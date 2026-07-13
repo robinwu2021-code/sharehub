@@ -14,6 +14,7 @@ import type {
   LoginResult,
   Notice,
   StoreDetail,
+  WalletTxn,
 } from "@/types";
 
 export interface PageQ {
@@ -23,6 +24,8 @@ export interface PageQ {
 }
 export type OrderQ = PageQ & { status?: string };
 export type NearbyQ = { lat?: number; lng?: number; keyword?: string; returnable?: boolean };
+// 资料可改字段（后端仅接受这几项，phone 走换绑单独流程）
+export type ProfilePatch = Partial<Pick<UserProfile, "nickname" | "avatar" | "email">>;
 
 // 登录换身份：因端而异的只有 grantType（App 手机 OTP/密码/Apple/Google，小程序微信）
 export type GrantType = "phone_otp" | "password" | "apple" | "google" | "wechat_miniapp";
@@ -78,12 +81,16 @@ export interface McpApi {
   register(p: RegisterParams): Promise<LoginResult>;
   resetPassword(p: ResetPwdParams): Promise<{ ok: true }>;
   getProfile(): Promise<UserProfile>;
+  updateProfile(p: ProfilePatch): Promise<UserProfile>;
   // 公告
   listNotices(): Promise<Notice[]>;
   // 找柜与地图
   nearbyCabinets(q?: NearbyQ): Promise<NearbyCabinet[]>;
   cabinetAvailability(cabinetNo: string): Promise<CabinetAvailability>;
   storeDetail(siteNo: string): Promise<StoreDetail>;
+  // 收藏门店
+  listFavorites(): Promise<NearbyCabinet[]>;
+  toggleFavorite(siteNo: string): Promise<{ favorite: boolean }>;
   // 借还
   rentOrder(p: RentParams): Promise<RentOrder>;
   getOrder(orderNo: string): Promise<RentOrder>;
@@ -97,6 +104,7 @@ export interface McpApi {
   report(p: ReportInput): Promise<ReportResult>;
   // 钱包 / 营销
   getWallet(): Promise<Wallet>;
+  walletTxns(q?: PageQ): Promise<PageResult<WalletTxn>>;
   listCoupons(): Promise<Coupon[]>;
   listMemberships(): Promise<Membership[]>;
 }

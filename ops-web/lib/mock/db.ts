@@ -1,7 +1,8 @@
 // 完整 mock 数据集（覆盖 docs/api 全部域）+ 通用查询/CRUD helper。
 // 仅 NEXT_PUBLIC_USE_MOCK=1 时经 lib/api/mock.ts 使用；切真实后端后不参与。
 import type {
-  Cabinet, Slot, RentOrder, WorkOrder, Tenant, Employee, DashboardStats,
+  Cabinet, Slot, RentOrder, WorkOrder, Tenant, Employee, DashboardStats, DashboardAlert,
+  UserRisk, UserBlacklist, AgentCommission, VenueOnboarding, SiteLifecycle,
   Location, Venue, Contract, ShareRule, Settlement, Withdrawal, Vendor,
   CUser, Coupon, RoleRow, AuditEntry, TenantConfig, PageResult, PageQuery,
   OrderStatus, WorkOrderStatus, WorkOrderType, Agent, PricePlan, LedgerEntry, Site,
@@ -194,11 +195,62 @@ export const pricePlans: PricePlan[] = [
 ];
 
 // —— 工作台 ——
+export const userRisks: UserRisk[] = [
+  { riskNo: "RK0001", userNo: "U-0012", nickname: "Ali Hassan", phone: "+971501230001", creditScore: 420, riskLevel: "HIGH", reason: "多次逾期未还", flaggedAt: "2026-07-10T09:00:00Z" },
+  { riskNo: "RK0002", userNo: "U-0034", nickname: "Sara Al", phone: "+971501230002", creditScore: 550, riskLevel: "MEDIUM", reason: "异常订单", flaggedAt: "2026-07-08T14:00:00Z" },
+  { riskNo: "RK0003", userNo: "U-0056", nickname: "Omar K", phone: "+971501230003", creditScore: 390, riskLevel: "HIGH", reason: "疑似欺诈", flaggedAt: "2026-07-05T10:00:00Z" },
+  { riskNo: "RK0004", userNo: "U-0078", nickname: "Fatima N", phone: "+971501230004", creditScore: 580, riskLevel: "MEDIUM", reason: "信用不足", flaggedAt: "2026-07-03T08:00:00Z" },
+];
+
+export const userBlacklist: UserBlacklist[] = [
+  { blacklistNo: "BL0001", userNo: "U-0090", nickname: "Test Bot", phone: "+971501230099", reason: "恶意刷单", blacklistedAt: "2026-07-01T12:00:00Z", releasedAt: null, status: "ACTIVE" },
+  { blacklistNo: "BL0002", userNo: "U-0091", nickname: "Spam User", phone: "+971501230098", reason: "骚扰客服", blacklistedAt: "2026-06-20T10:00:00Z", releasedAt: null, status: "ACTIVE" },
+  { blacklistNo: "BL0003", userNo: "U-0092", nickname: "Old Block", phone: "+971501230097", reason: "历史黑名单", blacklistedAt: "2026-05-15T09:00:00Z", releasedAt: "2026-07-01T00:00:00Z", status: "RELEASED" },
+];
+
+export const agentCommissions: AgentCommission[] = [
+  { ruleNo: "AC0001", agentNo: "AGT001", agentName: "Dubai South Agency", dimension: "GMV", rate: 0.12, mode: "CHANNEL_SPLIT", effectiveAt: "2026-01-01", status: "ACTIVE" },
+  { ruleNo: "AC0002", agentNo: "AGT002", agentName: "Abu Dhabi Partners", dimension: "GMV", rate: 0.10, mode: "LEDGER", effectiveAt: "2026-01-01", status: "ACTIVE" },
+  { ruleNo: "AC0003", agentNo: "AGT003", agentName: "Sharjah Ops", dimension: "ORDER_COUNT", rate: 0.08, mode: "LEDGER", effectiveAt: "2026-03-01", status: "INACTIVE" },
+];
+
+export const venueOnboardings: VenueOnboarding[] = [
+  { onboardingNo: "OB0001", venueName: "Al Barsha Mall", contact: "Ahmed +971501110001", industry: "购物中心", requestedAt: "2026-07-10T10:00:00Z", status: "PENDING", reviewAt: null, reviewNote: null },
+  { onboardingNo: "OB0002", venueName: "Dragon Mart 2", contact: "Lin +971501110002", industry: "商贸城", requestedAt: "2026-07-08T09:00:00Z", status: "APPROVED", reviewAt: "2026-07-09T14:00:00Z", reviewNote: "资料齐全，已通过" },
+  { onboardingNo: "OB0003", venueName: "Dune Hotel", contact: "Sara +971501110003", industry: "酒店", requestedAt: "2026-07-05T11:00:00Z", status: "REJECTED", reviewAt: "2026-07-06T10:00:00Z", reviewNote: "流量不足，建议重新评估" },
+  { onboardingNo: "OB0004", venueName: "City Walk Shops", contact: "Omar +971501110004", industry: "零售街区", requestedAt: "2026-07-12T08:00:00Z", status: "PENDING", reviewAt: null, reviewNote: null },
+];
+
+export const siteLifecycles: SiteLifecycle[] = [
+  { siteNo: "SITE001", siteName: "Dubai Mall L1", stage: "ACTIVE", stageAt: "2026-01-10", owner: "Ali Hassan", currency: "AED", gmvLtm: 28400 },
+  { siteNo: "SITE002", siteName: "Dubai Mall B2", stage: "LIVE", stageAt: "2026-06-01", owner: "Ali Hassan", currency: "AED", gmvLtm: 3200 },
+  { siteNo: "SITE003", siteName: "DIFC Gate", stage: "SIGNED", stageAt: "2026-07-01", owner: "Sara Ops", currency: "AED", gmvLtm: 0 },
+  { siteNo: "SITE004", siteName: "Karama Center", stage: "CHURNED", stageAt: "2026-05-15", owner: "BD Team", currency: "AED", gmvLtm: 410 },
+  { siteNo: "SITE005", siteName: "Deira City Centre", stage: "PROSPECTING", stageAt: "2026-07-10", owner: "BD Team", currency: "AED", gmvLtm: 0 },
+];
+
+const dashboardAlerts: DashboardAlert[] = [
+  { id: "ALT001", type: "OFFLINE", cabinetNo: "CAB1003", message: "CAB1003 离线超过 10 分钟", href: "/devices?q=CAB1003" },
+  { id: "ALT002", type: "EXCEPTION", cabinetNo: "CAB1007", message: "CAB1007 出现弹仓失败订单", href: "/orders?tab=exceptions" },
+  { id: "ALT003", type: "TIMEOUT", cabinetNo: "CAB1011", message: "CAB1011 工单超过 SLA 时限", href: "/work-orders" },
+];
+
 export const dashboard: DashboardStats = {
-  gmvToday: 4820, ordersToday: 386, activeCabinets: cabinets.filter((c) => c.onlineStatus === "ONLINE").length,
+  gmvToday: 4820, ordersToday: 386,
+  activeCabinets: cabinets.filter((c) => c.onlineStatus === "ONLINE").length,
   onlineRate: cabinets.filter((c) => c.onlineStatus === "ONLINE").length / cabinets.length,
-  openWorkOrders: workOrders.filter((w) => w.status !== "CLOSED" && w.status !== "DONE").length, currency: "AED",
+  openWorkOrders: workOrders.filter((w) => w.status !== "CLOSED" && w.status !== "DONE").length,
+  currency: "AED",
   trend: Array.from({ length: 7 }, (_, i) => ({ day: `D-${6 - i}`, gmv: 3000 + ((i * 613) % 2500), orders: 250 + ((i * 71) % 200) })),
+  todos: { pendingWorkOrders: workOrders.filter((w) => w.status === "CREATED").length, pendingRefunds: 3, pendingWithdrawals: 2 },
+  alerts: dashboardAlerts,
+  rankings: [
+    { rank: 1, siteName: "Dubai Mall L1", gmv: 4820, orderCount: 386, currency: "AED" },
+    { rank: 2, siteName: "MOE Floor 2", gmv: 3150, orderCount: 252, currency: "AED" },
+    { rank: 3, siteName: "DIFC Gate", gmv: 2840, orderCount: 231, currency: "AED" },
+    { rank: 4, siteName: "Karama Center", gmv: 1920, orderCount: 154, currency: "AED" },
+    { rank: 5, siteName: "Global Village E5", gmv: 1540, orderCount: 127, currency: "AED" },
+  ],
 };
 
 // —— 通用 helper ——
@@ -608,6 +660,13 @@ export const listOpenApiApps = (q: PageQuery = {}) => paginate(openApiApps, q.pa
 export const listDepositRecords = (q: PageQuery = {}) => paginate(depositRecords, q.page, q.size, (x) => kwHit(q.keyword, x.depositNo, x.orderNo, x.userNo));
 export const listMarketCountries = (q: PageQuery = {}) => paginate(marketCountries, q.page, q.size, (x) => kwHit(q.keyword, x.countryCode, x.name, x.currency));
 export const listConsumerSegments = (q: PageQuery = {}) => paginate(consumerSegments, q.page, q.size, (x) => kwHit(q.keyword, x.segmentNo, x.segment));
+export const listUserRisks = (q: PageQuery = {}) => paginate(userRisks, q.page, q.size, (x) => kwHit(q.keyword, x.riskNo, x.userNo, x.nickname, x.phone));
+export const listUserBlacklist = (q: PageQuery = {}) => paginate(userBlacklist, q.page, q.size, (x) => kwHit(q.keyword, x.blacklistNo, x.userNo, x.nickname));
+export const listAgentCommissions = (q: PageQuery = {}) => paginate(agentCommissions, q.page, q.size, (x) => kwHit(q.keyword, x.ruleNo, x.agentNo, x.agentName));
+export const listVenueOnboardings = (q: PageQuery = {}) => paginate(venueOnboardings, q.page, q.size, (x) => kwHit(q.keyword, x.onboardingNo, x.venueName, x.contact));
+export const listSiteLifecycles = (q: PageQuery = {}) => paginate(siteLifecycles, q.page, q.size, (x) => kwHit(q.keyword, x.siteNo, x.siteName, x.owner));
+export const saveAgentCommission = (x: Partial<AgentCommission>) => upsert(agentCommissions, x, "ruleNo", () => nextNo("AC", agentCommissions));
+export const saveVenueOnboarding = (x: Partial<VenueOnboarding>) => upsert(venueOnboardings, x, "onboardingNo", () => nextNo("OB", venueOnboardings));
 
 // ============================================================================
 // mock save 函数（新增/编辑：复用 upsert + nextNo，前缀与各域现有编号一致）

@@ -8,8 +8,8 @@ import UnoCSS from "unocss/vite";
 const uni = ((uniModule as any).default ?? uniModule) as () => any;
 
 // uni 插件在前，UnoCSS 在后（uni-app 官方推荐顺序）。
-// 固定 5174，避开并发会话在 5173 的 dev server。
+// 默认 5174（避开并发会话在 5173 的 dev server）；PORT 环境变量可覆盖，供其它会话并发起服务。
 export default defineConfig({
-  server: { port: 5174, strictPort: false },
+  server: { port: Number(process.env.PORT) || 5174, strictPort: false },
   plugins: [uni(), UnoCSS()],
 });

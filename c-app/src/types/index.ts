@@ -84,6 +84,7 @@ export interface UserProfile {
   nickname: string;
   avatar?: string;
   phone?: string;
+  email?: string;
   creditScore: number;
   freeDeposit: boolean; // 是否已开通免押
   memberLevel?: string;
@@ -95,6 +96,16 @@ export interface Wallet {
   deposit: number; // 押金
   frozen: number; // 免押冻结
   currency: string;
+}
+
+// 钱包流水（充值/消费/退款/赠金）
+export interface WalletTxn {
+  txnNo: string;
+  type: "RECHARGE" | "SPEND" | "REFUND" | "BONUS";
+  title: string;
+  amount: number; // 正=入账，负=出账
+  currency: string;
+  at: string;
 }
 
 export interface Coupon {

@@ -12,6 +12,7 @@ import type {
   ReportDevice, ReportLocation, ReportFinance, ReportScreen, ReportCustom,
   NotifyTemplate, DictEntry, Region, SysParam, OpenApiApp,
   DepositRecord, MarketCountry, ConsumerSegment,
+  UserRisk, UserBlacklist, AgentCommission, VenueOnboarding, SiteLifecycle,
 } from "../types";
 
 export interface PageQ { page?: number; size?: number; keyword?: string; [k: string]: unknown; }
@@ -124,6 +125,16 @@ export interface Api {
   listDepositRecords(q?: PageQ): Promise<PageResult<DepositRecord>>;
   listMarketCountries(q?: PageQ): Promise<PageResult<MarketCountry>>;
   listConsumerSegments(q?: PageQ): Promise<PageResult<ConsumerSegment>>;
+  // === 用户风控 ===
+  listUserRisks(q?: PageQ): Promise<PageResult<UserRisk>>;
+  listUserBlacklist(q?: PageQ): Promise<PageResult<UserBlacklist>>;
+  // === 代理分润 ===
+  listAgentCommissions(q?: PageQ): Promise<PageResult<AgentCommission>>;
+  saveAgentCommission(x: Partial<AgentCommission> & { ruleNo?: string }): Promise<AgentCommission>;
+  // === 门店 Onboarding / 生命周期 ===
+  listVenueOnboardings(q?: PageQ): Promise<PageResult<VenueOnboarding>>;
+  saveVenueOnboarding(x: Partial<VenueOnboarding> & { onboardingNo?: string }): Promise<VenueOnboarding>;
+  listSiteLifecycles(q?: PageQ): Promise<PageResult<SiteLifecycle>>;
 
   // === 扩展实体 save（照 saveCoupon 写法）===
   savePowerbank(x: Partial<Powerbank> & { powerbankNo?: string }): Promise<Powerbank>;

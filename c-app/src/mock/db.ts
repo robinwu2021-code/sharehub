@@ -9,6 +9,7 @@ import type {
   Membership,
   Notice,
   StoreDetail,
+  WalletTxn,
 } from "@/types";
 import { CURRENCY, MOCK_DELAY_MS } from "@/shared/constants";
 
@@ -101,12 +102,25 @@ export const profile: UserProfile = {
   cUserNo: "CU-0001",
   nickname: "Ahmed",
   phone: "+971 50 *** 1234",
+  email: "ahmed@example.com",
   creditScore: 720,
   freeDeposit: true,
   memberLevel: "Plus",
 };
 
 export const wallet: Wallet = { balance: 24, bonus: 10, deposit: 0, frozen: 100, currency: CURRENCY };
+
+// 收藏门店（siteNo 集合，可变）
+export const favorites = new Set<string>(["ST-DXBM"]);
+
+export const walletTxns: WalletTxn[] = [
+  { txnNo: "TX-06", type: "SPEND", title: "The Dubai Mall · rental", amount: -6, currency: CURRENCY, at: "2026-07-12T11:00:00Z" },
+  { txnNo: "TX-05", type: "BONUS", title: "Membership bonus", amount: 10, currency: CURRENCY, at: "2026-07-10T08:00:00Z" },
+  { txnNo: "TX-04", type: "RECHARGE", title: "Top-up", amount: 20, currency: CURRENCY, at: "2026-07-09T19:20:00Z" },
+  { txnNo: "TX-03", type: "REFUND", title: "JBR The Walk · refund", amount: 4, currency: CURRENCY, at: "2026-07-06T14:05:00Z" },
+  { txnNo: "TX-02", type: "SPEND", title: "Mall of the Emirates · rental", amount: -8, currency: CURRENCY, at: "2026-07-04T17:40:00Z" },
+  { txnNo: "TX-01", type: "RECHARGE", title: "Top-up", amount: 10, currency: CURRENCY, at: "2026-07-01T09:00:00Z" },
+];
 
 export const coupons: Coupon[] = [
   { couponNo: "CP-01", title: "New user AED 5 off", amount: 5, threshold: 0, status: "UNUSED", expireAt: "2026-08-01" },
@@ -138,7 +152,7 @@ export function storeOf(siteNo: string): StoreDetail {
     availableReturn: c.availableReturn,
     pricePerHour: c.pricePerHour,
     currency: c.currency,
-    favorite: false,
+    favorite: favorites.has(c.siteNo),
     cabinets: [
       { cabinetNo: c.cabinetNo, borrow: c.availableBorrow, return: c.availableReturn },
       { cabinetNo: c.cabinetNo.replace(/\d+$/, "") + "09", borrow: Math.max(0, c.availableBorrow - 2), return: c.availableReturn + 1 },

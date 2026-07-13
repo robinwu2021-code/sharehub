@@ -16,14 +16,25 @@ import { Button } from "@/components/ui/button";
 import { money } from "@/lib/utils";
 import { useCan } from "@/lib/use-can";
 import { notify } from "@/lib/notify";
-import type { Agent, AgentAssignment, AgentPerformance, AgentAccount } from "@/lib/types";
+import type { Agent, AgentAssignment, AgentPerformance, AgentAccount, AgentCommission } from "@/lib/types";
 
 const SIZE = 10;
 const TABS = [
   { key: "profiles", label: "代理商档案" },
+  { key: "commission", label: "分润配置" },
   { key: "assign", label: "设备/点位划拨" },
   { key: "performance", label: "代理绩效", phase: 2 as const },
   { key: "accounts", label: "代理账号" },
+];
+const COMMISSION_FIELDS: import("@/components/ui/form-drawer").FieldDef[] = [
+  { key: "ruleNo", label: "规则号", readOnlyOnEdit: true, placeholder: "留空自动生成" },
+  { key: "agentNo", label: "代理编号", placeholder: "AGT001" },
+  { key: "agentName", label: "代理名称" },
+  { key: "dimension", label: "维度", type: "select", options: [{ value: "GMV", label: "GMV" }, { value: "ORDER_COUNT", label: "订单量" }] },
+  { key: "rate", label: "分润比例（0~1）", type: "number" },
+  { key: "mode", label: "结算模式", type: "select", options: [{ value: "CHANNEL_SPLIT", label: "渠道分成" }, { value: "LEDGER", label: "账务分录" }] },
+  { key: "effectiveAt", label: "生效日期", placeholder: "2026-01-01" },
+  { key: "status", label: "状态", type: "select", options: [{ value: "ACTIVE", label: "启用" }, { value: "INACTIVE", label: "停用" }] },
 ];
 const ACCOUNT_FIELDS: FieldDef[] = [
   { key: "accountNo", label: "账号编号", readOnlyOnEdit: true, placeholder: "留空自动生成" },
@@ -43,6 +54,7 @@ function AgentsInner() {
   const [edit, setEdit] = useState<Agent | null>(null);
   const [form, setForm] = useState<Partial<Agent>>({});
   const [accountForm, setAccountForm] = useState<Partial<AgentAccount> | null>(null);
+  const [commissionForm, setCommissionForm] = useState<Partial<AgentCommission> | null>(null);
   const qc = useQueryClient();
   const allow = useCan();
   useEffect(() => { if (qTab && TABS.some((t) => t.key === qTab)) { setTab(qTab); setPage(1); } }, [qTab]);
@@ -71,6 +83,12 @@ function AgentsInner() {
     placeholderData: keepPreviousData,
     enabled: tab === "accounts",
   });
+  const commissions = useQuery({
+    queryKey: ["agent-commissions", page, keyword],
+    queryFn: () => api.listAgentCommissions({ page, size: SIZE, keyword }),
+    placeholderData: keepPreviousData,
+    enabled: tab === "commission",
+  });
 
   const canEditAccount = allow("agent:agent:update");
   const save = useMutation({
@@ -80,6 +98,10 @@ function AgentsInner() {
   const saveAccount = useMutation({
     mutationFn: (a: Partial<AgentAccount>) => api.saveAgentAccount(a),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["agent-accounts"] }); notify.success("保存成功"); setAccountForm(null); },
+  });
+  const saveCommission = useMutation({
+    mutationFn: (c: Partial<AgentCommission>) => api.saveAgentCommission(c),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["agent-commissions"] }); notify.success("保存成功"); setCommissionForm(null); },
   });
 
   function open(a: Agent) { setEdit(a); setForm(a); }
@@ -123,8 +145,21 @@ function AgentsInner() {
     { header: "操作", cell: (a) => canEditAccount ? <Button size="sm" variant="outline" onClick={() => setAccountForm(a)}>编辑</Button> : <span className="text-muted-foreground">-</span> },
   ];
 
+  const commissionCols: Column<AgentCommission>[] = [
+    { header: "规则号", cell: (c) => <span className="font-medium">{c.ruleNo}</span> },
+    { header: "代理编号", cell: (c) => <span className="text-muted-foreground">{c.agentNo}</span> },
+    { header: "代理名称", cell: (c) => c.agentName },
+    { header: "维度", cell: (c) => <Badge tone="outline">{c.dimension === "GMV" ? "GMV" : "订单量"}</Badge> },
+    { header: "分润比例", cell: (c) => `${(c.rate * 100).toFixed(0)}%` },
+    { header: "结算模式", cell: (c) => c.mode === "CHANNEL_SPLIT" ? "渠道分成" : "账务分录" },
+    { header: "生效日期", cell: (c) => <span className="text-muted-foreground">{c.effectiveAt}</span> },
+    { header: "状态", cell: (c) => c.status === "ACTIVE" ? <Badge tone="success">启用</Badge> : <Badge tone="muted">停用</Badge> },
+    { header: "操作", cell: (c) => allow("agent:settlement:read") ? <Button size="sm" variant="outline" onClick={() => setCommissionForm(c)}>编辑</Button> : <span className="text-muted-foreground">-</span> },
+  ];
+
   const total =
     tab === "profiles" ? profiles.data?.total
+    : tab === "commission" ? commissions.data?.total
     : tab === "assign" ? assign.data?.total
     : tab === "performance" ? performance.data?.total
     : accounts.data?.total;
@@ -137,6 +172,18 @@ function AgentsInner() {
         <>
           <div className="mb-4"><Input className="w-64" placeholder="搜索代理名称 / 编号 / 辖域" value={keyword} onChange={(e) => { setKeyword(e.target.value); setPage(1); }} /></div>
           <DataTable rowKey={(a: Agent) => a.agentNo} columns={profileCols} rows={profiles.data?.list} loading={profiles.isLoading} />
+        </>
+      )}
+      {tab === "commission" && (
+        <>
+          <Toolbar
+            search={keyword}
+            onSearch={(v) => { setKeyword(v); setPage(1); }}
+            searchPlaceholder="搜索规则号 / 代理编号 / 名称"
+            onAdd={allow("agent:settlement:read") ? () => setCommissionForm({ status: "ACTIVE", dimension: "GMV", mode: "CHANNEL_SPLIT", rate: 0.1 }) : undefined}
+            addLabel="新增分润规则"
+          />
+          <DataTable rowKey={(c: AgentCommission) => c.ruleNo} columns={commissionCols} rows={commissions.data?.list} loading={commissions.isLoading} />
         </>
       )}
       {tab === "assign" && (
@@ -197,6 +244,19 @@ function AgentsInner() {
         onChange={(v) => setAccountForm(v as Partial<AgentAccount>)}
         onSubmit={() => accountForm && saveAccount.mutate(accountForm)}
         submitting={saveAccount.isPending}
+      />
+
+      <FormDrawer
+        open={!!commissionForm}
+        onOpenChange={(o) => !o && setCommissionForm(null)}
+        titleNew="新增分润规则"
+        titleEdit={`编辑分润规则 ${commissionForm?.ruleNo ?? ""}`}
+        isEdit={!!commissionForm?.ruleNo}
+        fields={COMMISSION_FIELDS}
+        value={(commissionForm ?? {}) as Record<string, unknown>}
+        onChange={(v) => setCommissionForm(v as Partial<AgentCommission>)}
+        onSubmit={() => commissionForm && saveCommission.mutate(commissionForm)}
+        submitting={saveCommission.isPending}
       />
     </div>
   );

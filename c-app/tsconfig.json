@@ -17,7 +17,7 @@
       "@/*": ["./src/*"]
     },
     "lib": ["esnext", "dom"],
-    "types": ["@dcloudio/types"]
+    "types": ["@dcloudio/types", "google.maps"]
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue", "*.ts"]
 }

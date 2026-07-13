@@ -16,11 +16,13 @@ import { money, fmtTime } from "@/lib/utils";
 import { useCan } from "@/lib/use-can";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
-import type { CUser, Member, Wallet } from "@/lib/types";
+import type { CUser, Member, Wallet, UserRisk, UserBlacklist } from "@/lib/types";
 
 const SIZE = 10;
 const TABS = [
   { key: "list", label: "用户", phase: 2 as const },
+  { key: "risk", label: "风控用户", phase: 2 as const },
+  { key: "blacklist", label: "黑名单", phase: 2 as const },
   { key: "members", label: "会员/次卡", phase: 3 as const },
   { key: "wallets", label: "钱包", phase: 3 as const },
 ];
@@ -82,6 +84,18 @@ function UsersInner() {
     placeholderData: keepPreviousData,
     enabled: tab === "wallets",
   });
+  const risks = useQuery({
+    queryKey: ["user-risks", page, keyword],
+    queryFn: () => api.listUserRisks({ page, size: SIZE, keyword }),
+    placeholderData: keepPreviousData,
+    enabled: tab === "risk",
+  });
+  const blacklisted = useQuery({
+    queryKey: ["user-blacklist", page, keyword],
+    queryFn: () => api.listUserBlacklist({ page, size: SIZE, keyword }),
+    placeholderData: keepPreviousData,
+    enabled: tab === "blacklist",
+  });
 
   const bl = useMutation({
     mutationFn: (v: { no: string; blacklisted: boolean }) => api.setBlacklist(v.no, v.blacklisted),
@@ -131,6 +145,36 @@ function UsersInner() {
     { header: t("common.actions"), cell: (m) => canEditMember ? <Button size="sm" variant="outline" onClick={() => setMemberForm(m)}>{t("common.edit")}</Button> : <span className="text-muted-foreground">-</span> },
   ];
 
+  const RISK_LEVEL: Record<UserRisk["riskLevel"], { label: string; tone: "danger" | "warning" | "muted" }> = {
+    HIGH: { label: "高危", tone: "danger" },
+    MEDIUM: { label: "中等", tone: "warning" },
+    LOW: { label: "低风险", tone: "muted" },
+  };
+  const riskCols: Column<UserRisk>[] = [
+    { header: "风控号", cell: (r) => <span className="font-medium">{r.riskNo}</span> },
+    { header: "用户号", cell: (r) => r.userNo },
+    { header: "昵称", cell: (r) => r.nickname },
+    { header: "手机", cell: (r) => <span className="text-muted-foreground">{r.phone}</span> },
+    { header: "信用分", cell: (r) => <span className="tabular-nums">{r.creditScore}</span> },
+    { header: "风险等级", cell: (r) => <Badge tone={RISK_LEVEL[r.riskLevel].tone}>{RISK_LEVEL[r.riskLevel].label}</Badge> },
+    { header: "原因", cell: (r) => <span className="text-muted-foreground">{r.reason}</span> },
+    { header: "标记时间", cell: (r) => <span className="text-muted-foreground">{fmtTime(r.flaggedAt)}</span> },
+  ];
+  const blacklistCols: Column<UserBlacklist>[] = [
+    { header: "黑名单号", cell: (b) => <span className="font-medium">{b.blacklistNo}</span> },
+    { header: "用户号", cell: (b) => b.userNo },
+    { header: "昵称", cell: (b) => b.nickname },
+    { header: "手机", cell: (b) => <span className="text-muted-foreground">{b.phone}</span> },
+    { header: "原因", cell: (b) => b.reason },
+    { header: "拉黑时间", cell: (b) => <span className="text-muted-foreground">{fmtTime(b.blacklistedAt)}</span> },
+    { header: "状态", cell: (b) => b.status === "ACTIVE" ? <Badge tone="danger">拉黑中</Badge> : <Badge tone="muted">已解除</Badge> },
+    {
+      header: "操作",
+      cell: (b) => allow("user:risk:update") && b.status === "ACTIVE"
+        ? <Button size="sm" variant="outline" disabled={bl.isPending} onClick={() => bl.mutate({ no: b.userNo, blacklisted: false })}>解除</Button>
+        : <span className="text-muted-foreground">-</span>,
+    },
+  ];
   const walletCols: Column<Wallet>[] = [
     { header: "用户号", cell: (w) => <span className="font-medium">{w.userNo}</span> },
     { header: "昵称", cell: (w) => w.nickname },
@@ -141,7 +185,7 @@ function UsersInner() {
     { header: t("common.actions"), cell: (w) => canEditWallet ? <Button size="sm" variant="outline" onClick={() => setWalletForm(w)}>调整余额</Button> : <span className="text-muted-foreground">-</span> },
   ];
 
-  const active = tab === "list" ? users : tab === "members" ? members : wallets;
+  const active = tab === "list" ? users : tab === "members" ? members : tab === "wallets" ? wallets : tab === "risk" ? risks : blacklisted;
 
   return (
     <div>
@@ -162,6 +206,18 @@ function UsersInner() {
             addLabel="新增会员"
           />
           <DataTable rowKey={(m: Member) => m.userNo} columns={memberCols} rows={members.data?.list} loading={members.isLoading} />
+        </>
+      )}
+      {tab === "risk" && (
+        <>
+          <div className="mb-4"><Input className="w-64" placeholder="搜索用户号 / 昵称 / 手机" value={keyword} onChange={(e) => { setKeyword(e.target.value); setPage(1); }} /></div>
+          <DataTable rowKey={(r: UserRisk) => r.riskNo} columns={riskCols} rows={risks.data?.list} loading={risks.isLoading} />
+        </>
+      )}
+      {tab === "blacklist" && (
+        <>
+          <div className="mb-4"><Input className="w-64" placeholder="搜索用户号 / 昵称" value={keyword} onChange={(e) => { setKeyword(e.target.value); setPage(1); }} /></div>
+          <DataTable rowKey={(b: UserBlacklist) => b.blacklistNo} columns={blacklistCols} rows={blacklisted.data?.list} loading={blacklisted.isLoading} />
         </>
       )}
       {tab === "wallets" && (

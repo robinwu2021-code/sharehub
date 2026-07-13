@@ -43,7 +43,7 @@ function logout() {
 
       <!-- 资料 / 游客 -->
       <view class="mt-[24rpx]">
-        <pb-card v-if="isLoggedIn && profile">
+        <pb-card v-if="isLoggedIn && profile" @tap="go('/pages/me/profile')">
           <view class="flex items-center gap-[24rpx]">
             <pb-avatar :size="112" />
             <view class="flex-1">
@@ -51,6 +51,7 @@ function logout() {
               <view class="mt-[6rpx] text-[24rpx] text-sub">{{ profile.phone }}</view>
             </view>
             <pb-tag v-if="profile.freeDeposit" type="success">{{ $t("me.freeDeposit") }}</pb-tag>
+            <pb-icon name="chevron" :size="30" class="text-sub" />
           </view>
         </pb-card>
         <pb-card v-else>
@@ -63,7 +64,7 @@ function logout() {
 
       <!-- 钱包 / 信用 -->
       <view v-if="isLoggedIn && wallet" class="mt-[20rpx]">
-        <pb-card>
+        <pb-card @tap="go('/pages/wallet/index')">
           <view class="flex">
             <pb-stat :label="$t('me.wallet')"><pb-amount :value="wallet.balance" size="md" /></pb-stat>
             <pb-stat :label="$t('me.freeDeposit')"><pb-amount :value="wallet.frozen" size="md" /></pb-stat>
@@ -78,6 +79,8 @@ function logout() {
       <view class="mt-[20rpx]">
         <pb-card :pad="false">
           <view class="px-[28rpx]">
+            <pb-cell icon="wallet" :title="$t('me.wallet')" is-link @click="go('/pages/wallet/index')" />
+            <pb-cell icon="heart" :title="$t('me.favorites')" is-link @click="go('/pages/me/favorites')" />
             <pb-cell icon="ticket" :title="$t('me.coupons')" is-link @click="go('/pages/coupons/index')" />
             <pb-cell icon="card" :title="$t('me.membership')" is-link @click="go('/pages/membership/index')" />
             <pb-cell icon="sparkles" :title="$t('theme.title')" is-link @click="sheet = true" />

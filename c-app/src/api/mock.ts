@@ -10,8 +10,19 @@ export const mockApi: McpApi = {
   register: (p) => db.delay({ token: "mock-c-register", cUserNo: "CU-0001", nickname: p.nickname, isNew: true }, 500),
   resetPassword: () => db.delay({ ok: true as const }, 400),
   getProfile: () => db.delay(db.profile),
+  updateProfile: (p) => {
+    Object.assign(db.profile, p);
+    return db.delay(db.profile, 400);
+  },
   listNotices: () => db.delay(db.notices),
   storeDetail: (siteNo: string) => db.delay(db.storeOf(siteNo)),
+
+  listFavorites: () => db.delay(db.cabinets.filter((c) => db.favorites.has(c.siteNo))),
+  toggleFavorite: (siteNo: string) => {
+    if (db.favorites.has(siteNo)) db.favorites.delete(siteNo);
+    else db.favorites.add(siteNo);
+    return db.delay({ favorite: db.favorites.has(siteNo) }, 300);
+  },
   ongoingOrder: () => db.delay(db.orders.find((o) => o.status === "IN_USE" || o.status === "DISPENSING") ?? null),
   buyout: (orderNo: string) => {
     const o = db.orders.find((x) => x.orderNo === orderNo);
@@ -71,6 +82,7 @@ export const mockApi: McpApi = {
   report: (_p) => db.delay({ reportNo: `RP${Math.floor(performance.now())}`, woNo: `WO${Math.floor(performance.now())}`, status: "OPEN" }, 400),
 
   getWallet: () => db.delay(db.wallet),
+  walletTxns: (q = {}) => db.delay(db.paginate(db.walletTxns, q.page, q.size)),
   listCoupons: () => db.delay(db.coupons),
   listMemberships: () => db.delay(db.memberships),
 };

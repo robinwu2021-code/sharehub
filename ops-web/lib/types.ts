@@ -112,6 +112,20 @@ export interface Employee {
 }
 
 // —— 工作台 ——
+export interface DashboardAlert {
+  id: string;
+  type: "OFFLINE" | "EXCEPTION" | "TIMEOUT";
+  cabinetNo: string;
+  message: string;
+  href: string;
+}
+export interface DashboardRankItem {
+  rank: number;
+  siteName: string;
+  gmv: number;
+  orderCount: number;
+  currency: string;
+}
 export interface DashboardStats {
   gmvToday: number;
   ordersToday: number;
@@ -120,6 +134,9 @@ export interface DashboardStats {
   openWorkOrders: number;
   currency: string;
   trend: { day: string; gmv: number; orders: number }[];
+  todos: { pendingWorkOrders: number; pendingRefunds: number; pendingWithdrawals: number };
+  alerts: DashboardAlert[];
+  rankings: DashboardRankItem[];
 }
 
 // —— 场所：场地方 → 站点 → 点位（ADR-013 两层）——
@@ -648,6 +665,63 @@ export interface OpenApiApp {
   rateLimit: number;
   status: "ACTIVE" | "DISABLED";
   createdAt: string;
+}
+
+// —— 用户风控与黑名单（用户域 · P2）——
+export interface UserRisk {
+  riskNo: string;
+  userNo: string;
+  nickname: string;
+  phone: string;
+  creditScore: number;
+  riskLevel: "HIGH" | "MEDIUM" | "LOW";
+  reason: string;
+  flaggedAt: string;
+}
+export interface UserBlacklist {
+  blacklistNo: string;
+  userNo: string;
+  nickname: string;
+  phone: string;
+  reason: string;
+  blacklistedAt: string;
+  releasedAt: string | null;
+  status: "ACTIVE" | "RELEASED";
+}
+
+// —— 代理商分润配置（代理域 · P1）——
+export interface AgentCommission {
+  ruleNo: string;
+  agentNo: string;
+  agentName: string;
+  dimension: "GMV" | "ORDER_COUNT";
+  rate: number; // 0~1
+  mode: "CHANNEL_SPLIT" | "LEDGER";
+  effectiveAt: string;
+  status: "ACTIVE" | "INACTIVE";
+}
+
+// —— 门店自助 Onboarding（场地域 · P2）——
+export interface VenueOnboarding {
+  onboardingNo: string;
+  venueName: string;
+  contact: string;
+  industry: string;
+  requestedAt: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  reviewAt: string | null;
+  reviewNote: string | null;
+}
+
+// —— 站点生命周期管理（场地域 · P3）——
+export interface SiteLifecycle {
+  siteNo: string;
+  siteName: string;
+  stage: "PROSPECTING" | "SIGNED" | "LIVE" | "ACTIVE" | "CHURNED" | "CLOSED";
+  stageAt: string;
+  owner: string;
+  currency: string;
+  gmvLtm: number; // 近 12 月 GMV
 }
 
 // —— PDF 对照新增（分期屏蔽 P2/P3）——

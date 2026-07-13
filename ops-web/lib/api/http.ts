@@ -103,6 +103,16 @@ export const httpApi: Api = {
   listDepositRecords: (q?: PageQ) => client.get("/api/order/deposits", q),
   listMarketCountries: (q?: PageQ) => client.get("/api/platform/markets", q),
   listConsumerSegments: (q?: PageQ) => client.get("/api/report/consumer-segments", q),
+  // 用户风控
+  listUserRisks: (q?: PageQ) => client.get("/api/user/risk-users", q),
+  listUserBlacklist: (q?: PageQ) => client.get("/api/user/blacklist", q),
+  // 代理分润
+  listAgentCommissions: (q?: PageQ) => client.get("/api/agent/commissions", q),
+  saveAgentCommission: (x) => client.post(x.ruleNo ? `/api/agent/commissions/${x.ruleNo}` : "/api/agent/commissions", x),
+  // 门店 Onboarding / 生命周期
+  listVenueOnboardings: (q?: PageQ) => client.get("/api/ops/venue-onboardings", q),
+  saveVenueOnboarding: (x) => client.post(x.onboardingNo ? `/api/ops/venue-onboardings/${x.onboardingNo}` : "/api/ops/venue-onboardings", x),
+  listSiteLifecycles: (q?: PageQ) => client.get("/api/ops/site-lifecycles", q),
 
   // 扩展实体 save（URL 对齐各自 list 端点）
   savePowerbank: (x) => client.post(x.powerbankNo ? `/api/ops/powerbanks/${x.powerbankNo}` : "/api/ops/powerbanks", x),

@@ -32,6 +32,10 @@ export const useUserStore = defineStore("user", {
       uni.setStorageSync(STORAGE.user, p);
       return p;
     },
+    setProfile(p: UserProfile) {
+      this.profile = p;
+      uni.setStorageSync(STORAGE.user, p);
+    },
     logout() {
       this.token = "";
       this.profile = null;

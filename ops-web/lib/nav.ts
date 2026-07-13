@@ -98,14 +98,17 @@ export const NAV: NavDomain[] = [
           { href: "/locations?tab=points", label: "点位管理", perm: "location:poi:read" },
           { href: "/locations?tab=venues", label: "场地方", perm: "location:venue:read" },
           { href: "/locations?tab=contracts", label: "进场合同", perm: "location:contract:read", phase: 2 },
+          { href: "/locations?tab=onboarding", label: "门店 Onboarding", perm: "location:venue:read", phase: 2 },
           { href: "/locations?tab=crm", label: "BD 拓展 CRM", phase: 3 },
           { href: "/locations?tab=analysis", label: "站点坪效", perm: "location:analysis:read", phase: 3 },
+          { href: "/locations?tab=lifecycle", label: "门店生命周期", perm: "location:venue:read", phase: 3 },
         ],
       },
       {
         key: "agent", label: "代理商管理", icon: "Handshake", module: "agent", href: "/agents",
         children: [
           { href: "/agents", label: "代理商档案", perm: "agent:agent:read" },
+          { href: "/agents?tab=commission", label: "分润配置", perm: "agent:settlement:read" },
           { href: "/agents?tab=assign", label: "设备/点位划拨", perm: "agent:scope:assign" },
           // 跨域深链（D3）：复用财务结算单，面包屑按 URL 归属交易与资金
           { href: "/finance?tab=settlements", label: "代理收益结算", perm: "agent:settlement:read" },
@@ -159,6 +162,8 @@ export const NAV: NavDomain[] = [
         key: "user", label: "用户管理", icon: "UserCircle", module: "user", href: "/users",
         children: [
           { href: "/users", label: "用户列表", perm: "user:cuser:read", phase: 2 },
+          { href: "/users?tab=risk", label: "风控用户", perm: "user:risk:read", phase: 2 },
+          { href: "/users?tab=blacklist", label: "黑名单", perm: "user:risk:update", phase: 2 },
           { href: "/users?tab=members", label: "会员/次卡", perm: "user:member:read", phase: 3 },
           { href: "/users?tab=wallets", label: "钱包", perm: "user:wallet:read", phase: 3 },
         ],

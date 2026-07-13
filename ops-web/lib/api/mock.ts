@@ -146,6 +146,16 @@ export const mockApi: Api = {
   listDepositRecords: (q: PageQ = {}) => wait(db.listDepositRecords(q)),
   listMarketCountries: (q: PageQ = {}) => wait(db.listMarketCountries(q)),
   listConsumerSegments: (q: PageQ = {}) => wait(db.listConsumerSegments(q)),
+  // 用户风控
+  listUserRisks: (q: PageQ = {}) => wait(db.listUserRisks(q)),
+  listUserBlacklist: (q: PageQ = {}) => wait(db.listUserBlacklist(q)),
+  // 代理分润
+  listAgentCommissions: (q: PageQ = {}) => wait(db.listAgentCommissions(q)),
+  saveAgentCommission: (x) => wait(db.saveAgentCommission(x), 350),
+  // 门店 Onboarding / 生命周期
+  listVenueOnboardings: (q: PageQ = {}) => wait(db.listVenueOnboardings(q)),
+  saveVenueOnboarding: (x) => wait(db.saveVenueOnboarding(x), 350),
+  listSiteLifecycles: (q: PageQ = {}) => wait(db.listSiteLifecycles(q)),
 
   // 扩展实体 save
   savePowerbank: (x) => wait(db.savePowerbank(x), 350),

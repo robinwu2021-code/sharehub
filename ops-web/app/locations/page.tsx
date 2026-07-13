@@ -16,13 +16,15 @@ import { Button } from "@/components/ui/button";
 import { money, fmtTime } from "@/lib/utils";
 import { useCan } from "@/lib/use-can";
 import { notify } from "@/lib/notify";
-import type { Site, Location, Venue, Contract, Lead, SiteAnalysis, PageResult } from "@/lib/types";
+import type { Site, Location, Venue, Contract, Lead, SiteAnalysis, VenueOnboarding, SiteLifecycle, PageResult } from "@/lib/types";
 
 const SIZE = 10;
 const TABS = [
   { key: "sites", label: "站点" }, { key: "points", label: "点位" },
   { key: "venues", label: "场地方" }, { key: "contracts", label: "合同", phase: 2 as const },
+  { key: "onboarding", label: "门店 Onboarding", phase: 2 as const },
   { key: "crm", label: "BD 拓展 CRM", phase: 3 as const }, { key: "analysis", label: "站点坪效", phase: 3 as const },
+  { key: "lifecycle", label: "门店生命周期", phase: 3 as const },
 ];
 const LEAD_STAGE: Record<Lead["stage"], { label: string; tone: "muted" | "outline" | "default" | "warning" | "success" | "danger" }> = {
   NEW: { label: "新线索", tone: "muted" },
@@ -64,6 +66,14 @@ const LEAD_FIELDS: FieldDef[] = [
   { key: "owner", label: "负责人", placeholder: "BD 姓名" },
   { key: "expectSites", label: "预计站点数", type: "number" },
 ];
+const ONBOARDING_FIELDS: FieldDef[] = [
+  { key: "onboardingNo", label: "申请号", readOnlyOnEdit: true, placeholder: "新增自动生成" },
+  { key: "venueName", label: "场地名称", placeholder: "Al Barsha Mall" },
+  { key: "contact", label: "联系人", placeholder: "姓名 + 电话" },
+  { key: "industry", label: "行业", placeholder: "购物中心" },
+  { key: "status", label: "审核状态", type: "select", options: [{ value: "PENDING", label: "待审核" }, { value: "APPROVED", label: "已通过" }, { value: "REJECTED", label: "已驳回" }] },
+  { key: "reviewNote", label: "审核备注", placeholder: "通过/驳回原因" },
+];
 
 function LocationsInner() {
   const qc = useQueryClient();
@@ -79,12 +89,13 @@ function LocationsInner() {
   const [venueForm, setVenueForm] = useState<Partial<Venue> | null>(null);
   const [contractForm, setContractForm] = useState<Partial<Contract> | null>(null);
   const [leadForm, setLeadForm] = useState<Partial<Lead> | null>(null);
+  const [onboardingForm, setOnboardingForm] = useState<Partial<VenueOnboarding> | null>(null);
 
   const canVenue = allow("location:venue:update");
   const canContract = allow("location:contract:update");
   const canLead = allow("location:lead:update");
 
-  const q = useQuery<PageResult<Site | Location | Venue | Contract | Lead | SiteAnalysis>>({
+  const q = useQuery<PageResult<Site | Location | Venue | Contract | Lead | SiteAnalysis | VenueOnboarding | SiteLifecycle>>({
     queryKey: ["place", tab, page, keyword],
     queryFn: () =>
       tab === "sites" ? api.listSites({ page, size: SIZE, keyword })
@@ -92,6 +103,8 @@ function LocationsInner() {
       : tab === "venues" ? api.listVenues({ page, size: SIZE, keyword })
       : tab === "crm" ? api.listLeads({ page, size: SIZE, keyword })
       : tab === "analysis" ? api.listSiteAnalysis({ page, size: SIZE, keyword })
+      : tab === "onboarding" ? api.listVenueOnboardings({ page, size: SIZE, keyword })
+      : tab === "lifecycle" ? api.listSiteLifecycles({ page, size: SIZE, keyword })
       : api.listContracts({ page, size: SIZE, keyword }),
     placeholderData: keepPreviousData,
   });
@@ -115,6 +128,10 @@ function LocationsInner() {
   const saveLead = useMutation({
     mutationFn: (l: Partial<Lead>) => api.saveLead(l),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["place", "crm"] }); notify.success("保存成功"); setLeadForm(null); },
+  });
+  const saveOnboarding = useMutation({
+    mutationFn: (o: Partial<VenueOnboarding>) => api.saveVenueOnboarding(o),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["place", "onboarding"] }); notify.success("保存成功"); setOnboardingForm(null); },
   });
 
   const siteCols: Column<Site>[] = [
@@ -173,6 +190,37 @@ function LocationsInner() {
     { header: "回本天数", cell: (a) => <span className="tabular-nums">{Math.round(a.paybackDays)}</span> },
     { header: "机柜数", cell: (a) => <span className="tabular-nums">{a.cabinetCount}</span> },
   ];
+  const OB_STATUS: Record<VenueOnboarding["status"], { label: string; tone: "warning" | "success" | "danger" }> = {
+    PENDING: { label: "待审核", tone: "warning" },
+    APPROVED: { label: "已通过", tone: "success" },
+    REJECTED: { label: "已驳回", tone: "danger" },
+  };
+  const onboardingCols: Column<VenueOnboarding>[] = [
+    { header: "申请号", cell: (o) => <span className="font-medium">{o.onboardingNo}</span> },
+    { header: "场地名称", cell: (o) => o.venueName },
+    { header: "联系人", cell: (o) => <span className="text-muted-foreground">{o.contact}</span> },
+    { header: "行业", cell: (o) => o.industry },
+    { header: "申请时间", cell: (o) => <span className="text-muted-foreground">{fmtTime(o.requestedAt)}</span> },
+    { header: "审核状态", cell: (o) => <Badge tone={OB_STATUS[o.status].tone}>{OB_STATUS[o.status].label}</Badge> },
+    { header: "备注", cell: (o) => <span className="text-muted-foreground">{o.reviewNote ?? "-"}</span> },
+    { header: "操作", cell: (o) => canVenue ? <Button size="sm" variant="outline" onClick={() => setOnboardingForm(o)}>审核</Button> : <span className="text-muted-foreground">-</span> },
+  ];
+  const LC_STAGE: Record<SiteLifecycle["stage"], { label: string; tone: "muted" | "outline" | "warning" | "success" | "danger" | "default" }> = {
+    PROSPECTING: { label: "潜在", tone: "muted" },
+    SIGNED: { label: "已签约", tone: "outline" },
+    LIVE: { label: "上线", tone: "warning" },
+    ACTIVE: { label: "运营中", tone: "success" },
+    CHURNED: { label: "流失", tone: "danger" },
+    CLOSED: { label: "关闭", tone: "muted" },
+  };
+  const lifecycleCols: Column<SiteLifecycle>[] = [
+    { header: "站点号", cell: (l) => <span className="font-medium">{l.siteNo}</span> },
+    { header: "站点名称", cell: (l) => l.siteName },
+    { header: "阶段", cell: (l) => <Badge tone={LC_STAGE[l.stage].tone}>{LC_STAGE[l.stage].label}</Badge> },
+    { header: "阶段更新", cell: (l) => <span className="text-muted-foreground">{l.stageAt}</span> },
+    { header: "负责人", cell: (l) => l.owner },
+    { header: "GMV (LTM)", cell: (l) => <span className="tabular-nums">{money(l.gmvLtm, l.currency)}</span> },
+  ];
 
   const onSearch = (v: string) => { setKeyword(v); setPage(1); };
 
@@ -202,12 +250,21 @@ function LocationsInner() {
       {tab === "analysis" && (
         <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索站点号 / 名称" />
       )}
+      {tab === "onboarding" && (
+        <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索场地名称 / 联系人"
+          onAdd={canVenue ? () => setOnboardingForm({ status: "PENDING", industry: "购物中心" }) : undefined} addLabel="新增申请" />
+      )}
+      {tab === "lifecycle" && (
+        <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索站点号 / 名称 / 负责人" />
+      )}
       {tab === "sites" && <DataTable rowKey={(s: Site) => s.siteNo} columns={siteCols} rows={q.data?.list as Site[]} loading={q.isLoading} />}
       {tab === "points" && <DataTable rowKey={(l: Location) => l.locationNo} columns={pointCols} rows={q.data?.list as Location[]} loading={q.isLoading} />}
       {tab === "venues" && <DataTable rowKey={(v: Venue) => v.venueNo} columns={venueCols} rows={q.data?.list as Venue[]} loading={q.isLoading} />}
       {tab === "contracts" && <DataTable rowKey={(c: Contract) => c.contractNo} columns={ctCols} rows={q.data?.list as Contract[]} loading={q.isLoading} />}
       {tab === "crm" && <DataTable rowKey={(l: Lead) => l.leadNo} columns={leadCols} rows={q.data?.list as Lead[]} loading={q.isLoading} />}
       {tab === "analysis" && <DataTable rowKey={(a: SiteAnalysis) => a.siteNo} columns={analysisCols} rows={q.data?.list as SiteAnalysis[]} loading={q.isLoading} />}
+      {tab === "onboarding" && <DataTable rowKey={(o: VenueOnboarding) => o.onboardingNo} columns={onboardingCols} rows={q.data?.list as VenueOnboarding[]} loading={q.isLoading} />}
+      {tab === "lifecycle" && <DataTable rowKey={(l: SiteLifecycle) => l.siteNo} columns={lifecycleCols} rows={q.data?.list as SiteLifecycle[]} loading={q.isLoading} />}
       {q.data && <Pagination page={page} size={SIZE} total={q.data.total} onPage={setPage} />}
 
       {/* 站点 新增/编辑 */}
@@ -283,6 +340,20 @@ function LocationsInner() {
         onChange={(v) => setContractForm(v as Partial<Contract>)}
         onSubmit={() => contractForm && saveContract.mutate(contractForm)}
         submitting={saveContract.isPending}
+      />
+
+      {/* 门店 Onboarding 审核 */}
+      <FormDrawer
+        open={!!onboardingForm}
+        onOpenChange={(o) => !o && setOnboardingForm(null)}
+        titleNew="新增 Onboarding 申请"
+        titleEdit={`审核申请 ${onboardingForm?.onboardingNo ?? ""}`}
+        isEdit={!!onboardingForm?.onboardingNo}
+        fields={ONBOARDING_FIELDS}
+        value={(onboardingForm ?? {}) as Record<string, unknown>}
+        onChange={(v) => setOnboardingForm(v as Partial<VenueOnboarding>)}
+        onSubmit={() => onboardingForm && saveOnboarding.mutate(onboardingForm)}
+        submitting={saveOnboarding.isPending}
       />
 
       {/* BD 线索 新增/编辑 */}
