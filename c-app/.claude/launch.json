@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "c-app-h5",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:h5"],
+      "port": 5173,
+      "autoPort": true
+    }
+  ]
+}
