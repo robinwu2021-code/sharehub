@@ -1,0 +1,52 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: powerbank-app
+  # 引 neargo-common-security 只为其 rbac(@perm)；关掉它的其它 auto-config（powerbank 自持会话/租户/链）。
+  autoconfigure:
+    exclude:
+      - ai.neargo.common.security.SecurityAutoConfiguration
+      - ai.neargo.common.security.SessionStoreAutoConfiguration
+      - ai.neargo.common.data.DataAutoConfiguration
+  # P4：场所域(loc_)持久化到 MariaDB(pb_core)。其余域仍走内存种子（渐进替换）。
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/pb_core?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=UTF-8
+    username: ${PB_DB_USER:powerbank}
+    password: ${PB_DB_PASS:powerbank}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  # C 端 usr_user/usr_identity 表自建（幂等 CREATE IF NOT EXISTS，见 resources/schema.sql）。
+  sql:
+    init:
+      mode: always
+      continue-on-error: true
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# 骨架：其余域零基础设施（内存种子直出）。真域落地再引 data/security/tenant。
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  health:
+    redis:
+      enabled: false   # 关 redis 健康检查（token-store!=redis 时无 Redis，避免 readiness DOWN）
+
+# 开发期 CORS 允许源（ops-web Next dev）。生产走同源 nginx 反代 /api，无需 CORS。
+powerbank:
+  cors:
+    allowed-origins: http://localhost:3000
+  # 可切换会话存储：memory(默认) | ehcache(单节点TTL) | redis(多实例推荐) | mysql(强持久sys_token)
+  auth:
+    token-store: memory
+    token-ttl: 2h

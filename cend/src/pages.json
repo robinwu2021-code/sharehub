@@ -1,0 +1,54 @@
+{
+	"easycom": {
+		"autoscan": true,
+		"custom": {
+			"^wd-(.*)": "wot-design-uni/components/wd-$1/wd-$1.vue"
+		}
+	},
+	"pages": [
+		{
+			"path": "pages/index/index",
+			"style": { "navigationBarTitleText": "找柜借电" }
+		},
+		{
+			"path": "pages/orders/orders",
+			"style": { "navigationBarTitleText": "我的订单" }
+		},
+		{
+			"path": "pages/profile/profile",
+			"style": { "navigationBarTitleText": "我的" }
+		},
+		{
+			"path": "pages/login/login",
+			"style": { "navigationBarTitleText": "登录" }
+		},
+		{
+			"path": "pages/order/confirm",
+			"style": { "navigationBarTitleText": "借出确认" }
+		},
+		{
+			"path": "pages/order/detail",
+			"style": { "navigationBarTitleText": "订单详情" }
+		},
+		{
+			"path": "pages/report/report",
+			"style": { "navigationBarTitleText": "自助报障" }
+		}
+	],
+	"tabBar": {
+		"color": "#8a8a8a",
+		"selectedColor": "#16a34a",
+		"backgroundColor": "#ffffff",
+		"list": [
+			{ "pagePath": "pages/index/index", "text": "找柜" },
+			{ "pagePath": "pages/orders/orders", "text": "订单" },
+			{ "pagePath": "pages/profile/profile", "text": "我的" }
+		]
+	},
+	"globalStyle": {
+		"navigationBarTextStyle": "black",
+		"navigationBarTitleText": "powerbank 充电宝",
+		"navigationBarBackgroundColor": "#F8F8F8",
+		"backgroundColor": "#F5F6F8"
+	}
+}

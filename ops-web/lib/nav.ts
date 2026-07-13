@@ -1,0 +1,393 @@
+// 三级导航 SSOT：域(L1) → 模块(L2) → 子功能(L3)。
+// 依据 docs/technical/TDD-运营端三级导航.md 附录A（逐行对照，勿凭记忆增删）。
+// - 域可见性是派生的（域内任一模块 canModule 命中），无独立权限码。
+// - L3 可见性 = leaf.perm ? can(role, perm) : 跟随父模块。
+// - soon = 待建：灰显不可点，不产生 404 入口。
+// - phase = 产品分期：phase > CURRENT_PHASE 的叶子灰显不可点（按期屏蔽）。
+//   Phase 1=MVP T1-T3 | Phase 2=规模化 T4-T6 | Phase 3=生态 T7-T9。
+// - 深链沿用 ?tab= / ?view=；本文件为纯数据+纯函数（无 React），可单测。
+import type { Role } from "./auth";
+import { can, canModule } from "./permissions";
+import type { Phase } from "./phase";
+import { isPhaseLocked } from "./phase";
+
+export type NavMode = "panel" | "miller";
+export const NAV_MODE_DEFAULT: NavMode = "panel";
+export const NAV_PREFS_STORAGE_KEY = "ops-nav-prefs";
+
+// 布局常量（px）
+export const RAIL_WIDTH = 56;
+export const RAIL_EXPANDED_WIDTH = 168;
+export const PANEL_WIDTH = 208;
+export const MILLER_MODULE_WIDTH = 148;
+export const MILLER_LEAF_WIDTH = 188;
+
+export interface NavLeaf {
+  href: string; // 详情/深链（可含 ?tab= / ?view=，可跨模块）
+  label: string;
+  perm?: string; // 细粒度权限码；无则跟随父模块 canModule
+  soon?: boolean; // 待建：灰显不可点
+  phase?: Phase; // 产品分期（缺省=P1）；phase > CURRENT_PHASE 时灰显不可点
+}
+
+export interface NavModule {
+  key: string;
+  label: string;
+  icon: string;
+  module: string; // 权限码模块前缀（canModule 过滤）
+  href: string; // 模块首页
+  match?: string[]; // 路径归属前缀（默认 = href 的 path 部分）；如 system 模块归属 /system
+  soon?: boolean; // 整模块待建（页面不存在）
+  phase?: Phase; // 产品分期（缺省=P1）；整模块按期屏蔽
+  children?: NavLeaf[];
+}
+
+export interface NavDomain {
+  key: string;
+  label: string;
+  icon: string;
+  pinBottom?: boolean; // Rail 固定底部
+  modules: NavModule[];
+}
+
+export const NAV: NavDomain[] = [
+  {
+    key: "overview",
+    label: "概览",
+    icon: "LayoutDashboard",
+    modules: [
+      { key: "dashboard", label: "经营看板", icon: "LayoutDashboard", module: "dashboard", href: "/" },
+    ],
+  },
+  {
+    key: "device-ops",
+    label: "设备运营",
+    icon: "Cpu",
+    modules: [
+      {
+        key: "device", label: "设备管理", icon: "Server", module: "device", href: "/devices",
+        children: [
+          { href: "/devices", label: "设备台账", perm: "device:cabinet:read" },
+          { href: "/devices?tab=powerbanks", label: "充电宝管理", perm: "device:powerbank:read" },
+          { href: "/devices?tab=monitor", label: "实时监控", perm: "device:cabinet:read" },
+          { href: "/devices?tab=commands", label: "远程控制·指令记录", perm: "device:command:send" },
+          { href: "/devices?tab=inventory", label: "库存调拨", perm: "device:inventory:read", phase: 2 },
+          { href: "/devices?tab=ota", label: "固件 OTA", perm: "device:ota:read", phase: 2 },
+        ],
+      },
+      {
+        key: "workorder", label: "工单管理", icon: "Wrench", module: "workorder", href: "/work-orders",
+        children: [
+          { href: "/work-orders?view=list", label: "工单列表", perm: "workorder:wo:read" },
+          { href: "/work-orders?view=board", label: "工单看板", perm: "workorder:wo:read" },
+          { href: "/work-orders?view=sla", label: "SLA 管理", phase: 2 },
+          { href: "/work-orders?view=inspection", label: "巡检计划", phase: 2 },
+        ],
+      },
+    ],
+  },
+  {
+    key: "place-bd",
+    label: "场地与拓展",
+    icon: "MapPin",
+    modules: [
+      {
+        key: "location", label: "站点与点位", icon: "MapPin", module: "location", href: "/locations",
+        children: [
+          { href: "/locations?tab=sites", label: "站点管理", perm: "location:poi:read" },
+          { href: "/locations?tab=points", label: "点位管理", perm: "location:poi:read" },
+          { href: "/locations?tab=venues", label: "场地方", perm: "location:venue:read" },
+          { href: "/locations?tab=contracts", label: "进场合同", perm: "location:contract:read", phase: 2 },
+          { href: "/locations?tab=crm", label: "BD 拓展 CRM", phase: 3 },
+          { href: "/locations?tab=analysis", label: "站点坪效", perm: "location:analysis:read", phase: 3 },
+        ],
+      },
+      {
+        key: "agent", label: "代理商管理", icon: "Handshake", module: "agent", href: "/agents",
+        children: [
+          { href: "/agents", label: "代理商档案", perm: "agent:agent:read" },
+          { href: "/agents?tab=assign", label: "设备/点位划拨", perm: "agent:scope:assign" },
+          // 跨域深链（D3）：复用财务结算单，面包屑按 URL 归属交易与资金
+          { href: "/finance?tab=settlements", label: "代理收益结算", perm: "agent:settlement:read" },
+          { href: "/agents?tab=performance", label: "代理绩效", perm: "agent:performance:read", phase: 2 },
+          { href: "/agents?tab=accounts", label: "代理账号管理", perm: "agent:agent:update" },
+        ],
+      },
+    ],
+  },
+  {
+    key: "trade-fin",
+    label: "交易与资金",
+    icon: "ReceiptText",
+    modules: [
+      {
+        key: "order", label: "订单管理", icon: "ReceiptText", module: "order", href: "/orders",
+        children: [
+          { href: "/orders", label: "订单列表", perm: "order:order:read" },
+          { href: "/orders?tab=exceptions", label: "异常订单", perm: "order:exception:read" },
+          { href: "/orders?tab=deposit", label: "押金与欠费", perm: "order:order:read", phase: 2 },
+        ],
+      },
+      {
+        key: "pricing", label: "计费定价", icon: "Tag", module: "pricing", href: "/pricing",
+        children: [
+          { href: "/pricing", label: "计费模板", perm: "pricing:rule:read" },
+          { href: "/pricing?tab=diff", label: "差异化定价", phase: 2 },
+          { href: "/pricing?tab=schedule", label: "活动/时段价", phase: 3 },
+        ],
+      },
+      {
+        key: "finance", label: "财务管理", icon: "Wallet", module: "finance", href: "/finance",
+        children: [
+          { href: "/finance?tab=rules", label: "分润规则", perm: "finance:share_rule:read" },
+          { href: "/finance?tab=records", label: "分润明细", perm: "finance:share_record:read" },
+          { href: "/finance?tab=settlements", label: "结算单", perm: "finance:settlement:read" },
+          { href: "/finance?tab=ledger", label: "账务分录", perm: "finance:ledger:read", phase: 2 },
+          { href: "/finance?tab=withdrawals", label: "提现审核", perm: "finance:withdrawal:read", phase: 2 },
+          { href: "/finance?tab=reconcile", label: "对账", perm: "finance:reconcile:read", phase: 3 },
+          { href: "/finance?tab=invoices", label: "发票", perm: "finance:invoice:read", phase: 3 },
+        ],
+      },
+    ],
+  },
+  {
+    key: "user-growth",
+    label: "用户与增长",
+    icon: "Users",
+    modules: [
+      {
+        key: "user", label: "用户管理", icon: "UserCircle", module: "user", href: "/users",
+        children: [
+          { href: "/users", label: "用户列表", perm: "user:cuser:read", phase: 2 },
+          { href: "/users?tab=members", label: "会员/次卡", perm: "user:member:read", phase: 3 },
+          { href: "/users?tab=wallets", label: "钱包", perm: "user:wallet:read", phase: 3 },
+        ],
+      },
+      {
+        key: "marketing", label: "营销管理", icon: "Ticket", module: "marketing", href: "/marketing",
+        children: [
+          { href: "/marketing", label: "优惠券", perm: "marketing:coupon:read", phase: 2 },
+          { href: "/marketing?tab=campaigns", label: "活动", phase: 2 },
+          { href: "/marketing?tab=push", label: "推送触达", perm: "marketing:push:send", phase: 3 },
+          { href: "/marketing?tab=referral", label: "邀请裂变", phase: 3 },
+          { href: "/marketing?tab=ad-slots", label: "广告位管理", phase: 3 },
+          { href: "/marketing?tab=ad-campaigns", label: "广告活动", phase: 3 },
+          { href: "/marketing?tab=ad-delivery", label: "投放与曝光", phase: 3 },
+        ],
+      },
+      {
+        // 复用项为跨域深链，可点
+        key: "cs", label: "客服管理", icon: "Headset", module: "cs", href: "/cs",
+        children: [
+          { href: "/cs", label: "报障受理", phase: 2 },
+          { href: "/cs?tab=sessions", label: "客服会话", phase: 2 },
+          { href: "/orders", label: "退款/补偿", perm: "order:refund:apply" },
+          { href: "/users", label: "黑名单处理", perm: "user:risk:update", phase: 2 },
+        ],
+      },
+    ],
+  },
+  {
+    key: "analytics",
+    label: "数据报表",
+    icon: "ChartColumn",
+    modules: [
+      {
+        key: "report", label: "数据报表", icon: "ChartColumn", module: "report", href: "/reports",
+        children: [
+          { href: "/reports?tab=device", label: "设备运营分析", perm: "report:device:read", phase: 2 },
+          { href: "/reports?tab=location", label: "点位坪效", perm: "report:location:read", phase: 2 },
+          { href: "/reports?tab=finance", label: "财务报表", phase: 2 },
+          { href: "/reports?tab=screen", label: "实时大屏", phase: 3 },
+          { href: "/reports?tab=custom", label: "自定义报表", phase: 3 },
+          { href: "/reports?tab=consumer", label: "消费者分析", phase: 3 },
+        ],
+      },
+    ],
+  },
+  {
+    key: "system",
+    label: "系统与权限",
+    icon: "Settings",
+    pinBottom: true,
+    modules: [
+      {
+        key: "org", label: "员工与权限", icon: "Users", module: "org", href: "/employees",
+        children: [
+          { href: "/employees?tab=employees", label: "员工", perm: "org:employee:read" },
+          { href: "/employees?tab=roles", label: "角色权限", perm: "org:role:read" },
+          { href: "/employees?tab=audit", label: "操作审计", perm: "org:audit:read", phase: 2 },
+          { href: "/employees?tab=org", label: "组织架构", phase: 2 },
+          { href: "/employees?tab=performance", label: "绩效报表", phase: 3 },
+        ],
+      },
+      {
+        // D1：菜单按 system 模块过滤；供应商页按钮级用 device:vendor:*（权限双源，后端 SSOT 不改）
+        key: "system", label: "系统设置", icon: "Settings", module: "system", href: "/system?tab=vendors",
+        match: ["/system"],
+        children: [
+          { href: "/system?tab=vendors", label: "供应商接入" },
+          { href: "/system?tab=notify", label: "通知模板", perm: "system:notify_template:read" },
+          { href: "/system?tab=dict", label: "参数字典", perm: "system:dict:read" },
+          { href: "/system?tab=region", label: "地区库" },
+          { href: "/system?tab=params", label: "系统参数" },
+          { href: "/system?tab=markets", label: "多国家市场", phase: 3 },
+          { href: "/system?tab=openapi", label: "OpenAPI 应用", phase: 3 },
+        ],
+      },
+    ],
+  },
+];
+
+// ── 纯函数 helper（无 React 依赖，可单测） ──────────────────────────────
+
+/** trailingSlash:true 下 pathname 带尾斜杠，比较前归一化。 */
+export const normPath = (p: string) => p.replace(/\/+$/, "") || "/";
+
+/** 拆 href 为 path + tab + view。 */
+export function leafParts(href: string): { path: string; tab: string | null; view: string | null } {
+  const [path, qs] = href.split("?");
+  const sp = new URLSearchParams(qs);
+  return { path: normPath(path), tab: sp.get("tab"), view: sp.get("view") };
+}
+
+/** L2 可见性 = canModule。 */
+export function visibleModules(domain: NavDomain, role: Role | undefined): NavModule[] {
+  return domain.modules.filter((m) => canModule(role, m.module));
+}
+
+/** L1 可见性派生：域内任一模块可见。 */
+export function visibleDomains(role: Role | undefined): NavDomain[] {
+  return NAV.filter((d) => visibleModules(d, role).length > 0);
+}
+
+/** L3 可见性 = leaf.perm ? can() : 跟随父模块。phase-locked 叶子保留（灰显）。 */
+export function visibleLeaves(mod: NavModule, role: Role | undefined): NavLeaf[] {
+  return (mod.children ?? []).filter((l) => (l.perm ? can(role, l.perm) : true));
+}
+
+/** 叶子是否被产品分期屏蔽（phase > CURRENT_PHASE）。 */
+export function isLeafLocked(leaf: NavLeaf): boolean {
+  return isPhaseLocked(leaf.phase);
+}
+
+/** 模块是否被产品分期屏蔽（整模块 phase 或所有叶子均被锁）。 */
+export function isModuleLocked(mod: NavModule, role: Role | undefined): boolean {
+  if (isPhaseLocked(mod.phase)) return true;
+  const leaves = visibleLeaves(mod, role);
+  return leaves.length > 0 && leaves.every((l) => isLeafLocked(l));
+}
+
+/** 域整体待建：可见模块全为 soon（D2：Rail 灰显）。 */
+export function isDomainSoon(domain: NavDomain, role: Role | undefined): boolean {
+  const mods = visibleModules(domain, role);
+  return mods.length > 0 && mods.every((m) => m.soon);
+}
+
+/** 单模块域且模块无子功能（概览）：不渲染 L2 面板，详情全宽。 */
+export function isSingleModuleDomain(domain: NavDomain): boolean {
+  return domain.modules.length === 1 && !(domain.modules[0].children?.length);
+}
+
+/** 模块的路径归属前缀（含子路径如 /devices/detail）。 */
+function moduleMatchPrefixes(mod: NavModule): string[] {
+  return mod.match ?? [leafParts(mod.href).path];
+}
+
+/**
+ * 由 pathname 反推当前 域+模块：最长前缀匹配；"/" 仅精确匹配。
+ * 不做 RBAC 过滤——URL 已到达即需正确归属（页面自身有权限兜底）。
+ */
+export function findActiveModule(pathname: string): { domain: NavDomain; module: NavModule } | undefined {
+  const p = normPath(pathname);
+  let best: { domain: NavDomain; module: NavModule; len: number } | undefined;
+  for (const domain of NAV) {
+    for (const module of domain.modules) {
+      for (const prefix of moduleMatchPrefixes(module)) {
+        const hit = prefix === "/" ? p === "/" : p === prefix || p.startsWith(prefix + "/");
+        if (hit && (!best || prefix.length > best.len)) best = { domain, module, len: prefix.length };
+      }
+    }
+  }
+  return best && { domain: best.domain, module: best.module };
+}
+
+/**
+ * 当前模块的可见叶子中，命中项下标：
+ * 先按 path+query 精确匹配；模块首页（无 tab/view）默认高亮首个可点叶子。
+ * 未命中返回 -1。
+ */
+export function activeLeafIndex(
+  leaves: NavLeaf[], pathname: string, tab: string | null, view: string | null,
+): number {
+  const p = normPath(pathname);
+  const exact = leaves.findIndex((l) => {
+    if (l.soon || isLeafLocked(l)) return false;
+    const parts = leafParts(l.href);
+    if (parts.path !== p) return false;
+    if (parts.tab) return parts.tab === tab;
+    if (parts.view) return parts.view === view;
+    return !tab && !view;
+  });
+  if (exact >= 0) return exact;
+  if (!tab && !view) {
+    return leaves.findIndex((l) => !l.soon && !isLeafLocked(l) && leafParts(l.href).path === p);
+  }
+  return -1;
+}
+
+/** 域/模块的默认落地地址：首个可点叶子（排除 soon 和 phase-locked），无则模块首页。 */
+export function moduleDefaultHref(mod: NavModule, role: Role | undefined): string {
+  const leaf = visibleLeaves(mod, role).find((l) => !l.soon && !isLeafLocked(l));
+  return leaf?.href ?? mod.href;
+}
+export function domainDefaultHref(domain: NavDomain, role: Role | undefined): string | undefined {
+  const mod = visibleModules(domain, role).find((m) => !m.soon && !isModuleLocked(m, role));
+  return mod && moduleDefaultHref(mod, role);
+}
+
+/** 叶子是否不可点：待建 或 分期锁定（渲染层统一判定）。 */
+export function isLeafDisabled(leaf: NavLeaf): boolean {
+  return !!leaf.soon || isLeafLocked(leaf);
+}
+
+/**
+ * 按 URL 判断当前路由是否被产品分期锁定（页面级兜底用）。
+ * 返回锁定它的阶段 Phase（>CURRENT_PHASE），未锁定返回 undefined。
+ * 与 activeLeafIndex 不同：此处「无视锁定」匹配目标叶，才能识别到被锁叶。
+ */
+export function routeLockedPhase(
+  pathname: string, tab: string | null, view: string | null, role: Role | undefined,
+): Phase | undefined {
+  const hit = findActiveModule(pathname);
+  if (!hit) return undefined;
+  if (isPhaseLocked(hit.module.phase)) return hit.module.phase;
+  const p = normPath(pathname);
+  const leaves = visibleLeaves(hit.module, role);
+  let leaf = leaves.find((l) => {
+    const parts = leafParts(l.href);
+    if (parts.path !== p) return false;
+    if (parts.tab) return parts.tab === tab;
+    if (parts.view) return parts.view === view;
+    return !tab && !view;
+  });
+  // 模块首页（无 tab/view）：落到该 path 的首叶，兜底模块首叶
+  if (!leaf && !tab && !view) {
+    leaf = leaves.find((l) => leafParts(l.href).path === p) ?? leaves[0];
+  }
+  return leaf && isLeafLocked(leaf) ? leaf.phase : undefined;
+}
+
+/** 面包屑：域 › 模块 › 子功能（子功能可能无）。 */
+export function breadcrumb(
+  pathname: string, tab: string | null, view: string | null, role: Role | undefined,
+): string[] {
+  const hit = findActiveModule(pathname);
+  if (!hit) return [];
+  const crumbs = [hit.domain.label];
+  if (!isSingleModuleDomain(hit.domain)) crumbs.push(hit.module.label);
+  const leaves = visibleLeaves(hit.module, role);
+  const idx = activeLeafIndex(leaves, pathname, tab, view);
+  if (idx >= 0 && leaves[idx].label !== hit.module.label) crumbs.push(leaves[idx].label);
+  return crumbs;
+}

@@ -1,0 +1,35 @@
+{
+  "easycom": {
+    "autoscan": true,
+    "custom": {
+      "^wd-(.*)": "wot-design-uni/components/wd-$1/wd-$1.vue",
+      "^pb-(.*)": "@/components/ui/pb-$1.vue"
+    }
+  },
+  "pages": [
+    { "path": "pages/splash/index" },
+    { "path": "pages/home/index" },
+    { "path": "pages/orders/index" },
+    { "path": "pages/me/index" },
+    { "path": "pages/login/index" },
+    { "path": "pages/auth/forgot" },
+    { "path": "pages/auth/register" },
+    { "path": "pages/order/confirm" },
+    { "path": "pages/order/detail" },
+    { "path": "pages/order/feedback" },
+    { "path": "pages/coupons/index" },
+    { "path": "pages/membership/index" },
+    { "path": "pages/notice/index" },
+    { "path": "pages/me/settings" },
+    { "path": "pages/me/change-pwd" },
+    { "path": "pages/me/delete-account" },
+    { "path": "pages/me/about" },
+    { "path": "pages/me/policy" }
+  ],
+  "globalStyle": {
+    "navigationStyle": "custom",
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "Powerbank",
+    "backgroundColor": "#F3F4F7"
+  }
+}

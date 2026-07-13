@@ -1,0 +1,16 @@
+// 本地化格式化：AED 货币 / 距离。集中管理，避免各页面散落拼接。
+import { CURRENCY } from "./constants";
+
+export function money(amount: number, currency = CURRENCY): string {
+  return `${currency} ${amount.toFixed(2)}`;
+}
+
+export function distance(m: number): string {
+  return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`;
+}
+
+export function timeOf(iso: string): string {
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getHours())}:${p(d.getMinutes())}`;
+}

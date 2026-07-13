@@ -1,0 +1,60 @@
+{
+  "_comment": "运营方日常操作 E2E 测试数据（MENA / Dubai / AED）。所有写入用固定业务键做幂等 upsert，可重复跑不累积。",
+
+  "actors": {
+    "admin":   { "username": "root.admin",     "role": "ADMIN" },
+    "ops":     { "username": "laila.ops",       "role": "OPS" },
+    "finance": { "username": "khalid.finance",  "role": "FINANCE" },
+    "bd":      { "username": "omar.bd",          "role": "BD" },
+    "viewer":  { "username": "guest.viewer",     "role": "VIEWER" },
+    "agent":   { "username": "marina.partner",   "role": "AGENT", "agentNo": "AG002" }
+  },
+
+  "expansion": {
+    "_comment": "运营方在 Dubai Marina 新拓一个海滩点位：先建代理商，再建站点与点位。",
+    "agent": {
+      "agentNo": "AG-E2E-GULF",
+      "name": "Gulf Franchise LLC",
+      "contact": "+971509998877",
+      "regionScope": "Dubai Marina",
+      "shareRate": 0.18,
+      "cabinetCount": 0,
+      "status": "ENABLED"
+    },
+    "site": {
+      "siteNo": "ST-E2E-JBR",
+      "name": "JBR Beach Kiosk",
+      "venueName": "Nakheel",
+      "agentNo": "AG-E2E-GULF",
+      "regionId": "Dubai Marina",
+      "address": "JBR The Walk, Dubai, UAE",
+      "sceneType": "景区",
+      "pointCount": 1,
+      "cabinetCount": 0,
+      "status": "ACTIVE"
+    },
+    "location": {
+      "locationNo": "LOC-E2E-JBR1",
+      "name": "JBR Kiosk Entrance",
+      "siteNo": "ST-E2E-JBR",
+      "siteName": "JBR Beach Kiosk",
+      "spotDesc": "Beside the beach entrance, ground floor",
+      "cabinetCount": 0,
+      "status": "ACTIVE"
+    }
+  },
+
+  "device": {
+    "_comment": "巡检一台线下柜机并远程重启。CAB1000 种子数据为 OFFLINE/FAULT。",
+    "inspectCabinetNo": "CAB1000",
+    "rebootCommand": { "type": "REBOOT" }
+  },
+
+  "expectedBaseline": {
+    "_comment": "种子基线（*Seeder 幂等灌入 MariaDB / 内存）。首跑后本测试的 upsert 键不改变这些基线计数。",
+    "currency": "AED",
+    "cabinetsTotal": 48,
+    "workOrdersTotal": 64,
+    "vendorsTotal": 3
+  }
+}

@@ -1,0 +1,109 @@
+@import "tailwindcss";
+
+/* 扁平·色块分割：白底不变，区域靠背景色块（明暗差）反衬分区，不靠描边线。
+   色块（canvas/sidebar/secondary/muted/accent）由 --primary 经 color-mix 自动派生 →
+   换主题只需改 --primary，8 套主题块只覆盖主色。中等强度 + 极轻阴影。 */
+:root {
+  --primary: oklch(0.55 0.2 268);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: var(--primary);
+
+  --background: oklch(1 0 0); /* 白面/白卡 */
+  --foreground: oklch(0.18 0.012 268);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.012 268);
+
+  /* 色块分层（中等强度，随主题微染） */
+  --canvas: color-mix(in oklch, var(--primary) 5%, white); /* 页面画布底 */
+  --sidebar: color-mix(in oklch, var(--primary) 10%, white); /* 导航色块（Rail/面板） */
+  --sidebar-foreground: color-mix(in oklch, var(--primary) 55%, oklch(0.3 0 0));
+  --secondary: color-mix(in oklch, var(--primary) 8%, white); /* 填充块：输入/分段/outline 按钮 */
+  --secondary-foreground: color-mix(in oklch, var(--primary) 62%, oklch(0.22 0 0));
+  --muted: color-mix(in oklch, var(--primary) 6%, white); /* 表头/隔行色块 */
+  --muted-foreground: color-mix(in oklch, var(--primary) 26%, oklch(0.5 0 0));
+  --accent: color-mix(in oklch, var(--primary) 15%, white); /* 激活/hover 色块 */
+  --accent-foreground: color-mix(in oklch, var(--primary) 64%, black);
+  --border: color-mix(in oklch, var(--primary) 13%, white); /* 极弱发丝，仅个别处 */
+  --input: var(--secondary);
+
+  --destructive: oklch(0.577 0.245 27.325);
+  --success: oklch(0.6 0.13 160);
+  --warning: oklch(0.72 0.15 70);
+  --radius: 0.85rem;
+  --card-shadow: 0 1px 2px oklch(0 0 0 / 0.05), 0 1px 3px oklch(0 0 0 / 0.03);
+}
+
+/* 主题：仅换主色，色块自动随之派生 */
+[data-theme="indigo"]  { --primary: oklch(0.55 0.2 268);  --primary-foreground: oklch(0.985 0 0); }
+[data-theme="blue"]    { --primary: oklch(0.57 0.17 245); --primary-foreground: oklch(0.985 0 0); }
+[data-theme="teal"]    { --primary: oklch(0.6 0.11 195);  --primary-foreground: oklch(0.99 0 0); }
+[data-theme="emerald"] { --primary: oklch(0.6 0.14 162);  --primary-foreground: oklch(0.99 0 0); }
+[data-theme="violet"]  { --primary: oklch(0.55 0.22 300); --primary-foreground: oklch(0.985 0 0); }
+[data-theme="rose"]    { --primary: oklch(0.6 0.21 15);   --primary-foreground: oklch(0.99 0 0); }
+[data-theme="amber"]   { --primary: oklch(0.66 0.15 62);  --primary-foreground: oklch(0.2 0.03 62); }
+[data-theme="slate"]   { --primary: oklch(0.45 0.035 260); --primary-foreground: oklch(0.985 0 0); }
+
+.dark {
+  --background: oklch(0.24 0.012 268);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.26 0.014 268);
+  --card-foreground: oklch(0.985 0 0);
+  --canvas: oklch(0.19 0.01 268);
+  --sidebar: color-mix(in oklch, var(--primary) 16%, oklch(0.21 0.01 268));
+  --sidebar-foreground: oklch(0.9 0 0);
+  --secondary: color-mix(in oklch, var(--primary) 16%, oklch(0.26 0.012 268));
+  --secondary-foreground: oklch(0.96 0 0);
+  --muted: color-mix(in oklch, var(--primary) 13%, oklch(0.26 0.012 268));
+  --muted-foreground: oklch(0.72 0 0);
+  --accent: color-mix(in oklch, var(--primary) 26%, oklch(0.26 0.012 268));
+  --accent-foreground: oklch(0.97 0 0);
+  --border: oklch(1 0 0 / 9%);
+  --input: var(--secondary);
+  --destructive: oklch(0.704 0.191 22.216);
+  --success: oklch(0.7 0.13 160);
+  --warning: oklch(0.8 0.15 80);
+  --card-shadow: 0 1px 2px oklch(0 0 0 / 0.3);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-canvas: var(--canvas);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --radius-sm: calc(var(--radius) - 5px);
+  --radius-md: calc(var(--radius) - 3px);
+  --radius-lg: calc(var(--radius) - 1px);
+  --radius-xl: calc(var(--radius) + 3px);
+  --radius-2xl: calc(var(--radius) + 7px);
+}
+
+/* 残留 border 工具类统一走极弱发丝色（避免 Tailwind4 默认 currentColor 变黑线） */
+* {
+  border-color: var(--border);
+}
+body {
+  background: var(--canvas);
+  color: var(--foreground);
+  /* Latin 用圆润的 Nunito，中文回退系统黑体 */
+  font-family: var(--font-nunito), "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+    "微软雅黑", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}

@@ -1,0 +1,61 @@
+package ai.neargo.powerbank.config;
+
+import ai.neargo.powerbank.auth.TokenStore;
+import ai.neargo.powerbank.auth.store.LocalCacheTokenStore;
+import ai.neargo.powerbank.auth.store.MemoryTokenStore;
+import ai.neargo.powerbank.auth.store.MysqlTokenStore;
+import ai.neargo.powerbank.auth.store.RedisTokenStore;
+import ai.neargo.powerbank.auth.store.SysToken.SysTokenMapper;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.core.StringRedisTemplate;
+
+import java.time.Duration;
+
+/**
+ * 可切换 TokenStore 装配（{@code powerbank.auth.token-store}=memory|ehcache|redis|mysql，缺省 memory）。
+ * 认证过滤器/登录只依赖 {@link TokenStore} 接口——切换后端零改代码。见 docs/technical/权限体系设计.md §7。
+ */
+@Configuration
+public class TokenStoreConfig {
+
+    private static final String KEY = "powerbank.auth.token-store";
+
+    /**
+     * 会话序列化专用 ObjectMapper（自建，不依赖 web 上下文 bean；Jackson 原生支持 record/enum）。
+     * 关闭 FAIL_ON_UNKNOWN_PROPERTIES：LoginUser.isConsumer()/DataScope.isEmpty() 会被序列化为额外
+     * "consumer"/"empty" 字段，反序列化到 record 时需忽略这些非构造参数字段。
+     */
+    private final ObjectMapper authOm = new ObjectMapper()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+    @Bean
+    @ConditionalOnProperty(name = KEY, havingValue = "memory", matchIfMissing = true)
+    public TokenStore memoryTokenStore() {
+        return new MemoryTokenStore();
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = KEY, havingValue = "ehcache")
+    public TokenStore localCacheTokenStore(@Value("${powerbank.auth.token-ttl:2h}") Duration ttl) {
+        return new LocalCacheTokenStore(ttl);
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = KEY, havingValue = "redis")
+    public TokenStore redisTokenStore(StringRedisTemplate redis,
+                                      @Value("${powerbank.auth.token-ttl:2h}") Duration ttl) {
+        return new RedisTokenStore(redis, authOm, ttl);
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = KEY, havingValue = "mysql")
+    public TokenStore mysqlTokenStore(SysTokenMapper mapper,
+                                      @Value("${powerbank.auth.token-ttl:2h}") Duration ttl) {
+        return new MysqlTokenStore(mapper, authOm, ttl);
+    }
+}

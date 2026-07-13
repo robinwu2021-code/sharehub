@@ -1,0 +1,43 @@
+# ── 依赖 ──
+node_modules/
+**/node_modules/
+
+# ── 构建产物 ──
+.next/
+**/.next/
+**/out/
+**/dist/
+**/build/
+**/.turbo/
+**/unpackage/dist/
+# Maven
+**/target/
+
+# ── 环境变量（含密钥，不入库；保留 *.example）──
+**/.env
+**/.env.local
+**/.env.*.local
+**/.env.development.local
+**/.env.production.local
+**/.env.backend
+!**/.env.example
+!**/.env.*.example
+
+# ── 日志 / 缓存 ──
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.eslintcache
+*.tsbuildinfo
+
+# ── IDE / 系统 ──
+.DS_Store
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+
+# ── 测试 / 覆盖率 ──
+coverage/
+**/coverage/

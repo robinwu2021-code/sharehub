@@ -1,0 +1,26 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ops-web-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000,
+      "cwd": "ops-web"
+    },
+    {
+      "name": "cend-h5",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:h5"],
+      "port": 5173,
+      "cwd": "cend"
+    },
+    {
+      "name": "c-app-h5",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:h5"],
+      "port": 5174,
+      "cwd": "c-app"
+    }
+  ]
+}

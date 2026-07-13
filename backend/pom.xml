@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 站在 neargo 地基上（ADR-006）：继承 neargo-parent → 得 Spring Boot 4.0.x + Java 21
+         + maven-enforcer(锁 JDK21) + MyBatis-Plus BOM + neargo commons 版本管理。
+         relativePath 留空 → 从本机 ~/.m2 私仓解析（neargo commons 已发布/安装于此）。 -->
+    <parent>
+        <groupId>ai.neargo</groupId>
+        <artifactId>neargo-parent</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>ai.neargo.powerbank</groupId>
+    <artifactId>powerbank-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>powerbank-parent</name>
+    <description>共享充电宝/充电桩运营管理系统 · 服务端父 POM（独立仓库，仅依赖 ai.neargo:* 基础包）</description>
+
+    <!-- MVP=合并模块化单体（ADR-001）：先一个 modulith app 点亮运营端；access-gateway 后续裂解为独立 module -->
+    <modules>
+        <module>powerbank-app</module>
+    </modules>
+
+</project>
