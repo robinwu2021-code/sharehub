@@ -9,6 +9,7 @@
   "pages": [
     { "path": "pages/splash/index" },
     { "path": "pages/home/index" },
+    { "path": "pages/stores/index" },
     { "path": "pages/orders/index" },
     { "path": "pages/me/index" },
     { "path": "pages/login/index" },

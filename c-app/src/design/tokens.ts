@@ -2,7 +2,7 @@
 // UnoCSS 主题色指向 var(--pb-*)（uno.config.ts），故换肤 = 改根节点 data-skin/data-theme = 全局即时生效。
 // 扁平色块设计：主色 + 语义色 + 中性面色 + 由 color-mix 派生的 tint（色块底），几乎不用线条。
 
-export type SkinId = "mono" | "blue" | "purple";
+export type SkinId = "brand" | "mono" | "blue" | "purple";
 export type ModeId = "light" | "dark";
 
 export interface Labeled {
@@ -17,6 +17,7 @@ export interface SkinDef {
 }
 
 export const SKINS: SkinDef[] = [
+  { id: "brand", color: "#17C3C0", label: { zh: "简电青", en: "Teal", ar: "فيروزي" } },
   { id: "mono", color: "#18181B", label: { zh: "黑白灰", en: "Mono", ar: "رمادي" } },
   { id: "blue", color: "#2F6BFF", label: { zh: "时尚蓝", en: "Blue", ar: "أزرق" } },
   { id: "purple", color: "#7C3AED", label: { zh: "科幻紫", en: "Purple", ar: "بنفسجي" } },
@@ -27,7 +28,7 @@ export const MODES: { id: ModeId; label: Labeled }[] = [
   { id: "dark", label: { zh: "深色", en: "Dark", ar: "داكن" } },
 ];
 
-export const DEFAULT_SKIN: SkinId = "mono";
+export const DEFAULT_SKIN: SkinId = "brand";
 export const DEFAULT_MODE: ModeId = "light";
 
 // 圆角/间距（rpx），扁平风偏大圆角

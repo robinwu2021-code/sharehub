@@ -27,15 +27,18 @@ export type NearbyQ = { lat?: number; lng?: number; keyword?: string; returnable
 // 资料可改字段（后端仅接受这几项，phone 走换绑单独流程）
 export type ProfilePatch = Partial<Pick<UserProfile, "nickname" | "avatar" | "email">>;
 
-// 登录换身份：因端而异的只有 grantType（App 手机 OTP/密码/Apple/Google，小程序微信）
-export type GrantType = "phone_otp" | "password" | "apple" | "google" | "wechat_miniapp";
+// 登录换身份：因端而异的只有 grantType（App 手机 OTP/密码/Apple/Google/Microsoft，小程序微信）
+export type GrantType = "phone_otp" | "password" | "apple" | "google" | "microsoft" | "wechat_miniapp";
 export interface LoginParams {
   grantType: GrantType;
   countryCode?: string; // +971（全球版区号）
   phone?: string;
   otp?: string;
   password?: string;
-  code?: string; // 小程序 wx.login code / OAuth code
+  code?: string; // 小程序 wx.login code / OAuth 授权码（Microsoft/Apple/Google）
+  // OAuth Authorization Code + PKCE（公共客户端，前端无密钥）：后端用这三项换令牌
+  codeVerifier?: string; // PKCE code_verifier
+  redirectUri?: string; // 与授权时一致（后端换码校验）
 }
 export interface OtpParams {
   countryCode: string;

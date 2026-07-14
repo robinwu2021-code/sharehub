@@ -14,8 +14,8 @@ onLaunch(() => {
 <style>
 /* ===== 主题变量：皮肤(色) × 明暗(风格)。换肤=改 <html> 上 data-skin/data-theme，全局即时生效 ===== */
 :root {
-  /* 默认皮肤：黑白灰（mono），白底为基 */
-  --pb-primary: #18181b;
+  /* 默认皮肤：简电青（brand，取自原型 简电/JD Charge 品牌青绿），白底为基 */
+  --pb-primary: #17c3c0;
   --pb-on-primary: #ffffff;
   --pb-success: #12b76a;
   --pb-warning: #f79009;
@@ -38,7 +38,13 @@ onLaunch(() => {
   --pb-danger-tint: color-mix(in srgb, var(--pb-danger) 16%, transparent);
 }
 
-/* 皮肤：只改主色（中性面由明暗决定）。mono=黑白灰 / blue=时尚蓝 / purple=科幻紫 */
+/* 皮肤：只改主色（中性面由明暗决定）。brand=简电青 / mono=黑白灰 / blue=时尚蓝 / purple=科幻紫 */
+:root[data-skin="brand"] {
+  --pb-primary: #17c3c0;
+}
+:root[data-skin="mono"] {
+  --pb-primary: #18181b;
+}
 :root[data-skin="blue"] {
   --pb-primary: #2f6bff;
 }

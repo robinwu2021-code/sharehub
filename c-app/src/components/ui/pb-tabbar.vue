@@ -2,7 +2,7 @@
 // 自定义底部导航（可换肤）。线性图标 + 激活项主色 tint 药丸。顶部柔和阴影分层。
 defineProps<{ active: "home" | "orders" | "me" }>();
 const tabs = [
-  { key: "home", icon: "pin", url: "/pages/home/index", label: "tabbar.home" },
+  { key: "home", icon: "home", url: "/pages/home/index", label: "tabbar.home" },
   { key: "orders", icon: "receipt", url: "/pages/orders/index", label: "tabbar.orders" },
   { key: "me", icon: "user", url: "/pages/me/index", label: "tabbar.me" },
 ] as const;

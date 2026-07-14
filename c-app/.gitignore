@@ -12,6 +12,9 @@ node_modules
 dist
 *.local
 
+# Local build/debug artifacts
+emu-shot.png
+
 # Editor directories and files
 .idea
 *.suo

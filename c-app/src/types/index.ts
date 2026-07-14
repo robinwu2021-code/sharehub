@@ -39,6 +39,7 @@ export interface NearbyCabinet {
   pricePerHour: number;
   currency: string;
   status: "ACTIVE" | "PAUSED";
+  favorite?: boolean; // 是否已收藏（找柜列表/收藏页共用；后端 /mp/nearby 回填）
 }
 
 // 借出可用性校验（借出确认页）

@@ -40,6 +40,10 @@ const P: Record<string, string> = {
   trash: '<path d="M4.5 7h15"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><path d="M6.5 7l1 12.5a2 2 0 0 0 2 1.9h5a2 2 0 0 0 2-1.9L18 7"/>',
   info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5"/><path d="M12 8h.01"/>',
   map: '<path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6 9 4Z"/><path d="M9 4v14"/><path d="M15 6v14"/>',
+  locate: '<circle cx="12" cy="12" r="7"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="2.4"/>',
+  list: '<path d="M8 6h13M8 12h13M8 18h13"/><path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01"/>',
+  home: '<path d="m3 10 9-7 9 7v9.5a1.5 1.5 0 0 1-1.5 1.5H15v-6H9v6H4.5A1.5 1.5 0 0 1 3 19.5Z"/>',
+  store: '<path d="M4 9.6V20a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9.6"/><path d="M3 3h18l1.2 4.2a2.4 2.4 0 0 1-4.7.8 2.4 2.4 0 0 1-4.75 0 2.4 2.4 0 0 1-4.75 0 2.4 2.4 0 0 1-4.7-.8L3 3Z"/><path d="M9.5 21v-4.5h5V21"/>',
 };
 
 const svg = computed(

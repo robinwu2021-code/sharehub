@@ -1,9 +1,10 @@
 <script setup lang="ts">
 // 借出确认 → 下单 → 等弹出(dispensing) → 借出成功。免押/押金二选一（端侧 PaymentPort，MVP Stub）。
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import { api } from "@/api";
 import { t } from "@/i18n";
+import { money } from "@/shared/format";
 import type { CabinetAvailability } from "@/types";
 import { payment } from "@/ports/payment";
 
@@ -13,6 +14,17 @@ const useFree = ref(true);
 const stage = ref<"confirm" | "dispensing" | "success">("confirm");
 const orderNo = ref("");
 let cabinetNo = "";
+
+// 租借说明要点（数据驱动，金额随柜机）：计费 / 通用通还 / 押金自动退
+const rules = computed(() => {
+  const a = avail.value;
+  if (!a) return [];
+  return [
+    { title: t("borrow.rulePrice", { price: money(a.pricePerHour, a.currency), cap: money(a.dailyCap, a.currency) }), sub: t("borrow.rulePriceSub") },
+    { title: t("borrow.ruleReturn"), sub: t("borrow.ruleReturnSub") },
+    { title: t("borrow.ruleDeposit", { deposit: money(a.depositAmount, a.currency) }), sub: t("borrow.ruleDepositSub") },
+  ];
+});
 
 onLoad((q) => {
   cabinetNo = (q?.cabinetNo as string) || "";
@@ -46,7 +58,7 @@ function viewOrder() {
 <template>
   <pb-scaffold :title="$t('borrow.confirm')" show-back>
     <!-- 确认 -->
-    <view v-if="stage === 'confirm'" class="px-[32rpx] pt-[24rpx]">
+    <view v-if="stage === 'confirm'" class="px-[32rpx] pt-[24rpx] pb-[220rpx]">
       <pb-card v-if="avail">
         <text class="pb-h2">{{ avail.siteName }}</text>
         <view class="mt-[8rpx] text-[24rpx] text-sub">{{ $t("borrow.cabinet") }} · {{ avail.cabinetNo }}</view>
@@ -65,6 +77,22 @@ function viewOrder() {
           </view>
         </view>
       </pb-card>
+
+      <!-- 租借说明 -->
+      <view class="mt-[24rpx]">
+        <pb-card>
+          <text class="pb-h2">{{ $t("borrow.rulesTitle") }}</text>
+          <view class="mt-[24rpx] flex flex-col gap-[24rpx]">
+            <view v-for="(r, i) in rules" :key="i" class="flex gap-[16rpx]">
+              <view class="pb-rule-dot" />
+              <view class="flex-1">
+                <text class="text-[28rpx] font-semibold text-ink">{{ r.title }}</text>
+                <view class="mt-[4rpx] text-[22rpx] text-sub">{{ r.sub }}</view>
+              </view>
+            </view>
+          </view>
+        </pb-card>
+      </view>
 
       <!-- 免押 / 押金 -->
       <view class="mt-[24rpx] flex flex-col gap-[16rpx]">
@@ -88,8 +116,15 @@ function viewOrder() {
         <view class="pb-check" :class="{ 'is-on': agree }"><pb-icon v-if="agree" name="check" :size="24" :stroke="3" /></view>
         <text class="text-[24rpx] text-sub">{{ $t("borrow.agree") }}</text>
       </view>
+    </view>
 
-      <view class="mt-[36rpx]"><pb-button block size="lg" @click="submit">{{ $t("borrow.submit") }}</pb-button></view>
+    <!-- 吸底操作栏（仅确认阶段） -->
+    <view v-if="stage === 'confirm' && avail" class="pb-paybar">
+      <view class="flex flex-col">
+        <text class="text-[22rpx] text-sub">{{ useFree ? $t("borrow.freeDeposit") : $t("borrow.deposit") }}</text>
+        <pb-amount :value="useFree ? avail.freeQuota : avail.depositAmount" size="md" />
+      </view>
+      <pb-button size="lg" @click="submit">{{ useFree ? $t("borrow.submit") : $t("borrow.payDeposit") }}</pb-button>
     </view>
 
     <!-- 弹出中 -->
@@ -110,6 +145,14 @@ function viewOrder() {
 </template>
 
 <style scoped>
+.pb-rule-dot {
+  width: 16rpx;
+  height: 16rpx;
+  margin-top: 12rpx;
+  border-radius: 9999px;
+  background: var(--pb-primary);
+  flex-shrink: 0;
+}
 .pb-opt {
   display: flex;
   align-items: center;
@@ -151,6 +194,19 @@ function viewOrder() {
   flex-shrink: 0;
 }
 .pb-check.is-on { background: var(--pb-primary); border-color: var(--pb-primary); }
+/* 吸底操作栏 */
+.pb-paybar {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24rpx;
+  padding: 20rpx 32rpx calc(20rpx + env(safe-area-inset-bottom));
+  background: var(--pb-surface);
+  box-shadow: 0 -6rpx 28rpx rgba(18, 20, 34, 0.08);
+}
 .pb-dispense { display: inline-block; animation: pbbounce 1s ease-in-out infinite; }
 @keyframes pbbounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-16rpx); } }
 .pb-ok {

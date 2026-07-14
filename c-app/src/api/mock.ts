@@ -17,7 +17,7 @@ export const mockApi: McpApi = {
   listNotices: () => db.delay(db.notices),
   storeDetail: (siteNo: string) => db.delay(db.storeOf(siteNo)),
 
-  listFavorites: () => db.delay(db.cabinets.filter((c) => db.favorites.has(c.siteNo))),
+  listFavorites: () => db.delay(db.cabinets.filter((c) => db.favorites.has(c.siteNo)).map((c) => ({ ...c, favorite: true }))),
   toggleFavorite: (siteNo: string) => {
     if (db.favorites.has(siteNo)) db.favorites.delete(siteNo);
     else db.favorites.add(siteNo);
@@ -39,9 +39,9 @@ export const mockApi: McpApi = {
 
   nearbyCabinets: (q: NearbyQ = {}) =>
     db.delay(
-      db.cabinets.filter(
-        (c) => db.kwHit(q.keyword, c.siteName, c.address) && (!q.returnable || c.availableReturn > 0),
-      ),
+      db.cabinets
+        .filter((c) => db.kwHit(q.keyword, c.siteName, c.address) && (!q.returnable || c.availableReturn > 0))
+        .map((c) => ({ ...c, favorite: db.favorites.has(c.siteNo) })),
     ),
   cabinetAvailability: (cabinetNo: string) =>
     db.delay(db.availability[cabinetNo] ?? { ...Object.values(db.availability)[0], cabinetNo, borrowable: false }),

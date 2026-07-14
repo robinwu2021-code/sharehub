@@ -3,9 +3,23 @@
 // Capacitor WebView = H5，Maps JS API 在 WebView 中完全可用，无需 renderjs。
 import { onMounted, onUnmounted, watch } from "vue";
 import type { NearbyCabinet } from "@/types";
+import { useThemeStore } from "@/stores/theme";
 
-const props = defineProps<{ points: NearbyCabinet[] }>();
+const props = defineProps<{ points: NearbyCabinet[]; full?: boolean; selected?: string | null }>();
 const emit = defineEmits<{ (e: "select", p: NearbyCabinet): void }>();
+
+const theme = useThemeStore();
+
+// 从主题令牌取色，保证地图标注随 4 色系/明暗切换（严禁在此写死品牌色）
+function cssVar(name: string, fallback: string): string {
+  // #ifdef H5
+  if (typeof document !== "undefined") {
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    if (v) return v;
+  }
+  // #endif
+  return fallback;
+}
 
 const KEY = import.meta.env.VITE_GMAPS_KEY as string | undefined;
 const hasKey = !!KEY;
@@ -49,14 +63,46 @@ async function getUserLocation(): Promise<{ lat: number; lng: number }> {
   });
 }
 
-function buildMarkerIcon(available: boolean): google.maps.Symbol {
+type PinState = "available" | "off" | "selected";
+
+// 泪滴气泡 + 白色⚡（对齐原型）。整体 SVG data-URI，随主题令牌取色。
+function pinSvg(fill: string): string {
+  const zap = "M13 2 4 13.5h7L10 22l9-11.5h-7L13 2Z";
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="44" height="54" viewBox="0 0 44 54">` +
+    `<path d="M22 51C14 40 4 31 4 20A18 18 0 1 1 40 20C40 31 30 40 22 51Z" fill="${fill}"/>` +
+    `<g transform="translate(22 19) scale(0.82) translate(-11.5 -12)"><path d="${zap}" fill="#fff"/></g>` +
+    `</svg>`;
+  return "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg);
+}
+
+function pinFill(state: PinState): string {
+  if (state === "selected") return cssVar("--pb-ink", "#16171d");
+  if (state === "off") return cssVar("--pb-sub", "#9ca3af");
+  return cssVar("--pb-primary", "#17c3c0");
+}
+
+function buildMarkerIcon(state: PinState): google.maps.Icon {
+  return {
+    url: pinSvg(pinFill(state)),
+    scaledSize: new google.maps.Size(44, 54),
+    anchor: new google.maps.Point(22, 52),
+  };
+}
+
+function pinState(p: NearbyCabinet): PinState {
+  if (props.selected != null && p.siteNo === props.selected) return "selected";
+  return p.availableBorrow > 0 ? "available" : "off";
+}
+
+function buildUserIcon(): google.maps.Symbol {
   return {
     path: google.maps.SymbolPath.CIRCLE,
-    fillColor: available ? "#22c55e" : "#9ca3af",
+    fillColor: cssVar("--pb-ink", "#16171d"),
     fillOpacity: 1,
-    strokeColor: "#ffffff",
-    strokeWeight: 2.5,
-    scale: 17,
+    strokeColor: cssVar("--pb-surface", "#ffffff"),
+    strokeWeight: 3,
+    scale: 9,
   };
 }
 
@@ -67,14 +113,13 @@ function placeMarkers() {
 
   props.points.forEach((p) => {
     if (p.lat == null || p.lng == null) return;
-    const available = p.availableBorrow > 0;
+    const state = pinState(p);
     const m = new google.maps.Marker({
       position: { lat: p.lat, lng: p.lng },
       map: gmap!,
       title: p.siteName,
-      label: { text: String(p.availableBorrow), color: "#fff", fontSize: "11px", fontWeight: "700" },
-      icon: buildMarkerIcon(available),
-      zIndex: available ? 100 : 50,
+      icon: buildMarkerIcon(state),
+      zIndex: state === "selected" ? 200 : state === "available" ? 100 : 50,
     });
     m.addListener("click", () => emit("select", p));
     markers.push(m);
@@ -92,14 +137,7 @@ function setUserMarker(pos: { lat: number; lng: number }) {
       position: pos,
       map: gmap,
       title: "You",
-      icon: {
-        path: google.maps.SymbolPath.CIRCLE,
-        fillColor: "#2F6BFF",
-        fillOpacity: 1,
-        strokeColor: "#fff",
-        strokeWeight: 3,
-        scale: 9,
-      },
+      icon: buildUserIcon(),
       zIndex: 9999,
     });
   }
@@ -137,8 +175,28 @@ async function initGMap() {
   });
 }
 
+// 回到我的位置（供全屏地图的定位按钮调用）
+async function recenter() {
+  if (!gmap) return;
+  const center = await getUserLocation();
+  setUserMarker(center);
+  gmap.setCenter(center);
+  gmap.setZoom(14);
+}
+defineExpose({ recenter });
+
 onMounted(initGMap);
 watch(() => props.points, placeMarkers, { deep: true });
+watch(() => props.selected, placeMarkers);
+// 换肤/明暗切换时，JS 绘制的标注不会自动重绘 → 手动按新令牌重建
+watch(
+  () => [theme.skin, theme.mode],
+  () => {
+    if (!gmap) return;
+    placeMarkers();
+    userMarker?.setIcon(buildUserIcon());
+  },
+);
 onUnmounted(() => {
   markers.forEach((m) => m.setMap(null));
   userMarker?.setMap(null);
@@ -148,22 +206,21 @@ onUnmounted(() => {
 
 <template>
   <!-- 真实地图容器（有 key） -->
-  <view v-if="hasKey" id="pb-map-canvas" class="pb-map pb-map--real" />
+  <view v-if="hasKey" id="pb-map-canvas" class="pb-map pb-map--real" :class="{ 'pb-map--full': full }" />
 
   <!-- 占位（无 key） -->
-  <view v-else class="pb-map">
+  <view v-else class="pb-map" :class="{ 'pb-map--full': full }">
     <view class="pb-map__grid" />
     <view class="pb-map__me" />
     <view
       v-for="(p, i) in points.slice(0, 5)"
       :key="p.cabinetNo"
       class="pb-map__pin"
-      :class="{ 'is-off': p.availableBorrow <= 0 }"
+      :class="{ 'is-off': p.availableBorrow <= 0, 'is-sel': selected === p.siteNo }"
       :style="POS[i]"
       @tap="emit('select', p)"
     >
-      <pb-icon name="pin" :size="46" />
-      <text class="pb-map__cnt">{{ p.availableBorrow }}</text>
+      <view class="pb-map__balloon"><pb-icon name="zap" :size="30" /></view>
     </view>
     <view class="pb-map__note">
       <pb-icon name="map" :size="26" />
@@ -185,7 +242,9 @@ onUnmounted(() => {
   box-shadow: var(--pb-shadow);
 }
 /* 真实地图：Google Maps 自行填满 */
-.pb-map--real { background: #e5e3df; }
+.pb-map--real { background: var(--pb-faint); }
+/* 全屏模式：去圆角/阴影，边到边铺满 */
+.pb-map--full { border-radius: 0; box-shadow: none; min-height: 0; }
 
 /* 占位样式 */
 .pb-map__grid {
@@ -208,13 +267,23 @@ onUnmounted(() => {
 .pb-map__pin {
   position: absolute;
   transform: translate(-50%, -100%);
-  color: var(--pb-primary);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
 }
-.pb-map__pin.is-off { color: var(--pb-sub); }
-.pb-map__cnt { font-size: 20rpx; font-weight: 800; margin-top: -6rpx; }
+/* 泪滴气泡：圆角方块留一个尖角 + 旋转 45° 使尖角朝下；内部⚡反向旋转保持正立 */
+.pb-map__balloon {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: var(--pb-primary);
+  color: var(--pb-on-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6rpx 16rpx var(--pb-primary-tint);
+}
+.pb-map__balloon .pb-icon { transform: rotate(45deg); }
+.pb-map__pin.is-off .pb-map__balloon { background: var(--pb-sub); box-shadow: none; }
+.pb-map__pin.is-sel .pb-map__balloon { background: var(--pb-ink); }
 .pb-map__note {
   position: absolute;
   right: 16rpx; bottom: 16rpx;

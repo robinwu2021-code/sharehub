@@ -18,5 +18,6 @@ export function setI18nLang(lang: Lang) {
   i18n.global.locale.value = lang;
 }
 
-// TS 内取文案（模板用 $t）
-export const t = (key: string): string => i18n.global.t(key);
+// TS 内取文案（模板用 $t）。支持命名插值：t("k", { price })
+export const t = (key: string, named?: Record<string, unknown>): string =>
+  named ? i18n.global.t(key, named) : i18n.global.t(key);
