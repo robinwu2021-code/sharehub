@@ -97,7 +97,7 @@ export function SecondaryNav() {
   const { navMode, setNavMode } = useNavPrefs();
   const { tNav } = useI18n();
 
-  const hit = findActiveModule(pathname);
+  const hit = findActiveModule(pathname, tab, view);
   // miller 左列选中态（可浏览非当前模块的子功能）；路由变化时回同步
   const [selKey, setSelKey] = useState(hit?.module.key);
   useEffect(() => setSelKey(hit?.module.key), [hit?.module.key]);

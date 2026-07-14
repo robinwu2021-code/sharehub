@@ -1,4 +1,4 @@
-// nav 三级导航纯函数单测 —— 场景对照 TDD-运营端三级导航.md §4.2 + 附录A.9 矩阵。
+// nav 三级导航纯函数单测（V2 四级账户体系）—— 对照 运营端功能清单-V2四级体系.md §四 矩阵。
 import { describe, it, expect } from "vitest";
 import {
   NAV,
@@ -22,59 +22,94 @@ const module_ = (dKey: string, mKey: string) => {
 };
 const domainKeys = (role: Role) => visibleDomains(role).map((d) => d.key);
 
-describe("A.9 角色×域可见性矩阵（抽查）", () => {
-  it("ADMIN 见全部 7 域", () => {
+describe("§4.1 角色×域可见性矩阵（14 域派生）", () => {
+  it("ADMIN 见全部 14 域", () => {
     expect(domainKeys("ADMIN")).toEqual([
-      "overview", "device-ops", "place-bd", "trade-fin", "user-growth", "analytics", "system",
+      "overview", "operations", "devices", "alerts", "orders", "topup", "members",
+      "partners", "finance", "marketing", "integrations", "messaging", "analytics", "access",
     ]);
   });
-  it("VIEWER 不见 用户与增长/系统与权限", () => {
+  it("OPS 见 9 域（无充值/会员/财务/营销/集成）", () => {
+    expect(domainKeys("OPS")).toEqual([
+      "overview", "operations", "devices", "alerts", "orders", "partners", "messaging", "analytics", "access",
+    ]);
+  });
+  it("CS 见 8 域（无运营/合作伙伴/财务/集成/报表/系统权限）", () => {
+    expect(domainKeys("CS")).toEqual([
+      "overview", "devices", "alerts", "orders", "topup", "members", "marketing", "messaging",
+    ]);
+  });
+  it("FINANCE 见 9 域（无设备/告警/营销/集成/消息）", () => {
+    expect(domainKeys("FINANCE")).toEqual([
+      "overview", "operations", "orders", "topup", "members", "partners", "finance", "analytics", "access",
+    ]);
+  });
+  it("BD 见 6 域（拓展/营销/财务分润/报表）", () => {
+    expect(domainKeys("BD")).toEqual([
+      "overview", "operations", "partners", "finance", "marketing", "analytics",
+    ]);
+  });
+  it("VIEWER 见 7 域，不见 会员/系统权限/营销/集成/消息/告警/充值", () => {
     const keys = domainKeys("VIEWER");
-    expect(keys).not.toContain("user-growth");
-    expect(keys).not.toContain("system");
-    expect(keys).toEqual(expect.arrayContaining(["overview", "device-ops", "place-bd", "trade-fin", "analytics"]));
+    expect(keys).toEqual(["overview", "operations", "devices", "orders", "partners", "finance", "analytics"]);
+    expect(keys).not.toContain("members");
+    expect(keys).not.toContain("access");
   });
-  it("BD 不见 设备运营；CS 不见 场地与拓展/数据报表", () => {
-    expect(domainKeys("BD")).not.toContain("device-ops");
-    const cs = domainKeys("CS");
-    expect(cs).not.toContain("place-bd");
-    expect(cs).not.toContain("analytics");
+  it("AGENT 见 7 域（自己范围：设备/告警工单/订单/合作/财务）", () => {
+    expect(domainKeys("AGENT")).toEqual([
+      "overview", "operations", "devices", "alerts", "orders", "partners", "finance",
+    ]);
   });
-  it("FINANCE 进 系统与权限 仅见员工与权限(审计)，不见系统设置", () => {
-    const mods = visibleModules(domain("system"), "FINANCE").map((m) => m.key);
-    expect(mods).toEqual(["org"]);
-  });
-  it("AGENT 见 概览/设备运营/场地与拓展/交易与资金，不见其余", () => {
-    expect(domainKeys("AGENT")).toEqual(["overview", "device-ops", "place-bd", "trade-fin"]);
+  it("FINANCE 进 系统权限 仅见 员工与权限(org)，不见系统设置(system)", () => {
+    expect(visibleModules(domain("access"), "FINANCE").map((m) => m.key)).toEqual(["org"]);
   });
 });
 
-describe("L3 叶子过滤（4.2-2）", () => {
-  const finance = module_("trade-fin", "finance");
-  it("VIEWER 的财务：无 账务分录/对账/发票，有 规则/明细/结算/提现", () => {
-    const labels = visibleLeaves(finance, "VIEWER").map((l) => l.label);
+describe("A7 空模块过滤（canModule 命中但无可见叶 → 不渲染）", () => {
+  it("VIEWER 的财务只保留 分润结算 模块（平台/运营商/商户/会员/对账 全空被过滤）", () => {
+    expect(visibleModules(domain("finance"), "VIEWER").map((m) => m.key)).toEqual(["fin_share"]);
+  });
+  it("FINANCE 的财务保留全部 6 个模块", () => {
+    expect(visibleModules(domain("finance"), "FINANCE").map((m) => m.key)).toEqual([
+      "fin_platform", "fin_operator", "fin_merchant", "fin_member", "fin_share", "fin_recon",
+    ]);
+  });
+});
+
+describe("L3 叶子过滤（§三）", () => {
+  it("VIEWER 分润结算：有 规则/明细/结算/提现，无 代理分润配置(跨域)", () => {
+    const labels = visibleLeaves(module_("finance", "fin_share"), "VIEWER").map((l) => l.label);
     expect(labels).toEqual(["分润规则", "分润明细", "结算单", "提现审核"]);
   });
-  it("FINANCE 的财务：7 项全见", () => {
-    expect(visibleLeaves(finance, "FINANCE")).toHaveLength(7);
+  it("FINANCE 分润结算：5 项全见（含跨域「代理分润配置」深链）", () => {
+    const labels = visibleLeaves(module_("finance", "fin_share"), "FINANCE").map((l) => l.label);
+    expect(labels).toHaveLength(5);
+    expect(labels).toContain("代理分润配置");
   });
-  it("OPS 的站点与点位：无 进场合同/站点坪效", () => {
-    const labels = visibleLeaves(module_("place-bd", "location"), "OPS").map((l) => l.label);
+  it("OPS 的站点管理：无 进场合同，有 站点总览（坪效已迁数据报表）", () => {
+    const labels = visibleLeaves(module_("operations", "location"), "OPS").map((l) => l.label);
     expect(labels).not.toContain("进场合同");
     expect(labels).not.toContain("站点坪效");
-    expect(labels).toContain("站点管理");
+    expect(labels).toContain("站点总览");
+  });
+  it("VIEWER 见合作伙伴的「商户」，不见「代理商档案」", () => {
+    const labels = visibleLeaves(module_("partners", "partner"), "VIEWER").map((l) => l.label);
+    expect(labels).toEqual(["商户"]);
   });
 });
 
-describe("findActiveModule 路径反推（4.2-3，含尾斜杠/最长前缀）", () => {
+describe("findActiveModule 路径反推（含尾斜杠/最长前缀/A6 基座）", () => {
   it.each([
     ["/", "overview", "dashboard"],
-    ["/finance", "trade-fin", "finance"],
-    ["/finance/", "trade-fin", "finance"],
-    ["/devices/detail", "device-ops", "device"],
-    ["/system/vendors/", "system", "system"],
-    ["/work-orders", "device-ops", "workorder"],
-    ["/agents", "place-bd", "agent"],
+    ["/finance", "finance", "fin_platform"],
+    ["/finance/", "finance", "fin_platform"],
+    ["/orders", "orders", "order"],
+    ["/marketing", "marketing", "marketing"],
+    ["/devices/detail", "devices", "device"],
+    ["/system/vendors/", "access", "system"],
+    ["/work-orders", "alerts", "workorder"],
+    ["/agents", "partners", "agent"],
+    ["/partners", "partners", "partner"],
   ])("%s → %s / %s", (path, dKey, mKey) => {
     const hit = findActiveModule(path);
     expect(hit?.domain.key).toBe(dKey);
@@ -85,53 +120,82 @@ describe("findActiveModule 路径反推（4.2-3，含尾斜杠/最长前缀）",
   });
 });
 
-describe("activeLeafIndex 深链高亮（4.2-6）", () => {
-  const financeLeaves = (role: Role) => visibleLeaves(module_("trade-fin", "finance"), role);
-  it("裸 /finance 无 query → 默认首个可点叶子（分润规则）", () => {
-    const leaves = financeLeaves("FINANCE");
-    expect(leaves[activeLeafIndex(leaves, "/finance", null, null)].label).toBe("分润规则");
+describe("A6 同 path 多模块按 tab/view 归属消歧", () => {
+  it("finance 6 模块共享 /finance：按 tab 归属", () => {
+    expect(findActiveModule("/finance", "rules")?.module.key).toBe("fin_share");
+    expect(findActiveModule("/finance", "records")?.module.key).toBe("fin_share");
+    expect(findActiveModule("/finance", "merchant-flows")?.module.key).toBe("fin_merchant");
+    expect(findActiveModule("/finance", "operator-flows")?.module.key).toBe("fin_operator");
+    expect(findActiveModule("/finance", "member-flows")?.module.key).toBe("fin_member");
+    expect(findActiveModule("/finance", "ledger")?.module.key).toBe("fin_recon");
+    expect(findActiveModule("/finance", "withdrawals")?.module.key).toBe("fin_share");
+  });
+  it("orders 3 模块共享 /orders：按 tab 归属", () => {
+    expect(findActiveModule("/orders", "free-users")?.module.key).toBe("freeorder");
+    expect(findActiveModule("/orders", "stats-device")?.module.key).toBe("orderstats");
+    expect(findActiveModule("/orders", "exceptions")?.module.key).toBe("order");
+  });
+  it("marketing 活动/广告屏共享 /marketing：按 tab 归属", () => {
+    expect(findActiveModule("/marketing", "ad-slots")?.module.key).toBe("adscreen");
+    expect(findActiveModule("/marketing", "campaigns")?.module.key).toBe("marketing");
+  });
+});
+
+describe("activeLeafIndex 深链高亮", () => {
+  it("/finance?tab=rules → 分润规则（fin_share 首叶）", () => {
+    const leaves = visibleLeaves(module_("finance", "fin_share"), "FINANCE");
+    expect(leaves[activeLeafIndex(leaves, "/finance", "rules", null)].label).toBe("分润规则");
   });
   it("?tab=ledger → 账务分录 Phase 2，当前 P1 下不命中(-1)", () => {
-    const leaves = financeLeaves("FINANCE");
-    expect(activeLeafIndex(leaves, "/finance/", "ledger", null)).toBe(-1);
+    const leaves = visibleLeaves(module_("finance", "fin_recon"), "FINANCE");
+    expect(activeLeafIndex(leaves, "/finance", "ledger", null)).toBe(-1);
   });
-  it("VIEWER 无 ledger 菜单项 → ?tab=ledger 不命中(-1)", () => {
-    expect(activeLeafIndex(financeLeaves("VIEWER"), "/finance", "ledger", null)).toBe(-1);
+  it("VIEWER 无 对账开票 模块 → 空叶集合不命中(-1)", () => {
+    const leaves = visibleLeaves(module_("finance", "fin_recon"), "VIEWER");
+    expect(activeLeafIndex(leaves, "/finance", "ledger", null)).toBe(-1);
   });
-  it("工单 ?view=board → 工单看板", () => {
-    const leaves = visibleLeaves(module_("device-ops", "workorder"), "OPS");
-    expect(leaves[activeLeafIndex(leaves, "/work-orders", null, "board")].label).toBe("工单看板");
+  it("工单看板 P2（PRD 客服工单系统 P2）→ 当前 P1 下 ?view=board 被锁不命中(-1)", () => {
+    const leaves = visibleLeaves(module_("alerts", "workorder"), "OPS");
+    expect(activeLeafIndex(leaves, "/work-orders", null, "board")).toBe(-1);
   });
   it("固件 OTA Phase 2 → 当前 P1 下 ?tab=ota 不命中(-1)", () => {
-    const leaves = visibleLeaves(module_("device-ops", "device"), "OPS");
+    const leaves = visibleLeaves(module_("devices", "device"), "OPS");
     expect(activeLeafIndex(leaves, "/devices", "ota", null)).toBe(-1);
   });
 });
 
-describe("域形态（4.2-5 / D2）", () => {
-  it("概览 = 单模块域（无 L2 面板）；analytics 有子功能不算单模块域", () => {
+describe("域形态", () => {
+  it("概览 = 单模块域（无 L2 面板）；analytics/finance 非单模块域", () => {
     expect(isSingleModuleDomain(domain("overview"))).toBe(true);
     expect(isSingleModuleDomain(domain("analytics"))).toBe(false);
-    expect(isSingleModuleDomain(domain("trade-fin"))).toBe(false);
+    expect(isSingleModuleDomain(domain("finance"))).toBe(false);
   });
-  it("analytics 报表已建（OPS 视角）→ 非待建；device-ops 非待建", () => {
+  it("无 soon 标记 → isDomainSoon 恒为 false", () => {
     expect(isDomainSoon(domain("analytics"), "OPS")).toBe(false);
-    expect(isDomainSoon(domain("device-ops"), "OPS")).toBe(false);
+    expect(isDomainSoon(domain("devices"), "OPS")).toBe(false);
   });
 });
 
 describe("默认落地与面包屑", () => {
-  it("域默认落地 = 首个可点模块的首个可点叶子", () => {
-    expect(domainDefaultHref(domain("trade-fin"), "FINANCE")).toBe("/orders");
-    expect(domainDefaultHref(domain("device-ops"), "OPS")).toBe("/devices");
-    // CS 无 place-bd；FINANCE 的 place-bd 首模块 location → sites
-    expect(domainDefaultHref(domain("place-bd"), "FINANCE")).toBe("/locations?tab=venues");
+  it("域默认落地 = 首个可点模块的首个可点叶（跳过被锁模块/叶）", () => {
+    // 平台流水 P1（PRD 财务数据 P1）→ finance 域首落地 = /finance
+    expect(domainDefaultHref(domain("finance"), "FINANCE")).toBe("/finance");
+    expect(domainDefaultHref(domain("devices"), "OPS")).toBe("/devices");
+    expect(domainDefaultHref(domain("orders"), "OPS")).toBe("/orders");
+    // FINANCE 无站点 poi 权限 → operations 域落到 pricing（计费模板 P1）
+    expect(domainDefaultHref(domain("operations"), "FINANCE")).toBe("/pricing");
   });
-  it("cs 模块：报障受理/客服会话为 Phase 2，P1 下首个可点叶子 = 退款/补偿(/orders)", () => {
-    expect(moduleDefaultHref(module_("user-growth", "cs"), "CS")).toBe("/orders");
+  it("moduleDefaultHref：跳过被锁叶，落到首个可点叶（fin_share→分润规则）", () => {
+    expect(moduleDefaultHref(module_("finance", "fin_share"), "ADMIN")).toBe("/finance?tab=rules");
   });
-  it("面包屑：/finance?tab=withdrawals → 提现审核为 Phase 2，P1 只到模块层", () => {
-    expect(breadcrumb("/finance/", "withdrawals", null, "FINANCE")).toEqual(["交易与资金", "财务管理"]);
+  it("充值域 P1 全锁 → 无默认落地(undefined)", () => {
+    expect(domainDefaultHref(domain("topup"), "CS")).toBeUndefined();
+  });
+  it("面包屑：/finance?tab=rules → 域›模块›子功能", () => {
+    expect(breadcrumb("/finance/", "rules", null, "FINANCE")).toEqual(["财务管理", "分润结算", "分润规则"]);
+  });
+  it("面包屑：/finance?tab=withdrawals 提现审核 P2 → 只到模块层", () => {
+    expect(breadcrumb("/finance/", "withdrawals", null, "FINANCE")).toEqual(["财务管理", "分润结算"]);
   });
   it("面包屑：概览单模块域只有一级", () => {
     expect(breadcrumb("/", null, null, "ADMIN")).toEqual(["概览"]);
@@ -160,17 +224,20 @@ describe("分期屏蔽（phase gating，默认 CURRENT_PHASE=1）", () => {
     expect(isPhaseLocked(undefined)).toBe(false);
   });
   it("isLeafLocked / isLeafDisabled：固件 OTA(P2) 被锁且不可点", () => {
-    const ota = module_("device-ops", "device").children!.find((l) => l.href.includes("ota"))!;
+    const ota = module_("devices", "device").children!.find((l) => l.href.includes("ota"))!;
     expect(isLeafLocked(ota)).toBe(true);
     expect(isLeafDisabled(ota)).toBe(true);
   });
-  it("isModuleLocked：营销/用户/报表模块 P1 下全叶被锁 → 模块锁", () => {
-    expect(isModuleLocked(module_("user-growth", "marketing"), "ADMIN")).toBe(true);
-    expect(isModuleLocked(module_("user-growth", "user"), "ADMIN")).toBe(true);
+  it("isModuleLocked：营销活动/报表模块 P1 下全叶被锁 → 模块锁", () => {
+    expect(isModuleLocked(module_("marketing", "marketing"), "ADMIN")).toBe(true);
     expect(isModuleLocked(module_("analytics", "report"), "ADMIN")).toBe(true);
   });
+  it("isModuleLocked：会员模块含 P1 叶（用户列表）→ 不锁", () => {
+    // 甲特图真值：用户管理(C端) 属 P1，故会员/user 模块存在可点叶
+    expect(isModuleLocked(module_("members", "user"), "ADMIN")).toBe(false);
+  });
   it("isModuleLocked：设备模块含 P1 叶 → 不锁", () => {
-    expect(isModuleLocked(module_("device-ops", "device"), "ADMIN")).toBe(false);
+    expect(isModuleLocked(module_("devices", "device"), "ADMIN")).toBe(false);
   });
   it("routeLockedPhase：/devices?tab=ota → 被 P2 锁", () => {
     expect(routeLockedPhase("/devices", "ota", null, "ADMIN")).toBe(2);
@@ -178,13 +245,32 @@ describe("分期屏蔽（phase gating，默认 CURRENT_PHASE=1）", () => {
   it("routeLockedPhase：/devices（台账 P1）→ 不锁", () => {
     expect(routeLockedPhase("/devices", null, null, "ADMIN")).toBeUndefined();
   });
-  it("routeLockedPhase：/marketing 首页（首叶 优惠券 P2）→ 被 P2 锁", () => {
-    expect(routeLockedPhase("/marketing", null, null, "ADMIN")).toBe(2);
+  it("routeLockedPhase：/marketing 首页（首叶 优惠券 P3，PRD 会员营销工具 P3）→ 被 P3 锁", () => {
+    expect(routeLockedPhase("/marketing", null, null, "ADMIN")).toBe(3);
+  });
+  it("routeLockedPhase：/work-orders 首页（工单 P2，PRD 客服工单系统 P2）→ 被 P2 锁", () => {
+    expect(routeLockedPhase("/work-orders", null, "list", "ADMIN")).toBe(2);
+  });
+  it("routeLockedPhase：/finance 首页（平台流水 P1，PRD 财务数据 P1）→ 不锁", () => {
+    expect(routeLockedPhase("/finance", null, null, "ADMIN")).toBeUndefined();
+  });
+  it("routeLockedPhase：/reports?tab=device（设备效率分析 PRD P3）→ 被 P3 锁", () => {
+    expect(routeLockedPhase("/reports", "device", null, "ADMIN")).toBe(3);
+  });
+  it("routeLockedPhase：/operations 首页（基础运营全 P2）→ 被 P2 锁", () => {
+    expect(routeLockedPhase("/operations", null, null, "ADMIN")).toBe(2);
   });
   it("routeLockedPhase：设备详情等非叶路由 → 不锁（透传页面）", () => {
     expect(routeLockedPhase("/devices/detail", null, null, "ADMIN")).toBeUndefined();
   });
-  it("moduleDefaultHref：跳过被锁叶，落到首个可点叶（finance→分润规则）", () => {
-    expect(moduleDefaultHref(module_("trade-fin", "finance"), "ADMIN")).toBe("/finance?tab=rules");
+  // 甲特图真值补正：以下三项经 PDF 原件核对为 P1（还原文档曾误标）
+  it("routeLockedPhase：/users 首页（用户管理 C端 PDF P1）→ 不锁", () => {
+    expect(routeLockedPhase("/users", null, null, "ADMIN")).toBeUndefined();
+  });
+  it("routeLockedPhase：/marketing?tab=ad-slots（充电站点广告/设备屏 PDF P1）→ 不锁", () => {
+    expect(routeLockedPhase("/marketing", "ad-slots", null, "ADMIN")).toBeUndefined();
+  });
+  it("routeLockedPhase：/integrations 首页（Neargo 服务打通 PDF P1）→ 不锁", () => {
+    expect(routeLockedPhase("/integrations", null, null, "ADMIN")).toBeUndefined();
   });
 });
