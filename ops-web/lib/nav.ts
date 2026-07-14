@@ -1,9 +1,10 @@
 // 三级导航 SSOT（V2 四级账户体系）：域(L1) → 模块(L2) → 子功能(L3)。
-// 依据 docs/requirements/运营端功能清单-V2四级体系.md（14 域 / 27 模块 / 130 叶，逐行对照）。
+// 依据 docs/requirements/运营端功能清单-V2四级体系.md（基线 14 域 / 27 模块 / 130 叶，逐行对照）。
+// + 对齐参考功能清单「平台设置」补充 setting 模块（4 叶，仅 ADMIN）→ 现 14 域 / 28 模块 / 134 叶。
 // - 域可见性是派生的（域内任一模块 canModule 命中 且 至少一个可见叶）——见 visibleModules(A7)。
 // - L3 可见性 = leaf.perm ? can(role, perm) : 跟随父模块。
-// - phase = 产品分期：phase > CURRENT_PHASE 的叶子灰显不可点（按期屏蔽，不产生 404）。
-//   Phase 1=MVP T1-T3 | Phase 2=规模化 T4-T6 | Phase 3=生态 T7-T9。P1 可点集合与老方案一致。
+// - phase = 产品分期「标识」：P2/P3 叶子在导航中加徽标，但可正常点击/路由（不再屏蔽）。
+//   Phase 1=MVP T1-T3 | Phase 2=规模化 T4-T6 | Phase 3=生态 T7-T9。分期仅用于视觉标注与排期。
 // - A6：同 path 多模块（finance 6 模块共享 /finance；orders 3 模块共享 /orders；marketing 2 模块）
 //   由 findActiveModule 依 tab/view 归属消歧。
 // - 深链沿用 ?tab= / ?view=；本文件为纯数据+纯函数（无 React），可单测。
@@ -28,7 +29,7 @@ export interface NavLeaf {
   label: string;
   perm?: string; // 细粒度权限码；无则跟随父模块 canModule
   soon?: boolean; // 待建：灰显不可点
-  phase?: Phase; // 产品分期（缺省=P1）；phase > CURRENT_PHASE 时灰显不可点
+  phase?: Phase; // 产品分期（缺省=P1）；P2/P3 仅加徽标标识，可正常点击
 }
 
 export interface NavModule {
@@ -452,6 +453,16 @@ export const NAV: NavDomain[] = [
           { href: "/system?tab=compliance", label: "合规与备份", phase: 3 },
         ],
       },
+      {
+        // 平台设置（对齐参考功能清单「平台设置」模块）：品牌/支付网关/服务集成/其他配置。仅 ADMIN（module=setting）。
+        key: "settings", label: "平台设置", icon: "Cog", module: "setting", href: "/settings",
+        children: [
+          { href: "/settings", label: "应用与品牌", phase: 2 },
+          { href: "/settings?tab=payment", label: "支付设置", phase: 2 },
+          { href: "/settings?tab=service", label: "服务设置", phase: 2 },
+          { href: "/settings?tab=other", label: "其他设置", phase: 2 },
+        ],
+      },
     ],
   },
 ];
@@ -574,7 +585,7 @@ export function activeLeafIndex(
 ): number {
   const p = normPath(pathname);
   const exact = leaves.findIndex((l) => {
-    if (l.soon || isLeafLocked(l)) return false;
+    if (l.soon) return false; // 分期(P2/P3)可点，参与高亮；仅 soon（待建）不参与
     const parts = leafParts(l.href);
     if (parts.path !== p) return false;
     if (parts.tab) return parts.tab === tab;
@@ -583,24 +594,24 @@ export function activeLeafIndex(
   });
   if (exact >= 0) return exact;
   if (!tab && !view) {
-    return leaves.findIndex((l) => !l.soon && !isLeafLocked(l) && leafParts(l.href).path === p);
+    return leaves.findIndex((l) => !l.soon && leafParts(l.href).path === p);
   }
   return -1;
 }
 
-/** 域/模块的默认落地地址：首个可点叶子（排除 soon 和 phase-locked），无则模块首页。 */
+/** 域/模块的默认落地地址：首个可点叶子（仅排除 soon 待建；P2/P3 可落地），无则模块首页。 */
 export function moduleDefaultHref(mod: NavModule, role: Role | undefined): string {
-  const leaf = visibleLeaves(mod, role).find((l) => !l.soon && !isLeafLocked(l));
+  const leaf = visibleLeaves(mod, role).find((l) => !l.soon);
   return leaf?.href ?? mod.href;
 }
 export function domainDefaultHref(domain: NavDomain, role: Role | undefined): string | undefined {
-  const mod = visibleModules(domain, role).find((m) => !m.soon && !isModuleLocked(m, role));
+  const mod = visibleModules(domain, role).find((m) => !m.soon);
   return mod && moduleDefaultHref(mod, role);
 }
 
-/** 叶子是否不可点：待建 或 分期锁定（渲染层统一判定）。 */
+/** 叶子是否不可点：仅「待建(soon)」不可点；分期(P2/P3)已改为仅标识，可正常点击。 */
 export function isLeafDisabled(leaf: NavLeaf): boolean {
-  return !!leaf.soon || isLeafLocked(leaf);
+  return !!leaf.soon;
 }
 
 /**

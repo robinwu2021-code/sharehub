@@ -7,13 +7,13 @@
 import * as React from "react";
 import { ChevronRight } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
-import { isPhaseLocked, type Phase } from "@/lib/phase";
+import { PHASE_LABEL, type Phase } from "@/lib/phase";
 import { cn } from "@/lib/utils";
 
 export function TabHeader({
   tabs, value, onChange, action,
 }: {
-  // phase?：标注该子功能的交付阶段；phase > CURRENT_PHASE 时从页内 tab 条隐藏（分期屏蔽）。
+  // phase?：标注该子功能的交付阶段；P2/P3 仅在 tab 上加徽标「标识」，不再隐藏（可正常切换）。
   tabs: { key: string; label: string; phase?: Phase }[];
   value: string;
   onChange: (k: string) => void;
@@ -21,8 +21,8 @@ export function TabHeader({
 }) {
   const { t } = useI18n();
   const [pinned, setPinned] = React.useState(false);
-  // 分期锁定的 tab 不出现在页内切换条（nav L3 已灰显，页面 PhaseGuard 兜底直达）。
-  const visibleTabs = tabs.filter((x) => !isPhaseLocked(x.phase));
+  // 全部 tab 均可切换；P2/P3 仅以徽标标识交付阶段。
+  const visibleTabs = tabs;
   const current = tabs.find((x) => x.key === value);
   const multi = visibleTabs.length > 1;
   const toggle = () => setPinned((p) => !p);
@@ -71,13 +71,16 @@ export function TabHeader({
                   type="button"
                   onClick={() => onChange(tb.key)}
                   className={cn(
-                    "whitespace-nowrap rounded-lg px-3 py-1 text-[13px] transition-colors",
+                    "flex items-center gap-1 whitespace-nowrap rounded-lg px-3 py-1 text-[13px] transition-colors",
                     tb.key === value
                       ? "bg-card font-medium text-foreground shadow-[var(--card-shadow)]"
                       : "text-muted-foreground hover:text-foreground",
                   )}
                 >
                   {tb.label}
+                  {tb.phase && tb.phase > 1 && (
+                    <span className="rounded bg-primary/8 px-1 text-[9px] leading-3 text-primary/60">{PHASE_LABEL[tb.phase]}</span>
+                  )}
                 </button>
               ))}
             </div>

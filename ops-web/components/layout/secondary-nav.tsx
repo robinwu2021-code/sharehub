@@ -11,7 +11,7 @@ import * as Icons from "lucide-react";
 import {
   PANEL_WIDTH, MILLER_MODULE_WIDTH, MILLER_LEAF_WIDTH, type NavModule, type NavLeaf, type NavMode,
   visibleModules, visibleLeaves, findActiveModule, activeLeafIndex, isSingleModuleDomain,
-  moduleDefaultHref, normPath, isLeafLocked,
+  moduleDefaultHref, normPath,
 } from "@/lib/nav";
 import { useAuth } from "@/lib/auth";
 import { useNavPrefs } from "@/lib/stores/nav-prefs";
@@ -28,6 +28,7 @@ function SoonBadge() {
   return <span className="ms-auto shrink-0 rounded bg-muted px-1 text-[10px] leading-4 text-muted-foreground">{t("common.soon")}</span>;
 }
 
+// P2/P3 徽标：仅作阶段「标识」，不再屏蔽点击。
 function PhaseBadge({ phase }: { phase: Phase }) {
   return (
     <span className="ms-auto shrink-0 rounded bg-primary/8 px-1 text-[10px] leading-4 text-primary/60">
@@ -38,18 +39,19 @@ function PhaseBadge({ phase }: { phase: Phase }) {
 
 function LeafRow({ leaf, active }: { leaf: NavLeaf; active: boolean }) {
   const { t, tNav } = useI18n();
-  const locked = isLeafLocked(leaf);
-  if (leaf.soon || locked) {
+  // soon（待建，页面不存在）仍不可点；分期(P2/P3)改为「仅标识」——可正常点击，仅加徽标。
+  if (leaf.soon) {
     return (
       <span
         className="flex items-center rounded-md px-2.5 py-1.5 text-[13px] text-muted-foreground/50"
-        title={locked ? `${PHASE_LABEL[leaf.phase!]} ${t("phase.suffix")}` : t("common.soon")}
+        title={t("common.soon")}
       >
         <span className="truncate">{tNav(leaf.label)}</span>
-        {locked ? <PhaseBadge phase={leaf.phase!} /> : <SoonBadge />}
+        <SoonBadge />
       </span>
     );
   }
+  const marked = !!leaf.phase && leaf.phase > 1;
   return (
     <Link
       href={leaf.href}
@@ -59,6 +61,7 @@ function LeafRow({ leaf, active }: { leaf: NavLeaf; active: boolean }) {
       )}
     >
       <span className="truncate">{tNav(leaf.label)}</span>
+      {marked && <PhaseBadge phase={leaf.phase!} />}
     </Link>
   );
 }

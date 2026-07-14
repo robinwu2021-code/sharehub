@@ -146,21 +146,21 @@ describe("activeLeafIndex 深链高亮", () => {
     const leaves = visibleLeaves(module_("finance", "fin_share"), "FINANCE");
     expect(leaves[activeLeafIndex(leaves, "/finance", "rules", null)].label).toBe("分润规则");
   });
-  it("?tab=ledger → 账务分录 Phase 2，当前 P1 下不命中(-1)", () => {
+  it("?tab=ledger → 账务分录 Phase 2 现可点，正常命中高亮", () => {
     const leaves = visibleLeaves(module_("finance", "fin_recon"), "FINANCE");
-    expect(activeLeafIndex(leaves, "/finance", "ledger", null)).toBe(-1);
+    expect(leaves[activeLeafIndex(leaves, "/finance", "ledger", null)].label).toBe("账务分录");
   });
   it("VIEWER 无 对账开票 模块 → 空叶集合不命中(-1)", () => {
     const leaves = visibleLeaves(module_("finance", "fin_recon"), "VIEWER");
     expect(activeLeafIndex(leaves, "/finance", "ledger", null)).toBe(-1);
   });
-  it("工单看板 P2（PRD 客服工单系统 P2）→ 当前 P1 下 ?view=board 被锁不命中(-1)", () => {
+  it("工单看板 P2 现可点 → ?view=board 正常命中高亮", () => {
     const leaves = visibleLeaves(module_("alerts", "workorder"), "OPS");
-    expect(activeLeafIndex(leaves, "/work-orders", null, "board")).toBe(-1);
+    expect(leaves[activeLeafIndex(leaves, "/work-orders", null, "board")].label).toBe("工单看板");
   });
-  it("固件 OTA Phase 2 → 当前 P1 下 ?tab=ota 不命中(-1)", () => {
+  it("固件 OTA Phase 2 现可点 → ?tab=ota 正常命中高亮", () => {
     const leaves = visibleLeaves(module_("devices", "device"), "OPS");
-    expect(activeLeafIndex(leaves, "/devices", "ota", null)).toBe(-1);
+    expect(leaves[activeLeafIndex(leaves, "/devices", "ota", null)].label).toBe("固件 OTA");
   });
 });
 
@@ -177,25 +177,25 @@ describe("域形态", () => {
 });
 
 describe("默认落地与面包屑", () => {
-  it("域默认落地 = 首个可点模块的首个可点叶（跳过被锁模块/叶）", () => {
+  it("域默认落地 = 首个非待建模块的首叶（分期 P2/P3 也可落地）", () => {
     // 平台流水 P1（PRD 财务数据 P1）→ finance 域首落地 = /finance
     expect(domainDefaultHref(domain("finance"), "FINANCE")).toBe("/finance");
     expect(domainDefaultHref(domain("devices"), "OPS")).toBe("/devices");
     expect(domainDefaultHref(domain("orders"), "OPS")).toBe("/orders");
-    // FINANCE 无站点 poi 权限 → operations 域落到 pricing（计费模板 P1）
-    expect(domainDefaultHref(domain("operations"), "FINANCE")).toBe("/pricing");
+    // FINANCE 无 poi 权限但有 venue 权限 → operations 域首个可见叶 = 门店 Onboarding
+    expect(domainDefaultHref(domain("operations"), "FINANCE")).toBe("/locations?tab=onboarding");
   });
-  it("moduleDefaultHref：跳过被锁叶，落到首个可点叶（fin_share→分润规则）", () => {
+  it("moduleDefaultHref：落到首个非待建叶（fin_share→分润规则）", () => {
     expect(moduleDefaultHref(module_("finance", "fin_share"), "ADMIN")).toBe("/finance?tab=rules");
   });
-  it("充值域 P1 全锁 → 无默认落地(undefined)", () => {
-    expect(domainDefaultHref(domain("topup"), "CS")).toBeUndefined();
+  it("充值域全 P2 现可点 → 默认落地首叶(/topup)", () => {
+    expect(domainDefaultHref(domain("topup"), "CS")).toBe("/topup");
   });
   it("面包屑：/finance?tab=rules → 域›模块›子功能", () => {
     expect(breadcrumb("/finance/", "rules", null, "FINANCE")).toEqual(["财务管理", "分润结算", "分润规则"]);
   });
-  it("面包屑：/finance?tab=withdrawals 提现审核 P2 → 只到模块层", () => {
-    expect(breadcrumb("/finance/", "withdrawals", null, "FINANCE")).toEqual(["财务管理", "分润结算"]);
+  it("面包屑：/finance?tab=withdrawals 提现审核 P2 现可点 → 到子功能层", () => {
+    expect(breadcrumb("/finance/", "withdrawals", null, "FINANCE")).toEqual(["财务管理", "分润结算", "提现审核"]);
   });
   it("面包屑：概览单模块域只有一级", () => {
     expect(breadcrumb("/", null, null, "ADMIN")).toEqual(["概览"]);
@@ -223,10 +223,10 @@ describe("分期屏蔽（phase gating，默认 CURRENT_PHASE=1）", () => {
     expect(isPhaseLocked(1)).toBe(false);
     expect(isPhaseLocked(undefined)).toBe(false);
   });
-  it("isLeafLocked / isLeafDisabled：固件 OTA(P2) 被锁且不可点", () => {
+  it("isLeafLocked 仍标识分期(P2)，但 isLeafDisabled 不再因分期而不可点", () => {
     const ota = module_("devices", "device").children!.find((l) => l.href.includes("ota"))!;
-    expect(isLeafLocked(ota)).toBe(true);
-    expect(isLeafDisabled(ota)).toBe(true);
+    expect(isLeafLocked(ota)).toBe(true); // 分期查询：OTA 属 P2（> 当前 P1）
+    expect(isLeafDisabled(ota)).toBe(false); // 但分期不再屏蔽点击（仅 soon 才不可点）
   });
   it("isModuleLocked：营销活动/报表模块 P1 下全叶被锁 → 模块锁", () => {
     expect(isModuleLocked(module_("marketing", "marketing"), "ADMIN")).toBe(true);
