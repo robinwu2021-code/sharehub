@@ -17,11 +17,13 @@ import { fmtTime } from "@/lib/utils";
 import { useCan } from "@/lib/use-can";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
-import type { Vendor, AccessMode, NotifyTemplate, DictEntry, Region, SysParam, OpenApiApp, MarketCountry, PageResult } from "@/lib/types";
+import type { Vendor, AccessMode, NotifyTemplate, DictEntry, Region, SysParam, OpenApiApp, MarketCountry, PaymentChannel, PageResult } from "@/lib/types";
 
 const SIZE = 10;
 const TABS = [
   { key: "vendors", label: "供应商接入" },
+  // 支付渠道：竞品 7 个渠道各占一菜单，我们合并为一页（列表 + 各自配置抽屉）
+  { key: "payment", label: "支付渠道" },
   { key: "notify", label: "通知模板" },
   { key: "dict", label: "参数字典" },
   { key: "region", label: "地区库" },
@@ -66,6 +68,20 @@ const PARAM_FIELDS: FieldDef[] = [
   { key: "groupName", label: "分组", placeholder: "订单" },
 ];
 
+// 密钥类字段一律 password 型 + 掩码占位，前端永不承载真实密钥（真实值仅后端保管）
+const PAYMENT_FIELDS: FieldDef[] = [
+  { key: "channelCode", label: "渠道码", readOnlyOnEdit: true, placeholder: "NEARPAY / STRIPE / PAYPAL" },
+  { key: "channelName", label: "渠道名称", placeholder: "NearPay（聚合收单）" },
+  { key: "mode", label: "接入模式", type: "select", options: [{ value: "DELEGATED", label: "委托" }, { value: "DIRECT", label: "直连" }] },
+  { key: "status", label: "状态", type: "select", options: [{ value: "ENABLED", label: "启用" }, { value: "DISABLED", label: "停用" }] },
+  { key: "countries", label: "适用国家", placeholder: "AE,SA" },
+  { key: "currencies", label: "币种", placeholder: "AED,SAR" },
+  { key: "capabilities", label: "能力", placeholder: "支付,退款,预授权,分账" },
+  { key: "apiBase", label: "API 基址", placeholder: "https://api.nearpay.example" },
+  { key: "merchantId", label: "商户号", placeholder: "MID-AE-100286" },
+  { key: "apiKeyMasked", label: "API 密钥（掩码）", type: "password", placeholder: "sk_test_****" },
+];
+
 const OPENAPI_FIELDS: FieldDef[] = [
   { key: "appNo", label: "应用号", readOnlyOnEdit: true, placeholder: "留空自动生成" },
   { key: "name", label: "名称", placeholder: "合作方对接" },
@@ -101,12 +117,14 @@ function SystemInner() {
   const canRegion = allow("system:region:update");
   const canParam = allow("system:param:update");
   const canOpenapi = allow("system:openapi:update");
+  const canPayment = allow("system:payment_channel:update");
 
   const [notifyForm, setNotifyForm] = useState<Partial<NotifyTemplate> | null>(null);
   const [dictForm, setDictForm] = useState<Partial<DictEntry> | null>(null);
   const [regionForm, setRegionForm] = useState<Partial<Region> | null>(null);
   const [paramForm, setParamForm] = useState<Partial<SysParam> | null>(null);
   const [openapiForm, setOpenapiForm] = useState<Partial<OpenApiApp> | null>(null);
+  const [paymentForm, setPaymentForm] = useState<Partial<PaymentChannel> | null>(null);
 
   const onSaved = (setter: (v: null) => void) => () => { qc.invalidateQueries({ queryKey: ["sys"] }); notify.success(t("common.success")); setter(null); };
   const saveNotify = useMutation({ mutationFn: (v: Partial<NotifyTemplate>) => api.saveNotifyTemplate(v), onSuccess: onSaved(setNotifyForm) });
@@ -114,12 +132,14 @@ function SystemInner() {
   const saveRegion = useMutation({ mutationFn: (v: Partial<Region>) => api.saveRegion(v), onSuccess: onSaved(setRegionForm) });
   const saveParam = useMutation({ mutationFn: (v: Partial<SysParam>) => api.saveSysParam(v), onSuccess: onSaved(setParamForm) });
   const saveOpenapi = useMutation({ mutationFn: (v: Partial<OpenApiApp>) => api.saveOpenApiApp(v), onSuccess: onSaved(setOpenapiForm) });
+  const savePayment = useMutation({ mutationFn: (v: Partial<PaymentChannel>) => api.savePaymentChannel(v), onSuccess: onSaved(setPaymentForm) });
 
   // —— 其余分页 tab ——
-  const q = useQuery<PageResult<NotifyTemplate | DictEntry | Region | SysParam | OpenApiApp | MarketCountry>>({
+  const q = useQuery<PageResult<NotifyTemplate | DictEntry | Region | SysParam | OpenApiApp | MarketCountry | PaymentChannel>>({
     queryKey: ["sys", tab, page, keyword],
     queryFn: () =>
-      tab === "notify" ? api.listNotifyTemplates({ page, size: SIZE, keyword })
+      tab === "payment" ? api.listPaymentChannels({ page, size: SIZE, keyword })
+      : tab === "notify" ? api.listNotifyTemplates({ page, size: SIZE, keyword })
       : tab === "dict" ? api.listDictEntries({ page, size: SIZE, keyword })
       : tab === "region" ? api.listRegions({ page, size: SIZE, keyword })
       : tab === "params" ? api.listSysParams({ page, size: SIZE, keyword })
@@ -141,6 +161,21 @@ function SystemInner() {
     { header: "合规主体", cell: (m) => <span className="text-muted-foreground">{m.compliance}</span> },
     { header: "开城数", cell: (m) => <span className="tabular-nums">{m.cityCount}</span> },
     { header: "状态", cell: (m) => <Badge tone={MARKET_STATUS[m.status].tone}>{MARKET_STATUS[m.status].label}</Badge> },
+  ];
+
+  const paymentCols: Column<PaymentChannel>[] = [
+    { header: "渠道码", cell: (c) => <span className="font-medium">{c.channelCode}</span> },
+    { header: "名称", cell: (c) => c.channelName },
+    { header: "模式", cell: (c) => <Badge tone="outline">{c.mode === "DELEGATED" ? "委托" : "直连"}</Badge> },
+    { header: "适用国家", cell: (c) => <span className="tabular-nums">{c.countries}</span> },
+    { header: "币种", cell: (c) => <span className="tabular-nums">{c.currencies}</span> },
+    // 能力矩阵：决定能否走预授权（免押）与分账（场地方/代理商）
+    { header: "能力", cell: (c) => <span className="text-muted-foreground">{c.capabilities}</span> },
+    { header: "商户号", cell: (c) => <span className="text-muted-foreground tabular-nums">{c.merchantId}</span> },
+    { header: "密钥", cell: () => <span className="text-muted-foreground tabular-nums">****</span> },
+    { header: "状态", cell: (c) => c.status === "ENABLED" ? <Badge tone="success">启用</Badge> : <Badge tone="muted">停用</Badge> },
+    { header: "更新时间", cell: (c) => <span className="text-muted-foreground">{fmtTime(c.updatedAt)}</span> },
+    { header: "操作", cell: (c) => canPayment ? <Button size="sm" variant="outline" onClick={() => setPaymentForm(c)}>配置</Button> : <span className="text-muted-foreground">-</span> },
   ];
 
   const editBtn = <T,>(can: boolean, open: (r: T) => void) => (row: T) =>
@@ -206,6 +241,10 @@ function SystemInner() {
     <div>
       <TabHeader tabs={TABS} value={tab} onChange={(k) => { setTab(k); setPage(1); setKeyword(""); }} />
 
+      {tab === "payment" && (
+        <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索渠道码 / 名称 / 国家 / 币种"
+          onAdd={canPayment ? () => setPaymentForm({ mode: "DIRECT", status: "DISABLED", countries: "AE", currencies: "AED", capabilities: "支付,退款", apiBase: "", merchantId: "", apiKeyMasked: "sk_test_****" }) : undefined} addLabel="新增支付渠道" />
+      )}
       {tab === "notify" && (
         <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索模板号 / 名称"
           onAdd={canNotify ? () => setNotifyForm({ channel: "SMS", lang: "ar", status: "ENABLED" }) : undefined} addLabel="新增模板" />
@@ -231,6 +270,7 @@ function SystemInner() {
       )}
 
       {tab === "vendors" && <DataTable rowKey={(v: Vendor) => v.vendorCode} columns={vendorCols} rows={vendorsQ.data} loading={vendorsQ.isLoading} />}
+      {tab === "payment" && <DataTable rowKey={(c: PaymentChannel) => c.channelCode} columns={paymentCols} rows={q.data?.list as PaymentChannel[]} loading={q.isLoading} />}
       {tab === "notify" && <DataTable rowKey={(t: NotifyTemplate) => t.templateNo} columns={notifyCols} rows={q.data?.list as NotifyTemplate[]} loading={q.isLoading} />}
       {tab === "dict" && <DataTable rowKey={(d: DictEntry) => d.dictNo} columns={dictCols} rows={q.data?.list as DictEntry[]} loading={q.isLoading} />}
       {tab === "region" && <DataTable rowKey={(r: Region) => r.regionId} columns={regionCols} rows={q.data?.list as Region[]} loading={q.isLoading} />}
@@ -268,6 +308,13 @@ function SystemInner() {
           </Select>
         </Field>
       </Drawer>
+
+      {/* 支付渠道 配置抽屉（密钥仅掩码，真实值由后端保管）*/}
+      <FormDrawer open={!!paymentForm} onOpenChange={(o) => !o && setPaymentForm(null)}
+        titleNew="新增支付渠道" titleEdit={`配置支付渠道 ${paymentForm?.channelCode ?? ""}`} isEdit={!!paymentForm?.channelCode}
+        fields={PAYMENT_FIELDS} value={(paymentForm ?? {}) as Record<string, unknown>}
+        onChange={(v) => setPaymentForm(v as Partial<PaymentChannel>)}
+        onSubmit={() => paymentForm && savePayment.mutate(paymentForm)} submitting={savePayment.isPending} />
 
       {/* 通知模板 编辑抽屉 */}
       <FormDrawer open={!!notifyForm} onOpenChange={(o) => !o && setNotifyForm(null)}

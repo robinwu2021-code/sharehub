@@ -1,6 +1,6 @@
 // 真实后端实现（Api 契约）。端点对齐 docs/api/README.md。
 import { client } from "./http-client";
-import type { Api, CabinetQ, OrderQ, WoQ, PageQ } from "./contract";
+import type { Api, CabinetQ, OrderQ, WoQ, PageQ, AlarmQ, StatusQ } from "./contract";
 
 export const httpApi: Api = {
   login: (username, role, agentNo) => client.post("/api/auth/login", { username, role, agentNo }),
@@ -113,6 +113,20 @@ export const httpApi: Api = {
   listVenueOnboardings: (q?: PageQ) => client.get("/api/ops/venue-onboardings", q),
   saveVenueOnboarding: (x) => client.post(x.onboardingNo ? `/api/ops/venue-onboardings/${x.onboardingNo}` : "/api/ops/venue-onboardings", x),
   listSiteLifecycles: (q?: PageQ) => client.get("/api/ops/site-lifecycles", q),
+  // 告警治理
+  listAlarmRecords: (q?: AlarmQ) => client.get("/api/alarm/records", q),
+  listAlarmNotices: (q?: PageQ) => client.get("/api/alarm/notices", q),
+  listAlarmCodes: (q?: PageQ) => client.get("/api/alarm/codes", q),
+  listAlarmRules: (q?: PageQ) => client.get("/api/alarm/rules", q),
+  saveAlarmCode: (x) => client.post(x.code ? `/api/alarm/codes/${x.code}` : "/api/alarm/codes", x),
+  saveAlarmRule: (x) => client.post(x.ruleNo ? `/api/alarm/rules/${x.ruleNo}` : "/api/alarm/rules", x),
+  raiseAlarmWorkOrder: (no) => client.post(`/api/alarm/records/${no}/work-order`, {}),
+  // 售后处置
+  listOrderComplaints: (q?: StatusQ) => client.get("/api/order/complaints", q),
+  handleOrderComplaint: (no, resolution, note) => client.post(`/api/order/complaints/${no}/handle`, { resolution, note }),
+  raiseComplaintWorkOrder: (no) => client.post(`/api/order/complaints/${no}/work-order`, {}),
+  listRefundRecords: (q?: StatusQ) => client.get("/api/order/refunds", q),
+  auditRefund: (no, approve, rejectReason) => client.post(`/api/order/refunds/${no}/audit`, { approve, rejectReason }),
 
   // 扩展实体 save（URL 对齐各自 list 端点）
   savePowerbank: (x) => client.post(x.powerbankNo ? `/api/ops/powerbanks/${x.powerbankNo}` : "/api/ops/powerbanks", x),
@@ -143,4 +157,10 @@ export const httpApi: Api = {
   saveRegion: (x) => client.post(x.regionId ? `/api/platform/regions/${x.regionId}` : "/api/platform/regions", x),
   saveSysParam: (x) => client.post(x.paramKey ? `/api/platform/sys-params/${x.paramKey}` : "/api/platform/sys-params", x),
   saveOpenApiApp: (x) => client.post(x.appNo ? `/api/platform/openapi-apps/${x.appNo}` : "/api/platform/openapi-apps", x),
+
+  // 公告管理 / 支付渠道
+  listNotices: (q?: PageQ) => client.get("/api/marketing/notices", q),
+  saveNotice: (x) => client.post(x.noticeNo ? `/api/marketing/notices/${x.noticeNo}` : "/api/marketing/notices", x),
+  listPaymentChannels: (q?: PageQ) => client.get("/api/system/payment-channels", q),
+  savePaymentChannel: (x) => client.post(x.channelCode ? `/api/system/payment-channels/${x.channelCode}` : "/api/system/payment-channels", x),
 };

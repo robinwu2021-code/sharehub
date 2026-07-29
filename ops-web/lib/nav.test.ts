@@ -52,15 +52,15 @@ describe("A.9 角色×域可见性矩阵（抽查）", () => {
 
 describe("L3 叶子过滤（4.2-2）", () => {
   const finance = module_("trade-fin", "finance");
-  it("VIEWER 的财务：无 账务分录/对账/发票，有 规则/明细/结算/提现", () => {
+  it("VIEWER 的财务：无 账务分录/对账/发票，有 规则/明细/统计/结算/提现", () => {
     const labels = visibleLeaves(finance, "VIEWER").map((l) => l.label);
-    expect(labels).toEqual(["分润规则", "分润明细", "结算单", "提现审核"]);
+    expect(labels).toEqual(["分润规则", "分润明细", "分润统计", "结算单", "提现审核"]);
   });
-  it("FINANCE 的财务：7 项 + 代理分润配置/用户钱包 两条跨域深链", () => {
+  it("FINANCE 的财务：8 项 + 代理分润配置/用户钱包/充值订单 三条跨域深链", () => {
     const labels = visibleLeaves(finance, "FINANCE").map((l) => l.label);
-    expect(labels).toHaveLength(9);
+    expect(labels).toHaveLength(11);
     expect(labels).toContain("代理分润配置");
-    expect(labels.at(-1)).toBe("用户钱包"); // 用户账 分组殿后
+    expect(labels.at(-1)).toBe("充值订单"); // 用户账 分组殿后
   });
   it("VIEWER 无 agent:settlement:read → 财务不出现代理分润配置深链", () => {
     expect(visibleLeaves(finance, "VIEWER").map((l) => l.label)).not.toContain("代理分润配置");
@@ -231,10 +231,13 @@ describe("分期屏蔽（phase gating，默认 CURRENT_PHASE=1）", () => {
     expect(isLeafLocked(ota)).toBe(true);
     expect(isLeafDisabled(ota)).toBe(true);
   });
-  it("isModuleLocked：营销/用户/报表模块 P1 下全叶被锁 → 模块锁", () => {
-    expect(isModuleLocked(module_("user-growth", "marketing"), "ADMIN")).toBe(true);
+  it("isModuleLocked：用户/报表模块 P1 下全叶被锁 → 模块锁", () => {
     expect(isModuleLocked(module_("user-growth", "user"), "ADMIN")).toBe(true);
     expect(isModuleLocked(module_("analytics", "report"), "ADMIN")).toBe(true);
+  });
+  it("isModuleLocked：营销模块因「公告管理」为 P1 → 不再整体锁定（补齐清单 E1，c-app 首页公告条需要发布口）", () => {
+    expect(isModuleLocked(module_("user-growth", "marketing"), "ADMIN")).toBe(false);
+    expect(moduleDefaultHref(module_("user-growth", "marketing"), "ADMIN")).toBe("/marketing?tab=notices");
   });
   it("isModuleLocked：设备模块含 P1 叶 → 不锁", () => {
     expect(isModuleLocked(module_("device-ops", "device"), "ADMIN")).toBe(false);

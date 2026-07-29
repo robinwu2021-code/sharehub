@@ -14,6 +14,9 @@ import type {
   ReportLocation, ReportFinance, ReportScreen, ReportCustom, NotifyTemplate,
   DictEntry, Region, SysParam, OpenApiApp,
   DepositRecord, MarketCountry, ConsumerSegment,
+  AlarmRecord, AlarmNotice, AlarmCode, AlarmRule,
+  OrderComplaint, RefundRecord, ComplaintIssueType, ComplaintResolution,
+  Notice, PaymentChannel,
 } from "../types";
 
 const VENDORS = ["cd-tech", "sd-power", "chargenow"];
@@ -699,3 +702,346 @@ export const saveDictEntry = (x: Partial<DictEntry>) => upsert(dictEntries, x, "
 export const saveRegion = (x: Partial<Region>) => upsert(regions, x, "regionId", () => nextNo("REG", regions));
 export const saveSysParam = (x: Partial<SysParam>) => upsert(sysParams, x, "paramKey", () => nextNo("param.", sysParams));
 export const saveOpenApiApp = (x: Partial<OpenApiApp>) => upsert(openApiApps, x, "appNo", () => nextNo("APP", openApiApps));
+
+// ============================================================================
+// 告警域（对标简电云 A1~A4）：代码字典 / 通知规则 / 告警记录 / 通知流水
+// 关键：alarmCode（平台统一码）与 vendorErrorCode（厂商原始码）双列 —— 多厂商错误码归一化。
+// ============================================================================
+export const alarmCodes: AlarmCode[] = [
+  { code: "OFFLINE", message: "柜机离线", level: "CRITICAL", suggestion: "检查网络与供电；10 分钟未恢复派现场工单", autoWorkOrder: true },
+  { code: "SLOT_STUCK", message: "卡槽卡宝", level: "CRITICAL", suggestion: "远程弹仓一次；仍失败则锁槽并派维修", autoWorkOrder: true },
+  { code: "LOCK_FAIL", message: "锁扣异常", level: "CRITICAL", suggestion: "锁槽止损，安排更换锁扣模块", autoWorkOrder: true },
+  { code: "TEMP_HIGH", message: "机内温度过高", level: "CRITICAL", suggestion: "降功率并现场检查散热风道", autoWorkOrder: true },
+  { code: "EJECT_TIMEOUT", message: "弹出超时", level: "WARN", suggestion: "复核指令回执；连续 3 次转维修工单", autoWorkOrder: true },
+  { code: "BATTERY_LOW", message: "充电宝电量过低", level: "WARN", suggestion: "纳入下次补货路线，优先换宝", autoWorkOrder: false },
+  { code: "SIGNAL_WEAK", message: "通信信号弱", level: "WARN", suggestion: "确认 4G 信号与天线位置，必要时挪机位", autoWorkOrder: false },
+  { code: "HEARTBEAT_LOST", message: "心跳丢失", level: "WARN", suggestion: "观察 5 分钟；未恢复升级为 OFFLINE", autoWorkOrder: false },
+  { code: "FW_UPGRADE_FAIL", message: "固件升级失败", level: "INFO", suggestion: "回滚上一版本，纳入下一批灰度", autoWorkOrder: false },
+  { code: "SCREEN_FAULT", message: "广告屏异常", level: "INFO", suggestion: "不影响借还；并入巡检批量处理", autoWorkOrder: false },
+];
+
+// 厂商原始错误码风格各不相同：cd-tech=E2xx，sd-power=ERR-nn，chargenow=0x1Fxx
+const vendorErr = (vendorCode: string, i: number) =>
+  vendorCode === "cd-tech" ? `E${200 + (i % 40)}`
+  : vendorCode === "sd-power" ? `ERR-${10 + (i % 30)}`
+  : `0x1F${String(i % 100).padStart(2, "0")}`;
+
+export const alarmRecords: AlarmRecord[] = Array.from({ length: 14 }, (_, i) => {
+  const def = p(alarmCodes, i);
+  const cab = p(cabinets, i * 3);
+  const st = p(["OPEN", "OPEN", "ACKED", "CLOSED"] as const, i);
+  return {
+    alarmNo: `ALM${40000 + i}`, cabinetNo: cab.cabinetNo, siteName: cab.locationName ?? p(LOCS, i),
+    vendorCode: cab.vendorCode, alarmCode: def.code, vendorErrorCode: vendorErr(cab.vendorCode, i),
+    level: def.level, occurredAt: iso(i * 5400_000), status: st,
+    workOrderNo: st === "OPEN" ? null : `WO${70000 + (i % 64)}`,
+    remark: p(["心跳超时 10 分钟未恢复", "用户反馈取宝失败", "巡检现场发现", "厂商云回调上报", "监控脚本自动触发"], i),
+  };
+});
+
+export const alarmNotices: AlarmNotice[] = Array.from({ length: 12 }, (_, i) => {
+  const ch = p(["SMS", "EMAIL", "PUSH", "WEBHOOK"] as const, i);
+  const failed = i % 5 === 4;
+  return {
+    noticeNo: `AN${50000 + i}`, alarmNo: p(alarmRecords, i).alarmNo, channel: ch,
+    target: ch === "SMS" ? phone(i)
+      : ch === "EMAIL" ? p(["ops@sharehub.ae", "ops-dubai@sharehub.ae", "support@sharehub.ae"], i)
+      : ch === "PUSH" ? p(OPERATORS, i)
+      : "https://hooks.sharehub.ae/alarm",
+    sentAt: iso(i * 3600_000), status: failed ? "FAILED" : "SENT",
+    failReason: failed ? p(["短信网关超时", "目标号码停机", "Webhook 返回 500"], i) : null,
+  };
+});
+
+export const alarmRules: AlarmRule[] = Array.from({ length: 10 }, (_, i) => {
+  const def = p(alarmCodes, i);
+  const critical = def.level === "CRITICAL";
+  return {
+    ruleNo: `AR${600 + i}`, alarmCode: def.code,
+    target: p(["运维值班组", "区域经理", "厂商对接人", "客服一线", "运营总监"], i),
+    channel: p(["SMS", "PUSH", "EMAIL", "WEBHOOK"] as const, i),
+    method: critical ? "INSTANT" : p(["INSTANT", "DIGEST"] as const, i),
+    // 严重告警不设静默窗口（必须随时触达）；其余夜间静默，防轰炸
+    quietStart: critical ? "" : "22:00", quietEnd: critical ? "" : "08:00",
+    escalateMinutes: critical ? p([15, 30], i) : def.level === "WARN" ? 60 : 0,
+    status: i % 7 === 0 ? "INACTIVE" : "ACTIVE",
+  };
+});
+
+export const listAlarmRecords = (q: PageQuery & { level?: string; status?: string } = {}) =>
+  paginate(alarmRecords, q.page, q.size, (x) =>
+    kwHit(q.keyword, x.alarmNo, x.cabinetNo, x.siteName, x.alarmCode, x.vendorErrorCode, x.workOrderNo) &&
+    (!q.level || x.level === q.level) && (!q.status || x.status === q.status));
+export const listAlarmNotices = (q: PageQuery = {}) => paginate(alarmNotices, q.page, q.size, (x) => kwHit(q.keyword, x.noticeNo, x.alarmNo, x.target));
+export const listAlarmCodes = (q: PageQuery = {}) => paginate(alarmCodes, q.page, q.size, (x) => kwHit(q.keyword, x.code, x.message, x.suggestion));
+export const listAlarmRules = (q: PageQuery = {}) => paginate(alarmRules, q.page, q.size, (x) => kwHit(q.keyword, x.ruleNo, x.alarmCode, x.target));
+export const saveAlarmCode = (x: Partial<AlarmCode>) => upsert(alarmCodes, x, "code", () => nextNo("ALARM_CODE_", alarmCodes, 1));
+export const saveAlarmRule = (x: Partial<AlarmRule>) => upsert(alarmRules, x, "ruleNo", () => nextNo("AR", alarmRules, 600));
+
+/** 告警转工单（mock）：生成关联工单号并置为已受理；已转过的沿用原工单号（幂等）。 */
+export function raiseAlarmWorkOrder(alarmNo: string): AlarmRecord {
+  const a = alarmRecords.find((x) => x.alarmNo === alarmNo)!;
+  a.workOrderNo = a.workOrderNo ?? nextNo("WO", alarmRecords.filter((x) => x.workOrderNo), 70200);
+  a.status = "ACKED";
+  return a;
+}
+
+// ============================================================================
+// 售后处置（对标简电云 B1/B2）：投诉订单 / 退款记录
+// 关键：投诉可转工单（投诉-订单-工单串通）；退款走独立审批队列并带幂等键 + PSP 流水号。
+// orderNo / userNo 一律取自上面的 orders mock，保证列表间可互相搜到同一单。
+// ============================================================================
+const COMPLAINT_TYPES: ComplaintIssueType[] = ["BILLING_DISPUTE", "NOT_EJECTED", "NOT_RETURNED", "DEVICE_FAULT", "OTHER"];
+const COMPLAINT_DESC: Record<ComplaintIssueType, string> = {
+  BILLING_DISPUTE: "只借了 20 分钟却按 2 小时计费，要求核对账单",
+  NOT_EJECTED: "扫码后柜机没有弹出充电宝，但订单已生成并开始计费",
+  NOT_RETURNED: "已经把充电宝插回柜机，App 仍显示租借中",
+  DEVICE_FAULT: "借到的充电宝无法充电，接口松动",
+  OTHER: "机器屏幕不亮，现场无人可协助",
+};
+const COMPLAINT_RESOLUTIONS: ComplaintResolution[] = ["REFUND", "COMPENSATE", "REJECT", "EXPLAINED"];
+
+export const orderComplaints: OrderComplaint[] = Array.from({ length: 12 }, (_, i) => {
+  const o = p(orders, i * 7);
+  const type = p(COMPLAINT_TYPES, i);
+  const st = p(["PENDING", "PENDING", "PROCESSING", "RESOLVED", "RESOLVED", "REJECTED"] as const, i);
+  const done = st === "RESOLVED" || st === "REJECTED";
+  return {
+    complaintNo: `CPL${60000 + i}`, orderNo: o.orderNo, userNo: o.cUserNo,
+    issueType: type, description: COMPLAINT_DESC[type],
+    // mock 截图统一走占位图服务，真实实现替换为对象存储签名 URL
+    screenshotUrl: i % 4 === 3 ? null : `https://placehold.co/720x1280?text=CPL${60000 + i}`,
+    submittedAt: iso(i * 7200_000), status: st,
+    handlerName: st === "PENDING" ? null : p(OPERATORS, i + 1),
+    handledAt: done ? iso(i * 7200_000 - 1800_000) : null,
+    resolution: done ? (st === "REJECTED" ? "REJECT" : p(COMPLAINT_RESOLUTIONS, i)) : null,
+    resolutionNote: done ? p(["已按实际时长重算并退差额", "补发 10 AED 优惠券作为补偿", "核对后计费无误，已向用户解释", "已远程弹仓并确认归还成功"], i) : "",
+    // 设备类投诉默认已转工单：现场问题必须落到运维手上
+    workOrderNo: type === "DEVICE_FAULT" || type === "NOT_EJECTED" ? `WO${70000 + (i % 64)}` : null,
+  };
+});
+
+const REFUND_REASONS = ["计费争议，按实际时长重算", "未弹出充电宝，全额退回", "重复扣款", "设备故障导致无法使用", "超时买断后找回设备"];
+
+export const refundRecords: RefundRecord[] = Array.from({ length: 13 }, (_, i) => {
+  const o = p(orders, i * 5 + 2);
+  const st = p(["PENDING", "PENDING", "APPROVED", "EXECUTED", "EXECUTED", "REJECTED", "FAILED"] as const, i);
+  const audited = st !== "PENDING";
+  const executed = st === "EXECUTED" || st === "FAILED";
+  return {
+    refundNo: `RFD${80000 + i}`, orderNo: o.orderNo, userNo: o.cUserNo,
+    amount: Number((o.feeAmount > 0 ? o.feeAmount : 12 + (i % 5) * 3).toFixed(2)), currency: "AED",
+    reason: p(REFUND_REASONS, i), applicantName: p(OPERATORS, i), appliedAt: iso(i * 10800_000),
+    status: st,
+    auditorName: audited ? p(["Sara Ahmed", "Omar Khan", "admin"], i) : null,
+    auditedAt: audited ? iso(i * 10800_000 - 3600_000) : null,
+    rejectReason: st === "REJECTED" ? p(["订单计费无误，用户已确认", "超出退款申请时效", "同一订单已退款，重复提交"], i) : null,
+    // 幂等键 = 订单号 + 申请序号：同一订单重复申请只会落到同一笔退款
+    idempotencyKey: `RF-${o.orderNo}-${String(i % 3)}`,
+    psgTxnNo: executed ? `PSP${202607000000 + i * 137}` : null,
+  };
+});
+
+export const listOrderComplaints = (q: PageQuery & { status?: string } = {}) =>
+  paginate(orderComplaints, q.page, q.size, (x) =>
+    kwHit(q.keyword, x.complaintNo, x.orderNo, x.userNo, x.description, x.handlerName, x.workOrderNo) &&
+    (!q.status || x.status === q.status));
+export const listRefundRecords = (q: PageQuery & { status?: string } = {}) =>
+  paginate(refundRecords, q.page, q.size, (x) =>
+    kwHit(q.keyword, x.refundNo, x.orderNo, x.userNo, x.applicantName, x.auditorName, x.psgTxnNo, x.idempotencyKey) &&
+    (!q.status || x.status === q.status));
+
+export const saveOrderComplaint = (x: Partial<OrderComplaint>) =>
+  upsert(orderComplaints, x, "complaintNo", () => nextNo("CPL", orderComplaints, 60000));
+
+/** 处理投诉（mock）：写入处理结果/说明/处理人/处理时间；驳回落 REJECTED，其余落 RESOLVED。 */
+export function handleOrderComplaint(complaintNo: string, resolution: ComplaintResolution, note: string): OrderComplaint {
+  const c = orderComplaints.find((x) => x.complaintNo === complaintNo)!;
+  c.resolution = resolution;
+  c.resolutionNote = note;
+  c.status = resolution === "REJECT" ? "REJECTED" : "RESOLVED";
+  c.handlerName = "admin";
+  c.handledAt = new Date().toISOString();
+  return c;
+}
+
+/** 投诉转工单（mock）：生成关联工单号并置为处理中；已转过的沿用原工单号（幂等）。 */
+export function raiseComplaintWorkOrder(complaintNo: string): OrderComplaint {
+  const c = orderComplaints.find((x) => x.complaintNo === complaintNo)!;
+  c.workOrderNo = c.workOrderNo ?? nextNo("WO", orderComplaints.filter((x) => x.workOrderNo), 70300);
+  if (c.status === "PENDING") c.status = "PROCESSING";
+  return c;
+}
+
+/** 退款申请（mock）：订单详情抽屉「申请退款」的落库入口，幂等键相同则复用既有申请。 */
+export function applyRefund(orderNo: string, reason = "客服代客申请退款"): RefundRecord {
+  const key = `RF-${orderNo}-manual`;
+  const exist = refundRecords.find((x) => x.idempotencyKey === key);
+  if (exist) return exist;
+  const o = orders.find((x) => x.orderNo === orderNo);
+  const created: RefundRecord = {
+    refundNo: nextNo("RFD", refundRecords, 80000), orderNo,
+    userNo: o?.cUserNo ?? "-", amount: o?.feeAmount ?? 0, currency: o?.currency ?? "AED",
+    reason, applicantName: "admin", appliedAt: new Date().toISOString(), status: "PENDING",
+    auditorName: null, auditedAt: null, rejectReason: null, idempotencyKey: key, psgTxnNo: null,
+  };
+  refundRecords.unshift(created);
+  return created;
+}
+
+/** 退款审批（mock）：通过→APPROVED 并模拟 PSP 执行落 EXECUTED；驳回→REJECTED 并记原因。 */
+export function auditRefund(refundNo: string, approve: boolean, rejectReason?: string): RefundRecord {
+  const r = refundRecords.find((x) => x.refundNo === refundNo)!;
+  r.auditorName = "admin";
+  r.auditedAt = new Date().toISOString();
+  if (approve) {
+    r.status = "EXECUTED";
+    r.rejectReason = null;
+    r.psgTxnNo = r.psgTxnNo ?? `PSP${202607000000 + refundRecords.length * 137}`;
+  } else {
+    r.status = "REJECTED";
+    r.rejectReason = rejectReason ?? "";
+  }
+  return r;
+}
+
+// ============================================================================
+// 公告管理（营销域 · P1，对标简电云 E1）
+// 三语（zh/en/ar）+ 生效期 + 置顶 —— 竞品公告只有单语，我们要覆盖 MENA 多语市场。
+// ============================================================================
+export const notices: Notice[] = [
+  {
+    noticeNo: "NTC900", title: "斋月期间机柜服务时间调整",
+    titleEn: "Ramadan service hours update", titleAr: "تحديث ساعات الخدمة خلال رمضان",
+    content: "斋月期间，Dubai Mall、Mall of Emirates 等商场点位服务至次日 02:00，归还不受影响。",
+    contentEn: "During Ramadan, stations in Dubai Mall and Mall of Emirates stay open until 02:00. Returns are unaffected.",
+    contentAr: "خلال رمضان، تعمل المحطات في دبي مول ومول الإمارات حتى الساعة 02:00. الإرجاع غير متأثر.",
+    type: "SYSTEM", pinned: true, startAt: iso(3 * 86400_000), endAt: iso(-27 * 86400_000),
+    status: "PUBLISHED", publishedBy: "运营中心", createdAt: iso(4 * 86400_000),
+  },
+  {
+    noticeNo: "NTC901", title: "新用户首借 30 分钟免费",
+    titleEn: "First rental free for 30 minutes", titleAr: "أول استئجار مجاني لمدة 30 دقيقة",
+    content: "新用户首次借出充电宝，前 30 分钟免费，自动抵扣无需领券。",
+    contentEn: "New users get the first 30 minutes free on their first power bank rental. No coupon needed.",
+    contentAr: "يحصل المستخدمون الجدد على أول 30 دقيقة مجانًا عند أول استئجار لشاحن متنقل، دون الحاجة إلى قسيمة.",
+    type: "PROMO", pinned: true, startAt: iso(10 * 86400_000), endAt: iso(-20 * 86400_000),
+    status: "PUBLISHED", publishedBy: "增长组", createdAt: iso(11 * 86400_000),
+  },
+  {
+    noticeNo: "NTC902", title: "DXB T3 航站楼点位夜间维护",
+    titleEn: "Overnight maintenance at DXB Terminal 3", titleAr: "صيانة ليلية في مطار دبي المبنى 3",
+    content: "本周四 01:00-04:00 对 DXB T3 全部机柜进行固件升级，期间暂停借出，已借订单正常计费与归还。",
+    contentEn: "All cabinets at DXB T3 will receive a firmware upgrade on Thursday 01:00-04:00. Rentals pause; ongoing orders bill and return as usual.",
+    contentAr: "سيتم تحديث البرامج الثابتة لجميع الخزائن في المبنى 3 بمطار دبي يوم الخميس من 01:00 إلى 04:00. يتوقف الاستئجار مؤقتًا.",
+    type: "MAINTENANCE", pinned: false, startAt: iso(1 * 86400_000), endAt: iso(-2 * 86400_000),
+    status: "PUBLISHED", publishedBy: "运维值班组", createdAt: iso(2 * 86400_000),
+  },
+  {
+    noticeNo: "NTC903", title: "押金规则更新：信用免押上线",
+    titleEn: "Deposit update: credit-based deposit waiver", titleAr: "تحديث التأمين: الإعفاء بناءً على التقييم الائتماني",
+    content: "信用分达标用户借出充电宝免收 AED 50 押金，逾期未还仍按原规则计费买断。",
+    contentEn: "Users above the credit threshold rent without the AED 50 deposit. Overdue buy-out rules remain unchanged.",
+    contentAr: "يمكن للمستخدمين ذوي التقييم الائتماني المرتفع الاستئجار دون تأمين 50 درهمًا. تبقى قواعد الشراء عند التأخير كما هي.",
+    type: "SYSTEM", pinned: false, startAt: iso(20 * 86400_000), endAt: iso(-40 * 86400_000),
+    status: "PUBLISHED", publishedBy: "产品组", createdAt: iso(21 * 86400_000),
+  },
+  {
+    noticeNo: "NTC904", title: "Marina Walk 新增 12 个机柜点位",
+    titleEn: "12 new stations live at Marina Walk", titleAr: "تشغيل 12 محطة جديدة في مارينا ووك",
+    content: "Marina Walk 沿线新增 12 个机柜，扫码即可借还，缓解晚间排队。",
+    contentEn: "12 new cabinets are live along Marina Walk. Scan to rent or return and skip the evening queue.",
+    contentAr: "تم تشغيل 12 خزانة جديدة على امتداد مارينا ووك. امسح الرمز للاستئجار أو الإرجاع.",
+    type: "PROMO", pinned: false, startAt: iso(6 * 86400_000), endAt: iso(-24 * 86400_000),
+    status: "PUBLISHED", publishedBy: "拓展组", createdAt: iso(7 * 86400_000),
+  },
+  {
+    noticeNo: "NTC905", title: "支付通道切换公告",
+    titleEn: "Payment channel migration notice", titleAr: "إشعار بتغيير قناة الدفع",
+    content: "自本月起结算通道切换至 NEARPAY，账单主体显示为 ShareHub FZ-LLC，退款周期缩短至 3 个工作日。",
+    contentEn: "Settlement moves to NEARPAY this month. Statements show ShareHub FZ-LLC and refunds now take 3 business days.",
+    contentAr: "تنتقل التسوية إلى NEARPAY هذا الشهر. تظهر الفواتير باسم ShareHub FZ-LLC وتستغرق المبالغ المستردة 3 أيام عمل.",
+    type: "SYSTEM", pinned: false, startAt: iso(15 * 86400_000), endAt: iso(-15 * 86400_000),
+    status: "PUBLISHED", publishedBy: "财务中心", createdAt: iso(16 * 86400_000),
+  },
+  {
+    noticeNo: "NTC906", title: "Yas Mall 点位临时停用（商场装修）",
+    titleEn: "Yas Mall stations temporarily offline", titleAr: "إيقاف مؤقت لمحطات ياس مول",
+    content: "因商场装修，Yas Mall B1 层 4 台机柜临时停用，请前往 L1 层机柜归还。",
+    contentEn: "Due to mall renovation, 4 cabinets on Yas Mall B1 are offline. Please return at the L1 cabinets.",
+    contentAr: "بسبب أعمال التجديد، تم إيقاف 4 خزائن في الطابق B1 بياس مول. يرجى الإرجاع في خزائن الطابق L1.",
+    type: "MAINTENANCE", pinned: false, startAt: iso(-1 * 86400_000), endAt: iso(-30 * 86400_000),
+    status: "DRAFT", publishedBy: "区域经理", createdAt: iso(1 * 86400_000),
+  },
+  {
+    noticeNo: "NTC907", title: "国庆双周充电福利（已结束）",
+    titleEn: "UAE National Day charging offer (ended)", titleAr: "عرض اليوم الوطني للإمارات (منتهي)",
+    content: "国庆期间每日首单封顶 AED 3，活动已于上月结束，感谢参与。",
+    contentEn: "During National Day the first daily rental was capped at AED 3. The campaign ended last month.",
+    contentAr: "خلال اليوم الوطني، كان الحد الأقصى لأول استئجار يوميًا 3 دراهم. انتهى العرض الشهر الماضي.",
+    type: "PROMO", pinned: false, startAt: iso(60 * 86400_000), endAt: iso(45 * 86400_000),
+    status: "OFFLINE", publishedBy: "增长组", createdAt: iso(62 * 86400_000),
+  },
+  {
+    noticeNo: "NTC908", title: "客服热线与 WhatsApp 支持时间",
+    titleEn: "Support hotline and WhatsApp hours", titleAr: "أوقات الدعم عبر الهاتف وواتساب",
+    content: "客服热线 09:00-23:00（GST），WhatsApp 全天留言，超时未归还请先在 App 内提交申诉。",
+    contentEn: "Hotline 09:00-23:00 GST; WhatsApp accepts messages 24/7. For overdue returns, file a claim in the app first.",
+    contentAr: "الخط الساخن من 09:00 إلى 23:00 بتوقيت الخليج، وواتساب متاح على مدار الساعة. للإرجاع المتأخر، قدّم شكوى عبر التطبيق.",
+    type: "SYSTEM", pinned: false, startAt: iso(30 * 86400_000), endAt: iso(-60 * 86400_000),
+    status: "PUBLISHED", publishedBy: "客服中心", createdAt: iso(31 * 86400_000),
+  },
+];
+
+export const listNotices = (q: PageQuery = {}) =>
+  paginate(notices, q.page, q.size, (x) => kwHit(q.keyword, x.noticeNo, x.title, x.titleEn, x.titleAr, x.publishedBy));
+export const saveNotice = (x: Partial<Notice>) => upsert(notices, x, "noticeNo", () => nextNo("NTC", notices));
+
+// ============================================================================
+// 支付渠道（系统域 · P1，对标简电云 E8）
+// 一页承载渠道列表 + 配置抽屉：NEARPAY 为当前主通道，其余为未来可插拔占位。
+// 注意：mock 不写任何真实密钥，一律占位掩码。
+// ============================================================================
+export const paymentChannels: PaymentChannel[] = [
+  {
+    channelCode: "NEARPAY", channelName: "NearPay（聚合收单）", mode: "DELEGATED", status: "ENABLED",
+    countries: "AE", currencies: "AED", capabilities: "支付,退款,预授权,分账",
+    apiBase: "https://api.nearpay.example", merchantId: "MID-AE-100286",
+    apiKeyMasked: "sk_test_****", updatedAt: iso(2 * 86400_000),
+  },
+  {
+    channelCode: "STRIPE", channelName: "Stripe", mode: "DIRECT", status: "DISABLED",
+    countries: "AE,SA", currencies: "AED,SAR,USD", capabilities: "支付,退款,预授权",
+    apiBase: "https://api.stripe.com", merchantId: "acct_****",
+    apiKeyMasked: "sk_test_****", updatedAt: iso(20 * 86400_000),
+  },
+  {
+    channelCode: "PAYPAL", channelName: "PayPal", mode: "DIRECT", status: "DISABLED",
+    countries: "AE,EG", currencies: "USD,EUR", capabilities: "支付,退款",
+    apiBase: "https://api-m.paypal.com", merchantId: "PP-****",
+    apiKeyMasked: "sk_test_****", updatedAt: iso(30 * 86400_000),
+  },
+  {
+    channelCode: "TAP", channelName: "Tap Payments（海湾本地卡）", mode: "DIRECT", status: "DISABLED",
+    countries: "AE,SA,KW,BH", currencies: "AED,SAR,KWD,BHD", capabilities: "支付,退款,预授权",
+    apiBase: "https://api.tap.company", merchantId: "MID-GCC-****",
+    apiKeyMasked: "sk_test_****", updatedAt: iso(35 * 86400_000),
+  },
+  {
+    channelCode: "CHECKOUT", channelName: "Checkout.com", mode: "DIRECT", status: "DISABLED",
+    countries: "AE,SA,QA", currencies: "AED,SAR,QAR", capabilities: "支付,退款,预授权,分账",
+    apiBase: "https://api.checkout.com", merchantId: "MID-CKO-****",
+    apiKeyMasked: "sk_test_****", updatedAt: iso(45 * 86400_000),
+  },
+  {
+    channelCode: "HYPERPAY", channelName: "HyperPay（沙特本地）", mode: "DELEGATED", status: "DISABLED",
+    countries: "SA,JO,EG", currencies: "SAR,JOD,EGP", capabilities: "支付,退款",
+    apiBase: "https://eu-prod.oppwa.com", merchantId: "MID-SA-****",
+    apiKeyMasked: "sk_test_****", updatedAt: iso(50 * 86400_000),
+  },
+];
+
+export const listPaymentChannels = (q: PageQuery = {}) =>
+  paginate(paymentChannels, q.page, q.size, (x) => kwHit(q.keyword, x.channelCode, x.channelName, x.countries, x.currencies));
+export const savePaymentChannel = (x: Partial<PaymentChannel>) =>
+  upsert(paymentChannels, x, "channelCode", () => nextNo("CH", paymentChannels));

@@ -1,6 +1,6 @@
 // Mock 实现（Api 契约）。全部走 lib/mock/db 内存数据 + 模拟延迟。
 import * as db from "../mock/db";
-import type { Api, CabinetQ, OrderQ, WoQ, PageQ } from "./contract";
+import type { Api, CabinetQ, OrderQ, WoQ, PageQ, AlarmQ, StatusQ } from "./contract";
 import type { Vendor, Agent, Site, Location } from "../types";
 
 const wait = <T>(v: T, ms = 200): Promise<T> => new Promise((r) => setTimeout(() => r(v), ms));
@@ -21,7 +21,11 @@ export const mockApi: Api = {
     wait(db.paginate(db.orders, q.page, q.size, (o) =>
       db.kwHit(q.keyword, o.orderNo, o.cUserNo) && (!q.status || o.status === q.status))),
   getOrder: (no) => wait(db.orders.find((o) => o.orderNo === no)!),
-  interveneOrder: (_no, _action) => wait({ ok: true } as const, 400),
+  // 「申请退款」不是终态动作：落一条 PENDING 退款申请，进 /orders?tab=refunds 审批队列
+  interveneOrder: (no, action) => {
+    if (action === "refund_apply") db.applyRefund(no);
+    return wait({ ok: true } as const, 400);
+  },
 
   listWorkOrders: (q: WoQ = {}) =>
     wait(db.paginate(db.workOrders, q.page, q.size, (w) =>
@@ -156,6 +160,20 @@ export const mockApi: Api = {
   listVenueOnboardings: (q: PageQ = {}) => wait(db.listVenueOnboardings(q)),
   saveVenueOnboarding: (x) => wait(db.saveVenueOnboarding(x), 350),
   listSiteLifecycles: (q: PageQ = {}) => wait(db.listSiteLifecycles(q)),
+  // 告警治理
+  listAlarmRecords: (q: AlarmQ = {}) => wait(db.listAlarmRecords(q)),
+  listAlarmNotices: (q: PageQ = {}) => wait(db.listAlarmNotices(q)),
+  listAlarmCodes: (q: PageQ = {}) => wait(db.listAlarmCodes(q)),
+  listAlarmRules: (q: PageQ = {}) => wait(db.listAlarmRules(q)),
+  saveAlarmCode: (x) => wait(db.saveAlarmCode(x), 350),
+  saveAlarmRule: (x) => wait(db.saveAlarmRule(x), 350),
+  raiseAlarmWorkOrder: (no) => wait(db.raiseAlarmWorkOrder(no), 400),
+  // 售后处置
+  listOrderComplaints: (q: StatusQ = {}) => wait(db.listOrderComplaints(q)),
+  handleOrderComplaint: (no, resolution, note) => wait(db.handleOrderComplaint(no, resolution, note), 400),
+  raiseComplaintWorkOrder: (no) => wait(db.raiseComplaintWorkOrder(no), 400),
+  listRefundRecords: (q: StatusQ = {}) => wait(db.listRefundRecords(q)),
+  auditRefund: (no, approve, rejectReason) => wait(db.auditRefund(no, approve, rejectReason), 400),
 
   // 扩展实体 save
   savePowerbank: (x) => wait(db.savePowerbank(x), 350),
@@ -186,4 +204,10 @@ export const mockApi: Api = {
   saveRegion: (x) => wait(db.saveRegion(x), 350),
   saveSysParam: (x) => wait(db.saveSysParam(x), 350),
   saveOpenApiApp: (x) => wait(db.saveOpenApiApp(x), 350),
+
+  // 公告管理 / 支付渠道
+  listNotices: (q: PageQ = {}) => wait(db.listNotices(q)),
+  saveNotice: (x) => wait(db.saveNotice(x), 350),
+  listPaymentChannels: (q: PageQ = {}) => wait(db.listPaymentChannels(q)),
+  savePaymentChannel: (x) => wait(db.savePaymentChannel(x), 350),
 };

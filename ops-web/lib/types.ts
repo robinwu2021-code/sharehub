@@ -755,3 +755,134 @@ export interface ConsumerSegment {
   avgOrderValue: number;
   currency: string;
 }
+
+// —— 售后处置（订单域 · P1，对标简电云 B1/B2）——
+// 投诉问题类型：计费争议 / 未弹出 / 未归还 / 设备故障 / 其他
+export type ComplaintIssueType = "BILLING_DISPUTE" | "NOT_EJECTED" | "NOT_RETURNED" | "DEVICE_FAULT" | "OTHER";
+// 处理结果：退款 / 补偿 / 驳回 / 已解释
+export type ComplaintResolution = "REFUND" | "COMPENSATE" | "REJECT" | "EXPLAINED";
+
+// 投诉订单：比竞品多 workOrderNo —— 投诉可直接转工单，投诉/订单/工单三者串通（对方投诉与工单不通）。
+export interface OrderComplaint {
+  complaintNo: string;
+  orderNo: string; // 关联租借订单（引用 orders mock 真实单号）
+  userNo: string;
+  issueType: ComplaintIssueType;
+  description: string; // 用户描述
+  screenshotUrl: string | null; // 投诉截图（列表渲染为「查看」链接）
+  submittedAt: string;
+  status: "PENDING" | "PROCESSING" | "RESOLVED" | "REJECTED";
+  handlerName: string | null; // 处理人
+  handledAt: string | null;
+  resolution: ComplaintResolution | null; // 处理结果
+  resolutionNote: string; // 处理说明
+  workOrderNo: string | null; // 转工单后回填
+}
+
+// 退款记录：独立审批队列（申请→审批→执行），比竞品多一条审批链。
+// idempotencyKey / psgTxnNo 是资金操作可追溯的底线：前者防重复退款，后者对得上 PSP 流水。
+export interface RefundRecord {
+  refundNo: string;
+  orderNo: string;
+  userNo: string;
+  amount: number;
+  currency: string;
+  reason: string;
+  applicantName: string; // 申请人（客服/用户/系统）
+  appliedAt: string;
+  status: "PENDING" | "APPROVED" | "REJECTED" | "EXECUTED" | "FAILED";
+  auditorName: string | null; // 审批人
+  auditedAt: string | null;
+  rejectReason: string | null; // 驳回原因（驳回必填）
+  idempotencyKey: string; // 幂等键（同一键只退一次）
+  psgTxnNo: string | null; // PSP 支付流水号（未执行时为空）
+}
+
+// —— 告警治理（设备运营域 · P1，对标简电云 A1~A4）——
+// 告警等级：提示 / 警告 / 严重
+export type AlarmLevel = "INFO" | "WARN" | "CRITICAL";
+
+// 告警记录：多厂商错误码归一化 —— alarmCode 是平台统一码，vendorErrorCode 是厂商原始码。
+export interface AlarmRecord {
+  alarmNo: string;
+  cabinetNo: string;
+  siteName: string;
+  vendorCode: string; // 设备厂商（cd-tech / sd-power / chargenow）
+  alarmCode: string; // 平台统一告警码，如 SLOT_STUCK
+  vendorErrorCode: string; // 厂商原始错误码，各家风格不同（E203 / ERR-17 / 0x1F04）
+  level: AlarmLevel;
+  occurredAt: string;
+  status: "OPEN" | "ACKED" | "CLOSED"; // 待处理 / 已受理 / 已关闭
+  workOrderNo: string | null; // 关联工单号（转工单后回填）
+  remark: string;
+}
+
+// 告警通知：触达流水（谁/何时/何渠道/成功失败）
+export interface AlarmNotice {
+  noticeNo: string;
+  alarmNo: string;
+  channel: "SMS" | "EMAIL" | "PUSH" | "WEBHOOK";
+  target: string; // 接收人（手机号/邮箱/工号/回调地址）
+  sentAt: string;
+  status: "SENT" | "FAILED";
+  failReason: string | null;
+}
+
+// 告警代码字典：比竞品多「建议处置」「是否自动开工单」——字典即处置预案
+export interface AlarmCode {
+  code: string;
+  message: string;
+  level: AlarmLevel;
+  suggestion: string; // 建议处置
+  autoWorkOrder: boolean; // 命中后是否自动开工单
+}
+
+// 通知规则：比竞品多「静默窗口」「升级策略」——防夜间轰炸与告警风暴
+export interface AlarmRule {
+  ruleNo: string;
+  alarmCode: string;
+  target: string; // 通知目标（角色/人/群）
+  channel: AlarmNotice["channel"];
+  method: "INSTANT" | "DIGEST"; // 即时 / 汇总
+  quietStart: string; // 静默窗口起（HH:mm）
+  quietEnd: string; // 静默窗口止（HH:mm）
+  escalateMinutes: number; // N 分钟未处理则升级（0=不升级）
+  status: "ACTIVE" | "INACTIVE";
+}
+
+// —— 公告管理（营销域 · P1，对标简电云 E1）——
+// c-app 首页 Hub 的「公告条」需要运营端发布口（原功能清单遗漏）。
+// 三语（zh/en/ar）+ 生效期 + 置顶：竞品公告只有单语，我们要覆盖 MENA 多语市场。
+export interface Notice {
+  noticeNo: string;
+  title: string; // 中文标题
+  titleEn: string;
+  titleAr: string;
+  content: string; // 中文正文
+  contentEn: string;
+  contentAr: string;
+  type: "SYSTEM" | "PROMO" | "MAINTENANCE"; // 系统公告 / 活动公告 / 维护公告
+  pinned: boolean; // 置顶（C 端公告条优先展示）
+  startAt: string; // 生效期起
+  endAt: string; // 生效期止
+  status: "DRAFT" | "PUBLISHED" | "OFFLINE"; // 草稿 / 已发布 / 已下线
+  publishedBy: string;
+  createdAt: string;
+}
+
+// —— 支付渠道（系统域 · P1，对标简电云 E8）——
+// 竞品把 Stripe/Paypal/Braintree/Yedpay/ABA/Selcom 七个渠道各占一个菜单；
+// 我们合并为一页：渠道列表 + 各自配置抽屉 —— 少菜单噪音即「信息更清晰」。
+export interface PaymentChannel {
+  channelCode: string; // NEARPAY / STRIPE / PAYPAL ...
+  channelName: string;
+  mode: "DELEGATED" | "DIRECT"; // 委托（聚合/代收）/ 直连（自有商户号）
+  status: "ENABLED" | "DISABLED";
+  countries: string; // 适用国家，ISO alpha-2 逗号分隔，如 "AE,SA"
+  currencies: string; // 币种，逗号分隔，如 "AED,SAR"
+  capabilities: string; // 能力：支付/退款/预授权/分账，逗号分隔
+  apiBase: string;
+  merchantId: string;
+  apiKeyMasked: string; // 密钥仅掩码展示（真实密钥永不落前端，占位 sk_test_****）
+  updatedAt: string;
+}

@@ -80,8 +80,21 @@ export const NAV: NavDomain[] = [
           { href: "/devices?tab=powerbanks", label: "充电宝管理", perm: "device:powerbank:read", group: "资产台账" },
           { href: "/devices?tab=monitor", label: "实时监控", perm: "device:cabinet:read", group: "在线运行" },
           { href: "/devices?tab=commands", label: "远程控制·指令记录", perm: "device:command:send", group: "在线运行" },
+          { href: "/devices?tab=logs", label: "设备日志", perm: "device:cabinet:read", phase: 2, soon: true, group: "在线运行" },
           { href: "/devices?tab=inventory", label: "库存调拨", perm: "device:inventory:read", phase: 2, group: "资产流转" },
           { href: "/devices?tab=ota", label: "固件 OTA", perm: "device:ota:read", phase: 2, group: "资产流转" },
+          { href: "/devices?tab=codes", label: "设备编码", perm: "device:cabinet:read", phase: 2, soon: true, group: "资产流转" },
+        ],
+      },
+      {
+        // 对标简电云「告警管理」域（补齐清单 A）：告警码字典 → 通知规则 → 记录 → 触达。
+        // 我们比它多一环：记录带「关联工单号」，规则带「静默窗口/升级策略」，字典带「建议处置/自动开工单」。
+        key: "alarm", label: "告警管理", icon: "BellRing", module: "workorder", href: "/alarms",
+        children: [
+          { href: "/alarms", label: "告警记录", perm: "workorder:wo:read", group: "告警处置" },
+          { href: "/alarms?tab=notices", label: "告警通知", perm: "workorder:wo:read", group: "告警处置" },
+          { href: "/alarms?tab=codes", label: "告警代码", perm: "workorder:wo:read", group: "规则配置" },
+          { href: "/alarms?tab=rules", label: "通知规则", perm: "workorder:wo:read", group: "规则配置" },
         ],
       },
       {
@@ -139,9 +152,14 @@ export const NAV: NavDomain[] = [
       {
         key: "order", label: "订单管理", icon: "ReceiptText", module: "order", href: "/orders",
         children: [
-          { href: "/orders", label: "订单列表", perm: "order:order:read" },
-          { href: "/orders?tab=exceptions", label: "异常订单", perm: "order:exception:read" },
-          { href: "/orders?tab=deposit", label: "押金与欠费", perm: "order:order:read", phase: 2 },
+          // 按「交易流水 / 售后处置 / 特殊单据」分组（补齐清单 B）
+          { href: "/orders", label: "订单列表", perm: "order:order:read", group: "交易流水" },
+          { href: "/orders?tab=reservations", label: "预约订单", perm: "order:order:read", phase: 2, soon: true, group: "交易流水" },
+          { href: "/orders?tab=exceptions", label: "异常订单", perm: "order:exception:read", group: "售后处置" },
+          { href: "/orders?tab=complaints", label: "投诉订单", perm: "order:exception:read", group: "售后处置" },
+          { href: "/orders?tab=refunds", label: "退款记录", perm: "order:refund:audit", group: "售后处置" },
+          { href: "/orders?tab=deposit", label: "押金与欠费", perm: "order:order:read", phase: 2, group: "特殊单据" },
+          { href: "/orders?tab=free", label: "免费订单", perm: "order:order:read", phase: 2, soon: true, group: "特殊单据" },
         ],
       },
       {
@@ -159,6 +177,7 @@ export const NAV: NavDomain[] = [
           // 分润与结算 = 跨主体的规则与产出；平台账 = 自家的账；伙伴账 = 代理商/场地方的钱；用户账 = C 端的钱。
           { href: "/finance?tab=rules", label: "分润规则", perm: "finance:share_rule:read", group: "分润与结算" },
           { href: "/finance?tab=records", label: "分润明细", perm: "finance:share_record:read", group: "分润与结算" },
+          { href: "/finance?tab=summary", label: "分润统计", perm: "finance:share_record:read", phase: 2, soon: true, group: "分润与结算" },
           { href: "/finance?tab=settlements", label: "结算单", perm: "finance:settlement:read", group: "分润与结算" },
           { href: "/finance?tab=ledger", label: "账务分录", perm: "finance:ledger:read", phase: 2, group: "平台账" },
           { href: "/finance?tab=reconcile", label: "对账", perm: "finance:reconcile:read", phase: 3, group: "平台账" },
@@ -168,6 +187,7 @@ export const NAV: NavDomain[] = [
           { href: "/agents?tab=commission", label: "代理分润配置", perm: "agent:settlement:read", group: "伙伴账" },
           { href: "/finance?tab=withdrawals", label: "提现审核", perm: "finance:withdrawal:read", phase: 2, group: "伙伴账" },
           { href: "/users?tab=wallets", label: "用户钱包", perm: "user:wallet:read", phase: 3, group: "用户账" },
+          { href: "/finance?tab=recharges", label: "充值订单", perm: "user:wallet:read", phase: 3, soon: true, group: "用户账" },
         ],
       },
     ],
@@ -186,20 +206,24 @@ export const NAV: NavDomain[] = [
           { href: "/users", label: "用户列表", perm: "user:cuser:read", phase: 2, group: "用户主体" },
           { href: "/users?tab=risk", label: "风控用户", perm: "user:risk:read", phase: 2, group: "风险治理" },
           { href: "/users?tab=blacklist", label: "黑名单", perm: "user:risk:update", phase: 2, group: "风险治理" },
+          { href: "/users?tab=whitelist", label: "免费用户白名单", perm: "user:risk:update", phase: 2, soon: true, group: "风险治理" },
           { href: "/users?tab=members", label: "会员/次卡", perm: "user:member:read", phase: 3, group: "用户资产" },
           { href: "/users?tab=wallets", label: "钱包", perm: "user:wallet:read", phase: 3, group: "用户资产" },
+          { href: "/users?tab=recharge", label: "充值套餐", perm: "user:wallet:read", phase: 3, soon: true, group: "用户资产" },
         ],
       },
       {
         key: "marketing", label: "营销管理", icon: "Ticket", module: "marketing", href: "/marketing",
         children: [
-          { href: "/marketing", label: "优惠券", perm: "marketing:coupon:read", phase: 2 },
-          { href: "/marketing?tab=campaigns", label: "活动", phase: 2 },
-          { href: "/marketing?tab=push", label: "推送触达", perm: "marketing:push:send", phase: 3 },
-          { href: "/marketing?tab=referral", label: "邀请裂变", phase: 3 },
-          { href: "/marketing?tab=ad-slots", label: "广告位管理", phase: 3 },
-          { href: "/marketing?tab=ad-campaigns", label: "广告活动", phase: 3 },
-          { href: "/marketing?tab=ad-delivery", label: "投放与曝光", phase: 3 },
+          // 公告管理：c-app 首页 Hub 的「公告条」需要运营端发布口，原清单遗漏（补齐清单 E1）
+          { href: "/marketing?tab=notices", label: "公告管理", perm: "marketing:coupon:read", group: "运营内容" },
+          { href: "/marketing", label: "优惠券", perm: "marketing:coupon:read", phase: 2, group: "促销玩法" },
+          { href: "/marketing?tab=campaigns", label: "活动", phase: 2, group: "促销玩法" },
+          { href: "/marketing?tab=push", label: "推送触达", perm: "marketing:push:send", phase: 3, group: "促销玩法" },
+          { href: "/marketing?tab=referral", label: "邀请裂变", phase: 3, group: "促销玩法" },
+          { href: "/marketing?tab=ad-slots", label: "广告位管理", phase: 3, group: "广告经营" },
+          { href: "/marketing?tab=ad-campaigns", label: "广告活动", phase: 3, group: "广告经营" },
+          { href: "/marketing?tab=ad-delivery", label: "投放与曝光", phase: 3, group: "广告经营" },
         ],
       },
       {
@@ -257,13 +281,25 @@ export const NAV: NavDomain[] = [
         key: "system", label: "系统设置", icon: "Settings", module: "system", href: "/system?tab=vendors",
         match: ["/system"],
         children: [
-          { href: "/system?tab=vendors", label: "供应商接入" },
-          { href: "/system?tab=notify", label: "通知模板", perm: "system:notify_template:read" },
-          { href: "/system?tab=dict", label: "参数字典", perm: "system:dict:read" },
-          { href: "/system?tab=region", label: "地区库" },
-          { href: "/system?tab=params", label: "系统参数" },
-          { href: "/system?tab=markets", label: "多国家市场", phase: 3 },
-          { href: "/system?tab=openapi", label: "OpenAPI 应用", phase: 3 },
+          // 按「接入 / 消息触达 / 业务规则 / 基础字典 / 开放与市场」分组（补齐清单 E）。
+          // 注：对方把 提现设置/预约设置/充电设置 拆三个菜单、7 个支付渠道各占一菜单；
+          //     我们合并为「业务规则」一页与「支付渠道」一页 —— 少菜单噪音即"信息更清晰"。
+          { href: "/system?tab=vendors", label: "供应商接入", group: "接入与支付" },
+          { href: "/system?tab=payment", label: "支付渠道", group: "接入与支付" },
+          { href: "/system?tab=notify", label: "通知模板", perm: "system:notify_template:read", group: "消息触达" },
+          { href: "/system?tab=notify-log", label: "发送记录", perm: "system:notify_template:read", phase: 2, soon: true, group: "消息触达" },
+          { href: "/system?tab=notify-blacklist", label: "触达拉黑", perm: "system:notify_template:read", phase: 2, soon: true, group: "消息触达" },
+          { href: "/system?tab=rules", label: "业务规则", phase: 2, soon: true, group: "业务规则" },
+          { href: "/system?tab=login", label: "登录设置", phase: 2, soon: true, group: "业务规则" },
+          { href: "/system?tab=app-version", label: "应用版本", phase: 2, soon: true, group: "业务规则" },
+          { href: "/system?tab=dict", label: "参数字典", perm: "system:dict:read", group: "基础字典" },
+          { href: "/system?tab=region", label: "地区库", group: "基础字典" },
+          { href: "/system?tab=banks", label: "银行管理", phase: 2, soon: true, group: "基础字典" },
+          { href: "/system?tab=problems", label: "问题管理", phase: 2, soon: true, group: "基础字典" },
+          { href: "/system?tab=params", label: "系统参数", group: "基础字典" },
+          { href: "/system?tab=tax", label: "税率与发票", phase: 3, soon: true, group: "开放与市场" },
+          { href: "/system?tab=markets", label: "多国家市场", phase: 3, group: "开放与市场" },
+          { href: "/system?tab=openapi", label: "OpenAPI 应用", phase: 3, group: "开放与市场" },
         ],
       },
     ],

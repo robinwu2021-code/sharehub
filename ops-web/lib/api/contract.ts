@@ -13,12 +13,17 @@ import type {
   NotifyTemplate, DictEntry, Region, SysParam, OpenApiApp,
   DepositRecord, MarketCountry, ConsumerSegment,
   UserRisk, UserBlacklist, AgentCommission, VenueOnboarding, SiteLifecycle,
+  AlarmRecord, AlarmNotice, AlarmCode, AlarmRule,
+  OrderComplaint, RefundRecord, ComplaintResolution,
+  Notice, PaymentChannel,
 } from "../types";
 
 export interface PageQ { page?: number; size?: number; keyword?: string; [k: string]: unknown; }
 export type CabinetQ = PageQ & { onlineStatus?: string; status?: string };
 export type OrderQ = PageQ & { status?: string };
 export type WoQ = PageQ & { status?: string; type?: string };
+export type AlarmQ = PageQ & { level?: string; status?: string };
+export type StatusQ = PageQ & { status?: string };
 
 export interface LoginResp { token: string; username: string; role: string; agentNo: string; }
 
@@ -135,6 +140,25 @@ export interface Api {
   listVenueOnboardings(q?: PageQ): Promise<PageResult<VenueOnboarding>>;
   saveVenueOnboarding(x: Partial<VenueOnboarding> & { onboardingNo?: string }): Promise<VenueOnboarding>;
   listSiteLifecycles(q?: PageQ): Promise<PageResult<SiteLifecycle>>;
+  // === 告警治理（记录 / 通知流水 / 代码字典 / 通知规则）===
+  listAlarmRecords(q?: AlarmQ): Promise<PageResult<AlarmRecord>>;
+  listAlarmNotices(q?: PageQ): Promise<PageResult<AlarmNotice>>;
+  listAlarmCodes(q?: PageQ): Promise<PageResult<AlarmCode>>;
+  listAlarmRules(q?: PageQ): Promise<PageResult<AlarmRule>>;
+  saveAlarmCode(x: Partial<AlarmCode> & { code?: string }): Promise<AlarmCode>;
+  saveAlarmRule(x: Partial<AlarmRule> & { ruleNo?: string }): Promise<AlarmRule>;
+  /** 告警转工单：生成关联工单号并置为已受理，返回更新后的告警记录。 */
+  raiseAlarmWorkOrder(alarmNo: string): Promise<AlarmRecord>;
+
+  // === 售后处置（投诉订单 / 退款审批队列）===
+  listOrderComplaints(q?: StatusQ): Promise<PageResult<OrderComplaint>>;
+  /** 处理投诉：写入处理结果 + 说明，落 RESOLVED/REJECTED。 */
+  handleOrderComplaint(complaintNo: string, resolution: ComplaintResolution, note: string): Promise<OrderComplaint>;
+  /** 投诉转工单：投诉-订单-工单闭环（竞品此处断链）。 */
+  raiseComplaintWorkOrder(complaintNo: string): Promise<OrderComplaint>;
+  listRefundRecords(q?: StatusQ): Promise<PageResult<RefundRecord>>;
+  /** 退款审批：驳回必须带原因。幂等键由申请侧生成，审批不重发。 */
+  auditRefund(refundNo: string, approve: boolean, rejectReason?: string): Promise<RefundRecord>;
 
   // === 扩展实体 save（照 saveCoupon 写法）===
   savePowerbank(x: Partial<Powerbank> & { powerbankNo?: string }): Promise<Powerbank>;
@@ -165,4 +189,11 @@ export interface Api {
   saveRegion(x: Partial<Region> & { regionId?: string }): Promise<Region>;
   saveSysParam(x: Partial<SysParam> & { paramKey?: string }): Promise<SysParam>;
   saveOpenApiApp(x: Partial<OpenApiApp> & { appNo?: string }): Promise<OpenApiApp>;
+
+  // === 公告管理（营销域 · P1，补齐清单 E1）===
+  listNotices(q?: PageQ): Promise<PageResult<Notice>>;
+  saveNotice(x: Partial<Notice> & { noticeNo?: string }): Promise<Notice>;
+  // === 支付渠道（系统域 · P1，补齐清单 E8）===
+  listPaymentChannels(q?: PageQ): Promise<PageResult<PaymentChannel>>;
+  savePaymentChannel(x: Partial<PaymentChannel> & { channelCode?: string }): Promise<PaymentChannel>;
 }

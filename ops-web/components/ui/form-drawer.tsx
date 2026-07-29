@@ -11,7 +11,8 @@ import { useI18n } from "@/lib/i18n";
 export type FieldDef = {
   key: string;
   label: string;
-  type?: "text" | "number" | "select" | "switch";
+  /** password：密钥类字段，输入掩码显示（值不回显明文样式，仅用于配置类抽屉）。 */
+  type?: "text" | "number" | "select" | "switch" | "password";
   options?: { value: string; label: string }[];
   placeholder?: string;
   /** 编辑既有记录时只读（如业务主键）。 */
@@ -49,7 +50,7 @@ function InputForField({
   }
   return (
     <Input
-      type={f.type === "number" ? "number" : "text"}
+      type={f.type === "number" ? "number" : f.type === "password" ? "password" : "text"}
       value={(cur as string | number) ?? ""}
       disabled={disabled}
       placeholder={f.placeholder}

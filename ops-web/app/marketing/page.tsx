@@ -14,13 +14,16 @@ import { Button } from "@/components/ui/button";
 import { money, fmtTime } from "@/lib/utils";
 import { useCan } from "@/lib/use-can";
 import { useI18n } from "@/lib/i18n";
+import { isPhaseLocked } from "@/lib/phase";
 import { notify } from "@/lib/notify";
 import type {
-  Coupon, Campaign, PushMessage, Referral, AdSlot, AdCampaign, AdDelivery, PageResult,
+  Notice, Coupon, Campaign, PushMessage, Referral, AdSlot, AdCampaign, AdDelivery, PageResult,
 } from "@/lib/types";
 
 const SIZE = 10;
 const TABS = [
+  // 公告管理是营销模块唯一的阶段 1 项（c-app 首页公告条的发布口），故置于首位。
+  { key: "notices", label: "公告管理" },
   { key: "coupons", label: "优惠券", phase: 2 as const },
   { key: "campaigns", label: "活动", phase: 2 as const },
   { key: "push", label: "推送触达", phase: 3 as const },
@@ -29,6 +32,37 @@ const TABS = [
   { key: "ad-campaigns", label: "广告活动", phase: 3 as const },
   { key: "ad-delivery", label: "投放与曝光", phase: 3 as const },
 ];
+// 三语（zh/en/ar）+ 生效期 + 置顶：竞品公告只有单语，我们要覆盖 MENA 多语市场。
+const NOTICE_FIELDS: FieldDef[] = [
+  { key: "noticeNo", label: "公告号", readOnlyOnEdit: true, placeholder: "留空自动生成" },
+  { key: "type", label: "类型", type: "select", options: [{ value: "SYSTEM", label: "系统公告" }, { value: "PROMO", label: "活动公告" }, { value: "MAINTENANCE", label: "维护公告" }] },
+  { key: "title", label: "标题（中文）", placeholder: "斋月期间机柜服务时间调整" },
+  { key: "titleEn", label: "标题（English）", placeholder: "Ramadan service hours update" },
+  { key: "titleAr", label: "标题（العربية）", placeholder: "تحديث ساعات الخدمة خلال رمضان" },
+  { key: "content", label: "正文（中文）", placeholder: "面向 C 端首页公告条展示的正文" },
+  { key: "contentEn", label: "正文（English）", placeholder: "Body shown in the C-end home banner" },
+  { key: "contentAr", label: "正文（العربية）", placeholder: "النص المعروض في شريط الإعلانات" },
+  { key: "pinned", label: "置顶", type: "switch" },
+  { key: "startAt", label: "生效开始", placeholder: "2026-07-01 00:00:00" },
+  { key: "endAt", label: "生效结束", placeholder: "2026-07-31 23:59:59" },
+  { key: "status", label: "状态", type: "select", options: [{ value: "DRAFT", label: "草稿" }, { value: "PUBLISHED", label: "已发布" }, { value: "OFFLINE", label: "已下线" }] },
+  { key: "publishedBy", label: "发布人", placeholder: "运营中心" },
+];
+const NOTICE_TYPE: Record<Notice["type"], { label: string; tone: "outline" | "success" | "warning" }> = {
+  SYSTEM: { label: "系统公告", tone: "outline" },
+  PROMO: { label: "活动公告", tone: "success" },
+  MAINTENANCE: { label: "维护公告", tone: "warning" },
+};
+const NOTICE_STATUS: Record<Notice["status"], { label: string; tone: "muted" | "success" }> = {
+  DRAFT: { label: "草稿", tone: "muted" },
+  PUBLISHED: { label: "已发布", tone: "success" },
+  OFFLINE: { label: "已下线", tone: "muted" },
+};
+
+// 默认 tab：阶段 1 下「优惠券」被屏蔽，落到唯一可见的 P1 项「公告管理」；
+// 放开阶段 2 后 /marketing（nav 中标为「优惠券」）恢复原语义。
+const DEFAULT_TAB = isPhaseLocked(2) ? "notices" : "coupons";
+
 const COUPON_FIELDS: FieldDef[] = [
   { key: "name", label: "名称", placeholder: "新人立减" },
   { key: "type", label: "类型", type: "select", options: [{ value: "CUT", label: "立减" }, { value: "DISCOUNT", label: "折扣" }] },
@@ -72,9 +106,10 @@ function MarketingInner() {
   const qc = useQueryClient();
   const allow = useCan();
   const { t } = useI18n();
-  const [tab, setTab] = useState(TABS.some((t) => t.key === qTab) ? (qTab as string) : "coupons");
+  const [tab, setTab] = useState(TABS.some((t) => t.key === qTab) ? (qTab as string) : DEFAULT_TAB);
   const [page, setPage] = useState(1);
   const [keyword, setKeyword] = useState("");
+  const [noticeForm, setNoticeForm] = useState<Partial<Notice> | null>(null);
   const [couponForm, setCouponForm] = useState<Partial<Coupon> | null>(null);
   const [campaignForm, setCampaignForm] = useState<Partial<Campaign> | null>(null);
   const [pushForm, setPushForm] = useState<Partial<PushMessage> | null>(null);
@@ -82,10 +117,15 @@ function MarketingInner() {
   const [adForm, setAdForm] = useState<Partial<AdCampaign> | null>(null);
   useEffect(() => { if (qTab && TABS.some((t) => t.key === qTab)) { setTab(qTab); setPage(1); } }, [qTab]);
 
+  const canEditNotice = allow("marketing:coupon:issue");
   const canEditCoupon = allow("marketing:coupon:issue");
   const canEditCampaign = allow("marketing:campaign:manage");
   const canEditPush = allow("marketing:push:send");
   const canEditAd = allow("marketing:ad:manage");
+  const saveNotice = useMutation({
+    mutationFn: (n: Partial<Notice>) => api.saveNotice(n),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["mkt"] }); notify.success(t("common.success")); setNoticeForm(null); },
+  });
   const saveCoupon = useMutation({
     mutationFn: (c: Partial<Coupon>) => api.saveCoupon(c),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["mkt"] }); notify.success(t("common.success")); setCouponForm(null); },
@@ -107,10 +147,11 @@ function MarketingInner() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["mkt"] }); notify.success(t("common.success")); setAdForm(null); },
   });
 
-  const q = useQuery<PageResult<Coupon | Campaign | PushMessage | Referral | AdSlot | AdCampaign | AdDelivery>>({
+  const q = useQuery<PageResult<Notice | Coupon | Campaign | PushMessage | Referral | AdSlot | AdCampaign | AdDelivery>>({
     queryKey: ["mkt", tab, page, keyword],
     queryFn: () =>
-      tab === "coupons" ? api.listCoupons({ page, size: SIZE, keyword })
+      tab === "notices" ? api.listNotices({ page, size: SIZE, keyword })
+      : tab === "coupons" ? api.listCoupons({ page, size: SIZE, keyword })
       : tab === "campaigns" ? api.listCampaigns({ page, size: SIZE, keyword })
       : tab === "push" ? api.listPushMessages({ page, size: SIZE, keyword })
       : tab === "referral" ? api.listReferrals({ page, size: SIZE, keyword })
@@ -119,6 +160,16 @@ function MarketingInner() {
       : api.listAdDeliveries({ page, size: SIZE, keyword }),
     placeholderData: keepPreviousData,
   });
+
+  const noticeCols: Column<Notice>[] = [
+    { header: "公告号", cell: (n) => <span className="font-medium">{n.noticeNo}</span> },
+    { header: "标题（中）", cell: (n) => n.title },
+    { header: "类型", cell: (n) => <Badge tone={NOTICE_TYPE[n.type].tone}>{NOTICE_TYPE[n.type].label}</Badge> },
+    { header: "置顶", cell: (n) => n.pinned ? <Badge tone="success">置顶</Badge> : <span className="text-muted-foreground">-</span> },
+    { header: "生效期", cell: (n) => <span className="text-muted-foreground">{fmtTime(n.startAt)} ~ {fmtTime(n.endAt)}</span> },
+    { header: "状态", cell: (n) => <Badge tone={NOTICE_STATUS[n.status].tone}>{NOTICE_STATUS[n.status].label}</Badge> },
+    { header: t("common.actions"), cell: (n) => canEditNotice ? <Button size="sm" variant="outline" onClick={() => setNoticeForm(n)}>{t("common.edit")}</Button> : <span className="text-muted-foreground">-</span> },
+  ];
 
   const couponCols: Column<Coupon>[] = [
     { header: "券号", cell: (c) => <span className="font-medium">{c.couponNo}</span> },
@@ -195,6 +246,15 @@ function MarketingInner() {
   return (
     <div>
       <TabHeader tabs={TABS} value={tab} onChange={(k) => { setTab(k); setPage(1); setKeyword(""); }} />
+      {tab === "notices" && (
+        <Toolbar
+          search={keyword}
+          onSearch={(v) => { setKeyword(v); setPage(1); }}
+          searchPlaceholder="搜索公告号/标题（中/英/阿）/发布人"
+          onAdd={canEditNotice ? () => setNoticeForm({ type: "SYSTEM", pinned: false, status: "DRAFT", title: "", titleEn: "", titleAr: "", content: "", contentEn: "", contentAr: "", startAt: "", endAt: "", publishedBy: "" }) : undefined}
+          addLabel="新增公告"
+        />
+      )}
       {tab === "coupons" && (
         <Toolbar
           search={keyword}
@@ -254,6 +314,7 @@ function MarketingInner() {
           searchPlaceholder="搜索投放号/广告号/广告位"
         />
       )}
+      {tab === "notices" && <DataTable rowKey={(n: Notice) => n.noticeNo} columns={noticeCols} rows={q.data?.list as Notice[]} loading={q.isLoading} />}
       {tab === "coupons" && <DataTable rowKey={(c: Coupon) => c.couponNo} columns={couponCols} rows={q.data?.list as Coupon[]} loading={q.isLoading} />}
       {tab === "campaigns" && <DataTable rowKey={(c: Campaign) => c.campaignNo} columns={campaignCols} rows={q.data?.list as Campaign[]} loading={q.isLoading} />}
       {tab === "push" && <DataTable rowKey={(p: PushMessage) => p.pushNo} columns={pushCols} rows={q.data?.list as PushMessage[]} loading={q.isLoading} />}
@@ -262,6 +323,19 @@ function MarketingInner() {
       {tab === "ad-campaigns" && <DataTable rowKey={(a: AdCampaign) => a.adNo} columns={adCampaignCols} rows={q.data?.list as AdCampaign[]} loading={q.isLoading} />}
       {tab === "ad-delivery" && <DataTable rowKey={(d: AdDelivery) => d.deliveryNo} columns={deliveryCols} rows={q.data?.list as AdDelivery[]} loading={q.isLoading} />}
       {q.data && <Pagination page={page} size={SIZE} total={q.data.total} onPage={setPage} />}
+
+      <FormDrawer
+        open={!!noticeForm}
+        onOpenChange={(o) => !o && setNoticeForm(null)}
+        titleNew="新增公告"
+        titleEdit={`编辑公告 ${noticeForm?.noticeNo ?? ""}`}
+        isEdit={!!noticeForm?.noticeNo}
+        fields={NOTICE_FIELDS}
+        value={(noticeForm ?? {}) as Record<string, unknown>}
+        onChange={(v) => setNoticeForm(v as Partial<Notice>)}
+        onSubmit={() => noticeForm && saveNotice.mutate(noticeForm)}
+        submitting={saveNotice.isPending}
+      />
 
       <FormDrawer
         open={!!couponForm}
