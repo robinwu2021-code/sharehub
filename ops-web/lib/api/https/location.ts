@@ -2,14 +2,14 @@
 // 门店 Onboarding / 站点生命周期。端点前缀：/api/ops/**
 import { client } from "../http-client";
 import type { LocationApi } from "../contracts/location";
-import type { PageQ } from "../query";
+import type { PageQ, ArchiveQ } from "../query";
 
 export const locationHttp: LocationApi = {
-  listSites: (q?: PageQ) => client.get("/api/ops/sites", q),
+  listSites: (q?: ArchiveQ) => client.get("/api/ops/sites", q),
   saveSite: (s) => client.post(s.siteNo ? `/api/ops/sites/${s.siteNo}` : "/api/ops/sites", s),
-  listLocations: (q?: PageQ) => client.get("/api/ops/locations", q),
+  listLocations: (q?: ArchiveQ) => client.get("/api/ops/locations", q),
   savePoint: (l) => client.post(l.locationNo ? `/api/ops/locations/${l.locationNo}` : "/api/ops/locations", l),
-  listVenues: (q?: PageQ) => client.get("/api/ops/venues", q),
+  listVenues: (q?: ArchiveQ) => client.get("/api/ops/venues", q),
   listContracts: (q?: PageQ) => client.get("/api/ops/contracts", q),
 
   // 场所扩展
@@ -23,4 +23,12 @@ export const locationHttp: LocationApi = {
   listVenueOnboardings: (q?: PageQ) => client.get("/api/ops/venue-onboardings", q),
   saveVenueOnboarding: (x) => client.post(x.onboardingNo ? `/api/ops/venue-onboardings/${x.onboardingNo}` : "/api/ops/venue-onboardings", x),
   listSiteLifecycles: (q?: PageQ) => client.get("/api/ops/site-lifecycles", q),
+
+  // G1 软删除：归档 / 恢复。REST 上是「状态迁移」而非 DELETE —— 后端不得实现物理删除。
+  archiveSite: (no) => client.post(`/api/ops/sites/${no}/archive`, {}),
+  unarchiveSite: (no) => client.post(`/api/ops/sites/${no}/unarchive`, {}),
+  archivePoint: (no) => client.post(`/api/ops/locations/${no}/archive`, {}),
+  unarchivePoint: (no) => client.post(`/api/ops/locations/${no}/unarchive`, {}),
+  archiveVenue: (no) => client.post(`/api/ops/venues/${no}/archive`, {}),
+  unarchiveVenue: (no) => client.post(`/api/ops/venues/${no}/unarchive`, {}),
 };

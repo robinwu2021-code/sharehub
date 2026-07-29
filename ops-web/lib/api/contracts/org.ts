@@ -1,13 +1,13 @@
 // 覆盖范围：组织与权限 —— 员工、角色、审计日志、部门、员工绩效。
 // （无租户管理，租户仅后端兼容层）
-import type { PageQ } from "../query";
+import type { PageQ, ArchiveQ } from "../query";
 import type {
   PageResult, Employee, RoleRow, AuditEntry, Department, StaffPerformance, DataScope,
 } from "../../types";
 
 export interface OrgApi {
   listEmployees(q?: PageQ): Promise<PageResult<Employee>>;
-  listRoles(): Promise<RoleRow[]>;
+  listRoles(q?: ArchiveQ): Promise<RoleRow[]>;
   listAudits(q?: PageQ): Promise<PageResult<AuditEntry>>;
 
   // === 员工扩展 tab ===
@@ -23,4 +23,9 @@ export interface OrgApi {
    * scope 为 ALL / SELF 时无附加值，服务端会清空。
    */
   saveRoleDataScope(roleCode: string, scope: DataScope, scopeValues?: string): Promise<RoleRow>;
+
+  // === G1 软删除（TDD §10.1）：归档而非删除，**契约里禁止出现 deleteXxx** ===
+  /** 内置角色（builtin）不可归档——登录鉴权依赖其存在，服务端同样要拦。 */
+  archiveRole(roleNo: string): Promise<RoleRow>;
+  unarchiveRole(roleNo: string): Promise<RoleRow>;
 }

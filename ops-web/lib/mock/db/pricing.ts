@@ -1,13 +1,13 @@
 // 计费域：计费模板 pricePlans / 场景差异化定价 pricingDiffs / 时段策略 pricingSchedules。
 import type { PricePlan, PricingDiff, PricingSchedule, PageQuery } from "../../types";
 import { LOCS, p } from "./internal";
-import { paginate, kwHit, upsert, nextNo } from "./helpers";
+import { paginate, kwHit, upsert, nextNo, archiveRow, unarchiveRow } from "./helpers";
 
 export const pricePlans: PricePlan[] = [
-  { planNo: "PP001", name: "标准（默认）", freeMinutes: 5, unitMinutes: 30, unitPrice: 3, capDaily: 30, buyoutPrice: 60, currency: "AED", scope: "默认", status: "ACTIVE" },
-  { planNo: "PP002", name: "机场高价", freeMinutes: 3, unitMinutes: 30, unitPrice: 5, capDaily: 50, buyoutPrice: 99, currency: "AED", scope: "机场点位", status: "ACTIVE" },
-  { planNo: "PP003", name: "商场优惠", freeMinutes: 10, unitMinutes: 60, unitPrice: 2, capDaily: 20, buyoutPrice: 49, currency: "AED", scope: "商场点位", status: "ACTIVE" },
-  { planNo: "PP004", name: "旧活动价", freeMinutes: 15, unitMinutes: 30, unitPrice: 2, capDaily: 20, buyoutPrice: 40, currency: "AED", scope: "活动", status: "DISABLED" },
+  { planNo: "PP001", name: "标准（默认）", freeMinutes: 5, unitMinutes: 30, unitPrice: 3, capDaily: 30, buyoutPrice: 60, currency: "AED", scope: "默认", status: "ACTIVE", archivedAt: null },
+  { planNo: "PP002", name: "机场高价", freeMinutes: 3, unitMinutes: 30, unitPrice: 5, capDaily: 50, buyoutPrice: 99, currency: "AED", scope: "机场点位", status: "ACTIVE", archivedAt: null },
+  { planNo: "PP003", name: "商场优惠", freeMinutes: 10, unitMinutes: 60, unitPrice: 2, capDaily: 20, buyoutPrice: 49, currency: "AED", scope: "商场点位", status: "ACTIVE", archivedAt: null },
+  { planNo: "PP004", name: "旧活动价", freeMinutes: 15, unitMinutes: 30, unitPrice: 2, capDaily: 20, buyoutPrice: 40, currency: "AED", scope: "活动", status: "DISABLED", archivedAt: "2026-05-20T09:00:00Z" },
 ];
 
 export const pricingDiffs: PricingDiff[] = Array.from({ length: 12 }, (_, i) => ({
@@ -27,3 +27,7 @@ export const listPricingSchedules = (q: PageQuery = {}) => paginate(pricingSched
 export const savePricePlan = (x: Partial<PricePlan>) => upsert(pricePlans, x, "planNo", () => nextNo("PP", pricePlans));
 export const savePricingDiff = (x: Partial<PricingDiff>) => upsert(pricingDiffs, x, "ruleNo", () => nextNo("PD", pricingDiffs));
 export const savePricingSchedule = (x: Partial<PricingSchedule>) => upsert(pricingSchedules, x, "ruleNo", () => nextNo("PS", pricingSchedules));
+
+// —— G1 软删除：计费模板 ——
+export const archivePricePlan = (no: string) => archiveRow(pricePlans, "planNo", no);
+export const unarchivePricePlan = (no: string) => unarchiveRow(pricePlans, "planNo", no);

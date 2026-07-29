@@ -53,4 +53,10 @@ export const systemMock: SystemApi = {
   saveProblem: (x) => wait(db.saveProblem(x), 350),
   listTaxSettings: (q: PageQ = {}) => wait(db.listTaxSettings(q)),
   saveTaxSetting: (x) => wait(db.saveTaxSetting(x), 350),
+
+  // G1 软删除：归档 / 恢复（禁止物理删除）
+  archiveBank: async (code) => wait(db.archiveBank(code), 350),
+  unarchiveBank: async (code) => wait(db.unarchiveBank(code), 350),
+  archiveProblem: async (no) => wait(db.archiveProblem(no), 350),
+  unarchiveProblem: async (no) => wait(db.unarchiveProblem(no), 350),
 };

@@ -15,6 +15,7 @@ import { fmtTime } from "@/lib/utils";
 import { useCan } from "@/lib/use-can";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
+import { exportCsv } from "@/lib/export-csv";
 import type { CsTicket, CsSession, PageResult } from "@/lib/types";
 
 const SIZE = 10;
@@ -113,6 +114,15 @@ function CsInner() {
           searchPlaceholder="搜索工单号 / 用户 / 设备 / 问题"
           onAdd={canEditTicket ? () => setTicketForm({ status: "OPEN", channel: "APP", issue: "" }) : undefined}
           addLabel="新增工单"
+          onExport={() => exportCsv<CsTicket>("报障受理", [
+            { header: "工单号", value: (x) => x.ticketNo },
+            { header: "用户", value: (x) => x.userNo },
+            { header: "设备", value: (x) => x.cabinetNo },
+            { header: "问题", value: (x) => x.issue },
+            { header: "渠道", value: (x) => x.channel },
+            { header: "状态", value: (x) => TICKET_STATUS[x.status].label },
+            { header: "创建时间", value: (x) => x.createdAt },
+          ], (q.data?.list ?? []) as CsTicket[])}
         />
       )}
       {tab === "sessions" && (
@@ -120,10 +130,18 @@ function CsInner() {
           search={keyword}
           onSearch={(v) => { setKeyword(v); setPage(1); }}
           searchPlaceholder="搜索会话号 / 用户 / 客服"
+          onExport={() => exportCsv<CsSession>("客服会话", [
+            { header: "会话号", value: (s) => s.sessionNo },
+            { header: "用户", value: (s) => s.userNo },
+            { header: "客服", value: (s) => s.agentName },
+            { header: "最新消息", value: (s) => s.lastMessage },
+            { header: "状态", value: (s) => SESSION_STATUS[s.status].label },
+            { header: "更新时间", value: (s) => s.updatedAt },
+          ], (q.data?.list ?? []) as CsSession[])}
         />
       )}
-      {tab === "tickets" && <DataTable rowKey={(t: CsTicket) => t.ticketNo} columns={ticketCols} rows={q.data?.list as CsTicket[]} loading={q.isLoading} />}
-      {tab === "sessions" && <DataTable rowKey={(s: CsSession) => s.sessionNo} columns={sessionCols} rows={q.data?.list as CsSession[]} loading={q.isLoading} />}
+      {tab === "tickets" && <DataTable rowKey={(t: CsTicket) => t.ticketNo} columns={ticketCols} rows={q.data?.list as CsTicket[]} loading={q.isLoading} empty="暂无报障工单——用户来电/APP 报障后在此登记，也可点右上「新增工单」手工建单" />}
+      {tab === "sessions" && <DataTable rowKey={(s: CsSession) => s.sessionNo} columns={sessionCols} rows={q.data?.list as CsSession[]} loading={q.isLoading} empty="暂无客服会话——用户在 C 端发起在线咨询后会话才会出现在这里" />}
       {q.data && <Pagination page={page} size={SIZE} total={q.data.total} onPage={setPage} />}
 
       <FormDrawer

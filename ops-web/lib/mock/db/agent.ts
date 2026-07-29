@@ -5,12 +5,13 @@ import type {
   Agent, AgentAssignment, AgentPerformance, AgentAccount, AgentCommission, PageQuery,
 } from "../../types";
 import { p, iso, phone } from "./internal";
-import { paginate, kwHit, upsert, nextNo } from "./helpers";
+import { paginate, kwHit, upsert, nextNo, archiveRow, unarchiveRow } from "./helpers";
 
 export const agents: Agent[] = Array.from({ length: 9 }, (_, i) => ({
   agentNo: `AG${String(i + 1).padStart(3, "0")}`, name: p(["North Hub", "Marina Partner", "Deira Agent", "Airport Ops", "JBR Franchise"], i),
   contact: `+9715${String(6000000 + i * 271).slice(0, 7)}`, regionScope: p(["Dubai North", "Dubai Marina", "Deira", "DXB", "JBR"], i),
   shareRate: [0.3, 0.35, 0.4][i % 3], cabinetCount: 4 + i * 3, status: i % 6 === 0 ? "SUSPENDED" : "ENABLED",
+  archivedAt: null,
 }));
 
 export const agentAssignments: AgentAssignment[] = agents.map((a, i) => ({
@@ -52,3 +53,7 @@ export const listAgentCommissions = (q: PageQuery = {}) => paginate(agentCommiss
 
 export const saveAgentAccount = (x: Partial<AgentAccount>) => upsert(agentAccounts, x, "accountNo", () => nextNo("AA", agentAccounts));
 export const saveAgentCommission = (x: Partial<AgentCommission>) => upsert(agentCommissions, x, "ruleNo", () => nextNo("AC", agentCommissions));
+
+// —— G1 软删除：代理商档案 ——
+export const archiveAgent = (no: string) => archiveRow(agents, "agentNo", no);
+export const unarchiveAgent = (no: string) => unarchiveRow(agents, "agentNo", no);

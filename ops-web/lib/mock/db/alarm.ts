@@ -3,20 +3,20 @@
 // 机柜一律引用 device.ts 的 cabinets，不复制机柜数据。
 import type { AlarmCode, AlarmRecord, AlarmNotice, AlarmRule, PageQuery } from "../../types";
 import { LOCS, OPERATORS, p, iso, phone } from "./internal";
-import { paginate, kwHit, upsert, nextNo } from "./helpers";
+import { paginate, kwHit, upsert, nextNo, liveHit, archiveRow, unarchiveRow } from "./helpers";
 import { cabinets } from "./device";
 
 export const alarmCodes: AlarmCode[] = [
-  { code: "OFFLINE", message: "柜机离线", level: "CRITICAL", suggestion: "检查网络与供电；10 分钟未恢复派现场工单", autoWorkOrder: true },
-  { code: "SLOT_STUCK", message: "卡槽卡宝", level: "CRITICAL", suggestion: "远程弹仓一次；仍失败则锁槽并派维修", autoWorkOrder: true },
-  { code: "LOCK_FAIL", message: "锁扣异常", level: "CRITICAL", suggestion: "锁槽止损，安排更换锁扣模块", autoWorkOrder: true },
-  { code: "TEMP_HIGH", message: "机内温度过高", level: "CRITICAL", suggestion: "降功率并现场检查散热风道", autoWorkOrder: true },
-  { code: "EJECT_TIMEOUT", message: "弹出超时", level: "WARN", suggestion: "复核指令回执；连续 3 次转维修工单", autoWorkOrder: true },
-  { code: "BATTERY_LOW", message: "充电宝电量过低", level: "WARN", suggestion: "纳入下次补货路线，优先换宝", autoWorkOrder: false },
-  { code: "SIGNAL_WEAK", message: "通信信号弱", level: "WARN", suggestion: "确认 4G 信号与天线位置，必要时挪机位", autoWorkOrder: false },
-  { code: "HEARTBEAT_LOST", message: "心跳丢失", level: "WARN", suggestion: "观察 5 分钟；未恢复升级为 OFFLINE", autoWorkOrder: false },
-  { code: "FW_UPGRADE_FAIL", message: "固件升级失败", level: "INFO", suggestion: "回滚上一版本，纳入下一批灰度", autoWorkOrder: false },
-  { code: "SCREEN_FAULT", message: "广告屏异常", level: "INFO", suggestion: "不影响借还；并入巡检批量处理", autoWorkOrder: false },
+  { code: "OFFLINE", message: "柜机离线", level: "CRITICAL", suggestion: "检查网络与供电；10 分钟未恢复派现场工单", autoWorkOrder: true, archivedAt: null },
+  { code: "SLOT_STUCK", message: "卡槽卡宝", level: "CRITICAL", suggestion: "远程弹仓一次；仍失败则锁槽并派维修", autoWorkOrder: true, archivedAt: null },
+  { code: "LOCK_FAIL", message: "锁扣异常", level: "CRITICAL", suggestion: "锁槽止损，安排更换锁扣模块", autoWorkOrder: true, archivedAt: null },
+  { code: "TEMP_HIGH", message: "机内温度过高", level: "CRITICAL", suggestion: "降功率并现场检查散热风道", autoWorkOrder: true, archivedAt: null },
+  { code: "EJECT_TIMEOUT", message: "弹出超时", level: "WARN", suggestion: "复核指令回执；连续 3 次转维修工单", autoWorkOrder: true, archivedAt: null },
+  { code: "BATTERY_LOW", message: "充电宝电量过低", level: "WARN", suggestion: "纳入下次补货路线，优先换宝", autoWorkOrder: false, archivedAt: null },
+  { code: "SIGNAL_WEAK", message: "通信信号弱", level: "WARN", suggestion: "确认 4G 信号与天线位置，必要时挪机位", autoWorkOrder: false, archivedAt: null },
+  { code: "HEARTBEAT_LOST", message: "心跳丢失", level: "WARN", suggestion: "观察 5 分钟；未恢复升级为 OFFLINE", autoWorkOrder: false, archivedAt: null },
+  { code: "FW_UPGRADE_FAIL", message: "固件升级失败", level: "INFO", suggestion: "回滚上一版本，纳入下一批灰度", autoWorkOrder: false, archivedAt: null },
+  { code: "SCREEN_FAULT", message: "广告屏异常", level: "INFO", suggestion: "不影响借还；并入巡检批量处理", autoWorkOrder: false, archivedAt: null },
 ];
 
 // 厂商原始错误码风格各不相同：cd-tech=E2xx，sd-power=ERR-nn，chargenow=0x1Fxx
@@ -63,7 +63,7 @@ export const alarmRules: AlarmRule[] = Array.from({ length: 10 }, (_, i) => {
     // 严重告警不设静默窗口（必须随时触达）；其余夜间静默，防轰炸
     quietStart: critical ? "" : "22:00", quietEnd: critical ? "" : "08:00",
     escalateMinutes: critical ? p([15, 30], i) : def.level === "WARN" ? 60 : 0,
-    status: i % 7 === 0 ? "INACTIVE" : "ACTIVE",
+    status: i % 7 === 0 ? "INACTIVE" : "ACTIVE", archivedAt: null,
   };
 });
 
@@ -72,8 +72,10 @@ export const listAlarmRecords = (q: PageQuery & { level?: string; status?: strin
     kwHit(q.keyword, x.alarmNo, x.cabinetNo, x.siteName, x.alarmCode, x.vendorErrorCode, x.workOrderNo) &&
     (!q.level || x.level === q.level) && (!q.status || x.status === q.status));
 export const listAlarmNotices = (q: PageQuery = {}) => paginate(alarmNotices, q.page, q.size, (x) => kwHit(q.keyword, x.noticeNo, x.alarmNo, x.target));
-export const listAlarmCodes = (q: PageQuery = {}) => paginate(alarmCodes, q.page, q.size, (x) => kwHit(q.keyword, x.code, x.message, x.suggestion));
-export const listAlarmRules = (q: PageQuery = {}) => paginate(alarmRules, q.page, q.size, (x) => kwHit(q.keyword, x.ruleNo, x.alarmCode, x.target));
+export const listAlarmCodes = (q: PageQuery = {}) =>
+  paginate(alarmCodes, q.page, q.size, (x) => liveHit(x, q.showArchived) && kwHit(q.keyword, x.code, x.message, x.suggestion));
+export const listAlarmRules = (q: PageQuery = {}) =>
+  paginate(alarmRules, q.page, q.size, (x) => liveHit(x, q.showArchived) && kwHit(q.keyword, x.ruleNo, x.alarmCode, x.target));
 export const saveAlarmCode = (x: Partial<AlarmCode>) => upsert(alarmCodes, x, "code", () => nextNo("ALARM_CODE_", alarmCodes, 1));
 export const saveAlarmRule = (x: Partial<AlarmRule>) => upsert(alarmRules, x, "ruleNo", () => nextNo("AR", alarmRules, 600));
 
@@ -84,3 +86,9 @@ export function raiseAlarmWorkOrder(alarmNo: string): AlarmRecord {
   a.status = "ACKED";
   return a;
 }
+
+// —— G1 软删除：告警代码 / 通知规则 ——
+export const archiveAlarmCode = (code: string) => archiveRow(alarmCodes, "code", code);
+export const unarchiveAlarmCode = (code: string) => unarchiveRow(alarmCodes, "code", code);
+export const archiveAlarmRule = (no: string) => archiveRow(alarmRules, "ruleNo", no);
+export const unarchiveAlarmRule = (no: string) => unarchiveRow(alarmRules, "ruleNo", no);

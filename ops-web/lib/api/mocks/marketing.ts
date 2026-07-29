@@ -1,11 +1,12 @@
 // 覆盖范围：优惠券、活动、推送、裂变推荐、广告位 / 广告计划 / 投放、公告管理。
 import * as db from "../../mock/db";
 import type { MarketingApi } from "../contracts/marketing";
-import type { PageQ } from "../query";
+import type { PageQ, ArchiveQ } from "../query";
 import { wait } from "./_wait";
 
 export const marketingMock: MarketingApi = {
-  listCoupons: (q: PageQ = {}) => wait(db.paginate(db.coupons, q.page, q.size, (c) => db.kwHit(q.keyword, c.name))),
+  listCoupons: (q: ArchiveQ = {}) =>
+    wait(db.paginate(db.coupons, q.page, q.size, (c) => db.liveHit(c, q.showArchived) && db.kwHit(q.keyword, c.name))),
   saveCoupon: (c) => wait(db.saveCoupon(c), 350),
 
   // 营销扩展
@@ -21,6 +22,12 @@ export const marketingMock: MarketingApi = {
   saveAdCampaign: (x) => wait(db.saveAdCampaign(x), 350),
 
   // 公告管理
-  listNotices: (q: PageQ = {}) => wait(db.listNotices(q)),
+  listNotices: (q: ArchiveQ = {}) => wait(db.listNotices(q)),
   saveNotice: (x) => wait(db.saveNotice(x), 350),
+
+  // G1 软删除：归档 / 恢复（禁止物理删除）
+  archiveCoupon: async (no) => wait(db.archiveCoupon(no), 350),
+  unarchiveCoupon: async (no) => wait(db.unarchiveCoupon(no), 350),
+  archiveNotice: async (no) => wait(db.archiveNotice(no), 350),
+  unarchiveNotice: async (no) => wait(db.unarchiveNotice(no), 350),
 };

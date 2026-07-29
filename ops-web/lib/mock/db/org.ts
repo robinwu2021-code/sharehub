@@ -5,7 +5,7 @@ import type {
   Department, StaffPerformance, PageQuery,
 } from "../../types";
 import { VENDORS, p, iso } from "./internal";
-import { paginate, kwHit, upsert, nextNo } from "./helpers";
+import { paginate, kwHit, upsert, nextNo, liveHit, archiveRow, unarchiveRow } from "./helpers";
 
 // —— 租户 + 配置 ——
 export const tenants: Tenant[] = Array.from({ length: 8 }, (_, i) => ({
@@ -28,13 +28,13 @@ export const employees: Employee[] = Array.from({ length: 20 }, (_, i) => ({
 // scopeValues 里的 ID 一律引用真实主数据：REGION→system.regions.regionId、
 // LOCATION→location.sites.siteNo、AGENT→agent.agents.agentNo（role-scope.test.ts 断言这一点）。
 export const roles: RoleRow[] = [
-  { roleNo: "R1", code: "ADMIN", name: "运营管理员", permCount: 80, memberCount: 3, builtin: true, dataScope: "ALL", scopeValues: "" },
-  { roleNo: "R2", code: "OPS", name: "运维", permCount: 22, memberCount: 12, builtin: true, dataScope: "REGION", scopeValues: "AE-DU,AE-AZ" },
-  { roleNo: "R3", code: "CS", name: "客服", permCount: 16, memberCount: 6, builtin: true, dataScope: "ALL", scopeValues: "" },
-  { roleNo: "R4", code: "FINANCE", name: "财务", permCount: 20, memberCount: 4, builtin: true, dataScope: "ALL", scopeValues: "" },
-  { roleNo: "R5", code: "BD", name: "拓展", permCount: 15, memberCount: 5, builtin: true, dataScope: "REGION", scopeValues: "DU-MAR,DU-DEI,DU-DT" },
-  { roleNo: "R6", code: "VIEWER", name: "只读", permCount: 12, memberCount: 2, builtin: true, dataScope: "ALL", scopeValues: "" },
-  { roleNo: "R7", code: "AGENT", name: "代理商", permCount: 8, memberCount: 9, builtin: true, dataScope: "AGENT", scopeValues: "AG001,AG002" },
+  { roleNo: "R1", code: "ADMIN", name: "运营管理员", permCount: 80, memberCount: 3, builtin: true, dataScope: "ALL", scopeValues: "", archivedAt: null },
+  { roleNo: "R2", code: "OPS", name: "运维", permCount: 22, memberCount: 12, builtin: true, dataScope: "REGION", scopeValues: "AE-DU,AE-AZ", archivedAt: null },
+  { roleNo: "R3", code: "CS", name: "客服", permCount: 16, memberCount: 6, builtin: true, dataScope: "ALL", scopeValues: "", archivedAt: null },
+  { roleNo: "R4", code: "FINANCE", name: "财务", permCount: 20, memberCount: 4, builtin: true, dataScope: "ALL", scopeValues: "", archivedAt: null },
+  { roleNo: "R5", code: "BD", name: "拓展", permCount: 15, memberCount: 5, builtin: true, dataScope: "REGION", scopeValues: "DU-MAR,DU-DEI,DU-DT", archivedAt: null },
+  { roleNo: "R6", code: "VIEWER", name: "只读", permCount: 12, memberCount: 2, builtin: true, dataScope: "ALL", scopeValues: "", archivedAt: null },
+  { roleNo: "R7", code: "AGENT", name: "代理商", permCount: 8, memberCount: 9, builtin: true, dataScope: "AGENT", scopeValues: "AG001,AG002", archivedAt: null },
 ];
 export const audits: AuditEntry[] = Array.from({ length: 40 }, (_, i) => ({
   id: `A${9000 + i}`, actor: p(["admin", "ali", "omar", "sara"], i),
@@ -90,3 +90,16 @@ export function saveRoleDataScope(roleCode: string, scope: DataScope, scopeValue
   return roles[i];
 }
 export const saveEmployee = (x: Partial<Employee>) => upsert(employees, x, "employeeNo", () => nextNo("E", employees, 100));
+
+// —— G1 软删除：角色 ——
+// 内置角色（builtin）不允许归档：登录/鉴权依赖它们存在，归档等于把人锁在门外。
+// 这道门必须同时锁在服务端，前端只是提前拦一次。
+export function archiveRole(no: string) {
+  const r = roles.find((x) => x.roleNo === no);
+  if (r?.builtin) throw new Error("内置角色不可归档");
+  return archiveRow(roles, "roleNo", no);
+}
+export const unarchiveRole = (no: string) => unarchiveRow(roles, "roleNo", no);
+
+/** 角色列表：角色数量少，不分页；默认过滤已归档（`showArchived` 打开才带出）。 */
+export const listRoles = (q: PageQuery = {}) => roles.filter((r) => liveHit(r, q.showArchived));

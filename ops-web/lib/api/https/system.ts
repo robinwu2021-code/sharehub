@@ -48,4 +48,10 @@ export const systemHttp: SystemApi = {
   saveProblem: (x) => client.post(x.problemNo ? `/api/platform/problems/${x.problemNo}` : "/api/platform/problems", x),
   listTaxSettings: (q?: PageQ) => client.get("/api/platform/tax-settings", q),
   saveTaxSetting: (x) => client.post(x.country ? `/api/platform/tax-settings/${x.country}` : "/api/platform/tax-settings", x),
+
+  // G1 软删除：归档 / 恢复。REST 上是「状态迁移」而非 DELETE —— 后端不得实现物理删除。
+  archiveBank: (code) => client.post(`/api/platform/banks/${code}/archive`, {}),
+  unarchiveBank: (code) => client.post(`/api/platform/banks/${code}/unarchive`, {}),
+  archiveProblem: (no) => client.post(`/api/platform/problems/${no}/archive`, {}),
+  unarchiveProblem: (no) => client.post(`/api/platform/problems/${no}/unarchive`, {}),
 };

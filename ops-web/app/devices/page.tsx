@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Pagination } from "@/components/ui/misc";
-import { Input, Select } from "@/components/ui/input";
+import { Select } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/date-input";
 import { TabHeader } from "@/components/ui/tab-header";
 import { Toolbar } from "@/components/ui/toolbar";
@@ -16,10 +16,17 @@ import { DataTable, type Column } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CabinetStatusBadge, OnlineBadge } from "@/components/status";
+import { Drawer } from "@/components/ui/drawer";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import {
+  ShowArchivedToggle, ArchiveActions, ArchivedAt, archivedRowClass,
+  archiveConfirm, unarchiveConfirm,
+} from "@/components/archive";
 import { fmtTime } from "@/lib/utils";
 import { useCan } from "@/lib/use-can";
 import { notify } from "@/lib/notify";
 import { exportCsv } from "@/lib/export-csv";
+import { parseImport, templateCsv, type ImportColumn, type RowError } from "@/lib/import-csv";
 import type {
   Cabinet, Powerbank, CabinetMonitor, CommandRecord, InventoryTransfer, OtaRollout, PageResult,
   DeviceLog, DeviceCodeBatch,
@@ -41,18 +48,264 @@ const STANDALONE_TABS = ["cabinets", "logs", "codes"];
 
 type Tone = "default" | "success" | "warning" | "danger" | "muted" | "outline";
 
-// —— 机柜台账（原有视图，保留全部筛选/搜索/详情能力）——
-function CabinetsTab() {
+// ============================================================================
+// G2 导入：机柜台账（全平台唯一的导入口，规格 §10.2）
+// 四步：上传 → 预览前 10 行 → 校验报错（逐行指出第几行哪个字段错）→ 确认导入。
+// **必须先整批校验通过才允许落库**——不允许「导一半失败」留下半截台账。
+// ============================================================================
+const IMPORT_SAMPLE = {
+  柜机号: "CAB2000", SN: "SN95000", 供应商: "cd-tech", 型号: "X6",
+  点位编号: "LOC200", 仓位数: "8", 固件版本: "1.4.0",
+};
+
+/** 列定义依赖「已接入供应商」「已建点位」两份主数据做存在性校验，故做成工厂函数。 */
+const importColumns = (vendorCodes: string[], locationNos: string[]): ImportColumn<Partial<Cabinet>>[] => [
+  { header: "柜机号", key: "cabinetNo", required: true, unique: true,
+    validate: (v) => (/^CAB\d+$/.test(String(v)) ? null : "格式应为 CAB + 数字，如 CAB2000") },
+  { header: "SN", key: "sn", required: true, unique: true,
+    validate: (v) => (String(v).length >= 4 ? null : "出厂序列号至少 4 位") },
+  { header: "供应商", key: "vendorCode", required: true,
+    validate: (v) => (vendorCodes.includes(String(v)) ? null : `未接入的供应商，可选：${vendorCodes.join(" / ")}`) },
+  { header: "型号", key: "model", required: true },
+  // 点位可留空（到货未上架的机柜就是没点位），但填了就必须是真实存在的点位编号，
+  // 否则台账里会出现「点进去查无此点位」的悬空引用。
+  { header: "点位编号", key: "locationNo",
+    validate: (v) => (locationNos.includes(String(v)) ? null : "点位编号不存在，请先在「场所管理 · 点位」建档") },
+  { header: "仓位数", key: "slotTotal", required: true,
+    parse: (raw) => { const n = Number(raw); if (!Number.isInteger(n)) throw new Error("必须是整数"); return n; },
+    validate: (v) => ((v as number) >= 1 && (v as number) <= 48 ? null : "应在 1~48 之间") },
+  { header: "固件版本", key: "fwVersion" },
+];
+
+type ImportStep = "upload" | "review";
+
+function ImportCabinetsDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+  const qc = useQueryClient();
+  const [step, setStep] = useState<ImportStep>("upload");
+  const [fileName, setFileName] = useState("");
+  const [rows, setRows] = useState<Partial<Cabinet>[]>([]);
+  const [errors, setErrors] = useState<RowError[]>([]);
+
+  // 供应商 / 点位主数据：用于「填的值是否真实存在」这类跨表校验
+  const vendorsQ = useQuery({ queryKey: ["vendors"], queryFn: () => api.listVendors() });
+  const pointsQ = useQuery({ queryKey: ["locations", "all"], queryFn: () => api.listLocations({ size: 999 }) });
+  const cols = importColumns(
+    (vendorsQ.data ?? []).map((v) => v.vendorCode),
+    (pointsQ.data?.list ?? []).map((l) => l.locationNo),
+  );
+
+  const reset = () => { setStep("upload"); setFileName(""); setRows([]); setErrors([]); };
+  const close = (o: boolean) => { if (!o) reset(); onOpenChange(o); };
+
+  const doImport = useMutation({
+    mutationFn: () => api.importCabinets(rows),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ["cabinets"] });
+      notify.success(`导入完成：新增 ${r.imported} 台，更新 ${r.updated} 台`);
+      close(false);
+    },
+  });
+
+  const onFile = async (file: File) => {
+    setFileName(file.name);
+    const parsed = parseImport<Partial<Cabinet>>(await file.text(), cols);
+    setRows(parsed.rows);
+    setErrors(parsed.errors);
+    setStep("review");
+  };
+
+  const downloadTemplate = () => {
+    const blob = new Blob([templateCsv(cols, IMPORT_SAMPLE)], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "机柜台账导入模板.csv";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const ok = errors.length === 0 && rows.length > 0;
+
+  return (
+    <Drawer
+      open={open}
+      onOpenChange={close}
+      width="w-[620px]"
+      title="导入机柜台账"
+      desc="上传 → 预览 → 校验 → 确认。校验不通过不会写入任何数据"
+      footer={
+        step === "upload" ? (
+          <Button size="sm" variant="secondary" onClick={() => close(false)}>取消</Button>
+        ) : (
+          <>
+            <Button size="sm" variant="secondary" onClick={reset}>重新选择文件</Button>
+            <Button size="sm" disabled={!ok || doImport.isPending} onClick={() => doImport.mutate()}>
+              {doImport.isPending ? "导入中…" : `确认导入 ${rows.length} 条`}
+            </Button>
+          </>
+        )
+      }
+    >
+      {step === "upload" ? (
+        <div className="space-y-4 text-sm">
+          <div className="rounded-[var(--radius)] bg-muted p-4">
+            <div className="mb-2 font-medium">文件要求</div>
+            <ul className="list-inside list-disc space-y-1 text-muted-foreground">
+              <li>CSV 格式，首行为表头，列名需与模板一致</li>
+              <li>必填列：柜机号 · SN · 供应商 · 型号 · 仓位数</li>
+              <li>柜机号格式 <span className="font-mono">CAB + 数字</span>，文件内不得重复；已存在的柜机号按更新处理</li>
+              <li>点位编号可留空（到货未上架），填了则必须是已建档的点位</li>
+            </ul>
+          </div>
+          <Button size="sm" variant="outline" onClick={downloadTemplate}>下载导入模板</Button>
+          <div>
+            <div className="mb-1.5 text-xs text-muted-foreground">选择 CSV 文件</div>
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              className="block w-full cursor-pointer rounded-[var(--radius)] bg-secondary p-2.5 text-sm file:me-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-primary-foreground"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) void onFile(f); }}
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4 text-sm">
+          <div className="text-muted-foreground">
+            文件 <span className="font-medium text-foreground">{fileName}</span> ·
+            解析成功 <span className="tabular-nums font-medium text-foreground">{rows.length}</span> 条 ·
+            错误 <span className="tabular-nums font-medium text-foreground">{errors.length}</span> 处
+          </div>
+
+          {errors.length > 0 ? (
+            <div className="rounded-[var(--radius)] bg-destructive/10 p-4">
+              <div className="mb-2 font-medium text-[var(--destructive)]">
+                校验未通过，本次不会写入任何数据
+              </div>
+              <div className="max-h-60 space-y-1 overflow-y-auto">
+                {errors.map((e, i) => (
+                  <div key={i} className="tabular-nums">
+                    第 {e.line} 行{e.header && <> · <span className="font-medium">{e.header}</span></>}：{e.message}
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 text-xs text-muted-foreground">
+                行号与 Excel 中看到的行号一致（含表头）。修正后重新上传即可。
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-[var(--radius)] bg-muted p-3">校验全部通过，可以导入。</div>
+          )}
+
+          {rows.length > 0 && (
+            <div>
+              <div className="mb-1.5 text-xs text-muted-foreground">
+                预览前 10 行（共 {rows.length} 条）
+              </div>
+              <div className="overflow-x-auto rounded-[var(--radius)] bg-muted/60">
+                <table className="w-full text-xs">
+                  <thead className="text-muted-foreground">
+                    <tr>{cols.map((c) => <th key={c.header} className="px-2.5 py-2 text-start font-normal">{c.header}</th>)}</tr>
+                  </thead>
+                  <tbody>
+                    {rows.slice(0, 10).map((r, i) => (
+                      <tr key={i}>
+                        {cols.map((c) => (
+                          <td key={c.header} className="px-2.5 py-1.5 font-mono">
+                            {String(r[c.key] ?? "-")}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </Drawer>
+  );
+}
+
+// —— 机柜台账：筛选/搜索/详情 + G1 归档 + G2 导入导出 + G3 批量 ——
+// 批量远程指令只开这三种：都是「对整批下发同一动作」有意义的。弹仓/锁仓要指定仓位，
+// 批量下发说不清对哪个仓位，故不进批量。
+const BATCH_COMMANDS: { value: string; label: string; hint: string }[] = [
+  { value: "REBOOT", label: "重启", hint: "重启期间约 30 秒不可借还" },
+  { value: "LOCATE", label: "定位", hint: "机柜蜂鸣 3 秒，用于现场找机" },
+  { value: "FW_SYNC", label: "同步固件版本", hint: "仅拉取版本号，不触发升级" },
+];
+
+function CabinetsTab({ canWrite }: { canWrite: boolean }) {
+  const qc = useQueryClient();
+  const { confirm, dialog } = useConfirm();
   const [page, setPage] = useState(1);
   const [keyword, setKeyword] = useState("");
   const [online, setOnline] = useState("");
   const [status, setStatus] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [cmdType, setCmdType] = useState("REBOOT");
+  const [importOpen, setImportOpen] = useState(false);
+
+  // 换页/改筛选后选中的行已不在视野内，继续留着会造成「对看不见的行动手」
+  const resetPage = (fn: () => void) => { fn(); setPage(1); setSelected([]); };
 
   const { data, isLoading } = useQuery({
-    queryKey: ["cabinets", page, keyword, online, status],
-    queryFn: () => api.listCabinets({ page, size: SIZE, keyword, onlineStatus: online || undefined, status: status || undefined }),
+    queryKey: ["cabinets", page, keyword, online, status, showArchived],
+    queryFn: () => api.listCabinets({
+      page, size: SIZE, keyword,
+      onlineStatus: online || undefined, status: status || undefined,
+      showArchived: showArchived || undefined,
+    }),
     placeholderData: keepPreviousData,
   });
+  const rows = data?.list ?? [];
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["cabinets"] });
+
+  const archive = useMutation({
+    mutationFn: (no: string) => api.archiveCabinet(no),
+    onSuccess: () => { invalidate(); notify.success("已归档"); },
+  });
+  const unarchive = useMutation({
+    mutationFn: (no: string) => api.unarchiveCabinet(no),
+    onSuccess: () => { invalidate(); notify.success("已恢复"); },
+  });
+  const batchArchive = useMutation({
+    mutationFn: (nos: string[]) => Promise.all(nos.map((no) => api.archiveCabinet(no))),
+    onSuccess: (r) => { invalidate(); setSelected([]); notify.success(`已归档 ${r.length} 台机柜`); },
+  });
+  const batchCommand = useMutation({
+    mutationFn: (v: { nos: string[]; type: string }) =>
+      Promise.all(v.nos.map((no) => api.sendCommand(no, v.type))),
+    onSuccess: (r) => { setSelected([]); notify.success(`已向 ${r.length} 台机柜下发指令`); },
+  });
+
+  const onArchive = async (c: Cabinet) => {
+    // 机柜是主数据：要求输入柜机号确认，防手滑归档掉在运营的机器
+    if (await confirm(archiveConfirm("机柜", c.cabinetNo, c.cabinetNo))) archive.mutate(c.cabinetNo);
+  };
+  const onUnarchive = async (c: Cabinet) => {
+    if (await confirm(unarchiveConfirm("机柜", c.cabinetNo))) unarchive.mutate(c.cabinetNo);
+  };
+  const onBatchArchive = async () => {
+    const ok = await confirm({
+      title: `批量归档 ${selected.length} 台机柜`,
+      desc: `将归档已选的 ${selected.length} 台机柜：${selected.slice(0, 5).join("、")}${selected.length > 5 ? " 等" : ""}。归档后不再出现在默认列表，历史订单与告警全部保留，可随时恢复。`,
+      danger: true, confirmText: "归档", requireText: String(selected.length),
+    });
+    if (ok) batchArchive.mutate(selected);
+  };
+  const onBatchCommand = async () => {
+    const cmd = BATCH_COMMANDS.find((c) => c.value === cmdType)!;
+    const offline = rows.filter((r) => selected.includes(r.cabinetNo) && r.onlineStatus === "OFFLINE").length;
+    const ok = await confirm({
+      title: `批量下发「${cmd.label}」指令`,
+      desc: `将对已选的 ${selected.length} 台机柜下发「${cmd.label}」指令。${cmd.hint}。`
+        + (offline > 0 ? `其中 ${offline} 台当前离线，指令会排队等待上线后执行。` : ""),
+      danger: true, confirmText: "下发",
+    });
+    if (ok) batchCommand.mutate({ nos: selected, type: cmdType });
+  };
 
   const cabCols: Column<Cabinet>[] = [
     { header: "柜机号", cell: (c) => <span className="font-medium">{c.cabinetNo}</span> },
@@ -63,33 +316,94 @@ function CabinetsTab() {
     { header: "状态", cell: (c) => <CabinetStatusBadge s={c.status} /> },
     { header: "固件", cell: (c) => <span className="text-muted-foreground">{c.fwVersion}</span> },
     { header: "最后心跳", cell: (c) => <span className="text-muted-foreground">{fmtTime(c.lastHeartbeatAt)}</span> },
-    { header: "操作", cell: (c) => <Link className="text-primary hover:underline" href={`/devices/detail?no=${c.cabinetNo}`}>详情</Link> },
+    // 归档时间列只在打开「显示已归档」时才有信息量，故随开关出现
+    ...(showArchived ? [{ header: "归档时间", cell: (c: Cabinet) => <ArchivedAt at={c.archivedAt} /> }] : []),
+    {
+      header: "操作",
+      cell: (c) => (
+        <ArchiveActions
+          archived={!!c.archivedAt}
+          canWrite={canWrite}
+          onArchive={() => void onArchive(c)}
+          onUnarchive={() => void onUnarchive(c)}
+          actions={
+            <Link className="text-primary hover:underline" href={`/devices/detail?no=${c.cabinetNo}`}>详情</Link>
+          }
+        />
+      ),
+    },
   ];
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Input
-          className="w-64"
-          placeholder="搜索柜机号 / 点位"
-          value={keyword}
-          onChange={(e) => { setKeyword(e.target.value); setPage(1); }}
-        />
-        <Select value={online} onChange={(e) => { setOnline(e.target.value); setPage(1); }}>
+      <Toolbar
+        search={keyword}
+        onSearch={(v) => resetPage(() => setKeyword(v))}
+        searchPlaceholder="搜索柜机号 / 点位"
+        selectedCount={selected.length}
+        onClearSelection={() => setSelected([])}
+        batchActions={
+          <>
+            <Select className="w-44" value={cmdType} onChange={(e) => setCmdType(e.target.value)} aria-label="批量指令类型">
+              {BATCH_COMMANDS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+            </Select>
+            <Button size="sm" variant="outline" onClick={() => void onBatchCommand()}>下发指令</Button>
+            <Button size="sm" variant="outline" onClick={() => void onBatchArchive()}>批量归档</Button>
+          </>
+        }
+        onAdd={canWrite ? () => setImportOpen(true) : undefined}
+        addLabel="导入台账"
+        onExport={() => exportCsv<Cabinet>("机柜台账", [
+          { header: "柜机号", value: (c) => c.cabinetNo },
+          { header: "SN", value: (c) => c.sn },
+          { header: "点位", value: (c) => c.locationName },
+          { header: "点位编号", value: (c) => c.locationNo },
+          { header: "供应商", value: (c) => c.vendorCode },
+          { header: "型号", value: (c) => c.model },
+          { header: "可借", value: (c) => c.availableCount },
+          { header: "仓位数", value: (c) => c.slotTotal },
+          { header: "在线", value: (c) => (c.onlineStatus === "ONLINE" ? "在线" : "离线") },
+          { header: "状态", value: (c) => ({ DEPLOYED: "在用", FAULT: "故障", RETIRED: "报废" })[c.status] },
+          { header: "固件", value: (c) => c.fwVersion },
+          { header: "最后心跳", value: (c) => c.lastHeartbeatAt },
+          { header: "归档时间", value: (c) => c.archivedAt },
+        ], rows)}
+      >
+        <Select value={online} onChange={(e) => resetPage(() => setOnline(e.target.value))}>
           <option value="">全部在线态</option>
           <option value="ONLINE">在线</option>
           <option value="OFFLINE">离线</option>
         </Select>
-        <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
+        <Select value={status} onChange={(e) => resetPage(() => setStatus(e.target.value))}>
           <option value="">全部状态</option>
           <option value="DEPLOYED">在用</option>
           <option value="FAULT">故障</option>
           <option value="RETIRED">报废</option>
         </Select>
-      </div>
+        <ShowArchivedToggle checked={showArchived} onChange={(v) => resetPage(() => setShowArchived(v))} />
+      </Toolbar>
 
-      <DataTable rowKey={(c: Cabinet) => c.cabinetNo} columns={cabCols} rows={data?.list} loading={isLoading} empty="无设备" />
+      {!canWrite && (
+        <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">
+          仅可查看：当前角色无机柜维护权限（device:cabinet:update），归档与导入不可用
+        </div>
+      )}
+
+      <DataTable
+        rowKey={(c: Cabinet) => c.cabinetNo}
+        columns={cabCols}
+        rows={data?.list}
+        loading={isLoading}
+        rowClassName={archivedRowClass}
+        selectable={canWrite}
+        selectedKeys={selected}
+        onSelectedChange={setSelected}
+        empty="暂无机柜——可通过右上角「导入台账」批量建档，或确认筛选条件是否过窄（已归档的机柜需勾选「显示已归档」才会出现）"
+      />
       {data && <Pagination page={page} size={SIZE} total={data.total} onPage={setPage} />}
+
+      <ImportCabinetsDrawer open={importOpen} onOpenChange={setImportOpen} />
+      {dialog}
     </div>
   );
 }
@@ -413,6 +727,71 @@ const OTA_FIELDS: FieldDef[] = [
   ] },
 ];
 
+// —— G2 导出：共用 Toolbar 的四个 tab 各自的 CSV 列（与表格可见列一致）——
+const PB_STATUS_CSV = (s: Powerbank["status"]) => PB_STATUS[s][0];
+const EXPORTS: Record<string, { name: string; run: (rows: Row[]) => void }> = {
+  powerbanks: {
+    name: "充电宝管理",
+    run: (rows) => exportCsv<Powerbank>("充电宝管理", [
+      { header: "充电宝号", value: (r) => r.powerbankNo },
+      { header: "所属柜机", value: (r) => r.cabinetNo },
+      { header: "电量(%)", value: (r) => Math.round(r.battery) },
+      { header: "状态", value: (r) => PB_STATUS_CSV(r.status) },
+      { header: "健康", value: (r) => HEALTH[r.health][0] },
+      { header: "循环次数", value: (r) => Math.round(r.cycles) },
+      { header: "归档时间", value: (r) => r.archivedAt },
+    ], rows as Powerbank[]),
+  },
+  monitor: {
+    name: "实时监控",
+    run: (rows) => exportCsv<CabinetMonitor>("实时监控", [
+      { header: "柜机号", value: (r) => r.cabinetNo },
+      { header: "点位", value: (r) => r.locationName },
+      { header: "在线", value: (r) => (r.online ? "在线" : "离线") },
+      { header: "最后心跳", value: (r) => r.heartbeatAt },
+      { header: "信号(%)", value: (r) => Math.round(r.signal) },
+      { header: "温度(°C)", value: (r) => Math.round(r.temp) },
+      { header: "故障数", value: (r) => Math.round(r.faultCount) },
+    ], rows as CabinetMonitor[]),
+  },
+  commands: {
+    name: "远程指令记录",
+    run: (rows) => exportCsv<CommandRecord>("远程指令记录", [
+      { header: "指令ID", value: (r) => r.commandId },
+      { header: "柜机号", value: (r) => r.cabinetNo },
+      { header: "类型", value: (r) => CMD_TYPE[r.type] },
+      { header: "仓位", value: (r) => r.slotIndex },
+      { header: "状态", value: (r) => CMD_STATUS[r.status][0] },
+      { header: "操作人", value: (r) => r.operator },
+      { header: "时间", value: (r) => r.createdAt },
+    ], rows as CommandRecord[]),
+  },
+  inventory: {
+    name: "库存调拨",
+    run: (rows) => exportCsv<InventoryTransfer>("库存调拨", [
+      { header: "调拨单号", value: (r) => r.transferNo },
+      { header: "调出点位", value: (r) => r.fromLocation },
+      { header: "调入点位", value: (r) => r.toLocation },
+      { header: "充电宝数", value: (r) => Math.round(r.powerbankCount) },
+      { header: "状态", value: (r) => TRANSFER_STATUS[r.status][0] },
+      { header: "操作人", value: (r) => r.operator },
+      { header: "创建时间", value: (r) => r.createdAt },
+    ], rows as InventoryTransfer[]),
+  },
+  ota: {
+    name: "固件 OTA",
+    run: (rows) => exportCsv<OtaRollout>("固件OTA", [
+      { header: "发布单号", value: (r) => r.rolloutNo },
+      { header: "固件版本", value: (r) => r.fwVersion },
+      { header: "供应商", value: (r) => r.vendorCode },
+      { header: "策略", value: (r) => (r.strategy === "FULL" ? "全量" : "灰度") },
+      { header: "进度(%)", value: (r) => Math.round(r.progress) },
+      { header: "状态", value: (r) => OTA_STATUS[r.status][0] },
+      { header: "创建时间", value: (r) => r.createdAt },
+    ], rows as OtaRollout[]),
+  },
+};
+
 const SEARCH_HINT: Record<string, string> = {
   powerbanks: "搜索充电宝号 / 柜机号",
   monitor: "搜索柜机号 / 点位",
@@ -432,12 +811,15 @@ function DevicesInner() {
   const [pbForm, setPbForm] = useState<Partial<Powerbank> | null>(null);
   const [invForm, setInvForm] = useState<Partial<InventoryTransfer> | null>(null);
   const [otaForm, setOtaForm] = useState<Partial<OtaRollout> | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const { confirm, dialog } = useConfirm();
   useEffect(() => { if (qTab && TABS.some((t) => t.key === qTab)) { setTab(qTab); setPage(1); } }, [qTab]);
 
   const isCabinets = tab === "cabinets";
   // 自建 tab 自带筛选/查询/分页，页面共用的 Toolbar 与 q 不参与
   const isStandalone = STANDALONE_TABS.includes(tab);
-  const canEditCode = allow("device:cabinet:update");
+  const canEditCabinet = allow("device:cabinet:update");
+  const canEditCode = canEditCabinet;
   const canEditPowerbank = allow("device:powerbank:update");
   const canEditInventory = allow("device:inventory:update");
   const canEditOta = allow("device:ota:publish");
@@ -456,10 +838,19 @@ function DevicesInner() {
     onSuccess: () => { invalidate(); notify.success("保存成功"); setOtaForm(null); },
   });
 
+  const archivePb = useMutation({
+    mutationFn: (no: string) => api.archivePowerbank(no),
+    onSuccess: () => { invalidate(); notify.success("已归档"); },
+  });
+  const unarchivePb = useMutation({
+    mutationFn: (no: string) => api.unarchivePowerbank(no),
+    onSuccess: () => { invalidate(); notify.success("已恢复"); },
+  });
+
   const q = useQuery<PageResult<Row>>({
-    queryKey: ["devices", tab, page, keyword],
+    queryKey: ["devices", tab, page, keyword, showArchived],
     queryFn: () =>
-      tab === "powerbanks" ? api.listPowerbanks({ page, size: SIZE, keyword })
+      tab === "powerbanks" ? api.listPowerbanks({ page, size: SIZE, keyword, showArchived: showArchived || undefined })
       : tab === "monitor" ? api.listCabinetMonitor({ page, size: SIZE, keyword })
       : tab === "commands" ? api.listCommandRecords({ page, size: SIZE, keyword })
       : tab === "inventory" ? api.listInventoryTransfers({ page, size: SIZE, keyword })
@@ -471,7 +862,27 @@ function DevicesInner() {
   const editCell = (on: () => void, can: boolean) =>
     can ? <Button size="sm" variant="outline" onClick={on}>编辑</Button> : <span className="text-muted-foreground">-</span>;
 
-  const pbColsFull: Column<Powerbank>[] = [...pbCols, { header: "操作", cell: (r) => editCell(() => setPbForm(r), canEditPowerbank) }];
+  const pbColsFull: Column<Powerbank>[] = [
+    ...pbCols,
+    ...(showArchived ? [{ header: "归档时间", cell: (r: Powerbank) => <ArchivedAt at={r.archivedAt} /> }] : []),
+    {
+      header: "操作",
+      cell: (r) => (
+        <ArchiveActions
+          archived={!!r.archivedAt}
+          canWrite={canEditPowerbank}
+          onArchive={async () => {
+            // 充电宝不在「主数据强确认」清单里，故不要求手输编号
+            if (await confirm(archiveConfirm("充电宝", r.powerbankNo))) archivePb.mutate(r.powerbankNo);
+          }}
+          onUnarchive={async () => {
+            if (await confirm(unarchiveConfirm("充电宝", r.powerbankNo))) unarchivePb.mutate(r.powerbankNo);
+          }}
+          actions={<Button size="sm" variant="outline" onClick={() => setPbForm(r)}>编辑</Button>}
+        />
+      ),
+    },
+  ];
   const invColsFull: Column<InventoryTransfer>[] = [...invCols, { header: "操作", cell: (r) => editCell(() => setInvForm(r), canEditInventory) }];
   const otaColsFull: Column<OtaRollout>[] = [...otaCols, { header: "操作", cell: (r) => editCell(() => setOtaForm(r), canEditOta) }];
 
@@ -491,18 +902,37 @@ function DevicesInner() {
             : undefined
           }
           addLabel={tab === "powerbanks" ? "新增充电宝" : tab === "inventory" ? "新增调拨单" : tab === "ota" ? "新增发布单" : undefined}
-        />
+          onExport={EXPORTS[tab] ? () => EXPORTS[tab].run(q.data?.list ?? []) : undefined}
+        >
+          {/* 充电宝是可归档实体，故只有它需要「显示已归档」开关 */}
+          {tab === "powerbanks" && (
+            <ShowArchivedToggle
+              checked={showArchived}
+              onChange={(v) => { setShowArchived(v); setPage(1); }}
+            />
+          )}
+        </Toolbar>
       )}
 
-      {isCabinets && <CabinetsTab />}
+      {isCabinets && <CabinetsTab canWrite={canEditCabinet} />}
       {tab === "logs" && <LogsTab />}
       {tab === "codes" && <CodesTab canEdit={canEditCode} />}
-      {tab === "powerbanks" && <DataTable rowKey={(r: Powerbank) => r.powerbankNo} columns={pbColsFull} rows={q.data?.list as Powerbank[]} loading={q.isLoading} />}
+      {tab === "powerbanks" && (
+        <DataTable
+          rowKey={(r: Powerbank) => r.powerbankNo}
+          columns={pbColsFull}
+          rows={q.data?.list as Powerbank[]}
+          loading={q.isLoading}
+          rowClassName={archivedRowClass}
+          empty="暂无充电宝——新到货的充电宝需先入库建档；已归档的需勾选「显示已归档」才会出现"
+        />
+      )}
       {tab === "monitor" && <DataTable rowKey={(r: CabinetMonitor) => r.cabinetNo} columns={monCols} rows={q.data?.list as CabinetMonitor[]} loading={q.isLoading} />}
       {tab === "commands" && <DataTable rowKey={(r: CommandRecord) => r.commandId} columns={cmdCols} rows={q.data?.list as CommandRecord[]} loading={q.isLoading} />}
       {tab === "inventory" && <DataTable rowKey={(r: InventoryTransfer) => r.transferNo} columns={invColsFull} rows={q.data?.list as InventoryTransfer[]} loading={q.isLoading} />}
       {tab === "ota" && <DataTable rowKey={(r: OtaRollout) => r.rolloutNo} columns={otaColsFull} rows={q.data?.list as OtaRollout[]} loading={q.isLoading} />}
       {!isStandalone && q.data && <Pagination page={page} size={SIZE} total={q.data.total} onPage={setPage} />}
+      {dialog}
 
       <FormDrawer
         open={!!pbForm}

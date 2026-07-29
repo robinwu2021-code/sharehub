@@ -1,6 +1,6 @@
 // 覆盖范围：C 端用户主档与拉黑、会员、钱包、风控与黑名单、消费者分群、
 // 免费用户白名单、充值套餐。
-import type { PageQ, StatusQ, WhitelistQ } from "../query";
+import type { PageQ, WhitelistQ, PackageQ } from "../query";
 import type {
   PageResult, CUser, Member, Wallet, UserRisk, UserBlacklist,
   ConsumerSegment, FreeUserWhitelist, RechargePackage,
@@ -26,6 +26,10 @@ export interface UserApi {
   saveFreeWhitelist(x: Partial<FreeUserWhitelist> & { userNo?: string }): Promise<FreeUserWhitelist>;
   /** 撤销白名单：软撤销置 REVOKED（决策 §八-4，不物理删）。 */
   revokeFreeWhitelist(userNo: string): Promise<FreeUserWhitelist>;
-  listRechargePackages(q?: StatusQ): Promise<PageResult<RechargePackage>>;
+  listRechargePackages(q?: PackageQ): Promise<PageResult<RechargePackage>>;
   saveRechargePackage(x: Partial<RechargePackage> & { packageNo?: string }): Promise<RechargePackage>;
+
+  // === G1 软删除（TDD §10.1）：归档而非删除，**契约里禁止出现 deleteXxx** ===
+  archiveRechargePackage(packageNo: string): Promise<RechargePackage>;
+  unarchiveRechargePackage(packageNo: string): Promise<RechargePackage>;
 }

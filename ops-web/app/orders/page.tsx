@@ -16,6 +16,7 @@ import { OrderStatusBadge } from "@/components/status";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { money, fmtTime } from "@/lib/utils";
 import { useCan } from "@/lib/use-can";
+import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
 import { exportCsv } from "@/lib/export-csv";
 import type {
@@ -112,6 +113,7 @@ function OrdersInner() {
   const qTab = sp.get("tab");
   const qc = useQueryClient();
   const allow = useCan();
+  const { t } = useI18n(); // 导出订单状态用同一套 i18n 文案，避免与表格徽标不一致
   const [tab, setTab] = useState(TABS.some((t) => t.key === qTab) ? (qTab as string) : "list");
   const { confirm, dialog } = useConfirm();
   useEffect(() => { if (qTab && TABS.some((t) => t.key === qTab)) setTab(qTab); }, [qTab]);
@@ -379,6 +381,16 @@ function OrdersInner() {
             search={keyword}
             onSearch={(v) => { setKeyword(v); setPage(1); }}
             searchPlaceholder="搜索订单号 / 用户"
+            onExport={() => exportCsv<RentOrder>("订单列表", [
+              { header: "订单号", value: (o) => o.orderNo },
+              { header: "用户", value: (o) => o.cUserNo },
+              { header: "借出柜机", value: (o) => o.cabinetNo },
+              { header: "点位", value: (o) => o.locationName },
+              { header: "时长(分)", value: (o) => o.durationMin },
+              { header: "费用", value: (o) => o.feeAmount },
+              { header: "币种", value: (o) => o.currency },
+              { header: "状态", value: (o) => t(`orderStatus.${o.status}`) },
+            ], listQ.data?.list ?? [])}
           >
             <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
               <option value="">全部状态</option>
@@ -389,7 +401,13 @@ function OrdersInner() {
               <option value="CLOSED">已关闭</option>
             </Select>
           </Toolbar>
-          <DataTable rowKey={(o: RentOrder) => o.orderNo} columns={listCols} rows={listQ.data?.list} loading={listQ.isLoading} />
+          <DataTable
+            rowKey={(o: RentOrder) => o.orderNo}
+            columns={listCols}
+            rows={listQ.data?.list}
+            loading={listQ.isLoading}
+            empty="暂无订单——当前筛选条件下没有记录，清空搜索/状态筛选或等待用户借出充电宝"
+          />
           {listQ.data && <Pagination page={page} size={SIZE} total={listQ.data.total} onPage={setPage} />}
         </>
       )}
@@ -495,8 +513,24 @@ function OrdersInner() {
             search={excKeyword}
             onSearch={(v) => { setExcKeyword(v); setExcPage(1); }}
             searchPlaceholder="搜索订单号 / 柜机 / 用户"
+            onExport={() => exportCsv<OrderException>("异常订单", [
+              { header: "订单号", value: (e) => e.orderNo },
+              { header: "异常类型", value: (e) => EXC_TYPE_LABEL[e.type] },
+              { header: "柜机", value: (e) => e.cabinetNo },
+              { header: "用户", value: (e) => e.userNo },
+              { header: "涉及金额", value: (e) => e.amount },
+              { header: "币种", value: (e) => e.currency },
+              { header: "状态", value: (e) => (e.status === "HANDLED" ? "已处理" : "待处理") },
+              { header: "发生时间", value: (e) => e.createdAt },
+            ], excQ.data?.list ?? [])}
           />
-          <DataTable rowKey={(e: OrderException) => e.orderNo} columns={excCols} rows={excQ.data?.list} loading={excQ.isLoading} />
+          <DataTable
+            rowKey={(e: OrderException) => e.orderNo}
+            columns={excCols}
+            rows={excQ.data?.list}
+            loading={excQ.isLoading}
+            empty="暂无异常订单——未弹出/未归还/重复扣款等异常会自动汇入此处，也可放宽搜索条件再查"
+          />
           {excQ.data && <Pagination page={excPage} size={SIZE} total={excQ.data.total} onPage={setExcPage} />}
         </>
       )}
@@ -507,6 +541,19 @@ function OrdersInner() {
             search={cplKeyword}
             onSearch={(v) => { setCplKeyword(v); setCplPage(1); }}
             searchPlaceholder="搜索投诉号 / 订单号 / 用户 / 工单号"
+            onExport={() => exportCsv<OrderComplaint>("投诉订单", [
+              { header: "投诉号", value: (c) => c.complaintNo },
+              { header: "订单号", value: (c) => c.orderNo },
+              { header: "用户", value: (c) => c.userNo },
+              { header: "问题类型", value: (c) => ISSUE_LABEL[c.issueType] },
+              { header: "用户描述", value: (c) => c.description },
+              { header: "截图", value: (c) => c.screenshotUrl },
+              { header: "提交时间", value: (c) => c.submittedAt },
+              { header: "状态", value: (c) => CPL_STATUS[c.status].label },
+              { header: "处理人", value: (c) => c.handlerName },
+              { header: "处理结果", value: (c) => (c.resolution ? RESOLUTION_LABEL[c.resolution] : "") },
+              { header: "关联工单", value: (c) => c.workOrderNo },
+            ], cplQ.data?.list ?? [])}
           >
             <Select value={cplStatus} onChange={(e) => { setCplStatus(e.target.value); setCplPage(1); }}>
               <option value="">全部状态</option>
@@ -516,7 +563,13 @@ function OrdersInner() {
               <option value="REJECTED">已驳回</option>
             </Select>
           </Toolbar>
-          <DataTable rowKey={(c: OrderComplaint) => c.complaintNo} columns={cplCols} rows={cplQ.data?.list} loading={cplQ.isLoading} />
+          <DataTable
+            rowKey={(c: OrderComplaint) => c.complaintNo}
+            columns={cplCols}
+            rows={cplQ.data?.list}
+            loading={cplQ.isLoading}
+            empty="暂无投诉——C 端用户在订单内提交投诉后会进入此队列，处理结果可回写并转工单"
+          />
           {cplQ.data && <Pagination page={cplPage} size={SIZE} total={cplQ.data.total} onPage={setCplPage} />}
         </>
       )}
@@ -527,6 +580,20 @@ function OrdersInner() {
             search={rfdKeyword}
             onSearch={(v) => { setRfdKeyword(v); setRfdPage(1); }}
             searchPlaceholder="搜索退款单号 / 订单号 / 用户 / PSP 流水号"
+            onExport={() => exportCsv<RefundRecord>("退款记录", [
+              { header: "退款单号", value: (r) => r.refundNo },
+              { header: "订单号", value: (r) => r.orderNo },
+              { header: "用户", value: (r) => r.userNo },
+              { header: "退款金额", value: (r) => r.amount },
+              { header: "币种", value: (r) => r.currency },
+              { header: "原因", value: (r) => r.reason },
+              { header: "申请人", value: (r) => r.applicantName },
+              { header: "申请时间", value: (r) => r.appliedAt },
+              { header: "状态", value: (r) => RFD_STATUS[r.status].label },
+              { header: "审批人", value: (r) => r.auditorName },
+              { header: "幂等键", value: (r) => r.idempotencyKey },
+              { header: "PSP 流水号", value: (r) => r.psgTxnNo },
+            ], rfdQ.data?.list ?? [])}
           >
             <Select value={rfdStatus} onChange={(e) => { setRfdStatus(e.target.value); setRfdPage(1); }}>
               <option value="">全部状态</option>
@@ -538,7 +605,13 @@ function OrdersInner() {
             </Select>
           </Toolbar>
           {!canAuditRefund && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无退款审批权限（order:refund:audit）</div>}
-          <DataTable rowKey={(r: RefundRecord) => r.refundNo} columns={rfdCols} rows={rfdQ.data?.list} loading={rfdQ.isLoading} />
+          <DataTable
+            rowKey={(r: RefundRecord) => r.refundNo}
+            columns={rfdCols}
+            rows={rfdQ.data?.list}
+            loading={rfdQ.isLoading}
+            empty="暂无退款申请——客服在订单详情点「申请退款」后在此审批，审批通过才会真正出款"
+          />
           {rfdQ.data && <Pagination page={rfdPage} size={SIZE} total={rfdQ.data.total} onPage={setRfdPage} />}
         </>
       )}
@@ -549,8 +622,24 @@ function OrdersInner() {
             search={depKeyword}
             onSearch={(v) => { setDepKeyword(v); setDepPage(1); }}
             searchPlaceholder="搜索押金单号 / 订单号 / 用户"
+            onExport={() => exportCsv<DepositRecord>("押金与欠费", [
+              { header: "押金单号", value: (d) => d.depositNo },
+              { header: "订单号", value: (d) => d.orderNo },
+              { header: "用户", value: (d) => d.userNo },
+              { header: "押金", value: (d) => d.amount },
+              { header: "欠费", value: (d) => d.arrearsAmount },
+              { header: "币种", value: (d) => d.currency },
+              { header: "状态", value: (d) => DEP_STATUS[d.status].label },
+              { header: "时间", value: (d) => d.createdAt },
+            ], depQ.data?.list ?? [])}
           />
-          <DataTable rowKey={(d: DepositRecord) => d.depositNo} columns={depCols} rows={depQ.data?.list} loading={depQ.isLoading} />
+          <DataTable
+            rowKey={(d: DepositRecord) => d.depositNo}
+            columns={depCols}
+            rows={depQ.data?.list}
+            loading={depQ.isLoading}
+            empty="暂无押金记录——免押策略下不产生冻结记录，或该筛选条件下没有押金/欠费单"
+          />
           {depQ.data && <Pagination page={depPage} size={SIZE} total={depQ.data.total} onPage={setDepPage} />}
         </>
       )}

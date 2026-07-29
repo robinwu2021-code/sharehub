@@ -16,6 +16,12 @@ import { fmtTime } from "@/lib/utils";
 import { useCan } from "@/lib/use-can";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
+import { exportCsv, type CsvColumn } from "@/lib/export-csv";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import {
+  ShowArchivedToggle, archivedRowClass, ArchivedAt, ArchiveActions,
+  archiveConfirm, unarchiveConfirm,
+} from "@/components/archive";
 import type { AlarmRecord, AlarmNotice, AlarmCode, AlarmRule, AlarmLevel, PageResult } from "@/lib/types";
 
 const SIZE = 10;
@@ -74,7 +80,10 @@ function AlarmsInner() {
   const [keyword, setKeyword] = useState("");
   const [level, setLevel] = useState("");
   const [status, setStatus] = useState("");
-  useEffect(() => { if (qTab && TABS.some((x) => x.key === qTab)) { setTab(qTab); setPage(1); } }, [qTab]);
+  // 「显示已归档」开关（TDD §10.1：列表默认过滤已归档）。切 tab 复位。
+  const [showArchived, setShowArchived] = useState(false);
+  const { confirm, dialog } = useConfirm();
+  useEffect(() => { if (qTab && TABS.some((x) => x.key === qTab)) { setTab(qTab); setPage(1); setShowArchived(false); } }, [qTab]);
 
   // 转工单：告警→工单闭环（我们比竞品多的一环，竞品到通知就断了）
   const canRaise = allow("workorder:wo:create");
@@ -84,11 +93,12 @@ function AlarmsInner() {
   const [ruleForm, setRuleForm] = useState<Partial<AlarmRule> | null>(null);
 
   const q = useQuery<PageResult<AlarmRecord | AlarmNotice | AlarmCode | AlarmRule>>({
-    queryKey: ["alarm", tab, page, keyword, level, status],
+    // showArchived 必须进 queryKey，否则切开关不重新拉数据
+    queryKey: ["alarm", tab, page, keyword, level, status, showArchived],
     queryFn: () =>
       tab === "notices" ? api.listAlarmNotices({ page, size: SIZE, keyword })
-      : tab === "codes" ? api.listAlarmCodes({ page, size: SIZE, keyword })
-      : tab === "rules" ? api.listAlarmRules({ page, size: SIZE, keyword })
+      : tab === "codes" ? api.listAlarmCodes({ page, size: SIZE, keyword, showArchived })
+      : tab === "rules" ? api.listAlarmRules({ page, size: SIZE, keyword, showArchived })
       : api.listAlarmRecords({ page, size: SIZE, keyword, level: level || undefined, status: status || undefined }),
     placeholderData: keepPreviousData,
   });
@@ -100,6 +110,36 @@ function AlarmsInner() {
     mutationFn: (alarmNo: string) => api.raiseAlarmWorkOrder(alarmNo),
     onSuccess: (r) => { notify.success(`已转工单 ${r.workOrderNo}`); qc.invalidateQueries({ queryKey: ["alarm"] }); },
   });
+  // 归档 / 恢复：错误由全局 MutationCache 接管，这里只管成功后的失效与提示。
+  const archiveCodeM = useMutation({
+    mutationFn: (v: { no: string; undo: boolean }) => v.undo ? api.unarchiveAlarmCode(v.no) : api.archiveAlarmCode(v.no),
+    onSuccess: (_r, v) => { qc.invalidateQueries({ queryKey: ["alarm"] }); notify.success(v.undo ? "已恢复" : "已归档"); },
+  });
+  const archiveRuleM = useMutation({
+    mutationFn: (v: { no: string; undo: boolean }) => v.undo ? api.unarchiveAlarmRule(v.no) : api.archiveAlarmRule(v.no),
+    onSuccess: (_r, v) => { qc.invalidateQueries({ queryKey: ["alarm"] }); notify.success(v.undo ? "已恢复" : "已归档"); },
+  });
+  // 告警代码 / 通知规则非主数据，不要求手输编号确认（requireText 只留给机柜/站点/角色等主数据）。
+  const askArchiveCode = async (c: AlarmCode) => {
+    if (await confirm(archiveConfirm("告警代码", c.code))) archiveCodeM.mutate({ no: c.code, undo: false });
+  };
+  const askUnarchiveCode = async (c: AlarmCode) => {
+    if (await confirm(unarchiveConfirm("告警代码", c.code))) archiveCodeM.mutate({ no: c.code, undo: true });
+  };
+  const askArchiveRule = async (r: AlarmRule) => {
+    if (await confirm(archiveConfirm("通知规则", r.ruleNo))) archiveRuleM.mutate({ no: r.ruleNo, undo: false });
+  };
+  const askUnarchiveRule = async (r: AlarmRule) => {
+    if (await confirm(unarchiveConfirm("通知规则", r.ruleNo))) archiveRuleM.mutate({ no: r.ruleNo, undo: true });
+  };
+  // 归档时间列只在「显示已归档」打开时插入（默认视图里整列都是 "-"），且固定在操作列之前，保证操作列最右。
+  const archivedCol = <T extends { archivedAt: string | null }>(): Column<T>[] =>
+    showArchived ? [{ header: "归档时间", cell: (r: T) => <ArchivedAt at={r.archivedAt} /> }] : [];
+  const archivedCsv = <T extends { archivedAt: string | null }>(): CsvColumn<T>[] =>
+    showArchived ? [{ header: "归档时间", value: (r: T) => r.archivedAt ? fmtTime(r.archivedAt) : "-" }] : [];
+  // 导出当页数据（§10.2），列与表格可见列一致。
+  const onExportOf = <T,>(name: string, cols: CsvColumn<T>[]) =>
+    () => exportCsv<T>(name, cols, (q.data?.list ?? []) as T[]);
 
   const recordCols: Column<AlarmRecord>[] = [
     { header: "告警号", cell: (a) => <span className="font-medium">{a.alarmNo}</span> },
@@ -138,9 +178,18 @@ function AlarmsInner() {
     // 建议处置 + 自动开工单：字典即处置预案（比竞品多的两列）
     { header: "建议处置", cell: (c) => <span className="text-muted-foreground">{c.suggestion}</span> },
     { header: "自动开工单", cell: (c) => c.autoWorkOrder ? <Badge tone="success">是</Badge> : <Badge tone="muted">否</Badge> },
+    ...archivedCol<AlarmCode>(),
     {
       header: t("common.actions"),
-      cell: (c) => canConfig ? <Button size="sm" variant="outline" onClick={() => setCodeForm(c)}>{t("common.edit")}</Button> : <span className="text-muted-foreground">-</span>,
+      cell: (c) => (
+        <ArchiveActions
+          archived={!!c.archivedAt}
+          canWrite={canConfig}
+          onArchive={() => askArchiveCode(c)}
+          onUnarchive={() => askUnarchiveCode(c)}
+          actions={<Button size="sm" variant="outline" onClick={() => setCodeForm(c)}>{t("common.edit")}</Button>}
+        />
+      ),
     },
   ];
 
@@ -154,18 +203,40 @@ function AlarmsInner() {
     { header: "静默窗口", cell: (r) => r.quietStart && r.quietEnd ? <span className="tabular-nums">{r.quietStart} - {r.quietEnd}</span> : <span className="text-muted-foreground">不静默</span> },
     { header: "升级策略", cell: (r) => r.escalateMinutes > 0 ? <span className="tabular-nums">{r.escalateMinutes} 分钟未处理升级</span> : <span className="text-muted-foreground">不升级</span> },
     { header: "状态", cell: (r) => r.status === "ACTIVE" ? <Badge tone="success">启用</Badge> : <Badge tone="muted">停用</Badge> },
+    ...archivedCol<AlarmRule>(),
     {
       header: t("common.actions"),
-      cell: (r) => canConfig ? <Button size="sm" variant="outline" onClick={() => setRuleForm(r)}>{t("common.edit")}</Button> : <span className="text-muted-foreground">-</span>,
+      cell: (r) => (
+        <ArchiveActions
+          archived={!!r.archivedAt}
+          canWrite={canConfig}
+          onArchive={() => askArchiveRule(r)}
+          onUnarchive={() => askUnarchiveRule(r)}
+          actions={<Button size="sm" variant="outline" onClick={() => setRuleForm(r)}>{t("common.edit")}</Button>}
+        />
+      ),
     },
   ];
 
   return (
     <div>
-      <TabHeader tabs={TABS} value={tab} onChange={(k) => { setTab(k); setPage(1); setKeyword(""); setLevel(""); setStatus(""); }} />
+      <TabHeader tabs={TABS} value={tab} onChange={(k) => { setTab(k); setPage(1); setKeyword(""); setLevel(""); setStatus(""); setShowArchived(false); }} />
 
       {tab === "records" && (
-        <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索告警号 / 柜机 / 告警码 / 工单号">
+        <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索告警号 / 柜机 / 告警码 / 工单号"
+          onExport={onExportOf<AlarmRecord>("告警记录", [
+            { header: "告警号", value: (a) => a.alarmNo },
+            { header: "柜机", value: (a) => a.cabinetNo },
+            { header: "站点", value: (a) => a.siteName },
+            { header: "厂商", value: (a) => a.vendorCode },
+            { header: "告警码", value: (a) => a.alarmCode },
+            { header: "厂商错误码", value: (a) => a.vendorErrorCode },
+            { header: "等级", value: (a) => LEVEL[a.level].label },
+            { header: "发生时间", value: (a) => fmtTime(a.occurredAt) },
+            { header: "状态", value: (a) => REC_STATUS[a.status].label },
+            { header: "关联工单", value: (a) => a.workOrderNo ?? "-" },
+            { header: "备注", value: (a) => a.remark },
+          ])}>
           <Select value={level} onChange={(e) => { setLevel(e.target.value); setPage(1); }}>
             <option value="">全部等级</option>
             <option value="INFO">提示</option>
@@ -181,21 +252,57 @@ function AlarmsInner() {
         </Toolbar>
       )}
       {tab === "notices" && (
-        <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索通知号 / 告警号 / 接收人" />
+        <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索通知号 / 告警号 / 接收人"
+          onExport={onExportOf<AlarmNotice>("告警通知", [
+            { header: "通知号", value: (n) => n.noticeNo },
+            { header: "告警号", value: (n) => n.alarmNo },
+            { header: "渠道", value: (n) => CHANNEL_LABEL[n.channel] },
+            { header: "接收人", value: (n) => n.target },
+            { header: "发送时间", value: (n) => fmtTime(n.sentAt) },
+            { header: "状态", value: (n) => (n.status === "SENT" ? "已发送" : "发送失败") },
+            { header: "失败原因", value: (n) => n.failReason ?? "-" },
+          ])} />
       )}
       {tab === "codes" && (
         <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索代码 / 信息 / 建议处置"
-          onAdd={canConfig ? () => setCodeForm({ level: "WARN", autoWorkOrder: false, message: "", suggestion: "" }) : undefined} addLabel="新增告警代码" />
+          onAdd={canConfig ? () => setCodeForm({ level: "WARN", autoWorkOrder: false, message: "", suggestion: "" }) : undefined} addLabel="新增告警代码"
+          onExport={onExportOf<AlarmCode>("告警代码", [
+            { header: "告警代码", value: (c) => c.code },
+            { header: "告警信息", value: (c) => c.message },
+            { header: "等级", value: (c) => LEVEL[c.level].label },
+            { header: "建议处置", value: (c) => c.suggestion },
+            { header: "自动开工单", value: (c) => (c.autoWorkOrder ? "是" : "否") },
+            ...archivedCsv<AlarmCode>(),
+          ])}>
+          <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); setPage(1); }} />
+        </Toolbar>
       )}
       {tab === "rules" && (
         <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索规则号 / 告警代码 / 通知目标"
-          onAdd={canConfig ? () => setRuleForm({ channel: "SMS", method: "INSTANT", quietStart: "22:00", quietEnd: "08:00", escalateMinutes: 60, status: "ACTIVE", alarmCode: "", target: "" }) : undefined} addLabel="新增通知规则" />
+          onAdd={canConfig ? () => setRuleForm({ channel: "SMS", method: "INSTANT", quietStart: "22:00", quietEnd: "08:00", escalateMinutes: 60, status: "ACTIVE", alarmCode: "", target: "" }) : undefined} addLabel="新增通知规则"
+          onExport={onExportOf<AlarmRule>("通知规则", [
+            { header: "规则号", value: (r) => r.ruleNo },
+            { header: "告警代码", value: (r) => r.alarmCode },
+            { header: "通知目标", value: (r) => r.target },
+            { header: "渠道", value: (r) => CHANNEL_LABEL[r.channel] },
+            { header: "方式", value: (r) => (r.method === "INSTANT" ? "即时" : "汇总") },
+            { header: "静默窗口", value: (r) => (r.quietStart && r.quietEnd ? `${r.quietStart} - ${r.quietEnd}` : "不静默") },
+            { header: "升级策略", value: (r) => (r.escalateMinutes > 0 ? `${r.escalateMinutes} 分钟未处理升级` : "不升级") },
+            { header: "状态", value: (r) => (r.status === "ACTIVE" ? "启用" : "停用") },
+            ...archivedCsv<AlarmRule>(),
+          ])}>
+          <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); setPage(1); }} />
+        </Toolbar>
+      )}
+      {/* 权限降级显式提示（§3.2）：不静默隐藏操作列，否则会被当成功能坏了 */}
+      {(tab === "codes" || tab === "rules") && !canConfig && (
+        <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无告警配置权限（workorder:alarm:config），不能新增、编辑或归档</div>
       )}
 
-      {tab === "records" && <DataTable rowKey={(a: AlarmRecord) => a.alarmNo} columns={recordCols} rows={q.data?.list as AlarmRecord[]} loading={q.isLoading} />}
-      {tab === "notices" && <DataTable rowKey={(n: AlarmNotice) => n.noticeNo} columns={noticeCols} rows={q.data?.list as AlarmNotice[]} loading={q.isLoading} />}
-      {tab === "codes" && <DataTable rowKey={(c: AlarmCode) => c.code} columns={codeCols} rows={q.data?.list as AlarmCode[]} loading={q.isLoading} />}
-      {tab === "rules" && <DataTable rowKey={(r: AlarmRule) => r.ruleNo} columns={ruleCols} rows={q.data?.list as AlarmRule[]} loading={q.isLoading} />}
+      {tab === "records" && <DataTable rowKey={(a: AlarmRecord) => a.alarmNo} columns={recordCols} rows={q.data?.list as AlarmRecord[]} loading={q.isLoading} empty="暂无告警记录——设备运行正常，或当前筛选条件下无匹配，试着清空等级 / 状态筛选。" />}
+      {tab === "notices" && <DataTable rowKey={(n: AlarmNotice) => n.noticeNo} columns={noticeCols} rows={q.data?.list as AlarmNotice[]} loading={q.isLoading} empty="暂无告警通知——通知由「通知规则」命中告警后自动产生，先去规则页确认规则已启用。" />}
+      {tab === "codes" && <DataTable rowKey={(c: AlarmCode) => c.code} columns={codeCols} rows={q.data?.list as AlarmCode[]} loading={q.isLoading} rowClassName={archivedRowClass} empty={showArchived ? "没有匹配的告警代码——换个关键词，或点「新增告警代码」补一条。" : "暂无在用告警代码——可能都已归档（打开「显示已归档」查看），或点「新增告警代码」建第一条处置预案。"} />}
+      {tab === "rules" && <DataTable rowKey={(r: AlarmRule) => r.ruleNo} columns={ruleCols} rows={q.data?.list as AlarmRule[]} loading={q.isLoading} rowClassName={archivedRowClass} empty={showArchived ? "没有匹配的通知规则——换个关键词，或点「新增通知规则」补一条。" : "暂无在用通知规则——可能都已归档（打开「显示已归档」查看），或点「新增通知规则」为关键告警配通知目标。"} />}
       {q.data && <Pagination page={page} size={SIZE} total={q.data.total} onPage={setPage} />}
 
       {/* 告警代码 编辑抽屉 */}
@@ -211,6 +318,8 @@ function AlarmsInner() {
         fields={RULE_FIELDS} value={(ruleForm ?? {}) as Record<string, unknown>}
         onChange={(v) => setRuleForm(v as Partial<AlarmRule>)}
         onSubmit={() => ruleForm && saveRule.mutate(ruleForm)} submitting={saveRule.isPending} />
+
+      {dialog}
     </div>
   );
 }

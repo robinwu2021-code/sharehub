@@ -3,7 +3,7 @@
 // 端点前缀：/api/user/**（拉黑写操作走 /internal/user/**，消费者分群走 /api/ops/reports/**，沿用现状）。
 import { client } from "../http-client";
 import type { UserApi } from "../contracts/user";
-import type { PageQ, StatusQ, WhitelistQ } from "../query";
+import type { PageQ, PackageQ, WhitelistQ } from "../query";
 
 export const userHttp: UserApi = {
   listUsers: (q?: PageQ) => client.get("/api/user/users", q),
@@ -24,6 +24,10 @@ export const userHttp: UserApi = {
   listFreeWhitelist: (q?: WhitelistQ) => client.get("/api/user/free-whitelist", q),
   saveFreeWhitelist: (x) => client.post(x.userNo ? `/api/user/free-whitelist/${x.userNo}` : "/api/user/free-whitelist", x),
   revokeFreeWhitelist: (no) => client.post(`/api/user/free-whitelist/${no}/revoke`, {}),
-  listRechargePackages: (q?: StatusQ) => client.get("/api/user/recharge-packages", q),
+  listRechargePackages: (q?: PackageQ) => client.get("/api/user/recharge-packages", q),
   saveRechargePackage: (x) => client.post(x.packageNo ? `/api/user/recharge-packages/${x.packageNo}` : "/api/user/recharge-packages", x),
+
+  // G1 软删除：归档 / 恢复。REST 上是「状态迁移」而非 DELETE —— 后端不得实现物理删除。
+  archiveRechargePackage: (no) => client.post(`/api/user/recharge-packages/${no}/archive`, {}),
+  unarchiveRechargePackage: (no) => client.post(`/api/user/recharge-packages/${no}/unarchive`, {}),
 };

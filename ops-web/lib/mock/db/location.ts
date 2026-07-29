@@ -5,7 +5,7 @@ import type {
   VenueOnboarding, SiteLifecycle, PageQuery,
 } from "../../types";
 import { LOCS, VENUE_NAMES, p, iso, phone } from "./internal";
-import { paginate, kwHit, upsert, nextNo } from "./helpers";
+import { paginate, kwHit, upsert, nextNo, archiveRow, unarchiveRow } from "./helpers";
 
 // 台账 M11：站点的区域必须挂 regions 字典里真实存在的三级区域 ID（原先存的是"Dubai North"
 // 这类字典里根本没有的名字）。ID 与展示名成对，展示名冗余自字典。
@@ -21,18 +21,19 @@ export const sites: Site[] = Array.from({ length: 12 }, (_, i) => ({
   agentNo: i % 3 === 0 ? null : `AG${String((i % 9) + 1).padStart(3, "0")}`, regionId: p(REGIONS, i).id, regionName: p(REGIONS, i).name,
   address: `${p(LOCS, i)}, Dubai, UAE`, sceneType: p(["商场", "机场", "餐饮", "地铁", "写字楼"], i),
   pointCount: 1 + (i % 4), cabinetCount: 2 + (i * 3) % 10, status: i % 8 === 0 ? "PAUSED" : "ACTIVE",
+  archivedAt: null,
 }));
 export const locations: SitePoint[] = Array.from({ length: 30 }, (_, i) => {
   const site = sites[i % sites.length];
   return {
     locationNo: `LOC${200 + i}`, name: `${site.name} · ${p(["L1东门", "L2中庭", "B1出口", "主入口", "美食广场"], i)}`,
     siteNo: site.siteNo, siteName: site.name, spotDesc: p(["近扶梯", "收银台旁", "入口右侧", "电梯口"], i),
-    cabinetCount: 1 + (i % 3), status: i % 9 === 0 ? "PAUSED" : "ACTIVE",
+    cabinetCount: 1 + (i % 3), status: i % 9 === 0 ? "PAUSED" : "ACTIVE", archivedAt: null,
   };
 });
 export const venues: Venue[] = VENUE_NAMES.map((name, i) => ({
   venueNo: `VEN${300 + i}`, name, contact: `+9714${String(2000000 + i * 311).slice(0, 7)}`,
-  industry: p(["零售", "航空", "地产", "餐饮"], i), locationCount: 3 + i * 2,
+  industry: p(["零售", "航空", "地产", "餐饮"], i), locationCount: 3 + i * 2, archivedAt: null,
 }));
 export const contracts: Contract[] = Array.from({ length: 18 }, (_, i) => ({
   contractNo: `CT${400 + i}`, venueName: p(VENUE_NAMES, i), siteName: p(LOCS, i),
@@ -82,3 +83,11 @@ export const saveLead = (x: Partial<Lead>) => upsert(leads, x, "leadNo", () => n
 export const saveVenue = (x: Partial<Venue>) => upsert(venues, x, "venueNo", () => nextNo("VEN", venues));
 export const saveContract = (x: Partial<Contract>) => upsert(contracts, x, "contractNo", () => nextNo("CT", contracts));
 export const saveVenueOnboarding = (x: Partial<VenueOnboarding>) => upsert(venueOnboardings, x, "onboardingNo", () => nextNo("OB", venueOnboardings));
+
+// —— G1 软删除：站点 / 点位 / 场地方 ——
+export const archiveSite = (no: string) => archiveRow(sites, "siteNo", no);
+export const unarchiveSite = (no: string) => unarchiveRow(sites, "siteNo", no);
+export const archivePoint = (no: string) => archiveRow(locations, "locationNo", no);
+export const unarchivePoint = (no: string) => unarchiveRow(locations, "locationNo", no);
+export const archiveVenue = (no: string) => archiveRow(venues, "venueNo", no);
+export const unarchiveVenue = (no: string) => unarchiveRow(venues, "venueNo", no);

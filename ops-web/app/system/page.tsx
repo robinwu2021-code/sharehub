@@ -16,6 +16,7 @@ import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Input, Select } from "@/components/ui/input";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { ShowArchivedToggle, archivedRowClass, ArchivedAt, ArchiveActions, archiveConfirm, unarchiveConfirm } from "@/components/archive";
 import { Check, X } from "lucide-react";
 import { fmtTime, money } from "@/lib/utils";
 import { useCan } from "@/lib/use-can";
@@ -474,6 +475,8 @@ function SystemInner() {
   const [bankCurrency, setBankCurrency] = useState("");
   const [probCategory, setProbCategory] = useState("");
   const [probStatus, setProbStatus] = useState("");
+  // G1 软删除：默认过滤已归档；开关打开才把归档行拉回来（banks / problems 共用一个 state，切 tab 时清空）
+  const [showArchived, setShowArchived] = useState(false);
 
   const [blacklistForm, setBlacklistForm] = useState<Partial<NotifyBlacklist> | null>(null);
   const [loginForm, setLoginForm] = useState<Partial<LoginSetting> | null>(null);
@@ -503,6 +506,13 @@ function SystemInner() {
     mutationFn: (blockNo: string) => api.releaseNotifyBlacklist(blockNo),
     onSuccess: (r) => { qc.invalidateQueries({ queryKey: ["sys"] }); notify.success(`已解除拉黑 ${r.target}`); },
   });
+  // G1 软删除（TDD §10.1）：只有归档/恢复，没有物理删除。错误由全局 MutationCache 接管，此处不 catch。
+  const invalidateSys = () => { qc.invalidateQueries({ queryKey: ["sys"] }); };
+  const archiveBank = useMutation({ mutationFn: (code: string) => api.archiveBank(code), onSuccess: () => { invalidateSys(); notify.success("已归档"); } });
+  const unarchiveBank = useMutation({ mutationFn: (code: string) => api.unarchiveBank(code), onSuccess: () => { invalidateSys(); notify.success("已恢复"); } });
+  const archiveProblem = useMutation({ mutationFn: (no: string) => api.archiveProblem(no), onSuccess: () => { invalidateSys(); notify.success("已归档"); } });
+  const unarchiveProblem = useMutation({ mutationFn: (no: string) => api.unarchiveProblem(no), onSuccess: () => { invalidateSys(); notify.success("已恢复"); } });
+
   const rollbackVersion = useMutation({
     mutationFn: (versionId: string) => api.rollbackAppVersion(versionId),
     onSuccess: (r) => { qc.invalidateQueries({ queryKey: ["sys"] }); notify.success(`已回滚 ${PLATFORM_LABEL[r.platform]} ${r.versionNo}，灰度已归零`); },
@@ -510,7 +520,7 @@ function SystemInner() {
 
   // —— 其余分页 tab ——
   // 筛选值一并进 queryKey：否则改筛选器不会重新取数。
-  const filterKey = [logChannel, logStatus, logSort.key, logSort.dir, blChannel, blReason, verPlatform, bankCountry, bankCurrency, probCategory, probStatus].join("|");
+  const filterKey = [logChannel, logStatus, logSort.key, logSort.dir, blChannel, blReason, verPlatform, bankCountry, bankCurrency, probCategory, probStatus, showArchived ? "arc" : ""].join("|");
   const q = useQuery<PageResult<NotifyTemplate | DictEntry | Region | SysParam | OpenApiApp | MarketCountry | PaymentChannel | NotifyLog | NotifyBlacklist | LoginSetting | AppVersion | BankEntry | ProblemEntry | TaxSetting>>({
     queryKey: ["sys", tab, page, keyword, filterKey],
     queryFn: () =>
@@ -520,8 +530,8 @@ function SystemInner() {
       : tab === "notify-blacklist" ? api.listNotifyBlacklist({ page, size: SIZE, keyword, channel: blChannel, reason: blReason })
       : tab === "login" ? api.listLoginSettings({ page, size: SIZE, keyword })
       : tab === "app-version" ? api.listAppVersions({ page, size: SIZE, keyword, platform: verPlatform })
-      : tab === "banks" ? api.listBanks({ page, size: SIZE, keyword, country: bankCountry, currency: bankCurrency })
-      : tab === "problems" ? api.listProblems({ page, size: SIZE, keyword, category: probCategory, status: probStatus })
+      : tab === "banks" ? api.listBanks({ page, size: SIZE, keyword, country: bankCountry, currency: bankCurrency, showArchived })
+      : tab === "problems" ? api.listProblems({ page, size: SIZE, keyword, category: probCategory, status: probStatus, showArchived })
       : tab === "tax" ? api.listTaxSettings({ page, size: SIZE, keyword })
       : tab === "dict" ? api.listDictEntries({ page, size: SIZE, keyword })
       : tab === "region" ? api.listRegions({ page, size: SIZE, keyword })
@@ -759,7 +769,25 @@ function SystemInner() {
     // IBAN 长度：提现收款账户校验直接读这里，填错会让提现打款失败
     { header: "IBAN 长度", cell: (b) => <span className="tabular-nums">{b.ibanLength} 位</span> },
     { header: "状态", cell: (b) => b.status === "ENABLED" ? <Badge tone="success">启用</Badge> : <Badge tone="muted">停用</Badge> },
-    { header: t("common.actions"), cell: editBtn<BankEntry>(canBank, setBankForm) },
+    // 归档时间仅在「显示已归档」打开时占列，平时不白占一列
+    ...(showArchived ? [{ header: "归档时间", cell: (b: BankEntry) => <ArchivedAt at={b.archivedAt} /> }] : []),
+    {
+      header: t("common.actions"),
+      cell: (b) => (
+        <ArchiveActions
+          archived={!!b.archivedAt}
+          canWrite={canBank}
+          actions={<Button size="sm" variant="outline" onClick={() => setBankForm(b)}>{t("common.edit")}</Button>}
+          onArchive={async () => {
+            // 银行不在「主数据强确认」清单里，不要求手输编号
+            if (await confirm(archiveConfirm("银行", `${b.bankName}（${b.bankCode}）`))) archiveBank.mutate(b.bankCode);
+          }}
+          onUnarchive={async () => {
+            if (await confirm(unarchiveConfirm("银行", `${b.bankName}（${b.bankCode}）`))) unarchiveBank.mutate(b.bankCode);
+          }}
+        />
+      ),
+    },
   ];
 
   // —— §15 问题管理 ——
@@ -770,7 +798,23 @@ function SystemInner() {
     { header: "建议处置", cell: (p) => <Badge tone={PROBLEM_ACTION[p.suggestedAction].tone}>{PROBLEM_ACTION[p.suggestedAction].label}</Badge> },
     { header: "排序", cell: (p) => <span className="tabular-nums">{p.sortNo}</span> },
     { header: "状态", cell: (p) => p.status === "ENABLED" ? <Badge tone="success">启用</Badge> : <Badge tone="muted">停用</Badge> },
-    { header: t("common.actions"), cell: editBtn<ProblemEntry>(canProblem, setProblemForm) },
+    ...(showArchived ? [{ header: "归档时间", cell: (p: ProblemEntry) => <ArchivedAt at={p.archivedAt} /> }] : []),
+    {
+      header: t("common.actions"),
+      cell: (p) => (
+        <ArchiveActions
+          archived={!!p.archivedAt}
+          canWrite={canProblem}
+          actions={<Button size="sm" variant="outline" onClick={() => setProblemForm(p)}>{t("common.edit")}</Button>}
+          onArchive={async () => {
+            if (await confirm(archiveConfirm("问题", `${p.title}（${p.problemNo}）`))) archiveProblem.mutate(p.problemNo);
+          }}
+          onUnarchive={async () => {
+            if (await confirm(unarchiveConfirm("问题", `${p.title}（${p.problemNo}）`))) unarchiveProblem.mutate(p.problemNo);
+          }}
+        />
+      ),
+    },
   ];
 
   // —— §16 税率与发票 ——
@@ -793,6 +837,7 @@ function SystemInner() {
         setLogChannel(""); setLogStatus(""); setLogSort({ key: "sentAt", dir: "desc" });
         setBlChannel(""); setBlReason(""); setVerPlatform("");
         setBankCountry(""); setBankCurrency(""); setProbCategory(""); setProbStatus("");
+        setShowArchived(false);
       }} />
 
       {/* §9 发送记录页头统计：今日发送量 / 失败率 / 今日成本 —— OTP 是真金白银，成本要天天看见 */}
@@ -809,32 +854,102 @@ function SystemInner() {
         </div>
       )}
 
+      {/* 供应商接入：非分页列表，只给导出（配置走行内抽屉，无搜索/新增）*/}
+      {tab === "vendors" && (
+        <Toolbar
+          onExport={() => exportCsv<Vendor>("供应商接入", [
+            { header: "供应商码", value: (v) => v.vendorCode },
+            { header: "名称", value: (v) => v.name },
+            { header: "接入方式", value: (v) => MODE_LABEL[v.accessMode] },
+            { header: "设备数", value: (v) => v.deviceCount },
+            { header: "状态", value: (v) => (v.status === "ENABLED" ? "启用" : "停用") },
+          ], vendorsQ.data ?? [])}
+        />
+      )}
       {tab === "payment" && (
         <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索渠道码 / 名称 / 国家 / 币种"
+          // 密钥列导出为掩码占位，与表格一致——CSV 落到本地更不能带真实密钥
+          onExport={() => exportCsv<PaymentChannel>("支付渠道", [
+            { header: "渠道码", value: (c) => c.channelCode },
+            { header: "名称", value: (c) => c.channelName },
+            { header: "模式", value: (c) => (c.mode === "DELEGATED" ? "委托" : "直连") },
+            { header: "适用国家", value: (c) => c.countries },
+            { header: "币种", value: (c) => c.currencies },
+            { header: "能力", value: (c) => c.capabilities },
+            { header: "商户号", value: (c) => c.merchantId },
+            { header: "密钥", value: () => "****" },
+            { header: "状态", value: (c) => (c.status === "ENABLED" ? "启用" : "停用") },
+            { header: "更新时间", value: (c) => fmtTime(c.updatedAt) },
+          ], (q.data?.list ?? []) as PaymentChannel[])}
           onAdd={canPayment ? () => setPaymentForm({ mode: "DIRECT", status: "DISABLED", countries: "AE", currencies: "AED", capabilities: "支付,退款", apiBase: "", merchantId: "", apiKeyMasked: "sk_test_****" }) : undefined} addLabel="新增支付渠道" />
       )}
       {tab === "notify" && (
         <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索模板号 / 名称"
+          onExport={() => exportCsv<NotifyTemplate>("通知模板", [
+            { header: "模板号", value: (x) => x.templateNo },
+            { header: "名称", value: (x) => x.name },
+            { header: "渠道", value: (x) => CHANNEL_LABEL[x.channel] },
+            { header: "语言", value: (x) => LANG_LABEL[x.lang] },
+            { header: "状态", value: (x) => (x.status === "ENABLED" ? "启用" : "停用") },
+          ], (q.data?.list ?? []) as NotifyTemplate[])}
           onAdd={canNotify ? () => setNotifyForm({ channel: "SMS", lang: "ar", status: "ENABLED" }) : undefined} addLabel="新增模板" />
       )}
       {tab === "dict" && (
         <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索分组 / 编码 / 标签"
+          onExport={() => exportCsv<DictEntry>("参数字典", [
+            { header: "字典号", value: (d) => d.dictNo },
+            { header: "分组", value: (d) => d.group },
+            { header: "编码", value: (d) => d.code },
+            { header: "标签", value: (d) => d.label },
+            { header: "排序", value: (d) => d.sort },
+            { header: "状态", value: (d) => (d.enabled ? "启用" : "停用") },
+          ], (q.data?.list ?? []) as DictEntry[])}
           onAdd={canDict ? () => setDictForm({ sort: 0, enabled: true }) : undefined} addLabel="新增字典项" />
       )}
       {tab === "region" && (
         <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索区域 ID / 名称"
+          onExport={() => exportCsv<Region>("地区库", [
+            { header: "区域 ID", value: (r) => r.regionId },
+            { header: "名称", value: (r) => r.name },
+            { header: "上级", value: (r) => r.parent || "-" },
+            { header: "层级", value: (r) => r.level },
+            { header: "城市数", value: (r) => r.cityCount },
+          ], (q.data?.list ?? []) as Region[])}
           onAdd={canRegion ? () => setRegionForm({ level: 1, cityCount: 0, parent: "" }) : undefined} addLabel="新增地区" />
       )}
       {tab === "params" && (
         <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索参数键 / 说明"
+          onExport={() => exportCsv<SysParam>("系统参数", [
+            { header: "参数键", value: (p) => p.paramKey },
+            { header: "说明", value: (p) => p.label },
+            { header: "取值", value: (p) => p.value },
+            { header: "分组", value: (p) => p.groupName },
+            { header: "更新时间", value: (p) => fmtTime(p.updatedAt) },
+          ], (q.data?.list ?? []) as SysParam[])}
           onAdd={canParam ? () => setParamForm({ value: "", groupName: "" }) : undefined} addLabel="新增参数" />
       )}
       {tab === "openapi" && (
         <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索应用号 / 名称 / AppKey"
+          onExport={() => exportCsv<OpenApiApp>("OpenAPI 应用", [
+            { header: "应用号", value: (a) => a.appNo },
+            { header: "名称", value: (a) => a.name },
+            { header: "AppKey", value: (a) => a.appKey },
+            { header: "限流（次/秒）", value: (a) => a.rateLimit },
+            { header: "状态", value: (a) => (a.status === "ACTIVE" ? "启用" : "停用") },
+            { header: "创建时间", value: (a) => fmtTime(a.createdAt) },
+          ], (q.data?.list ?? []) as OpenApiApp[])}
           onAdd={canOpenapi ? () => setOpenapiForm({ rateLimit: 10, status: "ACTIVE" }) : undefined} addLabel="新增应用" />
       )}
       {tab === "markets" && (
         <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索国家 / 币种"
+          onExport={() => exportCsv<MarketCountry>("多国家市场", [
+            { header: "国家", value: (m) => `${m.name}（${m.countryCode}）` },
+            { header: "币种", value: (m) => m.currency },
+            { header: "时区", value: (m) => m.timezone },
+            { header: "合规主体", value: (m) => m.compliance },
+            { header: "开城数", value: (m) => m.cityCount },
+            { header: "状态", value: (m) => MARKET_STATUS[m.status].label },
+          ], (q.data?.list ?? []) as MarketCountry[])}
           onAdd={canMarket ? () => setMarketForm({ countryCode: "", name: "", currency: "AED", timezone: "Asia/Dubai", compliance: "规划", cityCount: 0, status: "PLANNED" }) : undefined} addLabel="新增国家市场" />
       )}
 
@@ -874,6 +989,16 @@ function SystemInner() {
         <Toolbar
           search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }}
           searchPlaceholder="搜索拉黑号 / 目标 / 操作人"
+          onExport={() => exportCsv<NotifyBlacklist>("触达拉黑", [
+            { header: "拉黑号", value: (b) => b.blockNo },
+            { header: "目标", value: (b) => b.target },
+            { header: "渠道", value: (b) => BL_CHANNEL[b.channel] },
+            { header: "原因", value: (b) => BL_REASON[b.reason].label },
+            { header: "拉黑时间", value: (b) => fmtTime(b.blockedAt) },
+            { header: "操作人", value: (b) => b.blockedBy },
+            { header: "到期时间", value: (b) => (b.expireAt ? fmtTime(b.expireAt) : "永久") },
+            { header: "状态", value: (b) => (isReleased(b) ? "已解除" : "拉黑中") },
+          ], (q.data?.list ?? []) as NotifyBlacklist[])}
           onAdd={canBlacklist ? () => setBlacklistForm({ channel: "SMS", reason: "MANUAL", blockedBy: "", target: "", expireAt: "" }) : undefined}
           addLabel="手动拉黑"
         >
@@ -894,6 +1019,16 @@ function SystemInner() {
         <Toolbar
           search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }}
           searchPlaceholder="搜索国家码 / 国家名称"
+          onExport={() => exportCsv<LoginSetting>("登录设置", [
+            { header: "国家", value: (s) => (s.country === "*" ? "默认档（*）" : `${s.countryName}（${s.country}）`) },
+            { header: "验证码登录", value: (s) => (s.otpEnabled ? "开" : "关") },
+            { header: "密码登录", value: (s) => (s.passwordEnabled ? "开" : "关") },
+            { header: "Apple 登录", value: (s) => (s.appleEnabled ? "开" : "关") },
+            { header: "Google 登录", value: (s) => (s.googleEnabled ? "开" : "关") },
+            { header: "OTP 有效期（秒）", value: (s) => (s.otpEnabled ? s.otpExpireSec : "-") },
+            { header: "日发送上限（条/人）", value: (s) => (s.otpEnabled ? s.otpDailyLimit : "-") },
+            { header: "强制实名", value: (s) => (s.forceRealName ? "强制" : "不强制") },
+          ], (q.data?.list ?? []) as LoginSetting[])}
           onAdd={canLogin ? () => setLoginForm({ country: "", countryName: "", otpEnabled: true, passwordEnabled: false, appleEnabled: true, googleEnabled: true, otpExpireSec: 300, otpDailyLimit: 10, forceRealName: false }) : undefined}
           addLabel="新增国家档"
         />
@@ -902,6 +1037,17 @@ function SystemInner() {
         <Toolbar
           search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }}
           searchPlaceholder="搜索版本号 / 平台 / 更新说明"
+          onExport={() => exportCsv<AppVersion>("应用版本", [
+            { header: "平台", value: (v) => PLATFORM_LABEL[v.platform] },
+            { header: "版本号", value: (v) => v.versionNo },
+            { header: "构建号", value: (v) => v.buildNo },
+            { header: "更新说明（中）", value: (v) => v.releaseNote },
+            { header: "强更", value: (v) => (v.forceUpdate ? "强制更新" : "-") },
+            { header: "最低支持", value: (v) => v.minSupported || "-" },
+            { header: "灰度（%）", value: (v) => v.rolloutPercent },
+            { header: "状态", value: (v) => VERSION_STATUS[v.status].label },
+            { header: "发布时间", value: (v) => fmtTime(v.releasedAt) },
+          ], (q.data?.list ?? []) as AppVersion[])}
           onAdd={canAppVersion ? () => setVersionForm({ platform: "IOS", versionNo: "", buildNo: 1, status: "DRAFT", releaseNote: "", releaseNoteEn: "", releaseNoteAr: "", forceUpdate: false, minSupported: "", rolloutPercent: 0, downloadUrl: "" }) : undefined}
           addLabel="新增版本"
         >
@@ -917,6 +1063,16 @@ function SystemInner() {
         <Toolbar
           search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }}
           searchPlaceholder="搜索银行代码 / 名称（中/英）/ SWIFT"
+          onExport={() => exportCsv<BankEntry>("银行管理", [
+            { header: "银行代码", value: (b) => b.bankCode },
+            { header: "银行名称", value: (b) => `${b.bankName} · ${b.bankNameEn}` },
+            { header: "国家", value: (b) => b.country },
+            { header: "币种", value: (b) => b.currency },
+            { header: "SWIFT 前缀", value: (b) => b.swiftPrefix },
+            { header: "IBAN 长度", value: (b) => b.ibanLength },
+            { header: "状态", value: (b) => (b.status === "ENABLED" ? "启用" : "停用") },
+            ...(showArchived ? [{ header: "归档时间", value: (b: BankEntry) => (b.archivedAt ? fmtTime(b.archivedAt) : "-") }] : []),
+          ], (q.data?.list ?? []) as BankEntry[])}
           onAdd={canBank ? () => setBankForm({ bankCode: "", bankName: "", bankNameEn: "", country: "AE", currency: "AED", swiftPrefix: "", ibanLength: 23, status: "ENABLED" }) : undefined}
           addLabel="新增银行"
         >
@@ -936,12 +1092,22 @@ function SystemInner() {
             <option value="KWD">KWD</option>
             <option value="EGP">EGP</option>
           </Select>
+          <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); setPage(1); }} />
         </Toolbar>
       )}
       {tab === "problems" && (
         <Toolbar
           search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }}
           searchPlaceholder="搜索问题号 / 标题（中/英/阿）/ 答复"
+          onExport={() => exportCsv<ProblemEntry>("问题管理", [
+            { header: "问题号", value: (p) => p.problemNo },
+            { header: "分类", value: (p) => PROBLEM_CATEGORY[p.category] },
+            { header: "标题（中）", value: (p) => p.title },
+            { header: "建议处置", value: (p) => PROBLEM_ACTION[p.suggestedAction].label },
+            { header: "排序", value: (p) => p.sortNo },
+            { header: "状态", value: (p) => (p.status === "ENABLED" ? "启用" : "停用") },
+            ...(showArchived ? [{ header: "归档时间", value: (p: ProblemEntry) => (p.archivedAt ? fmtTime(p.archivedAt) : "-") }] : []),
+          ], (q.data?.list ?? []) as ProblemEntry[])}
           onAdd={canProblem ? () => setProblemForm({ category: "RENT", sortNo: 1, status: "ENABLED", title: "", titleEn: "", titleAr: "", answer: "", answerEn: "", answerAr: "", suggestedAction: "SELF_SERVICE" }) : undefined}
           addLabel="新增问题"
         >
@@ -954,12 +1120,22 @@ function SystemInner() {
             <option value="ENABLED">启用</option>
             <option value="DISABLED">停用</option>
           </Select>
+          <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); setPage(1); }} />
         </Toolbar>
       )}
       {tab === "tax" && (
         <Toolbar
           search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }}
           searchPlaceholder="搜索国家 / 税种 / 开票抬头"
+          onExport={() => exportCsv<TaxSetting>("税率与发票", [
+            { header: "国家", value: (x) => `${x.countryName}（${x.country}）` },
+            { header: "税种", value: (x) => x.taxName },
+            { header: "税率（%）", value: (x) => x.ratePercent },
+            { header: "计税方式", value: (x) => (x.includedInPrice ? "价内税" : "价外税") },
+            { header: "税号（TRN）", value: (x) => x.trn },
+            { header: "开票抬头", value: (x) => x.invoiceTitle },
+            { header: "生效日期", value: (x) => x.effectiveFrom },
+          ], (q.data?.list ?? []) as TaxSetting[])}
           onAdd={canTax ? () => setTaxForm({ country: "", countryName: "", taxName: "VAT", ratePercent: 5, includedInPrice: true, trn: "", invoiceTitle: "", effectiveFrom: "" }) : undefined}
           addLabel="新增国家税率"
         />
@@ -992,18 +1168,18 @@ function SystemInner() {
       {tab === "notify-blacklist" && <DataTable rowKey={(b: NotifyBlacklist) => b.blockNo} columns={blacklistCols} rows={q.data?.list as NotifyBlacklist[]} loading={q.isLoading} empty="暂无拉黑记录——没有用户退订或硬退信，也可手动拉黑投诉来源" />}
       {tab === "login" && <DataTable rowKey={(s: LoginSetting) => s.country} columns={loginCols} rows={q.data?.list as LoginSetting[]} loading={q.isLoading} empty="暂无登录设置——至少应保留一条 * 默认档，否则各国登录方式无处可依" />}
       {tab === "app-version" && <DataTable rowKey={(v: AppVersion) => v.versionId} columns={versionCols} rows={q.data?.list as AppVersion[]} loading={q.isLoading} empty="暂无应用版本——所选平台还没发过版，先新增一条草稿再灰度" />}
-      {tab === "banks" && <DataTable rowKey={(b: BankEntry) => b.bankCode} columns={bankCols} rows={q.data?.list as BankEntry[]} loading={q.isLoading} empty="暂无银行——所选国家/币种下没有可用银行，提现收款账户将无法选择" />}
-      {tab === "problems" && <DataTable rowKey={(p: ProblemEntry) => p.problemNo} columns={problemCols} rows={q.data?.list as ProblemEntry[]} loading={q.isLoading} empty="暂无问题条目——C 端报障下拉与客服快捷答复都取自这里，建议先补常见问题" />}
+      {tab === "banks" && <DataTable rowKey={(b: BankEntry) => b.bankCode} columns={bankCols} rows={q.data?.list as BankEntry[]} loading={q.isLoading} rowClassName={archivedRowClass} empty="暂无银行——所选国家/币种下没有可用银行（已归档的默认不显示，可打开「显示已归档」查看），提现收款账户将无法选择，请先新增银行" />}
+      {tab === "problems" && <DataTable rowKey={(p: ProblemEntry) => p.problemNo} columns={problemCols} rows={q.data?.list as ProblemEntry[]} loading={q.isLoading} rowClassName={archivedRowClass} empty="暂无问题条目——C 端报障下拉与客服快捷答复都取自这里（已归档的默认不显示，可打开「显示已归档」查看），建议先补常见问题" />}
       {tab === "tax" && <DataTable rowKey={(x: TaxSetting) => x.country} columns={taxCols} rows={q.data?.list as TaxSetting[]} loading={q.isLoading} empty="暂无税率配置——未配置的国家按不含税出账，开票会缺税号" />}
 
-      {tab === "vendors" && <DataTable rowKey={(v: Vendor) => v.vendorCode} columns={vendorCols} rows={vendorsQ.data} loading={vendorsQ.isLoading} />}
-      {tab === "payment" && <DataTable rowKey={(c: PaymentChannel) => c.channelCode} columns={paymentCols} rows={q.data?.list as PaymentChannel[]} loading={q.isLoading} />}
-      {tab === "notify" && <DataTable rowKey={(t: NotifyTemplate) => t.templateNo} columns={notifyCols} rows={q.data?.list as NotifyTemplate[]} loading={q.isLoading} />}
-      {tab === "dict" && <DataTable rowKey={(d: DictEntry) => d.dictNo} columns={dictCols} rows={q.data?.list as DictEntry[]} loading={q.isLoading} />}
-      {tab === "region" && <DataTable rowKey={(r: Region) => r.regionId} columns={regionCols} rows={q.data?.list as Region[]} loading={q.isLoading} />}
-      {tab === "params" && <DataTable rowKey={(p: SysParam) => p.paramKey} columns={paramCols} rows={q.data?.list as SysParam[]} loading={q.isLoading} />}
-      {tab === "openapi" && <DataTable rowKey={(a: OpenApiApp) => a.appNo} columns={openapiCols} rows={q.data?.list as OpenApiApp[]} loading={q.isLoading} />}
-      {tab === "markets" && <DataTable rowKey={(m: MarketCountry) => m.countryCode} columns={marketCols} rows={q.data?.list as MarketCountry[]} loading={q.isLoading} />}
+      {tab === "vendors" && <DataTable rowKey={(v: Vendor) => v.vendorCode} columns={vendorCols} rows={vendorsQ.data} loading={vendorsQ.isLoading} empty="暂无供应商——还没有硬件厂商注册 driver，设备台账将无法接入，请先由平台管理员登记供应商" />}
+      {tab === "payment" && <DataTable rowKey={(c: PaymentChannel) => c.channelCode} columns={paymentCols} rows={q.data?.list as PaymentChannel[]} loading={q.isLoading} empty="暂无支付渠道——未配置渠道时 C 端无法下单支付，请先新增并启用至少一个渠道" />}
+      {tab === "notify" && <DataTable rowKey={(t: NotifyTemplate) => t.templateNo} columns={notifyCols} rows={q.data?.list as NotifyTemplate[]} loading={q.isLoading} empty="暂无通知模板——OTP/借还/扣费短信都取自这里，请先新增模板再启用" />}
+      {tab === "dict" && <DataTable rowKey={(d: DictEntry) => d.dictNo} columns={dictCols} rows={q.data?.list as DictEntry[]} loading={q.isLoading} empty="暂无字典项——所选分组下还没有枚举值，请新增字典项供下拉与状态展示使用" />}
+      {tab === "region" && <DataTable rowKey={(r: Region) => r.regionId} columns={regionCols} rows={q.data?.list as Region[]} loading={q.isLoading} empty="暂无地区——站点与点位的归属地取自这里，请先建国家/城市层级" />}
+      {tab === "params" && <DataTable rowKey={(p: SysParam) => p.paramKey} columns={paramCols} rows={q.data?.list as SysParam[]} loading={q.isLoading} empty="暂无系统参数——超时/重试等全局开关都在这里，未配置时按代码默认值运行" />}
+      {tab === "openapi" && <DataTable rowKey={(a: OpenApiApp) => a.appNo} columns={openapiCols} rows={q.data?.list as OpenApiApp[]} loading={q.isLoading} empty="暂无 OpenAPI 应用——还没有合作方接入，需要对外开放接口时在此新增应用并分配 AppKey" />}
+      {tab === "markets" && <DataTable rowKey={(m: MarketCountry) => m.countryCode} columns={marketCols} rows={q.data?.list as MarketCountry[]} loading={q.isLoading} empty="暂无国家市场——开城前需先登记国家、币种与合规主体，否则该国无法上线" />}
       {tab !== "vendors" && tab !== "rules" && q.data && <Pagination page={page} size={SIZE} total={q.data.total} onPage={setPage} />}
 
       {/* 供应商 配置抽屉（保留）*/}

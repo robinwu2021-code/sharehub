@@ -9,7 +9,7 @@ import type {
   AppVersion, BankEntry, ProblemEntry, TaxSetting, PageQuery,
 } from "../../types";
 import { p, iso } from "./internal";
-import { paginate, kwHit, upsert, nextNo } from "./helpers";
+import { paginate, kwHit, upsert, nextNo, liveHit, archiveRow, unarchiveRow } from "./helpers";
 
 // —— 通知模板 / 字典 / 区域 / 参数 / 开放平台 ——
 export const notifyTemplates: NotifyTemplate[] = Array.from({ length: 14 }, (_, i) => ({
@@ -349,20 +349,21 @@ export function rollbackAppVersion(versionId: string): AppVersion {
 // —— §14 银行管理 ——
 // IBAN 长度是各国固定值（AE 23 / SA 24 / EG 29 …），提现收款账户按此校验。
 export const banks: BankEntry[] = [
-  { bankCode: "ENBD", bankName: "阿联酋国民银行", bankNameEn: "Emirates NBD", country: "AE", currency: "AED", swiftPrefix: "EBILAEAD", ibanLength: 23, status: "ENABLED" },
-  { bankCode: "FAB", bankName: "阿布扎比第一银行", bankNameEn: "First Abu Dhabi Bank", country: "AE", currency: "AED", swiftPrefix: "NBADAEAA", ibanLength: 23, status: "ENABLED" },
-  { bankCode: "ADCB", bankName: "阿布扎比商业银行", bankNameEn: "Abu Dhabi Commercial Bank", country: "AE", currency: "AED", swiftPrefix: "ADCBAEAA", ibanLength: 23, status: "ENABLED" },
-  { bankCode: "MASHREQ", bankName: "马士礼格银行", bankNameEn: "Mashreq Bank", country: "AE", currency: "AED", swiftPrefix: "BOMLAEAD", ibanLength: 23, status: "ENABLED" },
-  { bankCode: "DIB", bankName: "迪拜伊斯兰银行", bankNameEn: "Dubai Islamic Bank", country: "AE", currency: "AED", swiftPrefix: "DUIBAEAD", ibanLength: 23, status: "ENABLED" },
-  { bankCode: "RAJHI", bankName: "拉吉希银行", bankNameEn: "Al Rajhi Bank", country: "SA", currency: "SAR", swiftPrefix: "RJHISARI", ibanLength: 24, status: "ENABLED" },
-  { bankCode: "SNB", bankName: "沙特国民银行", bankNameEn: "Saudi National Bank", country: "SA", currency: "SAR", swiftPrefix: "NCBKSAJE", ibanLength: 24, status: "ENABLED" },
-  { bankCode: "RIYAD", bankName: "利雅得银行", bankNameEn: "Riyad Bank", country: "SA", currency: "SAR", swiftPrefix: "RIBLSARI", ibanLength: 24, status: "DISABLED" },
-  { bankCode: "QNB", bankName: "卡塔尔国民银行", bankNameEn: "Qatar National Bank", country: "QA", currency: "QAR", swiftPrefix: "QNBAQAQA", ibanLength: 29, status: "DISABLED" },
-  { bankCode: "NBK", bankName: "科威特国民银行", bankNameEn: "National Bank of Kuwait", country: "KW", currency: "KWD", swiftPrefix: "NBOKKWKW", ibanLength: 30, status: "DISABLED" },
-  { bankCode: "CIB", bankName: "埃及商业国际银行", bankNameEn: "Commercial International Bank", country: "EG", currency: "EGP", swiftPrefix: "CIBEEGCX", ibanLength: 29, status: "DISABLED" },
+  { bankCode: "ENBD", bankName: "阿联酋国民银行", bankNameEn: "Emirates NBD", country: "AE", currency: "AED", swiftPrefix: "EBILAEAD", ibanLength: 23, status: "ENABLED", archivedAt: null },
+  { bankCode: "FAB", bankName: "阿布扎比第一银行", bankNameEn: "First Abu Dhabi Bank", country: "AE", currency: "AED", swiftPrefix: "NBADAEAA", ibanLength: 23, status: "ENABLED", archivedAt: null },
+  { bankCode: "ADCB", bankName: "阿布扎比商业银行", bankNameEn: "Abu Dhabi Commercial Bank", country: "AE", currency: "AED", swiftPrefix: "ADCBAEAA", ibanLength: 23, status: "ENABLED", archivedAt: null },
+  { bankCode: "MASHREQ", bankName: "马士礼格银行", bankNameEn: "Mashreq Bank", country: "AE", currency: "AED", swiftPrefix: "BOMLAEAD", ibanLength: 23, status: "ENABLED", archivedAt: null },
+  { bankCode: "DIB", bankName: "迪拜伊斯兰银行", bankNameEn: "Dubai Islamic Bank", country: "AE", currency: "AED", swiftPrefix: "DUIBAEAD", ibanLength: 23, status: "ENABLED", archivedAt: null },
+  { bankCode: "RAJHI", bankName: "拉吉希银行", bankNameEn: "Al Rajhi Bank", country: "SA", currency: "SAR", swiftPrefix: "RJHISARI", ibanLength: 24, status: "ENABLED", archivedAt: null },
+  { bankCode: "SNB", bankName: "沙特国民银行", bankNameEn: "Saudi National Bank", country: "SA", currency: "SAR", swiftPrefix: "NCBKSAJE", ibanLength: 24, status: "ENABLED", archivedAt: null },
+  { bankCode: "RIYAD", bankName: "利雅得银行", bankNameEn: "Riyad Bank", country: "SA", currency: "SAR", swiftPrefix: "RIBLSARI", ibanLength: 24, status: "DISABLED", archivedAt: null },
+  { bankCode: "QNB", bankName: "卡塔尔国民银行", bankNameEn: "Qatar National Bank", country: "QA", currency: "QAR", swiftPrefix: "QNBAQAQA", ibanLength: 29, status: "DISABLED", archivedAt: null },
+  { bankCode: "NBK", bankName: "科威特国民银行", bankNameEn: "National Bank of Kuwait", country: "KW", currency: "KWD", swiftPrefix: "NBOKKWKW", ibanLength: 30, status: "DISABLED", archivedAt: null },
+  { bankCode: "CIB", bankName: "埃及商业国际银行", bankNameEn: "Commercial International Bank", country: "EG", currency: "EGP", swiftPrefix: "CIBEEGCX", ibanLength: 29, status: "DISABLED", archivedAt: "2026-04-02T07:30:00Z" },
 ];
 export const listBanks = (q: PageQuery & { country?: string; currency?: string } = {}) =>
   paginate(banks, q.page, q.size, (x) =>
+    liveHit(x, q.showArchived) &&
     (!q.country || x.country === q.country) &&
     (!q.currency || x.currency === q.currency) &&
     kwHit(q.keyword, x.bankCode, x.bankName, x.bankNameEn, x.swiftPrefix));
@@ -378,7 +379,7 @@ export const problems: ProblemEntry[] = [
     answer: "请在 App 内点「重试弹出」；仍无反应说明卡槽卡宝，我们会自动开工单并在 30 分钟内到场，本单不计费。",
     answerEn: "Tap “Retry eject” in the app. If it still fails the slot is stuck — a work order is raised automatically, an engineer arrives within 30 minutes, and this rental is not charged.",
     answerAr: "اضغط «إعادة الإخراج» في التطبيق. إذا استمرت المشكلة فالفتحة عالقة — سيتم إنشاء طلب صيانة تلقائيًا والوصول خلال 30 دقيقة، ولن يتم احتساب رسوم.",
-    suggestedAction: "TO_WORKORDER", sortNo: 1, status: "ENABLED",
+    suggestedAction: "TO_WORKORDER", sortNo: 1, status: "ENABLED", archivedAt: null,
   },
   {
     problemNo: "ISS902", category: "RETURN",
@@ -386,7 +387,7 @@ export const problems: ProblemEntry[] = [
     answer: "请在 App 地图上选择附近可还机柜（显示空仓数）；因满仓产生的超时时长会在申诉后免除。",
     answerEn: "Pick a nearby cabinet with free slots on the app map. Overdue time caused by a full cabinet is waived after you file a claim.",
     answerAr: "اختر خزانة قريبة بها فتحات فارغة من خريطة التطبيق. سيتم إعفاء وقت التأخير الناتج عن امتلاء الخزانة بعد تقديم الشكوى.",
-    suggestedAction: "SELF_SERVICE", sortNo: 2, status: "ENABLED",
+    suggestedAction: "SELF_SERVICE", sortNo: 2, status: "ENABLED", archivedAt: null,
   },
   {
     problemNo: "ISS903", category: "BILLING",
@@ -394,7 +395,7 @@ export const problems: ProblemEntry[] = [
     answer: "归还回执以机柜上报为准，偶发延迟在 10 分钟内自动结算；超过 10 分钟请提交订单号，客服核对后按实际归还时间重算并退差额。",
     answerEn: "Return is confirmed by the cabinet report; occasional delays settle automatically within 10 minutes. Beyond that, submit the order number — we recalculate by the actual return time and refund the difference.",
     answerAr: "يتم تأكيد الإرجاع من تقرير الخزانة، وتتم التسوية تلقائيًا خلال 10 دقائق. بعد ذلك، أرسل رقم الطلب وسنعيد الحساب حسب وقت الإرجاع الفعلي ونرد الفرق.",
-    suggestedAction: "TO_REFUND", sortNo: 3, status: "ENABLED",
+    suggestedAction: "TO_REFUND", sortNo: 3, status: "ENABLED", archivedAt: null,
   },
   {
     problemNo: "ISS904", category: "BILLING",
@@ -402,7 +403,7 @@ export const problems: ProblemEntry[] = [
     answer: "归还后押金即时解冻，银行入账通常 1-3 个工作日（部分发卡行最长 7 天）。信用免押用户无押金冻结。",
     answerEn: "The deposit is released immediately after return; banks post it in 1-3 business days (up to 7 with some issuers). Credit-waiver users have no deposit hold.",
     answerAr: "يتم تحرير التأمين فور الإرجاع، ويستغرق ظهوره في البنك من 1 إلى 3 أيام عمل (حتى 7 أيام لدى بعض البنوك). لا يوجد تأمين لمستخدمي الإعفاء الائتماني.",
-    suggestedAction: "SELF_SERVICE", sortNo: 4, status: "ENABLED",
+    suggestedAction: "SELF_SERVICE", sortNo: 4, status: "ENABLED", archivedAt: null,
   },
   {
     problemNo: "ISS905", category: "DEVICE",
@@ -410,7 +411,7 @@ export const problems: ProblemEntry[] = [
     answer: "请就近归还并在 App 内报障，本单免费；我们会锁定该充电宝编号并派维修回收。",
     answerEn: "Return it at the nearest cabinet and report the fault in the app — this rental is free. We lock that powerbank and dispatch a technician to collect it.",
     answerAr: "أعِد البطارية في أقرب خزانة وأبلغ عن العطل في التطبيق — هذا الاستئجار مجاني. سنقوم بحظر البطارية وإرسال فني لاستلامها.",
-    suggestedAction: "TO_WORKORDER", sortNo: 5, status: "ENABLED",
+    suggestedAction: "TO_WORKORDER", sortNo: 5, status: "ENABLED", archivedAt: null,
   },
   {
     problemNo: "ISS906", category: "ACCOUNT",
@@ -418,7 +419,7 @@ export const problems: ProblemEntry[] = [
     answer: "请确认号码所在国家已开放注册，并检查是否曾回复 STOP 退订（会进入触达拉黑）。可改用 Apple / Google 登录。",
     answerEn: "Check that your country is open for sign-up and whether you previously replied STOP (which adds you to the send-blocklist). You can also sign in with Apple or Google.",
     answerAr: "تأكد من أن بلدك متاح للتسجيل، وتحقق مما إذا كنت قد رددت بكلمة STOP سابقًا (تؤدي إلى الحظر). يمكنك أيضًا تسجيل الدخول عبر Apple أو Google.",
-    suggestedAction: "TO_CS", sortNo: 6, status: "ENABLED",
+    suggestedAction: "TO_CS", sortNo: 6, status: "ENABLED", archivedAt: null,
   },
   {
     problemNo: "ISS907", category: "RENT",
@@ -426,7 +427,7 @@ export const problems: ProblemEntry[] = [
     answer: "单账号默认同时可借 1 个；实名用户可申请提升至 2 个，超出请使用同行人账号。",
     answerEn: "One active rental per account by default; verified users can request a limit of two. Beyond that, please use a companion’s account.",
     answerAr: "استئجار واحد نشط لكل حساب افتراضيًا؛ يمكن للمستخدمين الموثقين طلب رفعه إلى اثنين. لما زاد عن ذلك، استخدم حساب مرافق.",
-    suggestedAction: "SELF_SERVICE", sortNo: 7, status: "ENABLED",
+    suggestedAction: "SELF_SERVICE", sortNo: 7, status: "ENABLED", archivedAt: null,
   },
   {
     problemNo: "ISS908", category: "OTHER",
@@ -434,7 +435,7 @@ export const problems: ProblemEntry[] = [
     answer: "在「我的-订单」选择订单申请电子发票，含 TRN 税号，通常 10 分钟内发送到邮箱。",
     answerEn: "Request an e-invoice from My Orders; it includes the TRN and usually arrives by email within 10 minutes.",
     answerAr: "اطلب الفاتورة الإلكترونية من «طلباتي»؛ تتضمن الرقم الضريبي وتصل عبر البريد خلال 10 دقائق عادةً.",
-    suggestedAction: "SELF_SERVICE", sortNo: 8, status: "ENABLED",
+    suggestedAction: "SELF_SERVICE", sortNo: 8, status: "ENABLED", archivedAt: null,
   },
   {
     problemNo: "ISS909", category: "OTHER",
@@ -442,12 +443,13 @@ export const problems: ProblemEntry[] = [
     answer: "旧版斋月说明，已由公告替代，保留仅供历史工单参考。",
     answerEn: "Legacy Ramadan notice, superseded by announcements; kept for historical tickets only.",
     answerAr: "إشعار رمضان القديم، تم استبداله بالإعلانات؛ محفوظ للرجوع فقط.",
-    suggestedAction: "TO_CS", sortNo: 9, status: "DISABLED",
+    suggestedAction: "TO_CS", sortNo: 9, status: "DISABLED", archivedAt: null,
   },
 ];
 export const listProblems = (q: PageQuery & { category?: string; status?: string } = {}) => {
   const rows = problems
     .filter((x) =>
+      liveHit(x, q.showArchived) &&
       (!q.category || x.category === q.category) &&
       (!q.status || x.status === q.status) &&
       kwHit(q.keyword, x.problemNo, x.title, x.titleEn, x.titleAr, x.answer))
@@ -469,3 +471,9 @@ export const listTaxSettings = (q: PageQuery = {}) =>
   paginate(taxSettings, q.page, q.size, (x) => kwHit(q.keyword, x.country, x.countryName, x.taxName, x.invoiceTitle));
 export const saveTaxSetting = (x: Partial<TaxSetting>) =>
   upsert(taxSettings, x, "country", () => nextNo("XX", taxSettings, 0));
+
+// —— G1 软删除：银行 / 问题类型 ——
+export const archiveBank = (code: string) => archiveRow(banks, "bankCode", code);
+export const unarchiveBank = (code: string) => unarchiveRow(banks, "bankCode", code);
+export const archiveProblem = (no: string) => archiveRow(problems, "problemNo", no);
+export const unarchiveProblem = (no: string) => unarchiveRow(problems, "problemNo", no);

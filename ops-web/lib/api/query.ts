@@ -19,10 +19,16 @@ export type WoQ = StatusTypeQ;
 /** 预约订单列表。等价于 StatusTypeQ，保留旧名。 */
 export type ReservationQ = StatusTypeQ;
 
+/**
+ * G1 软删除：可归档主数据的列表参数。`showArchived` 打开才把已归档行带出来，
+ * 默认（不传 / false）一律过滤掉——「归档了还在列表里」是软删除最常见的漏实现。
+ */
+export type ArchiveQ = PageQ & { showArchived?: boolean };
+
 // ——— 域特有形状 ———
 
 /** 设备：在线状态 + 业务状态双筛。 */
-export type CabinetQ = PageQ & { onlineStatus?: string; status?: string };
+export type CabinetQ = PageQ & { onlineStatus?: string; status?: string; showArchived?: boolean };
 /** 告警记录：级别 + 处理状态。 */
 export type AlarmQ = PageQ & { level?: string; status?: string };
 /** 设备日志：stream 双流筛选 + 日期范围（YYYY-MM-DD，含端点）。 */
@@ -38,6 +44,8 @@ export type ShareSummaryQ = PageQ & {
 export type RechargeQ = PageQ & { status?: string; from?: string; to?: string };
 /** 免费订单：按减免原因筛选。 */
 export type FreeOrderQ = PageQ & { reason?: string };
+/** 充值套餐：上下架状态 + 归档开关。 */
+export type PackageQ = PageQ & { status?: string; showArchived?: boolean };
 /** 免费白名单：状态（含 REVOKED 软撤销）+ 原因。 */
 export type WhitelistQ = PageQ & { status?: string; reason?: string };
 /** 通知发送记录：渠道/状态筛选 + 受控排序（sort=sentAt|cost）。 */
@@ -47,6 +55,6 @@ export type NotifyBlacklistQ = PageQ & { channel?: string; reason?: string };
 /** App 版本：平台筛选。 */
 export type AppVersionQ = PageQ & { platform?: string };
 /** 银行字典：国家 + 币种。 */
-export type BankQ = PageQ & { country?: string; currency?: string };
+export type BankQ = PageQ & { country?: string; currency?: string; showArchived?: boolean };
 /** 常见问题：分类 + 上下架状态。 */
-export type ProblemQ = PageQ & { category?: string; status?: string };
+export type ProblemQ = PageQ & { category?: string; status?: string; showArchived?: boolean };

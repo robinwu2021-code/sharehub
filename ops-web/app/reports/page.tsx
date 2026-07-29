@@ -11,6 +11,7 @@ import { Toolbar } from "@/components/ui/toolbar";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { money } from "@/lib/utils";
+import { exportCsv } from "@/lib/export-csv";
 import type {
   ReportDevice, ReportLocation, ReportFinance, ReportScreen, ReportCustom, ConsumerSegment, PageResult,
 } from "@/lib/types";
@@ -105,17 +106,65 @@ function ReportsInner() {
           search={keyword}
           onSearch={(v) => { setKeyword(v); setPage(1); }}
           searchPlaceholder={tab === "device" ? "搜索点位" : tab === "location" ? "搜索站点" : "搜索周期"}
+          // 三张报表共用一条工具条，导出按当前 tab 出对应的列
+          onExport={() => {
+            if (tab === "device") {
+              exportCsv<ReportDevice>("设备运营分析", [
+                { header: "点位", value: (r) => r.locationName },
+                { header: "机柜数", value: (r) => Math.round(r.cabinetCount) },
+                { header: "在线率", value: (r) => r.onlineRate },
+                { header: "翻台率", value: (r) => r.turnover },
+                { header: "故障率", value: (r) => r.faultRate },
+              ], (q.data?.list ?? []) as ReportDevice[]);
+            } else if (tab === "location") {
+              exportCsv<ReportLocation>("点位坪效", [
+                { header: "站点", value: (r) => r.siteName },
+                { header: "营收", value: (r) => r.revenue },
+                { header: "成本", value: (r) => r.cost },
+                { header: "币种", value: (r) => r.currency },
+                { header: "回本天数", value: (r) => Math.round(r.payback) },
+                { header: "ROI", value: (r) => r.roi },
+              ], (q.data?.list ?? []) as ReportLocation[]);
+            } else {
+              exportCsv<ReportFinance>("财务报表", [
+                { header: "周期", value: (r) => r.period },
+                { header: "GMV", value: (r) => r.gmv },
+                { header: "分润", value: (r) => r.share },
+                { header: "结算", value: (r) => r.settle },
+                { header: "净收入", value: (r) => r.net },
+                { header: "币种", value: (r) => r.currency },
+              ], (q.data?.list ?? []) as ReportFinance[]);
+            }
+          }}
         />
       )}
 
       {tab === "device" && (
-        <DataTable rowKey={(r: ReportDevice) => r.locationName} columns={deviceCols} rows={q.data?.list as ReportDevice[]} loading={q.isLoading} />
+        <DataTable
+          rowKey={(r: ReportDevice) => r.locationName}
+          columns={deviceCols}
+          rows={q.data?.list as ReportDevice[]}
+          loading={q.isLoading}
+          empty="暂无设备运营数据——点位投放并产生订单后按日汇总，或放宽搜索条件再查"
+        />
       )}
       {tab === "location" && (
-        <DataTable rowKey={(r: ReportLocation) => r.siteName} columns={locationCols} rows={q.data?.list as ReportLocation[]} loading={q.isLoading} />
+        <DataTable
+          rowKey={(r: ReportLocation) => r.siteName}
+          columns={locationCols}
+          rows={q.data?.list as ReportLocation[]}
+          loading={q.isLoading}
+          empty="暂无坪效数据——站点需先录入投入成本并有营收记录，才能算回本天数与 ROI"
+        />
       )}
       {tab === "finance" && (
-        <DataTable rowKey={(r: ReportFinance) => r.period} columns={financeCols} rows={q.data?.list as ReportFinance[]} loading={q.isLoading} />
+        <DataTable
+          rowKey={(r: ReportFinance) => r.period}
+          columns={financeCols}
+          rows={q.data?.list as ReportFinance[]}
+          loading={q.isLoading}
+          empty="暂无财务报表——按周期跑批汇总 GMV/分润/结算，本周期尚未出数"
+        />
       )}
 
       {tab === "screen" && (
@@ -133,19 +182,49 @@ function ReportsInner() {
       )}
 
       {tab === "consumer" && (
-        <DataTable rowKey={(r: ConsumerSegment) => r.segmentNo} columns={consumerCols} rows={q.data?.list as ConsumerSegment[]} loading={q.isLoading} />
+        <>
+          <Toolbar
+            onExport={() => exportCsv<ConsumerSegment>("消费者分析", [
+              { header: "人群", value: (r) => r.segment },
+              { header: "用户数", value: (r) => r.userCount },
+              { header: "复借率", value: (r) => r.repeatRate },
+              { header: "客单价", value: (r) => r.avgOrderValue },
+              { header: "币种", value: (r) => r.currency },
+            ], (q.data?.list ?? []) as ConsumerSegment[])}
+          />
+          <DataTable
+            rowKey={(r: ConsumerSegment) => r.segmentNo}
+            columns={consumerCols}
+            rows={q.data?.list as ConsumerSegment[]}
+            loading={q.isLoading}
+            empty="暂无人群分析——需累积一定量的订单与用户行为后才会分层，新上线阶段属正常"
+          />
+        </>
       )}
 
       {tab === "custom" && (
         <>
-          <div className="mb-4 flex items-center gap-2">
+          {/* 指标筛选与导出同处工具条：导出的是筛选后的可见行 */}
+          <Toolbar
+            onExport={() => exportCsv<ReportCustom>("自定义报表", [
+              { header: "维度", value: (r) => r.dim },
+              { header: "指标", value: (r) => r.metric },
+              { header: "数值", value: (r) => r.value },
+            ], customFiltered)}
+          >
             <span className="text-sm text-muted-foreground">指标</span>
             <Select className="w-48" value={metric} onChange={(e) => setMetric(e.target.value)}>
               <option value="all">全部指标</option>
               {metricOptions.map((m) => <option key={m} value={m}>{m}</option>)}
             </Select>
-          </div>
-          <DataTable rowKey={(r: ReportCustom) => `${r.dim}-${r.metric}`} columns={customCols} rows={customFiltered} loading={q.isLoading} />
+          </Toolbar>
+          <DataTable
+            rowKey={(r: ReportCustom) => `${r.dim}-${r.metric}`}
+            columns={customCols}
+            rows={customFiltered}
+            loading={q.isLoading}
+            empty="暂无自定义报表数据——换个指标筛选，或先在报表配置中定义需要的维度与指标"
+          />
         </>
       )}
 

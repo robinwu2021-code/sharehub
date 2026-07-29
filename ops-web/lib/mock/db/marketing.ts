@@ -5,13 +5,14 @@ import type {
   Coupon, Campaign, PushMessage, Referral, AdSlot, AdCampaign, AdDelivery, Notice, PageQuery,
 } from "../../types";
 import { NICKS, p, iso } from "./internal";
-import { paginate, kwHit, upsert, nextNo } from "./helpers";
+import { paginate, kwHit, upsert, nextNo, liveHit, archiveRow, unarchiveRow } from "./helpers";
 import { cabNo } from "./device";
 
 export const coupons: Coupon[] = Array.from({ length: 14 }, (_, i) => ({
   couponNo: `CP${800 + i}`, name: p(["新人立减", "满减券", "周末折扣", "会员专享"], i),
   type: i % 2 === 0 ? "CUT" : "DISCOUNT", value: i % 2 === 0 ? [3, 5, 10][i % 3] : [8, 9][i % 2],
   threshold: (i % 3) * 10, stock: 1000 + i * 100, issued: (i * 137) % 900, status: i % 6 === 0 ? "PAUSED" : "ACTIVE",
+  archivedAt: null,
 }));
 export const saveCoupon = (c: Partial<Coupon>) => upsert(coupons, c, "couponNo", () => nextNo("CP", coupons));
 
@@ -73,7 +74,7 @@ export const notices: Notice[] = [
     contentEn: "During Ramadan, stations in Dubai Mall and Mall of Emirates stay open until 02:00. Returns are unaffected.",
     contentAr: "خلال رمضان، تعمل المحطات في دبي مول ومول الإمارات حتى الساعة 02:00. الإرجاع غير متأثر.",
     type: "SYSTEM", pinned: true, startAt: iso(3 * 86400_000), endAt: iso(-27 * 86400_000),
-    status: "PUBLISHED", publishedBy: "运营中心", createdAt: iso(4 * 86400_000),
+    status: "PUBLISHED", publishedBy: "运营中心", createdAt: iso(4 * 86400_000), archivedAt: null,
   },
   {
     noticeNo: "NTC901", title: "新用户首借 30 分钟免费",
@@ -82,7 +83,7 @@ export const notices: Notice[] = [
     contentEn: "New users get the first 30 minutes free on their first power bank rental. No coupon needed.",
     contentAr: "يحصل المستخدمون الجدد على أول 30 دقيقة مجانًا عند أول استئجار لشاحن متنقل، دون الحاجة إلى قسيمة.",
     type: "PROMO", pinned: true, startAt: iso(10 * 86400_000), endAt: iso(-20 * 86400_000),
-    status: "PUBLISHED", publishedBy: "增长组", createdAt: iso(11 * 86400_000),
+    status: "PUBLISHED", publishedBy: "增长组", createdAt: iso(11 * 86400_000), archivedAt: null,
   },
   {
     noticeNo: "NTC902", title: "DXB T3 航站楼点位夜间维护",
@@ -91,7 +92,7 @@ export const notices: Notice[] = [
     contentEn: "All cabinets at DXB T3 will receive a firmware upgrade on Thursday 01:00-04:00. Rentals pause; ongoing orders bill and return as usual.",
     contentAr: "سيتم تحديث البرامج الثابتة لجميع الخزائن في المبنى 3 بمطار دبي يوم الخميس من 01:00 إلى 04:00. يتوقف الاستئجار مؤقتًا.",
     type: "MAINTENANCE", pinned: false, startAt: iso(1 * 86400_000), endAt: iso(-2 * 86400_000),
-    status: "PUBLISHED", publishedBy: "运维值班组", createdAt: iso(2 * 86400_000),
+    status: "PUBLISHED", publishedBy: "运维值班组", createdAt: iso(2 * 86400_000), archivedAt: null,
   },
   {
     noticeNo: "NTC903", title: "押金规则更新：信用免押上线",
@@ -100,7 +101,7 @@ export const notices: Notice[] = [
     contentEn: "Users above the credit threshold rent without the AED 50 deposit. Overdue buy-out rules remain unchanged.",
     contentAr: "يمكن للمستخدمين ذوي التقييم الائتماني المرتفع الاستئجار دون تأمين 50 درهمًا. تبقى قواعد الشراء عند التأخير كما هي.",
     type: "SYSTEM", pinned: false, startAt: iso(20 * 86400_000), endAt: iso(-40 * 86400_000),
-    status: "PUBLISHED", publishedBy: "产品组", createdAt: iso(21 * 86400_000),
+    status: "PUBLISHED", publishedBy: "产品组", createdAt: iso(21 * 86400_000), archivedAt: null,
   },
   {
     noticeNo: "NTC904", title: "Marina Walk 新增 12 个机柜点位",
@@ -109,7 +110,7 @@ export const notices: Notice[] = [
     contentEn: "12 new cabinets are live along Marina Walk. Scan to rent or return and skip the evening queue.",
     contentAr: "تم تشغيل 12 خزانة جديدة على امتداد مارينا ووك. امسح الرمز للاستئجار أو الإرجاع.",
     type: "PROMO", pinned: false, startAt: iso(6 * 86400_000), endAt: iso(-24 * 86400_000),
-    status: "PUBLISHED", publishedBy: "拓展组", createdAt: iso(7 * 86400_000),
+    status: "PUBLISHED", publishedBy: "拓展组", createdAt: iso(7 * 86400_000), archivedAt: null,
   },
   {
     noticeNo: "NTC905", title: "支付通道切换公告",
@@ -118,7 +119,7 @@ export const notices: Notice[] = [
     contentEn: "Settlement moves to NEARPAY this month. Statements show ShareHub FZ-LLC and refunds now take 3 business days.",
     contentAr: "تنتقل التسوية إلى NEARPAY هذا الشهر. تظهر الفواتير باسم ShareHub FZ-LLC وتستغرق المبالغ المستردة 3 أيام عمل.",
     type: "SYSTEM", pinned: false, startAt: iso(15 * 86400_000), endAt: iso(-15 * 86400_000),
-    status: "PUBLISHED", publishedBy: "财务中心", createdAt: iso(16 * 86400_000),
+    status: "PUBLISHED", publishedBy: "财务中心", createdAt: iso(16 * 86400_000), archivedAt: null,
   },
   {
     noticeNo: "NTC906", title: "Yas Mall 点位临时停用（商场装修）",
@@ -127,7 +128,7 @@ export const notices: Notice[] = [
     contentEn: "Due to mall renovation, 4 cabinets on Yas Mall B1 are offline. Please return at the L1 cabinets.",
     contentAr: "بسبب أعمال التجديد، تم إيقاف 4 خزائن في الطابق B1 بياس مول. يرجى الإرجاع في خزائن الطابق L1.",
     type: "MAINTENANCE", pinned: false, startAt: iso(-1 * 86400_000), endAt: iso(-30 * 86400_000),
-    status: "DRAFT", publishedBy: "区域经理", createdAt: iso(1 * 86400_000),
+    status: "DRAFT", publishedBy: "区域经理", createdAt: iso(1 * 86400_000), archivedAt: null,
   },
   {
     noticeNo: "NTC907", title: "国庆双周充电福利（已结束）",
@@ -136,7 +137,7 @@ export const notices: Notice[] = [
     contentEn: "During National Day the first daily rental was capped at AED 3. The campaign ended last month.",
     contentAr: "خلال اليوم الوطني، كان الحد الأقصى لأول استئجار يوميًا 3 دراهم. انتهى العرض الشهر الماضي.",
     type: "PROMO", pinned: false, startAt: iso(60 * 86400_000), endAt: iso(45 * 86400_000),
-    status: "OFFLINE", publishedBy: "增长组", createdAt: iso(62 * 86400_000),
+    status: "OFFLINE", publishedBy: "增长组", createdAt: iso(62 * 86400_000), archivedAt: null,
   },
   {
     noticeNo: "NTC908", title: "客服热线与 WhatsApp 支持时间",
@@ -145,10 +146,16 @@ export const notices: Notice[] = [
     contentEn: "Hotline 09:00-23:00 GST; WhatsApp accepts messages 24/7. For overdue returns, file a claim in the app first.",
     contentAr: "الخط الساخن من 09:00 إلى 23:00 بتوقيت الخليج، وواتساب متاح على مدار الساعة. للإرجاع المتأخر، قدّم شكوى عبر التطبيق.",
     type: "SYSTEM", pinned: false, startAt: iso(30 * 86400_000), endAt: iso(-60 * 86400_000),
-    status: "PUBLISHED", publishedBy: "客服中心", createdAt: iso(31 * 86400_000),
+    status: "PUBLISHED", publishedBy: "客服中心", createdAt: iso(31 * 86400_000), archivedAt: null,
   },
 ];
 
 export const listNotices = (q: PageQuery = {}) =>
-  paginate(notices, q.page, q.size, (x) => kwHit(q.keyword, x.noticeNo, x.title, x.titleEn, x.titleAr, x.publishedBy));
+  paginate(notices, q.page, q.size, (x) => liveHit(x, q.showArchived) && kwHit(q.keyword, x.noticeNo, x.title, x.titleEn, x.titleAr, x.publishedBy));
 export const saveNotice = (x: Partial<Notice>) => upsert(notices, x, "noticeNo", () => nextNo("NTC", notices));
+
+// —— G1 软删除：优惠券 / 公告 ——
+export const archiveCoupon = (no: string) => archiveRow(coupons, "couponNo", no);
+export const unarchiveCoupon = (no: string) => unarchiveRow(coupons, "couponNo", no);
+export const archiveNotice = (no: string) => archiveRow(notices, "noticeNo", no);
+export const unarchiveNotice = (no: string) => unarchiveRow(notices, "noticeNo", no);

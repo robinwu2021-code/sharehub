@@ -255,12 +255,86 @@ function FinanceInner() {
           searchPlaceholder="搜索分成方"
           onAdd={canEditRule ? () => setRuleForm({ dimension: "VENUE", mode: "CHANNEL_SPLIT", rate: 0.3, priority: 1 }) : undefined}
           addLabel="新增分润规则"
+          onExport={() => exportCsv<ShareRule>("分润规则", [
+            { header: "规则号", value: (r) => r.ruleNo },
+            { header: "维度", value: (r) => (r.dimension === "VENUE" ? "场地方" : "代理商") },
+            { header: "分成方", value: (r) => r.payeeName },
+            { header: "模式", value: (r) => (r.mode === "CHANNEL_SPLIT" ? "渠道分账" : "平台记账") },
+            { header: "比例", value: (r) => r.rate },
+            { header: "优先级", value: (r) => r.priority },
+          ], (q.data?.list ?? []) as ShareRule[])}
         />
       )}
-      {tab === "ledger" && <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索账户/订单/凭证" />}
-      {tab === "settlements" && <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索结算单号/对象" />}
-      {tab === "withdrawals" && <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索提现号/对象/审批人" />}
-      {tab === "records" && <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索明细号/订单/分成方" />}
+      {tab === "ledger" && (
+        <Toolbar
+          search={keyword}
+          onSearch={(v) => { setKeyword(v); setPage(1); }}
+          searchPlaceholder="搜索账户/订单/凭证"
+          onExport={() => exportCsv<LedgerEntry>("账务分录", [
+            { header: "分录号", value: (l) => l.entryNo },
+            { header: "凭证", value: (l) => l.voucherNo },
+            { header: "订单", value: (l) => l.orderNo },
+            { header: "账户", value: (l) => l.account },
+            { header: "方向", value: (l) => (l.direction === "DEBIT" ? "借" : "贷") },
+            { header: "金额", value: (l) => l.amount },
+            { header: "币种", value: (l) => l.currency },
+            { header: "摘要", value: (l) => l.summary },
+            { header: "时间", value: (l) => l.createdAt },
+          ], (q.data?.list ?? []) as LedgerEntry[])}
+        />
+      )}
+      {tab === "settlements" && (
+        <Toolbar
+          search={keyword}
+          onSearch={(v) => { setKeyword(v); setPage(1); }}
+          searchPlaceholder="搜索结算单号/对象"
+          onExport={() => exportCsv<Settlement>("结算单", [
+            { header: "结算单号", value: (s) => s.settleNo },
+            { header: "对象", value: (s) => `${s.payeeName}（${s.payeeType === "VENUE" ? "场地方" : "代理"}）` },
+            { header: "周期", value: (s) => s.period },
+            { header: "金额", value: (s) => s.totalAmount },
+            { header: "币种", value: (s) => s.currency },
+            { header: "状态", value: (s) => (s.status === "PAID" ? "已打款" : s.status === "CONFIRMED" ? "已确认" : "已生成") },
+          ], (q.data?.list ?? []) as Settlement[])}
+        />
+      )}
+      {tab === "withdrawals" && (
+        <Toolbar
+          search={keyword}
+          onSearch={(v) => { setKeyword(v); setPage(1); }}
+          searchPlaceholder="搜索提现号/对象/审批人"
+          onExport={() => exportCsv<Withdrawal>("提现", [
+            { header: "提现号", value: (w) => w.withdrawNo },
+            { header: "对象", value: (w) => w.payeeName },
+            { header: "金额", value: (w) => w.amount },
+            { header: "手续费", value: (w) => w.fee },
+            { header: "实际到账", value: (w) => w.amount - w.fee },
+            { header: "币种", value: (w) => w.currency },
+            { header: "状态", value: (w) => w.status },
+            { header: "申请时间", value: (w) => w.appliedAt },
+            { header: "审批人", value: (w) => w.auditorName },
+            { header: "审批时间", value: (w) => w.auditedAt },
+            { header: "驳回原因", value: (w) => w.rejectReason },
+          ], (q.data?.list ?? []) as Withdrawal[])}
+        />
+      )}
+      {tab === "records" && (
+        <Toolbar
+          search={keyword}
+          onSearch={(v) => { setKeyword(v); setPage(1); }}
+          searchPlaceholder="搜索明细号/订单/分成方"
+          onExport={() => exportCsv<ShareRecord>("分润明细", [
+            { header: "明细号", value: (r) => r.recordNo },
+            { header: "订单", value: (r) => r.orderNo },
+            { header: "维度", value: (r) => (r.dimension === "VENUE" ? "场地方" : "代理商") },
+            { header: "分成方", value: (r) => r.payeeName },
+            { header: "金额", value: (r) => r.amount },
+            { header: "币种", value: (r) => r.currency },
+            { header: "比例", value: (r) => r.rate },
+            { header: "时间", value: (r) => r.createdAt },
+          ], (q.data?.list ?? []) as ShareRecord[])}
+        />
+      )}
       {tab === "summary" && (
         <>
           {/* 维度切换器：切的是同一张表的 dimension 参数，不是两个 tab */}
@@ -319,7 +393,23 @@ function FinanceInner() {
           <DateInput className="w-40" aria-label="下单时间止" value={rcTo} onChange={(e) => { setRcTo(e.target.value); setPage(1); }} />
         </Toolbar>
       )}
-      {tab === "reconcile" && <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索批次号/周期" />}
+      {tab === "reconcile" && (
+        <Toolbar
+          search={keyword}
+          onSearch={(v) => { setKeyword(v); setPage(1); }}
+          searchPlaceholder="搜索批次号/周期"
+          onExport={() => exportCsv<Reconcile>("对账", [
+            { header: "批次号", value: (r) => r.batchNo },
+            { header: "周期", value: (r) => r.period },
+            { header: "nearpay 汇总", value: (r) => r.nearpayTotal },
+            { header: "账务汇总", value: (r) => r.ledgerTotal },
+            { header: "差额", value: (r) => r.diff },
+            { header: "币种", value: (r) => r.currency },
+            { header: "状态", value: (r) => (r.status === "MATCHED" ? "已平" : "有差异") },
+            { header: "时间", value: (r) => r.createdAt },
+          ], (q.data?.list ?? []) as Reconcile[])}
+        />
+      )}
       {tab === "invoices" && (
         <Toolbar
           search={keyword}
@@ -327,14 +417,23 @@ function FinanceInner() {
           searchPlaceholder="搜索发票号/抬头/税号"
           onAdd={canEditInvoice ? () => setInvoiceForm({ currency: "AED", status: "DRAFT", amount: 0 }) : undefined}
           addLabel="新增发票"
+          onExport={() => exportCsv<Invoice>("发票", [
+            { header: "发票号", value: (i) => i.invoiceNo },
+            { header: "抬头", value: (i) => i.payeeName },
+            { header: "金额", value: (i) => i.amount },
+            { header: "币种", value: (i) => i.currency },
+            { header: "VAT TRN", value: (i) => i.vatTrn },
+            { header: "状态", value: (i) => (i.status === "ISSUED" ? "已开具" : i.status === "VOID" ? "已作废" : "草稿") },
+            { header: "开具时间", value: (i) => (i.status === "DRAFT" ? "" : i.issuedAt) },
+          ], (q.data?.list ?? []) as Invoice[])}
         />
       )}
-      {tab === "rules" && <DataTable rowKey={(r: ShareRule) => r.ruleNo} columns={ruleCols} rows={q.data?.list as ShareRule[]} loading={q.isLoading} />}
-      {tab === "ledger" && <DataTable rowKey={(l: LedgerEntry) => l.entryNo} columns={ledgerCols} rows={q.data?.list as LedgerEntry[]} loading={q.isLoading} />}
-      {tab === "settlements" && <DataTable rowKey={(s: Settlement) => s.settleNo} columns={stlCols} rows={q.data?.list as Settlement[]} loading={q.isLoading} />}
+      {tab === "rules" && <DataTable rowKey={(r: ShareRule) => r.ruleNo} columns={ruleCols} rows={q.data?.list as ShareRule[]} loading={q.isLoading} empty="暂无分润规则——点右上「新增分润规则」为场地方/代理商配置分成比例，否则订单收入全归平台" />}
+      {tab === "ledger" && <DataTable rowKey={(l: LedgerEntry) => l.entryNo} columns={ledgerCols} rows={q.data?.list as LedgerEntry[]} loading={q.isLoading} empty="暂无账务分录——订单结算与分账完成后自动记账，也可放宽搜索条件再查" />}
+      {tab === "settlements" && <DataTable rowKey={(s: Settlement) => s.settleNo} columns={stlCols} rows={q.data?.list as Settlement[]} loading={q.isLoading} empty="暂无结算单——按周期跑批生成，本周期尚未出账或该搜索条件下无匹配" />}
       {tab === "withdrawals" && !canAuditWithdrawal && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无提现审批权限（finance:withdrawal:audit）</div>}
-      {tab === "withdrawals" && <DataTable rowKey={(w: Withdrawal) => w.withdrawNo} columns={wdCols} rows={q.data?.list as Withdrawal[]} loading={q.isLoading} />}
-      {tab === "records" && <DataTable rowKey={(r: ShareRecord) => r.recordNo} columns={recordCols} rows={q.data?.list as ShareRecord[]} loading={q.isLoading} />}
+      {tab === "withdrawals" && <DataTable rowKey={(w: Withdrawal) => w.withdrawNo} columns={wdCols} rows={q.data?.list as Withdrawal[]} loading={q.isLoading} empty="暂无提现申请——场地方/代理商发起提现后在此审批，通过才会进入打款队列" />}
+      {tab === "records" && <DataTable rowKey={(r: ShareRecord) => r.recordNo} columns={recordCols} rows={q.data?.list as ShareRecord[]} loading={q.isLoading} empty="暂无分润明细——订单结算时按「分润规则」逐笔生成，先确认规则已配置" />}
       {tab === "summary" && (
         <DataTable
           rowKey={(s: ShareSummary) => `${s.dimension}-${s.payeeNo}-${s.period}`}
@@ -356,8 +455,8 @@ function FinanceInner() {
           empty="暂无充值订单 —— 该筛选条件下没有记录，或用户尚未使用钱包充值"
         />
       )}
-      {tab === "reconcile" && <DataTable rowKey={(r: Reconcile) => r.batchNo} columns={reconcileCols} rows={q.data?.list as Reconcile[]} loading={q.isLoading} />}
-      {tab === "invoices" && <DataTable rowKey={(i: Invoice) => i.invoiceNo} columns={invoiceCols} rows={q.data?.list as Invoice[]} loading={q.isLoading} />}
+      {tab === "reconcile" && <DataTable rowKey={(r: Reconcile) => r.batchNo} columns={reconcileCols} rows={q.data?.list as Reconcile[]} loading={q.isLoading} empty="暂无对账批次——每日与 nearpay 流水自动跑批比对，本周期尚未生成批次" />}
+      {tab === "invoices" && <DataTable rowKey={(i: Invoice) => i.invoiceNo} columns={invoiceCols} rows={q.data?.list as Invoice[]} loading={q.isLoading} empty="暂无发票——商户提出开票需求后点右上「新增发票」登记抬头与税号" />}
       {q.data && <Pagination page={page} size={SIZE} total={q.data.total} onPage={setPage} />}
 
       {/* 提现审批抽屉：通过 → 转打款中；驳回必填原因；审批人取当前登录账号 */}

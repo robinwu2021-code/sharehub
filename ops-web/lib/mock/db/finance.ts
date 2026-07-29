@@ -6,7 +6,7 @@ import type {
   ShareSummary, RechargeOrder, RechargePackage, PageQuery,
 } from "../../types";
 import { VENUE_NAMES, p, iso } from "./internal";
-import { paginate, kwHit, upsert, nextNo } from "./helpers";
+import { paginate, kwHit, upsert, nextNo, liveHit, archiveRow, unarchiveRow } from "./helpers";
 import { agents } from "./agent";
 import { venues } from "./location";
 import { cUsers } from "./user";
@@ -151,15 +151,16 @@ export const listShareSummaries = (q: ShareSummaryQuery = {}) => {
 // —— §8 充值套餐：比竞品多「赠额有效期」与「适用市场」 ——
 // ⚠️ 必须声明在 rechargeOrders 之前：充值订单的套餐直接引用本数组（台账 M6）。
 export const rechargePackages: RechargePackage[] = [
-  { packageNo: "RP900", name: "体验包", payAmount: 20, giftAmount: 0, currency: "AED", markets: "AE", validDays: 90, sortNo: 1, status: "ENABLED" },
-  { packageNo: "RP901", name: "常用包", payAmount: 50, giftAmount: 5, currency: "AED", markets: "AE,SA", validDays: 180, sortNo: 2, status: "ENABLED" },
-  { packageNo: "RP902", name: "超值包", payAmount: 100, giftAmount: 15, currency: "AED", markets: "AE,SA,KW", validDays: 365, sortNo: 3, status: "ENABLED" },
-  { packageNo: "RP903", name: "家庭包", payAmount: 200, giftAmount: 40, currency: "AED", markets: "AE", validDays: 365, sortNo: 4, status: "ENABLED" },
-  { packageNo: "RP904", name: "斋月特惠包", payAmount: 80, giftAmount: 20, currency: "AED", markets: "AE,SA,QA", validDays: 60, sortNo: 5, status: "DISABLED" },
-  { packageNo: "RP905", name: "商户自用包", payAmount: 500, giftAmount: 60, currency: "AED", markets: "AE", validDays: 365, sortNo: 6, status: "DISABLED" },
+  { packageNo: "RP900", name: "体验包", payAmount: 20, giftAmount: 0, currency: "AED", markets: "AE", validDays: 90, sortNo: 1, status: "ENABLED", archivedAt: null },
+  { packageNo: "RP901", name: "常用包", payAmount: 50, giftAmount: 5, currency: "AED", markets: "AE,SA", validDays: 180, sortNo: 2, status: "ENABLED", archivedAt: null },
+  { packageNo: "RP902", name: "超值包", payAmount: 100, giftAmount: 15, currency: "AED", markets: "AE,SA,KW", validDays: 365, sortNo: 3, status: "ENABLED", archivedAt: null },
+  { packageNo: "RP903", name: "家庭包", payAmount: 200, giftAmount: 40, currency: "AED", markets: "AE", validDays: 365, sortNo: 4, status: "ENABLED", archivedAt: null },
+  { packageNo: "RP904", name: "斋月特惠包", payAmount: 80, giftAmount: 20, currency: "AED", markets: "AE,SA,QA", validDays: 60, sortNo: 5, status: "DISABLED", archivedAt: null },
+  { packageNo: "RP905", name: "商户自用包", payAmount: 500, giftAmount: 60, currency: "AED", markets: "AE", validDays: 365, sortNo: 6, status: "DISABLED", archivedAt: "2026-06-15T08:00:00Z" },
 ];
 export const listRechargePackages = (q: PageQuery & { status?: string } = {}) =>
   paginate(rechargePackages, q.page, q.size, (x) => {
+    if (!liveHit(x, q.showArchived)) return false;
     if (!kwHit(q.keyword, x.packageNo, x.name, x.markets)) return false;
     if (q.status && x.status !== q.status) return false;
     return true;
@@ -203,3 +204,7 @@ export const listRechargeOrders = (q: RechargeQuery = {}) =>
     (!q.from || x.createdAt.slice(0, 10) >= q.from) &&
     (!q.to || x.createdAt.slice(0, 10) <= q.to));
 
+
+// —— G1 软删除：充值套餐 ——
+export const archiveRechargePackage = (no: string) => archiveRow(rechargePackages, "packageNo", no);
+export const unarchiveRechargePackage = (no: string) => unarchiveRow(rechargePackages, "packageNo", no);

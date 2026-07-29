@@ -2,7 +2,7 @@
 // 免费用户白名单、充值套餐。
 import * as db from "../../mock/db";
 import type { UserApi } from "../contracts/user";
-import type { PageQ, StatusQ, WhitelistQ } from "../query";
+import type { PageQ, WhitelistQ, PackageQ } from "../query";
 import { wait } from "./_wait";
 
 export const userMock: UserApi = {
@@ -28,6 +28,10 @@ export const userMock: UserApi = {
   listFreeWhitelist: (q: WhitelistQ = {}) => wait(db.listFreeWhitelist(q)),
   saveFreeWhitelist: (x) => wait(db.saveFreeWhitelist(x), 350),
   revokeFreeWhitelist: (no) => wait(db.revokeFreeWhitelist(no), 400),
-  listRechargePackages: (q: StatusQ = {}) => wait(db.listRechargePackages(q)),
+  listRechargePackages: (q: PackageQ = {}) => wait(db.listRechargePackages(q)),
   saveRechargePackage: (x) => wait(db.saveRechargePackage(x), 350),
+
+  // G1 软删除：归档 / 恢复（禁止物理删除）
+  archiveRechargePackage: async (no) => wait(db.archiveRechargePackage(no), 350),
+  unarchiveRechargePackage: async (no) => wait(db.unarchiveRechargePackage(no), 350),
 };

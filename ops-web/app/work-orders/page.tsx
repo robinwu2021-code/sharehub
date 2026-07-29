@@ -17,7 +17,9 @@ import { Button } from "@/components/ui/button";
 import { TabHeader } from "@/components/ui/tab-header";
 import { Toolbar } from "@/components/ui/toolbar";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { WoStatusBadge, WO_TYPE_LABEL } from "@/components/status";
+import { exportCsv, type CsvColumn } from "@/lib/export-csv";
 import { fmtTime } from "@/lib/utils";
 import { useCan } from "@/lib/use-can";
 import { useI18n } from "@/lib/i18n";
@@ -49,6 +51,23 @@ const SOURCE_LABEL: Record<WorkOrder["source"], string> = {
   ALERT: "告警转入", USER: "投诉转入", VENUE: "场地方报障", MANUAL: "手工开单",
 };
 const AUDIT_LABEL: Record<WoAuditResult, string> = { PASS: "验收合格", PASS_WITH_ISSUE: "有条件通过（有遗留）", FAIL: "验收不合格（退回返工）" };
+
+/** 状态中文名：与列表 Badge、看板列头同一份口径 */
+const WO_STATUS_LABEL = (s: string) => BOARD_COLS.find((c) => c.key === s)?.label ?? s;
+
+/** 导出列与表格可见列一致（操作列除外）。 */
+const WO_CSV_COLS: CsvColumn<WorkOrder>[] = [
+  { header: "工单号", value: (w) => w.woNo },
+  { header: "类型", value: (w) => WO_TYPE_LABEL[w.type] },
+  { header: "来源", value: (w) => `${SOURCE_LABEL[w.source]}${w.sourceNo ? ` · ${w.sourceNo}` : ""}` },
+  { header: "柜机", value: (w) => w.cabinetNo },
+  { header: "点位", value: (w) => w.locationName },
+  { header: "优先级", value: (w) => PRIO[w.priority][0] },
+  { header: "状态", value: (w) => WO_STATUS_LABEL(w.status) },
+  { header: "处理人", value: (w) => w.handlerName ?? w.assigneeName ?? "未派单" },
+  { header: "期望完成", value: (w) => (w.expectedAt ? fmtTime(w.expectedAt) : "") },
+  { header: "创建", value: (w) => fmtTime(w.createdAt) },
+];
 
 const WO_TYPE_OPTIONS = Object.entries(WO_TYPE_LABEL).map(([value, label]) => ({ value, label }));
 const PRIO_OPTIONS = [
@@ -86,11 +105,17 @@ function WorkOrdersInner() {
   const sp = useSearchParams();
   const qView = sp.get("view");
   const [view, setView] = useState<View>(TABS.some((t) => t.key === qView) ? (qView as View) : "list");
-  useEffect(() => { if (qView && TABS.some((t) => t.key === qView)) setView(qView as View); }, [qView]);
+  useEffect(() => { if (qView && TABS.some((t) => t.key === qView)) { setView(qView as View); setSelected([]); } }, [qView]);
   const [page, setPage] = useState(1);
   const [keyword, setKeyword] = useState("");
   const [status, setStatus] = useState("");
   const [type, setType] = useState("");
+  const { confirm, dialog } = useConfirm();
+  // 列表批量选中（G3）。翻页/切视图/改筛选都要清空——否则会对「看不见的行」下手。
+  const [selected, setSelected] = useState<string[]>([]);
+  const [batchAssignee, setBatchAssignee] = useState(STAFF[0]);
+  const clearSel = () => setSelected([]);
+  const goPage = (p: number) => { setPage(p); clearSel(); };
 
   // —— 抽屉状态：开单 / 派单 / 处理·完成 / 验收关单 / 驳回 / 详情 ——
   const [woForm, setWoForm] = useState<Partial<WorkOrderDraft> | null>(null);
@@ -189,6 +214,33 @@ function WorkOrdersInner() {
   const canSla = allow("workorder:sla:update");
   const canInspection = allow("workorder:inspection:update");
   const canAny = canCreate || canDispatch || canHandle || canClose;
+
+  // —— 批量派单（G3）——
+  // 工单有状态机：只有 CREATED（待派单）能派单，其余状态服务端会拒。
+  // 因此批量前先过滤，并把「跳过几张」写进确认文案——否则用户只会看到一串报错。
+  const batchDispatch = useMutation({
+    mutationFn: (v: { nos: string[]; assignee: string }) =>
+      Promise.all(v.nos.map((no) => api.dispatchWorkOrder(no, v.assignee))),
+    onSuccess: (_r, v) => { refreshWo(); notify.success(`已把 ${v.nos.length} 张工单派给 ${v.assignee}`); clearSel(); },
+  });
+  const askBatchDispatch = async () => {
+    const rowsOnPage = list.data?.list ?? [];
+    const picked = rowsOnPage.filter((w) => selected.includes(w.woNo));
+    const eligible = picked.filter((w) => w.status === "CREATED");
+    const skipped = picked.length - eligible.length;
+    if (eligible.length === 0) {
+      notify.error(`已选 ${picked.length} 张工单均不处于「待派单」，无法派单；请先筛选状态为「待派单」再选`);
+      return;
+    }
+    const ok = await confirm({
+      title: `批量派单 ${eligible.length} 张`,
+      desc: `已选 ${picked.length} 张工单，其中 ${eligible.length} 张处于「待派单」可派给 ${batchAssignee}`
+        + (skipped > 0 ? `，另 ${skipped} 张状态不符将跳过。` : "。")
+        + "派单后处理人需接单才进入处理中。",
+      confirmText: `确认派给 ${batchAssignee}`,
+    });
+    if (ok) batchDispatch.mutate({ nos: eligible.map((w) => w.woNo), assignee: batchAssignee });
+  };
 
   /** 动作 → 所需权限码（列表/看板/详情三处共用，避免各写一套） */
   const permOf = (a: WorkOrderAction) =>
@@ -295,23 +347,35 @@ function WorkOrdersInner() {
 
   return (
     <div>
-      <TabHeader tabs={TABS} value={view} onChange={(k) => { setView(k as View); setPage(1); }} />
+      <TabHeader tabs={TABS} value={view} onChange={(k) => { setView(k as View); setPage(1); clearSel(); }} />
 
       {(view === "list" || view === "board") && (
         <>
           <Toolbar
             search={keyword}
-            onSearch={(v) => { setKeyword(v); setPage(1); }}
+            onSearch={(v) => { setKeyword(v); setPage(1); clearSel(); }}
             searchPlaceholder="搜索工单号 / 柜机 / 点位 / 来源单号 / 处理人"
             onAdd={canCreate ? () => setWoForm({ ...NEW_WO }) : undefined}
             addLabel="新建工单"
+            onExport={view === "list" ? () => exportCsv<WorkOrder>("工单列表", WO_CSV_COLS, list.data?.list ?? []) : undefined}
+            selectedCount={view === "list" ? selected.length : 0}
+            batchActions={
+              <>
+                {/* 处理人沿用派单抽屉的同一份名单，不另造 */}
+                <Select className="h-8" value={batchAssignee} onChange={(e) => setBatchAssignee(e.target.value)} aria-label="批量派单处理人">
+                  {STAFF.map((s) => <option key={s} value={s}>{s}</option>)}
+                </Select>
+                <Button size="sm" disabled={batchDispatch.isPending} onClick={askBatchDispatch}>批量派单</Button>
+              </>
+            }
+            onClearSelection={clearSel}
           >
-            <Select value={type} onChange={(e) => { setType(e.target.value); setPage(1); }}>
+            <Select value={type} onChange={(e) => { setType(e.target.value); setPage(1); clearSel(); }}>
               <option value="">全部类型</option>
               {Object.entries(WO_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </Select>
             {view === "list" && (
-              <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
+              <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); clearSel(); }}>
                 <option value="">全部状态</option>
                 {BOARD_COLS.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
               </Select>
@@ -333,6 +397,14 @@ function WorkOrdersInner() {
             searchPlaceholder="搜索 SLA 编号 / 类型 / 升级对象"
             onAdd={canSla ? () => setSlaForm({ woType: "FAULT", responseMins: 30, resolveMins: 240, escalateTo: "", active: true }) : undefined}
             addLabel="新增 SLA"
+            onExport={() => exportCsv<SlaRule>("SLA 管理", [
+              { header: "SLA 编号", value: (s) => s.slaNo },
+              { header: "工单类型", value: (s) => WO_TYPE_LABEL[s.woType] ?? s.woType },
+              { header: "响应时限(分钟)", value: (s) => s.responseMins },
+              { header: "解决时限(分钟)", value: (s) => s.resolveMins },
+              { header: "升级至", value: (s) => s.escalateTo },
+              { header: "状态", value: (s) => (s.active ? "启用" : "停用") },
+            ], sla.data?.list ?? [])}
           />
           <DataTable rowKey={(s: SlaRule) => s.slaNo} columns={slaCols} rows={sla.data?.list} loading={sla.isLoading}
             empty="暂无 SLA 规则——尚未配置响应/解决时限，工单不会触发超时升级；点右上「新增 SLA」建一条。" />
@@ -348,6 +420,14 @@ function WorkOrdersInner() {
             searchPlaceholder="搜索计划编号 / 路线 / 负责人"
             onAdd={canInspection ? () => setInspForm({ route: "", frequency: "每周", nextAt: "", assignee: "", active: true }) : undefined}
             addLabel="新增巡检计划"
+            onExport={() => exportCsv<InspectionPlan>("巡检计划", [
+              { header: "计划编号", value: (p) => p.planNo },
+              { header: "巡检路线", value: (p) => p.route },
+              { header: "频率", value: (p) => p.frequency },
+              { header: "下次巡检", value: (p) => fmtTime(p.nextAt) },
+              { header: "负责人", value: (p) => p.assignee },
+              { header: "状态", value: (p) => (p.active ? "启用" : "停用") },
+            ], inspection.data?.list ?? [])}
           />
           <DataTable rowKey={(p: InspectionPlan) => p.planNo} columns={inspectionCols} rows={inspection.data?.list} loading={inspection.isLoading}
             empty="暂无巡检计划——巡检工单目前只能手工开；点右上「新增巡检计划」按路线周期自动开单。" />
@@ -358,8 +438,11 @@ function WorkOrdersInner() {
       {view === "list" && (
         <>
           <DataTable rowKey={(w: WorkOrder) => w.woNo} columns={cols} rows={list.data?.list} loading={list.isLoading}
+            selectable={canDispatch}
+            selectedKeys={selected}
+            onSelectedChange={setSelected}
             empty="没有符合条件的工单——可能是筛选条件太窄，或告警/投诉尚未转工单；换个状态筛选，或点右上「新建工单」。" />
-          {list.data && <Pagination page={page} size={SIZE} total={list.data.total} onPage={setPage} />}
+          {list.data && <Pagination page={page} size={SIZE} total={list.data.total} onPage={goPage} />}
         </>
       )}
 
@@ -587,6 +670,8 @@ function WorkOrdersInner() {
         onSubmit={() => inspForm && saveInspection.mutate(inspForm)}
         submitting={saveInspection.isPending}
       />
+
+      {dialog}
     </div>
   );
 }

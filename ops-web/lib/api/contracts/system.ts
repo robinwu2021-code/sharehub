@@ -56,4 +56,10 @@ export interface SystemApi {
   saveProblem(x: Partial<ProblemEntry> & { problemNo?: string }): Promise<ProblemEntry>;
   listTaxSettings(q?: PageQ): Promise<PageResult<TaxSetting>>;
   saveTaxSetting(x: Partial<TaxSetting> & { country?: string }): Promise<TaxSetting>;
+
+  // === G1 软删除（TDD §10.1）：归档而非删除，**契约里禁止出现 deleteXxx** ===
+  archiveBank(bankCode: string): Promise<BankEntry>;
+  unarchiveBank(bankCode: string): Promise<BankEntry>;
+  archiveProblem(problemNo: string): Promise<ProblemEntry>;
+  unarchiveProblem(problemNo: string): Promise<ProblemEntry>;
 }

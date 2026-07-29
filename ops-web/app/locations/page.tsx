@@ -13,6 +13,12 @@ import { DataTable, type Column } from "@/components/ui/data-table";
 import { Drawer, Field } from "@/components/ui/drawer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import {
+  ShowArchivedToggle, archivedRowClass, ArchivedAt, ArchiveActions,
+  archiveConfirm, unarchiveConfirm,
+} from "@/components/archive";
+import { exportCsv, type CsvColumn } from "@/lib/export-csv";
 import { money, fmtTime } from "@/lib/utils";
 import { useCan } from "@/lib/use-can";
 import { notify } from "@/lib/notify";
@@ -79,11 +85,14 @@ function LocationsInner() {
   const qc = useQueryClient();
   const allow = useCan();
   const sp = useSearchParams();
+  const { confirm, dialog } = useConfirm();
   const qTab = sp.get("tab");
   const [tab, setTab] = useState(TABS.some((t) => t.key === qTab) ? (qTab as string) : "sites");
   const [page, setPage] = useState(1);
   const [keyword, setKeyword] = useState("");
-  useEffect(() => { if (qTab && TABS.some((t) => t.key === qTab)) { setTab(qTab); setPage(1); } }, [qTab]);
+  // 「显示已归档」开关（TDD §10.1：列表默认过滤已归档）。切 tab 复位，避免在合同页残留一个看不见的过滤态。
+  const [showArchived, setShowArchived] = useState(false);
+  useEffect(() => { if (qTab && TABS.some((t) => t.key === qTab)) { setTab(qTab); setPage(1); setShowArchived(false); } }, [qTab]);
   const [siteForm, setSiteForm] = useState<Partial<Site> | null>(null);
   const [pointForm, setPointForm] = useState<Partial<SitePoint> | null>(null);
   const [venueForm, setVenueForm] = useState<Partial<Venue> | null>(null);
@@ -98,11 +107,12 @@ function LocationsInner() {
   // 站点表单的区域下拉数据源（system 域字典）
   const regionsQ = useQuery({ queryKey: ["regions-dict"], queryFn: () => api.listRegions({ page: 1, size: 100 }) });
   const q = useQuery<PageResult<Site | SitePoint | Venue | Contract | Lead | SiteAnalysis | VenueOnboarding | SiteLifecycle>>({
-    queryKey: ["place", tab, page, keyword],
+    // showArchived 必须进 queryKey，否则切开关不重新拉数据
+    queryKey: ["place", tab, page, keyword, showArchived],
     queryFn: () =>
-      tab === "sites" ? api.listSites({ page, size: SIZE, keyword })
-      : tab === "points" ? api.listLocations({ page, size: SIZE, keyword })
-      : tab === "venues" ? api.listVenues({ page, size: SIZE, keyword })
+      tab === "sites" ? api.listSites({ page, size: SIZE, keyword, showArchived })
+      : tab === "points" ? api.listLocations({ page, size: SIZE, keyword, showArchived })
+      : tab === "venues" ? api.listVenues({ page, size: SIZE, keyword, showArchived })
       : tab === "crm" ? api.listLeads({ page, size: SIZE, keyword })
       : tab === "analysis" ? api.listSiteAnalysis({ page, size: SIZE, keyword })
       : tab === "onboarding" ? api.listVenueOnboardings({ page, size: SIZE, keyword })
@@ -136,6 +146,20 @@ function LocationsInner() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["place", "onboarding"] }); notify.success("保存成功"); setOnboardingForm(null); },
   });
 
+  // 归档 / 恢复（G1 软删除）。错误由全局 MutationCache 接管，页面不重复 catch。
+  const invalidatePlace = () => qc.invalidateQueries({ queryKey: ["place"] });
+  const archiveSite = useMutation({ mutationFn: (no: string) => api.archiveSite(no), onSuccess: () => { invalidatePlace(); notify.success("已归档"); } });
+  const unarchiveSite = useMutation({ mutationFn: (no: string) => api.unarchiveSite(no), onSuccess: () => { invalidatePlace(); notify.success("已恢复"); } });
+  const archivePoint = useMutation({ mutationFn: (no: string) => api.archivePoint(no), onSuccess: () => { invalidatePlace(); notify.success("已归档"); } });
+  const unarchivePoint = useMutation({ mutationFn: (no: string) => api.unarchivePoint(no), onSuccess: () => { invalidatePlace(); notify.success("已恢复"); } });
+  const archiveVenue = useMutation({ mutationFn: (no: string) => api.archiveVenue(no), onSuccess: () => { invalidatePlace(); notify.success("已归档"); } });
+  const unarchiveVenue = useMutation({ mutationFn: (no: string) => api.unarchiveVenue(no), onSuccess: () => { invalidatePlace(); notify.success("已恢复"); } });
+
+  /** 归档时间列：只在「显示已归档」打开时出现，默认视图里整列都是 `-` 属于噪音。 */
+  function archivedCols<T extends { archivedAt: string | null }>(): Column<T>[] {
+    return showArchived ? [{ header: "归档时间", cell: (r: T) => <ArchivedAt at={r.archivedAt} /> }] : [];
+  }
+
   const siteCols: Column<Site>[] = [
     { header: "站点号", cell: (s) => <span className="font-medium">{s.siteNo}</span> },
     { header: "名称", cell: (s) => s.name },
@@ -144,7 +168,20 @@ function LocationsInner() {
     { header: "归属", cell: (s) => s.agentNo ? <Badge tone="outline">代理 {s.agentNo}</Badge> : <Badge tone="muted">平台直营</Badge> },
     { header: "点位/设备", cell: (s) => <span className="tabular-nums">{s.pointCount} / {s.cabinetCount}</span> },
     { header: "状态", cell: (s) => s.status === "ACTIVE" ? <Badge tone="success">启用</Badge> : <Badge tone="muted">暂停</Badge> },
-    { header: "操作", cell: (s) => allow("location:poi:update") ? <Button size="sm" variant="outline" onClick={() => setSiteForm(s)}>编辑</Button> : <span className="text-muted-foreground">-</span> },
+    ...archivedCols<Site>(),
+    {
+      header: "操作",
+      cell: (s) => (
+        <ArchiveActions
+          archived={!!s.archivedAt}
+          canWrite={allow("location:poi:update")}
+          actions={<Button size="sm" variant="outline" onClick={() => setSiteForm(s)}>编辑</Button>}
+          // 站点是主数据：要求手输站点号确认，避免误点
+          onArchive={async () => { if (await confirm(archiveConfirm("站点", s.siteNo, s.siteNo))) archiveSite.mutate(s.siteNo); }}
+          onUnarchive={async () => { if (await confirm(unarchiveConfirm("站点", s.siteNo))) unarchiveSite.mutate(s.siteNo); }}
+        />
+      ),
+    },
   ];
   const pointCols: Column<SitePoint>[] = [
     { header: "点位号", cell: (l) => <span className="font-medium">{l.locationNo}</span> },
@@ -153,7 +190,20 @@ function LocationsInner() {
     { header: "位置", cell: (l) => l.spotDesc },
     { header: "设备数", cell: (l) => <span className="tabular-nums">{l.cabinetCount}</span> },
     { header: "状态", cell: (l) => l.status === "ACTIVE" ? <Badge tone="success">启用</Badge> : <Badge tone="muted">暂停</Badge> },
-    { header: "操作", cell: (l) => allow("location:poi:update") ? <Button size="sm" variant="outline" onClick={() => setPointForm(l)}>编辑</Button> : <span className="text-muted-foreground">-</span> },
+    ...archivedCols<SitePoint>(),
+    {
+      header: "操作",
+      cell: (l) => (
+        <ArchiveActions
+          archived={!!l.archivedAt}
+          canWrite={allow("location:poi:update")}
+          actions={<Button size="sm" variant="outline" onClick={() => setPointForm(l)}>编辑</Button>}
+          // 点位不属于主数据核心（隶属站点），不要求手输编号
+          onArchive={async () => { if (await confirm(archiveConfirm("点位", l.locationNo))) archivePoint.mutate(l.locationNo); }}
+          onUnarchive={async () => { if (await confirm(unarchiveConfirm("点位", l.locationNo))) unarchivePoint.mutate(l.locationNo); }}
+        />
+      ),
+    },
   ];
   const venueCols: Column<Venue>[] = [
     { header: "编号", cell: (v) => <span className="font-medium">{v.venueNo}</span> },
@@ -161,7 +211,20 @@ function LocationsInner() {
     { header: "联系方式", cell: (v) => <span className="text-muted-foreground">{v.contact}</span> },
     { header: "行业", cell: (v) => v.industry },
     { header: "站点数", cell: (v) => <span className="tabular-nums">{v.locationCount}</span> },
-    { header: "操作", cell: (v) => canVenue ? <Button size="sm" variant="outline" onClick={() => setVenueForm(v)}>编辑</Button> : <span className="text-muted-foreground">-</span> },
+    ...archivedCols<Venue>(),
+    {
+      header: "操作",
+      cell: (v) => (
+        <ArchiveActions
+          archived={!!v.archivedAt}
+          canWrite={canVenue}
+          actions={<Button size="sm" variant="outline" onClick={() => setVenueForm(v)}>编辑</Button>}
+          // 场地方是主数据：要求手输编号确认
+          onArchive={async () => { if (await confirm(archiveConfirm("场地方", v.venueNo, v.venueNo))) archiveVenue.mutate(v.venueNo); }}
+          onUnarchive={async () => { if (await confirm(unarchiveConfirm("场地方", v.venueNo))) unarchiveVenue.mutate(v.venueNo); }}
+        />
+      ),
+    },
   ];
   const ctCols: Column<Contract>[] = [
     { header: "合同号", cell: (c) => <span className="font-medium">{c.contractNo}</span> },
@@ -226,47 +289,152 @@ function LocationsInner() {
 
   const onSearch = (v: string) => { setKeyword(v); setPage(1); };
 
+  // —— 导出（TDD §10.2）：当页数据，列与表格可见列严格一致 ——
+  function pageRows<T>(): T[] { return (q.data?.list ?? []) as T[]; }
+  function archivedCsv<T extends { archivedAt: string | null }>(): CsvColumn<T>[] {
+    return showArchived ? [{ header: "归档时间", value: (r) => (r.archivedAt ? fmtTime(r.archivedAt) : "") }] : [];
+  }
+  function exportCurrent() {
+    if (tab === "sites") {
+      exportCsv<Site>("站点", [
+        { header: "站点号", value: (s) => s.siteNo },
+        { header: "名称", value: (s) => s.name },
+        { header: "场地方", value: (s) => s.venueName },
+        { header: "区域", value: (s) => s.regionName },
+        { header: "归属", value: (s) => (s.agentNo ? `代理 ${s.agentNo}` : "平台直营") },
+        { header: "点位/设备", value: (s) => `${s.pointCount} / ${s.cabinetCount}` },
+        { header: "状态", value: (s) => (s.status === "ACTIVE" ? "启用" : "暂停") },
+        ...archivedCsv<Site>(),
+      ], pageRows<Site>());
+    } else if (tab === "points") {
+      exportCsv<SitePoint>("点位", [
+        { header: "点位号", value: (l) => l.locationNo },
+        { header: "名称", value: (l) => l.name },
+        { header: "所属站点", value: (l) => l.siteName },
+        { header: "位置", value: (l) => l.spotDesc },
+        { header: "设备数", value: (l) => l.cabinetCount },
+        { header: "状态", value: (l) => (l.status === "ACTIVE" ? "启用" : "暂停") },
+        ...archivedCsv<SitePoint>(),
+      ], pageRows<SitePoint>());
+    } else if (tab === "venues") {
+      exportCsv<Venue>("场地方", [
+        { header: "编号", value: (v) => v.venueNo },
+        { header: "名称", value: (v) => v.name },
+        { header: "联系方式", value: (v) => v.contact },
+        { header: "行业", value: (v) => v.industry },
+        { header: "站点数", value: (v) => v.locationCount },
+        ...archivedCsv<Venue>(),
+      ], pageRows<Venue>());
+    } else if (tab === "contracts") {
+      exportCsv<Contract>("合同", [
+        { header: "合同号", value: (c) => c.contractNo },
+        { header: "场地方", value: (c) => c.venueName },
+        { header: "站点", value: (c) => c.siteName },
+        { header: "分成", value: (c) => `${(c.shareRate * 100).toFixed(0)}%` },
+        { header: "进场费", value: (c) => c.entryFee },
+        { header: "到期", value: (c) => fmtTime(c.endAt) },
+        { header: "状态", value: (c) => (c.status === "ACTIVE" ? "有效" : "过期") },
+      ], pageRows<Contract>());
+    } else if (tab === "crm") {
+      exportCsv<Lead>("BD 拓展 CRM", [
+        { header: "线索号", value: (l) => l.leadNo },
+        { header: "场地名称", value: (l) => l.venueName },
+        { header: "联系人", value: (l) => l.contact },
+        { header: "阶段", value: (l) => LEAD_STAGE[l.stage].label },
+        { header: "负责人", value: (l) => l.owner },
+        { header: "预计站点数", value: (l) => l.expectSites },
+        { header: "更新时间", value: (l) => fmtTime(l.updatedAt) },
+      ], pageRows<Lead>());
+    } else if (tab === "analysis") {
+      exportCsv<SiteAnalysis>("站点坪效", [
+        { header: "站点号", value: (a) => a.siteNo },
+        { header: "站点名称", value: (a) => a.siteName },
+        { header: "营收", value: (a) => money(a.revenue, a.currency) },
+        { header: "订单数", value: (a) => Math.round(a.orders) },
+        { header: "翻台（次/日）", value: (a) => a.turnover.toFixed(1) },
+        { header: "回本天数", value: (a) => Math.round(a.paybackDays) },
+        { header: "机柜数", value: (a) => a.cabinetCount },
+      ], pageRows<SiteAnalysis>());
+    } else if (tab === "onboarding") {
+      exportCsv<VenueOnboarding>("门店 Onboarding", [
+        { header: "申请号", value: (o) => o.onboardingNo },
+        { header: "场地名称", value: (o) => o.venueName },
+        { header: "联系人", value: (o) => o.contact },
+        { header: "行业", value: (o) => o.industry },
+        { header: "申请时间", value: (o) => fmtTime(o.requestedAt) },
+        { header: "审核状态", value: (o) => OB_STATUS[o.status].label },
+        { header: "备注", value: (o) => o.reviewNote ?? "" },
+      ], pageRows<VenueOnboarding>());
+    } else if (tab === "lifecycle") {
+      exportCsv<SiteLifecycle>("门店生命周期", [
+        { header: "站点号", value: (l) => l.siteNo },
+        { header: "站点名称", value: (l) => l.siteName },
+        { header: "阶段", value: (l) => LC_STAGE[l.stage].label },
+        { header: "阶段更新", value: (l) => l.stageAt },
+        { header: "负责人", value: (l) => l.owner },
+        { header: "GMV (LTM)", value: (l) => money(l.gmvLtm, l.currency) },
+      ], pageRows<SiteLifecycle>());
+    }
+  }
+  // 无数据时不给导出按钮：导出一个空 CSV 只会让人以为功能坏了
+  const onExport = q.data?.list?.length ? exportCurrent : undefined;
+  const archivedToggle = <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); setPage(1); }} />;
+
   return (
     <div>
-      <TabHeader tabs={TABS} value={tab} onChange={(k) => { setTab(k); setPage(1); }} />
+      <TabHeader tabs={TABS} value={tab} onChange={(k) => { setTab(k); setPage(1); setShowArchived(false); }} />
       {tab === "sites" && (
-        <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索站点号 / 名称"
-          onAdd={allow("location:poi:create") ? () => setSiteForm({ status: "ACTIVE", sceneType: "商场", agentNo: null }) : undefined} addLabel="新增站点" />
+        <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索站点号 / 名称" onExport={onExport}
+          onAdd={allow("location:poi:create") ? () => setSiteForm({ status: "ACTIVE", sceneType: "商场", agentNo: null }) : undefined} addLabel="新增站点">
+          {archivedToggle}
+        </Toolbar>
       )}
       {tab === "points" && (
-        <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索点位号 / 名称"
-          onAdd={allow("location:poi:create") ? () => setPointForm({ status: "ACTIVE" }) : undefined} addLabel="新增点位" />
+        <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索点位号 / 名称" onExport={onExport}
+          onAdd={allow("location:poi:create") ? () => setPointForm({ status: "ACTIVE" }) : undefined} addLabel="新增点位">
+          {archivedToggle}
+        </Toolbar>
       )}
       {tab === "venues" && (
-        <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索场地方名称"
-          onAdd={canVenue ? () => setVenueForm({ locationCount: 0 }) : undefined} addLabel="新增场地方" />
+        <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索场地方名称" onExport={onExport}
+          onAdd={canVenue ? () => setVenueForm({ locationCount: 0 }) : undefined} addLabel="新增场地方">
+          {archivedToggle}
+        </Toolbar>
       )}
       {tab === "contracts" && (
-        <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索场地方 / 站点"
+        <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索场地方 / 站点" onExport={onExport}
           onAdd={canContract ? () => setContractForm({ status: "ACTIVE", shareRate: 0.15, entryFee: 0 }) : undefined} addLabel="新增合同" />
       )}
       {tab === "crm" && (
-        <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索线索号 / 场地 / 负责人"
+        <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索线索号 / 场地 / 负责人" onExport={onExport}
           onAdd={canLead ? () => setLeadForm({ stage: "NEW", expectSites: 1 }) : undefined} addLabel="新增线索" />
       )}
       {tab === "analysis" && (
-        <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索站点号 / 名称" />
+        <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索站点号 / 名称" onExport={onExport} />
       )}
       {tab === "onboarding" && (
-        <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索场地名称 / 联系人"
+        <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索场地名称 / 联系人" onExport={onExport}
           onAdd={canVenue ? () => setOnboardingForm({ status: "PENDING", industry: "购物中心" }) : undefined} addLabel="新增申请" />
       )}
       {tab === "lifecycle" && (
-        <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索站点号 / 名称 / 负责人" />
+        <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索站点号 / 名称 / 负责人" onExport={onExport} />
       )}
-      {tab === "sites" && <DataTable rowKey={(s: Site) => s.siteNo} columns={siteCols} rows={q.data?.list as Site[]} loading={q.isLoading} />}
-      {tab === "points" && <DataTable rowKey={(l: SitePoint) => l.locationNo} columns={pointCols} rows={q.data?.list as SitePoint[]} loading={q.isLoading} />}
-      {tab === "venues" && <DataTable rowKey={(v: Venue) => v.venueNo} columns={venueCols} rows={q.data?.list as Venue[]} loading={q.isLoading} />}
-      {tab === "contracts" && <DataTable rowKey={(c: Contract) => c.contractNo} columns={ctCols} rows={q.data?.list as Contract[]} loading={q.isLoading} />}
-      {tab === "crm" && <DataTable rowKey={(l: Lead) => l.leadNo} columns={leadCols} rows={q.data?.list as Lead[]} loading={q.isLoading} />}
-      {tab === "analysis" && <DataTable rowKey={(a: SiteAnalysis) => a.siteNo} columns={analysisCols} rows={q.data?.list as SiteAnalysis[]} loading={q.isLoading} />}
-      {tab === "onboarding" && <DataTable rowKey={(o: VenueOnboarding) => o.onboardingNo} columns={onboardingCols} rows={q.data?.list as VenueOnboarding[]} loading={q.isLoading} />}
-      {tab === "lifecycle" && <DataTable rowKey={(l: SiteLifecycle) => l.siteNo} columns={lifecycleCols} rows={q.data?.list as SiteLifecycle[]} loading={q.isLoading} />}
+      {tab === "sites" && <DataTable rowKey={(s: Site) => s.siteNo} columns={siteCols} rows={q.data?.list as Site[]} loading={q.isLoading} rowClassName={archivedRowClass}
+        empty={showArchived ? "没有匹配的站点——换个关键词，或先「新增站点」建档" : "没有在用的站点——可能都已归档（打开「显示已归档」查看），或先「新增站点」建档"} />}
+      {tab === "points" && <DataTable rowKey={(l: SitePoint) => l.locationNo} columns={pointCols} rows={q.data?.list as SitePoint[]} loading={q.isLoading} rowClassName={archivedRowClass}
+        empty={showArchived ? "没有匹配的点位——换个关键词，或先「新增点位」" : "没有在用的点位——点位隶属站点，先建站点再在此新增，或打开「显示已归档」查看已归档点位"} />}
+      {tab === "venues" && <DataTable rowKey={(v: Venue) => v.venueNo} columns={venueCols} rows={q.data?.list as Venue[]} loading={q.isLoading} rowClassName={archivedRowClass}
+        empty={showArchived ? "没有匹配的场地方——换个关键词，或先「新增场地方」" : "没有在用的场地方——可能都已归档（打开「显示已归档」查看），或先「新增场地方」建档"} />}
+      {tab === "contracts" && <DataTable rowKey={(c: Contract) => c.contractNo} columns={ctCols} rows={q.data?.list as Contract[]} loading={q.isLoading}
+        empty="暂无合同——合同绑定「场地方 × 站点」，请先建好两者再「新增合同」" />}
+      {tab === "crm" && <DataTable rowKey={(l: Lead) => l.leadNo} columns={leadCols} rows={q.data?.list as Lead[]} loading={q.isLoading}
+        empty="暂无线索——BD 拓展的场地线索会出现在这里，可点「新增线索」手工录入" />}
+      {tab === "analysis" && <DataTable rowKey={(a: SiteAnalysis) => a.siteNo} columns={analysisCols} rows={q.data?.list as SiteAnalysis[]} loading={q.isLoading}
+        empty="暂无坪效数据——站点需先产生订单，次日汇总后才会出现在此" />}
+      {tab === "onboarding" && <DataTable rowKey={(o: VenueOnboarding) => o.onboardingNo} columns={onboardingCols} rows={q.data?.list as VenueOnboarding[]} loading={q.isLoading}
+        empty="暂无入驻申请——门店自助提交的申请会进入此列表待审核，也可点「新增申请」代录" />}
+      {tab === "lifecycle" && <DataTable rowKey={(l: SiteLifecycle) => l.siteNo} columns={lifecycleCols} rows={q.data?.list as SiteLifecycle[]} loading={q.isLoading}
+        empty="暂无生命周期记录——站点签约后自动进入跟踪，尚无签约站点时此处为空" />}
       {q.data && <Pagination page={page} size={SIZE} total={q.data.total} onPage={setPage} />}
 
       {/* 站点 新增/编辑 */}
@@ -382,6 +550,8 @@ function LocationsInner() {
         onSubmit={() => leadForm && saveLead.mutate(leadForm)}
         submitting={saveLead.isPending}
       />
+
+      {dialog}
     </div>
   );
 }

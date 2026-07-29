@@ -2,10 +2,10 @@
 // 端点前缀：/api/trade/**
 import { client } from "../http-client";
 import type { PricingApi } from "../contracts/pricing";
-import type { PageQ } from "../query";
+import type { PageQ, ArchiveQ } from "../query";
 
 export const pricingHttp: PricingApi = {
-  listPricePlans: (q?: PageQ) => client.get("/api/trade/price-plans", q),
+  listPricePlans: (q?: ArchiveQ) => client.get("/api/trade/price-plans", q),
 
   // 定价扩展
   listPricingDiffs: (q?: PageQ) => client.get("/api/trade/pricing-diffs", q),
@@ -13,4 +13,8 @@ export const pricingHttp: PricingApi = {
   savePricePlan: (x) => client.post(x.planNo ? `/api/trade/price-plans/${x.planNo}` : "/api/trade/price-plans", x),
   savePricingDiff: (x) => client.post(x.ruleNo ? `/api/trade/pricing-diffs/${x.ruleNo}` : "/api/trade/pricing-diffs", x),
   savePricingSchedule: (x) => client.post(x.ruleNo ? `/api/trade/pricing-schedules/${x.ruleNo}` : "/api/trade/pricing-schedules", x),
+
+  // G1 软删除：归档 / 恢复。REST 上是「状态迁移」而非 DELETE —— 后端不得实现物理删除。
+  archivePricePlan: (no) => client.post(`/api/trade/price-plans/${no}/archive`, {}),
+  unarchivePricePlan: (no) => client.post(`/api/trade/price-plans/${no}/unarchive`, {}),
 };

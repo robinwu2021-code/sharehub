@@ -14,6 +14,12 @@ import { Button } from "@/components/ui/button";
 import { fmtTime } from "@/lib/utils";
 import { useCan } from "@/lib/use-can";
 import { notify } from "@/lib/notify";
+import { exportCsv, type CsvColumn } from "@/lib/export-csv";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import {
+  ShowArchivedToggle, archivedRowClass, ArchivedAt, ArchiveActions,
+  archiveConfirm, unarchiveConfirm,
+} from "@/components/archive";
 import type { Employee, RoleRow, AuditEntry, DataScope, Department, StaffPerformance } from "@/lib/types";
 
 const SIZE = 10;
@@ -74,7 +80,10 @@ function EmployeesInner() {
   const sp = useSearchParams();
   const qTab = sp.get("tab");
   const [tab, setTab] = useState(tabs.some((t) => t.key === qTab) ? (qTab as string) : (tabs[0]?.key ?? "employees"));
-  useEffect(() => { if (qTab && tabs.some((t) => t.key === qTab)) setTab(qTab); }, [qTab]);
+  const { confirm, dialog } = useConfirm();
+  // 「显示已归档」开关（TDD §10.1：列表默认过滤已归档）。切 tab 复位。
+  const [showArchived, setShowArchived] = useState(false);
+  useEffect(() => { if (qTab && tabs.some((t) => t.key === qTab)) { setTab(qTab); setShowArchived(false); } }, [qTab]);
   const [page, setPage] = useState(1);
   const [keyword, setKeyword] = useState("");
   const [scopeRole, setScopeRole] = useState<RoleRow | null>(null);
@@ -95,7 +104,8 @@ function EmployeesInner() {
     queryKey: ["staffPerformance", page, keyword], queryFn: () => api.listStaffPerformance({ page, size: SIZE, keyword }),
     placeholderData: keepPreviousData, enabled: tab === "performance",
   });
-  const roles = useQuery({ queryKey: ["roles"], queryFn: () => api.listRoles(), enabled: tab === "roles" });
+  // showArchived 必须进 queryKey，否则切开关不重新拉数据
+  const roles = useQuery({ queryKey: ["roles", showArchived], queryFn: () => api.listRoles({ showArchived }), enabled: tab === "roles" });
   const audit = useQuery({
     queryKey: ["audit", page, keyword], queryFn: () => api.listAudits({ page, size: SIZE, keyword }),
     placeholderData: keepPreviousData, enabled: tab === "audit",
@@ -161,6 +171,18 @@ function EmployeesInner() {
     mutationFn: (v: Partial<Department>) => api.saveDepartment(v),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["departments"] }); notify.success("保存成功"); setDeptForm(null); },
   });
+  // 角色归档 / 恢复：错误由全局 MutationCache 接管，这里只管成功后的失效与提示。
+  const archiveRoleM = useMutation({
+    mutationFn: (v: { no: string; undo: boolean }) => v.undo ? api.unarchiveRole(v.no) : api.archiveRole(v.no),
+    onSuccess: (_r, v) => { qc.invalidateQueries({ queryKey: ["roles"] }); notify.success(v.undo ? "已恢复" : "已归档"); },
+  });
+  // 角色是主数据（§10.1）：归档必须手输角色编号确认，避免误点把一整批人的权限来源归档掉。
+  const askArchiveRole = async (r: RoleRow) => {
+    if (await confirm(archiveConfirm("角色", `${r.name}（${r.roleNo}）`, r.roleNo))) archiveRoleM.mutate({ no: r.roleNo, undo: false });
+  };
+  const askUnarchiveRole = async (r: RoleRow) => {
+    if (await confirm(unarchiveConfirm("角色", `${r.name}（${r.roleNo}）`))) archiveRoleM.mutate({ no: r.roleNo, undo: true });
+  };
 
   const empCols: Column<Employee>[] = [
     { header: "工号", cell: (e) => <span className="font-medium">{e.employeeNo}</span> },
@@ -195,23 +217,51 @@ function EmployeesInner() {
     },
     { header: "成员数", cell: (r) => <span className="tabular-nums">{r.memberCount}</span> },
     { header: "类型", cell: (r) => r.builtin ? <Badge tone="muted">内置</Badge> : <Badge tone="outline">自定义</Badge> },
+    // 归档时间列只在「显示已归档」打开时插入（默认视图里整列都是 "-"），且固定在操作列之前。
+    ...(showArchived ? [{ header: "归档时间", cell: (r: RoleRow) => <ArchivedAt at={r.archivedAt} /> }] : []),
     {
       header: "操作",
-      cell: (r) => (
-        <div className="flex gap-2">
-          {canEditRole && <Button size="sm" variant="outline" onClick={() => setRoleForm(r)}>编辑</Button>}
-          {/* 无 org:role:update 时按钮显式禁用（不静默隐藏），范围与数量在「数据范围」列仍可查看 */}
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!canEditRole}
-            title={canEditRole ? undefined : "仅可查看：缺少 org:role:update"}
-            onClick={() => { setScopeRole(r); setScopeForm(scopeFormOf(r)); }}
-          >
-            数据权限
-          </Button>
-        </div>
-      ),
+      cell: (r) => {
+        const base = (
+          <>
+            {canEditRole && <Button size="sm" variant="outline" onClick={() => setRoleForm(r)}>编辑</Button>}
+            {/* 无 org:role:update 时按钮显式禁用（不静默隐藏），范围与数量在「数据范围」列仍可查看 */}
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!canEditRole}
+              title={canEditRole ? undefined : "仅可查看：缺少 org:role:update"}
+              onClick={() => { setScopeRole(r); setScopeForm(scopeFormOf(r)); }}
+            >
+              数据权限
+            </Button>
+          </>
+        );
+        // 已归档行一律只出「恢复」（§10.1），其余按钮不渲染。
+        if (r.archivedAt) {
+          return (
+            <ArchiveActions
+              archived
+              canWrite={canEditRole}
+              onArchive={() => askArchiveRole(r)}
+              onUnarchive={() => askUnarchiveRole(r)}
+            />
+          );
+        }
+        // 内置角色服务端拒绝归档，这里给禁用态 + 悬浮说明（而不是把按钮藏掉——
+        // 藏掉会让人以为"这行没有归档功能"，禁用+提示才说清"不是不能，是不允许"）。
+        return (
+          <ArchiveActions
+            archived={false}
+            canWrite={canEditRole}
+            canArchive={!r.builtin}
+            archiveHint="内置角色不可归档"
+            onArchive={() => askArchiveRole(r)}
+            onUnarchive={() => askUnarchiveRole(r)}
+            actions={base}
+          />
+        );
+      },
     },
   ];
   const orgCols: Column<Department>[] = [
@@ -246,10 +296,12 @@ function EmployeesInner() {
   if (tabs.length === 0) return <div><PageTitle title="员工与权限" /><EmptyState title="无权限" /></div>;
 
   const onSearch = (v: string) => { setKeyword(v); setPage(1); };
+  // 导出当页数据（§10.2），列与表格可见列一致。
+  const onExportOf = <T,>(name: string, cols: CsvColumn<T>[], rows: T[]) => () => exportCsv<T>(name, cols, rows);
 
   return (
     <div>
-      <TabHeader tabs={tabs} value={tab} onChange={(k) => { setTab(k); setPage(1); setKeyword(""); }} />
+      <TabHeader tabs={tabs} value={tab} onChange={(k) => { setTab(k); setPage(1); setKeyword(""); setShowArchived(false); }} />
       {tab === "employees" && (
         <>
           <Toolbar
@@ -258,6 +310,15 @@ function EmployeesInner() {
             searchPlaceholder="搜索工号 / 姓名 / 手机 / 邮箱"
             onAdd={canEditEmp ? () => setEmpForm({ name: "", phone: "", email: "", deptName: "", roleName: "", status: "ACTIVE" }) : undefined}
             addLabel="新增员工"
+            onExport={onExportOf<Employee>("员工", [
+              { header: "工号", value: (e) => e.employeeNo },
+              { header: "姓名", value: (e) => e.name },
+              { header: "手机", value: (e) => e.phone },
+              { header: "邮箱", value: (e) => e.email },
+              { header: "部门", value: (e) => e.deptName },
+              { header: "角色", value: (e) => e.roleName },
+              { header: "状态", value: (e) => (e.status === "ACTIVE" ? "在职" : "离职") },
+            ], emp.data?.list ?? [])}
           />
           {!canEditEmp && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无员工维护权限（org:employee:update）</div>}
         </>
@@ -269,9 +330,26 @@ function EmployeesInner() {
           searchPlaceholder="搜索部门 / 负责人"
           onAdd={canEditDept ? () => setDeptForm({ name: "", parent: "", leader: "", memberCount: 0 }) : undefined}
           addLabel="新增部门"
+          onExport={onExportOf<Department>("组织架构", [
+            { header: "部门编号", value: (d) => d.deptNo },
+            { header: "部门名称", value: (d) => d.name },
+            { header: "上级部门", value: (d) => d.parent || "-" },
+            { header: "成员数", value: (d) => Math.round(d.memberCount) },
+            { header: "负责人", value: (d) => d.leader },
+          ], org.data?.list ?? [])}
         />
       )}
-      {tab === "performance" && <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索工号 / 姓名" />}
+      {tab === "performance" && (
+        <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索工号 / 姓名"
+          onExport={onExportOf<StaffPerformance>("绩效报表", [
+            { header: "工号", value: (p) => p.employeeNo },
+            { header: "姓名", value: (p) => p.name },
+            { header: "角色", value: (p) => p.role },
+            { header: "处理量", value: (p) => Math.round(p.handled) },
+            { header: "平均解决(分钟)", value: (p) => Math.round(p.avgResolveMins) },
+            { header: "评分", value: (p) => p.score.toFixed(1) },
+          ], perf.data?.list ?? [])} />
+      )}
       {tab === "roles" && (
         <>
           <Toolbar
@@ -280,16 +358,37 @@ function EmployeesInner() {
             searchPlaceholder="搜索角色码 / 名称"
             onAdd={canEditRole ? () => setRoleForm({ code: "", name: "", dataScope: "ALL", scopeValues: "", permCount: 0, memberCount: 0, builtin: false }) : undefined}
             addLabel="新增角色"
-          />
+            onExport={onExportOf<RoleRow>("角色", [
+              { header: "角色码", value: (r) => r.code },
+              { header: "名称", value: (r) => r.name },
+              { header: "权限数", value: (r) => r.permCount },
+              { header: "数据范围", value: (r) => `${SCOPE_LABEL[r.dataScope]}${csvCount(r.scopeValues) > 0 ? ` · ${csvCount(r.scopeValues)} 个` : ""}` },
+              { header: "成员数", value: (r) => r.memberCount },
+              { header: "类型", value: (r) => (r.builtin ? "内置" : "自定义") },
+              ...(showArchived ? [{ header: "归档时间", value: (r: RoleRow) => r.archivedAt ? fmtTime(r.archivedAt) : "-" }] : []),
+            ], roleRows)}
+          >
+            <ShowArchivedToggle checked={showArchived} onChange={setShowArchived} />
+          </Toolbar>
           {!canEditRole && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无角色维护权限（org:role:update），不能修改角色与数据权限</div>}
         </>
       )}
-      {tab === "audit" && <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索操作人 / 动作 / 对象" />}
-      {tab === "employees" && <DataTable rowKey={(e: Employee) => e.employeeNo} columns={empCols} rows={emp.data?.list} loading={emp.isLoading} />}
-      {tab === "org" && <DataTable rowKey={(d: Department) => d.deptNo} columns={orgCols} rows={org.data?.list} loading={org.isLoading} />}
-      {tab === "performance" && <DataTable rowKey={(p: StaffPerformance) => p.employeeNo} columns={perfCols} rows={perf.data?.list} loading={perf.isLoading} />}
-      {tab === "roles" && <DataTable rowKey={(r: RoleRow) => r.roleNo} columns={roleCols} rows={roleRows} loading={roles.isLoading} />}
-      {tab === "audit" && <DataTable rowKey={(a: AuditEntry) => a.id} columns={auditCols} rows={audit.data?.list} loading={audit.isLoading} />}
+      {tab === "audit" && (
+        <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索操作人 / 动作 / 对象"
+          onExport={onExportOf<AuditEntry>("操作审计", [
+            { header: "时间", value: (a) => fmtTime(a.createdAt) },
+            { header: "操作人", value: (a) => a.actor },
+            { header: "动作", value: (a) => a.action },
+            { header: "对象", value: (a) => a.target },
+            { header: "结果", value: (a) => a.detail },
+            { header: "IP", value: (a) => a.ip },
+          ], audit.data?.list ?? [])} />
+      )}
+      {tab === "employees" && <DataTable rowKey={(e: Employee) => e.employeeNo} columns={empCols} rows={emp.data?.list} loading={emp.isLoading} empty="暂无员工——换个关键词，或点「新增员工」把运维 / 客服人员录进来。" />}
+      {tab === "org" && <DataTable rowKey={(d: Department) => d.deptNo} columns={orgCols} rows={org.data?.list} loading={org.isLoading} empty="暂无部门——点「新增部门」先建顶级部门，再逐级挂下级。" />}
+      {tab === "performance" && <DataTable rowKey={(p: StaffPerformance) => p.employeeNo} columns={perfCols} rows={perf.data?.list} loading={perf.isLoading} empty="暂无绩效数据——绩效按工单处理量与解决时长自动汇总，需先有已完成的工单。" />}
+      {tab === "roles" && <DataTable rowKey={(r: RoleRow) => r.roleNo} columns={roleCols} rows={roleRows} loading={roles.isLoading} rowClassName={archivedRowClass} empty={showArchived ? "没有匹配的角色——换个关键词，或点「新增角色」建一个自定义角色。" : "暂无在用角色——可能都已归档（打开「显示已归档」查看），或点「新增角色」建第一个自定义角色。"} />}
+      {tab === "audit" && <DataTable rowKey={(a: AuditEntry) => a.id} columns={auditCols} rows={audit.data?.list} loading={audit.isLoading} empty="暂无审计记录——记录在管理员执行写操作后自动产生，换个关键词或时间范围再看。" />}
       {paged && <Pagination page={page} size={SIZE} total={paged.total} onPage={setPage} />}
 
       <FormDrawer
@@ -343,6 +442,8 @@ function EmployeesInner() {
         onSubmit={() => deptForm && saveDept.mutate(deptForm)}
         submitting={saveDept.isPending}
       />
+
+      {dialog}
     </div>
   );
 }

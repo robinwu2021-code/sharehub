@@ -5,7 +5,7 @@ import type {
   InventoryTransfer, OtaRollout, DeviceLog, DeviceCodeBatch, PageQuery,
 } from "../../types";
 import { VENDORS, LOCS, OPERATORS, p, iso } from "./internal";
-import { paginate, kwHit, upsert, nextNo } from "./helpers";
+import { paginate, kwHit, upsert, nextNo, liveHit, archiveRow, unarchiveRow } from "./helpers";
 
 // —— 设备 ——
 export const cabinets: Cabinet[] = Array.from({ length: 48 }, (_, i) => {
@@ -17,6 +17,7 @@ export const cabinets: Cabinet[] = Array.from({ length: 48 }, (_, i) => {
     locationName: p(LOCS, i), slotTotal: total, availableCount: (i * 7) % (total + 1),
     onlineStatus: online ? "ONLINE" : "OFFLINE", status: i % 13 === 0 ? "FAULT" : "DEPLOYED",
     fwVersion: p(["1.2.0", "1.3.1", "1.4.0"], i), lastHeartbeatAt: online ? iso(i * 60000) : null,
+    archivedAt: null,
   };
 });
 export function slotsOf(cabinetNo: string): Slot[] {
@@ -51,6 +52,7 @@ export const powerbanks: Powerbank[] = Array.from({ length: 30 }, (_, i) => {
     powerbankNo: `PB${20000 + i}`, cabinetNo: cabNo(i),
     battery: st === "RENTED" ? 20 + (i * 7) % 60 : 60 + (i * 11) % 40,
     status: st, health: st === "FAULT" ? "FAULT" : "OK", cycles: 40 + (i * 37) % 900,
+    archivedAt: null,
   };
 });
 export const cabinetMonitors: CabinetMonitor[] = Array.from({ length: 24 }, (_, i) => {
@@ -142,7 +144,8 @@ export const deviceCodeBatches: DeviceCodeBatch[] = [
 ];
 
 // —— list / save ——
-export const listPowerbanks = (q: PageQuery = {}) => paginate(powerbanks, q.page, q.size, (x) => kwHit(q.keyword, x.powerbankNo, x.cabinetNo));
+export const listPowerbanks = (q: PageQuery = {}) =>
+  paginate(powerbanks, q.page, q.size, (x) => liveHit(x, q.showArchived) && kwHit(q.keyword, x.powerbankNo, x.cabinetNo));
 export const listCabinetMonitor = (q: PageQuery = {}) => paginate(cabinetMonitors, q.page, q.size, (x) => kwHit(q.keyword, x.cabinetNo, x.locationName));
 export const listCommandRecords = (q: PageQuery = {}) => paginate(commandRecords, q.page, q.size, (x) => kwHit(q.keyword, x.commandId, x.cabinetNo, x.operator));
 export const listInventoryTransfers = (q: PageQuery = {}) => paginate(inventoryTransfers, q.page, q.size, (x) => kwHit(q.keyword, x.transferNo, x.fromLocation, x.toLocation));
@@ -167,3 +170,31 @@ export const listDeviceCodeBatches = (q: PageQuery = {}) =>
   paginate(deviceCodeBatches, q.page, q.size, (x) => kwHit(q.keyword, x.batchNo, x.vendorCode, x.rangeStart, x.rangeEnd));
 export const saveDeviceCodeBatch = (x: Partial<DeviceCodeBatch>) =>
   upsert(deviceCodeBatches, x, "batchNo", () => nextNo("BC", deviceCodeBatches));
+
+// —— G1 软删除：机柜 / 充电宝 ——
+export const archiveCabinet = (no: string) => archiveRow(cabinets, "cabinetNo", no);
+export const unarchiveCabinet = (no: string) => unarchiveRow(cabinets, "cabinetNo", no);
+export const archivePowerbank = (no: string) => archiveRow(powerbanks, "powerbankNo", no);
+export const unarchivePowerbank = (no: string) => unarchiveRow(powerbanks, "powerbankNo", no);
+
+/**
+ * G2 导入：机柜台账批量落库（唯一的导入口）。
+ *
+ * **先全量校验、再整批落库**——不允许「导一半失败」留下半截数据，
+ * 故本函数只接收调用方已校验过的行，自身仍做一次机柜号查重兜底：
+ * 已存在的机柜号一律走更新（幂等重导），不存在的新增。
+ */
+export function importCabinets(rows: Partial<Cabinet>[]): { imported: number; updated: number } {
+  let imported = 0, updated = 0;
+  for (const r of rows) {
+    const i = cabinets.findIndex((c) => c.cabinetNo === r.cabinetNo);
+    if (i >= 0) { cabinets[i] = { ...cabinets[i], ...r }; updated++; }
+    else { cabinets.unshift({ ...DEFAULT_CABINET, ...r } as Cabinet); imported++; }
+  }
+  return { imported, updated };
+}
+const DEFAULT_CABINET: Cabinet = {
+  cabinetNo: "", sn: "", vendorCode: "cd-tech", model: "X6", locationNo: null, locationName: null,
+  slotTotal: 8, availableCount: 0, onlineStatus: "OFFLINE", status: "DEPLOYED",
+  fwVersion: "1.0.0", lastHeartbeatAt: null, archivedAt: null,
+};

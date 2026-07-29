@@ -111,7 +111,7 @@ describe("findActiveModule 路径反推（4.2-3，含尾斜杠/最长前缀）",
     ["/finance", "trade-fin", "finance"],
     ["/finance/", "trade-fin", "finance"],
     ["/devices/detail", "device-ops", "device"],
-    ["/system/vendors/", "system", "system"],
+    ["/system/", "system", "system"],
     ["/work-orders", "device-ops", "workorder"],
     ["/agents", "place-bd", "agent"],
   ])("%s → %s / %s", (path, dKey, mKey) => {

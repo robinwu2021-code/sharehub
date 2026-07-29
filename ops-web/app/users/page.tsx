@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tansta
 import { api } from "@/lib/api";
 import { Pagination } from "@/components/ui/misc";
 import { TabHeader } from "@/components/ui/tab-header";
-import { Input, Select } from "@/components/ui/input";
+import { Select } from "@/components/ui/input";
 import { Toolbar } from "@/components/ui/toolbar";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
 import { Progress } from "@/components/ui/progress";
@@ -14,6 +14,10 @@ import { DataTable, type Column } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import {
+  ShowArchivedToggle, archivedRowClass, ArchivedAt, ArchiveActions,
+  archiveConfirm, unarchiveConfirm,
+} from "@/components/archive";
 import { money, fmtTime } from "@/lib/utils";
 import { useCan } from "@/lib/use-can";
 import { useI18n } from "@/lib/i18n";
@@ -134,10 +138,18 @@ function UsersInner() {
   const [keyword, setKeyword] = useState("");
   const [memberForm, setMemberForm] = useState<Partial<Member> | null>(null);
   const [walletForm, setWalletForm] = useState<Partial<Wallet> | null>(null);
+  // 用户列表的批量选中（G3）。翻页/切 tab/改搜索都要清空——否则会对"看不见的行"下手。
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  // 充值套餐「显示已归档」（G1）。切 tab 复位，避免在别的 tab 残留一个看不见的过滤态。
+  const [showArchived, setShowArchived] = useState(false);
   const qc = useQueryClient();
   const allow = useCan();
   const { t } = useI18n();
-  useEffect(() => { if (qTab && TABS.some((t) => t.key === qTab)) { setTab(qTab); setPage(1); } }, [qTab]);
+  useEffect(() => { if (qTab && TABS.some((t) => t.key === qTab)) { setTab(qTab); setPage(1); setSelectedUsers([]); setShowArchived(false); } }, [qTab]);
+
+  const goTab = (k: string) => { setTab(k); setPage(1); setSelectedUsers([]); setShowArchived(false); };
+  const goPage = (p: number) => { setPage(p); setSelectedUsers([]); };
+  const search = (v: string) => { setKeyword(v); setPage(1); setSelectedUsers([]); };
 
   const canEditMember = allow("user:member:update");
   const canEditWallet = allow("user:wallet:update");
@@ -217,8 +229,9 @@ function UsersInner() {
   const [pkgStatus, setPkgStatus] = useState("");
   const [pkgForm, setPkgForm] = useState<Partial<RechargePackage> | null>(null);
   const packages = useQuery({
-    queryKey: ["recharge-packages", page, keyword, pkgStatus],
-    queryFn: () => api.listRechargePackages({ page, size: SIZE, keyword, status: pkgStatus || undefined }),
+    // showArchived 必须进 queryKey，否则切开关不重新拉数据
+    queryKey: ["recharge-packages", page, keyword, pkgStatus, showArchived],
+    queryFn: () => api.listRechargePackages({ page, size: SIZE, keyword, status: pkgStatus || undefined, showArchived }),
     placeholderData: keepPreviousData,
     enabled: tab === "recharge",
   });
@@ -226,11 +239,42 @@ function UsersInner() {
     mutationFn: (v: Partial<RechargePackage>) => api.saveRechargePackage(v),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["recharge-packages"] }); notify.success(t("common.success")); setPkgForm(null); },
   });
+  const archivePkg = useMutation({
+    mutationFn: (no: string) => api.archiveRechargePackage(no),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["recharge-packages"] }); notify.success("套餐已归档"); },
+  });
+  const unarchivePkg = useMutation({
+    mutationFn: (no: string) => api.unarchiveRechargePackage(no),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["recharge-packages"] }); notify.success("套餐已恢复"); },
+  });
 
   const bl = useMutation({
     mutationFn: (v: { no: string; blacklisted: boolean }) => api.setBlacklist(v.no, v.blacklisted),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["users"] }); qc.invalidateQueries({ queryKey: ["user-blacklist"] }); },
   });
+
+  // —— 批量拉黑（G3）——逐条调用；失败走全局 MutationCache.onError
+  const canBlacklist = allow("user:risk:update");
+  const batchBlacklist = useMutation({
+    mutationFn: (nos: string[]) => Promise.all(nos.map((no) => api.setBlacklist(no, true))),
+    onSuccess: (_r, nos) => {
+      qc.invalidateQueries({ queryKey: ["users"] });
+      qc.invalidateQueries({ queryKey: ["user-blacklist"] });
+      notify.success(`已将 ${nos.length} 位用户加入黑名单`);
+      setSelectedUsers([]);
+    },
+  });
+  const askBatchBlacklist = async () => {
+    const n = selectedUsers.length;
+    if (!n) return;
+    const ok = await confirm({
+      title: `批量拉黑 ${n} 位用户`,
+      desc: `将把已选的 ${n} 位用户加入黑名单，加入后无法借出充电宝；已在黑名单中的用户保持不变。可在「黑名单」页逐个解除。`,
+      danger: true,
+      confirmText: `确认拉黑 ${n} 位`,
+    });
+    if (ok) batchBlacklist.mutate(selectedUsers);
+  };
 
   const saveMember = useMutation({
     mutationFn: (v: Partial<Member>) => api.saveMember(v),
@@ -252,7 +296,7 @@ function UsersInner() {
     { header: "状态", cell: (u) => u.blacklisted ? <Badge tone="danger">黑名单</Badge> : <Badge tone="success">正常</Badge> },
     {
       header: "操作",
-      cell: (u) => allow("user:risk:update") ? (
+      cell: (u) => canBlacklist ? (
         <Button size="sm" variant="outline" disabled={bl.isPending} onClick={() => bl.mutate({ no: u.cUserNo, blacklisted: !u.blacklisted })}>
           {u.blacklisted ? "解除拉黑" : "拉黑"}
         </Button>
@@ -300,7 +344,7 @@ function UsersInner() {
     { header: "状态", cell: (b) => b.status === "ACTIVE" ? <Badge tone="danger">拉黑中</Badge> : <Badge tone="muted">已解除</Badge> },
     {
       header: "操作",
-      cell: (b) => allow("user:risk:update") && b.status === "ACTIVE"
+      cell: (b) => canBlacklist && b.status === "ACTIVE"
         ? <Button size="sm" variant="outline" disabled={bl.isPending} onClick={() => bl.mutate({ no: b.userNo, blacklisted: false })}>解除</Button>
         : <span className="text-muted-foreground">-</span>,
     },
@@ -371,7 +415,21 @@ function UsersInner() {
     { header: "赠额有效期", cell: (r) => <span className="tabular-nums">{r.validDays} 天</span> },
     { header: "排序", cell: (r) => <span className="tabular-nums">{r.sortNo}</span> },
     { header: "状态", cell: (r) => <Badge tone={r.status === "ENABLED" ? "success" : "muted"}>{r.status === "ENABLED" ? "上架" : "下架"}</Badge> },
-    { header: t("common.actions"), cell: (r) => canEditPackage ? <Button size="sm" variant="outline" onClick={() => setPkgForm(r)}>{t("common.edit")}</Button> : <span className="text-muted-foreground">-</span> },
+    // 归档时间列只在「显示已归档」打开时出现，默认视图里整列都是 `-` 属于噪音
+    ...(showArchived ? [{ header: "归档时间", cell: (r: RechargePackage) => <ArchivedAt at={r.archivedAt} /> }] : []),
+    {
+      header: t("common.actions"),
+      cell: (r) => (
+        <ArchiveActions
+          archived={!!r.archivedAt}
+          canWrite={canEditPackage}
+          actions={<Button size="sm" variant="outline" onClick={() => setPkgForm(r)}>{t("common.edit")}</Button>}
+          // 充值套餐不属于主数据强确认清单（机柜/站点/场地方/代理商/角色），不要求手输编号
+          onArchive={async () => { if (await confirm(archiveConfirm("充值套餐", `${r.packageNo} ${r.name}`))) archivePkg.mutate(r.packageNo); }}
+          onUnarchive={async () => { if (await confirm(unarchiveConfirm("充值套餐", `${r.packageNo} ${r.name}`))) unarchivePkg.mutate(r.packageNo); }}
+        />
+      ),
+    },
   ];
 
   const active = tab === "list" ? users
@@ -384,42 +442,110 @@ function UsersInner() {
 
   return (
     <div>
-      <TabHeader tabs={TABS} value={tab} onChange={(k) => { setTab(k); setPage(1); }} />
+      <TabHeader tabs={TABS} value={tab} onChange={goTab} />
       {tab === "list" && (
         <>
-          <div className="mb-4"><Input className="w-64" placeholder="搜索昵称 / 手机 / 用户号" value={keyword} onChange={(e) => { setKeyword(e.target.value); setPage(1); }} /></div>
-          <DataTable rowKey={(u: CUser) => u.cUserNo} columns={userCols} rows={users.data?.list} loading={users.isLoading} />
+          <Toolbar
+            search={keyword}
+            onSearch={search}
+            searchPlaceholder="搜索昵称 / 手机 / 用户号"
+            onExport={() => exportCsv<CUser>("用户", [
+              { header: "用户号", value: (u) => u.cUserNo },
+              { header: "昵称", value: (u) => u.nickname },
+              { header: "手机", value: (u) => u.phone },
+              { header: "信用分", value: (u) => u.creditScore },
+              { header: "订单数", value: (u) => u.orders },
+              { header: "注册", value: (u) => fmtTime(u.registeredAt) },
+              { header: "状态", value: (u) => (u.blacklisted ? "黑名单" : "正常") },
+            ], users.data?.list ?? [])}
+            selectedCount={selectedUsers.length}
+            batchActions={
+              <Button size="sm" variant="destructive" disabled={batchBlacklist.isPending} onClick={askBatchBlacklist}>
+                批量拉黑
+              </Button>
+            }
+            onClearSelection={() => setSelectedUsers([])}
+          />
+          {!canBlacklist && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无用户风控权限（user:risk:update），不能拉黑（含批量拉黑）</div>}
+          <DataTable
+            rowKey={(u: CUser) => u.cUserNo}
+            columns={userCols}
+            rows={users.data?.list}
+            loading={users.isLoading}
+            selectable={canBlacklist}
+            selectedKeys={selectedUsers}
+            onSelectedChange={setSelectedUsers}
+            empty="没有符合条件的用户——可能是搜索词太窄，或 C 端尚无用户注册；清空搜索再看一次"
+          />
         </>
       )}
       {tab === "members" && (
         <>
           <Toolbar
             search={keyword}
-            onSearch={(v) => { setKeyword(v); setPage(1); }}
+            onSearch={search}
             searchPlaceholder="搜索昵称 / 用户号"
             onAdd={canEditMember ? () => setMemberForm({ level: "SILVER", points: 0, cardType: "无", nickname: "" }) : undefined}
             addLabel="新增会员"
+            onExport={() => exportCsv<Member>("会员次卡", [
+              { header: "用户号", value: (m) => m.userNo },
+              { header: "昵称", value: (m) => m.nickname },
+              { header: "等级", value: (m) => LEVEL[m.level].label },
+              { header: "积分", value: (m) => Math.round(m.points) },
+              { header: "次卡", value: (m) => m.cardType },
+              { header: "到期", value: (m) => fmtTime(m.expireAt) },
+            ], members.data?.list ?? [])}
           />
-          <DataTable rowKey={(m: Member) => m.userNo} columns={memberCols} rows={members.data?.list} loading={members.isLoading} />
+          <DataTable rowKey={(m: Member) => m.userNo} columns={memberCols} rows={members.data?.list} loading={members.isLoading}
+            empty="暂无会员/次卡——尚未有用户开通会员或购买次卡；点右上「新增会员」可手工登记" />
         </>
       )}
       {tab === "risk" && (
         <>
-          <div className="mb-4"><Input className="w-64" placeholder="搜索用户号 / 昵称 / 手机" value={keyword} onChange={(e) => { setKeyword(e.target.value); setPage(1); }} /></div>
-          <DataTable rowKey={(r: UserRisk) => r.riskNo} columns={riskCols} rows={risks.data?.list} loading={risks.isLoading} />
+          <Toolbar
+            search={keyword}
+            onSearch={search}
+            searchPlaceholder="搜索用户号 / 昵称 / 手机"
+            onExport={() => exportCsv<UserRisk>("风控用户", [
+              { header: "风控号", value: (r) => r.riskNo },
+              { header: "用户号", value: (r) => r.userNo },
+              { header: "昵称", value: (r) => r.nickname },
+              { header: "手机", value: (r) => r.phone },
+              { header: "信用分", value: (r) => r.creditScore },
+              { header: "风险等级", value: (r) => RISK_LEVEL[r.riskLevel].label },
+              { header: "原因", value: (r) => r.reason },
+              { header: "标记时间", value: (r) => fmtTime(r.flaggedAt) },
+            ], risks.data?.list ?? [])}
+          />
+          <DataTable rowKey={(r: UserRisk) => r.riskNo} columns={riskCols} rows={risks.data?.list} loading={risks.isLoading}
+            empty="暂无风控用户——没有用户触发风控规则，或风控规则尚未配置（系统设置 · 业务规则）" />
         </>
       )}
       {tab === "blacklist" && (
         <>
-          <div className="mb-4"><Input className="w-64" placeholder="搜索用户号 / 昵称" value={keyword} onChange={(e) => { setKeyword(e.target.value); setPage(1); }} /></div>
-          <DataTable rowKey={(b: UserBlacklist) => b.blacklistNo} columns={blacklistCols} rows={blacklisted.data?.list} loading={blacklisted.isLoading} />
+          <Toolbar
+            search={keyword}
+            onSearch={search}
+            searchPlaceholder="搜索用户号 / 昵称"
+            onExport={() => exportCsv<UserBlacklist>("黑名单", [
+              { header: "黑名单号", value: (b) => b.blacklistNo },
+              { header: "用户号", value: (b) => b.userNo },
+              { header: "昵称", value: (b) => b.nickname },
+              { header: "手机", value: (b) => b.phone },
+              { header: "原因", value: (b) => b.reason },
+              { header: "拉黑时间", value: (b) => fmtTime(b.blacklistedAt) },
+              { header: "状态", value: (b) => (b.status === "ACTIVE" ? "拉黑中" : "已解除") },
+            ], blacklisted.data?.list ?? [])}
+          />
+          <DataTable rowKey={(b: UserBlacklist) => b.blacklistNo} columns={blacklistCols} rows={blacklisted.data?.list} loading={blacklisted.isLoading}
+            empty="暂无黑名单用户——没有用户被拉黑；可在「用户」页勾选后批量拉黑" />
         </>
       )}
       {tab === "whitelist" && (
         <>
           <Toolbar
             search={keyword}
-            onSearch={(v) => { setKeyword(v); setPage(1); }}
+            onSearch={search}
             searchPlaceholder="搜索用户号 / 昵称 / 手机 / 授予人"
             onAdd={canEditWhitelist ? () => setWlForm({ reason: "INTERNAL_TEST", quotaType: "TIMES", quotaValue: 10, usedValue: 0, status: "ACTIVE", nickname: "", phone: "", validFrom: "", validTo: "", grantedBy: "" }) : undefined}
             addLabel="新增白名单"
@@ -463,7 +589,7 @@ function UsersInner() {
         <>
           <Toolbar
             search={keyword}
-            onSearch={(v) => { setKeyword(v); setPage(1); }}
+            onSearch={search}
             searchPlaceholder="搜索套餐号 / 名称 / 适用市场"
             onAdd={canEditPackage ? () => setPkgForm({ name: "", payAmount: 50, giftAmount: 5, currency: "AED", markets: "AE", validDays: 180, sortNo: 1, status: "ENABLED" }) : undefined}
             addLabel="新增套餐"
@@ -477,6 +603,7 @@ function UsersInner() {
               { header: "赠额有效期(天)", value: (r) => r.validDays },
               { header: "排序", value: (r) => r.sortNo },
               { header: "状态", value: (r) => (r.status === "ENABLED" ? "上架" : "下架") },
+              ...(showArchived ? [{ header: "归档时间", value: (r: RechargePackage) => (r.archivedAt ? fmtTime(r.archivedAt) : "") }] : []),
             ], packages.data?.list ?? [])}
           >
             <Select value={pkgStatus} onChange={(e) => { setPkgStatus(e.target.value); setPage(1); }}>
@@ -484,15 +611,19 @@ function UsersInner() {
               <option value="ENABLED">上架</option>
               <option value="DISABLED">下架</option>
             </Select>
+            <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); setPage(1); }} />
           </Toolbar>
           {!canEditPackage && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无充值套餐维护权限（user:wallet:update）</div>}
           <DataTable
             rowKey={(r: RechargePackage) => r.packageNo}
             columns={packageCols}
-            rowClassName={(p: RechargePackage) => (p.status === "ENABLED" ? undefined : "opacity-60")}
+            // 已归档与已下架都整行弱化：归档优先（archivedRowClass 命中即返回）
+            rowClassName={(p: RechargePackage) => archivedRowClass(p) ?? (p.status === "ENABLED" ? undefined : "opacity-60")}
             rows={packages.data?.list}
             loading={packages.isLoading}
-            empty="暂无充值套餐——先配置「充 X 送 Y」套餐，C 端钱包页才有充值选项"
+            empty={showArchived
+              ? "没有套餐——包含已归档在内也没有记录；点右上「新增套餐」建一条"
+              : "暂无充值套餐——先配置「充 X 送 Y」套餐，C 端钱包页才有充值选项；已归档的套餐可打开「显示已归档」查看"}
           />
         </>
       )}
@@ -500,13 +631,27 @@ function UsersInner() {
         <>
           <Toolbar
             search={keyword}
-            onSearch={(v) => { setKeyword(v); setPage(1); }}
+            onSearch={search}
             searchPlaceholder="搜索昵称 / 用户号"
+            onExport={() => exportCsv<Wallet>("钱包", [
+              { header: "用户号", value: (w) => w.userNo },
+              { header: "昵称", value: (w) => w.nickname },
+              { header: "余额", value: (w) => money(w.balance, w.currency) },
+              { header: "赠额", value: (w) => money(w.bonus, w.currency) },
+              { header: "币种", value: (w) => w.currency },
+              { header: "订单数", value: (w) => w.orderCount },
+              { header: "订单金额", value: (w) => money(w.orderAmount, w.currency) },
+              { header: "充值次数", value: (w) => w.rechargeCount },
+              { header: "充值金额", value: (w) => money(w.rechargeAmount, w.currency) },
+              { header: "更新时间", value: (w) => fmtTime(w.updatedAt) },
+            ], wallets.data?.list ?? [])}
           />
-          <DataTable rowKey={(w: Wallet) => w.userNo} columns={walletCols} rows={wallets.data?.list} loading={wallets.isLoading} />
+          {!canEditWallet && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无钱包调整权限（user:wallet:update）</div>}
+          <DataTable rowKey={(w: Wallet) => w.userNo} columns={walletCols} rows={wallets.data?.list} loading={wallets.isLoading}
+            empty="暂无钱包记录——用户首次充值或产生余额后才会在此出现" />
         </>
       )}
-      {active.data && <Pagination page={page} size={SIZE} total={active.data.total} onPage={setPage} />}
+      {active.data && <Pagination page={page} size={SIZE} total={active.data.total} onPage={goPage} />}
 
       <FormDrawer
         open={!!memberForm}
