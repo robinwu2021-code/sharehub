@@ -28,6 +28,14 @@ export interface NavLeaf {
   perm?: string; // 细粒度权限码；无则跟随父模块 canModule
   soon?: boolean; // 待建：灰显不可点
   phase?: Phase; // 产品分期（缺省=P1）；phase > CURRENT_PHASE 时灰显不可点
+  /**
+   * L3 分组标题（按「机构/角色」或「对象」聚类，2026-07-29 结构优化）。
+   * 渲染规则：同一 group 的连续叶子共用一个小标题；不设 group 的叶子直接平铺。
+   * 约束：同 group 的叶子必须在 children 中相邻（单测 nav.test.ts 保证）。
+   * 动机：对标简电云把财务按「平台/运营商/商户/会员」切成四个 L2——
+   *      我们不拆模块（一页一模块的解析约束），改用 L3 分组达到同样的「一眼看清是谁的账」。
+   */
+  group?: string;
 }
 
 export interface NavModule {
@@ -67,12 +75,13 @@ export const NAV: NavDomain[] = [
       {
         key: "device", label: "设备管理", icon: "Server", module: "device", href: "/devices",
         children: [
-          { href: "/devices", label: "设备台账", perm: "device:cabinet:read" },
-          { href: "/devices?tab=powerbanks", label: "充电宝管理", perm: "device:powerbank:read" },
-          { href: "/devices?tab=monitor", label: "实时监控", perm: "device:cabinet:read" },
-          { href: "/devices?tab=commands", label: "远程控制·指令记录", perm: "device:command:send" },
-          { href: "/devices?tab=inventory", label: "库存调拨", perm: "device:inventory:read", phase: 2 },
-          { href: "/devices?tab=ota", label: "固件 OTA", perm: "device:ota:read", phase: 2 },
+          // 按「资产台账 / 在线运行 / 资产流转」分组
+          { href: "/devices", label: "设备台账", perm: "device:cabinet:read", group: "资产台账" },
+          { href: "/devices?tab=powerbanks", label: "充电宝管理", perm: "device:powerbank:read", group: "资产台账" },
+          { href: "/devices?tab=monitor", label: "实时监控", perm: "device:cabinet:read", group: "在线运行" },
+          { href: "/devices?tab=commands", label: "远程控制·指令记录", perm: "device:command:send", group: "在线运行" },
+          { href: "/devices?tab=inventory", label: "库存调拨", perm: "device:inventory:read", phase: 2, group: "资产流转" },
+          { href: "/devices?tab=ota", label: "固件 OTA", perm: "device:ota:read", phase: 2, group: "资产流转" },
         ],
       },
       {
@@ -96,26 +105,28 @@ export const NAV: NavDomain[] = [
       {
         key: "location", label: "站点与点位", icon: "MapPin", module: "location", href: "/locations",
         children: [
-          { href: "/locations?tab=sites", label: "站点管理", perm: "location:poi:read" },
-          { href: "/locations?tab=points", label: "点位管理", perm: "location:poi:read" },
-          { href: "/locations?tab=venues", label: "场地方", perm: "location:venue:read" },
-          { href: "/locations?tab=contracts", label: "进场合同", perm: "location:contract:read", phase: 2 },
-          { href: "/locations?tab=onboarding", label: "门店 Onboarding", perm: "location:venue:read", phase: 2 },
-          { href: "/locations?tab=crm", label: "BD 拓展 CRM", phase: 3 },
-          { href: "/locations?tab=analysis", label: "站点坪效", perm: "location:analysis:read", phase: 3 },
-          { href: "/locations?tab=lifecycle", label: "门店生命周期", perm: "location:venue:read", phase: 3 },
+          // 分组：物理资产（站点/点位）↔ 合作机构（场地方主体及其合同/进件/生命周期）
+          { href: "/locations?tab=sites", label: "站点管理", perm: "location:poi:read", group: "场地资产" },
+          { href: "/locations?tab=points", label: "点位管理", perm: "location:poi:read", group: "场地资产" },
+          { href: "/locations?tab=analysis", label: "站点坪效", perm: "location:analysis:read", phase: 3, group: "场地资产" },
+          { href: "/locations?tab=venues", label: "场地方", perm: "location:venue:read", group: "场地方机构" },
+          { href: "/locations?tab=contracts", label: "进场合同", perm: "location:contract:read", phase: 2, group: "场地方机构" },
+          { href: "/locations?tab=onboarding", label: "门店 Onboarding", perm: "location:venue:read", phase: 2, group: "场地方机构" },
+          { href: "/locations?tab=lifecycle", label: "门店生命周期", perm: "location:venue:read", phase: 3, group: "场地方机构" },
+          { href: "/locations?tab=crm", label: "BD 拓展 CRM", phase: 3, group: "场地方机构" },
         ],
       },
       {
         key: "agent", label: "代理商管理", icon: "Handshake", module: "agent", href: "/agents",
         children: [
-          { href: "/agents", label: "代理商档案", perm: "agent:agent:read" },
-          { href: "/agents?tab=commission", label: "分润配置", perm: "agent:settlement:read" },
-          { href: "/agents?tab=assign", label: "设备/点位划拨", perm: "agent:scope:assign" },
+          // 按「机构生命周期」分组：先建档授权，再谈钱，最后看经营。
+          { href: "/agents", label: "代理商档案", perm: "agent:agent:read", group: "机构档案" },
+          { href: "/agents?tab=accounts", label: "代理账号管理", perm: "agent:agent:update", group: "机构档案" },
+          { href: "/agents?tab=assign", label: "设备/点位划拨", perm: "agent:scope:assign", group: "机构档案" },
+          { href: "/agents?tab=commission", label: "分润配置", perm: "agent:settlement:read", group: "机构收益" },
           // 跨域深链（D3）：复用财务结算单，面包屑按 URL 归属交易与资金
-          { href: "/finance?tab=settlements", label: "代理收益结算", perm: "agent:settlement:read" },
-          { href: "/agents?tab=performance", label: "代理绩效", perm: "agent:performance:read", phase: 2 },
-          { href: "/agents?tab=accounts", label: "代理账号管理", perm: "agent:agent:update" },
+          { href: "/finance?tab=settlements", label: "代理收益结算", perm: "agent:settlement:read", group: "机构收益" },
+          { href: "/agents?tab=performance", label: "代理绩效", perm: "agent:performance:read", phase: 2, group: "机构经营" },
         ],
       },
     ],
@@ -144,16 +155,19 @@ export const NAV: NavDomain[] = [
       {
         key: "finance", label: "财务管理", icon: "Wallet", module: "finance", href: "/finance",
         children: [
-          { href: "/finance?tab=rules", label: "分润规则", perm: "finance:share_rule:read" },
-          { href: "/finance?tab=records", label: "分润明细", perm: "finance:share_record:read" },
-          { href: "/finance?tab=settlements", label: "结算单", perm: "finance:settlement:read" },
-          { href: "/finance?tab=ledger", label: "账务分录", perm: "finance:ledger:read", phase: 2 },
-          { href: "/finance?tab=withdrawals", label: "提现审核", perm: "finance:withdrawal:read", phase: 2 },
-          { href: "/finance?tab=reconcile", label: "对账", perm: "finance:reconcile:read", phase: 3 },
-          { href: "/finance?tab=invoices", label: "发票", perm: "finance:invoice:read", phase: 3 },
+          // 按「资金主体」分组（对标简电云 平台/运营商/商户/会员 四套财务视图）：
+          // 分润与结算 = 跨主体的规则与产出；平台账 = 自家的账；伙伴账 = 代理商/场地方的钱；用户账 = C 端的钱。
+          { href: "/finance?tab=rules", label: "分润规则", perm: "finance:share_rule:read", group: "分润与结算" },
+          { href: "/finance?tab=records", label: "分润明细", perm: "finance:share_record:read", group: "分润与结算" },
+          { href: "/finance?tab=settlements", label: "结算单", perm: "finance:settlement:read", group: "分润与结算" },
+          { href: "/finance?tab=ledger", label: "账务分录", perm: "finance:ledger:read", phase: 2, group: "平台账" },
+          { href: "/finance?tab=reconcile", label: "对账", perm: "finance:reconcile:read", phase: 3, group: "平台账" },
+          { href: "/finance?tab=invoices", label: "发票", perm: "finance:invoice:read", phase: 3, group: "平台账" },
           // 跨域深链（导航审查 #4）：FINANCE 岗管场地方分润在本模块、代理分润在 /agents，
           // 此处回链避免跨域跳转找不到入口；面包屑按 URL 归属「渠道与场地」。
-          { href: "/agents?tab=commission", label: "代理分润配置", perm: "agent:settlement:read" },
+          { href: "/agents?tab=commission", label: "代理分润配置", perm: "agent:settlement:read", group: "伙伴账" },
+          { href: "/finance?tab=withdrawals", label: "提现审核", perm: "finance:withdrawal:read", phase: 2, group: "伙伴账" },
+          { href: "/users?tab=wallets", label: "用户钱包", perm: "user:wallet:read", phase: 3, group: "用户账" },
         ],
       },
     ],
@@ -168,11 +182,12 @@ export const NAV: NavDomain[] = [
       {
         key: "user", label: "用户管理", icon: "UserCircle", module: "user", href: "/users",
         children: [
-          { href: "/users", label: "用户列表", perm: "user:cuser:read", phase: 2 },
-          { href: "/users?tab=risk", label: "风控用户", perm: "user:risk:read", phase: 2 },
-          { href: "/users?tab=blacklist", label: "黑名单", perm: "user:risk:update", phase: 2 },
-          { href: "/users?tab=members", label: "会员/次卡", perm: "user:member:read", phase: 3 },
-          { href: "/users?tab=wallets", label: "钱包", perm: "user:wallet:read", phase: 3 },
+          // 按「用户主体 / 风险治理 / 用户资产」分组
+          { href: "/users", label: "用户列表", perm: "user:cuser:read", phase: 2, group: "用户主体" },
+          { href: "/users?tab=risk", label: "风控用户", perm: "user:risk:read", phase: 2, group: "风险治理" },
+          { href: "/users?tab=blacklist", label: "黑名单", perm: "user:risk:update", phase: 2, group: "风险治理" },
+          { href: "/users?tab=members", label: "会员/次卡", perm: "user:member:read", phase: 3, group: "用户资产" },
+          { href: "/users?tab=wallets", label: "钱包", perm: "user:wallet:read", phase: 3, group: "用户资产" },
         ],
       },
       {
@@ -229,11 +244,12 @@ export const NAV: NavDomain[] = [
       {
         key: "org", label: "员工与权限", icon: "Users", module: "org", href: "/employees",
         children: [
-          { href: "/employees?tab=employees", label: "员工", perm: "org:employee:read" },
-          { href: "/employees?tab=roles", label: "角色权限", perm: "org:role:read" },
-          { href: "/employees?tab=audit", label: "操作审计", perm: "org:audit:read", phase: 2 },
-          { href: "/employees?tab=org", label: "组织架构", phase: 2 },
-          { href: "/employees?tab=performance", label: "绩效报表", phase: 3 },
+          // 按「人与组织 / 授权 / 留痕」分组
+          { href: "/employees?tab=employees", label: "员工", perm: "org:employee:read", group: "人与组织" },
+          { href: "/employees?tab=org", label: "组织架构", phase: 2, group: "人与组织" },
+          { href: "/employees?tab=roles", label: "角色权限", perm: "org:role:read", group: "授权" },
+          { href: "/employees?tab=audit", label: "操作审计", perm: "org:audit:read", phase: 2, group: "留痕与考核" },
+          { href: "/employees?tab=performance", label: "绩效报表", phase: 3, group: "留痕与考核" },
         ],
       },
       {
@@ -279,6 +295,22 @@ export function visibleDomains(role: Role | undefined): NavDomain[] {
 /** L3 可见性 = leaf.perm ? can() : 跟随父模块。phase-locked 叶子保留（灰显）。 */
 export function visibleLeaves(mod: NavModule, role: Role | undefined): NavLeaf[] {
   return (mod.children ?? []).filter((l) => (l.perm ? can(role, l.perm) : true));
+}
+
+/**
+ * 把可见叶子按 group 聚成连续段，供 L2 面板渲染小标题。
+ * - 无 group 的叶子聚成 `{ group: undefined }` 段（渲染时不出标题）。
+ * - 只合并**相邻**同名 group（不跨段合并）——保证渲染顺序 = 数据顺序，不隐式重排。
+ * - 一段内若所有叶子都被 phase 锁定，该段整体灰显（调用方可据此收起）。
+ */
+export function groupedLeaves(leaves: NavLeaf[]): { group?: string; leaves: NavLeaf[] }[] {
+  const out: { group?: string; leaves: NavLeaf[] }[] = [];
+  for (const leaf of leaves) {
+    const last = out[out.length - 1];
+    if (last && last.group === leaf.group) last.leaves.push(leaf);
+    else out.push({ group: leaf.group, leaves: [leaf] });
+  }
+  return out;
 }
 
 /** 叶子是否被产品分期屏蔽（phase > CURRENT_PHASE）。 */

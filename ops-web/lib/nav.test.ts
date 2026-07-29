@@ -5,7 +5,7 @@ import {
   visibleDomains, visibleModules, visibleLeaves,
   findActiveModule, activeLeafIndex, isDomainSoon, isSingleModuleDomain,
   moduleDefaultHref, domainDefaultHref, breadcrumb, leafParts, normPath,
-  isLeafLocked, isModuleLocked, isLeafDisabled, routeLockedPhase,
+  isLeafLocked, isModuleLocked, isLeafDisabled, routeLockedPhase, groupedLeaves,
 } from "./nav";
 import { isPhaseLocked, CURRENT_PHASE } from "./phase";
 import { hasNavLabel } from "./i18n/nav-labels";
@@ -56,10 +56,11 @@ describe("L3 叶子过滤（4.2-2）", () => {
     const labels = visibleLeaves(finance, "VIEWER").map((l) => l.label);
     expect(labels).toEqual(["分润规则", "分润明细", "结算单", "提现审核"]);
   });
-  it("FINANCE 的财务：7 项 + 代理分润配置跨域深链", () => {
+  it("FINANCE 的财务：7 项 + 代理分润配置/用户钱包 两条跨域深链", () => {
     const labels = visibleLeaves(finance, "FINANCE").map((l) => l.label);
-    expect(labels).toHaveLength(8);
-    expect(labels.at(-1)).toBe("代理分润配置");
+    expect(labels).toHaveLength(9);
+    expect(labels).toContain("代理分润配置");
+    expect(labels.at(-1)).toBe("用户钱包"); // 用户账 分组殿后
   });
   it("VIEWER 无 agent:settlement:read → 财务不出现代理分润配置深链", () => {
     expect(visibleLeaves(finance, "VIEWER").map((l) => l.label)).not.toContain("代理分润配置");
@@ -144,6 +145,49 @@ describe("默认落地与面包屑", () => {
   });
 });
 
+describe("L3 分组（按机构/对象聚类，2026-07-29 结构优化）", () => {
+  it("同名 group 的叶子必须在数据里相邻（否则渲染会出现重复小标题）", () => {
+    const broken: string[] = [];
+    for (const d of NAV) {
+      for (const m of d.modules) {
+        const segs = groupedLeaves(m.children ?? []);
+        const named = segs.map((s) => s.group).filter(Boolean) as string[];
+        if (named.length !== new Set(named).size) broken.push(`${d.label}/${m.label}`);
+      }
+    }
+    expect(broken).toEqual([]);
+  });
+  it("模块内要么全部叶子有 group，要么全部没有（不混用）", () => {
+    const mixed: string[] = [];
+    for (const d of NAV) {
+      for (const m of d.modules) {
+        const kids = m.children ?? [];
+        if (!kids.length) continue;
+        const withG = kids.filter((l) => l.group).length;
+        if (withG !== 0 && withG !== kids.length) mixed.push(`${d.label}/${m.label}`);
+      }
+    }
+    expect(mixed).toEqual([]);
+  });
+  it("财务模块按资金主体分四组：分润与结算/平台账/伙伴账/用户账", () => {
+    const segs = groupedLeaves(visibleLeaves(module_("trade-fin", "finance"), "ADMIN"));
+    expect(segs.map((s) => s.group)).toEqual(["分润与结算", "平台账", "伙伴账", "用户账"]);
+  });
+  it("站点与点位分两组：场地资产（物理）/ 场地方机构（主体）", () => {
+    const segs = groupedLeaves(visibleLeaves(module_("place-bd", "location"), "ADMIN"));
+    expect(segs.map((s) => s.group)).toEqual(["场地资产", "场地方机构"]);
+  });
+  it("RBAC 过滤后不产生空组（VIEWER 看财务）", () => {
+    const segs = groupedLeaves(visibleLeaves(module_("trade-fin", "finance"), "VIEWER"));
+    expect(segs.every((s) => s.leaves.length > 0)).toBe(true);
+  });
+  it("groupedLeaves 对无 group 的模块返回单段且 group 为 undefined", () => {
+    const segs = groupedLeaves(visibleLeaves(module_("analytics", "report"), "ADMIN"));
+    expect(segs).toHaveLength(1);
+    expect(segs[0].group).toBeUndefined();
+  });
+});
+
 describe("三语覆盖（防新增菜单漏配 en/ar）", () => {
   it("NAV 中每个 域/模块/子功能 标签都有 en+ar 译文", () => {
     const missing: string[] = [];
@@ -151,7 +195,10 @@ describe("三语覆盖（防新增菜单漏配 en/ar）", () => {
       if (!hasNavLabel(d.label)) missing.push(`域 ${d.label}`);
       for (const m of d.modules) {
         if (!hasNavLabel(m.label)) missing.push(`模块 ${m.label}`);
-        for (const l of m.children ?? []) if (!hasNavLabel(l.label)) missing.push(`子功能 ${l.label}`);
+        for (const l of m.children ?? []) {
+          if (!hasNavLabel(l.label)) missing.push(`子功能 ${l.label}`);
+          if (l.group && !hasNavLabel(l.group)) missing.push(`分组 ${l.group}`);
+        }
       }
     }
     expect(missing).toEqual([]);

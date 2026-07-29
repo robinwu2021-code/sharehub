@@ -11,7 +11,7 @@ import * as Icons from "lucide-react";
 import {
   PANEL_WIDTH, MILLER_MODULE_WIDTH, MILLER_LEAF_WIDTH, type NavModule, type NavLeaf, type NavMode,
   visibleModules, visibleLeaves, findActiveModule, activeLeafIndex, isSingleModuleDomain,
-  moduleDefaultHref, normPath, isLeafLocked,
+  moduleDefaultHref, normPath, isLeafLocked, groupedLeaves,
 } from "@/lib/nav";
 import { useAuth } from "@/lib/auth";
 import { useNavPrefs } from "@/lib/stores/nav-prefs";
@@ -61,6 +61,34 @@ function LeafRow({ leaf, active }: { leaf: NavLeaf; active: boolean }) {
       <span className="truncate">{tNav(leaf.label)}</span>
     </Link>
   );
+}
+
+/**
+ * 渲染 L3 叶子，按 group 分段并在段首插入小标题（无 group 则退化为平铺）。
+ * activeIdx 是在**扁平数组**里的下标，分段后需换算，故这里用累计偏移。
+ */
+function renderLeafSegments(
+  leaves: NavLeaf[], activeIdx: number, tNav: (s: string) => string,
+) {
+  let offset = 0;
+  return groupedLeaves(leaves).map((seg, si) => {
+    const base = offset;
+    offset += seg.leaves.length;
+    return (
+      <div key={seg.group ?? `seg${si}`} className={cn(si > 0 && "mt-1.5")}>
+        {seg.group && (
+          <div className="px-2.5 pb-0.5 pt-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+            {tNav(seg.group)}
+          </div>
+        )}
+        <div className="space-y-0.5">
+          {seg.leaves.map((l, i) => (
+            <LeafRow key={l.href + l.label} leaf={l} active={base + i === activeIdx} />
+          ))}
+        </div>
+      </div>
+    );
+  });
 }
 
 function ModeToggle({ mode, onChange }: { mode: NavMode; onChange: (m: NavMode) => void }) {
@@ -142,7 +170,7 @@ export function SecondaryNav() {
                 {/* 子（功能）：缩进 + 左导引线，13px 灰 */}
                 <div className="ms-5 space-y-0.5 border-s border-border/70 ps-1.5">
                   {leaves.length
-                    ? leaves.map((l, i) => <LeafRow key={l.href + l.label} leaf={l} active={i === activeIdx} />)
+                    ? renderLeafSegments(leaves, activeIdx, tNav)
                     : <LeafRow leaf={{ href: m.href, label: m.label, soon: m.soon }} active={m.key === activeModuleKey} />}
                 </div>
               </div>
@@ -193,7 +221,7 @@ export function SecondaryNav() {
         </div>
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-2">
           {selLeaves.length
-            ? selLeaves.map((l, i) => <LeafRow key={l.href + l.label} leaf={l} active={i === selActiveIdx} />)
+            ? renderLeafSegments(selLeaves, selActiveIdx, tNav)
             : sel && <LeafRow leaf={{ href: moduleDefaultHref(sel, role), label: sel.label, soon: sel.soon }} active={sel.key === activeModuleKey} />}
         </nav>
       </aside>
