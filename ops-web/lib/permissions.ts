@@ -16,8 +16,9 @@ const ROLE_PERMS: Record<Role, string[]> = {
     "agent:scope:assign",
     "report:device:read", "report:location:read",
     "system:notify_template:read", "system:dict:read",
+    // 对标补齐（功能权限清单 §13）：运维要能查发送记录与 App 版本
+    "system:notify_log:read", "system:app_version:read", "system:param:read", "system:market:read",
   ],
-
   CS: [
     "dashboard:overview:read", "dashboard:todo:read",
     "device:cabinet:read", "device:slot:read", "device:command:send",
@@ -27,6 +28,9 @@ const ROLE_PERMS: Record<Role, string[]> = {
     "workorder:wo:read", "workorder:wo:create",
     "cs:*",
     "marketing:coupon:read", "marketing:coupon:issue", "marketing:push:send",
+    // 对标补齐（功能权限清单 §13）：客服要能查发送记录、拦截骚扰、维护问题字典
+    "system:notify_log:read", "system:notify_blacklist:read", "system:notify_blacklist:update",
+    "system:problem:read", "system:problem:update",
   ],
 
   FINANCE: [
@@ -37,6 +41,9 @@ const ROLE_PERMS: Record<Role, string[]> = {
     "location:venue:read", "location:contract:read", "location:analysis:read",
     "user:cuser:read", "user:member:read", "user:wallet:read",
     "report:*", "org:audit:read",
+    // 对标补齐（功能权限清单 §13）：提现口径/收款方字典/税率归财务
+    "system:biz_rule:update", "system:bank:read", "system:bank:update",
+    "system:tax:update", "system:payment_channel:read",
   ],
 
   BD: [

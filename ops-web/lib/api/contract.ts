@@ -199,4 +199,84 @@ export interface Api {
   // === 支付渠道（系统域 · P1，补齐清单 E8）===
   listPaymentChannels(q?: PageQ): Promise<PageResult<PaymentChannel>>;
   savePaymentChannel(x: Partial<PaymentChannel> & { channelCode?: string }): Promise<PaymentChannel>;
+
+  // === 财务域 B5：分润统计 / 充值订单（规格 §5 §6，均为只读）===
+  /** 分润统计：dimension 是维度切换器的参数——一张表两种主体，不是两个接口。 */
+  listShareSummaries(q?: ShareSummaryQ): Promise<PageResult<ShareSummary>>;
+  listRechargeOrders(q?: RechargeQ): Promise<PageResult<RechargeOrder>>;
+
+  // === 批次 B4/B5：设备日志 / 设备编码 / 预约订单 / 免费订单 / 白名单 / 充值套餐 ===
+  // 规格 §1 §2 §3 §4 §7 §8
+  listDeviceLogs(q?: DeviceLogQ): Promise<PageResult<DeviceLog>>;
+  listDeviceCodeBatches(q?: PageQ): Promise<PageResult<DeviceCodeBatch>>;
+  saveDeviceCodeBatch(x: Partial<DeviceCodeBatch> & { batchNo?: string }): Promise<DeviceCodeBatch>;
+  listReservations(q?: ReservationQ): Promise<PageResult<Reservation>>;
+  /** 取消预约：仅 PENDING 可取消（后端同样校验，前端按钮先行拦截）。 */
+  cancelReservation(reservationNo: string): Promise<Reservation>;
+  listFreeOrders(q?: FreeOrderQ): Promise<PageResult<FreeOrder>>;
+  /** 免费订单页头统计：本月单数 / 累计减免（成本管控，须为全量口径而非当页）。 */
+  getFreeOrderStats(): Promise<FreeOrderStats>;
+  listFreeWhitelist(q?: WhitelistQ): Promise<PageResult<FreeUserWhitelist>>;
+  saveFreeWhitelist(x: Partial<FreeUserWhitelist> & { userNo?: string }): Promise<FreeUserWhitelist>;
+  /** 撤销白名单：软撤销置 REVOKED（决策 §八-4，不物理删）。 */
+  revokeFreeWhitelist(userNo: string): Promise<FreeUserWhitelist>;
+  listRechargePackages(q?: StatusQ): Promise<PageResult<RechargePackage>>;
+  saveRechargePackage(x: Partial<RechargePackage> & { packageNo?: string }): Promise<RechargePackage>;
+
+  // === 批次 B2/B3/B5：系统设置 8 项（规格 §9~§16）===
+  listNotifyLogs(q?: NotifyLogQ): Promise<PageResult<NotifyLog>>;
+  /** 发送记录页头统计：今日发送量 / 失败率 / 今日成本（全量口径，非当页）。 */
+  getNotifyLogStats(): Promise<NotifyLogStats>;
+  listNotifyBlacklist(q?: NotifyBlacklistQ): Promise<PageResult<NotifyBlacklist>>;
+  saveNotifyBlacklist(x: Partial<NotifyBlacklist> & { blockNo?: string }): Promise<NotifyBlacklist>;
+  /** 解除拉黑：软删除，把 expireAt 置为当下并保留记录（决策 §八-4）。 */
+  releaseNotifyBlacklist(blockNo: string): Promise<NotifyBlacklist>;
+  getBizRules(): Promise<BizRules>;
+  /** 业务规则分区保存：只传要改的分区（提现 / 预约 / 计费默认值各自一个保存按钮）。 */
+  saveBizRules(x: Partial<BizRules>): Promise<BizRules>;
+  listLoginSettings(q?: PageQ): Promise<PageResult<LoginSetting>>;
+  saveLoginSetting(x: Partial<LoginSetting> & { country?: string }): Promise<LoginSetting>;
+  listAppVersions(q?: AppVersionQ): Promise<PageResult<AppVersion>>;
+  saveAppVersion(x: Partial<AppVersion> & { versionId?: string }): Promise<AppVersion>;
+  /** 版本回滚：置 ROLLBACK 且灰度归零，记录保留。 */
+  rollbackAppVersion(versionId: string): Promise<AppVersion>;
+  listBanks(q?: BankQ): Promise<PageResult<BankEntry>>;
+  saveBank(x: Partial<BankEntry> & { bankCode?: string }): Promise<BankEntry>;
+  listProblems(q?: ProblemQ): Promise<PageResult<ProblemEntry>>;
+  saveProblem(x: Partial<ProblemEntry> & { problemNo?: string }): Promise<ProblemEntry>;
+  listTaxSettings(q?: PageQ): Promise<PageResult<TaxSetting>>;
+  saveTaxSetting(x: Partial<TaxSetting> & { country?: string }): Promise<TaxSetting>;
 }
+
+// —— 财务域 B5 追加（独立 import，避免与其他批次抢改顶部 import 块）——
+import type { ShareSummary, RechargeOrder } from "../types";
+export type ShareSummaryQ = PageQ & {
+  dimension?: string; // VENUE / AGENT
+  period?: string; // 2026-07
+  sortKey?: string; // shareAmount / pendingAmount / gmv / orderCount
+  sortDir?: string; // asc / desc
+};
+export type RechargeQ = PageQ & { status?: string; from?: string; to?: string };
+
+// —— 批次 B4/B5 追加（独立 import，避免与其他批次抢改顶部 import 块）——
+import type {
+  DeviceLog, DeviceCodeBatch, Reservation, FreeOrder, FreeOrderStats,
+  FreeUserWhitelist, RechargePackage,
+} from "../types";
+/** 设备日志：stream 双流筛选 + 日期范围（YYYY-MM-DD，含端点）。 */
+export type DeviceLogQ = PageQ & { stream?: string; from?: string; to?: string };
+export type ReservationQ = PageQ & { status?: string; type?: string };
+export type FreeOrderQ = PageQ & { reason?: string };
+export type WhitelistQ = PageQ & { status?: string; reason?: string };
+
+// —— 批次 B2/B3/B5 系统设置追加（独立 import，避免与其他批次抢改顶部 import 块）——
+import type {
+  NotifyLog, NotifyLogStats, NotifyBlacklist, BizRules, LoginSetting,
+  AppVersion, BankEntry, ProblemEntry, TaxSetting,
+} from "../types";
+/** 发送记录：渠道/状态筛选 + 受控排序（sort=sentAt|cost）。 */
+export type NotifyLogQ = PageQ & { channel?: string; status?: string; sort?: string; dir?: string };
+export type NotifyBlacklistQ = PageQ & { channel?: string; reason?: string };
+export type AppVersionQ = PageQ & { platform?: string };
+export type BankQ = PageQ & { country?: string; currency?: string };
+export type ProblemQ = PageQ & { category?: string; status?: string };

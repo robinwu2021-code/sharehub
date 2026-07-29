@@ -165,4 +165,46 @@ export const httpApi: Api = {
   saveNotice: (x) => client.post(x.noticeNo ? `/api/marketing/notices/${x.noticeNo}` : "/api/marketing/notices", x),
   listPaymentChannels: (q?: PageQ) => client.get("/api/system/payment-channels", q),
   savePaymentChannel: (x) => client.post(x.channelCode ? `/api/system/payment-channels/${x.channelCode}` : "/api/system/payment-channels", x),
+
+  // 财务 B5：分润统计（trade 域聚合）/ 充值订单（钱包同主体，归 user 域）
+  listShareSummaries: (q?: ShareSummaryQ) => client.get("/api/trade/share-summaries", q),
+  listRechargeOrders: (q?: RechargeQ) => client.get("/api/user/recharge-orders", q),
+
+  // 批次 B4/B5：设备日志/编码归 ops 域，预约与免费订单归 trade 域，白名单与充值套餐归 user 域
+  listDeviceLogs: (q?: DeviceLogQ) => client.get("/api/ops/device-logs", q),
+  listDeviceCodeBatches: (q?: PageQ) => client.get("/api/ops/device-code-batches", q),
+  saveDeviceCodeBatch: (x) => client.post(x.batchNo ? `/api/ops/device-code-batches/${x.batchNo}` : "/api/ops/device-code-batches", x),
+  listReservations: (q?: ReservationQ) => client.get("/api/trade/reservations", q),
+  cancelReservation: (no) => client.post(`/api/trade/reservations/${no}/cancel`, {}),
+  listFreeOrders: (q?: FreeOrderQ) => client.get("/api/trade/free-orders", q),
+  getFreeOrderStats: () => client.get("/api/trade/free-orders/stats"),
+  listFreeWhitelist: (q?: WhitelistQ) => client.get("/api/user/free-whitelist", q),
+  saveFreeWhitelist: (x) => client.post(x.userNo ? `/api/user/free-whitelist/${x.userNo}` : "/api/user/free-whitelist", x),
+  revokeFreeWhitelist: (no) => client.post(`/api/user/free-whitelist/${no}/revoke`, {}),
+  listRechargePackages: (q?: StatusQ) => client.get("/api/user/recharge-packages", q),
+  saveRechargePackage: (x) => client.post(x.packageNo ? `/api/user/recharge-packages/${x.packageNo}` : "/api/user/recharge-packages", x),
+
+  // 系统设置 B2/B3/B5（规格 §9~§16）
+  listNotifyLogs: (q?: NotifyLogQ) => client.get("/api/system/notify-logs", q),
+  getNotifyLogStats: () => client.get("/api/system/notify-logs/stats"),
+  listNotifyBlacklist: (q?: NotifyBlacklistQ) => client.get("/api/system/notify-blacklist", q),
+  saveNotifyBlacklist: (x) => client.post(x.blockNo ? `/api/system/notify-blacklist/${x.blockNo}` : "/api/system/notify-blacklist", x),
+  releaseNotifyBlacklist: (no) => client.post(`/api/system/notify-blacklist/${no}/release`, {}),
+  getBizRules: () => client.get("/api/system/biz-rules"),
+  saveBizRules: (x) => client.post("/api/system/biz-rules", x),
+  listLoginSettings: (q?: PageQ) => client.get("/api/system/login-settings", q),
+  saveLoginSetting: (x) => client.post(x.country ? `/api/system/login-settings/${x.country}` : "/api/system/login-settings", x),
+  listAppVersions: (q?: AppVersionQ) => client.get("/api/system/app-versions", q),
+  saveAppVersion: (x) => client.post(x.versionId ? `/api/system/app-versions/${x.versionId}` : "/api/system/app-versions", x),
+  rollbackAppVersion: (id) => client.post(`/api/system/app-versions/${id}/rollback`, {}),
+  listBanks: (q?: BankQ) => client.get("/api/system/banks", q),
+  saveBank: (x) => client.post(x.bankCode ? `/api/system/banks/${x.bankCode}` : "/api/system/banks", x),
+  listProblems: (q?: ProblemQ) => client.get("/api/system/problems", q),
+  saveProblem: (x) => client.post(x.problemNo ? `/api/system/problems/${x.problemNo}` : "/api/system/problems", x),
+  listTaxSettings: (q?: PageQ) => client.get("/api/system/tax-settings", q),
+  saveTaxSetting: (x) => client.post(x.country ? `/api/system/tax-settings/${x.country}` : "/api/system/tax-settings", x),
 };
+
+import type { ShareSummaryQ, RechargeQ } from "./contract";
+import type { DeviceLogQ, ReservationQ, FreeOrderQ, WhitelistQ } from "./contract";
+import type { NotifyLogQ, NotifyBlacklistQ, AppVersionQ, BankQ, ProblemQ } from "./contract";

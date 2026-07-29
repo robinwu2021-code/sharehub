@@ -17,6 +17,11 @@ import type {
   AlarmRecord, AlarmNotice, AlarmCode, AlarmRule,
   OrderComplaint, RefundRecord, ComplaintIssueType, ComplaintResolution,
   Notice, PaymentChannel,
+  DeviceLog, DeviceCodeBatch, Reservation, FreeOrder, FreeOrderStats,
+  FreeUserWhitelist, RechargePackage, WhitelistReason,
+  // 系统设置待建 8 项（规格 §9~§16）
+  NotifyLog, NotifyLogStats, NotifyBlacklist, BizRules, LoginSetting,
+  AppVersion, BankEntry, ProblemEntry, TaxSetting,
 } from "../types";
 
 const VENDORS = ["cd-tech", "sd-power", "chargenow"];
@@ -1091,3 +1096,652 @@ export const listPaymentChannels = (q: PageQuery = {}) =>
   paginate(paymentChannels, q.page, q.size, (x) => kwHit(q.keyword, x.channelCode, x.channelName, x.countries, x.currencies));
 export const savePaymentChannel = (x: Partial<PaymentChannel>) =>
   upsert(paymentChannels, x, "channelCode", () => nextNo("CH", paymentChannels));
+
+// ============================================================================
+// 财务域 · 批次 B5：分润统计（§5）/ 充值订单（§6）
+// 追加区块（含独立 import，避免与其他批次抢改顶部 import 块）。
+// ============================================================================
+import type { ShareSummary, RechargeOrder } from "../types";
+
+// —— §5 分润统计 ——
+// 分成方一律引用现有 mock 实体：场地方取 venues（VEN3xx），代理商取 agents（AG00x），
+// 保证与「分润规则 / 分润明细 / 结算单」跨页口径自洽（规格 §17.1-8）。
+const SUMMARY_PERIODS = ["2026-07", "2026-06", "2026-05"];
+const SUMMARY_PAYEES: { dimension: ShareSummary["dimension"]; payeeNo: string; payeeName: string }[] = [
+  ...venues.map((v) => ({ dimension: "VENUE" as const, payeeNo: v.venueNo, payeeName: v.name })),
+  ...agents.slice(0, 6).map((a) => ({ dimension: "AGENT" as const, payeeNo: a.agentNo, payeeName: a.name })),
+];
+export const shareSummaries: ShareSummary[] = SUMMARY_PERIODS.flatMap((period, pi) =>
+  SUMMARY_PAYEES.map((payee, i) => {
+    const orderCount = 320 + ((i * 137 + pi * 71) % 880);
+    // 客单价 3.2~4.0 AED（与计费模板 PP001 的 30 分钟 3 AED 量级一致）
+    const gmv = Number((orderCount * (3.2 + ((i * 3 + pi) % 9) / 10)).toFixed(2));
+    // 分成比例沿用各自域的口径：场地方 15~25%，代理商 30~40%
+    const rate = payee.dimension === "VENUE" ? [0.15, 0.2, 0.25][i % 3] : [0.3, 0.35, 0.4][i % 3];
+    const shareAmount = Number((gmv * rate).toFixed(2));
+    // 越早的周期结算越彻底：当月部分结算、上月大部分结清、上上月全清（settled ≤ share 恒成立）
+    const settledRatio = pi === 0 ? [0, 0.4, 0.65][i % 3] : pi === 1 ? [0.8, 1, 0.9][i % 3] : 1;
+    const settledAmount = Number((shareAmount * settledRatio).toFixed(2));
+    return {
+      ...payee, period, orderCount, gmv, shareAmount, settledAmount,
+      pendingAmount: Number((shareAmount - settledAmount).toFixed(2)),
+      currency: "AED",
+    };
+  }),
+);
+
+export type ShareSummaryQuery = PageQuery & {
+  dimension?: string; // VENUE / AGENT（维度切换器）
+  period?: string;
+  sortKey?: string; // 目前仅 shareAmount / pendingAmount / gmv / orderCount
+  sortDir?: string; // asc / desc
+};
+export const listShareSummaries = (q: ShareSummaryQuery = {}) => {
+  const rows = shareSummaries.filter((x) =>
+    kwHit(q.keyword, x.payeeNo, x.payeeName) &&
+    (!q.dimension || x.dimension === q.dimension) &&
+    (!q.period || x.period === q.period));
+  if (q.sortKey) {
+    const dir = q.sortDir === "desc" ? -1 : 1;
+    const key = q.sortKey as keyof ShareSummary;
+    rows.sort((a, b) => (Number(a[key]) - Number(b[key])) * dir);
+  }
+  return paginate(rows, q.page, q.size);
+};
+
+// —— §6 充值订单 ——
+// 用户引用 cUsers（U30xx）；channelCode 取自 paymentChannels 的真实渠道码（NEARPAY 为当前主通道）。
+const RECHARGE_PACKAGES = [
+  { packageNo: "RP001", pay: 20, gift: 0 },
+  { packageNo: "RP002", pay: 50, gift: 5 },
+  { packageNo: "RP003", pay: 100, gift: 15 },
+  { packageNo: "RP004", pay: 200, gift: 40 },
+  { packageNo: null, pay: 35, gift: 0 }, // 自定义金额：无套餐、无赠送
+];
+const RECHARGE_CHANNELS = ["NEARPAY", "NEARPAY", "NEARPAY", "STRIPE", "TAP", "NEARPAY", "CHECKOUT"];
+export const rechargeOrders: RechargeOrder[] = Array.from({ length: 36 }, (_, i) => {
+  const user = cUsers[i % cUsers.length];
+  const pkg = p(RECHARGE_PACKAGES, i);
+  const status = p(["PAID", "PAID", "PAID", "PENDING", "PAID", "FAILED", "PAID", "REFUNDED"] as const, i);
+  const settled = status === "PAID" || status === "REFUNDED";
+  return {
+    rechargeNo: `RCG${70000 + i}`, userNo: user.cUserNo, nickname: user.nickname,
+    packageNo: pkg.packageNo, payAmount: pkg.pay, giftAmount: pkg.gift,
+    creditAmount: pkg.pay + pkg.gift, currency: "AED",
+    channelCode: p(RECHARGE_CHANNELS, i), status,
+    createdAt: iso(i * 21600_000),
+    paidAt: settled ? iso(i * 21600_000 - 90_000) : null,
+    psgTxnNo: settled ? `PSG${20260700 + i}` : null,
+  };
+});
+
+export type RechargeQuery = PageQuery & { status?: string; from?: string; to?: string };
+export const listRechargeOrders = (q: RechargeQuery = {}) =>
+  paginate(rechargeOrders, q.page, q.size, (x) =>
+    kwHit(q.keyword, x.rechargeNo, x.userNo, x.nickname, x.psgTxnNo, x.channelCode) &&
+    (!q.status || x.status === q.status) &&
+    // 日期范围按下单时间（PENDING/FAILED 没有 paidAt，用 paidAt 会把它们全筛掉）
+    (!q.from || x.createdAt.slice(0, 10) >= q.from) &&
+    (!q.to || x.createdAt.slice(0, 10) <= q.to));
+
+// ============================================================================
+// 批次 B4/B5 · mock 数据 + list/save（规格 §1 §2 §3 §4 §7 §8）
+// 编号沿用现有口径：机柜 CAB1000+、订单 ORD5000xx、用户 U30xx、站点取自 sites；币种 AED。
+// ============================================================================
+
+// —— §1 设备日志：双流合一（COMMAND 下发 / REPORT 上报），按时间倒序 ——
+const CMD_EVENTS = ["EJECT", "LOCK", "REBOOT", "FW_UPGRADE", "LOCATE"] as const;
+const RPT_EVENTS = ["HEARTBEAT", "SLOT_STATE", "RETURN_DETECT", "BATTERY_LOW", "FAULT"] as const;
+
+const cmdPayload = (ev: string, cab: string, i: number) => {
+  const slot = (i % 8) + 1;
+  switch (ev) {
+    case "EJECT": return JSON.stringify({ cmd: "eject", cabinetNo: cab, slot, orderNo: `ORD${500000 + (i % 120)}`, ttlSec: 30 });
+    case "LOCK": return JSON.stringify({ cmd: "lock", cabinetNo: cab, slot, reason: "SLOT_FAULT" });
+    case "REBOOT": return JSON.stringify({ cmd: "reboot", cabinetNo: cab, delaySec: 5, operator: "admin" });
+    case "FW_UPGRADE": return JSON.stringify({ cmd: "fw_upgrade", cabinetNo: cab, fromVersion: "1.3.1", toVersion: "1.4.0", pkgSize: 1843200 });
+    default: return JSON.stringify({ cmd: "locate", cabinetNo: cab, buzzerSec: 3 });
+  }
+};
+const rptPayload = (ev: string, cab: string, i: number) => {
+  const slot = (i % 8) + 1;
+  switch (ev) {
+    case "HEARTBEAT": return JSON.stringify({ evt: "heartbeat", cabinetNo: cab, signal: 62 + (i % 30), temp: 31 + (i % 9), fwVersion: "1.4.0", availableCount: i % 9 });
+    case "SLOT_STATE": return JSON.stringify({ evt: "slot_state", cabinetNo: cab, slot, powerbankNo: `PB${1000 + i}`, battery: 40 + (i % 55), lock: "LOCKED" });
+    case "RETURN_DETECT": return JSON.stringify({ evt: "return_detect", cabinetNo: cab, slot, powerbankNo: `PB${1000 + i}`, orderNo: `ORD${500000 + (i % 120)}`, battery: 12 + (i % 40) });
+    case "BATTERY_LOW": return JSON.stringify({ evt: "battery_low", cabinetNo: cab, slot, powerbankNo: `PB${1000 + i}`, battery: 5 + (i % 8), threshold: 15 });
+    default: return JSON.stringify({ evt: "fault", cabinetNo: cab, slot, code: "SLOT_STUCK", detail: "powerbank not ejected after 3 retries" });
+  }
+};
+
+export const deviceLogs: DeviceLog[] = Array.from({ length: 42 }, (_, i) => {
+  const isCmd = i % 2 === 0; // 下发/上报交替，构成可读的因果时间轴
+  const cab = cabNo(i);
+  const ev = isCmd ? p(CMD_EVENTS as unknown as string[], i >> 1) : p(RPT_EVENTS as unknown as string[], i >> 1);
+  const bad = i % 11 === 3 ? "TIMEOUT" : i % 17 === 5 ? "FAILED" : "OK";
+  return {
+    logNo: `LOG${80000 + i}`,
+    cabinetNo: cab,
+    stream: isCmd ? "COMMAND" : "REPORT",
+    direction: isCmd ? "DOWN" : "UP",
+    eventType: ev,
+    payload: isCmd ? cmdPayload(ev, cab, i) : rptPayload(ev, cab, i),
+    vendorCode: p(VENDORS, i),
+    occurredAt: iso(i * 900_000), // 递增偏移 = 时间倒序
+    result: bad as DeviceLog["result"],
+  };
+});
+
+/** 设备日志查询：关键词(日志号/机柜/事件) + stream 双流筛选 + 日期范围(YYYY-MM-DD)。 */
+export const listDeviceLogs = (q: PageQuery & { stream?: string; from?: string; to?: string } = {}) =>
+  paginate(deviceLogs, q.page, q.size, (x) => {
+    if (!kwHit(q.keyword, x.logNo, x.cabinetNo, x.eventType, x.vendorCode)) return false;
+    if (q.stream && x.stream !== q.stream) return false;
+    const day = x.occurredAt.slice(0, 10);
+    if (q.from && day < q.from) return false;
+    if (q.to && day > q.to) return false;
+    return true;
+  });
+
+// —— §2 设备编码：按批次 + 供应商归集，跟踪绑定进度 ——
+export const deviceCodeBatches: DeviceCodeBatch[] = [
+  { batchNo: "BC900", vendorCode: "cd-tech", codeType: "SN", rangeStart: "SN090000", rangeEnd: "SN090999", total: 1000, bound: 1000, producedAt: iso(210 * 86400_000), status: "BOUND" },
+  { batchNo: "BC901", vendorCode: "cd-tech", codeType: "QR", rangeStart: "QRAE010001", rangeEnd: "QRAE011000", total: 1000, bound: 742, producedAt: iso(150 * 86400_000), status: "PARTIAL" },
+  { batchNo: "BC902", vendorCode: "sd-power", codeType: "SN", rangeStart: "SN091000", rangeEnd: "SN091499", total: 500, bound: 500, producedAt: iso(120 * 86400_000), status: "BOUND" },
+  { batchNo: "BC903", vendorCode: "sd-power", codeType: "QR", rangeStart: "QRAE020001", rangeEnd: "QRAE020600", total: 600, bound: 128, producedAt: iso(75 * 86400_000), status: "PARTIAL" },
+  { batchNo: "BC904", vendorCode: "chargenow", codeType: "SN", rangeStart: "SN092000", rangeEnd: "SN092799", total: 800, bound: 0, producedAt: iso(40 * 86400_000), status: "PENDING" },
+  { batchNo: "BC905", vendorCode: "chargenow", codeType: "QR", rangeStart: "QRSA030001", rangeEnd: "QRSA030400", total: 400, bound: 0, producedAt: iso(28 * 86400_000), status: "PENDING" },
+  { batchNo: "BC906", vendorCode: "cd-tech", codeType: "QR", rangeStart: "QRAE019001", rangeEnd: "QRAE019200", total: 200, bound: 0, producedAt: iso(96 * 86400_000), status: "VOID" },
+  { batchNo: "BC907", vendorCode: "sd-power", codeType: "SN", rangeStart: "SN093000", rangeEnd: "SN093299", total: 300, bound: 61, producedAt: iso(14 * 86400_000), status: "PARTIAL" },
+];
+export const listDeviceCodeBatches = (q: PageQuery = {}) =>
+  paginate(deviceCodeBatches, q.page, q.size, (x) => kwHit(q.keyword, x.batchNo, x.vendorCode, x.rangeStart, x.rangeEnd));
+export const saveDeviceCodeBatch = (x: Partial<DeviceCodeBatch>) =>
+  upsert(deviceCodeBatches, x, "batchNo", () => nextNo("BC", deviceCodeBatches));
+
+// —— §3 预约订单：预约取宝 / 预约还位 ——
+const RES_STATUS: Reservation["status"][] = ["PENDING", "PENDING", "FULFILLED", "EXPIRED", "CANCELLED", "FULFILLED"];
+export const reservations: Reservation[] = Array.from({ length: 22 }, (_, i) => {
+  const st = p(RES_STATUS, i);
+  const site = p(sites, i);
+  const type: Reservation["type"] = i % 3 === 0 ? "RETURN" : "BORROW";
+  // 待履约的预约窗口必须挂在**真实当前时间**上（而非 mock 固定时间轴），
+  // 否则「即将超时」永远算不出来——该高亮判定的是「距 reservedTo 还剩多久」。
+  const now = Date.now();
+  const pendingFrom = new Date(now - 10 * 60_000).toISOString();
+  const pendingTo = new Date(now + (i < 2 ? 12 : 45 + i * 20) * 60_000).toISOString();
+  const fromOffset = (i * 6 + 3) * 3600_000;
+  if (st === "PENDING") {
+    return {
+      reservationNo: `RSV${600 + i}`,
+      userNo: `U${3000 + (i % 40)}`,
+      type,
+      siteNo: site.siteNo,
+      siteName: site.name,
+      cabinetNo: i % 4 === 0 ? null : cabNo(i),
+      reservedFrom: pendingFrom,
+      reservedTo: pendingTo,
+      holdFee: 0,
+      currency: "AED",
+      status: st,
+      orderNo: null,
+    };
+  }
+  return {
+    reservationNo: `RSV${600 + i}`,
+    userNo: `U${3000 + (i % 40)}`,
+    type,
+    siteNo: site.siteNo,
+    siteName: site.name,
+    cabinetNo: i % 4 === 0 ? null : cabNo(i), // 空 = 站点级预约（不指定机柜）
+    reservedFrom: iso(fromOffset),
+    reservedTo: iso(fromOffset - 30 * 60_000),
+    holdFee: st === "EXPIRED" ? 2 + (i % 3) : 0,
+    currency: "AED",
+    status: st,
+    orderNo: st === "FULFILLED" ? `ORD${500000 + (i % 120)}` : null,
+  };
+});
+export const listReservations = (q: PageQuery & { status?: string; type?: string } = {}) =>
+  paginate(reservations, q.page, q.size, (x) => {
+    if (!kwHit(q.keyword, x.reservationNo, x.userNo, x.siteName, x.cabinetNo, x.orderNo)) return false;
+    if (q.status && x.status !== q.status) return false;
+    if (q.type && x.type !== q.type) return false;
+    return true;
+  });
+/** 取消预约：仅 PENDING 可取消（非 PENDING 直接原样返回，由前端按钮先行拦截）。 */
+export const cancelReservation = (no: string): Reservation => {
+  const i = reservations.findIndex((r) => r.reservationNo === no);
+  if (i < 0) throw new Error(`预约不存在：${no}`);
+  if (reservations[i].status !== "PENDING") throw new Error("仅待履约（PENDING）的预约可取消");
+  reservations[i] = { ...reservations[i], status: "CANCELLED", holdFee: 0 };
+  return reservations[i];
+};
+
+// —— §4 免费订单：来源即白名单用途，页头做成本管控统计 ——
+const REASONS: WhitelistReason[] = ["INTERNAL_TEST", "VIP", "BD_DEMO", "MERCHANT_SELF"];
+export const freeOrders: FreeOrder[] = Array.from({ length: 26 }, (_, i) => {
+  const dur = 25 + ((i * 37) % 260);
+  const start = i * 20 * 3600_000;
+  return {
+    orderNo: `ORD${500200 + i}`,
+    userNo: `U${3000 + (i % 40)}`,
+    nickname: p(NICKS, i),
+    whitelistReason: p(REASONS, i),
+    waivedAmount: Math.min(30, Math.ceil(dur / 30) * 3),
+    currency: "AED",
+    siteName: p(LOCS, i),
+    cabinetNo: cabNo(i),
+    startedAt: iso(start),
+    endedAt: iso(start - dur * 60_000),
+    duration: dur,
+  };
+});
+export const listFreeOrders = (q: PageQuery & { reason?: string } = {}) =>
+  paginate(freeOrders, q.page, q.size, (x) => {
+    if (!kwHit(q.keyword, x.orderNo, x.userNo, x.nickname, x.siteName, x.cabinetNo)) return false;
+    if (q.reason && x.whitelistReason !== q.reason) return false;
+    return true;
+  });
+/** 页头统计：本月免费单数（按 mock「当前」月份口径）+ 累计减免金额。 */
+export const getFreeOrderStats = (): FreeOrderStats => {
+  const month = iso(0).slice(0, 7);
+  return {
+    monthCount: freeOrders.filter((o) => o.startedAt.slice(0, 7) === month).length,
+    waivedTotal: freeOrders.reduce((s, o) => s + o.waivedAmount, 0),
+    currency: "AED",
+  };
+};
+
+// —— §7 免费用户白名单：用途强制枚举，额度可限次/限额/不限 ——
+export const freeWhitelist: FreeUserWhitelist[] = Array.from({ length: 14 }, (_, i) => {
+  const quotaType = p(["TIMES", "AMOUNT", "UNLIMITED"] as const, i);
+  const status: FreeUserWhitelist["status"] = i % 7 === 3 ? "EXPIRED" : i % 11 === 6 ? "REVOKED" : "ACTIVE";
+  const quotaValue = quotaType === "UNLIMITED" ? 0 : quotaType === "TIMES" ? 10 + (i % 4) * 10 : 100 + (i % 5) * 50;
+  return {
+    userNo: `U${3000 + i}`,
+    nickname: p(NICKS, i),
+    phone: phone(i),
+    reason: p(REASONS, i),
+    quotaType,
+    quotaValue,
+    usedValue: quotaType === "UNLIMITED" ? 0 : Math.round(quotaValue * ((i % 5) / 5)),
+    validFrom: iso((30 + i) * 86400_000).slice(0, 10),
+    validTo: iso((status === "EXPIRED" ? 3 : -(60 + i * 5)) * 86400_000).slice(0, 10),
+    grantedBy: p(OPERATORS, i),
+    status,
+  };
+});
+export const listFreeWhitelist = (q: PageQuery & { status?: string; reason?: string } = {}) =>
+  paginate(freeWhitelist, q.page, q.size, (x) => {
+    if (!kwHit(q.keyword, x.userNo, x.nickname, x.phone, x.grantedBy)) return false;
+    if (q.status && x.status !== q.status) return false;
+    if (q.reason && x.reason !== q.reason) return false;
+    return true;
+  });
+export const saveFreeWhitelist = (x: Partial<FreeUserWhitelist>) =>
+  upsert(freeWhitelist, x, "userNo", () => nextNo("U", freeWhitelist, 3900));
+/** 撤销白名单：置 REVOKED（软撤销，保留审计痕迹，对齐决策 §八-4）。 */
+export const revokeFreeWhitelist = (userNo: string): FreeUserWhitelist => {
+  const i = freeWhitelist.findIndex((w) => w.userNo === userNo);
+  if (i < 0) throw new Error(`白名单不存在：${userNo}`);
+  freeWhitelist[i] = { ...freeWhitelist[i], status: "REVOKED" };
+  return freeWhitelist[i];
+};
+
+// —— §8 充值套餐：比竞品多「赠额有效期」与「适用市场」 ——
+export const rechargePackages: RechargePackage[] = [
+  { packageNo: "RP900", name: "体验包", payAmount: 20, giftAmount: 0, currency: "AED", markets: "AE", validDays: 90, sortNo: 1, status: "ENABLED" },
+  { packageNo: "RP901", name: "常用包", payAmount: 50, giftAmount: 5, currency: "AED", markets: "AE,SA", validDays: 180, sortNo: 2, status: "ENABLED" },
+  { packageNo: "RP902", name: "超值包", payAmount: 100, giftAmount: 15, currency: "AED", markets: "AE,SA,KW", validDays: 365, sortNo: 3, status: "ENABLED" },
+  { packageNo: "RP903", name: "家庭包", payAmount: 200, giftAmount: 40, currency: "AED", markets: "AE", validDays: 365, sortNo: 4, status: "ENABLED" },
+  { packageNo: "RP904", name: "斋月特惠包", payAmount: 80, giftAmount: 20, currency: "AED", markets: "AE,SA,QA", validDays: 60, sortNo: 5, status: "DISABLED" },
+  { packageNo: "RP905", name: "商户自用包", payAmount: 500, giftAmount: 60, currency: "AED", markets: "AE", validDays: 365, sortNo: 6, status: "DISABLED" },
+];
+export const listRechargePackages = (q: PageQuery & { status?: string } = {}) =>
+  paginate(rechargePackages, q.page, q.size, (x) => {
+    if (!kwHit(q.keyword, x.packageNo, x.name, x.markets)) return false;
+    if (q.status && x.status !== q.status) return false;
+    return true;
+  });
+export const saveRechargePackage = (x: Partial<RechargePackage>) =>
+  upsert(rechargePackages, x, "packageNo", () => nextNo("RP", rechargePackages));
+
+// ============================================================================
+// 系统设置 · 批次 B2/B3/B5 待建 8 项 mock（规格 §9~§16）
+// 口径：MENA 市场（AE/SA/EG…）、币种 AED、引用现有编号（CAB1000+ / ORD5000xx / U30xx / NT1xx）。
+// 禁止写入任何真实密钥/真实联系方式：目标一律脱敏，税号/账号用占位。
+// ============================================================================
+
+/** 今日基准（mock 时间轴的"现在"），发送记录页头统计据此判定"今日"。 */
+const TODAY = iso(0).slice(0, 10);
+
+/** 联系方式脱敏：手机保留前 6 后 2，邮箱保留首字母与域名。前端永不承载完整联系方式。 */
+export function maskTarget(v: string): string {
+  if (v.includes("@")) {
+    const [name, domain] = v.split("@");
+    return `${name.slice(0, 1)}***@${domain}`;
+  }
+  if (v.length <= 8) return `${v.slice(0, 3)}****`;
+  return `${v.slice(0, 6)}****${v.slice(-2)}`;
+}
+
+// —— §9 发送记录 ——
+const NOTIFY_SCENES = ["OTP 验证码", "借出成功", "归还成功", "扣费通知", "逾期提醒", "工单派单", "提现结果", "告警通知"];
+const NOTIFY_FAILS = ["运营商拒收（号码停机）", "邮箱硬退信（地址不存在）", "设备 token 已失效", "触达拉黑名单命中", "上游限流，稍后重试"];
+const NOTIFY_TARGETS = [
+  "+9715012345678", "+9715098765432", "+966501234567", "+9715055512345",
+  "fatima.a@example.ae", "omar.k@example.sa", "layla.h@example.ae",
+  "dGtuX2FwbnNfODkwMTIz", "+201001234567", "+9715077788899",
+];
+export const notifyLogs: NotifyLog[] = Array.from({ length: 42 }, (_, i) => {
+  const channel = p(["SMS", "EMAIL", "PUSH", "WHATSAPP"] as const, i);
+  // Push 近乎免费，短信/WhatsApp 单价高——成本差异是本页存在的理由。
+  const cost = channel === "PUSH" ? 0 : channel === "EMAIL" ? 0.01 : channel === "WHATSAPP" ? 0.11 : 0.09;
+  const failed = i % 11 === 0;
+  return {
+    logNo: `NL${7000 + i}`,
+    channel,
+    templateNo: `NT${100 + (i % 14)}`,
+    target: maskTarget(p(NOTIFY_TARGETS, i)),
+    scene: p(NOTIFY_SCENES, i),
+    // 前 16 条落在"今日"，其余往前铺 1~6 天，让页头统计有真实分母。
+    sentAt: i < 16 ? iso(i * 1800_000) : iso((i - 15) * 86400_000 / 4 + 43200_000),
+    status: failed ? "FAILED" : "SENT",
+    failReason: failed ? p(NOTIFY_FAILS, i) : null,
+    cost,
+    currency: "AED",
+  } as NotifyLog;
+});
+
+export const listNotifyLogs = (q: PageQuery & { channel?: string; status?: string; sort?: string; dir?: string } = {}) => {
+  const rows = notifyLogs.filter((x) =>
+    (!q.channel || x.channel === q.channel) &&
+    (!q.status || x.status === q.status) &&
+    kwHit(q.keyword, x.logNo, x.templateNo, x.target, x.scene, x.failReason));
+  if (q.sort) {
+    const dir = q.dir === "asc" ? 1 : -1;
+    rows.sort((a, b) => (q.sort === "cost" ? (a.cost - b.cost) : a.sentAt.localeCompare(b.sentAt)) * dir);
+  }
+  return paginate(rows, q.page, q.size);
+};
+/** 页头统计：今日发送量 / 失败率 / 今日成本（失败率按今日口径，避免历史稀释当日异常）。 */
+export function getNotifyLogStats(): NotifyLogStats {
+  const today = notifyLogs.filter((x) => x.sentAt.slice(0, 10) === TODAY);
+  const failed = today.filter((x) => x.status === "FAILED").length;
+  return {
+    sentToday: today.length,
+    failedToday: failed,
+    failRate: today.length ? failed / today.length : 0,
+    costToday: Math.round(today.reduce((s, x) => s + x.cost, 0) * 100) / 100,
+    currency: "AED",
+  };
+}
+
+// —— §10 触达拉黑 ——
+export const notifyBlacklist: NotifyBlacklist[] = [
+  { blockNo: "BL901", target: maskTarget("+9715012345678"), channel: "SMS", reason: "USER_OPT_OUT", blockedAt: iso(3 * 86400_000), blockedBy: "系统（用户回复 STOP）", expireAt: null },
+  { blockNo: "BL902", target: maskTarget("omar.k@example.sa"), channel: "EMAIL", reason: "HARD_BOUNCE", blockedAt: iso(6 * 86400_000), blockedBy: "系统（SES 硬退信）", expireAt: null },
+  { blockNo: "BL903", target: maskTarget("+966501234567"), channel: "ALL", reason: "ABUSE", blockedAt: iso(9 * 86400_000), blockedBy: "风控值班组", expireAt: iso(-21 * 86400_000) },
+  { blockNo: "BL904", target: maskTarget("dGtuX2FwbnNfODkwMTIz"), channel: "PUSH", reason: "MANUAL", blockedAt: iso(12 * 86400_000), blockedBy: "客服中心", expireAt: iso(-3 * 86400_000) },
+  { blockNo: "BL905", target: maskTarget("+9715055512345"), channel: "SMS", reason: "ABUSE", blockedAt: iso(20 * 86400_000), blockedBy: "风控值班组", expireAt: iso(5 * 86400_000) },
+  { blockNo: "BL906", target: maskTarget("layla.h@example.ae"), channel: "EMAIL", reason: "USER_OPT_OUT", blockedAt: iso(26 * 86400_000), blockedBy: "系统（退订链接）", expireAt: null },
+  { blockNo: "BL907", target: maskTarget("+201001234567"), channel: "WHATSAPP", reason: "HARD_BOUNCE", blockedAt: iso(31 * 86400_000), blockedBy: "系统（WhatsApp 未注册）", expireAt: null },
+  { blockNo: "BL908", target: maskTarget("+9715077788899"), channel: "ALL", reason: "MANUAL", blockedAt: iso(40 * 86400_000), blockedBy: "运营中心", expireAt: iso(-60 * 86400_000) },
+];
+export const listNotifyBlacklist = (q: PageQuery & { channel?: string; reason?: string } = {}) =>
+  paginate(notifyBlacklist, q.page, q.size, (x) =>
+    (!q.channel || x.channel === q.channel) &&
+    (!q.reason || x.reason === q.reason) &&
+    kwHit(q.keyword, x.blockNo, x.target, x.blockedBy));
+export const saveNotifyBlacklist = (x: Partial<NotifyBlacklist>) =>
+  upsert(notifyBlacklist, x, "blockNo", () => nextNo("BL", notifyBlacklist));
+/** 解除拉黑：软删除——把到期时间置为当下，保留拉黑历史供审计（决策 §八-4）。 */
+export function releaseNotifyBlacklist(blockNo: string): NotifyBlacklist {
+  const i = notifyBlacklist.findIndex((x) => x.blockNo === blockNo);
+  if (i < 0) throw new Error("拉黑记录不存在");
+  notifyBlacklist[i] = { ...notifyBlacklist[i], expireAt: iso(0) };
+  return notifyBlacklist[i];
+}
+
+// —— §11 业务规则 ——
+// ⚠️ 数值为 mock 占位，非业务口径；提现手续费率/封顶将来是提现审核页的唯一来源（规格 §17.1-3）。
+export const bizRules: BizRules = {
+  withdraw: { minAmount: 100, feeRate: 0.006, feeCap: 25, settleDays: 7, dailyLimit: 20000, needApproval: true },
+  reservation: { maxDurationMin: 30, advanceHours: 24, holdFeePerMin: 0.2, maxConcurrent: 1 },
+  billing: { freeMinutes: 5, billUnitMinutes: 30, dailyCap: 20, buyoutPrice: 99, overdueHours: 72 },
+  currency: "AED",
+  updatedAt: iso(4 * 86400_000),
+};
+export const getBizRules = (): BizRules => bizRules;
+/** 分区保存：只覆盖传入的分区，未传分区保持不变（三张 Card 各自保存）。 */
+export function saveBizRules(x: Partial<BizRules>): BizRules {
+  if (x.withdraw) bizRules.withdraw = { ...bizRules.withdraw, ...x.withdraw };
+  if (x.reservation) bizRules.reservation = { ...bizRules.reservation, ...x.reservation };
+  if (x.billing) bizRules.billing = { ...bizRules.billing, ...x.billing };
+  bizRules.updatedAt = iso(0);
+  return bizRules;
+}
+
+// —— §12 登录设置 ——
+// `*` 是默认档（无专属配置的国家走它），列表置顶。
+export const loginSettings: LoginSetting[] = [
+  { country: "*", countryName: "默认（未单独配置的国家）", otpEnabled: true, passwordEnabled: false, appleEnabled: true, googleEnabled: true, otpExpireSec: 300, otpDailyLimit: 10, forceRealName: false },
+  { country: "AE", countryName: "阿联酋", otpEnabled: true, passwordEnabled: false, appleEnabled: true, googleEnabled: true, otpExpireSec: 300, otpDailyLimit: 12, forceRealName: false },
+  { country: "SA", countryName: "沙特", otpEnabled: true, passwordEnabled: true, appleEnabled: true, googleEnabled: false, otpExpireSec: 180, otpDailyLimit: 8, forceRealName: true },
+  { country: "QA", countryName: "卡塔尔", otpEnabled: true, passwordEnabled: false, appleEnabled: true, googleEnabled: true, otpExpireSec: 300, otpDailyLimit: 10, forceRealName: false },
+  { country: "KW", countryName: "科威特", otpEnabled: true, passwordEnabled: false, appleEnabled: false, googleEnabled: true, otpExpireSec: 300, otpDailyLimit: 10, forceRealName: false },
+  { country: "EG", countryName: "埃及", otpEnabled: true, passwordEnabled: true, appleEnabled: false, googleEnabled: true, otpExpireSec: 600, otpDailyLimit: 6, forceRealName: false },
+];
+/** `*` 默认档恒置顶，其余按国家码排序——一眼看清"默认是什么、谁被单独放开"。 */
+export const listLoginSettings = (q: PageQuery = {}) => {
+  const rows = loginSettings
+    .filter((x) => kwHit(q.keyword, x.country, x.countryName))
+    .sort((a, b) => (a.country === "*" ? -1 : b.country === "*" ? 1 : a.country.localeCompare(b.country)));
+  return paginate(rows, q.page, q.size);
+};
+export const saveLoginSetting = (x: Partial<LoginSetting>) =>
+  upsert(loginSettings, x, "country", () => nextNo("XX", loginSettings, 0));
+
+// —— §13 应用版本 ——
+export const appVersions: AppVersion[] = [
+  {
+    versionId: "IOS-1.4.2", versionNo: "1.4.2", platform: "IOS", buildNo: 1420,
+    releaseNote: "支持信用免押借出；修复 Dubai Mall 部分机柜扫码超时。",
+    releaseNoteEn: "Credit-based deposit waiver; fixed scan timeout at some Dubai Mall cabinets.",
+    releaseNoteAr: "الإعفاء من التأمين بناءً على التقييم الائتماني؛ إصلاح انتهاء مهلة المسح في بعض خزائن دبي مول.",
+    forceUpdate: false, minSupported: "1.2.0", rolloutPercent: 100,
+    downloadUrl: "https://apps.apple.com/app/id0000000000", status: "RELEASED", releasedAt: iso(6 * 86400_000),
+  },
+  {
+    versionId: "IOS-1.5.0", versionNo: "1.5.0", platform: "IOS", buildNo: 1500,
+    releaseNote: "新增预约取宝；阿语界面 RTL 全量适配。",
+    releaseNoteEn: "Reserve-a-powerbank; full RTL polish for Arabic.",
+    releaseNoteAr: "حجز بطارية مسبقًا؛ تحسين كامل لواجهة اللغة العربية من اليمين إلى اليسار.",
+    forceUpdate: false, minSupported: "1.3.0", rolloutPercent: 20,
+    downloadUrl: "https://apps.apple.com/app/id0000000000", status: "RELEASED", releasedAt: iso(1 * 86400_000),
+  },
+  {
+    versionId: "ANDROID-1.4.2", versionNo: "1.4.2", platform: "ANDROID", buildNo: 1421,
+    releaseNote: "支持信用免押借出；优化弱网下的归还确认。",
+    releaseNoteEn: "Credit-based deposit waiver; better return confirmation on weak networks.",
+    releaseNoteAr: "الإعفاء من التأمين؛ تحسين تأكيد الإرجاع عند ضعف الشبكة.",
+    forceUpdate: false, minSupported: "1.2.0", rolloutPercent: 100,
+    downloadUrl: "https://play.google.com/store/apps/details?id=example.sharehub", status: "RELEASED", releasedAt: iso(6 * 86400_000),
+  },
+  {
+    versionId: "ANDROID-1.4.3", versionNo: "1.4.3", platform: "ANDROID", buildNo: 1430,
+    releaseNote: "强制更新：修复支付回调丢单导致的重复扣费。",
+    releaseNoteEn: "Mandatory update: fixes duplicate charges caused by lost payment callbacks.",
+    releaseNoteAr: "تحديث إلزامي: إصلاح الخصم المزدوج الناتج عن فقدان استدعاء الدفع.",
+    forceUpdate: true, minSupported: "1.4.3", rolloutPercent: 100,
+    downloadUrl: "https://play.google.com/store/apps/details?id=example.sharehub", status: "RELEASED", releasedAt: iso(2 * 86400_000),
+  },
+  {
+    versionId: "ANDROID-1.4.1", versionNo: "1.4.1", platform: "ANDROID", buildNo: 1410,
+    releaseNote: "灰度中发现归还偶发失败，已回滚。",
+    releaseNoteEn: "Rolled back: intermittent return failures found during rollout.",
+    releaseNoteAr: "تم التراجع: أعطال متقطعة في الإرجاع أثناء الطرح التدريجي.",
+    forceUpdate: false, minSupported: "1.2.0", rolloutPercent: 0,
+    downloadUrl: "https://play.google.com/store/apps/details?id=example.sharehub", status: "ROLLBACK", releasedAt: iso(14 * 86400_000),
+  },
+  {
+    versionId: "H5-2.1.0", versionNo: "2.1.0", platform: "H5", buildNo: 2100,
+    releaseNote: "小程序/H5 免安装借还；接入 NEARPAY 快捷支付。",
+    releaseNoteEn: "Install-free rental on H5; NEARPAY express checkout.",
+    releaseNoteAr: "الاستئجار دون تثبيت عبر H5؛ الدفع السريع عبر NEARPAY.",
+    forceUpdate: false, minSupported: "2.0.0", rolloutPercent: 100,
+    downloadUrl: "https://h5.example.ae", status: "RELEASED", releasedAt: iso(9 * 86400_000),
+  },
+  {
+    versionId: "H5-2.2.0", versionNo: "2.2.0", platform: "H5", buildNo: 2200,
+    releaseNote: "草稿：站点地图与附近可借数量。",
+    releaseNoteEn: "Draft: station map with live availability.",
+    releaseNoteAr: "مسودة: خريطة المحطات مع توفر البطاريات مباشرة.",
+    forceUpdate: false, minSupported: "2.0.0", rolloutPercent: 0,
+    downloadUrl: "https://h5.example.ae", status: "DRAFT", releasedAt: null,
+  },
+];
+/** 按平台分组显示：先平台（IOS→ANDROID→H5），组内按 buildNo 倒序（新版在上）。 */
+const PLATFORM_ORDER: AppVersion["platform"][] = ["IOS", "ANDROID", "H5"];
+export const listAppVersions = (q: PageQuery & { platform?: string } = {}) => {
+  const rows = appVersions
+    .filter((x) => (!q.platform || x.platform === q.platform) && kwHit(q.keyword, x.versionNo, x.platform, x.releaseNote, x.releaseNoteEn))
+    .sort((a, b) =>
+      PLATFORM_ORDER.indexOf(a.platform) - PLATFORM_ORDER.indexOf(b.platform) || b.buildNo - a.buildNo);
+  return paginate(rows, q.page, q.size);
+};
+export const saveAppVersion = (x: Partial<AppVersion>) => {
+  // versionId 由 平台-版本号 派生：同一版本号在不同平台是两条记录。
+  const withId = x.versionId ? x : { ...x, versionId: `${x.platform ?? "IOS"}-${x.versionNo ?? "0.0.0"}` };
+  return upsert(appVersions, withId, "versionId", () => `${x.platform ?? "IOS"}-${x.versionNo ?? "0.0.0"}`);
+};
+/** 回滚：置 ROLLBACK 且灰度归零（立即停止下发），保留记录不物理删。 */
+export function rollbackAppVersion(versionId: string): AppVersion {
+  const i = appVersions.findIndex((x) => x.versionId === versionId);
+  if (i < 0) throw new Error("版本不存在");
+  appVersions[i] = { ...appVersions[i], status: "ROLLBACK", rolloutPercent: 0 };
+  return appVersions[i];
+}
+
+// —— §14 银行管理 ——
+// IBAN 长度是各国固定值（AE 23 / SA 24 / EG 29 …），提现收款账户按此校验。
+export const banks: BankEntry[] = [
+  { bankCode: "ENBD", bankName: "阿联酋国民银行", bankNameEn: "Emirates NBD", country: "AE", currency: "AED", swiftPrefix: "EBILAEAD", ibanLength: 23, status: "ENABLED" },
+  { bankCode: "FAB", bankName: "阿布扎比第一银行", bankNameEn: "First Abu Dhabi Bank", country: "AE", currency: "AED", swiftPrefix: "NBADAEAA", ibanLength: 23, status: "ENABLED" },
+  { bankCode: "ADCB", bankName: "阿布扎比商业银行", bankNameEn: "Abu Dhabi Commercial Bank", country: "AE", currency: "AED", swiftPrefix: "ADCBAEAA", ibanLength: 23, status: "ENABLED" },
+  { bankCode: "MASHREQ", bankName: "马士礼格银行", bankNameEn: "Mashreq Bank", country: "AE", currency: "AED", swiftPrefix: "BOMLAEAD", ibanLength: 23, status: "ENABLED" },
+  { bankCode: "DIB", bankName: "迪拜伊斯兰银行", bankNameEn: "Dubai Islamic Bank", country: "AE", currency: "AED", swiftPrefix: "DUIBAEAD", ibanLength: 23, status: "ENABLED" },
+  { bankCode: "RAJHI", bankName: "拉吉希银行", bankNameEn: "Al Rajhi Bank", country: "SA", currency: "SAR", swiftPrefix: "RJHISARI", ibanLength: 24, status: "ENABLED" },
+  { bankCode: "SNB", bankName: "沙特国民银行", bankNameEn: "Saudi National Bank", country: "SA", currency: "SAR", swiftPrefix: "NCBKSAJE", ibanLength: 24, status: "ENABLED" },
+  { bankCode: "RIYAD", bankName: "利雅得银行", bankNameEn: "Riyad Bank", country: "SA", currency: "SAR", swiftPrefix: "RIBLSARI", ibanLength: 24, status: "DISABLED" },
+  { bankCode: "QNB", bankName: "卡塔尔国民银行", bankNameEn: "Qatar National Bank", country: "QA", currency: "QAR", swiftPrefix: "QNBAQAQA", ibanLength: 29, status: "DISABLED" },
+  { bankCode: "NBK", bankName: "科威特国民银行", bankNameEn: "National Bank of Kuwait", country: "KW", currency: "KWD", swiftPrefix: "NBOKKWKW", ibanLength: 30, status: "DISABLED" },
+  { bankCode: "CIB", bankName: "埃及商业国际银行", bankNameEn: "Commercial International Bank", country: "EG", currency: "EGP", swiftPrefix: "CIBEEGCX", ibanLength: 29, status: "DISABLED" },
+];
+export const listBanks = (q: PageQuery & { country?: string; currency?: string } = {}) =>
+  paginate(banks, q.page, q.size, (x) =>
+    (!q.country || x.country === q.country) &&
+    (!q.currency || x.currency === q.currency) &&
+    kwHit(q.keyword, x.bankCode, x.bankName, x.bankNameEn, x.swiftPrefix));
+export const saveBank = (x: Partial<BankEntry>) => upsert(banks, x, "bankCode", () => nextNo("BK", banks));
+
+// —— §15 问题管理 ——
+export const problems: ProblemEntry[] = [
+  {
+    problemNo: "PB901", category: "RENT",
+    title: "扫码后充电宝没弹出", titleEn: "Nothing ejected after scanning", titleAr: "لم تخرج البطارية بعد مسح الرمز",
+    answer: "请在 App 内点「重试弹出」；仍无反应说明卡槽卡宝，我们会自动开工单并在 30 分钟内到场，本单不计费。",
+    answerEn: "Tap “Retry eject” in the app. If it still fails the slot is stuck — a work order is raised automatically, an engineer arrives within 30 minutes, and this rental is not charged.",
+    answerAr: "اضغط «إعادة الإخراج» في التطبيق. إذا استمرت المشكلة فالفتحة عالقة — سيتم إنشاء طلب صيانة تلقائيًا والوصول خلال 30 دقيقة، ولن يتم احتساب رسوم.",
+    suggestedAction: "TO_WORKORDER", sortNo: 1, status: "ENABLED",
+  },
+  {
+    problemNo: "PB902", category: "RETURN",
+    title: "机柜满仓，还不进去", titleEn: "Cabinet is full, cannot return", titleAr: "الخزانة ممتلئة ولا يمكن الإرجاع",
+    answer: "请在 App 地图上选择附近可还机柜（显示空仓数）；因满仓产生的超时时长会在申诉后免除。",
+    answerEn: "Pick a nearby cabinet with free slots on the app map. Overdue time caused by a full cabinet is waived after you file a claim.",
+    answerAr: "اختر خزانة قريبة بها فتحات فارغة من خريطة التطبيق. سيتم إعفاء وقت التأخير الناتج عن امتلاء الخزانة بعد تقديم الشكوى.",
+    suggestedAction: "SELF_SERVICE", sortNo: 2, status: "ENABLED",
+  },
+  {
+    problemNo: "PB903", category: "BILLING",
+    title: "已归还但仍在计费", titleEn: "Still being charged after returning", titleAr: "استمرار احتساب الرسوم بعد الإرجاع",
+    answer: "归还回执以机柜上报为准，偶发延迟在 10 分钟内自动结算；超过 10 分钟请提交订单号，客服核对后按实际归还时间重算并退差额。",
+    answerEn: "Return is confirmed by the cabinet report; occasional delays settle automatically within 10 minutes. Beyond that, submit the order number — we recalculate by the actual return time and refund the difference.",
+    answerAr: "يتم تأكيد الإرجاع من تقرير الخزانة، وتتم التسوية تلقائيًا خلال 10 دقائق. بعد ذلك، أرسل رقم الطلب وسنعيد الحساب حسب وقت الإرجاع الفعلي ونرد الفرق.",
+    suggestedAction: "TO_REFUND", sortNo: 3, status: "ENABLED",
+  },
+  {
+    problemNo: "PB904", category: "BILLING",
+    title: "押金什么时候退", titleEn: "When is my deposit refunded", titleAr: "متى يتم رد مبلغ التأمين",
+    answer: "归还后押金即时解冻，银行入账通常 1-3 个工作日（部分发卡行最长 7 天）。信用免押用户无押金冻结。",
+    answerEn: "The deposit is released immediately after return; banks post it in 1-3 business days (up to 7 with some issuers). Credit-waiver users have no deposit hold.",
+    answerAr: "يتم تحرير التأمين فور الإرجاع، ويستغرق ظهوره في البنك من 1 إلى 3 أيام عمل (حتى 7 أيام لدى بعض البنوك). لا يوجد تأمين لمستخدمي الإعفاء الائتماني.",
+    suggestedAction: "SELF_SERVICE", sortNo: 4, status: "ENABLED",
+  },
+  {
+    problemNo: "PB905", category: "DEVICE",
+    title: "充电宝充不进电 / 线坏了", titleEn: "Powerbank not charging or cable broken", titleAr: "البطارية لا تشحن أو الكابل تالف",
+    answer: "请就近归还并在 App 内报障，本单免费；我们会锁定该充电宝编号并派维修回收。",
+    answerEn: "Return it at the nearest cabinet and report the fault in the app — this rental is free. We lock that powerbank and dispatch a technician to collect it.",
+    answerAr: "أعِد البطارية في أقرب خزانة وأبلغ عن العطل في التطبيق — هذا الاستئجار مجاني. سنقوم بحظر البطارية وإرسال فني لاستلامها.",
+    suggestedAction: "TO_WORKORDER", sortNo: 5, status: "ENABLED",
+  },
+  {
+    problemNo: "PB906", category: "ACCOUNT",
+    title: "收不到验证码", titleEn: "Not receiving the OTP", titleAr: "لا أستلم رمز التحقق",
+    answer: "请确认号码所在国家已开放注册，并检查是否曾回复 STOP 退订（会进入触达拉黑）。可改用 Apple / Google 登录。",
+    answerEn: "Check that your country is open for sign-up and whether you previously replied STOP (which adds you to the send-blocklist). You can also sign in with Apple or Google.",
+    answerAr: "تأكد من أن بلدك متاح للتسجيل، وتحقق مما إذا كنت قد رددت بكلمة STOP سابقًا (تؤدي إلى الحظر). يمكنك أيضًا تسجيل الدخول عبر Apple أو Google.",
+    suggestedAction: "TO_CS", sortNo: 6, status: "ENABLED",
+  },
+  {
+    problemNo: "PB907", category: "RENT",
+    title: "同时借多个充电宝", titleEn: "Renting more than one powerbank", titleAr: "استئجار أكثر من بطارية",
+    answer: "单账号默认同时可借 1 个；实名用户可申请提升至 2 个，超出请使用同行人账号。",
+    answerEn: "One active rental per account by default; verified users can request a limit of two. Beyond that, please use a companion’s account.",
+    answerAr: "استئجار واحد نشط لكل حساب افتراضيًا؛ يمكن للمستخدمين الموثقين طلب رفعه إلى اثنين. لما زاد عن ذلك، استخدم حساب مرافق.",
+    suggestedAction: "SELF_SERVICE", sortNo: 7, status: "ENABLED",
+  },
+  {
+    problemNo: "PB908", category: "OTHER",
+    title: "发票 / 报销凭证", titleEn: "Invoice for expense claims", titleAr: "الفاتورة الضريبية للمصروفات",
+    answer: "在「我的-订单」选择订单申请电子发票，含 TRN 税号，通常 10 分钟内发送到邮箱。",
+    answerEn: "Request an e-invoice from My Orders; it includes the TRN and usually arrives by email within 10 minutes.",
+    answerAr: "اطلب الفاتورة الإلكترونية من «طلباتي»؛ تتضمن الرقم الضريبي وتصل عبر البريد خلال 10 دقائق عادةً.",
+    suggestedAction: "SELF_SERVICE", sortNo: 8, status: "ENABLED",
+  },
+  {
+    problemNo: "PB909", category: "OTHER",
+    title: "斋月营业时间（已停用）", titleEn: "Ramadan opening hours (retired)", titleAr: "ساعات العمل في رمضان (موقوف)",
+    answer: "旧版斋月说明，已由公告替代，保留仅供历史工单参考。",
+    answerEn: "Legacy Ramadan notice, superseded by announcements; kept for historical tickets only.",
+    answerAr: "إشعار رمضان القديم، تم استبداله بالإعلانات؛ محفوظ للرجوع فقط.",
+    suggestedAction: "TO_CS", sortNo: 9, status: "DISABLED",
+  },
+];
+export const listProblems = (q: PageQuery & { category?: string; status?: string } = {}) => {
+  const rows = problems
+    .filter((x) =>
+      (!q.category || x.category === q.category) &&
+      (!q.status || x.status === q.status) &&
+      kwHit(q.keyword, x.problemNo, x.title, x.titleEn, x.titleAr, x.answer))
+    .sort((a, b) => a.sortNo - b.sortNo);
+  return paginate(rows, q.page, q.size);
+};
+export const saveProblem = (x: Partial<ProblemEntry>) => upsert(problems, x, "problemNo", () => nextNo("PB", problems));
+
+// —— §16 税率与发票（阶段 3）——
+// 税号一律占位（`****`）：合规资料不落前端 mock。
+export const taxSettings: TaxSetting[] = [
+  { country: "AE", countryName: "阿联酋", taxName: "VAT", ratePercent: 5, trn: "1000****00003", invoiceTitle: "ShareHub FZ-LLC", includedInPrice: true, effectiveFrom: "2026-01-01" },
+  { country: "SA", countryName: "沙特", taxName: "ZATCA VAT", ratePercent: 15, trn: "3000****00003", invoiceTitle: "ShareHub Arabia LLC", includedInPrice: true, effectiveFrom: "2026-04-01" },
+  { country: "QA", countryName: "卡塔尔", taxName: "VAT（待立法）", ratePercent: 0, trn: "-", invoiceTitle: "ShareHub Qatar", includedInPrice: false, effectiveFrom: "2027-01-01" },
+  { country: "KW", countryName: "科威特", taxName: "VAT（待立法）", ratePercent: 0, trn: "-", invoiceTitle: "ShareHub Kuwait", includedInPrice: false, effectiveFrom: "2027-01-01" },
+  { country: "EG", countryName: "埃及", taxName: "VAT", ratePercent: 14, trn: "200-***-456", invoiceTitle: "ShareHub Egypt LLC", includedInPrice: false, effectiveFrom: "2027-01-01" },
+];
+export const listTaxSettings = (q: PageQuery = {}) =>
+  paginate(taxSettings, q.page, q.size, (x) => kwHit(q.keyword, x.country, x.countryName, x.taxName, x.invoiceTitle));
+export const saveTaxSetting = (x: Partial<TaxSetting>) =>
+  upsert(taxSettings, x, "country", () => nextNo("XX", taxSettings, 0));

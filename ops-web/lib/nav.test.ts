@@ -41,9 +41,21 @@ describe("A.9 角色×域可见性矩阵（抽查）", () => {
     expect(cs).not.toContain("place-bd");
     expect(cs).not.toContain("analytics");
   });
-  it("FINANCE 进 系统与权限 仅见员工与权限(审计)，不见系统设置", () => {
+  // 2026-07-29 对标补齐后语义变更：银行字典/税率/提现规则/支付渠道属财务职责，
+  // FINANCE 因此能进系统设置——但**只见这 4 项**，看不到登录设置/系统参数等运维项。
+  it("FINANCE 进 系统与权限：见员工与权限 + 系统设置(仅财务四项)", () => {
     const mods = visibleModules(domain("system"), "FINANCE").map((m) => m.key);
-    expect(mods).toEqual(["org"]);
+    expect(mods).toEqual(["org", "system"]);
+    const leaves = visibleLeaves(module_("system", "system"), "FINANCE").map((l) => l.label);
+    expect(leaves).toEqual(["支付渠道", "业务规则", "银行管理", "税率与发票"]);
+  });
+  it("系统设置每个叶子都有显式 perm：防「无 perm 跟随父模块」导致越权可见", () => {
+    const noPerm = (module_("system", "system").children ?? []).filter((l) => !l.perm).map((l) => l.label);
+    expect(noPerm).toEqual([]);
+  });
+  it("CS 在系统设置只见客服相关三项（发送记录/触达拉黑/问题管理）", () => {
+    expect(visibleLeaves(module_("system", "system"), "CS").map((l) => l.label))
+      .toEqual(["发送记录", "触达拉黑", "问题管理"]);
   });
   it("AGENT 见 概览/设备运营/渠道与场地/交易与资金，不见其余", () => {
     expect(domainKeys("AGENT")).toEqual(["overview", "device-ops", "place-bd", "trade-fin"]);

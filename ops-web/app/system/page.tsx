@@ -4,30 +4,49 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { Pagination } from "@/components/ui/misc";
+import { Pagination, StatCard } from "@/components/ui/misc";
 import { TabHeader } from "@/components/ui/tab-header";
 import { Toolbar } from "@/components/ui/toolbar";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
-import { DataTable, type Column } from "@/components/ui/data-table";
+import { DataTable, type Column, type SortDir } from "@/components/ui/data-table";
 import { Drawer, Field } from "@/components/ui/drawer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { Input, Select } from "@/components/ui/input";
-import { fmtTime } from "@/lib/utils";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { Check, X } from "lucide-react";
+import { fmtTime, money } from "@/lib/utils";
 import { useCan } from "@/lib/use-can";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
+import { exportCsv } from "@/lib/export-csv";
 import type { Vendor, AccessMode, NotifyTemplate, DictEntry, Region, SysParam, OpenApiApp, MarketCountry, PaymentChannel, PageResult } from "@/lib/types";
+import type {
+  NotifyLog, NotifyBlacklist, LoginSetting, AppVersion, BankEntry, ProblemEntry, TaxSetting,
+  WithdrawRule, ReservationRule, BillingDefaultRule,
+} from "@/lib/types";
 
 const SIZE = 10;
+// tab 顺序与 lib/nav.ts 的 /system 叶子顺序一致（接入与支付 → 消息触达 → 业务规则 → 基础字典 → 开放与市场），
+// 否则从菜单深链过来会觉得"页里的位置和菜单里的位置对不上"。
 const TABS = [
   { key: "vendors", label: "供应商接入" },
   // 支付渠道：竞品 7 个渠道各占一菜单，我们合并为一页（列表 + 各自配置抽屉）
   { key: "payment", label: "支付渠道" },
   { key: "notify", label: "通知模板" },
+  { key: "notify-log", label: "发送记录", phase: 2 as const },
+  { key: "notify-blacklist", label: "触达拉黑", phase: 2 as const },
+  { key: "rules", label: "业务规则", phase: 2 as const },
+  { key: "login", label: "登录设置", phase: 2 as const },
+  { key: "app-version", label: "应用版本", phase: 2 as const },
   { key: "dict", label: "参数字典" },
   { key: "region", label: "地区库" },
+  { key: "banks", label: "银行管理", phase: 2 as const },
+  { key: "problems", label: "问题管理", phase: 2 as const },
   { key: "params", label: "系统参数" },
+  { key: "tax", label: "税率与发票", phase: 3 as const },
   { key: "markets", label: "多国家市场", phase: 3 as const },
   { key: "openapi", label: "OpenAPI 应用", phase: 3 as const },
 ];
@@ -101,6 +120,302 @@ const OPENAPI_FIELDS: FieldDef[] = [
   { key: "status", label: "状态", type: "select", options: [{ value: "ACTIVE", label: "启用" }, { value: "DISABLED", label: "停用" }] },
 ];
 
+// ============================================================================
+// 批次 B2/B3/B5 · 系统设置 8 个待建 tab（规格 §9~§16）
+// 统一走 B0 补齐的共享组件能力：section 分区 / textarea / date / 字段级校验 /
+// disabledWhen 联动禁用 / help 说明 / Toolbar 导出槽 / useConfirm 二次确认 / DataTable 排序。
+// 勿在本区块手搓控件（TDD-运营端前端补全方案 §八-1）。
+// ============================================================================
+
+// —— §9 发送记录 ——
+const LOG_CHANNEL: Record<NotifyLog["channel"], string> = { SMS: "短信", EMAIL: "邮件", PUSH: "Push", WHATSAPP: "WhatsApp" };
+const LOG_SCENE_HINT = "OTP / 借出 / 归还 / 扣费 / 告警";
+
+// —— §10 触达拉黑 ——
+const BL_CHANNEL: Record<NotifyBlacklist["channel"], string> = { SMS: "短信", EMAIL: "邮件", PUSH: "Push", WHATSAPP: "WhatsApp", ALL: "全渠道" };
+const BL_REASON: Record<NotifyBlacklist["reason"], { label: string; tone: "muted" | "warning" | "danger" | "outline" }> = {
+  USER_OPT_OUT: { label: "用户退订", tone: "muted" },
+  HARD_BOUNCE: { label: "硬退信/无效号", tone: "warning" },
+  ABUSE: { label: "滥用/投诉", tone: "danger" },
+  MANUAL: { label: "人工拉黑", tone: "outline" },
+};
+const BL_CHANNEL_OPTIONS = [
+  { value: "SMS", label: "短信" }, { value: "EMAIL", label: "邮件" }, { value: "PUSH", label: "Push" },
+  { value: "WHATSAPP", label: "WhatsApp" }, { value: "ALL", label: "全渠道" },
+];
+const BLACKLIST_FIELDS: FieldDef[] = [
+  { key: "blockNo", label: "拉黑号", readOnlyOnEdit: true, placeholder: "留空自动生成", section: "拉黑对象" },
+  {
+    key: "target", label: "目标（号码 / 邮箱）", required: true, maxLength: 64, section: "拉黑对象",
+    placeholder: "+9715012345678 或 name@example.ae",
+    help: "落库时按脱敏规则处理，列表只展示脱敏后的值",
+  },
+  { key: "channel", label: "渠道", type: "select", required: true, section: "拉黑对象", options: BL_CHANNEL_OPTIONS, help: "选「全渠道」= 该目标不再接收任何触达" },
+  {
+    key: "reason", label: "原因", type: "select", required: true, section: "处置",
+    options: [
+      { value: "USER_OPT_OUT", label: "用户退订" }, { value: "HARD_BOUNCE", label: "硬退信/无效号" },
+      { value: "ABUSE", label: "滥用/投诉" }, { value: "MANUAL", label: "人工拉黑" },
+    ],
+    help: "枚举而非自由文本：退订来源要能统计",
+  },
+  { key: "blockedBy", label: "操作人", required: true, maxLength: 30, section: "处置", placeholder: "风控值班组" },
+  { key: "expireAt", label: "到期时间", type: "date", section: "处置", help: "留空 = 永久拉黑" },
+];
+
+// —— §12 登录设置 ——
+const LOGIN_FIELDS: FieldDef[] = [
+  {
+    key: "country", label: "国家码", readOnlyOnEdit: true, required: true, section: "适用范围",
+    placeholder: "AE / SA / *",
+    pattern: { re: "^(\\*|[A-Za-z]{2})$", msg: "国家码需为 ISO alpha-2（如 AE），或 * 表示默认档" },
+    help: "* = 默认档，未单独配置的国家走它",
+  },
+  { key: "countryName", label: "国家名称", required: true, maxLength: 30, section: "适用范围", placeholder: "阿联酋" },
+  { key: "otpEnabled", label: "短信验证码登录", type: "switch", section: "登录方式" },
+  { key: "passwordEnabled", label: "密码登录", type: "switch", section: "登录方式" },
+  { key: "appleEnabled", label: "Apple 登录", type: "switch", section: "第三方登录" },
+  { key: "googleEnabled", label: "Google 登录", type: "switch", section: "第三方登录" },
+  // 联动：关掉 OTP 登录，两个 OTP 策略字段自动禁用并清空——避免留下不生效的脏配置
+  { key: "otpExpireSec", label: "OTP 有效期（秒）", type: "number", required: true, min: 60, max: 1800, section: "OTP 策略", disabledWhen: (v) => !v.otpEnabled, help: "60~1800 秒；关闭 OTP 登录后不适用" },
+  { key: "otpDailyLimit", label: "单用户日发送上限（条）", type: "number", required: true, min: 1, max: 50, section: "OTP 策略", disabledWhen: (v) => !v.otpEnabled, help: "防刷与短信成本的主要闸门" },
+  { key: "forceRealName", label: "强制实名", type: "switch", section: "合规", help: "沙特等地监管要求；开启后未实名用户不能借出" },
+];
+
+// —— §13 应用版本 ——
+const PLATFORM_LABEL: Record<AppVersion["platform"], string> = { IOS: "iOS", ANDROID: "Android", H5: "H5 / 小程序" };
+const VERSION_STATUS: Record<AppVersion["status"], { label: string; tone: "muted" | "success" | "danger" }> = {
+  DRAFT: { label: "草稿", tone: "muted" },
+  RELEASED: { label: "已发布", tone: "success" },
+  ROLLBACK: { label: "已回滚", tone: "danger" },
+};
+const VERSION_FIELDS: FieldDef[] = [
+  { key: "platform", label: "平台", type: "select", required: true, readOnlyOnEdit: true, section: "基本信息", options: [{ value: "IOS", label: "iOS" }, { value: "ANDROID", label: "Android" }, { value: "H5", label: "H5 / 小程序" }] },
+  {
+    key: "versionNo", label: "版本号", required: true, readOnlyOnEdit: true, section: "基本信息", placeholder: "1.5.0",
+    pattern: { re: "^\\d+\\.\\d+\\.\\d+$", msg: "版本号格式为 x.y.z（如 1.5.0）" },
+    help: "平台 + 版本号构成业务键：同一版本号在 iOS / Android 是两条记录",
+  },
+  { key: "buildNo", label: "构建号", type: "number", required: true, min: 1, section: "基本信息", placeholder: "1500" },
+  { key: "status", label: "状态", type: "select", required: true, section: "基本信息", options: [{ value: "DRAFT", label: "草稿" }, { value: "RELEASED", label: "已发布" }, { value: "ROLLBACK", label: "已回滚" }] },
+  { key: "releaseNote", label: "更新说明（中文）", type: "textarea", rows: 3, required: true, maxLength: 200, section: "三语更新说明", placeholder: "支持信用免押借出；修复扫码超时。" },
+  { key: "releaseNoteEn", label: "更新说明（English）", type: "textarea", rows: 3, maxLength: 300, section: "三语更新说明" },
+  { key: "releaseNoteAr", label: "更新说明（العربية）", type: "textarea", rows: 3, maxLength: 300, section: "三语更新说明" },
+  { key: "forceUpdate", label: "强制更新", type: "switch", section: "发布控制", help: "开启后必须填「最低支持版本」，低于该版本的用户会被拦在启动页" },
+  {
+    key: "minSupported", label: "最低支持版本", section: "发布控制", placeholder: "1.4.3",
+    pattern: { re: "^\\d+\\.\\d+\\.\\d+$", msg: "版本号格式为 x.y.z（如 1.4.3）" },
+    help: "强更时必填（提交时校验）",
+  },
+  { key: "rolloutPercent", label: "灰度比例（%）", type: "number", required: true, min: 0, max: 100, section: "发布控制", help: "0~100；先小比例观察崩溃率再放量" },
+  { key: "downloadUrl", label: "下载地址", required: true, maxLength: 200, section: "发布控制", placeholder: "https://apps.apple.com/app/id..." },
+];
+
+// —— §14 银行管理 ——
+const BANK_FIELDS: FieldDef[] = [
+  { key: "bankCode", label: "银行代码", required: true, readOnlyOnEdit: true, maxLength: 12, section: "基本信息", placeholder: "ENBD", help: "业务键，自动转大写；建档后不可改" },
+  { key: "bankName", label: "银行名称（中文）", required: true, maxLength: 40, section: "基本信息", placeholder: "阿联酋国民银行" },
+  { key: "bankNameEn", label: "银行名称（English）", required: true, maxLength: 60, section: "基本信息", placeholder: "Emirates NBD" },
+  { key: "status", label: "状态", type: "select", required: true, section: "基本信息", options: [{ value: "ENABLED", label: "启用" }, { value: "DISABLED", label: "停用" }] },
+  {
+    key: "country", label: "国家码", required: true, section: "归属市场", placeholder: "AE",
+    pattern: { re: "^[A-Za-z]{2}$", msg: "国家码需为 ISO alpha-2（如 AE）" },
+  },
+  { key: "currency", label: "币种", required: true, maxLength: 3, section: "归属市场", placeholder: "AED" },
+  { key: "swiftPrefix", label: "SWIFT 前缀", required: true, maxLength: 11, section: "账户校验", placeholder: "EBILAEAD" },
+  {
+    key: "ibanLength", label: "IBAN 长度", type: "number", required: true, min: 15, max: 34, section: "账户校验",
+    help: "提现收款账户按此位数校验 IBAN（AE 23 / SA 24 / EG 29），填错会导致提现打款失败",
+  },
+];
+
+// —— §15 问题管理 ——
+const PROBLEM_CATEGORY: Record<ProblemEntry["category"], string> = {
+  RENT: "借出", RETURN: "归还", BILLING: "计费与退款", DEVICE: "设备故障", ACCOUNT: "账号", OTHER: "其他",
+};
+const PROBLEM_ACTION: Record<ProblemEntry["suggestedAction"], { label: string; tone: "muted" | "warning" | "danger" | "outline" }> = {
+  SELF_SERVICE: { label: "自助解决", tone: "muted" },
+  TO_WORKORDER: { label: "转工单", tone: "warning" },
+  TO_REFUND: { label: "转退款", tone: "danger" },
+  TO_CS: { label: "转人工客服", tone: "outline" },
+};
+const PROBLEM_CATEGORY_OPTIONS = (Object.keys(PROBLEM_CATEGORY) as ProblemEntry["category"][])
+  .map((k) => ({ value: k, label: PROBLEM_CATEGORY[k] }));
+const PROBLEM_FIELDS: FieldDef[] = [
+  { key: "problemNo", label: "问题号", readOnlyOnEdit: true, placeholder: "留空自动生成", section: "基本信息" },
+  { key: "category", label: "分类", type: "select", required: true, section: "基本信息", options: PROBLEM_CATEGORY_OPTIONS },
+  { key: "sortNo", label: "排序", type: "number", required: true, min: 1, section: "基本信息", help: "数字小的排前面，决定 C 端报障下拉的顺序" },
+  { key: "status", label: "状态", type: "select", required: true, section: "基本信息", options: [{ value: "ENABLED", label: "启用" }, { value: "DISABLED", label: "停用" }] },
+  // 三语标题 + 三语答复共 6 个输入：C 端报障下拉直接取标题，客服快捷答复直接取答复
+  { key: "title", label: "标题（中文）", required: true, maxLength: 40, section: "三语内容", placeholder: "扫码后充电宝没弹出" },
+  { key: "titleEn", label: "标题（English）", maxLength: 80, section: "三语内容", placeholder: "Nothing ejected after scanning" },
+  { key: "titleAr", label: "标题（العربية）", maxLength: 80, section: "三语内容", placeholder: "لم تخرج البطارية بعد مسح الرمز" },
+  { key: "answer", label: "标准答复（中文）", type: "textarea", rows: 3, required: true, maxLength: 300, section: "三语内容" },
+  { key: "answerEn", label: "标准答复（English）", type: "textarea", rows: 3, maxLength: 400, section: "三语内容" },
+  { key: "answerAr", label: "标准答复（العربية）", type: "textarea", rows: 3, maxLength: 400, section: "三语内容" },
+  {
+    key: "suggestedAction", label: "建议处置", type: "select", required: true, section: "处置",
+    options: [
+      { value: "SELF_SERVICE", label: "自助解决" }, { value: "TO_WORKORDER", label: "转工单" },
+      { value: "TO_REFUND", label: "转退款" }, { value: "TO_CS", label: "转人工客服" },
+    ],
+    help: "C 端报障与客服受理据此决定下一步——比竞品纯 FAQ 多的就是这一列",
+  },
+];
+
+// —— §16 税率与发票 ——
+const TAX_FIELDS: FieldDef[] = [
+  {
+    key: "country", label: "国家码", required: true, readOnlyOnEdit: true, section: "适用范围", placeholder: "AE",
+    pattern: { re: "^[A-Za-z]{2}$", msg: "国家码需为 ISO alpha-2（如 AE）" },
+    help: "业务键，自动转大写；建档后不可改",
+  },
+  { key: "countryName", label: "国家名称", required: true, maxLength: 30, section: "适用范围", placeholder: "阿联酋" },
+  { key: "taxName", label: "税种名称", required: true, maxLength: 30, section: "税率", placeholder: "VAT" },
+  { key: "ratePercent", label: "税率（%）", type: "number", required: true, min: 0, max: 100, section: "税率" },
+  { key: "includedInPrice", label: "价内税", type: "switch", section: "税率", help: "开启 = 价内税（展示价已含税）；关闭 = 价外税（结算时另加）——直接影响 C 端价格展示" },
+  { key: "trn", label: "税号（TRN）", required: true, maxLength: 20, section: "开票信息", placeholder: "1000****00003", help: "前端仅存掩码占位，完整税号由后端保管" },
+  { key: "invoiceTitle", label: "默认开票抬头", required: true, maxLength: 60, section: "开票信息", placeholder: "ShareHub FZ-LLC" },
+  { key: "effectiveFrom", label: "生效日期", type: "date", required: true, section: "开票信息" },
+];
+
+/** ✓/✗ 图标组：登录设置列表用它一眼看清"哪个国家开了什么"（比 是/否 文字更快扫读）。 */
+function OnOff({ on, label }: { on: boolean; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 text-xs" title={`${label}：${on ? "开启" : "关闭"}`}>
+      {on ? <Check className="size-3.5 text-[var(--success)]" /> : <X className="size-3.5 text-muted-foreground" />}
+      <span className={on ? undefined : "text-muted-foreground"}>{label}</span>
+    </span>
+  );
+}
+
+/** 灰度比例条：复用共享 Progress（showText 关掉，因为这里是"百分比"而非"已用/总数"）。 */
+function RolloutBar({ percent }: { percent: number }) {
+  const v = Math.max(0, Math.min(100, percent));
+  return (
+    <div className="flex items-center gap-2">
+      <Progress value={v} total={100} showText={false} className="min-w-0 w-20" />
+      <span className="tabular-nums text-xs text-muted-foreground">{v}%</span>
+    </div>
+  );
+}
+
+/** 带单位后缀的数值输入（业务规则页专用；FormDrawer 做不了"多块独立保存"，故就地组表单）。 */
+function NumField({
+  label, unit, value, onChange, help, disabled,
+}: { label: string; unit: string; value: number; onChange: (v: number) => void; help?: string; disabled?: boolean }) {
+  return (
+    <div className="mb-4">
+      <div className="mb-1 text-xs text-muted-foreground">{label}</div>
+      <div className="flex items-center gap-2">
+        <Input
+          type="number"
+          className="w-40"
+          value={Number.isFinite(value) ? value : 0}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.value === "" ? 0 : Number(e.target.value))}
+        />
+        <span className="text-xs text-muted-foreground">{unit}</span>
+      </div>
+      {help && <div className="mt-1 text-xs text-muted-foreground/70">{help}</div>}
+    </div>
+  );
+}
+
+/**
+ * §11 业务规则：**不是列表页**——竞品拆「提现设置 / 预约设置 / 充电设置」三个菜单，
+ * 我们合并为一页三张 Card，各自保存（规格 §11 / 方案 §3.3 分区表单）。
+ * 校验：数值非负；手续费率 0~1；提交前拦截并 notify.error（分区表单没有 FormDrawer 的字段级校验）。
+ */
+function BizRulesPanel({ canEdit }: { canEdit: boolean }) {
+  const qc = useQueryClient();
+  const { t } = useI18n();
+  const q = useQuery({ queryKey: ["sys", "biz-rules"], queryFn: () => api.getBizRules() });
+  const [withdraw, setWithdraw] = useState<WithdrawRule | null>(null);
+  const [reservation, setReservation] = useState<ReservationRule | null>(null);
+  const [billing, setBilling] = useState<BillingDefaultRule | null>(null);
+  useEffect(() => {
+    if (!q.data) return;
+    setWithdraw(q.data.withdraw); setReservation(q.data.reservation); setBilling(q.data.billing);
+  }, [q.data]);
+
+  const save = useMutation({
+    mutationFn: (x: Parameters<typeof api.saveBizRules>[0]) => api.saveBizRules(x),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["sys", "biz-rules"] }); notify.success(t("common.success")); },
+  });
+  const currency = q.data?.currency ?? "AED";
+  const nonNegative = (...vals: number[]) => vals.every((v) => Number.isFinite(v) && v >= 0);
+
+  if (q.isLoading || !withdraw || !reservation || !billing) {
+    return <Card className="p-5 text-sm text-muted-foreground">加载业务规则…</Card>;
+  }
+
+  const SaveBar = ({ onSave }: { onSave: () => void }) => (
+    <div className="mt-1 flex justify-end">
+      <Button size="sm" disabled={!canEdit || save.isPending} onClick={onSave}>{t("common.save")}</Button>
+    </div>
+  );
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-3">
+      <Card className="p-5">
+        <div className="mb-1 text-sm font-medium">提现规则</div>
+        <div className="mb-4 text-xs text-muted-foreground">
+          提现审核页的手续费口径以此为唯一来源，勿在别处硬编码。
+        </div>
+        <NumField label="最低提现额" unit={currency} value={withdraw.minAmount} disabled={!canEdit} onChange={(v) => setWithdraw({ ...withdraw, minAmount: v })} />
+        <NumField label="手续费率" unit="0~1（0.006 = 0.6%）" value={withdraw.feeRate} disabled={!canEdit} onChange={(v) => setWithdraw({ ...withdraw, feeRate: v })} />
+        <NumField label="手续费封顶" unit={currency} value={withdraw.feeCap} disabled={!canEdit} onChange={(v) => setWithdraw({ ...withdraw, feeCap: v })} />
+        <NumField label="结算周期" unit="T+N 天" value={withdraw.settleDays} disabled={!canEdit} onChange={(v) => setWithdraw({ ...withdraw, settleDays: v })} />
+        <NumField label="单日限额" unit={currency} value={withdraw.dailyLimit} disabled={!canEdit} onChange={(v) => setWithdraw({ ...withdraw, dailyLimit: v })} />
+        <Field label="需人工审批">
+          <Select className="w-40" value={withdraw.needApproval ? "1" : "0"} disabled={!canEdit} onChange={(e) => setWithdraw({ ...withdraw, needApproval: e.target.value === "1" })}>
+            <option value="1">是（走提现审核队列）</option>
+            <option value="0">否（自动放款）</option>
+          </Select>
+        </Field>
+        <SaveBar onSave={() => {
+          if (!nonNegative(withdraw.minAmount, withdraw.feeCap, withdraw.settleDays, withdraw.dailyLimit)) { notify.error("提现规则：金额与周期不能为负数"); return; }
+          if (!(withdraw.feeRate >= 0 && withdraw.feeRate <= 1)) { notify.error("手续费率需在 0~1 之间（0.006 = 0.6%）"); return; }
+          save.mutate({ withdraw });
+        }} />
+      </Card>
+
+      <Card className="p-5">
+        <div className="mb-1 text-sm font-medium">预约规则</div>
+        <div className="mb-4 text-xs text-muted-foreground">
+          热门点位高峰占位：预约取宝 / 预约还位共用这套阈值。
+        </div>
+        <NumField label="预约时长上限" unit="分钟" value={reservation.maxDurationMin} disabled={!canEdit} onChange={(v) => setReservation({ ...reservation, maxDurationMin: v })} />
+        <NumField label="提前预约上限" unit="小时" value={reservation.advanceHours} disabled={!canEdit} onChange={(v) => setReservation({ ...reservation, advanceHours: v })} />
+        <NumField label="超时未取占位费" unit={`${currency} / 分钟`} value={reservation.holdFeePerMin} disabled={!canEdit} onChange={(v) => setReservation({ ...reservation, holdFeePerMin: v })} help="预约订单页的占位费按此计算" />
+        <NumField label="单用户同时预约上限" unit="笔" value={reservation.maxConcurrent} disabled={!canEdit} onChange={(v) => setReservation({ ...reservation, maxConcurrent: v })} />
+        <SaveBar onSave={() => {
+          if (!nonNegative(reservation.maxDurationMin, reservation.advanceHours, reservation.holdFeePerMin, reservation.maxConcurrent)) { notify.error("预约规则：数值不能为负数"); return; }
+          save.mutate({ reservation });
+        }} />
+      </Card>
+
+      <Card className="p-5">
+        <div className="mb-1 text-sm font-medium">计费默认值</div>
+        <div className="mb-4 text-xs text-muted-foreground">
+          新建价格方案时的初始值；已存在的方案不受影响。
+        </div>
+        <NumField label="默认免费时长" unit="分钟" value={billing.freeMinutes} disabled={!canEdit} onChange={(v) => setBilling({ ...billing, freeMinutes: v })} />
+        <NumField label="默认计费单位" unit="分钟 / 计费周期" value={billing.billUnitMinutes} disabled={!canEdit} onChange={(v) => setBilling({ ...billing, billUnitMinutes: v })} />
+        <NumField label="默认日封顶" unit={currency} value={billing.dailyCap} disabled={!canEdit} onChange={(v) => setBilling({ ...billing, dailyCap: v })} />
+        <NumField label="默认买断价" unit={currency} value={billing.buyoutPrice} disabled={!canEdit} onChange={(v) => setBilling({ ...billing, buyoutPrice: v })} />
+        <NumField label="超时判定阈值" unit="小时" value={billing.overdueHours} disabled={!canEdit} onChange={(v) => setBilling({ ...billing, overdueHours: v })} help="超过即判定逾期并触发买断" />
+        <SaveBar onSave={() => {
+          if (!nonNegative(billing.freeMinutes, billing.billUnitMinutes, billing.dailyCap, billing.buyoutPrice, billing.overdueHours)) { notify.error("计费默认值：数值不能为负数"); return; }
+          if (billing.billUnitMinutes <= 0) { notify.error("计费单位必须大于 0 分钟"); return; }
+          save.mutate({ billing });
+        }} />
+      </Card>
+    </div>
+  );
+}
+
 function SystemInner() {
   const qc = useQueryClient();
   const allow = useCan();
@@ -139,6 +454,37 @@ function SystemInner() {
   const [paymentForm, setPaymentForm] = useState<Partial<PaymentChannel> | null>(null);
   const [marketForm, setMarketForm] = useState<Partial<MarketCountry> | null>(null);
 
+  // —— B2/B3/B5 八个 tab：写权限门控（权限码见 功能权限清单 §13）——
+  const canBlacklist = allow("system:notify_blacklist:update");
+  const canBizRule = allow("system:biz_rule:update");
+  const canLogin = allow("system:login_setting:update");
+  const canAppVersion = allow("system:app_version:release");
+  const canBank = allow("system:bank:update");
+  const canProblem = allow("system:problem:update");
+  const canTax = allow("system:tax:update");
+
+  // 各 tab 的筛选器（切 tab 时统一清空，见 TabHeader onChange）
+  const [logChannel, setLogChannel] = useState("");
+  const [logStatus, setLogStatus] = useState("");
+  const [logSort, setLogSort] = useState<{ key: string; dir: SortDir }>({ key: "sentAt", dir: "desc" });
+  const [blChannel, setBlChannel] = useState("");
+  const [blReason, setBlReason] = useState("");
+  const [verPlatform, setVerPlatform] = useState("");
+  const [bankCountry, setBankCountry] = useState("");
+  const [bankCurrency, setBankCurrency] = useState("");
+  const [probCategory, setProbCategory] = useState("");
+  const [probStatus, setProbStatus] = useState("");
+
+  const [blacklistForm, setBlacklistForm] = useState<Partial<NotifyBlacklist> | null>(null);
+  const [loginForm, setLoginForm] = useState<Partial<LoginSetting> | null>(null);
+  const [versionForm, setVersionForm] = useState<Partial<AppVersion> | null>(null);
+  const [bankForm, setBankForm] = useState<Partial<BankEntry> | null>(null);
+  const [problemForm, setProblemForm] = useState<Partial<ProblemEntry> | null>(null);
+  const [taxForm, setTaxForm] = useState<Partial<TaxSetting> | null>(null);
+  // 失败详情抽屉：失败行点「详情」看原始报错（列表里放不下完整报错）
+  const [logDetail, setLogDetail] = useState<NotifyLog | null>(null);
+  const { confirm, dialog } = useConfirm();
+
   const onSaved = (setter: (v: null) => void) => () => { qc.invalidateQueries({ queryKey: ["sys"] }); notify.success(t("common.success")); setter(null); };
   const saveNotify = useMutation({ mutationFn: (v: Partial<NotifyTemplate>) => api.saveNotifyTemplate(v), onSuccess: onSaved(setNotifyForm) });
   const saveDict = useMutation({ mutationFn: (v: Partial<DictEntry>) => api.saveDictEntry(v), onSuccess: onSaved(setDictForm) });
@@ -147,21 +493,46 @@ function SystemInner() {
   const saveOpenapi = useMutation({ mutationFn: (v: Partial<OpenApiApp>) => api.saveOpenApiApp(v), onSuccess: onSaved(setOpenapiForm) });
   const savePayment = useMutation({ mutationFn: (v: Partial<PaymentChannel>) => api.savePaymentChannel(v), onSuccess: onSaved(setPaymentForm) });
   const saveMarket = useMutation({ mutationFn: (v: Partial<MarketCountry>) => api.saveMarketCountry(v), onSuccess: onSaved(setMarketForm) });
+  const saveBlacklist = useMutation({ mutationFn: (v: Partial<NotifyBlacklist>) => api.saveNotifyBlacklist(v), onSuccess: onSaved(setBlacklistForm) });
+  const saveLogin = useMutation({ mutationFn: (v: Partial<LoginSetting>) => api.saveLoginSetting(v), onSuccess: onSaved(setLoginForm) });
+  const saveVersion = useMutation({ mutationFn: (v: Partial<AppVersion>) => api.saveAppVersion(v), onSuccess: onSaved(setVersionForm) });
+  const saveBank = useMutation({ mutationFn: (v: Partial<BankEntry>) => api.saveBank(v), onSuccess: onSaved(setBankForm) });
+  const saveProblem = useMutation({ mutationFn: (v: Partial<ProblemEntry>) => api.saveProblem(v), onSuccess: onSaved(setProblemForm) });
+  const saveTax = useMutation({ mutationFn: (v: Partial<TaxSetting>) => api.saveTaxSetting(v), onSuccess: onSaved(setTaxForm) });
+  const releaseBlock = useMutation({
+    mutationFn: (blockNo: string) => api.releaseNotifyBlacklist(blockNo),
+    onSuccess: (r) => { qc.invalidateQueries({ queryKey: ["sys"] }); notify.success(`已解除拉黑 ${r.target}`); },
+  });
+  const rollbackVersion = useMutation({
+    mutationFn: (versionId: string) => api.rollbackAppVersion(versionId),
+    onSuccess: (r) => { qc.invalidateQueries({ queryKey: ["sys"] }); notify.success(`已回滚 ${PLATFORM_LABEL[r.platform]} ${r.versionNo}，灰度已归零`); },
+  });
 
   // —— 其余分页 tab ——
-  const q = useQuery<PageResult<NotifyTemplate | DictEntry | Region | SysParam | OpenApiApp | MarketCountry | PaymentChannel>>({
-    queryKey: ["sys", tab, page, keyword],
+  // 筛选值一并进 queryKey：否则改筛选器不会重新取数。
+  const filterKey = [logChannel, logStatus, logSort.key, logSort.dir, blChannel, blReason, verPlatform, bankCountry, bankCurrency, probCategory, probStatus].join("|");
+  const q = useQuery<PageResult<NotifyTemplate | DictEntry | Region | SysParam | OpenApiApp | MarketCountry | PaymentChannel | NotifyLog | NotifyBlacklist | LoginSetting | AppVersion | BankEntry | ProblemEntry | TaxSetting>>({
+    queryKey: ["sys", tab, page, keyword, filterKey],
     queryFn: () =>
       tab === "payment" ? api.listPaymentChannels({ page, size: SIZE, keyword })
       : tab === "notify" ? api.listNotifyTemplates({ page, size: SIZE, keyword })
+      : tab === "notify-log" ? api.listNotifyLogs({ page, size: SIZE, keyword, channel: logChannel, status: logStatus, sort: logSort.key, dir: logSort.dir })
+      : tab === "notify-blacklist" ? api.listNotifyBlacklist({ page, size: SIZE, keyword, channel: blChannel, reason: blReason })
+      : tab === "login" ? api.listLoginSettings({ page, size: SIZE, keyword })
+      : tab === "app-version" ? api.listAppVersions({ page, size: SIZE, keyword, platform: verPlatform })
+      : tab === "banks" ? api.listBanks({ page, size: SIZE, keyword, country: bankCountry, currency: bankCurrency })
+      : tab === "problems" ? api.listProblems({ page, size: SIZE, keyword, category: probCategory, status: probStatus })
+      : tab === "tax" ? api.listTaxSettings({ page, size: SIZE, keyword })
       : tab === "dict" ? api.listDictEntries({ page, size: SIZE, keyword })
       : tab === "region" ? api.listRegions({ page, size: SIZE, keyword })
       : tab === "params" ? api.listSysParams({ page, size: SIZE, keyword })
       : tab === "markets" ? api.listMarketCountries({ page, size: SIZE, keyword })
       : api.listOpenApiApps({ page, size: SIZE, keyword }),
     placeholderData: keepPreviousData,
-    enabled: tab !== "vendors",
+    enabled: tab !== "vendors" && tab !== "rules",
   });
+  // 发送记录页头统计：全量口径（今日发送量 / 失败率 / 今日成本），与当页数据无关。
+  const logStats = useQuery({ queryKey: ["sys", "notify-log-stats"], queryFn: () => api.getNotifyLogStats(), enabled: tab === "notify-log" });
 
   const MARKET_STATUS: Record<MarketCountry["status"], { label: string; tone: "success" | "outline" | "muted" }> = {
     LIVE: { label: "已开城", tone: "success" },
@@ -252,9 +623,191 @@ function SystemInner() {
     { header: t("common.actions"), cell: editBtn<OpenApiApp>(canOpenapi, setOpenapiForm) },
   ];
 
+  // —— §9 发送记录：全渠道 + 计费，目标脱敏，时间/成本可排序 ——
+  const logCols: Column<NotifyLog>[] = [
+    { header: "流水号", cell: (l) => <span className="font-medium tabular-nums">{l.logNo}</span> },
+    { header: "渠道", cell: (l) => <Badge tone="outline">{LOG_CHANNEL[l.channel]}</Badge> },
+    { header: "模板", cell: (l) => <span className="text-muted-foreground tabular-nums">{l.templateNo}</span> },
+    // 目标脱敏：运营端排障只需要看得出"发给谁"，不需要完整联系方式
+    { header: "目标（脱敏）", cell: (l) => <span className="tabular-nums">{l.target}</span> },
+    { header: "场景", cell: (l) => <span className="text-muted-foreground">{l.scene}</span> },
+    { header: "发送时间", sortKey: "sentAt", cell: (l) => <span className="text-muted-foreground">{fmtTime(l.sentAt)}</span> },
+    { header: "状态", cell: (l) => <Badge tone={l.status === "SENT" ? "success" : "danger"}>{l.status === "SENT" ? "已发送" : "发送失败"}</Badge> },
+    { header: "成本", sortKey: "cost", cell: (l) => <span className="tabular-nums">{money(l.cost, l.currency)}</span> },
+    {
+      header: t("common.actions"),
+      cell: (l) => l.status === "FAILED"
+        ? <Button size="sm" variant="outline" onClick={() => setLogDetail(l)}>失败原因</Button>
+        : <span className="text-muted-foreground">-</span>,
+    },
+  ];
+
+  // —— §10 触达拉黑：到期时间在过去 = 已解除（软删除保留审计痕迹）——
+  const isReleased = (b: NotifyBlacklist) => !!b.expireAt && new Date(b.expireAt).getTime() <= Date.now();
+  const blacklistCols: Column<NotifyBlacklist>[] = [
+    { header: "拉黑号", cell: (b) => <span className="font-medium tabular-nums">{b.blockNo}</span> },
+    { header: "目标", cell: (b) => <span className="tabular-nums">{b.target}</span> },
+    { header: "渠道", cell: (b) => <Badge tone={b.channel === "ALL" ? "danger" : "outline"}>{BL_CHANNEL[b.channel]}</Badge> },
+    { header: "原因", cell: (b) => <Badge tone={BL_REASON[b.reason].tone}>{BL_REASON[b.reason].label}</Badge> },
+    { header: "拉黑时间", cell: (b) => <span className="text-muted-foreground">{fmtTime(b.blockedAt)}</span> },
+    { header: "操作人", cell: (b) => <span className="text-muted-foreground">{b.blockedBy}</span> },
+    { header: "到期时间", cell: (b) => b.expireAt ? <span className="text-muted-foreground">{fmtTime(b.expireAt)}</span> : <Badge tone="warning">永久</Badge> },
+    { header: "状态", cell: (b) => isReleased(b) ? <Badge tone="muted">已解除</Badge> : <Badge tone="danger">拉黑中</Badge> },
+    {
+      header: t("common.actions"),
+      cell: (b) => !canBlacklist ? <span className="text-muted-foreground">-</span>
+        : isReleased(b) ? <span className="text-muted-foreground">已解除</span>
+        : (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={releaseBlock.isPending}
+            onClick={async () => {
+              const ok = await confirm({
+                title: "解除拉黑",
+                desc: `解除后 ${b.target} 将重新接收${BL_CHANNEL[b.channel]}触达。记录会保留（软删除），到期时间置为当下。`,
+                confirmText: "解除",
+              });
+              if (ok) releaseBlock.mutate(b.blockNo);
+            }}
+          >
+            解除
+          </Button>
+        ),
+    },
+  ];
+
+  // —— §12 登录设置：按国家分行，开关列用 ✓/✗ 图标组 ——
+  const loginCols: Column<LoginSetting>[] = [
+    {
+      header: "国家",
+      cell: (s) => s.country === "*"
+        ? <span className="font-medium">默认档 <Badge tone="default">*</Badge></span>
+        : <span className="font-medium">{s.countryName}（{s.country}）</span>,
+    },
+    {
+      header: "登录方式",
+      cell: (s) => (
+        <div className="flex flex-wrap gap-x-3 gap-y-1">
+          <OnOff on={s.otpEnabled} label="验证码" />
+          <OnOff on={s.passwordEnabled} label="密码" />
+        </div>
+      ),
+    },
+    {
+      header: "第三方登录",
+      cell: (s) => (
+        <div className="flex flex-wrap gap-x-3 gap-y-1">
+          <OnOff on={s.appleEnabled} label="Apple" />
+          <OnOff on={s.googleEnabled} label="Google" />
+        </div>
+      ),
+    },
+    { header: "OTP 有效期", cell: (s) => s.otpEnabled ? <span className="tabular-nums">{s.otpExpireSec} 秒</span> : <span className="text-muted-foreground">-</span> },
+    { header: "日发送上限", cell: (s) => s.otpEnabled ? <span className="tabular-nums">{s.otpDailyLimit} 条/人</span> : <span className="text-muted-foreground">-</span> },
+    { header: "强制实名", cell: (s) => s.forceRealName ? <Badge tone="warning">强制</Badge> : <Badge tone="muted">不强制</Badge> },
+    { header: t("common.actions"), cell: editBtn<LoginSetting>(canLogin, setLoginForm) },
+  ];
+
+  // —— §13 应用版本：按平台分组（列表已按 平台→构建号 排序）+ 灰度进度条 + 强更 danger ——
+  const versionCols: Column<AppVersion>[] = [
+    { header: "平台", cell: (v) => <Badge tone="outline">{PLATFORM_LABEL[v.platform]}</Badge> },
+    { header: "版本号", cell: (v) => <span className="font-medium tabular-nums">{v.versionNo}</span> },
+    { header: "构建号", cell: (v) => <span className="tabular-nums text-muted-foreground">{v.buildNo}</span> },
+    { header: "更新说明（中）", cell: (v) => <span className="text-muted-foreground">{v.releaseNote}</span> },
+    { header: "强更", cell: (v) => v.forceUpdate ? <Badge tone="danger">强制更新</Badge> : <span className="text-muted-foreground">-</span> },
+    { header: "最低支持", cell: (v) => <span className="tabular-nums text-muted-foreground">{v.minSupported || "-"}</span> },
+    { header: "灰度", cell: (v) => <RolloutBar percent={v.rolloutPercent} /> },
+    { header: "状态", cell: (v) => <Badge tone={VERSION_STATUS[v.status].tone}>{VERSION_STATUS[v.status].label}</Badge> },
+    { header: "发布时间", cell: (v) => <span className="text-muted-foreground">{fmtTime(v.releasedAt)}</span> },
+    {
+      header: t("common.actions"),
+      cell: (v) => !canAppVersion ? <span className="text-muted-foreground">-</span> : (
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setVersionForm(v)}>{t("common.edit")}</Button>
+          {v.status === "RELEASED" && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={rollbackVersion.isPending}
+              onClick={async () => {
+                const ok = await confirm({
+                  title: `回滚 ${PLATFORM_LABEL[v.platform]} ${v.versionNo}`,
+                  desc: "回滚会立即把灰度比例归零并停止下发；已升级的用户不会自动降级。请确认新版本确有阻断性问题。",
+                  danger: true,
+                  confirmText: "确认回滚",
+                  requireText: v.versionNo,
+                });
+                if (ok) rollbackVersion.mutate(v.versionId);
+              }}
+            >
+              回滚
+            </Button>
+          )}
+        </div>
+      ),
+    },
+  ];
+
+  // —— §14 银行管理 ——
+  const bankCols: Column<BankEntry>[] = [
+    { header: "银行代码", cell: (b) => <span className="font-medium tabular-nums">{b.bankCode}</span> },
+    { header: "银行名称", cell: (b) => <>{b.bankName} <span className="text-muted-foreground">· {b.bankNameEn}</span></> },
+    { header: "国家", cell: (b) => <Badge tone="outline">{b.country}</Badge> },
+    { header: "币种", cell: (b) => <span className="tabular-nums">{b.currency}</span> },
+    { header: "SWIFT 前缀", cell: (b) => <span className="tabular-nums text-muted-foreground">{b.swiftPrefix}</span> },
+    // IBAN 长度：提现收款账户校验直接读这里，填错会让提现打款失败
+    { header: "IBAN 长度", cell: (b) => <span className="tabular-nums">{b.ibanLength} 位</span> },
+    { header: "状态", cell: (b) => b.status === "ENABLED" ? <Badge tone="success">启用</Badge> : <Badge tone="muted">停用</Badge> },
+    { header: t("common.actions"), cell: editBtn<BankEntry>(canBank, setBankForm) },
+  ];
+
+  // —— §15 问题管理 ——
+  const problemCols: Column<ProblemEntry>[] = [
+    { header: "问题号", cell: (p) => <span className="font-medium tabular-nums">{p.problemNo}</span> },
+    { header: "分类", cell: (p) => <Badge tone="outline">{PROBLEM_CATEGORY[p.category]}</Badge> },
+    { header: "标题（中）", cell: (p) => p.title },
+    { header: "建议处置", cell: (p) => <Badge tone={PROBLEM_ACTION[p.suggestedAction].tone}>{PROBLEM_ACTION[p.suggestedAction].label}</Badge> },
+    { header: "排序", cell: (p) => <span className="tabular-nums">{p.sortNo}</span> },
+    { header: "状态", cell: (p) => p.status === "ENABLED" ? <Badge tone="success">启用</Badge> : <Badge tone="muted">停用</Badge> },
+    { header: t("common.actions"), cell: editBtn<ProblemEntry>(canProblem, setProblemForm) },
+  ];
+
+  // —— §16 税率与发票 ——
+  const taxCols: Column<TaxSetting>[] = [
+    { header: "国家", cell: (x) => <span className="font-medium">{x.countryName}（{x.country}）</span> },
+    { header: "税种", cell: (x) => <Badge tone="outline">{x.taxName}</Badge> },
+    { header: "税率", cell: (x) => <span className="tabular-nums">{x.ratePercent}%</span> },
+    // 价内/价外直接决定 C 端展示价含不含税，必须醒目
+    { header: "计税方式", cell: (x) => x.includedInPrice ? <Badge tone="default">价内税</Badge> : <Badge tone="warning">价外税</Badge> },
+    { header: "税号（TRN）", cell: (x) => <span className="tabular-nums text-muted-foreground">{x.trn}</span> },
+    { header: "开票抬头", cell: (x) => <span className="text-muted-foreground">{x.invoiceTitle}</span> },
+    { header: "生效日期", cell: (x) => <span className="tabular-nums text-muted-foreground">{x.effectiveFrom}</span> },
+    { header: t("common.actions"), cell: editBtn<TaxSetting>(canTax, setTaxForm) },
+  ];
+
   return (
     <div>
-      <TabHeader tabs={TABS} value={tab} onChange={(k) => { setTab(k); setPage(1); setKeyword(""); }} />
+      <TabHeader tabs={TABS} value={tab} onChange={(k) => {
+        setTab(k); setPage(1); setKeyword("");
+        setLogChannel(""); setLogStatus(""); setLogSort({ key: "sentAt", dir: "desc" });
+        setBlChannel(""); setBlReason(""); setVerPlatform("");
+        setBankCountry(""); setBankCurrency(""); setProbCategory(""); setProbStatus("");
+      }} />
+
+      {/* §9 发送记录页头统计：今日发送量 / 失败率 / 今日成本 —— OTP 是真金白银，成本要天天看见 */}
+      {tab === "notify-log" && logStats.data && (
+        <div className="mb-4 grid gap-4 sm:grid-cols-3">
+          <StatCard label="今日发送量" value={logStats.data.sentToday} sub={`全渠道合计 · ${LOG_SCENE_HINT}`} />
+          <StatCard
+            label="今日失败率"
+            value={`${(logStats.data.failRate * 100).toFixed(1)}%`}
+            sub={`失败 ${logStats.data.failedToday} 条`}
+            tone={logStats.data.failRate > 0.05 ? "down" : "up"}
+          />
+          <StatCard label="今日成本" value={money(logStats.data.costToday, logStats.data.currency)} sub="短信/WhatsApp 计费，Push 免费" />
+        </div>
+      )}
 
       {tab === "payment" && (
         <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索渠道码 / 名称 / 国家 / 币种"
@@ -285,6 +838,164 @@ function SystemInner() {
           onAdd={canMarket ? () => setMarketForm({ countryCode: "", name: "", currency: "AED", timezone: "Asia/Dubai", compliance: "规划", cityCount: 0, status: "PLANNED" }) : undefined} addLabel="新增国家市场" />
       )}
 
+      {tab === "notify-log" && (
+        <Toolbar
+          search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }}
+          searchPlaceholder="搜索流水号 / 模板号 / 目标 / 场景 / 失败原因"
+          // 流水类页面必须可导出：对账短信账单、复盘失败批次都靠它（决策 §八-2，CSV 带 BOM）
+          onExport={() => exportCsv<NotifyLog>("发送记录", [
+            { header: "流水号", value: (l) => l.logNo },
+            { header: "渠道", value: (l) => LOG_CHANNEL[l.channel] },
+            { header: "模板号", value: (l) => l.templateNo },
+            { header: "目标（脱敏）", value: (l) => l.target },
+            { header: "场景", value: (l) => l.scene },
+            { header: "发送时间", value: (l) => l.sentAt },
+            { header: "状态", value: (l) => (l.status === "SENT" ? "已发送" : "发送失败") },
+            { header: "失败原因", value: (l) => l.failReason },
+            { header: "成本", value: (l) => l.cost },
+            { header: "币种", value: (l) => l.currency },
+          ], (q.data?.list ?? []) as NotifyLog[])}
+        >
+          <Select value={logChannel} onChange={(e) => { setLogChannel(e.target.value); setPage(1); }}>
+            <option value="">全部渠道</option>
+            <option value="SMS">短信</option>
+            <option value="EMAIL">邮件</option>
+            <option value="PUSH">Push</option>
+            <option value="WHATSAPP">WhatsApp</option>
+          </Select>
+          <Select value={logStatus} onChange={(e) => { setLogStatus(e.target.value); setPage(1); }}>
+            <option value="">全部状态</option>
+            <option value="SENT">已发送</option>
+            <option value="FAILED">发送失败</option>
+          </Select>
+        </Toolbar>
+      )}
+      {tab === "notify-blacklist" && (
+        <Toolbar
+          search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }}
+          searchPlaceholder="搜索拉黑号 / 目标 / 操作人"
+          onAdd={canBlacklist ? () => setBlacklistForm({ channel: "SMS", reason: "MANUAL", blockedBy: "", target: "", expireAt: "" }) : undefined}
+          addLabel="手动拉黑"
+        >
+          <Select value={blChannel} onChange={(e) => { setBlChannel(e.target.value); setPage(1); }}>
+            <option value="">全部渠道</option>
+            {BL_CHANNEL_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </Select>
+          <Select value={blReason} onChange={(e) => { setBlReason(e.target.value); setPage(1); }}>
+            <option value="">全部原因</option>
+            <option value="USER_OPT_OUT">用户退订</option>
+            <option value="HARD_BOUNCE">硬退信/无效号</option>
+            <option value="ABUSE">滥用/投诉</option>
+            <option value="MANUAL">人工拉黑</option>
+          </Select>
+        </Toolbar>
+      )}
+      {tab === "login" && (
+        <Toolbar
+          search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }}
+          searchPlaceholder="搜索国家码 / 国家名称"
+          onAdd={canLogin ? () => setLoginForm({ country: "", countryName: "", otpEnabled: true, passwordEnabled: false, appleEnabled: true, googleEnabled: true, otpExpireSec: 300, otpDailyLimit: 10, forceRealName: false }) : undefined}
+          addLabel="新增国家档"
+        />
+      )}
+      {tab === "app-version" && (
+        <Toolbar
+          search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }}
+          searchPlaceholder="搜索版本号 / 平台 / 更新说明"
+          onAdd={canAppVersion ? () => setVersionForm({ platform: "IOS", versionNo: "", buildNo: 1, status: "DRAFT", releaseNote: "", releaseNoteEn: "", releaseNoteAr: "", forceUpdate: false, minSupported: "", rolloutPercent: 0, downloadUrl: "" }) : undefined}
+          addLabel="新增版本"
+        >
+          <Select value={verPlatform} onChange={(e) => { setVerPlatform(e.target.value); setPage(1); }}>
+            <option value="">全部平台</option>
+            <option value="IOS">iOS</option>
+            <option value="ANDROID">Android</option>
+            <option value="H5">H5 / 小程序</option>
+          </Select>
+        </Toolbar>
+      )}
+      {tab === "banks" && (
+        <Toolbar
+          search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }}
+          searchPlaceholder="搜索银行代码 / 名称（中/英）/ SWIFT"
+          onAdd={canBank ? () => setBankForm({ bankCode: "", bankName: "", bankNameEn: "", country: "AE", currency: "AED", swiftPrefix: "", ibanLength: 23, status: "ENABLED" }) : undefined}
+          addLabel="新增银行"
+        >
+          <Select value={bankCountry} onChange={(e) => { setBankCountry(e.target.value); setPage(1); }}>
+            <option value="">全部国家</option>
+            <option value="AE">阿联酋 AE</option>
+            <option value="SA">沙特 SA</option>
+            <option value="QA">卡塔尔 QA</option>
+            <option value="KW">科威特 KW</option>
+            <option value="EG">埃及 EG</option>
+          </Select>
+          <Select value={bankCurrency} onChange={(e) => { setBankCurrency(e.target.value); setPage(1); }}>
+            <option value="">全部币种</option>
+            <option value="AED">AED</option>
+            <option value="SAR">SAR</option>
+            <option value="QAR">QAR</option>
+            <option value="KWD">KWD</option>
+            <option value="EGP">EGP</option>
+          </Select>
+        </Toolbar>
+      )}
+      {tab === "problems" && (
+        <Toolbar
+          search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }}
+          searchPlaceholder="搜索问题号 / 标题（中/英/阿）/ 答复"
+          onAdd={canProblem ? () => setProblemForm({ category: "RENT", sortNo: 1, status: "ENABLED", title: "", titleEn: "", titleAr: "", answer: "", answerEn: "", answerAr: "", suggestedAction: "SELF_SERVICE" }) : undefined}
+          addLabel="新增问题"
+        >
+          <Select value={probCategory} onChange={(e) => { setProbCategory(e.target.value); setPage(1); }}>
+            <option value="">全部分类</option>
+            {PROBLEM_CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </Select>
+          <Select value={probStatus} onChange={(e) => { setProbStatus(e.target.value); setPage(1); }}>
+            <option value="">全部状态</option>
+            <option value="ENABLED">启用</option>
+            <option value="DISABLED">停用</option>
+          </Select>
+        </Toolbar>
+      )}
+      {tab === "tax" && (
+        <Toolbar
+          search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }}
+          searchPlaceholder="搜索国家 / 税种 / 开票抬头"
+          onAdd={canTax ? () => setTaxForm({ country: "", countryName: "", taxName: "VAT", ratePercent: 5, includedInPrice: true, trn: "", invoiceTitle: "", effectiveFrom: "" }) : undefined}
+          addLabel="新增国家税率"
+        />
+      )}
+
+      {/* 权限降级：显式说明"仅可查看 + 缺哪个权限码"，不静默隐藏操作列 */}
+      {tab === "notify-blacklist" && !canBlacklist && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无触达拉黑维护权限（system:notify_blacklist:update）</div>}
+      {tab === "rules" && !canBizRule && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无业务规则修改权限（system:biz_rule:update）</div>}
+      {tab === "login" && !canLogin && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无登录设置修改权限（system:login_setting:update）</div>}
+      {tab === "app-version" && !canAppVersion && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无应用版本发布权限（system:app_version:release）</div>}
+      {tab === "banks" && !canBank && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无银行字典维护权限（system:bank:update）</div>}
+      {tab === "problems" && !canProblem && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无问题字典维护权限（system:problem:update）</div>}
+      {tab === "tax" && !canTax && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无税率与发票修改权限（system:tax:update）</div>}
+
+      {/* §11 业务规则：分区表单，不走列表/分页 */}
+      {tab === "rules" && <BizRulesPanel canEdit={canBizRule} />}
+
+      {tab === "notify-log" && (
+        <DataTable
+          rowKey={(l: NotifyLog) => l.logNo}
+          columns={logCols}
+          rows={q.data?.list as NotifyLog[]}
+          loading={q.isLoading}
+          sortKey={logSort.key}
+          sortDir={logSort.dir}
+          onSortChange={(key, dir) => { setLogSort({ key, dir }); setPage(1); }}
+          empty="暂无发送记录——所选渠道/状态下今日尚无触达，或通知模板尚未启用"
+        />
+      )}
+      {tab === "notify-blacklist" && <DataTable rowKey={(b: NotifyBlacklist) => b.blockNo} columns={blacklistCols} rows={q.data?.list as NotifyBlacklist[]} loading={q.isLoading} empty="暂无拉黑记录——没有用户退订或硬退信，也可手动拉黑投诉来源" />}
+      {tab === "login" && <DataTable rowKey={(s: LoginSetting) => s.country} columns={loginCols} rows={q.data?.list as LoginSetting[]} loading={q.isLoading} empty="暂无登录设置——至少应保留一条 * 默认档，否则各国登录方式无处可依" />}
+      {tab === "app-version" && <DataTable rowKey={(v: AppVersion) => v.versionId} columns={versionCols} rows={q.data?.list as AppVersion[]} loading={q.isLoading} empty="暂无应用版本——所选平台还没发过版，先新增一条草稿再灰度" />}
+      {tab === "banks" && <DataTable rowKey={(b: BankEntry) => b.bankCode} columns={bankCols} rows={q.data?.list as BankEntry[]} loading={q.isLoading} empty="暂无银行——所选国家/币种下没有可用银行，提现收款账户将无法选择" />}
+      {tab === "problems" && <DataTable rowKey={(p: ProblemEntry) => p.problemNo} columns={problemCols} rows={q.data?.list as ProblemEntry[]} loading={q.isLoading} empty="暂无问题条目——C 端报障下拉与客服快捷答复都取自这里，建议先补常见问题" />}
+      {tab === "tax" && <DataTable rowKey={(x: TaxSetting) => x.country} columns={taxCols} rows={q.data?.list as TaxSetting[]} loading={q.isLoading} empty="暂无税率配置——未配置的国家按不含税出账，开票会缺税号" />}
+
       {tab === "vendors" && <DataTable rowKey={(v: Vendor) => v.vendorCode} columns={vendorCols} rows={vendorsQ.data} loading={vendorsQ.isLoading} />}
       {tab === "payment" && <DataTable rowKey={(c: PaymentChannel) => c.channelCode} columns={paymentCols} rows={q.data?.list as PaymentChannel[]} loading={q.isLoading} />}
       {tab === "notify" && <DataTable rowKey={(t: NotifyTemplate) => t.templateNo} columns={notifyCols} rows={q.data?.list as NotifyTemplate[]} loading={q.isLoading} />}
@@ -293,7 +1004,7 @@ function SystemInner() {
       {tab === "params" && <DataTable rowKey={(p: SysParam) => p.paramKey} columns={paramCols} rows={q.data?.list as SysParam[]} loading={q.isLoading} />}
       {tab === "openapi" && <DataTable rowKey={(a: OpenApiApp) => a.appNo} columns={openapiCols} rows={q.data?.list as OpenApiApp[]} loading={q.isLoading} />}
       {tab === "markets" && <DataTable rowKey={(m: MarketCountry) => m.countryCode} columns={marketCols} rows={q.data?.list as MarketCountry[]} loading={q.isLoading} />}
-      {tab !== "vendors" && q.data && <Pagination page={page} size={SIZE} total={q.data.total} onPage={setPage} />}
+      {tab !== "vendors" && tab !== "rules" && q.data && <Pagination page={page} size={SIZE} total={q.data.total} onPage={setPage} />}
 
       {/* 供应商 配置抽屉（保留）*/}
       <Drawer
@@ -377,6 +1088,112 @@ function SystemInner() {
           if (!marketForm.countryCode?.trim()) { notify.error("国家码必填（ISO alpha-2，如 AE）"); return; }
           saveMarket.mutate({ ...marketForm, countryCode: marketForm.countryCode.trim().toUpperCase() });
         }} submitting={saveMarket.isPending} />
+
+      {/* §10 手动拉黑：新增时补拉黑时间；expireAt 留空 = 永久 */}
+      <FormDrawer open={!!blacklistForm} onOpenChange={(o) => !o && setBlacklistForm(null)}
+        titleNew="手动拉黑" titleEdit={`编辑拉黑 ${blacklistForm?.blockNo ?? ""}`} isEdit={!!blacklistForm?.blockNo}
+        fields={BLACKLIST_FIELDS} value={(blacklistForm ?? {}) as Record<string, unknown>}
+        onChange={(v) => setBlacklistForm(v as Partial<NotifyBlacklist>)}
+        onSubmit={() => {
+          if (!blacklistForm) return;
+          saveBlacklist.mutate({
+            ...blacklistForm,
+            expireAt: blacklistForm.expireAt || null,
+            blockedAt: blacklistForm.blockedAt || new Date().toISOString(),
+          });
+        }} submitting={saveBlacklist.isPending} />
+
+      {/* §12 登录设置：国家码是主键，新增必填 + 自动大写（`*` 默认档除外），编辑只读（规格 §17.1-10）*/}
+      <FormDrawer open={!!loginForm} onOpenChange={(o) => !o && setLoginForm(null)}
+        titleNew="新增国家登录档" titleEdit={`编辑登录设置 ${loginForm?.country ?? ""}`} isEdit={!!loginForm?.country}
+        fields={LOGIN_FIELDS} value={(loginForm ?? {}) as Record<string, unknown>}
+        onChange={(v) => setLoginForm(v as Partial<LoginSetting>)}
+        onSubmit={() => {
+          if (!loginForm) return;
+          const code = (loginForm.country ?? "").trim();
+          if (!loginForm.otpEnabled && !loginForm.passwordEnabled && !loginForm.appleEnabled && !loginForm.googleEnabled) {
+            notify.error("至少要保留一种登录方式，否则该国用户无法登录");
+            return;
+          }
+          saveLogin.mutate({ ...loginForm, country: code === "*" ? "*" : code.toUpperCase() });
+        }} submitting={saveLogin.isPending} />
+
+      {/* §13 应用版本：强更必须有最低支持版本——这条用 required/disabledWhen 表达不了（依赖另一字段的真值），故在提交时拦截 */}
+      <FormDrawer open={!!versionForm} onOpenChange={(o) => !o && setVersionForm(null)}
+        titleNew="新增应用版本" titleEdit={`编辑版本 ${versionForm?.platform ? PLATFORM_LABEL[versionForm.platform] : ""} ${versionForm?.versionNo ?? ""}`} isEdit={!!versionForm?.versionId}
+        fields={VERSION_FIELDS} value={(versionForm ?? {}) as Record<string, unknown>}
+        onChange={(v) => setVersionForm(v as Partial<AppVersion>)}
+        onSubmit={() => {
+          if (!versionForm) return;
+          if (versionForm.forceUpdate && !versionForm.minSupported?.trim()) {
+            notify.error("强制更新时必须填写「最低支持版本」，否则无法判断该拦谁");
+            return;
+          }
+          const pct = Number(versionForm.rolloutPercent ?? 0);
+          if (!Number.isFinite(pct) || pct < 0 || pct > 100) { notify.error("灰度比例需在 0~100 之间"); return; }
+          if (versionForm.forceUpdate && pct < 100) { notify.error("强制更新必须 100% 下发，否则部分用户被拦在旧版本无法升级"); return; }
+          saveVersion.mutate({ ...versionForm, rolloutPercent: pct, releasedAt: versionForm.status === "RELEASED" ? (versionForm.releasedAt ?? new Date().toISOString()) : versionForm.releasedAt ?? null });
+        }} submitting={saveVersion.isPending} />
+
+      {/* §14 银行管理：银行代码/国家码新增必填 + 自动大写，编辑只读 */}
+      <FormDrawer open={!!bankForm} onOpenChange={(o) => !o && setBankForm(null)}
+        titleNew="新增银行" titleEdit={`编辑银行 ${bankForm?.bankName ?? ""}`} isEdit={!!bankForm?.bankCode}
+        fields={BANK_FIELDS} value={(bankForm ?? {}) as Record<string, unknown>}
+        onChange={(v) => setBankForm(v as Partial<BankEntry>)}
+        onSubmit={() => {
+          if (!bankForm) return;
+          saveBank.mutate({
+            ...bankForm,
+            bankCode: (bankForm.bankCode ?? "").trim().toUpperCase(),
+            country: (bankForm.country ?? "").trim().toUpperCase(),
+            currency: (bankForm.currency ?? "").trim().toUpperCase(),
+            swiftPrefix: (bankForm.swiftPrefix ?? "").trim().toUpperCase(),
+          });
+        }} submitting={saveBank.isPending} />
+
+      {/* §15 问题管理：三语标题 + 三语答复共 6 个输入，分「基本信息 / 三语内容 / 处置」三区 */}
+      <FormDrawer open={!!problemForm} onOpenChange={(o) => !o && setProblemForm(null)}
+        titleNew="新增问题" titleEdit={`编辑问题 ${problemForm?.problemNo ?? ""}`} isEdit={!!problemForm?.problemNo}
+        fields={PROBLEM_FIELDS} value={(problemForm ?? {}) as Record<string, unknown>}
+        onChange={(v) => setProblemForm(v as Partial<ProblemEntry>)}
+        onSubmit={() => problemForm && saveProblem.mutate(problemForm)}
+        submitting={saveProblem.isPending} />
+
+      {/* §16 税率与发票：国家码是主键，新增必填 + 自动大写，编辑只读 */}
+      <FormDrawer open={!!taxForm} onOpenChange={(o) => !o && setTaxForm(null)}
+        titleNew="新增国家税率" titleEdit={`编辑税率 ${taxForm?.countryName ?? ""}`} isEdit={!!taxForm?.country}
+        fields={TAX_FIELDS} value={(taxForm ?? {}) as Record<string, unknown>}
+        onChange={(v) => setTaxForm(v as Partial<TaxSetting>)}
+        onSubmit={() => {
+          if (!taxForm) return;
+          saveTax.mutate({ ...taxForm, country: (taxForm.country ?? "").trim().toUpperCase() });
+        }} submitting={saveTax.isPending} />
+
+      {/* §9 失败详情：只读抽屉（长文本报错列表里放不下）*/}
+      <Drawer
+        open={!!logDetail}
+        onOpenChange={(o) => !o && setLogDetail(null)}
+        title={`发送失败详情 ${logDetail?.logNo ?? ""}`}
+        desc="原始报错来自上游通道回执，排障与找运营商对质都靠它"
+        footer={<Button variant="outline" onClick={() => setLogDetail(null)}>{t("common.cancel")}</Button>}
+      >
+        <Field label="渠道 / 模板"><span className="tabular-nums">{logDetail ? `${LOG_CHANNEL[logDetail.channel]} · ${logDetail.templateNo}` : "-"}</span></Field>
+        <Field label="目标（脱敏）"><span className="tabular-nums">{logDetail?.target ?? "-"}</span></Field>
+        <Field label="场景">{logDetail?.scene ?? "-"}</Field>
+        <Field label="发送时间">{fmtTime(logDetail?.sentAt)}</Field>
+        <Field label="计费">{logDetail ? money(logDetail.cost, logDetail.currency) : "-"}</Field>
+        <Field label="失败原因">
+          <div className="rounded-lg bg-muted px-3.5 py-2 text-sm">{logDetail?.failReason ?? "-"}</div>
+        </Field>
+        <Field label="下一步">
+          <span className="text-muted-foreground">
+            号码/邮箱无效或用户退订的，请到「触达拉黑」登记，避免持续扣费重发。
+          </span>
+        </Field>
+      </Drawer>
+
+      {/* 统一二次确认弹窗（解除拉黑 / 版本回滚）*/}
+      {dialog}
     </div>
   );
 }

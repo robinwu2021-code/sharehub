@@ -897,3 +897,300 @@ export interface PaymentChannel {
   apiKeyMasked: string; // 密钥仅掩码展示（真实密钥永不落前端，占位 sk_test_****）
   updatedAt: string;
 }
+
+// ============================================================================
+// 系统设置 · 批次 B2/B3/B5 待建 8 项（TDD-运营端对标补齐-待建功能规格 §9~§16）
+// 追加式：本区块只增不改，勿与上方内容混排。
+// ============================================================================
+
+// —— §9 发送记录（系统域 · 阶段 2，对标简电云「短信记录」）——
+// 我们更清晰：全渠道（短信/邮件/Push/WhatsApp）而非仅短信，且每条带计费——OTP 是真金白银。
+export type NotifyLogChannel = "SMS" | "EMAIL" | "PUSH" | "WHATSAPP";
+export interface NotifyLog {
+  logNo: string;
+  channel: NotifyLogChannel;
+  templateNo: string; // 关联通知模板（NT1xx）
+  target: string; // 目标（手机/邮箱/push token），**已脱敏中间位**，前端不承载完整联系方式
+  scene: string; // 场景：OTP / 订单完成 / 告警 …
+  sentAt: string;
+  status: "SENT" | "FAILED";
+  failReason: string | null;
+  cost: number; // 单条计费
+  currency: string; // 计费币种（AED）
+}
+/** 发送记录页头统计（今日发送量 / 失败率 / 今日成本）。 */
+export interface NotifyLogStats {
+  sentToday: number;
+  failedToday: number;
+  failRate: number; // 0~1
+  costToday: number;
+  currency: string;
+}
+
+// —— §10 触达拉黑（系统域 · 阶段 2，对标简电云「短信拉黑」）——
+// 我们更清晰：全渠道拉黑（含 ALL），且原因是枚举而非自由文本，便于统计退订来源。
+export type NotifyBlockReason = "USER_OPT_OUT" | "HARD_BOUNCE" | "ABUSE" | "MANUAL";
+export interface NotifyBlacklist {
+  blockNo: string; // 业务键（target+channel 是自然键，但复合键不便做行键/编辑，故另立单号）
+  target: string; // 号码 / 邮箱
+  // 规格 §10 写的是 SMS/EMAIL/PUSH/ALL；这里补上 WHATSAPP —— §9 发送记录已是全渠道，
+  // 拉黑若少一个渠道就等于该渠道不可拉黑，与"全渠道拉黑"的对标结论矛盾。
+  channel: NotifyLogChannel | "ALL";
+  reason: NotifyBlockReason;
+  blockedAt: string;
+  blockedBy: string;
+  expireAt: string | null; // 空 = 永久；「解除」即把到期时间置为当下（软删除，保留审计痕迹）
+}
+
+// —— §11 业务规则（系统域 · 阶段 2）——
+// 竞品拆「提现设置 / 预约设置 / 充电设置」三个菜单；我们合并为一页三分区，各自保存。
+export interface WithdrawRule {
+  minAmount: number; // 最低提现额
+  feeRate: number; // 手续费率 0~1
+  feeCap: number; // 手续费封顶
+  settleDays: number; // 结算周期 T+N
+  dailyLimit: number; // 单日限额
+  needApproval: boolean; // 是否需人工审批
+}
+export interface ReservationRule {
+  maxDurationMin: number; // 预约时长上限（分）
+  advanceHours: number; // 提前预约上限（小时）
+  holdFeePerMin: number; // 超时未取占位费（元/分）
+  maxConcurrent: number; // 单用户同时预约上限
+}
+export interface BillingDefaultRule {
+  freeMinutes: number; // 默认免费时长（分）
+  billUnitMinutes: number; // 默认计费单位（分）
+  dailyCap: number; // 默认日封顶
+  buyoutPrice: number; // 默认买断价
+  overdueHours: number; // 超时判定阈值（小时）
+}
+export interface BizRules {
+  withdraw: WithdrawRule;
+  reservation: ReservationRule;
+  billing: BillingDefaultRule;
+  currency: string;
+  updatedAt: string;
+}
+
+// —— §12 登录设置（系统域 · 阶段 2）——
+// 竞品「登录设置 / 第三方登录」两个菜单；我们合并且按国家可配（MENA 多国监管差异大）。
+export interface LoginSetting {
+  country: string; // ISO alpha-2；`*` = 默认档（置顶）
+  countryName: string;
+  otpEnabled: boolean;
+  passwordEnabled: boolean;
+  appleEnabled: boolean;
+  googleEnabled: boolean;
+  otpExpireSec: number;
+  otpDailyLimit: number;
+  forceRealName: boolean; // 强制实名（沙特等地合规要求）
+}
+
+// —— §13 应用版本（系统域 · 阶段 2）——
+// 竞品只有单一版本；我们按平台分 + 灰度比例 + 三语更新说明。
+export interface AppVersion {
+  versionId: string; // `IOS-1.4.2`：versionNo 在不同平台会重复，故以 平台-版本 为业务键
+  versionNo: string;
+  platform: "IOS" | "ANDROID" | "H5";
+  buildNo: number;
+  releaseNote: string;
+  releaseNoteEn: string;
+  releaseNoteAr: string;
+  forceUpdate: boolean;
+  minSupported: string; // 最低支持版本（强更时必填）
+  rolloutPercent: number; // 灰度比例 0~100
+  downloadUrl: string;
+  status: "DRAFT" | "RELEASED" | "ROLLBACK";
+  releasedAt: string | null;
+}
+
+// —— §14 银行管理（系统域 · 阶段 2）——
+// 竞品只有行名；我们带国家/币种/IBAN 长度——提现收款账户校验直接读这里。
+export interface BankEntry {
+  bankCode: string;
+  bankName: string;
+  bankNameEn: string;
+  country: string;
+  currency: string;
+  swiftPrefix: string;
+  ibanLength: number; // IBAN 位数（含国家码），用于提现账户格式校验
+  status: "ENABLED" | "DISABLED";
+}
+
+// —— §15 问题管理（系统域 · 阶段 2，对标简电云 FAQ）——
+// 我们更清晰：三语 + 关联建议处置，直接喂 C 端报障下拉与客服快捷答复。
+export type ProblemCategory = "RENT" | "RETURN" | "BILLING" | "DEVICE" | "ACCOUNT" | "OTHER";
+export type ProblemAction = "SELF_SERVICE" | "TO_WORKORDER" | "TO_REFUND" | "TO_CS";
+export interface ProblemEntry {
+  problemNo: string;
+  category: ProblemCategory;
+  title: string;
+  titleEn: string;
+  titleAr: string;
+  answer: string;
+  answerEn: string;
+  answerAr: string;
+  suggestedAction: ProblemAction;
+  sortNo: number;
+  status: "ENABLED" | "DISABLED";
+}
+
+// —— §16 税率与发票（系统域 · 阶段 3）——
+// 竞品「发票设置」只有税率；我们做国家维度配置，与现有「发票」列表互补。
+export interface TaxSetting {
+  country: string; // ISO alpha-2（业务键）
+  countryName: string;
+  taxName: string; // VAT / ZATCA VAT …
+  ratePercent: number;
+  trn: string; // 税号（UAE TRN 15 位）
+  invoiceTitle: string; // 默认开票抬头
+  includedInPrice: boolean; // 价内税 / 价外税（影响 C 端计费展示）
+  effectiveFrom: string;
+}
+
+// ============================================================================
+// 财务域 · 批次 B5 待建 2 项（TDD-运营端对标补齐-待建功能规格 §5 §6）
+// 追加式：本区块只增不改。
+// ============================================================================
+
+// —— §5 分润统计（财务域 · 阶段 2，对标简电云「佣金统计」）——
+// 竞品把佣金统计按「运营商 / 商户」切成两套菜单两张表；我们做**一张表 + 顶部维度切换器**，
+// 同一套列、同一次查询，少一次跳转——这是「信息更清晰」的正例。
+export interface ShareSummary {
+  /** 主体维度：与 ShareRule / ShareRecord 的 dimension 同枚举，切换器切的就是它 */
+  dimension: "VENUE" | "AGENT";
+  payeeNo: string; // 场地方 VEN3xx / 代理商 AG00x
+  payeeName: string;
+  period: string; // 统计周期 `2026-07`
+  orderCount: number;
+  gmv: number; // 交易额
+  shareAmount: number; // 分润额
+  settledAmount: number; // 已结算（≤ 分润额）
+  pendingAmount: number; // 待结算 = 分润额 − 已结算（列表高亮列：财务最关心的数）
+  currency: string;
+}
+
+// —— §6 充值订单（财务域 · 阶段 3）——
+// 归「用户账」分组，与钱包同主体。channelCode 取值必须与 系统设置·支付渠道 的 channelCode 对得上。
+export interface RechargeOrder {
+  rechargeNo: string;
+  userNo: string; // U30xx
+  nickname: string; // 冗余展示用：列表不必再跳用户页确认是谁
+  packageNo: string | null; // 充值套餐；null = 自定义金额
+  payAmount: number; // 实付
+  giftAmount: number; // 赠送
+  creditAmount: number; // 到账 = 实付 + 赠送
+  currency: string;
+  channelCode: string; // NEARPAY / STRIPE / TAP …（关联 PaymentChannel.channelCode）
+  status: "PENDING" | "PAID" | "FAILED" | "REFUNDED";
+  createdAt: string; // 下单时间：PENDING/FAILED 无 paidAt，日期范围筛选一律以本字段为准
+  paidAt: string | null;
+  psgTxnNo: string | null; // 支付网关流水号；未支付为空
+}
+
+// ============================================================================
+// 批次 B4/B5 · 设备日志 / 设备编码 / 预约订单 / 免费订单 / 免费用户白名单 / 充值套餐
+// 规格：docs/technical/TDD-运营端对标补齐-待建功能规格.md §1 §2 §3 §4 §7 §8
+// ============================================================================
+
+// —— 设备日志（阶段 2）——
+// 对标竞品「充电桩日志」（只有设备上报）。我们做**双流合一**：指令下发(COMMAND/DOWN)
+// 与设备上报(REPORT/UP) 在同一时间轴，排障时因果可见。
+export interface DeviceLog {
+  logNo: string;
+  cabinetNo: string;
+  stream: "COMMAND" | "REPORT"; // 双流标识：下发 / 上报
+  direction: "DOWN" | "UP"; // 方向，与 stream 对应
+  eventType: string; // EJECT / HEARTBEAT / SLOT_STATE / FW_UPGRADE ...
+  payload: string; // 报文（JSON 字符串；列表行内截断，展开看全文）
+  vendorCode: string;
+  occurredAt: string;
+  result: "OK" | "TIMEOUT" | "FAILED";
+}
+
+// —— 设备编码（阶段 2）——
+// 对标竞品「充电桩编码」（平铺列表）。我们按**批次 + 供应商**归集，并跟踪绑定进度。
+export interface DeviceCodeBatch {
+  batchNo: string;
+  vendorCode: string;
+  codeType: "QR" | "SN"; // 二维码 / 出厂序列号
+  rangeStart: string;
+  rangeEnd: string;
+  total: number;
+  bound: number; // 已绑定数（列表显示 已绑定/总数 + 进度条）
+  producedAt: string;
+  status: "PENDING" | "PARTIAL" | "BOUND" | "VOID";
+}
+
+// —— 预约订单（阶段 2）——
+// 竞品是电车预约充电桩；充电宝映射为「预约取宝 / 预约还位」（热门点位高峰占位）。
+export interface Reservation {
+  reservationNo: string;
+  userNo: string;
+  type: "BORROW" | "RETURN"; // 预约取宝 / 预约还位
+  siteNo: string;
+  siteName: string;
+  cabinetNo: string | null; // 指定机柜（空 = 站点级预约）
+  reservedFrom: string;
+  reservedTo: string;
+  holdFee: number; // 占位费（超时未取产生；规则在业务规则页配置）
+  currency: string; // 规格未列，金额展示统一需要币种（AED）
+  status: "PENDING" | "FULFILLED" | "EXPIRED" | "CANCELLED";
+  orderNo: string | null; // 履约后关联的租借订单
+}
+
+// 免费来源：白名单用途枚举（免费订单与白名单共用，保证两页口径一致）
+export type WhitelistReason = "INTERNAL_TEST" | "VIP" | "BD_DEMO" | "MERCHANT_SELF";
+
+// —— 免费订单（阶段 2）——：与免费用户白名单联动，页头做成本管控统计
+export interface FreeOrder {
+  orderNo: string; // 复用租借订单号
+  userNo: string;
+  nickname: string;
+  whitelistReason: WhitelistReason; // 免费来源
+  waivedAmount: number; // 减免金额
+  currency: string; // 规格未列，money() 需要（AED）
+  siteName: string;
+  cabinetNo: string;
+  startedAt: string;
+  endedAt: string;
+  duration: number; // 时长（分）
+}
+
+/** 免费订单页头统计（本月免费单数 / 累计减免金额），成本管控口径。 */
+export interface FreeOrderStats {
+  monthCount: number;
+  waivedTotal: number;
+  currency: string;
+}
+
+// —— 免费用户白名单（阶段 2）——
+// 竞品「免费用户」放订单域；我们归**用户域**（它本质是用户属性），并强制标注用途。
+export interface FreeUserWhitelist {
+  userNo: string;
+  nickname: string;
+  phone: string;
+  reason: WhitelistReason; // 必填用途（枚举，非自由文本）
+  quotaType: "UNLIMITED" | "TIMES" | "AMOUNT";
+  quotaValue: number; // 额度（次数 / 金额）
+  usedValue: number; // 已用
+  validFrom: string;
+  validTo: string;
+  grantedBy: string; // 授予人（审计用）
+  status: "ACTIVE" | "EXPIRED" | "REVOKED";
+}
+
+// —— 充值套餐（阶段 3）——
+// 竞品只有「充值 + 赠送」；我们加**有效期**与**适用市场**（MENA 多国家）。
+export interface RechargePackage {
+  packageNo: string;
+  name: string;
+  payAmount: number; // 充值金额
+  giftAmount: number; // 赠送金额
+  currency: string;
+  markets: string; // 适用市场，ISO alpha-2 逗号分隔，如 "AE,SA"
+  validDays: number; // 赠送金额有效期（天）
+  sortNo: number;
+  status: "ENABLED" | "DISABLED";
+}

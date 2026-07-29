@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
@@ -8,8 +9,10 @@ import { PageTitle, Pagination } from "@/components/ui/misc";
 import { TabHeader } from "@/components/ui/tab-header";
 import { Toolbar } from "@/components/ui/toolbar";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
-import { DataTable, type Column } from "@/components/ui/data-table";
+import { DataTable, type Column, type SortDir } from "@/components/ui/data-table";
 import { Drawer, Field } from "@/components/ui/drawer";
+import { Tabs } from "@/components/ui/tabs";
+import { DateInput } from "@/components/ui/date-input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/input";
@@ -18,10 +21,22 @@ import { useAuth } from "@/lib/auth";
 import { useCan } from "@/lib/use-can";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
-import type { ShareRule, Settlement, Withdrawal, LedgerEntry, ShareRecord, Reconcile, Invoice, PageResult } from "@/lib/types";
+import { exportCsv } from "@/lib/export-csv";
+import type { ShareRule, Settlement, Withdrawal, LedgerEntry, ShareRecord, Reconcile, Invoice, ShareSummary, RechargeOrder, PageResult } from "@/lib/types";
 
 const SIZE = 10;
-const TABS = [{ key: "rules", label: "分润规则" }, { key: "records", label: "分润明细" }, { key: "settlements", label: "结算单" }, { key: "ledger", label: "账务分录", phase: 2 as const }, { key: "withdrawals", label: "提现", phase: 2 as const }, { key: "reconcile", label: "对账", phase: 3 as const }, { key: "invoices", label: "发票", phase: 3 as const }];
+const TABS = [{ key: "rules", label: "分润规则" }, { key: "records", label: "分润明细" }, { key: "summary", label: "分润统计", phase: 2 as const }, { key: "settlements", label: "结算单" }, { key: "ledger", label: "账务分录", phase: 2 as const }, { key: "withdrawals", label: "提现", phase: 2 as const }, { key: "reconcile", label: "对账", phase: 3 as const }, { key: "invoices", label: "发票", phase: 3 as const }, { key: "recharges", label: "充值订单", phase: 3 as const }];
+
+// 分润统计：维度切换器（竞品把「运营商佣金」「商户佣金」拆成两套菜单两张表，
+// 我们一张表切 dimension——列完全相同，少一次跳转）
+const SUMMARY_DIMS = [{ key: "VENUE", label: "场地方" }, { key: "AGENT", label: "代理商" }];
+const SUMMARY_PERIODS = ["2026-07", "2026-06", "2026-05"];
+const RECHARGE_STATUS: Record<RechargeOrder["status"], { label: string; tone: "success" | "warning" | "danger" | "muted" }> = {
+  PENDING: { label: "待支付", tone: "warning" },
+  PAID: { label: "已支付", tone: "success" },
+  FAILED: { label: "支付失败", tone: "danger" },
+  REFUNDED: { label: "已退款", tone: "muted" },
+};
 
 const RULE_FIELDS: FieldDef[] = [
   { key: "ruleNo", label: "规则号", readOnlyOnEdit: true, placeholder: "新增留空自动生成" },
@@ -56,19 +71,34 @@ function FinanceInner() {
   const [wdApprove, setWdApprove] = useState("1");
   const [wdReject, setWdReject] = useState("");
   const username = useAuth((s) => s.username);
+  // 分润统计：维度 / 周期 / 排序（排序受控，实际排序在 mock·后端做，翻页后仍成立）
+  const [sumDim, setSumDim] = useState("VENUE");
+  const [sumPeriod, setSumPeriod] = useState(SUMMARY_PERIODS[0]);
+  const [sumSortKey, setSumSortKey] = useState("shareAmount");
+  const [sumSortDir, setSumSortDir] = useState<SortDir>("desc");
+  // 充值订单：状态 + 日期范围（按下单时间）
+  const [rcStatus, setRcStatus] = useState("");
+  const [rcFrom, setRcFrom] = useState("");
+  const [rcTo, setRcTo] = useState("");
   useEffect(() => { if (qTab && TABS.some((t) => t.key === qTab)) { setTab(qTab); setPage(1); } }, [qTab]);
   useEffect(() => { setKeyword(""); }, [tab]);
+  // 从分润统计深链过来：/finance?tab=records&payee=xxx —— 把 payee 落成分润明细的搜索词，
+  // 不静默丢弃参数（本 effect 必须排在上面的清空 effect 之后，否则会被清掉）
+  const qPayee = sp.get("payee");
+  useEffect(() => { if (qPayee && tab === "records") setKeyword(qPayee); }, [qPayee, tab]);
 
   const canEditRule = allow("finance:share_rule:config");
   const canEditInvoice = allow("finance:invoice:issue");
 
-  const q = useQuery<PageResult<ShareRule | Settlement | Withdrawal | LedgerEntry | ShareRecord | Reconcile | Invoice>>({
-    queryKey: ["fin", tab, page, keyword],
+  const q = useQuery<PageResult<ShareRule | Settlement | Withdrawal | LedgerEntry | ShareRecord | Reconcile | Invoice | ShareSummary | RechargeOrder>>({
+    queryKey: ["fin", tab, page, keyword, sumDim, sumPeriod, sumSortKey, sumSortDir, rcStatus, rcFrom, rcTo],
     queryFn: () =>
       tab === "rules" ? api.listShareRules({ page, size: SIZE, keyword })
       : tab === "ledger" ? api.listLedger({ page, size: SIZE, keyword })
       : tab === "settlements" ? api.listSettlements({ page, size: SIZE, keyword })
       : tab === "records" ? api.listShareRecords({ page, size: SIZE, keyword })
+      : tab === "summary" ? api.listShareSummaries({ page, size: SIZE, keyword, dimension: sumDim, period: sumPeriod, sortKey: sumSortKey, sortDir: sumSortDir })
+      : tab === "recharges" ? api.listRechargeOrders({ page, size: SIZE, keyword, status: rcStatus || undefined, from: rcFrom || undefined, to: rcTo || undefined })
       : tab === "reconcile" ? api.listReconciles({ page, size: SIZE, keyword })
       : tab === "invoices" ? api.listInvoices({ page, size: SIZE, keyword })
       : api.listWithdrawals({ page, size: SIZE, keyword }),
@@ -153,6 +183,48 @@ function FinanceInner() {
     { header: "时间", cell: (r) => <span className="text-muted-foreground">{fmtTime(r.createdAt)}</span> },
   ];
 
+  // 分润统计：分成方点进去 = 深链到分润明细并带 payee（跨模块跳转一律 <Link> + 完整 href）
+  const summaryCols: Column<ShareSummary>[] = [
+    {
+      header: "分成方",
+      cell: (s) => (
+        <Link href={`/finance?tab=records&payee=${encodeURIComponent(s.payeeName)}`} className="font-medium underline-offset-4 hover:underline">
+          {s.payeeName}
+        </Link>
+      ),
+    },
+    { header: "编号", cell: (s) => <span className="text-muted-foreground tabular-nums">{s.payeeNo}</span> },
+    { header: "统计周期", cell: (s) => <span className="tabular-nums">{s.period}</span> },
+    { header: "订单数", cell: (s) => <span className="tabular-nums">{s.orderCount}</span>, sortKey: "orderCount" },
+    { header: "交易额", cell: (s) => <span className="tabular-nums">{money(s.gmv, s.currency)}</span>, sortKey: "gmv" },
+    { header: "分润额", cell: (s) => <span className="tabular-nums">{money(s.shareAmount, s.currency)}</span>, sortKey: "shareAmount" },
+    { header: "已结算", cell: (s) => <span className="tabular-nums text-muted-foreground">{money(s.settledAmount, s.currency)}</span> },
+    // 待结算 = 分润 − 已结算：财务最关心的数，未结清高亮，结清则弱化
+    {
+      header: "待结算",
+      cell: (s) => (
+        <span className={s.pendingAmount > 0 ? "font-medium tabular-nums text-[var(--destructive)]" : "tabular-nums text-muted-foreground"}>
+          {money(s.pendingAmount, s.currency)}
+        </span>
+      ),
+      sortKey: "pendingAmount",
+    },
+  ];
+
+  const rechargeCols: Column<RechargeOrder>[] = [
+    { header: "充值单号", cell: (r) => <span className="font-medium tabular-nums">{r.rechargeNo}</span> },
+    { header: "用户", cell: (r) => <span>{r.nickname} <span className="text-muted-foreground tabular-nums">{r.userNo}</span></span> },
+    { header: "套餐", cell: (r) => r.packageNo ? <span className="tabular-nums">{r.packageNo}</span> : <Badge tone="outline">自定义金额</Badge> },
+    { header: "实付", cell: (r) => <span className="tabular-nums">{money(r.payAmount, r.currency)}</span> },
+    { header: "赠送", cell: (r) => <span className="tabular-nums text-muted-foreground">{money(r.giftAmount, r.currency)}</span> },
+    { header: "到账", cell: (r) => <span className="font-medium tabular-nums">{money(r.creditAmount, r.currency)}</span> },
+    // 渠道码与 系统设置·支付渠道（/system?tab=payment）同一套 channelCode
+    { header: "支付渠道", cell: (r) => <Badge tone="outline">{r.channelCode}</Badge> },
+    { header: "状态", cell: (r) => <Badge tone={RECHARGE_STATUS[r.status].tone}>{RECHARGE_STATUS[r.status].label}</Badge> },
+    { header: "支付时间", cell: (r) => <span className="text-muted-foreground">{r.paidAt ? fmtTime(r.paidAt) : "-"}</span> },
+    { header: "网关流水号", cell: (r) => <span className="text-muted-foreground tabular-nums">{r.psgTxnNo ?? "-"}</span> },
+  ];
+
   const reconcileCols: Column<Reconcile>[] = [
     { header: "批次号", cell: (r) => <span className="font-medium">{r.batchNo}</span> },
     { header: "周期", cell: (r) => r.period },
@@ -189,6 +261,64 @@ function FinanceInner() {
       {tab === "settlements" && <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索结算单号/对象" />}
       {tab === "withdrawals" && <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索提现号/对象/审批人" />}
       {tab === "records" && <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索明细号/订单/分成方" />}
+      {tab === "summary" && (
+        <>
+          {/* 维度切换器：切的是同一张表的 dimension 参数，不是两个 tab */}
+          <Tabs tabs={SUMMARY_DIMS} value={sumDim} onChange={(k) => { setSumDim(k); setPage(1); }} />
+          <Toolbar
+            search={keyword}
+            onSearch={(v) => { setKeyword(v); setPage(1); }}
+            searchPlaceholder="搜索分成方名称/编号"
+            onExport={() => exportCsv<ShareSummary>(`分润统计-${sumDim === "VENUE" ? "场地方" : "代理商"}-${sumPeriod}`, [
+              { header: "分成方", value: (s) => s.payeeName },
+              { header: "编号", value: (s) => s.payeeNo },
+              { header: "维度", value: (s) => (s.dimension === "VENUE" ? "场地方" : "代理商") },
+              { header: "统计周期", value: (s) => s.period },
+              { header: "订单数", value: (s) => s.orderCount },
+              { header: "交易额", value: (s) => s.gmv },
+              { header: "分润额", value: (s) => s.shareAmount },
+              { header: "已结算", value: (s) => s.settledAmount },
+              { header: "待结算", value: (s) => s.pendingAmount },
+              { header: "币种", value: (s) => s.currency },
+            ], (q.data?.list ?? []) as ShareSummary[])}
+          >
+            <Select value={sumPeriod} onChange={(e) => { setSumPeriod(e.target.value); setPage(1); }}>
+              {SUMMARY_PERIODS.map((p) => <option key={p} value={p}>{p}</option>)}
+            </Select>
+          </Toolbar>
+        </>
+      )}
+      {tab === "recharges" && (
+        <Toolbar
+          search={keyword}
+          onSearch={(v) => { setKeyword(v); setPage(1); }}
+          searchPlaceholder="搜索充值单号/用户/网关流水号"
+          onExport={() => exportCsv<RechargeOrder>("充值订单", [
+            { header: "充值单号", value: (r) => r.rechargeNo },
+            { header: "用户号", value: (r) => r.userNo },
+            { header: "昵称", value: (r) => r.nickname },
+            { header: "套餐", value: (r) => r.packageNo ?? "自定义金额" },
+            { header: "实付", value: (r) => r.payAmount },
+            { header: "赠送", value: (r) => r.giftAmount },
+            { header: "到账", value: (r) => r.creditAmount },
+            { header: "币种", value: (r) => r.currency },
+            { header: "支付渠道", value: (r) => r.channelCode },
+            { header: "状态", value: (r) => RECHARGE_STATUS[r.status].label },
+            { header: "下单时间", value: (r) => r.createdAt },
+            { header: "支付时间", value: (r) => r.paidAt },
+            { header: "网关流水号", value: (r) => r.psgTxnNo },
+          ], (q.data?.list ?? []) as RechargeOrder[])}
+        >
+          <Select value={rcStatus} onChange={(e) => { setRcStatus(e.target.value); setPage(1); }}>
+            <option value="">全部状态</option>
+            {Object.entries(RECHARGE_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+          </Select>
+          {/* 日期范围按下单时间：待支付/失败单没有支付时间，用支付时间会把它们全筛掉 */}
+          <DateInput className="w-40" aria-label="下单时间起" value={rcFrom} onChange={(e) => { setRcFrom(e.target.value); setPage(1); }} />
+          <span className="text-muted-foreground">~</span>
+          <DateInput className="w-40" aria-label="下单时间止" value={rcTo} onChange={(e) => { setRcTo(e.target.value); setPage(1); }} />
+        </Toolbar>
+      )}
       {tab === "reconcile" && <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索批次号/周期" />}
       {tab === "invoices" && (
         <Toolbar
@@ -205,6 +335,27 @@ function FinanceInner() {
       {tab === "withdrawals" && !canAuditWithdrawal && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无提现审批权限（finance:withdrawal:audit）</div>}
       {tab === "withdrawals" && <DataTable rowKey={(w: Withdrawal) => w.withdrawNo} columns={wdCols} rows={q.data?.list as Withdrawal[]} loading={q.isLoading} />}
       {tab === "records" && <DataTable rowKey={(r: ShareRecord) => r.recordNo} columns={recordCols} rows={q.data?.list as ShareRecord[]} loading={q.isLoading} />}
+      {tab === "summary" && (
+        <DataTable
+          rowKey={(s: ShareSummary) => `${s.dimension}-${s.payeeNo}-${s.period}`}
+          columns={summaryCols}
+          rows={q.data?.list as ShareSummary[]}
+          loading={q.isLoading}
+          empty={`${sumPeriod} 该维度暂无分润统计 —— 换个周期，或确认该周期已有已结算订单`}
+          sortKey={sumSortKey}
+          sortDir={sumSortDir}
+          onSortChange={(k, d) => { setSumSortKey(k); setSumSortDir(d); setPage(1); }}
+        />
+      )}
+      {tab === "recharges" && (
+        <DataTable
+          rowKey={(r: RechargeOrder) => r.rechargeNo}
+          columns={rechargeCols}
+          rows={q.data?.list as RechargeOrder[]}
+          loading={q.isLoading}
+          empty="暂无充值订单 —— 该筛选条件下没有记录，或用户尚未使用钱包充值"
+        />
+      )}
       {tab === "reconcile" && <DataTable rowKey={(r: Reconcile) => r.batchNo} columns={reconcileCols} rows={q.data?.list as Reconcile[]} loading={q.isLoading} />}
       {tab === "invoices" && <DataTable rowKey={(i: Invoice) => i.invoiceNo} columns={invoiceCols} rows={q.data?.list as Invoice[]} loading={q.isLoading} />}
       {q.data && <Pagination page={page} size={SIZE} total={q.data.total} onPage={setPage} />}

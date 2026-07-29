@@ -7,9 +7,11 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tansta
 import { api } from "@/lib/api";
 import { Pagination } from "@/components/ui/misc";
 import { Input, Select } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { TabHeader } from "@/components/ui/tab-header";
 import { Toolbar } from "@/components/ui/toolbar";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
+import { Progress } from "@/components/ui/progress";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,8 +19,10 @@ import { CabinetStatusBadge, OnlineBadge } from "@/components/status";
 import { fmtTime } from "@/lib/utils";
 import { useCan } from "@/lib/use-can";
 import { notify } from "@/lib/notify";
+import { exportCsv } from "@/lib/export-csv";
 import type {
   Cabinet, Powerbank, CabinetMonitor, CommandRecord, InventoryTransfer, OtaRollout, PageResult,
+  DeviceLog, DeviceCodeBatch,
 } from "@/lib/types";
 
 const SIZE = 10;
@@ -27,9 +31,13 @@ const TABS = [
   { key: "powerbanks", label: "充电宝管理" },
   { key: "monitor", label: "实时监控" },
   { key: "commands", label: "远程指令记录" },
+  { key: "logs", label: "设备日志", phase: 2 as const },
   { key: "inventory", label: "库存调拨", phase: 2 as const },
+  { key: "codes", label: "设备编码", phase: 2 as const },
   { key: "ota", label: "固件 OTA", phase: 2 as const },
 ];
+// 自建 tab（自带筛选器与查询），不走页面共用的 keyword/Toolbar/分页那一套
+const STANDALONE_TABS = ["cabinets", "logs", "codes"];
 
 type Tone = "default" | "success" | "warning" | "danger" | "muted" | "outline";
 
@@ -82,6 +90,207 @@ function CabinetsTab() {
 
       <DataTable rowKey={(c: Cabinet) => c.cabinetNo} columns={cabCols} rows={data?.list} loading={isLoading} empty="无设备" />
       {data && <Pagination page={page} size={SIZE} total={data.total} onPage={setPage} />}
+    </div>
+  );
+}
+
+// —— 设备日志（规格 §1）：双流合一（COMMAND 下发 / REPORT 上报）——
+// 竞品只有设备上报；两条流放同一时间轴后，「下发了什么 → 设备回了什么」的因果一眼可见。
+const LOG_STREAM: Record<DeviceLog["stream"], { label: string; tone: Tone }> = {
+  COMMAND: { label: "↓ 下发", tone: "default" }, // primary 色标
+  REPORT: { label: "↑ 上报", tone: "muted" },
+};
+const LOG_RESULT: Record<DeviceLog["result"], { label: string; tone: Tone }> = {
+  OK: { label: "成功", tone: "success" },
+  TIMEOUT: { label: "超时", tone: "warning" },
+  FAILED: { label: "失败", tone: "danger" },
+};
+// 事件类型走「已知才翻译，未知原样显示」——厂商随时可能上报新事件，不能因此显示空白
+const LOG_EVENT: Record<string, string> = {
+  EJECT: "弹仓", LOCK: "锁仓", REBOOT: "重启", FW_UPGRADE: "固件升级", LOCATE: "定位",
+  HEARTBEAT: "心跳", SLOT_STATE: "仓位状态", RETURN_DETECT: "归还检测", BATTERY_LOW: "低电量", FAULT: "故障",
+};
+
+function LogsTab() {
+  const [page, setPage] = useState(1);
+  const [keyword, setKeyword] = useState("");
+  const [stream, setStream] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const reset = () => setPage(1);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["device-logs", page, keyword, stream, from, to],
+    queryFn: () => api.listDeviceLogs({ page, size: SIZE, keyword, stream: stream || undefined, from: from || undefined, to: to || undefined }),
+    placeholderData: keepPreviousData,
+  });
+
+  const cols: Column<DeviceLog>[] = [
+    { header: "日志号", cell: (l) => <span className="font-medium tabular-nums">{l.logNo}</span> },
+    { header: "机柜号", cell: (l) => <span className="tabular-nums">{l.cabinetNo}</span> },
+    { header: "流向", cell: (l) => <Badge tone={LOG_STREAM[l.stream].tone}>{LOG_STREAM[l.stream].label}</Badge> },
+    { header: "事件类型", cell: (l) => <Badge tone="outline">{LOG_EVENT[l.eventType] ?? l.eventType}</Badge> },
+    // 报文行内截断；完整内容点行首箭头展开（DataTable expandable）
+    { header: "报文", cell: (l) => <span className="block max-w-[20rem] truncate font-mono text-xs text-muted-foreground">{l.payload}</span> },
+    { header: "厂商", cell: (l) => <span className="text-muted-foreground">{l.vendorCode}</span> },
+    { header: "时间", cell: (l) => <span className="text-muted-foreground">{fmtTime(l.occurredAt)}</span> },
+    { header: "结果", cell: (l) => <Badge tone={LOG_RESULT[l.result].tone}>{LOG_RESULT[l.result].label}</Badge> },
+  ];
+
+  return (
+    <div>
+      <Toolbar
+        search={keyword}
+        onSearch={(v) => { setKeyword(v); reset(); }}
+        searchPlaceholder="搜索日志号 / 机柜号 / 事件类型 / 厂商"
+        onExport={() => exportCsv<DeviceLog>("设备日志", [
+          { header: "日志号", value: (l) => l.logNo },
+          { header: "机柜号", value: (l) => l.cabinetNo },
+          { header: "流向", value: (l) => LOG_STREAM[l.stream].label },
+          { header: "方向", value: (l) => l.direction },
+          { header: "事件类型", value: (l) => l.eventType },
+          { header: "报文", value: (l) => l.payload },
+          { header: "厂商", value: (l) => l.vendorCode },
+          { header: "时间", value: (l) => l.occurredAt },
+          { header: "结果", value: (l) => LOG_RESULT[l.result].label },
+        ], data?.list ?? [])}
+      >
+        <Select value={stream} onChange={(e) => { setStream(e.target.value); reset(); }}>
+          <option value="">全部双流</option>
+          <option value="COMMAND">指令下发</option>
+          <option value="REPORT">设备上报</option>
+        </Select>
+        <DateInput className="w-40" aria-label="起始日期" value={from} onChange={(e) => { setFrom(e.target.value); reset(); }} />
+        <DateInput className="w-40" aria-label="截止日期" value={to} onChange={(e) => { setTo(e.target.value); reset(); }} />
+      </Toolbar>
+
+      <DataTable
+        rowKey={(l: DeviceLog) => l.logNo}
+        columns={cols}
+        rows={data?.list}
+        loading={isLoading}
+        empty="暂无设备日志——所选时间范围内没有指令下发与设备上报，或筛选条件过窄，可放宽日期范围重试"
+        // 行展开看完整报文：排障要看全文，但全文进列表会撑爆表格
+        expandable={(l) => (
+          <div>
+            <div className="mb-2 text-xs text-muted-foreground">
+              {LOG_STREAM[l.stream].label} · {LOG_EVENT[l.eventType] ?? l.eventType} · {l.cabinetNo} · {fmtTime(l.occurredAt)}
+            </div>
+            <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-card p-3 font-mono text-xs">{l.payload}</pre>
+          </div>
+        )}
+      />
+      {data && <Pagination page={page} size={SIZE} total={data.total} onPage={setPage} />}
+    </div>
+  );
+}
+
+// —— 设备编码（规格 §2）：按批次 + 供应商归集，跟踪贴码绑定进度 ——
+const CODE_STATUS: Record<DeviceCodeBatch["status"], { label: string; tone: Tone }> = {
+  PENDING: { label: "待绑定", tone: "muted" },
+  PARTIAL: { label: "部分绑定", tone: "warning" },
+  BOUND: { label: "已绑完", tone: "success" },
+  VOID: { label: "已作废", tone: "danger" },
+};
+const CODE_FIELDS: FieldDef[] = [
+  { key: "batchNo", label: "批次号", readOnlyOnEdit: true, placeholder: "留空自动生成", section: "批次信息" },
+  { key: "vendorCode", label: "供应商", type: "select", required: true, section: "批次信息", options: [
+    { value: "cd-tech", label: "cd-tech" }, { value: "sd-power", label: "sd-power" }, { value: "chargenow", label: "chargenow" },
+  ] },
+  { key: "codeType", label: "编码类型", type: "select", required: true, section: "批次信息", options: [
+    { value: "SN", label: "出厂序列号 SN" }, { value: "QR", label: "二维码 QR" },
+  ] },
+  { key: "producedAt", label: "生产日期", type: "date", required: true, section: "批次信息" },
+  { key: "rangeStart", label: "区间起", required: true, maxLength: 24, section: "编码区间", placeholder: "SN090000", help: "同批次编码需等长同前缀，便于按区间校验归属" },
+  { key: "rangeEnd", label: "区间止", required: true, maxLength: 24, section: "编码区间", placeholder: "SN090999" },
+  { key: "total", label: "总数", type: "number", required: true, min: 1, section: "编码区间" },
+  { key: "bound", label: "已绑定数", type: "number", required: true, min: 0, section: "编码区间", help: "不得超过总数；由绑定动作回写，此处仅供纠偏" },
+  { key: "status", label: "批次状态", type: "select", required: true, section: "编码区间", options: [
+    { value: "PENDING", label: "待绑定" }, { value: "PARTIAL", label: "部分绑定" },
+    { value: "BOUND", label: "已绑完" }, { value: "VOID", label: "已作废" },
+  ] },
+];
+
+function CodesTab({ canEdit }: { canEdit: boolean }) {
+  const qc = useQueryClient();
+  const [page, setPage] = useState(1);
+  const [keyword, setKeyword] = useState("");
+  const [form, setForm] = useState<Partial<DeviceCodeBatch> | null>(null);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["device-code-batches", page, keyword],
+    queryFn: () => api.listDeviceCodeBatches({ page, size: SIZE, keyword }),
+    placeholderData: keepPreviousData,
+  });
+  const save = useMutation({
+    mutationFn: (v: Partial<DeviceCodeBatch>) => api.saveDeviceCodeBatch(v),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["device-code-batches"] }); notify.success("保存成功"); setForm(null); },
+  });
+
+  // FieldDef 表达不了「跨字段」约束，故在提交前补校验（规格 §2）
+  const submit = () => {
+    if (!form) return;
+    const { rangeStart = "", rangeEnd = "", total = 0, bound = 0 } = form;
+    if (rangeEnd < rangeStart) { notify.error("区间止不得小于区间起"); return; }
+    if (rangeStart.length !== rangeEnd.length) { notify.error("区间起止长度不一致，无法按区间判断编码归属"); return; }
+    if (bound > total) { notify.error("已绑定数不得超过总数"); return; }
+    save.mutate(form);
+  };
+
+  const cols: Column<DeviceCodeBatch>[] = [
+    { header: "批次号", cell: (b) => <span className="font-medium tabular-nums">{b.batchNo}</span> },
+    { header: "供应商", cell: (b) => b.vendorCode },
+    { header: "编码类型", cell: (b) => <Badge tone="outline">{b.codeType === "QR" ? "二维码" : "序列号"}</Badge> },
+    // 区间等宽字体：位数对齐才看得出连续与断档
+    { header: "编码区间", cell: (b) => <span className="font-mono text-xs">{b.rangeStart} ~ {b.rangeEnd}</span> },
+    { header: "已绑定/总数", cell: (b) => <Progress value={b.bound} total={b.total} /> },
+    { header: "生产日期", cell: (b) => <span className="text-muted-foreground">{b.producedAt.slice(0, 10)}</span> },
+    { header: "状态", cell: (b) => <Badge tone={CODE_STATUS[b.status].tone}>{CODE_STATUS[b.status].label}</Badge> },
+    { header: "操作", cell: (b) => canEdit ? <Button size="sm" variant="outline" onClick={() => setForm({ ...b, producedAt: b.producedAt.slice(0, 10) })}>编辑</Button> : <span className="text-muted-foreground">-</span> },
+  ];
+
+  return (
+    <div>
+      <Toolbar
+        search={keyword}
+        onSearch={(v) => { setKeyword(v); setPage(1); }}
+        searchPlaceholder="搜索批次号 / 供应商 / 编码区间"
+        onAdd={canEdit ? () => setForm({ vendorCode: "cd-tech", codeType: "SN", rangeStart: "", rangeEnd: "", total: 100, bound: 0, producedAt: "", status: "PENDING" }) : undefined}
+        addLabel="新增贴码批次"
+        onExport={() => exportCsv<DeviceCodeBatch>("设备编码", [
+          { header: "批次号", value: (b) => b.batchNo },
+          { header: "供应商", value: (b) => b.vendorCode },
+          { header: "编码类型", value: (b) => b.codeType },
+          { header: "区间起", value: (b) => b.rangeStart },
+          { header: "区间止", value: (b) => b.rangeEnd },
+          { header: "总数", value: (b) => b.total },
+          { header: "已绑定", value: (b) => b.bound },
+          { header: "生产日期", value: (b) => b.producedAt.slice(0, 10) },
+          { header: "状态", value: (b) => CODE_STATUS[b.status].label },
+        ], data?.list ?? [])}
+      />
+      {!canEdit && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无设备编码维护权限（device:cabinet:update）</div>}
+      <DataTable
+        rowKey={(b: DeviceCodeBatch) => b.batchNo}
+        columns={cols}
+        rows={data?.list}
+        loading={isLoading}
+        empty="暂无贴码批次——设备到货后先在此登记编码区间，机柜建档时才能按区间校验编码归属"
+      />
+      {data && <Pagination page={page} size={SIZE} total={data.total} onPage={setPage} />}
+
+      <FormDrawer
+        open={!!form}
+        onOpenChange={(o) => !o && setForm(null)}
+        titleNew="新增贴码批次"
+        titleEdit={`编辑批次 ${form?.batchNo ?? ""}`}
+        isEdit={!!form?.batchNo}
+        fields={CODE_FIELDS}
+        value={(form ?? {}) as Record<string, unknown>}
+        onChange={(v) => setForm(v as Partial<DeviceCodeBatch>)}
+        onSubmit={submit}
+        submitting={save.isPending}
+      />
     </div>
   );
 }
@@ -226,6 +435,9 @@ function DevicesInner() {
   useEffect(() => { if (qTab && TABS.some((t) => t.key === qTab)) { setTab(qTab); setPage(1); } }, [qTab]);
 
   const isCabinets = tab === "cabinets";
+  // 自建 tab 自带筛选/查询/分页，页面共用的 Toolbar 与 q 不参与
+  const isStandalone = STANDALONE_TABS.includes(tab);
+  const canEditCode = allow("device:cabinet:update");
   const canEditPowerbank = allow("device:powerbank:update");
   const canEditInventory = allow("device:inventory:update");
   const canEditOta = allow("device:ota:publish");
@@ -253,7 +465,7 @@ function DevicesInner() {
       : tab === "inventory" ? api.listInventoryTransfers({ page, size: SIZE, keyword })
       : api.listOtaRollouts({ page, size: SIZE, keyword }),
     placeholderData: keepPreviousData,
-    enabled: !isCabinets,
+    enabled: !isStandalone,
   });
 
   const editCell = (on: () => void, can: boolean) =>
@@ -267,7 +479,7 @@ function DevicesInner() {
     <div>
       <TabHeader tabs={TABS} value={tab} onChange={(k) => { setTab(k); setPage(1); setKeyword(""); }} />
 
-      {!isCabinets && (
+      {!isStandalone && (
         <Toolbar
           search={keyword}
           onSearch={(v) => { setKeyword(v); setPage(1); }}
@@ -283,12 +495,14 @@ function DevicesInner() {
       )}
 
       {isCabinets && <CabinetsTab />}
+      {tab === "logs" && <LogsTab />}
+      {tab === "codes" && <CodesTab canEdit={canEditCode} />}
       {tab === "powerbanks" && <DataTable rowKey={(r: Powerbank) => r.powerbankNo} columns={pbColsFull} rows={q.data?.list as Powerbank[]} loading={q.isLoading} />}
       {tab === "monitor" && <DataTable rowKey={(r: CabinetMonitor) => r.cabinetNo} columns={monCols} rows={q.data?.list as CabinetMonitor[]} loading={q.isLoading} />}
       {tab === "commands" && <DataTable rowKey={(r: CommandRecord) => r.commandId} columns={cmdCols} rows={q.data?.list as CommandRecord[]} loading={q.isLoading} />}
       {tab === "inventory" && <DataTable rowKey={(r: InventoryTransfer) => r.transferNo} columns={invColsFull} rows={q.data?.list as InventoryTransfer[]} loading={q.isLoading} />}
       {tab === "ota" && <DataTable rowKey={(r: OtaRollout) => r.rolloutNo} columns={otaColsFull} rows={q.data?.list as OtaRollout[]} loading={q.isLoading} />}
-      {!isCabinets && q.data && <Pagination page={page} size={SIZE} total={q.data.total} onPage={setPage} />}
+      {!isStandalone && q.data && <Pagination page={page} size={SIZE} total={q.data.total} onPage={setPage} />}
 
       <FormDrawer
         open={!!pbForm}

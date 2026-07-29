@@ -51,6 +51,7 @@ export function DataTable<T>({
   selectable, selectedKeys, onSelectedChange,
   expandable,
   sortKey, sortDir, onSortChange,
+  rowClassName,
 }: {
   columns: Column<T>[];
   rows: T[] | undefined;
@@ -66,6 +67,11 @@ export function DataTable<T>({
   sortKey?: string;
   sortDir?: SortDir;
   onSortChange?: (key: string, dir: SortDir) => void;
+  /**
+   * 行级样式钩子：整行强调/弱化（如 预约即将超时高亮、白名单过期灰显、套餐下架灰显）。
+   * `Column.className` 只能到列级，行级状态表达不了 —— B0 首版遗漏，2026-07-29 补。
+   */
+  rowClassName?: (row: T) => string | undefined;
 }) {
   const { t } = useI18n();
   const emptyText = empty ?? t("common.empty");
@@ -148,7 +154,7 @@ export function DataTable<T>({
               const isOpen = expanded.includes(k);
               return (
                 <React.Fragment key={k}>
-                  <TR>
+                  <TR className={rowClassName?.(row)}>
                     {selectable && (
                       <TD className="w-10">
                         <RowCheckbox

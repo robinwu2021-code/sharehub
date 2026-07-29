@@ -208,4 +208,46 @@ export const mockApi: Api = {
   saveNotice: (x) => wait(db.saveNotice(x), 350),
   listPaymentChannels: (q: PageQ = {}) => wait(db.listPaymentChannels(q)),
   savePaymentChannel: (x) => wait(db.savePaymentChannel(x), 350),
+
+  // 财务 B5：分润统计（维度/周期/排序在 db 层处理）/ 充值订单
+  listShareSummaries: (q: ShareSummaryQ = {}) => wait(db.listShareSummaries(q)),
+  listRechargeOrders: (q: RechargeQ = {}) => wait(db.listRechargeOrders(q)),
+
+  // 批次 B4/B5：设备日志 / 设备编码 / 预约订单 / 免费订单 / 白名单 / 充值套餐
+  listDeviceLogs: (q: DeviceLogQ = {}) => wait(db.listDeviceLogs(q)),
+  listDeviceCodeBatches: (q: PageQ = {}) => wait(db.listDeviceCodeBatches(q)),
+  saveDeviceCodeBatch: (x) => wait(db.saveDeviceCodeBatch(x), 350),
+  listReservations: (q: ReservationQ = {}) => wait(db.listReservations(q)),
+  cancelReservation: (no) => wait(db.cancelReservation(no), 400),
+  listFreeOrders: (q: FreeOrderQ = {}) => wait(db.listFreeOrders(q)),
+  getFreeOrderStats: () => wait(db.getFreeOrderStats()),
+  listFreeWhitelist: (q: WhitelistQ = {}) => wait(db.listFreeWhitelist(q)),
+  saveFreeWhitelist: (x) => wait(db.saveFreeWhitelist(x), 350),
+  revokeFreeWhitelist: (no) => wait(db.revokeFreeWhitelist(no), 400),
+  listRechargePackages: (q: StatusQ = {}) => wait(db.listRechargePackages(q)),
+  saveRechargePackage: (x) => wait(db.saveRechargePackage(x), 350),
+
+  // 系统设置 B2/B3/B5（规格 §9~§16）
+  listNotifyLogs: (q: NotifyLogQ = {}) => wait(db.listNotifyLogs(q)),
+  getNotifyLogStats: () => wait(db.getNotifyLogStats()),
+  listNotifyBlacklist: (q: NotifyBlacklistQ = {}) => wait(db.listNotifyBlacklist(q)),
+  saveNotifyBlacklist: (x) => wait(db.saveNotifyBlacklist(x), 350),
+  releaseNotifyBlacklist: (no) => wait(db.releaseNotifyBlacklist(no), 400),
+  getBizRules: () => wait(db.getBizRules()),
+  saveBizRules: (x) => wait(db.saveBizRules(x), 350),
+  listLoginSettings: (q: PageQ = {}) => wait(db.listLoginSettings(q)),
+  saveLoginSetting: (x) => wait(db.saveLoginSetting(x), 350),
+  listAppVersions: (q: AppVersionQ = {}) => wait(db.listAppVersions(q)),
+  saveAppVersion: (x) => wait(db.saveAppVersion(x), 350),
+  rollbackAppVersion: (id) => wait(db.rollbackAppVersion(id), 400),
+  listBanks: (q: BankQ = {}) => wait(db.listBanks(q)),
+  saveBank: (x) => wait(db.saveBank(x), 350),
+  listProblems: (q: ProblemQ = {}) => wait(db.listProblems(q)),
+  saveProblem: (x) => wait(db.saveProblem(x), 350),
+  listTaxSettings: (q: PageQ = {}) => wait(db.listTaxSettings(q)),
+  saveTaxSetting: (x) => wait(db.saveTaxSetting(x), 350),
 };
+
+import type { ShareSummaryQ, RechargeQ } from "./contract";
+import type { DeviceLogQ, ReservationQ, FreeOrderQ, WhitelistQ } from "./contract";
+import type { NotifyLogQ, NotifyBlacklistQ, AppVersionQ, BankQ, ProblemQ } from "./contract";

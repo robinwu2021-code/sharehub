@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { PageTitle, Pagination } from "@/components/ui/misc";
+import { PageTitle, Pagination, StatCard } from "@/components/ui/misc";
 import { TabHeader } from "@/components/ui/tab-header";
 import { Input, Select } from "@/components/ui/input";
 import { Toolbar } from "@/components/ui/toolbar";
@@ -13,23 +13,55 @@ import { Drawer, Field } from "@/components/ui/drawer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { OrderStatusBadge } from "@/components/status";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { money, fmtTime } from "@/lib/utils";
 import { useCan } from "@/lib/use-can";
 import { notify } from "@/lib/notify";
+import { exportCsv } from "@/lib/export-csv";
 import type {
   RentOrder, OrderException, DepositRecord,
   OrderComplaint, RefundRecord, ComplaintIssueType, ComplaintResolution,
+  Reservation, FreeOrder, WhitelistReason,
 } from "@/lib/types";
 
 const SIZE = 10;
-// 顺序对齐 lib/nav.ts 的深链顺序（预约订单/免费订单为 soon，未实现）
+// 顺序对齐 lib/nav.ts 的深链顺序（交易流水 → 售后 → 特殊单据）
 const TABS = [
   { key: "list", label: "订单列表" },
+  { key: "reservations", label: "预约订单", phase: 2 as const },
   { key: "exceptions", label: "异常订单" },
   { key: "complaints", label: "投诉订单" },
   { key: "refunds", label: "退款记录" },
+  { key: "free", label: "免费订单", phase: 2 as const },
   { key: "deposit", label: "押金与欠费", phase: 2 as const },
 ];
+
+// —— 预约订单（规格 §3）：竞品是电车预约充电桩，充电宝映射为「预约取宝 / 预约还位」——
+const RES_TYPE: Record<Reservation["type"], { label: string; tone: "default" | "warning" }> = {
+  BORROW: { label: "预约取宝", tone: "default" },
+  RETURN: { label: "预约还位", tone: "warning" }, // 还位是占用空仓，与取宝挤兑的是相反资源，故换色
+};
+const RES_STATUS: Record<Reservation["status"], { label: string; tone: "warning" | "success" | "muted" | "danger" }> = {
+  PENDING: { label: "待履约", tone: "warning" },
+  FULFILLED: { label: "已履约", tone: "success" },
+  EXPIRED: { label: "已过期", tone: "danger" },
+  CANCELLED: { label: "已取消", tone: "muted" },
+};
+/** 即将超时：待履约且距预约时段结束 < 20 分钟。整行高亮见 DataTable 的 rowClassName。 */
+const RES_SOON_MS = 20 * 60_000;
+const isExpiringSoon = (r: Reservation) => {
+  if (r.status !== "PENDING") return false;
+  const left = new Date(r.reservedTo).getTime() - Date.now();
+  return left > 0 && left < RES_SOON_MS;
+};
+
+// —— 免费订单（规格 §4）：来源 = 白名单用途，两页口径一致 ——
+const REASON_LABEL: Record<WhitelistReason, string> = {
+  INTERNAL_TEST: "内测",
+  VIP: "VIP",
+  BD_DEMO: "BD 演示",
+  MERCHANT_SELF: "商户自用",
+};
 
 const ISSUE_LABEL: Record<ComplaintIssueType, string> = {
   BILLING_DISPUTE: "计费争议",
@@ -81,6 +113,7 @@ function OrdersInner() {
   const qc = useQueryClient();
   const allow = useCan();
   const [tab, setTab] = useState(TABS.some((t) => t.key === qTab) ? (qTab as string) : "list");
+  const { confirm, dialog } = useConfirm();
   useEffect(() => { if (qTab && TABS.some((t) => t.key === qTab)) setTab(qTab); }, [qTab]);
 
   // —— 订单列表 tab 状态 ——
@@ -168,6 +201,97 @@ function OrdersInner() {
     placeholderData: keepPreviousData,
     enabled: tab === "deposit",
   });
+
+  // —— 预约订单 tab（B4）——
+  const [resPage, setResPage] = useState(1);
+  const [resKeyword, setResKeyword] = useState("");
+  const [resStatus, setResStatus] = useState("");
+  const [resType, setResType] = useState("");
+  const resQ = useQuery({
+    queryKey: ["reservations", resPage, resKeyword, resStatus, resType],
+    queryFn: () => api.listReservations({ page: resPage, size: SIZE, keyword: resKeyword, status: resStatus || undefined, type: resType || undefined }),
+    placeholderData: keepPreviousData,
+    enabled: tab === "reservations",
+  });
+  const canCancelRes = allow("order:order:update");
+  const cancelRes = useMutation({
+    mutationFn: (no: string) => api.cancelReservation(no),
+    onSuccess: () => { notify.success("预约已取消"); qc.invalidateQueries({ queryKey: ["reservations"] }); },
+  });
+  const askCancelRes = async (r: Reservation) => {
+    const ok = await confirm({
+      title: `取消预约 ${r.reservationNo}`,
+      desc: `${RES_TYPE[r.type].label} · ${r.siteName} · ${fmtTime(r.reservedFrom)} 起。取消后释放占位，用户需重新预约。`,
+      danger: true,
+      confirmText: "确认取消",
+      cancelText: "再想想",
+    });
+    if (ok) cancelRes.mutate(r.reservationNo);
+  };
+
+  // —— 免费订单 tab（B4）：页头统计走全量口径（成本管控，不能只统计当页）——
+  const [freePage, setFreePage] = useState(1);
+  const [freeKeyword, setFreeKeyword] = useState("");
+  const [freeReason, setFreeReason] = useState("");
+  const freeQ = useQuery({
+    queryKey: ["free-orders", freePage, freeKeyword, freeReason],
+    queryFn: () => api.listFreeOrders({ page: freePage, size: SIZE, keyword: freeKeyword, reason: freeReason || undefined }),
+    placeholderData: keepPreviousData,
+    enabled: tab === "free",
+  });
+  const freeStatsQ = useQuery({
+    queryKey: ["free-order-stats"],
+    queryFn: () => api.getFreeOrderStats(),
+    enabled: tab === "free",
+  });
+
+  const resCols: Column<Reservation>[] = [
+    { header: "预约号", cell: (r) => <span className="font-medium tabular-nums">{r.reservationNo}</span> },
+    { header: "用户", cell: (r) => <span className="text-muted-foreground">{r.userNo}</span> },
+    { header: "类型", cell: (r) => <Badge tone={RES_TYPE[r.type].tone}>{RES_TYPE[r.type].label}</Badge> },
+    { header: "目标站点", cell: (r) => r.siteName },
+    // 空机柜号 = 站点级预约（到店任选一台），不是数据缺失，故显式写清
+    { header: "指定机柜", cell: (r) => r.cabinetNo ?? <span className="text-muted-foreground">站点级</span> },
+    {
+      header: "预约时段",
+      cell: (r) => (
+        <span className={isExpiringSoon(r) ? "font-medium text-[var(--destructive)]" : "text-muted-foreground"}>
+          {fmtTime(r.reservedFrom)} ~ {fmtTime(r.reservedTo)}
+        </span>
+      ),
+    },
+    { header: "占位费", cell: (r) => <span className="tabular-nums">{r.holdFee > 0 ? money(r.holdFee, r.currency) : "-"}</span> },
+    {
+      header: "状态",
+      cell: (r) => (
+        <div className="flex items-center gap-1">
+          <Badge tone={RES_STATUS[r.status].tone}>{RES_STATUS[r.status].label}</Badge>
+          {isExpiringSoon(r) && <Badge tone="danger">即将超时</Badge>}
+        </div>
+      ),
+    },
+    { header: "关联订单", cell: (r) => r.orderNo ? <span className="tabular-nums">{r.orderNo}</span> : <span className="text-muted-foreground">-</span> },
+    {
+      header: "操作",
+      // 仅 PENDING 可取消：已履约/过期/取消的预约再点没有语义
+      cell: (r) => canCancelRes && r.status === "PENDING"
+        ? <Button size="sm" variant="outline" disabled={cancelRes.isPending} onClick={() => askCancelRes(r)}>取消预约</Button>
+        : <span className="text-muted-foreground">-</span>,
+    },
+  ];
+
+  const freeCols: Column<FreeOrder>[] = [
+    { header: "订单号", cell: (f) => <span className="font-medium tabular-nums">{f.orderNo}</span> },
+    { header: "用户", cell: (f) => <span className="text-muted-foreground">{f.userNo}</span> },
+    { header: "昵称", cell: (f) => f.nickname },
+    { header: "免费来源", cell: (f) => <Badge tone="outline">{REASON_LABEL[f.whitelistReason]}</Badge> },
+    { header: "减免金额", cell: (f) => <span className="tabular-nums">{money(f.waivedAmount, f.currency)}</span> },
+    { header: "站点", cell: (f) => f.siteName },
+    { header: "机柜", cell: (f) => <span className="tabular-nums">{f.cabinetNo}</span> },
+    { header: "借出", cell: (f) => <span className="text-muted-foreground">{fmtTime(f.startedAt)}</span> },
+    { header: "归还", cell: (f) => <span className="text-muted-foreground">{fmtTime(f.endedAt)}</span> },
+    { header: "时长", cell: (f) => <span className="tabular-nums">{f.duration} 分</span> },
+  ];
 
   const listCols: Column<RentOrder>[] = [
     { header: "订单号", cell: (o) => <span className="font-medium">{o.orderNo}</span> },
@@ -267,6 +391,101 @@ function OrdersInner() {
           </Toolbar>
           <DataTable rowKey={(o: RentOrder) => o.orderNo} columns={listCols} rows={listQ.data?.list} loading={listQ.isLoading} />
           {listQ.data && <Pagination page={page} size={SIZE} total={listQ.data.total} onPage={setPage} />}
+        </>
+      )}
+
+      {tab === "reservations" && (
+        <>
+          <Toolbar
+            search={resKeyword}
+            onSearch={(v) => { setResKeyword(v); setResPage(1); }}
+            searchPlaceholder="搜索预约号 / 用户 / 站点 / 机柜 / 关联订单"
+            onExport={() => exportCsv<Reservation>("预约订单", [
+              { header: "预约号", value: (r) => r.reservationNo },
+              { header: "用户", value: (r) => r.userNo },
+              { header: "类型", value: (r) => RES_TYPE[r.type].label },
+              { header: "目标站点", value: (r) => r.siteName },
+              { header: "指定机柜", value: (r) => r.cabinetNo ?? "站点级" },
+              { header: "预约开始", value: (r) => r.reservedFrom },
+              { header: "预约结束", value: (r) => r.reservedTo },
+              { header: "占位费", value: (r) => r.holdFee },
+              { header: "状态", value: (r) => RES_STATUS[r.status].label },
+              { header: "关联订单", value: (r) => r.orderNo },
+            ], resQ.data?.list ?? [])}
+          >
+            <Select value={resType} onChange={(e) => { setResType(e.target.value); setResPage(1); }}>
+              <option value="">全部类型</option>
+              <option value="BORROW">预约取宝</option>
+              <option value="RETURN">预约还位</option>
+            </Select>
+            <Select value={resStatus} onChange={(e) => { setResStatus(e.target.value); setResPage(1); }}>
+              <option value="">全部状态</option>
+              <option value="PENDING">待履约</option>
+              <option value="FULFILLED">已履约</option>
+              <option value="EXPIRED">已过期</option>
+              <option value="CANCELLED">已取消</option>
+            </Select>
+          </Toolbar>
+          {!canCancelRes && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无预约取消权限（order:order:update）</div>}
+          <DataTable
+            rowKey={(r: Reservation) => r.reservationNo}
+            columns={resCols}
+            rows={resQ.data?.list}
+            loading={resQ.isLoading}
+            // 即将超时的预约整行提示（B0 补丁 rowClassName）
+            rowClassName={(r) => (isExpiringSoon(r) ? "bg-[color-mix(in_srgb,var(--destructive)_7%,transparent)]" : undefined)}
+            empty="暂无预约记录——热门点位高峰期才会产生预约，或占位规则尚未在「业务规则」中开启"
+          />
+          {resQ.data && <Pagination page={resPage} size={SIZE} total={resQ.data.total} onPage={setResPage} />}
+        </>
+      )}
+
+      {tab === "free" && (
+        <>
+          {/* 页头统计：免费单是真实成本，先看总量再看明细 */}
+          <div className="mb-4 grid gap-3 sm:grid-cols-2">
+            <StatCard label="本月免费单数" value={freeStatsQ.data ? `${freeStatsQ.data.monthCount} 单` : "-"} sub="来源于免费用户白名单" />
+            <StatCard
+              label="累计减免金额"
+              value={freeStatsQ.data ? money(freeStatsQ.data.waivedTotal, freeStatsQ.data.currency) : "-"}
+              sub="全量口径，非当页合计"
+              tone="down"
+            />
+          </div>
+          <Toolbar
+            search={freeKeyword}
+            onSearch={(v) => { setFreeKeyword(v); setFreePage(1); }}
+            searchPlaceholder="搜索订单号 / 用户 / 昵称 / 站点 / 机柜"
+            onExport={() => exportCsv<FreeOrder>("免费订单", [
+              { header: "订单号", value: (f) => f.orderNo },
+              { header: "用户", value: (f) => f.userNo },
+              { header: "昵称", value: (f) => f.nickname },
+              { header: "免费来源", value: (f) => REASON_LABEL[f.whitelistReason] },
+              { header: "减免金额", value: (f) => f.waivedAmount },
+              { header: "币种", value: (f) => f.currency },
+              { header: "站点", value: (f) => f.siteName },
+              { header: "机柜", value: (f) => f.cabinetNo },
+              { header: "借出时间", value: (f) => f.startedAt },
+              { header: "归还时间", value: (f) => f.endedAt },
+              { header: "时长(分)", value: (f) => f.duration },
+            ], freeQ.data?.list ?? [])}
+          >
+            <Select value={freeReason} onChange={(e) => { setFreeReason(e.target.value); setFreePage(1); }}>
+              <option value="">全部来源</option>
+              <option value="INTERNAL_TEST">内测</option>
+              <option value="VIP">VIP</option>
+              <option value="BD_DEMO">BD 演示</option>
+              <option value="MERCHANT_SELF">商户自用</option>
+            </Select>
+          </Toolbar>
+          <DataTable
+            rowKey={(f: FreeOrder) => f.orderNo}
+            columns={freeCols}
+            rows={freeQ.data?.list}
+            loading={freeQ.isLoading}
+            empty="暂无免费订单——尚无白名单用户下单，白名单在「用户 · 免费用户白名单」维护"
+          />
+          {freeQ.data && <Pagination page={freePage} size={SIZE} total={freeQ.data.total} onPage={setFreePage} />}
         </>
       )}
 
@@ -459,6 +678,8 @@ function OrdersInner() {
           </>
         )}
       </Drawer>
+
+      {dialog}
     </div>
   );
 }
