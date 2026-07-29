@@ -55,7 +55,8 @@ export interface Api {
   listLedger(q?: PageQ): Promise<PageResult<LedgerEntry>>;
   listSettlements(q?: PageQ): Promise<PageResult<Settlement>>;
   listWithdrawals(q?: PageQ): Promise<PageResult<Withdrawal>>;
-  auditWithdrawal(withdrawNo: string, approve: boolean): Promise<{ ok: true }>;
+  /** 提现审批：驳回必须带原因；auditorName 取当前登录用户（后端以会话为准，前端透传便于 mock）。 */
+  auditWithdrawal(withdrawNo: string, approve: boolean, rejectReason?: string, auditorName?: string): Promise<Withdrawal>;
   // 供应商接入
   listVendors(): Promise<Vendor[]>;
   saveVendor(v: Partial<Vendor> & { vendorCode: string }): Promise<Vendor>;
@@ -189,6 +190,8 @@ export interface Api {
   saveRegion(x: Partial<Region> & { regionId?: string }): Promise<Region>;
   saveSysParam(x: Partial<SysParam> & { paramKey?: string }): Promise<SysParam>;
   saveOpenApiApp(x: Partial<OpenApiApp> & { appNo?: string }): Promise<OpenApiApp>;
+  saveEmployee(x: Partial<Employee> & { employeeNo?: string }): Promise<Employee>;
+  saveMarketCountry(x: Partial<MarketCountry> & { countryCode?: string }): Promise<MarketCountry>;
 
   // === 公告管理（营销域 · P1，补齐清单 E1）===
   listNotices(q?: PageQ): Promise<PageResult<Notice>>;

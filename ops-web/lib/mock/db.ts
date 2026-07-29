@@ -90,6 +90,7 @@ export const tenantConfigs: TenantConfig[] = tenants.map((t) => ({
 export const employees: Employee[] = Array.from({ length: 20 }, (_, i) => ({
   employeeNo: `E${100 + i}`, name: p(["Ali Hassan", "Omar Khan", "Sara Ahmed", "Wang Lei", "Fatima N."], i),
   phone: `+9715${String(1000000 + i * 137).slice(0, 7)}`, deptName: p(["运营", "运维", "客服", "财务"], i),
+  email: `${p(["ali", "omar", "sara", "wang", "fatima"], i)}.${100 + i}@sharehub.ae`,
   roleName: p(["运维", "客服", "财务", "租户管理员"], i), status: i % 11 === 0 ? "LEFT" : "ACTIVE",
 }));
 export const roles: RoleRow[] = [
@@ -144,10 +145,22 @@ export const settlements: Settlement[] = Array.from({ length: 24 }, (_, i) => ({
   period: `2026-${String((i % 6) + 1).padStart(2, "0")}`, totalAmount: 800 + (i * 137) % 4000, currency: "AED",
   status: p(["GEN", "CONFIRMED", "PAID"] as const, i),
 }));
-export const withdrawals: Withdrawal[] = Array.from({ length: 20 }, (_, i) => ({
-  withdrawNo: `WD${3000 + i}`, payeeName: p([...VENUE_NAMES, "Agent-North"], i), amount: 500 + (i * 211) % 3000,
-  currency: "AED", status: p(["APPLY", "AUDIT", "PAYING", "PAID", "FAILED"] as const, i), appliedAt: iso(i * 43200_000),
-}));
+// 提现：APPLY/AUDIT = 未审批（审批四列为空）；PAYING/PAID = 已通过；FAILED = 已驳回（必带原因）
+const WD_REJECT = ["银行账户与合同主体不一致", "本期结算单未确认，暂缓打款", "超出单笔提现限额，需拆单重申"];
+export const withdrawals: Withdrawal[] = Array.from({ length: 20 }, (_, i) => {
+  const status = p(["APPLY", "AUDIT", "PAYING", "PAID", "FAILED"] as const, i);
+  const amount = 500 + (i * 211) % 3000;
+  const audited = status === "PAYING" || status === "PAID" || status === "FAILED";
+  return {
+    withdrawNo: `WD${3000 + i}`, payeeName: p([...VENUE_NAMES, "Agent-North"], i), amount,
+    // 手续费 = 金额 0.6%，下限 2 AED（与提现渠道成本口径一致）
+    fee: Number(Math.max(2, amount * 0.006).toFixed(2)),
+    currency: "AED", status, appliedAt: iso(i * 43200_000),
+    auditorName: audited ? p(["Sara Ahmed", "Omar Khan", "admin"], i) : null,
+    auditedAt: audited ? iso(i * 43200_000 - 7200_000) : null,
+    rejectReason: status === "FAILED" ? p(WD_REJECT, i) : null,
+  };
+});
 
 // —— 账务分录（复式：每笔业务借贷成对）——
 const ACCTS = ["现金-nearpay", "平台收入", "应付场地方", "应付代理", "押金负债"];
@@ -430,10 +443,23 @@ export const members: Member[] = Array.from({ length: 24 }, (_, i) => ({
   userNo: `U${3000 + i}`, nickname: p(NICKS, i), level: p(["SILVER", "GOLD", "PLATINUM"] as const, i),
   points: (i * 137) % 5000, cardType: p(["无", "月卡", "季卡", "年卡"], i), expireAt: iso(-(30 + i * 15) * 86400_000),
 }));
-export const wallets: Wallet[] = Array.from({ length: 24 }, (_, i) => ({
-  userNo: `U${3000 + i}`, nickname: p(NICKS, i), balance: Number(((i * 7) % 200 + (i % 10) / 10).toFixed(2)),
-  bonus: Number(((i * 3) % 50).toFixed(2)), currency: "AED", updatedAt: iso(i * 43200_000),
-}));
+// 钱包用户号与 cUsers 一一对应（U3000+）；orderCount 直接取该用户在 cUsers 里的订单数，保证两页数据自洽
+const RECHARGE_DENOM = [20, 50, 100];
+export const wallets: Wallet[] = Array.from({ length: 24 }, (_, i) => {
+  const userNo = `U${3000 + i}`;
+  const orderCount = cUsers.find((u) => u.cUserNo === userNo)?.orders ?? (i * 3) % 40;
+  const rechargeCount = Math.floor(orderCount / 4) + 1; // 约每 4 单充值一次
+  const denom = p(RECHARGE_DENOM, i);
+  return {
+    userNo, nickname: p(NICKS, i), balance: Number(((i * 7) % 200 + (i % 10) / 10).toFixed(2)),
+    bonus: Number(((i * 3) % 50).toFixed(2)), currency: "AED", updatedAt: iso(i * 43200_000),
+    orderCount,
+    // 客单价 4.5~7.5 AED（与租借计费口径一致）
+    orderAmount: Number((orderCount * (4.5 + (i % 7) * 0.5)).toFixed(2)),
+    rechargeCount,
+    rechargeAmount: Number((rechargeCount * denom).toFixed(2)),
+  };
+});
 
 // —— 营销域 ——
 export const campaigns: Campaign[] = Array.from({ length: 14 }, (_, i) => ({
@@ -640,6 +666,7 @@ export const listReconciles = (q: PageQuery = {}) => paginate(reconciles, q.page
 export const listInvoices = (q: PageQuery = {}) => paginate(invoices, q.page, q.size, (x) => kwHit(q.keyword, x.invoiceNo, x.payeeName, x.vatTrn));
 export const listMembers = (q: PageQuery = {}) => paginate(members, q.page, q.size, (x) => kwHit(q.keyword, x.userNo, x.nickname));
 export const listWallets = (q: PageQuery = {}) => paginate(wallets, q.page, q.size, (x) => kwHit(q.keyword, x.userNo, x.nickname));
+export const listEmployees = (q: PageQuery = {}) => paginate(employees, q.page, q.size, (x) => kwHit(q.keyword, x.employeeNo, x.name, x.phone, x.email));
 export const listCampaigns = (q: PageQuery = {}) => paginate(campaigns, q.page, q.size, (x) => kwHit(q.keyword, x.campaignNo, x.name, x.kind));
 export const listPushMessages = (q: PageQuery = {}) => paginate(pushMessages, q.page, q.size, (x) => kwHit(q.keyword, x.pushNo, x.title, x.audience));
 export const listReferrals = (q: PageQuery = {}) => paginate(referrals, q.page, q.size, (x) => kwHit(q.keyword, x.inviteNo, x.inviter, x.invitee));
@@ -702,6 +729,25 @@ export const saveDictEntry = (x: Partial<DictEntry>) => upsert(dictEntries, x, "
 export const saveRegion = (x: Partial<Region>) => upsert(regions, x, "regionId", () => nextNo("REG", regions));
 export const saveSysParam = (x: Partial<SysParam>) => upsert(sysParams, x, "paramKey", () => nextNo("param.", sysParams));
 export const saveOpenApiApp = (x: Partial<OpenApiApp>) => upsert(openApiApps, x, "appNo", () => nextNo("APP", openApiApps));
+export const saveEmployee = (x: Partial<Employee>) => upsert(employees, x, "employeeNo", () => nextNo("E", employees, 100));
+// 多国家市场：主键是 ISO alpha-2 国家码，由表单必填（不自动生成编号）
+export const saveMarketCountry = (x: Partial<MarketCountry>) =>
+  upsert(marketCountries, x, "countryCode", () => nextNo("XX", marketCountries, 0));
+
+/** 提现审批（mock）：通过→PAYING，驳回→FAILED 并记原因；两者都落审批人/审批时间。 */
+export function auditWithdrawal(withdrawNo: string, approve: boolean, rejectReason?: string, auditorName?: string): Withdrawal {
+  const w = withdrawals.find((x) => x.withdrawNo === withdrawNo)!;
+  w.auditorName = auditorName || "admin";
+  w.auditedAt = new Date().toISOString();
+  if (approve) {
+    w.status = "PAYING";
+    w.rejectReason = null;
+  } else {
+    w.status = "FAILED";
+    w.rejectReason = rejectReason ?? "";
+  }
+  return w;
+}
 
 // ============================================================================
 // 告警域（对标简电云 A1~A4）：代码字典 / 通知规则 / 告警记录 / 通知流水

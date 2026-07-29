@@ -9,9 +9,12 @@ import { TabHeader } from "@/components/ui/tab-header";
 import { Toolbar } from "@/components/ui/toolbar";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
 import { DataTable, type Column } from "@/components/ui/data-table";
+import { Drawer, Field } from "@/components/ui/drawer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input, Select } from "@/components/ui/input";
 import { money, fmtTime } from "@/lib/utils";
+import { useAuth } from "@/lib/auth";
 import { useCan } from "@/lib/use-can";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
@@ -48,6 +51,11 @@ function FinanceInner() {
   const { t } = useI18n();
   const [ruleForm, setRuleForm] = useState<Partial<ShareRule> | null>(null);
   const [invoiceForm, setInvoiceForm] = useState<Partial<Invoice> | null>(null);
+  // 提现审批：走抽屉而非行内按钮——驳回必须留原因，是资金审批的留痕底线
+  const [wdAudit, setWdAudit] = useState<Withdrawal | null>(null);
+  const [wdApprove, setWdApprove] = useState("1");
+  const [wdReject, setWdReject] = useState("");
+  const username = useAuth((s) => s.username);
   useEffect(() => { if (qTab && TABS.some((t) => t.key === qTab)) { setTab(qTab); setPage(1); } }, [qTab]);
   useEffect(() => { setKeyword(""); }, [tab]);
 
@@ -67,9 +75,15 @@ function FinanceInner() {
     placeholderData: keepPreviousData,
   });
 
+  const canAuditWithdrawal = allow("finance:withdrawal:audit");
   const audit = useMutation({
-    mutationFn: (v: { no: string; approve: boolean }) => api.auditWithdrawal(v.no, v.approve),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["fin", "withdrawals"] }),
+    mutationFn: (v: { no: string; approve: boolean; rejectReason?: string }) =>
+      api.auditWithdrawal(v.no, v.approve, v.rejectReason, username || undefined),
+    onSuccess: (_r, v) => {
+      notify.success(v.approve ? "提现已通过，转打款中" : "提现已驳回");
+      qc.invalidateQueries({ queryKey: ["fin"] });
+      setWdAudit(null);
+    },
   });
 
   const saveRule = useMutation({
@@ -101,15 +115,19 @@ function FinanceInner() {
     { header: "提现号", cell: (w) => <span className="font-medium">{w.withdrawNo}</span> },
     { header: "对象", cell: (w) => w.payeeName },
     { header: "金额", cell: (w) => <span className="tabular-nums">{money(w.amount, w.currency)}</span> },
+    // 手续费与实际到账同屏：审批人不必心算，避免按毛额放款
+    { header: "手续费", cell: (w) => <span className="tabular-nums">{money(w.fee, w.currency)}</span> },
+    { header: "实际到账", cell: (w) => <span className="tabular-nums">{money(w.amount - w.fee, w.currency)}</span> },
     { header: "状态", cell: (w) => <Badge tone={w.status === "PAID" || w.status === "PAYING" ? "success" : w.status === "FAILED" ? "danger" : "warning"}>{w.status}</Badge> },
     { header: "申请时间", cell: (w) => <span className="text-muted-foreground">{fmtTime(w.appliedAt)}</span> },
+    // 审批留痕三列：谁批的 / 何时批的 / 驳回为什么
+    { header: "审批人", cell: (w) => w.auditorName ?? <span className="text-muted-foreground">未审批</span> },
+    { header: "审批时间", cell: (w) => <span className="text-muted-foreground">{w.auditedAt ? fmtTime(w.auditedAt) : "-"}</span> },
+    { header: "驳回原因", cell: (w) => <span className="text-muted-foreground">{w.rejectReason ?? "-"}</span> },
     {
-      header: "操作",
-      cell: (w) => (w.status === "AUDIT" || w.status === "APPLY") && allow("finance:withdrawal:audit") ? (
-        <div className="flex gap-2">
-          <Button size="sm" onClick={() => audit.mutate({ no: w.withdrawNo, approve: true })} disabled={audit.isPending}>通过</Button>
-          <Button size="sm" variant="outline" onClick={() => audit.mutate({ no: w.withdrawNo, approve: false })} disabled={audit.isPending}>拒绝</Button>
-        </div>
+      header: t("common.actions"),
+      cell: (w) => (w.status === "AUDIT" || w.status === "APPLY") && canAuditWithdrawal ? (
+        <Button size="sm" variant="outline" onClick={() => { setWdAudit(w); setWdApprove("1"); setWdReject(""); }}>审批</Button>
       ) : <span className="text-muted-foreground">-</span>,
     },
   ];
@@ -169,7 +187,7 @@ function FinanceInner() {
       )}
       {tab === "ledger" && <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索账户/订单/凭证" />}
       {tab === "settlements" && <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索结算单号/对象" />}
-      {tab === "withdrawals" && <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索提现号/对象" />}
+      {tab === "withdrawals" && <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索提现号/对象/审批人" />}
       {tab === "records" && <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索明细号/订单/分成方" />}
       {tab === "reconcile" && <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索批次号/周期" />}
       {tab === "invoices" && (
@@ -184,11 +202,51 @@ function FinanceInner() {
       {tab === "rules" && <DataTable rowKey={(r: ShareRule) => r.ruleNo} columns={ruleCols} rows={q.data?.list as ShareRule[]} loading={q.isLoading} />}
       {tab === "ledger" && <DataTable rowKey={(l: LedgerEntry) => l.entryNo} columns={ledgerCols} rows={q.data?.list as LedgerEntry[]} loading={q.isLoading} />}
       {tab === "settlements" && <DataTable rowKey={(s: Settlement) => s.settleNo} columns={stlCols} rows={q.data?.list as Settlement[]} loading={q.isLoading} />}
+      {tab === "withdrawals" && !canAuditWithdrawal && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无提现审批权限（finance:withdrawal:audit）</div>}
       {tab === "withdrawals" && <DataTable rowKey={(w: Withdrawal) => w.withdrawNo} columns={wdCols} rows={q.data?.list as Withdrawal[]} loading={q.isLoading} />}
       {tab === "records" && <DataTable rowKey={(r: ShareRecord) => r.recordNo} columns={recordCols} rows={q.data?.list as ShareRecord[]} loading={q.isLoading} />}
       {tab === "reconcile" && <DataTable rowKey={(r: Reconcile) => r.batchNo} columns={reconcileCols} rows={q.data?.list as Reconcile[]} loading={q.isLoading} />}
       {tab === "invoices" && <DataTable rowKey={(i: Invoice) => i.invoiceNo} columns={invoiceCols} rows={q.data?.list as Invoice[]} loading={q.isLoading} />}
       {q.data && <Pagination page={page} size={SIZE} total={q.data.total} onPage={setPage} />}
+
+      {/* 提现审批抽屉：通过 → 转打款中；驳回必填原因；审批人取当前登录账号 */}
+      <Drawer
+        open={!!wdAudit}
+        onOpenChange={(o) => !o && setWdAudit(null)}
+        title={`提现审批 ${wdAudit?.withdrawNo ?? ""}`}
+        desc="资金操作：通过后进入打款队列，审批人/时间将留痕不可改"
+        footer={
+          wdAudit && canAuditWithdrawal && (
+            <Button
+              disabled={audit.isPending || (wdApprove === "0" && !wdReject.trim())}
+              variant={wdApprove === "0" ? "destructive" : "default"}
+              onClick={() => audit.mutate({ no: wdAudit.withdrawNo, approve: wdApprove === "1", rejectReason: wdReject })}
+            >提交审批</Button>
+          )
+        }
+      >
+        {wdAudit && (
+          <>
+            <Field label="提现对象">{wdAudit.payeeName}</Field>
+            <Field label="申请金额">{money(wdAudit.amount, wdAudit.currency)}</Field>
+            <Field label="手续费">{money(wdAudit.fee, wdAudit.currency)}</Field>
+            <Field label="实际到账">{money(wdAudit.amount - wdAudit.fee, wdAudit.currency)}</Field>
+            <Field label="申请时间">{fmtTime(wdAudit.appliedAt)}</Field>
+            <Field label="审批人">{username || "admin"}</Field>
+            <Field label="审批结果">
+              <Select className="w-full" value={wdApprove} onChange={(e) => setWdApprove(e.target.value)}>
+                <option value="1">通过（转打款）</option>
+                <option value="0">驳回</option>
+              </Select>
+            </Field>
+            {wdApprove === "0" && (
+              <Field label="驳回原因（必填）">
+                <Input className="w-full" value={wdReject} placeholder="如：银行账户与合同主体不一致" onChange={(e) => setWdReject(e.target.value)} />
+              </Field>
+            )}
+          </>
+        )}
+      </Drawer>
 
       <FormDrawer
         open={!!ruleForm}

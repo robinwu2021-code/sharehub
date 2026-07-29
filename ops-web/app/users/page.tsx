@@ -181,6 +181,11 @@ function UsersInner() {
     { header: "余额", cell: (w) => <span className="tabular-nums">{money(w.balance, w.currency)}</span> },
     { header: "赠额", cell: (w) => <span className="tabular-nums">{money(w.bonus, w.currency)}</span> },
     { header: "币种", cell: (w) => <Badge tone="outline">{w.currency}</Badge> },
+    // 用户价值画像四列：钱包页即可判断该用户值不值得挽留/补偿，不必再跳订单页
+    { header: "订单数", cell: (w) => <span className="tabular-nums">{w.orderCount}</span> },
+    { header: "订单金额", cell: (w) => <span className="tabular-nums">{money(w.orderAmount, w.currency)}</span> },
+    { header: "充值次数", cell: (w) => <span className="tabular-nums">{w.rechargeCount}</span> },
+    { header: "充值金额", cell: (w) => <span className="tabular-nums">{money(w.rechargeAmount, w.currency)}</span> },
     { header: "更新时间", cell: (w) => <span className="text-muted-foreground">{fmtTime(w.updatedAt)}</span> },
     { header: t("common.actions"), cell: (w) => canEditWallet ? <Button size="sm" variant="outline" onClick={() => setWalletForm(w)}>调整余额</Button> : <span className="text-muted-foreground">-</span> },
   ];

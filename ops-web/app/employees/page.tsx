@@ -29,6 +29,15 @@ const ROLE_FIELDS: FieldDef[] = [
   { key: "memberCount", label: "成员数", type: "number" },
   { key: "builtin", label: "内置角色", type: "switch" },
 ];
+const EMP_FIELDS: FieldDef[] = [
+  { key: "employeeNo", label: "工号", readOnlyOnEdit: true, placeholder: "留空自动生成" },
+  { key: "name", label: "姓名", placeholder: "Ali Hassan" },
+  { key: "phone", label: "手机", placeholder: "+9715xxxxxxx" },
+  { key: "email", label: "邮箱", placeholder: "ali.hassan@sharehub.ae" },
+  { key: "deptName", label: "部门", placeholder: "运维" },
+  { key: "roleName", label: "角色", placeholder: "运维" },
+  { key: "status", label: "状态", type: "select", options: [{ value: "ACTIVE", label: "在职" }, { value: "LEFT", label: "离职" }] },
+];
 const DEPT_FIELDS: FieldDef[] = [
   { key: "name", label: "部门名称", placeholder: "华东运营部" },
   { key: "parent", label: "上级部门", placeholder: "（顶级留空）" },
@@ -57,6 +66,7 @@ function EmployeesInner() {
   const [scope, setScope] = useState<DataScope>("ALL");
   const [roleForm, setRoleForm] = useState<Partial<RoleRow> | null>(null);
   const [deptForm, setDeptForm] = useState<Partial<Department> | null>(null);
+  const [empForm, setEmpForm] = useState<Partial<Employee> | null>(null);
 
   const emp = useQuery({
     queryKey: ["employees", page, keyword], queryFn: () => api.listEmployees({ page, size: SIZE, keyword }),
@@ -78,7 +88,13 @@ function EmployeesInner() {
 
   const canAssign = allow("org:role:assign");
   const canEditRole = allow("org:role:update");
+  // 员工与部门同属组织维护，沿用 org:employee:update
   const canEditDept = allow("org:employee:update");
+  const canEditEmp = allow("org:employee:update");
+  const saveEmp = useMutation({
+    mutationFn: (v: Partial<Employee>) => api.saveEmployee(v),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["employees"] }); notify.success("保存成功"); setEmpForm(null); },
+  });
   const saveRole = useMutation({
     mutationFn: (v: Partial<RoleRow>) => api.saveRoleRow(v),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["roles"] }); notify.success("保存成功"); setRoleForm(null); },
@@ -92,9 +108,11 @@ function EmployeesInner() {
     { header: "工号", cell: (e) => <span className="font-medium">{e.employeeNo}</span> },
     { header: "姓名", cell: (e) => e.name },
     { header: "手机", cell: (e) => <span className="text-muted-foreground">{e.phone}</span> },
+    { header: "邮箱", cell: (e) => <span className="text-muted-foreground">{e.email}</span> },
     { header: "部门", cell: (e) => <span className="text-muted-foreground">{e.deptName}</span> },
     { header: "角色", cell: (e) => <Badge tone="outline">{e.roleName}</Badge> },
     { header: "状态", cell: (e) => e.status === "ACTIVE" ? <Badge tone="success">在职</Badge> : <Badge tone="muted">离职</Badge> },
+    { header: "操作", cell: (e) => canEditEmp ? <Button size="sm" variant="outline" onClick={() => setEmpForm(e)}>编辑</Button> : <span className="text-muted-foreground">-</span> },
   ];
   const roleCols: Column<RoleRow>[] = [
     { header: "角色码", cell: (r) => <span className="font-medium">{r.code}</span> },
@@ -149,7 +167,18 @@ function EmployeesInner() {
   return (
     <div>
       <TabHeader tabs={tabs} value={tab} onChange={(k) => { setTab(k); setPage(1); setKeyword(""); }} />
-      {tab === "employees" && <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索工号 / 姓名 / 手机" />}
+      {tab === "employees" && (
+        <>
+          <Toolbar
+            search={keyword}
+            onSearch={onSearch}
+            searchPlaceholder="搜索工号 / 姓名 / 手机 / 邮箱"
+            onAdd={canEditEmp ? () => setEmpForm({ name: "", phone: "", email: "", deptName: "", roleName: "", status: "ACTIVE" }) : undefined}
+            addLabel="新增员工"
+          />
+          {!canEditEmp && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无员工维护权限（org:employee:update）</div>}
+        </>
+      )}
       {tab === "org" && (
         <Toolbar
           search={keyword}
@@ -211,6 +240,19 @@ function EmployeesInner() {
         onChange={(v) => setRoleForm(v as Partial<RoleRow>)}
         onSubmit={() => roleForm && saveRole.mutate(roleForm)}
         submitting={saveRole.isPending}
+      />
+
+      <FormDrawer
+        open={!!empForm}
+        onOpenChange={(o) => !o && setEmpForm(null)}
+        titleNew="新增员工"
+        titleEdit={`编辑员工 ${empForm?.employeeNo ?? ""}`}
+        isEdit={!!empForm?.employeeNo}
+        fields={EMP_FIELDS}
+        value={(empForm ?? {}) as Record<string, unknown>}
+        onChange={(v) => setEmpForm(v as Partial<Employee>)}
+        onSubmit={() => empForm && saveEmp.mutate(empForm)}
+        submitting={saveEmp.isPending}
       />
 
       <FormDrawer

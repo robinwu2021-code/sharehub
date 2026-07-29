@@ -28,7 +28,7 @@ export const httpApi: Api = {
   listLedger: (q?: PageQ) => client.get("/api/trade/ledger", q),
   listSettlements: (q?: PageQ) => client.get("/api/trade/settlements", q),
   listWithdrawals: (q?: PageQ) => client.get("/api/trade/withdrawals", q),
-  auditWithdrawal: (no, approve) => client.post(`/api/trade/withdrawals/${no}/audit`, { approve }),
+  auditWithdrawal: (no, approve, rejectReason, auditorName) => client.post(`/api/trade/withdrawals/${no}/audit`, { approve, rejectReason, auditorName }),
 
   listVendors: () => client.get("/internal/gw/vendors"),
   saveVendor: (v) => client.post(`/internal/gw/vendors/${v.vendorCode}/config`, v),
@@ -157,6 +157,8 @@ export const httpApi: Api = {
   saveRegion: (x) => client.post(x.regionId ? `/api/platform/regions/${x.regionId}` : "/api/platform/regions", x),
   saveSysParam: (x) => client.post(x.paramKey ? `/api/platform/sys-params/${x.paramKey}` : "/api/platform/sys-params", x),
   saveOpenApiApp: (x) => client.post(x.appNo ? `/api/platform/openapi-apps/${x.appNo}` : "/api/platform/openapi-apps", x),
+  saveEmployee: (x) => client.post(x.employeeNo ? `/api/platform/employees/${x.employeeNo}` : "/api/platform/employees", x),
+  saveMarketCountry: (x) => client.post(x.countryCode ? `/api/platform/markets/${x.countryCode}` : "/api/platform/markets", x),
 
   // 公告管理 / 支付渠道
   listNotices: (q?: PageQ) => client.get("/api/marketing/notices", q),

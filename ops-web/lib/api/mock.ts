@@ -56,12 +56,8 @@ export const mockApi: Api = {
   listShareRules: (q: PageQ = {}) => wait(db.paginate(db.shareRules, q.page, q.size, (s) => db.kwHit(q.keyword, s.payeeName))),
   listLedger: (q: PageQ = {}) => wait(db.paginate(db.ledger, q.page, q.size, (l) => db.kwHit(q.keyword, l.account, l.orderNo, l.voucherNo))),
   listSettlements: (q: PageQ = {}) => wait(db.paginate(db.settlements, q.page, q.size, (s) => db.kwHit(q.keyword, s.payeeName, s.settleNo))),
-  listWithdrawals: (q: PageQ = {}) => wait(db.paginate(db.withdrawals, q.page, q.size, (w) => db.kwHit(q.keyword, w.payeeName, w.withdrawNo))),
-  auditWithdrawal: (no, approve) => {
-    const w = db.withdrawals.find((x) => x.withdrawNo === no);
-    if (w) w.status = approve ? "PAYING" : "FAILED";
-    return wait({ ok: true } as const, 400);
-  },
+  listWithdrawals: (q: PageQ = {}) => wait(db.paginate(db.withdrawals, q.page, q.size, (w) => db.kwHit(q.keyword, w.payeeName, w.withdrawNo, w.auditorName))),
+  auditWithdrawal: (no, approve, rejectReason, auditorName) => wait(db.auditWithdrawal(no, approve, rejectReason, auditorName), 400),
 
   listVendors: () => wait(db.vendors),
   saveVendor: (v: Partial<Vendor> & { vendorCode: string }) => {
@@ -90,7 +86,7 @@ export const mockApi: Api = {
     return wait(merged, 350);
   },
 
-  listEmployees: (q: PageQ = {}) => wait(db.paginate(db.employees, q.page, q.size, (e) => db.kwHit(q.keyword, e.name))),
+  listEmployees: (q: PageQ = {}) => wait(db.listEmployees(q)),
   listRoles: () => wait(db.roles),
   listAudits: (q: PageQ = {}) => wait(db.paginate(db.audits, q.page, q.size, (a) => db.kwHit(q.keyword, a.actor, a.action, a.target))),
 
@@ -204,6 +200,8 @@ export const mockApi: Api = {
   saveRegion: (x) => wait(db.saveRegion(x), 350),
   saveSysParam: (x) => wait(db.saveSysParam(x), 350),
   saveOpenApiApp: (x) => wait(db.saveOpenApiApp(x), 350),
+  saveEmployee: (x) => wait(db.saveEmployee(x), 350),
+  saveMarketCountry: (x) => wait(db.saveMarketCountry(x), 350),
 
   // 公告管理 / 支付渠道
   listNotices: (q: PageQ = {}) => wait(db.listNotices(q)),

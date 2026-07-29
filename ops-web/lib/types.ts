@@ -106,6 +106,7 @@ export interface Employee {
   employeeNo: string;
   name: string;
   phone: string;
+  email: string; // 登录/通知邮箱
   deptName: string | null;
   roleName: string;
   status: "ACTIVE" | "LEFT";
@@ -204,6 +205,11 @@ export interface Withdrawal {
   currency: string;
   status: "APPLY" | "AUDIT" | "PAYING" | "PAID" | "FAILED";
   appliedAt: string;
+  // —— 资金审批合规四件套（对标补齐）——
+  fee: number; // 提现手续费（与 amount 同币种，实际到账 = amount - fee）
+  auditorName: string | null; // 审批人（未审批为 null）
+  auditedAt: string | null; // 审批时间
+  rejectReason: string | null; // 驳回原因（驳回必填）
 }
 
 // —— 账务分录（复式记账，trade 域）——
@@ -500,6 +506,11 @@ export interface Wallet {
   bonus: number;
   currency: string;
   updatedAt: string;
+  // —— 用户价值画像（对标补齐：钱包页直接看消费/充值贡献）——
+  orderCount: number; // 累计订单数
+  orderAmount: number; // 累计订单金额
+  rechargeCount: number; // 累计充值次数
+  rechargeAmount: number; // 累计充值金额
 }
 
 // —— 营销 · 待建功能补全（user/ad 域）——

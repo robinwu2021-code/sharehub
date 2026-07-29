@@ -82,6 +82,17 @@ const PAYMENT_FIELDS: FieldDef[] = [
   { key: "apiKeyMasked", label: "API 密钥（掩码）", type: "password", placeholder: "sk_test_****" },
 ];
 
+// 国家码是业务主键（ISO alpha-2），新增必填、编辑只读
+const MARKET_FIELDS: FieldDef[] = [
+  { key: "countryCode", label: "国家码（ISO alpha-2）", readOnlyOnEdit: true, placeholder: "AE" },
+  { key: "name", label: "国家名称", placeholder: "阿联酋" },
+  { key: "currency", label: "币种", placeholder: "AED" },
+  { key: "timezone", label: "时区", placeholder: "Asia/Dubai" },
+  { key: "compliance", label: "合规主体", placeholder: "Neargo FZ-LLC / 筹备中 / 规划" },
+  { key: "cityCount", label: "开城数", type: "number" },
+  { key: "status", label: "状态", type: "select", options: [{ value: "LIVE", label: "已开城" }, { value: "PILOT", label: "试点" }, { value: "PLANNED", label: "规划" }] },
+];
+
 const OPENAPI_FIELDS: FieldDef[] = [
   { key: "appNo", label: "应用号", readOnlyOnEdit: true, placeholder: "留空自动生成" },
   { key: "name", label: "名称", placeholder: "合作方对接" },
@@ -118,6 +129,7 @@ function SystemInner() {
   const canParam = allow("system:param:update");
   const canOpenapi = allow("system:openapi:update");
   const canPayment = allow("system:payment_channel:update");
+  const canMarket = allow("system:market:update");
 
   const [notifyForm, setNotifyForm] = useState<Partial<NotifyTemplate> | null>(null);
   const [dictForm, setDictForm] = useState<Partial<DictEntry> | null>(null);
@@ -125,6 +137,7 @@ function SystemInner() {
   const [paramForm, setParamForm] = useState<Partial<SysParam> | null>(null);
   const [openapiForm, setOpenapiForm] = useState<Partial<OpenApiApp> | null>(null);
   const [paymentForm, setPaymentForm] = useState<Partial<PaymentChannel> | null>(null);
+  const [marketForm, setMarketForm] = useState<Partial<MarketCountry> | null>(null);
 
   const onSaved = (setter: (v: null) => void) => () => { qc.invalidateQueries({ queryKey: ["sys"] }); notify.success(t("common.success")); setter(null); };
   const saveNotify = useMutation({ mutationFn: (v: Partial<NotifyTemplate>) => api.saveNotifyTemplate(v), onSuccess: onSaved(setNotifyForm) });
@@ -133,6 +146,7 @@ function SystemInner() {
   const saveParam = useMutation({ mutationFn: (v: Partial<SysParam>) => api.saveSysParam(v), onSuccess: onSaved(setParamForm) });
   const saveOpenapi = useMutation({ mutationFn: (v: Partial<OpenApiApp>) => api.saveOpenApiApp(v), onSuccess: onSaved(setOpenapiForm) });
   const savePayment = useMutation({ mutationFn: (v: Partial<PaymentChannel>) => api.savePaymentChannel(v), onSuccess: onSaved(setPaymentForm) });
+  const saveMarket = useMutation({ mutationFn: (v: Partial<MarketCountry>) => api.saveMarketCountry(v), onSuccess: onSaved(setMarketForm) });
 
   // —— 其余分页 tab ——
   const q = useQuery<PageResult<NotifyTemplate | DictEntry | Region | SysParam | OpenApiApp | MarketCountry | PaymentChannel>>({
@@ -161,6 +175,7 @@ function SystemInner() {
     { header: "合规主体", cell: (m) => <span className="text-muted-foreground">{m.compliance}</span> },
     { header: "开城数", cell: (m) => <span className="tabular-nums">{m.cityCount}</span> },
     { header: "状态", cell: (m) => <Badge tone={MARKET_STATUS[m.status].tone}>{MARKET_STATUS[m.status].label}</Badge> },
+    { header: t("common.actions"), cell: (m) => canMarket ? <Button size="sm" variant="outline" onClick={() => setMarketForm(m)}>{t("common.edit")}</Button> : <span className="text-muted-foreground">-</span> },
   ];
 
   const paymentCols: Column<PaymentChannel>[] = [
@@ -266,7 +281,8 @@ function SystemInner() {
           onAdd={canOpenapi ? () => setOpenapiForm({ rateLimit: 10, status: "ACTIVE" }) : undefined} addLabel="新增应用" />
       )}
       {tab === "markets" && (
-        <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索国家 / 币种" />
+        <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索国家 / 币种"
+          onAdd={canMarket ? () => setMarketForm({ countryCode: "", name: "", currency: "AED", timezone: "Asia/Dubai", compliance: "规划", cityCount: 0, status: "PLANNED" }) : undefined} addLabel="新增国家市场" />
       )}
 
       {tab === "vendors" && <DataTable rowKey={(v: Vendor) => v.vendorCode} columns={vendorCols} rows={vendorsQ.data} loading={vendorsQ.isLoading} />}
@@ -350,6 +366,17 @@ function SystemInner() {
         fields={OPENAPI_FIELDS} value={(openapiForm ?? {}) as Record<string, unknown>}
         onChange={(v) => setOpenapiForm(v as Partial<OpenApiApp>)}
         onSubmit={() => openapiForm && saveOpenapi.mutate(openapiForm)} submitting={saveOpenapi.isPending} />
+
+      {/* 多国家市场：国家码即主键，新增时必填才能提交 */}
+      <FormDrawer open={!!marketForm} onOpenChange={(o) => !o && setMarketForm(null)}
+        titleNew="新增国家市场" titleEdit={`编辑国家市场 ${marketForm?.name ?? ""}`} isEdit={!!marketForm?.countryCode}
+        fields={MARKET_FIELDS} value={(marketForm ?? {}) as Record<string, unknown>}
+        onChange={(v) => setMarketForm(v as Partial<MarketCountry>)}
+        onSubmit={() => {
+          if (!marketForm) return;
+          if (!marketForm.countryCode?.trim()) { notify.error("国家码必填（ISO alpha-2，如 AE）"); return; }
+          saveMarket.mutate({ ...marketForm, countryCode: marketForm.countryCode.trim().toUpperCase() });
+        }} submitting={saveMarket.isPending} />
     </div>
   );
 }
