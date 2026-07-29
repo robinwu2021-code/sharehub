@@ -175,6 +175,30 @@
 | **B7** | G6 工单闭环 · G7 数据权限落真 | — | 2 处深度改造 | 中 |
 | **B8** | G4 地图 · D 代理端角色视图 | 后端数据范围 | — | 延后 |
 
+### 追加：B1.5 API/Mock 层结构治理（2026-07-29 用户定调）
+
+> **总路线拍板**：**先完成全部前端 + 统一封装 api/mock → 全端完成后再整体开发后端**。
+> 因此在铺 B6–B8 之前插入一次结构治理——否则新功能继续往失控的结构里堆。
+
+**治理前的失控现状**（6 个 agent 追加式修改的累积后果）：
+
+| 文件 | 规模 | 问题 |
+|---|---|---|
+| `lib/api/contract.ts` | 282 行 / **单个 `Api` interface 挂 161 个方法** | 扁平巨型接口，无域边界 |
+| `lib/api/mock.ts` · `http.ts` | 253 / 210 行 | 各有 4–5 段分散的 `import type`（不同 agent 各加各的）|
+| `lib/mock/db.ts` | **1747 行** | 单文件承载全域 mock |
+| `lib/types.ts` | **1196 行** | 单文件承载全域类型 |
+| 查询参数 | `PageQ`/`StatusQ`/`AlarmQ`/`ShareSummaryQ`/`RechargeQ` 散落 | 无统一规范 |
+
+**治理方案（硬约束：公开导入路径与调用方式一律不变，40 个页面零改动）**：
+- `lib/types.ts` → `lib/types/{common,device,alarm,...}.ts` + `index.ts` re-export（`@/lib/types` 不变）
+- `lib/mock/db.ts` → `lib/mock/db/{helpers,device,...}.ts` + `index.ts`（`@/lib/mock/db` 不变）
+- `lib/api/{contract,mock,http}.ts` → 每域一个切片，入口文件组合（`api.listCabinets()` 写法不变）
+- 查询参数收进 `lib/api/query.ts`
+- **新增契约一致性单测**：断言 `mockApi` / `httpApi` / `Api` 三者方法名集合完全一致 —— **161 个方法靠人眼查不出漏实现**，这是本次治理最有价值的产出
+
+**原则**：纯搬运不重写；发现 bug/重复/签名不一致一律**上报不自行修**（避免重构与修 bug 混在一起，出问题无法二分定位）。
+
 **每批次验收（统一）**：`tsc` 零错 → `vitest` 全过 → `build` 成功 → **实机核对字段与交互** → 删 nav 对应叶的 `soon` → **回填矩阵「前端」列 + 实现状态总表变更日志**。
 
 ### 关键路径
