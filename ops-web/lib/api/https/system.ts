@@ -1,7 +1,7 @@
 // 覆盖范围：系统设置 —— 供应商接入、通知模板 / 发送记录 / 通知黑名单、数据字典、
 // 区域、系统参数、开放平台应用、市场国家、支付渠道、业务规则、登录设置、
 // App 版本、银行字典、常见问题、税率设置。
-// 端点前缀：字典/组织类在 /api/platform/**，B2/B3/B5 新增项在 /api/system/**，
+// 端点前缀：字典/组织类在 /api/platform/**，B2/B3/B5 新增项在 /api/platform/**，
 // 供应商接入走 /internal/gw/**（沿用现状，未改动）。
 import { client } from "../http-client";
 import type { SystemApi } from "../contracts/system";
@@ -26,26 +26,26 @@ export const systemHttp: SystemApi = {
   saveMarketCountry: (x) => client.post(x.countryCode ? `/api/platform/markets/${x.countryCode}` : "/api/platform/markets", x),
 
   // 支付渠道
-  listPaymentChannels: (q?: PageQ) => client.get("/api/system/payment-channels", q),
-  savePaymentChannel: (x) => client.post(x.channelCode ? `/api/system/payment-channels/${x.channelCode}` : "/api/system/payment-channels", x),
+  listPaymentChannels: (q?: PageQ) => client.get("/api/platform/payment-channels", q),
+  savePaymentChannel: (x) => client.post(x.channelCode ? `/api/platform/payment-channels/${x.channelCode}` : "/api/platform/payment-channels", x),
 
   // 系统设置 B2/B3/B5（规格 §9~§16）
-  listNotifyLogs: (q?: NotifyLogQ) => client.get("/api/system/notify-logs", q),
-  getNotifyLogStats: () => client.get("/api/system/notify-logs/stats"),
-  listNotifyBlacklist: (q?: NotifyBlacklistQ) => client.get("/api/system/notify-blacklist", q),
-  saveNotifyBlacklist: (x) => client.post(x.blockNo ? `/api/system/notify-blacklist/${x.blockNo}` : "/api/system/notify-blacklist", x),
-  releaseNotifyBlacklist: (no) => client.post(`/api/system/notify-blacklist/${no}/release`, {}),
-  getBizRules: () => client.get("/api/system/biz-rules"),
-  saveBizRules: (x) => client.post("/api/system/biz-rules", x),
-  listLoginSettings: (q?: PageQ) => client.get("/api/system/login-settings", q),
-  saveLoginSetting: (x) => client.post(x.country ? `/api/system/login-settings/${x.country}` : "/api/system/login-settings", x),
-  listAppVersions: (q?: AppVersionQ) => client.get("/api/system/app-versions", q),
-  saveAppVersion: (x) => client.post(x.versionId ? `/api/system/app-versions/${x.versionId}` : "/api/system/app-versions", x),
-  rollbackAppVersion: (id) => client.post(`/api/system/app-versions/${id}/rollback`, {}),
-  listBanks: (q?: BankQ) => client.get("/api/system/banks", q),
-  saveBank: (x) => client.post(x.bankCode ? `/api/system/banks/${x.bankCode}` : "/api/system/banks", x),
-  listProblems: (q?: ProblemQ) => client.get("/api/system/problems", q),
-  saveProblem: (x) => client.post(x.problemNo ? `/api/system/problems/${x.problemNo}` : "/api/system/problems", x),
-  listTaxSettings: (q?: PageQ) => client.get("/api/system/tax-settings", q),
-  saveTaxSetting: (x) => client.post(x.country ? `/api/system/tax-settings/${x.country}` : "/api/system/tax-settings", x),
+  listNotifyLogs: (q?: NotifyLogQ) => client.get("/api/platform/notify-logs", q),
+  getNotifyLogStats: () => client.get("/api/platform/notify-logs/stats"),
+  listNotifyBlacklist: (q?: NotifyBlacklistQ) => client.get("/api/platform/notify-blacklist", q),
+  saveNotifyBlacklist: (x) => client.post(x.blockNo ? `/api/platform/notify-blacklist/${x.blockNo}` : "/api/platform/notify-blacklist", x),
+  releaseNotifyBlacklist: (no) => client.post(`/api/platform/notify-blacklist/${no}/release`, {}),
+  getBizRules: () => client.get("/api/platform/biz-rules"),
+  saveBizRules: (x) => client.post("/api/platform/biz-rules", x),
+  listLoginSettings: (q?: PageQ) => client.get("/api/platform/login-settings", q),
+  saveLoginSetting: (x) => client.post(x.country ? `/api/platform/login-settings/${x.country}` : "/api/platform/login-settings", x),
+  listAppVersions: (q?: AppVersionQ) => client.get("/api/platform/app-versions", q),
+  saveAppVersion: (x) => client.post(x.versionId ? `/api/platform/app-versions/${x.versionId}` : "/api/platform/app-versions", x),
+  rollbackAppVersion: (id) => client.post(`/api/platform/app-versions/${id}/rollback`, {}),
+  listBanks: (q?: BankQ) => client.get("/api/platform/banks", q),
+  saveBank: (x) => client.post(x.bankCode ? `/api/platform/banks/${x.bankCode}` : "/api/platform/banks", x),
+  listProblems: (q?: ProblemQ) => client.get("/api/platform/problems", q),
+  saveProblem: (x) => client.post(x.problemNo ? `/api/platform/problems/${x.problemNo}` : "/api/platform/problems", x),
+  listTaxSettings: (q?: PageQ) => client.get("/api/platform/tax-settings", q),
+  saveTaxSetting: (x) => client.post(x.country ? `/api/platform/tax-settings/${x.country}` : "/api/platform/tax-settings", x),
 };
