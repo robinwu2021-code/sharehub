@@ -4,15 +4,15 @@ import { LOCS, p } from "./internal";
 import { paginate, kwHit, upsert, nextNo } from "./helpers";
 
 export const pricePlans: PricePlan[] = [
-  { planNo: "PP001", name: "标准（默认）", freeMinutes: 5, unitMinutes: 30, unitPrice: 3, capDaily: 30, capTotal: 60, currency: "AED", scope: "默认", status: "ACTIVE" },
-  { planNo: "PP002", name: "机场高价", freeMinutes: 3, unitMinutes: 30, unitPrice: 5, capDaily: 50, capTotal: 99, currency: "AED", scope: "机场点位", status: "ACTIVE" },
-  { planNo: "PP003", name: "商场优惠", freeMinutes: 10, unitMinutes: 60, unitPrice: 2, capDaily: 20, capTotal: 49, currency: "AED", scope: "商场点位", status: "ACTIVE" },
-  { planNo: "PP004", name: "旧活动价", freeMinutes: 15, unitMinutes: 30, unitPrice: 2, capDaily: 20, capTotal: 40, currency: "AED", scope: "活动", status: "DISABLED" },
+  { planNo: "PP001", name: "标准（默认）", freeMinutes: 5, unitMinutes: 30, unitPrice: 3, capDaily: 30, buyoutPrice: 60, currency: "AED", scope: "默认", status: "ACTIVE" },
+  { planNo: "PP002", name: "机场高价", freeMinutes: 3, unitMinutes: 30, unitPrice: 5, capDaily: 50, buyoutPrice: 99, currency: "AED", scope: "机场点位", status: "ACTIVE" },
+  { planNo: "PP003", name: "商场优惠", freeMinutes: 10, unitMinutes: 60, unitPrice: 2, capDaily: 20, buyoutPrice: 49, currency: "AED", scope: "商场点位", status: "ACTIVE" },
+  { planNo: "PP004", name: "旧活动价", freeMinutes: 15, unitMinutes: 30, unitPrice: 2, capDaily: 20, buyoutPrice: 40, currency: "AED", scope: "活动", status: "DISABLED" },
 ];
 
 export const pricingDiffs: PricingDiff[] = Array.from({ length: 12 }, (_, i) => ({
   ruleNo: `PD${400 + i}`, scene: p(["机场", "商场", "餐饮", "地铁", "写字楼"], i), locationName: p(LOCS, i),
-  freeMins: p([3, 5, 10], i), unitPrice: p([2, 3, 5], i), dayCap: p([20, 30, 50], i),
+  freeMinutes: p([3, 5, 10], i), unitPrice: p([2, 3, 5], i), capDaily: p([20, 30, 50], i),
   priority: (i % 3) + 1, currency: "AED",
 }));
 export const pricingSchedules: PricingSchedule[] = Array.from({ length: 12 }, (_, i) => ({

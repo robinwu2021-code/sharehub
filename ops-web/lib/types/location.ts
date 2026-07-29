@@ -13,7 +13,15 @@ export interface Site {
   cabinetCount: number;
   status: "ACTIVE" | "PAUSED";
 }
-export interface Location {
+/**
+ * 站点内的投放点位（Site → SitePoint → 机柜）。
+ *
+ * ⚠️ 原名 `Location`（2026-07-29 改名，台账 T8）。两个问题：
+ *  1. **遮蔽 DOM 全局 `Location`** —— `.tsx` 里忘记 import 时会静默拿到 DOM 类型，tsc 不报错；
+ *  2. 与 `Site`（站点）语义打架，读代码时分不清哪个是"场地"哪个是"点位"。
+ * 业务号仍为 `locationNo`（后端字段名未动，改名只在前端类型层）。
+ */
+export interface SitePoint {
   locationNo: string; // 点位
   name: string;
   siteNo: string;

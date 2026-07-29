@@ -1,3 +1,11 @@
+/**
+ * 全渠道通知枚举（台账 T3）。曾有四处各写一套内联枚举
+ * （NotifyLogChannel / NotifyTemplate.channel / AlarmNotice.channel / PushMessage.channel），
+ * 前三者语义相同故统一到本类型；PushMessage.channel 语义不同（是推送**类型**不是渠道），
+ * 已在 marketing.ts 就地注明，未强并。
+ */
+export type NotifyChannel = "SMS" | "EMAIL" | "PUSH" | "WHATSAPP" | "WEBHOOK";
+
 // 覆盖范围：系统/平台域（platform、gw）——租户与租户配置、供应商接入、支付渠道、
 // 通知模板与发送记录、触达拉黑、业务规则（提现/预约/计费默认）、登录设置、
 // 应用版本、数据字典、地区、银行、问题管理（FAQ）、系统参数、税率、市场国家、OpenAPI 应用。
@@ -20,7 +28,7 @@ export interface TenantConfig {
   paymentProvider: string; // nearpay（委托，ADR-005）
   currency: string;
   freeMinutes: number;
-  capTotal: number;
+  buyoutPrice: number;
   enabledVendors: string[];
 }
 
@@ -159,8 +167,8 @@ export interface ReservationRule {
 }
 export interface BillingDefaultRule {
   freeMinutes: number; // 默认免费时长（分）
-  billUnitMinutes: number; // 默认计费单位（分）
-  dailyCap: number; // 默认日封顶
+  unitMinutes: number; // 默认计费单位（分）
+  capDaily: number; // 默认日封顶
   buyoutPrice: number; // 默认买断价
   overdueHours: number; // 超时判定阈值（小时）
 }

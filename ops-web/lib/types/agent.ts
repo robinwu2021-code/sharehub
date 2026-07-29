@@ -1,3 +1,5 @@
+import type { DataScope } from "./org";
+
 // 覆盖范围：代理商域（agt · ADR-012）——代理主体、区域划分、业绩、
 // 代理端账号、分润规则配置。
 
@@ -34,7 +36,7 @@ export interface AgentAccount {
   agentName: string;
   loginPhone: string;
   status: "ACTIVE" | "DISABLED";
-  dataScope: string;
+  dataScope: DataScope; // 台账 T5：原为 string，与 RoleRow.dataScope 统一
   createdAt: string;
 }
 
@@ -43,7 +45,7 @@ export interface AgentCommission {
   ruleNo: string;
   agentNo: string;
   agentName: string;
-  dimension: "GMV" | "ORDER_COUNT";
+  basis: "GMV" | "ORDER_COUNT";
   rate: number; // 0~1
   mode: "CHANNEL_SPLIT" | "LEDGER";
   effectiveAt: string;

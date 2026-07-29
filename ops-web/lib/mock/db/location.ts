@@ -1,7 +1,7 @@
 // 场所域（ADR-013 场地方 → 站点 → 点位 → 合同）：sites / locations / venues / contracts，
 // 外加拓展侧的线索 leads、站点效益分析 siteAnalyses、场地入驻审核 venueOnboardings、站点生命周期 siteLifecycles。
 import type {
-  Site, Location, Venue, Contract, Lead, SiteAnalysis,
+  Site, SitePoint, Venue, Contract, Lead, SiteAnalysis,
   VenueOnboarding, SiteLifecycle, PageQuery,
 } from "../../types";
 import { LOCS, VENUE_NAMES, p, iso, phone } from "./internal";
@@ -14,7 +14,7 @@ export const sites: Site[] = Array.from({ length: 12 }, (_, i) => ({
   address: `${p(LOCS, i)}, Dubai, UAE`, sceneType: p(["商场", "机场", "餐饮", "地铁", "写字楼"], i),
   pointCount: 1 + (i % 4), cabinetCount: 2 + (i * 3) % 10, status: i % 8 === 0 ? "PAUSED" : "ACTIVE",
 }));
-export const locations: Location[] = Array.from({ length: 30 }, (_, i) => {
+export const locations: SitePoint[] = Array.from({ length: 30 }, (_, i) => {
   const site = sites[i % sites.length];
   return {
     locationNo: `LOC${200 + i}`, name: `${site.name} · ${p(["L1东门", "L2中庭", "B1出口", "主入口", "美食广场"], i)}`,

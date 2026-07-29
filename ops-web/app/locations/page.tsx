@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { money, fmtTime } from "@/lib/utils";
 import { useCan } from "@/lib/use-can";
 import { notify } from "@/lib/notify";
-import type { Site, Location, Venue, Contract, Lead, SiteAnalysis, VenueOnboarding, SiteLifecycle, PageResult } from "@/lib/types";
+import type { Site, SitePoint, Venue, Contract, Lead, SiteAnalysis, VenueOnboarding, SiteLifecycle, PageResult } from "@/lib/types";
 
 const SIZE = 10;
 const TABS = [
@@ -85,7 +85,7 @@ function LocationsInner() {
   const [keyword, setKeyword] = useState("");
   useEffect(() => { if (qTab && TABS.some((t) => t.key === qTab)) { setTab(qTab); setPage(1); } }, [qTab]);
   const [siteForm, setSiteForm] = useState<Partial<Site> | null>(null);
-  const [pointForm, setPointForm] = useState<Partial<Location> | null>(null);
+  const [pointForm, setPointForm] = useState<Partial<SitePoint> | null>(null);
   const [venueForm, setVenueForm] = useState<Partial<Venue> | null>(null);
   const [contractForm, setContractForm] = useState<Partial<Contract> | null>(null);
   const [leadForm, setLeadForm] = useState<Partial<Lead> | null>(null);
@@ -95,7 +95,7 @@ function LocationsInner() {
   const canContract = allow("location:contract:update");
   const canLead = allow("location:lead:update");
 
-  const q = useQuery<PageResult<Site | Location | Venue | Contract | Lead | SiteAnalysis | VenueOnboarding | SiteLifecycle>>({
+  const q = useQuery<PageResult<Site | SitePoint | Venue | Contract | Lead | SiteAnalysis | VenueOnboarding | SiteLifecycle>>({
     queryKey: ["place", tab, page, keyword],
     queryFn: () =>
       tab === "sites" ? api.listSites({ page, size: SIZE, keyword })
@@ -114,7 +114,7 @@ function LocationsInner() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["place", "sites"] }); setSiteForm(null); },
   });
   const savePoint = useMutation({
-    mutationFn: (l: Partial<Location>) => api.savePoint(l),
+    mutationFn: (l: Partial<SitePoint>) => api.savePoint(l),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["place", "points"] }); setPointForm(null); },
   });
   const saveVenue = useMutation({
@@ -144,7 +144,7 @@ function LocationsInner() {
     { header: "状态", cell: (s) => s.status === "ACTIVE" ? <Badge tone="success">启用</Badge> : <Badge tone="muted">暂停</Badge> },
     { header: "操作", cell: (s) => allow("location:poi:update") ? <Button size="sm" variant="outline" onClick={() => setSiteForm(s)}>编辑</Button> : <span className="text-muted-foreground">-</span> },
   ];
-  const pointCols: Column<Location>[] = [
+  const pointCols: Column<SitePoint>[] = [
     { header: "点位号", cell: (l) => <span className="font-medium">{l.locationNo}</span> },
     { header: "名称", cell: (l) => l.name },
     { header: "所属站点", cell: (l) => <span className="text-muted-foreground">{l.siteName}</span> },
@@ -258,7 +258,7 @@ function LocationsInner() {
         <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索站点号 / 名称 / 负责人" />
       )}
       {tab === "sites" && <DataTable rowKey={(s: Site) => s.siteNo} columns={siteCols} rows={q.data?.list as Site[]} loading={q.isLoading} />}
-      {tab === "points" && <DataTable rowKey={(l: Location) => l.locationNo} columns={pointCols} rows={q.data?.list as Location[]} loading={q.isLoading} />}
+      {tab === "points" && <DataTable rowKey={(l: SitePoint) => l.locationNo} columns={pointCols} rows={q.data?.list as SitePoint[]} loading={q.isLoading} />}
       {tab === "venues" && <DataTable rowKey={(v: Venue) => v.venueNo} columns={venueCols} rows={q.data?.list as Venue[]} loading={q.isLoading} />}
       {tab === "contracts" && <DataTable rowKey={(c: Contract) => c.contractNo} columns={ctCols} rows={q.data?.list as Contract[]} loading={q.isLoading} />}
       {tab === "crm" && <DataTable rowKey={(l: Lead) => l.leadNo} columns={leadCols} rows={q.data?.list as Lead[]} loading={q.isLoading} />}
@@ -307,7 +307,7 @@ function LocationsInner() {
           <Field label="所属站点名"><Input value={pointForm.siteName ?? ""} onChange={(e) => setPointForm({ ...pointForm, siteName: e.target.value })} placeholder="Dubai Mall L1" /></Field>
           <Field label="位置描述"><Input value={pointForm.spotDesc ?? ""} onChange={(e) => setPointForm({ ...pointForm, spotDesc: e.target.value })} placeholder="近扶梯" /></Field>
           <Field label="状态">
-            <Select className="w-full" value={pointForm.status ?? "ACTIVE"} onChange={(e) => setPointForm({ ...pointForm, status: e.target.value as Location["status"] })}>
+            <Select className="w-full" value={pointForm.status ?? "ACTIVE"} onChange={(e) => setPointForm({ ...pointForm, status: e.target.value as SitePoint["status"] })}>
               <option value="ACTIVE">启用</option><option value="PAUSED">暂停</option>
             </Select>
           </Field>

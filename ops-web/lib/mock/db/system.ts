@@ -231,7 +231,7 @@ export function releaseNotifyBlacklist(blockNo: string): NotifyBlacklist {
 export const bizRules: BizRules = {
   withdraw: { minAmount: 100, feeRate: 0.006, feeCap: 25, settleDays: 7, dailyLimit: 20000, needApproval: true },
   reservation: { maxDurationMin: 30, advanceHours: 24, holdFeePerMin: 0.2, maxConcurrent: 1 },
-  billing: { freeMinutes: 5, billUnitMinutes: 30, dailyCap: 20, buyoutPrice: 99, overdueHours: 72 },
+  billing: { freeMinutes: 5, unitMinutes: 30, capDaily: 20, buyoutPrice: 99, overdueHours: 72 },
   currency: "AED",
   updatedAt: iso(4 * 86400_000),
 };

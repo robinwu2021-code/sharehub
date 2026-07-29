@@ -1,3 +1,4 @@
+import type { AuditTrail } from "./common";
 // 覆盖范围：订单域（trade）——租借订单、订单异常、投诉、退款、押金与欠费、
 // 预约订单、免费订单及其页头统计。
 // 注：免费来源枚举 WhitelistReason 定义在 ./user（白名单归用户域），此处引用。
@@ -71,7 +72,7 @@ export interface OrderComplaint {
 
 // 退款记录：独立审批队列（申请→审批→执行），比竞品多一条审批链。
 // idempotencyKey / psgTxnNo 是资金操作可追溯的底线：前者防重复退款，后者对得上 PSP 流水。
-export interface RefundRecord {
+export interface RefundRecord extends AuditTrail {
   refundNo: string;
   orderNo: string;
   userNo: string;
@@ -81,9 +82,6 @@ export interface RefundRecord {
   applicantName: string; // 申请人（客服/用户/系统）
   appliedAt: string;
   status: "PENDING" | "APPROVED" | "REJECTED" | "EXECUTED" | "FAILED";
-  auditorName: string | null; // 审批人
-  auditedAt: string | null;
-  rejectReason: string | null; // 驳回原因（驳回必填）
   idempotencyKey: string; // 幂等键（同一键只退一次）
   psgTxnNo: string | null; // PSP 支付流水号（未执行时为空）
 }

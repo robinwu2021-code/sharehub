@@ -402,13 +402,13 @@ function BizRulesPanel({ canEdit }: { canEdit: boolean }) {
           新建价格方案时的初始值；已存在的方案不受影响。
         </div>
         <NumField label="默认免费时长" unit="分钟" value={billing.freeMinutes} disabled={!canEdit} onChange={(v) => setBilling({ ...billing, freeMinutes: v })} />
-        <NumField label="默认计费单位" unit="分钟 / 计费周期" value={billing.billUnitMinutes} disabled={!canEdit} onChange={(v) => setBilling({ ...billing, billUnitMinutes: v })} />
-        <NumField label="默认日封顶" unit={currency} value={billing.dailyCap} disabled={!canEdit} onChange={(v) => setBilling({ ...billing, dailyCap: v })} />
+        <NumField label="默认计费单位" unit="分钟 / 计费周期" value={billing.unitMinutes} disabled={!canEdit} onChange={(v) => setBilling({ ...billing, unitMinutes: v })} />
+        <NumField label="默认日封顶" unit={currency} value={billing.capDaily} disabled={!canEdit} onChange={(v) => setBilling({ ...billing, capDaily: v })} />
         <NumField label="默认买断价" unit={currency} value={billing.buyoutPrice} disabled={!canEdit} onChange={(v) => setBilling({ ...billing, buyoutPrice: v })} />
         <NumField label="超时判定阈值" unit="小时" value={billing.overdueHours} disabled={!canEdit} onChange={(v) => setBilling({ ...billing, overdueHours: v })} help="超过即判定逾期并触发买断" />
         <SaveBar onSave={() => {
-          if (!nonNegative(billing.freeMinutes, billing.billUnitMinutes, billing.dailyCap, billing.buyoutPrice, billing.overdueHours)) { notify.error("计费默认值：数值不能为负数"); return; }
-          if (billing.billUnitMinutes <= 0) { notify.error("计费单位必须大于 0 分钟"); return; }
+          if (!nonNegative(billing.freeMinutes, billing.unitMinutes, billing.capDaily, billing.buyoutPrice, billing.overdueHours)) { notify.error("计费默认值：数值不能为负数"); return; }
+          if (billing.unitMinutes <= 0) { notify.error("计费单位必须大于 0 分钟"); return; }
           save.mutate({ billing });
         }} />
       </Card>

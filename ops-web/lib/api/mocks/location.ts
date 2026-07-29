@@ -3,7 +3,7 @@
 import * as db from "../../mock/db";
 import type { LocationApi } from "../contracts/location";
 import type { PageQ } from "../query";
-import type { Site, Location } from "../../types";
+import type { Site, SitePoint } from "../../types";
 import { wait } from "./_wait";
 
 export const locationMock: LocationApi = {
@@ -17,7 +17,7 @@ export const locationMock: LocationApi = {
   listLocations: (q: PageQ = {}) => wait(db.paginate(db.locations, q.page, q.size, (l) => db.kwHit(q.keyword, l.name, l.siteName))),
   savePoint: (l) => {
     const idx = db.locations.findIndex((x) => x.locationNo === l.locationNo);
-    const merged = { ...(db.locations[idx] ?? { name: "", siteNo: "", siteName: "", spotDesc: "", cabinetCount: 0, status: "ACTIVE", locationNo: `LOC${200 + db.locations.length}` }), ...l } as Location;
+    const merged = { ...(db.locations[idx] ?? { name: "", siteNo: "", siteName: "", spotDesc: "", cabinetCount: 0, status: "ACTIVE", locationNo: `LOC${200 + db.locations.length}` }), ...l } as SitePoint;
     if (idx >= 0) db.locations[idx] = merged; else db.locations.unshift(merged);
     return wait(merged, 350);
   },

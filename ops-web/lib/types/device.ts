@@ -28,8 +28,9 @@ export interface Slot {
   health: "OK" | "FAULT";
 }
 
-export type PowerbankStatus =
-  | "IN_STOCK" | "DEPLOYED" | "IN_USE" | "RETURNED" | "SCRAP" | "LOST";
+// 注：曾有一个未被使用的 PowerbankStatus（IN_STOCK/DEPLOYED/IN_USE/RETURNED/SCRAP/LOST），
+// 与实际在用的 Powerbank.status（IN_CABINET/RENTED/FAULT/RETIRED）是两套词表，已删（台账 T1）。
+// ⚠️ 后端建表时词表要重新定：真实业务的「在库/已投放/在租/已归还/报废/丢失」比现在的 4 值更完整。
 
 // —— 设备 · 待建功能补全（ops/gw 域）——
 export interface Powerbank {

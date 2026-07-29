@@ -2,15 +2,15 @@
 // 门店 Onboarding / 站点生命周期。
 import type { PageQ } from "../query";
 import type {
-  PageResult, Site, Location, Venue, Contract, Lead, SiteAnalysis,
+  PageResult, Site, SitePoint, Venue, Contract, Lead, SiteAnalysis,
   VenueOnboarding, SiteLifecycle,
 } from "../../types";
 
 export interface LocationApi {
   listSites(q?: PageQ): Promise<PageResult<Site>>;
   saveSite(s: Partial<Site> & { siteNo?: string }): Promise<Site>;
-  listLocations(q?: PageQ): Promise<PageResult<Location>>;
-  savePoint(l: Partial<Location> & { locationNo?: string }): Promise<Location>;
+  listLocations(q?: PageQ): Promise<PageResult<SitePoint>>;
+  savePoint(l: Partial<SitePoint> & { locationNo?: string }): Promise<SitePoint>;
   listVenues(q?: PageQ): Promise<PageResult<Venue>>;
   listContracts(q?: PageQ): Promise<PageResult<Contract>>;
 

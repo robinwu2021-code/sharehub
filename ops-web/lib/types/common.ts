@@ -21,3 +21,13 @@ export interface PageQuery {
   keyword?: string;
   [k: string]: unknown;
 }
+
+/**
+ * 审批留痕三件套（台账 T6）。提现审核与退款审批原本各写一份同名字段。
+ * ⚠️ 后端阶段：这三个字段应落到**统一的审批流水表**，而不是在每张业务表上各加三列。
+ */
+export interface AuditTrail {
+  auditorName: string | null; // 审批人
+  auditedAt: string | null;   // 审批时间
+  rejectReason: string | null; // 驳回原因（通过时为 null）
+}

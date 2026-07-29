@@ -29,7 +29,7 @@ export const agentAccounts: AgentAccount[] = Array.from({ length: 12 }, (_, i) =
   const a = p(agents, i);
   return {
     accountNo: `AA${7000 + i}`, agentNo: a.agentNo, agentName: a.name, loginPhone: phone(i, "+9714"),
-    status: i % 6 === 0 ? "DISABLED" : "ACTIVE", dataScope: p(["本代理数据", "区域数据", "指定站点"], i),
+    status: i % 6 === 0 ? "DISABLED" : "ACTIVE", dataScope: p(["AGENT", "REGION", "LOCATION"] as const, i),
     createdAt: iso(i * 86400_000),
   };
 });
@@ -37,9 +37,9 @@ export const agentAccounts: AgentAccount[] = Array.from({ length: 12 }, (_, i) =
 // 佣金规则挂在**真实存在的代理商**上（台账 M4：原先挂 AGT001–AGT003，agents 里根本没有这些号，
 // 佣金规则点进去查无此代理商）。agentName 一律由 agents 反查，不再手写，杜绝名号对不上。
 const AGENT_COMMISSION_SEED: Omit<AgentCommission, "agentName">[] = [
-  { ruleNo: "AC0001", agentNo: "AG001", dimension: "GMV", rate: 0.12, mode: "CHANNEL_SPLIT", effectiveAt: "2026-01-01", status: "ACTIVE" },
-  { ruleNo: "AC0002", agentNo: "AG002", dimension: "GMV", rate: 0.10, mode: "LEDGER", effectiveAt: "2026-01-01", status: "ACTIVE" },
-  { ruleNo: "AC0003", agentNo: "AG003", dimension: "ORDER_COUNT", rate: 0.08, mode: "LEDGER", effectiveAt: "2026-03-01", status: "INACTIVE" },
+  { ruleNo: "AC0001", agentNo: "AG001", basis: "GMV", rate: 0.12, mode: "CHANNEL_SPLIT", effectiveAt: "2026-01-01", status: "ACTIVE" },
+  { ruleNo: "AC0002", agentNo: "AG002", basis: "GMV", rate: 0.10, mode: "LEDGER", effectiveAt: "2026-01-01", status: "ACTIVE" },
+  { ruleNo: "AC0003", agentNo: "AG003", basis: "ORDER_COUNT", rate: 0.08, mode: "LEDGER", effectiveAt: "2026-03-01", status: "INACTIVE" },
 ];
 export const agentCommissions: AgentCommission[] = AGENT_COMMISSION_SEED.map((r) => ({
   ...r, agentName: agents.find((a) => a.agentNo === r.agentNo)!.name,

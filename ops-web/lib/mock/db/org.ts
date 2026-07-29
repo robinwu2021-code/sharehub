@@ -15,7 +15,7 @@ export const tenants: Tenant[] = Array.from({ length: 8 }, (_, i) => ({
 }));
 export const tenantConfigs: TenantConfig[] = tenants.map((t) => ({
   tenantNo: t.tenantNo, brandName: t.brandName, paymentProvider: "nearpay", currency: "AED",
-  freeMinutes: 5, capTotal: 60, enabledVendors: VENDORS.slice(0, 2),
+  freeMinutes: 5, buyoutPrice: 60, enabledVendors: VENDORS.slice(0, 2),
 }));
 
 // —— 员工 / 角色 / 审计 ——

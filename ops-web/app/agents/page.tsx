@@ -16,9 +16,13 @@ import { Button } from "@/components/ui/button";
 import { money } from "@/lib/utils";
 import { useCan } from "@/lib/use-can";
 import { notify } from "@/lib/notify";
-import type { Agent, AgentAssignment, AgentPerformance, AgentAccount, AgentCommission } from "@/lib/types";
+import type { Agent, AgentAssignment, AgentPerformance, AgentAccount, AgentCommission, DataScope } from "@/lib/types";
 
 const SIZE = 10;
+// 数据范围文案与 app/employees 同源（台账 T5：AgentAccount.dataScope 原为 string
+// 且 mock 里存的是中文展示文案，收紧为 DataScope 枚举后统一走映射渲染）
+const SCOPE_LABEL: Record<DataScope, string> = { ALL: "全部数据", REGION: "按区域", LOCATION: "按点位", AGENT: "按代理(自己)", SELF: "仅自己经手" };
+const SCOPE_OPTIONS = (["ALL", "REGION", "LOCATION", "AGENT", "SELF"] as DataScope[]).map((s) => ({ value: s, label: SCOPE_LABEL[s] }));
 const TABS = [
   { key: "profiles", label: "代理商档案" },
   { key: "commission", label: "分润配置" },
@@ -30,7 +34,7 @@ const COMMISSION_FIELDS: import("@/components/ui/form-drawer").FieldDef[] = [
   { key: "ruleNo", label: "规则号", readOnlyOnEdit: true, placeholder: "留空自动生成" },
   { key: "agentNo", label: "代理编号", placeholder: "AG001" },
   { key: "agentName", label: "代理名称" },
-  { key: "dimension", label: "维度", type: "select", options: [{ value: "GMV", label: "GMV" }, { value: "ORDER_COUNT", label: "订单量" }] },
+  { key: "basis", label: "计佣基数", type: "select", options: [{ value: "GMV", label: "GMV" }, { value: "ORDER_COUNT", label: "订单量" }] },
   { key: "rate", label: "分润比例（0~1）", type: "number" },
   { key: "mode", label: "结算模式", type: "select", options: [{ value: "CHANNEL_SPLIT", label: "渠道分成" }, { value: "LEDGER", label: "账务分录" }] },
   { key: "effectiveAt", label: "生效日期", placeholder: "2026-01-01" },
@@ -42,7 +46,7 @@ const ACCOUNT_FIELDS: FieldDef[] = [
   { key: "agentName", label: "代理名称" },
   { key: "loginPhone", label: "登录手机" },
   { key: "status", label: "状态", type: "select", options: [{ value: "ACTIVE", label: "启用" }, { value: "DISABLED", label: "停用" }] },
-  { key: "dataScope", label: "数据范围", placeholder: "如：本代理 / 全辖域" },
+  { key: "dataScope", label: "数据范围", type: "select", options: SCOPE_OPTIONS },
 ];
 
 function AgentsInner() {
@@ -140,7 +144,7 @@ function AgentsInner() {
     { header: "代理名称", cell: (a) => a.agentName },
     { header: "登录手机", cell: (a) => <span className="tabular-nums">{a.loginPhone}</span> },
     { header: "状态", cell: (a) => a.status === "ACTIVE" ? <Badge tone="success">启用</Badge> : <Badge tone="muted">停用</Badge> },
-    { header: "数据范围", cell: (a) => <Badge tone="outline">{a.dataScope}</Badge> },
+    { header: "数据范围", cell: (a) => <Badge tone="outline">{SCOPE_LABEL[a.dataScope]}</Badge> },
     { header: "创建时间", cell: (a) => <span className="text-muted-foreground">{a.createdAt}</span> },
     { header: "操作", cell: (a) => canEditAccount ? <Button size="sm" variant="outline" onClick={() => setAccountForm(a)}>编辑</Button> : <span className="text-muted-foreground">-</span> },
   ];
@@ -149,7 +153,7 @@ function AgentsInner() {
     { header: "规则号", cell: (c) => <span className="font-medium">{c.ruleNo}</span> },
     { header: "代理编号", cell: (c) => <span className="text-muted-foreground">{c.agentNo}</span> },
     { header: "代理名称", cell: (c) => c.agentName },
-    { header: "维度", cell: (c) => <Badge tone="outline">{c.dimension === "GMV" ? "GMV" : "订单量"}</Badge> },
+    { header: "计佣基数", cell: (c) => <Badge tone="outline">{c.basis === "GMV" ? "GMV" : "订单量"}</Badge> },
     { header: "分润比例", cell: (c) => `${(c.rate * 100).toFixed(0)}%` },
     { header: "结算模式", cell: (c) => c.mode === "CHANNEL_SPLIT" ? "渠道分成" : "账务分录" },
     { header: "生效日期", cell: (c) => <span className="text-muted-foreground">{c.effectiveAt}</span> },
@@ -180,7 +184,7 @@ function AgentsInner() {
             search={keyword}
             onSearch={(v) => { setKeyword(v); setPage(1); }}
             searchPlaceholder="搜索规则号 / 代理编号 / 名称"
-            onAdd={allow("agent:settlement:read") ? () => setCommissionForm({ status: "ACTIVE", dimension: "GMV", mode: "CHANNEL_SPLIT", rate: 0.1 }) : undefined}
+            onAdd={allow("agent:settlement:read") ? () => setCommissionForm({ status: "ACTIVE", basis: "GMV", mode: "CHANNEL_SPLIT", rate: 0.1 }) : undefined}
             addLabel="新增分润规则"
           />
           <DataTable rowKey={(c: AgentCommission) => c.ruleNo} columns={commissionCols} rows={commissions.data?.list} loading={commissions.isLoading} />
@@ -204,7 +208,7 @@ function AgentsInner() {
             search={keyword}
             onSearch={(v) => { setKeyword(v); setPage(1); }}
             searchPlaceholder="搜索账号编号 / 代理 / 登录手机"
-            onAdd={canEditAccount ? () => setAccountForm({ status: "ACTIVE", dataScope: "本代理" }) : undefined}
+            onAdd={canEditAccount ? () => setAccountForm({ status: "ACTIVE", dataScope: "AGENT" }) : undefined}
             addLabel="新增代理账号"
           />
           <DataTable rowKey={(a: AgentAccount) => a.accountNo} columns={accountCols} rows={accounts.data?.list} loading={accounts.isLoading} />

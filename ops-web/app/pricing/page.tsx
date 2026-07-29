@@ -32,7 +32,7 @@ const PLAN_FIELDS: FieldDef[] = [
   { key: "unitMinutes", label: "计费单位（分）", type: "number" },
   { key: "unitPrice", label: "单位价", type: "number" },
   { key: "capDaily", label: "日封顶", type: "number" },
-  { key: "capTotal", label: "买断价", type: "number" },
+  { key: "buyoutPrice", label: "买断价", type: "number" },
   { key: "currency", label: "币种", placeholder: "AED" },
   { key: "status", label: "状态", type: "select", options: [{ value: "ACTIVE", label: "启用" }, { value: "DISABLED", label: "停用" }] },
 ];
@@ -41,9 +41,9 @@ const DIFF_FIELDS: FieldDef[] = [
   { key: "ruleNo", label: "规则号", readOnlyOnEdit: true, placeholder: "自动生成" },
   { key: "scene", label: "场景", placeholder: "机场 / 医院 / 景区" },
   { key: "locationName", label: "点位", placeholder: "点位名称" },
-  { key: "freeMins", label: "免费时长（分）", type: "number" },
+  { key: "freeMinutes", label: "免费时长（分）", type: "number" },
   { key: "unitPrice", label: "单位价", type: "number" },
-  { key: "dayCap", label: "日封顶", type: "number" },
+  { key: "capDaily", label: "日封顶", type: "number" },
   { key: "priority", label: "优先级", type: "number" },
   { key: "currency", label: "币种", placeholder: "AED" },
 ];
@@ -111,7 +111,7 @@ function PricingInner() {
     { header: "免费时长", cell: (p) => `${p.freeMinutes} 分` },
     { header: "计费", cell: (p) => `${money(p.unitPrice, p.currency)} / ${p.unitMinutes} 分` },
     { header: "日封顶", cell: (p) => <span className="tabular-nums">{money(p.capDaily, p.currency)}</span> },
-    { header: "买断价", cell: (p) => <span className="tabular-nums">{money(p.capTotal, p.currency)}</span> },
+    { header: "买断价", cell: (p) => <span className="tabular-nums">{money(p.buyoutPrice, p.currency)}</span> },
     { header: "状态", cell: (p) => p.status === "ACTIVE" ? <Badge tone="success">启用</Badge> : <Badge tone="muted">停用</Badge> },
     { header: t("common.actions"), cell: (p) => canEdit ? <Button size="sm" variant="outline" onClick={() => setPlanForm(p)}>{t("common.edit")}</Button> : <span className="text-muted-foreground">-</span> },
   ];
@@ -120,9 +120,9 @@ function PricingInner() {
     { header: "规则号", cell: (d) => <span className="font-medium">{d.ruleNo}</span> },
     { header: "场景", cell: (d) => <Badge tone="outline">{d.scene}</Badge> },
     { header: "点位", cell: (d) => <span className="text-muted-foreground">{d.locationName}</span> },
-    { header: "免费时长", cell: (d) => `${d.freeMins} 分` },
+    { header: "免费时长", cell: (d) => `${d.freeMinutes} 分` },
     { header: "单位价", cell: (d) => <span className="tabular-nums">{money(d.unitPrice, d.currency)}</span> },
-    { header: "日封顶", cell: (d) => <span className="tabular-nums">{money(d.dayCap, d.currency)}</span> },
+    { header: "日封顶", cell: (d) => <span className="tabular-nums">{money(d.capDaily, d.currency)}</span> },
     { header: "优先级", cell: (d) => <span className="tabular-nums">{d.priority}</span> },
     { header: t("common.actions"), cell: (d) => canEdit ? <Button size="sm" variant="outline" onClick={() => setDiffForm(d)}>{t("common.edit")}</Button> : <span className="text-muted-foreground">-</span> },
   ];
@@ -148,7 +148,7 @@ function PricingInner() {
             search={keyword}
             onSearch={(v) => { setKeyword(v); setPage(1); }}
             searchPlaceholder="搜索模板名称 / 适用"
-            onAdd={canEdit ? () => setPlanForm({ scope: "默认", freeMinutes: 5, unitMinutes: 30, unitPrice: 3, capDaily: 30, capTotal: 199, currency: "AED", status: "ACTIVE" }) : undefined}
+            onAdd={canEdit ? () => setPlanForm({ scope: "默认", freeMinutes: 5, unitMinutes: 30, unitPrice: 3, capDaily: 30, buyoutPrice: 199, currency: "AED", status: "ACTIVE" }) : undefined}
             addLabel="新增计费模板"
           />
           <DataTable rowKey={(p: PricePlan) => p.planNo} columns={planCols} rows={plans.data?.list} loading={plans.isLoading} />
@@ -161,7 +161,7 @@ function PricingInner() {
             search={keyword}
             onSearch={(v) => { setKeyword(v); setPage(1); }}
             searchPlaceholder="搜索规则号 / 场景 / 点位"
-            onAdd={canEdit ? () => setDiffForm({ scene: "", locationName: "", freeMins: 5, unitPrice: 3, dayCap: 30, priority: 10, currency: "AED" }) : undefined}
+            onAdd={canEdit ? () => setDiffForm({ scene: "", locationName: "", freeMinutes: 5, unitPrice: 3, capDaily: 30, priority: 10, currency: "AED" }) : undefined}
             addLabel="新增差异化规则"
           />
           <DataTable rowKey={(d: PricingDiff) => d.ruleNo} columns={diffCols} rows={diffs.data?.list} loading={diffs.isLoading} />

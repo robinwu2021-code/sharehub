@@ -1,3 +1,4 @@
+import type { AuditTrail } from "./common";
 // 覆盖范围：财务域（trade）——分润规则/明细/统计、结算、提现、账务分录、
 // 对账、发票、充值订单。
 
@@ -18,7 +19,7 @@ export interface Settlement {
   currency: string;
   status: "GEN" | "CONFIRMED" | "PAID";
 }
-export interface Withdrawal {
+export interface Withdrawal extends AuditTrail {
   withdrawNo: string;
   payeeName: string;
   amount: number;
@@ -27,9 +28,6 @@ export interface Withdrawal {
   appliedAt: string;
   // —— 资金审批合规四件套（对标补齐）——
   fee: number; // 提现手续费（与 amount 同币种，实际到账 = amount - fee）
-  auditorName: string | null; // 审批人（未审批为 null）
-  auditedAt: string | null; // 审批时间
-  rejectReason: string | null; // 驳回原因（驳回必填）
 }
 
 // —— 账务分录（复式记账，trade 域）——
