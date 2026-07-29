@@ -87,8 +87,10 @@ export const NAV: NavDomain[] = [
     ],
   },
   {
+    // 域含「站点与点位」+「代理商管理」：前者是物理场地，后者是商业渠道，
+    // 标签取「渠道与场地」以覆盖两者（原「场地与拓展」语义不含代理，2026-07-29 导航审查 #1）。
     key: "place-bd",
-    label: "场地与拓展",
+    label: "渠道与场地",
     icon: "MapPin",
     modules: [
       {
@@ -149,13 +151,18 @@ export const NAV: NavDomain[] = [
           { href: "/finance?tab=withdrawals", label: "提现审核", perm: "finance:withdrawal:read", phase: 2 },
           { href: "/finance?tab=reconcile", label: "对账", perm: "finance:reconcile:read", phase: 3 },
           { href: "/finance?tab=invoices", label: "发票", perm: "finance:invoice:read", phase: 3 },
+          // 跨域深链（导航审查 #4）：FINANCE 岗管场地方分润在本模块、代理分润在 /agents，
+          // 此处回链避免跨域跳转找不到入口；面包屑按 URL 归属「渠道与场地」。
+          { href: "/agents?tab=commission", label: "代理分润配置", perm: "agent:settlement:read" },
         ],
       },
     ],
   },
   {
+    // 域含 用户/营销/客服：客服是被动运营支撑而非增长工具，
+    // 标签取「用户与服务」（原「用户与增长」，2026-07-29 导航审查 #3）。
     key: "user-growth",
-    label: "用户与增长",
+    label: "用户与服务",
     icon: "Users",
     modules: [
       {
@@ -198,6 +205,9 @@ export const NAV: NavDomain[] = [
     icon: "ChartColumn",
     modules: [
       {
+        // 分期说明（导航审查 #2）：PDF V4 的「基础运营报表 P1」由「概览 › 经营看板」承载
+        // （KPI/趋势/实时告警/待办中心/排名榜单），本模块全部为 P2/P3 的专题分析报表，
+        // 故 P1 阶段本域整体灰显属预期。改阶段先改 docs/requirements/运营端功能清单.md §二·B。
         key: "report", label: "数据报表", icon: "ChartColumn", module: "report", href: "/reports",
         children: [
           { href: "/reports?tab=device", label: "设备运营分析", perm: "report:device:read", phase: 2 },

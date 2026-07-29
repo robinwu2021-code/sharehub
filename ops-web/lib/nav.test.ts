@@ -8,6 +8,7 @@ import {
   isLeafLocked, isModuleLocked, isLeafDisabled, routeLockedPhase,
 } from "./nav";
 import { isPhaseLocked, CURRENT_PHASE } from "./phase";
+import { hasNavLabel } from "./i18n/nav-labels";
 import type { Role } from "./auth";
 
 const domain = (key: string) => {
@@ -28,13 +29,13 @@ describe("A.9 角色×域可见性矩阵（抽查）", () => {
       "overview", "device-ops", "place-bd", "trade-fin", "user-growth", "analytics", "system",
     ]);
   });
-  it("VIEWER 不见 用户与增长/系统与权限", () => {
+  it("VIEWER 不见 用户与服务/系统与权限", () => {
     const keys = domainKeys("VIEWER");
     expect(keys).not.toContain("user-growth");
     expect(keys).not.toContain("system");
     expect(keys).toEqual(expect.arrayContaining(["overview", "device-ops", "place-bd", "trade-fin", "analytics"]));
   });
-  it("BD 不见 设备运营；CS 不见 场地与拓展/数据报表", () => {
+  it("BD 不见 设备运营；CS 不见 渠道与场地/数据报表", () => {
     expect(domainKeys("BD")).not.toContain("device-ops");
     const cs = domainKeys("CS");
     expect(cs).not.toContain("place-bd");
@@ -44,7 +45,7 @@ describe("A.9 角色×域可见性矩阵（抽查）", () => {
     const mods = visibleModules(domain("system"), "FINANCE").map((m) => m.key);
     expect(mods).toEqual(["org"]);
   });
-  it("AGENT 见 概览/设备运营/场地与拓展/交易与资金，不见其余", () => {
+  it("AGENT 见 概览/设备运营/渠道与场地/交易与资金，不见其余", () => {
     expect(domainKeys("AGENT")).toEqual(["overview", "device-ops", "place-bd", "trade-fin"]);
   });
 });
@@ -55,8 +56,13 @@ describe("L3 叶子过滤（4.2-2）", () => {
     const labels = visibleLeaves(finance, "VIEWER").map((l) => l.label);
     expect(labels).toEqual(["分润规则", "分润明细", "结算单", "提现审核"]);
   });
-  it("FINANCE 的财务：7 项全见", () => {
-    expect(visibleLeaves(finance, "FINANCE")).toHaveLength(7);
+  it("FINANCE 的财务：7 项 + 代理分润配置跨域深链", () => {
+    const labels = visibleLeaves(finance, "FINANCE").map((l) => l.label);
+    expect(labels).toHaveLength(8);
+    expect(labels.at(-1)).toBe("代理分润配置");
+  });
+  it("VIEWER 无 agent:settlement:read → 财务不出现代理分润配置深链", () => {
+    expect(visibleLeaves(finance, "VIEWER").map((l) => l.label)).not.toContain("代理分润配置");
   });
   it("OPS 的站点与点位：无 进场合同/站点坪效", () => {
     const labels = visibleLeaves(module_("place-bd", "location"), "OPS").map((l) => l.label);
@@ -135,6 +141,20 @@ describe("默认落地与面包屑", () => {
   });
   it("面包屑：概览单模块域只有一级", () => {
     expect(breadcrumb("/", null, null, "ADMIN")).toEqual(["概览"]);
+  });
+});
+
+describe("三语覆盖（防新增菜单漏配 en/ar）", () => {
+  it("NAV 中每个 域/模块/子功能 标签都有 en+ar 译文", () => {
+    const missing: string[] = [];
+    for (const d of NAV) {
+      if (!hasNavLabel(d.label)) missing.push(`域 ${d.label}`);
+      for (const m of d.modules) {
+        if (!hasNavLabel(m.label)) missing.push(`模块 ${m.label}`);
+        for (const l of m.children ?? []) if (!hasNavLabel(l.label)) missing.push(`子功能 ${l.label}`);
+      }
+    }
+    expect(missing).toEqual([]);
   });
 });
 

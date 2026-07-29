@@ -74,9 +74,9 @@
 |------|:-:|------|------|
 | `overview` 概览 | `layout-dashboard` | 经营看板 `dashboard`* | —（叶子域，直达详情） |
 | `device-ops` 设备运营 | `cpu` | 设备管理 `device` · 工单管理 `workorder` | 设备台账/实时监控/远程控制/库存⋯ · 工单列表/看板/SLA |
-| `place-bd` 场地与拓展 | `map-pin` | 站点与点位 `location` · 代理商管理 `agent` | 站点/点位/场地方/合同 · 档案/划拨/分润/结算 |
+| `place-bd` 渠道与场地 | `map-pin` | 站点与点位 `location` · 代理商管理 `agent` | 站点/点位/场地方/合同 · 档案/划拨/分润/结算 |
 | `trade-fin` 交易与资金 | `receipt` | 订单管理 `order` · 计费定价 `pricing` · 财务管理 `finance` | 订单/异常/干预/退款 · 模板/差异化 · 分润/账务/结算/提现/对账 |
-| `user-growth` 用户与增长 | `users` | 用户管理 `user` · 营销管理 `marketing` · 客服管理 `cs`† | 用户/风控/黑名单/会员/钱包 · 券/活动/推送/广告 · 报障/会话 |
+| `user-growth` 用户与服务 | `users` | 用户管理 `user` · 营销管理 `marketing` · 客服管理 `cs`† | 用户/风控/黑名单/会员/钱包 · 券/活动/推送/广告 · 报障/会话 |
 | `analytics` 数据报表 | `chart-bar` | 数据报表 `report`†* | 设备/坪效/财务/大屏/自定义 |
 | `system` 系统与权限 | `settings` | 员工与权限 `org` · 系统设置 `system` | 员工/角色/数据权限/审计 · 供应商/模板/字典/参数/OpenAPI |
 
@@ -216,7 +216,10 @@ export const useNavPrefs; // Zustand + persist('ops-nav-prefs')
 
 ## 附录A 三级菜单明细（T1 实现 SSOT）
 
-> 图例——状态：✅实机 / ◐部分 / ⬜待建 · 深链：`现有`（页面已支持）/ `加tab`（需页面加 tab 才可直达）/ `待建页` · 菜单项与「页内能力」严格区分：抽屉/行内动作**不是菜单项**，仅挂权限码门控。
+> 图例——深链：`现有`（页面已支持）/ `加tab`（需页面加 tab 才可直达）/ `待建页` · 菜单项与「页内能力」严格区分：抽屉/行内动作**不是菜单项**，仅挂权限码门控。
+>
+> ⚠️ **本附录的「状态」列已于 2026-07-29 冻结（停止维护，保留为 T1 设计快照）**：全量补齐后已大面积过时（如 `/cs`、`/reports` 标「待建页」但页面早已建成）。
+> **实现度与交付阶段的唯一 SSOT = [运营端功能清单 §三 逐叶矩阵](../requirements/运营端功能清单.md)**（含入口/建设优先级/阶段/前端实现度，与 nav.ts 叶子 1:1）。本附录仅继续承担**菜单结构与权限码**的对照职责；改菜单流程不变：改本附录结构 → 同步 `lib/nav.ts` → `npx vitest run`。
 
 ### A.1 域① 概览 `overview`（单模块域，L1 直达全宽，无 L2 面板）
 
@@ -248,7 +251,7 @@ export const useNavPrefs; // Zustand + persist('ops-nav-prefs')
 | L3 | 巡检计划 | `?view=inspection` `加tab` | `workorder:*` | P1 | ⬜ | soon；自动开单 |
 | 页内 | 开单/派单/处理验收 | 列表+抽屉 | `wo:create`/`wo:dispatch` | P0 | ◐ | 入向依赖：设备告警自动开单、客服报障转单、代理报修 |
 
-### A.3 域③ 场地与拓展 `place-bd`
+### A.3 域③ 渠道与场地 `place-bd`
 
 | 层 | 条目 | 入口/深链 | 权限码 | P | 状态 | 依赖/备注 |
 |---|------|----------|--------|:-:|:-:|------|
@@ -290,8 +293,9 @@ export const useNavPrefs; // Zustand + persist('ops-nav-prefs')
 | L3 | 提现审核 | `?tab=withdrawals` `现有` | `finance:withdrawal:audit` | P1 | ◐ | 审核→nearpay 打款 |
 | L3 | 对账 | `?tab=reconcile` `加tab` | `finance:reconcile:read` | P1 | ⬜ | soon；nearpay↔支付引用↔账务三方 |
 | L3 | 发票 | `?tab=invoices` `加tab` | `finance:invoice:*` | P1 | ⬜ | soon；VAT/TRN（UAE） |
+| L3 | 代理分润配置 | → `/agents?tab=commission` 跨域深链 | `agent:settlement:read` | P0 | ✅ | 导航审查 #4：FINANCE 岗回链，避免代理/场地分润跨域找不到入口 |
 
-### A.5 域⑤ 用户与增长 `user-growth`
+### A.5 域⑤ 用户与服务 `user-growth`
 
 | 层 | 条目 | 入口/深链 | 权限码 | P | 状态 | 依赖/备注 |
 |---|------|----------|--------|:-:|:-:|------|
@@ -314,7 +318,7 @@ export const useNavPrefs; // Zustand + persist('ops-nav-prefs')
 
 | 层 | 条目 | 入口/深链 | 权限码 | P | 状态 | 依赖/备注 |
 |---|------|----------|--------|:-:|:-:|------|
-| L2 | 数据报表 `report` | `/reports` `待建页` | `report:*` | P1 | ⬜ | 整域待建，见决策 D2 |
+| L2 | 数据报表 `report` | `/reports` | `report:*` | P1 | ✅ | 全部为专题分析报表（阶段 2/3）；PDF 的「基础运营报表 P1」由概览域经营看板承载 → **P1 本域整体灰显属预期**（导航审查 #2 定调）|
 | L3 | 设备运营分析 | `?tab=device` | `report:device:read` | P1 | ⬜ | 读 device：在线率/翻台/故障率 |
 | L3 | 点位坪效 | `?tab=location` | `report:location:read` | P1 | ⬜ | 读 location+finance |
 | L3 | 财务报表 | `?tab=finance` | `report:*` | P1 | ⬜ | 读 finance 汇总 |
@@ -344,7 +348,7 @@ export const useNavPrefs; // Zustand + persist('ops-nav-prefs')
 1. **L1 可见性是派生的，无独立权限码**：域可见 = 域内任一 L2 `canModule` 命中；点 L1 落到该域首个可见 L2 的 href。
 2. **L2 可见性 = `canModule`**；L2 `soon`（客服/报表）不影响域可见性但灰显不可点。
 3. **L3 可见性 = `leaf.perm ? can() : 跟随父 L2`**；`soon` 灰显。
-4. **面包屑/当前域反推**（最长前缀匹配 + 尾斜杠归一）：`/`→概览 · `/devices*`,`/work-orders`→设备运营 · `/locations`,`/agents`→场地与拓展 · `/orders`,`/pricing`,`/finance`→交易与资金 · `/users`,`/marketing`,`/cs`→用户与增长 · `/reports`→数据报表 · `/employees`,`/system*`→系统与权限。无歧义前缀。
+4. **面包屑/当前域反推**（最长前缀匹配 + 尾斜杠归一）：`/`→概览 · `/devices*`,`/work-orders`→设备运营 · `/locations`,`/agents`→渠道与场地 · `/orders`,`/pricing`,`/finance`→交易与资金 · `/users`,`/marketing`,`/cs`→用户与服务 · `/reports`→数据报表 · `/employees`,`/system*`→系统与权限。无歧义前缀。
 
 ### A.9 角色 × 域 可见性矩阵（由 permissions.ts 推导，单测锚点）
 
@@ -352,9 +356,9 @@ export const useNavPrefs; // Zustand + persist('ops-nav-prefs')
 |------|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
 | 概览 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | 设备运营 | ✓ | ✓ | ✓ | ✗ | ✗ | ✓(仅设备) | ✓ |
-| 场地与拓展 | ✓ | ✓ | ✗ | ✓ | ✓ | ✓(仅站点) | ✓ |
+| 渠道与场地 | ✓ | ✓ | ✗ | ✓ | ✓ | ✓(仅站点) | ✓ |
 | 交易与资金 | ✓ | ✓(仅订单) | ✓(仅订单) | ✓ | ✓(计费+分润读) | ✓(只读) | ✓ |
-| 用户与增长 | ✓ | ✗ | ✓ | ✓(仅用户读) | ✓(仅营销) | ✗ | ✗ |
+| 用户与服务 | ✓ | ✗ | ✓ | ✓(仅用户读) | ✓(仅营销) | ✗ | ✗ |
 | 数据报表 | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ |
 | 系统与权限 | ✓ | ✓(仅系统读) | ✗ | ✓(仅审计) | ✗ | ✗ | ✗ |
 

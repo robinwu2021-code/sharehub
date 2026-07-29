@@ -1,0 +1,90 @@
+### 简电云 OCPP 充电运营管理平台 · 运营端菜单原始导出
+### 采集 2026-07-29 · 来源：前端 AngularJS 作用域 permissionMenu（用户自有已登录会话）
+### 列：L1域 | L2模块 | L3子功能 | English | 路由state | sub_links(子页面)
+运营管理|站场管理|站场概览|Station Overview|main.station_overview|
+运营管理|站场管理|站场管理|Station Manage|main.station_page|main.station_add,main.station_edit,main.station_statistics
+运营管理|站场管理|收费方案|Charging Scheme|main.fee_page|
+运营管理|站场管理|预约调价|Fee Reserve|main.fee_reserve|main.fee_reserve_add,main.fee_reserve_edit,main.fee_reserve_view
+运营管理|站场管理|站场分成|Station Sharing|main.station_sharing|
+运营管理|站场管理|商户分成|Merchant Sharing|main.station_sharing_user|
+运营管理|基础管理|应用版本|App Version|main.base_app_version|
+运营管理|基础管理|充电电量|Charge Capacity|main.base_energy|
+运营管理|基础管理|银行管理|Bank Manage|main.base_bank|
+运营管理|基础管理|问题管理|Problem Manage|main.base_problem|
+运营管理|公告管理|公告管理|Notice Manage|main.notice|main.notice_add,main.notice_edit
+设备管理|设备管理|充电桩概览|Charger Overview|main.device_overview|
+设备管理|设备管理|充电桩编码|EV Charger Code|main.device_code|
+设备管理|设备管理|充电桩库存|Charger Inventory|main.device_storage|main.device_gun
+设备管理|设备管理|运营商设备|Operator Device|main.device_merchant|main.device_gun
+设备管理|设备管理|充电桩管理|Charger Manage|main.device_use|main.device_gun,main.device_configuration,main.device_local_list,main.device_statistics
+设备管理|设备管理|充电枪管理|Connector List|main.device_operation_gun|
+设备管理|设备管理|充电桩配置|Charging Profile|main.charging_profile|main.charging_profile_add,main.charging_profile_edit
+设备管理|设备管理|充电桩日志|EV Charger Logs|main.device_logs|
+设备管理|卡号管理|RFID管理|RFID Manage|main.card|
+告警管理|规则设置|告警代码|Alarm Code|main.alarm_code|
+告警管理|规则设置|通知规则|Notification Rule|main.alarm_rule|
+告警管理|设备故障|告警记录|Alarm Record|main.alarm_record|
+告警管理|设备故障|告警通知|Alarm Notification|main.alarm_notice|
+订单管理|订单管理|订单概览|Order Overview|main.order_overview|
+订单管理|订单管理|充电订单|Charge Orders|main.order_charge|main.order_charge_detail
+订单管理|订单管理|预约订单|Reserve Orders|main.order_reserve|
+订单管理|订单管理|退款记录|Refund Record|main.order_refund|main.order_charge_detail
+订单管理|订单管理|异常订单|Abnormal Orders|main.order_error|main.order_charge_detail
+订单管理|订单管理|投诉订单|Complaint Orders|main.order_complaint|main.order_charge_detail
+订单管理|免费充电|免费用户|Free Users|main.free_users|
+订单管理|免费充电|免费订单|Free Orders|main.free_order|main.order_charge_detail
+订单管理|订单统计|设备统计|Device Statistics|main.order_device_summary|
+订单管理|订单统计|站场统计|Station Statistics|main.order_station_summary|
+订单管理|订单统计|站场明细|Station Details|main.order_station_detail|
+充值管理|充值管理|充值套餐|Top up Package|main.recharge_package|
+充值管理|充值管理|充值订单|Top up Orders|main.recharge_order|
+会员管理|会员管理|会员列表|Member List|main.member_page|
+会员管理|会员管理|会员钱包|Member Wallet|main.member_wallet|main.member_wallet_bill
+会员管理|车辆管理|车辆品牌|Car Brand|main.member_brand|
+会员管理|车辆管理|车辆管理|Car Management|main.member_car|
+招商管理|招商管理|运营商管理|Operator Manage|main.platform_merchant|
+招商管理|招商管理|分佣商户|Merchant Manage|main.platform_sharing|
+佣金管理|运营商佣金|佣金明细|Commission Details|main.commission_merchant_order|main.order_charge_detail
+佣金管理|运营商佣金|佣金统计|Commission statistics|main.commission_merchant_summary|
+佣金管理|商户佣金|佣金明细|Commission Details|main.commission_sharing_order|main.order_charge_detail
+佣金管理|商户佣金|佣金统计|Commission statistics|main.commission_sharing_summary|
+财务管理|平台财务|收支流水|Platform Bill|main.financial_platform_bill|
+财务管理|平台财务|收益流水|Platform Profit|main.financial_platform_profit_bill|
+财务管理|运营商财务|收支流水|Operator Bill|main.financial_merchant_bill|
+财务管理|运营商财务|提现审核|Withdrawal Audit|main.financial_merchant_cashout|
+财务管理|商户财务|收支流水|Merchant Bill|main.financial_sharing_bill|
+财务管理|商户财务|提现审核|Withdrawal Audit|main.financial_sharing_cashout|
+财务管理|会员财务|收支流水|Member Bill|main.financial_member_bill|
+平台对接|EMSP 平台|Emsp 平台|Emsp Platform|main.emsp_platform|
+平台对接|EMSP 平台|Emsp 角色|Emsp Role|main.emsp_platform_role|
+平台对接|EMSP 平台|Emsp Token|Emsp Token|main.emsp_token|
+平台对接|EMSP 平台|Emsp 订单|Emsp Orders|main.emsp_orders|
+平台对接|EMSP 平台|Emsp 日志|Emsp Log|main.emsp_log|main.emsp_log_view
+平台对接|终端管理|POS终端|POS terminal|main.emsp_terminal|
+平台对接|终端管理|财务建议|Financial Advice|main.emsp_financial|
+平台对接|终端管理|Kiosk终端|Kiosk terminal|main.screen_kiosk|
+短信管理|短信管理|短信记录|Sms Record|main.sms_record|
+短信管理|短信管理|短信拉黑|Sms Blacklist|main.sms_blacklist|
+平台设置|应用管理|平台信息|Platform Info|main.setting_platform|
+平台设置|应用管理|应用信息|Application Info|main.setting_app|
+平台设置|应用管理|运营管理|Operation Info|main.setting_mp|
+平台设置|支付设置|支付设置|Payment Setting|main.setting_pay_method|
+平台设置|支付设置|Stripe设置|Stripe Setting|main.setting_pay_stripe|
+平台设置|支付设置|Paypal设置|Paypal Setting|main.setting_pay_paypal|
+平台设置|支付设置|Braintree设置|Braintree Setting|main.setting_pay_braintree|
+平台设置|支付设置|Yedpay设置|Yedpay Setting|main.setting_pay_yedpay|
+平台设置|支付设置|ABA设置|ABA Setting|main.setting_pay_aba|
+平台设置|支付设置|Selcom设置|Selcom Setting|main.setting_pay_selcom|
+平台设置|服务设置|短信服务|SMS Service|main.setting_sms|
+平台设置|服务设置|邮件服务|Email Setting|main.setting_email|
+平台设置|服务设置|个推设置|GeTui Settings|main.setting_getui|
+平台设置|服务设置|登录设置|Sign in Settings|main.setting_sign_type|
+平台设置|服务设置|第三方登录|Third Settings|main.setting_third|
+平台设置|其他设置|提现设置|Withdraw Setting|main.withdraw_setting|
+平台设置|其他设置|预约设置|Reserve Setting|main.reserve_setting|
+平台设置|其他设置|充电设置|Charging Setting|main.charge_setting|
+平台设置|其他设置|发票设置|Invoice setup|main.setting_tax|
+平台设置|其他设置|充值协议|Top up agreement|main.recharge_policy|
+平台设置|其他设置|密钥设置|Key Setting|main.key_setting|
+权限设置|权限设置|用户管理|Administrators|main.system_user|
+权限设置|权限设置|角色管理|Role Manage|main.system_role|

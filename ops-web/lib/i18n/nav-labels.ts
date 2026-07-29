@@ -8,9 +8,9 @@ const NAV: Record<string, Pair> = {
   // 域
   "概览": { en: "Overview", ar: "نظرة عامة" },
   "设备运营": { en: "Device Ops", ar: "تشغيل الأجهزة" },
-  "场地与拓展": { en: "Places & BD", ar: "المواقع والتطوير" },
+  "渠道与场地": { en: "Channels & Places", ar: "القنوات والمواقع" },
   "交易与资金": { en: "Trade & Finance", ar: "المعاملات والمالية" },
-  "用户与增长": { en: "Users & Growth", ar: "المستخدمون والنمو" },
+  "用户与服务": { en: "Users & Service", ar: "المستخدمون والخدمة" },
   "数据报表": { en: "Reports", ar: "التقارير" },
   "系统与权限": { en: "System & Access", ar: "النظام والصلاحيات" },
   // 模块
@@ -42,15 +42,20 @@ const NAV: Record<string, Pair> = {
   "点位管理": { en: "Points", ar: "النقاط" },
   "场地方": { en: "Venues", ar: "الأماكن" },
   "进场合同": { en: "Contracts", ar: "العقود" },
+  "门店 Onboarding": { en: "Store Onboarding", ar: "تسجيل المتاجر" },
   "BD 拓展 CRM": { en: "BD CRM", ar: "إدارة العملاء" },
   "站点坪效": { en: "Site Yield", ar: "أداء المواقع" },
+  "门店生命周期": { en: "Store Lifecycle", ar: "دورة حياة المتجر" },
   "代理商档案": { en: "Agent Profiles", ar: "ملفات الوكلاء" },
+  "分润配置": { en: "Commission Setup", ar: "إعداد العمولة" },
+  "代理分润配置": { en: "Agent Commission", ar: "عمولة الوكلاء" },
   "设备/点位划拨": { en: "Allocation", ar: "التخصيص" },
   "代理收益结算": { en: "Agent Settlement", ar: "تسوية الوكلاء" },
   "代理绩效": { en: "Agent Performance", ar: "أداء الوكلاء" },
   "代理账号管理": { en: "Agent Accounts", ar: "حسابات الوكلاء" },
   "订单列表": { en: "Orders", ar: "الطلبات" },
   "异常订单": { en: "Exceptions", ar: "الطلبات الشاذة" },
+  "押金与欠费": { en: "Deposits & Arrears", ar: "الودائع والمتأخرات" },
   "计费模板": { en: "Templates", ar: "قوالب التسعير" },
   "差异化定价": { en: "Differential", ar: "تسعير متمايز" },
   "活动/时段价": { en: "Time-based", ar: "تسعير زمني" },
@@ -62,6 +67,8 @@ const NAV: Record<string, Pair> = {
   "对账": { en: "Reconcile", ar: "المطابقة" },
   "发票": { en: "Invoices", ar: "الفواتير" },
   "用户列表": { en: "Users", ar: "المستخدمون" },
+  "风控用户": { en: "Risk Users", ar: "المستخدمون المحفوفون بالمخاطر" },
+  "黑名单": { en: "Blacklist", ar: "القائمة السوداء" },
   "会员/次卡": { en: "Members", ar: "الأعضاء" },
   "钱包": { en: "Wallets", ar: "المحافظ" },
   "优惠券": { en: "Coupons", ar: "القسائم" },
@@ -80,6 +87,7 @@ const NAV: Record<string, Pair> = {
   "财务报表": { en: "Financials", ar: "التقارير المالية" },
   "实时大屏": { en: "Live Wall", ar: "الشاشة المباشرة" },
   "自定义报表": { en: "Custom", ar: "تقارير مخصصة" },
+  "消费者分析": { en: "Consumer Analytics", ar: "تحليلات المستهلك" },
   "员工": { en: "Employees", ar: "الموظفون" },
   "角色权限": { en: "Roles", ar: "الأدوار" },
   "操作审计": { en: "Audit Log", ar: "سجل التدقيق" },
@@ -90,8 +98,14 @@ const NAV: Record<string, Pair> = {
   "参数字典": { en: "Dictionaries", ar: "القواميس" },
   "地区库": { en: "Regions", ar: "المناطق" },
   "系统参数": { en: "Parameters", ar: "المعاملات" },
+  "多国家市场": { en: "Markets", ar: "الأسواق الدولية" },
   "OpenAPI 应用": { en: "OpenAPI Apps", ar: "تطبيقات OpenAPI" },
 };
+
+/** 该中文标签是否已有 en/ar 译文（单测用：防新增菜单漏配三语）。 */
+export function hasNavLabel(label: string): boolean {
+  return label in NAV;
+}
 
 /** 翻译一个导航标签（中文源串）；未命中或 zh 时原样返回。 */
 export function tNav(label: string, locale: Locale): string {

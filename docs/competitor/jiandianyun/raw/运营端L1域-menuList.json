@@ -1,0 +1,15 @@
+[
+  { "order": 1,  "name": "运营管理", "name_en": "Operations",         "icon": "ic_operator.png",   "id": "c8844c5434a24131b8bab192850e9696" },
+  { "order": 2,  "name": "设备管理", "name_en": "Device",             "icon": "ic_device.png",     "id": "350d44f85e2b4c28af6101cbcd470afa" },
+  { "order": 3,  "name": "告警管理", "name_en": "Alarm",              "icon": "ic_alarm.png",      "id": "52a8c11145084e7bb071f995aeed8289" },
+  { "order": 4,  "name": "订单管理", "name_en": "Orders",             "icon": "ic_order.png",      "id": "e6e956a58ed34887a3d1d8bf2048fe38" },
+  { "order": 5,  "name": "充值管理", "name_en": "Recharge",           "icon": "ic_recharge.png",   "id": "0874aed522494c72b59f6ec9f659de30" },
+  { "order": 6,  "name": "会员管理", "name_en": "Membership",         "icon": "ic_vip.png",        "id": "18e5e00e1aea41648fb584e6fc5b8e70" },
+  { "order": 7,  "name": "招商管理", "name_en": "Investment",         "icon": "ic_join.png",       "id": "9e946bb06d1d441098437f96a10dbe43" },
+  { "order": 8,  "name": "佣金管理", "name_en": "Commission",         "icon": "ic_commission.png", "id": "bbcb3e4110cc4b3c8914c453f5ef98ed" },
+  { "order": 9,  "name": "财务管理", "name_en": "Financial",          "icon": "ic_financial.png",  "id": "edcebdbf67294feb9fd36da31990c57d" },
+  { "order": 10, "name": "平台对接", "name_en": "OCPI Platform",      "icon": "ic_nav_cec.png",    "id": "517c67146af343478567779624225425" },
+  { "order": 11, "name": "短信管理", "name_en": "Sms",                "icon": "ic_sms.png",        "id": "8213f3515f97446087de80593fb15a7f" },
+  { "order": 12, "name": "平台设置", "name_en": "Platform Setting",   "icon": "ic_setting.png",    "id": "8265b9a57b724682901e3e4d2a27e144" },
+  { "order": 13, "name": "权限设置", "name_en": "Permission setting", "icon": "ic_authority.png",  "id": "03a0b8232de8464780e4f873e9423c1a" }
+]
