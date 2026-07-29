@@ -12,12 +12,15 @@ import { venues } from "./location";
 import { cUsers } from "./user";
 
 // —— 分润规则 / 结算 / 提现 ——
+// 分成方名字必须是真实的场地方或代理商（原先写死 "Agent-North"/"Agent-South"，
+// agents 里没有这两个名字，分润规则/结算单/提现单点进去都对不上代理商档案）。
+const PAYEE_NAMES = [...VENUE_NAMES, ...agents.slice(0, 2).map((a) => a.name)];
 export const shareRules: ShareRule[] = Array.from({ length: 12 }, (_, i) => ({
-  ruleNo: `SR${600 + i}`, dimension: i % 3 === 0 ? "AGENT" : "VENUE", payeeName: p([...VENUE_NAMES, "Agent-North", "Agent-South"], i),
+  ruleNo: `SR${600 + i}`, dimension: i % 3 === 0 ? "AGENT" : "VENUE", payeeName: p(PAYEE_NAMES, i),
   mode: i % 4 === 0 ? "CHANNEL_SPLIT" : "LEDGER", rate: [0.15, 0.2, 0.25][i % 3], priority: (i % 3) + 1,
 }));
 export const settlements: Settlement[] = Array.from({ length: 24 }, (_, i) => ({
-  settleNo: `STL${700 + i}`, payeeType: i % 3 === 0 ? "AGENT" : "VENUE", payeeName: p([...VENUE_NAMES, "Agent-North"], i),
+  settleNo: `STL${700 + i}`, payeeType: i % 3 === 0 ? "AGENT" : "VENUE", payeeName: p(PAYEE_NAMES, i),
   period: `2026-${String((i % 6) + 1).padStart(2, "0")}`, totalAmount: 800 + (i * 137) % 4000, currency: "AED",
   status: p(["GEN", "CONFIRMED", "PAID"] as const, i),
 }));
@@ -28,7 +31,7 @@ export const withdrawals: Withdrawal[] = Array.from({ length: 20 }, (_, i) => {
   const amount = 500 + (i * 211) % 3000;
   const audited = status === "PAYING" || status === "PAID" || status === "FAILED";
   return {
-    withdrawNo: `WD${3000 + i}`, payeeName: p([...VENUE_NAMES, "Agent-North"], i), amount,
+    withdrawNo: `WD${3000 + i}`, payeeName: p(PAYEE_NAMES, i), amount,
     // 手续费 = 金额 0.6%，下限 2 AED（与提现渠道成本口径一致）
     fee: Number(Math.max(2, amount * 0.006).toFixed(2)),
     currency: "AED", status, appliedAt: iso(i * 43200_000),
@@ -72,7 +75,7 @@ export const reconciles: Reconcile[] = Array.from({ length: 12 }, (_, i) => {
   };
 });
 export const invoices: Invoice[] = Array.from({ length: 18 }, (_, i) => ({
-  invoiceNo: `INV${2026000 + i}`, payeeName: p([...VENUE_NAMES, "North Hub", "Marina Partner"], i),
+  invoiceNo: `INV${2026000 + i}`, payeeName: p(PAYEE_NAMES, i),
   amount: Number((500 + (i * 337) % 8000).toFixed(2)), vatTrn: `100${String(1000000000000 + i * 137).slice(0, 12)}`,
   currency: "AED", status: p(["DRAFT", "ISSUED", "ISSUED", "VOID"] as const, i), issuedAt: iso(i * 172800_000),
 }));
@@ -145,19 +148,39 @@ export const listShareSummaries = (q: ShareSummaryQuery = {}) => {
   return paginate(rows, q.page, q.size);
 };
 
+// —— §8 充值套餐：比竞品多「赠额有效期」与「适用市场」 ——
+// ⚠️ 必须声明在 rechargeOrders 之前：充值订单的套餐直接引用本数组（台账 M6）。
+export const rechargePackages: RechargePackage[] = [
+  { packageNo: "RP900", name: "体验包", payAmount: 20, giftAmount: 0, currency: "AED", markets: "AE", validDays: 90, sortNo: 1, status: "ENABLED" },
+  { packageNo: "RP901", name: "常用包", payAmount: 50, giftAmount: 5, currency: "AED", markets: "AE,SA", validDays: 180, sortNo: 2, status: "ENABLED" },
+  { packageNo: "RP902", name: "超值包", payAmount: 100, giftAmount: 15, currency: "AED", markets: "AE,SA,KW", validDays: 365, sortNo: 3, status: "ENABLED" },
+  { packageNo: "RP903", name: "家庭包", payAmount: 200, giftAmount: 40, currency: "AED", markets: "AE", validDays: 365, sortNo: 4, status: "ENABLED" },
+  { packageNo: "RP904", name: "斋月特惠包", payAmount: 80, giftAmount: 20, currency: "AED", markets: "AE,SA,QA", validDays: 60, sortNo: 5, status: "DISABLED" },
+  { packageNo: "RP905", name: "商户自用包", payAmount: 500, giftAmount: 60, currency: "AED", markets: "AE", validDays: 365, sortNo: 6, status: "DISABLED" },
+];
+export const listRechargePackages = (q: PageQuery & { status?: string } = {}) =>
+  paginate(rechargePackages, q.page, q.size, (x) => {
+    if (!kwHit(q.keyword, x.packageNo, x.name, x.markets)) return false;
+    if (q.status && x.status !== q.status) return false;
+    return true;
+  });
+export const saveRechargePackage = (x: Partial<RechargePackage>) =>
+  upsert(rechargePackages, x, "packageNo", () => nextNo("RP", rechargePackages));
+
 // —— §6 充值订单 ——
 // 用户引用 cUsers（U30xx）；channelCode 取自 paymentChannels 的真实渠道码（NEARPAY 为当前主通道）。
-const RECHARGE_PACKAGES = [
-  { packageNo: "RP001", pay: 20, gift: 0 },
-  { packageNo: "RP002", pay: 50, gift: 5 },
-  { packageNo: "RP003", pay: 100, gift: 15 },
-  { packageNo: "RP004", pay: 200, gift: 40 },
+// 套餐一律取自上面的 rechargePackages（台账 M6：原先另有一份私有 RP001–004，
+// 导致充值订单里的套餐号在套餐管理页查无此套餐）；只取在售套餐，另加一档自定义金额。
+const RECHARGE_PACKAGE_POOL: { packageNo: string | null; pay: number; gift: number }[] = [
+  ...rechargePackages
+    .filter((x) => x.status === "ENABLED")
+    .map((x) => ({ packageNo: x.packageNo, pay: x.payAmount, gift: x.giftAmount })),
   { packageNo: null, pay: 35, gift: 0 }, // 自定义金额：无套餐、无赠送
 ];
 const RECHARGE_CHANNELS = ["NEARPAY", "NEARPAY", "NEARPAY", "STRIPE", "TAP", "NEARPAY", "CHECKOUT"];
 export const rechargeOrders: RechargeOrder[] = Array.from({ length: 36 }, (_, i) => {
   const user = cUsers[i % cUsers.length];
-  const pkg = p(RECHARGE_PACKAGES, i);
+  const pkg = p(RECHARGE_PACKAGE_POOL, i);
   const status = p(["PAID", "PAID", "PAID", "PENDING", "PAID", "FAILED", "PAID", "REFUNDED"] as const, i);
   const settled = status === "PAID" || status === "REFUNDED";
   return {
@@ -180,20 +203,3 @@ export const listRechargeOrders = (q: RechargeQuery = {}) =>
     (!q.from || x.createdAt.slice(0, 10) >= q.from) &&
     (!q.to || x.createdAt.slice(0, 10) <= q.to));
 
-// —— §8 充值套餐：比竞品多「赠额有效期」与「适用市场」 ——
-export const rechargePackages: RechargePackage[] = [
-  { packageNo: "RP900", name: "体验包", payAmount: 20, giftAmount: 0, currency: "AED", markets: "AE", validDays: 90, sortNo: 1, status: "ENABLED" },
-  { packageNo: "RP901", name: "常用包", payAmount: 50, giftAmount: 5, currency: "AED", markets: "AE,SA", validDays: 180, sortNo: 2, status: "ENABLED" },
-  { packageNo: "RP902", name: "超值包", payAmount: 100, giftAmount: 15, currency: "AED", markets: "AE,SA,KW", validDays: 365, sortNo: 3, status: "ENABLED" },
-  { packageNo: "RP903", name: "家庭包", payAmount: 200, giftAmount: 40, currency: "AED", markets: "AE", validDays: 365, sortNo: 4, status: "ENABLED" },
-  { packageNo: "RP904", name: "斋月特惠包", payAmount: 80, giftAmount: 20, currency: "AED", markets: "AE,SA,QA", validDays: 60, sortNo: 5, status: "DISABLED" },
-  { packageNo: "RP905", name: "商户自用包", payAmount: 500, giftAmount: 60, currency: "AED", markets: "AE", validDays: 365, sortNo: 6, status: "DISABLED" },
-];
-export const listRechargePackages = (q: PageQuery & { status?: string } = {}) =>
-  paginate(rechargePackages, q.page, q.size, (x) => {
-    if (!kwHit(q.keyword, x.packageNo, x.name, x.markets)) return false;
-    if (q.status && x.status !== q.status) return false;
-    return true;
-  });
-export const saveRechargePackage = (x: Partial<RechargePackage>) =>
-  upsert(rechargePackages, x, "packageNo", () => nextNo("RP", rechargePackages));

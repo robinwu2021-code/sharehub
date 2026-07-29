@@ -28,7 +28,7 @@ const TABS = [
 ];
 const COMMISSION_FIELDS: import("@/components/ui/form-drawer").FieldDef[] = [
   { key: "ruleNo", label: "规则号", readOnlyOnEdit: true, placeholder: "留空自动生成" },
-  { key: "agentNo", label: "代理编号", placeholder: "AGT001" },
+  { key: "agentNo", label: "代理编号", placeholder: "AG001" },
   { key: "agentName", label: "代理名称" },
   { key: "dimension", label: "维度", type: "select", options: [{ value: "GMV", label: "GMV" }, { value: "ORDER_COUNT", label: "订单量" }] },
   { key: "rate", label: "分润比例（0~1）", type: "number" },
@@ -38,7 +38,7 @@ const COMMISSION_FIELDS: import("@/components/ui/form-drawer").FieldDef[] = [
 ];
 const ACCOUNT_FIELDS: FieldDef[] = [
   { key: "accountNo", label: "账号编号", readOnlyOnEdit: true, placeholder: "留空自动生成" },
-  { key: "agentNo", label: "代理编号", placeholder: "AGT0001" },
+  { key: "agentNo", label: "代理编号", placeholder: "AG001" },
   { key: "agentName", label: "代理名称" },
   { key: "loginPhone", label: "登录手机" },
   { key: "status", label: "状态", type: "select", options: [{ value: "ACTIVE", label: "启用" }, { value: "DISABLED", label: "停用" }] },

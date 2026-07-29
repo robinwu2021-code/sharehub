@@ -34,11 +34,16 @@ export const agentAccounts: AgentAccount[] = Array.from({ length: 12 }, (_, i) =
   };
 });
 
-export const agentCommissions: AgentCommission[] = [
-  { ruleNo: "AC0001", agentNo: "AGT001", agentName: "Dubai South Agency", dimension: "GMV", rate: 0.12, mode: "CHANNEL_SPLIT", effectiveAt: "2026-01-01", status: "ACTIVE" },
-  { ruleNo: "AC0002", agentNo: "AGT002", agentName: "Abu Dhabi Partners", dimension: "GMV", rate: 0.10, mode: "LEDGER", effectiveAt: "2026-01-01", status: "ACTIVE" },
-  { ruleNo: "AC0003", agentNo: "AGT003", agentName: "Sharjah Ops", dimension: "ORDER_COUNT", rate: 0.08, mode: "LEDGER", effectiveAt: "2026-03-01", status: "INACTIVE" },
+// 佣金规则挂在**真实存在的代理商**上（台账 M4：原先挂 AGT001–AGT003，agents 里根本没有这些号，
+// 佣金规则点进去查无此代理商）。agentName 一律由 agents 反查，不再手写，杜绝名号对不上。
+const AGENT_COMMISSION_SEED: Omit<AgentCommission, "agentName">[] = [
+  { ruleNo: "AC0001", agentNo: "AG001", dimension: "GMV", rate: 0.12, mode: "CHANNEL_SPLIT", effectiveAt: "2026-01-01", status: "ACTIVE" },
+  { ruleNo: "AC0002", agentNo: "AG002", dimension: "GMV", rate: 0.10, mode: "LEDGER", effectiveAt: "2026-01-01", status: "ACTIVE" },
+  { ruleNo: "AC0003", agentNo: "AG003", dimension: "ORDER_COUNT", rate: 0.08, mode: "LEDGER", effectiveAt: "2026-03-01", status: "INACTIVE" },
 ];
+export const agentCommissions: AgentCommission[] = AGENT_COMMISSION_SEED.map((r) => ({
+  ...r, agentName: agents.find((a) => a.agentNo === r.agentNo)!.name,
+}));
 
 export const listAgentAssignments = (q: PageQuery = {}) => paginate(agentAssignments, q.page, q.size, (x) => kwHit(q.keyword, x.agentNo, x.agentName, x.region));
 export const listAgentPerformance = (q: PageQuery = {}) => paginate(agentPerformances, q.page, q.size, (x) => kwHit(q.keyword, x.agentNo, x.agentName));

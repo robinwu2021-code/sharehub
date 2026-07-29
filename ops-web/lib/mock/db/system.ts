@@ -199,15 +199,17 @@ export function getNotifyLogStats(): NotifyLogStats {
 }
 
 // —— §10 触达拉黑 ——
+// 编号前缀 `NBL`（Notify BlackList）：`BL` 已归用户黑名单（user.ts 的 BL0001+）所有，
+// 两套 `BL` 号并存时「按号搜索」会跨页搜出无关记录（台账 M10）。
 export const notifyBlacklist: NotifyBlacklist[] = [
-  { blockNo: "BL901", target: maskTarget("+9715012345678"), channel: "SMS", reason: "USER_OPT_OUT", blockedAt: iso(3 * 86400_000), blockedBy: "系统（用户回复 STOP）", expireAt: null },
-  { blockNo: "BL902", target: maskTarget("omar.k@example.sa"), channel: "EMAIL", reason: "HARD_BOUNCE", blockedAt: iso(6 * 86400_000), blockedBy: "系统（SES 硬退信）", expireAt: null },
-  { blockNo: "BL903", target: maskTarget("+966501234567"), channel: "ALL", reason: "ABUSE", blockedAt: iso(9 * 86400_000), blockedBy: "风控值班组", expireAt: iso(-21 * 86400_000) },
-  { blockNo: "BL904", target: maskTarget("dGtuX2FwbnNfODkwMTIz"), channel: "PUSH", reason: "MANUAL", blockedAt: iso(12 * 86400_000), blockedBy: "客服中心", expireAt: iso(-3 * 86400_000) },
-  { blockNo: "BL905", target: maskTarget("+9715055512345"), channel: "SMS", reason: "ABUSE", blockedAt: iso(20 * 86400_000), blockedBy: "风控值班组", expireAt: iso(5 * 86400_000) },
-  { blockNo: "BL906", target: maskTarget("layla.h@example.ae"), channel: "EMAIL", reason: "USER_OPT_OUT", blockedAt: iso(26 * 86400_000), blockedBy: "系统（退订链接）", expireAt: null },
-  { blockNo: "BL907", target: maskTarget("+201001234567"), channel: "WHATSAPP", reason: "HARD_BOUNCE", blockedAt: iso(31 * 86400_000), blockedBy: "系统（WhatsApp 未注册）", expireAt: null },
-  { blockNo: "BL908", target: maskTarget("+9715077788899"), channel: "ALL", reason: "MANUAL", blockedAt: iso(40 * 86400_000), blockedBy: "运营中心", expireAt: iso(-60 * 86400_000) },
+  { blockNo: "NBL901", target: maskTarget("+9715012345678"), channel: "SMS", reason: "USER_OPT_OUT", blockedAt: iso(3 * 86400_000), blockedBy: "系统（用户回复 STOP）", expireAt: null },
+  { blockNo: "NBL902", target: maskTarget("omar.k@example.sa"), channel: "EMAIL", reason: "HARD_BOUNCE", blockedAt: iso(6 * 86400_000), blockedBy: "系统（SES 硬退信）", expireAt: null },
+  { blockNo: "NBL903", target: maskTarget("+966501234567"), channel: "ALL", reason: "ABUSE", blockedAt: iso(9 * 86400_000), blockedBy: "风控值班组", expireAt: iso(-21 * 86400_000) },
+  { blockNo: "NBL904", target: maskTarget("dGtuX2FwbnNfODkwMTIz"), channel: "PUSH", reason: "MANUAL", blockedAt: iso(12 * 86400_000), blockedBy: "客服中心", expireAt: iso(-3 * 86400_000) },
+  { blockNo: "NBL905", target: maskTarget("+9715055512345"), channel: "SMS", reason: "ABUSE", blockedAt: iso(20 * 86400_000), blockedBy: "风控值班组", expireAt: iso(5 * 86400_000) },
+  { blockNo: "NBL906", target: maskTarget("layla.h@example.ae"), channel: "EMAIL", reason: "USER_OPT_OUT", blockedAt: iso(26 * 86400_000), blockedBy: "系统（退订链接）", expireAt: null },
+  { blockNo: "NBL907", target: maskTarget("+201001234567"), channel: "WHATSAPP", reason: "HARD_BOUNCE", blockedAt: iso(31 * 86400_000), blockedBy: "系统（WhatsApp 未注册）", expireAt: null },
+  { blockNo: "NBL908", target: maskTarget("+9715077788899"), channel: "ALL", reason: "MANUAL", blockedAt: iso(40 * 86400_000), blockedBy: "运营中心", expireAt: iso(-60 * 86400_000) },
 ];
 export const listNotifyBlacklist = (q: PageQuery & { channel?: string; reason?: string } = {}) =>
   paginate(notifyBlacklist, q.page, q.size, (x) =>
@@ -215,7 +217,7 @@ export const listNotifyBlacklist = (q: PageQuery & { channel?: string; reason?: 
     (!q.reason || x.reason === q.reason) &&
     kwHit(q.keyword, x.blockNo, x.target, x.blockedBy));
 export const saveNotifyBlacklist = (x: Partial<NotifyBlacklist>) =>
-  upsert(notifyBlacklist, x, "blockNo", () => nextNo("BL", notifyBlacklist));
+  upsert(notifyBlacklist, x, "blockNo", () => nextNo("NBL", notifyBlacklist));
 /** 解除拉黑：软删除——把到期时间置为当下，保留拉黑历史供审计（决策 §八-4）。 */
 export function releaseNotifyBlacklist(blockNo: string): NotifyBlacklist {
   const i = notifyBlacklist.findIndex((x) => x.blockNo === blockNo);
@@ -367,9 +369,11 @@ export const listBanks = (q: PageQuery & { country?: string; currency?: string }
 export const saveBank = (x: Partial<BankEntry>) => upsert(banks, x, "bankCode", () => nextNo("BK", banks));
 
 // —— §15 问题管理 ——
+// 编号前缀 `ISS`（Issue）：`PB` 已归充电宝（device.ts 的 PB20000+）所有，
+// 原先问题管理占用 PB901+，与 `savePowerbank` 生成的号落在同一号段（台账 M9）。
 export const problems: ProblemEntry[] = [
   {
-    problemNo: "PB901", category: "RENT",
+    problemNo: "ISS901", category: "RENT",
     title: "扫码后充电宝没弹出", titleEn: "Nothing ejected after scanning", titleAr: "لم تخرج البطارية بعد مسح الرمز",
     answer: "请在 App 内点「重试弹出」；仍无反应说明卡槽卡宝，我们会自动开工单并在 30 分钟内到场，本单不计费。",
     answerEn: "Tap “Retry eject” in the app. If it still fails the slot is stuck — a work order is raised automatically, an engineer arrives within 30 minutes, and this rental is not charged.",
@@ -377,7 +381,7 @@ export const problems: ProblemEntry[] = [
     suggestedAction: "TO_WORKORDER", sortNo: 1, status: "ENABLED",
   },
   {
-    problemNo: "PB902", category: "RETURN",
+    problemNo: "ISS902", category: "RETURN",
     title: "机柜满仓，还不进去", titleEn: "Cabinet is full, cannot return", titleAr: "الخزانة ممتلئة ولا يمكن الإرجاع",
     answer: "请在 App 地图上选择附近可还机柜（显示空仓数）；因满仓产生的超时时长会在申诉后免除。",
     answerEn: "Pick a nearby cabinet with free slots on the app map. Overdue time caused by a full cabinet is waived after you file a claim.",
@@ -385,7 +389,7 @@ export const problems: ProblemEntry[] = [
     suggestedAction: "SELF_SERVICE", sortNo: 2, status: "ENABLED",
   },
   {
-    problemNo: "PB903", category: "BILLING",
+    problemNo: "ISS903", category: "BILLING",
     title: "已归还但仍在计费", titleEn: "Still being charged after returning", titleAr: "استمرار احتساب الرسوم بعد الإرجاع",
     answer: "归还回执以机柜上报为准，偶发延迟在 10 分钟内自动结算；超过 10 分钟请提交订单号，客服核对后按实际归还时间重算并退差额。",
     answerEn: "Return is confirmed by the cabinet report; occasional delays settle automatically within 10 minutes. Beyond that, submit the order number — we recalculate by the actual return time and refund the difference.",
@@ -393,7 +397,7 @@ export const problems: ProblemEntry[] = [
     suggestedAction: "TO_REFUND", sortNo: 3, status: "ENABLED",
   },
   {
-    problemNo: "PB904", category: "BILLING",
+    problemNo: "ISS904", category: "BILLING",
     title: "押金什么时候退", titleEn: "When is my deposit refunded", titleAr: "متى يتم رد مبلغ التأمين",
     answer: "归还后押金即时解冻，银行入账通常 1-3 个工作日（部分发卡行最长 7 天）。信用免押用户无押金冻结。",
     answerEn: "The deposit is released immediately after return; banks post it in 1-3 business days (up to 7 with some issuers). Credit-waiver users have no deposit hold.",
@@ -401,7 +405,7 @@ export const problems: ProblemEntry[] = [
     suggestedAction: "SELF_SERVICE", sortNo: 4, status: "ENABLED",
   },
   {
-    problemNo: "PB905", category: "DEVICE",
+    problemNo: "ISS905", category: "DEVICE",
     title: "充电宝充不进电 / 线坏了", titleEn: "Powerbank not charging or cable broken", titleAr: "البطارية لا تشحن أو الكابل تالف",
     answer: "请就近归还并在 App 内报障，本单免费；我们会锁定该充电宝编号并派维修回收。",
     answerEn: "Return it at the nearest cabinet and report the fault in the app — this rental is free. We lock that powerbank and dispatch a technician to collect it.",
@@ -409,7 +413,7 @@ export const problems: ProblemEntry[] = [
     suggestedAction: "TO_WORKORDER", sortNo: 5, status: "ENABLED",
   },
   {
-    problemNo: "PB906", category: "ACCOUNT",
+    problemNo: "ISS906", category: "ACCOUNT",
     title: "收不到验证码", titleEn: "Not receiving the OTP", titleAr: "لا أستلم رمز التحقق",
     answer: "请确认号码所在国家已开放注册，并检查是否曾回复 STOP 退订（会进入触达拉黑）。可改用 Apple / Google 登录。",
     answerEn: "Check that your country is open for sign-up and whether you previously replied STOP (which adds you to the send-blocklist). You can also sign in with Apple or Google.",
@@ -417,7 +421,7 @@ export const problems: ProblemEntry[] = [
     suggestedAction: "TO_CS", sortNo: 6, status: "ENABLED",
   },
   {
-    problemNo: "PB907", category: "RENT",
+    problemNo: "ISS907", category: "RENT",
     title: "同时借多个充电宝", titleEn: "Renting more than one powerbank", titleAr: "استئجار أكثر من بطارية",
     answer: "单账号默认同时可借 1 个；实名用户可申请提升至 2 个，超出请使用同行人账号。",
     answerEn: "One active rental per account by default; verified users can request a limit of two. Beyond that, please use a companion’s account.",
@@ -425,7 +429,7 @@ export const problems: ProblemEntry[] = [
     suggestedAction: "SELF_SERVICE", sortNo: 7, status: "ENABLED",
   },
   {
-    problemNo: "PB908", category: "OTHER",
+    problemNo: "ISS908", category: "OTHER",
     title: "发票 / 报销凭证", titleEn: "Invoice for expense claims", titleAr: "الفاتورة الضريبية للمصروفات",
     answer: "在「我的-订单」选择订单申请电子发票，含 TRN 税号，通常 10 分钟内发送到邮箱。",
     answerEn: "Request an e-invoice from My Orders; it includes the TRN and usually arrives by email within 10 minutes.",
@@ -433,7 +437,7 @@ export const problems: ProblemEntry[] = [
     suggestedAction: "SELF_SERVICE", sortNo: 8, status: "ENABLED",
   },
   {
-    problemNo: "PB909", category: "OTHER",
+    problemNo: "ISS909", category: "OTHER",
     title: "斋月营业时间（已停用）", titleEn: "Ramadan opening hours (retired)", titleAr: "ساعات العمل في رمضان (موقوف)",
     answer: "旧版斋月说明，已由公告替代，保留仅供历史工单参考。",
     answerEn: "Legacy Ramadan notice, superseded by announcements; kept for historical tickets only.",
@@ -450,7 +454,7 @@ export const listProblems = (q: PageQuery & { category?: string; status?: string
     .sort((a, b) => a.sortNo - b.sortNo);
   return paginate(rows, q.page, q.size);
 };
-export const saveProblem = (x: Partial<ProblemEntry>) => upsert(problems, x, "problemNo", () => nextNo("PB", problems));
+export const saveProblem = (x: Partial<ProblemEntry>) => upsert(problems, x, "problemNo", () => nextNo("ISS", problems));
 
 // —— §16 税率与发票（阶段 3）——
 // 税号一律占位（`****`）：合规资料不落前端 mock。

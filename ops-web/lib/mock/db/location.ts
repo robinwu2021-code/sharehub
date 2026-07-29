@@ -51,13 +51,19 @@ export const venueOnboardings: VenueOnboarding[] = [
   { onboardingNo: "OB0004", venueName: "City Walk Shops", contact: "Omar +971501110004", industry: "零售街区", requestedAt: "2026-07-12T08:00:00Z", status: "PENDING", reviewAt: null, reviewNote: null },
 ];
 
-export const siteLifecycles: SiteLifecycle[] = [
-  { siteNo: "SITE001", siteName: "Dubai Mall L1", stage: "ACTIVE", stageAt: "2026-01-10", owner: "Ali Hassan", currency: "AED", gmvLtm: 28400 },
-  { siteNo: "SITE002", siteName: "Dubai Mall B2", stage: "LIVE", stageAt: "2026-06-01", owner: "Ali Hassan", currency: "AED", gmvLtm: 3200 },
-  { siteNo: "SITE003", siteName: "DIFC Gate", stage: "SIGNED", stageAt: "2026-07-01", owner: "Sara Ops", currency: "AED", gmvLtm: 0 },
-  { siteNo: "SITE004", siteName: "Karama Center", stage: "CHURNED", stageAt: "2026-05-15", owner: "BD Team", currency: "AED", gmvLtm: 410 },
-  { siteNo: "SITE005", siteName: "Deira City Centre", stage: "PROSPECTING", stageAt: "2026-07-10", owner: "BD Team", currency: "AED", gmvLtm: 0 },
+// 生命周期挂在**真实存在的站点**上（台账 M5：原先是 SITE001–005 / DIFC Gate 等，
+// 既不在 sites 的 ST3xx 号段里，站点名也不在 LOCS 里，点进去查无此站点）。
+// siteName 一律由 sites 反查，不再手写。
+const SITE_LIFECYCLE_SEED: Omit<SiteLifecycle, "siteName">[] = [
+  { siteNo: "ST300", stage: "ACTIVE", stageAt: "2026-01-10", owner: "Ali Hassan", currency: "AED", gmvLtm: 28400 },
+  { siteNo: "ST301", stage: "LIVE", stageAt: "2026-06-01", owner: "Ali Hassan", currency: "AED", gmvLtm: 3200 },
+  { siteNo: "ST302", stage: "SIGNED", stageAt: "2026-07-01", owner: "Sara Ops", currency: "AED", gmvLtm: 0 },
+  { siteNo: "ST303", stage: "CHURNED", stageAt: "2026-05-15", owner: "BD Team", currency: "AED", gmvLtm: 410 },
+  { siteNo: "ST304", stage: "PROSPECTING", stageAt: "2026-07-10", owner: "BD Team", currency: "AED", gmvLtm: 0 },
 ];
+export const siteLifecycles: SiteLifecycle[] = SITE_LIFECYCLE_SEED.map((s) => ({
+  ...s, siteName: sites.find((x) => x.siteNo === s.siteNo)!.name,
+}));
 
 export const listLeads = (q: PageQuery = {}) => paginate(leads, q.page, q.size, (x) => kwHit(q.keyword, x.leadNo, x.venueName, x.owner));
 export const listSiteAnalysis = (q: PageQuery = {}) => paginate(siteAnalyses, q.page, q.size, (x) => kwHit(q.keyword, x.siteNo, x.siteName));

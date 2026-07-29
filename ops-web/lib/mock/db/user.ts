@@ -14,18 +14,37 @@ export const cUsers: CUser[] = Array.from({ length: 60 }, (_, i) => ({
   blacklisted: i % 17 === 0, orders: (i * 3) % 40, registeredAt: iso(i * 86400_000),
 }));
 
-export const userRisks: UserRisk[] = [
-  { riskNo: "RK0001", userNo: "U-0012", nickname: "Ali Hassan", phone: "+971501230001", creditScore: 420, riskLevel: "HIGH", reason: "多次逾期未还", flaggedAt: "2026-07-10T09:00:00Z" },
-  { riskNo: "RK0002", userNo: "U-0034", nickname: "Sara Al", phone: "+971501230002", creditScore: 550, riskLevel: "MEDIUM", reason: "异常订单", flaggedAt: "2026-07-08T14:00:00Z" },
-  { riskNo: "RK0003", userNo: "U-0056", nickname: "Omar K", phone: "+971501230003", creditScore: 390, riskLevel: "HIGH", reason: "疑似欺诈", flaggedAt: "2026-07-05T10:00:00Z" },
-  { riskNo: "RK0004", userNo: "U-0078", nickname: "Fatima N", phone: "+971501230004", creditScore: 580, riskLevel: "MEDIUM", reason: "信用不足", flaggedAt: "2026-07-03T08:00:00Z" },
-];
+// 风险名单 / 黑名单都必须挂在**真实存在的 C 端用户**上（台账 M7：原先用 `U-00xx` 带横杠的
+// 第三套号，cUsers 里根本没有，点进去查无此人）。昵称/手机号/信用分一律由 cUsers 反查，不再手写。
+const userOf = (no: string): CUser => {
+  const u = cUsers.find((x) => x.cUserNo === no);
+  if (!u) throw new Error(`mock 数据不自洽：用户 ${no} 不存在于 cUsers`);
+  return u;
+};
 
+// 挑的都是 cUsers 里信用分最低的几位（551/558/565/572），风险等级与分数同向。
+export const userRisks: UserRisk[] = [
+  { riskNo: "RK0001", userNo: "U3043", riskLevel: "HIGH" as const, reason: "多次逾期未还", flaggedAt: "2026-07-10T09:00:00Z" },
+  { riskNo: "RK0002", userNo: "U3044", riskLevel: "HIGH" as const, reason: "疑似欺诈", flaggedAt: "2026-07-08T14:00:00Z" },
+  { riskNo: "RK0003", userNo: "U3045", riskLevel: "MEDIUM" as const, reason: "异常订单", flaggedAt: "2026-07-05T10:00:00Z" },
+  { riskNo: "RK0004", userNo: "U3046", riskLevel: "MEDIUM" as const, reason: "信用不足", flaggedAt: "2026-07-03T08:00:00Z" },
+].map((r) => {
+  const u = userOf(r.userNo);
+  return { ...r, nickname: u.nickname, phone: u.phone, creditScore: u.creditScore };
+});
+
+// ACTIVE 的四条恰好是 cUsers 里 `blacklisted: true` 的四位（U3000/U3017/U3034/U3051），
+// RELEASED 的一条挂在已解封（blacklisted: false）的用户上——两页状态互相印证。
 export const userBlacklist: UserBlacklist[] = [
-  { blacklistNo: "BL0001", userNo: "U-0090", nickname: "Test Bot", phone: "+971501230099", reason: "恶意刷单", blacklistedAt: "2026-07-01T12:00:00Z", releasedAt: null, status: "ACTIVE" },
-  { blacklistNo: "BL0002", userNo: "U-0091", nickname: "Spam User", phone: "+971501230098", reason: "骚扰客服", blacklistedAt: "2026-06-20T10:00:00Z", releasedAt: null, status: "ACTIVE" },
-  { blacklistNo: "BL0003", userNo: "U-0092", nickname: "Old Block", phone: "+971501230097", reason: "历史黑名单", blacklistedAt: "2026-05-15T09:00:00Z", releasedAt: "2026-07-01T00:00:00Z", status: "RELEASED" },
-];
+  { blacklistNo: "BL0001", userNo: "U3000", reason: "恶意刷单", blacklistedAt: "2026-07-01T12:00:00Z", releasedAt: null, status: "ACTIVE" as const },
+  { blacklistNo: "BL0002", userNo: "U3017", reason: "骚扰客服", blacklistedAt: "2026-06-20T10:00:00Z", releasedAt: null, status: "ACTIVE" as const },
+  { blacklistNo: "BL0003", userNo: "U3034", reason: "超时未还且拒不沟通", blacklistedAt: "2026-06-02T08:00:00Z", releasedAt: null, status: "ACTIVE" as const },
+  { blacklistNo: "BL0004", userNo: "U3051", reason: "多设备批量薅免费额度", blacklistedAt: "2026-05-28T16:00:00Z", releasedAt: null, status: "ACTIVE" as const },
+  { blacklistNo: "BL0005", userNo: "U3009", reason: "历史黑名单（申诉成立已解除）", blacklistedAt: "2026-05-15T09:00:00Z", releasedAt: "2026-07-01T00:00:00Z", status: "RELEASED" as const },
+].map((b) => {
+  const u = userOf(b.userNo);
+  return { ...b, nickname: u.nickname, phone: u.phone };
+});
 
 export const members: Member[] = Array.from({ length: 24 }, (_, i) => ({
   userNo: `U${3000 + i}`, nickname: p(NICKS, i), level: p(["SILVER", "GOLD", "PLATINUM"] as const, i),

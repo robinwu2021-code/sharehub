@@ -10,7 +10,8 @@ const WSTATUS: WorkOrderStatus[] = ["CREATED", "DISPATCHED", "PROCESSING", "DONE
 export const workOrders: WorkOrder[] = Array.from({ length: 64 }, (_, i) => ({
   woNo: `WO${70000 + i}`, type: p(WTYPE, i), source: p(["ALERT", "USER", "VENUE", "MANUAL"] as const, i),
   priority: p(["LOW", "MEDIUM", "HIGH"] as const, i), cabinetNo: p(cabinets, i).cabinetNo,
-  locationName: p(LOCS, i), status: p(WSTATUS, i), assigneeName: i % 3 === 0 ? null : p(["Ali", "Omar", "Sara", "Wang"], i),
+  // 点位名取所在机柜的 locationName，而非另取一次 LOCS —— 工单数 64 > 机柜数 48 时两者会错位
+  locationName: p(cabinets, i).locationName, status: p(WSTATUS, i), assigneeName: i % 3 === 0 ? null : p(["Ali", "Omar", "Sara", "Wang"], i),
   slaDueAt: iso(-(i % 5) * 3600_000), description: p(["柜机离线", "缺货补货", "定期巡检", "用户投诉未弹出", "清洁维护"], i),
   createdAt: iso(i * 5400_000),
 }));

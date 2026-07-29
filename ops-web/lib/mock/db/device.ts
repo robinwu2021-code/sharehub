@@ -22,10 +22,13 @@ export const cabinets: Cabinet[] = Array.from({ length: 48 }, (_, i) => {
 export function slotsOf(cabinetNo: string): Slot[] {
   const cab = cabinets.find((c) => c.cabinetNo === cabinetNo);
   const total = cab?.slotTotal ?? 8;
+  // 仓位里的充电宝号一律取自 powerbanks 主数据（原先拼 `PB` + 机柜尾号 + 槽位，
+  // 造出第三套 PB 号段，点进充电宝管理查无此宝）。
+  const base = cabinets.findIndex((c) => c.cabinetNo === cabinetNo);
   return Array.from({ length: total }, (_, i) => {
     const filled = i < (cab?.availableCount ?? 0);
     return {
-      slotIndex: i + 1, powerbankNo: filled ? `PB${cabinetNo.slice(3)}${i + 1}` : null,
+      slotIndex: i + 1, powerbankNo: filled ? p(powerbanks, base * 3 + i).powerbankNo : null,
       battery: filled ? 40 + ((i * 13) % 60) : null, lockStatus: filled ? "LOCKED" : "UNLOCKED",
       health: i === total - 1 && cab?.status === "FAULT" ? "FAULT" : "OK",
     };
@@ -101,9 +104,9 @@ const rptPayload = (ev: string, cab: string, i: number) => {
   const slot = (i % 8) + 1;
   switch (ev) {
     case "HEARTBEAT": return JSON.stringify({ evt: "heartbeat", cabinetNo: cab, signal: 62 + (i % 30), temp: 31 + (i % 9), fwVersion: "1.4.0", availableCount: i % 9 });
-    case "SLOT_STATE": return JSON.stringify({ evt: "slot_state", cabinetNo: cab, slot, powerbankNo: `PB${1000 + i}`, battery: 40 + (i % 55), lock: "LOCKED" });
-    case "RETURN_DETECT": return JSON.stringify({ evt: "return_detect", cabinetNo: cab, slot, powerbankNo: `PB${1000 + i}`, orderNo: `ORD${500000 + (i % 120)}`, battery: 12 + (i % 40) });
-    case "BATTERY_LOW": return JSON.stringify({ evt: "battery_low", cabinetNo: cab, slot, powerbankNo: `PB${1000 + i}`, battery: 5 + (i % 8), threshold: 15 });
+    case "SLOT_STATE": return JSON.stringify({ evt: "slot_state", cabinetNo: cab, slot, powerbankNo: p(powerbanks, i).powerbankNo, battery: 40 + (i % 55), lock: "LOCKED" });
+    case "RETURN_DETECT": return JSON.stringify({ evt: "return_detect", cabinetNo: cab, slot, powerbankNo: p(powerbanks, i).powerbankNo, orderNo: `ORD${500000 + (i % 120)}`, battery: 12 + (i % 40) });
+    case "BATTERY_LOW": return JSON.stringify({ evt: "battery_low", cabinetNo: cab, slot, powerbankNo: p(powerbanks, i).powerbankNo, battery: 5 + (i % 8), threshold: 15 });
     default: return JSON.stringify({ evt: "fault", cabinetNo: cab, slot, code: "SLOT_STUCK", detail: "powerbank not ejected after 3 retries" });
   }
 };

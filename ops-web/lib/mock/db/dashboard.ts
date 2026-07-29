@@ -19,11 +19,13 @@ export const dashboard: DashboardStats = {
   trend: Array.from({ length: 7 }, (_, i) => ({ day: `D-${6 - i}`, gmv: 3000 + ((i * 613) % 2500), orders: 250 + ((i * 71) % 200) })),
   todos: { pendingWorkOrders: workOrders.filter((w) => w.status === "CREATED").length, pendingRefunds: 3, pendingWithdrawals: 2 },
   alerts: dashboardAlerts,
+  // 站点名必须是 sites 里真实存在的站点（原先 MOE Floor 2 / DIFC Gate / Karama Center /
+  // Global Village E5 都不在 sites 里，点排行榜跳站点详情查无此站点）。
   rankings: [
     { rank: 1, siteName: "Dubai Mall L1", gmv: 4820, orderCount: 386, currency: "AED" },
-    { rank: 2, siteName: "MOE Floor 2", gmv: 3150, orderCount: 252, currency: "AED" },
-    { rank: 3, siteName: "DIFC Gate", gmv: 2840, orderCount: 231, currency: "AED" },
-    { rank: 4, siteName: "Karama Center", gmv: 1920, orderCount: 154, currency: "AED" },
-    { rank: 5, siteName: "Global Village E5", gmv: 1540, orderCount: 127, currency: "AED" },
+    { rank: 2, siteName: "Mall of Emirates", gmv: 3150, orderCount: 252, currency: "AED" },
+    { rank: 3, siteName: "DXB T3", gmv: 2840, orderCount: 231, currency: "AED" },
+    { rank: 4, siteName: "Marina Walk", gmv: 1920, orderCount: 154, currency: "AED" },
+    { rank: 5, siteName: "City Centre Deira", gmv: 1540, orderCount: 127, currency: "AED" },
   ],
 };
