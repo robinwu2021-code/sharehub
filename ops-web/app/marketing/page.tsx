@@ -16,6 +16,7 @@ import { useCan } from "@/lib/use-can";
 import { useI18n } from "@/lib/i18n";
 import { isPhaseLocked } from "@/lib/phase";
 import { notify } from "@/lib/notify";
+import { exportCsv } from "@/lib/export-csv";
 import type {
   Notice, Coupon, Campaign, PushMessage, Referral, AdSlot, AdCampaign, AdDelivery, PageResult,
 } from "@/lib/types";
@@ -33,20 +34,22 @@ const TABS = [
   { key: "ad-delivery", label: "投放与曝光", phase: 3 as const },
 ];
 // 三语（zh/en/ar）+ 生效期 + 置顶：竞品公告只有单语，我们要覆盖 MENA 多语市场。
+// B0 组件能力的样板用法：分区 section + 三语 textarea + date + required/maxLength 校验。
+// 新页面照此写，勿再手搓控件（见 TDD-运营端前端补全方案 §八-1）。
 const NOTICE_FIELDS: FieldDef[] = [
-  { key: "noticeNo", label: "公告号", readOnlyOnEdit: true, placeholder: "留空自动生成" },
-  { key: "type", label: "类型", type: "select", options: [{ value: "SYSTEM", label: "系统公告" }, { value: "PROMO", label: "活动公告" }, { value: "MAINTENANCE", label: "维护公告" }] },
-  { key: "title", label: "标题（中文）", placeholder: "斋月期间机柜服务时间调整" },
-  { key: "titleEn", label: "标题（English）", placeholder: "Ramadan service hours update" },
-  { key: "titleAr", label: "标题（العربية）", placeholder: "تحديث ساعات الخدمة خلال رمضان" },
-  { key: "content", label: "正文（中文）", placeholder: "面向 C 端首页公告条展示的正文" },
-  { key: "contentEn", label: "正文（English）", placeholder: "Body shown in the C-end home banner" },
-  { key: "contentAr", label: "正文（العربية）", placeholder: "النص المعروض في شريط الإعلانات" },
-  { key: "pinned", label: "置顶", type: "switch" },
-  { key: "startAt", label: "生效开始", placeholder: "2026-07-01 00:00:00" },
-  { key: "endAt", label: "生效结束", placeholder: "2026-07-31 23:59:59" },
-  { key: "status", label: "状态", type: "select", options: [{ value: "DRAFT", label: "草稿" }, { value: "PUBLISHED", label: "已发布" }, { value: "OFFLINE", label: "已下线" }] },
-  { key: "publishedBy", label: "发布人", placeholder: "运营中心" },
+  { key: "noticeNo", label: "公告号", readOnlyOnEdit: true, placeholder: "留空自动生成", section: "基本信息" },
+  { key: "type", label: "类型", type: "select", required: true, section: "基本信息", options: [{ value: "SYSTEM", label: "系统公告" }, { value: "PROMO", label: "活动公告" }, { value: "MAINTENANCE", label: "维护公告" }] },
+  { key: "pinned", label: "置顶", type: "switch", section: "基本信息", help: "置顶公告在 C 端首页公告条优先展示" },
+  { key: "title", label: "标题（中文）", required: true, maxLength: 40, section: "三语内容", placeholder: "斋月期间机柜服务时间调整" },
+  { key: "titleEn", label: "标题（English）", maxLength: 60, section: "三语内容", placeholder: "Ramadan service hours update" },
+  { key: "titleAr", label: "标题（العربية）", maxLength: 60, section: "三语内容", placeholder: "تحديث ساعات الخدمة خلال رمضان" },
+  { key: "content", label: "正文（中文）", type: "textarea", rows: 3, required: true, maxLength: 200, section: "三语内容", placeholder: "面向 C 端首页公告条展示的正文" },
+  { key: "contentEn", label: "正文（English）", type: "textarea", rows: 3, maxLength: 300, section: "三语内容", placeholder: "Body shown in the C-end home banner" },
+  { key: "contentAr", label: "正文（العربية）", type: "textarea", rows: 3, maxLength: 300, section: "三语内容", placeholder: "النص المعروض في شريط الإعلانات" },
+  { key: "startAt", label: "生效开始", type: "date", required: true, section: "发布控制" },
+  { key: "endAt", label: "生效结束", type: "date", section: "发布控制", help: "留空表示长期有效" },
+  { key: "status", label: "状态", type: "select", required: true, section: "发布控制", options: [{ value: "DRAFT", label: "草稿" }, { value: "PUBLISHED", label: "已发布" }, { value: "OFFLINE", label: "已下线" }] },
+  { key: "publishedBy", label: "发布人", section: "发布控制", placeholder: "运营中心" },
 ];
 const NOTICE_TYPE: Record<Notice["type"], { label: string; tone: "outline" | "success" | "warning" }> = {
   SYSTEM: { label: "系统公告", tone: "outline" },
@@ -253,6 +256,19 @@ function MarketingInner() {
           searchPlaceholder="搜索公告号/标题（中/英/阿）/发布人"
           onAdd={canEditNotice ? () => setNoticeForm({ type: "SYSTEM", pinned: false, status: "DRAFT", title: "", titleEn: "", titleAr: "", content: "", contentEn: "", contentAr: "", startAt: "", endAt: "", publishedBy: "" }) : undefined}
           addLabel="新增公告"
+          // B0 样板：前端 CSV 导出当页数据（决策 §八-2）。exportCsv 自带 UTF-8 BOM 防 Excel 乱码。
+          onExport={() => exportCsv<Notice>("公告管理", [
+            { header: "公告号", value: (n) => n.noticeNo },
+            { header: "标题（中）", value: (n) => n.title },
+            { header: "标题（EN）", value: (n) => n.titleEn },
+            { header: "标题（AR）", value: (n) => n.titleAr },
+            { header: "类型", value: (n) => NOTICE_TYPE[n.type].label },
+            { header: "置顶", value: (n) => (n.pinned ? "是" : "否") },
+            { header: "生效开始", value: (n) => n.startAt },
+            { header: "生效结束", value: (n) => n.endAt },
+            { header: "状态", value: (n) => NOTICE_STATUS[n.status].label },
+            { header: "发布人", value: (n) => n.publishedBy },
+          ], (q.data?.list ?? []) as Notice[])}
         />
       )}
       {tab === "coupons" && (

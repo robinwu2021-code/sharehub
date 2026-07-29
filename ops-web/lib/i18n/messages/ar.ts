@@ -70,6 +70,25 @@ export const ar: Messages = {
     FAULT: "إصلاح", REFILL: "إعادة تعبئة", INSPECT: "تفتيش", INSTALL: "تركيب",
     REMOVE: "إزالة", COMPLAINT: "شكوى", CLEAN: "تنظيف",
   },
+  table: {
+    selectAll: "تحديد الكل",
+    selectRow: "تحديد الصف",
+    expand: "توسيع",
+    collapse: "طي",
+    sortBy: "اضغط للترتيب",
+    selectedN: "تم تحديد {n}",
+    clearSelection: "إلغاء التحديد",
+  },
+  confirm: {
+    ok: "تأكيد",
+    cancel: "إلغاء",
+    requireHint: "اكتب {text} لتأكيد هذا الإجراء",
+  },
+  export: {
+    label: "تصدير",
+    noData: "لا توجد بيانات للتصدير",
+    done: "تم تصدير {n} سجلاً",
+  },
   error: {
     forbidden: "لا توجد صلاحية",
     badRequest: "طلب غير صالح",
@@ -78,5 +97,18 @@ export const ar: Messages = {
     serverError: "خطأ في الخادم",
     network: "خطأ في الشبكة، حاول لاحقاً",
     unknown: "خطأ غير معروف",
+  },
+  // نصوص التحقق وعناصر النموذج (components/ui/form-drawer.tsx / multi-select.tsx)
+  form: {
+    required: "{label} مطلوب",
+    minValue: "{label} يجب ألا يقل عن {min}",
+    maxValue: "{label} يجب ألا يزيد عن {max}",
+    maxLength: "{label} يجب ألا يتجاوز {max} حرفاً",
+    numberInvalid: "{label} يجب أن يكون رقماً",
+    invalidFormat: "صيغة {label} غير صحيحة",
+    selectPlaceholder: "اختر",
+    selectedCount: "تم اختيار {n}",
+    clear: "مسح",
+    checkFields: "الرجاء تصحيح الأخطاء في النموذج",
   },
 };

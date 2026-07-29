@@ -67,6 +67,25 @@ export const zh = {
     FAULT: "故障维修", REFILL: "缺货补货", INSPECT: "巡检", INSTALL: "安装",
     REMOVE: "撤机", COMPLAINT: "投诉", CLEAN: "清洁",
   },
+  table: {
+    selectAll: "全选",
+    selectRow: "选择该行",
+    expand: "展开",
+    collapse: "收起",
+    sortBy: "点击排序",
+    selectedN: "已选 {n} 项",
+    clearSelection: "取消选择",
+  },
+  confirm: {
+    ok: "确认",
+    cancel: "取消",
+    requireHint: "请输入 {text} 以确认此操作",
+  },
+  export: {
+    label: "导出",
+    noData: "没有可导出的数据",
+    done: "已导出 {n} 条",
+  },
   error: {
     forbidden: "无权限",
     badRequest: "请求有误",
@@ -75,6 +94,19 @@ export const zh = {
     serverError: "服务器错误",
     network: "网络异常，请稍后重试",
     unknown: "未知错误",
+  },
+  // FormDrawer 表单校验与控件文案（components/ui/form-drawer.tsx / multi-select.tsx）
+  form: {
+    required: "{label}不能为空",
+    minValue: "{label}不能小于 {min}",
+    maxValue: "{label}不能大于 {max}",
+    maxLength: "{label}最多 {max} 个字符",
+    numberInvalid: "{label}必须是数字",
+    invalidFormat: "{label}格式不正确",
+    selectPlaceholder: "请选择",
+    selectedCount: "已选 {n} 项",
+    clear: "清空",
+    checkFields: "请先修正表单中的错误",
   },
 };
 

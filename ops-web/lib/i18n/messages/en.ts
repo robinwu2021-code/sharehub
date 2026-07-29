@@ -69,6 +69,25 @@ export const en: Messages = {
     FAULT: "Repair", REFILL: "Refill", INSPECT: "Inspection", INSTALL: "Install",
     REMOVE: "Removal", COMPLAINT: "Complaint", CLEAN: "Cleaning",
   },
+  table: {
+    selectAll: "Select all",
+    selectRow: "Select row",
+    expand: "Expand",
+    collapse: "Collapse",
+    sortBy: "Click to sort",
+    selectedN: "{n} selected",
+    clearSelection: "Clear selection",
+  },
+  confirm: {
+    ok: "Confirm",
+    cancel: "Cancel",
+    requireHint: "Type {text} to confirm this action",
+  },
+  export: {
+    label: "Export",
+    noData: "Nothing to export",
+    done: "Exported {n} rows",
+  },
   error: {
     forbidden: "No permission",
     badRequest: "Bad request",
@@ -77,5 +96,18 @@ export const en: Messages = {
     serverError: "Server error",
     network: "Network error, please retry",
     unknown: "Unknown error",
+  },
+  // FormDrawer validation & control copy (components/ui/form-drawer.tsx / multi-select.tsx)
+  form: {
+    required: "{label} is required",
+    minValue: "{label} must be at least {min}",
+    maxValue: "{label} must be at most {max}",
+    maxLength: "{label} must be {max} characters or fewer",
+    numberInvalid: "{label} must be a number",
+    invalidFormat: "{label} format is invalid",
+    selectPlaceholder: "Select",
+    selectedCount: "{n} selected",
+    clear: "Clear",
+    checkFields: "Please fix the errors in the form",
   },
 };
