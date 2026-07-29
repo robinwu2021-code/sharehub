@@ -9,17 +9,23 @@ import { paginate, kwHit, upsert, nextNo, archiveRow, unarchiveRow } from "./hel
 
 // 台账 M11：站点的区域必须挂 regions 字典里真实存在的三级区域 ID（原先存的是"Dubai North"
 // 这类字典里根本没有的名字）。ID 与展示名成对，展示名冗余自字典。
-const REGIONS: { id: string; name: string }[] = [
-  { id: "DU-MAR", name: "Dubai Marina" },
-  { id: "DU-DEI", name: "Deira" },
-  { id: "DU-DT", name: "Downtown Dubai" },
-  { id: "DU-DXB", name: "DXB 机场" },
-  { id: "AZ-YAS", name: "Yas Island" },
+// 区域 + 该区域的真实中心坐标。站点坐标由区域中心加小抖动派生——
+// 保证「站点落在它自己声明的区域里」，否则地图上会出现滨海区的站点飘到机场。
+const REGIONS: { id: string; name: string; lat: number; lng: number }[] = [
+  { id: "DU-MAR", name: "Dubai Marina", lat: 25.0805, lng: 55.1403 },
+  { id: "DU-DEI", name: "Deira", lat: 25.2697, lng: 55.3095 },
+  { id: "DU-DT", name: "Downtown Dubai", lat: 25.1972, lng: 55.2744 },
+  { id: "DU-DXB", name: "DXB 机场", lat: 25.2532, lng: 55.3657 },
+  { id: "AZ-YAS", name: "Yas Island", lat: 24.4991, lng: 54.6070 },
 ];
+/** 由区域中心 + 确定性抖动派生站点坐标（同一 i 恒等，避免每次渲染点位乱跳）。 */
+const jitter = (base: number, i: number, seed: number) => Number((base + (((i * seed) % 17) - 8) * 0.0035).toFixed(6));
 export const sites: Site[] = Array.from({ length: 12 }, (_, i) => ({
   siteNo: `ST${300 + i}`, name: p(LOCS, i), venueName: p(VENUE_NAMES, i),
   agentNo: i % 3 === 0 ? null : `AG${String((i % 9) + 1).padStart(3, "0")}`, regionId: p(REGIONS, i).id, regionName: p(REGIONS, i).name,
-  address: `${p(LOCS, i)}, Dubai, UAE`, sceneType: p(["商场", "机场", "餐饮", "地铁", "写字楼"], i),
+  address: `${p(LOCS, i)}, Dubai, UAE`,
+  lat: jitter(p(REGIONS, i).lat, i, 7), lng: jitter(p(REGIONS, i).lng, i, 11),
+  sceneType: p(["商场", "机场", "餐饮", "地铁", "写字楼"], i),
   pointCount: 1 + (i % 4), cabinetCount: 2 + (i * 3) % 10, status: i % 8 === 0 ? "PAUSED" : "ACTIVE",
   archivedAt: null,
 }));

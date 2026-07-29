@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
@@ -22,11 +22,12 @@ import {
   ShowArchivedToggle, ArchiveActions, ArchivedAt, archivedRowClass,
   archiveConfirm, unarchiveConfirm,
 } from "@/components/archive";
-import { fmtTime } from "@/lib/utils";
+import { fmtTime, cn } from "@/lib/utils";
 import { useCan } from "@/lib/use-can";
 import { notify } from "@/lib/notify";
 import { exportCsv } from "@/lib/export-csv";
 import { parseImport, templateCsv, type ImportColumn, type RowError } from "@/lib/import-csv";
+import { SiteMap, type MapPoint } from "@/components/ui/site-map";
 import type {
   Cabinet, Powerbank, CabinetMonitor, CommandRecord, InventoryTransfer, OtaRollout, PageResult,
   DeviceLog, DeviceCodeBatch,
@@ -812,6 +813,25 @@ function DevicesInner() {
   const [invForm, setInvForm] = useState<Partial<InventoryTransfer> | null>(null);
   const [otaForm, setOtaForm] = useState<Partial<OtaRollout> | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  // 监控 tab 的列表/地图切换（G4）。地图按**站点**聚合撒点，不逐台机柜——上千机柜会卡。
+  const [monitorView, setMonitorView] = useState<"list" | "map">("list");
+  const sitesQ = useQuery({
+    queryKey: ["monitor-sites"],
+    queryFn: () => api.listSites({ page: 1, size: 200 }),
+    enabled: tab === "monitor" && monitorView === "map",
+  });
+  const mapPoints: MapPoint[] = useMemo(
+    () => (sitesQ.data?.list ?? []).map((st) => ({
+      id: st.siteNo,
+      name: st.name,
+      lat: st.lat,
+      lng: st.lng,
+      count: st.cabinetCount,
+      desc: st.regionName,
+      alert: st.status === "PAUSED", // 停用站点标红，一眼看出哪块不在服务
+    })),
+    [sitesQ.data],
+  );
   const { confirm, dialog } = useConfirm();
   useEffect(() => { if (qTab && TABS.some((t) => t.key === qTab)) { setTab(qTab); setPage(1); } }, [qTab]);
 
@@ -904,6 +924,23 @@ function DevicesInner() {
           addLabel={tab === "powerbanks" ? "新增充电宝" : tab === "inventory" ? "新增调拨单" : tab === "ota" ? "新增发布单" : undefined}
           onExport={EXPORTS[tab] ? () => EXPORTS[tab].run(q.data?.list ?? []) : undefined}
         >
+          {/* 监控 tab：列表 / 地图 双视图（G4）。地图按站点聚合，点 marker 回列表并带上站点筛选。 */}
+          {tab === "monitor" && (
+            <div className="flex gap-0.5 rounded-lg bg-secondary p-0.5" role="group" aria-label="监控视图">
+              {(["list", "map"] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  aria-pressed={monitorView === v}
+                  onClick={() => setMonitorView(v)}
+                  className={cn(
+                    "rounded-md px-2.5 py-1 text-sm transition-colors",
+                    monitorView === v ? "bg-card font-medium text-foreground shadow-[var(--card-shadow)]" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >{v === "list" ? "列表" : "地图"}</button>
+              ))}
+            </div>
+          )}
           {/* 充电宝是可归档实体，故只有它需要「显示已归档」开关 */}
           {tab === "powerbanks" && (
             <ShowArchivedToggle
@@ -927,7 +964,9 @@ function DevicesInner() {
           empty="暂无充电宝——新到货的充电宝需先入库建档；已归档的需勾选「显示已归档」才会出现"
         />
       )}
-      {tab === "monitor" && <DataTable rowKey={(r: CabinetMonitor) => r.cabinetNo} columns={monCols} rows={q.data?.list as CabinetMonitor[]} loading={q.isLoading} />}
+      {tab === "monitor" && (monitorView === "list"
+        ? <DataTable rowKey={(r: CabinetMonitor) => r.cabinetNo} columns={monCols} rows={q.data?.list as CabinetMonitor[]} loading={q.isLoading} />
+        : <SiteMap points={mapPoints} onSelect={(pt) => { setKeyword(pt.name); setMonitorView("list"); setPage(1); }} />)}
       {tab === "commands" && <DataTable rowKey={(r: CommandRecord) => r.commandId} columns={cmdCols} rows={q.data?.list as CommandRecord[]} loading={q.isLoading} />}
       {tab === "inventory" && <DataTable rowKey={(r: InventoryTransfer) => r.transferNo} columns={invColsFull} rows={q.data?.list as InventoryTransfer[]} loading={q.isLoading} />}
       {tab === "ota" && <DataTable rowKey={(r: OtaRollout) => r.rolloutNo} columns={otaColsFull} rows={q.data?.list as OtaRollout[]} loading={q.isLoading} />}

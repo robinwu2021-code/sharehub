@@ -205,7 +205,7 @@ InnoDB · `utf8mb4_0900_ai_ci` · 金额 `DECIMAL(18,2)` + `currency VARCHAR(8) 
 | `dev_shadow` | 设备影子快照（主 Redis，DB 兜底）| cabinet_no, slots `JSON`, online, signal, temp, fault_count, snapshot_at | 实时监控 |
 | `dev_heartbeat` `append`(月) | 心跳遥测 | cabinet_no, metrics `JSON`, beat_at | 实时监控 |
 | `dev_code_batch` `NEW` | 设备编码批次 | `batch_no` UK, tenant_id, vendor_code, code_type(QR/SN), range_start, range_end, total, **bound**, produced_at, status(PENDING/PARTIAL/BOUND/VOID) | 设备编码 |
-| `dev_ota_release` | OTA 版本 | `release_no` UK, fw_type, vendor_code, version, version_code, artifact_url, checksum, mandatory, status(DRAFT/PUBLISHED/PAUSED/COMPLETED) | 固件 OTA |
+| `dev_ota_release` | OTA 版本 | `release_no` UK, fw_type, vendor_code, **`fw_version`**(固件版本串 —— **不能叫 `version`**，那是乐观锁列名), version_code, artifact_url, checksum, mandatory, status(DRAFT/PUBLISHED/PAUSED/COMPLETED) | 固件 OTA |
 | `dev_ota_rollout` | OTA 投放 | `rollout_no` UK, release_no, fw_version, vendor_code, strategy(**GRAY/FULL**), scope(DEVICE/LOCATION/ALL), target_ref, progress, status(PENDING/RUNNING/DONE/**ROLLBACK**) | 固件 OTA |
 | `dev_ota_task` | 逐设备升级 | rollout_no, cabinet_no, status(PENDING/DOWNLOADING/INSTALLING/SUCCESS/FAILED/ROLLED_BACK), previous_version, progress | 固件 OTA |
 

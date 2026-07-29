@@ -14,14 +14,14 @@ for p in sorted(pathlib.Path("lib/api/https").glob("*.ts")):
     for m in re.finditer(r'^\s{2}(\w+):\s*(\([^)]*\)|\w+)\s*=>\s*([\s\S]*?)(?=\n\s{2}\w+:|\n\};)', src, re.M):
         name, args, body = m.group(1), m.group(2), m.group(3)
         verbs = re.findall(r'client\.(get|post|put|patch|delete)\s*\(', body)
-        paths = re.findall(r'[`"]((/api|/internal)[^`"]*)[`"]', body)
+        paths = [x[0] if isinstance(x, tuple) else x for x in re.findall(r'[`"]((?:/api|/internal)[^`"]*)[`"]', body)]
         if not verbs or not paths: continue
         # 条件路径（新增 vs 编辑）会有两个 path
         verb = verbs[0].upper()
         # 规范化模板变量：${x.foo} → {foo}
         norm=[]
         for pa in paths:
-            pa=re.sub(r'\$\{[^}]*?\.?(\w+)\}', r'{\1}', pa)
+            pa=re.sub(r'\$\{[^}]*?\.?(\w+)\}', r'{\1}', str(pa))
             norm.append(pa)
         rows.append((dom, name, verb, norm))
 

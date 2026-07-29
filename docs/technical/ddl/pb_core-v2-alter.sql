@@ -219,3 +219,56 @@ UPDATE wo_order SET close_reason = 'RESOLVED' WHERE status = 'CLOSED' AND close_
 ALTER TABLE wo_sla_rule
   MODIFY COLUMN wo_type VARCHAR(16) NOT NULL
     COMMENT 'FAULT/REFILL/INSPECT/INSTALL/REMOVE/COMPLAINT/CLEAN';
+
+
+-- ============================================================
+-- 9) dev_ 域：v1 DDL 与 db-design v2 §3.1 的对齐（2026-07-29 骨架生成时暴露）
+--    v1 建于 07-12，此后 db-design 补了实时监控/OTA 灰度所需的列。
+-- ============================================================
+USE pb_core;
+
+-- 9.1 dev_ota_release：把固件版本号让出 `version` 列名
+--     v1 用 `version` 存固件版本串、把乐观锁挤到 `version_col`，导致实体无法继承 BaseEntity
+--     （BaseEntity.version 固定映射 version 列，继承会把 Long 乐观锁值写进固件版本列）。
+--     统一为：fw_version = 固件版本串，version = 乐观锁。
+ALTER TABLE dev_ota_release
+  CHANGE COLUMN version     fw_version VARCHAR(32) NOT NULL COMMENT '固件版本号(如 1.4.2)',
+  CHANGE COLUMN version_col version    BIGINT      NOT NULL DEFAULT 0 COMMENT '乐观锁',
+  ADD COLUMN vendor_code VARCHAR(32) NULL COMMENT '供应商(逻辑引用 gw_vendor)' AFTER fw_type;
+
+ALTER TABLE dev_ota_release
+  MODIFY COLUMN status VARCHAR(16) NOT NULL DEFAULT 'DRAFT'
+    COMMENT 'DRAFT/PUBLISHED/PAUSED/COMPLETED';
+
+-- 9.2 dev_ota_rollout：补灰度投放所需列 + 枚举对齐 db-design
+ALTER TABLE dev_ota_rollout
+  ADD COLUMN tenant_id   VARCHAR(36)  NOT NULL DEFAULT 'MAIN'          AFTER rollout_no,
+  ADD COLUMN fw_version  VARCHAR(32)      NULL COMMENT '冗余展示(取自 release)' AFTER release_no,
+  ADD COLUMN vendor_code VARCHAR(32)      NULL                          AFTER fw_version,
+  ADD COLUMN strategy    VARCHAR(16)  NOT NULL DEFAULT 'GRAY' COMMENT 'GRAY 灰度/FULL 全量' AFTER target_ref,
+  ADD COLUMN progress    DECIMAL(5,2) NOT NULL DEFAULT 0 COMMENT '完成百分比 0..100' AFTER strategy,
+  ADD COLUMN version     BIGINT       NOT NULL DEFAULT 0,
+  ADD COLUMN deleted     TINYINT(1)   NOT NULL DEFAULT 0;
+
+ALTER TABLE dev_ota_rollout
+  MODIFY COLUMN scope  VARCHAR(16) NOT NULL COMMENT 'DEVICE/LOCATION/ALL',
+  MODIFY COLUMN status VARCHAR(16) NOT NULL DEFAULT 'PENDING'
+    COMMENT 'PENDING/RUNNING/DONE/ROLLBACK';
+
+UPDATE dev_ota_rollout SET scope  = 'LOCATION' WHERE scope  = 'SITE';
+UPDATE dev_ota_rollout SET status = 'DONE'     WHERE status = 'COMPLETED';
+UPDATE dev_ota_rollout SET status = 'ROLLBACK' WHERE status = 'CANCELED';
+
+-- 9.3 dev_ota_task：补隔离键与审计列
+ALTER TABLE dev_ota_task
+  ADD COLUMN tenant_id VARCHAR(36) NOT NULL DEFAULT 'MAIN' AFTER rollout_no,
+  ADD COLUMN version   BIGINT      NOT NULL DEFAULT 0,
+  ADD COLUMN deleted   TINYINT(1)  NOT NULL DEFAULT 0;
+
+-- 9.4 dev_shadow：补实时监控读模型直接依赖的三列
+--     「实时监控」菜单叶展示 signal/temp/faultCount，无这三列该页取不到数
+ALTER TABLE dev_shadow
+  ADD COLUMN tenant_id   VARCHAR(36) NOT NULL DEFAULT 'MAIN' AFTER cabinet_no,
+  ADD COLUMN signal      INT         NULL COMMENT '信号强度 0..100' AFTER online,
+  ADD COLUMN temp        DECIMAL(5,2) NULL COMMENT '机内温度 ℃'      AFTER signal,
+  ADD COLUMN fault_count INT         NOT NULL DEFAULT 0 COMMENT '当前未闭环故障数' AFTER temp;

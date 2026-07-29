@@ -13,6 +13,9 @@ export interface Site extends Archivable {
   /** 区域展示名（冗余自 `regions.name`）。存 ID 是因为区域名会变、ID 不会；列表要展示故冗余一份。 */
   regionName: string;
   address: string;
+  /** 经纬度（地图撒点用）。运营端按**站点**聚合展示，不逐台机柜撒点——上千机柜会卡。 */
+  lat: number;
+  lng: number;
   sceneType: string;
   pointCount: number;
   cabinetCount: number;
