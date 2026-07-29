@@ -2,6 +2,8 @@
 // 告警记录 / 通知流水 / 告警码字典 / 通知规则。
 
 // 告警等级：提示 / 警告 / 严重
+import type { Archivable } from "./common";
+
 export type AlarmLevel = "INFO" | "WARN" | "CRITICAL";
 
 // 告警记录：多厂商错误码归一化 —— alarmCode 是平台统一码，vendorErrorCode 是厂商原始码。
@@ -31,7 +33,7 @@ export interface AlarmNotice {
 }
 
 // 告警代码字典：比竞品多「建议处置」「是否自动开工单」——字典即处置预案
-export interface AlarmCode {
+export interface AlarmCode extends Archivable {
   code: string;
   message: string;
   level: AlarmLevel;
@@ -40,7 +42,7 @@ export interface AlarmCode {
 }
 
 // 通知规则：比竞品多「静默窗口」「升级策略」——防夜间轰炸与告警风暴
-export interface AlarmRule {
+export interface AlarmRule extends Archivable {
   ruleNo: string;
   alarmCode: string;
   target: string; // 通知目标（角色/人/群）

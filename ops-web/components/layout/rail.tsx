@@ -68,7 +68,7 @@ export function Rail() {
   const { t } = useI18n();
 
   const domains = visibleDomains(role);
-  const activeDomainKey = findActiveModule(pathname)?.domain.key;
+  const activeDomainKey = findActiveModule(pathname, role)?.domain.key;
   const top = domains.filter((d) => !d.pinBottom);
   const bottom = domains.filter((d) => d.pinBottom);
 

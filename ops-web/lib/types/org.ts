@@ -1,5 +1,7 @@
 // 覆盖范围：组织域（platform）——员工、角色与数据权限、部门、绩效、操作审计。
 
+import type { Archivable } from "./common";
+
 export interface Employee {
   employeeNo: string;
   name: string;
@@ -12,7 +14,7 @@ export interface Employee {
 
 // —— 角色 · 审计（platform 域）——
 export type DataScope = "ALL" | "REGION" | "LOCATION" | "AGENT" | "SELF";
-export interface RoleRow {
+export interface RoleRow extends Archivable {
   roleNo: string;
   code: string;
   name: string;

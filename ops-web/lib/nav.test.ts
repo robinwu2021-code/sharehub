@@ -57,8 +57,28 @@ describe("A.9 角色×域可见性矩阵（抽查）", () => {
     expect(visibleLeaves(module_("system", "system"), "CS").map((l) => l.label))
       .toEqual(["发送记录", "触达拉黑", "问题管理"]);
   });
-  it("AGENT 见 概览/设备运营/渠道与场地/交易与资金，不见其余", () => {
-    expect(domainKeys("AGENT")).toEqual(["overview", "device-ops", "place-bd", "trade-fin"]);
+  // 2026-07-29 代理端门户（B8）：AGENT 是受限外部伙伴，不再走通用运营域。
+  // 此前它靠「无 perm 的叶子跟随父模块」漏出了 SLA 管理/巡检计划/BD 拓展 CRM/押金与欠费。
+  it("AGENT 只见专属门户「我的」，通用运营域一律不出", () => {
+    expect(domainKeys("AGENT")).toEqual(["agent-portal"]);
+  });
+  it("非 AGENT 角色看不到门户域", () => {
+    for (const r of ["ADMIN", "OPS", "CS", "FINANCE", "BD", "VIEWER"] as Role[]) {
+      expect(domainKeys(r)).not.toContain("agent-portal");
+    }
+  });
+  it("AGENT 门户只含「我的」五项，不含任何运营方功能", () => {
+    const labels = domain("agent-portal").modules.flatMap((m) => visibleLeaves(m, "AGENT").map((l) => l.label));
+    expect(labels).toEqual(["我的看板", "我的收益", "我的结算", "我的设备", "我的订单", "设备报修"]);
+    for (const forbidden of ["SLA 管理", "巡检计划", "BD 拓展 CRM", "押金与欠费", "分润配置"]) {
+      expect(labels).not.toContain(forbidden);
+    }
+  });
+  it("路径反推必须按角色区分：/devices 对 OPS 是设备管理，对 AGENT 是我的资产", () => {
+    // 门户域与运营域共用同一批路径，不按角色限定的话排在前面的门户域会对所有角色命中
+    expect(findActiveModule("/devices", "OPS")?.domain.key).toBe("device-ops");
+    expect(findActiveModule("/devices", "AGENT")?.domain.key).toBe("agent-portal");
+    expect(findActiveModule("/devices")?.domain.key).toBe("device-ops"); // 不传角色时排除门户域
   });
 });
 

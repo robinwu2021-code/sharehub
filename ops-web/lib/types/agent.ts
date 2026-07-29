@@ -1,9 +1,11 @@
+import type { Archivable } from "./common";
+
 import type { DataScope } from "./org";
 
 // 覆盖范围：代理商域（agt · ADR-012）——代理主体、区域划分、业绩、
 // 代理端账号、分润规则配置。
 
-export interface Agent {
+export interface Agent extends Archivable {
   agentNo: string;
   name: string;
   contact: string;

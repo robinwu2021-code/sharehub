@@ -4,6 +4,8 @@
  * 前三者语义相同故统一到本类型；PushMessage.channel 语义不同（是推送**类型**不是渠道），
  * 已在 marketing.ts 就地注明，未强并。
  */
+import type { Archivable } from "./common";
+
 export type NotifyChannel = "SMS" | "EMAIL" | "PUSH" | "WHATSAPP" | "WEBHOOK";
 
 // 覆盖范围：系统/平台域（platform、gw）——租户与租户配置、供应商接入、支付渠道、
@@ -214,7 +216,7 @@ export interface AppVersion {
 
 // —— §14 银行管理（系统域 · 阶段 2）——
 // 竞品只有行名；我们带国家/币种/IBAN 长度——提现收款账户校验直接读这里。
-export interface BankEntry {
+export interface BankEntry extends Archivable {
   bankCode: string;
   bankName: string;
   bankNameEn: string;
@@ -229,7 +231,7 @@ export interface BankEntry {
 // 我们更清晰：三语 + 关联建议处置，直接喂 C 端报障下拉与客服快捷答复。
 export type ProblemCategory = "RENT" | "RETURN" | "BILLING" | "DEVICE" | "ACCOUNT" | "OTHER";
 export type ProblemAction = "SELF_SERVICE" | "TO_WORKORDER" | "TO_REFUND" | "TO_CS";
-export interface ProblemEntry {
+export interface ProblemEntry extends Archivable {
   problemNo: string;
   category: ProblemCategory;
   title: string;

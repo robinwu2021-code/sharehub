@@ -6,7 +6,9 @@
 //   capDaily     日封顶           buyoutPrice 买断价（原叫 capTotal，但它就是行业说的"买断"）
 // **新增任何计费相关字段一律沿用这套名，勿再造同义词。**
 
-export interface PricePlan {
+import type { Archivable } from "./common";
+
+export interface PricePlan extends Archivable {
   planNo: string;
   name: string;
   freeMinutes: number;

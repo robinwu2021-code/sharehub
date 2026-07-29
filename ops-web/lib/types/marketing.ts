@@ -2,7 +2,9 @@
 // 广告位/广告计划/投放数据。
 
 // —— 营销：优惠券（user 域）——
-export interface Coupon {
+import type { Archivable } from "./common";
+
+export interface Coupon extends Archivable {
   couponNo: string;
   name: string;
   type: "CUT" | "DISCOUNT";
@@ -70,7 +72,7 @@ export interface AdDelivery {
 // —— 公告管理（营销域 · P1，对标简电云 E1）——
 // c-app 首页 Hub 的「公告条」需要运营端发布口（原功能清单遗漏）。
 // 三语（zh/en/ar）+ 生效期 + 置顶：竞品公告只有单语，我们要覆盖 MENA 多语市场。
-export interface Notice {
+export interface Notice extends Archivable {
   noticeNo: string;
   title: string; // 中文标题
   titleEn: string;

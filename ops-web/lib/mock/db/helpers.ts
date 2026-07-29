@@ -1,6 +1,7 @@
 // 通用查询/CRUD helper（原样搬运自 db.ts）。
-// 覆盖：分页 paginate / 关键词命中 kwHit / 新增编辑 upsert / 业务号生成 nextNo。
-import type { PageResult } from "../../types";
+// 覆盖：分页 paginate / 关键词命中 kwHit / 新增编辑 upsert / 业务号生成 nextNo /
+//       归档过滤 liveHit + 归档落库 setArchived（G1 软删除）。
+import type { PageResult, Archivable } from "../../types";
 
 export function paginate<T>(all: T[], page = 1, size = 10, filter?: (t: T) => boolean): PageResult<T> {
   const rows = filter ? all.filter(filter) : all;
@@ -49,3 +50,35 @@ export const nextNo = (prefix: string, arr: unknown[], base = 900, keyField?: st
   }
   return `${prefix}${max + 1}`;
 };
+
+// ————————————————————————————————————————————————————————————————
+// G1 软删除（TDD §10.1）：归档而非删除
+// ————————————————————————————————————————————————————————————————
+
+/**
+ * 列表默认过滤已归档行的谓词。**每个可归档实体的 list 都必须串上它**，
+ * 否则「归档了还在列表里」——这是软删除最常见的漏实现。
+ *
+ * `showArchived` 从 URL/查询参数来，可能是 boolean 也可能是字符串 "1"/"true"，
+ * 故此处做宽松解释（http-client 的 qs() 会把 boolean 序列化成字符串）。
+ */
+export const liveHit = (row: { archivedAt?: string | null }, showArchived?: unknown) =>
+  showArchived === true || showArchived === "1" || showArchived === "true" ? true : !row.archivedAt;
+
+/** 归档/恢复落库：按业务键就地改 `archivedAt`。找不到直接抛——前端不该调到不存在的行。 */
+export function setArchived<T extends Archivable>(
+  arr: T[], keyField: keyof T, key: string, at: string | null,
+): T {
+  const i = arr.findIndex((x) => (x[keyField] as unknown as string) === key);
+  if (i < 0) throw new Error(`记录不存在：${key}`);
+  arr[i] = { ...arr[i], archivedAt: at };
+  return arr[i];
+}
+
+/** 归档：盖当前时间戳。 */
+export const archiveRow = <T extends Archivable>(arr: T[], keyField: keyof T, key: string) =>
+  setArchived(arr, keyField, key, new Date().toISOString());
+
+/** 恢复：清空归档时间，回到默认列表。 */
+export const unarchiveRow = <T extends Archivable>(arr: T[], keyField: keyof T, key: string) =>
+  setArchived(arr, keyField, key, null);

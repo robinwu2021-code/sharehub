@@ -1,7 +1,9 @@
 // 覆盖范围：场所域——场地方 → 站点 → 点位（ADR-013 两层）、合同、
 // BD 线索（CRM）、站点经营分析、门店自助 onboarding、站点生命周期。
 
-export interface Site {
+import type { Archivable } from "./common";
+
+export interface Site extends Archivable {
   siteNo: string;
   name: string;
   venueName: string;
@@ -24,7 +26,7 @@ export interface Site {
  *  2. 与 `Site`（站点）语义打架，读代码时分不清哪个是"场地"哪个是"点位"。
  * 业务号仍为 `locationNo`（后端字段名未动，改名只在前端类型层）。
  */
-export interface SitePoint {
+export interface SitePoint extends Archivable {
   locationNo: string; // 点位
   name: string;
   siteNo: string;
@@ -33,7 +35,7 @@ export interface SitePoint {
   cabinetCount: number;
   status: "ACTIVE" | "PAUSED";
 }
-export interface Venue {
+export interface Venue extends Archivable {
   venueNo: string;
   name: string;
   contact: string;

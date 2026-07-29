@@ -2,9 +2,11 @@
 // 库存调拨、OTA 升级、设备日志、设备编码批次。
 
 // —— 设备（ops 域）——
+import type { Archivable } from "./common";
+
 export type OnlineStatus = "ONLINE" | "OFFLINE";
 export type CabinetStatus = "DEPLOYED" | "FAULT" | "RETIRED";
-export interface Cabinet {
+export interface Cabinet extends Archivable {
   cabinetNo: string;
   sn: string;
   vendorCode: string;
@@ -33,7 +35,7 @@ export interface Slot {
 // ⚠️ 后端建表时词表要重新定：真实业务的「在库/已投放/在租/已归还/报废/丢失」比现在的 4 值更完整。
 
 // —— 设备 · 待建功能补全（ops/gw 域）——
-export interface Powerbank {
+export interface Powerbank extends Archivable {
   powerbankNo: string;
   cabinetNo: string;
   battery: number; // 0..100

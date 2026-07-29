@@ -6,6 +6,19 @@ type Pair = { en: string; ar: string };
 
 const NAV: Record<string, Pair> = {
   // 域
+  "我的": { en: "My Portal", ar: "بوابتي" },
+  "我的经营": { en: "My Business", ar: "أعمالي" },
+  "我的资产": { en: "My Assets", ar: "أصولي" },
+  "我的服务": { en: "My Service", ar: "خدماتي" },
+  "我的看板": { en: "My Dashboard", ar: "لوحتي" },
+  "我的收益": { en: "My Earnings", ar: "أرباحي" },
+  "我的结算": { en: "My Settlements", ar: "تسوياتي" },
+  "我的设备": { en: "My Devices", ar: "أجهزتي" },
+  "我的订单": { en: "My Orders", ar: "طلباتي" },
+  "设备报修": { en: "Report Fault", ar: "الإبلاغ عن عطل" },
+  "经营概览": { en: "Business Overview", ar: "نظرة عامة على الأعمال" },
+  "设备与订单": { en: "Devices & Orders", ar: "الأجهزة والطلبات" },
+  "报修与跟进": { en: "Faults & Follow-up", ar: "الأعطال والمتابعة" },
   "概览": { en: "Overview", ar: "نظرة عامة" },
   "设备运营": { en: "Device Ops", ar: "تشغيل الأجهزة" },
   "渠道与场地": { en: "Channels & Places", ar: "القنوات والمواقع" },

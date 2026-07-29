@@ -1,6 +1,8 @@
 // 覆盖范围：C 端用户域（user）——用户主体、风控、黑名单、会员、钱包、
 // 免费用户白名单（含共用的免费来源枚举）、充值套餐。
 
+import type { Archivable } from "./common";
+
 export interface CUser {
   cUserNo: string;
   nickname: string;
@@ -77,7 +79,7 @@ export interface FreeUserWhitelist {
 
 // —— 充值套餐（阶段 3）——
 // 竞品只有「充值 + 赠送」；我们加**有效期**与**适用市场**（MENA 多国家）。
-export interface RechargePackage {
+export interface RechargePackage extends Archivable {
   packageNo: string;
   name: string;
   payAmount: number; // 充值金额

@@ -55,10 +55,51 @@ export interface NavDomain {
   label: string;
   icon: string;
   pinBottom?: boolean; // Rail 固定底部
+  /**
+   * 专属门户：声明本域是某些角色的**唯一**入口。
+   * 规则（见 visibleDomains）：
+   *  - 角色若命中任一域的 portalFor → **只看到这些门户域**，通用运营域一律不出；
+   *  - 其它角色**看不到**门户域。
+   * 动机：AGENT 是运营方体内的受限外部伙伴（ADR-012）。此前它靠"无 perm 的叶子跟随
+   * 父模块"漏出了 SLA 管理 / 巡检计划 / BD 拓展 CRM / 押金与欠费 等运营方功能——
+   * 与 §三·B G5「代理端缺位」是同一问题的两面：既没有自己的门户，又看到了不该看的。
+   */
+  portalFor?: Role[];
   modules: NavModule[];
 }
 
 export const NAV: NavDomain[] = [
+  {
+    // 代理端门户（方案 §六 方案 A：不建新工程/新页，AGENT 登录后只出「我的」域，
+    // 深链复用运营端既有页面，数据由后端按 agent_no 收敛）。
+    key: "agent-portal",
+    label: "我的",
+    icon: "Handshake",
+    portalFor: ["AGENT"],
+    modules: [
+      {
+        key: "my-biz", label: "我的经营", icon: "LayoutDashboard", module: "dashboard", href: "/",
+        children: [
+          { href: "/", label: "我的看板", perm: "dashboard:overview:read", group: "经营概览" },
+          { href: "/finance?tab=records", label: "我的收益", perm: "finance:share_record:read", group: "经营概览" },
+          { href: "/finance?tab=settlements", label: "我的结算", perm: "agent:settlement:read", group: "经营概览" },
+        ],
+      },
+      {
+        key: "my-asset", label: "我的资产", icon: "Server", module: "device", href: "/devices",
+        children: [
+          { href: "/devices", label: "我的设备", perm: "device:cabinet:read", group: "设备与订单" },
+          { href: "/orders", label: "我的订单", perm: "order:order:read", group: "设备与订单" },
+        ],
+      },
+      {
+        key: "my-service", label: "我的服务", icon: "Wrench", module: "workorder", href: "/work-orders",
+        children: [
+          { href: "/work-orders?view=list", label: "设备报修", perm: "workorder:wo:create", group: "报修与跟进" },
+        ],
+      },
+    ],
+  },
   {
     key: "overview",
     label: "概览",
@@ -325,7 +366,9 @@ export function visibleModules(domain: NavDomain, role: Role | undefined): NavMo
 
 /** L1 可见性派生：域内任一模块可见。 */
 export function visibleDomains(role: Role | undefined): NavDomain[] {
-  return NAV.filter((d) => visibleModules(d, role).length > 0);
+  const portals = NAV.filter((d) => role && d.portalFor?.includes(role));
+  const pool = portals.length > 0 ? portals : NAV.filter((d) => !d.portalFor);
+  return pool.filter((d) => visibleModules(d, role).length > 0);
 }
 
 /** L3 可见性 = leaf.perm ? can() : 跟随父模块。phase-locked 叶子保留（灰显）。 */
@@ -381,10 +424,15 @@ function moduleMatchPrefixes(mod: NavModule): string[] {
  * 由 pathname 反推当前 域+模块：最长前缀匹配；"/" 仅精确匹配。
  * 不做 RBAC 过滤——URL 已到达即需正确归属（页面自身有权限兜底）。
  */
-export function findActiveModule(pathname: string): { domain: NavDomain; module: NavModule } | undefined {
+export function findActiveModule(pathname: string, role?: Role): { domain: NavDomain; module: NavModule } | undefined {
   const p = normPath(pathname);
+  // ⚠️ 必须按角色限定搜索范围：门户域（如代理端「我的」）与运营域**共用同一批路径**
+  // （/、/devices、/orders…）。不限定的话，域列表里排在前面的门户域会对所有角色命中，
+  // 运营人员的面包屑会变成「我的 › 我的经营」。传 role 时只在该角色可见的域里找；
+  // 不传时排除门户域（对运营端是安全默认值）。
+  const pool = role ? visibleDomains(role) : NAV.filter((d) => !d.portalFor);
   let best: { domain: NavDomain; module: NavModule; len: number } | undefined;
-  for (const domain of NAV) {
+  for (const domain of pool) {
     for (const module of domain.modules) {
       for (const prefix of moduleMatchPrefixes(module)) {
         const hit = prefix === "/" ? p === "/" : p === prefix || p.startsWith(prefix + "/");
@@ -442,7 +490,7 @@ export function isLeafDisabled(leaf: NavLeaf): boolean {
 export function routeLockedPhase(
   pathname: string, tab: string | null, view: string | null, role: Role | undefined,
 ): Phase | undefined {
-  const hit = findActiveModule(pathname);
+  const hit = findActiveModule(pathname, role);
   if (!hit) return undefined;
   if (isPhaseLocked(hit.module.phase)) return hit.module.phase;
   const p = normPath(pathname);
@@ -465,7 +513,7 @@ export function routeLockedPhase(
 export function breadcrumb(
   pathname: string, tab: string | null, view: string | null, role: Role | undefined,
 ): string[] {
-  const hit = findActiveModule(pathname);
+  const hit = findActiveModule(pathname, role);
   if (!hit) return [];
   const crumbs = [hit.domain.label];
   if (!isSingleModuleDomain(hit.domain)) crumbs.push(hit.module.label);
