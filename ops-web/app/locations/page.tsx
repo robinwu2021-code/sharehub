@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { money, fmtTime } from "@/lib/utils";
 import { useCan } from "@/lib/use-can";
 import { notify } from "@/lib/notify";
-import type { Site, SitePoint, Venue, Contract, Lead, SiteAnalysis, VenueOnboarding, SiteLifecycle, PageResult } from "@/lib/types";
+import type { Site, SitePoint, Venue, Contract, Lead, SiteAnalysis, VenueOnboarding, SiteLifecycle, PageResult, Region } from "@/lib/types";
 
 const SIZE = 10;
 const TABS = [
@@ -95,6 +95,8 @@ function LocationsInner() {
   const canContract = allow("location:contract:update");
   const canLead = allow("location:lead:update");
 
+  // 站点表单的区域下拉数据源（system 域字典）
+  const regionsQ = useQuery({ queryKey: ["regions-dict"], queryFn: () => api.listRegions({ page: 1, size: 100 }) });
   const q = useQuery<PageResult<Site | SitePoint | Venue | Contract | Lead | SiteAnalysis | VenueOnboarding | SiteLifecycle>>({
     queryKey: ["place", tab, page, keyword],
     queryFn: () =>
@@ -138,7 +140,7 @@ function LocationsInner() {
     { header: "站点号", cell: (s) => <span className="font-medium">{s.siteNo}</span> },
     { header: "名称", cell: (s) => s.name },
     { header: "场地方", cell: (s) => <span className="text-muted-foreground">{s.venueName}</span> },
-    { header: "区域", cell: (s) => s.regionId },
+    { header: "区域", cell: (s) => <span title={s.regionId}>{s.regionName}</span> },
     { header: "归属", cell: (s) => s.agentNo ? <Badge tone="outline">代理 {s.agentNo}</Badge> : <Badge tone="muted">平台直营</Badge> },
     { header: "点位/设备", cell: (s) => <span className="tabular-nums">{s.pointCount} / {s.cabinetCount}</span> },
     { header: "状态", cell: (s) => s.status === "ACTIVE" ? <Badge tone="success">启用</Badge> : <Badge tone="muted">暂停</Badge> },
@@ -278,7 +280,18 @@ function LocationsInner() {
         {siteForm && (<>
           <Field label="站点名称"><Input value={siteForm.name ?? ""} onChange={(e) => setSiteForm({ ...siteForm, name: e.target.value })} /></Field>
           <Field label="场地方"><Input value={siteForm.venueName ?? ""} onChange={(e) => setSiteForm({ ...siteForm, venueName: e.target.value })} /></Field>
-          <Field label="区域"><Input value={siteForm.regionId ?? ""} onChange={(e) => setSiteForm({ ...siteForm, regionId: e.target.value })} placeholder="Dubai North" /></Field>
+          {/* 区域从字典选，不能自由输入——台账 M11：原先是文本框，写进去的名字在 regions 字典里根本不存在 */}
+          <Field label="区域">
+            <Select className="w-full" value={siteForm.regionId ?? ""} onChange={(e) => {
+              const r = (regionsQ.data?.list ?? []).find((x) => x.regionId === e.target.value);
+              setSiteForm({ ...siteForm, regionId: e.target.value, regionName: r?.name ?? "" });
+            }}>
+              <option value="">请选择区域</option>
+              {(regionsQ.data?.list ?? []).filter((r) => r.level === 3).map((r) => (
+                <option key={r.regionId} value={r.regionId}>{r.name}（{r.regionId}）</option>
+              ))}
+            </Select>
+          </Field>
           <Field label="归属代理（空=平台直营）"><Input value={siteForm.agentNo ?? ""} onChange={(e) => setSiteForm({ ...siteForm, agentNo: e.target.value || null })} placeholder="AG001" /></Field>
           <Field label="场景">
             <Select className="w-full" value={siteForm.sceneType ?? "商场"} onChange={(e) => setSiteForm({ ...siteForm, sceneType: e.target.value })}>

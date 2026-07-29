@@ -86,6 +86,9 @@ const REFS: Ref[] = [
     nullableReason: "直营站点没有代理商（Site.agentNo 类型即为 string | null）",
   }),
   ref("sites", db.sites, "venueName", "venues.name", venueNames),
+  // 台账 M11：站点的区域曾经存的是"Dubai North"这类字典里不存在的名字，现改为存 regions 字典 ID
+  ref("sites", db.sites, "regionId", "regions.regionId", new Set(db.regions.map((r) => r.regionId))),
+  ref("sites", db.sites, "regionName", "regions.name", new Set(db.regions.map((r) => r.name))),
   ref("locations", db.locations, "siteNo", "sites.siteNo", siteNos),
   ref("locations", db.locations, "siteName", "sites.name", siteNames),
   ref("contracts", db.contracts, "siteName", "sites.name", siteNames),

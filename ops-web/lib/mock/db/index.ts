@@ -91,7 +91,7 @@ export {
 export {
   tenants, tenantConfigs, employees, roles, audits, departments, staffPerformances,
   listEmployees, listDepartments, listStaffPerformance,
-  saveDepartment, saveRoleRow, saveEmployee,
+  saveDepartment, saveRoleRow, saveEmployee, saveRoleDataScope,
 } from "./org";
 
 export {

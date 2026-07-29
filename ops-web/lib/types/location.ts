@@ -6,7 +6,10 @@ export interface Site {
   name: string;
   venueName: string;
   agentNo: string | null; // 归属代理，空=平台直营
+  /** 区域字典 ID（`regions.regionId`，如 `DU-MAR`）。台账 M11：原先误存区域名。 */
   regionId: string;
+  /** 区域展示名（冗余自 `regions.name`）。存 ID 是因为区域名会变、ID 不会；列表要展示故冗余一份。 */
+  regionName: string;
   address: string;
   sceneType: string;
   pointCount: number;

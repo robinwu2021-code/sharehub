@@ -15,4 +15,7 @@ export const orgHttp: OrgApi = {
   saveDepartment: (x) => client.post(x.deptNo ? `/api/platform/departments/${x.deptNo}` : "/api/platform/departments", x),
   saveRoleRow: (x) => client.post(x.roleNo ? `/api/platform/roles/${x.roleNo}` : "/api/platform/roles", x),
   saveEmployee: (x) => client.post(x.employeeNo ? `/api/platform/employees/${x.employeeNo}` : "/api/platform/employees", x),
+  // 覆盖写（PUT），对齐《权限体系设计》§9「数据范围配置 PUT .../data-scope」
+  saveRoleDataScope: (code, scope, values) =>
+    client.put(`/api/platform/iam/roles/${code}/data-scope`, { scope, scopeValues: values ?? "" }),
 };

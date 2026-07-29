@@ -15,7 +15,7 @@ const API_METHODS: Record<string, readonly string[]> = {
   dashboard: ["login", "getDashboard"],
   device: ["listCabinets", "getCabinet", "sendCommand", "listPowerbanks", "listCabinetMonitor", "listCommandRecords", "listInventoryTransfers", "listOtaRollouts", "savePowerbank", "saveInventoryTransfer", "saveOtaRollout", "listDeviceLogs", "listDeviceCodeBatches", "saveDeviceCodeBatch"],
   alarm: ["listAlarmRecords", "listAlarmNotices", "listAlarmCodes", "listAlarmRules", "saveAlarmCode", "saveAlarmRule", "raiseAlarmWorkOrder"],
-  workorder: ["listWorkOrders", "dispatchWorkOrder", "listSlaRules", "listInspectionPlans", "saveSlaRule", "saveInspectionPlan"],
+  workorder: ["listWorkOrders", "createWorkOrder", "dispatchWorkOrder", "acceptWorkOrder", "processWorkOrder", "completeWorkOrder", "closeWorkOrder", "rejectWorkOrder", "reworkWorkOrder", "listSlaRules", "listInspectionPlans", "saveSlaRule", "saveInspectionPlan"],
   location: ["listSites", "saveSite", "listLocations", "savePoint", "listVenues", "listContracts", "listLeads", "listSiteAnalysis", "saveLead", "saveVenue", "saveContract", "listVenueOnboardings", "saveVenueOnboarding", "listSiteLifecycles"],
   agent: ["listAgents", "saveAgent", "listAgentAssignments", "listAgentPerformance", "listAgentAccounts", "saveAgentAccount", "listAgentCommissions", "saveAgentCommission"],
   order: ["listOrders", "getOrder", "interveneOrder", "listOrderExceptions", "listDepositRecords", "listOrderComplaints", "handleOrderComplaint", "raiseComplaintWorkOrder", "listRefundRecords", "auditRefund", "listReservations", "cancelReservation", "listFreeOrders", "getFreeOrderStats"],
@@ -25,7 +25,7 @@ const API_METHODS: Record<string, readonly string[]> = {
   marketing: ["listCoupons", "saveCoupon", "listCampaigns", "listPushMessages", "listReferrals", "listAdSlots", "listAdCampaigns", "listAdDeliveries", "saveCampaign", "savePushMessage", "saveAdSlot", "saveAdCampaign", "listNotices", "saveNotice"],
   cs: ["listCsTickets", "listCsSessions", "saveCsTicket"],
   report: ["listReportDevice", "listReportLocation", "listReportFinance", "listReportScreen", "listReportCustom"],
-  org: ["listEmployees", "listRoles", "listAudits", "listDepartments", "listStaffPerformance", "saveDepartment", "saveRoleRow", "saveEmployee"],
+  org: ["listEmployees", "listRoles", "listAudits", "listDepartments", "listStaffPerformance", "saveDepartment", "saveRoleRow", "saveEmployee", "saveRoleDataScope"],
   system: ["listVendors", "saveVendor", "listNotifyTemplates", "listDictEntries", "listRegions", "listSysParams", "listOpenApiApps", "listMarketCountries", "saveNotifyTemplate", "saveDictEntry", "saveRegion", "saveSysParam", "saveOpenApiApp", "saveMarketCountry", "listPaymentChannels", "savePaymentChannel", "listNotifyLogs", "getNotifyLogStats", "listNotifyBlacklist", "saveNotifyBlacklist", "releaseNotifyBlacklist", "getBizRules", "saveBizRules", "listLoginSettings", "saveLoginSetting", "listAppVersions", "saveAppVersion", "rollbackAppVersion", "listBanks", "saveBank", "listProblems", "saveProblem", "listTaxSettings", "saveTaxSetting"],
 };
 
@@ -80,7 +80,7 @@ describe("域切片划分", () => {
     expect(sorted(keysOf((HTTP_SLICES as Record<string, object>)[domain]))).toEqual(expected);
   });
 
-  it("方法总数仍为 161（新增/删除 API 时须自觉更新此数）", () => {
-    expect(ALL_METHODS.length).toBe(161);
+  it("方法总数仍为 168（新增/删除 API 时须自觉更新此数）", () => {
+    expect(ALL_METHODS.length).toBe(169);
   });
 });

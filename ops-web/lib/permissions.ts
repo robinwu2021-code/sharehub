@@ -12,6 +12,8 @@ const ROLE_PERMS: Record<Role, string[]> = {
     "device:command:*", "device:inventory:*", "device:ota:read", "device:vendor:read",
     "location:poi:read", "location:venue:read",
     "order:order:read", "order:exception:read", "order:exception:handle",
+    // OPS 是工单主责，工单域全量：wo:read/create/dispatch/handle(接单·处理·完成)/close(验收关单)
+    // + sla:update / inspection:update / alarm:config（对应功能权限清单 §7）
     "workorder:*",
     "agent:scope:assign",
     "report:device:read", "report:location:read",

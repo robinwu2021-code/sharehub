@@ -27,11 +27,18 @@ export function MultiSelect({
   const [open, setOpen] = React.useState(false);
   const rootRef = React.useRef<HTMLDivElement>(null);
 
+  // 关闭时触发 onBlur（供 FormDrawer 做失焦校验）。
+  // ⚠️ onBlur 绝不能写在 setOpen 的 updater 里：updater 会在 render 阶段执行，
+  // 在其中调用父组件的 setState 会报 "Cannot update a component while rendering
+  // a different component"，且 StrictMode 下 updater 执行两次会重复触发。
+  // 用 ref 读当前 open 值，副作用留在事件回调里。（同类错误另见 confirm-dialog 的 resolve）
+  const openRef = React.useRef(false);
+  React.useEffect(() => { openRef.current = open; }, [open]);
+
   const close = React.useCallback(() => {
-    setOpen((o) => {
-      if (o) onBlur?.();
-      return false;
-    });
+    const wasOpen = openRef.current;
+    setOpen(false);
+    if (wasOpen) onBlur?.();
   }, [onBlur]);
 
   React.useEffect(() => {

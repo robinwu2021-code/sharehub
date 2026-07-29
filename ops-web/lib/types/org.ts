@@ -20,6 +20,14 @@ export interface RoleRow {
   memberCount: number;
   builtin: boolean;
   dataScope: DataScope; // 数据权限范围
+  /**
+   * 数据范围的具体取值，逗号分隔的 ID 列表（对应后端 iam_data_scope.scope_refs）：
+   * - REGION   → regions.regionId，如 "AE-DU,AE-AZ"
+   * - LOCATION → sites.siteNo，如 "ST300,ST305"
+   * - AGENT    → agents.agentNo，如 "AG001"
+   * - ALL / SELF → 语义上不需要附加值，一律为空串（保存时会被清空）
+   */
+  scopeValues?: string;
 }
 export interface AuditEntry {
   id: string;

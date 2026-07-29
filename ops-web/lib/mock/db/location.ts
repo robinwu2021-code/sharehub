@@ -7,10 +7,18 @@ import type {
 import { LOCS, VENUE_NAMES, p, iso, phone } from "./internal";
 import { paginate, kwHit, upsert, nextNo } from "./helpers";
 
-const REGIONS = ["Dubai North", "Dubai Marina", "Deira", "DXB", "JBR"];
+// 台账 M11：站点的区域必须挂 regions 字典里真实存在的三级区域 ID（原先存的是"Dubai North"
+// 这类字典里根本没有的名字）。ID 与展示名成对，展示名冗余自字典。
+const REGIONS: { id: string; name: string }[] = [
+  { id: "DU-MAR", name: "Dubai Marina" },
+  { id: "DU-DEI", name: "Deira" },
+  { id: "DU-DT", name: "Downtown Dubai" },
+  { id: "DU-DXB", name: "DXB 机场" },
+  { id: "AZ-YAS", name: "Yas Island" },
+];
 export const sites: Site[] = Array.from({ length: 12 }, (_, i) => ({
   siteNo: `ST${300 + i}`, name: p(LOCS, i), venueName: p(VENUE_NAMES, i),
-  agentNo: i % 3 === 0 ? null : `AG${String((i % 9) + 1).padStart(3, "0")}`, regionId: p(REGIONS, i),
+  agentNo: i % 3 === 0 ? null : `AG${String((i % 9) + 1).padStart(3, "0")}`, regionId: p(REGIONS, i).id, regionName: p(REGIONS, i).name,
   address: `${p(LOCS, i)}, Dubai, UAE`, sceneType: p(["商场", "机场", "餐饮", "地铁", "写字楼"], i),
   pointCount: 1 + (i % 4), cabinetCount: 2 + (i * 3) % 10, status: i % 8 === 0 ? "PAUSED" : "ACTIVE",
 }));

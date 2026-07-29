@@ -1,16 +1,14 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PageTitle, Pagination, EmptyState } from "@/components/ui/misc";
-import { Select } from "@/components/ui/input";
 import { TabHeader } from "@/components/ui/tab-header";
 import { Toolbar } from "@/components/ui/toolbar";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
 import { DataTable, type Column } from "@/components/ui/data-table";
-import { Drawer, Field } from "@/components/ui/drawer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { fmtTime } from "@/lib/utils";
@@ -21,6 +19,23 @@ import type { Employee, RoleRow, AuditEntry, DataScope, Department, StaffPerform
 const SIZE = 10;
 const SCOPE_LABEL: Record<DataScope, string> = { ALL: "全部数据", REGION: "按区域", LOCATION: "按点位", AGENT: "按代理(自己)", SELF: "仅自己经手" };
 const SCOPE_OPTIONS = (["ALL", "REGION", "LOCATION", "AGENT", "SELF"] as DataScope[]).map((s) => ({ value: s, label: SCOPE_LABEL[s] }));
+// 数据权限抽屉的表单形状：三档范围值各占一个 key（共用一个 key 会被 disabledWhen 的清空逻辑互相抹掉），
+// 提交时按 dataScope 收敛成单个 scopeValues（逗号分隔 ID）。
+type ScopeForm = { dataScope: DataScope; regionValues: string; locationValues: string; agentValues: string };
+const EMPTY_SCOPE_FORM: ScopeForm = { dataScope: "ALL", regionValues: "", locationValues: "", agentValues: "" };
+const scopeFormOf = (r: RoleRow): ScopeForm => ({
+  ...EMPTY_SCOPE_FORM,
+  dataScope: r.dataScope,
+  regionValues: r.dataScope === "REGION" ? (r.scopeValues ?? "") : "",
+  locationValues: r.dataScope === "LOCATION" ? (r.scopeValues ?? "") : "",
+  agentValues: r.dataScope === "AGENT" ? (r.scopeValues ?? "") : "",
+});
+const scopeValuesOf = (f: ScopeForm): string =>
+  f.dataScope === "REGION" ? f.regionValues
+  : f.dataScope === "LOCATION" ? f.locationValues
+  : f.dataScope === "AGENT" ? f.agentValues
+  : ""; // ALL / SELF 无附加范围值
+const csvCount = (v?: string) => (v ?? "").split(",").filter((s) => s.trim()).length;
 const ROLE_FIELDS: FieldDef[] = [
   { key: "code", label: "角色码", placeholder: "custom_ops" },
   { key: "name", label: "名称", placeholder: "自定义运营" },
@@ -63,7 +78,7 @@ function EmployeesInner() {
   const [page, setPage] = useState(1);
   const [keyword, setKeyword] = useState("");
   const [scopeRole, setScopeRole] = useState<RoleRow | null>(null);
-  const [scope, setScope] = useState<DataScope>("ALL");
+  const [scopeForm, setScopeForm] = useState<ScopeForm>(EMPTY_SCOPE_FORM);
   const [roleForm, setRoleForm] = useState<Partial<RoleRow> | null>(null);
   const [deptForm, setDeptForm] = useState<Partial<Department> | null>(null);
   const [empForm, setEmpForm] = useState<Partial<Employee> | null>(null);
@@ -86,7 +101,45 @@ function EmployeesInner() {
     placeholderData: keepPreviousData, enabled: tab === "audit",
   });
 
-  const canAssign = allow("org:role:assign");
+  // 数据权限范围值的候选主数据（只在抽屉打开时拉，避免进页面就多三个请求）
+  const scopeOpen = !!scopeRole;
+  const regionsQ = useQuery({ queryKey: ["scope-regions"], queryFn: () => api.listRegions({ page: 1, size: 200 }), enabled: scopeOpen });
+  const sitesQ = useQuery({ queryKey: ["scope-sites"], queryFn: () => api.listSites({ page: 1, size: 200 }), enabled: scopeOpen });
+  const agentsQ = useQuery({ queryKey: ["scope-agents"], queryFn: () => api.listAgents({ page: 1, size: 200 }), enabled: scopeOpen });
+  // ⚠️ AGENT 角色自身的数据范围是**锁死**的：功能权限清单 §二 明确「AGENT 数据范围强制 = 自己 agent_no」。
+  // 若放开让它选任意代理，就等于代理商能看别家代理的数据——真的越权口子。
+  // 其它角色（如 BD 管几家代理）选特定代理是合理的，故只针对 AGENT 这一行锁。
+  const isAgentRole = scopeRole?.code === "AGENT";
+  const scopeFields: FieldDef[] = useMemo(() => [
+    {
+      key: "dataScope", label: "数据范围", type: "select", options: SCOPE_OPTIONS,
+      disabledWhen: () => isAgentRole,
+      help: isAgentRole
+        ? "代理商角色的数据范围强制为「自己 agent_no」，不可更改（功能权限清单 §二）"
+        : "后端按 tenant/region/location/agent_no 拦截（iam_data_scope）",
+    },
+    {
+      key: "regionValues", label: "可见区域", type: "multiselect", csv: true,
+      options: (regionsQ.data?.list ?? []).map((r) => ({ value: r.regionId, label: `${r.name}（${r.regionId}）` })),
+      placeholder: "选择区域（可多选）", disabledWhen: (v) => v.dataScope !== "REGION",
+      help: "仅「按区域」可选；留空 = 未限定任何区域（后端视为无可见数据）",
+    },
+    {
+      key: "locationValues", label: "可见站点", type: "multiselect", csv: true,
+      options: (sitesQ.data?.list ?? []).map((s) => ({ value: s.siteNo, label: `${s.name}（${s.siteNo}）` })),
+      placeholder: "选择站点（可多选）", disabledWhen: (v) => v.dataScope !== "LOCATION",
+      help: "仅「按点位」可选；站点下的点位/柜机随站点一起可见",
+    },
+    {
+      key: "agentValues", label: "可见代理商", type: "multiselect", csv: true,
+      options: (agentsQ.data?.list ?? []).map((a) => ({ value: a.agentNo, label: `${a.name}（${a.agentNo}）` })),
+      placeholder: "选择代理商（可多选）", disabledWhen: (v) => v.dataScope !== "AGENT" || isAgentRole,
+      help: isAgentRole
+        ? "代理商角色恒为「仅本人所属 agent_no」，不可指定其它代理"
+        : "仅「按代理」可选；留空 = 仅本人所属 agent_no",
+    },
+  ], [regionsQ.data, sitesQ.data, agentsQ.data, isAgentRole]);
+
   const canEditRole = allow("org:role:update");
   // 员工与部门同属组织维护，沿用 org:employee:update
   const canEditDept = allow("org:employee:update");
@@ -98,6 +151,11 @@ function EmployeesInner() {
   const saveRole = useMutation({
     mutationFn: (v: Partial<RoleRow>) => api.saveRoleRow(v),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["roles"] }); notify.success("保存成功"); setRoleForm(null); },
+  });
+  // G7：数据权限真落库（此前 onSave 只 invalidate、选中值被丢弃，重开抽屉又变回原值）
+  const saveScope = useMutation({
+    mutationFn: (v: { code: string; form: ScopeForm }) => api.saveRoleDataScope(v.code, v.form.dataScope, scopeValuesOf(v.form)),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["roles"] }); notify.success("数据权限已保存"); setScopeRole(null); },
   });
   const saveDept = useMutation({
     mutationFn: (v: Partial<Department>) => api.saveDepartment(v),
@@ -118,17 +176,42 @@ function EmployeesInner() {
     { header: "角色码", cell: (r) => <span className="font-medium">{r.code}</span> },
     { header: "名称", cell: (r) => r.name },
     { header: "权限数", cell: (r) => <span className="tabular-nums">{r.permCount}</span> },
-    { header: "数据范围", cell: (r) => <Badge tone="outline">{SCOPE_LABEL[r.dataScope]}</Badge> },
+    {
+      header: "数据范围",
+      cell: (r) => {
+        const n = csvCount(r.scopeValues);
+        const needValues = r.dataScope === "REGION" || r.dataScope === "LOCATION" || r.dataScope === "AGENT";
+        return (
+          <div className="flex items-center gap-1.5">
+            <Badge tone="outline">{SCOPE_LABEL[r.dataScope]}</Badge>
+            {needValues && (
+              n > 0
+                ? <span className="text-xs text-muted-foreground tabular-nums">· {n} 个</span>
+                : <span className="text-xs text-warning">· 未配置范围</span>
+            )}
+          </div>
+        );
+      },
+    },
     { header: "成员数", cell: (r) => <span className="tabular-nums">{r.memberCount}</span> },
     { header: "类型", cell: (r) => r.builtin ? <Badge tone="muted">内置</Badge> : <Badge tone="outline">自定义</Badge> },
     {
       header: "操作",
-      cell: (r) => (canEditRole || canAssign) ? (
+      cell: (r) => (
         <div className="flex gap-2">
           {canEditRole && <Button size="sm" variant="outline" onClick={() => setRoleForm(r)}>编辑</Button>}
-          {canAssign && <Button size="sm" variant="outline" onClick={() => { setScopeRole(r); setScope(r.dataScope); }}>数据权限</Button>}
+          {/* 无 org:role:update 时按钮显式禁用（不静默隐藏），范围与数量在「数据范围」列仍可查看 */}
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!canEditRole}
+            title={canEditRole ? undefined : "仅可查看：缺少 org:role:update"}
+            onClick={() => { setScopeRole(r); setScopeForm(scopeFormOf(r)); }}
+          >
+            数据权限
+          </Button>
         </div>
-      ) : <span className="text-muted-foreground">-</span>,
+      ),
     },
   ];
   const orgCols: Column<Department>[] = [
@@ -190,13 +273,16 @@ function EmployeesInner() {
       )}
       {tab === "performance" && <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索工号 / 姓名" />}
       {tab === "roles" && (
-        <Toolbar
-          search={keyword}
-          onSearch={onSearch}
-          searchPlaceholder="搜索角色码 / 名称"
-          onAdd={canEditRole ? () => setRoleForm({ code: "", name: "", dataScope: "ALL", permCount: 0, memberCount: 0, builtin: false }) : undefined}
-          addLabel="新增角色"
-        />
+        <>
+          <Toolbar
+            search={keyword}
+            onSearch={onSearch}
+            searchPlaceholder="搜索角色码 / 名称"
+            onAdd={canEditRole ? () => setRoleForm({ code: "", name: "", dataScope: "ALL", scopeValues: "", permCount: 0, memberCount: 0, builtin: false }) : undefined}
+            addLabel="新增角色"
+          />
+          {!canEditRole && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无角色维护权限（org:role:update），不能修改角色与数据权限</div>}
+        </>
       )}
       {tab === "audit" && <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索操作人 / 动作 / 对象" />}
       {tab === "employees" && <DataTable rowKey={(e: Employee) => e.employeeNo} columns={empCols} rows={emp.data?.list} loading={emp.isLoading} />}
@@ -206,28 +292,18 @@ function EmployeesInner() {
       {tab === "audit" && <DataTable rowKey={(a: AuditEntry) => a.id} columns={auditCols} rows={audit.data?.list} loading={audit.isLoading} />}
       {paged && <Pagination page={page} size={SIZE} total={paged.total} onPage={setPage} />}
 
-      <Drawer
+      <FormDrawer
         open={!!scopeRole}
         onOpenChange={(o) => !o && setScopeRole(null)}
-        title={`数据权限 · ${scopeRole?.name ?? ""}`}
-        desc="限定该角色可见/可操作的数据范围（后端按 tenant/region/location/agent_no 拦截）"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setScopeRole(null)}>取消</Button>
-            <Button onClick={() => { qc.invalidateQueries({ queryKey: ["roles"] }); setScopeRole(null); }}>保存</Button>
-          </>
-        }
-      >
-        <Field label="功能权限">{scopeRole?.permCount} 项（角色码 {scopeRole?.code}）</Field>
-        <Field label="数据范围">
-          <Select className="w-full" value={scope} onChange={(e) => setScope(e.target.value as DataScope)} disabled={scopeRole?.dataScope === "AGENT"}>
-            {(["ALL", "REGION", "LOCATION", "AGENT", "SELF"] as DataScope[]).map((s) => <option key={s} value={s}>{SCOPE_LABEL[s]}</option>)}
-          </Select>
-        </Field>
-        {scope === "REGION" && <Field label="可见区域">（选择区域 · mock）Dubai North / Marina …</Field>}
-        {scope === "LOCATION" && <Field label="可见点位">（选择点位 · mock）Dubai Mall / DXB T3 …</Field>}
-        {scopeRole?.dataScope === "AGENT" && <div className="text-xs text-muted-foreground">代理角色数据范围强制为自己 agent_no，不可改。</div>}
-      </Drawer>
+        titleNew="数据权限"
+        titleEdit={`数据权限 · ${scopeRole?.name ?? ""}（${scopeRole?.code ?? ""} · ${scopeRole?.permCount ?? 0} 项功能权限）`}
+        isEdit
+        fields={scopeFields}
+        value={scopeForm as unknown as Record<string, unknown>}
+        onChange={(v) => setScopeForm(v as unknown as ScopeForm)}
+        onSubmit={() => scopeRole && saveScope.mutate({ code: scopeRole.code, form: scopeForm })}
+        submitting={saveScope.isPending}
+      />
 
       <FormDrawer
         open={!!roleForm}

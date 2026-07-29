@@ -2,7 +2,7 @@
 // （无租户管理，租户仅后端兼容层）
 import type { PageQ } from "../query";
 import type {
-  PageResult, Employee, RoleRow, AuditEntry, Department, StaffPerformance,
+  PageResult, Employee, RoleRow, AuditEntry, Department, StaffPerformance, DataScope,
 } from "../../types";
 
 export interface OrgApi {
@@ -16,4 +16,11 @@ export interface OrgApi {
   saveDepartment(x: Partial<Department> & { deptNo?: string }): Promise<Department>;
   saveRoleRow(x: Partial<RoleRow> & { roleNo?: string }): Promise<RoleRow>;
   saveEmployee(x: Partial<Employee> & { employeeNo?: string }): Promise<Employee>;
+
+  /**
+   * 角色数据权限（G7）：覆盖写该角色的数据范围。
+   * scopeValues 为逗号分隔的 ID 列表（REGION→regionId / LOCATION→siteNo / AGENT→agentNo）；
+   * scope 为 ALL / SELF 时无附加值，服务端会清空。
+   */
+  saveRoleDataScope(roleCode: string, scope: DataScope, scopeValues?: string): Promise<RoleRow>;
 }

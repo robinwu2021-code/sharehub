@@ -16,7 +16,7 @@
 >
 > **原则**：前端已定型的字段即为本表的「关键列」下界 —— 前端能展示的，库里必须存得下。前端 mock 里出现、v1 未建表的实体，本次一律补表并标 `NEW`。
 >
-> **表数**：v1 63 表 → **v2 108 表**（新增 45，改造 6）。逐表来源见 §十一 覆盖核对表。
+> **表数**：v1 63 表 → **v2 `pb_core` 131 表**（新增 68，改造 6）+ `pb_pii` 1 + `pb_auth` 1 = **133**。数字由 `ddl/*.sql` 的 `CREATE TABLE` 实数核出，非估算。逐表来源见 §十一 覆盖核对表。
 
 ---
 
@@ -37,12 +37,15 @@ powerbank 是模块化单体部署，不采用 neargo「一域一库」，而是
 
 | 域 | 前缀 | 含义 | 表数 |
 |---|---|---|---|
-| platform | `tenant` `iam_` `notify_` `dict_` `md_` `sys_` `openapi_` `audit_` | 租户口子·组织权限·消息·字典·主数据·系统配置 | 26 |
-| ops | `dev_` `inv_` `loc_` `agt_` `wo_` | 设备·库存·场地·代理·工单 | 33 |
+| platform | `tenant` `iam_` `notify_` `dict_` `md_` `sys_` `openapi_` | 租户口子·组织权限·消息·字典·主数据·系统配置 | 26 |
+| ops | `dev_` `inv_` `loc_` `agt_` `wo_` | 设备·库存·场地·代理·工单 | 37 |
 | gateway | `gw_` | 南向接入 | 5 |
-| trade | `ord_` `price_` `pay_` `acct_` `share_` `stl_` `recon_` `fin_` | 订单·计费·支付·账务·分润·结算·对账·发票 | 27 |
-| user | `usr_` `mbr_` `coupon_` `mkt_` `ad_` `cs_` | C端·会员·券·营销·广告·客服 | 26 |
-| pii / auth | `pii_` `cred_` | 个人数据 / 凭据（独立库） | 2 |
+| trade | `ord_` `price_` `pay_` `acct_` `share_` `stl_` `recon_` `fin_` | 订单·计费·支付·账务·分润·结算·对账·发票 | 28 |
+| user | `usr_` `mbr_` `coupon_` `mkt_` `ad_` `cs_` | C端·会员·券·营销·广告·客服 | 35 |
+| **`pb_core` 小计** | | | **131** |
+| pii / auth | `pii_` `cred_` | 个人数据 / 凭据（**独立库**） | 2 |
+
+> 审计表落 `iam_` 前缀（`iam_audit_log`），不单设 `audit_` 前缀 —— 见 §2.2。
 
 ### 1.3 通用列（继承 commons `BaseEntity` v2，下文各表省略）
 `id BIGINT UNSIGNED AUTO_INCREMENT PK`（库内物理主键，不跨库不对外）· `region_id VARCHAR(36)` · `created_at DATETIME(3)` · `updated_at DATETIME(3)` · `version BIGINT` · `deleted TINYINT(1)`。
@@ -74,7 +77,8 @@ powerbank 是模块化单体部署，不采用 neargo「一域一库」，而是
 | `RSV` | 预约 | `PD` | 差异化定价 | `PS` | 时段价 |
 | `SR` | 分润规则 | `SREC` | 分润记录 | `STL` | 结算单 |
 | `WD` | 提现 | `LE` | 账务分录 | `V` | 记账凭证 |
-| `RC` | 对账批次 | `INV` | 发票 | `RP` | 充值套餐 |
+| `RC` | 对账批次 | `INV` | 发票(运营侧) | `UINV` | 发票(C端申请) |
+| `RP` | 充值套餐 | | | | |
 | `U` | C端用户/会员/钱包/白名单 | `RK` | 风控 | `BL` | 用户黑名单 |
 | `CP` | 优惠券 | `CMP` | 活动 | `PM` | 推送 |
 | `RF` | 裂变邀请 | `AS` | 广告位 | `AD` | 广告活动 |
@@ -83,9 +87,11 @@ powerbank 是模块化单体部署，不采用 neargo「一域一库」，而是
 | `A` | 审计 | `D` | 部门 | `T` | 租户 |
 | `NT` | 通知模板 | `DC` | 字典 | `APP` | OpenAPI 应用 |
 | `NBL` | 触达拉黑 | `ISS` | 问题字典 | `BK` | 银行 |
-| `CH` | 支付渠道 | `SEG` | 消费者分群 | | |
+| `CH` | 支付渠道 | `SEG` | 消费者分群 | `NL` | 通知发送记录 |
 
 **自然键（无前缀，对外有语义）**：`vendor_code` · `channel_code` · `bank_code` · `alarm_code` · `param_key` · `region_id` · `country_code`（ISO alpha-2）· `sys_tax_setting.country` · `sys_login_setting.country`（`*` = 默认行）· `sys_app_version.version_id`（复合 `PLATFORM-versionNo`）。
+
+> ⚠️ **自然键在非全局表上必须与 `tenant_id` 组成复合 UK**（`sys_param` / `sys_login_setting` / `sys_tax_setting` 三处）。单列 UK 在启用多租户时必撞 —— 休眠口子也要建对，否则将来是破坏性迁移。真正的全局表（`md_bank` / `md_market_country` / `md_region` / `dev_alarm_code` / `iam_permission` / `gw_vendor`）才可用单列 UK。
 
 **已知前缀冲突（必须保持区分，勿合并）**：`NBL`(触达拉黑) ≠ `BL`(用户黑名单) · `ISS`(问题字典) ≠ `PB`(充电宝)。
 
@@ -127,7 +133,7 @@ InnoDB · `utf8mb4_0900_ai_ci` · 金额 `DECIMAL(18,2)` + `currency VARCHAR(8) 
 | `TenantConfig.enabledVendors` | `tenant_config` 已是 `JSON`，保留 |
 | `Invoice.orderNos` / `usr_invoice.orderNos` | `fin_invoice_item`(invoice_no, order_no)；UK |
 
-> 合计再 +6 表 → **v2 总表数 114**（108 主表 + 6 关联表）。
+> 这 6 张关联表已计入 §1.2 的 131。
 
 ---
 
@@ -153,7 +159,9 @@ InnoDB · `utf8mb4_0900_ai_ci` · 金额 `DECIMAL(18,2)` + `currency VARCHAR(8) 
 | `iam_data_scope` | 数据权限（角色级+员工级统一）| subject_type(ROLE/EMPLOYEE), subject_no, scope_type(ALL/REGION/SITE/LOCATION/VENUE/AGENT/SELF), scope_refs `JSON`；UK(subject_type,subject_no) | 角色权限·数据权限抽屉 |
 | `iam_menu` | 菜单树（动态导航）| `menu_no` UK, parent_no, name, name_en, name_ar, type, path, icon, sort, perm, visible, status | —（支撑 nav） |
 | `iam_staff_perf` `NEW` | 员工绩效 | employee_no, period, role, handled, avg_resolve_mins, score；UK(employee_no,period) | 绩效报表 |
-| `audit_log` `append`(月) | 操作审计(WORM) | tenant_id, actor(employee_no), action, target_type, target_no, detail `JSON`, ip, created_at | 操作审计 |
+| `iam_audit_log` `append`(月) | 操作审计(WORM) | tenant_id, actor(employee_no), actor_name, action, target_type, target_no, detail `JSON`, ip, created_at | 操作审计 |
+
+> ⚠️ **表名以现有 DDL 的 `iam_audit_log` 为准**（v1 正文写 `audit_log`、DDL 建的是 `iam_audit_log`，v2 统一取后者 —— 它符合「前缀 = 子域」规则）。现有 DDL 只有单列 `target`，需按上表拆为 `target_type` + `target_no`。
 
 > `iam_data_scope` 落库是[缺口 G7](../requirements/运营端功能清单.md#三b-横向缺口跨模块2026-07-29-梳理发现)（数据权限抽屉当前只有 UI、保存丢弃）的后端前提。
 
@@ -161,8 +169,8 @@ InnoDB · `utf8mb4_0900_ai_ci` · 金额 `DECIMAL(18,2)` + `currency VARCHAR(8) 
 | 表 | 说明 | 关键列 | 菜单叶 |
 |----|------|-------|---|
 | `notify_template` | 通知模板 | `template_no` UK, tenant_id, name, channel(SMS/EMAIL/PUSH/WHATSAPP), lang(ar/en/zh), scene, content, params `JSON`, status | 通知模板 |
-| `notify_log` `append`(月) `NEW` | 发送记录 | `log_no` UK, tenant_id, channel, template_no, target(**存储即脱敏**), scene, sent_at, status(SENT/FAILED), fail_reason, cost `DECIMAL(18,4)`, currency | 发送记录 |
-| `notify_blacklist` `NEW` | 触达拉黑（全渠道）| `block_no` UK, tenant_id, target, channel(SMS/EMAIL/PUSH/WHATSAPP/**ALL**), reason(USER_OPT_OUT/HARD_BOUNCE/ABUSE/MANUAL), blocked_at, blocked_by, expire_at, status(ACTIVE/RELEASED) | 触达拉黑 |
+| `notify_log` `append`(月) `NEW` | 发送记录 | `log_no`(前缀 `NL`) UK, tenant_id, channel, template_no, target(**存储即脱敏**), scene, sent_at, status(SENT/FAILED), fail_reason, **cost `DECIMAL(18,4)`**（单条触达成本，是 §1.5「金额 `(18,2)`」的**唯一例外** —— 单条短信可能是 0.0035 AED，两位小数会全归零）, currency | 发送记录 |
+| `notify_blacklist` `NEW` | 触达拉黑（全渠道）| `block_no` UK, tenant_id, target, channel(SMS/EMAIL/PUSH/WHATSAPP/**ALL**), reason(USER_OPT_OUT/HARD_BOUNCE/ABUSE/MANUAL), blocked_at, blocked_by, expire_at, **released_at**, **released_by**, status(ACTIVE/RELEASED) | 触达拉黑 |
 
 > **比竞品清晰在哪**：对方只有「短信拉黑」，我们 `channel` 含 `ALL` 覆盖全渠道；`notify_log.cost` 让触达成本可核算。
 > **解除拉黑是软删除**：`status=RELEASED` + 保留记录，不物理删（合规留痕）。
@@ -174,12 +182,12 @@ InnoDB · `utf8mb4_0900_ai_ci` · 金额 `DECIMAL(18,2)` + `currency VARCHAR(8) 
 | `md_region`（全局）| 地区库 | `region_id` UK, name, name_en, name_ar, parent_id, level, city_count | 地区库 |
 | `md_bank`（全局）`NEW` | 银行字典（提现收款方）| `bank_code` UK, bank_name, bank_name_en, country, currency, swift_prefix, **iban_length**, status | 银行管理 |
 | `md_problem` `NEW` | C端报障问题字典 | `problem_no` UK, category(RENT/RETURN/BILLING/DEVICE/ACCOUNT/OTHER), title/title_en/title_ar, answer/answer_en/answer_ar, **suggested_action**(SELF_SERVICE/TO_WORKORDER/TO_REFUND/TO_CS), sort_no, status | 问题管理 |
-| `md_market_country` `NEW` | 多国家市场 | `country_code` UK(ISO alpha-2), name, currency, timezone, compliance, city_count, status(LIVE/PILOT/PLANNED) | 多国家市场 |
-| `sys_param` | 系统参数 | `param_key` UK, tenant_id, label, value, group_name, updated_at | 系统参数 |
+| `md_market_country` `NEW` | 多国家市场 | `country_code` UK(ISO alpha-2), name/name_en/name_ar, currency, timezone, compliance, status(LIVE/PILOT/PLANNED)；`city_count` 为 `[读]` 聚合自 `md_region` | 多国家市场 |
+| `sys_param` | 系统参数 | UK(**tenant_id**,`param_key`), label, value, group_name, updated_at | 系统参数 |
 | `sys_biz_rule` `NEW` | 业务规则（三分区单例）| tenant_id, category(**WITHDRAW/RESERVATION/BILLING**), rule `JSON`, currency, updated_at, updated_by；UK(tenant_id,category) | 业务规则 |
-| `sys_login_setting` `NEW` | 登录设置（按国家）| `country` UK, country_name, otp_enabled, password_enabled, apple_enabled, google_enabled, otp_expire_sec, otp_daily_limit, force_real_name | 登录设置 |
+| `sys_login_setting` `NEW` | 登录设置（按国家）| UK(**tenant_id**,`country`)（`*` = 默认行）, country_name, otp_enabled, password_enabled, apple_enabled, google_enabled, otp_expire_sec, otp_daily_limit, force_real_name | 登录设置 |
 | `sys_app_version` `NEW` | C端应用版本 | `version_id` UK, version_no, platform(IOS/ANDROID/H5), build_no, release_note/_en/_ar, force_update, min_supported, **rollout_percent**, download_url, status(DRAFT/RELEASED/ROLLBACK), released_at；UK(platform,version_no) | 应用版本 |
-| `sys_tax_setting` `NEW` | 税率与发票 | `country` UK, country_name, tax_name, rate_percent, trn, invoice_title, **included_in_price**, effective_from | 税率与发票 |
+| `sys_tax_setting` `NEW` | 税率与发票 | UK(**tenant_id**,`country`), country_name, tax_name, rate_percent, trn, invoice_title, **included_in_price**, effective_from | 税率与发票 |
 | `openapi_app` | 开放平台应用 | `app_no` UK, tenant_id, name, app_key UK, app_secret(hash), scopes `JSON`, rate_limit, status | OpenAPI 应用 |
 
 > **`sys_biz_rule` 是提现手续费口径的唯一来源**：`category=WITHDRAW` 的 `rule.feeRate/feeCap/minAmount/settleDays/dailyLimit/needApproval` 是 `stl_withdrawal.fee` 的计算依据，财务页不得另存一份。
@@ -191,9 +199,9 @@ InnoDB · `utf8mb4_0900_ai_ci` · 金额 `DECIMAL(18,2)` + `currency VARCHAR(8) 
 ### 3.1 设备台账（`dev_`，菜单：设备管理 8 叶）
 | 表 | 说明 | 关键列 | 菜单叶 |
 |----|------|-------|---|
-| `dev_cabinet` ★ | 机柜/充电桩 | `cabinet_no` UK, tenant_id, **agent_no**, sn, vendor_code, model, location_no, site_no(冗余), slot_total, available_count, online_status(ONLINE/OFFLINE), last_heartbeat_at, fw_version, status(DEPLOYED/FAULT/RETIRED) | 设备台账 |
+| `dev_cabinet` ★ | 机柜/充电桩 | `cabinet_no` UK, tenant_id, **agent_no**, sn, vendor_code, model, location_no, site_no(冗余), slot_total, available_count, online_status(ONLINE/OFFLINE ← **正交轴**), last_heartbeat_at, fw_version, **status(IN_STOCK/DEPLOYED/FAULT/RETIRED)** ← 补 `IN_STOCK`，见 **§9A.2** | 设备台账 |
 | `dev_slot` | 仓位 | cabinet_no, slot_index, powerbank_no(在仓), lock_status(LOCKED/UNLOCKED), health(OK/FAULT)；UK(cabinet_no,slot_index) | 机柜详情·仓位明细 |
-| `dev_powerbank` ★ | 充电宝 | `powerbank_no` UK, tenant_id, sn, vendor_code, battery, **cycles**, health(OK/FAULT), status(IN_STOCK/**IN_CABINET**/**RENTED**/RETURNED/**FAULT**/SCRAP/LOST), cabinet_no, slot_index | 充电宝管理 |
+| `dev_powerbank` ★ | 充电宝 | `powerbank_no` UK, tenant_id, sn, vendor_code, battery, **cycles**, health(OK/FAULT), **status(IN_STOCK/IN_CABINET/RENTED/FAULT/LOST/SOLD/SCRAP)** ← 两套枚举合一，见 **§9A.1**, cabinet_no, slot_index | 充电宝管理 |
 | `dev_shadow` | 设备影子快照（主 Redis，DB 兜底）| cabinet_no, slots `JSON`, online, signal, temp, fault_count, snapshot_at | 实时监控 |
 | `dev_heartbeat` `append`(月) | 心跳遥测 | cabinet_no, metrics `JSON`, beat_at | 实时监控 |
 | `dev_code_batch` `NEW` | 设备编码批次 | `batch_no` UK, tenant_id, vendor_code, code_type(QR/SN), range_start, range_end, total, **bound**, produced_at, status(PENDING/PARTIAL/BOUND/VOID) | 设备编码 |
@@ -221,7 +229,7 @@ InnoDB · `utf8mb4_0900_ai_ci` · 金额 `DECIMAL(18,2)` + `currency VARCHAR(8) 
 |----|------|-------|
 | `inv_warehouse` | 仓库 | `warehouse_no` UK, tenant_id, name, region_id, address |
 | `inv_stock` | 仓/区域库存 | warehouse_no, item_type(CABINET/POWERBANK), model, qty, updated_at；UK(warehouse_no,item_type,model) |
-| `inv_transfer` `NEW` | 调拨单 | `transfer_no` UK, tenant_id, from_location, to_location, item_type, powerbank_count, status(DRAFT/IN_TRANSIT/DONE), operator, created_at |
+| `inv_transfer` `NEW` | 调拨单 | `transfer_no` UK, tenant_id, **from_type/to_type**(WAREHOUSE/SITE/LOCATION), from_ref/to_ref, from_name/to_name(快照), item_type, powerbank_count, status(DRAFT/IN_TRANSIT/DONE), operator_no, created_at |
 | `inv_transfer_item` `NEW` | 调拨明细 | transfer_no, powerbank_no/cabinet_no, checked |
 
 ### 3.4 场地（`loc_`，菜单：站点与点位 8 叶）
@@ -235,10 +243,11 @@ InnoDB · `utf8mb4_0900_ai_ci` · 金额 `DECIMAL(18,2)` + `currency VARCHAR(8) 
 | `loc_contract` | 进场合同（场地方×站点）| `contract_no` UK, tenant_id, venue_no, venue_name, site_no, site_name, share_rate `DECIMAL(5,4)`, entry_fee, settle_period, start_at, end_at, attach_url, status(ACTIVE/EXPIRED) | 进场合同 |
 | `loc_lead` `NEW` | BD 拓展 CRM 商机 | `lead_no` UK, tenant_id, venue_name, contact, stage(NEW/CONTACTED/NEGOTIATING/SIGNED/LOST), owner, expect_sites, next_follow_at, updated_at | BD 拓展 CRM |
 | `loc_venue_onboarding` `NEW` | 门店自助进件 | `onboarding_no` UK, tenant_id, venue_name, contact, industry, attach `JSON`, requested_at, status(PENDING/APPROVED/REJECTED), review_at, review_by, review_note, **venue_no**(通过后回填) | 门店 Onboarding |
-| `loc_site_lifecycle` `NEW` | 门店生命周期 | site_no, stage(PROSPECTING/SIGNED/LIVE/ACTIVE/CHURNED/CLOSED), stage_at, owner, gmv_ltm, currency；UK(site_no) + 变更走 `loc_site_lifecycle_log` | 门店生命周期 |
+| `loc_site_lifecycle` `NEW` | 门店生命周期 | site_no, stage(PROSPECTING/SIGNED/LIVE/ACTIVE/CHURNED/CLOSED), stage_at, owner_no/owner, **gmv_ltm**(⚠️ 见下), currency；UK(site_no) + 变更走 `loc_site_lifecycle_log` | 门店生命周期 |
 | `loc_site_lifecycle_log` `append` `NEW` | 阶段流转留痕 | site_no, from_stage, to_stage, operator, reason, created_at | 门店生命周期 |
 
 - **`[读] 站点坪效 SiteAnalysis`** = `loc_site` ⋈ `ord_rent` 聚合（revenue/orders/turnover/payback_days/cabinet_count），不建表。
+- ⚠️ **`loc_site_lifecycle.gmv_ltm` 是本文唯一「聚合值落列」的例外**，与 §1.4「计数列不是列」相抵。保留的理由：生命周期看的是**阶段决策快照**（"退场时该站累计做了多少"），不是实时经营指标，允许与 `ord_rent` 实时聚合有偏差。**由阶段流转时写入，不做定时回刷**；要实时值请查站点坪效。
 
 ### 3.5 代理商（`agt_`，ADR-012，菜单：代理商管理 6 叶）
 > 代理商 = 运营方**体内经营伙伴，非租户**。设备/点位经 `agent_no` 归属；分润复用 `share_*`(dimension=AGENT)；数据权限维度 `AGENT`。
@@ -248,7 +257,7 @@ InnoDB · `utf8mb4_0900_ai_ci` · 金额 `DECIMAL(18,2)` + `currency VARCHAR(8) 
 | `agt_agent` ★ | 代理商档案 | `agent_no` UK, tenant_id, name, contact `[KMS→pii]`, region_scope `JSON`, default_share_rate `DECIMAL(5,4)`, settle_account, bank_code(→`md_bank`), cabinet_count, status(ENABLED/SUSPENDED) | 代理商档案 |
 | `agt_account` `NEW` | 代理登录账号 | `account_no` UK, agent_no, agent_name, login_phone, cred 引用(pb_auth realm=AGENT), data_scope, status(ACTIVE/DISABLED) | 代理账号管理 |
 | `agt_assignment` `append` `NEW` | 设备/点位划拨记录 | `assign_no` UK, agent_no, target_type(CABINET/LOCATION/SITE), target_no, action(ASSIGN/REVOKE), operator, created_at | 设备/点位划拨 |
-| `agt_commission` `NEW` | 代理分润配置 | `rule_no` UK, agent_no, agent_name, dimension(**GMV/ORDER_COUNT**), rate `DECIMAL(5,4)`, mode(CHANNEL_SPLIT/LEDGER), effective_at, status(ACTIVE/INACTIVE) | 分润配置 |
+| `agt_commission` `NEW` | 代理分润配置 | `rule_no` UK, agent_no, agent_name, dimension(**GMV/ORDER_COUNT**), rate `DECIMAL(5,4)`(GMV 维度用), **fixed_amount** `DECIMAL(18,2)`(ORDER_COUNT 维度用·单均固定额), currency, mode(CHANNEL_SPLIT/LEDGER), effective_at, status(ACTIVE/INACTIVE) | 分润配置 |
 
 - **`[读] 代理绩效 AgentPerformance`** = `agt_agent` ⋈ `ord_rent`/`dev_cabinet` 聚合（gmv/cabinet_count/online_rate/rank），不建表。
 - **代理收益结算**复用 `stl_settlement`(payee_type=AGENT)，不另建表（菜单为跨域深链）。
@@ -256,7 +265,7 @@ InnoDB · `utf8mb4_0900_ai_ci` · 金额 `DECIMAL(18,2)` + `currency VARCHAR(8) 
 ### 3.6 工单（`wo_`，菜单：工单管理 4 叶）
 | 表 | 说明 | 关键列 | 菜单叶 |
 |----|------|-------|---|
-| `wo_order` ★ | 工单 | `wo_no` UK, tenant_id, type(FAULT/REFILL/INSPECT/INSTALL/REMOVE/COMPLAINT/CLEAN), source(ALERT/USER/VENUE/MANUAL), **source_ref**(alarm_no/complaint_no，**UK 幂等**), priority(LOW/MEDIUM/HIGH), cabinet_no, location_no, **agent_no**, **site_no**, status(CREATED/DISPATCHED/ACCEPTED/PROCESSING/DONE/AUDITED/CLOSED), assignee_no, assignee_name, sla_due_at, description | 工单列表/看板 |
+| `wo_order` ★ | 工单 | `wo_no` UK, tenant_id, type(FAULT/REFILL/INSPECT/INSTALL/REMOVE/COMPLAINT/CLEAN), source(ALERT/USER/VENUE/MANUAL), **source_ref**(alarm_no/complaint_no，**UK 幂等**), priority(LOW/MEDIUM/HIGH), cabinet_no, location_no, **agent_no**, **site_no**, status(CREATED/DISPATCHED/ACCEPTED/PROCESSING/DONE/AUDITED/CLOSED ← 7 态全保留，见 **§9A.4**), **close_reason**(RESOLVED/INVALID/DUPLICATE/WITHDRAWN), assignee_no, assignee_name, sla_due_at, description | 工单列表/看板 |
 | `wo_dispatch` `append` | 派单记录 | wo_no, assignee_no, strategy(NEAREST/LOAD/MANUAL/GRAB), dispatched_at, action | 派单（页内）|
 | `wo_handle` `append` | 现场处理 | wo_no, assignee_no, photos `JSON`, note, part_changed, device_changed, handled_at | 处理与验收（页内）|
 | `wo_sla` | SLA 计时（逐单）| wo_no, respond_due_at, resolve_due_at, respond_breached, resolve_breached, escalated_at；UK(wo_no) | SLA 管理 |
@@ -288,8 +297,8 @@ InnoDB · `utf8mb4_0900_ai_ci` · 金额 `DECIMAL(18,2)` + `currency VARCHAR(8) 
 |----|------|-------|---|
 | `ord_rent` ★ | 租借订单 | `order_no` UK, tenant_id, c_user_no, cabinet_no(借出), return_cabinet_no, powerbank_no, location_no, location_name, **agent_no**, **site_no**, price_plan_no, coupon_no, status(CREATED/DISPENSING/IN_USE/RETURNED/SETTLED/CLOSED/EXCEPTION), rent_start_at, rent_end_at, duration_min, fee_amount, deposit_amount, currency, buyout, **free_reason**(→`usr_free_whitelist.reason`，空=正常单), **waived_amount**(减免额) | 订单列表 / 免费订单 |
 | `ord_event_log` `append` | 订单状态流水（时间线）| order_no, from_status, to_status, event, operator, created_at | 订单详情·时间线 |
-| `ord_exception` `NEW` | 异常订单 | `exception_no` UK, order_no, type(NOT_EJECTED/NOT_RETURNED/OVERTIME_BUYOUT/DOUBLE_CHARGE), cabinet_no, c_user_no, amount, currency, status(OPEN/HANDLED), handled_by, handled_at, created_at | 异常订单 |
-| `ord_complaint` `NEW` | 投诉订单 | `complaint_no` UK, order_no, c_user_no, issue_type(BILLING_DISPUTE/NOT_EJECTED/NOT_RETURNED/DEVICE_FAULT/OTHER), description, **screenshot_url**(截图证据), submitted_at, status(PENDING/PROCESSING/RESOLVED/REJECTED), handler_name, handled_at, resolution(REFUND/COMPENSATE/REJECT/EXPLAINED), resolution_note, **wo_no**(转工单) | 投诉订单 |
+| `ord_exception` `NEW` | 异常订单 | `exception_no` UK, tenant_id, order_no, type(NOT_EJECTED/NOT_RETURNED/OVERTIME_BUYOUT/DOUBLE_CHARGE), cabinet_no, c_user_no, amount, currency, status(OPEN/HANDLED), handled_by, handled_at, created_at | 异常订单 |
+| `ord_complaint` `NEW` | 投诉订单 | `complaint_no` UK, tenant_id, order_no, c_user_no, issue_type(BILLING_DISPUTE/NOT_EJECTED/NOT_RETURNED/DEVICE_FAULT/OTHER), description, **screenshot_url**(截图证据), submitted_at, status(PENDING/PROCESSING/RESOLVED/REJECTED), handler_name, handled_at, resolution(REFUND/COMPENSATE/REJECT/EXPLAINED), resolution_note, **wo_no**(转工单) | 投诉订单 |
 | `ord_refund` ★ `NEW` | 退款审批单（业务侧）| `refund_no` UK, tenant_id, order_no, c_user_no, amount, currency, reason, applicant_name, applied_at, status(PENDING/APPROVED/REJECTED/EXECUTED/FAILED), auditor_name, audited_at, reject_reason, **idempotency_key** UK, **psp_txn_no**, pay_refund_no(→`pay_refund`) | 退款记录 |
 | `ord_reservation` `NEW` | 预约订单 | `reservation_no` UK, tenant_id, c_user_no, type(**BORROW/RETURN**), site_no, site_name, cabinet_no, reserved_from, reserved_to, hold_fee, currency, status(PENDING/FULFILLED/EXPIRED/CANCELLED), order_no(履约后回填) | 预约订单 |
 | `ord_deposit` `NEW` | 押金与欠费 | `deposit_no` UK, tenant_id, order_no, c_user_no, amount, currency, status(HELD/RELEASED/BOUGHT_OUT/**ARREARS**), **arrears_amount**, released_at, created_at | 押金与欠费 |
@@ -302,7 +311,7 @@ InnoDB · `utf8mb4_0900_ai_ci` · 金额 `DECIMAL(18,2)` + `currency VARCHAR(8) 
 |----|------|-------|---|
 | `price_plan` ★ | 计费模板 | `plan_no` UK, tenant_id, name, free_minutes, unit_minutes, unit_price, cap_daily, cap_total(封顶/买断价), currency, scope, status(ACTIVE/DISABLED) | 计费模板 |
 | `price_rule` `NEW` | 差异化定价 | `rule_no` UK, tenant_id, plan_no, dimension(SCENE/LOCATION/SITE), match_ref, scene, location_name, free_mins, unit_price, day_cap, priority, currency | 差异化定价 |
-| `price_schedule` `NEW` | 活动/时段价 | `rule_no` UK, tenant_id, name, period(时段/节假日表达式), multiplier, active | 活动/时段价 |
+| `price_schedule` `NEW` | 活动/时段价 | `rule_no` UK, tenant_id, name, period(时段/节假日表达式), **multiplier `DECIMAL(6,4)`**（倍率可 >1，是 §1.5「比率 0..1」的例外）, active | 活动/时段价 |
 
 > 计费模板改动**仅影响新订单**：`ord_rent.price_plan_no` 指向下单当刻的模板，历史单不重算。
 
@@ -315,7 +324,7 @@ InnoDB · `utf8mb4_0900_ai_ci` · 金额 `DECIMAL(18,2)` + `currency VARCHAR(8) 
 | `pay_auth` ★ | 免押编排状态 | `auth_no` UK, tenant_id, order_no, c_user_no, freeze_amount, captured_amount, status(FROZEN/CAPTURED/RELEASED), **nearpay_auth_no**, expire_at | 押金与欠费 |
 | `pay_refund` | 渠道退款引用 | `refund_no` UK, tenant_id, pay_no, ord_refund_no, amount, reason, status(INIT/SUCCESS/FAILED), **nearpay_refund_no** | 退款记录 |
 | `pay_event_log` `append` | nearpay 结果事件留痕（幂等）| source(NEARPAY), ref_no, event_type, raw `JSON`, processed, received_at；**UK(ref_no,event_type)** | —（回调幂等）|
-| `pay_channel` `NEW` | 支付渠道配置 | `channel_code` UK, channel_name, mode(**DELEGATED**(委托 nearpay)/**DIRECT**), status, countries, currencies, capabilities, api_base, merchant_id, **api_key_masked**(明文 `[KMS]` 另存), updated_at | 支付渠道 |
+| `pay_channel` `NEW` | 支付渠道配置 | `channel_code` UK, channel_name/_en/_ar, mode(**DELEGATED**(委托 nearpay)/**DIRECT**), status, api_base, merchant_id, **api_key_masked** + **api_secret_masked**(调用密钥 + 验签密钥两把，对齐 `gw_vendor_config`；明文落 KMS/vault **不入库**), updated_at；国家/币种/能力见 `pay_channel_scope`（§1.7） | 支付渠道 |
 
 > **`pay_channel` 的 API 落在 `/api/platform/payment-channels`**（承载在「系统设置」页），表前缀仍归 trade —— 这是本文里唯一一处「表子域 ≠ API 前缀」，因为它本质是支付域配置，只是被运营端归到系统设置菜单下。
 > **比竞品清晰在哪**：对方 7 个支付渠道各占一个菜单；我们一张表 + 一页 + 配置抽屉，密钥列只出掩码。
@@ -336,10 +345,10 @@ InnoDB · `utf8mb4_0900_ai_ci` · 金额 `DECIMAL(18,2)` + `currency VARCHAR(8) 
 |----|------|-------|---|
 | `stl_settlement` ★ | 结算单 | `settle_no` UK, tenant_id, payee_type(VENUE/AGENT), payee_no, payee_name, period, total_amount, currency, status(GEN/CONFIRMED/PAID) | 结算单 / 代理收益结算 |
 | `stl_settlement_detail` `NEW` | 结算明细 | settle_no, ref_type(ORDER/SHARE), ref_no, amount | 结算单 |
-| `stl_withdrawal` | 提现 | `withdraw_no` UK, tenant_id, account_no, **payee_type(VENUE/AGENT)** `NEW`, payee_no, payee_name, amount, **fee**, currency, bank_code, status(APPLY/AUDIT/PAYING/PAID/FAILED), applied_at, applicant_no, **auditor_no**/**auditor_name**, **audited_at**, **reject_reason**, paid_at | 提现审核 |
+| `stl_withdrawal` | 提现 | `withdraw_no` UK, tenant_id, account_no, payee_type(VENUE/AGENT), payee_no, **payee_name**, amount, **fee**, currency, **bank_code**, status(APPLY/AUDIT/PAYING/PAID/FAILED), applied_at, applicant_no, **auditor_no**/**auditor_name**, **audited_at**, **reject_reason**, paid_at | 提现审核 |
 | `recon_task` `NEW` | 对账任务 | `batch_no` UK, tenant_id, channel, period, bill_date, nearpay_total, ledger_total, diff, currency, status(MATCHED/DIFF) | 对账 |
 | `recon_diff` `NEW` | 对账差错 | batch_no, pay_no, diff_type, detail `JSON`, resolved | 对账 |
-| `fin_invoice` `NEW` | 发票（运营侧开票管理）| `invoice_no` UK, tenant_id, payee_name, order_nos `JSON`, amount, **vat_trn**, currency, status(DRAFT/ISSUED/VOID), issued_at, file_url | 发票 |
+| `fin_invoice` `NEW` | 发票（运营侧开票管理）| `invoice_no`(前缀 `INV`) UK, tenant_id, payee_type, payee_no, payee_name, amount, **vat_trn**, currency, status(DRAFT/ISSUED/VOID), issued_at, file_url；关联订单走 `fin_invoice_item`（§1.7），**不落 `order_nos JSON`** | 发票 |
 
 > **提现四件套（`fee`/`auditor_name`/`audited_at`/`reject_reason`）是资金审批合规下界**：驳回必须留原因，审批人必须留痕，手续费口径来自 `sys_biz_rule(WITHDRAW)`。派生列「实际到账」= `amount - fee`，不落库。
 
@@ -365,7 +374,7 @@ InnoDB · `utf8mb4_0900_ai_ci` · 金额 `DECIMAL(18,2)` + `currency VARCHAR(8) 
 | `usr_wallet` | 钱包 | `wallet_no` UK, tenant_id, c_user_no, balance, **gift_balance**(赠金), deposit_amount, frozen_amount, currency | 钱包 / C-WA-01 |
 | `usr_wallet_txn` `append`(月) | 钱包流水 | `txn_no` UK, wallet_no, c_user_no, type(**RECHARGE/SPEND/REFUND/BONUS**), direction, title, amount(带符号), currency, biz_type, biz_no, created_at | 钱包 / C-WA-05 |
 | `usr_recharge_pkg` `NEW` | 充值套餐 | `package_no` UK, tenant_id, name, pay_amount, **gift_amount**, currency, **markets**(适用市场,多选), **valid_days**(有效期), sort_no, status(ENABLED/DISABLED) | 充值套餐 / C-WA-02 |
-| `usr_recharge_order` `NEW` | 充值订单 | `recharge_no` UK, tenant_id, c_user_no, nickname, package_no, pay_amount, gift_amount, credit_amount, currency, channel_code, status(PENDING/PAID/FAILED/REFUNDED), created_at, paid_at, psg_txn_no | 充值订单 |
+| `usr_recharge_order` `NEW` | 充值订单 | `recharge_no` UK, tenant_id, c_user_no, nickname, package_no, pay_amount, gift_amount, credit_amount, currency, channel_code, status(PENDING/PAID/FAILED/REFUNDED), created_at, paid_at, **psp_txn_no**（前端字段名 `psgTxnNo` 是笔误，全库统一 `psp_`） | 充值订单 |
 
 - **`[读] 用户价值画像`**（`order_count`/`order_amount`/`recharge_count`/`recharge_amount`）= `ord_rent` + `usr_recharge_order` 按 `c_user_no` 聚合，挂在钱包页展示，不落冗余列（避免与订单表不自洽）。
 
@@ -408,13 +417,13 @@ InnoDB · `utf8mb4_0900_ai_ci` · 金额 `DECIMAL(18,2)` + `currency VARCHAR(8) 
 | 表 | 说明 | 关键列 | C端编号 |
 |----|------|-------|---|
 | `usr_favorite` `NEW` | 收藏门店 | c_user_no, site_no, created_at；UK(c_user_no,site_no) | c-app `/mp/user/favorites` |
-| `usr_message` `NEW` | 站内消息中心 | `message_no` UK, c_user_no, type, title, body, read, created_at | C-MS-03 |
+| `usr_message` `NEW` | 站内消息中心 | `message_no` UK, tenant_id, c_user_no, type, title, body, **is_read**（`read` 是 MySQL 保留字）, read_at, created_at | C-MS-03 |
 | `usr_push_token` `NEW` | Push token 注册 | c_user_no, platform(APNS/FCM/UNIPUSH), token, device_id, active；UK(platform,token) | C-MS-01 |
 | `usr_notify_pref` `NEW` | 通知偏好 | c_user_no, category, enabled, quiet_start, quiet_end, lang；UK(c_user_no,category) | C-MS-04 |
 | `usr_invoice_title` `NEW` | 发票抬头 | `title_no` UK, c_user_no, type(PERSONAL/COMPANY), title, **vat_trn**, is_default | C-IV-02 |
-| `usr_invoice` `NEW` | C端开票申请 | `invoice_no` UK, c_user_no, title_no, order_nos `JSON`, amount, currency, status(APPLIED/ISSUED/REJECTED), file_url, applied_at | C-IV-01/03 |
+| `usr_invoice` `NEW` | C端开票申请 | `invoice_no`(前缀 **`UINV`**，与运营侧 `INV` 分开防撞) UK, tenant_id, c_user_no, title_no, amount, currency, status(APPLIED/ISSUED/REJECTED), file_url, applied_at；关联订单走 `fin_invoice_item` | C-IV-01/03 |
 | `usr_logoff` `NEW` | 注销申请（PDPL 冷静期）| c_user_no, requested_at, cooling_until, status(PENDING/CANCELLED/DONE), purged_at | C-AC-05 |
-| `usr_consent` `append` `NEW` | 同意与撤回留痕（PDPL）| c_user_no, agreement_code, version, action(GRANT/REVOKE), lang, ip, created_at | C-AC-06 |
+| `usr_consent` `append` `NEW` | 同意与撤回留痕（PDPL）| tenant_id, c_user_no, agreement_code, **agreement_version**（不叫 `version` —— 与 BaseEntity 乐观锁列撞名）, action(GRANT/REVOKE), lang, ip, created_at | C-AC-06 |
 
 > **PDPL 硬要求的三件套**：`usr_logoff`（可注销 + 冷静期 + 到期清除）、`usr_consent`（明示同意与撤回可举证）、数据导出（走 `usr_*` + `pii_user` 的导出作业，不建表）。v1 只在文字里提 PDPL，未落表 —— v2 补齐。
 
@@ -455,6 +464,90 @@ InnoDB · `utf8mb4_0900_ai_ci` · 金额 `DECIMAL(18,2)` + `currency VARCHAR(8) 
 权限:      iam_role 1─* iam_role_perm · iam_data_scope(subject=ROLE|EMPLOYEE) 承载两级数据权限
 南向:      gw_command_log *─1 dev_cabinet · gw_command_log 0..1─1 ord_rent（弹出指令）
 ```
+
+---
+
+## 九·A 状态机（业务梳理定稿 · 2026-07-29）
+
+> 建 DDL 时暴露出前端存在两套不兼容枚举、多处「定义 N 态只产出 M 态」。本节按**实际业务流程**逐个梳理并定稿，**结论即 SSOT**，前端类型与后端状态机一律对齐本节。
+
+### 9A.1 充电宝 `dev_powerbank.status`（**两套合一 → 7 态**）
+
+**问题根因**：前端两套枚举实为**两个正交的轴被混用** ——
+- `PowerbankStatus`（6 值 `IN_STOCK/DEPLOYED/IN_USE/RETURNED/SCRAP/LOST`）= **资产生命周期轴**
+- `Powerbank.status`（4 值 `IN_CABINET/RENTED/FAULT/RETIRED`）= **位置/占用轴 + 生命周期混杂**
+
+**业务判断**：充电宝的「在哪」已经由 `cabinet_no` + `slot_index` 两列精确表达，**不需要再用状态位重复表达位置**。真正需要状态机管的只有一件事：**这颗充电宝当前处于资产生命周期的哪一环、能不能借出**。故合为单一状态机：
+
+| 状态 | 业务含义 | 可借 | 备注 |
+|---|---|:---:|---|
+| `IN_STOCK` | 入库未投放（在仓库） | 否 | `cabinet_no` 为空 |
+| `IN_CABINET` | 在仓可借（已投放到机柜） | **是** | `cabinet_no`+`slot_index` 有值 |
+| `RENTED` | 借出中（用户持有） | 否 | 挂 `ord_rent.powerbank_no` |
+| `FAULT` | 故障待修（自检异常/坏机归还） | 否 | 触发 `dev_alarm` + 工单 |
+| `LOST` | 丢失（超时未归还，待追偿） | 否 | **半终态，可回收** |
+| `SOLD` | 买断（用户付费持有） | 否 | **终态** |
+| `SCRAP` | 报废 | 否 | **终态** |
+
+**废弃 3 个值，理由逐条**：
+- `DEPLOYED` —— 「投放」是动作，投放的结果就是 `IN_CABINET`，两者语义重合。
+- `RETURNED` —— 「归还」是**事件不是状态**，归还落仓后即 `IN_CABINET`；订单侧已有 `ord_rent.status=RETURNED` 承载归还语义，资产侧再存一份必然漂移。
+- `RETIRED` —— 与 `SCRAP` 同义，择一。
+
+**新增 `SOLD`**：v1 两套枚举都没有买断终态，但买断在系统里到处都是（`ord_rent.buyout`、`price_plan.cap_total` 买断价、`ord_exception.OVERTIME_BUYOUT`、`ord_deposit.BOUGHT_OUT`）。买断后充电宝归用户所有，**必须离开资产池，且不能记成 `LOST`** —— `LOST` 是「未付费且待追偿」，`SOLD` 是「已付费正常出表」，两者的财务处理完全不同（前者计损失，后者计收入）。
+
+**状态转移**：
+```
+IN_STOCK ──投放/补货──▶ IN_CABINET ──借出──▶ RENTED
+                            ▲                  │
+                            └──── 归还(任意柜) ─┤
+                                               ├── 超时未归还 ──▶ LOST ──失而复得──▶ IN_CABINET
+                                               ├── 买断付费 ────▶ SOLD   (终态)
+                                               └── 坏机归还 ────▶ FAULT
+IN_CABINET ──自检/上报故障──▶ FAULT ──维修回仓──▶ IN_STOCK
+FAULT / IN_STOCK / IN_CABINET ──报废──▶ SCRAP (终态)
+```
+
+**存量迁移映射**：`DEPLOYED→IN_CABINET` · `IN_USE→RENTED` · `RETURNED→IN_CABINET` · `RETIRED→SCRAP`。
+
+### 9A.2 机柜 `dev_cabinet.status`（3 → **4 态**）
+
+`DEPLOYED / FAULT / RETIRED` **缺 `IN_STOCK`**。理由：「库存调拨」tab 管的就是**未投放机柜**（`inv_stock.item_type=CABINET`），没有 `IN_STOCK` 就无法把「仓库里的新机柜」与「已投放在点位的机柜」区分开，调拨单的起止状态也无从表达。
+
+定稿 4 态：`IN_STOCK`（入库未投放，`location_no` 为空）→ `DEPLOYED`（已投放）→ `FAULT`（故障停用）→ `RETIRED`（退役，终态）。
+
+> ⚠️ `online_status`（`ONLINE/OFFLINE`）是**独立正交轴**，表示通信可达性，**不并入 `status`**。一台 `DEPLOYED` 的机柜可以 `OFFLINE`（断网），一台 `FAULT` 的机柜也可以 `ONLINE`（能通信但仓门卡死）。实时监控看的是两轴的组合。
+
+### 9A.3 租借订单 `ord_rent.status`（**7 态全部保留**）
+
+前端 mock 从未产出 `DISPENSING`，但**这不是枚举冗余，是 mock 数据覆盖不全**：
+
+- `CREATED`（已下单待弹出）与 `DISPENSING`（弹出指令已下发、等设备确认）**必须分开** —— C端「等待弹出」页（`C-RT-04`）渲染的就是 `DISPENSING`，且弹出超时兜底（`C-RT-05` 撤销预授权、不产生费用）只能从这个态发起。合并后无法区分「支付成功但指令还没发」与「指令发了但设备没响应」，兜底逻辑就没有落点。
+- `RETURNED`（已归还待结算）与 `SETTLED`（已结算）**必须分开** —— capture 请款是异步且可能失败挂账（`C-PAY-05` 欠费挂账、下次借出前结清）。归还与结算不是原子的，合并会让「已还但没扣到钱」的单无处安放。
+
+**要求**：ops-web mock 补出 `DISPENSING` 样本，否则前端「等待弹出」链路永远测不到。
+
+### 9A.4 工单 `wo_order.status`（**7 态全部保留** + 补 `close_reason`）
+
+前端 mock 从未产出 `ACCEPTED` / `AUDITED`，同样是覆盖不全而非冗余：
+
+- `ACCEPTED`（运维接单）是**响应 SLA 的度量终点** —— `wo_sla.respond_due_at` / `respond_breached` 判定的就是「派单到接单」这段。删掉 `ACCEPTED`，响应 SLA 就没有计时终点，整个 SLA 管理叶失去意义。
+- `AUDITED`（验收）与 `CLOSED`（归档）分开 —— `AUDITED` 是**判定**（验收不通过可退回 `PROCESSING` 返工），`CLOSED` 是**终态**。而且 `workorder:wo:audit` 权限码单独存在，本身就隐含「完工人 ≠ 验收人」的角色分离（防虚假完工，尤其换件/换设备类工单）。
+
+**新增列 `close_reason`**：告警误报开的单需要「无效关闭」，但**不新增 `CANCELLED` 态**（会让状态机多一条平行终态线）。改为 `CLOSED` + `close_reason`（`RESOLVED`(正常完结) / `INVALID`(误报) / `DUPLICATE`(重复单) / `WITHDRAWN`(撤单)）。
+
+**要求**：ops-web mock 补出 `ACCEPTED` / `AUDITED` 样本。
+
+### 9A.5 状态机实现落点
+
+| 状态机 | 组件 | 现状 |
+|---|---|---|
+| `ord_rent` | `trade/OrdStateMachine` | ✅ 已实现 |
+| `wo_order` | `wo/WoStateMachine` | ✅ 已实现（需补 `ACCEPTED`/`AUDITED` 迁移与 `close_reason`）|
+| `dev_powerbank` | `dev/PowerbankStateMachine` | ⬜ **待建**（本节定稿后实现）|
+| `dev_cabinet` | 同上 | ⬜ 待建 |
+
+> 非法迁移一律返 **409**，不静默忽略 —— 与已实现的 `WoStateMachine` 行为一致。
 
 ---
 
@@ -558,18 +651,22 @@ InnoDB · `utf8mb4_0900_ai_ci` · 金额 `DECIMAL(18,2)` + `currency VARCHAR(8) 
 
 ## 十二、v1 → v2 变更清单
 
-### 12.1 新增 45 表
-`iam_staff_perf` `notify_log` `notify_blacklist` `md_bank` `md_problem` `md_market_country` `sys_biz_rule` `sys_login_setting` `sys_app_version` `sys_tax_setting` · `dev_code_batch` `dev_alarm_notice` `dev_alarm_code` `dev_alarm_rule` · `inv_transfer` `inv_transfer_item` · `loc_lead` `loc_venue_onboarding` `loc_site_lifecycle` `loc_site_lifecycle_log` · `agt_account`(v1 有名无字段) `agt_assignment` `agt_commission` · `wo_sla_rule` · `ord_exception` `ord_complaint` `ord_refund` `ord_reservation` `ord_deposit` · `price_rule`(v1 有名无字段) `price_schedule` · `pay_channel` · `stl_settlement_detail` `recon_task` `recon_diff` `fin_invoice` · `usr_blacklist` `usr_free_whitelist` `usr_recharge_pkg` `usr_recharge_order` · `mkt_notice` `mkt_campaign` `mkt_push` `mkt_referral` · `cs_ticket` `cs_session` `cs_message` · `usr_favorite` `usr_message` `usr_push_token` `usr_notify_pref` `usr_invoice_title` `usr_invoice` `usr_logoff` `usr_consent`
+### 12.1 新增 68 表（实数，逐张已落 `ddl/pb_core-v2-*.sql`）
+`iam_staff_perf` `notify_log` `notify_blacklist` `md_bank` `md_problem` `md_market_country` `sys_biz_rule` `sys_login_setting` `sys_app_version` `sys_tax_setting` · `dev_code_batch` `dev_alarm_notice` `dev_alarm_code` `dev_alarm_rule` · `inv_transfer` `inv_transfer_item` · `loc_lead` `loc_venue_onboarding` `loc_site_lifecycle` `loc_site_lifecycle_log` · `agt_account`(v1 有名无字段) `agt_assignment` `agt_commission` · `wo_sla_rule` · `ord_exception` `ord_complaint` `ord_refund` `ord_reservation` `ord_deposit` · `price_rule`(v1 有名无字段) `price_schedule` · `pay_channel` · `stl_settlement_detail` `recon_task` `recon_diff` `fin_invoice` · `usr_blacklist` `usr_free_whitelist` `usr_recharge_pkg` `usr_recharge_order` · `mkt_notice` `mkt_campaign` `mkt_push` `mkt_referral` · `cs_ticket` `cs_session` `cs_message` · `usr_favorite` `usr_message` `usr_push_token` `usr_notify_pref` `usr_invoice_title` `usr_invoice` `usr_logoff` `usr_consent` · **覆盖核对时补漏 5 张**：`tenant` `tenant_config` `iam_dept` `iam_menu` `mbr_plan`（db-design v1 正文有、DDL 从未建）· **§1.7 关联表 6 张**：`pay_channel_scope` `usr_recharge_pkg_market` `agt_agent_region` `price_plan_scope` `fin_invoice_item` `inv_transfer_item`
 
-### 12.2 改造 6 表
+### 12.2 改造 10 表
 | 表 | 改动 |
 |---|---|
 | `dev_alert` → **`dev_alarm`** | 更名；补 `alarm_no`/`vendor_error_code`/`wo_no`/`agent_no`/`site_no`/`remark` |
 | `ord_rent` | 补 `free_reason`/`waived_amount`/`coupon_no`/`location_name` |
 | `usr_credit` | 补 `risk_no`/`risk_level`/`flagged_at`；`blacklisted` 移出到 `usr_blacklist` |
-| `stl_withdrawal` | 补 `fee`/`auditor_name`/`audited_at`/`reject_reason`/`bank_code`/`payee_name` |
+| `stl_withdrawal` | 补 `fee`/`auditor_no`/`auditor_name`/`audited_at`/`reject_reason`/`bank_code`/`payee_name`/`applicant_no`（`payee_type`/`payee_no` 现有 DDL 已有）|
 | `pay_order` | `type` 枚举补 `RECHARGE`/`MEMBERSHIP`；补 `channel_code` |
 | `pii_user` | 补 `subject_type`，从「仅 C 端」扩为承载员工/场地方/代理联系人 |
+| `dev_powerbank` | **两套不兼容枚举合一为 7 态 + 补 `SOLD` 买断终态**（§9A.1）；补 `cycles`/`health` |
+| `dev_cabinet` | `status` 补 `IN_STOCK`（§9A.2） |
+| `wo_order` | 补 `close_reason`/`closed_at`/`audited_by`/`audited_at`（§9A.4） |
+| `wo_sla_rule` | `wo_type` 由自由字符串收敛为 `WorkOrderType` 枚举 |
 
 ### 12.3 明确不建表的 9 处（读模型）
 实时监控 · 设备日志 · 站点坪效 · 代理绩效 · 分润统计 · 免费订单 · 用户价值画像 · 数据报表 6 叶 · 经营看板
@@ -584,9 +681,32 @@ InnoDB · `utf8mb4_0900_ai_ci` · 金额 `DECIMAL(18,2)` + `currency VARCHAR(8) 
 4. **`pii_user` 扩到员工/场地方/代理**后，运营端列表页展示的掩码值从业务表冗余列取（快）还是每次回查 pii（准）？**本文取冗余掩码列**，明文只在 pii。
 5. `usr_logoff` 冷静期天数与到期清除范围（哪些表随注销物理清除、哪些匿名化保留用于财务留痕）——需法务确认后写入 PDPL 专篇。
 6. 分区保留周期（§十）中「财务流水 7 年」需按 UAE/CBUAE 实际要求复核。
-7. **前端枚举不一致，需拍板以哪边为准**（后端建表前必须定，否则状态机对不上）：
-   - `dev_powerbank.status`：类型文件同时导出了 `PowerbankStatus`（6 值 `IN_STOCK/DEPLOYED/IN_USE/RETURNED/SCRAP/LOST`）与 `Powerbank.status`（4 值 `IN_CABINET/RENTED/FAULT/RETIRED`），**两套不兼容且后者在用**。本文按并集建列（见 §3.1），但生命周期状态机只能有一套。
-   - `wo_order.status` 定义 7 态，mock 只产出 5 态（`ACCEPTED`/`AUDITED` 从未出现）；`ord_rent.status` 定义 7 态，`DISPENSING` 从未产出。是枚举多余，还是流程缺失？
-   - `wo_sla_rule.wo_type` 前端是自由字符串，应收敛为 `WorkOrderType` 枚举。
-8. **五个「只有读/审批、没有创建」的缺口**（前端 141 个契约方法里零 DELETE、且缺以下写入口），后端建表时要确认生产者是谁：手工开工单（`source=MANUAL` 有枚举无入口）· 退款申请（只有 `auditRefund`）· 投诉登记（只有 `handleComplaint`）· 提现申请（只有审核）· 结算单生成（只有查询）。前三个应是运营端补入口，后两个应是后端批处理作业。
-9. 多币种：`currency` 已随表下沉，但**汇率表 `md_fx_rate` 未建** —— 单一 AED 时不需要，开城多国后必须补。触发条件 = `md_market_country` 出现第二个 `LIVE`。
+7. ~~前端枚举不一致~~ ✅ **已按业务梳理定稿，见 §九·A**：充电宝两套枚举合一为 7 态（补 `SOLD`）· 机柜补 `IN_STOCK` · 订单与工单 7 态全保留（mock 覆盖不全，非枚举冗余）· 工单补 `close_reason`。**剩余动作**：`wo_sla_rule.wo_type` 收敛为 `WorkOrderType` 枚举；ops-web 前端类型与 mock 需按 §九·A 对齐（见 §十四）。
+8. ~~五个「只有读/审批、没有创建」的缺口~~ ✅ **已按业务梳理定稿，见 [api/README §六·A「写入口与生产者」](../api/README.md)**：五个入口的生产者、触发方式、权限码已逐条明确，端点全部就位。
+9. **告警域三处待定**（建 DDL 时暴露）：
+   - `dev_alarm_code` 是**全局表无 `tenant_id`**，而引用它的 `dev_alarm_rule` 有 —— 多租户下租户无法自定义告警码，只能改通知规则。MVP 单租户无影响，**拆库或启用租户前必须复核**。
+   - `dev_alarm.level` 与 `dev_alarm_code.level` 双份：本文按「记录列 = 写入时快照，可被规则覆盖」建，字典 level 是默认值。若要以字典为准则记录列应去掉。
+   - v1 `dev_alert.status` 是 `OPEN/ACK/RESOLVED`，v2 `dev_alarm` 是 `OPEN/ACKED/CLOSED`。迁移映射已写进 `ddl/pb_core-v2-ops-alarm.sql` 的注释草稿。
+10. `wo_sla_rule` 是否允许**同一 `wo_type` 多条规则**（按优先级取）？DDL 当前建了 `UK(tenant_id, wo_type)` = 一类型一规则；若要多条需去掉该 UK 并加 `priority` 列。
+11. 多币种：`currency` 已随表下沉，但**汇率表 `md_fx_rate` 未建** —— 单一 AED 时不需要，开城多国后必须补。触发条件 = `md_market_country` 出现第二个 `LIVE`。
+
+---
+
+## 十四、§九·A 定稿引出的下游改动清单（未做，供排期）
+
+> 状态机定稿后，**前端类型/mock 与后端状态机需同步对齐**。本节是逐条待办，不做完则前后端切换时状态值对不上。
+
+| # | 位置 | 改动 | 阻塞谁 |
+|---|---|---|---|
+| F1 | `ops-web/lib/types/device.ts` | 删除 6 值 `PowerbankStatus`，`Powerbank.status` 改为 §9A.1 的 7 值 | 充电宝管理 tab |
+| F2 | 同上 | `CabinetStatus` 补 `IN_STOCK`（§9A.2） | 库存调拨 tab |
+| F3 | `ops-web/lib/types/workorder.ts` | `WorkOrder` 补 `closeReason` 字段（§9A.4） | 工单关单 |
+| F4 | `ops-web/lib/mock/db/device.ts` | 按新枚举重铺充电宝/机柜样本，补 `IN_STOCK`/`SOLD`/`LOST` 各态 | 前端自测 |
+| F5 | `ops-web/lib/mock/db/order.ts` | **补 `DISPENSING` 态订单样本** —— 当前 0 条，C端「等待弹出」链路无从测试（§9A.3） | C端借出兜底 |
+| F6 | `ops-web/lib/mock/db/workorder.ts` | **补 `ACCEPTED` / `AUDITED` 态工单样本** —— 当前 0 条，SLA 响应判定与验收退回链路无从测试（§9A.4） | SLA 管理 |
+| F7 | `ops-web/lib/types/workorder.ts` | `SlaRule.woType` 由 `string` 收敛为 `WorkOrderType` | SLA 规则配置 |
+| B1 | `backend` `dev/PowerbankStateMachine` | 新建（§9A.5），非法迁移返 409 | 充电宝生命周期 |
+| B2 | `backend` `wo/WoStateMachine` | 补 `ACCEPTED`/`AUDITED` 迁移 + `close_reason` 校验（`CLOSED` 必填） | 工单闭环 G6 |
+| D1 | `ddl/pb_core-v2-alter.sql` | `dev_powerbank.status` / `dev_cabinet.status` 的 COMMENT 与迁移、`wo_order.close_reason` 建列 | 建库 |
+
+> ⚠️ **F1/F4 有并发风险**：本文定稿时 `ops-web/` 正被另一会话改动（工单闭环与数据权限方向）。动前先 `git status` 确认，避免与在途改动冲突。
