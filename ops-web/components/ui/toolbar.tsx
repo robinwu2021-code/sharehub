@@ -45,7 +45,7 @@ export function Toolbar({
   }
 
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-2">
+    <div data-surface="toolbar" className="mb-4 flex flex-wrap items-center gap-2">
       {onSearch !== undefined && (
         <Input
           className="w-60"

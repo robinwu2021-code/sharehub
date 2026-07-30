@@ -15,6 +15,7 @@ export function Card({
 }) {
   return (
     <div
+      data-surface="card"
       className={cn(
         "rounded-card text-card-foreground",
         tone

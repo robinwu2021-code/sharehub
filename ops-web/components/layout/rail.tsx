@@ -99,6 +99,7 @@ export function Rail() {
 
   return (
     <aside
+      data-shell="rail"
       className="hidden shrink-0 flex-col bg-sidebar text-sidebar-foreground md:flex"
       style={{ width: railExpanded ? RAIL_EXPANDED_WIDTH : RAIL_WIDTH }}
     >
