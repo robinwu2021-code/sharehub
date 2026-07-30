@@ -19,21 +19,27 @@
   --primary-foreground: oklch(0.985 0 0);
   --ring: var(--primary);
 
-  /* 中性面色：零彩度，恒定不随皮肤变 */
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --canvas: oklch(0.985 0 0);          /* 页面画布：比卡片低一档，卡片才浮得起来 */
-  --sidebar: oklch(0.97 0 0);
-  --sidebar-foreground: oklch(0.35 0 0);
-  --secondary: oklch(0.97 0 0);        /* 填充块：输入/分段/outline 按钮 */
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);            /* 表头/隔行 */
-  --muted-foreground: oklch(0.556 0 0); /* 对白底 ≈4.6:1，过 WCAG AA */
-  --accent: oklch(0.94 0 0);           /* 激活/hover */
-  --accent-foreground: oklch(0.205 0 0);
-  --border: oklch(0.922 0 0);          /* 可见发丝边（旧值几乎不可见，是"糊"的主因之一）*/
+  /* 中性面色：**逐个取自 C 端 --pb-***（c-app/src/App.vue），不再自造。
+     C 端这组灰是微冷的（带一点蓝），不是纯中性 —— 这与"中性色不由主色派生"
+     并不冲突：病根是**派生**（换肤就整屏变色），不是"带不带色相"。
+     一组固定的冷调灰同样治病，还能让两端截图是同一个产品。 */
+  --background: #ffffff;               /* = C 端 --pb-surface */
+  --card: #ffffff;                     /* = C 端 --pb-elev */
+  --foreground: #16171d;               /* = C 端 --pb-ink */
+  --card-foreground: #16171d;
+  --muted-foreground: #8a8d97;         /* = C 端 --pb-sub，对白底 3.9:1 */
+  --muted: #f2f3f6;                    /* = C 端 --pb-faint（表头/隔行）*/
+  --secondary: #f2f3f6;                /* 填充块：输入/分段/outline 按钮 */
+  --secondary-foreground: #2a2c34;
+  /* 下面两个 C 端没有对应物 —— 手机端页面底就是纯白，靠阴影分卡片；
+     运营台是密集表格，画布与卡片必须有明度差，否则卡片边界只剩阴影、一糊到底。
+     故从 faint 派生，保持同一个色相家族。 */
+  --canvas: color-mix(in srgb, #f2f3f6 55%, white);  /* ≈ #F8F9FB */
+  --sidebar: #f2f3f6;
+  --sidebar-foreground: #3b3e48;
+  --accent: #e8eaef;                   /* 激活/hover：比 faint 再深一档 */
+  --accent-foreground: #16171d;
+  --border: #e4e6eb;                   /* 可见发丝边 */
   --input: var(--border);
 
   /* 语义色：直接采用 C 端 --pb-* 的 hex，一个不改，跨端状态色一致 */
@@ -54,7 +60,8 @@
   --info-ink: color-mix(in oklch, var(--info) 78%, black);
 
   --radius: 0.85rem;                   /* ≈13.6px，与 C 端 28rpx 对齐 */
-  --card-shadow: 0 1px 2px oklch(0 0 0 / 0.06), 0 1px 3px oklch(0 0 0 / 0.04);
+  /* = C 端 --pb-shadow-sm / --pb-shadow 换算（rpx→px，750 设计宽下 2rpx≈1px）*/
+  --card-shadow: 0 1px 5px rgba(18, 20, 34, 0.05), 0 3px 14px rgba(18, 20, 34, 0.06);
 }
 
 /* 皮肤：3 套，与 C 端 SKINS 一一对应（黑白灰 / 时尚蓝 / 科幻紫）。
@@ -64,21 +71,22 @@
 [data-theme="purple"] { --primary: oklch(0.52 0.26 296);  --primary-foreground: oklch(0.985 0 0); } /* #7C3AED */
 
 .dark {
-  --background: oklch(0.205 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.23 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --canvas: oklch(0.165 0 0);
-  --sidebar: oklch(0.19 0 0);
-  --sidebar-foreground: oklch(0.87 0 0);
-  --secondary: oklch(0.27 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.27 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.32 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 15%);
+  /* 同样逐个取自 C 端 dark（--pb-bg/surface/elev/ink/sub/faint）*/
+  --canvas: #0b0e14;                   /* = --pb-bg */
+  --background: #161a22;               /* = --pb-surface */
+  --card: #161a22;
+  --foreground: #f2f4f7;               /* = --pb-ink */
+  --card-foreground: #f2f4f7;
+  --muted-foreground: #97a0af;         /* = --pb-sub */
+  --muted: #232937;                    /* = --pb-faint */
+  --secondary: #232937;
+  --secondary-foreground: #f2f4f7;
+  --accent: #1e232d;                   /* = --pb-elev */
+  --accent-foreground: #f2f4f7;
+  --sidebar: #10141b;                  /* C 端无侧边栏，取 bg 与 surface 之间 */
+  --sidebar-foreground: #c9d0da;
+  --border: rgba(255, 255, 255, 0.12);
+  --input: rgba(255, 255, 255, 0.15);
   /* 暗底上语义色要提亮才够对比，色相不变 */
   --success: #32d583;
   --warning: #fdb022;
@@ -93,7 +101,7 @@
   --warning-ink: var(--warning);
   --destructive-ink: var(--destructive);
   --info-ink: var(--info);
-  --card-shadow: 0 1px 2px oklch(0 0 0 / 0.3);
+  --card-shadow: 0 1px 5px rgba(0, 0, 0, 0.28), 0 3px 14px rgba(0, 0, 0, 0.32);
 }
 
 /* 暗色下黑白灰皮肤的主色要反相，否则近黑主色在深底上完全看不见 */
@@ -144,9 +152,22 @@
 body {
   background: var(--canvas);
   color: var(--foreground);
-  /* Latin 用圆润的 Nunito，中文回退系统黑体 */
-  font-family: var(--font-nunito), "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
-    "微软雅黑", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* 字族顺序与 C 端 App.vue 完全一致：拉丁 Nunito / 阿语 Tajawal / 中文 Noto Sans SC，
+     按字形自动回退，最后才是系统字。 */
+  font-family: var(--font-nunito), var(--font-tajawal), var(--font-noto-sc),
+    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑",
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* = C 端 28rpx/1.5（750 设计宽下 28rpx≈14px）。只影响未显式标 text-* 的元素；
+     Tailwind 的 text-sm 等是 rem 基准（跟 html 字号），不受这里影响。 */
+  font-size: 14px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
+
+/* 标题字距与等宽数字：对齐 C 端 .pb-h1 / .pb-h2 / .pb-num。
+   Nunito 大字号下不收字距会显松散；金额/计数必须等宽，否则表格里逐行跳动。 */
+.txt-h1 { font-size: 23px; font-weight: 800; letter-spacing: -0.2px; line-height: 1.2; }
+.txt-h2 { font-size: 17px; font-weight: 700; letter-spacing: -0.1px; }
+.tabular-nums, .txt-num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
