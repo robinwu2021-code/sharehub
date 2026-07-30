@@ -24,8 +24,8 @@ export function PhaseGuard({ children }: { children: React.ReactNode }) {
       <div className="mb-4 flex size-14 items-center justify-center rounded-sheet bg-primary/8 text-primary/70">
         <Lock className="size-6" />
       </div>
-      <div className="mb-1 text-lg font-medium">{t("phase.lockedTitle")}</div>
-      <p className="max-w-md text-sm text-muted-foreground">
+      <div className="mb-1 txt-title">{t("phase.lockedTitle")}</div>
+      <p className="max-w-md txt-body text-muted-foreground">
         {t("phase.lockedDesc", {
           feature: `${PHASE_LABEL[locked]} ${t("phase.suffix")}`,
           phase: PHASE_LABEL[locked],
@@ -34,7 +34,7 @@ export function PhaseGuard({ children }: { children: React.ReactNode }) {
       </p>
       <Link
         href="/"
-        className="mt-5 rounded-field bg-secondary px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+        className="mt-5 rounded-field bg-secondary px-4 py-2 txt-strong text-foreground transition-colors hover:bg-accent"
       >
         {t("phase.backHome")}
       </Link>

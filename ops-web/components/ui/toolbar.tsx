@@ -33,7 +33,7 @@ export function Toolbar({
   if (selectedCount > 0) {
     return (
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-card bg-accent px-3.5 py-2">
-        <span className="text-sm font-medium">{t("table.selectedN", { n: selectedCount })}</span>
+        <span className="txt-strong">{t("table.selectedN", { n: selectedCount })}</span>
         <div className="flex flex-wrap items-center gap-2">{batchActions}</div>
         {onClearSelection && (
           <Button size="sm" variant="ghost" className="ms-auto" onClick={onClearSelection}>

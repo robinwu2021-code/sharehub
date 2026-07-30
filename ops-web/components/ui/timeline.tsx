@@ -38,10 +38,10 @@ export function Timeline({
         <li key={it.key} className="border-l-2 border-[var(--border)] pl-3">
           <div className="flex flex-wrap items-center gap-1.5">
             {it.badge && <Badge tone={it.badge.tone}>{it.badge.label}</Badge>}
-            <span className="text-xs text-muted-foreground tabular-nums">{it.meta}</span>
+            <span className="txt-caption text-muted-foreground tabular-nums">{it.meta}</span>
           </div>
-          {it.change != null && <div className="text-xs text-muted-foreground">{it.change}</div>}
-          {it.text != null && <div className="text-sm">{it.text}</div>}
+          {it.change != null && <div className="txt-caption text-muted-foreground">{it.change}</div>}
+          {it.text != null && <div className="txt-body">{it.text}</div>}
         </li>
       ))}
     </ol>

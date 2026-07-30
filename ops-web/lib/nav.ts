@@ -18,16 +18,12 @@ import { can, canModule } from "./permissions";
 import type { Phase } from "./phase";
 import { isPhaseLocked } from "./phase";
 
-export type NavMode = "panel" | "miller";
-export const NAV_MODE_DEFAULT: NavMode = "panel";
 export const NAV_PREFS_STORAGE_KEY = "ops-nav-prefs";
 
 // 布局常量（px）
 export const RAIL_WIDTH = 56;
 export const RAIL_EXPANDED_WIDTH = 168;
 export const PANEL_WIDTH = 176; // 2026-07-30 收窄（208→176）：条目均为短词，给内容区让位
-export const MILLER_GROUP_WIDTH = 148;
-export const MILLER_LEAF_WIDTH = 188;
 
 export interface NavLeaf {
   href: string; // 详情/深链（可含 ?tab= / ?view=，可跨 section）

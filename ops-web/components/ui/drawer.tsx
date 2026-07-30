@@ -37,8 +37,8 @@ export function Drawer({
         >
           <div className="flex items-start justify-between bg-muted/50 p-5">
             <div>
-              <Dialog.Title className="text-base font-medium">{title}</Dialog.Title>
-              {desc && <Dialog.Description className="mt-0.5 text-sm text-muted-foreground">{desc}</Dialog.Description>}
+              <Dialog.Title className="txt-heading">{title}</Dialog.Title>
+              {desc && <Dialog.Description className="mt-0.5 txt-body text-muted-foreground">{desc}</Dialog.Description>}
             </div>
             <Dialog.Close
               className={cn(
@@ -71,8 +71,8 @@ export function Field({
 }: { label: string; children: React.ReactNode; className?: string }) {
   return (
     <div className={cn("mb-4", className)}>
-      <div className="mb-1 text-xs text-muted-foreground">{label}</div>
-      <div className="text-sm">{children}</div>
+      <div className="mb-1 txt-label text-muted-foreground">{label}</div>
+      <div className="txt-body">{children}</div>
     </div>
   );
 }

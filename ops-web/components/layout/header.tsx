@@ -22,7 +22,7 @@ function Breadcrumb() {
   const crumbs = breadcrumb(pathname, sp.get("tab"), sp.get("view"), role);
   if (!crumbs.length) return null;
   return (
-    <nav aria-label="breadcrumb" className="flex items-center gap-1 text-sm text-muted-foreground">
+    <nav aria-label="breadcrumb" className="flex items-center gap-1 txt-body text-muted-foreground">
       {crumbs.map((c, i) => (
         <span key={i} className="flex items-center gap-1">
           {i > 0 && <ChevronRight className="size-3.5 opacity-50 rtl:-scale-x-100" />}
@@ -39,14 +39,14 @@ export function Header() {
   const router = useRouter();
   return (
     <header className="sticky top-0 z-[var(--z-sticky)] flex h-14 items-center justify-between bg-[color-mix(in_srgb,var(--surface)_82%,transparent)] px-6 backdrop-blur-md">
-      <div className="flex items-center gap-3 text-sm text-muted-foreground">
+      <div className="flex items-center gap-3 txt-body text-muted-foreground">
         <Suspense fallback={null}>
           <Breadcrumb />
         </Suspense>
         {role === "AGENT" && <span>{t("common.agent")} <span className="text-foreground">{agentNo || "-"}</span></span>}
         {IS_MOCK && <Badge tone="warning">{t("common.mockData")}</Badge>}
       </div>
-      <div className="flex items-center gap-2 text-sm">
+      <div className="flex items-center gap-2 txt-body">
         <LangSwitcher />
         <ThemeSwitcher />
         {/* 角色名不再单独占位：进用户名的 title。此前"运营管理员 admin"两段文本

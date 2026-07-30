@@ -22,7 +22,7 @@ export function ShowArchivedToggle({
   checked, onChange, label = "显示已归档",
 }: { checked: boolean; onChange: (v: boolean) => void; label?: string }) {
   return (
-    <label className="inline-flex h-9 cursor-pointer select-none items-center gap-2 rounded-[var(--radius)] bg-secondary px-3 text-sm">
+    <label className="inline-flex h-9 cursor-pointer select-none items-center gap-2 rounded-[var(--radius)] bg-secondary px-3 txt-body">
       <input
         type="checkbox"
         className="size-4 cursor-pointer accent-[var(--primary)]"

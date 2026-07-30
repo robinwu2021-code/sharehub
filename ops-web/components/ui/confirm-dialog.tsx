@@ -67,13 +67,13 @@ export function useConfirm() {
         <Dialog.Overlay className="fixed inset-0 z-[var(--z-dialog)] bg-black/40 animate-in fade-in" />
         <Dialog.Content className="fixed left-1/2 top-1/2 z-[var(--z-dialog)] w-[min(92vw,400px)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-sheet bg-card shadow-pop outline-none animate-in zoom-in">
           <div className="p-5">
-            <Dialog.Title className="text-base font-medium">{pending?.title ?? ""}</Dialog.Title>
+            <Dialog.Title className="txt-heading">{pending?.title ?? ""}</Dialog.Title>
             {pending?.desc && (
-              <Dialog.Description className="mt-1.5 text-sm text-muted-foreground">{pending.desc}</Dialog.Description>
+              <Dialog.Description className="mt-1.5 txt-body text-muted-foreground">{pending.desc}</Dialog.Description>
             )}
             {pending?.requireText && (
               <div className="mt-4">
-                <div className="mb-1.5 text-xs text-muted-foreground">
+                <div className="mb-1.5 txt-caption text-muted-foreground">
                   {t("confirm.requireHint", { text: pending.requireText })}
                 </div>
                 <Input

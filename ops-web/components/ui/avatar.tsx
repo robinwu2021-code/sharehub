@@ -75,7 +75,7 @@ export function AvatarLabel({
       <Avatar src={src} name={name} size={size} />
       <div className="min-w-0">
         <div className="truncate text-sm font-bold">{name}</div>
-        {desc && <div className="truncate text-xs text-muted-foreground">{desc}</div>}
+        {desc && <div className="truncate txt-caption text-muted-foreground">{desc}</div>}
       </div>
     </div>
   );

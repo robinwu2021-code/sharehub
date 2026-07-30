@@ -31,6 +31,8 @@ export function LangSwitcher() {
             aria-pressed={active}
             title={o.label}
             className={cn(
+              // 不用 txt-label：active 态靠 font-semibold 区分，而类型阶（无 @layer）
+              // 会盖掉 Tailwind 的字重类 —— 同 tabs/tab-header 的分段控件。
               "rounded-control px-2 py-0.5 text-xs transition-all duration-[var(--dur)] ease-[var(--ease)]",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               active

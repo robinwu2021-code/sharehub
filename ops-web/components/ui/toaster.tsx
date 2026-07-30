@@ -23,7 +23,7 @@ export function Toaster() {
           <div
             key={t.id}
             className={cn(
-              "pointer-events-auto flex items-center gap-2.5 rounded-card px-4 py-2.5 text-sm shadow-[var(--card-shadow)]",
+              "pointer-events-auto flex items-center gap-2.5 rounded-card px-4 py-2.5 txt-body shadow-[var(--card-shadow)]",
               TONE[t.type],
             )}
           >

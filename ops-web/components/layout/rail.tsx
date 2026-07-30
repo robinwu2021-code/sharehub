@@ -30,8 +30,8 @@ function RailItem({
     <>
       {active && <span className="absolute top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-e-full bg-primary" style={{ insetInlineStart: 0 }} />}
       <Icon className="size-5 shrink-0" />
-      {expanded && <span className="truncate text-sm">{label}</span>}
-      {expanded && soon && <span className="ms-auto rounded-control bg-muted px-1 text-[11px] font-semibold leading-4 text-muted-foreground">{t("common.soon")}</span>}
+      {expanded && <span className="truncate txt-body">{label}</span>}
+      {expanded && soon && <span className="ms-auto rounded-control bg-muted px-1 txt-caption text-muted-foreground">{t("common.soon")}</span>}
     </>
   );
   // shrink-0：15 项时容器溢出滚动，flex 默认会压扁子项（图标变形），必须禁止收缩。
@@ -106,7 +106,7 @@ export function Rail() {
     >
       <div className={cn("flex h-14 items-center gap-2", railExpanded ? "px-4" : "justify-center")}>
         <span className="flex size-8 shrink-0 items-center justify-center rounded-field bg-primary text-xs text-primary-foreground">PB</span>
-        {railExpanded && <span className="truncate text-sm font-medium">{t("common.appName")}</span>}
+        {railExpanded && <span className="truncate txt-strong">{t("common.appName")}</span>}
       </div>
       <nav className={cn("flex flex-1 flex-col gap-1 overflow-y-auto py-2", railExpanded ? "px-2" : "px-2")}>
         {top.map(render)}

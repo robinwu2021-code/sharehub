@@ -102,7 +102,7 @@ function InputForField({
         onBlur={onBlur}
         onChange={(e) => set(e.target.value)}
         className={cn(
-          "flex w-full resize-y rounded-field bg-secondary px-3.5 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ring-offset-bg)] disabled:opacity-50",
+          "flex w-full resize-y rounded-field bg-secondary px-3.5 py-2 txt-body transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ring-offset-bg)] disabled:opacity-50",
           invalid && ERR_RING,
         )}
       />
@@ -161,7 +161,7 @@ function FieldRow({
   const over = f.maxLength != null && len > f.maxLength;
   return (
     <div className="mb-4">
-      <div className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
+      <div className="mb-1 flex items-center gap-1 txt-label text-muted-foreground">
         <span>{f.label}</span>
         {f.required && <span className="text-destructive">*</span>}
         {f.maxLength != null && (
@@ -170,11 +170,11 @@ function FieldRow({
           </span>
         )}
       </div>
-      <div className="text-sm">
+      <div className="txt-body">
         <InputForField f={f} value={value} onChange={onChange} isEdit={isEdit} invalid={!!error} onBlur={onBlur} />
       </div>
-      {error && <div className="mt-1 text-xs text-destructive">{error}</div>}
-      {!error && f.help && <div className="mt-1 text-xs text-muted-foreground/70">{f.help}</div>}
+      {error && <div className="mt-1 txt-caption text-destructive">{error}</div>}
+      {!error && f.help && <div className="mt-1 txt-caption text-muted-foreground/70">{f.help}</div>}
     </div>
   );
 }

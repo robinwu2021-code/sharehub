@@ -11,7 +11,7 @@ export const DateInput = React.forwardRef<HTMLInputElement, React.InputHTMLAttri
       ref={ref}
       type="date"
       className={cn(
-        "flex h-[var(--ctl-h)] w-full rounded-field bg-secondary px-3.5 py-1 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ring-offset-bg)] disabled:opacity-50",
+        "flex h-[var(--ctl-h)] w-full rounded-field bg-secondary px-3.5 py-1 txt-body transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ring-offset-bg)] disabled:opacity-50",
         "[&::-webkit-calendar-picker-indicator]:opacity-60 [&::-webkit-calendar-picker-indicator]:hover:opacity-100",
         className,
       )}

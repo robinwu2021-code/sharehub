@@ -36,7 +36,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
       className={cn(
         // 与 Input 同源：field 档圆角（11px）+ 填充块、零描边。
         // 只允许纵向 resize —— 横向拉伸会撑破抽屉栅格。
-        "flex w-full resize-y rounded-field bg-secondary px-3.5 py-2 text-sm",
+        "flex w-full resize-y rounded-field bg-secondary px-3.5 py-2 txt-body",
         "transition-colors duration-[var(--dur-fast)] ease-[var(--ease)] placeholder:text-muted-foreground",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ring-offset-bg)]",
         "disabled:cursor-not-allowed disabled:opacity-50",

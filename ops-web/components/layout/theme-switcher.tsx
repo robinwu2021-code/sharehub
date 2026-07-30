@@ -36,7 +36,7 @@ export function ThemeSwitcher() {
 
       {open && (
         <div className="absolute right-0 top-10 z-50 w-56 rounded-card bg-card p-3 shadow-lg">
-          <div className="mb-2 px-1 text-xs font-medium text-muted-foreground">主题色</div>
+          <div className="mb-2 px-1 txt-label text-muted-foreground">主题色</div>
           <div className="grid grid-cols-4 gap-2">
             {THEMES.map((t) => {
               const active = t.key === themeKey;

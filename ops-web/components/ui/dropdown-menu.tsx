@@ -58,7 +58,7 @@ export const DropdownMenuItem = React.forwardRef<
     ref={ref}
     className={cn(
       // 菜单项在浮层内部，圆角收一档到 field；起始侧对齐文字，图标用 gap 不用 mr。
-      "flex cursor-pointer select-none items-center gap-2 rounded-field px-2.5 py-1.5 text-sm outline-none",
+      "flex cursor-pointer select-none items-center gap-2 rounded-field px-2.5 py-1.5 txt-body outline-none",
       "transition-colors duration-[var(--dur-fast)] ease-[var(--ease)]",
       // 键盘高亮与鼠标 hover 走同一个态：Radix 的 data-highlighted 覆盖两者。
       "data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground",

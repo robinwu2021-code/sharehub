@@ -68,7 +68,7 @@ export function MultiSelect({
         aria-expanded={open}
         onClick={() => (open ? close() : setOpen(true))}
         className={cn(
-          "flex min-h-9 w-full items-center gap-1 rounded-field bg-secondary px-2.5 py-1 text-start text-sm transition-colors",
+          "flex min-h-9 w-full items-center gap-1 rounded-field bg-secondary px-2.5 py-1 text-start txt-body transition-colors",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
           invalid && "ring-2 ring-destructive",
         )}
@@ -96,7 +96,7 @@ export function MultiSelect({
       {open && !disabled && (
         <div className="absolute inset-x-0 top-full z-50 mt-1 max-h-56 overflow-y-auto rounded-field bg-card p-1 shadow-[var(--card-shadow)] ring-1 ring-black/5">
           {options.length === 0 && (
-            <div className="px-2 py-1.5 text-xs text-muted-foreground">{t("common.empty")}</div>
+            <div className="px-2 py-1.5 txt-caption text-muted-foreground">{t("common.empty")}</div>
           )}
           {options.map((o) => {
             const on = value.includes(o.value);

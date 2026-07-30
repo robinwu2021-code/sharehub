@@ -43,7 +43,7 @@ export function TabHeader({
             multi && "cursor-pointer hover:bg-accent/40",
           )}
         >
-          <h1 className="truncate text-[17px] font-extrabold tracking-[-0.2px]">{current?.label ?? ""}</h1>
+          <h1 className="truncate txt-title">{current?.label ?? ""}</h1>
           {multi && (
             <ChevronRight
               className={cn(

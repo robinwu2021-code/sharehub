@@ -10,8 +10,8 @@ export function StatCard({
 }: { label: string; value: React.ReactNode; sub?: string; tone?: "up" | "down" }) {
   return (
     <div data-surface="stat" className="rounded-card bg-card p-5 shadow-[var(--card-shadow)]">
-      <div data-slot="label" className="text-sm text-muted-foreground">{label}</div>
-      <div className="mt-2 text-[24px] font-bold leading-tight tracking-[-0.3px] tabular-nums">{value}</div>
+      <div data-slot="label" className="txt-body text-muted-foreground">{label}</div>
+      <div className="mt-2 txt-display tabular-nums">{value}</div>
       {sub && (
         <div className={cn("mt-1 text-xs", tone === "down" ? "text-[var(--destructive)]" : "text-[var(--success)]")}>
           {sub}
@@ -25,7 +25,7 @@ export function EmptyState({ title, desc }: { title: string; desc?: string }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 rounded-card bg-muted/50 py-16 text-center">
       <div className="text-sm font-semibold">{title}</div>
-      {desc && <div className="text-xs text-muted-foreground">{desc}</div>}
+      {desc && <div className="txt-caption text-muted-foreground">{desc}</div>}
     </div>
   );
 }
@@ -39,8 +39,8 @@ export function PageTitle({ title, desc, action }: { title: string; desc?: strin
   return (
     <div className="mb-3 flex items-center justify-between gap-4">
       <div className="flex items-baseline gap-2 min-w-0">
-        <h1 className="text-[17px] font-extrabold tracking-[-0.2px] shrink-0">{title}</h1>
-        {desc && <p className="truncate text-xs text-muted-foreground">{desc}</p>}
+        <h1 className="txt-title shrink-0">{title}</h1>
+        {desc && <p className="truncate txt-caption text-muted-foreground">{desc}</p>}
       </div>
       {action && <div className="shrink-0">{action}</div>}
     </div>
@@ -54,7 +54,7 @@ export function Pagination({
   const { t } = useI18n();
   const pages = Math.max(1, Math.ceil(total / size));
   return (
-    <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+    <div className="mt-4 flex items-center justify-between txt-body text-muted-foreground">
       <span>{t("common.totalItems", { n: total })}</span>
       <div className="flex items-center gap-2">
         <button

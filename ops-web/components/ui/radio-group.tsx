@@ -88,7 +88,7 @@ export function Radio({
         className={cn("select-none text-sm leading-tight", disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer")}
       >
         {label}
-        {desc && <span className="mt-0.5 block text-xs font-normal text-muted-foreground">{desc}</span>}
+        {desc && <span className="mt-0.5 block txt-caption text-muted-foreground">{desc}</span>}
       </label>
     </div>
   );
