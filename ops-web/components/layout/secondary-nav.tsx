@@ -16,7 +16,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { useNavPrefs } from "@/lib/stores/nav-prefs";
 import { useI18n } from "@/lib/i18n";
-import { PHASE_LABEL, type Phase } from "@/lib/phase";
+import { PHASE_LABEL, isPhaseLocked, type Phase } from "@/lib/phase";
 import { cn } from "@/lib/utils";
 
 function SoonBadge() {
@@ -55,32 +55,10 @@ function LeafRow({ leaf, active }: { leaf: NavLeaf; active: boolean }) {
       )}
     >
       <span className="truncate">{tNav(leaf.label)}</span>
+      {/* 已就绪但排期在后的叶子（ready + phase>当前）：可点，但保留分期徽章 ——
+          否则「P2 功能已提前可用」这个信息在界面上完全消失，运营看不出自己在用超前功能。 */}
+      {leaf.phase && isPhaseLocked(leaf.phase) && <PhaseBadge phase={leaf.phase} />}
     </Link>
-  );
-}
-
-function ModeToggle({ mode, onChange }: { mode: NavMode; onChange: (m: NavMode) => void }) {
-  return (
-    <div className="flex gap-0.5 rounded-lg bg-secondary p-0.5" role="group" aria-label="导航呈现模式">
-      <button
-        type="button"
-        title="面板分组"
-        aria-pressed={mode === "panel"}
-        onClick={() => onChange("panel")}
-        className={cn("rounded-md p-1 transition-colors", mode === "panel" ? "bg-card text-foreground shadow-[var(--card-shadow)]" : "text-muted-foreground hover:text-foreground")}
-      >
-        <Icons.Rows3 className="size-3.5" />
-      </button>
-      <button
-        type="button"
-        title="三列逐级"
-        aria-pressed={mode === "miller"}
-        onClick={() => onChange("miller")}
-        className={cn("rounded-md p-1 transition-colors", mode === "miller" ? "bg-card text-foreground shadow-[var(--card-shadow)]" : "text-muted-foreground hover:text-foreground")}
-      >
-        <Icons.Columns3 className="size-3.5" />
-      </button>
-    </div>
   );
 }
 
@@ -93,7 +71,7 @@ export function SecondaryNav() {
   const tab = sp.get("tab");
   const view = sp.get("view");
   const role = useAuth((s) => s.role);
-  const { navMode, setNavMode } = useNavPrefs();
+  const { navMode } = useNavPrefs();
   const { tNav } = useI18n();
 
   const section = findActiveSection(pathname, role);
@@ -116,12 +94,14 @@ export function SecondaryNav() {
   if (!section || !leaves.length) return null; // 无子功能的 section（经营看板）全宽（AC5）
 
   const header = (
-    <div className="flex h-14 shrink-0 items-center justify-between px-3">
+    <div className="flex h-14 shrink-0 items-center px-3">
       <span className="truncate text-sm font-medium">{tNav(section.label)}</span>
-      <ModeToggle mode={navMode} onChange={setNavMode} />
     </div>
   );
 
+  // 呈现模式固定为 panel：原来的「面板分组/三列逐级」切换是个元设置，运营用户
+  // 不需要在工作中切换导航形态，它却占着面板头部最显眼的位置。miller 分支代码
+  // 暂留（localStorage 里存过 miller 的老用户仍走它，避免突然换形态），入口已撤。
   if (navMode === "panel") {
     return (
       <aside className="hidden shrink-0 flex-col bg-sidebar/60 md:flex" style={{ width: PANEL_WIDTH }}>
@@ -136,7 +116,7 @@ export function SecondaryNav() {
                 </div>
               )}
               {/* 子（功能）：有分组时缩进 + 左导引线，13px 灰；无分组则平铺 */}
-              <div className={cn("space-y-0.5", seg.group && "ms-3 border-s border-border/70 ps-1.5")}>
+              <div className={cn("space-y-0.5", seg.group && "ms-1")}>
                 {seg.leaves.map((l, i) => (
                   <LeafRow key={l.href + l.label} leaf={l} active={segBase[si] + i === activeIdx} />
                 ))}

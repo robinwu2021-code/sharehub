@@ -7,8 +7,11 @@
 // - L1 可见性 = canModule(section.module)；门户 section 见 portalFor。
 // - L3 可见性 = leaf.perm ? can(role, perm) : 跟随 section。
 // - soon = 待建：灰显不可点，不产生 404 入口。
-// - phase = 产品分期：phase > CURRENT_PHASE 的叶子灰显不可点（按期屏蔽）。
-//   Phase 1=MVP T1-T3 | Phase 2=规模化 T4-T6 | Phase 3=生态 T7-T9。
+// - phase = 产品分期（徽章）：Phase 1=MVP T1-T3 | 2=规模化 T4-T6 | 3=生态 T7-T9。
+// - ready = 就绪度（门禁）：叶子灰显 ⇔ !ready && phase > CURRENT_PHASE。
+//   2026-07-30 拆分：此前 phase 一个字段兼管「第几期」和「能不能点」，导致 60 个灰叶子
+//   的灰色原因（假数据 / 后端缺端点 / 只是排期靠后）无法区分。现在补完一个叶子的
+//   前后端就标 ready: true，逐叶解锁；phase 不再是门禁，只是徽章。
 // - 深链沿用 ?tab= / ?view=；本文件为纯数据+纯函数（无 React），可单测。
 import type { Role } from "./auth";
 import { can, canModule } from "./permissions";
@@ -22,7 +25,7 @@ export const NAV_PREFS_STORAGE_KEY = "ops-nav-prefs";
 // 布局常量（px）
 export const RAIL_WIDTH = 56;
 export const RAIL_EXPANDED_WIDTH = 168;
-export const PANEL_WIDTH = 208;
+export const PANEL_WIDTH = 176; // 2026-07-30 收窄（208→176）：条目均为短词，给内容区让位
 export const MILLER_GROUP_WIDTH = 148;
 export const MILLER_LEAF_WIDTH = 188;
 
@@ -32,6 +35,18 @@ export interface NavLeaf {
   perm?: string; // 细粒度权限码；无则跟随所属 section 的 canModule
   soon?: boolean; // 待建：灰显不可点
   phase?: Phase; // 产品分期（缺省=P1）；phase > CURRENT_PHASE 时灰显不可点
+  /**
+   * 就绪度覆盖：本叶**前后端已贯通并验证**，无视 phase 直接解锁（2026-07-30）。
+   *
+   * 为什么加这一维：原设计里 phase 同时承担两件事——「这是第几期的功能」和「现在能不能点」。
+   * 于是 60 个叶子灰着，而灰的真实原因各不相同：有的页面是假数据、有的后端端点压根不存在、
+   * 有的其实全通了只是排在 P2。三者混成一种灰色，看不出该修哪个。
+   * 现在拆开：phase 只表达「第几期」（徽章），ready 表达「就绪可用」（门禁）。
+   * 补完一个叶子的前后端就给它加 ready: true，解锁是逐叶推进的结果，不是一次性改环境变量。
+   *
+   * 注意：ready 只放宽 phase，不放宽 perm 与 soon —— 无权限仍不可见，待建仍不可点。
+   */
+  ready?: boolean;
   /**
    * L2 分组标题（按「机构/角色」或「对象」聚类，2026-07-29 结构优化）。
    * 渲染规则：同一 group 的连续叶子共用一个小标题；不设 group 的叶子直接平铺。
@@ -334,8 +349,12 @@ export function groupedLeaves(leaves: NavLeaf[]): { group?: string; leaves: NavL
   return out;
 }
 
-/** 叶子是否被产品分期屏蔽（phase > CURRENT_PHASE）。 */
+/**
+ * 叶子是否被屏蔽 = 未就绪 且 超出当前分期。
+ * `ready: true` 是逐叶解锁的覆盖开关（见 NavLeaf.ready）。
+ */
 export function isLeafLocked(leaf: NavLeaf): boolean {
+  if (leaf.ready) return false;
   return isPhaseLocked(leaf.phase);
 }
 
