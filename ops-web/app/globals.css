@@ -62,10 +62,49 @@
   --destructive-ink: color-mix(in oklch, var(--destructive) 75%, black);
   --info-ink: color-mix(in oklch, var(--info) 78%, black);
 
-  --radius: 14px;                      /* C 端卡片实测 13~14px */
-  /* C 端的搜索框/分段控件/主 CTA 都是全圆药丸（实测 9999px），不是小圆角矩形 ——
-     这是它「软」的主要来源，比配色更决定风格。 */
-  --radius-pill: 9999px;
+  /* ── 形状阶 ─────────────────────────────────────────────────────────────
+     此前只有 --radius 一个形状 token，其余全是 Tailwind 默认阶硬写，实测组件层
+     混用了 **7 种圆角写法**（md/lg/xl/2xl/full/[11px]/[var(--radius)]）——
+     这是"看着不统一"的结构性原因，不是某个组件没调好。
+     现在收成四档，每档都对应 C 端一个真实组件；**只允许用这四档**。 */
+  --r-chip: 9999px;                    /* 徽章/按钮/搜索框/分段 = C 端 pb-tag·pb-button */
+  --r-field: 11px;                     /* 表单输入/小色块 = C 端 pb-field 22rpx */
+  --r-card: 14px;                      /* 卡片/表格容器 = C 端 pb-card 30rpx */
+  --r-sheet: 20px;                     /* 抽屉/弹层等大面 = C 端底部弹层 */
+  --radius: var(--r-card);             /* 兼容既有 rounded-[var(--radius)] 调用点 */
+  /* ── 焦点环 ──────────────────────────────────────────────────────────────
+     实测 23 个组件里只有 5 个写了 focus-visible —— 键盘用户看不到焦点在哪。
+     统一成一组 token，组件里一律用 `focus-visible:ring-2 focus-visible:ring-ring
+     focus-visible:ring-offset-2 focus-visible:ring-offset-[--ring-offset-bg]`。 */
+  --ring-offset-bg: var(--card);
+
+  /* ── 阴影阶 ──────────────────────────────────────────────────────────────
+     卡片与浮层不该是同一级阴影：浮层要"离纸更远"才读得出层次。
+     两档都换算自 C 端 --pb-shadow-sm / --pb-shadow。 */
+  --shadow-pop: 0 4px 12px rgba(18, 20, 34, 0.10), 0 12px 32px rgba(18, 20, 34, 0.12);
+
+  /* ── 层级阶 ──────────────────────────────────────────────────────────────
+     此前浮层全是硬写 z-50，叠加顺序靠 DOM 先后碰运气（tooltip 被 drawer 盖住过）。 */
+  --z-sticky: 20;
+  --z-drawer: 40;
+  --z-dialog: 50;
+  --z-popover: 60;
+  --z-toast: 70;
+  --z-tooltip: 80;                     /* tooltip 永远在最上：它是对其它浮层的说明 */
+
+  /* ── 动效 ────────────────────────────────────────────────────────────────
+     取自 C 端 pb-button / pb-segmented 的实测值，不再各组件自己写 duration。 */
+  --dur-fast: 0.12s;
+  --dur: 0.2s;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* ── 密度 ────────────────────────────────────────────────────────────────
+     C 端是手机触控尺寸（pb-btn md = 84rpx ≈ 42px），运营台是鼠标 + 密集表格，
+     两边尺寸体系天然不同 —— 这是**不追求与 C 端一致**的一维。
+     两档：default 给表单/抽屉，dense 给列表页（单屏多看 3~5 行是运营真实诉求）。
+     用法：容器加 `data-density="dense"`，控件高度写 `h-[var(--ctl-h)]`。 */
+  --ctl-h: 36px;                       /* 控件高（输入/按钮/下拉）*/
+  --row-h: 44px;                       /* 表格行高 */
   /* = C 端 --pb-shadow-sm / --pb-shadow 换算（rpx→px，750 设计宽下 2rpx≈1px）*/
   --card-shadow: 0 1px 5px rgba(18, 20, 34, 0.05), 0 3px 14px rgba(18, 20, 34, 0.06);
 }
@@ -113,7 +152,19 @@
 /* 暗色下黑白灰皮肤的主色要反相，否则近黑主色在深底上完全看不见 */
 .dark[data-theme="mono"] { --primary: oklch(0.92 0 0); --primary-foreground: oklch(0.205 0 0); }
 
+[data-density="dense"] {
+  --ctl-h: 30px;
+  --row-h: 36px;
+}
+
 @theme inline {
+  /* 圆角四档（Tailwind 会生成 rounded-chip / rounded-field / rounded-card / rounded-sheet）*/
+  --radius-chip: var(--r-chip);
+  --radius-field: var(--r-field);
+  --radius-card: var(--r-card);
+  --radius-sheet: var(--r-sheet);
+  --shadow-card: var(--card-shadow);
+  --shadow-pop: var(--shadow-pop);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-canvas: var(--canvas);
@@ -144,6 +195,9 @@
   --color-ring: var(--ring);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
+  /* ⚠️ 以下五档是**待淘汰的**：新代码只允许用 rounded-chip/field/card/sheet 四档。
+     暂留是因为组件层还有 23 处 rounded-md/lg/xl/2xl 调用点未替换（P2 处理），
+     替换完这里连同这些别名一起删，并加扫描测试挡住回流。 */
   --radius-sm: calc(var(--radius) - 5px);
   --radius-md: calc(var(--radius) - 3px);
   --radius-lg: calc(var(--radius) - 1px);
