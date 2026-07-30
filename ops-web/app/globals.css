@@ -15,7 +15,7 @@
    主色只用于点睛（激活态/主按钮/焦点环）。换肤只改 --primary，
    中性色与语义色恒定 —— 换肤不再动摇整个界面的观感。 */
 :root {
-  --primary: oklch(0.21 0 0);          /* 黑白灰 #18181B，与 C 端默认皮肤同值 */
+  --primary: #18181b;                  /* = C 端 --pb-primary，取原值不再用 oklch 近似 */
   --primary-foreground: oklch(0.985 0 0);
   --ring: var(--primary);
 
@@ -39,8 +39,11 @@
   --sidebar-foreground: #3b3e48;
   --accent: #e8eaef;                   /* 激活/hover：比 faint 再深一档 */
   --accent-foreground: #16171d;
-  --border: #e4e6eb;                   /* 可见发丝边 */
-  --input: var(--border);
+  /* ⚠️ C 端实测 **border-width 全部为 0** —— 分区完全靠填充块 + 阴影，一根线都不画。
+     运营台不能全照搬：密集表格没有行分隔就读不动。折中：边框色压到几乎只剩带感，
+     且**只用于表格行分隔**；卡片/工具栏/输入框一律无边框走填充块。 */
+  --border: #eef0f3;
+  --input: #f2f3f6;                    /* 输入是**填充块**不是描边框（同 C 端搜索框）*/
 
   /* 语义色：直接采用 C 端 --pb-* 的 hex，一个不改，跨端状态色一致 */
   --success: #12b76a;
@@ -59,16 +62,19 @@
   --destructive-ink: color-mix(in oklch, var(--destructive) 75%, black);
   --info-ink: color-mix(in oklch, var(--info) 78%, black);
 
-  --radius: 0.85rem;                   /* ≈13.6px，与 C 端 28rpx 对齐 */
+  --radius: 14px;                      /* C 端卡片实测 13~14px */
+  /* C 端的搜索框/分段控件/主 CTA 都是全圆药丸（实测 9999px），不是小圆角矩形 ——
+     这是它「软」的主要来源，比配色更决定风格。 */
+  --radius-pill: 9999px;
   /* = C 端 --pb-shadow-sm / --pb-shadow 换算（rpx→px，750 设计宽下 2rpx≈1px）*/
   --card-shadow: 0 1px 5px rgba(18, 20, 34, 0.05), 0 3px 14px rgba(18, 20, 34, 0.06);
 }
 
 /* 皮肤：3 套，与 C 端 SKINS 一一对应（黑白灰 / 时尚蓝 / 科幻紫）。
    只换主色 —— 中性色与语义色不参与换肤。 */
-[data-theme="mono"]   { --primary: oklch(0.21 0 0);       --primary-foreground: oklch(0.985 0 0); }
-[data-theme="blue"]   { --primary: oklch(0.55 0.22 264);  --primary-foreground: oklch(0.985 0 0); } /* #2F6BFF */
-[data-theme="purple"] { --primary: oklch(0.52 0.26 296);  --primary-foreground: oklch(0.985 0 0); } /* #7C3AED */
+[data-theme="mono"]   { --primary: #18181b;              --primary-foreground: #ffffff; }
+[data-theme="blue"]   { --primary: #2f6bff;              --primary-foreground: #ffffff; }
+[data-theme="purple"] { --primary: #7c3aed;              --primary-foreground: #ffffff; }
 
 .dark {
   /* 同样逐个取自 C 端 dark（--pb-bg/surface/elev/ink/sub/faint）*/

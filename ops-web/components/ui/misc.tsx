@@ -11,7 +11,7 @@ export function StatCard({
   return (
     <div className="rounded-xl bg-card p-5 shadow-[var(--card-shadow)]">
       <div className="text-sm text-muted-foreground">{label}</div>
-      <div className="mt-2 text-2xl font-medium tabular-nums">{value}</div>
+      <div className="mt-2 text-2xl font-extrabold tracking-[-0.3px] tabular-nums">{value}</div>
       {sub && (
         <div className={cn("mt-1 text-xs", tone === "down" ? "text-[var(--destructive)]" : "text-[var(--success)]")}>
           {sub}
@@ -24,7 +24,7 @@ export function StatCard({
 export function EmptyState({ title, desc }: { title: string; desc?: string }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 rounded-xl bg-muted/50 py-16 text-center">
-      <div className="text-sm font-medium">{title}</div>
+      <div className="text-sm font-semibold">{title}</div>
       {desc && <div className="text-xs text-muted-foreground">{desc}</div>}
     </div>
   );
@@ -39,7 +39,7 @@ export function PageTitle({ title, desc, action }: { title: string; desc?: strin
   return (
     <div className="mb-3 flex items-center justify-between gap-4">
       <div className="flex items-baseline gap-2 min-w-0">
-        <h1 className="text-base font-medium shrink-0">{title}</h1>
+        <h1 className="text-[17px] font-extrabold tracking-[-0.2px] shrink-0">{title}</h1>
         {desc && <p className="truncate text-xs text-muted-foreground">{desc}</p>}
       </div>
       {action && <div className="shrink-0">{action}</div>}
