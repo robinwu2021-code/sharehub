@@ -32,6 +32,7 @@ export const ar: Messages = {
     agent: "وكيل",
     soon: "قريباً",
     switchView: "تبديل العرض",
+    more: "المزيد",
   },
   phase: {
     suffix: "ميزة المرحلة",

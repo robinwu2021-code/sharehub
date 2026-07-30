@@ -67,6 +67,9 @@
      混用了 **7 种圆角写法**（md/lg/xl/2xl/full/[11px]/[var(--radius)]）——
      这是"看着不统一"的结构性原因，不是某个组件没调好。
      现在收成四档，每档都对应 C 端一个真实组件；**只允许用这四档**。 */
+  --r-control: 4px;                    /* 16px 级小控件（checkbox）：四档最小的 field(11px)
+                                          超过它半边长会被夹成正圆，与单选点撞脸，
+                                          「方=多选 / 圆=互斥」的形状区分当场失效 */
   --r-chip: 9999px;                    /* 徽章/按钮/搜索框/分段 = C 端 pb-tag·pb-button */
   --r-field: 11px;                     /* 表单输入/小色块 = C 端 pb-field 22rpx */
   --r-card: 14px;                      /* 卡片/表格容器 = C 端 pb-card 30rpx */
@@ -159,6 +162,7 @@
 
 @theme inline {
   /* 圆角四档（Tailwind 会生成 rounded-chip / rounded-field / rounded-card / rounded-sheet）*/
+  --radius-control: var(--r-control);
   --radius-chip: var(--r-chip);
   --radius-field: var(--r-field);
   --radius-card: var(--r-card);

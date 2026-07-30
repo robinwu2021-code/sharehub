@@ -31,6 +31,7 @@ export const en: Messages = {
     agent: "Agent",
     soon: "Soon",
     switchView: "Switch view",
+    more: "More",
   },
   phase: {
     suffix: "phase feature",

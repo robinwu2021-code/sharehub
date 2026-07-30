@@ -29,6 +29,7 @@ export const zh = {
     agent: "代理",
     soon: "待建",
     switchView: "切换视图",
+    more: "更多",
   },
   phase: {
     suffix: "阶段功能",

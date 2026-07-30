@@ -3,6 +3,7 @@
 import * as React from "react";
 import { ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { Card } from "./card";
+import { Checkbox } from "./checkbox";
 import { Table, THead, TBody, TR, TH, TD } from "./table";
 import { Skeleton, EmptyState } from "./misc";
 import { cn } from "@/lib/utils";
@@ -18,7 +19,13 @@ export interface Column<T> {
 
 export type SortDir = "asc" | "desc";
 
-/** 行选择 checkbox（含半选态）。项目无 checkbox 原语，这里就地实现，保持扁平无描边风格。 */
+/**
+ * 行选择 checkbox（含半选态）。
+ *
+ * 原为就地实现的原生 `<input type=checkbox>`（靠 ref 副作用设 `indeterminate`），
+ * 已上移为原语 `ui/checkbox.tsx`；这里只留「三态 boolean → CheckedState」的转接
+ * 与 `stopPropagation`（行整体可点，勾选不该顺带打开详情）。
+ */
 function RowCheckbox({
   checked, indeterminate, onChange, label,
 }: {
@@ -27,20 +34,15 @@ function RowCheckbox({
   onChange: (v: boolean) => void;
   label: string;
 }) {
-  const ref = React.useRef<HTMLInputElement>(null);
-  React.useEffect(() => {
-    if (ref.current) ref.current.indeterminate = !!indeterminate && !checked;
-  }, [indeterminate, checked]);
   return (
-    <input
-      ref={ref}
-      type="checkbox"
-      aria-label={label}
-      className="size-4 cursor-pointer accent-[var(--primary)] align-middle"
-      checked={checked}
-      onChange={(e) => onChange(e.target.checked)}
-      onClick={(e) => e.stopPropagation()}
-    />
+    <span onClick={(e) => e.stopPropagation()} className="inline-flex">
+      <Checkbox
+        aria-label={label}
+        checked={checked ? true : indeterminate ? "indeterminate" : false}
+        // 半选被点击时 Radix 给 true（半选 → 全选），与全选列的直觉一致。
+        onChange={(v) => onChange(v === true)}
+      />
+    </span>
   );
 }
 

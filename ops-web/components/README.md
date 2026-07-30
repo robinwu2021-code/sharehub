@@ -27,6 +27,15 @@
 | `Notice` | `ui/notice.tsx` | 页内灰底提示条。权限降级用业务件 `ReadOnlyNotice` |
 | `StatCard` / `EmptyState` / `Skeleton` / `PageTitle` / `Pagination` | `ui/misc.tsx` | |
 | `Tooltip` | `ui/tooltip.tsx` | |
+| `Checkbox` / `CheckboxField` | `ui/checkbox.tsx` | 三态（含半选）。`DataTable` 的行选择用它 |
+| `RadioGroup` / `RadioGroupItem` / `Radio` | `ui/radio-group.tsx` | 选项 ≤4 且需全部可见时用它，别用下拉 |
+| `Switch` / `SwitchField` | `ui/switch.tsx` | **立即生效**的开关；待提交的布尔字段用 `Checkbox` |
+| `Textarea` | `ui/textarea.tsx` | 多行输入，与 `Input` 同一套填充与圆角 |
+| `Label` | `ui/label.tsx` | 可编辑控件的标签（`required` 出星号）。只读详情行是 `Field` |
+| `Separator` | `ui/separator.tsx` | 语义分界线。**不要**拿它给卡片/工具栏描边 |
+| `Avatar` / `AvatarLabel` | `ui/avatar.tsx` | 带首字母兜底，图挂了不留空圈 |
+| `Popover` / `PopoverTrigger` / `PopoverContent` | `ui/popover.tsx` | 可交互轻浮层。Portal 定位，不会被 `overflow` 裁掉 |
+| `DropdownMenu*` / `RowActions` | `ui/dropdown-menu.tsx` | 动作菜单；`RowActions` 是表格操作列的「更多」 |
 
 ## 组合件（composites）
 
@@ -83,6 +92,19 @@
   放进 grid / flex 由容器给间距时传 `className="mb-0"`。
 - `ui/form-drawer.tsx` 的 `FieldRow` **不是重复定义**，是表单行（必填星号 / 字数计数 /
   错误态 / 控件分发）。两者只有外框间距长得像，合并会把表单关注点塞进只读展示件 —— 保持分开。
+
+### 四种浮层怎么选
+
+选错就会出现第二份重复实现，这条按**内容性质**判，不按「大小」判：
+
+| 内容 | 用 | 依据 |
+|---|---|---|
+| 一句纯说明，hover 即出，不可点 | `Tooltip` | 无焦点、无交互 |
+| 一列**动作**（编辑/停用/归档） | `DropdownMenu` / `RowActions` | 方向键 + typeahead 由 Radix 保证 |
+| 任意可交互内容（筛选面板、迷你表单、二维码） | `Popover` | 顺手看一眼 / 改一下，**不遮挡列表上下文** |
+| 成体系的一件事，有标题与底部动作条 | `Drawer` / `ConfirmDialog` | 进去做一件事 |
+
+一句话判据：**Popover 是「顺手改一下」，Drawer 是「进去做一件事」。**
 
 ### 状态映射表放哪
 
