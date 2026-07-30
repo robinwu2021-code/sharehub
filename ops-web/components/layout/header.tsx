@@ -38,7 +38,7 @@ export function Header() {
   const { t } = useI18n();
   const router = useRouter();
   return (
-    <header className="flex h-14 items-center justify-between px-6">
+    <header className="sticky top-0 z-[var(--z-sticky)] flex h-14 items-center justify-between bg-[color-mix(in_srgb,var(--surface)_82%,transparent)] px-6 backdrop-blur-md">
       <div className="flex items-center gap-3 text-sm text-muted-foreground">
         <Suspense fallback={null}>
           <Breadcrumb />

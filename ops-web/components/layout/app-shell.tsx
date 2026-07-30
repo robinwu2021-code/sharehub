@@ -45,12 +45,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* 内容纸：header 吸顶不滚，页体独立滚动 */}
       <div data-shell="sheet" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-y-auto p-6">
+        {/* Header 放进滚动容器内 sticky：静止时与内容同底无感知，滚动时内容从
+            毛玻璃下穿过、自然出现分界 —— 零线条（Linear/GitHub 的做法）。 */}
+        <main className="flex-1 overflow-y-auto">
+          <Header />
+          <div className="p-6 pt-2">
           {/* PhaseGuard 读 useSearchParams（静态导出要求包 Suspense） */}
           <Suspense fallback={null}>
             <PhaseGuard>{children}</PhaseGuard>
           </Suspense>
+          </div>
         </main>
       </div>
     </div>
