@@ -5,19 +5,17 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+// 三套皮肤与 C 端 c-app 的 SKINS 一一对应（src/design/tokens.ts）：
+// 同名、同 hex，两端截图放一起是同一个产品。
+// 皮肤只换 --primary —— 中性色与语义色在 globals.css 里恒定，不参与换肤。
 export const THEMES = [
-  { key: "indigo", label: "靛蓝", color: "oklch(0.55 0.2 268)" },
-  { key: "blue", label: "天蓝", color: "oklch(0.57 0.17 245)" },
-  { key: "teal", label: "青碧", color: "oklch(0.6 0.11 195)" },
-  { key: "emerald", label: "翠绿", color: "oklch(0.6 0.14 162)" },
-  { key: "violet", label: "紫罗兰", color: "oklch(0.55 0.22 300)" },
-  { key: "rose", label: "玫瑰", color: "oklch(0.6 0.21 15)" },
-  { key: "amber", label: "琥珀", color: "oklch(0.66 0.15 62)" },
-  { key: "slate", label: "石墨", color: "oklch(0.45 0.035 260)" },
+  { key: "mono", label: "黑白灰", color: "oklch(0.21 0 0)" },
+  { key: "blue", label: "时尚蓝", color: "oklch(0.55 0.22 264)" },
+  { key: "purple", label: "科幻紫", color: "oklch(0.52 0.26 296)" },
 ] as const;
 
 export type ThemeKey = (typeof THEMES)[number]["key"];
-export const DEFAULT_THEME: ThemeKey = "indigo";
+export const DEFAULT_THEME: ThemeKey = "mono";
 
 /** 立即把主题写到 <html data-theme>（供点击时即时生效）。 */
 export function applyTheme(key: ThemeKey) {
@@ -38,6 +36,17 @@ export const useTheme = create<ThemeState>()(
         set({ themeKey: k });
       },
     }),
-    { name: "ops-theme" },
+    {
+      name: "ops-theme",
+      // 皮肤从 9 套收敛到 3 套（2026-07-30）。老用户 localStorage 里可能还存着
+      // indigo/teal/rose 这类已删除的 key —— 不清洗的话选择器会一个都不高亮，
+      // 用户以为换肤坏了。这里在水合时把无效值落回默认并同步写回 <html>。
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        const valid = THEMES.some((t) => t.key === state.themeKey);
+        if (!valid) state.themeKey = DEFAULT_THEME;
+        applyTheme(state.themeKey);
+      },
+    },
   ),
 );

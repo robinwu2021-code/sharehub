@@ -1,69 +1,103 @@
 @import "tailwindcss";
 
-/* 扁平·色块分割：白底不变，区域靠背景色块（明暗差）反衬分区，不靠描边线。
-   色块（canvas/sidebar/secondary/muted/accent）由 --primary 经 color-mix 自动派生 →
-   换主题只需改 --primary，8 套主题块只覆盖主色。中等强度 + 极轻阴影。 */
+/* ── 设计令牌（2026-07-30 重做）─────────────────────────────────────────────
+   与 C 端 c-app 的 token 体系对齐（src/design/tokens.ts + App.vue）：
+   同一组皮肤名、同一组语义色 hex、同样的 tint 派生方式。
+
+   ⚠️ 改动的核心：**中性色不再由主色派生**。
+   旧方案把 canvas/sidebar/muted/border 全写成 color-mix(primary, white)，
+   于是画布、侧栏、表头、输入框、边框统统泛着同一种主色调，整屏没有一处真中性；
+   叠加 --border 只有 13% 主色混白（对白底约 1.05:1，肉眼几乎看不见），
+   密集表格界面只能靠大片浅色块暗示边界 → 糊、脏、层次不清。
+
+   新方案（shadcn 默认形态，也是 Linear/Vercel/Stripe 后台的通行做法）：
+   面色全部 chroma=0 的中性灰阶；层次靠「明度差 + 可见发丝边 + 极轻阴影」；
+   主色只用于点睛（激活态/主按钮/焦点环）。换肤只改 --primary，
+   中性色与语义色恒定 —— 换肤不再动摇整个界面的观感。 */
 :root {
-  --primary: oklch(0.55 0.2 268);
+  --primary: oklch(0.21 0 0);          /* 黑白灰 #18181B，与 C 端默认皮肤同值 */
   --primary-foreground: oklch(0.985 0 0);
   --ring: var(--primary);
 
-  --background: oklch(1 0 0); /* 白面/白卡 */
-  --foreground: oklch(0.18 0.012 268);
+  /* 中性面色：零彩度，恒定不随皮肤变 */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.012 268);
+  --card-foreground: oklch(0.145 0 0);
+  --canvas: oklch(0.985 0 0);          /* 页面画布：比卡片低一档，卡片才浮得起来 */
+  --sidebar: oklch(0.97 0 0);
+  --sidebar-foreground: oklch(0.35 0 0);
+  --secondary: oklch(0.97 0 0);        /* 填充块：输入/分段/outline 按钮 */
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);            /* 表头/隔行 */
+  --muted-foreground: oklch(0.556 0 0); /* 对白底 ≈4.6:1，过 WCAG AA */
+  --accent: oklch(0.94 0 0);           /* 激活/hover */
+  --accent-foreground: oklch(0.205 0 0);
+  --border: oklch(0.922 0 0);          /* 可见发丝边（旧值几乎不可见，是"糊"的主因之一）*/
+  --input: var(--border);
 
-  /* 色块分层（中等强度，随主题微染） */
-  --canvas: color-mix(in oklch, var(--primary) 5%, white); /* 页面画布底 */
-  --sidebar: color-mix(in oklch, var(--primary) 10%, white); /* 导航色块（Rail/面板） */
-  --sidebar-foreground: color-mix(in oklch, var(--primary) 55%, oklch(0.3 0 0));
-  --secondary: color-mix(in oklch, var(--primary) 8%, white); /* 填充块：输入/分段/outline 按钮 */
-  --secondary-foreground: color-mix(in oklch, var(--primary) 62%, oklch(0.22 0 0));
-  --muted: color-mix(in oklch, var(--primary) 6%, white); /* 表头/隔行色块 */
-  --muted-foreground: color-mix(in oklch, var(--primary) 26%, oklch(0.5 0 0));
-  --accent: color-mix(in oklch, var(--primary) 15%, white); /* 激活/hover 色块 */
-  --accent-foreground: color-mix(in oklch, var(--primary) 64%, black);
-  --border: color-mix(in oklch, var(--primary) 13%, white); /* 极弱发丝，仅个别处 */
-  --input: var(--secondary);
+  /* 语义色：直接采用 C 端 --pb-* 的 hex，一个不改，跨端状态色一致 */
+  --success: #12b76a;
+  --warning: #f79009;
+  --destructive: #f04438;
+  --info: #2f6bff;                     /* 新增：运营台大量"处理中/待审/提示"，
+                                          此前只能借主色，与"可点击/主操作"语义混淆 */
+  /* tint：Badge/状态块底色，同 C 端 --pb-*-tint 的做法 */
+  --success-tint: color-mix(in oklch, var(--success) 14%, white);
+  --warning-tint: color-mix(in oklch, var(--warning) 14%, white);
+  --destructive-tint: color-mix(in oklch, var(--destructive) 14%, white);
+  --info-tint: color-mix(in oklch, var(--info) 14%, white);
+  /* tint 上的文字要单独压暗：#12b76a 直接放在浅绿底上只有 ~2.8:1，小字过不了 AA */
+  --success-ink: color-mix(in oklch, var(--success) 72%, black);
+  --warning-ink: color-mix(in oklch, var(--warning) 68%, black);
+  --destructive-ink: color-mix(in oklch, var(--destructive) 75%, black);
+  --info-ink: color-mix(in oklch, var(--info) 78%, black);
 
-  --destructive: oklch(0.577 0.245 27.325);
-  --success: oklch(0.6 0.13 160);
-  --warning: oklch(0.72 0.15 70);
-  --radius: 0.85rem;
-  --card-shadow: 0 1px 2px oklch(0 0 0 / 0.05), 0 1px 3px oklch(0 0 0 / 0.03);
+  --radius: 0.85rem;                   /* ≈13.6px，与 C 端 28rpx 对齐 */
+  --card-shadow: 0 1px 2px oklch(0 0 0 / 0.06), 0 1px 3px oklch(0 0 0 / 0.04);
 }
 
-/* 主题：仅换主色，色块自动随之派生 */
-[data-theme="indigo"]  { --primary: oklch(0.55 0.2 268);  --primary-foreground: oklch(0.985 0 0); }
-[data-theme="blue"]    { --primary: oklch(0.57 0.17 245); --primary-foreground: oklch(0.985 0 0); }
-[data-theme="teal"]    { --primary: oklch(0.6 0.11 195);  --primary-foreground: oklch(0.99 0 0); }
-[data-theme="emerald"] { --primary: oklch(0.6 0.14 162);  --primary-foreground: oklch(0.99 0 0); }
-[data-theme="violet"]  { --primary: oklch(0.55 0.22 300); --primary-foreground: oklch(0.985 0 0); }
-[data-theme="rose"]    { --primary: oklch(0.6 0.21 15);   --primary-foreground: oklch(0.99 0 0); }
-[data-theme="amber"]   { --primary: oklch(0.66 0.15 62);  --primary-foreground: oklch(0.2 0.03 62); }
-[data-theme="slate"]   { --primary: oklch(0.45 0.035 260); --primary-foreground: oklch(0.985 0 0); }
+/* 皮肤：3 套，与 C 端 SKINS 一一对应（黑白灰 / 时尚蓝 / 科幻紫）。
+   只换主色 —— 中性色与语义色不参与换肤。 */
+[data-theme="mono"]   { --primary: oklch(0.21 0 0);       --primary-foreground: oklch(0.985 0 0); }
+[data-theme="blue"]   { --primary: oklch(0.55 0.22 264);  --primary-foreground: oklch(0.985 0 0); } /* #2F6BFF */
+[data-theme="purple"] { --primary: oklch(0.52 0.26 296);  --primary-foreground: oklch(0.985 0 0); } /* #7C3AED */
 
 .dark {
-  --background: oklch(0.24 0.012 268);
+  --background: oklch(0.205 0 0);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.26 0.014 268);
+  --card: oklch(0.23 0 0);
   --card-foreground: oklch(0.985 0 0);
-  --canvas: oklch(0.19 0.01 268);
-  --sidebar: color-mix(in oklch, var(--primary) 16%, oklch(0.21 0.01 268));
-  --sidebar-foreground: oklch(0.9 0 0);
-  --secondary: color-mix(in oklch, var(--primary) 16%, oklch(0.26 0.012 268));
-  --secondary-foreground: oklch(0.96 0 0);
-  --muted: color-mix(in oklch, var(--primary) 13%, oklch(0.26 0.012 268));
-  --muted-foreground: oklch(0.72 0 0);
-  --accent: color-mix(in oklch, var(--primary) 26%, oklch(0.26 0.012 268));
-  --accent-foreground: oklch(0.97 0 0);
-  --border: oklch(1 0 0 / 9%);
-  --input: var(--secondary);
-  --destructive: oklch(0.704 0.191 22.216);
-  --success: oklch(0.7 0.13 160);
-  --warning: oklch(0.8 0.15 80);
+  --canvas: oklch(0.165 0 0);
+  --sidebar: oklch(0.19 0 0);
+  --sidebar-foreground: oklch(0.87 0 0);
+  --secondary: oklch(0.27 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.27 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.32 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 15%);
+  /* 暗底上语义色要提亮才够对比，色相不变 */
+  --success: #32d583;
+  --warning: #fdb022;
+  --destructive: #f97066;
+  --info: #6690ff;
+  --success-tint: color-mix(in oklch, var(--success) 22%, oklch(0.23 0 0));
+  --warning-tint: color-mix(in oklch, var(--warning) 22%, oklch(0.23 0 0));
+  --destructive-tint: color-mix(in oklch, var(--destructive) 22%, oklch(0.23 0 0));
+  --info-tint: color-mix(in oklch, var(--info) 22%, oklch(0.23 0 0));
+  /* 暗色下 tint 本身就是深色，文字反而要用亮的语义色原值 */
+  --success-ink: var(--success);
+  --warning-ink: var(--warning);
+  --destructive-ink: var(--destructive);
+  --info-ink: var(--info);
   --card-shadow: 0 1px 2px oklch(0 0 0 / 0.3);
 }
+
+/* 暗色下黑白灰皮肤的主色要反相，否则近黑主色在深底上完全看不见 */
+.dark[data-theme="mono"] { --primary: oklch(0.92 0 0); --primary-foreground: oklch(0.205 0 0); }
 
 @theme inline {
   --color-background: var(--background);
@@ -81,6 +115,15 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-success: var(--success);
+  --color-info: var(--info);
+  --color-success-tint: var(--success-tint);
+  --color-warning-tint: var(--warning-tint);
+  --color-destructive-tint: var(--destructive-tint);
+  --color-info-tint: var(--info-tint);
+  --color-success-ink: var(--success-ink);
+  --color-warning-ink: var(--warning-ink);
+  --color-destructive-ink: var(--destructive-ink);
+  --color-info-ink: var(--info-ink);
   --color-warning: var(--warning);
   --color-border: var(--border);
   --color-input: var(--input);
