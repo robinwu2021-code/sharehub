@@ -4,7 +4,7 @@
 //
 // **为什么需要它**：实测有 3 处手写 `<textarea>`（`app/work-orders/page.tsx`、
 // `app/cs/page.tsx`、`components/ui/form-drawer.tsx`），三处的类名串各自复制粘贴、
-// 已经开始漂移（圆角写的是待淘汰的 `rounded-lg`，其中两处漏了 `disabled:opacity-50`）。
+// 已经开始漂移（圆角写的是待淘汰的 `rounded-field`，其中两处漏了 `disabled:opacity-50`）。
 // 这正是「没有原语 → 每处重抄一遍 → 慢慢不一致」的标准症状。
 //
 // **与 `Input` 的边界**：单行走 `Input`（同一套 field 圆角 + 填充块），

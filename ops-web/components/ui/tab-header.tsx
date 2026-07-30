@@ -39,7 +39,7 @@ export function TabHeader({
           aria-expanded={multi ? pinned : undefined}
           title={multi ? t("common.switchView") : undefined}
           className={cn(
-            "-mx-1 flex shrink-0 select-none items-center gap-1 rounded-md px-1",
+            "-mx-1 flex shrink-0 select-none items-center gap-1 rounded-field px-1",
             multi && "cursor-pointer hover:bg-accent/40",
           )}
         >

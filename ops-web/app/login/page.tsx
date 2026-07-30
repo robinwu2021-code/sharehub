@@ -40,7 +40,7 @@ export default function LoginPage() {
     <div className="flex h-screen items-center justify-center bg-muted/30">
       <Card className="w-[360px]">
         <CardHeader>
-          <div className="mb-1 flex size-9 items-center justify-center rounded-md bg-primary text-primary-foreground text-sm font-medium">PB</div>
+          <div className="mb-1 flex size-9 items-center justify-center rounded-field bg-primary text-primary-foreground text-sm font-medium">PB</div>
           <CardTitle>{t("common.appTitle")}</CardTitle>
           <p className="text-sm text-muted-foreground">{t("login.subtitle")}</p>
         </CardHeader>
@@ -56,7 +56,7 @@ export default function LoginPage() {
                 {ROLES.map((r) => <option key={r} value={r}>{t(`role.${r}`)}</option>)}
               </Select>
             </div>
-            {err && <div className="rounded-lg bg-destructive/10 px-3.5 py-2 text-sm text-destructive">{err}</div>}
+            {err && <div className="rounded-field bg-destructive/10 px-3.5 py-2 text-sm text-destructive">{err}</div>}
             <Button className="w-full" type="submit" disabled={busy}>{busy ? t("common.loading") : t("login.submit")}</Button>
           </form>
         </CardContent>

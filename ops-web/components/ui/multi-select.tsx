@@ -68,7 +68,7 @@ export function MultiSelect({
         aria-expanded={open}
         onClick={() => (open ? close() : setOpen(true))}
         className={cn(
-          "flex min-h-9 w-full items-center gap-1 rounded-lg bg-secondary px-2.5 py-1 text-start text-sm transition-colors",
+          "flex min-h-9 w-full items-center gap-1 rounded-field bg-secondary px-2.5 py-1 text-start text-sm transition-colors",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
           invalid && "ring-2 ring-destructive",
         )}
@@ -94,7 +94,7 @@ export function MultiSelect({
       </button>
 
       {open && !disabled && (
-        <div className="absolute inset-x-0 top-full z-50 mt-1 max-h-56 overflow-y-auto rounded-lg bg-card p-1 shadow-[var(--card-shadow)] ring-1 ring-black/5">
+        <div className="absolute inset-x-0 top-full z-50 mt-1 max-h-56 overflow-y-auto rounded-field bg-card p-1 shadow-[var(--card-shadow)] ring-1 ring-black/5">
           {options.length === 0 && (
             <div className="px-2 py-1.5 text-xs text-muted-foreground">{t("common.empty")}</div>
           )}
@@ -106,7 +106,7 @@ export function MultiSelect({
                 type="button"
                 onClick={() => toggle(o.value)}
                 className={cn(
-                  "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-[13px] transition-colors",
+                  "flex w-full items-center gap-2 rounded-field px-2 py-1.5 text-start text-[13px] transition-colors",
                   on ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
                 )}
               >

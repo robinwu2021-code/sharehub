@@ -74,7 +74,6 @@
   --primary-foreground: #ffffff;
   --accent-subtle: color-mix(in srgb, var(--primary) 12%, var(--background));
   --accent-border: color-mix(in srgb, var(--primary) 32%, var(--background));
-  --accent-hover:  color-mix(in srgb, var(--primary) 92%, #000);
   --ring: var(--primary);
   --ring-offset-bg: var(--background);
 
@@ -95,15 +94,12 @@
   /* ── 层次：密集界面优先描边，阴影只给真浮层 ──────────────────────────── */
   --elevation-1: 0 1px 2px rgb(16 18 24 / 0.04), 0 1px 3px rgb(16 18 24 / 0.06);
   --elevation-2: 0 4px 8px rgb(16 18 24 / 0.06), 0 8px 16px rgb(16 18 24 / 0.08);
-  --elevation-3: 0 8px 16px rgb(16 18 24 / 0.08), 0 24px 48px rgb(16 18 24 / 0.12);
   --card-shadow: var(--elevation-1);
   --shadow-pop:  var(--elevation-2);
 
   /* ── 动效 ────────────────────────────────────────────────────────────── */
-  --dur-instant: 0ms;
   --dur-fast: 120ms;
   --dur: 180ms;
-  --dur-slow: 240ms;
   --ease: cubic-bezier(0.2, 0, 0, 1);
 
   /* ── 层级（六档，禁止即兴取值）──────────────────────────────────────── */
@@ -221,8 +217,10 @@
   --color-ring: var(--ring);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
-  /* ⚠️ 待淘汰：新代码只允许用 control/field/card/sheet/chip 五档。
-     暂留是因为组件层还有少量 rounded-md/lg/xl 调用点，清完连同别名一起删。 */
+  /* 兼容层：把 Tailwind 默认阶**映射到五档**，而不是让它们各行其是。
+     所以页面里残留的 rounded-lg 实际渲染的就是 field(6px) —— 视觉是对的，
+     只是命名没收敛。组件层已清零并由 lib/design-tokens.test.ts 锁住；
+     app/ 下 37 处待另一并发会话提交后统一清理，清完即删本段。 */
   --radius-sm: var(--r-control);
   --radius-md: var(--r-field);
   --radius-lg: var(--r-field);
@@ -275,7 +273,7 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* 类型阶（规范 §3.2 的实现）
+/* 类型阶（规范 §3.2 的实现）—— 组件层正在接入中
    **字号下限 12px**：此前页面上真实出现过 10px 文字，任何屏幕都读不清。
    小字（≤12px）一律 500 以上字重 —— 400 在小字号下笔画太细，是 tip 看不清的直接原因。 */
 .txt-display { font-size: 24px; font-weight: 700; line-height: 1.25; letter-spacing: -0.2px; }

@@ -28,14 +28,14 @@ export function ThemeSwitcher() {
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-label="切换主题色"
-        className="flex h-8 items-center gap-1.5 rounded-lg bg-secondary px-2.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        className="flex h-8 items-center gap-1.5 rounded-field bg-secondary px-2.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
       >
         <Palette className="size-4" />
-        <span className="size-3.5 rounded-full ring-1 ring-border" style={{ background: current.color }} />
+        <span className="size-3.5 rounded-chip ring-1 ring-border" style={{ background: current.color }} />
       </button>
 
       {open && (
-        <div className="absolute right-0 top-10 z-50 w-56 rounded-xl bg-card p-3 shadow-lg">
+        <div className="absolute right-0 top-10 z-50 w-56 rounded-card bg-card p-3 shadow-lg">
           <div className="mb-2 px-1 text-xs font-medium text-muted-foreground">主题色</div>
           <div className="grid grid-cols-4 gap-2">
             {THEMES.map((t) => {
@@ -51,7 +51,7 @@ export function ThemeSwitcher() {
                   className={cn(
                     // ring 必须用 --border 而不是写死 black/5：黑白灰皮肤的色卡本身
                     // 就是近黑，在暗色弹层上会整块隐形（实测只看得到 2 个色卡）。
-                    "flex aspect-square items-center justify-center rounded-xl ring-1 ring-border transition-transform hover:scale-105",
+                    "flex aspect-square items-center justify-center rounded-card ring-1 ring-border transition-transform hover:scale-105",
                     active && "ring-2 ring-offset-2 ring-offset-card",
                   )}
                   style={{ background: t.color, boxShadow: active ? `0 0 0 2px ${t.color}` : undefined }}

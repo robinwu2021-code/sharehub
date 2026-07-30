@@ -21,7 +21,7 @@ export function PhaseGuard({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
-      <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-primary/8 text-primary/70">
+      <div className="mb-4 flex size-14 items-center justify-center rounded-sheet bg-primary/8 text-primary/70">
         <Lock className="size-6" />
       </div>
       <div className="mb-1 text-lg font-medium">{t("phase.lockedTitle")}</div>
@@ -34,7 +34,7 @@ export function PhaseGuard({ children }: { children: React.ReactNode }) {
       </p>
       <Link
         href="/"
-        className="mt-5 rounded-lg bg-secondary px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+        className="mt-5 rounded-field bg-secondary px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
       >
         {t("phase.backHome")}
       </Link>

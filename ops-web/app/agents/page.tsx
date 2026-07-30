@@ -469,7 +469,7 @@ function AgentsInner() {
           </Toolbar>
           {/* 权限降级显式提示，不静默隐藏——静默隐藏会让人以为功能坏了 */}
           {!canAssign && (
-            <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">
+            <div className="mb-4 rounded-field bg-muted px-3.5 py-2 text-sm text-muted-foreground">
               仅可查看：当前角色无划拨权限（agent:scope:assign），可查看归属汇总与划拨流水
             </div>
           )}

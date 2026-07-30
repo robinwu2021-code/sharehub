@@ -36,7 +36,7 @@ function RailItem({
   );
   // shrink-0：15 项时容器溢出滚动，flex 默认会压扁子项（图标变形），必须禁止收缩。
   const base = cn(
-    "group relative flex shrink-0 items-center gap-3 rounded-md py-2 transition-colors",
+    "group relative flex shrink-0 items-center gap-3 rounded-field py-2 transition-colors",
     expanded ? "px-3" : "justify-center px-0",
   );
   // 折叠态提示：自绘 Tooltip（components/ui/tooltip.tsx，portal+fixed）。
@@ -105,7 +105,7 @@ export function Rail() {
       style={{ width: railExpanded ? RAIL_EXPANDED_WIDTH : RAIL_WIDTH }}
     >
       <div className={cn("flex h-14 items-center gap-2", railExpanded ? "px-4" : "justify-center")}>
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-xs text-primary-foreground">PB</span>
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-field bg-primary text-xs text-primary-foreground">PB</span>
         {railExpanded && <span className="truncate text-sm font-medium">{t("common.appName")}</span>}
       </div>
       <nav className={cn("flex flex-1 flex-col gap-1 overflow-y-auto py-2", railExpanded ? "px-2" : "px-2")}>

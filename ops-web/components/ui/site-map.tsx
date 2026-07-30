@@ -178,7 +178,7 @@ export function SiteMap({
               key={p.id}
               type="button"
               onClick={() => onSelect?.(p)}
-              className="flex items-center justify-between rounded-lg bg-secondary px-3 py-2 text-start text-sm transition-colors hover:bg-accent"
+              className="flex items-center justify-between rounded-field bg-secondary px-3 py-2 text-start text-sm transition-colors hover:bg-accent"
             >
               <span className="truncate">
                 <span className="font-medium">{p.name}</span>

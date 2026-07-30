@@ -38,7 +38,7 @@ function LeafRow({ leaf, active }: { leaf: NavLeaf; active: boolean }) {
   if (leaf.soon || locked) {
     return (
       <span
-        className="flex items-center rounded-md px-2.5 py-1.5 text-[13px] text-muted-foreground/50"
+        className="flex items-center rounded-field px-2.5 py-1.5 text-[13px] text-muted-foreground/50"
         title={locked ? `${PHASE_LABEL[leaf.phase!]} ${t("phase.suffix")}` : t("common.soon")}
       >
         <span className="truncate">{tNav(leaf.label)}</span>
@@ -50,7 +50,7 @@ function LeafRow({ leaf, active }: { leaf: NavLeaf; active: boolean }) {
     <Link
       href={leaf.href}
       className={cn(
-        "flex items-center rounded-md px-2.5 py-1.5 text-[13px] transition-colors",
+        "flex items-center rounded-field px-2.5 py-1.5 text-[13px] transition-colors",
         active ? "bg-accent font-medium text-[var(--primary)]" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
       )}
     >
@@ -147,7 +147,7 @@ export function SecondaryNav() {
                 type="button"
                 onClick={() => setSelKey(segKey(seg.group, si))}
                 className={cn(
-                  "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-colors",
+                  "flex w-full items-center gap-2 rounded-field px-2.5 py-2 text-left text-sm transition-colors",
                   isSel ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
                   isActive && "font-medium text-primary",
                   allLocked && "text-muted-foreground/40",
