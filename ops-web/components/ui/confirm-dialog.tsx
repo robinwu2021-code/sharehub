@@ -62,8 +62,10 @@ export function useConfirm() {
       onOpenChange={(o) => { if (!o) close(false); }}
     >
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40 data-[state=open]:animate-in data-[state=open]:fade-in" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,400px)] -translate-x-1/2 -translate-y-1/2 rounded-[var(--radius)] bg-card shadow-xl outline-none data-[state=open]:animate-in data-[state=open]:fade-in">
+        {/* data-[state=open]: 前缀会让 animate-in/fade-in/zoom-in 这几个纯 CSS 类完全生成不出规则
+            （Tailwind 把它们当未知工具类丢弃），Content 只在 open 时挂载，去掉前缀即可，见 drawer.tsx 同注释 */}
+        <Dialog.Overlay className="fixed inset-0 z-[var(--z-dialog)] bg-black/40 animate-in fade-in" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-[var(--z-dialog)] w-[min(92vw,400px)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-sheet bg-card shadow-pop outline-none animate-in zoom-in">
           <div className="p-5">
             <Dialog.Title className="text-base font-medium">{pending?.title ?? ""}</Dialog.Title>
             {pending?.desc && (

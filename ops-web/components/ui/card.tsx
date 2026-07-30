@@ -16,7 +16,7 @@ export function Card({
   return (
     <div
       className={cn(
-        "rounded-[var(--radius)] text-card-foreground",
+        "rounded-card text-card-foreground",
         tone
           ? {
               primary: "bg-[color-mix(in_oklch,var(--primary)_10%,transparent)]",

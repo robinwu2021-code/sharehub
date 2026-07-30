@@ -22,7 +22,8 @@
 | `Badge` | `ui/badge.tsx` | 导出 `BadgeTone` —— **全站色调联合的唯一真源** |
 | `Card` / `CardHeader` / `CardContent` / `CardTitle` | `ui/card.tsx` | |
 | `Table` / `THead` / `TBody` / `TR` / `TH` / `TD` | `ui/table.tsx` | 裸表格；列表页用 `DataTable` |
-| `Tabs` | `ui/tabs.tsx` | 页内维度切换器（非 tab 导航） |
+| `Tabs` | `ui/tabs.tsx` | 页内维度切换器（非 tab 导航）。形状（灰槽/全圆/字重）来自 `ui/segmented.ts` |
+| `segmentedTrackClass` / `segmentedItemClass` | `ui/segmented.ts` | 分段控件（灰槽+全圆+白色药丸）的 className 拼装，供 `Tabs` 与 `TabHeader` 共用；两者场景不同（内容切换 vs URL 导航）不合并组件，只共享形状 |
 | `Progress` | `ui/progress.tsx` | |
 | `Notice` | `ui/notice.tsx` | 页内灰底提示条。权限降级用业务件 `ReadOnlyNotice` |
 | `StatCard` / `EmptyState` / `Skeleton` / `PageTitle` / `Pagination` | `ui/misc.tsx` | |

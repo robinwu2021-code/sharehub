@@ -111,7 +111,8 @@ export function DataTable<T>({
         <button
           type="button"
           className={cn(
-            "inline-flex items-center gap-1 rounded-md transition-colors hover:text-foreground",
+            "inline-flex items-center gap-1 rounded-chip transition-colors hover:text-foreground",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ring-offset-bg)]",
             active && "text-foreground",
           )}
           aria-sort={active ? (sortDir === "desc" ? "descending" : "ascending") : "none"}
@@ -158,7 +159,7 @@ export function DataTable<T>({
                 <React.Fragment key={k}>
                   <TR className={rowClassName?.(row)}>
                     {selectable && (
-                      <TD className="w-10">
+                      <TD className="h-[var(--row-h)] w-10">
                         <RowCheckbox
                           checked={selected.has(k)}
                           onChange={(v) => toggleOne(k, v)}
@@ -167,11 +168,14 @@ export function DataTable<T>({
                       </TD>
                     )}
                     {expandable && (
-                      <TD className="w-10">
+                      <TD className="h-[var(--row-h)] w-10">
                         {content ? (
                           <button
                             type="button"
-                            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent"
+                            className={cn(
+                              "rounded-chip p-1 text-muted-foreground transition-colors hover:bg-accent",
+                              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ring-offset-bg)]",
+                            )}
                             aria-expanded={isOpen}
                             aria-label={isOpen ? t("table.collapse") : t("table.expand")}
                             onClick={() => toggleExpand(k)}
@@ -183,7 +187,7 @@ export function DataTable<T>({
                         ) : null}
                       </TD>
                     )}
-                    {columns.map((c, i) => <TD key={i} className={c.className}>{c.cell(row)}</TD>)}
+                    {columns.map((c, i) => <TD key={i} className={cn("h-[var(--row-h)]", c.className)}>{c.cell(row)}</TD>)}
                   </TR>
                   {expandable && isOpen && content && (
                     <TR className="hover:bg-muted">

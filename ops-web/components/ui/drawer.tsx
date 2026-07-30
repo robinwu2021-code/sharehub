@@ -20,11 +20,18 @@ export function Drawer({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40 data-[state=open]:animate-in data-[state=open]:fade-in" />
+        {/*
+          ⚠️ `animate-in`/`fade-in`/`slide-in-from-right` 是 globals.css 里补的**纯 CSS 类**
+          （没有走 tailwindcss-animate 插件，也没有注册成 Tailwind @utility）。挂 `data-[state=open]:`
+          前缀会让 Tailwind 把整个 token 当成"变体+未知工具类"而丢弃 —— 生成不出任何规则，
+          实测 computedStyle.animationName 恒为 none（比"没有动画"更隐蔽：class 都在，就是不生效）。
+          Content 只在 open 时才挂载（Radix 默认不 forceMount），故不需要靠 data-state 再选择性触发。
+        */}
+        <Dialog.Overlay className="fixed inset-0 z-[var(--z-drawer)] bg-black/40 animate-in fade-in" />
         <Dialog.Content
           className={cn(
-            "fixed right-0 top-0 z-50 flex h-screen flex-col bg-card shadow-xl outline-none",
-            "data-[state=open]:animate-in data-[state=open]:slide-in-from-right",
+            "fixed right-0 top-0 z-[var(--z-drawer)] flex h-screen flex-col overflow-hidden rounded-l-sheet bg-card shadow-pop outline-none",
+            "animate-in slide-in-from-right",
             width,
           )}
         >
@@ -33,7 +40,12 @@ export function Drawer({
               <Dialog.Title className="text-base font-medium">{title}</Dialog.Title>
               {desc && <Dialog.Description className="mt-0.5 text-sm text-muted-foreground">{desc}</Dialog.Description>}
             </div>
-            <Dialog.Close className="rounded-md p-1 text-muted-foreground hover:bg-accent">
+            <Dialog.Close
+              className={cn(
+                "rounded-chip p-1 text-muted-foreground transition-colors hover:bg-accent",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ring-offset-bg)]",
+              )}
+            >
               <X className="size-4" />
             </Dialog.Close>
           </div>

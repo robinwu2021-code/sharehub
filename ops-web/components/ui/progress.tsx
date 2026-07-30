@@ -25,9 +25,15 @@ export function Progress({
           {value}/{total} <span className="text-muted-foreground">({pct}%)</span>
         </div>
       )}
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
+      <div
+        role="progressbar"
+        aria-valuenow={pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        className="h-1.5 w-full overflow-hidden rounded-chip bg-secondary"
+      >
         <div
-          className={cn("h-full rounded-full", warn ? "bg-[var(--destructive)]" : "bg-primary")}
+          className={cn("h-full rounded-chip", warn ? "bg-[var(--destructive)]" : "bg-primary")}
           style={{ width: `${pct}%` }}
         />
       </div>

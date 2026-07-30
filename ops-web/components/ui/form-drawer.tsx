@@ -82,9 +82,13 @@ function InputForField({
         aria-checked={!!cur}
         disabled={disabled}
         onClick={() => set(!cur)}
-        className={`h-6 w-11 rounded-full transition-colors disabled:opacity-50 ${cur ? "bg-primary" : "bg-secondary"}`}
+        className={cn(
+          "h-6 w-11 rounded-chip transition-colors disabled:opacity-50",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ring-offset-bg)]",
+          cur ? "bg-primary" : "bg-secondary",
+        )}
       >
-        <span className={`block size-5 rounded-full bg-card shadow-[var(--card-shadow)] transition-transform ${cur ? "translate-x-6 rtl:-translate-x-6" : "translate-x-0.5"}`} />
+        <span className={cn("block size-5 rounded-chip bg-card shadow-[var(--card-shadow)] transition-transform", cur ? "translate-x-6 rtl:-translate-x-6" : "translate-x-0.5")} />
       </button>
     );
   }
@@ -98,7 +102,7 @@ function InputForField({
         onBlur={onBlur}
         onChange={(e) => set(e.target.value)}
         className={cn(
-          "flex w-full resize-y rounded-lg bg-secondary px-3.5 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
+          "flex w-full resize-y rounded-field bg-secondary px-3.5 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ring-offset-bg)] disabled:opacity-50",
           invalid && ERR_RING,
         )}
       />

@@ -32,7 +32,7 @@ export function Toolbar({
 
   if (selectedCount > 0) {
     return (
-      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-[var(--radius)] bg-accent px-3.5 py-2">
+      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-card bg-accent px-3.5 py-2">
         <span className="text-sm font-medium">{t("table.selectedN", { n: selectedCount })}</span>
         <div className="flex flex-wrap items-center gap-2">{batchActions}</div>
         {onClearSelection && (

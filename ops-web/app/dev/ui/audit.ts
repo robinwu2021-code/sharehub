@@ -58,7 +58,10 @@ const FOCUSABLE = 'button,a[href],input,select,textarea,[tabindex]:not([tabindex
 function allowedRadii(): number[] {
   const cs = getComputedStyle(document.documentElement);
   const read = (name: string) => parseFloat(cs.getPropertyValue(name)) || NaN;
-  return [0, read("--r-field"), read("--r-card"), read("--r-sheet")].filter((x) => !Number.isNaN(x));
+  // --r-control 是刻意只给 16px 级小控件（Checkbox）开的第五档，见 globals.css 里的注释：
+  // 四档最小的 field(11px) 会把 16px 方块夹成正圆、与单选点撞脸。漏掉它会把 Checkbox
+  // 唯一正确的圆角误判成"违规"。
+  return [0, read("--r-control"), read("--r-field"), read("--r-card"), read("--r-sheet")].filter((x) => !Number.isNaN(x));
 }
 
 /** 四个角是否同一个值；返回该值（px），不一致返回 null（不一致本身不判违规，四角不同是合法设计） */

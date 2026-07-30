@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 const badgeVariants = cva(
   // 形态取自 C 端 pb-tag：药丸 + 字重 700 + 11px（原为 rounded-md/500，偏"方"）
-  "inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold leading-[1.7] tracking-[0.1px]",
+  "inline-flex items-center rounded-chip px-2.5 py-0.5 text-[11px] font-bold leading-[1.7] tracking-[0.1px]",
   {
     variants: {
       tone: {

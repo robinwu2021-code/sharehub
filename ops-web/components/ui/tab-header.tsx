@@ -9,6 +9,7 @@ import { ChevronRight } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { isPhaseLocked, type Phase } from "@/lib/phase";
 import { cn } from "@/lib/utils";
+import { segmentedItemClass, segmentedTrackClass } from "@/components/ui/segmented";
 
 export function TabHeader({
   tabs, value, onChange, action,
@@ -64,19 +65,16 @@ export function TabHeader({
               "max-md:!max-w-full max-md:!opacity-100 max-md:overflow-visible",
             )}
           >
-            {/* 分段控件 = C 端 pb-segmented：灰槽(faint) + 全圆，选中项是白色药丸 */}
-            <div className="flex w-max gap-1 rounded-full bg-secondary p-1 max-md:w-full max-md:flex-wrap max-md:rounded-2xl">
+            {/* 分段控件 = C 端 pb-segmented：灰槽(faint) + 全圆，选中项是白色药丸。
+                形状规格与 `ui/tabs.tsx` 共用 `ui/segmented.ts`，尺寸（13px/紧凑内边距）
+                按这里的密度自己传。 */}
+            <div className={segmentedTrackClass("w-max max-md:w-full max-md:flex-wrap")}>
               {visibleTabs.map((tb) => (
                 <button
                   key={tb.key}
                   type="button"
                   onClick={() => onChange(tb.key)}
-                  className={cn(
-                    "whitespace-nowrap rounded-full px-3.5 py-1 text-[13px] transition-colors",
-                    tb.key === value
-                      ? "bg-card font-semibold text-foreground shadow-[var(--card-shadow)]"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
+                  className={segmentedItemClass(tb.key === value, "px-3.5 py-1 text-[13px]")}
                 >
                   {tb.label}
                 </button>
