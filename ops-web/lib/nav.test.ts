@@ -386,8 +386,10 @@ describe("分期屏蔽（phase gating，默认 CURRENT_PHASE=1）", () => {
     expect(isLeafLocked(ota)).toBe(true);
     expect(isLeafDisabled(ota)).toBe(true);
   });
-  it("isSectionLocked：用户/报表 P1 下全叶被锁 → 整体锁", () => {
-    expect(isSectionLocked(sec("user"), "ADMIN")).toBe(true);
+  it("isSectionLocked：报表 P1 下全叶被锁 → 整体锁；用户因「风控用户」已 ready → 不锁", () => {
+    // 用户 section 曾经整体锁（全叶 P2）。2026-07-30「风控用户」标 ready 后，
+    // 段内有可用叶 → 整段解锁。这正是逐叶解锁机制该有的表现，不是回归。
+    expect(isSectionLocked(sec("user"), "ADMIN")).toBe(false);
     expect(isSectionLocked(sec("report"), "ADMIN")).toBe(true);
   });
   it("isSectionLocked：营销因「公告管理」为 P1 → 不再整体锁定（补齐清单 E1，c-app 首页公告条需要发布口）", () => {
@@ -403,11 +405,29 @@ describe("分期屏蔽（phase gating，默认 CURRENT_PHASE=1）", () => {
   it("routeLockedPhase：/devices（台账 P1）→ 不锁", () => {
     expect(routeLockedPhase("/devices", null, null, "ADMIN")).toBeUndefined();
   });
-  it("routeLockedPhase：/marketing 首页（首叶 优惠券 P2）→ 被 P2 锁", () => {
-    expect(routeLockedPhase("/marketing", null, null, "ADMIN")).toBe(2);
+  it("routeLockedPhase：/marketing 首页（首叶 优惠券 P2 但已 ready）→ 不再锁", () => {
+    // 优惠券 2026-07-30 标 ready（发放功能已实机验证），故首页不再被 P2 拦。
+    expect(routeLockedPhase("/marketing", null, null, "ADMIN")).toBeUndefined();
   });
   it("routeLockedPhase：设备详情等非叶路由 → 不锁（透传页面）", () => {
     expect(routeLockedPhase("/devices/detail", null, null, "ADMIN")).toBeUndefined();
+  });
+  // ready = 逐叶解锁覆盖（2026-07-30）：phase 只管徽章，ready 才是门禁。
+  // 这几条是新旧语义的分界线，改 isLeafLocked 必须先看懂它们。
+  it("ready 覆盖 phase：P3 叶标 ready 后不再被锁、可点", () => {
+    expect(isLeafLocked({ href: "/x", label: "x", phase: 3 })).toBe(true);
+    expect(isLeafLocked({ href: "/x", label: "x", phase: 3, ready: true })).toBe(false);
+    expect(isLeafDisabled({ href: "/x", label: "x", phase: 3, ready: true })).toBe(false);
+  });
+  it("ready 不放宽 soon：待建仍不可点（两者是不同概念，不可互相顶替）", () => {
+    expect(isLeafDisabled({ href: "/x", label: "x", soon: true, ready: true })).toBe(true);
+  });
+  it("ready 叶参与 isSectionLocked / sectionDefaultHref / routeLockedPhase", () => {
+    const locked = { href: "/x", label: "a", phase: 2 } as const;
+    const readyLeaf = { href: "/x?tab=b", label: "b", phase: 2, ready: true } as const;
+    const s = { key: "t", label: "T", icon: "X", module: "device", href: "/x", children: [locked, readyLeaf] };
+    expect(isSectionLocked(s, "ADMIN")).toBe(false); // 有一个 ready 叶 → 整段不锁
+    expect(sectionDefaultHref(s, "ADMIN")).toBe("/x?tab=b"); // 落到 ready 叶而非被锁首叶
   });
   it("sectionDefaultHref：跳过被锁叶，落到首个可点叶（财务→分润规则）", () => {
     expect(sectionDefaultHref(sec("finance"), "ADMIN")).toBe("/finance?tab=rules");

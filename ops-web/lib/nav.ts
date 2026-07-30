@@ -10,8 +10,8 @@
 // - phase = 产品分期（徽章）：Phase 1=MVP T1-T3 | 2=规模化 T4-T6 | 3=生态 T7-T9。
 // - ready = 就绪度（门禁）：叶子灰显 ⇔ !ready && phase > CURRENT_PHASE。
 //   2026-07-30 拆分：此前 phase 一个字段兼管「第几期」和「能不能点」，导致 60 个灰叶子
-//   的灰色原因（假数据 / 后端缺端点 / 只是排期靠后）无法区分。现在补完一个叶子的
-//   前后端就标 ready: true，逐叶解锁；phase 不再是门禁，只是徽章。
+//   的灰色原因（假数据 / 后端缺端点 / 只是排期靠后）无法区分。phase 现在只是徽章。
+//   ⚠️ ready 认证的是**前端静态功能**，不是后端贯通 —— 见 NavLeaf.ready 的说明。
 // - 深链沿用 ?tab= / ?view=；本文件为纯数据+纯函数（无 React），可单测。
 import type { Role } from "./auth";
 import { can, canModule } from "./permissions";
@@ -32,7 +32,21 @@ export interface NavLeaf {
   soon?: boolean; // 待建：灰显不可点
   phase?: Phase; // 产品分期（缺省=P1）；phase > CURRENT_PHASE 时灰显不可点
   /**
-   * 就绪度覆盖：本叶**前后端已贯通并验证**，无视 phase 直接解锁（2026-07-30）。
+   * 就绪度覆盖：本叶**前端静态功能完整且已实机验证**，无视 phase 直接解锁。
+   *
+   * ⚠️ **口径修正（2026-07-30）**：原文写的是「前后端已贯通并验证」，但本项目当前
+   * 阶段是**纯前端 + mock，将来一键切后端**（见 CLAUDE.md 运营端技术约定）。
+   * 按「前后端贯通」根本无叶可标 —— 所有验证都是对着 mock 做的，从未跑过真实后端；
+   * 后端端点也只覆盖一半（押金/结算/发券/发票有，推送/信用分/对账/干预没有）。
+   * 照字面标就是在代码里写假陈述，故把口径改成可诚实核验的那个。
+   *
+   * **标 ready 的条件**（三条全满足）：
+   *   1. 该页写操作在 mock 层**真落库**（重开能读回），非伪实现
+   *   2. 状态机/校验在 mock 层强制，非法迁移抛错
+   *   3. **浏览器实机验证过**该功能的关键路径，不是只跑了单测
+   *
+   * **后端贯通状态另行追踪**：docs/technical/实现状态-证据核验清单.md
+   * 切真后端前必须逐叶复核，届时 ready 的含义要再收紧一次。
    *
    * 为什么加这一维：原设计里 phase 同时承担两件事——「这是第几期的功能」和「现在能不能点」。
    * 于是 60 个叶子灰着，而灰的真实原因各不相同：有的页面是假数据、有的后端端点压根不存在、
@@ -180,7 +194,7 @@ export const NAV: NavSection[] = [
       { href: "/orders?tab=exceptions", label: "异常订单", perm: "order:exception:read", group: "售后处置" },
       { href: "/orders?tab=complaints", label: "投诉订单", perm: "order:exception:read", group: "售后处置" },
       { href: "/orders?tab=refunds", label: "退款记录", perm: "order:refund:audit", group: "售后处置" },
-      { href: "/orders?tab=deposit", label: "押金与欠费", perm: "order:order:read", phase: 2, group: "特殊单据" },
+      { href: "/orders?tab=deposit", label: "押金与欠费", perm: "order:order:read", phase: 2, ready: true, group: "特殊单据" },
       { href: "/orders?tab=free", label: "免费订单", perm: "order:order:read", phase: 2, group: "特殊单据" },
     ],
   },
@@ -202,8 +216,8 @@ export const NAV: NavSection[] = [
       { href: "/finance?tab=summary", label: "分润统计", perm: "finance:share_record:read", phase: 2, group: "分润与结算" },
       { href: "/finance?tab=settlements", label: "结算单", perm: "finance:settlement:read", group: "分润与结算" },
       { href: "/finance?tab=ledger", label: "账务分录", perm: "finance:ledger:read", phase: 2, group: "平台账" },
-      { href: "/finance?tab=reconcile", label: "对账", perm: "finance:recon:read", phase: 3, group: "平台账" },
-      { href: "/finance?tab=invoices", label: "发票", perm: "finance:invoice:read", phase: 3, group: "平台账" },
+      { href: "/finance?tab=reconcile", label: "对账", perm: "finance:recon:read", phase: 3, ready: true, group: "平台账" },
+      { href: "/finance?tab=invoices", label: "发票", perm: "finance:invoice:read", phase: 3, ready: true, group: "平台账" },
       // 跨 section 深链（导航审查 #4）：FINANCE 岗管场地方分润在本页、代理分润在 /agents，
       // 此处回链避免找不到入口；面包屑按 URL 归属「代理商管理」。
       { href: "/agents?tab=commission", label: "代理分润配置", perm: "agent:settlement:read", group: "伙伴账" },
@@ -217,7 +231,7 @@ export const NAV: NavSection[] = [
     children: [
       // 按「用户主体 / 风险治理 / 用户资产」分组
       { href: "/users", label: "用户列表", perm: "user:cuser:read", phase: 2, group: "用户主体" },
-      { href: "/users?tab=risk", label: "风控用户", perm: "user:risk:read", phase: 2, group: "风险治理" },
+      { href: "/users?tab=risk", label: "风控用户", perm: "user:risk:read", phase: 2, ready: true, group: "风险治理" },
       { href: "/users?tab=blacklist", label: "黑名单", perm: "user:risk:update", phase: 2, group: "风险治理" },
       { href: "/users?tab=whitelist", label: "免费用户白名单", perm: "user:risk:update", phase: 2, group: "风险治理" },
       { href: "/users?tab=members", label: "会员/次卡", perm: "user:member:read", phase: 3, group: "用户资产" },
@@ -230,9 +244,9 @@ export const NAV: NavSection[] = [
     children: [
       // 公告管理：c-app 首页 Hub 的「公告条」需要运营端发布口，原清单遗漏（补齐清单 E1）
       { href: "/marketing?tab=notices", label: "公告管理", perm: "marketing:coupon:read", group: "运营内容" },
-      { href: "/marketing", label: "优惠券", perm: "marketing:coupon:read", phase: 2, group: "促销玩法" },
+      { href: "/marketing", label: "优惠券", perm: "marketing:coupon:read", phase: 2, ready: true, group: "促销玩法" },
       { href: "/marketing?tab=campaigns", label: "活动", phase: 2, group: "促销玩法" },
-      { href: "/marketing?tab=push", label: "推送触达", perm: "marketing:push:send", phase: 3, group: "促销玩法" },
+      { href: "/marketing?tab=push", label: "推送触达", perm: "marketing:push:send", phase: 3, ready: true, group: "促销玩法" },
       { href: "/marketing?tab=referral", label: "邀请裂变", phase: 3, group: "促销玩法" },
       { href: "/marketing?tab=ad-slots", label: "广告位管理", phase: 3, group: "广告经营" },
       { href: "/marketing?tab=ad-campaigns", label: "广告活动", phase: 3, group: "广告经营" },
