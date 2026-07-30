@@ -2,7 +2,7 @@
 // 端点前缀：/api/trade/**；充值订单与钱包同主体，归 /api/user/**。
 import { client } from "../http-client";
 import type { FinanceApi } from "../contracts/finance";
-import type { PageQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ } from "../query";
+import type { PageQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ } from "../query";
 
 export const financeHttp: FinanceApi = {
   listShareRules: (q?: PageQ) => client.get("/api/trade/share-rules", q),
@@ -18,10 +18,17 @@ export const financeHttp: FinanceApi = {
 
   // 财务扩展
   listShareRecords: (q?: ShareRecordQ) => client.get("/api/trade/share-records", q),
-  listReconciles: (q?: PageQ) => client.get("/api/trade/reconciles", q),
-  listInvoices: (q?: PageQ) => client.get("/api/trade/invoices", q),
+  listReconciles: (q?: ReconQ) => client.get("/api/trade/reconciles", q),
+  listInvoices: (q?: InvoiceQ) => client.get("/api/trade/invoices", q),
   saveShareRule: (x) => client.post(x.ruleNo ? `/api/trade/share-rules/${x.ruleNo}` : "/api/trade/share-rules", x),
   saveInvoice: (x) => client.post(x.invoiceNo ? `/api/trade/invoices/${x.invoiceNo}` : "/api/trade/invoices", x),
+
+  // S2：差错处置与开具/作废都是动作端点（状态迁移），汇总是对账资源下的聚合子资源
+  handleRecon: (no, action, handleNote, operatorName) =>
+    client.post(`/api/trade/reconciles/${no}/handle`, { action, handleNote, operatorName }),
+  getReconStats: () => client.get("/api/trade/reconciles/stats"),
+  issueInvoice: (no, operatorName) => client.post(`/api/trade/invoices/${no}/issue`, { operatorName }),
+  voidInvoice: (no, voidReason, operatorName) => client.post(`/api/trade/invoices/${no}/void`, { voidReason, operatorName }),
 
   // 财务 B5：分润统计（trade 域聚合）/ 充值订单（钱包同主体，归 user 域）
   listShareSummaries: (q?: ShareSummaryQ) => client.get("/api/trade/share-summaries", q),

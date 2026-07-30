@@ -1,7 +1,7 @@
 // 覆盖范围：分账规则与流水、总账、结算、提现审批、对账、发票、分润统计、充值订单。
 import * as db from "../../mock/db";
 import type { FinanceApi } from "../contracts/finance";
-import type { PageQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ } from "../query";
+import type { PageQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ } from "../query";
 import { wait } from "./_wait";
 
 export const financeMock: FinanceApi = {
@@ -18,10 +18,17 @@ export const financeMock: FinanceApi = {
 
   // 财务扩展
   listShareRecords: (q: ShareRecordQ = {}) => wait(db.listShareRecords(q)),
-  listReconciles: (q: PageQ = {}) => wait(db.listReconciles(q)),
-  listInvoices: (q: PageQ = {}) => wait(db.listInvoices(q)),
+  listReconciles: (q: ReconQ = {}) => wait(db.listReconciles(q)),
+  listInvoices: (q: InvoiceQ = {}) => wait(db.listInvoices(q)),
   saveShareRule: (x) => wait(db.saveShareRule(x), 350),
   saveInvoice: (x) => wait(db.saveInvoice(x), 350),
+
+  // S2：差错处置 / 发票开具作废——状态机、必填结论与原因、金额对平全在 db 层，
+  // 错误由全局 MutationCache 弹出，页面不重复兜底
+  handleRecon: (no, action, note, operatorName) => wait(db.handleRecon(no, action, note, operatorName), 400),
+  getReconStats: () => wait(db.getReconStats()),
+  issueInvoice: (no, operatorName) => wait(db.issueInvoice(no, operatorName), 400),
+  voidInvoice: (no, voidReason, operatorName) => wait(db.voidInvoice(no, voidReason, operatorName), 400),
 
   // 财务 B5：分润统计（维度/周期/排序在 db 层处理）/ 充值订单
   listShareSummaries: (q: ShareSummaryQ = {}) => wait(db.listShareSummaries(q)),

@@ -4,6 +4,10 @@
 import type {
   CUser, UserRisk, UserBlacklist, Member, Wallet,
   FreeUserWhitelist, ConsumerSegment, PageQuery,
+  CreditScoreChange, CreditScoreAdjustPayload, CreditScoreAdjustResult,
+} from "../../types";
+import {
+  CREDIT_SCORE_MIN, CREDIT_SCORE_MAX, RISK_MEDIUM_BELOW, riskLevelOf,
 } from "../../types";
 import { NICKS, OPERATORS, REASONS, p, iso, phone } from "./internal";
 import { paginate, kwHit, upsert, nextNo } from "./helpers";
@@ -102,6 +106,102 @@ export const listWallets = (q: PageQuery = {}) => paginate(wallets, q.page, q.si
 export const listUserRisks = (q: PageQuery = {}) => paginate(userRisks, q.page, q.size, (x) => kwHit(q.keyword, x.riskNo, x.userNo, x.nickname, x.phone));
 export const listUserBlacklist = (q: PageQuery = {}) => paginate(userBlacklist, q.page, q.size, (x) => kwHit(q.keyword, x.blacklistNo, x.userNo, x.nickname));
 export const listConsumerSegments = (q: PageQuery = {}) => paginate(consumerSegments, q.page, q.size, (x) => kwHit(q.keyword, x.segmentNo, x.segment));
+
+// ————————————————————————————————————————————————————————————————
+// 信用分调整（S2：F2 → F3，权限码 user:risk:update 早已定义、风控页从没用过）
+//
+// 口径三件事：
+//   ① 分数的**唯一真相**是 cUsers[].creditScore；userRisks[].creditScore 是它的投影，调分后同步。
+//   ② 上下限在 mock 层强制（越界抛错，不做静默截断——静默截断会让运营以为改成功了）。
+//   ③ 每次调分落一条 CreditScoreChange 留痕，并按阈值重算风险等级；
+//      分数掉到 640 以下且不在名单里的，自动补一条风控记录（进观察名单）。
+//      分数回升**不自动移出**名单（见 lib/types/user.ts 的口径说明）。
+// ————————————————————————————————————————————————————————————————
+const nowIso = () => new Date().toISOString();
+/** 号码生成沿用本域既有格式（RK0001 / CS0001 四位补零），`nextNo` 不补零故不复用。 */
+const padNo = (prefix: string, rows: readonly unknown[], key: string) => {
+  const re = new RegExp(`^${prefix}(\\d+)$`);
+  const max = rows.reduce<number>((m, r) => {
+    const v = (r as Record<string, unknown>)[key];
+    const hit = typeof v === "string" ? re.exec(v) : null;
+    return hit ? Math.max(m, Number(hit[1])) : m;
+  }, 0);
+  return `${prefix}${String(max + 1).padStart(4, "0")}`;
+};
+
+/** 信用分变更留痕（审计）。最新在前。 */
+export const creditScoreChanges: CreditScoreChange[] = [];
+
+export class CreditScoreError extends Error {
+  constructor(readonly cUserNo: string, msg: string) {
+    super(msg);
+    this.name = "CreditScoreError";
+  }
+}
+
+/**
+ * 调整信用分：查人 → 校验必填与上下限 → 改分 → 联动风控等级/观察名单 → 落留痕。
+ * `delta` 有正负；越界（<0 或 >1000）一律拒绝，用户分数保持不变。
+ */
+export function adjustCreditScore(cUserNo: string, payload: CreditScoreAdjustPayload): CreditScoreAdjustResult {
+  const u = cUsers.find((x) => x.cUserNo === cUserNo);
+  if (!u) throw new CreditScoreError(cUserNo, `用户 ${cUserNo} 不存在`);
+  const reason = payload?.reason?.trim();
+  if (!reason) throw new CreditScoreError(cUserNo, "调整信用分必须填写原因");
+  const delta = Number(payload?.delta);
+  if (!Number.isFinite(delta) || delta === 0) throw new CreditScoreError(cUserNo, "调整分值必须是非 0 的数字");
+  if (!Number.isInteger(delta)) throw new CreditScoreError(cUserNo, "调整分值必须是整数");
+
+  const before = u.creditScore;
+  const after = before + delta;
+  if (after < CREDIT_SCORE_MIN || after > CREDIT_SCORE_MAX) {
+    throw new CreditScoreError(
+      cUserNo,
+      `调整后信用分 ${after} 超出允许范围 ${CREDIT_SCORE_MIN}~${CREDIT_SCORE_MAX}（当前 ${before}）`,
+    );
+  }
+  u.creditScore = after;
+
+  // —— 联动：风控名单里的同步分数与等级；掉到门槛以下的自动进观察名单 ——
+  let risk = userRisks.find((r) => r.userNo === cUserNo) ?? null;
+  if (risk) {
+    risk.creditScore = after;
+    risk.riskLevel = riskLevelOf(after);
+  } else if (after < RISK_MEDIUM_BELOW) {
+    risk = {
+      riskNo: padNo("RK", userRisks, "riskNo"),
+      userNo: cUserNo,
+      nickname: u.nickname,
+      phone: u.phone,
+      creditScore: after,
+      riskLevel: riskLevelOf(after),
+      reason: `信用分调整至 ${after}（低于 ${RISK_MEDIUM_BELOW}），自动进入风控观察名单`,
+      flaggedAt: nowIso(),
+    };
+    userRisks.push(risk);
+  }
+
+  const change: CreditScoreChange = {
+    changeNo: padNo("CS", creditScoreChanges, "changeNo"),
+    cUserNo, before, after, delta,
+    reason,
+    operatorName: payload.operatorName?.trim() || "admin",
+    createdAt: nowIso(),
+  };
+  creditScoreChanges.unshift(change);
+  return { user: { ...u }, risk: risk ? { ...risk } : null, change };
+}
+
+/** 调分历史：`cUserNo` 精确过滤（用户/风控抽屉的时间线），keyword 覆盖单号/用户/人/原因。 */
+export const listCreditScoreChanges = (q: PageQuery & { cUserNo?: string } = {}) =>
+  paginate(creditScoreChanges, q.page, q.size, (x) => {
+    if (q.cUserNo && x.cUserNo !== q.cUserNo) return false;
+    return kwHit(q.keyword, x.changeNo, x.cUserNo, x.operatorName, x.reason);
+  });
+
+// —— 定点演示数据：**走真实调分入口生成**，保证「留痕 ↔ 用户分数 ↔ 风控等级」天然一致 ——
+adjustCreditScore("U3043", { delta: -20, reason: "连续两单逾期未还，按风控规则扣分", operatorName: "Sara Ahmed" });
+adjustCreditScore("U3045", { delta: 30, reason: "申诉成立，恢复此前误扣分值", operatorName: "admin" });
 
 export const saveMember = (x: Partial<Member>) => upsert(members, x, "userNo", () => nextNo("U", members));
 export const saveWallet = (x: Partial<Wallet>) => upsert(wallets, x, "userNo", () => nextNo("U", wallets));

@@ -3,15 +3,28 @@
 // 广告位挂载的机柜号引用 device.ts 的 cabinets。
 import type {
   Coupon, Campaign, PushMessage, Referral, AdSlot, AdCampaign, AdDelivery, Notice, PageQuery,
+  AudienceSpec, AudienceResolved, AudienceType, CouponIssueRecord, CouponIssuePayload,
+  CouponIssueResult, PushAction, PushSendPayload,
 } from "../../types";
+import { PUSH_TRANSITIONS, canPushAction, couponRemaining, couponExpired } from "../../types";
 import { NICKS, p, iso } from "./internal";
 import { paginate, kwHit, upsert, nextNo, liveHit, archiveRow, unarchiveRow } from "./helpers";
 import { cabNo } from "./device";
+import { cUsers, members, consumerSegments } from "./user";
+
+const now = () => new Date().toISOString();
+/**
+ * 有效期挂**真实当前时间**而不是 mock 固定时间轴（同 reservations 的处理）：
+ * 「过期券不可发放」判定的是「expireAt 是否早于此刻」，用固定时间轴会随日历自然全部过期。
+ */
+const daysFromNow = (d: number) => new Date(Date.now() + d * 86400_000).toISOString();
 
 export const coupons: Coupon[] = Array.from({ length: 14 }, (_, i) => ({
   couponNo: `CP${800 + i}`, name: p(["新人立减", "满减券", "周末折扣", "会员专享"], i),
   type: i % 2 === 0 ? "CUT" : "DISCOUNT", value: i % 2 === 0 ? [3, 5, 10][i % 3] : [8, 9][i % 2],
   threshold: (i % 3) * 10, stock: 1000 + i * 100, issued: (i * 137) % 900, status: i % 6 === 0 ? "PAUSED" : "ACTIVE",
+  // i % 7 === 3 的几张刻意过期，用来演示 / 测试「过期券不可发放」
+  expireAt: daysFromNow(i % 7 === 3 ? -(5 + i) : 60 + i * 10),
   archivedAt: null,
 }));
 export const saveCoupon = (c: Partial<Coupon>) => upsert(coupons, c, "couponNo", () => nextNo("CP", coupons));
@@ -22,12 +35,81 @@ export const campaigns: Campaign[] = Array.from({ length: 14 }, (_, i) => ({
   status: p(["DRAFT", "RUNNING", "RUNNING", "ENDED"] as const, i),
   startAt: iso((i + 3) * 86400_000), endAt: iso(-(i + 10) * 86400_000),
 }));
-export const pushMessages: PushMessage[] = Array.from({ length: 16 }, (_, i) => ({
-  pushNo: `PM${900 + i}`, title: p(["借充电宝立享优惠", "您有一张券即将过期", "新点位上线通知", "斋月特惠开启"], i),
-  channel: i % 3 === 0 ? "SUBSCRIBE" : "APP_PUSH", audience: p(["全部用户", "活跃用户", "沉睡用户", "白金会员"], i),
-  sentCount: i % 4 === 0 ? 0 : 500 + (i * 337) % 20000, status: i % 4 === 0 ? "DRAFT" : "SENT",
-  sentAt: iso(i * 86400_000),
-}));
+// ============================================================================
+// 营销投放人群（S2）：优惠券发放 / 推送触达共用
+// ----------------------------------------------------------------------------
+// 规模一律从既有主数据算出来（cUsers / members / consumerSegments），不写死数字。
+// consumerSegments 是「分层画像」表，userCount 就是该层人数；members 是会员档案，
+// 等级人数按档案条数算——两套口径都能在别的页面点开核对，不会出现「这里 3820、那里 12」。
+// ============================================================================
+export class AudienceError extends Error {
+  constructor(msg: string) { super(msg); this.name = "AudienceError"; }
+}
+
+export const MEMBER_LEVELS = ["SILVER", "GOLD", "PLATINUM"] as const;
+const LEVEL_LABEL: Record<string, string> = { SILVER: "白银会员", GOLD: "黄金会员", PLATINUM: "白金会员" };
+
+/** 解析人群：返回可读口径 + 规模。维度非法 / 目标不存在一律抛错，不静默兜底成「全体」。 */
+export function resolveAudience(spec: AudienceSpec): AudienceResolved {
+  const type = spec.targetType;
+  const value = (spec.targetValue ?? "").trim();
+  if (type === "ALL") {
+    return { targetType: type, targetDesc: `全体用户（${cUsers.length} 人）`, size: cUsers.length };
+  }
+  if (type === "MEMBER_LEVEL") {
+    if (!MEMBER_LEVELS.includes(value as (typeof MEMBER_LEVELS)[number])) {
+      throw new AudienceError(`会员等级不存在：「${value || "未选择"}」，可选 ${MEMBER_LEVELS.join(" / ")}`);
+    }
+    const size = members.filter((m) => m.level === value).length;
+    return { targetType: type, targetDesc: `会员等级：${LEVEL_LABEL[value]}（${size} 人）`, size };
+  }
+  if (type === "SEGMENT") {
+    const seg = consumerSegments.find((s) => s.segmentNo === value);
+    if (!seg) throw new AudienceError(`消费者分层不存在：「${value || "未选择"}」`);
+    return { targetType: type, targetDesc: `消费者分层：${seg.segment}（${seg.userCount} 人）`, size: seg.userCount };
+  }
+  if (type === "USER_LIST") {
+    const nos = [...new Set(value.split(/[,，\s]+/).map((s) => s.trim()).filter(Boolean))];
+    if (!nos.length) throw new AudienceError("请至少填写一个用户号");
+    const bad = nos.filter((no) => !cUsers.some((u) => u.cUserNo === no));
+    if (bad.length) throw new AudienceError(`用户号不存在：${bad.join("、")}——请填写 C 端真实用户号（如 U3000）`);
+    return { targetType: type, targetDesc: `指定用户 ${nos.length} 人：${nos.slice(0, 5).join("、")}${nos.length > 5 ? " 等" : ""}`, size: nos.length };
+  }
+  throw new AudienceError(`发放对象类型不合法：「${String(type)}」`);
+}
+
+// —— 推送触达 ——
+// 种子人群同样落在真实分层上（原先是「活跃用户」这类字符串，点开在任何页面都查无此群）。
+const PUSH_SEED_AUDIENCE: AudienceSpec[] = [
+  { targetType: "ALL", targetValue: "" },
+  { targetType: "SEGMENT", targetValue: "SEG901" },
+  { targetType: "MEMBER_LEVEL", targetValue: "PLATINUM" },
+  { targetType: "SEGMENT", targetValue: "SEG905" },
+];
+const PUSH_CHANNELS: PushMessage["channel"][] = ["APP_PUSH", "SUBSCRIBE", "SMS"];
+export const pushMessages: PushMessage[] = Array.from({ length: 16 }, (_, i) => {
+  const aud = resolveAudience(p(PUSH_SEED_AUDIENCE, i));
+  const draft = i % 4 === 0;
+  // 成功率 ~94%（触达必有失败：关推送权限、停机、黑名单），successCount 恒 ≤ targetCount
+  const success = draft ? 0 : Math.round(aud.size * 0.94);
+  return {
+    pushNo: `PM${900 + i}`, title: p(["借充电宝立享优惠", "您有一张券即将过期", "新点位上线通知", "斋月特惠开启"], i),
+    content: p([
+      "现在借充电宝，首单立减 3 AED，活动仅限本周。",
+      "您账户内有一张优惠券将在 3 天后过期，记得使用。",
+      "Marina Walk 新增 12 个机柜点位，扫码即可借还。",
+      "斋月特惠开启：每日 20:00 后借出享 5 折。",
+    ], i),
+    channel: p(PUSH_CHANNELS, i), audience: aud.targetDesc,
+    audienceType: aud.targetType, audienceValue: p(PUSH_SEED_AUDIENCE, i).targetValue ?? "",
+    scheduledAt: null,
+    targetCount: draft ? 0 : aud.size, successCount: success, sentCount: success,
+    status: draft ? "DRAFT" : "SENT",
+    sentAt: draft ? "" : iso(i * 86400_000),
+    idempotencyKey: draft ? null : `PSH-PM${900 + i}-seed`,
+    operatorName: draft ? null : p(["admin", "增长组", "运营中心"], i),
+  };
+});
 export const referrals: Referral[] = Array.from({ length: 20 }, (_, i) => ({
   inviteNo: `RF${4000 + i}`, inviter: p(NICKS, i), invitee: p(NICKS, i + 3),
   reward: p([5, 8, 10], i), status: i % 3 === 0 ? "PENDING" : "REWARDED",
@@ -51,14 +133,13 @@ export const adDeliveries: AdDelivery[] = Array.from({ length: 24 }, (_, i) => (
 }));
 
 export const listCampaigns = (q: PageQuery = {}) => paginate(campaigns, q.page, q.size, (x) => kwHit(q.keyword, x.campaignNo, x.name, x.kind));
-export const listPushMessages = (q: PageQuery = {}) => paginate(pushMessages, q.page, q.size, (x) => kwHit(q.keyword, x.pushNo, x.title, x.audience));
+export const listPushMessages = (q: PageQuery = {}) => paginate(pushMessages, q.page, q.size, (x) => kwHit(q.keyword, x.pushNo, x.title, x.content, x.audience));
 export const listReferrals = (q: PageQuery = {}) => paginate(referrals, q.page, q.size, (x) => kwHit(q.keyword, x.inviteNo, x.inviter, x.invitee));
 export const listAdSlots = (q: PageQuery = {}) => paginate(adSlots, q.page, q.size, (x) => kwHit(q.keyword, x.slotNo, x.cabinetNo));
 export const listAdCampaigns = (q: PageQuery = {}) => paginate(adCampaigns, q.page, q.size, (x) => kwHit(q.keyword, x.adNo, x.advertiser, x.creative));
 export const listAdDeliveries = (q: PageQuery = {}) => paginate(adDeliveries, q.page, q.size, (x) => kwHit(q.keyword, x.deliveryNo, x.adNo, x.slotNo));
 
 export const saveCampaign = (x: Partial<Campaign>) => upsert(campaigns, x, "campaignNo", () => nextNo("CMP", campaigns));
-export const savePushMessage = (x: Partial<PushMessage>) => upsert(pushMessages, x, "pushNo", () => nextNo("PM", pushMessages));
 export const saveAdSlot = (x: Partial<AdSlot>) => upsert(adSlots, x, "slotNo", () => nextNo("AS", adSlots));
 export const saveAdCampaign = (x: Partial<AdCampaign>) => upsert(adCampaigns, x, "adNo", () => nextNo("AD", adCampaigns));
 
@@ -153,6 +234,165 @@ export const notices: Notice[] = [
 export const listNotices = (q: PageQuery = {}) =>
   paginate(notices, q.page, q.size, (x) => liveHit(x, q.showArchived) && kwHit(q.keyword, x.noticeNo, x.title, x.titleEn, x.titleAr, x.publishedBy));
 export const saveNotice = (x: Partial<Notice>) => upsert(notices, x, "noticeNo", () => nextNo("NTC", notices));
+
+// ============================================================================
+// S2 · 优惠券发放（权限码 marketing:coupon:issue）
+// ----------------------------------------------------------------------------
+// 库存口径：`stock` 是**发行总量**（不变），`issued` 是**已发放数**（只增），
+// 剩余 = stock - issued。发放不改 stock——否则「已发/库存」两个数会一起漂，
+// 事后查不出这张券一共印了多少。四道闸门任一不过整批拒绝，不做半成功。
+// ============================================================================
+export class CouponIssueError extends Error {
+  constructor(msg: string) { super(msg); this.name = "CouponIssueError"; }
+}
+
+export const couponIssueRecords: CouponIssueRecord[] = [
+  {
+    issueNo: "CIS900", couponNo: "CP801", couponName: "满减券",
+    targetType: "SEGMENT", targetDesc: "消费者分层：高频通勤用户（3820 人）",
+    quantity: 500, operatorName: "增长组", createdAt: iso(2 * 86400_000),
+  },
+  {
+    issueNo: "CIS901", couponNo: "CP803", couponName: "会员专享",
+    targetType: "MEMBER_LEVEL", targetDesc: "会员等级：白金会员（8 人）",
+    quantity: 120, operatorName: "运营中心", createdAt: iso(5 * 86400_000),
+  },
+  {
+    issueNo: "CIS902", couponNo: "CP804", couponName: "新人立减",
+    targetType: "ALL", targetDesc: "全体用户（60 人）",
+    quantity: 60, operatorName: "admin", createdAt: iso(9 * 86400_000),
+  },
+];
+
+export const listCouponIssueRecords = (q: PageQuery & { couponNo?: string; targetType?: string } = {}) =>
+  paginate(couponIssueRecords, q.page, q.size, (x) =>
+    (!q.couponNo || x.couponNo === q.couponNo) &&
+    (!q.targetType || x.targetType === q.targetType) &&
+    kwHit(q.keyword, x.issueNo, x.couponNo, x.couponName, x.targetDesc, x.operatorName));
+
+/**
+ * 发放优惠券。闸门：
+ *  ① 券必须存在且未归档；② 已下线（PAUSED）/ 已过期一律拒绝；
+ *  ③ 张数为正整数；④ **不得超过剩余库存**（超发＝凭空印券）。
+ * 通过后：`issued += quantity`（剩余随之减少）+ 落一条发放流水。
+ */
+export function issueCoupon(couponNo: string, x: CouponIssuePayload): CouponIssueResult {
+  const c = coupons.find((y) => y.couponNo === couponNo);
+  if (!c) throw new CouponIssueError(`优惠券 ${couponNo} 不存在`);
+  if (c.archivedAt) throw new CouponIssueError(`优惠券 ${couponNo} 已归档，不可发放——请先恢复`);
+  if (c.status !== "ACTIVE") throw new CouponIssueError(`优惠券 ${couponNo} 已下线（暂停），不可发放`);
+  if (couponExpired(c)) throw new CouponIssueError(`优惠券 ${couponNo} 已于 ${c.expireAt.slice(0, 10)} 过期，不可发放`);
+
+  const qty = Number(x?.quantity ?? 0);
+  if (!Number.isInteger(qty) || qty <= 0) throw new CouponIssueError("发放张数必须是大于 0 的整数");
+  const remaining = couponRemaining(c);
+  if (qty > remaining) {
+    throw new CouponIssueError(
+      `发放张数 ${qty} 超过剩余库存 ${remaining}（发行总量 ${c.stock}、已发放 ${c.issued}）——超发等于凭空印券，请先调高发行总量`,
+    );
+  }
+
+  const aud = resolveAudience(x); // 人群非法在这里抛 AudienceError
+  const record: CouponIssueRecord = {
+    issueNo: nextNo("CIS", couponIssueRecords, 900, "issueNo"),
+    couponNo: c.couponNo, couponName: c.name,
+    targetType: aud.targetType, targetDesc: aud.targetDesc,
+    quantity: qty, operatorName: x.operatorName?.trim() || "admin", createdAt: now(),
+  };
+  c.issued += qty;
+  couponIssueRecords.unshift(record);
+  return { coupon: c, record };
+}
+
+// ============================================================================
+// S2 · 推送触达发送（权限码 marketing:push:send）
+// ----------------------------------------------------------------------------
+// 状态机在本层强制：DRAFT →（定时）SCHEDULED → SENDING → SENT，SENT 是终态。
+// 幂等：发送/重发必须带 idempotencyKey，同键第二次直接拒绝——触达是批量对外动作，
+// 重复提交＝真的把消息发两遍（口径同退款，见 cs.ts applyRefund）。
+// ============================================================================
+export class PushError extends Error {
+  constructor(msg: string) { super(msg); this.name = "PushError"; }
+}
+
+/** 已用过的幂等键（跨草稿全局唯一，防同一批内容换个推送号重发一遍）。 */
+const usedPushKeys = new Set<string>(
+  pushMessages.map((x) => x.idempotencyKey).filter((k): k is string => !!k),
+);
+
+const findPush = (pushNo: string) => {
+  const x = pushMessages.find((y) => y.pushNo === pushNo);
+  if (!x) throw new PushError(`推送 ${pushNo} 不存在`);
+  return x;
+};
+
+/** 统一迁移入口：所有推送状态变更都走这里，禁止别处直接写 `p.status = ...`。 */
+export function transitionPush(pushNo: string, action: PushAction, patch: Partial<PushMessage> = {}): PushMessage {
+  const x = findPush(pushNo);
+  if (!canPushAction(x.status, action)) {
+    throw new PushError(`推送 ${pushNo} 当前状态「${x.status}」不允许执行「${PUSH_TRANSITIONS[action].label}」`);
+  }
+  Object.assign(x, patch, { status: PUSH_TRANSITIONS[action].to });
+  return x;
+}
+
+/**
+ * 新增 / 编辑推送草稿。**状态与发送结果字段一律由状态机写**，这里强制剥离，
+ * 否则页面塞一个 `status: "SENT"` 就能绕过发送流程伪造已发送。
+ */
+export function savePushMessage(x: Partial<PushMessage>): PushMessage {
+  const { status: _s, sentAt: _a, targetCount: _t, successCount: _c, sentCount: _n,
+    idempotencyKey: _k, ...safe } = x;
+  const aud = resolveAudience({
+    targetType: (safe.audienceType ?? "ALL") as AudienceType,
+    targetValue: safe.audienceValue ?? "",
+  });
+  const draft: Partial<PushMessage> = {
+    ...safe, audienceType: aud.targetType, audienceValue: safe.audienceValue ?? "", audience: aud.targetDesc,
+  };
+  const existing = safe.pushNo && pushMessages.some((y) => y.pushNo === safe.pushNo);
+  if (existing) return upsert(pushMessages, draft, "pushNo", () => nextNo("PM", pushMessages));
+  return upsert(pushMessages, {
+    content: "", channel: "APP_PUSH", scheduledAt: null,
+    targetCount: 0, successCount: 0, sentCount: 0, status: "DRAFT", sentAt: "",
+    idempotencyKey: null, operatorName: null, ...draft,
+  }, "pushNo", () => nextNo("PM", pushMessages));
+}
+
+/**
+ * 发送推送。定时（带 scheduledAt）→ SCHEDULED；立即 → SENDING → SENT 并落
+ * sentAt / targetCount / successCount。已发送的券不会走到这里——SENT 不在 send.from 里。
+ */
+export function sendPushMessage(pushNo: string, x: PushSendPayload): PushMessage {
+  const key = (x?.idempotencyKey ?? "").trim();
+  if (!key) throw new PushError("发送必须携带幂等键（idempotencyKey）——重复提交会把消息真发两遍");
+  if (usedPushKeys.has(key)) throw new PushError(`幂等键 ${key} 已提交过，拒绝重复发送`);
+
+  const target = findPush(pushNo);
+  if (!target.title?.trim() || !target.content?.trim()) throw new PushError("推送标题与内容不能为空");
+  // 状态非法时先抛，**不能**在此之前占用幂等键（否则一次失败把键烧掉，用户再也发不出去）
+  if (!canPushAction(target.status, "send")) {
+    throw new PushError(`推送 ${pushNo} 当前状态「${target.status}」不允许执行「发送」`);
+  }
+  const aud = resolveAudience({ targetType: target.audienceType, targetValue: target.audienceValue });
+  const operatorName = x.operatorName?.trim() || "admin";
+  usedPushKeys.add(key);
+
+  const scheduledAt = x.scheduledAt?.trim() || null;
+  if (scheduledAt) {
+    return transitionPush(pushNo, "schedule", {
+      scheduledAt, audience: aud.targetDesc, targetCount: aud.size,
+      successCount: 0, sentCount: 0, idempotencyKey: key, operatorName,
+    });
+  }
+  transitionPush(pushNo, "send", {
+    scheduledAt: null, audience: aud.targetDesc, targetCount: aud.size,
+    idempotencyKey: key, operatorName,
+  });
+  // 成功率 ~94%：关推送权限 / 停机 / 触达黑名单必然吃掉一部分，successCount 恒 ≤ targetCount
+  const success = Math.round(aud.size * 0.94);
+  return transitionPush(pushNo, "finish", { sentAt: now(), successCount: success, sentCount: success });
+}
 
 // —— G1 软删除：优惠券 / 公告 ——
 export const archiveCoupon = (no: string) => archiveRow(coupons, "couponNo", no);

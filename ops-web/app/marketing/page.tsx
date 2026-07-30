@@ -9,8 +9,10 @@ import { TabHeader } from "@/components/ui/tab-header";
 import { Toolbar } from "@/components/ui/toolbar";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
 import { DataTable, type Column } from "@/components/ui/data-table";
+import { Drawer, Field } from "@/components/ui/drawer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input, Select } from "@/components/ui/input";
 import { money, fmtTime } from "@/lib/utils";
 import { useCan } from "@/lib/use-can";
 import { useI18n } from "@/lib/i18n";
@@ -24,13 +26,16 @@ import {
 } from "@/components/archive";
 import type {
   Notice, Coupon, Campaign, PushMessage, Referral, AdSlot, AdCampaign, AdDelivery, PageResult,
+  CouponIssueRecord, AudienceType,
 } from "@/lib/types";
+import { couponIssuable, couponRemaining, couponExpired, canSendPush } from "@/lib/types";
 
 const SIZE = 10;
 const TABS = [
   // 公告管理是营销模块唯一的阶段 1 项（c-app 首页公告条的发布口），故置于首位。
   { key: "notices", label: "公告管理" },
   { key: "coupons", label: "优惠券", phase: 2 as const },
+  { key: "coupon-issues", label: "发放记录", phase: 2 as const },
   { key: "campaigns", label: "活动", phase: 2 as const },
   { key: "push", label: "推送触达", phase: 3 as const },
   { key: "referral", label: "邀请裂变", phase: 3 as const },
@@ -72,13 +77,32 @@ const NOTICE_STATUS: Record<Notice["status"], { label: string; tone: "muted" | "
 const DEFAULT_TAB = isPhaseLocked(2) ? "notices" : "coupons";
 
 const COUPON_FIELDS: FieldDef[] = [
-  { key: "name", label: "名称", placeholder: "新人立减" },
+  { key: "name", label: "名称", required: true, maxLength: 20, placeholder: "新人立减" },
   { key: "type", label: "类型", type: "select", options: [{ value: "CUT", label: "立减" }, { value: "DISCOUNT", label: "折扣" }] },
   { key: "value", label: "面额 / 折扣", type: "number" },
   { key: "threshold", label: "门槛（满 X 元）", type: "number" },
-  { key: "stock", label: "库存", type: "number" },
-  { key: "status", label: "状态", type: "select", options: [{ value: "ACTIVE", label: "进行中" }, { value: "PAUSED", label: "暂停" }] },
+  { key: "stock", label: "发行总量", type: "number", min: 0, help: "库存上限；发放只增「已发放」，剩余 = 发行总量 - 已发放" },
+  { key: "expireAt", label: "有效期止", type: "date", required: true, help: "过期券不可再发放" },
+  { key: "status", label: "状态", type: "select", options: [{ value: "ACTIVE", label: "进行中" }, { value: "PAUSED", label: "暂停（已下线，不可发放）" }] },
 ];
+
+// —— S2 营销投放人群（优惠券发放 / 推送触达共用）——
+// 维度全部落在既有主数据上（cUsers / members / consumerSegments），口径见 types/marketing.ts。
+const AUD_TYPE_LABEL: Record<AudienceType, string> = {
+  ALL: "全体用户", MEMBER_LEVEL: "会员等级", SEGMENT: "消费者分层", USER_LIST: "指定用户号",
+};
+const MEMBER_LEVEL_OPTS = [
+  { value: "SILVER", label: "白银会员" }, { value: "GOLD", label: "黄金会员" }, { value: "PLATINUM", label: "白金会员" },
+];
+const PUSH_CHANNEL_LABEL: Record<PushMessage["channel"], string> = {
+  APP_PUSH: "App 推送", SUBSCRIBE: "订阅消息（站内）", SMS: "短信",
+};
+const PUSH_STATUS: Record<PushMessage["status"], { label: string; tone: "muted" | "warning" | "success" }> = {
+  DRAFT: { label: "草稿", tone: "muted" },
+  SCHEDULED: { label: "已排期", tone: "warning" },
+  SENDING: { label: "发送中", tone: "warning" },
+  SENT: { label: "已发送", tone: "success" },
+};
 const CAMPAIGN_FIELDS: FieldDef[] = [
   { key: "name", label: "活动名称", placeholder: "夏日充电狂欢" },
   { key: "kind", label: "类型", placeholder: "满减 / 拉新 / 签到" },
@@ -87,12 +111,34 @@ const CAMPAIGN_FIELDS: FieldDef[] = [
   { key: "startAt", label: "开始时间", placeholder: "2026-07-01 00:00:00" },
   { key: "endAt", label: "结束时间", placeholder: "2026-07-31 23:59:59" },
 ];
-const PUSH_FIELDS: FieldDef[] = [
-  { key: "title", label: "标题", placeholder: "您有一张新券待领取" },
-  { key: "channel", label: "渠道", type: "select", options: [{ value: "APP_PUSH", label: "App 推送" }, { value: "SUBSCRIBE", label: "订阅消息" }] },
-  { key: "audience", label: "受众", placeholder: "全部用户 / 沉默用户" },
-  { key: "status", label: "状态", type: "select", options: [{ value: "DRAFT", label: "草稿" }, { value: "SENT", label: "已发送" }] },
+/**
+ * 推送草稿表单。**没有「状态」字段**——状态只能由发送动作的状态机推进
+ * （DRAFT →（定时）SCHEDULED → SENDING → SENT），表单能改就等于能伪造「已发送」。
+ * 目标人群做成一个扁平下拉（`audienceKey` = `类型:值`），提交时拆回 audienceType/audienceValue。
+ */
+const pushFields = (segments: { segmentNo: string; segment: string; userCount: number }[]): FieldDef[] => [
+  { key: "title", label: "标题", required: true, maxLength: 30, section: "内容", placeholder: "您有一张新券待领取" },
+  { key: "content", label: "正文", type: "textarea", rows: 3, required: true, maxLength: 200, section: "内容", placeholder: "现在借充电宝，首单立减 3 AED" },
+  {
+    key: "channel", label: "渠道", type: "select", required: true, section: "触达设置",
+    options: (Object.keys(PUSH_CHANNEL_LABEL) as PushMessage["channel"][]).map((c) => ({ value: c, label: PUSH_CHANNEL_LABEL[c] })),
+  },
+  {
+    key: "audienceKey", label: "目标人群", type: "select", required: true, section: "触达设置",
+    help: "人群规模取自会员档案 / 消费者分层，发送时按该规模落目标人数",
+    options: [
+      { value: "ALL:", label: "全体用户" },
+      ...MEMBER_LEVEL_OPTS.map((o) => ({ value: `MEMBER_LEVEL:${o.value}`, label: `会员等级 · ${o.label}` })),
+      ...segments.map((s) => ({ value: `SEGMENT:${s.segmentNo}`, label: `消费者分层 · ${s.segment}（${s.userCount} 人）` })),
+    ],
+  },
 ];
+/** `类型:值` ↔ audienceType/audienceValue 的互转（下拉值只能是一个字符串）。 */
+const audKeyOf = (p: Partial<PushMessage>) => `${p.audienceType ?? "ALL"}:${p.audienceValue ?? ""}`;
+const parseAudKey = (k: string) => {
+  const i = k.indexOf(":");
+  return { audienceType: k.slice(0, i) as AudienceType, audienceValue: k.slice(i + 1) };
+};
 const SLOT_FIELDS: FieldDef[] = [
   { key: "cabinetNo", label: "机柜号", placeholder: "CAB-0001" },
   { key: "position", label: "位置", type: "select", options: [{ value: "SCREEN", label: "屏幕" }, { value: "BODY", label: "机身" }] },
@@ -123,13 +169,27 @@ function MarketingInner() {
   const [noticeForm, setNoticeForm] = useState<Partial<Notice> | null>(null);
   const [couponForm, setCouponForm] = useState<Partial<Coupon> | null>(null);
   const [campaignForm, setCampaignForm] = useState<Partial<Campaign> | null>(null);
-  const [pushForm, setPushForm] = useState<Partial<PushMessage> | null>(null);
+  // audienceKey 是表单里的合成字段（`类型:值`），提交时拆回 audienceType/audienceValue
+  const [pushForm, setPushForm] = useState<(Partial<PushMessage> & { audienceKey?: string }) | null>(null);
   const [slotForm, setSlotForm] = useState<Partial<AdSlot> | null>(null);
   const [adForm, setAdForm] = useState<Partial<AdCampaign> | null>(null);
   useEffect(() => { if (qTab && TABS.some((t) => t.key === qTab)) { setTab(qTab); setPage(1); setShowArchived(false); } }, [qTab]);
 
+  // —— S2 优惠券发放 / 推送发送的抽屉状态 ——
+  const [issueFor, setIssueFor] = useState<Coupon | null>(null);
+  const [issueType, setIssueType] = useState<AudienceType>("ALL");
+  const [issueValue, setIssueValue] = useState("");
+  const [issueQty, setIssueQty] = useState("100");
+  const [sendFor, setSendFor] = useState<PushMessage | null>(null);
+  const [sendWhen, setSendWhen] = useState<"NOW" | "SCHEDULED">("NOW");
+  const [sendAt, setSendAt] = useState("");
+  // 幂等键在抽屉打开时生成一次并全程沿用：双击提交 / 网络重试用的是同一把键，
+  // 服务端据此拒绝第二次——这正是「重发必须带幂等键」的落地方式（口径同订单退款）。
+  const [sendKey, setSendKey] = useState("");
+
   const canEditNotice = allow("marketing:coupon:issue");
   const canEditCoupon = allow("marketing:coupon:issue");
+  const canIssueCoupon = allow("marketing:coupon:issue");
   const canEditCampaign = allow("marketing:campaign:manage");
   const canEditPush = allow("marketing:push:send");
   const canEditAd = allow("marketing:ad:manage");
@@ -149,6 +209,88 @@ function MarketingInner() {
     mutationFn: (p: Partial<PushMessage>) => api.savePushMessage(p),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["mkt"] }); notify.success(t("common.success")); setPushForm(null); },
   });
+
+  // —— S2：消费者分层（人群下拉的数据源，取 user 域既有主数据，不另造维度）——
+  const segQ = useQuery({
+    queryKey: ["mkt-segments"],
+    queryFn: () => api.listConsumerSegments({ page: 1, size: 100 }),
+    enabled: tab === "coupons" || tab === "push",
+  });
+  const segments = segQ.data?.list ?? [];
+
+  // —— S2 发放优惠券：库存/状态/有效期由 mock 层兜底，这里只管成功后的失效与提示 ——
+  const issueCoupon = useMutation({
+    mutationFn: (v: { no: string; targetType: AudienceType; targetValue: string; quantity: number }) =>
+      api.issueCoupon(v.no, { targetType: v.targetType, targetValue: v.targetValue, quantity: v.quantity }),
+    onSuccess: (r) => {
+      notify.success(`已发放 ${r.record.quantity} 张 ${r.record.couponName} · ${r.record.targetDesc} · 剩余 ${couponRemaining(r.coupon)} 张`);
+      qc.invalidateQueries({ queryKey: ["mkt"] });
+      setIssueFor(null);
+    },
+  });
+  const openIssue = (c: Coupon) => {
+    setIssueFor(c);
+    setIssueType("ALL");
+    setIssueValue("");
+    setIssueQty(String(Math.min(100, couponRemaining(c))));
+  };
+  const issueQtyNum = Number(issueQty);
+  const issueQtyOk = Number.isInteger(issueQtyNum) && issueQtyNum > 0 && !!issueFor && issueQtyNum <= couponRemaining(issueFor);
+  const issueTargetOk = issueType === "ALL" || !!issueValue.trim();
+  /** 发放是批量权益动作（等同于发钱），提交前二次确认，文案写明发给谁、发多少张。 */
+  const submitIssue = async () => {
+    if (!issueFor || !issueQtyOk || !issueTargetOk) return;
+    const audLabel = issueType === "ALL" ? "全体用户"
+      : issueType === "MEMBER_LEVEL" ? `${AUD_TYPE_LABEL[issueType]} ${MEMBER_LEVEL_OPTS.find((o) => o.value === issueValue)?.label ?? issueValue}`
+      : issueType === "SEGMENT" ? `${AUD_TYPE_LABEL[issueType]} ${segments.find((s) => s.segmentNo === issueValue)?.segment ?? issueValue}`
+      : `指定用户号 ${issueValue}`;
+    const ok = await confirm({
+      title: `发放优惠券 ${issueFor.couponNo}`,
+      desc: `将向${audLabel}发放 ${issueQtyNum} 张「${issueFor.name}」，发放后剩余 ${couponRemaining(issueFor) - issueQtyNum} 张。发放不可撤销。`,
+      danger: true,
+      confirmText: "确认发放",
+      cancelText: "再想想",
+    });
+    if (ok) issueCoupon.mutate({ no: issueFor.couponNo, targetType: issueType, targetValue: issueValue.trim(), quantity: issueQtyNum });
+  };
+
+  // —— S2 发送推送：状态机 + 幂等键都在 mock 层强制 ——
+  const sendPush = useMutation({
+    mutationFn: (v: { no: string; idempotencyKey: string; scheduledAt: string | null }) =>
+      api.sendPushMessage(v.no, { idempotencyKey: v.idempotencyKey, scheduledAt: v.scheduledAt }),
+    onSuccess: (r) => {
+      notify.success(r.status === "SCHEDULED"
+        ? `已排期 ${fmtTime(r.scheduledAt ?? "")} 发送 · 预计触达 ${r.targetCount} 人`
+        : `已发送 · 目标 ${r.targetCount} 人 / 成功 ${r.successCount} 人`);
+      qc.invalidateQueries({ queryKey: ["mkt"] });
+      setSendFor(null);
+    },
+  });
+  const openSend = (p: PushMessage) => {
+    setSendFor(p);
+    setSendWhen("NOW");
+    setSendAt("");
+    setSendKey(`PSH-${p.pushNo}-${Date.now()}`);
+  };
+  const submitSend = async () => {
+    if (!sendFor) return;
+    if (sendWhen === "SCHEDULED" && !sendAt) return;
+    const ok = await confirm({
+      title: `发送推送 ${sendFor.pushNo}`,
+      desc: sendWhen === "NOW"
+        ? `将向${sendFor.audience}发送「${sendFor.title}」（${PUSH_CHANNEL_LABEL[sendFor.channel]}）。发出后不可撤回。`
+        : `将于 ${sendAt.replace("T", " ")} 向${sendFor.audience}发送「${sendFor.title}」（${PUSH_CHANNEL_LABEL[sendFor.channel]}）。`,
+      danger: true,
+      confirmText: sendWhen === "NOW" ? "确认发送" : "确认排期",
+      cancelText: "再想想",
+    });
+    if (ok) {
+      sendPush.mutate({
+        no: sendFor.pushNo, idempotencyKey: sendKey,
+        scheduledAt: sendWhen === "SCHEDULED" ? new Date(sendAt).toISOString() : null,
+      });
+    }
+  };
   const saveSlot = useMutation({
     mutationFn: (s: Partial<AdSlot>) => api.saveAdSlot(s),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["mkt"] }); notify.success(t("common.success")); setSlotForm(null); },
@@ -181,12 +323,13 @@ function MarketingInner() {
     if (await confirm(unarchiveConfirm("优惠券", c.couponNo))) archiveCouponM.mutate({ no: c.couponNo, undo: true });
   };
 
-  const q = useQuery<PageResult<Notice | Coupon | Campaign | PushMessage | Referral | AdSlot | AdCampaign | AdDelivery>>({
+  const q = useQuery<PageResult<Notice | Coupon | CouponIssueRecord | Campaign | PushMessage | Referral | AdSlot | AdCampaign | AdDelivery>>({
     // showArchived 必须进 queryKey，否则切开关不重新拉数据
     queryKey: ["mkt", tab, page, keyword, showArchived],
     queryFn: () =>
       tab === "notices" ? api.listNotices({ page, size: SIZE, keyword, showArchived })
       : tab === "coupons" ? api.listCoupons({ page, size: SIZE, keyword, showArchived })
+      : tab === "coupon-issues" ? api.listCouponIssueRecords({ page, size: SIZE, keyword })
       : tab === "campaigns" ? api.listCampaigns({ page, size: SIZE, keyword })
       : tab === "push" ? api.listPushMessages({ page, size: SIZE, keyword })
       : tab === "referral" ? api.listReferrals({ page, size: SIZE, keyword })
@@ -231,8 +374,16 @@ function MarketingInner() {
     { header: "类型", cell: (c) => <Badge tone="outline">{c.type === "CUT" ? "立减" : "折扣"}</Badge> },
     { header: "面额", cell: (c) => couponAmount(c) },
     { header: "门槛", cell: (c) => c.threshold ? `满 ${money(c.threshold)}` : "无" },
-    { header: "已发/库存", cell: (c) => <span className="tabular-nums">{c.issued}/{c.stock}</span> },
-    { header: "状态", cell: (c) => c.status === "ACTIVE" ? <Badge tone="success">进行中</Badge> : <Badge tone="muted">暂停</Badge> },
+    // 已发 / 发行总量 + 剩余：发放要看的就是剩余，别让人在脑子里做减法
+    { header: "已发/总量", cell: (c) => <span className="tabular-nums">{c.issued}/{c.stock}</span> },
+    { header: "剩余", cell: (c) => <span className="tabular-nums">{couponRemaining(c)}</span> },
+    {
+      header: "有效期止",
+      cell: (c) => couponExpired(c)
+        ? <Badge tone="muted">已过期 {fmtTime(c.expireAt)}</Badge>
+        : <span className="text-muted-foreground">{fmtTime(c.expireAt)}</span>,
+    },
+    { header: "状态", cell: (c) => c.status === "ACTIVE" ? <Badge tone="success">进行中</Badge> : <Badge tone="muted">已下线</Badge> },
     ...archivedCol<Coupon>(),
     {
       header: t("common.actions"),
@@ -242,10 +393,30 @@ function MarketingInner() {
           canWrite={canEditCoupon}
           onArchive={() => askArchiveCoupon(c)}
           onUnarchive={() => askUnarchiveCoupon(c)}
-          actions={<Button size="sm" variant="outline" onClick={() => setCouponForm(c)}>{t("common.edit")}</Button>}
+          actions={
+            <>
+              <Button size="sm" variant="outline" onClick={() => setCouponForm(c)}>{t("common.edit")}</Button>
+              {/* 已下线 / 已过期 / 无剩余库存的券**不出**发放按钮（与 mock 层同一个判定函数） */}
+              {canIssueCoupon && couponIssuable(c) && (
+                <Button size="sm" onClick={() => openIssue(c)}>发放</Button>
+              )}
+            </>
+          }
         />
       ),
     },
+  ];
+
+  // 发放记录：发放是不可撤销的权益动作，必须逐笔可查（谁、向谁、发了多少）
+  const issueCols: Column<CouponIssueRecord>[] = [
+    { header: "发放号", cell: (r) => <span className="font-medium">{r.issueNo}</span> },
+    { header: "券号", cell: (r) => <span className="text-muted-foreground">{r.couponNo}</span> },
+    { header: "券名称", cell: (r) => r.couponName },
+    { header: "发放对象", cell: (r) => <Badge tone="outline">{AUD_TYPE_LABEL[r.targetType]}</Badge> },
+    { header: "人群口径", cell: (r) => <span className="text-muted-foreground">{r.targetDesc}</span> },
+    { header: "张数", cell: (r) => <span className="tabular-nums">{r.quantity}</span> },
+    { header: "操作人", cell: (r) => r.operatorName },
+    { header: "发放时间", cell: (r) => <span className="text-muted-foreground">{fmtTime(r.createdAt)}</span> },
   ];
 
   const campaignCols: Column<Campaign>[] = [
@@ -262,12 +433,28 @@ function MarketingInner() {
   const pushCols: Column<PushMessage>[] = [
     { header: "推送号", cell: (p) => <span className="font-medium">{p.pushNo}</span> },
     { header: "标题", cell: (p) => p.title },
-    { header: "渠道", cell: (p) => <Badge tone="outline">{p.channel === "APP_PUSH" ? "App 推送" : "订阅消息"}</Badge> },
-    { header: "受众", cell: (p) => <span className="text-muted-foreground">{p.audience}</span> },
-    { header: "触达数", cell: (p) => <span className="tabular-nums">{Math.round(p.sentCount)}</span> },
-    { header: "状态", cell: (p) => <Badge tone={p.status === "SENT" ? "success" : "muted"}>{p.status === "SENT" ? "已发送" : "草稿"}</Badge> },
-    { header: "发送时间", cell: (p) => <span className="text-muted-foreground">{p.status === "SENT" ? fmtTime(p.sentAt) : "-"}</span> },
-    { header: t("common.actions"), cell: (p) => canEditPush ? <Button size="sm" variant="outline" onClick={() => setPushForm(p)}>{t("common.edit")}</Button> : <span className="text-muted-foreground">-</span> },
+    { header: "渠道", cell: (p) => <Badge tone="outline">{PUSH_CHANNEL_LABEL[p.channel]}</Badge> },
+    { header: "目标人群", cell: (p) => <span className="text-muted-foreground">{p.audience}</span> },
+    // 目标 / 成功分两列：只看「触达数」看不出失败了多少（关推送权限、停机、黑名单）
+    { header: "目标/成功", cell: (p) => <span className="tabular-nums">{p.targetCount}/{p.successCount}</span> },
+    { header: "状态", cell: (p) => <Badge tone={PUSH_STATUS[p.status].tone}>{PUSH_STATUS[p.status].label}</Badge> },
+    {
+      header: "发送时间",
+      cell: (p) => <span className="text-muted-foreground">
+        {p.status === "SENT" ? fmtTime(p.sentAt) : p.status === "SCHEDULED" ? `排期 ${fmtTime(p.scheduledAt ?? "")}` : "-"}
+      </span>,
+    },
+    {
+      header: t("common.actions"),
+      cell: (p) => canEditPush ? (
+        <div className="flex gap-2">
+          {/* 已发送是终态：不出「发送」按钮，也不允许编辑内容（改了等于篡改已发出的消息） */}
+          {p.status === "DRAFT" && <Button size="sm" variant="outline" onClick={() => setPushForm({ ...p, audienceKey: audKeyOf(p) })}>{t("common.edit")}</Button>}
+          {canSendPush(p.status) && <Button size="sm" onClick={() => openSend(p)}>发送</Button>}
+          {p.status === "SENT" && <span className="text-muted-foreground">已发送</span>}
+        </div>
+      ) : <span className="text-muted-foreground">-</span>,
+    },
   ];
 
   const referralCols: Column<Referral>[] = [
@@ -348,7 +535,7 @@ function MarketingInner() {
           search={keyword}
           onSearch={(v) => { setKeyword(v); setPage(1); }}
           searchPlaceholder="搜索券名称"
-          onAdd={canEditCoupon ? () => setCouponForm({ type: "CUT", status: "ACTIVE", value: 5, threshold: 0, stock: 1000, issued: 0 }) : undefined}
+          onAdd={canEditCoupon ? () => setCouponForm({ type: "CUT", status: "ACTIVE", value: 5, threshold: 0, stock: 1000, issued: 0, expireAt: "" }) : undefined}
           addLabel="新增优惠券"
           onExport={onExportOf<Coupon>("优惠券", [
             { header: "券号", value: (c) => c.couponNo },
@@ -356,13 +543,32 @@ function MarketingInner() {
             { header: "类型", value: (c) => (c.type === "CUT" ? "立减" : "折扣") },
             { header: "面额", value: (c) => couponAmount(c) },
             { header: "门槛", value: (c) => (c.threshold ? `满 ${money(c.threshold)}` : "无") },
-            { header: "已发/库存", value: (c) => `${c.issued}/${c.stock}` },
-            { header: "状态", value: (c) => (c.status === "ACTIVE" ? "进行中" : "暂停") },
+            { header: "已发/总量", value: (c) => `${c.issued}/${c.stock}` },
+            { header: "剩余", value: (c) => couponRemaining(c) },
+            { header: "有效期止", value: (c) => fmtTime(c.expireAt) },
+            { header: "状态", value: (c) => (c.status === "ACTIVE" ? "进行中" : "已下线") },
             ...archivedCsv<Coupon>(),
           ])}
         >
           <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); setPage(1); }} />
         </Toolbar>
+      )}
+      {tab === "coupon-issues" && (
+        <Toolbar
+          search={keyword}
+          onSearch={(v) => { setKeyword(v); setPage(1); }}
+          searchPlaceholder="搜索发放号/券号/券名称/人群/操作人"
+          onExport={onExportOf<CouponIssueRecord>("优惠券发放记录", [
+            { header: "发放号", value: (r) => r.issueNo },
+            { header: "券号", value: (r) => r.couponNo },
+            { header: "券名称", value: (r) => r.couponName },
+            { header: "发放对象", value: (r) => AUD_TYPE_LABEL[r.targetType] },
+            { header: "人群口径", value: (r) => r.targetDesc },
+            { header: "张数", value: (r) => r.quantity },
+            { header: "操作人", value: (r) => r.operatorName },
+            { header: "发放时间", value: (r) => fmtTime(r.createdAt) },
+          ])}
+        />
       )}
       {tab === "campaigns" && (
         <Toolbar
@@ -387,16 +593,19 @@ function MarketingInner() {
           search={keyword}
           onSearch={(v) => { setKeyword(v); setPage(1); }}
           searchPlaceholder="搜索推送号/标题/受众"
-          onAdd={canEditPush ? () => setPushForm({ channel: "APP_PUSH", status: "DRAFT", audience: "全部用户", sentCount: 0 }) : undefined}
+          onAdd={canEditPush ? () => setPushForm({ title: "", content: "", channel: "APP_PUSH", audienceKey: "ALL:" }) : undefined}
           addLabel="新增推送"
           onExport={onExportOf<PushMessage>("推送触达", [
             { header: "推送号", value: (p) => p.pushNo },
             { header: "标题", value: (p) => p.title },
-            { header: "渠道", value: (p) => (p.channel === "APP_PUSH" ? "App 推送" : "订阅消息") },
-            { header: "受众", value: (p) => p.audience },
-            { header: "触达数", value: (p) => Math.round(p.sentCount) },
-            { header: "状态", value: (p) => (p.status === "SENT" ? "已发送" : "草稿") },
-            { header: "发送时间", value: (p) => (p.status === "SENT" ? fmtTime(p.sentAt) : "-") },
+            { header: "正文", value: (p) => p.content },
+            { header: "渠道", value: (p) => PUSH_CHANNEL_LABEL[p.channel] },
+            { header: "目标人群", value: (p) => p.audience },
+            { header: "目标人数", value: (p) => p.targetCount },
+            { header: "成功人数", value: (p) => p.successCount },
+            { header: "状态", value: (p) => PUSH_STATUS[p.status].label },
+            { header: "发送时间", value: (p) => (p.status === "SENT" ? fmtTime(p.sentAt) : p.status === "SCHEDULED" ? fmtTime(p.scheduledAt ?? "") : "-") },
+            { header: "幂等键", value: (p) => p.idempotencyKey ?? "-" },
           ])}
         />
       )}
@@ -467,6 +676,7 @@ function MarketingInner() {
       )}
       {tab === "notices" && <DataTable rowKey={(n: Notice) => n.noticeNo} columns={noticeCols} rows={q.data?.list as Notice[]} loading={q.isLoading} rowClassName={archivedRowClass} empty={showArchived ? "没有匹配的公告——换个关键词，或点「新增公告」发布第一条 C 端公告条。" : "暂无在用公告——可能都已归档（打开「显示已归档」查看），或点「新增公告」发布第一条。"} />}
       {tab === "coupons" && <DataTable rowKey={(c: Coupon) => c.couponNo} columns={couponCols} rows={q.data?.list as Coupon[]} loading={q.isLoading} rowClassName={archivedRowClass} empty={showArchived ? "没有匹配的优惠券——换个关键词，或点「新增优惠券」建一张。" : "暂无在用优惠券——可能都已归档（打开「显示已归档」查看），或点「新增优惠券」建第一张。"} />}
+      {tab === "coupon-issues" && <DataTable rowKey={(r: CouponIssueRecord) => r.issueNo} columns={issueCols} rows={q.data?.list as CouponIssueRecord[]} loading={q.isLoading} empty="暂无发放记录——到「优惠券」tab 选一张在用的券点「发放」，这里会逐笔留痕。" />}
       {tab === "campaigns" && <DataTable rowKey={(c: Campaign) => c.campaignNo} columns={campaignCols} rows={q.data?.list as Campaign[]} loading={q.isLoading} empty="暂无营销活动——点「新增活动」配置满减 / 拉新 / 签到规则。" />}
       {tab === "push" && <DataTable rowKey={(p: PushMessage) => p.pushNo} columns={pushCols} rows={q.data?.list as PushMessage[]} loading={q.isLoading} empty="暂无推送任务——点「新增推送」创建一条 App 推送或订阅消息。" />}
       {tab === "referral" && <DataTable rowKey={(r: Referral) => r.inviteNo} columns={referralCols} rows={q.data?.list as Referral[]} loading={q.isLoading} empty="暂无邀请记录——用户在 C 端发起邀请后自动生成，无需在此手工录入。" />}
@@ -518,14 +728,127 @@ function MarketingInner() {
         open={!!pushForm}
         onOpenChange={(o) => !o && setPushForm(null)}
         titleNew="新增推送"
-        titleEdit={`编辑推送 ${pushForm?.pushNo ?? ""}`}
+        titleEdit={`编辑推送草稿 ${pushForm?.pushNo ?? ""}`}
         isEdit={!!pushForm?.pushNo}
-        fields={PUSH_FIELDS}
+        fields={pushFields(segments)}
         value={(pushForm ?? {}) as Record<string, unknown>}
-        onChange={(v) => setPushForm(v as Partial<PushMessage>)}
-        onSubmit={() => pushForm && savePush.mutate(pushForm)}
+        onChange={(v) => setPushForm(v as Partial<PushMessage> & { audienceKey?: string })}
+        onSubmit={() => {
+          if (!pushForm) return;
+          // 只提交草稿字段：audienceKey 拆回 audienceType/audienceValue，状态由发送动作推进
+          const { audienceKey, ...rest } = pushForm;
+          savePush.mutate({ ...rest, ...parseAudKey(audienceKey ?? "ALL:") });
+        }}
         submitting={savePush.isPending}
       />
+
+      {/* S2 发放优惠券抽屉：人群 + 张数；提交前再走 useConfirm（批量权益动作 = 发钱） */}
+      <Drawer
+        open={!!issueFor}
+        onOpenChange={(o) => !o && setIssueFor(null)}
+        title={issueFor ? `发放优惠券 ${issueFor.couponNo}` : ""}
+        desc="发放只增「已发放」，剩余随之减少；已下线 / 已过期 / 无剩余的券发不出去"
+        footer={
+          issueFor && (
+            <Button disabled={issueCoupon.isPending || !issueQtyOk || !issueTargetOk} onClick={submitIssue}>
+              下一步：确认发放
+            </Button>
+          )
+        }
+      >
+        {issueFor && (
+          <>
+            <Field label="券">{issueFor.name} · {couponAmount(issueFor)}{issueFor.threshold ? ` · 满 ${money(issueFor.threshold)}` : ""}</Field>
+            <Field label="库存">
+              发行总量 {issueFor.stock} · 已发放 {issueFor.issued} · <span className="font-medium">剩余 {couponRemaining(issueFor)}</span>
+            </Field>
+            <Field label="有效期止">{fmtTime(issueFor.expireAt)}</Field>
+            <Field label="发放对象（必选）">
+              <Select
+                className="w-full"
+                value={issueType}
+                onChange={(e) => { setIssueType(e.target.value as AudienceType); setIssueValue(""); }}
+              >
+                {(Object.keys(AUD_TYPE_LABEL) as AudienceType[]).map((k) => (
+                  <option key={k} value={k}>{AUD_TYPE_LABEL[k]}</option>
+                ))}
+              </Select>
+            </Field>
+            {issueType === "MEMBER_LEVEL" && (
+              <Field label="会员等级（必选）">
+                <Select className="w-full" value={issueValue} onChange={(e) => setIssueValue(e.target.value)}>
+                  <option value="">请选择</option>
+                  {MEMBER_LEVEL_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </Select>
+              </Field>
+            )}
+            {issueType === "SEGMENT" && (
+              <Field label="消费者分层（必选）">
+                <Select className="w-full" value={issueValue} onChange={(e) => setIssueValue(e.target.value)}>
+                  <option value="">请选择</option>
+                  {segments.map((s) => <option key={s.segmentNo} value={s.segmentNo}>{s.segment}（{s.userCount} 人）</option>)}
+                </Select>
+              </Field>
+            )}
+            {issueType === "USER_LIST" && (
+              <Field label="用户号列表（必填，逗号分隔）">
+                <Input value={issueValue} placeholder="U3000,U3001,U3002" onChange={(e) => setIssueValue(e.target.value)} />
+              </Field>
+            )}
+            <Field label={`发放张数（必填，≤ 剩余 ${couponRemaining(issueFor)}）`}>
+              <Input type="number" min="1" step="1" value={issueQty} onChange={(e) => setIssueQty(e.target.value)} />
+            </Field>
+            {!issueQtyOk && issueQty !== "" && (
+              <div className="rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">
+                张数须为正整数且不超过剩余库存 {couponRemaining(issueFor)}——超发等于凭空印券。
+              </div>
+            )}
+          </>
+        )}
+      </Drawer>
+
+      {/* S2 发送推送抽屉：立即 / 定时；幂等键随抽屉生成，重复提交由服务端拒绝 */}
+      <Drawer
+        open={!!sendFor}
+        onOpenChange={(o) => !o && setSendFor(null)}
+        title={sendFor ? `发送推送 ${sendFor.pushNo}` : ""}
+        desc="状态机：草稿 →（定时）已排期 → 发送中 → 已发送；已发送是终态，不可重发"
+        footer={
+          sendFor && (
+            <Button
+              disabled={sendPush.isPending || (sendWhen === "SCHEDULED" && !sendAt)}
+              onClick={submitSend}
+            >{sendWhen === "NOW" ? "下一步：确认发送" : "下一步：确认排期"}</Button>
+          )
+        }
+      >
+        {sendFor && (
+          <>
+            <Field label="标题">{sendFor.title}</Field>
+            <Field label="正文">{sendFor.content || <span className="text-muted-foreground">（空——发送前请先补内容）</span>}</Field>
+            <Field label="渠道"><Badge tone="outline">{PUSH_CHANNEL_LABEL[sendFor.channel]}</Badge></Field>
+            <Field label="目标人群">{sendFor.audience}</Field>
+            <Field label="当前状态"><Badge tone={PUSH_STATUS[sendFor.status].tone}>{PUSH_STATUS[sendFor.status].label}</Badge></Field>
+            <Field label="发送时机">
+              <Select className="w-full" value={sendWhen} onChange={(e) => setSendWhen(e.target.value as "NOW" | "SCHEDULED")}>
+                <option value="NOW">立即发送</option>
+                <option value="SCHEDULED">定时发送</option>
+              </Select>
+            </Field>
+            {sendWhen === "SCHEDULED" && (
+              <Field label="发送时间（必填）">
+                <Input type="datetime-local" value={sendAt} onChange={(e) => setSendAt(e.target.value)} />
+              </Field>
+            )}
+            <Field label="幂等键">
+              <span className="text-muted-foreground tabular-nums">{sendKey}</span>
+            </Field>
+            <div className="rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">
+              本次提交携带上面这把幂等键，重复提交（双击 / 重试）服务端会直接拒绝——触达重复提交等于把消息真发两遍。
+            </div>
+          </>
+        )}
+      </Drawer>
 
       <FormDrawer
         open={!!slotForm}

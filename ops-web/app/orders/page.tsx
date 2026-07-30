@@ -19,9 +19,9 @@ import { useCan } from "@/lib/use-can";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
 import { exportCsv } from "@/lib/export-csv";
-import { ORDER_INTERVENTIONS, interveneActions, depositActions } from "@/lib/types";
+import { ORDER_INTERVENTIONS, interveneActions, depositActions, exceptionHandleActions, EXCEPTION_HANDLINGS } from "@/lib/types";
 import type {
-  RentOrder, OrderException, DepositRecord,
+  RentOrder, OrderException, OrderExceptionStatus, ExceptionHandleAction, DepositRecord,
   OrderComplaint, RefundRecord, ComplaintIssueType, ComplaintResolution,
   OrderInterventionAction, DepositAction, DunChannel,
   Reservation, FreeOrder, WhitelistReason,
@@ -133,6 +133,22 @@ const EXC_TYPE_LABEL: Record<OrderException["type"], string> = {
   DOUBLE_CHARGE: "重复扣款",
 };
 
+// —— 异常订单处置（S2：原先只有只读列表，order:exception:handle 定义了没人用）——
+const EXC_STATUS: Record<OrderExceptionStatus, { label: string; tone: "warning" | "default" | "success" }> = {
+  PENDING: { label: "待处置", tone: "warning" },
+  HANDLING: { label: "处置中", tone: "default" },
+  HANDLED: { label: "已处置", tone: "success" },
+};
+const EXC_ACTION_LABEL: Record<ExceptionHandleAction, string> = {
+  work_order: "转工单", refund: "发起退款", close: "直接关闭",
+};
+/** 每种处置到底会发生什么 —— 抽屉里写清楚，避免「点了不知道改了什么」。 */
+const EXC_ACTION_DESC: Record<ExceptionHandleAction, string> = {
+  work_order: "按异常类型开一条工单派给运维（设备类→故障单，计费类→投诉单），异常单转「处置中」，工单闭环后再回来关闭",
+  refund: "落一条待审批的退款申请进「退款记录」，异常单转「处置中」；审批通过才真正出款",
+  close: "无需下游动作，直接按结论结案：异常单转「已处置」（终态，不可再处置）",
+};
+
 function OrdersInner() {
   const sp = useSearchParams();
   const qTab = sp.get("tab");
@@ -184,11 +200,32 @@ function OrdersInner() {
   // —— 异常订单 tab 状态 ——
   const [excPage, setExcPage] = useState(1);
   const [excKeyword, setExcKeyword] = useState("");
+  const [excStatus, setExcStatus] = useState("");
   const excQ = useQuery({
-    queryKey: ["order-exceptions", excPage, excKeyword],
-    queryFn: () => api.listOrderExceptions({ page: excPage, size: SIZE, keyword: excKeyword }),
+    queryKey: ["order-exceptions", excPage, excKeyword, excStatus],
+    queryFn: () => api.listOrderExceptions({ page: excPage, size: SIZE, keyword: excKeyword, status: excStatus || undefined }),
     placeholderData: keepPreviousData,
     enabled: tab === "exceptions",
+  });
+  const canHandleExc = allow("order:exception:handle");
+  // 处置抽屉：三种方式共用一张表单，处置结论一律必填
+  const [excAct, setExcAct] = useState<{ row: OrderException; action: ExceptionHandleAction } | null>(null);
+  const [excResult, setExcResult] = useState("");
+  const handleExc = useMutation({
+    mutationFn: (v: { no: string; action: ExceptionHandleAction; result: string }) =>
+      api.handleOrderException(v.no, v.action, { result: v.result }),
+    onSuccess: (r, v) => {
+      notify.success(
+        v.action === "work_order" ? `已转工单 ${r.workOrderNo}`
+          : v.action === "refund" ? `已发起退款申请 ${r.refundNo}（待审批）`
+            : `异常单 ${r.orderNo} 已关闭`,
+      );
+      qc.invalidateQueries({ queryKey: ["order-exceptions"] });
+      // 转工单会真的落一条工单、发起退款会落一条退款申请，两处列表同步刷新
+      if (v.action === "work_order") qc.invalidateQueries({ queryKey: ["workorders"] });
+      if (v.action === "refund") qc.invalidateQueries({ queryKey: ["refunds"] });
+      setExcAct(null);
+    },
   });
 
   // —— 投诉订单 tab 状态（B1）——
@@ -494,8 +531,55 @@ function OrdersInner() {
     { header: "柜机", cell: (e) => e.cabinetNo },
     { header: "用户", cell: (e) => <span className="text-muted-foreground">{e.userNo}</span> },
     { header: "涉及金额", cell: (e) => <span className="tabular-nums">{money(e.amount, e.currency)}</span> },
-    { header: "状态", cell: (e) => <Badge tone={e.status === "HANDLED" ? "success" : "warning"}>{e.status === "HANDLED" ? "已处理" : "待处理"}</Badge> },
+    { header: "状态", cell: (e) => <Badge tone={EXC_STATUS[e.status].tone}>{EXC_STATUS[e.status].label}</Badge> },
     { header: "发生时间", cell: (e) => <span className="text-muted-foreground">{fmtTime(e.createdAt)}</span> },
+    // 处置留痕上列表：不用点进去就知道谁在什么时候按什么方式处置过、下游单号是多少
+    {
+      header: "处置留痕",
+      cell: (e) => e.handledAt
+        ? (
+          <div className="text-xs text-muted-foreground">
+            <div>{e.handleAction ? EXC_ACTION_LABEL[e.handleAction] : "-"} · {e.handledBy} · {fmtTime(e.handledAt)}</div>
+            <div className="text-foreground">{e.handleResult}</div>
+          </div>
+        )
+        : <span className="text-muted-foreground">未处置</span>,
+    },
+    {
+      header: "下游单据",
+      cell: (e) => (e.workOrderNo || e.refundNo)
+        ? (
+          <div className="flex flex-col gap-0.5 text-xs tabular-nums">
+            {e.workOrderNo && <span>工单 {e.workOrderNo}</span>}
+            {e.refundNo && <span>退款 {e.refundNo}</span>}
+          </div>
+        )
+        : <span className="text-muted-foreground">-</span>,
+    },
+    {
+      header: "操作",
+      // 可执行动作由状态机决定：HANDLED 是终态，不再出按钮；已转过的工单/已发起的退款也不重复出
+      cell: (e) => {
+        if (!canHandleExc) return <span className="text-muted-foreground">-</span>;
+        const acts = exceptionHandleActions(e.status)
+          .filter((a) => !(a === "work_order" && e.workOrderNo) && !(a === "refund" && e.refundNo));
+        return acts.length
+          ? (
+            <div className="flex gap-1.5">
+              {acts.map((a) => (
+                <Button
+                  key={a}
+                  size="sm"
+                  variant={a === "close" ? "outline" : "default"}
+                  disabled={handleExc.isPending}
+                  onClick={() => { setExcAct({ row: e, action: a }); setExcResult(""); }}
+                >{EXC_ACTION_LABEL[a]}</Button>
+              ))}
+            </div>
+          )
+          : <span className="text-muted-foreground">-</span>;
+      },
+    },
   ];
 
   return (
@@ -642,7 +726,7 @@ function OrdersInner() {
           <Toolbar
             search={excKeyword}
             onSearch={(v) => { setExcKeyword(v); setExcPage(1); }}
-            searchPlaceholder="搜索订单号 / 柜机 / 用户"
+            searchPlaceholder="搜索订单号 / 柜机 / 用户 / 工单号 / 退款号"
             onExport={() => exportCsv<OrderException>("异常订单", [
               { header: "订单号", value: (e) => e.orderNo },
               { header: "异常类型", value: (e) => EXC_TYPE_LABEL[e.type] },
@@ -650,10 +734,24 @@ function OrdersInner() {
               { header: "用户", value: (e) => e.userNo },
               { header: "涉及金额", value: (e) => e.amount },
               { header: "币种", value: (e) => e.currency },
-              { header: "状态", value: (e) => (e.status === "HANDLED" ? "已处理" : "待处理") },
+              { header: "状态", value: (e) => EXC_STATUS[e.status].label },
               { header: "发生时间", value: (e) => e.createdAt },
+              { header: "处置方式", value: (e) => (e.handleAction ? EXC_ACTION_LABEL[e.handleAction] : "") },
+              { header: "处置结论", value: (e) => e.handleResult },
+              { header: "处置人", value: (e) => e.handledBy },
+              { header: "处置时间", value: (e) => e.handledAt },
+              { header: "关联工单", value: (e) => e.workOrderNo },
+              { header: "关联退款", value: (e) => e.refundNo },
             ], excQ.data?.list ?? [])}
-          />
+          >
+            <Select value={excStatus} onChange={(e) => { setExcStatus(e.target.value); setExcPage(1); }}>
+              <option value="">全部状态</option>
+              <option value="PENDING">待处置</option>
+              <option value="HANDLING">处置中</option>
+              <option value="HANDLED">已处置</option>
+            </Select>
+          </Toolbar>
+          {!canHandleExc && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无异常订单处置权限（order:exception:handle）</div>}
           <DataTable
             rowKey={(e: OrderException) => e.orderNo}
             columns={excCols}
@@ -1073,6 +1171,63 @@ function OrdersInner() {
                 </Field>
               </>
             )}
+          </>
+        )}
+      </Drawer>
+
+      {/* 异常单处置抽屉：转工单 / 发起退款 / 直接关闭共用；处置结论必填，关闭是终态故走二次确认 */}
+      <Drawer
+        open={!!excAct}
+        onOpenChange={(o) => !o && setExcAct(null)}
+        title={excAct ? `${EXC_ACTION_LABEL[excAct.action]} · 异常单 ${excAct.row.orderNo}` : ""}
+        desc="处置按状态机执行：转工单/发起退款转「处置中」，直接关闭是终态；结论随异常单永久留痕"
+        footer={
+          excAct && (
+            <Button
+              variant={excAct.action === "close" ? "destructive" : "default"}
+              disabled={handleExc.isPending || !excResult.trim()}
+              onClick={async () => {
+                if (excAct.action === "close") {
+                  const ok = await confirm({
+                    title: `关闭异常单 ${excAct.row.orderNo}`,
+                    desc: "「已处置」是终态：关闭后该异常单不能再转工单、发起退款或重新打开。",
+                    danger: true,
+                    confirmText: "确认关闭",
+                    cancelText: "再想想",
+                  });
+                  if (!ok) return;
+                }
+                handleExc.mutate({ no: excAct.row.orderNo, action: excAct.action, result: excResult });
+              }}
+            >{excAct.action === "close" ? "下一步：确认关闭" : `确认${EXC_ACTION_LABEL[excAct.action]}`}</Button>
+          )
+        }
+      >
+        {excAct && (
+          <>
+            <Field label="异常单 / 用户">{excAct.row.orderNo} · {excAct.row.userNo}</Field>
+            <Field label="异常类型"><Badge tone="outline">{EXC_TYPE_LABEL[excAct.row.type]}</Badge></Field>
+            <Field label="柜机 / 涉及金额">{excAct.row.cabinetNo} · {money(excAct.row.amount, excAct.row.currency)}</Field>
+            <Field label="当前状态"><Badge tone={EXC_STATUS[excAct.row.status].tone}>{EXC_STATUS[excAct.row.status].label}</Badge></Field>
+            <Field label="处置口径">{EXC_ACTION_DESC[excAct.action]}</Field>
+            <Field label="状态变化">
+              {EXC_STATUS[excAct.row.status].label} → {EXC_STATUS[EXCEPTION_HANDLINGS[excAct.action].to].label}
+            </Field>
+            {(excAct.row.workOrderNo || excAct.row.refundNo) && (
+              <Field label="已有下游单据">
+                {[excAct.row.workOrderNo && `工单 ${excAct.row.workOrderNo}`, excAct.row.refundNo && `退款 ${excAct.row.refundNo}`]
+                  .filter(Boolean).join(" · ")}
+              </Field>
+            )}
+            {excAct.row.handledAt && (
+              <Field label="上次处置">
+                {excAct.row.handleAction ? EXC_ACTION_LABEL[excAct.row.handleAction] : "-"} · {excAct.row.handledBy} · {fmtTime(excAct.row.handledAt)}
+                <div className="text-sm">{excAct.row.handleResult}</div>
+              </Field>
+            )}
+            <Field label="处置结论（必填）">
+              <Input value={excResult} placeholder="写清查明的原因与处置理由，将随异常单永久留痕" onChange={(e) => setExcResult(e.target.value)} />
+            </Field>
           </>
         )}
       </Drawer>

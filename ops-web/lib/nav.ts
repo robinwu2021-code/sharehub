@@ -221,7 +221,7 @@ export const NAV: NavDomain[] = [
           { href: "/finance?tab=summary", label: "分润统计", perm: "finance:share_record:read", phase: 2, group: "分润与结算" },
           { href: "/finance?tab=settlements", label: "结算单", perm: "finance:settlement:read", group: "分润与结算" },
           { href: "/finance?tab=ledger", label: "账务分录", perm: "finance:ledger:read", phase: 2, group: "平台账" },
-          { href: "/finance?tab=reconcile", label: "对账", perm: "finance:reconcile:read", phase: 3, group: "平台账" },
+          { href: "/finance?tab=reconcile", label: "对账", perm: "finance:recon:read", phase: 3, group: "平台账" },
           { href: "/finance?tab=invoices", label: "发票", perm: "finance:invoice:read", phase: 3, group: "平台账" },
           // 跨域深链（导航审查 #4）：FINANCE 岗管场地方分润在本模块、代理分润在 /agents，
           // 此处回链避免跨域跳转找不到入口；面包屑按 URL 归属「渠道与场地」。

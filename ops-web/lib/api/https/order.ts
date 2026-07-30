@@ -12,7 +12,8 @@ export const orderHttp: OrderApi = {
   listOrderInterventions: (q?: PageQ & { orderNo?: string; action?: string }) => client.get("/api/trade/order-interventions", q),
 
   // 订单扩展
-  listOrderExceptions: (q?: PageQ) => client.get("/api/trade/order-exceptions", q),
+  listOrderExceptions: (q?: StatusQ & { type?: string }) => client.get("/api/trade/order-exceptions", q),
+  handleOrderException: (no, action, payload) => client.post(`/api/trade/order-exceptions/${no}/handle`, { action, ...payload }),
   listDepositRecords: (q?: StatusQ) => client.get("/api/trade/deposits", q),
   releaseDeposit: (no, reason) => client.post(`/api/trade/deposits/${no}/release`, { reason }),
   buyoutDeposit: (no, payload) => client.post(`/api/trade/deposits/${no}/buyout`, payload),

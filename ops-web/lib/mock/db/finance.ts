@@ -5,8 +5,14 @@ import type {
   ShareRule, Settlement, SettlementStatus, SettlementAction, SettlementDraft,
   Withdrawal, LedgerEntry, ShareRecord, Reconcile, Invoice,
   ShareSummary, RechargeOrder, RechargePackage, PageQuery,
+  ReconHandleStatus, ReconHandleResult, ReconAction, ReconStats,
+  InvoiceStatus, InvoiceAction,
 } from "../../types";
-import { STL_TRANSITIONS, canSettlementTransition } from "../../types";
+import {
+  STL_TRANSITIONS, canSettlementTransition,
+  RECON_TRANSITIONS, canReconTransition, RECON_TERMINAL,
+  INV_TRANSITIONS, canInvoiceTransition, canEditInvoiceFields,
+} from "../../types";
 import { VENUE_NAMES, p, iso } from "./internal";
 import { paginate, kwHit, upsert, nextNo, liveHit, archiveRow, unarchiveRow } from "./helpers";
 import { agents } from "./agent";
@@ -112,20 +118,56 @@ export const ledger: LedgerEntry[] = Array.from({ length: 60 }, (_, i) => {
 });
 
 // —— 对账 / 发票 ——（分润明细 shareRecords 在上方与结算单同源定义）
+// 差错处置的种子分布：每 3 期出一次差错、正负交替（+ = 渠道多/账务少记，− = 账务多记），
+// 处置进度覆盖 待处理 / 处理中 / 已结案 三档，页面一进来就能看到四种动作各自的去向。
+const RECON_SEEDED: Record<Exclude<ReconHandleStatus, "OPEN">, { result: ReconHandleResult; note: string }> = {
+  HANDLING: { result: "CHANNEL_ERROR", note: "已向 nearpay 提交差错工单 NP-2026-0417，挂起等待渠道回执" },
+  RESOLVED: { result: "COMPENSATED", note: "按差额发起补差单 ADJ-2026-0033，平台侧已补记账并复核平账" },
+  IGNORED: { result: "VERIFIED_OK", note: "逐笔核对无误：差额来自跨日切分，次日批次已自动冲平" },
+};
 export const reconciles: Reconcile[] = Array.from({ length: 12 }, (_, i) => {
   const nearpay = 30000 + (i * 3137) % 50000;
-  const diff = i % 4 === 0 ? (i % 2 === 0 ? 1 : -1) * (12 + (i * 3) % 80) : 0;
+  const diff = i % 3 === 0 ? (i % 2 === 0 ? 1 : -1) * (12 + (i * 7) % 90) : 0;
+  const handleStatus: ReconHandleStatus | null =
+    diff === 0 ? null : p(["OPEN", "OPEN", "HANDLING", "RESOLVED"] as const, i);
+  const seeded = handleStatus && handleStatus !== "OPEN" ? RECON_SEEDED[handleStatus] : null;
   return {
     batchNo: `RC${2026000 + i}`, period: `2026-${String((i % 12) + 1).padStart(2, "0")}`,
     nearpayTotal: nearpay, ledgerTotal: nearpay - diff, diff, currency: "AED",
     status: diff === 0 ? "MATCHED" : "DIFF", createdAt: iso(i * 86400_000),
+    handleStatus,
+    handleResult: seeded?.result ?? null,
+    handleNote: seeded?.note ?? null,
+    handledBy: seeded ? p(["Sara Ahmed", "Omar Khan", "admin"], i) : null,
+    handledAt: seeded ? iso(i * 86400_000 - 10800_000) : null,
   };
 });
-export const invoices: Invoice[] = Array.from({ length: 18 }, (_, i) => ({
-  invoiceNo: `INV${2026000 + i}`, payeeName: p(PAYEE_NAMES, i),
-  amount: Number((500 + (i * 337) % 8000).toFixed(2)), vatTrn: `100${String(1000000000000 + i * 137).slice(0, 12)}`,
-  currency: "AED", status: p(["DRAFT", "ISSUED", "ISSUED", "VOID"] as const, i), issuedAt: iso(i * 172800_000),
-}));
+
+// 发票：**金额不自造**，一律挂在一张结算单上（sourceNo），金额/抬头/币种取自该结算单——
+// 「已开具发票 8000、对应结算单 620」这种数是骗财务的，开具时还会再校验一次（issueInvoice）。
+const INVOICE_VOID_REASONS = ["抬头填错，需重开", "客户取消开票需求", "税号有误，重新登记后再开"];
+/** 发票代码：税区 + 年度批次，10 位（同一年份同一批，开具时按当年生成）。 */
+const invoiceCodeOfYear = (year: number) => `04${year}0001`;
+/** 发票号码：8 位流水，落库时取现有最大值 +1（不用 length，避免删改后撞号）。 */
+const INVOICE_NUMBER_BASE = 20260000;
+export const invoices: Invoice[] = Array.from({ length: 18 }, (_, i) => {
+  const src = settlements[(i * 3) % settlements.length];
+  const status = p(["DRAFT", "ISSUED", "ISSUED", "VOID"] as const, i);
+  const issued = status !== "DRAFT";
+  const issuedAt = issued ? iso(i * 172800_000) : null;
+  return {
+    invoiceNo: `INV${2026000 + i}`, payeeName: src.payeeName,
+    amount: src.totalAmount, vatTrn: `100${String(1000000000000 + i * 137).slice(0, 12)}`,
+    currency: src.currency, status,
+    sourceType: "SETTLEMENT" as const, sourceNo: src.settleNo,
+    invoiceCode: issued ? invoiceCodeOfYear(2026) : null,
+    invoiceNumber: issued ? String(INVOICE_NUMBER_BASE + i) : null,
+    issuedAt, issuedBy: issued ? p(["Sara Ahmed", "Omar Khan", "admin"], i) : null,
+    voidedAt: status === "VOID" ? iso(i * 172800_000 - 86400_000) : null,
+    voidedBy: status === "VOID" ? p(["Sara Ahmed", "admin"], i) : null,
+    voidReason: status === "VOID" ? p(INVOICE_VOID_REASONS, i) : null,
+  };
+});
 
 export type ShareRecordQuery = PageQuery & { dimension?: string; payeeNo?: string; period?: string };
 export const listShareRecords = (q: ShareRecordQuery = {}) =>
@@ -134,11 +176,199 @@ export const listShareRecords = (q: ShareRecordQuery = {}) =>
     (!q.dimension || x.dimension === q.dimension) &&
     (!q.payeeNo || x.payeeNo === q.payeeNo) &&
     (!q.period || x.period === q.period));
-export const listReconciles = (q: PageQuery = {}) => paginate(reconciles, q.page, q.size, (x) => kwHit(q.keyword, x.batchNo, x.period));
-export const listInvoices = (q: PageQuery = {}) => paginate(invoices, q.page, q.size, (x) => kwHit(q.keyword, x.invoiceNo, x.payeeName, x.vatTrn));
+export type ReconQuery = PageQuery & { status?: string; handleStatus?: string };
+export const listReconciles = (q: ReconQuery = {}) =>
+  paginate(reconciles, q.page, q.size, (x) =>
+    // 搜索域随可见列一起扩：处理人/处理结论也要能搜（规格 §17.1-9）
+    kwHit(q.keyword, x.batchNo, x.period, x.handledBy, x.handleNote) &&
+    (!q.status || x.status === q.status) &&
+    (!q.handleStatus || x.handleStatus === q.handleStatus));
+
+export type InvoiceQuery = PageQuery & { status?: string };
+export const listInvoices = (q: InvoiceQuery = {}) =>
+  paginate(invoices, q.page, q.size, (x) =>
+    kwHit(q.keyword, x.invoiceNo, x.payeeName, x.vatTrn, x.sourceNo, x.invoiceCode, x.invoiceNumber) &&
+    (!q.status || x.status === q.status));
 
 export const saveShareRule = (x: Partial<ShareRule>) => upsert(shareRules, x, "ruleNo", () => nextNo("SR", shareRules));
-export const saveInvoice = (x: Partial<Invoice>) => upsert(invoices, x, "invoiceNo", () => nextNo("INV", invoices));
+
+// ————————————————————————————————————————————————————————————————
+// 对账差错处理（S2）：OPEN → HANDLING → RESOLVED / IGNORED
+// 状态机定义在 lib/types/finance.ts（页面按钮与本层校验共用同一份），本层**强制执行**。
+// 汇总（getReconStats）与列表同源于 `reconciles` 数组，所以处理完一笔，未结笔数/金额当场变。
+// ————————————————————————————————————————————————————————————————
+
+/** 对账差错处置违规（已平账 / 非法迁移 / 结论未填）。 */
+export class ReconError extends Error {
+  constructor(msg: string) { super(msg); this.name = "ReconError"; }
+}
+
+const RECON_STATUS_LABEL: Record<ReconHandleStatus, string> = {
+  OPEN: "待处理", HANDLING: "处理中", RESOLVED: "已结案", IGNORED: "已忽略",
+};
+
+const findRecon = (batchNo: string) => {
+  const r = reconciles.find((x) => x.batchNo === batchNo);
+  if (!r) throw new ReconError(`对账批次 ${batchNo} 不存在`);
+  return r;
+};
+
+/**
+ * 差错处置。四道闸门：
+ *  ① 批次必须真有差错（已平批次没有可处置对象）；② 动作必须是四个已声明动作之一；
+ *  ③ 状态机允许（终态不可再动）；④ **结论必填**——差错处置是钱的定责，没结论等于没处理。
+ */
+export function handleRecon(
+  batchNo: string, action: ReconAction, handleNote?: string, operatorName?: string,
+): Reconcile {
+  const r = findRecon(batchNo);
+  if (r.status !== "DIFF" || r.handleStatus === null) {
+    throw new ReconError(`对账批次 ${batchNo} 跑批结果为已平账，没有差错可处理`);
+  }
+  const tr = RECON_TRANSITIONS[action];
+  if (!tr) throw new ReconError(`未知的差错处理动作：${action}`);
+  if (!canReconTransition(r.handleStatus, action)) {
+    throw new ReconError(
+      `差错 ${batchNo} 当前「${RECON_STATUS_LABEL[r.handleStatus]}」不允许执行「${tr.label}」`
+      + (RECON_TERMINAL.includes(r.handleStatus) ? "——已结案的差错不可再处置，如需翻案请重新跑批" : ""),
+    );
+  }
+  const note = (handleNote ?? "").trim();
+  if (!note) throw new ReconError("处理结论必填——写清依据（差额构成、凭证号/补差单号、对接人），否则无从复盘");
+
+  Object.assign(r, {
+    handleStatus: tr.to, handleResult: tr.result, handleNote: note,
+    handledBy: operatorName || "admin", handledAt: new Date().toISOString(),
+  });
+  return r;
+}
+
+/** 对账汇总：全量口径、实时重算（不腌数字），所以「差错笔数/差错金额」跟着处置动作当场变。 */
+export function getReconStats(): ReconStats {
+  const diffs = reconciles.filter((x) => x.status === "DIFF" && x.handleStatus !== null);
+  const open = diffs.filter((x) => x.handleStatus === "OPEN");
+  const handling = diffs.filter((x) => x.handleStatus === "HANDLING");
+  const closed = diffs.filter((x) => RECON_TERMINAL.includes(x.handleStatus!));
+  const sumAbs = (rows: Reconcile[]) => Number(rows.reduce((s, x) => s + Math.abs(x.diff), 0).toFixed(2));
+  return {
+    batchCount: reconciles.length,
+    matchedCount: reconciles.filter((x) => x.status === "MATCHED").length,
+    diffCount: open.length + handling.length,
+    diffAmount: sumAbs([...open, ...handling]),
+    openCount: open.length,
+    handlingCount: handling.length,
+    closedCount: closed.length,
+    closedAmount: sumAbs(closed),
+    currency: reconciles[0]?.currency ?? "AED",
+  };
+}
+
+// ————————————————————————————————————————————————————————————————
+// 发票开具 / 作废（S2）：DRAFT → ISSUED → VOID
+// 三条硬规矩：① 开具后抬头/金额锁死（saveInvoice 直接拒）；
+//            ② 开具时金额必须与来源结算单对得上；③ 作废原因必填。
+// ————————————————————————————————————————————————————————————————
+
+/** 发票业务规则违规（非法迁移 / 已开具改数 / 作废未填原因 / 来源单据对不上）。 */
+export class InvoiceError extends Error {
+  constructor(msg: string) { super(msg); this.name = "InvoiceError"; }
+}
+
+const INV_STATUS_LABEL: Record<InvoiceStatus, string> = { DRAFT: "草稿", ISSUED: "已开具", VOID: "已作废" };
+
+const findInvoice = (invoiceNo: string) => {
+  const inv = invoices.find((x) => x.invoiceNo === invoiceNo);
+  if (!inv) throw new InvoiceError(`发票 ${invoiceNo} 不存在`);
+  return inv;
+};
+/** 来源结算单：发票金额的唯一出处。找不到就不许开票（宁可挡住，不许开一张对不上账的票）。 */
+const invoiceSource = (inv: Pick<Invoice, "sourceNo">) => settlements.find((s) => s.settleNo === inv.sourceNo);
+
+/**
+ * 登记 / 编辑发票（草稿态）。开具与作废**不走这里**，只能走 issueInvoice / voidInvoice：
+ * 状态、发票代码号码、开具与作废留痕都是服务端写的，表单送什么都一律丢弃。
+ */
+export function saveInvoice(x: Partial<Invoice>): Invoice {
+  const {
+    status: _st, invoiceCode: _c, invoiceNumber: _n,
+    issuedAt: _ia, issuedBy: _ib, voidedAt: _va, voidedBy: _vb, voidReason: _vr,
+    ...editable
+  } = x;
+  if (editable.invoiceNo) {
+    const cur = findInvoice(editable.invoiceNo);
+    if (!canEditInvoiceFields(cur.status)) {
+      throw new InvoiceError(
+        `发票 ${cur.invoiceNo} 已${INV_STATUS_LABEL[cur.status]}，抬头与金额不可再改`
+        + (cur.status === "ISSUED" ? "——如需更正请先作废原票再重开" : "——已作废的票是历史记录"),
+      );
+    }
+  }
+  const sourceNo = String(editable.sourceNo ?? "").trim();
+  if (!sourceNo) throw new InvoiceError("来源结算单必填——发票金额只能来自已确认的结算单，不凭空开票");
+  const src = invoiceSource({ sourceNo });
+  if (!src) throw new InvoiceError(`来源结算单 ${sourceNo} 不存在`);
+  if (src.status === "DRAFT") throw new InvoiceError(`结算单 ${sourceNo} 尚未确认（待确认），确认后才能开票`);
+
+  return upsert(
+    invoices,
+    {
+      ...editable, sourceNo, sourceType: "SETTLEMENT",
+      // 新增一律落草稿：开具必须是一个显式动作（要生成发票代码/号码并留痕）
+      ...(editable.invoiceNo ? {} : {
+        status: "DRAFT" as const, invoiceCode: null, invoiceNumber: null,
+        issuedAt: null, issuedBy: null, voidedAt: null, voidedBy: null, voidReason: null,
+      }),
+    },
+    "invoiceNo",
+    () => nextNo("INV", invoices, 2026000, "invoiceNo"),
+  );
+}
+
+/** 统一迁移入口：发票所有状态变更都必须走这里，不允许别处直接写 `inv.status = ...`。 */
+function transitionInvoice(inv: Invoice, action: InvoiceAction, patch: Partial<Invoice>): Invoice {
+  if (!canInvoiceTransition(inv.status, action)) {
+    const tr = INV_TRANSITIONS[action];
+    throw new InvoiceError(
+      `发票 ${inv.invoiceNo} 当前「${INV_STATUS_LABEL[inv.status]}」不允许执行「${tr.label}」`
+      + (action === "void" && inv.status === "DRAFT" ? "——草稿尚未进账，直接编辑或归档即可，不必占用作废号" : ""),
+    );
+  }
+  Object.assign(inv, patch, { status: INV_TRANSITIONS[action].to });
+  return inv;
+}
+
+/** 开具：DRAFT → ISSUED，生成发票代码/号码并留痕；金额必须与来源结算单一致。 */
+export function issueInvoice(invoiceNo: string, operatorName?: string): Invoice {
+  const inv = findInvoice(invoiceNo);
+  if (!canInvoiceTransition(inv.status, "issue")) transitionInvoice(inv, "issue", {}); // 复用同一段报错文案
+  const src = invoiceSource(inv);
+  if (!src) throw new InvoiceError(`来源结算单 ${inv.sourceNo} 不存在，无法开具`);
+  if (Math.abs(src.totalAmount - inv.amount) > 0.005) {
+    throw new InvoiceError(
+      `开票金额 ${inv.amount} ${inv.currency} 与来源结算单 ${src.settleNo} 的 ${src.totalAmount} ${src.currency} 对不上，`
+      + "开具前必须先对平——已开具的票金额就锁死了",
+    );
+  }
+  const maxNumber = invoices.reduce((m, x) => Math.max(m, Number(x.invoiceNumber ?? 0)), INVOICE_NUMBER_BASE);
+  const now = new Date();
+  return transitionInvoice(inv, "issue", {
+    invoiceCode: invoiceCodeOfYear(now.getUTCFullYear()),
+    invoiceNumber: String(maxNumber + 1),
+    issuedAt: now.toISOString(),
+    issuedBy: operatorName || "admin",
+  });
+}
+
+/** 作废：ISSUED → VOID，**原因必填**（不可逆，页面另有二次确认）。 */
+export function voidInvoice(invoiceNo: string, voidReason?: string, operatorName?: string): Invoice {
+  const inv = findInvoice(invoiceNo);
+  if (!canInvoiceTransition(inv.status, "void")) transitionInvoice(inv, "void", {});
+  const reason = (voidReason ?? "").trim();
+  if (!reason) throw new InvoiceError("作废原因必填——作废等于账面凭空少一张票，不留原因日后无从解释");
+  return transitionInvoice(inv, "void", {
+    voidedAt: new Date().toISOString(), voidedBy: operatorName || "admin", voidReason: reason,
+  });
+}
 
 /** 提现审批（mock）：通过→PAYING，驳回→FAILED 并记原因；两者都落审批人/审批时间。 */
 export function auditWithdrawal(withdrawNo: string, approve: boolean, rejectReason?: string, auditorName?: string): Withdrawal {

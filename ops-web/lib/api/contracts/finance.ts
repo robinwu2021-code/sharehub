@@ -1,8 +1,8 @@
 // 覆盖范围：分账规则与流水、总账、结算、提现审批、对账、发票、分润统计、充值订单。
-import type { PageQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ } from "../query";
+import type { PageQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ } from "../query";
 import type {
   PageResult, ShareRule, LedgerEntry, Settlement, SettlementDraft, Withdrawal,
-  ShareRecord, Reconcile, Invoice, ShareSummary, RechargeOrder,
+  ShareRecord, Reconcile, ReconAction, ReconStats, Invoice, ShareSummary, RechargeOrder,
 } from "../../types";
 
 export interface FinanceApi {
@@ -26,10 +26,26 @@ export interface FinanceApi {
 
   // === 财务扩展 tab ===
   listShareRecords(q?: ShareRecordQ): Promise<PageResult<ShareRecord>>;
-  listReconciles(q?: PageQ): Promise<PageResult<Reconcile>>;
-  listInvoices(q?: PageQ): Promise<PageResult<Invoice>>;
+  listReconciles(q?: ReconQ): Promise<PageResult<Reconcile>>;
+  listInvoices(q?: InvoiceQ): Promise<PageResult<Invoice>>;
   saveShareRule(x: Partial<ShareRule> & { ruleNo?: string }): Promise<ShareRule>;
+  /** 登记/编辑发票草稿。开具后（ISSUED/VOID）抬头与金额由服务端拒绝修改。 */
   saveInvoice(x: Partial<Invoice> & { invoiceNo?: string }): Promise<Invoice>;
+
+  // === S2 对账差错处理（权限码 finance:recon:handle）===
+  /**
+   * 差错处置：verify=已核对无误 / platform=平台侧 / channel=渠道侧（挂起待回执）/ compensate=发起补差。
+   * `handleNote`（结论）必填；非法状态迁移、已平账批次由服务端拒绝。
+   */
+  handleRecon(batchNo: string, action: ReconAction, handleNote: string, operatorName?: string): Promise<Reconcile>;
+  /** 对账汇总条：未结差错笔数/金额与列表同源，处置一笔当场变（全量口径，不随列表筛选）。 */
+  getReconStats(): Promise<ReconStats>;
+
+  // === S2 发票开具 / 作废（权限码 finance:invoice:issue / finance:invoice:void）===
+  /** 开具：DRAFT → ISSUED，服务端生成发票代码/号码并留痕；金额与来源结算单对不上则拒绝。 */
+  issueInvoice(invoiceNo: string, operatorName?: string): Promise<Invoice>;
+  /** 作废：ISSUED → VOID，`voidReason` 必填（不可逆）。草稿不可作废——改错直接编辑。 */
+  voidInvoice(invoiceNo: string, voidReason: string, operatorName?: string): Promise<Invoice>;
 
   // === 财务域 B5：分润统计 / 充值订单（规格 §5 §6，均为只读）===
   /** 分润统计：dimension 是维度切换器的参数——一张表两种主体，不是两个接口。 */

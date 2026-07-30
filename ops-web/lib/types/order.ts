@@ -103,6 +103,16 @@ export interface OrderInterveneResult {
 }
 
 // —— 订单 · 待建功能补全（trade 域）——
+/**
+ * 异常单状态（S2）。原来只有 `OPEN`/`HANDLED` 两态，把「已转工单/已发起退款、正等下游闭环」
+ * 和「什么都没做」混为一谈，运营看不出哪些单其实已经在处理了，故拆出中间态 HANDLING。
+ *
+ *   PENDING  待处置
+ *   HANDLING 处置中 —— 已转工单或已发起退款，结论未定，仍可继续处置/关闭
+ *   HANDLED  已处置（**终态**，不再出处置按钮）
+ */
+export type OrderExceptionStatus = "PENDING" | "HANDLING" | "HANDLED";
+
 export interface OrderException {
   orderNo: string;
   type: "NOT_EJECTED" | "NOT_RETURNED" | "OVERTIME_BUYOUT" | "DOUBLE_CHARGE";
@@ -110,8 +120,60 @@ export interface OrderException {
   userNo: string;
   amount: number;
   currency: string;
-  status: "OPEN" | "HANDLED";
+  status: OrderExceptionStatus;
   createdAt: string;
+
+  // —— 处置留痕（S2）：谁、什么时候、用哪种方式、结论是什么 ——
+  /** 最近一次处置方式。 */
+  handleAction?: ExceptionHandleAction | null;
+  /** 处置结论/原因（必填，随记录永久留痕）。 */
+  handleResult?: string | null;
+  handledBy?: string | null;
+  handledAt?: string | null;
+  /** 转工单后回填的工单号（引用 workOrders.woNo 真实工单）。 */
+  workOrderNo?: string | null;
+  /** 发起退款后回填的退款申请号（进 /orders?tab=refunds 审批队列）。 */
+  refundNo?: string | null;
+}
+
+/**
+ * 异常单处置方式（三选一）。
+ *
+ *   work_order 转工单   —— 落一条真实工单（设备类异常交运维），异常单转「处置中」
+ *   refund     发起退款 —— 落一条 PENDING 退款申请（走既有审批队列），异常单转「处置中」
+ *   close      直接关闭 —— 无需下游动作，异常单转「已处置」（终态）
+ */
+export type ExceptionHandleAction = "work_order" | "refund" | "close";
+
+/**
+ * 异常单处置状态机 —— **全站唯一定义**（页面按钮、mock 校验、将来后端校验共用一份）。
+ * HANDLED 是终态：已处置的单不再出任何处置按钮，mock 层也会拒绝。
+ * 转工单/发起退款可在 HANDLING 上继续做另一种（如先转工单、后又要退款），但**同一种不可重复**
+ * （已有 workOrderNo/refundNo 时再点会被 mock 层拒绝，避免重复开单、重复退款）。
+ */
+export const EXCEPTION_HANDLINGS: Record<ExceptionHandleAction, { from: readonly OrderExceptionStatus[]; to: OrderExceptionStatus }> = {
+  work_order: { from: ["PENDING", "HANDLING"], to: "HANDLING" },
+  refund: { from: ["PENDING", "HANDLING"], to: "HANDLING" },
+  close: { from: ["PENDING", "HANDLING"], to: "HANDLED" },
+};
+
+/** 该处置在当前异常单状态下是否合法（列表按钮据此渲染，与 mock/后端同一份定义）。 */
+export const canHandleException = (status: OrderExceptionStatus, action: ExceptionHandleAction) =>
+  EXCEPTION_HANDLINGS[action].from.includes(status);
+
+/** 当前状态下可执行的处置动作（终态返回空数组 → 列表不出按钮）。 */
+export const exceptionHandleActions = (status: OrderExceptionStatus): ExceptionHandleAction[] =>
+  (Object.keys(EXCEPTION_HANDLINGS) as ExceptionHandleAction[]).filter((a) => canHandleException(status, a));
+
+/** 处置入参：结论/原因**必填**（无结论的处置事后无从追责，沿用干预/退款审批口径）。 */
+export interface OrderExceptionHandlePayload {
+  result: string;
+  operatorName?: string;
+  /**
+   * 退款申请号。退款记录住在 cs.ts 而 cs.ts 反向依赖订单域，db 层不能反向 import，
+   * 故由 API mock 层先调 `applyRefund` 再把号带进来（与 refund_apply 干预同一套做法）。
+   */
+  refundNo?: string;
 }
 
 // 押金与欠费管理（订单域 · P2）

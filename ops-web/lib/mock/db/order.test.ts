@@ -241,3 +241,162 @@ describe("押金状态机", () => {
     expect(() => releaseDeposit("DEP_NOT_EXIST", "x")).toThrow(/不存在/);
   });
 });
+
+// ————————————————————————————————————————————————————————————————
+// 异常订单处置状态机（S2 的防复发机制）
+//
+// 背景：/orders?tab=exceptions 长期只有一张只读列表 —— 权限码 order:exception:handle
+// 早就定义好了，页面上却没有任何处置动作，「已处理」的单也说不清是谁按什么结论处理的。
+// 本节钉住三件事：
+//   ① 三种处置方式真的改了异常单状态并留痕（handledBy/handledAt/handleResult）
+//   ② 转工单真的落一条工单、发起退款真的挂上退款号，且都不可重复
+//   ③ 处置结论必填；HANDLED 是终态，再处置必须**抛错**
+// ————————————————————————————————————————————————————————————————
+import type { OrderException, OrderExceptionStatus } from "../../types";
+import { EXCEPTION_HANDLINGS, exceptionHandleActions } from "../../types";
+import { orderExceptions, handleOrderException, OrderExceptionError, listOrderExceptions } from "./order";
+import { workOrders } from "./workorder";
+
+/** 造一条指定状态的异常单（直接落数组，绕开状态机——测试夹具允许，业务代码不允许）。 */
+function exception(status: OrderExceptionStatus, patch: Partial<OrderException> = {}): OrderException {
+  const src = orderExceptions[0];
+  const e: OrderException = {
+    ...src,
+    orderNo: `ORD8${String(800 + ++seq)}`,
+    type: "NOT_EJECTED",
+    status,
+    handleAction: null, handleResult: null, handledBy: null, handledAt: null,
+    workOrderNo: null, refundNo: null,
+    ...patch,
+  };
+  orderExceptions.push(e);
+  return e;
+}
+
+const RESULT = "单测：核查后按结论处置";
+
+describe("异常单处置状态机定义", () => {
+  it("三种处置方式齐备，且只有 close 落终态", () => {
+    expect(Object.keys(EXCEPTION_HANDLINGS).sort()).toEqual(["close", "refund", "work_order"]);
+    expect(EXCEPTION_HANDLINGS.close.to).toBe("HANDLED");
+    expect(EXCEPTION_HANDLINGS.work_order.to).toBe("HANDLING");
+    expect(EXCEPTION_HANDLINGS.refund.to).toBe("HANDLING");
+  });
+
+  it("HANDLED 是终态：不出任何处置动作（页面按钮据此不渲染）", () => {
+    expect(exceptionHandleActions("HANDLED")).toEqual([]);
+    expect(exceptionHandleActions("PENDING").sort()).toEqual(["close", "refund", "work_order"]);
+    expect(exceptionHandleActions("HANDLING").sort()).toEqual(["close", "refund", "work_order"]);
+  });
+});
+
+describe("异常单处置真落库", () => {
+  it("直接关闭：PENDING → HANDLED，并记 handledBy/handledAt/handleResult", () => {
+    const e = exception("PENDING");
+    const r = handleOrderException(e.orderNo, "close", { result: RESULT, operatorName: "Sara Ahmed" });
+    expect(r.status).toBe("HANDLED");
+    expect(r.handleAction).toBe("close");
+    expect(r.handleResult).toBe(RESULT);
+    expect(r.handledBy).toBe("Sara Ahmed");
+    expect(r.handledAt).toBeTruthy();
+    // 列表读到的也是改后的状态（不是只改了返回值的副本）
+    expect(listOrderExceptions({ keyword: e.orderNo }).list[0].status).toBe("HANDLED");
+  });
+
+  it("转工单：PENDING → HANDLING，真的落一条工单并回填工单号", () => {
+    const e = exception("PENDING", { type: "NOT_EJECTED" });
+    const before = workOrders.length;
+    const r = handleOrderException(e.orderNo, "work_order", { result: "柜机卡宝，转运维检修" });
+    expect(r.status).toBe("HANDLING");
+    expect(workOrders.length).toBe(before + 1);
+    const wo = workOrders.find((w) => w.woNo === r.workOrderNo);
+    expect(wo).toBeTruthy();
+    expect(wo!.type).toBe("FAULT"); // 设备类异常派运维
+    expect(wo!.sourceNo).toBe(e.orderNo); // 工单能反查回异常单
+    expect(wo!.cabinetNo).toBe(e.cabinetNo);
+    // 处置中的单还能继续处置（等工单闭环后关闭）
+    expect(exceptionHandleActions(r.status)).toContain("close");
+  });
+
+  it("计费类异常转的是投诉单（不是故障单）", () => {
+    const e = exception("PENDING", { type: "DOUBLE_CHARGE" });
+    const r = handleOrderException(e.orderNo, "work_order", { result: "重复扣款，转客服核账" });
+    expect(workOrders.find((w) => w.woNo === r.workOrderNo)!.type).toBe("COMPLAINT");
+  });
+
+  it("发起退款：挂上退款号并转 HANDLING（退款申请由 API 层先落库再回填）", () => {
+    const e = exception("PENDING");
+    const r = handleOrderException(e.orderNo, "refund", { result: "确认重复扣款，退回用户", refundNo: "RFD80999" });
+    expect(r.status).toBe("HANDLING");
+    expect(r.refundNo).toBe("RFD80999");
+  });
+
+  it("先转工单、后发起退款：两个下游单号并存，状态仍是 HANDLING", () => {
+    const e = exception("PENDING");
+    handleOrderException(e.orderNo, "work_order", { result: "先转运维排查" });
+    const r = handleOrderException(e.orderNo, "refund", { result: "排查确认资损，同时退款", refundNo: "RFD80998" });
+    expect(r.status).toBe("HANDLING");
+    expect(r.workOrderNo).toBeTruthy();
+    expect(r.refundNo).toBe("RFD80998");
+  });
+});
+
+describe("异常单非法处置被拒", () => {
+  it("终态不可再处置：已处置的单三种方式全部抛错，且状态不动", () => {
+    const e = exception("HANDLED", { handleResult: "已结案", handledBy: "admin", handledAt: "2026-07-11T12:00:00Z" });
+    expect(() => handleOrderException(e.orderNo, "close", { result: RESULT })).toThrow(OrderExceptionError);
+    expect(() => handleOrderException(e.orderNo, "work_order", { result: RESULT })).toThrow(OrderExceptionError);
+    expect(() => handleOrderException(e.orderNo, "refund", { result: RESULT, refundNo: "RFD1" })).toThrow(OrderExceptionError);
+    expect(e.status).toBe("HANDLED");
+    expect(e.handleResult).toBe("已结案"); // 失败不覆盖既有留痕
+  });
+
+  it("处置结论必填：空白结论一律拒绝，状态与留痕都不动", () => {
+    const e = exception("PENDING");
+    expect(() => handleOrderException(e.orderNo, "close", { result: "  " })).toThrow(/必须填写处置结论/);
+    expect(() => handleOrderException(e.orderNo, "work_order", { result: "" })).toThrow(/必须填写处置结论/);
+    expect(e.status).toBe("PENDING");
+    expect(e.handledAt).toBeNull();
+  });
+
+  it("不可重复转工单 / 重复发起退款（重复开单、重复退款是真实资损）", () => {
+    const e = exception("PENDING");
+    handleOrderException(e.orderNo, "work_order", { result: "转运维" });
+    const woNo = e.workOrderNo;
+    const before = workOrders.length;
+    expect(() => handleOrderException(e.orderNo, "work_order", { result: "再转一次" })).toThrow(/已转工单/);
+    expect(workOrders.length).toBe(before); // 没有多开一张
+    expect(e.workOrderNo).toBe(woNo);
+
+    handleOrderException(e.orderNo, "refund", { result: "退款", refundNo: "RFD80997" });
+    expect(() => handleOrderException(e.orderNo, "refund", { result: "再退一次", refundNo: "RFD80996" })).toThrow(/已发起退款申请/);
+    expect(e.refundNo).toBe("RFD80997");
+  });
+
+  it("退款号缺失被拒（API 层必须先落退款申请再回填）", () => {
+    const e = exception("PENDING");
+    expect(() => handleOrderException(e.orderNo, "refund", { result: "退款" })).toThrow(/退款申请号缺失/);
+    expect(e.status).toBe("PENDING");
+  });
+
+  it("异常单不存在直接抛错", () => {
+    expect(() => handleOrderException("ORD_NOT_EXIST", "close", { result: RESULT })).toThrow(/不存在/);
+  });
+});
+
+describe("异常单种子数据自洽", () => {
+  it("演示数据是走真实入口生成的：已处置/处置中的单必带完整留痕", () => {
+    for (const e of orderExceptions.filter((x) => x.status !== "PENDING")) {
+      expect(e.handleResult, e.orderNo).toBeTruthy();
+      expect(e.handledBy, e.orderNo).toBeTruthy();
+      expect(e.handledAt, e.orderNo).toBeTruthy();
+    }
+  });
+
+  it("待处置的单没有任何处置留痕（不会出现「没处置却有结论」）", () => {
+    for (const e of orderExceptions.filter((x) => x.status === "PENDING")) {
+      expect(e.handledAt ?? null, e.orderNo).toBeNull();
+      expect(e.workOrderNo ?? null, e.orderNo).toBeNull();
+    }
+  });
+});

@@ -23,6 +23,9 @@ export const userMock: UserApi = {
   // 用户风控
   listUserRisks: (q: PageQ = {}) => wait(db.listUserRisks(q)),
   listUserBlacklist: (q: PageQ = {}) => wait(db.listUserBlacklist(q)),
+  // 调分在 db 层真改 cUsers 的分数、联动风控等级/观察名单并落变更留痕（越界抛错）
+  adjustCreditScore: (no, payload) => wait(db.adjustCreditScore(no, payload), 400),
+  listCreditScoreChanges: (q: PageQ & { cUserNo?: string } = {}) => wait(db.listCreditScoreChanges(q)),
 
   // 批次 B4/B5：免费白名单 / 充值套餐
   listFreeWhitelist: (q: WhitelistQ = {}) => wait(db.listFreeWhitelist(q)),

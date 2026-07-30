@@ -5,6 +5,7 @@ import type {
   PageResult, RentOrder, OrderException, DepositRecord,
   OrderComplaint, ComplaintResolution, RefundRecord,
   OrderIntervention, OrderInterventionAction, OrderIntervenePayload, OrderInterveneResult,
+  ExceptionHandleAction, OrderExceptionHandlePayload,
   DepositBuyoutPayload, ArrearsDunPayload,
   Reservation, FreeOrder, FreeOrderStats,
 } from "../../types";
@@ -22,7 +23,13 @@ export interface OrderApi {
   listOrderInterventions(q?: PageQ & { orderNo?: string; action?: string }): Promise<PageResult<OrderIntervention>>;
 
   // === 订单扩展 tab ===
-  listOrderExceptions(q?: PageQ): Promise<PageResult<OrderException>>;
+  listOrderExceptions(q?: StatusQ & { type?: string }): Promise<PageResult<OrderException>>;
+  /**
+   * 异常单处置（order:exception:handle）：转工单 / 发起退款 / 直接关闭，三选一。
+   * **处置结论必填**，合法性按 EXCEPTION_HANDLINGS 状态机校验（HANDLED 是终态）；
+   * 转工单会落一条真实工单、发起退款会落一条 PENDING 退款申请，号回填到异常单上。
+   */
+  handleOrderException(orderNo: string, action: ExceptionHandleAction, payload: OrderExceptionHandlePayload): Promise<OrderException>;
   listDepositRecords(q?: StatusQ): Promise<PageResult<DepositRecord>>;
   /** 押金解冻（order:order:update）：HELD → RELEASED，原因必填。 */
   releaseDeposit(depositNo: string, reason: string): Promise<DepositRecord>;

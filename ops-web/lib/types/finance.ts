@@ -92,25 +92,126 @@ export interface ShareRecord {
   period: string;
   createdAt: string;
 }
+// —— 对账 · 差错处理（trade 域 · S2）——
+// `status` 是**比对结果**（跑批算出来的，人改不了）；`handleStatus` 是**处置进度**（人推动的）。
+// 两者必须分开：把「已核对无误」写回 status=MATCHED 会篡改跑批事实，日后无从审计。
+/** 差错处置进度：OPEN=待处理 → HANDLING=处理中（挂起等外部回执）→ RESOLVED/IGNORED（终态）。 */
+export type ReconHandleStatus = "OPEN" | "HANDLING" | "RESOLVED" | "IGNORED";
+/** 处置动作（= 页面上的四个按钮，也是 mock/后端校验的入口参数）。 */
+export type ReconAction = "verify" | "platform" | "channel" | "compensate";
+/** 处置结论分类：终态/中间态都要留下「判成了哪一类差错」，否则复盘时只剩一段自由文本。 */
+export type ReconHandleResult = "VERIFIED_OK" | "PLATFORM_ERROR" | "CHANNEL_ERROR" | "COMPENSATED";
+
 export interface Reconcile {
   batchNo: string;
   period: string;
   nearpayTotal: number;
   ledgerTotal: number;
+  /** 差额 = nearpayTotal − ledgerTotal。>0 渠道多、账务少记；<0 账务多记、渠道少到账。 */
   diff: number;
   currency: string;
+  /** 跑批比对结果（只读事实，不因人工处置而变）。 */
   status: "MATCHED" | "DIFF";
   createdAt: string;
+  /** 处置进度；已平批次为 null（无差错可处理）。 */
+  handleStatus: ReconHandleStatus | null;
+  handleResult: ReconHandleResult | null;
+  /** 处理结论（必填）：写清依据——金额、凭证号、对接人。 */
+  handleNote: string | null;
+  handledBy: string | null;
+  handledAt: string | null;
 }
+
+/**
+ * 对账差错状态机（SSOT）：页面按钮可用性与 mock/后端校验共用同一份，
+ * 与结算单 `STL_TRANSITIONS`、工单 `WO_TRANSITIONS` 同一套写法。
+ *
+ * 四个动作覆盖现实里差错的四种去向，都必须落到 `result` 上：
+ * 核对无误 → 忽略结案；平台/渠道定责 → 转处理中（各自等内部补记账 / 外部回执）；补差 → 结案。
+ */
+export const RECON_TRANSITIONS: Record<ReconAction, {
+  from: ReconHandleStatus[]; to: ReconHandleStatus; result: ReconHandleResult; label: string; hint: string;
+}> = {
+  verify: {
+    from: ["OPEN", "HANDLING"], to: "IGNORED", result: "VERIFIED_OK",
+    label: "已核对无误（忽略）", hint: "逐笔核对后确认账实相符（如跨日切分次日自动冲平），差错结案不追款",
+  },
+  platform: {
+    from: ["OPEN"], to: "HANDLING", result: "PLATFORM_ERROR",
+    label: "标记为平台侧差错", hint: "定责平台记账错漏，转处理中等待补记账凭证，补完再发起补差或核对结案",
+  },
+  channel: {
+    from: ["OPEN"], to: "HANDLING", result: "CHANNEL_ERROR",
+    label: "标记为渠道侧差错（挂起待渠道回执）", hint: "定责支付渠道，已提差错工单，挂起等 nearpay 回执，回执到后再结案",
+  },
+  compensate: {
+    from: ["OPEN", "HANDLING"], to: "RESOLVED", result: "COMPENSATED",
+    label: "发起补差", hint: "按差额发起补差并结案——真金白银找平，结论里必须写清补差单号与金额",
+  },
+};
+export const canReconTransition = (from: ReconHandleStatus, action: ReconAction) =>
+  RECON_TRANSITIONS[action].from.includes(from);
+/** 终态：不再出处理按钮。 */
+export const RECON_TERMINAL: ReconHandleStatus[] = ["RESOLVED", "IGNORED"];
+
+/**
+ * 对账汇总条。**全量口径**（不随列表筛选变），但**随处理动作实时重算**——
+ * 处理一笔差错，未结笔数/金额当场下降，与列表同源于 `reconciles` 数组。
+ */
+export interface ReconStats {
+  batchCount: number; // 批次总数
+  matchedCount: number; // 已平批次
+  /** 未结差错笔数 = OPEN + HANDLING（页面上「差错笔数」就是它）。 */
+  diffCount: number;
+  /** 未结差错金额 = 未结案差错的 Σ|diff|（正负差错都是要找平的钱，取绝对值）。 */
+  diffAmount: number;
+  openCount: number;
+  handlingCount: number;
+  /** 已结案 = RESOLVED + IGNORED。 */
+  closedCount: number;
+  closedAmount: number;
+  currency: string;
+}
+
+// —— 发票 · 开具 / 作废（trade 域 · S2）——
+export type InvoiceStatus = "DRAFT" | "ISSUED" | "VOID";
+export type InvoiceAction = "issue" | "void";
+
 export interface Invoice {
   invoiceNo: string;
   payeeName: string;
   amount: number;
   vatTrn: string;
   currency: string;
-  status: "DRAFT" | "ISSUED" | "VOID";
-  issuedAt: string;
+  status: InvoiceStatus;
+  /** 来源单据类型：当前只对**已确认的结算单**开票（开具时校验金额必须一致）。 */
+  sourceType: "SETTLEMENT";
+  /** 来源单号（Settlement.settleNo）——发票金额的出处，详情里可核对。 */
+  sourceNo: string;
+  /** 税局发票代码 / 号码：开具时生成，草稿为空。 */
+  invoiceCode: string | null;
+  invoiceNumber: string | null;
+  /** 草稿未开具 → null（原类型是 string 但草稿行里塞了个假时间，页面只好靠 status 遮住）。 */
+  issuedAt: string | null;
+  issuedBy: string | null;
+  voidedAt: string | null;
+  voidedBy: string | null;
+  /** 作废原因（必填）：作废比开具更危险，不留原因等于账面凭空少一张票。 */
+  voidReason: string | null;
 }
+
+/**
+ * 发票状态机（SSOT）：DRAFT → ISSUED → VOID。
+ * 作废**只能从 ISSUED 走**——草稿还没进账，改错直接编辑即可，不该占用一个作废号。
+ */
+export const INV_TRANSITIONS: Record<InvoiceAction, { from: InvoiceStatus[]; to: InvoiceStatus; label: string }> = {
+  issue: { from: ["DRAFT"], to: "ISSUED", label: "开具" },
+  void: { from: ["ISSUED"], to: "VOID", label: "作废" },
+};
+export const canInvoiceTransition = (from: InvoiceStatus, action: InvoiceAction) =>
+  INV_TRANSITIONS[action].from.includes(from);
+/** 抬头/金额是否还能改：只有草稿能改，开具后金额已进税务口径，作废后是历史。 */
+export const canEditInvoiceFields = (status: InvoiceStatus) => status === "DRAFT";
 
 // —— 分润统计（财务域 · 阶段 2，对标简电云「佣金统计」）——
 // 竞品把佣金统计按「运营商 / 商户」切成两套菜单两张表；我们做**一张表 + 顶部维度切换器**，

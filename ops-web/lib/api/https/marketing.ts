@@ -2,11 +2,15 @@
 // 端点前缀：多数在 /api/user/**（营销与 C 端用户同库），广告位在 /api/ops/**，公告在 /api/ops/marketing/**（沿用现状）。
 import { client } from "../http-client";
 import type { MarketingApi } from "../contracts/marketing";
-import type { PageQ, ArchiveQ } from "../query";
+import type { PageQ, ArchiveQ, CouponIssueQ } from "../query";
 
 export const marketingHttp: MarketingApi = {
   listCoupons: (q?: ArchiveQ) => client.get("/api/user/coupons", q),
   saveCoupon: (c) => client.post(c.couponNo ? `/api/user/coupons/${c.couponNo}` : "/api/user/coupons", c),
+
+  // S2 发放：REST 上是券的子动作（不是新建资源），故 POST 到 /{couponNo}/issue
+  issueCoupon: (no, x) => client.post(`/api/user/coupons/${no}/issue`, x),
+  listCouponIssueRecords: (q?: CouponIssueQ) => client.get("/api/user/coupon-issue-records", q),
 
   // 营销扩展
   listCampaigns: (q?: PageQ) => client.get("/api/user/campaigns", q),
@@ -17,6 +21,8 @@ export const marketingHttp: MarketingApi = {
   listAdDeliveries: (q?: PageQ) => client.get("/api/user/ad-deliveries", q),
   saveCampaign: (x) => client.post(x.campaignNo ? `/api/user/campaigns/${x.campaignNo}` : "/api/user/campaigns", x),
   savePushMessage: (x) => client.post(x.pushNo ? `/api/user/push-messages/${x.pushNo}` : "/api/user/push-messages", x),
+  // 幂等键随 body 走（同 order 域退款），后端按 (pushNo, idempotencyKey) 去重
+  sendPushMessage: (no, x) => client.post(`/api/user/push-messages/${no}/send`, x),
   saveAdSlot: (x) => client.post(x.slotNo ? `/api/ops/ad-slots/${x.slotNo}` : "/api/ops/ad-slots", x),
   saveAdCampaign: (x) => client.post(x.adNo ? `/api/user/ad-campaigns/${x.adNo}` : "/api/user/ad-campaigns", x),
 

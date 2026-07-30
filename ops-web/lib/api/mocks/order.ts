@@ -23,7 +23,17 @@ export const orderMock: OrderApi = {
   listOrderInterventions: (q: PageQ = {}) => wait(db.listOrderInterventions(q)),
 
   // 订单扩展
-  listOrderExceptions: (q: PageQ = {}) => wait(db.listOrderExceptions(q)),
+  listOrderExceptions: (q: StatusQ & { type?: string } = {}) => wait(db.listOrderExceptions(q)),
+  // 「发起退款」不是终态动作：先落一条 PENDING 退款申请（进 /orders?tab=refunds 审批队列），
+  // 再把退款号带进异常单 —— 退款记录住在 cs.ts，db 层不能反向 import，故在此组合
+  //（与订单干预的 refund_apply 同一套做法）。转工单/直接关闭 db 层自己就能完成。
+  handleOrderException: (no, action, payload) => {
+    if (action === "refund") {
+      const r = db.applyRefund(no, payload.result?.trim() || "异常订单处置退款");
+      return wait(db.handleOrderException(no, action, { ...payload, refundNo: r.refundNo }), 400);
+    }
+    return wait(db.handleOrderException(no, action, payload), 400);
+  },
   listDepositRecords: (q: StatusQ = {}) => wait(db.listDepositRecords(q)),
   releaseDeposit: (no, reason) => wait(db.releaseDeposit(no, reason), 400),
   buyoutDeposit: (no, payload) => wait(db.buyoutDeposit(no, payload), 400),

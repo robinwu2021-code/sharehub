@@ -1,4 +1,4 @@
-// 契约一致性单测：211 个方法靠人眼查不出漏实现，这里用集合运算兜住。
+// 契约一致性单测：221 个方法靠人眼查不出漏实现，这里用集合运算兜住。
 //
 // 三条防线：
 // ① mockApi 与 httpApi 方法名集合完全相同 —— 防某一侧漏实现（页面切到真实后端才炸）。
@@ -18,11 +18,11 @@ const API_METHODS: Record<string, readonly string[]> = {
   workorder: ["listWorkOrders", "createWorkOrder", "dispatchWorkOrder", "acceptWorkOrder", "processWorkOrder", "completeWorkOrder", "closeWorkOrder", "rejectWorkOrder", "reworkWorkOrder", "listSlaRules", "listInspectionPlans", "saveSlaRule", "saveInspectionPlan"],
   location: ["listSites", "saveSite", "listLocations", "savePoint", "listVenues", "listContracts", "listLeads", "listSiteAnalysis", "saveLead", "saveVenue", "saveContract", "listVenueOnboardings", "saveVenueOnboarding", "listSiteLifecycles", "archiveSite", "unarchiveSite", "archivePoint", "unarchivePoint", "archiveVenue", "unarchiveVenue"],
   agent: ["listAgents", "saveAgent", "listAgentAssignments", "listAgentPerformance", "listAgentAccounts", "saveAgentAccount", "listAssignableAssets", "assignAgentAssets", "reclaimAgentAssets", "listAgentAssignmentRecords", "listAgentCommissions", "saveAgentCommission", "archiveAgent", "unarchiveAgent"],
-  order: ["listOrders", "getOrder", "interveneOrder", "listOrderInterventions", "listOrderExceptions", "listDepositRecords", "releaseDeposit", "buyoutDeposit", "dunArrears", "listOrderComplaints", "handleOrderComplaint", "raiseComplaintWorkOrder", "listRefundRecords", "auditRefund", "listReservations", "cancelReservation", "listFreeOrders", "getFreeOrderStats"],
+  order: ["listOrders", "getOrder", "interveneOrder", "listOrderInterventions", "listOrderExceptions", "handleOrderException", "listDepositRecords", "releaseDeposit", "buyoutDeposit", "dunArrears", "listOrderComplaints", "handleOrderComplaint", "raiseComplaintWorkOrder", "listRefundRecords", "auditRefund", "listReservations", "cancelReservation", "listFreeOrders", "getFreeOrderStats"],
   pricing: ["listPricePlans", "listPricingDiffs", "listPricingSchedules", "savePricePlan", "savePricingDiff", "savePricingSchedule", "archivePricePlan", "unarchivePricePlan"],
-  finance: ["listShareRules", "listLedger", "listSettlements", "listWithdrawals", "auditWithdrawal", "generateSettlements", "confirmSettlement", "listSettlementRecords", "listShareRecords", "listReconciles", "listInvoices", "saveShareRule", "saveInvoice", "listShareSummaries", "listRechargeOrders"],
-  user: ["listUsers", "setBlacklist", "listMembers", "listWallets", "saveMember", "saveWallet", "listConsumerSegments", "listUserRisks", "listUserBlacklist", "listFreeWhitelist", "saveFreeWhitelist", "revokeFreeWhitelist", "listRechargePackages", "saveRechargePackage", "archiveRechargePackage", "unarchiveRechargePackage"],
-  marketing: ["listCoupons", "saveCoupon", "listCampaigns", "listPushMessages", "listReferrals", "listAdSlots", "listAdCampaigns", "listAdDeliveries", "saveCampaign", "savePushMessage", "saveAdSlot", "saveAdCampaign", "listNotices", "saveNotice", "archiveCoupon", "unarchiveCoupon", "archiveNotice", "unarchiveNotice"],
+  finance: ["listShareRules", "listLedger", "listSettlements", "listWithdrawals", "auditWithdrawal", "generateSettlements", "confirmSettlement", "listSettlementRecords", "listShareRecords", "listReconciles", "listInvoices", "saveShareRule", "saveInvoice", "listShareSummaries", "listRechargeOrders", "handleRecon", "getReconStats", "issueInvoice", "voidInvoice"],
+  user: ["listUsers", "setBlacklist", "listMembers", "listWallets", "saveMember", "saveWallet", "listConsumerSegments", "listUserRisks", "listUserBlacklist", "adjustCreditScore", "listCreditScoreChanges", "listFreeWhitelist", "saveFreeWhitelist", "revokeFreeWhitelist", "listRechargePackages", "saveRechargePackage", "archiveRechargePackage", "unarchiveRechargePackage"],
+  marketing: ["listCoupons", "saveCoupon", "issueCoupon", "listCouponIssueRecords", "sendPushMessage", "listCampaigns", "listPushMessages", "listReferrals", "listAdSlots", "listAdCampaigns", "listAdDeliveries", "saveCampaign", "savePushMessage", "saveAdSlot", "saveAdCampaign", "listNotices", "saveNotice", "archiveCoupon", "unarchiveCoupon", "archiveNotice", "unarchiveNotice"],
   cs: ["listCsTickets", "listCsSessions", "saveCsTicket"],
   report: ["listReportDevice", "listReportLocation", "listReportFinance", "listReportScreen", "listReportCustom"],
   org: ["listEmployees", "listRoles", "listAudits", "listDepartments", "listStaffPerformance", "saveDepartment", "saveRoleRow", "saveEmployee", "saveRoleDataScope", "archiveRole", "unarchiveRole"],
@@ -80,7 +80,7 @@ describe("域切片划分", () => {
     expect(sorted(keysOf((HTTP_SLICES as Record<string, object>)[domain]))).toEqual(expected);
   });
 
-  it("方法总数仍为 211（新增/删除 API 时须自觉更新此数）", () => {
-    expect(ALL_METHODS.length).toBe(211);
+  it("方法总数仍为 221（新增/删除 API 时须自觉更新此数）", () => {
+    expect(ALL_METHODS.length).toBe(221);
   });
 });

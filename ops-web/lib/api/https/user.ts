@@ -19,6 +19,9 @@ export const userHttp: UserApi = {
   // 用户风控
   listUserRisks: (q?: PageQ) => client.get("/api/user/risk-users", q),
   listUserBlacklist: (q?: PageQ) => client.get("/api/user/blacklist", q),
+  // 调分是「对用户信用分的一次带留痕的变更」，故建在用户资源下；变更流水单列一个只读集合
+  adjustCreditScore: (no, payload) => client.post(`/api/user/users/${no}/credit-score`, payload),
+  listCreditScoreChanges: (q?: PageQ & { cUserNo?: string }) => client.get("/api/user/credit-score-changes", q),
 
   // 批次 B4/B5：白名单与充值套餐归 user 域
   listFreeWhitelist: (q?: WhitelistQ) => client.get("/api/user/free-whitelist", q),

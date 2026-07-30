@@ -1,13 +1,17 @@
 // 覆盖范围：优惠券、活动、推送、裂变推荐、广告位 / 广告计划 / 投放、公告管理。
 import * as db from "../../mock/db";
 import type { MarketingApi } from "../contracts/marketing";
-import type { PageQ, ArchiveQ } from "../query";
+import type { PageQ, ArchiveQ, CouponIssueQ } from "../query";
 import { wait } from "./_wait";
 
 export const marketingMock: MarketingApi = {
   listCoupons: (q: ArchiveQ = {}) =>
-    wait(db.paginate(db.coupons, q.page, q.size, (c) => db.liveHit(c, q.showArchived) && db.kwHit(q.keyword, c.name))),
+    wait(db.paginate(db.coupons, q.page, q.size, (c) => db.liveHit(c, q.showArchived) && db.kwHit(q.keyword, c.couponNo, c.name))),
   saveCoupon: (c) => wait(db.saveCoupon(c), 350),
+
+  // S2 发放：库存/状态/有效期校验全在 db 层，错误由全局 MutationCache 弹出
+  issueCoupon: (no, x) => wait(db.issueCoupon(no, x), 350),
+  listCouponIssueRecords: (q: CouponIssueQ = {}) => wait(db.listCouponIssueRecords(q)),
 
   // 营销扩展
   listCampaigns: (q: PageQ = {}) => wait(db.listCampaigns(q)),
@@ -18,6 +22,7 @@ export const marketingMock: MarketingApi = {
   listAdDeliveries: (q: PageQ = {}) => wait(db.listAdDeliveries(q)),
   saveCampaign: (x) => wait(db.saveCampaign(x), 350),
   savePushMessage: (x) => wait(db.savePushMessage(x), 350),
+  sendPushMessage: (no, x) => wait(db.sendPushMessage(no, x), 350),
   saveAdSlot: (x) => wait(db.saveAdSlot(x), 350),
   saveAdCampaign: (x) => wait(db.saveAdCampaign(x), 350),
 

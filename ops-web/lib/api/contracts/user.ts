@@ -4,6 +4,7 @@ import type { PageQ, WhitelistQ, PackageQ } from "../query";
 import type {
   PageResult, CUser, Member, Wallet, UserRisk, UserBlacklist,
   ConsumerSegment, FreeUserWhitelist, RechargePackage,
+  CreditScoreChange, CreditScoreAdjustPayload, CreditScoreAdjustResult,
 } from "../../types";
 
 export interface UserApi {
@@ -20,6 +21,14 @@ export interface UserApi {
   // === 用户风控 ===
   listUserRisks(q?: PageQ): Promise<PageResult<UserRisk>>;
   listUserBlacklist(q?: PageQ): Promise<PageResult<UserBlacklist>>;
+  /**
+   * 调整信用分（user:risk:update）：`delta` 有正负（加分/减分），**原因必填**，
+   * 调整后分数须落在 CREDIT_SCORE_MIN~MAX 内（越界后端/mock 一律拒绝，不静默截断）。
+   * 返回落库后的用户 + 联动后的风控记录 + 刚写入的变更留痕。
+   */
+  adjustCreditScore(cUserNo: string, payload: CreditScoreAdjustPayload): Promise<CreditScoreAdjustResult>;
+  /** 信用分变更留痕（审计）：用户/风控抽屉的时间线按 `cUserNo` 精确过滤。 */
+  listCreditScoreChanges(q?: PageQ & { cUserNo?: string }): Promise<PageResult<CreditScoreChange>>;
 
   // === 批次 B4/B5：免费白名单 / 充值套餐（规格 §7 §8）===
   listFreeWhitelist(q?: WhitelistQ): Promise<PageResult<FreeUserWhitelist>>;

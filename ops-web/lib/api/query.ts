@@ -51,6 +51,10 @@ export type ShareSummaryQ = PageQ & {
   sortKey?: string; // shareAmount / pendingAmount / gmv / orderCount
   sortDir?: string; // asc / desc
 };
+/** 对账：跑批结果（MATCHED/DIFF）+ 差错处置进度（OPEN/HANDLING/RESOLVED/IGNORED）双筛。 */
+export type ReconQ = PageQ & { status?: string; handleStatus?: string };
+/** 发票：状态筛选（DRAFT/ISSUED/VOID）。 */
+export type InvoiceQ = PageQ & { status?: string };
 /** 充值订单：状态 + 日期范围。 */
 export type RechargeQ = PageQ & { status?: string; from?: string; to?: string };
 /** 免费订单：按减免原因筛选。 */
@@ -67,5 +71,7 @@ export type NotifyBlacklistQ = PageQ & { channel?: string; reason?: string };
 export type AppVersionQ = PageQ & { platform?: string };
 /** 银行字典：国家 + 币种。 */
 export type BankQ = PageQ & { country?: string; currency?: string; showArchived?: boolean };
+/** 优惠券发放记录：按券号 / 发放对象类型筛（S2 发放留痕的审计流水）。 */
+export type CouponIssueQ = PageQ & { couponNo?: string; targetType?: string };
 /** 常见问题：分类 + 上下架状态。 */
 export type ProblemQ = PageQ & { category?: string; status?: string; showArchived?: boolean };

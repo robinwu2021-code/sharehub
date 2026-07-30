@@ -6,7 +6,8 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tansta
 import { api } from "@/lib/api";
 import { Pagination } from "@/components/ui/misc";
 import { TabHeader } from "@/components/ui/tab-header";
-import { Select } from "@/components/ui/input";
+import { Input, Select } from "@/components/ui/input";
+import { Drawer, Field } from "@/components/ui/drawer";
 import { Toolbar } from "@/components/ui/toolbar";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
 import { Progress } from "@/components/ui/progress";
@@ -23,6 +24,7 @@ import { useCan } from "@/lib/use-can";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
 import { exportCsv } from "@/lib/export-csv";
+import { CREDIT_SCORE_MIN, CREDIT_SCORE_MAX, RISK_MEDIUM_BELOW, riskLevelOf } from "@/lib/types";
 import type {
   CUser, Member, Wallet, UserRisk, UserBlacklist,
   FreeUserWhitelist, RechargePackage, WhitelistReason,
@@ -183,6 +185,38 @@ function UsersInner() {
     placeholderData: keepPreviousData,
     enabled: tab === "risk",
   });
+
+  // —— 信用分调整（S2：权限码 user:risk:update 早已定义，风控页却没有调分动作）——
+  // 抽屉里同时展示该用户的调分历史：金额/分值类操作没有留痕就等于没做。
+  // 权限码核实过：SSOT《功能权限清单》§用户域「风控/黑名单 改」= user:risk:update（与拉黑同码）
+  const canAdjustCredit = allow("user:risk:update");
+  const [creditRow, setCreditRow] = useState<UserRisk | null>(null);
+  const [creditDir, setCreditDir] = useState<"add" | "sub">("sub");
+  const [creditValue, setCreditValue] = useState("");
+  const [creditReason, setCreditReason] = useState("");
+  const creditDelta = creditDir === "add" ? Number(creditValue || 0) : -Number(creditValue || 0);
+  const creditAfter = (creditRow?.creditScore ?? 0) + creditDelta;
+  const creditValid = Number.isInteger(Number(creditValue)) && Number(creditValue) > 0
+    && creditAfter >= CREDIT_SCORE_MIN && creditAfter <= CREDIT_SCORE_MAX && !!creditReason.trim();
+  const creditHistory = useQuery({
+    queryKey: ["credit-score-changes", creditRow?.userNo],
+    queryFn: () => api.listCreditScoreChanges({ cUserNo: creditRow!.userNo, size: 50 }),
+    enabled: !!creditRow,
+  });
+  const adjustCredit = useMutation({
+    mutationFn: (v: { no: string; delta: number; reason: string }) =>
+      api.adjustCreditScore(v.no, { delta: v.delta, reason: v.reason }),
+    onSuccess: (r) => {
+      notify.success(`信用分 ${r.change.before} → ${r.change.after}（${r.change.delta > 0 ? "+" : ""}${r.change.delta}）· ${r.change.changeNo}`);
+      qc.invalidateQueries({ queryKey: ["user-risks"] });
+      qc.invalidateQueries({ queryKey: ["users"] });
+      qc.invalidateQueries({ queryKey: ["credit-score-changes"] });
+      // 抽屉不关：就地显示调整后的分数/等级与新增的一条留痕，便于连续调整
+      if (r.risk) setCreditRow(r.risk);
+      setCreditValue("");
+      setCreditReason("");
+    },
+  });
   const blacklisted = useQuery({
     queryKey: ["user-blacklist", page, keyword],
     queryFn: () => api.listUserBlacklist({ page, size: SIZE, keyword }),
@@ -333,6 +367,19 @@ function UsersInner() {
     { header: "风险等级", cell: (r) => <Badge tone={RISK_LEVEL[r.riskLevel].tone}>{RISK_LEVEL[r.riskLevel].label}</Badge> },
     { header: "原因", cell: (r) => <span className="text-muted-foreground">{r.reason}</span> },
     { header: "标记时间", cell: (r) => <span className="text-muted-foreground">{fmtTime(r.flaggedAt)}</span> },
+    {
+      header: "操作",
+      cell: (r) => canAdjustCredit
+        ? (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={adjustCredit.isPending}
+            onClick={() => { setCreditRow(r); setCreditDir("sub"); setCreditValue(""); setCreditReason(""); }}
+          >调整信用分</Button>
+        )
+        : <span className="text-muted-foreground">-</span>,
+    },
   ];
   const blacklistCols: Column<UserBlacklist>[] = [
     { header: "黑名单号", cell: (b) => <span className="font-medium">{b.blacklistNo}</span> },
@@ -517,6 +564,7 @@ function UsersInner() {
               { header: "标记时间", value: (r) => fmtTime(r.flaggedAt) },
             ], risks.data?.list ?? [])}
           />
+          {!canAdjustCredit && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无用户风控权限（user:risk:update），不能调整信用分</div>}
           <DataTable rowKey={(r: UserRisk) => r.riskNo} columns={riskCols} rows={risks.data?.list} loading={risks.isLoading}
             empty="暂无风控用户——没有用户触发风控规则，或风控规则尚未配置（系统设置 · 业务规则）" />
         </>
@@ -704,6 +752,84 @@ function UsersInner() {
         onSubmit={() => pkgForm && savePkg.mutate(pkgForm)}
         submitting={savePkg.isPending}
       />
+
+      {/* 调分抽屉：加分/减分 + 分值 + 原因必填；上下限在此先拦一道，mock/后端仍会兜底拒绝 */}
+      <Drawer
+        open={!!creditRow}
+        onOpenChange={(o) => !o && setCreditRow(null)}
+        title={creditRow ? `调整信用分 · ${creditRow.userNo} ${creditRow.nickname}` : ""}
+        desc={`信用分范围 ${CREDIT_SCORE_MIN}~${CREDIT_SCORE_MAX}；调整后按阈值重算风险等级，每次调整永久留痕`}
+        footer={
+          creditRow && (
+            <Button
+              variant={creditDir === "sub" ? "destructive" : "default"}
+              disabled={adjustCredit.isPending || !creditValid}
+              onClick={() => adjustCredit.mutate({ no: creditRow.userNo, delta: creditDelta, reason: creditReason })}
+            >确认{creditDir === "add" ? "加分" : "减分"}</Button>
+          )
+        }
+      >
+        {creditRow && (
+          <>
+            <Field label="用户 / 手机">{creditRow.userNo} · {creditRow.phone}</Field>
+            <Field label="当前信用分 / 风险等级">
+              <span className="tabular-nums">{creditRow.creditScore}</span>
+              {" · "}
+              <Badge tone={RISK_LEVEL[creditRow.riskLevel].tone}>{RISK_LEVEL[creditRow.riskLevel].label}</Badge>
+            </Field>
+            <Field label="调整方向">
+              <Select className="w-full" value={creditDir} onChange={(e) => setCreditDir(e.target.value as "add" | "sub")}>
+                <option value="sub">减分（违规/风险行为）</option>
+                <option value="add">加分（申诉成立/良好履约）</option>
+              </Select>
+            </Field>
+            <Field label={`调整分值（正整数，${CREDIT_SCORE_MIN}~${CREDIT_SCORE_MAX} 之内）`}>
+              <Input type="number" min="1" step="1" value={creditValue} placeholder="如 20" onChange={(e) => setCreditValue(e.target.value)} />
+            </Field>
+            <Field label="调整后">
+              {creditValue
+                ? (
+                  <span>
+                    <span className="tabular-nums">{creditRow.creditScore} → {creditAfter}</span>
+                    {" · "}
+                    <Badge tone={RISK_LEVEL[riskLevelOf(creditAfter)].tone}>{RISK_LEVEL[riskLevelOf(creditAfter)].label}</Badge>
+                    {(creditAfter < CREDIT_SCORE_MIN || creditAfter > CREDIT_SCORE_MAX) && (
+                      <span className="ml-2 text-[var(--destructive)]">超出 {CREDIT_SCORE_MIN}~{CREDIT_SCORE_MAX}，无法提交</span>
+                    )}
+                  </span>
+                )
+                : <span className="text-muted-foreground">填写分值后显示</span>}
+            </Field>
+            <Field label="联动口径">
+              分数低于 {RISK_MEDIUM_BELOW} 且该用户尚不在风控名单时，会自动补一条风控记录（进观察名单）；
+              分数回升不会自动移出名单，只把等级降为「低风险」——名单是审计痕迹，移出需人工操作。
+            </Field>
+            <Field label="调整原因（必填）">
+              <Input value={creditReason} placeholder="写清为什么调分，将随变更记录永久留痕" onChange={(e) => setCreditReason(e.target.value)} />
+            </Field>
+            <Field label="调分历史">
+              {creditHistory.isLoading
+                ? <span className="text-muted-foreground">加载中…</span>
+                : creditHistory.data?.list.length
+                  ? (
+                    <ol className="space-y-2.5">
+                      {creditHistory.data.list.map((x) => (
+                        <li key={x.changeNo} className="border-l-2 border-[var(--border)] pl-3">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <Badge tone={x.delta > 0 ? "success" : "danger"}>{x.delta > 0 ? `+${x.delta}` : x.delta}</Badge>
+                            <span className="text-xs text-muted-foreground tabular-nums">{x.changeNo} · {fmtTime(x.createdAt)} · {x.operatorName}</span>
+                          </div>
+                          <div className="text-xs text-muted-foreground tabular-nums">{x.before} → {x.after}</div>
+                          <div className="text-sm">{x.reason}</div>
+                        </li>
+                      ))}
+                    </ol>
+                  )
+                  : <span className="text-muted-foreground">无调分记录——该用户的信用分未被人工调整过</span>}
+            </Field>
+          </>
+        )}
+      </Drawer>
 
       {dialog}
     </div>

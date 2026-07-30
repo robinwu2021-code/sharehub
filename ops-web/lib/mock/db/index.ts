@@ -56,6 +56,8 @@ export {
   // S1：订单干预（状态机 + 审计记录）与押金处置
   orderInterventions, interveneOrder, listOrderInterventions, OrderInterventionError,
   transitionDeposit, releaseDeposit, buyoutDeposit, dunArrears, DepositTransitionError,
+  // S2：异常订单处置（转工单 / 发起退款 / 直接关闭）
+  handleOrderException, OrderExceptionError,
 } from "./order";
 
 export {
@@ -75,14 +77,19 @@ export {
   // S1 结算单：生成 / 确认 / 构成明细
   listSettlements, generateSettlements, confirmSettlement, transitionSettlement,
   listSettlementRecords, aggregateShareRecords, SettlementError,
+  // S2 对账差错处理 / 发票开具作废
+  handleRecon, getReconStats, ReconError,
+  issueInvoice, voidInvoice, InvoiceError,
 } from "./finance";
-export type { ShareSummaryQuery, RechargeQuery, SettlementQuery, ShareRecordQuery } from "./finance";
+export type { ShareSummaryQuery, RechargeQuery, SettlementQuery, ShareRecordQuery, ReconQuery, InvoiceQuery } from "./finance";
 
 export {
   cUsers, userRisks, userBlacklist, members, wallets, freeWhitelist, consumerSegments,
   listMembers, listWallets, listUserRisks, listUserBlacklist, listConsumerSegments,
   saveMember, saveWallet,
   listFreeWhitelist, saveFreeWhitelist, revokeFreeWhitelist,
+  // S2：信用分调整（上下限强制 + 风控等级联动 + 变更留痕）
+  creditScoreChanges, adjustCreditScore, listCreditScoreChanges, CreditScoreError,
 } from "./user";
 
 export {
@@ -92,6 +99,10 @@ export {
   saveCampaign, savePushMessage, saveAdSlot, saveAdCampaign,
   notices, listNotices, saveNotice,
   archiveCoupon, unarchiveCoupon, archiveNotice, unarchiveNotice,
+  // S2：优惠券发放 / 推送发送
+  couponIssueRecords, listCouponIssueRecords, issueCoupon,
+  resolveAudience, MEMBER_LEVELS, sendPushMessage, transitionPush,
+  CouponIssueError, PushError, AudienceError,
 } from "./marketing";
 
 export {

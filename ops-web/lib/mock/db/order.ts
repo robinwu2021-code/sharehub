@@ -2,17 +2,23 @@
 // 预约订单 reservations / 免费订单 freeOrders。
 // 机柜号引用 device.ts，站点引用 location.ts；售后（投诉/退款）在 cs.ts 里反向引用本域的 orders。
 import type {
-  RentOrder, OrderStatus, OrderException, DepositRecord, DepositStatus, DepositAction,
+  RentOrder, OrderStatus, OrderException, OrderExceptionStatus,
+  ExceptionHandleAction, OrderExceptionHandlePayload,
+  DepositRecord, DepositStatus, DepositAction,
   DepositBuyoutPayload, ArrearsDunPayload,
   OrderIntervention, OrderInterventionAction, OrderIntervenePayload, OrderInterveneResult,
-  Reservation, FreeOrder, FreeOrderStats, PageQuery,
+  Reservation, FreeOrder, FreeOrderStats, PageQuery, WorkOrderType,
 } from "../../types";
-import { ORDER_INTERVENTIONS, canIntervene, DEPOSIT_TRANSITIONS, canDepositAction } from "../../types";
+import {
+  ORDER_INTERVENTIONS, canIntervene, DEPOSIT_TRANSITIONS, canDepositAction,
+  EXCEPTION_HANDLINGS, canHandleException,
+} from "../../types";
 import { NICKS, p, iso } from "./internal";
 import { paginate, kwHit, nextNo } from "./helpers";
 import { cabinets, cabNo, powerbanks } from "./device";
 import { sites } from "./location";
 import { cUsers, freeWhitelist } from "./user";
+import { createWorkOrder } from "./workorder";
 
 // —— 订单 ——
 // 充电宝号引用 device.ts 的 powerbanks（原先自造 PB1000+ 这套号，在充电宝档案里查无此宝）；
@@ -35,12 +41,16 @@ export const orders: RentOrder[] = Array.from({ length: 120 }, (_, i) => {
 // —— 异常订单 ——
 // 就是 orders 里 status=EXCEPTION 的那 20 单（原先自造 ORD520000+ 号段，在订单列表里搜不到）。
 const EXCEPTION_TYPES: OrderException["type"][] = ["NOT_EJECTED", "NOT_RETURNED", "OVERTIME_BUYOUT", "DOUBLE_CHARGE"];
+// 全部种子一律落 PENDING —— 已处置/处置中的样例在文件末尾**走真实处置入口**生成，
+// 保证「状态 ↔ 处置留痕（handledBy/handledAt/handleResult/工单号/退款号）」天然一致。
 export const orderExceptions: OrderException[] = orders
   .filter((o) => o.status === "EXCEPTION")
   .map((o, i) => ({
     orderNo: o.orderNo, type: p(EXCEPTION_TYPES, i),
     cabinetNo: o.cabinetNo, userNo: o.cUserNo, amount: Number((3 + (i * 7) % 97).toFixed(2)),
-    currency: "AED", status: i % 3 === 0 ? "HANDLED" : "OPEN", createdAt: iso(i * 5400_000),
+    currency: "AED", status: "PENDING" as OrderExceptionStatus, createdAt: iso(i * 5400_000),
+    handleAction: null, handleResult: null, handledBy: null, handledAt: null,
+    workOrderNo: null, refundNo: null,
   }));
 
 // —— 押金记录（PDF 对照新增 mock）——
@@ -135,7 +145,13 @@ export const freeOrders: FreeOrder[] = FREE_SOURCE_ORDERS.map((o, i) => {
 });
 
 // —— list ——
-export const listOrderExceptions = (q: PageQuery = {}) => paginate(orderExceptions, q.page, q.size, (x) => kwHit(q.keyword, x.orderNo, x.cabinetNo, x.userNo));
+// 搜索域随可见列扩展（规格 §17.1-9）：处置留痕上了列表，工单号/退款号/处置人也要能搜到。
+export const listOrderExceptions = (q: PageQuery & { status?: string; type?: string } = {}) =>
+  paginate(orderExceptions, q.page, q.size, (x) => {
+    if (q.status && x.status !== q.status) return false;
+    if (q.type && x.type !== q.type) return false;
+    return kwHit(q.keyword, x.orderNo, x.cabinetNo, x.userNo, x.workOrderNo, x.refundNo, x.handledBy);
+  });
 export const listDepositRecords = (q: PageQuery & { status?: string } = {}) =>
   paginate(depositRecords, q.page, q.size, (x) =>
     kwHit(q.keyword, x.depositNo, x.orderNo, x.userNo) && (!q.status || x.status === q.status));
@@ -333,6 +349,81 @@ export const dunArrears = (depositNo: string, x: ArrearsDunPayload): DepositReco
   });
 };
 
+// ————————————————————————————————————————————————————————————————
+// 异常订单处置（S2：F2 → F3，权限码 order:exception:handle 早已定义、页面从没用过）
+//
+// 修之前：/orders?tab=exceptions 只有一张只读列表 —— 看得见异常、处置不了，
+// 「已处理」的单也说不清是谁在什么时候按什么结论处理的。
+// 现在：三种处置方式（转工单 / 发起退款 / 直接关闭）走状态机，结论必填，全部留痕。
+// ————————————————————————————————————————————————————————————————
+const EXC_LABEL: Record<ExceptionHandleAction, string> = {
+  work_order: "转工单", refund: "发起退款", close: "直接关闭",
+};
+
+/** 异常类型 → 工单类型：设备侧异常交运维（FAULT），计费/归还争议交客服闭环（COMPLAINT）。 */
+const EXC_WO_TYPE: Record<OrderException["type"], WorkOrderType> = {
+  NOT_EJECTED: "FAULT",
+  NOT_RETURNED: "FAULT",
+  OVERTIME_BUYOUT: "COMPLAINT",
+  DOUBLE_CHARGE: "COMPLAINT",
+};
+const EXC_TYPE_TEXT: Record<OrderException["type"], string> = {
+  NOT_EJECTED: "未弹出", NOT_RETURNED: "未归还", OVERTIME_BUYOUT: "超时买断", DOUBLE_CHARGE: "重复扣款",
+};
+
+export class OrderExceptionError extends Error {
+  constructor(readonly orderNo: string, readonly action: ExceptionHandleAction, readonly from: OrderExceptionStatus | null, msg?: string) {
+    super(msg ?? `异常单 ${orderNo} 当前状态「${from}」不允许执行「${EXC_LABEL[action]}」`);
+    this.name = "OrderExceptionError";
+  }
+}
+
+const findException = (orderNo: string) => orderExceptions.find((e) => e.orderNo === orderNo);
+
+/**
+ * 统一处置入口：查单 → 校验状态机与必填 → 落下游动作（工单/退款）→ 迁状态 → 记留痕。
+ * 禁止任何地方直接改 `e.status`。
+ *
+ * 注：`refund` 的退款申请由 API mock 层先调 `applyRefund` 再把 `refundNo` 传进来
+ * （退款记录住在 cs.ts，cs.ts 反向依赖本文件的 orders，直接 import 会成环）。
+ */
+export function handleOrderException(
+  orderNo: string, action: ExceptionHandleAction, payload: OrderExceptionHandlePayload,
+): OrderException {
+  const e = findException(orderNo);
+  if (!e) throw new OrderExceptionError(orderNo, action, null, `异常单 ${orderNo} 不存在`);
+  const result = payload?.result?.trim();
+  if (!result) throw new OrderExceptionError(orderNo, action, e.status, `「${EXC_LABEL[action]}」必须填写处置结论`);
+  if (!canHandleException(e.status, action)) throw new OrderExceptionError(orderNo, action, e.status);
+
+  if (action === "work_order") {
+    // 同一异常单不重复开单：重复转工单会让运维收到两条同样的活
+    if (e.workOrderNo) throw new OrderExceptionError(orderNo, action, e.status, `该异常单已转工单 ${e.workOrderNo}，不可重复转`);
+    const wo = createWorkOrder({
+      type: EXC_WO_TYPE[e.type],
+      source: "USER",
+      sourceNo: e.orderNo,
+      priority: "HIGH", // 异常单已经产生资损/投诉风险，一律高优
+      cabinetNo: e.cabinetNo,
+      description: `异常订单 ${e.orderNo}（${EXC_TYPE_TEXT[e.type]}）：${result}`,
+    });
+    e.workOrderNo = wo.woNo;
+  }
+  if (action === "refund") {
+    // 同一异常单不重复退款：真正出款在退款审批队列，这里只保证申请唯一
+    if (e.refundNo) throw new OrderExceptionError(orderNo, action, e.status, `该异常单已发起退款申请 ${e.refundNo}，不可重复发起`);
+    if (!payload.refundNo) throw new OrderExceptionError(orderNo, action, e.status, "退款申请号缺失（应由 API 层先落退款申请再回填）");
+    e.refundNo = payload.refundNo;
+  }
+
+  e.status = EXCEPTION_HANDLINGS[action].to;
+  e.handleAction = action;
+  e.handleResult = result;
+  e.handledBy = payload.operatorName?.trim() || "admin";
+  e.handledAt = now();
+  return { ...e };
+}
+
 // —— 定点演示数据：**直接走干预入口生成**，保证「干预记录 ↔ 订单状态」天然一致 ——
 // （手写记录必然与订单状态对不上，那正是本次要修的 F0 病根）
 interveneOrder(orders[23].orderNo, "eject", {
@@ -346,4 +437,14 @@ interveneOrder(orders[4].orderNo, "waive", {
 });
 interveneOrder(orders[4].orderNo, "compensate", {
   reason: "同一异常单额外补偿用户余额", amount: 5, operatorName: "admin",
+});
+
+// —— 异常单定点演示数据：同样**走真实处置入口**（转工单会真的落一条工单）——
+// 「发起退款」不在此处种：退款申请要先落 cs.ts 的退款队列，db 层不能反向 import，
+// 该链路由 API mock 层组合（见 lib/api/mocks/order.ts），页面上点一次即可验证。
+handleOrderException(orderExceptions[0].orderNo, "close", {
+  result: "核查柜机日志确认宝已正常弹出，用户未取走，无资损，直接关闭", operatorName: "Sara Ahmed",
+});
+handleOrderException(orderExceptions[1].orderNo, "work_order", {
+  result: "柜机仓位卡宝导致未弹出，转运维现场检修", operatorName: "Omar Khan",
 });

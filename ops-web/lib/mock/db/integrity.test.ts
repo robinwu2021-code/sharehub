@@ -32,6 +32,7 @@ const vendorCodes = setOf(db.vendors, (v) => v.vendorCode);
 const userNos = setOf(db.cUsers, (u) => u.cUserNo);
 const orderNos = setOf(db.orders, (o) => o.orderNo);
 const workOrderNos = setOf(db.workOrders, (w) => w.woNo);
+const refundNos = setOf(db.refundRecords, (r) => r.refundNo);
 const alarmNos = setOf(db.alarmRecords, (a) => a.alarmNo);
 const alarmCodeValues = setOf(db.alarmCodes, (a) => a.code);
 const packageNos = setOf(db.rechargePackages, (p) => p.packageNo);
@@ -161,6 +162,13 @@ const REFS: Ref[] = [
   ref("orderExceptions", db.orderExceptions, "orderNo", "orders.orderNo", orderNos),
   ref("orderExceptions", db.orderExceptions, "cabinetNo", "cabinets.cabinetNo", cabinetNos),
   ref("orderExceptions", db.orderExceptions, "userNo", "cUsers.cUserNo", userNos),
+  // S2 异常单处置：转工单落的是**真实工单**（不是编出来的号），退款号同理挂在退款队列上
+  ref("orderExceptions", db.orderExceptions, "workOrderNo", "workOrders.woNo", workOrderNos, {
+    nullableReason: "未转工单的异常单没有工单号（待处置 / 直接关闭 / 只发起了退款）",
+  }),
+  ref("orderExceptions", db.orderExceptions, "refundNo", "refundRecords.refundNo", refundNos, {
+    nullableReason: "未发起退款的异常单没有退款号",
+  }),
   ref("depositRecords", db.depositRecords, "orderNo", "orders.orderNo", orderNos),
   ref("depositRecords", db.depositRecords, "userNo", "cUsers.cUserNo", userNos),
   ref("reservations", db.reservations, "userNo", "cUsers.cUserNo", userNos),
@@ -195,6 +203,8 @@ const REFS: Ref[] = [
   ref("freeWhitelist", db.freeWhitelist, "userNo", "cUsers.cUserNo", userNos),
   ref("userRisks", db.userRisks, "userNo", "cUsers.cUserNo", userNos),
   ref("userBlacklist", db.userBlacklist, "userNo", "cUsers.cUserNo", userNos),
+  // S2 信用分变更留痕：调的必须是真实存在的 C 端用户
+  ref("creditScoreChanges", db.creditScoreChanges, "cUserNo", "cUsers.cUserNo", userNos),
 
   // —— 财务 ——
   ref("ledger", db.ledger, "orderNo", "orders.orderNo", orderNos),
@@ -209,6 +219,9 @@ const REFS: Ref[] = [
     new Set([...venueNos, ...agentNos])),
   ref("withdrawals", db.withdrawals, "payeeName", "venues.name ∪ agents.name", payeeNames),
   ref("invoices", db.invoices, "payeeName", "venues.name ∪ agents.name", payeeNames),
+  // S2：发票金额不自造，一律挂在一张结算单上——来源单号必须是真实结算单
+  ref("invoices", db.invoices, "sourceNo", "settlements.settleNo",
+    new Set(db.settlements.map((s) => s.settleNo))),
   ref("shareSummaries", db.shareSummaries, "payeeNo", "venues.venueNo ∪ agents.agentNo",
     new Set([...venueNos, ...agentNos])),
   ref("shareSummaries", db.shareSummaries, "payeeName", "venues.name ∪ agents.name", payeeNames),
@@ -222,6 +235,11 @@ const REFS: Ref[] = [
   ref("adSlots", db.adSlots, "cabinetNo", "cabinets.cabinetNo", cabinetNos),
   ref("adDeliveries", db.adDeliveries, "adNo", "adCampaigns.adNo", adNos),
   ref("adDeliveries", db.adDeliveries, "slotNo", "adSlots.slotNo", slotNos),
+  // S2 优惠券发放流水：券号/券名必须指向真实的券，否则「发放记录」点回去查无此券
+  ref("couponIssueRecords", db.couponIssueRecords, "couponNo", "coupons.couponNo",
+    setOf(db.coupons, (c) => c.couponNo)),
+  ref("couponIssueRecords", db.couponIssueRecords, "couponName", "coupons.name",
+    setOf(db.coupons, (c) => c.name)),
 
   // —— 系统 / 组织 ——
   ref("notifyLogs", db.notifyLogs, "templateNo", "notifyTemplates.templateNo", templateNos),
