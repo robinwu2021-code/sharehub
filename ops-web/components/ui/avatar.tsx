@@ -17,7 +17,7 @@ import * as AvatarPrimitive from "@radix-ui/react-avatar";
 import { cn } from "@/lib/utils";
 
 const SIZE = {
-  sm: "size-6 text-[10px]",
+  sm: "size-6 text-[11px] font-semibold",
   md: "size-8 text-xs",
   lg: "size-10 text-sm",
 } as const;

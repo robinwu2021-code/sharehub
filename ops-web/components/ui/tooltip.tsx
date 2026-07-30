@@ -112,7 +112,7 @@ export function Tooltip({
         <div
           id={id}
           role="tooltip"
-          className="pointer-events-none fixed z-[var(--z-tooltip)] max-w-[240px] truncate rounded-field bg-foreground px-2 py-1 text-xs text-background shadow-pop"
+          className="pointer-events-none fixed z-[var(--z-tooltip)] max-w-[240px] truncate rounded-field bg-foreground px-2.5 py-1.5 text-[13px] font-medium leading-snug text-background shadow-pop"
           style={{ top: pos.top, left: pos.left, transform }}
         >
           {label}

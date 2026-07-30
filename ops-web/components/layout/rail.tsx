@@ -31,7 +31,7 @@ function RailItem({
       {active && <span className="absolute top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-e-full bg-primary" style={{ insetInlineStart: 0 }} />}
       <Icon className="size-5 shrink-0" />
       {expanded && <span className="truncate text-sm">{label}</span>}
-      {expanded && soon && <span className="ms-auto rounded bg-muted px-1 text-[10px] leading-4 text-muted-foreground">{t("common.soon")}</span>}
+      {expanded && soon && <span className="ms-auto rounded-control bg-muted px-1 text-[11px] font-semibold leading-4 text-muted-foreground">{t("common.soon")}</span>}
     </>
   );
   // shrink-0：15 项时容器溢出滚动，flex 默认会压扁子项（图标变形），必须禁止收缩。

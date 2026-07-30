@@ -4,7 +4,9 @@ import { cn } from "@/lib/utils";
 
 const badgeVariants = cva(
   // 形态取自 C 端 pb-tag：药丸 + 字重 700 + 11px（原为 rounded-md/500，偏"方"）
-  "inline-flex items-center rounded-chip px-2.5 py-0.5 text-[11px] font-bold leading-[1.7] tracking-[0.1px]",
+  // 12px/600：11px + 700 看着"更醒目"，实际笔画在小字号下糊成一团反而更难认。
+  // 规范定的字号下限就是 12px。
+  "inline-flex items-center rounded-chip px-2.5 py-0.5 text-[12px] font-semibold leading-[1.5]",
   {
     variants: {
       tone: {
