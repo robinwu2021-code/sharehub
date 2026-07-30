@@ -7,6 +7,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PageTitle, Skeleton, EmptyState } from "@/components/ui/misc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Field } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CabinetStatusBadge, OnlineBadge } from "@/components/status";
@@ -56,14 +57,14 @@ function CabinetDetail() {
         <>
           <Card>
             <CardContent className="grid grid-cols-2 gap-4 pt-5 text-sm md:grid-cols-4">
-              <Field label="点位" v={data.cabinet.locationName} />
-              <Field label="供应商" v={data.cabinet.vendorCode} />
-              <Field label="型号" v={data.cabinet.model} />
-              <Field label="固件" v={data.cabinet.fwVersion} />
-              <Field label="在线" v={<OnlineBadge s={data.cabinet.onlineStatus} />} />
-              <Field label="状态" v={<CabinetStatusBadge s={data.cabinet.status} />} />
-              <Field label="可借/仓位" v={`${data.cabinet.availableCount} / ${data.cabinet.slotTotal}`} />
-              <Field label="最后心跳" v={fmtTime(data.cabinet.lastHeartbeatAt)} />
+              <Field label="点位" className="mb-0">{data.cabinet.locationName}</Field>
+              <Field label="供应商" className="mb-0">{data.cabinet.vendorCode}</Field>
+              <Field label="型号" className="mb-0">{data.cabinet.model}</Field>
+              <Field label="固件" className="mb-0">{data.cabinet.fwVersion}</Field>
+              <Field label="在线" className="mb-0"><OnlineBadge s={data.cabinet.onlineStatus} /></Field>
+              <Field label="状态" className="mb-0"><CabinetStatusBadge s={data.cabinet.status} /></Field>
+              <Field label="可借/仓位" className="mb-0">{`${data.cabinet.availableCount} / ${data.cabinet.slotTotal}`}</Field>
+              <Field label="最后心跳" className="mb-0">{fmtTime(data.cabinet.lastHeartbeatAt)}</Field>
             </CardContent>
           </Card>
 
@@ -94,15 +95,6 @@ function CabinetDetail() {
           </Card>
         </>
       )}
-    </div>
-  );
-}
-
-function Field({ label, v }: { label: string; v: React.ReactNode }) {
-  return (
-    <div>
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="mt-1">{v}</div>
     </div>
   );
 }

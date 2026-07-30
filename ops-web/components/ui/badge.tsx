@@ -23,6 +23,14 @@ const badgeVariants = cva(
   },
 );
 
+/**
+ * 徽标色调的唯一真源。
+ * 各页的状态映射表（`StatusMap<T>`，见 ./status-badge）都引这个类型，
+ * 不要再就地写 `"muted" | "warning" | "danger"` 之类的字面量联合 ——
+ * 那样每加一个色调就要改十几处，而且各处允许的子集互不相同、读不出规律。
+ */
+export type BadgeTone = NonNullable<VariantProps<typeof badgeVariants>["tone"]>;
+
 export function Badge({
   className, tone, ...props
 }: React.HTMLAttributes<HTMLSpanElement> & VariantProps<typeof badgeVariants>) {

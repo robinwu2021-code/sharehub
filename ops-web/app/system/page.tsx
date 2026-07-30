@@ -10,6 +10,10 @@ import { Toolbar } from "@/components/ui/toolbar";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
 import { DataTable, type Column, type SortDir } from "@/components/ui/data-table";
 import { Drawer, Field } from "@/components/ui/drawer";
+import { FilterSelect } from "@/components/ui/filter-select";
+import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
+import { EnabledBadge } from "@/components/status";
+import { ReadOnlyNotice } from "@/components/read-only-notice";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -130,11 +134,20 @@ const OPENAPI_FIELDS: FieldDef[] = [
 
 // —— §9 发送记录 ——
 const LOG_CHANNEL: Record<NotifyLog["channel"], string> = { SMS: "短信", EMAIL: "邮件", PUSH: "Push", WHATSAPP: "WhatsApp" };
+const LOG_CHANNEL_OPTIONS = Object.entries(LOG_CHANNEL).map(([value, label]) => ({ value, label }));
+const LOG_STATUS_OPTIONS = [{ value: "SENT", label: "已发送" }, { value: "FAILED", label: "发送失败" }];
+/** 启用/停用二选一，多个字典 tab 共用 */
+const ENABLED_OPTIONS = [{ value: "ENABLED", label: "启用" }, { value: "DISABLED", label: "停用" }];
+const BANK_COUNTRY_OPTIONS = [
+  { value: "AE", label: "阿联酋 AE" }, { value: "SA", label: "沙特 SA" }, { value: "QA", label: "卡塔尔 QA" },
+  { value: "KW", label: "科威特 KW" }, { value: "EG", label: "埃及 EG" },
+];
+const BANK_CURRENCY_OPTIONS = ["AED", "SAR", "QAR", "KWD", "EGP"].map((c) => ({ value: c, label: c }));
 const LOG_SCENE_HINT = "OTP / 借出 / 归还 / 扣费 / 告警";
 
 // —— §10 触达拉黑 ——
 const BL_CHANNEL: Record<NotifyBlacklist["channel"], string> = { SMS: "短信", EMAIL: "邮件", PUSH: "Push", WHATSAPP: "WhatsApp", ALL: "全渠道" };
-const BL_REASON: Record<NotifyBlacklist["reason"], { label: string; tone: "muted" | "warning" | "danger" | "outline" }> = {
+const BL_REASON: StatusMap<NotifyBlacklist["reason"]> = {
   USER_OPT_OUT: { label: "用户退订", tone: "muted" },
   HARD_BOUNCE: { label: "硬退信/无效号", tone: "warning" },
   ABUSE: { label: "滥用/投诉", tone: "danger" },
@@ -185,7 +198,8 @@ const LOGIN_FIELDS: FieldDef[] = [
 
 // —— §13 应用版本 ——
 const PLATFORM_LABEL: Record<AppVersion["platform"], string> = { IOS: "iOS", ANDROID: "Android", H5: "H5 / 小程序" };
-const VERSION_STATUS: Record<AppVersion["status"], { label: string; tone: "muted" | "success" | "danger" }> = {
+const PLATFORM_OPTIONS = Object.entries(PLATFORM_LABEL).map(([value, label]) => ({ value, label }));
+const VERSION_STATUS: StatusMap<AppVersion["status"]> = {
   DRAFT: { label: "草稿", tone: "muted" },
   RELEASED: { label: "已发布", tone: "success" },
   ROLLBACK: { label: "已回滚", tone: "danger" },
@@ -234,7 +248,7 @@ const BANK_FIELDS: FieldDef[] = [
 const PROBLEM_CATEGORY: Record<ProblemEntry["category"], string> = {
   RENT: "借出", RETURN: "归还", BILLING: "计费与退款", DEVICE: "设备故障", ACCOUNT: "账号", OTHER: "其他",
 };
-const PROBLEM_ACTION: Record<ProblemEntry["suggestedAction"], { label: string; tone: "muted" | "warning" | "danger" | "outline" }> = {
+const PROBLEM_ACTION: StatusMap<ProblemEntry["suggestedAction"]> = {
   SELF_SERVICE: { label: "自助解决", tone: "muted" },
   TO_WORKORDER: { label: "转工单", tone: "warning" },
   TO_REFUND: { label: "转退款", tone: "danger" },
@@ -544,7 +558,7 @@ function SystemInner() {
   // 发送记录页头统计：全量口径（今日发送量 / 失败率 / 今日成本），与当页数据无关。
   const logStats = useQuery({ queryKey: ["sys", "notify-log-stats"], queryFn: () => api.getNotifyLogStats(), enabled: tab === "notify-log" });
 
-  const MARKET_STATUS: Record<MarketCountry["status"], { label: string; tone: "success" | "outline" | "muted" }> = {
+  const MARKET_STATUS: StatusMap<MarketCountry["status"]> = {
     LIVE: { label: "已开城", tone: "success" },
     PILOT: { label: "试点", tone: "outline" },
     PLANNED: { label: "规划", tone: "muted" },
@@ -555,7 +569,7 @@ function SystemInner() {
     { header: "时区", cell: (m) => <span className="text-muted-foreground">{m.timezone}</span> },
     { header: "合规主体", cell: (m) => <span className="text-muted-foreground">{m.compliance}</span> },
     { header: "开城数", cell: (m) => <span className="tabular-nums">{m.cityCount}</span> },
-    { header: "状态", cell: (m) => <Badge tone={MARKET_STATUS[m.status].tone}>{MARKET_STATUS[m.status].label}</Badge> },
+    { header: "状态", cell: (m) => <StatusBadge map={MARKET_STATUS} value={m.status} /> },
     { header: t("common.actions"), cell: (m) => canMarket ? <Button size="sm" variant="outline" onClick={() => setMarketForm(m)}>{t("common.edit")}</Button> : <span className="text-muted-foreground">-</span> },
   ];
 
@@ -569,7 +583,7 @@ function SystemInner() {
     { header: "能力", cell: (c) => <span className="text-muted-foreground">{c.capabilities}</span> },
     { header: "商户号", cell: (c) => <span className="text-muted-foreground tabular-nums">{c.merchantId}</span> },
     { header: "密钥", cell: () => <span className="text-muted-foreground tabular-nums">****</span> },
-    { header: "状态", cell: (c) => c.status === "ENABLED" ? <Badge tone="success">启用</Badge> : <Badge tone="muted">停用</Badge> },
+    { header: "状态", cell: (c) => <EnabledBadge on={c.status === "ENABLED"} /> },
     { header: "更新时间", cell: (c) => <span className="text-muted-foreground">{fmtTime(c.updatedAt)}</span> },
     { header: "操作", cell: (c) => canPayment ? <Button size="sm" variant="outline" onClick={() => setPaymentForm(c)}>配置</Button> : <span className="text-muted-foreground">-</span> },
   ];
@@ -582,7 +596,7 @@ function SystemInner() {
     { header: "名称", cell: (v) => v.name },
     { header: "接入方式", cell: (v) => <Badge tone="outline">{MODE_LABEL[v.accessMode]}</Badge> },
     { header: "设备数", cell: (v) => <span className="tabular-nums">{v.deviceCount}</span> },
-    { header: "状态", cell: (v) => v.status === "ENABLED" ? <Badge tone="success">启用</Badge> : <Badge tone="muted">停用</Badge> },
+    { header: "状态", cell: (v) => <EnabledBadge on={v.status === "ENABLED"} /> },
     { header: "操作", cell: (v) => allow("device:vendor:config") ? <Button size="sm" variant="outline" onClick={() => openVendor(v)}>配置</Button> : <span className="text-muted-foreground">-</span> },
   ];
 
@@ -591,7 +605,7 @@ function SystemInner() {
     { header: "名称", cell: (t) => t.name },
     { header: "渠道", cell: (t) => <Badge tone="outline">{CHANNEL_LABEL[t.channel]}</Badge> },
     { header: "语言", cell: (t) => <span className="text-muted-foreground">{LANG_LABEL[t.lang]}</span> },
-    { header: "状态", cell: (t) => t.status === "ENABLED" ? <Badge tone="success">启用</Badge> : <Badge tone="muted">停用</Badge> },
+    { header: "状态", cell: (t) => <EnabledBadge on={t.status === "ENABLED"} /> },
     { header: t("common.actions"), cell: editBtn<NotifyTemplate>(canNotify, setNotifyForm) },
   ];
 
@@ -601,7 +615,7 @@ function SystemInner() {
     { header: "编码", cell: (d) => <span className="text-muted-foreground tabular-nums">{d.code}</span> },
     { header: "标签", cell: (d) => d.label },
     { header: "排序", cell: (d) => <span className="tabular-nums">{d.sort}</span> },
-    { header: "状态", cell: (d) => d.enabled ? <Badge tone="success">启用</Badge> : <Badge tone="muted">停用</Badge> },
+    { header: "状态", cell: (d) => <EnabledBadge on={d.enabled} /> },
     { header: t("common.actions"), cell: editBtn<DictEntry>(canDict, setDictForm) },
   ];
 
@@ -628,7 +642,7 @@ function SystemInner() {
     { header: "名称", cell: (a) => a.name },
     { header: "AppKey", cell: (a) => <span className="text-muted-foreground tabular-nums">{a.appKey}</span> },
     { header: "限流（次/秒）", cell: (a) => <span className="tabular-nums">{a.rateLimit}</span> },
-    { header: "状态", cell: (a) => a.status === "ACTIVE" ? <Badge tone="success">启用</Badge> : <Badge tone="muted">停用</Badge> },
+    { header: "状态", cell: (a) => <EnabledBadge on={a.status === "ACTIVE"} /> },
     { header: "创建时间", cell: (a) => <span className="text-muted-foreground">{fmtTime(a.createdAt)}</span> },
     { header: t("common.actions"), cell: editBtn<OpenApiApp>(canOpenapi, setOpenapiForm) },
   ];
@@ -658,7 +672,7 @@ function SystemInner() {
     { header: "拉黑号", cell: (b) => <span className="font-medium tabular-nums">{b.blockNo}</span> },
     { header: "目标", cell: (b) => <span className="tabular-nums">{b.target}</span> },
     { header: "渠道", cell: (b) => <Badge tone={b.channel === "ALL" ? "danger" : "outline"}>{BL_CHANNEL[b.channel]}</Badge> },
-    { header: "原因", cell: (b) => <Badge tone={BL_REASON[b.reason].tone}>{BL_REASON[b.reason].label}</Badge> },
+    { header: "原因", cell: (b) => <StatusBadge map={BL_REASON} value={b.reason} /> },
     { header: "拉黑时间", cell: (b) => <span className="text-muted-foreground">{fmtTime(b.blockedAt)}</span> },
     { header: "操作人", cell: (b) => <span className="text-muted-foreground">{b.blockedBy}</span> },
     { header: "到期时间", cell: (b) => b.expireAt ? <span className="text-muted-foreground">{fmtTime(b.expireAt)}</span> : <Badge tone="warning">永久</Badge> },
@@ -728,7 +742,7 @@ function SystemInner() {
     { header: "强更", cell: (v) => v.forceUpdate ? <Badge tone="danger">强制更新</Badge> : <span className="text-muted-foreground">-</span> },
     { header: "最低支持", cell: (v) => <span className="tabular-nums text-muted-foreground">{v.minSupported || "-"}</span> },
     { header: "灰度", cell: (v) => <RolloutBar percent={v.rolloutPercent} /> },
-    { header: "状态", cell: (v) => <Badge tone={VERSION_STATUS[v.status].tone}>{VERSION_STATUS[v.status].label}</Badge> },
+    { header: "状态", cell: (v) => <StatusBadge map={VERSION_STATUS} value={v.status} /> },
     { header: "发布时间", cell: (v) => <span className="text-muted-foreground">{fmtTime(v.releasedAt)}</span> },
     {
       header: t("common.actions"),
@@ -768,7 +782,7 @@ function SystemInner() {
     { header: "SWIFT 前缀", cell: (b) => <span className="tabular-nums text-muted-foreground">{b.swiftPrefix}</span> },
     // IBAN 长度：提现收款账户校验直接读这里，填错会让提现打款失败
     { header: "IBAN 长度", cell: (b) => <span className="tabular-nums">{b.ibanLength} 位</span> },
-    { header: "状态", cell: (b) => b.status === "ENABLED" ? <Badge tone="success">启用</Badge> : <Badge tone="muted">停用</Badge> },
+    { header: "状态", cell: (b) => <EnabledBadge on={b.status === "ENABLED"} /> },
     // 归档时间仅在「显示已归档」打开时占列，平时不白占一列
     ...(showArchived ? [{ header: "归档时间", cell: (b: BankEntry) => <ArchivedAt at={b.archivedAt} /> }] : []),
     {
@@ -795,9 +809,9 @@ function SystemInner() {
     { header: "问题号", cell: (p) => <span className="font-medium tabular-nums">{p.problemNo}</span> },
     { header: "分类", cell: (p) => <Badge tone="outline">{PROBLEM_CATEGORY[p.category]}</Badge> },
     { header: "标题（中）", cell: (p) => p.title },
-    { header: "建议处置", cell: (p) => <Badge tone={PROBLEM_ACTION[p.suggestedAction].tone}>{PROBLEM_ACTION[p.suggestedAction].label}</Badge> },
+    { header: "建议处置", cell: (p) => <StatusBadge map={PROBLEM_ACTION} value={p.suggestedAction} /> },
     { header: "排序", cell: (p) => <span className="tabular-nums">{p.sortNo}</span> },
-    { header: "状态", cell: (p) => p.status === "ENABLED" ? <Badge tone="success">启用</Badge> : <Badge tone="muted">停用</Badge> },
+    { header: "状态", cell: (p) => <EnabledBadge on={p.status === "ENABLED"} /> },
     ...(showArchived ? [{ header: "归档时间", cell: (p: ProblemEntry) => <ArchivedAt at={p.archivedAt} /> }] : []),
     {
       header: t("common.actions"),
@@ -971,18 +985,8 @@ function SystemInner() {
             { header: "币种", value: (l) => l.currency },
           ], (q.data?.list ?? []) as NotifyLog[])}
         >
-          <Select value={logChannel} onChange={(e) => { setLogChannel(e.target.value); setPage(1); }}>
-            <option value="">全部渠道</option>
-            <option value="SMS">短信</option>
-            <option value="EMAIL">邮件</option>
-            <option value="PUSH">Push</option>
-            <option value="WHATSAPP">WhatsApp</option>
-          </Select>
-          <Select value={logStatus} onChange={(e) => { setLogStatus(e.target.value); setPage(1); }}>
-            <option value="">全部状态</option>
-            <option value="SENT">已发送</option>
-            <option value="FAILED">发送失败</option>
-          </Select>
+          <FilterSelect value={logChannel} onChange={(v) => { setLogChannel(v); setPage(1); }} allLabel="全部渠道" options={LOG_CHANNEL_OPTIONS} />
+          <FilterSelect value={logStatus} onChange={(v) => { setLogStatus(v); setPage(1); }} allLabel="全部状态" options={LOG_STATUS_OPTIONS} />
         </Toolbar>
       )}
       {tab === "notify-blacklist" && (
@@ -1002,17 +1006,8 @@ function SystemInner() {
           onAdd={canBlacklist ? () => setBlacklistForm({ channel: "SMS", reason: "MANUAL", blockedBy: "", target: "", expireAt: "" }) : undefined}
           addLabel="手动拉黑"
         >
-          <Select value={blChannel} onChange={(e) => { setBlChannel(e.target.value); setPage(1); }}>
-            <option value="">全部渠道</option>
-            {BL_CHANNEL_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </Select>
-          <Select value={blReason} onChange={(e) => { setBlReason(e.target.value); setPage(1); }}>
-            <option value="">全部原因</option>
-            <option value="USER_OPT_OUT">用户退订</option>
-            <option value="HARD_BOUNCE">硬退信/无效号</option>
-            <option value="ABUSE">滥用/投诉</option>
-            <option value="MANUAL">人工拉黑</option>
-          </Select>
+          <FilterSelect value={blChannel} onChange={(v) => { setBlChannel(v); setPage(1); }} allLabel="全部渠道" options={BL_CHANNEL_OPTIONS} />
+          <FilterSelect value={blReason} onChange={(v) => { setBlReason(v); setPage(1); }} allLabel="全部原因" options={BL_REASON} />
         </Toolbar>
       )}
       {tab === "login" && (
@@ -1051,12 +1046,7 @@ function SystemInner() {
           onAdd={canAppVersion ? () => setVersionForm({ platform: "IOS", versionNo: "", buildNo: 1, status: "DRAFT", releaseNote: "", releaseNoteEn: "", releaseNoteAr: "", forceUpdate: false, minSupported: "", rolloutPercent: 0, downloadUrl: "" }) : undefined}
           addLabel="新增版本"
         >
-          <Select value={verPlatform} onChange={(e) => { setVerPlatform(e.target.value); setPage(1); }}>
-            <option value="">全部平台</option>
-            <option value="IOS">iOS</option>
-            <option value="ANDROID">Android</option>
-            <option value="H5">H5 / 小程序</option>
-          </Select>
+          <FilterSelect value={verPlatform} onChange={(v) => { setVerPlatform(v); setPage(1); }} allLabel="全部平台" options={PLATFORM_OPTIONS} />
         </Toolbar>
       )}
       {tab === "banks" && (
@@ -1076,22 +1066,8 @@ function SystemInner() {
           onAdd={canBank ? () => setBankForm({ bankCode: "", bankName: "", bankNameEn: "", country: "AE", currency: "AED", swiftPrefix: "", ibanLength: 23, status: "ENABLED" }) : undefined}
           addLabel="新增银行"
         >
-          <Select value={bankCountry} onChange={(e) => { setBankCountry(e.target.value); setPage(1); }}>
-            <option value="">全部国家</option>
-            <option value="AE">阿联酋 AE</option>
-            <option value="SA">沙特 SA</option>
-            <option value="QA">卡塔尔 QA</option>
-            <option value="KW">科威特 KW</option>
-            <option value="EG">埃及 EG</option>
-          </Select>
-          <Select value={bankCurrency} onChange={(e) => { setBankCurrency(e.target.value); setPage(1); }}>
-            <option value="">全部币种</option>
-            <option value="AED">AED</option>
-            <option value="SAR">SAR</option>
-            <option value="QAR">QAR</option>
-            <option value="KWD">KWD</option>
-            <option value="EGP">EGP</option>
-          </Select>
+          <FilterSelect value={bankCountry} onChange={(v) => { setBankCountry(v); setPage(1); }} allLabel="全部国家" options={BANK_COUNTRY_OPTIONS} />
+          <FilterSelect value={bankCurrency} onChange={(v) => { setBankCurrency(v); setPage(1); }} allLabel="全部币种" options={BANK_CURRENCY_OPTIONS} />
           <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); setPage(1); }} />
         </Toolbar>
       )}
@@ -1111,15 +1087,8 @@ function SystemInner() {
           onAdd={canProblem ? () => setProblemForm({ category: "RENT", sortNo: 1, status: "ENABLED", title: "", titleEn: "", titleAr: "", answer: "", answerEn: "", answerAr: "", suggestedAction: "SELF_SERVICE" }) : undefined}
           addLabel="新增问题"
         >
-          <Select value={probCategory} onChange={(e) => { setProbCategory(e.target.value); setPage(1); }}>
-            <option value="">全部分类</option>
-            {PROBLEM_CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </Select>
-          <Select value={probStatus} onChange={(e) => { setProbStatus(e.target.value); setPage(1); }}>
-            <option value="">全部状态</option>
-            <option value="ENABLED">启用</option>
-            <option value="DISABLED">停用</option>
-          </Select>
+          <FilterSelect value={probCategory} onChange={(v) => { setProbCategory(v); setPage(1); }} allLabel="全部分类" options={PROBLEM_CATEGORY_OPTIONS} />
+          <FilterSelect value={probStatus} onChange={(v) => { setProbStatus(v); setPage(1); }} allLabel="全部状态" options={ENABLED_OPTIONS} />
           <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); setPage(1); }} />
         </Toolbar>
       )}
@@ -1142,13 +1111,13 @@ function SystemInner() {
       )}
 
       {/* 权限降级：显式说明"仅可查看 + 缺哪个权限码"，不静默隐藏操作列 */}
-      {tab === "notify-blacklist" && !canBlacklist && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无触达拉黑维护权限（system:notify_blacklist:update）</div>}
-      {tab === "rules" && !canBizRule && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无业务规则修改权限（system:biz_rule:update）</div>}
-      {tab === "login" && !canLogin && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无登录设置修改权限（system:login_setting:update）</div>}
-      {tab === "app-version" && !canAppVersion && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无应用版本发布权限（system:app_version:release）</div>}
-      {tab === "banks" && !canBank && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无银行字典维护权限（system:bank:update）</div>}
-      {tab === "problems" && !canProblem && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无问题字典维护权限（system:problem:update）</div>}
-      {tab === "tax" && !canTax && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无税率与发票修改权限（system:tax:update）</div>}
+      {tab === "notify-blacklist" && !canBlacklist && <ReadOnlyNotice what="触达拉黑维护" perm="system:notify_blacklist:update" />}
+      {tab === "rules" && !canBizRule && <ReadOnlyNotice what="业务规则修改" perm="system:biz_rule:update" />}
+      {tab === "login" && !canLogin && <ReadOnlyNotice what="登录设置修改" perm="system:login_setting:update" />}
+      {tab === "app-version" && !canAppVersion && <ReadOnlyNotice what="应用版本发布" perm="system:app_version:release" />}
+      {tab === "banks" && !canBank && <ReadOnlyNotice what="银行字典维护" perm="system:bank:update" />}
+      {tab === "problems" && !canProblem && <ReadOnlyNotice what="问题字典维护" perm="system:problem:update" />}
+      {tab === "tax" && !canTax && <ReadOnlyNotice what="税率与发票修改" perm="system:tax:update" />}
 
       {/* §11 业务规则：分区表单，不走列表/分页 */}
       {tab === "rules" && <BizRulesPanel canEdit={canBizRule} />}

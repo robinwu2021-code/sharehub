@@ -1,10 +1,11 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
+import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { useI18n } from "@/lib/i18n";
 import type { OrderStatus, WorkOrderStatus, CabinetStatus, OnlineStatus } from "@/lib/types";
 
-type Tone = "default" | "success" | "warning" | "danger" | "muted";
+// 色调联合的唯一真源在 ui/badge.tsx（BadgeTone），此处不再自建。
+type Tone = BadgeTone;
 
 // 只保留「枚举→色调」在代码；文案统一走 i18n（orderStatus.* / woStatus.* / cabStatus.* / online.* / woType.*）。
 const ORDER_TONE: Record<OrderStatus, Tone> = {
@@ -35,6 +36,16 @@ export const OnlineBadge = ({ s }: { s: OnlineStatus }) => {
   const { t } = useI18n();
   return s === "ONLINE" ? <Badge tone="success">{t("online.ONLINE")}</Badge> : <Badge tone="muted">{t("online.OFFLINE")}</Badge>;
 };
+
+/**
+ * 启用 / 停用徽标。全站 14 处「`x === "ENABLED" ? 绿启用 : 灰停用`」的同一句话，
+ * 枚举值却各不相同（ENABLED / ACTIVE / boolean），故入参收成 boolean。
+ * 反义词不是「停用」的（点位是「暂停」）传 offLabel。
+ */
+export const EnabledBadge = ({
+  on, onLabel = "启用", offLabel = "停用",
+}: { on: boolean; onLabel?: string; offLabel?: string }) =>
+  on ? <Badge tone="success">{onLabel}</Badge> : <Badge tone="muted">{offLabel}</Badge>;
 
 /** 工单类型标签（hook）：页面用 `const woTypeLabel = useWoTypeLabel(); woTypeLabel(type)`。 */
 export function useWoTypeLabel() {

@@ -45,9 +45,20 @@ export function Drawer({
   );
 }
 
-export function Field({ label, children }: { label: string; children: React.ReactNode }) {
+/**
+ * 详情行：标签在上、值在下。抽屉详情与卡片栅格共用这一份（原先散了 3 份定义）。
+ *
+ * - 默认带 `mb-4`（抽屉里靠自身间距堆叠）；
+ * - 放进 grid/flex 由容器给 gap 时传 `className="mb-0"`（cn 走 tailwind-merge，会覆盖掉 mb-4）。
+ *
+ * 与 FormDrawer 的 FieldRow **不是**同一件事：那个带必填星号、字数计数、错误态与控件，
+ * 是表单行；这个是只读展示行。共同点只有外框间距，合并会把表单关注点塞进展示件。
+ */
+export function Field({
+  label, children, className,
+}: { label: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className="mb-4">
+    <div className={cn("mb-4", className)}>
       <div className="mb-1 text-xs text-muted-foreground">{label}</div>
       <div className="text-sm">{children}</div>
     </div>
