@@ -58,13 +58,13 @@ export function Pagination({
       <span>{t("common.totalItems", { n: total })}</span>
       <div className="flex items-center gap-2">
         <button
-          className="rounded-chip bg-secondary px-2.5 py-1 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ring-offset-bg)] disabled:opacity-40 disabled:hover:bg-secondary"
+          className="rounded-field bg-secondary px-2.5 py-1 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ring-offset-bg)] disabled:opacity-40 disabled:hover:bg-secondary"
           disabled={page <= 1}
           onClick={() => onPage(page - 1)}
         >{t("common.prevPage")}</button>
         <span className="tabular-nums">{t("common.pageOf", { p: page, total: pages })}</span>
         <button
-          className="rounded-chip bg-secondary px-2.5 py-1 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ring-offset-bg)] disabled:opacity-40 disabled:hover:bg-secondary"
+          className="rounded-field bg-secondary px-2.5 py-1 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ring-offset-bg)] disabled:opacity-40 disabled:hover:bg-secondary"
           disabled={page >= pages}
           onClick={() => onPage(page + 1)}
         >{t("common.nextPage")}</button>

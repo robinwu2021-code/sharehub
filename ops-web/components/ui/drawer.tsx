@@ -42,7 +42,7 @@ export function Drawer({
             </div>
             <Dialog.Close
               className={cn(
-                "rounded-chip p-1 text-muted-foreground transition-colors hover:bg-accent",
+                "rounded-field p-1 text-muted-foreground transition-colors hover:bg-accent",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ring-offset-bg)]",
               )}
             >

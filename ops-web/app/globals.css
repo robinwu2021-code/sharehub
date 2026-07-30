@@ -27,22 +27,30 @@
   --card: #ffffff;                     /* = C 端 --pb-elev */
   --foreground: #16171d;               /* = C 端 --pb-ink */
   --card-foreground: #16171d;
-  --muted-foreground: #8a8d97;         /* = C 端 --pb-sub，对白底 3.9:1 */
-  --muted: #f2f3f6;                    /* = C 端 --pb-faint（表头/隔行）*/
-  --secondary: #f2f3f6;                /* 填充块：输入/分段/outline 按钮 */
+  /* C 端 --pb-sub 是 #8A8D97，对白底仅 3.9:1 —— 小字过不了 AA。运营台的次要文字
+     密度远高于手机端（表格里每行都有），故**刻意压深一档**，与暗色语义色提亮同理。 */
+  --muted-foreground: #6e717a;         /* 对白底 ≈4.8:1 */
+  --muted: #f6f7f9;                    /* 表头/隔行：卡片内的浅带，比画布浅 */
+  --secondary: #f1f2f5;                /* 填充块（输入/分段）：与画布同深，读作"凹陷" */
   --secondary-foreground: #2a2c34;
   /* 下面两个 C 端没有对应物 —— 手机端页面底就是纯白，靠阴影分卡片；
      运营台是密集表格，画布与卡片必须有明度差，否则卡片边界只剩阴影、一糊到底。
      故从 faint 派生，保持同一个色相家族。 */
-  --canvas: color-mix(in srgb, #f2f3f6 55%, white);  /* ≈ #F8F9FB */
-  --sidebar: #f2f3f6;
+  /* ⚠️ 2026-07-30 重调：原来 canvas 取 faint 混白 55%（≈#F8F9FB），实测
+     **画布/卡片对比度只有 1.06、卡片/边框 1.14、卡片/表头 1.11** —— 三个分隔
+     机制全挤在 1.1 附近，整屏亮度几乎一样，所以「平、糊、没层次」。
+     根因是折中失误：C 端根本没有画布（页面底=卡片=纯白，纯靠阴影分层），
+     我为密集表格发明了画布却定得离白太近，同时又保留了 C 端那套很轻的阴影 ——
+     两种分层手段各用一半，等于都没用上。现在把画布压深、边框加强，让卡片真的浮起来。 */
+  --canvas: #f1f2f5;                   /* vs 卡片 ≈1.13，卡片才浮得起来 */
+  --sidebar: #f1f2f5;
   --sidebar-foreground: #3b3e48;
-  --accent: #e8eaef;                   /* 激活/hover：比 faint 再深一档 */
+  --accent: #e4e6eb;                   /* 激活/hover */
   --accent-foreground: #16171d;
   /* ⚠️ C 端实测 **border-width 全部为 0** —— 分区完全靠填充块 + 阴影，一根线都不画。
      运营台不能全照搬：密集表格没有行分隔就读不动。折中：边框色压到几乎只剩带感，
      且**只用于表格行分隔**；卡片/工具栏/输入框一律无边框走填充块。 */
-  --border: #eef0f3;
+  --border: #e2e4ea;                   /* vs 卡片 ≈1.29，发丝边真的看得见 */
   --input: #f2f3f6;                    /* 输入是**填充块**不是描边框（同 C 端搜索框）*/
 
   /* 语义色：直接采用 C 端 --pb-* 的 hex，一个不改，跨端状态色一致 */
@@ -66,14 +74,19 @@
      此前只有 --radius 一个形状 token，其余全是 Tailwind 默认阶硬写，实测组件层
      混用了 **7 种圆角写法**（md/lg/xl/2xl/full/[11px]/[var(--radius)]）——
      这是"看着不统一"的结构性原因，不是某个组件没调好。
-     现在收成四档，每档都对应 C 端一个真实组件；**只允许用这四档**。 */
-  --r-control: 4px;                    /* 16px 级小控件（checkbox）：四档最小的 field(11px)
-                                          超过它半边长会被夹成正圆，与单选点撞脸，
-                                          「方=多选 / 圆=互斥」的形状区分当场失效 */
-  --r-chip: 9999px;                    /* 徽章/按钮/搜索框/分段 = C 端 pb-tag·pb-button */
-  --r-field: 11px;                     /* 表单输入/小色块 = C 端 pb-field 22rpx */
-  --r-card: 14px;                      /* 卡片/表格容器 = C 端 pb-card 30rpx */
-  --r-sheet: 20px;                     /* 抽屉/弹层等大面 = C 端底部弹层 */
+     现在收成五档，**只允许用这五档**。 */
+  /* ⚠️ 2026-07-30 定位变更：ops-web 只从 C 端取**四个主色**，形状语言独立设计。
+     此前把 C 端的手机端形状整体搬了过来（按钮/输入/筛选全是 9999px 药丸），
+     但**药丸是消费端语言**：密集表格每行 3~5 个按钮，药丸吃掉横向空间、
+     削弱扫描性。业界密集后台（Linear/Vercel/Stripe/shadcn 默认）控件圆角
+     都在 4~8px、卡片 8~12px。现按数据台重定。 */
+  --r-control: 4px;                    /* 16px 级小控件（checkbox）：再大会被夹成正圆，
+                                          与单选点撞脸，「方=多选 / 圆=互斥」失效 */
+  --r-field: 6px;                      /* 控件：按钮/输入/下拉/分段 —— 密集台账的主力档 */
+  --r-card: 10px;                      /* 卡片/表格容器 */
+  --r-sheet: 14px;                     /* 抽屉/弹层等大面 */
+  --r-chip: 9999px;                    /* **只给徽章/状态芯片** —— 它本来就是"标签"隐喻，
+                                          是唯一该用药丸的地方，不要再外扩到按钮/输入 */
   --radius: var(--r-card);             /* 兼容既有 rounded-[var(--radius)] 调用点 */
   /* ── 焦点环 ──────────────────────────────────────────────────────────────
      实测 23 个组件里只有 5 个写了 focus-visible —— 键盘用户看不到焦点在哪。
@@ -108,12 +121,25 @@
      用法：容器加 `data-density="dense"`，控件高度写 `h-[var(--ctl-h)]`。 */
   --ctl-h: 36px;                       /* 控件高（输入/按钮/下拉）*/
   --row-h: 44px;                       /* 表格行高 */
+
+  /* ── 表现手法（取自 C 端 v2，配方逐字实测）─────────────────────────────
+     此前 ops-web 只有「白卡 + 极轻阴影」一种表达，C 端有四种，这是"精致度"
+     差距的实际来源（比色值重要得多）。三者都跟随 --primary，换肤自动生效。 */
+  /* ① 渐变 hero：C 端首页/我的/订单详情票根头三处同一配方。黑白灰皮肤下
+        就是一块近黑渐变 —— 正是 mono 最缺的那个视觉锚点。 */
+  --gradient-brand: linear-gradient(135deg, var(--primary),
+                    color-mix(in srgb, var(--primary) 72%, #000 14%));
+  /* ② tint 图标底片：主色 12% 圆角方块 + 主色图标，替代"灰底灰图标" */
+  --tint-icon: color-mix(in srgb, var(--primary) 12%, transparent);
+  /* ③ 票根虚线：次要文字色 32% 的虚线，比实线柔和且自动适配明暗 */
+  --divider-dashed: color-mix(in srgb, var(--muted-foreground) 32%, transparent);
   /* = C 端 --pb-shadow-sm / --pb-shadow 换算（rpx→px，750 设计宽下 2rpx≈1px）*/
   --card-shadow: 0 1px 5px rgba(18, 20, 34, 0.05), 0 3px 14px rgba(18, 20, 34, 0.06);
 }
 
 /* 皮肤：3 套，与 C 端 SKINS 一一对应（黑白灰 / 时尚蓝 / 科幻紫）。
    只换主色 —— 中性色与语义色不参与换肤。 */
+[data-theme="brand"]  { --primary: #17c3c0;              --primary-foreground: #ffffff; }
 [data-theme="mono"]   { --primary: #18181b;              --primary-foreground: #ffffff; }
 [data-theme="blue"]   { --primary: #2f6bff;              --primary-foreground: #ffffff; }
 [data-theme="purple"] { --primary: #7c3aed;              --primary-foreground: #ffffff; }
@@ -133,7 +159,7 @@
   --accent-foreground: #f2f4f7;
   --sidebar: #10141b;                  /* C 端无侧边栏，取 bg 与 surface 之间 */
   --sidebar-foreground: #c9d0da;
-  --border: rgba(255, 255, 255, 0.12);
+  --border: rgba(255, 255, 255, 0.14);
   --input: rgba(255, 255, 255, 0.15);
   /* 暗底上语义色要提亮才够对比，色相不变 */
   --success: #32d583;
@@ -167,6 +193,7 @@
   --radius-field: var(--r-field);
   --radius-card: var(--r-card);
   --radius-sheet: var(--r-sheet);
+  --color-tint-icon: var(--tint-icon);
   --shadow-card: var(--card-shadow);
   --shadow-pop: var(--shadow-pop);
   --color-background: var(--background);
@@ -235,3 +262,28 @@ body {
 .txt-h1 { font-size: 23px; font-weight: 800; letter-spacing: -0.2px; line-height: 1.2; }
 .txt-h2 { font-size: 17px; font-weight: 700; letter-spacing: -0.1px; }
 .tabular-nums, .txt-num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+
+/* ── 入场动效 ──────────────────────────────────────────────────────────────
+   drawer / confirm-dialog 里用了 `animate-in` `fade-in` `slide-in-from-right`
+   这几个类名，但项目**没有装 tailwindcss-animate**，Tailwind 4 下它们一个都不生成
+   —— 也就是说抽屉和弹窗一直是"瞬间出现"的，代码却看着像有动画。
+
+   这里补上真实实现，而不是加一个依赖：只需要三个类，且用我们自己的
+   --dur/--ease（= C 端 pb-button 的实测缓动），比插件默认值更贴近 C 端手感。 */
+@keyframes pb-fade-in { from { opacity: 0 } to { opacity: 1 } }
+@keyframes pb-slide-in-end { from { transform: translateX(100%) } to { transform: translateX(0) } }
+@keyframes pb-zoom-in { from { opacity: 0; transform: translate(-50%, -50%) scale(0.96) } to { opacity: 1; transform: translate(-50%, -50%) scale(1) } }
+
+.animate-in { animation-duration: var(--dur); animation-timing-function: var(--ease); animation-fill-mode: both; }
+.fade-in { animation-name: pb-fade-in; }
+.zoom-in { animation-name: pb-zoom-in; }
+/* 抽屉从**行末方向**滑入：LTR 是右、RTL 是左。写死 right 会让阿语界面从错误的一侧飞进来。 */
+.slide-in-from-right { animation-name: pb-slide-in-end; }
+[dir="rtl"] .slide-in-from-right { animation-name: pb-slide-in-end; transform-origin: left; }
+@keyframes pb-slide-in-end-rtl { from { transform: translateX(-100%) } to { transform: translateX(0) } }
+[dir="rtl"] .slide-in-from-right { animation-name: pb-slide-in-end-rtl; }
+
+/* 尊重系统的「减少动态效果」设置 —— 前庭失调用户会因位移动画不适。 */
+@media (prefers-reduced-motion: reduce) {
+  .animate-in { animation: none !important; }
+}

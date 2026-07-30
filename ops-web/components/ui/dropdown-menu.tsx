@@ -166,7 +166,7 @@ export function RowActions({
         aria-label={a11yLabel}
         title={a11yLabel}
         className={cn(
-          "inline-flex size-8 items-center justify-center rounded-chip text-muted-foreground",
+          "inline-flex size-8 items-center justify-center rounded-field text-muted-foreground",
           "transition-colors duration-[var(--dur-fast)] ease-[var(--ease)] hover:bg-accent hover:text-accent-foreground",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ring-offset-bg)]",
           "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",

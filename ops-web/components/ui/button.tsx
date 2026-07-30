@@ -4,9 +4,9 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  // 药丸形：C 端的主 CTA / 分段控件 / 搜索框实测都是 9999px 圆角，这是它"软"的
-  // 主要来源，比配色更决定风格。小尺寸下就是 chip，密集表格里也立得住。
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-bold tracking-[0.1px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
+  // 控件档 6px：**不用药丸**。药丸是消费端语言，密集表格每行 3~5 个按钮时
+  // 吃横向空间且削弱扫描性；业界密集后台（Linear/Vercel/Stripe/shadcn）都在 4~8px。
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-field text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {

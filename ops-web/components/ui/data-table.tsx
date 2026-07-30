@@ -111,7 +111,7 @@ export function DataTable<T>({
         <button
           type="button"
           className={cn(
-            "inline-flex items-center gap-1 rounded-chip transition-colors hover:text-foreground",
+            "inline-flex items-center gap-1 rounded-field transition-colors hover:text-foreground",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ring-offset-bg)]",
             active && "text-foreground",
           )}
@@ -173,7 +173,7 @@ export function DataTable<T>({
                           <button
                             type="button"
                             className={cn(
-                              "rounded-chip p-1 text-muted-foreground transition-colors hover:bg-accent",
+                              "rounded-field p-1 text-muted-foreground transition-colors hover:bg-accent",
                               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ring-offset-bg)]",
                             )}
                             aria-expanded={isOpen}

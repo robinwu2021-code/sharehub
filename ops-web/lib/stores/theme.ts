@@ -9,12 +9,16 @@ import { persist } from "zustand/middleware";
 // 同名、同 hex，两端截图放一起是同一个产品。
 // 皮肤只换 --primary —— 中性色与语义色在 globals.css 里恒定，不参与换肤。
 export const THEMES = [
-  { key: "mono", label: "黑白灰", color: "oklch(0.21 0 0)" },
-  { key: "blue", label: "时尚蓝", color: "oklch(0.55 0.22 264)" },
-  { key: "purple", label: "科幻紫", color: "oklch(0.52 0.26 296)" },
+  { key: "mono", label: "黑白灰", color: "#18181b" },
+  { key: "brand", label: "简电青", color: "#17c3c0" },
+  { key: "blue", label: "时尚蓝", color: "#2f6bff" },
+  { key: "purple", label: "科幻紫", color: "#7c3aed" },
 ] as const;
 
 export type ThemeKey = (typeof THEMES)[number]["key"];
+// 运营台默认黑白灰（C 端默认是简电青）：这是两端**刻意的差异**——
+// 运营台是密集表格，主色会出现在每个链接/激活态/主按钮上，频率远高于手机端，
+// 用彩色主色会显得跳。简电青仍在可选列表里，需要品牌感时可切。
 export const DEFAULT_THEME: ThemeKey = "mono";
 
 /** 立即把主题写到 <html data-theme>（供点击时即时生效）。 */
