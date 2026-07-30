@@ -95,6 +95,30 @@ describe("页面层规范一致性（只允许变好）", () => {
     expect(countAll(/Badge tone=\{/g)).toBeLessThanOrEqual(58);
   });
 
+  it("筛选用的裸 <Select> 不增加 —— 应改用 <FilterSelect>", () => {
+    // 判据：<Select> 里带 `option value=""`（"全部 XX"）的才是**筛选**下拉；
+    // 表单里的 <Select> 是合法用法，不算违规（清单里把两者混在一起数了）。
+    // FilterSelect 的价值不是省一层标签，是让**筛选项文案与徽标文案同源**
+    // （传 StatusMap 时选项由映射表派生），否则改文案要改两处。
+    // 基线 17（页面里 <Select> 共 39 处，其余 22 处是表单）。
+    // 注：先前用行级 grep 估成 16，块匹配实测 17 —— **以断言用的同一段代码为准**，
+    // 估算与断言口径不同就会出现"基线一写上就红"。
+    const bareFilterSelects = pageFiles().reduce((n, f) => {
+      const src = readFileSync(f, "utf8");
+      // 取每个 <Select …> 到 </Select> 的块，块内有空值 option 即视为筛选
+      const blocks = src.match(/<Select[\s\S]*?<\/Select>/g) ?? [];
+      return n + blocks.filter((b) => /<option value=""/.test(b)).length;
+    }, 0);
+    expect(bareFilterSelects).toBeLessThanOrEqual(17);
+  });
+
+  it("金额不许手写格式 —— 一律走 money()（规范 §12 数字列）", () => {
+    // 这条基线是 **0**：当前已全部走 money()（120 处调用、0 处手写）。
+    // 锁在 0 是为了防回归 —— 手写 `AED ${x}` 会绕过 Intl 本地化与货币符号位置，
+    // 阿语 RTL 下符号位置是反的，手写必错。
+    expect(countAll(/`AED \$\{|"AED " *\+|AED ` *\+/g)).toBe(0);
+  });
+
   it("泛化空态文案不增加 —— 空态要说清**为什么**空（规范 §12）", () => {
     // 「暂无数据」「暂无记录」这类说不出原因的空态。基线 1（且那 1 处本身带解释）
     expect(countAll(/empty="暂无(数据|记录)"/g)).toBeLessThanOrEqual(1);

@@ -36,6 +36,8 @@ const RULES = {
   shadow: "阴影只有 shadow-card / shadow-pop 两档",
   dur: "过渡时长走 var(--dur) / var(--dur-fast)",
   ctlH: "控件高走 var(--ctl-h)、表格行高走 var(--row-h)（否则密度切换无效）",
+  numAlign: "数字单元格应右对齐（规范 §12：数字右对齐 + 等宽）",
+  pkWeight: "主键列应加强字重（规范 §12：扫描时需要锚点）",
 } as const;
 
 function classOf(el: Element): string {
@@ -85,6 +87,54 @@ function specimens(root: HTMLElement): HTMLElement[] {
     out.push(...Array.from(box.querySelectorAll<HTMLElement>("*")));
   }
   return out;
+}
+
+/**
+ * 表格级检查：数字列右对齐 + 主键列字重。
+ *
+ * **这两条只能在 DOM 上查，源码 grep 查不了** —— 判断"这一列是不是数字列"
+ * 需要看渲染出来的内容，判断"对齐/字重对不对"需要看计算样式。
+ * 所以它们不在 lib/design-tokens.test.ts（那是源码扫描），而在这里。
+ */
+function auditTables(root: HTMLElement, findings: Finding[]) {
+  for (const table of Array.from(root.querySelectorAll("table"))) {
+    const rows = Array.from(table.querySelectorAll<HTMLTableRowElement>("tbody tr"));
+    if (rows.length < 2) continue;
+    const colCount = rows[0].cells.length;
+
+    for (let c = 0; c < colCount; c++) {
+      const cells = rows.map((r) => r.cells[c]).filter(Boolean);
+      if (cells.length < 2) continue;
+      const texts = cells.map((td) => (td.textContent ?? "").trim()).filter(Boolean);
+      if (texts.length < 2) continue;
+
+      // 纯数字列：只含数字/千分位/小数点/货币符号/斜杠（如 "7/8"）与空白
+      const numeric = texts.every((t) => /^[\d.,\s/%+-]+$|^[A-Z]{3}\s[\d.,]+$/.test(t));
+      if (numeric) {
+        const align = getComputedStyle(cells[0]).textAlign;
+        if (align !== "right" && align !== "end") {
+          findings.push({
+            comp: compOf(table), rule: RULES.numAlign,
+            detail: `第 ${c + 1} 列 text-align: ${align}（示例 "${texts[0]}"）`,
+            sample: sampleOf(cells[0]),
+          });
+        }
+      }
+
+      // 主键列：第一个非选择框列，内容形如 CAB1000 / ORD500001（字母前缀 + 数字）
+      const isPk = c <= 2 && texts.every((t) => /^[A-Z]{2,4}[-_]?\d{3,}$/.test(t));
+      if (isPk) {
+        const w = Number(getComputedStyle(cells[0]).fontWeight);
+        if (w < 500) {
+          findings.push({
+            comp: compOf(table), rule: RULES.pkWeight,
+            detail: `第 ${c + 1} 列 font-weight: ${w}（示例 "${texts[0]}"）`,
+            sample: sampleOf(cells[0]),
+          });
+        }
+      }
+    }
+  }
 }
 
 export function audit(root: HTMLElement): AuditResult {
@@ -150,6 +200,8 @@ export function audit(root: HTMLElement): AuditResult {
       findings.push({ comp: compOf(el), rule: RULES.focusOffset, detail: "有 ring 无 offset", sample: sampleOf(el) });
     }
   }
+
+  auditTables(root, findings);
 
   return { findings, scanned: all.length, focusable: focusables.length };
 }
