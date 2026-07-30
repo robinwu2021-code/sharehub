@@ -45,8 +45,11 @@
   /* ── Tier 2 · 语义层（组件只准用这一层）──────────────────────────────── */
 
   /* 背景 */
-  --canvas: var(--gray-3);        /* 页面画布 */
-  --background: #ffffff;          /* 卡片 / 面板 */
+  /* 外壳只有两级色调（规范 布局与外壳 §2）：白面 + 唯一的灰块 */
+  --surface: #ffffff;             /* 白面：rail / content / 卡片 */
+  --sunken: var(--gray-3);        /* 灰块：二级面板，全局唯一 */
+  --canvas: var(--surface);
+  --background: #ffffff;
   --card: #ffffff;
   --muted: var(--gray-2);         /* 卡片内浅带：表头 / 隔行 */
   --secondary: var(--gray-3);     /* 元件填充：输入 / 分段槽（与画布同深，读作"凹陷"）*/
@@ -116,14 +119,6 @@
         —— 此前定义了却没有组件消费，切了等于没切。 */
   --ctl-h: 36px;
   --row-h: 48px;
-
-  /* ── 外壳色调阶梯 ──────────────────────────────────────────────────────
-     原则：**导航越持久，色调越深；内容浮在最上。**
-     图标栏（常驻 L1）最深 → 二级面板（上下文 L2）次之 → 内容纸最浅 + 阴影托起。
-     此前三栏用了同一个色（实测对比度 1.00），等于完全没分区——用色块分区的前提
-     是色块得**有不同的色**。 */
-  --nav-rail: var(--gray-5);
-  --nav-panel: var(--gray-4);
 }
 
 /* 皮肤：**只换主色**。中性色与语义色恒定 —— 换肤不该动摇整个界面的观感。 */
@@ -157,15 +152,15 @@
   /* ⚠️ 暗色下卡片要**整体上移一档**（用 gray-3 而不是 gray-2）：
      gray-1 与 gray-2 只差 1.05 的对比度，卡片浮不起来。规范里"画布/卡片 ≥1.10"
      这条硬指标在暗色下同样要满足，不能因为"暗色本来就该靠描边"就放过。 */
-  --canvas: var(--gray-1);
-  --background: var(--gray-3);
-  --card: var(--gray-3);
+  --surface: var(--gray-2);
+  --sunken: var(--gray-1);        /* 暗色下"下沉"是更深，不是更浅 */
+  --canvas: var(--surface);
+  --background: var(--gray-2);
+  --card: var(--gray-2);
   --muted: var(--gray-4);
   --secondary: var(--gray-4);
   --accent: var(--gray-5);
-  --sidebar: var(--gray-1);
-  --nav-rail: var(--gray-1);
-  --nav-panel: var(--gray-2);
+  --sidebar: var(--gray-3);
   --input: var(--gray-4);
 
   /* 暗色下浅字压深底会显胖，此时才需要 antialiased 把笔画收细 */
@@ -179,67 +174,6 @@
 
 /* 黑白灰皮肤在暗色下主色要反相，否则近黑主色在深底上完全看不见 */
 .dark[data-theme="mono"] { --primary: #f2f4f7; --primary-foreground: #16171d; }
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   白底体系（data-ground="flat"）
-   方案：docs/technical/设计方案-白底体系.md
-
-   构图：**色块 + 阴影**，尽量不用线。
-   - 容器边界 = 柔和阴影（不是描边）
-   - 内部分隔 = 填充色块（表头带 / 隔行 / hover），不是分隔线
-
-   为什么：线多了界面就"碎"，尤其密集表格里每行一条线，视觉噪音极大。
-   色块是**面**的语言、阴影是**层**的语言，两者都比线安静。
-
-   白底与灰底因此收敛成**同一套构图**，差别只在画布色调与阴影强度：
-   白底没有画布/卡片的明度差，需要略强的阴影补偿。
-
-   ⏳ 过渡期双轨：方案已定 A（白底取代灰底），保留灰底只为对比与回退。
-   ═══════════════════════════════════════════════════════════════════════════ */
-[data-ground="flat"] {
-  --canvas: #ffffff;
-  --background: #ffffff;
-  --card: #ffffff;
-  --sidebar: var(--gray-2);
-  /* 白底下内容纸是纯白，导航阶梯整体上移一档拉开差距 */
-  --nav-rail: var(--gray-3);
-  --nav-panel: var(--gray-2);
-  /* 白底没有画布/卡片明度差，阴影要略强才托得住卡片 */
-  --card-shadow: 0 1px 2px rgb(16 18 24 / 0.06), 0 2px 8px rgb(16 18 24 / 0.08);
-}
-.dark[data-ground="flat"] {
-  --canvas: var(--gray-1);
-  --background: var(--gray-3);
-  --card: var(--gray-3);
-  --sidebar: var(--gray-2);
-  --nav-rail: var(--gray-1);
-  --nav-panel: var(--gray-2);
-  --card-shadow: none;           /* 暗色下阴影不可见，靠色块明度差分层 */
-}
-
-/* 容器：靠阴影托起，**不画描边** */
-[data-ground="flat"] [data-surface="card"],
-[data-ground="flat"] [data-surface="stat"],
-[data-ground="flat"] [data-surface="table"] {
-  background: var(--card);
-  border: 0;
-  border-radius: var(--r-card);
-  box-shadow: var(--card-shadow);
-}
-/* 嵌套不叠影：卡片里的表格不再自己托一层，否则阴影叠加发脏 */
-[data-ground="flat"] [data-surface="card"] [data-surface="table"] {
-  box-shadow: none;
-  border-radius: 0;
-}
-[data-ground="flat"] [data-surface="card"][class*="tint"] {
-  background: revert-layer;
-  box-shadow: none;              /* 语义 tint 卡本身就是色块，不需要再托 */
-}
-
-[data-ground="flat"] [data-surface="stat"] [data-slot="label"] {
-  font-size: 12px;
-  font-weight: 500;
-}
 
 [data-density="dense"] {
   --ctl-h: 30px;
@@ -295,20 +229,28 @@
   --radius-xl: var(--r-card);
   --radius-2xl: var(--r-sheet);
 }
-/* ── 外壳：导航底 + 内容纸 ────────────────────────────────────────────────
-   零线条实现结构分区：三栏各自色块（阶梯递浅），内容区是一张**抬起的纸**
-   —— 起始侧圆角 + 阴影，天然把导航与内容切开，比任何竖线都干净。
+/* ── 外壳：一整块白底，中间嵌一条灰带 ─────────────────────────────────────
+   规范：docs/technical/设计规范-布局与外壳.md §2
 
-   此前三栏用了同一个色（实测两两对比度都是 1.00），等于完全没分区：
-   用色块分区的前提是色块得**有不同的色**。 */
-/* ⚠️ 图标栏本身也是 <aside class="...bg-sidebar...">，所以下面那条面板规则
-   （element+attr 特异性更高）会把它一起覆盖掉 —— 必须显式排除，
-   否则两栏又变成同一个色（已实测踩过）。 */
-[data-shell="rail"] { background: var(--nav-rail); }
-aside[class*="bg-sidebar"]:not([data-shell="rail"]) { background: var(--nav-panel); }
-[data-shell="sheet"] {
-  background: var(--canvas);
-  box-shadow: var(--elevation-2);
+   **只用两级色调**：白（rail + content）与灰（panel）。
+   灰色的二级面板**自己就是分隔物** —— 它同时隔开 rail 与 content，
+   不需要缝隙、不需要线、不需要第三个色阶。
+
+   一级菜单与内容同为白面：一级是主功能入口，不该被压成灰底推到背景里。
+   二级是"上下文"，比一级更临时、比内容更辅助，用一个下沉色块表达刚好。
+
+   走到这版之前试错了四轮（见规范 §9）：三栏同色 → 加竖线 → 三级灰阶梯
+   （导航整片发灰）→ 两张白纸（主次菜单又混在一起）。
+   本版关键是**减少色块层级**：层级越少越不容易乱，且"一级白、二级灰"
+   直接对应导航的主次关系，而不是靠深浅程度去暗示。 */
+[data-shell="page"],
+[data-shell="rail"],
+[data-shell="sheet"] { background: var(--surface); }
+
+/* 全局唯一的灰块 */
+aside[class*="bg-sidebar"]:not([data-shell="rail"]) {
+  background: var(--sunken);
+  color: var(--foreground);
 }
 
 * {

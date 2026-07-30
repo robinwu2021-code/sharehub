@@ -100,7 +100,8 @@ export function Rail() {
   return (
     <aside
       data-shell="rail"
-      className="hidden shrink-0 flex-col bg-sidebar text-sidebar-foreground md:flex"
+      // 底色由父级导航纸提供（规范 §2.2：rail 与 panel 同属一张纸）
+      className="hidden shrink-0 flex-col text-sidebar-foreground md:flex"
       style={{ width: railExpanded ? RAIL_EXPANDED_WIDTH : RAIL_WIDTH }}
     >
       <div className={cn("flex h-14 items-center gap-2", railExpanded ? "px-4" : "justify-center")}>

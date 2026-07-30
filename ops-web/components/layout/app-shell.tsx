@@ -32,27 +32,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (!ready || !loggedIn) return null;
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Rail />
-      {/* SecondaryNav 读 useSearchParams（静态导出要求包 Suspense） */}
-      <Suspense fallback={null}>
-        <SecondaryNav />
-      </Suspense>
-      {/* 内容纸：导航是"底"，内容是浮在其上的一张纸 —— 起始侧圆角 + 阴影，
-          零线条把导航与内容切开。色调阶梯见 globals.css 的 --nav-rail/--nav-panel。 */}
-      <div className="flex min-w-0 flex-1 flex-col p-2 ps-0">
-        <div
-          data-shell="sheet"
-          className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-sheet"
-        >
-          <Header />
-          <main className="flex-1 overflow-y-auto p-6">
-            {/* PhaseGuard 读 useSearchParams（静态导出要求包 Suspense） */}
-            <Suspense fallback={null}>
-              <PhaseGuard>{children}</PhaseGuard>
-            </Suspense>
-          </main>
-        </div>
+    // 规范：设计规范-布局与外壳.md §2 —— 只用两级色调，全幅铺满不留边距。
+    <div data-shell="page" className="flex h-screen overflow-hidden">
+      {/* 一整块白底，中间嵌一条灰带：灰色的二级面板自己就是 rail 与 content 的分隔 */}
+      <div data-shell="nav" className="flex min-h-0 shrink-0 overflow-hidden">
+        <Rail />
+        {/* SecondaryNav 读 useSearchParams（静态导出要求包 Suspense） */}
+        <Suspense fallback={null}>
+          <SecondaryNav />
+        </Suspense>
+      </div>
+
+      {/* 内容纸：header 吸顶不滚，页体独立滚动 */}
+      <div data-shell="sheet" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <Header />
+        <main className="flex-1 overflow-y-auto p-6">
+          {/* PhaseGuard 读 useSearchParams（静态导出要求包 Suspense） */}
+          <Suspense fallback={null}>
+            <PhaseGuard>{children}</PhaseGuard>
+          </Suspense>
+        </main>
       </div>
     </div>
   );

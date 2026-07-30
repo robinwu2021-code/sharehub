@@ -3,11 +3,11 @@
 // 色块主题切换器：点开一格调色板，每个主题一个圆润色块，白底不变。
 import { useEffect, useRef, useState } from "react";
 import { Check, Palette } from "lucide-react";
-import { THEMES, GROUNDS, useTheme } from "@/lib/stores/theme";
+import { THEMES, useTheme } from "@/lib/stores/theme";
 import { cn } from "@/lib/utils";
 
 export function ThemeSwitcher() {
-  const { themeKey, setTheme, ground, setGround } = useTheme();
+  const { themeKey, setTheme } = useTheme();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -60,28 +60,6 @@ export function ThemeSwitcher() {
                 </button>
               );
             })}
-          </div>
-
-          {/* 底色方案：与皮肤正交的另一个轴。灰底靠明度差分层，白底靠描边分层。 */}
-          <div className="mb-2 mt-4 px-1 text-xs font-medium text-muted-foreground">底色</div>
-          <div className="grid grid-cols-2 gap-2">
-            {GROUNDS.map((g) => (
-              <button
-                key={g.key}
-                type="button"
-                onClick={() => setGround(g.key)}
-                aria-pressed={ground === g.key}
-                className={cn(
-                  "rounded-field px-2 py-1.5 text-[12px] font-medium transition-colors",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ring-offset-bg)]",
-                  ground === g.key
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-secondary text-secondary-foreground hover:bg-accent",
-                )}
-              >
-                {g.label}
-              </button>
-            ))}
           </div>
         </div>
       )}
