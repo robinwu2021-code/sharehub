@@ -12,7 +12,8 @@ import { ThemeSwitcher } from "./theme-switcher";
 import { LangSwitcher } from "./lang-switcher";
 import { ChevronRight, LogOut } from "lucide-react";
 
-// 面包屑：域 › 模块 › 子功能（URL 反推，标签经 tNav 本地化）。读 useSearchParams → 包 Suspense。
+// 面包屑：L1 › 分组 › 子功能（URL 反推，标签经 tNav 本地化）。分组为不可点的中间项。
+// 读 useSearchParams → 包 Suspense。
 function Breadcrumb() {
   const pathname = usePathname();
   const sp = useSearchParams();
