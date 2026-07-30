@@ -27,8 +27,11 @@ import { audit, groupFindings, type AuditResult } from "./audit";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+// 与 lib/stores/theme.ts 的 THEMES 一一对应（四套）。
+// 曾经漏了简电青 —— 总览页少一套皮肤，等于那套皮肤的问题永远不会在这里被发现。
 const SKINS = [
   { key: "mono", label: "黑白灰" },
+  { key: "brand", label: "简电青" },
   { key: "blue", label: "时尚蓝" },
   { key: "purple", label: "科幻紫" },
 ] as const;
@@ -77,7 +80,7 @@ function Toggle({
       onClick={onClick}
       aria-pressed={on}
       className={cn(
-        "rounded-chip px-3 py-1 text-xs font-bold transition-colors",
+        "rounded-field px-3 py-1 txt-label transition-colors",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ring-offset-bg)]",
         on ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent",
       )}
@@ -110,8 +113,8 @@ export default function DevUiPage() {
     <PreviewVersionCtx.Provider value={version}>
       <div className="pb-16">
         <header className="mb-4">
-          <h1 className="text-[20px] font-extrabold tracking-[-0.3px]">组件总览 · 全状态矩阵</h1>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <h1 className="txt-display">组件总览 · 全状态矩阵</h1>
+          <p className="mt-1 txt-caption text-muted-foreground">
             dev-only 工具页，不在菜单里。四个开关作用于 <code>&lt;html&gt;</code>，离开本页自动还原，不写 localStorage。
           </p>
         </header>
@@ -127,7 +130,7 @@ export default function DevUiPage() {
           <Toggle on={t.dense} onClick={() => t.setDense(!t.dense)}>紧凑</Toggle>
           <div className="ms-auto flex items-center gap-2">
             {result && (
-              <span className="text-[11px] text-muted-foreground">
+              <span className="txt-caption text-muted-foreground">
                 扫 {result.scanned} 元素 / {result.focusable} 可聚焦 · 发现 {result.findings.length} 处
               </span>
             )}
@@ -137,24 +140,24 @@ export default function DevUiPage() {
 
         {result && (
           <section className="mb-5 rounded-card bg-card p-5 shadow-[var(--card-shadow)]">
-            <h2 className="text-[15px] font-extrabold tracking-[-0.2px]">规范体检结果</h2>
-            <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+            <h2 className="txt-heading">规范体检结果</h2>
+            <p className="mt-1 txt-caption text-muted-foreground">
               在**已渲染的 DOM** 上扫描，不是读源码 —— 组件改好了这份清单会自动变短，不需要有人回来维护手抄的问题列表。
               局限：抽屉/弹窗关着时其内容不在 DOM 里（打开后重新体检）；class 字符串判断不了「这个尺寸是不是刻意的」，
               所以结论是**线索不是判决**。
             </p>
             {grouped.length === 0 ? (
-              <div className="mt-3 rounded-field bg-success-tint px-3 py-2 text-xs text-success-ink">
+              <div className="mt-3 rounded-field bg-success-tint px-3 py-2 txt-caption text-success-ink">
                 本次扫描未发现违规。
               </div>
             ) : (
               <ul className="mt-3 space-y-1.5">
                 {grouped.map((g) => (
-                  <li key={`${g.comp}/${g.rule}`} className="rounded-field bg-muted px-3 py-2 text-[11px] leading-relaxed">
+                  <li key={`${g.comp}/${g.rule}`} className="rounded-field bg-muted px-3 py-2 txt-caption">
                     <span className="font-bold">{g.comp}</span>
                     <span className="mx-1.5 text-muted-foreground">·</span>
                     <span>{g.rule}</span>
-                    <span className="ms-1.5 rounded-chip bg-destructive-tint px-1.5 py-0.5 font-bold text-destructive-ink">
+                    <span className="ms-1.5 rounded-chip bg-destructive-tint px-1.5 py-0.5 text-destructive-ink">
                       {g.count}
                     </span>
                     <div className="mt-1 text-muted-foreground">{g.details.slice(0, 4).join(" · ")}</div>

@@ -39,7 +39,10 @@
         小字过不了 AA —— 本项目真实踩过的坑。 */
   --green-solid:  #12b76a;  --green-subtle:  #e7f7ef;  --green-text:  #05663a;
   --amber-solid:  #f79009;  --amber-subtle:  #fdf1e3;  --amber-text:  #79450b;
-  --red-solid:    #f04438;  --red-subtle:    #fdeceb;  --red-text:    #8f221b;
+  /* red-600 而非 red-500(#F04438)：实心红按钮压白字，#F04438 只有 3.76:1，
+     过不了 AA（14px bold 不算大字，阈值仍是 4.5）。#D92D20 给到 4.83。
+     是同一色阶往下一档，不是随手调深。 */
+  --red-solid:    #d92d20;  --red-subtle:    #fdeceb;  --red-text:    #8f221b;
   --blue-solid:   #2f6bff;  --blue-subtle:   #e9eeff;  --blue-text:   #1a3f9e;
 
   /* ── Tier 2 · 语义层（组件只准用这一层）──────────────────────────────── */
@@ -82,6 +85,10 @@
   --warning: var(--amber-solid);  --warning-tint: var(--amber-subtle);  --warning-ink: var(--amber-text);
   --destructive: var(--red-solid); --destructive-tint: var(--red-subtle); --destructive-ink: var(--red-text);
   --info: var(--blue-solid);      --info-tint: var(--blue-subtle);      --info-ink: var(--blue-text);
+  /* 压在**实心语义底**上的文字色（区别于 --*-ink，那个是压在 tint 浅底上的）。
+     浅色下语义底够深 → 用白字；暗色下语义色被提亮 → 必须换深字，
+     否则 #F97066 配白字只有 2.79:1。此前 Button 写死 text-white，暗色下就是这个问题。 */
+  --on-semantic: #ffffff;
 
   /* ── 形状（五档，仅此五档）──────────────────────────────────────────── */
   --r-control: 3px;   /* 复选框 */
@@ -144,6 +151,9 @@
   --amber-solid: #fdb022; --amber-subtle: #2a1d09; --amber-text: #fec84b;
   --red-solid:   #f97066; --red-subtle:   #2d1513; --red-text:   #fda29b;
   --blue-solid:  #6690ff; --blue-subtle:  #131c33; --blue-text:  #a4bcfd;
+  /* 实心语义底上的文字：暗色下语义色被提亮，白字只有 2.79:1 → 必须压深。
+     浅色是白字（4.83:1）。这一档明暗必须不同，不能只定义一次。 */
+  --on-semantic: var(--gray-1);
 
   /* ⚠️ 暗色下卡片要**整体上移一档**（用 gray-3 而不是 gray-2）：
      gray-1 与 gray-2 只差 1.05 的对比度，卡片浮不起来。规范里"画布/卡片 ≥1.10"
@@ -200,6 +210,7 @@
   --color-accent-subtle: var(--accent-subtle);
   --color-accent-border: var(--accent-border);
   --color-destructive: var(--destructive);
+  --color-on-semantic: var(--on-semantic);
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-info: var(--info);
