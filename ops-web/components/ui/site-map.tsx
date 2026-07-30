@@ -68,6 +68,10 @@ export function SiteMap({
   const markersRef = React.useRef<google.maps.Marker[]>([]);
   const [ready, setReady] = React.useState(false);
   const [failed, setFailed] = React.useState(!KEY);
+  // 瓦片看门狗：脚本能加载 ≠ 瓦片能渲染（受限网络/CSP 会只拦瓦片请求，
+  // 表现为「一片灰底 + 圆点」——比直接报错更糟，用户以为页面坏了）。
+  // 超时未收到 tilesloaded 就降级到列表，保证任何环境下都有可用信息。
+  const [tilesOk, setTilesOk] = React.useState(false);
 
   React.useEffect(() => {
     let alive = true;
@@ -121,6 +125,7 @@ export function SiteMap({
       else if (points.length === 1) { map.setCenter({ lat: points[0].lat, lng: points[0].lng }); map.setZoom(14); }
     };
     applyView();
+    g.event.addListenerOnce(map, "tilesloaded", () => setTilesOk(true));
     // ⚠️ 地图常在容器最终尺寸确定前就初始化（首帧布局 / tab 切换），Google 会按当时的
     // 尺寸算视口，结果瓦片只铺满一小块。ResizeObserver 只在尺寸**变化**时触发，
     // 而这里尺寸自始至终没变过 → 救不到。所以创建后主动补一次 resize + 重设视野。
@@ -128,7 +133,11 @@ export function SiteMap({
       g.event.trigger(map, "resize");
       applyView();
     });
-    return () => cancelAnimationFrame(raf);
+    const watchdog = window.setTimeout(() => {
+      // 用 setState 的函数式判断，避免把 tilesOk 塞进依赖导致重建 marker
+      setTilesOk((ok) => { if (!ok) setFailed(true); return ok; });
+    }, 5000);
+    return () => { cancelAnimationFrame(raf); window.clearTimeout(watchdog); };
   }, [ready, points, onSelect]);
 
   // 容器尺寸变化后要让地图重算视野：地图常在容器最终尺寸确定前就初始化了
@@ -158,10 +167,10 @@ export function SiteMap({
     return (
       <Card className="p-4">
         <EmptyState
-          title={KEY ? "地图加载失败" : "未配置地图 Key，暂以列表展示"}
-          desc={KEY
-            ? "请检查网络，或确认该 Key 已启用 Maps JavaScript API 并放行了当前域名"
-            : "在 ops-web/.env.local 配置 NEXT_PUBLIC_GMAPS_KEY 后即可看到地图撒点"}
+          title={!KEY ? "未配置地图 Key，暂以列表展示" : "地图瓦片加载失败，已切换为列表"}
+          desc={!KEY
+            ? "在 ops-web/.env.local 配置 NEXT_PUBLIC_GMAPS_KEY 后即可看到地图撒点"
+            : "常见原因：当前环境的 CSP/网络拦截了 maps.googleapis.com 的瓦片请求；或该 Key 未放行当前域名、未启用 Maps JavaScript API。下方列表数据与地图一致。"}
         />
         <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {points.map((p) => (

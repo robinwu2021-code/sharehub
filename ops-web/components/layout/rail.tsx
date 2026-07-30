@@ -36,17 +36,20 @@ function RailItem({
     "group relative flex items-center gap-3 rounded-md py-2 transition-colors",
     expanded ? "px-3" : "justify-center px-0",
   );
-  // 折叠态用自绘 tooltip（原生 title 延迟高）
-  const tip = !expanded && (
-    <span className="pointer-events-none absolute top-1/2 z-50 hidden -translate-y-1/2 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-xs text-background group-hover:block" style={{ insetInlineStart: "100%", marginInlineStart: "0.5rem" }}>
-      {label}{soon ? ` · ${t("common.soon")}` : ""}
-    </span>
-  );
+  // 折叠态提示改用**原生 title**。
+  // 原先是自绘 tooltip（绝对定位在图标右侧 100% 处），但父级 nav 有 overflow-y-auto，
+  // CSS 规范下一轴 auto 会把另一轴的 visible 也算成 auto → tooltip 被裁掉，
+  // 表现为「只有图标、没有任何提示」。原生 title 不受裁剪影响，且带无障碍语义。
+  const tipText = !expanded ? `${label}${soon ? ` · ${t("common.soon")}` : ""}` : undefined;
 
   if (soon || !href) {
     return (
-      <span aria-disabled className={cn(base, "cursor-not-allowed text-muted-foreground/40")} title={expanded ? t("common.soon") : undefined}>
-        {inner}{tip}
+      <span
+        aria-disabled
+        className={cn(base, "cursor-not-allowed text-muted-foreground/40")}
+        title={tipText ?? (expanded ? t("common.soon") : undefined)}
+      >
+        {inner}
       </span>
     );
   }
@@ -54,9 +57,10 @@ function RailItem({
     <Link
       href={href}
       aria-label={label}
+      title={tipText}
       className={cn(base, active ? "bg-accent font-medium text-[var(--primary)]" : "text-sidebar-foreground hover:bg-accent/60 hover:text-foreground")}
     >
-      {inner}{tip}
+      {inner}
     </Link>
   );
 }
