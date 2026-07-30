@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Nunito, Tajawal, Noto_Sans_SC } from "next/font/google";
+import { Nunito, Tajawal } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 import { AppShell } from "@/components/layout/app-shell";
@@ -23,14 +23,12 @@ const tajawal = Tajawal({
   variable: "--font-tajawal",
   display: "swap",
 });
-const notoSC = Noto_Sans_SC({
-  // 必须是 chinese-simplified —— 用 latin 子集的话字库里根本没有汉字，
-  // 中文会静默回退到 PingFang，等于白加（已实测 fonts.check 返回 false）。
-  subsets: ["chinese-simplified"],
-  weight: ["400", "500", "700"],
-  variable: "--font-noto-sc",
-  display: "swap",
-});
+// ⚠️ 中文的 Noto Sans SC 走 CDN 而不是 next/font，**这是被迫的不是偷懒**：
+// 该字族在 next/font 的字体数据里只登记了 cyrillic/latin/latin-ext/vietnamese，
+// 没有 chinese-simplified，自托管路径根本取不到汉字字形（用 latin 子集时
+// document.fonts.check(...,'设备') 实测为 false，字体加了等于没加）。
+// 故与 C 端 c-app/index.html 采用同一条 CDN link（见下方 <head>），两端字形一致。
+// 已知代价：受限网络/内网部署下会静默回退到 PingFang SC / 微软雅黑。
 
 export const metadata: Metadata = {
   title: "powerbank 运营端",
@@ -43,8 +41,15 @@ try{var l=JSON.parse(localStorage.getItem('ops-locale')||'{}');var lo=(l&&l.stat
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="zh" className={`${nunito.variable} ${tajawal.variable} ${notoSC.variable}`} suppressHydrationWarning>
+    <html lang="zh" className={`${nunito.variable} ${tajawal.variable}`} suppressHydrationWarning>
       <head>
+        {/* 中文字体：与 C 端 c-app/index.html 同一条 CDN link（见上方注释说明为何不走 next/font）*/}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap"
+        />
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
       </head>
       <body>

@@ -154,7 +154,7 @@ body {
   color: var(--foreground);
   /* 字族顺序与 C 端 App.vue 完全一致：拉丁 Nunito / 阿语 Tajawal / 中文 Noto Sans SC，
      按字形自动回退，最后才是系统字。 */
-  font-family: var(--font-nunito), var(--font-tajawal), var(--font-noto-sc),
+  font-family: var(--font-nunito), var(--font-tajawal), "Noto Sans SC",
     "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑",
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   /* = C 端 28rpx/1.5（750 设计宽下 28rpx≈14px）。只影响未显式标 text-* 的元素；
