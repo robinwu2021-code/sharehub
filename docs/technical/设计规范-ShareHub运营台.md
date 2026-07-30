@@ -118,11 +118,6 @@ Tier 3  组件层 (component)     --btn-height, --table-row-h …
 | `bg-surface` | `#FFFFFF` | gray-3 |
 | `bg-subtle` | gray-2 | gray-4 |
 | `bg-hover` | gray-4 | gray-5 |
-
-> **为什么亮色画布取 gray-3 而不是 Radix 原模型的 gray-2**：我们的卡片是纯白，
-> 画布必须坐到第 3 档才能过下面那条 ≥1.10 的硬指标（gray-2 对白只有 1.05）。
-> **暗色同理，卡片整体上移一档到 gray-3** —— 不能因为"暗色本来就该靠描边"
-> 就放过这条指标（实测 gray-1/gray-2 只有 1.05，卡片浮不起来）。
 | `bg-selected` | accent-subtle | accent-subtle |
 | `border-subtle` | gray-6 | gray-6 |
 | `border-default` | gray-7 | gray-7 |
@@ -130,6 +125,11 @@ Tier 3  组件层 (component)     --btn-height, --table-row-h …
 | `text-secondary` | gray-11 | gray-11 |
 | `text-placeholder` | gray-9 | gray-9 |
 | `text-on-solid` | `#FFFFFF` | `#FFFFFF` |
+
+> **为什么亮色画布取 gray-3 而不是 Radix 原模型的 gray-2**：我们的卡片是纯白，
+> 画布必须坐到第 3 档才能过下面那条 ≥1.10 的硬指标（gray-2 对白只有 1.05）。
+> **暗色同理，卡片整体上移一档到 gray-3** —— 不能因为"暗色本来就该靠描边"
+> 就放过这条指标（实测 gray-1/gray-2 只有 1.05，卡片浮不起来）。
 
 **画布与卡片的明度差不得低于 1.10**（否则卡片浮不起来）；
 **卡片与描边不得低于 1.25**（否则发丝边等于不存在）。这两条是硬指标，可自动化检查。
