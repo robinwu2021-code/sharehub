@@ -174,82 +174,56 @@
    白底体系（data-ground="flat"）
    方案：docs/technical/设计方案-白底体系.md
 
-   构图：**纯白画布 + 统一卡片边界**。
-   灰底靠"卡片与画布的明度差"分层；白底画布与卡片同色，明度差归零，
-   改由**一条统一的发丝描边**承担全部容器边界职责。
+   构图：**色块 + 阴影**，尽量不用线。
+   - 容器边界 = 柔和阴影（不是描边）
+   - 内部分隔 = 填充色块（表头带 / 隔行 / hover），不是分隔线
 
-   ⚠️ 关键是**统一**，不是"给卡片加线"：
-   - 所有容器用**同一个描边色、同一个圆角、零投影**
-   - 不允许有的靠投影、有的靠线、有的什么都没有 —— 那正是"杂乱"的来源
-   - 嵌套容器不叠边（卡片里的表格不再自己画边）
+   为什么：线多了界面就"碎"，尤其密集表格里每行一条线，视觉噪音极大。
+   色块是**面**的语言、阴影是**层**的语言，两者都比线安静。
+
+   白底与灰底因此收敛成**同一套构图**，差别只在画布色调与阴影强度：
+   白底没有画布/卡片的明度差，需要略强的阴影补偿。
 
    ⏳ 过渡期双轨：方案已定 A（白底取代灰底），保留灰底只为对比与回退。
-   确认后必须删掉灰底那套与 ground 开关，否则会滑向永久双轨。
    ═══════════════════════════════════════════════════════════════════════════ */
 [data-ground="flat"] {
   --canvas: #ffffff;
   --background: #ffffff;
   --card: #ffffff;
-  --sidebar: #ffffff;
-  --card-shadow: none;           /* 静态内容零投影：白底上投影只会显脏 */
-  --rule: var(--gray-6);         /* 容器边界与分隔线的**唯一**用色 */
-  --rule-strong: var(--gray-7);
+  --sidebar: var(--gray-2);      /* 侧栏用**浅色块**与内容区分，不画竖线 */
+  /* 白底没有画布/卡片明度差，阴影要略强才托得住卡片 */
+  --card-shadow: 0 1px 2px rgb(16 18 24 / 0.06), 0 2px 8px rgb(16 18 24 / 0.08);
 }
 .dark[data-ground="flat"] {
-  --canvas: var(--gray-2);
-  --background: var(--gray-2);
-  --card: var(--gray-2);
+  --canvas: var(--gray-1);
+  --background: var(--gray-3);
+  --card: var(--gray-3);
   --sidebar: var(--gray-2);
-  --card-shadow: none;
+  --card-shadow: none;           /* 暗色下阴影不可见，靠色块明度差分层 */
 }
 
-/* ① 统一的卡片边界：描边 + 圆角 + 零投影 —— 全站同一种表达 */
+/* 容器：靠阴影托起，**不画描边** */
 [data-ground="flat"] [data-surface="card"],
 [data-ground="flat"] [data-surface="stat"],
 [data-ground="flat"] [data-surface="table"] {
   background: var(--card);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-card);
-  box-shadow: none;
-}
-/* 嵌套不叠边：卡片里的表格不再自己画边，否则出现双线 */
-[data-ground="flat"] [data-surface="card"] [data-surface="table"] {
   border: 0;
+  border-radius: var(--r-card);
+  box-shadow: var(--card-shadow);
+}
+/* 嵌套不叠影：卡片里的表格不再自己托一层，否则阴影叠加发脏 */
+[data-ground="flat"] [data-surface="card"] [data-surface="table"] {
+  box-shadow: none;
   border-radius: 0;
 }
-/* 语义 tint 卡片（"这块要注意"）保留底色，边界同样统一 */
 [data-ground="flat"] [data-surface="card"][class*="tint"] {
   background: revert-layer;
+  box-shadow: none;              /* 语义 tint 卡本身就是色块，不需要再托 */
 }
 
-/* ② 表格：表头浅带保留（扫描锚点），行分隔线用统一色 */
-[data-ground="flat"] [data-surface="table"] thead {
-  background: var(--muted);
-}
-[data-ground="flat"] [data-surface="table"] tbody tr {
-  box-shadow: inset 0 -1px 0 var(--rule);
-}
-/* 斑马纹与行分隔线是两套分隔手段，同时用就是打架 —— 白底体系只留分隔线 */
-[data-ground="flat"] [data-surface="table"] tbody tr:nth-child(even) {
-  background: transparent;
-}
-[data-ground="flat"] [data-surface="table"] tbody tr:last-child {
-  box-shadow: none;
-}
-
-/* ③ 统计卡：与其它卡片同一种边界（不再是无边的数字行） */
 [data-ground="flat"] [data-surface="stat"] [data-slot="label"] {
   font-size: 12px;
   font-weight: 500;
-}
-
-/* ④ 三栏外壳：全白，靠竖发丝线分栏（而不是灰块） */
-[data-ground="flat"] [data-shell="rail"] { border-inline-end: 1px solid var(--rule); }
-/* 二级面板：该文件有其它会话的在途改动，不去加 data 钩子，改用类名选择器兜住。
-   面板用了 bg-sidebar/60、/35 等透明度变体，故用前缀匹配。 */
-[data-ground="flat"] aside[class*="bg-sidebar"] {
-  background: var(--sidebar);
-  border-inline-end: 1px solid var(--rule);
 }
 
 [data-density="dense"] {
