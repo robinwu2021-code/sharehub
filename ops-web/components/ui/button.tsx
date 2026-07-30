@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 const buttonVariants = cva(
   // 药丸形：C 端的主 CTA / 分段控件 / 搜索框实测都是 9999px 圆角，这是它"软"的
   // 主要来源，比配色更决定风格。小尺寸下就是 chip，密集表格里也立得住。
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-bold tracking-[0.1px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {

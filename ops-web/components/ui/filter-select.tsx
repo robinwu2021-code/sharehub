@@ -6,6 +6,7 @@
 // 传 StatusMap 时选项直接由映射表派生，改文案只改一处。
 // 没有对应映射表的（如按平台/国家筛）传 options 数组，形态与 FieldDef.options 一致。
 import * as React from "react";
+import { cn } from "@/lib/utils";
 import { Select } from "./input";
 import { statusOptions, type StatusMap } from "./status-badge";
 
@@ -28,8 +29,10 @@ export function FilterSelect<K extends string>({
     () => (Array.isArray(options) ? (options as readonly FilterOption[]) : statusOptions(options as StatusMap<K>)),
     [options],
   );
+  // 药丸形：筛选下拉与搜索框同处工具栏一行，形状必须一致。
+  // 表单里的 <Select> 仍是 11px 圆角（对齐 C 端 pb-field），两者刻意不同。
   return (
-    <Select className={className} aria-label={ariaLabel} value={value} onChange={(e) => onChange(e.target.value)}>
+    <Select className={cn("rounded-full", className)} aria-label={ariaLabel} value={value} onChange={(e) => onChange(e.target.value)}>
       {allLabel !== undefined && <option value="">{allLabel}</option>}
       {list.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
     </Select>

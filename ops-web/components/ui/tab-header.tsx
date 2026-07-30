@@ -64,16 +64,17 @@ export function TabHeader({
               "max-md:!max-w-full max-md:!opacity-100 max-md:overflow-visible",
             )}
           >
-            <div className="flex w-max gap-1 rounded-xl bg-secondary p-1 max-md:w-full max-md:flex-wrap">
+            {/* 分段控件 = C 端 pb-segmented：灰槽(faint) + 全圆，选中项是白色药丸 */}
+            <div className="flex w-max gap-1 rounded-full bg-secondary p-1 max-md:w-full max-md:flex-wrap max-md:rounded-2xl">
               {visibleTabs.map((tb) => (
                 <button
                   key={tb.key}
                   type="button"
                   onClick={() => onChange(tb.key)}
                   className={cn(
-                    "whitespace-nowrap rounded-lg px-3 py-1 text-[13px] transition-colors",
+                    "whitespace-nowrap rounded-full px-3.5 py-1 text-[13px] transition-colors",
                     tb.key === value
-                      ? "bg-card font-medium text-foreground shadow-[var(--card-shadow)]"
+                      ? "bg-card font-semibold text-foreground shadow-[var(--card-shadow)]"
                       : "text-muted-foreground hover:text-foreground",
                   )}
                 >

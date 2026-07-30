@@ -3,7 +3,8 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const badgeVariants = cva(
-  "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium",
+  // 形态取自 C 端 pb-tag：药丸 + 字重 700 + 11px（原为 rounded-md/500，偏"方"）
+  "inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold leading-[1.7] tracking-[0.1px]",
   {
     variants: {
       tone: {

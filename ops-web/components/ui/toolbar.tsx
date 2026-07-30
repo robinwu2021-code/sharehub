@@ -48,7 +48,8 @@ export function Toolbar({
     <div className="mb-4 flex flex-wrap items-center gap-2">
       {onSearch !== undefined && (
         <Input
-          className="w-60"
+          // 搜索框是 C 端唯一用药丸的输入（首页 search）；表单输入走 Input 默认的 11px
+          className="w-60 rounded-full"
           placeholder={searchPlaceholder ?? t("common.search")}
           value={search ?? ""}
           onChange={(e) => onSearch(e.target.value)}
