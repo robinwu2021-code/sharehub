@@ -116,6 +116,14 @@
         —— 此前定义了却没有组件消费，切了等于没切。 */
   --ctl-h: 36px;
   --row-h: 48px;
+
+  /* ── 外壳色调阶梯 ──────────────────────────────────────────────────────
+     原则：**导航越持久，色调越深；内容浮在最上。**
+     图标栏（常驻 L1）最深 → 二级面板（上下文 L2）次之 → 内容纸最浅 + 阴影托起。
+     此前三栏用了同一个色（实测对比度 1.00），等于完全没分区——用色块分区的前提
+     是色块得**有不同的色**。 */
+  --nav-rail: var(--gray-5);
+  --nav-panel: var(--gray-4);
 }
 
 /* 皮肤：**只换主色**。中性色与语义色恒定 —— 换肤不该动摇整个界面的观感。 */
@@ -156,6 +164,8 @@
   --secondary: var(--gray-4);
   --accent: var(--gray-5);
   --sidebar: var(--gray-1);
+  --nav-rail: var(--gray-1);
+  --nav-panel: var(--gray-2);
   --input: var(--gray-4);
 
   /* 暗色下浅字压深底会显胖，此时才需要 antialiased 把笔画收细 */
@@ -190,7 +200,10 @@
   --canvas: #ffffff;
   --background: #ffffff;
   --card: #ffffff;
-  --sidebar: var(--gray-2);      /* 侧栏用**浅色块**与内容区分，不画竖线 */
+  --sidebar: var(--gray-2);
+  /* 白底下内容纸是纯白，导航阶梯整体上移一档拉开差距 */
+  --nav-rail: var(--gray-3);
+  --nav-panel: var(--gray-2);
   /* 白底没有画布/卡片明度差，阴影要略强才托得住卡片 */
   --card-shadow: 0 1px 2px rgb(16 18 24 / 0.06), 0 2px 8px rgb(16 18 24 / 0.08);
 }
@@ -199,6 +212,8 @@
   --background: var(--gray-3);
   --card: var(--gray-3);
   --sidebar: var(--gray-2);
+  --nav-rail: var(--gray-1);
+  --nav-panel: var(--gray-2);
   --card-shadow: none;           /* 暗色下阴影不可见，靠色块明度差分层 */
 }
 
@@ -280,6 +295,22 @@
   --radius-xl: var(--r-card);
   --radius-2xl: var(--r-sheet);
 }
+/* ── 外壳：导航底 + 内容纸 ────────────────────────────────────────────────
+   零线条实现结构分区：三栏各自色块（阶梯递浅），内容区是一张**抬起的纸**
+   —— 起始侧圆角 + 阴影，天然把导航与内容切开，比任何竖线都干净。
+
+   此前三栏用了同一个色（实测两两对比度都是 1.00），等于完全没分区：
+   用色块分区的前提是色块得**有不同的色**。 */
+/* ⚠️ 图标栏本身也是 <aside class="...bg-sidebar...">，所以下面那条面板规则
+   （element+attr 特异性更高）会把它一起覆盖掉 —— 必须显式排除，
+   否则两栏又变成同一个色（已实测踩过）。 */
+[data-shell="rail"] { background: var(--nav-rail); }
+aside[class*="bg-sidebar"]:not([data-shell="rail"]) { background: var(--nav-panel); }
+[data-shell="sheet"] {
+  background: var(--canvas);
+  box-shadow: var(--elevation-2);
+}
+
 * {
   border-color: var(--border);
 }

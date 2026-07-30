@@ -38,14 +38,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Suspense fallback={null}>
         <SecondaryNav />
       </Suspense>
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Header />
-        <main className="flex-1 overflow-y-auto p-6">
-          {/* PhaseGuard 读 useSearchParams（静态导出要求包 Suspense） */}
-          <Suspense fallback={null}>
-            <PhaseGuard>{children}</PhaseGuard>
-          </Suspense>
-        </main>
+      {/* 内容纸：导航是"底"，内容是浮在其上的一张纸 —— 起始侧圆角 + 阴影，
+          零线条把导航与内容切开。色调阶梯见 globals.css 的 --nav-rail/--nav-panel。 */}
+      <div className="flex min-w-0 flex-1 flex-col p-2 ps-0">
+        <div
+          data-shell="sheet"
+          className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-sheet"
+        >
+          <Header />
+          <main className="flex-1 overflow-y-auto p-6">
+            {/* PhaseGuard 读 useSearchParams（静态导出要求包 Suspense） */}
+            <Suspense fallback={null}>
+              <PhaseGuard>{children}</PhaseGuard>
+            </Suspense>
+          </main>
+        </div>
       </div>
     </div>
   );
