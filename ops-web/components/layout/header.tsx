@@ -46,20 +46,23 @@ export function Header() {
         {role === "AGENT" && <span>{t("common.agent")} <span className="text-foreground">{agentNo || "-"}</span></span>}
         {IS_MOCK && <Badge tone="warning">{t("common.mockData")}</Badge>}
       </div>
-      <div className="flex items-center gap-3 text-sm">
+      <div className="flex items-center gap-2 text-sm">
         <LangSwitcher />
         <ThemeSwitcher />
-        <span className="text-muted-foreground">{t(`role.${role}`)}</span>
-        <span className="font-medium">{username}</span>
+        {/* 角色名不再单独占位：进用户名的 title。此前"运营管理员 admin"两段文本
+            说的是同一个人，占了顶栏最大的一块。 */}
+        <span className="font-medium" title={t(`role.${role}`)}>{username}</span>
         <Button
           size="sm"
           variant="ghost"
+          aria-label={t("common.logout")}
+          title={t("common.logout")}
           onClick={() => {
             logout();
             router.push("/login");
           }}
         >
-          <LogOut className="size-4 rtl:-scale-x-100" /> {t("common.logout")}
+          <LogOut className="size-4 rtl:-scale-x-100" />
         </Button>
       </div>
     </header>
