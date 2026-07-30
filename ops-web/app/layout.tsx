@@ -1,33 +1,31 @@
 import type { Metadata } from "next";
-import { Nunito, Tajawal } from "next/font/google";
+import { IBM_Plex_Sans, IBM_Plex_Sans_Arabic } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 import { AppShell } from "@/components/layout/app-shell";
 
-// 三个字族按字形自动回退，与 C 端 c-app/index.html 加载的完全同一组
-// （拉丁 Nunito / 阿语 Tajawal / 中文 Noto Sans SC）。
-// 走 next/font 构建期自托管而非 C 端那样的 Google Fonts CDN：本环境已证实
-// 会拦外部请求（地图瓦片就挂在这上面），CDN 字体在受限网络/内网部署下会静默
-// 回退成系统字，两端看着就不是一个产品了。
-const nunito = Nunito({
+// 字族：IBM Plex Sans 一族打通三种文字（拉丁 / 阿语 / 中文），全部来自 Google Fonts。
+//
+// 为什么从 Nunito 换过来：Nunito 是圆润的消费端字体，用在处理金额与设备号的密集
+// 台账上偏"软"；IBM Plex 是为技术界面设计的中性无衬线，数字辨识度高（0/O、1/l 分得开），
+// 且**同一家族覆盖三种文字**——三语混排时字重、字宽、基线是一致的，
+// 拼三个不同家族做不到这一点。
+const plex = IBM_Plex_Sans({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
-  variable: "--font-nunito",
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-plex",
   display: "swap",
 });
-// 阿语此前完全没有字体 —— 这不是风格差异是缺陷：ops-web 支持 ar + RTL，
-// 却只能靠系统兜底，Windows 上尤其难看。
-const tajawal = Tajawal({
+const plexArabic = IBM_Plex_Sans_Arabic({
   subsets: ["arabic"],
-  weight: ["400", "500", "700", "800"],
-  variable: "--font-tajawal",
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-plex-ar",
   display: "swap",
 });
-// ⚠️ 中文的 Noto Sans SC 走 CDN 而不是 next/font，**这是被迫的不是偷懒**：
-// 该字族在 next/font 的字体数据里只登记了 cyrillic/latin/latin-ext/vietnamese，
-// 没有 chinese-simplified，自托管路径根本取不到汉字字形（用 latin 子集时
-// document.fonts.check(...,'设备') 实测为 false，字体加了等于没加）。
-// 故与 C 端 c-app/index.html 采用同一条 CDN link（见下方 <head>），两端字形一致。
+// ⚠️ 中文走 CDN 而非 next/font：**CJK 家族在 next/font 的字体数据里没有登记**
+// （已用 next 自带的 font-data.json 逐个探测确认：IBM Plex Sans / Arabic 都在，
+// 但 IBM Plex Sans SC 查无此项）。自托管路径取不到汉字字形，用 latin 子集时
+// document.fonts.check(...,'设备') 实测为 false —— 字体加了等于没加，且肉眼看不出来。
 // 已知代价：受限网络/内网部署下会静默回退到 PingFang SC / 微软雅黑。
 
 export const metadata: Metadata = {
@@ -41,14 +39,14 @@ try{var l=JSON.parse(localStorage.getItem('ops-locale')||'{}');var lo=(l&&l.stat
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="zh" className={`${nunito.variable} ${tajawal.variable}`} suppressHydrationWarning>
+    <html lang="zh" className={`${plex.variable} ${plexArabic.variable}`} suppressHydrationWarning>
       <head>
-        {/* 中文字体：与 C 端 c-app/index.html 同一条 CDN link（见上方注释说明为何不走 next/font）*/}
+        {/* 中文字体：IBM Plex Sans SC（见上方注释说明为何不走 next/font）*/}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
           rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+SC:wght@400;500;600;700&display=swap"
         />
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
       </head>

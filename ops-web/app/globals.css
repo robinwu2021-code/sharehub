@@ -1,185 +1,167 @@
 @import "tailwindcss";
 
-/* ── 设计令牌（2026-07-30 重做）─────────────────────────────────────────────
-   与 C 端 c-app 的 token 体系对齐（src/design/tokens.ts + App.vue）：
-   同一组皮肤名、同一组语义色 hex、同样的 tint 派生方式。
+/* ═══════════════════════════════════════════════════════════════════════════
+   ShareHub 运营台 · 设计 token
+   规范：docs/technical/设计规范-ShareHub运营台.md（**该文档是唯一真源**）
 
-   ⚠️ 改动的核心：**中性色不再由主色派生**。
-   旧方案把 canvas/sidebar/muted/border 全写成 color-mix(primary, white)，
-   于是画布、侧栏、表头、输入框、边框统统泛着同一种主色调，整屏没有一处真中性；
-   叠加 --border 只有 13% 主色混白（对白底约 1.05:1，肉眼几乎看不见），
-   密集表格界面只能靠大片浅色块暗示边界 → 糊、脏、层次不清。
+   三层架构，组件只准消费 Tier 2：
+     Tier 1 原始层  --gray-N / --accent-N / --green-N …  只有数值没有含义
+     Tier 2 语义层  --canvas / --border / --text-…       有岗位定义
+     Tier 3 组件层  --ctl-h / --row-h                     语义层表达不了时才加
 
-   新方案（shadcn 默认形态，也是 Linear/Vercel/Stripe 后台的通行做法）：
-   面色全部 chroma=0 的中性灰阶；层次靠「明度差 + 可见发丝边 + 极轻阴影」；
-   主色只用于点睛（激活态/主按钮/焦点环）。换肤只改 --primary，
-   中性色与语义色恒定 —— 换肤不再动摇整个界面的观感。 */
+   为什么要分层：此前 token 是逐轮累加的，命名按用途随手起，彼此没有数量关系，
+   每次调色都要凭感觉试。分层后「这个灰好不好看」变成「这里该用第 6 档还是第 7 档」
+   —— 可判定、可争论出对错。
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 :root {
-  --primary: #18181b;                  /* = C 端 --pb-primary，取原值不再用 oklch 近似 */
-  --primary-foreground: oklch(0.985 0 0);
+  /* ── Tier 1 · 中性色阶（12 档，Radix Colors 岗位模型）────────────────────
+     色相偏冷（略带蓝）而非纯中性：纯灰读起来像"没选过"，微冷与设备/科技属性
+     相合，且四套主色（青绿/蓝/紫/近黑）都能坐得住。
+     ⚠️ 每档的岗位是**规定死的**，见下方 Tier 2 映射。混用档位就是 bug。 */
+  --gray-1:  #fcfcfd;   /* 最底层背景 */
+  --gray-2:  #f7f8fa;   /* 次级背景：卡片内的浅带（表头/隔行）*/
+  --gray-3:  #f1f2f5;   /* UI 元件底：输入框 / 分段槽 / 页面画布 */
+  --gray-4:  #ecedf1;   /* UI 元件 hover */
+  --gray-5:  #e5e7ec;   /* UI 元件 active / 选中 */
+  --gray-6:  #dee0e6;   /* 弱分隔线：表格行线 —— "隐约的界" */
+  --gray-7:  #d2d5dd;   /* 元件描边 —— "明确的边" */
+  --gray-8:  #b9bdc8;   /* 元件描边 hover */
+  --gray-9:  #8b8f9c;   /* 实心中性底 / 占位符文字 */
+  --gray-10: #7e828f;   /* 实心中性底 hover */
+  --gray-11: #61656f;   /* 次要文字（对白底 ≥4.5:1）*/
+  --gray-12: #16171d;   /* 主要文字 */
+
+  /* ── Tier 1 · 语义色（四套皮肤下恒定，状态含义不能随皮肤漂移）──────────
+     每色三档派生：subtle 底 / border 边 / text 文字。
+     ⚠️ text 档是必须的不是优化：直接拿 solid 当 tint 底上的文字色只有约 2.8:1，
+        小字过不了 AA —— 本项目真实踩过的坑。 */
+  --green-solid:  #12b76a;  --green-subtle:  #e7f7ef;  --green-text:  #05663a;
+  --amber-solid:  #f79009;  --amber-subtle:  #fdf1e3;  --amber-text:  #79450b;
+  --red-solid:    #f04438;  --red-subtle:    #fdeceb;  --red-text:    #8f221b;
+  --blue-solid:   #2f6bff;  --blue-subtle:   #e9eeff;  --blue-text:   #1a3f9e;
+
+  /* ── Tier 2 · 语义层（组件只准用这一层）──────────────────────────────── */
+
+  /* 背景 */
+  --canvas: var(--gray-3);        /* 页面画布 */
+  --background: #ffffff;          /* 卡片 / 面板 */
+  --card: #ffffff;
+  --muted: var(--gray-2);         /* 卡片内浅带：表头 / 隔行 */
+  --secondary: var(--gray-3);     /* 元件填充：输入 / 分段槽（与画布同深，读作"凹陷"）*/
+  --accent: var(--gray-4);        /* hover */
+  --sidebar: var(--gray-3);
+
+  /* 文字 */
+  --foreground: var(--gray-12);
+  --card-foreground: var(--gray-12);
+  --muted-foreground: var(--gray-11);
+  --secondary-foreground: var(--gray-12);
+  --accent-foreground: var(--gray-12);
+  --sidebar-foreground: var(--gray-11);
+
+  /* 边界：**两档，别混用** —— 6 是表格行线，7 是元件描边 */
+  --border: var(--gray-6);
+  --border-strong: var(--gray-7);
+  --input: var(--gray-3);
+
+  /* 主色（Tier 1 由皮肤块注入 --primary，此处派生五档）*/
+  --primary: #18181b;
+  --primary-foreground: #ffffff;
+  --accent-subtle: color-mix(in srgb, var(--primary) 12%, var(--background));
+  --accent-border: color-mix(in srgb, var(--primary) 32%, var(--background));
+  --accent-hover:  color-mix(in srgb, var(--primary) 92%, #000);
   --ring: var(--primary);
+  --ring-offset-bg: var(--background);
 
-  /* 中性面色：**逐个取自 C 端 --pb-***（c-app/src/App.vue），不再自造。
-     C 端这组灰是微冷的（带一点蓝），不是纯中性 —— 这与"中性色不由主色派生"
-     并不冲突：病根是**派生**（换肤就整屏变色），不是"带不带色相"。
-     一组固定的冷调灰同样治病，还能让两端截图是同一个产品。 */
-  --background: #ffffff;               /* = C 端 --pb-surface */
-  --card: #ffffff;                     /* = C 端 --pb-elev */
-  --foreground: #16171d;               /* = C 端 --pb-ink */
-  --card-foreground: #16171d;
-  /* C 端 --pb-sub 是 #8A8D97，对白底仅 3.9:1 —— 小字过不了 AA。运营台的次要文字
-     密度远高于手机端（表格里每行都有），故**刻意压深一档**，与暗色语义色提亮同理。 */
-  --muted-foreground: #6e717a;         /* 对白底 ≈4.8:1 */
-  --muted: #f6f7f9;                    /* 表头/隔行：卡片内的浅带，比画布浅 */
-  --secondary: #f1f2f5;                /* 填充块（输入/分段）：与画布同深，读作"凹陷" */
-  --secondary-foreground: #2a2c34;
-  /* 下面两个 C 端没有对应物 —— 手机端页面底就是纯白，靠阴影分卡片；
-     运营台是密集表格，画布与卡片必须有明度差，否则卡片边界只剩阴影、一糊到底。
-     故从 faint 派生，保持同一个色相家族。 */
-  /* ⚠️ 2026-07-30 重调：原来 canvas 取 faint 混白 55%（≈#F8F9FB），实测
-     **画布/卡片对比度只有 1.06、卡片/边框 1.14、卡片/表头 1.11** —— 三个分隔
-     机制全挤在 1.1 附近，整屏亮度几乎一样，所以「平、糊、没层次」。
-     根因是折中失误：C 端根本没有画布（页面底=卡片=纯白，纯靠阴影分层），
-     我为密集表格发明了画布却定得离白太近，同时又保留了 C 端那套很轻的阴影 ——
-     两种分层手段各用一半，等于都没用上。现在把画布压深、边框加强，让卡片真的浮起来。 */
-  --canvas: #f1f2f5;                   /* vs 卡片 ≈1.13，卡片才浮得起来 */
-  --sidebar: #f1f2f5;
-  --sidebar-foreground: #3b3e48;
-  --accent: #e4e6eb;                   /* 激活/hover */
-  --accent-foreground: #16171d;
-  /* ⚠️ C 端实测 **border-width 全部为 0** —— 分区完全靠填充块 + 阴影，一根线都不画。
-     运营台不能全照搬：密集表格没有行分隔就读不动。折中：边框色压到几乎只剩带感，
-     且**只用于表格行分隔**；卡片/工具栏/输入框一律无边框走填充块。 */
-  --border: #e2e4ea;                   /* vs 卡片 ≈1.29，发丝边真的看得见 */
-  --input: #f2f3f6;                    /* 输入是**填充块**不是描边框（同 C 端搜索框）*/
+  /* 语义色语义名（组件用这些，不用 Tier 1）*/
+  --success: var(--green-solid);  --success-tint: var(--green-subtle);  --success-ink: var(--green-text);
+  --warning: var(--amber-solid);  --warning-tint: var(--amber-subtle);  --warning-ink: var(--amber-text);
+  --destructive: var(--red-solid); --destructive-tint: var(--red-subtle); --destructive-ink: var(--red-text);
+  --info: var(--blue-solid);      --info-tint: var(--blue-subtle);      --info-ink: var(--blue-text);
 
-  /* 语义色：直接采用 C 端 --pb-* 的 hex，一个不改，跨端状态色一致 */
-  --success: #12b76a;
-  --warning: #f79009;
-  --destructive: #f04438;
-  --info: #2f6bff;                     /* 新增：运营台大量"处理中/待审/提示"，
-                                          此前只能借主色，与"可点击/主操作"语义混淆 */
-  /* tint：Badge/状态块底色，同 C 端 --pb-*-tint 的做法 */
-  --success-tint: color-mix(in oklch, var(--success) 14%, white);
-  --warning-tint: color-mix(in oklch, var(--warning) 14%, white);
-  --destructive-tint: color-mix(in oklch, var(--destructive) 14%, white);
-  --info-tint: color-mix(in oklch, var(--info) 14%, white);
-  /* tint 上的文字要单独压暗：#12b76a 直接放在浅绿底上只有 ~2.8:1，小字过不了 AA */
-  --success-ink: color-mix(in oklch, var(--success) 72%, black);
-  --warning-ink: color-mix(in oklch, var(--warning) 68%, black);
-  --destructive-ink: color-mix(in oklch, var(--destructive) 75%, black);
-  --info-ink: color-mix(in oklch, var(--info) 78%, black);
+  /* ── 形状（五档，仅此五档）──────────────────────────────────────────── */
+  --r-control: 3px;   /* 复选框 */
+  --r-field:   6px;   /* 控件：按钮/输入/下拉/分段项 */
+  --r-card:    10px;  /* 卡片、表格容器 */
+  --r-sheet:   14px;  /* 抽屉、模态框 */
+  --r-chip:    9999px;/* **仅徽章/状态芯片** —— 药丸是"标签"隐喻 */
+  --radius: var(--r-card);
 
-  /* ── 形状阶 ─────────────────────────────────────────────────────────────
-     此前只有 --radius 一个形状 token，其余全是 Tailwind 默认阶硬写，实测组件层
-     混用了 **7 种圆角写法**（md/lg/xl/2xl/full/[11px]/[var(--radius)]）——
-     这是"看着不统一"的结构性原因，不是某个组件没调好。
-     现在收成五档，**只允许用这五档**。 */
-  /* ⚠️ 2026-07-30 定位变更：ops-web 只从 C 端取**四个主色**，形状语言独立设计。
-     此前把 C 端的手机端形状整体搬了过来（按钮/输入/筛选全是 9999px 药丸），
-     但**药丸是消费端语言**：密集表格每行 3~5 个按钮，药丸吃掉横向空间、
-     削弱扫描性。业界密集后台（Linear/Vercel/Stripe/shadcn 默认）控件圆角
-     都在 4~8px、卡片 8~12px。现按数据台重定。 */
-  --r-control: 4px;                    /* 16px 级小控件（checkbox）：再大会被夹成正圆，
-                                          与单选点撞脸，「方=多选 / 圆=互斥」失效 */
-  --r-field: 6px;                      /* 控件：按钮/输入/下拉/分段 —— 密集台账的主力档 */
-  --r-card: 10px;                      /* 卡片/表格容器 */
-  --r-sheet: 14px;                     /* 抽屉/弹层等大面 */
-  --r-chip: 9999px;                    /* **只给徽章/状态芯片** —— 它本来就是"标签"隐喻，
-                                          是唯一该用药丸的地方，不要再外扩到按钮/输入 */
-  --radius: var(--r-card);             /* 兼容既有 rounded-[var(--radius)] 调用点 */
-  /* ── 焦点环 ──────────────────────────────────────────────────────────────
-     实测 23 个组件里只有 5 个写了 focus-visible —— 键盘用户看不到焦点在哪。
-     统一成一组 token，组件里一律用 `focus-visible:ring-2 focus-visible:ring-ring
-     focus-visible:ring-offset-2 focus-visible:ring-offset-[--ring-offset-bg]`。 */
-  --ring-offset-bg: var(--card);
+  /* ── 层次：密集界面优先描边，阴影只给真浮层 ──────────────────────────── */
+  --elevation-1: 0 1px 2px rgb(16 18 24 / 0.04), 0 1px 3px rgb(16 18 24 / 0.06);
+  --elevation-2: 0 4px 8px rgb(16 18 24 / 0.06), 0 8px 16px rgb(16 18 24 / 0.08);
+  --elevation-3: 0 8px 16px rgb(16 18 24 / 0.08), 0 24px 48px rgb(16 18 24 / 0.12);
+  --card-shadow: var(--elevation-1);
+  --shadow-pop:  var(--elevation-2);
 
-  /* ── 阴影阶 ──────────────────────────────────────────────────────────────
-     卡片与浮层不该是同一级阴影：浮层要"离纸更远"才读得出层次。
-     两档都换算自 C 端 --pb-shadow-sm / --pb-shadow。 */
-  --shadow-pop: 0 4px 12px rgba(18, 20, 34, 0.10), 0 12px 32px rgba(18, 20, 34, 0.12);
+  /* ── 动效 ────────────────────────────────────────────────────────────── */
+  --dur-instant: 0ms;
+  --dur-fast: 120ms;
+  --dur: 180ms;
+  --dur-slow: 240ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
 
-  /* ── 层级阶 ──────────────────────────────────────────────────────────────
-     此前浮层全是硬写 z-50，叠加顺序靠 DOM 先后碰运气（tooltip 被 drawer 盖住过）。 */
-  --z-sticky: 20;
-  --z-drawer: 40;
-  --z-dialog: 50;
-  --z-popover: 60;
-  --z-toast: 70;
-  --z-tooltip: 80;                     /* tooltip 永远在最上：它是对其它浮层的说明 */
+  /* ── 层级（六档，禁止即兴取值）──────────────────────────────────────── */
+  --z-sticky: 100;
+  --z-drawer: 200;
+  --z-dialog: 300;
+  --z-popover: 400;
+  --z-toast: 500;
+  --z-tooltip: 600;   /* 恒在最上：它是对其它浮层的说明 */
 
-  /* ── 动效 ────────────────────────────────────────────────────────────────
-     取自 C 端 pb-button / pb-segmented 的实测值，不再各组件自己写 duration。 */
-  --dur-fast: 0.12s;
-  --dur: 0.2s;
-  --ease: cubic-bezier(0.22, 1, 0.36, 1);
-
-  /* ── 密度 ────────────────────────────────────────────────────────────────
-     C 端是手机触控尺寸（pb-btn md = 84rpx ≈ 42px），运营台是鼠标 + 密集表格，
-     两边尺寸体系天然不同 —— 这是**不追求与 C 端一致**的一维。
-     两档：default 给表单/抽屉，dense 给列表页（单屏多看 3~5 行是运营真实诉求）。
-     用法：容器加 `data-density="dense"`，控件高度写 `h-[var(--ctl-h)]`。 */
-  --ctl-h: 36px;                       /* 控件高（输入/按钮/下拉）*/
-  --row-h: 44px;                       /* 表格行高 */
-
-  /* ── 表现手法（取自 C 端 v2，配方逐字实测）─────────────────────────────
-     此前 ops-web 只有「白卡 + 极轻阴影」一种表达，C 端有四种，这是"精致度"
-     差距的实际来源（比色值重要得多）。三者都跟随 --primary，换肤自动生效。 */
-  /* ① 渐变 hero：C 端首页/我的/订单详情票根头三处同一配方。黑白灰皮肤下
-        就是一块近黑渐变 —— 正是 mono 最缺的那个视觉锚点。 */
-  --gradient-brand: linear-gradient(135deg, var(--primary),
-                    color-mix(in srgb, var(--primary) 72%, #000 14%));
-  /* ② tint 图标底片：主色 12% 圆角方块 + 主色图标，替代"灰底灰图标" */
-  --tint-icon: color-mix(in srgb, var(--primary) 12%, transparent);
-  /* ③ 票根虚线：次要文字色 32% 的虚线，比实线柔和且自动适配明暗 */
-  --divider-dashed: color-mix(in srgb, var(--muted-foreground) 32%, transparent);
-  /* = C 端 --pb-shadow-sm / --pb-shadow 换算（rpx→px，750 设计宽下 2rpx≈1px）*/
-  --card-shadow: 0 1px 5px rgba(18, 20, 34, 0.05), 0 3px 14px rgba(18, 20, 34, 0.06);
+  /* ── Tier 3 · 密度（列表页紧凑 / 表单舒适）────────────────────────────
+     ⚠️ 控件高度必须走这两个 token，否则密度切换无效
+        —— 此前定义了却没有组件消费，切了等于没切。 */
+  --ctl-h: 36px;
+  --row-h: 48px;
 }
 
-/* 皮肤：3 套，与 C 端 SKINS 一一对应（黑白灰 / 时尚蓝 / 科幻紫）。
-   只换主色 —— 中性色与语义色不参与换肤。 */
-[data-theme="brand"]  { --primary: #17c3c0;              --primary-foreground: #ffffff; }
-[data-theme="mono"]   { --primary: #18181b;              --primary-foreground: #ffffff; }
-[data-theme="blue"]   { --primary: #2f6bff;              --primary-foreground: #ffffff; }
-[data-theme="purple"] { --primary: #7c3aed;              --primary-foreground: #ffffff; }
+/* 皮肤：**只换主色**。中性色与语义色恒定 —— 换肤不该动摇整个界面的观感。 */
+[data-theme="mono"]   { --primary: #18181b; --primary-foreground: #ffffff; }
+[data-theme="brand"]  { --primary: #17c3c0; --primary-foreground: #ffffff; }
+[data-theme="blue"]   { --primary: #2f6bff; --primary-foreground: #ffffff; }
+[data-theme="purple"] { --primary: #7c3aed; --primary-foreground: #ffffff; }
 
 .dark {
-  /* 同样逐个取自 C 端 dark（--pb-bg/surface/elev/ink/sub/faint）*/
-  --canvas: #0b0e14;                   /* = --pb-bg */
-  --background: #161a22;               /* = --pb-surface */
-  --card: #161a22;
-  --foreground: #f2f4f7;               /* = --pb-ink */
-  --card-foreground: #f2f4f7;
-  --muted-foreground: #97a0af;         /* = --pb-sub */
-  --muted: #232937;                    /* = --pb-faint */
-  --secondary: #232937;
-  --secondary-foreground: #f2f4f7;
-  --accent: #1e232d;                   /* = --pb-elev */
-  --accent-foreground: #f2f4f7;
-  --sidebar: #10141b;                  /* C 端无侧边栏，取 bg 与 surface 之间 */
-  --sidebar-foreground: #c9d0da;
-  --border: rgba(255, 255, 255, 0.14);
-  --input: rgba(255, 255, 255, 0.15);
-  /* 暗底上语义色要提亮才够对比，色相不变 */
-  --success: #32d583;
-  --warning: #fdb022;
-  --destructive: #f97066;
-  --info: #6690ff;
-  --success-tint: color-mix(in oklch, var(--success) 22%, oklch(0.23 0 0));
-  --warning-tint: color-mix(in oklch, var(--warning) 22%, oklch(0.23 0 0));
-  --destructive-tint: color-mix(in oklch, var(--destructive) 22%, oklch(0.23 0 0));
-  --info-tint: color-mix(in oklch, var(--info) 22%, oklch(0.23 0 0));
-  /* 暗色下 tint 本身就是深色，文字反而要用亮的语义色原值 */
-  --success-ink: var(--success);
-  --warning-ink: var(--warning);
-  --destructive-ink: var(--destructive);
-  --info-ink: var(--info);
-  --card-shadow: 0 1px 5px rgba(0, 0, 0, 0.28), 0 3px 14px rgba(0, 0, 0, 0.32);
+  --gray-1:  #0c0d10;
+  --gray-2:  #111318;
+  --gray-3:  #191c22;
+  --gray-4:  #1e2128;
+  --gray-5:  #23272f;
+  --gray-6:  #2a2e37;
+  --gray-7:  #343945;
+  --gray-8:  #454b59;
+  --gray-9:  #6c7280;
+  --gray-10: #7a8090;
+  --gray-11: #a0a6b2;
+  --gray-12: #f2f4f7;
+
+  /* 暗底上语义色要提亮才够对比，色相不变；subtle 改为混入卡片色（不能用浅色底）*/
+  --green-solid: #32d583; --green-subtle: #10281d; --green-text: #6ce9a6;
+  --amber-solid: #fdb022; --amber-subtle: #2a1d09; --amber-text: #fec84b;
+  --red-solid:   #f97066; --red-subtle:   #2d1513; --red-text:   #fda29b;
+  --blue-solid:  #6690ff; --blue-subtle:  #131c33; --blue-text:  #a4bcfd;
+
+  /* ⚠️ 暗色下卡片要**整体上移一档**（用 gray-3 而不是 gray-2）：
+     gray-1 与 gray-2 只差 1.05 的对比度，卡片浮不起来。规范里"画布/卡片 ≥1.10"
+     这条硬指标在暗色下同样要满足，不能因为"暗色本来就该靠描边"就放过。 */
+  --canvas: var(--gray-1);
+  --background: var(--gray-3);
+  --card: var(--gray-3);
+  --muted: var(--gray-4);
+  --secondary: var(--gray-4);
+  --accent: var(--gray-5);
+  --sidebar: var(--gray-1);
+  --input: var(--gray-4);
+
+  /* ⚠️ 暗色下阴影不可见，浮层边界改用描边表达 —— 加深阴影是无效的 */
+  --card-shadow: none;
+  --shadow-pop: 0 8px 24px rgb(0 0 0 / 0.5);
 }
 
-/* 暗色下黑白灰皮肤的主色要反相，否则近黑主色在深底上完全看不见 */
-.dark[data-theme="mono"] { --primary: oklch(0.92 0 0); --primary-foreground: oklch(0.205 0 0); }
+/* 黑白灰皮肤在暗色下主色要反相，否则近黑主色在深底上完全看不见 */
+.dark[data-theme="mono"] { --primary: #f2f4f7; --primary-foreground: #16171d; }
 
 [data-density="dense"] {
   --ctl-h: 30px;
@@ -187,13 +169,11 @@
 }
 
 @theme inline {
-  /* 圆角四档（Tailwind 会生成 rounded-chip / rounded-field / rounded-card / rounded-sheet）*/
   --radius-control: var(--r-control);
-  --radius-chip: var(--r-chip);
   --radius-field: var(--r-field);
   --radius-card: var(--r-card);
   --radius-sheet: var(--r-sheet);
-  --color-tint-icon: var(--tint-icon);
+  --radius-chip: var(--r-chip);
   --shadow-card: var(--card-shadow);
   --shadow-pop: var(--shadow-pop);
   --color-background: var(--background);
@@ -209,8 +189,11 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-accent-subtle: var(--accent-subtle);
+  --color-accent-border: var(--accent-border);
   --color-destructive: var(--destructive);
   --color-success: var(--success);
+  --color-warning: var(--warning);
   --color-info: var(--info);
   --color-success-tint: var(--success-tint);
   --color-warning-tint: var(--warning-tint);
@@ -220,32 +203,28 @@
   --color-warning-ink: var(--warning-ink);
   --color-destructive-ink: var(--destructive-ink);
   --color-info-ink: var(--info-ink);
-  --color-warning: var(--warning);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
-  /* ⚠️ 以下五档是**待淘汰的**：新代码只允许用 rounded-chip/field/card/sheet 四档。
-     暂留是因为组件层还有 23 处 rounded-md/lg/xl/2xl 调用点未替换（P2 处理），
-     替换完这里连同这些别名一起删，并加扫描测试挡住回流。 */
-  --radius-sm: calc(var(--radius) - 5px);
-  --radius-md: calc(var(--radius) - 3px);
-  --radius-lg: calc(var(--radius) - 1px);
-  --radius-xl: calc(var(--radius) + 3px);
-  --radius-2xl: calc(var(--radius) + 7px);
+  /* ⚠️ 待淘汰：新代码只允许用 control/field/card/sheet/chip 五档。
+     暂留是因为组件层还有少量 rounded-md/lg/xl 调用点，清完连同别名一起删。 */
+  --radius-sm: var(--r-control);
+  --radius-md: var(--r-field);
+  --radius-lg: var(--r-field);
+  --radius-xl: var(--r-card);
+  --radius-2xl: var(--r-sheet);
 }
-
-/* 残留 border 工具类统一走极弱发丝色（避免 Tailwind4 默认 currentColor 变黑线） */
 * {
   border-color: var(--border);
 }
 body {
   background: var(--canvas);
   color: var(--foreground);
-  /* 字族顺序与 C 端 App.vue 完全一致：拉丁 Nunito / 阿语 Tajawal / 中文 Noto Sans SC，
-     按字形自动回退，最后才是系统字。 */
-  font-family: var(--font-nunito), var(--font-tajawal), "Noto Sans SC",
+  /* IBM Plex 一族覆盖三种文字，按字形自动回退，最后才是系统字。 */
+  font-family: var(--font-plex), var(--font-plex-ar), "IBM Plex Sans SC",
     "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑",
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   /* = C 端 28rpx/1.5（750 设计宽下 28rpx≈14px）。只影响未显式标 text-* 的元素；

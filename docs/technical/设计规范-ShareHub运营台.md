@@ -114,10 +114,15 @@ Tier 3  组件层 (component)     --btn-height, --table-row-h …
 
 | 语义 token | Light | Dark |
 |---|---|---|
-| `bg-canvas` | gray-2 | gray-1 |
-| `bg-surface` | `#FFFFFF` | gray-2 |
-| `bg-subtle` | gray-3 | gray-3 |
-| `bg-hover` | gray-4 | gray-4 |
+| `bg-canvas` | gray-3 | gray-1 |
+| `bg-surface` | `#FFFFFF` | gray-3 |
+| `bg-subtle` | gray-2 | gray-4 |
+| `bg-hover` | gray-4 | gray-5 |
+
+> **为什么亮色画布取 gray-3 而不是 Radix 原模型的 gray-2**：我们的卡片是纯白，
+> 画布必须坐到第 3 档才能过下面那条 ≥1.10 的硬指标（gray-2 对白只有 1.05）。
+> **暗色同理，卡片整体上移一档到 gray-3** —— 不能因为"暗色本来就该靠描边"
+> 就放过这条指标（实测 gray-1/gray-2 只有 1.05，卡片浮不起来）。
 | `bg-selected` | accent-subtle | accent-subtle |
 | `border-subtle` | gray-6 | gray-6 |
 | `border-default` | gray-7 | gray-7 |
@@ -137,9 +142,9 @@ Tier 3  组件层 (component)     --btn-height, --table-row-h …
 
 | 用途 | 字族 |
 |---|---|
-| 拉丁 / 数字 | 见 §3.4 待决 |
-| 阿拉伯语 | Tajawal |
-| 中文 | Noto Sans SC |
+| 拉丁 / 数字 | **IBM Plex Sans** |
+| 阿拉伯语 | **IBM Plex Sans Arabic** |
+| 中文 | **IBM Plex Sans SC**（CDN，见下）|
 
 ### 3.2 类型阶
 
@@ -164,15 +169,25 @@ Tier 3  组件层 (component)     --btn-height, --table-row-h …
 只用 400 / 500 / 600 / 700 四档。**不要用字重表达层级以外的东西**
 （如"重要"用颜色或徽章表达，不是加粗）。
 
-### 3.4 ⚠️ 待决：拉丁字族
+### 3.4 字族决策（已实施）
 
-当前用 Nunito（圆润、消费端气质）。密集台账处理金额与设备号，业界更常用中性无衬线。
-候选：
-- **IBM Plex Sans** —— 有完整 SC / Arabic 家族，三语一套解决；工程气质契合；非"安全默认"
-- **系统栈** —— 零加载成本，但三平台字形不一致
-- 保持 Nunito —— 与 C 端一致，但气质偏软
+选 **IBM Plex 一族打通三种文字**，全部来自 Google Fonts。
 
-建议 IBM Plex Sans，需单独评审后实施。
+- 换掉 Nunito 的理由：它是圆润的消费端字体，用在处理金额与设备号的密集台账上偏"软"；
+  IBM Plex 为技术界面设计，数字辨识度高（0/O、1/l 分得开）
+- **同一家族覆盖三种文字**是关键：三语混排时字重、字宽、基线一致，拼三个不同家族做不到
+
+加载方式：
+| 文字 | 方式 |
+|---|---|
+| 拉丁 / 阿语 | `next/font` 构建期自托管 |
+| 中文 | Google Fonts CDN |
+
+> ⚠️ **CJK 家族在 `next/font` 的字体数据里没有登记**（用 next 自带的 font-data.json
+> 逐个探测确认：IBM Plex Sans / Arabic 都在，IBM Plex Sans SC 查无此项）。
+> 自托管路径取不到汉字字形，用 latin 子集时 `document.fonts.check(...,'设备')`
+> 实测为 `false` —— **字体加了等于没加，且肉眼完全看不出来**。
+> 已知代价：受限网络/内网部署下中文会静默回退到 PingFang SC / 微软雅黑。
 
 ---
 
