@@ -43,12 +43,19 @@ export {
   listAgentAssignments, listAgentPerformance, listAgentAccounts, listAgentCommissions,
   saveAgentAccount, saveAgentCommission,
   archiveAgent, unarchiveAgent,
+  // S1 设备/点位划拨
+  agentAssignmentRecords, listAgentAssignmentRecords, listAssignableAssets,
+  assignAgentAssets, reclaimAgentAssets, refreshAgentAssetCounts, AgentAssignError,
 } from "./agent";
+export type { AssignmentRecordQuery, AssignableAssetQuery } from "./agent";
 
 export {
   orders, orderExceptions, depositRecords, reservations, freeOrders,
   listOrderExceptions, listDepositRecords, listReservations, cancelReservation,
   listFreeOrders, getFreeOrderStats,
+  // S1：订单干预（状态机 + 审计记录）与押金处置
+  orderInterventions, interveneOrder, listOrderInterventions, OrderInterventionError,
+  transitionDeposit, releaseDeposit, buyoutDeposit, dunArrears, DepositTransitionError,
 } from "./order";
 
 export {
@@ -65,8 +72,11 @@ export {
   rechargeOrders, listRechargeOrders,
   rechargePackages, listRechargePackages, saveRechargePackage,
   archiveRechargePackage, unarchiveRechargePackage,
+  // S1 结算单：生成 / 确认 / 构成明细
+  listSettlements, generateSettlements, confirmSettlement, transitionSettlement,
+  listSettlementRecords, aggregateShareRecords, SettlementError,
 } from "./finance";
-export type { ShareSummaryQuery, RechargeQuery } from "./finance";
+export type { ShareSummaryQuery, RechargeQuery, SettlementQuery, ShareRecordQuery } from "./finance";
 
 export {
   cUsers, userRisks, userBlacklist, members, wallets, freeWhitelist, consumerSegments,

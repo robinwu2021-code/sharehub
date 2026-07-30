@@ -13,6 +13,12 @@ export interface Cabinet extends Archivable {
   model: string;
   locationNo: string | null;
   locationName?: string | null;
+  /**
+   * 归属代理（`agents.agentNo`），空 = 平台直营。台账偏差 A1：后端 `DevCabinet` 有此列、
+   * 前端原先没有，导致「这台柜子归谁」在前端拿不到、划拨也无从落地。
+   * **唯一写入口是代理域的划拨/回收**（`assignAgentAssets` / `reclaimAgentAssets`）。
+   */
+  agentNo: string | null;
   slotTotal: number;
   availableCount: number; // 可借（在仓充电宝数）
   onlineStatus: OnlineStatus;

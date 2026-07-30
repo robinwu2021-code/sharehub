@@ -80,6 +80,11 @@ const REFS: Ref[] = [
   ref("agentPerformances", db.agentPerformances, "agentNo", "agents.agentNo", agentNos),
   ref("agentAccounts", db.agentAccounts, "agentNo", "agents.agentNo", agentNos),
   ref("agentAccounts", db.agentAccounts, "agentName", "agents.name", agentNames),
+  // S1 划拨流水：代理必须真实；assetNo 是机柜号或站点号的并集（assetType 区分是哪种）
+  ref("agentAssignmentRecords", db.agentAssignmentRecords, "agentNo", "agents.agentNo", agentNos),
+  ref("agentAssignmentRecords", db.agentAssignmentRecords, "agentName", "agents.name", agentNames),
+  ref("agentAssignmentRecords", db.agentAssignmentRecords, "assetNo", "cabinets.cabinetNo ∪ sites.siteNo",
+    new Set([...cabinetNos, ...siteNos])),
 
   // —— 场所 ——
   ref("sites", db.sites, "agentNo", "agents.agentNo", agentNos, {
@@ -117,6 +122,10 @@ const REFS: Ref[] = [
   ref("cabinets", db.cabinets, "locationNo", "locations.locationNo", locationNos),
   ref("cabinets", db.cabinets, "locationName", "sites.name", siteNames),
   ref("cabinets", db.cabinets, "vendorCode", "vendors.vendorCode", vendorCodes),
+  // 偏差 A1 补齐：机柜的归属代理（划拨的落点）
+  ref("cabinets", db.cabinets, "agentNo", "agents.agentNo", agentNos, {
+    nullableReason: "平台直营机柜没有代理商（Cabinet.agentNo 类型即为 string | null，回收后也会置 null）",
+  }),
   ref("powerbanks", db.powerbanks, "cabinetNo", "cabinets.cabinetNo", cabinetNos),
   ref("cabinetMonitors", db.cabinetMonitors, "cabinetNo", "cabinets.cabinetNo", cabinetNos),
   ref("cabinetMonitors", db.cabinetMonitors, "locationName", "sites.name", siteNames),
@@ -191,8 +200,13 @@ const REFS: Ref[] = [
   ref("ledger", db.ledger, "orderNo", "orders.orderNo", orderNos),
   ref("shareRecords", db.shareRecords, "orderNo", "orders.orderNo", orderNos),
   ref("shareRecords", db.shareRecords, "payeeName", "venues.name ∪ agents.name", payeeNames),
+  ref("shareRecords", db.shareRecords, "payeeNo", "venues.venueNo ∪ agents.agentNo",
+    new Set([...venueNos, ...agentNos])),
   ref("shareRules", db.shareRules, "payeeName", "venues.name ∪ agents.name", payeeNames),
   ref("settlements", db.settlements, "payeeName", "venues.name ∪ agents.name", payeeNames),
+  // 结算单的对象号：结算单与分润明细靠 (payeeType, payeeNo, period) 对齐，号对不上就汇总不出金额
+  ref("settlements", db.settlements, "payeeNo", "venues.venueNo ∪ agents.agentNo",
+    new Set([...venueNos, ...agentNos])),
   ref("withdrawals", db.withdrawals, "payeeName", "venues.name ∪ agents.name", payeeNames),
   ref("invoices", db.invoices, "payeeName", "venues.name ∪ agents.name", payeeNames),
   ref("shareSummaries", db.shareSummaries, "payeeNo", "venues.venueNo ∪ agents.agentNo",

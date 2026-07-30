@@ -19,9 +19,11 @@ import { useCan } from "@/lib/use-can";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
 import { exportCsv } from "@/lib/export-csv";
+import { ORDER_INTERVENTIONS, interveneActions, depositActions } from "@/lib/types";
 import type {
   RentOrder, OrderException, DepositRecord,
   OrderComplaint, RefundRecord, ComplaintIssueType, ComplaintResolution,
+  OrderInterventionAction, DepositAction, DunChannel,
   Reservation, FreeOrder, WhitelistReason,
 } from "@/lib/types";
 
@@ -101,6 +103,29 @@ const DEP_STATUS: Record<DepositRecord["status"], { label: string; tone: "succes
   ARREARS: { label: "欠费", tone: "warning" },
 };
 
+// —— 订单人工干预（S1：原先四个动作是伪实现，点了状态不变）——
+const IV_LABEL: Record<OrderInterventionAction, string> = {
+  eject: "远程弹出", force_return: "强制归还", waive: "免单", compensate: "补偿", refund_apply: "申请退款",
+};
+/** 每个动作到底会改什么 —— 抽屉里写清楚，避免「点了不知道发生了什么」。 */
+const IV_DESC: Record<OrderInterventionAction, string> = {
+  eject: "向柜机补发一次弹仓指令：记一次弹出，订单转「弹出中」，柜机上报后才进入使用中",
+  force_return: "按当前时间结单：写入归还时间、时长与费用，订单转「已结算」",
+  waive: "本单应收金额置 0，减免金额单独记账（成本管控可查）",
+  compensate: "按填写金额补至用户余额（mock 口径为余额补偿，不发券）",
+  refund_apply: "只提交退款申请，进「退款记录」待审批；审批通过才真正出款",
+};
+/** 干预权限：四个处置动作用 order:intervene:execute，申请退款用 order:refund:apply。 */
+const IV_PERM: Record<OrderInterventionAction, string> = {
+  eject: "order:intervene:execute", force_return: "order:intervene:execute",
+  waive: "order:intervene:execute", compensate: "order:intervene:execute",
+  refund_apply: "order:refund:apply",
+};
+
+// —— 押金处置（S1：押金页原先纯只读）——
+const DEP_ACTION_LABEL: Record<DepositAction, string> = { release: "解冻", buyout: "买断", dun: "催缴" };
+const DUN_CHANNEL_LABEL: Record<DunChannel, string> = { SMS: "短信", PUSH: "App 推送", PHONE: "电话" };
+
 const EXC_TYPE_LABEL: Record<OrderException["type"], string> = {
   NOT_EJECTED: "未弹出",
   NOT_RETURNED: "未归还",
@@ -123,7 +148,10 @@ function OrdersInner() {
   const [keyword, setKeyword] = useState("");
   const [status, setStatus] = useState("");
   const [detail, setDetail] = useState<RentOrder | null>(null);
-  const [msg, setMsg] = useState("");
+  // 干预确认抽屉：原因必填（沿用退款审批口径），补偿另需金额
+  const [iv, setIv] = useState<{ order: RentOrder; action: OrderInterventionAction } | null>(null);
+  const [ivReason, setIvReason] = useState("");
+  const [ivAmount, setIvAmount] = useState("");
 
   const listQ = useQuery({
     queryKey: ["orders", page, keyword, status],
@@ -132,13 +160,24 @@ function OrdersInner() {
     enabled: tab === "list",
   });
 
+  // 干预历史（审计时间线）：只查当前详情订单的记录
+  const ivHistoryQ = useQuery({
+    queryKey: ["order-interventions", detail?.orderNo],
+    queryFn: () => api.listOrderInterventions({ orderNo: detail!.orderNo, size: 50 }),
+    enabled: !!detail,
+  });
+
   const intervene = useMutation({
-    mutationFn: (v: { no: string; action: string }) => api.interveneOrder(v.no, v.action),
-    onSuccess: (_r, v) => {
-      setMsg(`已${v.action === "refund" ? "退款" : v.action === "force_return" ? "强制归还" : v.action === "refund_apply" ? "提交退款申请（见「退款记录」待审批）" : "补偿"}：${v.no}`);
+    mutationFn: (v: { no: string; action: OrderInterventionAction; reason: string; amount?: number }) =>
+      api.interveneOrder(v.no, v.action, { reason: v.reason, amount: v.amount }),
+    onSuccess: (r, v) => {
+      notify.success(`${IV_LABEL[v.action]}已执行 · ${r.intervention.interventionNo} · 状态 ${t(`orderStatus.${r.intervention.beforeStatus}`)} → ${t(`orderStatus.${r.intervention.afterStatus}`)}`);
       qc.invalidateQueries({ queryKey: ["orders"] });
+      qc.invalidateQueries({ queryKey: ["order-interventions"] });
       // 申请退款会落一条退款申请，刷新审批队列
       if (v.action === "refund_apply") qc.invalidateQueries({ queryKey: ["refunds"] });
+      setDetail(r.order); // 详情抽屉立刻显示落库后的新状态与金额
+      setIv(null);
     },
   });
 
@@ -194,15 +233,71 @@ function OrdersInner() {
   });
   const canAuditRefund = allow("order:refund:audit");
 
-  // —— 押金与欠费 tab 状态（P2）——
+  // —— 押金与欠费 tab 状态（P2 → S1 补处置动作）——
   const [depPage, setDepPage] = useState(1);
   const [depKeyword, setDepKeyword] = useState("");
+  const [depStatus, setDepStatus] = useState("");
   const depQ = useQuery({
-    queryKey: ["deposit-records", depPage, depKeyword],
-    queryFn: () => api.listDepositRecords({ page: depPage, size: SIZE, keyword: depKeyword }),
+    queryKey: ["deposit-records", depPage, depKeyword, depStatus],
+    queryFn: () => api.listDepositRecords({ page: depPage, size: SIZE, keyword: depKeyword, status: depStatus || undefined }),
     placeholderData: keepPreviousData,
     enabled: tab === "deposit",
   });
+  // 押金处置拆两个码：解冻/买断动的是用户的钱（财务），催缴只留痕（客服日常）。
+  // 合成一个码会让客服为了催缴顺带拿到买断权——见 功能权限清单 §4 注。
+  const canDepositManage = allow("order:deposit:manage");
+  const canDun = allow("order:arrears:dun");
+  const canDeposit = canDepositManage || canDun;
+  // 押金处置抽屉：解冻/买断/催缴共用（买断填金额、催缴选渠道，全都要填原因）
+  const [depAct, setDepAct] = useState<{ row: DepositRecord; action: DepositAction } | null>(null);
+  const [depReason, setDepReason] = useState("");
+  const [depAmount, setDepAmount] = useState("");
+  const [dunChannel, setDunChannel] = useState<DunChannel>("SMS");
+  const openDepAct = (row: DepositRecord, action: DepositAction) => {
+    setDepAct({ row, action });
+    setDepReason("");
+    setDepAmount(String(row.amount)); // 买断金额缺省为押金额（上限也是它）
+    setDunChannel("SMS");
+  };
+  const onDepDone = (label: string) => {
+    notify.success(`${label}已执行`);
+    qc.invalidateQueries({ queryKey: ["deposit-records"] });
+    setDepAct(null);
+  };
+  const releaseDep = useMutation({
+    mutationFn: (v: { no: string; reason: string }) => api.releaseDeposit(v.no, v.reason),
+    onSuccess: () => onDepDone("押金解冻"),
+  });
+  const buyoutDep = useMutation({
+    mutationFn: (v: { no: string; amount: number; reason: string }) => api.buyoutDeposit(v.no, { amount: v.amount, reason: v.reason }),
+    onSuccess: () => onDepDone("押金买断"),
+  });
+  const dunDep = useMutation({
+    mutationFn: (v: { no: string; channel: DunChannel; note: string }) => api.dunArrears(v.no, { channel: v.channel, note: v.note }),
+    onSuccess: () => onDepDone("欠费催缴"),
+  });
+  const depBusy = releaseDep.isPending || buyoutDep.isPending || dunDep.isPending;
+  /** 解冻/买断是金额类操作，提交前走二次确认；催缴只是触达，无需确认。 */
+  const submitDepAct = async () => {
+    if (!depAct) return;
+    const { row, action } = depAct;
+    if (action === "dun") {
+      dunDep.mutate({ no: row.depositNo, channel: dunChannel, note: depReason });
+      return;
+    }
+    const ok = await confirm({
+      title: `${DEP_ACTION_LABEL[action]}押金 ${row.depositNo}`,
+      desc: action === "release"
+        ? `将解冻 ${money(row.amount, row.currency)} 并退回用户原支付方式，解冻后不可撤销。`
+        : `将按 ${money(Number(depAmount) || 0, row.currency)} 买断（押金额 ${money(row.amount, row.currency)}），买断后押金不再退还。`,
+      danger: true,
+      confirmText: `确认${DEP_ACTION_LABEL[action]}`,
+      cancelText: "再想想",
+    });
+    if (!ok) return;
+    if (action === "release") releaseDep.mutate({ no: row.depositNo, reason: depReason });
+    else buyoutDep.mutate({ no: row.depositNo, amount: Number(depAmount), reason: depReason });
+  };
 
   // —— 预约订单 tab（B4）——
   const [resPage, setResPage] = useState(1);
@@ -314,6 +409,39 @@ function OrdersInner() {
     { header: "欠费", cell: (d) => <span className="tabular-nums">{d.arrearsAmount > 0 ? money(d.arrearsAmount, d.currency) : "-"}</span> },
     { header: "状态", cell: (d) => <Badge tone={DEP_STATUS[d.status].tone}>{DEP_STATUS[d.status].label}</Badge> },
     { header: "时间", cell: (d) => <span className="text-muted-foreground">{fmtTime(d.createdAt)}</span> },
+    // 处置留痕上列表：谁在什么时候解冻/买断/催缴过，不用点进去才知道
+    {
+      header: "处置留痕",
+      cell: (d) => {
+        if (d.status === "RELEASED") return <span className="text-muted-foreground">解冻 {d.releasedAt ? fmtTime(d.releasedAt) : "-"}</span>;
+        if (d.status === "BOUGHT_OUT") return <span className="tabular-nums">买断 {d.buyoutAmount != null ? money(d.buyoutAmount, d.currency) : "-"}</span>;
+        if (d.status === "ARREARS") {
+          return d.dunCount
+            ? <span className="text-muted-foreground">已催缴 {d.dunCount} 次 · {d.lastDunAt ? fmtTime(d.lastDunAt) : "-"}</span>
+            : <span className="text-muted-foreground">未催缴</span>;
+        }
+        return <span className="text-muted-foreground">-</span>;
+      },
+    },
+    {
+      header: "操作",
+      // 可执行动作由押金状态机决定（已解冻/已买断是终态，不再出按钮）
+      cell: (d) => {
+        const acts = depositActions(d.status)
+          .filter((a) => (a === "dun" ? canDun : canDepositManage));
+        return acts.length
+          ? (
+            <div className="flex gap-1.5">
+              {acts.map((a) => (
+                <Button key={a} size="sm" variant="outline" disabled={depBusy} onClick={() => openDepAct(d, a)}>
+                  {DEP_ACTION_LABEL[a]}
+                </Button>
+              ))}
+            </div>
+          )
+          : <span className="text-muted-foreground">-</span>;
+      },
+    },
   ];
 
   const cplCols: Column<OrderComplaint>[] = [
@@ -376,7 +504,6 @@ function OrdersInner() {
 
       {tab === "list" && (
         <>
-          {msg && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm">{msg}</div>}
           <Toolbar
             search={keyword}
             onSearch={(v) => { setKeyword(v); setPage(1); }}
@@ -394,6 +521,9 @@ function OrdersInner() {
           >
             <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
               <option value="">全部状态</option>
+              {/* 已创建/弹出中原先不在筛选里，而远程弹出干预会把订单落到「弹出中」，必须能筛出来 */}
+              <option value="CREATED">已创建</option>
+              <option value="DISPENSING">弹出中</option>
               <option value="IN_USE">使用中</option>
               <option value="SETTLED">已结算</option>
               <option value="RETURNED">已归还</option>
@@ -631,8 +761,25 @@ function OrdersInner() {
               { header: "币种", value: (d) => d.currency },
               { header: "状态", value: (d) => DEP_STATUS[d.status].label },
               { header: "时间", value: (d) => d.createdAt },
+              { header: "解冻时间", value: (d) => d.releasedAt },
+              { header: "买断金额", value: (d) => d.buyoutAmount },
+              { header: "买断时间", value: (d) => d.buyoutAt },
+              { header: "催缴次数", value: (d) => d.dunCount },
+              { header: "最后催缴", value: (d) => d.lastDunAt },
+              { header: "处置操作人", value: (d) => d.operatorName },
+              { header: "处置说明", value: (d) => d.note },
             ], depQ.data?.list ?? [])}
-          />
+          >
+            <Select value={depStatus} onChange={(e) => { setDepStatus(e.target.value); setDepPage(1); }}>
+              <option value="">全部状态</option>
+              <option value="HELD">已冻结</option>
+              <option value="RELEASED">已解冻</option>
+              <option value="BOUGHT_OUT">已买断</option>
+              <option value="ARREARS">欠费</option>
+            </Select>
+          </Toolbar>
+          {!canDeposit && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色既无押金处置权限（order:deposit:manage）也无催缴权限（order:arrears:dun）</div>}
+          {canDeposit && !canDepositManage && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">当前角色仅可催缴欠费；解冻/买断需财务权限（order:deposit:manage）</div>}
           <DataTable
             rowKey={(d: DepositRecord) => d.depositNo}
             columns={depCols}
@@ -742,15 +889,34 @@ function OrdersInner() {
         title={`订单 ${detail?.orderNo ?? ""}`}
         desc="订单详情与客服干预（支付执行委托 nearpay）"
         footer={
-          detail && (
-            <>
-              {allow("order:intervene:execute") && <Button variant="outline" disabled={intervene.isPending} onClick={() => intervene.mutate({ no: detail.orderNo, action: "force_return" })}>强制归还</Button>}
-              {allow("order:intervene:execute") && <Button variant="outline" disabled={intervene.isPending} onClick={() => intervene.mutate({ no: detail.orderNo, action: "compensate" })}>补偿</Button>}
-              {allow("order:refund:apply") && <Button variant="outline" disabled={intervene.isPending} onClick={() => intervene.mutate({ no: detail.orderNo, action: "refund_apply" })}>申请退款</Button>}
-              {allow("order:refund:audit") && <Button variant="destructive" disabled={intervene.isPending} onClick={() => intervene.mutate({ no: detail.orderNo, action: "refund" })}>退款审批</Button>}
-              {!allow("order:intervene:execute") && !allow("order:refund:apply") && !allow("order:refund:audit") && <span className="text-sm text-muted-foreground">无干预权限</span>}
-            </>
-          )
+          detail && (() => {
+            // 可执行动作 = 状态机允许 ∩ 当前角色有权限（与 mock/后端同一份 ORDER_INTERVENTIONS）
+            // 应收已为 0 的单不出「免单」按钮（mock/后端都会拒，出按钮只会让人白点一次）
+            const acts = interveneActions(detail.status)
+              .filter((a) => allow(IV_PERM[a]))
+              .filter((a) => a !== "waive" || detail.feeAmount > 0);
+            if (!acts.length) {
+              return (
+                <span className="text-sm text-muted-foreground">
+                  {allow("order:intervene:execute") || allow("order:refund:apply")
+                    ? `当前状态「${t(`orderStatus.${detail.status}`)}」没有可执行的干预动作`
+                    : "仅可查看：当前角色无订单干预权限（order:intervene:execute）"}
+                </span>
+              );
+            }
+            return (
+              <>
+                {acts.map((a) => (
+                  <Button
+                    key={a}
+                    variant={a === "waive" ? "destructive" : "outline"}
+                    disabled={intervene.isPending}
+                    onClick={() => { setIv({ order: detail, action: a }); setIvReason(""); setIvAmount(""); }}
+                  >{IV_LABEL[a]}</Button>
+                ))}
+              </>
+            );
+          })()
         }
       >
         {detail && (
@@ -764,6 +930,149 @@ function OrdersInner() {
             <Field label="归还时间">{fmtTime(detail.rentEndAt)}</Field>
             <Field label="时长">{detail.durationMin != null ? `${detail.durationMin} 分钟` : "-"}</Field>
             <Field label="费用 / 押金">{money(detail.feeAmount, detail.currency)} / {money(detail.depositAmount, detail.currency)}</Field>
+            {/* 干预结果落在订单上：弹了几次、免了多少、补了多少 —— 光有日志不算落库 */}
+            {!!detail.ejectCount && <Field label="远程弹出">{detail.ejectCount} 次 · 最近 {detail.lastEjectAt ? fmtTime(detail.lastEjectAt) : "-"}</Field>}
+            {!!detail.waivedAmount && <Field label="已免单金额">{money(detail.waivedAmount, detail.currency)}</Field>}
+            {!!detail.compensateAmount && <Field label="已补偿金额">{money(detail.compensateAmount, detail.currency)}（补至用户余额）</Field>}
+            <Field label="干预历史">
+              {ivHistoryQ.isLoading
+                ? <span className="text-muted-foreground">加载中…</span>
+                : ivHistoryQ.data?.list.length
+                  ? (
+                    <ol className="space-y-2.5">
+                      {ivHistoryQ.data.list.map((x) => (
+                        <li key={x.interventionNo} className="border-l-2 border-[var(--border)] pl-3">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <Badge tone="outline">{IV_LABEL[x.action]}</Badge>
+                            <span className="text-xs text-muted-foreground tabular-nums">{x.interventionNo} · {fmtTime(x.createdAt)} · {x.operatorName}</span>
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {t(`orderStatus.${x.beforeStatus}`)} → {t(`orderStatus.${x.afterStatus}`)}
+                            {x.amount != null ? ` · ${money(x.amount, x.currency)}` : ""}
+                          </div>
+                          <div className="text-sm">{x.reason}</div>
+                        </li>
+                      ))}
+                    </ol>
+                  )
+                  : <span className="text-muted-foreground">无干预记录——该单未被人工处置过</span>}
+            </Field>
+          </>
+        )}
+      </Drawer>
+
+      {/* 干预确认抽屉：原因必填（沿用退款审批口径），补偿另填金额；动作口径写在屉里，避免点了不知道改了什么 */}
+      <Drawer
+        open={!!iv}
+        onOpenChange={(o) => !o && setIv(null)}
+        title={iv ? `${IV_LABEL[iv.action]} · 订单 ${iv.order.orderNo}` : ""}
+        desc="人工干预会改订单状态/金额并落一条审计记录，原因随记录永久留痕"
+        footer={
+          iv && (
+            <Button
+              variant={iv.action === "waive" || iv.action === "compensate" ? "destructive" : "default"}
+              disabled={intervene.isPending || !ivReason.trim() || (iv.action === "compensate" && !(Number(ivAmount) > 0))}
+              onClick={() => intervene.mutate({
+                no: iv.order.orderNo,
+                action: iv.action,
+                reason: ivReason,
+                amount: iv.action === "compensate" ? Number(ivAmount) : undefined,
+              })}
+            >确认{IV_LABEL[iv.action]}</Button>
+          )
+        }
+      >
+        {iv && (
+          <>
+            <Field label="订单 / 用户">{iv.order.orderNo} · {iv.order.cUserNo}</Field>
+            <Field label="当前状态"><OrderStatusBadge s={iv.order.status} /></Field>
+            <Field label="动作口径">{IV_DESC[iv.action]}</Field>
+            <Field label="状态变化">
+              {ORDER_INTERVENTIONS[iv.action].to
+                ? `${t(`orderStatus.${iv.order.status}`)} → ${t(`orderStatus.${ORDER_INTERVENTIONS[iv.action].to!}`)}`
+                : "状态不变（只记账与留痕）"}
+            </Field>
+            {iv.action === "waive" && (
+              <Field label="减免金额">{money(iv.order.feeAmount, iv.order.currency)}（本单应收，确认后置 0）</Field>
+            )}
+            {iv.action === "compensate" && (
+              <Field label={`补偿金额（${iv.order.currency}，必填）`}>
+                <Input type="number" min="0" step="0.5" value={ivAmount} placeholder="补至用户余额的金额" onChange={(e) => setIvAmount(e.target.value)} />
+              </Field>
+            )}
+            {iv.action === "refund_apply" && (
+              <Field label="申请退款金额">{money(iv.order.feeAmount, iv.order.currency)}（本单实收，进「退款记录」待审批）</Field>
+            )}
+            <Field label="干预原因（必填）">
+              <Input value={ivReason} placeholder="写清为什么干预，将随干预记录永久留痕" onChange={(e) => setIvReason(e.target.value)} />
+            </Field>
+          </>
+        )}
+      </Drawer>
+
+      {/* 押金处置抽屉：解冻 / 买断 / 催缴共用；解冻与买断提交前再走 useConfirm（金额类二次确认） */}
+      <Drawer
+        open={!!depAct}
+        onOpenChange={(o) => !o && setDepAct(null)}
+        title={depAct ? `${DEP_ACTION_LABEL[depAct.action]}押金 ${depAct.row.depositNo}` : ""}
+        desc="押金处置按状态机执行：已解冻/已买断是终态，欠费催缴只留痕不改状态"
+        footer={
+          depAct && (
+            <Button
+              variant={depAct.action === "buyout" ? "destructive" : "default"}
+              disabled={
+                depBusy
+                || (depAct.action !== "dun" && !depReason.trim())
+                || (depAct.action === "buyout" && !(Number(depAmount) > 0 && Number(depAmount) <= depAct.row.amount))
+              }
+              onClick={submitDepAct}
+            >{depAct.action === "dun" ? "确认催缴" : `下一步：确认${DEP_ACTION_LABEL[depAct.action]}`}</Button>
+          )
+        }
+      >
+        {depAct && (
+          <>
+            <Field label="押金单 / 订单">{depAct.row.depositNo} · {depAct.row.orderNo}</Field>
+            <Field label="用户">{depAct.row.userNo}</Field>
+            <Field label="状态"><Badge tone={DEP_STATUS[depAct.row.status].tone}>{DEP_STATUS[depAct.row.status].label}</Badge></Field>
+            <Field label="押金 / 欠费">
+              {money(depAct.row.amount, depAct.row.currency)} / {depAct.row.arrearsAmount > 0 ? money(depAct.row.arrearsAmount, depAct.row.currency) : "无欠费"}
+            </Field>
+            {depAct.action === "release" && (
+              <>
+                <Field label="处置口径">解冻后押金退回用户原支付方式，状态转「已解冻」，不可撤销</Field>
+                <Field label="解冻原因（必填）">
+                  <Input value={depReason} placeholder="如：订单已结清，充电宝已归还" onChange={(e) => setDepReason(e.target.value)} />
+                </Field>
+              </>
+            )}
+            {depAct.action === "buyout" && (
+              <>
+                <Field label="处置口径">买断后押金不再退还，状态转「已买断」；买断金额不得超过押金额</Field>
+                <Field label={`买断金额（${depAct.row.currency}，必填，≤ ${depAct.row.amount}）`}>
+                  <Input type="number" min="0" step="1" value={depAmount} onChange={(e) => setDepAmount(e.target.value)} />
+                </Field>
+                <Field label="买断原因（必填）">
+                  <Input value={depReason} placeholder="如：超时未归还，按买断处理" onChange={(e) => setDepReason(e.target.value)} />
+                </Field>
+              </>
+            )}
+            {depAct.action === "dun" && (
+              <>
+                <Field label="处置口径">催缴只记一次触达（次数 +1、记最后催缴时间），押金状态保持「欠费」</Field>
+                <Field label="已催缴">{depAct.row.dunCount ? `${depAct.row.dunCount} 次 · 最近 ${depAct.row.lastDunAt ? fmtTime(depAct.row.lastDunAt) : "-"}` : "尚未催缴"}</Field>
+                <Field label="催缴渠道（必选）">
+                  <Select className="w-full" value={dunChannel} onChange={(e) => setDunChannel(e.target.value as DunChannel)}>
+                    {(Object.keys(DUN_CHANNEL_LABEL) as DunChannel[]).map((c) => (
+                      <option key={c} value={c}>{DUN_CHANNEL_LABEL[c]}</option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field label="催缴备注">
+                  <Input value={depReason} placeholder="可选：本次催缴的说明" onChange={(e) => setDepReason(e.target.value)} />
+                </Field>
+              </>
+            )}
           </>
         )}
       </Drawer>

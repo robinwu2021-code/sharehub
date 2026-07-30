@@ -12,6 +12,7 @@ const ROLE_PERMS: Record<Role, string[]> = {
     "device:command:*", "device:inventory:*", "device:ota:read", "device:vendor:read",
     "location:poi:read", "location:venue:read",
     "order:order:read", "order:exception:read", "order:exception:handle",
+    "order:reservation:cancel",
     // OPS 是工单主责，工单域全量：wo:read/create/dispatch/handle(接单·处理·完成)/close(验收关单)
     // + sla:update / inspection:update / alarm:config（对应功能权限清单 §7）
     "workorder:*",
@@ -26,6 +27,8 @@ const ROLE_PERMS: Record<Role, string[]> = {
     "device:cabinet:read", "device:slot:read", "device:command:send",
     "order:order:read", "order:order:export", "order:exception:read", "order:exception:handle",
     "order:intervene:execute", "order:refund:apply",
+    // 催缴给客服（只留痕不改钱），解冻/买断不给（动钱，归财务）——见功能权限清单 §4 注
+    "order:reservation:cancel", "order:arrears:dun",
     "user:cuser:read", "user:risk:update", "user:member:read", "user:wallet:read",
     "workorder:wo:read", "workorder:wo:create",
     "cs:*",
@@ -38,6 +41,7 @@ const ROLE_PERMS: Record<Role, string[]> = {
   FINANCE: [
     "dashboard:overview:read", "dashboard:todo:read",
     "order:order:read", "order:order:export", "order:refund:audit",
+    "order:deposit:manage", "order:arrears:dun",
     "pricing:*", "finance:*",
     "agent:agent:read", "agent:share:config", "agent:settlement:read", "agent:performance:read",
     "location:venue:read", "location:contract:read", "location:analysis:read",

@@ -4,17 +4,32 @@ import type { PageQ, OrderQ, StatusQ, ReservationQ, FreeOrderQ } from "../query"
 import type {
   PageResult, RentOrder, OrderException, DepositRecord,
   OrderComplaint, ComplaintResolution, RefundRecord,
+  OrderIntervention, OrderInterventionAction, OrderIntervenePayload, OrderInterveneResult,
+  DepositBuyoutPayload, ArrearsDunPayload,
   Reservation, FreeOrder, FreeOrderStats,
 } from "../../types";
 
 export interface OrderApi {
   listOrders(q?: OrderQ): Promise<PageResult<RentOrder>>;
   getOrder(orderNo: string): Promise<RentOrder>;
-  interveneOrder(orderNo: string, action: string): Promise<{ ok: true }>;
+  /**
+   * 人工干预（order:intervene:execute）：远程弹出 / 强制归还 / 免单 / 补偿 / 申请退款。
+   * **原因必填**（沿用退款审批口径），合法性按 ORDER_INTERVENTIONS 状态机校验，
+   * 返回落库后的订单 + 刚写入的干预记录。
+   */
+  interveneOrder(orderNo: string, action: OrderInterventionAction, payload: OrderIntervenePayload): Promise<OrderInterveneResult>;
+  /** 干预记录（审计）：订单详情抽屉的时间线按 `orderNo` 精确过滤。 */
+  listOrderInterventions(q?: PageQ & { orderNo?: string; action?: string }): Promise<PageResult<OrderIntervention>>;
 
   // === 订单扩展 tab ===
   listOrderExceptions(q?: PageQ): Promise<PageResult<OrderException>>;
-  listDepositRecords(q?: PageQ): Promise<PageResult<DepositRecord>>;
+  listDepositRecords(q?: StatusQ): Promise<PageResult<DepositRecord>>;
+  /** 押金解冻（order:order:update）：HELD → RELEASED，原因必填。 */
+  releaseDeposit(depositNo: string, reason: string): Promise<DepositRecord>;
+  /** 押金买断（order:order:update）：HELD → BOUGHT_OUT，写买断金额（不得超过押金额）。 */
+  buyoutDeposit(depositNo: string, payload: DepositBuyoutPayload): Promise<DepositRecord>;
+  /** 欠费催缴（order:order:update）：ARREARS 记一次催缴（次数 +1、最后催缴时间），状态不变。 */
+  dunArrears(depositNo: string, payload: ArrearsDunPayload): Promise<DepositRecord>;
 
   // === 售后处置（投诉订单 / 退款审批队列）===
   listOrderComplaints(q?: StatusQ): Promise<PageResult<OrderComplaint>>;

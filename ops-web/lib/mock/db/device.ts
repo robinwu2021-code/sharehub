@@ -13,6 +13,10 @@ export const cabinets: Cabinet[] = Array.from({ length: 48 }, (_, i) => {
   const online = i % 9 !== 0;
   return {
     cabinetNo: `CAB${1000 + i}`, sn: `SN${90000 + i}`, vendorCode: p(VENDORS, i),
+    // 归属代理（A1）：号段与 agents（AG001–AG009）对齐；每 5 台留 1 台平台直营，
+    // 划拨抽屉才有「未归属」的候选可选。这里刻意不 import agent.ts —— 保持
+    // device → agent 的依赖方向单向（agent.ts 反过来引用 cabinets 反算设备数）。
+    agentNo: i % 5 === 0 ? null : `AG${String((i % 9) + 1).padStart(3, "0")}`,
     model: p(["X6", "S8", "M12"], i), locationNo: `LOC${200 + (i % LOCS.length)}`,
     locationName: p(LOCS, i), slotTotal: total, availableCount: (i * 7) % (total + 1),
     onlineStatus: online ? "ONLINE" : "OFFLINE", status: i % 13 === 0 ? "FAULT" : "DEPLOYED",
@@ -194,7 +198,8 @@ export function importCabinets(rows: Partial<Cabinet>[]): { imported: number; up
   return { imported, updated };
 }
 const DEFAULT_CABINET: Cabinet = {
-  cabinetNo: "", sn: "", vendorCode: "cd-tech", model: "X6", locationNo: null, locationName: null,
+  // 导入的新机柜默认平台直营（agentNo=null）：归属只能经代理域的划拨动作落，不从 CSV 里塞
+  cabinetNo: "", sn: "", vendorCode: "cd-tech", model: "X6", locationNo: null, locationName: null, agentNo: null,
   slotTotal: 8, availableCount: 0, onlineStatus: "OFFLINE", status: "DEPLOYED",
   fwVersion: "1.0.0", lastHeartbeatAt: null, archivedAt: null,
 };

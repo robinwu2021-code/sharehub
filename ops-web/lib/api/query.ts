@@ -33,6 +33,17 @@ export type CabinetQ = PageQ & { onlineStatus?: string; status?: string; showArc
 export type AlarmQ = PageQ & { level?: string; status?: string };
 /** 设备日志：stream 双流筛选 + 日期范围（YYYY-MM-DD，含端点）。 */
 export type DeviceLogQ = PageQ & { stream?: string; from?: string; to?: string };
+/** 代理划拨记录：按代理 / 资产类型 / 动作筛（审计流水）。 */
+export type AssignmentRecordQ = PageQ & { agentNo?: string; assetType?: string; action?: string };
+/**
+ * 可划拨资产池：`assetType` 分机柜/站点；
+ * `agentNo` = 只列该代理名下的（回收用）；`excludeAgentNo` = 排除该代理已有的（划拨用）。
+ */
+export type AssignableAssetQ = PageQ & { assetType?: string; agentNo?: string; excludeAgentNo?: string };
+/** 结算单：状态 + 对象类型 + 周期。 */
+export type SettlementQ = PageQ & { status?: string; payeeType?: string; period?: string };
+/** 分润明细：可按维度/对象/周期收敛（结算单详情就是「某对象某周期」的那批明细）。 */
+export type ShareRecordQ = PageQ & { dimension?: string; payeeNo?: string; period?: string };
 /** 分润统计：一张表两种主体，dimension 是维度切换器参数（VENUE / AGENT）。 */
 export type ShareSummaryQ = PageQ & {
   dimension?: string; // VENUE / AGENT

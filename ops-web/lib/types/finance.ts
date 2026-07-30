@@ -10,15 +10,49 @@ export interface ShareRule {
   rate: number; // 0..1
   priority: number;
 }
+// —— 结算单（trade 域 · S1）——
+// 状态语义：DRAFT=已生成待确认（金额可重算/可作废）→ CONFIRMED=财务确认（进入应付）→ PAID=已打款。
+// 原枚举首值为 `GEN`，与「草稿态」的通行叫法不一致（发票用的就是 DRAFT），统一为 DRAFT。
+export type SettlementStatus = "DRAFT" | "CONFIRMED" | "PAID";
+export type SettlementAction = "confirm" | "pay";
+
 export interface Settlement {
   settleNo: string;
   payeeType: "VENUE" | "AGENT";
+  /** 结算对象业务号：场地方 VEN3xx / 代理商 AG00x。汇总分润明细的连接键之一。 */
+  payeeNo: string;
   payeeName: string;
-  period: string;
+  period: string; // 结算周期 `2026-07`
+  /** 金额 = 该 (对象, 周期) 下**分润明细金额之和**，不独立造数（详情抽屉可逐笔核对）。 */
   totalAmount: number;
+  /** 构成本单的分润明细笔数（0 笔不允许出单）。 */
+  recordCount: number;
   currency: string;
-  status: "GEN" | "CONFIRMED" | "PAID";
+  status: SettlementStatus;
+  createdAt: string;
+  confirmedBy: string | null;
+  confirmedAt: string | null;
 }
+
+/** 生成结算单入参：一次可为多个对象出同周期的单（后端一个事务）。 */
+export interface SettlementDraft {
+  payeeType: "VENUE" | "AGENT";
+  payeeNos: string[];
+  period: string; // `2026-07`
+  operatorName?: string;
+}
+
+/**
+ * 结算单状态机（SSOT）：页面按钮可用性与 mock/后端校验共用同一份，
+ * 与工单域 `WO_TRANSITIONS` 同一套写法。
+ * `pay`（打款）暂未开放动作入口，但合法迁移必须在这里声明清楚，否则种子里的 PAID 无从解释。
+ */
+export const STL_TRANSITIONS: Record<SettlementAction, { from: SettlementStatus[]; to: SettlementStatus; label: string }> = {
+  confirm: { from: ["DRAFT"], to: "CONFIRMED", label: "确认结算" },
+  pay: { from: ["CONFIRMED"], to: "PAID", label: "打款" },
+};
+export const canSettlementTransition = (from: SettlementStatus, action: SettlementAction) =>
+  STL_TRANSITIONS[action].from.includes(from);
 export interface Withdrawal extends AuditTrail {
   withdrawNo: string;
   payeeName: string;
@@ -48,10 +82,14 @@ export interface ShareRecord {
   recordNo: string;
   orderNo: string;
   dimension: "VENUE" | "AGENT";
+  /** 分成方业务号（VEN3xx / AG00x）。结算单按 (dimension, payeeNo, period) 汇总本表。 */
+  payeeNo: string;
   payeeName: string;
   amount: number;
   rate: number; // 0..1
   currency: string;
+  /** 归属结算周期 `2026-07`（= createdAt 所在月，冗余一列便于按周期汇总与筛选）。 */
+  period: string;
   createdAt: string;
 }
 export interface Reconcile {

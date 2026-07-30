@@ -8,11 +8,15 @@ import type { PageQ, OrderQ, StatusQ, ReservationQ, FreeOrderQ } from "../query"
 export const orderHttp: OrderApi = {
   listOrders: (q?: OrderQ) => client.get("/api/trade/orders", q),
   getOrder: (no) => client.get(`/api/trade/orders/${no}`),
-  interveneOrder: (no, action) => client.post(`/api/trade/orders/${no}/intervene`, { action }),
+  interveneOrder: (no, action, payload) => client.post(`/api/trade/orders/${no}/intervene`, { action, ...payload }),
+  listOrderInterventions: (q?: PageQ & { orderNo?: string; action?: string }) => client.get("/api/trade/order-interventions", q),
 
   // 订单扩展
   listOrderExceptions: (q?: PageQ) => client.get("/api/trade/order-exceptions", q),
-  listDepositRecords: (q?: PageQ) => client.get("/api/trade/deposits", q),
+  listDepositRecords: (q?: StatusQ) => client.get("/api/trade/deposits", q),
+  releaseDeposit: (no, reason) => client.post(`/api/trade/deposits/${no}/release`, { reason }),
+  buyoutDeposit: (no, payload) => client.post(`/api/trade/deposits/${no}/buyout`, payload),
+  dunArrears: (no, payload) => client.post(`/api/trade/deposits/${no}/dun`, payload),
 
   // 售后处置
   listOrderComplaints: (q?: StatusQ) => client.get("/api/trade/complaints", q),

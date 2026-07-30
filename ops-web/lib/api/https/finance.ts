@@ -2,17 +2,22 @@
 // 端点前缀：/api/trade/**；充值订单与钱包同主体，归 /api/user/**。
 import { client } from "../http-client";
 import type { FinanceApi } from "../contracts/finance";
-import type { PageQ, ShareSummaryQ, RechargeQ } from "../query";
+import type { PageQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ } from "../query";
 
 export const financeHttp: FinanceApi = {
   listShareRules: (q?: PageQ) => client.get("/api/trade/share-rules", q),
   listLedger: (q?: PageQ) => client.get("/api/trade/ledger", q),
-  listSettlements: (q?: PageQ) => client.get("/api/trade/settlements", q),
+  listSettlements: (q?: SettlementQ) => client.get("/api/trade/settlements", q),
   listWithdrawals: (q?: PageQ) => client.get("/api/trade/withdrawals", q),
   auditWithdrawal: (no, approve, rejectReason, auditorName) => client.post(`/api/trade/withdrawals/${no}/audit`, { approve, rejectReason, auditorName }),
 
+  // S1 结算单闭环：生成/确认都是动作端点（状态迁移），详情明细挂在结算单资源下
+  generateSettlements: (x) => client.post("/api/trade/settlements/generate", x),
+  confirmSettlement: (no, operatorName) => client.post(`/api/trade/settlements/${no}/confirm`, { operatorName }),
+  listSettlementRecords: (no, q?: PageQ) => client.get(`/api/trade/settlements/${no}/records`, q),
+
   // 财务扩展
-  listShareRecords: (q?: PageQ) => client.get("/api/trade/share-records", q),
+  listShareRecords: (q?: ShareRecordQ) => client.get("/api/trade/share-records", q),
   listReconciles: (q?: PageQ) => client.get("/api/trade/reconciles", q),
   listInvoices: (q?: PageQ) => client.get("/api/trade/invoices", q),
   saveShareRule: (x) => client.post(x.ruleNo ? `/api/trade/share-rules/${x.ruleNo}` : "/api/trade/share-rules", x),

@@ -1,13 +1,16 @@
 // 覆盖范围：代理商主档、区域分配、业绩、资金账户、分润规则。
 import * as db from "../../mock/db";
 import type { AgentApi } from "../contracts/agent";
-import type { PageQ, ArchiveQ } from "../query";
+import type { PageQ, ArchiveQ, AssignmentRecordQ, AssignableAssetQ } from "../query";
 import type { Agent } from "../../types";
 import { wait } from "./_wait";
 
 export const agentMock: AgentApi = {
-  listAgents: (q: ArchiveQ = {}) =>
-    wait(db.paginate(db.agents, q.page, q.size, (a) => db.liveHit(a, q.showArchived) && db.kwHit(q.keyword, a.name, a.agentNo, a.regionScope))),
+  listAgents: (q: ArchiveQ = {}) => {
+    // 设备数是从 cabinets.agentNo 反算的：查询前先对齐，否则划拨后档案页的「设备数」还是旧值
+    db.refreshAgentAssetCounts();
+    return wait(db.paginate(db.agents, q.page, q.size, (a) => db.liveHit(a, q.showArchived) && db.kwHit(q.keyword, a.name, a.agentNo, a.regionScope)));
+  },
   saveAgent: (a) => {
     const idx = db.agents.findIndex((x) => x.agentNo === a.agentNo);
     const merged = { ...(db.agents[idx] ?? { name: "", contact: "", regionScope: "", shareRate: 0.3, cabinetCount: 0, status: "ENABLED", archivedAt: null, agentNo: `AG${db.agents.length + 1}` }), ...a } as Agent;
@@ -20,6 +23,12 @@ export const agentMock: AgentApi = {
   listAgentPerformance: (q: PageQ = {}) => wait(db.listAgentPerformance(q)),
   listAgentAccounts: (q: PageQ = {}) => wait(db.listAgentAccounts(q)),
   saveAgentAccount: (x) => wait(db.saveAgentAccount(x), 350),
+
+  // S1 设备/点位划拨：写操作一律走 db 层的 assign/reclaim（校验 + 落流水 + 刷新汇总都在那）
+  listAssignableAssets: (q: AssignableAssetQ = {}) => wait(db.listAssignableAssets(q)),
+  assignAgentAssets: (x) => wait(db.assignAgentAssets(x), 400),
+  reclaimAgentAssets: (x) => wait(db.reclaimAgentAssets(x), 400),
+  listAgentAssignmentRecords: (q: AssignmentRecordQ = {}) => wait(db.listAgentAssignmentRecords(q)),
 
   // 代理分润
   listAgentCommissions: (q: PageQ = {}) => wait(db.listAgentCommissions(q)),

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
@@ -16,13 +16,14 @@ import { DateInput } from "@/components/ui/date-input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/input";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { money, fmtTime } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { useCan } from "@/lib/use-can";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
 import { exportCsv } from "@/lib/export-csv";
-import type { ShareRule, Settlement, Withdrawal, LedgerEntry, ShareRecord, Reconcile, Invoice, ShareSummary, RechargeOrder, PageResult } from "@/lib/types";
+import type { ShareRule, Settlement, SettlementStatus, Withdrawal, LedgerEntry, ShareRecord, Reconcile, Invoice, ShareSummary, RechargeOrder, PageResult } from "@/lib/types";
 
 const SIZE = 10;
 const TABS = [{ key: "rules", label: "分润规则" }, { key: "records", label: "分润明细" }, { key: "summary", label: "分润统计", phase: 2 as const }, { key: "settlements", label: "结算单" }, { key: "ledger", label: "账务分录", phase: 2 as const }, { key: "withdrawals", label: "提现", phase: 2 as const }, { key: "reconcile", label: "对账", phase: 3 as const }, { key: "invoices", label: "发票", phase: 3 as const }, { key: "recharges", label: "充值订单", phase: 3 as const }];
@@ -37,6 +38,16 @@ const RECHARGE_STATUS: Record<RechargeOrder["status"], { label: string; tone: "s
   FAILED: { label: "支付失败", tone: "danger" },
   REFUNDED: { label: "已退款", tone: "muted" },
 };
+
+// 结算单状态：全站同色（待确认=warning / 已确认=default / 已打款=success）
+const STL_STATUS: Record<SettlementStatus, { label: string; tone: "success" | "warning" | "default" }> = {
+  DRAFT: { label: "待确认", tone: "warning" },
+  CONFIRMED: { label: "已确认", tone: "default" },
+  PAID: { label: "已打款", tone: "success" },
+};
+const PAYEE_TYPE_LABEL = { VENUE: "场地方", AGENT: "代理商" } as const;
+/** multiselect + csv 的值是逗号分隔业务号串。 */
+const csvArr = (v: unknown) => String(v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 
 const RULE_FIELDS: FieldDef[] = [
   { key: "ruleNo", label: "规则号", readOnlyOnEdit: true, placeholder: "新增留空自动生成" },
@@ -64,6 +75,11 @@ function FinanceInner() {
   const qc = useQueryClient();
   const allow = useCan();
   const { t } = useI18n();
+  const { confirm, dialog } = useConfirm();
+  // 结算单（S1）：生成抽屉 / 详情抽屉（详情展示构成它的分润明细）
+  const [genForm, setGenForm] = useState<{ payeeType: string; period: string; payeeNos: string } | null>(null);
+  const [stlDetail, setStlDetail] = useState<Settlement | null>(null);
+  const [stlStatus, setStlStatus] = useState("");
   const [ruleForm, setRuleForm] = useState<Partial<ShareRule> | null>(null);
   const [invoiceForm, setInvoiceForm] = useState<Partial<Invoice> | null>(null);
   // 提现审批：走抽屉而非行内按钮——驳回必须留原因，是资金审批的留痕底线
@@ -91,11 +107,11 @@ function FinanceInner() {
   const canEditInvoice = allow("finance:invoice:issue");
 
   const q = useQuery<PageResult<ShareRule | Settlement | Withdrawal | LedgerEntry | ShareRecord | Reconcile | Invoice | ShareSummary | RechargeOrder>>({
-    queryKey: ["fin", tab, page, keyword, sumDim, sumPeriod, sumSortKey, sumSortDir, rcStatus, rcFrom, rcTo],
+    queryKey: ["fin", tab, page, keyword, sumDim, sumPeriod, sumSortKey, sumSortDir, rcStatus, rcFrom, rcTo, stlStatus],
     queryFn: () =>
       tab === "rules" ? api.listShareRules({ page, size: SIZE, keyword })
       : tab === "ledger" ? api.listLedger({ page, size: SIZE, keyword })
-      : tab === "settlements" ? api.listSettlements({ page, size: SIZE, keyword })
+      : tab === "settlements" ? api.listSettlements({ page, size: SIZE, keyword, status: stlStatus || undefined })
       : tab === "records" ? api.listShareRecords({ page, size: SIZE, keyword })
       : tab === "summary" ? api.listShareSummaries({ page, size: SIZE, keyword, dimension: sumDim, period: sumPeriod, sortKey: sumSortKey, sortDir: sumSortDir })
       : tab === "recharges" ? api.listRechargeOrders({ page, size: SIZE, keyword, status: rcStatus || undefined, from: rcFrom || undefined, to: rcTo || undefined })
@@ -116,6 +132,93 @@ function FinanceInner() {
     },
   });
 
+  // —— 结算单闭环（S1）——
+  // 生成：金额从该周期的分润明细汇总而来；确认：DRAFT → CONFIRMED。
+  // 幂等冲突 / 无明细 / 非法状态迁移都由服务端（mock db 层）拒绝并给出可读原因，页面不重复兜底。
+  const canGenSettlement = allow("finance:settlement:generate");
+  const canConfirmSettlement = allow("finance:settlement:confirm");
+  // 结算对象候选：场地方 / 代理商各自的主数据，抽屉打开才拉
+  const venuesQ = useQuery({
+    queryKey: ["stl-venues"],
+    queryFn: () => api.listVenues({ page: 1, size: 200 }),
+    enabled: !!genForm && genForm.payeeType === "VENUE",
+  });
+  const agentsQ = useQuery({
+    queryKey: ["stl-agents"],
+    queryFn: () => api.listAgents({ page: 1, size: 200 }),
+    enabled: !!genForm && genForm.payeeType === "AGENT",
+  });
+  // 结算单构成明细：这张单的钱是哪几笔分润凑出来的
+  const stlRecordsQ = useQuery({
+    queryKey: ["stl-records", stlDetail?.settleNo ?? ""],
+    queryFn: () => api.listSettlementRecords(stlDetail!.settleNo, { page: 1, size: 100 }),
+    enabled: !!stlDetail,
+  });
+
+  const payeeOptions = useMemo(() => {
+    if (genForm?.payeeType === "AGENT") {
+      return (agentsQ.data?.list ?? []).filter((a) => !a.archivedAt).map((a) => ({ value: a.agentNo, label: `${a.agentNo} · ${a.name}` }));
+    }
+    return (venuesQ.data?.list ?? []).filter((v) => !v.archivedAt).map((v) => ({ value: v.venueNo, label: `${v.venueNo} · ${v.name}` }));
+  }, [genForm?.payeeType, venuesQ.data, agentsQ.data]);
+
+  const GEN_FIELDS: FieldDef[] = useMemo(() => [
+    {
+      key: "payeeType", label: "结算对象类型", type: "select", required: true,
+      options: [{ value: "VENUE", label: "场地方" }, { value: "AGENT", label: "代理商" }],
+    },
+    {
+      key: "period", label: "结算周期", type: "select", required: true,
+      options: SUMMARY_PERIODS.map((p) => ({ value: p, label: p })),
+      help: "金额取该周期分润明细的汇总值；同一对象同一周期只能出一次账",
+    },
+    {
+      key: "payeeNos", label: "结算对象（可多选）", type: "multiselect", csv: true, required: true,
+      placeholder: "选择要出账的对象", options: payeeOptions,
+      help: "该周期没有分润明细的对象会被拒绝——结算金额不凭空生成",
+    },
+  ], [payeeOptions]);
+
+  const genSettlements = useMutation({
+    mutationFn: (v: { payeeType: "VENUE" | "AGENT"; period: string; payeeNos: string[] }) =>
+      api.generateSettlements({ ...v, operatorName: username || undefined }),
+    onSuccess: (rows) => {
+      qc.invalidateQueries({ queryKey: ["fin"] });
+      notify.success(`已生成 ${rows.length} 张结算单（待确认），合计 ${money(rows.reduce((s, r) => s + r.totalAmount, 0), rows[0]?.currency ?? "AED")}`);
+      setGenForm(null);
+    },
+  });
+  const confirmSettlement = useMutation({
+    mutationFn: (no: string) => api.confirmSettlement(no, username || undefined),
+    onSuccess: (s) => {
+      qc.invalidateQueries({ queryKey: ["fin"] });
+      notify.success(`结算单 ${s.settleNo} 已确认`);
+      setStlDetail((cur) => (cur && cur.settleNo === s.settleNo ? s : cur));
+    },
+  });
+
+  async function submitGen() {
+    if (!genForm) return;
+    const payeeNos = csvArr(genForm.payeeNos);
+    if (!genForm.payeeType || !genForm.period) { notify.error("请选择结算对象类型与周期"); return; }
+    if (!payeeNos.length) { notify.error("请至少选择一个结算对象"); return; }
+    const ok = await confirm({
+      title: "确认生成结算单",
+      desc: `将为 ${payeeNos.length} 个${PAYEE_TYPE_LABEL[genForm.payeeType as "VENUE" | "AGENT"]}生成 ${genForm.period} 的结算单（状态：待确认）。`
+        + "金额来自该周期分润明细汇总，同一对象同一周期不可重复生成。",
+      confirmText: "生成",
+    });
+    if (ok) genSettlements.mutate({ payeeType: genForm.payeeType as "VENUE" | "AGENT", period: genForm.period, payeeNos });
+  }
+  async function askConfirmSettlement(s: Settlement) {
+    const ok = await confirm({
+      title: `确认结算 ${s.settleNo}`,
+      desc: `确认后 ${s.payeeName}（${s.period}）的 ${money(s.totalAmount, s.currency)} 进入应付，金额锁定不可再改，确认人与时间将留痕。`,
+      confirmText: "确认结算",
+    });
+    if (ok) confirmSettlement.mutate(s.settleNo);
+  }
+
   const saveRule = useMutation({
     mutationFn: (v: Partial<ShareRule>) => api.saveShareRule(v),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["fin"] }); notify.success(t("common.success")); setRuleForm(null); },
@@ -135,11 +238,35 @@ function FinanceInner() {
     { header: t("common.actions"), cell: (r) => canEditRule ? <Button size="sm" variant="outline" onClick={() => setRuleForm(r)}>{t("common.edit")}</Button> : <span className="text-muted-foreground">-</span> },
   ];
   const stlCols: Column<Settlement>[] = [
-    { header: "结算单号", cell: (s) => <span className="font-medium">{s.settleNo}</span> },
-    { header: "对象", cell: (s) => `${s.payeeName}（${s.payeeType === "VENUE" ? "场地方" : "代理"}）` },
-    { header: "周期", cell: (s) => s.period },
+    {
+      header: "结算单号",
+      cell: (s) => (
+        <button type="button" className="font-medium tabular-nums underline-offset-4 hover:underline" onClick={() => setStlDetail(s)}>
+          {s.settleNo}
+        </button>
+      ),
+    },
+    { header: "对象", cell: (s) => <span>{s.payeeName} <span className="text-muted-foreground tabular-nums">{s.payeeNo}</span>（{PAYEE_TYPE_LABEL[s.payeeType]}）</span> },
+    { header: "周期", cell: (s) => <span className="tabular-nums">{s.period}</span> },
     { header: "金额", cell: (s) => <span className="tabular-nums">{money(s.totalAmount, s.currency)}</span> },
-    { header: "状态", cell: (s) => <Badge tone={s.status === "PAID" ? "success" : s.status === "CONFIRMED" ? "default" : "muted"}>{s.status === "PAID" ? "已打款" : s.status === "CONFIRMED" ? "已确认" : "已生成"}</Badge> },
+    // 明细笔数：金额是这几笔分润加出来的，点单号可逐笔核对
+    { header: "明细笔数", cell: (s) => <span className="tabular-nums text-muted-foreground">{s.recordCount}</span> },
+    { header: "状态", cell: (s) => <Badge tone={STL_STATUS[s.status].tone}>{STL_STATUS[s.status].label}</Badge> },
+    { header: "生成时间", cell: (s) => <span className="text-muted-foreground">{fmtTime(s.createdAt)}</span> },
+    { header: "确认人", cell: (s) => s.confirmedBy ?? <span className="text-muted-foreground">未确认</span> },
+    { header: "确认时间", cell: (s) => <span className="text-muted-foreground">{s.confirmedAt ? fmtTime(s.confirmedAt) : "-"}</span> },
+    {
+      header: t("common.actions"),
+      cell: (s) => (
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setStlDetail(s)}>明细</Button>
+          {/* 只有 DRAFT 能确认（状态机 STL_TRANSITIONS），其余状态不给按钮 */}
+          {s.status === "DRAFT" && canConfirmSettlement && (
+            <Button size="sm" onClick={() => askConfirmSettlement(s)} disabled={confirmSettlement.isPending}>确认结算</Button>
+          )}
+        </div>
+      ),
+    },
   ];
   const wdCols: Column<Withdrawal>[] = [
     { header: "提现号", cell: (w) => <span className="font-medium">{w.withdrawNo}</span> },
@@ -176,10 +303,12 @@ function FinanceInner() {
   const recordCols: Column<ShareRecord>[] = [
     { header: "明细号", cell: (r) => <span className="font-medium">{r.recordNo}</span> },
     { header: "订单", cell: (r) => <span className="text-muted-foreground">{r.orderNo}</span> },
-    { header: "维度", cell: (r) => r.dimension === "VENUE" ? "场地方" : "代理商" },
-    { header: "分成方", cell: (r) => r.payeeName },
+    { header: "维度", cell: (r) => PAYEE_TYPE_LABEL[r.dimension] },
+    { header: "分成方", cell: (r) => <span>{r.payeeName} <span className="text-muted-foreground tabular-nums">{r.payeeNo}</span></span> },
     { header: "金额", cell: (r) => <span className="tabular-nums">{money(r.amount, r.currency)}</span> },
     { header: "比例", cell: (r) => `${(r.rate * 100).toFixed(0)}%` },
+    // 周期是结算单的汇总键：明细上直接看得到它归哪一期，才对得上结算单
+    { header: "周期", cell: (r) => <span className="tabular-nums">{r.period}</span> },
     { header: "时间", cell: (r) => <span className="text-muted-foreground">{fmtTime(r.createdAt)}</span> },
   ];
 
@@ -287,16 +416,28 @@ function FinanceInner() {
         <Toolbar
           search={keyword}
           onSearch={(v) => { setKeyword(v); setPage(1); }}
-          searchPlaceholder="搜索结算单号/对象"
+          searchPlaceholder="搜索结算单号/对象/周期/确认人"
+          onAdd={canGenSettlement ? () => setGenForm({ payeeType: "VENUE", period: SUMMARY_PERIODS[0], payeeNos: "" }) : undefined}
+          addLabel="生成结算单"
           onExport={() => exportCsv<Settlement>("结算单", [
             { header: "结算单号", value: (s) => s.settleNo },
-            { header: "对象", value: (s) => `${s.payeeName}（${s.payeeType === "VENUE" ? "场地方" : "代理"}）` },
+            { header: "对象编号", value: (s) => s.payeeNo },
+            { header: "对象", value: (s) => `${s.payeeName}（${PAYEE_TYPE_LABEL[s.payeeType]}）` },
             { header: "周期", value: (s) => s.period },
             { header: "金额", value: (s) => s.totalAmount },
+            { header: "明细笔数", value: (s) => s.recordCount },
             { header: "币种", value: (s) => s.currency },
-            { header: "状态", value: (s) => (s.status === "PAID" ? "已打款" : s.status === "CONFIRMED" ? "已确认" : "已生成") },
+            { header: "状态", value: (s) => STL_STATUS[s.status].label },
+            { header: "生成时间", value: (s) => s.createdAt },
+            { header: "确认人", value: (s) => s.confirmedBy },
+            { header: "确认时间", value: (s) => s.confirmedAt },
           ], (q.data?.list ?? []) as Settlement[])}
-        />
+        >
+          <Select value={stlStatus} onChange={(e) => { setStlStatus(e.target.value); setPage(1); }}>
+            <option value="">全部状态</option>
+            {Object.entries(STL_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+          </Select>
+        </Toolbar>
       )}
       {tab === "withdrawals" && (
         <Toolbar
@@ -322,15 +463,17 @@ function FinanceInner() {
         <Toolbar
           search={keyword}
           onSearch={(v) => { setKeyword(v); setPage(1); }}
-          searchPlaceholder="搜索明细号/订单/分成方"
+          searchPlaceholder="搜索明细号/订单/分成方编号或名称"
           onExport={() => exportCsv<ShareRecord>("分润明细", [
             { header: "明细号", value: (r) => r.recordNo },
             { header: "订单", value: (r) => r.orderNo },
-            { header: "维度", value: (r) => (r.dimension === "VENUE" ? "场地方" : "代理商") },
+            { header: "维度", value: (r) => PAYEE_TYPE_LABEL[r.dimension] },
+            { header: "分成方编号", value: (r) => r.payeeNo },
             { header: "分成方", value: (r) => r.payeeName },
             { header: "金额", value: (r) => r.amount },
             { header: "币种", value: (r) => r.currency },
             { header: "比例", value: (r) => r.rate },
+            { header: "周期", value: (r) => r.period },
             { header: "时间", value: (r) => r.createdAt },
           ], (q.data?.list ?? []) as ShareRecord[])}
         />
@@ -430,7 +573,12 @@ function FinanceInner() {
       )}
       {tab === "rules" && <DataTable rowKey={(r: ShareRule) => r.ruleNo} columns={ruleCols} rows={q.data?.list as ShareRule[]} loading={q.isLoading} empty="暂无分润规则——点右上「新增分润规则」为场地方/代理商配置分成比例，否则订单收入全归平台" />}
       {tab === "ledger" && <DataTable rowKey={(l: LedgerEntry) => l.entryNo} columns={ledgerCols} rows={q.data?.list as LedgerEntry[]} loading={q.isLoading} empty="暂无账务分录——订单结算与分账完成后自动记账，也可放宽搜索条件再查" />}
-      {tab === "settlements" && <DataTable rowKey={(s: Settlement) => s.settleNo} columns={stlCols} rows={q.data?.list as Settlement[]} loading={q.isLoading} empty="暂无结算单——按周期跑批生成，本周期尚未出账或该搜索条件下无匹配" />}
+      {tab === "settlements" && !canGenSettlement && !canConfirmSettlement && (
+        <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">
+          仅可查看：当前角色无结算单生成/确认权限（finance:settlement:generate / :confirm）
+        </div>
+      )}
+      {tab === "settlements" && <DataTable rowKey={(s: Settlement) => s.settleNo} columns={stlCols} rows={q.data?.list as Settlement[]} loading={q.isLoading} empty="暂无结算单——点右上「生成结算单」按周期出账（金额取该周期分润明细汇总），或放宽筛选条件" />}
       {tab === "withdrawals" && !canAuditWithdrawal && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无提现审批权限（finance:withdrawal:audit）</div>}
       {tab === "withdrawals" && <DataTable rowKey={(w: Withdrawal) => w.withdrawNo} columns={wdCols} rows={q.data?.list as Withdrawal[]} loading={q.isLoading} empty="暂无提现申请——场地方/代理商发起提现后在此审批，通过才会进入打款队列" />}
       {tab === "records" && <DataTable rowKey={(r: ShareRecord) => r.recordNo} columns={recordCols} rows={q.data?.list as ShareRecord[]} loading={q.isLoading} empty="暂无分润明细——订单结算时按「分润规则」逐笔生成，先确认规则已配置" />}
@@ -498,6 +646,56 @@ function FinanceInner() {
         )}
       </Drawer>
 
+      {/* 生成结算单：类型 + 周期 + 多选对象；金额不在这里填——由服务端按分润明细汇总 */}
+      <FormDrawer
+        open={!!genForm}
+        onOpenChange={(o) => !o && setGenForm(null)}
+        titleNew="生成结算单"
+        titleEdit="生成结算单"
+        isEdit={false}
+        width="w-[520px]"
+        fields={GEN_FIELDS}
+        value={(genForm ?? {}) as Record<string, unknown>}
+        onChange={(v) => setGenForm(v as { payeeType: string; period: string; payeeNos: string })}
+        onSubmit={submitGen}
+        submitting={genSettlements.isPending}
+      />
+
+      {/* 结算单详情：金额是怎么来的——逐笔列出构成它的分润明细 */}
+      <Drawer
+        open={!!stlDetail}
+        onOpenChange={(o) => !o && setStlDetail(null)}
+        title={`结算单 ${stlDetail?.settleNo ?? ""}`}
+        desc="金额 = 下方分润明细之和；确认后进入应付，金额锁定"
+        width="w-[760px]"
+        footer={
+          stlDetail?.status === "DRAFT" && canConfirmSettlement && (
+            <Button disabled={confirmSettlement.isPending} onClick={() => askConfirmSettlement(stlDetail)}>确认结算</Button>
+          )
+        }
+      >
+        {stlDetail && (
+          <>
+            <Field label="结算对象">{stlDetail.payeeName}（{PAYEE_TYPE_LABEL[stlDetail.payeeType]} {stlDetail.payeeNo}）</Field>
+            <Field label="结算周期">{stlDetail.period}</Field>
+            <Field label="结算金额">{money(stlDetail.totalAmount, stlDetail.currency)}（{stlDetail.recordCount} 笔明细）</Field>
+            <Field label="状态"><Badge tone={STL_STATUS[stlDetail.status].tone}>{STL_STATUS[stlDetail.status].label}</Badge></Field>
+            <Field label="生成时间">{fmtTime(stlDetail.createdAt)}</Field>
+            <Field label="确认人 / 确认时间">
+              {stlDetail.confirmedBy ? `${stlDetail.confirmedBy} · ${fmtTime(stlDetail.confirmedAt!)}` : "未确认"}
+            </Field>
+            <div className="mb-2 mt-4 text-xs text-muted-foreground">构成明细（{stlDetail.period}）</div>
+            <DataTable
+              rowKey={(r: ShareRecord) => r.recordNo}
+              columns={recordCols.filter((c) => c.header !== "维度" && c.header !== "分成方")}
+              rows={stlRecordsQ.data?.list}
+              loading={stlRecordsQ.isLoading}
+              empty="该周期没有分润明细——理论上不该出现（无明细不允许出单），若看到请核对分润规则"
+            />
+          </>
+        )}
+      </Drawer>
+
       <FormDrawer
         open={!!ruleForm}
         onOpenChange={(o) => !o && setRuleForm(null)}
@@ -522,6 +720,7 @@ function FinanceInner() {
         onSubmit={() => invoiceForm && saveInvoice.mutate(invoiceForm)}
         submitting={saveInvoice.isPending}
       />
+      {dialog}
     </div>
   );
 }

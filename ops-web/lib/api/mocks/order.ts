@@ -10,15 +10,24 @@ export const orderMock: OrderApi = {
     wait(db.paginate(db.orders, q.page, q.size, (o) =>
       db.kwHit(q.keyword, o.orderNo, o.cUserNo) && (!q.status || o.status === q.status))),
   getOrder: (no) => wait(db.orders.find((o) => o.orderNo === no)!),
-  // 「申请退款」不是终态动作：落一条 PENDING 退款申请，进 /orders?tab=refunds 审批队列
-  interveneOrder: (no, action) => {
-    if (action === "refund_apply") db.applyRefund(no);
-    return wait({ ok: true } as const, 400);
+  // 四个干预动作在 db 层真改订单状态并落干预记录（见 mock/db/order.ts 的状态机）。
+  // 「申请退款」不是终态动作：先落一条 PENDING 退款申请（进 /orders?tab=refunds 审批队列），
+  // 再把退款金额带进干预记录 —— 退款记录住在 cs.ts，db 层不能反向 import，故在此组合。
+  interveneOrder: (no, action, payload) => {
+    if (action === "refund_apply") {
+      const r = db.applyRefund(no, payload.reason?.trim() || "客服代客申请退款");
+      return wait(db.interveneOrder(no, action, { ...payload, amount: r.amount }), 400);
+    }
+    return wait(db.interveneOrder(no, action, payload), 400);
   },
+  listOrderInterventions: (q: PageQ = {}) => wait(db.listOrderInterventions(q)),
 
   // 订单扩展
   listOrderExceptions: (q: PageQ = {}) => wait(db.listOrderExceptions(q)),
-  listDepositRecords: (q: PageQ = {}) => wait(db.listDepositRecords(q)),
+  listDepositRecords: (q: StatusQ = {}) => wait(db.listDepositRecords(q)),
+  releaseDeposit: (no, reason) => wait(db.releaseDeposit(no, reason), 400),
+  buyoutDeposit: (no, payload) => wait(db.buyoutDeposit(no, payload), 400),
+  dunArrears: (no, payload) => wait(db.dunArrears(no, payload), 400),
 
   // 售后处置
   listOrderComplaints: (q: StatusQ = {}) => wait(db.listOrderComplaints(q)),
