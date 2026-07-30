@@ -68,3 +68,35 @@ describe("设计 token 守卫", () => {
     expect(RADIUS_EXEMPT.length).toBeLessThanOrEqual(2);
   });
 });
+
+/* ────────────────────────────────────────────────────────────────────────────
+   页面层规范一致性（棘轮基线）
+
+   这几条不是"现在就全绿"，而是**冻结当前偏离数量、只允许下降**。
+   为什么用基线而不是豁免文件名：那 14 个页面此刻压着另一并发会话 3548 行在途
+   业务改动，改不了；但**新页面必须一开始就合规**，而已有页面每清理一处，
+   基线就该跟着降一处。数字写死在这里，涨了就红。
+   ──────────────────────────────────────────────────────────────────────────── */
+describe("页面层规范一致性（只允许变好）", () => {
+  const pageFiles = () =>
+    walk(join(ROOT, "app")).filter((f) => f.endsWith("page.tsx") && !f.includes("/dev/ui/"));
+
+  const countAll = (re: RegExp) =>
+    pageFiles().reduce((n, f) => n + (readFileSync(f, "utf8").match(re)?.length ?? 0), 0);
+
+  it("手写「仅可查看」不增加 —— 应改用 <ReadOnlyNotice>（规范 §13）", () => {
+    // 基线 17：句式统一 + 说清缺哪个权限码，全靠组件保证，手写必然发散
+    expect(countAll(/仅可查看/g)).toBeLessThanOrEqual(17);
+  });
+
+  it("内联 <Badge tone={…}> 不增加 —— 枚举应走 StatusMap + <StatusBadge>", () => {
+    // 基线 58：内联 ternary 让"状态→文案→色调"的映射散落在页面里，
+    // 同一个枚举在两个页面可能配出不同颜色
+    expect(countAll(/Badge tone=\{/g)).toBeLessThanOrEqual(58);
+  });
+
+  it("泛化空态文案不增加 —— 空态要说清**为什么**空（规范 §12）", () => {
+    // 「暂无数据」「暂无记录」这类说不出原因的空态。基线 1（且那 1 处本身带解释）
+    expect(countAll(/empty="暂无(数据|记录)"/g)).toBeLessThanOrEqual(1);
+  });
+});

@@ -24,8 +24,25 @@
 1. `components/` 不许用废弃圆角类 —— 只用 `rounded-control/field/card/sheet/chip` **五档**
 2. 组件层不许写死颜色（hex / rgb / oklch）—— **颜色一律改 token**
 3. 豁免清单不许变长（加豁免必须改数字，在 review 里显形）
+4. **页面层棘轮基线**：手写「仅可查看」≤17、内联 `Badge tone={}` ≤58、
+   泛化空态 ≤1 —— 这些数字**只允许下降**。新页面必须一开始就用
+   `<ReadOnlyNotice>` / `<StatusBadge>` / 解释性空态文案
 
-### 三个反复踩过的坑
+### 类型阶会静默吃掉字重/行高类
+
+`.txt-*`（七档类型阶）定义在 `globals.css` 的**非 layer** 区，Tailwind 工具类在
+`@layer utilities` —— **非 layer 永远胜出**，与顺序和特异性无关。所以：
+
+```
+class="txt-body font-medium leading-none"   →  实测 14px / 400 / 21px
+                 ^^^^^^^^^^^^^^^^^^^^^^^  这两个是死代码
+```
+
+**规则：类型阶不与 `font-*` / `leading-*` 共存。** 要么用档位自带的字重行高，
+要么不用类型阶（控件字号、承重的 leading 就属于后者，见规范 §3）。
+逐行 grep 查不出来 —— `cn()` 里的条件字重通常在另一行。
+
+### 四个反复踩过的坑
 
 1. **改 `globals.css` 的 token 后必须清 `.next` 重启验证。**
    Turbopack 会缓存类名候选与部分 CSS，出现过三次「源码改了但 served CSS 是旧的」，
@@ -34,6 +51,8 @@
    写 `z-[var(--z-*)]` 这种带通配符又像类名的文本会生成非法 CSS、**让整站白屏**。
    用省略号（`--z-…`）或举真实档位名。
 3. **别在 dev server 运行时跑 `npm run build`** —— 两者共用 `.next`，会污染 dev 的 chunk。
+4. **用脚本批量改文件后要 grep 验证落点。** 字符串锚点不匹配时 Python 的 `replace`
+   会**静默无操作**，出现过"以为加了规则其实没加"。改完立刻 grep 确认。
 
 ---
 
