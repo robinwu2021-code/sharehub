@@ -1,6 +1,6 @@
 # TDD-后端API对齐实现（逐 API 清零缺口）
 
-状态：**B0–B6 已实现 · 余 3 个记账拍板项 + 前端侧裁决**
+状态：**已实现**（B0–B6 全部完成 · 记账三口径已定案 · 余量为前端接线与裁决）
 关联需求：[运营端功能清单](../requirements/运营端功能清单.md) · [C端功能清单](../requirements/C端功能清单.md) · [功能权限清单](../requirements/功能权限清单.md)（RBAC SSOT）
 逐 API 工作清单（SSOT，勿在本文重复）：[后端实现对齐清单](../api/后端实现对齐清单.md)（`gen-impl-align.py` 生成，随实现重跑）
 创建日期：2026-08-04
@@ -81,7 +81,7 @@
 明细见[前后端对齐缺口](../api/前后端对齐缺口.md) §B。方向规则：
 - 前端有后端无（页面空白）→ **后端补出参**（列已在表的补 VO 映射；确无列的补列/查询，如 `WorkOrder` 审计处置 14 字段多数在 `wo_dispatch`/`wo_handle`/`wo_sla`，是**出参装配缺失**不是缺列）
 - 后端有前端无 → 逐个判「该展示没展示」（提任务给前端）或「后端赘余」（从 VO 删除）
-- [ ] ⚖️ 依赖产品口径的 3 个记账语义先拍板（未完成清单 B1：`share_record.period` / `ShareSummary.gmv` 反推 / `acct_account.balance` 方向）——挡住 `ShareRecord`/`Settlement`/`LedgerEntry` 三个结构
+- [x] 3 个记账语义已定案并落地（V34 + `LedgerService.balanceOf` + `AccountingSemanticsTest`），详见[未完成清单 B1](./未完成清单.md)
 - [x] D-3：`mkt_referral_rule` 已建（V31+V33），`pageRules` 切到真规则表出 `ReferralRuleVO`（不再翻邀请记录）
 
 **B5 · P 类权限码补齐（19 个 `/api` 端点）**
@@ -146,6 +146,22 @@
   对内联匿名类型的误报（JSON 形状已一致）；⚖️ `ShareRecord.period` 等 3 项仍等记账口径拍板。
 - **新识别缺口**：`loc_site` 无 lat/lng/openHours 列 → `/mp/nearby` 距离与营业时段如实出 0/空（待 V31）；
   `AbstractCrudService.unarchive` 疑似清不掉 archived_at（MP NOT_NULL 策略），已发独立核实任务。
+
+### 收尾增补（2026-08-05 · P1/P2/P4）
+
+- **实机联调**（ops-web `USE_MOCK=0`，影子实例隔离运行，未触碰另一会话的 dev server 与 `.env.local`）
+  暴露并修掉 3 个真缺陷：① 告警提醒条类型按**告警码名**匹配关键词 → 真实码是 E001/E002，
+  四条提醒清一色「异常」（改判**码表文案**）；② 对账 `/resolve` 查了该批次全部差错行（含已处置），
+  重复处置会「成功」并覆盖上一次留痕；③ `wo_sla` 到期时刻是 DATETIME 列却按 String 存取，
+  写入带 `T`、读回空格 → 灌 SLA 规则种子后工单流转**全线 500**（此前该表恒空，从未触发）。
+- **空表种子**：14 张表在骨架退役后成了「200 + 空列表」的白板（页面上与接口坏掉无法区分），
+  补 `DemoOpsFinanceSeeder`（逐表判空，跨 6 个域）。
+- **存量债**：`AbstractCrudService.unarchive` 静默失效已复现并修（MP `NOT_NULL` 策略跳过 null 字段 →
+  归档进得去出不来，接口还返回 200），由 `ArchiveRoundTripTest` 钉住往返；
+  写操作审计拦截器落地，`iam_audit_log` 有了第一个真生产者。
+- **脚本修正**：`entity-column-diff.py` 现读 `@TableField` 注解 —— 不读它的代价是 V13
+  给 6 张表建了一批**永远为 NULL 的 JSON 影子列**（删列迁移另行排期）。
+- 测试 109 → **113**（+3 记账口径守卫 +1 归档往返）。
 
 ---
 确认记录：2026-08-04 用户确认开工（裁决点按推荐方案执行，记账语义 3 项保守搁置单列）

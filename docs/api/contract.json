@@ -14665,6 +14665,10 @@
     {
      "name": "status",
      "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -14719,6 +14723,10 @@
     },
     {
      "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
      "type": "String"
     }
    ],
@@ -14864,6 +14872,10 @@
     },
     {
      "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
      "type": "String"
     }
    ],
@@ -16329,6 +16341,14 @@
     {
      "name": "createdAt",
      "type": "String"
+    },
+    {
+     "name": "period",
+     "type": "String"
+    },
+    {
+     "name": "grossAmount",
+     "type": "BigDecimal"
     }
    ],
    "requestShape": null
@@ -22548,7 +22568,7 @@
  "conflicts": {},
  "stats": {
   "endpoints": 368,
-  "records": 255,
+  "records": 256,
   "withPerm": 311,
   "withBody": 151,
   "shapedResponses": 281
