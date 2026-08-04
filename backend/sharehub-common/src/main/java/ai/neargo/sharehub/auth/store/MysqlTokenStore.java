@@ -1,8 +1,8 @@
-package ai.neargo.powerbank.auth.store;
+package ai.neargo.sharehub.auth.store;
 
 import ai.neargo.common.data.scope.DataScopeContext;
-import ai.neargo.powerbank.auth.TokenStore;
-import ai.neargo.powerbank.auth.store.SysToken.SysTokenMapper;
+import ai.neargo.sharehub.auth.TokenStore;
+import ai.neargo.sharehub.auth.store.SysToken.SysTokenMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.Duration;

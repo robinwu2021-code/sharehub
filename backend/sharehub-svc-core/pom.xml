@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>ai.neargo.sharehub</groupId>
+    <artifactId>sharehub-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>sharehub-svc-core</artifactId>
+  <name>sharehub-svc-core</name>
+  <description>
+    核心交易与设备服务实现（约 230 个类）：消费者 · 券会员 · 计价 · **订单** · 支付 · 设备资产 · 库存。
+
+    **借还/充电主链路全在这里**（ADR-018）：扫码 → 查机柜 → 选充电宝 → 弹仓 → 建单 → 收款
+    要在一个事务里完成，拆开就得上分布式事务 —— **core 大是有意的**，
+    用系统最热的链路换「服务更小」不划算。
+
+    它是五个服务里最大的一个，也是最后抽出的：前面四个都拆干净了，剩下的自然收敛到这里。
+  </description>
+  <packaging>jar</packaging>
+
+  <dependencies>
+    <dependency>
+      <groupId>ai.neargo.sharehub</groupId>
+      <artifactId>sharehub-common</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>ai.neargo.sharehub</groupId>
+      <artifactId>sharehub-api</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- provided 不传递，须自行声明 -->
+    <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+</project>

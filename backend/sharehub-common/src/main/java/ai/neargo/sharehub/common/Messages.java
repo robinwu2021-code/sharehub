@@ -1,4 +1,4 @@
-package ai.neargo.powerbank.common;
+package ai.neargo.sharehub.common;
 
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;

@@ -1,0 +1,49 @@
+package ai.neargo.sharehub.seed.domain;
+
+import ai.neargo.sharehub.agent.entity.AgtAgent;
+import ai.neargo.sharehub.agent.mapper.AgentMapper;
+import ai.neargo.sharehub.agent.dto.AgentDtos.Agent;
+import ai.neargo.sharehub.seed.SeedData;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.annotation.Order;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Component;
+
+/** agt 域首次落库：agt_agent 空时灌内存种子。幂等（非空跳过）。 */
+@Component
+// 演示种子数据：**默认关闭**（sharehub.seed.enabled=true 才装配）。
+//
+// 原先无任何门禁 —— 任何空库启动都会灌入 12 个假代理商 / 20 个假站点 / 演示订单，
+// **生产首次上线会被写入演示数据**，且因为 seeder 幂等（有数据即跳过），
+// 一旦灌入就再也不会被覆盖或提示。这不是拆分问题，是上线事故。
+@ConditionalOnProperty(name = "sharehub.seed.enabled", havingValue = "true")
+@Order(2)
+public class AgtSeeder implements CommandLineRunner {
+
+    private final SeedData seed;
+    private final AgentMapper mapper;
+
+    public AgtSeeder(SeedData seed, AgentMapper mapper) {
+        this.seed = seed;
+        this.mapper = mapper;
+    }
+
+    @Override
+    public void run(String... args) {
+        if (mapper.selectCount(null) > 0) {
+            return;
+        }
+        for (Agent a : seed.agents()) {
+            AgtAgent e = new AgtAgent();
+            e.setAgentNo(a.agentNo());
+            e.setTenantId("MAIN");
+            e.setName(a.name());
+            e.setContact(a.contact());
+            e.setRegionScope(a.regionScope());
+            e.setShareRate(a.shareRate());
+            e.setCabinetCount(a.cabinetCount());
+            e.setStatus(a.status());
+            mapper.insert(e);
+        }
+    }
+}

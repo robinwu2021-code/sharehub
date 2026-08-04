@@ -1,4 +1,4 @@
-package ai.neargo.powerbank.auth;
+package ai.neargo.sharehub.auth;
 
 import ai.neargo.common.data.scope.DataScopeContext;
 import jakarta.servlet.FilterChain;
@@ -54,6 +54,9 @@ public class StaffTokenAuthFilter extends OncePerRequestFilter {
                 var auth = new UsernamePasswordAuthenticationToken(u, null, authorities);
                 SecurityContextHolder.getContext().setAuthentication(auth);
                 DataScopeContext.set(u.dataScope());                  // 供 DataScopeHandler 注入 SQL
+                // 原始 token 另存一份供跨服务透传：SecurityContext 里只有解析后的 LoginUser，
+                // token 本身已经不在了。**透传 token 而非身份声明**，红线（不信客户端 X-Roles）不破。
+                CallContext.setToken(token);
                 scopeSet = true;
             }
         }
@@ -62,6 +65,8 @@ public class StaffTokenAuthFilter extends OncePerRequestFilter {
         } finally {
             if (scopeSet) {
                 DataScopeContext.clear();
+                // 线程池复用下不清会把上一个请求的身份泄露给下一个
+                CallContext.clear();
             }
         }
     }

@@ -1,4 +1,4 @@
-package ai.neargo.powerbank.support;
+package ai.neargo.sharehub.support;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -86,6 +86,14 @@ public abstract class ApiTestSupport {
         HttpRequest.Builder b = reqBuilder(path, token)
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(payload));
+        return send(b.build());
+    }
+
+    /** PUT（全站仅「整体覆盖」语义用它：角色权限、数据范围）。 */
+    protected Resp put(String path, Object body, String token) {
+        HttpRequest.Builder b = reqBuilder(path, token)
+                .header("Content-Type", "application/json")
+                .PUT(HttpRequest.BodyPublishers.ofString(toJson(body)));
         return send(b.build());
     }
 

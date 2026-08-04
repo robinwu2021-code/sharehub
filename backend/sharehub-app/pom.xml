@@ -5,18 +5,56 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>ai.neargo.powerbank</groupId>
-        <artifactId>powerbank-parent</artifactId>
+        <groupId>ai.neargo.sharehub</groupId>
+        <artifactId>sharehub-parent</artifactId>
         <version>0.1.0-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>powerbank-app</artifactId>
+    <artifactId>sharehub-app</artifactId>
     <packaging>jar</packaging>
-    <name>powerbank-app</name>
+    <name>sharehub-app</name>
     <description>powerbank 合并模块化单体：运营端 BFF/业务域（骨架：内存种子，零基础设施启动）</description>
 
     <dependencies>
+        <!-- ADR-017 S1：横切基础设施。app 依赖 common，反向绝不允许 -->
+        <dependency>
+            <groupId>ai.neargo.sharehub</groupId>
+            <artifactId>sharehub-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ai.neargo.sharehub</groupId>
+            <artifactId>sharehub-api</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- app 聚合 svc-*：这就是「换个 app 就换形态」的落点 -->
+        <dependency>
+            <groupId>ai.neargo.sharehub</groupId>
+            <artifactId>sharehub-svc-platform</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ai.neargo.sharehub</groupId>
+            <artifactId>sharehub-svc-gateway</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ai.neargo.sharehub</groupId>
+            <artifactId>sharehub-svc-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ai.neargo.sharehub</groupId>
+            <artifactId>sharehub-svc-ops</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ai.neargo.sharehub</groupId>
+            <artifactId>sharehub-svc-finance</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- 复用 neargo L1 核心（Result/ErrorCode/IdGenerator/PageResult 等纯库，无 autoconfig）。
              注意：对外响应契约用 powerbank 自有 ApiResult/PageData（msg/records），与 neargo 命名有别。 -->
         <dependency>
@@ -84,6 +122,26 @@
             <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
 
+        <!-- 数据库迁移。为什么不用 spring.sql.init：ALTER 不幂等、v2-alter 里有 CREATE DATABASE/USE
+             会切库污染后续脚本、且无版本记录（每次启动重跑）。Flyway 逐脚本一次性执行并记录到
+             flyway_schema_history，是 ddl/README 一直建议的方案。 -->
+        <!-- ⚠️ Boot 4 把自动配置按技术拆成独立模块：flyway 的 AutoConfiguration 不在
+             spring-boot-autoconfigure 里，只加 flyway-core 不会生效（jar 在 classpath 但迁移不执行，
+             且没有任何报错 —— 表数不变、无 flyway_schema_history，很容易误判为"跑过了"）。 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-flyway</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+            <version>11.14.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-mysql</artifactId>
+            <version>11.14.1</version>
+        </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>ai.neargo.sharehub</groupId>
+    <artifactId>sharehub-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>sharehub-svc-finance</artifactId>
+  <name>sharehub-svc-finance</name>
+  <description>
+    资金服务实现：账务 · 分润 · 结算提现 · 发票 · 对账（40 个类）。
+
+    **拆出它是对 ADR-018 那句「新增设备类型资金域一行不改」的结构性坐实** ——
+    资金侧只 join `ord_order` 共性主表、不碰任何 `ord_*_ext` 扩展表，
+    所以它的依赖里**没有 svc-core**。这不是巧合，是共性主表设计成立的证据：
+    做不到这一点，说明共性列没抽对（[设计v3-数据库变更 §二] 的验收判据）。
+
+    全部由订单完成事件驱动，无同步调用（ADR-017 §四）。
+    包名由 `trade.finance` 正名为顶层 `finance` —— 避免与 svc-core 的 `trade` 形成跨 jar 分裂包。
+  </description>
+  <packaging>jar</packaging>
+
+  <dependencies>
+    <dependency>
+      <groupId>ai.neargo.sharehub</groupId>
+      <artifactId>sharehub-common</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>ai.neargo.sharehub</groupId>
+      <artifactId>sharehub-api</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- provided 不传递，须自行声明 -->
+    <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+</project>

@@ -1,4 +1,4 @@
-package ai.neargo.powerbank.common;
+package ai.neargo.sharehub.common;
 
 /** 关键词匹配 helper（对齐 ops-web mock 的 kwHit：空关键词命中全部，否则任一字段包含即命中，忽略大小写）。 */
 public final class Kw {

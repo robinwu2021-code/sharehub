@@ -1,4 +1,4 @@
-package ai.neargo.powerbank.common;
+package ai.neargo.sharehub.common;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.context.MessageSource;

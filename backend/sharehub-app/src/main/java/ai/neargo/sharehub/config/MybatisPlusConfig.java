@@ -1,4 +1,4 @@
-package ai.neargo.powerbank.config;
+package ai.neargo.sharehub.config;
 
 import ai.neargo.common.data.scope.DataScopeHandler;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
@@ -14,7 +14,7 @@ import org.springframework.context.annotation.Configuration;
  * 拦截器顺序遵循 MP 建议：（租户→）数据权限→分页。租户行级隔离 MVP 暂不启用（单租户 MAIN）。
  */
 @Configuration
-@MapperScan(basePackages = "ai.neargo.powerbank",
+@MapperScan(basePackages = "ai.neargo.sharehub",
         markerInterface = com.baomidou.mybatisplus.core.mapper.BaseMapper.class)
 public class MybatisPlusConfig {
 

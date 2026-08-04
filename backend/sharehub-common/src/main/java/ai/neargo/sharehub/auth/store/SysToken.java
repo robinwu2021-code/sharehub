@@ -1,4 +1,4 @@
-package ai.neargo.powerbank.auth.store;
+package ai.neargo.sharehub.auth.store;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;

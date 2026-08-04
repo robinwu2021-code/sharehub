@@ -1,6 +1,20 @@
-package ai.neargo.powerbank.seed;
+package ai.neargo.sharehub.seed;
 
-import ai.neargo.powerbank.dto.Dto.*;
+import ai.neargo.sharehub.agent.dto.AgentDtos.Agent;
+import ai.neargo.sharehub.loc.dto.LocDtos.Site;
+import ai.neargo.sharehub.loc.dto.LocDtos.Location;
+import ai.neargo.sharehub.loc.dto.LocDtos.Venue;
+import ai.neargo.sharehub.loc.dto.LocDtos.Contract;
+import ai.neargo.sharehub.wo.dto.WoDtos.WorkOrder;
+import ai.neargo.sharehub.dto.Dto.*;
+import ai.neargo.sharehub.dev.dto.DevLegacyDtos.Cabinet;
+import ai.neargo.sharehub.dev.dto.DevLegacyDtos.Slot;
+import ai.neargo.sharehub.trade.dto.TradeLegacyDtos.RentOrder;
+import ai.neargo.sharehub.agent.dto.AgentDtos.Agent;
+import ai.neargo.sharehub.loc.dto.LocDtos.Site;
+import ai.neargo.sharehub.loc.dto.LocDtos.Location;
+import ai.neargo.sharehub.loc.dto.LocDtos.Venue;
+import ai.neargo.sharehub.loc.dto.LocDtos.Contract;
 import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Component;
 

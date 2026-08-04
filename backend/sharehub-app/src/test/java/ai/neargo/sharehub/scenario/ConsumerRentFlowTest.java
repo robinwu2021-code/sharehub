@@ -1,6 +1,6 @@
-package ai.neargo.powerbank.scenario;
+package ai.neargo.sharehub.scenario;
 
-import ai.neargo.powerbank.support.ApiTestSupport;
+import ai.neargo.sharehub.support.ApiTestSupport;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.Test;
 

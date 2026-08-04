@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>ai.neargo.sharehub</groupId>
+    <artifactId>sharehub-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>sharehub-app-gateway</artifactId>
+  <name>sharehub-app-gateway</name>
+  <description>
+    device-gateway 的**微服务形态**启动模块（ADR-017 §5.1）。
+
+    它与 `sharehub-app`（单体形态）的差别**只有依赖列表**：本模块只依赖 svc-gateway，
+    单体依赖全部 5 个 svc。两者共用同一份 svc 代码，**svc 一行不改**。
+
+    这就是「一套代码两种部署」的证明点：
+    · classpath 上有 svc-core 的本地实现 → Port 走方法调用（单体）；
+    · classpath 上没有 → `@ConditionalOnMissingBean` 装配 HTTP 实现（微服务）。
+    **装配由 classpath 决定而非配置**，所以配置写错不会导致装配错误，最坏是 fail-fast。
+
+    ⚠️ **当前是最小可启动骨架**：Port 的远程实现（`api/*/remote`）尚未编写，
+    故本模块目前只能验证「模块结构成立 + 能独立启动」，还不能真正跨进程调用。
+  </description>
+  <packaging>jar</packaging>
+
+  <dependencies>
+    <dependency>
+      <groupId>ai.neargo.sharehub</groupId>
+      <artifactId>sharehub-svc-gateway</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.baomidou</groupId>
+      <artifactId>mybatis-plus-spring-boot4-starter</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.mysql</groupId>
+      <artifactId>mysql-connector-j</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>

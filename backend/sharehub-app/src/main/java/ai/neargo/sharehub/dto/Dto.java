@@ -1,4 +1,4 @@
-package ai.neargo.powerbank.dto;
+package ai.neargo.sharehub.dto;
 
 import java.util.List;
 
@@ -14,49 +14,18 @@ public final class Dto {
     }
 
     // —— 设备（ops 域）——
-    public record Cabinet(String cabinetNo, String sn, String vendorCode, String model,
-                          String locationNo, String locationName, int slotTotal, int availableCount,
-                          String onlineStatus, String status, String fwVersion, String lastHeartbeatAt) {
-    }
 
-    public record Slot(int slotIndex, String powerbankNo, Integer battery, String lockStatus, String health) {
-    }
 
-    public record CabinetDetail(Cabinet cabinet, List<Slot> slots) {
-    }
 
     // —— 订单（trade 域）——
-    public record RentOrder(String orderNo, String cUserNo, String cabinetNo, String returnCabinetNo,
-                           String powerbankNo, String locationName, String status,
-                           String rentStartAt, String rentEndAt, Integer durationMin,
-                           double feeAmount, double depositAmount, String currency) {
-    }
 
-    /** C 端借出回执：订单号 + 弹出的充电宝 + 网关指令号（弹仓为骨架）。 */
-    public record RentResult(String orderNo, String powerbankNo, String commandId) {
-    }
 
     // —— 工单（ops 域）——
-    public record WorkOrder(String woNo, String type, String source, String priority, String cabinetNo,
-                           String locationName, String status, String assigneeName, String slaDueAt,
-                           String description, String createdAt) {
-    }
 
     // —— 场所：场地方 → 站点 → 点位 → 合同（ADR-013）——
-    public record Site(String siteNo, String name, String venueName, String agentNo, String regionId,
-                      String address, String sceneType, int pointCount, int cabinetCount, String status) {
-    }
 
-    public record Location(String locationNo, String name, String siteNo, String siteName,
-                          String spotDesc, int cabinetCount, String status) {
-    }
 
-    public record Venue(String venueNo, String name, String contact, String industry, int locationCount) {
-    }
 
-    public record Contract(String contractNo, String venueName, String siteName, double shareRate,
-                          double entryFee, String startAt, String endAt, String status) {
-    }
 
     // —— 财务：分润 / 结算 / 提现 / 分录（trade 域）——
     public record ShareRule(String ruleNo, String dimension, String payeeName, String mode,
@@ -96,9 +65,6 @@ public final class Dto {
     }
 
     // —— 代理商（agt 域，ADR-012）——
-    public record Agent(String agentNo, String name, String contact, String regionScope,
-                       double shareRate, int cabinetCount, String status) {
-    }
 
     // —— 员工 / 角色 / 审计（platform 域）——
     public record Employee(String employeeNo, String name, String phone, String deptName,
@@ -122,9 +88,4 @@ public final class Dto {
     }
 
     // —— 动作返回 ——
-    public record CommandResult(String commandId) {
-    }
-
-    public record OkResult(boolean ok) {
-    }
 }

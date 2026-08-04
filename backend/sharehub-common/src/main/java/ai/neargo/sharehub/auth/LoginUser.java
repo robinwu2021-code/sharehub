@@ -1,4 +1,4 @@
-package ai.neargo.powerbank.auth;
+package ai.neargo.sharehub.auth;
 
 import ai.neargo.common.data.scope.DataScopeSpec;
 import ai.neargo.common.security.rbac.PermissionCarrier;

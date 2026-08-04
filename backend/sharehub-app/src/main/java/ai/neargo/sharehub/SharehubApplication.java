@@ -1,4 +1,4 @@
-package ai.neargo.powerbank;
+package ai.neargo.sharehub;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -10,9 +10,9 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * 真业务域落地时逐步引入 neargo-common-{data,security} 与持久层/鉴权。
  */
 @SpringBootApplication
-public class PowerbankApplication {
+public class SharehubApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(PowerbankApplication.class, args);
+        SpringApplication.run(SharehubApplication.class, args);
     }
 }

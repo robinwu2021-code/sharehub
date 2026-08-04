@@ -1,11 +1,11 @@
-package ai.neargo.powerbank.config;
+package ai.neargo.sharehub.config;
 
-import ai.neargo.powerbank.auth.TokenStore;
-import ai.neargo.powerbank.auth.store.LocalCacheTokenStore;
-import ai.neargo.powerbank.auth.store.MemoryTokenStore;
-import ai.neargo.powerbank.auth.store.MysqlTokenStore;
-import ai.neargo.powerbank.auth.store.RedisTokenStore;
-import ai.neargo.powerbank.auth.store.SysToken.SysTokenMapper;
+import ai.neargo.sharehub.auth.TokenStore;
+import ai.neargo.sharehub.auth.store.LocalCacheTokenStore;
+import ai.neargo.sharehub.auth.store.MemoryTokenStore;
+import ai.neargo.sharehub.auth.store.MysqlTokenStore;
+import ai.neargo.sharehub.auth.store.RedisTokenStore;
+import ai.neargo.sharehub.auth.store.SysToken.SysTokenMapper;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -41,21 +41,21 @@ public class TokenStoreConfig {
 
     @Bean
     @ConditionalOnProperty(name = KEY, havingValue = "ehcache")
-    public TokenStore localCacheTokenStore(@Value("${powerbank.auth.token-ttl:2h}") Duration ttl) {
+    public TokenStore localCacheTokenStore(@Value("${sharehub.auth.token-ttl:2h}") Duration ttl) {
         return new LocalCacheTokenStore(ttl);
     }
 
     @Bean
     @ConditionalOnProperty(name = KEY, havingValue = "redis")
     public TokenStore redisTokenStore(StringRedisTemplate redis,
-                                      @Value("${powerbank.auth.token-ttl:2h}") Duration ttl) {
+                                      @Value("${sharehub.auth.token-ttl:2h}") Duration ttl) {
         return new RedisTokenStore(redis, authOm, ttl);
     }
 
     @Bean
     @ConditionalOnProperty(name = KEY, havingValue = "mysql")
     public TokenStore mysqlTokenStore(SysTokenMapper mapper,
-                                      @Value("${powerbank.auth.token-ttl:2h}") Duration ttl) {
+                                      @Value("${sharehub.auth.token-ttl:2h}") Duration ttl) {
         return new MysqlTokenStore(mapper, authOm, ttl);
     }
 }

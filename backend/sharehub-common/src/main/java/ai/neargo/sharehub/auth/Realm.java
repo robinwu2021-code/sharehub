@@ -1,4 +1,4 @@
-package ai.neargo.powerbank.auth;
+package ai.neargo.sharehub.auth;
 
 /**
  * 身份域（凭据池，对应 pb_auth.cred_credential.realm）。

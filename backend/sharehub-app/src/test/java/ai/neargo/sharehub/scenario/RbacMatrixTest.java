@@ -1,8 +1,9 @@
-package ai.neargo.powerbank.scenario;
+package ai.neargo.sharehub.scenario;
 
-import ai.neargo.powerbank.support.ApiTestSupport;
+import ai.neargo.sharehub.support.ApiTestSupport;
 import org.junit.jupiter.api.Test;
 
+import java.util.HashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -89,8 +90,17 @@ class RbacMatrixTest extends ApiTestSupport {
 
     @Test
     void finance_can_audit_withdrawal() {
-        // FINANCE 有 finance:*
-        post("/api/trade/withdrawals/" + WD + "/audit", Map.of("approve", true), login("FINANCE")).okData();
+        // FINANCE 有 finance:*。
+        // 自建一笔再审：提现端点已从内存实现迁到落库版，固定编号的单会被前面的用例审掉，
+        // 再审一次就是非法迁移（PAYING --APPROVE--> ?）。
+        Map<String, Object> req = new HashMap<>();
+        req.put("payeeType", "AGENT");
+        req.put("payeeNo", "AG002");
+        req.put("payeeName", "RBAC 测试");
+        req.put("amount", 300);
+        req.put("currency", "AED");
+        String no = post("/api/trade/withdrawals", req, login("FINANCE")).okData().path("withdrawNo").asText();
+        post("/api/trade/withdrawals/" + no + "/audit", Map.of("approve", true), login("FINANCE")).okData();
     }
 
     @Test

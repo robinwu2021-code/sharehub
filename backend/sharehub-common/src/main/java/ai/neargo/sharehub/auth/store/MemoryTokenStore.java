@@ -1,6 +1,6 @@
-package ai.neargo.powerbank.auth.store;
+package ai.neargo.sharehub.auth.store;
 
-import ai.neargo.powerbank.auth.TokenStore;
+import ai.neargo.sharehub.auth.TokenStore;
 
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;

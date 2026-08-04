@@ -11,4 +11,4 @@
  * 口径 B 的会话重建经 {@code PrincipalRefresher} 接口（DIP）由 IAM 注入实现，故 infra 不依赖 iam。
  * 边界干净 ⇒ 未来抽 starter jar = 纯搬迁。
  */
-package ai.neargo.powerbank.auth;
+package ai.neargo.sharehub.auth;

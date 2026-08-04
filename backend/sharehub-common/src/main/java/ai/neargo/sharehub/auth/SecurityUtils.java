@@ -1,4 +1,4 @@
-package ai.neargo.powerbank.auth;
+package ai.neargo.sharehub.auth;
 
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;

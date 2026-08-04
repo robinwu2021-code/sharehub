@@ -1,6 +1,6 @@
-package ai.neargo.powerbank.auth.store;
+package ai.neargo.sharehub.auth.store;
 
-import ai.neargo.powerbank.auth.TokenStore;
+import ai.neargo.sharehub.auth.TokenStore;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.data.redis.core.StringRedisTemplate;
 

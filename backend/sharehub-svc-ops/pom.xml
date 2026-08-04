@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>ai.neargo.sharehub</groupId>
+    <artifactId>sharehub-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>sharehub-svc-ops</artifactId>
+  <name>sharehub-svc-ops</name>
+  <description>
+    运行管理服务实现（57 个类）：告警 · 工单 · 客服。
+
+    异步、可延迟，与借还主链路解耦（ADR-018）—— 告警去重与工单 SLA 慢几秒不影响用户下单。
+
+    **包正名**：`user.cs` → 顶层 `cs`、`dev.alarm` → 顶层 `alarm`。
+    不正名的话，svc-ops 的 `user.cs` 会与 svc-core 的 `user` 形成**跨 jar 分裂包** ——
+    classpath 下能跑，但 package-private 访问会跨模块生效（破坏封装），且 JPMS 直接拒绝。
+  </description>
+  <packaging>jar</packaging>
+
+  <dependencies>
+    <dependency>
+      <groupId>ai.neargo.sharehub</groupId>
+      <artifactId>sharehub-common</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>ai.neargo.sharehub</groupId>
+      <artifactId>sharehub-api</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- provided 不传递，须自行声明 -->
+    <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+</project>

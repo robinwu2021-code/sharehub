@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>ai.neargo.sharehub</groupId>
+    <artifactId>sharehub-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>sharehub-svc-platform</artifactId>
+  <name>sharehub-svc-platform</name>
+  <description>
+    平台底座服务实现（105 个类）：租户 · IAM · 组织 · 主数据 · 字典 · 系统参数 · 通知 · 开放平台。
+
+    含 `platform`(105) + `agent`(25) + `loc`(27) 三个包。
+
+    `agent`/`loc` 起初有 7 处遗留依赖挡路，按「先搬干净的、脏的单独清」的顺序逐个解开：
+    DTO 归位各自域 · `SiteAnalysis` 归位报表域 · **seeder 上提到 app 的装配层**（关键一步）。
+
+    包 `platform` 与本模块同名是巧合：模块名指服务，包名指域，两者恰好都叫 platform。
+  </description>
+  <packaging>jar</packaging>
+
+  <dependencies>
+    <dependency>
+      <groupId>ai.neargo.sharehub</groupId>
+      <artifactId>sharehub-common</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>ai.neargo.sharehub</groupId>
+      <artifactId>sharehub-api</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+</project>

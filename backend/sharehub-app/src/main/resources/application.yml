@@ -3,8 +3,8 @@ server:
 
 spring:
   application:
-    name: powerbank-app
-  # 引 neargo-common-security 只为其 rbac(@perm)；关掉它的其它 auto-config（powerbank 自持会话/租户/链）。
+    name: sharehub-app
+  # 引 neargo-common-security 只为其 rbac(@perm)；关掉它的其它 auto-config（sharehub 自持会话/租户/链）。
   autoconfigure:
     exclude:
       - ai.neargo.common.security.SecurityAutoConfiguration
@@ -17,10 +17,22 @@ spring:
     password: ${PB_DB_PASS:powerbank}
     driver-class-name: com.mysql.cj.jdbc.Driver
   # C 端 usr_user/usr_identity 表自建（幂等 CREATE IF NOT EXISTS，见 resources/schema.sql）。
+  # 建表交给 Flyway（db/migration/V1..V10，131 张表）。
+  # 关掉 spring.sql.init：它每次启动重跑、无版本记录，且 continue-on-error:true 会把真错误一起吞掉
+  # —— 之前「表不存在」的问题反复出现，正是因为它只建了 resources/schema.sql 里那 8 张。
   sql:
     init:
-      mode: always
-      continue-on-error: true
+      mode: never
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # 开发库已存在 17 张表（非 Flyway 建的）→ baseline 后把 V1..V10 全部作为「待应用」执行。
+    # 脚本已幂等化（CREATE TABLE / ADD COLUMN / ADD KEY 均带 IF NOT EXISTS，MariaDB 支持），
+    # 因此对已有表与已有列是安全的空操作，不会丢数据。
+    baseline-on-migrate: true
+    baseline-version: 0
+    # 允许迁移与已应用记录的校验和不一致时报错（默认即 true），改动历史脚本会被挡下 —— 这是想要的
+    validate-on-migrate: true
 
 mybatis-plus:
   configuration:
@@ -43,7 +55,12 @@ management:
       enabled: false   # 关 redis 健康检查（token-store!=redis 时无 Redis，避免 readiness DOWN）
 
 # 开发期 CORS 允许源（ops-web Next dev）。生产走同源 nginx 反代 /api，无需 CORS。
-powerbank:
+sharehub:
+  # 演示种子数据：开发/演示环境开，**生产必须关**（默认即关）。
+  # 之前 5 个 Seeder 无任何门禁，任何空库启动都会灌入 12 个假代理商 / 20 个假站点，
+  # 且因幂等（有数据即跳过）灌入后不会被覆盖也不会提示 —— 生产上线即事故。
+  seed:
+    enabled: true
   cors:
     allowed-origins: http://localhost:3000
   # 可切换会话存储：memory(默认) | ehcache(单节点TTL) | redis(多实例推荐) | mysql(强持久sys_token)

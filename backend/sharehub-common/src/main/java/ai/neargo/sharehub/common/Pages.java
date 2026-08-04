@@ -1,4 +1,4 @@
-package ai.neargo.powerbank.common;
+package ai.neargo.sharehub.common;
 
 import ai.neargo.common.core.PageResult;
 

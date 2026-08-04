@@ -1,0 +1,24 @@
+# device-gateway 微服务形态的最小配置。
+# 与单体共用同一个库（拆分第一阶段：先分 schema 再分实例，见 ADR-017 §5.3）。
+spring:
+  application:
+    name: sharehub-app-gateway
+  # 与单体形态相同的自动配置排除 —— sharehub-common 自持会话/租户/审计填充，
+  # 不排除会与 neargo 的同名 bean 冲突（微服务形态下首次暴露：单体靠 app 的配置屏蔽了）。
+  #
+  # ⚠️ 这段在每个 app-* 里都要重复，正是 ADR-017 §七开放问题 1「app-mono 与 app-* 如何避免两套配置」
+  # 所指的东西 —— 应抽成共享的 application-shared.yml 片段各自 import。
+  autoconfigure:
+    exclude:
+      - ai.neargo.common.security.SecurityAutoConfiguration
+      - ai.neargo.common.security.SessionStoreAutoConfiguration
+      - ai.neargo.common.data.DataAutoConfiguration
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/pb_core?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=UTF-8
+    username: ${PB_DB_USER:powerbank}
+    password: ${PB_DB_PASS:powerbank}
+server:
+  port: 8091
+sharehub:
+  deploy:
+    mode: micro       # 仅用于日志与健康检查自述；**装配由 classpath 决定，不读这个值**

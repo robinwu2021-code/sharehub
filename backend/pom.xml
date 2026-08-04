@@ -14,16 +14,28 @@
         <relativePath/>
     </parent>
 
-    <groupId>ai.neargo.powerbank</groupId>
-    <artifactId>powerbank-parent</artifactId>
+    <groupId>ai.neargo.sharehub</groupId>
+    <artifactId>sharehub-parent</artifactId>
     <version>0.1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
-    <name>powerbank-parent</name>
+    <name>sharehub-parent</name>
     <description>共享充电宝/充电桩运营管理系统 · 服务端父 POM（独立仓库，仅依赖 ai.neargo:* 基础包）</description>
 
     <!-- MVP=合并模块化单体（ADR-001）：先一个 modulith app 点亮运营端；access-gateway 后续裂解为独立 module -->
     <modules>
-        <module>powerbank-app</module>
+        <!-- ADR-017 S1：横切基础设施先抽出，它是唯一零业务依赖的模块 -->
+        <module>sharehub-common</module>
+        <!-- ADR-017 §5.1：只有接口，谁都能依赖，自己只依赖 common -->
+        <module>sharehub-api</module>
+        <!-- 业务服务实现（jar，不可独立启动）。先拆最小的 gateway 验证模式 -->
+        <module>sharehub-svc-platform</module>
+        <module>sharehub-svc-gateway</module>
+        <module>sharehub-svc-core</module>
+        <module>sharehub-svc-ops</module>
+        <module>sharehub-svc-finance</module>
+        <module>sharehub-app</module>
+        <!-- 微服务形态启动模块：与单体共用同一份 svc，差别只有依赖列表 -->
+        <module>sharehub-app-gateway</module>
     </modules>
 
 </project>

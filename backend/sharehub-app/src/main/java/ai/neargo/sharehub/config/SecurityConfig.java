@@ -1,7 +1,7 @@
-package ai.neargo.powerbank.config;
+package ai.neargo.sharehub.config;
 
-import ai.neargo.powerbank.auth.ConsumerTokenAuthFilter;
-import ai.neargo.powerbank.auth.StaffTokenAuthFilter;
+import ai.neargo.sharehub.auth.ConsumerTokenAuthFilter;
+import ai.neargo.sharehub.auth.StaffTokenAuthFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -36,7 +36,7 @@ public class SecurityConfig {
 
     private final String[] allowedOrigins;
 
-    public SecurityConfig(@Value("${powerbank.cors.allowed-origins:http://localhost:3000}") String origins) {
+    public SecurityConfig(@Value("${sharehub.cors.allowed-origins:http://localhost:3000}") String origins) {
         this.allowedOrigins = origins.split("\\s*,\\s*");
     }
 

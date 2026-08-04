@@ -1,6 +1,6 @@
-package ai.neargo.powerbank.scenario;
+package ai.neargo.sharehub.scenario;
 
-import ai.neargo.powerbank.support.ApiTestSupport;
+import ai.neargo.sharehub.support.ApiTestSupport;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 
+import java.util.HashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -94,9 +95,12 @@ class OperatorDailyFlowTest extends ApiTestSupport {
         assumeTrue(created.path("list").size() > 0, "无待派工单（多次运行后 CREATED 已耗尽）——跳过");
         String woNo = created.path("list").get(0).path("woNo").asText();
 
-        JsonNode ok = post("/api/ops/work-orders/" + woNo + "/dispatch",
+        // 契约（contracts/workorder.ts）：dispatch 返回工单富行（不是旧 {ok:true}）
+        JsonNode row = post("/api/ops/work-orders/" + woNo + "/dispatch",
                 Map.of("assignee", "Ahmed Field-Eng"), opsToken).okData();
-        assertThat(ok.path("ok").asBoolean()).isTrue();
+        assertThat(row.path("woNo").asText()).isEqualTo(woNo);
+        assertThat(row.path("status").asText()).isEqualTo("DISPATCHED");
+        assertThat(row.path("assigneeName").asText()).isEqualTo("Ahmed Field-Eng");
 
         // 已 DISPATCHED，再次派单 = 非法迁移 → 400（WoStateMachine 拒绝）
         Resp again = post("/api/ops/work-orders/" + woNo + "/dispatch",
@@ -134,15 +138,28 @@ class OperatorDailyFlowTest extends ApiTestSupport {
         assertThat(hit).as("新建站点 %s 应可检索", siteNo).isTrue();
     }
 
-    /** 步骤 7：财务对账——列提现，审核通过一笔（FINANCE 有 finance:*）。 */
+    /**
+     * 步骤 7：财务——申请一笔提现并审核通过。
+     *
+     * <p>原来是「列表取第一条直接审」。提现端点从内存实现迁到落库版（合规四件套）后这不再成立：
+     * 列表里可能全是已审过的单，再审一次就是非法迁移（PAYING --APPROVE--> ?）。
+     * 改为自己申请一笔再审，既幂等又顺带覆盖了申请流程。
+     * 出参也从 {@code OkResult} 变成 {@code Withdrawal}（前端契约本就要这个形状）。
+     */
     @Test @Order(7)
     void step07_finance_audit_withdrawal() {
-        JsonNode list = get("/api/trade/withdrawals?page=1&size=50", financeToken).okData();
-        assumeTrue(list.path("list").size() > 0, "无提现记录——跳过");
-        String withdrawNo = list.path("list").get(0).path("withdrawNo").asText();
+        Map<String, Object> req = new HashMap<>();
+        req.put("payeeType", "AGENT");
+        req.put("payeeNo", "AG002");
+        req.put("payeeName", "日常流程测试");
+        req.put("amount", 500);
+        req.put("currency", "AED");
+        String no = post("/api/trade/withdrawals", req, financeToken).okData().path("withdrawNo").asText();
+        assertThat(no).startsWith("WD");
 
-        JsonNode ok = post("/api/trade/withdrawals/" + withdrawNo + "/audit",
+        JsonNode w = post("/api/trade/withdrawals/" + no + "/audit",
                 Map.of("approve", true), financeToken).okData();
-        assertThat(ok.path("ok").asBoolean()).isTrue();
+        assertThat(w.path("status").asText()).isEqualTo("PAYING");
+        assertThat(w.path("auditorName").asText()).as("审批人由服务端回填").isNotBlank();
     }
 }

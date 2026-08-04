@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>ai.neargo.sharehub</groupId>
+    <artifactId>sharehub-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>sharehub-svc-gateway</artifactId>
+  <name>sharehub-svc-gateway</name>
+  <description>
+    南向接入服务实现（ADR-018 第 5 个服务）：厂商目录 · 驱动 SPI 与分族 · 绑定 · 心跳 · 指令与报文 · OTA。
+
+    **jar 而非可启动应用** —— 它由 app-mono（单体）或 app-gateway（微服务）聚合。
+    这就是「一套代码两种部署」的落点：换个 app 就换形态，本模块一行不改。
+
+    **为什么先拆它**：它是设备类型与供应商增多时唯一线性膨胀的部分（ADR-018），
+    也是五个服务里最小、跨服务引用最先归零的一个 —— 拿它验证拆分模式，
+    失败的代价最小，成功则其余四个是机械重复。
+
+    依赖只有 common + api。**绝不允许依赖任何 svc-***（由 split-readiness.py 卡口保证）。
+  </description>
+  <packaging>jar</packaging>
+
+  <dependencies>
+    <dependency>
+      <groupId>ai.neargo.sharehub</groupId>
+      <artifactId>sharehub-common</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>ai.neargo.sharehub</groupId>
+      <artifactId>sharehub-api</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <!-- provided 作用域不传递，每个 svc 模块须自行声明 -->
+    <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+</project>

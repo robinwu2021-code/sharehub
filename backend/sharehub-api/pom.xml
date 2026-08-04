@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>ai.neargo.sharehub</groupId>
+    <artifactId>sharehub-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>sharehub-api</artifactId>
+  <name>sharehub-api</name>
+  <description>
+    跨服务接口层（ADR-017 §5.1）：**只有 Port 接口 + 窄 DTO + 事件类，没有任何实现**。
+
+    谁都能依赖它，它只依赖 sharehub-common —— 这条不变式是拆分能成立的支点：
+    · api 依赖 svc 会形成环，且拆分时把实现拖进调用方；
+    · svc-X 依赖 svc-Y 是拆不动的根源，有了 api 就不需要那么做。
+
+    设计上最终会按服务再分成 api-{platform,core,gateway,ops,finance} 五个，
+    让 svc-X 只依赖它真正调用的那几个。**现在合成一个**：接口总共 6 个文件，
+    分成五个模块的收益还抵不过 pom 的维护成本；等接口数量上来、
+    或出现「只想依赖某一个服务的接口」的真实需求时再拆。
+  </description>
+  <packaging>jar</packaging>
+
+  <dependencies>
+    <dependency>
+      <groupId>ai.neargo.sharehub</groupId>
+      <artifactId>sharehub-common</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- 远程 Port 实现需要 RestClient 与自动配置支持 -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+  </dependencies>
+</project>

@@ -1,6 +1,8 @@
-package ai.neargo.powerbank.common;
+package ai.neargo.sharehub.common;
 
+import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.Version;
@@ -32,9 +34,19 @@ public abstract class BaseEntity {
 
     private String tenantId;
 
+    @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 
+    /** 创建人（业务键：员工 employee_no / 代理账号 account_no / C端 c_user_no；系统作业为 SYSTEM）。 */
+    @TableField(fill = FieldFill.INSERT)
+    private String createdBy;
+
+    @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updatedAt;
+
+    /** 更新人，同 {@link #createdBy} 取值口径。 */
+    @TableField(fill = FieldFill.INSERT_UPDATE)
+    private String updatedBy;
 
     @Version
     private Long version;
