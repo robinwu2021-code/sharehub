@@ -22,6 +22,23 @@ public class I18nConfig implements WebMvcConfigurer {
     static final Locale AR = Locale.forLanguageTag("ar");
     static final List<Locale> SUPPORTED = List.of(Locale.SIMPLIFIED_CHINESE, Locale.ENGLISH, AR);
 
+    private final AuditTrailInterceptor auditTrail;
+
+    public I18nConfig(AuditTrailInterceptor auditTrail) {
+        this.auditTrail = auditTrail;
+    }
+
+    /**
+     * 注册运营端写操作审计拦截器。
+     *
+     * <p>挂在本类而非新建一个 {@code WebMvcConfigurer}：多个 configurer 各注册各的，
+     * 拦截器的**执行顺序**就散在几个文件里看不出来了。
+     */
+    @Override
+    public void addInterceptors(org.springframework.web.servlet.config.annotation.InterceptorRegistry registry) {
+        registry.addInterceptor(auditTrail).addPathPatterns("/api/**");
+    }
+
     @Bean
     public MessageSource messageSource() {
         ReloadableResourceBundleMessageSource ms = new ReloadableResourceBundleMessageSource();

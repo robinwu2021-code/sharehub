@@ -33,4 +33,19 @@ public interface LedgerService {
      *                                  或**借贷不平衡**
      */
     String post(LedgerPostReq req);
+
+    /**
+     * 账户余额（按科目性质定方向）。
+     *
+     * <p>复式记账里余额方向随科目走：<b>资产/费用类 = Σ借 − Σ贷</b>，
+     * <b>负债/权益/收入类 = Σ贷 − Σ借</b>。此前 {@code acct_account.balance} 是不带方向语义的单列，
+     * 对负债科目（应付场地方/应付代理）取到的数会是反的 —— 应付越多余额越"负"，
+     * 财务看到的是「我们欠人家 −4200」这种读不懂的数（未完成清单 B1 第三条）。
+     *
+     * <p>本方法由分录实时算，<b>不读 {@code acct_account.balance} 那一列</b> ——
+     * 那一列当前无任何生产者（记分录不更新账户），信它等于信一个没人维护的数。
+     *
+     * @return 该科目方向上的余额；账户不存在抛 {@link IllegalArgumentException}
+     */
+    java.math.BigDecimal balanceOf(String accountNo);
 }

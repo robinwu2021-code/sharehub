@@ -426,8 +426,10 @@ public class ReportServiceImpl implements ReportService {
         List<DashboardAlert> alerts = alarmFacts.openAlarms().stream().map(r -> {
             String cab = str(r.get("cabinetNo"));
             String code = str(r.get("alarmCode"));
-            return new DashboardAlert(str(r.get("alarmNo")), alertType(code), cab,
-                    code + " · " + cab, "/devices/detail?no=" + cab);
+            String msg = str(r.get("alarmMessage"));
+            String label = blankTo(msg, code);
+            return new DashboardAlert(str(r.get("alarmNo")), alertType(label), cab,
+                    label + " · " + cab, "/devices/detail?no=" + cab);
         }).toList();
 
         List<Object[]> raw = new ArrayList<>();
@@ -453,11 +455,14 @@ public class ReportServiceImpl implements ReportService {
     }
 
     /** 告警码 → 前端提醒条类型（{@code OFFLINE | EXCEPTION | TIMEOUT}），对不上的一律 EXCEPTION。 */
-    private static String alertType(String code) {
-        if (code == null) return "EXCEPTION";
-        String c = code.toUpperCase();
-        if (c.contains("OFFLINE")) return "OFFLINE";
-        if (c.contains("TIMEOUT")) return "TIMEOUT";
+    private static String alertType(String label) {
+        if (label == null) return "EXCEPTION";
+        String c = label.toUpperCase();
+        // 判据是**码表文案**而非告警码：真实码是 E001/E002 这类无语义编号，
+        // 按码名匹配关键词会让所有告警都落到 EXCEPTION（实测过：四条提醒清一色「异常」）。
+        // 中英文都认 —— 码表三语，运营环境语言不定。
+        if (c.contains("OFFLINE") || label.contains("离线")) return "OFFLINE";
+        if (c.contains("TIMEOUT") || label.contains("超时")) return "TIMEOUT";
         return "EXCEPTION";
     }
 

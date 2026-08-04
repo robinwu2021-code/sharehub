@@ -27,6 +27,12 @@ JAVA2SQL = {
 }
 
 
+def camel(col):
+    """下划线列名 → 驼峰（与比对侧的 camel→snake 还原互逆）。"""
+    head, *rest = col.split('_')
+    return head + ''.join(x[:1].upper() + x[1:] for x in rest)
+
+
 def base_class_fields():
     """扫 BaseEntity 等父类的字段。
 
@@ -85,7 +91,14 @@ def entities():
                 fields = {}
                 for fm in re.finditer(r'private\s+(?:static\s+|final\s+)*([A-Za-z_][\w.<>]*)\s+(\w+)\s*[;=]', body):
                     jt = fm.group(1).split('.')[-1].split('<')[0]
-                    fields[fm.group(2)] = jt
+                    name = fm.group(2)
+                    # @TableField("real_column") 显式改名的字段**按注解名算**，不按字段名推导。
+                    # 不读它的代价是实打实的：V13 因此把 WoHandle.assigneeNo（注解指向已存在的
+                    # assignee_id）误判成「缺 assignee_no 列」，给 6 张表加了一批**永远为 NULL
+                    # 的影子列**（且被标成 JSON）。脚本读不到的映射，迁移就会照着幻觉建表。
+                    ann = re.search(r'@TableField\(\s*(?:value\s*=\s*)?"(\w+)"[^)]*\)\s*(?:@\w+[^\n]*\s*)*'
+                                    r'private[^;]*\b' + re.escape(name) + r'\s*[;=]', body)
+                    fields[camel(ann.group(1)) if ann else name] = jt
                 # 合并父类字段。`@TableName(excludeProperty=...)` 排除的列不算
                 # （全局表用它排掉 tenantId —— 那些表确实没有该列，是有意的）。
                 ext = re.search(r'\bclass\s+' + re.escape(cls) + r'\s+extends\s+(\w+)', s)

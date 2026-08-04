@@ -28,6 +28,9 @@ public class AcctAccount extends BaseEntity {
 
     private String ownerNo;
 
+    /** 科目类型：CASH 现金 / PAYABLE 应付 / REVENUE 收入 / LIABILITY 负债（V3 列，NOT NULL 无默认）。 */
+    private String acctType;
+
     private BigDecimal balance;
 
     /** 冻结额（提现在途、押金预授权占用）。 */

@@ -49,6 +49,12 @@ public class ShareRecord extends BaseEntity {
     /** 结算后回填 {@code stl_settlement.settle_no}。 */
     private String settleNo;
 
+    /** 归属结算周期 YYYY-MM（V34：写入定格，不再由 created_at 现推）。 */
+    private String period;
+
+    /** 分润基数（GMV 快照，V34：不再由 amount/rate 反推 —— 固定额/阶梯分润反推必错）。 */
+    private BigDecimal grossAmount;
+
     // createdAt / updatedAt / version / deleted 见 BaseEntity，**不重复声明**（[SKELETON_BRIEF §4]）。
     // 统计口径里的 period（YYYY-MM）就是从 created_at 现算的，本表没有也不需要 period 列。
 }

@@ -179,7 +179,16 @@ public abstract class AbstractCrudService<E extends BaseEntity, V> implements Cr
                     e.getClass().getSimpleName() + " 未实现 Archivable，不支持归档");
         }
         a.setArchivedAt(at);
-        mapper.updateById(e);
+        if (at == null) {
+            // **取消归档必须按列名显式置 NULL**：MyBatis-Plus 默认更新策略是 NOT_NULL，
+            // null 字段根本不会进 UPDATE SET —— updateById 会「成功」但 archived_at 原封不动，
+            // 接口返回 200、行却永远留在归档态。归档能进不能出，且没有任何报错提示。
+            mapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<E>()
+                    .eq(keyColumn(), no)
+                    .set("archived_at", null));
+        } else {
+            mapper.updateById(e);
+        }
         return toVO(selectByKey(no));
     }
 

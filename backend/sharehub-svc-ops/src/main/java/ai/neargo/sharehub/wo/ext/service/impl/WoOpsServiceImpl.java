@@ -335,13 +335,13 @@ public class WoOpsServiceImpl implements WoOpsService {
                     e.getLocationName(), e.getStatus(), e.getAssigneeName(), e.getSlaDueAt(),
                     e.getDescription(), e.getWoCreatedAt(),
                     str(x.get("source_ref")), str(x.get("expected_at")),
-                    dispatchedAt.get(e.getWoNo()),
-                    acc == null ? null : acc.getDispatchedAt(),
+                    iso(dispatchedAt.get(e.getWoNo())),
+                    acc == null ? null : iso(acc.getDispatchedAt()),
                     h != null ? h.getAssigneeNo() : (acc == null ? null : acc.getAssigneeNo()),
-                    h == null ? null : h.getHandledAt(),
+                    h == null ? null : iso(h.getHandledAt()),
                     h == null ? null : h.getNote(),
                     h != null && h.getPartChanged() != null && h.getPartChanged() == 1 ? "PART_CHANGED" : null,
-                    completedAt.get(e.getWoNo()),
+                    iso(completedAt.get(e.getWoNo())),
                     str(x.get("audited_by")), str(x.get("audited_at")),
                     str(x.get("audit_result")), str(x.get("audit_note")),
                     str(x.get("reject_reason")),
@@ -350,8 +350,24 @@ public class WoOpsServiceImpl implements WoOpsService {
         return new ai.neargo.common.core.PageResult<>(out, r.getTotal());
     }
 
+    /**
+     * 按列名读回的值归一为字符串；时间列统一出 <b>ISO-8601</b>。
+     *
+     * <p>{@code selectMaps} 读 DATETIME 列拿到的是 {@link java.sql.Timestamp}，其 {@code toString}
+     * 是空格分隔的 {@code "2026-08-05 01:04:01.4"}，而同一响应里实体字段出的是带 {@code T} 的 ISO。
+     * 一个 JSON 里两种时间格式，前端只能靠 {@code new Date()} 的宽容解析兜住 —— 换个运行时就崩。
+     */
+    /** 时间字符串归一：DATETIME 列经 String 字段读回是空格分隔，统一补 {@code T}（见 {@link #str}）。 */
+    private static String iso(String v) {
+        if (v == null || v.length() < 11 || v.charAt(10) != ' ') return v;
+        return v.substring(0, 10) + "T" + v.substring(11);
+    }
+
     private static String str(Object v) {
-        return v == null ? null : String.valueOf(v);
+        if (v == null) return null;
+        if (v instanceof java.sql.Timestamp ts) return ts.toLocalDateTime().toString();
+        if (v instanceof java.time.LocalDateTime dt) return dt.toString();
+        return String.valueOf(v);
     }
 
     // ——————————————————————— 回退：驳回 / 返工 ———————————————————————
@@ -506,10 +522,25 @@ public class WoOpsServiceImpl implements WoOpsService {
         if (sla == null) return;
         String due = respond ? sla.getRespondDueAt() : sla.getResolveDueAt();
         if (due == null || due.isBlank()) return;      // 无规则配置 = 不考核
-        boolean breached = LocalDateTime.now().isAfter(LocalDateTime.parse(due));
+        boolean breached = LocalDateTime.now().isAfter(parseDue(due));
         if (!breached) return;
         if (respond) sla.setRespondBreached(1); else sla.setResolveBreached(1);
         slaMapper.updateById(sla);
+    }
+
+    /**
+     * SLA 到期时刻解析：两种格式都认。
+     *
+     * <p>{@code wo_sla.respond_due_at/resolve_due_at} 是 <b>DATETIME 列而实体按 String 存取</b>——
+     * 写进去是 {@code LocalDateTime.toString()}（带 {@code T}），读回来是驱动给的
+     * {@code "2026-08-05 02:12:08.302"}（空格）。只认 ISO 的话每次接单/关单都
+     * {@code DateTimeParseException → 500}。这条此前没暴露，仅仅因为 {@code wo_sla_rule} 一直是空表
+     * （无规则 → due 为 null → 不解析）；一灌 SLA 规则种子，工单流转全线 500。
+     */
+    private static LocalDateTime parseDue(String due) {
+        String s = due.trim();
+        if (s.length() > 10 && s.charAt(10) == ' ') s = s.substring(0, 10) + "T" + s.substring(11);
+        return LocalDateTime.parse(s);
     }
 
     private static Integer bool(Boolean b) {

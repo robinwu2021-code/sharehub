@@ -157,6 +157,32 @@ public class LedgerServiceImpl implements LedgerService {
         accountMapper.updateById(acc);
     }
 
+    /** 贷方增加（余额 = Σ贷 − Σ借）的科目性质；其余（ASSET/EXPENSE）借方增加。 */
+    private static final java.util.Set<String> CREDIT_NATURE =
+            java.util.Set.of("LIABILITY", "EQUITY", "REVENUE");
+
+    @Override
+    public java.math.BigDecimal balanceOf(String accountNo) {
+        ai.neargo.sharehub.finance.entity.AcctAccount acc = accountMapper.selectOne(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<
+                        ai.neargo.sharehub.finance.entity.AcctAccount>()
+                        .eq(ai.neargo.sharehub.finance.entity.AcctAccount::getAccountNo, accountNo)
+                        .last("limit 1"));
+        if (acc == null) throw new IllegalArgumentException("账户不存在: " + accountNo);
+
+        java.math.BigDecimal debit = java.math.BigDecimal.ZERO;
+        java.math.BigDecimal credit = java.math.BigDecimal.ZERO;
+        for (AcctLedger e : mapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<AcctLedger>()
+                        .eq(AcctLedger::getAccountNo, accountNo))) {
+            java.math.BigDecimal amt = e.getAmount() == null ? java.math.BigDecimal.ZERO : e.getAmount();
+            if ("DEBIT".equals(e.getDirection())) debit = debit.add(amt); else credit = credit.add(amt);
+        }
+        return CREDIT_NATURE.contains(acc.getAcctType())
+                ? credit.subtract(debit)     // 负债/权益/收入：贷增
+                : debit.subtract(credit);    // 资产/费用：借增
+    }
+
     private static LedgerEntry toVO(AcctLedger e) {
         return new LedgerEntry(e.getEntryNo(), e.getVoucherNo(), e.getOrderNo(), e.getAccountNo(),
                 e.getAccount(), e.getDirection(), e.getAmount(), e.getCurrency(),

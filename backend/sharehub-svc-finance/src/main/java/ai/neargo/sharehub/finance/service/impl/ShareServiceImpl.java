@@ -91,20 +91,19 @@ public class ShareServiceImpl implements ShareService {
                 "payee_no",
                 "MAX(payee_name) AS payee_name",
                 "MAX(currency) AS currency",
-                "DATE_FORMAT(created_at, '%Y-%m') AS period",
+                "period",
                 "COUNT(*) AS order_count",
-                // GMV 由「分润额 ÷ 比率」反推。真实口径应 join ord_order.fee_amount 求和，
-                // 但 share_record 未冗余单笔 GMV，骨架期先用反推值，比率为 0 的行不参与。
-                "COALESCE(SUM(amount / NULLIF(rate, 0)), 0) AS gmv",
+                // GMV 取**快照列**（V34）而非 amount/rate 反推：固定额分润 rate=0、阶梯分润
+                // 有效费率≠单一 rate，反推在这两种模式下必错（前者整行消失、后者偏差）
+                "COALESCE(SUM(gross_amount), 0) AS gmv",
                 "COALESCE(SUM(amount), 0) AS share_amount",
                 "COALESCE(SUM(CASE WHEN status = 'DONE' THEN amount ELSE 0 END), 0) AS settled_amount",
                 "COALESCE(SUM(CASE WHEN status <> 'DONE' THEN amount ELSE 0 END), 0) AS pending_amount");
 
         if (dimension != null && !dimension.isBlank()) w.eq("dimension", dimension);
-        if (period != null && !period.isBlank()) {
-            // period 是 YYYY-MM，作为参数绑定（? 占位）而非字符串拼接
-            w.apply("DATE_FORMAT(created_at, '%Y-%m') = {0}", period);
-        }
+        // 账期按**列**过滤（V34）：此前是 DATE_FORMAT 现推，函数包列走不了索引，
+        // 且「创建月」≠「归属月」（跨月补记的分润会记错账期）
+        if (period != null && !period.isBlank()) w.eq("period", period);
         w.groupBy("dimension", "payee_no", "period");
 
         if (sortKey != null && !sortKey.isBlank()) {
@@ -196,7 +195,8 @@ public class ShareServiceImpl implements ShareService {
     private static FinDtos.ShareRecord toRecordVO(ShareRecord e) {
         return new FinDtos.ShareRecord(e.getRecordNo(), e.getOrderNo(), e.getDimension(), e.getPayeeNo(),
                 e.getPayeeName(), e.getAmount(), e.getRate(), e.getCurrency(), e.getMode(),
-                e.getStatus(), e.getSettleNo(), fmt(e.getCreatedAt()));
+                e.getStatus(), e.getSettleNo(), fmt(e.getCreatedAt()),
+                e.getPeriod(), e.getGrossAmount());
     }
 
     private static FinDtos.ShareSummary toSummary(Map<String, Object> m) {

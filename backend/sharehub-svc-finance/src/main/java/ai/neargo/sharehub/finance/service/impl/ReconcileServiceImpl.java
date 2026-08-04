@@ -84,6 +84,10 @@ public class ReconcileServiceImpl implements ReconcileService {
 
         LambdaQueryWrapper<ReconDiff> w = new LambdaQueryWrapper<ReconDiff>().eq(ReconDiff::getBatchNo, batchNo);
         if (diffId != null) w.eq(ReconDiff::getId, diffId);
+        // 只取**未处置**行（NULL 也算未处置，见下方计数处的同一理由）——
+        // 不过滤的话，已平批次再点一次处置会再次「成功」并覆盖上一次的处置留痕，
+        // 事后看不出这批差错究竟是被谁、以什么结论处置掉的。
+        w.and(q -> q.isNull(ReconDiff::getResolved).or().ne(ReconDiff::getResolved, 1));
         List<ReconDiff> rows = diffMapper.selectList(w);
         if (rows.isEmpty()) throw new IllegalArgumentException("无待处置差错: " + batchNo);
 

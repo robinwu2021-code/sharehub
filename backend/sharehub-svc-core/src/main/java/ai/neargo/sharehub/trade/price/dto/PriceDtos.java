@@ -14,14 +14,17 @@ public final class PriceDtos {
     }
 
     /**
-     * 计费模板行，镜像前端 {@code PricePlan}。
+     * 计费模板行，镜像前端 {@code PricePlan}（{@code extends Archivable}）。
      *
      * <p>{@code buyoutPrice} 对应实体/列的 {@code capTotal}/{@code cap_total}（前端口径叫「买断价」）。
      * {@code scope} 是给列表展示的 CSV，由 {@code price_plan_scope} 拼回；权威值仍在拆表。
+     *
+     * <p>{@code archivedAt} 不可省：前端类型继承 {@code Archivable}，页面靠它区分「在用/已归档」。
+     * 出参漏了它，归档行与在用行在页面上长得一模一样。
      */
     public record PricePlanEntry(String planNo, String name, Integer freeMinutes, Integer unitMinutes,
                                  BigDecimal unitPrice, BigDecimal capDaily, BigDecimal buyoutPrice,
-                                 String currency, String scope, String status) {
+                                 String currency, String scope, String status, String archivedAt) {
     }
 
     /** 计费模板适用范围一行，镜像 {@code price_plan_scope}（[db-design §1.7]）。 */

@@ -209,12 +209,18 @@ public final class ReportMappers {
     /** 告警：最近未处理告警（工作台提醒条）。只取 {@code OPEN}，ACK 过的视为已有人跟进。 */
     public interface AlarmFactMapper extends BaseMapper<DevAlarm> {
 
+        /**
+         * 提醒条要的是<b>人能读懂的告警语义</b>，故 join 码表取 message ——
+         * 只出 {@code alarm_code}（E001/E002）的话，页面上是一串谁也认不出的编号，
+         * 前端也无从判断该显示「离线」还是「超时」图标。
+         */
         @Select("""
-                SELECT alarm_no AS alarmNo, cabinet_no AS cabinetNo, alarm_code AS alarmCode,
-                       level, occurred_at AS occurredAt
-                  FROM dev_alarm
-                 WHERE deleted = 0 AND status = 'OPEN'
-                 ORDER BY id DESC
+                SELECT a.alarm_no AS alarmNo, a.cabinet_no AS cabinetNo, a.alarm_code AS alarmCode,
+                       a.level, a.occurred_at AS occurredAt, c.message AS alarmMessage
+                  FROM dev_alarm a
+                  LEFT JOIN dev_alarm_code c ON c.code = a.alarm_code
+                 WHERE a.deleted = 0 AND a.status = 'OPEN'
+                 ORDER BY a.id DESC
                  LIMIT 10
                 """)
         java.util.List<java.util.Map<String, Object>> openAlarms();

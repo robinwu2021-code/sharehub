@@ -65,11 +65,35 @@ public class InspectionPlanServiceImpl extends AbstractCrudService<WoInspectionP
     @Override
     protected void beforeCreate(WoInspectionPlan e) {
         if (e.getActive() == null) e.setActive(1);
+        e.setRoute(routeJson(e.getRoute()));
+    }
+
+    /**
+     * {@code wo_inspection_plan.route} 是 <b>JSON 列</b>（V13 对账产物，带 {@code json_valid} CHECK），
+     * 而前端契约是展示串 {@code "A → B"}。两侧都不能改，故在此做进出参转换：
+     * 入参串按 {@code →} 拆成 JSON 数组存，出参再拼回串。直接存展示串会被 CHECK 拒（500）。
+     */
+    static String routeJson(String display) {
+        if (display == null || display.isBlank()) return null;
+        if (display.trim().startsWith("[")) return display;   // 已是 JSON（内部调用/重复保存）
+        java.util.List<String> stops = java.util.Arrays.stream(display.split("→"))
+                .map(String::trim).filter(x -> !x.isBlank()).toList();
+        return ai.neargo.sharehub.common.Json.write(stops);
+    }
+
+    /** JSON 数组 → 展示串；非 JSON（历史行）原样返回。 */
+    static String routeText(String json) {
+        if (json == null || json.isBlank()) return json;
+        if (!json.trim().startsWith("[")) return json;
+        java.util.List<?> stops = ai.neargo.sharehub.common.Json.read(json, java.util.List.class, null);
+        return stops == null ? json
+                : stops.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(" → "));
     }
 
     @Override
     protected void beforeUpdate(WoInspectionPlan e, WoInspectionPlan current) {
         if (e.getActive() == null) e.setActive(current.getActive());
+        e.setRoute(e.getRoute() == null ? current.getRoute() : routeJson(e.getRoute()));
         // nextAt 由调度器回写，业务面提交的值不作数（否则改一次计划就把下次执行时间抹了）
         if (e.getNextAt() == null) e.setNextAt(current.getNextAt());
     }
@@ -79,7 +103,7 @@ public class InspectionPlanServiceImpl extends AbstractCrudService<WoInspectionP
         java.util.List<String> woNos = e.getLastRunWoNos() == null || e.getLastRunWoNos().isBlank()
                 ? java.util.List.of()
                 : java.util.List.of(e.getLastRunWoNos().split(","));
-        return new InspectionPlan(e.getPlanNo(), e.getRoute(), e.getFrequency(), e.getCron(),
+        return new InspectionPlan(e.getPlanNo(), routeText(e.getRoute()), e.getFrequency(), e.getCron(),
                 e.getNextAt(), e.getAssigneeNo(), e.getActive() != null && e.getActive() == 1,
                 e.getLastRunAt() == null ? null : e.getLastRunAt().toString(),
                 e.getLastRunPeriod(), woNos);
@@ -101,7 +125,7 @@ public class InspectionPlanServiceImpl extends AbstractCrudService<WoInspectionP
 
         // 路线「A → B」拆站点，逐站定位一台在册机柜（缺一站则整批拒 —— 半跑会让巡检覆盖率成谜）
         java.util.List<String> stops = java.util.Arrays.stream(
-                        (e.getRoute() == null ? "" : e.getRoute()).split("→"))
+                        (routeText(e.getRoute()) == null ? "" : routeText(e.getRoute())).split("→"))
                 .map(String::trim).filter(x -> !x.isBlank()).toList();
         if (stops.isEmpty()) throw new IllegalArgumentException("巡检路线为空，无法生成工单: " + planNo);
         java.util.Map<String, String> stopCabinet = new java.util.LinkedHashMap<>();
@@ -120,7 +144,7 @@ public class InspectionPlanServiceImpl extends AbstractCrudService<WoInspectionP
         for (var en : stopCabinet.entrySet()) {
             var wo = woOps.create(new WorkOrderDraft("INSPECT", "PLAN", planNo + ":" + period + ":" + en.getKey(),
                     "LOW", en.getValue(), null, en.getKey(), null, null,
-                    "【巡检计划 " + planNo + "】" + e.getRoute() + " · " + en.getKey()
+                    "【巡检计划 " + planNo + "】" + routeText(e.getRoute()) + " · " + en.getKey()
                             + " 例行巡检（" + e.getFrequency() + "）", e.getNextAt()));
             woOps.dispatch(wo.woNo(), e.getAssigneeNo());
             woNos.add(wo.woNo());

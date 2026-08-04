@@ -112,7 +112,8 @@ public class SettlementServiceImpl implements SettlementService {
 
         QueryWrapper<ShareRecord> w = new QueryWrapper<>();
         w.eq("status", "PENDING");
-        w.apply("DATE_FORMAT(created_at, '%Y-%m') = {0}", period);
+        // 按归属账期列取（V34）：创建时刻不等于归属周期，且函数包列无法走索引
+        w.eq("period", period);
         if (payeeType != null && !payeeType.isBlank()) w.eq("payee_type", payeeType);
         List<ShareRecord> pending = recordMapper.selectList(w);
 

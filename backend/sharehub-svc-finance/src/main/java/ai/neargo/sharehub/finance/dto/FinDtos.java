@@ -30,7 +30,8 @@ public final class FinDtos {
     /** 分润明细行（逐单），镜像前端 {@code ShareRecord}。 */
     public record ShareRecord(String recordNo, String orderNo, String dimension, String payeeNo,
                               String payeeName, BigDecimal amount, BigDecimal rate, String currency,
-                              String mode, String status, String settleNo, String createdAt) {
+                              String mode, String status, String settleNo, String createdAt,
+                              String period, BigDecimal grossAmount) {
     }
 
     /**
