@@ -8,7 +8,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm run test",
+    "check:drift": "python3 scripts/check-backend-parity.py; python3 scripts/check-perm-parity.py"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.2.6",
