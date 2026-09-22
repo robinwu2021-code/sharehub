@@ -166,6 +166,34 @@ lib/market-time.ts            市场时区的显示与换算（纯函数）
 
 ---
 
+### 3.1 进度
+
+| 阶段 | 状态 | 提交 |
+|---|---|---|
+| F0 | ✅ 在途改动分 3 个提交入库 | `3b8edbc` `c453e1e` `5425717` |
+| F1 | ✅ 菜单、权限、后端就绪开关、市场时区、10 页占位 | `caf7b63` |
+| F2 | ✅ 应用版本 / 银行管理 / 问题管理 / 公告管理 | 见 git log |
+
+**F2 实现说明**
+- 规则集中在 `lib/operation-rules.ts`，**表单提交前与 mock 写入调用同一份**：版本号 / 构建号递增、同平台只一个灰度、强更必须全量、已发布只能调灰度；银行代码唯一且不可改；公告状态机与置顶上限 3 条；问题同分类内换序
+- mock 的 `saveAppVersion` / `rollbackAppVersion` / `saveBank` / `saveNotice` 已接入这些规则（旧页面读写同一份 mock，也一并受约束）
+- `FormDrawer` 新增 `datetime` 字段类型（只新增，不影响已有类型）；时区换算在页面用 `lib/market-time`
+- 新增 `components/operation/lang-preview.tsx`（三语 + RTL 预览，未填语言按 C 端回退中文并标注）、`summary-card.tsx`（中性摘要卡；`StatCard` 副文案是涨跌色，不适合写说明）
+
+### 3.2 后端待办（F2 核对后端代码时发现）
+
+这四页的后端接口都在，**页面可以上线**；但下列规则和字段后端缺失，前端这一层是目前唯一的防线，绕过前端直接调接口就能写入不合规数据：
+
+| # | 缺口 | 影响 |
+|---|---|---|
+| BE-1 | `AppVersionServiceImpl` 未校验：版本号 / 构建号递增、同平台只一个灰度、强更必须全量、已发布只能调灰度、状态机 | 可能出现两个版本同时灰度、已发布版本被改内容 |
+| BE-2 | `NoticeServiceImpl` 未校验：状态机、置顶上限、结束晚于开始 | 置顶可超过 3 条 |
+| BE-3 | `BankServiceImpl` 未校验：代码格式、国家 / 币种格式、IBAN 长度范围 | — |
+| BE-4 | 银行返回结构 `MdDtos.BankEntry` 缺 `bankNameAr`、`archivedAt`（表里有列） | 银行名称只能中英两语；归档状态后端列表无法区分 |
+| BE-5 | 公告发布时不记录 `publishedBy` | 发布人列为空 |
+| BE-6 | `ProblemActionResolver` 为 Stub | 「自动开工单」处置不生效（页面已提示） |
+| BE-7 | c-app 未调用 `GET /mp/app/version` | 发布与强更不会弹给用户（页面已提示） |
+
 ## 4. 测试
 
 | 类型 | 覆盖 |

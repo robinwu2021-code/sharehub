@@ -119,6 +119,20 @@ function InputForField({
       />
     );
   }
+  if (f.type === "datetime") {
+    // 原生 datetime-local：值为无时区的本地时间串。这里不做时区换算——
+    // 「本地」指市场时区，由页面在打开 / 提交时用 lib/market-time 换算（2026-09-22 运营管理引入）。
+    return (
+      <Input
+        className={cn(invalid && ERR_RING)}
+        type="datetime-local"
+        value={(cur as string) ?? ""}
+        disabled={disabled}
+        onBlur={onBlur}
+        onChange={(e) => set(e.target.value)}
+      />
+    );
+  }
   if (f.type === "multiselect") {
     return (
       <MultiSelect

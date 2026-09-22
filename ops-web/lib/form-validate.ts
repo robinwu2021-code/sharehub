@@ -4,7 +4,9 @@
 
 export type FieldType =
   | "text" | "number" | "select" | "switch" | "password"
-  | "textarea" | "date" | "multiselect";
+  | "textarea" | "date" | "multiselect"
+  /** 日期 + 时间（精确到分钟）。值为「市场时区」的 `YYYY-MM-DDTHH:mm`，与 UTC 的换算由页面用 lib/market-time 做。 */
+  | "datetime";
 
 export type FormValues = Record<string, unknown>;
 

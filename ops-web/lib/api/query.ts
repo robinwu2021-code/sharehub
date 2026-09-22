@@ -78,7 +78,7 @@ export type NotifyBlacklistQ = PageQ & { channel?: string; reason?: string };
 /** App 版本：平台筛选。 */
 export type AppVersionQ = PageQ & { platform?: string };
 /** 银行字典：国家 + 币种。 */
-export type BankQ = PageQ & { country?: string; currency?: string; showArchived?: boolean };
+export type BankQ = PageQ & { country?: string; currency?: string; status?: string; showArchived?: boolean };
 /** 优惠券发放记录：按券号 / 发放对象类型筛（S2 发放留痕的审计流水）。 */
 export type CouponIssueQ = PageQ & { couponNo?: string; targetType?: string };
 /** 营销活动：状态筛（加了「暂停」后要能单独捞 PAUSED）。等价于 StatusQ，保留域名。 */

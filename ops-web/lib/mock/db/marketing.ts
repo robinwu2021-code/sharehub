@@ -2,6 +2,7 @@
 // 广告位 adSlots · 广告计划 adCampaigns · 投放数据 adDeliveries / 公告 notices（三语）。
 // 广告位挂载的机柜号引用 device.ts 的 cabinets。
 import { AD_CAMPAIGN_TRANSITIONS, adWindowPassed } from "../../types";
+import { validateNotice } from "../../operation-rules";
 import type {
   Coupon, Campaign, PushMessage, Referral, AdSlot, AdCampaign, AdDelivery, Notice, PageQuery,
   AudienceSpec, AudienceResolved, AudienceType, CouponIssueRecord, CouponIssuePayload,
@@ -342,7 +343,13 @@ export const notices: Notice[] = [
 
 export const listNotices = (q: PageQuery = {}) =>
   paginate(notices, q.page, q.size, (x) => liveHit(x, q.showArchived) && kwHit(q.keyword, x.noticeNo, x.title, x.titleEn, x.titleAr, x.publishedBy));
-export const saveNotice = (x: Partial<Notice>) => upsert(notices, x, "noticeNo", () => nextNo("NTC", notices));
+export const saveNotice = (x: Partial<Notice>) => {
+  // 状态机、置顶上限、生效期在 mock 层强制（与运营管理页面共用 lib/operation-rules）
+  const prev = x.noticeNo ? notices.find((n) => n.noticeNo === x.noticeNo) : undefined;
+  const errors = validateNotice({ ...(prev ?? {}), ...x }, prev, notices);
+  if (errors.length) throw new Error(errors[0]);
+  return upsert(notices, x, "noticeNo", () => nextNo("NTC", notices));
+};
 
 // ============================================================================
 // S2 · 优惠券发放（权限码 marketing:coupon:issue）

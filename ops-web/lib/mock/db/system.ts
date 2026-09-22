@@ -10,6 +10,7 @@ import type {
   VendorProbeResult, NotifyTemplatePreview, NotifyTestSendPayload, NotifyResendPayload,
 } from "../../types";
 import { p, iso } from "./internal";
+import { validateAppVersion, validateBank } from "../../operation-rules";
 import { paginate, kwHit, upsert, nextNo, liveHit, archiveRow, unarchiveRow } from "./helpers";
 // 供应商台账住在 device.ts（设备域），连通性探测是系统设置页的动作，故读取而不搬迁。
 import { vendors } from "./device";
@@ -535,12 +536,22 @@ export const listAppVersions = (q: PageQuery & { platform?: string } = {}) => {
 export const saveAppVersion = (x: Partial<AppVersion>) => {
   // versionId 由 平台-版本号 派生：同一版本号在不同平台是两条记录。
   const withId = x.versionId ? x : { ...x, versionId: `${x.platform ?? "IOS"}-${x.versionNo ?? "0.0.0"}` };
-  return upsert(appVersions, withId, "versionId", () => `${x.platform ?? "IOS"}-${x.versionNo ?? "0.0.0"}`);
+  // 规则与状态机在 mock 层强制（与运营管理页面的表单校验共用 lib/operation-rules）
+  const prev = appVersions.find((v) => v.versionId === withId.versionId);
+  const merged = { ...(prev ?? {}), ...withId } as AppVersion;
+  const errors = validateAppVersion(merged, prev, appVersions);
+  if (errors.length) throw new Error(errors[0]);
+  // 发布时刻由系统记录，不信任客户端传值
+  const releasedAt = merged.status === "RELEASED" && prev?.status !== "RELEASED" ? new Date().toISOString() : merged.releasedAt ?? null;
+  return upsert(appVersions, { ...withId, releasedAt }, "versionId", () => `${x.platform ?? "IOS"}-${x.versionNo ?? "0.0.0"}`);
 };
 /** 回滚：置 ROLLBACK 且灰度归零（立即停止下发），保留记录不物理删。 */
 export function rollbackAppVersion(versionId: string): AppVersion {
   const i = appVersions.findIndex((x) => x.versionId === versionId);
   if (i < 0) throw new Error("版本不存在");
+  if (appVersions[i].status !== "RELEASED") {
+    throw new Error("只有已发布的版本可以回滚");
+  }
   appVersions[i] = { ...appVersions[i], status: "ROLLBACK", rolloutPercent: 0 };
   return appVersions[i];
 }
@@ -560,13 +571,23 @@ export const banks: BankEntry[] = [
   { bankCode: "NBK", bankName: "科威特国民银行", bankNameEn: "National Bank of Kuwait", country: "KW", currency: "KWD", swiftPrefix: "NBOKKWKW", ibanLength: 30, status: "DISABLED", archivedAt: null },
   { bankCode: "CIB", bankName: "埃及商业国际银行", bankNameEn: "Commercial International Bank", country: "EG", currency: "EGP", swiftPrefix: "CIBEEGCX", ibanLength: 29, status: "DISABLED", archivedAt: "2026-04-02T07:30:00Z" },
 ];
-export const listBanks = (q: PageQuery & { country?: string; currency?: string } = {}) =>
+export const listBanks = (q: PageQuery & { country?: string; currency?: string; status?: string } = {}) =>
   paginate(banks, q.page, q.size, (x) =>
     liveHit(x, q.showArchived) &&
     (!q.country || x.country === q.country) &&
+    (!q.status || x.status === q.status) &&
     (!q.currency || x.currency === q.currency) &&
     kwHit(q.keyword, x.bankCode, x.bankName, x.bankNameEn, x.swiftPrefix));
-export const saveBank = (x: Partial<BankEntry>) => upsert(banks, x, "bankCode", () => nextNo("BK", banks));
+export const saveBank = (x: Partial<BankEntry>) => {
+  // 代码类字段统一转大写再校验（旧页面文案承诺「自动转大写」）
+  const up = (v?: string) => (v == null ? v : v.trim().toUpperCase());
+  const norm = { ...x, bankCode: up(x.bankCode), country: up(x.country), currency: up(x.currency) };
+  const prev = banks.find((b) => b.bankCode === norm.bankCode);
+  // 编辑时调用方可能只传部分字段，按合并后的完整记录校验
+  const errors = validateBank({ ...(prev ?? {}), ...norm }, prev, banks);
+  if (errors.length) throw new Error(errors[0]);
+  return upsert(banks, norm, "bankCode", () => nextNo("BK", banks));
+};
 
 // —— §15 问题管理 ——
 // 编号前缀 `ISS`（Issue）：`PB` 已归充电宝（device.ts 的 PB20000+）所有，
