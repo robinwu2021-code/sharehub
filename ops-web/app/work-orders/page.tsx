@@ -9,29 +9,45 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tansta
 import { api } from "@/lib/api";
 import { Pagination } from "@/components/ui/misc";
 import { Input, Select } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Drawer, Field } from "@/components/ui/drawer";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { RowActions } from "@/components/ui/dropdown-menu";
 import { TabHeader } from "@/components/ui/tab-header";
 import { Toolbar } from "@/components/ui/toolbar";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
+import { FilterSelect } from "@/components/ui/filter-select";
+import { StatusBadge, statusOptions, type StatusMap } from "@/components/ui/status-badge";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { WoStatusBadge, WO_TYPE_LABEL } from "@/components/status";
+import { Notice } from "@/components/ui/notice";
+import { ReadOnlyNotice } from "@/components/read-only-notice";
+import { WoStatusBadge, EnabledBadge, WO_TYPE_LABEL } from "@/components/status";
 import { exportCsv, type CsvColumn } from "@/lib/export-csv";
 import { fmtTime } from "@/lib/utils";
 import { useCan } from "@/lib/use-can";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
-import { nextActions } from "@/lib/types";
+import { nextActions, inspectionPeriodKey, inspectionRunnable } from "@/lib/types";
 import type {
-  WorkOrder, WorkOrderAction, WorkOrderDraft, WoAuditResult, SlaRule, InspectionPlan,
+  WorkOrder, WorkOrderAction, WorkOrderDraft, WorkOrderPriority, WorkOrderStatus,
+  WoAuditResult, SlaRule, InspectionPlan,
 } from "@/lib/types";
 
 const SIZE = 10;
-const PRIO: Record<string, [string, "danger" | "warning" | "muted" | "outline"]> = {
-  URGENT: ["紧急", "danger"], HIGH: ["高", "danger"], MEDIUM: ["中", "warning"], LOW: ["低", "muted"],
+/**
+ * 优先级：文案 + 色调 + **形状阶梯**（规范 §11.4）。
+ * 紧急与高同为 danger 色 —— 红绿色盲（男性约 8%）看不出「紧急比高更急」，
+ * 而优先级直接决定值班响应顺序，故在文案里带一条与颜色无关的阶梯：▫ < ▪ < ▲ < ▲▲。
+ * 键序 = 下拉选项顺序（低→紧急，沿用原 PRIO_OPTIONS 的升序）。
+ */
+const PRIO: StatusMap<WorkOrderPriority> = {
+  LOW: { label: "▫ 低", tone: "muted" },
+  MEDIUM: { label: "▪ 中", tone: "warning" },
+  HIGH: { label: "▲ 高", tone: "danger" },
+  URGENT: { label: "▲▲ 紧急", tone: "danger" },
 };
 const STAFF = ["Ali", "Omar", "Sara", "Wang"];
 const BOARD_COLS: { key: string; label: string }[] = [
@@ -47,8 +63,16 @@ type View = "list" | "board" | "sla" | "inspection";
 const ACTION_LABEL: Record<WorkOrderAction, string> = {
   dispatch: "派单", accept: "接单", process: "提交处理", complete: "完成", close: "验收关单", reject: "驳回", rework: "退回返工",
 };
+/**
+ * 操作列的**主动作** = 该状态下推进流程的那一步；其余动作收进「更多」菜单。
+ * 原先是 `acts.slice(0, 2)`：处理中有三个动作（提交处理/完成/驳回），第三个被静默截掉，
+ * 只能进详情抽屉才找得到 —— 截掉的偏偏是「驳回」这种需要显形的动作。
+ */
+const PRIMARY_ACTION: Partial<Record<WorkOrderStatus, WorkOrderAction>> = {
+  CREATED: "dispatch", DISPATCHED: "accept", PROCESSING: "complete", DONE: "close",
+};
 const SOURCE_LABEL: Record<WorkOrder["source"], string> = {
-  ALERT: "告警转入", USER: "投诉转入", VENUE: "场地方报障", MANUAL: "手工开单",
+  ALERT: "告警转入", USER: "投诉转入", VENUE: "场地方报障", MANUAL: "手工开单", PLAN: "巡检计划",
 };
 const AUDIT_LABEL: Record<WoAuditResult, string> = { PASS: "验收合格", PASS_WITH_ISSUE: "有条件通过（有遗留）", FAIL: "验收不合格（退回返工）" };
 
@@ -62,7 +86,7 @@ const WO_CSV_COLS: CsvColumn<WorkOrder>[] = [
   { header: "来源", value: (w) => `${SOURCE_LABEL[w.source]}${w.sourceNo ? ` · ${w.sourceNo}` : ""}` },
   { header: "柜机", value: (w) => w.cabinetNo },
   { header: "点位", value: (w) => w.locationName },
-  { header: "优先级", value: (w) => PRIO[w.priority][0] },
+  { header: "优先级", value: (w) => PRIO[w.priority].label },
   { header: "状态", value: (w) => WO_STATUS_LABEL(w.status) },
   { header: "处理人", value: (w) => w.handlerName ?? w.assigneeName ?? "未派单" },
   { header: "期望完成", value: (w) => (w.expectedAt ? fmtTime(w.expectedAt) : "") },
@@ -70,10 +94,10 @@ const WO_CSV_COLS: CsvColumn<WorkOrder>[] = [
 ];
 
 const WO_TYPE_OPTIONS = Object.entries(WO_TYPE_LABEL).map(([value, label]) => ({ value, label }));
-const PRIO_OPTIONS = [
-  { value: "LOW", label: "低" }, { value: "MEDIUM", label: "中" },
-  { value: "HIGH", label: "高" }, { value: "URGENT", label: "紧急" },
-];
+// 优先级选项与徽标同源（含形状阶梯）：表单里选的形状 = 表格里看到的形状
+const PRIO_OPTIONS = statusOptions(PRIO);
+// 状态筛选项与看板列头同一份文案，不另抄一遍
+const WO_STATUS_OPTIONS = BOARD_COLS.map((c) => ({ value: c.key, label: c.label }));
 
 const SLA_FIELDS: FieldDef[] = [
   { key: "slaNo", label: "SLA 编号", readOnlyOnEdit: true, placeholder: "自动生成" },
@@ -213,6 +237,8 @@ function WorkOrdersInner() {
   const canClose = allow("workorder:wo:close");
   const canSla = allow("workorder:sla:update");
   const canInspection = allow("workorder:inspection:update");
+  // 「立即执行一次」= 改计划留痕 + 开工单，两件事都做，故两个权限码都要有（不新造权限码）
+  const canRunPlan = canInspection && canCreate;
   const canAny = canCreate || canDispatch || canHandle || canClose;
 
   // —— 批量派单（G3）——
@@ -255,7 +281,7 @@ function WorkOrdersInner() {
     setRejecting(w); setRejectReason("");
   };
 
-  /** 当前状态下有权执行的动作。列表操作列只出前两个，其余进详情抽屉（操作列 >2 收「更多」）。 */
+  /** 当前状态下有权执行的动作。列表操作列出主动作，其余进「更多」菜单；详情抽屉出全部。 */
   const actionsOf = (w: WorkOrder) => nextActions(w.status).filter(permOf);
 
   const busy = doDispatch.isPending || doAccept.isPending || doHandle.isPending || doClose.isPending || doReject.isPending || doRework.isPending;
@@ -297,50 +323,125 @@ function WorkOrdersInner() {
     mutationFn: (v: Partial<SlaRule>) => api.saveSlaRule(v),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["sla-rules"] }); notify.success(t("common.success")); setSlaForm(null); },
   });
+  // 「立即执行一次」：mock 没有定时器，用它手动触发一次「按计划开工单」。
+  // 生成的工单会真的进列表/看板，故成功后连工单查询一起失效。
+  const runPlan = useMutation({
+    mutationFn: (no: string) => api.runInspectionPlan(no),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ["inspection-plans"] });
+      refreshWo();
+      notify.success(
+        `巡检计划 ${r.planNo} 已执行（周期 ${r.period}）：生成 ${r.woNos.length} 张巡检工单 ${r.woNos.join("、")}，已派给计划负责人`,
+      );
+    },
+  });
+  /** 执行前二次确认：说清开几张、派给谁、计入哪个周期（幂等口径要让人看得见）。 */
+  const askRunPlan = async (pl: InspectionPlan) => {
+    const blocked = inspectionRunnable(pl);
+    if (blocked) { notify.error(`巡检计划 ${pl.planNo} 无法执行：${blocked}`); return; }
+    const stops = pl.route.split("→").map((s) => s.trim()).filter(Boolean);
+    const ok = await confirm({
+      title: `立即执行巡检计划 ${pl.planNo}`,
+      desc: `将按路线「${pl.route}」为 ${stops.length} 个站点各开一张巡检工单，并派给 ${pl.assignee}。`
+        + `本次计入周期 ${inspectionPeriodKey(pl.frequency)}——同周期内再点会被拒绝，不会重复开单。`
+        + `计划的「下次巡检」时间不变（手动补跑不推进排期）。`,
+      confirmText: "确认执行",
+    });
+    if (ok) runPlan.mutate(pl.planNo);
+  };
+
   const saveInspection = useMutation({
     mutationFn: (v: Partial<InspectionPlan>) => api.saveInspectionPlan(v),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["inspection-plans"] }); notify.success(t("common.success")); setInspForm(null); },
   });
 
   const cols: Column<WorkOrder>[] = [
-    { header: "工单号", cell: (w) => <span className="font-medium tabular-nums">{w.woNo}</span> },
+    // 业务号列 body-strong（类型阶 txt-strong = 14/500）作扫描锚点（规范 §12.3）
+    { header: "工单号", cell: (w) => <span className="txt-strong tabular-nums">{w.woNo}</span> },
     { header: "类型", cell: (w) => WO_TYPE_LABEL[w.type] },
     { header: "来源", cell: (w) => <span className="text-muted-foreground">{SOURCE_LABEL[w.source]}{w.sourceNo ? ` · ${w.sourceNo}` : ""}</span> },
     { header: "柜机", cell: (w) => w.cabinetNo },
     { header: "点位", cell: (w) => <span className="text-muted-foreground">{w.locationName}</span> },
-    { header: "优先级", cell: (w) => <Badge tone={PRIO[w.priority][1]}>{PRIO[w.priority][0]}</Badge> },
+    // nowrap：形状标记让文案变宽，窄列里会把「▲▲ 紧急」折成两行、把整行行高撑起来
+    { header: "优先级", cell: (w) => <StatusBadge map={PRIO} value={w.priority} className="whitespace-nowrap" /> },
     { header: "状态", cell: (w) => <WoStatusBadge s={w.status} /> },
     { header: "处理人", cell: (w) => <span className="text-muted-foreground">{w.handlerName ?? w.assigneeName ?? "未派单"}</span> },
     { header: "期望完成", cell: (w) => <span className="text-muted-foreground">{w.expectedAt ? fmtTime(w.expectedAt) : "-"}</span> },
     { header: "创建", cell: (w) => <span className="text-muted-foreground">{fmtTime(w.createdAt)}</span> },
     {
       header: t("common.actions"),
-      cell: (w) => (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <ActionButtons w={w} max={2} />
-          <Button size="sm" variant="outline" onClick={() => setDetail(w)}>详情</Button>
-        </div>
-      ),
+      // 主动作 + 详情常驻，其余（提交处理 / 驳回 / 退回返工）进「更多」。
+      // 驳回与退回返工标 danger：RowActions 会把它们排到分隔线之下，方向键连按不会误中；
+      // 两者都还要在抽屉里填原因才生效，不存在「一点就炸」。
+      cell: (w) => {
+        const acts = actionsOf(w);
+        const primary = PRIMARY_ACTION[w.status];
+        return (
+          <div className="flex items-center gap-1.5">
+            {acts.filter((a) => a === primary).map((a) => (
+              <Button key={a} size="sm" disabled={busy} onClick={() => openAction(w, a)}>{ACTION_LABEL[a]}</Button>
+            ))}
+            <Button size="sm" variant="outline" onClick={() => setDetail(w)}>详情</Button>
+            <RowActions
+              actions={acts.filter((a) => a !== primary).map((a) => ({
+                label: ACTION_LABEL[a],
+                onSelect: () => openAction(w, a),
+                disabled: busy,
+                danger: a === "reject" || a === "rework",
+              }))}
+            />
+          </div>
+        );
+      },
     },
   ];
 
   const slaCols: Column<SlaRule>[] = [
-    { header: "SLA 编号", cell: (s) => <span className="font-medium">{s.slaNo}</span> },
+    { header: "SLA 编号", cell: (s) => <span className="txt-strong tabular-nums">{s.slaNo}</span> },
     { header: "工单类型", cell: (s) => <Badge tone="outline">{s.woType}</Badge> },
-    { header: "响应时限", cell: (s) => <span className="tabular-nums">{s.responseMins} 分钟</span> },
-    { header: "解决时限", cell: (s) => <span className="tabular-nums">{s.resolveMins} 分钟</span> },
+    // 时限是纯数量：右对齐 + 等宽，位数才对得齐（规范 §12.4）
+    { header: "响应时限", className: "text-end", cell: (s) => <span className="tabular-nums">{s.responseMins} 分钟</span> },
+    { header: "解决时限", className: "text-end", cell: (s) => <span className="tabular-nums">{s.resolveMins} 分钟</span> },
     { header: "升级至", cell: (s) => <span className="text-muted-foreground">{s.escalateTo}</span> },
-    { header: "状态", cell: (s) => <Badge tone={s.active ? "success" : "muted"}>{s.active ? "启用" : "停用"}</Badge> },
+    { header: "状态", cell: (s) => <EnabledBadge on={s.active} /> },
     { header: t("common.actions"), cell: (s) => canSla ? <Button size="sm" variant="outline" onClick={() => setSlaForm(s)}>{t("common.edit")}</Button> : <span className="text-muted-foreground">-</span> },
   ];
   const inspectionCols: Column<InspectionPlan>[] = [
-    { header: "计划编号", cell: (p) => <span className="font-medium">{p.planNo}</span> },
+    { header: "计划编号", cell: (p) => <span className="txt-strong tabular-nums">{p.planNo}</span> },
     { header: "巡检路线", cell: (p) => p.route },
     { header: "频率", cell: (p) => <Badge tone="outline">{p.frequency}</Badge> },
     { header: "下次巡检", cell: (p) => <span className="text-muted-foreground">{fmtTime(p.nextAt)}</span> },
     { header: "负责人", cell: (p) => <span className="text-muted-foreground">{p.assignee}</span> },
-    { header: "状态", cell: (p) => <Badge tone={p.active ? "success" : "muted"}>{p.active ? "启用" : "停用"}</Badge> },
-    { header: t("common.actions"), cell: (p) => canInspection ? <Button size="sm" variant="outline" onClick={() => setInspForm(p)}>{t("common.edit")}</Button> : <span className="text-muted-foreground">-</span> },
+    { header: "状态", cell: (p) => <EnabledBadge on={p.active} /> },
+    // 上次执行：没有它就看不出「这个计划今天到底跑没跑」，也解释不了按钮为什么变灰
+    {
+      header: "上次执行",
+      cell: (p) => (
+        <span className="text-muted-foreground">
+          {p.lastRunAt ? `${fmtTime(p.lastRunAt)} · ${p.lastRunWoNos?.length ?? 0} 张工单` : "从未执行"}
+        </span>
+      ),
+    },
+    {
+      header: t("common.actions"),
+      cell: (p) => {
+        // 不可执行的原因直接挂 title：按钮变灰但说得出为什么（判定与 mock 校验同一份）
+        const blocked = inspectionRunnable(p);
+        if (!canRunPlan && !canInspection) return <span className="text-muted-foreground">-</span>;
+        return (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {canRunPlan && (
+              <Button
+                size="sm" disabled={runPlan.isPending || !!blocked}
+                title={blocked ?? "按路线各开一张巡检工单，并派给计划负责人"}
+                onClick={() => void askRunPlan(p)}
+              >立即执行一次</Button>
+            )}
+            {canInspection && <Button size="sm" variant="outline" onClick={() => setInspForm(p)}>{t("common.edit")}</Button>}
+          </div>
+        );
+      },
+    },
   ];
 
   const rows = board.data?.list ?? [];
@@ -370,21 +471,19 @@ function WorkOrdersInner() {
             }
             onClearSelection={clearSel}
           >
-            <Select value={type} onChange={(e) => { setType(e.target.value); setPage(1); clearSel(); }}>
-              <option value="">全部类型</option>
-              {Object.entries(WO_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </Select>
+            <FilterSelect value={type} onChange={(v) => { setType(v); setPage(1); clearSel(); }}
+              allLabel="全部类型" options={WO_TYPE_OPTIONS} aria-label="按工单类型筛选" />
             {view === "list" && (
-              <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); clearSel(); }}>
-                <option value="">全部状态</option>
-                {BOARD_COLS.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
-              </Select>
+              <FilterSelect value={status} onChange={(v) => { setStatus(v); setPage(1); clearSel(); }}
+                allLabel="全部状态" options={WO_STATUS_OPTIONS} aria-label="按工单状态筛选" />
             )}
           </Toolbar>
           {!canAny && (
-            <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">
-              仅可查看：当前角色无工单开单/流转权限（workorder:wo:create / :dispatch / :handle / :close）
-            </div>
+            <ReadOnlyNotice
+              what="工单开单/流转"
+              perm={["workorder:wo:create", "workorder:wo:dispatch", "workorder:wo:handle", "workorder:wo:close"]}
+              note="只能看列表与详情，不能开单、派单、处理或验收关单"
+            />
           )}
         </>
       )}
@@ -429,6 +528,13 @@ function WorkOrdersInner() {
               { header: "状态", value: (p) => (p.active ? "启用" : "停用") },
             ], inspection.data?.list ?? [])}
           />
+          {/* 说清「立即执行一次」到底做了什么、为什么同周期点不了第二次，以及它还不是真定时器 */}
+          <Notice>
+            「立即执行一次」按路线真的生成巡检工单（来源「巡检计划」，在工单列表搜计划号即可找到），
+            并派给计划负责人；同一计划同周期只能执行一次，重复点击会被拒绝。
+            ⚠️ 后端目前没有触发端点（也没有定时任务），此动作在真实后端下暂不可用。
+          </Notice>
+          {!canRunPlan && !canInspection && <ReadOnlyNotice what="巡检计划维护/执行" perm={["workorder:inspection:update", "workorder:wo:create"]} note="不能新增、编辑或立即执行" />}
           <DataTable rowKey={(p: InspectionPlan) => p.planNo} columns={inspectionCols} rows={inspection.data?.list} loading={inspection.isLoading}
             empty="暂无巡检计划——巡检工单目前只能手工开；点右上「新增巡检计划」按路线周期自动开单。" />
           {inspection.data && <Pagination page={page} size={SIZE} total={inspection.data.total} onPage={setPage} />}
@@ -451,7 +557,7 @@ function WorkOrdersInner() {
           {BOARD_COLS.map((col) => {
             const items = rows.filter((w) => w.status === col.key);
             return (
-              <div key={col.key} className="rounded-lg bg-muted/40 p-2">
+              <div key={col.key} className="rounded-card bg-muted/40 p-2">
                 <div className="mb-2 flex items-center justify-between px-1 text-sm font-medium">
                   <span>{col.label}</span>
                   <Badge tone="muted">{items.length}</Badge>
@@ -460,8 +566,8 @@ function WorkOrdersInner() {
                   {items.map((w) => (
                     <Card key={w.woNo} className="p-3 text-sm">
                       <div className="flex items-center justify-between">
-                        <button type="button" className="font-medium tabular-nums underline-offset-2 hover:underline" onClick={() => setDetail(w)}>{w.woNo}</button>
-                        <Badge tone={PRIO[w.priority][1]}>{PRIO[w.priority][0]}</Badge>
+                        <button type="button" className="txt-strong tabular-nums underline-offset-2 hover:underline" onClick={() => setDetail(w)}>{w.woNo}</button>
+                        <StatusBadge map={PRIO} value={w.priority} className="whitespace-nowrap" />
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground">{WO_TYPE_LABEL[w.type]} · {w.cabinetNo}</div>
                       <div className="mt-1 text-xs text-muted-foreground">{w.description}</div>
@@ -539,10 +645,10 @@ function WorkOrdersInner() {
             <Field label="柜机 / 点位">{handle.wo.cabinetNo} · {handle.wo.locationName}</Field>
             <Field label="问题描述">{handle.wo.description}</Field>
             <Field label="处理说明（必填）">
-              <textarea
-                rows={4} value={handleNote} onChange={(e) => setHandleNote(e.target.value)}
+              {/* 手写 textarea 的类名串已与 Input 漂移（圆角/焦点环偏移都不一致），改用原语 */}
+              <Textarea
+                rows={4} value={handleNote} onChange={setHandleNote}
                 placeholder="到场时间、排查过程、处理动作、复测结果"
-                className="flex w-full resize-y rounded-lg bg-secondary px-3.5 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
             </Field>
             <Field label="换件记录（可选）">
@@ -627,7 +733,7 @@ function WorkOrdersInner() {
       >
         {detail && (
           <>
-            <Field label="状态 / 优先级"><WoStatusBadge s={detail.status} /> <Badge tone={PRIO[detail.priority][1]}>{PRIO[detail.priority][0]}</Badge></Field>
+            <Field label="状态 / 优先级"><WoStatusBadge s={detail.status} /> <StatusBadge map={PRIO} value={detail.priority} /></Field>
             <Field label="类型 / 来源">{WO_TYPE_LABEL[detail.type]} · {SOURCE_LABEL[detail.source]}{detail.sourceNo ? ` · ${detail.sourceNo}` : ""}</Field>
             <Field label="柜机 / 点位">{detail.cabinetNo} · {detail.locationName}</Field>
             <Field label="问题描述">{detail.description}</Field>

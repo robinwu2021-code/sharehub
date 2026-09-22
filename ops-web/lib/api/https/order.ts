@@ -21,9 +21,12 @@ export const orderHttp: OrderApi = {
 
   // 售后处置
   listOrderComplaints: (q?: StatusQ) => client.get("/api/trade/complaints", q),
+  createOrderComplaint: (payload) => client.post("/api/trade/complaints", payload),
   handleOrderComplaint: (no, resolution, note) => client.post(`/api/trade/complaints/${no}/handle`, { resolution, note }),
   raiseComplaintWorkOrder: (no) => client.post(`/api/trade/complaints/${no}/work-order`, {}),
   listRefundRecords: (q?: StatusQ) => client.get("/api/trade/refunds", q),
+  // 幂等键随 body 走（后端 RefundApplyReq 就带这个字段），重复提交返回已有单而非再退一笔
+  createRefund: (payload) => client.post("/api/trade/refunds", payload),
   auditRefund: (no, approve, rejectReason) => client.post(`/api/trade/refunds/${no}/audit`, { approve, rejectReason }),
 
   // 批次 B4：预约与免费订单归 trade 域

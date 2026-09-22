@@ -7,6 +7,7 @@ import {
   findActiveSection, activeLeafIndex,
   sectionDefaultHref, breadcrumb, leafParts, normPath,
   isLeafLocked, isSectionLocked, isLeafDisabled, routeLockedPhase, groupedLeaves,
+  portalTitleOverride,
 } from "./nav";
 import { isPhaseLocked, CURRENT_PHASE } from "./phase";
 import { hasNavLabel } from "./i18n/nav-labels";
@@ -431,5 +432,30 @@ describe("分期屏蔽（phase gating，默认 CURRENT_PHASE=1）", () => {
   });
   it("sectionDefaultHref：跳过被锁叶，落到首个可点叶（财务→分润规则）", () => {
     expect(sectionDefaultHref(sec("finance"), "ADMIN")).toBe("/finance?tab=rules");
+  });
+});
+
+describe("portalTitleOverride（拍板 #5：代理端只改标题）", () => {
+  it("AGENT 命中门户叶：无 tab 的叶只接管页面默认位", () => {
+    expect(portalTitleOverride("AGENT", "/", null, true)).toBe("我的看板");
+    expect(portalTitleOverride("AGENT", "/devices", "cabinets", true)).toBe("我的设备");
+    expect(portalTitleOverride("AGENT", "/orders", "list", true)).toBe("我的订单");
+    // 子 tab 不接管：AGENT 看实时监控时标题仍是「实时监控」
+    expect(portalTitleOverride("AGENT", "/devices", "monitor", false)).toBeUndefined();
+  });
+  it("AGENT 命中带 tab/view 的门户叶：按 key 精确匹配", () => {
+    expect(portalTitleOverride("AGENT", "/finance", "records", false)).toBe("我的收益");
+    expect(portalTitleOverride("AGENT", "/finance", "settlements", false)).toBe("我的结算");
+    expect(portalTitleOverride("AGENT", "/work-orders", "list", true)).toBe("设备报修");
+    expect(portalTitleOverride("AGENT", "/finance", "rules", true)).toBeUndefined();
+  });
+  it("非门户角色一律不覆盖（运营端标题不受影响）", () => {
+    for (const role of ["ADMIN", "OPS", "CS", "FINANCE", "BD", "VIEWER"] as const) {
+      expect(portalTitleOverride(role, "/devices", "cabinets", true)).toBeUndefined();
+    }
+    expect(portalTitleOverride(undefined, "/devices", "cabinets", true)).toBeUndefined();
+  });
+  it("尾斜杠归一化后仍命中（trailingSlash:true 的路由形态）", () => {
+    expect(portalTitleOverride("AGENT", "/devices/", "cabinets", true)).toBe("我的设备");
   });
 });

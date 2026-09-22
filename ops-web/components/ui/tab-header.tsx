@@ -8,6 +8,7 @@ import * as React from "react";
 import { ChevronRight } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { isPhaseLocked, type Phase } from "@/lib/phase";
+import { usePortalTitle } from "@/lib/use-portal-title";
 import { cn } from "@/lib/utils";
 import { segmentedItemClass, segmentedTrackClass } from "@/components/ui/segmented";
 
@@ -27,6 +28,9 @@ export function TabHeader({
   const current = tabs.find((x) => x.key === value);
   const multi = visibleTabs.length > 1;
   const toggle = () => setPinned((p) => !p);
+  // 拍板 #5：门户角色（AGENT）在命中门户叶的路由上，标题换成门户文案（「机柜」→「我的设备」）。
+  // 只换 h1，tab 条与列一概不动；非门户场景返回 undefined，零影响。
+  const portalTitle = usePortalTitle(value, value === tabs[0]?.key);
 
   return (
     <div className="mb-3 flex items-center gap-3">
@@ -43,7 +47,7 @@ export function TabHeader({
             multi && "cursor-pointer hover:bg-accent/40",
           )}
         >
-          <h1 className="truncate txt-title">{current?.label ?? ""}</h1>
+          <h1 className="truncate txt-title">{portalTitle ?? current?.label ?? ""}</h1>
           {multi && (
             <ChevronRight
               className={cn(

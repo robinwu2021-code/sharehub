@@ -344,6 +344,31 @@ export function visibleLeaves(section: NavSection, role: Role | undefined): NavL
 }
 
 /**
+ * 门户标题覆盖（拍板 #5，2026-07-30：代理端按角色改文案，**只改标题不改列**）。
+ * 当前路由命中该角色的**门户叶**时返回叶 label（AGENT 在 /devices 默认 tab → 「我的设备」），
+ * 其余情况一律 undefined（非门户角色、非门户页、门户页的子 tab）。
+ *
+ * 匹配规则：path 相等，且——叶 href 带 tab/view 的须与 currentKey 相等
+ * （/finance?tab=records → 我的收益）；不带的要求当前处于页面**默认 tab**（isDefault）——
+ * 门户叶没细到 tab 的，不抢子 tab 的标题（AGENT 看 /devices?tab=monitor 时仍叫「实时监控」）。
+ */
+export function portalTitleOverride(
+  role: Role | undefined, pathname: string, currentKey: string | null, isDefault: boolean,
+): string | undefined {
+  const p = normPath(pathname);
+  for (const section of NAV) {
+    if (!role || !section.portalFor?.includes(role)) continue;
+    for (const leaf of section.children ?? []) {
+      const parts = leafParts(leaf.href);
+      if (parts.path !== p) continue;
+      const key = parts.tab ?? parts.view;
+      if (key ? key === currentKey : isDefault) return leaf.label;
+    }
+  }
+  return undefined;
+}
+
+/**
  * 把可见叶子按 group 聚成连续段（L2 分组）。
  * - 无 group 的叶子聚成 `{ group: undefined }` 段（渲染时不出标题）。
  * - 只合并**相邻**同名 group（不跨段合并）——保证渲染顺序 = 数据顺序，不隐式重排。

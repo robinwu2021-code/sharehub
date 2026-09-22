@@ -3,7 +3,7 @@
 // 充值订单的用户引用 user.ts 的 cUsers，渠道码取自 system.ts 的 paymentChannels 口径。
 import type {
   ShareRule, Settlement, SettlementStatus, SettlementAction, SettlementDraft,
-  Withdrawal, LedgerEntry, ShareRecord, Reconcile, Invoice,
+  Withdrawal, LedgerEntry, ShareRecord, Reconcile, ReconDiff, ReconDiffType, Invoice,
   ShareSummary, RechargeOrder, RechargePackage, PageQuery,
   ReconHandleStatus, ReconHandleResult, ReconAction, ReconStats,
   InvoiceStatus, InvoiceAction,
@@ -12,13 +12,18 @@ import {
   STL_TRANSITIONS, canSettlementTransition,
   RECON_TRANSITIONS, canReconTransition, RECON_TERMINAL,
   INV_TRANSITIONS, canInvoiceTransition, canEditInvoiceFields,
+  computeWithdrawFee,
 } from "../../types";
 import { VENUE_NAMES, p, iso } from "./internal";
 import { paginate, kwHit, upsert, nextNo, liveHit, archiveRow, unarchiveRow } from "./helpers";
 import { agents } from "./agent";
 import { venues } from "./location";
+// 提现手续费口径唯一来源（系统域 §11 业务规则）；只读不写，财务域不另存一份费率
+import { bizRules } from "./system";
 import { orders } from "./order";
 import { cUsers } from "./user";
+// 期间筛选与报表域共用 REPORT_PERIODS 的窗口换算
+import { daysOf } from "./report";
 
 // —— 分润规则 / 结算 / 提现 ——
 // 分成方名字必须是真实的场地方或代理商（原先写死 "Agent-North"/"Agent-South"，
@@ -94,8 +99,9 @@ export const withdrawals: Withdrawal[] = Array.from({ length: 20 }, (_, i) => {
   const audited = status === "PAYING" || status === "PAID" || status === "FAILED";
   return {
     withdrawNo: `WD${3000 + i}`, payeeName: p(PAYEE_NAMES, i), amount,
-    // 手续费 = 金额 0.6%，下限 2 AED（与提现渠道成本口径一致）
-    fee: Number(Math.max(2, amount * 0.006).toFixed(2)),
+    // 手续费不在这里定口径：费率/封顶取「系统设置 · 业务规则」的 withdraw 分区（唯一来源）。
+    // 原先写死 0.6% + 下限 2 AED，其中「下限」业务规则里根本没有这个字段 —— 是财务侧自己多存的阈值。
+    fee: computeWithdrawFee(amount, bizRules.withdraw),
     currency: "AED", status, appliedAt: iso(i * 43200_000),
     auditorName: audited ? p(["Sara Ahmed", "Omar Khan", "admin"], i) : null,
     auditedAt: audited ? iso(i * 43200_000 - 7200_000) : null,
@@ -116,6 +122,92 @@ export const ledger: LedgerEntry[] = Array.from({ length: 60 }, (_, i) => {
     createdAt: iso(i * 1800_000),
   };
 });
+
+/**
+ * 凭证下钻：取同一 `voucherNo` 的全部分录。
+ *
+ * 为什么值得单独给个入口：分录表是按 entryNo 平铺的，一张凭证的借贷两方在列表里可能
+ * 隔着几页。而**会计上有意义的单位是凭证**（一借一贷必须等额），逐条看根本判断不了平不平。
+ */
+export const listVoucherEntries = (voucherNo: string): LedgerEntry[] =>
+  ledger.filter((e) => e.voucherNo === voucherNo).sort((a, b) => a.entryNo.localeCompare(b.entryNo));
+
+/** 借贷合计与是否平衡。不平的凭证是记账错误，必须能一眼看出来而不是靠人心算。 */
+export function voucherBalance(voucherNo: string): { debit: number; credit: number; balanced: boolean } {
+  const es = listVoucherEntries(voucherNo);
+  const debit = Number(es.filter((e) => e.direction === "DEBIT").reduce((n, e) => n + e.amount, 0).toFixed(2));
+  const credit = Number(es.filter((e) => e.direction === "CREDIT").reduce((n, e) => n + e.amount, 0).toFixed(2));
+  return { debit, credit, balanced: Math.abs(debit - credit) < 0.01 };
+}
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+export class VoucherError extends Error {}
+
+/**
+ * 手工记账（补一张凭证）。
+ *
+ * 先前刻意没做，理由是「不校验平衡的手工记账比不做更危险」。现在做，是因为把那条顾虑
+ * 变成了硬约束 —— 下面五条全在本层强制，页面绕不过去：
+ *
+ *  ① **借贷必须相等**（差额 ≥0.01 直接拒）—— 会计上一张凭证不平就是错账；
+ *  ② 至少两条分录，且借、贷两侧都得有 —— 单边凭证不是记账；
+ *  ③ 每条分录金额 > 0，账户与摘要必填 —— 负数金额靠方向表达，不靠符号；
+ *  ④ 摘要（凭证级 summary）必填 —— 手工凭证没有来源单据，说明就是它唯一的可审计线索；
+ *  ⑤ **已过账凭证不可改**：本函数只新增，不提供编辑/删除。要冲正就再记一张反向凭证 ——
+ *     直接改历史分录会让「账实相符」无从追溯，这是会计红线。
+ *
+ * 凭证号由服务端派（`V` + 序号），不接受调用方指定：让前端选号必然撞号。
+ */
+export function createVoucher(x: {
+  summary: string;
+  orderNo?: string | null;
+  entries: { account: string; direction: LedgerEntry["direction"]; amount: number; summary?: string }[];
+  currency?: string;
+}): LedgerEntry[] {
+  const summary = (x.summary ?? "").trim();
+  if (!summary) throw new VoucherError("凭证摘要必填——手工凭证没有来源单据，摘要是唯一的可审计线索");
+  const es = x.entries ?? [];
+  if (es.length < 2) throw new VoucherError("至少需要两条分录（一借一贷）");
+  for (const e of es) {
+    if (!e.account?.trim()) throw new VoucherError("每条分录都要指定账户");
+    if (!(Number(e.amount) > 0)) throw new VoucherError("分录金额必须大于 0——借贷方向由 direction 表达，不用负数");
+  }
+  const debit = round2(es.filter((e) => e.direction === "DEBIT").reduce((n, e) => n + Number(e.amount), 0));
+  const credit = round2(es.filter((e) => e.direction === "CREDIT").reduce((n, e) => n + Number(e.amount), 0));
+  if (debit === 0 || credit === 0) throw new VoucherError("借方与贷方都必须有分录——单边凭证不是记账");
+  if (Math.abs(debit - credit) >= 0.01) {
+    throw new VoucherError(`借贷不平：借 ${debit} / 贷 ${credit}，差 ${round2(Math.abs(debit - credit))}——凭证必须借贷相等`);
+  }
+
+  const voucherNo = nextNo("V", ledger, 2000, "voucherNo");
+  const currency = x.currency ?? "AED";
+  const now = new Date().toISOString();
+  const created = es.map((e) => ({
+    entryNo: nextNo("LE", ledger, 9000),
+    voucherNo,
+    orderNo: x.orderNo ?? null,
+    account: e.account.trim(),
+    direction: e.direction,
+    amount: round2(Number(e.amount)),
+    currency,
+    summary: (e.summary ?? summary).trim(),
+    createdAt: now,
+  } as LedgerEntry));
+  // unshift：手工凭证是最新的，列表默认按新到旧
+  created.forEach((e) => ledger.unshift(e));
+  return created;
+}
+
+/** 分录按期间筛（createdAt 落在周期窗口内）。周期口径与报表域同源，不另造。 */
+export const listLedgerInPeriod = (q: PageQuery & { period?: string } = {}) => {
+  const dayStrs = new Set(daysOf(q.period).map((d) => new Date(d * 86400_000).toISOString().slice(0, 10)));
+  return paginate(
+    ledger.filter((e) => dayStrs.has(e.createdAt.slice(0, 10))),
+    q.page, q.size,
+    (x) => kwHit(q.keyword, x.entryNo, x.voucherNo, x.orderNo, x.account, x.summary),
+  );
+};
 
 // —— 对账 / 发票 ——（分润明细 shareRecords 在上方与结算单同源定义）
 // 差错处置的种子分布：每 3 期出一次差错、正负交替（+ = 渠道多/账务少记，− = 账务多记），
@@ -141,6 +233,51 @@ export const reconciles: Reconcile[] = Array.from({ length: 12 }, (_, i) => {
     handledBy: seeded ? p(["Sara Ahmed", "Omar Khan", "admin"], i) : null,
     handledAt: seeded ? iso(i * 86400_000 - 10800_000) : null,
   };
+});
+
+// 差错明细（recon_diff 子表）：每个有差异的批次挂 1~3 条，**逐条差额之和必须等于批次的 diff**。
+// 这条不变量是这张表存在的意义——抽屉里加总跟它上一层的差额对不上，等于让财务对着两个数猜哪个真。
+// 已平批次（MATCHED）一条都没有：没有差错却列出差错行，比不列更糟。
+// resolved 与批次处置进度同源：终态批次的差错全已平，OPEN/HANDLING 的一条都没平（半平不算平）。
+const RECON_DIFF_NOTES: Record<ReconDiffType, string> = {
+  ONLY_IN_NEARPAY: "渠道有该笔清算、我方无对应分录（疑似回调丢失）",
+  ONLY_IN_LEDGER: "我方已记账、渠道清算文件中无此笔（疑似重复记账）",
+  AMOUNT_MISMATCH: "两侧金额不等（差额多为手续费口径或部分退款未同步）",
+  STATUS_MISMATCH: "两侧金额一致但状态不一致（渠道已退款、我方仍为已支付）——差错但不差钱",
+};
+let reconDiffSeq = 0;
+export const reconDiffs: ReconDiff[] = reconciles.flatMap((r, bi) => {
+  if (r.status !== "DIFF") return [];
+  const resolved = r.handleStatus !== null && RECON_TERMINAL.includes(r.handleStatus);
+  const n = (bi % 3) + 1;
+  // 差额按 n 份切开，余数一律并进最后一条：整数分摊的老规矩，不能凭空多出或少掉一分钱
+  const unit = Math.trunc(r.diff / n);
+  const rows: { diffType: ReconDiffType; nearpay: number; ledger: number }[] = Array.from({ length: n }, (_, k) => {
+    const delta = k === n - 1 ? r.diff - unit * (n - 1) : unit;
+    // 单边差错只有一侧有金额，金额不等的两侧都有——detail 里的两个数必须自己就能推出 delta
+    const oneSided = (bi + k) % 2 === 1;
+    const diffType: ReconDiffType = oneSided
+      ? (delta > 0 ? "ONLY_IN_NEARPAY" : "ONLY_IN_LEDGER")
+      : "AMOUNT_MISMATCH";
+    const base = 60 + ((bi * 13 + k * 7) % 200);
+    const nearpay = oneSided ? (delta > 0 ? delta : 0) : base + delta;
+    const ledger = oneSided ? (delta > 0 ? 0 : -delta) : base;
+    return { diffType, nearpay, ledger };
+  });
+  // 每 6 期额外挂一条「状态不一致」：两侧金额相同（delta=0），加进来不动上面的不变量
+  if (bi % 6 === 0) {
+    const amt = 100 + (bi % 7) * 5;
+    rows.push({ diffType: "STATUS_MISMATCH", nearpay: amt, ledger: amt });
+  }
+  return rows.map((row, k) => ({
+    id: ++reconDiffSeq,
+    batchNo: r.batchNo,
+    // 支付单号挂在真实租借订单上：点进去查得到源单，不是一串自造号
+    payNo: `PAY${orders[(bi * 3 + k) % orders.length].orderNo.slice(3)}`,
+    diffType: row.diffType,
+    detail: JSON.stringify({ nearpay: row.nearpay, ledger: row.ledger, note: RECON_DIFF_NOTES[row.diffType] }),
+    resolved,
+  }));
 });
 
 // 发票：**金额不自造**，一律挂在一张结算单上（sourceNo），金额/抬头/币种取自该结算单——
@@ -213,13 +350,23 @@ const findRecon = (batchNo: string) => {
   return r;
 };
 
+/** 批次下的差错明细（按 id 升序，与后端 diffs 同口径）。批次不存在直接报错，不返回空数组糊过去。 */
+export function listReconDiffs(batchNo: string): ReconDiff[] {
+  findRecon(batchNo);
+  return reconDiffs.filter((d) => d.batchNo === batchNo).sort((a, b) => a.id - b.id);
+}
+
 /**
  * 差错处置。四道闸门：
  *  ① 批次必须真有差错（已平批次没有可处置对象）；② 动作必须是四个已声明动作之一；
  *  ③ 状态机允许（终态不可再动）；④ **结论必填**——差错处置是钱的定责，没结论等于没处理。
+ *
+ * `diffId` 指定处置单条差错，不传则处置该批次全部未处置差错（口径同后端 resolve）。
+ * 逐条处置时**批次进度只在最后一条未处置差错被平掉时才迁移**——半平不算平，
+ * 否则批次显示「已结案」而抽屉里还挂着两笔没平的差错，比不显示更误导。
  */
 export function handleRecon(
-  batchNo: string, action: ReconAction, handleNote?: string, operatorName?: string,
+  batchNo: string, action: ReconAction, handleNote?: string, operatorName?: string, diffId?: number,
 ): Reconcile {
   const r = findRecon(batchNo);
   if (r.status !== "DIFF" || r.handleStatus === null) {
@@ -236,9 +383,24 @@ export function handleRecon(
   const note = (handleNote ?? "").trim();
   if (!note) throw new ReconError("处理结论必填——写清依据（差额构成、凭证号/补差单号、对接人），否则无从复盘");
 
+  // 目标差错行：指定 diffId 时必须真属于这个批次且尚未平账（防抽屉拿着过期列表重复提交）
+  const batchDiffs = reconDiffs.filter((d) => d.batchNo === batchNo);
+  let targets = batchDiffs.filter((d) => !d.resolved);
+  if (diffId !== undefined) {
+    const one = batchDiffs.find((d) => d.id === diffId);
+    if (!one) throw new ReconError(`差错明细 #${diffId} 不属于对账批次 ${batchNo}`);
+    if (one.resolved) throw new ReconError(`差错明细 #${diffId} 已平账，不可重复处置`);
+    targets = [one];
+  }
+  for (const d of targets) d.resolved = true;
+
+  // 留痕（结论/处理人/时间）无论整批还是单条都要写；进度与定责只在这个批次全平了才迁移
+  const stillOpen = batchDiffs.some((d) => !d.resolved);
   Object.assign(r, {
-    handleStatus: tr.to, handleResult: tr.result, handleNote: note,
-    handledBy: operatorName || "admin", handledAt: new Date().toISOString(),
+    handleNote: note,
+    handledBy: operatorName || "admin",
+    handledAt: new Date().toISOString(),
+    ...(stillOpen ? {} : { handleStatus: tr.to, handleResult: tr.result }),
   });
   return r;
 }

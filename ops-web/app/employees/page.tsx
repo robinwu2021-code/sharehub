@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
@@ -9,7 +9,18 @@ import { TabHeader } from "@/components/ui/tab-header";
 import { Toolbar } from "@/components/ui/toolbar";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
 import { DataTable, type Column } from "@/components/ui/data-table";
+import { Drawer, Field } from "@/components/ui/drawer";
+import { Tree, type TreeNode } from "@/components/ui/tree";
+import { Notice } from "@/components/ui/notice";
+import { Card } from "@/components/ui/card";
+import { ReadOnlyNotice } from "@/components/read-only-notice";
+import { Input } from "@/components/ui/input";
+import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
+import { FilterSelect } from "@/components/ui/filter-select";
+// 绩效周期复用报表域枚举，与站点坪效/代理绩效同一套口径
+import { REPORT_PERIODS, REPORT_PERIOD_DEFAULT, type ReportPeriod } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { fmtTime } from "@/lib/utils";
 import { useCan } from "@/lib/use-can";
@@ -20,9 +31,13 @@ import {
   ShowArchivedToggle, archivedRowClass, ArchivedAt, ArchiveActions,
   archiveConfirm, unarchiveConfirm,
 } from "@/components/archive";
-import type { Employee, RoleRow, AuditEntry, DataScope, Department, StaffPerformance } from "@/lib/types";
+import type {
+  Employee, RoleRow, AuditEntry, DataScope, Department, StaffPerformance, PermissionItem,
+} from "@/lib/types";
 
 const SIZE = 10;
+// 组织架构与权限目录都要整棵拉（树不能分页——少半棵树等于错的树），单独给个大 size。
+const TREE_SIZE = 500;
 const SCOPE_LABEL: Record<DataScope, string> = { ALL: "全部数据", REGION: "按区域", LOCATION: "按点位", AGENT: "按代理(自己)", SELF: "仅自己经手" };
 const SCOPE_OPTIONS = (["ALL", "REGION", "LOCATION", "AGENT", "SELF"] as DataScope[]).map((s) => ({ value: s, label: SCOPE_LABEL[s] }));
 // 数据权限抽屉的表单形状：三档范围值各占一个 key（共用一个 key 会被 disabledWhen 的清空逻辑互相抹掉），
@@ -46,7 +61,7 @@ const ROLE_FIELDS: FieldDef[] = [
   { key: "code", label: "角色码", placeholder: "custom_ops" },
   { key: "name", label: "名称", placeholder: "自定义运营" },
   { key: "dataScope", label: "数据范围", type: "select", options: SCOPE_OPTIONS },
-  { key: "permCount", label: "权限数", type: "number" },
+  // 权限数不在这里填：它是「功能权限勾选树里勾了几项」的派生量，手填只会和实际授权对不上。
   { key: "memberCount", label: "成员数", type: "number" },
   { key: "builtin", label: "内置角色", type: "switch" },
 ];
@@ -59,12 +74,19 @@ const EMP_FIELDS: FieldDef[] = [
   { key: "roleName", label: "角色", placeholder: "运维" },
   { key: "status", label: "状态", type: "select", options: [{ value: "ACTIVE", label: "在职" }, { value: "LEFT", label: "离职" }] },
 ];
-const DEPT_FIELDS: FieldDef[] = [
-  { key: "name", label: "部门名称", placeholder: "华东运营部" },
-  { key: "parent", label: "上级部门", placeholder: "（顶级留空）" },
-  { key: "leader", label: "负责人", placeholder: "张三" },
-  { key: "memberCount", label: "成员数", type: "number" },
-];
+// 绩效评分档位。原先是内联 `Badge tone={score>=90?…}`：颜色成了「好/差」的唯一线索（§11.4），
+// 且阈值口径写在渲染处。拆成「数值列 + 档位徽标」——数值给精度，档位给结论。
+/** 周期码 → 中文标签。取自 REPORT_PERIODS，不另抄一份。 */
+const periodLabel = (p: string) => REPORT_PERIODS.find((x) => x.value === p)?.label ?? p;
+
+const PERF_GRADE: StatusMap<"EXCELLENT" | "GOOD" | "WATCH"> = {
+  EXCELLENT: { label: "优秀", tone: "success" },
+  GOOD: { label: "达标", tone: "default" },
+  WATCH: { label: "待改进", tone: "warning" },
+};
+const gradeOf = (score: number): keyof typeof PERF_GRADE =>
+  score >= 90 ? "EXCELLENT" : score >= 75 ? "GOOD" : "WATCH";
+
 const ALL_TABS = [
   { key: "employees", label: "员工", perm: "org:employee:read" },
   { key: "roles", label: "角色权限", perm: "org:role:read" },
@@ -72,6 +94,104 @@ const ALL_TABS = [
   { key: "audit", label: "操作审计", perm: "org:audit:read", phase: 2 as const },
   { key: "performance", label: "绩效报表", perm: "org:employee:read", phase: 3 as const },
 ];
+
+// —— 组织架构树 ——
+/**
+ * 按 `parent`（上级 deptNo）拼树。挂不上父节点的（parent 指向不存在的部门）**提到顶层**，
+ * 不是丢掉：mock 自洽性由 org-tree.test.ts 兜，但真实后端一旦回来一条脏数据，
+ * 静默吞掉整棵子树是最难查的那种 bug，宁可让它显眼地漂在顶层。
+ */
+function buildDeptTree(rows: Department[], renderExtra: (d: Department) => ReactNode): TreeNode[] {
+  const byNo = new Map(rows.map((d) => [d.deptNo, d]));
+  const childrenOf = new Map<string, Department[]>();
+  for (const d of rows) {
+    const key = d.parent && byNo.has(d.parent) ? d.parent : "";
+    (childrenOf.get(key) ?? childrenOf.set(key, []).get(key)!).push(d);
+  }
+  const node = (d: Department): TreeNode => ({
+    key: d.deptNo,
+    label: (
+      <span className="flex flex-wrap items-center gap-2">
+        <span className="txt-strong">{d.name}</span>
+        <span className="text-xs text-muted-foreground">{d.deptNo}</span>
+      </span>
+    ),
+    extra: renderExtra(d),
+    children: (childrenOf.get(d.deptNo) ?? []).map(node),
+  });
+  return (childrenOf.get("") ?? []).map(node);
+}
+
+/** 关键词命中时连**祖先链**一起留下，否则命中的子部门会因为父节点被滤掉而整支消失。 */
+function filterDepts(rows: Department[], kw: string): Department[] {
+  if (!kw) return rows;
+  const byNo = new Map(rows.map((d) => [d.deptNo, d]));
+  const keep = new Set<string>();
+  for (const d of rows) {
+    if (!`${d.deptNo} ${d.name} ${d.leader}`.toLowerCase().includes(kw)) continue;
+    for (let cur: Department | undefined = d; cur && !keep.has(cur.deptNo); cur = byNo.get(cur.parent)) keep.add(cur.deptNo);
+  }
+  return rows.filter((d) => keep.has(d.deptNo));
+}
+
+// —— 功能权限勾选树 ——
+const PERM_MODULE_LABEL: Record<string, string> = {
+  dashboard: "经营看板", device: "设备运营", location: "点位拓展", order: "订单交易",
+  pricing: "计费定价", finance: "财务分润", workorder: "工单运维", user: "用户运营",
+  marketing: "营销", cs: "客服", org: "员工与权限", report: "数据报表",
+  system: "系统配置", agent: "代理商管理",
+};
+/**
+ * 资源层中文名：后端 iam_permission 只有 code/module/name，**没有**资源层的名字。
+ * 这里从该资源 `:read` 那条的 name 里剥掉动作词得出（"机柜台账 查看" → "机柜台账"），
+ * 而不是再手写一份 60 条的资源名映射——两份清单必然漂移，剥词只会跟着目录走。
+ */
+function resourceLabel(resource: string, items: PermissionItem[]): string {
+  const read = items.find((x) => x.code.endsWith(":read")) ?? items[0];
+  const name = read?.name ?? "";
+  const cut = name.lastIndexOf(" ");
+  return cut > 0 ? name.slice(0, cut) : resource;
+}
+/** 权限码目录 → `<模块>/<资源>/<动作>` 三层树。叶子 key 即权限码（勾选值只认叶子）。 */
+function buildPermTree(items: PermissionItem[]): TreeNode[] {
+  const byModule = new Map<string, PermissionItem[]>();
+  for (const x of items) (byModule.get(x.module) ?? byModule.set(x.module, []).get(x.module)!).push(x);
+  return [...byModule].map(([module, mItems]) => {
+    const byRes = new Map<string, PermissionItem[]>();
+    for (const x of mItems) {
+      const res = x.code.split(":")[1] ?? "-";
+      (byRes.get(res) ?? byRes.set(res, []).get(res)!).push(x);
+    }
+    return {
+      key: `m:${module}`,
+      label: (
+        <span className="flex flex-wrap items-center gap-2">
+          <span className="txt-strong">{PERM_MODULE_LABEL[module] ?? module}</span>
+          <span className="text-xs text-muted-foreground">{module}</span>
+        </span>
+      ),
+      extra: <span className="text-xs text-muted-foreground tabular-nums">{mItems.length} 项</span>,
+      children: [...byRes].map(([res, rItems]) => ({
+        key: `r:${module}:${res}`,
+        label: (
+          <span className="flex flex-wrap items-center gap-2">
+            <span>{resourceLabel(res, rItems)}</span>
+            <span className="text-xs text-muted-foreground">{res}</span>
+          </span>
+        ),
+        children: rItems.map((x) => ({
+          key: x.code,
+          label: (
+            <span className="flex flex-wrap items-center gap-2">
+              <span>{x.name}</span>
+              <span className="text-xs text-muted-foreground">{x.code}</span>
+            </span>
+          ),
+        })),
+      })),
+    };
+  });
+}
 
 function EmployeesInner() {
   const allow = useCan();
@@ -85,23 +205,35 @@ function EmployeesInner() {
   const [showArchived, setShowArchived] = useState(false);
   useEffect(() => { if (qTab && tabs.some((t) => t.key === qTab)) { setTab(qTab); setShowArchived(false); } }, [qTab]);
   const [page, setPage] = useState(1);
+  // 绩效周期（缺省近 30 日，同报表域）
+  const [period, setPeriod] = useState<ReportPeriod>(REPORT_PERIOD_DEFAULT);
   const [keyword, setKeyword] = useState("");
   const [scopeRole, setScopeRole] = useState<RoleRow | null>(null);
   const [scopeForm, setScopeForm] = useState<ScopeForm>(EMPTY_SCOPE_FORM);
   const [roleForm, setRoleForm] = useState<Partial<RoleRow> | null>(null);
   const [deptForm, setDeptForm] = useState<Partial<Department> | null>(null);
   const [empForm, setEmpForm] = useState<Partial<Employee> | null>(null);
+  // 功能权限勾选树。permDraft = 「用户动过手的草稿」，null 表示还没动过 → 显示服务端现值。
+  // 不用「打开时 setState 灌一次」那套：react-query 命中缓存时 data 的引用不变，
+  // 重开同一个角色的 effect 不会再跑，抽屉里就会出现「一项都没勾」的假象。
+  const [permRole, setPermRole] = useState<RoleRow | null>(null);
+  const [permDraft, setPermDraft] = useState<string[] | null>(null);
+  const [permFilter, setPermFilter] = useState("");
+  const [auditId, setAuditId] = useState<string | null>(null);
 
   const emp = useQuery({
     queryKey: ["employees", page, keyword], queryFn: () => api.listEmployees({ page, size: SIZE, keyword }),
     placeholderData: keepPreviousData, enabled: tab === "employees",
   });
+  // 组织架构整棵拉、不带 keyword：树的过滤必须在前端做（要保留命中节点的祖先链），
+  // 交给服务端 keyword 会把父部门滤掉，命中的子部门跟着从树上消失。
   const org = useQuery({
-    queryKey: ["departments", page, keyword], queryFn: () => api.listDepartments({ page, size: SIZE, keyword }),
-    placeholderData: keepPreviousData, enabled: tab === "org",
+    queryKey: ["departments", "tree"], queryFn: () => api.listDepartments({ page: 1, size: TREE_SIZE }),
+    enabled: tab === "org",
   });
   const perf = useQuery({
-    queryKey: ["staffPerformance", page, keyword], queryFn: () => api.listStaffPerformance({ page, size: SIZE, keyword }),
+    queryKey: ["staffPerformance", page, keyword, period],
+    queryFn: () => api.listStaffPerformance({ page, size: SIZE, keyword, period }),
     placeholderData: keepPreviousData, enabled: tab === "performance",
   });
   // showArchived 必须进 queryKey，否则切开关不重新拉数据
@@ -109,6 +241,19 @@ function EmployeesInner() {
   const audit = useQuery({
     queryKey: ["audit", page, keyword], queryFn: () => api.listAudits({ page, size: SIZE, keyword }),
     placeholderData: keepPreviousData, enabled: tab === "audit",
+  });
+
+  // 功能权限：目录 + 该角色已分配码（只在抽屉打开时拉）
+  const permsQ = useQuery({ queryKey: ["permissions"], queryFn: () => api.listPermissions(), enabled: !!permRole });
+  const rolePermsQ = useQuery({
+    queryKey: ["role-perms", permRole?.roleNo],
+    queryFn: () => api.listRolePermissions(permRole!.roleNo),
+    enabled: !!permRole,
+  });
+  const picked = permDraft ?? rolePermsQ.data ?? [];
+
+  const auditDetailQ = useQuery({
+    queryKey: ["audit-detail", auditId], queryFn: () => api.getAuditDetail(auditId!), enabled: !!auditId,
   });
 
   // 数据权限范围值的候选主数据（只在抽屉打开时拉，避免进页面就多三个请求）
@@ -171,6 +316,34 @@ function EmployeesInner() {
     mutationFn: (v: Partial<Department>) => api.saveDepartment(v),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["departments"] }); notify.success("保存成功"); setDeptForm(null); },
   });
+  // 功能权限覆盖写：成功后角色列表的 permCount 要跟着变（它就是勾选数），所以两个 key 都失效
+  const savePerms = useMutation({
+    mutationFn: (v: { roleNo: string; perms: string[] }) => api.saveRolePermissions(v.roleNo, v.perms),
+    onSuccess: (_r, v) => {
+      qc.invalidateQueries({ queryKey: ["roles"] });
+      qc.invalidateQueries({ queryKey: ["role-perms", v.roleNo] });
+      notify.success(`功能权限已保存（${v.perms.length} 项）`);
+      setPermRole(null);
+      setPermDraft(null);
+    },
+  });
+  // 上级部门用下拉而不是手输名字：手输既拼不对 deptNo，也挡不住指向不存在的部门（孤儿节点 = 树上少一支）。
+  // 编辑时排除自己，避免选出自环。
+  const deptFields: FieldDef[] = useMemo(() => [
+    { key: "name", label: "部门名称", placeholder: "华东运营部" },
+    {
+      key: "parent", label: "上级部门", type: "select",
+      options: [
+        { value: "", label: "（顶级部门）" },
+        ...(org.data?.list ?? [])
+          .filter((d) => d.deptNo !== deptForm?.deptNo)
+          .map((d) => ({ value: d.deptNo, label: `${d.name}（${d.deptNo}）` })),
+      ],
+      help: "不能选自己的下级——会形成环，服务端同样拦",
+    },
+    { key: "leader", label: "负责人", placeholder: "张三" },
+    { key: "memberCount", label: "成员数", type: "number" },
+  ], [org.data, deptForm?.deptNo]);
   // 角色归档 / 恢复：错误由全局 MutationCache 接管，这里只管成功后的失效与提示。
   const archiveRoleM = useMutation({
     mutationFn: (v: { no: string; undo: boolean }) => v.undo ? api.unarchiveRole(v.no) : api.archiveRole(v.no),
@@ -185,7 +358,8 @@ function EmployeesInner() {
   };
 
   const empCols: Column<Employee>[] = [
-    { header: "工号", cell: (e) => <span className="font-medium">{e.employeeNo}</span> },
+    // 业务号列做扫描锚点（§12.3）：body-strong + 等宽
+    { header: "工号", cell: (e) => <span className="txt-strong tabular-nums">{e.employeeNo}</span> },
     { header: "姓名", cell: (e) => e.name },
     { header: "手机", cell: (e) => <span className="text-muted-foreground">{e.phone}</span> },
     { header: "邮箱", cell: (e) => <span className="text-muted-foreground">{e.email}</span> },
@@ -195,7 +369,7 @@ function EmployeesInner() {
     { header: "操作", cell: (e) => canEditEmp ? <Button size="sm" variant="outline" onClick={() => setEmpForm(e)}>编辑</Button> : <span className="text-muted-foreground">-</span> },
   ];
   const roleCols: Column<RoleRow>[] = [
-    { header: "角色码", cell: (r) => <span className="font-medium">{r.code}</span> },
+    { header: "角色码", cell: (r) => <span className="txt-strong">{r.code}</span> },
     { header: "名称", cell: (r) => r.name },
     { header: "权限数", cell: (r) => <span className="tabular-nums">{r.permCount}</span> },
     {
@@ -225,12 +399,18 @@ function EmployeesInner() {
         const base = (
           <>
             {canEditRole && <Button size="sm" variant="outline" onClick={() => setRoleForm(r)}>编辑</Button>}
+            {/* 功能权限对无 update 权者也开放（只读查看勾选树）：「这个角色到底能干什么」是排障第一问，
+                此前只有 permCount 一个数字，谁也答不上来。写侧由抽屉内的按钮再拦一次。 */}
+            <Button size="sm" variant="outline" onClick={() => { setPermRole(r); setPermDraft(null); setPermFilter(""); }}>
+              功能权限
+            </Button>
             {/* 无 org:role:update 时按钮显式禁用（不静默隐藏），范围与数量在「数据范围」列仍可查看 */}
             <Button
               size="sm"
               variant="outline"
               disabled={!canEditRole}
-              title={canEditRole ? undefined : "仅可查看：缺少 org:role:update"}
+              // 禁用态的悬浮说明不套「仅可查看」那句（那是 ReadOnlyNotice 的句式），只说缺哪个码
+              title={canEditRole ? undefined : "缺少 org:role:update，不能修改数据范围"}
               onClick={() => { setScopeRole(r); setScopeForm(scopeFormOf(r)); }}
             >
               数据权限
@@ -264,21 +444,29 @@ function EmployeesInner() {
       },
     },
   ];
-  const orgCols: Column<Department>[] = [
-    { header: "部门编号", cell: (d) => <span className="font-medium">{d.deptNo}</span> },
-    { header: "部门名称", cell: (d) => d.name },
-    { header: "上级部门", cell: (d) => <span className="text-muted-foreground">{d.parent || "-"}</span> },
-    { header: "成员数", cell: (d) => <span className="tabular-nums">{Math.round(d.memberCount)}</span> },
-    { header: "负责人", cell: (d) => <Badge tone="outline">{d.leader}</Badge> },
-    { header: "操作", cell: (d) => canEditDept ? <Button size="sm" variant="outline" onClick={() => setDeptForm(d)}>编辑</Button> : <span className="text-muted-foreground">-</span> },
-  ];
+  // 组织架构改树形（S6 / 拍板点 #4）：层级本身就是信息，扁平表加一列「上级」读者得自己拼。
+  const deptRows = org.data?.list ?? [];
+  const deptTree = useMemo(
+    () => buildDeptTree(filterDepts(deptRows, keyword.trim().toLowerCase()), (d) => (
+      <>
+        <span className="text-xs text-muted-foreground tabular-nums">{Math.round(d.memberCount)} 人</span>
+        <Badge tone="outline">{d.leader}</Badge>
+        {canEditDept && <Button size="sm" variant="outline" onClick={() => setDeptForm(d)}>编辑</Button>}
+      </>
+    )),
+    [deptRows, keyword, canEditDept],
+  );
   const perfCols: Column<StaffPerformance>[] = [
-    { header: "工号", cell: (p) => <span className="font-medium">{p.employeeNo}</span> },
+    { header: "工号", cell: (p) => <span className="txt-strong tabular-nums">{p.employeeNo}</span> },
     { header: "姓名", cell: (p) => p.name },
     { header: "角色", cell: (p) => <Badge tone="outline">{p.role}</Badge> },
-    { header: "处理量", cell: (p) => <span className="tabular-nums">{Math.round(p.handled)}</span> },
-    { header: "平均解决(分钟)", cell: (p) => <span className="tabular-nums">{Math.round(p.avgResolveMins)}</span> },
-    { header: "评分", cell: (p) => <Badge tone={p.score >= 90 ? "success" : p.score >= 75 ? "default" : "warning"}>{p.score.toFixed(1)}</Badge> },
+    // 数字列右对齐 + 等宽（§12.4）：处理量/时长/评分是要横向比较的量
+    { header: "处理量", className: "text-right", cell: (p) => <span className="tabular-nums">{Math.round(p.handled)}</span> },
+    { header: "平均解决(分钟)", className: "text-right", cell: (p) => <span className="tabular-nums">{Math.round(p.avgResolveMins)}</span> },
+    { header: "评分", className: "text-right", cell: (p) => <span className="txt-strong tabular-nums">{p.handled ? p.score.toFixed(1) : "—"}</span> },
+    // 0 单员工出「—」而非「待改进」：绩效从工单派生（buildStaffPerformances），
+    // 「没接过单」和「干得差」是两回事，给 0 单的人挂黄标等于冤枉人
+    { header: "评价", cell: (p) => p.handled ? <StatusBadge map={PERF_GRADE} value={gradeOf(p.score)} /> : <span className="text-muted-foreground">—</span> },
   ];
   const auditCols: Column<AuditEntry>[] = [
     { header: "时间", cell: (a) => <span className="text-muted-foreground">{fmtTime(a.createdAt)}</span> },
@@ -287,9 +475,21 @@ function EmployeesInner() {
     { header: "对象", cell: (a) => <span className="text-muted-foreground">{a.target}</span> },
     { header: "结果", cell: (a) => a.detail },
     { header: "IP", cell: (a) => <span className="text-muted-foreground">{a.ip}</span> },
+    { header: "操作", cell: (a) => <Button size="sm" variant="outline" onClick={() => setAuditId(a.id)}>详情</Button> },
   ];
 
-  const paged = tab === "employees" ? emp.data : tab === "org" ? org.data : tab === "performance" ? perf.data : tab === "audit" ? audit.data : undefined;
+  // 功能权限勾选树：筛选后重建树。内置角色 + 无 org:role:update 都只读，禁用整棵树而不是隐藏它。
+  const permItems = useMemo(() => {
+    const f = permFilter.trim().toLowerCase();
+    const all = permsQ.data ?? [];
+    return f ? all.filter((x) => `${x.code} ${x.name}`.toLowerCase().includes(f)) : all;
+  }, [permsQ.data, permFilter]);
+  const permTree = useMemo(() => buildPermTree(permItems), [permItems]);
+  const permCanWrite = canEditRole && !permRole?.builtin;
+  const permReadOnlyWhy = permRole?.builtin ? "内置角色的功能权限只读" : "缺少 org:role:update";
+
+  // org 改树形后不分页（整棵拉），故不进这里
+  const paged = tab === "employees" ? emp.data : tab === "performance" ? perf.data : tab === "audit" ? audit.data : undefined;
   const kw = keyword.trim().toLowerCase();
   const roleRows = (roles.data ?? []).filter((r) => !kw || `${r.code} ${r.name}`.toLowerCase().includes(kw));
 
@@ -320,7 +520,7 @@ function EmployeesInner() {
               { header: "状态", value: (e) => (e.status === "ACTIVE" ? "在职" : "离职") },
             ], emp.data?.list ?? [])}
           />
-          {!canEditEmp && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无员工维护权限（org:employee:update）</div>}
+          {!canEditEmp && <ReadOnlyNotice what="员工维护" perm="org:employee:update" note="不能新增或编辑员工" />}
         </>
       )}
       {tab === "org" && (
@@ -333,22 +533,31 @@ function EmployeesInner() {
           onExport={onExportOf<Department>("组织架构", [
             { header: "部门编号", value: (d) => d.deptNo },
             { header: "部门名称", value: (d) => d.name },
-            { header: "上级部门", value: (d) => d.parent || "-" },
+            // CSV 里给上级的中文名（deptNo 对读表的人没有意义），拼不到就退回原值
+            { header: "上级部门", value: (d) => deptRows.find((x) => x.deptNo === d.parent)?.name ?? (d.parent || "-") },
             { header: "成员数", value: (d) => Math.round(d.memberCount) },
             { header: "负责人", value: (d) => d.leader },
-          ], org.data?.list ?? [])}
+          ], deptRows)}
         />
       )}
       {tab === "performance" && (
         <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索工号 / 姓名"
-          onExport={onExportOf<StaffPerformance>("绩效报表", [
+          onExport={onExportOf<StaffPerformance>(`绩效报表-${periodLabel(period)}`, [
             { header: "工号", value: (p) => p.employeeNo },
             { header: "姓名", value: (p) => p.name },
             { header: "角色", value: (p) => p.role },
             { header: "处理量", value: (p) => Math.round(p.handled) },
             { header: "平均解决(分钟)", value: (p) => Math.round(p.avgResolveMins) },
-            { header: "评分", value: (p) => p.score.toFixed(1) },
-          ], perf.data?.list ?? [])} />
+            { header: "评分", value: (p) => (p.handled ? p.score.toFixed(1) : "—") },
+            { header: "评价", value: (p) => (p.handled ? PERF_GRADE[gradeOf(p.score)].label : "—") },
+          ], perf.data?.list ?? [])}>
+          <FilterSelect
+            value={period}
+            onChange={(v) => { setPeriod(v as ReportPeriod); setPage(1); }}
+            options={REPORT_PERIODS.map((x) => ({ value: x.value, label: x.label }))}
+            aria-label="按统计周期筛选"
+          />
+        </Toolbar>
       )}
       {tab === "roles" && (
         <>
@@ -370,7 +579,7 @@ function EmployeesInner() {
           >
             <ShowArchivedToggle checked={showArchived} onChange={setShowArchived} />
           </Toolbar>
-          {!canEditRole && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无角色维护权限（org:role:update），不能修改角色与数据权限</div>}
+          {!canEditRole && <ReadOnlyNotice what="角色维护" perm="org:role:update" note="不能修改角色、功能权限与数据权限" />}
         </>
       )}
       {tab === "audit" && (
@@ -385,8 +594,16 @@ function EmployeesInner() {
           ], audit.data?.list ?? [])} />
       )}
       {tab === "employees" && <DataTable rowKey={(e: Employee) => e.employeeNo} columns={empCols} rows={emp.data?.list} loading={emp.isLoading} empty="暂无员工——换个关键词，或点「新增员工」把运维 / 客服人员录进来。" />}
-      {tab === "org" && <DataTable rowKey={(d: Department) => d.deptNo} columns={orgCols} rows={org.data?.list} loading={org.isLoading} empty="暂无部门——点「新增部门」先建顶级部门，再逐级挂下级。" />}
-      {tab === "performance" && <DataTable rowKey={(p: StaffPerformance) => p.employeeNo} columns={perfCols} rows={perf.data?.list} loading={perf.isLoading} empty="暂无绩效数据——绩效按工单处理量与解决时长自动汇总，需先有已完成的工单。" />}
+      {tab === "org" && (
+        <Card className="p-2">
+          <Tree
+            nodes={deptTree}
+            loading={org.isLoading}
+            empty={keyword ? "没有匹配的部门——换个关键词试试（可搜部门名 / 编号 / 负责人）。" : "暂无部门——点「新增部门」先建顶级部门，再逐级挂下级。"}
+          />
+        </Card>
+      )}
+      {tab === "performance" && <DataTable rowKey={(p: StaffPerformance) => p.employeeNo} columns={perfCols} rows={perf.data?.list} loading={perf.isLoading} empty={`${periodLabel(period)}内没有绩效数据——换个关键词或更长的周期再看。`} />}
       {tab === "roles" && <DataTable rowKey={(r: RoleRow) => r.roleNo} columns={roleCols} rows={roleRows} loading={roles.isLoading} rowClassName={archivedRowClass} empty={showArchived ? "没有匹配的角色——换个关键词，或点「新增角色」建一个自定义角色。" : "暂无在用角色——可能都已归档（打开「显示已归档」查看），或点「新增角色」建第一个自定义角色。"} />}
       {tab === "audit" && <DataTable rowKey={(a: AuditEntry) => a.id} columns={auditCols} rows={audit.data?.list} loading={audit.isLoading} empty="暂无审计记录——记录在管理员执行写操作后自动产生，换个关键词或时间范围再看。" />}
       {paged && <Pagination page={page} size={SIZE} total={paged.total} onPage={setPage} />}
@@ -436,12 +653,117 @@ function EmployeesInner() {
         titleNew="新增部门"
         titleEdit={`编辑部门 ${deptForm?.deptNo ?? ""}`}
         isEdit={!!deptForm?.deptNo}
-        fields={DEPT_FIELDS}
+        fields={deptFields}
         value={(deptForm ?? {}) as Record<string, unknown>}
         onChange={(v) => setDeptForm(v as Partial<Department>)}
         onSubmit={() => deptForm && saveDept.mutate(deptForm)}
         submitting={saveDept.isPending}
       />
+
+      {/* 功能权限勾选树（S6）：此前只有 permCount 一个数字，「这个角色能干什么」无处可查、更无处可改。 */}
+      <Drawer
+        open={!!permRole}
+        onOpenChange={(o) => !o && setPermRole(null)}
+        width="w-[560px]"
+        title={`功能权限 · ${permRole?.name ?? ""}`}
+        desc={`${permRole?.code ?? ""} · 已选 ${picked.length} / 共 ${permsQ.data?.length ?? 0} 项权限码`}
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setPermRole(null)}>取消</Button>
+            <Button
+              disabled={!permCanWrite || savePerms.isPending}
+              title={permCanWrite ? undefined : permReadOnlyWhy}
+              onClick={() => permRole && savePerms.mutate({ roleNo: permRole.roleNo, perms: picked })}
+            >
+              {savePerms.isPending ? "保存中…" : "保存"}
+            </Button>
+          </>
+        }
+      >
+        {/* 内置角色只读这条门锁在服务端（IamAdminController 判 builtin=1 直接拒），这里只是提前说清 */}
+        {permRole?.builtin && <Notice>内置角色的功能权限只读——登录鉴权依赖这套固定授权，改动请新建自定义角色。</Notice>}
+        {!canEditRole && !permRole?.builtin && <ReadOnlyNotice what="角色维护" perm="org:role:update" note="只能查看勾选结果" />}
+        <div className="mb-3 flex items-center gap-2">
+          <Input
+            className="flex-1"
+            aria-label="搜索权限码"
+            placeholder="搜索权限码 / 名称，如 refund"
+            value={permFilter}
+            onChange={(e) => setPermFilter(e.target.value)}
+          />
+          <Button
+            size="sm" variant="outline" disabled={!permCanWrite}
+            onClick={() => setPermDraft([...new Set([...picked, ...permItems.map((x) => x.code)])])}
+          >
+            {permFilter ? "全选结果" : "全选"}
+          </Button>
+          <Button
+            size="sm" variant="outline" disabled={!permCanWrite}
+            onClick={() => { const drop = new Set(permItems.map((x) => x.code)); setPermDraft(picked.filter((c) => !drop.has(c))); }}
+          >
+            {permFilter ? "清空结果" : "清空"}
+          </Button>
+        </div>
+        <Tree
+          nodes={permTree}
+          checkable
+          checkedKeys={picked}
+          onCheckedChange={setPermDraft}
+          disabled={!permCanWrite}
+          loading={permsQ.isLoading || rolePermsQ.isLoading}
+          // 有筛选词时全展开（否则命中项藏在收起的模块里），否则只显示模块层
+          collapseFrom={permFilter ? undefined : 0}
+          empty={permFilter ? "没有匹配的权限码——换个关键词（可搜码或中文名）。" : "权限码目录为空——后端 iam_permission 未初始化。"}
+        />
+      </Drawer>
+
+      {/* 审计详情（S4）：只有列表时「改了什么」全靠猜，这里给字段级前后对比 */}
+      <Drawer
+        open={!!auditId}
+        onOpenChange={(o) => !o && setAuditId(null)}
+        width="w-[560px]"
+        title="审计详情"
+        desc={auditDetailQ.data ? `${auditDetailQ.data.action} · ${auditDetailQ.data.target}` : undefined}
+      >
+        {auditDetailQ.isLoading && <span className="text-muted-foreground">加载中…</span>}
+        {auditDetailQ.data && (
+          <>
+            <div className="grid grid-cols-2 gap-x-4">
+              <Field className="mb-3" label="时间">{fmtTime(auditDetailQ.data.createdAt)}</Field>
+              <Field className="mb-3" label="操作人">{auditDetailQ.data.actor}</Field>
+              <Field className="mb-3" label="动作">{auditDetailQ.data.action}</Field>
+              <Field className="mb-3" label="对象">{auditDetailQ.data.target}</Field>
+              <Field className="mb-3" label="结果"><Badge tone="success">{auditDetailQ.data.detail}</Badge></Field>
+              <Field className="mb-3" label="来源 IP">{auditDetailQ.data.ip}</Field>
+              {/* 请求号 / UA 后端目前恒为空串（iam_audit_log 无这两列，也还没有 requestId 概念）——
+                  空串渲染成短横，别让它看起来像「有个长度为 0 的合法追踪号」。 */}
+              <Field className="mb-3" label="请求号">{auditDetailQ.data.requestId || "—"}</Field>
+            </div>
+            <Field label="User-Agent">
+              <span className="break-all text-xs text-muted-foreground">{auditDetailQ.data.userAgent || "—"}</span>
+            </Field>
+            <div className="mb-2 text-xs text-muted-foreground">改动前后对比</div>
+            {auditDetailQ.data.changes.length === 0 ? (
+              <Notice>该动作不改业务字段（远程指令、导出这类纯动作），只留痕不产生前后对比。</Notice>
+            ) : (
+              <Table>
+                <THead>
+                  <TR><TH>字段</TH><TH>改动前</TH><TH>改动后</TH></TR>
+                </THead>
+                <TBody>
+                  {auditDetailQ.data.changes.map((c) => (
+                    <TR key={c.field}>
+                      <TD>{c.field}</TD>
+                      <TD><span className="text-muted-foreground line-through">{c.before}</span></TD>
+                      <TD><span className="txt-strong">{c.after}</span></TD>
+                    </TR>
+                  ))}
+                </TBody>
+              </Table>
+            )}
+          </>
+        )}
+      </Drawer>
 
       {dialog}
     </div>

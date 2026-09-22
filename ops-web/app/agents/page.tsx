@@ -14,6 +14,7 @@ import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { ReadOnlyNotice } from "@/components/read-only-notice";
 import {
   ShowArchivedToggle, archivedRowClass, ArchivedAt, ArchiveActions,
   archiveConfirm, unarchiveConfirm,
@@ -23,12 +24,17 @@ import { money, fmtTime } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { useCan } from "@/lib/use-can";
 import { notify } from "@/lib/notify";
+import { FilterSelect } from "@/components/ui/filter-select";
+// 绩效周期复用报表域枚举：代理 GMV = 名下站点营收之和，必须与站点坪效同一套周期口径
+import { REPORT_PERIODS, REPORT_PERIOD_DEFAULT, type ReportPeriod } from "@/lib/types";
 import type {
   Agent, AgentAssignment, AgentPerformance, AgentAccount, AgentCommission, DataScope,
   AgentAssignmentRecord, AssignableAsset,
 } from "@/lib/types";
 
 const SIZE = 10;
+/** 周期码 → 中文标签。取自 REPORT_PERIODS，不另抄一份。 */
+const periodLabel = (p: string) => REPORT_PERIODS.find((x) => x.value === p)?.label ?? p;
 // 数据范围文案与 app/employees 同源（台账 T5：AgentAccount.dataScope 原为 string
 // 且 mock 里存的是中文展示文案，收紧为 DataScope 枚举后统一走映射渲染）
 const SCOPE_LABEL: Record<DataScope, string> = { ALL: "全部数据", REGION: "按区域", LOCATION: "按点位", AGENT: "按代理(自己)", SELF: "仅自己经手" };
@@ -74,6 +80,8 @@ function AgentsInner() {
   const qTab = sp.get("tab");
   const [tab, setTab] = useState(TABS.some((t) => t.key === qTab) ? (qTab as string) : "profiles");
   const [page, setPage] = useState(1);
+  // 代理绩效周期（复用报表域缺省值 LAST_30D）
+  const [period, setPeriod] = useState<ReportPeriod>(REPORT_PERIOD_DEFAULT);
   const [keyword, setKeyword] = useState("");
   const [edit, setEdit] = useState<Agent | null>(null);
   const [form, setForm] = useState<Partial<Agent>>({});
@@ -106,8 +114,8 @@ function AgentsInner() {
     enabled: tab === "assign",
   });
   const performance = useQuery({
-    queryKey: ["agent-performance", page, keyword],
-    queryFn: () => api.listAgentPerformance({ page, size: SIZE, keyword }),
+    queryKey: ["agent-performance", page, keyword, period],
+    queryFn: () => api.listAgentPerformance({ page, size: SIZE, keyword, period }),
     placeholderData: keepPreviousData,
     enabled: tab === "performance",
   });
@@ -265,13 +273,14 @@ function AgentsInner() {
 
   function open(a: Agent) { setEdit(a); setForm(a); }
 
+  // 业务号列一律 txt-strong（§12.3 主键列加强）；比例/计数/金额列 text-right + tabular-nums（§12.4）
   const profileCols: Column<Agent>[] = [
-    { header: "代理编号", cell: (a) => <span className="font-medium">{a.agentNo}</span> },
+    { header: "代理编号", cell: (a) => <span className="txt-strong tabular-nums">{a.agentNo}</span> },
     { header: "名称", cell: (a) => a.name },
     { header: "辖域", cell: (a) => <span className="text-muted-foreground">{a.regionScope}</span> },
     { header: "联系方式", cell: (a) => <span className="text-muted-foreground">{a.contact}</span> },
-    { header: "分润比例", cell: (a) => `${(a.shareRate * 100).toFixed(0)}%` },
-    { header: "设备数", cell: (a) => <span className="tabular-nums">{a.cabinetCount}</span> },
+    { header: "分润比例", className: "text-right", cell: (a) => <span className="tabular-nums">{(a.shareRate * 100).toFixed(0)}%</span> },
+    { header: "设备数", className: "text-right", cell: (a) => <span className="tabular-nums">{a.cabinetCount}</span> },
     { header: "状态", cell: (a) => a.status === "ENABLED" ? <Badge tone="success">启用</Badge> : <Badge tone="muted">停用</Badge> },
     // 归档时间列只在「显示已归档」打开时出现，默认视图里整列都是 `-` 属于噪音
     ...(showArchived ? [{ header: "归档时间", cell: (a: Agent) => <ArchivedAt at={a.archivedAt} /> }] : []),
@@ -291,12 +300,12 @@ function AgentsInner() {
   ];
 
   const assignCols: Column<AgentAssignment>[] = [
-    { header: "代理编号", cell: (a) => <span className="font-medium">{a.agentNo}</span> },
+    { header: "代理编号", cell: (a) => <span className="txt-strong tabular-nums">{a.agentNo}</span> },
     { header: "代理名称", cell: (a) => a.agentName },
     { header: "区域", cell: (a) => <span className="text-muted-foreground">{a.region}</span> },
     // 这两列由 cabinets.agentNo / sites.agentNo 实时反算：划拨/回收后数字当场变
-    { header: "设备数", cell: (a) => <span className="tabular-nums">{a.cabinetCount}</span> },
-    { header: "点位数", cell: (a) => <span className="tabular-nums">{a.siteCount}</span> },
+    { header: "设备数", className: "text-right", cell: (a) => <span className="tabular-nums">{a.cabinetCount}</span> },
+    { header: "点位数", className: "text-right", cell: (a) => <span className="tabular-nums">{a.siteCount}</span> },
     {
       header: "操作",
       cell: (a) => (
@@ -319,7 +328,7 @@ function AgentsInner() {
   ];
 
   const recordCols: Column<AgentAssignmentRecord>[] = [
-    { header: "流水号", cell: (r) => <span className="font-medium tabular-nums">{r.assignmentNo}</span> },
+    { header: "流水号", cell: (r) => <span className="txt-strong tabular-nums">{r.assignmentNo}</span> },
     { header: "代理", cell: (r) => <span>{r.agentName} <span className="text-muted-foreground tabular-nums">{r.agentNo}</span></span> },
     { header: "资产", cell: (r) => <span className="tabular-nums">{r.assetNo}</span> },
     { header: "类型", cell: (r) => <Badge tone="outline">{ASSET_TYPE_LABEL[r.assetType]}</Badge> },
@@ -329,17 +338,17 @@ function AgentsInner() {
   ];
 
   const perfCols: Column<AgentPerformance>[] = [
-    { header: "排名", cell: (a) => <span className="tabular-nums font-medium">#{a.rank}</span> },
-    { header: "代理编号", cell: (a) => <span className="font-medium">{a.agentNo}</span> },
+    { header: "排名", className: "text-right", cell: (a) => <span className="txt-strong tabular-nums">#{a.rank}</span> },
+    { header: "代理编号", cell: (a) => <span className="txt-strong tabular-nums">{a.agentNo}</span> },
     { header: "代理名称", cell: (a) => a.agentName },
-    { header: "GMV", cell: (a) => <span className="tabular-nums">{money(a.gmv, a.currency)}</span> },
-    { header: "设备数", cell: (a) => <span className="tabular-nums">{a.cabinetCount}</span> },
-    { header: "在线率", cell: (a) => `${(a.onlineRate * 100).toFixed(0)}%` },
+    { header: "GMV", className: "text-right", cell: (a) => <span className="tabular-nums">{money(a.gmv, a.currency)}</span> },
+    { header: "设备数", className: "text-right", cell: (a) => <span className="tabular-nums">{a.cabinetCount}</span> },
+    { header: "在线率", className: "text-right", cell: (a) => <span className="tabular-nums">{(a.onlineRate * 100).toFixed(0)}%</span> },
   ];
 
   const accountCols: Column<AgentAccount>[] = [
-    { header: "账号编号", cell: (a) => <span className="font-medium">{a.accountNo}</span> },
-    { header: "代理编号", cell: (a) => <span className="text-muted-foreground">{a.agentNo}</span> },
+    { header: "账号编号", cell: (a) => <span className="txt-strong tabular-nums">{a.accountNo}</span> },
+    { header: "代理编号", cell: (a) => <span className="text-muted-foreground tabular-nums">{a.agentNo}</span> },
     { header: "代理名称", cell: (a) => a.agentName },
     { header: "登录手机", cell: (a) => <span className="tabular-nums">{a.loginPhone}</span> },
     { header: "状态", cell: (a) => a.status === "ACTIVE" ? <Badge tone="success">启用</Badge> : <Badge tone="muted">停用</Badge> },
@@ -349,11 +358,11 @@ function AgentsInner() {
   ];
 
   const commissionCols: Column<AgentCommission>[] = [
-    { header: "规则号", cell: (c) => <span className="font-medium">{c.ruleNo}</span> },
-    { header: "代理编号", cell: (c) => <span className="text-muted-foreground">{c.agentNo}</span> },
+    { header: "规则号", cell: (c) => <span className="txt-strong tabular-nums">{c.ruleNo}</span> },
+    { header: "代理编号", cell: (c) => <span className="text-muted-foreground tabular-nums">{c.agentNo}</span> },
     { header: "代理名称", cell: (c) => c.agentName },
     { header: "计佣基数", cell: (c) => <Badge tone="outline">{c.basis === "GMV" ? "GMV" : "订单量"}</Badge> },
-    { header: "分润比例", cell: (c) => `${(c.rate * 100).toFixed(0)}%` },
+    { header: "分润比例", className: "text-right", cell: (c) => <span className="tabular-nums">{(c.rate * 100).toFixed(0)}%</span> },
     { header: "结算模式", cell: (c) => c.mode === "CHANNEL_SPLIT" ? "渠道分成" : "账务分录" },
     { header: "生效日期", cell: (c) => <span className="text-muted-foreground">{c.effectiveAt}</span> },
     { header: "状态", cell: (c) => c.status === "ACTIVE" ? <Badge tone="success">启用</Badge> : <Badge tone="muted">停用</Badge> },
@@ -388,7 +397,7 @@ function AgentsInner() {
     { header: "设备数", value: (a) => a.cabinetCount },
     { header: "点位数", value: (a) => a.siteCount },
   ], assign.data?.list ?? []);
-  const exportPerformance = () => exportCsv<AgentPerformance>("代理绩效", [
+  const exportPerformance = () => exportCsv<AgentPerformance>(`代理绩效-${periodLabel(period)}`, [
     { header: "排名", value: (a) => a.rank },
     { header: "代理编号", value: (a) => a.agentNo },
     { header: "代理名称", value: (a) => a.agentName },
@@ -467,11 +476,10 @@ function AgentsInner() {
           >
             <Button variant="outline" onClick={() => { setRecordsFor({ agentNo: "", agentName: "" }); setRecPage(1); }}>全部划拨流水</Button>
           </Toolbar>
-          {/* 权限降级显式提示，不静默隐藏——静默隐藏会让人以为功能坏了 */}
+          {/* 权限降级显式提示，不静默隐藏——静默隐藏会让人以为功能坏了。
+              句式与权限码的排布交给 ReadOnlyNotice，手写会各页各一套（规范 §13） */}
           {!canAssign && (
-            <div className="mb-4 rounded-field bg-muted px-3.5 py-2 text-sm text-muted-foreground">
-              仅可查看：当前角色无划拨权限（agent:scope:assign），可查看归属汇总与划拨流水
-            </div>
+            <ReadOnlyNotice what="划拨" perm="agent:scope:assign" note="可查看归属汇总与划拨流水" />
           )}
           <DataTable rowKey={(a: AgentAssignment) => a.agentNo} columns={assignCols} rows={assign.data?.list} loading={assign.isLoading}
             empty="没有匹配的代理商——划拨以代理商为单位进行，先在「代理商档案」建档，或换个关键词" />
@@ -480,9 +488,16 @@ function AgentsInner() {
       {tab === "performance" && (
         <>
           <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索代理编号 / 名称"
-            onExport={exportIf(exportPerformance, performance.data?.list?.length)} />
+            onExport={exportIf(exportPerformance, performance.data?.list?.length)}>
+            <FilterSelect
+              value={period}
+              onChange={(v) => { setPeriod(v as ReportPeriod); setPage(1); }}
+              options={REPORT_PERIODS.map((x) => ({ value: x.value, label: x.label }))}
+              aria-label="按统计周期筛选"
+            />
+          </Toolbar>
           <DataTable rowKey={(a: AgentPerformance) => a.agentNo} columns={perfCols} rows={performance.data?.list} loading={performance.isLoading}
-            empty="暂无绩效数据——代理名下设备需先产生订单，次日汇总后才会出现在此" />
+            empty={`${periodLabel(period)}内没有绩效数据——统计截至昨日（T+1），代理名下站点需先产生订单；可换更长周期，或先在「设备/点位划拨」把资产划给代理`} />
         </>
       )}
       {tab === "accounts" && (

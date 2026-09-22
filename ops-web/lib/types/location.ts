@@ -21,6 +21,16 @@ export interface Site extends Archivable {
   cabinetCount: number;
   status: "ACTIVE" | "PAUSED";
 }
+
+/**
+ * 站点坐标的可信窗口（SSOT）：抽屉里的提示文案与 mock 落库校验共用一份。
+ *
+ * 为什么要有窗口而不是只判 ±90/±180：经纬度写反（55, 25）在全球范围里完全合法，
+ * 但会把点扔到印度洋，地图上表现为「站点凭空消失」，是最难查的一类脏数据。
+ * 窗口 = 当前运营国家（UAE）的外接矩形，扩国家时改这里一处。
+ */
+export const SITE_COORD_BOUNDS = { latMin: 22, latMax: 27, lngMin: 51, lngMax: 57 } as const;
+
 /**
  * 站点内的投放点位（Site → SitePoint → 机柜）。
  *
@@ -54,17 +64,84 @@ export interface Contract {
   startAt: string;
   endAt: string;
   status: "ACTIVE" | "EXPIRED";
+  /** 合同扫描件。内嵌而非另开列表接口：一份合同的附件个数是个位数，单独分页没有意义。 */
+  attachments: ContractAttachment[];
+}
+
+/**
+ * 合同附件（扫描件）元数据。
+ *
+ * **拍板点 #3：mock 阶段做假上传** —— 只存文件名 + 大小，字节流不传、不读。
+ * 所以这里故意没有 `url` / `storageKey`：接后端时由服务端返回对象存储地址再补字段，
+ * 前端先编一个假地址的话，「点开看不了」会比「明确没有下载入口」更难查。
+ */
+export interface ContractAttachment {
+  attachNo: string;
+  fileName: string;
+  size: number; // 字节；由 File.size 直取，不做换算，展示层再格式化
+  uploadedBy: string;
+  uploadedAt: string;
+}
+/**
+ * 附件限制（SSOT）：抽屉的 `accept` 属性与提示文案、mock 落库校验共用一份。
+ * 分开写会出现「input 不让选、但接口收」或反过来——两种都会被当成 bug 报上来。
+ */
+export const ATTACH_EXTS = ["pdf", "jpg", "jpeg", "png"] as const;
+/** 单份上限 10MB：合同扫描件超过这个量级基本是没压缩的整本 PDF，先挡住而不是让它进库。 */
+export const ATTACH_MAX_SIZE = 10 * 1024 * 1024;
+
+/** 上传入参。`uploadedBy` 留空由服务端取当前登录人（与流转留痕的 operator 同口径）。 */
+export interface ContractAttachmentReq {
+  fileName: string;
+  size: number;
+  uploadedBy?: string;
 }
 
 // —— 场所 · 待建功能补全（ops 域）——
+
+/** 线索阶段取值域（SSOT）：页面徽标/筛选、mock 校验、跟进记录的阶段快照共用一份。 */
+export const LEAD_STAGES = ["NEW", "CONTACTED", "NEGOTIATING", "SIGNED", "LOST"] as const;
+export type LeadStage = (typeof LEAD_STAGES)[number];
+
 export interface Lead {
   leadNo: string;
   venueName: string;
   contact: string;
-  stage: "NEW" | "CONTACTED" | "NEGOTIATING" | "SIGNED" | "LOST";
+  stage: LeadStage;
   owner: string;
   expectSites: number;
+  /** 最后一次跟进时间 —— 与 `leadFollowUps` 里最新一条的 `createdAt` 必须一致（列表按它排序）。 */
   updatedAt: string;
+}
+
+/** 跟进方式。后端尚无此表，取值域由前端先定（见 contracts/location.ts 的缺口标注）。 */
+export const LEAD_FOLLOW_CHANNELS = ["CALL", "VISIT", "WHATSAPP", "EMAIL", "OTHER"] as const;
+export type LeadFollowChannel = (typeof LEAD_FOLLOW_CHANNELS)[number];
+
+/**
+ * 线索跟进记录（append-only 流水，对应设想中的 `loc_lead_follow_up`）。
+ *
+ * 阶段快照记 `fromStage`/`toStage` 而不是只记「当时阶段」：CRM 里真正要回答的问题是
+ * **哪一次跟进推动了阶段变化**，只存单值的话时间线上看不出推进点。
+ */
+export interface LeadFollowUp {
+  followNo: string;
+  leadNo: string;
+  channel: LeadFollowChannel;
+  fromStage: LeadStage | null; // 首条建档跟进没有来源阶段
+  toStage: LeadStage;
+  owner: string;
+  content: string;
+  nextAt: string | null; // 下次跟进计划日（YYYY-MM-DD），空=未约
+  createdAt: string;
+}
+/** 记一条跟进。`stage` 不传=只留痕不动阶段；传了且与当前不同则同时推进线索阶段。 */
+export interface LeadFollowUpReq {
+  content: string;
+  channel: LeadFollowChannel;
+  stage?: LeadStage;
+  owner?: string;
+  nextAt?: string;
 }
 export interface SiteAnalysis {
   siteNo: string;
@@ -90,12 +167,44 @@ export interface VenueOnboarding {
 }
 
 // —— 站点生命周期管理（场地域 · P3）——
+
+/** 阶段取值域（SSOT）：与后端 `SiteLifecycleServiceImpl.STAGES`、[db-design §3.4] 逐字一致。 */
+export const SITE_STAGES = ["PROSPECTING", "SIGNED", "LIVE", "ACTIVE", "CHURNED", "CLOSED"] as const;
+export type SiteStage = (typeof SITE_STAGES)[number];
+
 export interface SiteLifecycle {
   siteNo: string;
   siteName: string;
-  stage: "PROSPECTING" | "SIGNED" | "LIVE" | "ACTIVE" | "CHURNED" | "CLOSED";
+  stage: SiteStage;
   stageAt: string;
   owner: string;
   currency: string;
   gmvLtm: number; // 近 12 月 GMV
 }
+
+/**
+ * 阶段流转入参，镜像后端 `StageChangeReq`。
+ *
+ * `gmvLtm` 是**阶段决策快照**（进入该阶段那一刻的近 12 月 GMV），服务端只落库、不定时回刷；
+ * 留空即沿用上一次的值。页面不传——运营手填一个 GMV 只会污染快照，实时值请看「站点坪效」。
+ */
+export interface SiteStageChangeReq {
+  stage: SiteStage;
+  reason?: string;
+  operator?: string;
+  gmvLtm?: number;
+  currency?: string;
+}
+
+/**
+ * 阶段流转合法性（SSOT）：页面按钮可用性与 mock 校验共用同一份，
+ * 与结算单 `STL_TRANSITIONS`、工单 `WO_TRANSITIONS` 同一个位置、同一套用法。
+ *
+ * 但**故意不是一张单向状态机图**：后端 `SiteLifecycleServiceImpl.changeStage` 写明
+ * [db-design §9A] 只给 `ord_rent`/`wo_order`/`dev_*` 三处定稿了状态机，门店生命周期不在其列；
+ * 现实里「CHURNED 的店重新签回来」「CLOSED 复开」都是正常业务，硬编一条链会当场挡住合法操作。
+ * 前端若自己加严，就会出现「接口能做、按钮不给点」的假约束——比放开更难查。
+ * 因此这里与后端保持完全一致：只排掉「目标 = 当前」这一种非法，其余交给留痕（每次流转必写 log）。
+ */
+export const nextSiteStages = (from: SiteStage): SiteStage[] => SITE_STAGES.filter((s) => s !== from);
+export const canSiteStageTransition = (from: SiteStage, to: SiteStage) => nextSiteStages(from).includes(to);

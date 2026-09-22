@@ -2,7 +2,7 @@
 // 端点前缀：多数在 /api/user/**（营销与 C 端用户同库），广告位在 /api/ops/**，公告在 /api/ops/marketing/**（沿用现状）。
 import { client } from "../http-client";
 import type { MarketingApi } from "../contracts/marketing";
-import type { PageQ, ArchiveQ, CouponIssueQ } from "../query";
+import type { PageQ, ArchiveQ, CouponIssueQ, CampaignQ , ReportQ } from "../query";
 
 export const marketingHttp: MarketingApi = {
   listCoupons: (q?: ArchiveQ) => client.get("/api/user/coupons", q),
@@ -13,13 +13,25 @@ export const marketingHttp: MarketingApi = {
   listCouponIssueRecords: (q?: CouponIssueQ) => client.get("/api/user/coupon-issue-records", q),
 
   // 营销扩展
-  listCampaigns: (q?: PageQ) => client.get("/api/user/campaigns", q),
+  // status 后端 GET /api/user/campaigns 已支持（与 kind 同批入参），无需后端改动
+  listCampaigns: (q?: CampaignQ) => client.get("/api/user/campaigns", q),
   listPushMessages: (q?: PageQ) => client.get("/api/user/push-messages", q),
   listReferrals: (q?: PageQ) => client.get("/api/user/referrals", q),
   listAdSlots: (q?: PageQ) => client.get("/api/ops/ad-slots", q),
   listAdCampaigns: (q?: PageQ) => client.get("/api/user/ad-campaigns", q),
-  listAdDeliveries: (q?: PageQ) => client.get("/api/user/ad-deliveries", q),
+  listAdDeliveries: (q?: ReportQ) => client.get("/api/user/ad-deliveries", q),
+  // ⚠️ 后端缺口：广告投放动作端点不存在（MarketingController 只有 ad-campaigns 的增查）。
+  //    路径按现有 `/{no}/{action}` 约定先占位；后端补齐时状态机校验必须在服务端做。
+  transitionAdCampaign: (adNo, action) => client.post(`/api/user/ad-campaigns/${adNo}/${action}`),
+  // ⚠️ 后端缺口：邀请奖励规则无端点（MarketingController 只有 referrals 只读列表）。
+  listReferralRules: (q?: PageQ) => client.get("/api/user/referral-rules", q),
+  saveReferralRule: (x) => client.post(x.ruleNo ? `/api/user/referral-rules/${x.ruleNo}` : "/api/user/referral-rules", x),
   saveCampaign: (x) => client.post(x.campaignNo ? `/api/user/campaigns/${x.campaignNo}` : "/api/user/campaigns", x),
+  // ⚠️ 后端缺口：活动只有 GET /campaigns 与 POST /campaigns[/{no}] 两个 upsert
+  // （MarketingController:113-134，权限码 marketing:campaign:read / :update），**无启停动作端点**。
+  // 不退化成「upsert 里传 status」：那等于把状态机搬到客户端，前端改个字段就能复活已结束的活动。
+  // 待后端补 POST /api/user/campaigns/{no}/{action}（action ∈ start|pause|end，挂 marketing:campaign:update）。
+  transitionCampaign: (no, action) => client.post(`/api/user/campaigns/${no}/${action}`, {}),
   savePushMessage: (x) => client.post(x.pushNo ? `/api/user/push-messages/${x.pushNo}` : "/api/user/push-messages", x),
   // 幂等键随 body 走（同 order 域退款），后端按 (pushNo, idempotencyKey) 去重
   sendPushMessage: (no, x) => client.post(`/api/user/push-messages/${no}/send`, x),

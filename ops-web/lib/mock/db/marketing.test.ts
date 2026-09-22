@@ -5,12 +5,16 @@
 //  ① 发放真的改库存并留痕（不是只弹个 toast）；② 超发 / 已下线 / 已过期一律拒绝；
 //  ③ 推送状态机强制，已发送是终态；④ 发送**必须带幂等键**，同键第二次拒绝。
 import { describe, expect, it } from "vitest";
+// 状态机 SSOT 在 types 层：按钮派生与本层校验共用同一份（见 AD_CAMPAIGN_TRANSITIONS）
+import { adWindowPassed, adActionAllowed, adCampaignActions } from "../../types";
 import {
   coupons, couponIssueRecords, issueCoupon, listCouponIssueRecords, CouponIssueError,
   pushMessages, savePushMessage, sendPushMessage, transitionPush, PushError,
   resolveAudience, AudienceError,
-} from "./marketing";
-import { couponRemaining, couponExpired } from "../../types";
+  campaigns, listCampaigns, saveCampaign, transitionCampaign, CampaignError,
+ adCampaigns, transitionAdCampaign, saveReferralRule,} from "./marketing";
+import { couponRemaining, couponExpired, campaignActions, campaignWindowPassed, CAMPAIGN_TRANSITIONS } from "../../types";
+import type { Campaign, CampaignAction, CampaignStatus } from "../../types";
 import { cUsers, members, consumerSegments } from "./user";
 
 /** 取一张当前可发放的券（ACTIVE / 未过期 / 有剩余），每个用例各取一张避免互相污染。 */
@@ -201,5 +205,196 @@ describe("推送触达发送", () => {
   it("标题 / 正文为空不给发", () => {
     const empty = savePushMessage({ title: "有标题没正文", content: "", audienceType: "ALL" });
     expect(() => sendPushMessage(empty.pushNo, { idempotencyKey: "K-EMPTY" })).toThrow(/标题与内容不能为空/);
+  });
+});
+
+// ============================================================================
+// 活动启停（F2 补：缺启停动作）
+// 要钉的不是「能启动」这种顺风路径，而是四件不许发生的事：
+//  ① 已结束（终态）被复活；② 窗口已过还能启动；③ 从没启动过的被暂停；
+//  ④ 编辑表单塞 status 绕过上面三道闸门。
+// 另外钉住「页面按钮可用性」与「服务端拒绝」同源：campaignActions 说不行的，
+// transitionCampaign 必须抛；说行的，必须不抛。两边分叉就是「按钮亮着点了报错」。
+// ============================================================================
+const ALL_ACTIONS = Object.keys(CAMPAIGN_TRANSITIONS) as CampaignAction[];
+/** 种子活动号在**任何夹具创建之前**取快照——否则下面的种子覆盖断言会把夹具算进去。 */
+const SEED_NOS = campaigns.map((c) => c.campaignNo);
+const days = (d: number) => new Date(Date.now() + d * 86400_000).toISOString();
+/** 造一条新活动（一律 DRAFT），endDays < 0 即窗口已过。 */
+const fresh = (name: string, endDays = 30) =>
+  saveCampaign({ name, kind: "满减", rule: "满10减3", startAt: days(-1), endAt: days(endDays) });
+/** 构造指定状态：直接写字段是**测试夹具**手段，只为凑出四种起始态，被测的是 transitionCampaign。 */
+const at = (status: CampaignStatus, endDays = 30) => {
+  const c = fresh(`夹具-${status}-${endDays}`, endDays);
+  c.status = status;
+  return c;
+};
+
+describe("活动启停", () => {
+  it("新建一律落 DRAFT，且表单塞 status 无效（状态归状态机独占）", () => {
+    const c = saveCampaign({ name: "伪造进行中", kind: "满减", rule: "x", startAt: days(-1), endAt: days(30), status: "RUNNING" });
+    expect(c.status).toBe("DRAFT");
+    // 编辑同样剥离：已结束的活动不能靠改字段复活
+    const ended = at("ENDED");
+    saveCampaign({ campaignNo: ended.campaignNo, name: "改个名", status: "RUNNING" });
+    expect(campaigns.find((x) => x.campaignNo === ended.campaignNo)!.status).toBe("ENDED");
+  });
+
+  it("启动 / 暂停可来回：DRAFT → RUNNING → PAUSED → RUNNING（PAUSED 不是终态）", () => {
+    const c = fresh("正常启停");
+    expect(transitionCampaign(c.campaignNo, "start").status).toBe("RUNNING");
+    expect(transitionCampaign(c.campaignNo, "pause").status).toBe("PAUSED");
+    expect(transitionCampaign(c.campaignNo, "start").status).toBe("RUNNING");
+  });
+
+  it("已结束是终态：不给任何动作按钮，三个动作全部拒绝", () => {
+    const c = at("ENDED");
+    expect(campaignActions(c)).toEqual([]);
+    for (const a of ALL_ACTIONS) {
+      expect(() => transitionCampaign(c.campaignNo, a)).toThrow(CampaignError);
+      expect(() => transitionCampaign(c.campaignNo, a)).toThrow(/不允许执行/);
+    }
+    expect(c.status).toBe("ENDED"); // 被拒的行毫发无伤
+  });
+
+  it("窗口已过不可启动，但仍可暂停 / 结束（否则过期的进行中活动收不了尾）", () => {
+    const draft = at("DRAFT", -3);
+    expect(campaignWindowPassed(draft)).toBe(true);
+    expect(campaignActions(draft)).toEqual([]); // DRAFT 只有 start 一条边，窗口过了就没按钮
+    expect(() => transitionCampaign(draft.campaignNo, "start")).toThrow(/已过，不可启动/);
+    expect(draft.status).toBe("DRAFT");
+
+    const paused = at("PAUSED", -5);
+    expect(() => transitionCampaign(paused.campaignNo, "start")).toThrow(/已过，不可启动/);
+    expect(campaignActions(paused)).toEqual(["end"]); // 收尾必须留着
+    expect(transitionCampaign(paused.campaignNo, "end").status).toBe("ENDED");
+
+    const running = at("RUNNING", -7);
+    expect(campaignActions(running)).toEqual(["pause", "end"]);
+    expect(transitionCampaign(running.campaignNo, "pause").status).toBe("PAUSED");
+  });
+
+  it("没启动过的（DRAFT）不能暂停，也不能直接结束", () => {
+    const c = fresh("草稿不能暂停");
+    expect(() => transitionCampaign(c.campaignNo, "pause")).toThrow(/当前状态「DRAFT」不允许执行「暂停」/);
+    expect(() => transitionCampaign(c.campaignNo, "end")).toThrow(/不允许执行「结束」/);
+    expect(c.status).toBe("DRAFT");
+  });
+
+  it("活动不存在直接抛错", () => {
+    expect(() => transitionCampaign("CMP000", "start")).toThrow(/不存在/);
+  });
+
+  it("页面按钮可用性与服务端拒绝同源（四种状态 × 窗口内/外，逐个对照）", () => {
+    const statuses: CampaignStatus[] = ["DRAFT", "RUNNING", "PAUSED", "ENDED"];
+    for (const s of statuses) {
+      for (const endDays of [30, -3]) {
+        for (const a of ALL_ACTIONS) {
+          const row = at(s, endDays);
+          const allowed = campaignActions(row).includes(a);
+          if (allowed) {
+            expect(transitionCampaign(row.campaignNo, a).status, `${s}/${endDays}/${a}`)
+              .toBe(CAMPAIGN_TRANSITIONS[a].to);
+          } else {
+            expect(() => transitionCampaign(row.campaignNo, a), `${s}/${endDays}/${a}`).toThrow(CampaignError);
+            expect(row.status, `${s}/${endDays}/${a}`).toBe(s);
+          }
+        }
+      }
+    }
+  });
+
+  it("状态筛选能把暂停的活动单独捞出来", () => {
+    const c = fresh("待暂停");
+    transitionCampaign(c.campaignNo, "start");
+    transitionCampaign(c.campaignNo, "pause");
+    const paused = listCampaigns({ status: "PAUSED", size: 200 }).list;
+    expect(paused.length).toBeGreaterThan(0);
+    expect(paused.every((x: Campaign) => x.status === "PAUSED")).toBe(true);
+    expect(paused.some((x: Campaign) => x.campaignNo === c.campaignNo)).toBe(true);
+  });
+
+  it("种子数据覆盖到四种状态与「窗口已过」（否则这几条闸门在页面上根本演示不出来）", () => {
+    const seeds = campaigns.filter((x) => SEED_NOS.includes(x.campaignNo));
+    for (const s of ["DRAFT", "RUNNING", "PAUSED", "ENDED"] as CampaignStatus[]) {
+      expect(seeds.some((x) => x.status === s), s).toBe(true);
+    }
+    expect(seeds.some((x) => campaignWindowPassed(x))).toBe(true);
+  });
+});
+
+// —— 广告投放动作（S9）——
+// 动作挂在**广告活动**上而不是「投放与曝光」：后者是按天回传的曝光事实行，没有生命周期。
+// 与营销活动的状态机刻意分开（广告要对广告主结算，暂停即停止计费）。
+describe("广告投放动作", () => {
+  const anyDraft = () => adCampaigns.find((a) => a.status === "DRAFT" && !adWindowPassed(a))!;
+
+  it("上线：DRAFT → RUNNING", () => {
+    const a = anyDraft();
+    expect(transitionAdCampaign(a.adNo, "launch").status).toBe("RUNNING");
+  });
+
+  it("非法迁移被拒：ENDED 是终态，三个动作都不行", () => {
+    const a = adCampaigns.find((x) => x.status === "DRAFT")!;
+    transitionAdCampaign(a.adNo, "stop");
+    for (const k of ["launch", "pause", "stop"] as const) {
+      expect(() => transitionAdCampaign(a.adNo, k)).toThrow();
+    }
+    expect(adCampaignActions(a)).toEqual([]);   // 终态不出按钮
+  });
+
+  it("窗口已过只拦「上线」，不拦「下线」—— 否则过期的 RUNNING 广告永远收不了尾", () => {
+    const past = adCampaigns.find((a) => adWindowPassed(a));
+    if (!past) return;
+    expect(adActionAllowed(past, "launch")).toBe(false);
+    if (past.status === "RUNNING") expect(adActionAllowed(past, "stop")).toBe(true);
+  });
+
+  it("按钮集合与 mock 校验同源：adCampaignActions 允许的动作必然不抛", () => {
+    for (const a of adCampaigns) {
+      for (const k of adCampaignActions(a)) {
+        const before = a.status;
+        expect(() => transitionAdCampaign(a.adNo, k)).not.toThrow();
+        a.status = before;   // 还原，避免污染后续用例
+      }
+    }
+  });
+});
+
+// —— 邀请奖励规则（S9）——
+// 这几条错了都是真金白银，故校验必须在 mock 层（表单能被绕过）。
+describe("邀请奖励规则", () => {
+  const base = () => ({
+    name: "测试规则", rewardTo: "BOTH" as const, rewardAmount: 5, currency: "AED",
+    trigger: "FIRST_ORDER" as const, maxPerInviter: 3,
+    startAt: "2027-01-01T00:00:00Z", endAt: "2027-02-01T00:00:00Z", status: "DISABLED" as const,
+  });
+
+  it("奖励金额必须 > 0（0 元规则等于挂着一个永不发奖的活动）", () => {
+    expect(() => saveReferralRule({ ...base(), rewardAmount: 0 })).toThrow(/大于 0/);
+    expect(() => saveReferralRule({ ...base(), rewardAmount: -1 })).toThrow();
+  });
+
+  it("结束必须晚于开始（窗口为空的规则永不生效，但状态会显示生效）", () => {
+    expect(() => saveReferralRule({ ...base(), startAt: "2027-03-01T00:00:00Z", endAt: "2027-02-01T00:00:00Z" }))
+      .toThrow(/晚于/);
+  });
+
+  it("每人上限不能为负（0 是「不限」的约定值，不是非法值）", () => {
+    expect(() => saveReferralRule({ ...base(), maxPerInviter: -1 })).toThrow();
+    expect(() => saveReferralRule({ ...base(), maxPerInviter: 0 })).not.toThrow();
+  });
+
+  it("同一时间窗只允许一条 ACTIVE —— 重叠时一次邀请该发几笔无法回答", () => {
+    // RR001 已是 ACTIVE 且覆盖 2026 下半年
+    expect(() => saveReferralRule({
+      ...base(), status: "ACTIVE", startAt: "2026-08-01T00:00:00Z", endAt: "2026-09-01T00:00:00Z",
+    })).toThrow(/重叠/);
+  });
+
+  it("窗口不重叠的 ACTIVE 规则可以存", () => {
+    const r = saveReferralRule({ ...base(), status: "ACTIVE", startAt: "2028-01-01T00:00:00Z", endAt: "2028-02-01T00:00:00Z" });
+    expect(r.ruleNo).toMatch(/^RR/);
+    expect(r.status).toBe("ACTIVE");
   });
 });

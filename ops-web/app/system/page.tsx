@@ -12,6 +12,8 @@ import { DataTable, type Column, type SortDir } from "@/components/ui/data-table
 import { Drawer, Field } from "@/components/ui/drawer";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
+import { Tree, type TreeNode } from "@/components/ui/tree";
+import { Notice } from "@/components/ui/notice";
 import { EnabledBadge } from "@/components/status";
 import { ReadOnlyNotice } from "@/components/read-only-notice";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +29,7 @@ import { useCan } from "@/lib/use-can";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
 import { exportCsv } from "@/lib/export-csv";
-import type { Vendor, AccessMode, NotifyTemplate, DictEntry, Region, SysParam, OpenApiApp, MarketCountry, PaymentChannel, PageResult } from "@/lib/types";
+import type { Vendor, AccessMode, NotifyTemplate, DictEntry, Region, RegionNode, SysParam, OpenApiApp, MarketCountry, PaymentChannel, PageResult, VendorProbeResult } from "@/lib/types";
 import type {
   NotifyLog, NotifyBlacklist, LoginSetting, AppVersion, BankEntry, ProblemEntry, TaxSetting,
   WithdrawRule, ReservationRule, BillingDefaultRule,
@@ -59,6 +61,8 @@ const TABS = [
 const MODE_LABEL: Record<AccessMode, string> = { TCP: "TCP 私有协议", MQTT: "MQTT 直连", HTTP_API: "HTTP 云对接" };
 const CHANNEL_LABEL: Record<NotifyTemplate["channel"], string> = { SMS: "短信", EMAIL: "邮件", PUSH: "推送", WHATSAPP: "WhatsApp" };
 const LANG_LABEL: Record<NotifyTemplate["lang"], string> = { ar: "阿拉伯语", en: "英语" };
+// 地区库定死三级：国家 → 城市/酋长国 → 商圈。层级名比数字 1/2/3 更能说明"这一层是什么"
+const REGION_LEVEL_LABEL: Record<number, string> = { 1: "国家", 2: "城市 / 酋长国", 3: "商圈" };
 
 const NOTIFY_FIELDS: FieldDef[] = [
   { key: "templateNo", label: "模板号", readOnlyOnEdit: true, placeholder: "留空自动生成" },
@@ -66,6 +70,10 @@ const NOTIFY_FIELDS: FieldDef[] = [
   { key: "channel", label: "渠道", type: "select", options: [{ value: "SMS", label: "短信" }, { value: "EMAIL", label: "邮件" }, { value: "PUSH", label: "推送" }, { value: "WHATSAPP", label: "WhatsApp" }] },
   { key: "lang", label: "语言", type: "select", options: [{ value: "ar", label: "阿拉伯语" }, { value: "en", label: "英语" }] },
   { key: "status", label: "状态", type: "select", options: [{ value: "ENABLED", label: "启用" }, { value: "DISABLED", label: "停用" }] },
+  // S7：正文与变量此前只在后端有，前端改不了——那样"编辑模板"其实只是改元数据，预览也无从谈起
+  { key: "scene", label: "场景键", placeholder: "OTP / RENT_OK / RETURN_REMIND" },
+  { key: "content", label: "正文", type: "textarea", rows: 3, maxLength: 300, placeholder: "{{userName}}，验证码 {{code}}", help: "变量写作 {{name}}，与下方「变量名」保持一致" },
+  { key: "params", label: "变量名（逗号分隔）", placeholder: "userName,code", help: "预览/试发按此列出待填变量；漏声明的变量会被当成普通文字发出去" },
 ];
 
 const DICT_FIELDS: FieldDef[] = [
@@ -77,12 +85,18 @@ const DICT_FIELDS: FieldDef[] = [
   { key: "enabled", label: "启用", type: "switch" },
 ];
 
-const REGION_FIELDS: FieldDef[] = [
-  { key: "regionId", label: "区域 ID", readOnlyOnEdit: true, placeholder: "留空自动生成" },
-  { key: "name", label: "名称", placeholder: "迪拜" },
-  { key: "parent", label: "上级区域", placeholder: "阿联酋" },
-  { key: "level", label: "层级", type: "number" },
-  { key: "cityCount", label: "城市数", type: "number" },
+/**
+ * 地区库表单（S6）。**层级与上级名称都不给填**：选定上级后由 parentId 推出 level 与 parent，
+ * 手填必然出现「level=3 但挂在国家下」这类自相矛盾的行，而树是靠这两个字段画出来的。
+ */
+const regionFields = (options: { value: string; label: string }[]): FieldDef[] => [
+  { key: "regionId", label: "区域 ID", readOnlyOnEdit: true, placeholder: "如 AE-RK（留空自动生成）" },
+  { key: "name", label: "名称", required: true, maxLength: 40, placeholder: "哈伊马角" },
+  {
+    key: "parentId", label: "上级区域", type: "select", options,
+    help: "留空 = 顶级（国家）；层级与上级名称按此自动推出，不用手填",
+  },
+  { key: "cityCount", label: "城市数", type: "number", min: 0 },
 ];
 
 const PARAM_FIELDS: FieldDef[] = [
@@ -146,6 +160,21 @@ const BANK_CURRENCY_OPTIONS = ["AED", "SAR", "QAR", "KWD", "EGP"].map((c) => ({ 
 const LOG_SCENE_HINT = "OTP / 借出 / 归还 / 扣费 / 告警";
 
 // —— §10 触达拉黑 ——
+// 发送结果。原先是内联 ternary：颜色是「成功/失败」的唯一线索（§11.4），
+// 且筛选项文案要另抄一份 —— 收进 StatusMap 后徽标与筛选同源。
+const LOG_STATUS: StatusMap<NotifyLog["status"]> = {
+  SENT: { label: "已发送", tone: "success" },
+  FAILED: { label: "发送失败", tone: "danger" },
+};
+// 拉黑渠道：ALL 用 danger 是有意的 —— 「全渠道拉黑」比单渠道影响面大一档，
+// 需要在密集表格里一眼看出来。文案仍由 label 承载，不靠颜色单独表意。
+const BL_CHANNEL_STATUS: StatusMap<NotifyBlacklist["channel"]> = {
+  SMS: { label: "短信", tone: "outline" },
+  EMAIL: { label: "邮件", tone: "outline" },
+  PUSH: { label: "Push", tone: "outline" },
+  WHATSAPP: { label: "WhatsApp", tone: "outline" },
+  ALL: { label: "全渠道", tone: "danger" },
+};
 const BL_CHANNEL: Record<NotifyBlacklist["channel"], string> = { SMS: "短信", EMAIL: "邮件", PUSH: "Push", WHATSAPP: "WhatsApp", ALL: "全渠道" };
 const BL_REASON: StatusMap<NotifyBlacklist["reason"]> = {
   USER_OPT_OUT: { label: "用户退订", tone: "muted" },
@@ -452,6 +481,21 @@ function SystemInner() {
   });
   function openVendor(v: Vendor) { setEdit(v); setForm(v); }
 
+  // —— S7 供应商连通性测试：探测不改配置，结果落抽屉（一句话结论 + 原始信息）——
+  // 探测权限用 device:vendor:read 而非 :config —— 排障是运维日常，不该要改配置的权。
+  const canVendorProbe = allow("device:vendor:read");
+  const [probe, setProbe] = useState<VendorProbeResult | null>(null);
+  const [probingCode, setProbingCode] = useState<string | null>(null);
+  const testVendor = useMutation({
+    mutationFn: (code: string) => api.testVendorConnectivity(code),
+    onSuccess: (r) => {
+      setProbe(r);
+      // 失败结论也用 success 提示条？不 —— 结论本身要带情绪，否则运维会以为"测过就是通了"
+      if (r.ok) notify.success(`${r.vendorCode} ${r.message}`); else notify.error(`${r.vendorCode} 探测失败：${r.message}`);
+    },
+    onSettled: () => setProbingCode(null),
+  });
+
   // —— 编辑门控与表单 state ——
   const canNotify = allow("system:notify_template:update");
   const canDict = allow("system:dict:update");
@@ -502,6 +546,53 @@ function SystemInner() {
   const [logDetail, setLogDetail] = useState<NotifyLog | null>(null);
   const { confirm, dialog } = useConfirm();
 
+  // —— S7 模板预览 / 试发：一个抽屉两件事 ——
+  // 变量取值本地持有，改一个字就重新渲染预览；试发的幂等键随抽屉生成（同一次打开只发得出一条）。
+  const [previewFor, setPreviewFor] = useState<NotifyTemplate | null>(null);
+  const [previewVars, setPreviewVars] = useState<Record<string, string>>({});
+  const [testTarget, setTestTarget] = useState("");
+  const [testKey, setTestKey] = useState("");
+  const previewQ = useQuery({
+    queryKey: ["sys", "tpl-preview", previewFor?.templateNo, previewVars],
+    queryFn: () => api.previewNotifyTemplate(previewFor!.templateNo, previewVars),
+    enabled: !!previewFor,
+  });
+  const openPreview = (x: NotifyTemplate) => {
+    setPreviewFor(x);
+    setPreviewVars({});
+    setTestTarget("");
+    setTestKey(`TPL-${x.templateNo}-${Date.now()}`);
+  };
+  const testSend = useMutation({
+    mutationFn: (v: { no: string; target: string; idempotencyKey: string }) =>
+      api.testSendNotifyTemplate(v.no, { target: v.target, vars: previewVars, idempotencyKey: v.idempotencyKey }),
+    onSuccess: (l) => {
+      qc.invalidateQueries({ queryKey: ["sys"] });
+      notify.success(`已试发 · 流水号 ${l.logNo} · 计费 ${money(l.cost, l.currency)}（可在「发送记录」查到）`);
+      // 键已烧掉：换一把，否则同一抽屉里再点会被服务端按重复提交拒绝
+      setTestKey(`TPL-${l.templateNo}-${Date.now()}`);
+    },
+  });
+
+  // —— S7 发送记录重发（拍板 #6）：幂等键必带，重发是新增一条，原记录不动 ——
+  const canResend = allow("system:notify_log:resend");
+  const resendLog = useMutation({
+    mutationFn: (v: { logNo: string; idempotencyKey: string }) => api.resendNotifyLog(v.logNo, { idempotencyKey: v.idempotencyKey }),
+    onSuccess: (l) => {
+      qc.invalidateQueries({ queryKey: ["sys"] });
+      notify.success(`已重发 · 新流水号 ${l.logNo}（原记录 ${l.resendOf} 保留）`);
+    },
+  });
+
+  // —— S7 OpenAPI 密钥重置：新 secret 只回掩码，真实值由后端带外交付 ——
+  const resetSecret = useMutation({
+    mutationFn: (appNo: string) => api.resetOpenApiAppSecret(appNo),
+    onSuccess: (a) => {
+      qc.invalidateQueries({ queryKey: ["sys"] });
+      notify.success(`${a.appNo} 密钥已重置为 ${a.appSecretMasked}，旧密钥立即失效`);
+    },
+  });
+
   const onSaved = (setter: (v: null) => void) => () => { qc.invalidateQueries({ queryKey: ["sys"] }); notify.success(t("common.success")); setter(null); };
   const saveNotify = useMutation({ mutationFn: (v: Partial<NotifyTemplate>) => api.saveNotifyTemplate(v), onSuccess: onSaved(setNotifyForm) });
   const saveDict = useMutation({ mutationFn: (v: Partial<DictEntry>) => api.saveDictEntry(v), onSuccess: onSaved(setDictForm) });
@@ -548,15 +639,48 @@ function SystemInner() {
       : tab === "problems" ? api.listProblems({ page, size: SIZE, keyword, category: probCategory, status: probStatus, showArchived })
       : tab === "tax" ? api.listTaxSettings({ page, size: SIZE, keyword })
       : tab === "dict" ? api.listDictEntries({ page, size: SIZE, keyword })
-      : tab === "region" ? api.listRegions({ page, size: SIZE, keyword })
       : tab === "params" ? api.listSysParams({ page, size: SIZE, keyword })
       : tab === "markets" ? api.listMarketCountries({ page, size: SIZE, keyword })
       : api.listOpenApiApps({ page, size: SIZE, keyword }),
     placeholderData: keepPreviousData,
-    enabled: tab !== "vendors" && tab !== "rules",
+    // vendors 非分页、rules 是分区表单、region 已改树（整棵取回）——三者都不走这个分页查询
+    enabled: tab !== "vendors" && tab !== "rules" && tab !== "region",
   });
   // 发送记录页头统计：全量口径（今日发送量 / 失败率 / 今日成本），与当页数据无关。
   const logStats = useQuery({ queryKey: ["sys", "notify-log-stats"], queryFn: () => api.getNotifyLogStats(), enabled: tab === "notify-log" });
+
+  // ——— S6 地区库树形（拍板 #4）———
+  // 树不分页：三级区域一分页就断链（第 2 页的商圈找不到第 1 页的城市当父节点），
+  // 故走独立端点、整棵取回，关键词在前端剪枝（命中节点连同祖先保留，否则命中的叶子会没有落脚处）。
+  const regionTreeQ = useQuery({ queryKey: ["sys", "region-tree"], queryFn: () => api.listRegionTree(), enabled: tab === "region" });
+  const flatRegions = (ns: RegionNode[]): Region[] => ns.flatMap((n) => [n, ...flatRegions(n.children)]);
+  const pruneRegions = (ns: RegionNode[], kw: string): RegionNode[] =>
+    ns.map((n) => ({ ...n, children: pruneRegions(n.children, kw) }))
+      .filter((n) => n.children.length > 0 || `${n.regionId} ${n.name}`.toLowerCase().includes(kw));
+  const regionRoots = regionTreeQ.data ?? [];
+  const shownRegions = keyword.trim() ? pruneRegions(regionRoots, keyword.trim().toLowerCase()) : regionRoots;
+  const regionNodes: TreeNode[] = (function toNodes(ns: RegionNode[]): TreeNode[] {
+    return ns.map((n) => ({
+      key: n.regionId,
+      label: (
+        <span className="flex flex-wrap items-center gap-2">
+          <span className="font-medium">{n.name}</span>
+          <span className="text-xs text-muted-foreground tabular-nums">{n.regionId}</span>
+          <Badge tone="outline">{REGION_LEVEL_LABEL[n.level] ?? `第 ${n.level} 级`}</Badge>
+          {n.cityCount > 0 && <span className="text-xs text-muted-foreground">{n.cityCount} 城</span>}
+        </span>
+      ),
+      extra: canRegion
+        ? <Button size="sm" variant="outline" onClick={() => setRegionForm(n)}>{t("common.edit")}</Button>
+        : undefined,
+      children: toNodes(n.children),
+    }));
+  })(shownRegions);
+  // 上级下拉不列第 3 级：再往下就是第 4 级，而地区库定死三级（国家/城市/商圈）
+  const regionParentOptions = [
+    { value: "", label: "（顶级：国家）" },
+    ...flatRegions(regionRoots).filter((r) => r.level < 3).map((r) => ({ value: r.regionId, label: `${"　".repeat(r.level - 1)}${r.name}（${r.regionId}）` })),
+  ];
 
   const MARKET_STATUS: StatusMap<MarketCountry["status"]> = {
     LIVE: { label: "已开城", tone: "success" },
@@ -597,7 +721,25 @@ function SystemInner() {
     { header: "接入方式", cell: (v) => <Badge tone="outline">{MODE_LABEL[v.accessMode]}</Badge> },
     { header: "设备数", cell: (v) => <span className="tabular-nums">{v.deviceCount}</span> },
     { header: "状态", cell: (v) => <EnabledBadge on={v.status === "ENABLED"} /> },
-    { header: "操作", cell: (v) => allow("device:vendor:config") ? <Button size="sm" variant="outline" onClick={() => openVendor(v)}>配置</Button> : <span className="text-muted-foreground">-</span> },
+    {
+      header: "操作",
+      cell: (v) => (
+        <div className="flex gap-2">
+          {allow("device:vendor:config") && <Button size="sm" variant="outline" onClick={() => openVendor(v)}>配置</Button>}
+          {canVendorProbe && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={testVendor.isPending}
+              onClick={() => { setProbingCode(v.vendorCode); testVendor.mutate(v.vendorCode); }}
+            >
+              {probingCode === v.vendorCode ? "探测中…" : "连通性测试"}
+            </Button>
+          )}
+          {!allow("device:vendor:config") && !canVendorProbe && <span className="text-muted-foreground">-</span>}
+        </div>
+      ),
+    },
   ];
 
   const notifyCols: Column<NotifyTemplate>[] = [
@@ -605,8 +747,18 @@ function SystemInner() {
     { header: "名称", cell: (t) => t.name },
     { header: "渠道", cell: (t) => <Badge tone="outline">{CHANNEL_LABEL[t.channel]}</Badge> },
     { header: "语言", cell: (t) => <span className="text-muted-foreground">{LANG_LABEL[t.lang]}</span> },
-    { header: "状态", cell: (t) => <EnabledBadge on={t.status === "ENABLED"} /> },
-    { header: t("common.actions"), cell: editBtn<NotifyTemplate>(canNotify, setNotifyForm) },
+    { header: "场景", cell: (x) => <span className="text-muted-foreground tabular-nums">{x.scene || "-"}</span> },
+    { header: "状态", cell: (x) => <EnabledBadge on={x.status === "ENABLED"} /> },
+    {
+      header: t("common.actions"),
+      cell: (x) => (
+        <div className="flex gap-2">
+          {canNotify && <Button size="sm" variant="outline" onClick={() => setNotifyForm(x)}>{t("common.edit")}</Button>}
+          {/* 预览只读，不需要写权限：看不见真正会发出去的文案，才是这一页最大的风险 */}
+          <Button size="sm" variant="outline" onClick={() => openPreview(x)}>预览 / 试发</Button>
+        </div>
+      ),
+    },
   ];
 
   const dictCols: Column<DictEntry>[] = [
@@ -619,14 +771,7 @@ function SystemInner() {
     { header: t("common.actions"), cell: editBtn<DictEntry>(canDict, setDictForm) },
   ];
 
-  const regionCols: Column<Region>[] = [
-    { header: "区域 ID", cell: (r) => <span className="font-medium">{r.regionId}</span> },
-    { header: "名称", cell: (r) => r.name },
-    { header: "上级", cell: (r) => <span className="text-muted-foreground">{r.parent || "-"}</span> },
-    { header: "层级", cell: (r) => <span className="tabular-nums">{r.level}</span> },
-    { header: "城市数", cell: (r) => <span className="tabular-nums">{r.cityCount}</span> },
-    { header: t("common.actions"), cell: editBtn<Region>(canRegion, setRegionForm) },
-  ];
+  // 地区库不再有 regionCols：形态改成树（拍板 #4），层级本身就是信息，扁平表格靠「上级」列拼不出来。
 
   const paramCols: Column<SysParam>[] = [
     { header: "参数键", cell: (p) => <span className="font-medium">{p.paramKey}</span> },
@@ -641,10 +786,37 @@ function SystemInner() {
     { header: "应用号", cell: (a) => <span className="font-medium">{a.appNo}</span> },
     { header: "名称", cell: (a) => a.name },
     { header: "AppKey", cell: (a) => <span className="text-muted-foreground tabular-nums">{a.appKey}</span> },
+    // AppSecret 只掩码：真实值仅在重置时由后端带外交付一次，前端永不承载（口径同支付渠道密钥）
+    { header: "AppSecret", cell: (a) => <span className="text-muted-foreground tabular-nums">{a.appSecretMasked}</span> },
     { header: "限流（次/秒）", cell: (a) => <span className="tabular-nums">{a.rateLimit}</span> },
     { header: "状态", cell: (a) => <EnabledBadge on={a.status === "ACTIVE"} /> },
     { header: "创建时间", cell: (a) => <span className="text-muted-foreground">{fmtTime(a.createdAt)}</span> },
-    { header: t("common.actions"), cell: editBtn<OpenApiApp>(canOpenapi, setOpenapiForm) },
+    { header: "最近重置", cell: (a) => a.secretResetAt ? <span className="text-muted-foreground">{fmtTime(a.secretResetAt)}</span> : <span className="text-muted-foreground">未重置</span> },
+    {
+      header: t("common.actions"),
+      cell: (a) => !canOpenapi ? <span className="text-muted-foreground">-</span> : (
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setOpenapiForm(a)}>{t("common.edit")}</Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={resetSecret.isPending}
+            onClick={async () => {
+              const ok = await confirm({
+                title: `重置 ${a.name} 的 AppSecret`,
+                desc: "重置后旧密钥立即失效，该合作方所有在途调用会立刻返回 401，直到对方换上新密钥。新密钥由后端带外交付，页面只显示掩码。",
+                danger: true,
+                confirmText: "确认重置",
+                requireText: a.appNo,
+              });
+              if (ok) resetSecret.mutate(a.appNo);
+            }}
+          >
+            重置密钥
+          </Button>
+        </div>
+      ),
+    },
   ];
 
   // —— §9 发送记录：全渠道 + 计费，目标脱敏，时间/成本可排序 ——
@@ -656,13 +828,37 @@ function SystemInner() {
     { header: "目标（脱敏）", cell: (l) => <span className="tabular-nums">{l.target}</span> },
     { header: "场景", cell: (l) => <span className="text-muted-foreground">{l.scene}</span> },
     { header: "发送时间", sortKey: "sentAt", cell: (l) => <span className="text-muted-foreground">{fmtTime(l.sentAt)}</span> },
-    { header: "状态", cell: (l) => <Badge tone={l.status === "SENT" ? "success" : "danger"}>{l.status === "SENT" ? "已发送" : "发送失败"}</Badge> },
+    { header: "状态", cell: (l) => <StatusBadge map={LOG_STATUS} value={l.status} /> },
     { header: "成本", sortKey: "cost", cell: (l) => <span className="tabular-nums">{money(l.cost, l.currency)}</span> },
+    // 重发来源：让人一眼看出"这条是补发的"，否则同一目标两条成功记录像是系统发了两遍
+    { header: "重发自", cell: (l) => l.resendOf ? <Badge tone="warning">{l.resendOf}</Badge> : <span className="text-muted-foreground">-</span> },
     {
       header: t("common.actions"),
-      cell: (l) => l.status === "FAILED"
-        ? <Button size="sm" variant="outline" onClick={() => setLogDetail(l)}>失败原因</Button>
-        : <span className="text-muted-foreground">-</span>,
+      cell: (l) => l.status !== "FAILED" ? <span className="text-muted-foreground">-</span> : (
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setLogDetail(l)}>失败原因</Button>
+          {/* 只有失败记录能重发：成功记录再发一遍就是重复扣费 + 重复骚扰（拍板 #6）*/}
+          {canResend && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={resendLog.isPending}
+              onClick={async () => {
+                const ok = await confirm({
+                  title: `重发 ${l.logNo}`,
+                  desc: `将按原渠道（${LOG_CHANNEL[l.channel]}）与原目标 ${l.target} 再发一次，计费 ${money(l.cost, l.currency)}。重发会新增一条记录，原记录保留；已退订的目标会被拒绝。`,
+                  danger: true,
+                  confirmText: "确认重发",
+                });
+                // 幂等键在点确认的瞬间生成：整条链路只认这一把键，重复提交由服务端拒绝
+                if (ok) resendLog.mutate({ logNo: l.logNo, idempotencyKey: `RS-${l.logNo}-${Date.now()}` });
+              }}
+            >
+              重发
+            </Button>
+          )}
+        </div>
+      ),
     },
   ];
 
@@ -671,7 +867,7 @@ function SystemInner() {
   const blacklistCols: Column<NotifyBlacklist>[] = [
     { header: "拉黑号", cell: (b) => <span className="font-medium tabular-nums">{b.blockNo}</span> },
     { header: "目标", cell: (b) => <span className="tabular-nums">{b.target}</span> },
-    { header: "渠道", cell: (b) => <Badge tone={b.channel === "ALL" ? "danger" : "outline"}>{BL_CHANNEL[b.channel]}</Badge> },
+    { header: "渠道", cell: (b) => <StatusBadge map={BL_CHANNEL_STATUS} value={b.channel} /> },
     { header: "原因", cell: (b) => <StatusBadge map={BL_REASON} value={b.reason} /> },
     { header: "拉黑时间", cell: (b) => <span className="text-muted-foreground">{fmtTime(b.blockedAt)}</span> },
     { header: "操作人", cell: (b) => <span className="text-muted-foreground">{b.blockedBy}</span> },
@@ -922,14 +1118,16 @@ function SystemInner() {
       )}
       {tab === "region" && (
         <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索区域 ID / 名称"
+          // 导出仍是扁平表（CSV 表达不了树），但导出的是整棵树而非当前页——树本来就不分页
           onExport={() => exportCsv<Region>("地区库", [
             { header: "区域 ID", value: (r) => r.regionId },
             { header: "名称", value: (r) => r.name },
+            { header: "上级 ID", value: (r) => r.parentId ?? "-" },
             { header: "上级", value: (r) => r.parent || "-" },
-            { header: "层级", value: (r) => r.level },
+            { header: "层级", value: (r) => REGION_LEVEL_LABEL[r.level] ?? r.level },
             { header: "城市数", value: (r) => r.cityCount },
-          ], (q.data?.list ?? []) as Region[])}
-          onAdd={canRegion ? () => setRegionForm({ level: 1, cityCount: 0, parent: "" }) : undefined} addLabel="新增地区" />
+          ], flatRegions(shownRegions))}
+          onAdd={canRegion ? () => setRegionForm({ parentId: "", cityCount: 0 }) : undefined} addLabel="新增地区" />
       )}
       {tab === "params" && (
         <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索参数键 / 说明"
@@ -1110,7 +1308,9 @@ function SystemInner() {
         />
       )}
 
-      {/* 权限降级：显式说明"仅可查看 + 缺哪个权限码"，不静默隐藏操作列 */}
+      {/* 权限降级：句式与缺失权限码由 ReadOnlyNotice 统一给出，不静默隐藏操作列 */}
+      {tab === "notify-log" && !canResend && <ReadOnlyNotice what="发送记录重发" perm="system:notify_log:resend" note="失败记录只能看原因，不能补发" />}
+      {tab === "region" && !canRegion && <ReadOnlyNotice what="地区库维护" perm="system:region:update" note="树只可浏览" />}
       {tab === "notify-blacklist" && !canBlacklist && <ReadOnlyNotice what="触达拉黑维护" perm="system:notify_blacklist:update" />}
       {tab === "rules" && !canBizRule && <ReadOnlyNotice what="业务规则修改" perm="system:biz_rule:update" />}
       {tab === "login" && !canLogin && <ReadOnlyNotice what="登录设置修改" perm="system:login_setting:update" />}
@@ -1145,11 +1345,23 @@ function SystemInner() {
       {tab === "payment" && <DataTable rowKey={(c: PaymentChannel) => c.channelCode} columns={paymentCols} rows={q.data?.list as PaymentChannel[]} loading={q.isLoading} empty="暂无支付渠道——未配置渠道时 C 端无法下单支付，请先新增并启用至少一个渠道" />}
       {tab === "notify" && <DataTable rowKey={(t: NotifyTemplate) => t.templateNo} columns={notifyCols} rows={q.data?.list as NotifyTemplate[]} loading={q.isLoading} empty="暂无通知模板——OTP/借还/扣费短信都取自这里，请先新增模板再启用" />}
       {tab === "dict" && <DataTable rowKey={(d: DictEntry) => d.dictNo} columns={dictCols} rows={q.data?.list as DictEntry[]} loading={q.isLoading} empty="暂无字典项——所选分组下还没有枚举值，请新增字典项供下拉与状态展示使用" />}
-      {tab === "region" && <DataTable rowKey={(r: Region) => r.regionId} columns={regionCols} rows={q.data?.list as Region[]} loading={q.isLoading} empty="暂无地区——站点与点位的归属地取自这里，请先建国家/城市层级" />}
+      {/* S6 地区库：三级树。层级/上级由 parentId 推出，故树上不可能出现「层级与位置矛盾」的行 */}
+      {tab === "region" && (
+        <Card className="p-4">
+          <Tree
+            nodes={regionNodes}
+            loading={regionTreeQ.isLoading}
+            collapseFrom={2}
+            empty={keyword.trim()
+              ? "没有匹配的地区——关键词只匹配区域 ID 与名称"
+              : "暂无地区——站点与点位的归属地取自这里，请先建国家，再往下建城市与商圈"}
+          />
+        </Card>
+      )}
       {tab === "params" && <DataTable rowKey={(p: SysParam) => p.paramKey} columns={paramCols} rows={q.data?.list as SysParam[]} loading={q.isLoading} empty="暂无系统参数——超时/重试等全局开关都在这里，未配置时按代码默认值运行" />}
       {tab === "openapi" && <DataTable rowKey={(a: OpenApiApp) => a.appNo} columns={openapiCols} rows={q.data?.list as OpenApiApp[]} loading={q.isLoading} empty="暂无 OpenAPI 应用——还没有合作方接入，需要对外开放接口时在此新增应用并分配 AppKey" />}
       {tab === "markets" && <DataTable rowKey={(m: MarketCountry) => m.countryCode} columns={marketCols} rows={q.data?.list as MarketCountry[]} loading={q.isLoading} empty="暂无国家市场——开城前需先登记国家、币种与合规主体，否则该国无法上线" />}
-      {tab !== "vendors" && tab !== "rules" && q.data && <Pagination page={page} size={SIZE} total={q.data.total} onPage={setPage} />}
+      {tab !== "vendors" && tab !== "rules" && tab !== "region" && q.data && <Pagination page={page} size={SIZE} total={q.data.total} onPage={setPage} />}
 
       {/* 供应商 配置抽屉（保留）*/}
       <Drawer
@@ -1202,12 +1414,22 @@ function SystemInner() {
         onChange={(v) => setDictForm(v as Partial<DictEntry>)}
         onSubmit={() => dictForm && saveDict.mutate(dictForm)} submitting={saveDict.isPending} />
 
-      {/* 地区库 编辑抽屉 */}
+      {/* 地区库 编辑抽屉：level / parent 从 parentId 推出（见 regionFields 注） */}
       <FormDrawer open={!!regionForm} onOpenChange={(o) => !o && setRegionForm(null)}
         titleNew="新增地区" titleEdit={`编辑地区 ${regionForm?.regionId ?? ""}`} isEdit={!!regionForm?.regionId}
-        fields={REGION_FIELDS} value={(regionForm ?? {}) as Record<string, unknown>}
+        fields={regionFields(regionParentOptions)} value={(regionForm ?? {}) as Record<string, unknown>}
         onChange={(v) => setRegionForm(v as Partial<Region>)}
-        onSubmit={() => regionForm && saveRegion.mutate(regionForm)} submitting={saveRegion.isPending} />
+        onSubmit={() => {
+          if (!regionForm) return;
+          const parentId = (regionForm.parentId ?? "") || null;
+          const parent = parentId ? flatRegions(regionRoots).find((r) => r.regionId === parentId) : undefined;
+          if (parentId && !parent) { notify.error("上级区域不存在——请重新选择"); return; }
+          saveRegion.mutate({
+            ...regionForm, parentId,
+            parent: parent?.name ?? "-",
+            level: parent ? parent.level + 1 : 1,
+          });
+        }} submitting={saveRegion.isPending} />
 
       {/* 系统参数 编辑抽屉 */}
       <FormDrawer open={!!paramForm} onOpenChange={(o) => !o && setParamForm(null)}
@@ -1328,7 +1550,7 @@ function SystemInner() {
         <Field label="发送时间">{fmtTime(logDetail?.sentAt)}</Field>
         <Field label="计费">{logDetail ? money(logDetail.cost, logDetail.currency) : "-"}</Field>
         <Field label="失败原因">
-          <div className="rounded-lg bg-muted px-3.5 py-2 text-sm">{logDetail?.failReason ?? "-"}</div>
+          <div className="rounded-card bg-muted px-3.5 py-2 text-sm">{logDetail?.failReason ?? "-"}</div>
         </Field>
         <Field label="下一步">
           <span className="text-muted-foreground">
@@ -1337,7 +1559,90 @@ function SystemInner() {
         </Field>
       </Drawer>
 
-      {/* 统一二次确认弹窗（解除拉黑 / 版本回滚）*/}
+      {/* S7 连通性测试结果：只读抽屉。结论 + 原始信息分开摆——前者给判断，后者给厂商对质 */}
+      <Drawer
+        open={!!probe}
+        onOpenChange={(o) => !o && setProbe(null)}
+        title={`连通性测试 ${probe?.vendorCode ?? ""}`}
+        desc="仅探测，不改任何接入配置"
+        footer={<Button variant="outline" onClick={() => setProbe(null)}>{t("common.cancel")}</Button>}
+      >
+        {probe && (
+          <>
+            <Field label="结论">
+              <Badge tone={probe.ok ? "success" : "danger"}>{probe.ok ? "连通" : "不通"}</Badge>
+            </Field>
+            <Field label="探测目标"><span className="tabular-nums">{probe.endpoint || "-"}</span></Field>
+            <Field label="往返延迟">{probe.ok ? <span className="tabular-nums">{probe.latencyMs} ms</span> : <span className="text-muted-foreground">-</span>}</Field>
+            <Field label="探测时间">{fmtTime(probe.checkedAt)}</Field>
+            <Field label="说明">{probe.message}</Field>
+            <Field label="原始信息">
+              <div className="rounded-card bg-muted px-3.5 py-2 text-sm">{probe.detail}</div>
+            </Field>
+          </>
+        )}
+      </Drawer>
+
+      {/* S7 模板预览 / 试发：改变量即重渲染；试发带幂等键，服务端拒绝重复提交 */}
+      <Drawer
+        open={!!previewFor}
+        onOpenChange={(o) => !o && setPreviewFor(null)}
+        title={previewFor ? `预览 / 试发 ${previewFor.templateNo}` : ""}
+        desc="预览不发送、不计费；试发是真发一条并落进「发送记录」"
+        footer={
+          previewFor && (
+            <>
+              <Button variant="outline" onClick={() => setPreviewFor(null)}>{t("common.cancel")}</Button>
+              {canNotify && (
+                <Button
+                  disabled={testSend.isPending || !testTarget.trim() || !!previewQ.data?.missingVars.length}
+                  onClick={() => previewFor && testSend.mutate({ no: previewFor.templateNo, target: testTarget.trim(), idempotencyKey: testKey })}
+                >
+                  试发一条
+                </Button>
+              )}
+            </>
+          )
+        }
+      >
+        {previewFor && (
+          <>
+            <Field label="渠道 / 语言">
+              <span>{CHANNEL_LABEL[previewFor.channel]} · {LANG_LABEL[previewFor.lang]}</span>
+            </Field>
+            {previewFor.status !== "ENABLED" && <Notice>模板已停用：可以预览，但不能试发（先到编辑抽屉里启用）。</Notice>}
+            {/* 变量逐个给输入框：留空则用示例值兜底，让人先看到成品再决定要不要试发 */}
+            {(previewFor.params ?? "").split(",").map((s) => s.trim()).filter(Boolean).map((name) => (
+              <Field key={name} label={`变量 {{${name}}}`}>
+                <Input
+                  value={previewVars[name] ?? ""}
+                  placeholder={previewQ.data?.vars[name] ?? "（无示例值，必须填）"}
+                  onChange={(e) => setPreviewVars({ ...previewVars, [name]: e.target.value })}
+                />
+              </Field>
+            ))}
+            {previewQ.data?.subject && <Field label="邮件标题">{previewQ.data.subject}</Field>}
+            <Field label="预览">
+              <div className="rounded-card bg-muted px-3.5 py-2 text-sm whitespace-pre-wrap" dir={previewFor.lang === "ar" ? "rtl" : "ltr"}>
+                {previewQ.isLoading ? "渲染中…" : previewQ.data?.rendered}
+              </div>
+            </Field>
+            {!!previewQ.data?.missingVars.length && (
+              <Notice>
+                变量未填全：{previewQ.data.missingVars.join("、")}——带着 {"{{}}"} 发出去是事故，试发已禁用。
+              </Notice>
+            )}
+            <Field label="试发目标（手机号 / 邮箱）">
+              <Input value={testTarget} placeholder="+9715012345678" onChange={(e) => setTestTarget(e.target.value)} />
+            </Field>
+            <Field label="幂等键">
+              <span className="text-muted-foreground tabular-nums">{testKey}</span>
+            </Field>
+          </>
+        )}
+      </Drawer>
+
+      {/* 统一二次确认弹窗（解除拉黑 / 版本回滚 / 重发 / 密钥重置）*/}
       {dialog}
     </div>
   );

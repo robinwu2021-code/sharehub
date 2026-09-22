@@ -400,3 +400,103 @@ describe("异常单种子数据自洽", () => {
     }
   });
 });
+
+// ————————————————————————————————————————————————————————————————
+// 售后「新建」入口（补两个后端早已实现、前端从没调过的 POST）
+//
+// 背景：投诉/退款两张表原先只有列表 + 处置动作，客服**只能处理从别处冒出来的单** ——
+// 电话/线下投诉进不了队列，退款也只能绕订单详情做一次干预（金额还改不了）。
+// 本组钉住三件事：① 号/状态/申请人是服务端决定的，前端说了不算；
+// ② 关联订单必须真实存在、必填项缺一不可；③ 退款**必须带幂等键**，同键第二次不再落单。
+//
+// 注：两个函数住在 ./cs（投诉/退款两张表在那边，order.ts 反向 import 会成环），
+// 但语义属订单售后，故与订单处置的测试放在一起。
+// ————————————————————————————————————————————————————————————————
+import {
+  orderComplaints, refundRecords, createOrderComplaint, createRefund,
+} from "./cs";
+
+describe("代客登记投诉（POST /api/trade/complaints）", () => {
+  it("号 / 提交时间 / 状态由服务端决定，登记后进「待处理」队列", () => {
+    const o = orders[7];
+    const before = orderComplaints.length;
+    const c = createOrderComplaint({
+      orderNo: o.orderNo, userNo: o.cUserNo, issueType: "BILLING_DISPUTE",
+      description: "用户电话反馈只借了 20 分钟却按 2 小时计费",
+    });
+    expect(c.complaintNo).toMatch(/^CPL\d+$/);
+    expect(c.status).toBe("PENDING");
+    expect(c.submittedAt).toBeTruthy();
+    // 处理人 / 结果留空：登记不等于已处理
+    expect(c.handlerName).toBeNull();
+    expect(c.resolution).toBeNull();
+    expect(c.workOrderNo).toBeNull();
+    expect(orderComplaints.length).toBe(before + 1);
+    expect(orderComplaints[0].complaintNo).toBe(c.complaintNo); // 最新在前，列表首页就能看到
+  });
+
+  it("用户号可空：缺省取该订单的下单人（客服现场常常只问到订单号）", () => {
+    const o = orders[9];
+    const c = createOrderComplaint({ orderNo: o.orderNo, userNo: "  ", issueType: "OTHER", description: "机器屏幕不亮" });
+    expect(c.userNo).toBe(o.cUserNo);
+    expect(c.screenshotUrl).toBeNull(); // 电话投诉没有截图
+  });
+
+  it("订单必须真实存在、描述必填 —— 否则拒绝落库", () => {
+    const before = orderComplaints.length;
+    expect(() => createOrderComplaint({ orderNo: "ORD_NOT_EXIST", userNo: "U3001", issueType: "OTHER", description: "x" }))
+      .toThrow(/订单不存在/);
+    expect(() => createOrderComplaint({ orderNo: " ", userNo: "U3001", issueType: "OTHER", description: "x" }))
+      .toThrow(/必须填写关联订单号/);
+    expect(() => createOrderComplaint({ orderNo: orders[0].orderNo, userNo: "U3001", issueType: "OTHER", description: "  " }))
+      .toThrow(/必须填写用户描述/);
+    expect(orderComplaints.length).toBe(before);
+  });
+});
+
+describe("新建退款申请（POST /api/trade/refunds）", () => {
+  const refundOf = (orderNo: string) => refundRecords.filter((r) => r.orderNo === orderNo);
+
+  it("落 PENDING 进审批队列；单号 / 申请人 / 申请时间由服务端回填", () => {
+    const o = orders[11];
+    const r = createRefund({
+      orderNo: o.orderNo, userNo: o.cUserNo, amount: 8.5,
+      reason: "计费争议，按实际时长重算", idempotencyKey: "RF-TEST-1",
+    });
+    expect(r.refundNo).toMatch(/^RFD\d+$/);
+    expect(r.status).toBe("PENDING");
+    expect(r.applicantName).toBeTruthy();
+    expect(r.appliedAt).toBeTruthy();
+    expect(r.amount).toBe(8.5);
+    expect(r.currency).toBe(o.currency); // 币种跟随订单，退款与原收款必须同币种
+    // 未审批未执行：审批人与 PSP 流水号都还是空的
+    expect(r.auditorName).toBeNull();
+    expect(r.psgTxnNo).toBeNull();
+  });
+
+  it("幂等：必须带键，且同一把键第二次返回已有单而不再落新单（重复退款是真实资损）", () => {
+    const o = orders[13];
+    expect(() => createRefund({ orderNo: o.orderNo, userNo: o.cUserNo, amount: 5, reason: "x", idempotencyKey: "  " }))
+      .toThrow(/必须携带幂等键/);
+
+    const first = createRefund({ orderNo: o.orderNo, userNo: o.cUserNo, amount: 5, reason: "未弹出，全额退回", idempotencyKey: "RF-TEST-DUP" });
+    const before = refundRecords.length;
+    // 金额/原因换了也不作数：同键就是同一次点击
+    const again = createRefund({ orderNo: o.orderNo, userNo: o.cUserNo, amount: 99, reason: "改了金额再点一次", idempotencyKey: "RF-TEST-DUP" });
+    expect(again.refundNo).toBe(first.refundNo);
+    expect(again.amount).toBe(5);
+    expect(refundRecords.length).toBe(before);
+    expect(refundOf(o.orderNo).filter((r) => r.idempotencyKey === "RF-TEST-DUP")).toHaveLength(1);
+  });
+
+  it("订单必须真实存在、金额 > 0、原因必填 —— 否则拒绝落库", () => {
+    const before = refundRecords.length;
+    expect(() => createRefund({ orderNo: "ORD_NOT_EXIST", userNo: "U3001", amount: 5, reason: "x", idempotencyKey: "RF-TEST-2" }))
+      .toThrow(/订单不存在/);
+    expect(() => createRefund({ orderNo: orders[0].orderNo, userNo: "U3001", amount: 0, reason: "x", idempotencyKey: "RF-TEST-3" }))
+      .toThrow(/金额必须大于 0/);
+    expect(() => createRefund({ orderNo: orders[0].orderNo, userNo: "U3001", amount: 5, reason: " ", idempotencyKey: "RF-TEST-4" }))
+      .toThrow(/必须填写退款原因/);
+    expect(refundRecords.length).toBe(before);
+  });
+});

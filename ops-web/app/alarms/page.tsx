@@ -11,13 +11,18 @@ import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/input";
+import { Input } from "@/components/ui/input";
+import { FilterSelect } from "@/components/ui/filter-select";
+import { StatusBadge, statusOptions, type StatusMap } from "@/components/ui/status-badge";
+import { EnabledBadge } from "@/components/status";
+import { Drawer, Field } from "@/components/ui/drawer";
 import { fmtTime } from "@/lib/utils";
 import { useCan } from "@/lib/use-can";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
 import { exportCsv, type CsvColumn } from "@/lib/export-csv";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { ReadOnlyNotice } from "@/components/read-only-notice";
 import {
   ShowArchivedToggle, archivedRowClass, ArchivedAt, ArchiveActions,
   archiveConfirm, unarchiveConfirm,
@@ -32,21 +37,34 @@ const TABS = [
   { key: "rules", label: "通知规则" },
 ];
 
-const LEVEL: Record<AlarmLevel, { label: string; tone: "muted" | "warning" | "danger" }> = {
-  INFO: { label: "提示", tone: "muted" },
-  WARN: { label: "警告", tone: "warning" },
-  CRITICAL: { label: "严重", tone: "danger" },
+/**
+ * 告警等级：文案 + 色调 + **形状阶梯**（规范 §11.4）。
+ * 严重度是告警页最承重的一列（它决定值班要不要立刻起床），而 warning/danger 两档
+ * 对红绿色盲（男性约 8%）几乎同色，故文案里带一条与颜色无关的阶梯：▫ < ▲ < ▲▲。
+ * 键序 = 下拉选项顺序。
+ */
+const LEVEL: StatusMap<AlarmLevel> = {
+  INFO: { label: "▫ 提示", tone: "muted" },
+  WARN: { label: "▲ 警告", tone: "warning" },
+  CRITICAL: { label: "▲▲ 严重", tone: "danger" },
 };
 
-const REC_STATUS: Record<AlarmRecord["status"], { label: string; tone: "warning" | "default" | "muted" }> = {
+const REC_STATUS: StatusMap<AlarmRecord["status"]> = {
   OPEN: { label: "待处理", tone: "warning" },
   ACKED: { label: "已受理", tone: "default" },
   CLOSED: { label: "已关闭", tone: "muted" },
 };
 
+/** 通知流水的发送结果。原为就地 ternary，收成映射表后导出列与徽标共用同一份文案。 */
+const NOTICE_STATUS: StatusMap<AlarmNotice["status"]> = {
+  SENT: { label: "已发送", tone: "success" },
+  FAILED: { label: "发送失败", tone: "danger" },
+};
+
 const CHANNEL_LABEL: Record<AlarmNotice["channel"], string> = { SMS: "短信", EMAIL: "邮件", PUSH: "推送", WEBHOOK: "Webhook" };
 
-const LEVEL_OPTIONS = [{ value: "INFO", label: "提示" }, { value: "WARN", label: "警告" }, { value: "CRITICAL", label: "严重" }];
+// 等级选项由映射表派生：筛选下拉、表单下拉、徽标三处文案（含形状阶梯）永远一致
+const LEVEL_OPTIONS = statusOptions(LEVEL);
 const CHANNEL_OPTIONS = [{ value: "SMS", label: "短信" }, { value: "EMAIL", label: "邮件" }, { value: "PUSH", label: "推送" }, { value: "WEBHOOK", label: "Webhook" }];
 
 const CODE_FIELDS: FieldDef[] = [
@@ -87,7 +105,15 @@ function AlarmsInner() {
 
   // 转工单：告警→工单闭环（我们比竞品多的一环，竞品到通知就断了）
   const canRaise = allow("workorder:wo:create");
+  // 确认告警只是认领处置责任、不建单，故与列表同权（后端 ack 也是 wo:read）
+  const canAck = allow("workorder:wo:read");
   const canConfig = allow("workorder:alarm:config");
+  // 重发通知会**真的再发一条**短信/邮件（重复触达 + 重复计费），故与只读/配置分开发码
+  const canResendNotice = allow("workorder:alarm:notice_resend");
+
+  // 待确认的告警 + 处置备注：备注选填，故用抽屉而非 confirm（confirm 只能要求「输入指定文本」）
+  const [acking, setAcking] = useState<AlarmRecord | null>(null);
+  const [ackRemark, setAckRemark] = useState("");
 
   const [codeForm, setCodeForm] = useState<Partial<AlarmCode> | null>(null);
   const [ruleForm, setRuleForm] = useState<Partial<AlarmRule> | null>(null);
@@ -108,7 +134,29 @@ function AlarmsInner() {
   const saveRule = useMutation({ mutationFn: (v: Partial<AlarmRule>) => api.saveAlarmRule(v), onSuccess: onSaved(setRuleForm) });
   const raise = useMutation({
     mutationFn: (alarmNo: string) => api.raiseAlarmWorkOrder(alarmNo),
-    onSuccess: (r) => { notify.success(`已转工单 ${r.workOrderNo}`); qc.invalidateQueries({ queryKey: ["alarm"] }); },
+    // created=false 表示该告警此前已开过单（后端以 alarmNo 幂等）——必须说清，否则运营会重复派人到现场。
+    onSuccess: (r) => {
+      notify.success(r.created ? `已转工单 ${r.woNo}` : `该告警已有工单 ${r.woNo}，未重复开单`);
+      qc.invalidateQueries({ queryKey: ["alarm"] });
+    },
+  });
+  // 确认告警：只回状态不回整行，故必须 invalidate 才能看到列表变「已受理」
+  const ack = useMutation({
+    mutationFn: (v: { alarmNo: string; remark: string }) => api.ackAlarm(v.alarmNo, v.remark.trim() || undefined),
+    onSuccess: (r) => {
+      notify.success(`告警 ${r.alarmNo} 已确认（${REC_STATUS[r.status].label}）`);
+      qc.invalidateQueries({ queryKey: ["alarm"] });
+      setAcking(null);
+    },
+  });
+  // 重发通知（拍板 #6）：服务端新增一条流水、原记录不动，故必须 invalidate 才看得到补发那条。
+  // 拒绝（键重复 / 已发送 / 命中拉黑 / 告警已关闭）由全局 MutationCache 弹错，这里不重复处理。
+  const resendNotice = useMutation({
+    mutationFn: (v: { noticeNo: string; idempotencyKey: string }) => api.resendAlarmNotice(v.noticeNo, { idempotencyKey: v.idempotencyKey }),
+    onSuccess: (n) => {
+      notify.success(`已重发 · 新通知号 ${n.noticeNo}（原记录 ${n.resendOf} 保留）`);
+      qc.invalidateQueries({ queryKey: ["alarm"] });
+    },
   });
   // 归档 / 恢复：错误由全局 MutationCache 接管，这里只管成功后的失效与提示。
   const archiveCodeM = useMutation({
@@ -142,42 +190,78 @@ function AlarmsInner() {
     () => exportCsv<T>(name, cols, (q.data?.list ?? []) as T[]);
 
   const recordCols: Column<AlarmRecord>[] = [
-    { header: "告警号", cell: (a) => <span className="font-medium">{a.alarmNo}</span> },
+    // 业务号列 body-strong（类型阶 txt-strong = 14/500）作扫描锚点（规范 §12.3）；
+    // 一张表只加强一列 —— 告警码同时加粗就没有锚点了，故它只保留等宽
+    { header: "告警号", cell: (a) => <span className="txt-strong tabular-nums">{a.alarmNo}</span> },
     { header: "柜机 / 站点", cell: (a) => <>{a.cabinetNo} <span className="text-muted-foreground">· {a.siteName}</span></> },
     { header: "厂商", cell: (a) => <Badge tone="outline">{a.vendorCode}</Badge> },
     // 双列并存 = 多厂商错误码归一化：平台统一码用于规则/统计，厂商原始码用于对厂商排障
-    { header: "告警码", cell: (a) => <span className="font-medium tabular-nums">{a.alarmCode}</span> },
+    { header: "告警码", cell: (a) => <span className="tabular-nums">{a.alarmCode}</span> },
     { header: "厂商错误码", cell: (a) => <span className="text-muted-foreground tabular-nums">{a.vendorErrorCode}</span> },
-    { header: "等级", cell: (a) => <Badge tone={LEVEL[a.level].tone}>{LEVEL[a.level].label}</Badge> },
+    // nowrap：形状标记让文案变宽，窄列里会把「▲▲ 严重」折成两行、把整行行高撑起来
+    { header: "等级", cell: (a) => <StatusBadge map={LEVEL} value={a.level} className="whitespace-nowrap" /> },
     { header: "发生时间", cell: (a) => <span className="text-muted-foreground">{fmtTime(a.occurredAt)}</span> },
-    { header: "状态", cell: (a) => <Badge tone={REC_STATUS[a.status].tone}>{REC_STATUS[a.status].label}</Badge> },
+    { header: "状态", cell: (a) => <StatusBadge map={REC_STATUS} value={a.status} /> },
     { header: "关联工单", cell: (a) => a.workOrderNo ? <span className="tabular-nums">{a.workOrderNo}</span> : <span className="text-muted-foreground">-</span> },
     { header: "备注", cell: (a) => <span className="text-muted-foreground">{a.remark}</span> },
     {
       header: t("common.actions"),
-      cell: (a) => canRaise && !a.workOrderNo
-        ? <Button size="sm" variant="outline" disabled={raise.isPending} onClick={() => raise.mutate(a.alarmNo)}>转工单</Button>
-        : <span className="text-muted-foreground">-</span>,
+      // 「确认」只对 OPEN 出：状态机只认 OPEN --ACK--> ACKED，已受理/已关闭再点必被后端拒
+      cell: (a) => {
+        const acts = [
+          canAck && a.status === "OPEN" && (
+            <Button key="ack" size="sm" variant="outline" disabled={ack.isPending}
+              onClick={() => { setAcking(a); setAckRemark(a.remark ?? ""); }}>确认</Button>
+          ),
+          canRaise && !a.workOrderNo && (
+            <Button key="raise" size="sm" variant="outline" disabled={raise.isPending}
+              onClick={() => raise.mutate(a.alarmNo)}>转工单</Button>
+          ),
+        ].filter(Boolean);
+        return acts.length ? <div className="flex flex-wrap items-center gap-1.5">{acts}</div> : <span className="text-muted-foreground">-</span>;
+      },
     },
   ];
 
   const noticeCols: Column<AlarmNotice>[] = [
-    { header: "通知号", cell: (n) => <span className="font-medium">{n.noticeNo}</span> },
-    { header: "告警号", cell: (n) => <span className="text-muted-foreground">{n.alarmNo}</span> },
+    { header: "通知号", cell: (n) => <span className="txt-strong tabular-nums">{n.noticeNo}</span> },
+    { header: "告警号", cell: (n) => <span className="text-muted-foreground tabular-nums">{n.alarmNo}</span> },
     { header: "渠道", cell: (n) => <Badge tone="outline">{CHANNEL_LABEL[n.channel]}</Badge> },
     { header: "接收人", cell: (n) => n.target },
     { header: "发送时间", cell: (n) => <span className="text-muted-foreground">{fmtTime(n.sentAt)}</span> },
-    { header: "状态", cell: (n) => <Badge tone={n.status === "SENT" ? "success" : "danger"}>{n.status === "SENT" ? "已发送" : "发送失败"}</Badge> },
+    { header: "状态", cell: (n) => <StatusBadge map={NOTICE_STATUS} value={n.status} /> },
     { header: "失败原因", cell: (n) => <span className="text-muted-foreground">{n.failReason ?? "-"}</span> },
+    // 重发来源：让人一眼看出「这条是补发的」，否则同一目标两条成功流水像是系统发了两遍
+    { header: "重发自", cell: (n) => n.resendOf ? <Badge tone="warning">{n.resendOf}</Badge> : <span className="text-muted-foreground">-</span> },
+    {
+      header: t("common.actions"),
+      // 只有失败的才给重发：成功的再发一遍就是重复轰炸值班人 + 重复计费（拍板 #6）
+      cell: (n) => !canResendNotice || n.status !== "FAILED" ? <span className="text-muted-foreground">-</span> : (
+        <Button size="sm" variant="outline" disabled={resendNotice.isPending}
+          onClick={async () => {
+            const ok = await confirm({
+              title: `重发通知 ${n.noticeNo}`,
+              desc: `将按原渠道（${CHANNEL_LABEL[n.channel]}）与原目标 ${n.target} 再发一次。重发会新增一条流水，原记录保留；已退订的目标与已关闭的告警会被拒绝。`,
+              danger: true,
+              confirmText: "确认重发",
+            });
+            // 幂等键在点确认的瞬间生成：整条链路只认这一把键，重复提交由服务端拒绝
+            if (ok) resendNotice.mutate({ noticeNo: n.noticeNo, idempotencyKey: `ANR-${n.noticeNo}-${Date.now()}` });
+          }}
+        >
+          重发
+        </Button>
+      ),
+    },
   ];
 
   const codeCols: Column<AlarmCode>[] = [
-    { header: "告警代码", cell: (c) => <span className="font-medium tabular-nums">{c.code}</span> },
+    { header: "告警代码", cell: (c) => <span className="txt-strong tabular-nums">{c.code}</span> },
     { header: "告警信息", cell: (c) => c.message },
-    { header: "等级", cell: (c) => <Badge tone={LEVEL[c.level].tone}>{LEVEL[c.level].label}</Badge> },
+    { header: "等级", cell: (c) => <StatusBadge map={LEVEL} value={c.level} className="whitespace-nowrap" /> },
     // 建议处置 + 自动开工单：字典即处置预案（比竞品多的两列）
     { header: "建议处置", cell: (c) => <span className="text-muted-foreground">{c.suggestion}</span> },
-    { header: "自动开工单", cell: (c) => c.autoWorkOrder ? <Badge tone="success">是</Badge> : <Badge tone="muted">否</Badge> },
+    { header: "自动开工单", cell: (c) => <EnabledBadge on={c.autoWorkOrder} onLabel="是" offLabel="否" /> },
     ...archivedCol<AlarmCode>(),
     {
       header: t("common.actions"),
@@ -194,7 +278,7 @@ function AlarmsInner() {
   ];
 
   const ruleCols: Column<AlarmRule>[] = [
-    { header: "规则号", cell: (r) => <span className="font-medium">{r.ruleNo}</span> },
+    { header: "规则号", cell: (r) => <span className="txt-strong tabular-nums">{r.ruleNo}</span> },
     { header: "告警代码", cell: (r) => <span className="tabular-nums">{r.alarmCode}</span> },
     { header: "通知目标", cell: (r) => r.target },
     { header: "渠道", cell: (r) => <Badge tone="outline">{CHANNEL_LABEL[r.channel]}</Badge> },
@@ -202,7 +286,7 @@ function AlarmsInner() {
     // 静默窗口 / 升级策略：防夜间轰炸与告警风暴（比竞品多）
     { header: "静默窗口", cell: (r) => r.quietStart && r.quietEnd ? <span className="tabular-nums">{r.quietStart} - {r.quietEnd}</span> : <span className="text-muted-foreground">不静默</span> },
     { header: "升级策略", cell: (r) => r.escalateMinutes > 0 ? <span className="tabular-nums">{r.escalateMinutes} 分钟未处理升级</span> : <span className="text-muted-foreground">不升级</span> },
-    { header: "状态", cell: (r) => r.status === "ACTIVE" ? <Badge tone="success">启用</Badge> : <Badge tone="muted">停用</Badge> },
+    { header: "状态", cell: (r) => <EnabledBadge on={r.status === "ACTIVE"} /> },
     ...archivedCol<AlarmRule>(),
     {
       header: t("common.actions"),
@@ -237,18 +321,11 @@ function AlarmsInner() {
             { header: "关联工单", value: (a) => a.workOrderNo ?? "-" },
             { header: "备注", value: (a) => a.remark },
           ])}>
-          <Select value={level} onChange={(e) => { setLevel(e.target.value); setPage(1); }}>
-            <option value="">全部等级</option>
-            <option value="INFO">提示</option>
-            <option value="WARN">警告</option>
-            <option value="CRITICAL">严重</option>
-          </Select>
-          <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
-            <option value="">全部状态</option>
-            <option value="OPEN">待处理</option>
-            <option value="ACKED">已受理</option>
-            <option value="CLOSED">已关闭</option>
-          </Select>
+          {/* 选项由映射表派生：改文案只改映射表，筛选项与徽标不会各说一套 */}
+          <FilterSelect value={level} onChange={(v) => { setLevel(v); setPage(1); }}
+            allLabel="全部等级" options={LEVEL} aria-label="按告警等级筛选" />
+          <FilterSelect value={status} onChange={(v) => { setStatus(v); setPage(1); }}
+            allLabel="全部状态" options={REC_STATUS} aria-label="按处理状态筛选" />
         </Toolbar>
       )}
       {tab === "notices" && (
@@ -259,8 +336,9 @@ function AlarmsInner() {
             { header: "渠道", value: (n) => CHANNEL_LABEL[n.channel] },
             { header: "接收人", value: (n) => n.target },
             { header: "发送时间", value: (n) => fmtTime(n.sentAt) },
-            { header: "状态", value: (n) => (n.status === "SENT" ? "已发送" : "发送失败") },
+            { header: "状态", value: (n) => NOTICE_STATUS[n.status].label },
             { header: "失败原因", value: (n) => n.failReason ?? "-" },
+            { header: "重发自", value: (n) => n.resendOf ?? "-" },
           ])} />
       )}
       {tab === "codes" && (
@@ -296,7 +374,10 @@ function AlarmsInner() {
       )}
       {/* 权限降级显式提示（§3.2）：不静默隐藏操作列，否则会被当成功能坏了 */}
       {(tab === "codes" || tab === "rules") && !canConfig && (
-        <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无告警配置权限（workorder:alarm:config），不能新增、编辑或归档</div>
+        <ReadOnlyNotice what="告警配置" perm="workorder:alarm:config" note="不能新增、编辑或归档告警代码与通知规则" />
+      )}
+      {tab === "notices" && !canResendNotice && (
+        <ReadOnlyNotice what="告警通知重发" perm="workorder:alarm:notice_resend" note="失败通知只能看原因，不能补发" />
       )}
 
       {tab === "records" && <DataTable rowKey={(a: AlarmRecord) => a.alarmNo} columns={recordCols} rows={q.data?.list as AlarmRecord[]} loading={q.isLoading} empty="暂无告警记录——设备运行正常，或当前筛选条件下无匹配，试着清空等级 / 状态筛选。" />}
@@ -304,6 +385,32 @@ function AlarmsInner() {
       {tab === "codes" && <DataTable rowKey={(c: AlarmCode) => c.code} columns={codeCols} rows={q.data?.list as AlarmCode[]} loading={q.isLoading} rowClassName={archivedRowClass} empty={showArchived ? "没有匹配的告警代码——换个关键词，或点「新增告警代码」补一条。" : "暂无在用告警代码——可能都已归档（打开「显示已归档」查看），或点「新增告警代码」建第一条处置预案。"} />}
       {tab === "rules" && <DataTable rowKey={(r: AlarmRule) => r.ruleNo} columns={ruleCols} rows={q.data?.list as AlarmRule[]} loading={q.isLoading} rowClassName={archivedRowClass} empty={showArchived ? "没有匹配的通知规则——换个关键词，或点「新增通知规则」补一条。" : "暂无在用通知规则——可能都已归档（打开「显示已归档」查看），或点「新增通知规则」为关键告警配通知目标。"} />}
       {q.data && <Pagination page={page} size={SIZE} total={q.data.total} onPage={setPage} />}
+
+      {/* 确认告警：备注选填（提交不禁用），但预填原上报说明，让值班人在原文上追述而不是从零写 */}
+      <Drawer
+        open={!!acking}
+        onOpenChange={(o) => !o && setAcking(null)}
+        title={`确认告警 ${acking?.alarmNo ?? ""}`}
+        desc="确认表示已认领处置责任，告警转为「已受理」，不会开工单；需要现场处理请改用「转工单」"
+        footer={
+          acking && (
+            <>
+              <Button variant="outline" onClick={() => setAcking(null)}>取消</Button>
+              <Button disabled={ack.isPending} onClick={() => ack.mutate({ alarmNo: acking.alarmNo, remark: ackRemark })}>确认受理</Button>
+            </>
+          )
+        }
+      >
+        {acking && (
+          <>
+            <Field label="告警">{acking.alarmCode} · {LEVEL[acking.level].label}（{acking.vendorCode} {acking.vendorErrorCode}）</Field>
+            <Field label="柜机 / 站点">{acking.cabinetNo} · {acking.siteName}</Field>
+            <Field label="处置备注（选填）">
+              <Input value={ackRemark} placeholder="留空则保留原上报说明" onChange={(e) => setAckRemark(e.target.value)} />
+            </Field>
+          </>
+        )}
+      </Drawer>
 
       {/* 告警代码 编辑抽屉 */}
       <FormDrawer open={!!codeForm} onOpenChange={(o) => !o && setCodeForm(null)}

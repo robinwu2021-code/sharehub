@@ -2,27 +2,63 @@
 // 工单挂载的机柜号取自 device.ts 的 cabinets（保证与设备列表可互相搜到同一台）。
 import type {
   WorkOrder, WorkOrderType, WorkOrderStatus, WorkOrderAction, WorkOrderDraft,
-  WorkOrderHandlePayload, WorkOrderClosePayload, SlaRule, InspectionPlan, PageQuery,
+  WorkOrderHandlePayload, WorkOrderClosePayload, SlaRule, InspectionPlan, InspectionRunResult, PageQuery,
 } from "../../types";
-import { WO_TRANSITIONS, canTransition } from "../../types";
+import { WO_TRANSITIONS, canTransition, inspectionPeriodKey, inspectionRunnable } from "../../types";
 import { LOCS, p, iso } from "./internal";
 import { paginate, kwHit, upsert, nextNo } from "./helpers";
 import { cabinets } from "./device";
 
 const WTYPE: WorkOrderType[] = ["FAULT", "REFILL", "INSPECT", "COMPLAINT", "CLEAN"];
 const WSTATUS: WorkOrderStatus[] = ["CREATED", "DISPATCHED", "PROCESSING", "DONE", "CLOSED"];
+/** 派单/处理人取自员工表的同一批姓名（org.ts employees 用的也是这 5 个）。 */
+const WO_STAFF = ["Ali Hassan", "Omar Khan", "Sara Ahmed", "Wang Lei", "Fatima N."];
+
 export const workOrders: WorkOrder[] = Array.from({ length: 64 }, (_, i) => ({
   woNo: `WO${70000 + i}`, type: p(WTYPE, i), source: p(["ALERT", "USER", "VENUE", "MANUAL"] as const, i),
   // 来源单号：ALERT 挂告警号、USER 挂投诉号（编号规则与 alarm.ts / cs.ts 一致，避免跨文件循环依赖）。
   sourceNo: srcNo(p(["ALERT", "USER", "VENUE", "MANUAL"] as const, i), i),
   priority: p(["LOW", "MEDIUM", "HIGH"] as const, i), cabinetNo: p(cabinets, i).cabinetNo,
   // 点位名取所在机柜的 locationName，而非另取一次 LOCS —— 工单数 64 > 机柜数 48 时两者会错位
-  locationName: p(cabinets, i).locationName, status: p(WSTATUS, i), assigneeName: i % 3 === 0 ? null : p(["Ali", "Omar", "Sara", "Wang"], i),
+  locationName: p(cabinets, i).locationName, status: p(WSTATUS, i),
+  // 派单对象用**员工真名**（与 org.ts 的 employees 同一批），不再用 "Ali" 这类短名。
+  // 短名与 employees[].name（"Ali Hassan"）对不上，导致「绩效报表」永远算不出是谁处理的 ——
+  // 一张只能按名字关联的表，名字对不上就等于没有关联。
+  assigneeName: i % 3 === 0 ? null : p(WO_STAFF, i),
   slaDueAt: iso(-(i % 5) * 3600_000), description: p(["柜机离线", "缺货补货", "定期巡检", "用户投诉未弹出", "清洁维护"], i),
   createdAt: iso(i * 5400_000),
   expectedAt: iso(-(i % 4 + 1) * 86400_000),
   rejectCount: 0,
+  // —— 流转留痕：按状态回填，只填「已经走到的那几步」——
+  // 此前这几列全空，于是「平均解决时长」无源可算、绩效页只能靠编。
+  ...flowTrace(p(WSTATUS, i), i),
 }));
+
+
+/**
+ * 按状态回填流转留痕。**只填走到过的步骤**：CREATED 什么都没有，DISPATCHED 只有派单时间，
+ * 以此类推 —— 给一张待派单的工单填上完工时间，比不填更误导。
+ *
+ * 时长刻意做出差异（`45 + (i*17)%180` 分钟）而非常数：绩效报表要按人算「平均解决时长」，
+ * 常数会让所有人分数一样，那个页面就永远看不出差别。
+ */
+function flowTrace(status: WorkOrderStatus, i: number) {
+  const base = i * 5400_000;                     // 与 createdAt 同基准
+  const dispatchMs = 10 * 60_000;                // 建单 10 分钟后派单
+  const acceptMs = dispatchMs + 15 * 60_000;     // 派单 15 分钟后接单
+  const resolveMin = 45 + (i * 17) % 180;        // 接单 → 完工：45~224 分钟
+  const handler = p(WO_STAFF, i);
+  const reached = (s: WorkOrderStatus) => WSTATUS.indexOf(status) >= WSTATUS.indexOf(s);
+  return {
+    dispatchedAt: reached("DISPATCHED") ? iso(base - dispatchMs) : null,
+    acceptedAt: reached("PROCESSING") ? iso(base - acceptMs) : null,
+    handlerName: reached("PROCESSING") ? handler : null,
+    handledAt: reached("PROCESSING") ? iso(base - acceptMs) : null,
+    completedAt: reached("DONE") ? iso(base - acceptMs - resolveMin * 60_000) : null,
+    auditorName: reached("CLOSED") ? "admin" : null,
+    auditedAt: reached("CLOSED") ? iso(base - acceptMs - resolveMin * 60_000 - 600_000) : null,
+  };
+}
 
 /** 种子数据的来源单号：与 alarmRecords（ALM40000..40013）/ orderComplaints（CPL60000..60011）对齐。 */
 function srcNo(source: WorkOrder["source"], i: number): string | null {
@@ -184,9 +220,77 @@ export const inspectionPlans: InspectionPlan[] = Array.from({ length: 14 }, (_, 
   planNo: `IP${200 + i}`, route: `${p(LOCS, i)} → ${p(LOCS, i + 1)}`,
   frequency: p(["每日", "每周", "双周", "每月"], i), nextAt: iso(-(i % 7) * 86400_000),
   assignee: p(["Ali Hassan", "Omar Khan", "Sara Ahmed", "Wang Lei"], i), active: i % 8 !== 0,
+  // 种子一律「本周期未执行过」：否则页面一进来一半计划的按钮就是灰的，看不出功能在哪
+  lastRunAt: null, lastRunPeriod: null, lastRunWoNos: [],
 }));
 
 export const listSlaRules = (q: PageQuery = {}) => paginate(slaRules, q.page, q.size, (x) => kwHit(q.keyword, x.slaNo, x.woType, x.escalateTo));
 export const listInspectionPlans = (q: PageQuery = {}) => paginate(inspectionPlans, q.page, q.size, (x) => kwHit(q.keyword, x.planNo, x.route, x.assignee));
 export const saveSlaRule = (x: Partial<SlaRule>) => upsert(slaRules, x, "slaNo", () => nextNo("SLA", slaRules));
-export const saveInspectionPlan = (x: Partial<InspectionPlan>) => upsert(inspectionPlans, x, "planNo", () => nextNo("IP", inspectionPlans));
+
+/**
+ * 增改巡检计划。**执行留痕字段一律剥离**（同 savePushMessage 的加固）：
+ * 否则表单里塞一个 `lastRunPeriod` 就能伪造「本周期已执行」，或者反过来把它抹掉重跑一遍。
+ * 这些字段只有 runInspectionPlanNow 能写。
+ */
+export const saveInspectionPlan = (x: Partial<InspectionPlan>) => {
+  const { lastRunAt: _a, lastRunPeriod: _p, lastRunWoNos: _w, ...clean } = x;
+  const row = upsert(inspectionPlans, clean, "planNo", () => nextNo("IP", inspectionPlans));
+  // 新建的计划要有留痕字段的初值，否则「上次执行」列拿到 undefined
+  row.lastRunAt ??= null; row.lastRunPeriod ??= null; row.lastRunWoNos ??= [];
+  return row;
+};
+
+/** 「立即执行一次」被拒（停用 / 本周期已执行 / 路线上找不到机柜）。页面走全局 onError 弹错。 */
+export class InspectionRunError extends Error {
+  constructor(msg: string) { super(msg); this.name = "InspectionRunError"; }
+}
+
+/**
+ * 巡检计划「立即执行一次」：手动补上 mock 里不存在的定时器，**真的生成工单**
+ * （落 workOrders，工单列表/看板当场可见），来源 `PLAN` + `sourceNo=planNo` 挂回计划。
+ *
+ * 幂等：同一计划在同一周期（见 inspectionPeriodKey）只能执行一次，第二次整批拒绝——
+ * 连点两下不会开出两批重复巡检单。判定用的是与页面按钮同一个 `inspectionRunnable`。
+ *
+ * 一站一张工单：巡检对象是站点，机柜号取该站在册的第一台（工单必须挂真实机柜，
+ * 逐柜检查结果写在处理说明里），路线上任一站在台账里找不到机柜则整批拒绝、不做半成功。
+ * `nextAt` **不推进**：手动补跑不代表计划周期到了，改它会让排期看起来已经走过。
+ */
+export function runInspectionPlanNow(planNo: string): InspectionRunResult {
+  const plan = inspectionPlans.find((x) => x.planNo === planNo);
+  if (!plan) throw new InspectionRunError(`巡检计划 ${planNo} 不存在`);
+  const reason = inspectionRunnable(plan);
+  if (reason) throw new InspectionRunError(`巡检计划 ${planNo} 无法执行：${reason}`);
+
+  // 路线形如「A → B」：拆成站点，逐站找一台在册机柜
+  const stops = plan.route.split("→").map((s) => s.trim()).filter(Boolean);
+  if (stops.length === 0) throw new InspectionRunError(`巡检计划 ${planNo} 的路线为空，无法生成工单`);
+  const picked = stops.map((stop) => ({
+    stop,
+    cab: cabinets.find((c) => c.locationName === stop && !c.archivedAt && c.status !== "RETIRED") ?? null,
+  }));
+  const missing = picked.filter((x) => !x.cab).map((x) => x.stop);
+  if (missing.length) {
+    throw new InspectionRunError(
+      `巡检计划 ${planNo} 的站点「${missing.join("、")}」在设备台账里没有在册机柜，本次不生成任何工单`,
+    );
+  }
+
+  const period = inspectionPeriodKey(plan.frequency);
+  const woNos = picked.map(({ stop, cab }) => {
+    const w = createWorkOrder({
+      type: "INSPECT", cabinetNo: cab!.cabinetNo, locationName: stop, priority: "LOW",
+      description: `【巡检计划 ${planNo}】${plan.route} · ${stop} 例行巡检（${plan.frequency}）`,
+      source: "PLAN", sourceNo: planNo, expectedAt: plan.nextAt,
+    });
+    // 计划自带负责人，生成即派给他——但走状态机的 dispatch，不直接写 assigneeName
+    dispatchWorkOrder(w.woNo, plan.assignee);
+    return w.woNo;
+  });
+
+  plan.lastRunAt = now();
+  plan.lastRunPeriod = period;
+  plan.lastRunWoNos = woNos;
+  return { planNo, period, woNos };
+}

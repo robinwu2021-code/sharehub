@@ -85,14 +85,20 @@ describe("页面层规范一致性（只允许变好）", () => {
     pageFiles().reduce((n, f) => n + (readFileSync(f, "utf8").match(re)?.length ?? 0), 0);
 
   it("手写「仅可查看」不增加 —— 应改用 <ReadOnlyNotice>（规范 §13）", () => {
-    // 基线 17：句式统一 + 说清缺哪个权限码，全靠组件保证，手写必然发散
-    expect(countAll(/仅可查看/g)).toBeLessThanOrEqual(17);
+    // 基线 1（原 17，2026-07-30 页面层清理）：句式统一 + 说清缺哪个权限码全靠组件保证。
+    // 剩的 1 处在**注释里**（employees 说明「禁用态悬浮提示刻意不套这句」），
+    // 即正则会连注释一起数 —— 想压到 0 需要先让判据只看 JSX 文本。
+    expect(countAll(/仅可查看/g)).toBeLessThanOrEqual(1);
   });
 
   it("内联 <Badge tone={…}> 不增加 —— 枚举应走 StatusMap + <StatusBadge>", () => {
-    // 基线 58：内联 ternary 让"状态→文案→色调"的映射散落在页面里，
-    // 同一个枚举在两个页面可能配出不同颜色
-    expect(countAll(/Badge tone=\{/g)).toBeLessThanOrEqual(58);
+    // 基线 2（原 58，2026-07-30 页面层清理）：内联 ternary 让"状态→文案→色调"的映射
+    // 散落在页面里，同一个枚举在两个页面可能配出不同颜色。
+    // 剩的 2 处都不是"待清"，压到 0 前先看清楚：
+    //  · employees 那处在**注释**里（正则连注释一起数）
+    //  · system「连通性探测」是一次性布尔结果、不是落库枚举，套 StatusMap 属硬凑；
+    //    §11.4 也已满足 —— 文案「连通/不通」自己就承载了语义，不靠颜色单独表意
+    expect(countAll(/Badge tone=\{/g)).toBeLessThanOrEqual(2);
   });
 
   it("筛选用的裸 <Select> 不增加 —— 应改用 <FilterSelect>", () => {
@@ -109,7 +115,12 @@ describe("页面层规范一致性（只允许变好）", () => {
       const blocks = src.match(/<Select[\s\S]*?<\/Select>/g) ?? [];
       return n + blocks.filter((b) => /<option value=""/.test(b)).length;
     }, 0);
-    expect(bareFilterSelects).toBeLessThanOrEqual(17);
+    // 基线 4（原 17，2026-07-30 页面层清理）。⚠️ 剩的 4 处**全是判据误判**：
+    //   locations「请选择区域」「不改阶段，仅记跟进」、marketing 两处「请选择」
+    // 都是**表单占位**而非"全部 XX"筛选，按规范就该是 6px 控件、不该改成 FilterSelect。
+    // 即本项已实质清零，4 是判据的下限。要真正压到 0，把判据从 `<option value="">`
+    // 收紧成「空值文案以『全部』开头」即可 —— 那样这 4 处不再计入。
+    expect(bareFilterSelects).toBeLessThanOrEqual(4);
   });
 
   it("金额不许手写格式 —— 一律走 money()（规范 §12 数字列）", () => {
@@ -117,6 +128,21 @@ describe("页面层规范一致性（只允许变好）", () => {
     // 锁在 0 是为了防回归 —— 手写 `AED ${x}` 会绕过 Intl 本地化与货币符号位置，
     // 阿语 RTL 下符号位置是反的，手写必错。
     expect(countAll(/`AED \$\{|"AED " *\+|AED ` *\+/g)).toBe(0);
+  });
+
+  it("页面层不使用废弃圆角类 —— 五档之外一律不许（规范 §5）", () => {
+    // 2026-07-30 从 36 处清到 0：原先 `rounded-lg` 的填充块实为 6px，
+    // 而真正的 <Notice> 是 rounded-card(10px) —— 手写块与组件不同档，界面上看得出来。
+    // components/ 早有同款检查，这条把页面层也锁住，基线是 **0**，不留额度。
+    // 用 match 而非 test：DEPRECATED_RADIUS 带 /g/，`test()` 会推进 lastIndex，
+    // 在 filter 里逐文件调用会交替返回 true/false 而**静默漏掉违规**（String.match 不受影响）。
+    const offenders: string[] = [];
+    for (const file of pageFiles()) {
+      const hits = readFileSync(file, "utf8").match(DEPRECATED_RADIUS);
+      if (hits) offenders.push(`${file.slice(ROOT.length).replace(/^\/+/, "")}: ${[...new Set(hits)].join(", ")}`);
+    }
+    expect(offenders, `改用五档圆角（rounded-control/field/card/sheet/chip）：\n${offenders.join("\n")}`)
+      .toEqual([]);
   });
 
   it("泛化空态文案不增加 —— 空态要说清**为什么**空（规范 §12）", () => {

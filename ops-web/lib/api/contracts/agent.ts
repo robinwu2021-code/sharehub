@@ -1,5 +1,5 @@
 // 覆盖范围：代理商主档、区域分配、业绩、资金账户、分润规则。
-import type { PageQ, ArchiveQ, AssignmentRecordQ, AssignableAssetQ } from "../query";
+import type { PageQ, ArchiveQ, AssignmentRecordQ, AssignableAssetQ , ReportQ } from "../query";
 import type {
   PageResult, Agent, AgentAssignment, AgentPerformance, AgentAccount, AgentCommission,
   AgentAssignmentRecord, AssignableAsset, AssignAssetsPayload, ReclaimAssetsPayload,
@@ -11,7 +11,8 @@ export interface AgentApi {
 
   // === 代理商扩展 tab ===
   listAgentAssignments(q?: PageQ): Promise<PageResult<AgentAssignment>>;
-  listAgentPerformance(q?: PageQ): Promise<PageResult<AgentPerformance>>;
+  /** 代理绩效。period 复用报表域 ReportQ —— GMV 与站点坪效同一套周期口径。 */
+  listAgentPerformance(q?: ReportQ): Promise<PageResult<AgentPerformance>>;
   listAgentAccounts(q?: PageQ): Promise<PageResult<AgentAccount>>;
   saveAgentAccount(x: Partial<AgentAccount> & { accountNo?: string }): Promise<AgentAccount>;
 

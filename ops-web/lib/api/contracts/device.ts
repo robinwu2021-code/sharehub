@@ -1,13 +1,18 @@
 // 覆盖范围：机柜与仓位、下发指令、充电宝、实时监控、指令记录、调拨、OTA、设备日志、设备编码批次。
-import type { PageQ, CabinetQ, DeviceLogQ, ArchiveQ } from "../query";
+import type { PageQ, CabinetQ, DeviceLogQ, ArchiveQ, OtaReleaseQ } from "../query";
 import type {
   PageResult, Cabinet, Slot, Powerbank, CabinetMonitor, CommandRecord,
-  InventoryTransfer, OtaRollout, DeviceLog, DeviceCodeBatch,
+  InventoryTransfer, OtaRollout, OtaRelease, OtaTask, DeviceLog, DeviceCodeBatch,
 } from "../../types";
 
 export interface DeviceApi {
   listCabinets(q?: CabinetQ): Promise<PageResult<Cabinet>>;
   getCabinet(cabinetNo: string): Promise<{ cabinet: Cabinet; slots: Slot[] }>;
+  /**
+   * 机柜建档 / 编辑。**入参只含建档字段**：`siteNo`/`locationName` 由 `locationNo` 反查，
+   * `agentNo` 只能经代理域划拨，在线态与心跳是设备上报的事实——传了也不采信。
+   */
+  saveCabinet(x: Partial<Cabinet> & { cabinetNo?: string }): Promise<Cabinet>;
   sendCommand(cabinetNo: string, type: string, params?: Record<string, unknown>): Promise<{ commandId: string }>;
 
   // === 设备扩展 tab ===
@@ -19,6 +24,13 @@ export interface DeviceApi {
   savePowerbank(x: Partial<Powerbank> & { powerbankNo?: string }): Promise<Powerbank>;
   saveInventoryTransfer(x: Partial<InventoryTransfer> & { transferNo?: string }): Promise<InventoryTransfer>;
   saveOtaRollout(x: Partial<OtaRollout> & { rolloutNo?: string }): Promise<OtaRollout>;
+
+  // === 固件 OTA 补齐：版本库 + 逐设备任务（后端 DeviceController 早已实现，前端一直没入口）===
+  listOtaReleases(q?: OtaReleaseQ): Promise<PageResult<OtaRelease>>;
+  /** 建版本。后端只有集合 POST（无 `/{releaseNo}`），故更新也走同一个口、靠 body 里的 releaseNo 判 upsert。 */
+  saveOtaRelease(x: Partial<OtaRelease> & { releaseNo?: string }): Promise<OtaRelease>;
+  /** 某次投放的逐设备任务。不分页——一次投放的任务量按柜数计，投放详情要的是全量而非翻页。 */
+  listOtaTasks(rolloutNo: string): Promise<OtaTask[]>;
 
   // === 批次 B4：设备日志 / 设备编码（规格 §1 §2）===
   listDeviceLogs(q?: DeviceLogQ): Promise<PageResult<DeviceLog>>;

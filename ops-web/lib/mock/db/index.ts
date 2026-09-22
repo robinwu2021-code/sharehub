@@ -11,17 +11,20 @@ export { dashboard } from "./dashboard";
 
 export {
   cabinets, slotsOf, vendors, powerbanks, cabinetMonitors, commandRecords,
-  inventoryTransfers, otaRollouts, deviceLogs, deviceCodeBatches,
+  inventoryTransfers, otaRollouts, otaReleases, otaTasks, deviceLogs, deviceCodeBatches,
   listPowerbanks, listCabinetMonitor, listCommandRecords, listInventoryTransfers,
-  listOtaRollouts, listDeviceLogs, listDeviceCodeBatches,
-  savePowerbank, saveInventoryTransfer, saveOtaRollout, saveDeviceCodeBatch,
+  listOtaRollouts, listOtaReleases, listOtaTasks, listDeviceLogs, listDeviceCodeBatches,
+  savePowerbank, saveInventoryTransfer, saveOtaRollout, saveOtaRelease, saveDeviceCodeBatch,
+  // 机柜建档 + 单柜指令下发留痕（S8）
+  saveCabinet, recordCommand, cabinetPlacement, CabinetError, CommandError,
   archiveCabinet, unarchiveCabinet, archivePowerbank, unarchivePowerbank, importCabinets,
 } from "./device";
 
 export {
   alarmCodes, alarmRecords, alarmNotices, alarmRules,
   listAlarmRecords, listAlarmNotices, listAlarmCodes, listAlarmRules,
-  saveAlarmCode, saveAlarmRule, raiseAlarmWorkOrder,
+  saveAlarmCode, saveAlarmRule, raiseAlarmWorkOrder, ackAlarm,
+  resendAlarmNotice, AlarmNoticeSendError, autoRaiseWorkOrders,
   archiveAlarmCode, unarchiveAlarmCode, archiveAlarmRule, unarchiveAlarmRule,
 } from "./alarm";
 
@@ -31,16 +34,18 @@ export {
 } from "./workorder";
 
 export {
-  sites, locations, venues, contracts, leads, siteAnalyses,
+  sites, locations, venues, contracts, leads,
   venueOnboardings, siteLifecycles,
-  listLeads, listSiteAnalysis, listVenueOnboardings, listSiteLifecycles,
+  listLeads, listVenueOnboardings, listSiteLifecycles,
   saveLead, saveVenue, saveContract, saveVenueOnboarding,
   archiveSite, unarchiveSite, archivePoint, unarchivePoint, archiveVenue, unarchiveVenue,
+  // 门店生命周期阶段流转（后端 POST /api/ops/site-lifecycles/{siteNo}/stage 的前端入口）
+  siteLifecycleLogs, changeSiteStage, SiteLifecycleError,
 } from "./location";
 
 export {
   agents, agentAssignments, agentPerformances, agentAccounts, agentCommissions,
-  listAgentAssignments, listAgentPerformance, listAgentAccounts, listAgentCommissions,
+  listAgentAssignments, listAgentAccounts, listAgentCommissions,
   saveAgentAccount, saveAgentCommission,
   archiveAgent, unarchiveAgent,
   // S1 设备/点位划拨
@@ -78,7 +83,9 @@ export {
   listSettlements, generateSettlements, confirmSettlement, transitionSettlement,
   listSettlementRecords, aggregateShareRecords, SettlementError,
   // S2 对账差错处理 / 发票开具作废
-  handleRecon, getReconStats, ReconError,
+  handleRecon, getReconStats, ReconError, reconDiffs, listReconDiffs,
+  // 账务分录：凭证下钻 + 借贷平衡 + 期间筛选 + 手工记账（借贷平衡在 db 层强制）
+  listVoucherEntries, voucherBalance, listLedgerInPeriod, createVoucher, VoucherError,
   issueInvoice, voidInvoice, InvoiceError,
 } from "./finance";
 export type { ShareSummaryQuery, RechargeQuery, SettlementQuery, ShareRecordQuery, ReconQuery, InvoiceQuery } from "./finance";
@@ -90,6 +97,12 @@ export {
   listFreeWhitelist, saveFreeWhitelist, revokeFreeWhitelist,
   // S2：信用分调整（上下限强制 + 风控等级联动 + 变更留痕）
   creditScoreChanges, adjustCreditScore, listCreditScoreChanges, CreditScoreError,
+  // 钱包流水（后端 /api/user/wallets/{userNo}/txns 的前端入口）
+  walletTxns, listWalletTxns, sumPrincipal, sumBonus,
+  // S4 用户详情 + 会员权益/次卡发放
+  getUserProfileBase,
+  memberBenefits, listMemberBenefits, saveMemberBenefit, MemberBenefitError,
+  memberCards, listMemberCards, grantMemberCard, MemberCardError,
 } from "./user";
 
 export {
@@ -101,19 +114,28 @@ export {
   archiveCoupon, unarchiveCoupon, archiveNotice, unarchiveNotice,
   // S2：优惠券发放 / 推送发送
   couponIssueRecords, listCouponIssueRecords, issueCoupon,
+  // 广告投放动作 + 曝光按周期过滤（动作挂广告活动，不挂曝光事实行）
+  transitionAdCampaign, AdCampaignError, listAdDeliveriesInPeriod,
+  referralRules, listReferralRules, saveReferralRule, ReferralRuleError,
   resolveAudience, MEMBER_LEVELS, sendPushMessage, transitionPush,
   CouponIssueError, PushError, AudienceError,
 } from "./marketing";
 
 export {
-  csTickets, csSessions, listCsTickets, listCsSessions, saveCsTicket,
+  csTickets, csSessions, csMessages, listCsTickets, listCsSessions, saveCsTicket,
+  refundCsTicket, woCsTicket, listCsMessages, replyCsSession,
   orderComplaints, refundRecords, listOrderComplaints, listRefundRecords,
-  saveOrderComplaint, handleOrderComplaint, raiseComplaintWorkOrder, applyRefund, auditRefund,
+  saveOrderComplaint, createOrderComplaint, handleOrderComplaint, raiseComplaintWorkOrder,
+  applyRefund, createRefund, auditRefund,
 } from "./cs";
 
 export {
+  siteAnalyses, listSiteAnalysis,        // 站点坪效：自 location 迁来（读模型，避免互引）
+  listAgentPerformance,                  // 代理绩效：自 agent 迁来（GMV 与坪效同源）
   reportDevices, reportLocations, reportFinances, reportScreens, reportCustoms,
   listReportDevice, listReportLocation, listReportFinance, listReportScreen, listReportCustom,
+  // S3 报表域成型：周期趋势 / 大屏看板 / 指标目录 / 消费者洞察
+  getReportTrend, getScreenBoard, listReportMetrics, getConsumerInsight,
 } from "./report";
 
 export {
@@ -121,6 +143,8 @@ export {
   listEmployees, listDepartments, listStaffPerformance,
   saveDepartment, saveRoleRow, saveEmployee, saveRoleDataScope,
   listRoles, archiveRole, unarchiveRole,
+  // S6 功能权限勾选树 + 审计详情
+  permissions, listRolePermissions, saveRolePermissions, getAuditDetail,
 } from "./org";
 
 export {
@@ -138,4 +162,8 @@ export {
   problems, listProblems, saveProblem,
   taxSettings, listTaxSettings, saveTaxSetting,
   archiveBank, unarchiveBank, archiveProblem, unarchiveProblem,
+  // S6/S7：地区库树 / 供应商连通性探测 / 模板预览与试发 / 发送记录重发 / OpenAPI 密钥重置
+  listRegionTree, testVendorConnectivity, VendorProbeError,
+  previewNotifyTemplate, testSendNotifyTemplate, resendNotifyLog, NotifySendError,
+  resetOpenApiAppSecret,
 } from "./system";

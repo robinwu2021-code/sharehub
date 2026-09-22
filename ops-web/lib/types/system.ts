@@ -44,6 +44,20 @@ export interface Vendor {
   apiBase: string | null;
   deviceCount: number;
 }
+/**
+ * S7 供应商连通性探测结果。
+ * 「配置能存」≠「对得上」：接入参数填错要在配置页当场知道，否则等到设备离线告警才发现。
+ * 静态阶段是**假探测**（mock 按接入方式/状态推演结论），但结论字段与真探测一致，接后端不改 UI。
+ */
+export interface VendorProbeResult {
+  vendorCode: string;
+  ok: boolean;
+  endpoint: string; // 实际探测目标：HTTP 型是 apiBase，TCP/MQTT 型是网关侧监听地址
+  latencyMs: number;
+  checkedAt: string;
+  message: string; // 一句话结论，直接给运维看
+  detail: string; // 原始信息，排障与找厂商对质用
+}
 
 // —— 系统 · 待建功能补全（platform 域）——
 export interface NotifyTemplate {
@@ -52,6 +66,27 @@ export interface NotifyTemplate {
   channel: "SMS" | "EMAIL" | "PUSH" | "WHATSAPP";
   lang: "ar" | "en";
   status: "ENABLED" | "DISABLED";
+  // 下面三个字段后端实体（platform/notify/entity/NotifyTemplate）早就有，前端此前没接——
+  // 没有 content 就没法做「预览」，模板页只能改元数据，改不了真正会发出去的文案。
+  scene: string; // 场景键：OTP / RENT_OK / RETURN_OK …
+  content: string; // 正文，变量写作 {{name}}
+  params: string; // 声明的变量名，逗号分隔（预览按此列出待填变量）
+}
+/** S7 模板预览：变量替换后的成品文案。缺变量要显式列出——带着 {{}} 发出去是事故。 */
+export interface NotifyTemplatePreview {
+  templateNo: string;
+  channel: NotifyTemplate["channel"];
+  lang: NotifyTemplate["lang"];
+  subject: string; // 邮件标题；非邮件渠道为空串
+  rendered: string;
+  vars: Record<string, string>; // 本次替换实际用到的取值（未填的用示例值兜底）
+  missingVars: string[]; // 模板声明了但既没填也没有示例值的变量
+}
+/** S7 模板试发：试发也是真发、真计费，故与重发同规格必须带幂等键。 */
+export interface NotifyTestSendPayload {
+  target: string; // 收件手机/邮箱，落库前脱敏
+  vars?: Record<string, string>;
+  idempotencyKey: string;
 }
 export interface DictEntry {
   dictNo: string;
@@ -64,9 +99,18 @@ export interface DictEntry {
 export interface Region {
   regionId: string;
   name: string;
-  parent: string;
+  parent: string; // 上级**名称**（列表列直读，历史字段，保留）
+  /**
+   * 上级 regionId；根节点为 null。树只能按 ID 连边——`parent` 存的是名称，
+   * 「Sharjah City」这类名字在多国之间会重复，按名字连边必然连错（拍板 #4 要三级树）。
+   */
+  parentId: string | null;
   level: number;
   cityCount: number;
+}
+/** 地区树节点。`level` 必须等于树深度，`parentId` 必须指向存在的节点（mock 与后端同责）。 */
+export interface RegionNode extends Region {
+  children: RegionNode[];
 }
 export interface SysParam {
   paramKey: string;
@@ -82,6 +126,10 @@ export interface OpenApiApp {
   rateLimit: number;
   status: "ACTIVE" | "DISABLED";
   createdAt: string;
+  // AppKey 是公开标识，AppSecret 才是密钥：前端只承载掩码，真实值仅在重置时由后端
+  // 经带外渠道交付一次（口径同 PaymentChannel.apiKeyMasked）。
+  appSecretMasked: string;
+  secretResetAt: string | null; // null = 建档后从未重置
 }
 
 // 多国家市场管理架构（系统域 · P3）
@@ -126,6 +174,17 @@ export interface NotifyLog {
   failReason: string | null;
   cost: number; // 单条计费
   currency: string; // 计费币种（AED）
+  /**
+   * 幂等键（拍板 #6）。重发/试发**必须**携带，同键第二次由服务端拒绝——
+   * 双击提交或网络重试各落一笔，就是真的多发一条短信、多扣一次钱。历史 seed 为 null。
+   */
+  idempotencyKey: string | null;
+  /** 由哪条记录重发而来；null = 原始发送。重发是**新增一条**，原记录一字不改（审计要看得见发了两次）。 */
+  resendOf: string | null;
+}
+/** 重发入参：只有幂等键——目标/渠道/模板一律沿用原记录，让运营改这些等于换了一次发送。 */
+export interface NotifyResendPayload {
+  idempotencyKey: string;
 }
 /** 发送记录页头统计（今日发送量 / 失败率 / 今日成本）。 */
 export interface NotifyLogStats {

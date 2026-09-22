@@ -1,23 +1,49 @@
 // 设备域：机柜 / 仓位 / 充电宝 / 实时监控 / 远程指令 / 调拨 / OTA / 供应商接入 / 设备日志 / 设备编码批次。
 // cabinets 是全库的“机柜号来源”，其他域（订单/告警/客服/营销广告位…）一律通过 cabNo() 引用，不复制数据。
 import type {
-  Cabinet, Slot, Vendor, Powerbank, CabinetMonitor, CommandRecord,
-  InventoryTransfer, OtaRollout, DeviceLog, DeviceCodeBatch, PageQuery,
+  Cabinet, CabinetStatus, Slot, Vendor, Powerbank, CabinetMonitor, CommandRecord, CommandType,
+  InventoryTransfer, OtaRollout, OtaRelease, OtaTask, DeviceLog, DeviceCodeBatch, PageQuery,
 } from "../../types";
+// 指令词表是 types 层 SSOT：抽屉里的选项、这里的落库校验同源，避免「界面能选、落库不认」
+import { COMMAND_TYPES, SLOT_REQUIRED_COMMANDS } from "../../types";
 import { VENDORS, LOCS, OPERATORS, p, iso } from "./internal";
 import { paginate, kwHit, upsert, nextNo, liveHit, archiveRow, unarchiveRow } from "./helpers";
+// 机柜归属站点（A1）取自场所域的真实点位，**不另造字符串**。依赖方向 device → location
+// 是单向的（location.ts 不引用设备），与 agent.ts 反过来引用 cabinets 的做法不冲突。
+import { locations } from "./location";
 
 // —— 设备 ——
+/**
+ * 点位 → 站点反查：机柜的 `siteNo` 恒等于它所在点位的站点，不独立维护。
+ * 点位为空（到货未上架）或点位号查不到时返回 null，绝不编一个站点号出来。
+ */
+const locOf = (locationNo: string | null | undefined) =>
+  locations.find((l) => l.locationNo === locationNo) ?? null;
+export const siteNoOfLocation = (locationNo: string | null | undefined) => locOf(locationNo)?.siteNo ?? null;
+
+/**
+ * 点位 → 台账上的「归属投影」：站点号 + 站点名一起反查。
+ * `Cabinet.locationName` 存的就是**站点名**（引用完整性盯着 `sites.name`），所以它和
+ * `siteNo` 一样不能由表单/CSV 给——两者分别来源就会出现「站点号是 A、站点名是 B」。
+ */
+export const cabinetPlacement = (locationNo: string | null | undefined) => {
+  const loc = locOf(locationNo);
+  return { siteNo: loc?.siteNo ?? null, locationName: loc?.siteName ?? null };
+};
+
 export const cabinets: Cabinet[] = Array.from({ length: 48 }, (_, i) => {
   const total = p([6, 8, 12], i);
   const online = i % 9 !== 0;
+  const locationNo = `LOC${200 + (i % LOCS.length)}`;
   return {
     cabinetNo: `CAB${1000 + i}`, sn: `SN${90000 + i}`, vendorCode: p(VENDORS, i),
     // 归属代理（A1）：号段与 agents（AG001–AG009）对齐；每 5 台留 1 台平台直营，
     // 划拨抽屉才有「未归属」的候选可选。这里刻意不 import agent.ts —— 保持
     // device → agent 的依赖方向单向（agent.ts 反过来引用 cabinets 反算设备数）。
     agentNo: i % 5 === 0 ? null : `AG${String((i % 9) + 1).padStart(3, "0")}`,
-    model: p(["X6", "S8", "M12"], i), locationNo: `LOC${200 + (i % LOCS.length)}`,
+    model: p(["X6", "S8", "M12"], i), locationNo,
+    // 站点由点位反查：与 locationName（存的就是站点名）天然对得上，不会出现「点位在 A 站、站点写 B」
+    siteNo: siteNoOfLocation(locationNo),
     locationName: p(LOCS, i), slotTotal: total, availableCount: (i * 7) % (total + 1),
     onlineStatus: online ? "ONLINE" : "OFFLINE", status: i % 13 === 0 ? "FAULT" : "DEPLOYED",
     fwVersion: p(["1.2.0", "1.3.1", "1.4.0"], i), lastHeartbeatAt: online ? iso(i * 60000) : null,
@@ -82,14 +108,88 @@ export const inventoryTransfers: InventoryTransfer[] = Array.from({ length: 16 }
   powerbankCount: 5 + (i * 3) % 40, status: p(["DRAFT", "IN_TRANSIT", "DONE"] as const, i),
   operator: p(OPERATORS, i), createdAt: iso(i * 43200_000),
 }));
-export const otaRollouts: OtaRollout[] = Array.from({ length: 14 }, (_, i) => {
-  const st = p(["PENDING", "RUNNING", "DONE", "ROLLBACK"] as const, i);
-  return {
-    rolloutNo: `OTA${5000 + i}`, fwVersion: p(["1.4.0", "1.4.1", "1.5.0", "2.0.0"], i),
-    vendorCode: p(VENDORS, i), strategy: i % 3 === 0 ? "FULL" : "GRAY",
-    progress: st === "DONE" ? 100 : st === "PENDING" ? 0 : 10 + (i * 13) % 80,
-    status: st, createdAt: iso(i * 86400_000),
-  };
+// —— 固件 OTA：版本库（货架）→ 投放（灰度/全量）→ 逐设备任务（下钻）——
+// 三层共用一份种子，**投放不再自带 progress**：投放的百分比由它的任务均值算出，
+// 固件版本只能取版本库里已存在的版本。否则「列表 62% / 点开抽屉 4 台全 100%」这类
+// 自相矛盾的假数据会让人以为页面坏了（版本库缺 1.4.1 时投放行也会点进去查无此版本）。
+
+/** 版本库按 versionCode 倒序排列，与后端 `releases()` 的排序一致（mock 无排序能力，靠声明顺序）。 */
+export const otaReleases: OtaRelease[] = [
+  { releaseNo: "FW908", fwType: "MODEM", vendorCode: "cd-tech", version: "4.1.0", versionCode: 410,
+    artifactUrl: "https://fw.example/pb/modem-4.1.0.bin", checksum: "sha256:9f21c4ab7e", mandatory: false,
+    status: "DRAFT", releaseNotes: "通信模组：弱网重连退避策略调整，尚未灰度" },
+  { releaseNo: "FW907", fwType: "SLOT", vendorCode: "sd-power", version: "3.2.0", versionCode: 320,
+    artifactUrl: "https://fw.example/pb/slot-3.2.0.bin", checksum: "sha256:41ba0d9c72", mandatory: false,
+    status: "PUBLISHED", releaseNotes: "仓门：弹出电机堵转检测阈值下调，减少卡仓" },
+  { releaseNo: "FW906", fwType: "MCU", vendorCode: null, version: "2.1.0", versionCode: 210,
+    artifactUrl: "https://fw.example/pb/mcu-2.1.0.bin", checksum: "sha256:c07e5518af", mandatory: false,
+    status: "DRAFT", releaseNotes: "主控：2.0.0 回滚问题的修复版，待验证后发布" },
+  { releaseNo: "FW905", fwType: "MCU", vendorCode: null, version: "2.0.0", versionCode: 200,
+    artifactUrl: "https://fw.example/pb/mcu-2.0.0.bin", checksum: "sha256:6d3af1029b", mandatory: false,
+    status: "PAUSED", releaseNotes: "主控大版本：现场自检失败已整批回滚，暂停继续投放" },
+  { releaseNo: "FW904", fwType: "MCU", vendorCode: null, version: "1.5.0", versionCode: 150,
+    artifactUrl: "https://fw.example/pb/mcu-1.5.0.bin", checksum: "sha256:2e88b4fd15", mandatory: true,
+    status: "PUBLISHED", releaseNotes: "主控：修复归还检测偶发漏判（安全修复，强制升级）" },
+  { releaseNo: "FW903", fwType: "MCU", vendorCode: null, version: "1.4.1", versionCode: 141,
+    artifactUrl: "https://fw.example/pb/mcu-1.4.1.bin", checksum: "sha256:70cc9e3a68", mandatory: false,
+    status: "PUBLISHED", releaseNotes: "主控：心跳上报间隔可配置" },
+  { releaseNo: "FW902", fwType: "MCU", vendorCode: null, version: "1.4.0", versionCode: 140,
+    artifactUrl: "https://fw.example/pb/mcu-1.4.0.bin", checksum: "sha256:1ab4402fd9", mandatory: false,
+    status: "PUBLISHED", releaseNotes: "主控：低电量阈值上报 + 仓位状态全量补报" },
+  { releaseNo: "FW901", fwType: "MCU", vendorCode: null, version: "1.3.1", versionCode: 131,
+    artifactUrl: "https://fw.example/pb/mcu-1.3.1.bin", checksum: "sha256:88f0e1c4a7", mandatory: false,
+    status: "COMPLETED", releaseNotes: "主控：老版本，仍有存量机柜在跑" },
+  { releaseNo: "FW900", fwType: "MCU", vendorCode: null, version: "1.2.0", versionCode: 120,
+    artifactUrl: "https://fw.example/pb/mcu-1.2.0.bin", checksum: "sha256:5c19aa7b30", mandatory: false,
+    status: "COMPLETED", releaseNotes: "主控：出厂版本" },
+];
+
+/** 投放种子：progress 缺席（由任务算），fwVersion 取自 otaReleases 里已发布/已暂停的主控版本。 */
+const ROLLOUT_SEEDS = Array.from({ length: 14 }, (_, i) => ({
+  rolloutNo: `OTA${5000 + i}`,
+  fwVersion: p(["1.4.0", "1.4.1", "1.5.0", "2.0.0"], i),
+  vendorCode: p(VENDORS, i),
+  strategy: (i % 3 === 0 ? "FULL" : "GRAY") as OtaRollout["strategy"],
+  status: p(["PENDING", "RUNNING", "DONE", "ROLLBACK"] as const, i),
+  createdAt: iso(i * 86400_000),
+}));
+
+const codeOf = (version: string) => otaReleases.find((r) => r.version === version)?.versionCode ?? 0;
+/** 升级前版本只能取「版本库里比目标低的档位」——出现 1.5.0 → 1.5.0 这种就不是升级了。 */
+const prevOf = (target: string, k: number) => {
+  const lower = otaReleases.filter((r) => r.versionCode < codeOf(target)).map((r) => r.version);
+  return lower.length ? p(lower, k) : "1.0.0";
+};
+
+/** RUNNING 投放的逐台进度分布：先成功一台、再一台装、一台下载，其余排队（灰度该有的样子）。 */
+const RUNNING_STEPS = [
+  { status: "SUCCESS", progress: 100 }, { status: "INSTALLING", progress: 70 },
+  { status: "DOWNLOADING", progress: 35 }, { status: "DOWNLOADED", progress: 50 },
+  { status: "PENDING", progress: 0 },
+] as const;
+
+export const otaTasks: OtaTask[] = ROLLOUT_SEEDS.flatMap((s, i) =>
+  Array.from({ length: 3 + (i % 3) }, (_, j): OtaTask => {
+    const base = {
+      taskNo: `OTK${7000 + i * 10 + j}`, rolloutNo: s.rolloutNo,
+      cabinetNo: cabNo(i * 5 + j), previousVersion: prevOf(s.fwVersion, i + j),
+    };
+    if (s.status === "PENDING") return { ...base, status: "PENDING", progress: 0, error: null };
+    if (s.status === "DONE") return { ...base, status: "SUCCESS", progress: 100, error: null };
+    // 回滚是「一台炸了整批退回」，故第一台留 FAILED + 原因，其余 ROLLED_BACK——
+    // 不留那台失败任务，运营就永远查不到当初为什么回滚
+    if (s.status === "ROLLBACK") {
+      return j === 0
+        ? { ...base, status: "FAILED", progress: 40, error: "安装后自检失败：仓门电机无响应" }
+        : { ...base, status: "ROLLED_BACK", progress: 0, error: null };
+    }
+    return { ...base, ...RUNNING_STEPS[j % RUNNING_STEPS.length], error: null };
+  }),
+);
+
+export const otaRollouts: OtaRollout[] = ROLLOUT_SEEDS.map((s) => {
+  const mine = otaTasks.filter((t) => t.rolloutNo === s.rolloutNo);
+  return { ...s, progress: Math.round(mine.reduce((n, t) => n + t.progress, 0) / mine.length) };
 });
 
 // —— §1 设备日志：双流合一（COMMAND 下发 / REPORT 上报），按时间倒序 ——
@@ -159,6 +259,20 @@ export const savePowerbank = (x: Partial<Powerbank>) => upsert(powerbanks, x, "p
 export const saveInventoryTransfer = (x: Partial<InventoryTransfer>) => upsert(inventoryTransfers, x, "transferNo", () => nextNo("TR", inventoryTransfers));
 export const saveOtaRollout = (x: Partial<OtaRollout>) => upsert(otaRollouts, x, "rolloutNo", () => nextNo("OTA", otaRollouts));
 
+/** 版本库查询：关键词(版本号/发布单号/说明) + 固件类型 / 供应商 / 发布状态三筛。 */
+export const listOtaReleases = (q: PageQuery & { fwType?: string; vendorCode?: string; status?: string } = {}) =>
+  paginate(otaReleases, q.page, q.size, (x) => {
+    if (!kwHit(q.keyword, x.releaseNo, x.version, x.releaseNotes)) return false;
+    if (q.fwType && x.fwType !== q.fwType) return false;
+    if (q.vendorCode && x.vendorCode !== q.vendorCode) return false;
+    if (q.status && x.status !== q.status) return false;
+    return true;
+  });
+export const saveOtaRelease = (x: Partial<OtaRelease>) => upsert(otaReleases, x, "releaseNo", () => nextNo("FW", otaReleases));
+
+/** 某次投放的逐设备任务（不分页，抽屉里要看全量）。 */
+export const listOtaTasks = (rolloutNo: string) => otaTasks.filter((t) => t.rolloutNo === rolloutNo);
+
 /** 设备日志查询：关键词(日志号/机柜/事件) + stream 双流筛选 + 日期范围(YYYY-MM-DD)。 */
 export const listDeviceLogs = (q: PageQuery & { stream?: string; from?: string; to?: string } = {}) =>
   paginate(deviceLogs, q.page, q.size, (x) => {
@@ -191,15 +305,120 @@ export const unarchivePowerbank = (no: string) => unarchiveRow(powerbanks, "powe
 export function importCabinets(rows: Partial<Cabinet>[]): { imported: number; updated: number } {
   let imported = 0, updated = 0;
   for (const r of rows) {
-    const i = cabinets.findIndex((c) => c.cabinetNo === r.cabinetNo);
-    if (i >= 0) { cabinets[i] = { ...cabinets[i], ...r }; updated++; }
-    else { cabinets.unshift({ ...DEFAULT_CABINET, ...r } as Cabinet); imported++; }
+    // 归属站点/站点名不从 CSV 里塞（模板也没这两列）：由点位反查，否则一台机柜会有互相矛盾的归属。
+    // 点位留空即「到货未上架」，归属随之清空——CSV 的空值是明确表态，不是「保持原样」。
+    const row = { ...r, ...cabinetPlacement(r.locationNo) };
+    const i = cabinets.findIndex((c) => c.cabinetNo === row.cabinetNo);
+    if (i >= 0) { cabinets[i] = { ...cabinets[i], ...row }; updated++; }
+    else { cabinets.unshift({ ...DEFAULT_CABINET, ...row } as Cabinet); imported++; }
   }
   return { imported, updated };
 }
+// ————————————————————————————————————————————————————————————————
+// 机柜建档 / 编辑（POST /api/ops/cabinets[/{cabinetNo}]）
+// ⚠️ 后端缺口：写端点尚不存在（OpsController 只有 GET /cabinets 与 GET /cabinets/{no}）。
+// 校验放这一层而不是抽屉里：导入、建档、将来的后端都得守同一套规则，
+// 只写在表单里等于「换个入口就能塞脏数据」。
+// ————————————————————————————————————————————————————————————————
+
+/** 建档违规（编号/SN 重复、仓位数越界、点位不存在…）。 */
+export class CabinetError extends Error {
+  constructor(msg: string) { super(msg); this.name = "CabinetError"; }
+}
+
+/**
+ * 机柜建档/编辑。**只接受建档字段**（SN/供应商/型号/仓位数/点位/固件/状态），
+ * 其余字段一律不从入参取：
+ * - `siteNo`/`locationName` 由点位反查（见 `cabinetPlacement`）；
+ * - `agentNo` 只能经代理域的划拨写入；
+ * - `onlineStatus`/`lastHeartbeatAt`/`availableCount` 是设备上报出来的事实，
+ *   表单填一个「在线」不会让机器真的在线，只会让台账骗人。
+ */
+export function saveCabinet(x: Partial<Cabinet> & { cabinetNo?: string }): Cabinet {
+  const no = (x.cabinetNo ?? "").trim();
+  const idx = no ? cabinets.findIndex((c) => c.cabinetNo === no) : -1;
+  const prev = idx >= 0 ? cabinets[idx] : null;
+  // 手填柜机号才校验格式；留空走自动生成。号段与导入模板同一条规则（CAB + 数字）
+  if (no && !prev && !/^CAB\d+$/.test(no)) throw new CabinetError("柜机号格式应为 CAB + 数字，如 CAB2000");
+
+  const sn = String(x.sn ?? "").trim();
+  if (sn.length < 4) throw new CabinetError("出厂序列号至少 4 位：SN 是现场核机与厂商保修的唯一凭据");
+  const dup = cabinets.find((c, i) => i !== idx && c.sn === sn);
+  if (dup) throw new CabinetError(`SN ${sn} 已被 ${dup.cabinetNo} 占用：同一台机器不能建两份档`);
+
+  const model = String(x.model ?? "").trim();
+  if (!model) throw new CabinetError("型号必填：仓位布局与配件都按型号走");
+  if (!vendors.some((v) => v.vendorCode === x.vendorCode)) {
+    throw new CabinetError(`未接入的供应商：${x.vendorCode ?? "(空)"}，可选 ${vendors.map((v) => v.vendorCode).join(" / ")}`);
+  }
+
+  const slotTotal = Number(x.slotTotal);
+  if (!Number.isInteger(slotTotal) || slotTotal < 1 || slotTotal > 48) throw new CabinetError("仓位数应为 1~48 的整数");
+  // 缩仓位不能把已在仓的充电宝挤出台账：可借数就是在仓宝数，缩到它以下台账立刻自相矛盾
+  if (prev && slotTotal < prev.availableCount) {
+    throw new CabinetError(`仓位数不得小于当前在仓充电宝数（${prev.availableCount}）：请先调拨出宝再缩仓`);
+  }
+
+  const locationNo = (x.locationNo ?? "").trim() || null;
+  if (locationNo && !locations.some((l) => l.locationNo === locationNo)) {
+    throw new CabinetError(`点位不存在：${locationNo}，请先在「渠道与场地 · 点位管理」建档`);
+  }
+
+  const row: Cabinet = {
+    ...(prev ?? DEFAULT_CABINET),
+    cabinetNo: prev?.cabinetNo ?? (no || nextNo("CAB", cabinets, 1000, "cabinetNo")),
+    sn, vendorCode: x.vendorCode!, model, slotTotal, locationNo,
+    status: (x.status as CabinetStatus) ?? prev?.status ?? DEFAULT_CABINET.status,
+    fwVersion: String(x.fwVersion ?? "").trim() || prev?.fwVersion || DEFAULT_CABINET.fwVersion,
+    ...cabinetPlacement(locationNo),
+  };
+  if (prev) cabinets[idx] = row; else cabinets.unshift(row);
+  return row;
+}
+
+// ————————————————————————————————————————————————————————————————
+// 远程指令下发（POST /api/ops/cabinets/{cabinetNo}/commands，后端已实现）
+// ————————————————————————————————————————————————————————————————
+
+/** 指令违规（机柜不存在/已归档、未知指令、仓位越界）。 */
+export class CommandError extends Error {
+  constructor(msg: string) { super(msg); this.name = "CommandError"; }
+}
+
+/**
+ * 下发一条远程指令，**并落一条指令记录**。
+ * 原先 mock 只回一个假 commandId，于是「下发了 → 指令记录里查不到」，
+ * 与真实链路（网关下发后必然留痕）不符，也让指令记录 tab 看起来是死数据。
+ * 落库状态恒为 `SENT`：ACK 要等设备回，mock 里直接写「已确认」等于伪造设备回执。
+ */
+export function recordCommand(cabinetNo: string, type: string, params?: Record<string, unknown>): CommandRecord {
+  const cab = cabinets.find((c) => c.cabinetNo === cabinetNo);
+  if (!cab) throw new CommandError(`机柜不存在：${cabinetNo}`);
+  if (cab.archivedAt) throw new CommandError(`机柜 ${cabinetNo} 已归档：先恢复再下发，否则指令发给一台账面上已不存在的机器`);
+  if (!COMMAND_TYPES.includes(type as CommandType)) {
+    throw new CommandError(`未知指令类型：${type}，可选 ${COMMAND_TYPES.join(" / ")}`);
+  }
+  const t = type as CommandType;
+  const raw = params?.slotIndex;
+  const slotIndex = raw === undefined || raw === null || raw === "" ? null : Number(raw);
+  if (slotIndex === null && SLOT_REQUIRED_COMMANDS.includes(t)) throw new CommandError(`「${t}」必须指定仓位`);
+  if (slotIndex !== null && (!Number.isInteger(slotIndex) || slotIndex < 1 || slotIndex > cab.slotTotal)) {
+    throw new CommandError(`仓位号应在 1~${cab.slotTotal} 之间（${cabinetNo} 共 ${cab.slotTotal} 仓）`);
+  }
+  const operator = typeof params?.operator === "string" && params.operator.trim() ? params.operator.trim() : "admin";
+  const rec: CommandRecord = {
+    commandId: nextNo("CMD", commandRecords, 880000, "commandId"),
+    cabinetNo, type: t, slotIndex, status: "SENT", operator,
+    createdAt: new Date().toISOString(),
+  };
+  commandRecords.unshift(rec);
+  return rec;
+}
+
 const DEFAULT_CABINET: Cabinet = {
   // 导入的新机柜默认平台直营（agentNo=null）：归属只能经代理域的划拨动作落，不从 CSV 里塞
-  cabinetNo: "", sn: "", vendorCode: "cd-tech", model: "X6", locationNo: null, locationName: null, agentNo: null,
+  // 未上架的机柜没有点位、也就没有归属站点（siteNo 由点位反查，见 siteNoOfLocation）
+  cabinetNo: "", sn: "", vendorCode: "cd-tech", model: "X6", locationNo: null, siteNo: null, locationName: null, agentNo: null,
   slotTotal: 8, availableCount: 0, onlineStatus: "OFFLINE", status: "DEPLOYED",
   fwVersion: "1.0.0", lastHeartbeatAt: null, archivedAt: null,
 };

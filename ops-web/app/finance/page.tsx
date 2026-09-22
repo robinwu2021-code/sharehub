@@ -11,6 +11,10 @@ import { Toolbar } from "@/components/ui/toolbar";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
 import { DataTable, type Column, type SortDir } from "@/components/ui/data-table";
 import { Drawer, Field } from "@/components/ui/drawer";
+import { FilterSelect } from "@/components/ui/filter-select";
+import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
+import { ReadOnlyNotice } from "@/components/read-only-notice";
+import { Notice } from "@/components/ui/notice";
 import { Tabs } from "@/components/ui/tabs";
 import { DateInput } from "@/components/ui/date-input";
 import { Badge } from "@/components/ui/badge";
@@ -25,19 +29,32 @@ import { notify } from "@/lib/notify";
 import { exportCsv } from "@/lib/export-csv";
 import type {
   ShareRule, Settlement, SettlementStatus, Withdrawal, LedgerEntry, ShareRecord,
-  Reconcile, ReconAction, ReconHandleStatus, Invoice, InvoiceStatus,
+  Reconcile, ReconAction, ReconHandleStatus, ReconDiff, ReconDiffType, Invoice, InvoiceStatus,
   ShareSummary, RechargeOrder, PageResult,
+
+  VoucherCreatePayload,} from "@/lib/types";
+import {
+  RECON_TRANSITIONS, RECON_TERMINAL, canReconTransition, canEditInvoiceFields, parseReconDiffDetail,
+  withdrawFeeOf, withdrawNetOf, WITHDRAW_FEE_PENDING,
+  // 记账期间复用报表域枚举：与站点坪效/代理绩效/绩效报表同一套周期口径
+  REPORT_PERIODS, REPORT_PERIOD_DEFAULT, type ReportPeriod,
 } from "@/lib/types";
-import { RECON_TRANSITIONS, RECON_TERMINAL, canReconTransition, canEditInvoiceFields } from "@/lib/types";
 
 const SIZE = 10;
+/** 周期码 → 中文标签。取自 REPORT_PERIODS，不另抄一份。 */
+const periodLabel = (p: string) => REPORT_PERIODS.find((x) => x.value === p)?.label ?? p;
 const TABS = [{ key: "rules", label: "分润规则" }, { key: "records", label: "分润明细" }, { key: "summary", label: "分润统计", phase: 2 as const }, { key: "settlements", label: "结算单" }, { key: "ledger", label: "账务分录", phase: 2 as const }, { key: "withdrawals", label: "提现", phase: 2 as const }, { key: "reconcile", label: "对账", phase: 3 as const }, { key: "invoices", label: "发票", phase: 3 as const }, { key: "recharges", label: "充值订单", phase: 3 as const }];
 
 // 分润统计：维度切换器（竞品把「运营商佣金」「商户佣金」拆成两套菜单两张表，
 // 我们一张表切 dimension——列完全相同，少一次跳转）
 const SUMMARY_DIMS = [{ key: "VENUE", label: "场地方" }, { key: "AGENT", label: "代理商" }];
+// 分润规则 · 双向视图：竞品「场地方分成」「代理商分成」是两个菜单两套规则，
+// 我们是**同一份规则**按分成主体分开看——切视角只换 dimension 筛选，不是两套数据。
+const RULE_VIEWS = [{ key: "VENUE", label: "按场地方看" }, { key: "AGENT", label: "按代理商看" }];
+const RULE_VIEW_LABEL = { VENUE: "场地方", AGENT: "代理商" } as const;
 const SUMMARY_PERIODS = ["2026-07", "2026-06", "2026-05"];
-const RECHARGE_STATUS: Record<RechargeOrder["status"], { label: string; tone: "success" | "warning" | "danger" | "muted" }> = {
+const PERIOD_OPTIONS = SUMMARY_PERIODS.map((p) => ({ value: p, label: p }));
+const RECHARGE_STATUS: StatusMap<RechargeOrder["status"]> = {
   PENDING: { label: "待支付", tone: "warning" },
   PAID: { label: "已支付", tone: "success" },
   FAILED: { label: "支付失败", tone: "danger" },
@@ -45,10 +62,20 @@ const RECHARGE_STATUS: Record<RechargeOrder["status"], { label: string; tone: "s
 };
 
 // 结算单状态：全站同色（待确认=warning / 已确认=default / 已打款=success）
-const STL_STATUS: Record<SettlementStatus, { label: string; tone: "success" | "warning" | "default" }> = {
+const STL_STATUS: StatusMap<SettlementStatus> = {
   DRAFT: { label: "待确认", tone: "warning" },
   CONFIRMED: { label: "已确认", tone: "default" },
   PAID: { label: "已打款", tone: "success" },
+};
+// 提现状态：原先徽标直接印枚举值（"AUDIT"/"PAID"），那是系统内部词（规范 §13）。
+// 键序 = 资金流转顺序：申请 → 审批 → 打款 → 到账 / 驳回。
+const WD_STATUS: StatusMap<Withdrawal["status"]> = {
+  APPLY: { label: "待审批", tone: "warning" },
+  AUDIT: { label: "审批中", tone: "warning" },
+  PAYING: { label: "打款中", tone: "info" },
+  PAID: { label: "已打款", tone: "success" },
+  // 驳回与打款失败共用 FAILED（两者都带 rejectReason），故文案兼表两义
+  FAILED: { label: "驳回 / 失败", tone: "danger" },
 };
 const PAYEE_TYPE_LABEL = { VENUE: "场地方", AGENT: "代理商" } as const;
 /** multiselect + csv 的值是逗号分隔业务号串。 */
@@ -64,21 +91,38 @@ const RULE_FIELDS: FieldDef[] = [
 ];
 // —— 对账差错（S2）——
 // 跑批结果与处置进度是两列：status 是机器算的事实，handleStatus 是人推的进度，不混为一谈。
-const RECON_HANDLE_STATUS: Record<ReconHandleStatus, { label: string; tone: "success" | "warning" | "danger" | "muted" }> = {
+const RECON_HANDLE_STATUS: StatusMap<ReconHandleStatus> = {
   OPEN: { label: "待处理", tone: "danger" },
   HANDLING: { label: "处理中", tone: "warning" },
   RESOLVED: { label: "已结案", tone: "success" },
   IGNORED: { label: "已忽略", tone: "muted" },
 };
+/** 跑批结果（机器算出的事实，与人推的 handleStatus 分列两栏，互不写回）。 */
+const RECON_STATUS: StatusMap<Reconcile["status"]> = {
+  MATCHED: { label: "已平", tone: "success" },
+  DIFF: { label: "有差异", tone: "danger" },
+};
+/** 逐笔平账标记：resolved 是布尔，映射成两个键，好让它与其它状态列同走 StatusBadge。 */
+const DIFF_RESOLVED: StatusMap<"RESOLVED" | "OPEN"> = {
+  RESOLVED: { label: "已平账", tone: "success" },
+  OPEN: { label: "未处置", tone: "danger" },
+};
 const RECON_RESULT_LABEL: Record<string, string> = {
   VERIFIED_OK: "核对无误", PLATFORM_ERROR: "平台侧差错", CHANNEL_ERROR: "渠道侧差错", COMPENSATED: "已补差",
+};
+/** 差错类型（子表 recon_diff.diff_type）：一句话说清「差在哪一侧」。 */
+const RECON_DIFF_TYPE: StatusMap<ReconDiffType> = {
+  ONLY_IN_NEARPAY: { label: "渠道单边", tone: "danger" },
+  ONLY_IN_LEDGER: { label: "我方单边", tone: "danger" },
+  AMOUNT_MISMATCH: { label: "金额不等", tone: "warning" },
+  STATUS_MISMATCH: { label: "状态不一致", tone: "muted" },
 };
 /** 差错方向由 diff 的正负推出（不是新造的分类字段，就是同一个数的解读）。 */
 const diffSideLabel = (diff: number) =>
   diff === 0 ? "已平" : diff > 0 ? "渠道多 / 账务少记" : "账务多记 / 渠道少到账";
 
 // —— 发票（S2）——
-const INV_STATUS: Record<InvoiceStatus, { label: string; tone: "success" | "danger" | "muted" }> = {
+const INV_STATUS: StatusMap<InvoiceStatus> = {
   DRAFT: { label: "草稿", tone: "muted" },
   ISSUED: { label: "已开具", tone: "success" },
   VOID: { label: "已作废", tone: "danger" },
@@ -97,6 +141,15 @@ function FinanceInner() {
   const qTab = sp.get("tab");
   const [tab, setTab] = useState(TABS.some((t) => t.key === qTab) ? (qTab as string) : "rules");
   const [page, setPage] = useState(1);
+  // 账务分录期间（缺省近 30 日，与坪效/绩效同一套 REPORT_PERIODS）
+  const [ledgerPeriod, setLedgerPeriod] = useState<ReportPeriod>(REPORT_PERIOD_DEFAULT);
+  // 凭证下钻：会计上有意义的单位是「凭证」而非单条分录（一借一贷必须等额）
+  const [voucherNo, setVoucherNo] = useState<string | null>(null);
+  // 手工记账。凭证是「一组分录」而不是一条，故用数组而非单对象 —— 借贷必须成对。
+  const [entryDraft, setEntryDraft] = useState<{
+    summary: string; orderNo: string;
+    rows: { account: string; direction: "DEBIT" | "CREDIT"; amount: string }[];
+  } | null>(null);
   const [keyword, setKeyword] = useState("");
   const qc = useQueryClient();
   const allow = useCan();
@@ -107,11 +160,17 @@ function FinanceInner() {
   const [stlDetail, setStlDetail] = useState<Settlement | null>(null);
   const [stlStatus, setStlStatus] = useState("");
   const [ruleForm, setRuleForm] = useState<Partial<ShareRule> | null>(null);
+  // 分润规则视角：默认场地方（规则数量最多的一侧）
+  const [ruleDim, setRuleDim] = useState<"VENUE" | "AGENT">("VENUE");
   const [invoiceForm, setInvoiceForm] = useState<Partial<Invoice> | null>(null);
   // 对账差错处置（S2）：处理走抽屉——结论必填，与提现审批同一套「审批类抽屉」范式
   const [reconHandle, setReconHandle] = useState<Reconcile | null>(null);
   const [reconAction, setReconAction] = useState<ReconAction>("verify");
   const [reconNote, setReconNote] = useState("");
+  // 差错明细下钻：批次行只给「差了多少钱」，差在哪几笔要看子表——也是逐条处置的取号来源。
+  // reconDiffRow 非空 = 本次处置只针对这一条（带 diffId），为空 = 整批处置。
+  const [reconDiffsOf, setReconDiffsOf] = useState<Reconcile | null>(null);
+  const [reconDiffRow, setReconDiffRow] = useState<ReconDiff | null>(null);
   const [reconStatusFilter, setReconStatusFilter] = useState("");
   // 发票（S2）：详情下钻（含来源结算单核对）+ 作废抽屉（原因必填 + 二次确认）
   const [invDetail, setInvDetail] = useState<Invoice | null>(null);
@@ -145,12 +204,14 @@ function FinanceInner() {
   const canEditInvoice = allow("finance:invoice:issue");
   const canVoidInvoice = allow("finance:invoice:void");
   const canHandleRecon = allow("finance:recon:handle");
+  // 差错明细是只读下钻，与「对账」菜单同一个权限码（nav.ts 上 /finance?tab=reconcile 就挂它）
+  const canReadRecon = allow("finance:recon:read");
 
   const q = useQuery<PageResult<ShareRule | Settlement | Withdrawal | LedgerEntry | ShareRecord | Reconcile | Invoice | ShareSummary | RechargeOrder>>({
-    queryKey: ["fin", tab, page, keyword, sumDim, sumPeriod, sumSortKey, sumSortDir, rcStatus, rcFrom, rcTo, stlStatus, reconStatusFilter, invStatusFilter],
+    queryKey: ["fin", tab, page, keyword, ruleDim, sumDim, sumPeriod, sumSortKey, sumSortDir, rcStatus, rcFrom, rcTo, stlStatus, reconStatusFilter, invStatusFilter, ledgerPeriod],
     queryFn: () =>
-      tab === "rules" ? api.listShareRules({ page, size: SIZE, keyword })
-      : tab === "ledger" ? api.listLedger({ page, size: SIZE, keyword })
+      tab === "rules" ? api.listShareRules({ page, size: SIZE, keyword, dimension: ruleDim })
+      : tab === "ledger" ? api.listLedger({ page, size: SIZE, keyword, period: ledgerPeriod })
       : tab === "settlements" ? api.listSettlements({ page, size: SIZE, keyword, status: stlStatus || undefined })
       : tab === "records" ? api.listShareRecords({ page, size: SIZE, keyword })
       : tab === "summary" ? api.listShareSummaries({ page, size: SIZE, keyword, dimension: sumDim, period: sumPeriod, sortKey: sumSortKey, sortDir: sumSortDir })
@@ -162,6 +223,16 @@ function FinanceInner() {
   });
 
   const canAuditWithdrawal = allow("finance:withdrawal:audit");
+  // —— 提现手续费接「业务规则」（S7）——
+  // 费率/封顶/最低提现额的唯一来源是 系统设置 · 业务规则（/system?tab=rules），页面上原先写死 0.6%
+  // 与它并存：改了规则页提现页不动，正是「口径分叉 → 对账差钱」。这里改成读同一份配置。
+  // 取不到（未加载 / 无 system:biz_rule:read 权限）时退回落库手续费，绝不自己编一个费率。
+  const bizRulesQ = useQuery({
+    queryKey: ["fin", "biz-rules"],
+    queryFn: () => api.getBizRules(),
+    enabled: tab === "withdrawals",
+  });
+  const feeRule = bizRulesQ.data?.withdraw;
   const audit = useMutation({
     mutationFn: (v: { no: string; approve: boolean; rejectReason?: string }) =>
       api.auditWithdrawal(v.no, v.approve, v.rejectReason, username || undefined),
@@ -267,21 +338,33 @@ function FinanceInner() {
     queryFn: () => api.getReconStats(),
     enabled: tab === "reconcile",
   });
+  // 差错明细：抽屉打开才拉；queryKey 同样挂在 ["fin"] 下，处置成功后一次 invalidate 刷新明细+汇总+列表
+  const reconDiffsQ = useQuery({
+    queryKey: ["fin", "recon-diffs", reconDiffsOf?.batchNo ?? ""],
+    queryFn: () => api.listReconDiffs(reconDiffsOf!.batchNo),
+    enabled: !!reconDiffsOf,
+  });
   const handleRecon = useMutation({
-    mutationFn: (v: { batchNo: string; action: ReconAction; note: string }) =>
-      api.handleRecon(v.batchNo, v.action, v.note, username || undefined),
-    onSuccess: (r) => {
+    mutationFn: (v: { batchNo: string; action: ReconAction; note: string; diffId?: number }) =>
+      api.handleRecon(v.batchNo, v.action, v.note, username || undefined, v.diffId),
+    onSuccess: (r, v) => {
       qc.invalidateQueries({ queryKey: ["fin"] });
-      notify.success(`差错 ${r.batchNo} 已${RECON_HANDLE_STATUS[r.handleStatus!].label}（${RECON_TRANSITIONS[reconAction].label}）`);
+      // 逐条处置时批次进度可能还没动（半平不算平），所以提示按「处置了哪一条」说，不谎报批次已结案
+      notify.success(v.diffId
+        ? `差错明细 #${v.diffId} 已平账（${RECON_TRANSITIONS[v.action].label}）`
+        : `差错 ${r.batchNo} 已${RECON_HANDLE_STATUS[r.handleStatus!].label}（${RECON_TRANSITIONS[v.action].label}）`);
       setReconHandle(null);
+      setReconDiffRow(null);
     },
   });
   /** 当前差错允许的动作：状态机说了算，终态返回空数组（页面因此不出处理按钮）。 */
   const reconActionsFor = (r: Reconcile | null): ReconAction[] =>
     !r || r.handleStatus === null ? []
       : (Object.keys(RECON_TRANSITIONS) as ReconAction[]).filter((a) => canReconTransition(r.handleStatus!, a));
-  function openReconHandle(r: Reconcile) {
+  /** 打开处置抽屉。带 diff = 只处置这一条（抽屉里会带上它的支付单号与两侧金额）。 */
+  function openReconHandle(r: Reconcile, diff?: ReconDiff) {
     setReconHandle(r);
+    setReconDiffRow(diff ?? null);
     setReconAction(reconActionsFor(r)[0] ?? "verify");
     setReconNote("");
   }
@@ -354,6 +437,8 @@ function FinanceInner() {
         + "作废人、时间与原因将留痕备查。如客户仍需开票，请作废后重新登记草稿。",
       confirmText: "确认作废",
       danger: true,
+      // 不可逆（规范 §12.6）：手输发票号才解锁，防「误点两下就废掉一张已进税务口径的票」
+      requireText: invVoid.invoiceNo,
     });
     if (ok) voidInvoice.mutate({ no: invVoid.invoiceNo, reason });
   }
@@ -367,30 +452,32 @@ function FinanceInner() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["fin"] }); notify.success(t("common.success")); setInvoiceForm(null); },
   });
 
+  // 视角选定后「维度」列必然是同一个值，占一列纯浪费——把它并进表头（「分成方」→「场地方 / 代理商」）
+  // 业务号列一律 txt-strong（规范 §12.3 主键列加强，扫描时有锚点）；
+  // 金额/比例/计数列一律 text-right + tabular-nums（§12.4），同一张表里不许一半左一半右。
   const ruleCols: Column<ShareRule>[] = [
-    { header: "规则号", cell: (r) => <span className="font-medium">{r.ruleNo}</span> },
-    { header: "维度", cell: (r) => r.dimension === "VENUE" ? "场地方" : "代理商" },
-    { header: "分成方", cell: (r) => r.payeeName },
+    { header: "规则号", cell: (r) => <span className="txt-strong">{r.ruleNo}</span> },
+    { header: RULE_VIEW_LABEL[ruleDim], cell: (r) => r.payeeName },
     { header: "模式", cell: (r) => <Badge tone="outline">{r.mode === "CHANNEL_SPLIT" ? "渠道分账" : "平台记账"}</Badge> },
-    { header: "比例", cell: (r) => `${(r.rate * 100).toFixed(0)}%` },
-    { header: "优先级", cell: (r) => <span className="tabular-nums">{r.priority}</span> },
+    { header: "比例", className: "text-right", cell: (r) => <span className="tabular-nums">{(r.rate * 100).toFixed(0)}%</span> },
+    { header: "优先级", className: "text-right", cell: (r) => <span className="tabular-nums">{r.priority}</span> },
     { header: t("common.actions"), cell: (r) => canEditRule ? <Button size="sm" variant="outline" onClick={() => setRuleForm(r)}>{t("common.edit")}</Button> : <span className="text-muted-foreground">-</span> },
   ];
   const stlCols: Column<Settlement>[] = [
     {
       header: "结算单号",
       cell: (s) => (
-        <button type="button" className="font-medium tabular-nums underline-offset-4 hover:underline" onClick={() => setStlDetail(s)}>
+        <button type="button" className="txt-strong tabular-nums underline-offset-4 hover:underline" onClick={() => setStlDetail(s)}>
           {s.settleNo}
         </button>
       ),
     },
     { header: "对象", cell: (s) => <span>{s.payeeName} <span className="text-muted-foreground tabular-nums">{s.payeeNo}</span>（{PAYEE_TYPE_LABEL[s.payeeType]}）</span> },
     { header: "周期", cell: (s) => <span className="tabular-nums">{s.period}</span> },
-    { header: "金额", cell: (s) => <span className="tabular-nums">{money(s.totalAmount, s.currency)}</span> },
+    { header: "金额", className: "text-right", cell: (s) => <span className="tabular-nums">{money(s.totalAmount, s.currency)}</span> },
     // 明细笔数：金额是这几笔分润加出来的，点单号可逐笔核对
-    { header: "明细笔数", cell: (s) => <span className="tabular-nums text-muted-foreground">{s.recordCount}</span> },
-    { header: "状态", cell: (s) => <Badge tone={STL_STATUS[s.status].tone}>{STL_STATUS[s.status].label}</Badge> },
+    { header: "明细笔数", className: "text-right", cell: (s) => <span className="tabular-nums text-muted-foreground">{s.recordCount}</span> },
+    { header: "状态", cell: (s) => <StatusBadge map={STL_STATUS} value={s.status} /> },
     { header: "生成时间", cell: (s) => <span className="text-muted-foreground">{fmtTime(s.createdAt)}</span> },
     { header: "确认人", cell: (s) => s.confirmedBy ?? <span className="text-muted-foreground">未确认</span> },
     { header: "确认时间", cell: (s) => <span className="text-muted-foreground">{s.confirmedAt ? fmtTime(s.confirmedAt) : "-"}</span> },
@@ -408,13 +495,26 @@ function FinanceInner() {
     },
   ];
   const wdCols: Column<Withdrawal>[] = [
-    { header: "提现号", cell: (w) => <span className="font-medium">{w.withdrawNo}</span> },
+    { header: "提现号", cell: (w) => <span className="txt-strong">{w.withdrawNo}</span> },
     { header: "对象", cell: (w) => w.payeeName },
-    { header: "金额", cell: (w) => <span className="tabular-nums">{money(w.amount, w.currency)}</span> },
-    // 手续费与实际到账同屏：审批人不必心算，避免按毛额放款
-    { header: "手续费", cell: (w) => <span className="tabular-nums">{money(w.fee, w.currency)}</span> },
-    { header: "实际到账", cell: (w) => <span className="tabular-nums">{money(w.amount - w.fee, w.currency)}</span> },
-    { header: "状态", cell: (w) => <Badge tone={w.status === "PAID" || w.status === "PAYING" ? "success" : w.status === "FAILED" ? "danger" : "warning"}>{w.status}</Badge> },
+    { header: "金额", className: "text-right", cell: (w) => <span className="tabular-nums">{money(w.amount, w.currency)}</span> },
+    // 手续费与实际到账同屏：审批人不必心算，避免按毛额放款。
+    // 两列都走 withdrawFeeOf/withdrawNetOf 同一个口径函数——未审批的按业务规则现行费率实时算，
+    // 已审批的按落库值（事后调费率不该改写历史放款额），费率来源在表上方的提示条里写明。
+    {
+      header: "手续费",
+      className: "text-right",
+      cell: (w) => (
+        <div>
+          <span className="tabular-nums">{money(withdrawFeeOf(w, feeRule), w.currency)}</span>
+          {feeRule && WITHDRAW_FEE_PENDING.includes(w.status) && (
+            <div className="text-xs text-muted-foreground tabular-nums">按现行 {(feeRule.feeRate * 100).toFixed(2)}%</div>
+          )}
+        </div>
+      ),
+    },
+    { header: "实际到账", className: "text-right", cell: (w) => <span className="tabular-nums">{money(withdrawNetOf(w, feeRule), w.currency)}</span> },
+    { header: "状态", cell: (w) => <StatusBadge map={WD_STATUS} value={w.status} /> },
     { header: "申请时间", cell: (w) => <span className="text-muted-foreground">{fmtTime(w.appliedAt)}</span> },
     // 审批留痕三列：谁批的 / 何时批的 / 驳回为什么
     { header: "审批人", cell: (w) => w.auditorName ?? <span className="text-muted-foreground">未审批</span> },
@@ -428,24 +528,54 @@ function FinanceInner() {
     },
   ];
 
+  // 手工记账权限：本轮在 功能权限清单 §账务分录 新登记 finance:ledger:create。
+  // 记账会直接改总账，与「查账」不是一回事，故不复用 :read。
+  const canPostVoucher = allow("finance:ledger:create");
+  const postVoucher = useMutation({
+    // 借贷平衡等五条校验全在 mock/后端强制，页面只管把错误提示出来（全局 MutationCache 接管）
+    mutationFn: (x: VoucherCreatePayload) => api.createVoucher(x),
+    onSuccess: (rows) => {
+      qc.invalidateQueries({ queryKey: ["fin"] });
+      notify.success(`凭证 ${rows[0]?.voucherNo} 已记账（${rows.length} 条分录）`);
+      setEntryDraft(null);
+    },
+  });
+
+  const voucherQ = useQuery({
+    queryKey: ["fin-voucher", voucherNo],
+    queryFn: () => api.getVoucher(voucherNo!),
+    enabled: !!voucherNo,
+  });
+
   const ledgerCols: Column<LedgerEntry>[] = [
-    { header: "分录号", cell: (l) => <span className="font-medium">{l.entryNo}</span> },
-    { header: "凭证", cell: (l) => <span className="text-muted-foreground">{l.voucherNo}</span> },
+    { header: "分录号", cell: (l) => <span className="txt-strong">{l.entryNo}</span> },
+    {
+      header: "凭证",
+      // 凭证号做成入口：分录表是平铺的，同一张凭证的借贷两方可能隔着几页，
+      // 逐条看根本判断不了平不平衡
+      cell: (l) => (
+        <button
+          type="button"
+          className="text-primary hover:underline tabular-nums"
+          onClick={() => setVoucherNo(l.voucherNo)}
+        >{l.voucherNo}</button>
+      ),
+    },
     { header: "订单", cell: (l) => <span className="text-muted-foreground">{l.orderNo ?? "-"}</span> },
     { header: "账户", cell: (l) => l.account },
     { header: "方向", cell: (l) => l.direction === "DEBIT" ? <Badge tone="outline">借</Badge> : <Badge tone="muted">贷</Badge> },
-    { header: "金额", cell: (l) => <span className="tabular-nums">{money(l.amount, l.currency)}</span> },
+    { header: "金额", className: "text-right", cell: (l) => <span className="tabular-nums">{money(l.amount, l.currency)}</span> },
     { header: "摘要", cell: (l) => <span className="text-muted-foreground">{l.summary}</span> },
     { header: "时间", cell: (l) => <span className="text-muted-foreground">{fmtTime(l.createdAt)}</span> },
   ];
 
   const recordCols: Column<ShareRecord>[] = [
-    { header: "明细号", cell: (r) => <span className="font-medium">{r.recordNo}</span> },
-    { header: "订单", cell: (r) => <span className="text-muted-foreground">{r.orderNo}</span> },
+    { header: "明细号", cell: (r) => <span className="txt-strong">{r.recordNo}</span> },
+    { header: "订单", cell: (r) => <span className="text-muted-foreground tabular-nums">{r.orderNo}</span> },
     { header: "维度", cell: (r) => PAYEE_TYPE_LABEL[r.dimension] },
     { header: "分成方", cell: (r) => <span>{r.payeeName} <span className="text-muted-foreground tabular-nums">{r.payeeNo}</span></span> },
-    { header: "金额", cell: (r) => <span className="tabular-nums">{money(r.amount, r.currency)}</span> },
-    { header: "比例", cell: (r) => `${(r.rate * 100).toFixed(0)}%` },
+    { header: "金额", className: "text-right", cell: (r) => <span className="tabular-nums">{money(r.amount, r.currency)}</span> },
+    { header: "比例", className: "text-right", cell: (r) => <span className="tabular-nums">{(r.rate * 100).toFixed(0)}%</span> },
     // 周期是结算单的汇总键：明细上直接看得到它归哪一期，才对得上结算单
     { header: "周期", cell: (r) => <span className="tabular-nums">{r.period}</span> },
     { header: "时间", cell: (r) => <span className="text-muted-foreground">{fmtTime(r.createdAt)}</span> },
@@ -456,22 +586,23 @@ function FinanceInner() {
     {
       header: "分成方",
       cell: (s) => (
-        <Link href={`/finance?tab=records&payee=${encodeURIComponent(s.payeeName)}`} className="font-medium underline-offset-4 hover:underline">
+        <Link href={`/finance?tab=records&payee=${encodeURIComponent(s.payeeName)}`} className="txt-strong underline-offset-4 hover:underline">
           {s.payeeName}
         </Link>
       ),
     },
     { header: "编号", cell: (s) => <span className="text-muted-foreground tabular-nums">{s.payeeNo}</span> },
     { header: "统计周期", cell: (s) => <span className="tabular-nums">{s.period}</span> },
-    { header: "订单数", cell: (s) => <span className="tabular-nums">{s.orderCount}</span>, sortKey: "orderCount" },
-    { header: "交易额", cell: (s) => <span className="tabular-nums">{money(s.gmv, s.currency)}</span>, sortKey: "gmv" },
-    { header: "分润额", cell: (s) => <span className="tabular-nums">{money(s.shareAmount, s.currency)}</span>, sortKey: "shareAmount" },
-    { header: "已结算", cell: (s) => <span className="tabular-nums text-muted-foreground">{money(s.settledAmount, s.currency)}</span> },
+    { header: "订单数", className: "text-right", cell: (s) => <span className="tabular-nums">{s.orderCount}</span>, sortKey: "orderCount" },
+    { header: "交易额", className: "text-right", cell: (s) => <span className="tabular-nums">{money(s.gmv, s.currency)}</span>, sortKey: "gmv" },
+    { header: "分润额", className: "text-right", cell: (s) => <span className="tabular-nums">{money(s.shareAmount, s.currency)}</span>, sortKey: "shareAmount" },
+    { header: "已结算", className: "text-right", cell: (s) => <span className="tabular-nums text-muted-foreground">{money(s.settledAmount, s.currency)}</span> },
     // 待结算 = 分润 − 已结算：财务最关心的数，未结清高亮，结清则弱化
     {
       header: "待结算",
+      className: "text-right",
       cell: (s) => (
-        <span className={s.pendingAmount > 0 ? "font-medium tabular-nums text-[var(--destructive)]" : "tabular-nums text-muted-foreground"}>
+        <span className={s.pendingAmount > 0 ? "txt-strong tabular-nums text-[var(--destructive)]" : "tabular-nums text-muted-foreground"}>
           {money(s.pendingAmount, s.currency)}
         </span>
       ),
@@ -480,42 +611,43 @@ function FinanceInner() {
   ];
 
   const rechargeCols: Column<RechargeOrder>[] = [
-    { header: "充值单号", cell: (r) => <span className="font-medium tabular-nums">{r.rechargeNo}</span> },
+    { header: "充值单号", cell: (r) => <span className="txt-strong tabular-nums">{r.rechargeNo}</span> },
     { header: "用户", cell: (r) => <span>{r.nickname} <span className="text-muted-foreground tabular-nums">{r.userNo}</span></span> },
     { header: "套餐", cell: (r) => r.packageNo ? <span className="tabular-nums">{r.packageNo}</span> : <Badge tone="outline">自定义金额</Badge> },
-    { header: "实付", cell: (r) => <span className="tabular-nums">{money(r.payAmount, r.currency)}</span> },
-    { header: "赠送", cell: (r) => <span className="tabular-nums text-muted-foreground">{money(r.giftAmount, r.currency)}</span> },
-    { header: "到账", cell: (r) => <span className="font-medium tabular-nums">{money(r.creditAmount, r.currency)}</span> },
+    { header: "实付", className: "text-right", cell: (r) => <span className="tabular-nums">{money(r.payAmount, r.currency)}</span> },
+    { header: "赠送", className: "text-right", cell: (r) => <span className="tabular-nums text-muted-foreground">{money(r.giftAmount, r.currency)}</span> },
+    { header: "到账", className: "text-right", cell: (r) => <span className="txt-strong tabular-nums">{money(r.creditAmount, r.currency)}</span> },
     // 渠道码与 系统设置·支付渠道（/system?tab=payment）同一套 channelCode
     { header: "支付渠道", cell: (r) => <Badge tone="outline">{r.channelCode}</Badge> },
-    { header: "状态", cell: (r) => <Badge tone={RECHARGE_STATUS[r.status].tone}>{RECHARGE_STATUS[r.status].label}</Badge> },
+    { header: "状态", cell: (r) => <StatusBadge map={RECHARGE_STATUS} value={r.status} /> },
     { header: "支付时间", cell: (r) => <span className="text-muted-foreground">{r.paidAt ? fmtTime(r.paidAt) : "-"}</span> },
     { header: "网关流水号", cell: (r) => <span className="text-muted-foreground tabular-nums">{r.psgTxnNo ?? "-"}</span> },
   ];
 
   const reconcileCols: Column<Reconcile>[] = [
-    { header: "批次号", cell: (r) => <span className="font-medium">{r.batchNo}</span> },
-    { header: "周期", cell: (r) => r.period },
-    { header: "nearpay 汇总", cell: (r) => <span className="tabular-nums">{money(r.nearpayTotal, r.currency)}</span> },
-    { header: "账务汇总", cell: (r) => <span className="tabular-nums">{money(r.ledgerTotal, r.currency)}</span> },
+    { header: "批次号", cell: (r) => <span className="txt-strong">{r.batchNo}</span> },
+    { header: "周期", cell: (r) => <span className="tabular-nums">{r.period}</span> },
+    { header: "nearpay 汇总", className: "text-right", cell: (r) => <span className="tabular-nums">{money(r.nearpayTotal, r.currency)}</span> },
+    { header: "账务汇总", className: "text-right", cell: (r) => <span className="tabular-nums">{money(r.ledgerTotal, r.currency)}</span> },
     // 差额同时给「多少钱」和「往哪边偏」——方向就是 diff 的正负，不是另造的分类
     {
       header: "差额",
+      className: "text-right",
       cell: (r) => (
         <div>
-          <span className={r.diff === 0 ? "tabular-nums text-muted-foreground" : "font-medium tabular-nums text-[var(--destructive)]"}>
+          <span className={r.diff === 0 ? "tabular-nums text-muted-foreground" : "txt-strong tabular-nums text-[var(--destructive)]"}>
             {money(r.diff, r.currency)}
           </span>
           {r.diff !== 0 && <div className="text-xs text-muted-foreground">{diffSideLabel(r.diff)}</div>}
         </div>
       ),
     },
-    { header: "跑批结果", cell: (r) => <Badge tone={r.status === "MATCHED" ? "success" : "danger"}>{r.status === "MATCHED" ? "已平" : "有差异"}</Badge> },
+    { header: "跑批结果", cell: (r) => <StatusBadge map={RECON_STATUS} value={r.status} /> },
     // 处置进度是另一列：把「已核对无误」写回跑批结果会篡改事实，日后无从审计
     {
       header: "处置进度",
       cell: (r) => r.handleStatus
-        ? <Badge tone={RECON_HANDLE_STATUS[r.handleStatus].tone}>{RECON_HANDLE_STATUS[r.handleStatus].label}</Badge>
+        ? <StatusBadge map={RECON_HANDLE_STATUS} value={r.handleStatus} />
         : <span className="text-muted-foreground">无需处理</span>,
     },
     { header: "定责", cell: (r) => <span className="text-muted-foreground">{r.handleResult ? RECON_RESULT_LABEL[r.handleResult] : "-"}</span> },
@@ -534,9 +666,62 @@ function FinanceInner() {
     { header: "跑批时间", cell: (r) => <span className="text-muted-foreground">{fmtTime(r.createdAt)}</span> },
     {
       header: t("common.actions"),
-      // 终态（已结案/已忽略）与已平批次都不出按钮——状态机说了不能动，页面就不该给入口
-      cell: (r) => r.handleStatus && !RECON_TERMINAL.includes(r.handleStatus) && canHandleRecon
-        ? <Button size="sm" variant="outline" onClick={() => openReconHandle(r)}>处理差错</Button>
+      // 终态（已结案/已忽略）与已平批次都不出「处理」按钮——状态机说了不能动，页面就不该给入口。
+      // 但「差错明细」终态也给：结案后照样要能查这批差在哪几笔（只读，不受状态机管）。
+      cell: (r) => (
+        <div className="flex gap-2">
+          {r.status === "DIFF" && canReadRecon && (
+            <Button size="sm" variant="outline" onClick={() => setReconDiffsOf(r)}>差错明细</Button>
+          )}
+          {r.handleStatus && !RECON_TERMINAL.includes(r.handleStatus) && canHandleRecon && (
+            <Button size="sm" variant="outline" onClick={() => openReconHandle(r)}>处理差错</Button>
+          )}
+          {r.status !== "DIFF" && <span className="text-muted-foreground">-</span>}
+        </div>
+      ),
+    },
+  ];
+
+  // 差错明细列：两侧金额 + 逐笔差额（差额由 detail 里两侧金额相减推出，不是另存的一列，
+  // 所以它们加总必然等于批次差额）。处置按钮带 diff.id，落到后端 resolve 的 diffId。
+  const reconDiffCurrency = reconDiffsOf?.currency ?? "AED";
+  const reconDiffDelta = (d: ReconDiff) => {
+    const v = parseReconDiffDetail(d.detail);
+    return v ? (v.nearpay ?? 0) - (v.ledger ?? 0) : 0;
+  };
+  const reconDiffCols: Column<ReconDiff>[] = [
+    { header: "#", className: "text-right", cell: (d) => <span className="text-muted-foreground tabular-nums">{d.id}</span> },
+    { header: "支付单号", cell: (d) => <span className="txt-strong tabular-nums">{d.payNo}</span> },
+    { header: "差错类型", cell: (d) => <StatusBadge map={RECON_DIFF_TYPE} value={d.diffType} /> },
+    {
+      header: "nearpay / 账务",
+      className: "text-right",
+      cell: (d) => {
+        const v = parseReconDiffDetail(d.detail);
+        // detail 解析不出来就退化成原文：格式变了也不该让这个抽屉打不开
+        return v
+          ? <span className="tabular-nums">{money(v.nearpay ?? 0, reconDiffCurrency)} / {money(v.ledger ?? 0, reconDiffCurrency)}</span>
+          : <span className="text-muted-foreground">{d.detail}</span>;
+      },
+    },
+    {
+      header: "逐笔差额",
+      className: "text-right",
+      cell: (d) => {
+        const delta = reconDiffDelta(d);
+        return (
+          <span className={delta === 0 ? "tabular-nums text-muted-foreground" : "txt-strong tabular-nums text-[var(--destructive)]"}>
+            {money(delta, reconDiffCurrency)}
+          </span>
+        );
+      },
+    },
+    { header: "说明", cell: (d) => <span className="max-w-[20rem] text-xs text-muted-foreground">{parseReconDiffDetail(d.detail)?.note ?? "-"}</span> },
+    { header: "平账", cell: (d) => <StatusBadge map={DIFF_RESOLVED} value={d.resolved ? "RESOLVED" : "OPEN"} /> },
+    {
+      header: t("common.actions"),
+      cell: (d) => !d.resolved && reconDiffsOf?.handleStatus && !RECON_TERMINAL.includes(reconDiffsOf.handleStatus) && canHandleRecon
+        ? <Button size="sm" variant="outline" onClick={() => openReconHandle(reconDiffsOf, d)}>处置</Button>
         : <span className="text-muted-foreground">-</span>,
     },
   ];
@@ -545,18 +730,18 @@ function FinanceInner() {
     {
       header: "发票号",
       cell: (i) => (
-        <button type="button" className="font-medium tabular-nums underline-offset-4 hover:underline" onClick={() => setInvDetail(i)}>
+        <button type="button" className="txt-strong tabular-nums underline-offset-4 hover:underline" onClick={() => setInvDetail(i)}>
           {i.invoiceNo}
         </button>
       ),
     },
     { header: "抬头", cell: (i) => i.payeeName },
-    { header: "金额", cell: (i) => <span className="tabular-nums">{money(i.amount, i.currency)}</span> },
+    { header: "金额", className: "text-right", cell: (i) => <span className="tabular-nums">{money(i.amount, i.currency)}</span> },
     // 来源单号：这张票的钱是哪张结算单来的（开具时校验两者金额必须一致）
     { header: "来源结算单", cell: (i) => <span className="text-muted-foreground tabular-nums">{i.sourceNo}</span> },
     { header: "发票代码 / 号码", cell: (i) => <span className="text-muted-foreground tabular-nums">{i.invoiceCode ? `${i.invoiceCode} / ${i.invoiceNumber}` : "未开具"}</span> },
     { header: "VAT TRN", cell: (i) => <span className="text-muted-foreground tabular-nums">{i.vatTrn}</span> },
-    { header: "状态", cell: (i) => <Badge tone={INV_STATUS[i.status].tone}>{INV_STATUS[i.status].label}</Badge> },
+    { header: "状态", cell: (i) => <StatusBadge map={INV_STATUS} value={i.status} /> },
     // 开具/作废留痕合成一列：分四列会把表撑到横向滚动，而它们本来就是一起看的
     {
       header: "开具 / 作废留痕",
@@ -598,21 +783,26 @@ function FinanceInner() {
     <div>
       <TabHeader tabs={TABS} value={tab} onChange={(k) => { setTab(k); setPage(1); }} />
       {tab === "rules" && (
-        <Toolbar
-          search={keyword}
-          onSearch={(v) => { setKeyword(v); setPage(1); }}
-          searchPlaceholder="搜索分成方"
-          onAdd={canEditRule ? () => setRuleForm({ dimension: "VENUE", mode: "CHANNEL_SPLIT", rate: 0.3, priority: 1 }) : undefined}
-          addLabel="新增分润规则"
-          onExport={() => exportCsv<ShareRule>("分润规则", [
-            { header: "规则号", value: (r) => r.ruleNo },
-            { header: "维度", value: (r) => (r.dimension === "VENUE" ? "场地方" : "代理商") },
-            { header: "分成方", value: (r) => r.payeeName },
-            { header: "模式", value: (r) => (r.mode === "CHANNEL_SPLIT" ? "渠道分账" : "平台记账") },
-            { header: "比例", value: (r) => r.rate },
-            { header: "优先级", value: (r) => r.priority },
-          ], (q.data?.list ?? []) as ShareRule[])}
-        />
+        <>
+          {/* 双向视图：切的是同一张表的 dimension 参数（同分润统计的维度切换器），不是两个 tab 两套规则 */}
+          <Tabs tabs={RULE_VIEWS} value={ruleDim} onChange={(k) => { setRuleDim(k as "VENUE" | "AGENT"); setPage(1); }} />
+          <Toolbar
+            search={keyword}
+            onSearch={(v) => { setKeyword(v); setPage(1); }}
+            searchPlaceholder={`搜索${RULE_VIEW_LABEL[ruleDim]}名称/规则号`}
+            // 新增默认落在当前视角：在「按代理商看」下点新增却建出一条场地方规则，会当场从列表里消失
+            onAdd={canEditRule ? () => setRuleForm({ dimension: ruleDim, mode: "CHANNEL_SPLIT", rate: ruleDim === "AGENT" ? 0.3 : 0.2, priority: 1 }) : undefined}
+            addLabel={`新增${RULE_VIEW_LABEL[ruleDim]}分润规则`}
+            onExport={() => exportCsv<ShareRule>(`分润规则-${RULE_VIEW_LABEL[ruleDim]}`, [
+              { header: "规则号", value: (r) => r.ruleNo },
+              { header: "维度", value: (r) => (r.dimension === "VENUE" ? "场地方" : "代理商") },
+              { header: "分成方", value: (r) => r.payeeName },
+              { header: "模式", value: (r) => (r.mode === "CHANNEL_SPLIT" ? "渠道分账" : "平台记账") },
+              { header: "比例", value: (r) => r.rate },
+              { header: "优先级", value: (r) => r.priority },
+            ], (q.data?.list ?? []) as ShareRule[])}
+          />
+        </>
       )}
       {tab === "ledger" && (
         <Toolbar
@@ -630,7 +820,20 @@ function FinanceInner() {
             { header: "摘要", value: (l) => l.summary },
             { header: "时间", value: (l) => l.createdAt },
           ], (q.data?.list ?? []) as LedgerEntry[])}
-        />
+        >
+          {canPostVoucher && (
+            <Button size="sm" onClick={() => setEntryDraft({
+              summary: "", orderNo: "",
+              rows: [{ account: "", direction: "DEBIT", amount: "" }, { account: "", direction: "CREDIT", amount: "" }],
+            })}>手工记账</Button>
+          )}
+          <FilterSelect
+            value={ledgerPeriod}
+            onChange={(v) => { setLedgerPeriod(v as ReportPeriod); setPage(1); }}
+            options={REPORT_PERIODS.map((x) => ({ value: x.value, label: x.label }))}
+            aria-label="按记账期间筛选"
+          />
+        </Toolbar>
       )}
       {tab === "settlements" && (
         <Toolbar
@@ -653,10 +856,7 @@ function FinanceInner() {
             { header: "确认时间", value: (s) => s.confirmedAt },
           ], (q.data?.list ?? []) as Settlement[])}
         >
-          <Select value={stlStatus} onChange={(e) => { setStlStatus(e.target.value); setPage(1); }}>
-            <option value="">全部状态</option>
-            {Object.entries(STL_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-          </Select>
+          <FilterSelect value={stlStatus} onChange={(v) => { setStlStatus(v); setPage(1); }} allLabel="全部状态" options={STL_STATUS} />
         </Toolbar>
       )}
       {tab === "withdrawals" && (
@@ -668,10 +868,12 @@ function FinanceInner() {
             { header: "提现号", value: (w) => w.withdrawNo },
             { header: "对象", value: (w) => w.payeeName },
             { header: "金额", value: (w) => w.amount },
-            { header: "手续费", value: (w) => w.fee },
-            { header: "实际到账", value: (w) => w.amount - w.fee },
+            // 导出必须和屏幕上一致：同样走口径函数，否则导出的表拿去对账又是另一个数
+            { header: "手续费", value: (w) => withdrawFeeOf(w, feeRule) },
+            { header: "实际到账", value: (w) => withdrawNetOf(w, feeRule) },
             { header: "币种", value: (w) => w.currency },
-            { header: "状态", value: (w) => w.status },
+            // 状态导出走同一张映射表：屏幕上是「已打款」，导出不该是 PAID
+            { header: "状态", value: (w) => WD_STATUS[w.status].label },
             { header: "申请时间", value: (w) => w.appliedAt },
             { header: "审批人", value: (w) => w.auditorName },
             { header: "审批时间", value: (w) => w.auditedAt },
@@ -719,9 +921,7 @@ function FinanceInner() {
               { header: "币种", value: (s) => s.currency },
             ], (q.data?.list ?? []) as ShareSummary[])}
           >
-            <Select value={sumPeriod} onChange={(e) => { setSumPeriod(e.target.value); setPage(1); }}>
-              {SUMMARY_PERIODS.map((p) => <option key={p} value={p}>{p}</option>)}
-            </Select>
+            <FilterSelect value={sumPeriod} onChange={(v) => { setSumPeriod(v); setPage(1); }} options={PERIOD_OPTIONS} />
           </Toolbar>
         </>
       )}
@@ -746,10 +946,7 @@ function FinanceInner() {
             { header: "网关流水号", value: (r) => r.psgTxnNo },
           ], (q.data?.list ?? []) as RechargeOrder[])}
         >
-          <Select value={rcStatus} onChange={(e) => { setRcStatus(e.target.value); setPage(1); }}>
-            <option value="">全部状态</option>
-            {Object.entries(RECHARGE_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-          </Select>
+          <FilterSelect value={rcStatus} onChange={(v) => { setRcStatus(v); setPage(1); }} allLabel="全部状态" options={RECHARGE_STATUS} />
           {/* 日期范围按下单时间：待支付/失败单没有支付时间，用支付时间会把它们全筛掉 */}
           <DateInput className="w-40" aria-label="下单时间起" value={rcFrom} onChange={(e) => { setRcFrom(e.target.value); setPage(1); }} />
           <span className="text-muted-foreground">~</span>
@@ -795,7 +992,7 @@ function FinanceInner() {
               { header: "差额", value: (r) => r.diff },
               { header: "差错方向", value: (r) => diffSideLabel(r.diff) },
               { header: "币种", value: (r) => r.currency },
-              { header: "跑批结果", value: (r) => (r.status === "MATCHED" ? "已平" : "有差异") },
+              { header: "跑批结果", value: (r) => RECON_STATUS[r.status].label },
               { header: "处置进度", value: (r) => (r.handleStatus ? RECON_HANDLE_STATUS[r.handleStatus].label : "无需处理") },
               { header: "定责", value: (r) => (r.handleResult ? RECON_RESULT_LABEL[r.handleResult] : "") },
               { header: "处理结论", value: (r) => r.handleNote },
@@ -804,10 +1001,7 @@ function FinanceInner() {
               { header: "跑批时间", value: (r) => r.createdAt },
             ], (q.data?.list ?? []) as Reconcile[])}
           >
-            <Select value={reconStatusFilter} onChange={(e) => { setReconStatusFilter(e.target.value); setPage(1); }}>
-              <option value="">全部处置进度</option>
-              {Object.entries(RECON_HANDLE_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-            </Select>
+            <FilterSelect value={reconStatusFilter} onChange={(v) => { setReconStatusFilter(v); setPage(1); }} allLabel="全部处置进度" options={RECON_HANDLE_STATUS} />
           </Toolbar>
         </>
       )}
@@ -835,21 +1029,43 @@ function FinanceInner() {
             { header: "作废原因", value: (i) => i.voidReason },
           ], (q.data?.list ?? []) as Invoice[])}
         >
-          <Select value={invStatusFilter} onChange={(e) => { setInvStatusFilter(e.target.value); setPage(1); }}>
-            <option value="">全部状态</option>
-            {Object.entries(INV_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-          </Select>
+          <FilterSelect value={invStatusFilter} onChange={(v) => { setInvStatusFilter(v); setPage(1); }} allLabel="全部状态" options={INV_STATUS} />
         </Toolbar>
       )}
-      {tab === "rules" && <DataTable rowKey={(r: ShareRule) => r.ruleNo} columns={ruleCols} rows={q.data?.list as ShareRule[]} loading={q.isLoading} empty="暂无分润规则——点右上「新增分润规则」为场地方/代理商配置分成比例，否则订单收入全归平台" />}
-      {tab === "ledger" && <DataTable rowKey={(l: LedgerEntry) => l.entryNo} columns={ledgerCols} rows={q.data?.list as LedgerEntry[]} loading={q.isLoading} empty="暂无账务分录——订单结算与分账完成后自动记账，也可放宽搜索条件再查" />}
+      {tab === "rules" && (
+        <DataTable
+          rowKey={(r: ShareRule) => r.ruleNo}
+          columns={ruleCols}
+          rows={q.data?.list as ShareRule[]}
+          loading={q.isLoading}
+          empty={`当前视角（${RULE_VIEW_LABEL[ruleDim]}）暂无分润规则——换个视角看看，或点右上新增为该${RULE_VIEW_LABEL[ruleDim]}配置分成比例，否则订单收入全归平台`}
+        />
+      )}
+      {tab === "ledger" && <DataTable rowKey={(l: LedgerEntry) => l.entryNo} columns={ledgerCols} rows={q.data?.list as LedgerEntry[]} loading={q.isLoading} empty={`${periodLabel(ledgerPeriod)}内没有账务分录——订单结算与分账完成后自动记账，可换更长的期间或放宽搜索条件`} />}
       {tab === "settlements" && !canGenSettlement && !canConfirmSettlement && (
-        <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">
-          仅可查看：当前角色无结算单生成/确认权限（finance:settlement:generate / :confirm）
-        </div>
+        <ReadOnlyNotice what="结算单生成/确认" perm={["finance:settlement:generate", ":confirm"]} />
       )}
       {tab === "settlements" && <DataTable rowKey={(s: Settlement) => s.settleNo} columns={stlCols} rows={q.data?.list as Settlement[]} loading={q.isLoading} empty="暂无结算单——点右上「生成结算单」按周期出账（金额取该周期分润明细汇总），或放宽筛选条件" />}
-      {tab === "withdrawals" && !canAuditWithdrawal && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无提现审批权限（finance:withdrawal:audit）</div>}
+      {tab === "withdrawals" && !canAuditWithdrawal && <ReadOnlyNotice what="提现审批" perm="finance:withdrawal:audit" />}
+      {/* 手续费口径必须写明出处：审批人看到的数从哪来、改哪里能改，否则「唯一来源」只是一句话 */}
+      {tab === "withdrawals" && (
+        <Notice>
+          {feeRule ? (
+            <>
+              手续费口径来自「
+              <Link href="/system?tab=rules" className="underline underline-offset-4">系统设置 · 业务规则</Link>
+              」：费率 <span className="tabular-nums">{(feeRule.feeRate * 100).toFixed(2)}%</span>、
+              封顶 <span className="tabular-nums">{money(feeRule.feeCap, bizRulesQ.data!.currency)}</span>、
+              最低提现额 <span className="tabular-nums">{money(feeRule.minAmount, bizRulesQ.data!.currency)}</span>。
+              未审批的单子按现行费率实时计算；已审批的按当时落库值展示，改费率不会改写历史放款额。
+            </>
+          ) : (
+            // 取不到规则不装作有：表上显示的是落库手续费，别让人以为已经按最新费率算过
+            <>⚠️ 未取到「业务规则」中的提现手续费配置（可能缺 <code>system:biz_rule:read</code> 权限），
+              下表手续费为申请时的落库值，未按现行费率重算。</>
+          )}
+        </Notice>
+      )}
       {tab === "withdrawals" && <DataTable rowKey={(w: Withdrawal) => w.withdrawNo} columns={wdCols} rows={q.data?.list as Withdrawal[]} loading={q.isLoading} empty="暂无提现申请——场地方/代理商发起提现后在此审批，通过才会进入打款队列" />}
       {tab === "records" && <DataTable rowKey={(r: ShareRecord) => r.recordNo} columns={recordCols} rows={q.data?.list as ShareRecord[]} loading={q.isLoading} empty="暂无分润明细——订单结算时按「分润规则」逐笔生成，先确认规则已配置" />}
       {tab === "summary" && (
@@ -874,15 +1090,11 @@ function FinanceInner() {
         />
       )}
       {tab === "reconcile" && !canHandleRecon && (
-        <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">
-          仅可查看：当前角色无对账差错处理权限（finance:recon:handle）
-        </div>
+        <ReadOnlyNotice what="对账差错处理" perm="finance:recon:handle" />
       )}
       {tab === "reconcile" && <DataTable rowKey={(r: Reconcile) => r.batchNo} columns={reconcileCols} rows={q.data?.list as Reconcile[]} loading={q.isLoading} empty="暂无对账批次——每日与 nearpay 流水自动跑批比对，本周期尚未生成批次；也可能是「处置进度」筛窄了" />}
       {tab === "invoices" && !canEditInvoice && !canVoidInvoice && (
-        <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">
-          仅可查看：当前角色无发票开具/作废权限（finance:invoice:issue / :void）
-        </div>
+        <ReadOnlyNotice what="发票开具/作废" perm={["finance:invoice:issue", ":void"]} />
       )}
       {tab === "invoices" && <DataTable rowKey={(i: Invoice) => i.invoiceNo} columns={invoiceCols} rows={q.data?.list as Invoice[]} loading={q.isLoading} empty="暂无发票——商户提出开票需求后点右上「登记发票草稿」挂到对应结算单，再开具" />}
       {q.data && <Pagination page={page} size={SIZE} total={q.data.total} onPage={setPage} />}
@@ -906,9 +1118,22 @@ function FinanceInner() {
         {wdAudit && (
           <>
             <Field label="提现对象">{wdAudit.payeeName}</Field>
-            <Field label="申请金额">{money(wdAudit.amount, wdAudit.currency)}</Field>
-            <Field label="手续费">{money(wdAudit.fee, wdAudit.currency)}</Field>
-            <Field label="实际到账">{money(wdAudit.amount - wdAudit.fee, wdAudit.currency)}</Field>
+            <Field label="申请金额">
+              {money(wdAudit.amount, wdAudit.currency)}
+              {/* 低于业务规则的最低提现额是该被看见的：批过去就是违反自己定的规则 */}
+              {feeRule && wdAudit.amount < feeRule.minAmount && (
+                <Badge tone="danger" className="ml-2">低于最低提现额 {money(feeRule.minAmount, wdAudit.currency)}</Badge>
+              )}
+            </Field>
+            <Field label="手续费">
+              {money(withdrawFeeOf(wdAudit, feeRule), wdAudit.currency)}
+              {feeRule && (
+                <span className="ml-2 text-muted-foreground">
+                  费率 {(feeRule.feeRate * 100).toFixed(2)}% · 封顶 {money(feeRule.feeCap, wdAudit.currency)}（业务规则）
+                </span>
+              )}
+            </Field>
+            <Field label="实际到账">{money(withdrawNetOf(wdAudit, feeRule), wdAudit.currency)}</Field>
             <Field label="申请时间">{fmtTime(wdAudit.appliedAt)}</Field>
             <Field label="审批人">{username || "admin"}</Field>
             <Field label="审批结果">
@@ -959,7 +1184,7 @@ function FinanceInner() {
             <Field label="结算对象">{stlDetail.payeeName}（{PAYEE_TYPE_LABEL[stlDetail.payeeType]} {stlDetail.payeeNo}）</Field>
             <Field label="结算周期">{stlDetail.period}</Field>
             <Field label="结算金额">{money(stlDetail.totalAmount, stlDetail.currency)}（{stlDetail.recordCount} 笔明细）</Field>
-            <Field label="状态"><Badge tone={STL_STATUS[stlDetail.status].tone}>{STL_STATUS[stlDetail.status].label}</Badge></Field>
+            <Field label="状态"><StatusBadge map={STL_STATUS} value={stlDetail.status} /></Field>
             <Field label="生成时间">{fmtTime(stlDetail.createdAt)}</Field>
             <Field label="确认人 / 确认时间">
               {stlDetail.confirmedBy ? `${stlDetail.confirmedBy} · ${fmtTime(stlDetail.confirmedAt!)}` : "未确认"}
@@ -988,6 +1213,130 @@ function FinanceInner() {
         onSubmit={() => ruleForm && saveRule.mutate(ruleForm)}
         submitting={saveRule.isPending}
       />
+      {/* 手工记账。**实时显示借贷合计与差额** —— 校验虽在服务端强制，但让人提交后才知道
+          不平是糟糕的交互：凭证有好几行，事后回头找哪行错很费劲。 */}
+      <Drawer
+        open={!!entryDraft}
+        onOpenChange={(o) => !o && setEntryDraft(null)}
+        title="手工记账"
+        width="w-[760px]"
+        footer={entryDraft && (() => {
+          const num = (v: string) => Number(v) || 0;
+          const debit = Math.round(entryDraft.rows.filter((r) => r.direction === "DEBIT").reduce((n, r) => n + num(r.amount), 0) * 100) / 100;
+          const credit = Math.round(entryDraft.rows.filter((r) => r.direction === "CREDIT").reduce((n, r) => n + num(r.amount), 0) * 100) / 100;
+          const balanced = debit > 0 && Math.abs(debit - credit) < 0.01;
+          return (
+            <div className="flex items-center justify-between gap-3">
+              <span className="txt-body">
+                借 <span className="tabular-nums">{money(debit, "AED")}</span>
+                {" / "}贷 <span className="tabular-nums">{money(credit, "AED")}</span>{" "}
+                {balanced ? <Badge tone="success">平衡</Badge>
+                  : <Badge tone="danger">差 {money(Math.abs(debit - credit), "AED")}</Badge>}
+              </span>
+              <Button
+                disabled={!balanced || !entryDraft.summary.trim() || postVoucher.isPending}
+                onClick={() => postVoucher.mutate({
+                  summary: entryDraft.summary,
+                  orderNo: entryDraft.orderNo || null,
+                  entries: entryDraft.rows.map((r) => ({ account: r.account, direction: r.direction, amount: Number(r.amount) })),
+                })}
+              >{postVoucher.isPending ? "记账中…" : "确认记账"}</Button>
+            </div>
+          );
+        })()}
+      >
+        {entryDraft && (
+          <>
+            <Notice className="mb-4">
+              凭证一经记账**不可修改**——需要更正请再记一张反向凭证。直接改历史分录会让账实相符无从追溯。
+            </Notice>
+            <Field label="凭证摘要（必填）">
+              <Input
+                value={entryDraft.summary}
+                placeholder="如：补记 7 月场地方分润差额"
+                onChange={(e) => setEntryDraft({ ...entryDraft, summary: e.target.value })}
+              />
+            </Field>
+            <Field label="关联订单号（可选）">
+              <Input
+                value={entryDraft.orderNo}
+                placeholder="ORD500001"
+                onChange={(e) => setEntryDraft({ ...entryDraft, orderNo: e.target.value })}
+              />
+            </Field>
+            <div className="mt-4 mb-2 flex items-center justify-between">
+              <span className="txt-strong">分录（至少两条，借贷两侧都要有）</span>
+              <Button size="sm" variant="outline"
+                onClick={() => setEntryDraft({ ...entryDraft, rows: [...entryDraft.rows, { account: "", direction: "DEBIT", amount: "" }] })}
+              >添加一行</Button>
+            </div>
+            <div className="space-y-2">
+              {entryDraft.rows.map((r, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Input
+                    className="flex-1" placeholder="账户，如 现金-nearpay"
+                    value={r.account}
+                    onChange={(e) => { const rows=[...entryDraft.rows]; rows[i]={...r,account:e.target.value}; setEntryDraft({...entryDraft,rows}); }}
+                  />
+                  <Select
+                    className="w-24" value={r.direction}
+                    onChange={(e) => { const rows=[...entryDraft.rows]; rows[i]={...r,direction:e.target.value as "DEBIT"|"CREDIT"}; setEntryDraft({...entryDraft,rows}); }}
+                  >
+                    <option value="DEBIT">借</option>
+                    <option value="CREDIT">贷</option>
+                  </Select>
+                  <Input
+                    className="w-32 text-right" type="number" min="0" step="0.01" placeholder="金额"
+                    value={r.amount}
+                    onChange={(e) => { const rows=[...entryDraft.rows]; rows[i]={...r,amount:e.target.value}; setEntryDraft({...entryDraft,rows}); }}
+                  />
+                  <Button
+                    size="sm" variant="outline"
+                    disabled={entryDraft.rows.length <= 2}
+                    title={entryDraft.rows.length <= 2 ? "至少保留两条分录" : undefined}
+                    onClick={() => setEntryDraft({ ...entryDraft, rows: entryDraft.rows.filter((_, j) => j !== i) })}
+                  >删除</Button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </Drawer>
+
+      {/* 凭证下钻。核心是**借贷平衡判定** —— 不平的凭证是记账错误，
+          必须一眼看出来而不是靠人心算；判定由服务端算，前端只渲染结论。 */}
+      <Drawer
+        open={!!voucherNo}
+        onOpenChange={(o) => !o && setVoucherNo(null)}
+        title={`凭证 ${voucherNo ?? ""}`}
+        width="w-[720px]"
+      >
+        {voucherQ.data && (
+          <>
+            <div className="mb-4 grid grid-cols-3 gap-3">
+              <Field label="借方合计"><span className="tabular-nums">{money(voucherQ.data.debit, "AED")}</span></Field>
+              <Field label="贷方合计"><span className="tabular-nums">{money(voucherQ.data.credit, "AED")}</span></Field>
+              <Field label="平衡">
+                {voucherQ.data.balanced
+                  ? <Badge tone="success">借贷平衡</Badge>
+                  : <Badge tone="danger">不平（差 {money(Math.abs(voucherQ.data.debit - voucherQ.data.credit), "AED")}）</Badge>}
+              </Field>
+            </div>
+            {!voucherQ.data.balanced && (
+              <Notice className="mb-4">
+                该凭证借贷不等额，属记账错误：请核对是否有分录漏记或金额录错。会计上一张凭证必须借贷相等。
+              </Notice>
+            )}
+            <DataTable
+              rowKey={(l: LedgerEntry) => l.entryNo}
+              columns={ledgerCols.filter((c) => c.header !== "凭证")}
+              rows={voucherQ.data.entries}
+              empty="该凭证下没有分录——凭证号可能有误"
+            />
+          </>
+        )}
+      </Drawer>
+
       <FormDrawer
         open={!!invoiceForm}
         onOpenChange={(o) => !o && setInvoiceForm(null)}
@@ -1002,19 +1351,64 @@ function FinanceInner() {
         submitting={saveInvoice.isPending}
       />
 
+      {/* 差错明细下钻：批次差额是怎么来的——逐笔列出，每笔可单独处置（同结算单详情的「构成明细」范式） */}
+      <Drawer
+        open={!!reconDiffsOf}
+        onOpenChange={(o) => !o && setReconDiffsOf(null)}
+        title={`差错明细 ${reconDiffsOf?.batchNo ?? ""}`}
+        desc="逐笔差额之和 = 批次差额；可对单笔处置，全部平账后批次进度才迁移（半平不算平）"
+        width="w-[860px]"
+      >
+        {reconDiffsOf && (
+          <>
+            <Field label="对账周期">{reconDiffsOf.period}</Field>
+            <Field label="批次差额">
+              <span className="font-medium tabular-nums text-[var(--destructive)]">{money(reconDiffsOf.diff, reconDiffsOf.currency)}</span>
+              <span className="ml-2 text-muted-foreground">{diffSideLabel(reconDiffsOf.diff)}</span>
+            </Field>
+            <Field label="当前处置进度">
+              {reconDiffsOf.handleStatus
+                ? <StatusBadge map={RECON_HANDLE_STATUS} value={reconDiffsOf.handleStatus} />
+                : <span className="text-muted-foreground">无需处理</span>}
+            </Field>
+            {/* 逐笔加总当场对给用户看：对不上说明明细与批次脱钩（数据问题），比默默显示更该让人看见 */}
+            <Field label="逐笔加总">
+              <span className="tabular-nums">
+                {money((reconDiffsQ.data ?? []).reduce((s, d) => s + reconDiffDelta(d), 0), reconDiffsOf.currency)}
+              </span>
+              <span className="ml-2 text-muted-foreground">
+                （{(reconDiffsQ.data ?? []).length} 笔，未处置 {(reconDiffsQ.data ?? []).filter((d) => !d.resolved).length} 笔）
+              </span>
+            </Field>
+            <div className="mb-2 mt-4 text-xs text-muted-foreground">逐笔差错</div>
+            <DataTable
+              rowKey={(d: ReconDiff) => String(d.id)}
+              columns={reconDiffCols}
+              rows={reconDiffsQ.data}
+              loading={reconDiffsQ.isLoading}
+              empty="该批次没有差错明细——理论上不该出现（有差额必有逐笔差错），若看到请核对跑批作业"
+            />
+          </>
+        )}
+      </Drawer>
+
       {/* 对账差错处理：动作按状态机过滤，结论必填——「审批类抽屉」范式（同提现审批） */}
       <Drawer
         open={!!reconHandle}
         onOpenChange={(o) => !o && setReconHandle(null)}
-        title={`处理对账差错 ${reconHandle?.batchNo ?? ""}`}
-        desc="差错是真金白银对不上：处置需定责并留下结论，处理人与时间将留痕不可改"
+        title={reconDiffRow ? `处置差错明细 #${reconDiffRow.id}` : `处理对账差错 ${reconHandle?.batchNo ?? ""}`}
+        desc={reconDiffRow
+          ? "只处置这一笔：批次其余未处置差错不动，全部平账后批次进度才迁移"
+          : "差错是真金白银对不上：处置需定责并留下结论，处理人与时间将留痕不可改"}
         width="w-[560px]"
         footer={
           reconHandle && canHandleRecon && (
             <Button
               disabled={handleRecon.isPending || !reconNote.trim()}
               variant={reconAction === "compensate" ? "destructive" : "default"}
-              onClick={() => handleRecon.mutate({ batchNo: reconHandle.batchNo, action: reconAction, note: reconNote })}
+              onClick={() => handleRecon.mutate({
+                batchNo: reconHandle.batchNo, action: reconAction, note: reconNote, diffId: reconDiffRow?.id,
+              })}
             >提交处理</Button>
           )
         }
@@ -1022,6 +1416,21 @@ function FinanceInner() {
         {reconHandle && (
           <>
             <Field label="对账周期">{reconHandle.period}</Field>
+            {/* 逐条处置时先把「处置的是哪一笔」摊开：光有 diffId 数字，操作的人无从核对 */}
+            {reconDiffRow && (
+              <>
+                <Field label="支付单号">
+                  <span className="tabular-nums">{reconDiffRow.payNo}</span>
+                  <StatusBadge map={RECON_DIFF_TYPE} value={reconDiffRow.diffType} className="ml-2" />
+                </Field>
+                <Field label="本笔差额">
+                  <span className="font-medium tabular-nums text-[var(--destructive)]">
+                    {money(reconDiffDelta(reconDiffRow), reconHandle.currency)}
+                  </span>
+                  <span className="ml-2 text-muted-foreground">{parseReconDiffDetail(reconDiffRow.detail)?.note ?? ""}</span>
+                </Field>
+              </>
+            )}
             <Field label="nearpay 汇总 / 账务汇总">
               {money(reconHandle.nearpayTotal, reconHandle.currency)} / {money(reconHandle.ledgerTotal, reconHandle.currency)}
             </Field>
@@ -1030,7 +1439,7 @@ function FinanceInner() {
               <span className="ml-2 text-muted-foreground">{diffSideLabel(reconHandle.diff)}</span>
             </Field>
             <Field label="当前处置进度">
-              <Badge tone={RECON_HANDLE_STATUS[reconHandle.handleStatus!].tone}>{RECON_HANDLE_STATUS[reconHandle.handleStatus!].label}</Badge>
+              <StatusBadge map={RECON_HANDLE_STATUS} value={reconHandle.handleStatus!} />
             </Field>
             {reconHandle.handleNote && <Field label="上一次结论">{reconHandle.handleNote}（{reconHandle.handledBy} · {fmtTime(reconHandle.handledAt!)}）</Field>}
             <Field label="处理人">{username || "admin"}</Field>
@@ -1079,7 +1488,7 @@ function FinanceInner() {
       >
         {invDetail && (
           <>
-            <Field label="状态"><Badge tone={INV_STATUS[invDetail.status].tone}>{INV_STATUS[invDetail.status].label}</Badge></Field>
+            <Field label="状态"><StatusBadge map={INV_STATUS} value={invDetail.status} /></Field>
             <Field label="抬头">{invDetail.payeeName}</Field>
             <Field label="金额">{money(invDetail.amount, invDetail.currency)}</Field>
             <Field label="VAT TRN">{invDetail.vatTrn}</Field>
@@ -1098,12 +1507,14 @@ function FinanceInner() {
               {invDetail.voidedBy ? `${invDetail.voidedBy} · ${fmtTime(invDetail.voidedAt!)}` : "-"}
             </Field>
             <Field label="作废原因">{invDetail.voidReason ?? "-"}</Field>
+            {/* 「为什么这屉里改不了」原先是手写灰底块，圆角还取自 Tailwind 默认阶（已废弃）。
+                收敛到 Notice 原语：形状与字号跟着规范走，不各页各一套 */}
             {invDetail.status !== "DRAFT" && (
-              <div className="rounded-lg bg-muted px-3.5 py-2 text-xs text-muted-foreground">
+              <Notice className="mb-0">
                 {invDetail.status === "ISSUED"
                   ? "已开具：抬头与金额已进税务口径，不可再修改——如需更正请作废后重新登记草稿再开具。"
                   : "已作废：本票为历史记录，不可修改也不可再开具。"}
-              </div>
+              </Notice>
             )}
           </>
         )}

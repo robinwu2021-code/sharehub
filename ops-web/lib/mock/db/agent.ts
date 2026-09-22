@@ -72,10 +72,10 @@ export const listAgentAssignments = (q: PageQuery = {}) => {
   refreshAgentAssetCounts();
   return paginate(agentAssignments, q.page, q.size, (x) => kwHit(q.keyword, x.agentNo, x.agentName, x.region));
 };
-export const listAgentPerformance = (q: PageQuery = {}) => {
-  refreshAgentAssetCounts();
-  return paginate(agentPerformances, q.page, q.size, (x) => kwHit(q.keyword, x.agentNo, x.agentName));
-};
+// listAgentPerformance **已迁到 report.ts**：绩效是读模型，GMV 必须与站点坪效同源
+// （代理 GMV = 名下站点营收之和）。留在这里会让 agent 域反向依赖 report 域，而 report
+// 已经 import 本文件的 agents —— 互引会在模块初始化期炸。同 SiteAnalysis 的处理。
+// `agentPerformances` fixture 仅作默认周期快照保留（引用完整性测试用）。
 export const listAgentAccounts = (q: PageQuery = {}) => paginate(agentAccounts, q.page, q.size, (x) => kwHit(q.keyword, x.accountNo, x.agentNo, x.agentName, x.loginPhone));
 export const listAgentCommissions = (q: PageQuery = {}) => paginate(agentCommissions, q.page, q.size, (x) => kwHit(q.keyword, x.ruleNo, x.agentNo, x.agentName));
 

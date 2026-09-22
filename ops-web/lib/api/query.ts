@@ -33,6 +33,8 @@ export type CabinetQ = PageQ & { onlineStatus?: string; status?: string; showArc
 export type AlarmQ = PageQ & { level?: string; status?: string };
 /** 设备日志：stream 双流筛选 + 日期范围（YYYY-MM-DD，含端点）。 */
 export type DeviceLogQ = PageQ & { stream?: string; from?: string; to?: string };
+/** 固件版本库：固件类型 + 供应商 + 发布状态三筛（投放列表用 PageQ 就够，版本库要按类型/厂商找包）。 */
+export type OtaReleaseQ = PageQ & { fwType?: string; vendorCode?: string; status?: string };
 /** 代理划拨记录：按代理 / 资产类型 / 动作筛（审计流水）。 */
 export type AssignmentRecordQ = PageQ & { agentNo?: string; assetType?: string; action?: string };
 /**
@@ -40,6 +42,8 @@ export type AssignmentRecordQ = PageQ & { agentNo?: string; assetType?: string; 
  * `agentNo` = 只列该代理名下的（回收用）；`excludeAgentNo` = 排除该代理已有的（划拨用）。
  */
 export type AssignableAssetQ = PageQ & { assetType?: string; agentNo?: string; excludeAgentNo?: string };
+/** 分润规则：dimension 是「双向视图」的视角参数（按场地方看 / 按代理商看），同 ShareSummaryQ 口径。 */
+export type ShareRuleQ = PageQ & { dimension?: string };
 /** 结算单：状态 + 对象类型 + 周期。 */
 export type SettlementQ = PageQ & { status?: string; payeeType?: string; period?: string };
 /** 分润明细：可按维度/对象/周期收敛（结算单详情就是「某对象某周期」的那批明细）。 */
@@ -61,6 +65,10 @@ export type RechargeQ = PageQ & { status?: string; from?: string; to?: string };
 export type FreeOrderQ = PageQ & { reason?: string };
 /** 充值套餐：上下架状态 + 归档开关。 */
 export type PackageQ = PageQ & { status?: string; showArchived?: boolean };
+/** 钱包流水：按流水类型筛（RECHARGE/SPEND/REFUND/BONUS）；用户号走路径参数，不进 q。 */
+export type WalletTxnQ = PageQ & { type?: string };
+/** 次卡：按用户 / 卡类型 / 状态筛（用户详情抽屉按 userNo 精确取该用户的卡）。 */
+export type MemberCardQ = PageQ & { userNo?: string; cardType?: string; status?: string };
 /** 免费白名单：状态（含 REVOKED 软撤销）+ 原因。 */
 export type WhitelistQ = PageQ & { status?: string; reason?: string };
 /** 通知发送记录：渠道/状态筛选 + 受控排序（sort=sentAt|cost）。 */
@@ -73,5 +81,18 @@ export type AppVersionQ = PageQ & { platform?: string };
 export type BankQ = PageQ & { country?: string; currency?: string; showArchived?: boolean };
 /** 优惠券发放记录：按券号 / 发放对象类型筛（S2 发放留痕的审计流水）。 */
 export type CouponIssueQ = PageQ & { couponNo?: string; targetType?: string };
+/** 营销活动：状态筛（加了「暂停」后要能单独捞 PAUSED）。等价于 StatusQ，保留域名。 */
+export type CampaignQ = StatusQ;
+/**
+ * 报表：周期是报表的第一入参（`ReportPeriod`，缺省 LAST_30D）。
+ * 不做成 `period?: ReportPeriod` 是因为它从 URL/查询参数来，可能是任意字符串；
+ * 合法性由 mock/后端归一化（`normalizePeriod`），不靠前端类型断言。
+ */
+export type ReportQ = PageQ & { period?: string };
+/** 报表趋势：`kind` 决定汇总口径（DEVICE / LOCATION / FINANCE）。 */
+export type ReportTrendQ = ReportQ & { kind?: string };
+/** 自定义报表：维度 + 自选指标（`metrics` 为 csv，如 `GMV,ORDERS`）。 */
+export type ReportCustomQ = ReportQ & { dim?: string; metrics?: string };
+
 /** 常见问题：分类 + 上下架状态。 */
 export type ProblemQ = PageQ & { category?: string; status?: string; showArchived?: boolean };

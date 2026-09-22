@@ -1,13 +1,28 @@
 // 覆盖范围：分账规则与流水、总账、结算、提现审批、对账、发票、分润统计、充值订单。
-import type { PageQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ } from "../query";
+import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ , ReportQ } from "../query";
 import type {
   PageResult, ShareRule, LedgerEntry, Settlement, SettlementDraft, Withdrawal,
-  ShareRecord, Reconcile, ReconAction, ReconStats, Invoice, ShareSummary, RechargeOrder,
-} from "../../types";
+  ShareRecord, Reconcile, ReconAction, ReconDiff, ReconStats, Invoice, ShareSummary, RechargeOrder,
+
+  VoucherDetail,
+  VoucherCreatePayload,} from "../../types";
 
 export interface FinanceApi {
-  listShareRules(q?: PageQ): Promise<PageResult<ShareRule>>;
-  listLedger(q?: PageQ): Promise<PageResult<LedgerEntry>>;
+  /** 分润规则：`dimension` 是双向视图的视角参数——一份规则按分成主体分开看，不是两套规则。 */
+  listShareRules(q?: ShareRuleQ): Promise<PageResult<ShareRule>>;
+  /** 账务分录。period 复用报表域 ReportQ（同一套周期口径）。 */
+  listLedger(q?: ReportQ): Promise<PageResult<LedgerEntry>>;
+  /**
+   * 凭证下钻：同一 voucherNo 的全部分录 + 借贷合计与平衡判定。
+   * **刻意只做只读**：手工记账是会计操作，开口子前必须先定「谁能记、能不能改已过账凭证、
+   * 如何强制借贷平衡与留痕」，否则一个不校验平衡的「手工记账」比不做更危险。
+   */
+  getVoucher(voucherNo: string): Promise<VoucherDetail>;
+  /**
+   * 手工记账（补一张凭证）。**借贷必须相等**，服务端强制，页面绕不过去。
+   * 只新增不修改：已过账凭证要更正就再记一张反向凭证 —— 直接改历史分录会让账实相符无从追溯。
+   */
+  createVoucher(x: VoucherCreatePayload): Promise<LedgerEntry[]>;
   listSettlements(q?: SettlementQ): Promise<PageResult<Settlement>>;
   listWithdrawals(q?: PageQ): Promise<PageResult<Withdrawal>>;
   /** 提现审批：驳回必须带原因；auditorName 取当前登录用户（后端以会话为准，前端透传便于 mock）。 */
@@ -34,10 +49,17 @@ export interface FinanceApi {
 
   // === S2 对账差错处理（权限码 finance:recon:handle）===
   /**
+   * 批次下的差错明细（权限码 finance:recon:read）。批次行只说「差了多少」，
+   * 差在哪几笔要看这张表——也是逐条处置（`handleRecon` 的 `diffId`）唯一的取号来源。
+   */
+  listReconDiffs(batchNo: string): Promise<ReconDiff[]>;
+  /**
    * 差错处置：verify=已核对无误 / platform=平台侧 / channel=渠道侧（挂起待回执）/ compensate=发起补差。
    * `handleNote`（结论）必填；非法状态迁移、已平账批次由服务端拒绝。
+   *
+   * `diffId` 指定处置**单条**差错；不传 = 处置该批次全部未处置差错（与后端 resolve 同口径）。
    */
-  handleRecon(batchNo: string, action: ReconAction, handleNote: string, operatorName?: string): Promise<Reconcile>;
+  handleRecon(batchNo: string, action: ReconAction, handleNote: string, operatorName?: string, diffId?: number): Promise<Reconcile>;
   /** 对账汇总条：未结差错笔数/金额与列表同源，处置一笔当场变（全量口径，不随列表筛选）。 */
   getReconStats(): Promise<ReconStats>;
 

@@ -1,10 +1,15 @@
 // 场所域（ADR-013 场地方 → 站点 → 点位 → 合同）：sites / locations / venues / contracts，
 // 外加拓展侧的线索 leads、站点效益分析 siteAnalyses、场地入驻审核 venueOnboardings、站点生命周期 siteLifecycles。
 import type {
-  Site, SitePoint, Venue, Contract, Lead, SiteAnalysis,
-  VenueOnboarding, SiteLifecycle, PageQuery,
+  Site, SitePoint, Venue, Contract, ContractAttachment, ContractAttachmentReq,
+  Lead, LeadStage, LeadFollowUp, LeadFollowUpReq,
+  VenueOnboarding, SiteLifecycle, SiteStage, SiteStageChangeReq, PageQuery,
 } from "../../types";
-import { LOCS, VENUE_NAMES, p, iso, phone } from "./internal";
+import {
+  SITE_STAGES, canSiteStageTransition, SITE_COORD_BOUNDS,
+  LEAD_STAGES, LEAD_FOLLOW_CHANNELS, ATTACH_EXTS, ATTACH_MAX_SIZE,
+} from "../../types";
+import { LOCS, VENUE_NAMES, OPERATORS, p, iso, phone } from "./internal";
 import { paginate, kwHit, upsert, nextNo, archiveRow, unarchiveRow } from "./helpers";
 
 // 台账 M11：站点的区域必须挂 regions 字典里真实存在的三级区域 ID（原先存的是"Dubai North"
@@ -45,19 +50,61 @@ export const contracts: Contract[] = Array.from({ length: 18 }, (_, i) => ({
   contractNo: `CT${400 + i}`, venueName: p(VENUE_NAMES, i), siteName: p(LOCS, i),
   shareRate: [0.15, 0.2, 0.25, 0.3][i % 4], entryFee: (i % 4) * 500, startAt: iso(i * 30 * 86400_000),
   endAt: iso(-(365 - i * 10) * 86400_000), status: i % 9 === 0 ? "EXPIRED" : "ACTIVE",
+  // 附件只给一部分合同：空态（「这份合同还没扫描件」）与已上传态都要能在页面上看到。
+  // 上传时间 = 合同生效时间之后一天，避免出现「扫描件早于合同生效」这种自相矛盾的流水。
+  attachments: i % 3 === 0
+    ? [{
+        attachNo: `ATT${900 + i}`, fileName: `CT${400 + i}-进场合同扫描件.pdf`,
+        size: 1_200_000 + i * 40_000, uploadedBy: p(OPERATORS, i), uploadedAt: iso(i * 30 * 86400_000 - 86400_000),
+      }]
+    : [],
 }));
 
 export const leads: Lead[] = Array.from({ length: 20 }, (_, i) => ({
   leadNo: `LD${3000 + i}`, venueName: p([...VENUE_NAMES, "Dubai Marina Mall", "The Dubai Fountain", "Global Village"], i),
-  contact: phone(i), stage: p(["NEW", "CONTACTED", "NEGOTIATING", "SIGNED", "LOST"] as const, i),
+  contact: phone(i), stage: p([...LEAD_STAGES], i),
   owner: p(["BD-Layla", "BD-Yusuf", "BD-Ahmed"], i), expectSites: 1 + (i * 3) % 12,
   updatedAt: iso(i * 21600_000),
 }));
-export const siteAnalyses: SiteAnalysis[] = Array.from({ length: 12 }, (_, i) => ({
-  siteNo: `ST${300 + i}`, siteName: p(LOCS, i), revenue: 8000 + (i * 1337) % 40000,
-  orders: 200 + (i * 71) % 1800, turnover: Number((1.2 + (i % 7) * 0.6).toFixed(1)),
-  paybackDays: 90 + (i * 17) % 300, cabinetCount: 2 + (i * 3) % 12, currency: "AED",
-}));
+
+// 跟进记录种子必须与线索自身对得上，否则时间线一看就是假的。三条自洽规则：
+//  ① `owner` 全部取该线索的负责人（不会出现「别人的线索被我跟进」）；
+//  ② 阶段链从 NEW 走到线索当前 `stage`（LOST 视为在接触后谈崩，不经过 SIGNED）；
+//  ③ 最后一条的 `createdAt` **恰好等于** `lead.updatedAt` —— 列表的「更新时间」就是最后一次跟进时间。
+// 阶段停留在 NEW 的线索**故意不给记录**：还没人跟进过，正好覆盖空态。
+const LEAD_STAGE_PATH: Record<LeadStage, LeadStage[]> = {
+  NEW: [],
+  CONTACTED: ["NEW", "CONTACTED"],
+  NEGOTIATING: ["NEW", "CONTACTED", "NEGOTIATING"],
+  SIGNED: ["NEW", "CONTACTED", "NEGOTIATING", "SIGNED"],
+  LOST: ["NEW", "CONTACTED", "LOST"],
+};
+const FOLLOW_TEXT: Record<LeadStage, string> = {
+  NEW: "渠道推荐获取线索，已录入待首访",
+  CONTACTED: "电话首访：物业对充电宝合作有意向，约现场看点位",
+  NEGOTIATING: "现场看点位，谈分成比例与进场费，对方要求月结",
+  SIGNED: "合同条款谈定，已签回扫描件，转交运营排期进场",
+  LOST: "对方已与其他品牌签独家，本轮结束，半年后再跟",
+};
+export const leadFollowUps: LeadFollowUp[] = leads.flatMap((lead, i) => {
+  const path = LEAD_STAGE_PATH[lead.stage];
+  return path.map((to, k) => ({
+    followNo: `LF${5000 + i * 10 + k}`,
+    leadNo: lead.leadNo,
+    channel: p([...LEAD_FOLLOW_CHANNELS], i + k),
+    fromStage: k === 0 ? null : path[k - 1],
+    toStage: to,
+    owner: lead.owner,
+    content: FOLLOW_TEXT[to],
+    // 只有未到终态的线索才有「下次跟进」计划：签约/流失后再约人是无意义的待办
+    nextAt: k === path.length - 1 && to !== "SIGNED" && to !== "LOST" ? iso(-(3 + (i % 5)) * 86400_000).slice(0, 10) : null,
+    createdAt: iso(i * 21600_000 + (path.length - 1 - k) * 3 * 86400_000),
+  }));
+});
+// 站点坪效（siteAnalyses / listSiteAnalysis）**已迁到 report.ts**。
+// 它是读模型不是站点的领域概念：留在这里就等于让业务域依赖报表域，而 report.ts 本就要
+// import 本文件的 `sites` —— 两边互引会在模块初始化期炸（实测 22 个测试文件连带失败）。
+// 后端出于同一理由把 SiteAnalysis 从 loc.ext 迁进了报表域（见 ReportDtos 的迁入注释）。
 
 export const venueOnboardings: VenueOnboarding[] = [
   { onboardingNo: "OB0001", venueName: "Al Barsha Mall", contact: "Ahmed +971501110001", industry: "购物中心", requestedAt: "2026-07-10T10:00:00Z", status: "PENDING", reviewAt: null, reviewNote: null },
@@ -81,14 +128,218 @@ export const siteLifecycles: SiteLifecycle[] = SITE_LIFECYCLE_SEED.map((s) => ({
 }));
 
 export const listLeads = (q: PageQuery = {}) => paginate(leads, q.page, q.size, (x) => kwHit(q.keyword, x.leadNo, x.venueName, x.owner));
-export const listSiteAnalysis = (q: PageQuery = {}) => paginate(siteAnalyses, q.page, q.size, (x) => kwHit(q.keyword, x.siteNo, x.siteName));
 export const listVenueOnboardings = (q: PageQuery = {}) => paginate(venueOnboardings, q.page, q.size, (x) => kwHit(q.keyword, x.onboardingNo, x.venueName, x.contact));
 export const listSiteLifecycles = (q: PageQuery = {}) => paginate(siteLifecycles, q.page, q.size, (x) => kwHit(q.keyword, x.siteNo, x.siteName, x.owner));
 
 export const saveLead = (x: Partial<Lead>) => upsert(leads, x, "leadNo", () => nextNo("LD", leads));
 export const saveVenue = (x: Partial<Venue>) => upsert(venues, x, "venueNo", () => nextNo("VEN", venues));
-export const saveContract = (x: Partial<Contract>) => upsert(contracts, x, "contractNo", () => nextNo("CT", contracts));
+/**
+ * 合同保存。附件不经此路径写入（走 addContractAttachment），但这里必须**兜住不被清空**：
+ * 页面的编辑抽屉是字段配置化的，提交体里没有 attachments，直接 upsert 会把已有扫描件抹掉。
+ */
+export const saveContract = (x: Partial<Contract>) => {
+  const cur = contracts.find((c) => c.contractNo === x.contractNo);
+  return upsert(contracts, { ...x, attachments: x.attachments ?? cur?.attachments ?? [] }, "contractNo", () => nextNo("CT", contracts));
+};
 export const saveVenueOnboarding = (x: Partial<VenueOnboarding>) => upsert(venueOnboardings, x, "onboardingNo", () => nextNo("OB", venueOnboardings));
+
+// ————————————————————————————————————————————————————————————————
+// 站点坐标校验（saveSite 的写入闸门）
+// 窗口取值在 lib/types/location.ts（抽屉提示与本层校验同源）。
+// ————————————————————————————————————————————————————————————————
+
+/** 坐标缺失 / 非数 / 落在运营窗口外。 */
+export class SiteCoordError extends Error {
+  constructor(msg: string) { super(msg); this.name = "SiteCoordError"; }
+}
+
+/**
+ * 站点坐标必填校验。**比 DDL 严一格**（`loc_site.lng/lat` 允许 NULL）——这是有意的：
+ * 前端 `Site.lat/lng` 是非空 number，地图组件直接读，一旦落库为空就变成 NaN 撒点，
+ * 表现是「地图少了几个站点」而非报错。宽松留给后端，前端在入口处挡住。
+ */
+export function assertSiteCoords(lat: unknown, lng: unknown): void {
+  const { latMin, latMax, lngMin, lngMax } = SITE_COORD_BOUNDS;
+  const num = (v: unknown) => (typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v) : NaN);
+  const la = num(lat), ln = num(lng);
+  if (!Number.isFinite(la) || !Number.isFinite(ln)) throw new SiteCoordError("站点经纬度必填：地图撒点直接读这两个字段，留空的站点不会出现在地图上");
+  if (la < latMin || la > latMax || ln < lngMin || ln > lngMax) {
+    throw new SiteCoordError(
+      `坐标超出运营范围（纬度 ${latMin}~${latMax} / 经度 ${lngMin}~${lngMax}）：当前 ${la}, ${ln}。经纬度写反是最常见的原因`,
+    );
+  }
+}
+
+// ————————————————————————————————————————————————————————————————
+// 合同附件（假上传：只存文件名 + 大小，拍板点 #3）
+// POST /api/ops/contracts/{contractNo}/attachments —— ⚠️ 后端尚无此端点
+// ————————————————————————————————————————————————————————————————
+
+/** 附件违规（合同不存在 / 文件名或大小不合规 / 同名重复 / 删不存在的附件）。 */
+export class ContractAttachmentError extends Error {
+  constructor(msg: string) { super(msg); this.name = "ContractAttachmentError"; }
+}
+
+const findContract = (contractNo: string): Contract => {
+  const c = contracts.find((x) => x.contractNo === contractNo);
+  if (!c) throw new ContractAttachmentError(`合同不存在：${contractNo}`);
+  return c;
+};
+
+/**
+ * 挂一份扫描件。**不传字节流**：入参只有文件名与大小，浏览器侧的 File 对象不被读取，
+ * 所以这里也无从校验内容真伪——mock 阶段的口径就是「登记一条附件记录」。
+ * 返回整份合同而不是附件本身：页面一次响应就能刷新抽屉里的附件列表，不用二次拉取。
+ */
+export function addContractAttachment(contractNo: string, req: ContractAttachmentReq): Contract {
+  const c = findContract(contractNo);
+  const name = req?.fileName?.trim();
+  if (!name) throw new ContractAttachmentError("文件名必填");
+  const ext = name.includes(".") ? name.slice(name.lastIndexOf(".") + 1).toLowerCase() : "";
+  if (!(ATTACH_EXTS as readonly string[]).includes(ext)) {
+    throw new ContractAttachmentError(`不支持的文件格式「${ext || "无扩展名"}」，仅接受 ${ATTACH_EXTS.join(" / ")}`);
+  }
+  if (!Number.isFinite(req.size) || req.size <= 0) throw new ContractAttachmentError("文件大小非法：空文件不接受");
+  if (req.size > ATTACH_MAX_SIZE) throw new ContractAttachmentError(`文件超过 ${ATTACH_MAX_SIZE / 1024 / 1024}MB 上限，请压缩后再上传`);
+  // 同名拒绝：合同附件靠文件名辨识（没有内容哈希可比），允许同名会让「哪份是最新的」无从判断
+  if (c.attachments.some((a) => a.fileName === name)) throw new ContractAttachmentError(`同名附件已存在：${name}，请先移除旧件或改名`);
+
+  const seq = contracts.reduce((m, x) => Math.max(m, ...x.attachments.map((a) => Number(a.attachNo.slice(3)) || 0)), 899);
+  const row: ContractAttachment = {
+    attachNo: `ATT${seq + 1}`, fileName: name, size: req.size,
+    uploadedBy: req.uploadedBy?.trim() || "admin", uploadedAt: new Date().toISOString(),
+  };
+  c.attachments = [row, ...c.attachments]; // 新件置顶，与各处流水一致
+  return c;
+}
+
+/** 移除附件（误传的扫描件要能撤）。走 remove 而非 DELETE：与 G1 的「状态迁移」表达保持一致。 */
+export function removeContractAttachment(contractNo: string, attachNo: string): Contract {
+  const c = findContract(contractNo);
+  const next = c.attachments.filter((a) => a.attachNo !== attachNo);
+  if (next.length === c.attachments.length) throw new ContractAttachmentError(`附件不存在：${attachNo}`);
+  c.attachments = next;
+  return c;
+}
+
+// ————————————————————————————————————————————————————————————————
+// BD 线索跟进记录（CRM 时间线）
+// GET/POST /api/ops/leads/{leadNo}/follow-ups —— ⚠️ 后端尚无这两个端点
+// ————————————————————————————————————————————————————————————————
+
+/** 跟进记录违规（线索不存在 / 内容为空 / 方式或阶段取值非法）。 */
+export class LeadFollowUpError extends Error {
+  constructor(msg: string) { super(msg); this.name = "LeadFollowUpError"; }
+}
+
+/** 某条线索的跟进流水，新的在前。 */
+export const listLeadFollowUps = (leadNo: string, q: PageQuery = {}) =>
+  paginate(
+    leadFollowUps.filter((x) => x.leadNo === leadNo).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    q.page, q.size, (x) => kwHit(q.keyword, x.content, x.owner),
+  );
+
+/**
+ * 记一条跟进。与阶段推进**同一个动作**：BD 现实里就是「打完电话顺手把阶段拨过去」，
+ * 拆成两步会出现「阶段变了但没人知道为什么」——这正是本次要补的窟窿。
+ * 阶段不传即只留痕；传了且与当前不同才动 `lead.stage`，同时把 `lead.updatedAt` 对齐本条时间
+ * （列表的「更新时间」= 最后一次跟进时间，两处不能各算一套）。
+ */
+export function addLeadFollowUp(leadNo: string, req: LeadFollowUpReq): LeadFollowUp {
+  const lead = leads.find((x) => x.leadNo === leadNo);
+  if (!lead) throw new LeadFollowUpError(`线索不存在：${leadNo}`);
+  const content = req?.content?.trim();
+  if (!content) throw new LeadFollowUpError("跟进内容必填：时间线上一条没有内容的记录等于没记");
+  if (!req.channel || !LEAD_FOLLOW_CHANNELS.includes(req.channel)) throw new LeadFollowUpError(`跟进方式非法: ${req.channel}`);
+  if (req.stage && !LEAD_STAGES.includes(req.stage)) throw new LeadFollowUpError(`线索阶段非法: ${req.stage}`);
+
+  const from = lead.stage;
+  const to = req.stage && req.stage !== from ? req.stage : from;
+  const row: LeadFollowUp = {
+    followNo: nextNo("LF", leadFollowUps, 5000, "followNo"),
+    leadNo, channel: req.channel,
+    // 阶段没动就不制造「A → A」的假迁移：fromStage 记 null，时间线只展示阶段徽标
+    fromStage: to === from ? null : from,
+    toStage: to,
+    owner: req.owner?.trim() || lead.owner,
+    content, nextAt: req.nextAt?.trim() || null,
+    createdAt: new Date().toISOString(),
+  };
+  leadFollowUps.unshift(row);
+  lead.stage = to;
+  lead.updatedAt = row.createdAt;
+  return row;
+}
+
+// ————————————————————————————————————————————————————————————————
+// 门店生命周期阶段流转（POST /api/ops/site-lifecycles/{siteNo}/stage）
+// 取值域与合法性判定在 lib/types/location.ts（页面按钮与本层校验共用同一份），本层**强制执行**——
+// mock 比后端松一格，页面就会学到一个线上不存在的操作；紧一格，又会藏掉线上合法的操作。
+// ————————————————————————————————————————————————————————————————
+
+/** 阶段流转违规（阶段取值非法 / 空转）。 */
+export class SiteLifecycleError extends Error {
+  constructor(msg: string) { super(msg); this.name = "SiteLifecycleError"; }
+}
+
+const STAGE_LABEL: Record<SiteStage, string> = {
+  PROSPECTING: "潜在", SIGNED: "已签约", LIVE: "上线", ACTIVE: "运营中", CHURNED: "流失", CLOSED: "关闭",
+};
+
+/** 流转留痕，对应后端 append 表 `loc_site_lifecycle_log`：主表只留「当前阶段」，历史全在这里。 */
+export interface SiteLifecycleLog {
+  siteNo: string;
+  fromStage: SiteStage | null; // 首次建档没有来源阶段
+  toStage: SiteStage;
+  operator: string;
+  reason: string;
+  createdAt: string;
+}
+export const siteLifecycleLogs: SiteLifecycleLog[] = [];
+
+/**
+ * 阶段流转。三道闸门 + 一次留痕：
+ *  ① 目标阶段必填且在取值域内；② 状态机允许（当前只排空转，见 types 里的 SSOT 注释）；
+ *  ③ 站点没有生命周期行时**建档**而非报错——与后端 insert 分支一致，fromStage 记 null。
+ * 留痕与主表更新同一个动作里完成：不留痕即不算流转。
+ */
+export function changeSiteStage(siteNo: string, req: SiteStageChangeReq): SiteLifecycle {
+  if (!siteNo?.trim()) throw new SiteLifecycleError("siteNo 必填");
+  const to = req?.stage;
+  if (!to) throw new SiteLifecycleError("目标阶段必填");
+  if (!SITE_STAGES.includes(to)) throw new SiteLifecycleError(`门店生命周期阶段非法: ${to}`);
+
+  const cur = siteLifecycles.find((x) => x.siteNo === siteNo) ?? null;
+  const from = cur?.stage ?? null;
+  if (from && !canSiteStageTransition(from, to)) {
+    throw new SiteLifecycleError(
+      from === to
+        ? `站点 ${siteNo} 已处于「${STAGE_LABEL[to]}」阶段，无需重复推进`
+        : `站点 ${siteNo} 不允许从「${STAGE_LABEL[from]}」推进到「${STAGE_LABEL[to]}」`,
+    );
+  }
+
+  const row: SiteLifecycle = cur ?? {
+    siteNo, siteName: sites.find((x) => x.siteNo === siteNo)?.name ?? siteNo,
+    stage: to, stageAt: "", owner: "", currency: "AED", gmvLtm: 0,
+  };
+  Object.assign(row, {
+    stage: to,
+    stageAt: new Date().toISOString().slice(0, 10), // 后端列是 DATE，只有日期语义
+    owner: req.operator?.trim() || row.owner,
+    // gmvLtm / currency 是阶段决策快照：只在调用方明确传了才覆盖，否则沿用上一次的值
+    ...(req.gmvLtm === undefined ? {} : { gmvLtm: req.gmvLtm }),
+    ...(req.currency ? { currency: req.currency } : {}),
+  });
+  if (!cur) siteLifecycles.unshift(row);
+
+  siteLifecycleLogs.unshift({
+    siteNo, fromStage: from, toStage: to,
+    operator: req.operator?.trim() || "admin", reason: req.reason?.trim() ?? "",
+    createdAt: new Date().toISOString(),
+  });
+  return row;
+}
 
 // —— G1 软删除：站点 / 点位 / 场地方 ——
 export const archiveSite = (no: string) => archiveRow(sites, "siteNo", no);

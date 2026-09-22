@@ -8,11 +8,17 @@ import { PageTitle, Pagination } from "@/components/ui/misc";
 import { TabHeader } from "@/components/ui/tab-header";
 import { Toolbar } from "@/components/ui/toolbar";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
+import { segmentedTrackClass, segmentedItemClass } from "@/components/ui/segmented";
+import { ReadOnlyNotice } from "@/components/read-only-notice";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Drawer, Field } from "@/components/ui/drawer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/input";
+import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
+import { FilterSelect } from "@/components/ui/filter-select";
+// 公告实体类型也叫 Notice，提示条改名导入以免撞名
+import { Notice as InfoNotice } from "@/components/ui/notice";
 import { money, fmtTime } from "@/lib/utils";
 import { useCan } from "@/lib/use-can";
 import { useI18n } from "@/lib/i18n";
@@ -26,11 +32,19 @@ import {
 } from "@/components/archive";
 import type {
   Notice, Coupon, Campaign, PushMessage, Referral, AdSlot, AdCampaign, AdDelivery, PageResult,
-  CouponIssueRecord, AudienceType,
+  CouponIssueRecord, AudienceType, CampaignAction, AdCampaignAction, ReferralRule,
 } from "@/lib/types";
-import { couponIssuable, couponRemaining, couponExpired, canSendPush } from "@/lib/types";
+import {
+  couponIssuable, couponRemaining, couponExpired, canSendPush,
+  CAMPAIGN_TRANSITIONS, campaignActions, campaignWindowPassed,
+  AD_CAMPAIGN_TRANSITIONS, adCampaignActions,
+  // 曝光按周期筛：与坪效/绩效同一套 REPORT_PERIODS
+  REPORT_PERIODS, REPORT_PERIOD_DEFAULT, type ReportPeriod,
+} from "@/lib/types";
 
 const SIZE = 10;
+/** 周期码 → 中文标签。取自 REPORT_PERIODS，不另抄一份。 */
+const periodLabel = (p: string) => REPORT_PERIODS.find((x) => x.value === p)?.label ?? p;
 const TABS = [
   // 公告管理是营销模块唯一的阶段 1 项（c-app 首页公告条的发布口），故置于首位。
   { key: "notices", label: "公告管理" },
@@ -61,12 +75,12 @@ const NOTICE_FIELDS: FieldDef[] = [
   { key: "status", label: "状态", type: "select", required: true, section: "发布控制", options: [{ value: "DRAFT", label: "草稿" }, { value: "PUBLISHED", label: "已发布" }, { value: "OFFLINE", label: "已下线" }] },
   { key: "publishedBy", label: "发布人", section: "发布控制", placeholder: "运营中心" },
 ];
-const NOTICE_TYPE: Record<Notice["type"], { label: string; tone: "outline" | "success" | "warning" }> = {
+const NOTICE_TYPE: StatusMap<Notice["type"]> = {
   SYSTEM: { label: "系统公告", tone: "outline" },
   PROMO: { label: "活动公告", tone: "success" },
   MAINTENANCE: { label: "维护公告", tone: "warning" },
 };
-const NOTICE_STATUS: Record<Notice["status"], { label: string; tone: "muted" | "success" }> = {
+const NOTICE_STATUS: StatusMap<Notice["status"]> = {
   DRAFT: { label: "草稿", tone: "muted" },
   PUBLISHED: { label: "已发布", tone: "success" },
   OFFLINE: { label: "已下线", tone: "muted" },
@@ -75,6 +89,35 @@ const NOTICE_STATUS: Record<Notice["status"], { label: string; tone: "muted" | "
 // 默认 tab：阶段 1 下「优惠券」被屏蔽，落到唯一可见的 P1 项「公告管理」；
 // 放开阶段 2 后 /marketing（nav 中标为「优惠券」）恢复原语义。
 const DEFAULT_TAB = isPhaseLocked(2) ? "notices" : "coupons";
+
+// 邀请奖励规则表单。`rewardTo` 用单选而不是两个勾选：BOTH 是「一次事件出两笔奖励」，
+// 与「二选一」在结算上完全不同，枚举把歧义堵死（见 types/marketing.ts 的注释）。
+const REFERRAL_RULE_FIELDS: FieldDef[] = [
+  { key: "name", label: "规则名称", required: true, placeholder: "首单奖励", section: "基本" },
+  { key: "rewardTo", label: "奖励对象", type: "select", required: true, section: "基本",
+    options: [
+      { value: "INVITER", label: "仅邀请人" },
+      { value: "INVITEE", label: "仅受邀人" },
+      { value: "BOTH", label: "双方各得（一次邀请发两笔）" },
+    ] },
+  { key: "trigger", label: "触发条件", type: "select", required: true, section: "基本",
+    options: [
+      { value: "REGISTERED", label: "受邀人完成注册" },
+      { value: "FIRST_ORDER", label: "受邀人首次下单" },
+      { value: "FIRST_PAID", label: "受邀人首次支付成功" },
+    ], help: "越靠后越难触发，但获客质量越高" },
+  { key: "rewardAmount", label: "单侧奖励金额", type: "number", required: true, section: "金额与上限",
+    help: "必须大于 0；「双方各得」时双方各得此额，不是均分" },
+  { key: "currency", label: "币种", type: "select", section: "金额与上限",
+    options: [{ value: "AED", label: "AED" }, { value: "SAR", label: "SAR" }] },
+  { key: "maxPerInviter", label: "每位邀请人上限（次）", type: "number", section: "金额与上限",
+    help: "0 = 不限。设上限是防刷的第一道闸" },
+  { key: "startAt", label: "生效开始", type: "date", required: true, section: "生效期" },
+  { key: "endAt", label: "生效结束", type: "date", required: true, section: "生效期" },
+  { key: "status", label: "状态", type: "select", section: "生效期",
+    options: [{ value: "ACTIVE", label: "生效" }, { value: "DISABLED", label: "停用" }],
+    help: "同一时间窗内只允许一条生效规则——重叠会导致一次邀请发多笔" },
+];
 
 const COUPON_FIELDS: FieldDef[] = [
   { key: "name", label: "名称", required: true, maxLength: 20, placeholder: "新人立减" },
@@ -97,19 +140,53 @@ const MEMBER_LEVEL_OPTS = [
 const PUSH_CHANNEL_LABEL: Record<PushMessage["channel"], string> = {
   APP_PUSH: "App 推送", SUBSCRIBE: "订阅消息（站内）", SMS: "短信",
 };
-const PUSH_STATUS: Record<PushMessage["status"], { label: string; tone: "muted" | "warning" | "success" }> = {
+const PUSH_STATUS: StatusMap<PushMessage["status"]> = {
   DRAFT: { label: "草稿", tone: "muted" },
   SCHEDULED: { label: "已排期", tone: "warning" },
   SENDING: { label: "发送中", tone: "warning" },
   SENT: { label: "已发送", tone: "success" },
 };
+// 裂变 / 广告位 / 广告投放的状态映射。原先是三处内联 ternary ——
+// 同一个枚举在别的页面很可能配出不同颜色，且筛选项文案要另抄一遍。
+const REFERRAL_STATUS: StatusMap<Referral["status"]> = {
+  PENDING: { label: "待发奖", tone: "warning" },
+  REWARDED: { label: "已发奖", tone: "success" },
+};
+const AD_SLOT_STATUS: StatusMap<AdSlot["status"]> = {
+  IDLE: { label: "空闲", tone: "muted" },
+  OCCUPIED: { label: "已占用", tone: "default" },
+};
+const RULE_STATUS: StatusMap<ReferralRule["status"]> = {
+  ACTIVE: { label: "生效", tone: "success" },
+  DISABLED: { label: "停用", tone: "muted" },
+};
+const REWARD_TO_LABEL: Record<ReferralRule["rewardTo"], string> = {
+  INVITER: "仅邀请人", INVITEE: "仅受邀人", BOTH: "双方各得",
+};
+const TRIGGER_LABEL: Record<ReferralRule["trigger"], string> = {
+  REGISTERED: "完成注册", FIRST_ORDER: "首次下单", FIRST_PAID: "首次支付",
+};
+const AD_CAMPAIGN_STATUS: StatusMap<AdCampaign["status"]> = {
+  DRAFT: { label: "草稿", tone: "warning" },
+  RUNNING: { label: "投放中", tone: "success" },
+  ENDED: { label: "已结束", tone: "muted" },
+};
+const CAMPAIGN_STATUS: StatusMap<Campaign["status"]> = {
+  DRAFT: { label: "草稿", tone: "muted" },
+  RUNNING: { label: "进行中", tone: "success" },
+  PAUSED: { label: "已暂停", tone: "warning" },
+  ENDED: { label: "已结束", tone: "muted" },
+};
+/**
+ * 活动表单。**没有「状态」字段**——状态只能由启停动作的状态机推进
+ * （草稿 → 进行中 ⇄ 已暂停 → 已结束），表单能改就等于能复活已结束的活动。
+ */
 const CAMPAIGN_FIELDS: FieldDef[] = [
-  { key: "name", label: "活动名称", placeholder: "夏日充电狂欢" },
+  { key: "name", label: "活动名称", required: true, maxLength: 20, placeholder: "夏日充电狂欢" },
   { key: "kind", label: "类型", placeholder: "满减 / 拉新 / 签到" },
   { key: "rule", label: "规则", placeholder: "满 20 减 5" },
-  { key: "status", label: "状态", type: "select", options: [{ value: "DRAFT", label: "草稿" }, { value: "RUNNING", label: "进行中" }, { value: "ENDED", label: "已结束" }] },
   { key: "startAt", label: "开始时间", placeholder: "2026-07-01 00:00:00" },
-  { key: "endAt", label: "结束时间", placeholder: "2026-07-31 23:59:59" },
+  { key: "endAt", label: "结束时间", placeholder: "2026-07-31 23:59:59", help: "结束时间已过的活动不能再启动，需先延长" },
 ];
 /**
  * 推送草稿表单。**没有「状态」字段**——状态只能由发送动作的状态机推进
@@ -163,9 +240,16 @@ function MarketingInner() {
   const { confirm, dialog } = useConfirm();
   const [tab, setTab] = useState(TABS.some((t) => t.key === qTab) ? (qTab as string) : DEFAULT_TAB);
   const [page, setPage] = useState(1);
+  // 投放曝光周期（缺省近 30 日，同报表域）
+  const [period, setPeriod] = useState<ReportPeriod>(REPORT_PERIOD_DEFAULT);
+  // 裂变页子视图：邀请记录（只读流水）/ 奖励规则（可配置）
+  const [refView, setRefView] = useState<"records" | "rules">("records");
+  const [ruleForm, setRuleForm] = useState<Partial<ReferralRule> | null>(null);
   const [keyword, setKeyword] = useState("");
   // 「显示已归档」开关（TDD §10.1：列表默认过滤已归档）。切 tab 复位，避免在别的 tab 残留看不见的过滤态。
   const [showArchived, setShowArchived] = useState(false);
+  // 活动状态筛：加了「暂停」之后，要能把被暂停的活动单独捞出来复核
+  const [campaignStatus, setCampaignStatus] = useState("");
   const [noticeForm, setNoticeForm] = useState<Partial<Notice> | null>(null);
   const [couponForm, setCouponForm] = useState<Partial<Coupon> | null>(null);
   const [campaignForm, setCampaignForm] = useState<Partial<Campaign> | null>(null);
@@ -190,7 +274,9 @@ function MarketingInner() {
   const canEditNotice = allow("marketing:coupon:issue");
   const canEditCoupon = allow("marketing:coupon:issue");
   const canIssueCoupon = allow("marketing:coupon:issue");
-  const canEditCampaign = allow("marketing:campaign:manage");
+  // 权限码对齐权限清单与后端（marketing:campaign:read / :update）。原先写的 `:manage`
+  // 在清单里根本不存在，只有靠 `marketing:*`（BD/ADMIN）通配才碰巧亮起——等于没做权限控制。
+  const canEditCampaign = allow("marketing:campaign:update");
   const canEditPush = allow("marketing:push:send");
   const canEditAd = allow("marketing:ad:manage");
   const saveNotice = useMutation({
@@ -205,6 +291,75 @@ function MarketingInner() {
     mutationFn: (c: Partial<Campaign>) => api.saveCampaign(c),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["mkt"] }); notify.success(t("common.success")); setCampaignForm(null); },
   });
+  // 启停：合法性（状态机 + 时间窗）由 mock/后端兜底，这里只管二次确认与成功提示。
+  const transitionCampaign = useMutation({
+    mutationFn: (v: { no: string; action: CampaignAction }) => api.transitionCampaign(v.no, v.action),
+    onSuccess: (c, v) => {
+      qc.invalidateQueries({ queryKey: ["mkt"] });
+      notify.success(`活动 ${c.campaignNo} 已${CAMPAIGN_TRANSITIONS[v.action].label} · 当前${CAMPAIGN_STATUS[c.status].label}`);
+    },
+  });
+  // 广告上线/暂停/下线。状态机与时间窗由 types 的 AD_CAMPAIGN_TRANSITIONS 单点定义，
+  // mock 层强制、按钮由它派生 —— 与营销活动分开是因为广告要对广告主结算，语义不同。
+  const transitionAd = useMutation({
+    mutationFn: (v: { no: string; action: AdCampaignAction }) => api.transitionAdCampaign(v.no, v.action),
+    onSuccess: (a, v) => {
+      qc.invalidateQueries({ queryKey: ["mkt"] });
+      notify.success(`广告 ${a.adNo} 已${AD_CAMPAIGN_TRANSITIONS[v.action].label} · 当前${AD_CAMPAIGN_STATUS[a.status].label}`);
+    },
+  });
+  // 邀请奖励规则：独立查询（子视图切到「奖励规则」才拉）
+  const rules = useQuery({
+    queryKey: ["mkt-referral-rules", page, keyword],
+    queryFn: () => api.listReferralRules({ page, size: SIZE, keyword }),
+    placeholderData: keepPreviousData,
+    enabled: tab === "referral" && refView === "rules",
+  });
+  // 校验（金额>0 / 窗口有效 / 生效期不重叠）在 mock 层强制，错误由全局 MutationCache 提示
+  const saveRule = useMutation({
+    mutationFn: (x: Partial<ReferralRule>) => api.saveReferralRule(x),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["mkt-referral-rules"] });
+      notify.success(t("common.success"));
+      setRuleForm(null);
+    },
+  });
+
+  /** 上线即开始对广告主计费、素材上柜机屏；下线是终态，按危险动作处理。 */
+  const askTransitionAd = async (a: AdCampaign, action: AdCampaignAction) => {
+    const label = AD_CAMPAIGN_TRANSITIONS[action].label;
+    const desc = action === "launch"
+      ? `上线后素材立即进入柜机屏轮播，并开始按曝光对广告主「${a.advertiser}」计费。`
+      : action === "pause"
+      ? `暂停后素材立即停止轮播、停止计费，可再次上线。`
+      : `下线后广告进入终态，不可再上线（需要复投请另建广告）。`;
+    const ok = await confirm({
+      title: `${label}广告 ${a.adNo}`,
+      desc: `${desc}投放窗口：${fmtTime(a.startAt)} ~ ${fmtTime(a.endAt)}。`,
+      danger: action === "stop",
+      confirmText: `确认${label}`,
+      cancelText: "再想想",
+    });
+    if (ok) transitionAd.mutate({ no: a.adNo, action });
+  };
+
+  /** 启停都影响 C 端能不能领到权益，逐个二次确认；「结束」是终态，按危险动作处理。 */
+  const askTransitionCampaign = async (c: Campaign, action: CampaignAction) => {
+    const label = CAMPAIGN_TRANSITIONS[action].label;
+    const desc = action === "start"
+      ? `启动后活动规则「${c.rule}」立即对 C 端生效，用户下单即可命中。`
+      : action === "pause"
+      ? `暂停后 C 端立即不再命中该活动规则，已发生的订单不受影响；之后可再次启动。`
+      : `结束后活动进入终态，不可再启动（需要复用请另建活动）。`;
+    const ok = await confirm({
+      title: `${label}活动 ${c.campaignNo}`,
+      desc: `${desc}活动窗口：${fmtTime(c.startAt)} ~ ${fmtTime(c.endAt)}。`,
+      danger: action === "end",
+      confirmText: `确认${label}`,
+      cancelText: "再想想",
+    });
+    if (ok) transitionCampaign.mutate({ no: c.campaignNo, action });
+  };
   const savePush = useMutation({
     mutationFn: (p: Partial<PushMessage>) => api.savePushMessage(p),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["mkt"] }); notify.success(t("common.success")); setPushForm(null); },
@@ -325,17 +480,17 @@ function MarketingInner() {
 
   const q = useQuery<PageResult<Notice | Coupon | CouponIssueRecord | Campaign | PushMessage | Referral | AdSlot | AdCampaign | AdDelivery>>({
     // showArchived 必须进 queryKey，否则切开关不重新拉数据
-    queryKey: ["mkt", tab, page, keyword, showArchived],
+    queryKey: ["mkt", tab, page, keyword, showArchived, campaignStatus, period],
     queryFn: () =>
       tab === "notices" ? api.listNotices({ page, size: SIZE, keyword, showArchived })
       : tab === "coupons" ? api.listCoupons({ page, size: SIZE, keyword, showArchived })
       : tab === "coupon-issues" ? api.listCouponIssueRecords({ page, size: SIZE, keyword })
-      : tab === "campaigns" ? api.listCampaigns({ page, size: SIZE, keyword })
+      : tab === "campaigns" ? api.listCampaigns({ page, size: SIZE, keyword, status: campaignStatus })
       : tab === "push" ? api.listPushMessages({ page, size: SIZE, keyword })
       : tab === "referral" ? api.listReferrals({ page, size: SIZE, keyword })
       : tab === "ad-slots" ? api.listAdSlots({ page, size: SIZE, keyword })
       : tab === "ad-campaigns" ? api.listAdCampaigns({ page, size: SIZE, keyword })
-      : api.listAdDeliveries({ page, size: SIZE, keyword }),
+      : api.listAdDeliveries({ page, size: SIZE, keyword, period }),
     placeholderData: keepPreviousData,
   });
 
@@ -349,10 +504,10 @@ function MarketingInner() {
   const noticeCols: Column<Notice>[] = [
     { header: "公告号", cell: (n) => <span className="font-medium">{n.noticeNo}</span> },
     { header: "标题（中）", cell: (n) => n.title },
-    { header: "类型", cell: (n) => <Badge tone={NOTICE_TYPE[n.type].tone}>{NOTICE_TYPE[n.type].label}</Badge> },
+    { header: "类型", cell: (n) => <StatusBadge map={NOTICE_TYPE} value={n.type} /> },
     { header: "置顶", cell: (n) => n.pinned ? <Badge tone="success">置顶</Badge> : <span className="text-muted-foreground">-</span> },
     { header: "生效期", cell: (n) => <span className="text-muted-foreground">{fmtTime(n.startAt)} ~ {fmtTime(n.endAt)}</span> },
-    { header: "状态", cell: (n) => <Badge tone={NOTICE_STATUS[n.status].tone}>{NOTICE_STATUS[n.status].label}</Badge> },
+    { header: "状态", cell: (n) => <StatusBadge map={NOTICE_STATUS} value={n.status} /> },
     ...archivedCol<Notice>(),
     {
       header: t("common.actions"),
@@ -424,10 +579,48 @@ function MarketingInner() {
     { header: "名称", cell: (c) => c.name },
     { header: "类型", cell: (c) => <Badge tone="outline">{c.kind}</Badge> },
     { header: "规则", cell: (c) => <span className="text-muted-foreground">{c.rule}</span> },
-    { header: "状态", cell: (c) => <Badge tone={c.status === "RUNNING" ? "success" : c.status === "ENDED" ? "muted" : "warning"}>{c.status === "RUNNING" ? "进行中" : c.status === "ENDED" ? "已结束" : "草稿"}</Badge> },
+    { header: "状态", cell: (c) => <StatusBadge map={CAMPAIGN_STATUS} value={c.status} /> },
     { header: "开始", cell: (c) => <span className="text-muted-foreground">{fmtTime(c.startAt)}</span> },
-    { header: "结束", cell: (c) => <span className="text-muted-foreground">{fmtTime(c.endAt)}</span> },
-    { header: t("common.actions"), cell: (c) => canEditCampaign ? <Button size="sm" variant="outline" onClick={() => setCampaignForm(c)}>{t("common.edit")}</Button> : <span className="text-muted-foreground">-</span> },
+    {
+      // 窗口已过要在列上标出来：否则「为什么这条没有启动按钮」得靠人去比日期
+      header: "结束",
+      cell: (c) => campaignWindowPassed(c)
+        ? <Badge tone="muted">窗口已过 {fmtTime(c.endAt)}</Badge>
+        : <span className="text-muted-foreground">{fmtTime(c.endAt)}</span>,
+    },
+    {
+      header: t("common.actions"),
+      cell: (c) => canEditCampaign ? (
+        <div className="flex gap-2">
+          {/* 已结束的活动不给编辑：终态还能改规则等于改一份已经生效过的合约 */}
+          {c.status !== "ENDED" && <Button size="sm" variant="outline" onClick={() => setCampaignForm(c)}>{t("common.edit")}</Button>}
+          {/* 按钮**完全由状态机派生**（campaignActions = CAMPAIGN_TRANSITIONS + 时间窗），
+              与 mock 校验同一份口径：终态与窗口已过的行自然没有按钮，不会「亮着点了报错」 */}
+          {campaignActions(c).map((a) => (
+            <Button
+              key={a} size="sm" variant={a === "start" ? "default" : "outline"}
+              disabled={transitionCampaign.isPending}
+              onClick={() => askTransitionCampaign(c, a)}
+            >{CAMPAIGN_TRANSITIONS[a].label}</Button>
+          ))}
+          {c.status === "ENDED" && <span className="text-muted-foreground">已结束</span>}
+        </div>
+      ) : <span className="text-muted-foreground">-</span>,
+    },
+  ];
+
+  const ruleCols: Column<ReferralRule>[] = [
+    { header: "规则号", cell: (r) => <span className="txt-strong tabular-nums">{r.ruleNo}</span> },
+    { header: "名称", cell: (r) => r.name },
+    { header: "奖励对象", cell: (r) => REWARD_TO_LABEL[r.rewardTo] },
+    { header: "触发条件", cell: (r) => <span className="text-muted-foreground">{TRIGGER_LABEL[r.trigger]}</span> },
+    { header: "单侧金额", className: "text-right", cell: (r) => <span className="tabular-nums">{money(r.rewardAmount, r.currency)}</span> },
+    { header: "每人上限", className: "text-right", cell: (r) => <span className="tabular-nums">{r.maxPerInviter === 0 ? "不限" : r.maxPerInviter}</span> },
+    { header: "生效期", cell: (r) => <span className="text-muted-foreground">{fmtTime(r.startAt)} ~ {fmtTime(r.endAt)}</span> },
+    { header: "状态", cell: (r) => <StatusBadge map={RULE_STATUS} value={r.status} /> },
+    { header: t("common.actions"), cell: (r) => canEditAd
+      ? <Button size="sm" variant="outline" onClick={() => setRuleForm(r)}>{t("common.edit")}</Button>
+      : <span className="text-muted-foreground">-</span> },
   ];
 
   const pushCols: Column<PushMessage>[] = [
@@ -437,7 +630,7 @@ function MarketingInner() {
     { header: "目标人群", cell: (p) => <span className="text-muted-foreground">{p.audience}</span> },
     // 目标 / 成功分两列：只看「触达数」看不出失败了多少（关推送权限、停机、黑名单）
     { header: "目标/成功", cell: (p) => <span className="tabular-nums">{p.targetCount}/{p.successCount}</span> },
-    { header: "状态", cell: (p) => <Badge tone={PUSH_STATUS[p.status].tone}>{PUSH_STATUS[p.status].label}</Badge> },
+    { header: "状态", cell: (p) => <StatusBadge map={PUSH_STATUS} value={p.status} /> },
     {
       header: "发送时间",
       cell: (p) => <span className="text-muted-foreground">
@@ -462,7 +655,7 @@ function MarketingInner() {
     { header: "邀请人", cell: (r) => r.inviter },
     { header: "受邀人", cell: (r) => r.invitee },
     { header: "奖励", cell: (r) => <span className="tabular-nums">{money(r.reward, r.currency)}</span> },
-    { header: "状态", cell: (r) => <Badge tone={r.status === "REWARDED" ? "success" : "warning"}>{r.status === "REWARDED" ? "已发奖" : "待发奖"}</Badge> },
+    { header: "状态", cell: (r) => <StatusBadge map={REFERRAL_STATUS} value={r.status} /> },
     { header: "时间", cell: (r) => <span className="text-muted-foreground">{fmtTime(r.createdAt)}</span> },
   ];
 
@@ -471,7 +664,7 @@ function MarketingInner() {
     { header: "机柜", cell: (s) => <span className="text-muted-foreground">{s.cabinetNo}</span> },
     { header: "位置", cell: (s) => <Badge tone="outline">{s.position === "SCREEN" ? "屏幕" : "机身"}</Badge> },
     { header: "尺寸", cell: (s) => s.size },
-    { header: "状态", cell: (s) => <Badge tone={s.status === "OCCUPIED" ? "default" : "muted"}>{s.status === "OCCUPIED" ? "已占用" : "空闲"}</Badge> },
+    { header: "状态", cell: (s) => <StatusBadge map={AD_SLOT_STATUS} value={s.status} /> },
     { header: "创建时间", cell: (s) => <span className="text-muted-foreground">{fmtTime(s.createdAt)}</span> },
     { header: t("common.actions"), cell: (s) => canEditAd ? <Button size="sm" variant="outline" onClick={() => setSlotForm(s)}>{t("common.edit")}</Button> : <span className="text-muted-foreground">-</span> },
   ];
@@ -481,10 +674,26 @@ function MarketingInner() {
     { header: "广告主", cell: (a) => a.advertiser },
     { header: "创意", cell: (a) => <span className="text-muted-foreground">{a.creative}</span> },
     { header: "定向", cell: (a) => <span className="text-muted-foreground">{a.targeting}</span> },
-    { header: "状态", cell: (a) => <Badge tone={a.status === "RUNNING" ? "success" : a.status === "ENDED" ? "muted" : "warning"}>{a.status === "RUNNING" ? "投放中" : a.status === "ENDED" ? "已结束" : "草稿"}</Badge> },
+    { header: "状态", cell: (a) => <StatusBadge map={AD_CAMPAIGN_STATUS} value={a.status} /> },
     { header: "开始", cell: (a) => <span className="text-muted-foreground">{fmtTime(a.startAt)}</span> },
     { header: "结束", cell: (a) => <span className="text-muted-foreground">{fmtTime(a.endAt)}</span> },
-    { header: t("common.actions"), cell: (a) => canEditAd ? <Button size="sm" variant="outline" onClick={() => setAdForm(a)}>{t("common.edit")}</Button> : <span className="text-muted-foreground">-</span> },
+    {
+      header: t("common.actions"),
+      cell: (a) => canEditAd ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Button size="sm" variant="outline" onClick={() => setAdForm(a)}>{t("common.edit")}</Button>
+          {/* 按钮完全由 adCampaignActions（状态机 + 时间窗）派生：终态与窗口已过的行自然无按钮 */}
+          {adCampaignActions(a).map((k) => (
+            <Button
+              key={k} size="sm" variant={k === "launch" ? "default" : "outline"}
+              disabled={transitionAd.isPending}
+              onClick={() => askTransitionAd(a, k)}
+            >{AD_CAMPAIGN_TRANSITIONS[k].label}</Button>
+          ))}
+          {a.status === "ENDED" && <span className="text-muted-foreground">已下线</span>}
+        </div>
+      ) : <span className="text-muted-foreground">-</span>,
+    },
   ];
 
   const deliveryCols: Column<AdDelivery>[] = [
@@ -504,7 +713,7 @@ function MarketingInner() {
 
   return (
     <div>
-      <TabHeader tabs={TABS} value={tab} onChange={(k) => { setTab(k); setPage(1); setKeyword(""); setShowArchived(false); }} />
+      <TabHeader tabs={TABS} value={tab} onChange={(k) => { setTab(k); setPage(1); setKeyword(""); setShowArchived(false); setCampaignStatus(""); }} />
       {tab === "notices" && (
         <Toolbar
           search={keyword}
@@ -575,18 +784,20 @@ function MarketingInner() {
           search={keyword}
           onSearch={(v) => { setKeyword(v); setPage(1); }}
           searchPlaceholder="搜索活动号/名称/类型"
-          onAdd={canEditCampaign ? () => setCampaignForm({ kind: "满减", status: "DRAFT", startAt: "", endAt: "" }) : undefined}
+          onAdd={canEditCampaign ? () => setCampaignForm({ kind: "满减", startAt: "", endAt: "" }) : undefined}
           addLabel="新增活动"
           onExport={onExportOf<Campaign>("活动", [
             { header: "活动号", value: (c) => c.campaignNo },
             { header: "名称", value: (c) => c.name },
             { header: "类型", value: (c) => c.kind },
             { header: "规则", value: (c) => c.rule },
-            { header: "状态", value: (c) => (c.status === "RUNNING" ? "进行中" : c.status === "ENDED" ? "已结束" : "草稿") },
+            { header: "状态", value: (c) => CAMPAIGN_STATUS[c.status].label },
             { header: "开始", value: (c) => fmtTime(c.startAt) },
             { header: "结束", value: (c) => fmtTime(c.endAt) },
           ])}
-        />
+        >
+          <FilterSelect value={campaignStatus} onChange={(v) => { setCampaignStatus(v); setPage(1); }} allLabel="全部状态" options={CAMPAIGN_STATUS} />
+        </Toolbar>
       )}
       {tab === "push" && (
         <Toolbar
@@ -622,7 +833,19 @@ function MarketingInner() {
             { header: "状态", value: (r) => (r.status === "REWARDED" ? "已发奖" : "待发奖") },
             { header: "时间", value: (r) => fmtTime(r.createdAt) },
           ])}
-        />
+        >
+          {/* 子视图：邀请记录是只读流水（C 端自动产生），奖励规则才是可配置项。
+              不拆成两个 tab —— 它们是同一件事的「结果」与「口径」，放一起才好对照 */}
+          <div className={segmentedTrackClass()} role="group" aria-label="裂变子视图">
+            {([["records", "邀请记录"], ["rules", "奖励规则"]] as const).map(([k, label]) => (
+              <button
+                key={k} type="button" aria-pressed={refView === k}
+                onClick={() => { setRefView(k); setPage(1); }}
+                className={segmentedItemClass(refView === k, "px-2.5 py-1 text-sm")}
+              >{label}</button>
+            ))}
+          </div>
+        </Toolbar>
       )}
       {tab === "ad-slots" && (
         <Toolbar
@@ -664,7 +887,7 @@ function MarketingInner() {
           search={keyword}
           onSearch={(v) => { setKeyword(v); setPage(1); }}
           searchPlaceholder="搜索投放号/广告号/广告位"
-          onExport={onExportOf<AdDelivery>("投放与曝光", [
+          onExport={onExportOf<AdDelivery>(`投放与曝光-${periodLabel(period)}`, [
             { header: "投放号", value: (d) => d.deliveryNo },
             { header: "广告号", value: (d) => d.adNo },
             { header: "广告位", value: (d) => d.slotNo },
@@ -672,18 +895,55 @@ function MarketingInner() {
             { header: "播放", value: (d) => Math.round(d.plays) },
             { header: "日期", value: (d) => d.date },
           ])}
-        />
+        >
+          {/* 曝光是按天回传的事实行，周期筛选就是它的「完成态」——
+              动作（上线/暂停/下线）挂在广告活动上，不挂事实表 */}
+          <FilterSelect
+            value={period}
+            onChange={(v) => { setPeriod(v as ReportPeriod); setPage(1); }}
+            options={REPORT_PERIODS.map((x) => ({ value: x.value, label: x.label }))}
+            aria-label="按统计周期筛选"
+          />
+        </Toolbar>
       )}
       {tab === "notices" && <DataTable rowKey={(n: Notice) => n.noticeNo} columns={noticeCols} rows={q.data?.list as Notice[]} loading={q.isLoading} rowClassName={archivedRowClass} empty={showArchived ? "没有匹配的公告——换个关键词，或点「新增公告」发布第一条 C 端公告条。" : "暂无在用公告——可能都已归档（打开「显示已归档」查看），或点「新增公告」发布第一条。"} />}
       {tab === "coupons" && <DataTable rowKey={(c: Coupon) => c.couponNo} columns={couponCols} rows={q.data?.list as Coupon[]} loading={q.isLoading} rowClassName={archivedRowClass} empty={showArchived ? "没有匹配的优惠券——换个关键词，或点「新增优惠券」建一张。" : "暂无在用优惠券——可能都已归档（打开「显示已归档」查看），或点「新增优惠券」建第一张。"} />}
       {tab === "coupon-issues" && <DataTable rowKey={(r: CouponIssueRecord) => r.issueNo} columns={issueCols} rows={q.data?.list as CouponIssueRecord[]} loading={q.isLoading} empty="暂无发放记录——到「优惠券」tab 选一张在用的券点「发放」，这里会逐笔留痕。" />}
-      {tab === "campaigns" && <DataTable rowKey={(c: Campaign) => c.campaignNo} columns={campaignCols} rows={q.data?.list as Campaign[]} loading={q.isLoading} empty="暂无营销活动——点「新增活动」配置满减 / 拉新 / 签到规则。" />}
+      {tab === "campaigns" && (
+        <InfoNotice>
+          启停走状态机：草稿 / 已暂停 →启动→ 进行中 →暂停→ 已暂停；进行中 / 已暂停 →结束→ 已结束（终态，不可复活）。
+          结束时间已过的活动不能启动——请先在编辑里延长结束时间。
+        </InfoNotice>
+      )}
+      {tab === "campaigns" && <DataTable rowKey={(c: Campaign) => c.campaignNo} columns={campaignCols} rows={q.data?.list as Campaign[]} loading={q.isLoading} empty={campaignStatus ? `没有「${CAMPAIGN_STATUS[campaignStatus as Campaign["status"]].label}」的活动——换个状态看看。` : "暂无营销活动——点「新增活动」配置满减 / 拉新 / 签到规则。"} />}
       {tab === "push" && <DataTable rowKey={(p: PushMessage) => p.pushNo} columns={pushCols} rows={q.data?.list as PushMessage[]} loading={q.isLoading} empty="暂无推送任务——点「新增推送」创建一条 App 推送或订阅消息。" />}
-      {tab === "referral" && <DataTable rowKey={(r: Referral) => r.inviteNo} columns={referralCols} rows={q.data?.list as Referral[]} loading={q.isLoading} empty="暂无邀请记录——用户在 C 端发起邀请后自动生成，无需在此手工录入。" />}
+      {tab === "referral" && refView === "records" && <DataTable rowKey={(r: Referral) => r.inviteNo} columns={referralCols} rows={q.data?.list as Referral[]} loading={q.isLoading} empty="暂无邀请记录——用户在 C 端发起邀请后自动生成，无需在此手工录入。" />}
+      {tab === "referral" && refView === "rules" && (
+        <>
+          {canEditAd
+            ? <div className="mb-3 flex justify-end"><Button size="sm" onClick={() => setRuleForm({ rewardTo: "BOTH", trigger: "FIRST_ORDER", currency: "AED", maxPerInviter: 10, status: "ACTIVE" })}>新增规则</Button></div>
+            : <ReadOnlyNotice what="奖励规则配置" perm="marketing:ad:manage" />}
+          <DataTable rowKey={(r: ReferralRule) => r.ruleNo} columns={ruleCols} rows={rules.data?.list} loading={rules.isLoading}
+            empty="还没有奖励规则——没有生效规则时 C 端邀请不发奖，点「新增规则」配置奖多少、奖给谁、什么条件触发。" />
+        </>
+      )}
       {tab === "ad-slots" && <DataTable rowKey={(s: AdSlot) => s.slotNo} columns={slotCols} rows={q.data?.list as AdSlot[]} loading={q.isLoading} empty="暂无广告位——点「新增广告位」把机柜屏幕 / 机身登记为可售位。" />}
       {tab === "ad-campaigns" && <DataTable rowKey={(a: AdCampaign) => a.adNo} columns={adCampaignCols} rows={q.data?.list as AdCampaign[]} loading={q.isLoading} empty="暂无广告活动——点「新增广告活动」录入广告主与创意后再排期投放。" />}
-      {tab === "ad-delivery" && <DataTable rowKey={(d: AdDelivery) => d.deliveryNo} columns={deliveryCols} rows={q.data?.list as AdDelivery[]} loading={q.isLoading} empty="暂无投放数据——广告活动开始投放后按天回传曝光与播放量。" />}
+      {tab === "ad-delivery" && <DataTable rowKey={(d: AdDelivery) => d.deliveryNo} columns={deliveryCols} rows={q.data?.list as AdDelivery[]} loading={q.isLoading} empty={`${periodLabel(period)}内没有投放数据——曝光按天回传，需广告先上线；可换更长的周期再看。`} />}
       {q.data && <Pagination page={page} size={SIZE} total={q.data.total} onPage={setPage} />}
+
+      <FormDrawer
+        open={!!ruleForm}
+        onOpenChange={(o) => !o && setRuleForm(null)}
+        titleNew="新增奖励规则"
+        titleEdit={`编辑规则 ${ruleForm?.ruleNo ?? ""}`}
+        isEdit={!!ruleForm?.ruleNo}
+        fields={REFERRAL_RULE_FIELDS}
+        value={(ruleForm ?? {}) as Record<string, unknown>}
+        onChange={(v) => setRuleForm(v as Partial<ReferralRule>)}
+        onSubmit={() => ruleForm && saveRule.mutate(ruleForm)}
+        submitting={saveRule.isPending}
+      />
 
       <FormDrawer
         open={!!noticeForm}
@@ -799,7 +1059,7 @@ function MarketingInner() {
               <Input type="number" min="1" step="1" value={issueQty} onChange={(e) => setIssueQty(e.target.value)} />
             </Field>
             {!issueQtyOk && issueQty !== "" && (
-              <div className="rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">
+              <div className="rounded-card bg-muted px-3.5 py-2 text-sm text-muted-foreground">
                 张数须为正整数且不超过剩余库存 {couponRemaining(issueFor)}——超发等于凭空印券。
               </div>
             )}
@@ -828,7 +1088,7 @@ function MarketingInner() {
             <Field label="正文">{sendFor.content || <span className="text-muted-foreground">（空——发送前请先补内容）</span>}</Field>
             <Field label="渠道"><Badge tone="outline">{PUSH_CHANNEL_LABEL[sendFor.channel]}</Badge></Field>
             <Field label="目标人群">{sendFor.audience}</Field>
-            <Field label="当前状态"><Badge tone={PUSH_STATUS[sendFor.status].tone}>{PUSH_STATUS[sendFor.status].label}</Badge></Field>
+            <Field label="当前状态"><StatusBadge map={PUSH_STATUS} value={sendFor.status} /></Field>
             <Field label="发送时机">
               <Select className="w-full" value={sendWhen} onChange={(e) => setSendWhen(e.target.value as "NOW" | "SCHEDULED")}>
                 <option value="NOW">立即发送</option>
@@ -843,7 +1103,7 @@ function MarketingInner() {
             <Field label="幂等键">
               <span className="text-muted-foreground tabular-nums">{sendKey}</span>
             </Field>
-            <div className="rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">
+            <div className="rounded-card bg-muted px-3.5 py-2 text-sm text-muted-foreground">
               本次提交携带上面这把幂等键，重复提交（双击 / 重试）服务端会直接拒绝——触达重复提交等于把消息真发两遍。
             </div>
           </>

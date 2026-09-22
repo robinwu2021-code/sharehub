@@ -1,14 +1,20 @@
 // 营销域：优惠券 coupons / 活动 campaigns / 推送 pushMessages / 邀请 referrals /
 // 广告位 adSlots · 广告计划 adCampaigns · 投放数据 adDeliveries / 公告 notices（三语）。
 // 广告位挂载的机柜号引用 device.ts 的 cabinets。
+import { AD_CAMPAIGN_TRANSITIONS, adWindowPassed } from "../../types";
 import type {
   Coupon, Campaign, PushMessage, Referral, AdSlot, AdCampaign, AdDelivery, Notice, PageQuery,
   AudienceSpec, AudienceResolved, AudienceType, CouponIssueRecord, CouponIssuePayload,
-  CouponIssueResult, PushAction, PushSendPayload,
-} from "../../types";
+  CouponIssueResult, PushAction, PushSendPayload, CampaignAction,
+
+  AdCampaignAction,
+  ReferralRule,} from "../../types";
 import { PUSH_TRANSITIONS, canPushAction, couponRemaining, couponExpired } from "../../types";
+import { CAMPAIGN_TRANSITIONS, canCampaignAction, campaignWindowPassed } from "../../types";
 import { NICKS, p, iso } from "./internal";
 import { paginate, kwHit, upsert, nextNo, liveHit, archiveRow, unarchiveRow } from "./helpers";
+// 曝光按周期筛：与报表域共用 REPORT_PERIODS 的窗口换算，不自造
+import { daysOf } from "./report";
 import { cabNo } from "./device";
 import { cUsers, members, consumerSegments } from "./user";
 
@@ -32,8 +38,12 @@ export const saveCoupon = (c: Partial<Coupon>) => upsert(coupons, c, "couponNo",
 export const campaigns: Campaign[] = Array.from({ length: 14 }, (_, i) => ({
   campaignNo: `CMP${800 + i}`, name: p(["新人首借免费", "满3送1", "周末半价", "斋月回馈", "邀请有礼", "会员日"], i),
   kind: p(["满减", "折扣", "赠券", "积分"], i), rule: p(["满10减3", "首单立减5", "第2小时免费", "邀请返5AED"], i),
-  status: p(["DRAFT", "RUNNING", "RUNNING", "ENDED"] as const, i),
-  startAt: iso((i + 3) * 86400_000), endAt: iso(-(i + 10) * 86400_000),
+  status: p(["DRAFT", "RUNNING", "PAUSED", "RUNNING", "ENDED"] as const, i),
+  // 活动窗口同优惠券 expireAt 挂**真实当前时间**：用固定时间轴会随日历自然全部过期，
+  // 「窗口已过不可启动」就退化成对每一行都成立的死规则，演示与测试都失真。
+  // i % 7 === 3 的两条刻意让窗口已过（一条 RUNNING 一条 DRAFT），用来钉住该闸门。
+  startAt: daysFromNow(-(30 + i)),
+  endAt: daysFromNow(i % 7 === 3 ? -(3 + i) : 30 + i),
 }));
 // ============================================================================
 // 营销投放人群（S2）：优惠券发放 / 推送触达共用
@@ -124,7 +134,11 @@ export const adCampaigns: AdCampaign[] = Array.from({ length: 14 }, (_, i) => ({
   adNo: `AD${700 + i}`, advertiser: p(["Emirates NBD", "Careem", "Noon", "Talabat", "Etisalat"], i),
   creative: p(["品牌视频30s", "开屏图", "轮播图", "互动H5"], i), targeting: p(["全城", "机场点位", "商场点位", "白金会员"], i),
   status: p(["DRAFT", "RUNNING", "RUNNING", "ENDED"] as const, i),
-  startAt: iso((i + 2) * 86400_000), endAt: iso(-(i + 12) * 86400_000),
+  // 窗口挂**真实当前时间**（同 campaigns 的取舍）：原先锚定 iso 固定基准，随日历自然全部过期——
+  // 2026-08-04 实际发生：最后一条 DRAFT 的窗口过期，「上线」用例当天开始必挂。
+  // i % 7 === 3 的两条（RUNNING）刻意窗口已过，钉住「过期只拦上线不拦下线」的闸门。
+  startAt: daysFromNow(-(14 + i)),
+  endAt: daysFromNow(i % 7 === 3 ? -(2 + i) : 21 + i),
 }));
 export const adDeliveries: AdDelivery[] = Array.from({ length: 24 }, (_, i) => ({
   deliveryNo: `DLV${5000 + i}`, adNo: `AD${700 + (i % 14)}`, slotNo: `AS${600 + (i % 20)}`,
@@ -132,14 +146,109 @@ export const adDeliveries: AdDelivery[] = Array.from({ length: 24 }, (_, i) => (
   date: iso(i * 86400_000).slice(0, 10),
 }));
 
-export const listCampaigns = (q: PageQuery = {}) => paginate(campaigns, q.page, q.size, (x) => kwHit(q.keyword, x.campaignNo, x.name, x.kind));
+// 状态筛：加了「暂停」之后必须能把 PAUSED 的活动单独捞出来（后端 GET /campaigns 也收 status）
+export const listCampaigns = (q: PageQuery & { status?: string } = {}) =>
+  paginate(campaigns, q.page, q.size, (x) =>
+    (!q.status || x.status === q.status) && kwHit(q.keyword, x.campaignNo, x.name, x.kind));
 export const listPushMessages = (q: PageQuery = {}) => paginate(pushMessages, q.page, q.size, (x) => kwHit(q.keyword, x.pushNo, x.title, x.content, x.audience));
 export const listReferrals = (q: PageQuery = {}) => paginate(referrals, q.page, q.size, (x) => kwHit(q.keyword, x.inviteNo, x.inviter, x.invitee));
 export const listAdSlots = (q: PageQuery = {}) => paginate(adSlots, q.page, q.size, (x) => kwHit(q.keyword, x.slotNo, x.cabinetNo));
+// —— 邀请奖励规则（裂变页原先只有只读统计，没有「奖多少/奖给谁/什么条件」的配置口）——
+export const referralRules: ReferralRule[] = [
+  {
+    ruleNo: "RR001", name: "首单奖励（默认）", rewardTo: "BOTH", rewardAmount: 5, currency: "AED",
+    trigger: "FIRST_ORDER", maxPerInviter: 10,
+    startAt: "2026-07-01T00:00:00Z", endAt: "2026-12-31T23:59:59Z", status: "ACTIVE",
+  },
+  {
+    ruleNo: "RR002", name: "注册即奖（已停用）", rewardTo: "INVITER", rewardAmount: 2, currency: "AED",
+    trigger: "REGISTERED", maxPerInviter: 0,
+    startAt: "2026-05-01T00:00:00Z", endAt: "2026-06-30T23:59:59Z", status: "DISABLED",
+  },
+];
+
+export class ReferralRuleError extends Error {}
+
+export const listReferralRules = (q: PageQuery = {}) =>
+  paginate(referralRules, q.page, q.size, (x) => kwHit(q.keyword, x.ruleNo, x.name));
+
+/**
+ * 保存邀请奖励规则。**校验放在这一层**，不是只放表单 —— 表单能绕过（改 URL / 直接调 api），
+ * 而这几条错了都是真金白银：
+ *  · 奖励金额必须 > 0：0 元规则等于挂着一个永不发奖的活动，运营会以为在发
+ *  · 结束必须晚于开始：反了的话窗口为空，规则永不生效但状态显示 ACTIVE
+ *  · maxPerInviter 不能为负（0 是「不限」的约定值）
+ *  · 同一时间窗内只允许一条 ACTIVE 规则：两条同时生效时一次邀请该发几笔？无法回答，
+ *    所以在入口就堵掉，而不是等结算时才发现重复发奖。
+ */
+export function saveReferralRule(x: Partial<ReferralRule>): ReferralRule {
+  const amount = Number(x.rewardAmount ?? 0);
+  if (!(amount > 0)) throw new ReferralRuleError("奖励金额必须大于 0——0 元规则等于永不发奖");
+  if (Number(x.maxPerInviter ?? 0) < 0) throw new ReferralRuleError("每人上限不能为负（0 表示不限）");
+  if (!x.startAt || !x.endAt) throw new ReferralRuleError("生效期起止必填");
+  if (new Date(x.endAt).getTime() <= new Date(x.startAt).getTime()) {
+    throw new ReferralRuleError("结束时间必须晚于开始时间——窗口为空的规则永不生效");
+  }
+  if ((x.status ?? "ACTIVE") === "ACTIVE") {
+    const s = new Date(x.startAt).getTime(), e = new Date(x.endAt).getTime();
+    const clash = referralRules.find((r) =>
+      r.ruleNo !== x.ruleNo && r.status === "ACTIVE" &&
+      new Date(r.startAt).getTime() <= e && new Date(r.endAt).getTime() >= s);
+    if (clash) {
+      throw new ReferralRuleError(`与规则「${clash.name}」（${clash.ruleNo}）时间窗重叠——同一时刻只能有一条生效规则，否则一次邀请该发几笔无法回答`);
+    }
+  }
+  return upsert(referralRules, x, "ruleNo", () => nextNo("RR", referralRules, 1));
+}
+
+/** 广告投放状态流转错误（页面靠 message 提示，故文案要能直接给运营看）。 */
+export class AdCampaignError extends Error {}
+
+/**
+ * 广告上线/暂停/下线。校验与页面按钮读**同一份** AD_CAMPOIGN_TRANSITIONS —— 页面禁用只是体验，
+ * 这里才是防线（同 transitionCampaign 的分工）。
+ */
+export function transitionAdCampaign(adNo: string, action: AdCampaignAction): AdCampaign {
+  const a = adCampaigns.find((x) => x.adNo === adNo);
+  if (!a) throw new AdCampaignError(`广告不存在：${adNo}`);
+  const def = AD_CAMPAIGN_TRANSITIONS[action];
+  if (!def) throw new AdCampaignError(`未知动作：${action}`);
+  if (!def.from.includes(a.status)) {
+    throw new AdCampaignError(`当前状态「${a.status}」不可${def.label}`);
+  }
+  if (action === "launch" && adWindowPassed(a)) {
+    throw new AdCampaignError("投放窗口已结束，不能上线——请先延长结束时间");
+  }
+  a.status = def.to;
+  return a;
+}
+
+/** 广告位/广告的曝光事实按周期过滤。date 是真实日期串，直接按窗口筛，不用再造第二套口径。 */
+export const listAdDeliveriesInPeriod = (q: PageQuery & { period?: string } = {}) => {
+  const days = daysOf(q.period);
+  const dayStrs = new Set(days.map((d) => new Date(d * 86400_000).toISOString().slice(0, 10)));
+  return paginate(
+    adDeliveries.filter((x) => dayStrs.has(x.date)),
+    q.page, q.size,
+    (x) => kwHit(q.keyword, x.deliveryNo, x.adNo, x.slotNo),
+  );
+};
+
 export const listAdCampaigns = (q: PageQuery = {}) => paginate(adCampaigns, q.page, q.size, (x) => kwHit(q.keyword, x.adNo, x.advertiser, x.creative));
 export const listAdDeliveries = (q: PageQuery = {}) => paginate(adDeliveries, q.page, q.size, (x) => kwHit(q.keyword, x.deliveryNo, x.adNo, x.slotNo));
 
-export const saveCampaign = (x: Partial<Campaign>) => upsert(campaigns, x, "campaignNo", () => nextNo("CMP", campaigns));
+/**
+ * 新增 / 编辑活动。**status 由启停状态机独占**，这里强制剥离（同 `savePushMessage`）：
+ * 表单里留一个状态下拉，就等于绕过「已结束不可复活 / 窗口已过不可启动」两道闸门。
+ * 新建一律落 DRAFT——上线要显式点「启动」。
+ */
+export function saveCampaign(x: Partial<Campaign>): Campaign {
+  const { status: _s, ...safe } = x;
+  const existing = safe.campaignNo && campaigns.some((c) => c.campaignNo === safe.campaignNo);
+  if (existing) return upsert(campaigns, safe, "campaignNo", () => nextNo("CMP", campaigns));
+  return upsert(campaigns, { kind: "满减", rule: "", startAt: "", endAt: "", status: "DRAFT", ...safe },
+    "campaignNo", () => nextNo("CMP", campaigns));
+}
 export const saveAdSlot = (x: Partial<AdSlot>) => upsert(adSlots, x, "slotNo", () => nextNo("AS", adSlots));
 export const saveAdCampaign = (x: Partial<AdCampaign>) => upsert(adCampaigns, x, "adNo", () => nextNo("AD", adCampaigns));
 
@@ -392,6 +501,36 @@ export function sendPushMessage(pushNo: string, x: PushSendPayload): PushMessage
   // 成功率 ~94%：关推送权限 / 停机 / 触达黑名单必然吃掉一部分，successCount 恒 ≤ targetCount
   const success = Math.round(aud.size * 0.94);
   return transitionPush(pushNo, "finish", { sentAt: now(), successCount: success, sentCount: success });
+}
+
+// ============================================================================
+// 活动启停（权限码 marketing:campaign:update）
+// ----------------------------------------------------------------------------
+// 合法迁移在 types 的 CAMPAIGN_TRANSITIONS 单点声明，本层只负责**拒绝**；页面读同一张表
+// 决定出不出按钮，两边不可能给出不同答案。三个必须拒绝的场景：
+//   ① 已结束（ENDED 终态）不可复活——ENDED 不在任何 from 里；
+//   ② 窗口已过不可启动——规则算得出来但 C 端领不到，等于挂一个假活动；
+//   ③ 没启动过的（DRAFT）不可暂停——「暂停一个从没跑过的活动」在对账上无法解释。
+// ============================================================================
+export class CampaignError extends Error {
+  constructor(msg: string) { super(msg); this.name = "CampaignError"; }
+}
+
+/** 统一迁移入口：活动状态变更只能走这里，禁止别处直接写 `c.status = ...`。 */
+export function transitionCampaign(campaignNo: string, action: CampaignAction): Campaign {
+  const c = campaigns.find((x) => x.campaignNo === campaignNo);
+  if (!c) throw new CampaignError(`活动 ${campaignNo} 不存在`);
+  const label = CAMPAIGN_TRANSITIONS[action].label;
+  if (!canCampaignAction(c.status, action)) {
+    throw new CampaignError(`活动 ${campaignNo} 当前状态「${c.status}」不允许执行「${label}」`);
+  }
+  if (action === "start" && campaignWindowPassed(c)) {
+    throw new CampaignError(
+      `活动 ${campaignNo} 的结束时间 ${c.endAt.slice(0, 10)} 已过，不可启动——请先延长结束时间`,
+    );
+  }
+  c.status = CAMPAIGN_TRANSITIONS[action].to;
+  return c;
 }
 
 // —— G1 软删除：优惠券 / 公告 ——

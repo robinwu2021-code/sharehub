@@ -2,7 +2,7 @@
 // 免费用户白名单、充值套餐。
 import * as db from "../../mock/db";
 import type { UserApi } from "../contracts/user";
-import type { PageQ, WhitelistQ, PackageQ } from "../query";
+import type { PageQ, WhitelistQ, PackageQ, WalletTxnQ, MemberCardQ } from "../query";
 import { wait } from "./_wait";
 
 export const userMock: UserApi = {
@@ -13,9 +13,36 @@ export const userMock: UserApi = {
     return wait({ ok: true } as const, 350);
   },
 
+  // —— 用户详情：**唯一**同时看得见用户域与订单域的一层，故订单在这里补 ——
+  // db/user.ts 不能 import order.ts（order.ts 已反向 import 它，会成环）。
+  // 订单直接从 db.orders 过滤，不走 listOrders 的模糊关键词 —— 关键词匹配会把 U300 和 U3001 混为一谈。
+  // async：查无此人要走 Promise 拒绝（同真实 HTTP 的 404），不能同步抛给调用方
+  getUserProfile: async (no) => {
+    const base = db.getUserProfileBase(no);
+    const orders = db.orders.filter((o) => o.cUserNo === no); // 数组本身即最新在前，与订单列表同序
+    return wait({
+      ...base,
+      orders,
+      orderStats: {
+        count: orders.length,
+        amount: Number(orders.reduce((s, o) => s + o.feeAmount, 0).toFixed(2)),
+        // 币种取该用户第一单的；无单时退回钱包币种，再退 AED（不给一个空币种去格式化金额）
+        currency: orders[0]?.currency ?? base.wallet?.currency ?? "AED",
+        openCount: orders.filter((o) => o.status === "CREATED" || o.status === "DISPENSING" || o.status === "IN_USE").length,
+      },
+    }, 300);
+  },
+
   // 用户扩展
   listMembers: (q: PageQ = {}) => wait(db.listMembers(q)),
+  listMemberBenefits: (q: PageQ = {}) => wait(db.listMemberBenefits(q)),
+  // 权益写入在 db 层校验范围与「随等级单调变好」，不过就整表回滚并抛错
+  saveMemberBenefit: (x) => wait(db.saveMemberBenefit(x), 350),
+  listMemberCards: (q: MemberCardQ = {}) => wait(db.listMemberCards(q)),
+  // 发卡在 db 层落卡并同步会员行的次卡/到期两列（黑名单拒发、事由必填）
+  grantMemberCard: (payload) => wait(db.grantMemberCard(payload), 400),
   listWallets: (q: PageQ = {}) => wait(db.listWallets(q)),
+  listWalletTxns: (no, q: WalletTxnQ = {}) => wait(db.listWalletTxns(no, q)),
   saveMember: (x) => wait(db.saveMember(x), 350),
   saveWallet: (x) => wait(db.saveWallet(x), 350),
   listConsumerSegments: (q: PageQ = {}) => wait(db.listConsumerSegments(q)),

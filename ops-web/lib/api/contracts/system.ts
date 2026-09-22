@@ -8,12 +8,16 @@ import type {
   PageResult, Vendor, NotifyTemplate, DictEntry, Region, SysParam, OpenApiApp,
   MarketCountry, PaymentChannel, NotifyLog, NotifyLogStats, NotifyBlacklist,
   BizRules, LoginSetting, AppVersion, BankEntry, ProblemEntry, TaxSetting,
+  VendorProbeResult, RegionNode, NotifyTemplatePreview, NotifyTestSendPayload,
+  NotifyResendPayload,
 } from "../../types";
 
 export interface SystemApi {
   // 供应商接入
   listVendors(): Promise<Vendor[]>;
   saveVendor(v: Partial<Vendor> & { vendorCode: string }): Promise<Vendor>;
+  /** S7 连通性测试：不改任何配置，只回一次探测结论（静态阶段是假探测，字段与真探测一致）。 */
+  testVendorConnectivity(vendorCode: string): Promise<VendorProbeResult>;
 
   // === 系统扩展 tab ===
   listNotifyTemplates(q?: PageQ): Promise<PageResult<NotifyTemplate>>;
@@ -29,6 +33,19 @@ export interface SystemApi {
   saveOpenApiApp(x: Partial<OpenApiApp> & { appNo?: string }): Promise<OpenApiApp>;
   saveMarketCountry(x: Partial<MarketCountry> & { countryCode?: string }): Promise<MarketCountry>;
 
+  // === S6/S7 形态与收尾（拍板 #4 树形 / #6 幂等重发）===
+  /**
+   * S6 地区树：**不分页**。三级区域分页返回时树必然被截断（第 2 页的区拿不到第 1 页的市做父节点），
+   * 所以树是独立端点，由服务端保证 parentId 无孤儿、level 等于深度。
+   */
+  listRegionTree(): Promise<RegionNode[]>;
+  /** S7 模板预览：变量替换后的成品文案，不发送、不计费、不留痕。 */
+  previewNotifyTemplate(templateNo: string, vars?: Record<string, string>): Promise<NotifyTemplatePreview>;
+  /** S7 模板试发：真发一条到指定目标，落一条发送记录（故返回 NotifyLog）；必须带幂等键。 */
+  testSendNotifyTemplate(templateNo: string, x: NotifyTestSendPayload): Promise<NotifyLog>;
+  /** S7 密钥重置：新 AppSecret 只回掩码，真实值由后端带外交付——前端永不承载真实密钥。 */
+  resetOpenApiAppSecret(appNo: string): Promise<OpenApiApp>;
+
   // === 支付渠道（P1，补齐清单 E8）===
   listPaymentChannels(q?: PageQ): Promise<PageResult<PaymentChannel>>;
   savePaymentChannel(x: Partial<PaymentChannel> & { channelCode?: string }): Promise<PaymentChannel>;
@@ -37,6 +54,11 @@ export interface SystemApi {
   listNotifyLogs(q?: NotifyLogQ): Promise<PageResult<NotifyLog>>;
   /** 发送记录页头统计：今日发送量 / 失败率 / 今日成本（全量口径，非当页）。 */
   getNotifyLogStats(): Promise<NotifyLogStats>;
+  /**
+   * 重发（拍板 #6）：**新增**一条发送记录并返回它，原记录不变。
+   * `idempotencyKey` 必填且全局唯一，同键第二次必须被拒——否则重复扣费、重复骚扰用户。
+   */
+  resendNotifyLog(logNo: string, x: NotifyResendPayload): Promise<NotifyLog>;
   listNotifyBlacklist(q?: NotifyBlacklistQ): Promise<PageResult<NotifyBlacklist>>;
   saveNotifyBlacklist(x: Partial<NotifyBlacklist> & { blockNo?: string }): Promise<NotifyBlacklist>;
   /** 解除拉黑：软删除，把 expireAt 置为当下并保留记录（决策 §八-4）。 */

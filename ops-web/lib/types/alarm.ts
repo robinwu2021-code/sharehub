@@ -21,6 +21,36 @@ export interface AlarmRecord {
   remark: string;
 }
 
+// 确认告警结果：回带落库后的状态，前端不自己猜 —— 状态迁移由后端状态机裁决（OPEN → ACKED）
+export interface AlarmAckResult {
+  alarmNo: string;
+  status: AlarmRecord["status"];
+}
+
+/**
+ * 告警转工单结果，镜像后端 `AlarmDtos.WorkOrderRef`。
+ *
+ * 此前契约把这个方法声明成返回整行 `AlarmRecord`、页面读 `r.workOrderNo` ——
+ * 后端从来返回的是这个三字段对象，接真后端时 toast 会显示「已转工单 undefined」。
+ * `created` 是幂等结果标志：该端点以 alarmNo 为幂等键，重复调用返回首次的 woNo 且 created=false，
+ * 不回带它就无法区分「新建了一张单」与「已经有单了」，运营会重复派人到现场。
+ */
+export interface AlarmWorkOrderRef {
+  alarmNo: string;
+  woNo: string;
+  created: boolean;
+}
+
+/** 自动开工单的执行结果。回带明细而不只回条数 —— 运营要能核对「到底给哪几条开了单」。 */
+export interface AutoWorkOrderResult {
+  /** 命中「自动开工单」告警码且未关闭的告警数 */
+  eligible: number;
+  /** 本次真正新建的工单（告警号 → 工单号） */
+  created: { alarmNo: string; woNo: string }[];
+  /** 已有工单被跳过的条数（幂等命中） */
+  skipped: number;
+}
+
 // 告警通知：触达流水（谁/何时/何渠道/成功失败）
 export interface AlarmNotice {
   noticeNo: string;
@@ -30,6 +60,20 @@ export interface AlarmNotice {
   sentAt: string;
   status: "SENT" | "FAILED";
   failReason: string | null;
+  /**
+   * 本条对外真发时用的幂等键（历史流水为 null：seed 里没有重发链）。
+   * 落库而不只是当请求头，是为了「这条到底是哪次点击发出去的」可查 —— 排重复计费的账要看得见键。
+   */
+  idempotencyKey: string | null;
+  resendOf: string | null; // 非空 = 本条是某条失败通知的补发，指向原通知号
+}
+
+/**
+ * 重发告警通知的入参。**幂等键必带**（拍板 #6）：重发是「真的再发一条短信/邮件」，
+ * 重复提交＝重复触达 + 重复计费，故键由前端在点确认的瞬间生成、服务端按键拒绝第二次。
+ */
+export interface AlarmNoticeResendPayload {
+  idempotencyKey: string;
 }
 
 // 告警代码字典：比竞品多「建议处置」「是否自动开工单」——字典即处置预案

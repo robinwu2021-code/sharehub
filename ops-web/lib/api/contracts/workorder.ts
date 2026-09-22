@@ -8,7 +8,7 @@
 import type { PageQ, WoQ } from "../query";
 import type {
   PageResult, WorkOrder, WorkOrderDraft, WorkOrderHandlePayload, WorkOrderClosePayload,
-  SlaRule, InspectionPlan,
+  SlaRule, InspectionPlan, InspectionRunResult,
 } from "../../types";
 
 export interface WorkOrderApi {
@@ -35,4 +35,11 @@ export interface WorkOrderApi {
   listInspectionPlans(q?: PageQ): Promise<PageResult<InspectionPlan>>;
   saveSlaRule(x: Partial<SlaRule> & { slaNo?: string }): Promise<SlaRule>;
   saveInspectionPlan(x: Partial<InspectionPlan> & { planNo?: string }): Promise<InspectionPlan>;
+  /**
+   * 巡检计划「立即执行一次」（workorder:inspection:update + workorder:wo:create）：
+   * 按路线生成 INSPECT 工单（source=PLAN，sourceNo=planNo）并派给计划负责人。
+   * **幂等**：同计划同周期只允许一次，服务端必须按周期键拒绝重复提交。
+   * ⚠️ 后端缺口：`WoExtController` 目前没有这个端点（详见 https/workorder.ts）。
+   */
+  runInspectionPlan(planNo: string): Promise<InspectionRunResult>;
 }

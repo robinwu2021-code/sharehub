@@ -9,18 +9,26 @@ const ROLE_PERMS: Record<Role, string[]> = {
   OPS: [
     "dashboard:overview:read", "dashboard:todo:read",
     "device:cabinet:*", "device:slot:read", "device:powerbank:*",
-    "device:command:*", "device:inventory:*", "device:ota:read", "device:vendor:read",
+    // OTA 给整模块通配：后端 GET/POST /ota-releases 判 device:ota:manage、投放编辑判
+    // device:ota:publish，二者此前都没登记 —— 只有 ADMIN 靠 '*' 能用，OPS 作为运维主责
+    // 却连固件版本库入口都不渲染。固件写权仅给 OPS，CS/FINANCE/BD/VIEWER/AGENT 一律不给。
+    "device:command:*", "device:inventory:*", "device:ota:*", "device:vendor:read",
     "location:poi:read", "location:venue:read",
     "order:order:read", "order:exception:read", "order:exception:handle",
     "order:reservation:cancel",
     // OPS 是工单主责，工单域全量：wo:read/create/dispatch/handle(接单·处理·完成)/close(验收关单)
     // + sla:update / inspection:update / alarm:config（对应功能权限清单 §7）
+    // + alarm:notice_resend（重发通知会真的再发一条，故与 alarm:config 分开发码；
+    //   刻意不复用 system:notify_log:resend —— 那个码 CS 也持有，客服不该能把设备告警
+    //   重新轰炸给值班工程师）
     "workorder:*",
     "agent:scope:assign",
     "report:device:read", "report:location:read",
     "system:notify_template:read", "system:dict:read",
     // 对标补齐（功能权限清单 §13）：运维要能查发送记录与 App 版本
-    "system:notify_log:read", "system:app_version:read", "system:param:read", "system:market:read",
+    // notify_log:resend 为 S7 新增：重发是**会真的再发一次**的动作，故与只读分开发码
+    "system:notify_log:read", "system:notify_log:resend",
+    "system:app_version:read", "system:param:read", "system:market:read",
   ],
   CS: [
     "dashboard:overview:read", "dashboard:todo:read",
@@ -34,7 +42,8 @@ const ROLE_PERMS: Record<Role, string[]> = {
     "cs:*",
     "marketing:coupon:read", "marketing:coupon:issue", "marketing:push:send",
     // 对标补齐（功能权限清单 §13）：客服要能查发送记录、拦截骚扰、维护问题字典
-    "system:notify_log:read", "system:notify_blacklist:read", "system:notify_blacklist:update",
+    "system:notify_log:read", "system:notify_log:resend",
+    "system:notify_blacklist:read", "system:notify_blacklist:update",
     "system:problem:read", "system:problem:update",
   ],
 

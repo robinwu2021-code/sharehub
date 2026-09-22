@@ -1,6 +1,8 @@
 // 覆盖范围：租借订单与人工干预、异常订单、押金流水、售后处置（投诉 / 退款审批）、
 // 预约订单、免费订单及其统计。
 import * as db from "../../mock/db";
+// 两个新建入口住在 cs.ts（投诉/退款两张表在那边，order.ts 反向 import 会成环），
+// 且尚未在 mock/db/index.ts 汇出，故直接引子模块（同 lib/api/mocks/cs.ts 的做法）。
 import type { OrderApi } from "../contracts/order";
 import type { PageQ, OrderQ, StatusQ, ReservationQ, FreeOrderQ } from "../query";
 import { wait } from "./_wait";
@@ -41,9 +43,12 @@ export const orderMock: OrderApi = {
 
   // 售后处置
   listOrderComplaints: (q: StatusQ = {}) => wait(db.listOrderComplaints(q)),
+  createOrderComplaint: (payload) => wait(db.createOrderComplaint(payload), 400),
   handleOrderComplaint: (no, resolution, note) => wait(db.handleOrderComplaint(no, resolution, note), 400),
   raiseComplaintWorkOrder: (no) => wait(db.raiseComplaintWorkOrder(no), 400),
   listRefundRecords: (q: StatusQ = {}) => wait(db.listRefundRecords(q)),
+  // 幂等/必填校验全在 db 层（错误由全局 MutationCache.onError 弹出），此处只做延迟透传
+  createRefund: (payload) => wait(db.createRefund(payload), 400),
   auditRefund: (no, approve, rejectReason) => wait(db.auditRefund(no, approve, rejectReason), 400),
 
   // 批次 B4：预约订单 / 免费订单

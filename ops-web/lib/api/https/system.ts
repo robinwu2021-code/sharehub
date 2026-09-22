@@ -10,6 +10,8 @@ import type { PageQ, NotifyLogQ, NotifyBlacklistQ, AppVersionQ, BankQ, ProblemQ 
 export const systemHttp: SystemApi = {
   listVendors: () => client.get("/internal/gw/vendors"),
   saveVendor: (v) => client.post(`/internal/gw/vendors/${v.vendorCode}/config`, v),
+  // ⚠️ 后端缺口：VendorController 目前只有 GET / 与 POST /{code}/config，没有 /test。
+  testVendorConnectivity: (code) => client.post(`/internal/gw/vendors/${code}/test`, {}),
 
   // 系统扩展
   listNotifyTemplates: (q?: PageQ) => client.get("/api/platform/notify-templates", q),
@@ -25,6 +27,16 @@ export const systemHttp: SystemApi = {
   saveOpenApiApp: (x) => client.post(x.appNo ? `/api/platform/openapi-apps/${x.appNo}` : "/api/platform/openapi-apps", x),
   saveMarketCountry: (x) => client.post(x.countryCode ? `/api/platform/markets/${x.countryCode}` : "/api/platform/markets", x),
 
+  // S6/S7。以下四个端点后端均未实现，接后端前需先补 controller：
+  // ⚠️ 后端缺口：SysConfigController 只有 GET/POST /api/platform/regions，没有 /regions/tree。
+  listRegionTree: () => client.get("/api/platform/regions/tree"),
+  // ⚠️ 后端缺口：NotifyController 有 POST /internal/platform/notify/send（内网真发），
+  // 但没有面向运营端的模板预览 / 试发端点。
+  previewNotifyTemplate: (no, vars) => client.post(`/api/platform/notify-templates/${no}/preview`, { vars: vars ?? {} }),
+  testSendNotifyTemplate: (no, x) => client.post(`/api/platform/notify-templates/${no}/test-send`, x),
+  // ⚠️ 后端缺口：SysSettingController 无 /reset-secret；且后端实体目前也没有 app_secret 字段。
+  resetOpenApiAppSecret: (no) => client.post(`/api/platform/openapi-apps/${no}/reset-secret`, {}),
+
   // 支付渠道
   listPaymentChannels: (q?: PageQ) => client.get("/api/platform/payment-channels", q),
   savePaymentChannel: (x) => client.post(x.channelCode ? `/api/platform/payment-channels/${x.channelCode}` : "/api/platform/payment-channels", x),
@@ -32,6 +44,9 @@ export const systemHttp: SystemApi = {
   // 系统设置 B2/B3/B5（规格 §9~§16）
   listNotifyLogs: (q?: NotifyLogQ) => client.get("/api/platform/notify-logs", q),
   getNotifyLogStats: () => client.get("/api/platform/notify-logs/stats"),
+  // ⚠️ 后端缺口：发送记录目前是 append-only 只读，没有 /resend。
+  // 幂等键走 body 而非 Idempotency-Key 头：现有 http-client 不支持自定义头，且键要落库可查。
+  resendNotifyLog: (no, x) => client.post(`/api/platform/notify-logs/${no}/resend`, x),
   listNotifyBlacklist: (q?: NotifyBlacklistQ) => client.get("/api/platform/notify-blacklist", q),
   saveNotifyBlacklist: (x) => client.post(x.blockNo ? `/api/platform/notify-blacklist/${x.blockNo}` : "/api/platform/notify-blacklist", x),
   releaseNotifyBlacklist: (no) => client.post(`/api/platform/notify-blacklist/${no}/release`, {}),

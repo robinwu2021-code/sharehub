@@ -3,15 +3,25 @@
 // 端点前缀：/api/user/**（拉黑写操作走 /internal/user/**，消费者分群走 /api/ops/reports/**，沿用现状）。
 import { client } from "../http-client";
 import type { UserApi } from "../contracts/user";
-import type { PageQ, PackageQ, WhitelistQ } from "../query";
+import type { PageQ, PackageQ, WhitelistQ, WalletTxnQ, MemberCardQ } from "../query";
 
 export const userHttp: UserApi = {
   listUsers: (q?: PageQ) => client.get("/api/user/users", q),
   setBlacklist: (no, blacklisted) => client.post("/internal/user/credit/blacklist", { cUserNo: no, blacklisted }),
+  // 详情是用户资源的子资源。⚠️ 后端缺口：UserController 目前只有 GET /api/user/users
+  getUserProfile: (no) => client.get(`/api/user/users/${no}/profile`),
 
   // 用户扩展
   listMembers: (q?: PageQ) => client.get("/api/user/members", q),
+  // 会员权益与次卡都挂在 user 域（与 /members 同级）。⚠️ 后端缺口：四个端点都还没有
+  listMemberBenefits: (q?: PageQ) => client.get("/api/user/member-benefits", q),
+  // 等级是主键：只有更新语义，故路径必带 {level}（没有「新增一档」的入口）
+  saveMemberBenefit: (x) => client.post(`/api/user/member-benefits/${x.level}`, x),
+  listMemberCards: (q?: MemberCardQ) => client.get("/api/user/member-cards", q),
+  grantMemberCard: (payload) => client.post("/api/user/member-cards", payload),
   listWallets: (q?: PageQ) => client.get("/api/user/wallets", q),
+  // 流水是钱包的子资源，故挂在 /wallets/{userNo}/ 下（后端 UserOpsController 已实现此路径）
+  listWalletTxns: (no, q?: WalletTxnQ) => client.get(`/api/user/wallets/${no}/txns`, q),
   saveMember: (x) => client.post(x.userNo ? `/api/user/members/${x.userNo}` : "/api/user/members", x),
   saveWallet: (x) => client.post(x.userNo ? `/api/user/wallets/${x.userNo}` : "/api/user/wallets", x),
   listConsumerSegments: (q?: PageQ) => client.get("/api/ops/reports/consumer-segments", q),

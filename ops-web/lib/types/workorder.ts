@@ -5,8 +5,13 @@ export type WorkOrderType =
 export type WorkOrderStatus =
   | "CREATED" | "DISPATCHED" | "ACCEPTED" | "PROCESSING" | "DONE" | "AUDITED" | "CLOSED";
 
-/** 工单来源。ALERT=告警转工单，USER=投诉转工单，VENUE=场地方报障，MANUAL=运维手工开单。 */
-export type WorkOrderSource = "ALERT" | "USER" | "VENUE" | "MANUAL";
+/**
+ * 工单来源。ALERT=告警转工单，USER=投诉转工单，VENUE=场地方报障，MANUAL=运维手工开单，
+ * PLAN=巡检计划触发（S7「立即执行一次」生成，`sourceNo` 挂计划号 IP*）。
+ * PLAN 单独成一档而不复用 MANUAL：计划生成的批量工单必须能被认回它的计划，
+ * 否则「这一堆巡检单哪来的」在列表上说不清，也无从做重复执行的判定。
+ */
+export type WorkOrderSource = "ALERT" | "USER" | "VENUE" | "MANUAL" | "PLAN";
 export type WorkOrderPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 
 /**
@@ -131,4 +136,50 @@ export interface InspectionPlan {
   nextAt: string;
   assignee: string;
   active: boolean;
+
+  // —— S7 手动触发留痕（mock 无定时概念，「按计划自动开工单」只能手动执行一次）——
+  /** 最近一次执行时间。 */
+  lastRunAt?: string | null;
+  /** 最近一次执行所属周期键（幂等键，见 inspectionPeriodKey）——同周期第二次执行会被拒。 */
+  lastRunPeriod?: string | null;
+  /** 最近一次执行生成的工单号（详情/提示里回显，让人能点回工单列表核对）。 */
+  lastRunWoNos?: string[];
 }
+
+/** 「立即执行一次」的返回：本次落了哪几张工单，属于哪个周期。 */
+export interface InspectionRunResult {
+  planNo: string;
+  period: string;
+  woNos: string[];
+}
+
+/**
+ * 巡检计划的**周期键** = 幂等键。频率决定粒度：每日按天、每周/双周按自然周序、每月按月。
+ * 同一计划在同一周期内只允许执行一次——否则连点两下就会给同一条路线开出两批重复巡检单，
+ * 接后端后更是重复派工。周次用「年内自然周序」而非 ISO 周（跨年归属规则复杂且此处不需要），
+ * 只要求同一年内单调、跨周必变。
+ */
+export const inspectionPeriodKey = (frequency: string, at: Date = new Date()): string => {
+  const y = at.getUTCFullYear();
+  const day = `${y}-${String(at.getUTCMonth() + 1).padStart(2, "0")}-${String(at.getUTCDate()).padStart(2, "0")}`;
+  const week = Math.floor((Date.UTC(y, at.getUTCMonth(), at.getUTCDate()) - Date.UTC(y, 0, 1)) / 604800_000) + 1;
+  if (frequency === "每日") return day;
+  if (frequency === "每周") return `${y}-W${String(week).padStart(2, "0")}`;
+  if (frequency === "双周") return `${y}-B${String(Math.ceil(week / 2)).padStart(2, "0")}`;
+  if (frequency === "每月") return day.slice(0, 7);
+  // 未知频率（表单是下拉，但导入/后端可能给别的值）：退化到按天，宁可粒度细也不放开幂等
+  return day;
+};
+
+/**
+ * 能否「立即执行一次」：不能则返回原因，能则返回 null。
+ * **页面按钮与 mock 校验共用这一份**（同 couponIssuable 的做法），杜绝「按钮亮着点了报错」。
+ */
+export const inspectionRunnable = (plan: InspectionPlan, at: Date = new Date()): string | null => {
+  if (!plan.active) return "计划已停用，启用后才能执行";
+  const period = inspectionPeriodKey(plan.frequency, at);
+  if (plan.lastRunPeriod === period) {
+    return `本周期（${period}）已执行过，生成了 ${plan.lastRunWoNos?.length ?? 0} 张巡检工单；下个周期才能再执行`;
+  }
+  return null;
+};

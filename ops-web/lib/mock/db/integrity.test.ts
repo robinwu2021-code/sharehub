@@ -29,6 +29,8 @@ const locationNos = setOf(db.locations, (l) => l.locationNo);
 const cabinetNos = setOf(db.cabinets, (c) => c.cabinetNo);
 const powerbankNos = setOf(db.powerbanks, (p) => p.powerbankNo);
 const vendorCodes = setOf(db.vendors, (v) => v.vendorCode);
+const fwVersions = setOf(db.otaReleases, (r) => r.version);
+const rolloutNos = setOf(db.otaRollouts, (r) => r.rolloutNo);
 const userNos = setOf(db.cUsers, (u) => u.cUserNo);
 const orderNos = setOf(db.orders, (o) => o.orderNo);
 const workOrderNos = setOf(db.workOrders, (w) => w.woNo);
@@ -123,6 +125,11 @@ const REFS: Ref[] = [
   ref("cabinets", db.cabinets, "locationNo", "locations.locationNo", locationNos),
   ref("cabinets", db.cabinets, "locationName", "sites.name", siteNames),
   ref("cabinets", db.cabinets, "vendorCode", "vendors.vendorCode", vendorCodes),
+  // 偏差 A1 补齐（S5）：机柜的归属站点。后端实体有、DDL 还没有 site_no 列（见清单 §一 A1），
+  // 但既然前端展示了，就必须指向真实站点——否则「归属站点」点过去查无此站
+  ref("cabinets", db.cabinets, "siteNo", "sites.siteNo", siteNos, {
+    nullableReason: "到货未上架的机柜没有点位、也就没有归属站点（Cabinet.siteNo 类型即为 string | null）",
+  }),
   // 偏差 A1 补齐：机柜的归属代理（划拨的落点）
   ref("cabinets", db.cabinets, "agentNo", "agents.agentNo", agentNos, {
     nullableReason: "平台直营机柜没有代理商（Cabinet.agentNo 类型即为 string | null，回收后也会置 null）",
@@ -135,6 +142,14 @@ const REFS: Ref[] = [
   ref("deviceLogs", db.deviceLogs, "vendorCode", "vendors.vendorCode", vendorCodes),
   ref("deviceCodeBatches", db.deviceCodeBatches, "vendorCode", "vendors.vendorCode", vendorCodes),
   ref("otaRollouts", db.otaRollouts, "vendorCode", "vendors.vendorCode", vendorCodes),
+  // 固件 OTA 三层：投放投的必须是版本库里真有的版本，任务必须挂在真投放与真机柜上
+  ref("otaRollouts", db.otaRollouts, "fwVersion", "otaReleases.version", fwVersions),
+  ref("otaReleases", db.otaReleases, "vendorCode", "vendors.vendorCode", vendorCodes, {
+    nullableReason: "通用固件不限供应商（OtaRelease.vendorCode 类型即为 string | null，各厂商投放都能引用）",
+  }),
+  ref("otaTasks", db.otaTasks, "rolloutNo", "otaRollouts.rolloutNo", rolloutNos),
+  ref("otaTasks", db.otaTasks, "cabinetNo", "cabinets.cabinetNo", cabinetNos),
+  ref("otaTasks", db.otaTasks, "previousVersion", "otaReleases.version", fwVersions),
   ref("inventoryTransfers", db.inventoryTransfers, "fromLocation", "sites.name", siteNames),
   ref("inventoryTransfers", db.inventoryTransfers, "toLocation", "sites.name", siteNames),
 
@@ -252,7 +267,14 @@ const REFS: Ref[] = [
   ref("reportCustoms", db.reportCustoms, "dim", "sites.name", siteNames),
   ref("dashboard.rankings", db.dashboard.rankings, "siteName", "sites.name", siteNames),
   ref("dashboard.alerts", db.dashboard.alerts, "cabinetNo", "cabinets.cabinetNo", cabinetNos),
-  ref("pricingDiffs", db.pricingDiffs, "locationName", "sites.name", siteNames),
+  // S6 + 三维扩展：差异化规则真正的定位键是 dimension + matchRef，按维度指向各自的表。
+  // 「冗余列与维度自洽」这条成对约束在 pricing.test.ts 里另有断言，此处只钉住 matchRef 的存在性。
+  ref("pricingDiffs(SITE)", db.pricingDiffs.filter((d) => d.dimension === "SITE"),
+    "matchRef", "sites.siteNo", siteNos),
+  ref("pricingDiffs(LOCATION)", db.pricingDiffs.filter((d) => d.dimension === "LOCATION"),
+    "matchRef", "locations.locationNo", locationNos),
+  ref("pricingDiffs(SCENE)", db.pricingDiffs.filter((d) => d.dimension === "SCENE"),
+    "matchRef", "sites.sceneType", setOf(db.sites, (s) => s.sceneType)),
 ];
 
 /** 逐条比对，返回可读的违规清单（空数组 = 通过）。 */
@@ -304,6 +326,35 @@ describe("mock 引用完整性", () => {
         }
       });
     }
+    expect(bad, `\n${bad.join("\n")}\n`).toEqual([]);
+  });
+
+  // 投放行上的百分比若与抽屉里的逐台进度对不上，运营会以为页面坏了——故把「均值」这条约束钉住。
+  it("otaRollouts.progress 等于其逐设备任务进度的均值，且每次投放都有任务", () => {
+    const bad: string[] = [];
+    for (const r of db.otaRollouts) {
+      const mine = db.otaTasks.filter((t) => t.rolloutNo === r.rolloutNo);
+      if (mine.length === 0) { bad.push(`${r.rolloutNo} 没有任何逐设备任务（抽屉点开会是空的）`); continue; }
+      const avg = Math.round(mine.reduce((n, t) => n + t.progress, 0) / mine.length);
+      if (avg !== r.progress) bad.push(`${r.rolloutNo}.progress = ${r.progress}，但 ${mine.length} 个任务均值是 ${avg}`);
+    }
+    expect(bad, `\n${bad.join("\n")}\n`).toEqual([]);
+  });
+
+  // A1：机柜的归属站点不是独立维护的字段，而是「点位所属站点」的投影。
+  // 一旦有人手改其中一个，台账上就会出现「点位在 A 站、归属写 B 站」这种自相矛盾的行。
+  it("cabinets.siteNo 与其 locationNo 所属站点一致，且站点名与 locationName 对得上", () => {
+    const bad: string[] = [];
+    db.cabinets.forEach((c, i) => {
+      const loc = db.locations.find((l) => l.locationNo === c.locationNo) ?? null;
+      const expected = loc?.siteNo ?? null;
+      if ((c.siteNo ?? null) !== expected) {
+        bad.push(`cabinets[${i}](${c.cabinetNo}).siteNo = ${JSON.stringify(c.siteNo)}，但点位 ${c.locationNo} 属于 ${JSON.stringify(expected)}`);
+      }
+      if (loc && c.locationName && loc.siteName !== c.locationName) {
+        bad.push(`cabinets[${i}](${c.cabinetNo}).locationName = "${c.locationName}"，但点位 ${c.locationNo} 所属站点名是 "${loc.siteName}"`);
+      }
+    });
     expect(bad, `\n${bad.join("\n")}\n`).toEqual([]);
   });
 

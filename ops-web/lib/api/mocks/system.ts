@@ -15,6 +15,8 @@ export const systemMock: SystemApi = {
     if (idx >= 0) db.vendors[idx] = merged; else db.vendors.push(merged);
     return wait(merged, 350);
   },
+  // 探测比保存慢是合理的：真探测要等对端响应，这里也给足等待感，免得运维以为"没点上"
+  testVendorConnectivity: (code) => wait(db.testVendorConnectivity(code), 700),
 
   // 系统扩展
   listNotifyTemplates: (q: PageQ = {}) => wait(db.listNotifyTemplates(q)),
@@ -30,6 +32,12 @@ export const systemMock: SystemApi = {
   saveOpenApiApp: (x) => wait(db.saveOpenApiApp(x), 350),
   saveMarketCountry: (x) => wait(db.saveMarketCountry(x), 350),
 
+  // S6/S7
+  listRegionTree: () => wait(db.listRegionTree()),
+  previewNotifyTemplate: (no, vars) => wait(db.previewNotifyTemplate(no, vars), 200),
+  testSendNotifyTemplate: (no, x) => wait(db.testSendNotifyTemplate(no, x), 500),
+  resetOpenApiAppSecret: (no) => wait(db.resetOpenApiAppSecret(no), 400),
+
   // 支付渠道
   listPaymentChannels: (q: PageQ = {}) => wait(db.listPaymentChannels(q)),
   savePaymentChannel: (x) => wait(db.savePaymentChannel(x), 350),
@@ -37,6 +45,7 @@ export const systemMock: SystemApi = {
   // 系统设置 B2/B3/B5（规格 §9~§16）
   listNotifyLogs: (q: NotifyLogQ = {}) => wait(db.listNotifyLogs(q)),
   getNotifyLogStats: () => wait(db.getNotifyLogStats()),
+  resendNotifyLog: (no, x) => wait(db.resendNotifyLog(no, x), 500),
   listNotifyBlacklist: (q: NotifyBlacklistQ = {}) => wait(db.listNotifyBlacklist(q)),
   saveNotifyBlacklist: (x) => wait(db.saveNotifyBlacklist(x), 350),
   releaseNotifyBlacklist: (no) => wait(db.releaseNotifyBlacklist(no), 400),

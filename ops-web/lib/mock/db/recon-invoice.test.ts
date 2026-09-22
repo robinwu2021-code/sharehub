@@ -7,12 +7,14 @@
 //  ④ 作废原因必填，开票金额必须与来源结算单对得上。
 import { describe, expect, it } from "vitest";
 import {
-  reconciles, handleRecon, getReconStats, ReconError,
+  reconciles, reconDiffs, listReconDiffs, handleRecon, getReconStats, ReconError,
   invoices, saveInvoice, issueInvoice, voidInvoice, InvoiceError,
   settlements,
-} from "./finance";
-import { RECON_TERMINAL } from "../../types";
-import type { Reconcile, Invoice } from "../../types";
+
+  ledger, listVoucherEntries, voucherBalance, listLedgerInPeriod,
+  createVoucher,} from "./finance";
+import { RECON_TERMINAL, parseReconDiffDetail } from "../../types";
+import type { Reconcile, ReconDiff, Invoice } from "../../types";
 
 // mock 是模块级可变状态、又没有 reset API，而处置动作是**单向**的（终态不可回退）。
 // 所以用例不能靠「种子里刚好还剩一条 OPEN」，各自把要用的行摆回起始状态再跑——
@@ -34,6 +36,50 @@ function draftInvoice(): Invoice {
     vatTrn: "100777777777777", currency: src.currency, sourceNo: src.settleNo,
   });
 }
+
+// 逐笔差额：detail 里两侧金额相减（页面上那一列也是这么算的，不是另存的字段）
+const deltaOf = (d: ReconDiff) => {
+  const v = parseReconDiffDetail(d.detail)!;
+  return (v.nearpay ?? 0) - (v.ledger ?? 0);
+};
+const sum = (rows: ReconDiff[]) => Number(rows.reduce((s, d) => s + deltaOf(d), 0).toFixed(2));
+/** 取第 n 条差错批次，连同它的差错行一起摆回「一笔都没平」的起始状态。 */
+function openReconWithDiffs(nth = 0): { batch: Reconcile; diffs: ReconDiff[] } {
+  const batch = openRecon(nth);
+  const diffs = reconDiffs.filter((d) => d.batchNo === batch.batchNo);
+  for (const d of diffs) d.resolved = false;
+  return { batch, diffs };
+}
+
+// 这一组只读、不改状态，必须排在下面那些会推进状态机的用例之前：
+// 种子不变量一旦被前面的用例改过，「明细与批次口径一致」就验不出来了。
+describe("对账差错明细：与批次口径一致（种子不变量）", () => {
+  it("每个有差异的批次，逐笔差额之和 = 批次差额（抽屉不会跟它上一层打架）", () => {
+    for (const r of reconciles.filter((x) => x.status === "DIFF")) {
+      const rows = listReconDiffs(r.batchNo);
+      expect(rows.length, `批次 ${r.batchNo} 有差额必须有逐笔差错`).toBeGreaterThan(0);
+      expect(sum(rows), `批次 ${r.batchNo} 逐笔加总`).toBe(Number(r.diff.toFixed(2)));
+    }
+  });
+
+  it("已平批次一条差错行都没有（没有差错却列出差错行，比不列更糟）", () => {
+    for (const r of reconciles.filter((x) => x.status === "MATCHED")) {
+      expect(listReconDiffs(r.batchNo)).toHaveLength(0);
+    }
+  });
+
+  it("种子里 resolved 与批次处置进度同源：终态全平、未结案一条未平", () => {
+    for (const r of reconciles.filter((x) => x.status === "DIFF")) {
+      const rows = reconDiffs.filter((d) => d.batchNo === r.batchNo);
+      const terminal = r.handleStatus !== null && RECON_TERMINAL.includes(r.handleStatus);
+      expect(rows.every((d) => d.resolved === terminal), `批次 ${r.batchNo}（${r.handleStatus}）`).toBe(true);
+    }
+  });
+
+  it("不存在的批次要报错，不返回空数组糊过去", () => {
+    expect(() => listReconDiffs("RC99999")).toThrow(/不存在/);
+  });
+});
 
 describe("对账差错处理：状态机 + 汇总同源", () => {
   it("种子里三档处置进度都有（页面一进来四种去向都看得到）", () => {
@@ -129,6 +175,61 @@ describe("对账差错处理：状态机 + 汇总同源", () => {
     expect(() => handleRecon(r.batchNo, "verify", "   ")).toThrow(/结论必填/);
     expect(r.handleStatus).toBe("OPEN");
     expect(r.handledBy).toBeNull();
+  });
+});
+
+describe("对账差错明细：逐条处置（diffId）", () => {
+  it("逐条处置只平掉指定那一条；批次进度要等全部平账才迁移（半平不算平）", () => {
+    // 用有多条差错的批次才验得出「半平」
+    const found = [0, 1, 2, 3].map(openReconWithDiffs).find((x) => x.diffs.length > 1)!;
+    expect(found, "种子里应有差错行 >1 的批次").toBeTruthy();
+    const { batch, diffs } = found;
+
+    const done = handleRecon(batch.batchNo, "compensate", "先补这一笔 ADJ-0001", "Sara Ahmed", diffs[0].id);
+    expect(diffs[0].resolved).toBe(true);
+    expect(diffs.slice(1).every((d) => !d.resolved)).toBe(true);
+    expect(done.handleStatus).toBe("OPEN"); // 还有没平的，进度不动
+    expect(done.handleNote).toBe("先补这一笔 ADJ-0001"); // 但留痕要写（谁在什么时候平了一笔）
+    expect(done.handledBy).toBe("Sara Ahmed");
+
+    // 把剩下的逐条平掉，最后一条落地时批次才迁移
+    for (const d of diffs.slice(1)) handleRecon(batch.batchNo, "compensate", "补齐剩余", "Sara Ahmed", d.id);
+    expect(batch.handleStatus).toBe("RESOLVED");
+    expect(batch.handleResult).toBe("COMPENSATED");
+  });
+
+  it("整批处置（不带 diffId）把该批次全部差错一次平掉", () => {
+    const { batch, diffs } = openReconWithDiffs(1);
+    handleRecon(batch.batchNo, "verify", "逐笔核对无误，整批结案");
+    expect(diffs.every((d) => d.resolved)).toBe(true);
+    expect(batch.handleStatus).toBe("IGNORED");
+  });
+
+  it("diffId 不属于该批次 / 已平账的差错，都拒绝处置", () => {
+    const { batch, diffs } = openReconWithDiffs(2);
+    const alien = reconDiffs.find((d) => d.batchNo !== batch.batchNo)!;
+    expect(() => handleRecon(batch.batchNo, "verify", "越批处置", undefined, alien.id))
+      .toThrow(/不属于对账批次/);
+    expect(() => handleRecon(batch.batchNo, "verify", "不存在的明细", undefined, 999999))
+      .toThrow(/不属于对账批次/);
+
+    handleRecon(batch.batchNo, "verify", "核对无误", undefined, diffs[0].id);
+    expect(() => handleRecon(batch.batchNo, "verify", "再来一次", undefined, diffs[0].id))
+      .toThrow(/已平账，不可重复处置/);
+  });
+
+  it("逐条处置同样吃状态机与结论必填两道闸门（diffId 不是后门）", () => {
+    const { batch, diffs } = openReconWithDiffs(3);
+    expect(() => handleRecon(batch.batchNo, "verify", "  ", undefined, diffs[0].id)).toThrow(/结论必填/);
+    expect(diffs[0].resolved).toBe(false); // 拒绝后不留半平状态
+
+    handleRecon(batch.batchNo, "channel", "挂起等回执", undefined, diffs[0].id);
+    // channel 的 from 只含 OPEN；批次仍是 OPEN（半平不迁移）时可以再定责，
+    // 但一旦进了 HANDLING 就不许再定责一次——用整批处置把它推进 HANDLING 再验
+    const { batch: b2 } = openReconWithDiffs(3);
+    handleRecon(b2.batchNo, "channel", "整批挂起等回执");
+    expect(b2.handleStatus).toBe("HANDLING");
+    expect(() => handleRecon(b2.batchNo, "platform", "改判平台侧", undefined, undefined)).toThrow(/不允许执行/);
   });
 });
 
@@ -250,5 +351,103 @@ describe("发票：开具后抬头与金额不可再改", () => {
       expect(() => saveInvoice({ payeeName: "X", amount: draftStl.totalAmount, sourceNo: draftStl.settleNo }))
         .toThrow(/尚未确认/);
     }
+  });
+});
+
+// —— 账务分录：凭证下钻与借贷平衡（S9）——
+// 账务分录页原先只有平铺列表。会计上有意义的单位是**凭证**（一借一贷必须等额），
+// 逐条看判断不了平不平。这里把「每张凭证必须借贷平衡」钉成不变量 ——
+// 不平的凭证是记账错误，是这一页最该拦住的东西。
+describe("账务分录 · 凭证平衡", () => {
+  it("每一张凭证都借贷平衡", () => {
+    for (const no of new Set(ledger.map((e) => e.voucherNo))) {
+      const b = voucherBalance(no);
+      expect(b.balanced, `凭证 ${no} 不平：借 ${b.debit} / 贷 ${b.credit}`).toBe(true);
+    }
+  });
+
+  it("凭证下钻取到的分录属于该凭证，且合计与 voucherBalance 一致", () => {
+    const no = ledger[0].voucherNo;
+    const es = listVoucherEntries(no);
+    expect(es.length).toBeGreaterThan(0);
+    for (const e of es) expect(e.voucherNo).toBe(no);
+    const debit = es.filter((e) => e.direction === "DEBIT").reduce((n, e) => n + e.amount, 0);
+    expect(voucherBalance(no).debit).toBeCloseTo(debit, 2);
+  });
+
+  it("不存在的凭证：空分录且判定为平衡（0 == 0），不抛错", () => {
+    const b = voucherBalance("V-NOPE");
+    expect(listVoucherEntries("V-NOPE")).toEqual([]);
+    expect(b.balanced).toBe(true);
+  });
+
+  it("期间筛选真的收窄：近 7 日的分录数不多于近 12 月", () => {
+    const n7 = listLedgerInPeriod({ period: "LAST_7D", size: 500 }).total;
+    const n12 = listLedgerInPeriod({ period: "LAST_12M", size: 500 }).total;
+    expect(n12).toBeGreaterThanOrEqual(n7);
+  });
+});
+
+// —— 手工记账（S10）——
+// 先前刻意不做，理由是「不校验平衡的手工记账比不做更危险」。做了，是因为把那条顾虑
+// 变成了硬约束。这些用例钉的就是那几条约束 —— 它们一旦松掉，这个功能就变回危险品。
+describe("账务分录 · 手工记账", () => {
+  const ok = () => ({
+    summary: "补记测试凭证",
+    entries: [
+      { account: "现金-nearpay", direction: "DEBIT" as const, amount: 30 },
+      { account: "平台收入", direction: "CREDIT" as const, amount: 30 },
+    ],
+  });
+
+  it("借贷相等才记账，且新凭证自身必须平衡", () => {
+    const rows = createVoucher(ok());
+    expect(rows.length).toBe(2);
+    expect(voucherBalance(rows[0].voucherNo).balanced).toBe(true);
+  });
+
+  it("借贷不等直接拒（这是最该拦住的一条）", () => {
+    const bad = ok();
+    bad.entries[1].amount = 29.99;
+    expect(() => createVoucher(bad)).toThrow(/借贷不平/);
+  });
+
+  it("单边凭证不是记账：只有借方或只有贷方一律拒", () => {
+    expect(() => createVoucher({
+      summary: "只有借方",
+      entries: [
+        { account: "现金", direction: "DEBIT", amount: 10 },
+        { account: "银行", direction: "DEBIT", amount: 10 },
+      ],
+    })).toThrow(/都必须有分录/);
+  });
+
+  it("摘要必填 —— 手工凭证没有来源单据，摘要是唯一可审计线索", () => {
+    expect(() => createVoucher({ ...ok(), summary: "  " })).toThrow(/摘要必填/);
+  });
+
+  it("金额必须为正：负数不是表达贷方的方式（方向由 direction 表达）", () => {
+    const bad = ok();
+    bad.entries[0].amount = -30;
+    expect(() => createVoucher(bad)).toThrow(/大于 0/);
+  });
+
+  it("少于两条分录直接拒", () => {
+    expect(() => createVoucher({ summary: "单条", entries: [{ account: "现金", direction: "DEBIT", amount: 5 }] }))
+      .toThrow(/至少需要两条/);
+  });
+
+  it("凭证号由服务端派且不撞号；记账后总账里能查到该凭证", () => {
+    const a = createVoucher(ok())[0].voucherNo;
+    const b = createVoucher(ok())[0].voucherNo;
+    expect(a).not.toBe(b);
+    expect(listVoucherEntries(b).length).toBe(2);
+  });
+
+  it("记账只新增不改历史：既有凭证的分录数不受影响", () => {
+    const existing = ledger.find((e) => e.voucherNo.startsWith("V2"))!.voucherNo;
+    const before = listVoucherEntries(existing).length;
+    createVoucher(ok());
+    expect(listVoucherEntries(existing).length).toBe(before);
   });
 });

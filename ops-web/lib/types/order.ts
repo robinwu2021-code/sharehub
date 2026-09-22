@@ -265,6 +265,40 @@ export interface OrderComplaint {
   workOrderNo: string | null; // 转工单后回填
 }
 
+/**
+ * 客服代客登记投诉入参（电话 / 线下渠道）。C 端用户自助提交走 C 端接口自动派生，
+ * 不走这里。
+ *
+ * 刻意**不含** complaintNo / submittedAt / status / handlerName / resolution ——
+ * 新登记一律由服务端落 PENDING 并打提交时间，前端说自己是什么状态不作数
+ *（同退款审批「审批人由服务端回填」的口径）。
+ */
+export interface ComplaintCreatePayload {
+  orderNo: string;
+  userNo: string;
+  issueType: ComplaintIssueType;
+  description: string;
+  /** 投诉截图。电话投诉常常没有截图，故可空。 */
+  screenshotUrl?: string;
+}
+
+/**
+ * 退款申请入参（客服代客发起，落 PENDING 进审批队列，审批通过才真正出款）。
+ *
+ * `idempotencyKey` **必填**：双击提交 / 网络重试如果各落一笔，就是真的退两次钱。
+ * 键在表单打开时生成一次并全程沿用，服务端同键直接返回已有单（同推送发送口径）。
+ * 退款单号 / 申请人 / 申请时间 / 状态 / PSP 流水号一律服务端决定，故不在入参里。
+ */
+export interface RefundApplyPayload {
+  orderNo: string;
+  userNo: string;
+  amount: number;
+  /** 缺省跟随订单币种（服务端兜底 AED），故表单不出这一项。 */
+  currency?: string;
+  reason: string;
+  idempotencyKey: string;
+}
+
 // 退款记录：独立审批队列（申请→审批→执行），比竞品多一条审批链。
 // idempotencyKey / psgTxnNo 是资金操作可追溯的底线：前者防重复退款，后者对得上 PSP 流水。
 export interface RefundRecord extends AuditTrail {

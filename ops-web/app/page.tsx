@@ -6,15 +6,30 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import { StatCard, PageTitle, Skeleton } from "@/components/ui/misc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
+import { QuickActions } from "@/components/quick-actions";
 import { money } from "@/lib/utils";
+import { usePortalTitle } from "@/lib/use-portal-title";
+import type { DashboardAlert } from "@/lib/types";
+
+// 告警类型 → 文案 + 色调。原为就地三目（类型判两遍：一遍出色、一遍出字），
+// 两处各改一半就会出现「红底写着超时」。键序 = 严重度从高到低。
+const ALERT_TYPE: StatusMap<DashboardAlert["type"]> = {
+  OFFLINE: { label: "离线", tone: "danger" },
+  EXCEPTION: { label: "异常", tone: "warning" },
+  TIMEOUT: { label: "超时", tone: "muted" },
+};
 
 export default function DashboardPage() {
   const { data, isLoading } = useQuery({ queryKey: ["dashboard"], queryFn: () => api.getDashboard() });
+  // 拍板 #5：AGENT 门户下标题换「我的看板」（本页无 tab 概念，恒视为默认位）
+  const portalTitle = usePortalTitle(null, true);
 
   return (
     <div>
-      <PageTitle title="工作台" desc="经营总览（今日）" />
+      {/* 快捷动作放页头：看板是每个角色的落地页，「看到问题→当场处置」不该先跳三层页面。
+          按钮各按底层操作的权限码显示，无权限的角色看不到（见 components/quick-actions）。 */}
+      <PageTitle title={portalTitle ?? "工作台"} desc="经营总览（今日）" action={<QuickActions />} />
       {isLoading || !data ? (
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
           {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24" />)}
@@ -39,8 +54,11 @@ export default function DashboardPage() {
                     <XAxis dataKey="day" stroke="var(--muted-foreground)" fontSize={12} />
                     <YAxis stroke="var(--muted-foreground)" fontSize={12} />
                     <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} />
-                    <Line type="monotone" dataKey="gmv" stroke="var(--primary)" strokeWidth={2} dot={false} name="GMV" />
-                    <Line type="monotone" dataKey="orders" stroke="var(--success)" strokeWidth={2} dot={false} name="订单" />
+                    {/* isAnimationActive={false} 是必需的，不是调优：recharts 2.x 的入场动画在
+                        React 19 下不推进，路径停在 t=0 —— 折线一根都画不出来。整站 recharts
+                        系列都必须带这个 flag（app/reports/page.tsx 同）。升级 recharts 后可复查。 */}
+                    <Line type="monotone" dataKey="gmv" stroke="var(--primary)" strokeWidth={2} dot={false} name="GMV" isAnimationActive={false} />
+                    <Line type="monotone" dataKey="orders" stroke="var(--success)" strokeWidth={2} dot={false} name="订单" isAnimationActive={false} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -83,9 +101,7 @@ export default function DashboardPage() {
                 <ul className="space-y-2">
                   {data.alerts.map((a) => (
                     <li key={a.id} className="flex items-center gap-3 text-sm">
-                      <Badge tone={a.type === "OFFLINE" ? "danger" : a.type === "EXCEPTION" ? "warning" : "muted"}>
-                        {a.type === "OFFLINE" ? "离线" : a.type === "EXCEPTION" ? "异常" : "超时"}
-                      </Badge>
+                      <StatusBadge map={ALERT_TYPE} value={a.type} />
                       <span className="flex-1">{a.message}</span>
                       <Link href={a.href} className="text-primary hover:underline shrink-0">查看</Link>
                     </li>
@@ -111,7 +127,7 @@ export default function DashboardPage() {
                 <tbody>
                   {data.rankings.map((r) => (
                     <tr key={r.rank} className="border-b border-border/40 last:border-0">
-                      <td className="py-2 font-medium tabular-nums text-muted-foreground">#{r.rank}</td>
+                      <td className="py-2 txt-strong tabular-nums text-muted-foreground">#{r.rank}</td>
                       <td className="py-2">{r.siteName}</td>
                       <td className="py-2 text-right tabular-nums">{money(r.gmv, r.currency)}</td>
                       <td className="py-2 text-right tabular-nums">{r.orderCount}</td>

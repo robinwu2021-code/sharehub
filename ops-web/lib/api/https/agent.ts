@@ -2,7 +2,41 @@
 // 端点前缀：/api/agent/**
 import { client } from "../http-client";
 import type { AgentApi } from "../contracts/agent";
-import type { PageQ, ArchiveQ, AssignmentRecordQ, AssignableAssetQ } from "../query";
+import type { PageQ, ArchiveQ, AssignmentRecordQ, AssignableAssetQ , ReportQ } from "../query";
+import type { AgentAssignmentRecord, AssetType, AssignAction } from "../../types/agent";
+import type { PageResult } from "../../types/common";
+
+/**
+ * 后端 `agt_assignment` 流水行（AgentExtDtos.AssignmentLog）原样形状。
+ * 与前端 {@link AgentAssignmentRecord} 字段名成对但不同名，故此处显式声明 + 映射，
+ * 不用 `as` 硬转 —— 硬转会让 assignNo/targetNo 静默变成 undefined。
+ */
+interface AssignmentLogRaw {
+  assignNo: string;
+  agentNo: string;
+  targetType: string; // CABINET | LOCATION | SITE
+  targetNo: string;
+  action: string; // ASSIGN | REVOKE
+  operator: string;
+  createdAt: string;
+}
+
+/** 后端流水行 → 前端划拨记录。 */
+function toAssignmentRecord(r: AssignmentLogRaw): AgentAssignmentRecord {
+  return {
+    assignmentNo: r.assignNo,
+    agentNo: r.agentNo,
+    // ⚠️ 后端 AssignmentLog 不带代理名（只存 agentNo，未 join agt_agent）。
+    //    表格里这一列会空 —— 需后端补 join，或页面用已加载的代理列表本地映射。
+    agentName: "",
+    // 后端 LOCATION 前端无对应枚举（AssetType 只有 CABINET|SITE），归到 SITE 展示。
+    assetType: (r.targetType === "CABINET" ? "CABINET" : "SITE") as AssetType,
+    assetNo: r.targetNo,
+    action: (r.action === "REVOKE" ? "RECLAIM" : "ASSIGN") as AssignAction,
+    operatorName: r.operator,
+    createdAt: r.createdAt,
+  };
+}
 
 export const agentHttp: AgentApi = {
   listAgents: (q?: ArchiveQ) => client.get("/api/agent/agents", q),
@@ -10,15 +44,49 @@ export const agentHttp: AgentApi = {
 
   // 代理商扩展
   listAgentAssignments: (q?: PageQ) => client.get("/api/agent/assignments", q),
-  listAgentPerformance: (q?: PageQ) => client.get("/api/agent/performance", q),
+  listAgentPerformance: (q?: ReportQ) => client.get("/api/agent/performance", q),
   listAgentAccounts: (q?: PageQ) => client.get("/api/agent/accounts", q),
   saveAgentAccount: (x) => client.post(x.accountNo ? `/api/agent/accounts/${x.accountNo}` : "/api/agent/accounts", x),
 
-  // S1 设备/点位划拨：划拨/回收是「归属状态迁移」，用 POST 动作端点而非 PUT 整体覆盖
+  // S1 设备/点位划拨。
+  // ⚠️ T1-D 后端缺口：可划拨资产池无端点（AgentExtController 只有 /assignments）。
   listAssignableAssets: (q?: AssignableAssetQ) => client.get("/api/agent/assignable-assets", q),
-  assignAgentAssets: (x) => client.post("/api/agent/assignments/assign", x),
+
+  // T0-5：后端是**单资产**端点 POST /api/agent/assignments（AssignReq{agentNo,targetType,
+  // targetNo,action,operator} → AssignmentLog），前端契约是**批量**。此处做扇出适配。
+  //
+  // ⚠️ 非原子：后端没有批量端点，N 个资产 = N 次请求，中途失败会留下"部分划拨"。
+  //    types/agent.ts 的注释写着「后端一个事务」——那是 mock 的行为，真实后端做不到。
+  //    要恢复原子性需后端补 POST /assignments/batch。
+  assignAgentAssets: async (x) => {
+    const targets = [
+      ...x.cabinetNos.map((no) => ({ targetType: "CABINET", targetNo: no })),
+      ...x.siteNos.map((no) => ({ targetType: "SITE", targetNo: no })),
+    ];
+    const logs = await Promise.all(
+      targets.map((t) =>
+        client.post<AssignmentLogRaw>("/api/agent/assignments", {
+          agentNo: x.agentNo, ...t, action: "ASSIGN", operator: x.operatorName,
+        }),
+      ),
+    );
+    return logs.map(toAssignmentRecord);
+  },
+
+  // ⚠️ T1-D 未接通，仍指向不存在的端点：后端 assign() 强制校验 agentNo 必填且代理必须存在，
+  //    而 ReclaimAssetsPayload 故意不带 agentNo（「从资产当前归属反查」，见 types/agent.ts）。
+  //    两边语义冲突，不能靠改路径解决 —— 需二选一：后端支持 agentNo 缺省时反查归属，
+  //    或前端回收抽屉改为按代理维度提交并带上 agentNo。留待拍板，不在此处猜。
+  //    注：后端动作枚举是 ASSIGN|REVOKE，前端 AssignAction 是 ASSIGN|RECLAIM，一并需对齐。
   reclaimAgentAssets: (x) => client.post("/api/agent/assignments/reclaim", x),
-  listAgentAssignmentRecords: (q?: AssignmentRecordQ) => client.get("/api/agent/assignment-records", q),
+
+  // T0-5：划拨流水复用 /assignments，靠 ?view=log 切读模型（见 AgentExtController#assignments）。
+  listAgentAssignmentRecords: async (q?: AssignmentRecordQ) => {
+    const p = await client.get<PageResult<AssignmentLogRaw>>(
+      "/api/agent/assignments", { ...q, view: "log" },
+    );
+    return { ...p, list: (p.list ?? []).map(toAssignmentRecord) };
+  },
 
   // 代理分润
   listAgentCommissions: (q?: PageQ) => client.get("/api/agent/commissions", q),

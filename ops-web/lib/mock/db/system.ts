@@ -4,37 +4,57 @@
 // 口径：MENA 市场（AE/SA/EG…）、币种 AED、引用现有编号（CAB1000+ / ORD5000xx / U30xx / NT1xx）。
 // 禁止写入任何真实密钥/真实联系方式：目标一律脱敏，税号/账号用占位。
 import type {
-  NotifyTemplate, DictEntry, Region, SysParam, OpenApiApp, MarketCountry, PaymentChannel,
+  NotifyTemplate, DictEntry, Region, RegionNode, SysParam, OpenApiApp, MarketCountry, PaymentChannel,
   NotifyLog, NotifyLogStats, NotifyBlacklist, BizRules, LoginSetting,
   AppVersion, BankEntry, ProblemEntry, TaxSetting, PageQuery,
+  VendorProbeResult, NotifyTemplatePreview, NotifyTestSendPayload, NotifyResendPayload,
 } from "../../types";
 import { p, iso } from "./internal";
 import { paginate, kwHit, upsert, nextNo, liveHit, archiveRow, unarchiveRow } from "./helpers";
+// 供应商台账住在 device.ts（设备域），连通性探测是系统设置页的动作，故读取而不搬迁。
+import { vendors } from "./device";
 
 // —— 通知模板 / 字典 / 区域 / 参数 / 开放平台 ——
-export const notifyTemplates: NotifyTemplate[] = Array.from({ length: 14 }, (_, i) => ({
-  templateNo: `NT${100 + i}`, name: p(["借出成功通知", "归还提醒", "扣费通知", "验证码", "工单派单通知", "提现结果", "营销推送"], i),
-  channel: p(["SMS", "EMAIL", "PUSH", "WHATSAPP"] as const, i), lang: i % 2 === 0 ? "ar" : "en",
-  status: i % 7 === 0 ? "DISABLED" : "ENABLED",
-}));
+// 模板文案与变量：预览要拿真东西替换，所以 content/params 必须成对自洽——
+// params 里的每个变量都得在 content 里出现，否则「缺变量」提示会永远报同一个假缺口。
+const TEMPLATE_SEEDS = [
+  { name: "借出成功通知", scene: "RENT_OK", content: "{{userName}}，您已在 {{siteName}} 借出充电宝 {{powerbankNo}}，前 {{freeMinutes}} 分钟免费。", params: "userName,siteName,powerbankNo,freeMinutes" },
+  { name: "归还提醒", scene: "RETURN_REMIND", content: "{{userName}}，充电宝已使用 {{hours}} 小时，当前费用 {{amount}} {{currency}}，请就近归还。", params: "userName,hours,amount,currency" },
+  { name: "扣费通知", scene: "CHARGE", content: "订单 {{orderNo}} 已结算，扣款 {{amount}} {{currency}}。", params: "orderNo,amount,currency" },
+  { name: "验证码", scene: "OTP", content: "验证码 {{code}}，{{expireMin}} 分钟内有效，请勿转发给任何人。", params: "code,expireMin" },
+  { name: "工单派单通知", scene: "WO_DISPATCH", content: "工单 {{woNo}} 已派给您：{{siteName}}，请在 {{deadline}} 前到场。", params: "woNo,siteName,deadline" },
+  { name: "提现结果", scene: "WITHDRAW_RESULT", content: "提现 {{amount}} {{currency}} 已{{result}}，预计 {{settleDays}} 个工作日到账。", params: "amount,currency,result,settleDays" },
+  // 营销模板故意留一个「声明了却没有示例值」的变量（couponName），让预览的缺变量提示在 mock 下就看得见
+  { name: "营销推送", scene: "PROMO", content: "{{title}}：{{body}}（活动券：{{couponName}}）", params: "title,body,couponName" },
+];
+export const notifyTemplates: NotifyTemplate[] = Array.from({ length: 14 }, (_, i) => {
+  const seed = p(TEMPLATE_SEEDS, i);
+  return {
+    templateNo: `NT${100 + i}`, name: seed.name, scene: seed.scene, content: seed.content, params: seed.params,
+    channel: p(["SMS", "EMAIL", "PUSH", "WHATSAPP"] as const, i), lang: i % 2 === 0 ? "ar" : "en",
+    status: i % 7 === 0 ? "DISABLED" : "ENABLED",
+  };
+});
 export const dictEntries: DictEntry[] = Array.from({ length: 20 }, (_, i) => ({
   dictNo: `DC${1000 + i}`, group: p(["order_status", "wo_type", "scene_type", "pay_channel"], i),
   code: p(["IN_USE", "FAULT", "MALL", "NEARPAY", "SETTLED", "REFILL"], i),
   label: p(["使用中", "故障", "商场", "NearPay", "已结算", "补货"], i), sort: i + 1, enabled: i % 9 !== 0,
 }));
+// 三级区域：国家 → 城市/酋长国 → 商圈。`parentId` 与 `level` 必须自洽（level = 深度，
+// 且 parentId 必指向已存在的行），否则树上会冒出孤儿父节点——integrity 测试守这条。
 export const regions: Region[] = [
-  { regionId: "AE", name: "阿联酋", parent: "-", level: 1, cityCount: 7 },
-  { regionId: "AE-DU", name: "迪拜", parent: "阿联酋", level: 2, cityCount: 1 },
-  { regionId: "AE-AZ", name: "阿布扎比", parent: "阿联酋", level: 2, cityCount: 1 },
-  { regionId: "AE-SH", name: "沙迦", parent: "阿联酋", level: 2, cityCount: 1 },
-  { regionId: "DU-MAR", name: "Dubai Marina", parent: "迪拜", level: 3, cityCount: 0 },
-  { regionId: "DU-DEI", name: "Deira", parent: "迪拜", level: 3, cityCount: 0 },
-  { regionId: "DU-DT", name: "Downtown Dubai", parent: "迪拜", level: 3, cityCount: 0 },
-  { regionId: "DU-DXB", name: "DXB 机场", parent: "迪拜", level: 3, cityCount: 0 },
-  { regionId: "AZ-YAS", name: "Yas Island", parent: "阿布扎比", level: 3, cityCount: 0 },
-  { regionId: "AZ-COR", name: "Corniche", parent: "阿布扎比", level: 3, cityCount: 0 },
-  { regionId: "SH-CIT", name: "Sharjah City", parent: "沙迦", level: 3, cityCount: 0 },
-  { regionId: "AE-AJ", name: "阿治曼", parent: "阿联酋", level: 2, cityCount: 1 },
+  { regionId: "AE", name: "阿联酋", parent: "-", parentId: null, level: 1, cityCount: 7 },
+  { regionId: "AE-DU", name: "迪拜", parent: "阿联酋", parentId: "AE", level: 2, cityCount: 1 },
+  { regionId: "AE-AZ", name: "阿布扎比", parent: "阿联酋", parentId: "AE", level: 2, cityCount: 1 },
+  { regionId: "AE-SH", name: "沙迦", parent: "阿联酋", parentId: "AE", level: 2, cityCount: 1 },
+  { regionId: "DU-MAR", name: "Dubai Marina", parent: "迪拜", parentId: "AE-DU", level: 3, cityCount: 0 },
+  { regionId: "DU-DEI", name: "Deira", parent: "迪拜", parentId: "AE-DU", level: 3, cityCount: 0 },
+  { regionId: "DU-DT", name: "Downtown Dubai", parent: "迪拜", parentId: "AE-DU", level: 3, cityCount: 0 },
+  { regionId: "DU-DXB", name: "DXB 机场", parent: "迪拜", parentId: "AE-DU", level: 3, cityCount: 0 },
+  { regionId: "AZ-YAS", name: "Yas Island", parent: "阿布扎比", parentId: "AE-AZ", level: 3, cityCount: 0 },
+  { regionId: "AZ-COR", name: "Corniche", parent: "阿布扎比", parentId: "AE-AZ", level: 3, cityCount: 0 },
+  { regionId: "SH-CIT", name: "Sharjah City", parent: "沙迦", parentId: "AE-SH", level: 3, cityCount: 0 },
+  { regionId: "AE-AJ", name: "阿治曼", parent: "阿联酋", parentId: "AE", level: 2, cityCount: 1 },
 ];
 export const sysParams: SysParam[] = [
   { paramKey: "deposit.default", label: "默认押金", value: "50", groupName: "计费", updatedAt: iso(0) },
@@ -58,6 +78,10 @@ export const openApiApps: OpenApiApp[] = Array.from({ length: 12 }, (_, i) => ({
   appNo: `APP${300 + i}`, name: p(["Careem 集成", "Noon 广告平台", "Emirates NBD 支付", "第三方BI", "场地方门户", "代理商开放平台"], i),
   appKey: `ak_${String(1000000000 + i * 7654321).slice(0, 10)}`, rateLimit: p([100, 300, 500, 1000], i),
   status: i % 5 === 0 ? "DISABLED" : "ACTIVE", createdAt: iso(i * 172800_000),
+  // 掩码占位：mock 里也不写完整密钥形状，避免被当成"真密钥长这样"照抄
+  appSecretMasked: "sk_live_****",
+  // 只给前两个应用铺"已重置过"的痕迹，其余保持 null，让两种状态在列表里都看得到
+  secretResetAt: i < 2 ? iso((i + 3) * 86400_000) : null,
 }));
 
 export const marketCountries: MarketCountry[] = [
@@ -83,6 +107,60 @@ export const saveOpenApiApp = (x: Partial<OpenApiApp>) => upsert(openApiApps, x,
 // 多国家市场：主键是 ISO alpha-2 国家码，由表单必填（不自动生成编号）
 export const saveMarketCountry = (x: Partial<MarketCountry>) =>
   upsert(marketCountries, x, "countryCode", () => nextNo("XX", marketCountries, 0));
+
+/**
+ * S6 地区树（拍板 #4）：按 `parentId` 连边，不分页——分页会把树截断。
+ * `parentId` 指向不存在的行（脏数据）时，该节点冒到顶层而不是被丢掉：
+ * 树上少一个区，运营会以为"没建"而重复建档；冒到顶层至少看得见、能修。
+ */
+export function listRegionTree(): RegionNode[] {
+  const nodes = new Map<string, RegionNode>(regions.map((r) => [r.regionId, { ...r, children: [] }]));
+  const roots: RegionNode[] = [];
+  for (const node of nodes.values()) {
+    const parent = node.parentId ? nodes.get(node.parentId) : undefined;
+    if (parent) parent.children.push(node); else roots.push(node);
+  }
+  const sortDeep = (ns: RegionNode[]) => {
+    ns.sort((a, b) => a.level - b.level || a.regionId.localeCompare(b.regionId));
+    ns.forEach((n) => sortDeep(n.children));
+  };
+  sortDeep(roots);
+  return roots;
+}
+
+// ============================================================================
+// S7 供应商连通性测试（假探测）
+// ----------------------------------------------------------------------------
+// 结论是**推演**出来的而不是随机的：同一个供应商每次点都得给同样的答案，
+// 否则运维分不清"配置真有问题"还是"探测本身不稳"。
+// ============================================================================
+export class VendorProbeError extends Error {
+  constructor(msg: string) { super(msg); this.name = "VendorProbeError"; }
+}
+export function testVendorConnectivity(vendorCode: string): VendorProbeResult {
+  const v = vendors.find((x) => x.vendorCode === vendorCode);
+  if (!v) throw new VendorProbeError(`供应商 ${vendorCode} 不存在`);
+  // 延迟由供应商码派生：稳定、可断言，且各家不同（看起来像真的）
+  const latencyMs = 40 + ([...vendorCode].reduce((s, c) => s + c.charCodeAt(0), 0) % 260);
+  const endpoint = v.accessMode === "HTTP_API"
+    ? (v.apiBase ?? "")
+    : `gw://${v.accessMode.toLowerCase()}.gateway.internal/${v.vendorCode}`;
+  const base = { vendorCode, endpoint, checkedAt: iso(0) };
+
+  if (v.status === "DISABLED") {
+    return { ...base, ok: false, latencyMs: 0, message: "供应商已停用，未发起探测", detail: "vendor.status=DISABLED：停用状态下网关不会建立连接，请先启用再测。" };
+  }
+  if (v.accessMode === "HTTP_API" && !v.apiBase) {
+    return { ...base, ok: false, latencyMs: 0, message: "云对接型缺 API 基址，无法探测", detail: "vendor.apiBase 为空：HTTP 云对接必须填基址，否则 driver 无处发起请求。" };
+  }
+  return {
+    ...base, ok: true, latencyMs,
+    message: `连通正常 · ${latencyMs}ms`,
+    detail: v.accessMode === "HTTP_API"
+      ? `GET ${endpoint}/ping → 200 OK（${latencyMs}ms）`
+      : `${v.accessMode} 握手成功，已收到心跳帧（${latencyMs}ms）`,
+  };
+}
 
 // ============================================================================
 // 支付渠道（系统域 · P1，对标简电云 E8）
@@ -154,10 +232,13 @@ const NOTIFY_TARGETS = [
   "fatima.a@example.ae", "omar.k@example.sa", "layla.h@example.ae",
   "dGtuX2FwbnNfODkwMTIz", "+201001234567", "+9715077788899",
 ];
+/** 单条计费：Push 近乎免费，短信/WhatsApp 单价高——成本差异是发送记录页存在的理由。 */
+const channelCost = (ch: NotifyLog["channel"]) =>
+  ch === "PUSH" ? 0 : ch === "EMAIL" ? 0.01 : ch === "WHATSAPP" ? 0.11 : 0.09;
+
 export const notifyLogs: NotifyLog[] = Array.from({ length: 42 }, (_, i) => {
   const channel = p(["SMS", "EMAIL", "PUSH", "WHATSAPP"] as const, i);
-  // Push 近乎免费，短信/WhatsApp 单价高——成本差异是本页存在的理由。
-  const cost = channel === "PUSH" ? 0 : channel === "EMAIL" ? 0.01 : channel === "WHATSAPP" ? 0.11 : 0.09;
+  const cost = channelCost(channel);
   const failed = i % 11 === 0;
   return {
     logNo: `NL${7000 + i}`,
@@ -171,6 +252,9 @@ export const notifyLogs: NotifyLog[] = Array.from({ length: 42 }, (_, i) => {
     failReason: failed ? p(NOTIFY_FAILS, i) : null,
     cost,
     currency: "AED",
+    // 历史记录都是"原始发送"：重发只会在运营点按钮时新增，seed 里不预置重发链
+    idempotencyKey: null,
+    resendOf: null,
   } as NotifyLog;
 });
 
@@ -196,6 +280,121 @@ export function getNotifyLogStats(): NotifyLogStats {
     costToday: Math.round(today.reduce((s, x) => s + x.cost, 0) * 100) / 100,
     currency: "AED",
   };
+}
+
+// ============================================================================
+// S7 · 模板预览 / 试发 · 发送记录重发（拍板 #6）
+// ----------------------------------------------------------------------------
+// 幂等：试发与重发都必须带 idempotencyKey，同键第二次直接拒绝。口径与 marketing.ts
+// 的 sendPushMessage、cs.ts 的退款一致——重复提交＝真的多发一条、多扣一次钱。
+// 键在**全部校验通过之后**才登记：校验失败就烧掉键，运营改完参数再点就永远发不出去。
+// ============================================================================
+export class NotifySendError extends Error {
+  constructor(msg: string) { super(msg); this.name = "NotifySendError"; }
+}
+
+/** 已用过的幂等键（试发与重发共用一个命名空间：两者都是"对外真发一条"）。 */
+const usedNotifyKeys = new Set<string>(
+  notifyLogs.map((x) => x.idempotencyKey).filter((k): k is string => !!k),
+);
+
+/** 预览用示例值。缺项是有意的（PROMO 的 couponName 没有），用来暴露"变量没填就会带 {{}} 发出去"。 */
+const PREVIEW_SAMPLES: Record<string, string> = {
+  userName: "Fatima A.", siteName: "Dubai Mall L2", powerbankNo: "PB20007", freeMinutes: "5",
+  hours: "3", amount: "12.00", currency: "AED", orderNo: "ORD500123", code: "8421", expireMin: "5",
+  woNo: "WO40088", deadline: "今天 18:00", result: "到账", settleDays: "3",
+  title: "斋月特惠", body: "借出满 30 分钟立减 5 AED",
+};
+
+const findTemplate = (templateNo: string) => {
+  const t = notifyTemplates.find((x) => x.templateNo === templateNo);
+  if (!t) throw new NotifySendError(`通知模板 ${templateNo} 不存在`);
+  return t;
+};
+const declaredVars = (t: NotifyTemplate) => t.params.split(",").map((s) => s.trim()).filter(Boolean);
+
+/** 预览：只渲染，不发送、不计费、不留痕。未提供且无示例值的变量原样留 {{x}} 并列进 missingVars。 */
+export function previewNotifyTemplate(templateNo: string, vars: Record<string, string> = {}): NotifyTemplatePreview {
+  const t = findTemplate(templateNo);
+  const used: Record<string, string> = {};
+  const missing: string[] = [];
+  for (const name of declaredVars(t)) {
+    const v = (vars[name] ?? "").trim() || PREVIEW_SAMPLES[name];
+    if (v) used[name] = v; else missing.push(name);
+  }
+  const rendered = t.content.replace(/\{\{(\w+)\}\}/g, (whole, name: string) => used[name] ?? whole);
+  return {
+    templateNo: t.templateNo, channel: t.channel, lang: t.lang,
+    // 邮件才有标题，其余渠道没有这个概念——给个空串而不是塞模板名，免得运营以为短信会带标题
+    subject: t.channel === "EMAIL" ? `【ShareHub】${t.name}` : "",
+    rendered, vars: used, missingVars: missing,
+  };
+}
+
+/** 试发：真发一条并落一条发送记录（试发也计费，所以必须能在记录里对上账）。 */
+export function testSendNotifyTemplate(templateNo: string, x: NotifyTestSendPayload): NotifyLog {
+  const key = (x?.idempotencyKey ?? "").trim();
+  if (!key) throw new NotifySendError("试发必须携带幂等键（idempotencyKey）——重复提交会真的多发一条");
+  const t = findTemplate(templateNo);
+  const target = (x?.target ?? "").trim();
+  if (!target) throw new NotifySendError("试发目标不能为空（手机号或邮箱）");
+  if (t.status !== "ENABLED") throw new NotifySendError(`模板 ${templateNo} 已停用，请先启用再试发`);
+  const preview = previewNotifyTemplate(templateNo, x.vars);
+  if (preview.missingVars.length) {
+    throw new NotifySendError(`变量未填全：${preview.missingVars.join("、")}——带着 {{}} 发出去是事故`);
+  }
+  if (usedNotifyKeys.has(key)) throw new NotifySendError(`幂等键 ${key} 已提交过，拒绝重复发送`);
+  usedNotifyKeys.add(key);
+
+  const log: NotifyLog = {
+    logNo: nextNo("NL", notifyLogs, 7000, "logNo"),
+    channel: t.channel, templateNo: t.templateNo, target: maskTarget(target),
+    scene: `试发 · ${t.scene}`, sentAt: iso(0), status: "SENT", failReason: null,
+    cost: channelCost(t.channel), currency: "AED", idempotencyKey: key, resendOf: null,
+  };
+  notifyLogs.unshift(log);
+  return log;
+}
+
+/**
+ * 重发：**新增**一条记录并返回它，原记录一字不改（审计要看得见"发了两次"）。
+ * 只允许重发失败记录：成功记录再发一遍就是重复骚扰 + 重复扣费，要补发请走模板试发。
+ * 目标已在触达拉黑（且未到期）时拒绝——对退订用户重发既违规又白烧钱。
+ */
+export function resendNotifyLog(logNo: string, x: NotifyResendPayload): NotifyLog {
+  const key = (x?.idempotencyKey ?? "").trim();
+  if (!key) throw new NotifySendError("重发必须携带幂等键（idempotencyKey）——重复提交会重复扣费");
+  const src = notifyLogs.find((l) => l.logNo === logNo);
+  if (!src) throw new NotifySendError(`发送记录 ${logNo} 不存在`);
+  if (src.status !== "FAILED") throw new NotifySendError(`记录 ${logNo} 是「已发送」，不允许重发——重复发送会重复扣费`);
+  const blocked = notifyBlacklist.find((b) =>
+    b.target === src.target && (b.channel === "ALL" || b.channel === src.channel) &&
+    (!b.expireAt || new Date(b.expireAt).getTime() > Date.now()));
+  if (blocked) throw new NotifySendError(`目标已在触达拉黑（${blocked.blockNo}），不允许重发`);
+  if (usedNotifyKeys.has(key)) throw new NotifySendError(`幂等键 ${key} 已提交过，拒绝重复发送`);
+  usedNotifyKeys.add(key);
+
+  const log: NotifyLog = {
+    ...src,
+    logNo: nextNo("NL", notifyLogs, 7000, "logNo"),
+    sentAt: iso(0), status: "SENT", failReason: null,
+    idempotencyKey: key, resendOf: src.logNo,
+  };
+  notifyLogs.unshift(log);
+  return log;
+}
+
+/**
+ * S7 OpenAPI 密钥重置：只换掩码与重置时间。真实 AppSecret 由后端生成并带外交付一次，
+ * **绝不**回传给前端——回传了就会进浏览器内存、日志与截图。
+ */
+export function resetOpenApiAppSecret(appNo: string): OpenApiApp {
+  const i = openApiApps.findIndex((x) => x.appNo === appNo);
+  if (i < 0) throw new Error(`OpenAPI 应用 ${appNo} 不存在`);
+  // 掩码后四位跟着重置变化，否则运营看不出"到底换没换"
+  const tail = String(1000 + (Date.now() % 9000));
+  openApiApps[i] = { ...openApiApps[i], appSecretMasked: `sk_live_****${tail}`, secretResetAt: iso(0) };
+  return openApiApps[i];
 }
 
 // —— §10 触达拉黑 ——

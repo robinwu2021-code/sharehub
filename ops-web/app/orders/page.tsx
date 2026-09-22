@@ -10,6 +10,11 @@ import { Input, Select } from "@/components/ui/input";
 import { Toolbar } from "@/components/ui/toolbar";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Drawer, Field } from "@/components/ui/drawer";
+import { Timeline } from "@/components/ui/timeline";
+import { Notice } from "@/components/ui/notice";
+import { FilterSelect } from "@/components/ui/filter-select";
+import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
+import { ReadOnlyNotice } from "@/components/read-only-notice";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { OrderStatusBadge } from "@/components/status";
@@ -23,6 +28,7 @@ import { ORDER_INTERVENTIONS, interveneActions, depositActions, exceptionHandleA
 import type {
   RentOrder, OrderException, OrderExceptionStatus, ExceptionHandleAction, DepositRecord,
   OrderComplaint, RefundRecord, ComplaintIssueType, ComplaintResolution,
+  ComplaintCreatePayload, RefundApplyPayload,
   OrderInterventionAction, DepositAction, DunChannel,
   Reservation, FreeOrder, WhitelistReason,
 } from "@/lib/types";
@@ -40,11 +46,11 @@ const TABS = [
 ];
 
 // —— 预约订单（规格 §3）：竞品是电车预约充电桩，充电宝映射为「预约取宝 / 预约还位」——
-const RES_TYPE: Record<Reservation["type"], { label: string; tone: "default" | "warning" }> = {
+const RES_TYPE: StatusMap<Reservation["type"]> = {
   BORROW: { label: "预约取宝", tone: "default" },
   RETURN: { label: "预约还位", tone: "warning" }, // 还位是占用空仓，与取宝挤兑的是相反资源，故换色
 };
-const RES_STATUS: Record<Reservation["status"], { label: string; tone: "warning" | "success" | "muted" | "danger" }> = {
+const RES_STATUS: StatusMap<Reservation["status"]> = {
   PENDING: { label: "待履约", tone: "warning" },
   FULFILLED: { label: "已履约", tone: "success" },
   EXPIRED: { label: "已过期", tone: "danger" },
@@ -59,12 +65,23 @@ const isExpiringSoon = (r: Reservation) => {
 };
 
 // —— 免费订单（规格 §4）：来源 = 白名单用途，两页口径一致 ——
+/** 订单列表的状态筛选项。徽标文案走 i18n（OrderStatusBadge），此处是筛选口径，故显式列出。
+ *  已创建/弹出中必须在列——远程弹出干预会把订单落到「弹出中」，筛不出来就找不回。 */
+const ORDER_STATUS_FILTER = [
+  { value: "CREATED", label: "已创建" }, { value: "DISPENSING", label: "弹出中" },
+  { value: "IN_USE", label: "使用中" }, { value: "SETTLED", label: "已结算" },
+  { value: "RETURNED", label: "已归还" }, { value: "EXCEPTION", label: "异常" },
+  { value: "CLOSED", label: "已关闭" },
+];
+
 const REASON_LABEL: Record<WhitelistReason, string> = {
   INTERNAL_TEST: "内测",
   VIP: "VIP",
   BD_DEMO: "BD 演示",
   MERCHANT_SELF: "商户自用",
 };
+
+const REASON_OPTIONS = Object.entries(REASON_LABEL).map(([value, label]) => ({ value, label }));
 
 const ISSUE_LABEL: Record<ComplaintIssueType, string> = {
   BILLING_DISPUTE: "计费争议",
@@ -74,7 +91,7 @@ const ISSUE_LABEL: Record<ComplaintIssueType, string> = {
   OTHER: "其他",
 };
 
-const CPL_STATUS: Record<OrderComplaint["status"], { label: string; tone: "warning" | "default" | "success" | "muted" }> = {
+const CPL_STATUS: StatusMap<OrderComplaint["status"]> = {
   PENDING: { label: "待处理", tone: "warning" },
   PROCESSING: { label: "处理中", tone: "default" },
   RESOLVED: { label: "已解决", tone: "success" },
@@ -88,15 +105,16 @@ const RESOLUTION_LABEL: Record<ComplaintResolution, string> = {
   EXPLAINED: "已解释",
 };
 
-const RFD_STATUS: Record<RefundRecord["status"], { label: string; tone: "warning" | "default" | "success" | "muted" | "danger" }> = {
+const RFD_STATUS: StatusMap<RefundRecord["status"]> = {
+  // 键序 = 退款筛选下拉的顺序（申请 → 通过 → 出款 → 驳回 → 失败）
   PENDING: { label: "待审批", tone: "warning" },
   APPROVED: { label: "已通过", tone: "default" },
-  REJECTED: { label: "已驳回", tone: "muted" },
   EXECUTED: { label: "已退款", tone: "success" },
+  REJECTED: { label: "已驳回", tone: "muted" },
   FAILED: { label: "退款失败", tone: "danger" },
 };
 
-const DEP_STATUS: Record<DepositRecord["status"], { label: string; tone: "success" | "muted" | "outline" | "warning" }> = {
+const DEP_STATUS: StatusMap<DepositRecord["status"]> = {
   HELD: { label: "已冻结", tone: "outline" },
   RELEASED: { label: "已解冻", tone: "success" },
   BOUGHT_OUT: { label: "已买断", tone: "muted" },
@@ -134,7 +152,7 @@ const EXC_TYPE_LABEL: Record<OrderException["type"], string> = {
 };
 
 // —— 异常订单处置（S2：原先只有只读列表，order:exception:handle 定义了没人用）——
-const EXC_STATUS: Record<OrderExceptionStatus, { label: string; tone: "warning" | "default" | "success" }> = {
+const EXC_STATUS: StatusMap<OrderExceptionStatus> = {
   PENDING: { label: "待处置", tone: "warning" },
   HANDLING: { label: "处置中", tone: "default" },
   HANDLED: { label: "已处置", tone: "success" },
@@ -152,6 +170,7 @@ const EXC_ACTION_DESC: Record<ExceptionHandleAction, string> = {
 function OrdersInner() {
   const sp = useSearchParams();
   const qTab = sp.get("tab");
+  const qKeyword = sp.get("keyword");
   const qc = useQueryClient();
   const allow = useCan();
   const { t } = useI18n(); // 导出订单状态用同一套 i18n 文案，避免与表格徽标不一致
@@ -161,7 +180,10 @@ function OrdersInner() {
 
   // —— 订单列表 tab 状态 ——
   const [page, setPage] = useState(1);
-  const [keyword, setKeyword] = useState("");
+  // 关键词支持 ?keyword= 深链（经营看板「查订单」跳过来时预填单号）；
+  // effect 兜住「已在本页时再点一次深链」——初始值只在挂载时生效，参数变化要跟着走。
+  const [keyword, setKeyword] = useState(qKeyword ?? "");
+  useEffect(() => { if (qKeyword != null) { setKeyword(qKeyword); setPage(1); } }, [qKeyword]);
   const [status, setStatus] = useState("");
   const [detail, setDetail] = useState<RentOrder | null>(null);
   // 干预确认抽屉：原因必填（沿用退款审批口径），补偿另需金额
@@ -241,6 +263,18 @@ function OrdersInner() {
     placeholderData: keepPreviousData,
     enabled: tab === "complaints",
   });
+  // 代客登记投诉：电话/线下投诉原先根本进不了队列，客服只能处理「从别处冒出来」的投诉。
+  // 权限沿用 order:exception:handle —— 后端 createComplaint 用的就是这个码。
+  const canCreateCpl = allow("order:exception:handle");
+  const [cplNew, setCplNew] = useState<{ orderNo: string; userNo: string; issueType: ComplaintIssueType; description: string; screenshotUrl: string } | null>(null);
+  const createCpl = useMutation({
+    mutationFn: (v: ComplaintCreatePayload) => api.createOrderComplaint(v),
+    onSuccess: (r) => {
+      notify.success(`投诉已登记 ${r.complaintNo}（待处理）`);
+      qc.invalidateQueries({ queryKey: ["complaints"] });
+      setCplNew(null);
+    },
+  });
   const handleCpl = useMutation({
     mutationFn: (v: { no: string; resolution: ComplaintResolution; note: string }) => api.handleOrderComplaint(v.no, v.resolution, v.note),
     onSuccess: () => { notify.success("投诉已处理"); qc.invalidateQueries({ queryKey: ["complaints"] }); setCplDetail(null); },
@@ -269,6 +303,43 @@ function OrdersInner() {
     onSuccess: (_r, v) => { notify.success(v.approve ? "退款已通过并执行" : "退款已驳回"); qc.invalidateQueries({ queryKey: ["refunds"] }); setRfdDetail(null); },
   });
   const canAuditRefund = allow("order:refund:audit");
+  // 直接在队列里开退款单（原先只能绕订单详情做一次「申请退款」干预，金额还改不了）。
+  // 幂等键在表单打开时生成一次并全程沿用：双击提交 / 网络重试用的是同一把键，服务端据此
+  // 返回已有单而不是再退一笔 —— 没有键的重复提交就是真的退两次钱（口径同推送重发）。
+  const canApplyRefund = allow("order:refund:apply");
+  const [rfdNew, setRfdNew] = useState<{ orderNo: string; userNo: string; amount: string; reason: string; idempotencyKey: string } | null>(null);
+  const createRfd = useMutation({
+    mutationFn: (v: RefundApplyPayload) => api.createRefund(v),
+    onSuccess: (r) => {
+      notify.success(`退款申请已提交 ${r.refundNo} · ${money(r.amount, r.currency)}（待审批）`);
+      qc.invalidateQueries({ queryKey: ["refunds"] });
+      setRfdNew(null);
+    },
+  });
+  const openRfdNew = () => setRfdNew({
+    orderNo: "", userNo: "", amount: "", reason: "",
+    idempotencyKey: `RF-MANUAL-${Date.now()}`,
+  });
+  const rfdNewOk = !!rfdNew && !!rfdNew.orderNo.trim() && !!rfdNew.reason.trim() && Number(rfdNew.amount) > 0;
+  /** 退款是资金操作：提交前二次确认，文案写明退给哪一单、退多少。 */
+  const submitRfdNew = async () => {
+    if (!rfdNew || !rfdNewOk) return;
+    const ok = await confirm({
+      title: `新建退款申请 · 订单 ${rfdNew.orderNo.trim()}`,
+      desc: `将提交一笔 ${Number(rfdNew.amount)} 的退款申请进审批队列（审批通过才真正出款）。本次携带幂等键 ${rfdNew.idempotencyKey}，重复提交不会重复退款。`,
+      danger: true,
+      confirmText: "确认提交",
+      cancelText: "再想想",
+    });
+    if (!ok) return;
+    createRfd.mutate({
+      orderNo: rfdNew.orderNo.trim(),
+      userNo: rfdNew.userNo.trim(),
+      amount: Number(rfdNew.amount),
+      reason: rfdNew.reason.trim(),
+      idempotencyKey: rfdNew.idempotencyKey,
+    });
+  };
 
   // —— 押金与欠费 tab 状态（P2 → S1 补处置动作）——
   const [depPage, setDepPage] = useState(1);
@@ -330,6 +401,9 @@ function OrdersInner() {
       danger: true,
       confirmText: `确认${DEP_ACTION_LABEL[action]}`,
       cancelText: "再想想",
+      // 买断不可逆（押金不再退还，规范 §12.6）：手输押金单号才解锁。
+      // 解冻虽也不可撤销，但结果是「钱回到用户」，误操作代价远小于买断，故不加强确认。
+      requireText: action === "buyout" ? row.depositNo : undefined,
     });
     if (!ok) return;
     if (action === "release") releaseDep.mutate({ no: row.depositNo, reason: depReason });
@@ -379,10 +453,12 @@ function OrdersInner() {
     enabled: tab === "free",
   });
 
+  // 业务号列一律 txt-strong（规范 §12.3 主键列加强，扫描时有锚点）；
+  // 金额/时长/计数列一律 text-right + tabular-nums（§12.4）——钱表里一半左一半右是真实的阅读缺陷。
   const resCols: Column<Reservation>[] = [
-    { header: "预约号", cell: (r) => <span className="font-medium tabular-nums">{r.reservationNo}</span> },
+    { header: "预约号", cell: (r) => <span className="txt-strong tabular-nums">{r.reservationNo}</span> },
     { header: "用户", cell: (r) => <span className="text-muted-foreground">{r.userNo}</span> },
-    { header: "类型", cell: (r) => <Badge tone={RES_TYPE[r.type].tone}>{RES_TYPE[r.type].label}</Badge> },
+    { header: "类型", cell: (r) => <StatusBadge map={RES_TYPE} value={r.type} /> },
     { header: "目标站点", cell: (r) => r.siteName },
     // 空机柜号 = 站点级预约（到店任选一台），不是数据缺失，故显式写清
     { header: "指定机柜", cell: (r) => r.cabinetNo ?? <span className="text-muted-foreground">站点级</span> },
@@ -394,12 +470,12 @@ function OrdersInner() {
         </span>
       ),
     },
-    { header: "占位费", cell: (r) => <span className="tabular-nums">{r.holdFee > 0 ? money(r.holdFee, r.currency) : "-"}</span> },
+    { header: "占位费", className: "text-right", cell: (r) => <span className="tabular-nums">{r.holdFee > 0 ? money(r.holdFee, r.currency) : "-"}</span> },
     {
       header: "状态",
       cell: (r) => (
         <div className="flex items-center gap-1">
-          <Badge tone={RES_STATUS[r.status].tone}>{RES_STATUS[r.status].label}</Badge>
+          <StatusBadge map={RES_STATUS} value={r.status} />
           {isExpiringSoon(r) && <Badge tone="danger">即将超时</Badge>}
         </div>
       ),
@@ -415,36 +491,37 @@ function OrdersInner() {
   ];
 
   const freeCols: Column<FreeOrder>[] = [
-    { header: "订单号", cell: (f) => <span className="font-medium tabular-nums">{f.orderNo}</span> },
-    { header: "用户", cell: (f) => <span className="text-muted-foreground">{f.userNo}</span> },
+    { header: "订单号", cell: (f) => <span className="txt-strong tabular-nums">{f.orderNo}</span> },
+    { header: "用户", cell: (f) => <span className="text-muted-foreground tabular-nums">{f.userNo}</span> },
     { header: "昵称", cell: (f) => f.nickname },
     { header: "免费来源", cell: (f) => <Badge tone="outline">{REASON_LABEL[f.whitelistReason]}</Badge> },
-    { header: "减免金额", cell: (f) => <span className="tabular-nums">{money(f.waivedAmount, f.currency)}</span> },
+    { header: "减免金额", className: "text-right", cell: (f) => <span className="tabular-nums">{money(f.waivedAmount, f.currency)}</span> },
     { header: "站点", cell: (f) => f.siteName },
     { header: "机柜", cell: (f) => <span className="tabular-nums">{f.cabinetNo}</span> },
     { header: "借出", cell: (f) => <span className="text-muted-foreground">{fmtTime(f.startedAt)}</span> },
     { header: "归还", cell: (f) => <span className="text-muted-foreground">{fmtTime(f.endedAt)}</span> },
-    { header: "时长", cell: (f) => <span className="tabular-nums">{f.duration} 分</span> },
+    { header: "时长", className: "text-right", cell: (f) => <span className="tabular-nums">{f.duration} 分</span> },
   ];
 
   const listCols: Column<RentOrder>[] = [
-    { header: "订单号", cell: (o) => <span className="font-medium">{o.orderNo}</span> },
-    { header: "用户", cell: (o) => <span className="text-muted-foreground">{o.cUserNo}</span> },
-    { header: "借出柜机", cell: (o) => o.cabinetNo },
+    { header: "订单号", cell: (o) => <span className="txt-strong tabular-nums">{o.orderNo}</span> },
+    { header: "用户", cell: (o) => <span className="text-muted-foreground tabular-nums">{o.cUserNo}</span> },
+    { header: "借出柜机", cell: (o) => <span className="tabular-nums">{o.cabinetNo}</span> },
     { header: "点位", cell: (o) => <span className="text-muted-foreground">{o.locationName}</span> },
-    { header: "时长", cell: (o) => <span className="tabular-nums">{o.durationMin != null ? `${o.durationMin} 分` : "-"}</span> },
-    { header: "费用", cell: (o) => <span className="tabular-nums">{money(o.feeAmount, o.currency)}</span> },
+    { header: "时长", className: "text-right", cell: (o) => <span className="tabular-nums">{o.durationMin != null ? `${o.durationMin} 分` : "-"}</span> },
+    { header: "费用", className: "text-right", cell: (o) => <span className="tabular-nums">{money(o.feeAmount, o.currency)}</span> },
     { header: "状态", cell: (o) => <OrderStatusBadge s={o.status} /> },
     { header: "操作", cell: (o) => <Button size="sm" variant="outline" onClick={() => setDetail(o)}>详情</Button> },
   ];
 
   const depCols: Column<DepositRecord>[] = [
-    { header: "押金单号", cell: (d) => <span className="font-medium">{d.depositNo}</span> },
-    { header: "订单号", cell: (d) => <span className="text-muted-foreground">{d.orderNo}</span> },
-    { header: "用户", cell: (d) => <span className="text-muted-foreground">{d.userNo}</span> },
-    { header: "押金", cell: (d) => <span className="tabular-nums">{money(d.amount, d.currency)}</span> },
-    { header: "欠费", cell: (d) => <span className="tabular-nums">{d.arrearsAmount > 0 ? money(d.arrearsAmount, d.currency) : "-"}</span> },
-    { header: "状态", cell: (d) => <Badge tone={DEP_STATUS[d.status].tone}>{DEP_STATUS[d.status].label}</Badge> },
+    { header: "押金单号", cell: (d) => <span className="txt-strong tabular-nums">{d.depositNo}</span> },
+    { header: "订单号", cell: (d) => <span className="text-muted-foreground tabular-nums">{d.orderNo}</span> },
+    { header: "用户", cell: (d) => <span className="text-muted-foreground tabular-nums">{d.userNo}</span> },
+    { header: "押金", className: "text-right", cell: (d) => <span className="tabular-nums">{money(d.amount, d.currency)}</span> },
+    // 欠费与押金同为金额列，右对齐才能上下位数对齐（原先两列一左一右）
+    { header: "欠费", className: "text-right", cell: (d) => <span className="tabular-nums">{d.arrearsAmount > 0 ? money(d.arrearsAmount, d.currency) : "-"}</span> },
+    { header: "状态", cell: (d) => <StatusBadge map={DEP_STATUS} value={d.status} /> },
     { header: "时间", cell: (d) => <span className="text-muted-foreground">{fmtTime(d.createdAt)}</span> },
     // 处置留痕上列表：谁在什么时候解冻/买断/催缴过，不用点进去才知道
     {
@@ -482,9 +559,9 @@ function OrdersInner() {
   ];
 
   const cplCols: Column<OrderComplaint>[] = [
-    { header: "投诉号", cell: (c) => <span className="font-medium">{c.complaintNo}</span> },
-    { header: "订单号", cell: (c) => <span className="text-muted-foreground">{c.orderNo}</span> },
-    { header: "用户", cell: (c) => <span className="text-muted-foreground">{c.userNo}</span> },
+    { header: "投诉号", cell: (c) => <span className="txt-strong tabular-nums">{c.complaintNo}</span> },
+    { header: "订单号", cell: (c) => <span className="text-muted-foreground tabular-nums">{c.orderNo}</span> },
+    { header: "用户", cell: (c) => <span className="text-muted-foreground tabular-nums">{c.userNo}</span> },
     { header: "问题类型", cell: (c) => <Badge tone="outline">{ISSUE_LABEL[c.issueType]}</Badge> },
     { header: "用户描述", cell: (c) => <span className="text-muted-foreground">{c.description}</span> },
     {
@@ -494,7 +571,7 @@ function OrdersInner() {
         : <span className="text-muted-foreground">-</span>,
     },
     { header: "提交时间", cell: (c) => <span className="text-muted-foreground">{fmtTime(c.submittedAt)}</span> },
-    { header: "状态", cell: (c) => <Badge tone={CPL_STATUS[c.status].tone}>{CPL_STATUS[c.status].label}</Badge> },
+    { header: "状态", cell: (c) => <StatusBadge map={CPL_STATUS} value={c.status} /> },
     { header: "处理人", cell: (c) => c.handlerName ?? <span className="text-muted-foreground">-</span> },
     { header: "处理结果", cell: (c) => c.resolution ? RESOLUTION_LABEL[c.resolution] : <span className="text-muted-foreground">-</span> },
     // 关联工单直接上列表：一眼看出投诉有没有落到运维手上
@@ -506,13 +583,13 @@ function OrdersInner() {
   ];
 
   const rfdCols: Column<RefundRecord>[] = [
-    { header: "退款单号", cell: (r) => <span className="font-medium">{r.refundNo}</span> },
-    { header: "订单号", cell: (r) => <span className="text-muted-foreground">{r.orderNo}</span> },
-    { header: "用户", cell: (r) => <span className="text-muted-foreground">{r.userNo}</span> },
-    { header: "退款金额", cell: (r) => <span className="tabular-nums">{money(r.amount, r.currency)}</span> },
+    { header: "退款单号", cell: (r) => <span className="txt-strong tabular-nums">{r.refundNo}</span> },
+    { header: "订单号", cell: (r) => <span className="text-muted-foreground tabular-nums">{r.orderNo}</span> },
+    { header: "用户", cell: (r) => <span className="text-muted-foreground tabular-nums">{r.userNo}</span> },
+    { header: "退款金额", className: "text-right", cell: (r) => <span className="tabular-nums">{money(r.amount, r.currency)}</span> },
     { header: "原因", cell: (r) => <span className="text-muted-foreground">{r.reason}</span> },
     { header: "申请人 / 时间", cell: (r) => <>{r.applicantName} <span className="text-muted-foreground">· {fmtTime(r.appliedAt)}</span></> },
-    { header: "状态", cell: (r) => <Badge tone={RFD_STATUS[r.status].tone}>{RFD_STATUS[r.status].label}</Badge> },
+    { header: "状态", cell: (r) => <StatusBadge map={RFD_STATUS} value={r.status} /> },
     { header: "审批人", cell: (r) => r.auditorName ?? <span className="text-muted-foreground">-</span> },
     // 幂等键 + PSP 流水号 = 资金操作可追溯的底线（防重复退款 / 对得上支付侧流水）
     { header: "幂等键", cell: (r) => <span className="text-muted-foreground tabular-nums">{r.idempotencyKey}</span> },
@@ -526,12 +603,12 @@ function OrdersInner() {
   ];
 
   const excCols: Column<OrderException>[] = [
-    { header: "订单号", cell: (e) => <span className="font-medium">{e.orderNo}</span> },
+    { header: "订单号", cell: (e) => <span className="txt-strong tabular-nums">{e.orderNo}</span> },
     { header: "异常类型", cell: (e) => <Badge tone="outline">{EXC_TYPE_LABEL[e.type]}</Badge> },
-    { header: "柜机", cell: (e) => e.cabinetNo },
-    { header: "用户", cell: (e) => <span className="text-muted-foreground">{e.userNo}</span> },
-    { header: "涉及金额", cell: (e) => <span className="tabular-nums">{money(e.amount, e.currency)}</span> },
-    { header: "状态", cell: (e) => <Badge tone={EXC_STATUS[e.status].tone}>{EXC_STATUS[e.status].label}</Badge> },
+    { header: "柜机", cell: (e) => <span className="tabular-nums">{e.cabinetNo}</span> },
+    { header: "用户", cell: (e) => <span className="text-muted-foreground tabular-nums">{e.userNo}</span> },
+    { header: "涉及金额", className: "text-right", cell: (e) => <span className="tabular-nums">{money(e.amount, e.currency)}</span> },
+    { header: "状态", cell: (e) => <StatusBadge map={EXC_STATUS} value={e.status} /> },
     { header: "发生时间", cell: (e) => <span className="text-muted-foreground">{fmtTime(e.createdAt)}</span> },
     // 处置留痕上列表：不用点进去就知道谁在什么时候按什么方式处置过、下游单号是多少
     {
@@ -603,17 +680,7 @@ function OrdersInner() {
               { header: "状态", value: (o) => t(`orderStatus.${o.status}`) },
             ], listQ.data?.list ?? [])}
           >
-            <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
-              <option value="">全部状态</option>
-              {/* 已创建/弹出中原先不在筛选里，而远程弹出干预会把订单落到「弹出中」，必须能筛出来 */}
-              <option value="CREATED">已创建</option>
-              <option value="DISPENSING">弹出中</option>
-              <option value="IN_USE">使用中</option>
-              <option value="SETTLED">已结算</option>
-              <option value="RETURNED">已归还</option>
-              <option value="EXCEPTION">异常</option>
-              <option value="CLOSED">已关闭</option>
-            </Select>
+            <FilterSelect value={status} onChange={(v) => { setStatus(v); setPage(1); }} allLabel="全部状态" options={ORDER_STATUS_FILTER} />
           </Toolbar>
           <DataTable
             rowKey={(o: RentOrder) => o.orderNo}
@@ -645,20 +712,10 @@ function OrdersInner() {
               { header: "关联订单", value: (r) => r.orderNo },
             ], resQ.data?.list ?? [])}
           >
-            <Select value={resType} onChange={(e) => { setResType(e.target.value); setResPage(1); }}>
-              <option value="">全部类型</option>
-              <option value="BORROW">预约取宝</option>
-              <option value="RETURN">预约还位</option>
-            </Select>
-            <Select value={resStatus} onChange={(e) => { setResStatus(e.target.value); setResPage(1); }}>
-              <option value="">全部状态</option>
-              <option value="PENDING">待履约</option>
-              <option value="FULFILLED">已履约</option>
-              <option value="EXPIRED">已过期</option>
-              <option value="CANCELLED">已取消</option>
-            </Select>
+            <FilterSelect value={resType} onChange={(v) => { setResType(v); setResPage(1); }} allLabel="全部类型" options={RES_TYPE} />
+            <FilterSelect value={resStatus} onChange={(v) => { setResStatus(v); setResPage(1); }} allLabel="全部状态" options={RES_STATUS} />
           </Toolbar>
-          {!canCancelRes && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无预约取消权限（order:order:update）</div>}
+          {!canCancelRes && <ReadOnlyNotice what="预约取消" perm="order:order:update" />}
           <DataTable
             rowKey={(r: Reservation) => r.reservationNo}
             columns={resCols}
@@ -702,13 +759,7 @@ function OrdersInner() {
               { header: "时长(分)", value: (f) => f.duration },
             ], freeQ.data?.list ?? [])}
           >
-            <Select value={freeReason} onChange={(e) => { setFreeReason(e.target.value); setFreePage(1); }}>
-              <option value="">全部来源</option>
-              <option value="INTERNAL_TEST">内测</option>
-              <option value="VIP">VIP</option>
-              <option value="BD_DEMO">BD 演示</option>
-              <option value="MERCHANT_SELF">商户自用</option>
-            </Select>
+            <FilterSelect value={freeReason} onChange={(v) => { setFreeReason(v); setFreePage(1); }} allLabel="全部来源" options={REASON_OPTIONS} />
           </Toolbar>
           <DataTable
             rowKey={(f: FreeOrder) => f.orderNo}
@@ -744,14 +795,9 @@ function OrdersInner() {
               { header: "关联退款", value: (e) => e.refundNo },
             ], excQ.data?.list ?? [])}
           >
-            <Select value={excStatus} onChange={(e) => { setExcStatus(e.target.value); setExcPage(1); }}>
-              <option value="">全部状态</option>
-              <option value="PENDING">待处置</option>
-              <option value="HANDLING">处置中</option>
-              <option value="HANDLED">已处置</option>
-            </Select>
+            <FilterSelect value={excStatus} onChange={(v) => { setExcStatus(v); setExcPage(1); }} allLabel="全部状态" options={EXC_STATUS} />
           </Toolbar>
-          {!canHandleExc && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无异常订单处置权限（order:exception:handle）</div>}
+          {!canHandleExc && <ReadOnlyNotice what="异常订单处置" perm="order:exception:handle" />}
           <DataTable
             rowKey={(e: OrderException) => e.orderNo}
             columns={excCols}
@@ -782,14 +828,11 @@ function OrdersInner() {
               { header: "处理结果", value: (c) => (c.resolution ? RESOLUTION_LABEL[c.resolution] : "") },
               { header: "关联工单", value: (c) => c.workOrderNo },
             ], cplQ.data?.list ?? [])}
+            onAdd={() => setCplNew({ orderNo: "", userNo: "", issueType: "BILLING_DISPUTE", description: "", screenshotUrl: "" })}
+            addLabel="新建投诉"
+            canAdd={canCreateCpl}
           >
-            <Select value={cplStatus} onChange={(e) => { setCplStatus(e.target.value); setCplPage(1); }}>
-              <option value="">全部状态</option>
-              <option value="PENDING">待处理</option>
-              <option value="PROCESSING">处理中</option>
-              <option value="RESOLVED">已解决</option>
-              <option value="REJECTED">已驳回</option>
-            </Select>
+            <FilterSelect value={cplStatus} onChange={(v) => { setCplStatus(v); setCplPage(1); }} allLabel="全部状态" options={CPL_STATUS} />
           </Toolbar>
           <DataTable
             rowKey={(c: OrderComplaint) => c.complaintNo}
@@ -822,17 +865,16 @@ function OrdersInner() {
               { header: "幂等键", value: (r) => r.idempotencyKey },
               { header: "PSP 流水号", value: (r) => r.psgTxnNo },
             ], rfdQ.data?.list ?? [])}
+            onAdd={openRfdNew}
+            addLabel="新建退款"
+            canAdd={canApplyRefund}
           >
-            <Select value={rfdStatus} onChange={(e) => { setRfdStatus(e.target.value); setRfdPage(1); }}>
-              <option value="">全部状态</option>
-              <option value="PENDING">待审批</option>
-              <option value="APPROVED">已通过</option>
-              <option value="EXECUTED">已退款</option>
-              <option value="REJECTED">已驳回</option>
-              <option value="FAILED">退款失败</option>
-            </Select>
+            <FilterSelect value={rfdStatus} onChange={(v) => { setRfdStatus(v); setRfdPage(1); }} allLabel="全部状态" options={RFD_STATUS} />
           </Toolbar>
-          {!canAuditRefund && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色无退款审批权限（order:refund:audit）</div>}
+          {/* 申请与审批是两个码：客服能开单不能出款，财务能出款不能开单，两种缺权要分别说清 */}
+          {!canAuditRefund && !canApplyRefund && <ReadOnlyNotice what="退款申请 / 退款审批" perm={["order:refund:apply", "order:refund:audit"]} />}
+          {/* 半降级（能开单不能出款）不是纯只读，故用 Notice 自述而非 ReadOnlyNotice */}
+          {!canAuditRefund && canApplyRefund && <Notice>当前角色仅可新建退款申请；审批出款需财务权限（order:refund:audit）</Notice>}
           <DataTable
             rowKey={(r: RefundRecord) => r.refundNo}
             columns={rfdCols}
@@ -868,16 +910,10 @@ function OrdersInner() {
               { header: "处置说明", value: (d) => d.note },
             ], depQ.data?.list ?? [])}
           >
-            <Select value={depStatus} onChange={(e) => { setDepStatus(e.target.value); setDepPage(1); }}>
-              <option value="">全部状态</option>
-              <option value="HELD">已冻结</option>
-              <option value="RELEASED">已解冻</option>
-              <option value="BOUGHT_OUT">已买断</option>
-              <option value="ARREARS">欠费</option>
-            </Select>
+            <FilterSelect value={depStatus} onChange={(v) => { setDepStatus(v); setDepPage(1); }} allLabel="全部状态" options={DEP_STATUS} />
           </Toolbar>
-          {!canDeposit && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">仅可查看：当前角色既无押金处置权限（order:deposit:manage）也无催缴权限（order:arrears:dun）</div>}
-          {canDeposit && !canDepositManage && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm text-muted-foreground">当前角色仅可催缴欠费；解冻/买断需财务权限（order:deposit:manage）</div>}
+          {!canDeposit && <ReadOnlyNotice what="押金处置 / 欠费催缴" perm={["order:deposit:manage", "order:arrears:dun"]} />}
+          {canDeposit && !canDepositManage && <Notice>当前角色仅可催缴欠费；解冻/买断需财务权限（order:deposit:manage）</Notice>}
           <DataTable
             rowKey={(d: DepositRecord) => d.depositNo}
             columns={depCols}
@@ -888,6 +924,95 @@ function OrdersInner() {
           {depQ.data && <Pagination page={depPage} size={SIZE} total={depQ.data.total} onPage={setDepPage} />}
         </>
       )}
+
+      {/* 代客登记投诉抽屉：客服接到电话/线下投诉时手工入队。
+          投诉号/提交时间/状态由服务端决定（新登记一律「待处理」），故表单里没有这几项。 */}
+      <Drawer
+        open={!!cplNew}
+        onOpenChange={(o) => !o && setCplNew(null)}
+        title="新建投诉"
+        desc="客服代客登记电话 / 线下投诉；C 端用户自助提交的投诉会自动进入本队列"
+        footer={
+          cplNew && (
+            <Button
+              disabled={createCpl.isPending || !cplNew.orderNo.trim() || !cplNew.description.trim()}
+              onClick={() => createCpl.mutate({
+                orderNo: cplNew.orderNo.trim(),
+                userNo: cplNew.userNo.trim(),
+                issueType: cplNew.issueType,
+                description: cplNew.description.trim(),
+                screenshotUrl: cplNew.screenshotUrl.trim() || undefined,
+              })}
+            >提交登记</Button>
+          )
+        }
+      >
+        {cplNew && (
+          <>
+            <Field label="关联订单号（必填）">
+              <Input value={cplNew.orderNo} placeholder="如 ORD500001，须为真实存在的订单" onChange={(e) => setCplNew({ ...cplNew, orderNo: e.target.value })} />
+            </Field>
+            {/* 留空即取该订单的下单人：客服现场往往只问到订单号 */}
+            <Field label="用户号（可空，默认取订单下单人）">
+              <Input value={cplNew.userNo} placeholder="如 U3001" onChange={(e) => setCplNew({ ...cplNew, userNo: e.target.value })} />
+            </Field>
+            <Field label="问题类型">
+              <Select className="w-full" value={cplNew.issueType} onChange={(e) => setCplNew({ ...cplNew, issueType: e.target.value as ComplaintIssueType })}>
+                {(Object.keys(ISSUE_LABEL) as ComplaintIssueType[]).map((k) => (
+                  <option key={k} value={k}>{ISSUE_LABEL[k]}</option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="用户描述（必填）">
+              <Input value={cplNew.description} placeholder="按用户原话记录问题，随投诉永久留痕" onChange={(e) => setCplNew({ ...cplNew, description: e.target.value })} />
+            </Field>
+            <Field label="投诉截图（可空）">
+              <Input value={cplNew.screenshotUrl} placeholder="用户提供的截图链接；电话投诉通常没有" onChange={(e) => setCplNew({ ...cplNew, screenshotUrl: e.target.value })} />
+            </Field>
+            <Field label="登记后状态">待处理（处理人 / 处理结果由后续「处理」动作回写）</Field>
+          </>
+        )}
+      </Drawer>
+
+      {/* 新建退款申请抽屉：落 PENDING 进本队列，审批通过才出款。
+          幂等键随抽屉生成并同屏展示 —— 重复提交（双击 / 重试）服务端返回已有单，不重复出款。 */}
+      <Drawer
+        open={!!rfdNew}
+        onOpenChange={(o) => !o && setRfdNew(null)}
+        title="新建退款申请"
+        desc="资金操作：只提交申请，审批通过后才由 nearpay 执行退款"
+        footer={
+          rfdNew && (
+            <Button variant="destructive" disabled={createRfd.isPending || !rfdNewOk} onClick={submitRfdNew}>
+              下一步：确认提交
+            </Button>
+          )
+        }
+      >
+        {rfdNew && (
+          <>
+            <Field label="关联订单号（必填）">
+              <Input value={rfdNew.orderNo} placeholder="如 ORD500001，须为真实存在的订单" onChange={(e) => setRfdNew({ ...rfdNew, orderNo: e.target.value })} />
+            </Field>
+            <Field label="用户号（可空，默认取订单下单人）">
+              <Input value={rfdNew.userNo} placeholder="如 U3001" onChange={(e) => setRfdNew({ ...rfdNew, userNo: e.target.value })} />
+            </Field>
+            {/* 币种不出表单：退款与原收款必须同币种，服务端一律跟随订单 */}
+            <Field label="退款金额（必填，> 0）">
+              <Input type="number" min="0" step="0.5" value={rfdNew.amount} placeholder="退回给用户的金额" onChange={(e) => setRfdNew({ ...rfdNew, amount: e.target.value })} />
+            </Field>
+            <Field label="退款原因（必填）">
+              <Input value={rfdNew.reason} placeholder="写清为什么退，审批人据此判断" onChange={(e) => setRfdNew({ ...rfdNew, reason: e.target.value })} />
+            </Field>
+            <Field label="幂等键">
+              <span className="tabular-nums">{rfdNew.idempotencyKey}</span>
+            </Field>
+            <Field label="提交后状态">
+              待审批（申请人 / 申请时间 / 退款单号由服务端回填）；本次提交携带上面这把幂等键，重复提交服务端返回已有单——没有键的重复提交就是真的退两笔钱。
+            </Field>
+          </>
+        )}
+      </Drawer>
 
       {/* 投诉处理抽屉：处理结果 + 说明；并提供「转工单」把投诉落到运维 */}
       <Drawer
@@ -911,7 +1036,7 @@ function OrdersInner() {
       >
         {cplDetail && (
           <>
-            <Field label="状态"><Badge tone={CPL_STATUS[cplDetail.status].tone}>{CPL_STATUS[cplDetail.status].label}</Badge></Field>
+            <Field label="状态"><StatusBadge map={CPL_STATUS} value={cplDetail.status} /></Field>
             {/* 关联订单/工单同屏：投诉不再是孤立记录 */}
             <Field label="关联订单">{cplDetail.orderNo}</Field>
             <Field label="关联工单">{cplDetail.workOrderNo ?? "未转工单"}</Field>
@@ -958,7 +1083,7 @@ function OrdersInner() {
       >
         {rfdDetail && (
           <>
-            <Field label="状态"><Badge tone={RFD_STATUS[rfdDetail.status].tone}>{RFD_STATUS[rfdDetail.status].label}</Badge></Field>
+            <Field label="状态"><StatusBadge map={RFD_STATUS} value={rfdDetail.status} /></Field>
             <Field label="关联订单">{rfdDetail.orderNo}</Field>
             <Field label="用户">{rfdDetail.userNo}</Field>
             <Field label="退款金额">{money(rfdDetail.amount, rfdDetail.currency)}</Field>
@@ -994,12 +1119,14 @@ function OrdersInner() {
               .filter((a) => allow(IV_PERM[a]))
               .filter((a) => a !== "waive" || detail.feeAmount > 0);
             if (!acts.length) {
-              return (
+              // 「没动作」有两种原因，必须分开说：状态机不允许 vs 缺权限。
+              // 后者交给 ReadOnlyNotice —— 句式与各列表页上方那条一致，且权限码由它统一列出（§13）
+              return allow("order:intervene:execute") || allow("order:refund:apply") ? (
                 <span className="text-sm text-muted-foreground">
-                  {allow("order:intervene:execute") || allow("order:refund:apply")
-                    ? `当前状态「${t(`orderStatus.${detail.status}`)}」没有可执行的干预动作`
-                    : "仅可查看：当前角色无订单干预权限（order:intervene:execute）"}
+                  当前状态「{t(`orderStatus.${detail.status}`)}」没有可执行的干预动作
                 </span>
+              ) : (
+                <ReadOnlyNotice className="mb-0" what="订单干预" perm={["order:intervene:execute", "order:refund:apply"]} />
               );
             }
             return (
@@ -1033,27 +1160,17 @@ function OrdersInner() {
             {!!detail.waivedAmount && <Field label="已免单金额">{money(detail.waivedAmount, detail.currency)}</Field>}
             {!!detail.compensateAmount && <Field label="已补偿金额">{money(detail.compensateAmount, detail.currency)}（补至用户余额）</Field>}
             <Field label="干预历史">
-              {ivHistoryQ.isLoading
-                ? <span className="text-muted-foreground">加载中…</span>
-                : ivHistoryQ.data?.list.length
-                  ? (
-                    <ol className="space-y-2.5">
-                      {ivHistoryQ.data.list.map((x) => (
-                        <li key={x.interventionNo} className="border-l-2 border-[var(--border)] pl-3">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <Badge tone="outline">{IV_LABEL[x.action]}</Badge>
-                            <span className="text-xs text-muted-foreground tabular-nums">{x.interventionNo} · {fmtTime(x.createdAt)} · {x.operatorName}</span>
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {t(`orderStatus.${x.beforeStatus}`)} → {t(`orderStatus.${x.afterStatus}`)}
-                            {x.amount != null ? ` · ${money(x.amount, x.currency)}` : ""}
-                          </div>
-                          <div className="text-sm">{x.reason}</div>
-                        </li>
-                      ))}
-                    </ol>
-                  )
-                  : <span className="text-muted-foreground">无干预记录——该单未被人工处置过</span>}
+              <Timeline
+                loading={ivHistoryQ.isLoading}
+                empty="无干预记录——该单未被人工处置过"
+                items={(ivHistoryQ.data?.list ?? []).map((x) => ({
+                  key: x.interventionNo,
+                  badge: { label: IV_LABEL[x.action], tone: "outline" as const },
+                  meta: `${x.interventionNo} · ${fmtTime(x.createdAt)} · ${x.operatorName}`,
+                  change: `${t(`orderStatus.${x.beforeStatus}`)} → ${t(`orderStatus.${x.afterStatus}`)}${x.amount != null ? ` · ${money(x.amount, x.currency)}` : ""}`,
+                  text: x.reason,
+                }))}
+              />
             </Field>
           </>
         )}
@@ -1132,7 +1249,7 @@ function OrdersInner() {
           <>
             <Field label="押金单 / 订单">{depAct.row.depositNo} · {depAct.row.orderNo}</Field>
             <Field label="用户">{depAct.row.userNo}</Field>
-            <Field label="状态"><Badge tone={DEP_STATUS[depAct.row.status].tone}>{DEP_STATUS[depAct.row.status].label}</Badge></Field>
+            <Field label="状态"><StatusBadge map={DEP_STATUS} value={depAct.row.status} /></Field>
             <Field label="押金 / 欠费">
               {money(depAct.row.amount, depAct.row.currency)} / {depAct.row.arrearsAmount > 0 ? money(depAct.row.arrearsAmount, depAct.row.currency) : "无欠费"}
             </Field>
@@ -1208,7 +1325,7 @@ function OrdersInner() {
             <Field label="异常单 / 用户">{excAct.row.orderNo} · {excAct.row.userNo}</Field>
             <Field label="异常类型"><Badge tone="outline">{EXC_TYPE_LABEL[excAct.row.type]}</Badge></Field>
             <Field label="柜机 / 涉及金额">{excAct.row.cabinetNo} · {money(excAct.row.amount, excAct.row.currency)}</Field>
-            <Field label="当前状态"><Badge tone={EXC_STATUS[excAct.row.status].tone}>{EXC_STATUS[excAct.row.status].label}</Badge></Field>
+            <Field label="当前状态"><StatusBadge map={EXC_STATUS} value={excAct.row.status} /></Field>
             <Field label="处置口径">{EXC_ACTION_DESC[excAct.action]}</Field>
             <Field label="状态变化">
               {EXC_STATUS[excAct.row.status].label} → {EXC_STATUS[EXCEPTION_HANDLINGS[excAct.action].to].label}

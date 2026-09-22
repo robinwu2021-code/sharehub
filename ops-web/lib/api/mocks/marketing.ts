@@ -1,8 +1,11 @@
 // 覆盖范围：优惠券、活动、推送、裂变推荐、广告位 / 广告计划 / 投放、公告管理。
 import * as db from "../../mock/db";
 import type { MarketingApi } from "../contracts/marketing";
-import type { PageQ, ArchiveQ, CouponIssueQ } from "../query";
+import type { PageQ, ArchiveQ, CouponIssueQ, CampaignQ , ReportQ } from "../query";
 import { wait } from "./_wait";
+// transitionCampaign 暂时直接从域文件取：mock/db/index.ts 的桶导出是显式清单，
+// 由维护者集中合并（见本批报告），补上后可改回 db.transitionCampaign。
+import { transitionCampaign } from "../../mock/db/marketing";
 
 export const marketingMock: MarketingApi = {
   listCoupons: (q: ArchiveQ = {}) =>
@@ -14,13 +17,18 @@ export const marketingMock: MarketingApi = {
   listCouponIssueRecords: (q: CouponIssueQ = {}) => wait(db.listCouponIssueRecords(q)),
 
   // 营销扩展
-  listCampaigns: (q: PageQ = {}) => wait(db.listCampaigns(q)),
+  listCampaigns: (q: CampaignQ = {}) => wait(db.listCampaigns(q)),
   listPushMessages: (q: PageQ = {}) => wait(db.listPushMessages(q)),
   listReferrals: (q: PageQ = {}) => wait(db.listReferrals(q)),
   listAdSlots: (q: PageQ = {}) => wait(db.listAdSlots(q)),
   listAdCampaigns: (q: PageQ = {}) => wait(db.listAdCampaigns(q)),
-  listAdDeliveries: (q: PageQ = {}) => wait(db.listAdDeliveries(q)),
+  listAdDeliveries: (q: ReportQ = {}) => wait(db.listAdDeliveriesInPeriod(q)),
+  transitionAdCampaign: (adNo, action) => wait(db.transitionAdCampaign(adNo, action), 350),
+  listReferralRules: (q: PageQ = {}) => wait(db.listReferralRules(q)),
+  saveReferralRule: (x) => wait(db.saveReferralRule(x), 350),
   saveCampaign: (x) => wait(db.saveCampaign(x), 350),
+  // 启停：状态机与窗口校验全在 db 层，错误由全局 MutationCache 弹出
+  transitionCampaign: (no, action) => wait(transitionCampaign(no, action), 350),
   savePushMessage: (x) => wait(db.savePushMessage(x), 350),
   sendPushMessage: (no, x) => wait(db.sendPushMessage(no, x), 350),
   saveAdSlot: (x) => wait(db.saveAdSlot(x), 350),

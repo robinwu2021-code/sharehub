@@ -64,7 +64,53 @@ export interface Withdrawal extends AuditTrail {
   fee: number; // 提现手续费（与 amount 同币种，实际到账 = amount - fee）
 }
 
+// —— 提现手续费口径（SSOT，S7）——
+// 费率与封顶只有一处来源：系统设置 · 业务规则 `BizRules.withdraw`（GET /api/platform/biz-rules）。
+// 后端 `SysBizRule` 的注释是同一句要求：`fin_withdrawal.fee` 必须取自 `feeRate`/`feeCap`，
+// 财务侧不得另存一份阈值 —— 两处口径一旦分叉，对账永远差钱。
+// 因此这里只放**纯函数**：页面表格、审批抽屉、CSV 导出与 mock 种子全调它，不各算一遍。
+/** 只取算费用得上的两个字段（不依赖整个 WithdrawRule，mock 种子与测试都好构造）。 */
+export interface WithdrawFeeRule { feeRate: number; feeCap: number }
+/** 手续费 = min(金额 × 费率, 封顶)，两位小数。**没有下限**——业务规则里没有这个字段，就不许凭空加。 */
+export const computeWithdrawFee = (amount: number, rule: WithdrawFeeRule): number =>
+  Number(Math.min(amount * rule.feeRate, rule.feeCap).toFixed(2));
+/** 费率变更只影响还没批的单子：这几个状态是「钱还没出去」。 */
+export const WITHDRAW_FEE_PENDING: Withdrawal["status"][] = ["APPLY", "AUDIT"];
+/**
+ * 展示用手续费。未审批的按**现行**规则实时算 —— 审核页给的必须是点「通过」那一刻真会扣的数；
+ * 已审批（PAYING/PAID/FAILED）一律按落库值 —— 事后调费率不能改写历史放款额。
+ * `rule` 取不到时（业务规则未加载 / 无 `system:biz_rule:read`）退回落库值，不猜一个费率出来。
+ */
+export const withdrawFeeOf = (w: Withdrawal, rule?: WithdrawFeeRule): number =>
+  rule && WITHDRAW_FEE_PENDING.includes(w.status) ? computeWithdrawFee(w.amount, rule) : w.fee;
+/** 实际到账：必须和手续费同源，否则表上「金额 − 手续费 ≠ 实发」这种数会直接骗到审批人。 */
+export const withdrawNetOf = (w: Withdrawal, rule?: WithdrawFeeRule): number =>
+  Number((w.amount - withdrawFeeOf(w, rule)).toFixed(2));
+
 // —— 账务分录（复式记账，trade 域）——
+/**
+ * 手工记账入参。凭证号由服务端派（让前端选号必然撞号），故不在入参里。
+ * `entries` 至少两条且借贷两侧都要有；金额一律正数，借/贷由 `direction` 表达。
+ */
+export interface VoucherCreatePayload {
+  summary: string;
+  orderNo?: string | null;
+  currency?: string;
+  entries: { account: string; direction: LedgerEntry["direction"]; amount: number; summary?: string }[];
+}
+
+/**
+ * 凭证详情：一张凭证的全部分录 + 借贷合计与平衡判定。
+ * `balanced` 由服务端算而不是前端心算 —— 不平的凭证是记账错误，判定口径必须只有一处。
+ */
+export interface VoucherDetail {
+  voucherNo: string;
+  entries: LedgerEntry[];
+  debit: number;
+  credit: number;
+  balanced: boolean;
+}
+
 export interface LedgerEntry {
   entryNo: string;
   voucherNo: string;
@@ -120,6 +166,47 @@ export interface Reconcile {
   handleNote: string | null;
   handledBy: string | null;
   handledAt: string | null;
+}
+
+/** 差错类型：渠道单边 / 我方单边 / 两侧金额不等 / 两侧状态不一致（口径同后端 recon_diff.diff_type）。 */
+export type ReconDiffType = "ONLY_IN_NEARPAY" | "ONLY_IN_LEDGER" | "AMOUNT_MISMATCH" | "STATUS_MISMATCH";
+
+/**
+ * 批次下的**单条**差错（子表 recon_diff，无独立业务键，只有自增 id）。
+ *
+ * 批次那一行只给「差了多少钱」，逐笔差在哪必须看这张表——否则处置只能对整批下手，
+ * 而后端的 resolve 本来就收 `diffId`（不带才是整批）。
+ */
+export interface ReconDiff {
+  id: number;
+  batchNo: string;
+  /** 支付单号（pay_order.pay_no）；渠道单边差错时也是渠道流水的落点。 */
+  payNo: string;
+  diffType: ReconDiffType;
+  /** 差错上下文（两侧原始金额/状态）的 JSON 文本，后端原样透传，前端只解析不改写。 */
+  detail: string;
+  /** 已平账标记：处置只翻这个标记，绝不回头改历史分录（分录是只增表，纠错要走红冲）。 */
+  resolved: boolean;
+}
+
+/** `ReconDiff.detail` 解析后的形状（两侧金额与一句人读的上下文）。 */
+export interface ReconDiffDetail {
+  nearpay?: number;
+  ledger?: number;
+  note?: string;
+}
+/**
+ * 解析 detail。**解析失败返回 null 而不抛**：detail 是后端存的自由 JSON 文本，
+ * 哪天格式变了也只该让这一列退化成原文显示，不能把整个抽屉炸掉。
+ */
+export function parseReconDiffDetail(detail: string | null | undefined): ReconDiffDetail | null {
+  if (!detail) return null;
+  try {
+    const v = JSON.parse(detail) as unknown;
+    return v && typeof v === "object" && !Array.isArray(v) ? (v as ReconDiffDetail) : null;
+  } catch {
+    return null;
+  }
 }
 
 /**

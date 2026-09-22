@@ -2,11 +2,16 @@
 // 端点前缀：/api/ops/**
 import { client } from "../http-client";
 import type { DeviceApi } from "../contracts/device";
-import type { PageQ, CabinetQ, DeviceLogQ, ArchiveQ } from "../query";
+import type { PageQ, CabinetQ, DeviceLogQ, ArchiveQ, OtaReleaseQ } from "../query";
 
 export const deviceHttp: DeviceApi = {
   listCabinets: (q?: CabinetQ) => client.get("/api/ops/cabinets", q),
   getCabinet: (no) => client.get(`/api/ops/cabinets/${no}`),
+  // ⚠️ S8 后端缺口：机柜写端点后端**完全没有**（OpsController 只有 GET /cabinets 与
+  // GET /cabinets/{no}；导入端点 /cabinets/import 同样缺）。USE_MOCK=0 时建档/编辑必然 404。
+  // 路径按 `x.no ? /coll/{no} : /coll` 的既有约定先占位；后端补齐时注意：`siteNo`/`locationName`
+  // 由服务端按 locationNo 反查覆写，不采信请求体（前端也不发这两个字段）。
+  saveCabinet: (x) => client.post(x.cabinetNo ? `/api/ops/cabinets/${x.cabinetNo}` : "/api/ops/cabinets", x),
   sendCommand: (no, type, params) => client.post(`/api/ops/cabinets/${no}/commands`, { type, params }),
 
   // 设备扩展
@@ -18,6 +23,12 @@ export const deviceHttp: DeviceApi = {
   savePowerbank: (x) => client.post(x.powerbankNo ? `/api/ops/powerbanks/${x.powerbankNo}` : "/api/ops/powerbanks", x),
   saveInventoryTransfer: (x) => client.post(x.transferNo ? `/api/ops/inventory-transfers/${x.transferNo}` : "/api/ops/inventory-transfers", x),
   saveOtaRollout: (x) => client.post(x.rolloutNo ? `/api/ops/ota-rollouts/${x.rolloutNo}` : "/api/ops/ota-rollouts", x),
+
+  // 固件 OTA 补齐：版本库 + 逐设备任务。版本库**没有** `/{releaseNo}` 更新路由（后端只暴露集合 POST，
+  // 由 service 按 body.releaseNo 判 upsert），故这里不套用 `x.no ? /coll/{no} : /coll` 那个约定。
+  listOtaReleases: (q?: OtaReleaseQ) => client.get("/api/ops/ota-releases", q),
+  saveOtaRelease: (x) => client.post("/api/ops/ota-releases", x),
+  listOtaTasks: (no) => client.get(`/api/ops/ota-rollouts/${no}/tasks`),
 
   // 批次 B4：设备日志/编码归 ops 域
   listDeviceLogs: (q?: DeviceLogQ) => client.get("/api/ops/device-logs", q),

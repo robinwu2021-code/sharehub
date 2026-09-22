@@ -1,7 +1,7 @@
 // 覆盖范围：代理商主档、区域分配、业绩、资金账户、分润规则。
 import * as db from "../../mock/db";
 import type { AgentApi } from "../contracts/agent";
-import type { PageQ, ArchiveQ, AssignmentRecordQ, AssignableAssetQ } from "../query";
+import type { PageQ, ArchiveQ, AssignmentRecordQ, AssignableAssetQ , ReportQ } from "../query";
 import type { Agent } from "../../types";
 import { wait } from "./_wait";
 
@@ -20,7 +20,7 @@ export const agentMock: AgentApi = {
 
   // 代理商扩展
   listAgentAssignments: (q: PageQ = {}) => wait(db.listAgentAssignments(q)),
-  listAgentPerformance: (q: PageQ = {}) => wait(db.listAgentPerformance(q)),
+  listAgentPerformance: (q: ReportQ = {}) => wait(db.listAgentPerformance(q)),
   listAgentAccounts: (q: PageQ = {}) => wait(db.listAgentAccounts(q)),
   saveAgentAccount: (x) => wait(db.saveAgentAccount(x), 350),
 

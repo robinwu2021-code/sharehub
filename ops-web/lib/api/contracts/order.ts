@@ -3,7 +3,8 @@
 import type { PageQ, OrderQ, StatusQ, ReservationQ, FreeOrderQ } from "../query";
 import type {
   PageResult, RentOrder, OrderException, DepositRecord,
-  OrderComplaint, ComplaintResolution, RefundRecord,
+  OrderComplaint, ComplaintResolution, ComplaintCreatePayload,
+  RefundRecord, RefundApplyPayload,
   OrderIntervention, OrderInterventionAction, OrderIntervenePayload, OrderInterveneResult,
   ExceptionHandleAction, OrderExceptionHandlePayload,
   DepositBuyoutPayload, ArrearsDunPayload,
@@ -40,11 +41,22 @@ export interface OrderApi {
 
   // === 售后处置（投诉订单 / 退款审批队列）===
   listOrderComplaints(q?: StatusQ): Promise<PageResult<OrderComplaint>>;
+  /**
+   * 客服代客登记投诉（order:exception:handle，与异常单处置同一个码——后端亦如此）。
+   * 电话/线下渠道的投诉原先只能等 C 端自助提交，队列里根本进不来。
+   * 号/提交时间/状态由服务端决定，新登记一律 PENDING。
+   */
+  createOrderComplaint(payload: ComplaintCreatePayload): Promise<OrderComplaint>;
   /** 处理投诉：写入处理结果 + 说明，落 RESOLVED/REJECTED。 */
   handleOrderComplaint(complaintNo: string, resolution: ComplaintResolution, note: string): Promise<OrderComplaint>;
   /** 投诉转工单：投诉-订单-工单闭环（竞品此处断链）。 */
   raiseComplaintWorkOrder(complaintNo: string): Promise<OrderComplaint>;
   listRefundRecords(q?: StatusQ): Promise<PageResult<RefundRecord>>;
+  /**
+   * 新建退款申请（order:refund:apply）：落 PENDING 进本队列，审批通过才出款。
+   * **幂等键必填**，同键重复提交返回已有单——没有键的重复提交等于真退两笔钱。
+   */
+  createRefund(payload: RefundApplyPayload): Promise<RefundRecord>;
   /** 退款审批：驳回必须带原因。幂等键由申请侧生成，审批不重发。 */
   auditRefund(refundNo: string, approve: boolean, rejectReason?: string): Promise<RefundRecord>;
 

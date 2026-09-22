@@ -14,6 +14,17 @@ export interface Cabinet extends Archivable {
   locationNo: string | null;
   locationName?: string | null;
   /**
+   * 归属站点（`sites.siteNo`），空 = 到货未上架（没有点位就没有站点）。台账偏差 A1 的剩余项：
+   * 原先前端只有点位号，「这台柜子在哪个站点」得靠点位反查，跨页深链（站点坪效/门店生命周期）
+   * 无从下手。**不独立维护**：值恒等于 `locationNo` 所在点位的站点，由点位反查得出，
+   * 避免同一台机柜的点位与站点互相矛盾。
+   *
+   * ⚠️ **前后端偏差（已记入后端待办）**：后端 `DevCabinet` 实体有 `siteNo`（注释即「冗余·随点位级联」，
+   * 与这里的口径一致），但 **DDL `dev_cabinet` 还没有 `site_no` 列**（v2-alter 也未补），
+   * 即接口能声明、库里查不出。故展示处一律按「未归属」降级，不假定后端一定给得出值。
+   */
+  siteNo: string | null;
+  /**
    * 归属代理（`agents.agentNo`），空 = 平台直营。台账偏差 A1：后端 `DevCabinet` 有此列、
    * 前端原先没有，导致「这台柜子归谁」在前端拿不到、划拨也无从落地。
    * **唯一写入口是代理域的划拨/回收**（`assignAgentAssets` / `reclaimAgentAssets`）。
@@ -58,10 +69,25 @@ export interface CabinetMonitor {
   temp: number;
   faultCount: number;
 }
+/**
+ * 远程指令词表：**能下发的与记录里能表达的必须是同一套**。
+ * 原先三处各说各话——详情页发 `EJECT_ANY`/`EJECT_SLOT`、批量发 `FW_SYNC`，
+ * 而 `CommandRecord.type` 只有四个值，于是指令记录根本放不下这些指令（真接后端时
+ * 记录列表会显示空白类型）。收敛口径：弹仓一律 `EJECT`，带 `slotIndex` = 指定仓、
+ * 不带 = 任意仓；`FW_SYNC` 进词表。后端 `sendCommand` 收的是自由字符串，不受影响。
+ */
+export const COMMAND_TYPES = ["EJECT", "LOCK", "REBOOT", "LOCATE", "FW_SYNC"] as const;
+export type CommandType = (typeof COMMAND_TYPES)[number];
+/**
+ * 必须指定仓位的指令：锁仓说不清「锁哪个仓」就是废指令。
+ * 弹仓刻意不在此列——不带仓位 = 任意仓（借还主流程走的就是这条）。
+ */
+export const SLOT_REQUIRED_COMMANDS: readonly CommandType[] = ["LOCK"];
+
 export interface CommandRecord {
   commandId: string;
   cabinetNo: string;
-  type: "EJECT" | "LOCK" | "REBOOT" | "LOCATE";
+  type: CommandType;
   slotIndex: number | null;
   status: "SENT" | "ACKED" | "TIMEOUT" | "FAILED";
   operator: string;
@@ -84,6 +110,47 @@ export interface OtaRollout {
   progress: number; // 0..100
   status: "PENDING" | "RUNNING" | "DONE" | "ROLLBACK";
   createdAt: string;
+}
+
+/**
+ * 固件版本库（`dev_ota_release`）：投放引用的「货架」。
+ * 原先前端只有投放（OtaRollout）没有版本库，于是「投的是哪个包、校验和是多少、是否强制升级」
+ * 全都无处可看——投放页填的固件版本号只是一个自由文本。
+ */
+export interface OtaRelease {
+  releaseNo: string;
+  /**
+   * 固件类型（主控 / 仓门 / 通信模组…）。**刻意不收成联合类型**：后端 DDL 是自由文本、
+   * 厂商随时会上报新类型，收紧只会让未知值在页面显示成空白（同 DeviceLog.eventType 的处理）。
+   */
+  fwType: string;
+  /** 适用供应商；null = 通用固件（后端「空表示通用」），因此各厂商的投放都能引用同一个版本。 */
+  vendorCode: string | null;
+  /** 固件版本号（如 1.4.2），投放的 `fwVersion` 必须取自这里。 */
+  version: string;
+  /** 版本序号：比大小判断能否升级，也是版本库的排序键（后端按它倒序）。 */
+  versionCode: number;
+  artifactUrl: string;
+  checksum: string;
+  mandatory: boolean;
+  status: "DRAFT" | "PUBLISHED" | "PAUSED" | "COMPLETED";
+  releaseNotes: string;
+}
+
+/**
+ * OTA 逐设备任务（`dev_ota_task`）：一次投放 1─* 任务。
+ * 投放行上那个百分比是这批任务的均值，看不到逐台明细时「卡在 60% 不动」无法定位到具体哪台柜子。
+ */
+export interface OtaTask {
+  taskNo: string;
+  rolloutNo: string;
+  cabinetNo: string;
+  status: "PENDING" | "DOWNLOADING" | "DOWNLOADED" | "INSTALLING" | "SUCCESS" | "FAILED" | "ROLLED_BACK";
+  progress: number; // 单机进度 0..100
+  /** 升级前版本，回滚依据。 */
+  previousVersion: string;
+  /** 失败原因；仅 FAILED 有值。 */
+  error: string | null;
 }
 
 // —— 设备日志（阶段 2）——

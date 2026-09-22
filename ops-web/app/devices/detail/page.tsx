@@ -45,11 +45,14 @@ function CabinetDetail() {
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={() => refetch()}><RotateCw className="size-4" /> 刷新</Button>
             {canCmd && <Button size="sm" variant="outline" onClick={() => cmd.mutate({ type: "REBOOT" })} disabled={cmd.isPending}>重启</Button>}
-            {canCmd && <Button size="sm" onClick={() => cmd.mutate({ type: "EJECT_ANY" })} disabled={cmd.isPending}>弹出充电宝</Button>}
+            {/* 指令名走 types 层的 COMMAND_TYPES 词表：原先这里发的 EJECT_ANY / EJECT_SLOT
+                不在 CommandRecord.type 里，下发完在指令记录 tab 显示成空白类型。
+                收敛后「不带仓位 = 任意仓、带仓位 = 指定仓」，一个 EJECT 表达两件事 */}
+            {canCmd && <Button size="sm" onClick={() => cmd.mutate({ type: "EJECT" })} disabled={cmd.isPending}>弹出充电宝</Button>}
           </div>
         }
       />
-      {msg && <div className="mb-4 rounded-lg bg-muted px-3.5 py-2 text-sm">{msg}</div>}
+      {msg && <div className="mb-4 rounded-card bg-muted px-3.5 py-2 text-sm">{msg}</div>}
 
       {isLoading || !data ? (
         <Skeleton className="h-40" />
@@ -58,6 +61,12 @@ function CabinetDetail() {
           <Card>
             <CardContent className="grid grid-cols-2 gap-4 pt-5 text-sm md:grid-cols-4">
               <Field label="点位" className="mb-0">{data.cabinet.locationName}</Field>
+              {/* 归属站点（偏差 A1）：站点号 + 点位号一起给，排障时能一路查到站点与合同；
+                  未上架或后端未提供该列时显示「未归属」，不用点位名冒充站点 */}
+              <Field label="归属站点" className="mb-0">
+                {data.cabinet.siteNo ?? "未归属"}
+                {data.cabinet.locationNo && <span className="text-muted-foreground"> · {data.cabinet.locationNo}</span>}
+              </Field>
               <Field label="供应商" className="mb-0">{data.cabinet.vendorCode}</Field>
               <Field label="型号" className="mb-0">{data.cabinet.model}</Field>
               <Field label="固件" className="mb-0">{data.cabinet.fwVersion}</Field>
@@ -73,7 +82,7 @@ function CabinetDetail() {
             <CardContent>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 {data.slots.map((s) => (
-                  <div key={s.slotIndex} className="rounded-xl bg-muted/60 p-3">
+                  <div key={s.slotIndex} className="rounded-card bg-muted/60 p-3">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">仓位 {s.slotIndex}</span>
                       {s.health === "FAULT" ? <Badge tone="danger">故障</Badge> : s.powerbankNo ? <Badge tone="success">有宝</Badge> : <Badge tone="muted">空仓</Badge>}
@@ -84,7 +93,7 @@ function CabinetDetail() {
                     </div>
                     {canCmd && (
                       <Button className="mt-2 w-full" size="sm" variant="outline" disabled={!s.powerbankNo || cmd.isPending}
-                        onClick={() => cmd.mutate({ type: "EJECT_SLOT", slotIndex: s.slotIndex })}>
+                        onClick={() => cmd.mutate({ type: "EJECT", slotIndex: s.slotIndex })}>
                         弹出
                       </Button>
                     )}

@@ -2,7 +2,7 @@
 // 门店 Onboarding / 站点生命周期。端点前缀：/api/ops/**
 import { client } from "../http-client";
 import type { LocationApi } from "../contracts/location";
-import type { PageQ, ArchiveQ } from "../query";
+import type { PageQ, ArchiveQ , ReportQ } from "../query";
 
 export const locationHttp: LocationApi = {
   listSites: (q?: ArchiveQ) => client.get("/api/ops/sites", q),
@@ -14,15 +14,23 @@ export const locationHttp: LocationApi = {
 
   // 场所扩展
   listLeads: (q?: PageQ) => client.get("/api/ops/leads", q),
-  listSiteAnalysis: (q?: PageQ) => client.get("/api/ops/site-analysis", q),
+  listSiteAnalysis: (q?: ReportQ) => client.get("/api/ops/site-analysis", q),
   saveLead: (x) => client.post(x.leadNo ? `/api/ops/leads/${x.leadNo}` : "/api/ops/leads", x),
   saveVenue: (x) => client.post(x.venueNo ? `/api/ops/venues/${x.venueNo}` : "/api/ops/venues", x),
   saveContract: (x) => client.post(x.contractNo ? `/api/ops/contracts/${x.contractNo}` : "/api/ops/contracts", x),
+
+  // ⚠️ 后端缺口：以下四个端点后端尚未实现（合同写入侧连 POST /contracts 都还没有）。
+  // 路径按既有命名规则拟定（子资源用复数、非幂等状态动作挂 /remove），后端补的时候照此实现即可。
+  listLeadFollowUps: (leadNo, q?: PageQ) => client.get(`/api/ops/leads/${leadNo}/follow-ups`, q),
+  addLeadFollowUp: (leadNo, req) => client.post(`/api/ops/leads/${leadNo}/follow-ups`, req),
+  addContractAttachment: (contractNo, req) => client.post(`/api/ops/contracts/${contractNo}/attachments`, req),
+  removeContractAttachment: (contractNo, attachNo) => client.post(`/api/ops/contracts/${contractNo}/attachments/${attachNo}/remove`, {}),
 
   // 门店 Onboarding / 生命周期
   listVenueOnboardings: (q?: PageQ) => client.get("/api/ops/venue-onboardings", q),
   saveVenueOnboarding: (x) => client.post(x.onboardingNo ? `/api/ops/venue-onboardings/${x.onboardingNo}` : "/api/ops/venue-onboardings", x),
   listSiteLifecycles: (q?: PageQ) => client.get("/api/ops/site-lifecycles", q),
+  changeSiteStage: (siteNo, req) => client.post(`/api/ops/site-lifecycles/${siteNo}/stage`, req),
 
   // G1 软删除：归档 / 恢复。REST 上是「状态迁移」而非 DELETE —— 后端不得实现物理删除。
   archiveSite: (no) => client.post(`/api/ops/sites/${no}/archive`, {}),

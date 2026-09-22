@@ -24,4 +24,7 @@ export const workOrderMock: WorkOrderApi = {
   listInspectionPlans: (q: PageQ = {}) => wait(db.listInspectionPlans(q)),
   saveSlaRule: (x) => wait(db.saveSlaRule(x), 350),
   saveInspectionPlan: (x) => wait(db.saveInspectionPlan(x), 350),
+  // 立即执行一次：db 层抛 InspectionRunError（停用/本周期已执行/站点无机柜），
+  // 声明 async 让它变成 rejected promise 交给全局 onError，不能默默吞掉
+  runInspectionPlan: async (no) => wait(wo.runInspectionPlanNow(no), 500),
 };
