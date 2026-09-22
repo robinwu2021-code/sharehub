@@ -987,6 +987,10 @@
      "type": "String"
     },
     {
+     "name": "password",
+     "type": "String"
+    },
+    {
      "name": "role",
      "type": "String"
     },
