@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { useLocaleStore } from "@/lib/stores/locale";
+import { DEFAULT_CURRENCY } from "./constants";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -12,8 +13,8 @@ function localeTag() {
   return TAG[useLocaleStore.getState().locale] ?? "en-AE";
 }
 
-/** 金额展示（默认 AED，MENA 主市场；ADR-009）。随 locale 格式化。 */
-export function money(amount: number, currency = "AED") {
+/** 金额展示（默认币种见 {@link DEFAULT_CURRENCY}）。随 locale 格式化。 */
+export function money(amount: number, currency = DEFAULT_CURRENCY) {
   return new Intl.NumberFormat(localeTag(), { style: "currency", currency }).format(amount ?? 0);
 }
 

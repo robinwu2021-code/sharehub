@@ -23,7 +23,7 @@ import { PageTitle, EmptyState, Skeleton } from "@/components/ui/misc";
 import { Tabs } from "@/components/ui/tabs";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
-import { SummaryCard } from "@/components/operation/summary-card";
+import { SummaryCard } from "@/components/ui/summary-card";
 
 const DAY = 86400_000;
 const RANGES = [

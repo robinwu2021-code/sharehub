@@ -32,7 +32,7 @@ import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/drawer";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { ReadOnlyNotice } from "@/components/read-only-notice";
-import { SummaryCard } from "@/components/operation/summary-card";
+import { SummaryCard } from "@/components/ui/summary-card";
 
 const zone = formatOffset(tzOffsetMinutes(new Date(), MARKET_TZ));
 

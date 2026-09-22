@@ -72,6 +72,9 @@ export interface NavLeaf {
  * L1 导航项（原 NavDomain + NavModule 合并，2026-07-30）。
  * 一个 section = 一个权限模块 = 一个页面（children 是它的 tab/view 深链）。
  */
+/** {@link navTabs} 的入参：字符串 = 菜单叶的 tab key；对象 = 非菜单叶的页内子视图，自带名字 */
+export type PageTabSpec = string | { key: string; label: string };
+
 export interface NavSection {
   key: string;
   label: string;
@@ -391,6 +394,62 @@ export function visibleSections(role: Role | undefined): NavSection[] {
 /** L3 可见性 = leaf.perm ? can() : 跟随 section。phase-locked 叶子保留（灰显）。 */
 export function visibleLeaves(section: NavSection, role: Role | undefined): NavLeaf[] {
   return (section.children ?? []).filter((l) => (l.perm ? can(role, l.perm) : true));
+}
+
+/**
+ * 页内 tab 的**标签与权限**来源：nav.ts。
+ *
+ * ## 为什么要有它
+ *
+ * 整理前每个页面自己写一份 `const TABS = [{key:"withdrawals", label:"提现"}, …]`，
+ * 于是同一个功能有两个名字（nav 叫「提现审核」、页面叫「提现」），改一处不改另一处
+ * 没有任何东西会报错。更要命的是 **tab 不判权**：`TABS` 是写死的数组，
+ * 没有 `finance:withdrawal:read` 的角色照样看得到、点得动那个 tab，
+ * 只能靠接口 403 兜底 —— 实测 /finance 菜单按角色只剩 3 条，tab 条仍是 9 条。
+ *
+ * 收进来之后：页面只声明**有哪些 tab、什么顺序**，名字和能不能看由菜单说了算。
+ *
+ * @param path  页面路径（不带 query）
+ * @param specs 顺序即展示顺序。字符串 = 从菜单取名；`{key,label}` = 这个 tab
+ *              **不是菜单叶**（页内子视图），必须自带名字，写明理由
+ * @returns 已按权限过滤、按 specs 顺序排列的 tab；phase 原样带出（由 TabHeader 决定是否隐藏）
+ */
+export function navTabs(
+  path: string, specs: readonly PageTabSpec[], role: Role | undefined,
+): { key: string; label: string; phase?: Phase }[] {
+  const target = normPath(path);
+  // 只在当前角色可见的 section 里找：门户角色与通用运营 section 互斥，
+  // 同一个 href 在两边都登记时（如 /finance?tab=settlements），要取他这一侧的名字
+  const pool = [...visibleSections(role), ...NAV];
+  const out: { key: string; label: string; phase?: Phase }[] = [];
+  for (const spec of specs) {
+    const key = typeof spec === "string" ? spec : spec.key;
+    let leaf: NavLeaf | undefined;
+    for (const section of pool) {
+      leaf = (section.children ?? []).find((l) => {
+        const parts = leafParts(l.href);
+        return parts.path === target && parts.tab === key;
+      });
+      if (leaf) break;
+    }
+    if (!leaf) {
+      if (typeof spec === "string") {
+        // 菜单里没登记、页面也没自带名字 —— 这不是显示问题，是**这个功能在菜单里进不去**。
+        // 开发期直接抛；生产回落成 key 本身（难看，但不白屏，且一眼看得出漏了什么）。
+        if (process.env.NODE_ENV !== "production") {
+          throw new Error(`[navTabs] ${target}?tab=${key} 未在 nav.ts 登记；` +
+            `它若是菜单叶请补登记，若只是页内子视图请传 { key, label }`);
+        }
+        out.push({ key, label: key });
+        continue;
+      }
+      out.push({ key, label: spec.label });
+      continue;
+    }
+    if (leaf.perm && !can(role, leaf.perm)) continue; // 无权限：tab 不渲染，与菜单同一口径
+    out.push({ key, label: leaf.label, phase: leaf.phase });
+  }
+  return out;
 }
 
 /**

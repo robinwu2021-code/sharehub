@@ -30,6 +30,11 @@ export const zh = {
     soon: "待建",
     switchView: "切换视图",
     more: "更多",
+    retry: "重试",
+    helpNote: "说明",
+    loadFailed: "加载失败",
+    loadFailedDesc: "数据没有取到，不是「没有数据」。请重试；持续失败请联系技术排查。",
+    pageSize: "每页 {n} 条",
   },
   phase: {
     suffix: "阶段功能",

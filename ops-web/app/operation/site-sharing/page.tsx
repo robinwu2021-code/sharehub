@@ -19,7 +19,7 @@ import { DataTable, type Column } from "@/components/ui/data-table";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
 import { Notice } from "@/components/ui/notice";
-import { SummaryCard } from "@/components/operation/summary-card";
+import { SummaryCard } from "@/components/ui/summary-card";
 
 const STATE: StatusMap<SiteSharingRow["state"]> = {
   OK: { label: "已配置", tone: "success" },

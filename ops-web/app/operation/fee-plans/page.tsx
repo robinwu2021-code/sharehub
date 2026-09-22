@@ -38,7 +38,7 @@ import { ReadOnlyNotice } from "@/components/read-only-notice";
 import {
   ShowArchivedToggle, archivedRowClass, ArchiveActions, archiveConfirm, unarchiveConfirm,
 } from "@/components/archive";
-import { SummaryCard } from "@/components/operation/summary-card";
+import { SummaryCard } from "@/components/ui/summary-card";
 
 const PLAN_STATUS: StatusMap<PricePlan["status"]> = {
   ACTIVE: { label: "启用", tone: "success" },

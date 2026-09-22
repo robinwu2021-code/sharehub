@@ -20,7 +20,7 @@ import { notify } from "@/lib/notify";
 import { currentReleased, grayRelease, validateAppVersion } from "@/lib/operation-rules";
 import { formatMarketTime } from "@/lib/market-time";
 import { PageTitle } from "@/components/ui/misc";
-import { SummaryCard } from "@/components/operation/summary-card";
+import { SummaryCard } from "@/components/ui/summary-card";
 import { Tabs } from "@/components/ui/tabs";
 import { Toolbar } from "@/components/ui/toolbar";
 import { DataTable, type Column } from "@/components/ui/data-table";

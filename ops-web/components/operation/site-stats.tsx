@@ -11,7 +11,7 @@ import { featureReady } from "@/lib/backend-ready";
 import { Tabs } from "@/components/ui/tabs";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { EmptyState, Skeleton } from "@/components/ui/misc";
-import { SummaryCard } from "@/components/operation/summary-card";
+import { SummaryCard } from "@/components/ui/summary-card";
 import type { SiteStats } from "@/lib/types";
 
 const DAY = 86400_000;

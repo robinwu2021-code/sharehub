@@ -20,7 +20,7 @@ import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
 import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState, Skeleton } from "@/components/ui/misc";
-import { SummaryCard } from "@/components/operation/summary-card";
+import { SummaryCard } from "@/components/ui/summary-card";
 import { SiteStatsPanel } from "@/components/operation/site-stats";
 
 const TABS = [

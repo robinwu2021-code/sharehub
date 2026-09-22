@@ -33,6 +33,11 @@ export const ar: Messages = {
     soon: "قريباً",
     switchView: "تبديل العرض",
     more: "المزيد",
+    retry: "إعادة المحاولة",
+    helpNote: "شرح",
+    loadFailed: "فشل التحميل",
+    loadFailedDesc: "تعذر جلب البيانات — هذا ليس «لا توجد بيانات». أعد المحاولة، وإذا استمر الفشل فاتصل بالدعم.",
+    pageSize: "{n} لكل صفحة",
   },
   phase: {
     suffix: "ميزة المرحلة",

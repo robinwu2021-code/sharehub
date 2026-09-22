@@ -5,7 +5,7 @@ import { ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-rea
 import { Card } from "./card";
 import { Checkbox } from "./checkbox";
 import { Table, THead, TBody, TR, TH, TD } from "./table";
-import { Skeleton, EmptyState } from "./misc";
+import { Skeleton, EmptyState, ErrorState } from "./misc";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 
@@ -48,16 +48,18 @@ function RowCheckbox({
 
 // 通用列表表格：列配置 + 行数据 + 加载/空态。让新列表页保持一致、精简。
 // 可选能力（不传即与旧行为完全一致）：行选择 / 行展开 / 受控排序。
-export function DataTable<T>({
-  columns, rows, loading, rowKey, empty,
-  selectable, selectedKeys, onSelectedChange,
-  expandable,
-  sortKey, sortDir, onSortChange,
-  rowClassName,
-}: {
+export interface DataTableProps<T> {
   columns: Column<T>[];
   rows: T[] | undefined;
   loading?: boolean;
+  /**
+   * 取数失败。**传了就优先于空态渲染** —— 失败与「没有数据」是两件事，
+   * 混为一谈的后果是运营对着 500 去改筛选条件（见 `ErrorState` 注释）。
+   * 由 `useQuery` 支撑的列表**一律要接**；`PagedTable` 那条路上由组件替你接。
+   */
+  error?: unknown;
+  /** 重试。一般直接给 `query.refetch` */
+  onRetry?: () => void;
   rowKey: (row: T) => string;
   empty?: string;
   /** 显示行选择 checkbox 列（最左） */
@@ -74,7 +76,15 @@ export function DataTable<T>({
    * `Column.className` 只能到列级，行级状态表达不了 —— B0 首版遗漏，2026-07-29 补。
    */
   rowClassName?: (row: T) => string | undefined;
-}) {
+}
+
+export function DataTable<T>({
+  columns, rows, loading, error, onRetry, rowKey, empty,
+  selectable, selectedKeys, onSelectedChange,
+  expandable,
+  sortKey, sortDir, onSortChange,
+  rowClassName,
+}: DataTableProps<T>) {
   const { t } = useI18n();
   const emptyText = empty ?? t("common.empty");
   const [expanded, setExpanded] = React.useState<string[]>([]);
@@ -130,6 +140,8 @@ export function DataTable<T>({
     <Card className="overflow-hidden">
       {loading && !rows ? (
         <div className="space-y-2 p-4">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-10" />)}</div>
+      ) : error ? (
+        <div className="p-4"><ErrorState error={error} onRetry={onRetry} /></div>
       ) : !rows || rows.length === 0 ? (
         <div className="p-4"><EmptyState title={emptyText} /></div>
       ) : (

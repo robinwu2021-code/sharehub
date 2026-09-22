@@ -32,6 +32,11 @@ export const en: Messages = {
     soon: "Soon",
     switchView: "Switch view",
     more: "More",
+    retry: "Retry",
+    helpNote: "About this",
+    loadFailed: "Failed to load",
+    loadFailedDesc: "The data could not be fetched \u2014 this is not \u201cno data\u201d. Retry; if it keeps failing, contact support.",
+    pageSize: "{n} / page",
   },
   phase: {
     suffix: "phase feature",
