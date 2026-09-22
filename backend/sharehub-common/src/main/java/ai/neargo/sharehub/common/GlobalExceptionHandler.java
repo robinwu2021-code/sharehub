@@ -7,9 +7,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * 兜底异常 → neargo {@link Result} 错误包（复用 common-core 的 {@link ErrorCode}/{@link ServerException}）。
@@ -40,6 +42,15 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public Result<Void> onDenied(AccessDeniedException e) {
         return Result.error(ErrorCode.FORBIDDEN.getCode(), Messages.msg("error.forbidden"));
+    }
+
+    /** 显式抛的 ResponseStatusException（如登录密码错 → 401） —— 保留其状态与 reason，
+     *  否则会被下面兜底的 {@link Exception} handler 抹成 500「服务器错误」。 */
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<Result<Void>> onResponseStatus(ResponseStatusException e) {
+        String reason = e.getReason() == null ? e.getStatusCode().toString() : e.getReason();
+        return ResponseEntity.status(e.getStatusCode())
+                .body(Result.error(e.getStatusCode().value(), Messages.msg(reason)));
     }
 
     /**
