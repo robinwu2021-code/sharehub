@@ -42,6 +42,10 @@ public class AuthController {
     @Value("${sharehub.admin.password:}")
     private String adminPassword;
 
+    /** admin 账号绑定的角色 —— 由账号确定，登录页不再让用户挑（避免选错角色进后看到「无权限」）。 */
+    @Value("${sharehub.admin.role:ADMIN}")
+    private String adminRole;
+
     public AuthController(TokenStore tokenStore, PermissionResolver permissionResolver,
                           DataScopeResolver dataScopeResolver, MenuService menuService, PermVersion permVersion) {
         this.tokenStore = tokenStore;
@@ -61,12 +65,15 @@ public class AuthController {
     public LoginResp login(@RequestBody LoginReq in) {
         String username = (in.username() == null || in.username().isBlank()) ? "user" : in.username();
         String role = (in.role() == null || in.role().isBlank()) ? "VIEWER" : in.role();
-        // 口令闸：sharehub.admin.password 非空则要求 username=admin + 密码匹配。
+        // 口令闸：sharehub.admin.password 非空则要求 username=admin + 密码匹配，
+        // 且**登录后的角色由账号决定**（读 sharehub.admin.role，默认 ADMIN）——
+        // 前端传的 role 只在此闸门关闭时（MVP 无密码演示）有意义。
         // 空 = 关（保留 MVP 无密码演示；上生产必须配非空值 —— 见 deploy/tencent/README.md §5）。
         if (adminPassword != null && !adminPassword.isBlank()) {
             if (!"admin".equals(username) || !adminPassword.equals(in.password())) {
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "用户名或密码错误");
             }
+            role = adminRole;
         }
         // 经 SPI 解析权限（resolvePermissions 只看 roles，realm 用占位）；未知角色 → 兜底 VIEWER
         List<String> perms = List.copyOf(permissionResolver.resolvePermissions(rolesOnly(username, role)));

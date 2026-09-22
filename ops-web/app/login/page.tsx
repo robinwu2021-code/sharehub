@@ -6,19 +6,18 @@ import { useAuth, type Role } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
-import { Input, Select } from "@/components/ui/input";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-const ROLES: Role[] = ["ADMIN", "OPS", "CS", "FINANCE", "BD", "VIEWER", "AGENT"];
-
-// MVP 登录（mock）：选角色 + 用户名即可进入。接后端后换 auth-core（OTP/密码 + JWT）。
+// 生产登录：用户名 + 密码；角色由账号决定（后端根据 username 派发 role/perms），
+// 前端不再让用户挑角色 —— 之前 mock 期为「MVP：选角色 + 用户名即可进入」，容易误选。
+// mock 模式（NEXT_PUBLIC_USE_MOCK != 0）下 api.login 会走 mocks/dashboard.ts，那里的 role 用默认 ADMIN。
 export default function LoginPage() {
   const router = useRouter();
   const login = useAuth((s) => s.login);
   const { t } = useI18n();
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<Role>("ADMIN");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -26,8 +25,8 @@ export default function LoginPage() {
     e.preventDefault();
     setBusy(true); setErr("");
     try {
-      // 换后端 token（mock 模式返回 mock token）；后端据 token 角色鉴权
-      const r = await api.login(username, password, role, role === "AGENT" ? "AG001" : undefined);
+      // 后端会依据 username 决定 role/perms；此处 role 只作 mock 兜底与 AGENT 场景 agentNo 判断的存量参数
+      const r = await api.login(username, password, "ADMIN");
       login({ username: r.username, role: r.role as Role, token: r.token, agentNo: r.agentNo });
       router.replace("/");
     } catch (e) {
@@ -54,12 +53,6 @@ export default function LoginPage() {
             <div className="space-y-1">
               <label className="text-sm text-muted-foreground">{t("login.password")}</label>
               <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("login.password")} autoComplete="current-password" />
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm text-muted-foreground">{t("login.role")}</label>
-              <Select className="w-full" value={role} onChange={(e) => setRole(e.target.value as Role)}>
-                {ROLES.map((r) => <option key={r} value={r}>{t(`role.${r}`)}</option>)}
-              </Select>
             </div>
             {err && <div className="rounded-field bg-destructive/10 px-3.5 py-2 text-sm text-destructive">{err}</div>}
             <Button className="w-full" type="submit" disabled={busy}>{busy ? t("common.loading") : t("login.submit")}</Button>
