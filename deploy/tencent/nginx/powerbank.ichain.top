@@ -1,0 +1,63 @@
+# powerbank · nginx 站点（powerbank.ichain.top）
+#
+# 与 ai-shop www.hxmall.top 同机共存，location 语义一致（/ 静态、/c/ 静态、
+# /mp /biz /ops /actuator 反代 8082）。改这里必须 `sudo nginx -t && sudo systemctl reload nginx`。
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name powerbank.ichain.top;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name powerbank.ichain.top;
+
+    ssl_certificate     /etc/nginx/ssl/ichain.top/fullchain.crt;
+    ssl_certificate_key /etc/nginx/ssl/ichain.top/privkey.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    # ── 客户端上传上限（与后端 spring.servlet.multipart 对齐；先给 30M）
+    client_max_body_size 30m;
+
+    # ── 运营端静态（Next.js export，出在 /）
+    root /data/app/powerbank/web/ops-web;
+    index index.html;
+
+    # ── C 端 H5（uni-app 静态）
+    location ^~ /c/ {
+        alias /data/app/powerbank/web/c-app/;
+        try_files $uri $uri/ /c/index.html;
+        # 版本化资源可强缓存；index.html 不缓存交给下面 no-cache 兜底
+        location ~* \.(js|css|woff2?|svg|png|jpg|jpeg|webp)$ {
+            expires 30d;
+            access_log off;
+        }
+    }
+
+    # ── 后端反代（端口 8082，避让 ai-shop 8081/8083）
+    location ^~ /mp/       { proxy_pass http://127.0.0.1:8082; include /etc/nginx/proxy_params; }
+    location ^~ /biz/      { proxy_pass http://127.0.0.1:8082; include /etc/nginx/proxy_params; }
+    location ^~ /ops/      { proxy_pass http://127.0.0.1:8082; include /etc/nginx/proxy_params; }
+    location = /actuator   { proxy_pass http://127.0.0.1:8082; include /etc/nginx/proxy_params; }
+    location ^~ /actuator/ { proxy_pass http://127.0.0.1:8082; include /etc/nginx/proxy_params; }
+    # 后端文件目录（如启用），与 ai-shop 同款反代兜底
+    location ^~ /uploads/  { proxy_pass http://127.0.0.1:8082; include /etc/nginx/proxy_params; }
+    location ^~ /media/    { proxy_pass http://127.0.0.1:8082; include /etc/nginx/proxy_params; }
+
+    # ── 运营端 SPA 回退（Next.js export，trailingSlash: true）
+    location / {
+        try_files $uri $uri/ $uri.html /index.html;
+        add_header Cache-Control "no-cache, must-revalidate";
+    }
+
+    # 运营端 Next 静态资源可缓存
+    location ~* ^/.*/\.(js|css|woff2?|svg|png|jpg|jpeg|webp)$ {
+        expires 30d;
+        access_log off;
+    }
+}

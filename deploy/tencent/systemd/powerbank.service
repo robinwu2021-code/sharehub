@@ -1,0 +1,28 @@
+[Unit]
+Description=powerbank sharehub-app (Spring Boot / Java 21)
+After=network.target mysql97.service
+Wants=mysql97.service
+
+[Service]
+Type=simple
+User=deploy
+Group=deploy
+WorkingDirectory=/data/app/powerbank/sharehub-app
+# 真凭据 + 端口 + DB URL 都在 env file 里（600）。
+EnvironmentFile=/data/app/powerbank/sharehub-app/sharehub-app.env
+# JVM：与 ai-shop 相同上限（7.5G 机器上，两应用共存需克制）。
+Environment="JAVA_OPTS=-Xms256m -Xmx768m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+ExitOnOutOfMemoryError -Djava.security.egd=file:/dev/./urandom -Duser.timezone=Asia/Shanghai -Dfile.encoding=UTF-8"
+# 日志目录（logback 自己滚动、总量封顶）
+Environment="LOG_HOME=/data/log/powerbank/sharehub-app"
+ExecStart=/usr/lib/jvm/java-21-openjdk-amd64/bin/java $JAVA_OPTS -jar /data/app/powerbank/sharehub-app/sharehub-app.jar
+SuccessExitStatus=143
+Restart=on-failure
+RestartSec=5s
+# 只在 systemd/journal 里保留 ERROR；应用日志走文件
+StandardOutput=journal
+StandardError=journal
+# 收紧文件描述符
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
