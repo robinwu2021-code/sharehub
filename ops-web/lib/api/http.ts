@@ -16,6 +16,7 @@ import { csHttp } from "./https/cs";
 import { reportHttp } from "./https/report";
 import { orgHttp } from "./https/org";
 import { systemHttp } from "./https/system";
+import { operationHttp } from "./https/operation";
 
 /** 各域 http 切片。contract.test.ts 用它逐片校验 key 集合、检测重复实现。 */
 export const HTTP_SLICES = {
@@ -34,10 +35,11 @@ export const HTTP_SLICES = {
   report: reportHttp,
   org: orgHttp,
   system: systemHttp,
+  operation: operationHttp,
 } as const;
 
 export const httpApi: Api = {
   ...dashboardHttp, ...deviceHttp, ...alarmHttp, ...workOrderHttp, ...locationHttp,
   ...agentHttp, ...orderHttp, ...pricingHttp, ...financeHttp, ...userHttp,
-  ...marketingHttp, ...csHttp, ...reportHttp, ...orgHttp, ...systemHttp,
+  ...marketingHttp, ...csHttp, ...reportHttp, ...orgHttp, ...systemHttp, ...operationHttp,
 };

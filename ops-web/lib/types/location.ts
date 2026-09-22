@@ -17,6 +17,10 @@ export interface Site extends Archivable {
   lat: number;
   lng: number;
   sceneType: string;
+  /** 阿语站点名（后端 `loc_site.name_ar`）。空 = 阿语界面回退中文名。 */
+  nameAr?: string;
+  /** 营业时间，多段逗号分隔，如 `10:00-14:00,17:00-22:00`（后端 `loc_site.open_hours`）。 */
+  openHours?: string;
   pointCount: number;
   cabinetCount: number;
   status: "ACTIVE" | "PAUSED";

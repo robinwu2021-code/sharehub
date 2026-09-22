@@ -16,6 +16,7 @@ import { csMock } from "./mocks/cs";
 import { reportMock } from "./mocks/report";
 import { orgMock } from "./mocks/org";
 import { systemMock } from "./mocks/system";
+import { operationMock } from "./mocks/operation";
 
 /** 各域 mock 切片。contract.test.ts 用它逐片校验 key 集合、检测重复实现。 */
 export const MOCK_SLICES = {
@@ -34,10 +35,11 @@ export const MOCK_SLICES = {
   report: reportMock,
   org: orgMock,
   system: systemMock,
+  operation: operationMock,
 } as const;
 
 export const mockApi: Api = {
   ...dashboardMock, ...deviceMock, ...alarmMock, ...workOrderMock, ...locationMock,
   ...agentMock, ...orderMock, ...pricingMock, ...financeMock, ...userMock,
-  ...marketingMock, ...csMock, ...reportMock, ...orgMock, ...systemMock,
+  ...marketingMock, ...csMock, ...reportMock, ...orgMock, ...systemMock, ...operationMock,
 };

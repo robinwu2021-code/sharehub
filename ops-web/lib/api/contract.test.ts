@@ -1,4 +1,4 @@
-// 契约一致性单测：267 个方法靠人眼查不出漏实现，这里用集合运算兜住。
+// 契约一致性单测：271 个方法靠人眼查不出漏实现，这里用集合运算兜住。
 //
 // 三条防线：
 // ① mockApi 与 httpApi 方法名集合完全相同 —— 防某一侧漏实现（页面切到真实后端才炸）。
@@ -27,6 +27,7 @@ const API_METHODS: Record<string, readonly string[]> = {
   report: ["listReportDevice", "listReportLocation", "listReportFinance", "listReportScreen", "listReportCustom", "getReportTrend", "getScreenBoard", "listReportMetrics", "getConsumerInsight"],
   org: ["listEmployees", "listRoles", "listAudits", "listDepartments", "listStaffPerformance", "saveDepartment", "saveRoleRow", "saveEmployee", "saveRoleDataScope", "listPermissions", "listRolePermissions", "saveRolePermissions", "getAuditDetail", "archiveRole", "unarchiveRole"],
   system: ["listVendors", "saveVendor", "testVendorConnectivity", "listNotifyTemplates", "listDictEntries", "listRegions", "listSysParams", "listOpenApiApps", "listMarketCountries", "saveNotifyTemplate", "saveDictEntry", "saveRegion", "saveSysParam", "saveOpenApiApp", "saveMarketCountry", "listRegionTree", "previewNotifyTemplate", "testSendNotifyTemplate", "resetOpenApiAppSecret", "listPaymentChannels", "savePaymentChannel", "listNotifyLogs", "getNotifyLogStats", "resendNotifyLog", "listNotifyBlacklist", "saveNotifyBlacklist", "releaseNotifyBlacklist", "getBizRules", "saveBizRules", "listLoginSettings", "saveLoginSetting", "listAppVersions", "saveAppVersion", "rollbackAppVersion", "listBanks", "saveBank", "listProblems", "saveProblem", "listTaxSettings", "saveTaxSetting", "archiveBank", "unarchiveBank", "archiveProblem", "unarchiveProblem"],
+  operation: ["getOperationOverview", "getSiteStats", "pauseSite", "resumeSite"],
 };
 
 const ALL_METHODS = Object.values(API_METHODS).flat();
@@ -80,7 +81,7 @@ describe("域切片划分", () => {
     expect(sorted(keysOf((HTTP_SLICES as Record<string, object>)[domain]))).toEqual(expected);
   });
 
-  it("方法总数仍为 267（新增/删除 API 时须自觉更新此数）", () => {
-    expect(ALL_METHODS.length).toBe(267);
+  it("方法总数仍为 271（新增/删除 API 时须自觉更新此数）", () => {
+    expect(ALL_METHODS.length).toBe(271);
   });
 });

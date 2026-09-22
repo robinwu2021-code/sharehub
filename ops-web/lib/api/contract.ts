@@ -20,6 +20,7 @@ import type { CsApi } from "./contracts/cs";
 import type { ReportApi } from "./contracts/report";
 import type { OrgApi } from "./contracts/org";
 import type { SystemApi } from "./contracts/system";
+import type { OperationApi } from "./contracts/operation";
 
 // 查询参数集中在 query.ts；此处再导出，保持 `@/lib/api` 的对外导出面不变。
 export * from "./query";
@@ -27,8 +28,11 @@ export type { LoginResp } from "./contracts/dashboard";
 export type {
   DashboardApi, DeviceApi, AlarmApi, WorkOrderApi, LocationApi, AgentApi, OrderApi,
   PricingApi, FinanceApi, UserApi, MarketingApi, CsApi, ReportApi, OrgApi, SystemApi,
+  OperationApi,
 };
+export type { OverviewQ, SiteStatsQ } from "./contracts/operation";
 
 export interface Api extends
   DashboardApi, DeviceApi, AlarmApi, WorkOrderApi, LocationApi, AgentApi, OrderApi,
-  PricingApi, FinanceApi, UserApi, MarketingApi, CsApi, ReportApi, OrgApi, SystemApi {}
+  PricingApi, FinanceApi, UserApi, MarketingApi, CsApi, ReportApi, OrgApi, SystemApi,
+  OperationApi {}
