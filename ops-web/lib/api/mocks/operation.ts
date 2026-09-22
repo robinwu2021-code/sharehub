@@ -9,4 +9,14 @@ export const operationMock: OperationApi = {
   getSiteStats: (siteNo, q = {}) => wait(db.getSiteStats(siteNo, q), 300),
   pauseSite: async (siteNo, reason) => wait(db.pauseSite(siteNo, reason), 400),
   resumeSite: async (siteNo) => wait(db.resumeSite(siteNo), 400),
+
+  listPriceAdjustments: (q = {}) => wait(db.listPriceAdjustments(q)),
+  savePriceAdjustment: async (x) => wait(db.savePriceAdjustment(x), 350),
+  cancelPriceAdjustment: async (no, reason) => wait(db.cancelPriceAdjustment(no, reason), 400),
+  revertPriceAdjustment: async (no) => wait(db.revertPriceAdjustment(no), 400),
+  retryPriceAdjustment: async (no) => wait(db.retryPriceAdjustment(no), 400),
+
+  listSiteSharing: (q = {}) => wait(db.listSiteSharing(q), 300),
+  getSiteSharingStats: () => wait(db.getSiteSharingStats(), 200),
+  listPayeeSharing: (q = {}) => wait(db.listPayeeSharing(q), 300),
 };

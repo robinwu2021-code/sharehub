@@ -9,4 +9,14 @@ export const operationHttp: OperationApi = {
   getSiteStats: (siteNo, q) => client.get(`/api/ops/sites/${siteNo}/stats`, q),
   pauseSite: (siteNo, reason) => client.post(`/api/ops/sites/${siteNo}/pause`, { reason }),
   resumeSite: (siteNo) => client.post(`/api/ops/sites/${siteNo}/resume`, {}),
+
+  listPriceAdjustments: (q) => client.get("/api/trade/price-adjustments", q),
+  savePriceAdjustment: (x) => client.post(x.adjustNo ? `/api/trade/price-adjustments/${x.adjustNo}` : "/api/trade/price-adjustments", x),
+  cancelPriceAdjustment: (no, reason) => client.post(`/api/trade/price-adjustments/${no}/cancel`, { reason }),
+  revertPriceAdjustment: (no) => client.post(`/api/trade/price-adjustments/${no}/revert`, {}),
+  retryPriceAdjustment: (no) => client.post(`/api/trade/price-adjustments/${no}/retry`, {}),
+
+  listSiteSharing: (q) => client.get("/api/trade/site-sharing", q),
+  getSiteSharingStats: () => client.get("/api/trade/site-sharing/stats"),
+  listPayeeSharing: (q) => client.get("/api/trade/payee-sharing", q),
 };

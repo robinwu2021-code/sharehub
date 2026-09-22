@@ -7,7 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { api } from "@/lib/api";
 import { money } from "@/lib/utils";
-import { pageReady } from "@/lib/backend-ready";
+import { featureReady } from "@/lib/backend-ready";
 import { Tabs } from "@/components/ui/tabs";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { EmptyState, Skeleton } from "@/components/ui/misc";
@@ -27,9 +27,12 @@ export function SiteStatsPanel({ siteNo }: { siteNo: string }) {
   const to = new Date();
   const from = new Date(to.getTime() - (days - 1) * DAY);
 
+  // 统计接口后端未实现：真实后端模式下不发请求，直接说明原因（发了也只会 404）
+  const ready = featureReady("sites.stats");
   const q = useQuery({
     queryKey: ["op", "site-stats", siteNo, range],
     queryFn: () => api.getSiteStats(siteNo, { from: from.toISOString(), to: to.toISOString() }),
+    enabled: ready,
   });
   const s = q.data as SiteStats | undefined;
 
@@ -49,15 +52,14 @@ export function SiteStatsPanel({ siteNo }: { siteNo: string }) {
   return (
     <div>
       <Tabs tabs={RANGES} value={range} onChange={setRange} />
-      {q.isLoading && <Skeleton className="h-28" />}
-      {q.isError && (
+      {ready && q.isLoading && <Skeleton className="h-28" />}
+      {!ready && (
         <EmptyState
-          title="统计暂不可用"
-          desc={pageReady("sites")
-            ? "单站统计接口后端尚未实现，切到本地 mock 模式可以预览这一页的形态。"
-            : "取数失败，请稍后重试。"}
+          title="统计暂未开放"
+          desc="单站统计接口后端尚未实现（GET /api/ops/sites/{no}/stats）。接口上线后这一页会自动可用。"
         />
       )}
+      {ready && q.isError && <EmptyState title="统计取数失败" desc="请稍后重试；若持续失败请联系后端排查。" />}
       {s && (
         <>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">

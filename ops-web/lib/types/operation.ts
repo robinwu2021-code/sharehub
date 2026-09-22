@@ -95,3 +95,77 @@ export interface SiteStats {
   /** 按点位拆分 */
   byPoint: { locationNo: string; locationName: string; cabinetCount: number; orders: number; gmv: number; perCabinet: number }[];
 }
+
+// ——— 预约调价（清单 OM-S4；后端需新表 price_adjustment）———————————————
+
+/** 可调整的计费字段（只列这几个：改适用范围属于改方案本身，不走调价）。 */
+export interface PriceAdjustPatch {
+  freeMinutes?: number;
+  unitMinutes?: number;
+  unitPrice?: number;
+  capDaily?: number;
+  buyoutPrice?: number;
+}
+
+export interface PriceAdjustment {
+  adjustNo: string;
+  planNo: string;
+  planName: string;
+  name: string;
+  patch: PriceAdjustPatch;
+  /** 生效时写入的变更前快照，用于到期恢复与审计；未生效时为空。 */
+  beforeSnapshot: PriceAdjustPatch | null;
+  effectiveAt: string;       // UTC ISO
+  revertAt: string | null;   // UTC ISO，空 = 不自动恢复
+  reason: string;
+  status: "SCHEDULED" | "APPLIED" | "REVERTED" | "CANCELLED" | "FAILED";
+  appliedAt: string | null;
+  revertedAt: string | null;
+  failReason: string | null;
+  createdBy: string;
+  createdAt: string;
+}
+
+// ——— 分成（清单 OM-S5 / OM-S6）———————————————————————————————
+//
+// ⚠️ 契约取决于清单 D2（分成比例现在存在分润规则与进场合同两处，且缺少站点维度）。
+// 这里的形状是**前端按现状聚合出来的读模型**，后端定案后可能调整。
+
+export interface SitePayee {
+  payeeType: "VENUE" | "AGENT";
+  payeeNo: string;
+  payeeName: string;
+  /** 0..1 */
+  rate: number;
+  mode: string;
+  /** 这条比例是从哪里来的：合同 or 分润规则 */
+  source: "CONTRACT" | "RULE";
+  sourceNo: string;
+}
+
+export interface SiteSharingRow {
+  siteNo: string;
+  siteName: string;
+  venueName: string;
+  payees: SitePayee[];
+  /** 各方合计 0..1 */
+  totalRate: number;
+  /** 平台留存 = 1 - totalRate */
+  platformRate: number;
+  contractEndAt: string | null;
+  /** 配置状态：已配置 / 缺配置 / 异常（超 100% 或合同过期仍营业） */
+  state: "OK" | "MISSING" | "INVALID";
+  stateDetail: string;
+}
+
+export interface PayeeSharingRow {
+  payeeType: "VENUE" | "AGENT";
+  payeeName: string;
+  siteCount: number;
+  minRate: number;
+  maxRate: number;
+  /** 近 30 日分成金额（来自分润明细；没有真实明细时为 0 并在页面说明） */
+  amount30d: number;
+  currency: string;
+  sites: { siteNo: string; siteName: string; rate: number }[];
+}

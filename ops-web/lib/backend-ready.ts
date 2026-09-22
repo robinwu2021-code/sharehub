@@ -33,9 +33,9 @@ export const BACKEND_READY: Record<OperationPage, boolean> = {
 export const PARTIAL_READY = {
   "sites.pause": false,      // POST /api/ops/sites/{no}/pause|resume
   "sites.stats": false,      // GET /api/ops/sites/{no}/stats
-  "fee-plans.simulate": false,
-  "fee-plans.status": false,
-  "fee-plans.sites": false,
+  // 试算纯前端算（lib/pricing-rules#simulate），不依赖后端，故恒可用
+  "fee-plans.status": false, // 启用/停用：后端暂无该端点，改状态只能走保存整条
+  "fee-plans.sites": false,  // 命中站点列表：后端暂无
 } as const;
 
 export type PartialFeature = keyof typeof PARTIAL_READY;

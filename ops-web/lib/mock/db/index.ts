@@ -171,3 +171,10 @@ export {
 export {
   getOperationOverview, getSiteStats, pauseSite, resumeSite,
 } from "./operation";
+
+export {
+  priceAdjustments, tickAdjustments, listPriceAdjustments, savePriceAdjustment,
+  cancelPriceAdjustment, revertPriceAdjustment, retryPriceAdjustment,
+} from "./adjust";
+
+export { listSiteSharing, getSiteSharingStats, listPayeeSharing } from "./sharing";
