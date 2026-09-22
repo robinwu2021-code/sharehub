@@ -40,6 +40,7 @@ export const zh = {
   login: {
     subtitle: "共享充电宝 SaaS 运营管理后台",
     username: "用户名",
+    password: "密码",
     role: "角色",
     submit: "登录",
   },

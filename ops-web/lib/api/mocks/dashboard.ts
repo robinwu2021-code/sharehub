@@ -4,6 +4,6 @@ import type { DashboardApi } from "../contracts/dashboard";
 import { wait } from "./_wait";
 
 export const dashboardMock: DashboardApi = {
-  login: (username, role, agentNo) => wait({ token: `mock-${role}`, username, role, agentNo: role === "AGENT" ? (agentNo ?? "AG001") : "" }),
+  login: (username, _password, role, agentNo) => wait({ token: `mock-${role}`, username, role, agentNo: role === "AGENT" ? (agentNo ?? "AG001") : "" }),
   getDashboard: () => wait(db.dashboard),
 };

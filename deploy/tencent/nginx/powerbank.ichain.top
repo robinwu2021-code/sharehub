@@ -24,12 +24,8 @@ server {
     # ── 客户端上传上限（与后端 spring.servlet.multipart 对齐；先给 30M）
     client_max_body_size 30m;
 
-    # ── HTTP Basic Auth 兜底（应用层暂无密码校验：AuthController 就是「MVP 无密码演示」）。
-    # 保护点：所有 HTML 页面 + 所有后端 API。放行点：/actuator/health（供云监控）+ 静态资源
-    # （拿到 URL 才能读，页面本身要过 Basic Auth）。
-    # htpasswd 文件由部署侧维护：/etc/nginx/.htpasswd_powerbank
-    auth_basic           "powerbank";
-    auth_basic_user_file /etc/nginx/.htpasswd_powerbank;
+    # ── 应用层已接口令校验（AuthController + SHAREHUB_ADMIN_PASSWORD），
+    # 网关不再叠一层 Basic Auth。密码换法：动 sharehub-app.env 中 SHAREHUB_ADMIN_PASSWORD 后重启 powerbank。
 
     # ── 运营端静态（Next.js export，出在 /）
     root /data/app/powerbank/web/ops-web;
@@ -51,8 +47,7 @@ server {
     location ^~ /mp/       { proxy_pass http://127.0.0.1:8082; include /etc/nginx/proxy_params; }
     location ^~ /biz/      { proxy_pass http://127.0.0.1:8082; include /etc/nginx/proxy_params; }
     location ^~ /ops/      { proxy_pass http://127.0.0.1:8082; include /etc/nginx/proxy_params; }
-    # /actuator/health 放行 Basic Auth，供云监控无凭据探活
-    location = /actuator/health { auth_basic off; proxy_pass http://127.0.0.1:8082; include /etc/nginx/proxy_params; }
+    location = /actuator/health { proxy_pass http://127.0.0.1:8082; include /etc/nginx/proxy_params; }
     location = /actuator   { proxy_pass http://127.0.0.1:8082; include /etc/nginx/proxy_params; }
     location ^~ /actuator/ { proxy_pass http://127.0.0.1:8082; include /etc/nginx/proxy_params; }
     # 后端文件目录（如启用），与 ai-shop 同款反代兜底

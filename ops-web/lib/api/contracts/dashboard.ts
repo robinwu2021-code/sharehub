@@ -5,7 +5,7 @@ export interface LoginResp { token: string; username: string; role: string; agen
 
 export interface DashboardApi {
   // 认证：登录换后端 token（后端据 token 角色鉴权，不认客户端 X-Roles）
-  login(username: string, role: string, agentNo?: string): Promise<LoginResp>;
+  login(username: string, password: string, role: string, agentNo?: string): Promise<LoginResp>;
   // 工作台
   getDashboard(): Promise<DashboardStats>;
 }

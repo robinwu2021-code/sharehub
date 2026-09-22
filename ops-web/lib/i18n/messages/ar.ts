@@ -43,6 +43,7 @@ export const ar: Messages = {
   login: {
     subtitle: "لوحة تشغيل SaaS لبنوك الطاقة المشتركة",
     username: "اسم المستخدم",
+    password: "كلمة المرور",
     role: "الدور",
     submit: "تسجيل الدخول",
   },

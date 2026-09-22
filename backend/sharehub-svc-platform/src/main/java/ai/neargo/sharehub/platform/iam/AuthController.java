@@ -10,7 +10,10 @@ import ai.neargo.sharehub.auth.Realm;
 import ai.neargo.sharehub.auth.SecurityUtils;
 import ai.neargo.sharehub.auth.TokenStore;
 import ai.neargo.sharehub.platform.iam.MenuService.MenuNode;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
@@ -32,6 +35,13 @@ public class AuthController {
     private final MenuService menuService;
     private final PermVersion permVersion;
 
+    /**
+     * 生产口令闸：配置了 {@code sharehub.admin.password} 就要求用户名 = admin + 密码匹配。
+     * 空字符串 = 关（保留原 MVP 演示行为：任意 username + role 直接发 token）。
+     */
+    @Value("${sharehub.admin.password:}")
+    private String adminPassword;
+
     public AuthController(TokenStore tokenStore, PermissionResolver permissionResolver,
                           DataScopeResolver dataScopeResolver, MenuService menuService, PermVersion permVersion) {
         this.tokenStore = tokenStore;
@@ -41,7 +51,7 @@ public class AuthController {
         this.permVersion = permVersion;
     }
 
-    public record LoginReq(String username, String role, String agentNo) {
+    public record LoginReq(String username, String password, String role, String agentNo) {
     }
 
     public record LoginResp(String token, String username, String role, String agentNo, List<String> perms) {
@@ -51,6 +61,13 @@ public class AuthController {
     public LoginResp login(@RequestBody LoginReq in) {
         String username = (in.username() == null || in.username().isBlank()) ? "user" : in.username();
         String role = (in.role() == null || in.role().isBlank()) ? "VIEWER" : in.role();
+        // 口令闸：sharehub.admin.password 非空则要求 username=admin + 密码匹配。
+        // 空 = 关（保留 MVP 无密码演示；上生产必须配非空值 —— 见 deploy/tencent/README.md §5）。
+        if (adminPassword != null && !adminPassword.isBlank()) {
+            if (!"admin".equals(username) || !adminPassword.equals(in.password())) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "用户名或密码错误");
+            }
+        }
         // 经 SPI 解析权限（resolvePermissions 只看 roles，realm 用占位）；未知角色 → 兜底 VIEWER
         List<String> perms = List.copyOf(permissionResolver.resolvePermissions(rolesOnly(username, role)));
         if (perms.isEmpty() && !"ADMIN".equals(role)) {

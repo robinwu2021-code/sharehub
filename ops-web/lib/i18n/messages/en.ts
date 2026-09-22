@@ -42,6 +42,7 @@ export const en: Messages = {
   login: {
     subtitle: "Shared Power Bank SaaS Operations Console",
     username: "Username",
+    password: "Password",
     role: "Role",
     submit: "Sign in",
   },

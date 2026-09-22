@@ -17,6 +17,7 @@ export default function LoginPage() {
   const login = useAuth((s) => s.login);
   const { t } = useI18n();
   const [username, setUsername] = useState("admin");
+  const [password, setPassword] = useState("");
   const [role, setRole] = useState<Role>("ADMIN");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -26,7 +27,7 @@ export default function LoginPage() {
     setBusy(true); setErr("");
     try {
       // 换后端 token（mock 模式返回 mock token）；后端据 token 角色鉴权
-      const r = await api.login(username, role, role === "AGENT" ? "AG001" : undefined);
+      const r = await api.login(username, password, role, role === "AGENT" ? "AG001" : undefined);
       login({ username: r.username, role: r.role as Role, token: r.token, agentNo: r.agentNo });
       router.replace("/");
     } catch (e) {
@@ -48,7 +49,11 @@ export default function LoginPage() {
           <form className="space-y-3" onSubmit={submit}>
             <div className="space-y-1">
               <label className="text-sm text-muted-foreground">{t("login.username")}</label>
-              <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder={t("login.username")} />
+              <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder={t("login.username")} autoComplete="username" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm text-muted-foreground">{t("login.password")}</label>
+              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("login.password")} autoComplete="current-password" />
             </div>
             <div className="space-y-1">
               <label className="text-sm text-muted-foreground">{t("login.role")}</label>
