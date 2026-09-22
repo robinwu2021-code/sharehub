@@ -173,6 +173,7 @@ lib/market-time.ts            市场时区的显示与换算（纯函数）
 | F0 | ✅ 在途改动分 3 个提交入库 | `3b8edbc` `c453e1e` `5425717` |
 | F1 | ✅ 菜单、权限、后端就绪开关、市场时区、10 页占位 | `caf7b63` |
 | F2 | ✅ 应用版本 / 银行管理 / 问题管理 / 公告管理 | `68e4608` |
+| F3 | ✅ 站点管理（8 页签详情）/ 站点概览 + operation 数据域 | `2d60905` |
 
 **F2 实现说明**
 - 规则集中在 `lib/operation-rules.ts`，**表单提交前与 mock 写入调用同一份**：版本号 / 构建号递增、同平台只一个灰度、强更必须全量、已发布只能调灰度；银行代码唯一且不可改；公告状态机与置顶上限 3 条；问题同分类内换序
@@ -193,6 +194,10 @@ lib/market-time.ts            市场时区的显示与换算（纯函数）
 | BE-5 | 公告发布时不记录 `publishedBy` | 发布人列为空 |
 | BE-6 | `ProblemActionResolver` 为 Stub | 「自动开工单」处置不生效（页面已提示） |
 | BE-7 | c-app 未调用 `GET /mp/app/version` | 发布与强更不会弹给用户（页面已提示） |
+| BE-8 | 站点概览聚合接口 `GET /api/ops/operation/overview` 未实现 | 概览页线上灰显；口径见 `lib/operation-overview`，后端实现时照此对齐 |
+| BE-9 | 单站统计 `GET /api/ops/sites/{no}/stats` 未实现 | 站点详情「统计」页签线上不可用 |
+| BE-10 | 站点暂停 / 恢复 `POST /api/ops/sites/{no}/pause\|resume` 未实现 | 线上不渲染这两个按钮；C 端「暂停站点不可借、可归还」也需后端配合 |
+| BE-11 | `loc_site` 的 `point_count` / `cabinet_count` 是冗余计数，与真实关系不一致 | 前端已改为实时聚合；后端若要保留这两列，需在点位/机柜变更时同步维护，否则建议去掉 |
 
 ## 4. 测试
 
