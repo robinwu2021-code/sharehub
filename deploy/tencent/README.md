@@ -87,6 +87,7 @@ scripts/deploy-frontend.sh c-app         # C 端 H5
 | `SERVER_PORT` | 8080 | **8082** | 避让 ai-shop 的 8081（shop-app）与 8083（pay-svc） |
 | `PB_DB_USER` / `PB_DB_PASS` | dev 默认 | 生产随机 32 位 | 存 `sharehub-app.env`（600） |
 | `SPRING_FLYWAY_PLACEHOLDER_REPLACEMENT` | 默认 true | **视 SQL 内容** | ai-shop 踩过 Flyway 把注释里的 `${}` 也当占位符解析 —— 上线前对 `backend/sharehub-app/src/main/resources/db/migration/*.sql` 扫一遍是否有裸 `${}` |
+| `SHAREHUB_CORS_ALLOWED_ORIGINS` | `http://localhost:3000` | **`https://<生产域名>,http://localhost:3000`** | 即使同源，浏览器 fetch 的 POST 仍会带 `Origin` 头 → Spring CorsFilter 若在白名单外会返 403「Invalid CORS request」→ 前端映射为「无权限」；curl 默认不发 Origin 头，所以 shell 测试通过而浏览器登录失败 |
 
 **发完必须验的两句**（同 ai-shop）：
 
