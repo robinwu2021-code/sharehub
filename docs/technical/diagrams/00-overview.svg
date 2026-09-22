@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Source Han Sans SC','Noto Sans CJK SC',-apple-system,'Segoe UI',Roboto,sans-serif">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4A585B"/></marker><marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0F7173"/></marker></defs>
+<rect width="1600" height="900" fill="#FFFFFF"/>
+<text x="56" y="68" font-size="42" fill="#12181B" font-weight="750" text-anchor="start" letter-spacing="-1" opacity="1">ShareHub 系统总架构</text>
+<text x="56" y="104" font-size="22" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">端 · 接入 · 10 业务服务 · 数据 · 横切支撑 · 南向与外部　｜　标「待建」= 设计已定未实现</text>
+<line x1="56" y1="126" x2="1544" y2="126" stroke="#D8E0DF" stroke-width="2"/>
+<rect x="56" y="148" width="1488" height="106" rx="10" fill="#EEF2F8"/>
+<rect x="56" y="148" width="6" height="106" rx="3" fill="#5B7BA6"/>
+<text x="78" y="178" font-size="21" fill="#5B7BA6" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">① 端</text>
+<rect x="56.0" y="182" width="391.3333333333333" height="62" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="251.66666666666666" y="209.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">运营端 ops-web</text>
+<text x="251.66666666666666" y="238.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">Next.js · 98 菜单叶</text>
+<rect x="467.3333333333333" y="182" width="391.3333333333333" height="62" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="663.0" y="209.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">C端 c-app</text>
+<text x="663.0" y="238.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">uni-app · 17 模块</text>
+<rect x="878.6666666666666" y="182" width="391.3333333333333" height="62" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="1074.3333333333333" y="209.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">代理端（待建）</text>
+<text x="1074.3333333333333" y="238.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">复用运营端 + AGENT 范围</text>
+<rect x="56" y="268" width="1488" height="106" rx="10" fill="#EEF2F8"/>
+<rect x="56" y="268" width="6" height="106" rx="3" fill="#5B7BA6"/>
+<text x="78" y="298" font-size="21" fill="#5B7BA6" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">② 接入（受信头边缘注入 · 客户端同名头一律剥离）</text>
+<rect x="56.0" y="302" width="391.3333333333333" height="62" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="251.66666666666666" y="329.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">ops-bff</text>
+<text x="251.66666666666666" y="358.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">/api 六前缀</text>
+<rect x="467.3333333333333" y="302" width="391.3333333333333" height="62" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="663.0" y="329.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">mp-bff</text>
+<text x="663.0" y="358.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">/mp 端上可渲染形状</text>
+<rect x="878.6666666666666" y="302" width="391.3333333333333" height="62" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="1074.3333333333333" y="329.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">agent-bff（待建）</text>
+<text x="1074.3333333333333" y="358.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">接口面为运营端子集</text>
+<rect x="56" y="388" width="1488" height="240" rx="10" fill="#F9EEEF"/>
+<rect x="56" y="388" width="6" height="240" rx="3" fill="#A35D63"/>
+<text x="78" y="418" font-size="21" fill="#A35D63" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">③ 业务服务（10 个 · 卡内为独占表前缀）</text>
+<rect x="56.0" y="424" width="230.0" height="86" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="171.0" y="463.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">identity</text>
+<text x="171.0" y="492.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">iam_</text>
+<rect x="302.0" y="424" width="230.0" height="86" rx="9" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.8"/>
+<text x="417.0" y="463.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">location</text>
+<text x="417.0" y="492.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">loc_ agt_</text>
+<rect x="548.0" y="424" width="230.0" height="86" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="1.8"/>
+<text x="663.0" y="463.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">device</text>
+<text x="663.0" y="492.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">dev_ inv_</text>
+<rect x="794.0" y="424" width="230.0" height="86" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="1.8"/>
+<text x="909.0" y="463.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">workorder</text>
+<text x="909.0" y="492.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">wo_ dev_alarm_</text>
+<rect x="1040.0" y="424" width="230.0" height="86" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="3"/>
+<text x="1155.0" y="463.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">trade</text>
+<text x="1155.0" y="492.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">ord_ price_</text>
+<rect x="56.0" y="524" width="230.0" height="86" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="171.0" y="563.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">payment</text>
+<text x="171.0" y="592.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">pay_</text>
+<rect x="302.0" y="524" width="230.0" height="86" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="417.0" y="563.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">finance</text>
+<text x="417.0" y="592.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">acct_ share_ stl_</text>
+<rect x="548.0" y="524" width="230.0" height="86" rx="9" fill="#FFFFFF" stroke="#7D63A3" stroke-width="1.8"/>
+<text x="663.0" y="563.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">customer</text>
+<text x="663.0" y="592.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">usr_ mbr_</text>
+<rect x="794.0" y="524" width="230.0" height="86" rx="9" fill="#FFFFFF" stroke="#7D63A3" stroke-width="1.8"/>
+<text x="909.0" y="563.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">marketing</text>
+<text x="909.0" y="592.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">mkt_ ad_ cs_</text>
+<rect x="1040.0" y="524" width="230.0" height="86" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="1155.0" y="563.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">platform-config</text>
+<text x="1155.0" y="592.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">sys_ md_ dict_</text>
+<rect x="56" y="650" width="1488" height="96" rx="10" fill="#F0F3F3"/>
+<rect x="56" y="650" width="6" height="96" rx="3" fill="#6B7A7C"/>
+<text x="78" y="680" font-size="21" fill="#6B7A7C" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">④ 数据</text>
+<rect x="56.0" y="682" width="291.5" height="56" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="201.75" y="706.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">pb_core</text>
+<text x="201.75" y="735.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">131 表 · 业务</text>
+<rect x="363.5" y="682" width="291.5" height="56" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="509.25" y="706.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">pb_pii</text>
+<text x="509.25" y="735.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">独立 KMS · PDPL</text>
+<rect x="671.0" y="682" width="291.5" height="56" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="816.75" y="706.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">pb_auth</text>
+<text x="816.75" y="735.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">独立 KMS · 凭据</text>
+<rect x="978.5" y="682" width="291.5" height="56" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="1124.25" y="706.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">Redis</text>
+<text x="1124.25" y="735.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">会话·影子·幂等·锁</text>
+<rect x="56" y="754" width="1488" height="84" rx="10" fill="#EDF4EE"/>
+<rect x="56" y="754" width="6" height="84" rx="3" fill="#5C8A63"/>
+<text x="78" y="784" font-size="21" fill="#5C8A63" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">⑤ 横切支撑（全域依赖，不画连线）</text>
+<rect x="62" y="794" width="139.35" height="34" rx="17" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.6"/>
+<text x="131.675" y="816" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">认证 双安全链</text>
+<rect x="211.35" y="794" width="153.8" height="34" rx="17" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.6"/>
+<text x="288.25" y="816" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">RBAC 89 权限码</text>
+<rect x="375.15" y="794" width="139.35" height="34" rx="17" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.6"/>
+<text x="444.825" y="816" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">数据范围 行级</text>
+<rect x="524.5" y="794" width="108.75" height="34" rx="17" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.6"/>
+<text x="578.875" y="816" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">审计 WORM</text>
+<rect x="643.25" y="794" width="149.54999999999998" height="34" rx="17" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.6"/>
+<text x="718.025" y="816" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">i18n zh/en/ar</text>
+<rect x="802.8" y="794" width="124.05000000000001" height="34" rx="17" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.6"/>
+<text x="864.8249999999999" y="816" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">幂等 4 落法</text>
+<rect x="936.8499999999999" y="794" width="79.0" height="34" rx="17" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.6"/>
+<text x="976.3499999999999" y="816" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">状态机</text>
+<rect x="1025.85" y="794" width="155.49999999999997" height="34" rx="17" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.6"/>
+<text x="1103.6" y="816" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">事件 Publisher</text>
+<rect x="1294" y="424" width="250" height="86" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="3"/>
+<text x="1419.0" y="463.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">access-gateway</text>
+<text x="1419.0" y="492.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">待建 · Netty/MQTT/回调</text>
+<rect x="1294" y="540" width="250" height="60" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="1419.0" y="566.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">供应商柜机</text>
+<text x="1419.0" y="595.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">TCP · MQTT · HTTP</text>
+<rect x="1294" y="614" width="250" height="60" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="1419.0" y="640.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">nearpay（待建）</text>
+<text x="1419.0" y="669.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">收单·预授权·退款</text>
+<rect x="1294" y="688" width="250" height="60" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="1419.0" y="714.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">推送 / 短信</text>
+<text x="1419.0" y="743.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">APNs · FCM · SMS</text>
+<line x1="251.66666666666666" y1="246" x2="251.66666666666666" y2="300" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="251.66666666666666" y1="366" x2="251.66666666666666" y2="386" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="663.0" y1="246" x2="663.0" y2="300" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="663.0" y1="366" x2="663.0" y2="386" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="1074.3333333333333" y1="246" x2="1074.3333333333333" y2="300" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="1074.3333333333333" y1="366" x2="1074.3333333333333" y2="386" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="663.0" y1="630" x2="663.0" y2="648" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="1274" y1="467" x2="1288" y2="467" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<text x="1286" y="452" font-size="17" fill="#0F7173" font-weight="400" text-anchor="end" letter-spacing="0" opacity="1">指令 / 事件</text>
+<line x1="1419.0" y1="512" x2="1419.0" y2="538" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)"/>
+<text x="56" y="872" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">服务间依赖方向见「02 服务依赖」· 模块归属见「03 模块到服务」· 主链路见「04 借还主链路」</text>
+</svg>

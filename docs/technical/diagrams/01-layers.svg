@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Source Han Sans SC','Noto Sans CJK SC',-apple-system,'Segoe UI',Roboto,sans-serif">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4A585B"/></marker><marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0F7173"/></marker></defs>
+<rect width="1600" height="900" fill="#FFFFFF"/>
+<text x="56" y="68" font-size="42" fill="#12181B" font-weight="750" text-anchor="start" letter-spacing="-1" opacity="1">ShareHub 系统分层</text>
+<text x="56" y="104" font-size="22" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">端 → BFF → 业务服务 → 数据；南向与外部旁挂</text>
+<line x1="56" y1="126" x2="1544" y2="126" stroke="#D8E0DF" stroke-width="2"/>
+<rect x="56" y="152" width="1488" height="116" rx="10" fill="#EEF2F8"/>
+<rect x="56" y="152" width="6" height="116" rx="3" fill="#5B7BA6"/>
+<text x="78" y="182" font-size="21" fill="#5B7BA6" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">① 端</text>
+<rect x="455.0" y="196" width="250" height="60" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="580.0" y="222.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">运营端 ops-web</text>
+<text x="580.0" y="251.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">98 菜单叶</text>
+<rect x="735.0" y="196" width="250" height="60" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="860.0" y="222.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">C端 c-app</text>
+<text x="860.0" y="251.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">17 模块</text>
+<rect x="1015.0" y="196" width="250" height="60" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="1140.0" y="222.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">代理端</text>
+<text x="1140.0" y="251.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">待建</text>
+<rect x="56" y="296" width="1488" height="116" rx="10" fill="#EEF2F8"/>
+<rect x="56" y="296" width="6" height="116" rx="3" fill="#5B7BA6"/>
+<text x="78" y="326" font-size="21" fill="#5B7BA6" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">② BFF</text>
+<rect x="455.0" y="340" width="250" height="60" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="580.0" y="366.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">ops-bff</text>
+<text x="580.0" y="395.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">/api/**</text>
+<rect x="735.0" y="340" width="250" height="60" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="860.0" y="366.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">mp-bff</text>
+<text x="860.0" y="395.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">/mp/**</text>
+<rect x="1015.0" y="340" width="250" height="60" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="1140.0" y="366.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">agent-bff</text>
+<text x="1140.0" y="395.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">待建</text>
+<rect x="56" y="440" width="1488" height="116" rx="10" fill="#F9EEEF"/>
+<rect x="56" y="440" width="6" height="116" rx="3" fill="#A35D63"/>
+<text x="78" y="470" font-size="21" fill="#A35D63" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">③ 业务服务</text>
+<rect x="650.0" y="484" width="420" height="60" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="860.0" y="510.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">10 个微服务</text>
+<text x="860.0" y="539.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">见「服务依赖」图</text>
+<rect x="56" y="584" width="1488" height="116" rx="10" fill="#F0F3F3"/>
+<rect x="56" y="584" width="6" height="116" rx="3" fill="#6B7A7C"/>
+<text x="78" y="614" font-size="21" fill="#6B7A7C" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">④ 数据</text>
+<rect x="315.0" y="628" width="250" height="60" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="440.0" y="654.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">pb_core</text>
+<text x="440.0" y="683.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">131 表</text>
+<rect x="595.0" y="628" width="250" height="60" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="720.0" y="654.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">pb_pii</text>
+<text x="720.0" y="683.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">独立 KMS</text>
+<rect x="875.0" y="628" width="250" height="60" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="1000.0" y="654.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">pb_auth</text>
+<text x="1000.0" y="683.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">独立 KMS</text>
+<rect x="1155.0" y="628" width="250" height="60" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="1280.0" y="654.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">Redis</text>
+<text x="1280.0" y="683.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">会话·影子·幂等</text>
+<line x1="800.0" y1="268" x2="800.0" y2="296" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="800.0" y1="412" x2="800.0" y2="440" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="800.0" y1="556" x2="800.0" y2="584" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<rect x="1180" y="726" width="356" height="62" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="1.8"/>
+<text x="1358.0" y="753.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">access-gateway（待建）</text>
+<text x="1358.0" y="782.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">Netty · MQTT · /gw 回调</text>
+<rect x="64" y="726" width="356" height="62" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="242.0" y="753.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">外部系统</text>
+<text x="242.0" y="782.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">nearpay · 供应商柜机 · 推送</text>
+<rect x="622" y="726" width="356" height="62" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="800.0" y="753.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">基础支撑</text>
+<text x="800.0" y="782.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">认证 · RBAC · 数据范围 · 审计 · i18n</text>
+<line x1="800" y1="700" x2="800" y2="724" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)"/>
+<text x="56" y="852" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">标记：无标记 = 已运行 · 「待建」= 设计已定未实现（ADR-016）</text>
+</svg>

@@ -2,7 +2,23 @@
 
 > 状态：**v2 全量重整**（2026-07-29）· 初版 2026-07-11
 > 关联：[architecture.md](./architecture.md) · [api/README.md](../api/README.md) · [ddl/](./ddl/README.md)
-> 规范对齐：ai-neargo `db-naming.md`（ADR-010）；本文为**服务端库表 SSOT**。
+> 规范对齐：ai-neargo `db-naming.md`（ADR-010）。
+>
+> ## 两份文档的分工（2026-07-30 拆分，改文档前先看这里）
+>
+> | 文件 | 回答什么 | 谁维护 |
+> |---|---|---|
+> | **本文** | **为什么这么设计**：命名/金额/时间约定、业务键前缀注册表、幂等键、状态机、读模型为何不建表、待拍板项 | **手写** |
+> | [db-schema-reference.md](./db-schema-reference.md) | **现在到底是什么**：133 张表 / 2020 列的实际结构、类型、索引、实体映射 | 脚本生成，**不要手改** |
+>
+> ```bash
+> python3 backend/scripts/gen-db-doc.py     # 实际库 + DDL 注释 + 实体映射 → db-schema-reference.md
+> ```
+>
+> **结构真值取自实际库的 `information_schema`，不取 `ddl/` 文件** —— DDL 用 `IF NOT EXISTS`
+> 落到既有表上是空操作，**文件里写了不代表库里有**。这个坑本项目踩过两次（V8 报
+> `Unknown column 'price_plan_no'`、V13 的 113 列缺失），所以生成器只信库。
+> 反过来注释以 DDL 为补充：库里只有约六成业务列带注释（同样因为 `IF NOT EXISTS` 不补注释）。
 >
 > ## 本次重整的依据与口径（必读）
 > v1（2026-07-11）写于运营端 73 项菜单、C 端清单未细化之前。此后运营端按[功能覆盖原则](../requirements/运营端功能清单.md#-功能覆盖原则2026-07-29-用户定调硬约束)对标补齐到 **98 项菜单叶**、C 端定稿 **17 模块**，前端已 100% 落地（mock）。**v2 以三份文档 + 一份代码为输入源，逐项反查建表**：
@@ -78,6 +94,7 @@ powerbank 是模块化单体部署，不采用 neargo「一域一库」，而是
 | `SR` | 分润规则 | `SREC` | 分润记录 | `STL` | 结算单 |
 | `WD` | 提现 | `LE` | 账务分录 | `V` | 记账凭证 |
 | `RC` | 对账批次 | `INV` | 发票(运营侧) | `UINV` | 发票(C端申请) |
+| `OEX` | 异常订单 | `FW` | 固件版本 | | |
 | `RP` | 充值套餐 | | | | |
 | `U` | C端用户/会员/钱包/白名单 | `RK` | 风控 | `BL` | 用户黑名单 |
 | `CP` | 优惠券 | `CMP` | 活动 | `PM` | 推送 |
@@ -202,7 +219,7 @@ InnoDB · `utf8mb4_0900_ai_ci` · 金额 `DECIMAL(18,2)` + `currency VARCHAR(8) 
 | `dev_cabinet` ★ | 机柜/充电桩 | `cabinet_no` UK, tenant_id, **agent_no**, sn, vendor_code, model, location_no, site_no(冗余), slot_total, available_count, online_status(ONLINE/OFFLINE ← **正交轴**), last_heartbeat_at, fw_version, **status(IN_STOCK/DEPLOYED/FAULT/RETIRED)** ← 补 `IN_STOCK`，见 **§9A.2** | 设备台账 |
 | `dev_slot` | 仓位 | cabinet_no, slot_index, powerbank_no(在仓), lock_status(LOCKED/UNLOCKED), health(OK/FAULT)；UK(cabinet_no,slot_index) | 机柜详情·仓位明细 |
 | `dev_powerbank` ★ | 充电宝 | `powerbank_no` UK, tenant_id, sn, vendor_code, battery, **cycles**, health(OK/FAULT), **status(IN_STOCK/IN_CABINET/RENTED/FAULT/LOST/SOLD/SCRAP)** ← 两套枚举合一，见 **§9A.1**, cabinet_no, slot_index | 充电宝管理 |
-| `dev_shadow` | 设备影子快照（主 Redis，DB 兜底）| cabinet_no, slots `JSON`, online, signal, temp, fault_count, snapshot_at | 实时监控 |
+| `dev_shadow` | 设备影子快照（主 Redis，DB 兜底）| cabinet_no, slots `JSON`, online, **`signal`**（⚠️ MariaDB **保留字**，DDL 与查询必须反引号）, temp, fault_count, snapshot_at | 实时监控 |
 | `dev_heartbeat` `append`(月) | 心跳遥测 | cabinet_no, metrics `JSON`, beat_at | 实时监控 |
 | `dev_code_batch` `NEW` | 设备编码批次 | `batch_no` UK, tenant_id, vendor_code, code_type(QR/SN), range_start, range_end, total, **bound**, produced_at, status(PENDING/PARTIAL/BOUND/VOID) | 设备编码 |
 | `dev_ota_release` | OTA 版本 | `release_no` UK, fw_type, vendor_code, **`fw_version`**(固件版本串 —— **不能叫 `version`**，那是乐观锁列名), version_code, artifact_url, checksum, mandatory, status(DRAFT/PUBLISHED/PAUSED/COMPLETED) | 固件 OTA |

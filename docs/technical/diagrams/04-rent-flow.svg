@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Source Han Sans SC','Noto Sans CJK SC',-apple-system,'Segoe UI',Roboto,sans-serif">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4A585B"/></marker><marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0F7173"/></marker></defs>
+<rect width="1600" height="900" fill="#FFFFFF"/>
+<text x="56" y="68" font-size="42" fill="#12181B" font-weight="750" text-anchor="start" letter-spacing="-1" opacity="1">借还主链路</text>
+<text x="56" y="104" font-size="22" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">跨 4 个服务 + 南向网关 + 外部支付；虚线为异步事件</text>
+<line x1="56" y1="126" x2="1544" y2="126" stroke="#D8E0DF" stroke-width="2"/>
+<rect x="95.0" y="156" width="210" height="54" rx="9" fill="#FFFFFF" stroke="#7D63A3" stroke-width="1.8"/>
+<text x="200.0" y="192.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">c-app</text>
+<line x1="200.0" y1="214" x2="200.0" y2="818" stroke="#D8E0DF" stroke-width="2" stroke-dasharray="4 6"/>
+<rect x="335.0" y="156" width="210" height="54" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="440.0" y="192.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">trade</text>
+<line x1="440.0" y1="214" x2="440.0" y2="818" stroke="#D8E0DF" stroke-width="2" stroke-dasharray="4 6"/>
+<rect x="575.0" y="156" width="210" height="54" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="1.8"/>
+<text x="680.0" y="192.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">device</text>
+<line x1="680.0" y1="214" x2="680.0" y2="818" stroke="#D8E0DF" stroke-width="2" stroke-dasharray="4 6"/>
+<rect x="815.0" y="156" width="210" height="54" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="920.0" y="192.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">payment</text>
+<line x1="920.0" y1="214" x2="920.0" y2="818" stroke="#D8E0DF" stroke-width="2" stroke-dasharray="4 6"/>
+<rect x="1055.0" y="156" width="210" height="54" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="1.8"/>
+<text x="1160.0" y="192.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">gateway</text>
+<line x1="1160.0" y1="214" x2="1160.0" y2="818" stroke="#D8E0DF" stroke-width="2" stroke-dasharray="4 6"/>
+<rect x="1295.0" y="156" width="210" height="54" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="1400.0" y="192.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">柜机</text>
+<line x1="1400.0" y1="214" x2="1400.0" y2="818" stroke="#D8E0DF" stroke-width="2" stroke-dasharray="4 6"/>
+<line x1="206.0" y1="262" x2="430.0" y2="262" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)"/>
+<text x="318.0" y="250.0" font-size="18" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">① 扫码借出</text>
+<line x1="446.0" y1="312" x2="670.0" y2="312" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)"/>
+<text x="558.0" y="300.0" font-size="18" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">② 校验可借</text>
+<line x1="446.0" y1="362" x2="910.0" y2="362" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)"/>
+<text x="678.0" y="350.0" font-size="18" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">③ 免押预授权</text>
+<line x1="446.0" y1="412" x2="1150.0" y2="412" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)"/>
+<text x="798.0" y="400.0" font-size="18" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">④ 下发弹仓指令</text>
+<line x1="1166.0" y1="462" x2="1390.0" y2="462" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)"/>
+<text x="1278.0" y="450.0" font-size="18" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">⑤ driver 编码下发</text>
+<line x1="1394.0" y1="512" x2="1170.0" y2="512" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)" stroke-dasharray="6 5"/>
+<text x="1282.0" y="500.0" font-size="18" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">⑥ 弹出确认</text>
+<line x1="1154.0" y1="562" x2="450.0" y2="562" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)" stroke-dasharray="6 5"/>
+<text x="802.0" y="550.0" font-size="18" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">⑦ DeviceEvent</text>
+<line x1="434.0" y1="612" x2="210.0" y2="612" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)"/>
+<text x="322.0" y="600.0" font-size="18" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">⑧ 借出成功 → IN_USE</text>
+<line x1="1394.0" y1="694" x2="1170.0" y2="694" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)" stroke-dasharray="6 5"/>
+<text x="1282.0" y="682.0" font-size="18" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">⑨ 归还上报</text>
+<line x1="1154.0" y1="744" x2="450.0" y2="744" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)" stroke-dasharray="6 5"/>
+<text x="802.0" y="732.0" font-size="18" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">⑩ 停计费 → 算费</text>
+<line x1="446.0" y1="794" x2="910.0" y2="794" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)"/>
+<text x="678.0" y="782.0" font-size="18" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">⑪ 请款 capture</text>
+<line x1="56" y1="656" x2="1544" y2="656" stroke="#D8E0DF" stroke-width="2" stroke-dasharray="8 8"/>
+<text x="64" y="650" font-size="21" fill="#7C8B8E" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">归还</text>
+<text x="56" y="856" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">超时未确认 → 重试 → 终态失败：订单转 EXCEPTION + 撤销预授权 + 自动开工单（saga 补偿）</text>
+</svg>

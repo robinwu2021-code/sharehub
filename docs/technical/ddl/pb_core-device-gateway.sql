@@ -95,7 +95,8 @@ CREATE TABLE dev_ota_release (
   release_no   VARCHAR(36) NOT NULL,
   tenant_id    VARCHAR(36) NOT NULL DEFAULT 'MAIN',
   fw_type      VARCHAR(32) NOT NULL,
-  version      VARCHAR(32) NOT NULL,
+  vendor_code  VARCHAR(32)     NULL COMMENT '供应商(逻辑引用 gw_vendor)',
+  fw_version   VARCHAR(32) NOT NULL COMMENT '固件版本号(如 1.4.2)。不能叫 version —— 那是乐观锁列名',
   version_code INT         NOT NULL,
   artifact_url VARCHAR(512)    NULL,
   checksum     VARCHAR(128)    NULL,
@@ -104,7 +105,7 @@ CREATE TABLE dev_ota_release (
   release_notes TEXT           NULL,
   created_at   DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at   DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  version_col  BIGINT      NOT NULL DEFAULT 0,
+  version      BIGINT      NOT NULL DEFAULT 0 COMMENT '乐观锁',
   deleted      TINYINT(1)  NOT NULL DEFAULT 0,
   PRIMARY KEY (id),
   UNIQUE KEY uk_ota_release_no (release_no)

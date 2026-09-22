@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Source Han Sans SC','Noto Sans CJK SC',-apple-system,'Segoe UI',Roboto,sans-serif">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4A585B"/></marker><marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0F7173"/></marker></defs>
+<rect width="1600" height="900" fill="#FFFFFF"/>
+<text x="56" y="68" font-size="42" fill="#12181B" font-weight="750" text-anchor="start" letter-spacing="-1" opacity="1">15 个运营模块 → 10 个服务</text>
+<text x="56" y="104" font-size="22" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">多对一归属；菜单按运营习惯组织，服务按数据归属切</text>
+<line x1="56" y1="126" x2="1544" y2="126" stroke="#D8E0DF" stroke-width="2"/>
+<rect x="70" y="160" width="400" height="52" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="1.8"/>
+<text x="270.0" y="195.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">设备管理 · 库存调拨</text>
+<line x1="478" y1="186" x2="596" y2="186" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<rect x="604" y="160" width="380" height="52" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="3"/>
+<text x="794.0" y="195.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">device</text>
+<text x="1012" y="194" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">dev_ inv_</text>
+<rect x="70" y="228" width="400" height="52" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="1.8"/>
+<text x="270.0" y="263.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">告警管理 · 工单管理</text>
+<line x1="478" y1="254" x2="596" y2="254" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<rect x="604" y="228" width="380" height="52" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="3"/>
+<text x="794.0" y="263.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">workorder</text>
+<text x="1012" y="262" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">wo_ dev_alarm_</text>
+<rect x="70" y="296" width="400" height="52" rx="9" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.8"/>
+<text x="270.0" y="331.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">站点与点位 · 代理商</text>
+<line x1="478" y1="322" x2="596" y2="322" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<rect x="604" y="296" width="380" height="52" rx="9" fill="#FFFFFF" stroke="#5C8A63" stroke-width="3"/>
+<text x="794.0" y="331.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">location</text>
+<text x="1012" y="330" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">loc_ agt_</text>
+<rect x="70" y="364" width="400" height="52" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="270.0" y="399.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">订单管理 · 计费定价</text>
+<line x1="478" y1="390" x2="596" y2="390" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<rect x="604" y="364" width="380" height="52" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="3"/>
+<text x="794.0" y="399.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">trade</text>
+<text x="1012" y="398" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">ord_ price_</text>
+<rect x="70" y="432" width="400" height="52" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="270.0" y="467.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">财务管理</text>
+<line x1="478" y1="458" x2="596" y2="458" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<rect x="604" y="432" width="380" height="52" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="3"/>
+<text x="794.0" y="467.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">finance</text>
+<text x="1012" y="466" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">acct_ share_ stl_</text>
+<rect x="70" y="500" width="400" height="52" rx="9" fill="#FFFFFF" stroke="#7D63A3" stroke-width="1.8"/>
+<text x="270.0" y="535.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">用户管理</text>
+<line x1="478" y1="526" x2="596" y2="526" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<rect x="604" y="500" width="380" height="52" rx="9" fill="#FFFFFF" stroke="#7D63A3" stroke-width="3"/>
+<text x="794.0" y="535.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">customer</text>
+<text x="1012" y="534" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">usr_ mbr_</text>
+<rect x="70" y="568" width="400" height="52" rx="9" fill="#FFFFFF" stroke="#7D63A3" stroke-width="1.8"/>
+<text x="270.0" y="603.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">营销管理 · 客服管理</text>
+<line x1="478" y1="594" x2="596" y2="594" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<rect x="604" y="568" width="380" height="52" rx="9" fill="#FFFFFF" stroke="#7D63A3" stroke-width="3"/>
+<text x="794.0" y="603.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">marketing</text>
+<text x="1012" y="602" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">mkt_ ad_ cs_</text>
+<rect x="70" y="636" width="400" height="52" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="270.0" y="671.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">员工与权限</text>
+<line x1="478" y1="662" x2="596" y2="662" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<rect x="604" y="636" width="380" height="52" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="3"/>
+<text x="794.0" y="671.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">identity</text>
+<text x="1012" y="670" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">iam_</text>
+<rect x="70" y="704" width="400" height="52" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="270.0" y="739.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">系统设置</text>
+<line x1="478" y1="730" x2="596" y2="730" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<rect x="604" y="704" width="380" height="52" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="3"/>
+<text x="794.0" y="739.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">platform-config</text>
+<text x="1012" y="738" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">sys_ md_ dict_</text>
+<rect x="70" y="772" width="400" height="52" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="270.0" y="807.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">经营看板 · 数据报表</text>
+<line x1="478" y1="798" x2="596" y2="798" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)"/>
+<rect x="604" y="772" width="380" height="52" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="3"/>
+<text x="794.0" y="807.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">读模型（跨服务聚合）</text>
+<text x="1012" y="806" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">rpt_ 待建</text>
+<text x="56" y="872" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">「菜单归属 ≠ 服务归属」三处：告警归 workorder · 代理商归 location · 支付渠道归 payment</text>
+</svg>

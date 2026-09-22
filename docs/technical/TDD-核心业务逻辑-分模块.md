@@ -212,21 +212,46 @@ fee = min(amount × feeRate, feeCap)
 
 ### 5.2 补齐清单
 
-| 表 | 过滤列 | 支持的 scope |
-|---|---|---|
-| `loc_site` | `agent_no` / `region_id` / `site_no` | AGENT / REGION / SITE ✅ 已注册 |
-| `ord_rent` | `agent_no` / `site_no` | AGENT / SITE ⬜ **待注册** |
-| `wo_order` | `agent_no` / `site_no` | AGENT / SITE ⬜ **待注册** |
-| `dev_cabinet` | `agent_no` / `site_no` | AGENT / SITE ⬜ **待注册** |
-| `dev_alarm` | `agent_no` / `site_no` | AGENT / SITE ⬜ **待注册** |
-| `loc_location` | `agent_no` / `site_no` | AGENT / SITE ⬜ **待注册** |
-| `share_record` | `payee_no`(payee_type=AGENT 时) | AGENT ⬜ **待注册** |
-| `stl_settlement` | `payee_no` | AGENT ⬜ **待注册** |
+| 表 | 过滤列 | 支持的 scope | 状态 |
+|---|---|---|---|
+| `loc_site` | `agent_no` / `region_id` / `site_no` | AGENT / REGION / SITE | ✅ 原有 |
+| `loc_location` | `agent_no` / `site_no` | AGENT / SITE | ✅ **B1 已注册** |
+| `dev_cabinet` | `agent_no` / `site_no` | AGENT / SITE | ✅ **B1 已注册** |
+| `ord_rent` | `agent_no` / `site_no` / **`c_user_no`** | AGENT / SITE / **SELF** | ✅ **B1 已注册** |
+| `wo_order` | `agent_no` / `site_no` | AGENT / SITE | ✅ **B1 已注册** |
+| `dev_alarm` | `agent_no` / `site_no` | AGENT / SITE | ⬜ 表未创建 |
+| `share_record` | `payee_no`(payee_type=AGENT 时) | AGENT | ⬜ 表未创建 + 需条件锚点 |
+| `stl_settlement` | `payee_no` | AGENT | ⬜ 表未创建 |
 
-### 5.3 `SELF` 语义
+> **前置条件是列必须真的存在**。B1 落地时发现开发库里 `ord_rent`/`wo_order`/`dev_cabinet`/`loc_location`
+> **都没有 `agent_no`** —— 这才是数据范围长期只注册了一张表的真实原因（不是「忘了注册」）。
+> 补列与按归属链回填见 `ddl/pb_core-v2-datascope.sql`。
 
-C 端属主（`c_user_no`）**不走数据范围拦截器**，走 `ConsumerContext` 显式过滤 —— 两套机制别混：
-数据范围是「运营人员能看哪些经营对象」，属主是「消费者只能看自己的单」。
+### 5.3 `SELF` 语义 —— ⚠️ 本节已被实测推翻并重写
+
+> **原结论（错误）**：「C 端属主不走数据范围拦截器，两套机制别混」。
+> 该结论建立在「未登记的维度会放行」这个**未经验证的假设**上。
+
+**实测行为**：`DataScopeHandler.buildCondition` 在「当前 spec 的维度在本表锚点里找不到列」时，
+生成的是 **`1=0`（全部拒绝）而非放行** —— 它是 fail-closed 的。
+
+**由此得出的真正规则**：
+
+1. **一张表一旦被注册，所有可能访问它的主体的维度都必须登记**，漏一个 = 那类主体全瞎。
+   C 端会话的 spec 是 `SELF`，所以 `ord_rent` 必须登记 `SELF → c_user_no`；
+   漏登记的直接后果是 C 端「我的订单」返回空集（B1 落地时 `ConsumerRentFlowTest` 实测挂掉）。
+2. 登记 `SELF` 后，属主过滤额外获得了 **SQL 层的防 IDOR 兜底**，是纵深防御而非冗余。
+3. **但显式属主守卫仍不能撤**：数据范围会在守卫之前把行过滤掉，导致
+   「403 无权」退化成「400 不存在」。需要 403 语义的路径（如 `GET /mp/trade/orders/{no}`）
+   必须用 `DataScopeContext.executeWithoutScope(...)` 取数、再由守卫判定 ——
+   见 `RentOrderService#detailForConsumer`。
+   **豁免只能加在有显式守卫兜底的那一条路径上**：给运营端共用的 `detail()` 加豁免，
+   会让 AGENT 读到其它代理的订单详情。
+
+**遗留问题（`/mp/nearby/**` 落地时必须处理）**：`loc_site`/`dev_cabinet`/`loc_location`
+上没有、也不该有 `c_user_no` 这类 SELF 锚点，而 C 端要浏览它们找附近网点。
+按 fail-closed 规则，附近网点查询会拿到空集。届时应在那几个查询上显式 `executeWithoutScope`，
+**而不是**给这些表编一个假的 SELF 锚点。
 
 ### 5.4 验收
 

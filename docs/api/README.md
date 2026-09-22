@@ -3,7 +3,29 @@
 > 状态：**v2 全量重整**（2026-07-29）· 初版 2026-07-11
 > 关联：[db-design.md](../technical/db-design.md)（库表 SSOT）· [architecture.md](../technical/architecture.md) · [功能权限清单](../requirements/功能权限清单.md)（RBAC SSOT）
 > 约定对齐 ai-neargo：统一 `Result<T>`、`AuthHeaders` 可信头、`Query/PageResult` 分页、`ErrorCode`。
-> 本文为**端点目录**（method / path / 用途 / 权限码 / 对应菜单叶）；字段级 req/resp DTO 由各模块 TDD + `powerbank-common-api` 契约细化。
+> 本文为**端点目录 + 设计裁决**（前缀怎么划、权限码怎么定、文档与代码冲突谁赢、写入口归谁）。
+>
+> ## 三份文档的分工（2026-07-30 拆分，改文档前先看这里）
+>
+> 逐端点的输入输出**不写在本文里**，改由脚本从控制器源码抽取 —— 268 个端点的字段级契约手写一遍，
+> 下一次改代码就过期，而**过期的接口文档比没有文档更危险**：前端会照着它写，然后对不上。
+>
+> | 文件 | 内容 | 谁维护 |
+> |---|---|---|
+> | **本文** | 为什么这么设计：前缀划分、权限码约定、写入口判据、冲突裁决 | **手写** |
+> | [reference.md](./reference.md) | 全量 268 端点的入参/出参/权限码/数据结构 | 脚本生成，**不要手改** |
+> | [contract.json](./contract.json) | 机器可读真值。文档生成器与 ops-web 的 parity 门禁都读它 | 脚本生成 |
+> | [前后端对齐缺口.md](./前后端对齐缺口.md) | 后端 × 前端调用 × 前端类型 三方比对出的缺口清单 | 脚本生成 |
+>
+> ```bash
+> python3 backend/scripts/api-extract.py    # 控制器源码 → contract.json
+> python3 backend/scripts/gen-api-doc.py    # contract.json → reference.md
+> python3 backend/scripts/api-align.py      # 三方比对 → 前后端对齐缺口.md
+> ```
+>
+> **contract.json 是唯一真值**：ops-web 的 `scripts/check-backend-parity.py` 原来自己用正则扫 Java，
+> 与后端侧的抽取器各数出 267 和 268 —— 同一个问题两套口径就必然给出两个答案，
+> 「后端到底有多少端点」变得无法回答。现已统一改读 contract.json。
 >
 > ## 本次重整的依据与口径（必读）
 > v1 写于运营端 73 项菜单之前，且 `/mp` 端点是**照 C 端功能清单推演**的，与 c-app 实际在调的路径不符。v2 改为**以已落地的前端为准反查端点**：

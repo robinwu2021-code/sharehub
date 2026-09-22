@@ -260,4 +260,5 @@ INSERT INTO iam_role (role_no, code, name, builtin, data_scope) VALUES
  ('R4','FINANCE','财务',1,'ALL'),
  ('R5','BD','拓展',1,'REGION'),
  ('R6','VIEWER','只读',1,'ALL'),
- ('R7','AGENT','代理商',1,'AGENT');
+ ('R7','AGENT','代理商',1,'AGENT')
+ON DUPLICATE KEY UPDATE role_no = role_no;   -- 幂等：迁移工具可能重跑，种子不能撞唯一键

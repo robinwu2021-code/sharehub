@@ -83,6 +83,8 @@ ALTER TABLE stl_withdrawal
   ADD COLUMN auditor_name  VARCHAR(64)      NULL COMMENT '审批人名快照',
   ADD COLUMN audited_at    DATETIME(3)      NULL COMMENT '审批时间(NULL=未审)',
   ADD COLUMN reject_reason VARCHAR(256)     NULL COMMENT '驳回原因(驳回时必填)',
+  ADD COLUMN paid_at       DATETIME(3)      NULL COMMENT '打款到账时间',
+  ADD COLUMN created_at    DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   ADD COLUMN deleted       TINYINT(1)   NOT NULL DEFAULT 0;
 
 ALTER TABLE stl_withdrawal
@@ -227,18 +229,14 @@ ALTER TABLE wo_sla_rule
 -- ============================================================
 USE pb_core;
 
--- 9.1 dev_ota_release：把固件版本号让出 `version` 列名
---     v1 用 `version` 存固件版本串、把乐观锁挤到 `version_col`，导致实体无法继承 BaseEntity
---     （BaseEntity.version 固定映射 version 列，继承会把 Long 乐观锁值写进固件版本列）。
---     统一为：fw_version = 固件版本串，version = 乐观锁。
-ALTER TABLE dev_ota_release
-  CHANGE COLUMN version     fw_version VARCHAR(32) NOT NULL COMMENT '固件版本号(如 1.4.2)',
-  CHANGE COLUMN version_col version    BIGINT      NOT NULL DEFAULT 0 COMMENT '乐观锁',
-  ADD COLUMN vendor_code VARCHAR(32) NULL COMMENT '供应商(逻辑引用 gw_vendor)' AFTER fw_type;
-
-ALTER TABLE dev_ota_release
-  MODIFY COLUMN status VARCHAR(16) NOT NULL DEFAULT 'DRAFT'
-    COMMENT 'DRAFT/PUBLISHED/PAUSED/COMPLETED';
+-- 9.1 dev_ota_release：已在建表脚本（pb_core-device-gateway.sql）直接建成
+--     fw_version（固件版本）+ version（乐观锁），此处不再做 CHANGE COLUMN 重命名。
+--     原因：重命名本质无法安全重跑 —— 改完之后 `version` 已是乐观锁列，
+--     再跑一次 `CHANGE COLUMN IF EXISTS version fw_version` 会把乐观锁列改名，
+--     且 IF EXISTS 挡不住（列确实存在，只是语义变了）→ Duplicate column name 'fw_version'。
+--     存量库若还是旧列名，由 ops 手工执行一次：
+--       ALTER TABLE dev_ota_release CHANGE COLUMN version fw_version VARCHAR(32) NOT NULL,
+--                                   CHANGE COLUMN version_col version BIGINT NOT NULL DEFAULT 0;
 
 -- 9.2 dev_ota_rollout：补灰度投放所需列 + 枚举对齐 db-design
 ALTER TABLE dev_ota_rollout
@@ -269,6 +267,6 @@ ALTER TABLE dev_ota_task
 --     「实时监控」菜单叶展示 signal/temp/faultCount，无这三列该页取不到数
 ALTER TABLE dev_shadow
   ADD COLUMN tenant_id   VARCHAR(36) NOT NULL DEFAULT 'MAIN' AFTER cabinet_no,
-  ADD COLUMN signal      INT         NULL COMMENT '信号强度 0..100' AFTER online,
+  ADD COLUMN `signal`    INT         NULL COMMENT '信号强度 0..100' AFTER online,
   ADD COLUMN temp        DECIMAL(5,2) NULL COMMENT '机内温度 ℃'      AFTER signal,
   ADD COLUMN fault_count INT         NOT NULL DEFAULT 0 COMMENT '当前未闭环故障数' AFTER temp;

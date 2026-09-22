@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Source Han Sans SC','Noto Sans CJK SC',-apple-system,'Segoe UI',Roboto,sans-serif">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4A585B"/></marker><marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0F7173"/></marker></defs>
+<rect width="1600" height="900" fill="#FFFFFF"/>
+<text x="56" y="68" font-size="42" fill="#12181B" font-weight="750" text-anchor="start" letter-spacing="-1" opacity="1">ShareHub 业务模块分层</text>
+<text x="56" y="104" font-size="22" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">6 层 · 32 模块 · 132 张表全部归位　｜　规则：只能依赖同层或更低层</text>
+<line x1="56" y1="126" x2="1544" y2="126" stroke="#D8E0DF" stroke-width="2"/>
+<rect x="56" y="150" width="1488" height="92" rx="10" fill="#F2EDF7"/>
+<rect x="56" y="150" width="6" height="92" rx="3" fill="#7D63A3"/>
+<text x="78" y="180" font-size="21" fill="#7D63A3" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">L5 服务</text>
+<rect x="76" y="186" width="230" height="46" rx="9" fill="#FFFFFF" stroke="#7D63A3" stroke-width="1.8"/>
+<text x="191.0" y="218.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">客服</text>
+<rect x="56" y="256" width="1488" height="92" rx="10" fill="#F9EEEF"/>
+<rect x="56" y="256" width="6" height="92" rx="3" fill="#A35D63"/>
+<text x="78" y="286" font-size="21" fill="#A35D63" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">L4 资金</text>
+<rect x="76" y="292" width="230" height="46" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="191.0" y="324.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">账务</text>
+<rect x="318" y="292" width="230" height="46" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="433.0" y="324.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">分润</text>
+<rect x="560" y="292" width="230" height="46" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="675.0" y="324.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">结算提现</text>
+<rect x="802" y="292" width="230" height="46" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="917.0" y="324.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">发票</text>
+<rect x="1044" y="292" width="230" height="46" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="1159.0" y="324.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">对账</text>
+<rect x="56" y="362" width="1488" height="92" rx="10" fill="#F9EEEF"/>
+<rect x="56" y="362" width="6" height="92" rx="3" fill="#A35D63"/>
+<text x="78" y="392" font-size="21" fill="#A35D63" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">L3 交易</text>
+<rect x="76" y="398" width="230" height="46" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="191.0" y="430.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">计价</text>
+<rect x="318" y="398" width="230" height="46" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="433.0" y="430.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">订单</text>
+<rect x="560" y="398" width="230" height="46" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="675.0" y="430.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">支付</text>
+<rect x="56" y="468" width="1488" height="92" rx="10" fill="#FBF3E8"/>
+<rect x="56" y="468" width="6" height="92" rx="3" fill="#B07D3A"/>
+<text x="78" y="498" font-size="21" fill="#B07D3A" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">L2 运行管理</text>
+<rect x="76" y="504" width="230" height="46" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="1.8"/>
+<text x="191.0" y="536.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">告警</text>
+<rect x="318" y="504" width="230" height="46" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="1.8"/>
+<text x="433.0" y="536.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">工单</text>
+<rect x="560" y="504" width="230" height="46" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="1.8"/>
+<text x="675.0" y="536.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">设备接入</text>
+<rect x="56" y="574" width="1488" height="92" rx="10" fill="#EDF4EE"/>
+<rect x="56" y="574" width="6" height="92" rx="3" fill="#5C8A63"/>
+<text x="78" y="604" font-size="21" fill="#5C8A63" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">L1 主体与资源</text>
+<rect x="76.0" y="610" width="132.0" height="46" rx="9" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.8"/>
+<text x="142.0" y="642.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">组织架构</text>
+<rect x="220.0" y="610" width="132.0" height="46" rx="9" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.8"/>
+<text x="286.0" y="642.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">代理商</text>
+<rect x="364.0" y="610" width="132.0" height="46" rx="9" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.8"/>
+<text x="430.0" y="642.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">消费者</text>
+<rect x="508.0" y="610" width="132.0" height="46" rx="9" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.8"/>
+<text x="574.0" y="642.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">权益与营销</text>
+<rect x="652.0" y="610" width="132.0" height="46" rx="9" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.8"/>
+<text x="718.0" y="642.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">场地拓展</text>
+<rect x="796.0" y="610" width="132.0" height="46" rx="9" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.8"/>
+<text x="862.0" y="642.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">场地与点位</text>
+<rect x="940.0" y="610" width="132.0" height="46" rx="9" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.8"/>
+<text x="1006.0" y="642.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">设备资产</text>
+<rect x="1084.0" y="610" width="132.0" height="46" rx="9" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.8"/>
+<text x="1150.0" y="642.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">固件</text>
+<rect x="1228.0" y="610" width="132.0" height="46" rx="9" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.8"/>
+<text x="1294.0" y="642.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">库存</text>
+<rect x="1372.0" y="610" width="132.0" height="46" rx="9" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.8"/>
+<text x="1438.0" y="642.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">资产归属</text>
+<rect x="56" y="680" width="1488" height="92" rx="10" fill="#EEF2F8"/>
+<rect x="56" y="680" width="6" height="92" rx="3" fill="#5B7BA6"/>
+<text x="78" y="710" font-size="21" fill="#5B7BA6" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">L0 平台底座</text>
+<rect x="76.0" y="716" width="132.0" height="46" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="142.0" y="748.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">租户</text>
+<rect x="220.0" y="716" width="132.0" height="46" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="286.0" y="748.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">认证授权</text>
+<rect x="364.0" y="716" width="132.0" height="46" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="430.0" y="748.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">审计</text>
+<rect x="508.0" y="716" width="132.0" height="46" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="574.0" y="748.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">主数据</text>
+<rect x="652.0" y="716" width="132.0" height="46" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="718.0" y="748.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">数据字典</text>
+<rect x="796.0" y="716" width="132.0" height="46" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="862.0" y="748.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">系统参数</text>
+<rect x="940.0" y="716" width="132.0" height="46" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="1006.0" y="748.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">通知</text>
+<rect x="1084.0" y="716" width="132.0" height="46" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="1150.0" y="748.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">开放平台</text>
+<rect x="1228.0" y="716" width="132.0" height="46" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="1294.0" y="748.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">支付渠道</text>
+<rect x="1372.0" y="716" width="132.0" height="46" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="1438.0" y="748.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">厂商目录</text>
+<line x1="1516" y1="264" x2="1516" y2="236" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="1516" y1="370" x2="1516" y2="342" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="1516" y1="476" x2="1516" y2="448" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="1516" y1="582" x2="1516" y2="554" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="1516" y1="688" x2="1516" y2="660" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<text x="56" y="800" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">箭头 = 依赖方向（上层依赖下层）。层内模块可互相依赖，如「库存」依赖「设备资产」。</text>
+<text x="56" y="832" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">唯一反向依赖：设备接入(L2) → 订单(L3)，由 gw_command_log.order_no —— 指令日志该记通用 biz_ref，不该硬绑订单。</text>
+<text x="56" y="864" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">边界靠三条约束顶住：每表必须归位 · 每条依赖可追到具体列 · 分层不允许反向依赖。</text>
+</svg>

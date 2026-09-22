@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Source Han Sans SC','Noto Sans CJK SC',-apple-system,'Segoe UI',Roboto,sans-serif">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4A585B"/></marker><marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0F7173"/></marker></defs>
+<rect width="1600" height="900" fill="#FFFFFF"/>
+<text x="56" y="68" font-size="42" fill="#12181B" font-weight="750" text-anchor="start" letter-spacing="-1" opacity="1">一套代码，两种部署</text>
+<text x="56" y="104" font-size="22" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">默认单体 · 需要时拆 5 个进程　｜　业务代码不知道自己在哪种形态</text>
+<line x1="56" y1="126" x2="1544" y2="126" stroke="#D8E0DF" stroke-width="2"/>
+<rect x="56" y="150" width="1488" height="250" rx="10" fill="#EEF2F8"/>
+<rect x="56" y="150" width="6" height="250" rx="3" fill="#5B7BA6"/>
+<text x="78" y="180" font-size="21" fill="#5B7BA6" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">① 同一套业务代码（32 模块 / 132 张表全部有主）</text>
+<rect x="80" y="196" width="274" height="80" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="217.0" y="232.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">platform</text>
+<text x="217.0" y="261.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">底座+运营配置 · 41 表</text>
+<rect x="372" y="196" width="274" height="80" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="509.0" y="232.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">core</text>
+<text x="509.0" y="261.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">主链路 · 56 表</text>
+<rect x="664" y="196" width="274" height="80" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="801.0" y="232.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">device-gateway</text>
+<text x="801.0" y="261.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">南向接入 · 9 表</text>
+<rect x="956" y="196" width="274" height="80" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="1093.0" y="232.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">ops</text>
+<text x="1093.0" y="261.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">告警·工单·客服 · 14 表</text>
+<rect x="1248" y="196" width="274" height="80" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="1385.0" y="232.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">finance</text>
+<text x="1385.0" y="261.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">账务·分润·结算 · 12 表</text>
+<text x="96" y="316" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">跨服务调用只经 *-api 接口；本地实现在 classpath 上就用本地，否则自动装远程 —— 业务代码一字不改。</text>
+<text x="96" y="348" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">四条纪律从今天起对单体生效：不跨模块 JOIN · 不跨服务事务 · 只经接口调用 · 写操作幂等。</text>
+<rect x="56" y="430" width="1488" height="210" rx="10" fill="#EDF4EE"/>
+<rect x="56" y="430" width="6" height="210" rx="3" fill="#5C8A63"/>
+<text x="78" y="460" font-size="21" fill="#5C8A63" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">② 形态 A：单体（默认）</text>
+<rect x="96" y="480" width="700" height="70" rx="9" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.8"/>
+<text x="446.0" y="511.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">app-mono</text>
+<text x="446.0" y="540.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">一个进程 · 一个库 · 跨模块 = 方法调用</text>
+<rect x="96" y="562" width="700" height="56" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="446.0" y="586.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">pb_core</text>
+<text x="446.0" y="615.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">132 张表同库；报表可直接 JOIN</text>
+<rect x="852" y="480" width="330" height="70" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="1017.0" y="511.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">app-core</text>
+<text x="1017.0" y="540.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">主链路，单独扩容</text>
+<rect x="1198" y="480" width="330" height="70" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="1363.0" y="511.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">app-platform</text>
+<text x="1363.0" y="540.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">读多写少，多副本</text>
+<rect x="852" y="562" width="216" height="56" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="960.0" y="586.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">app-gateway</text>
+<text x="960.0" y="615.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">南向，变得最快</text>
+<rect x="1082" y="562" width="216" height="56" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="1190.0" y="586.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">app-ops</text>
+<text x="1190.0" y="615.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">可延迟</text>
+<rect x="1312" y="562" width="216" height="56" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="1420.0" y="586.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">app-finance</text>
+<text x="1420.0" y="615.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">批处理</text>
+<text x="852" y="462" font-size="21" fill="#A35D63" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">② 形态 B：拆 5 个进程（信号出现再切）</text>
+<text x="96" y="664" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">16 条真实跨服务依赖，没有一条在同步主链路上：资金域读订单走事件 · 运行域读资源走只读 API + 快照 · 场地是慢变数据走缓存。</text>
+<text x="96" y="696" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">另有 18 条目录型引用（region_id / vendor_code / channel_code）不计成本：本地缓存 + 变更事件即可。</text>
+<text x="96" y="740" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">为什么 core 大：借出一笔要在一个事务里同时动订单/充电宝占用/支付预授权/券核销，拆开就得上分布式事务 —— 拿最热链路换整洁不值。</text>
+<text x="96" y="784" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">⚠️ 拆分前必须先解决：划拨级联跨界事务（AgentOwnershipSync 同事务写 platform+core 的表）· gw_command_log.order_no 反向依赖 · 5 个跨域重名业务键。</text>
+<text x="96" y="828" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">⚠️「跨界事务 0 处」这个结论不可信 —— 自动扫描不跟调用链，上面那处就是人工找到的。拆分前需做一次跟调用链的完整核查。</text>
+<text x="96" y="864" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">何时真拆：core 扩容需求分化 · finance 批处理影响主链路 · 合规要求资金独立部署 · 团队大到发布互相阻塞。信号出现前不拆。</text>
+</svg>

@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Source Han Sans SC','Noto Sans CJK SC',-apple-system,'Segoe UI',Roboto,sans-serif">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4A585B"/></marker><marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0F7173"/></marker></defs>
+<rect width="1600" height="900" fill="#FFFFFF"/>
+<text x="56" y="68" font-size="42" fill="#12181B" font-weight="750" text-anchor="start" letter-spacing="-1" opacity="1">十个业务服务与依赖方向</text>
+<text x="56" y="104" font-size="22" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">实线 = 同步调用 · 虚线 = 异步事件 · 自上而下为依赖方向</text>
+<line x1="56" y1="126" x2="1544" y2="126" stroke="#D8E0DF" stroke-width="2"/>
+<rect x="196" y="178" width="236" height="70" rx="9" fill="#FFFFFF" stroke="#7D63A3" stroke-width="1.8"/>
+<text x="314.0" y="222.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">marketing</text>
+<rect x="682" y="178" width="236" height="70" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="3"/>
+<text x="800.0" y="222.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">trade</text>
+<rect x="196" y="330" width="236" height="70" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="1.8"/>
+<text x="314.0" y="374.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">device</text>
+<rect x="682" y="330" width="236" height="70" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="800.0" y="374.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">payment</text>
+<rect x="1168" y="330" width="236" height="70" rx="9" fill="#FFFFFF" stroke="#7D63A3" stroke-width="1.8"/>
+<text x="1286.0" y="374.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">customer</text>
+<rect x="196" y="482" width="236" height="70" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="1.8"/>
+<text x="314.0" y="526.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">workorder</text>
+<rect x="682" y="482" width="236" height="70" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="800.0" y="526.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">finance</text>
+<rect x="438" y="620" width="236" height="70" rx="9" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.8"/>
+<text x="556.0" y="664.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">location</text>
+<line x1="432" y1="213.0" x2="682" y2="213.0" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)"/>
+<rect x="515.0" y="194.0" width="84.0" height="26" rx="4" fill="#FFFFFF"/>
+<text x="557.0" y="213.0" font-size="18" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">报障转单</text>
+<line x1="742" y1="248" x2="314.0" y2="330" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)"/>
+<rect x="486.0" y="270.0" width="84.0" height="26" rx="4" fill="#FFFFFF"/>
+<text x="528.0" y="289.0" font-size="18" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">校验库存</text>
+<line x1="800.0" y1="248" x2="800.0" y2="330" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)"/>
+<rect x="758.0" y="270.0" width="84.0" height="26" rx="4" fill="#FFFFFF"/>
+<text x="800.0" y="289.0" font-size="18" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">资金动作</text>
+<line x1="858" y1="248" x2="1286.0" y2="330" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)"/>
+<rect x="1030.0" y="270.0" width="84.0" height="26" rx="4" fill="#FFFFFF"/>
+<text x="1072.0" y="289.0" font-size="18" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">风控拦截</text>
+<line x1="314.0" y1="400" x2="314.0" y2="482" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)" stroke-dasharray="6 5"/>
+<rect x="253.55" y="422.0" width="120.90000000000002" height="26" rx="4" fill="#FFFFFF"/>
+<text x="314.0" y="441.0" font-size="18" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">AlarmRaised</text>
+<line x1="800.0" y1="400" x2="800.0" y2="482" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)" stroke-dasharray="6 5"/>
+<rect x="739.55" y="422.0" width="120.90000000000002" height="26" rx="4" fill="#FFFFFF"/>
+<text x="800.0" y="441.0" font-size="18" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">PayCaptured</text>
+<line x1="314.0" y1="552" x2="478" y2="620" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)"/>
+<rect x="372.0" y="567.0" width="48.0" height="26" rx="4" fill="#FFFFFF"/>
+<text x="396.0" y="586.0" font-size="18" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">归属</text>
+<line x1="800.0" y1="552" x2="634" y2="620" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)"/>
+<rect x="675.0" y="567.0" width="84.0" height="26" rx="4" fill="#FFFFFF"/>
+<text x="717.0" y="586.0" font-size="18" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">收益归属</text>
+<rect x="56" y="722" width="1488" height="122" rx="10" fill="#EEF2F8"/>
+<rect x="56" y="722" width="6" height="122" rx="3" fill="#5B7BA6"/>
+<text x="78" y="752" font-size="21" fill="#5B7BA6" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">共享服务　被任何服务调用，自身不调任何人 —— 故不画连线</text>
+<rect x="556" y="766" width="236" height="58" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="674.0" y="804.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">identity</text>
+<rect x="826" y="766" width="262" height="58" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="957.0" y="804.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">platform-config</text>
+<text x="56" y="878" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">identity = 鉴权 + 数据范围规格 · platform-config = 字典/业务规则/触达；画连线会是 20 条边覆盖全图</text>
+</svg>

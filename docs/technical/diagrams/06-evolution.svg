@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Source Han Sans SC','Noto Sans CJK SC',-apple-system,'Segoe UI',Roboto,sans-serif">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4A585B"/></marker><marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0F7173"/></marker></defs>
+<rect width="1600" height="900" fill="#FFFFFF"/>
+<text x="56" y="68" font-size="42" fill="#12181B" font-weight="750" text-anchor="start" letter-spacing="-1" opacity="1">拆分演进路径</text>
+<text x="56" y="104" font-size="22" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">按信号裂解，不预先拆（ADR-001 + ADR-016）</text>
+<line x1="56" y1="126" x2="1544" y2="126" stroke="#D8E0DF" stroke-width="2"/>
+<rect x="52.0" y="250" width="226" height="220" rx="11" fill="#F0F3F3" stroke="#6B7A7C" stroke-width="3"/>
+<text x="165.0" y="296" font-size="28" fill="#6B7A7C" font-weight="750" text-anchor="middle" letter-spacing="0" opacity="1">P0 现在</text>
+<text x="165.0" y="344" font-size="21" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">模块化单体</text>
+<text x="165.0" y="372" font-size="21" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">1 进程</text>
+<line x1="82.0" y1="396" x2="248.0" y2="396" stroke="#6B7A7C" stroke-width="1.4"/>
+<text x="165.0" y="424" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">—</text>
+<line x1="282.0" y1="360" x2="300.0" y2="360" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<rect x="306.0" y="250" width="226" height="220" rx="11" fill="#FBF3E8" stroke="#B07D3A" stroke-width="1.8"/>
+<text x="419.0" y="296" font-size="28" fill="#B07D3A" font-weight="750" text-anchor="middle" letter-spacing="0" opacity="1">P1</text>
+<text x="419.0" y="344" font-size="21" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">抽 access-gateway</text>
+<line x1="336.0" y1="396" x2="502.0" y2="396" stroke="#B07D3A" stroke-width="1.4"/>
+<text x="419.0" y="424" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">接入真实硬件</text>
+<line x1="536.0" y1="360" x2="554.0" y2="360" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<rect x="560.0" y="250" width="226" height="220" rx="11" fill="#F9EEEF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="673.0" y="296" font-size="28" fill="#A35D63" font-weight="750" text-anchor="middle" letter-spacing="0" opacity="1">P2</text>
+<text x="673.0" y="344" font-size="21" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">抽 payment + finance</text>
+<line x1="590.0" y1="396" x2="756.0" y2="396" stroke="#A35D63" stroke-width="1.4"/>
+<text x="673.0" y="424" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">资金合规审计边界</text>
+<line x1="790.0" y1="360" x2="808.0" y2="360" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<rect x="814.0" y="250" width="226" height="220" rx="11" fill="#F9EEEF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="927.0" y="296" font-size="28" fill="#A35D63" font-weight="750" text-anchor="middle" letter-spacing="0" opacity="1">P3</text>
+<text x="927.0" y="344" font-size="21" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">抽 trade</text>
+<line x1="844.0" y1="396" x2="1010.0" y2="396" stroke="#A35D63" stroke-width="1.4"/>
+<text x="927.0" y="424" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">大促峰值需独立扩缩容</text>
+<line x1="1044.0" y1="360" x2="1062.0" y2="360" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<rect x="1068.0" y="250" width="226" height="220" rx="11" fill="#FBF3E8" stroke="#B07D3A" stroke-width="1.8"/>
+<text x="1181.0" y="296" font-size="28" fill="#B07D3A" font-weight="750" text-anchor="middle" letter-spacing="0" opacity="1">P4</text>
+<text x="1181.0" y="344" font-size="21" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">抽 device + workorder</text>
+<line x1="1098.0" y1="396" x2="1264.0" y2="396" stroke="#B07D3A" stroke-width="1.4"/>
+<text x="1181.0" y="424" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">设备量级压过交易</text>
+<line x1="1298.0" y1="360" x2="1316.0" y2="360" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<rect x="1322.0" y="250" width="226" height="220" rx="11" fill="#EEF2F8" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="1435.0" y="296" font-size="28" fill="#5B7BA6" font-weight="750" text-anchor="middle" letter-spacing="0" opacity="1">P5</text>
+<text x="1435.0" y="344" font-size="21" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">其余按需</text>
+<line x1="1352.0" y1="396" x2="1518.0" y2="396" stroke="#5B7BA6" stroke-width="1.4"/>
+<text x="1435.0" y="424" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">identity /</text>
+<text x="1435.0" y="448" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">platform-config</text>
+<text x="56" y="560" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">每步的前置条件（缺一不可）：该服务的表已无跨域 join · 域间调用已走 /internal 或事件 ·</text>
+<text x="56" y="592" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">有链路追踪 · 有该服务独立的集成测试</text>
+<text x="56" y="656" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">「搬迁不重写」依赖三个前置设计：</text>
+<text x="80" y="688" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">① 表名 = 子域前缀 + 实体，库内唯一 → 拆库是纯 schema 迁移，零改名</text>
+<text x="80" y="720" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">② 跨域只有逻辑引用、不建物理 FK → 拆开后无跨库外键</text>
+<text x="80" y="752" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">③ 域间通信已走 DomainEventPublisher 抽象 → 进程内换 Kafka，业务代码零改动</text>
+<text x="56" y="812" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">反过来说：任何一次「图省事直接 join 另一个域的表」都是在给未来的拆分埋雷。</text>
+</svg>

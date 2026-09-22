@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Source Han Sans SC','Noto Sans CJK SC',-apple-system,'Segoe UI',Roboto,sans-serif">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4A585B"/></marker><marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0F7173"/></marker></defs>
+<rect width="1600" height="900" fill="#FFFFFF"/>
+<text x="56" y="68" font-size="42" fill="#12181B" font-weight="750" text-anchor="start" letter-spacing="-1" opacity="1">请求的四层权限</text>
+<text x="56" y="104" font-size="22" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">任一层缺失即为越权面；③ 是本轮补齐的重点</text>
+<line x1="56" y1="126" x2="1544" y2="126" stroke="#D8E0DF" stroke-width="2"/>
+<rect x="180.0" y="250" width="286" height="290" rx="12" fill="#EEF2F8" stroke="#5B7BA6" stroke-width="2.4"/>
+<text x="323.0" y="304" font-size="31" fill="#5B7BA6" font-weight="750" text-anchor="middle" letter-spacing="0" opacity="1">① 认证</text>
+<text x="323.0" y="342" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">你是谁</text>
+<line x1="218.0" y1="368" x2="428.0" y2="368" stroke="#5B7BA6" stroke-width="1.5"/>
+<text x="323.0" y="408" font-size="18" fill="#12181B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">Bearer → LoginUser</text>
+<text x="323.0" y="438" font-size="18" fill="#12181B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">realm: STAFF·AGENT·CONSUMER</text>
+<line x1="471.0" y1="395.0" x2="491.0" y2="395.0" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<rect x="498.0" y="250" width="286" height="290" rx="12" fill="#EEF2F8" stroke="#5B7BA6" stroke-width="2.4"/>
+<text x="641.0" y="304" font-size="31" fill="#5B7BA6" font-weight="750" text-anchor="middle" letter-spacing="0" opacity="1">② 功能权限</text>
+<text x="641.0" y="342" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">能不能调这个接口</text>
+<line x1="536.0" y1="368" x2="746.0" y2="368" stroke="#5B7BA6" stroke-width="1.5"/>
+<text x="641.0" y="408" font-size="18" fill="#12181B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">@perm.can(权限码)</text>
+<text x="641.0" y="438" font-size="18" fill="#12181B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">89 个码 · 无码返 403</text>
+<line x1="789.0" y1="395.0" x2="809.0" y2="395.0" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<rect x="816.0" y="250" width="286" height="290" rx="12" fill="#EDF4EE" stroke="#5C8A63" stroke-width="2.4"/>
+<text x="959.0" y="304" font-size="31" fill="#5C8A63" font-weight="750" text-anchor="middle" letter-spacing="0" opacity="1">③ 数据范围</text>
+<text x="959.0" y="342" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">能看哪几行</text>
+<line x1="854.0" y1="368" x2="1064.0" y2="368" stroke="#5C8A63" stroke-width="1.5"/>
+<text x="959.0" y="408" font-size="18" fill="#12181B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">SQL 自动追加</text>
+<text x="959.0" y="438" font-size="18" fill="#12181B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">agent_no IN (...)</text>
+<line x1="1107.0" y1="395.0" x2="1127.0" y2="395.0" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<rect x="1134.0" y="250" width="286" height="290" rx="12" fill="#F2EDF7" stroke="#7D63A3" stroke-width="2.4"/>
+<text x="1277.0" y="304" font-size="31" fill="#7D63A3" font-weight="750" text-anchor="middle" letter-spacing="0" opacity="1">④ 出参脱敏</text>
+<text x="1277.0" y="342" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">能看到哪些明文</text>
+<line x1="1172.0" y1="368" x2="1382.0" y2="368" stroke="#7D63A3" stroke-width="1.5"/>
+<text x="1277.0" y="408" font-size="18" fill="#12181B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">手机/邮箱/密钥掩码</text>
+<text x="1277.0" y="438" font-size="18" fill="#12181B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">明文只在 pb_pii</text>
+<text x="64" y="403.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">请求</text>
+<line x1="134" y1="395.0" x2="172.0" y2="395.0" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="1428.0" y1="395.0" x2="1494.0" y2="395.0" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<text x="1506.0" y="403.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">响应</text>
+<text x="56" y="690" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">③ 数据范围的性质：未注册的表 = 全局放行。漏注册不报错、不告警，只会静默越权。</text>
+<text x="56" y="724" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">handler 是 fail-closed：一张表一旦注册，所有访问主体的维度都必须登记，漏一个那类主体全瞎。</text>
+<text x="56" y="758" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">已注册 5 表：loc_site · loc_location · dev_cabinet · ord_rent · wo_order</text>
+</svg>
