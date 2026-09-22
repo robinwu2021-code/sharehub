@@ -8,6 +8,8 @@ const ROLE_PERMS: Record<Role, string[]> = {
 
   OPS: [
     "dashboard:overview:read", "dashboard:todo:read",
+    // 运营管理·站点概览（2026-09-22）：看站点/设备铺设与待关注站点，运维主责
+    "location:overview:read",
     "device:cabinet:*", "device:slot:read", "device:powerbank:*",
     // OTA 给整模块通配：后端 GET/POST /ota-releases 判 device:ota:manage、投放编辑判
     // device:ota:publish，二者此前都没登记 —— 只有 ADMIN 靠 '*' 能用，OPS 作为运维主责
@@ -32,6 +34,9 @@ const ROLE_PERMS: Record<Role, string[]> = {
   ],
   CS: [
     "dashboard:overview:read", "dashboard:todo:read",
+    // 公告只读（2026-09-22）：旧菜单公告挂在 marketing:coupon:read 下、CS 原本可见，保持可见性不变；
+    // 发布/下线（:update）不给客服。后端早已按 marketing:notice:* 判权
+    "marketing:notice:read",
     "device:cabinet:read", "device:slot:read", "device:command:send",
     "order:order:read", "order:order:export", "order:exception:read", "order:exception:handle",
     "order:intervene:execute", "order:refund:apply",
@@ -49,6 +54,7 @@ const ROLE_PERMS: Record<Role, string[]> = {
 
   FINANCE: [
     "dashboard:overview:read", "dashboard:todo:read",
+    "location:overview:read", // 运营管理·站点概览；预约调价 pricing:adjustment:* 已被 pricing:* 覆盖
     "order:order:read", "order:order:export", "order:refund:audit",
     "order:deposit:manage", "order:arrears:dun",
     "pricing:*", "finance:*",
@@ -71,6 +77,7 @@ const ROLE_PERMS: Record<Role, string[]> = {
 
   VIEWER: [
     "dashboard:overview:read", "dashboard:todo:read",
+    "location:overview:read", // 运营管理·站点概览（只读角色）
     "device:cabinet:read", "device:slot:read", "order:order:read",
     "location:poi:read", "location:venue:read", "location:analysis:read",
     "finance:share_rule:read", "finance:share_record:read", "finance:settlement:read", "finance:withdrawal:read",

@@ -7,8 +7,9 @@ import {
   findActiveSection, activeLeafIndex,
   sectionDefaultHref, breadcrumb, leafParts, normPath,
   isLeafLocked, isSectionLocked, isLeafDisabled, routeLockedPhase, groupedLeaves,
-  portalTitleOverride,
+  portalTitleOverride, opLeaves,
 } from "./nav";
+import type { OperationPage } from "./backend-ready";
 import { isPhaseLocked, CURRENT_PHASE } from "./phase";
 import { hasNavLabel } from "./i18n/nav-labels";
 import type { Role } from "./auth";
@@ -24,7 +25,7 @@ const sectionKeys = (role: Role) => visibleSections(role).map((s) => s.key);
 // L1 顺序即 Rail 顺序；改动必须是有意识的产品决策，连带更新 docs。
 const L1_KEYS = [
   "my-biz", "my-asset", "my-service", // 代理端门户（portalFor: AGENT）
-  "dashboard", "device", "alarm", "workorder", "location", "agent", "order",
+  "dashboard", "operation", "device", "alarm", "workorder", "location", "agent", "order",
   "pricing", "finance", "user", "marketing", "cs", "report", "org", "system",
 ];
 // 叶子五元组 href|label|perm|phase|group —— 2026-07-30 层级重构前后逐条比对为零差异。
@@ -35,6 +36,17 @@ const LEAF_TUPLES = [
   "/devices|我的设备|device:cabinet:read||设备与订单",
   "/orders|我的订单|order:order:read||设备与订单",
   "/work-orders?view=list|设备报修|workorder:wo:create||报修与跟进",
+  // 2026-09-22 新增：运营管理（对标简电三分组）。有意变更，见 TDD-运营管理菜单-前端.md
+  "/operation/overview|站点概览|location:overview:read||场站管理",
+  "/operation/sites|站点管理|location:poi:read||场站管理",
+  "/operation/fee-plans|收费方案|pricing:plan:read||场站管理",
+  "/operation/fee-adjustments|预约调价|pricing:adjustment:read||场站管理",
+  "/operation/site-sharing|站点分成|finance:share_rule:read||场站管理",
+  "/operation/payee-sharing|分成方分成|finance:share_rule:read||场站管理",
+  "/operation/app-versions|应用版本|system:app_version:read||基础管理",
+  "/operation/banks|银行管理|system:bank:read||基础管理",
+  "/operation/problems|问题管理|system:problem:read||基础管理",
+  "/operation/notices|公告管理|marketing:notice:read||公告管理",
   "/devices|设备台账|device:cabinet:read||资产台账",
   "/devices?tab=powerbanks|充电宝管理|device:powerbank:read||资产台账",
   "/devices?tab=monitor|实时监控|device:cabinet:read||在线运行",
@@ -134,9 +146,9 @@ const LEAF_TUPLES = [
   "/system?tab=openapi|OpenAPI 应用|system:openapi:read|3|开放与市场",];
 
 describe("结构回归基线（层级重构不改内容）", () => {
-  it("L1 = 15 个运营项 + 3 个代理门户项，顺序固定", () => {
+  it("L1 = 16 个运营项 + 3 个代理门户项，顺序固定", () => {
     expect(NAV.map((s) => s.key)).toEqual(L1_KEYS);
-    expect(NAV.filter((s) => !s.portalFor)).toHaveLength(15);
+    expect(NAV.filter((s) => !s.portalFor)).toHaveLength(16);
     expect(NAV.filter((s) => s.portalFor)).toHaveLength(3);
   });
   it("叶子五元组集合与顺序逐条不变（href|label|perm|phase|group）", () => {
@@ -151,9 +163,9 @@ describe("结构回归基线（层级重构不改内容）", () => {
 });
 
 describe("A.9 角色×L1 可见性矩阵（抽查）", () => {
-  it("ADMIN 见全部 15 个运营项", () => {
+  it("ADMIN 见全部 16 个运营项", () => {
     expect(sectionKeys("ADMIN")).toEqual([
-      "dashboard", "device", "alarm", "workorder", "location", "agent", "order",
+      "dashboard", "operation", "device", "alarm", "workorder", "location", "agent", "order",
       "pricing", "finance", "user", "marketing", "cs", "report", "org", "system",
     ]);
   });
@@ -457,5 +469,61 @@ describe("portalTitleOverride（拍板 #5：代理端只改标题）", () => {
   });
   it("尾斜杠归一化后仍命中（trailingSlash:true 的路由形态）", () => {
     expect(portalTitleOverride("AGENT", "/devices/", "cabinets", true)).toBe("我的设备");
+  });
+});
+
+// ── 运营管理（2026-09-22，对标简电三分组；TDD-运营管理菜单-前端.md）──────────
+describe("运营管理：跨模块 section", () => {
+  const op = () => sec("operation");
+  const leafLabels = (r: Role) => visibleLeaves(op(), r).map((l) => l.label);
+
+  it("各角色可见的子页面与后端权限码一致", () => {
+    expect(leafLabels("ADMIN")).toEqual([
+      "站点概览", "站点管理", "收费方案", "预约调价", "站点分成", "分成方分成",
+      "应用版本", "银行管理", "问题管理", "公告管理",
+    ]);
+    expect(leafLabels("OPS")).toEqual(["站点概览", "站点管理", "应用版本"]);
+    expect(leafLabels("FINANCE")).toEqual(["站点概览", "收费方案", "预约调价", "站点分成", "分成方分成", "银行管理"]);
+    expect(leafLabels("BD")).toEqual(["站点概览", "站点管理", "站点分成", "分成方分成", "公告管理"]);
+    expect(leafLabels("VIEWER")).toEqual(["站点概览", "站点管理", "站点分成", "分成方分成"]);
+  });
+
+  it("CS 没有 location 模块权限，也能通过 system/marketing 看到运营管理（多模块规则）", () => {
+    expect(sectionKeys("CS")).toContain("operation");
+    expect(leafLabels("CS")).toEqual(["问题管理", "公告管理"]);
+    // 默认落地到它第一个能打开的页面，而不是它没权限的站点概览
+    expect(sectionDefaultHref(op(), "CS")).toBe("/operation/problems");
+  });
+
+  it("AGENT 走门户，看不到运营管理", () => {
+    expect(sectionKeys("AGENT")).not.toContain("operation");
+  });
+
+  it("凡是能看到运营管理的角色，至少有一个子页面（不出现点开是空的一级菜单）", () => {
+    for (const r of ["ADMIN", "OPS", "CS", "FINANCE", "BD", "VIEWER"] as Role[]) {
+      if (sectionKeys(r).includes("operation")) expect(leafLabels(r).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("三个分组与简电一致且顺序固定", () => {
+    expect(groupedLeaves(visibleLeaves(op(), "ADMIN")).map((g) => g.group)).toEqual(["场站管理", "基础管理", "公告管理"]);
+  });
+
+  it("多个独立页面：路径反推与高亮按页面路径", () => {
+    expect(findActiveSection("/operation/banks", "ADMIN")?.key).toBe("operation");
+    expect(findActiveSection("/operation/banks/", "ADMIN")?.key).toBe("operation");
+    const leaves = visibleLeaves(op(), "ADMIN");
+    expect(leaves[activeLeafIndex(leaves, "/operation/banks", null, null)]?.label).toBe("银行管理");
+    expect(breadcrumb("/operation/fee-adjustments", null, null, "ADMIN")).toEqual(["运营管理", "场站管理", "预约调价"]);
+    // 旧菜单的同名功能不受影响
+    expect(findActiveSection("/system", "ADMIN")?.key).toBe("system");
+  });
+
+  it("真实后端模式下，后端未就绪的页面灰显；mock 模式全部可点", () => {
+    const rows = (op().children ?? []).map((l) =>
+      [l.href.replace("/operation/", ""), l.label, l.perm ?? "", l.group ?? ""] as [OperationPage, string, string, string]);
+    const soonReal = opLeaves(rows, false).filter((l) => l.soon).map((l) => l.label);
+    expect(soonReal).toEqual(["站点概览", "预约调价", "站点分成", "分成方分成"]);
+    expect(opLeaves(rows, true).filter((l) => l.soon)).toEqual([]);
   });
 });

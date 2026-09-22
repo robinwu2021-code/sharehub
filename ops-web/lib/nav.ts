@@ -17,6 +17,7 @@ import type { Role } from "./auth";
 import { can, canModule } from "./permissions";
 import type { Phase } from "./phase";
 import { isPhaseLocked } from "./phase";
+import { pageReady, type OperationPage } from "./backend-ready";
 
 export const NAV_PREFS_STORAGE_KEY = "ops-nav-prefs";
 
@@ -76,6 +77,13 @@ export interface NavSection {
   label: string;
   icon: string;
   module: string; // 权限码模块前缀（canModule 过滤）
+  /**
+   * 跨模块 section 的全部权限模块前缀（2026-09-22，运营管理新菜单引入）。
+   * 设置后 L1 可见性改为：**任一模块可见即显示**（仍由 L3 的 perm 逐叶过滤）。
+   * 动机：运营管理横跨 location/pricing/finance/system/marketing 五个模块，
+   * 只按单个 module 判断会让只有其中一部分权限的角色（如 CS 只能看问题管理）整个看不到。
+   */
+  modules?: string[];
   href: string; // section 首页
   match?: string[]; // 路径归属前缀（默认 = href 的 path 部分）；如 system 归属 /system
   soon?: boolean; // 整 section 待建（页面不存在）
@@ -92,6 +100,21 @@ export interface NavSection {
    */
   portalFor?: Role[];
   children?: NavLeaf[];
+}
+
+/**
+ * 运营管理的叶子：[页面, 标签, 权限码, 分组]。soon = 该页后端未就绪（仅真实后端模式下为 true）。
+ * `useMock` 参数只为单测注入；运行时取 backend-ready 的环境判定。
+ */
+export function opLeaves(
+  rows: [OperationPage, string, string, string][],
+  useMock?: boolean,
+): NavLeaf[] {
+  return rows.map(([page, label, perm, group]) => {
+    const leaf: NavLeaf = { href: `/operation/${page}`, label, perm, group };
+    if (!pageReady(page, useMock)) leaf.soon = true;
+    return leaf;
+  });
 }
 
 export const NAV: NavSection[] = [
@@ -122,8 +145,30 @@ export const NAV: NavSection[] = [
     ],
   },
 
-  // ── 运营端 15 项 ────────────────────────────────────────────────────
+  // ── 运营端 16 项 ────────────────────────────────────────────────────
   { key: "dashboard", label: "经营看板", icon: "LayoutDashboard", module: "dashboard", href: "/" },
+  {
+    // 2026-09-22 新菜单：对标简电云「运营管理」三个分组（场站管理 / 基础管理 / 公告管理），
+    // 不在旧菜单上叠加，将来替换站点/计费/系统设置/营销里的对应项。
+    // 需求：docs/requirements/features/运营管理-功能清单.md；方案：TDD-运营管理菜单-前端.md
+    // 与其它 section 不同：一个 section 下是**多个独立页面**（/operation/<page>），不是同页 tab。
+    // soon 由 backend-ready.ts 决定：真实后端模式下接口未就绪的页面灰显，mock 模式恒可点。
+    key: "operation", label: "运营管理", icon: "Store", module: "location",
+    modules: ["location", "pricing", "finance", "system", "marketing"],
+    href: "/operation/overview", match: ["/operation"],
+    children: opLeaves([
+      ["overview", "站点概览", "location:overview:read", "场站管理"],
+      ["sites", "站点管理", "location:poi:read", "场站管理"],
+      ["fee-plans", "收费方案", "pricing:plan:read", "场站管理"],
+      ["fee-adjustments", "预约调价", "pricing:adjustment:read", "场站管理"],
+      ["site-sharing", "站点分成", "finance:share_rule:read", "场站管理"],
+      ["payee-sharing", "分成方分成", "finance:share_rule:read", "场站管理"],
+      ["app-versions", "应用版本", "system:app_version:read", "基础管理"],
+      ["banks", "银行管理", "system:bank:read", "基础管理"],
+      ["problems", "问题管理", "system:problem:read", "基础管理"],
+      ["notices", "公告管理", "marketing:notice:read", "公告管理"],
+    ]),
+  },
   {
     key: "device", label: "设备管理", icon: "Server", module: "device", href: "/devices",
     children: [
@@ -335,7 +380,12 @@ export function leafParts(href: string): { path: string; tab: string | null; vie
 export function visibleSections(role: Role | undefined): NavSection[] {
   const portals = NAV.filter((s) => role && s.portalFor?.includes(role));
   const pool = portals.length > 0 ? portals : NAV.filter((s) => !s.portalFor);
-  return pool.filter((s) => canModule(role, s.module));
+  return pool.filter((s) => {
+    if (!s.modules) return canModule(role, s.module);
+    // 跨模块 section：有任一模块权限，且至少一个叶子可见（防出现点开是空的 L1）
+    return s.modules.some((m) => canModule(role, m))
+      && (s.children ?? []).some((l) => (l.perm ? can(role, l.perm) : true));
+  });
 }
 
 /** L3 可见性 = leaf.perm ? can() : 跟随 section。phase-locked 叶子保留（灰显）。 */

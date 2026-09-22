@@ -170,6 +170,15 @@ const NAV: Record<string, Pair> = {
   "系统参数": { en: "Parameters", ar: "المعاملات" },
   "多国家市场": { en: "Markets", ar: "الأسواق الدولية" },
   "OpenAPI 应用": { en: "OpenAPI Apps", ar: "تطبيقات OpenAPI" },
+  // 运营管理新菜单（2026-09-22）
+  "运营管理": { en: "Operations", ar: "إدارة العمليات" },
+  "场站管理": { en: "Sites & Pricing", ar: "المواقع والتسعير" },
+  "基础管理": { en: "Base Data", ar: "البيانات الأساسية" },
+  "站点概览": { en: "Site Overview", ar: "نظرة عامة على المواقع" },
+  "收费方案": { en: "Fee Plans", ar: "خطط الرسوم" },
+  "预约调价": { en: "Scheduled Price Changes", ar: "تعديلات الأسعار المجدولة" },
+  "站点分成": { en: "Site Revenue Share", ar: "حصص إيرادات المواقع" },
+  "分成方分成": { en: "Payee Revenue Share", ar: "حصص المستفيدين" },
 };
 
 /** 该中文标签是否已有 en/ar 译文（单测用：防新增菜单漏配三语）。 */
