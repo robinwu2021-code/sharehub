@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Source Han Sans SC','Noto Sans CJK SC',-apple-system,'Segoe UI',Roboto,sans-serif">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4A585B"/></marker><marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0F7173"/></marker></defs>
+<rect width="1600" height="900" fill="#FFFFFF"/>
+<text x="56" y="68" font-size="42" fill="#12181B" font-weight="750" text-anchor="start" letter-spacing="-1" opacity="1">协议对接服务 sharehub-gateway</text>
+<text x="56" y="104" font-size="22" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">对接第三方充电宝 · 充电桩平台与设备　｜　逻辑上一个服务：可以是 1 个进程 / 插件化 / 多进程</text>
+<line x1="56" y1="126" x2="1544" y2="126" stroke="#D8E0DF" stroke-width="2"/>
+<rect x="56" y="148" width="1488" height="100" rx="10" fill="#F0F3F3"/>
+<rect x="56" y="148" width="6" height="100" rx="3" fill="#6B7A7C"/>
+<text x="78" y="178" font-size="21" fill="#6B7A7C" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">① 对端（三种接入形态）</text>
+<rect x="76.0" y="182" width="350.0" height="60" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="251.0" y="208.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">A 厂商云</text>
+<text x="251.0" y="237.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">HTTPS API + Webhook 回调</text>
+<rect x="442.0" y="182" width="716.0" height="60" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="800.0" y="208.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">B 设备直连</text>
+<text x="800.0" y="237.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">TCP 私有协议 · MQTT（经 EMQX）</text>
+<rect x="1174.0" y="182" width="350.0" height="60" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="1349.0" y="208.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">C 行业标准</text>
+<text x="1349.0" y="237.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">OCPP 1.6J / 2.0.1（WebSocket）</text>
+<line x1="239.0" y1="244" x2="239.0" y2="264" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="263.0" y1="264" x2="263.0" y2="244" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)" stroke-dasharray="6 5"/>
+<line x1="605.0" y1="244" x2="605.0" y2="264" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="629.0" y1="264" x2="629.0" y2="244" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)" stroke-dasharray="6 5"/>
+<line x1="971.0" y1="244" x2="971.0" y2="264" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="995.0" y1="264" x2="995.0" y2="244" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)" stroke-dasharray="6 5"/>
+<line x1="1337.0" y1="244" x2="1337.0" y2="264" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="1361.0" y1="264" x2="1361.0" y2="244" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)" stroke-dasharray="6 5"/>
+<rect x="56" y="266" width="1488" height="100" rx="10" fill="#FBF3E8"/>
+<rect x="56" y="266" width="6" height="100" rx="3" fill="#B07D3A"/>
+<text x="78" y="296" font-size="21" fill="#B07D3A" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">② 传输适配 transport（按协议一个，互不依赖）</text>
+<rect x="76.0" y="300" width="350.0" height="60" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="1.8"/>
+<text x="251.0" y="326.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">http-webhook</text>
+<text x="251.0" y="355.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">/gw/callback/{vendor} · 验签</text>
+<rect x="442.0" y="300" width="350.0" height="60" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="1.8"/>
+<text x="617.0" y="326.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">tcp-netty</text>
+<text x="617.0" y="355.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">长连接会话 · 帧编解码</text>
+<rect x="808.0" y="300" width="350.0" height="60" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="1.8"/>
+<text x="983.0" y="326.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">mqtt</text>
+<text x="983.0" y="355.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">订阅上行 · 发布指令</text>
+<rect x="1174.0" y="300" width="350.0" height="60" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="1.8"/>
+<text x="1349.0" y="326.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">ocpp-ws</text>
+<text x="1349.0" y="355.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">/ocpp/{chargePointId}</text>
+<line x1="239.0" y1="362" x2="239.0" y2="382" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="263.0" y1="382" x2="263.0" y2="362" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)" stroke-dasharray="6 5"/>
+<line x1="605.0" y1="362" x2="605.0" y2="382" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="629.0" y1="382" x2="629.0" y2="362" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)" stroke-dasharray="6 5"/>
+<line x1="971.0" y1="362" x2="971.0" y2="382" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="995.0" y1="382" x2="995.0" y2="362" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)" stroke-dasharray="6 5"/>
+<line x1="1337.0" y1="362" x2="1337.0" y2="382" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="1361.0" y1="382" x2="1361.0" y2="362" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)" stroke-dasharray="6 5"/>
+<rect x="56" y="384" width="1488" height="100" rx="10" fill="#EEF2F8"/>
+<rect x="56" y="384" width="6" height="100" rx="3" fill="#5B7BA6"/>
+<text x="78" y="414" font-size="21" fill="#5B7BA6" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">③ 接入内核 kernel（与协议、厂商都无关）</text>
+<rect x="76.0" y="418" width="276.8" height="60" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="214.4" y="444.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">驱动路由</text>
+<text x="214.4" y="473.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">(厂商, 设备类型) → 驱动</text>
+<rect x="368.8" y="418" width="276.8" height="60" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="507.20000000000005" y="444.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">指令生命周期</text>
+<text x="507.20000000000005" y="473.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">受理→下发→ACK→重试→终态</text>
+<rect x="661.6" y="418" width="276.8" height="60" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="800.0" y="444.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">事件归一化</text>
+<text x="800.0" y="473.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">报文 → NormalizedEvent</text>
+<rect x="954.4000000000001" y="418" width="276.8" height="60" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="1092.8000000000002" y="444.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">会话与 SN 映射</text>
+<text x="1092.8000000000002" y="473.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">SN→节点 · 在线态 · LWT</text>
+<rect x="1247.2" y="418" width="276.8" height="60" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="1385.6000000000001" y="444.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">报文留痕</text>
+<text x="1385.6000000000001" y="473.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">上下行原文 · 脱敏 · 可回放</text>
+<line x1="214.4" y1="480" x2="214.4" y2="500" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<rect x="56" y="502" width="1488" height="100" rx="10" fill="#FBF3E8"/>
+<rect x="56" y="502" width="6" height="100" rx="3" fill="#B07D3A"/>
+<text x="78" y="532" font-size="21" fill="#B07D3A" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">④ 驱动插件（每家厂商 = 1 个 driver + manifest；指令 / 事件按设备族白名单）</text>
+<rect x="76.0" y="536" width="350.0" height="60" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="1.8"/>
+<text x="251.0" y="562.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">通用族</text>
+<text x="251.0" y="591.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">REBOOT · ONLINE · FAULT · OTA</text>
+<rect x="442.0" y="536" width="350.0" height="60" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="1.8"/>
+<text x="617.0" y="562.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">充电宝族</text>
+<text x="617.0" y="591.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">EJECT_SLOT · ITEM_INSERTED</text>
+<rect x="808.0" y="536" width="350.0" height="60" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="1.8"/>
+<text x="983.0" y="562.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">充电桩族（OCPP）</text>
+<text x="983.0" y="591.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">START/STOP · METER_VALUE</text>
+<rect x="1174.0" y="536" width="350.0" height="60" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="1.8"/>
+<text x="1349.0" y="562.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">储物柜族</text>
+<text x="1349.0" y="591.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">OPEN_CELL · CELL_CLOSED</text>
+<rect x="56" y="620" width="1488" height="100" rx="10" fill="#F9EEEF"/>
+<rect x="56" y="620" width="6" height="100" rx="3" fill="#A35D63"/>
+<text x="78" y="650" font-size="21" fill="#A35D63" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">⑤ 对业务的契约（sharehub-app 只看得到这三样；内核直出，不经驱动）</text>
+<rect x="76.0" y="654" width="472.0" height="60" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="312.0" y="680.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">DeviceCommandPort</text>
+<text x="312.0" y="709.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">app → gateway · 受理即回 commandId</text>
+<rect x="564.0" y="654" width="472.0" height="60" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="800.0" y="680.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">DeviceEvent</text>
+<text x="800.0" y="709.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">gateway → app · Outbox 推送 · 至少一次</text>
+<rect x="1052.0" y="654" width="472.0" height="60" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="1288.0" y="680.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">TelemetryQueryPort</text>
+<text x="1288.0" y="709.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">心跳 / 在线态 · 只读查询</text>
+<text x="56" y="766" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">演进（对业务始终是一个服务）：① 单进程，驱动 = Maven 子模块　→　② 插件化，驱动 jar 放 plugins/ 独立类加载，</text>
+<text x="56" y="794" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">　　不重编内核即可接新厂商　→　③ 按传输拆多进程（OCPP / TCP 长连接节点），共用内核库、pb_gw 与 /internal/gw 契约。</text>
+<text x="56" y="832" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">红线：只报物理事实（EJECT_OK / ITEM_INSERTED），归还判定归 core · 不碰订单与资金 · 指令不带消费者个人信息（PDPL）。</text>
+<text x="56" y="866" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">北向伙伴（OCPI，伙伴调我们下单）不走本服务 —— 它是资金对手方，归 interconnect 模块，与南向互不混用。</text>
+</svg>

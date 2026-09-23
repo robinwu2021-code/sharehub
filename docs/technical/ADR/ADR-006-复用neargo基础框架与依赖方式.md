@@ -1,6 +1,7 @@
 # ADR-006 复用 ai-neargo 基础框架与依赖方式
 
 状态：已接受（2026-07-11 用户确认）· 依赖方式=私仓坐标 · groupId=ai.neargo.powerbank
+· **分发方式拟被 [ADR-022](./ADR-022-共享构件发布到自建Nexus.md) 修订**（2026-09-23，待确认）：Codeup 私仓未落地，改为自建 Nexus；并拆出 `neargo-build-parent` / `neargo-bom`
 
 ## 背景
 用户要求 powerbank「技术栈参考 ai-neargo，基础层框架能力共用与依赖」。ai-neargo 已有成熟的 8 个 commons + auth-core（Java21/Boot4.0），提供响应/异常/ID/多租户/鉴权/事件/审计/配置等 L1 能力。

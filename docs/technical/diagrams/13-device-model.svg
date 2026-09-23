@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Source Han Sans SC','Noto Sans CJK SC',-apple-system,'Segoe UI',Roboto,sans-serif">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4A585B"/></marker><marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0F7173"/></marker></defs>
+<rect width="1600" height="900" fill="#FFFFFF"/>
+<text x="56" y="68" font-size="42" fill="#12181B" font-weight="750" text-anchor="start" letter-spacing="-1" opacity="1">通用设备模型</text>
+<text x="56" y="104" font-size="22" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">充电宝为主 · 充电桩 · 按摩椅 · 储物柜同一模型　｜　按「使用形态」分化，不按设备名　｜　ADR-021</text>
+<line x1="56" y1="126" x2="1544" y2="126" stroke="#D8E0DF" stroke-width="2"/>
+<rect x="56" y="148" width="1488" height="104" rx="10" fill="#EDF4EE"/>
+<rect x="56" y="148" width="6" height="104" rx="3" fill="#5C8A63"/>
+<text x="78" y="178" font-size="21" fill="#5C8A63" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">① 物理层级（全部设备通用）</text>
+<rect x="76.0" y="182" width="257.6" height="60" rx="9" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.8"/>
+<text x="204.8" y="208.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">站点 Site</text>
+<text x="204.8" y="237.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">归属：代理 · 区域</text>
+<line x1="337.6" y1="212" x2="369.6" y2="212" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<rect x="373.6" y="182" width="257.6" height="60" rx="9" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.8"/>
+<text x="502.40000000000003" y="208.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">点位 Location</text>
+<text x="502.40000000000003" y="237.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">站内投放位</text>
+<line x1="635.2" y1="212" x2="667.2" y2="212" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<rect x="671.2" y="182" width="257.6" height="60" rx="9" fill="#FFFFFF" stroke="#5C8A63" stroke-width="3"/>
+<text x="800.0" y="208.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">设备 Device</text>
+<text x="800.0" y="237.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">柜机 / 桩 / 椅 / 柜</text>
+<line x1="932.8000000000001" y1="212" x2="964.8000000000001" y2="212" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<rect x="968.8000000000001" y="182" width="257.6" height="60" rx="9" fill="#FFFFFF" stroke="#5C8A63" stroke-width="3"/>
+<text x="1097.6000000000001" y="208.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">槽位 Slot</text>
+<text x="1097.6000000000001" y="237.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">仓位 / 枪 / 座位 / 格口</text>
+<line x1="1230.4" y1="212" x2="1262.4" y2="212" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<rect x="1266.4" y="182" width="257.6" height="60" rx="9" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.8"/>
+<text x="1395.2" y="208.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">物品 Item</text>
+<text x="1395.2" y="237.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">仅借还型：充电宝</text>
+<rect x="56" y="268" width="1488" height="290" rx="10" fill="#FBF3E8"/>
+<rect x="56" y="268" width="6" height="290" rx="3" fill="#B07D3A"/>
+<text x="78" y="298" font-size="21" fill="#B07D3A" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">② 四类设备：差在「怎么用」，不在「设备」</text>
+<rect x="268.0" y="304" width="305.0" height="56" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="1.8"/>
+<text x="420.5" y="328.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">充电宝（主业务）</text>
+<text x="420.5" y="357.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">POWERBANK</text>
+<rect x="585.0" y="304" width="305.0" height="56" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="1.8"/>
+<text x="737.5" y="328.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">充电桩</text>
+<text x="737.5" y="357.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">EV_CHARGER</text>
+<rect x="902.0" y="304" width="305.0" height="56" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="3"/>
+<text x="1054.5" y="328.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">按摩椅（新样本）</text>
+<text x="1054.5" y="357.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">MASSAGE_CHAIR</text>
+<rect x="1219.0" y="304" width="305.0" height="56" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="1.8"/>
+<text x="1371.5" y="328.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">储物柜</text>
+<text x="1371.5" y="357.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">LOCKER</text>
+<text x="96" y="392" font-size="19" fill="#4A585B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">使用形态</text>
+<text x="420.5" y="392" font-size="19" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">RENTAL 借还</text>
+<text x="737.5" y="392" font-size="19" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">SESSION 就地使用</text>
+<text x="1054.5" y="392" font-size="19" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">SESSION 就地使用</text>
+<text x="1371.5" y="392" font-size="19" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">SESSION 就地使用</text>
+<text x="96" y="420" font-size="19" fill="#4A585B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">槽位</text>
+<text x="420.5" y="420" font-size="19" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">仓位 BAY</text>
+<text x="737.5" y="420" font-size="19" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">枪 CONNECTOR</text>
+<text x="1054.5" y="420" font-size="19" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">座位 SEAT</text>
+<text x="1371.5" y="420" font-size="19" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">格口 CELL</text>
+<text x="96" y="448" font-size="19" fill="#4A585B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">计量</text>
+<text x="420.5" y="448" font-size="19" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">MINUTE 按时长</text>
+<text x="737.5" y="448" font-size="19" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">KWH 按电量</text>
+<text x="1054.5" y="448" font-size="19" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">PACKAGE 套餐</text>
+<text x="1371.5" y="448" font-size="19" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">MINUTE 按时长</text>
+<text x="96" y="476" font-size="19" fill="#4A585B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">付费模式</text>
+<text x="420.5" y="476" font-size="19" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">PREAUTH → DEPOSIT</text>
+<text x="737.5" y="476" font-size="19" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">PREAUTH</text>
+<text x="1054.5" y="476" font-size="19" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">PREPAY 先付后用</text>
+<text x="1371.5" y="476" font-size="19" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">PREPAY / PREAUTH</text>
+<text x="96" y="504" font-size="19" fill="#4A585B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">指令族</text>
+<text x="420.5" y="504" font-size="19" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">POWERBANK</text>
+<text x="737.5" y="504" font-size="19" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">EV_CHARGER（对齐 OCPP）</text>
+<text x="1054.5" y="504" font-size="19" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">SESSION（通用）</text>
+<text x="1371.5" y="504" font-size="19" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">LOCKER</text>
+<text x="96" y="532" font-size="19" fill="#4A585B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">订单扩展表</text>
+<text x="420.5" y="532" font-size="19" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">ord_rent_ext</text>
+<text x="737.5" y="532" font-size="19" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">ord_charge_ext</text>
+<text x="1054.5" y="532" font-size="19" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">ord_session_ext（通用）</text>
+<text x="1371.5" y="532" font-size="19" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">ord_locker_ext</text>
+<rect x="56" y="574" width="1488" height="96" rx="10" fill="#F9EEEF"/>
+<rect x="56" y="574" width="6" height="96" rx="3" fill="#A35D63"/>
+<text x="78" y="604" font-size="21" fill="#A35D63" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">③ 全部复用：新增一种设备，这些一行不改</text>
+<rect x="76" y="614" width="198.84999999999994" height="34" rx="17" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.6"/>
+<text x="175.42499999999995" y="636" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">设备台账 dev_device</text>
+<rect x="284.8499999999999" y="614" width="124.05000000000001" height="34" rx="17" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.6"/>
+<text x="346.8749999999999" y="636" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">站点 · 点位</text>
+<rect x="418.8999999999999" y="614" width="189.49999999999994" height="34" rx="17" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.6"/>
+<text x="513.6499999999999" y="636" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">订单主表 ord_order</text>
+<rect x="618.3999999999999" y="614" width="62.0" height="34" rx="17" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.6"/>
+<text x="649.3999999999999" y="636" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">支付</text>
+<rect x="690.3999999999999" y="614" width="124.05000000000001" height="34" rx="17" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.6"/>
+<text x="752.4249999999998" y="636" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">分润 · 账务</text>
+<rect x="824.4499999999998" y="614" width="124.05000000000001" height="34" rx="17" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.6"/>
+<text x="886.4749999999998" y="636" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">结算 · 发票</text>
+<rect x="958.4999999999998" y="614" width="186.1" height="34" rx="17" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.6"/>
+<text x="1051.5499999999997" y="636" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">工单 · 告警 · 客服</text>
+<rect x="1154.5999999999997" y="614" width="293.19999999999993" height="34" rx="17" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.6"/>
+<text x="1301.1999999999996" y="636" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">运营端列表（按 deviceType 筛）</text>
+<rect x="56" y="686" width="1488" height="104" rx="10" fill="#EEF2F8"/>
+<rect x="56" y="686" width="6" height="104" rx="3" fill="#5B7BA6"/>
+<text x="78" y="716" font-size="21" fill="#5B7BA6" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">④ 新增一种设备 = 5 件事（按摩椅：只写 ② 和驱动，③ ④ 复用）</text>
+<rect x="76.0" y="720" width="276.8" height="60" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="214.4" y="746.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">① 登记类型</text>
+<text x="214.4" y="775.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">md_device_type 一行</text>
+<rect x="368.8" y="720" width="276.8" height="60" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="3"/>
+<text x="507.20000000000005" y="746.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">② 类型模块</text>
+<text x="507.20000000000005" y="775.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">DeviceTypeModule</text>
+<rect x="661.6" y="720" width="276.8" height="60" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="800.0" y="746.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">③ 扩展表</text>
+<text x="800.0" y="775.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">能复用就复用</text>
+<rect x="954.4000000000001" y="720" width="276.8" height="60" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="1092.8000000000002" y="746.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">④ 指令族 + 驱动</text>
+<text x="1092.8000000000002" y="775.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">族复用，驱动按厂商</text>
+<rect x="1247.2" y="720" width="276.8" height="60" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="1385.6000000000001" y="746.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">⑤ 计价方案</text>
+<text x="1385.6000000000001" y="775.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">后台配套餐 / 电价</text>
+<text x="56" y="834" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">命名：平台层只用 device / slot / order / start · end · stop；设备名只在 device.&lt;type&gt; 包、ord_&lt;x&gt;_ext、驱动族与类型专属清单里出现。</text>
+<text x="56" y="868" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">改名：dev_cabinet → dev_device · cabinet_no → device_no · EV_PILE → EV_CHARGER · IN_USE / RETURNED → ACTIVE / ENDED · /orders/rent → POST /orders</text>
+</svg>

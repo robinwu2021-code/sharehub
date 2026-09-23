@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Source Han Sans SC','Noto Sans CJK SC',-apple-system,'Segoe UI',Roboto,sans-serif">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4A585B"/></marker><marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0F7173"/></marker></defs>
+<rect width="1600" height="900" fill="#FFFFFF"/>
+<text x="56" y="68" font-size="42" fill="#12181B" font-weight="750" text-anchor="start" letter-spacing="-1" opacity="1">后端代码架构（参照 ai-shop）</text>
+<text x="56" y="104" font-size="22" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">模块层序 · 业务域包布局 · 能复用尽量复用　｜　v4/09</text>
+<line x1="56" y1="126" x2="1544" y2="126" stroke="#D8E0DF" stroke-width="2"/>
+<rect x="56" y="148" width="804" height="520" rx="10" fill="#EEF2F8"/>
+<rect x="56" y="148" width="6" height="520" rx="3" fill="#5B7BA6"/>
+<text x="78" y="178" font-size="21" fill="#5B7BA6" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">① 模块层序（上层依赖下层 · 右侧为 ai-shop 对应层）</text>
+<rect x="76" y="192" width="560" height="50" rx="10" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="92" y="225" font-size="22" fill="#12181B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">sharehub-app</text>
+<text x="306" y="224" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">配置 · 跨域编排 · 任务目标</text>
+<text x="650" y="224" font-size="17" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">≈ shop-app</text>
+<rect x="76" y="256" width="132" height="50" rx="10" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="142" y="288" font-size="19" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">svc-platform</text>
+<rect x="218" y="256" width="132" height="50" rx="10" fill="#FFFFFF" stroke="#A35D63" stroke-width="3"/>
+<text x="284" y="288" font-size="19" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">svc-core</text>
+<rect x="360" y="256" width="132" height="50" rx="10" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="426" y="288" font-size="19" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">svc-ops</text>
+<rect x="502" y="256" width="132" height="50" rx="10" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="568" y="288" font-size="19" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">svc-finance</text>
+<text x="650" y="288" font-size="17" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">≈ shop-core 等业务域</text>
+<rect x="76" y="320" width="560" height="50" rx="10" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="92" y="353" font-size="22" fill="#12181B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">sharehub-api</text>
+<text x="306" y="352" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">Port · 事件 · 远程实现</text>
+<text x="650" y="352" font-size="17" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">≈ shop-base/spi</text>
+<rect x="76" y="384" width="560" height="50" rx="10" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="3"/>
+<text x="92" y="417" font-size="22" fill="#12181B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">sharehub-store</text>
+<text x="306" y="416" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">BaseEntity · CRUD · 幂等 · Outbox</text>
+<text x="650" y="416" font-size="17" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">≈ shop-store-mybatis</text>
+<rect x="76" y="448" width="560" height="50" rx="10" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="92" y="481" font-size="22" fill="#12181B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">sharehub-auth</text>
+<text x="306" y="480" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">Realm · Perms · 响应包裹 · 异常</text>
+<text x="650" y="480" font-size="17" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">≈ shop-base-auth</text>
+<rect x="76" y="512" width="560" height="50" rx="10" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="3"/>
+<text x="92" y="545" font-size="22" fill="#12181B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">sharehub-common</text>
+<text x="306" y="544" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">BizException · 业务号 · AfterCommit</text>
+<text x="650" y="544" font-size="17" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">≈ shop-base</text>
+<rect x="76" y="576" width="560" height="50" rx="10" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.8"/>
+<text x="92" y="609" font-size="22" fill="#12181B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">neargo 共享件</text>
+<text x="306" y="608" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">job · auth-store · internal · store</text>
+<text x="650" y="608" font-size="17" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">ai-neargo（下沉）</text>
+<rect x="880" y="148" width="664" height="520" rx="10" fill="#EDF4EE"/>
+<rect x="880" y="148" width="6" height="520" rx="3" fill="#5C8A63"/>
+<text x="902" y="178" font-size="21" fill="#5C8A63" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">② 业务域包布局（照 ai-shop）</text>
+<rect x="900" y="190" width="624" height="272" rx="10" fill="#FFFFFF" stroke="#5C8A63" stroke-width="3"/>
+<text x="920" y="220" font-size="20" fill="#12181B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">ai.neargo.sharehub.&lt;domain&gt;</text>
+<text x="920" y="252" font-size="18" fill="#12181B" font-weight="600" text-anchor="start" letter-spacing="0" opacity="1">api/ops · mp · internal</text>
+<text x="1160" y="252" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">控制器随域走；Req 嵌在控制器</text>
+<text x="920" y="282" font-size="18" fill="#12181B" font-weight="600" text-anchor="start" letter-spacing="0" opacity="1">service/ · service/impl/</text>
+<text x="1160" y="282" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">接口 + 实现；Command；状态机</text>
+<text x="920" y="312" font-size="18" fill="#12181B" font-weight="600" text-anchor="start" letter-spacing="0" opacity="1">entity/</text>
+<text x="1160" y="312" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">一实体一文件</text>
+<text x="920" y="342" font-size="18" fill="#12181B" font-weight="600" text-anchor="start" letter-spacing="0" opacity="1">mapper/</text>
+<text x="1160" y="342" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">XxxMappers（每域一个）</text>
+<text x="920" y="372" font-size="18" fill="#12181B" font-weight="600" text-anchor="start" letter-spacing="0" opacity="1">dto/</text>
+<text x="1160" y="372" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">XxxVO（of(entity) 唯一出口）</text>
+<text x="920" y="402" font-size="18" fill="#12181B" font-weight="600" text-anchor="start" letter-spacing="0" opacity="1">port/</text>
+<text x="1160" y="402" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">实现 sharehub-api 的 Port</text>
+<text x="920" y="432" font-size="18" fill="#12181B" font-weight="600" text-anchor="start" letter-spacing="0" opacity="1">event/ · job/</text>
+<text x="1160" y="432" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">OutboxConsumer · JobHandler</text>
+<text x="900" y="494" font-size="18" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">✗ 实体 / Map 作请求体或响应（现 78 + 33 处）</text>
+<text x="900" y="528" font-size="18" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">✗ 控制器依赖 Mapper · 服务层碰 HttpServletRequest</text>
+<text x="900" y="562" font-size="18" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">✗ @Scheduled（任务只经 JobHandler）</text>
+<text x="900" y="596" font-size="18" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">✓ 跨域读走 Port · 跨域写 AfterCommit · 异步 Outbox + 去重</text>
+<text x="900" y="630" font-size="18" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">✓ 失败只抛 BizException(ErrorCode)，分段码 + 三语</text>
+<rect x="56" y="684" width="1488" height="122" rx="10" fill="#F9EEEF"/>
+<rect x="56" y="684" width="6" height="122" rx="3" fill="#A35D63"/>
+<text x="78" y="714" font-size="21" fill="#A35D63" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">③ 复用 ai-shop</text>
+<text x="76" y="750" font-size="18" fill="#A35D63" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">下沉共享</text>
+<rect x="170" y="728" width="121.5" height="34" rx="17" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.6"/>
+<text x="230.75" y="750" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">neargo-job</text>
+<rect x="301.5" y="728" width="186.94999999999996" height="34" rx="17" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.6"/>
+<text x="394.97499999999997" y="750" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">neargo-auth-store</text>
+<rect x="498.44999999999993" y="728" width="121.5" height="34" rx="17" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.6"/>
+<text x="559.1999999999999" y="750" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">neargo-pay</text>
+<rect x="629.9499999999999" y="728" width="158.89999999999998" height="34" rx="17" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.6"/>
+<text x="709.3999999999999" y="750" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">InternalClient</text>
+<rect x="798.8499999999999" y="728" width="242.19999999999996" height="34" rx="17" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.6"/>
+<text x="919.9499999999999" y="750" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">幂等 · 事件去重 · Outbox</text>
+<rect x="1051.05" y="728" width="252.39999999999992" height="34" rx="17" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.6"/>
+<text x="1177.25" y="750" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">BizException · ErrorCode</text>
+<text x="76" y="790" font-size="18" fill="#A35D63" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">照搬约定</text>
+<rect x="170" y="768" width="308.49999999999994" height="34" rx="17" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.6"/>
+<text x="324.25" y="790" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">ArchitectureTest + known-*.txt</text>
+<rect x="488.49999999999994" y="768" width="230.29999999999993" height="34" rx="17" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.6"/>
+<text x="603.6499999999999" y="790" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">H2 + 生成 schema + e2e</text>
+<rect x="728.7999999999998" y="768" width="196.29999999999995" height="34" rx="17" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.6"/>
+<text x="826.9499999999998" y="790" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">Req / Command / VO</text>
+<rect x="935.0999999999998" y="768" width="209.89999999999998" height="34" rx="17" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.6"/>
+<text x="1040.0499999999997" y="790" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">assertTransit 状态机</text>
+<rect x="1154.9999999999998" y="768" width="130.85" height="34" rx="17" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.6"/>
+<text x="1220.4249999999997" y="790" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">AfterCommit</text>
+<rect x="1295.8499999999997" y="768" width="144.45000000000002" height="34" rx="17" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.6"/>
+<text x="1368.0749999999996" y="790" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">${ENV:默认值}</text>
+<text x="56" y="846" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">有意不同：信封用 neargo {message, list} · 403 用真实 HTTP 状态 · 金额 BigDecimal（支付边界换算 minor）· 注入 Clock</text>
+<text x="56" y="880" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">棘轮：实体请求体 78→0 · Map 契约 33→0 · svc 单测 0→全覆盖 · 写开发库的测试→0 · 平台层 cabinet* 751 处→0</text>
+</svg>

@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Source Han Sans SC','Noto Sans CJK SC',-apple-system,'Segoe UI',Roboto,sans-serif">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4A585B"/></marker><marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0F7173"/></marker></defs>
+<rect width="1600" height="900" fill="#FFFFFF"/>
+<text x="56" y="68" font-size="42" fill="#12181B" font-weight="750" text-anchor="start" letter-spacing="-1" opacity="1">支付：共享 ai-shop pay 模块</text>
+<text x="56" y="104" font-size="22" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">一份代码（抽为中立的 neargo-pay）· 两个项目各自部署实例与库 · ShareHub 只写适配层与支付编排　｜　ADR-020</text>
+<line x1="56" y1="126" x2="1544" y2="126" stroke="#D8E0DF" stroke-width="2"/>
+<rect x="56" y="148" width="1488" height="100" rx="10" fill="#EEF2F8"/>
+<rect x="56" y="148" width="6" height="100" rx="3" fill="#5B7BA6"/>
+<text x="78" y="178" font-size="21" fill="#5B7BA6" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">① 调用方（各自项目，只经契约，不直连支付表）</text>
+<rect x="76.0" y="182" width="350.0" height="60" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="251.0" y="208.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">ai-shop · shop-app</text>
+<text x="251.0" y="237.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">电商下单 · 售后 · 商户结算</text>
+<rect x="442.0" y="182" width="716.0" height="60" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="3"/>
+<text x="800.0" y="208.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">ShareHub · sharehub-app</text>
+<text x="800.0" y="237.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">借出预授权 · 归还请款 · 钱包充值 · 退款 · 提现打款</text>
+<rect x="1174.0" y="182" width="350.0" height="60" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="1349.0" y="208.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">c-app / 小程序</text>
+<text x="1349.0" y="237.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">经 app 拿收银参数，端上 SDK 拉起</text>
+<line x1="251.0" y1="244" x2="251.0" y2="264" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="800.0" y1="244" x2="800.0" y2="264" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<rect x="56" y="266" width="1488" height="100" rx="10" fill="#EEF2F8"/>
+<rect x="56" y="266" width="6" height="100" rx="3" fill="#5B7BA6"/>
+<text x="78" y="296" font-size="21" fill="#5B7BA6" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">② 接入契约（各项目自己的一层薄适配）</text>
+<rect x="76.0" y="300" width="472.0" height="60" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="312.0" y="326.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">ai-shop：*AppService</text>
+<text x="312.0" y="355.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">embedded / remote 二选一（已有）</text>
+<rect x="564.0" y="300" width="472.0" height="60" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="3"/>
+<text x="800.0" y="326.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">ShareHub：PaymentPort</text>
+<text x="800.0" y="355.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">RemotePaymentPort · 内部 HTTP · 服务凭证</text>
+<rect x="1052.0" y="300" width="472.0" height="60" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="1288.0" y="326.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">支付事件回推</text>
+<text x="1288.0" y="355.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">PAID · AUTHORIZED · CAPTURED · REFUNDED</text>
+<line x1="312.0" y1="362" x2="312.0" y2="382" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="800.0" y1="362" x2="800.0" y2="382" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<rect x="56" y="384" width="1488" height="100" rx="10" fill="#F9EEEF"/>
+<rect x="56" y="384" width="6" height="100" rx="3" fill="#A35D63"/>
+<text x="78" y="414" font-size="21" fill="#A35D63" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">③ 共享 pay 模块（一份代码 · 两项目契约测试都过才能改）</text>
+<rect x="76.0" y="418" width="350.0" height="60" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="3"/>
+<text x="251.0" y="444.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">pay-channel</text>
+<text x="251.0" y="473.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">PayGateway SPI · 验签 · 通道配置</text>
+<rect x="442.0" y="418" width="350.0" height="60" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="3"/>
+<text x="617.0" y="444.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">pay-domain</text>
+<text x="617.0" y="473.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">支付流水 · 退款 · 对账 · 提现</text>
+<rect x="808.0" y="418" width="350.0" height="60" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="3"/>
+<text x="983.0" y="444.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">pay-svc</text>
+<text x="983.0" y="473.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">独立进程 · /internal/pay</text>
+<rect x="1174.0" y="418" width="350.0" height="60" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="1349.0" y="444.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">按需装配</text>
+<text x="1349.0" y="473.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">积分 · 商户分账：ShareHub 关</text>
+<line x1="251.0" y1="480" x2="251.0" y2="500" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<rect x="56" y="502" width="1488" height="100" rx="10" fill="#F9EEEF"/>
+<rect x="56" y="502" width="6" height="100" rx="3" fill="#A35D63"/>
+<text x="78" y="532" font-size="21" fill="#A35D63" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">④ 通道适配器（PayGateway 实现 · 注入即路由）　✓ 已有　○ 待建</text>
+<rect x="76.0" y="536" width="350.0" height="60" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="251.0" y="562.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">✓ 微信 / 支付宝</text>
+<text x="251.0" y="591.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">CN · JSAPI / APP / H5</text>
+<rect x="442.0" y="536" width="350.0" height="60" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="617.0" y="562.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">✓ Stub / Test</text>
+<text x="617.0" y="591.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">开发 · 演示 · 自动化测试</text>
+<rect x="808.0" y="536" width="350.0" height="60" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="3"/>
+<text x="983.0" y="562.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">○ AE 卡通道</text>
+<text x="983.0" y="591.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">N-Genius · Tap · PayTabs</text>
+<rect x="1174.0" y="536" width="350.0" height="60" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="3"/>
+<text x="1349.0" y="562.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">○ 预授权能力</text>
+<text x="1349.0" y="591.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">preAuth · capture · release</text>
+<line x1="239.0" y1="598" x2="239.0" y2="618" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="263.0" y1="618" x2="263.0" y2="598" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)" stroke-dasharray="6 5"/>
+<line x1="971.0" y1="598" x2="971.0" y2="618" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="995.0" y1="618" x2="995.0" y2="598" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)" stroke-dasharray="6 5"/>
+<rect x="56" y="620" width="1488" height="100" rx="10" fill="#F0F3F3"/>
+<rect x="56" y="620" width="6" height="100" rx="3" fill="#6B7A7C"/>
+<text x="78" y="650" font-size="21" fill="#6B7A7C" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">⑤ 部署（同一代码，两套实例 —— 主体、市场、数据驻留都不同）</text>
+<rect x="76.0" y="654" width="472.0" height="60" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="312.0" y="680.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">ai-shop pay-svc</text>
+<text x="312.0" y="709.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">:8083 · 库 ai_shop（独立数据源）</text>
+<rect x="564.0" y="654" width="472.0" height="60" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="3"/>
+<text x="800.0" y="680.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">ShareHub pay-svc</text>
+<text x="800.0" y="709.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">:8092 · 库 pb_pay · MENA 驻留</text>
+<rect x="1052.0" y="654" width="472.0" height="60" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="1288.0" y="680.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">通道回调</text>
+<text x="1288.0" y="709.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">nginx /pay/callback/{channel} → 各自实例</text>
+<text x="56" y="772" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">ShareHub 不用 pay-domain 的结算 / 积分：分润与结算规则仍在 ShareHub finance —— 场地 / 代理分成 ≠ 电商商户结算，按需装配关掉。</text>
+<text x="56" y="806" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">共享前要做的三件事：① 抽离到中立位置、依赖从 shop-base 换成 neargo commons　② 41 处反向引用（MerchantQueryPort 27 ·</text>
+<text x="56" y="834" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">　　SettleSourcePort 14）泛化为 bizType + bizNo 的 SPI，两项目各自实现　③ 回调入口随独立部署移进 pay-svc（今天在 shop-core）。</text>
+<text x="56" y="870" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">回调顺序沿用 ai-shop：验签 → 回查通道 → 落库 → 发事件；回查失败返回 FAIL 让通道重推。卡号不进本系统，通道密钥只在 pay 库（KMS）。</text>
+</svg>
