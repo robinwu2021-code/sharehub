@@ -546,6 +546,66 @@
   },
   {
    "verb": "POST",
+   "path": "/api/agent/applies",
+   "perm": "agent:apply:create",
+   "handler": "AgentApplyController#opsCreateApply",
+   "summary": "**运营代建**：替线下签约的商家录入（`source = OPS_CREATED`）。",
+   "params": [],
+   "bodyType": "SubmitReq",
+   "returnType": "ApplyResult",
+   "returnContainer": null,
+   "returnElement": "ApplyResult",
+   "responseShape": [
+    {
+     "name": "applyNo",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "operatorNo",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "email",
+     "type": "String"
+    },
+    {
+     "name": "otp",
+     "type": "String"
+    },
+    {
+     "name": "operatorName",
+     "type": "String"
+    },
+    {
+     "name": "operatorType",
+     "type": "String"
+    },
+    {
+     "name": "regionScope",
+     "type": "String"
+    },
+    {
+     "name": "shareRate",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "payload",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
    "path": "/api/agent/applies/{applyNo}/accept",
    "perm": "agent:apply:approve",
    "handler": "AgentApplyController#accept",
@@ -633,7 +693,7 @@
    "verb": "POST",
    "path": "/api/agent/apply",
    "perm": null,
-   "handler": "AgentApplyController#submit",
+   "handler": "AgentApplyController#selfServiceApply",
    "summary": "提交入驻申请 —— **自助与代建共用同一个端点**。",
    "params": [],
    "bodyType": "SubmitReq",
@@ -24136,6 +24196,10 @@
   }
  ],
  "enums": {
+  "AssignTargetType": [
+   "CABINET",
+   "LOCATION"
+  ],
   "Period": [
    "LAST_7D",
    "LAST_30D",
@@ -24174,13 +24238,32 @@
    "GOOGLE",
    "PHONE"
   ],
+  "CodeBatchStatus": [
+   "PENDING",
+   "PARTIAL",
+   "BOUND"
+  ],
+  "DeviceCodeType": [
+   "QR"
+  ],
   "DeviceKind": [
    "POWERBANK",
    "EV_PILE",
    "LOCKER"
   ],
+  "OtaReleaseStatus": [
+   "DRAFT",
+   "PUBLISHED",
+   "PAUSED",
+   "COMPLETED"
+  ],
   "OnlineStatus": [
    "ONLINE"
+  ],
+  "OtaRolloutStatus": [
+   "PENDING",
+   "RUNNING",
+   "DONE"
   ],
   "CabinetStatus": [
    "IN_STOCK",
@@ -24254,10 +24337,10 @@
  },
  "conflicts": {},
  "stats": {
-  "endpoints": 392,
+  "endpoints": 393,
   "records": 283,
-  "withPerm": 332,
-  "withBody": 158,
-  "shapedResponses": 296
+  "withPerm": 333,
+  "withBody": 159,
+  "shapedResponses": 297
  }
 }

@@ -42,7 +42,16 @@ public class OperationController {
     // ——— 站点概览 / 单站统计 ———
 
     @GetMapping("/api/ops/operation/overview")
-    @PreAuthorize("@perm.can('location:poi:read')")
+    /*
+     * D6d 权限对账：此前判的是 `location:poi:read` —— 一个覆盖 4 个端点、3 个菜单叶的**宽码**，
+     * 而本端点只是个只读看板。功能权限清单第 67 行本来就为它定了专属码
+     * `location:overview:read`（给 OPS/FIN/BD/VIEW），**后端却没有任何端点用过它**。
+     *
+     * 后果是前端拿一个没人判的码渲染菜单入口、后端拿另一个更宽的码判访问：
+     * 财务看得到「站点概览」却打不开（没有 poi:read），而给财务补 poi:read
+     * 又会连带解锁「站点管理」「点位管理」两个它不该有的入口。改判专属码，两头都正了。
+     */
+    @PreAuthorize("@perm.can('location:overview:read')")
     public OperationOverview overview(@RequestParam(required = false) String from,
                                       @RequestParam(required = false) String to) {
         return overview.overview(from, to);
