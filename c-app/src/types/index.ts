@@ -1,13 +1,23 @@
 // C 端契约镜像（后端 powerbank-common-api 就绪后由 openapi 生成替换，前后端零漂移）。
-// 对外口径：Result {code,msg,data} + 分页 {records,total,page,size}（对齐 docs/api、ops-web，非 commons）。
+// 对外口径：**复用 neargo-common-core 的契约** —— Result {code,message,data} + PageResult {total,list}。
+//
+// 2026-09-23 更正：原本写的是 {code,msg,data} + {records,total}，理由是「对齐 docs/api、ops-web，非 commons」。
+// 三点都站不住：
+//   · ops-web 读的是 message / list，从来不是 msg / records；
+//   · docs/api 自己矛盾（§信封 写 msg、§分页 写 list），错的是 §信封 那一行（已一并修）；
+//   · 「非 commons」正是要避免的 —— 两个项目共同依赖 neargo-common-core，
+//     各自另造信封就是放弃复用，ai-shop 的 ApiResult{code,msg,data} 是同一个偏离。
+//
+// 后果是实打实的：msg 让业务错误提示取不到；records 让钱包流水与订单列表**在真后端下永远是空的** ——
+// 之前没暴露，是因为 c-app 默认跑 mock，而 mock 也按 records 造数据，两头一起错就看不出来。
 
 export interface Result<T> {
   code: number;
-  msg: string;
+  message: string;
   data: T;
 }
 export interface PageResult<T> {
-  records: T[];
+  list: T[];
   total: number;
   page: number;
   size: number;

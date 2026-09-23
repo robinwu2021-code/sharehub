@@ -22,7 +22,9 @@ export const kwHit = (kw: string | undefined, ...fields: (string | undefined)[])
 export function paginate<T>(all: T[], page = 1, size = 10, pred?: (x: T) => boolean) {
   const filtered = pred ? all.filter(pred) : all;
   const start = (page - 1) * size;
-  return { records: filtered.slice(start, start + size), total: filtered.length, page, size };
+  // 字段名必须与真后端一致（list 而非 records）。mock 跟着错的话，
+  // mock 下一切正常、切真后端全空 —— 这正是 2026-09-23 之前的状态
+  return { list: filtered.slice(start, start + size), total: filtered.length, page, size };
 }
 
 export const cabinets: NearbyCabinet[] = [

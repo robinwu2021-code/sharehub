@@ -1,5 +1,5 @@
 // 真实后端 uni.request 封装：拼 Bearer + 统一 Result<T> 拆包 + 错误抛出。
-// C 端只持 token，不自造受信头（后端据 token 反查属主，防 IDOR）。契约口径 {code,msg,data}。
+// C 端只持 token，不自造受信头（后端据 token 反查属主，防 IDOR）。契约口径 {code,message,data}（neargo-common-core 的 Result，与 ops-web 同一份）。
 import type { Result } from "@/types";
 import { STORAGE } from "@/shared/constants";
 
@@ -61,7 +61,7 @@ function request<T>(
           // 不处理的话 token 还留在 storage 里，isLoggedIn 仍为真，
           // 界面照常显示已登录，而每个请求各弹一个错。
           if (res.statusCode === 401 && isSessionSensitive(path)) onUnauthorized?.();
-          reject(new Error(body?.msg || `HTTP ${res.statusCode}`));
+          reject(new Error(body?.message || `HTTP ${res.statusCode}`));
         }
       },
       fail: (err) => reject(new Error(err.errMsg || "network error")),

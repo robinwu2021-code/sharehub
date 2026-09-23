@@ -135,6 +135,9 @@ public class SecurityConfig {
     private static void writeJson(HttpServletResponse resp, int code, String msg) throws java.io.IOException {
         resp.setStatus(code);
         resp.setContentType("application/json;charset=UTF-8");
-        resp.getWriter().write("{\"code\":" + code + ",\"msg\":\"" + msg + "\",\"data\":null}");
+        // 字段名是 message 不是 msg：契约是 neargo-common-core 的 Result{code,message,data}，
+        // 与 ApiResponseWrapper 包出来的形状必须一致。2026-09-23 之前这里写 msg ——
+        // 运营端读 body.message 拿到 undefined，**401/403 的后端文案永远显示不出来**。
+        resp.getWriter().write("{\"code\":" + code + ",\"message\":\"" + msg + "\",\"data\":null}");
     }
 }

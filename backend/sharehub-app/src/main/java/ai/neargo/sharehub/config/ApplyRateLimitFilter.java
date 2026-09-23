@@ -67,7 +67,8 @@ public class ApplyRateLimitFilter extends OncePerRequestFilter {
         if (!allow(clientIp(req))) {
             resp.setStatus(429);
             resp.setContentType("application/json;charset=UTF-8");
-            resp.getWriter().write("{\"code\":429,\"msg\":\"操作过于频繁，请稍后再试\",\"data\":null}");
+            // message 不是 msg —— 见 SecurityConfig 同处注释
+            resp.getWriter().write("{\"code\":429,\"message\":\"操作过于频繁，请稍后再试\",\"data\":null}");
             return;
         }
         chain.doFilter(req, resp);

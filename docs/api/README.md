@@ -48,9 +48,10 @@
 
 ### 1.1 响应包（commons `Result<T>`）
 ```json
-{ "code": 0, "msg": "ok", "data": {...} }
+{ "code": 0, "message": "ok", "data": {...} }
 ```
-`ErrorCode`：0 成功 · 400 参数 · 401 未认证 · 403 无权 · 404 不存在 · 409 冲突/幂等 · 500 服务端。业务细分码在 `msg` + 扩展 `bizCode`。
+`ErrorCode`：0 成功 · 400 参数 · 401 未认证 · 403 无权 · 404 不存在 · 409 冲突/幂等 · 500 服务端。业务细分码在 `message` + 扩展 `bizCode`。
+> ⚠️ 2026-09-23 更正：本行原写 `msg`，与本文件 §分页 的 `{list,total}` 及第 5 行「对齐 ai-neargo」自相矛盾。权威是两个项目共同依赖的 `neargo-common-core`：`Result{code,message,data}`。c-app 曾照抄错的那一行，已一并修。
 
 > ⚠️ 前端 `ops-web/lib/types/common.ts` 的 `Result<T>` 用的是 `message` 字段，后端 `ApiResponseWrapper` 产出 `msg`。**以后端 `msg` 为准**，前端 http-client 已做兼容；新代码一律 `msg`。
 

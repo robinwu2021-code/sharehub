@@ -18,7 +18,7 @@ async function load() {
   try {
     const [w, page] = await Promise.all([api.getWallet(), api.walletTxns()]);
     wallet.value = w;
-    txns.value = page.records;
+    txns.value = page.list;
   } finally {
     loading.value = false;
   }

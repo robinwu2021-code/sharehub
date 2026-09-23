@@ -33,7 +33,7 @@ async function load() {
   loading.value = true;
   try {
     const r = await api.listOrders();
-    all.value = r.records;
+    all.value = r.list;
   } finally {
     loading.value = false;
   }
