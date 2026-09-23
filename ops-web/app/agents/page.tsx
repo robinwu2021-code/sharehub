@@ -8,7 +8,6 @@ import { PageTitle, Pagination } from "@/components/ui/misc";
 import { usePaging } from "@/lib/hooks/use-paging";
 import { useNavTabs, usePageTab } from "@/lib/hooks/use-page-tab";
 import { Input, Select } from "@/components/ui/input";
-import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
 import { TabHeader } from "@/components/ui/tab-header";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Drawer, Field } from "@/components/ui/drawer";
@@ -28,11 +27,12 @@ import { useAuth } from "@/lib/auth";
 import { useCan } from "@/lib/hooks/use-can";
 import { notify } from "@/lib/notify";
 import { FilterSelect } from "@/components/ui/filter-select";
+import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
 // 绩效周期复用报表域枚举：代理 GMV = 名下站点营收之和，必须与站点坪效同一套周期口径
 import { REPORT_PERIODS, REPORT_PERIOD_DEFAULT, type ReportPeriod } from "@/lib/types";
 import type {
-  Agent, AgentType, AgentAssignment, AgentPerformance, AgentAccount, AgentCommission, DataScope,
-  AgentAssignmentRecord, AssignableAsset,
+  Agent, AgentAssignment, AgentPerformance, AgentAccount, AgentCommission, DataScope,
+  AgentAssignmentRecord, AssignableAsset, AgentApply, ApplyStatus, OperatorType, AgentType,
 } from "@/lib/types";
 
 /** 周期码 → 中文标签。取自 REPORT_PERIODS，不另抄一份。 */
@@ -41,20 +41,65 @@ const periodLabel = (p: string) => REPORT_PERIODS.find((x) => x.value === p)?.la
 // 且 mock 里存的是中文展示文案，收紧为 DataScope 枚举后统一走映射渲染）
 const SCOPE_LABEL: Record<DataScope, string> = { ALL: "全部数据", REGION: "按区域", LOCATION: "按点位", AGENT: "按代理(自己)", SELF: "仅自己经手" };
 const SCOPE_OPTIONS = (["ALL", "REGION", "LOCATION", "AGENT", "SELF"] as DataScope[]).map((s) => ({ value: s, label: SCOPE_LABEL[s] }));
-// tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）
-// 注意「代理账号」在菜单里叫「代理账号管理」——以菜单为准，这里不再写第二份名字
 /**
- * 登记类型的展示（ADR-027 §一）。与本库其它枚举一致：值域在类型层、展示名在这里一处。
+ * 入驻申请状态。
  *
+ * ⚠️ **DRAFT 不会出现在运营端**：它是申请人在自助页填一半的草稿，提交后才是 SUBMITTED。
+ * 列在这里是为了状态映射完整 —— 少一个键，TS 不报错而运行时 `M[v]` 是 undefined，
+ * 渲染出一个空徽章。
+ */
+const APPLY_STATUS: StatusMap<ApplyStatus> = {
+  DRAFT: { label: "草稿", tone: "muted" },
+  SUBMITTED: { label: "待受理", tone: "warning" },
+  REVIEWING: { label: "审核中", tone: "info" },
+  APPROVED: { label: "已通过", tone: "success" },
+  REJECTED: { label: "已驳回", tone: "danger" },
+};
+
+const APPLY_SOURCE_LABEL: Record<AgentApply["source"], string> = {
+  SELF_SERVICE: "商家自助",
+  OPS_CREATED: "运营代建",
+};
+
+const OPERATOR_TYPE_LABEL: Record<OperatorType, string> = {
+  AGENT: "代理商",
+  CITY_PARTNER: "城市合伙人",
+};
+
+/**
+ * 代建录入字段。
+ *
+ * **与商家自助填的是同一套必填**（ADR-030 §3.1「条件相同」的第 2 个「同」）——
+ * 代建时放宽必填的话，补件日后没人记得。必填由 operatorType 决定，不由来源决定。
+ */
+/**
+ * 登记类型的展示。与本库其它枚举一致：值域在类型层、展示名在这里一处。
  * 不另建 `md_agent_type` 字典表 —— ADR-027 里那张表是为「默认责任 / 默认费率」准备的，
- * 而那两样要等 A2 的「伙伴 × 站点 × 责任」行才有消费方；现在建只会多两行没人读的数据。
+ * 而那两样要等 A2 的责任行才有消费方，现在建只会多两行没人读的数据。
  */
 const AGENT_TYPE: StatusMap<AgentType> = {
   AGENT: { label: "代理商", tone: "outline" },
   CITY_PARTNER: { label: "城市合伙人", tone: "default" },
 };
 
-const TAB_KEYS = ["profiles", "commission", "assign", "performance", "accounts"] as const;
+const APPLY_FIELDS: FieldDef[] = [
+  { key: "operatorName", label: "主体名称", required: true, placeholder: "营业执照上的名称" },
+  { key: "operatorType", label: "主体类型", type: "select", required: true,
+    options: [{ value: "AGENT", label: "代理商" }, { value: "CITY_PARTNER", label: "城市合伙人" }] },
+  // 手机号与邮箱**都必填**（2026-09-23 用户定）：手机号是 OTP 通道与身份锚，
+  // 邮箱承载审核结果、驳回原因、结算账单这类需要留存的长文
+  { key: "phone", label: "手机号", required: true,
+    pattern: { re: "^\\+?[0-9 -]{6,20}$", msg: "手机号格式不对（可带国际区号）" } },
+  { key: "email", label: "邮箱", required: true,
+    pattern: { re: "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", msg: "邮箱格式不对" } },
+  { key: "regionScope", label: "辖域", placeholder: "如：迪拜 · 商业湾" },
+  { key: "shareRate", label: "拟定分润比例（0~1）", type: "number", min: 0, max: 1 },
+  { key: "payload", label: "资质材料说明", placeholder: "线下已签约 / 材料清单" },
+];
+
+// tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）
+// 注意「代理账号」在菜单里叫「代理账号管理」——以菜单为准，这里不再写第二份名字
+const TAB_KEYS = ["applies", "profiles", "commission", "assign", "performance", "accounts"] as const;
 /**
  * 分润规则字段。代理商**选**不**打** —— 原先是「代理编号 + 代理名称」两个文本框，
  * 要人手填两遍同一件事，填不一致时以哪个为准没人说得清。现在只选编号，名字提交时带出。
@@ -100,6 +145,16 @@ function AgentsInner() {
   const onTabChange = () => { paging.reset(); setKeyword(""); setShowArchived(false); };
   const tabs = useNavTabs("/agents", TAB_KEYS);
   const { tab, setTab } = usePageTab(tabs, onTabChange);
+  // —— 入驻审核（ADR-030 §三）——
+  /** 状态筛选；空 = 待办队列（SUBMITTED + REVIEWING），由后端/mock 决定，不在前端拼。 */
+  const [applyStatus, setApplyStatus] = useState("");
+  const [applyFrom, setApplyFrom] = useState("");
+  const [applyTo, setApplyTo] = useState("");
+  /** 审核抽屉里的那一条；null = 关闭。 */
+  const [auditing, setAuditing] = useState<AgentApply | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [applyForm, setApplyForm] = useState<Record<string, unknown> | null>(null);
+
   // 代理绩效周期（复用报表域缺省值 LAST_30D）
   const [period, setPeriod] = useState<ReportPeriod>(REPORT_PERIOD_DEFAULT);
   const [keyword, setKeyword] = useState("");
@@ -115,6 +170,11 @@ function AgentsInner() {
   const username = useAuth((s) => s.username);
   const qc = useQueryClient();
   const allow = useCan();
+  // 入驻审核三码：读 / 放行 / 代建录入。**放行与录入分开发码** ——
+  // 合成一个的话「能录入」就等于「能放行」，四眼原则以后没有落脚点（ADR-030 §3.3）
+  const canReadApply = allow("agent:apply:read");
+  const canApprove = allow("agent:apply:approve");
+  const canCreateApply = allow("agent:apply:create");
   const { confirm, dialog } = useConfirm();
   // 「显示已归档」只作用于代理商档案 tab（TDD §10.1），切 tab 复位
   const [showArchived, setShowArchived] = useState(false);
@@ -149,6 +209,55 @@ function AgentsInner() {
     queryFn: () => api.listAgentCommissions({ page: paging.page, size: paging.size, keyword }),
     placeholderData: keepPreviousData,
     enabled: tab === "commission",
+  });
+
+  const appliesQ = useQuery({
+    queryKey: ["agent-applies", paging.page, paging.size, keyword, applyStatus, applyFrom, applyTo],
+    queryFn: () => api.listAgentApplies({
+      page: paging.page, size: paging.size, keyword,
+      status: applyStatus || undefined,
+      // date input 给的是 yyyy-MM-dd；转成当天起止的 ISO，否则「选 9-22」会漏掉当天下午提交的
+      from: applyFrom ? new Date(`${applyFrom}T00:00:00Z`).toISOString() : undefined,
+      to: applyTo ? new Date(`${applyTo}T23:59:59Z`).toISOString() : undefined,
+    }),
+    placeholderData: keepPreviousData,
+    enabled: tab === "applies" && canReadApply,
+  });
+  const afterApplyWrite = () => {
+    // 审核通过会派生出新主体 —— 代理商档案那一份缓存也得作废，否则「通过了但档案里没有」
+    qc.invalidateQueries({ queryKey: ["agent-applies"] });
+    qc.invalidateQueries({ queryKey: ["agents"] });
+    qc.invalidateQueries({ queryKey: ["agent-options"] });
+  };
+  const acceptApply = useMutation({
+    mutationFn: (no: string) => api.acceptAgentApply(no, username || undefined),
+    onSuccess: () => { notify.success("已受理，进入审核中"); afterApplyWrite(); },
+    onError: (e: Error) => notify.error(e.message),
+  });
+  const auditApply = useMutation({
+    mutationFn: (v: { applyNo: string; approve: boolean; rejectReason?: string }) =>
+      api.auditAgentApply({ ...v, operatorName: username || undefined }),
+    onSuccess: (r) => {
+      notify.success(r.status === "APPROVED" ? `已通过，主体 ${r.operatorNo} 已建档` : "已驳回，原因将回显给申请人");
+      setAuditing(null); setRejectReason("");
+      afterApplyWrite();
+    },
+    onError: (e: Error) => notify.error(e.message),
+  });
+  const createApply = useMutation({
+    mutationFn: (v: Record<string, unknown>) => api.createAgentApply({
+      phone: String(v.phone ?? ""), email: String(v.email ?? ""),
+      operatorName: String(v.operatorName ?? ""),
+      operatorType: (v.operatorType as OperatorType) ?? "AGENT",
+      regionScope: v.regionScope ? String(v.regionScope) : undefined,
+      shareRate: v.shareRate === "" || v.shareRate === undefined ? undefined : Number(v.shareRate),
+      payload: v.payload ? String(v.payload) : undefined,
+    }),
+    onSuccess: (r) => {
+      notify.success(`已录入 ${r.applyNo}，仍需审核放行`);
+      setApplyForm(null); afterApplyWrite();
+    },
+    onError: (e: Error) => notify.error(e.message),
   });
 
   // —— 划拨相关查询（都只在划拨 tab / 抽屉打开时才拉）——
@@ -459,8 +568,72 @@ function AgentsInner() {
   // 无数据时不给导出按钮：导出一个空 CSV 只会让人以为功能坏了
   const exportIf = (fn: () => void, n?: number) => (n ? fn : undefined);
 
+  const applyColumns: Column<AgentApply>[] = [
+    { header: "申请单号", cell: (r) => <span className="font-mono txt-caption">{r.applyNo}</span> },
+    { header: "主体名称", cell: (r) => (
+      <div>
+        <div>{r.operatorName}</div>
+        <div className="txt-caption text-muted-foreground">{OPERATOR_TYPE_LABEL[r.operatorType]}</div>
+      </div>
+    ) },
+    { header: "来源", cell: (r) => (
+      <span className="txt-caption text-muted-foreground">{APPLY_SOURCE_LABEL[r.source]}</span>
+    ) },
+    { header: "联系方式", cell: (r) => (
+      <div className="txt-caption text-muted-foreground">
+        {/* 只显示掩码。明文在服务端，登录键是 HMAC —— 掩码不可逆也会碰撞，不能拿来做任何判断 */}
+        <div className="font-mono">{r.phoneMask}</div>
+        <div className="font-mono">{r.emailMask}</div>
+      </div>
+    ) },
+    { header: "状态", cell: (r) => (
+      <div className="flex items-center gap-1.5">
+        <StatusBadge map={APPLY_STATUS} value={r.status} />
+        {/*
+          * 多主体申请必须显眼：这个手机号已经有主体了。
+          * **它不是重复注册**（ADR-030 §3.5），审核人要知道这是同一个人在开第二个主体。
+          */}
+        {r.phoneAlreadyKnown && <Badge tone="info">已有主体</Badge>}
+      </div>
+    ) },
+    { header: "提交时间", cell: (r) => (
+      <span className="txt-caption text-muted-foreground">{r.submittedAt ? fmtTime(r.submittedAt) : "-"}</span>
+    ) },
+    { header: "结果", cell: (r) => (
+      r.operatorNo
+        ? <span className="font-mono txt-caption">{r.operatorNo}</span>
+        : r.rejectReason
+          ? <span className="txt-caption text-muted-foreground" title={r.rejectReason}>
+              {r.rejectReason.length > 18 ? `${r.rejectReason.slice(0, 18)}…` : r.rejectReason}
+            </span>
+          : <span className="text-muted-foreground">-</span>
+    ) },
+    { header: "操作", cell: (r) => {
+      // 无放行权时不渲染按钮即可 —— 顶部已有 <ReadOnlyNotice> 统一说明原因。
+      // 在这里再写一句同义的只读提示，会让同一句话散落两处（规范 §13 的棘轮盯的就是这个；
+      // 它扫源码字符串，**注释里写出那句原话也会被计入**）
+      if (!canApprove) return <span className="text-muted-foreground">-</span>;
+      if (r.status === "APPROVED" || r.status === "REJECTED") {
+        return <span className="txt-caption text-muted-foreground">已处理</span>;
+      }
+      return (
+        <div className="flex gap-2">
+          {r.status === "SUBMITTED" && (
+            <Button
+              size="sm" variant="outline"
+              disabled={acceptApply.isPending}
+              onClick={() => acceptApply.mutate(r.applyNo)}
+            >受理</Button>
+          )}
+          <Button size="sm" onClick={() => { setAuditing(r); setRejectReason(""); }}>审核</Button>
+        </div>
+      );
+    } },
+  ];
+
   const total =
-    tab === "profiles" ? profiles.data?.total
+    tab === "applies" ? appliesQ.data?.total
+    : tab === "profiles" ? profiles.data?.total
     : tab === "commission" ? commissions.data?.total
     : tab === "assign" ? assign.data?.total
     : tab === "performance" ? performance.data?.total
@@ -469,6 +642,57 @@ function AgentsInner() {
   return (
     <div>
       <TabHeader tabs={tabs} value={tab} onChange={setTab} />
+
+      {tab === "applies" && (
+        <>
+          {!canApprove && (
+            <ReadOnlyNotice
+              what="受理与审核"
+              perm="agent:apply:approve"
+              note="能看队列不等于能放行 —— 录入码与放行码是分开的"
+            />
+          )}
+          <Toolbar
+            search={keyword}
+            onSearch={(v) => { setKeyword(v); paging.reset(); }}
+            searchPlaceholder="搜主体名称 / 申请单号"
+            onAdd={() => setApplyForm({ operatorType: "AGENT" })}
+            addLabel="代建录入"
+            canAdd={canCreateApply}
+          >
+            <FilterSelect
+              value={applyStatus}
+              onChange={(v) => { setApplyStatus(v); paging.reset(); }}
+              options={[
+                { value: "", label: "待办（待受理 + 审核中）" },
+                ...(Object.keys(APPLY_STATUS) as ApplyStatus[])
+                  .filter((k) => k !== "DRAFT")   // 草稿在申请人那边，运营端看不到
+                  .map((k) => ({ value: k, label: APPLY_STATUS[k].label })),
+              ]}
+            />
+            <Input
+              type="date" aria-label="提交起始日"
+              value={applyFrom}
+              onChange={(e) => { setApplyFrom(e.target.value); paging.reset(); }}
+            />
+            <Input
+              type="date" aria-label="提交截止日"
+              value={applyTo}
+              onChange={(e) => { setApplyTo(e.target.value); paging.reset(); }}
+            />
+          </Toolbar>
+          <DataTable
+            rows={appliesQ.data?.list ?? []}
+            loading={appliesQ.isPending}
+            rowKey={(r) => r.applyNo}
+            empty={applyStatus || keyword || applyFrom || applyTo
+              ? "这些筛选条件下没有申请单，换个状态或时间区间试试"
+              : "当前没有待办 —— 商家自助提交与运营代建录入的申请都会出现在这里"}
+            columns={applyColumns}
+          />
+          <Pagination page={paging.page} size={paging.size} total={total ?? 0} onPage={paging.setPage} onSize={paging.setSize} />
+        </>
+      )}
 
       {tab === "profiles" && (
         <>
@@ -586,6 +810,101 @@ function AgentsInner() {
         <Field label="默认分润比例（%）">
           <Input type="number" value={form.shareRate != null ? Math.round(form.shareRate * 100) : ""} onChange={(e) => setForm({ ...form, shareRate: Number(e.target.value) / 100 })} />
         </Field>
+      </Drawer>
+
+      {/* 代建录入：与商家自助**同一套必填**，只是谁来填不同 */}
+      <FormDrawer
+        open={!!applyForm}
+        onOpenChange={(o) => !o && setApplyForm(null)}
+        titleNew="代建录入入驻申请"
+        titleEdit="代建录入入驻申请"
+        isEdit={false}
+        fields={APPLY_FIELDS}
+        value={applyForm ?? {}}
+        onChange={(v) => setApplyForm(v)}
+        onSubmit={() => applyForm && createApply.mutate(applyForm)}
+        submitting={createApply.isPending}
+      />
+
+      {/* 审核抽屉：受理/通过/驳回三个动作里，只有通过会派生出主体 */}
+      <Drawer
+        open={!!auditing}
+        onOpenChange={(o) => { if (!o) { setAuditing(null); setRejectReason(""); } }}
+        title={`审核 ${auditing?.applyNo ?? ""}`}
+        desc="通过后会在一个事务里建出主体、自然人与属主账号；驳回原因会原样回显给申请人"
+        width="w-[520px]"
+        footer={auditing && (
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              disabled={auditApply.isPending}
+              onClick={() => auditApply.mutate({
+                applyNo: auditing.applyNo, approve: false, rejectReason,
+              })}
+            >驳回</Button>
+            <Button
+              disabled={auditApply.isPending}
+              onClick={() => auditApply.mutate({ applyNo: auditing.applyNo, approve: true })}
+            >通过并建档</Button>
+          </div>
+        )}
+      >
+        {auditing && (
+          <div className="space-y-4">
+            {/*
+              * 多主体申请的提示放最上面：审核人第一眼就要知道
+              * 「这个手机号已经有主体了」**不是重复注册**，是同一个人在开第二个主体。
+              */}
+            {auditing.phoneAlreadyKnown && (
+              <div className="rounded-card border border-info/40 bg-info/5 p-3 txt-body">
+                <div className="font-medium">这个手机号已经有主体</div>
+                <div className="mt-1 txt-caption text-muted-foreground">
+                  这是<strong>多主体申请</strong>，不是重复注册 —— 同一个人可以经营多个主体。
+                  通过后会复用已有的自然人与凭据，不会让他多记一套密码。
+                </div>
+                {auditing.knownEmailMask && (
+                  <div className="mt-2 txt-caption text-warning">
+                    ⚠️ 本次填的邮箱（{auditing.emailMask}）与已有记录（{auditing.knownEmailMask}）不一致。
+                    <strong>不会静默覆盖</strong> —— 要么是他换了邮箱（应走改邮箱流程重新验证），要么是填错了，请先核实。
+                  </div>
+                )}
+              </div>
+            )}
+
+            <Field label="主体名称">{auditing.operatorName}</Field>
+            <Field label="主体类型">{OPERATOR_TYPE_LABEL[auditing.operatorType]}</Field>
+            <Field label="来源">
+              {APPLY_SOURCE_LABEL[auditing.source]}
+              <span className="ml-2 txt-caption text-muted-foreground">
+                提交人 {auditing.submittedBy ?? "-"}
+              </span>
+            </Field>
+            <Field label="联系方式">
+              <span className="font-mono">{auditing.phoneMask}</span>
+              <span className="mx-2 text-muted-foreground">·</span>
+              <span className="font-mono">{auditing.emailMask}</span>
+            </Field>
+            <Field label="辖域">{auditing.regionScope ?? <span className="text-muted-foreground">未填</span>}</Field>
+            <Field label="拟定分润比例">
+              {auditing.shareRate == null
+                ? <span className="text-muted-foreground">未填，通过后按主体档案默认值</span>
+                : `${(auditing.shareRate * 100).toFixed(1)}%`}
+            </Field>
+            <Field label="资质材料">{auditing.payload ?? <span className="text-muted-foreground">未上传</span>}</Field>
+
+            <div className="space-y-1">
+              <label className="txt-caption text-muted-foreground" htmlFor="reject-reason">
+                驳回原因（驳回时必填，会原样回显给申请人）
+              </label>
+              <Input
+                id="reject-reason"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="如：营业执照与主体名称不一致，请补正后重新提交"
+              />
+            </div>
+          </div>
+        )}
       </Drawer>
 
       <FormDrawer

@@ -50,6 +50,13 @@ export const agentHttp: AgentApi = {
 
   // S1 设备/点位划拨。
   // ⚠️ T1-D 后端缺口：可划拨资产池无端点（AgentExtController 只有 /assignments）。
+  // 入驻申请（ADR-030 §三）。注意 source 不从前端传 —— 服务端按有无 STAFF 令牌判定
+  listAgentApplies: (q) => client.get("/api/agent/applies", q),
+  acceptAgentApply: (applyNo) => client.post(`/api/agent/applies/${applyNo}/accept`, {}),
+  auditAgentApply: ({ applyNo, ...body }) => client.post(`/api/agent/applies/${applyNo}/audit`, body),
+  // 代建走复数端点（判 agent:apply:create）；单数 /apply 是免鉴权的自助入口，D5 的公开页用
+  createAgentApply: (x) => client.post("/api/agent/applies", x),
+
   listAssignableAssets: (q?: AssignableAssetQ) => client.get("/api/agent/assignable-assets", q),
 
   // T0-5：后端是**单资产**端点 POST /api/agent/assignments（AssignReq{agentNo,targetType,

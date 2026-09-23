@@ -24,6 +24,12 @@ export const agentMock: AgentApi = {
   listAgentAccounts: (q: PageQ = {}) => wait(db.listAgentAccounts(q)),
   saveAgentAccount: (x) => wait(db.saveAgentAccount(x), 350),
 
+  // 入驻申请：写操作全部走 db 层 —— 状态机与「同手机号至多一张在途」都在那强制
+  listAgentApplies: (q = {}) => wait(db.listAgentApplies(q)),
+  acceptAgentApply: (applyNo, operatorName) => wait(db.acceptAgentApply(applyNo, operatorName), 350),
+  auditAgentApply: (x) => wait(db.auditAgentApply(x), 400),
+  createAgentApply: (x) => wait(db.createAgentApply(x), 400),
+
   // S1 设备/点位划拨：写操作一律走 db 层的 assign/reclaim（校验 + 落流水 + 刷新汇总都在那）
   listAssignableAssets: (q: AssignableAssetQ = {}) => wait(db.listAssignableAssets(q)),
   assignAgentAssets: (x) => wait(db.assignAgentAssets(x), 400),

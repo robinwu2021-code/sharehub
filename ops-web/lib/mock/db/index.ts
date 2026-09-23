@@ -53,6 +53,11 @@ export {
   assignAgentAssets, reclaimAgentAssets, refreshAgentAssetCounts, AgentAssignError,
 } from "./agent";
 export type { AssignmentRecordQuery, AssignableAssetQuery } from "./agent";
+// 入驻申请（ADR-030 §三 · D4）。**这一行不是误提交** —— 它配套 ./apply.ts，
+// 缺了它 lib/api/mocks/agent.ts 的四个入驻方法会编译不过（tsc 会红）。
+export {
+  applies, listAgentApplies, acceptAgentApply, auditAgentApply, createAgentApply,
+} from "./apply";
 
 export {
   orders, orderExceptions, depositRecords, reservations, freeOrders,

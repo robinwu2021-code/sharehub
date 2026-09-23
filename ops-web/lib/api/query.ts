@@ -96,3 +96,10 @@ export type ReportCustomQ = ReportQ & { dim?: string; metrics?: string };
 
 /** 常见问题：分类 + 上下架状态。 */
 export type ProblemQ = PageQ & { category?: string; status?: string; showArchived?: boolean };
+
+/** 入驻申请检索。`from`/`to` 卡 `submittedAt`（ISO 串）。 */
+export interface ApplyQ extends PageQ {
+  status?: string;
+  from?: string;
+  to?: string;
+}
