@@ -6,7 +6,7 @@
 // ⚠️ **这一页目前是只读的聚合视图**，原因见清单 D2：
 // 分润规则表按「分成方」配比例、没有站点维度；站点级比例只存在进场合同里。
 // 在「以哪一份为准」定案之前，这里如实展示两个来源各自给出的值，并标出缺配置与异常，
-// 编辑仍在原入口（财务 › 分润规则 / 站点与点位 › 进场合同）。定案后再开本页的编辑。
+// 编辑仍在原入口（财务 › 分润规则 / 运营管理 › 场地与合同 › 进场合同）。定案后再开本页的编辑。
 import { useState } from "react";
 import Link from "next/link";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
@@ -91,7 +91,7 @@ export default function SiteSharingPage() {
         在「以哪一份为准」定下来之前，这里如实展示两个来源各自的值并标出问题；修改请到
         <Link href="/finance?tab=rules" className="mx-1 text-primary hover:underline">财务 › 分润规则</Link>
         或
-        <Link href="/locations?tab=contracts" className="mx-1 text-primary hover:underline">站点与点位 › 进场合同</Link>。
+        <Link href="/locations?tab=contracts" className="mx-1 text-primary hover:underline">运营管理 › 场地与合同 › 进场合同</Link>。
       </Notice>
 
       {stats && (

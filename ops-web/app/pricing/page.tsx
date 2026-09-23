@@ -169,7 +169,7 @@ function PricingInner() {
           />
           {/* 站点列表拉不到（接口挂了/无数据）时三个维度的下拉都是空的，说清楚原因，别让人对着空下拉猜 */}
           {canEdit && sitesQ.isSuccess && (sitesQ.data?.list ?? []).length === 0 && (
-            <Notice>没有可选站点——差异化规则必须挂在真实站点/点位/场景上，请先在「站点与点位」建站点</Notice>
+            <Notice>没有可选站点——差异化规则必须挂在真实站点/点位/场景上，请先在「运营管理 › 场站管理 › 站点管理」建站点</Notice>
           )}
           <DataTable rowKey={(d: PricingDiff) => d.ruleNo} columns={diffCols} rows={diffs.data?.list} loading={diffs.isLoading} error={diffs.error} onRetry={diffs.refetch}
             empty="暂无差异化规则——未配置时全部点位走计费模板，可点「新增差异化规则」为机场/医院等场景单独定价" />
