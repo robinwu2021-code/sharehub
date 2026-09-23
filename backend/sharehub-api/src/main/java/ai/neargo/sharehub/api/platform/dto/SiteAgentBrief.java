@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.api.platform.dto;
 
+import java.math.BigDecimal;
+
 /**
  * 站点上一位伙伴的一项责任 —— platform 暴露给 finance 的最小只读投影（ADR-027 §三）。
  *
@@ -10,6 +12,9 @@ package ai.neargo.sharehub.api.platform.dto;
  * @param agentName 冗余展示名，写进分润明细省一次连表
  * @param role      INVEST / DEVELOP / OPERATE / REFER
  * @param ruleNo    该责任指定的分润规则号；为空表示按 {@code (AGENT, agentNo, role)} 去找
+ * @param oneOffAmount 一次性对价（牵线费），签约时付；仅 {@code REFER} 用。
+ *                     {@code null} = 没配，与 0（明确不付）不是一回事
  */
-public record SiteAgentBrief(String agentNo, String agentName, String role, String ruleNo) {
+public record SiteAgentBrief(String agentNo, String agentName, String role, String ruleNo,
+                             BigDecimal oneOffAmount) {
 }

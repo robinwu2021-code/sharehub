@@ -363,6 +363,9 @@ export const saveSiteAgent = (siteNo: string, x: Partial<SiteAgent>) => {
     id: x.id ?? Math.max(0, ...siteAgents.map((a) => a.id ?? 0)) + 1,
     siteNo, agentNo: x.agentNo!, role,
     ruleNo: x.ruleNo ?? null,
+    // 一次性对价只有牵线用得上。别的责任存下来就会有人以为它会被付出去，
+    // 而实际上没有任何代码读它（出资/拓展/运维走分润规则的比例）。
+    oneOffAmount: role === "REFER" ? (x.oneOffAmount ?? null) : null,
     effectiveFrom: x.effectiveFrom ?? null, effectiveTo: x.effectiveTo ?? null,
     remark: x.remark ?? "",
   };

@@ -84,3 +84,65 @@ describe("商机拓展归因", () => {
     await mockApi.removeSiteAgent(SITE, refer.id!);
   });
 });
+
+/**
+ * 合同签约 → 一次性牵线费（ADR-027 §四 / TDD-A2 第 4 批）。
+ *
+ * 牵线的对价是「把关系介绍过来」这个一次性动作 —— 按逐单比例付会变成「介绍一次、分十年」。
+ */
+describe("签约付牵线费", () => {
+  const SITE = "ST310";
+  const REFERRER = "AG006";
+
+  const clean = async () => {
+    for (const r of await mockApi.listSiteAgents(SITE)) {
+      if (r.agentNo === REFERRER) await mockApi.removeSiteAgent(SITE, r.id!);
+    }
+  };
+  const contract = (status: "ACTIVE" | "EXPIRED") => ({
+    venueNo: "VEN300", siteNo: SITE, venueName: "牵线费测试", siteName: "牵线费测试站点",
+    shareRate: 0.2, entryFee: 1000, startAt: "2026-01-01", endAt: "2027-01-01",
+    status, attachments: [],
+  });
+  const feesOf = async (contractNo: string) =>
+    (await mockApi.listShareRecords({ page: 1, size: 50, keyword: contractNo })).list;
+
+  it("签约结出牵线费，金额取责任行上的一次性对价", async () => {
+    await clean();
+    await mockApi.saveSiteAgent(SITE, { agentNo: REFERRER, role: "REFER", oneOffAmount: 500 });
+    const c = await mockApi.saveContract(contract("ACTIVE"));
+    const fees = await feesOf(c.contractNo);
+    expect(fees).toHaveLength(1);
+    expect(fees[0].basis).toBe("REFER");
+    expect(fees[0].amount, "不乘任何基数").toBe(500);
+    expect(fees[0].orderNo, "来源单据是合同本身").toBe(c.contractNo);
+    await clean();
+  });
+
+  it("重复保存不重复付", async () => {
+    // 合同会被反复编辑（补附件、改到期日）。每存一次付一次，就是每改一次多付一笔。
+    await clean();
+    await mockApi.saveSiteAgent(SITE, { agentNo: REFERRER, role: "REFER", oneOffAmount: 500 });
+    const c = await mockApi.saveContract(contract("ACTIVE"));
+    await mockApi.saveContract({ ...c, entryFee: 1200 });
+    expect(await feesOf(c.contractNo)).toHaveLength(1);
+    await clean();
+  });
+
+  it("没配金额时不落 0 元明细", async () => {
+    // 没配 ≠ 0。0 元明细会让运营以为这笔本来就不该有。
+    await clean();
+    await mockApi.saveSiteAgent(SITE, { agentNo: REFERRER, role: "REFER" });
+    const c = await mockApi.saveContract(contract("ACTIVE"));
+    expect(await feesOf(c.contractNo)).toHaveLength(0);
+    await clean();
+  });
+
+  it("已到期的历史合同不触发付款", async () => {
+    await clean();
+    await mockApi.saveSiteAgent(SITE, { agentNo: REFERRER, role: "REFER", oneOffAmount: 500 });
+    const c = await mockApi.saveContract(contract("EXPIRED"));
+    expect(await feesOf(c.contractNo)).toHaveLength(0);
+    await clean();
+  });
+});

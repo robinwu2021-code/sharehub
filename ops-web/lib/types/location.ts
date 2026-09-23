@@ -212,6 +212,13 @@ export interface SiteAgent {
   role: SiteAgentRole;
   /** 该责任对应的分润规则；空 = 用登记类型默认费率。 */
   ruleNo?: string | null;
+  /**
+   * 一次性对价（牵线费），签约时付；**仅 REFER 用**。
+   *
+   * `null` = 还没谈定，与 `0`（明确不付）不是一回事：前者该有人去配，
+   * 后者是明确的不分。混为一谈就会静默少付。
+   */
+  oneOffAmount?: number | null;
   effectiveFrom?: string | null;
   effectiveTo?: string | null;
   /** 为什么是这个责任 —— 结算争议时的人话依据。 */

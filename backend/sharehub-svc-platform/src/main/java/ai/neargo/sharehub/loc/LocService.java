@@ -32,12 +32,18 @@ public class LocService {
     private final ContractMapper contractMapper;
     private final ai.neargo.sharehub.loc.ext.mapper.LocContractAttachMapper attachMapper;
     private final ai.neargo.sharehub.platform.md.mapper.MdRegionMapper regions;
+    private final ai.neargo.sharehub.common.event.DomainEventBus events;
+
+    /** 合同状态词表只有 ACTIVE / EXPIRED；录入即已签（见 saveContract 注释）。 */
+    private static final String ACTIVE = "ACTIVE";
 
     public LocService(SiteMapper siteMapper, LocationMapper locationMapper,
                       VenueMapper venueMapper, ContractMapper contractMapper,
                       ai.neargo.sharehub.loc.ext.mapper.LocContractAttachMapper attachMapper,
-                      ai.neargo.sharehub.platform.md.mapper.MdRegionMapper regions) {
+                      ai.neargo.sharehub.platform.md.mapper.MdRegionMapper regions,
+                      ai.neargo.sharehub.common.event.DomainEventBus events) {
         this.regions = regions;
+        this.events = events;
         this.siteMapper = siteMapper;
         this.locationMapper = locationMapper;
         this.venueMapper = venueMapper;
@@ -241,6 +247,91 @@ public class LocService {
                         attachByNo.getOrDefault(c.getContractNo(), java.util.List.of())))
                 .toList();
         return new PageResult<>(rows, r.getTotal());
+    }
+
+    /**
+     * 新建 / 修改进场合同。
+     *
+     * <p><b>这个写入口此前根本不存在</b>：`loc_contract` 只有种子在写，
+     * 前端的「新增/编辑合同」在 {@code USE_MOCK=0} 下必 404
+     * （见《功能矩阵-前后端贯通对照表》里那 7 个缺失的 save*）。
+     * 而合同是**场地方分成的唯一依据**，建不了合同就等于场地方费率只能靠改库。
+     *
+     * <p><b>状态取 ACTIVE 即视为已签</b>：本域的状态词表只有 ACTIVE / EXPIRED，
+     * 没有草稿态 —— 运营录入的本来就是一份**已经签好的**纸质合同，
+     * 「录入」这个动作本身就代表签约。所以不另造 DRAFT：
+     * 多一个没人会停留的状态，只会让每份合同多一次点击。
+     *
+     * <p><b>签约事件在事务提交后才投递</b>（{@code DomainEventBus} 走 outbox）：
+     * 在事务内发事件，若随后回滚，消费方就会按一个从未发生的事实付掉一笔牵线费。
+     */
+    @org.springframework.transaction.annotation.Transactional
+    public Contract saveContract(LocContract body) {
+        if (body.getSiteNo() == null || body.getSiteNo().isBlank()) {
+            // 合同不绑站点的话，场地方分成取价时找不到它，会静默回落到通用规则 ——
+            // 而回落值与合同里白纸黑字写的比例往往不一样。
+            throw new IllegalArgumentException("合同必须绑定站点：站点是场地方分成的连接键");
+        }
+        if (body.getStartAt() != null && body.getEndAt() != null
+                && !body.getStartAt().isBlank() && !body.getEndAt().isBlank()
+                && body.getEndAt().compareTo(body.getStartAt()) < 0) {
+            throw new IllegalArgumentException("合同结束日不能早于开始日");
+        }
+        if (body.getStatus() == null || body.getStatus().isBlank()) body.setStatus(ACTIVE);
+
+        String no = body.getContractNo();
+        LocContract current = (no == null || no.isBlank()) ? null
+                : contractMapper.selectOne(new LambdaQueryWrapper<LocContract>()
+                        .eq(LocContract::getContractNo, no).last("limit 1"));
+
+        if (current == null) {
+            if (no == null || no.isBlank()) {
+                body.setContractNo(ai.neargo.common.core.IdGenerator.next(
+                        ai.neargo.sharehub.common.BizKey.CONTRACT));
+            }
+            if (body.getTenantId() == null) body.setTenantId("MAIN");
+            contractMapper.insert(body);
+        } else {
+            // 服务端决定的字段一律从 current 取，不看客户端传了什么（同 AbstractCrudService 的加固）
+            body.setId(current.getId());
+            body.setVersion(current.getVersion());
+            body.setTenantId(current.getTenantId());
+            body.setDeleted(current.getDeleted());
+            body.setCreatedAt(current.getCreatedAt());
+            // LocContract 不继承 BaseEntity，没有 createdBy —— 审计列在 V10 加到了表上，
+            // 但实体没跟着加。这里不顺手补：补了要连带确认 AuditMetaObjectHandler 的填充范围，
+            // 是另一件事（见《实体-领域对象对账表》里那批漂移）。
+            contractMapper.updateById(body);
+        }
+
+        // 已签 → 通知 finance 结一次性牵线费。**每次保存都发**：重复投递由
+        // share_record 的唯一键（order_no, dimension, payee_no, basis）挡住，
+        // 不会多付；而「只在状态首次变 ACTIVE 时发」要额外判前态，
+        // 漏判的后果是牵线人一分钱都收不到，且没有任何地方看得出来。
+        if (ACTIVE.equals(body.getStatus())) {
+            events.publish(new ai.neargo.sharehub.api.platform.event.ContractSignedEvent(
+                    body.getContractNo(), body.getSiteNo(), body.getVenueNo(), body.getCurrency()));
+        }
+        // 按**编号**读回，不走 pageContracts —— 它的 keyword 只匹配场地方名/站点名，
+        // 拿合同号去搜必然搜不到（第一版就是这么写的，每次保存都 500）。
+        LocContract saved = contractMapper.selectOne(new LambdaQueryWrapper<LocContract>()
+                .eq(LocContract::getContractNo, body.getContractNo()).last("limit 1"));
+        return toContractVO(saved);
+    }
+
+    /** 合同实体 → VO，附件单独查（同 pageContracts 的口径）。 */
+    private Contract toContractVO(LocContract c) {
+        java.util.List<ai.neargo.sharehub.loc.dto.LocDtos.ContractAttachment> atts =
+                attachMapper.selectList(new LambdaQueryWrapper<ai.neargo.sharehub.loc.ext.entity.LocContractAttach>()
+                                .eq(ai.neargo.sharehub.loc.ext.entity.LocContractAttach::getContractNo, c.getContractNo())
+                                .orderByAsc(ai.neargo.sharehub.loc.ext.entity.LocContractAttach::getId))
+                        .stream()
+                        .map(a -> new ai.neargo.sharehub.loc.dto.LocDtos.ContractAttachment(
+                                a.getAttachNo(), a.getFileName(), a.getSize(), a.getUploadedBy(),
+                                a.getUploadedAt() == null ? null : a.getUploadedAt().toString()))
+                        .toList();
+        return new Contract(c.getContractNo(), c.getVenueName(), c.getSiteName(),
+                c.getShareRate(), c.getEntryFee(), c.getStartAt(), c.getEndAt(), c.getStatus(), atts);
     }
 
     /**

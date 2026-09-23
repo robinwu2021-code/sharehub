@@ -51,8 +51,8 @@ public class SiteAgentServiceImpl implements SiteAgentService {
                     return new SiteAgentRow(r.getId(), r.getSiteNo(), r.getAgentNo(),
                             a == null ? null : a.name(),
                             a == null || a.agentType() == null ? null : a.agentType().name(),
-                            r.getRole(), r.getRuleNo(), str(r.getEffectiveFrom()), str(r.getEffectiveTo()),
-                            r.getRemark());
+                            r.getRole(), r.getRuleNo(), r.getOneOffAmount(),
+                            str(r.getEffectiveFrom()), str(r.getEffectiveTo()), r.getRemark());
                 })
                 .toList();
     }
@@ -111,6 +111,9 @@ public class SiteAgentServiceImpl implements SiteAgentService {
         e.setAgentNo(in.agentNo());
         e.setRole(role.name());
         e.setRuleNo(blankToNull(in.ruleNo()));
+        // 一次性对价只有牵线用得上。别的责任传了也不存 —— 存下来就会有人以为它会被付出去，
+        // 而实际上没有任何代码会读它（出资/拓展/运维走 share_rule 的比例）。
+        e.setOneOffAmount(role == SiteAgentRole.REFER ? in.oneOffAmount() : null);
         e.setEffectiveFrom(from);
         e.setEffectiveTo(to);
         e.setRemark(in.remark() == null ? "" : in.remark().trim());
@@ -118,7 +121,7 @@ public class SiteAgentServiceImpl implements SiteAgentService {
 
         return new SiteAgentRow(e.getId(), e.getSiteNo(), e.getAgentNo(), agent.name(),
                 agent.agentType() == null ? null : agent.agentType().name(), e.getRole(), e.getRuleNo(),
-                str(e.getEffectiveFrom()), str(e.getEffectiveTo()), e.getRemark());
+                e.getOneOffAmount(), str(e.getEffectiveFrom()), str(e.getEffectiveTo()), e.getRemark());
     }
 
     @Override

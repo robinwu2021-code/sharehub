@@ -11,6 +11,7 @@ import ai.neargo.sharehub.loc.dto.LocDtos.Site;
 import ai.neargo.sharehub.loc.dto.LocDtos.Location;
 import ai.neargo.sharehub.loc.dto.LocDtos.Venue;
 import ai.neargo.sharehub.loc.dto.LocDtos.Contract;
+import ai.neargo.sharehub.loc.entity.LocContract;
 import ai.neargo.sharehub.loc.LocService;
 import ai.neargo.sharehub.report.dto.ReportDtos.DashboardStats;
 import ai.neargo.sharehub.report.service.ReportService;
@@ -169,6 +170,27 @@ public class OpsController {
                                         @RequestParam(required = false) Integer size,
                                         @RequestParam(required = false) String keyword) {
         return loc.pageContracts(page, size, keyword);
+    }
+
+    /**
+     * 新建 / 修改进场合同。
+     *
+     * <p><b>此前这个端点根本不存在</b>：合同只有种子在写，前端的「新增/编辑」按钮
+     * 在 {@code USE_MOCK=0} 下必 404。而合同是场地方分成的唯一依据 ——
+     * 建不了合同，场地方费率就只能靠改库。
+     */
+    @PostMapping("/contracts")
+    @PreAuthorize("@perm.can('location:contract:create')")
+    public Contract createContract(@RequestBody LocContract body) {
+        body.setContractNo(null);   // 新建一律服务端取号，忽略 body 里的键
+        return loc.saveContract(body);
+    }
+
+    @PostMapping("/contracts/{contractNo}")
+    @PreAuthorize("@perm.can('location:contract:update')")
+    public Contract updateContract(@PathVariable String contractNo, @RequestBody LocContract body) {
+        body.setContractNo(contractNo); // 路径为准，防越权改别人的合同
+        return loc.saveContract(body);
     }
 
     /**

@@ -60,7 +60,7 @@ public class LocalSiteAgentQuery implements SiteAgentQueryPort {
                         .thenComparing(r -> r.getAgentNo() == null ? "" : r.getAgentNo()))
                 .map(r -> new SiteAgentBrief(r.getAgentNo(),
                         Optional.ofNullable(byNo.get(r.getAgentNo())).map(AgentBrief::name).orElse(null),
-                        r.getRole(), r.getRuleNo()))
+                        r.getRole(), r.getRuleNo(), r.getOneOffAmount()))
                 .toList();
     }
 }

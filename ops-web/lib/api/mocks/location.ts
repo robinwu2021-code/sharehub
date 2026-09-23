@@ -67,7 +67,38 @@ export const locationMock: LocationApi = {
     return wait(saved, 350);
   },
   saveVenue: (x) => wait(db.saveVenue(x), 350),
-  saveContract: (x) => wait(db.saveContract(x), 350),
+  /**
+   * 合同保存 + 一次性牵线费（ADR-027 §四）——与后端 `LocService.saveContract` 同一条规则。
+   *
+   * 状态为 ACTIVE 即视为已签：本域的状态词表只有 ACTIVE / EXPIRED，没有草稿态 ——
+   * 运营录入的本来就是一份已经签好的纸质合同。
+   *
+   * **每次保存都尝试结算，靠「同一合同同一伙伴只结一次」去重**，
+   * 而不是判「状态首次变 ACTIVE」：漏判的后果是牵线人一分钱都收不到，且没人看得出来。
+   */
+  saveContract: (x) => {
+    const saved = db.saveContract(x);
+    if (saved.status === "ACTIVE" && saved.siteNo) {
+      for (const r of db.listSiteAgents(saved.siteNo)) {
+        // 没配金额 ≠ 0。记一条 0 元明细会把「该有人去配」和「明确不付」混为一谈。
+        if (r.role !== "REFER" || r.oneOffAmount == null || r.oneOffAmount <= 0) continue;
+        const already = db.shareRecords.some(
+          (rec) => rec.orderNo === saved.contractNo && rec.payeeNo === r.agentNo && rec.basis === "REFER");
+        if (already) continue;
+        db.shareRecords.push({
+          recordNo: `SREC${9000 + db.shareRecords.length}`,
+          orderNo: saved.contractNo,          // 来源单据就是合同，不是某一张订单
+          dimension: "AGENT", payeeNo: r.agentNo, payeeName: r.agentName ?? r.agentNo,
+          basis: "REFER",
+          amount: r.oneOffAmount, rate: 0,    // 与比例无关：一次性对价不随 GMV 走
+          currency: "AED",
+          period: new Date().toISOString().slice(0, 7),
+          createdAt: new Date().toISOString(),
+        });
+      }
+    }
+    return wait(saved, 350);
+  },
 
   // 跟进记录 / 合同附件：校验与留痕都在 db 层，本文件只延迟透传（async 让守卫抛错变 rejected）
   listLeadFollowUps: (leadNo, q: PageQ = {}) => wait(loc.listLeadFollowUps(leadNo, q)),

@@ -311,6 +311,14 @@ export function SiteDetailDrawer({
           { key: "remark", label: "依据", maxLength: 256, section: "责任",
             placeholder: "如：全程谈下进场合同",
             help: "结算争议时用它回答「凭什么是这个责任」，一句人话即可" },
+          // 牵线费只在「牵线」这一档出现：另外三档是按 GMV 的持续分成，走分润规则的比例。
+          // 给它们也显示一个金额框，等于邀请运营去填一个**没有任何代码会读**的数。
+          ...(partnerForm?.role === "REFER"
+            ? [{
+                key: "oneOffAmount", label: "牵线费（一次性）", type: "number" as const, min: 0, section: "责任",
+                help: "签合同时一次性付，不进逐单分润。留空 = 还没谈定（与 0「明确不付」不是一回事）",
+              }]
+            : []),
           { key: "effectiveFrom", label: "生效起", type: "date", section: "生效期", help: "留空 = 立即" },
           { key: "effectiveTo", label: "生效止", type: "date", section: "生效期", help: "留空 = 长期" },
         ];
@@ -325,6 +333,13 @@ export function SiteDetailDrawer({
           ) },
           { header: "责任", className: "whitespace-nowrap", cell: (r) => <StatusBadge map={ROLE} value={r.role} /> },
           { header: "依据", cell: (r) => <span className="txt-caption text-muted-foreground">{r.remark || "—"}</span> },
+          // 只有牵线有一次性对价；别的责任显示「—」而不是空白 —— 空白会被读成数据缺失
+          { header: "牵线费", className: "whitespace-nowrap text-right", cell: (r) => (
+            r.role !== "REFER" ? <span className="text-muted-foreground">—</span>
+              : r.oneOffAmount == null
+                ? <span className="text-muted-foreground">未定</span>
+                : <span className="tabular-nums">{r.oneOffAmount.toFixed(2)}</span>
+          ) },
           { header: "生效期", className: "whitespace-nowrap", cell: (r) => (
             <span className="txt-caption text-muted-foreground">
               {(r.effectiveFrom ?? "").slice(0, 10) || "立即"} ~ {(r.effectiveTo ?? "").slice(0, 10) || "长期"}

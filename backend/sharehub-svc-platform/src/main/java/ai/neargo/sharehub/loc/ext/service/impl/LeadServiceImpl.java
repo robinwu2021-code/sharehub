@@ -124,7 +124,7 @@ public class LeadServiceImpl extends AbstractCrudService<LocLead, Lead> implemen
         }
         try {
             siteAgents.upsert(vo.siteNo(), new SiteAgentRow(null, vo.siteNo(), vo.owner(),
-                    null, null, SiteAgentRole.DEVELOP.name(), null, null, null,
+                    null, null, SiteAgentRole.DEVELOP.name(), null, null, null, null,
                     "来自商机 " + vo.leadNo() + "：" + vo.venueName()));
         } catch (RuntimeException ex) {
             // 最常见的是「该伙伴在本站点已有牵线，与拓展互斥」—— 那是真实的业务冲突，

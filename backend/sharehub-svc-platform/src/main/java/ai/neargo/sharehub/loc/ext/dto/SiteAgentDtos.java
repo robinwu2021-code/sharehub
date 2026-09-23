@@ -13,9 +13,12 @@ public final class SiteAgentDtos {
      * @param role      INVEST / DEVELOP / OPERATE / REFER
      * @param ruleNo    该责任对应的分润规则；空 = 用登记类型默认费率
      * @param agentName 冗余展示名，出参才有 —— 入参传了也不采信（同「存编号不存名字」纪律）
+     * @param oneOffAmount 一次性对价（牵线费），签约时付；仅 REFER 用。
+     *                     null = 没配，与 0（明确不付）不是一回事
      */
     public record SiteAgentRow(Long id, String siteNo, String agentNo, String agentName,
                                String agentType, String role, String ruleNo,
+                               java.math.BigDecimal oneOffAmount,
                                String effectiveFrom, String effectiveTo, String remark) {
     }
 }
