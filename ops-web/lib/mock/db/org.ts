@@ -5,7 +5,7 @@ import type {
   Department, StaffPerformance, PermissionItem, PageQuery,
 } from "../../types";
 import type { Role } from "../../auth"; // 仅取角色码联合类型（type-only，不引入 store 运行时）
-import { roleHas } from "../../permissions";
+import { can } from "../../permissions";
 import { notFound, fail } from "@/lib/biz-error";
 import { VENDORS, p, iso } from "./internal";
 import { paginate, kwHit, upsert, nextNo, liveHit, archiveRow, unarchiveRow } from "./helpers";
@@ -235,7 +235,7 @@ const PERM_CODES = new Set(permissions.map((x) => x.code));
  * 在目录上展开得到 —— 两份手写清单必然漂移，而 permCount 与勾选树读的是同一个来源才自洽。
  */
 const rolePermMap: Record<string, string[]> = Object.fromEntries(
-  roles.map((r) => [r.roleNo, permissions.filter((x) => roleHas(r.code as Role, x.code)).map((x) => x.code)]),
+  roles.map((r) => [r.roleNo, permissions.filter((x) => can(r.code as Role, x.code)).map((x) => x.code)]),
 );
 // permCount ≡ 已分配码数（org-perm.test.ts 断言这条恒等式）
 roles.forEach((r) => { r.permCount = rolePermMap[r.roleNo].length; });
