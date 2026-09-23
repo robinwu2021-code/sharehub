@@ -67,6 +67,13 @@ export interface Venue extends Archivable {
 }
 export interface Contract {
   contractNo: string;
+  /**
+   * 场地方 / 站点编号。合同是**场地方分成的唯一依据**，按编号连；
+   * 名字只作展示冗余（同一商场不同楼层会有同名站点，按名字连必然连错）。
+   * 后端 `loc_contract.venue_no/site_no` 列与实体都已有，读接口的 DTO 尚未带出（见 contracts/location.ts 缺口）。
+   */
+  venueNo?: string | null;
+  siteNo?: string | null;
   venueName: string;
   siteName: string; // 合同绑定 场地方 × 站点（ADR-013）
   shareRate: number; // 0..1

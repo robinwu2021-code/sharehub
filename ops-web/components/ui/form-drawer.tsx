@@ -4,7 +4,7 @@
 // 用法：<FormDrawer open={!!form} onOpenChange fields={FIELDS} value={form} onChange={setForm} onSubmit=.../>
 //
 // 能力：
-// - 字段类型：text/number/select/switch/password/textarea/date/multiselect
+// - 字段类型：text/number/select/switch/password/textarea/date/datetime/multiselect/address
 // - 校验：blur 校验单字段 + 提交校验全部；错误在字段下方红字，输入框描边转 destructive；有错时保存按钮禁用
 // - 分区：相邻同名 section 合成一段，段首渲染小标题（样式对齐 secondary-nav 的分组小标题）
 // - 联动：disabledWhen(values) 为 true 时禁用该字段并清空其值（不提交隐藏字段的脏数据）
@@ -13,6 +13,7 @@ import { Drawer } from "./drawer";
 import { Input, Select } from "./input";
 import { DateInput } from "./date-input";
 import { MultiSelect } from "./multi-select";
+import { AddressPicker } from "./address-picker";
 import { Button } from "./button";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -40,6 +41,9 @@ export type FieldDef = ValidatableField & {
   csv?: boolean;
   /** 字段下方灰色说明。 */
   help?: string;
+  /** 仅 address：经纬度写到 values 的哪两个键（地图选点与手填都写这里）。 */
+  latKey?: string;
+  lngKey?: string;
 };
 
 type FormValue = FormValues;
@@ -130,6 +134,23 @@ function InputForField({
         disabled={disabled}
         onBlur={onBlur}
         onChange={(e) => set(e.target.value)}
+      />
+    );
+  }
+  if (f.type === "address") {
+    const latK = f.latKey ?? "lat", lngK = f.lngKey ?? "lng";
+    return (
+      <AddressPicker
+        value={{
+          address: (cur as string) ?? "",
+          lat: (value[latK] as number | "") ?? "",
+          lng: (value[lngK] as number | "") ?? "",
+        }}
+        disabled={disabled}
+        invalid={invalid}
+        placeholder={f.placeholder}
+        onBlur={onBlur}
+        onChange={(v) => onChange({ ...value, [f.key]: v.address, [latK]: v.lat, [lngK]: v.lng })}
       />
     );
   }

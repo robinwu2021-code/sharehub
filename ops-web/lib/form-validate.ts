@@ -6,7 +6,9 @@ export type FieldType =
   | "text" | "number" | "select" | "switch" | "password"
   | "textarea" | "date" | "multiselect"
   /** 日期 + 时间（精确到分钟）。值为「市场时区」的 `YYYY-MM-DDTHH:mm`，与 UTC 的换算由页面用 lib/market-time 做。 */
-  | "datetime";
+  | "datetime"
+  /** 地址 + 地图选点。本字段存地址文本，经纬度另存于 FieldDef 的 latKey/lngKey 指定的两个键。 */
+  | "address";
 
 export type FormValues = Record<string, unknown>;
 

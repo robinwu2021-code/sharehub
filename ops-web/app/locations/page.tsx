@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { UNPAGED_SIZE, RECENT_LIMIT } from "@/lib/constants";
 import { api } from "@/lib/api";
@@ -13,6 +13,7 @@ import { Toolbar } from "@/components/ui/toolbar";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Drawer, Field } from "@/components/ui/drawer";
+import { AddressPicker } from "@/components/ui/address-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
@@ -81,29 +82,52 @@ const ATTACH_ACCEPT_LABEL = ATTACH_EXTS.join(" / ").toUpperCase();
 const ATTACH_MAX_MB = ATTACH_MAX_SIZE / 1024 / 1024;
 const VENUE_FIELDS: FieldDef[] = [
   { key: "venueNo", label: "编号", readOnlyOnEdit: true, placeholder: "新增自动生成" },
-  { key: "name", label: "名称", placeholder: "Dubai Mall" },
+  { key: "name", label: "名称", required: true, maxLength: 128, placeholder: "Dubai Mall" },
   { key: "contact", label: "联系方式", placeholder: "姓名 / 电话" },
   { key: "industry", label: "行业", placeholder: "购物中心" },
-  { key: "locationCount", label: "站点数", type: "number" },
+  // 「站点数」曾是一个可编辑的数字框——它是**聚合值**（名下有几个站点），不是属性，
+  // 手填必然与实际脱节（[db-design §1.4]「计数不是列，是聚合」）。列表列照常展示，表单不再收。
 ];
-const CONTRACT_FIELDS: FieldDef[] = [
-  { key: "contractNo", label: "合同号", readOnlyOnEdit: true, placeholder: "新增自动生成" },
-  { key: "venueName", label: "场地方", placeholder: "Dubai Mall" },
-  { key: "siteName", label: "站点", placeholder: "Dubai Mall L1" },
-  { key: "shareRate", label: "分成比例（0~1）", type: "number" },
-  { key: "entryFee", label: "进场费", type: "number" },
-  { key: "startAt", label: "生效时间", placeholder: "2026-01-01" },
-  { key: "endAt", label: "到期时间", placeholder: "2027-01-01" },
-  { key: "status", label: "状态", type: "select", options: [{ value: "ACTIVE", label: "有效" }, { value: "EXPIRED", label: "过期" }] },
-];
+/**
+ * 合同字段。场地方 / 站点必须**选**不能**打** —— 合同是场地方分成的唯一依据，
+ * 按名字连必然连错（同一商场不同楼层会有同名站点），所以存编号、名字只作展示冗余。
+ */
+function contractFieldsFor(
+  venues: { value: string; label: string }[],
+  sites: { value: string; label: string }[],
+): FieldDef[] {
+  return [
+    { key: "contractNo", label: "合同号", readOnlyOnEdit: true, placeholder: "新增自动生成" },
+    { key: "venueNo", label: "场地方", type: "select", required: true,
+      options: [{ value: "", label: "请选择场地方" }, ...venues] },
+    { key: "siteNo", label: "站点", type: "select", required: true,
+      options: [{ value: "", label: "请选择站点" }, ...sites],
+      help: "只列所选场地方名下的站点" },
+    // 上限 1 不是形式主义：这里填 20（本意 20%）就是**二十倍分成**，而且分完才会被发现。
+    { key: "shareRate", label: "分成比例（0~1，如 0.15 = 15%）", type: "number", required: true, min: 0, max: 1 },
+    { key: "entryFee", label: "进场费", type: "number", min: 0 },
+    { key: "startAt", label: "生效时间", type: "date", required: true },
+    { key: "endAt", label: "到期时间", type: "date", required: true },
+    { key: "status", label: "状态", type: "select", options: [{ value: "ACTIVE", label: "有效" }, { value: "EXPIRED", label: "过期" }] },
+  ];
+}
 const LEAD_FIELDS: FieldDef[] = [
   { key: "leadNo", label: "线索号", readOnlyOnEdit: true, placeholder: "新增自动生成" },
   { key: "venueName", label: "场地名称", placeholder: "某商场" },
   { key: "contact", label: "联系人", placeholder: "姓名 / 电话" },
   { key: "stage", label: "阶段", type: "select", options: LEAD_STAGE_OPTIONS },
-  { key: "owner", label: "负责人", placeholder: "BD 姓名" },
-  { key: "expectSites", label: "预计站点数", type: "number" },
+  { key: "expectSites", label: "预计站点数", type: "number", min: 0 },
 ];
+/** 负责人单独拼：`loc_lead.owner` 存的是 **employee_no**，以前填姓名对不上人。 */
+function leadFieldsFor(employees: { value: string; label: string }[]): FieldDef[] {
+  return [
+    ...LEAD_FIELDS.slice(0, 4),
+    { key: "owner", label: "负责人", type: "select",
+      options: [{ value: "", label: "请选择负责人" }, ...employees],
+      help: "存员工编号，不是姓名" },
+    ...LEAD_FIELDS.slice(4),
+  ];
+}
 const ONBOARDING_FIELDS: FieldDef[] = [
   { key: "onboardingNo", label: "申请号", readOnlyOnEdit: true, placeholder: "新增自动生成" },
   { key: "venueName", label: "场地名称", placeholder: "Al Barsha Mall" },
@@ -154,6 +178,29 @@ function LocationsInner() {
 
   // 站点表单的区域下拉数据源（system 域字典）
   const regionsQ = useQuery({ queryKey: ["regions-dict"], queryFn: () => api.listRegions({ page: 1, size: UNPAGED_SIZE }) });
+  // 关联字段的下拉数据源。三份都是小字典，一次拉全量不分页；单独开 query 是为了
+  // 不被主列表的 tab 切换连带作废（切到合同页时场地方列表还在，不必重拉）。
+  const venuesQ = useQuery({ queryKey: ["venues-dict"], queryFn: () => api.listVenues({ page: 1, size: UNPAGED_SIZE }) });
+  const sitesQ = useQuery({ queryKey: ["sites-dict"], queryFn: () => api.listSites({ page: 1, size: UNPAGED_SIZE }) });
+  const employeesQ = useQuery({ queryKey: ["employees-dict"], queryFn: () => api.listEmployees({ page: 1, size: UNPAGED_SIZE }) });
+  const venueOpts = useMemo(
+    () => (venuesQ.data?.list ?? []).map((v) => ({ value: v.venueNo, label: `${v.name}（${v.venueNo}）` })),
+    [venuesQ.data],
+  );
+  // 站点下拉按已选场地方收窄：选了 Dubai Mall 还能选到别家商场的站点，等于没约束。
+  const contractSiteOpts = useMemo(() => {
+    const all = sitesQ.data?.list ?? [];
+    const vNo = contractForm?.venueNo;
+    const scoped = vNo ? all.filter((x) => x.venueNo === vNo) : all;
+    return scoped.map((x) => ({ value: x.siteNo, label: `${x.name}（${x.siteNo}）` }));
+  }, [sitesQ.data, contractForm?.venueNo]);
+  const employeeOpts = useMemo(
+    () => (employeesQ.data?.list ?? []).filter((e) => e.status === "ACTIVE")
+      .map((e) => ({ value: e.employeeNo, label: `${e.name}（${e.employeeNo}）` })),
+    [employeesQ.data],
+  );
+  const contractFields = useMemo(() => contractFieldsFor(venueOpts, contractSiteOpts), [venueOpts, contractSiteOpts]);
+  const leadFields = useMemo(() => leadFieldsFor(employeeOpts), [employeeOpts]);
   const q = useQuery<PageResult<Site | SitePoint | Venue | Contract | Lead | SiteAnalysis | VenueOnboarding | SiteLifecycle>>({
     // showArchived 必须进 queryKey，否则切开关不重新拉数据
     queryKey: ["place", tab, paging.page, paging.size, keyword, showArchived, period],
@@ -181,6 +228,16 @@ function LocationsInner() {
     mutationFn: (v: Partial<Venue>) => api.saveVenue(v),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["place", "venues"] }); notify.success("保存成功"); setVenueForm(null); },
   });
+  // 合同提交：名字由所选编号带出（不让编号与名字各说各话），并挡住「到期早于生效」。
+  const submitContract = () => {
+    const c = contractForm;
+    if (!c) return;
+    if (c.startAt && c.endAt && c.endAt < c.startAt) { notify.error("到期时间早于生效时间"); return; }
+    const venueName = venuesQ.data?.list.find((v) => v.venueNo === c.venueNo)?.name ?? c.venueName ?? "";
+    const siteName = sitesQ.data?.list.find((x) => x.siteNo === c.siteNo)?.name ?? c.siteName ?? "";
+    saveContract.mutate({ ...c, venueName, siteName });
+  };
+
   const saveContract = useMutation({
     mutationFn: (c: Partial<Contract>) => api.saveContract(c),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["place", "contracts"] }); notify.success("保存成功"); setContractForm(null); },
@@ -589,7 +646,18 @@ function LocationsInner() {
       >
         {siteForm && (<>
           <Field label="站点名称"><Input value={siteForm.name ?? ""} onChange={(e) => setSiteForm({ ...siteForm, name: e.target.value })} /></Field>
-          <Field label="场地方"><Input value={siteForm.venueName ?? ""} onChange={(e) => setSiteForm({ ...siteForm, venueName: e.target.value })} /></Field>
+          {/* 场地方从档案选，不自由输入——分成按场地方结算，同名场地方按名字连会把钱分给另一家 */}
+          <Field label="场地方">
+            <Select className="w-full" value={siteForm.venueNo ?? ""} onChange={(e) => {
+              const v = (venuesQ.data?.list ?? []).find((x) => x.venueNo === e.target.value);
+              setSiteForm({ ...siteForm, venueNo: e.target.value, venueName: v?.name ?? "" });
+            }}>
+              <option value="">请选择场地方</option>
+              {(venuesQ.data?.list ?? []).map((v) => (
+                <option key={v.venueNo} value={v.venueNo}>{v.name}（{v.venueNo}）</option>
+              ))}
+            </Select>
+          </Field>
           {/* 区域从字典选，不能自由输入——台账 M11：原先是文本框，写进去的名字在 regions 字典里根本不存在 */}
           <Field label="区域">
             <Select className="w-full" value={siteForm.regionId ?? ""} onChange={(e) => {
@@ -608,23 +676,25 @@ function LocationsInner() {
               {SCENES.map((s) => <option key={s} value={s}>{s}</option>)}
             </Select>
           </Field>
-          <Field label="地址"><Input value={siteForm.address ?? ""} onChange={(e) => setSiteForm({ ...siteForm, address: e.target.value })} /></Field>
           {/*
-            坐标必填：地图撒点直读这两个字段，留空的站点在地图上是「凭空消失」而不是报错。
-            用两个数字框而不是地图选点：静态导出下地图底图依赖 NEXT_PUBLIC_GMAPS_KEY，缺 key 时
-            地图整体降级为列表占位（见 components/ui/site-map.tsx）——若把编辑入口挂在地图上，
-            没配 key 的环境就彻底没法维护坐标了。数字框与 key 无关，任何环境都能改。
+            地址与经纬度绑成一个控件：两者**必须一致**，分开手填时对不上没人拦得住
+            （C 端「找附近」按经纬度排，地址只给人看）。地图选点一次写三个值。
+            没配地图密钥时 AddressPicker 自动降级为「地址 + 两个经纬度输入框」——
+            这正是原先那段注释担心的情形，任何环境都能维护坐标，不被地图挡住。
           */}
-          <Field label="经纬度（地图撒点）">
-            <div className="flex gap-2">
-              <Input type="number" step="0.000001" className="w-full" placeholder={`纬度 lat ${SITE_COORD_BOUNDS.latMin}~${SITE_COORD_BOUNDS.latMax}`}
-                value={siteForm.lat ?? ""} onChange={(e) => setSiteForm({ ...siteForm, lat: e.target.value === "" ? undefined : Number(e.target.value) })} />
-              <Input type="number" step="0.000001" className="w-full" placeholder={`经度 lng ${SITE_COORD_BOUNDS.lngMin}~${SITE_COORD_BOUNDS.lngMax}`}
-                value={siteForm.lng ?? ""} onChange={(e) => setSiteForm({ ...siteForm, lng: e.target.value === "" ? undefined : Number(e.target.value) })} />
-            </div>
+          <Field label="地址 · 位置">
+            <AddressPicker
+              value={{ address: siteForm.address ?? "", lat: siteForm.lat ?? "", lng: siteForm.lng ?? "" }}
+              onChange={(v) => setSiteForm({
+                ...siteForm,
+                address: v.address,
+                lat: v.lat === "" ? undefined : v.lat,
+                lng: v.lng === "" ? undefined : v.lng,
+              })}
+            />
             <div className="mt-1 text-xs text-muted-foreground">
               取值范围 纬度 {SITE_COORD_BOUNDS.latMin}~{SITE_COORD_BOUNDS.latMax} · 经度 {SITE_COORD_BOUNDS.lngMin}~{SITE_COORD_BOUNDS.lngMax}（当前运营国家 UAE）。
-              经纬度写反在全球范围内也合法，但会把点扔到海里，保存时会被拒绝。地图底图缺 key 时降级为占位列表，坐标照样生效。
+              经纬度写反在全球范围内也合法，但会把点扔到海里，保存时会被拒绝。
             </div>
           </Field>
           <Field label="状态">
@@ -645,7 +715,18 @@ function LocationsInner() {
       >
         {pointForm && (<>
           <Field label="点位名称"><Input value={pointForm.name ?? ""} onChange={(e) => setPointForm({ ...pointForm, name: e.target.value })} /></Field>
-          <Field label="所属站点名"><Input value={pointForm.siteName ?? ""} onChange={(e) => setPointForm({ ...pointForm, siteName: e.target.value })} placeholder="Dubai Mall L1" /></Field>
+          {/* 站点从列表选：点位是归属链（站点→点位→机柜）的一环，填错等于设备挂到别的站点 */}
+          <Field label="所属站点">
+            <Select className="w-full" value={pointForm.siteNo ?? ""} onChange={(e) => {
+              const x = (sitesQ.data?.list ?? []).find((y) => y.siteNo === e.target.value);
+              setPointForm({ ...pointForm, siteNo: e.target.value, siteName: x?.name ?? "" });
+            }}>
+              <option value="">请选择站点</option>
+              {(sitesQ.data?.list ?? []).map((x) => (
+                <option key={x.siteNo} value={x.siteNo}>{x.name}（{x.siteNo}）</option>
+              ))}
+            </Select>
+          </Field>
           <Field label="位置描述"><Input value={pointForm.spotDesc ?? ""} onChange={(e) => setPointForm({ ...pointForm, spotDesc: e.target.value })} placeholder="近扶梯" /></Field>
           <Field label="状态">
             <Select className="w-full" value={pointForm.status ?? "ACTIVE"} onChange={(e) => setPointForm({ ...pointForm, status: e.target.value as SitePoint["status"] })}>
@@ -676,10 +757,10 @@ function LocationsInner() {
         titleNew="新增合同"
         titleEdit={`编辑合同 ${contractForm?.contractNo ?? ""}`}
         isEdit={!!contractForm?.contractNo}
-        fields={CONTRACT_FIELDS}
+        fields={contractFields}
         value={(contractForm ?? {}) as Record<string, unknown>}
         onChange={(v) => setContractForm(v as Partial<Contract>)}
-        onSubmit={() => contractForm && saveContract.mutate(contractForm)}
+        onSubmit={() => contractForm && submitContract()}
         submitting={saveContract.isPending}
       />
 
@@ -748,7 +829,7 @@ function LocationsInner() {
         titleNew="新增线索"
         titleEdit={`编辑线索 ${leadForm?.leadNo ?? ""}`}
         isEdit={!!leadForm?.leadNo}
-        fields={LEAD_FIELDS}
+        fields={leadFields}
         value={(leadForm ?? {}) as Record<string, unknown>}
         onChange={(v) => setLeadForm(v as Partial<Lead>)}
         onSubmit={() => leadForm && saveLead.mutate(leadForm)}

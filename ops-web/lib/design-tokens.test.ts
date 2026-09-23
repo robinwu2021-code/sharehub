@@ -111,16 +111,16 @@ describe("页面层规范一致性（只允许变好）", () => {
     // 估算与断言口径不同就会出现"基线一写上就红"。
     const bareFilterSelects = pageFiles().reduce((n, f) => {
       const src = readFileSync(f, "utf8");
-      // 取每个 <Select …> 到 </Select> 的块，块内有空值 option 即视为筛选
+      // 取每个 <Select …> 到 </Select> 的块。**判据收紧**（2026-09-23）：
+      // 空值 option 的文案以「全部」开头才算筛选；「请选择 XX」是表单占位，按规范
+      // 本就该是 6px 控件、不该改成 FilterSelect。旧判据把两者一起数，导致每加一个
+      // 合规的表单下拉基线就被迫抬一次 —— 那是让判据反过来惩罚正确写法。
       const blocks = src.match(/<Select[\s\S]*?<\/Select>/g) ?? [];
-      return n + blocks.filter((b) => /<option value=""/.test(b)).length;
+      return n + blocks.filter((b) => /<option value="">\s*全部/.test(b)).length;
     }, 0);
-    // 基线 4（原 17，2026-07-30 页面层清理）。⚠️ 剩的 4 处**全是判据误判**：
-    //   locations「请选择区域」「不改阶段，仅记跟进」、marketing 两处「请选择」
-    // 都是**表单占位**而非"全部 XX"筛选，按规范就该是 6px 控件、不该改成 FilterSelect。
-    // 即本项已实质清零，4 是判据的下限。要真正压到 0，把判据从 `<option value="">`
-    // 收紧成「空值文案以『全部』开头」即可 —— 那样这 4 处不再计入。
-    expect(bareFilterSelects).toBeLessThanOrEqual(4);
+    // 基线 0（原 17 → 4 → 0）。4 那一档剩的全是「请选择 XX」表单占位，
+    // 判据收紧后不再计入，本项**实质与形式都清零**。再涨就是真的有人写了裸筛选下拉。
+    expect(bareFilterSelects).toBeLessThanOrEqual(0);
   });
 
   it("金额不许手写格式 —— 一律走 money()（规范 §12 数字列）", () => {

@@ -8,12 +8,13 @@
 // 后端就绪度（lib/backend-ready）：列表 / 新增 / 编辑 / 归档已有，可上线；
 // 「暂停营业 / 恢复营业」「统计」依赖尚未实现的接口，真实后端模式下不渲染这些入口，
 // 而不是点了再报错。
-import { Suspense, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { BarChart3, Pause, Pencil, Play } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Site } from "@/lib/types";
+import { SITE_COORD_BOUNDS } from "@/lib/types/location";
 import { useCan } from "@/lib/hooks/use-can";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
@@ -48,17 +49,40 @@ const PAUSE_FIELDS: FieldDef[] = [
     help: "暂停后 C 端附近列表不再显示该站点，站内机柜不允许新借；已经借出的仍可正常归还。原因会记入操作日志" },
 ];
 
-const FIELDS: FieldDef[] = [
-  { key: "name", label: "站点名称", required: true, maxLength: 128, section: "基本信息" },
-  { key: "nameAr", label: "站点名称（العربية）", maxLength: 128, section: "基本信息", help: "不填时阿语界面显示中文名" },
-  { key: "venueName", label: "场地方", required: true, maxLength: 128, section: "基本信息", help: "分成按场地方结算，必须填写" },
-  { key: "sceneType", label: "场景类型", type: "select", required: true, section: "基本信息", options: SCENES.map((s) => ({ value: s, label: s })) },
-  { key: "regionName", label: "区域", required: true, section: "位置", help: "数据权限按区域收敛" },
-  { key: "address", label: "地址", required: true, maxLength: 256, section: "位置" },
-  { key: "lat", label: "纬度", type: "number", min: -90, max: 90, section: "位置", help: "选填。地图撒点用；留空不影响其它功能" },
-  { key: "lng", label: "经度", type: "number", min: -180, max: 180, section: "位置" },
-  { key: "openHours", label: "营业时间", section: "营业", placeholder: "10:00-22:00", help: "多段用逗号分隔，如 10:00-14:00,17:00-22:00；24 小时填 00:00-24:00" },
-];
+/** 营业时间：多段 `HH:MM-HH:MM`，逗号分隔。以前只在 help 里说，填错了没人拦。 */
+const OPEN_HOURS_RE = "^([01]\\d|2[0-4]):[0-5]\\d-([01]\\d|2[0-4]):[0-5]\\d(,([01]\\d|2[0-4]):[0-5]\\d-([01]\\d|2[0-4]):[0-5]\\d)*$";
+
+/**
+ * 字段定义依赖「场地方 / 区域」两份下拉数据，故做成函数而非常量。
+ *
+ * ⚠️ 2026-09-23 之前这两个字段是**自由文本**，各踩过一次：
+ *  - 场地方存名字不存编号 → 分成链在「站点→场地方」这一跳断掉，同名场地方会把钱分错家；
+ *  - 区域存名字 → 数据权限按区域收敛，打错一个字**静默失效**（不报错，是看不到/看到不该看的）。
+ * 所以现在一律「选出来」，存编号，名字只作展示冗余。
+ */
+function fieldsFor(
+  venues: { value: string; label: string }[],
+  regions: { value: string; label: string }[],
+): FieldDef[] {
+  return [
+    { key: "name", label: "站点名称", required: true, maxLength: 128, section: "基本信息" },
+    { key: "nameAr", label: "站点名称（العربية）", maxLength: 128, section: "基本信息", help: "不填时阿语界面显示中文名" },
+    { key: "venueNo", label: "场地方", type: "select", required: true, section: "基本信息",
+      options: [{ value: "", label: "请选择场地方" }, ...venues],
+      help: "分成按场地方结算；这里选的是档案里的场地方，不是手打名字" },
+    { key: "sceneType", label: "场景类型", type: "select", required: true, section: "基本信息", options: SCENES.map((s) => ({ value: s, label: s })) },
+    { key: "regionId", label: "区域", type: "select", required: true, section: "位置",
+      options: [{ value: "", label: "请选择区域" }, ...regions],
+      help: "数据权限按区域收敛，必须选字典里的区域" },
+    { key: "address", label: "地址", type: "address", latKey: "lat", lngKey: "lng",
+      required: true, maxLength: 256, section: "位置",
+      placeholder: "点「地图选点」或直接输入",
+      help: "地址与经纬度请保持一致：C 端「找附近」按经纬度排，地址只给人看" },
+    { key: "openHours", label: "营业时间", section: "营业", placeholder: "10:00-22:00",
+      pattern: { re: OPEN_HOURS_RE, msg: "格式应为 HH:MM-HH:MM，多段用逗号分隔" },
+      help: "多段用逗号分隔，如 10:00-14:00,17:00-22:00；24 小时填 00:00-24:00" },
+  ];
+}
 
 function SitesInner() {
   const qc = useQueryClient();
@@ -123,6 +147,28 @@ function SitesInner() {
     return { points: pts.length, cabinets: cabs.length };
   };
 
+  // 场地方 / 区域下拉。两份都是小字典（几十条），一次拉全量不分页。
+  const venueQ = useQuery({
+    queryKey: ["op", "venue-options"],
+    queryFn: () => api.listVenues({ page: 1, size: UNPAGED_SIZE }),
+  });
+  const regionQ = useQuery({
+    queryKey: ["op", "region-options"],
+    queryFn: () => api.listRegions({ page: 1, size: UNPAGED_SIZE }),
+  });
+  const venueOpts = useMemo(
+    () => (venueQ.data?.list ?? []).map((v) => ({ value: v.venueNo, label: `${v.name}（${v.venueNo}）` })),
+    [venueQ.data],
+  );
+  // 只列叶子层（level 3 的区/城区）：站点落在区一级，挂到「阿联酋」这种国家节点
+  // 等于没收敛数据权限。与旧入口（站点与点位 › 站点管理）的区域下拉口径一致。
+  const regionOpts = useMemo(
+    () => (regionQ.data?.list ?? []).filter((r) => r.level === 3)
+      .map((r) => ({ value: r.regionId, label: `${r.name}（${r.regionId}）` })),
+    [regionQ.data],
+  );
+  const fields = useMemo(() => fieldsFor(venueOpts, regionOpts), [venueOpts, regionOpts]);
+
   const refresh = () => qc.invalidateQueries({ queryKey: ["op", "sites"] });
 
   const save = useMutation({
@@ -145,8 +191,22 @@ function SitesInner() {
   const submit = () => {
     if (!form) return;
     if (!(form.name ?? "").trim()) { notify.error("请填写站点名称"); return; }
-    if (!(form.venueName ?? "").trim()) { notify.error("请填写场地方——分成按场地方结算"); return; }
-    save.mutate({ ...form, lat: Number(form.lat ?? 0), lng: Number(form.lng ?? 0) });
+    if (!form.venueNo) { notify.error("请选择场地方——分成按场地方结算"); return; }
+    if (!form.regionId) { notify.error("请选择区域——数据权限按区域收敛"); return; }
+
+    const lat = Number(form.lat ?? 0), lng = Number(form.lng ?? 0);
+    // 经纬度填反（把 55 填进纬度）在全球范围内完全合法，但会把站点扔到印度洋，
+    // 地图上表现为「站点凭空消失」——最难查的一类脏数据，所以在入口就拦。
+    const B = SITE_COORD_BOUNDS;
+    if ((lat || lng) && (lat < B.latMin || lat > B.latMax || lng < B.lngMin || lng > B.lngMax)) {
+      notify.error(`经纬度超出当前运营范围（纬度 ${B.latMin}~${B.latMax}，经度 ${B.lngMin}~${B.lngMax}）。是不是填反了？`);
+      return;
+    }
+
+    // 名字是冗余展示字段，由所选编号带出——不让它和编号各说各话。
+    const venueName = venueQ.data?.list.find((v) => v.venueNo === form.venueNo)?.name ?? form.venueName ?? "";
+    const regionName = regionQ.data?.list.find((r) => r.regionId === form.regionId)?.name ?? form.regionName ?? "";
+    save.mutate({ ...form, venueName, regionName, lat, lng });
   };
 
   // 暂停要填原因，而 confirm 只能确认不能收集输入，故用一个单字段抽屉
@@ -240,7 +300,7 @@ function SitesInner() {
         titleNew="新增站点"
         titleEdit={`编辑站点 ${editing?.siteNo ?? ""}`}
         isEdit={!!editing}
-        fields={FIELDS}
+        fields={fields}
         value={(form ?? {}) as Record<string, unknown>}
         onChange={(v) => setForm(v as Partial<Site>)}
         onSubmit={submit}

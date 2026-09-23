@@ -26,7 +26,11 @@ const REGIONS: { id: string; name: string; lat: number; lng: number }[] = [
 /** 由区域中心 + 确定性抖动派生站点坐标（同一 i 恒等，避免每次渲染点位乱跳）。 */
 const jitter = (base: number, i: number, seed: number) => Number((base + (((i * seed) % 17) - 8) * 0.0035).toFixed(6));
 export const sites: Site[] = Array.from({ length: 12 }, (_, i) => ({
-  siteNo: `ST${300 + i}`, name: p(LOCS, i), venueName: p(VENUE_NAMES, i),
+  siteNo: `ST${300 + i}`, name: p(LOCS, i),
+  // venueNo 与 venueName 必须同源：venues 是 VENUE_NAMES.map 出来的（VEN300 起），
+  // 所以这里用同一个下标算编号。此前 mock 只有名字没有编号 —— 与真实库当初的毛病一样，
+  // 「合同选站点」这类按编号过滤的联动在 mock 下会一条都筛不出来。
+  venueNo: `VEN${300 + (i % VENUE_NAMES.length)}`, venueName: p(VENUE_NAMES, i),
   agentNo: i % 3 === 0 ? null : `AG${String((i % 9) + 1).padStart(3, "0")}`, regionId: p(REGIONS, i).id, regionName: p(REGIONS, i).name,
   address: `${p(LOCS, i)}, Dubai, UAE`,
   lat: jitter(p(REGIONS, i).lat, i, 7), lng: jitter(p(REGIONS, i).lng, i, 11),

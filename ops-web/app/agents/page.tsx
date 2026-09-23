@@ -43,16 +43,23 @@ const SCOPE_OPTIONS = (["ALL", "REGION", "LOCATION", "AGENT", "SELF"] as DataSco
 // tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）
 // 注意「代理账号」在菜单里叫「代理账号管理」——以菜单为准，这里不再写第二份名字
 const TAB_KEYS = ["profiles", "commission", "assign", "performance", "accounts"] as const;
-const COMMISSION_FIELDS: import("@/components/ui/form-drawer").FieldDef[] = [
-  { key: "ruleNo", label: "规则号", readOnlyOnEdit: true, placeholder: "留空自动生成" },
-  { key: "agentNo", label: "代理编号", placeholder: "AG001" },
-  { key: "agentName", label: "代理名称" },
-  { key: "basis", label: "计佣基数", type: "select", options: [{ value: "GMV", label: "GMV" }, { value: "ORDER_COUNT", label: "订单量" }] },
-  { key: "rate", label: "分润比例（0~1）", type: "number" },
-  { key: "mode", label: "结算模式", type: "select", options: [{ value: "CHANNEL_SPLIT", label: "渠道分成" }, { value: "LEDGER", label: "账务分录" }] },
-  { key: "effectiveAt", label: "生效日期", placeholder: "2026-01-01" },
-  { key: "status", label: "状态", type: "select", options: [{ value: "ACTIVE", label: "启用" }, { value: "INACTIVE", label: "停用" }] },
-];
+/**
+ * 分润规则字段。代理商**选**不**打** —— 原先是「代理编号 + 代理名称」两个文本框，
+ * 要人手填两遍同一件事，填不一致时以哪个为准没人说得清。现在只选编号，名字提交时带出。
+ */
+function commissionFieldsFor(agents: { value: string; label: string }[]): FieldDef[] {
+  return [
+    { key: "ruleNo", label: "规则号", readOnlyOnEdit: true, placeholder: "留空自动生成" },
+    { key: "agentNo", label: "代理商", type: "select", required: true,
+      options: [{ value: "", label: "请选择代理商" }, ...agents] },
+    { key: "basis", label: "计佣基数", type: "select", options: [{ value: "GMV", label: "GMV" }, { value: "ORDER_COUNT", label: "订单量" }] },
+    // 上限 1：这里填 20（本意 20%）就是二十倍分润，而且要等分完才发现。
+    { key: "rate", label: "分润比例（0~1，如 0.15 = 15%）", type: "number", required: true, min: 0, max: 1 },
+    { key: "mode", label: "结算模式", type: "select", options: [{ value: "CHANNEL_SPLIT", label: "渠道分成" }, { value: "LEDGER", label: "账务分录" }] },
+    { key: "effectiveAt", label: "生效日期", type: "date", required: true },
+    { key: "status", label: "状态", type: "select", options: [{ value: "ACTIVE", label: "启用" }, { value: "INACTIVE", label: "停用" }] },
+  ];
+}
 // —— 划拨（S1）——
 /** multiselect + csv 的值是逗号分隔业务号串（与 employees 页数据权限抽屉同一套约定）。 */
 const csvArr = (v: unknown) => String(v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
@@ -63,14 +70,18 @@ const toOptions = (rows: AssignableAsset[] | undefined, type: AssignableAsset["a
   (rows ?? []).filter((a) => a.assetType === type).map((a) => ({ value: a.assetNo, label: assetLabel(a) }));
 const ASSET_TYPE_LABEL: Record<AssignableAsset["assetType"], string> = { CABINET: "机柜", SITE: "站点" };
 
-const ACCOUNT_FIELDS: FieldDef[] = [
-  { key: "accountNo", label: "账号编号", readOnlyOnEdit: true, placeholder: "留空自动生成" },
-  { key: "agentNo", label: "代理编号", placeholder: "AG001" },
-  { key: "agentName", label: "代理名称" },
-  { key: "loginPhone", label: "登录手机" },
-  { key: "status", label: "状态", type: "select", options: [{ value: "ACTIVE", label: "启用" }, { value: "DISABLED", label: "停用" }] },
-  { key: "dataScope", label: "数据范围", type: "select", options: SCOPE_OPTIONS },
-];
+/** 代理账号字段。同上：代理商选而不打。 */
+function accountFieldsFor(agents: { value: string; label: string }[]): FieldDef[] {
+  return [
+    { key: "accountNo", label: "账号编号", readOnlyOnEdit: true, placeholder: "留空自动生成" },
+    { key: "agentNo", label: "代理商", type: "select", required: true,
+      options: [{ value: "", label: "请选择代理商" }, ...agents] },
+    { key: "loginPhone", label: "登录手机", required: true,
+      pattern: { re: "^\\+?[0-9 -]{6,20}$", msg: "手机号格式不对（可带国际区号）" } },
+    { key: "status", label: "状态", type: "select", options: [{ value: "ACTIVE", label: "启用" }, { value: "DISABLED", label: "停用" }] },
+    { key: "dataScope", label: "数据范围", type: "select", options: SCOPE_OPTIONS },
+  ];
+}
 
 function AgentsInner() {
   const paging = usePaging();
@@ -134,7 +145,8 @@ function AgentsInner() {
   const agentOptionsQ = useQuery({
     queryKey: ["agent-options"],
     queryFn: () => api.listAgents({ page: 1, size: UNPAGED_SIZE }),
-    enabled: tab === "assign",
+    // 划拨、分润配置、代理账号三个页签都要这份下拉，别只在划拨页开。
+    enabled: tab === "assign" || tab === "commission" || tab === "accounts",
   });
   const agentOptions = useMemo(
     () => (agentOptionsQ.data?.list ?? [])
@@ -142,6 +154,27 @@ function AgentsInner() {
       .map((a) => ({ value: a.agentNo, label: `${a.agentNo} · ${a.name}（${a.regionScope}）` })),
     [agentOptionsQ.data],
   );
+  /**
+   * 下拉只列「在用」代理商，但**编辑既有记录时必须补上它自己的那一个** ——
+   * 否则一条挂在已停用代理商下的旧规则，一打开编辑就看到空下拉，随手一存就把 agentNo 抹了。
+   */
+  const withCurrent = (opts: { value: string; label: string }[], no?: string | null, name?: string | null) =>
+    !no || opts.some((o) => o.value === no) ? opts
+      : [...opts, { value: no, label: `${no} · ${name ?? ""}（已停用）`.replace(" · （", "（") }];
+  const commissionFields = useMemo(
+    () => commissionFieldsFor(withCurrent(agentOptions, commissionForm?.agentNo, commissionForm?.agentName)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [agentOptions, commissionForm?.agentNo, commissionForm?.agentName],
+  );
+  const accountFields = useMemo(
+    () => accountFieldsFor(withCurrent(agentOptions, accountForm?.agentNo, accountForm?.agentName)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [agentOptions, accountForm?.agentNo, accountForm?.agentName],
+  );
+  /** 代理名称是展示冗余，由所选编号带出——不让编号与名字各说各话。 */
+  const agentNameOf = (no?: string | null, fallback?: string | null) =>
+    (agentOptionsQ.data?.list ?? []).find((a) => a.agentNo === no)?.name ?? fallback ?? "";
+
   // 划拨候选：只列**未归属或归属其它代理**的资产（excludeAgentNo = 目标代理）
   const assignableQ = useQuery({
     queryKey: ["assignable-assets", assignForm?.agentNo ?? ""],
@@ -539,10 +572,10 @@ function AgentsInner() {
         titleNew="新增代理账号"
         titleEdit={`编辑代理账号 ${accountForm?.accountNo ?? ""}`}
         isEdit={!!accountForm?.accountNo}
-        fields={ACCOUNT_FIELDS}
+        fields={accountFields}
         value={(accountForm ?? {}) as Record<string, unknown>}
         onChange={(v) => setAccountForm(v as Partial<AgentAccount>)}
-        onSubmit={() => accountForm && saveAccount.mutate(accountForm)}
+        onSubmit={() => accountForm && saveAccount.mutate({ ...accountForm, agentName: agentNameOf(accountForm.agentNo, accountForm.agentName) })}
         submitting={saveAccount.isPending}
       />
 
@@ -600,10 +633,10 @@ function AgentsInner() {
         titleNew="新增分润规则"
         titleEdit={`编辑分润规则 ${commissionForm?.ruleNo ?? ""}`}
         isEdit={!!commissionForm?.ruleNo}
-        fields={COMMISSION_FIELDS}
+        fields={commissionFields}
         value={(commissionForm ?? {}) as Record<string, unknown>}
         onChange={(v) => setCommissionForm(v as Partial<AgentCommission>)}
-        onSubmit={() => commissionForm && saveCommission.mutate(commissionForm)}
+        onSubmit={() => commissionForm && saveCommission.mutate({ ...commissionForm, agentName: agentNameOf(commissionForm.agentNo, commissionForm.agentName) })}
         submitting={saveCommission.isPending}
       />
 
