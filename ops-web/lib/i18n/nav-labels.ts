@@ -13,6 +13,7 @@ const NAV: Record<string, Pair> = {
   "我的看板": { en: "My Dashboard", ar: "لوحتي" },
   "我的收益": { en: "My Earnings", ar: "أرباحي" },
   "我的结算": { en: "My Settlements", ar: "تسوياتي" },
+  "申请提现": { en: "Request Withdrawal", ar: "طلب سحب" },
   "我的设备": { en: "My Devices", ar: "أجهزتي" },
   "我的订单": { en: "My Orders", ar: "طلباتي" },
   "设备报修": { en: "Report Fault", ar: "الإبلاغ عن عطل" },

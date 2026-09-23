@@ -29,14 +29,16 @@ const L1_KEYS = [
   "pricing", "finance", "user", "marketing", "cs", "report", "org", "system",
 ];
 // 叶子五元组 href|label|perm|phase|group —— 2026-07-30 层级重构前后逐条比对为零差异。
+// 2026-09-23 有意变更：phase 从三值(1/2/3)改为四值 L0-L3，28 个叶子按分级矩阵重标，
+// 并新增代理门户「申请提现」(AGT-06)。依据 docs/requirements/功能清单-分级矩阵.md §六/§七。
 const LEAF_TUPLES = [
   "/|我的看板|dashboard:overview:read||经营概览",
   "/finance?tab=records|我的收益|finance:share_record:read||经营概览",
   "/finance?tab=settlements|我的结算|agent:settlement:read||经营概览",
+  "/finance?tab=withdrawals|申请提现|finance:withdrawal:apply||经营概览",
   "/devices|我的设备|device:cabinet:read||设备与订单",
   "/orders|我的订单|order:order:read||设备与订单",
   "/work-orders?view=list|设备报修|workorder:wo:create||报修与跟进",
-  // 2026-09-22 新增：运营管理（对标简电三分组）。有意变更，见 TDD-运营管理菜单-前端.md
   "/operation/overview|站点概览|location:overview:read||场站管理",
   "/operation/sites|站点管理|location:poi:read||场站管理",
   "/operation/fee-plans|收费方案|pricing:plan:read||场站管理",
@@ -51,10 +53,10 @@ const LEAF_TUPLES = [
   "/devices?tab=powerbanks|充电宝管理|device:powerbank:read||资产台账",
   "/devices?tab=monitor|实时监控|device:cabinet:read||在线运行",
   "/devices?tab=commands|远程控制·指令记录|device:command:send||在线运行",
-  "/devices?tab=logs|设备日志|device:cabinet:read|2|在线运行",
+  "/devices?tab=logs|设备日志|device:cabinet:read|1|在线运行",
   "/devices?tab=inventory|库存调拨|device:inventory:read|2|资产流转",
   "/devices?tab=ota|固件 OTA|device:ota:read|2|资产流转",
-  "/devices?tab=codes|设备编码|device:cabinet:read|2|资产流转",
+  "/devices?tab=codes|设备编码|device:cabinet:read|1|资产流转",
   "/alarms|告警记录|workorder:wo:read||告警处置",
   "/alarms?tab=notices|告警通知|workorder:wo:read||告警处置",
   "/alarms?tab=codes|告警代码|workorder:wo:read||规则配置",
@@ -67,10 +69,10 @@ const LEAF_TUPLES = [
   "/locations?tab=points|点位管理|location:poi:read||场地资产",
   "/locations?tab=analysis|站点坪效|location:analysis:read|3|场地资产",
   "/locations?tab=venues|场地方|location:venue:read||场地方机构",
-  "/locations?tab=contracts|进场合同|location:contract:read|2|场地方机构",
+  "/locations?tab=contracts|进场合同|location:contract:read||场地方机构",
   "/locations?tab=onboarding|门店 Onboarding|location:venue:read|2|场地方机构",
   "/locations?tab=lifecycle|门店生命周期|location:venue:read|3|场地方机构",
-  "/locations?tab=crm|BD 拓展 CRM||3|场地方机构",
+  "/locations?tab=crm|BD 拓展 CRM|||场地方机构",
   "/agents|代理商档案|agent:agent:read||机构档案",
   "/agents?tab=accounts|代理账号管理|agent:agent:update||机构档案",
   "/agents?tab=assign|设备/点位划拨|agent:scope:assign||机构档案",
@@ -82,29 +84,29 @@ const LEAF_TUPLES = [
   "/orders?tab=exceptions|异常订单|order:exception:read||售后处置",
   "/orders?tab=complaints|投诉订单|order:exception:read||售后处置",
   "/orders?tab=refunds|退款记录|order:refund:audit||售后处置",
-  "/orders?tab=deposit|押金与欠费|order:order:read|2|特殊单据",
+  "/orders?tab=deposit|押金与欠费|order:order:read|1|特殊单据",
   "/orders?tab=free|免费订单|order:order:read|2|特殊单据",
   "/pricing|计费模板|pricing:rule:read||",
   "/pricing?tab=diff|差异化定价||2|",
   "/pricing?tab=schedule|活动/时段价||3|",
   "/finance?tab=rules|分润规则|finance:share_rule:read||分润与结算",
   "/finance?tab=records|分润明细|finance:share_record:read||分润与结算",
-  "/finance?tab=summary|分润统计|finance:share_record:read|2|分润与结算",
+  "/finance?tab=summary|分润统计|finance:share_record:read|1|分润与结算",
   "/finance?tab=settlements|结算单|finance:settlement:read||分润与结算",
   "/finance?tab=ledger|账务分录|finance:ledger:read|2|平台账",
-  "/finance?tab=reconcile|对账|finance:recon:read|3|平台账",
-  "/finance?tab=invoices|发票|finance:invoice:read|3|平台账",
+  "/finance?tab=reconcile|对账|finance:recon:read|1|平台账",
+  "/finance?tab=invoices|发票|finance:invoice:read|2|平台账",
   "/agents?tab=commission|代理分润配置|agent:settlement:read||伙伴账",
-  "/finance?tab=withdrawals|提现审核|finance:withdrawal:read|2|伙伴账",
-  "/users?tab=wallets|用户钱包|user:wallet:read|3|用户账",
-  "/finance?tab=recharges|充值订单|user:wallet:read|3|用户账",
-  "/users|用户列表|user:cuser:read|2|用户主体",
-  "/users?tab=risk|风控用户|user:risk:read|2|风险治理",
-  "/users?tab=blacklist|黑名单|user:risk:update|2|风险治理",
+  "/finance?tab=withdrawals|提现审核|finance:withdrawal:read||伙伴账",
+  "/users?tab=wallets|用户钱包|user:wallet:read|2|用户账",
+  "/finance?tab=recharges|充值订单|user:wallet:read|2|用户账",
+  "/users|用户列表|user:cuser:read|1|用户主体",
+  "/users?tab=risk|风控用户|user:risk:read|1|风险治理",
+  "/users?tab=blacklist|黑名单|user:risk:update|1|风险治理",
   "/users?tab=whitelist|免费用户白名单|user:risk:update|2|风险治理",
-  "/users?tab=members|会员/次卡|user:member:read|3|用户资产",
-  "/users?tab=wallets|钱包|user:wallet:read|3|用户资产",
-  "/users?tab=recharge|充值套餐|user:wallet:read|3|用户资产",
+  "/users?tab=members|会员/次卡|user:member:read|2|用户资产",
+  "/users?tab=wallets|钱包|user:wallet:read|2|用户资产",
+  "/users?tab=recharge|充值套餐|user:wallet:read|2|用户资产",
   "/marketing?tab=notices|公告管理|marketing:coupon:read||运营内容",
   "/marketing|优惠券|marketing:coupon:read|2|促销玩法",
   "/marketing?tab=campaigns|活动||2|促销玩法",
@@ -113,10 +115,10 @@ const LEAF_TUPLES = [
   "/marketing?tab=ad-slots|广告位管理||3|广告经营",
   "/marketing?tab=ad-campaigns|广告活动||3|广告经营",
   "/marketing?tab=ad-delivery|投放与曝光||3|广告经营",
-  "/cs|报障受理||2|",
+  "/cs|报障受理||1|",
   "/cs?tab=sessions|客服会话||2|",
   "/orders|退款/补偿|order:refund:apply||",
-  "/users|黑名单处理|user:risk:update|2|",
+  "/users|黑名单处理|user:risk:update|1|",
   "/reports?tab=device|设备运营分析|report:device:read|2|",
   "/reports?tab=location|点位坪效|report:location:read|2|",
   "/reports?tab=finance|财务报表||2|",
@@ -126,24 +128,24 @@ const LEAF_TUPLES = [
   "/employees?tab=employees|员工|org:employee:read||人与组织",
   "/employees?tab=org|组织架构|org:employee:read|2|人与组织",
   "/employees?tab=roles|角色权限|org:role:read||授权",
-  "/employees?tab=audit|操作审计|org:audit:read|2|留痕与考核",
+  "/employees?tab=audit|操作审计|org:audit:read|1|留痕与考核",
   "/employees?tab=performance|绩效报表|org:employee:read|3|留痕与考核",
   "/system?tab=vendors|供应商接入|device:vendor:read||接入与支付",
   "/system?tab=payment|支付渠道|system:payment_channel:read||接入与支付",
   "/system?tab=notify|通知模板|system:notify_template:read||消息触达",
-  "/system?tab=notify-log|发送记录|system:notify_log:read|2|消息触达",
-  "/system?tab=notify-blacklist|触达拉黑|system:notify_blacklist:read|2|消息触达",
-  "/system?tab=rules|业务规则|system:biz_rule:update|2|业务规则",
-  "/system?tab=login|登录设置|system:login_setting:update|2|业务规则",
-  "/system?tab=app-version|应用版本|system:app_version:read|2|业务规则",
+  "/system?tab=notify-log|发送记录|system:notify_log:read|1|消息触达",
+  "/system?tab=notify-blacklist|触达拉黑|system:notify_blacklist:read|1|消息触达",
+  "/system?tab=rules|业务规则|system:biz_rule:update|1|业务规则",
+  "/system?tab=login|登录设置|system:login_setting:update|1|业务规则",
+  "/system?tab=app-version|应用版本|system:app_version:read|1|业务规则",
   "/system?tab=dict|参数字典|system:dict:read||基础字典",
   "/system?tab=region|地区库|system:dict:read||基础字典",
-  "/system?tab=banks|银行管理|system:bank:read|2|基础字典",
-  "/system?tab=problems|问题管理|system:problem:read|2|基础字典",
+  "/system?tab=banks|银行管理|system:bank:read||基础字典",
+  "/system?tab=problems|问题管理|system:problem:read||基础字典",
   "/system?tab=params|系统参数|system:param:read||基础字典",
-  "/system?tab=tax|税率与发票|system:tax:update|3|开放与市场",
+  "/system?tab=tax|税率与发票|system:tax:update|2|开放与市场",
   "/system?tab=markets|多国家市场|system:market:read|3|开放与市场",
-  "/system?tab=openapi|OpenAPI 应用|system:openapi:read|3|开放与市场",];
+  "/system?tab=openapi|OpenAPI 应用|system:openapi:read|3|开放与市场"];
 
 describe("结构回归基线（层级重构不改内容）", () => {
   it("L1 = 16 个运营项 + 3 个代理门户项，顺序固定", () => {
@@ -205,9 +207,10 @@ describe("A.9 角色×L1 可见性矩阵（抽查）", () => {
       for (const k of ["my-biz", "my-asset", "my-service"]) expect(sectionKeys(r)).not.toContain(k);
     }
   });
-  it("AGENT 门户只含「我的」六项，不含任何运营方功能", () => {
+  it("AGENT 门户只含「我的」七项，不含任何运营方功能", () => {
+    // 2026-09-23 加「申请提现」(AGT-06)：分级矩阵把代理自助提现定为 L0（⑦ 分钱的最后一步）。
     const labels = visibleSections("AGENT").flatMap((s) => visibleLeaves(s, "AGENT").map((l) => l.label));
-    expect(labels).toEqual(["我的看板", "我的收益", "我的结算", "我的设备", "我的订单", "设备报修"]);
+    expect(labels).toEqual(["我的看板", "我的收益", "我的结算", "申请提现", "我的设备", "我的订单", "设备报修"]);
     for (const forbidden of ["SLA 管理", "巡检计划", "BD 拓展 CRM", "押金与欠费", "分润配置"]) {
       expect(labels).not.toContain(forbidden);
     }
@@ -309,8 +312,9 @@ describe("默认落地与面包屑", () => {
   it("面包屑两级：叶子无 group 时退化", () => {
     expect(breadcrumb("/work-orders", null, "board", "OPS")).toEqual(["工单管理", "工单看板"]);
   });
-  it("面包屑：/finance?tab=withdrawals → 提现审核为 Phase 2，P1 只到 L1", () => {
-    expect(breadcrumb("/finance/", "withdrawals", null, "FINANCE")).toEqual(["财务管理"]);
+  it("面包屑：/finance?tab=withdrawals → 提现审核 2026-09-23 升为 L0，不再被锁，面包屑到 L3", () => {
+    // 旧断言是 Phase 2 被锁故只到 L1。分级矩阵 §六：提现是分钱的最后一步，缺了业务开不了张 → L0。
+    expect(breadcrumb("/finance/", "withdrawals", null, "FINANCE")).toEqual(["财务管理", "伙伴账", "提现审核"]);
   });
   it("面包屑：经营看板无子功能，只有一级", () => {
     expect(breadcrumb("/", null, null, "ADMIN")).toEqual(["经营看板"]);
@@ -384,14 +388,15 @@ describe("工具函数", () => {
   });
 });
 
-describe("分期屏蔽（phase gating，默认 CURRENT_PHASE=1）", () => {
-  it("CURRENT_PHASE 测试环境为 1（MVP）", () => {
-    expect(CURRENT_PHASE).toBe(1);
+describe("分级屏蔽（tier gating，默认 CURRENT_PHASE=0）", () => {
+  it("CURRENT_PHASE 测试环境为 0（L0 最小闭环）", () => {
+    expect(CURRENT_PHASE).toBe(0);
   });
-  it("isPhaseLocked：P2/P3 锁，P1/undefined 不锁", () => {
+  it("isPhaseLocked：L1/L2/L3 锁，L0/undefined 不锁（undefined 与 0 同义）", () => {
+    expect(isPhaseLocked(1)).toBe(true);
     expect(isPhaseLocked(2)).toBe(true);
     expect(isPhaseLocked(3)).toBe(true);
-    expect(isPhaseLocked(1)).toBe(false);
+    expect(isPhaseLocked(0)).toBe(false);
     expect(isPhaseLocked(undefined)).toBe(false);
   });
   it("isLeafLocked / isLeafDisabled：固件 OTA(P2) 被锁且不可点", () => {

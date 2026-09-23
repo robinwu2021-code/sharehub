@@ -1,7 +1,7 @@
 # TDD-分期屏蔽功能（Phase Gating）
 
 状态：已实现（2026-07-13）· **门禁语义已修订，见 §1.1（2026-07-30）**
-关联需求：[PRD-分期路线图](../requirements/PRD-分期路线图.md) · [运营端功能清单 §二·B](../requirements/运营端功能清单.md)
+关联需求：**[功能清单-分级矩阵](../requirements/功能清单-分级矩阵.md)（2026-09-23 起的分级 SSOT）** · [运营端功能清单 §三](../requirements/运营端功能清单.md)「级」列 · [PRD-分期路线图](../requirements/PRD-分期路线图.md)（PDF 还原，来源参考）
 创建日期：2026-07-13
 
 ## 1. 需求摘要
@@ -36,7 +36,10 @@ isLeafLocked(leaf) = !leaf.ready && isPhaseLocked(leaf.phase)
 ## 2. 当前架构分析
 - 复用 `soon`（待建灰显）的既有心智：nav.ts 已有 `soon` 灰显 + SecondaryNav `LeafRow` 灰显渲染 + `activeLeafIndex` 跳过 soon。分期屏蔽是同构能力，复用其渲染/跳过路径。
 - 菜单 SSOT = `lib/nav.ts`（NavDomain→NavModule→NavLeaf 纯函数）。
-- 阶段标注 SSOT = 运营端功能清单 §二·B 表。
+- ~~阶段标注 SSOT = 运营端功能清单 §二·B 表。~~
+- **分级标注 SSOT = [功能清单-分级矩阵 §四](../requirements/功能清单-分级矩阵.md)**（2026-09-23 起）。
+  `Phase` 由三值 `1/2/3` 改为四值 **`0/1/2/3` = L0/L1/L2/L3**；`undefined` 与 `0` 同义（L0，永不锁）。
+  逐叶的级在 运营端功能清单 §三 的「级」列（矩阵的运营端投影），nav.ts 从它派生。
 
 ## 3. 方案设计
 ### 方案选型
@@ -48,7 +51,7 @@ isLeafLocked(leaf) = !leaf.ready && isPhaseLocked(leaf.phase)
 
 ### 模块设计
 - **新增** `lib/phase.ts`：`Phase=1|2|3`、`CURRENT_PHASE`（读 `NEXT_PUBLIC_CURRENT_PHASE`，默认 1）、`PHASE_LABEL`、`isPhaseLocked(phase)`。
-- **修改** `lib/nav.ts`：`NavLeaf.phase?` / `NavModule.phase?` 字段；逐叶按 §二·B 标注；新增纯函数 `isLeafLocked(leaf)` / `isModuleLocked(mod,role)`；`activeLeafIndex` 跳过 locked 叶；`moduleDefaultHref` 落到首个未锁叶。
+- **修改** `lib/nav.ts`：`NavLeaf.phase?` / `NavModule.phase?` 字段；逐叶按分级矩阵标注（原文写的是 §二·B，已过时）；新增纯函数 `isLeafLocked(leaf)` / `isModuleLocked(mod,role)`；`activeLeafIndex` 跳过 locked 叶；`moduleDefaultHref` 落到首个未锁叶。
 - **修改** `components/layout/secondary-nav.tsx`：`LeafRow` 对 locked 叶灰显 + 阶段徽章（P2/P3）；模块整锁同理。
 - **修改** `components/ui/tab-header.tsx` / 各页 tabs：locked tab 灰显（复用 nav 数据）。
 - **新增** `components/phase-guard.tsx`：页面级兜底——URL 直达 locked 功能时提示「该功能将于 Pn 阶段开放」。
@@ -78,7 +81,8 @@ export function isModuleLocked(mod: NavModule, role?: Role): boolean;
 - 构建：`next build` 全绿；浏览器实测灰显 + 徽章 + env 切换。
 
 ## 5. 风险与注意事项
-- 阶段标注与 §二·B 表须一致（改一处即改两处）。
+- 分级标注与 [分级矩阵 §四](../requirements/功能清单-分级矩阵.md) / 运营端功能清单 §三「级」列须一致：
+  **改级的顺序是 矩阵 → §三 → `nav.ts` leaf `phase` → `npx vitest run`**（`lib/nav.test.ts` 的 LEAF_TUPLES 棘轮会拦）。
 - 静态导出：`CURRENT_PHASE` 是**构建期**注入，切期需重新 `next build`（符合「按期交付」节奏，非运行时热切）。
 - 权限(perm)与阶段(phase)正交：先按 perm 过滤可见性，再按 phase 决定是否灰锁。
 

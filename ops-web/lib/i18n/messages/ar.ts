@@ -40,9 +40,9 @@ export const ar: Messages = {
     pageSize: "{n} لكل صفحة",
   },
   phase: {
-    suffix: "ميزة المرحلة",
+    suffix: "ميزة المستوى",
     lockedTitle: "الميزة غير متاحة بعد",
-    lockedDesc: "ستُفتح «{feature}» في المرحلة {phase}؛ النظام حالياً في {current}.",
+    lockedDesc: "ستُفتح «{feature}» عند {phase}؛ النظام يغطي حالياً حتى {current}.",
     backHome: "العودة إلى لوحة التحكم",
   },
   login: {

@@ -1,12 +1,12 @@
 "use client";
 
-// 页面级分期兜底：URL 直达「当前阶段未解锁」功能时，拦截并提示，不渲染真实页面。
+// 页面级分级兜底：URL 直达「当前分级未解锁」功能时，拦截并提示，不渲染真实页面。
 // 集中在 AppShell 的 main 内，避免逐页包裹。可访问则透传 children。
 import { usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Lock } from "lucide-react";
 import { routeLockedPhase } from "@/lib/nav";
-import { PHASE_LABEL, CURRENT_PHASE } from "@/lib/phase";
+import { PHASE_NAME, CURRENT_PHASE } from "@/lib/phase";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 
@@ -27,9 +27,9 @@ export function PhaseGuard({ children }: { children: React.ReactNode }) {
       <div className="mb-1 txt-title">{t("phase.lockedTitle")}</div>
       <p className="max-w-md txt-body text-muted-foreground">
         {t("phase.lockedDesc", {
-          feature: `${PHASE_LABEL[locked]} ${t("phase.suffix")}`,
-          phase: PHASE_LABEL[locked],
-          current: PHASE_LABEL[CURRENT_PHASE],
+          feature: `${PHASE_NAME[locked]} ${t("phase.suffix")}`,
+          phase: PHASE_NAME[locked],
+          current: PHASE_NAME[CURRENT_PHASE],
         })}
       </p>
       <Link

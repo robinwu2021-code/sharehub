@@ -37,9 +37,9 @@ export const zh = {
     pageSize: "每页 {n} 条",
   },
   phase: {
-    suffix: "阶段功能",
+    suffix: "级功能",
     lockedTitle: "功能尚未开放",
-    lockedDesc: "「{feature}」将于 {phase} 阶段开放，系统当前处于 {current} 阶段。",
+    lockedDesc: "「{feature}」将于 {phase} 开放，系统当前交付到 {current}。",
     backHome: "返回工作台",
   },
   login: {

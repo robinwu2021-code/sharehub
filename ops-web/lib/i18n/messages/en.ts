@@ -39,9 +39,9 @@ export const en: Messages = {
     pageSize: "{n} / page",
   },
   phase: {
-    suffix: "phase feature",
+    suffix: "tier feature",
     lockedTitle: "Feature not yet available",
-    lockedDesc: "\"{feature}\" unlocks in the {phase} stage; the system is currently in {current}.",
+    lockedDesc: "\"{feature}\" unlocks at {phase}; the system currently delivers up to {current}.",
     backHome: "Back to dashboard",
   },
   login: {
