@@ -105,7 +105,17 @@ public class OperationController {
      * 不会出现「明明已经过了生效时间，界面还显示待生效」。
      */
     @PostMapping("/internal/trade/price-adjustments/tick")
-    public Map<String, Object> tick() {
+    public Map<String, Object> tick(jakarta.servlet.http.HttpServletRequest req) {
+        /*
+         * **只接受本机回环调用**。这个端点会改价格，不能因为「nginx 没暴露 /internal」
+         * 就当它安全 —— 任何能在这台机器上起进程的东西都够得着 8082，
+         * 而依赖反代配置来保证鉴权，等于把安全边界放在一个随时可能被改的文件里。
+         */
+        String ip = req.getRemoteAddr();
+        if (!"127.0.0.1".equals(ip) && !"0:0:0:0:0:0:0:1".equals(ip) && !"::1".equals(ip)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "该端点只接受本机调用");
+        }
         List<String> touched = adjustments.tick();
         return Map.of("touched", touched, "count", touched.size());
     }

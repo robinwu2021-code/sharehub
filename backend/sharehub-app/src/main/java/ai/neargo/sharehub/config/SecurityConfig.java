@@ -72,6 +72,13 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/login", "/api/auth/logout").permitAll()
                         .requestMatchers("/actuator/**", "/notify/**").permitAll()
+                        /*
+                         * 预约调价的执行器，给**本机 cron** 调（见 deploy/tencent/cron/）。
+                         * 这里放行、由 {@code OperationController#tick} 再判一次调用方是不是回环地址 ——
+                         * 它会改价格，不能因为「nginx 没暴露 /internal」就当它安全：
+                         * 任何能在这台机器上起进程的东西都够得着 8082。
+                         */
+                        .requestMatchers(HttpMethod.POST, "/internal/trade/price-adjustments/tick").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(staffFilter, UsernamePasswordAuthenticationFilter.class)
                 .exceptionHandling(ex -> ex
