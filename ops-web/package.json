@@ -11,7 +11,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run test",
-    "check:drift": "python3 scripts/check-backend-parity.py; python3 scripts/check-perm-parity.py"
+    "check:drift": "python3 scripts/check-backend-parity.py; python3 scripts/check-perm-parity.py",
+    "build:prod": "NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE= next build && node scripts/assert-prod-build.mjs"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.2.6",

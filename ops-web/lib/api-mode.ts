@@ -10,3 +10,13 @@
  * 默认值是 mock，所以漏配 = 静默退回 mock —— 这正是这个标记要暴露的东西。
  */
 export const IS_MOCK = process.env.NEXT_PUBLIC_USE_MOCK !== "0";
+
+/**
+ * 给 HTML meta 用的字面值。
+ *
+ * 为什么要把它印到产物里：mock 开关在构建期被内联成常量，**产物里读不出原值** ——
+ * 而「漏配 NEXT_PUBLIC_USE_MOCK=0 = 静默退回 mock」正是最该被拦住的一种事故
+ * （运营端连着假数据上线，每个数字都是假的而界面毫无异样）。
+ * 印出来，`scripts/assert-prod-build.mjs` 才有东西可查。
+ */
+export const API_MODE = IS_MOCK ? "mock" : "http";

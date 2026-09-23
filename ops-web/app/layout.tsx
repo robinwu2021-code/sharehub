@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { API_MODE } from "@/lib/api-mode";
 import { IBM_Plex_Sans, IBM_Plex_Sans_Arabic } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
@@ -41,6 +42,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="zh" className={`${plex.variable} ${plexArabic.variable}`} suppressHydrationWarning>
       <head>
+        {/* 这份产物连的是 mock 还是真后端。给 scripts/assert-prod-build.mjs 查用 ——
+            漏配 USE_MOCK=0 会静默退回 mock，产物里没有别的痕迹能看出来。
+            从零依赖的 lib/api-mode 读，不从 lib/api：在根布局 import 后者
+            会把整个 mock 拉进服务端构建。 */}
+        <meta name="api-mode" content={API_MODE} />
         {/* 中文字体：IBM Plex Sans SC（见上方注释说明为何不走 next/font）*/}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
