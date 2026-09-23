@@ -4,6 +4,7 @@
 // 项数从 7 增至 15（2026-07-30 删「域」层）→ 竖排可能超出视口，nav 保留 overflow-y-auto。
 // 仅依赖 pathname（不读 query），无需 Suspense。
 import Link from "next/link";
+import { useViewer } from "@/lib/hooks/use-viewer";
 import { usePathname } from "next/navigation";
 import * as Icons from "lucide-react";
 import {
@@ -77,12 +78,12 @@ function RailItem({
 
 export function Rail() {
   const pathname = normPath(usePathname());
-  const role = useAuth((s) => s.role);
+  const viewer = useViewer();
   const { railExpanded, toggleRail } = useNavPrefs();
   const { t } = useI18n();
 
-  const sections = visibleSections(role);
-  const activeKey = findActiveSection(pathname, role)?.key;
+  const sections = visibleSections(viewer);
+  const activeKey = findActiveSection(pathname, viewer)?.key;
   const top = sections.filter((s) => !s.pinBottom);
   const bottom = sections.filter((s) => s.pinBottom);
 
@@ -92,7 +93,7 @@ export function Rail() {
       section={s}
       active={s.key === activeKey}
       soon={!!s.soon}
-      href={sectionDefaultHref(s, role)}
+      href={sectionDefaultHref(s, viewer)}
       expanded={railExpanded}
     />
   );

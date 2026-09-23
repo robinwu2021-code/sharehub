@@ -6,6 +6,7 @@
 // 还能走到它 —— 一条没有入口的呈现路径不值得长期维护（navMode 也一并删）。
 // 读 useSearchParams → 必须在 <Suspense> 下渲染（app-shell 已包）。
 import Link from "next/link";
+import { useViewer } from "@/lib/hooks/use-viewer";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   PANEL_WIDTH, type NavLeaf,
@@ -68,11 +69,11 @@ export function SecondaryNav() {
   const sp = useSearchParams();
   const tab = sp.get("tab");
   const view = sp.get("view");
-  const role = useAuth((s) => s.role);
+  const viewer = useViewer();
   const { tNav } = useI18n();
 
-  const section = findActiveSection(pathname, role);
-  const leaves = section ? visibleLeaves(section, role) : [];
+  const section = findActiveSection(pathname, viewer);
+  const leaves = section ? visibleLeaves(section, viewer) : [];
   const activeIdx = section ? activeLeafIndex(leaves, pathname, tab, view) : -1;
   const segments = groupedLeaves(leaves);
 

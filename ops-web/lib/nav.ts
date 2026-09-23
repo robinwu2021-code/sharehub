@@ -5,7 +5,9 @@
 //   动机：L1 只有 7 项时，「设备+告警+工单」「订单+计费+财务」被硬凑成一个域，上窄下深；
 //         竞品简电云是 13 个 L1 的三层结构，比我们浅一层。
 // - L1 可见性 = canModule(section.module)；门户 section 见 portalFor。
-// - L3 可见性 = leaf.perm ? can(role, perm) : 跟随 section。
+// - L3 可见性 = leaf.perm ? can(perms, perm) : 跟随 section。
+//   ⚠️ 判权入参是**后端下发的 perms**，不是 role（D6a）。role 只剩一个用途：
+//   挑门户 section（portalFor）—— 那是**分组**不是判权。
 // - soon = 待建：灰显不可点，不产生 404 入口。
 // - phase = 产品分期（徽章）：Phase 1=MVP T1-T3 | 2=规模化 T4-T6 | 3=生态 T7-T9。
 // - ready = 就绪度（门禁）：叶子灰显 ⇔ !ready && phase > CURRENT_PHASE。
@@ -14,7 +16,7 @@
 //   ⚠️ ready 认证的是**前端静态功能**，不是后端贯通 —— 见 NavLeaf.ready 的说明。
 // - 深链沿用 ?tab= / ?view=；本文件为纯数据+纯函数（无 React），可单测。
 import type { Role } from "./auth";
-import { can, canModule, type MaybeRole } from "./permissions";
+import { asViewer, can, canModule, type MaybeRole, type ViewerLike } from "./permissions";
 import type { Phase } from "./phase";
 import { isPhaseLocked } from "./phase";
 import { pageReady, type OperationPage } from "./backend-ready";
@@ -259,6 +261,9 @@ export const NAV: NavSection[] = [
     key: "agent", label: "代理商管理", icon: "Handshake", module: "agent", href: "/agents",
     children: [
       // 按「机构生命周期」分组：先建档授权，再谈钱，最后看经营。
+      // 入驻审核排在档案之前：档案是「已经在的」，入驻是「正在进来的」——
+      // 待办优先于台账。代建录入不单开叶子，它是本页的一个按钮（权限码另发，见 §3.3）
+      { href: "/agents?tab=applies", label: "入驻审核", perm: "agent:apply:read", group: "机构档案" },
       { href: "/agents", label: "代理商档案", perm: "agent:agent:read", group: "机构档案" },
       { href: "/agents?tab=accounts", label: "代理账号管理", perm: "agent:agent:update", group: "机构档案" },
       { href: "/agents?tab=assign", label: "设备/点位划拨", perm: "agent:scope:assign", group: "机构档案" },
@@ -409,20 +414,22 @@ export function leafParts(href: string): { path: string; tab: string | null; vie
 /**
  * L1 可见性 = canModule；门户 section 与通用运营 section 互斥（见 NavSection.portalFor）。
  */
-export function visibleSections(role: MaybeRole): NavSection[] {
-  const portals = NAV.filter((s) => role && s.portalFor?.includes(role));
+export function visibleSections(v: ViewerLike): NavSection[] {
+  const { perms, role } = asViewer(v);
+  const portals = NAV.filter((s) => role && s.portalFor?.includes(role as Role));
   const pool = portals.length > 0 ? portals : NAV.filter((s) => !s.portalFor);
   return pool.filter((s) => {
-    if (!s.modules) return canModule(role, s.module);
+    if (!s.modules) return canModule(perms, s.module);
     // 跨模块 section：有任一模块权限，且至少一个叶子可见（防出现点开是空的 L1）
-    return s.modules.some((m) => canModule(role, m))
-      && (s.children ?? []).some((l) => (l.perm ? can(role, l.perm) : true));
+    return s.modules.some((m) => canModule(perms, m))
+      && (s.children ?? []).some((l) => (l.perm ? can(perms, l.perm) : true));
   });
 }
 
 /** L3 可见性 = leaf.perm ? can() : 跟随 section。phase-locked 叶子保留（灰显）。 */
-export function visibleLeaves(section: NavSection, role: MaybeRole): NavLeaf[] {
-  return (section.children ?? []).filter((l) => (l.perm ? can(role, l.perm) : true));
+export function visibleLeaves(section: NavSection, v: ViewerLike): NavLeaf[] {
+  const { perms } = asViewer(v);
+  return (section.children ?? []).filter((l) => (l.perm ? can(perms, l.perm) : true));
 }
 
 /**
@@ -444,9 +451,9 @@ export function visibleLeaves(section: NavSection, role: MaybeRole): NavLeaf[] {
  * @returns 已按权限过滤、按 specs 顺序排列的 tab；phase 原样带出（由 TabHeader 决定是否隐藏）
  */
 export function navTabs(
-  path: string, specs: readonly PageTabSpec[], role: MaybeRole, defaultKey?: string,
+  path: string, specs: readonly PageTabSpec[], v: ViewerLike, defaultKey?: string,
 ): { key: string; label: string; phase?: Phase }[] {
-  return resolveTabs(path, specs, role, false, defaultKey).tabs;
+  return resolveTabs(path, specs, v, false, defaultKey).tabs;
 }
 
 /**
@@ -457,14 +464,15 @@ export function navTabs(
  * 于是单独问任何一个 key 都能匹配上。必须整组一起问。
  */
 export function missingTabs(
-  path: string, keys: readonly string[], role: MaybeRole, defaultKey?: string,
+  path: string, keys: readonly string[], v: ViewerLike, defaultKey?: string,
 ): string[] {
-  return resolveTabs(path, keys, role, true, defaultKey).missing;
+  return resolveTabs(path, keys, v, true, defaultKey).missing;
 }
 
 function resolveTabs(
-  path: string, specs: readonly PageTabSpec[], role: MaybeRole, quiet = false, defaultKey?: string,
+  path: string, specs: readonly PageTabSpec[], v: ViewerLike, quiet = false, defaultKey?: string,
 ): { tabs: { key: string; label: string; phase?: Phase }[]; missing: string[] } {
+  const { perms } = asViewer(v);
   const target = normPath(path);
   const keys = specs.map((x) => (typeof x === "string" ? x : x.key));
   /*
@@ -497,7 +505,7 @@ function resolveTabs(
     const k = tabOf(l.href);
     return k !== undefined && keys.includes(k);
   }).length;
-  const visible = visibleSections(role);
+  const visible = visibleSections(v);
   const ranked = [...visible, ...NAV.filter((x) => !visible.includes(x))]
     .map((sec, i) => ({ sec, s: score(sec), i }))
     .filter((x) => x.s > 0)
@@ -528,7 +536,7 @@ function resolveTabs(
       out.push({ key, label: spec.label });
       continue;
     }
-    if (leaf.perm && !can(role, leaf.perm)) continue; // 无权限：tab 不渲染，与菜单同一口径
+    if (leaf.perm && !can(perms, leaf.perm)) continue; // 无权限：tab 不渲染，与菜单同一口径
     out.push({ key, label: leaf.label, phase: leaf.phase });
   }
   return { tabs: out, missing };
@@ -544,8 +552,9 @@ function resolveTabs(
  * 门户叶没细到 tab 的，不抢子 tab 的标题（AGENT 看 /devices?tab=monitor 时仍叫「实时监控」）。
  */
 export function portalTitleOverride(
-  role: MaybeRole, pathname: string, currentKey: string | null, isDefault: boolean,
+  v: ViewerLike, pathname: string, currentKey: string | null, isDefault: boolean,
 ): string | undefined {
+  const { role } = asViewer(v);
   const p = normPath(pathname);
   for (const section of NAV) {
     if (!role || !section.portalFor?.includes(role)) continue;
@@ -585,9 +594,9 @@ export function isLeafLocked(leaf: NavLeaf): boolean {
 }
 
 /** section 是否被产品分期屏蔽（整 section phase 或所有叶子均被锁）。 */
-export function isSectionLocked(section: NavSection, role: MaybeRole): boolean {
+export function isSectionLocked(section: NavSection, v: ViewerLike): boolean {
   if (isPhaseLocked(section.phase)) return true;
-  const leaves = visibleLeaves(section, role);
+  const leaves = visibleLeaves(section, v);
   return leaves.length > 0 && leaves.every((l) => isLeafLocked(l));
 }
 
@@ -600,13 +609,13 @@ function sectionMatchPrefixes(section: NavSection): string[] {
  * 由 pathname 反推当前 section：最长前缀匹配；"/" 仅精确匹配。
  * 不做 RBAC 过滤——URL 已到达即需正确归属（页面自身有权限兜底）。
  */
-export function findActiveSection(pathname: string, role?: MaybeRole): NavSection | undefined {
+export function findActiveSection(pathname: string, v?: ViewerLike): NavSection | undefined {
   const p = normPath(pathname);
   // ⚠️ 必须按角色限定搜索范围：门户 section（如代理端「我的经营」）与运营 section**共用同一批路径**
   // （/、/devices、/orders…）。不限定的话，排在前面的门户项会对所有角色命中，
   // 运营人员的面包屑会变成「我的经营 › …」。传 role 时只在该角色可见的 section 里找；
   // 不传时排除门户 section（对运营端是安全默认值）。
-  const pool = role ? visibleSections(role) : NAV.filter((s) => !s.portalFor);
+  const pool = v !== undefined && asViewer(v).role ? visibleSections(v) : NAV.filter((s) => !s.portalFor);
   let best: { section: NavSection; len: number } | undefined;
   for (const section of pool) {
     for (const prefix of sectionMatchPrefixes(section)) {
@@ -642,8 +651,8 @@ export function activeLeafIndex(
 }
 
 /** section 的默认落地地址：首个可点叶子（排除 soon 和 phase-locked），无则 section 首页。 */
-export function sectionDefaultHref(section: NavSection, role: MaybeRole): string {
-  const leaf = visibleLeaves(section, role).find((l) => !l.soon && !isLeafLocked(l));
+export function sectionDefaultHref(section: NavSection, v: ViewerLike): string {
+  const leaf = visibleLeaves(section, v).find((l) => !l.soon && !isLeafLocked(l));
   return leaf?.href ?? section.href;
 }
 
@@ -658,13 +667,13 @@ export function isLeafDisabled(leaf: NavLeaf): boolean {
  * 与 activeLeafIndex 不同：此处「无视锁定」匹配目标叶，才能识别到被锁叶。
  */
 export function routeLockedPhase(
-  pathname: string, tab: string | null, view: string | null, role: MaybeRole,
+  pathname: string, tab: string | null, view: string | null, v: ViewerLike,
 ): Phase | undefined {
-  const section = findActiveSection(pathname, role);
+  const section = findActiveSection(pathname, v);
   if (!section) return undefined;
   if (isPhaseLocked(section.phase)) return section.phase;
   const p = normPath(pathname);
-  const leaves = visibleLeaves(section, role);
+  const leaves = visibleLeaves(section, v);
   let leaf = leaves.find((l) => {
     const parts = leafParts(l.href);
     if (parts.path !== p) return false;
@@ -684,12 +693,12 @@ export function routeLockedPhase(
  * 分组是视觉聚类不是可导航节点，仅作不可点的中间项；叶子无 group 时退化为两级。
  */
 export function breadcrumb(
-  pathname: string, tab: string | null, view: string | null, role: MaybeRole,
+  pathname: string, tab: string | null, view: string | null, v: ViewerLike,
 ): string[] {
-  const section = findActiveSection(pathname, role);
+  const section = findActiveSection(pathname, v);
   if (!section) return [];
   const crumbs = [section.label];
-  const leaves = visibleLeaves(section, role);
+  const leaves = visibleLeaves(section, v);
   const idx = activeLeafIndex(leaves, pathname, tab, view);
   if (idx >= 0) {
     const leaf = leaves[idx];

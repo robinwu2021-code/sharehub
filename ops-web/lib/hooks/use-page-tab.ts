@@ -20,6 +20,7 @@
 //  3. **`useSearchParams` 在静态导出下必须包 `<Suspense>`**，漏一个构建期才炸。
 //     收进 hook 之后至少只剩一处要记得。
 import * as React from "react";
+import { useViewer } from "./use-viewer";
 import { useSearchParams } from "next/navigation";
 import { navTabs, type PageTabSpec } from "@/lib/nav";
 import { useAuth } from "@/lib/auth";
@@ -40,9 +41,10 @@ export function useNavTabs(
   path: string, specs: readonly PageTabSpec[], defaultKey?: string,
 ): PageTab[] {
   const role = useAuth((s) => s.role);
+  const viewer = useViewer();
   const { tNav } = useI18n();
   return React.useMemo(
-    () => navTabs(path, specs, role, defaultKey).map((t) => ({ ...t, label: tNav(t.label) })),
+    () => navTabs(path, specs, viewer, defaultKey).map((t) => ({ ...t, label: tNav(t.label) })),
     // specs 是页面模块级常量，引用稳定；列进依赖会让 useMemo 每次都失效
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [path, role, tNav, defaultKey],

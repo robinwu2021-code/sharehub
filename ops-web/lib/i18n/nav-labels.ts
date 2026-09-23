@@ -102,6 +102,7 @@ const NAV: Record<string, Pair> = {
   "BD 拓展 CRM": { en: "BD CRM", ar: "إدارة العملاء" },
   "站点坪效": { en: "Site Yield", ar: "أداء المواقع" },
   "门店生命周期": { en: "Store Lifecycle", ar: "دورة حياة المتجر" },
+  "入驻审核": { en: "Onboarding Review", ar: "مراجعة الانضمام" },
   "代理商档案": { en: "Agent Profiles", ar: "ملفات الوكلاء" },
   "分润配置": { en: "Commission Setup", ar: "إعداد العمولة" },
   "代理分润配置": { en: "Agent Commission", ar: "عمولة الوكلاء" },

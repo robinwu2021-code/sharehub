@@ -43,6 +43,9 @@ const L1_KEYS = [
 // 「分成」不是报表，原「场站报表」组改名「分成」，站点坪效归回场站管理。
 // 2026-09-23 有意变更：phase 从三值(1/2/3)改为四值 L0-L3，28 个叶子按分级矩阵重标，
 // 并新增代理门户「申请提现」(AGT-06)。依据 docs/requirements/功能清单-分级矩阵.md §六/§七。
+// 2026-09-23 有意变更：新增「入驻审核」(OPS-AGT-07/09/10)，排在代理商档案之前 ——
+// 档案是「已经在的」，入驻是「正在进来的」，待办优先于台账。
+// 代建录入不单开叶子：它是该页的一个按钮，权限码 agent:apply:create 与放行码分开（ADR-030 §3.3）。
 const LEAF_TUPLES = [
   "/|我的看板|dashboard:overview:read||经营概览",
   "/finance?tab=records|我的收益|finance:share_record:read||经营概览",
@@ -85,6 +88,7 @@ const LEAF_TUPLES = [
   "/venues?tab=crm|BD 拓展 CRM|location:lead:read||拓展",
   "/venues?tab=onboarding|门店 Onboarding|location:venue:read|2|拓展",
   "/venues?tab=lifecycle|门店生命周期|location:venue:read|3|拓展",
+  "/agents?tab=applies|入驻审核|agent:apply:read||机构档案",
   "/agents|代理商档案|agent:agent:read||机构档案",
   "/agents?tab=accounts|代理账号管理|agent:agent:update||机构档案",
   "/agents?tab=assign|设备/点位划拨|agent:scope:assign||机构档案",

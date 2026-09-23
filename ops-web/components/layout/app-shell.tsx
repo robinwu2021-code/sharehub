@@ -8,8 +8,19 @@ import { SecondaryNav } from "./secondary-nav";
 import { Header } from "./header";
 import { PhaseGuard } from "./phase-guard";
 
+/**
+ * 不需要登录态的路由。**这是全站唯一的免登录清单**，加页面时必须同步这里。
+ *
+ * 它此前是一句硬编码的 `norm === "/login"`（2026-09-23 改，D6a）——
+ * 入驻自助注册页面向的是**还没有账号的陌生人**，不改的话它会被守卫一路弹回登录页。
+ *
+ * ⚠️ 免登录**不等于**不设防：`/apply` 的后端端点靠手机号 OTP + 单 IP 限流 +
+ * 「同手机号至多一张在途」三道闸（ADR-030 §三）。前端这份清单只管「放不放行进页面」。
+ */
+const PUBLIC_PATHS = ["/login", "/apply"] as const;
+
 // 登录守卫 + 三级导航布局：Rail(L1) + SecondaryNav(L2/L3，单模块域自隐) + Header/main。
-// 未登录跳 /login；/login 页自身不套 shell。ready 门保证导航在 hydration 后渲染（persist 安全）。
+// 未登录跳 /login；免登录页自身不套 shell。ready 门保证导航在 hydration 后渲染（persist 安全）。
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -18,17 +29,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   // trailingSlash:true → pathname 可能带尾斜杠，归一化后再比较。
   const norm = pathname.replace(/\/+$/, "") || "/";
-  const isLogin = norm === "/login";
+  const isPublic = PUBLIC_PATHS.some((p) => norm === p || norm.startsWith(p + "/"));
 
   useEffect(() => {
     setReady(true);
   }, []);
 
   useEffect(() => {
-    if (ready && !loggedIn && !isLogin) router.replace("/login");
-  }, [ready, loggedIn, isLogin, router]);
+    if (ready && !loggedIn && !isPublic) router.replace("/login");
+  }, [ready, loggedIn, isPublic, router]);
 
-  if (isLogin) return <>{children}</>;
+  if (isPublic) return <>{children}</>;
   if (!ready || !loggedIn) return null;
 
   return (

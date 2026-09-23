@@ -2,7 +2,7 @@
 // 这三件事各自对应一个真实缺陷（见 navTabs 注释），所以都留了用例。
 import { describe, it, expect } from "vitest";
 import { navTabs, NAV, leafParts } from "./nav";
-import { can } from "./permissions";
+import { roleHas } from "./permissions";
 import type { Role } from "./auth";
 
 /** 与 app/finance/page.tsx 的 TAB_KEYS 同一组，用于「主属 section」判定 */
@@ -59,7 +59,9 @@ describe("navTabs 判权（与菜单同一口径）", () => {
     const roles: Role[] = ["ADMIN", "OPERATOR", "FINANCE", "SUPPORT", "AGENT"];
     for (const role of roles) {
       const visible = navTabs("/finance", ["withdrawals"], role).length > 0;
-      expect(visible, `${role}`).toBe(can(role, perm));
+      // roleHas = 角色视角的判权（按 BACKEND_ROLE_PERMS 展开）。
+      // can() 现在收的是**后端下发的 perms**，不是 role —— 语义没变，入口换了（D6a）。
+      expect(visible, `${role}`).toBe(roleHas(role, perm));
     }
   });
 

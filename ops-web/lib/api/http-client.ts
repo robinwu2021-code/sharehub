@@ -30,9 +30,17 @@ function headers(): Record<string, string> {
   return {
     "Content-Type": "application/json",
     "Accept-Language": LOCALE_TAG[curLocale()], // 让后端按语言返回本地化 message
-    "X-Merchant-Id": a?.tenantNo ?? "", // 承载租户（ADR-007）
-    "X-User-Id": a?.username ?? "",
-    "X-Roles": a?.role ?? "",
+    /*
+     * X-Merchant-Id / X-User-Id / X-Roles **已删**（2026-09-23，D6a）。
+     * 实测后端全仓只读两个头：Authorization 与 X-Forwarded-For；
+     * 那三个在后端出现 10 处**全是注释**，内容都是「不信客户端这些头」。
+     * 留着只会让人以为可以靠它们传身份。
+     *
+     * ⚠️ X-Operator-No 与它们**性质相反**：服务端**会采纳**它（落在会话 memberships 内时），
+     * 是整条多主体改造里唯一有越权面的头。服务端必须校验，不在成员集合内就
+     * 整个丢弃、回落默认主体、不报错（ADR-030 §4.2）。前端这一层不算数。
+     */
+    ...(a?.currentOperatorNo ? { "X-Operator-No": a.currentOperatorNo } : {}),
     ...(a?.token ? { Authorization: `Bearer ${a.token}` } : {}),
   };
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
+import { useViewer } from "@/lib/hooks/use-viewer";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { IS_MOCK } from "@/lib/api";
@@ -19,8 +20,9 @@ function Breadcrumb() {
   const pathname = usePathname();
   const sp = useSearchParams();
   const role = useAuth((s) => s.role);
+  const viewer = useViewer();
   const { tNav } = useI18n();
-  const crumbs = breadcrumb(pathname, sp.get("tab"), sp.get("view"), role);
+  const crumbs = breadcrumb(pathname, sp.get("tab"), sp.get("view"), viewer);
   if (!crumbs.length) return null;
   return (
     <nav aria-label="breadcrumb" className="flex items-center gap-1 txt-body text-muted-foreground">
@@ -35,7 +37,7 @@ function Breadcrumb() {
 }
 
 export function Header() {
-  const { username, role, agentNo } = useAuth();
+  const { username, role, currentOperatorNo } = useAuth();
   const { t } = useI18n();
   const router = useRouter();
   return (
@@ -44,7 +46,7 @@ export function Header() {
         <Suspense fallback={null}>
           <Breadcrumb />
         </Suspense>
-        {role === "AGENT" && <span>{t("common.agent")} <span className="text-foreground">{agentNo || "-"}</span></span>}
+        {role === "AGENT" && <span>{t("common.agent")} <span className="text-foreground">{currentOperatorNo || "-"}</span></span>}
         {IS_MOCK && <Badge tone="warning">{t("common.mockData")}</Badge>}
       </div>
       <div className="flex items-center gap-2 txt-body">

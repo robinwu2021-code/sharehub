@@ -3,6 +3,7 @@
 // 门户标题覆盖的薄 hook：只是把 nav 的纯函数接上当前路由与登录角色。
 // 判定逻辑全部在 lib/nav.ts#portalTitleOverride（可单测），这里不写任何规则。
 import { usePathname } from "next/navigation";
+import { useViewer } from "./use-viewer";
 import { useAuth } from "../auth";
 import { portalTitleOverride } from "../nav";
 
@@ -12,6 +13,6 @@ import { portalTitleOverride } from "../nav";
  */
 export function usePortalTitle(currentKey: string | null, isDefault: boolean): string | undefined {
   const pathname = usePathname();
-  const role = useAuth((s) => s.role);
-  return portalTitleOverride(role, pathname ?? "/", currentKey, isDefault);
+  const viewer = useViewer();
+  return portalTitleOverride(viewer, pathname ?? "/", currentKey, isDefault);
 }
