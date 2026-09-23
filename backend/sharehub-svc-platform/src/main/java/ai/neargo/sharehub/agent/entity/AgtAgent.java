@@ -14,6 +14,18 @@ public class AgtAgent extends BaseEntity implements ai.neargo.sharehub.common.cr
     private String name;
     private String contact;
     private String regionScope;
+
+    /**
+     * 登记类型：{@code AGENT} 代理商 / {@code CITY_PARTNER} 城市合伙人（ADR-027 §一）。
+     *
+     * <p>两者不是叫法之别：代理商出资 + 运维，城市合伙人还包拓展与效果管理，
+     * <b>拿的钱性质不同</b>，分润说不清按什么分就是从这里开始的。
+     *
+     * <p>类型只定「他大体是哪种人」。「他在**这个站点**做了什么」由 A2 的
+     * {@code loc_site_agent}（伙伴 × 站点 × 责任）表达 —— 两者都要，
+     * 否则「这个人在 A 站是介绍人、在 B 站是代理商」无处安放。
+     */
+    private String agentType;
     /**
      * 档案上的默认分润比例 —— 列名是 V1 就定的 `default_share_rate`。
      *

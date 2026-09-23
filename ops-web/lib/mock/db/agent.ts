@@ -16,6 +16,8 @@ export const agents: Agent[] = Array.from({ length: 9 }, (_, i) => ({
   contact: `+9715${String(6000000 + i * 271).slice(0, 7)}`, regionScope: p(["Dubai North", "Dubai Marina", "Deira", "DXB", "JBR"], i),
   // cabinetCount 由 refreshAgentAssetCounts() 从 cabinets.agentNo 实时反算（下方立即调用一次），
   // 这里给 0 只是占位——档案页的「设备数」与划拨页必须是同一个数。
+  // 两种登记类型都出现，页面上能看出区别（ADR-027）
+  agentType: i % 3 === 0 ? "CITY_PARTNER" : "AGENT",
   shareRate: [0.3, 0.35, 0.4][i % 3], cabinetCount: 0, status: i % 6 === 0 ? "SUSPENDED" : "ENABLED",
   archivedAt: null,
 }));

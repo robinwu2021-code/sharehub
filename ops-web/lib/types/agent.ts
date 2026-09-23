@@ -5,14 +5,78 @@ import type { DataScope } from "./org";
 // 覆盖范围：代理商域（agt · ADR-012）——代理主体、区域划分、业绩、
 // 代理端账号、分润规则配置。
 
+/**
+ * 登记类型（ADR-027 §一）。
+ *
+ * 两者不是叫法之别：代理商出资 + 运维，城市合伙人还包拓展与效果管理，**拿的钱性质不同**。
+ * 类型只定「他大体是哪种人」；「他在**这个站点**做了什么」由将来的「伙伴 × 站点 × 责任」
+ * 表达（A2）—— 两者都要，否则「这个人在 A 站是介绍人、在 B 站是代理商」无处安放。
+ */
+export type AgentType = "AGENT" | "CITY_PARTNER";
+
 export interface Agent extends Archivable {
   agentNo: string;
   name: string;
   contact: string;
   regionScope: string;
+  /** 登记类型；存量与缺省为 `AGENT`。 */
+  agentType: AgentType;
   shareRate: number; // 默认分润比例 0..1
   cabinetCount: number;
   status: "ENABLED" | "SUSPENDED";
+}
+
+// —— 入驻申请（ADR-030 §三）——
+
+/**
+ * 申请来源。
+ *
+ * **`SELF_SERVICE` 与 `OPS_CREATED` 走的是同一张表、同一个状态机、同一套必填校验** ——
+ * 用户 2026-09-23 定的「条件相同」就是这个意思：不按来源分叉。
+ * 差别只在谁按下提交、以及自助那一侧要验手机号 OTP。
+ *
+ * ⚠️ **前端不传这个字段**：服务端按有无 STAFF 令牌判定。
+ * 让客户端传的话，自助申请可以自称代建，绕开 OTP 与限流。
+ */
+export type ApplySource = "SELF_SERVICE" | "OPS_CREATED";
+
+export type ApplyStatus = "DRAFT" | "SUBMITTED" | "REVIEWING" | "APPROVED" | "REJECTED";
+
+/** 运营主体类型。`CITY_PARTNER` 是 ADR-027 加的，与代理商同层不同责任。 */
+export type OperatorType = "AGENT" | "CITY_PARTNER";
+
+export interface AgentApply {
+  applyNo: string;
+  source: ApplySource;
+  status: ApplyStatus;
+  operatorName: string;
+  operatorType: OperatorType;
+  /**
+   * 手机号与邮箱一律**只给掩码**。
+   *
+   * 明文在服务端（可逆加密），登录键是 HMAC —— 掩码不可逆也会碰撞
+   * （`13800138000` 与 `13811138000` 掩码相同），拿它做任何等值判断都是错的。
+   */
+  phoneMask: string;
+  emailMask: string;
+  regionScope: string | null;
+  shareRate: number | null;
+  /** 资质材料。敏感件只存 pii 引用，不落明文（PDPL）。 */
+  payload: string | null;
+  /** 命中已有自然人时回填 —— **手机号已存在不是重复注册，是多主体申请**。 */
+  principalNo: string | null;
+  /** 驳回原因。**原样回显给申请人**，不是只给运营看。 */
+  rejectReason: string | null;
+  submittedBy: string | null;
+  submittedAt: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  /** 审核通过后回写，申请 ↔ 主体双向可查。 */
+  operatorNo: string | null;
+  /** 这个手机号已经有主体了（多主体申请）——审核台要显眼地标出来。 */
+  phoneAlreadyKnown: boolean;
+  /** 已有自然人的邮箱与本次申请不一致时给出，**由审核人裁决，不静默覆盖**。 */
+  knownEmailMask: string | null;
 }
 
 // —— 代理商 · 待建功能补全（agt 域）——

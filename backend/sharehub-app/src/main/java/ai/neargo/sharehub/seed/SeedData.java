@@ -228,7 +228,10 @@ public class SeedData {
         for (int i = 0; i < 9; i++) {
             agents.add(new Agent("AG" + String.format("%03d", i + 1),
                     p(List.of("North Hub", "Marina Partner", "Deira Agent", "Airport Ops", "JBR Franchise"), i),
-                    "+9715" + first7(6000000 + i * 271), p(REGIONS, i), p(agentRates, i), 4 + i * 3,
+                    "+9715" + first7(6000000 + i * 271), p(REGIONS, i),
+                    // 演示数据里两种类型都出现，页面上能看出区别（ADR-027）
+                    i % 3 == 0 ? "CITY_PARTNER" : "AGENT",
+                    p(agentRates, i), 4 + i * 3,
                     i % 6 == 0 ? "SUSPENDED" : "ENABLED"));
         }
 

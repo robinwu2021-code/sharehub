@@ -14,7 +14,10 @@ public final class AgentDtos {
     private AgentDtos() {
     }
 
+    /**
+     * @param agentType 登记类型 AGENT / CITY_PARTNER（ADR-027）；存量与缺省为 AGENT
+     */
     public record Agent(String agentNo, String name, String contact, String regionScope,
-                       double shareRate, int cabinetCount, String status) {
+                       String agentType, double shareRate, int cabinetCount, String status) {
     }
 }

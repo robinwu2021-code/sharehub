@@ -7,7 +7,8 @@ import { api } from "@/lib/api";
 import { PageTitle, Pagination } from "@/components/ui/misc";
 import { usePaging } from "@/lib/hooks/use-paging";
 import { useNavTabs, usePageTab } from "@/lib/hooks/use-page-tab";
-import { Input } from "@/components/ui/input";
+import { Input, Select } from "@/components/ui/input";
+import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
 import { TabHeader } from "@/components/ui/tab-header";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Drawer, Field } from "@/components/ui/drawer";
@@ -30,7 +31,7 @@ import { FilterSelect } from "@/components/ui/filter-select";
 // 绩效周期复用报表域枚举：代理 GMV = 名下站点营收之和，必须与站点坪效同一套周期口径
 import { REPORT_PERIODS, REPORT_PERIOD_DEFAULT, type ReportPeriod } from "@/lib/types";
 import type {
-  Agent, AgentAssignment, AgentPerformance, AgentAccount, AgentCommission, DataScope,
+  Agent, AgentType, AgentAssignment, AgentPerformance, AgentAccount, AgentCommission, DataScope,
   AgentAssignmentRecord, AssignableAsset,
 } from "@/lib/types";
 
@@ -42,6 +43,17 @@ const SCOPE_LABEL: Record<DataScope, string> = { ALL: "全部数据", REGION: "�
 const SCOPE_OPTIONS = (["ALL", "REGION", "LOCATION", "AGENT", "SELF"] as DataScope[]).map((s) => ({ value: s, label: SCOPE_LABEL[s] }));
 // tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）
 // 注意「代理账号」在菜单里叫「代理账号管理」——以菜单为准，这里不再写第二份名字
+/**
+ * 登记类型的展示（ADR-027 §一）。与本库其它枚举一致：值域在类型层、展示名在这里一处。
+ *
+ * 不另建 `md_agent_type` 字典表 —— ADR-027 里那张表是为「默认责任 / 默认费率」准备的，
+ * 而那两样要等 A2 的「伙伴 × 站点 × 责任」行才有消费方；现在建只会多两行没人读的数据。
+ */
+const AGENT_TYPE: StatusMap<AgentType> = {
+  AGENT: { label: "代理商", tone: "outline" },
+  CITY_PARTNER: { label: "城市合伙人", tone: "default" },
+};
+
 const TAB_KEYS = ["profiles", "commission", "assign", "performance", "accounts"] as const;
 /**
  * 分润规则字段。代理商**选**不**打** —— 原先是「代理编号 + 代理名称」两个文本框，
@@ -306,6 +318,7 @@ function AgentsInner() {
   const profileCols: Column<Agent>[] = [
     { header: "代理编号", cell: (a) => <span className="txt-strong tabular-nums">{a.agentNo}</span> },
     { header: "名称", cell: (a) => a.name },
+    { header: "类型", className: "whitespace-nowrap", cell: (a) => <StatusBadge map={AGENT_TYPE} value={a.agentType ?? "AGENT"} /> },
     { header: "辖域", cell: (a) => <span className="text-muted-foreground">{a.regionScope}</span> },
     { header: "联系方式", cell: (a) => <span className="text-muted-foreground">{a.contact}</span> },
     { header: "分润比例", className: "text-right", cell: (a) => <span className="tabular-nums">{(a.shareRate * 100).toFixed(0)}%</span> },
@@ -559,6 +572,15 @@ function AgentsInner() {
         }
       >
         <Field label="名称"><Input value={form.name ?? ""} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
+        {/* 类型决定这个伙伴的钱按什么性质分 —— 代理商出资+运维，城市合伙人还包拓展与效果管理 */}
+        <Field label="登记类型">
+          <Select className="w-full" value={form.agentType ?? "AGENT"}
+            onChange={(e) => setForm({ ...form, agentType: e.target.value as AgentType })}>
+            {(Object.keys(AGENT_TYPE) as AgentType[]).map((k) => (
+              <option key={k} value={k}>{AGENT_TYPE[k].label}</option>
+            ))}
+          </Select>
+        </Field>
         <Field label="辖域"><Input value={form.regionScope ?? ""} onChange={(e) => setForm({ ...form, regionScope: e.target.value })} /></Field>
         <Field label="联系方式"><Input value={form.contact ?? ""} onChange={(e) => setForm({ ...form, contact: e.target.value })} /></Field>
         <Field label="默认分润比例（%）">
