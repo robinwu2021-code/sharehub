@@ -52,7 +52,7 @@ public class AgentServiceImpl implements AgentService {
         if (insert) { e = new AgtAgent(); e.setAgentNo(no); e.setTenantId("MAIN"); }
         e.setName(in.name());
         e.setContact(in.contact());
-        e.setRegionScope(asJsonArray(in.regionScope()));
+        e.setRegionScope(ai.neargo.sharehub.agent.RegionScopeJson.toJson(in.regionScope()));
         e.setShareRate(in.shareRate());
         // 类型只认两个值；归一规则与理由见 AgentType.of
         e.setAgentType(AgentType.of(in.agentType()).name());
@@ -62,32 +62,11 @@ public class AgentServiceImpl implements AgentService {
         return toVO(e);
     }
 
-    /**
-     * `region_scope` 是 **JSON** 列（DDL 注释：辖域(区域数组)），而调用方传的是一个区域名。
-     * 直接写会触发 JSON 的 CHECK 约束、接口返回 500 —— 运营新建/编辑代理商时就撞得到。
-     *
-     * <p>已经是 JSON（`[...]` 或 `"..."`）就原样放行，否则包成单元素数组。
-     * 不在这里做更复杂的解析：这一列目前只承载「一个或几个区域名」，
-     * 提前造一套小语法只会让下一个人猜不到该传什么。
-     */
-    private static String asJsonArray(String v) {
-        if (v == null || v.isBlank()) return null;
-        String t = v.trim();
-        if (t.startsWith("[") || t.startsWith("\"")) return t;
-        return "[\"" + t.replace("\"", "\\\"") + "\"]";
-    }
-
-    /** 出参把 JSON 数组还原成人读的文本 —— 界面上要显示的是区域名，不是一段 JSON。 */
-    private static String plainScope(String json) {
-        if (json == null || json.isBlank()) return json;
-        String t = json.trim();
-        if (!t.startsWith("[")) return t.replaceAll("^\"|\"$", "");
-        return t.substring(1, Math.max(1, t.length() - 1))
-                .replaceAll("\"", "").trim();
-    }
+    // region_scope 的 JSON 转换已提取到 RegionScopeJson —— 入驻审核的激活派生也要写这一列，
+    // 而此前它是 private，于是那边原样踩了同一个 500。
 
     private static Agent toVO(AgtAgent e) {
-        return new Agent(e.getAgentNo(), e.getName(), e.getContact(), plainScope(e.getRegionScope()),
+        return new Agent(e.getAgentNo(), e.getName(), e.getContact(), ai.neargo.sharehub.agent.RegionScopeJson.toPlain(e.getRegionScope()),
                 // 存量行与缺省一律 AGENT：出参里给空会让前端多处理一个「没有类型」的不存在状态
                 AgentType.of(e.getAgentType()).name(),
                 e.getShareRate() == null ? 0 : e.getShareRate(),

@@ -7,6 +7,7 @@ import ai.neargo.sharehub.agent.apply.dto.ApplyDtos.AuditReq;
 import ai.neargo.sharehub.agent.apply.dto.ApplyDtos.MyApplyView;
 import ai.neargo.sharehub.agent.apply.dto.ApplyDtos.SubmitReq;
 import ai.neargo.sharehub.agent.AgentStatus;
+import ai.neargo.sharehub.agent.RegionScopeJson;
 import ai.neargo.sharehub.agent.apply.ApplyStatus;
 import ai.neargo.sharehub.agent.apply.entity.AgtApply;
 import ai.neargo.sharehub.agent.apply.mapper.AgtApplyMapper;
@@ -138,7 +139,8 @@ public class ApplyServiceImpl implements ApplyService {
         e.setPrincipalNo(known == null ? null : known.getPrincipalNo());
         e.setOperatorName(req.operatorName().trim());
         e.setOperatorType(req.operatorType());
-        e.setRegionScope(req.regionScope());
+        // region_scope 是 JSON 列（两张表都是）—— 直接写自然语言会触发 json_valid 约束、返回 500
+        e.setRegionScope(RegionScopeJson.toJson(req.regionScope()));
         e.setShareRate(req.shareRate());
         e.setPayload(req.payload());
         e.setStatus(ApplyStatus.SUBMITTED.name());
@@ -244,7 +246,8 @@ public class ApplyServiceImpl implements ApplyService {
         AgtAgent agent = new AgtAgent();
         agent.setAgentNo(nextNo(agentMapper, AgtAgent.class, "agent_no", "AG"));
         agent.setName(e.getOperatorName());
-        agent.setRegionScope(req.regionScope() != null ? req.regionScope() : e.getRegionScope());
+        agent.setRegionScope(RegionScopeJson.toJson(
+                req.regionScope() != null ? req.regionScope() : e.getRegionScope()));
         java.math.BigDecimal rate = req.shareRate() != null ? req.shareRate() : e.getShareRate();
         agent.setShareRate(rate == null ? 0d : rate.doubleValue());
         agent.setStatus(AgentStatus.ENABLED.name());
@@ -336,7 +339,7 @@ public class ApplyServiceImpl implements ApplyService {
         String knownEmail = p != null && !p.getEmailHash().equals(e.getEmailHash()) ? p.getEmailMask() : null;
         return new ApplyView(e.getApplyNo(), e.getSource(), e.getStatus(),
                 e.getOperatorName(), e.getOperatorType(), e.getPhoneMask(), e.getEmailMask(),
-                e.getRegionScope(), e.getShareRate(), e.getPayload(), e.getPrincipalNo(),
+                RegionScopeJson.toPlain(e.getRegionScope()), e.getShareRate(), e.getPayload(), e.getPrincipalNo(),
                 e.getRejectReason(), e.getSubmittedBy(), e.getSubmittedAt(),
                 e.getReviewedBy(), e.getReviewedAt(), e.getOperatorNo(),
                 phoneKnown, knownEmail);
