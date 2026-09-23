@@ -19,12 +19,10 @@ import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/input";
 import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
 import { FilterSelect } from "@/components/ui/filter-select";
-// 公告实体类型也叫 Notice，提示条改名导入以免撞名
 import { Notice as InfoNotice } from "@/components/ui/notice";
 import { money, fmtTime } from "@/lib/utils";
 import { useCan } from "@/lib/hooks/use-can";
 import { useI18n } from "@/lib/i18n";
-import { isPhaseLocked } from "@/lib/phase";
 import { notify } from "@/lib/notify";
 import { exportCsv, type CsvColumn } from "@/lib/export-csv";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -33,7 +31,7 @@ import {
   archiveConfirm, unarchiveConfirm,
 } from "@/components/archive";
 import type {
-  Notice, Coupon, Campaign, PushMessage, Referral, AdSlot, AdCampaign, AdDelivery, PageResult,
+  Coupon, Campaign, PushMessage, Referral, AdSlot, AdCampaign, AdDelivery, PageResult,
   CouponIssueRecord, AudienceType, CampaignAction, AdCampaignAction, ReferralRule,
 } from "@/lib/types";
 import {
@@ -52,40 +50,14 @@ const periodLabel = (p: string) => REPORT_PERIODS.find((x) => x.value === p)?.la
 // 只能从优惠券页内切过去。这不是本次整理造成的，是功能清单的待办
 // （要么补进菜单、要么承认它就是个页内子视图）——在定下来之前如实标成子视图，
 // 而不是让 navTabs 在开发期抛错把页面打挂。
-const TAB_KEYS = ["notices", "coupons", { key: "coupon-issues", label: "发放记录" },
+// 2026-09-23 移除 "notices"：公告管理与「运营管理 › 公告管理」调同一组 API
+// （listNotices/saveNotice/archiveNotice），是同一张表的两个维护入口。
+// 按「重合功能一律并到运营管理」收敛到那边，本页不再留第二份。
+const TAB_KEYS = ["coupons", { key: "coupon-issues", label: "发放记录" },
   "campaigns", "push", "referral", "ad-slots", "ad-campaigns", "ad-delivery"] as const;
-// 三语（zh/en/ar）+ 生效期 + 置顶：竞品公告只有单语，我们要覆盖 MENA 多语市场。
-// B0 组件能力的样板用法：分区 section + 三语 textarea + date + required/maxLength 校验。
-// 新页面照此写，勿再手搓控件（见 TDD-运营端前端补全方案 §八-1）。
-const NOTICE_FIELDS: FieldDef[] = [
-  { key: "noticeNo", label: "公告号", readOnlyOnEdit: true, placeholder: "留空自动生成", section: "基本信息" },
-  { key: "type", label: "类型", type: "select", required: true, section: "基本信息", options: [{ value: "SYSTEM", label: "系统公告" }, { value: "PROMO", label: "活动公告" }, { value: "MAINTENANCE", label: "维护公告" }] },
-  { key: "pinned", label: "置顶", type: "switch", section: "基本信息", help: "置顶公告在 C 端首页公告条优先展示" },
-  { key: "title", label: "标题（中文）", required: true, maxLength: 40, section: "三语内容", placeholder: "斋月期间机柜服务时间调整" },
-  { key: "titleEn", label: "标题（English）", maxLength: 60, section: "三语内容", placeholder: "Ramadan service hours update" },
-  { key: "titleAr", label: "标题（العربية）", maxLength: 60, section: "三语内容", placeholder: "تحديث ساعات الخدمة خلال رمضان" },
-  { key: "content", label: "正文（中文）", type: "textarea", rows: 3, required: true, maxLength: 200, section: "三语内容", placeholder: "面向 C 端首页公告条展示的正文" },
-  { key: "contentEn", label: "正文（English）", type: "textarea", rows: 3, maxLength: 300, section: "三语内容", placeholder: "Body shown in the C-end home banner" },
-  { key: "contentAr", label: "正文（العربية）", type: "textarea", rows: 3, maxLength: 300, section: "三语内容", placeholder: "النص المعروض في شريط الإعلانات" },
-  { key: "startAt", label: "生效开始", type: "date", required: true, section: "发布控制" },
-  { key: "endAt", label: "生效结束", type: "date", section: "发布控制", help: "留空表示长期有效" },
-  { key: "status", label: "状态", type: "select", required: true, section: "发布控制", options: [{ value: "DRAFT", label: "草稿" }, { value: "PUBLISHED", label: "已发布" }, { value: "OFFLINE", label: "已下线" }] },
-  { key: "publishedBy", label: "发布人", section: "发布控制", placeholder: "运营中心" },
-];
-const NOTICE_TYPE: StatusMap<Notice["type"]> = {
-  SYSTEM: { label: "系统公告", tone: "outline" },
-  PROMO: { label: "活动公告", tone: "success" },
-  MAINTENANCE: { label: "维护公告", tone: "warning" },
-};
-const NOTICE_STATUS: StatusMap<Notice["status"]> = {
-  DRAFT: { label: "草稿", tone: "muted" },
-  PUBLISHED: { label: "已发布", tone: "success" },
-  OFFLINE: { label: "已下线", tone: "muted" },
-};
-
-// 默认 tab：阶段 1 下「优惠券」被屏蔽，落到唯一可见的 P1 项「公告管理」；
-// 放开阶段 2 后 /marketing（nav 中标为「优惠券」）恢复原语义。
-const DEFAULT_TAB = isPhaseLocked(2) ? "notices" : "coupons";
+// 默认 tab：公告管理并入运营管理后，本页只剩促销与广告，一律落「优惠券」。
+// （阶段 1 下它被 phase 屏蔽，页面由 PhaseGuard 兜底，不再需要一个 P1 的替补 tab。）
+const DEFAULT_TAB = "coupons";
 
 // 邀请奖励规则表单。`rewardTo` 用单选而不是两个勾选：BOTH 是「一次事件出两笔奖励」，
 // 与「二选一」在结算上完全不同，枚举把歧义堵死（见 types/marketing.ts 的注释）。
@@ -250,7 +222,6 @@ function MarketingInner() {
   const [showArchived, setShowArchived] = useState(false);
   // 活动状态筛：加了「暂停」之后，要能把被暂停的活动单独捞出来复核
   const [campaignStatus, setCampaignStatus] = useState("");
-  const [noticeForm, setNoticeForm] = useState<Partial<Notice> | null>(null);
   const [couponForm, setCouponForm] = useState<Partial<Coupon> | null>(null);
   const [campaignForm, setCampaignForm] = useState<Partial<Campaign> | null>(null);
   // audienceKey 是表单里的合成字段（`类型:值`），提交时拆回 audienceType/audienceValue
@@ -270,7 +241,6 @@ function MarketingInner() {
   // 服务端据此拒绝第二次——这正是「重发必须带幂等键」的落地方式（口径同订单退款）。
   const [sendKey, setSendKey] = useState("");
 
-  const canEditNotice = allow("marketing:coupon:issue");
   const canEditCoupon = allow("marketing:coupon:issue");
   const canIssueCoupon = allow("marketing:coupon:issue");
   // 权限码对齐权限清单与后端（marketing:campaign:read / :update）。原先写的 `:manage`
@@ -278,10 +248,6 @@ function MarketingInner() {
   const canEditCampaign = allow("marketing:campaign:update");
   const canEditPush = allow("marketing:push:send");
   const canEditAd = allow("marketing:ad:manage");
-  const saveNotice = useMutation({
-    mutationFn: (n: Partial<Notice>) => api.saveNotice(n),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["mkt"] }); notify.success(t("common.success")); setNoticeForm(null); },
-  });
   const saveCoupon = useMutation({
     mutationFn: (c: Partial<Coupon>) => api.saveCoupon(c),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["mkt"] }); notify.success(t("common.success")); setCouponForm(null); },
@@ -455,21 +421,11 @@ function MarketingInner() {
   });
 
   // 归档 / 恢复：错误由全局 MutationCache 接管，这里只管成功后的失效与提示。
-  const archiveNoticeM = useMutation({
-    mutationFn: (v: { no: string; undo: boolean }) => v.undo ? api.unarchiveNotice(v.no) : api.archiveNotice(v.no),
-    onSuccess: (_r, v) => { qc.invalidateQueries({ queryKey: ["mkt"] }); notify.success(v.undo ? "已恢复" : "已归档"); },
-  });
   const archiveCouponM = useMutation({
     mutationFn: (v: { no: string; undo: boolean }) => v.undo ? api.unarchiveCoupon(v.no) : api.archiveCoupon(v.no),
     onSuccess: (_r, v) => { qc.invalidateQueries({ queryKey: ["mkt"] }); notify.success(v.undo ? "已恢复" : "已归档"); },
   });
   // 公告 / 优惠券非主数据，归档确认不要求手输编号（requireText 只留给机柜/站点/角色等）。
-  const askArchiveNotice = async (n: Notice) => {
-    if (await confirm(archiveConfirm("公告", n.noticeNo))) archiveNoticeM.mutate({ no: n.noticeNo, undo: false });
-  };
-  const askUnarchiveNotice = async (n: Notice) => {
-    if (await confirm(unarchiveConfirm("公告", n.noticeNo))) archiveNoticeM.mutate({ no: n.noticeNo, undo: true });
-  };
   const askArchiveCoupon = async (c: Coupon) => {
     if (await confirm(archiveConfirm("优惠券", c.couponNo))) archiveCouponM.mutate({ no: c.couponNo, undo: false });
   };
@@ -477,12 +433,11 @@ function MarketingInner() {
     if (await confirm(unarchiveConfirm("优惠券", c.couponNo))) archiveCouponM.mutate({ no: c.couponNo, undo: true });
   };
 
-  const q = useQuery<PageResult<Notice | Coupon | CouponIssueRecord | Campaign | PushMessage | Referral | AdSlot | AdCampaign | AdDelivery>>({
+  const q = useQuery<PageResult<Coupon | CouponIssueRecord | Campaign | PushMessage | Referral | AdSlot | AdCampaign | AdDelivery>>({
     // showArchived 必须进 queryKey，否则切开关不重新拉数据
     queryKey: ["mkt", tab, paging.page, paging.size, keyword, showArchived, campaignStatus, period],
     queryFn: () =>
-      tab === "notices" ? api.listNotices({ page: paging.page, size: paging.size, keyword, showArchived })
-      : tab === "coupons" ? api.listCoupons({ page: paging.page, size: paging.size, keyword, showArchived })
+      tab === "coupons" ? api.listCoupons({ page: paging.page, size: paging.size, keyword, showArchived })
       : tab === "coupon-issues" ? api.listCouponIssueRecords({ page: paging.page, size: paging.size, keyword })
       : tab === "campaigns" ? api.listCampaigns({ page: paging.page, size: paging.size, keyword, status: campaignStatus })
       : tab === "push" ? api.listPushMessages({ page: paging.page, size: paging.size, keyword })
@@ -499,28 +454,6 @@ function MarketingInner() {
     showArchived ? [{ header: "归档时间", cell: (r: T) => <ArchivedAt at={r.archivedAt} /> }] : [];
 
   const couponAmount = (c: Coupon) => c.type === "CUT" ? money(c.value) : `${c.value} 折`;
-
-  const noticeCols: Column<Notice>[] = [
-    { header: "公告号", cell: (n) => <span className="font-medium">{n.noticeNo}</span> },
-    { header: "标题（中）", cell: (n) => n.title },
-    { header: "类型", cell: (n) => <StatusBadge map={NOTICE_TYPE} value={n.type} /> },
-    { header: "置顶", cell: (n) => n.pinned ? <Badge tone="success">置顶</Badge> : <span className="text-muted-foreground">-</span> },
-    { header: "生效期", cell: (n) => <span className="text-muted-foreground">{fmtTime(n.startAt)} ~ {fmtTime(n.endAt)}</span> },
-    { header: "状态", cell: (n) => <StatusBadge map={NOTICE_STATUS} value={n.status} /> },
-    ...archivedCol<Notice>(),
-    {
-      header: t("common.actions"),
-      cell: (n) => (
-        <ArchiveActions
-          archived={!!n.archivedAt}
-          canWrite={canEditNotice}
-          onArchive={() => askArchiveNotice(n)}
-          onUnarchive={() => askUnarchiveNotice(n)}
-          actions={<Button size="sm" variant="outline" onClick={() => setNoticeForm(n)}>{t("common.edit")}</Button>}
-        />
-      ),
-    },
-  ];
 
   const couponCols: Column<Coupon>[] = [
     { header: "券号", cell: (c) => <span className="font-medium">{c.couponNo}</span> },
@@ -713,31 +646,6 @@ function MarketingInner() {
   return (
     <div>
       <TabHeader tabs={tabs} value={tab} onChange={setTab} />
-      {tab === "notices" && (
-        <Toolbar
-          search={keyword}
-          onSearch={(v) => { setKeyword(v); paging.reset(); }}
-          searchPlaceholder="搜索公告号/标题（中/英/阿）/发布人"
-          onAdd={canEditNotice ? () => setNoticeForm({ type: "SYSTEM", pinned: false, status: "DRAFT", title: "", titleEn: "", titleAr: "", content: "", contentEn: "", contentAr: "", startAt: "", endAt: "", publishedBy: "" }) : undefined}
-          addLabel="新增公告"
-          // B0 样板：前端 CSV 导出当页数据（决策 §八-2）。exportCsv 自带 UTF-8 BOM 防 Excel 乱码。
-          onExport={onExportOf<Notice>("公告管理", [
-            { header: "公告号", value: (n) => n.noticeNo },
-            { header: "标题（中）", value: (n) => n.title },
-            { header: "标题（EN）", value: (n) => n.titleEn },
-            { header: "标题（AR）", value: (n) => n.titleAr },
-            { header: "类型", value: (n) => NOTICE_TYPE[n.type].label },
-            { header: "置顶", value: (n) => (n.pinned ? "是" : "否") },
-            { header: "生效开始", value: (n) => n.startAt },
-            { header: "生效结束", value: (n) => n.endAt },
-            { header: "状态", value: (n) => NOTICE_STATUS[n.status].label },
-            { header: "发布人", value: (n) => n.publishedBy },
-            ...archivedCsv<Notice>(),
-          ])}
-        >
-          <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); paging.reset(); }} />
-        </Toolbar>
-      )}
       {tab === "coupons" && (
         <Toolbar
           search={keyword}
@@ -905,7 +813,6 @@ function MarketingInner() {
           />
         </Toolbar>
       )}
-      {tab === "notices" && <DataTable rowKey={(n: Notice) => n.noticeNo} columns={noticeCols} rows={q.data?.list as Notice[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} rowClassName={archivedRowClass} empty={showArchived ? "没有匹配的公告——换个关键词，或点「新增公告」发布第一条 C 端公告条。" : "暂无在用公告——可能都已归档（打开「显示已归档」查看），或点「新增公告」发布第一条。"} />}
       {tab === "coupons" && <DataTable rowKey={(c: Coupon) => c.couponNo} columns={couponCols} rows={q.data?.list as Coupon[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} rowClassName={archivedRowClass} empty={showArchived ? "没有匹配的优惠券——换个关键词，或点「新增优惠券」建一张。" : "暂无在用优惠券——可能都已归档（打开「显示已归档」查看），或点「新增优惠券」建第一张。"} />}
       {tab === "coupon-issues" && <DataTable rowKey={(r: CouponIssueRecord) => r.issueNo} columns={issueCols} rows={q.data?.list as CouponIssueRecord[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无发放记录——到「优惠券」tab 选一张在用的券点「发放」，这里会逐笔留痕。" />}
       {tab === "campaigns" && (
@@ -942,19 +849,6 @@ function MarketingInner() {
         onChange={(v) => setRuleForm(v as Partial<ReferralRule>)}
         onSubmit={() => ruleForm && saveRule.mutate(ruleForm)}
         submitting={saveRule.isPending}
-      />
-
-      <FormDrawer
-        open={!!noticeForm}
-        onOpenChange={(o) => !o && setNoticeForm(null)}
-        titleNew="新增公告"
-        titleEdit={`编辑公告 ${noticeForm?.noticeNo ?? ""}`}
-        isEdit={!!noticeForm?.noticeNo}
-        fields={NOTICE_FIELDS}
-        value={(noticeForm ?? {}) as Record<string, unknown>}
-        onChange={(v) => setNoticeForm(v as Partial<Notice>)}
-        onSubmit={() => noticeForm && saveNotice.mutate(noticeForm)}
-        submitting={saveNotice.isPending}
       />
 
       <FormDrawer

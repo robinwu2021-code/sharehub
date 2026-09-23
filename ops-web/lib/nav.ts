@@ -161,8 +161,13 @@ export const NAV: NavSection[] = [
     // 与其它 section 不同：一个 section 下是**多个独立页面**（/operation/<page>），不是同页 tab。
     // soon 由 backend-ready.ts 决定：真实后端模式下接口未就绪的页面灰显，mock 模式恒可点。
     key: "operation", label: "运营管理", icon: "Store", module: "location",
-    modules: ["location", "pricing", "finance"],
+    modules: ["location", "pricing", "finance", "system", "marketing"],
     href: "/operation/overview", match: ["/operation"],
+    // 2026-09-23 菜单重合收敛（docs/technical/菜单重合梳理与优化方案.md §A 类）：
+    // 下面 10 项此前**每一项都有第二个入口**，且调同一组 API —— 站点在「站点与点位」、
+    // 收费方案与时段倍率在「计费定价」、应用版本/银行/问题在「系统设置」、公告在「营销管理」。
+    // 同一张表两个维护入口，结果是「在哪个入口改的，决定别人看不看得见」。
+    // 一律**并到运营管理这一份**，旧入口连页面代码一起撤，不留跳转壳子。
     children: opLeaves([
       ["overview", "站点概览", "location:overview:read", "场站管理"],
       ["sites", "站点管理", "location:poi:read", "场站管理"],
@@ -170,12 +175,10 @@ export const NAV: NavSection[] = [
       ["fee-adjustments", "预约调价", "pricing:adjustment:read", "场站管理"],
       ["site-sharing", "站点分成", "finance:share_rule:read", "场站管理"],
       ["payee-sharing", "分成方分成", "finance:share_rule:read", "场站管理"],
-      // 2026-09-23 撤销「基础管理」「公告管理」两组：应用版本 / 银行 / 问题 / 公告
-      // 曾在这里各有一份页面，与系统设置 › 基础字典、营销管理 › 运营内容**调同一组 API**
-      // （listBanks/saveBank、listProblems、listAppVersions、listNotices），
-      // 是同一张表的两个维护入口 —— 在哪个入口改的，决定了别人能不能看到自己的改动。
-      // 判据是「这一项的主语是什么」：那四项的主语是系统字典与触达内容，不是站点，故归还原处。
-      // 详见 docs/technical/菜单重合梳理与优化方案.md §A 类。
+      ["app-versions", "应用版本", "system:app_version:read", "基础管理"],
+      ["banks", "银行管理", "system:bank:read", "基础管理"],
+      ["problems", "问题管理", "system:problem:read", "基础管理"],
+      ["notices", "公告管理", "marketing:notice:read", "公告管理"],
     ]),
   },
   {
@@ -301,8 +304,8 @@ export const NAV: NavSection[] = [
   {
     key: "marketing", label: "营销管理", icon: "Ticket", module: "marketing", href: "/marketing",
     children: [
-      // 公告管理：c-app 首页 Hub 的「公告条」需要运营端发布口，原清单遗漏（补齐清单 E1）
-      { href: "/marketing?tab=notices", label: "公告管理", perm: "marketing:coupon:read", group: "运营内容" },
+      // 公告管理 2026-09-23 并入 运营管理 › 公告管理（同一组 listNotices/saveNotice/archiveNotice）。
+      // c-app 首页 Hub 的「公告条」发布口仍在，只是换了一个菜单位置。
       { href: "/marketing", label: "优惠券", perm: "marketing:coupon:read", phase: 2, ready: true, group: "促销玩法" },
       { href: "/marketing?tab=campaigns", label: "活动", phase: 2, group: "促销玩法" },
       { href: "/marketing?tab=push", label: "推送触达", perm: "marketing:push:send", phase: 3, ready: true, group: "促销玩法" },
@@ -365,11 +368,11 @@ export const NAV: NavSection[] = [
       { href: "/system?tab=notify-blacklist", label: "触达拉黑", perm: "system:notify_blacklist:read", phase: 1, group: "消息触达" },
       { href: "/system?tab=rules", label: "业务规则", perm: "system:biz_rule:update", phase: 1, group: "业务规则" },
       { href: "/system?tab=login", label: "登录设置", perm: "system:login_setting:update", phase: 1, group: "业务规则" },
-      { href: "/system?tab=app-version", label: "应用版本", perm: "system:app_version:read", phase: 1, group: "业务规则" },
+      // 「应用版本」「银行管理」「问题管理」2026-09-23 并入 运营管理 › 基础管理
+      // （同一组 listAppVersions/saveAppVersion/rollbackAppVersion、listBanks/saveBank、
+      // listProblems/saveProblem），本页不再留第二份。
       { href: "/system?tab=dict", label: "参数字典", perm: "system:dict:read", group: "基础字典" },
       { href: "/system?tab=region", label: "地区库", perm: "system:dict:read", group: "基础字典" },
-      { href: "/system?tab=banks", label: "银行管理", perm: "system:bank:read", group: "基础字典" },
-      { href: "/system?tab=problems", label: "问题管理", perm: "system:problem:read", group: "基础字典" },
       { href: "/system?tab=params", label: "系统参数", perm: "system:param:read", group: "基础字典" },
       { href: "/system?tab=tax", label: "税率与发票", perm: "system:tax:update", phase: 2, group: "开放与市场" },
       { href: "/system?tab=markets", label: "多国家市场", perm: "system:market:read", phase: 3, group: "开放与市场" },

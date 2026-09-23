@@ -20,7 +20,6 @@ import { ReadOnlyNotice } from "@/components/read-only-notice";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Input, Select } from "@/components/ui/input";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { ShowArchivedToggle, archivedRowClass, ArchivedAt, ArchiveActions, archiveConfirm, unarchiveConfirm } from "@/components/archive";
@@ -32,15 +31,19 @@ import { notify } from "@/lib/notify";
 import { exportCsv } from "@/lib/export-csv";
 import type { Vendor, AccessMode, NotifyTemplate, DictEntry, Region, RegionNode, SysParam, OpenApiApp, MarketCountry, PaymentChannel, PageResult, VendorProbeResult } from "@/lib/types";
 import type {
-  NotifyLog, NotifyBlacklist, LoginSetting, AppVersion, BankEntry, ProblemEntry, TaxSetting,
+  NotifyLog, NotifyBlacklist, LoginSetting, TaxSetting,
   WithdrawRule, ReservationRule, BillingDefaultRule,
 } from "@/lib/types";
 
 // tab 顺序与 lib/nav.ts 的 /system 叶子顺序一致（接入与支付 → 消息触达 → 业务规则 → 基础字典 → 开放与市场），
 // 否则从菜单深链过来会觉得"页里的位置和菜单里的位置对不上"。
 // tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）
+// 2026-09-23 移除 "app-version" / "banks" / "problems"：三者与「运营管理 › 基础管理」的
+// 三个页面调同一组 API（listAppVersions/saveAppVersion/rollbackAppVersion、listBanks/
+// saveBank/archiveBank、listProblems/saveProblem/archiveProblem），是同一张表的两个
+// 维护入口。按「重合功能一律并到运营管理」收敛到那边，本页不再留第二份。
 const TAB_KEYS = ["vendors", "payment", "notify", "notify-log", "notify-blacklist", "rules",
-  "login", "app-version", "dict", "region", "banks", "problems", "params", "tax",
+  "login", "dict", "region", "params", "tax",
   "markets", "openapi"] as const;
 
 const MODE_LABEL: Record<AccessMode, string> = { TCP: "TCP 私有协议", MQTT: "MQTT 直连", HTTP_API: "HTTP 云对接" };
@@ -137,11 +140,6 @@ const LOG_CHANNEL_OPTIONS = Object.entries(LOG_CHANNEL).map(([value, label]) => 
 const LOG_STATUS_OPTIONS = [{ value: "SENT", label: "已发送" }, { value: "FAILED", label: "发送失败" }];
 /** 启用/停用二选一，多个字典 tab 共用 */
 const ENABLED_OPTIONS = [{ value: "ENABLED", label: "启用" }, { value: "DISABLED", label: "停用" }];
-const BANK_COUNTRY_OPTIONS = [
-  { value: "AE", label: "阿联酋 AE" }, { value: "SA", label: "沙特 SA" }, { value: "QA", label: "卡塔尔 QA" },
-  { value: "KW", label: "科威特 KW" }, { value: "EG", label: "埃及 EG" },
-];
-const BANK_CURRENCY_OPTIONS = ["AED", "SAR", "QAR", "KWD", "EGP"].map((c) => ({ value: c, label: c }));
 const LOG_SCENE_HINT = "OTP / 借出 / 归还 / 扣费 / 告警";
 
 // —— §10 触达拉黑 ——
@@ -210,88 +208,6 @@ const LOGIN_FIELDS: FieldDef[] = [
   { key: "forceRealName", label: "强制实名", type: "switch", section: "合规", help: "沙特等地监管要求；开启后未实名用户不能借出" },
 ];
 
-// —— §13 应用版本 ——
-const PLATFORM_LABEL: Record<AppVersion["platform"], string> = { IOS: "iOS", ANDROID: "Android", H5: "H5 / 小程序" };
-const PLATFORM_OPTIONS = Object.entries(PLATFORM_LABEL).map(([value, label]) => ({ value, label }));
-const VERSION_STATUS: StatusMap<AppVersion["status"]> = {
-  DRAFT: { label: "草稿", tone: "muted" },
-  RELEASED: { label: "已发布", tone: "success" },
-  ROLLBACK: { label: "已回滚", tone: "danger" },
-};
-const VERSION_FIELDS: FieldDef[] = [
-  { key: "platform", label: "平台", type: "select", required: true, readOnlyOnEdit: true, section: "基本信息", options: [{ value: "IOS", label: "iOS" }, { value: "ANDROID", label: "Android" }, { value: "H5", label: "H5 / 小程序" }] },
-  {
-    key: "versionNo", label: "版本号", required: true, readOnlyOnEdit: true, section: "基本信息", placeholder: "1.5.0",
-    pattern: { re: "^\\d+\\.\\d+\\.\\d+$", msg: "版本号格式为 x.y.z（如 1.5.0）" },
-    help: "平台 + 版本号构成业务键：同一版本号在 iOS / Android 是两条记录",
-  },
-  { key: "buildNo", label: "构建号", type: "number", required: true, min: 1, section: "基本信息", placeholder: "1500" },
-  { key: "status", label: "状态", type: "select", required: true, section: "基本信息", options: [{ value: "DRAFT", label: "草稿" }, { value: "RELEASED", label: "已发布" }, { value: "ROLLBACK", label: "已回滚" }] },
-  { key: "releaseNote", label: "更新说明（中文）", type: "textarea", rows: 3, required: true, maxLength: 200, section: "三语更新说明", placeholder: "支持信用免押借出；修复扫码超时。" },
-  { key: "releaseNoteEn", label: "更新说明（English）", type: "textarea", rows: 3, maxLength: 300, section: "三语更新说明" },
-  { key: "releaseNoteAr", label: "更新说明（العربية）", type: "textarea", rows: 3, maxLength: 300, section: "三语更新说明" },
-  { key: "forceUpdate", label: "强制更新", type: "switch", section: "发布控制", help: "开启后必须填「最低支持版本」，低于该版本的用户会被拦在启动页" },
-  {
-    key: "minSupported", label: "最低支持版本", section: "发布控制", placeholder: "1.4.3",
-    pattern: { re: "^\\d+\\.\\d+\\.\\d+$", msg: "版本号格式为 x.y.z（如 1.4.3）" },
-    help: "强更时必填（提交时校验）",
-  },
-  { key: "rolloutPercent", label: "灰度比例（%）", type: "number", required: true, min: 0, max: 100, section: "发布控制", help: "0~100；先小比例观察崩溃率再放量" },
-  { key: "downloadUrl", label: "下载地址", required: true, maxLength: 200, section: "发布控制", placeholder: "https://apps.apple.com/app/id..." },
-];
-
-// —— §14 银行管理 ——
-const BANK_FIELDS: FieldDef[] = [
-  { key: "bankCode", label: "银行代码", required: true, readOnlyOnEdit: true, maxLength: 12, section: "基本信息", placeholder: "ENBD", help: "业务键，自动转大写；建档后不可改" },
-  { key: "bankName", label: "银行名称（中文）", required: true, maxLength: 40, section: "基本信息", placeholder: "阿联酋国民银行" },
-  { key: "bankNameEn", label: "银行名称（English）", required: true, maxLength: 60, section: "基本信息", placeholder: "Emirates NBD" },
-  { key: "status", label: "状态", type: "select", required: true, section: "基本信息", options: [{ value: "ENABLED", label: "启用" }, { value: "DISABLED", label: "停用" }] },
-  {
-    key: "country", label: "国家码", required: true, section: "归属市场", placeholder: "AE",
-    pattern: { re: "^[A-Za-z]{2}$", msg: "国家码需为 ISO alpha-2（如 AE）" },
-  },
-  { key: "currency", label: "币种", required: true, maxLength: 3, section: "归属市场", placeholder: "AED" },
-  { key: "swiftPrefix", label: "SWIFT 前缀", required: true, maxLength: 11, section: "账户校验", placeholder: "EBILAEAD" },
-  {
-    key: "ibanLength", label: "IBAN 长度", type: "number", required: true, min: 15, max: 34, section: "账户校验",
-    help: "提现收款账户按此位数校验 IBAN（AE 23 / SA 24 / EG 29），填错会导致提现打款失败",
-  },
-];
-
-// —— §15 问题管理 ——
-const PROBLEM_CATEGORY: Record<ProblemEntry["category"], string> = {
-  RENT: "借出", RETURN: "归还", BILLING: "计费与退款", DEVICE: "设备故障", ACCOUNT: "账号", OTHER: "其他",
-};
-const PROBLEM_ACTION: StatusMap<ProblemEntry["suggestedAction"]> = {
-  SELF_SERVICE: { label: "自助解决", tone: "muted" },
-  TO_WORKORDER: { label: "转工单", tone: "warning" },
-  TO_REFUND: { label: "转退款", tone: "danger" },
-  TO_CS: { label: "转人工客服", tone: "outline" },
-};
-const PROBLEM_CATEGORY_OPTIONS = (Object.keys(PROBLEM_CATEGORY) as ProblemEntry["category"][])
-  .map((k) => ({ value: k, label: PROBLEM_CATEGORY[k] }));
-const PROBLEM_FIELDS: FieldDef[] = [
-  { key: "problemNo", label: "问题号", readOnlyOnEdit: true, placeholder: "留空自动生成", section: "基本信息" },
-  { key: "category", label: "分类", type: "select", required: true, section: "基本信息", options: PROBLEM_CATEGORY_OPTIONS },
-  { key: "sortNo", label: "排序", type: "number", required: true, min: 1, section: "基本信息", help: "数字小的排前面，决定 C 端报障下拉的顺序" },
-  { key: "status", label: "状态", type: "select", required: true, section: "基本信息", options: [{ value: "ENABLED", label: "启用" }, { value: "DISABLED", label: "停用" }] },
-  // 三语标题 + 三语答复共 6 个输入：C 端报障下拉直接取标题，客服快捷答复直接取答复
-  { key: "title", label: "标题（中文）", required: true, maxLength: 40, section: "三语内容", placeholder: "扫码后充电宝没弹出" },
-  { key: "titleEn", label: "标题（English）", maxLength: 80, section: "三语内容", placeholder: "Nothing ejected after scanning" },
-  { key: "titleAr", label: "标题（العربية）", maxLength: 80, section: "三语内容", placeholder: "لم تخرج البطارية بعد مسح الرمز" },
-  { key: "answer", label: "标准答复（中文）", type: "textarea", rows: 3, required: true, maxLength: 300, section: "三语内容" },
-  { key: "answerEn", label: "标准答复（English）", type: "textarea", rows: 3, maxLength: 400, section: "三语内容" },
-  { key: "answerAr", label: "标准答复（العربية）", type: "textarea", rows: 3, maxLength: 400, section: "三语内容" },
-  {
-    key: "suggestedAction", label: "建议处置", type: "select", required: true, section: "处置",
-    options: [
-      { value: "SELF_SERVICE", label: "自助解决" }, { value: "TO_WORKORDER", label: "转工单" },
-      { value: "TO_REFUND", label: "转退款" }, { value: "TO_CS", label: "转人工客服" },
-    ],
-    help: "C 端报障与客服受理据此决定下一步——比竞品纯 FAQ 多的就是这一列",
-  },
-];
-
 // —— §16 税率与发票 ——
 const TAX_FIELDS: FieldDef[] = [
   {
@@ -315,17 +231,6 @@ function OnOff({ on, label }: { on: boolean; label: string }) {
       {on ? <Check className="size-3.5 text-[var(--success)]" /> : <X className="size-3.5 text-muted-foreground" />}
       <span className={on ? undefined : "text-muted-foreground"}>{label}</span>
     </span>
-  );
-}
-
-/** 灰度比例条：复用共享 Progress（showText 关掉，因为这里是"百分比"而非"已用/总数"）。 */
-function RolloutBar({ percent }: { percent: number }) {
-  const v = Math.max(0, Math.min(100, percent));
-  return (
-    <div className="flex items-center gap-2">
-      <Progress value={v} total={100} showText={false} className="min-w-0 w-20" />
-      <span className="tabular-nums text-xs text-muted-foreground">{v}%</span>
-    </div>
   );
 }
 
@@ -500,9 +405,6 @@ function SystemInner() {
   const canBlacklist = allow("system:notify_blacklist:update");
   const canBizRule = allow("system:biz_rule:update");
   const canLogin = allow("system:login_setting:update");
-  const canAppVersion = allow("system:app_version:release");
-  const canBank = allow("system:bank:update");
-  const canProblem = allow("system:problem:update");
   const canTax = allow("system:tax:update");
 
   // 各 tab 的筛选器（切 tab 时统一清空，见 TabHeader onChange）
@@ -511,19 +413,11 @@ function SystemInner() {
   const [logSort, setLogSort] = useState<{ key: string; dir: SortDir }>({ key: "sentAt", dir: "desc" });
   const [blChannel, setBlChannel] = useState("");
   const [blReason, setBlReason] = useState("");
-  const [verPlatform, setVerPlatform] = useState("");
-  const [bankCountry, setBankCountry] = useState("");
-  const [bankCurrency, setBankCurrency] = useState("");
-  const [probCategory, setProbCategory] = useState("");
-  const [probStatus, setProbStatus] = useState("");
   // G1 软删除：默认过滤已归档；开关打开才把归档行拉回来（banks / problems 共用一个 state，切 tab 时清空）
   const [showArchived, setShowArchived] = useState(false);
 
   const [blacklistForm, setBlacklistForm] = useState<Partial<NotifyBlacklist> | null>(null);
   const [loginForm, setLoginForm] = useState<Partial<LoginSetting> | null>(null);
-  const [versionForm, setVersionForm] = useState<Partial<AppVersion> | null>(null);
-  const [bankForm, setBankForm] = useState<Partial<BankEntry> | null>(null);
-  const [problemForm, setProblemForm] = useState<Partial<ProblemEntry> | null>(null);
   const [taxForm, setTaxForm] = useState<Partial<TaxSetting> | null>(null);
   // 失败详情抽屉：失败行点「详情」看原始报错（列表里放不下完整报错）
   const [logDetail, setLogDetail] = useState<NotifyLog | null>(null);
@@ -586,9 +480,6 @@ function SystemInner() {
   const saveMarket = useMutation({ mutationFn: (v: Partial<MarketCountry>) => api.saveMarketCountry(v), onSuccess: onSaved(setMarketForm) });
   const saveBlacklist = useMutation({ mutationFn: (v: Partial<NotifyBlacklist>) => api.saveNotifyBlacklist(v), onSuccess: onSaved(setBlacklistForm) });
   const saveLogin = useMutation({ mutationFn: (v: Partial<LoginSetting>) => api.saveLoginSetting(v), onSuccess: onSaved(setLoginForm) });
-  const saveVersion = useMutation({ mutationFn: (v: Partial<AppVersion>) => api.saveAppVersion(v), onSuccess: onSaved(setVersionForm) });
-  const saveBank = useMutation({ mutationFn: (v: Partial<BankEntry>) => api.saveBank(v), onSuccess: onSaved(setBankForm) });
-  const saveProblem = useMutation({ mutationFn: (v: Partial<ProblemEntry>) => api.saveProblem(v), onSuccess: onSaved(setProblemForm) });
   const saveTax = useMutation({ mutationFn: (v: Partial<TaxSetting>) => api.saveTaxSetting(v), onSuccess: onSaved(setTaxForm) });
   const releaseBlock = useMutation({
     mutationFn: (blockNo: string) => api.releaseNotifyBlacklist(blockNo),
@@ -596,31 +487,22 @@ function SystemInner() {
   });
   // G1 软删除（TDD §10.1）：只有归档/恢复，没有物理删除。错误由全局 MutationCache 接管，此处不 catch。
   const invalidateSys = () => { qc.invalidateQueries({ queryKey: ["sys"] }); };
-  const archiveBank = useMutation({ mutationFn: (code: string) => api.archiveBank(code), onSuccess: () => { invalidateSys(); notify.success("已归档"); } });
-  const unarchiveBank = useMutation({ mutationFn: (code: string) => api.unarchiveBank(code), onSuccess: () => { invalidateSys(); notify.success("已恢复"); } });
-  const archiveProblem = useMutation({ mutationFn: (no: string) => api.archiveProblem(no), onSuccess: () => { invalidateSys(); notify.success("已归档"); } });
-  const unarchiveProblem = useMutation({ mutationFn: (no: string) => api.unarchiveProblem(no), onSuccess: () => { invalidateSys(); notify.success("已恢复"); } });
 
-  const rollbackVersion = useMutation({
-    mutationFn: (versionId: string) => api.rollbackAppVersion(versionId),
-    onSuccess: (r) => { qc.invalidateQueries({ queryKey: ["sys"] }); notify.success(`已回滚 ${PLATFORM_LABEL[r.platform]} ${r.versionNo}，灰度已归零`); },
-  });
 
   // —— 其余分页 tab ——
   // 筛选值一并进 queryKey：否则改筛选器不会重新取数。
-  const filterKey = [logChannel, logStatus, logSort.key, logSort.dir, blChannel, blReason, verPlatform, bankCountry, bankCurrency, probCategory, probStatus, showArchived ? "arc" : ""].join("|");
+  const filterKey = [logChannel, logStatus, logSort.key, logSort.dir, blChannel, blReason, showArchived ? "arc" : ""].join("|");
   // 切 tab 要把上一个 tab 的筛选条件全部清掉。此前这段只写在 TabHeader 的 onChange 里，
   // 从 URL 换 tab（点侧边菜单）的那一路只复位了页码，筛选会带到新 tab 上——
   // 表现是切过去看到一张空表，而筛选器不在视野里。
   const onTabChange = () => {
     paging.reset(); setKeyword("");
     setLogChannel(""); setLogStatus(""); setLogSort({ key: "sentAt", dir: "desc" });
-    setBlChannel(""); setBlReason(""); setVerPlatform("");
-    setBankCountry(""); setBankCurrency(""); setProbCategory(""); setProbStatus("");
+    setBlChannel(""); setBlReason("");
     setShowArchived(false);
   };
 
-  const q = useQuery<PageResult<NotifyTemplate | DictEntry | Region | SysParam | OpenApiApp | MarketCountry | PaymentChannel | NotifyLog | NotifyBlacklist | LoginSetting | AppVersion | BankEntry | ProblemEntry | TaxSetting>>({
+  const q = useQuery<PageResult<NotifyTemplate | DictEntry | Region | SysParam | OpenApiApp | MarketCountry | PaymentChannel | NotifyLog | NotifyBlacklist | LoginSetting | TaxSetting>>({
     queryKey: ["sys", tab, paging.page, paging.size, keyword, filterKey],
     queryFn: () =>
       tab === "payment" ? api.listPaymentChannels({ page: paging.page, size: paging.size, keyword })
@@ -628,9 +510,6 @@ function SystemInner() {
       : tab === "notify-log" ? api.listNotifyLogs({ page: paging.page, size: paging.size, keyword, channel: logChannel, status: logStatus, sort: logSort.key, dir: logSort.dir })
       : tab === "notify-blacklist" ? api.listNotifyBlacklist({ page: paging.page, size: paging.size, keyword, channel: blChannel, reason: blReason })
       : tab === "login" ? api.listLoginSettings({ page: paging.page, size: paging.size, keyword })
-      : tab === "app-version" ? api.listAppVersions({ page: paging.page, size: paging.size, keyword, platform: verPlatform })
-      : tab === "banks" ? api.listBanks({ page: paging.page, size: paging.size, keyword, country: bankCountry, currency: bankCurrency, showArchived })
-      : tab === "problems" ? api.listProblems({ page: paging.page, size: paging.size, keyword, category: probCategory, status: probStatus, showArchived })
       : tab === "tax" ? api.listTaxSettings({ page: paging.page, size: paging.size, keyword })
       : tab === "dict" ? api.listDictEntries({ page: paging.page, size: paging.size, keyword })
       : tab === "params" ? api.listSysParams({ page: paging.page, size: paging.size, keyword })
@@ -923,104 +802,6 @@ function SystemInner() {
     { header: t("common.actions"), cell: editBtn<LoginSetting>(canLogin, setLoginForm) },
   ];
 
-  // —— §13 应用版本：按平台分组（列表已按 平台→构建号 排序）+ 灰度进度条 + 强更 danger ——
-  const versionCols: Column<AppVersion>[] = [
-    { header: "平台", cell: (v) => <Badge tone="outline">{PLATFORM_LABEL[v.platform]}</Badge> },
-    { header: "版本号", cell: (v) => <span className="font-medium tabular-nums">{v.versionNo}</span> },
-    { header: "构建号", cell: (v) => <span className="tabular-nums text-muted-foreground">{v.buildNo}</span> },
-    { header: "更新说明（中）", cell: (v) => <span className="text-muted-foreground">{v.releaseNote}</span> },
-    { header: "强更", cell: (v) => v.forceUpdate ? <Badge tone="danger">强制更新</Badge> : <span className="text-muted-foreground">-</span> },
-    { header: "最低支持", cell: (v) => <span className="tabular-nums text-muted-foreground">{v.minSupported || "-"}</span> },
-    { header: "灰度", cell: (v) => <RolloutBar percent={v.rolloutPercent} /> },
-    { header: "状态", cell: (v) => <StatusBadge map={VERSION_STATUS} value={v.status} /> },
-    { header: "发布时间", cell: (v) => <span className="text-muted-foreground">{fmtTime(v.releasedAt)}</span> },
-    {
-      header: t("common.actions"),
-      cell: (v) => !canAppVersion ? <span className="text-muted-foreground">-</span> : (
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => setVersionForm(v)}>{t("common.edit")}</Button>
-          {v.status === "RELEASED" && (
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={rollbackVersion.isPending}
-              onClick={async () => {
-                const ok = await confirm({
-                  title: `回滚 ${PLATFORM_LABEL[v.platform]} ${v.versionNo}`,
-                  desc: "回滚会立即把灰度比例归零并停止下发；已升级的用户不会自动降级。请确认新版本确有阻断性问题。",
-                  danger: true,
-                  confirmText: "确认回滚",
-                  requireText: v.versionNo,
-                });
-                if (ok) rollbackVersion.mutate(v.versionId);
-              }}
-            >
-              回滚
-            </Button>
-          )}
-        </div>
-      ),
-    },
-  ];
-
-  // —— §14 银行管理 ——
-  const bankCols: Column<BankEntry>[] = [
-    { header: "银行代码", cell: (b) => <span className="font-medium tabular-nums">{b.bankCode}</span> },
-    { header: "银行名称", cell: (b) => <>{b.bankName} <span className="text-muted-foreground">· {b.bankNameEn}</span></> },
-    { header: "国家", cell: (b) => <Badge tone="outline">{b.country}</Badge> },
-    { header: "币种", cell: (b) => <span className="tabular-nums">{b.currency}</span> },
-    { header: "SWIFT 前缀", cell: (b) => <span className="tabular-nums text-muted-foreground">{b.swiftPrefix}</span> },
-    // IBAN 长度：提现收款账户校验直接读这里，填错会让提现打款失败
-    { header: "IBAN 长度", cell: (b) => <span className="tabular-nums">{b.ibanLength} 位</span> },
-    { header: "状态", cell: (b) => <EnabledBadge on={b.status === "ENABLED"} /> },
-    // 归档时间仅在「显示已归档」打开时占列，平时不白占一列
-    ...(showArchived ? [{ header: "归档时间", cell: (b: BankEntry) => <ArchivedAt at={b.archivedAt} /> }] : []),
-    {
-      header: t("common.actions"),
-      cell: (b) => (
-        <ArchiveActions
-          archived={!!b.archivedAt}
-          canWrite={canBank}
-          actions={<Button size="sm" variant="outline" onClick={() => setBankForm(b)}>{t("common.edit")}</Button>}
-          onArchive={async () => {
-            // 银行不在「主数据强确认」清单里，不要求手输编号
-            if (await confirm(archiveConfirm("银行", `${b.bankName}（${b.bankCode}）`))) archiveBank.mutate(b.bankCode);
-          }}
-          onUnarchive={async () => {
-            if (await confirm(unarchiveConfirm("银行", `${b.bankName}（${b.bankCode}）`))) unarchiveBank.mutate(b.bankCode);
-          }}
-        />
-      ),
-    },
-  ];
-
-  // —— §15 问题管理 ——
-  const problemCols: Column<ProblemEntry>[] = [
-    { header: "问题号", cell: (p) => <span className="font-medium tabular-nums">{p.problemNo}</span> },
-    { header: "分类", cell: (p) => <Badge tone="outline">{PROBLEM_CATEGORY[p.category]}</Badge> },
-    { header: "标题（中）", cell: (p) => p.title },
-    { header: "建议处置", cell: (p) => <StatusBadge map={PROBLEM_ACTION} value={p.suggestedAction} /> },
-    { header: "排序", cell: (p) => <span className="tabular-nums">{p.sortNo}</span> },
-    { header: "状态", cell: (p) => <EnabledBadge on={p.status === "ENABLED"} /> },
-    ...(showArchived ? [{ header: "归档时间", cell: (p: ProblemEntry) => <ArchivedAt at={p.archivedAt} /> }] : []),
-    {
-      header: t("common.actions"),
-      cell: (p) => (
-        <ArchiveActions
-          archived={!!p.archivedAt}
-          canWrite={canProblem}
-          actions={<Button size="sm" variant="outline" onClick={() => setProblemForm(p)}>{t("common.edit")}</Button>}
-          onArchive={async () => {
-            if (await confirm(archiveConfirm("问题", `${p.title}（${p.problemNo}）`))) archiveProblem.mutate(p.problemNo);
-          }}
-          onUnarchive={async () => {
-            if (await confirm(unarchiveConfirm("问题", `${p.title}（${p.problemNo}）`))) unarchiveProblem.mutate(p.problemNo);
-          }}
-        />
-      ),
-    },
-  ];
-
   // —— §16 税率与发票 ——
   const taxCols: Column<TaxSetting>[] = [
     { header: "国家", cell: (x) => <span className="font-medium">{x.countryName}（{x.country}）</span> },
@@ -1214,70 +995,6 @@ function SystemInner() {
           addLabel="新增国家档"
         />
       )}
-      {tab === "app-version" && (
-        <Toolbar
-          search={keyword} onSearch={(v) => { setKeyword(v); paging.reset(); }}
-          searchPlaceholder="搜索版本号 / 平台 / 更新说明"
-          onExport={() => exportCsv<AppVersion>("应用版本", [
-            { header: "平台", value: (v) => PLATFORM_LABEL[v.platform] },
-            { header: "版本号", value: (v) => v.versionNo },
-            { header: "构建号", value: (v) => v.buildNo },
-            { header: "更新说明（中）", value: (v) => v.releaseNote },
-            { header: "强更", value: (v) => (v.forceUpdate ? "强制更新" : "-") },
-            { header: "最低支持", value: (v) => v.minSupported || "-" },
-            { header: "灰度（%）", value: (v) => v.rolloutPercent },
-            { header: "状态", value: (v) => VERSION_STATUS[v.status].label },
-            { header: "发布时间", value: (v) => fmtTime(v.releasedAt) },
-          ], (q.data?.list ?? []) as AppVersion[])}
-          onAdd={canAppVersion ? () => setVersionForm({ platform: "IOS", versionNo: "", buildNo: 1, status: "DRAFT", releaseNote: "", releaseNoteEn: "", releaseNoteAr: "", forceUpdate: false, minSupported: "", rolloutPercent: 0, downloadUrl: "" }) : undefined}
-          addLabel="新增版本"
-        >
-          <FilterSelect value={verPlatform} onChange={(v) => { setVerPlatform(v); paging.reset(); }} allLabel="全部平台" options={PLATFORM_OPTIONS} />
-        </Toolbar>
-      )}
-      {tab === "banks" && (
-        <Toolbar
-          search={keyword} onSearch={(v) => { setKeyword(v); paging.reset(); }}
-          searchPlaceholder="搜索银行代码 / 名称（中/英）/ SWIFT"
-          onExport={() => exportCsv<BankEntry>("银行管理", [
-            { header: "银行代码", value: (b) => b.bankCode },
-            { header: "银行名称", value: (b) => `${b.bankName} · ${b.bankNameEn}` },
-            { header: "国家", value: (b) => b.country },
-            { header: "币种", value: (b) => b.currency },
-            { header: "SWIFT 前缀", value: (b) => b.swiftPrefix },
-            { header: "IBAN 长度", value: (b) => b.ibanLength },
-            { header: "状态", value: (b) => (b.status === "ENABLED" ? "启用" : "停用") },
-            ...(showArchived ? [{ header: "归档时间", value: (b: BankEntry) => (b.archivedAt ? fmtTime(b.archivedAt) : "-") }] : []),
-          ], (q.data?.list ?? []) as BankEntry[])}
-          onAdd={canBank ? () => setBankForm({ bankCode: "", bankName: "", bankNameEn: "", country: "AE", currency: "AED", swiftPrefix: "", ibanLength: 23, status: "ENABLED" }) : undefined}
-          addLabel="新增银行"
-        >
-          <FilterSelect value={bankCountry} onChange={(v) => { setBankCountry(v); paging.reset(); }} allLabel="全部国家" options={BANK_COUNTRY_OPTIONS} />
-          <FilterSelect value={bankCurrency} onChange={(v) => { setBankCurrency(v); paging.reset(); }} allLabel="全部币种" options={BANK_CURRENCY_OPTIONS} />
-          <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); paging.reset(); }} />
-        </Toolbar>
-      )}
-      {tab === "problems" && (
-        <Toolbar
-          search={keyword} onSearch={(v) => { setKeyword(v); paging.reset(); }}
-          searchPlaceholder="搜索问题号 / 标题（中/英/阿）/ 答复"
-          onExport={() => exportCsv<ProblemEntry>("问题管理", [
-            { header: "问题号", value: (p) => p.problemNo },
-            { header: "分类", value: (p) => PROBLEM_CATEGORY[p.category] },
-            { header: "标题（中）", value: (p) => p.title },
-            { header: "建议处置", value: (p) => PROBLEM_ACTION[p.suggestedAction].label },
-            { header: "排序", value: (p) => p.sortNo },
-            { header: "状态", value: (p) => (p.status === "ENABLED" ? "启用" : "停用") },
-            ...(showArchived ? [{ header: "归档时间", value: (p: ProblemEntry) => (p.archivedAt ? fmtTime(p.archivedAt) : "-") }] : []),
-          ], (q.data?.list ?? []) as ProblemEntry[])}
-          onAdd={canProblem ? () => setProblemForm({ category: "RENT", sortNo: 1, status: "ENABLED", title: "", titleEn: "", titleAr: "", answer: "", answerEn: "", answerAr: "", suggestedAction: "SELF_SERVICE" }) : undefined}
-          addLabel="新增问题"
-        >
-          <FilterSelect value={probCategory} onChange={(v) => { setProbCategory(v); paging.reset(); }} allLabel="全部分类" options={PROBLEM_CATEGORY_OPTIONS} />
-          <FilterSelect value={probStatus} onChange={(v) => { setProbStatus(v); paging.reset(); }} allLabel="全部状态" options={ENABLED_OPTIONS} />
-          <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); paging.reset(); }} />
-        </Toolbar>
-      )}
       {tab === "tax" && (
         <Toolbar
           search={keyword} onSearch={(v) => { setKeyword(v); paging.reset(); }}
@@ -1302,9 +1019,6 @@ function SystemInner() {
       {tab === "notify-blacklist" && !canBlacklist && <ReadOnlyNotice what="触达拉黑维护" perm="system:notify_blacklist:update" />}
       {tab === "rules" && !canBizRule && <ReadOnlyNotice what="业务规则修改" perm="system:biz_rule:update" />}
       {tab === "login" && !canLogin && <ReadOnlyNotice what="登录设置修改" perm="system:login_setting:update" />}
-      {tab === "app-version" && !canAppVersion && <ReadOnlyNotice what="应用版本发布" perm="system:app_version:release" />}
-      {tab === "banks" && !canBank && <ReadOnlyNotice what="银行字典维护" perm="system:bank:update" />}
-      {tab === "problems" && !canProblem && <ReadOnlyNotice what="问题字典维护" perm="system:problem:update" />}
       {tab === "tax" && !canTax && <ReadOnlyNotice what="税率与发票修改" perm="system:tax:update" />}
 
       {/* §11 业务规则：分区表单，不走列表/分页 */}
@@ -1324,9 +1038,6 @@ function SystemInner() {
       )}
       {tab === "notify-blacklist" && <DataTable rowKey={(b: NotifyBlacklist) => b.blockNo} columns={blacklistCols} rows={q.data?.list as NotifyBlacklist[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无拉黑记录——没有用户退订或硬退信，也可手动拉黑投诉来源" />}
       {tab === "login" && <DataTable rowKey={(s: LoginSetting) => s.country} columns={loginCols} rows={q.data?.list as LoginSetting[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无登录设置——至少应保留一条 * 默认档，否则各国登录方式无处可依" />}
-      {tab === "app-version" && <DataTable rowKey={(v: AppVersion) => v.versionId} columns={versionCols} rows={q.data?.list as AppVersion[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无应用版本——所选平台还没发过版，先新增一条草稿再灰度" />}
-      {tab === "banks" && <DataTable rowKey={(b: BankEntry) => b.bankCode} columns={bankCols} rows={q.data?.list as BankEntry[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} rowClassName={archivedRowClass} empty="暂无银行——所选国家/币种下没有可用银行（已归档的默认不显示，可打开「显示已归档」查看），提现收款账户将无法选择，请先新增银行" />}
-      {tab === "problems" && <DataTable rowKey={(p: ProblemEntry) => p.problemNo} columns={problemCols} rows={q.data?.list as ProblemEntry[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} rowClassName={archivedRowClass} empty="暂无问题条目——C 端报障下拉与客服快捷答复都取自这里（已归档的默认不显示，可打开「显示已归档」查看），建议先补常见问题" />}
       {tab === "tax" && <DataTable rowKey={(x: TaxSetting) => x.country} columns={taxCols} rows={q.data?.list as TaxSetting[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无税率配置——未配置的国家按不含税出账，开票会缺税号" />}
 
       {tab === "vendors" && <DataTable rowKey={(v: Vendor) => v.vendorCode} columns={vendorCols} rows={vendorsQ.data} loading={vendorsQ.isLoading} error={vendorsQ.error} onRetry={vendorsQ.refetch} empty="暂无供应商——还没有硬件厂商注册 driver，设备台账将无法接入，请先由平台管理员登记供应商" />}
@@ -1473,46 +1184,6 @@ function SystemInner() {
           saveLogin.mutate({ ...loginForm, country: code === "*" ? "*" : code.toUpperCase() });
         }} submitting={saveLogin.isPending} />
 
-      {/* §13 应用版本：强更必须有最低支持版本——这条用 required/disabledWhen 表达不了（依赖另一字段的真值），故在提交时拦截 */}
-      <FormDrawer open={!!versionForm} onOpenChange={(o) => !o && setVersionForm(null)}
-        titleNew="新增应用版本" titleEdit={`编辑版本 ${versionForm?.platform ? PLATFORM_LABEL[versionForm.platform] : ""} ${versionForm?.versionNo ?? ""}`} isEdit={!!versionForm?.versionId}
-        fields={VERSION_FIELDS} value={(versionForm ?? {}) as Record<string, unknown>}
-        onChange={(v) => setVersionForm(v as Partial<AppVersion>)}
-        onSubmit={() => {
-          if (!versionForm) return;
-          if (versionForm.forceUpdate && !versionForm.minSupported?.trim()) {
-            notify.error("强制更新时必须填写「最低支持版本」，否则无法判断该拦谁");
-            return;
-          }
-          const pct = Number(versionForm.rolloutPercent ?? 0);
-          if (!Number.isFinite(pct) || pct < 0 || pct > 100) { notify.error("灰度比例需在 0~100 之间"); return; }
-          if (versionForm.forceUpdate && pct < 100) { notify.error("强制更新必须 100% 下发，否则部分用户被拦在旧版本无法升级"); return; }
-          saveVersion.mutate({ ...versionForm, rolloutPercent: pct, releasedAt: versionForm.status === "RELEASED" ? (versionForm.releasedAt ?? new Date().toISOString()) : versionForm.releasedAt ?? null });
-        }} submitting={saveVersion.isPending} />
-
-      {/* §14 银行管理：银行代码/国家码新增必填 + 自动大写，编辑只读 */}
-      <FormDrawer open={!!bankForm} onOpenChange={(o) => !o && setBankForm(null)}
-        titleNew="新增银行" titleEdit={`编辑银行 ${bankForm?.bankName ?? ""}`} isEdit={!!bankForm?.bankCode}
-        fields={BANK_FIELDS} value={(bankForm ?? {}) as Record<string, unknown>}
-        onChange={(v) => setBankForm(v as Partial<BankEntry>)}
-        onSubmit={() => {
-          if (!bankForm) return;
-          saveBank.mutate({
-            ...bankForm,
-            bankCode: (bankForm.bankCode ?? "").trim().toUpperCase(),
-            country: (bankForm.country ?? "").trim().toUpperCase(),
-            currency: (bankForm.currency ?? "").trim().toUpperCase(),
-            swiftPrefix: (bankForm.swiftPrefix ?? "").trim().toUpperCase(),
-          });
-        }} submitting={saveBank.isPending} />
-
-      {/* §15 问题管理：三语标题 + 三语答复共 6 个输入，分「基本信息 / 三语内容 / 处置」三区 */}
-      <FormDrawer open={!!problemForm} onOpenChange={(o) => !o && setProblemForm(null)}
-        titleNew="新增问题" titleEdit={`编辑问题 ${problemForm?.problemNo ?? ""}`} isEdit={!!problemForm?.problemNo}
-        fields={PROBLEM_FIELDS} value={(problemForm ?? {}) as Record<string, unknown>}
-        onChange={(v) => setProblemForm(v as Partial<ProblemEntry>)}
-        onSubmit={() => problemForm && saveProblem.mutate(problemForm)}
-        submitting={saveProblem.isPending} />
 
       {/* §16 税率与发票：国家码是主键，新增必填 + 自动大写，编辑只读 */}
       <FormDrawer open={!!taxForm} onOpenChange={(o) => !o && setTaxForm(null)}

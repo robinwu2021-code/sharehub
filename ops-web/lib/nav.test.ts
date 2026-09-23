@@ -30,9 +30,10 @@ const L1_KEYS = [
 ];
 // 叶子五元组 href|label|perm|phase|group —— 2026-07-30 层级重构前后逐条比对为零差异。
 // 2026-09-23 有意变更（A 类菜单重合收敛，见 docs/technical/菜单重合梳理与优化方案.md）：
-// 删 7 个重复叶子 —— 运营管理的 应用版本/银行管理/问题管理/公告管理（与系统设置、营销
-// 调同一组 API）、站点与点位的 站点管理、计费定价的 计费模板 与 活动/时段价
-// （与运营管理 › 站点管理 / 收费方案 调同一组 API）。同一张表不留两个维护入口。
+// 7 对「同一组 API 两个页面」的重复，**一律保留运营管理那一份**，旧入口连页面代码一起撤：
+//   站点与点位 › 站点管理、计费定价 › 计费模板 + 活动/时段价、
+//   系统设置 › 应用版本 + 银行管理 + 问题管理、营销管理 › 公告管理。
+// 同一张表不留两个维护入口 —— 否则「在哪个入口改的」决定别人看不看得见。
 // 2026-09-23 有意变更：phase 从三值(1/2/3)改为四值 L0-L3，28 个叶子按分级矩阵重标，
 // 并新增代理门户「申请提现」(AGT-06)。依据 docs/requirements/功能清单-分级矩阵.md §六/§七。
 const LEAF_TUPLES = [
@@ -49,6 +50,10 @@ const LEAF_TUPLES = [
   "/operation/fee-adjustments|预约调价|pricing:adjustment:read||场站管理",
   "/operation/site-sharing|站点分成|finance:share_rule:read||场站管理",
   "/operation/payee-sharing|分成方分成|finance:share_rule:read||场站管理",
+  "/operation/app-versions|应用版本|system:app_version:read||基础管理",
+  "/operation/banks|银行管理|system:bank:read||基础管理",
+  "/operation/problems|问题管理|system:problem:read||基础管理",
+  "/operation/notices|公告管理|marketing:notice:read||公告管理",
   "/devices|设备台账|device:cabinet:read||资产台账",
   "/devices?tab=powerbanks|充电宝管理|device:powerbank:read||资产台账",
   "/devices?tab=monitor|实时监控|device:cabinet:read||在线运行",
@@ -104,7 +109,6 @@ const LEAF_TUPLES = [
   "/users?tab=members|会员/次卡|user:member:read|2|用户资产",
   "/users?tab=wallets|钱包|user:wallet:read|2|用户资产",
   "/users?tab=recharge|充值套餐|user:wallet:read|2|用户资产",
-  "/marketing?tab=notices|公告管理|marketing:coupon:read||运营内容",
   "/marketing|优惠券|marketing:coupon:read|2|促销玩法",
   "/marketing?tab=campaigns|活动||2|促销玩法",
   "/marketing?tab=push|推送触达|marketing:push:send|3|促销玩法",
@@ -134,11 +138,8 @@ const LEAF_TUPLES = [
   "/system?tab=notify-blacklist|触达拉黑|system:notify_blacklist:read|1|消息触达",
   "/system?tab=rules|业务规则|system:biz_rule:update|1|业务规则",
   "/system?tab=login|登录设置|system:login_setting:update|1|业务规则",
-  "/system?tab=app-version|应用版本|system:app_version:read|1|业务规则",
   "/system?tab=dict|参数字典|system:dict:read||基础字典",
   "/system?tab=region|地区库|system:dict:read||基础字典",
-  "/system?tab=banks|银行管理|system:bank:read||基础字典",
-  "/system?tab=problems|问题管理|system:problem:read||基础字典",
   "/system?tab=params|系统参数|system:param:read||基础字典",
   "/system?tab=tax|税率与发票|system:tax:update|2|开放与市场",
   "/system?tab=markets|多国家市场|system:market:read|3|开放与市场",
@@ -179,20 +180,22 @@ describe("A.9 角色×L1 可见性矩阵（抽查）", () => {
     expect(cs).not.toContain("location");
     expect(cs).not.toContain("report");
   });
-  // 2026-07-29 对标补齐后语义变更：银行字典/税率/提现规则/支付渠道属财务职责，
-  // FINANCE 因此能进系统设置——但**只见这 4 项**，看不到登录设置/系统参数等运维项。
-  it("FINANCE 进 系统设置：只见财务四项", () => {
+  // 2026-07-29 对标补齐后语义变更：税率/提现规则/支付渠道属财务职责，FINANCE 因此能进系统设置
+  // ——但只见这几项，看不到登录设置/系统参数等运维项。
+  // 2026-09-23：银行管理移到运营管理 › 基础管理，FINANCE 在那边仍看得到（见下方运营管理用例）。
+  it("FINANCE 进 系统设置：只见财务相关项", () => {
     expect(sectionKeys("FINANCE")).toEqual(expect.arrayContaining(["org", "system"]));
     expect(visibleLeaves(sec("system"), "FINANCE").map((l) => l.label))
-      .toEqual(["支付渠道", "业务规则", "银行管理", "税率与发票"]);
+      .toEqual(["支付渠道", "业务规则", "税率与发票"]);
   });
   it("系统设置每个叶子都有显式 perm：防「无 perm 跟随父级」导致越权可见", () => {
     const noPerm = (sec("system").children ?? []).filter((l) => !l.perm).map((l) => l.label);
     expect(noPerm).toEqual([]);
   });
-  it("CS 在系统设置只见客服相关三项（发送记录/触达拉黑/问题管理）", () => {
+  // 2026-09-23：问题管理移到运营管理 › 基础管理，CS 从那边进（见下方运营管理用例）。
+  it("CS 在系统设置只见触达相关两项（发送记录/触达拉黑）", () => {
     expect(visibleLeaves(sec("system"), "CS").map((l) => l.label))
-      .toEqual(["发送记录", "触达拉黑", "问题管理"]);
+      .toEqual(["发送记录", "触达拉黑"]);
   });
   // 2026-07-29 代理端门户（B8）：AGENT 是受限外部伙伴，不再走通用运营项。
   // 此前它靠「无 perm 的叶子跟随父级」漏出了 SLA 管理/巡检计划/BD 拓展 CRM/押金与欠费。
@@ -409,9 +412,11 @@ describe("分级屏蔽（tier gating，默认 CURRENT_PHASE=0）", () => {
     expect(isSectionLocked(sec("user"), "ADMIN")).toBe(false);
     expect(isSectionLocked(sec("report"), "ADMIN")).toBe(true);
   });
-  it("isSectionLocked：营销因「公告管理」为 P1 → 不再整体锁定（补齐清单 E1，c-app 首页公告条需要发布口）", () => {
+  // 2026-09-23：公告管理并入运营管理后，营销靠「优惠券」（ready:true）保持不锁，
+  // 默认落点也随之变成 /marketing。
+  it("isSectionLocked：营销因「优惠券」已 ready → 不整体锁定", () => {
     expect(isSectionLocked(sec("marketing"), "ADMIN")).toBe(false);
-    expect(sectionDefaultHref(sec("marketing"), "ADMIN")).toBe("/marketing?tab=notices");
+    expect(sectionDefaultHref(sec("marketing"), "ADMIN")).toBe("/marketing");
   });
   it("isSectionLocked：设备含 P1 叶 → 不锁", () => {
     expect(isSectionLocked(sec("device"), "ADMIN")).toBe(false);
@@ -484,19 +489,19 @@ describe("运营管理：跨模块 section", () => {
   it("各角色可见的子页面与后端权限码一致", () => {
     expect(leafLabels("ADMIN")).toEqual([
       "站点概览", "站点管理", "收费方案", "预约调价", "站点分成", "分成方分成",
+      "应用版本", "银行管理", "问题管理", "公告管理",
     ]);
-    expect(leafLabels("OPS")).toEqual(["站点概览", "站点管理"]);
-    expect(leafLabels("FINANCE")).toEqual(["站点概览", "收费方案", "预约调价", "站点分成", "分成方分成"]);
-    expect(leafLabels("BD")).toEqual(["站点概览", "站点管理", "站点分成", "分成方分成"]);
+    expect(leafLabels("OPS")).toEqual(["站点概览", "站点管理", "应用版本"]);
+    expect(leafLabels("FINANCE")).toEqual(["站点概览", "收费方案", "预约调价", "站点分成", "分成方分成", "银行管理"]);
+    expect(leafLabels("BD")).toEqual(["站点概览", "站点管理", "站点分成", "分成方分成", "公告管理"]);
     expect(leafLabels("VIEWER")).toEqual(["站点概览", "站点管理", "站点分成", "分成方分成"]);
   });
 
-  it("CS 看不到运营管理——它的两项（问题管理/公告管理）已归还系统设置与营销", () => {
-    // 2026-09-23 之前 CS 靠 system/marketing 两个模块权限从这里漏进来，
-    // 看到的恰恰是那两个**重复页面**。重复删掉后它在本 section 一个叶子都没有，
-    // 按 visibleSections 的「不出现点开是空的一级菜单」规则整个 section 不可见。
-    expect(leafLabels("CS")).toEqual([]);
-    expect(sectionKeys("CS")).not.toContain("operation");
+  it("CS 没有 location 模块权限，也能通过 system/marketing 看到运营管理（多模块规则）", () => {
+    expect(sectionKeys("CS")).toContain("operation");
+    expect(leafLabels("CS")).toEqual(["问题管理", "公告管理"]);
+    // 默认落地到它第一个能打开的页面，而不是它没权限的站点概览
+    expect(sectionDefaultHref(op(), "CS")).toBe("/operation/problems");
   });
 
   it("AGENT 走门户，看不到运营管理", () => {
@@ -509,9 +514,8 @@ describe("运营管理：跨模块 section", () => {
     }
   });
 
-  it("分组与顺序固定", () => {
-    // 2026-09-23：「基础管理」「公告管理」两组整组撤销（内容与系统设置/营销重复）
-    expect(groupedLeaves(visibleLeaves(op(), "ADMIN")).map((g) => g.group)).toEqual(["场站管理"]);
+  it("三个分组与简电一致且顺序固定", () => {
+    expect(groupedLeaves(visibleLeaves(op(), "ADMIN")).map((g) => g.group)).toEqual(["场站管理", "基础管理", "公告管理"]);
   });
 
   it("多个独立页面：路径反推与高亮按页面路径", () => {

@@ -12,7 +12,8 @@
 export const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK !== "0";
 
 export type OperationPage =
-  | "overview" | "sites" | "fee-plans" | "fee-adjustments" | "site-sharing" | "payee-sharing";
+  | "overview" | "sites" | "fee-plans" | "fee-adjustments" | "site-sharing" | "payee-sharing"
+  | "app-versions" | "banks" | "problems" | "notices";
 
 /** 整页后端就绪度。依据：后端 Controller 实际存在的端点（2026-09-22 核对）。 */
 export const BACKEND_READY: Record<OperationPage, boolean> = {
@@ -25,8 +26,10 @@ export const BACKEND_READY: Record<OperationPage, boolean> = {
   "fee-adjustments": true,
   "site-sharing": true,
   "payee-sharing": true,
-  // app-versions / banks / problems / notices 已于 2026-09-23 撤销（与系统设置、营销重复），
-  // 页面与登记一并删除 —— 留着登记项会让人以为还有四个页面没做。
+  "app-versions": true,
+  banks: true,
+  problems: true,
+  notices: true,
 };
 
 /** 页内局部功能的后端就绪度（整页已就绪、但个别按钮依赖新接口）。 */
