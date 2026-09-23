@@ -91,8 +91,41 @@ scripts/deploy-frontend.sh c-app         # C 端 H5
 > # 期望 1。为 0 就先补配再发，否则发完没人能登录运营端
 > ```
 
+> ⚠️ **发布前必查（2026-09-23 新增）**：`SHAREHUB_IDENTITY_PEPPER` 必须非空且 ≥32 字符，
+> 否则**应用根本起不来** —— 它比上面那条更硬：上面是「起得来但没人能登录」，这条是「进程直接退出」。
+> ```bash
+> ssh soukmind-tx 'sudo grep -cE "^SHAREHUB_IDENTITY_PEPPER=.{32,}" /data/app/powerbank/sharehub-app/sharehub-app.env'
+> # 期望 1。为 0 就先补配再发
+>
+> # 还没有的话先生成一个（生成后存进 env file，**不要进 git**）：
+> openssl rand -base64 48
+> ```
+> 为什么是 fail-closed 而不是给个默认值：手机号的取值空间小到可以穷举，
+> 没有 pepper 的哈希等于明文存储；而给默认值等于所有部署共用同一个 pepper，等于没有。
+>
+> ⚠️ **换 pepper = 全表哈希失效**。轮换必须走 `agt_principal.*_enc`（可逆加密的明文）
+> 全表重算后统一切 `hash_ver`，不能直接改 env 重启 —— 那样所有人都登不进去，且查不出原因。
+
+> ⚠️ **发布前必查 · 迁移号顺序**（并行开发特有的坑）：
+> Flyway 没开 `out-of-order`，`validate-on-migrate` 是 `true` —— 意味着
+> **版本号低于「现网已应用的最高版本」的迁移，再也进不去**，而且会让启动直接失败。
+>
+> 本仓长期有多个会话并行，各自占用不同号段（如 V47/V48 与 V49/V52），
+> 谁先部署，谁的号就成了基线。**分批部署最容易踩**：先上了含 V49 的版本，
+> 之后含 V47 的那批就永远进不去了。
+> ```bash
+> # 发布前看现网应用到哪一版
+> ssh soukmind-tx 'sudo mysql -N -e "SELECT MAX(CAST(version AS UNSIGNED)) FROM powerbank.flyway_schema_history"'
+> # 再看这次要带上去的最小号
+> ls backend/sharehub-app/src/main/resources/db/migration/ | sed "s/V\([0-9]*\)__.*/\1/" | sort -n | tail -20
+> ```
+> 最小号 ≤ 现网最高版本就**先别发**：要么等那批一起合并后整体部署，
+> 要么重新编号（改号只在**尚未部署到任何环境**时才安全 —— 已应用过的库里存着校验和）。
+
 | 配置 | 仓库默认 | 生产必须 | 原因 |
 |---|---|---|---|
+| `SHAREHUB_IDENTITY_PEPPER` | 空 | **必须配，≥32 字符** | 登录标识（手机号/邮箱）哈希的 pepper。**为空即拒绝启动**。手机号取值空间小到可以穷举，裸哈希等于明文存储；给默认值等于所有部署共用一个 pepper。轮换见上方「发布前必查」 |
+| `SHAREHUB_DEFAULT_CALLING_CODE` | `971`（AE） | 与业务市场一致，**上线后不可改** | 本地号补哪个国际区号。改了等于所有本地号算出另一个哈希 —— 表现是老用户「注册过但登录查不到」，且只影响没带国际区号的那批 |
 | `NEXT_PUBLIC_USE_MOCK` | mock（`!== "0"`） | **`0`** | 漏配 → 静默跑 mock（ai-shop 2026-09-01 踩过，admin 登录看似无权限，其实请求根本没到后端） |
 | `NEXT_PUBLIC_API_BASE`（ops-web） | — | 留空（同源） | 走 nginx 反代 `/ops/**`，后端不配 CORS |
 | c-app 的 `VITE_API_BASE` | `.env` 里的默认 | **`.env.production` 留空**（同源） | Vite `VITE_*` 只从 `.env` 文件读，shell 环境变量覆盖不了；不覆盖就把本地地址烧进生产包 |
