@@ -1,0 +1,182 @@
+# 裸状态 / 类型字面量台账 —— **只准变短，不准变长**（L1.5 词表收敛）
+#
+# 由 BareStatusLiteralRatchetTest 执行。新增一条 → 测试红。
+#
+# 【为什么要盯】
+# 业务状态的合法取值在三处各写一遍、互不相认：建表 DDL 注释（55 套词表）、
+# 领域模型文档（12 个对象）、Java 代码里的裸字符串（业务状态 enum：0 个）。
+# 没有任何一处对另外两处有约束力，于是分叉是必然的，而且**没有症状**：
+#
+#   · ACK / ACKED    —— AlarmServiceImpl 查 status IN ('OPEN','ACK')，但 ACK 是事件名、
+#                        落库状态是 ACKED。已受理的告警永远开不出工单。已修（0723a29）。
+#   · CANCELLED / CANCELED —— 两种拼法都在 DDL 里，代码只用前者。
+#   · RECLAIM / REVOKE     —— 领域模型写 RECLAIM，DDL 与代码白名单都是 REVOKE，
+#                        RECLAIM 从未被任何代码写入过。已修文档。
+#
+# 【条目格式】 类名#字段=字面量
+#
+# 【怎么变短】
+# 每个对象一个 enum，**值仍以 String 落库**（实体字段保持 String，不动 MyBatis
+# 类型处理器 —— 那是连锁改动，收益不抵风险），只把字面量的来源收到一处：
+#
+#     public enum AlarmStatus { OPEN, ACKED, CLOSED; public String code() { return name(); } }
+#
+# 词表以领域模型的「状态 / 生命周期」列为准，与 DDL 注释逐条对齐；打架的在收敛时裁定，
+# 不留到 L3 写状态机的时候（那时再改等于把状态机写两遍）。
+# 收完一个域，把它下面的行整段删掉。
+#
+# 【暂不收敛的域】agent / price / share / loc —— 被 ADR-027 / 028 / 029 圈着，
+# 等拍板后随该域的 L1–L5 一起做。它们的条目仍在台账里，只是先不动。
+#
+# 依据：docs/technical/实体-领域对象对账表.md §三 · TDD-backend-layer-cleanup-order L1.5
+
+
+# ── agent（4 条）──
+AgentAccountServiceImpl#status=ACTIVE
+AgentAssignmentServiceImpl#status=ENABLED
+AgentCommissionServiceImpl#mode=LEDGER
+AgentCommissionServiceImpl#status=ACTIVE
+
+# ── alarm（3 条）──
+AlarmCodeServiceImpl#level=WARN
+AlarmRuleServiceImpl#status=ACTIVE
+AlarmServiceImpl#status=SENT
+
+# ── common（3 条）──
+OutboxEventBus#status=FAILED
+OutboxEventBus#status=PENDING
+OutboxEventBus#status=SENT
+
+# ── cs（7 条）──
+CsSessionServiceImpl#senderType=AGENT
+CsSessionServiceImpl#senderType=USER
+CsSessionServiceImpl#status=ACTIVE
+CsSessionServiceImpl#status=CLOSED
+CsTicketServiceImpl#status=CLOSED
+CsTicketServiceImpl#status=OPEN
+CsTicketServiceImpl#status=PROCESSING
+
+# ── dev（13 条）──
+AssetAssignedListener#type=CABINET
+CabinetServiceImpl#deviceType=POWERBANK
+CabinetServiceImpl#onlineStatus=OFFLINE
+CabinetServiceImpl#status=FAULT
+CabinetServiceImpl#status=IN_STOCK
+CodeBatchServiceImpl#codeType=QR
+CodeBatchServiceImpl#status=PENDING
+OtaServiceImpl#status=DRAFT
+OtaServiceImpl#status=PENDING
+OwnershipReconciler#eventType=ASSET_ASSIGNED
+OwnershipReconciler#status=FAILED
+OwnershipReconciler#status=PENDING
+OwnershipReconciler#status=SENT
+
+# ── finance（9 条）──
+InvoiceServiceImpl#status=ISSUED
+InvoiceServiceImpl#status=VOID
+ReconcileServiceImpl#status=MATCHED
+SettlementServiceImpl#refType=SHARE
+SettlementServiceImpl#status=DONE
+SettlementServiceImpl#status=GEN
+ShareGeneratorImpl#mode=LEDGER
+ShareGeneratorImpl#status=PENDING
+WithdrawalServiceImpl#status=APPLY
+
+# ── gw（1 条）──
+VendorServiceImpl#status=ENABLED
+
+# ── loc（6 条）──
+LocService#status=ACTIVE
+LocService#status=PAUSED
+LocalSiteSharingQuery#status=ACTIVE
+VenueOnboardingServiceImpl#status=APPROVED
+VenueOnboardingServiceImpl#status=PENDING
+VenueOnboardingServiceImpl#status=REJECTED
+
+# ── operation（2 条）──
+OperationOverviewService#status=ACTIVE
+SharingQueryService#status=ACTIVE
+
+# ── platform（23 条）──
+AppVersionServiceImpl#status=DRAFT
+AppVersionServiceImpl#status=RELEASED
+AppVersionServiceImpl#status=ROLLBACK
+DepartmentServiceImpl#status=ACTIVE
+EmployeeServiceImpl#status=ACTIVE
+IamSeeder#scopeType=AGENT
+IamSeeder#scopeType=ALL
+IamSeeder#status=ACTIVE
+IamSeeder#subjectType=ROLE
+IamSeeder#type=MENU
+MarketServiceImpl#status=PLANNED
+MenuService#status=ACTIVE
+NotifyLogServiceImpl#status=SENT
+NotifySendServiceImpl#status=FAILED
+NotifySendServiceImpl#status=SENT
+NotifyTemplateServiceImpl#status=ENABLED
+NotifyTemplateServiceImpl#status=SENT
+OpenApiAppServiceImpl#status=ENABLED
+PermissionService#scopeType=ALL
+PermissionService#subjectType=ROLE
+ProblemServiceImpl#status=ENABLED
+ProblemServiceImpl#suggestedAction=SELF_SERVICE
+TenantServiceImpl#status=ENABLED
+
+# ── seed（8 条）──
+DemoOpsFinanceSeeder#handleStatus=OPEN
+DemoOpsFinanceSeeder#mode=RATE
+DemoOpsFinanceSeeder#refType=SHARE
+DemoOpsFinanceSeeder#sourceType=SETTLEMENT
+DemoOpsFinanceSeeder#status=ACTIVE
+DemoOpsFinanceSeeder#status=PENDING
+DemoOpsFinanceSeeder#status=SETTLED
+TradeSeeder#deviceType=POWERBANK
+
+# ── trade（19 条）──
+ComplaintServiceImpl#status=REJECT
+DepositServiceImpl#status=BUYOUT
+DepositServiceImpl#status=RELEASED
+PaymentChannelServiceImpl#mode=DELEGATED
+PaymentChannelServiceImpl#status=DISABLED
+PaymentChannelServiceImpl#status=ENABLED
+PaymentServiceImpl#status=FROZEN
+PaymentServiceImpl#status=INIT
+PaymentServiceImpl#status=PAID
+PriceAdjustmentServiceImpl#status=ACTIVE
+PriceAdjustmentServiceImpl#status=APPLIED
+PriceAdjustmentServiceImpl#status=CANCELLED
+PriceAdjustmentServiceImpl#status=FAILED
+PriceAdjustmentServiceImpl#status=REVERTED
+PriceAdjustmentServiceImpl#status=SCHEDULED
+PricePlanServiceImpl#status=ACTIVE
+PriceResolver#status=ACTIVE
+PriceResolver#status=ENABLED
+RentOrderServiceImpl#status=IN_USE
+
+# ── user（19 条）──
+AdCampaignServiceImpl#status=DRAFT
+AdSlotServiceImpl#status=IDLE
+CampaignServiceImpl#status=DRAFT
+ConsumerAuthService#status=ACTIVE
+CouponTplServiceImpl#status=ACTIVE
+MembershipServiceImpl#status=ACTIVE
+MembershipServiceImpl#status=ENABLED
+NoticeServiceImpl#status=DRAFT
+NoticeServiceImpl#status=PUBLISHED
+NoticeServiceImpl#type=SYSTEM
+PushServiceImpl#status=DRAFT
+PushServiceImpl#status=SENT
+RechargePackageServiceImpl#status=ENABLED
+ReferralServiceImpl#status=ENABLED
+UserCouponServiceImpl#status=ACTIVE
+UserCouponServiceImpl#status=UNUSED
+UserInvoiceServiceImpl#status=APPLIED
+UserInvoiceServiceImpl#type=COMPANY
+WalletServiceImpl#status=PAID
+
+# ── wo（5 条）──
+WoOpsServiceImpl#action=ACCEPT
+WoOpsServiceImpl#action=DISPATCH
+WoOpsServiceImpl#status=CLOSED
+WoOpsServiceImpl#status=CREATED
+WoOpsServiceImpl#status=PROCESSING

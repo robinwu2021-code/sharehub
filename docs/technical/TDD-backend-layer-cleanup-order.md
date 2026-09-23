@@ -97,6 +97,37 @@ L0 对账发现：业务状态**没有任何单一真源** —— DDL 注释里 
 **判据**：12 个对象各有 enum；裸状态字面量台账建立且基线记录在案；
 `AlarmServiceImpl` 那条缺陷随本步修掉并补一条会红的测试。
 
+#### ✅ 卡口已建（2026-09-23）
+
+`known-bare-status-literals.txt` + `BareStatusLiteralRatchetTest`，**实测基线 122 条 / 62 个类 / 60 个取值**
+（此前"49 处 ACTIVE"只是按值计数，这才是按用法锚定的真实工作量）：
+
+| 域 | 条 | | 域 | 条 |
+|---|---:|---|---|---:|
+| platform | 23 | | cs | 7 |
+| trade | 19 | | loc | 6 |
+| user | 19 | | wo | 5 |
+| dev | 13 | | agent | 4 |
+| finance | 9 | | common · alarm | 3 · 3 |
+| seed | 8 | | operation · gw | 2 · 1 |
+
+**锚在用法上，不扫所有大写字符串**：`^[A-Z_]+$` 会把权限码、表名、事件名全扫进来。
+只认状态值真正流过的五个口子（`setXxx("L")` · `"L".equals(getXxx())` ·
+`getXxx().equals("L")` · `.eq(X::getXxx,"L")` · `.in(X::getXxx,…)`），
+字段名以 Status / Type / Level / Action / Mode 结尾。实测**注释误报 0 条**。
+
+> 说服力在于：告警那个缺陷正是 `.in(DevAlarm::getStatus, List.of("OPEN","ACK"))`
+> —— 这条卡口若早存在，它在写下的当天就会红。
+
+**五类字段一次定全**：以后再往锚点加类别会让台账变长，而台账的全部意义是「只准变短」。
+一个能被放宽的棘轮不是棘轮。
+
+反向对照三条全部验过：新增一条裸字面量 → 红；把扫描路径改坏 → `isNotEmpty` 抓住
+（而不是"0 违规"绿过，arch-guard 假绿过一次）；台账留陈旧条目 → 红。
+
+**收敛顺序**：先做未被 ADR 圈住的域（`dev` 13 · `cs` 7 · `wo` 5 · `alarm` 3 · `gw` 1），
+`agent` / `price` / `share` / `loc` 等 ADR-027/028/029 拍板。
+
 ---
 
 ### L2 · Mapper 层：形态统一为**每域一个** `XxxMappers`
