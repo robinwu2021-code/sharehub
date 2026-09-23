@@ -228,3 +228,49 @@ lib/market-time.ts            市场时区的显示与换算（纯函数）
 | P4 | 旧菜单什么时候隐藏 | 新菜单对应页面在线上跑满一周、没有问题反馈后，再隐藏旧入口 |
 
 **确认记录（2026-09-22，用户）**：P0 按方案 A 先提交在途改动（已完成，见 §0）；P1～P4 按建议执行。
+
+
+---
+
+## 后端补齐（2026-09-23，提交 4e530b0 / f26f0cd）
+
+前端十页早已完成，但菜单里四页灰着、三个按钮不渲染 —— `lib/backend-ready.ts`
+如实登记着「后端未实现」。本次把那一批补上，**契约缺口 12 → 0**（严格覆盖率 93% → 97%）。
+
+| 能力 | 端点 | 落点 |
+|---|---|---|
+| 站点概览 | `GET /api/ops/operation/overview` | `sharehub-app/operation`（跨域读模型，同 report） |
+| 单站统计 | `GET /api/ops/sites/{no}/stats` | 同上 |
+| 暂停 / 恢复营业 | `POST /api/ops/sites/{no}/pause\|resume` | `LocService`（V40 加 `pause_reason`） |
+| 预约调价 ×5 | `/api/trade/price-adjustments…` | `svc-core/trade/price`（V40 建表） |
+| 分成两视角 ×3 | `/api/trade/{site-sharing,…/stats,payee-sharing}` | `sharehub-app/operation/SharingQueryService` |
+
+### 几处刻意的取舍
+
+- **跨域聚合放 `sharehub-app`**：概览要同时看站点(platform)/机柜订单(core)/分成(finance)，
+  放任一域都名不正。沿用 `ReportMappers` 的约定：一条聚合 SQL 出事实。
+  待关注的七条规则仍在 Java 里判 —— 拼成一条 SQL 之后没人能改，而站点是百级规模。
+- **订单按机柜连站点**，不读 `ord_order.site_no`：那列只在数据范围过滤时回填，历史单大量为空。
+- **调价恢复靠快照，且恢复前先核对**：方案若在调价期间被人手工改过就置 FAILED 不恢复。
+  悄悄覆盖别人的改动比不恢复更难查 —— 没有人会知道发生过。
+- **不加 `@Scheduled`**：沿用仓库既有判断（多副本并发要分布式锁），改用系统 cron 调
+  `/internal/.../tick`。该端点**只接受回环调用** —— 它会改价格，不能因为
+  「nginx 没暴露 /internal」就当它安全。
+
+### 途中发现的既有缺陷
+
+**计价引擎选不中运营新建的方案**：`PriceResolver` 只认 `status='ENABLED'`，
+而新建时写的是 `'ACTIVE'`（DDL 默认与前端契约也都是 ACTIVE/DISABLED）。
+后果是运营新建一个方案、界面显示「启用」，订单却一律按兜底价计费且无任何报错。
+今天没出事只因种子里那行恰好是 ENABLED。V41 归一 + 引擎改判。
+
+另：`fee-plans.status`（方案启停）本就不需要新端点 —— 页面做的是
+`savePricePlan({...p, status})`，保存接口一直吃 status；那个标志写着 false
+纯属登记时想当然，于是一个能用的按钮被藏了。`fee-plans.sites` 登记了却无人使用，已删。
+
+### 验证
+
+后端 145 tests（新增 `OperationMenuTest` 7 条）/ 前端 869 tests / tsc 全绿；
+本地起真实后端 + `NEXT_PUBLIC_USE_MOCK=0` 逐页实测：概览（20 站点 / 48 机柜 / 在线率 81.3%）、
+预约调价（新建 → 打开列表自动生效、快照原值 → 提前恢复 → 单价回到原值）、
+站点分成（20 站 / 已配置 2）、分成方分成（3 个分成方，近 30 日金额来自 M1 生成的真实分润）。
