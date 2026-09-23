@@ -19,10 +19,15 @@ public final class LocDtos {
      *                种子里就有同名场地方，按名字连必然连错
      * @param lng     经度；为空的后果不在运营端，是 C 端「找附近的柜」算不出距离
      * @param lat     纬度
+     * @param pointCount    点位数。**只出不进**：它是按关系聚合出来的数，保存时不回写
+     *                      （装箱类型而非 int —— 请求里没带这个字段时 int 会让 Jackson 抛
+     *                      「Cannot map null into type int」，而调用方看到的是 500 服务器错误，
+     *                      完全指不到「少传了一个本就不该传的字段」）
+     * @param cabinetCount  机柜数，同上
      */
     public record Site(String siteNo, String name, String venueNo, String venueName, String agentNo,
                       String regionId, String address, java.math.BigDecimal lng, java.math.BigDecimal lat,
-                      String sceneType, int pointCount, int cabinetCount, String status) {
+                      String sceneType, Integer pointCount, Integer cabinetCount, String status) {
     }
 
     public record Location(String locationNo, String name, String siteNo, String siteName,

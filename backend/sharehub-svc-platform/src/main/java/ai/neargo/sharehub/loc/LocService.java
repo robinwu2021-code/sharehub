@@ -77,8 +77,16 @@ public class LocService {
         if (in.lng() != null) e.setLng(in.lng());
         if (in.lat() != null) e.setLat(in.lat());
         e.setSceneType(in.sceneType());
-        e.setPointCount(in.pointCount());
-        e.setCabinetCount(in.cabinetCount());
+        /*
+         * 点位数 / 机柜数**不接受调用方写入**：它们是按关系聚合出来的数
+         * （db-design §1.4「计数不是列，是聚合」）。接受前端传值的后果是
+         * 列表说「有 3 台机柜」而实际一台都没有 —— 运营端已经因为这个自相矛盾过一次。
+         * 新建时置 0，编辑时保持库里现值。
+         */
+        if (insert) {
+            e.setPointCount(0);
+            e.setCabinetCount(0);
+        }
         e.setStatus(in.status() == null ? "ACTIVE" : in.status());
         if (insert) siteMapper.insert(e); else siteMapper.updateById(e);
         return toSite(e);
