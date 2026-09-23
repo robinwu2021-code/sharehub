@@ -5,6 +5,7 @@
 // 页面只负责「不给点非法动作」，真正的拒绝在服务端（mock 层抛 WorkOrderTransitionError）。
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
 import { Pagination } from "@/components/ui/misc";
 import { usePaging } from "@/lib/hooks/use-paging";
@@ -127,7 +128,7 @@ function WorkOrdersInner() {
   const { t } = useI18n();
   const paging = usePaging();
   const tabs = useNavTabs("/work-orders", TAB_KEYS);
-  const { tab: view, setTab: setView } = usePageTab(tabs, () => { paging.reset(); setSelected([]); }, "view");
+  const { tab: view, setTab: setView } = usePageTab(tabs, () => { paging.reset(); setSelected([]); }, { param: "view" });
   const [keyword, setKeyword] = useState("");
   const [status, setStatus] = useState("");
   const [type, setType] = useState("");
@@ -168,7 +169,7 @@ function WorkOrdersInner() {
   });
   const board = useQuery({
     queryKey: ["workorders-board", keyword, type],
-    queryFn: () => api.listWorkOrders({ page: 1, size: 200, keyword, type: type || undefined }),
+    queryFn: () => api.listWorkOrders({ page: 1, size: UNPAGED_SIZE, keyword, type: type || undefined }),
     enabled: view === "board",
   });
   const sla = useQuery({
@@ -184,7 +185,7 @@ function WorkOrdersInner() {
   // 开单时机柜下拉：与设备台账同一份数据，避免手打错柜号
   const cabinetOpts = useQuery({
     queryKey: ["wo-cabinet-options"],
-    queryFn: () => api.listCabinets({ page: 1, size: 200 }),
+    queryFn: () => api.listCabinets({ page: 1, size: UNPAGED_SIZE }),
     enabled: !!woForm,
   });
 

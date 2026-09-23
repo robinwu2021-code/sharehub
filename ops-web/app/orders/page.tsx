@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { RECENT_LIMIT } from "@/lib/constants";
 import { api } from "@/lib/api";
 import { PageTitle, Pagination, StatCard } from "@/components/ui/misc";
 import { usePaging } from "@/lib/hooks/use-paging";
@@ -194,7 +195,7 @@ function OrdersInner() {
   // 干预历史（审计时间线）：只查当前详情订单的记录
   const ivHistoryQ = useQuery({
     queryKey: ["order-interventions", detail?.orderNo],
-    queryFn: () => api.listOrderInterventions({ orderNo: detail!.orderNo, size: 50 }),
+    queryFn: () => api.listOrderInterventions({ orderNo: detail!.orderNo, size: RECENT_LIMIT }),
     enabled: !!detail,
   });
 

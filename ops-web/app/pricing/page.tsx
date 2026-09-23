@@ -2,6 +2,7 @@
 
 import { Suspense, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
 import { Pagination } from "@/components/ui/misc";
 import { usePaging } from "@/lib/hooks/use-paging";
@@ -160,12 +161,12 @@ function PricingInner() {
   // size=200 一次拉全——下拉不分页，分页的下拉会让人以为「我的站点不见了」。
   const sitesQ = useQuery({
     queryKey: ["pricing-sites"],
-    queryFn: () => api.listSites({ page: 1, size: 200 }),
+    queryFn: () => api.listSites({ page: 1, size: UNPAGED_SIZE }),
     enabled: tab === "diff",
   });
   const locationsQ = useQuery({
     queryKey: ["pricing-locations"],
-    queryFn: () => api.listLocations({ page: 1, size: 200 }),
+    queryFn: () => api.listLocations({ page: 1, size: UNPAGED_SIZE }),
     enabled: tab === "diff",
   });
   const diffDim: PricingDimension = diffForm?.dimension ?? "SITE";

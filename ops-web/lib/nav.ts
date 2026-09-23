@@ -330,10 +330,12 @@ export const NAV: NavSection[] = [
     children: [
       // 按「人与组织 / 授权 / 留痕」分组
       { href: "/employees?tab=employees", label: "员工", perm: "org:employee:read", group: "人与组织" },
-      { href: "/employees?tab=org", label: "组织架构", phase: 2, group: "人与组织" },
+      // 组织架构与绩效展示的都是员工数据，与「员工」同一个码 ——
+      // 此前菜单没写 perm 而页面写了，两边不一致时以更严的那边为准
+      { href: "/employees?tab=org", label: "组织架构", perm: "org:employee:read", phase: 2, group: "人与组织" },
       { href: "/employees?tab=roles", label: "角色权限", perm: "org:role:read", group: "授权" },
       { href: "/employees?tab=audit", label: "操作审计", perm: "org:audit:read", phase: 2, group: "留痕与考核" },
-      { href: "/employees?tab=performance", label: "绩效报表", phase: 3, group: "留痕与考核" },
+      { href: "/employees?tab=performance", label: "绩效报表", perm: "org:employee:read", phase: 3, group: "留痕与考核" },
     ],
   },
   {

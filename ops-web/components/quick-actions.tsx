@@ -14,6 +14,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Radio, ClipboardPlus, Search } from "lucide-react";
+import { SEARCH_PREVIEW_SIZE, UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
 import { notify } from "@/lib/notify";
 import { useCan } from "@/lib/use-can";
@@ -35,7 +36,7 @@ import {
 function useCabinetOptions(enabled: boolean) {
   return useQuery({
     queryKey: ["quick-action-cabinets"],
-    queryFn: () => api.listCabinets({ page: 1, size: 200 }),
+    queryFn: () => api.listCabinets({ page: 1, size: UNPAGED_SIZE }),
     enabled,
   });
 }
@@ -184,7 +185,7 @@ function OrderLookupDrawer({ open, onOpenChange }: { open: boolean; onOpenChange
   const ready = orderKeywordReady(keyword);
   const q = useQuery({
     queryKey: ["quick-action-orders", keyword.trim()],
-    queryFn: () => api.listOrders({ page: 1, size: 10, keyword: keyword.trim() }),
+    queryFn: () => api.listOrders({ page: 1, size: SEARCH_PREVIEW_SIZE, keyword: keyword.trim() }),
     enabled: open && ready,
   });
   const rows = q.data?.list ?? [];

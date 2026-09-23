@@ -3,9 +3,12 @@
 import { Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
 import { PageTitle, Pagination, EmptyState } from "@/components/ui/misc";
 import { TabHeader } from "@/components/ui/tab-header";
+import { usePaging } from "@/lib/hooks/use-paging";
+import { useNavTabs, usePageTab } from "@/lib/hooks/use-page-tab";
 import { Toolbar } from "@/components/ui/toolbar";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
 import { DataTable, type Column } from "@/components/ui/data-table";
@@ -35,7 +38,6 @@ import type {
   Employee, RoleRow, AuditEntry, DataScope, Department, StaffPerformance, PermissionItem,
 } from "@/lib/types";
 
-const SIZE = 10;
 // 组织架构与权限目录都要整棵拉（树不能分页——少半棵树等于错的树），单独给个大 size。
 const TREE_SIZE = 500;
 const SCOPE_LABEL: Record<DataScope, string> = { ALL: "全部数据", REGION: "按区域", LOCATION: "按点位", AGENT: "按代理(自己)", SELF: "仅自己经手" };
@@ -87,13 +89,9 @@ const PERF_GRADE: StatusMap<"EXCELLENT" | "GOOD" | "WATCH"> = {
 const gradeOf = (score: number): keyof typeof PERF_GRADE =>
   score >= 90 ? "EXCELLENT" : score >= 75 ? "GOOD" : "WATCH";
 
-const ALL_TABS = [
-  { key: "employees", label: "员工", perm: "org:employee:read" },
-  { key: "roles", label: "角色权限", perm: "org:role:read" },
-  { key: "org", label: "组织架构", perm: "org:employee:read", phase: 2 as const },
-  { key: "audit", label: "操作审计", perm: "org:audit:read", phase: 2 as const },
-  { key: "performance", label: "绩效报表", perm: "org:employee:read", phase: 3 as const },
-];
+// tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）。
+// 本页原先自己判权（这点是对的，多数页面连这个都没有），只是名字与权限各存一份。
+const TAB_KEYS = ["employees", "roles", "org", "audit", "performance"] as const;
 
 // —— 组织架构树 ——
 /**
@@ -196,15 +194,12 @@ function buildPermTree(items: PermissionItem[]): TreeNode[] {
 function EmployeesInner() {
   const allow = useCan();
   const qc = useQueryClient();
-  const tabs = ALL_TABS.filter((t) => allow(t.perm));
-  const sp = useSearchParams();
-  const qTab = sp.get("tab");
-  const [tab, setTab] = useState(tabs.some((t) => t.key === qTab) ? (qTab as string) : (tabs[0]?.key ?? "employees"));
+  const tabs = useNavTabs("/employees", TAB_KEYS);
   const { confirm, dialog } = useConfirm();
   // 「显示已归档」开关（TDD §10.1：列表默认过滤已归档）。切 tab 复位。
   const [showArchived, setShowArchived] = useState(false);
-  useEffect(() => { if (qTab && tabs.some((t) => t.key === qTab)) { setTab(qTab); setShowArchived(false); } }, [qTab]);
-  const [page, setPage] = useState(1);
+  const paging = usePaging();
+  const { tab, setTab } = usePageTab(tabs, () => { paging.reset(); setKeyword(""); setShowArchived(false); });
   // 绩效周期（缺省近 30 日，同报表域）
   const [period, setPeriod] = useState<ReportPeriod>(REPORT_PERIOD_DEFAULT);
   const [keyword, setKeyword] = useState("");
@@ -222,7 +217,7 @@ function EmployeesInner() {
   const [auditId, setAuditId] = useState<string | null>(null);
 
   const emp = useQuery({
-    queryKey: ["employees", page, keyword], queryFn: () => api.listEmployees({ page, size: SIZE, keyword }),
+    queryKey: ["employees", paging.page, paging.size, keyword], queryFn: () => api.listEmployees({ page: paging.page, size: paging.size, keyword }),
     placeholderData: keepPreviousData, enabled: tab === "employees",
   });
   // 组织架构整棵拉、不带 keyword：树的过滤必须在前端做（要保留命中节点的祖先链），
@@ -232,14 +227,14 @@ function EmployeesInner() {
     enabled: tab === "org",
   });
   const perf = useQuery({
-    queryKey: ["staffPerformance", page, keyword, period],
-    queryFn: () => api.listStaffPerformance({ page, size: SIZE, keyword, period }),
+    queryKey: ["staffPerformance", paging.page, paging.size, keyword, period],
+    queryFn: () => api.listStaffPerformance({ page: paging.page, size: paging.size, keyword, period }),
     placeholderData: keepPreviousData, enabled: tab === "performance",
   });
   // showArchived 必须进 queryKey，否则切开关不重新拉数据
   const roles = useQuery({ queryKey: ["roles", showArchived], queryFn: () => api.listRoles({ showArchived }), enabled: tab === "roles" });
   const audit = useQuery({
-    queryKey: ["audit", page, keyword], queryFn: () => api.listAudits({ page, size: SIZE, keyword }),
+    queryKey: ["audit", paging.page, paging.size, keyword], queryFn: () => api.listAudits({ page: paging.page, size: paging.size, keyword }),
     placeholderData: keepPreviousData, enabled: tab === "audit",
   });
 
@@ -258,9 +253,9 @@ function EmployeesInner() {
 
   // 数据权限范围值的候选主数据（只在抽屉打开时拉，避免进页面就多三个请求）
   const scopeOpen = !!scopeRole;
-  const regionsQ = useQuery({ queryKey: ["scope-regions"], queryFn: () => api.listRegions({ page: 1, size: 200 }), enabled: scopeOpen });
-  const sitesQ = useQuery({ queryKey: ["scope-sites"], queryFn: () => api.listSites({ page: 1, size: 200 }), enabled: scopeOpen });
-  const agentsQ = useQuery({ queryKey: ["scope-agents"], queryFn: () => api.listAgents({ page: 1, size: 200 }), enabled: scopeOpen });
+  const regionsQ = useQuery({ queryKey: ["scope-regions"], queryFn: () => api.listRegions({ page: 1, size: UNPAGED_SIZE }), enabled: scopeOpen });
+  const sitesQ = useQuery({ queryKey: ["scope-sites"], queryFn: () => api.listSites({ page: 1, size: UNPAGED_SIZE }), enabled: scopeOpen });
+  const agentsQ = useQuery({ queryKey: ["scope-agents"], queryFn: () => api.listAgents({ page: 1, size: UNPAGED_SIZE }), enabled: scopeOpen });
   // ⚠️ AGENT 角色自身的数据范围是**锁死**的：功能权限清单 §二 明确「AGENT 数据范围强制 = 自己 agent_no」。
   // 若放开让它选任意代理，就等于代理商能看别家代理的数据——真的越权口子。
   // 其它角色（如 BD 管几家代理）选特定代理是合理的，故只针对 AGENT 这一行锁。
@@ -495,13 +490,13 @@ function EmployeesInner() {
 
   if (tabs.length === 0) return <div><PageTitle title="员工与权限" /><EmptyState title="无权限" /></div>;
 
-  const onSearch = (v: string) => { setKeyword(v); setPage(1); };
+  const onSearch = (v: string) => { setKeyword(v); paging.reset(); };
   // 导出当页数据（§10.2），列与表格可见列一致。
   const onExportOf = <T,>(name: string, cols: CsvColumn<T>[], rows: T[]) => () => exportCsv<T>(name, cols, rows);
 
   return (
     <div>
-      <TabHeader tabs={tabs} value={tab} onChange={(k) => { setTab(k); setPage(1); setKeyword(""); setShowArchived(false); }} />
+      <TabHeader tabs={tabs} value={tab} onChange={setTab} />
       {tab === "employees" && (
         <>
           <Toolbar
@@ -553,7 +548,7 @@ function EmployeesInner() {
           ], perf.data?.list ?? [])}>
           <FilterSelect
             value={period}
-            onChange={(v) => { setPeriod(v as ReportPeriod); setPage(1); }}
+            onChange={(v) => { setPeriod(v as ReportPeriod); paging.reset(); }}
             options={REPORT_PERIODS.map((x) => ({ value: x.value, label: x.label }))}
             aria-label="按统计周期筛选"
           />
@@ -593,7 +588,7 @@ function EmployeesInner() {
             { header: "IP", value: (a) => a.ip },
           ], audit.data?.list ?? [])} />
       )}
-      {tab === "employees" && <DataTable rowKey={(e: Employee) => e.employeeNo} columns={empCols} rows={emp.data?.list} loading={emp.isLoading} empty="暂无员工——换个关键词，或点「新增员工」把运维 / 客服人员录进来。" />}
+      {tab === "employees" && <DataTable rowKey={(e: Employee) => e.employeeNo} columns={empCols} rows={emp.data?.list} loading={emp.isLoading} error={emp.error} onRetry={emp.refetch} empty="暂无员工——换个关键词，或点「新增员工」把运维 / 客服人员录进来。" />}
       {tab === "org" && (
         <Card className="p-2">
           <Tree
@@ -603,10 +598,10 @@ function EmployeesInner() {
           />
         </Card>
       )}
-      {tab === "performance" && <DataTable rowKey={(p: StaffPerformance) => p.employeeNo} columns={perfCols} rows={perf.data?.list} loading={perf.isLoading} empty={`${periodLabel(period)}内没有绩效数据——换个关键词或更长的周期再看。`} />}
-      {tab === "roles" && <DataTable rowKey={(r: RoleRow) => r.roleNo} columns={roleCols} rows={roleRows} loading={roles.isLoading} rowClassName={archivedRowClass} empty={showArchived ? "没有匹配的角色——换个关键词，或点「新增角色」建一个自定义角色。" : "暂无在用角色——可能都已归档（打开「显示已归档」查看），或点「新增角色」建第一个自定义角色。"} />}
-      {tab === "audit" && <DataTable rowKey={(a: AuditEntry) => a.id} columns={auditCols} rows={audit.data?.list} loading={audit.isLoading} empty="暂无审计记录——记录在管理员执行写操作后自动产生，换个关键词或时间范围再看。" />}
-      {paged && <Pagination page={page} size={SIZE} total={paged.total} onPage={setPage} />}
+      {tab === "performance" && <DataTable rowKey={(p: StaffPerformance) => p.employeeNo} columns={perfCols} rows={perf.data?.list} loading={perf.isLoading} error={perf.error} onRetry={perf.refetch} empty={`${periodLabel(period)}内没有绩效数据——换个关键词或更长的周期再看。`} />}
+      {tab === "roles" && <DataTable rowKey={(r: RoleRow) => r.roleNo} columns={roleCols} rows={roleRows} loading={roles.isLoading} error={roles.error} onRetry={roles.refetch} rowClassName={archivedRowClass} empty={showArchived ? "没有匹配的角色——换个关键词，或点「新增角色」建一个自定义角色。" : "暂无在用角色——可能都已归档（打开「显示已归档」查看），或点「新增角色」建第一个自定义角色。"} />}
+      {tab === "audit" && <DataTable rowKey={(a: AuditEntry) => a.id} columns={auditCols} rows={audit.data?.list} loading={audit.isLoading} error={audit.error} onRetry={audit.refetch} empty="暂无审计记录——记录在管理员执行写操作后自动产生，换个关键词或时间范围再看。" />}
+      {paged && <Pagination page={paging.page} size={paging.size} total={paged.total} onPage={paging.setPage} onSize={paging.setSize} />}
 
       <FormDrawer
         open={!!scopeRole}

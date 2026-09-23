@@ -7,6 +7,7 @@ import {
   Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import { Maximize2, Minimize2, RefreshCw } from "lucide-react";
+import { UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
 import { Pagination, Skeleton, StatCard } from "@/components/ui/misc";
 import { usePaging } from "@/lib/hooks/use-paging";
@@ -491,7 +492,7 @@ function ReportsInner() {
 
   const customQ = useQuery<PageResult<ReportCustom>>({
     queryKey: ["report-custom", dim, period, metrics.join(",")],
-    queryFn: () => api.listReportCustom({ page: 1, size: 200, dim, period, metrics: metrics.join(",") }),
+    queryFn: () => api.listReportCustom({ page: 1, size: UNPAGED_SIZE, dim, period, metrics: metrics.join(",") }),
     enabled: tab === "custom" && metrics.length > 0,
     placeholderData: keepPreviousData,
   });

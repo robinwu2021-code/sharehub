@@ -2,10 +2,12 @@
 
 import { Suspense, useEffect, useState, useMemo, type ReactNode } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
 import { Pagination } from "@/components/ui/misc";
+import { usePaging } from "@/lib/hooks/use-paging";
+import { useNavTabs, usePageTab } from "@/lib/hooks/use-page-tab";
 import { Select } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/date-input";
 import { TabHeader } from "@/components/ui/tab-header";
@@ -39,17 +41,10 @@ import type {
   OtaRelease, OtaTask, DeviceLog, DeviceCodeBatch,
 } from "@/lib/types";
 
-const SIZE = 10;
-const TABS = [
-  { key: "cabinets", label: "机柜" },
-  { key: "powerbanks", label: "充电宝管理" },
-  { key: "monitor", label: "实时监控" },
-  { key: "commands", label: "远程指令记录" },
-  { key: "logs", label: "设备日志", phase: 2 as const },
-  { key: "inventory", label: "库存调拨", phase: 2 as const },
-  { key: "codes", label: "设备编码", phase: 2 as const },
-  { key: "ota", label: "固件 OTA", phase: 2 as const },
-];
+// tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）。
+// 「机柜」在菜单里叫「设备台账」、「远程指令记录」叫「远程控制·指令记录」——以菜单为准。
+const TAB_KEYS = ["cabinets", "powerbanks", "monitor", "commands", "logs",
+  "inventory", "codes", "ota"] as const;
 // 自建 tab（自带筛选器与查询），不走页面共用的 keyword/Toolbar/分页那一套
 const STANDALONE_TABS = ["cabinets", "logs", "codes"];
 
@@ -120,7 +115,7 @@ function ImportCabinetsDrawer({ open, onOpenChange }: { open: boolean; onOpenCha
 
   // 供应商 / 点位主数据：用于「填的值是否真实存在」这类跨表校验
   const vendorsQ = useQuery({ queryKey: ["vendors"], queryFn: () => api.listVendors() });
-  const pointsQ = useQuery({ queryKey: ["locations", "all"], queryFn: () => api.listLocations({ size: 999 }) });
+  const pointsQ = useQuery({ queryKey: ["locations", "all"], queryFn: () => api.listLocations({ size: UNPAGED_SIZE }) });
   const cols = importColumns(
     (vendorsQ.data ?? []).map((v) => v.vendorCode),
     (pointsQ.data?.list ?? []).map((l) => l.locationNo),
@@ -315,7 +310,7 @@ const cabinetFields = (
 function CabinetsTab({ canWrite }: { canWrite: boolean }) {
   const qc = useQueryClient();
   const { confirm, dialog } = useConfirm();
-  const [page, setPage] = useState(1);
+  const paging = usePaging();
   const [keyword, setKeyword] = useState("");
   const [online, setOnline] = useState("");
   const [status, setStatus] = useState("");
@@ -327,15 +322,15 @@ function CabinetsTab({ canWrite }: { canWrite: boolean }) {
 
   // 建档抽屉的两份主数据（供应商 / 点位）。查询键与导入抽屉一致，两处共用同一份缓存
   const vendorsQ = useQuery({ queryKey: ["vendors"], queryFn: () => api.listVendors() });
-  const pointsQ = useQuery({ queryKey: ["locations", "all"], queryFn: () => api.listLocations({ size: 999 }) });
+  const pointsQ = useQuery({ queryKey: ["locations", "all"], queryFn: () => api.listLocations({ size: UNPAGED_SIZE }) });
 
   // 换页/改筛选后选中的行已不在视野内，继续留着会造成「对看不见的行动手」
-  const resetPage = (fn: () => void) => { fn(); setPage(1); setSelected([]); };
+  const resetPage = (fn: () => void) => { fn(); paging.reset(); setSelected([]); };
 
   const { data, isLoading } = useQuery({
-    queryKey: ["cabinets", page, keyword, online, status, showArchived],
+    queryKey: ["cabinets", paging.page, paging.size, keyword, online, status, showArchived],
     queryFn: () => api.listCabinets({
-      page, size: SIZE, keyword,
+      page: paging.page, size: paging.size, keyword,
       onlineStatus: online || undefined, status: status || undefined,
       showArchived: showArchived || undefined,
     }),
@@ -506,7 +501,7 @@ function CabinetsTab({ canWrite }: { canWrite: boolean }) {
         onSelectedChange={setSelected}
         empty="暂无机柜——可用右上角「新增机柜」逐台建档、或「导入台账」批量建档，也确认一下筛选条件是否过窄（已归档的机柜需勾选「显示已归档」才会出现）"
       />
-      {data && <Pagination page={page} size={SIZE} total={data.total} onPage={setPage} />}
+      {data && <Pagination page={paging.page} size={paging.size} total={data.total} onPage={paging.setPage} onSize={paging.setSize} />}
 
       <FormDrawer
         open={!!cabForm}
@@ -549,16 +544,16 @@ const LOG_EVENT: Record<string, string> = {
 };
 
 function LogsTab() {
-  const [page, setPage] = useState(1);
+  const paging = usePaging();
   const [keyword, setKeyword] = useState("");
   const [stream, setStream] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const reset = () => setPage(1);
+  const reset = () => paging.reset();
 
   const { data, isLoading } = useQuery({
-    queryKey: ["device-logs", page, keyword, stream, from, to],
-    queryFn: () => api.listDeviceLogs({ page, size: SIZE, keyword, stream: stream || undefined, from: from || undefined, to: to || undefined }),
+    queryKey: ["device-logs", paging.page, paging.size, keyword, stream, from, to],
+    queryFn: () => api.listDeviceLogs({ page: paging.page, size: paging.size, keyword, stream: stream || undefined, from: from || undefined, to: to || undefined }),
     placeholderData: keepPreviousData,
   });
 
@@ -620,7 +615,7 @@ function LogsTab() {
           </div>
         )}
       />
-      {data && <Pagination page={page} size={SIZE} total={data.total} onPage={setPage} />}
+      {data && <Pagination page={paging.page} size={paging.size} total={data.total} onPage={paging.setPage} onSize={paging.setSize} />}
     </div>
   );
 }
@@ -653,13 +648,13 @@ const CODE_FIELDS: FieldDef[] = [
 
 function CodesTab({ canEdit }: { canEdit: boolean }) {
   const qc = useQueryClient();
-  const [page, setPage] = useState(1);
+  const paging = usePaging();
   const [keyword, setKeyword] = useState("");
   const [form, setForm] = useState<Partial<DeviceCodeBatch> | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["device-code-batches", page, keyword],
-    queryFn: () => api.listDeviceCodeBatches({ page, size: SIZE, keyword }),
+    queryKey: ["device-code-batches", paging.page, paging.size, keyword],
+    queryFn: () => api.listDeviceCodeBatches({ page: paging.page, size: paging.size, keyword }),
     placeholderData: keepPreviousData,
   });
   const save = useMutation({
@@ -693,7 +688,7 @@ function CodesTab({ canEdit }: { canEdit: boolean }) {
     <div>
       <Toolbar
         search={keyword}
-        onSearch={(v) => { setKeyword(v); setPage(1); }}
+        onSearch={(v) => { setKeyword(v); paging.reset(); }}
         searchPlaceholder="搜索批次号 / 供应商 / 编码区间"
         onAdd={canEdit ? () => setForm({ vendorCode: "cd-tech", codeType: "SN", rangeStart: "", rangeEnd: "", total: 100, bound: 0, producedAt: "", status: "PENDING" }) : undefined}
         addLabel="新增贴码批次"
@@ -718,7 +713,7 @@ function CodesTab({ canEdit }: { canEdit: boolean }) {
         loading={isLoading}
         empty="暂无贴码批次——设备到货后先在此登记编码区间，机柜建档时才能按区间校验编码归属"
       />
-      {data && <Pagination page={page} size={SIZE} total={data.total} onPage={setPage} />}
+      {data && <Pagination page={paging.page} size={paging.size} total={data.total} onPage={paging.setPage} onSize={paging.setSize} />}
 
       <FormDrawer
         open={!!form}
@@ -977,15 +972,15 @@ const RELEASE_FIELDS: FieldDef[] = [
 
 function OtaReleasesTab({ canManage, viewSwitch }: { canManage: boolean; viewSwitch: ReactNode }) {
   const qc = useQueryClient();
-  const [page, setPage] = useState(1);
+  const paging = usePaging();
   const [keyword, setKeyword] = useState("");
   const [fwType, setFwType] = useState("");
   const [status, setStatus] = useState("");
   const [form, setForm] = useState<Partial<OtaRelease> | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["ota-releases", page, keyword, fwType, status],
-    queryFn: () => api.listOtaReleases({ page, size: SIZE, keyword, fwType: fwType || undefined, status: status || undefined }),
+    queryKey: ["ota-releases", paging.page, paging.size, keyword, fwType, status],
+    queryFn: () => api.listOtaReleases({ page: paging.page, size: paging.size, keyword, fwType: fwType || undefined, status: status || undefined }),
     placeholderData: keepPreviousData,
   });
   const save = useMutation({
@@ -1026,7 +1021,7 @@ function OtaReleasesTab({ canManage, viewSwitch }: { canManage: boolean; viewSwi
     <div>
       <Toolbar
         search={keyword}
-        onSearch={(v) => { setKeyword(v); setPage(1); }}
+        onSearch={(v) => { setKeyword(v); paging.reset(); }}
         searchPlaceholder="搜索版本单号 / 版本号 / 版本说明"
         onAdd={canManage ? () => setForm({ fwType: "MCU", vendorCode: "", version: "", versionCode: 100, artifactUrl: "", checksum: "", mandatory: false, status: "DRAFT", releaseNotes: "" }) : undefined}
         addLabel="新建版本"
@@ -1046,14 +1041,14 @@ function OtaReleasesTab({ canManage, viewSwitch }: { canManage: boolean; viewSwi
         {viewSwitch}
         <FilterSelect
           value={fwType}
-          onChange={(v) => { setFwType(v); setPage(1); }}
+          onChange={(v) => { setFwType(v); paging.reset(); }}
           options={[{ value: "MCU", label: "主控 MCU" }, { value: "SLOT", label: "仓门 SLOT" }, { value: "MODEM", label: "通信模组 MODEM" }]}
           allLabel="全部固件类型"
           aria-label="按固件类型筛选"
         />
         <FilterSelect
           value={status}
-          onChange={(v) => { setStatus(v); setPage(1); }}
+          onChange={(v) => { setStatus(v); paging.reset(); }}
           /* 选项由 RELEASE_STATUS 派生 —— 筛选项文案与徽标文案同源，改一处即可 */
           options={RELEASE_STATUS}
           allLabel="全部状态"
@@ -1068,7 +1063,7 @@ function OtaReleasesTab({ canManage, viewSwitch }: { canManage: boolean; viewSwi
         loading={isLoading}
         empty="暂无固件版本——投放前先在此登记固件包与校验和，投放列表里的版本号才有出处"
       />
-      {data && <Pagination page={page} size={SIZE} total={data.total} onPage={setPage} />}
+      {data && <Pagination page={paging.page} size={paging.size} total={data.total} onPage={paging.setPage} onSize={paging.setSize} />}
 
       <FormDrawer
         open={!!form}
@@ -1164,7 +1159,7 @@ function SendCommandDrawer({ draft, onOpenChange }: { draft: CmdDraft | null; on
 
   const cabsQ = useQuery({
     queryKey: ["cabinets", "command-options"],
-    queryFn: () => api.listCabinets({ size: 999 }),
+    queryFn: () => api.listCabinets({ size: UNPAGED_SIZE }),
     enabled: !!draft,
   });
   const cabs = cabsQ.data?.list ?? [];
@@ -1214,12 +1209,11 @@ function SendCommandDrawer({ draft, onOpenChange }: { draft: CmdDraft | null; on
 }
 
 function DevicesInner() {
-  const sp = useSearchParams();
-  const qTab = sp.get("tab");
   const qc = useQueryClient();
   const allow = useCan();
-  const [tab, setTab] = useState(TABS.some((t) => t.key === qTab) ? (qTab as string) : "cabinets");
-  const [page, setPage] = useState(1);
+  const paging = usePaging();
+  const tabs = useNavTabs("/devices", TAB_KEYS);
+  const { tab, setTab } = usePageTab(tabs, () => { paging.reset(); setKeyword(""); });
   const [keyword, setKeyword] = useState("");
   const [pbForm, setPbForm] = useState<Partial<Powerbank> | null>(null);
   const [invForm, setInvForm] = useState<Partial<InventoryTransfer> | null>(null);
@@ -1234,7 +1228,7 @@ function DevicesInner() {
   const [monitorView, setMonitorView] = useState<"list" | "map">("list");
   const sitesQ = useQuery({
     queryKey: ["monitor-sites"],
-    queryFn: () => api.listSites({ page: 1, size: 200 }),
+    queryFn: () => api.listSites({ page: 1, size: UNPAGED_SIZE }),
     enabled: tab === "monitor" && monitorView === "map",
   });
   const mapPoints: MapPoint[] = useMemo(
@@ -1250,7 +1244,6 @@ function DevicesInner() {
     [sitesQ.data],
   );
   const { confirm, dialog } = useConfirm();
-  useEffect(() => { if (qTab && TABS.some((t) => t.key === qTab)) { setTab(qTab); setPage(1); } }, [qTab]);
 
   const isCabinets = tab === "cabinets";
   // 版本库视图与自建 tab 同类：自带筛选/查询/分页，页面共用的 Toolbar 与 q 都不参与
@@ -1273,7 +1266,7 @@ function DevicesInner() {
       label="固件 OTA 视图"
       value={otaView}
       options={[{ value: "rollouts", label: "投放列表" }, { value: "releases", label: "固件版本库" }] as const}
-      onChange={(v) => { setOtaView(v); setPage(1); setKeyword(""); }}
+      onChange={(v) => { setOtaView(v); paging.reset(); setKeyword(""); }}
     />
   ) : null;
 
@@ -1326,13 +1319,13 @@ function DevicesInner() {
   };
 
   const q = useQuery<PageResult<Row>>({
-    queryKey: ["devices", tab, page, keyword, showArchived],
+    queryKey: ["devices", tab, paging.page, paging.size, keyword, showArchived],
     queryFn: () =>
-      tab === "powerbanks" ? api.listPowerbanks({ page, size: SIZE, keyword, showArchived: showArchived || undefined })
-      : tab === "monitor" ? api.listCabinetMonitor({ page, size: SIZE, keyword })
-      : tab === "commands" ? api.listCommandRecords({ page, size: SIZE, keyword })
-      : tab === "inventory" ? api.listInventoryTransfers({ page, size: SIZE, keyword })
-      : api.listOtaRollouts({ page, size: SIZE, keyword }),
+      tab === "powerbanks" ? api.listPowerbanks({ page: paging.page, size: paging.size, keyword, showArchived: showArchived || undefined })
+      : tab === "monitor" ? api.listCabinetMonitor({ page: paging.page, size: paging.size, keyword })
+      : tab === "commands" ? api.listCommandRecords({ page: paging.page, size: paging.size, keyword })
+      : tab === "inventory" ? api.listInventoryTransfers({ page: paging.page, size: paging.size, keyword })
+      : api.listOtaRollouts({ page: paging.page, size: paging.size, keyword }),
     placeholderData: keepPreviousData,
     enabled: !isStandalone,
   });
@@ -1385,12 +1378,12 @@ function DevicesInner() {
 
   return (
     <div>
-      <TabHeader tabs={TABS} value={tab} onChange={(k) => { setTab(k); setPage(1); setKeyword(""); }} />
+      <TabHeader tabs={tabs} value={tab} onChange={setTab} />
 
       {!isStandalone && (
         <Toolbar
           search={keyword}
-          onSearch={(v) => { setKeyword(v); setPage(1); }}
+          onSearch={(v) => { setKeyword(v); paging.reset(); }}
           searchPlaceholder={SEARCH_HINT[tab]}
           onAdd={
             tab === "powerbanks" && canEditPowerbank ? () => setPbForm({ cabinetNo: "", battery: 100, status: "IN_CABINET", health: "OK", cycles: 0 })
@@ -1423,7 +1416,7 @@ function DevicesInner() {
           {tab === "powerbanks" && (
             <ShowArchivedToggle
               checked={showArchived}
-              onChange={(v) => { setShowArchived(v); setPage(1); }}
+              onChange={(v) => { setShowArchived(v); paging.reset(); }}
             />
           )}
         </Toolbar>
@@ -1437,24 +1430,24 @@ function DevicesInner() {
           rowKey={(r: Powerbank) => r.powerbankNo}
           columns={pbColsFull}
           rows={q.data?.list as Powerbank[]}
-          loading={q.isLoading}
+          loading={q.isLoading} error={q.error} onRetry={q.refetch}
           rowClassName={archivedRowClass}
           empty="暂无充电宝——新到货的充电宝需先入库建档；已归档的需勾选「显示已归档」才会出现"
         />
       )}
       {tab === "monitor" && (monitorView === "list"
-        ? <DataTable rowKey={(r: CabinetMonitor) => r.cabinetNo} columns={monCols} rows={q.data?.list as CabinetMonitor[]} loading={q.isLoading} />
-        : <SiteMap points={mapPoints} onSelect={(pt) => { setKeyword(pt.name); setMonitorView("list"); setPage(1); }} />)}
+        ? <DataTable rowKey={(r: CabinetMonitor) => r.cabinetNo} columns={monCols} rows={q.data?.list as CabinetMonitor[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} />
+        : <SiteMap points={mapPoints} onSelect={(pt) => { setKeyword(pt.name); setMonitorView("list"); paging.reset(); }} />)}
       {tab === "commands" && (
         <>
           {!canSendCommand && <ReadOnlyNotice what="指令下发" perm="device:command:send" note="历史指令流水仍可查看" />}
-          <DataTable rowKey={(r: CommandRecord) => r.commandId} columns={cmdColsFull} rows={q.data?.list as CommandRecord[]} loading={q.isLoading} />
+          <DataTable rowKey={(r: CommandRecord) => r.commandId} columns={cmdColsFull} rows={q.data?.list as CommandRecord[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} />
         </>
       )}
-      {tab === "inventory" && <DataTable rowKey={(r: InventoryTransfer) => r.transferNo} columns={invColsFull} rows={q.data?.list as InventoryTransfer[]} loading={q.isLoading} />}
+      {tab === "inventory" && <DataTable rowKey={(r: InventoryTransfer) => r.transferNo} columns={invColsFull} rows={q.data?.list as InventoryTransfer[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} />}
       {isReleases && <OtaReleasesTab canManage={canManageOta} viewSwitch={otaViewSwitch} />}
-      {tab === "ota" && !isReleases && <DataTable rowKey={(r: OtaRollout) => r.rolloutNo} columns={otaColsFull} rows={q.data?.list as OtaRollout[]} loading={q.isLoading} />}
-      {!isStandalone && q.data && <Pagination page={page} size={SIZE} total={q.data.total} onPage={setPage} />}
+      {tab === "ota" && !isReleases && <DataTable rowKey={(r: OtaRollout) => r.rolloutNo} columns={otaColsFull} rows={q.data?.list as OtaRollout[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} />}
+      {!isStandalone && q.data && <Pagination page={paging.page} size={paging.size} total={q.data.total} onPage={paging.setPage} onSize={paging.setSize} />}
       {dialog}
 
       <FormDrawer

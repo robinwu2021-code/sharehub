@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
 import { PageTitle, Pagination } from "@/components/ui/misc";
 import { usePaging } from "@/lib/hooks/use-paging";
@@ -132,7 +133,7 @@ function AgentsInner() {
   // 目标代理商下拉：取在用（未归档）代理商，一次拉全量，抽屉里不再分页
   const agentOptionsQ = useQuery({
     queryKey: ["agent-options"],
-    queryFn: () => api.listAgents({ page: 1, size: 200 }),
+    queryFn: () => api.listAgents({ page: 1, size: UNPAGED_SIZE }),
     enabled: tab === "assign",
   });
   const agentOptions = useMemo(
@@ -144,13 +145,13 @@ function AgentsInner() {
   // 划拨候选：只列**未归属或归属其它代理**的资产（excludeAgentNo = 目标代理）
   const assignableQ = useQuery({
     queryKey: ["assignable-assets", assignForm?.agentNo ?? ""],
-    queryFn: () => api.listAssignableAssets({ page: 1, size: 500, excludeAgentNo: assignForm?.agentNo || undefined }),
+    queryFn: () => api.listAssignableAssets({ page: 1, size: UNPAGED_SIZE, excludeAgentNo: assignForm?.agentNo || undefined }),
     enabled: !!assignForm,
   });
   // 回收候选：只列该代理名下的资产
   const reclaimableQ = useQuery({
     queryKey: ["reclaimable-assets", reclaimForm?.agentNo ?? ""],
-    queryFn: () => api.listAssignableAssets({ page: 1, size: 500, agentNo: reclaimForm?.agentNo }),
+    queryFn: () => api.listAssignableAssets({ page: 1, size: UNPAGED_SIZE, agentNo: reclaimForm?.agentNo }),
     enabled: !!reclaimForm?.agentNo,
   });
   const records = useQuery({

@@ -1,10 +1,12 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
 import { PageTitle, Pagination } from "@/components/ui/misc";
+import { usePaging } from "@/lib/hooks/use-paging";
+import { useNavTabs, usePageTab } from "@/lib/hooks/use-page-tab";
 import { TabHeader } from "@/components/ui/tab-header";
 import { Toolbar } from "@/components/ui/toolbar";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
@@ -42,21 +44,16 @@ import {
   REPORT_PERIODS, REPORT_PERIOD_DEFAULT, type ReportPeriod,
 } from "@/lib/types";
 
-const SIZE = 10;
 /** 周期码 → 中文标签。取自 REPORT_PERIODS，不另抄一份。 */
 const periodLabel = (p: string) => REPORT_PERIODS.find((x) => x.value === p)?.label ?? p;
-const TABS = [
-  // 公告管理是营销模块唯一的阶段 1 项（c-app 首页公告条的发布口），故置于首位。
-  { key: "notices", label: "公告管理" },
-  { key: "coupons", label: "优惠券", phase: 2 as const },
-  { key: "coupon-issues", label: "发放记录", phase: 2 as const },
-  { key: "campaigns", label: "活动", phase: 2 as const },
-  { key: "push", label: "推送触达", phase: 3 as const },
-  { key: "referral", label: "邀请裂变", phase: 3 as const },
-  { key: "ad-slots", label: "广告位", phase: 3 as const },
-  { key: "ad-campaigns", label: "广告活动", phase: 3 as const },
-  { key: "ad-delivery", label: "投放与曝光", phase: 3 as const },
-];
+// tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）。
+//
+// `coupon-issues`（发放记录）是**唯一自带名字的一条**：它在菜单里没有入口，
+// 只能从优惠券页内切过去。这不是本次整理造成的，是功能清单的待办
+// （要么补进菜单、要么承认它就是个页内子视图）——在定下来之前如实标成子视图，
+// 而不是让 navTabs 在开发期抛错把页面打挂。
+const TAB_KEYS = ["notices", "coupons", { key: "coupon-issues", label: "发放记录" },
+  "campaigns", "push", "referral", "ad-slots", "ad-campaigns", "ad-delivery"] as const;
 // 三语（zh/en/ar）+ 生效期 + 置顶：竞品公告只有单语，我们要覆盖 MENA 多语市场。
 // B0 组件能力的样板用法：分区 section + 三语 textarea + date + required/maxLength 校验。
 // 新页面照此写，勿再手搓控件（见 TDD-运营端前端补全方案 §八-1）。
@@ -232,14 +229,17 @@ const AD_FIELDS: FieldDef[] = [
 ];
 
 function MarketingInner() {
-  const sp = useSearchParams();
-  const qTab = sp.get("tab");
   const qc = useQueryClient();
   const allow = useCan();
   const { t } = useI18n();
   const { confirm, dialog } = useConfirm();
-  const [tab, setTab] = useState(TABS.some((t) => t.key === qTab) ? (qTab as string) : DEFAULT_TAB);
-  const [page, setPage] = useState(1);
+  const paging = usePaging();
+  // 默认 tab 随分期变（阶段 1 是公告、阶段 2 起是优惠券），而 tab 顺序固定 ——
+  // 所以要显式告诉 navTabs 哪个是默认，它才知道菜单里不带 query 的那条叶子指的是谁
+  const tabs = useNavTabs("/marketing", TAB_KEYS, DEFAULT_TAB);
+  const { tab, setTab } = usePageTab(tabs, () => {
+    paging.reset(); setKeyword(""); setShowArchived(false); setCampaignStatus("");
+  }, { defaultKey: DEFAULT_TAB });
   // 投放曝光周期（缺省近 30 日，同报表域）
   const [period, setPeriod] = useState<ReportPeriod>(REPORT_PERIOD_DEFAULT);
   // 裂变页子视图：邀请记录（只读流水）/ 奖励规则（可配置）
@@ -257,7 +257,6 @@ function MarketingInner() {
   const [pushForm, setPushForm] = useState<(Partial<PushMessage> & { audienceKey?: string }) | null>(null);
   const [slotForm, setSlotForm] = useState<Partial<AdSlot> | null>(null);
   const [adForm, setAdForm] = useState<Partial<AdCampaign> | null>(null);
-  useEffect(() => { if (qTab && TABS.some((t) => t.key === qTab)) { setTab(qTab); setPage(1); setShowArchived(false); } }, [qTab]);
 
   // —— S2 优惠券发放 / 推送发送的抽屉状态 ——
   const [issueFor, setIssueFor] = useState<Coupon | null>(null);
@@ -310,8 +309,8 @@ function MarketingInner() {
   });
   // 邀请奖励规则：独立查询（子视图切到「奖励规则」才拉）
   const rules = useQuery({
-    queryKey: ["mkt-referral-rules", page, keyword],
-    queryFn: () => api.listReferralRules({ page, size: SIZE, keyword }),
+    queryKey: ["mkt-referral-rules", paging.page, paging.size, keyword],
+    queryFn: () => api.listReferralRules({ page: paging.page, size: paging.size, keyword }),
     placeholderData: keepPreviousData,
     enabled: tab === "referral" && refView === "rules",
   });
@@ -368,7 +367,7 @@ function MarketingInner() {
   // —— S2：消费者分层（人群下拉的数据源，取 user 域既有主数据，不另造维度）——
   const segQ = useQuery({
     queryKey: ["mkt-segments"],
-    queryFn: () => api.listConsumerSegments({ page: 1, size: 100 }),
+    queryFn: () => api.listConsumerSegments({ page: 1, size: UNPAGED_SIZE }),
     enabled: tab === "coupons" || tab === "push",
   });
   const segments = segQ.data?.list ?? [];
@@ -480,17 +479,17 @@ function MarketingInner() {
 
   const q = useQuery<PageResult<Notice | Coupon | CouponIssueRecord | Campaign | PushMessage | Referral | AdSlot | AdCampaign | AdDelivery>>({
     // showArchived 必须进 queryKey，否则切开关不重新拉数据
-    queryKey: ["mkt", tab, page, keyword, showArchived, campaignStatus, period],
+    queryKey: ["mkt", tab, paging.page, paging.size, keyword, showArchived, campaignStatus, period],
     queryFn: () =>
-      tab === "notices" ? api.listNotices({ page, size: SIZE, keyword, showArchived })
-      : tab === "coupons" ? api.listCoupons({ page, size: SIZE, keyword, showArchived })
-      : tab === "coupon-issues" ? api.listCouponIssueRecords({ page, size: SIZE, keyword })
-      : tab === "campaigns" ? api.listCampaigns({ page, size: SIZE, keyword, status: campaignStatus })
-      : tab === "push" ? api.listPushMessages({ page, size: SIZE, keyword })
-      : tab === "referral" ? api.listReferrals({ page, size: SIZE, keyword })
-      : tab === "ad-slots" ? api.listAdSlots({ page, size: SIZE, keyword })
-      : tab === "ad-campaigns" ? api.listAdCampaigns({ page, size: SIZE, keyword })
-      : api.listAdDeliveries({ page, size: SIZE, keyword, period }),
+      tab === "notices" ? api.listNotices({ page: paging.page, size: paging.size, keyword, showArchived })
+      : tab === "coupons" ? api.listCoupons({ page: paging.page, size: paging.size, keyword, showArchived })
+      : tab === "coupon-issues" ? api.listCouponIssueRecords({ page: paging.page, size: paging.size, keyword })
+      : tab === "campaigns" ? api.listCampaigns({ page: paging.page, size: paging.size, keyword, status: campaignStatus })
+      : tab === "push" ? api.listPushMessages({ page: paging.page, size: paging.size, keyword })
+      : tab === "referral" ? api.listReferrals({ page: paging.page, size: paging.size, keyword })
+      : tab === "ad-slots" ? api.listAdSlots({ page: paging.page, size: paging.size, keyword })
+      : tab === "ad-campaigns" ? api.listAdCampaigns({ page: paging.page, size: paging.size, keyword })
+      : api.listAdDeliveries({ page: paging.page, size: paging.size, keyword, period }),
     placeholderData: keepPreviousData,
   });
 
@@ -713,11 +712,11 @@ function MarketingInner() {
 
   return (
     <div>
-      <TabHeader tabs={TABS} value={tab} onChange={(k) => { setTab(k); setPage(1); setKeyword(""); setShowArchived(false); setCampaignStatus(""); }} />
+      <TabHeader tabs={tabs} value={tab} onChange={setTab} />
       {tab === "notices" && (
         <Toolbar
           search={keyword}
-          onSearch={(v) => { setKeyword(v); setPage(1); }}
+          onSearch={(v) => { setKeyword(v); paging.reset(); }}
           searchPlaceholder="搜索公告号/标题（中/英/阿）/发布人"
           onAdd={canEditNotice ? () => setNoticeForm({ type: "SYSTEM", pinned: false, status: "DRAFT", title: "", titleEn: "", titleAr: "", content: "", contentEn: "", contentAr: "", startAt: "", endAt: "", publishedBy: "" }) : undefined}
           addLabel="新增公告"
@@ -736,13 +735,13 @@ function MarketingInner() {
             ...archivedCsv<Notice>(),
           ])}
         >
-          <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); setPage(1); }} />
+          <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); paging.reset(); }} />
         </Toolbar>
       )}
       {tab === "coupons" && (
         <Toolbar
           search={keyword}
-          onSearch={(v) => { setKeyword(v); setPage(1); }}
+          onSearch={(v) => { setKeyword(v); paging.reset(); }}
           searchPlaceholder="搜索券名称"
           onAdd={canEditCoupon ? () => setCouponForm({ type: "CUT", status: "ACTIVE", value: 5, threshold: 0, stock: 1000, issued: 0, expireAt: "" }) : undefined}
           addLabel="新增优惠券"
@@ -759,13 +758,13 @@ function MarketingInner() {
             ...archivedCsv<Coupon>(),
           ])}
         >
-          <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); setPage(1); }} />
+          <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); paging.reset(); }} />
         </Toolbar>
       )}
       {tab === "coupon-issues" && (
         <Toolbar
           search={keyword}
-          onSearch={(v) => { setKeyword(v); setPage(1); }}
+          onSearch={(v) => { setKeyword(v); paging.reset(); }}
           searchPlaceholder="搜索发放号/券号/券名称/人群/操作人"
           onExport={onExportOf<CouponIssueRecord>("优惠券发放记录", [
             { header: "发放号", value: (r) => r.issueNo },
@@ -782,7 +781,7 @@ function MarketingInner() {
       {tab === "campaigns" && (
         <Toolbar
           search={keyword}
-          onSearch={(v) => { setKeyword(v); setPage(1); }}
+          onSearch={(v) => { setKeyword(v); paging.reset(); }}
           searchPlaceholder="搜索活动号/名称/类型"
           onAdd={canEditCampaign ? () => setCampaignForm({ kind: "满减", startAt: "", endAt: "" }) : undefined}
           addLabel="新增活动"
@@ -796,13 +795,13 @@ function MarketingInner() {
             { header: "结束", value: (c) => fmtTime(c.endAt) },
           ])}
         >
-          <FilterSelect value={campaignStatus} onChange={(v) => { setCampaignStatus(v); setPage(1); }} allLabel="全部状态" options={CAMPAIGN_STATUS} />
+          <FilterSelect value={campaignStatus} onChange={(v) => { setCampaignStatus(v); paging.reset(); }} allLabel="全部状态" options={CAMPAIGN_STATUS} />
         </Toolbar>
       )}
       {tab === "push" && (
         <Toolbar
           search={keyword}
-          onSearch={(v) => { setKeyword(v); setPage(1); }}
+          onSearch={(v) => { setKeyword(v); paging.reset(); }}
           searchPlaceholder="搜索推送号/标题/受众"
           onAdd={canEditPush ? () => setPushForm({ title: "", content: "", channel: "APP_PUSH", audienceKey: "ALL:" }) : undefined}
           addLabel="新增推送"
@@ -823,7 +822,7 @@ function MarketingInner() {
       {tab === "referral" && (
         <Toolbar
           search={keyword}
-          onSearch={(v) => { setKeyword(v); setPage(1); }}
+          onSearch={(v) => { setKeyword(v); paging.reset(); }}
           searchPlaceholder="搜索邀请号/邀请人/受邀人"
           onExport={onExportOf<Referral>("邀请裂变", [
             { header: "邀请号", value: (r) => r.inviteNo },
@@ -840,7 +839,7 @@ function MarketingInner() {
             {([["records", "邀请记录"], ["rules", "奖励规则"]] as const).map(([k, label]) => (
               <button
                 key={k} type="button" aria-pressed={refView === k}
-                onClick={() => { setRefView(k); setPage(1); }}
+                onClick={() => { setRefView(k); paging.reset(); }}
                 className={segmentedItemClass(refView === k, "px-2.5 py-1 text-sm")}
               >{label}</button>
             ))}
@@ -850,7 +849,7 @@ function MarketingInner() {
       {tab === "ad-slots" && (
         <Toolbar
           search={keyword}
-          onSearch={(v) => { setKeyword(v); setPage(1); }}
+          onSearch={(v) => { setKeyword(v); paging.reset(); }}
           searchPlaceholder="搜索广告位号/机柜号"
           onAdd={canEditAd ? () => setSlotForm({ position: "SCREEN", status: "IDLE", size: "1080x1920" }) : undefined}
           addLabel="新增广告位"
@@ -867,7 +866,7 @@ function MarketingInner() {
       {tab === "ad-campaigns" && (
         <Toolbar
           search={keyword}
-          onSearch={(v) => { setKeyword(v); setPage(1); }}
+          onSearch={(v) => { setKeyword(v); paging.reset(); }}
           searchPlaceholder="搜索广告号/广告主/创意"
           onAdd={canEditAd ? () => setAdForm({ status: "DRAFT", startAt: "", endAt: "" }) : undefined}
           addLabel="新增广告活动"
@@ -885,7 +884,7 @@ function MarketingInner() {
       {tab === "ad-delivery" && (
         <Toolbar
           search={keyword}
-          onSearch={(v) => { setKeyword(v); setPage(1); }}
+          onSearch={(v) => { setKeyword(v); paging.reset(); }}
           searchPlaceholder="搜索投放号/广告号/广告位"
           onExport={onExportOf<AdDelivery>(`投放与曝光-${periodLabel(period)}`, [
             { header: "投放号", value: (d) => d.deliveryNo },
@@ -900,37 +899,37 @@ function MarketingInner() {
               动作（上线/暂停/下线）挂在广告活动上，不挂事实表 */}
           <FilterSelect
             value={period}
-            onChange={(v) => { setPeriod(v as ReportPeriod); setPage(1); }}
+            onChange={(v) => { setPeriod(v as ReportPeriod); paging.reset(); }}
             options={REPORT_PERIODS.map((x) => ({ value: x.value, label: x.label }))}
             aria-label="按统计周期筛选"
           />
         </Toolbar>
       )}
-      {tab === "notices" && <DataTable rowKey={(n: Notice) => n.noticeNo} columns={noticeCols} rows={q.data?.list as Notice[]} loading={q.isLoading} rowClassName={archivedRowClass} empty={showArchived ? "没有匹配的公告——换个关键词，或点「新增公告」发布第一条 C 端公告条。" : "暂无在用公告——可能都已归档（打开「显示已归档」查看），或点「新增公告」发布第一条。"} />}
-      {tab === "coupons" && <DataTable rowKey={(c: Coupon) => c.couponNo} columns={couponCols} rows={q.data?.list as Coupon[]} loading={q.isLoading} rowClassName={archivedRowClass} empty={showArchived ? "没有匹配的优惠券——换个关键词，或点「新增优惠券」建一张。" : "暂无在用优惠券——可能都已归档（打开「显示已归档」查看），或点「新增优惠券」建第一张。"} />}
-      {tab === "coupon-issues" && <DataTable rowKey={(r: CouponIssueRecord) => r.issueNo} columns={issueCols} rows={q.data?.list as CouponIssueRecord[]} loading={q.isLoading} empty="暂无发放记录——到「优惠券」tab 选一张在用的券点「发放」，这里会逐笔留痕。" />}
+      {tab === "notices" && <DataTable rowKey={(n: Notice) => n.noticeNo} columns={noticeCols} rows={q.data?.list as Notice[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} rowClassName={archivedRowClass} empty={showArchived ? "没有匹配的公告——换个关键词，或点「新增公告」发布第一条 C 端公告条。" : "暂无在用公告——可能都已归档（打开「显示已归档」查看），或点「新增公告」发布第一条。"} />}
+      {tab === "coupons" && <DataTable rowKey={(c: Coupon) => c.couponNo} columns={couponCols} rows={q.data?.list as Coupon[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} rowClassName={archivedRowClass} empty={showArchived ? "没有匹配的优惠券——换个关键词，或点「新增优惠券」建一张。" : "暂无在用优惠券——可能都已归档（打开「显示已归档」查看），或点「新增优惠券」建第一张。"} />}
+      {tab === "coupon-issues" && <DataTable rowKey={(r: CouponIssueRecord) => r.issueNo} columns={issueCols} rows={q.data?.list as CouponIssueRecord[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无发放记录——到「优惠券」tab 选一张在用的券点「发放」，这里会逐笔留痕。" />}
       {tab === "campaigns" && (
         <InfoNotice>
           启停走状态机：草稿 / 已暂停 →启动→ 进行中 →暂停→ 已暂停；进行中 / 已暂停 →结束→ 已结束（终态，不可复活）。
           结束时间已过的活动不能启动——请先在编辑里延长结束时间。
         </InfoNotice>
       )}
-      {tab === "campaigns" && <DataTable rowKey={(c: Campaign) => c.campaignNo} columns={campaignCols} rows={q.data?.list as Campaign[]} loading={q.isLoading} empty={campaignStatus ? `没有「${CAMPAIGN_STATUS[campaignStatus as Campaign["status"]].label}」的活动——换个状态看看。` : "暂无营销活动——点「新增活动」配置满减 / 拉新 / 签到规则。"} />}
-      {tab === "push" && <DataTable rowKey={(p: PushMessage) => p.pushNo} columns={pushCols} rows={q.data?.list as PushMessage[]} loading={q.isLoading} empty="暂无推送任务——点「新增推送」创建一条 App 推送或订阅消息。" />}
-      {tab === "referral" && refView === "records" && <DataTable rowKey={(r: Referral) => r.inviteNo} columns={referralCols} rows={q.data?.list as Referral[]} loading={q.isLoading} empty="暂无邀请记录——用户在 C 端发起邀请后自动生成，无需在此手工录入。" />}
+      {tab === "campaigns" && <DataTable rowKey={(c: Campaign) => c.campaignNo} columns={campaignCols} rows={q.data?.list as Campaign[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty={campaignStatus ? `没有「${CAMPAIGN_STATUS[campaignStatus as Campaign["status"]].label}」的活动——换个状态看看。` : "暂无营销活动——点「新增活动」配置满减 / 拉新 / 签到规则。"} />}
+      {tab === "push" && <DataTable rowKey={(p: PushMessage) => p.pushNo} columns={pushCols} rows={q.data?.list as PushMessage[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无推送任务——点「新增推送」创建一条 App 推送或订阅消息。" />}
+      {tab === "referral" && refView === "records" && <DataTable rowKey={(r: Referral) => r.inviteNo} columns={referralCols} rows={q.data?.list as Referral[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无邀请记录——用户在 C 端发起邀请后自动生成，无需在此手工录入。" />}
       {tab === "referral" && refView === "rules" && (
         <>
           {canEditAd
             ? <div className="mb-3 flex justify-end"><Button size="sm" onClick={() => setRuleForm({ rewardTo: "BOTH", trigger: "FIRST_ORDER", currency: "AED", maxPerInviter: 10, status: "ACTIVE" })}>新增规则</Button></div>
             : <ReadOnlyNotice what="奖励规则配置" perm="marketing:ad:manage" />}
-          <DataTable rowKey={(r: ReferralRule) => r.ruleNo} columns={ruleCols} rows={rules.data?.list} loading={rules.isLoading}
+          <DataTable rowKey={(r: ReferralRule) => r.ruleNo} columns={ruleCols} rows={rules.data?.list} loading={rules.isLoading} error={rules.error} onRetry={rules.refetch}
             empty="还没有奖励规则——没有生效规则时 C 端邀请不发奖，点「新增规则」配置奖多少、奖给谁、什么条件触发。" />
         </>
       )}
-      {tab === "ad-slots" && <DataTable rowKey={(s: AdSlot) => s.slotNo} columns={slotCols} rows={q.data?.list as AdSlot[]} loading={q.isLoading} empty="暂无广告位——点「新增广告位」把机柜屏幕 / 机身登记为可售位。" />}
-      {tab === "ad-campaigns" && <DataTable rowKey={(a: AdCampaign) => a.adNo} columns={adCampaignCols} rows={q.data?.list as AdCampaign[]} loading={q.isLoading} empty="暂无广告活动——点「新增广告活动」录入广告主与创意后再排期投放。" />}
-      {tab === "ad-delivery" && <DataTable rowKey={(d: AdDelivery) => d.deliveryNo} columns={deliveryCols} rows={q.data?.list as AdDelivery[]} loading={q.isLoading} empty={`${periodLabel(period)}内没有投放数据——曝光按天回传，需广告先上线；可换更长的周期再看。`} />}
-      {q.data && <Pagination page={page} size={SIZE} total={q.data.total} onPage={setPage} />}
+      {tab === "ad-slots" && <DataTable rowKey={(s: AdSlot) => s.slotNo} columns={slotCols} rows={q.data?.list as AdSlot[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无广告位——点「新增广告位」把机柜屏幕 / 机身登记为可售位。" />}
+      {tab === "ad-campaigns" && <DataTable rowKey={(a: AdCampaign) => a.adNo} columns={adCampaignCols} rows={q.data?.list as AdCampaign[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无广告活动——点「新增广告活动」录入广告主与创意后再排期投放。" />}
+      {tab === "ad-delivery" && <DataTable rowKey={(d: AdDelivery) => d.deliveryNo} columns={deliveryCols} rows={q.data?.list as AdDelivery[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty={`${periodLabel(period)}内没有投放数据——曝光按天回传，需广告先上线；可换更长的周期再看。`} />}
+      {q.data && <Pagination page={paging.page} size={paging.size} total={q.data.total} onPage={paging.setPage} onSize={paging.setSize} />}
 
       <FormDrawer
         open={!!ruleForm}

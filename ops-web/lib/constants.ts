@@ -26,3 +26,15 @@ export const SEARCH_DEBOUNCE_MS = 300;
  * 多市场下由数据自带 `currency` 覆盖 —— 页面**不要**自己写 `"AED"` 字面量。
  */
 export const DEFAULT_CURRENCY = "AED";
+
+/**
+ * 详情页「最近 N 条」子列表的条数（跟进记录、信用变动、干预记录…）。
+ *
+ * 与 {@link UNPAGED_SIZE} 不是一回事：那个的意思是「这张表设计上有界，一次取完」，
+ * 这个的意思是「这张表会一直长，这里**只看最近的**」。两者混用会让人以为
+ * 详情页展示的是全部 —— 它不是。
+ */
+export const RECENT_LIMIT = 50;
+
+/** 全局搜索下拉的预览条数。不是分页，是「先给几条看看」。 */
+export const SEARCH_PREVIEW_SIZE = 10;

@@ -35,7 +35,7 @@ const CALL_SITES = [...walk(join(ROOT, "app")), ...walk(join(ROOT, "components")
 const read = (p: string) => readFileSync(p, "utf8");
 
 describe("列表接线棘轮（数字只许降）", () => {
-  it("裸 DataTable 未接 error 的调用点 ≤ 111", () => {
+  it("裸 DataTable 未接 error 的调用点 ≤ 24", () => {
     let n = 0;
     for (const p of CALL_SITES) {
       const s = read(p);
@@ -45,17 +45,17 @@ describe("列表接线棘轮（数字只许降）", () => {
         if (!(end > 0 ? seg.slice(0, end) : seg).includes("error")) n++;
       }
     }
-    expect(n).toBeLessThanOrEqual(111);
+    expect(n).toBeLessThanOrEqual(24);
   });
 
-  it("页面层的 size 数字字面量 ≤ 36", () => {
+  it("页面层的 size 数字字面量 ≤ 0", () => {
     let n = 0;
     for (const p of CALL_SITES) n += [...read(p).matchAll(/size: \d{2,}/g)].length;
-    expect(n).toBeLessThanOrEqual(36);
+    expect(n).toBeLessThanOrEqual(0);
   });
 
-  it("手写 useState(1) 分页的文件 ≤ 15", () => {
+  it("手写 useState(1) 分页的文件 ≤ 2", () => {
     const n = CALL_SITES.filter((p) => /useState\(1\)/.test(read(p))).length;
-    expect(n).toBeLessThanOrEqual(15);
+    expect(n).toBeLessThanOrEqual(2);
   });
 });

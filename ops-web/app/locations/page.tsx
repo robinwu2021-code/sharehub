@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { UNPAGED_SIZE, RECENT_LIMIT } from "@/lib/constants";
 import { api } from "@/lib/api";
 import { PageTitle, Pagination } from "@/components/ui/misc";
 import { usePaging } from "@/lib/hooks/use-paging";
@@ -152,7 +153,7 @@ function LocationsInner() {
   const canLead = allow("location:lead:update");
 
   // 站点表单的区域下拉数据源（system 域字典）
-  const regionsQ = useQuery({ queryKey: ["regions-dict"], queryFn: () => api.listRegions({ page: 1, size: 100 }) });
+  const regionsQ = useQuery({ queryKey: ["regions-dict"], queryFn: () => api.listRegions({ page: 1, size: UNPAGED_SIZE }) });
   const q = useQuery<PageResult<Site | SitePoint | Venue | Contract | Lead | SiteAnalysis | VenueOnboarding | SiteLifecycle>>({
     // showArchived 必须进 queryKey，否则切开关不重新拉数据
     queryKey: ["place", tab, paging.page, paging.size, keyword, showArchived, period],
@@ -196,7 +197,7 @@ function LocationsInner() {
   // 跟进流水：只查当前详情线索的记录（同订单干预历史的做法）
   const followUpsQ = useQuery({
     queryKey: ["lead-follow-ups", leadDetail?.leadNo],
-    queryFn: () => api.listLeadFollowUps(leadDetail!.leadNo, { size: 50 }),
+    queryFn: () => api.listLeadFollowUps(leadDetail!.leadNo, { size: RECENT_LIMIT }),
     enabled: !!leadDetail,
   });
   const addFollowUp = useMutation({

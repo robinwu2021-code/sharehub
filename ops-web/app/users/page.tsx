@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { UNPAGED_SIZE, RECENT_LIMIT } from "@/lib/constants";
 import { api } from "@/lib/api";
 import { Pagination } from "@/components/ui/misc";
 import { usePaging } from "@/lib/hooks/use-paging";
@@ -271,7 +272,7 @@ function UsersInner() {
   const [benefitForm, setBenefitForm] = useState<Partial<MemberBenefit> | null>(null);
   const benefits = useQuery({
     queryKey: ["member-benefits"],
-    queryFn: () => api.listMemberBenefits({ size: 10 }),
+    queryFn: () => api.listMemberBenefits({ size: UNPAGED_SIZE }),
     enabled: tab === "members",
   });
   const saveBenefit = useMutation({
@@ -353,7 +354,7 @@ function UsersInner() {
     && creditAfter >= CREDIT_SCORE_MIN && creditAfter <= CREDIT_SCORE_MAX && !!creditReason.trim();
   const creditHistory = useQuery({
     queryKey: ["credit-score-changes", creditRow?.userNo],
-    queryFn: () => api.listCreditScoreChanges({ cUserNo: creditRow!.userNo, size: 50 }),
+    queryFn: () => api.listCreditScoreChanges({ cUserNo: creditRow!.userNo, size: RECENT_LIMIT }),
     enabled: !!creditRow,
   });
   const adjustCredit = useMutation({

@@ -57,12 +57,28 @@ export function useNavTabs(
  *
  * 调用方所在的组件必须在 `<Suspense>` 内（静态导出 + `useSearchParams` 的硬要求）。
  */
-export function usePageTab(tabs: PageTab[], onChange?: () => void, param: "tab" | "view" = "tab") {
+export interface PageTabOptions {
+  /**
+   * 页内切换参数：多数页 `?tab=`，工单页 `?view=`。菜单里那条叶子用哪个，这里就得用哪个 ——
+   * 读错的表现是深链点进去永远落在默认 tab。
+   */
+  param?: "tab" | "view";
+  /**
+   * URL 没带 tab 时落在哪一个。
+   *
+   * **不传就是列表里的第一个**，而这对少数页面是错的：`/marketing` 的默认随分期变
+   * （阶段 1 公告、阶段 2 起优惠券），tab 顺序却固定。漏传的表现很隐蔽 ——
+   * 面包屑按菜单显示「优惠券」，页面内容却是公告，两者对不上
+   * （2026-09-23 浏览器实测撞到过）。
+   */
+  defaultKey?: string;
+}
+
+export function usePageTab(tabs: PageTab[], onChange?: () => void, opts: PageTabOptions = {}) {
+  const { param = "tab", defaultKey } = opts;
   const sp = useSearchParams();
-  // 页内切换参数有两种写法：多数页 `?tab=`，工单页 `?view=`。菜单里那条叶子用哪个，
-  // 这里就得读哪个 —— 读错的表现是深链点进去永远落在默认 tab。
   const qTab = sp.get(param);
-  const fallback = tabs[0]?.key ?? "";
+  const fallback = (defaultKey && tabs.some((t) => t.key === defaultKey) ? defaultKey : tabs[0]?.key) ?? "";
   const valid = React.useCallback((k: string | null): k is string => !!k && tabs.some((t) => t.key === k), [tabs]);
   const [tab, setTabState] = React.useState(() => (valid(qTab) ? qTab : fallback));
 

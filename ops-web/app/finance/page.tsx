@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
 import { PageTitle, Pagination, StatCard } from "@/components/ui/misc";
 import { usePaging } from "@/lib/hooks/use-paging";
@@ -255,18 +256,18 @@ function FinanceInner() {
   // 结算对象候选：场地方 / 代理商各自的主数据，抽屉打开才拉
   const venuesQ = useQuery({
     queryKey: ["stl-venues"],
-    queryFn: () => api.listVenues({ page: 1, size: 200 }),
+    queryFn: () => api.listVenues({ page: 1, size: UNPAGED_SIZE }),
     enabled: !!genForm && genForm.payeeType === "VENUE",
   });
   const agentsQ = useQuery({
     queryKey: ["stl-agents"],
-    queryFn: () => api.listAgents({ page: 1, size: 200 }),
+    queryFn: () => api.listAgents({ page: 1, size: UNPAGED_SIZE }),
     enabled: !!genForm && genForm.payeeType === "AGENT",
   });
   // 结算单构成明细：这张单的钱是哪几笔分润凑出来的
   const stlRecordsQ = useQuery({
     queryKey: ["stl-records", stlDetail?.settleNo ?? ""],
-    queryFn: () => api.listSettlementRecords(stlDetail!.settleNo, { page: 1, size: 100 }),
+    queryFn: () => api.listSettlementRecords(stlDetail!.settleNo, { page: 1, size: UNPAGED_SIZE }),
     enabled: !!stlDetail,
   });
 
@@ -377,7 +378,7 @@ function FinanceInner() {
   // 开票只能挂在**已确认**的结算单上（草稿单还可能重算），金额由该单带出，页面不让手输一个对不上的数。
   const invSettlementsQ = useQuery({
     queryKey: ["inv-settlements"],
-    queryFn: () => api.listSettlements({ page: 1, size: 200 }),
+    queryFn: () => api.listSettlements({ page: 1, size: UNPAGED_SIZE }),
     enabled: !!invoiceForm,
   });
   const invSourceOptions = useMemo(

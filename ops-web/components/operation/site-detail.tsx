@@ -7,6 +7,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus } from "lucide-react";
+import { RECENT_LIMIT, UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
 import type { Site, SitePoint, Cabinet, Contract, PricingDiff, ShareRule, AuditEntry } from "@/lib/types";
 import { useCan } from "@/lib/use-can";
@@ -69,42 +70,42 @@ export function SiteDetailDrawer({
   // 站点本体：列表页已有数据，但深链直接打开时列表可能还没加载，故独立取一次
   const siteQ = useQuery({
     queryKey: ["op", "site", siteNo],
-    queryFn: async () => (await api.listSites({ page: 1, size: 200 })).list.find((s) => s.siteNo === siteNo),
+    queryFn: async () => (await api.listSites({ page: 1, size: UNPAGED_SIZE })).list.find((s) => s.siteNo === siteNo),
     enabled: !!siteNo,
   });
   const site = siteQ.data as Site | undefined;
 
   const pointsQ = useQuery({
     queryKey: ["op", "site-points", siteNo],
-    queryFn: () => api.listLocations({ page: 1, size: 200, siteNo: siteNo! }),
+    queryFn: () => api.listLocations({ page: 1, size: UNPAGED_SIZE, siteNo: siteNo! }),
     enabled: !!siteNo && ["points", "cabinets", "stats"].includes(active),
   });
   const cabinetsQ = useQuery({
     queryKey: ["op", "site-cabinets", siteNo],
-    queryFn: () => api.listCabinets({ page: 1, size: 200 }),
+    queryFn: () => api.listCabinets({ page: 1, size: UNPAGED_SIZE }),
     enabled: !!siteNo && active === "cabinets",
   });
   const contractsQ = useQuery({
     queryKey: ["op", "site-contracts", siteNo],
-    queryFn: () => api.listContracts({ page: 1, size: 200 }),
+    queryFn: () => api.listContracts({ page: 1, size: UNPAGED_SIZE }),
     enabled: !!siteNo && ["contracts", "sharing"].includes(active),
   });
   const pricingQ = useQuery({
     queryKey: ["op", "site-pricing", siteNo],
     queryFn: async () => ({
-      diffs: (await api.listPricingDiffs({ page: 1, size: 200 })).list,
-      plans: (await api.listPricePlans({ page: 1, size: 200 })).list,
+      diffs: (await api.listPricingDiffs({ page: 1, size: UNPAGED_SIZE })).list,
+      plans: (await api.listPricePlans({ page: 1, size: UNPAGED_SIZE })).list,
     }),
     enabled: !!siteNo && active === "pricing",
   });
   const sharingQ = useQuery({
     queryKey: ["op", "site-sharing", siteNo],
-    queryFn: () => api.listShareRules({ page: 1, size: 200 }),
+    queryFn: () => api.listShareRules({ page: 1, size: UNPAGED_SIZE }),
     enabled: !!siteNo && active === "sharing",
   });
   const auditQ = useQuery({
     queryKey: ["op", "site-audit", siteNo],
-    queryFn: () => api.listAudits({ page: 1, size: 50, keyword: siteNo! }),
+    queryFn: () => api.listAudits({ page: 1, size: RECENT_LIMIT, keyword: siteNo! }),
     enabled: !!siteNo && active === "audit",
   });
 
