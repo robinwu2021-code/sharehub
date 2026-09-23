@@ -41,23 +41,50 @@ def scan_frontend_calls():
                     continue
                 p = os.path.join(base, f)
                 s = io.open(p, encoding='utf-8').read()
-                for m in re.finditer(
-                        r'\b(get|post|put|del|delete|patch)\s*<[^>]*>\s*\(\s*[`"\']([^`"\']+)[`"\']',
-                        s):
-                    verb = {'del': 'DELETE'}.get(m.group(1), m.group(1).upper())
-                    calls.append({'verb': verb, 'path': normalize(m.group(2)),
-                                  'raw': m.group(2), 'file': os.path.relpath(p, ROOT)})
-                for m in re.finditer(
-                        r'\b(get|post|put|del|delete|patch)\s*\(\s*[`"\']([^`"\']+)[`"\']', s):
-                    verb = {'del': 'DELETE'}.get(m.group(1), m.group(1).upper())
-                    calls.append({'verb': verb, 'path': normalize(m.group(2)),
-                                  'raw': m.group(2), 'file': os.path.relpath(p, ROOT)})
+                calls.extend(calls_in(s, os.path.relpath(p, ROOT)))
     seen, out = set(), []
     for c in calls:
         k = (c['verb'], c['path'])
         if k not in seen:
             seen.add(k)
             out.append(c)
+    return out
+
+
+VERB_CALL = re.compile(r'\b(get|post|put|del|delete|patch)\s*(?:<[^>()]*>)?\s*\(')
+PATH_LIT = re.compile(r'[`"\'](/(?:api|internal|mp)/[^`"\']*)[`"\']')
+
+
+def calls_in(src, relpath):
+    """抠出一个前端文件里的 (verb, path)。
+
+    **不要求路径字面量紧跟在 `(` 之后** —— 这是 2026-09-23 修掉的缺陷：
+    原正则写的是 `\(\s*[`"\']`，于是
+
+        client.post(x.accountNo ? `/api/x/${x.no}` : "/api/x", x)
+
+    这种三元写法整条匹配不上，**两个路径一起漏报成「前端未调用」**。
+    实测误报率 84%（运营端 113 条里 95 条是假的），而[实现状态总表] §六
+    「131 条前端未接线」正是照抄这份输出 —— 按它排期会去做 95 条不存在的工作。
+
+    改法：先用 verb 定位调用，再在**括号配平的实参区**里找出全部路径字面量。
+    一次调用里有几个路径就记几个（三元两分支、拼接前缀，都算）。
+    """
+    out = []
+    for m in VERB_CALL.finditer(src):
+        verb = {'del': 'DELETE'}.get(m.group(1), m.group(1).upper())
+        i, depth = m.end() - 1, 0
+        while i < len(src):                     # 括号配平，取完整实参区
+            if src[i] == '(':
+                depth += 1
+            elif src[i] == ')':
+                depth -= 1
+                if depth == 0:
+                    break
+            i += 1
+        for pm in PATH_LIT.finditer(src[m.end():i]):
+            out.append({'verb': verb, 'path': normalize(pm.group(1)),
+                        'raw': pm.group(1), 'file': relpath})
     return out
 
 
@@ -70,6 +97,41 @@ def normalize(p):
 
 
 # ─────────────────────────── 前端：类型定义 ───────────────────────────
+
+def top_level_fields(body):
+    """只取**顶层**字段，跳过嵌套对象字面量内部。
+
+    2026-09-23 修：原来对整个 body 跑一遍正则，于是
+
+        trend: { day: string; gmv: number; orders: number }[];
+        todos: { pendingWorkOrders: number; pendingRefunds: number };
+
+    里的 gmv / orders / pendingRefunds 都被当成了顶层字段，
+    与后端顶层记录组件一比就报「前端有后端无」——**DashboardStats 因此凭空多出 4 条缺口，
+    而它一个都不缺**。OperationOverview 的 `total`（在 geoReady 里）同理。
+    """
+    fields, depth, seg = [], 0, []
+    for ch in body:
+        if ch in '{[(':
+            depth += 1
+        elif ch in '}])':
+            depth -= 1
+        if depth == 0 and ch in ';\n':
+            line = ''.join(seg)
+            fm = re.match(r'\s*(\w+)(\??)\s*:\s*(.+)', line, re.S)
+            if fm:
+                fields.append({'name': fm.group(1), 'optional': fm.group(2) == '?',
+                               'type': fm.group(3).strip().rstrip(',')})
+            seg = []
+        else:
+            seg.append(ch)
+    line = ''.join(seg)
+    fm = re.match(r'\s*(\w+)(\??)\s*:\s*(.+)', line, re.S)
+    if fm:
+        fields.append({'name': fm.group(1), 'optional': fm.group(2) == '?',
+                       'type': fm.group(3).strip().rstrip(',')})
+    return fields
+
 
 def scan_frontend_types():
     """抽 ops-web `lib/types/*.ts` 的 interface / type 字面量字段。"""
@@ -95,10 +157,7 @@ def scan_frontend_types():
                         break
                 i += 1
             body = s[m.end():i]
-            fields = []
-            for fm in re.finditer(r'(\w+)(\??)\s*:\s*([^;\n]+)', body):
-                fields.append({'name': fm.group(1), 'optional': fm.group(2) == '?',
-                               'type': fm.group(3).strip().rstrip(',')})
+            fields = top_level_fields(body)
             if fields:
                 types[name] = {'file': 'lib/types/' + f, 'fields': fields}
     return types
