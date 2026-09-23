@@ -81,7 +81,9 @@ public class PricePlanServiceImpl extends AbstractCrudService<PricePlan, PricePl
                         .eq(PricePlanScope::getPlanNo, planNo)
                         .orderByAsc(PricePlanScope::getId))
                 .stream()
-                .map(s -> new PlanScopeEntry(s.getPlanNo(), s.getScopeType(), s.getScopeRef()))
+                .map(s -> new PlanScopeEntry(s.getPlanNo(), s.getScopeType(), s.getScopeRef(),
+                        s.getDeviceType(), s.getVendorCode(), s.getModel(), s.getBrandNo(),
+                        s.getPriority(), str(s.getEffectiveFrom()), str(s.getEffectiveTo())))
                 .toList();
     }
 
@@ -129,5 +131,10 @@ public class PricePlanServiceImpl extends AbstractCrudService<PricePlan, PricePl
                 ? List.of()
                 : Arrays.stream(csv.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
         replaceScope(planNo, scopeType, values);
+    }
+
+    /** 生效期出参用 ISO 串：跨端传时间一律字符串，避免各端各自解 Date 的时区（既有口径）。 */
+    private static String str(java.time.LocalDateTime t) {
+        return t == null ? null : t.toString();
     }
 }

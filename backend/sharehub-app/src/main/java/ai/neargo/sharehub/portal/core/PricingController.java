@@ -2,13 +2,10 @@ package ai.neargo.sharehub.portal.core;
 
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.trade.price.dto.PriceDtos.PricePlanEntry;
-import ai.neargo.sharehub.trade.price.dto.PriceDtos.PricingDiff;
 import ai.neargo.sharehub.trade.price.dto.PriceDtos.PricingSchedule;
 import ai.neargo.sharehub.trade.price.entity.PricePlan;
-import ai.neargo.sharehub.trade.price.entity.PriceRule;
 import ai.neargo.sharehub.trade.price.entity.PriceSchedule;
 import ai.neargo.sharehub.trade.price.service.PricePlanService;
-import ai.neargo.sharehub.trade.price.service.PricingDiffService;
 import ai.neargo.sharehub.trade.price.service.PricingScheduleService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -30,13 +27,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 public class PricingController {
 
     private final PricePlanService planService;
-    private final PricingDiffService diffService;
     private final PricingScheduleService scheduleService;
 
-    public PricingController(PricePlanService planService, PricingDiffService diffService,
-                             PricingScheduleService scheduleService) {
+    public PricingController(PricePlanService planService, PricingScheduleService scheduleService) {
         this.planService = planService;
-        this.diffService = diffService;
         this.scheduleService = scheduleService;
     }
 
@@ -64,31 +58,14 @@ public class PricingController {
         return planService.save(body);
     }
 
-    // —— 差异化定价 ——
-
-    @GetMapping("/pricing-diffs")
-    @PreAuthorize("@perm.can('pricing:rule:read')")
-    public PageResult<PricingDiff> pricingDiffs(@RequestParam(required = false) Integer page,
-                                                @RequestParam(required = false) Integer size,
-                                                @RequestParam(required = false) String keyword,
-                                                @RequestParam(required = false) String planNo,
-                                                @RequestParam(required = false) String dimension) {
-        return diffService.page(page, size, keyword,
-                Map.of("planNo", nz(planNo), "dimension", nz(dimension)));
-    }
-
-    @PostMapping("/pricing-diffs")
-    @PreAuthorize("@perm.can('pricing:rule:update')")
-    public PricingDiff createPricingDiff(@RequestBody PriceRule body) {
-        return diffService.save(body);
-    }
-
-    @PostMapping("/pricing-diffs/{ruleNo}")
-    @PreAuthorize("@perm.can('pricing:rule:update')")
-    public PricingDiff updatePricingDiff(@PathVariable String ruleNo, @RequestBody PriceRule body) {
-        body.setRuleNo(ruleNo);
-        return diffService.save(body);
-    }
+    /*
+     * 「差异化定价」的三个端点已于 2026-09-23 退役（ADR-028 / V46）。
+     *
+     * 它读写的 `price_rule` 表达的是「站点/场景 → 方案」，与收费方案上的「适用范围」
+     * （`price_plan_scope`）说的是同一件事。两套机制并存，而**取价引擎两套都没读到**：
+     * 引擎读 price_rule，但下单处从未把站点传进来。留着一个已经没有表的写入口，
+     * 只会让人以为配了有用。范围维护统一在「运营管理 › 收费方案 › 适用范围」。
+     */
 
     // —— 活动 / 时段价 ——
 

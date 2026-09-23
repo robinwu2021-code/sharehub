@@ -27,19 +27,18 @@ public final class PriceDtos {
                                  String currency, String scope, String status, String archivedAt) {
     }
 
-    /** 计费模板适用范围一行，镜像 {@code price_plan_scope}（[db-design §1.7]）。 */
-    public record PlanScopeEntry(String planNo, String scopeType, String scopeRef) {
-    }
-
     /**
-     * 差异化定价行，镜像前端 {@code PricingDiff}。
+     * 收费方案适用范围一行，镜像 {@code price_plan_scope} —— **取价的唯一依据**（ADR-028）。
      *
-     * <p>字段名以前端收敛口径为准：{@code freeMinutes}(列 {@code free_mins})、
-     * {@code capDaily}(列 {@code day_cap})。
+     * <p>2026-09-23 扩字段：此前只有 {@code (planNo, scopeType, scopeRef)}，是给界面看的展示行；
+     * 现在取价引擎读的就是它，所以设备类型、过滤器、优先级、生效期都必须能编辑，
+     * 否则「界面上能配的」少于「引擎会读的」，差额部分只能改库。
+     *
+     * @param scopeType DEVICE/LOCATION/SITE/VENUE/AGENT/SCENE/REGION/ALL，越靠前越具体
      */
-    public record PricingDiff(String ruleNo, String scene, String locationName, Integer freeMinutes,
-                              BigDecimal unitPrice, BigDecimal capDaily, Integer priority, String currency,
-                              String siteNo, String dimension, String matchRef) {
+    public record PlanScopeEntry(String planNo, String scopeType, String scopeRef,
+                                 String deviceType, String vendorCode, String model, String brandNo,
+                                 Integer priority, String effectiveFrom, String effectiveTo) {
     }
 
     /**

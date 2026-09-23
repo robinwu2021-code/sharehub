@@ -31,7 +31,8 @@ public class LocalSiteQuery implements SiteQueryPort {
         return sites.selectList(new LambdaQueryWrapper<LocSite>()
                         .in(LocSite::getSiteNo, siteNos))
                 .stream()
-                .map(s -> new SiteBrief(s.getSiteNo(), s.getName(), s.getRegionId()))
+                .map(s -> new SiteBrief(s.getSiteNo(), s.getName(), s.getRegionId(),
+                        s.getVenueNo(), s.getSceneType()))
                 .toList();
     }
 }

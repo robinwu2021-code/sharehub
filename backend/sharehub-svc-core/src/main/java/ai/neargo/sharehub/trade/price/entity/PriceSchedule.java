@@ -38,4 +38,22 @@ public class PriceSchedule extends BaseEntity {
 
     /** 是否启用（TINYINT(1) → Integer）。 */
     private Integer active;
+
+    // —— 结构化时段（V46）——————————————————————————————
+    // `period` 存的是**展示串**（`周六-周日 18:00-22:00`、`每天`）。后端拿它判倍率
+    // 就得复刻前端那个按中文标签解析的 parser —— 而界面还有英文与阿语。
+    // 用展示串做判断，与本项目栽过的「按名字连表」是同一类错。
+    // 故判断只读下面这几列，`period` 降级为纯展示。
+
+    /** 生效星期 CSV，{@code 1}=周一 … {@code 7}=周日；空 = 每天。 */
+    private String days;
+
+    /** {@code HH:mm}；与 {@link #timeTo} 同时为空 = 全天。 */
+    private String timeFrom;
+
+    /** {@code HH:mm}；可跨零点（{@code 22:00-06:00} 合法）。 */
+    private String timeTo;
+
+    /** 节假日等日历表达式；**本期不参与计算**，原样保留待日历能力。 */
+    private String expr;
 }

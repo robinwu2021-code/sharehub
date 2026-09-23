@@ -17,12 +17,17 @@ import ai.neargo.sharehub.trade.order.entity.OrdRentExt;
 import ai.neargo.sharehub.trade.order.mapper.OrdRentExtMapper;
 import ai.neargo.sharehub.trade.price.engine.PriceEngine;
 import ai.neargo.sharehub.trade.price.engine.PriceResolver;
+import ai.neargo.sharehub.api.platform.dto.SiteBrief;
+import ai.neargo.sharehub.api.platform.port.SiteQueryPort;
 import ai.neargo.sharehub.trade.price.engine.ChargeChain;
+import ai.neargo.sharehub.trade.price.engine.PriceMultiplierResolver;
+import ai.neargo.sharehub.trade.price.engine.PriceQuery;
 import ai.neargo.sharehub.trade.mapper.OrdMapper;
 import ai.neargo.sharehub.trade.service.RentOrderService;
 import ai.neargo.sharehub.api.core.event.OrderSettledEvent;
 import ai.neargo.sharehub.common.event.DomainEventBus;
 import ai.neargo.sharehub.dev.entity.DevCabinet;
+import org.springframework.beans.factory.ObjectProvider;
 import ai.neargo.sharehub.dev.mapper.CabinetMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -51,12 +56,18 @@ public class RentOrderServiceImpl implements RentOrderService {
     private final ChargeChain chargeChain;
     private final CabinetMapper cabinetMapper;
     private final DomainEventBus eventBus;
+    private final PriceMultiplierResolver multipliers;
+    /** 站点的场地方 / 场景 / 区域在 platform；跨服务只读面（ADR-017 §5.2）。可缺席 —— 见 {@link #queryOf}。 */
+    private final ObjectProvider<SiteQueryPort> siteQuery;
 
     public RentOrderServiceImpl(OrdMapper mapper, OrdStateMachine stateMachine,
                                 OrdRentExtMapper rentExtMapper, InterventionMapper interventionMapper,
                                 PriceResolver priceResolver, PriceEngine priceEngine,
                                 ChargeChain chargeChain, CabinetMapper cabinetMapper,
-                                DomainEventBus eventBus) {
+                                DomainEventBus eventBus, PriceMultiplierResolver multipliers,
+                                ObjectProvider<SiteQueryPort> siteQuery) {
+        this.multipliers = multipliers;
+        this.siteQuery = siteQuery;
         this.cabinetMapper = cabinetMapper;
         this.eventBus = eventBus;
         this.chargeChain = chargeChain;
@@ -194,9 +205,18 @@ public class RentOrderServiceImpl implements RentOrderService {
         e.setAmount(java.math.BigDecimal.ZERO);
         e.setStartedAt(java.time.LocalDateTime.now());
 
-        // 快照计价规格：**展开后的结构**而非 planNo 引用 —— 改价不影响在途单。
-        // 匹配不到方案会在这里抛异常拒绝下单，而不是留到结算时才发现没法算钱。
-        PriceResolver.Resolved priced = priceResolver.resolve(DEVICE_TYPE_POWERBANK, null, null);
+        /*
+         * 快照计价规格：**展开后的结构**而非 planNo 引用 —— 改价不影响在途单。
+         * 匹配不到方案会在这里抛异常拒绝下单，而不是留到结算时才发现没法算钱。
+         *
+         * ⚠️ 2026-09-23 之前这里是 `resolve(POWERBANK, null, null)` —— **站点压根没传**。
+         * 于是「差异化定价」那套按站点/场景取价的规则从未生效过，每一单都落到设备类型默认方案。
+         * 配置再怎么改都不影响金额，而且不报任何错。现在按机柜反查出完整的取价上下文。
+         */
+        PriceQuery pq = queryOf(cabinetNo, e.getStartedAt());
+        PriceResolver.Resolved priced = priceResolver.resolve(pq);
+        // 时段倍率按**下单时刻**解析一次并随快照定格（ADR-028 §四：跨时段长单不分段）。
+        priced = priced.withMultiplier(multipliers.resolve(pq.regionId(), pq.at()));
         e.setPricePlanNo(priced.planNo());
         e.setPriceSnapshot(priced.toSnapshot());
         e.setCurrency(priced.currency() == null ? CURRENCY : priced.currency());
@@ -230,10 +250,19 @@ public class RentOrderServiceImpl implements RentOrderService {
                 java.util.Map.of("MINUTE", java.math.BigDecimal.valueOf(min)),
                 e.getCurrency()).total();
 
-        // ③④ 分时倍率 / 券 / 免单 —— **按归还时刻重算，不快照**：
-        // 时段价本就依赖使用时段，券与会员权益在结算时才确定（[TDD §1.1]）。
+        /*
+         * ③④ 倍率 / 券 / 免单。
+         *
+         * **倍率从快照读，券与免单按归还时刻算** —— 两者时机不同，别混为一谈：
+         * 倍率在下单时就定格了（ADR-028 §四：按开始时刻取值，跨时段长单不分段），
+         * 归还时重新解析会让「借的时候是平价、还的时候撞上高峰」变成涨价，用户无法预期；
+         * 而券与会员权益本来就是结算时才确定的。
+         *
+         * 原先这里倍率位写死 null —— 「活动/时段价」菜单能存能改，订单一分钱都不多收。
+         */
         ChargeChain.Charged charged = chargeChain.charge(
-                gross, null, couponOffOf(e), null, e.getFreeReason());
+                gross, PriceResolver.multiplierFromSnapshot(e.getPriceSnapshot()),
+                couponOffOf(e), null, e.getFreeReason());
 
         e.setAmount(charged.payable());
         e.setWaivedAmount(charged.waivedAmount());
@@ -244,6 +273,41 @@ public class RentOrderServiceImpl implements RentOrderService {
 
         publishSettled(e);
         return new OkResult(true);
+    }
+
+    /**
+     * 按机柜反查取价上下文（修「下单没传站点」）。
+     *
+     * <p>机柜自己就带 {@code locationNo / siteNo / agentNo / vendorCode / model} —— 这几层不必跨服务。
+     * 只有场地方 / 场景 / 区域在 platform，走 {@link SiteQueryPort} 取。
+     *
+     * <p><b>取不到站点不静默降级</b>：对应层的引用留 {@code null}，那几层就不参与匹配，
+     * 最终落到 {@code ALL} 层（默认方案）并在快照里如实记 {@code level=ALL}。
+     * 不把缺失当成通配 —— 通配会命中一个本不该命中的方案，那正是这次要修的那类错。
+     */
+    private PriceQuery queryOf(String cabinetNo, java.time.LocalDateTime at) {
+        DevCabinet c = cabinetMapper.selectOne(new LambdaQueryWrapper<DevCabinet>()
+                .eq(DevCabinet::getCabinetNo, cabinetNo).last("limit 1"));
+        if (c == null) {
+            // 机柜查不到不在这里拦（弹仓那一步自然会失败），但取价要如实反映「什么都不知道」
+            return PriceQuery.ofDeviceType(DEVICE_TYPE_POWERBANK, at);
+        }
+        String venueNo = null, sceneType = null, regionId = null;
+        SiteQueryPort port = siteQuery.getIfAvailable();
+        if (port != null && c.getSiteNo() != null && !c.getSiteNo().isBlank()) {
+            SiteBrief b = port.briefsByNos(java.util.List.of(c.getSiteNo()))
+                    .stream().findFirst().orElse(null);
+            if (b != null) {
+                venueNo = b.venueNo();
+                sceneType = b.sceneType();
+                regionId = b.regionId();
+            }
+        }
+        return new PriceQuery(
+                c.getDeviceType() == null ? DEVICE_TYPE_POWERBANK : c.getDeviceType(),
+                c.getCabinetNo(), c.getLocationNo(), c.getSiteNo(),
+                venueNo, c.getAgentNo(), sceneType, regionId,
+                c.getVendorCode(), c.getModel(), null /* brandNo 待 B1 品牌落地 */, at);
     }
 
     /**

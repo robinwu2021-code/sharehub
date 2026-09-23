@@ -8,6 +8,7 @@ import ai.neargo.sharehub.loc.LocService;
 import ai.neargo.sharehub.loc.dto.LocDtos.Site;
 import ai.neargo.sharehub.platform.sys.service.BizRuleService;
 import ai.neargo.sharehub.trade.price.engine.PriceItemSpec;
+import ai.neargo.sharehub.trade.price.engine.PriceQuery;
 import ai.neargo.sharehub.trade.price.engine.PriceResolver;
 import ai.neargo.sharehub.user.core.service.UserFavoriteService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -154,9 +155,18 @@ public class MpNearbyController {
         return m;
     }
 
-    /** 站点报价：解析该站点生效计价方案的时间项 → 每小时单价 + 日封顶。 */
+    /**
+     * 站点报价：解析该站点生效计价方案的时间项 → 每小时单价 + 日封顶。
+     *
+     * <p>C 端列表只知道站点与场景 —— 机柜、点位、代理、厂商这些更具体的层在这里无从判断，
+     * 对应引用留 {@code null}，那几层就不参与匹配（{@link PriceQuery} 的约定：
+     * null = 无从判断，不是通配）。所以列表价是**站点级的展示价**，
+     * 真正的成单价以借出时按具体机柜解析的快照为准。
+     */
     private Quote quoteOf(String siteNo, String sceneType) {
-        PriceResolver.Resolved r = prices.resolve("POWERBANK", siteNo, sceneType);
+        PriceResolver.Resolved r = prices.resolve(new PriceQuery(
+                "POWERBANK", null, null, siteNo, null, null, sceneType, null,
+                null, null, null, java.time.LocalDateTime.now()));
         BigDecimal perHour = BigDecimal.ZERO;
         BigDecimal dailyCap = BigDecimal.ZERO;
         for (PriceItemSpec spec : r.specs()) {
