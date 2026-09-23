@@ -21,50 +21,72 @@ export interface PricePlan extends Archivable {
   status: "ACTIVE" | "DISABLED";
 }
 
-// —— 计费 · 待建功能补全（trade 域）——
+// —— 适用范围：取价的唯一依据（ADR-028）——
 
 /**
- * 取价维度（对齐后端 `PriceRule.dimension`）：SITE=单站 · LOCATION=站内单点 · SCENE=同场景全部站点。
- * 命中多条时按 `priority` 取第一条（数值小者优先，与后端计价约定一致）。
+ * 适用范围的层。**顺序即优先级**，越靠前越具体（与后端 `ScopeLevel` 的声明顺序一一对应）。
+ *
+ * <p>2026-09-23 取代了原来的 `PricingDimension`（SITE/LOCATION/SCENE 三维）。
+ * 那套叫「差异化定价」，与方案上的「适用范围」表达同一件事，而取价引擎**两套都没读到**
+ * （下单时站点压根没传进去）。现在只有这一套。
  */
-export type PricingDimension = "SITE" | "LOCATION" | "SCENE";
-/** 维度展示文案 SSOT：表单下拉、表格徽标、CSV 导出共用这一份，防止三处各叫各的。 */
-export const PRICING_DIMENSION_LABEL: Record<PricingDimension, string> = {
-  SITE: "站点", LOCATION: "点位", SCENE: "场景",
+export const SCOPE_LEVELS = [
+  "DEVICE", "LOCATION", "SITE", "VENUE", "AGENT", "SCENE", "REGION", "ALL",
+] as const;
+export type ScopeLevel = (typeof SCOPE_LEVELS)[number];
+
+/** 层的展示文案与它选的是什么 —— 表单下拉、表格徽标共用这一份。 */
+export const SCOPE_LEVEL_LABEL: Record<ScopeLevel, string> = {
+  DEVICE: "单台设备", LOCATION: "点位", SITE: "站点", VENUE: "场地方",
+  AGENT: "代理商", SCENE: "场景", REGION: "区域", ALL: "默认（全部）",
 };
 
+/** `ALL` 层的引用值。空串会与「没填」混淆，故用显式的 `*`（与后端 `ScopeLevel.ALL_REF` 一致）。 */
+export const SCOPE_ALL_REF = "*";
+
 /**
- * 差异化定价规则。
+ * 收费方案的一条适用范围。
  *
- * S6：定位键从自由文本收敛为真键（原 `locationName` 一个自由文本，站点改名或压根不存在时
- * 规则就悬空了，取价永远命中不到）。本轮再对齐后端 `PriceRule` 的三维形态：
- * **`dimension + matchRef` 是规则真正的定位键**，`siteNo/scene/locationName` 全部降级为
- * **冗余展示列**（服务端按维度反查覆盖，页面不让手填），与 `Site.regionId`/`regionName`
- * 同一套「存 ID、冗余名」写法。
+ * 厂商 / 型号 / 品牌是**过滤条件不是层**：它们与场所层级正交（快充柜可能出现在任何站点）。
+ * 「本站点 × 厂商 X」比「本站点」更具体，同层内胜出。
  */
-export interface PricingDiff {
-  ruleNo: string;
-  /** 取价维度（对齐后端 `PriceRule.dimension`）。 */
-  dimension: PricingDimension;
-  /** 该维度下的匹配值：SITE=`sites.siteNo` · LOCATION=`locations.locationNo` · SCENE=`sceneType` 值（对齐后端 `matchRef`）。 */
-  matchRef: string;
-  /** 站点号冗余：SITE=matchRef 本身；LOCATION=点位所属站点；SCENE 不落站点 → 空串。 */
-  siteNo: string;
-  /** 场景冗余：SITE/LOCATION 取所在站点的 `sceneType`；SCENE=matchRef 本身。 */
-  scene: string;
-  /** 目标展示名冗余：SITE=站点名 · LOCATION=点位名 · SCENE 无实体 → 空串。字段名沿用后端 `PriceRule.locationName`。 */
-  locationName: string;
-  freeMinutes: number;
-  unitPrice: number;
-  capDaily: number;
-  priority: number;
-  currency: string;
+export interface PlanScope {
+  /** 这张表没有业务号（它不是独立对象，只是方案的一条范围），故用 id。新增时为空。 */
+  id?: number;
+  planNo: string;
+  scopeType: ScopeLevel;
+  /** 对应层的业务号；`ALL` 层固定为 `*`。 */
+  scopeRef: string;
+  /** 设备类型硬过滤 —— 缺了就会出现「站点规则把充电宝价给了按摩椅」。 */
+  deviceType: string;
+  vendorCode?: string | null;
+  model?: string | null;
+  brandNo?: string | null;
+  /** 同层同范围并列时降序裁决。 */
+  priority?: number;
+  effectiveFrom?: string | null;
+  effectiveTo?: string | null;
 }
+
 export interface PricingSchedule {
   ruleNo: string;
   name: string;
-  /** 时段表达式原文。落库仍是一个字符串（后端 `PriceSchedule.period` 只存表达式），结构化只在编辑期。 */
+  /**
+   * 时段表达式原文 —— **只作展示**。
+   *
+   * 2026-09-23：后端判倍率改读下面的结构化字段。原先只存这一个中文串，
+   * 后端要用它就得复刻前端那个按中文标签解析的 parser，而界面还有英文与阿语 ——
+   * 用展示串做判断，与本项目栽过的「按名字连表」是同一类错。
+   */
   period: string;
+  /** 生效星期 CSV，`1`=周一…`7`=周日；空 = 每天。 */
+  days?: string | null;
+  /** `HH:mm`；与 `timeTo` 同时为空 = 全天。 */
+  timeFrom?: string | null;
+  /** `HH:mm`；可跨零点（`22:00-06:00` 合法）。 */
+  timeTo?: string | null;
+  /** 节假日等日历表达式；后端本期不参与计算，原样保留。 */
+  expr?: string | null;
   multiplier: number;
   active: boolean;
 }

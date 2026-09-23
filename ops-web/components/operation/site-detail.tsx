@@ -9,7 +9,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus } from "lucide-react";
 import { RECENT_LIMIT, UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
-import type { Site, SitePoint, Cabinet, Contract, PricingDiff, ShareRule, AuditEntry } from "@/lib/types";
+import type { Site, SitePoint, Cabinet, Contract, PlanScope, ShareRule, AuditEntry } from "@/lib/types";
 import { useCan } from "@/lib/hooks/use-can";
 import { notify } from "@/lib/notify";
 import { money, fmtTime } from "@/lib/utils";
@@ -92,10 +92,13 @@ export function SiteDetailDrawer({
   });
   const pricingQ = useQuery({
     queryKey: ["op", "site-pricing", siteNo],
-    queryFn: async () => ({
-      diffs: (await api.listPricingDiffs({ page: 1, size: UNPAGED_SIZE })).list,
-      plans: (await api.listPricePlans({ page: 1, size: UNPAGED_SIZE })).list,
-    }),
+    queryFn: async () => {
+      const plans = (await api.listPricePlans({ page: 1, size: UNPAGED_SIZE })).list;
+      // 适用范围挂在方案上，没有「按站点查范围」的接口 —— 方案是配置量级（几十条），
+      // 逐个取比新开一个反查接口便宜，也不必让后端多一个只有这里用的查询。
+      const scopes = (await Promise.all(plans.map((p) => api.listPlanScopes(p.planNo)))).flat();
+      return { plans, scopes };
+    },
     enabled: !!siteNo && active === "pricing",
   });
   const sharingQ = useQuery({
@@ -253,33 +256,52 @@ export function SiteDetailDrawer({
         <div>
           {pricingQ.isLoading && <Skeleton className="h-24" />}
           {pricingQ.data && (() => {
-            // 取价优先级：站点专属的差异化定价 > 全平台默认方案。
-            // 差异化定价自带计费参数（不挂方案号），故两种来源分别渲染。
-            const diff = pricingQ.data.diffs.find((d: PricingDiff) => d.dimension === "SITE" && d.siteNo === site.siteNo);
-            const fallback = pricingQ.data.plans.find((p) => p.scope === "默认" || p.scope === "DEFAULT") ?? pricingQ.data.plans[0];
+            /*
+             * 取价优先级照 ADR-028 的层序：越具体越优先。这里只解释**站点这一层能看到的部分** ——
+             * 真正成单时还会按机柜带上点位 / 厂商 / 型号再裁决一次，所以这张卡片说的是
+             * 「站点级看下来命中谁」，不是「每一单一定按它」。
+             */
+            const { plans, scopes } = pricingQ.data;
+            const byPlan = new Map(plans.map((p) => [p.planNo, p]));
+            const LEVELS: PlanScope["scopeType"][] = ["SITE", "VENUE", "AGENT", "SCENE", "REGION", "ALL"];
+            const refOf = (lv: PlanScope["scopeType"]) => ({
+              SITE: site.siteNo, VENUE: site.venueNo ?? undefined, AGENT: site.agentNo ?? undefined,
+              SCENE: site.sceneType, REGION: site.regionId, ALL: "*",
+              DEVICE: undefined, LOCATION: undefined,
+            })[lv];
+            let hit: PlanScope | undefined;
+            let hitLevel: PlanScope["scopeType"] | undefined;
+            for (const lv of LEVELS) {
+              const ref = refOf(lv);
+              if (!ref) continue;   // 这一层无从判断 → 不参与，**不当成通配**
+              const found = scopes.find((x) => x.scopeType === lv && x.scopeRef === ref
+                && byPlan.get(x.planNo)?.status === "ACTIVE");
+              if (found) { hit = found; hitLevel = lv; break; }
+            }
+            const plan = hit ? byPlan.get(hit.planNo) : undefined;
+            const LEVEL_WHY: Record<string, string> = {
+              SITE: "为本站点单独配了方案", VENUE: "按场地方统一价（通常来自进场合同）",
+              AGENT: "按代理商统一价", SCENE: `按场景「${site.sceneType}」`,
+              REGION: "按区域定价", ALL: "没有更具体的配置，落到默认方案",
+            };
             return (
               <div>
                 <SummaryCard
                   label="当前生效的计费"
-                  value={diff ? `站点专属 · ${diff.ruleNo}` : fallback ? fallback.name : "—"}
-                  sub={diff
-                    ? "命中原因：为本站点单独配置了差异化定价"
-                    : fallback ? "命中原因：没有站点专属配置，落到默认方案" : "没有任何可用方案，将按系统兜底价计费"}
+                  value={plan ? plan.name : "—"}
+                  sub={hitLevel
+                    ? `命中原因：${LEVEL_WHY[hitLevel]}（${hit!.scopeType} · ${hit!.scopeRef}）`
+                    : "没有任何适用范围命中——这种站点下单会被拒绝，请至少配一条默认方案"}
                 />
-                {diff ? (
+                {plan && (
                   <div className="mt-3">
-                    <Field label="免费时长">{diff.freeMinutes} 分钟</Field>
-                    <Field label="单价">{money(diff.unitPrice)}</Field>
-                    <Field label="日封顶">{money(diff.capDaily)}</Field>
+                    <Field label="方案号">{plan.planNo}</Field>
+                    <Field label="免费时长">{plan.freeMinutes} 分钟</Field>
+                    <Field label="计费">每 {plan.unitMinutes} 分钟 {money(plan.unitPrice, plan.currency)}</Field>
+                    <Field label="日封顶">{money(plan.capDaily, plan.currency)}</Field>
+                    <Field label="买断价">{money(plan.buyoutPrice, plan.currency)}</Field>
                   </div>
-                ) : fallback ? (
-                  <div className="mt-3">
-                    <Field label="免费时长">{fallback.freeMinutes} 分钟</Field>
-                    <Field label="计费">每 {fallback.unitMinutes} 分钟 {money(fallback.unitPrice, fallback.currency)}</Field>
-                    <Field label="日封顶">{money(fallback.capDaily, fallback.currency)}</Field>
-                    <Field label="买断价">{money(fallback.buyoutPrice, fallback.currency)}</Field>
-                  </div>
-                ) : null}
+                )}
               </div>
             );
           })()}

@@ -418,6 +418,335 @@
   },
   {
    "verb": "GET",
+   "path": "/api/agent/applies",
+   "perm": "agent:apply:read",
+   "handler": "AgentApplyController#applies",
+   "summary": "运营端待办队列与历史检索。",
+   "params": [
+    {
+     "in": "query",
+     "name": "status",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "keyword",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "from",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "to",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<ApplyView>",
+   "returnContainer": "PageResult",
+   "returnElement": "ApplyView",
+   "responseShape": [
+    {
+     "name": "applyNo",
+     "type": "String"
+    },
+    {
+     "name": "source",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "operatorName",
+     "type": "String"
+    },
+    {
+     "name": "operatorType",
+     "type": "String"
+    },
+    {
+     "name": "phoneMask",
+     "type": "String"
+    },
+    {
+     "name": "emailMask",
+     "type": "String"
+    },
+    {
+     "name": "regionScope",
+     "type": "String"
+    },
+    {
+     "name": "shareRate",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "payload",
+     "type": "String"
+    },
+    {
+     "name": "principalNo",
+     "type": "String"
+    },
+    {
+     "name": "rejectReason",
+     "type": "String"
+    },
+    {
+     "name": "submittedBy",
+     "type": "String"
+    },
+    {
+     "name": "submittedAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "reviewedBy",
+     "type": "String"
+    },
+    {
+     "name": "reviewedAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "operatorNo",
+     "type": "String"
+    },
+    {
+     "name": "phoneAlreadyKnown",
+     "type": "boolean"
+    },
+    {
+     "name": "knownEmailMask",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/agent/applies/{applyNo}/accept",
+   "perm": "agent:apply:approve",
+   "handler": "AgentApplyController#accept",
+   "summary": "受理：SUBMITTED → REVIEWING。",
+   "params": [
+    {
+     "in": "path",
+     "name": "applyNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ApplyResult",
+   "returnContainer": null,
+   "returnElement": "ApplyResult",
+   "responseShape": [
+    {
+     "name": "applyNo",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "operatorNo",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/agent/applies/{applyNo}/audit",
+   "perm": "agent:apply:approve",
+   "handler": "AgentApplyController#audit",
+   "summary": "审核：通过 / 驳回。",
+   "params": [
+    {
+     "in": "path",
+     "name": "applyNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "AuditReq",
+   "returnType": "ApplyResult",
+   "returnContainer": null,
+   "returnElement": "ApplyResult",
+   "responseShape": [
+    {
+     "name": "applyNo",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "operatorNo",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "approve",
+     "type": "boolean"
+    },
+    {
+     "name": "rejectReason",
+     "type": "String"
+    },
+    {
+     "name": "shareRate",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "regionScope",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/agent/apply",
+   "perm": null,
+   "handler": "AgentApplyController#submit",
+   "summary": "提交入驻申请 —— **自助与代建共用同一个端点**。",
+   "params": [],
+   "bodyType": "SubmitReq",
+   "returnType": "ApplyResult",
+   "returnContainer": null,
+   "returnElement": "ApplyResult",
+   "responseShape": [
+    {
+     "name": "applyNo",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "operatorNo",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "email",
+     "type": "String"
+    },
+    {
+     "name": "otp",
+     "type": "String"
+    },
+    {
+     "name": "operatorName",
+     "type": "String"
+    },
+    {
+     "name": "operatorType",
+     "type": "String"
+    },
+    {
+     "name": "regionScope",
+     "type": "String"
+    },
+    {
+     "name": "shareRate",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "payload",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "GET",
+   "path": "/api/agent/apply/mine",
+   "perm": null,
+   "handler": "AgentApplyController#mine",
+   "summary": "申请人查进度与驳回原因（免鉴权，凭手机号 + OTP）。",
+   "params": [
+    {
+     "in": "query",
+     "name": "phone",
+     "type": "String",
+     "required": true
+    },
+    {
+     "in": "query",
+     "name": "otp",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "MyApplyView",
+   "returnContainer": null,
+   "returnElement": "MyApplyView",
+   "responseShape": [
+    {
+     "name": "applyNo",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "operatorName",
+     "type": "String"
+    },
+    {
+     "name": "phoneMask",
+     "type": "String"
+    },
+    {
+     "name": "emailMask",
+     "type": "String"
+    },
+    {
+     "name": "rejectReason",
+     "type": "String"
+    },
+    {
+     "name": "submittedAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
    "path": "/api/agent/assignable-assets",
    "perm": "agent:scope:assign",
    "handler": "AgentExtController#assignableAssets",
@@ -6877,6 +7206,10 @@
      "type": "String"
     },
     {
+     "name": "regionName",
+     "type": "String"
+    },
+    {
      "name": "address",
      "type": "String"
     },
@@ -6951,6 +7284,10 @@
      "type": "String"
     },
     {
+     "name": "regionName",
+     "type": "String"
+    },
+    {
      "name": "address",
      "type": "String"
     },
@@ -7002,6 +7339,10 @@
     },
     {
      "name": "regionId",
+     "type": "String"
+    },
+    {
+     "name": "regionName",
      "type": "String"
     },
     {
@@ -7120,6 +7461,10 @@
      "type": "String"
     },
     {
+     "name": "regionName",
+     "type": "String"
+    },
+    {
      "name": "address",
      "type": "String"
     },
@@ -7191,6 +7536,10 @@
     },
     {
      "name": "regionId",
+     "type": "String"
+    },
+    {
+     "name": "regionName",
      "type": "String"
     },
     {
@@ -15689,215 +16038,209 @@
   },
   {
    "verb": "GET",
-   "path": "/api/trade/pricing-diffs",
-   "perm": "pricing:rule:read",
-   "handler": "PricingController#pricingDiffs",
-   "summary": "",
-   "params": [
-    {
-     "in": "query",
-     "name": "page",
-     "type": "Integer",
-     "required": false
-    },
-    {
-     "in": "query",
-     "name": "size",
-     "type": "Integer",
-     "required": false
-    },
-    {
-     "in": "query",
-     "name": "keyword",
-     "type": "String",
-     "required": false
-    },
-    {
-     "in": "query",
-     "name": "planNo",
-     "type": "String",
-     "required": false
-    },
-    {
-     "in": "query",
-     "name": "dimension",
-     "type": "String",
-     "required": false
-    }
-   ],
-   "bodyType": null,
-   "returnType": "PageResult<PricingDiff>",
-   "returnContainer": "PageResult",
-   "returnElement": "PricingDiff",
-   "responseShape": [
-    {
-     "name": "ruleNo",
-     "type": "String"
-    },
-    {
-     "name": "scene",
-     "type": "String"
-    },
-    {
-     "name": "locationName",
-     "type": "String"
-    },
-    {
-     "name": "freeMinutes",
-     "type": "Integer"
-    },
-    {
-     "name": "unitPrice",
-     "type": "BigDecimal"
-    },
-    {
-     "name": "capDaily",
-     "type": "BigDecimal"
-    },
-    {
-     "name": "priority",
-     "type": "Integer"
-    },
-    {
-     "name": "currency",
-     "type": "String"
-    },
-    {
-     "name": "siteNo",
-     "type": "String"
-    },
-    {
-     "name": "dimension",
-     "type": "String"
-    },
-    {
-     "name": "matchRef",
-     "type": "String"
-    }
-   ],
-   "requestShape": null
-  },
-  {
-   "verb": "POST",
-   "path": "/api/trade/pricing-diffs",
-   "perm": "pricing:rule:update",
-   "handler": "PricingController#createPricingDiff",
-   "summary": "",
-   "params": [],
-   "bodyType": "PriceRule",
-   "returnType": "PricingDiff",
-   "returnContainer": null,
-   "returnElement": "PricingDiff",
-   "responseShape": [
-    {
-     "name": "ruleNo",
-     "type": "String"
-    },
-    {
-     "name": "scene",
-     "type": "String"
-    },
-    {
-     "name": "locationName",
-     "type": "String"
-    },
-    {
-     "name": "freeMinutes",
-     "type": "Integer"
-    },
-    {
-     "name": "unitPrice",
-     "type": "BigDecimal"
-    },
-    {
-     "name": "capDaily",
-     "type": "BigDecimal"
-    },
-    {
-     "name": "priority",
-     "type": "Integer"
-    },
-    {
-     "name": "currency",
-     "type": "String"
-    },
-    {
-     "name": "siteNo",
-     "type": "String"
-    },
-    {
-     "name": "dimension",
-     "type": "String"
-    },
-    {
-     "name": "matchRef",
-     "type": "String"
-    }
-   ],
-   "requestShape": null
-  },
-  {
-   "verb": "POST",
-   "path": "/api/trade/pricing-diffs/{ruleNo}",
-   "perm": "pricing:rule:update",
-   "handler": "PricingController#updatePricingDiff",
+   "path": "/api/trade/price-plans/{planNo}/scopes",
+   "perm": "pricing:plan:read",
+   "handler": "PricingController#planScopes",
    "summary": "",
    "params": [
     {
      "in": "path",
-     "name": "ruleNo",
+     "name": "planNo",
      "type": "String",
      "required": true
     }
    ],
-   "bodyType": "PriceRule",
-   "returnType": "PricingDiff",
-   "returnContainer": null,
-   "returnElement": "PricingDiff",
+   "bodyType": null,
+   "returnType": "List<PlanScopeEntry>",
+   "returnContainer": "List",
+   "returnElement": "PlanScopeEntry",
    "responseShape": [
     {
-     "name": "ruleNo",
+     "name": "id",
+     "type": "Long"
+    },
+    {
+     "name": "planNo",
      "type": "String"
     },
     {
-     "name": "scene",
+     "name": "scopeType",
      "type": "String"
     },
     {
-     "name": "locationName",
+     "name": "scopeRef",
      "type": "String"
     },
     {
-     "name": "freeMinutes",
-     "type": "Integer"
+     "name": "deviceType",
+     "type": "String"
     },
     {
-     "name": "unitPrice",
-     "type": "BigDecimal"
+     "name": "vendorCode",
+     "type": "String"
     },
     {
-     "name": "capDaily",
-     "type": "BigDecimal"
+     "name": "model",
+     "type": "String"
+    },
+    {
+     "name": "brandNo",
+     "type": "String"
     },
     {
      "name": "priority",
      "type": "Integer"
     },
     {
-     "name": "currency",
+     "name": "effectiveFrom",
      "type": "String"
     },
     {
-     "name": "siteNo",
+     "name": "effectiveTo",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/trade/price-plans/{planNo}/scopes",
+   "perm": "pricing:plan:create",
+   "handler": "PricingController#savePlanScope",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "planNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "PlanScopeEntry",
+   "returnType": "PlanScopeEntry",
+   "returnContainer": null,
+   "returnElement": "PlanScopeEntry",
+   "responseShape": [
+    {
+     "name": "id",
+     "type": "Long"
+    },
+    {
+     "name": "planNo",
      "type": "String"
     },
     {
-     "name": "dimension",
+     "name": "scopeType",
      "type": "String"
     },
     {
-     "name": "matchRef",
+     "name": "scopeRef",
      "type": "String"
+    },
+    {
+     "name": "deviceType",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "model",
+     "type": "String"
+    },
+    {
+     "name": "brandNo",
+     "type": "String"
+    },
+    {
+     "name": "priority",
+     "type": "Integer"
+    },
+    {
+     "name": "effectiveFrom",
+     "type": "String"
+    },
+    {
+     "name": "effectiveTo",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "id",
+     "type": "Long"
+    },
+    {
+     "name": "planNo",
+     "type": "String"
+    },
+    {
+     "name": "scopeType",
+     "type": "String"
+    },
+    {
+     "name": "scopeRef",
+     "type": "String"
+    },
+    {
+     "name": "deviceType",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "model",
+     "type": "String"
+    },
+    {
+     "name": "brandNo",
+     "type": "String"
+    },
+    {
+     "name": "priority",
+     "type": "Integer"
+    },
+    {
+     "name": "effectiveFrom",
+     "type": "String"
+    },
+    {
+     "name": "effectiveTo",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/trade/price-plans/{planNo}/scopes/{id}/remove",
+   "perm": "pricing:plan:create",
+   "handler": "PricingController#removePlanScope",
+   "summary": "契约禁止 delete*，用 remove（软删语义由实体的",
+   "params": [
+    {
+     "in": "path",
+     "name": "planNo",
+     "type": "String",
+     "required": true
+    },
+    {
+     "in": "path",
+     "name": "id",
+     "type": "Long",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "OkResult",
+   "returnContainer": null,
+   "returnElement": "OkResult",
+   "responseShape": [
+    {
+     "name": "ok",
+     "type": "boolean"
     }
    ],
    "requestShape": null
@@ -21342,6 +21685,14 @@
     {
      "name": "regionId",
      "type": "String"
+    },
+    {
+     "name": "venueNo",
+     "type": "String"
+    },
+    {
+     "name": "sceneType",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -23465,12 +23816,41 @@
    "AGENT",
    "CONSUMER"
   ],
+  "Outcome": [
+   "OK",
+   "NOT_CONFIGURED",
+   "UNREACHABLE",
+   "REMOTE_ERROR"
+  ],
+  "ScopeLevel": [
+   "DEVICE",
+   "LOCATION",
+   "SITE",
+   "VENUE",
+   "AGENT",
+   "SCENE",
+   "REGION"
+  ],
   "Provider": [
    "WECHAT_MP",
    "WECHAT_OA",
    "APPLE",
    "GOOGLE",
    "PHONE"
+  ],
+  "AlarmStatus": [
+   "OPEN",
+   "ACKED"
+  ],
+  "AlarmNoticeStatus": [
+   "SENT"
+  ],
+  "AlarmLevel": [
+   "INFO",
+   "WARN"
+  ],
+  "AlarmRuleStatus": [
+   "ACTIVE"
   ],
   "WorkOrderType": [
    "FAULT",
@@ -23483,10 +23863,10 @@
  },
  "conflicts": {},
  "stats": {
-  "endpoints": 382,
-  "records": 274,
-  "withPerm": 324,
-  "withBody": 155,
-  "shapedResponses": 288
+  "endpoints": 387,
+  "records": 282,
+  "withPerm": 327,
+  "withBody": 156,
+  "shapedResponses": 293
  }
 }

@@ -12,7 +12,7 @@
 import { Suspense, useMemo, useState } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { CalendarClock, Calculator, Copy, Pencil, Power } from "lucide-react";
+import { CalendarClock, Calculator, Copy, Crosshair, Pencil, Power } from "lucide-react";
 import Link from "next/link";
 import { UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
@@ -27,6 +27,7 @@ import { PageTitle, EmptyState } from "@/components/ui/misc";
 import { Tabs } from "@/components/ui/tabs";
 import { Toolbar } from "@/components/ui/toolbar";
 import { DataTable, type Column } from "@/components/ui/data-table";
+import { PlanScopeDrawer } from "@/components/operation/plan-scope-drawer";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
@@ -48,8 +49,11 @@ const PLAN_STATUS: StatusMap<PricePlan["status"]> = {
 
 const PLAN_FIELDS: FieldDef[] = [
   { key: "name", label: "方案名称", required: true, maxLength: 64, section: "基本信息", placeholder: "机场高价" },
-  { key: "scope", label: "适用范围", required: true, section: "基本信息", placeholder: "默认 / 机场点位 / 商场点位",
-    help: "第一期为文字描述；按站点单独取价请用「差异化定价」（计费定价菜单），两者合并要等后端接口对齐" },
+  // `scope` 是一句**给人看的描述**，不参与取价。真正决定「这个方案对谁生效」的是
+  // 「适用范围」（price_plan_scope，见行末的按钮）—— 2026-09-23 之前这里写什么都不影响金额，
+  // 而 help 文案还让人去用另一个菜单，两处都不生效（ADR-028 / V49）。
+  { key: "scope", label: "描述", maxLength: 64, section: "基本信息", placeholder: "机场专用 / 默认",
+    help: "只是一句说明，方便在列表里认出它。真正决定对谁生效的是「适用范围」，在列表行上维护" },
   { key: "currency", label: "币种", type: "select", required: true, section: "基本信息",
     options: ["AED", "SAR", "QAR", "EGP"].map((c) => ({ value: c, label: c })), readOnlyOnEdit: true,
     help: "保存后不能改——已用这个方案下过的单都是这个币种" },
@@ -60,14 +64,45 @@ const PLAN_FIELDS: FieldDef[] = [
   { key: "buyoutPrice", label: "买断价", type: "number", required: true, min: 0, section: "计费规则", help: "累计到这个金额就不再计费，设备归用户；须 ≥ 日封顶" },
 ];
 
-const SCHEDULE_FIELDS: FieldDef[] = [
-  { key: "name", label: "名称", required: true, maxLength: 40, placeholder: "晚高峰" },
-  { key: "period", label: "时段", required: true, maxLength: 60, placeholder: "18:00-23:00",
-    help: "支持时间段（18:00-23:00）、星期（周六-周日）、节假日（公共假日 / 斋月全月）" },
-  { key: "multiplier", label: "倍率", type: "number", required: true, min: 0.1, max: 5,
-    help: "1.5 = 上浮 50%，0.8 = 打八折。作用在计费段上，不影响免费时长与封顶" },
-  { key: "active", label: "启用", type: "switch" },
+/*
+ * 时段用**结构化字段**填，不再让人写一句自由文本。
+ *
+ * 2026-09-23 之前只存一个展示串（`周六-周日 18:00-22:00`），后端要判倍率就得复刻
+ * 前端那个按中文标签解析的 parser —— 而界面还有英文与阿语。用展示串做判断，
+ * 与本项目栽过的「按名字连表」是同一类错（ADR-028 / V49）。
+ * `period` 仍然落库，但降级为纯展示，由下面这几个字段拼出来。
+ */
+const WEEKDAYS = [
+  { value: "1", label: "周一" }, { value: "2", label: "周二" }, { value: "3", label: "周三" },
+  { value: "4", label: "周四" }, { value: "5", label: "周五" }, { value: "6", label: "周六" },
+  { value: "7", label: "周日" },
 ];
+const HHMM = "^([01][0-9]|2[0-3]):[0-5][0-9]$";
+const SCHEDULE_FIELDS: FieldDef[] = [
+  { key: "name", label: "名称", required: true, maxLength: 40, placeholder: "晚高峰", section: "基本信息" },
+  { key: "days", label: "星期", type: "multiselect", csv: true, options: WEEKDAYS, section: "时段",
+    placeholder: "留空 = 每天" },
+  { key: "timeFrom", label: "开始时刻", section: "时段", placeholder: "18:00",
+    pattern: { re: HHMM, msg: "格式为 HH:mm（24 时制）" },
+    help: "两端都留空 = 全天；跨零点（22:00-06:00）合法。**只填一端视为没配完，不会生效**" },
+  { key: "timeTo", label: "结束时刻", section: "时段", placeholder: "23:00",
+    pattern: { re: HHMM, msg: "格式为 HH:mm（24 时制）" } },
+  { key: "expr", label: "节假日表达式", section: "时段", maxLength: 60, placeholder: "公共假日 / 斋月全月",
+    help: "星期+时刻表达不了的日历事件写这里。⚠️ 后端本期**不参与计算**，只原样保留" },
+  { key: "multiplier", label: "倍率", type: "number", required: true, min: 0.1, max: 5, section: "倍率",
+    help: "1.5 = 上浮 50%，0.8 = 打八折。作用在计费段上，不影响免费时长与封顶。多条命中取最大，不相乘" },
+  { key: "active", label: "启用", type: "switch", section: "倍率" },
+];
+
+/** 结构化字段 → 展示串。落库与列表看到的是同一份，避免「看到的」与「存下的」两套。 */
+function periodText(v: Partial<PricingSchedule>): string {
+  const days = (v.days ?? "").split(",").map((x) => x.trim()).filter(Boolean)
+    .map((n) => WEEKDAYS.find((w) => w.value === n)?.label ?? n);
+  const time = v.timeFrom && v.timeTo ? `${v.timeFrom}-${v.timeTo}` : "";
+  const expr = (v.expr ?? "").trim();
+  return [days.length && days.length < 7 ? days.join("、") : "每天", time, expr]
+    .filter(Boolean).join(" ");
+}
 
 function FeePlansInner() {
   const qc = useQueryClient();
@@ -96,6 +131,7 @@ function FeePlansInner() {
   const [schedForm, setSchedForm] = useState<Partial<PricingSchedule> | null>(null);
   const [editingSched, setEditingSched] = useState<PricingSchedule | undefined>();
   const [simPlan, setSimPlan] = useState<PricePlan | null>(null);
+  const [scopePlan, setScopePlan] = useState<PricePlan | null>(null);
   const [simMinutes, setSimMinutes] = useState(90);
   const [simMultiplier, setSimMultiplier] = useState(1);
 
@@ -133,7 +169,9 @@ function FeePlansInner() {
     onSuccess: () => { refresh(); notify.success("已保存"); setForm(null); },
   });
   const saveSched = useMutation({
-    mutationFn: (v: Partial<PricingSchedule>) => api.savePricingSchedule(v as Partial<PricingSchedule> & { ruleNo?: string }),
+    // period 由结构化字段派生后一并提交 —— 它只是展示串，不让人手写也不让两边各存一套
+    mutationFn: (v: Partial<PricingSchedule>) => api.savePricingSchedule(
+      { ...v, period: periodText(v) } as Partial<PricingSchedule> & { ruleNo?: string }),
     onSuccess: () => { refresh(); notify.success("已保存"); setSchedForm(null); },
   });
   const archive = useMutation({ mutationFn: (no: string) => api.archivePricePlan(no), onSuccess: () => { refresh(); notify.success("已归档"); } });
@@ -184,7 +222,9 @@ function FeePlansInner() {
     { header: "方案", cell: (p) => (
       <div className="min-w-0">
         <div className="truncate">{p.name}</div>
-        <div className="truncate txt-caption text-muted-foreground">{p.planNo} · {p.scope}</div>
+        <div className="truncate txt-caption text-muted-foreground">
+          {p.planNo}{p.scope ? ` · ${p.scope}` : ""}
+        </div>
       </div>
     ) },
     { header: "计费摘要", className: "min-w-64", cell: (p) => <span className="txt-caption">{planSummary(p)}</span> },
@@ -198,6 +238,9 @@ function FeePlansInner() {
       header: "操作",
       cell: (p) => (
         <div className="flex w-max items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => setScopePlan(p)}>
+            <Crosshair className="size-4" /> 适用范围
+          </Button>
           <Button size="sm" variant="outline" onClick={() => { setSimPlan(p); setSimMinutes(90); setSimMultiplier(1); }}>
             <Calculator className="size-4" /> 试算
           </Button>
@@ -356,6 +399,7 @@ function FeePlansInner() {
         )}
         {!simPlan && <EmptyState title="没有选择方案" />}
       </Drawer>
+      <PlanScopeDrawer plan={scopePlan} onClose={() => setScopePlan(null)} canWrite={canWrite} />
       {dialog}
     </div>
   );

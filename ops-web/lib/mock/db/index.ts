@@ -66,9 +66,9 @@ export {
 } from "./order";
 
 export {
-  pricePlans, pricingDiffs, pricingSchedules,
-  listPricingDiffs, listPricingSchedules,
-  savePricePlan, savePricingDiff, savePricingSchedule,
+  pricePlans, planScopes, pricingSchedules,
+  listPlanScopes, listPricingSchedules,
+  savePricePlan, savePlanScope, removePlanScope, savePricingSchedule,
   archivePricePlan, unarchivePricePlan,
 } from "./pricing";
 

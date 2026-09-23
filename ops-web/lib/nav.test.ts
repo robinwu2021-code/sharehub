@@ -26,7 +26,7 @@ const sectionKeys = (role: Role) => visibleSections(role).map((s) => s.key);
 const L1_KEYS = [
   "my-biz", "my-asset", "my-service", // 代理端门户（portalFor: AGENT）
   "dashboard", "operation", "device", "alarm", "workorder", "venue", "agent", "order",
-  "pricing", "finance", "user", "marketing", "cs", "report", "org", "system",
+  "finance", "user", "marketing", "cs", "report", "org", "system",
 ];
 // 叶子五元组 href|label|perm|phase|group —— 2026-07-30 层级重构前后逐条比对为零差异。
 // 2026-09-23 有意变更（A 类菜单重合收敛，见 docs/technical/菜单重合梳理与优化方案.md）：
@@ -97,7 +97,6 @@ const LEAF_TUPLES = [
   "/orders?tab=refunds|退款记录|order:refund:audit||售后处置",
   "/orders?tab=deposit|押金与欠费|order:order:read|1|特殊单据",
   "/orders?tab=free|免费订单|order:order:read|2|特殊单据",
-  "/pricing?tab=diff|差异化定价||2|",
   "/finance?tab=rules|分润规则|finance:share_rule:read||分润与结算",
   "/finance?tab=records|分润明细|finance:share_record:read||分润与结算",
   "/finance?tab=summary|分润统计|finance:share_record:read|1|分润与结算",
@@ -155,9 +154,12 @@ const LEAF_TUPLES = [
 describe("结构回归基线（层级重构不改内容）", () => {
   // 2026-09-23 菜单收敛：第二步撤销「站点与点位」（16 → 15），第三步把场地方那条线
   // 拆成「场地方与拓展」（15 → 16），落位在原「站点与点位」处，与代理商管理相邻。
-  it("L1 = 16 个运营项 + 3 个代理门户项，顺序固定", () => {
+  // 2026-09-23 第三步（续）：「计费定价」L1 撤销（16 → 15）——
+  // 计费模板/时段价早已并入运营管理 › 收费方案，最后剩的「差异化定价」随 ADR-028
+  // 并入方案的「适用范围」，取价从此只有一处答案（V49）。那个 L1 已无内容。
+  it("L1 = 15 个运营项 + 3 个代理门户项，顺序固定", () => {
     expect(NAV.map((s) => s.key)).toEqual(L1_KEYS);
-    expect(NAV.filter((s) => !s.portalFor)).toHaveLength(16);
+    expect(NAV.filter((s) => !s.portalFor)).toHaveLength(15);
     expect(NAV.filter((s) => s.portalFor)).toHaveLength(3);
   });
   it("叶子五元组集合与顺序逐条不变（href|label|perm|phase|group）", () => {
@@ -172,10 +174,10 @@ describe("结构回归基线（层级重构不改内容）", () => {
 });
 
 describe("A.9 角色×L1 可见性矩阵（抽查）", () => {
-  it("ADMIN 见全部 16 个运营项", () => {
+  it("ADMIN 见全部 15 个运营项", () => {
     expect(sectionKeys("ADMIN")).toEqual([
       "dashboard", "operation", "device", "alarm", "workorder", "venue", "agent", "order",
-      "pricing", "finance", "user", "marketing", "cs", "report", "org", "system",
+      "finance", "user", "marketing", "cs", "report", "org", "system",
     ]);
   });
   it("VIEWER 不见 用户/营销/客服/员工与权限/系统设置", () => {

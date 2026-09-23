@@ -267,14 +267,16 @@ const REFS: Ref[] = [
   ref("reportCustoms", db.reportCustoms, "dim", "sites.name", siteNames),
   ref("dashboard.rankings", db.dashboard.rankings, "siteName", "sites.name", siteNames),
   ref("dashboard.alerts", db.dashboard.alerts, "cabinetNo", "cabinets.cabinetNo", cabinetNos),
-  // S6 + 三维扩展：差异化规则真正的定位键是 dimension + matchRef，按维度指向各自的表。
-  // 「冗余列与维度自洽」这条成对约束在 pricing.test.ts 里另有断言，此处只钉住 matchRef 的存在性。
-  ref("pricingDiffs(SITE)", db.pricingDiffs.filter((d) => d.dimension === "SITE"),
-    "matchRef", "sites.siteNo", siteNos),
-  ref("pricingDiffs(LOCATION)", db.pricingDiffs.filter((d) => d.dimension === "LOCATION"),
-    "matchRef", "locations.locationNo", locationNos),
-  ref("pricingDiffs(SCENE)", db.pricingDiffs.filter((d) => d.dimension === "SCENE"),
-    "matchRef", "sites.sceneType", setOf(db.sites, (s) => s.sceneType)),
+  // 适用范围（ADR-028）：定位键是 scopeType + scopeRef，按层指向各自的表。
+  // 悬空的范围行取价永远命中不到，而且不报错 —— 与旧的「按名字挂规则」是同一类风险。
+  ref("planScopes(SITE)", db.planScopes.filter((x) => x.scopeType === "SITE"),
+    "scopeRef", "sites.siteNo", siteNos),
+  ref("planScopes(LOCATION)", db.planScopes.filter((x) => x.scopeType === "LOCATION"),
+    "scopeRef", "locations.locationNo", locationNos),
+  ref("planScopes(SCENE)", db.planScopes.filter((x) => x.scopeType === "SCENE"),
+    "scopeRef", "sites.sceneType", setOf(db.sites, (s) => s.sceneType)),
+  ref("planScopes.planNo", db.planScopes, "planNo", "pricePlans.planNo",
+    setOf(db.pricePlans, (p) => p.planNo)),
 ];
 
 /** 逐条比对，返回可读的违规清单（空数组 = 通过）。 */

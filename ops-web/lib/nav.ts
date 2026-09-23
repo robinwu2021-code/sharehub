@@ -170,6 +170,10 @@ export const NAV: NavSection[] = [
     //
     // 第二步：撤销「站点与点位」L1，点位与坪效并进来（URL 仍是 /locations，故 match 带它）。
     //
+    // 第三步（续）：「计费定价」L1 整体撤销 —— 它的计费模板/时段价早已并入本 section 的
+    // 「收费方案」，最后剩的「差异化定价」在 ADR-028 落地后并入方案的「适用范围」，
+    // 取价从此只有一处答案（V49）。那个 L1 已无内容，留着只是一个空壳。
+    //
     // 第三步：场地方 / 合同 / BD CRM / 进件 / 生命周期 **移出本 section**，
     // 独立成「场地方与拓展」L1 —— 拓展是签约前的获客，不是经营已有站点；
     // 而分成是分账动作、不是报表，故原「场站报表」组改名「分成」，坪效归回场站管理。
@@ -274,18 +278,6 @@ export const NAV: NavSection[] = [
       { href: "/orders?tab=refunds", label: "退款记录", perm: "order:refund:audit", group: "售后处置" },
       { href: "/orders?tab=deposit", label: "押金与欠费", perm: "order:order:read", phase: 1, ready: true, group: "特殊单据" },
       { href: "/orders?tab=free", label: "免费订单", perm: "order:order:read", phase: 2, group: "特殊单据" },
-    ],
-  },
-  {
-    // 2026-09-23 撤销「计费模板」「活动/时段价」：与「运营管理 › 收费方案」的两个页签
-    // 调同一组 API，是同一张表的两个维护入口。留后者 —— 它多了试算与待执行调价，
-    // 且 ADR-028 的「适用范围」要落在那边。
-    // 本 L1 现在只剩「差异化定价」，已是空壳：按经营链条方案 P1，它会并入收费方案的
-    // 适用范围后整页下线，届时本 L1 一并撤销（菜单重合方案第 3 步）。在替代品建好前
-    // 不删 —— 那是目前唯一的差异化取价入口。
-    key: "pricing", label: "计费定价", icon: "Tag", module: "pricing", href: "/pricing?tab=diff",
-    children: [
-      { href: "/pricing?tab=diff", label: "差异化定价", phase: 2 },
     ],
   },
   {

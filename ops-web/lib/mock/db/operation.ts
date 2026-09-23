@@ -9,7 +9,7 @@ import { buildOverview, buildSiteStats, type OverviewInput } from "../../rules/o
 import { sites, locations, contracts } from "./location";
 import { cabinets, powerbanks } from "./device";
 import { orders } from "./order";
-import { pricingDiffs } from "./pricing";
+import { planScopes } from "./pricing";
 import { shareRules } from "./finance";
 
 const DAY = 86400_000;
@@ -48,8 +48,10 @@ function inputOf(from?: string, to?: string, filter?: { regionId?: string; agent
     sharedSiteNames: new Set(
       contracts.filter((c) => shareRules.some((r) => r.payeeName === c.venueName)).map((c) => c.siteName),
     ),
-    // 命中收费方案：差异化定价里指定了这个站点，即视为命中；否则落全平台默认
-    pricedSiteNos: new Set(pricingDiffs.map((d) => d.siteNo).filter(Boolean) as string[]),
+    // 命中收费方案：适用范围里有一条 SITE 层指向这个站点，即视为有专属价；否则落默认方案
+    pricedSiteNos: new Set(
+      planScopes.filter((x) => x.scopeType === "SITE").map((x) => x.scopeRef).filter(Boolean),
+    ),
     from: range.from,
     to: range.to,
     now: new Date(),

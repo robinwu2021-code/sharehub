@@ -36,7 +36,7 @@ public final class PriceDtos {
      *
      * @param scopeType DEVICE/LOCATION/SITE/VENUE/AGENT/SCENE/REGION/ALL，越靠前越具体
      */
-    public record PlanScopeEntry(String planNo, String scopeType, String scopeRef,
+    public record PlanScopeEntry(Long id, String planNo, String scopeType, String scopeRef,
                                  String deviceType, String vendorCode, String model, String brandNo,
                                  Integer priority, String effectiveFrom, String effectiveTo) {
     }

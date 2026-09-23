@@ -1,4 +1,4 @@
-// 覆盖范围：计费定价 —— 价格方案、差异化定价规则、分时定价规则。
+// 覆盖范围：计费定价 —— 收费方案、适用范围（取价唯一依据）、分时倍率。
 // 端点前缀：/api/trade/**
 import { client } from "../http-client";
 import type { PricingApi } from "../contracts/pricing";
@@ -7,14 +7,12 @@ import type { PageQ, ArchiveQ } from "../query";
 export const pricingHttp: PricingApi = {
   listPricePlans: (q?: ArchiveQ) => client.get("/api/trade/price-plans", q),
 
-  // 定价扩展。后端 `PricingController` 三组读写端点均已存在；
-  // ⚠️ 但 `PriceDtos.PricingDiff` 记录里**还没有 dimension/matchRef/siteNo**
-  // （实体 `PriceRule` 三者都有，DTO 未透出）。前端已按三维（SITE/LOCATION/SCENE + matchRef）
-  // 对齐实体形态，接后端时需先给该 DTO 补字段，否则回包只剩展示名、维度信息全丢。
-  listPricingDiffs: (q?: PageQ) => client.get("/api/trade/pricing-diffs", q),
+  // 适用范围：取价的唯一依据（ADR-028 / V49）。三个端点 2026-09-23 随取价引擎重写一并补齐。
+  listPlanScopes: (planNo) => client.get(`/api/trade/price-plans/${planNo}/scopes`),
+  savePlanScope: (planNo, x) => client.post(`/api/trade/price-plans/${planNo}/scopes`, x),
+  removePlanScope: (planNo, id) => client.post(`/api/trade/price-plans/${planNo}/scopes/${id}/remove`, {}),
   listPricingSchedules: (q?: PageQ) => client.get("/api/trade/pricing-schedules", q),
   savePricePlan: (x) => client.post(x.planNo ? `/api/trade/price-plans/${x.planNo}` : "/api/trade/price-plans", x),
-  savePricingDiff: (x) => client.post(x.ruleNo ? `/api/trade/pricing-diffs/${x.ruleNo}` : "/api/trade/pricing-diffs", x),
   savePricingSchedule: (x) => client.post(x.ruleNo ? `/api/trade/pricing-schedules/${x.ruleNo}` : "/api/trade/pricing-schedules", x),
 
   // G1 软删除：归档 / 恢复。REST 上是「状态迁移」而非 DELETE —— 后端不得实现物理删除。

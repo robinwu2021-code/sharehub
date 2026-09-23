@@ -9,10 +9,11 @@ export const pricingMock: PricingApi = {
     wait(db.paginate(db.pricePlans, q.page, q.size, (p) => db.liveHit(p, q.showArchived) && db.kwHit(q.keyword, p.name, p.scope))),
 
   // 定价扩展
-  listPricingDiffs: (q: PageQ = {}) => wait(db.listPricingDiffs(q)),
+  listPlanScopes: (planNo) => wait(db.listPlanScopes(planNo)),
   listPricingSchedules: (q: PageQ = {}) => wait(db.listPricingSchedules(q)),
   savePricePlan: (x) => wait(db.savePricePlan(x), 350),
-  savePricingDiff: (x) => wait(db.savePricingDiff(x), 350),
+  savePlanScope: async (planNo, x) => wait(db.savePlanScope(planNo, x), 350),
+  removePlanScope: async (planNo, id) => wait(db.removePlanScope(planNo, id), 350),
   savePricingSchedule: (x) => wait(db.savePricingSchedule(x), 350),
 
   // G1 软删除：归档 / 恢复（禁止物理删除）

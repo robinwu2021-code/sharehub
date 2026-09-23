@@ -1,6 +1,8 @@
 package ai.neargo.sharehub.portal.core;
 
 import ai.neargo.common.core.PageResult;
+import ai.neargo.sharehub.common.OkResult;
+import ai.neargo.sharehub.trade.price.dto.PriceDtos.PlanScopeEntry;
 import ai.neargo.sharehub.trade.price.dto.PriceDtos.PricePlanEntry;
 import ai.neargo.sharehub.trade.price.dto.PriceDtos.PricingSchedule;
 import ai.neargo.sharehub.trade.price.entity.PricePlan;
@@ -10,6 +12,7 @@ import ai.neargo.sharehub.trade.price.service.PricingScheduleService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -66,6 +69,35 @@ public class PricingController {
      * 引擎读 price_rule，但下单处从未把站点传进来。留着一个已经没有表的写入口，
      * 只会让人以为配了有用。范围维护统一在「运营管理 › 收费方案 › 适用范围」。
      */
+
+    // —— 适用范围（取价的唯一依据，ADR-028）——
+    //
+    // 2026-09-23 补：这三个端点此前**根本不存在** —— 服务层早有 scopesOf/replaceScope，
+    // 但没有任何 HTTP 出口。于是「适用范围」在界面上只是一个自由文本描述框，
+    // 真正被引擎读的那张表**只有种子能写**。「配了不生效」的另一半是「压根没法配」。
+
+    @GetMapping("/price-plans/{planNo}/scopes")
+    @PreAuthorize("@perm.can('pricing:plan:read')")
+    public List<PlanScopeEntry> planScopes(@PathVariable String planNo) {
+        return planService.scopesOf(planNo);
+    }
+
+    @PostMapping("/price-plans/{planNo}/scopes")
+    @PreAuthorize("@perm.can('pricing:plan:create')")
+    public PlanScopeEntry savePlanScope(@PathVariable String planNo, @RequestBody PlanScopeEntry body) {
+        // 路径为准，忽略 body 里的 planNo —— 防越权改他单（与 updatePlan 同一处理）
+        return planService.upsertScope(new PlanScopeEntry(body.id(), planNo, body.scopeType(),
+                body.scopeRef(), body.deviceType(), body.vendorCode(), body.model(), body.brandNo(),
+                body.priority(), body.effectiveFrom(), body.effectiveTo()));
+    }
+
+    /** 契约禁止 delete*，用 remove（软删语义由实体的 @TableLogic 负责）。 */
+    @PostMapping("/price-plans/{planNo}/scopes/{id}/remove")
+    @PreAuthorize("@perm.can('pricing:plan:create')")
+    public OkResult removePlanScope(@PathVariable String planNo, @PathVariable Long id) {
+        planService.removeScope(planNo, id);
+        return new OkResult(true);
+    }
 
     // —— 活动 / 时段价 ——
 
