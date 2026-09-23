@@ -29,6 +29,10 @@ const L1_KEYS = [
   "pricing", "finance", "user", "marketing", "cs", "report", "org", "system",
 ];
 // 叶子五元组 href|label|perm|phase|group —— 2026-07-30 层级重构前后逐条比对为零差异。
+// 2026-09-23 有意变更（A 类菜单重合收敛，见 docs/technical/菜单重合梳理与优化方案.md）：
+// 删 7 个重复叶子 —— 运营管理的 应用版本/银行管理/问题管理/公告管理（与系统设置、营销
+// 调同一组 API）、站点与点位的 站点管理、计费定价的 计费模板 与 活动/时段价
+// （与运营管理 › 站点管理 / 收费方案 调同一组 API）。同一张表不留两个维护入口。
 // 2026-09-23 有意变更：phase 从三值(1/2/3)改为四值 L0-L3，28 个叶子按分级矩阵重标，
 // 并新增代理门户「申请提现」(AGT-06)。依据 docs/requirements/功能清单-分级矩阵.md §六/§七。
 const LEAF_TUPLES = [
@@ -45,10 +49,6 @@ const LEAF_TUPLES = [
   "/operation/fee-adjustments|预约调价|pricing:adjustment:read||场站管理",
   "/operation/site-sharing|站点分成|finance:share_rule:read||场站管理",
   "/operation/payee-sharing|分成方分成|finance:share_rule:read||场站管理",
-  "/operation/app-versions|应用版本|system:app_version:read||基础管理",
-  "/operation/banks|银行管理|system:bank:read||基础管理",
-  "/operation/problems|问题管理|system:problem:read||基础管理",
-  "/operation/notices|公告管理|marketing:notice:read||公告管理",
   "/devices|设备台账|device:cabinet:read||资产台账",
   "/devices?tab=powerbanks|充电宝管理|device:powerbank:read||资产台账",
   "/devices?tab=monitor|实时监控|device:cabinet:read||在线运行",
@@ -65,7 +65,6 @@ const LEAF_TUPLES = [
   "/work-orders?view=board|工单看板|workorder:wo:read||",
   "/work-orders?view=sla|SLA 管理||2|",
   "/work-orders?view=inspection|巡检计划||2|",
-  "/locations?tab=sites|站点管理|location:poi:read||场地资产",
   "/locations?tab=points|点位管理|location:poi:read||场地资产",
   "/locations?tab=analysis|站点坪效|location:analysis:read|3|场地资产",
   "/locations?tab=venues|场地方|location:venue:read||场地方机构",
@@ -86,9 +85,7 @@ const LEAF_TUPLES = [
   "/orders?tab=refunds|退款记录|order:refund:audit||售后处置",
   "/orders?tab=deposit|押金与欠费|order:order:read|1|特殊单据",
   "/orders?tab=free|免费订单|order:order:read|2|特殊单据",
-  "/pricing|计费模板|pricing:rule:read||",
   "/pricing?tab=diff|差异化定价||2|",
-  "/pricing?tab=schedule|活动/时段价||3|",
   "/finance?tab=rules|分润规则|finance:share_rule:read||分润与结算",
   "/finance?tab=records|分润明细|finance:share_record:read||分润与结算",
   "/finance?tab=summary|分润统计|finance:share_record:read|1|分润与结算",
@@ -242,7 +239,9 @@ describe("L3 叶子过滤（4.2-2）", () => {
     const labels = visibleLeaves(sec("location"), "OPS").map((l) => l.label);
     expect(labels).not.toContain("进场合同");
     expect(labels).not.toContain("站点坪效");
-    expect(labels).toContain("站点管理");
+    // 「站点管理」2026-09-23 已归并到运营管理，本 section 只留点位
+    expect(labels).not.toContain("站点管理");
+    expect(labels).toContain("点位管理");
   });
 });
 
@@ -485,19 +484,19 @@ describe("运营管理：跨模块 section", () => {
   it("各角色可见的子页面与后端权限码一致", () => {
     expect(leafLabels("ADMIN")).toEqual([
       "站点概览", "站点管理", "收费方案", "预约调价", "站点分成", "分成方分成",
-      "应用版本", "银行管理", "问题管理", "公告管理",
     ]);
-    expect(leafLabels("OPS")).toEqual(["站点概览", "站点管理", "应用版本"]);
-    expect(leafLabels("FINANCE")).toEqual(["站点概览", "收费方案", "预约调价", "站点分成", "分成方分成", "银行管理"]);
-    expect(leafLabels("BD")).toEqual(["站点概览", "站点管理", "站点分成", "分成方分成", "公告管理"]);
+    expect(leafLabels("OPS")).toEqual(["站点概览", "站点管理"]);
+    expect(leafLabels("FINANCE")).toEqual(["站点概览", "收费方案", "预约调价", "站点分成", "分成方分成"]);
+    expect(leafLabels("BD")).toEqual(["站点概览", "站点管理", "站点分成", "分成方分成"]);
     expect(leafLabels("VIEWER")).toEqual(["站点概览", "站点管理", "站点分成", "分成方分成"]);
   });
 
-  it("CS 没有 location 模块权限，也能通过 system/marketing 看到运营管理（多模块规则）", () => {
-    expect(sectionKeys("CS")).toContain("operation");
-    expect(leafLabels("CS")).toEqual(["问题管理", "公告管理"]);
-    // 默认落地到它第一个能打开的页面，而不是它没权限的站点概览
-    expect(sectionDefaultHref(op(), "CS")).toBe("/operation/problems");
+  it("CS 看不到运营管理——它的两项（问题管理/公告管理）已归还系统设置与营销", () => {
+    // 2026-09-23 之前 CS 靠 system/marketing 两个模块权限从这里漏进来，
+    // 看到的恰恰是那两个**重复页面**。重复删掉后它在本 section 一个叶子都没有，
+    // 按 visibleSections 的「不出现点开是空的一级菜单」规则整个 section 不可见。
+    expect(leafLabels("CS")).toEqual([]);
+    expect(sectionKeys("CS")).not.toContain("operation");
   });
 
   it("AGENT 走门户，看不到运营管理", () => {
@@ -510,15 +509,16 @@ describe("运营管理：跨模块 section", () => {
     }
   });
 
-  it("三个分组与简电一致且顺序固定", () => {
-    expect(groupedLeaves(visibleLeaves(op(), "ADMIN")).map((g) => g.group)).toEqual(["场站管理", "基础管理", "公告管理"]);
+  it("分组与顺序固定", () => {
+    // 2026-09-23：「基础管理」「公告管理」两组整组撤销（内容与系统设置/营销重复）
+    expect(groupedLeaves(visibleLeaves(op(), "ADMIN")).map((g) => g.group)).toEqual(["场站管理"]);
   });
 
   it("多个独立页面：路径反推与高亮按页面路径", () => {
-    expect(findActiveSection("/operation/banks", "ADMIN")?.key).toBe("operation");
-    expect(findActiveSection("/operation/banks/", "ADMIN")?.key).toBe("operation");
+    expect(findActiveSection("/operation/site-sharing", "ADMIN")?.key).toBe("operation");
+    expect(findActiveSection("/operation/site-sharing/", "ADMIN")?.key).toBe("operation");
     const leaves = visibleLeaves(op(), "ADMIN");
-    expect(leaves[activeLeafIndex(leaves, "/operation/banks", null, null)]?.label).toBe("银行管理");
+    expect(leaves[activeLeafIndex(leaves, "/operation/site-sharing", null, null)]?.label).toBe("站点分成");
     expect(breadcrumb("/operation/fee-adjustments", null, null, "ADMIN")).toEqual(["运营管理", "场站管理", "预约调价"]);
     // 旧菜单的同名功能不受影响
     expect(findActiveSection("/system", "ADMIN")?.key).toBe("system");

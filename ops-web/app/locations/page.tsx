@@ -39,7 +39,11 @@ import type { Site, SitePoint, Venue, Contract, Lead, LeadStage, LeadFollowChann
 
 // tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）。
 // 「站点/点位/合同」在菜单里叫「站点管理 / 点位管理 / 进场合同」——以菜单为准。
-const TAB_KEYS = ["sites", "points", "venues", "contracts", "onboarding", "crm", "analysis", "lifecycle"] as const;
+// 2026-09-23 移除 "sites"：站点管理与「运营管理 › 站点管理」调同一组 API（listSites/saveSite/
+// archiveSite），是同一张表的两个维护入口。保留后者 —— 它是超集：详情抽屉有 8 个页签
+// （基本信息/点位/机柜/合同/计费/分成/统计/操作记录），还带暂停营业与统计。
+// 本页保留「点位管理」：站点详情里能维护点位，但跨站点批量看点位仍只有这里能做。
+const TAB_KEYS = ["points", "venues", "contracts", "onboarding", "crm", "analysis", "lifecycle"] as const;
 const LEAD_STAGE: StatusMap<LeadStage> = {
   NEW: { label: "新线索", tone: "muted" },
   CONTACTED: { label: "已接触", tone: "outline" },
@@ -151,7 +155,6 @@ function LocationsInner() {
   // 站点坪效周期。复用报表域的 REPORT_PERIODS/缺省值 —— 自己拼一套 label，
   // 「近 30 日」在坪效页和点位报表页就会是两个窗口。
   const [period, setPeriod] = useState<ReportPeriod>(REPORT_PERIOD_DEFAULT);
-  const [siteForm, setSiteForm] = useState<Partial<Site> | null>(null);
   const [pointForm, setPointForm] = useState<Partial<SitePoint> | null>(null);
   const [venueForm, setVenueForm] = useState<Partial<Venue> | null>(null);
   const [contractForm, setContractForm] = useState<Partial<Contract> | null>(null);
@@ -205,8 +208,7 @@ function LocationsInner() {
     // showArchived 必须进 queryKey，否则切开关不重新拉数据
     queryKey: ["place", tab, paging.page, paging.size, keyword, showArchived, period],
     queryFn: () =>
-      tab === "sites" ? api.listSites({ page: paging.page, size: paging.size, keyword, showArchived })
-      : tab === "points" ? api.listLocations({ page: paging.page, size: paging.size, keyword, showArchived })
+      tab === "points" ? api.listLocations({ page: paging.page, size: paging.size, keyword, showArchived })
       : tab === "venues" ? api.listVenues({ page: paging.page, size: paging.size, keyword, showArchived })
       : tab === "crm" ? api.listLeads({ page: paging.page, size: paging.size, keyword })
       : tab === "analysis" ? api.listSiteAnalysis({ page: paging.page, size: paging.size, keyword, period })
@@ -216,10 +218,6 @@ function LocationsInner() {
     placeholderData: keepPreviousData,
   });
 
-  const saveSite = useMutation({
-    mutationFn: (s: Partial<Site>) => api.saveSite(s),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["place", "sites"] }); setSiteForm(null); },
-  });
   const savePoint = useMutation({
     mutationFn: (l: Partial<SitePoint>) => api.savePoint(l),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["place", "points"] }); setPointForm(null); },
@@ -314,8 +312,6 @@ function LocationsInner() {
 
   // 归档 / 恢复（G1 软删除）。错误由全局 MutationCache 接管，页面不重复 catch。
   const invalidatePlace = () => qc.invalidateQueries({ queryKey: ["place"] });
-  const archiveSite = useMutation({ mutationFn: (no: string) => api.archiveSite(no), onSuccess: () => { invalidatePlace(); notify.success("已归档"); } });
-  const unarchiveSite = useMutation({ mutationFn: (no: string) => api.unarchiveSite(no), onSuccess: () => { invalidatePlace(); notify.success("已恢复"); } });
   const archivePoint = useMutation({ mutationFn: (no: string) => api.archivePoint(no), onSuccess: () => { invalidatePlace(); notify.success("已归档"); } });
   const unarchivePoint = useMutation({ mutationFn: (no: string) => api.unarchivePoint(no), onSuccess: () => { invalidatePlace(); notify.success("已恢复"); } });
   const archiveVenue = useMutation({ mutationFn: (no: string) => api.archiveVenue(no), onSuccess: () => { invalidatePlace(); notify.success("已归档"); } });
@@ -327,31 +323,6 @@ function LocationsInner() {
   }
 
   // 业务号列一律 txt-strong（§12.3 主键列加强）；计数/金额列 text-right + tabular-nums（§12.4）
-  const siteCols: Column<Site>[] = [
-    { header: "站点号", cell: (s) => <span className="txt-strong tabular-nums">{s.siteNo}</span> },
-    { header: "名称", cell: (s) => s.name },
-    { header: "场地方", cell: (s) => <span className="text-muted-foreground">{s.venueName}</span> },
-    { header: "区域", cell: (s) => <span title={s.regionId}>{s.regionName}</span> },
-    { header: "归属", cell: (s) => s.agentNo ? <Badge tone="outline">代理 {s.agentNo}</Badge> : <Badge tone="muted">平台直营</Badge> },
-    { header: "点位/设备", className: "text-right", cell: (s) => <span className="tabular-nums">{s.pointCount} / {s.cabinetCount}</span> },
-    // 坐标上列表：地图少了一个点时，能当场看出是哪个站点没填/填错，不用点进抽屉逐个翻
-    { header: "坐标", cell: (s) => <span className="tabular-nums text-muted-foreground">{fmtCoord(s.lat, s.lng)}</span> },
-    { header: "状态", cell: (s) => s.status === "ACTIVE" ? <Badge tone="success">启用</Badge> : <Badge tone="muted">暂停</Badge> },
-    ...archivedCols<Site>(),
-    {
-      header: "操作",
-      cell: (s) => (
-        <ArchiveActions
-          archived={!!s.archivedAt}
-          canWrite={allow("location:poi:update")}
-          actions={<Button size="sm" variant="outline" onClick={() => setSiteForm(s)}>编辑</Button>}
-          // 站点是主数据：要求手输站点号确认，避免误点
-          onArchive={async () => { if (await confirm(archiveConfirm("站点", s.siteNo, s.siteNo))) archiveSite.mutate(s.siteNo); }}
-          onUnarchive={async () => { if (await confirm(unarchiveConfirm("站点", s.siteNo))) unarchiveSite.mutate(s.siteNo); }}
-        />
-      ),
-    },
-  ];
   const pointCols: Column<SitePoint>[] = [
     { header: "点位号", cell: (l) => <span className="txt-strong tabular-nums">{l.locationNo}</span> },
     { header: "名称", cell: (l) => l.name },
@@ -485,19 +456,7 @@ function LocationsInner() {
     return showArchived ? [{ header: "归档时间", value: (r) => (r.archivedAt ? fmtTime(r.archivedAt) : "") }] : [];
   }
   function exportCurrent() {
-    if (tab === "sites") {
-      exportCsv<Site>("站点", [
-        { header: "站点号", value: (s) => s.siteNo },
-        { header: "名称", value: (s) => s.name },
-        { header: "场地方", value: (s) => s.venueName },
-        { header: "区域", value: (s) => s.regionName },
-        { header: "归属", value: (s) => (s.agentNo ? `代理 ${s.agentNo}` : "平台直营") },
-        { header: "点位/设备", value: (s) => `${s.pointCount} / ${s.cabinetCount}` },
-        { header: "坐标", value: (s) => fmtCoord(s.lat, s.lng) },
-        { header: "状态", value: (s) => (s.status === "ACTIVE" ? "启用" : "暂停") },
-        ...archivedCsv<Site>(),
-      ], pageRows<Site>());
-    } else if (tab === "points") {
+    if (tab === "points") {
       exportCsv<SitePoint>("点位", [
         { header: "点位号", value: (l) => l.locationNo },
         { header: "名称", value: (l) => l.name },
@@ -575,12 +534,6 @@ function LocationsInner() {
   return (
     <div>
       <TabHeader tabs={tabs} value={tab} onChange={setTab} />
-      {tab === "sites" && (
-        <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索站点号 / 名称" onExport={onExport}
-          onAdd={allow("location:poi:create") ? () => setSiteForm({ status: "ACTIVE", sceneType: "商场", agentNo: null }) : undefined} addLabel="新增站点">
-          {archivedToggle}
-        </Toolbar>
-      )}
       {tab === "points" && (
         <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索点位号 / 名称" onExport={onExport}
           onAdd={allow("location:poi:create") ? () => setPointForm({ status: "ACTIVE" }) : undefined} addLabel="新增点位">
@@ -618,8 +571,6 @@ function LocationsInner() {
       {tab === "lifecycle" && (
         <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索站点号 / 名称 / 负责人" onExport={onExport} />
       )}
-      {tab === "sites" && <DataTable rowKey={(s: Site) => s.siteNo} columns={siteCols} rows={q.data?.list as Site[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} rowClassName={archivedRowClass}
-        empty={showArchived ? "没有匹配的站点——换个关键词，或先「新增站点」建档" : "没有在用的站点——可能都已归档（打开「显示已归档」查看），或先「新增站点」建档"} />}
       {tab === "points" && <DataTable rowKey={(l: SitePoint) => l.locationNo} columns={pointCols} rows={q.data?.list as SitePoint[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} rowClassName={archivedRowClass}
         empty={showArchived ? "没有匹配的点位——换个关键词，或先「新增点位」" : "没有在用的点位——点位隶属站点，先建站点再在此新增，或打开「显示已归档」查看已归档点位"} />}
       {tab === "venues" && <DataTable rowKey={(v: Venue) => v.venueNo} columns={venueCols} rows={q.data?.list as Venue[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} rowClassName={archivedRowClass}
@@ -635,75 +586,6 @@ function LocationsInner() {
       {tab === "lifecycle" && <DataTable rowKey={(l: SiteLifecycle) => l.siteNo} columns={lifecycleCols} rows={q.data?.list as SiteLifecycle[]} loading={q.isLoading} error={q.error} onRetry={q.refetch}
         empty="暂无生命周期记录——站点签约后自动进入跟踪，尚无签约站点时此处为空" />}
       {q.data && <Pagination page={paging.page} size={paging.size} total={q.data.total} onPage={paging.setPage} onSize={paging.setSize} />}
-
-      {/* 站点 新增/编辑 */}
-      <Drawer
-        open={!!siteForm}
-        onOpenChange={(o) => !o && setSiteForm(null)}
-        title={siteForm?.siteNo ? `编辑站点 ${siteForm.siteNo}` : "新增站点"}
-        desc="站点=运营与归属单元；归属决定分润与数据可见"
-        footer={<><Button variant="outline" onClick={() => setSiteForm(null)}>取消</Button><Button disabled={saveSite.isPending} onClick={() => siteForm && saveSite.mutate(siteForm)}>保存</Button></>}
-      >
-        {siteForm && (<>
-          <Field label="站点名称"><Input value={siteForm.name ?? ""} onChange={(e) => setSiteForm({ ...siteForm, name: e.target.value })} /></Field>
-          {/* 场地方从档案选，不自由输入——分成按场地方结算，同名场地方按名字连会把钱分给另一家 */}
-          <Field label="场地方">
-            <Select className="w-full" value={siteForm.venueNo ?? ""} onChange={(e) => {
-              const v = (venuesQ.data?.list ?? []).find((x) => x.venueNo === e.target.value);
-              setSiteForm({ ...siteForm, venueNo: e.target.value, venueName: v?.name ?? "" });
-            }}>
-              <option value="">请选择场地方</option>
-              {(venuesQ.data?.list ?? []).map((v) => (
-                <option key={v.venueNo} value={v.venueNo}>{v.name}（{v.venueNo}）</option>
-              ))}
-            </Select>
-          </Field>
-          {/* 区域从字典选，不能自由输入——台账 M11：原先是文本框，写进去的名字在 regions 字典里根本不存在 */}
-          <Field label="区域">
-            <Select className="w-full" value={siteForm.regionId ?? ""} onChange={(e) => {
-              const r = (regionsQ.data?.list ?? []).find((x) => x.regionId === e.target.value);
-              setSiteForm({ ...siteForm, regionId: e.target.value, regionName: r?.name ?? "" });
-            }}>
-              <option value="">请选择区域</option>
-              {(regionsQ.data?.list ?? []).filter((r) => r.level === 3).map((r) => (
-                <option key={r.regionId} value={r.regionId}>{r.name}（{r.regionId}）</option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="归属代理（空=平台直营）"><Input value={siteForm.agentNo ?? ""} onChange={(e) => setSiteForm({ ...siteForm, agentNo: e.target.value || null })} placeholder="AG001" /></Field>
-          <Field label="场景">
-            <Select className="w-full" value={siteForm.sceneType ?? "商场"} onChange={(e) => setSiteForm({ ...siteForm, sceneType: e.target.value })}>
-              {SCENES.map((s) => <option key={s} value={s}>{s}</option>)}
-            </Select>
-          </Field>
-          {/*
-            地址与经纬度绑成一个控件：两者**必须一致**，分开手填时对不上没人拦得住
-            （C 端「找附近」按经纬度排，地址只给人看）。地图选点一次写三个值。
-            没配地图密钥时 AddressPicker 自动降级为「地址 + 两个经纬度输入框」——
-            这正是原先那段注释担心的情形，任何环境都能维护坐标，不被地图挡住。
-          */}
-          <Field label="地址 · 位置">
-            <AddressPicker
-              value={{ address: siteForm.address ?? "", lat: siteForm.lat ?? "", lng: siteForm.lng ?? "" }}
-              onChange={(v) => setSiteForm({
-                ...siteForm,
-                address: v.address,
-                lat: v.lat === "" ? undefined : v.lat,
-                lng: v.lng === "" ? undefined : v.lng,
-              })}
-            />
-            <div className="mt-1 text-xs text-muted-foreground">
-              取值范围 纬度 {SITE_COORD_BOUNDS.latMin}~{SITE_COORD_BOUNDS.latMax} · 经度 {SITE_COORD_BOUNDS.lngMin}~{SITE_COORD_BOUNDS.lngMax}（当前运营国家 UAE）。
-              经纬度写反在全球范围内也合法，但会把点扔到海里，保存时会被拒绝。
-            </div>
-          </Field>
-          <Field label="状态">
-            <Select className="w-full" value={siteForm.status ?? "ACTIVE"} onChange={(e) => setSiteForm({ ...siteForm, status: e.target.value as Site["status"] })}>
-              <option value="ACTIVE">启用</option><option value="PAUSED">暂停</option>
-            </Select>
-          </Field>
-        </>)}
-      </Drawer>
 
       {/* 点位 新增/编辑 */}
       <Drawer

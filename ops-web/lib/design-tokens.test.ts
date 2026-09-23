@@ -101,6 +101,33 @@ describe("页面层规范一致性（只允许变好）", () => {
     expect(countAll(/Badge tone=\{/g)).toBeLessThanOrEqual(2);
   });
 
+  /**
+   * 同一个写操作不许有两个维护入口。
+   *
+   * 2026-09-23 补：运营管理菜单 2026-09-22 建起来时，把站点、收费方案、银行、问题、
+   * 应用版本、公告各做了第二份页面，调的是**同一组 API**。一年里没人发现，直到有人去改
+   * 站点表单，在两个文件里各改了一遍才暴露。样式棘轮管不住这种重复 —— 两份页面各自都合规。
+   *
+   * 判据取写操作（save/archive/unarchive/create/update/delete/remove）而不是 list：
+   * 同一份数据在两处**只读展示**是合理的（概览页、报表页），
+   * 但**两个地方都能改**必然出现「在哪个入口改的，决定别人看不看得见」。
+   */
+  it("同一个写操作 API 不被两个页面调用 —— 一份数据只留一个维护入口", () => {
+    const WRITE = /\bapi\.((?:save|archive|unarchive|create|update|delete|remove)[A-Za-z0-9_]*)\s*\(/g;
+    const byApi = new Map<string, Set<string>>();
+    for (const f of pageFiles()) {
+      const src = readFileSync(f, "utf8");
+      for (const m of src.matchAll(WRITE)) {
+        if (!byApi.has(m[1])) byApi.set(m[1], new Set());
+        byApi.get(m[1])!.add(f);
+      }
+    }
+    const dup = [...byApi.entries()]
+      .filter(([, files]) => files.size > 1)
+      .map(([api, files]) => `${api}: ${[...files].map((f) => f.replace(/.*\/app\//, "app/")).join(" + ")}`);
+    expect(dup).toEqual([]);
+  });
+
   it("筛选用的裸 <Select> 不增加 —— 应改用 <FilterSelect>", () => {
     // 判据：<Select> 里带 `option value=""`（"全部 XX"）的才是**筛选**下拉；
     // 表单里的 <Select> 是合法用法，不算违规（清单里把两者混在一起数了）。

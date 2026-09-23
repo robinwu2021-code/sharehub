@@ -161,7 +161,7 @@ export const NAV: NavSection[] = [
     // 与其它 section 不同：一个 section 下是**多个独立页面**（/operation/<page>），不是同页 tab。
     // soon 由 backend-ready.ts 决定：真实后端模式下接口未就绪的页面灰显，mock 模式恒可点。
     key: "operation", label: "运营管理", icon: "Store", module: "location",
-    modules: ["location", "pricing", "finance", "system", "marketing"],
+    modules: ["location", "pricing", "finance"],
     href: "/operation/overview", match: ["/operation"],
     children: opLeaves([
       ["overview", "站点概览", "location:overview:read", "场站管理"],
@@ -170,10 +170,12 @@ export const NAV: NavSection[] = [
       ["fee-adjustments", "预约调价", "pricing:adjustment:read", "场站管理"],
       ["site-sharing", "站点分成", "finance:share_rule:read", "场站管理"],
       ["payee-sharing", "分成方分成", "finance:share_rule:read", "场站管理"],
-      ["app-versions", "应用版本", "system:app_version:read", "基础管理"],
-      ["banks", "银行管理", "system:bank:read", "基础管理"],
-      ["problems", "问题管理", "system:problem:read", "基础管理"],
-      ["notices", "公告管理", "marketing:notice:read", "公告管理"],
+      // 2026-09-23 撤销「基础管理」「公告管理」两组：应用版本 / 银行 / 问题 / 公告
+      // 曾在这里各有一份页面，与系统设置 › 基础字典、营销管理 › 运营内容**调同一组 API**
+      // （listBanks/saveBank、listProblems、listAppVersions、listNotices），
+      // 是同一张表的两个维护入口 —— 在哪个入口改的，决定了别人能不能看到自己的改动。
+      // 判据是「这一项的主语是什么」：那四项的主语是系统字典与触达内容，不是站点，故归还原处。
+      // 详见 docs/technical/菜单重合梳理与优化方案.md §A 类。
     ]),
   },
   {
@@ -211,10 +213,11 @@ export const NAV: NavSection[] = [
     ],
   },
   {
-    key: "location", label: "站点与点位", icon: "MapPin", module: "location", href: "/locations",
+    key: "location", label: "站点与点位", icon: "MapPin", module: "location", href: "/locations?tab=points",
     children: [
-      // 分组：物理资产（站点/点位）↔ 合作机构（场地方主体及其合同/进件/生命周期）
-      { href: "/locations?tab=sites", label: "站点管理", perm: "location:poi:read", group: "场地资产" },
+      // 分组：物理资产（点位）↔ 合作机构（场地方主体及其合同/进件/生命周期）
+      // 2026-09-23 撤销「站点管理」：与「运营管理 › 站点管理」调同一组 API，是同一张表的
+      // 两个维护入口。留后者 —— 它是超集（详情 8 个页签 + 暂停营业 + 统计）。
       { href: "/locations?tab=points", label: "点位管理", perm: "location:poi:read", group: "场地资产" },
       { href: "/locations?tab=analysis", label: "站点坪效", perm: "location:analysis:read", phase: 3, group: "场地资产" },
       { href: "/locations?tab=venues", label: "场地方", perm: "location:venue:read", group: "场地方机构" },
@@ -251,11 +254,15 @@ export const NAV: NavSection[] = [
     ],
   },
   {
-    key: "pricing", label: "计费定价", icon: "Tag", module: "pricing", href: "/pricing",
+    // 2026-09-23 撤销「计费模板」「活动/时段价」：与「运营管理 › 收费方案」的两个页签
+    // 调同一组 API，是同一张表的两个维护入口。留后者 —— 它多了试算与待执行调价，
+    // 且 ADR-028 的「适用范围」要落在那边。
+    // 本 L1 现在只剩「差异化定价」，已是空壳：按经营链条方案 P1，它会并入收费方案的
+    // 适用范围后整页下线，届时本 L1 一并撤销（菜单重合方案第 3 步）。在替代品建好前
+    // 不删 —— 那是目前唯一的差异化取价入口。
+    key: "pricing", label: "计费定价", icon: "Tag", module: "pricing", href: "/pricing?tab=diff",
     children: [
-      { href: "/pricing", label: "计费模板", perm: "pricing:rule:read" },
       { href: "/pricing?tab=diff", label: "差异化定价", phase: 2 },
-      { href: "/pricing?tab=schedule", label: "活动/时段价", phase: 3 },
     ],
   },
   {
@@ -434,13 +441,13 @@ export function navTabs(
  * 于是单独问任何一个 key 都能匹配上。必须整组一起问。
  */
 export function missingTabs(
-  path: string, keys: readonly string[], role: Role | undefined, defaultKey?: string,
+  path: string, keys: readonly string[], role: MaybeRole, defaultKey?: string,
 ): string[] {
   return resolveTabs(path, keys, role, true, defaultKey).missing;
 }
 
 function resolveTabs(
-  path: string, specs: readonly PageTabSpec[], role: Role | undefined, quiet = false, defaultKey?: string,
+  path: string, specs: readonly PageTabSpec[], role: MaybeRole, quiet = false, defaultKey?: string,
 ): { tabs: { key: string; label: string; phase?: Phase }[]; missing: string[] } {
   const target = normPath(path);
   const keys = specs.map((x) => (typeof x === "string" ? x : x.key));
@@ -521,7 +528,7 @@ function resolveTabs(
  * 门户叶没细到 tab 的，不抢子 tab 的标题（AGENT 看 /devices?tab=monitor 时仍叫「实时监控」）。
  */
 export function portalTitleOverride(
-  role: Role | undefined, pathname: string, currentKey: string | null, isDefault: boolean,
+  role: MaybeRole, pathname: string, currentKey: string | null, isDefault: boolean,
 ): string | undefined {
   const p = normPath(pathname);
   for (const section of NAV) {
@@ -562,7 +569,7 @@ export function isLeafLocked(leaf: NavLeaf): boolean {
 }
 
 /** section 是否被产品分期屏蔽（整 section phase 或所有叶子均被锁）。 */
-export function isSectionLocked(section: NavSection, role: Role | undefined): boolean {
+export function isSectionLocked(section: NavSection, role: MaybeRole): boolean {
   if (isPhaseLocked(section.phase)) return true;
   const leaves = visibleLeaves(section, role);
   return leaves.length > 0 && leaves.every((l) => isLeafLocked(l));
@@ -577,7 +584,7 @@ function sectionMatchPrefixes(section: NavSection): string[] {
  * 由 pathname 反推当前 section：最长前缀匹配；"/" 仅精确匹配。
  * 不做 RBAC 过滤——URL 已到达即需正确归属（页面自身有权限兜底）。
  */
-export function findActiveSection(pathname: string, role?: Role): NavSection | undefined {
+export function findActiveSection(pathname: string, role?: MaybeRole): NavSection | undefined {
   const p = normPath(pathname);
   // ⚠️ 必须按角色限定搜索范围：门户 section（如代理端「我的经营」）与运营 section**共用同一批路径**
   // （/、/devices、/orders…）。不限定的话，排在前面的门户项会对所有角色命中，
@@ -619,7 +626,7 @@ export function activeLeafIndex(
 }
 
 /** section 的默认落地地址：首个可点叶子（排除 soon 和 phase-locked），无则 section 首页。 */
-export function sectionDefaultHref(section: NavSection, role: Role | undefined): string {
+export function sectionDefaultHref(section: NavSection, role: MaybeRole): string {
   const leaf = visibleLeaves(section, role).find((l) => !l.soon && !isLeafLocked(l));
   return leaf?.href ?? section.href;
 }
@@ -635,7 +642,7 @@ export function isLeafDisabled(leaf: NavLeaf): boolean {
  * 与 activeLeafIndex 不同：此处「无视锁定」匹配目标叶，才能识别到被锁叶。
  */
 export function routeLockedPhase(
-  pathname: string, tab: string | null, view: string | null, role: Role | undefined,
+  pathname: string, tab: string | null, view: string | null, role: MaybeRole,
 ): Phase | undefined {
   const section = findActiveSection(pathname, role);
   if (!section) return undefined;
@@ -661,7 +668,7 @@ export function routeLockedPhase(
  * 分组是视觉聚类不是可导航节点，仅作不可点的中间项；叶子无 group 时退化为两级。
  */
 export function breadcrumb(
-  pathname: string, tab: string | null, view: string | null, role: Role | undefined,
+  pathname: string, tab: string | null, view: string | null, role: MaybeRole,
 ): string[] {
   const section = findActiveSection(pathname, role);
   if (!section) return [];
