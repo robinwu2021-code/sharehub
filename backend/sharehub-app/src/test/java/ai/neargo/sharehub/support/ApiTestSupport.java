@@ -23,7 +23,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>约定：登录换 Bearer token；断言基于 powerbank 契约 {@code {code,msg,data}}，
  * 列表 {@code data.records/total/page/size}。测试数据见 {@code resources/fixtures/operator-daily.json}。
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        // 免密 + 多角色登录只在 dev-mode 下成立（TDD-auth-security-hotfix）：
+        // 生产是 fail-closed（未配 sharehub.admin.password 即拒登）且角色只由账号决定。
+        // 真实账号登录的回归要等 A3 的凭据库；在那之前集成测试显式开 dev-mode。
+        // **生产姿态**（dev-mode 关）由 SecurityHotfixTest 专门守。
+        properties = "sharehub.dev-mode.enabled=true")
 public abstract class ApiTestSupport {
 
     @LocalServerPort

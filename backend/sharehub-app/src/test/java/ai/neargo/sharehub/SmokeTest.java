@@ -20,7 +20,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>用 JDK HttpClient + Jackson（web 起步已带）而非 boot 的 TestRestTemplate/MockMvc——
  * Spring Boot 4.0 已把这些 web 测试助手拆出独立模块，本机私仓未含，故不依赖它们。
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        // 本类的两个前提，2026-09-23 起必须显式声明（TDD-auth-security-hotfix 把两个默认值都收紧了）：
+        //  1) 免密登录 —— 生产已改为 fail-closed，未配 sharehub.admin.password 即拒登；
+        //  2) 演示种子 —— seed.enabled 默认改为 false，而下面的断言（48 个柜机、CAB1000）吃的就是种子数据。
+        properties = {"sharehub.dev-mode.enabled=true", "sharehub.seed.enabled=true"})
 class SmokeTest {
 
     @LocalServerPort

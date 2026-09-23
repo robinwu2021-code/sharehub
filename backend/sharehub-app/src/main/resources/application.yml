@@ -56,14 +56,25 @@ management:
 
 # 开发期 CORS 允许源（ops-web Next dev）。生产走同源 nginx 反代 /api，无需 CORS。
 sharehub:
-  # 演示种子数据：开发/演示环境开，**生产必须关**（默认即关）。
+  # 开发便利总开关：固定验证码 000000 + OTP 明文回传 + 免密登录运营端。
+  # **默认关，生产绝不可开**（开启时启动日志会打 WARN 横幅）。
+  # 2026-09-23 之前这三件事在所有环境无条件生效 —— 线上任何人可登录任意手机号。
+  dev-mode:
+    enabled: false
+  # 演示种子数据：开发/演示环境开，**生产必须关**。
+  # 2026-09-23 修正：注释一直写「默认即关」，值却是 true —— 空库启动即灌演示数据。
   # 之前 5 个 Seeder 无任何门禁，任何空库启动都会灌入 12 个假代理商 / 20 个假站点，
   # 且因幂等（有数据即跳过）灌入后不会被覆盖也不会提示 —— 生产上线即事故。
   seed:
-    enabled: true
+    enabled: false
   cors:
     allowed-origins: http://localhost:3000
   # 可切换会话存储：memory(默认) | ehcache(单节点TTL) | redis(多实例推荐) | mysql(强持久sys_token)
   auth:
     token-store: memory
     token-ttl: 2h
+    # 手机验证码（内存实现，落库见 A3）
+    otp:
+      ttl: 5m                 # 有效期
+      resend-interval: 60s    # 同手机号重发间隔
+      max-attempts: 5         # 单个码最多校验次数，超过即作废（防 6 位码被枚举）

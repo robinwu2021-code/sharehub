@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.portal.core;
 
+import ai.neargo.sharehub.auth.DevMode;
 import ai.neargo.sharehub.auth.TokenStore;
 import ai.neargo.sharehub.user.consumer.ConsumerAuthService;
 import ai.neargo.sharehub.user.consumer.OtpService;
@@ -19,11 +20,14 @@ public class ConsumerAuthController {
     private final ConsumerAuthService authService;
     private final OtpService otpService;
     private final TokenStore tokenStore;
+    private final DevMode devMode;
 
-    public ConsumerAuthController(ConsumerAuthService authService, OtpService otpService, TokenStore tokenStore) {
+    public ConsumerAuthController(ConsumerAuthService authService, OtpService otpService,
+                                  TokenStore tokenStore, DevMode devMode) {
         this.authService = authService;
         this.otpService = otpService;
         this.tokenStore = tokenStore;
+        this.devMode = devMode;
     }
 
     /** 统一登录：grantType 分发（phone_otp/wechat_miniapp/wechat_oauth/apple/google）。 */
@@ -32,7 +36,13 @@ public class ConsumerAuthController {
         return authService.login(req);
     }
 
-    /** 发送 OTP（dev 返回固定码 000000 便于联调）。 */
+    /**
+     * 发送 OTP。
+     *
+     * <p><b>2026-09-23 安全止血</b>：此前**无条件把验证码明文回传**给调用方，
+     * 等于任何人都能以任意手机号登录（线上生效过）。现在只有 {@link DevMode} 开启时才回传，
+     * 生产只回 {@code {"sent": true}}，码由短信通道送达。
+     */
     @PostMapping("/otp")
     public Map<String, Object> otp(@RequestBody Map<String, String> body) {
         String phone = body.get("phone");
@@ -40,7 +50,9 @@ public class ConsumerAuthController {
             throw new IllegalArgumentException("手机号为空");
         }
         String code = otpService.issue(phone.trim());
-        return Map.of("sent", true, "devCode", code);
+        return devMode.isEnabled()
+                ? Map.of("sent", true, "devCode", code)
+                : Map.of("sent", true);
     }
 
     /**

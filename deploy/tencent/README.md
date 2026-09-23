@@ -78,6 +78,19 @@ scripts/deploy-frontend.sh c-app         # C 端 H5
 
 ## 5. 三个**必须由部署侧覆盖**的配置
 
+> ⚠️ **2026-09-23 起：C 端在生产环境暂时登录不了。这是预期行为，不是故障。**
+> 此前 C 端靠固定验证码 `000000` 登录（任何人可登录任意手机号，是个公网上的认证绕过）。
+> 该后门已关闭（[TDD-auth-security-hotfix](../../docs/technical/TDD-auth-security-hotfix.md)），
+> 但后端**还没有短信通道**（`NotifySendServiceImpl` 是 `TODO(接入层)`，只落日志不投递），
+> 所以验证码发不出去。**恢复条件**：接入短信通道（`neargo-notify` / N4）。
+> 本机联调可设 `SHAREHUB_DEV_MODE_ENABLED=true`（**生产绝不可设**）。
+
+> ⚠️ **发布前必查**：`SHAREHUB_ADMIN_PASSWORD` 必须非空，否则运营端**彻底登不进**（fail-closed 的预期行为）：
+> ```bash
+> ssh soukmind-tx 'sudo grep -c "^SHAREHUB_ADMIN_PASSWORD=.\+" /data/app/powerbank/sharehub-app/sharehub-app.env'
+> # 期望 1。为 0 就先补配再发，否则发完没人能登录运营端
+> ```
+
 | 配置 | 仓库默认 | 生产必须 | 原因 |
 |---|---|---|---|
 | `NEXT_PUBLIC_USE_MOCK` | mock（`!== "0"`） | **`0`** | 漏配 → 静默跑 mock（ai-shop 2026-09-01 踩过，admin 登录看似无权限，其实请求根本没到后端） |
@@ -87,6 +100,10 @@ scripts/deploy-frontend.sh c-app         # C 端 H5
 | `SERVER_PORT` | 8080 | **8082** | 避让 ai-shop 的 8081（shop-app）与 8083（pay-svc） |
 | `PB_DB_USER` / `PB_DB_PASS` | dev 默认 | 生产随机 32 位 | 存 `sharehub-app.env`（600） |
 | `SPRING_FLYWAY_PLACEHOLDER_REPLACEMENT` | 默认 true | **视 SQL 内容** | ai-shop 踩过 Flyway 把注释里的 `${}` 也当占位符解析 —— 上线前对 `backend/sharehub-app/src/main/resources/db/migration/*.sql` 扫一遍是否有裸 `${}` |
+| `SHAREHUB_DEV_MODE_ENABLED` | `false` | **绝不可设为 true** | 开发便利总开关：固定验证码 `000000` + OTP 明文回传 + **免密登录运营端**。2026-09-23 之前这三件事在所有环境无条件生效，线上任何人可登录任意手机号（TDD-auth-security-hotfix）。开启时启动日志会打 WARN 横幅 |
+| `SHAREHUB_ADMIN_PASSWORD` | 空 | **必须配非空** | 2026-09-23 起为 **fail-closed**：为空且 dev-mode 关 → **一律拒绝登录**（此前为空 = 任意用户名 + 前端自选角色直接放行）。角色只由 `SHAREHUB_ADMIN_ROLE` 决定，不认前端传入 |
+| `SHAREHUB_SEED_ENABLED` | `false`（2026-09-23 由 `true` 改） | 生产保持 `false`；**演示机**要灌数据才设 `true` | 之前默认 `true`，空库启动即灌 12 个假代理商 / 20 个假站点。Seeder 幂等，改默认不影响存量数据 |
+| `SHAREHUB_AUTH_TOKEN_STORE` | `memory` | 多实例用 `redis` | 2026-09-23 修正：此前开关键名写成 `powerbank.auth.token-store`，与配置对不上，**配 redis 也永远回落到内存实现**（且内存实现当时没有过期）。现已修正且内存档也有 TTL（`SHAREHUB_AUTH_TOKEN_TTL`，默认 2h） |
 | `SHAREHUB_CORS_ALLOWED_ORIGINS` | `http://localhost:3000` | **`https://<生产域名>,http://localhost:3000`** | 即使同源，浏览器 fetch 的 POST 仍会带 `Origin` 头 → Spring CorsFilter 若在白名单外会返 403「Invalid CORS request」→ 前端映射为「无权限」；curl 默认不发 Origin 头，所以 shell 测试通过而浏览器登录失败 |
 
 **发完必须验的两句**（同 ai-shop）：

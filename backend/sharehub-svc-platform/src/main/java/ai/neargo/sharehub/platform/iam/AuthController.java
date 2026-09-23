@@ -4,6 +4,7 @@ import ai.neargo.common.data.scope.DataScopeResolver;
 import ai.neargo.common.data.scope.DataScopeSpec;
 import ai.neargo.common.security.rbac.AuthSubject;
 import ai.neargo.common.security.rbac.PermissionResolver;
+import ai.neargo.sharehub.auth.DevMode;
 import ai.neargo.sharehub.auth.LoginUser;
 import ai.neargo.sharehub.auth.PermVersion;
 import ai.neargo.sharehub.auth.Realm;
@@ -36,8 +37,11 @@ public class AuthController {
     private final PermVersion permVersion;
 
     /**
-     * 生产口令闸：配置了 {@code sharehub.admin.password} 就要求用户名 = admin + 密码匹配。
-     * 空字符串 = 关（保留原 MVP 演示行为：任意 username + role 直接发 token）。
+     * 口令闸：要求用户名 = admin + 密码匹配。
+     *
+     * <p><b>2026-09-23 安全止血</b>（TDD-auth-security-hotfix）：此前为空 = 关闸，
+     * 任意 username + 前端自选 role 直接发 token。现在改为 <b>fail-closed</b> ——
+     * 未配置口令时一律拒绝登录，除非 {@link DevMode} 显式开启（仅本机联调）。
      */
     @Value("${sharehub.admin.password:}")
     private String adminPassword;
@@ -46,8 +50,12 @@ public class AuthController {
     @Value("${sharehub.admin.role:ADMIN}")
     private String adminRole;
 
+    private final DevMode devMode;
+
     public AuthController(TokenStore tokenStore, PermissionResolver permissionResolver,
-                          DataScopeResolver dataScopeResolver, MenuService menuService, PermVersion permVersion) {
+                          DataScopeResolver dataScopeResolver, MenuService menuService,
+                          PermVersion permVersion, DevMode devMode) {
+        this.devMode = devMode;
         this.tokenStore = tokenStore;
         this.permissionResolver = permissionResolver;
         this.dataScopeResolver = dataScopeResolver;
@@ -55,6 +63,10 @@ public class AuthController {
         this.permVersion = permVersion;
     }
 
+    /**
+     * 登录入参。{@code role} **保留但不再受理**（2026-09-23 起角色只由账号决定）——
+     * 字段留着是为了两个前端不必同步改就能继续登录，可在前端改完后删除。
+     */
     public record LoginReq(String username, String password, String role, String agentNo) {
     }
 
@@ -64,16 +76,24 @@ public class AuthController {
     @PostMapping("/login")
     public LoginResp login(@RequestBody LoginReq in) {
         String username = (in.username() == null || in.username().isBlank()) ? "user" : in.username();
-        String role = (in.role() == null || in.role().isBlank()) ? "VIEWER" : in.role();
-        // 口令闸：sharehub.admin.password 非空则要求 username=admin + 密码匹配，
-        // 且**登录后的角色由账号决定**（读 sharehub.admin.role，默认 ADMIN）——
-        // 前端传的 role 只在此闸门关闭时（MVP 无密码演示）有意义。
-        // 空 = 关（保留 MVP 无密码演示；上生产必须配非空值 —— 见 deploy/tencent/README.md §5）。
-        if (adminPassword != null && !adminPassword.isBlank()) {
+        String role;
+        boolean gateConfigured = adminPassword != null && !adminPassword.isBlank();
+        if (gateConfigured) {
+            // 正常路径：账号 + 口令都对才放行；**角色只由账号决定**，前端传的 role 一概不认
+            // （此前闸门关闭时前端可自选 ADMIN —— v4/06 §〇 第 1 条）。
             if (!"admin".equals(username) || !adminPassword.equals(in.password())) {
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "用户名或密码错误");
             }
             role = adminRole;
+        } else if (devMode.isEnabled()) {
+            // 本机联调 / 集成测试：允许免密，且**此分支**仍按前端传入的角色发 token ——
+            // 真实账号与凭据库要等 A3（v4/06），在那之前多角色回归测试只能这样跑。
+            // 生产走不到这里：dev-mode 默认关，且配了口令时上面的分支优先。
+            role = (in.role() == null || in.role().isBlank()) ? "VIEWER" : in.role();
+        } else {
+            // fail-closed：没配口令又不是 dev-mode —— 拒绝，而不是放行任何人进来
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                    "登录未开通：未配置 sharehub.admin.password");
         }
         // 经 SPI 解析权限（resolvePermissions 只看 roles，realm 用占位）；未知角色 → 兜底 VIEWER
         List<String> perms = List.copyOf(permissionResolver.resolvePermissions(rolesOnly(username, role)));

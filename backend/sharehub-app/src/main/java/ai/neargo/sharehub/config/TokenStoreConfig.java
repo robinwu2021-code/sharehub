@@ -17,13 +17,19 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import java.time.Duration;
 
 /**
- * 可切换 TokenStore 装配（{@code powerbank.auth.token-store}=memory|ehcache|redis|mysql，缺省 memory）。
+ * 可切换 TokenStore 装配（{@code sharehub.auth.token-store}=memory|ehcache|redis|mysql，缺省 memory）。
  * 认证过滤器/登录只依赖 {@link TokenStore} 接口——切换后端零改代码。见 docs/technical/权限体系设计.md §7。
  */
 @Configuration
 public class TokenStoreConfig {
 
-    private static final String KEY = "powerbank.auth.token-store";
+    /**
+     * 开关键名。**2026-09-23 修正**：此前写的是 {@code powerbank.auth.token-store}，
+     * 而 application.yml 配的是 {@code sharehub.auth.token-store} —— 键名对不上，
+     * 加上 memory 分支 {@code matchIfMissing = true}，导致**配 redis/mysql 也永远拿到
+     * 没有过期的内存实现**（这正是「令牌不过期」的根因）。
+     */
+    private static final String KEY = "sharehub.auth.token-store";
 
     /**
      * 会话序列化专用 ObjectMapper（自建，不依赖 web 上下文 bean；Jackson 原生支持 record/enum）。
@@ -35,8 +41,8 @@ public class TokenStoreConfig {
 
     @Bean
     @ConditionalOnProperty(name = KEY, havingValue = "memory", matchIfMissing = true)
-    public TokenStore memoryTokenStore() {
-        return new MemoryTokenStore();
+    public TokenStore memoryTokenStore(@Value("${sharehub.auth.token-ttl:2h}") Duration ttl) {
+        return new MemoryTokenStore(ttl);
     }
 
     @Bean
