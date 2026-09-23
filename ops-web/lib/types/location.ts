@@ -126,12 +126,30 @@ export interface ContractAttachmentReq {
 export const LEAD_STAGES = ["NEW", "CONTACTED", "NEGOTIATING", "SIGNED", "LOST"] as const;
 export type LeadStage = (typeof LEAD_STAGES)[number];
 
+/**
+ * 商机归属方类型（ADR-027 §五 / V55）。决定 `owner` 里那个号属于哪个命名空间。
+ *
+ * 判错的后果是拓展佣金算给不存在的人，或者白付一笔给自己的员工 —— 两种都不报错。
+ */
+export const LEAD_OWNER_TYPES = ["STAFF", "AGENT"] as const;
+export type LeadOwnerType = (typeof LEAD_OWNER_TYPES)[number];
+
 export interface Lead {
   leadNo: string;
   venueName: string;
   contact: string;
   stage: LeadStage;
+  /** 归属方业务号：`ownerType=STAFF` 时是 employeeNo，`AGENT` 时是 agentNo。 */
   owner: string;
+  /** 见 LEAD_OWNER_TYPES。缺省 STAFF（这一列出现之前只可能是员工）。 */
+  ownerType?: LeadOwnerType;
+  /**
+   * 这条商机最终落成的站点。
+   *
+   * 拓展归因只有落到站点上才能变成钱 —— 责任行挂在「伙伴 × 站点」上，
+   * 而商机谈的是场地、站点是之后才建的。签下且归属是伙伴时，据此写 DEVELOP 责任行。
+   */
+  siteNo?: string;
   expectSites: number;
   /** 最后一次跟进时间 —— 与 `leadFollowUps` 里最新一条的 `createdAt` 必须一致（列表按它排序）。 */
   updatedAt: string;

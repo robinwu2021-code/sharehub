@@ -15,8 +15,14 @@ public final class LocExtDtos {
     }
 
     /** BD 商机行，镜像前端 {@code Lead}。 */
+    /**
+     * @param owner     归属方业务号；{@code ownerType} 说它是 employee_no 还是 agent_no
+     * @param ownerType STAFF / AGENT（V55）
+     * @param siteNo    最终落成的站点；签下且归属是伙伴时，据此写 DEVELOP 责任行
+     */
     public record Lead(String leadNo, String venueName, String contact, String stage,
-                       String owner, Integer expectSites, String nextFollowAt,
+                       String owner, String ownerType, String siteNo,
+                       Integer expectSites, String nextFollowAt,
                        String updatedAt) {
     }
 

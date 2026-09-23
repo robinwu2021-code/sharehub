@@ -31,8 +31,24 @@ public class LocLead extends BaseEntity {
     /** NEW / CONTACTED / NEGOTIATING / SIGNED / LOST。 */
     private String stage;
 
-    /** 负责人 employee_no。 */
+    /**
+     * 归属方业务号：{@code ownerType=STAFF} 时是 employee_no，{@code AGENT} 时是 agent_no。
+     *
+     * <p>一列存号、一列存类型。没有 ownerType 时这一列是有二义的 ——
+     * 而二义的后果是拓展佣金算给错的人，且不报错。
+     */
     private String owner;
+
+    /** STAFF（自己人）/ AGENT（伙伴谈下来的，拓展佣金的依据）。见 V55。 */
+    private String ownerType;
+
+    /**
+     * 这条商机最终落成的站点。
+     *
+     * <p>拓展归因只有落到站点上才能变成钱：责任行挂在「伙伴 × 站点」上，
+     * 而商机谈的是场地、站点是之后才建的。签下并指定站点后才写 {@code DEVELOP} 责任行。
+     */
+    private String siteNo;
 
     /** 预计可铺站点数。 */
     private Integer expectSites;

@@ -124,13 +124,40 @@ const LEAD_FIELDS: FieldDef[] = [
   { key: "stage", label: "阶段", type: "select", options: LEAD_STAGE_OPTIONS },
   { key: "expectSites", label: "预计站点数", type: "number", min: 0 },
 ];
-/** 负责人单独拼：`loc_lead.owner` 存的是 **employee_no**，以前填姓名对不上人。 */
-function leadFieldsFor(employees: { value: string; label: string }[]): FieldDef[] {
+/**
+ * 负责人单独拼：`loc_lead.owner` 存的是**业务号**（以前填姓名对不上人），
+ * 而它是员工号还是伙伴号由 `ownerType` 说了算。
+ *
+ * 归属是伙伴时，商机签下并指定落成站点后会自动写一行「拓展」责任 —— 那是拓展佣金的依据。
+ * 所以这两个字段不是登记信息，是**算钱的输入**。
+ */
+function leadFieldsFor(
+  ownerType: string,
+  employees: { value: string; label: string }[],
+  agents: { value: string; label: string }[],
+  sites: { value: string; label: string }[],
+): FieldDef[] {
+  const partner = ownerType === "AGENT";
   return [
     ...LEAD_FIELDS.slice(0, 4),
-    { key: "owner", label: "负责人", type: "select",
-      options: [{ value: "", label: "请选择负责人" }, ...employees],
-      help: "存员工编号，不是姓名" },
+    {
+      key: "ownerType", label: "归属方类型", type: "select",
+      options: [{ value: "STAFF", label: "自己人（员工）" }, { value: "AGENT", label: "伙伴（代理商）" }],
+      help: "伙伴谈下来的，签下后自动记一行「拓展」责任，作为拓展佣金的依据",
+    },
+    // 切换类型时候选集整个换掉：两个命名空间的号混填进同一列，对不上人且不报错
+    partner
+      ? { key: "owner", label: "归属伙伴", type: "select",
+          options: [{ value: "", label: "请选择伙伴" }, ...agents], help: "存代理商编号" }
+      : { key: "owner", label: "负责人", type: "select",
+          options: [{ value: "", label: "请选择负责人" }, ...employees], help: "存员工编号，不是姓名" },
+    ...(partner
+      ? [{
+          key: "siteNo", label: "落成站点", type: "select" as const,
+          options: [{ value: "", label: "尚未建站" }, ...sites],
+          help: "先签后建站是常态：这里留空不影响保存，站点补填上去的那一次会补写拓展责任",
+        }]
+      : []),
     ...LEAD_FIELDS.slice(4),
   ];
 }
@@ -204,6 +231,7 @@ function VenuesInner() {
   const venuesQ = useQuery({ queryKey: ["venues-dict"], queryFn: () => api.listVenues({ page: 1, size: UNPAGED_SIZE }) });
   const sitesQ = useQuery({ queryKey: ["sites-dict"], queryFn: () => api.listSites({ page: 1, size: UNPAGED_SIZE }) });
   const employeesQ = useQuery({ queryKey: ["employees-dict"], queryFn: () => api.listEmployees({ page: 1, size: UNPAGED_SIZE }) });
+  const agentsQ = useQuery({ queryKey: ["agents-dict"], queryFn: () => api.listAgents({ page: 1, size: UNPAGED_SIZE }) });
   const venueOpts = useMemo(
     () => (venuesQ.data?.list ?? []).map((v) => ({ value: v.venueNo, label: `${v.name}（${v.venueNo}）` })),
     [venuesQ.data],
@@ -221,7 +249,18 @@ function VenuesInner() {
     [employeesQ.data],
   );
   const contractFields = useMemo(() => contractFieldsFor(venueOpts, contractSiteOpts), [venueOpts, contractSiteOpts]);
-  const leadFields = useMemo(() => leadFieldsFor(employeeOpts), [employeeOpts]);
+  const siteOpts = useMemo(
+    () => (sitesQ.data?.list ?? []).map((x) => ({ value: x.siteNo, label: `${x.name}（${x.siteNo}）` })),
+    [sitesQ.data],
+  );
+  const agentOpts = useMemo(
+    () => (agentsQ.data?.list ?? []).map((a) => ({ value: a.agentNo, label: `${a.name}（${a.agentNo}）` })),
+    [agentsQ.data],
+  );
+  const leadFields = useMemo(
+    () => leadFieldsFor(String(leadForm?.ownerType ?? "STAFF"), employeeOpts, agentOpts, siteOpts),
+    [leadForm?.ownerType, employeeOpts, agentOpts, siteOpts],
+  );
   const q = useQuery<PageResult<Venue | Contract | Lead | VenueOnboarding | SiteLifecycle>>({
     // showArchived 必须进 queryKey，否则切开关不重新拉数据
     queryKey: ["venue-bd", tab, paging.page, paging.size, keyword, showArchived],
@@ -401,7 +440,20 @@ function VenuesInner() {
     { header: "场地名称", cell: (l) => l.venueName },
     { header: "联系人", cell: (l) => <span className="text-muted-foreground">{l.contact}</span> },
     { header: "阶段", cell: (l) => <StatusBadge map={LEAD_STAGE} value={l.stage} /> },
-    { header: "负责人", cell: (l) => l.owner },
+    // 归属方要连类型一起显示：光一个编号看不出这是自己人还是伙伴，
+    // 而两者的差别是「这条商机要不要付拓展佣金」
+    {
+      header: "归属",
+      cell: (l) => (
+        <span>
+          {l.owner}
+          {l.ownerType === "AGENT" && <span className="ml-1 text-muted-foreground">伙伴</span>}
+          {l.ownerType === "AGENT" && l.stage === "SIGNED" && !l.siteNo && (
+            <span className="ml-1 text-muted-foreground">· 待指定站点</span>
+          )}
+        </span>
+      ),
+    },
     { header: "预计站点数", className: "text-right", cell: (l) => <span className="tabular-nums">{l.expectSites}</span> },
     // 更新时间就是最后一次跟进时间（db 层保证两者同源），所以这一列点进详情能一眼对上时间线首条
     { header: "最后跟进", cell: (l) => <span className="text-muted-foreground">{fmtTime(l.updatedAt)}</span> },

@@ -69,7 +69,12 @@ export const contracts: Contract[] = Array.from({ length: 18 }, (_, i) => ({
 export const leads: Lead[] = Array.from({ length: 20 }, (_, i) => ({
   leadNo: `LD${3000 + i}`, venueName: p([...VENUE_NAMES, "Dubai Marina Mall", "The Dubai Fountain", "Global Village"], i),
   contact: phone(i), stage: p([...LEAD_STAGES], i),
-  owner: p(["BD-Layla", "BD-Yusuf", "BD-Ahmed"], i), expectSites: 1 + (i * 3) % 12,
+  // 每 5 条里有一条是伙伴谈下来的 —— 拓展佣金这条路径要有样本，
+  // 否则「归属方类型」在页面上永远只看得到一种取值，等于没实现
+  ...(i % 5 === 1
+    ? { ownerType: "AGENT" as const, owner: `AG00${1 + (i % 6)}` }
+    : { ownerType: "STAFF" as const, owner: p(["BD-Layla", "BD-Yusuf", "BD-Ahmed"], i) }),
+  expectSites: 1 + (i * 3) % 12,
   updatedAt: iso(i * 21600_000),
 }));
 
@@ -137,6 +142,14 @@ export const listLeads = (q: PageQuery = {}) => paginate(leads, q.page, q.size, 
 export const listVenueOnboardings = (q: PageQuery = {}) => paginate(venueOnboardings, q.page, q.size, (x) => kwHit(q.keyword, x.onboardingNo, x.venueName, x.contact));
 export const listSiteLifecycles = (q: PageQuery = {}) => paginate(siteLifecycles, q.page, q.size, (x) => kwHit(q.keyword, x.siteNo, x.siteName, x.owner));
 
+/**
+ * 商机保存。
+ *
+ * <b>拓展归因（签下 + 伙伴 + 已指定站点 → 写一行「拓展」责任）不在这里</b>，
+ * 而在 `lib/api/mocks/location.ts`：责任行住在 agent 模块（A2-1 为打破
+ * device → location → agent → device 的环挪过去的），从这里 import 它会把那个环重新闭合
+ * —— 实测 25 个测试文件整体加载失败。API mock 层本来就拿得到整个 db，组合放那里没有这个问题。
+ */
 export const saveLead = (x: Partial<Lead>) => upsert(leads, x, "leadNo", () => nextNo("LD", leads));
 export const saveVenue = (x: Partial<Venue>) => upsert(venues, x, "venueNo", () => nextNo("VEN", venues));
 /**

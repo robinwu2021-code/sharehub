@@ -39,7 +39,33 @@ export const locationMock: LocationApi = {
   // 场所扩展
   listLeads: (q: PageQ = {}) => wait(db.listLeads(q)),
   listSiteAnalysis: (q: ReportQ = {}) => wait(db.listSiteAnalysis(q)),
-  saveLead: (x) => wait(db.saveLead(x), 350),
+  /**
+   * 商机保存 + 拓展归因（ADR-027 §五）——与后端 `LeadServiceImpl.save` 同一条规则。
+   *
+   * 签下且归属是伙伴时，顺带把「这个场地是谁谈下来的」落成一行「拓展」责任，
+   * 那是拓展佣金的依据。mock 不能只存不写，否则页面上看不出这件事发生过。
+   *
+   * **条件是「已签 + 已指定站点」而不是「阶段刚翻成 SIGNED」**：先签后建站是常态，
+   * 签的那一刻没有站点可挂；站点补填上去的那一次保存会补写。幂等由 saveSiteAgent 的唯一性保证。
+   *
+   * 组合写在这一层而不是 db 层：责任行住在 agent 模块，从 db/location 里 import 它
+   * 会闭合 device → location → agent → device 的环（实测整批 mock 测试加载失败）。
+   */
+  saveLead: (x) => {
+    const saved = db.saveLead(x);
+    if (saved.stage === "SIGNED" && saved.ownerType === "AGENT" && saved.siteNo && saved.owner) {
+      try {
+        db.saveSiteAgent(saved.siteNo, {
+          agentNo: saved.owner, role: "DEVELOP",
+          remark: `来自商机 ${saved.leadNo}：${saved.venueName}`,
+        });
+      } catch {
+        // 最常见的是「该伙伴在本站点已有牵线，与拓展互斥」——真实的业务冲突，
+        // 要让运营看见并自己决定算哪一个，但**不能把商机也存不上**
+      }
+    }
+    return wait(saved, 350);
+  },
   saveVenue: (x) => wait(db.saveVenue(x), 350),
   saveContract: (x) => wait(db.saveContract(x), 350),
 
