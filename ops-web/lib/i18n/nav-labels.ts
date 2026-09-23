@@ -130,7 +130,6 @@ const NAV: Record<string, Pair> = {
   "问题管理": { en: "Issue Types", ar: "أنواع المشكلات" },
   "税率与发票": { en: "Tax & Invoice", ar: "الضريبة والفواتير" },
   "计费模板": { en: "Templates", ar: "قوالب التسعير" },
-  "差异化定价": { en: "Differential", ar: "تسعير متمايز" },
   "活动/时段价": { en: "Time-based", ar: "تسعير زمني" },
   "分润规则": { en: "Share Rules", ar: "قواعد التقسيم" },
   "分润明细": { en: "Share Records", ar: "سجلات التقسيم" },
