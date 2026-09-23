@@ -15,7 +15,11 @@ public class AgtAgent extends BaseEntity implements ai.neargo.sharehub.common.cr
     private String contact;
     private String regionScope;
     private Double shareRate;
-    private Integer cabinetCount;
+    /*
+     * 这里**没有** cabinetCount：同 LocVenue，机柜数是聚合值不是属性。
+     * shareRate 保留 —— 它是档案上的真实配置（V42 补列），
+     * 但**分账以 share_rule 为准**，别拿这一列去算钱。
+     */
     private String status;
 
     /** 归档时间；null=在用。**不是 deleted** —— 归档是业务停用、可恢复，见 Archivable。 */

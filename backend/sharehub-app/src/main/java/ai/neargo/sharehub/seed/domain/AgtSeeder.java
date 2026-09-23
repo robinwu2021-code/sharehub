@@ -41,7 +41,7 @@ public class AgtSeeder implements CommandLineRunner {
             e.setContact(a.contact());
             e.setRegionScope(a.regionScope());
             e.setShareRate(a.shareRate());
-            e.setCabinetCount(a.cabinetCount());
+            // 机柜数不落库：聚合值，实体与库里都已没有这一列
             e.setStatus(a.status());
             mapper.insert(e);
         }

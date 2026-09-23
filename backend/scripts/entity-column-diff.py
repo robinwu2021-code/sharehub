@@ -119,6 +119,71 @@ def snake(n):
     return re.sub(r'([A-Z])', lambda m: '_' + m.group(1).lower(), n)
 
 
+MIGRATIONS = os.path.join(ROOT, 'backend', 'sharehub-app', 'src', 'main', 'resources', 'db', 'migration')
+
+
+def migration_columns():
+    """从**迁移脚本**推出每张表有哪些列。
+
+    ## 为什么默认照迁移、而不是照开发库
+
+    2026-09-23 这一天，「实体有字段、迁移没建列」这类缺陷撞了四次，
+    其中一次让生产在灌演示数据时**直接起不来**（`loc_venue.location_count`）。
+    而本脚本当时照着开发库比对，报的是「缺列 0 张」——
+    因为开发库里那些列是历史上手工 ALTER 加的，**开发库跑在迁移前面**。
+
+    干净部署得到的是迁移脚本的产物，不是谁的开发库。所以默认照迁移。
+    `--db` 仍保留：想知道「我这台机器的库和实体差多少」时用它。
+    """
+    cols = {}
+    # **按版本号排序，不能用字典序**：字典序下 V16 排在 V3 前面，
+    # 于是 V16 的 `RENAME TABLE ord_rent TO ord_order` 跑在 V3 建表之前，
+    # 重命名找不到源表，ord_order 会被判成「缺 33 列」——一条假警报足以让人不再信这个卡口。
+    def ver(name):
+        m = re.match(r'V(\d+)__', name)
+        return int(m.group(1)) if m else 10 ** 9
+
+    for f in sorted([x for x in os.listdir(MIGRATIONS) if x.endswith('.sql')], key=ver):
+        sql = io.open(os.path.join(MIGRATIONS, f), encoding='utf-8').read()
+        # CREATE TABLE [IF NOT EXISTS] x ( ... )
+        for m in re.finditer(r'CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`?(\w+)`?\s*\((.*?)\n\)', sql,
+                             re.S | re.I):
+            table, body = m.group(1), m.group(2)
+            # **先剥掉 `--` 整行注释**：本仓库的 DDL 习惯在列上方写多行中文说明，
+            # 按逗号切出来的块会以注释开头，列名匹配锚在块首就会失配
+            # —— ord_intervention 的 reason / amount 正是这样被误判成「缺列」的。
+            body = re.sub(r'^\s*--[^\n]*$', '', body, flags=re.M)
+            # **按逗号切列，不按换行**：V11 的 sys_token 把多列写在同一行
+            # （`token VARCHAR(64) NOT NULL, realm VARCHAR(16) NOT NULL, …`），
+            # 按行切只会认到每行第一列，把其余的判成「缺列」。
+            for line in re.split(r',\s*(?=`?\w+`?\s)', body):
+                line = line.strip()
+                cm = re.match(r'`?(\w+)`?\s+(?:BIGINT|INT|TINYINT|SMALLINT|MEDIUMINT|VARCHAR|CHAR|TEXT|LONGTEXT|MEDIUMTEXT|DATE|DATETIME|TIMESTAMP|TIME|DECIMAL|NUMERIC|DOUBLE|FLOAT|JSON|BLOB|VARBINARY|BINARY|ENUM|BIT)',
+                              line, re.I)
+                if cm and cm.group(1).upper() not in ('PRIMARY', 'UNIQUE', 'KEY', 'INDEX', 'CONSTRAINT'):
+                    cols.setdefault(table, set()).add(cm.group(1))
+        '''
+        ALTER TABLE 的 ADD COLUMN：**按「最近一条 ALTER TABLE」归属，不按分号切语句**。
+        本仓库的 DDL 大量在 COMMENT 里写中文说明，其中夹着 ASCII 分号
+        （如 V16 的「…；**资金侧不读**」）——按分号切会把一条 ALTER 从中间截断，
+        后面那些 ADD COLUMN 全部丢掉，于是 ord_order 被判成缺 10 列。假警报比没警报更糟。
+        '''
+        cur = None
+        for m in re.finditer(r'ALTER\s+TABLE\s+`?(\w+)`?|ADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?`?(\w+)`?',
+                             sql, re.I):
+            if m.group(1):
+                cur = m.group(1)
+            elif cur:
+                cols.setdefault(cur, set()).add(m.group(2))
+        for m in re.finditer(r'RENAME\s+TABLE\s+(?:IF\s+EXISTS\s+)?`?(\w+)`?\s+TO\s+`?(\w+)`?', sql, re.I):
+            old, new = m.group(1), m.group(2)
+            if old in cols:
+                # **合并而不是覆盖**：同一个文件里可能先 RENAME 再 ALTER 新表名
+                # （V16 就是这样），直接赋值会把刚归到新表名下的列全冲掉。
+                cols.setdefault(new, set()).update(cols.pop(old))
+    return cols
+
+
 def db_columns(table):
     """查表的列。**查库失败必须炸，不能返回空集**。
 
@@ -140,6 +205,10 @@ BASE_ENTITY_FIELDS = {'id', 'tenantId', 'createdAt', 'createdBy', 'updatedAt', '
 
 
 def main():
+    from_db = '--db' in sys.argv
+    mig = None if from_db else migration_columns()
+    if not from_db:
+        print("比对对象：**迁移脚本**（干净部署的产物）。想照本机库比对加 --db")
     ents = entities()
     print("扫到 %d 个实体（按 @TableName 逐类切分）" % len(ents))
     multi = {}
@@ -153,7 +222,9 @@ def main():
 
     result, total_missing = {}, 0
     for table, cls, path, fields in sorted(ents):
-        have = db_columns(table)
+        have = db_columns(table) if from_db else mig.get(table)
+        if have is None:
+            continue   # 迁移里没有这张表：属另一类问题，不在本脚本范围
         if not have:
             result[table] = {'_status': 'TABLE_MISSING', '_class': cls}
             continue

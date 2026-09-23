@@ -125,6 +125,26 @@ public class LocService {
         return toSite(e, pointCountsOf(List.of(siteNo)).getOrDefault(siteNo, 0));
     }
 
+    /**
+     * 按场地方统计名下在用站点数。
+     *
+     * <p><b>现算而不是读列</b>：`loc_venue.location_count` 曾是实体字段，但那一列
+     * 在干净库里根本不存在 —— 2026-09-23 灌演示数据时它让服务直接起不来。
+     * 即便补上也必然与实际脱节：每次站点增删都要记得回写，漏一次就对不上。
+     *
+     * <p>一次 IN 分组查询覆盖整页，不是逐行 N+1。
+     */
+    private Map<String, Integer> venueSiteCounts(List<String> venueNos) {
+        List<String> ids = venueNos.stream().filter(java.util.Objects::nonNull).toList();
+        if (ids.isEmpty()) return Map.of();
+        Map<String, Integer> out = new java.util.HashMap<>();
+        for (LocSite s : siteMapper.selectList(new LambdaQueryWrapper<LocSite>()
+                .in(LocSite::getVenueNo, ids).isNull(LocSite::getArchivedAt))) {
+            if (s.getVenueNo() != null) out.merge(s.getVenueNo(), 1, Integer::sum);
+        }
+        return out;
+    }
+
     private LocSite requireSite(String siteNo) {
         LocSite e = siteMapper.selectOne(new LambdaQueryWrapper<LocSite>()
                 .eq(LocSite::getSiteNo, siteNo).last("limit 1"));
@@ -169,8 +189,10 @@ public class LocService {
         if (kw(keyword)) w.like(LocVenue::getName, keyword);
         w.orderByAsc(LocVenue::getId);
         Page<LocVenue> r = venueMapper.selectPage(p, w);
+        Map<String, Integer> counts = venueSiteCounts(r.getRecords().stream().map(LocVenue::getVenueNo).toList());
         List<Venue> rows = r.getRecords().stream()
-                .map(v -> new Venue(v.getVenueNo(), v.getName(), v.getContact(), v.getIndustry(), v.getLocationCount()))
+                .map(v -> new Venue(v.getVenueNo(), v.getName(), v.getContact(), v.getIndustry(),
+                        counts.getOrDefault(v.getVenueNo(), 0)))
                 .toList();
         return new PageResult<>(rows, r.getTotal());
     }
@@ -309,6 +331,7 @@ public class LocService {
         if (e == null) throw new IllegalArgumentException("场地方不存在: " + venueNo);
         e.setArchivedAt(at);
         venueMapper.updateById(e);
-        return new Venue(e.getVenueNo(), e.getName(), e.getContact(), e.getIndustry(), e.getLocationCount());
+        return new Venue(e.getVenueNo(), e.getName(), e.getContact(), e.getIndustry(),
+                venueSiteCounts(List.of(e.getVenueNo())).getOrDefault(e.getVenueNo(), 0));
     }
 }

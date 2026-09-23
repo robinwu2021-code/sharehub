@@ -89,7 +89,7 @@ public class LocSeeder implements CommandLineRunner {
                 e.setName(v.name());
                 e.setContact(v.contact());
                 e.setIndustry(v.industry());
-                e.setLocationCount(v.locationCount());
+                // 站点数不落库：聚合值，实体与库里都已没有这一列
                 venueMapper.insert(e);
             }
         }

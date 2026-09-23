@@ -53,7 +53,7 @@ public class AgentServiceImpl implements AgentService {
         e.setContact(in.contact());
         e.setRegionScope(in.regionScope());
         e.setShareRate(in.shareRate());
-        e.setCabinetCount(in.cabinetCount());
+        // 机柜数不回写：它是聚合值不是档案属性（实体与库里都已没有这一列）
         e.setStatus(in.status() == null ? "ENABLED" : in.status());
         if (insert) mapper.insert(e); else mapper.updateById(e);
         return toVO(e);
@@ -62,7 +62,11 @@ public class AgentServiceImpl implements AgentService {
     private static Agent toVO(AgtAgent e) {
         return new Agent(e.getAgentNo(), e.getName(), e.getContact(), e.getRegionScope(),
                 e.getShareRate() == null ? 0 : e.getShareRate(),
-                e.getCabinetCount() == null ? 0 : e.getCabinetCount(), e.getStatus());
+                /*
+                 * 机柜数：platform 算不出（dev_cabinet 属于 core），**给 0 而不是假装有值**。
+                 * 代理商的真实机柜数在「设备/点位划拨」页按关系现算。
+                 */
+                0, e.getStatus());
     }
 
     // ── 归档 / 取消归档（前端契约 Archivable）──

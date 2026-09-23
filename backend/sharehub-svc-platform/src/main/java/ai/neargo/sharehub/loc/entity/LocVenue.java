@@ -20,7 +20,12 @@ public class LocVenue {
     private String name;
     private String contact;
     private String industry;
-    private Integer locationCount;
+    /*
+     * 这里**没有** locationCount：它是「这个场地方名下有几个站点」的聚合值，
+     * 不是场地方的属性。存成列的后果见 V39 的说明（列表说有 3 个、点进去一个都没有），
+     * 而且这一列在干净库里根本不存在 —— 2026-09-23 灌演示数据时它让服务没起来。
+     * 改为查询时现算，见 LocService#venueSiteCounts。
+     */
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     @Version
