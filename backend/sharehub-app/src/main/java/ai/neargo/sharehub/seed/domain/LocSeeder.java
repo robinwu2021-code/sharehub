@@ -60,8 +60,10 @@ public class LocSeeder implements CommandLineRunner {
                 e.setRegionId(s.regionId());
                 e.setAddress(s.address());
                 e.setSceneType(s.sceneType());
-                e.setPointCount(s.pointCount());
-                e.setCabinetCount(s.cabinetCount());
+                e.setLng(s.lng());
+                e.setLat(s.lat());
+                e.setVenueNo(s.venueNo());
+                // 点位数/机柜数不再落库：它们是聚合值，实体与库里都已没有对应列
                 e.setStatus(s.status());
                 siteMapper.insert(e);
             }
@@ -75,7 +77,6 @@ public class LocSeeder implements CommandLineRunner {
                 e.setSiteNo(l.siteNo());
                 e.setSiteName(l.siteName());
                 e.setSpotDesc(l.spotDesc());
-                e.setCabinetCount(l.cabinetCount());
                 e.setStatus(l.status());
                 locationMapper.insert(e);
             }

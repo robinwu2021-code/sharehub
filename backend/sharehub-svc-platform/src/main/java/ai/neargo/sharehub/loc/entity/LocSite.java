@@ -37,9 +37,16 @@ public class LocSite {
     private java.math.BigDecimal lng;
 
     private java.math.BigDecimal lat;
+    /*
+     * 这里**没有** pointCount / cabinetCount。
+     *
+     * 它们此前是实体字段，但**任何迁移都没建过这两列** —— 本机库里的是手工加的，
+     * 干净库（生产）上一 SELECT 就报 Unknown column，站点列表整个 500。
+     * 修法不是补列：计数是按关系聚合出来的（db-design §1.4「计数不是列，是聚合」），
+     * 补成列之后必然与实际脱节 —— 运营端已经因为读这种计数列而出现过
+     * 「列表说有 3 台机柜、待关注说一台都没有」。改为查询时现算，见 LocService#toSite。
+     */
     private String sceneType;
-    private Integer pointCount;
-    private Integer cabinetCount;
     private String status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

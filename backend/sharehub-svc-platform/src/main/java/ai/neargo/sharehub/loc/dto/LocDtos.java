@@ -30,8 +30,14 @@ public final class LocDtos {
                       String sceneType, Integer pointCount, Integer cabinetCount, String status) {
     }
 
+    /**
+     * @param cabinetCount 机柜数。**可能为 null** —— platform 算不出（`dev_cabinet` 属于 core），
+     *                     null 表示「这里答不了」，与 0（「确实一台都没有」）是两回事。
+     *                     装箱类型还有第二个作用：请求里不带这个字段时，int 会让 Jackson 抛
+     *                     「Cannot map null into type int」，调用方看到的是 500。
+     */
     public record Location(String locationNo, String name, String siteNo, String siteName,
-                          String spotDesc, int cabinetCount, String status) {
+                          String spotDesc, Integer cabinetCount, String status) {
     }
 
     public record Venue(String venueNo, String name, String contact, String industry, int locationCount) {

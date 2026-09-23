@@ -23,7 +23,6 @@ public class LocLocation {
     private String agentNo;
     private String siteName;
     private String spotDesc;
-    private Integer cabinetCount;
     private String status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

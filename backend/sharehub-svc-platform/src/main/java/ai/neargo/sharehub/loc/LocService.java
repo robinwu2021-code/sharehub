@@ -20,6 +20,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 
 /** 场所域（loc_）持久化服务：站点/点位/场地方/合同 走 MariaDB，实体↔DTO 转换。 */
 @Service
@@ -55,7 +56,10 @@ public class LocService {
         }
         w.orderByAsc(LocSite::getId);
         Page<LocSite> r = siteMapper.selectPage(p, w);
-        List<Site> rows = r.getRecords().stream().map(LocService::toSite).toList();
+        // 点位数**现算**（一次分组查询覆盖本页，不是逐行 N+1，也不是读脱节的计数列）
+        Map<String, Integer> points = pointCountsOf(r.getRecords().stream().map(LocSite::getSiteNo).toList());
+        List<Site> rows = r.getRecords().stream()
+                .map(x -> toSite(x, points.getOrDefault(x.getSiteNo(), 0))).toList();
         return new PageResult<>(rows, r.getTotal());
     }
 
@@ -81,12 +85,8 @@ public class LocService {
          * 点位数 / 机柜数**不接受调用方写入**：它们是按关系聚合出来的数
          * （db-design §1.4「计数不是列，是聚合」）。接受前端传值的后果是
          * 列表说「有 3 台机柜」而实际一台都没有 —— 运营端已经因为这个自相矛盾过一次。
-         * 新建时置 0，编辑时保持库里现值。
+         * 实体上已经没有这两个字段（列本就不存在），这里也不再有可写之处。
          */
-        if (insert) {
-            e.setPointCount(0);
-            e.setCabinetCount(0);
-        }
         e.setStatus(in.status() == null ? "ACTIVE" : in.status());
         if (insert) siteMapper.insert(e); else siteMapper.updateById(e);
         return toSite(e);
@@ -116,7 +116,7 @@ public class LocService {
         e.setSiteNo(in.siteNo());
         e.setSiteName(in.siteName());
         e.setSpotDesc(in.spotDesc());
-        e.setCabinetCount(in.cabinetCount());
+        // 机柜数不回写：同 saveSite，它是聚合值不是属性
         e.setStatus(in.status() == null ? "ACTIVE" : in.status());
         if (insert) locationMapper.insert(e); else locationMapper.updateById(e);
         return toLocation(e);
@@ -167,16 +167,45 @@ public class LocService {
         return new PageResult<>(rows, r.getTotal());
     }
 
+    /**
+     * 按站点统计在用点位数。
+     *
+     * <p><b>为什么现算</b>：`loc_site` 上曾有 `point_count` 字段（实体里有、迁移里没有，
+     * 干净库上直接 500）。补成列的话，每一次点位增删都要记得回写，漏一次就是
+     * 「列表说有 3 个点位、点进去一个都没有」—— 运营端已经踩过这种自相矛盾。
+     *
+     * <p>一次 IN 分组查询覆盖整页，不是逐行 N+1。
+     */
+    private Map<String, Integer> pointCountsOf(List<String> siteNos) {
+        if (siteNos == null || siteNos.isEmpty()) return Map.of();
+        Map<String, Integer> out = new java.util.HashMap<>();
+        for (LocLocation l : locationMapper.selectList(new LambdaQueryWrapper<LocLocation>()
+                .in(LocLocation::getSiteNo, siteNos).isNull(LocLocation::getArchivedAt))) {
+            out.merge(l.getSiteNo(), 1, Integer::sum);
+        }
+        return out;
+    }
+
     private static Site toSite(LocSite e) {
+        return toSite(e, null);
+    }
+
+    private static Site toSite(LocSite e, Integer pointCount) {
         return new Site(e.getSiteNo(), e.getName(), e.getVenueNo(), e.getVenueName(), e.getAgentNo(),
                 e.getRegionId(), e.getAddress(), e.getLng(), e.getLat(), e.getSceneType(),
-                e.getPointCount() == null ? 0 : e.getPointCount(),
-                e.getCabinetCount() == null ? 0 : e.getCabinetCount(), e.getStatus());
+                pointCount,
+                /*
+                 * 机柜数**这一层算不出来**：`dev_cabinet` 属于 core，platform 不该反向依赖它。
+                 * 返回 null 而不是 0 —— 0 会被读成「这个站点一台机柜都没有」，
+                 * 而真相是「这里答不了」。调用方（运营端站点页）本来就按关系现算。
+                 */
+                null, e.getStatus());
     }
 
     private static Location toLocation(LocLocation e) {
+        // 机柜数同 toSite：platform 算不出（dev_cabinet 属于 core），返回 null 表示「这里答不了」
         return new Location(e.getLocationNo(), e.getName(), e.getSiteNo(), e.getSiteName(),
-                e.getSpotDesc(), e.getCabinetCount() == null ? 0 : e.getCabinetCount(), e.getStatus());
+                e.getSpotDesc(), null, e.getStatus());
     }
 
     // ───────────────── 归档 / 取消归档（前端契约 Archivable）─────────────────
