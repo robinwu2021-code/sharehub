@@ -415,8 +415,27 @@ export function visibleLeaves(section: NavSection, role: Role | undefined): NavL
  * @returns 已按权限过滤、按 specs 顺序排列的 tab；phase 原样带出（由 TabHeader 决定是否隐藏）
  */
 export function navTabs(
-  path: string, specs: readonly PageTabSpec[], role: Role | undefined,
+  path: string, specs: readonly PageTabSpec[], role: Role | undefined, defaultKey?: string,
 ): { key: string; label: string; phase?: Phase }[] {
+  return resolveTabs(path, specs, role, false, defaultKey).tabs;
+}
+
+/**
+ * 哪些 tab 在菜单里找不到。
+ *
+ * 单独给一个纯函数，是因为「逐个 key 去问」会得到错误答案：
+ * key 列表的**第一个**被当作页面默认 tab，会去匹配不带 `?tab=` 的裸路径叶，
+ * 于是单独问任何一个 key 都能匹配上。必须整组一起问。
+ */
+export function missingTabs(
+  path: string, keys: readonly string[], role: Role | undefined, defaultKey?: string,
+): string[] {
+  return resolveTabs(path, keys, role, true, defaultKey).missing;
+}
+
+function resolveTabs(
+  path: string, specs: readonly PageTabSpec[], role: Role | undefined, quiet = false, defaultKey?: string,
+): { tabs: { key: string; label: string; phase?: Phase }[]; missing: string[] } {
   const target = normPath(path);
   const keys = specs.map((x) => (typeof x === "string" ? x : x.key));
   /*
@@ -428,9 +447,26 @@ export function navTabs(
    * 判据：**命中本页 tab 最多的那个 section 就是这一页的归属**，先从它取名，
    * 剩下的再去别处找（门户角色的 section 优先参与评分）。
    */
+  /*
+   * **页面的默认 tab 在菜单里是不带 `?tab=` 的那条裸路径。**
+   * 例：`/orders` 这一条叫「订单列表」，对应页面的默认 tab `list`。
+   * 不认这条的话，十二个页面的默认 tab 会全部报「未在 nav.ts 登记」。
+   *
+   * 默认 tab 不一定是列表里的第一个：`/marketing` 的默认 tab 随分期变
+   * （阶段 1 是公告、阶段 2 起是优惠券），而 tab 顺序是固定的。
+   * 所以这种页面要显式把 `defaultKey` 传进来；不传才退回"第一个"。
+   */
+  const dft = defaultKey ?? keys[0];
+  // 页内切换参数有两种写法：多数页用 `?tab=`，工单页用 `?view=`。
+  // 一条叶最多带其中一个，所以这里两个都认，不必让调用方声明用的是哪一个。
+  const tabOf = (href: string) => {
+    const parts = leafParts(href);
+    if (parts.path !== target) return undefined;
+    return parts.tab ?? parts.view ?? dft;
+  };
   const score = (sec: NavSection) => (sec.children ?? []).filter((l) => {
-    const parts = leafParts(l.href);
-    return parts.path === target && parts.tab !== null && keys.includes(parts.tab);
+    const k = tabOf(l.href);
+    return k !== undefined && keys.includes(k);
   }).length;
   const visible = visibleSections(role);
   const ranked = [...visible, ...NAV.filter((x) => !visible.includes(x))]
@@ -440,22 +476,21 @@ export function navTabs(
     .map((x) => x.sec);
   const pool = [...ranked, ...visible, ...NAV];
   const out: { key: string; label: string; phase?: Phase }[] = [];
+  const missing: string[] = [];
   for (const spec of specs) {
     const key = typeof spec === "string" ? spec : spec.key;
     let leaf: NavLeaf | undefined;
     for (const section of pool) {
-      leaf = (section.children ?? []).find((l) => {
-        const parts = leafParts(l.href);
-        return parts.path === target && parts.tab === key;
-      });
+      leaf = (section.children ?? []).find((l) => tabOf(l.href) === key);
       if (leaf) break;
     }
     if (!leaf) {
       if (typeof spec === "string") {
         // 菜单里没登记、页面也没自带名字 —— 这不是显示问题，是**这个功能在菜单里进不去**。
         // 开发期直接抛；生产回落成 key 本身（难看，但不白屏，且一眼看得出漏了什么）。
-        if (process.env.NODE_ENV !== "production") {
-          throw new Error(`[navTabs] ${target}?tab=${key} 未在 nav.ts 登记；` +
+        missing.push(key);
+        if (!quiet && process.env.NODE_ENV !== "production") {
+          throw new Error(`[navTabs] ${target} 的 tab「${key}」未在 nav.ts 登记；` +
             `它若是菜单叶请补登记，若只是页内子视图请传 { key, label }`);
         }
         out.push({ key, label: key });
@@ -467,7 +502,7 @@ export function navTabs(
     if (leaf.perm && !can(role, leaf.perm)) continue; // 无权限：tab 不渲染，与菜单同一口径
     out.push({ key, label: leaf.label, phase: leaf.phase });
   }
-  return out;
+  return { tabs: out, missing };
 }
 
 /**

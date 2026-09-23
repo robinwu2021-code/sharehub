@@ -1,10 +1,11 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Pagination } from "@/components/ui/misc";
+import { usePaging } from "@/lib/hooks/use-paging";
+import { useNavTabs, usePageTab } from "@/lib/hooks/use-page-tab";
 import { Notice } from "@/components/ui/notice";
 import { TabHeader } from "@/components/ui/tab-header";
 import { Toolbar } from "@/components/ui/toolbar";
@@ -26,12 +27,8 @@ import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
 import type { PricePlan, PricingDiff, PricingDimension, PricingSchedule, PeriodSpec } from "@/lib/types";
 import { WEEKDAY_OPTIONS, TIME_PATTERN, PERIOD_ANY_DAY, PRICING_DIMENSION_LABEL, parsePeriod, formatPeriod } from "@/lib/types";
 
-const SIZE = 10;
-const TABS = [
-  { key: "templates", label: "计费模板" },
-  { key: "diff", label: "差异化定价", phase: 2 as const },
-  { key: "schedule", label: "活动/时段价", phase: 3 as const },
-];
+// tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）
+const TAB_KEYS = ["templates", "diff", "schedule"] as const;
 
 const PLAN_FIELDS: FieldDef[] = [
   { key: "planNo", label: "模板号", readOnlyOnEdit: true, placeholder: "自动生成" },
@@ -123,13 +120,13 @@ const specOf = (d: ScheduleDraft | null): PeriodSpec => ({
 const draftOf = (s: PricingSchedule): ScheduleDraft => ({ ...s, ...parsePeriod(s.period) });
 
 function PricingInner() {
-  const sp = useSearchParams();
-  const qTab = sp.get("tab");
   const qc = useQueryClient();
   const allow = useCan();
   const { t } = useI18n();
-  const [tab, setTab] = useState(TABS.some((t) => t.key === qTab) ? (qTab as string) : "templates");
-  const [page, setPage] = useState(1);
+  const paging = usePaging();
+  const onTabChange = () => { paging.reset(); setKeyword(""); setShowArchived(false); };
+  const tabs = useNavTabs("/pricing", TAB_KEYS);
+  const { tab, setTab } = usePageTab(tabs, onTabChange);
   const [keyword, setKeyword] = useState("");
   const [planForm, setPlanForm] = useState<Partial<PricePlan> | null>(null);
   const [diffForm, setDiffForm] = useState<Partial<PricingDiff> | null>(null);
@@ -137,26 +134,25 @@ function PricingInner() {
   const { confirm, dialog } = useConfirm();
   // 「显示已归档」只作用于计费模板 tab（TDD §10.1），切 tab 复位
   const [showArchived, setShowArchived] = useState(false);
-  useEffect(() => { if (qTab && TABS.some((t) => t.key === qTab)) { setTab(qTab); setPage(1); setShowArchived(false); } }, [qTab]);
 
   const canEdit = allow("pricing:rule:update");
 
   const plans = useQuery({
     // showArchived 必须进 queryKey，否则切开关不重新拉数据
-    queryKey: ["priceplans", page, keyword, showArchived],
-    queryFn: () => api.listPricePlans({ page, size: SIZE, keyword, showArchived }),
+    queryKey: ["priceplans", paging.page, paging.size, keyword, showArchived],
+    queryFn: () => api.listPricePlans({ page: paging.page, size: paging.size, keyword, showArchived }),
     placeholderData: keepPreviousData,
     enabled: tab === "templates",
   });
   const diffs = useQuery({
-    queryKey: ["pricingdiffs", page, keyword],
-    queryFn: () => api.listPricingDiffs({ page, size: SIZE, keyword }),
+    queryKey: ["pricingdiffs", paging.page, paging.size, keyword],
+    queryFn: () => api.listPricingDiffs({ page: paging.page, size: paging.size, keyword }),
     placeholderData: keepPreviousData,
     enabled: tab === "diff",
   });
   const schedules = useQuery({
-    queryKey: ["pricingschedules", page, keyword],
-    queryFn: () => api.listPricingSchedules({ page, size: SIZE, keyword }),
+    queryKey: ["pricingschedules", paging.page, paging.size, keyword],
+    queryFn: () => api.listPricingSchedules({ page: paging.page, size: paging.size, keyword }),
     placeholderData: keepPreviousData,
     enabled: tab === "schedule",
   });
@@ -318,25 +314,25 @@ function PricingInner() {
 
   return (
     <div>
-      <TabHeader tabs={TABS} value={tab} onChange={(k) => { setTab(k); setPage(1); setKeyword(""); setShowArchived(false); }} />
+      <TabHeader tabs={tabs} value={tab} onChange={setTab} />
 
       {tab === "templates" && (
         <>
           <Toolbar
             search={keyword}
-            onSearch={(v) => { setKeyword(v); setPage(1); }}
+            onSearch={(v) => { setKeyword(v); paging.reset(); }}
             searchPlaceholder="搜索模板名称 / 适用"
             onExport={exportIf(exportPlans, plans.data?.list?.length)}
             onAdd={canEdit ? () => setPlanForm({ scope: "默认", freeMinutes: 5, unitMinutes: 30, unitPrice: 3, capDaily: 30, buyoutPrice: 199, currency: "AED", status: "ACTIVE" }) : undefined}
             addLabel="新增计费模板"
           >
-            <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); setPage(1); }} />
+            <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); paging.reset(); }} />
           </Toolbar>
           <DataTable
             rowKey={(p: PricePlan) => p.planNo}
             columns={planCols}
             rows={plans.data?.list}
-            loading={plans.isLoading}
+            loading={plans.isLoading} error={plans.error} onRetry={plans.refetch}
             rowClassName={archivedRowClass}
             empty={showArchived
               ? "没有匹配的计费模板——换个关键词试试"
@@ -349,7 +345,7 @@ function PricingInner() {
         <>
           <Toolbar
             search={keyword}
-            onSearch={(v) => { setKeyword(v); setPage(1); }}
+            onSearch={(v) => { setKeyword(v); paging.reset(); }}
             searchPlaceholder="搜索规则号 / 匹配值 / 场景 / 名称"
             onExport={exportIf(exportDiffs, diffs.data?.list?.length)}
             onAdd={canEdit ? () => setDiffForm({ dimension: "SITE", matchRef: "", freeMinutes: 5, unitPrice: 3, capDaily: 30, priority: 10, currency: "AED" }) : undefined}
@@ -359,7 +355,7 @@ function PricingInner() {
           {canEdit && sitesQ.isSuccess && (sitesQ.data?.list ?? []).length === 0 && (
             <Notice>没有可选站点——差异化规则必须挂在真实站点/点位/场景上，请先在「站点与点位」建站点</Notice>
           )}
-          <DataTable rowKey={(d: PricingDiff) => d.ruleNo} columns={diffCols} rows={diffs.data?.list} loading={diffs.isLoading}
+          <DataTable rowKey={(d: PricingDiff) => d.ruleNo} columns={diffCols} rows={diffs.data?.list} loading={diffs.isLoading} error={diffs.error} onRetry={diffs.refetch}
             empty="暂无差异化规则——未配置时全部点位走计费模板，可点「新增差异化规则」为机场/医院等场景单独定价" />
         </>
       )}
@@ -368,18 +364,18 @@ function PricingInner() {
         <>
           <Toolbar
             search={keyword}
-            onSearch={(v) => { setKeyword(v); setPage(1); }}
+            onSearch={(v) => { setKeyword(v); paging.reset(); }}
             searchPlaceholder="搜索规则号 / 名称 / 时段"
             onExport={exportIf(exportSchedules, schedules.data?.list?.length)}
             onAdd={canEdit ? () => setScheduleForm({ name: "", multiplier: 1.5, active: true, kind: "RANGE", days: "", from: "", to: "", expr: "" }) : undefined}
             addLabel="新增活动/时段价"
           />
-          <DataTable rowKey={(s: PricingSchedule) => s.ruleNo} columns={scheduleCols} rows={schedules.data?.list} loading={schedules.isLoading}
+          <DataTable rowKey={(s: PricingSchedule) => s.ruleNo} columns={scheduleCols} rows={schedules.data?.list} loading={schedules.isLoading} error={schedules.error} onRetry={schedules.refetch}
             empty="暂无活动/时段价——未配置时不做时段加价，可点「新增活动/时段价」设节假日或高峰倍率" />
         </>
       )}
 
-      {cur.data && <Pagination page={page} size={SIZE} total={cur.data.total} onPage={setPage} />}
+      {cur.data && <Pagination page={paging.page} size={paging.size} total={cur.data.total} onPage={paging.setPage} onSize={paging.setSize} />}
 
       <FormDrawer
         open={!!planForm}

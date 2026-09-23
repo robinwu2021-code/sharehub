@@ -1,10 +1,11 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Pagination } from "@/components/ui/misc";
+import { usePaging } from "@/lib/hooks/use-paging";
+import { useNavTabs, usePageTab } from "@/lib/hooks/use-page-tab";
 import { TabHeader } from "@/components/ui/tab-header";
 import { Toolbar } from "@/components/ui/toolbar";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
@@ -29,13 +30,8 @@ import {
 } from "@/components/archive";
 import type { AlarmRecord, AlarmNotice, AlarmCode, AlarmRule, AlarmLevel, PageResult } from "@/lib/types";
 
-const SIZE = 10;
-const TABS = [
-  { key: "records", label: "告警记录" },
-  { key: "notices", label: "告警通知" },
-  { key: "codes", label: "告警代码" },
-  { key: "rules", label: "通知规则" },
-];
+// tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）
+const TAB_KEYS = ["records", "notices", "codes", "rules"] as const;
 
 /**
  * 告警等级：文案 + 色调 + **形状阶梯**（规范 §11.4）。
@@ -91,17 +87,16 @@ function AlarmsInner() {
   const qc = useQueryClient();
   const allow = useCan();
   const { t } = useI18n();
-  const sp = useSearchParams();
-  const qTab = sp.get("tab");
-  const [tab, setTab] = useState(TABS.some((x) => x.key === qTab) ? (qTab as string) : "records");
-  const [page, setPage] = useState(1);
+  const paging = usePaging();
+  const onTabChange = () => { paging.reset(); setKeyword(""); setLevel(""); setStatus(""); setShowArchived(false); };
+  const tabs = useNavTabs("/alarms", TAB_KEYS);
+  const { tab, setTab } = usePageTab(tabs, onTabChange);
   const [keyword, setKeyword] = useState("");
   const [level, setLevel] = useState("");
   const [status, setStatus] = useState("");
   // 「显示已归档」开关（TDD §10.1：列表默认过滤已归档）。切 tab 复位。
   const [showArchived, setShowArchived] = useState(false);
   const { confirm, dialog } = useConfirm();
-  useEffect(() => { if (qTab && TABS.some((x) => x.key === qTab)) { setTab(qTab); setPage(1); setShowArchived(false); } }, [qTab]);
 
   // 转工单：告警→工单闭环（我们比竞品多的一环，竞品到通知就断了）
   const canRaise = allow("workorder:wo:create");
@@ -120,12 +115,12 @@ function AlarmsInner() {
 
   const q = useQuery<PageResult<AlarmRecord | AlarmNotice | AlarmCode | AlarmRule>>({
     // showArchived 必须进 queryKey，否则切开关不重新拉数据
-    queryKey: ["alarm", tab, page, keyword, level, status, showArchived],
+    queryKey: ["alarm", tab, paging.page, paging.size, keyword, level, status, showArchived],
     queryFn: () =>
-      tab === "notices" ? api.listAlarmNotices({ page, size: SIZE, keyword })
-      : tab === "codes" ? api.listAlarmCodes({ page, size: SIZE, keyword, showArchived })
-      : tab === "rules" ? api.listAlarmRules({ page, size: SIZE, keyword, showArchived })
-      : api.listAlarmRecords({ page, size: SIZE, keyword, level: level || undefined, status: status || undefined }),
+      tab === "notices" ? api.listAlarmNotices({ page: paging.page, size: paging.size, keyword })
+      : tab === "codes" ? api.listAlarmCodes({ page: paging.page, size: paging.size, keyword, showArchived })
+      : tab === "rules" ? api.listAlarmRules({ page: paging.page, size: paging.size, keyword, showArchived })
+      : api.listAlarmRecords({ page: paging.page, size: paging.size, keyword, level: level || undefined, status: status || undefined }),
     placeholderData: keepPreviousData,
   });
 
@@ -304,10 +299,10 @@ function AlarmsInner() {
 
   return (
     <div>
-      <TabHeader tabs={TABS} value={tab} onChange={(k) => { setTab(k); setPage(1); setKeyword(""); setLevel(""); setStatus(""); setShowArchived(false); }} />
+      <TabHeader tabs={tabs} value={tab} onChange={setTab} />
 
       {tab === "records" && (
-        <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索告警号 / 柜机 / 告警码 / 工单号"
+        <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); paging.reset(); }} searchPlaceholder="搜索告警号 / 柜机 / 告警码 / 工单号"
           onExport={onExportOf<AlarmRecord>("告警记录", [
             { header: "告警号", value: (a) => a.alarmNo },
             { header: "柜机", value: (a) => a.cabinetNo },
@@ -322,14 +317,14 @@ function AlarmsInner() {
             { header: "备注", value: (a) => a.remark },
           ])}>
           {/* 选项由映射表派生：改文案只改映射表，筛选项与徽标不会各说一套 */}
-          <FilterSelect value={level} onChange={(v) => { setLevel(v); setPage(1); }}
+          <FilterSelect value={level} onChange={(v) => { setLevel(v); paging.reset(); }}
             allLabel="全部等级" options={LEVEL} aria-label="按告警等级筛选" />
-          <FilterSelect value={status} onChange={(v) => { setStatus(v); setPage(1); }}
+          <FilterSelect value={status} onChange={(v) => { setStatus(v); paging.reset(); }}
             allLabel="全部状态" options={REC_STATUS} aria-label="按处理状态筛选" />
         </Toolbar>
       )}
       {tab === "notices" && (
-        <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索通知号 / 告警号 / 接收人"
+        <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); paging.reset(); }} searchPlaceholder="搜索通知号 / 告警号 / 接收人"
           onExport={onExportOf<AlarmNotice>("告警通知", [
             { header: "通知号", value: (n) => n.noticeNo },
             { header: "告警号", value: (n) => n.alarmNo },
@@ -342,7 +337,7 @@ function AlarmsInner() {
           ])} />
       )}
       {tab === "codes" && (
-        <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索代码 / 信息 / 建议处置"
+        <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); paging.reset(); }} searchPlaceholder="搜索代码 / 信息 / 建议处置"
           onAdd={canConfig ? () => setCodeForm({ level: "WARN", autoWorkOrder: false, message: "", suggestion: "" }) : undefined} addLabel="新增告警代码"
           onExport={onExportOf<AlarmCode>("告警代码", [
             { header: "告警代码", value: (c) => c.code },
@@ -352,11 +347,11 @@ function AlarmsInner() {
             { header: "自动开工单", value: (c) => (c.autoWorkOrder ? "是" : "否") },
             ...archivedCsv<AlarmCode>(),
           ])}>
-          <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); setPage(1); }} />
+          <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); paging.reset(); }} />
         </Toolbar>
       )}
       {tab === "rules" && (
-        <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索规则号 / 告警代码 / 通知目标"
+        <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); paging.reset(); }} searchPlaceholder="搜索规则号 / 告警代码 / 通知目标"
           onAdd={canConfig ? () => setRuleForm({ channel: "SMS", method: "INSTANT", quietStart: "22:00", quietEnd: "08:00", escalateMinutes: 60, status: "ACTIVE", alarmCode: "", target: "" }) : undefined} addLabel="新增通知规则"
           onExport={onExportOf<AlarmRule>("通知规则", [
             { header: "规则号", value: (r) => r.ruleNo },
@@ -369,7 +364,7 @@ function AlarmsInner() {
             { header: "状态", value: (r) => (r.status === "ACTIVE" ? "启用" : "停用") },
             ...archivedCsv<AlarmRule>(),
           ])}>
-          <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); setPage(1); }} />
+          <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); paging.reset(); }} />
         </Toolbar>
       )}
       {/* 权限降级显式提示（§3.2）：不静默隐藏操作列，否则会被当成功能坏了 */}
@@ -380,11 +375,11 @@ function AlarmsInner() {
         <ReadOnlyNotice what="告警通知重发" perm="workorder:alarm:notice_resend" note="失败通知只能看原因，不能补发" />
       )}
 
-      {tab === "records" && <DataTable rowKey={(a: AlarmRecord) => a.alarmNo} columns={recordCols} rows={q.data?.list as AlarmRecord[]} loading={q.isLoading} empty="暂无告警记录——设备运行正常，或当前筛选条件下无匹配，试着清空等级 / 状态筛选。" />}
-      {tab === "notices" && <DataTable rowKey={(n: AlarmNotice) => n.noticeNo} columns={noticeCols} rows={q.data?.list as AlarmNotice[]} loading={q.isLoading} empty="暂无告警通知——通知由「通知规则」命中告警后自动产生，先去规则页确认规则已启用。" />}
-      {tab === "codes" && <DataTable rowKey={(c: AlarmCode) => c.code} columns={codeCols} rows={q.data?.list as AlarmCode[]} loading={q.isLoading} rowClassName={archivedRowClass} empty={showArchived ? "没有匹配的告警代码——换个关键词，或点「新增告警代码」补一条。" : "暂无在用告警代码——可能都已归档（打开「显示已归档」查看），或点「新增告警代码」建第一条处置预案。"} />}
-      {tab === "rules" && <DataTable rowKey={(r: AlarmRule) => r.ruleNo} columns={ruleCols} rows={q.data?.list as AlarmRule[]} loading={q.isLoading} rowClassName={archivedRowClass} empty={showArchived ? "没有匹配的通知规则——换个关键词，或点「新增通知规则」补一条。" : "暂无在用通知规则——可能都已归档（打开「显示已归档」查看），或点「新增通知规则」为关键告警配通知目标。"} />}
-      {q.data && <Pagination page={page} size={SIZE} total={q.data.total} onPage={setPage} />}
+      {tab === "records" && <DataTable rowKey={(a: AlarmRecord) => a.alarmNo} columns={recordCols} rows={q.data?.list as AlarmRecord[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无告警记录——设备运行正常，或当前筛选条件下无匹配，试着清空等级 / 状态筛选。" />}
+      {tab === "notices" && <DataTable rowKey={(n: AlarmNotice) => n.noticeNo} columns={noticeCols} rows={q.data?.list as AlarmNotice[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无告警通知——通知由「通知规则」命中告警后自动产生，先去规则页确认规则已启用。" />}
+      {tab === "codes" && <DataTable rowKey={(c: AlarmCode) => c.code} columns={codeCols} rows={q.data?.list as AlarmCode[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} rowClassName={archivedRowClass} empty={showArchived ? "没有匹配的告警代码——换个关键词，或点「新增告警代码」补一条。" : "暂无在用告警代码——可能都已归档（打开「显示已归档」查看），或点「新增告警代码」建第一条处置预案。"} />}
+      {tab === "rules" && <DataTable rowKey={(r: AlarmRule) => r.ruleNo} columns={ruleCols} rows={q.data?.list as AlarmRule[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} rowClassName={archivedRowClass} empty={showArchived ? "没有匹配的通知规则——换个关键词，或点「新增通知规则」补一条。" : "暂无在用通知规则——可能都已归档（打开「显示已归档」查看），或点「新增通知规则」为关键告警配通知目标。"} />}
+      {q.data && <Pagination page={paging.page} size={paging.size} total={q.data.total} onPage={paging.setPage} onSize={paging.setSize} />}
 
       {/* 确认告警：备注选填（提交不禁用），但预填原上报说明，让值班人在原文上追述而不是从零写 */}
       <Drawer

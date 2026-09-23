@@ -1,10 +1,11 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PageTitle, Pagination } from "@/components/ui/misc";
+import { usePaging } from "@/lib/hooks/use-paging";
+import { useNavTabs, usePageTab } from "@/lib/hooks/use-page-tab";
 import { TabHeader } from "@/components/ui/tab-header";
 import { Toolbar } from "@/components/ui/toolbar";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
@@ -23,11 +24,8 @@ import { notify } from "@/lib/notify";
 import { exportCsv } from "@/lib/export-csv";
 import type { CsTicket, CsSession, CsMessage, PageResult } from "@/lib/types";
 
-const SIZE = 10;
-const TABS = [
-  { key: "tickets", label: "报障受理" },
-  { key: "sessions", label: "客服会话" },
-];
+// tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）
+const TAB_KEYS = ["tickets", "sessions"] as const;
 
 const TICKET_FIELDS: FieldDef[] = [
   { key: "ticketNo", label: "工单号", readOnlyOnEdit: true, placeholder: "留空自动生成" },
@@ -59,19 +57,18 @@ const SENDER: StatusMap<CsMessage["senderType"]> = {
 };
 
 function CsInner() {
-  const sp = useSearchParams();
-  const qTab = sp.get("tab");
   const qc = useQueryClient();
   const { t } = useI18n();
-  const [tab, setTab] = useState(TABS.some((x) => x.key === qTab) ? (qTab as string) : "tickets");
-  const [page, setPage] = useState(1);
+  const paging = usePaging();
+  const onTabChange = () => paging.reset();
+  const tabs = useNavTabs("/cs", TAB_KEYS);
+  const { tab, setTab } = usePageTab(tabs, onTabChange);
   const [keyword, setKeyword] = useState("");
   const [ticketForm, setTicketForm] = useState<Partial<CsTicket> | null>(null);
   const [session, setSession] = useState<CsSession | null>(null);
   const [reply, setReply] = useState("");
   const [attach, setAttach] = useState("");
   const allow = useCan();
-  useEffect(() => { if (qTab && TABS.some((x) => x.key === qTab)) { setTab(qTab); setPage(1); } }, [qTab]);
 
   const canEditTicket = allow("cs:ticket:handle");
   // 转退款借用资金域的码：谁能发起退款由资金域授权说了算，不是「有客服权限就能造退款单」
@@ -115,10 +112,10 @@ function CsInner() {
   });
 
   const q = useQuery<PageResult<CsTicket | CsSession>>({
-    queryKey: ["cs", tab, page, keyword],
+    queryKey: ["cs", tab, paging.page, paging.size, keyword],
     queryFn: () =>
-      tab === "sessions" ? api.listCsSessions({ page, size: SIZE, keyword })
-      : api.listCsTickets({ page, size: SIZE, keyword }),
+      tab === "sessions" ? api.listCsSessions({ page: paging.page, size: paging.size, keyword })
+      : api.listCsTickets({ page: paging.page, size: paging.size, keyword }),
     placeholderData: keepPreviousData,
   });
 
@@ -180,11 +177,11 @@ function CsInner() {
 
   return (
     <div>
-      <TabHeader tabs={TABS} value={tab} onChange={(k) => { setTab(k); setPage(1); }} />
+      <TabHeader tabs={tabs} value={tab} onChange={setTab} />
       {tab === "tickets" && (
         <Toolbar
           search={keyword}
-          onSearch={(v) => { setKeyword(v); setPage(1); }}
+          onSearch={(v) => { setKeyword(v); paging.reset(); }}
           searchPlaceholder="搜索工单号 / 用户 / 设备 / 问题"
           onAdd={canEditTicket ? () => setTicketForm({ status: "OPEN", channel: "APP", issue: "" }) : undefined}
           addLabel="新增工单"
@@ -202,7 +199,7 @@ function CsInner() {
       {tab === "sessions" && (
         <Toolbar
           search={keyword}
-          onSearch={(v) => { setKeyword(v); setPage(1); }}
+          onSearch={(v) => { setKeyword(v); paging.reset(); }}
           searchPlaceholder="搜索会话号 / 用户 / 客服"
           onExport={() => exportCsv<CsSession>("客服会话", [
             { header: "会话号", value: (s) => s.sessionNo },
@@ -214,9 +211,9 @@ function CsInner() {
           ], (q.data?.list ?? []) as CsSession[])}
         />
       )}
-      {tab === "tickets" && <DataTable rowKey={(t: CsTicket) => t.ticketNo} columns={ticketCols} rows={q.data?.list as CsTicket[]} loading={q.isLoading} empty="暂无报障工单——用户来电/APP 报障后在此登记，也可点右上「新增工单」手工建单" />}
-      {tab === "sessions" && <DataTable rowKey={(s: CsSession) => s.sessionNo} columns={sessionCols} rows={q.data?.list as CsSession[]} loading={q.isLoading} empty="暂无客服会话——用户在 C 端发起在线咨询后会话才会出现在这里" />}
-      {q.data && <Pagination page={page} size={SIZE} total={q.data.total} onPage={setPage} />}
+      {tab === "tickets" && <DataTable rowKey={(t: CsTicket) => t.ticketNo} columns={ticketCols} rows={q.data?.list as CsTicket[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无报障工单——用户来电/APP 报障后在此登记，也可点右上「新增工单」手工建单" />}
+      {tab === "sessions" && <DataTable rowKey={(s: CsSession) => s.sessionNo} columns={sessionCols} rows={q.data?.list as CsSession[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无客服会话——用户在 C 端发起在线咨询后会话才会出现在这里" />}
+      {q.data && <Pagination page={paging.page} size={paging.size} total={q.data.total} onPage={paging.setPage} onSize={paging.setSize} />}
 
       <FormDrawer
         open={!!ticketForm}
