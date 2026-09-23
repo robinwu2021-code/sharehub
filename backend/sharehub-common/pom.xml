@@ -73,4 +73,30 @@
       <scope>provided</scope>
     </dependency>
   </dependencies>
+
+    <!-- 模块边界（v4/12 §5.2）：最底层，不许依赖任何 sharehub 模块（它被所有人依赖，一旦反向依赖就成环） -->
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>module-boundary</id>
+                        <goals><goal>enforce</goal></goals>
+                        <configuration>
+                            <rules>
+                                <bannedDependencies>
+                                    <excludes>
+                                        <exclude>ai.neargo.sharehub:*</exclude>
+                                    </excludes>
+                                </bannedDependencies>
+                            </rules>
+                            <fail>true</fail>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>

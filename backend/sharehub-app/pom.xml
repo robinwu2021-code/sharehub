@@ -157,6 +157,35 @@
 
     <build>
         <plugins>
+            <!-- 模块边界（v4/12 §5.2）：启动模块可依赖全部业务域。
+                 **为什么现在不禁 sharehub-svc-gateway**：今天是单体形态，网关内嵌在本进程里
+                 （ADR-017 双形态：本地实现在 classpath 上就走本地），这条依赖是有意为之。
+                 v4/12 的矩阵描述的是 **S5 之后**的目标形态（网关独立部署 :8091，
+                 业务侧只经 DeviceCommandPort 远程调用）。
+                 **S5 落地时把 sharehub-svc-gateway 加进下面的 excludes**，那一刻这条卡口才有意义；
+                 现在就加只会逼着把正常的单体形态绕过去。
+                 禁 sharehub-app-gateway 则是任何时候都成立的：两个启动模块互相依赖没有正当理由。 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>module-boundary</id>
+                        <goals><goal>enforce</goal></goals>
+                        <configuration>
+                            <rules>
+                                <bannedDependencies>
+                                    <excludes>
+                                        <exclude>ai.neargo.sharehub:sharehub-app-gateway</exclude>
+                                    </excludes>
+                                </bannedDependencies>
+                            </rules>
+                            <fail>true</fail>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>

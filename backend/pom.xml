@@ -38,4 +38,42 @@
         <module>sharehub-app-gateway</module>
     </modules>
 
+
+    <!-- ── 依赖纪律卡口（v4/12 §5.2 的模块依赖矩阵 · v4/08 §三）────────────────────
+         这里只放**全局**规则；每个模块的边界规则写在各自 pom 的 module-boundary 执行里。
+         为什么要卡：模块边界一旦被穿，编译照过、测试照绿，只有真拆服务的那天才发现拆不动
+         （arch-guard 的 G3 查的是「注入了别的服务的实现类」，这里查的是「Maven 层面依赖了谁」，
+         两者互补：前者防写法上的越界，后者防依赖声明上的越界）。 -->
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>sharehub-global-rules</id>
+                        <goals><goal>enforce</goal></goals>
+                        <configuration>
+                            <rules>
+                                <!-- 同一构件出现两个版本 → 失败。2026-09-23 实测全部模块零冲突，
+                                     所以这条是「保持现状」而不是「先欠着」。 -->
+                                <dependencyConvergence/>
+                                <!-- 同一 pom 里把同一构件写两遍（复制粘贴的典型产物） -->
+                                <banDuplicatePomDependencyVersions/>
+                                <bannedDependencies>
+                                    <excludes>
+                                        <!-- ai-shop 的构件一律不许依赖。ADR-024 定了将来只放行三个
+                                             服务客户端 / 契约（pay-client · shop-job-api · shop-job-target），
+                                             届时把它们加进 includes；在那之前一个都不许进来。 -->
+                                        <exclude>ai.neargo.shop:*</exclude>
+                                    </excludes>
+                                </bannedDependencies>
+                            </rules>
+                            <fail>true</fail>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>

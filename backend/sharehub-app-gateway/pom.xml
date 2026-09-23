@@ -52,6 +52,32 @@
 
   <build>
     <plugins>
+            <!-- 模块边界（v4/12 §5.2）：网关启动模块：只带网关内核，不许把业务域链接进来 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>module-boundary</id>
+                        <goals><goal>enforce</goal></goals>
+                        <configuration>
+                            <rules>
+                                <bannedDependencies>
+                                    <excludes>
+                                        <exclude>ai.neargo.sharehub:sharehub-svc-platform</exclude>
+                                        <exclude>ai.neargo.sharehub:sharehub-svc-core</exclude>
+                                        <exclude>ai.neargo.sharehub:sharehub-svc-ops</exclude>
+                                        <exclude>ai.neargo.sharehub:sharehub-svc-finance</exclude>
+                                        <exclude>ai.neargo.sharehub:sharehub-app</exclude>
+                                    </excludes>
+                                </bannedDependencies>
+                            </rules>
+                            <fail>true</fail>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>

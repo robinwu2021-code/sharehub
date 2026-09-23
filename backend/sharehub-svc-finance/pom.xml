@@ -44,4 +44,35 @@
       <scope>provided</scope>
     </dependency>
   </dependencies>
+
+    <!-- 模块边界（v4/12 §5.2）：业务域之间互不依赖（跨域只经 sharehub-api 的 Port），也不依赖启动模块 -->
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>module-boundary</id>
+                        <goals><goal>enforce</goal></goals>
+                        <configuration>
+                            <rules>
+                                <bannedDependencies>
+                                    <excludes>
+                                        <exclude>ai.neargo.sharehub:sharehub-svc-platform</exclude>
+                                        <exclude>ai.neargo.sharehub:sharehub-svc-core</exclude>
+                                        <exclude>ai.neargo.sharehub:sharehub-svc-ops</exclude>
+                                        <exclude>ai.neargo.sharehub:sharehub-svc-gateway</exclude>
+                                        <exclude>ai.neargo.sharehub:sharehub-app</exclude>
+                                        <exclude>ai.neargo.sharehub:sharehub-app-gateway</exclude>
+                                    </excludes>
+                                </bannedDependencies>
+                            </rules>
+                            <fail>true</fail>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>
