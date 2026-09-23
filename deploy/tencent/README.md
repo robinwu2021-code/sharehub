@@ -85,6 +85,21 @@ scripts/deploy-frontend.sh c-app         # C 端 H5
 > 所以验证码发不出去。**恢复条件**：接入短信通道（`neargo-notify` / N4）。
 > 本机联调可设 `SHAREHUB_DEV_MODE_ENABLED=true`（**生产绝不可设**）。
 
+> ## 发布前先跑这一条
+>
+> ```bash
+> deploy/tencent/preflight.sh          # 全部必查项；退出码非 0 就别发
+> deploy/tencent/preflight.sh --skip-ssh   # 只查本地（迁移号），连不上机器时用
+> ```
+>
+> 下面那几条「必查」它都会跑一遍。**留着文字版是为了讲清「为什么」** ——
+> 脚本告诉你哪一项没过，这里告诉你没过会怎样。
+>
+> 为什么值得做成脚本：这些必查项一直都在，问题是散在文档各处、靠人记得。
+> 本仓为同一件事改造过一次 —— 前后端漂移检查本来挂在 `npm run check:drift` 下
+> （也就是要有人记得去跑），实际没人跑，于是「漂移可被发现」退化成
+> 「漂移可被发现，如果你已经知道它在那儿」。搬进测试之后才真的跑到。
+
 > ⚠️ **发布前必查**：`SHAREHUB_ADMIN_PASSWORD` 必须非空，否则运营端**彻底登不进**（fail-closed 的预期行为）：
 > ```bash
 > ssh soukmind-tx 'sudo grep -c "^SHAREHUB_ADMIN_PASSWORD=.\+" /data/app/powerbank/sharehub-app/sharehub-app.env'
