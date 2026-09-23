@@ -19,7 +19,7 @@ import type { AttentionItem, OperationOverview, SiteRankMetric } from "@/lib/typ
 import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/utils";
 import { pageReady } from "@/lib/backend-ready";
-import { PageTitle, EmptyState, Skeleton } from "@/components/ui/misc";
+import { PageTitle, EmptyState, ErrorState, Skeleton } from "@/components/ui/misc";
 import { Tabs } from "@/components/ui/tabs";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
@@ -120,14 +120,14 @@ function OverviewInner() {
     <div>
       <PageTitle title={tNav("站点概览")} desc="站点与设备的铺设规模、经营排行，以及需要处置的站点" />
 
-      {q.isError && (
-        <EmptyState
-          title="概览暂不可用"
-          desc={pageReady("overview")
-            ? "取数失败，请稍后重试。"
-            : "站点概览的聚合接口后端尚未实现。本地 mock 模式可以完整预览这一页。"}
-        />
-      )}
+      {/* 两种「没东西看」要分开：后端没这个接口是**能力缺失**（空态，没有重试的意义）；
+          接口有但这次没取到是**失败**（失败态，给原因和重试）。原先都画成空态。 */}
+      {q.isError && (pageReady("overview")
+        ? <ErrorState error={q.error} onRetry={q.refetch} />
+        : <EmptyState
+            title="概览暂不可用"
+            desc="站点概览的聚合接口后端尚未实现。本地 mock 模式可以完整预览这一页。"
+          />)}
       {q.isLoading && <Skeleton className="h-40" />}
 
       {d && (

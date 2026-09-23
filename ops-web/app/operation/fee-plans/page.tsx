@@ -14,6 +14,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { CalendarClock, Calculator, Copy, Pencil, Power } from "lucide-react";
 import Link from "next/link";
+import { UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
 import type { PricePlan, PricingSchedule } from "@/lib/types";
 import { useCan } from "@/lib/use-can";
@@ -100,18 +101,18 @@ function FeePlansInner() {
 
   const plansQ = useQuery({
     queryKey: ["op", "plans", keyword, status, showArchived],
-    queryFn: () => api.listPricePlans({ page: 1, size: 200, keyword, showArchived }),
+    queryFn: () => api.listPricePlans({ page: 1, size: UNPAGED_SIZE, keyword, showArchived }),
   });
   const schedQ = useQuery({
     queryKey: ["op", "periods"],
-    queryFn: () => api.listPricingSchedules({ page: 1, size: 200 }),
+    queryFn: () => api.listPricingSchedules({ page: 1, size: UNPAGED_SIZE }),
     enabled: tab === "periods",
   });
   // 预约调价接口后端未实现：真实后端模式下不发这个请求，「待生效调价」列显示为未开放
   const adjustmentsReady = pageReady("fee-adjustments");
   const adjQ = useQuery({
     queryKey: ["op", "plan-adjustments"],
-    queryFn: () => api.listPriceAdjustments({ page: 1, size: 200, status: "SCHEDULED" }),
+    queryFn: () => api.listPriceAdjustments({ page: 1, size: UNPAGED_SIZE, status: "SCHEDULED" }),
     enabled: adjustmentsReady,
   });
 
@@ -255,6 +256,8 @@ function FeePlansInner() {
             columns={planCols}
             rows={plansQ.isLoading ? undefined : plans}
             loading={plansQ.isLoading}
+            error={plansQ.error}
+            onRetry={plansQ.refetch}
             rowClassName={archivedRowClass}
             empty={keyword || status ? "没有符合条件的方案。" : "还没有收费方案。没有方案时所有站点都按系统兜底价计费，建议先建一个默认方案。"}
           />
@@ -277,6 +280,8 @@ function FeePlansInner() {
             columns={schedCols}
             rows={schedQ.isLoading ? undefined : schedQ.data?.list}
             loading={schedQ.isLoading}
+            error={schedQ.error}
+            onRetry={schedQ.refetch}
             empty="还没有时段倍率。不配的话全天同一个价，节假日与高峰期无法区分。"
           />
         </>

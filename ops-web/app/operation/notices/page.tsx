@@ -12,6 +12,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Eye, Pencil, Pin, Send, CircleOff } from "lucide-react";
+import { UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
 import type { Notice } from "@/lib/types";
 import { useCan } from "@/lib/use-can";
@@ -104,7 +105,7 @@ export default function NoticesPage() {
   // 派生状态只能在前端算，所以公告（几十条量级）一次取全，页签与类型筛选在前端做
   const q = useQuery({
     queryKey: ["op", "notices", keyword, showArchived],
-    queryFn: () => api.listNotices({ page: 1, size: 500, keyword, showArchived }),
+    queryFn: () => api.listNotices({ page: 1, size: UNPAGED_SIZE, keyword, showArchived }),
   });
   const all = useMemo(() => q.data?.list ?? [], [q.data]);
   const now = new Date();
@@ -222,7 +223,7 @@ export default function NoticesPage() {
         <FilterSelect aria-label="类型" value={type} onChange={setType} options={TYPE} allLabel="全部类型" />
         <ShowArchivedToggle checked={showArchived} onChange={setShowArchived} />
       </Toolbar>
-      <DataTable rowKey={(n: Notice) => n.noticeNo} columns={cols} rows={q.isLoading ? undefined : rows} loading={q.isLoading} rowClassName={archivedRowClass} empty={emptyText} />
+      <DataTable rowKey={(n: Notice) => n.noticeNo} columns={cols} rows={q.isLoading ? undefined : rows} loading={q.isLoading} error={q.error} onRetry={q.refetch} rowClassName={archivedRowClass} empty={emptyText} />
 
       <FormDrawer
         open={!!form}

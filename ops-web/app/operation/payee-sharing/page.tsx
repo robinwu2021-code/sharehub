@@ -5,7 +5,7 @@
 // 与「站点分成」是同一份数据的另一个方向，不另存（同样只读，原因见 D2）。
 import { useState } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { PayeeSharingRow } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
@@ -14,7 +14,9 @@ import { money } from "@/lib/utils";
 import { PageTitle } from "@/components/ui/misc";
 import { Tabs } from "@/components/ui/tabs";
 import { Toolbar } from "@/components/ui/toolbar";
-import { DataTable, type Column } from "@/components/ui/data-table";
+import { type Column } from "@/components/ui/data-table";
+import { PagedTable } from "@/components/ui/paged-table";
+import { usePaging } from "@/lib/hooks/use-paging";
 import { Notice } from "@/components/ui/notice";
 
 const TABS = [
@@ -28,12 +30,14 @@ export default function PayeeSharingPage() {
   const { tNav } = useI18n();
   const allow = useCan();
   const canSeeAmount = allow("finance:share_record:read");
+  const paging = usePaging();
   const [payeeType, setPayeeType] = useState("");
   const [keyword, setKeyword] = useState("");
 
   const q = useQuery({
-    queryKey: ["op", "payee-sharing", payeeType, keyword],
-    queryFn: () => api.listPayeeSharing({ page: 1, size: 200, payeeType, keyword }),
+    queryKey: ["op", "payee-sharing", paging.page, paging.size, payeeType, keyword],
+    queryFn: () => api.listPayeeSharing({ page: paging.page, size: paging.size, payeeType, keyword }),
+    placeholderData: keepPreviousData,
   });
   const rows = q.data?.list ?? [];
   const noAmount = rows.length > 0 && rows.every((r) => r.amount30d === 0);
@@ -74,13 +78,13 @@ export default function PayeeSharingPage() {
           （已记入后端待办）。链路补齐后这一列会自动有值。
         </Notice>
       )}
-      <Tabs tabs={TABS} value={payeeType} onChange={setPayeeType} />
-      <Toolbar search={keyword} onSearch={setKeyword} searchPlaceholder="搜索分成方名称" />
-      <DataTable
+      <Tabs tabs={TABS} value={payeeType} onChange={(v) => { setPayeeType(v); paging.reset(); }} />
+      <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); paging.reset(); }} searchPlaceholder="搜索分成方名称" />
+      <PagedTable
+        query={q}
+        paging={paging}
         rowKey={(r: PayeeSharingRow) => `${r.payeeType}:${r.payeeName}`}
         columns={cols}
-        rows={q.isLoading ? undefined : rows}
-        loading={q.isLoading}
         expandable={(r) => (
           <div>
             <div className="mb-2 txt-caption text-muted-foreground">{r.payeeName} 分成的站点（比例从高到低）</div>

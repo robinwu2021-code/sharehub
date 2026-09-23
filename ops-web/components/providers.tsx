@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useTheme, applyTheme } from "@/lib/stores/theme";
 import { useLocaleStore, applyLocale } from "@/lib/stores/locale";
 import { notify } from "@/lib/notify";
+import { IS_MOCK } from "@/lib/api-mode";
 import { Toaster } from "@/components/ui/toaster";
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -15,7 +16,19 @@ export function Providers({ children }: { children: React.ReactNode }) {
         mutationCache: new MutationCache({
           onError: (e) => notify.error(e instanceof Error ? e.message : String(e)),
         }),
-        defaultOptions: { queries: { staleTime: 15_000, retry: 1, refetchOnWindowFocus: false } },
+        defaultOptions: {
+          queries: {
+            staleTime: 15_000,
+            retry: 1,
+            refetchOnWindowFocus: false,
+            /*
+             * mock 模式**不走网络**，没有理由按网络状态挂起取数。
+             * 真后端保留 "online"：那边离线时挂起、等网络回来自动续跑，
+             * 比立刻报一个「网络异常」更贴近实际。
+             */
+            networkMode: IS_MOCK ? "always" : "online",
+          },
+        },
       }),
   );
   // hydration 后对齐主题与语言（首帧脚本已抢先应用，避免闪烁）。

@@ -35,6 +35,16 @@ export interface PagedQuery<T> {
   /** v5 语义：从没拿到过数据。`enabled:false` 的查询会一直为 true —— 那种情形自己传 `loading` */
   isPending?: boolean;
   isLoading?: boolean;
+  /**
+   * v5 的取数子状态。`"paused"` 是一种**看不出来的进行中**：
+   * 失败重试遇到「窗口失焦」或「离线」时，retryer 会挂起（见 query-core/retryer.js
+   * 的 `canContinue = focusManager.isFocused() && …`），此时
+   * `status` 一直是 `"pending"`、`isLoading` 是 false、`error` 是 null ——
+   * 三个字段联手把它伪装成「取完了，没有数据」，于是**画出来是一张空表**。
+   * 2026-09-23 实测撞到过：人为让 mock 抛错，界面显示「还没有银行」。
+   * 这里把它并回加载态：它确实还没结束，用户切回来就会继续。
+   */
+  fetchStatus?: string;
   error?: unknown;
   refetch?: () => unknown;
 }
@@ -55,18 +65,20 @@ export type PagedTableProps<T> = Omit<
 export function PagedTable<T>({ query, paging, loading, footer, ...rest }: PagedTableProps<T>) {
   const rows = query.data?.list;
   const total = query.data?.total ?? 0;
+  // 挂起中的重试不是「没有数据」，见 PagedQuery.fetchStatus
+  const paused = (query.isPending ?? false) && query.fetchStatus === "paused";
   return (
     <>
       <DataTable
         {...rest}
         rows={rows}
-        loading={loading ?? (query.isLoading ?? query.isPending ?? false)}
+        loading={loading ?? (query.isLoading || paused)}
         error={query.error}
         onRetry={query.refetch ? () => query.refetch!() : undefined}
       />
       {footer}
       {/* 失败时不渲染分页条：total 是 0，画一个「共 0 条 · 1/1」等于替错误数据背书 */}
-      {!query.error && (
+      {!query.error && !paused && (
         <Pagination
           page={paging.page}
           size={paging.size}

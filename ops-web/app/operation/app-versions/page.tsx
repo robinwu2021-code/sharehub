@@ -12,6 +12,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Rocket, SlidersHorizontal, Undo2 } from "lucide-react";
+import { UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
 import type { AppVersion } from "@/lib/types";
 import { useCan } from "@/lib/use-can";
@@ -88,7 +89,7 @@ export default function AppVersionsPage() {
   const [rolloutValue, setRolloutValue] = useState<Record<string, unknown>>({});
 
   // 取全部平台：跨记录规则（版本号递增、同平台只一个灰度）要看到同平台的所有版本，不能只看当前页
-  const q = useQuery({ queryKey: ["op", "app-versions"], queryFn: () => api.listAppVersions({ page: 1, size: 500 }) });
+  const q = useQuery({ queryKey: ["op", "app-versions"], queryFn: () => api.listAppVersions({ page: 1, size: UNPAGED_SIZE }) });
   const all = useMemo(() => q.data?.list ?? [], [q.data]);
   const rows = all
     .filter((v) => v.platform === platform && (!keyword || v.versionNo.includes(keyword) || v.releaseNote.includes(keyword)))
@@ -220,6 +221,8 @@ export default function AppVersionsPage() {
         columns={cols}
         rows={q.isLoading ? undefined : rows}
         loading={q.isLoading}
+        error={q.error}
+        onRetry={q.refetch}
         empty={keyword ? "没有符合搜索条件的版本。" : "这个平台还没有发过版本。先新建一个草稿，确认无误后再小比例灰度发布。"}
       />
 

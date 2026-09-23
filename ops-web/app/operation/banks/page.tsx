@@ -18,7 +18,9 @@ import { useCan } from "@/lib/use-can";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
 import { IBAN_LENGTH_BY_COUNTRY, CURRENCY_BY_COUNTRY, validateBank } from "@/lib/operation-rules";
-import { PageTitle, Pagination } from "@/components/ui/misc";
+import { PageTitle } from "@/components/ui/misc";
+import { PagedTable } from "@/components/ui/paged-table";
+import { usePaging } from "@/lib/hooks/use-paging";
 import { Toolbar } from "@/components/ui/toolbar";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
@@ -31,7 +33,6 @@ import {
   ShowArchivedToggle, archivedRowClass, ArchiveActions, archiveConfirm, unarchiveConfirm,
 } from "@/components/archive";
 
-const SIZE = 20;
 
 const BANK_STATUS: StatusMap<BankEntry["status"]> = {
   ENABLED: { label: "启用", tone: "success" },
@@ -63,7 +64,7 @@ export default function BanksPage() {
   const { confirm, dialog } = useConfirm();
   const canWrite = allow("system:bank:update");
 
-  const [page, setPage] = useState(1);
+  const paging = usePaging();
   const [keyword, setKeyword] = useState("");
   const [country, setCountry] = useState("");
   const [currency, setCurrency] = useState("");
@@ -73,8 +74,8 @@ export default function BanksPage() {
   const [editing, setEditing] = useState<BankEntry | undefined>();
 
   const q = useQuery({
-    queryKey: ["op", "banks", page, keyword, country, currency, status, showArchived],
-    queryFn: () => api.listBanks({ page, size: SIZE, keyword, country, currency, status, showArchived }),
+    queryKey: ["op", "banks", paging.page, paging.size, keyword, country, currency, status, showArchived],
+    queryFn: () => api.listBanks({ page: paging.page, size: paging.size, keyword, country, currency, status, showArchived }),
     placeholderData: keepPreviousData,
   });
   const refresh = () => qc.invalidateQueries({ queryKey: ["op", "banks"] });
@@ -168,28 +169,27 @@ export default function BanksPage() {
       {!canWrite && <ReadOnlyNotice what="银行字典维护" perm="system:bank:update" note="不能新增、编辑、停用或归档" className="mb-3" />}
       <Toolbar
         search={keyword}
-        onSearch={(v) => { setKeyword(v); setPage(1); }}
+        onSearch={(v) => { setKeyword(v); paging.reset(); }}
         searchPlaceholder="搜索代码 / 名称 / SWIFT"
         onAdd={openNew}
         addLabel="新增银行"
         canAdd={canWrite}
       >
-        <FilterSelect aria-label="国家" value={country} onChange={(v) => { setCountry(v); setPage(1); }} options={COUNTRY_OPTIONS} allLabel="全部国家" />
-        <FilterSelect aria-label="币种" value={currency} onChange={(v) => { setCurrency(v); setPage(1); }} options={CURRENCY_OPTIONS} allLabel="全部币种" />
-        <FilterSelect aria-label="状态" value={status} onChange={(v) => { setStatus(v); setPage(1); }} options={BANK_STATUS} allLabel="全部状态" />
-        <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); setPage(1); }} />
+        <FilterSelect aria-label="国家" value={country} onChange={(v) => { setCountry(v); paging.reset(); }} options={COUNTRY_OPTIONS} allLabel="全部国家" />
+        <FilterSelect aria-label="币种" value={currency} onChange={(v) => { setCurrency(v); paging.reset(); }} options={CURRENCY_OPTIONS} allLabel="全部币种" />
+        <FilterSelect aria-label="状态" value={status} onChange={(v) => { setStatus(v); paging.reset(); }} options={BANK_STATUS} allLabel="全部状态" />
+        <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); paging.reset(); }} />
       </Toolbar>
-      <DataTable
+      <PagedTable
+        query={q}
+        paging={paging}
         rowKey={(b: BankEntry) => b.bankCode}
         columns={cols}
-        rows={q.data?.list}
-        loading={q.isLoading}
         rowClassName={archivedRowClass}
         empty={filtered
           ? "没有符合筛选条件的银行。试试清空筛选，或打开「显示已归档」。"
           : "还没有银行。商户和代理提现时要从这里选择收款银行，没有银行就无法提现，请先新增。"}
       />
-      <Pagination page={page} size={SIZE} total={q.data?.total ?? 0} onPage={setPage} />
       <FormDrawer
         open={!!form}
         onOpenChange={(o) => !o && setForm(null)}

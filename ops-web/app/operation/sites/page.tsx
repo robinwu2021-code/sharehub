@@ -8,7 +8,7 @@
 // 后端就绪度（lib/backend-ready）：列表 / 新增 / 编辑 / 归档已有，可上线；
 // 「暂停营业 / 恢复营业」「统计」依赖尚未实现的接口，真实后端模式下不渲染这些入口，
 // 而不是点了再报错。
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { BarChart3, Pause, Pencil, Play } from "lucide-react";
@@ -18,7 +18,10 @@ import { useCan } from "@/lib/use-can";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
 import { featureReady } from "@/lib/backend-ready";
-import { PageTitle, Pagination } from "@/components/ui/misc";
+import { PageTitle } from "@/components/ui/misc";
+import { PagedTable } from "@/components/ui/paged-table";
+import { usePaging } from "@/lib/hooks/use-paging";
+import { UNPAGED_SIZE } from "@/lib/constants";
 import { Toolbar } from "@/components/ui/toolbar";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
@@ -32,7 +35,6 @@ import {
 } from "@/components/archive";
 import { SiteDetailDrawer } from "@/components/operation/site-detail";
 
-const SIZE = 20;
 
 const SITE_STATUS: StatusMap<Site["status"]> = {
   ACTIVE: { label: "营业中", tone: "success" },
@@ -70,7 +72,7 @@ function SitesInner() {
   const canPause = featureReady("sites.pause");
   const canStats = featureReady("sites.stats");
 
-  const [page, setPage] = useState(1);
+  const paging = usePaging();
   const [keyword, setKeyword] = useState("");
   const [status, setStatus] = useState("");
   const [scene, setScene] = useState("");
@@ -95,23 +97,22 @@ function SitesInner() {
   };
 
   const q = useQuery({
-    queryKey: ["op", "sites", page, keyword, status, scene, showArchived],
-    queryFn: () => api.listSites({ page, size: SIZE, keyword, status, showArchived }),
+    queryKey: ["op", "sites", paging.page, paging.size, keyword, status, scene, showArchived],
+    queryFn: () => api.listSites({ page: paging.page, size: paging.size, keyword, status, showArchived }),
+    // 场景筛选后端列表参数不支持，只能前端筛。放在 select 里而不是拿到 list 之后再 filter：
+    // 那样 PagedTable 就得多开一个 rows 口子，而「rows 可以自己传」正是错误态漏接的来源。
+    // 代价照旧且已在空态文案里说明：total 仍是后端的数，筛选只作用于当前页。
+    select: (d) => (scene ? { ...d, list: d.list.filter((x) => x.sceneType === scene) } : d),
     placeholderData: keepPreviousData,
   });
-  // 场景筛选后端列表参数不支持，前端按当前页过滤并在页面上说明
-  const rows = useMemo(
-    () => (q.data?.list ?? []).filter((s) => !scene || s.sceneType === scene),
-    [q.data, scene],
-  );
   // 点位数 / 机柜数按**实时关系聚合**，不读 Site 上的计数字段：
   // 那两个字段是种子/冗余值，与实际关系对不上（db-design §1.4「计数不是列，是聚合」），
   // 页面若读它，就会出现「列表说有 3 台机柜，待关注说一台都没有」这种自相矛盾。
   const relQ = useQuery({
     queryKey: ["op", "site-relations"],
     queryFn: async () => ({
-      points: (await api.listLocations({ page: 1, size: 500 })).list,
-      cabinets: (await api.listCabinets({ page: 1, size: 500 })).list,
+      points: (await api.listLocations({ page: 1, size: UNPAGED_SIZE })).list,
+      cabinets: (await api.listCabinets({ page: 1, size: UNPAGED_SIZE })).list,
     }),
   });
   const countsOf = (siteNo: string) => {
@@ -212,27 +213,26 @@ function SitesInner() {
       {!canWrite && <ReadOnlyNotice what="站点维护" perm="location:poi:create / location:poi:update" note="不能新增、编辑、暂停营业或归档" className="mb-3" />}
       <Toolbar
         search={keyword}
-        onSearch={(v) => { setKeyword(v); setPage(1); }}
+        onSearch={(v) => { setKeyword(v); paging.reset(); }}
         searchPlaceholder="搜索站点名 / 编号 / 地址"
         onAdd={openNew}
         addLabel="新增站点"
         canAdd={canWrite}
       >
-        <FilterSelect aria-label="状态" value={status} onChange={(v) => { setStatus(v); setPage(1); }} options={SITE_STATUS} allLabel="全部状态" />
-        <FilterSelect aria-label="场景" value={scene} onChange={(v) => { setScene(v); setPage(1); }} options={SCENES.map((s) => ({ value: s, label: s }))} allLabel="全部场景" />
-        <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); setPage(1); }} />
+        <FilterSelect aria-label="状态" value={status} onChange={(v) => { setStatus(v); paging.reset(); }} options={SITE_STATUS} allLabel="全部状态" />
+        <FilterSelect aria-label="场景" value={scene} onChange={(v) => { setScene(v); paging.reset(); }} options={SCENES.map((s) => ({ value: s, label: s }))} allLabel="全部场景" />
+        <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); paging.reset(); }} />
       </Toolbar>
-      <DataTable
+      <PagedTable
+        query={q}
+        paging={paging}
         rowKey={(s: Site) => s.siteNo}
         columns={cols}
-        rows={q.isLoading ? undefined : rows}
-        loading={q.isLoading}
         rowClassName={archivedRowClass}
         empty={filtered
           ? "没有符合筛选条件的站点。场景筛选只作用于当前页，翻页后需要重新筛选。"
           : "还没有站点。站点是点位和机柜的归属单位，也是分成与统计的口径，先新增站点再投放设备。"}
       />
-      <Pagination page={page} size={SIZE} total={q.data?.total ?? 0} onPage={setPage} />
 
       <FormDrawer
         open={!!form}

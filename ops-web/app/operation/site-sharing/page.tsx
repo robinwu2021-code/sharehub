@@ -9,17 +9,19 @@
 // 编辑仍在原入口（财务 › 分润规则 / 站点与点位 › 进场合同）。定案后再开本页的编辑。
 import { useState } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { SiteSharingRow, SitePayee } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { PageTitle } from "@/components/ui/misc";
 import { Toolbar } from "@/components/ui/toolbar";
-import { DataTable, type Column } from "@/components/ui/data-table";
+import { type Column } from "@/components/ui/data-table";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
 import { Notice } from "@/components/ui/notice";
 import { SummaryCard } from "@/components/ui/summary-card";
+import { PagedTable } from "@/components/ui/paged-table";
+import { usePaging } from "@/lib/hooks/use-paging";
 
 const STATE: StatusMap<SiteSharingRow["state"]> = {
   OK: { label: "已配置", tone: "success" },
@@ -34,12 +36,14 @@ function payeeLine(p: SitePayee) {
 
 export default function SiteSharingPage() {
   const { tNav } = useI18n();
+  const paging = usePaging();
   const [keyword, setKeyword] = useState("");
   const [state, setState] = useState("");
 
   const q = useQuery({
-    queryKey: ["op", "site-sharing-list", keyword, state],
-    queryFn: () => api.listSiteSharing({ page: 1, size: 200, keyword, state }),
+    queryKey: ["op", "site-sharing-list", paging.page, paging.size, keyword, state],
+    queryFn: () => api.listSiteSharing({ page: paging.page, size: paging.size, keyword, state }),
+    placeholderData: keepPreviousData,
   });
   const statsQ = useQuery({ queryKey: ["op", "site-sharing-stats"], queryFn: () => api.getSiteSharingStats() });
   const stats = statsQ.data;
@@ -99,14 +103,18 @@ export default function SiteSharingPage() {
         </div>
       )}
 
-      <Toolbar search={keyword} onSearch={setKeyword} searchPlaceholder="搜索站点名 / 编号 / 场地方">
-        <FilterSelect aria-label="配置状态" value={state} onChange={setState} options={STATE} allLabel="全部状态" />
+      <Toolbar
+        search={keyword}
+        onSearch={(v) => { setKeyword(v); paging.reset(); }}
+        searchPlaceholder="搜索站点名 / 编号 / 场地方"
+      >
+        <FilterSelect aria-label="配置状态" value={state} onChange={(v) => { setState(v); paging.reset(); }} options={STATE} allLabel="全部状态" />
       </Toolbar>
-      <DataTable
+      <PagedTable
+        query={q}
+        paging={paging}
         rowKey={(r: SiteSharingRow) => r.siteNo}
         columns={cols}
-        rows={q.isLoading ? undefined : q.data?.list}
-        loading={q.isLoading}
         empty={keyword || state ? "没有符合条件的站点。" : "还没有站点，因此没有分成配置。"}
       />
     </div>

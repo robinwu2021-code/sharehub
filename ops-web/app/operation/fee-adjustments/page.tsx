@@ -11,6 +11,7 @@ import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Ban, Eye, Pencil, RotateCcw, Undo2 } from "lucide-react";
+import { UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
 import type { PriceAdjustment, PriceAdjustPatch, PricePlan } from "@/lib/types";
 import { useCan } from "@/lib/use-can";
@@ -75,11 +76,11 @@ function AdjustmentsInner() {
 
   const listQ = useQuery({
     queryKey: ["op", "adjustments", keyword, planFilter],
-    queryFn: () => api.listPriceAdjustments({ page: 1, size: 200, keyword, planNo: planFilter }),
+    queryFn: () => api.listPriceAdjustments({ page: 1, size: UNPAGED_SIZE, keyword, planNo: planFilter }),
     // 惰性执行：定期回看一次，页面开着也能看到到点生效
     refetchInterval: 60_000,
   });
-  const plansQ = useQuery({ queryKey: ["op", "plans-for-adjust"], queryFn: () => api.listPricePlans({ page: 1, size: 200 }) });
+  const plansQ = useQuery({ queryKey: ["op", "plans-for-adjust"], queryFn: () => api.listPricePlans({ page: 1, size: UNPAGED_SIZE }) });
   const plans = plansQ.data?.list ?? [];
   const planOf = (no?: string) => plans.find((p) => p.planNo === no);
 
@@ -265,6 +266,8 @@ function AdjustmentsInner() {
         columns={cols}
         rows={listQ.isLoading ? undefined : rows}
         loading={listQ.isLoading}
+        error={listQ.error}
+        onRetry={listQ.refetch}
         empty={tab === "pending"
           ? "没有待生效的调价。需要在指定时间改价（如节假日上调、活动期降价）时，在这里新建。"
           : tab === "active" ? "当前没有正在生效的调价。"

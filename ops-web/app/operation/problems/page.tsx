@@ -10,14 +10,16 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, Eye, Pencil, Power } from "lucide-react";
+import { UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
 import type { ProblemEntry } from "@/lib/types";
 import { useCan } from "@/lib/use-can";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
 import { moveProblem } from "@/lib/operation-rules";
-import { PageTitle } from "@/components/ui/misc";
+import { PageTitle, ErrorState } from "@/components/ui/misc";
 import { Toolbar } from "@/components/ui/toolbar";
+import { SectionHeader } from "@/components/ui/section-header";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
 import { FilterSelect } from "@/components/ui/filter-select";
@@ -81,7 +83,7 @@ export default function ProblemsPage() {
   // 问题类型是几十条量级的字典，一次取全、按分类分组展示，不分页
   const q = useQuery({
     queryKey: ["op", "problems", keyword, category, status, showArchived],
-    queryFn: () => api.listProblems({ page: 1, size: 500, keyword, category, status, showArchived }),
+    queryFn: () => api.listProblems({ page: 1, size: UNPAGED_SIZE, keyword, category, status, showArchived }),
   });
   const rows = useMemo(() => q.data?.list ?? [], [q.data]);
   const groups = useMemo(() => CATEGORY_ORDER
@@ -188,7 +190,8 @@ export default function ProblemsPage() {
         <ShowArchivedToggle checked={showArchived} onChange={setShowArchived} />
       </Toolbar>
 
-      {!q.isLoading && groups.length === 0 && (
+      {q.isError && <ErrorState error={q.error} onRetry={q.refetch} />}
+      {!q.isLoading && !q.isError && groups.length === 0 && (
         <DataTable
           rowKey={(p: ProblemEntry) => p.problemNo}
           columns={colsFor([])}
@@ -201,7 +204,7 @@ export default function ProblemsPage() {
       {q.isLoading && <DataTable rowKey={(p: ProblemEntry) => p.problemNo} columns={colsFor([])} rows={undefined} loading />}
       {groups.map((g) => (
         <section key={g.category} className="mb-6">
-          <h2 className="mb-2 txt-strong">{CATEGORY[g.category]} <span className="txt-caption text-muted-foreground">{g.rows.length} 条</span></h2>
+          <SectionHeader title={CATEGORY[g.category]} summary={`${g.rows.length} 条`} />
           <DataTable
             rowKey={(p: ProblemEntry) => p.problemNo}
             columns={colsFor(g.rows)}
