@@ -122,6 +122,25 @@ public class OpsController {
         return loc.saveSite(siteNo, in);
     }
 
+    /**
+     * 暂停 / 恢复营业（运营管理清单 OM-S3）。
+     *
+     * <p>与「归档」分开：归档是「这个站点不在经营范围里了」，停业是「暂时不做生意」。
+     * 两者混成一个开关的话，运营想临时停业就只能归档，而归档会把它从所有列表里拿掉。
+     */
+    @PostMapping("/sites/{siteNo}/pause")
+    @PreAuthorize("@perm.can('location:poi:update')")
+    public Site pauseSite(@PathVariable String siteNo, @RequestBody(required = false) java.util.Map<String, Object> body) {
+        Object reason = body == null ? null : body.get("reason");
+        return loc.pauseSite(siteNo, reason == null ? null : String.valueOf(reason));
+    }
+
+    @PostMapping("/sites/{siteNo}/resume")
+    @PreAuthorize("@perm.can('location:poi:update')")
+    public Site resumeSite(@PathVariable String siteNo) {
+        return loc.resumeSite(siteNo);
+    }
+
     @GetMapping("/locations")
     @PreAuthorize("@perm.can('location:poi:read')")
     public PageResult<Location> locations(@RequestParam(required = false) Integer page,

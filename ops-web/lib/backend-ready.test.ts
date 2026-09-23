@@ -7,17 +7,20 @@ describe("运营管理：后端就绪开关", () => {
     for (const f of Object.keys(PARTIAL_READY) as (keyof typeof PARTIAL_READY)[]) expect(featureReady(f, true)).toBe(true);
   });
 
-  it("真实后端模式按登记表：已有接口的页面可用，新接口页面不可用", () => {
-    expect(pageReady("banks", false)).toBe(true);
-    expect(pageReady("notices", false)).toBe(true);
-    expect(pageReady("sites", false)).toBe(true);
-    expect(pageReady("fee-adjustments", false)).toBe(false);
-    expect(pageReady("overview", false)).toBe(false);
+  /*
+   * 2026-09-23：运营管理这一批后端补齐后，登记表整体翻成 true。
+   * 这条用例保留的价值不再是「哪些页没就绪」，而是**这张表不许被顺手改**：
+   * 把某一项改回 false 会让对应菜单灰掉，是一次产品可见的变化，必须在 review 里显形。
+   */
+  it("真实后端模式下运营管理十页全部可用（登记表整体翻绿的锚点）", () => {
+    for (const p of Object.keys(BACKEND_READY) as OperationPage[]) {
+      expect(pageReady(p, false), p).toBe(true);
+    }
   });
 
-  it("整页可用但页内新功能未就绪：站点的暂停和统计在真实后端下不可用", () => {
-    expect(pageReady("sites", false)).toBe(true);
-    expect(featureReady("sites.pause", false)).toBe(false);
-    expect(featureReady("sites.stats", false)).toBe(false);
+  it("页内功能同样全部可用（站点暂停 / 单站统计 / 方案启停）", () => {
+    for (const f of Object.keys(PARTIAL_READY) as (keyof typeof PARTIAL_READY)[]) {
+      expect(featureReady(f, false), f).toBe(true);
+    }
   });
 });

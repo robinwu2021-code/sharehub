@@ -524,11 +524,14 @@ describe("运营管理：跨模块 section", () => {
     expect(findActiveSection("/system", "ADMIN")?.key).toBe("system");
   });
 
-  it("真实后端模式下，后端未就绪的页面灰显；mock 模式全部可点", () => {
+  it("灰显完全由 backend-ready 决定（当前两种模式都不灰）", () => {
     const rows = (op().children ?? []).map((l) =>
       [l.href.replace("/operation/", ""), l.label, l.perm ?? "", l.group ?? ""] as [OperationPage, string, string, string]);
+    // 2026-09-23 后端补齐后，真实模式下也不再有灰显项。
+    // 这条断言**不删**：它守的是「灰显完全由 backend-ready 决定」这条机制，
+    // 哪天再有新页面未就绪，它会立刻把那一项列出来。
     const soonReal = opLeaves(rows, false).filter((l) => l.soon).map((l) => l.label);
-    expect(soonReal).toEqual(["站点概览", "预约调价", "站点分成", "分成方分成"]);
+    expect(soonReal).toEqual([]);
     expect(opLeaves(rows, true).filter((l) => l.soon)).toEqual([]);
   });
 });

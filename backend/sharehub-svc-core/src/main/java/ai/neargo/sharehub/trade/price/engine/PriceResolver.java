@@ -122,7 +122,14 @@ public class PriceResolver {
 
         // ③④ 设备类型默认 / 通用：直接从方案表取，规则表不必为「默认」配一条
         List<PricePlan> ps = plans.selectList(new LambdaQueryWrapper<PricePlan>()
-                .eq(PricePlan::getStatus, "ENABLED"));
+                /*
+                 * 状态取值统一为 ACTIVE / DISABLED（与 `price_plan` 的 DDL 默认值、
+                 * 运营端契约一致）。此处原为 "ENABLED" —— 而 `PricePlanServiceImpl` 新建时写的是
+                 * "ACTIVE"，于是**运营新建的方案永远不会被计价引擎选中**：
+                 * 界面上方案好端端地列着、状态显示启用，订单却一律按兜底价计费。
+                 * 今天没出事只是因为种子里那一行恰好是 "ENABLED"。V41 已归一存量数据。
+                 */
+                .eq(PricePlan::getStatus, "ACTIVE"));
         return ps.stream().filter(p -> deviceType != null && deviceType.equals(p.getDeviceType()))
                 .map(PricePlan::getPlanNo).findFirst()
                 .orElseGet(() -> ps.stream().filter(p -> p.getDeviceType() == null)

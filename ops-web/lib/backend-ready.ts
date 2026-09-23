@@ -17,12 +17,15 @@ export type OperationPage =
 
 /** 整页后端就绪度。依据：后端 Controller 实际存在的端点（2026-09-22 核对）。 */
 export const BACKEND_READY: Record<OperationPage, boolean> = {
-  overview: false,           // 需新增聚合接口 /api/ops/operation/overview
-  sites: true,               // 列表/新增/编辑/归档已有；暂停、统计见 PARTIAL
-  "fee-plans": true,         // 列表/编辑/归档已有；试算、启停、命中站点见 PARTIAL
-  "fee-adjustments": false,  // 新表 + 定时任务，全部未实现
-  "site-sharing": false,     // 契约取决于清单 D2
-  "payee-sharing": false,    // 同上，且依赖真实分润明细
+  // 2026-09-23：运营管理这一批后端全部补齐（OperationController + V40/V41），
+  // 端到端用例见 backend `OperationMenuTest`。此前这里登记的「未实现」是如实的 ——
+  // 菜单灰着，总好过点进去一片 404 而运营以为是自己权限不够。
+  overview: true,
+  sites: true,
+  "fee-plans": true,
+  "fee-adjustments": true,
+  "site-sharing": true,
+  "payee-sharing": true,
   "app-versions": true,
   banks: true,
   problems: true,
@@ -31,11 +34,16 @@ export const BACKEND_READY: Record<OperationPage, boolean> = {
 
 /** 页内局部功能的后端就绪度（整页已就绪、但个别按钮依赖新接口）。 */
 export const PARTIAL_READY = {
-  "sites.pause": false,      // POST /api/ops/sites/{no}/pause|resume
-  "sites.stats": false,      // GET /api/ops/sites/{no}/stats
-  // 试算纯前端算（lib/pricing-rules#simulate），不依赖后端，故恒可用
-  "fee-plans.status": false, // 启用/停用：后端暂无该端点，改状态只能走保存整条
-  "fee-plans.sites": false,  // 命中站点列表：后端暂无
+  "sites.pause": true,       // POST /api/ops/sites/{no}/pause|resume（V40 加了 pause_reason 列）
+  "sites.stats": true,       // GET /api/ops/sites/{no}/stats
+  // 试算纯前端算（lib/rules/pricing-rules#simulate），不依赖后端，故恒可用
+  /*
+   * 启用/停用：**本来就不需要新端点** —— 页面做的是 `savePricePlan({...p, status})`，
+   * 而保存接口一直都吃 status。这个标志此前写着 false，纯属登记时想当然，
+   * 于是一个能用的按钮被藏了起来。
+   */
+  "fee-plans.status": true,
+  // 原有 "fee-plans.sites" 已删：登记了却**没有任何页面用它**，留着只会让人以为还有一块没做
 } as const;
 
 export type PartialFeature = keyof typeof PARTIAL_READY;

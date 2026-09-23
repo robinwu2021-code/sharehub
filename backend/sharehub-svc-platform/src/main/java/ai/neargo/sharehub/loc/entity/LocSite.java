@@ -57,4 +57,9 @@ public class LocSite {
 
     /** 归档时间；null=在用。**不是 deleted** —— 归档是业务停用、可恢复，见 Archivable。 */
     private java.time.LocalDateTime archivedAt;
+
+    /** 暂停营业原因（V40）。运营端要求必填 —— 此前无处可存，「为什么停」只能靠问人。 */
+    private String pauseReason;
+
+    private java.time.LocalDateTime pausedAt;
 }

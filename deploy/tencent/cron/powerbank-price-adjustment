@@ -1,0 +1,19 @@
+# powerbank · 预约调价的执行器
+#
+# 为什么用系统 cron 而不是代码里的 @Scheduled：
+# 本仓库的既有判断（见 OwnershipReconciler 的注释）——定时任务在多副本下会并发跑，
+# 需要分布式锁，那是与 outbox 投递器一起设计的事。系统 cron 天然单实例，
+# 在单体阶段是更小的代价。将来真要多副本了，这一行删掉、换成带锁的调度器即可。
+#
+# 每分钟一次：调价的粒度是「几点几分生效」，半小时跑一次会让活动价晚半小时上线。
+# 接口是幂等的，跑空也只是一次空查询。
+#
+# 安装：sudo cp deploy/tencent/cron/powerbank-price-adjustment /etc/cron.d/
+#       sudo chown root:root /etc/cron.d/powerbank-price-adjustment
+#       sudo chmod 644 /etc/cron.d/powerbank-price-adjustment
+#
+# /internal/** 只在本机可达（nginx 未对外暴露该前缀），所以这里不带鉴权。
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+* * * * * deploy curl -s -m 10 -X POST http://127.0.0.1:8082/internal/trade/price-adjustments/tick -o /dev/null

@@ -953,7 +953,7 @@
    "path": "/api/auth/login",
    "perm": null,
    "handler": "AuthController#login",
-   "summary": "",
+   "summary": "登录入参。",
    "params": [],
    "bodyType": "LoginReq",
    "returnType": "LoginResp",
@@ -4565,7 +4565,7 @@
     },
     {
      "name": "cabinetCount",
-     "type": "int"
+     "type": "Integer"
     },
     {
      "name": "status",
@@ -4615,7 +4615,7 @@
     },
     {
      "name": "cabinetCount",
-     "type": "int"
+     "type": "Integer"
     },
     {
      "name": "status",
@@ -4645,7 +4645,7 @@
     },
     {
      "name": "cabinetCount",
-     "type": "int"
+     "type": "Integer"
     },
     {
      "name": "status",
@@ -4998,6 +4998,224 @@
    "returnContainer": null,
    "returnElement": "Object",
    "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/operation/overview",
+   "perm": "location:poi:read",
+   "handler": "OperationController#overview",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "from",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "to",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "OperationOverview",
+   "returnContainer": null,
+   "returnElement": "OperationOverview",
+   "responseShape": [
+    {
+     "name": "scale",
+     "type": "OverviewScale",
+     "fields": [
+      {
+       "name": "siteTotal",
+       "type": "int"
+      },
+      {
+       "name": "siteActive",
+       "type": "int"
+      },
+      {
+       "name": "sitePaused",
+       "type": "int"
+      },
+      {
+       "name": "pointTotal",
+       "type": "int"
+      },
+      {
+       "name": "cabinetTotal",
+       "type": "int"
+      },
+      {
+       "name": "cabinetOnline",
+       "type": "int"
+      },
+      {
+       "name": "onlineRate",
+       "type": "double"
+      },
+      {
+       "name": "powerbankTotal",
+       "type": "int"
+      },
+      {
+       "name": "powerbankInCabinet",
+       "type": "int"
+      },
+      {
+       "name": "powerbankRented",
+       "type": "int"
+      },
+      {
+       "name": "powerbankFault",
+       "type": "int"
+      }
+     ]
+    },
+    {
+     "name": "business",
+     "type": "OverviewBusiness",
+     "fields": [
+      {
+       "name": "orders",
+       "type": "int"
+      },
+      {
+       "name": "gmv",
+       "type": "BigDecimal"
+      },
+      {
+       "name": "currency",
+       "type": "String"
+      },
+      {
+       "name": "avgOrderValue",
+       "type": "BigDecimal"
+      },
+      {
+       "name": "ordersPerCabinetPerDay",
+       "type": "double"
+      }
+     ]
+    },
+    {
+     "name": "trend",
+     "type": "List<TrendPoint>",
+     "fields": [
+      {
+       "name": "day",
+       "type": "String"
+      },
+      {
+       "name": "orders",
+       "type": "int"
+      },
+      {
+       "name": "gmv",
+       "type": "BigDecimal"
+      }
+     ]
+    },
+    {
+     "name": "ranking",
+     "type": "List<SiteRankRow>",
+     "fields": [
+      {
+       "name": "siteNo",
+       "type": "String"
+      },
+      {
+       "name": "siteName",
+       "type": "String"
+      },
+      {
+       "name": "venueName",
+       "type": "String"
+      },
+      {
+       "name": "cabinetCount",
+       "type": "int"
+      },
+      {
+       "name": "gmv",
+       "type": "BigDecimal"
+      },
+      {
+       "name": "orders",
+       "type": "int"
+      },
+      {
+       "name": "perCabinet",
+       "type": "double"
+      },
+      {
+       "name": "onlineRate",
+       "type": "double"
+      }
+     ]
+    },
+    {
+     "name": "attention",
+     "type": "List<AttentionItem>",
+     "fields": [
+      {
+       "name": "siteNo",
+       "type": "String"
+      },
+      {
+       "name": "siteName",
+       "type": "String"
+      },
+      {
+       "name": "kind",
+       "type": "String"
+      },
+      {
+       "name": "severity",
+       "type": "String"
+      },
+      {
+       "name": "detail",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "scenes",
+     "type": "List<SceneShare>",
+     "fields": [
+      {
+       "name": "sceneType",
+       "type": "String"
+      },
+      {
+       "name": "siteCount",
+       "type": "int"
+      },
+      {
+       "name": "gmv",
+       "type": "BigDecimal"
+      }
+     ]
+    },
+    {
+     "name": "geoReady",
+     "type": "GeoReady",
+     "fields": [
+      {
+       "name": "withGeo",
+       "type": "int"
+      },
+      {
+       "name": "total",
+       "type": "int"
+      }
+     ]
+    }
+   ],
    "requestShape": null
   },
   {
@@ -6676,11 +6894,11 @@
     },
     {
      "name": "pointCount",
-     "type": "int"
+     "type": "Integer"
     },
     {
      "name": "cabinetCount",
-     "type": "int"
+     "type": "Integer"
     },
     {
      "name": "status",
@@ -6750,11 +6968,11 @@
     },
     {
      "name": "pointCount",
-     "type": "int"
+     "type": "Integer"
     },
     {
      "name": "cabinetCount",
-     "type": "int"
+     "type": "Integer"
     },
     {
      "name": "status",
@@ -6804,11 +7022,11 @@
     },
     {
      "name": "pointCount",
-     "type": "int"
+     "type": "Integer"
     },
     {
      "name": "cabinetCount",
-     "type": "int"
+     "type": "Integer"
     },
     {
      "name": "status",
@@ -6856,6 +7074,284 @@
    "returnContainer": null,
    "returnElement": "Object",
    "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/sites/{siteNo}/pause",
+   "perm": "location:poi:update",
+   "handler": "OpsController#pauseSite",
+   "summary": "暂停 / 恢复营业（运营管理清单 OM-S3）。",
+   "params": [
+    {
+     "in": "path",
+     "name": "siteNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "java.util.Map<String, Object>",
+   "returnType": "Site",
+   "returnContainer": null,
+   "returnElement": "Site",
+   "responseShape": [
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "venueNo",
+     "type": "String"
+    },
+    {
+     "name": "venueName",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "regionId",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "lng",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "lat",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "sceneType",
+     "type": "String"
+    },
+    {
+     "name": "pointCount",
+     "type": "Integer"
+    },
+    {
+     "name": "cabinetCount",
+     "type": "Integer"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/sites/{siteNo}/resume",
+   "perm": "location:poi:update",
+   "handler": "OpsController#resumeSite",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "siteNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "Site",
+   "returnContainer": null,
+   "returnElement": "Site",
+   "responseShape": [
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "venueNo",
+     "type": "String"
+    },
+    {
+     "name": "venueName",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "regionId",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "lng",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "lat",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "sceneType",
+     "type": "String"
+    },
+    {
+     "name": "pointCount",
+     "type": "Integer"
+    },
+    {
+     "name": "cabinetCount",
+     "type": "Integer"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/sites/{siteNo}/stats",
+   "perm": "location:poi:read",
+   "handler": "OperationController#siteStats",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "siteNo",
+     "type": "String",
+     "required": true
+    },
+    {
+     "in": "query",
+     "name": "from",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "to",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "SiteStats",
+   "returnContainer": null,
+   "returnElement": "SiteStats",
+   "responseShape": [
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "siteName",
+     "type": "String"
+    },
+    {
+     "name": "from",
+     "type": "String"
+    },
+    {
+     "name": "to",
+     "type": "String"
+    },
+    {
+     "name": "orders",
+     "type": "int"
+    },
+    {
+     "name": "gmv",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "avgOrderValue",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "avgDurationMin",
+     "type": "int"
+    },
+    {
+     "name": "ordersPerCabinetPerDay",
+     "type": "double"
+    },
+    {
+     "name": "onlineRate",
+     "type": "double"
+    },
+    {
+     "name": "cabinetCount",
+     "type": "int"
+    },
+    {
+     "name": "trend",
+     "type": "List<TrendPoint>",
+     "fields": [
+      {
+       "name": "day",
+       "type": "String"
+      },
+      {
+       "name": "orders",
+       "type": "int"
+      },
+      {
+       "name": "gmv",
+       "type": "BigDecimal"
+      }
+     ]
+    },
+    {
+     "name": "byPoint",
+     "type": "List<PointStat>",
+     "fields": [
+      {
+       "name": "locationNo",
+       "type": "String"
+      },
+      {
+       "name": "locationName",
+       "type": "String"
+      },
+      {
+       "name": "cabinetCount",
+       "type": "int"
+      },
+      {
+       "name": "orders",
+       "type": "int"
+      },
+      {
+       "name": "gmv",
+       "type": "BigDecimal"
+      },
+      {
+       "name": "perCabinet",
+       "type": "double"
+      }
+     ]
+    }
+   ],
    "requestShape": null
   },
   {
@@ -14652,6 +15148,214 @@
   },
   {
    "verb": "GET",
+   "path": "/api/trade/payee-sharing",
+   "perm": "finance:share_rule:read",
+   "handler": "OperationController#payeeSharing",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "keyword",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "payeeType",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<PayeeSharingRow>",
+   "returnContainer": "PageResult",
+   "returnElement": "PayeeSharingRow",
+   "responseShape": [
+    {
+     "name": "payeeType",
+     "type": "String"
+    },
+    {
+     "name": "payeeName",
+     "type": "String"
+    },
+    {
+     "name": "siteCount",
+     "type": "int"
+    },
+    {
+     "name": "minRate",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "maxRate",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "amount30d",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "sites",
+     "type": "List<PayeeSiteRef>",
+     "fields": [
+      {
+       "name": "siteNo",
+       "type": "String"
+      },
+      {
+       "name": "siteName",
+       "type": "String"
+      },
+      {
+       "name": "rate",
+       "type": "BigDecimal"
+      }
+     ]
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/trade/price-adjustments",
+   "perm": "pricing:rule:read",
+   "handler": "OperationController#adjustments",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "keyword",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "planNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "status",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<Map<String, Object>>",
+   "returnContainer": "PageResult",
+   "returnElement": "Map<String, Object>",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/trade/price-adjustments",
+   "perm": "pricing:rule:config",
+   "handler": "OperationController#saveAdjustment",
+   "summary": "",
+   "params": [],
+   "bodyType": "Map<String, Object>",
+   "returnType": "Map<String, Object>",
+   "returnContainer": null,
+   "returnElement": "Map<String, Object>",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/trade/price-adjustments/{adjustNo}/cancel",
+   "perm": "pricing:rule:config",
+   "handler": "OperationController#cancelAdjustment",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "adjustNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "Map<String, Object>",
+   "returnType": "Map<String, Object>",
+   "returnContainer": null,
+   "returnElement": "Map<String, Object>",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/trade/price-adjustments/{adjustNo}/retry",
+   "perm": "pricing:rule:config",
+   "handler": "OperationController#retryAdjustment",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "adjustNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "Map<String, Object>",
+   "returnContainer": null,
+   "returnElement": "Map<String, Object>",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/trade/price-adjustments/{adjustNo}/revert",
+   "perm": "pricing:rule:config",
+   "handler": "OperationController#revertAdjustment",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "adjustNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "Map<String, Object>",
+   "returnContainer": null,
+   "returnElement": "Map<String, Object>",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
    "path": "/api/trade/price-plans",
    "perm": "pricing:plan:read",
    "handler": "PricingController#pricePlans",
@@ -16755,6 +17459,143 @@
     {
      "name": "currency",
      "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/trade/site-sharing",
+   "perm": "finance:share_rule:read",
+   "handler": "OperationController#siteSharing",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "keyword",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "state",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<SiteSharingRow>",
+   "returnContainer": "PageResult",
+   "returnElement": "SiteSharingRow",
+   "responseShape": [
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "siteName",
+     "type": "String"
+    },
+    {
+     "name": "venueName",
+     "type": "String"
+    },
+    {
+     "name": "payees",
+     "type": "List<SitePayee>",
+     "fields": [
+      {
+       "name": "payeeType",
+       "type": "String"
+      },
+      {
+       "name": "payeeNo",
+       "type": "String"
+      },
+      {
+       "name": "payeeName",
+       "type": "String"
+      },
+      {
+       "name": "rate",
+       "type": "BigDecimal"
+      },
+      {
+       "name": "mode",
+       "type": "String"
+      },
+      {
+       "name": "source",
+       "type": "String"
+      },
+      {
+       "name": "sourceNo",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "totalRate",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "platformRate",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "contractEndAt",
+     "type": "String"
+    },
+    {
+     "name": "state",
+     "type": "String"
+    },
+    {
+     "name": "stateDetail",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/trade/site-sharing/stats",
+   "perm": "finance:share_rule:read",
+   "handler": "OperationController#siteSharingStats",
+   "summary": "",
+   "params": [],
+   "bodyType": null,
+   "returnType": "SharingStats",
+   "returnContainer": null,
+   "returnElement": "SharingStats",
+   "responseShape": [
+    {
+     "name": "total",
+     "type": "int"
+    },
+    {
+     "name": "ok",
+     "type": "int"
+    },
+    {
+     "name": "missing",
+     "type": "int"
+    },
+    {
+     "name": "invalid",
+     "type": "int"
     }
    ],
    "requestShape": null
@@ -20726,6 +21567,20 @@
   },
   {
    "verb": "POST",
+   "path": "/internal/trade/price-adjustments/tick",
+   "perm": null,
+   "handler": "OperationController#tick",
+   "summary": "执行到点的调价 / 到期的恢复。",
+   "params": [],
+   "bodyType": null,
+   "returnType": "Map<String, Object>",
+   "returnContainer": null,
+   "returnElement": "Map<String, Object>",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
    "path": "/internal/trade/settlements/generate",
    "perm": null,
    "handler": "FinanceController#generateSettlements",
@@ -20919,7 +21774,7 @@
    "path": "/mp/auth/otp",
    "perm": null,
    "handler": "ConsumerAuthController#otp",
-   "summary": "发送 OTP（dev 返回固定码 000000 便于联调）。",
+   "summary": "发送 OTP。",
    "params": [],
    "bodyType": "Map<String, String>",
    "returnType": "Map<String, Object>",
@@ -22628,10 +23483,10 @@
  },
  "conflicts": {},
  "stats": {
-  "endpoints": 369,
-  "records": 259,
-  "withPerm": 312,
-  "withBody": 152,
-  "shapedResponses": 281
+  "endpoints": 382,
+  "records": 274,
+  "withPerm": 324,
+  "withBody": 155,
+  "shapedResponses": 288
  }
 }

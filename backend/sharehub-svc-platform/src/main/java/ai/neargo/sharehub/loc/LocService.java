@@ -92,6 +92,46 @@ public class LocService {
         return toSite(e);
     }
 
+    /**
+     * 暂停营业（运营管理清单 OM-S3）。
+     *
+     * <p>语义：C 端隐藏该站点、站内机柜不允许**新借**，<b>已借出的仍可归还</b> ——
+     * 停业不该把用户的充电宝扣在手里。
+     *
+     * <p><b>已归档的站点不允许改营业状态</b>：归档是「这个站点不在经营范围里了」，
+     * 在它上面谈营业与否没有意义，先恢复归档再操作。
+     */
+    public Site pauseSite(String siteNo, String reason) {
+        LocSite e = requireSite(siteNo);
+        if (e.getArchivedAt() != null) throw new IllegalArgumentException("已归档的站点不能暂停营业");
+        if ("PAUSED".equals(e.getStatus())) throw new IllegalArgumentException("站点已处于暂停营业状态");
+        if (reason == null || reason.isBlank()) throw new IllegalArgumentException("请填写暂停原因");
+        e.setStatus("PAUSED");
+        e.setPauseReason(reason.trim());
+        e.setPausedAt(java.time.LocalDateTime.now());
+        siteMapper.updateById(e);
+        return toSite(e, pointCountsOf(List.of(siteNo)).getOrDefault(siteNo, 0));
+    }
+
+    /** 恢复营业。清空暂停原因 —— 留着会让下次停业的界面显示上一次的理由。 */
+    public Site resumeSite(String siteNo) {
+        LocSite e = requireSite(siteNo);
+        if (e.getArchivedAt() != null) throw new IllegalArgumentException("已归档的站点不能恢复营业");
+        if ("ACTIVE".equals(e.getStatus())) throw new IllegalArgumentException("站点已在营业中");
+        e.setStatus("ACTIVE");
+        e.setPauseReason(null);
+        e.setPausedAt(null);
+        siteMapper.updateById(e);
+        return toSite(e, pointCountsOf(List.of(siteNo)).getOrDefault(siteNo, 0));
+    }
+
+    private LocSite requireSite(String siteNo) {
+        LocSite e = siteMapper.selectOne(new LambdaQueryWrapper<LocSite>()
+                .eq(LocSite::getSiteNo, siteNo).last("limit 1"));
+        if (e == null) throw new IllegalArgumentException("站点不存在：" + siteNo);
+        return e;
+    }
+
     // —— 点位 ——
     public PageResult<Location> pageLocations(Integer page, Integer size, String keyword) {
         Page<LocLocation> p = new Page<>(pg(page), sz(size));
