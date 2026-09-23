@@ -144,4 +144,30 @@ public final class FinDtos {
     public record LedgerLine(String accountNo, String account, String direction,
                              BigDecimal amount, String currency) {
     }
+
+    // —— 收款账户（B3）——
+
+    /**
+     * 收款账户出参。
+     *
+     * <p>⚠️ 只给掩码，<b>不给明文</b>：账号明文属于 PII，运营端列表没有展示它的理由。
+     * 需要核对完整账号时走单独的、带审计的查询（尚未建，见 ADR-029 §七）。
+     */
+    public record PayoutAccount(String accountNo, String payeeType, String payeeNo,
+                                String bankCode, String accountName, String accountMasked,
+                                String currency, boolean isDefault, String status) {
+    }
+
+    /**
+     * 收款账户入参。
+     *
+     * @param accountNo     留空 = 新增
+     * @param accountMasked 账号。<b>调用方传明文，服务端只落掩码</b> —— 明文入 pii（PDPL）；
+     *                      这个字段名保留 masked 是为了和出参对称，避免两个名字指同一件事
+     * @param makeDefault   置为默认；同一受益方其它账户会在同一事务里被清零
+     */
+    public record PayoutAccountReq(String accountNo, String payeeType, String payeeNo,
+                                   String bankCode, String accountName, String accountMasked,
+                                   String currency, Boolean makeDefault) {
+    }
 }

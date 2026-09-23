@@ -49,6 +49,20 @@ public class StlWithdrawal extends BaseEntity {
     /** 收款银行 {@code md_bank.bank_code}（自然键）。 */
     private String bankCode;
 
+    /**
+     * 收款账户引用 → {@code stl_payout_account.account_no}（B3）。审批通过时落定。
+     *
+     * <p>⚠️ 与 {@link #accountNo} 不是一回事：那个是<b>出款</b>账户（平台的钱从哪出），
+     * 这个是<b>收款</b>方的账户（钱打到哪去）。两个名字太像，读代码时格外容易看反。
+     */
+    private String payoutAccountNo;
+
+    /** 快照：审批那一刻的户名。账户日后改名，这笔提现要对得上当初的打款回单。 */
+    private String payoutAccountName;
+
+    /** 快照：审批那一刻的账号掩码。 */
+    private String payoutAccountMasked;
+
     /** APPLY / AUDIT / PAYING / PAID / FAILED。 */
     private String status;
 

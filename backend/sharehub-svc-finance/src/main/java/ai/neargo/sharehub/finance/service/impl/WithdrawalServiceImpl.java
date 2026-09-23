@@ -8,6 +8,8 @@ import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.finance.FinNos;
 import ai.neargo.sharehub.finance.WithdrawFeePolicy;
 import ai.neargo.sharehub.finance.WithdrawalStateMachine;
+import ai.neargo.sharehub.finance.dto.FinDtos.PayoutAccount;
+import ai.neargo.sharehub.finance.service.PayoutAccountService;
 import ai.neargo.sharehub.finance.dto.FinDtos.WithdrawApplyReq;
 import ai.neargo.sharehub.finance.dto.FinDtos.Withdrawal;
 import ai.neargo.sharehub.finance.entity.StlWithdrawal;
@@ -44,12 +46,15 @@ public class WithdrawalServiceImpl implements WithdrawalService {
     private final StlWithdrawalMapper mapper;
     private final WithdrawFeePolicy feePolicy;
     private final WithdrawalStateMachine stateMachine;
+    private final PayoutAccountService payoutAccounts;
 
     public WithdrawalServiceImpl(StlWithdrawalMapper mapper, WithdrawFeePolicy feePolicy,
-                                 WithdrawalStateMachine stateMachine) {
+                                 WithdrawalStateMachine stateMachine,
+                                 PayoutAccountService payoutAccounts) {
         this.mapper = mapper;
         this.feePolicy = feePolicy;
         this.stateMachine = stateMachine;
+        this.payoutAccounts = payoutAccounts;
     }
 
     @Override
@@ -113,6 +118,30 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         // —— 合规下界：驳回必须留原因，没有原因的驳回等于没有审批记录 ——
         if (!approve && (rejectReason == null || rejectReason.isBlank())) {
             throw new IllegalArgumentException("驳回提现必须填写驳回原因");
+        }
+
+        /*
+         * —— 通过前先确认「钱打得出去」（B3）——
+         *
+         * 在此之前这一步是缺的：审批照样通过，而收款账户压根没录 —— 审批完不知道往哪打钱。
+         * 这正是 ADR-030 §3.6 那条「审核通过 ≠ 能拿钱」：
+         * agt_agent.status=ENABLED 只说明能经营，能不能收钱要看这里。
+         *
+         * **拦在审批这一步，而不是打款那一步**：打款时才发现的话，这笔提现已经对用户
+         * 显示「已通过」了，再退回去解释一遍代价大得多。
+         */
+        if (approve) {
+            PayoutAccount acct = payoutAccounts.defaultOf(e.getPayeeType(), e.getPayeeNo())
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "该受益方还没有可用的收款账户，无法通过 —— 请先补录收款账户"));
+            /*
+             * 落**快照**而不是只存引用：账户日后改名或换卡，这笔已审批的提现要能对得上
+             * 当初的打款回单（本仓既有的快照原则，领域模型 §2.3）。
+             * 引用也一并留着 —— 否则查不到「这笔打给的是哪条账户记录」。
+             */
+            e.setPayoutAccountNo(acct.accountNo());
+            e.setPayoutAccountName(acct.accountName());
+            e.setPayoutAccountMasked(acct.accountMasked());
         }
 
         e.setStatus(stateMachine.next(e.getStatus(), approve ? "APPROVE" : "REJECT"));

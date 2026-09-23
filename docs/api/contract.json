@@ -16193,6 +16193,230 @@
   },
   {
    "verb": "GET",
+   "path": "/api/trade/payout-accounts",
+   "perm": "finance:payout_account:read",
+   "handler": "FinanceController#payoutAccounts",
+   "summary": "收款账户列表。",
+   "params": [
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "payeeType",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "payeeNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "keyword",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<FinDtos.PayoutAccount>",
+   "returnContainer": "PageResult",
+   "returnElement": "FinDtos.PayoutAccount",
+   "responseShape": [
+    {
+     "name": "accountNo",
+     "type": "String"
+    },
+    {
+     "name": "payeeType",
+     "type": "String"
+    },
+    {
+     "name": "payeeNo",
+     "type": "String"
+    },
+    {
+     "name": "bankCode",
+     "type": "String"
+    },
+    {
+     "name": "accountName",
+     "type": "String"
+    },
+    {
+     "name": "accountMasked",
+     "type": "String"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "isDefault",
+     "type": "boolean"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/trade/payout-accounts",
+   "perm": "finance:payout_account:update",
+   "handler": "FinanceController#savePayoutAccount",
+   "summary": "新增 / 修改收款账户。",
+   "params": [],
+   "bodyType": "FinDtos.PayoutAccountReq",
+   "returnType": "FinDtos.PayoutAccount",
+   "returnContainer": null,
+   "returnElement": "FinDtos.PayoutAccount",
+   "responseShape": [
+    {
+     "name": "accountNo",
+     "type": "String"
+    },
+    {
+     "name": "payeeType",
+     "type": "String"
+    },
+    {
+     "name": "payeeNo",
+     "type": "String"
+    },
+    {
+     "name": "bankCode",
+     "type": "String"
+    },
+    {
+     "name": "accountName",
+     "type": "String"
+    },
+    {
+     "name": "accountMasked",
+     "type": "String"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "isDefault",
+     "type": "boolean"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "accountNo",
+     "type": "String"
+    },
+    {
+     "name": "payeeType",
+     "type": "String"
+    },
+    {
+     "name": "payeeNo",
+     "type": "String"
+    },
+    {
+     "name": "bankCode",
+     "type": "String"
+    },
+    {
+     "name": "accountName",
+     "type": "String"
+    },
+    {
+     "name": "accountMasked",
+     "type": "String"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "makeDefault",
+     "type": "Boolean"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/trade/payout-accounts/{accountNo}/disable",
+   "perm": "finance:payout_account:update",
+   "handler": "FinanceController#disablePayoutAccount",
+   "summary": "停用收款账户。",
+   "params": [
+    {
+     "in": "path",
+     "name": "accountNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "FinDtos.PayoutAccount",
+   "returnContainer": null,
+   "returnElement": "FinDtos.PayoutAccount",
+   "responseShape": [
+    {
+     "name": "accountNo",
+     "type": "String"
+    },
+    {
+     "name": "payeeType",
+     "type": "String"
+    },
+    {
+     "name": "payeeNo",
+     "type": "String"
+    },
+    {
+     "name": "bankCode",
+     "type": "String"
+    },
+    {
+     "name": "accountName",
+     "type": "String"
+    },
+    {
+     "name": "accountMasked",
+     "type": "String"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "isDefault",
+     "type": "boolean"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
    "path": "/api/trade/price-adjustments",
    "perm": "pricing:rule:read",
    "handler": "OperationController#adjustments",
@@ -18033,6 +18257,10 @@
      "type": "String"
     },
     {
+     "name": "basis",
+     "type": "String"
+    },
+    {
      "name": "amount",
      "type": "BigDecimal"
     },
@@ -18119,6 +18347,10 @@
      "type": "String"
     },
     {
+     "name": "basis",
+     "type": "String"
+    },
+    {
      "name": "mode",
      "type": "String"
     },
@@ -18170,6 +18402,10 @@
      "type": "String"
     },
     {
+     "name": "basis",
+     "type": "String"
+    },
+    {
      "name": "mode",
      "type": "String"
     },
@@ -18205,6 +18441,10 @@
     },
     {
      "name": "payeeName",
+     "type": "String"
+    },
+    {
+     "name": "basis",
      "type": "String"
     },
     {
@@ -18265,6 +18505,10 @@
      "type": "String"
     },
     {
+     "name": "basis",
+     "type": "String"
+    },
+    {
      "name": "mode",
      "type": "String"
     },
@@ -18300,6 +18544,10 @@
     },
     {
      "name": "payeeName",
+     "type": "String"
+    },
+    {
+     "name": "basis",
      "type": "String"
     },
     {
@@ -24226,6 +24474,9 @@
   }
  ],
  "enums": {
+  "AgentType": [
+   "AGENT"
+  ],
   "AssignTargetType": [
    "CABINET",
    "LOCATION"
@@ -24388,9 +24639,6 @@
   "AgentStatus": [
    "ENABLED"
   ],
-  "AgentType": [
-   "AGENT"
-  ],
   "ApplyStatus": [
    "DRAFT",
    "SUBMITTED",
@@ -24404,10 +24652,10 @@
  },
  "conflicts": {},
  "stats": {
-  "endpoints": 393,
-  "records": 282,
-  "withPerm": 336,
-  "withBody": 159,
-  "shapedResponses": 296
+  "endpoints": 396,
+  "records": 286,
+  "withPerm": 339,
+  "withBody": 160,
+  "shapedResponses": 299
  }
 }

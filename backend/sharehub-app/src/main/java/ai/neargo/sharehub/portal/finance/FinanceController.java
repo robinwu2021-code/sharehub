@@ -8,6 +8,7 @@ import ai.neargo.sharehub.finance.service.InvoiceService;
 import ai.neargo.sharehub.finance.service.ReconcileService;
 import ai.neargo.sharehub.finance.service.SettlementService;
 import ai.neargo.sharehub.finance.service.ShareService;
+import ai.neargo.sharehub.finance.service.PayoutAccountService;
 import ai.neargo.sharehub.finance.service.WithdrawalService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -42,11 +43,13 @@ public class FinanceController {
     private final ai.neargo.sharehub.trade.order.service.DepositService depositService;
     private final SettlementService settlementService;
     private final WithdrawalService withdrawalService;
+    private final PayoutAccountService payoutAccountService;
     private final ReconcileService reconcileService;
     private final InvoiceService invoiceService;
 
     public FinanceController(ShareService shareService, SettlementService settlementService,
-                             WithdrawalService withdrawalService, ReconcileService reconcileService,
+                             WithdrawalService withdrawalService,
+                             PayoutAccountService payoutAccountService, ReconcileService reconcileService,
                              InvoiceService invoiceService,
                              ai.neargo.sharehub.finance.service.LedgerService ledgerService,
                              ai.neargo.sharehub.trade.order.service.DepositService depositService) {
@@ -55,6 +58,7 @@ public class FinanceController {
         this.shareService = shareService;
         this.settlementService = settlementService;
         this.withdrawalService = withdrawalService;
+        this.payoutAccountService = payoutAccountService;
         this.reconcileService = reconcileService;
         this.invoiceService = invoiceService;
     }
@@ -189,6 +193,43 @@ public class FinanceController {
         boolean approve = body != null && Boolean.TRUE.equals(body.approve());
         String reason = body == null ? null : body.rejectReason();
         return withdrawalService.audit(withdrawNo, approve, reason);
+    }
+
+    // ——————————————————— 收款账户（B3）———————————————————
+
+    /**
+     * 收款账户列表。
+     *
+     * <p>代理端也持 {@code finance:payout_account:read} —— 代理门户要显示
+     * 「你还不能收款」，判据就是这里有没有可用账户。看到哪些行由数据范围收敛。
+     */
+    @GetMapping("/api/trade/payout-accounts")
+    @PreAuthorize("@perm.can('finance:payout_account:read')")
+    public PageResult<FinDtos.PayoutAccount> payoutAccounts(@RequestParam(required = false) Integer page,
+                                                            @RequestParam(required = false) Integer size,
+                                                            @RequestParam(required = false) String payeeType,
+                                                            @RequestParam(required = false) String payeeNo,
+                                                            @RequestParam(required = false) String keyword) {
+        return payoutAccountService.page(page, size, payeeType, payeeNo, keyword);
+    }
+
+    /**
+     * 新增 / 修改收款账户。
+     *
+     * <p><b>写权限与提现审核分开发码</b>：合用的话「能审批」顺带变成「能改收款账号」——
+     * 那是同一个人既能改钱去哪、又能放行这笔钱。
+     */
+    @PostMapping("/api/trade/payout-accounts")
+    @PreAuthorize("@perm.can('finance:payout_account:update')")
+    public FinDtos.PayoutAccount savePayoutAccount(@RequestBody FinDtos.PayoutAccountReq body) {
+        return payoutAccountService.save(body);
+    }
+
+    /** 停用收款账户。不做物理删除 —— 历史提现单要能回溯到当时打给了哪条账户记录。 */
+    @PostMapping("/api/trade/payout-accounts/{accountNo}/disable")
+    @PreAuthorize("@perm.can('finance:payout_account:update')")
+    public FinDtos.PayoutAccount disablePayoutAccount(@PathVariable String accountNo) {
+        return payoutAccountService.disable(accountNo);
     }
 
     /** 审批入参。**不含 auditorName** —— 即便前端传了也不会进入本记录（见上方说明）。 */
