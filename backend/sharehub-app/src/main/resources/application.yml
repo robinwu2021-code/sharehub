@@ -69,6 +69,23 @@ sharehub:
     enabled: false
   cors:
     allowed-origins: http://localhost:3000
+  # 跨进程地基（B7 · TDD-cross-process-foundation）
+  services:
+    # 服务凭证共享密钥。**空 = 内部调用与 /internal/** 端点一律拒绝**（fail-closed）。
+    # 生产从环境变量注入，不写进仓库。
+    internal-token: ${SHAREHUB_INTERNAL_TOKEN:}
+    # 服务名 → 基址。走内网不经 nginx；单体形态下 GATEWAY 内嵌本进程，故留空。
+    targets:
+      SHAREHUB: ${SHAREHUB_TARGET_SHAREHUB:}
+      GATEWAY: ${SHAREHUB_TARGET_GATEWAY:}
+  outbox:
+    dispatch:
+      # 进程内轮询重投：**临时方案**，H4 接入共用调度器后关掉并删掉 OutboxDispatchScheduler。
+      # 默认关 —— 多副本下会重复投递（消费端 EventIdempotency 兜底）。
+      enabled: ${SHAREHUB_OUTBOX_DISPATCH_ENABLED:false}
+      interval: 30s
+      batch-size: 200
+      max-attempts: 6
   # 可切换会话存储：memory(默认) | ehcache(单节点TTL) | redis(多实例推荐) | mysql(强持久sys_token)
   auth:
     token-store: memory

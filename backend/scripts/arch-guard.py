@@ -381,7 +381,21 @@ def g4_common_purity():
     root = os.path.join(ROOT, 'backend/sharehub-common/src/main/java')
     if not os.path.isdir(root):
         raise SystemExit('arch-guard: 找不到 common 模块源码根 ' + root + ' —— 模块改名后请同步此处')
-    allow = ('ai.neargo.sharehub.common', 'ai.neargo.sharehub.auth')
+    # 允许的前缀 = **本模块自己拥有的那些包**，自动推导而不是硬编码。
+    #
+    # 2026-09-23：这里原本写死 ('...common', '...auth')，于是 B7 往 sharehub-common 里加了
+    # svc/（内部调用）与 trace/（链路）两个横切包之后，G4 立刻把「common 内部互相 import」
+    # 判成了「common 依赖业务包」。硬编码清单会过期 —— 与 EXTRA_SRC 那个 bug 同一种失败模式，
+    # 只是这次表现为**误报**而不是漏报。误报同样有害：它会逼着下一个人去加豁免，
+    # 而豁免一旦开了口子，真正的违规就能混进来。
+    pkg_root = os.path.join(root, 'ai/neargo/sharehub')
+    allow = tuple(
+        'ai.neargo.sharehub.' + d
+        for d in sorted(os.listdir(pkg_root))
+        if os.path.isdir(os.path.join(pkg_root, d))
+    ) if os.path.isdir(pkg_root) else ()
+    if not allow:
+        raise SystemExit('arch-guard: ' + pkg_root + ' 下没有任何包 —— 路径或模块结构变了')
     bad = []
     for base, _, fs in os.walk(root):
         for f in fs:

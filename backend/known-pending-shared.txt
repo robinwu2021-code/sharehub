@@ -1,0 +1,19 @@
+# 待下沉到框架的中性件台账 —— **只准变短，不准变长**。
+#
+# 这些是从 ai-shop 移植或本项目自写的**中性**能力（不含任何业务名词），
+# 按 ADR-024 将来要下沉到 neargo-framework，两个产品共用一份。
+# 框架线目前冻结（ADR-025 决定 5），所以先在本仓库留一份副本，在这里登记。
+#
+# 解冻并下沉后，逐条删除并把依赖改为框架坐标。
+#
+# 格式：<路径>  <来源>  <下沉目标>
+
+sharehub-common/src/main/java/ai/neargo/sharehub/svc/InternalClient.java       移植自 ai-shop shop-base/svc  neargo-web 的 internal 包
+sharehub-common/src/main/java/ai/neargo/sharehub/svc/ServiceLocator.java       移植自 ai-shop shop-base/svc  同上
+sharehub-common/src/main/java/ai/neargo/sharehub/svc/ServiceName.java          本项目自写（中性）            同上
+sharehub-common/src/main/java/ai/neargo/sharehub/svc/InternalTokenFilter.java  本项目自写（中性）            同上
+sharehub-common/src/main/java/ai/neargo/sharehub/trace/TraceContext.java       本项目自写（中性）            neargo-web 的 trace 包
+sharehub-common/src/main/java/ai/neargo/sharehub/trace/TraceFilter.java        本项目自写（中性）            同上
+sharehub-common/src/main/java/ai/neargo/sharehub/common/event/dedup/           本项目自写（中性）            neargo-store（幂等/事件去重/Outbox）
+sharehub-common/src/main/java/ai/neargo/sharehub/common/event/OutboxDispatcher.java      本项目自写（中性）  neargo-store
+sharehub-common/src/main/java/ai/neargo/sharehub/common/event/OutboxConsumer.java        本项目自写（中性）  neargo-store
