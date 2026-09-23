@@ -72,6 +72,22 @@ public class SecurityConfig {
                 .authorizeHttpRequests(reg -> reg
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/login", "/api/auth/logout").permitAll()
+                        /*
+                         * 入驻申请的两个免鉴权端点（ADR-030 §三）。
+                         *
+                         * 自助注册面向**还没有账号的陌生人**，天然进不了任何鉴权链路。
+                         * 防刷靠三道闸，缺一不可：
+                         *   ① 手机号 OTP（证明申请人持有该号，与 C 端注册同档）
+                         *   ② 单 IP 限流（见 ApplyRateLimitFilter）
+                         *   ③ agt_apply.active_key 生成列 —— 同手机号至多一张在途
+                         *
+                         * ⚠️ 放行的是「不带令牌也能调」，**不是「带了令牌也当匿名」**：
+                         * 控制器仍会读当前登录人来判 source（带 STAFF 令牌 = 代建）。
+                         */
+                        // **只放自助那一个**（单数 /apply）。代建走 POST /api/agent/applies（复数），
+                        // 它判 agent:apply:create，不能出现在这份白名单里。
+                        .requestMatchers(HttpMethod.POST, "/api/agent/apply").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/agent/apply/mine").permitAll()
                         .requestMatchers("/actuator/**", "/notify/**").permitAll()
                         /*
                          * 预约调价的执行器，给**本机 cron** 调（见 deploy/tencent/cron/）。

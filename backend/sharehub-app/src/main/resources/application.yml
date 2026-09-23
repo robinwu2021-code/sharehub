@@ -56,6 +56,15 @@ management:
 
 # 开发期 CORS 允许源（ops-web Next dev）。生产走同源 nginx 反代 /api，无需 CORS。
 sharehub:
+  security:
+    # 登录标识哈希的 pepper（ADR-030 §2.3）。**不配则启动失败** —— 手机号取值空间小到
+    # 可以穷举，裸哈希等于明文存储。至少 32 字符。
+    # ⚠️ 换 pepper = 全表 hash 失效，轮换必须走 *_enc 全表重算后统一切 hash_ver。
+    identity-pepper: ${SHAREHUB_IDENTITY_PEPPER:}
+    identity-pepper-version: ${SHAREHUB_IDENTITY_PEPPER_VERSION:1}
+    # 本地号补哪个国际区号。**与 pepper 同级：上线后不可改**，改了等于所有本地号
+    # 算出另一个 hash（注册能成、登录查不到）。971=AE
+    default-calling-code: ${SHAREHUB_DEFAULT_CALLING_CODE:971}
   # 开发便利总开关：固定验证码 000000 + OTP 明文回传 + 免密登录运营端。
   # **默认关，生产绝不可开**（开启时启动日志会打 WARN 横幅）。
   # 2026-09-23 之前这三件事在所有环境无条件生效 —— 线上任何人可登录任意手机号。
