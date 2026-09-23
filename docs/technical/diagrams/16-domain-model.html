@@ -1,0 +1,380 @@
+<title>ShareHub 领域模型</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #F6F8F8;
+    --card: #FFFFFF;
+    --ink: #12181B;
+    --ink2: #4A585B;
+    --ink3: #7C8B8E;
+    --rule: #D8E0DF;
+    --accent: #0F7173;
+    --accent-soft: #E3F0F0;
+    --base-s: #5B7BA6; --base-f: #EEF2F8;
+    --place-s: #5C8A63; --place-f: #EDF4EE;
+    --dev-s: #B07D3A; --dev-f: #FBF3E8;
+    --money-s: #A35D63; --money-f: #F9EEEF;
+    --user-s: #7D63A3; --user-f: #F2EDF7;
+    --gray-s: #6B7A7C; --gray-f: #F0F3F3;
+    --font-body: "IBM Plex Sans", "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif;
+    --font-mono: "IBM Plex Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #0F1416; --card: #161D20;
+      --ink: #E6ECEC; --ink2: #AEBBBD; --ink3: #7C8B8E;
+      --rule: #2A3538; --accent: #4FB3B5; --accent-soft: #163336;
+      --base-s: #8FA8CC; --base-f: #1B2430;
+      --place-s: #8DB894; --place-f: #1A2A1D;
+      --dev-s: #D3A465; --dev-f: #2E2416;
+      --money-s: #CF8A90; --money-f: #2E1B1E;
+      --user-s: #A88FCF; --user-f: #241C30;
+      --gray-s: #9AA8AA; --gray-f: #1E2527;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0F1416; --card: #161D20;
+    --ink: #E6ECEC; --ink2: #AEBBBD; --ink3: #7C8B8E;
+    --rule: #2A3538; --accent: #4FB3B5; --accent-soft: #163336;
+    --base-s: #8FA8CC; --base-f: #1B2430;
+    --place-s: #8DB894; --place-f: #1A2A1D;
+    --dev-s: #D3A465; --dev-f: #2E2416;
+    --money-s: #CF8A90; --money-f: #2E1B1E;
+    --user-s: #A88FCF; --user-f: #241C30;
+    --gray-s: #9AA8AA; --gray-f: #1E2527;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding-block: 36px 56px; padding-inline: 20px; }
+
+  header { display: grid; gap: 8px; margin-bottom: 28px; }
+  .eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink3); font-family: var(--font-mono); }
+  h1 { font-size: 30px; line-height: 1.2; margin: 0; font-weight: 600; text-wrap: balance; }
+  .lede { max-width: 66ch; color: var(--ink2); margin: 0; }
+
+  .terms { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 32px; padding: 0; list-style: none; }
+  .terms li {
+    display: inline-flex; align-items: baseline; gap: 6px;
+    background: var(--card); border: 1px solid var(--rule); border-radius: 6px;
+    padding: 5px 10px; font-size: 13px;
+  }
+  .terms b { font-weight: 600; }
+  .terms .no { color: var(--money-s); font-weight: 600; }
+  .terms .to { color: var(--ink3); }
+
+  .jump { display: flex; gap: 18px; font-size: 13px; margin-bottom: 8px; }
+  .jump a { color: var(--accent); text-decoration: none; border-bottom: 1px solid transparent; }
+  .jump a:hover, .jump a:focus-visible { border-bottom-color: var(--accent); outline: none; }
+
+  section { margin-top: 40px; }
+  h2 { font-size: 20px; margin: 0 0 6px; font-weight: 600; }
+  .sub { color: var(--ink2); margin: 0 0 16px; max-width: 70ch; }
+
+  .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .toolbar span { font-size: 12px; color: var(--ink3); margin-right: 4px; }
+  .toolbar button {
+    font: inherit; font-size: 13px; padding: 5px 12px; border-radius: 6px;
+    border: 1px solid var(--rule); background: var(--card); color: var(--ink2); cursor: pointer;
+  }
+  .toolbar button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 500; }
+  .toolbar button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  figure { margin: 0; background: var(--card); border: 1px solid var(--rule); border-radius: 10px; padding: 16px; }
+  .scroll { overflow-x: auto; }
+  svg { display: block; width: 100%; height: auto; max-width: 100%; font-family: var(--font-body); color: var(--ink); }
+  figcaption { margin-top: 12px; font-size: 13.5px; color: var(--ink2); max-width: 78ch; }
+  figcaption strong { color: var(--ink); }
+
+  /* 节点：按对象家族着色，与 gen.py 的 14 张图同一套 */
+  .n rect, .n path { stroke-width: 1.6; }
+  .n-base rect { fill: var(--base-f); stroke: var(--base-s); }
+  .n-place rect { fill: var(--place-f); stroke: var(--place-s); }
+  .n-dev rect { fill: var(--dev-f); stroke: var(--dev-s); }
+  .n-money rect { fill: var(--money-f); stroke: var(--money-s); }
+  .n-user rect { fill: var(--user-f); stroke: var(--user-s); }
+  .n-gray rect { fill: var(--gray-f); stroke: var(--gray-s); }
+  .n-ext rect { stroke-dasharray: 5 4; }
+  .n-hub rect { stroke: var(--accent); stroke-width: 3; }
+  .n text { fill: var(--ink); font-size: 14px; font-weight: 600; }
+  .n .s { fill: var(--ink2); font-size: 11.5px; font-weight: 400; }
+  .n .m { font-family: var(--font-mono); font-size: 11px; fill: var(--ink3); font-weight: 400; }
+  .pill rect { fill: var(--card); stroke: var(--money-s); stroke-width: 1.2; }
+  .pill text { font-size: 10.5px; font-weight: 500; fill: var(--money-s); }
+
+  .edge { fill: none; stroke: currentColor; stroke-width: 1.6; }
+  .edge.dash { stroke-dasharray: 6 4; }
+  .lbl { font-size: 12px; fill: var(--ink2); }
+  .lbl.m { font-family: var(--font-mono); font-size: 11px; fill: var(--ink3); }
+  .mk { fill: currentColor; }
+  .mk-hollow { fill: var(--card); stroke: currentColor; stroke-width: 1.4; }
+  .band rect { fill: var(--bg); stroke: var(--rule); stroke-width: 1; }
+  .band text { fill: var(--ink3); font-size: 11px; letter-spacing: .06em; font-weight: 500; }
+  .legend text { fill: var(--ink2); font-size: 11.5px; }
+
+  /* 关联图的按类高亮：只降低不相关边与其标签的存在感，不隐藏 */
+  .g { transition: opacity .15s ease; }
+  figure[data-filter="own"] .e-money, figure[data-filter="own"] .e-struct { opacity: .16; }
+  figure[data-filter="money"] .e-own, figure[data-filter="money"] .e-struct { opacity: .16; }
+  figure[data-filter="struct"] .e-own, figure[data-filter="struct"] .e-money { opacity: .16; }
+  @media (prefers-reduced-motion: reduce) { .g { transition: none; } }
+
+  .skip { display: grid; gap: 6px; margin: 14px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--ink2); }
+  .skip li { display: grid; grid-template-columns: 11em 1fr; gap: 10px; }
+  .skip b { color: var(--ink); font-weight: 500; }
+  @media (max-width: 560px) { .skip li { grid-template-columns: 1fr; gap: 2px; } }
+
+  footer { margin-top: 44px; padding-top: 16px; border-top: 1px solid var(--rule); font-size: 12.5px; color: var(--ink3); }
+  footer code { font-family: var(--font-mono); font-size: 12px; color: var(--ink2); }
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">领域模型 · 本体与关系 · v2 · 2026-09-23</div>
+  <h1>ShareHub 领域模型</h1>
+  <p class="lede">一个运营商、多个品牌、若干代理商，在别人的场地上放设备。三张图：谁指向谁，谁是谁的一种，谁的行为离不开谁。</p>
+</header>
+
+<ul class="terms" aria-label="术语裁定">
+  <li><span class="no">商户</span><span class="to">禁用词</span></li>
+  <li><b>加盟商 / 代理商 / 城市合伙人</b><span class="to">→</span>代理商 Agent</li>
+  <li><b>门店 / 站点</b><span class="to">→</span>站点 Site</li>
+  <li><b>租户</b><span class="to">不存在</span>（ADR-026）</li>
+  <li><b>品牌</b><span class="to">归运营商</span>，代理商不得拥有</li>
+  <li><b>机柜</b><span class="to">→</span>设备 Device（ADR-021）</li>
+  <li><b>主体 Entity</b><span class="to">不抽</span>（无多执照场景）</li>
+</ul>
+
+<nav class="jump" aria-label="跳转"><a href="#assoc">一 · 关联</a><a href="#gen">二 · 泛化</a><a href="#dep">三 · 依赖</a></nav>
+
+<section id="assoc">
+  <h2>一、关联 — 谁指向谁</h2>
+  <p class="sub">站点是全图的交汇点：品牌、代理商、场地方三条线在这里汇合，往下逐级继承归属，往右汇成一笔订单和两份分润。</p>
+  <div class="toolbar" role="group" aria-label="高亮关系类型">
+    <span>高亮</span>
+    <button type="button" data-f="all" aria-pressed="true">全部</button>
+    <button type="button" data-f="own" aria-pressed="false">归属线</button>
+    <button type="button" data-f="struct" aria-pressed="false">场所层级</button>
+    <button type="button" data-f="money" aria-pressed="false">资金线</button>
+  </div>
+  <figure data-filter="all">
+    <div class="scroll">
+    <svg viewBox="0 0 1240 760" role="img" aria-label="关联关系图：运营商拥有品牌、招募代理商；品牌、代理商、场地方三方汇合到站点；站点向下含点位、设备、槽位、物品；设备产生订单，订单按合同与分润规则生成两份分润记录，汇总为结算单并提现。">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0,0 L10,5 L0,10 z"/></marker>
+      </defs>
+
+      <!-- 图例（右上留白） -->
+      <g class="legend">
+        <rect x="800" y="40" width="14" height="14" rx="3" class="lg" style="fill:var(--base-f);stroke:var(--base-s);stroke-width:1.4"/><text x="822" y="52">主体</text>
+        <rect x="880" y="40" width="14" height="14" rx="3" style="fill:var(--place-f);stroke:var(--place-s);stroke-width:1.4"/><text x="902" y="52">场所</text>
+        <rect x="960" y="40" width="14" height="14" rx="3" style="fill:var(--dev-f);stroke:var(--dev-s);stroke-width:1.4"/><text x="982" y="52">设备资产</text>
+        <rect x="1070" y="40" width="14" height="14" rx="3" style="fill:var(--money-f);stroke:var(--money-s);stroke-width:1.4"/><text x="1092" y="52">交易与资金</text>
+        <rect x="800" y="70" width="14" height="14" rx="3" style="fill:var(--gray-f);stroke:var(--gray-s);stroke-width:1.4;stroke-dasharray:4 3"/><text x="822" y="82">虚线框 = 外部主体（不登录 / 无角色）</text>
+        <rect x="800" y="100" width="14" height="14" rx="3" style="fill:var(--place-f);stroke:var(--accent);stroke-width:3"/><text x="822" y="112">粗框 = 归属与分成的单元</text>
+      </g>
+
+      <!-- 运营商 -->
+      <g class="n n-base"><rect x="40" y="30" width="700" height="44" rx="8"/><text x="56" y="57">运营商 Operator</text><text class="s" x="230" y="57">唯一 · 隐含单例 · 拥有品牌、招募代理商、雇佣员工 —— 不是一张表</text></g>
+
+      <!-- 第一行 -->
+      <g class="n n-base"><rect x="40" y="118" width="200" height="54" rx="9"/><text x="52" y="140">品牌 Brand</text><text class="m" x="52" y="160">brand_no · 归运营商</text></g>
+      <g class="n n-base"><rect x="290" y="118" width="200" height="54" rx="9"/><text x="302" y="140">代理商 Agent</text><text class="m" x="302" y="160">agent_no · 用运营商品牌</text></g>
+      <g class="n n-gray n-ext"><rect x="540" y="118" width="200" height="54" rx="9"/><text x="552" y="140">场地方 Venue</text><text class="m" x="552" y="160">venue_no · 外部，不登录</text></g>
+
+      <!-- 运营商 → 品牌 / 代理商 -->
+      <g class="g e-own">
+        <path class="edge" d="M140,74 V118" marker-end="url(#ar)"/><text class="lbl" x="148" y="101">拥有</text>
+        <path class="edge" d="M390,74 V118" marker-end="url(#ar)"/><text class="lbl" x="398" y="101">招募</text>
+      </g>
+
+      <!-- 站点（交汇点）与合同 -->
+      <g class="n n-place n-hub"><rect x="290" y="300" width="200" height="64" rx="10"/><text x="302" y="322">站点 Site</text><text class="s" x="302" y="340">归属与分成的单元</text><text class="m" x="302" y="355">region · brand · venue · agent</text></g>
+      <g class="n n-money"><rect x="540" y="300" width="200" height="54" rx="9"/><text x="552" y="322">进场合同 Contract</text><text class="m" x="552" y="342">Venue × Site · 分成率/期限</text></g>
+      <g class="n n-money"><rect x="540" y="410" width="200" height="44" rx="9"/><text x="552" y="429">分润规则 ShareRule</text><text class="m" x="552" y="446">dimension = AGENT</text></g>
+
+      <!-- 三条归属线汇合到站点 -->
+      <g class="g e-own">
+        <path class="edge" d="M390,172 V300" marker-end="url(#ar)"/>
+        <text class="lbl" x="398" y="228">经营 agent_no</text><text class="lbl m" x="398" y="244">关联 · 可划拨 / 收回</text>
+        <path class="edge" d="M140,172 V332 H290" marker-end="url(#ar)"/>
+        <text class="lbl" x="148" y="248">以此品牌运营</text><text class="lbl m" x="148" y="264">brand_no</text>
+        <path class="edge" d="M560,172 V230 H470 V300" marker-end="url(#ar)"/>
+        <text class="lbl" x="568" y="206">提供场地</text><text class="lbl m" x="568" y="222">venue_no</text>
+      </g>
+      <!-- 合同：场地方签约，约定该站点分成 -->
+      <g class="g e-money">
+        <path class="edge" d="M640,172 V300" marker-end="url(#ar)"/><text class="lbl" x="648" y="240">签约</text>
+        <path class="edge" d="M540,327 H490" marker-end="url(#ar)"/><text class="lbl" x="515" y="318" text-anchor="middle">约定分成</text>
+      </g>
+
+      <!-- 场所层级往下 -->
+      <g class="n n-place"><rect x="290" y="410" width="200" height="50" rx="9"/><text x="302" y="431">点位 Location</text><text class="m" x="302" y="450">归属继承站点，不自持</text></g>
+      <g class="n n-dev"><rect x="290" y="500" width="200" height="54" rx="9"/><text x="302" y="522">设备 Device</text><text class="m" x="302" y="542">device_no · 按类型特化</text></g>
+      <g class="n n-dev"><rect x="40" y="500" width="200" height="54" rx="9"/><text x="52" y="522">设备类型 DeviceType</text><text class="m" x="52" y="542">md_device_type · 形态/指令族</text></g>
+      <g class="n n-dev"><rect x="40" y="594" width="200" height="46" rx="9"/><text x="52" y="614">槽位 Slot</text><text class="m" x="52" y="632">仓位 / 枪 / 座 / 格口</text></g>
+      <g class="n n-dev"><rect x="40" y="680" width="200" height="46" rx="9"/><text x="52" y="700">物品 Item</text><text class="m" x="52" y="718">仅借还型 · 位置动态</text></g>
+      <g class="g e-struct">
+        <path class="edge" d="M390,364 V410" marker-end="url(#ar)"/><text class="lbl" x="398" y="392">含</text>
+        <path class="edge" d="M390,460 V500" marker-end="url(#ar)"/><text class="lbl" x="398" y="485">投放</text>
+        <path class="edge" d="M240,527 H290" marker-end="url(#ar)"/><text class="lbl" x="265" y="519" text-anchor="middle">类型</text>
+        <path class="edge" d="M310,554 V572 H140 V594" marker-end="url(#ar)"/><text class="lbl" x="220" y="586" text-anchor="middle">槽位</text>
+        <path class="edge" d="M140,640 V680" marker-end="url(#ar)"/><text class="lbl" x="148" y="665">在槽</text>
+      </g>
+
+      <!-- 消费者与订单 -->
+      <g class="n n-user n-ext"><rect x="290" y="594" width="200" height="46" rx="9"/><text x="302" y="614">消费者 Consumer</text><text class="m" x="302" y="632">c_user_no · 无角色，仅属主</text></g>
+      <g class="n n-money"><rect x="290" y="680" width="200" height="56" rx="9"/><text x="302" y="702">订单 Order</text><text class="m" x="302" y="722">order_no · 主表 + 形态扩展</text></g>
+      <g class="g e-money">
+        <path class="edge" d="M390,640 V680" marker-end="url(#ar)"/><text class="lbl" x="398" y="665">下单</text>
+        <path class="edge" d="M490,527 H515 V660 H470 V680" marker-end="url(#ar)"/><text class="lbl" x="522" y="600">产生</text>
+      </g>
+
+      <!-- 资金链：分润记录（两个受益方）→ 结算单 → 提现 -->
+      <g class="n n-money"><rect x="540" y="680" width="200" height="64" rx="9"/><text x="552" y="701">分润记录 ShareRecord</text></g>
+      <g class="pill"><rect x="552" y="712" width="86" height="22" rx="11"/><text x="595" y="727" text-anchor="middle">→ 场地方 VENUE</text></g>
+      <g class="pill"><rect x="644" y="712" width="86" height="22" rx="11"/><text x="687" y="727" text-anchor="middle">→ 代理商 AGENT</text></g>
+      <g class="n n-money"><rect x="790" y="680" width="200" height="56" rx="9"/><text x="802" y="702">结算单 Settlement</text><text class="m" x="802" y="722">按受益方 · 按周期</text></g>
+      <g class="n n-money"><rect x="1040" y="680" width="180" height="56" rx="9"/><text x="1052" y="702">提现 Withdrawal</text><text class="m" x="1052" y="722">财务审核 → 打款</text></g>
+      <g class="g e-money">
+        <path class="edge" d="M490,708 H540" marker-end="url(#ar)"/><text class="lbl" x="515" y="700" text-anchor="middle">逐单分润</text>
+        <path class="edge" d="M640,454 V680" marker-end="url(#ar)"/><text class="lbl" x="648" y="560">AGENT 费率</text><text class="lbl m" x="648" y="576">快照</text>
+        <path class="edge" d="M740,327 H765 V690 H740" marker-end="url(#ar)"/><text class="lbl" x="772" y="500">VENUE 费率</text><text class="lbl m" x="772" y="516">快照</text>
+        <path class="edge" d="M740,712 H790" marker-end="url(#ar)"/><text class="lbl" x="765" y="758" text-anchor="middle">汇总</text>
+        <path class="edge" d="M990,708 H1040" marker-end="url(#ar)"/><text class="lbl" x="1015" y="700" text-anchor="middle">打款</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption><strong>站点上挂着两个正交的归属。</strong> <code>venue_no</code> 说这是谁的地盘（拿进场分成，依据合同），<code>agent_no</code> 说谁出的钱和人（拿代理分润，依据规则）。场地方不拥有设备，代理商不拥有场地——所以一笔订单结算后生成两份分润记录，各自带着当时的费率快照，再分别汇成结算单。零售的「商户 → 门店」一条链表达不了这件事。</figcaption>
+  </figure>
+</section>
+
+<section id="gen">
+  <h2>二、泛化（继承）— 四处成立</h2>
+  <p class="sub">空心三角指向父类型。四处都不是 Java 继承：设备靠注册表 + 策略，订单靠主表 + 扩展表，受益方与登录主体靠同一条链跑不同取值。</p>
+  <figure>
+    <div class="scroll">
+    <svg viewBox="0 0 1240 400" role="img" aria-label="四组泛化：设备按使用形态分为借还型与就地使用型；订单主表下挂四种形态扩展；分润受益方分为场地方与代理商，共用一条资金链；登录主体分为员工、代理账户、消费者三个 Realm，共用令牌与会话机制。">
+      <defs>
+        <marker id="tri" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="10" markerHeight="10" orient="auto-start-reverse"><path class="mk-hollow" d="M1,1 L11,6 L1,11 z"/></marker>
+      </defs>
+
+      <!-- A 设备类型 -->
+      <g class="band"><rect x="40" y="20" width="280" height="24" rx="4"/><text x="52" y="36">A · 设备类型 · 按使用形态</text></g>
+      <g class="n n-dev"><rect x="40" y="60" width="280" height="44" rx="9"/><text x="52" y="86">Device 设备（通用）</text></g>
+      <g class="n n-dev"><rect x="40" y="150" width="130" height="44" rx="9"/><text x="50" y="168" style="font-size:12.5px">RENTAL 借还型</text><text class="m" x="50" y="185">物品离开设备</text></g>
+      <g class="n n-dev"><rect x="190" y="150" width="130" height="44" rx="9"/><text x="200" y="168" style="font-size:12.5px">SESSION 就地用</text><text class="m" x="200" y="185">在设备上用一段</text></g>
+      <g class="n n-dev"><rect x="40" y="240" width="130" height="34" rx="9"/><text class="m" x="105" y="262" text-anchor="middle" style="fill:var(--ink)">POWERBANK</text></g>
+      <g class="n n-dev"><rect x="190" y="240" width="130" height="34" rx="9"/><text class="m" x="255" y="262" text-anchor="middle" style="fill:var(--ink)">EV_CHARGER · CHAIR · LOCKER</text></g>
+      <path class="edge" d="M105,150 V104" marker-end="url(#tri)"/>
+      <path class="edge" d="M255,150 V104" marker-end="url(#tri)"/>
+      <path class="edge" d="M105,240 V194" marker-end="url(#tri)"/>
+      <path class="edge" d="M255,240 V194" marker-end="url(#tri)"/>
+      <g class="band"><rect x="40" y="320" width="280" height="50" rx="6"/><text x="52" y="340" style="letter-spacing:0">实现 = md_device_type 登记 + DeviceTypeModule 策略</text><text x="52" y="358" style="letter-spacing:0">新增一种设备：登记一行 + 写一个实现，不动主表</text></g>
+
+      <!-- B 订单形态 -->
+      <g class="band"><rect x="340" y="20" width="280" height="24" rx="4"/><text x="352" y="36">B · 订单形态 · 主表 + 扩展表</text></g>
+      <g class="n n-money"><rect x="340" y="60" width="280" height="44" rx="9"/><text x="352" y="80">Order 主表</text><text class="m" x="352" y="97">资金侧只认它</text></g>
+      <g class="n n-money"><rect x="340" y="150" width="130" height="40" rx="9"/><text class="m" x="405" y="167" text-anchor="middle" style="fill:var(--ink)">RentalExt</text><text class="m" x="405" y="182" text-anchor="middle">物品 · 归还 · 买断</text></g>
+      <g class="n n-money"><rect x="490" y="150" width="130" height="40" rx="9"/><text class="m" x="555" y="167" text-anchor="middle" style="fill:var(--ink)">SessionExt</text><text class="m" x="555" y="182" text-anchor="middle">套餐 · 时长</text></g>
+      <g class="n n-money"><rect x="340" y="234" width="130" height="40" rx="9"/><text class="m" x="405" y="251" text-anchor="middle" style="fill:var(--ink)">ChargingExt</text><text class="m" x="405" y="266" text-anchor="middle">电量 · 表底</text></g>
+      <g class="n n-money"><rect x="490" y="234" width="130" height="40" rx="9"/><text class="m" x="555" y="251" text-anchor="middle" style="fill:var(--ink)">LockerExt</text><text class="m" x="555" y="266" text-anchor="middle">格口 · 存取</text></g>
+      <path class="edge" d="M405,150 V104" marker-end="url(#tri)"/>
+      <path class="edge" d="M555,150 V104" marker-end="url(#tri)"/>
+      <path class="edge" d="M380,234 V210 H405 V190"/>
+      <path class="edge" d="M580,234 V210 H555 V190"/>
+      <g class="band"><rect x="340" y="320" width="280" height="50" rx="6"/><text x="352" y="340" style="letter-spacing:0">分润 / 结算 / 账务 / 发票只读主表通用字段</text><text x="352" y="358" style="letter-spacing:0">不得为某种设备在主表加列</text></g>
+
+      <!-- C 分润受益方 -->
+      <g class="band"><rect x="640" y="20" width="280" height="24" rx="4"/><text x="652" y="36">C · 分润受益方 · 同一条资金链</text></g>
+      <g class="n n-money"><rect x="640" y="60" width="280" height="44" rx="9"/><text x="652" y="80">Payee 受益方</text><text class="m" x="652" y="97">payeeType + payeeNo</text></g>
+      <g class="n n-gray"><rect x="640" y="150" width="130" height="44" rx="9"/><text x="650" y="168" style="font-size:12.5px">VENUE 场地方</text><text class="m" x="650" y="185">费率 ← 进场合同</text></g>
+      <g class="n n-base"><rect x="790" y="150" width="130" height="44" rx="9"/><text x="800" y="168" style="font-size:12.5px">AGENT 代理商</text><text class="m" x="800" y="185">费率 ← 分润规则</text></g>
+      <path class="edge" d="M705,150 V104" marker-end="url(#tri)"/>
+      <path class="edge" d="M855,150 V104" marker-end="url(#tri)"/>
+      <g class="n n-money"><rect x="640" y="234" width="280" height="40" rx="9"/><text class="m" x="780" y="252" text-anchor="middle" style="fill:var(--ink)">share_record → stl_settlement → stl_withdrawal → acct_account</text><text class="m" x="780" y="267" text-anchor="middle">两种受益方跑的是同一条链</text></g>
+      <path class="edge" d="M705,194 V234"/><path class="edge" d="M855,194 V234"/>
+      <g class="band"><rect x="640" y="320" width="280" height="50" rx="6"/><text x="652" y="340" style="letter-spacing:0">加第三类受益方 = 加一个 payeeType + 一个费率来源</text><text x="652" y="358" style="letter-spacing:0">只对某类成立的字段不进主表</text></g>
+
+      <!-- D 登录主体 -->
+      <g class="band"><rect x="940" y="20" width="280" height="24" rx="4"/><text x="952" y="36">D · 登录主体 · 三个 Realm</text></g>
+      <g class="n n-base"><rect x="940" y="60" width="280" height="44" rx="9"/><text x="952" y="80">Principal 登录主体</text><text class="m" x="952" y="97">realm + subjectNo + 凭据 + 会话</text></g>
+      <g class="n n-base"><rect x="940" y="150" width="85" height="44" rx="9"/><text x="948" y="168" style="font-size:12px">STAFF</text><text class="m" x="948" y="185">stk_</text></g>
+      <g class="n n-base"><rect x="1037" y="150" width="85" height="44" rx="9"/><text x="1045" y="168" style="font-size:12px">AGENT</text><text class="m" x="1045" y="185">atk_</text></g>
+      <g class="n n-user"><rect x="1135" y="150" width="85" height="44" rx="9"/><text x="1143" y="168" style="font-size:12px">CONSUMER</text><text class="m" x="1143" y="185">ctk_</text></g>
+      <path class="edge" d="M982,150 V104" marker-end="url(#tri)"/>
+      <path class="edge" d="M1080,150 V104" marker-end="url(#tri)"/>
+      <path class="edge" d="M1177,150 V104" marker-end="url(#tri)"/>
+      <g class="n n-base"><rect x="940" y="234" width="280" height="40" rx="9"/><text class="m" x="1080" y="252" text-anchor="middle" style="fill:var(--ink)">角色+数据范围 · 角色+强制 agent_no · 无角色仅属主</text><text class="m" x="1080" y="267" text-anchor="middle">差异只在身份解析与授权模型</text></g>
+      <g class="band"><rect x="940" y="320" width="280" height="50" rx="6"/><text x="952" y="340" style="letter-spacing:0">共用：不透明令牌（只存哈希）· 凭据 · 会话档位</text><text x="952" y="358" style="letter-spacing:0">三池不互相关联；C 端不进 RBAC</text></g>
+    </svg>
+    </div>
+    <figcaption><strong>Payee 是最容易被忽略、却已经在代码里成立的一处泛化。</strong> 场地方和代理商共享 <code>share_record → settlement → withdrawal → account</code> 整条链；将来加第三类受益方，只需加一个 <code>payeeType</code> 取值和一个费率来源。</figcaption>
+    <ul class="skip" aria-label="有意不抽的泛化">
+      <li><b>Party 基类</b><span>运营商 / 代理商 / 场地方 / 消费者的生命周期与合规要求完全不同，抽出来只剩 name</span></li>
+      <li><b>Entity 经营主体</b><span>ai-shop 的 entity 为多执照场景而生；我方一个代理商一个主体，抽了是过度设计</span></li>
+      <li><b>Place 基类</b><span>站点承载归属与分成，点位只是位置；合并会让「归属挂在哪」变模糊</span></li>
+      <li><b>统一资产</b><span>设备固定、物品流动、广告位是附属面；等第二种可移动物品再抽 dev_item</span></li>
+      <li><b>站点群</b><span>ai-shop 两级足够，第三级用额度 + 跨店聚合顶掉；我方已有 region 承担分组</span></li>
+    </ul>
+  </figure>
+</section>
+
+<section id="dep">
+  <h2>三、依赖 — 单向</h2>
+  <p class="sub">实线是行为依赖，虚线是事件。场所层不知道交易层存在，交易层不知道资金层存在——只往下游发事件。</p>
+  <figure>
+    <div class="scroll">
+    <svg viewBox="0 0 1240 250" role="img" aria-label="依赖方向：交易层依赖场所层，资金层依赖交易层，交易层只向资金层发事件；两个关键外部依赖：设备网关支撑订单编排，数据范围注册支撑归属链。">
+      <defs>
+        <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0,0 L10,5 L0,10 z"/></marker>
+      </defs>
+      <g class="n n-place"><rect x="40" y="40" width="320" height="90" rx="10"/><text x="56" y="66">场所层</text><text class="s" x="56" y="88">站点 · 点位 · 设备 · 槽位 · 物品</text><text class="m" x="56" y="110">归属链在这里解析</text></g>
+      <g class="n n-money"><rect x="460" y="40" width="320" height="90" rx="10"/><text x="476" y="66">交易层</text><text class="s" x="476" y="88">订单编排 · 计价 · 支付</text><text class="m" x="476" y="110">按类型模块委托设备相关决定</text></g>
+      <g class="n n-money"><rect x="880" y="40" width="320" height="90" rx="10"/><text x="896" y="66">资金层</text><text class="s" x="896" y="88">分润 · 结算 · 提现 · 账务</text><text class="m" x="896" y="110">只读订单主表通用字段</text></g>
+
+      <path class="edge" d="M460,72 H360" marker-end="url(#ar2)"/><text class="lbl" x="410" y="64" text-anchor="middle">依赖：读归属 / 可用性</text>
+      <path class="edge" d="M880,72 H780" marker-end="url(#ar2)"/><text class="lbl" x="830" y="64" text-anchor="middle">依赖：读订单主表</text>
+      <path class="edge dash" d="M780,104 H880" marker-end="url(#ar2)"/><text class="lbl m" x="830" y="122" text-anchor="middle">OrderSettled 事件</text>
+
+      <!-- 两个枢纽依赖 -->
+      <g class="n n-dev"><rect x="460" y="180" width="320" height="50" rx="9"/><text x="476" y="201">设备网关（南向）</text><text class="m" x="476" y="220">指令下发 · 物理事件回传</text></g>
+      <path class="edge" d="M620,130 V180" marker-start="url(#ar2)"/><text class="lbl" x="630" y="160">断了：设备不动，订单停在 CREATED</text>
+      <g class="n n-base"><rect x="40" y="180" width="320" height="50" rx="9"/><text x="56" y="201">DataScopeRegistration</text><text class="m" x="56" y="220">带归属列的表必须注册</text></g>
+      <path class="edge" d="M200,130 V180" marker-start="url(#ar2)"/><text class="lbl" x="210" y="160">漏注册的表：静默放行，不报错</text>
+    </svg>
+    </div>
+    <figcaption><strong>违反单向依赖的代价是连锁改动。</strong> 一旦资金层反向依赖订单表结构，「改结算逻辑要动订单表」就会发生。两个枢纽依赖决定了 L0 能否成立：设备网关（硬阻塞 1）与数据范围注册（代理门户开放前必须补齐）。</figcaption>
+  </figure>
+</section>
+
+<footer>
+  来源 <code>docs/technical/领域模型-本体与关系.md</code>（v2）· 依据 ADR-026 / ADR-012 / ADR-013 / ADR-021 / ADR-004 · 家族配色沿用 <code>diagrams/gen.py</code>
+</footer>
+</div>
+
+<script>
+  (function () {
+    var fig = document.querySelector('#assoc figure');
+    var btns = document.querySelectorAll('#assoc .toolbar button');
+    if (!fig || !btns.length) return;
+    btns.forEach(function (b) {
+      b.addEventListener('click', function () {
+        var f = b.getAttribute('data-f');
+        fig.setAttribute('data-filter', f);
+        btns.forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); });
+      });
+    });
+  })();
+</script>
