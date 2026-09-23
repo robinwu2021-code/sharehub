@@ -39,27 +39,18 @@ AgentCommissionServiceImpl#status=ACTIVE
 
 # ── alarm：✅ 已收敛（AlarmStatus / AlarmLevel / AlarmRuleStatus / AlarmNoticeStatus）──
 
-# ── common（3 条）──
-OutboxEventBus#status=FAILED
-OutboxEventBus#status=PENDING
-OutboxEventBus#status=SENT
+# ── common：✅ 已收敛（OutboxStatus，含 B7 补的 DEAD；OutboxDispatcher 的常量改为委托它）──
 
 # ── cs：✅ 已收敛（CsTicketStatus / CsSessionStatus / CsSenderType）──
 
-# ── dev（13 条）──
-AssetAssignedListener#type=CABINET
-CabinetServiceImpl#deviceType=POWERBANK
-CabinetServiceImpl#onlineStatus=OFFLINE
-CabinetServiceImpl#status=FAULT
-CabinetServiceImpl#status=IN_STOCK
-CodeBatchServiceImpl#codeType=QR
-CodeBatchServiceImpl#status=PENDING
-OtaServiceImpl#status=DRAFT
-OtaServiceImpl#status=PENDING
-OwnershipReconciler#eventType=ASSET_ASSIGNED
-OwnershipReconciler#status=FAILED
-OwnershipReconciler#status=PENDING
-OwnershipReconciler#status=SENT
+# ── dev：✅ 已收敛 ──
+#    CabinetStatus · OnlineStatus · PowerbankStatus · DeviceKind
+#    · CodeBatchStatus · DeviceCodeType · OtaReleaseStatus · OtaRolloutStatus
+#    · AssignTargetType（在 sharehub-api，写入方与消费方跨域共用）
+#
+#    eventType=ASSET_ASSIGNED 没做成枚举：sys_outbox.event_type 是**开放注册**，
+#    各域自己声明。做成 common 的枚举等于让 sharehub-common 反向依赖每个业务域 ——
+#    正是 arch-guard G4 禁止的形状。改为引用声明方的 AssetAssignedEvent.TYPE 常量。
 
 # ── finance（9 条）──
 InvoiceServiceImpl#status=ISSUED

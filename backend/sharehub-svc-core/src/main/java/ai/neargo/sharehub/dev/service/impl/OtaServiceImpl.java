@@ -1,5 +1,8 @@
 package ai.neargo.sharehub.dev.service.impl;
 
+import ai.neargo.sharehub.dev.OtaReleaseStatus;
+import ai.neargo.sharehub.dev.OtaRolloutStatus;
+
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.dev.dto.DevDtos.OtaReleaseRow;
@@ -42,10 +45,10 @@ public class OtaServiceImpl implements OtaService {
 
     /** 投放合法迁移：from → 可达 to。 */
     private static final Map<String, Set<String>> ROLLOUT_TRANSITIONS = Map.of(
-            "PENDING", Set.of("RUNNING", "ROLLBACK"),
-            "RUNNING", Set.of("DONE", "ROLLBACK"),
-            "DONE", Set.of("ROLLBACK"),   // 全量完成后仍可整体回滚
-            "ROLLBACK", Set.of());        // 终态
+            OtaRolloutStatus.PENDING.name(), Set.of(OtaRolloutStatus.RUNNING.name(), OtaRolloutStatus.ROLLBACK.name()),
+            OtaRolloutStatus.RUNNING.name(), Set.of(OtaRolloutStatus.DONE.name(), OtaRolloutStatus.ROLLBACK.name()),
+            OtaRolloutStatus.DONE.name(), Set.of(OtaRolloutStatus.ROLLBACK.name()),   // 全量完成后仍可整体回滚
+            OtaRolloutStatus.ROLLBACK.name(), Set.of());                              // 终态
 
     private final OtaReleaseMapper releaseMapper;
     private final OtaRolloutMapper rolloutMapper;
@@ -82,7 +85,7 @@ public class OtaServiceImpl implements OtaService {
         if (no == null || no.isBlank()) {
             body.setReleaseNo(nextReleaseNo());
             if (body.getTenantId() == null) body.setTenantId(TENANT_MAIN);
-            if (body.getStatus() == null || body.getStatus().isBlank()) body.setStatus("DRAFT");
+            if (body.getStatus() == null || body.getStatus().isBlank()) body.setStatus(OtaReleaseStatus.DRAFT.name());
             if (body.getMandatory() == null) body.setMandatory(0);
             releaseMapper.insert(body);
             return toVO(selectRelease(body.getReleaseNo()));
@@ -90,7 +93,7 @@ public class OtaServiceImpl implements OtaService {
         DevOtaRelease cur = selectRelease(no);
         if (cur == null) {
             if (body.getTenantId() == null) body.setTenantId(TENANT_MAIN);
-            if (body.getStatus() == null || body.getStatus().isBlank()) body.setStatus("DRAFT");
+            if (body.getStatus() == null || body.getStatus().isBlank()) body.setStatus(OtaReleaseStatus.DRAFT.name());
             releaseMapper.insert(body);
         } else {
             body.setId(cur.getId());
@@ -130,7 +133,7 @@ public class OtaServiceImpl implements OtaService {
         String no = body.getRolloutNo();
         if (no == null || no.isBlank()) {
             body.setRolloutNo(nextRolloutNo());
-            if (body.getStatus() == null || body.getStatus().isBlank()) body.setStatus("PENDING");
+            if (body.getStatus() == null || body.getStatus().isBlank()) body.setStatus(OtaRolloutStatus.PENDING.name());
             if (body.getStrategy() == null || body.getStrategy().isBlank()) body.setStrategy("GRAY");
             if (body.getScope() == null || body.getScope().isBlank()) body.setScope("ALL");
             if (body.getProgress() == null) body.setProgress(0);

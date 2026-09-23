@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.dev.port;
 
+import ai.neargo.sharehub.api.platform.event.AssignTargetType;
+
 import ai.neargo.sharehub.api.core.port.DeviceOwnershipPort;
 import ai.neargo.sharehub.api.platform.event.AssetAssignedEvent;
 import ai.neargo.common.data.scope.DataScopeContext;
@@ -38,7 +40,7 @@ public class AssetAssignedListener {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(AssetAssignedEvent e) {
         int n = DataScopeContext.executeWithoutScope(() -> {
-            if ("CABINET".equals(e.targetType())) {
+            if (AssignTargetType.CABINET.name().equals(e.targetType())) {
                 return deviceOwnership.reassignCabinet(e.cabinetNo(), e.agentNo());
             }
             if (e.locationNos() == null || e.locationNos().isEmpty()) {

@@ -34,8 +34,21 @@ public record AssetAssignedEvent(String targetType, String targetNo, String agen
         return targetType + ":" + targetNo;
     }
 
+    /**
+     * 事件类型常量。
+     *
+     * <p><b>放在声明方而不是 common 里的枚举</b>：{@code sys_outbox.event_type} 是
+     * **开放注册**，各域自己声明自己的事件类型。做成 common 的枚举等于让
+     * {@code sharehub-common} 反向依赖每一个业务域 —— 那正是 arch-guard G4
+     * （common 零业务依赖）禁止的形状。
+     *
+     * <p>消费方（如 {@code OwnershipReconciler}）引用这个常量而不是抄一遍字符串，
+     * 改名时编译器就会指出所有引用点。
+     */
+    public static final String TYPE = "ASSET_ASSIGNED";
+
     @Override
     public String eventType() {
-        return "ASSET_ASSIGNED";
+        return TYPE;
     }
 }

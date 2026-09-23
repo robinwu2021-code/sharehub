@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.dev.port;
 
+import ai.neargo.sharehub.api.platform.event.AssetAssignedEvent;
+import ai.neargo.sharehub.common.event.OutboxStatus;
 import ai.neargo.sharehub.common.event.entity.SysOutbox;
 import ai.neargo.sharehub.common.event.mapper.SysOutboxMapper;
 import ai.neargo.common.data.scope.DataScopeContext;
@@ -55,8 +57,8 @@ public class OwnershipReconciler {
      */
     public int redeliverPending() {
         List<SysOutbox> rows = outbox.selectList(new LambdaQueryWrapper<SysOutbox>()
-                .eq(SysOutbox::getEventType, "ASSET_ASSIGNED")
-                .in(SysOutbox::getStatus, List.of("PENDING", "FAILED"))
+                .eq(SysOutbox::getEventType, AssetAssignedEvent.TYPE)
+                .in(SysOutbox::getStatus, List.of(OutboxStatus.PENDING.name(), OutboxStatus.FAILED.name()))
                 .lt(SysOutbox::getRetryCount, MAX_RETRY)
                 .and(w -> w.isNull(SysOutbox::getNextRetryAt)
                         .or().le(SysOutbox::getNextRetryAt, LocalDateTime.now()))
@@ -77,7 +79,7 @@ public class OwnershipReconciler {
                 });
                 SysOutbox upd = new SysOutbox();
                 upd.setId(row.getId());
-                upd.setStatus("SENT");
+                upd.setStatus(OutboxStatus.SENT.name());
                 upd.setSentAt(LocalDateTime.now());
                 outbox.updateById(upd);
                 ok++;
@@ -85,7 +87,7 @@ public class OwnershipReconciler {
                 // 退避重试：失败次数越多等得越久，避免坏事件把轮询打满
                 SysOutbox upd = new SysOutbox();
                 upd.setId(row.getId());
-                upd.setStatus("FAILED");
+                upd.setStatus(OutboxStatus.FAILED.name());
                 upd.setRetryCount((row.getRetryCount() == null ? 0 : row.getRetryCount()) + 1);
                 upd.setLastError(String.valueOf(ex.getMessage()));
                 upd.setNextRetryAt(LocalDateTime.now().plusMinutes(

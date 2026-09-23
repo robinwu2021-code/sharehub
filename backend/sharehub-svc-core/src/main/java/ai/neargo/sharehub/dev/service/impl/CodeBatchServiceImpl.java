@@ -1,5 +1,8 @@
 package ai.neargo.sharehub.dev.service.impl;
 
+import ai.neargo.sharehub.dev.CodeBatchStatus;
+import ai.neargo.sharehub.dev.DeviceCodeType;
+
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.common.crud.AbstractCrudService;
 import ai.neargo.sharehub.dev.dto.DevDtos.CodeBatchRow;
@@ -49,8 +52,8 @@ public class CodeBatchServiceImpl extends AbstractCrudService<DevCodeBatch, Code
 
     @Override
     protected void beforeCreate(DevCodeBatch e) {
-        if (e.getStatus() == null || e.getStatus().isBlank()) e.setStatus("PENDING");
-        if (e.getCodeType() == null || e.getCodeType().isBlank()) e.setCodeType("QR");
+        if (e.getStatus() == null || e.getStatus().isBlank()) e.setStatus(CodeBatchStatus.PENDING.name());
+        if (e.getCodeType() == null || e.getCodeType().isBlank()) e.setCodeType(DeviceCodeType.QR.name());
         if (e.getTotal() == null) e.setTotal(0);
         if (e.getBound() == null) e.setBound(0);
     }

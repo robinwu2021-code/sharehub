@@ -1,5 +1,9 @@
 package ai.neargo.sharehub.dev.service.impl;
 
+import ai.neargo.sharehub.dev.CabinetStatus;
+import ai.neargo.sharehub.dev.DeviceKind;
+import ai.neargo.sharehub.dev.OnlineStatus;
+
 import ai.neargo.common.core.PageResult;
 import org.springframework.transaction.annotation.Transactional;
 import ai.neargo.sharehub.dev.entity.DevCabinet;
@@ -49,10 +53,10 @@ public class CabinetServiceImpl implements CabinetService {
             e = new DevCabinet();
             e.setCabinetNo(no);
             e.setTenantId("MAIN");
-            e.setDeviceType("POWERBANK");
+            e.setDeviceType(DeviceKind.POWERBANK.name());
             // 新建默认在库：还没上架就置 ONLINE 会让它出现在 C 端可借列表里
-            e.setStatus("IN_STOCK");
-            e.setOnlineStatus("OFFLINE");
+            e.setStatus(CabinetStatus.IN_STOCK.name());
+            e.setOnlineStatus(OnlineStatus.OFFLINE.name());
         }
         if (in.containsKey("sn")) e.setSn(str(in.get("sn")));
         if (in.containsKey("vendorCode")) e.setVendorCode(str(in.get("vendorCode")));
@@ -140,7 +144,7 @@ public class CabinetServiceImpl implements CabinetService {
         List<Slot> slots = new ArrayList<>();
         for (int i = 0; i < total; i++) {
             boolean filled = i < avail;
-            String health = (i == total - 1 && "FAULT".equals(c.getStatus())) ? "FAULT" : "OK";
+            String health = (i == total - 1 && CabinetStatus.FAULT.name().equals(c.getStatus())) ? "FAULT" : "OK";
             slots.add(new Slot(i + 1, filled ? "PB" + c.getCabinetNo().substring(3) + (i + 1) : null,
                     filled ? 40 + (i * 13) % 60 : null, filled ? "LOCKED" : "UNLOCKED", health));
         }
@@ -201,8 +205,8 @@ public class CabinetServiceImpl implements CabinetService {
             if (r.get("siteNo") != null) e.setSiteNo(String.valueOf(r.get("siteNo")));
             if (r.get("locationNo") != null) e.setLocationNo(String.valueOf(r.get("locationNo")));
             if (r.get("vendorCode") != null) e.setVendorCode(String.valueOf(r.get("vendorCode")));
-            e.setDeviceType("POWERBANK");
-            e.setStatus("IN_STOCK");
+            e.setDeviceType(DeviceKind.POWERBANK.name());
+            e.setStatus(CabinetStatus.IN_STOCK.name());
             mapper.insert(e);
             n++;
         }

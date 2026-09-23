@@ -42,11 +42,11 @@ public class OutboxDispatcher {
 
     private static final Logger log = LoggerFactory.getLogger(OutboxDispatcher.class);
 
-    static final String PENDING = "PENDING";
-    static final String SENT = "SENT";
-    static final String FAILED = "FAILED";
+    static final String PENDING = OutboxStatus.PENDING.name();
+    static final String SENT = OutboxStatus.SENT.name();
+    static final String FAILED = OutboxStatus.FAILED.name();
     /** 超过重试上限的终态：不再重投，等人处理。 */
-    static final String DEAD = "DEAD";
+    static final String DEAD = OutboxStatus.DEAD.name();
 
     /** 退避梯度；索引 = 已重试次数。超出数组长度取最后一档。 */
     private static final Duration[] BACKOFF = {

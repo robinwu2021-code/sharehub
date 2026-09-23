@@ -48,7 +48,7 @@ public class OutboxEventBus implements DomainEventBus {
         row.setAggregateId(event.aggregateId());
         row.setEventType(event.eventType());
         row.setPayload(Json.write(event));
-        row.setStatus("PENDING");
+        row.setStatus(OutboxStatus.PENDING.name());
         row.setRetryCount(0);
         mapper.insert(row);
 
@@ -72,7 +72,7 @@ public class OutboxEventBus implements DomainEventBus {
             publisher.publishEvent(event);
             SysOutbox upd = new SysOutbox();
             upd.setId(id);
-            upd.setStatus("SENT");
+            upd.setStatus(OutboxStatus.SENT.name());
             upd.setSentAt(java.time.LocalDateTime.now());
             mapper.updateById(upd);
         } catch (Exception e) {
@@ -81,7 +81,7 @@ public class OutboxEventBus implements DomainEventBus {
             log.error("事件投递失败，留待重投：eventNo={} type={}", id, event.eventType(), e);
             SysOutbox upd = new SysOutbox();
             upd.setId(id);
-            upd.setStatus("FAILED");
+            upd.setStatus(OutboxStatus.FAILED.name());
             upd.setLastError(String.valueOf(e.getMessage()));
             upd.setNextRetryAt(java.time.LocalDateTime.now().plusMinutes(1));
             mapper.updateById(upd);
