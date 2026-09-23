@@ -1,7 +1,6 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend, Line,
@@ -10,6 +9,8 @@ import {
 import { Maximize2, Minimize2, RefreshCw } from "lucide-react";
 import { api } from "@/lib/api";
 import { Pagination, Skeleton, StatCard } from "@/components/ui/misc";
+import { usePaging } from "@/lib/hooks/use-paging";
+import { useNavTabs, usePageTab } from "@/lib/hooks/use-page-tab";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FilterSelect } from "@/components/ui/filter-select";
@@ -29,15 +30,8 @@ import type {
   ReportTrendKind, ReportMetricDef, ScreenBoard, ConsumerSegment, ConsumerInsight, PageResult,
 } from "@/lib/types";
 
-const SIZE = 10;
-const TABS = [
-  { key: "device", label: "设备运营分析", phase: 2 as const },
-  { key: "location", label: "点位坪效", phase: 2 as const },
-  { key: "finance", label: "财务报表", phase: 2 as const },
-  { key: "screen", label: "实时大屏", phase: 3 as const },
-  { key: "custom", label: "自定义报表", phase: 3 as const },
-  { key: "consumer", label: "消费者分析", phase: 3 as const },
-];
+// tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）
+const TAB_KEYS = ["device", "location", "finance", "screen", "custom", "consumer"] as const;
 
 /** 三张周期报表 → 趋势口径。tab 与 kind 一一对应，别在多处各写一次映射。 */
 const TREND_KIND: Record<string, ReportTrendKind> = {
@@ -449,25 +443,24 @@ function ConsumerInsightView({ insight }: { insight?: ConsumerInsight }) {
 interface WideRow { dim: string; values: Record<string, number> }
 
 function ReportsInner() {
-  const sp = useSearchParams();
-  const qTab = sp.get("tab");
-  const [tab, setTab] = useState(TABS.some((t) => t.key === qTab) ? (qTab as string) : "device");
-  const [page, setPage] = useState(1);
+  const paging = usePaging();
+  const onTabChange = () => { paging.reset(); setKeyword(""); };
+  const tabs = useNavTabs("/reports", TAB_KEYS);
+  const { tab, setTab } = usePageTab(tabs, onTabChange);
   const [keyword, setKeyword] = useState("");
   const [period, setPeriod] = useState<ReportPeriod>(REPORT_PERIOD_DEFAULT);
   const [dim, setDim] = useState<string>("SITE");
   const [metrics, setMetrics] = useState<string[]>([...REPORT_METRICS_DEFAULT]);
-  useEffect(() => { if (qTab && TABS.some((t) => t.key === qTab)) { setTab(qTab); setPage(1); } }, [qTab]);
 
   const isPeriodTab = tab === "device" || tab === "location" || tab === "finance";
 
   const q = useQuery<PageResult<ReportDevice | ReportLocation | ReportFinance | ConsumerSegment>>({
-    queryKey: ["report", tab, page, keyword, period],
+    queryKey: ["report", tab, paging.page, paging.size, keyword, period],
     queryFn: () =>
-      tab === "device" ? api.listReportDevice({ page, size: SIZE, keyword, period })
-      : tab === "location" ? api.listReportLocation({ page, size: SIZE, keyword, period })
-      : tab === "finance" ? api.listReportFinance({ page, size: SIZE, keyword, period })
-      : api.listConsumerSegments({ page, size: 100 }),
+      tab === "device" ? api.listReportDevice({ page: paging.page, size: paging.size, keyword, period })
+      : tab === "location" ? api.listReportLocation({ page: paging.page, size: paging.size, keyword, period })
+      : tab === "finance" ? api.listReportFinance({ page: paging.page, size: paging.size, keyword, period })
+      : api.listConsumerSegments({ page: paging.page, size: paging.size }),
     enabled: isPeriodTab || tab === "consumer",
     placeholderData: keepPreviousData,
   });
@@ -598,18 +591,18 @@ function ReportsInner() {
 
   return (
     <div>
-      <TabHeader tabs={TABS} value={tab} onChange={(k) => { setTab(k); setPage(1); setKeyword(""); }} />
+      <TabHeader tabs={tabs} value={tab} onChange={setTab} />
 
       {isPeriodTab && (
         <>
           <Toolbar
             search={keyword}
-            onSearch={(v) => { setKeyword(v); setPage(1); }}
+            onSearch={(v) => { setKeyword(v); paging.reset(); }}
             searchPlaceholder={tab === "finance" ? "搜索周期" : "搜索站点"}
             // 三张报表共用一条工具条：周期选择在左，导出按当前 tab 出对应的列
             onExport={exportCurrent}
           >
-            <PeriodSelect value={period} onChange={(v) => { setPeriod(v as ReportPeriod); setPage(1); }} />
+            <PeriodSelect value={period} onChange={(v) => { setPeriod(v as ReportPeriod); paging.reset(); }} />
           </Toolbar>
           <Notice>
             统计口径：{periodLabel(period)}（到昨日为止，T+1 跑批）。图表与汇总条与表格同源，切周期三处同时变；
@@ -625,7 +618,7 @@ function ReportsInner() {
           rowKey={(r: ReportDevice) => r.locationName}
           columns={deviceCols}
           rows={q.data?.list as ReportDevice[]}
-          loading={q.isLoading}
+          loading={q.isLoading} error={q.error} onRetry={q.refetch}
           empty="暂无设备运营数据——点位投放并产生订单后按日汇总，或放宽搜索条件/换个周期再查"
         />
       )}
@@ -634,7 +627,7 @@ function ReportsInner() {
           rowKey={(r: ReportLocation) => r.siteName}
           columns={locationCols}
           rows={q.data?.list as ReportLocation[]}
-          loading={q.isLoading}
+          loading={q.isLoading} error={q.error} onRetry={q.refetch}
           empty="暂无坪效数据——站点需先录入投入成本并有营收记录，才能算回本天数与 ROI"
         />
       )}
@@ -643,7 +636,7 @@ function ReportsInner() {
           rowKey={(r: ReportFinance) => r.period}
           columns={financeCols}
           rows={q.data?.list as ReportFinance[]}
-          loading={q.isLoading}
+          loading={q.isLoading} error={q.error} onRetry={q.refetch}
           empty="暂无财务报表——按周期跑批汇总 GMV/分润/结算，本周期尚未出数"
         />
       )}
@@ -666,7 +659,7 @@ function ReportsInner() {
             rowKey={(r: ConsumerSegment) => r.segmentNo}
             columns={consumerCols}
             rows={q.data?.list as ConsumerSegment[]}
-            loading={q.isLoading}
+            loading={q.isLoading} error={q.error} onRetry={q.refetch}
             empty="暂无人群分析——需累积一定量的订单与用户行为后才会分层，新上线阶段属正常"
           />
         </>
@@ -730,7 +723,7 @@ function ReportsInner() {
                 rowKey={(r: WideRow) => r.dim}
                 columns={customCols}
                 rows={wideRows}
-                loading={customQ.isLoading}
+                loading={customQ.isLoading} error={customQ.error} onRetry={customQ.refetch}
                 empty="暂无数据——换个维度/周期，或减少指标再查"
               />
             </>
@@ -739,7 +732,7 @@ function ReportsInner() {
       )}
 
       {isPeriodTab && q.data && (
-        <Pagination page={page} size={SIZE} total={q.data.total} onPage={setPage} />
+        <Pagination page={paging.page} size={paging.size} total={q.data.total} onPage={paging.setPage} onSize={paging.setSize} />
       )}
     </div>
   );

@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PageTitle, Pagination, StatCard } from "@/components/ui/misc";
+import { usePaging } from "@/lib/hooks/use-paging";
+import { useNavTabs, usePageTab } from "@/lib/hooks/use-page-tab";
 import { TabHeader } from "@/components/ui/tab-header";
 import { Input, Select } from "@/components/ui/input";
 import { Toolbar } from "@/components/ui/toolbar";
@@ -33,17 +35,9 @@ import type {
   Reservation, FreeOrder, WhitelistReason,
 } from "@/lib/types";
 
-const SIZE = 10;
 // 顺序对齐 lib/nav.ts 的深链顺序（交易流水 → 售后 → 特殊单据）
-const TABS = [
-  { key: "list", label: "订单列表" },
-  { key: "reservations", label: "预约订单", phase: 2 as const },
-  { key: "exceptions", label: "异常订单" },
-  { key: "complaints", label: "投诉订单" },
-  { key: "refunds", label: "退款记录" },
-  { key: "free", label: "免费订单", phase: 2 as const },
-  { key: "deposit", label: "押金与欠费", phase: 2 as const },
-];
+// tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）
+const TAB_KEYS = ["list", "reservations", "exceptions", "complaints", "refunds", "free", "deposit"] as const;
 
 // —— 预约订单（规格 §3）：竞品是电车预约充电桩，充电宝映射为「预约取宝 / 预约还位」——
 const RES_TYPE: StatusMap<Reservation["type"]> = {
@@ -169,21 +163,20 @@ const EXC_ACTION_DESC: Record<ExceptionHandleAction, string> = {
 
 function OrdersInner() {
   const sp = useSearchParams();
-  const qTab = sp.get("tab");
   const qKeyword = sp.get("keyword");
   const qc = useQueryClient();
   const allow = useCan();
   const { t } = useI18n(); // 导出订单状态用同一套 i18n 文案，避免与表格徽标不一致
-  const [tab, setTab] = useState(TABS.some((t) => t.key === qTab) ? (qTab as string) : "list");
   const { confirm, dialog } = useConfirm();
-  useEffect(() => { if (qTab && TABS.some((t) => t.key === qTab)) setTab(qTab); }, [qTab]);
 
   // —— 订单列表 tab 状态 ——
-  const [page, setPage] = useState(1);
+  const paging = usePaging();
+  const tabs = useNavTabs("/orders", TAB_KEYS);
+  const { tab, setTab } = usePageTab(tabs, paging.reset);
   // 关键词支持 ?keyword= 深链（经营看板「查订单」跳过来时预填单号）；
   // effect 兜住「已在本页时再点一次深链」——初始值只在挂载时生效，参数变化要跟着走。
   const [keyword, setKeyword] = useState(qKeyword ?? "");
-  useEffect(() => { if (qKeyword != null) { setKeyword(qKeyword); setPage(1); } }, [qKeyword]);
+  useEffect(() => { if (qKeyword != null) { setKeyword(qKeyword); paging.reset(); } }, [qKeyword]);
   const [status, setStatus] = useState("");
   const [detail, setDetail] = useState<RentOrder | null>(null);
   // 干预确认抽屉：原因必填（沿用退款审批口径），补偿另需金额
@@ -192,8 +185,8 @@ function OrdersInner() {
   const [ivAmount, setIvAmount] = useState("");
 
   const listQ = useQuery({
-    queryKey: ["orders", page, keyword, status],
-    queryFn: () => api.listOrders({ page, size: SIZE, keyword, status: status || undefined }),
+    queryKey: ["orders", paging.page, paging.size, keyword, status],
+    queryFn: () => api.listOrders({ page: paging.page, size: paging.size, keyword, status: status || undefined }),
     placeholderData: keepPreviousData,
     enabled: tab === "list",
   });
@@ -220,12 +213,12 @@ function OrdersInner() {
   });
 
   // —— 异常订单 tab 状态 ——
-  const [excPage, setExcPage] = useState(1);
+  const excPaging = usePaging();
   const [excKeyword, setExcKeyword] = useState("");
   const [excStatus, setExcStatus] = useState("");
   const excQ = useQuery({
-    queryKey: ["order-exceptions", excPage, excKeyword, excStatus],
-    queryFn: () => api.listOrderExceptions({ page: excPage, size: SIZE, keyword: excKeyword, status: excStatus || undefined }),
+    queryKey: ["order-exceptions", excPaging.page, excPaging.size, excKeyword, excStatus],
+    queryFn: () => api.listOrderExceptions({ page: excPaging.page, size: excPaging.size, keyword: excKeyword, status: excStatus || undefined }),
     placeholderData: keepPreviousData,
     enabled: tab === "exceptions",
   });
@@ -251,15 +244,15 @@ function OrdersInner() {
   });
 
   // —— 投诉订单 tab 状态（B1）——
-  const [cplPage, setCplPage] = useState(1);
+  const cplPaging = usePaging();
   const [cplKeyword, setCplKeyword] = useState("");
   const [cplStatus, setCplStatus] = useState("");
   const [cplDetail, setCplDetail] = useState<OrderComplaint | null>(null);
   const [cplResolution, setCplResolution] = useState<ComplaintResolution>("REFUND");
   const [cplNote, setCplNote] = useState("");
   const cplQ = useQuery({
-    queryKey: ["complaints", cplPage, cplKeyword, cplStatus],
-    queryFn: () => api.listOrderComplaints({ page: cplPage, size: SIZE, keyword: cplKeyword, status: cplStatus || undefined }),
+    queryKey: ["complaints", cplPaging.page, cplPaging.size, cplKeyword, cplStatus],
+    queryFn: () => api.listOrderComplaints({ page: cplPaging.page, size: cplPaging.size, keyword: cplKeyword, status: cplStatus || undefined }),
     placeholderData: keepPreviousData,
     enabled: tab === "complaints",
   });
@@ -286,15 +279,15 @@ function OrdersInner() {
   });
 
   // —— 退款记录 tab 状态（B2：独立审批队列）——
-  const [rfdPage, setRfdPage] = useState(1);
+  const rfdPaging = usePaging();
   const [rfdKeyword, setRfdKeyword] = useState("");
   const [rfdStatus, setRfdStatus] = useState("");
   const [rfdDetail, setRfdDetail] = useState<RefundRecord | null>(null);
   const [rfdApprove, setRfdApprove] = useState("1");
   const [rfdReject, setRfdReject] = useState("");
   const rfdQ = useQuery({
-    queryKey: ["refunds", rfdPage, rfdKeyword, rfdStatus],
-    queryFn: () => api.listRefundRecords({ page: rfdPage, size: SIZE, keyword: rfdKeyword, status: rfdStatus || undefined }),
+    queryKey: ["refunds", rfdPaging.page, rfdPaging.size, rfdKeyword, rfdStatus],
+    queryFn: () => api.listRefundRecords({ page: rfdPaging.page, size: rfdPaging.size, keyword: rfdKeyword, status: rfdStatus || undefined }),
     placeholderData: keepPreviousData,
     enabled: tab === "refunds",
   });
@@ -342,12 +335,12 @@ function OrdersInner() {
   };
 
   // —— 押金与欠费 tab 状态（P2 → S1 补处置动作）——
-  const [depPage, setDepPage] = useState(1);
+  const depPaging = usePaging();
   const [depKeyword, setDepKeyword] = useState("");
   const [depStatus, setDepStatus] = useState("");
   const depQ = useQuery({
-    queryKey: ["deposit-records", depPage, depKeyword, depStatus],
-    queryFn: () => api.listDepositRecords({ page: depPage, size: SIZE, keyword: depKeyword, status: depStatus || undefined }),
+    queryKey: ["deposit-records", depPaging.page, depPaging.size, depKeyword, depStatus],
+    queryFn: () => api.listDepositRecords({ page: depPaging.page, size: depPaging.size, keyword: depKeyword, status: depStatus || undefined }),
     placeholderData: keepPreviousData,
     enabled: tab === "deposit",
   });
@@ -411,13 +404,13 @@ function OrdersInner() {
   };
 
   // —— 预约订单 tab（B4）——
-  const [resPage, setResPage] = useState(1);
+  const resPaging = usePaging();
   const [resKeyword, setResKeyword] = useState("");
   const [resStatus, setResStatus] = useState("");
   const [resType, setResType] = useState("");
   const resQ = useQuery({
-    queryKey: ["reservations", resPage, resKeyword, resStatus, resType],
-    queryFn: () => api.listReservations({ page: resPage, size: SIZE, keyword: resKeyword, status: resStatus || undefined, type: resType || undefined }),
+    queryKey: ["reservations", resPaging.page, resPaging.size, resKeyword, resStatus, resType],
+    queryFn: () => api.listReservations({ page: resPaging.page, size: resPaging.size, keyword: resKeyword, status: resStatus || undefined, type: resType || undefined }),
     placeholderData: keepPreviousData,
     enabled: tab === "reservations",
   });
@@ -438,12 +431,12 @@ function OrdersInner() {
   };
 
   // —— 免费订单 tab（B4）：页头统计走全量口径（成本管控，不能只统计当页）——
-  const [freePage, setFreePage] = useState(1);
+  const freePaging = usePaging();
   const [freeKeyword, setFreeKeyword] = useState("");
   const [freeReason, setFreeReason] = useState("");
   const freeQ = useQuery({
-    queryKey: ["free-orders", freePage, freeKeyword, freeReason],
-    queryFn: () => api.listFreeOrders({ page: freePage, size: SIZE, keyword: freeKeyword, reason: freeReason || undefined }),
+    queryKey: ["free-orders", freePaging.page, freePaging.size, freeKeyword, freeReason],
+    queryFn: () => api.listFreeOrders({ page: freePaging.page, size: freePaging.size, keyword: freeKeyword, reason: freeReason || undefined }),
     placeholderData: keepPreviousData,
     enabled: tab === "free",
   });
@@ -661,13 +654,13 @@ function OrdersInner() {
 
   return (
     <div>
-      <TabHeader tabs={TABS} value={tab} onChange={(k) => setTab(k)} />
+      <TabHeader tabs={tabs} value={tab} onChange={setTab} />
 
       {tab === "list" && (
         <>
           <Toolbar
             search={keyword}
-            onSearch={(v) => { setKeyword(v); setPage(1); }}
+            onSearch={(v) => { setKeyword(v); paging.reset(); }}
             searchPlaceholder="搜索订单号 / 用户"
             onExport={() => exportCsv<RentOrder>("订单列表", [
               { header: "订单号", value: (o) => o.orderNo },
@@ -680,16 +673,16 @@ function OrdersInner() {
               { header: "状态", value: (o) => t(`orderStatus.${o.status}`) },
             ], listQ.data?.list ?? [])}
           >
-            <FilterSelect value={status} onChange={(v) => { setStatus(v); setPage(1); }} allLabel="全部状态" options={ORDER_STATUS_FILTER} />
+            <FilterSelect value={status} onChange={(v) => { setStatus(v); paging.reset(); }} allLabel="全部状态" options={ORDER_STATUS_FILTER} />
           </Toolbar>
           <DataTable
             rowKey={(o: RentOrder) => o.orderNo}
             columns={listCols}
             rows={listQ.data?.list}
-            loading={listQ.isLoading}
+            loading={listQ.isLoading} error={listQ.error} onRetry={listQ.refetch}
             empty="暂无订单——当前筛选条件下没有记录，清空搜索/状态筛选或等待用户借出充电宝"
           />
-          {listQ.data && <Pagination page={page} size={SIZE} total={listQ.data.total} onPage={setPage} />}
+          {listQ.data && <Pagination page={paging.page} size={paging.size} total={listQ.data.total} onPage={paging.setPage} onSize={paging.setSize} />}
         </>
       )}
 
@@ -697,7 +690,7 @@ function OrdersInner() {
         <>
           <Toolbar
             search={resKeyword}
-            onSearch={(v) => { setResKeyword(v); setResPage(1); }}
+            onSearch={(v) => { setResKeyword(v); resPaging.reset(); }}
             searchPlaceholder="搜索预约号 / 用户 / 站点 / 机柜 / 关联订单"
             onExport={() => exportCsv<Reservation>("预约订单", [
               { header: "预约号", value: (r) => r.reservationNo },
@@ -712,20 +705,20 @@ function OrdersInner() {
               { header: "关联订单", value: (r) => r.orderNo },
             ], resQ.data?.list ?? [])}
           >
-            <FilterSelect value={resType} onChange={(v) => { setResType(v); setResPage(1); }} allLabel="全部类型" options={RES_TYPE} />
-            <FilterSelect value={resStatus} onChange={(v) => { setResStatus(v); setResPage(1); }} allLabel="全部状态" options={RES_STATUS} />
+            <FilterSelect value={resType} onChange={(v) => { setResType(v); resPaging.reset(); }} allLabel="全部类型" options={RES_TYPE} />
+            <FilterSelect value={resStatus} onChange={(v) => { setResStatus(v); resPaging.reset(); }} allLabel="全部状态" options={RES_STATUS} />
           </Toolbar>
           {!canCancelRes && <ReadOnlyNotice what="预约取消" perm="order:order:update" />}
           <DataTable
             rowKey={(r: Reservation) => r.reservationNo}
             columns={resCols}
             rows={resQ.data?.list}
-            loading={resQ.isLoading}
+            loading={resQ.isLoading} error={resQ.error} onRetry={resQ.refetch}
             // 即将超时的预约整行提示（B0 补丁 rowClassName）
             rowClassName={(r) => (isExpiringSoon(r) ? "bg-[color-mix(in_srgb,var(--destructive)_7%,transparent)]" : undefined)}
             empty="暂无预约记录——热门点位高峰期才会产生预约，或占位规则尚未在「业务规则」中开启"
           />
-          {resQ.data && <Pagination page={resPage} size={SIZE} total={resQ.data.total} onPage={setResPage} />}
+          {resQ.data && <Pagination page={resPaging.page} size={resPaging.size} total={resQ.data.total} onPage={resPaging.setPage} onSize={resPaging.setSize} />}
         </>
       )}
 
@@ -743,7 +736,7 @@ function OrdersInner() {
           </div>
           <Toolbar
             search={freeKeyword}
-            onSearch={(v) => { setFreeKeyword(v); setFreePage(1); }}
+            onSearch={(v) => { setFreeKeyword(v); freePaging.reset(); }}
             searchPlaceholder="搜索订单号 / 用户 / 昵称 / 站点 / 机柜"
             onExport={() => exportCsv<FreeOrder>("免费订单", [
               { header: "订单号", value: (f) => f.orderNo },
@@ -759,16 +752,16 @@ function OrdersInner() {
               { header: "时长(分)", value: (f) => f.duration },
             ], freeQ.data?.list ?? [])}
           >
-            <FilterSelect value={freeReason} onChange={(v) => { setFreeReason(v); setFreePage(1); }} allLabel="全部来源" options={REASON_OPTIONS} />
+            <FilterSelect value={freeReason} onChange={(v) => { setFreeReason(v); freePaging.reset(); }} allLabel="全部来源" options={REASON_OPTIONS} />
           </Toolbar>
           <DataTable
             rowKey={(f: FreeOrder) => f.orderNo}
             columns={freeCols}
             rows={freeQ.data?.list}
-            loading={freeQ.isLoading}
+            loading={freeQ.isLoading} error={freeQ.error} onRetry={freeQ.refetch}
             empty="暂无免费订单——尚无白名单用户下单，白名单在「用户 · 免费用户白名单」维护"
           />
-          {freeQ.data && <Pagination page={freePage} size={SIZE} total={freeQ.data.total} onPage={setFreePage} />}
+          {freeQ.data && <Pagination page={freePaging.page} size={freePaging.size} total={freeQ.data.total} onPage={freePaging.setPage} onSize={freePaging.setSize} />}
         </>
       )}
 
@@ -776,7 +769,7 @@ function OrdersInner() {
         <>
           <Toolbar
             search={excKeyword}
-            onSearch={(v) => { setExcKeyword(v); setExcPage(1); }}
+            onSearch={(v) => { setExcKeyword(v); excPaging.reset(); }}
             searchPlaceholder="搜索订单号 / 柜机 / 用户 / 工单号 / 退款号"
             onExport={() => exportCsv<OrderException>("异常订单", [
               { header: "订单号", value: (e) => e.orderNo },
@@ -795,17 +788,17 @@ function OrdersInner() {
               { header: "关联退款", value: (e) => e.refundNo },
             ], excQ.data?.list ?? [])}
           >
-            <FilterSelect value={excStatus} onChange={(v) => { setExcStatus(v); setExcPage(1); }} allLabel="全部状态" options={EXC_STATUS} />
+            <FilterSelect value={excStatus} onChange={(v) => { setExcStatus(v); excPaging.reset(); }} allLabel="全部状态" options={EXC_STATUS} />
           </Toolbar>
           {!canHandleExc && <ReadOnlyNotice what="异常订单处置" perm="order:exception:handle" />}
           <DataTable
             rowKey={(e: OrderException) => e.orderNo}
             columns={excCols}
             rows={excQ.data?.list}
-            loading={excQ.isLoading}
+            loading={excQ.isLoading} error={excQ.error} onRetry={excQ.refetch}
             empty="暂无异常订单——未弹出/未归还/重复扣款等异常会自动汇入此处，也可放宽搜索条件再查"
           />
-          {excQ.data && <Pagination page={excPage} size={SIZE} total={excQ.data.total} onPage={setExcPage} />}
+          {excQ.data && <Pagination page={excPaging.page} size={excPaging.size} total={excQ.data.total} onPage={excPaging.setPage} onSize={excPaging.setSize} />}
         </>
       )}
 
@@ -813,7 +806,7 @@ function OrdersInner() {
         <>
           <Toolbar
             search={cplKeyword}
-            onSearch={(v) => { setCplKeyword(v); setCplPage(1); }}
+            onSearch={(v) => { setCplKeyword(v); cplPaging.reset(); }}
             searchPlaceholder="搜索投诉号 / 订单号 / 用户 / 工单号"
             onExport={() => exportCsv<OrderComplaint>("投诉订单", [
               { header: "投诉号", value: (c) => c.complaintNo },
@@ -832,16 +825,16 @@ function OrdersInner() {
             addLabel="新建投诉"
             canAdd={canCreateCpl}
           >
-            <FilterSelect value={cplStatus} onChange={(v) => { setCplStatus(v); setCplPage(1); }} allLabel="全部状态" options={CPL_STATUS} />
+            <FilterSelect value={cplStatus} onChange={(v) => { setCplStatus(v); cplPaging.reset(); }} allLabel="全部状态" options={CPL_STATUS} />
           </Toolbar>
           <DataTable
             rowKey={(c: OrderComplaint) => c.complaintNo}
             columns={cplCols}
             rows={cplQ.data?.list}
-            loading={cplQ.isLoading}
+            loading={cplQ.isLoading} error={cplQ.error} onRetry={cplQ.refetch}
             empty="暂无投诉——C 端用户在订单内提交投诉后会进入此队列，处理结果可回写并转工单"
           />
-          {cplQ.data && <Pagination page={cplPage} size={SIZE} total={cplQ.data.total} onPage={setCplPage} />}
+          {cplQ.data && <Pagination page={cplPaging.page} size={cplPaging.size} total={cplQ.data.total} onPage={cplPaging.setPage} onSize={cplPaging.setSize} />}
         </>
       )}
 
@@ -849,7 +842,7 @@ function OrdersInner() {
         <>
           <Toolbar
             search={rfdKeyword}
-            onSearch={(v) => { setRfdKeyword(v); setRfdPage(1); }}
+            onSearch={(v) => { setRfdKeyword(v); rfdPaging.reset(); }}
             searchPlaceholder="搜索退款单号 / 订单号 / 用户 / PSP 流水号"
             onExport={() => exportCsv<RefundRecord>("退款记录", [
               { header: "退款单号", value: (r) => r.refundNo },
@@ -869,7 +862,7 @@ function OrdersInner() {
             addLabel="新建退款"
             canAdd={canApplyRefund}
           >
-            <FilterSelect value={rfdStatus} onChange={(v) => { setRfdStatus(v); setRfdPage(1); }} allLabel="全部状态" options={RFD_STATUS} />
+            <FilterSelect value={rfdStatus} onChange={(v) => { setRfdStatus(v); rfdPaging.reset(); }} allLabel="全部状态" options={RFD_STATUS} />
           </Toolbar>
           {/* 申请与审批是两个码：客服能开单不能出款，财务能出款不能开单，两种缺权要分别说清 */}
           {!canAuditRefund && !canApplyRefund && <ReadOnlyNotice what="退款申请 / 退款审批" perm={["order:refund:apply", "order:refund:audit"]} />}
@@ -879,10 +872,10 @@ function OrdersInner() {
             rowKey={(r: RefundRecord) => r.refundNo}
             columns={rfdCols}
             rows={rfdQ.data?.list}
-            loading={rfdQ.isLoading}
+            loading={rfdQ.isLoading} error={rfdQ.error} onRetry={rfdQ.refetch}
             empty="暂无退款申请——客服在订单详情点「申请退款」后在此审批，审批通过才会真正出款"
           />
-          {rfdQ.data && <Pagination page={rfdPage} size={SIZE} total={rfdQ.data.total} onPage={setRfdPage} />}
+          {rfdQ.data && <Pagination page={rfdPaging.page} size={rfdPaging.size} total={rfdQ.data.total} onPage={rfdPaging.setPage} onSize={rfdPaging.setSize} />}
         </>
       )}
 
@@ -890,7 +883,7 @@ function OrdersInner() {
         <>
           <Toolbar
             search={depKeyword}
-            onSearch={(v) => { setDepKeyword(v); setDepPage(1); }}
+            onSearch={(v) => { setDepKeyword(v); depPaging.reset(); }}
             searchPlaceholder="搜索押金单号 / 订单号 / 用户"
             onExport={() => exportCsv<DepositRecord>("押金与欠费", [
               { header: "押金单号", value: (d) => d.depositNo },
@@ -910,7 +903,7 @@ function OrdersInner() {
               { header: "处置说明", value: (d) => d.note },
             ], depQ.data?.list ?? [])}
           >
-            <FilterSelect value={depStatus} onChange={(v) => { setDepStatus(v); setDepPage(1); }} allLabel="全部状态" options={DEP_STATUS} />
+            <FilterSelect value={depStatus} onChange={(v) => { setDepStatus(v); depPaging.reset(); }} allLabel="全部状态" options={DEP_STATUS} />
           </Toolbar>
           {!canDeposit && <ReadOnlyNotice what="押金处置 / 欠费催缴" perm={["order:deposit:manage", "order:arrears:dun"]} />}
           {canDeposit && !canDepositManage && <Notice>当前角色仅可催缴欠费；解冻/买断需财务权限（order:deposit:manage）</Notice>}
@@ -918,10 +911,10 @@ function OrdersInner() {
             rowKey={(d: DepositRecord) => d.depositNo}
             columns={depCols}
             rows={depQ.data?.list}
-            loading={depQ.isLoading}
+            loading={depQ.isLoading} error={depQ.error} onRetry={depQ.refetch}
             empty="暂无押金记录——免押策略下不产生冻结记录，或该筛选条件下没有押金/欠费单"
           />
-          {depQ.data && <Pagination page={depPage} size={SIZE} total={depQ.data.total} onPage={setDepPage} />}
+          {depQ.data && <Pagination page={depPaging.page} size={depPaging.size} total={depQ.data.total} onPage={depPaging.setPage} onSize={depPaging.setSize} />}
         </>
       )}
 

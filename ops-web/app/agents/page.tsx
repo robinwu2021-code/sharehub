@@ -1,10 +1,11 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PageTitle, Pagination } from "@/components/ui/misc";
+import { usePaging } from "@/lib/hooks/use-paging";
+import { useNavTabs, usePageTab } from "@/lib/hooks/use-page-tab";
 import { Input } from "@/components/ui/input";
 import { TabHeader } from "@/components/ui/tab-header";
 import { DataTable, type Column } from "@/components/ui/data-table";
@@ -32,20 +33,15 @@ import type {
   AgentAssignmentRecord, AssignableAsset,
 } from "@/lib/types";
 
-const SIZE = 10;
 /** 周期码 → 中文标签。取自 REPORT_PERIODS，不另抄一份。 */
 const periodLabel = (p: string) => REPORT_PERIODS.find((x) => x.value === p)?.label ?? p;
 // 数据范围文案与 app/employees 同源（台账 T5：AgentAccount.dataScope 原为 string
 // 且 mock 里存的是中文展示文案，收紧为 DataScope 枚举后统一走映射渲染）
 const SCOPE_LABEL: Record<DataScope, string> = { ALL: "全部数据", REGION: "按区域", LOCATION: "按点位", AGENT: "按代理(自己)", SELF: "仅自己经手" };
 const SCOPE_OPTIONS = (["ALL", "REGION", "LOCATION", "AGENT", "SELF"] as DataScope[]).map((s) => ({ value: s, label: SCOPE_LABEL[s] }));
-const TABS = [
-  { key: "profiles", label: "代理商档案" },
-  { key: "commission", label: "分润配置" },
-  { key: "assign", label: "设备/点位划拨" },
-  { key: "performance", label: "代理绩效", phase: 2 as const },
-  { key: "accounts", label: "代理账号" },
-];
+// tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）
+// 注意「代理账号」在菜单里叫「代理账号管理」——以菜单为准，这里不再写第二份名字
+const TAB_KEYS = ["profiles", "commission", "assign", "performance", "accounts"] as const;
 const COMMISSION_FIELDS: import("@/components/ui/form-drawer").FieldDef[] = [
   { key: "ruleNo", label: "规则号", readOnlyOnEdit: true, placeholder: "留空自动生成" },
   { key: "agentNo", label: "代理编号", placeholder: "AG001" },
@@ -76,10 +72,10 @@ const ACCOUNT_FIELDS: FieldDef[] = [
 ];
 
 function AgentsInner() {
-  const sp = useSearchParams();
-  const qTab = sp.get("tab");
-  const [tab, setTab] = useState(TABS.some((t) => t.key === qTab) ? (qTab as string) : "profiles");
-  const [page, setPage] = useState(1);
+  const paging = usePaging();
+  const onTabChange = () => { paging.reset(); setKeyword(""); setShowArchived(false); };
+  const tabs = useNavTabs("/agents", TAB_KEYS);
+  const { tab, setTab } = usePageTab(tabs, onTabChange);
   // 代理绩效周期（复用报表域缺省值 LAST_30D）
   const [period, setPeriod] = useState<ReportPeriod>(REPORT_PERIOD_DEFAULT);
   const [keyword, setKeyword] = useState("");
@@ -91,43 +87,42 @@ function AgentsInner() {
   const [assignForm, setAssignForm] = useState<{ agentNo: string; cabinetNos: string; siteNos: string } | null>(null);
   const [reclaimForm, setReclaimForm] = useState<{ agentNo: string; agentName: string; cabinetNos: string; siteNos: string } | null>(null);
   const [recordsFor, setRecordsFor] = useState<{ agentNo: string; agentName: string } | null>(null);
-  const [recPage, setRecPage] = useState(1);
+  const recPaging = usePaging();
   const username = useAuth((s) => s.username);
   const qc = useQueryClient();
   const allow = useCan();
   const { confirm, dialog } = useConfirm();
   // 「显示已归档」只作用于代理商档案 tab（TDD §10.1），切 tab 复位
   const [showArchived, setShowArchived] = useState(false);
-  useEffect(() => { if (qTab && TABS.some((t) => t.key === qTab)) { setTab(qTab); setPage(1); setShowArchived(false); } }, [qTab]);
 
   const profiles = useQuery({
     // showArchived 必须进 queryKey，否则切开关不重新拉数据
-    queryKey: ["agents", page, keyword, showArchived],
-    queryFn: () => api.listAgents({ page, size: SIZE, keyword, showArchived }),
+    queryKey: ["agents", paging.page, paging.size, keyword, showArchived],
+    queryFn: () => api.listAgents({ page: paging.page, size: paging.size, keyword, showArchived }),
     placeholderData: keepPreviousData,
     enabled: tab === "profiles",
   });
   const assign = useQuery({
-    queryKey: ["agent-assign", page, keyword],
-    queryFn: () => api.listAgentAssignments({ page, size: SIZE, keyword }),
+    queryKey: ["agent-assign", paging.page, paging.size, keyword],
+    queryFn: () => api.listAgentAssignments({ page: paging.page, size: paging.size, keyword }),
     placeholderData: keepPreviousData,
     enabled: tab === "assign",
   });
   const performance = useQuery({
-    queryKey: ["agent-performance", page, keyword, period],
-    queryFn: () => api.listAgentPerformance({ page, size: SIZE, keyword, period }),
+    queryKey: ["agent-performance", paging.page, paging.size, keyword, period],
+    queryFn: () => api.listAgentPerformance({ page: paging.page, size: paging.size, keyword, period }),
     placeholderData: keepPreviousData,
     enabled: tab === "performance",
   });
   const accounts = useQuery({
-    queryKey: ["agent-accounts", page, keyword],
-    queryFn: () => api.listAgentAccounts({ page, size: SIZE, keyword }),
+    queryKey: ["agent-accounts", paging.page, paging.size, keyword],
+    queryFn: () => api.listAgentAccounts({ page: paging.page, size: paging.size, keyword }),
     placeholderData: keepPreviousData,
     enabled: tab === "accounts",
   });
   const commissions = useQuery({
-    queryKey: ["agent-commissions", page, keyword],
-    queryFn: () => api.listAgentCommissions({ page, size: SIZE, keyword }),
+    queryKey: ["agent-commissions", paging.page, paging.size, keyword],
+    queryFn: () => api.listAgentCommissions({ page: paging.page, size: paging.size, keyword }),
     placeholderData: keepPreviousData,
     enabled: tab === "commission",
   });
@@ -159,8 +154,8 @@ function AgentsInner() {
     enabled: !!reclaimForm?.agentNo,
   });
   const records = useQuery({
-    queryKey: ["assign-records", recordsFor?.agentNo ?? "", recPage],
-    queryFn: () => api.listAgentAssignmentRecords({ page: recPage, size: SIZE, agentNo: recordsFor?.agentNo || undefined }),
+    queryKey: ["assign-records", recordsFor?.agentNo ?? "", recPaging.page, recPaging.size],
+    queryFn: () => api.listAgentAssignmentRecords({ page: recPaging.page, size: recPaging.size, agentNo: recordsFor?.agentNo || undefined }),
     placeholderData: keepPreviousData,
     enabled: !!recordsFor,
   });
@@ -426,23 +421,23 @@ function AgentsInner() {
 
   return (
     <div>
-      <TabHeader tabs={TABS} value={tab} onChange={(k) => { setTab(k); setPage(1); setKeyword(""); setShowArchived(false); }} />
+      <TabHeader tabs={tabs} value={tab} onChange={setTab} />
 
       {tab === "profiles" && (
         <>
           <Toolbar
             search={keyword}
-            onSearch={(v) => { setKeyword(v); setPage(1); }}
+            onSearch={(v) => { setKeyword(v); paging.reset(); }}
             searchPlaceholder="搜索代理名称 / 编号 / 辖域"
             onExport={exportIf(exportProfiles, profiles.data?.list?.length)}
           >
-            <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); setPage(1); }} />
+            <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); paging.reset(); }} />
           </Toolbar>
           <DataTable
             rowKey={(a: Agent) => a.agentNo}
             columns={profileCols}
             rows={profiles.data?.list}
-            loading={profiles.isLoading}
+            loading={profiles.isLoading} error={profiles.error} onRetry={profiles.refetch}
             rowClassName={archivedRowClass}
             empty={showArchived
               ? "没有匹配的代理商——换个关键词试试"
@@ -454,13 +449,13 @@ function AgentsInner() {
         <>
           <Toolbar
             search={keyword}
-            onSearch={(v) => { setKeyword(v); setPage(1); }}
+            onSearch={(v) => { setKeyword(v); paging.reset(); }}
             searchPlaceholder="搜索规则号 / 代理编号 / 名称"
             onExport={exportIf(exportCommissions, commissions.data?.list?.length)}
             onAdd={allow("agent:settlement:read") ? () => setCommissionForm({ status: "ACTIVE", basis: "GMV", mode: "CHANNEL_SPLIT", rate: 0.1 }) : undefined}
             addLabel="新增分润规则"
           />
-          <DataTable rowKey={(c: AgentCommission) => c.ruleNo} columns={commissionCols} rows={commissions.data?.list} loading={commissions.isLoading}
+          <DataTable rowKey={(c: AgentCommission) => c.ruleNo} columns={commissionCols} rows={commissions.data?.list} loading={commissions.isLoading} error={commissions.error} onRetry={commissions.refetch}
             empty="暂无分润规则——代理商需配置规则后才会参与分润，可点「新增分润规则」建一条" />
         </>
       )}
@@ -468,35 +463,35 @@ function AgentsInner() {
         <>
           <Toolbar
             search={keyword}
-            onSearch={(v) => { setKeyword(v); setPage(1); }}
+            onSearch={(v) => { setKeyword(v); paging.reset(); }}
             searchPlaceholder="搜索代理编号 / 名称 / 区域"
             onExport={exportIf(exportAssign, assign.data?.list?.length)}
             onAdd={canAssign ? () => setAssignForm({ agentNo: "", cabinetNos: "", siteNos: "" }) : undefined}
             addLabel="划拨设备/点位"
           >
-            <Button variant="outline" onClick={() => { setRecordsFor({ agentNo: "", agentName: "" }); setRecPage(1); }}>全部划拨流水</Button>
+            <Button variant="outline" onClick={() => { setRecordsFor({ agentNo: "", agentName: "" }); recPaging.reset(); }}>全部划拨流水</Button>
           </Toolbar>
           {/* 权限降级显式提示，不静默隐藏——静默隐藏会让人以为功能坏了。
               句式与权限码的排布交给 ReadOnlyNotice，手写会各页各一套（规范 §13） */}
           {!canAssign && (
             <ReadOnlyNotice what="划拨" perm="agent:scope:assign" note="可查看归属汇总与划拨流水" />
           )}
-          <DataTable rowKey={(a: AgentAssignment) => a.agentNo} columns={assignCols} rows={assign.data?.list} loading={assign.isLoading}
+          <DataTable rowKey={(a: AgentAssignment) => a.agentNo} columns={assignCols} rows={assign.data?.list} loading={assign.isLoading} error={assign.error} onRetry={assign.refetch}
             empty="没有匹配的代理商——划拨以代理商为单位进行，先在「代理商档案」建档，或换个关键词" />
         </>
       )}
       {tab === "performance" && (
         <>
-          <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); setPage(1); }} searchPlaceholder="搜索代理编号 / 名称"
+          <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); paging.reset(); }} searchPlaceholder="搜索代理编号 / 名称"
             onExport={exportIf(exportPerformance, performance.data?.list?.length)}>
             <FilterSelect
               value={period}
-              onChange={(v) => { setPeriod(v as ReportPeriod); setPage(1); }}
+              onChange={(v) => { setPeriod(v as ReportPeriod); paging.reset(); }}
               options={REPORT_PERIODS.map((x) => ({ value: x.value, label: x.label }))}
               aria-label="按统计周期筛选"
             />
           </Toolbar>
-          <DataTable rowKey={(a: AgentPerformance) => a.agentNo} columns={perfCols} rows={performance.data?.list} loading={performance.isLoading}
+          <DataTable rowKey={(a: AgentPerformance) => a.agentNo} columns={perfCols} rows={performance.data?.list} loading={performance.isLoading} error={performance.error} onRetry={performance.refetch}
             empty={`${periodLabel(period)}内没有绩效数据——统计截至昨日（T+1），代理名下站点需先产生订单；可换更长周期，或先在「设备/点位划拨」把资产划给代理`} />
         </>
       )}
@@ -504,18 +499,18 @@ function AgentsInner() {
         <>
           <Toolbar
             search={keyword}
-            onSearch={(v) => { setKeyword(v); setPage(1); }}
+            onSearch={(v) => { setKeyword(v); paging.reset(); }}
             searchPlaceholder="搜索账号编号 / 代理 / 登录手机"
             onExport={exportIf(exportAccounts, accounts.data?.list?.length)}
             onAdd={canEditAccount ? () => setAccountForm({ status: "ACTIVE", dataScope: "AGENT" }) : undefined}
             addLabel="新增代理账号"
           />
-          <DataTable rowKey={(a: AgentAccount) => a.accountNo} columns={accountCols} rows={accounts.data?.list} loading={accounts.isLoading}
+          <DataTable rowKey={(a: AgentAccount) => a.accountNo} columns={accountCols} rows={accounts.data?.list} loading={accounts.isLoading} error={accounts.error} onRetry={accounts.refetch}
             empty="暂无代理账号——代理商需要账号才能登录代理端，可点「新增代理账号」开通" />
         </>
       )}
 
-      {total != null && <Pagination page={page} size={SIZE} total={total} onPage={setPage} />}
+      {total != null && <Pagination page={paging.page} size={paging.size} total={total} onPage={paging.setPage} onSize={paging.setSize} />}
 
       <Drawer
         open={!!edit}
@@ -583,7 +578,7 @@ function AgentsInner() {
       {/* 划拨流水（审计）：谁在什么时候把哪台柜子给了谁 / 从谁那收回 */}
       <Drawer
         open={!!recordsFor}
-        onOpenChange={(o) => { if (!o) { setRecordsFor(null); setRecPage(1); } }}
+        onOpenChange={(o) => { if (!o) { setRecordsFor(null); recPaging.reset(); } }}
         title={recordsFor?.agentNo ? `划拨流水 · ${recordsFor.agentName}（${recordsFor.agentNo}）` : "划拨流水（全部代理）"}
         desc="资产归属的每次变更都在此留痕，含操作人与时间"
         width="w-[760px]"
@@ -592,10 +587,10 @@ function AgentsInner() {
           rowKey={(r: AgentAssignmentRecord) => r.assignmentNo}
           columns={recordCols}
           rows={records.data?.list}
-          loading={records.isLoading}
+          loading={records.isLoading} error={records.error} onRetry={records.refetch}
           empty="暂无划拨流水——该代理名下的资产还没有过划拨或回收操作"
         />
-        {records.data && <Pagination page={recPage} size={SIZE} total={records.data.total} onPage={setRecPage} />}
+        {records.data && <Pagination page={recPaging.page} size={recPaging.size} total={records.data.total} onPage={recPaging.setPage} onSize={recPaging.setSize} />}
       </Drawer>
 
       <FormDrawer
