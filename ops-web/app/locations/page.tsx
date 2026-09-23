@@ -43,7 +43,9 @@ import type { Site, SitePoint, Venue, Contract, Lead, LeadStage, LeadFollowChann
 // archiveSite），是同一张表的两个维护入口。保留后者 —— 它是超集：详情抽屉有 8 个页签
 // （基本信息/点位/机柜/合同/计费/分成/统计/操作记录），还带暂停营业与统计。
 // 本页保留「点位管理」：站点详情里能维护点位，但跨站点批量看点位仍只有这里能做。
-const TAB_KEYS = ["points", "venues", "contracts", "onboarding", "crm", "analysis", "lifecycle"] as const;
+// 顺序与菜单分组一致（场站管理 / 场地与合同 / 拓展 / 场站报表）——页内 tab 条
+// 和左侧二级面板是同一批东西，两处顺序不同会让人以为少了一项。
+const TAB_KEYS = ["points", "venues", "contracts", "crm", "onboarding", "lifecycle", "analysis"] as const;
 const LEAD_STAGE: StatusMap<LeadStage> = {
   NEW: { label: "新线索", tone: "muted" },
   CONTACTED: { label: "已接触", tone: "outline" },

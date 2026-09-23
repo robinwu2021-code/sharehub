@@ -31,7 +31,6 @@ const NAV: Record<string, Pair> = {
   "经营看板": { en: "Dashboard", ar: "لوحة المعلومات" },
   "设备管理": { en: "Devices", ar: "الأجهزة" },
   "工单管理": { en: "Work Orders", ar: "أوامر العمل" },
-  "站点与点位": { en: "Sites & Points", ar: "المواقع والنقاط" },
   "代理商管理": { en: "Agents", ar: "الوكلاء" },
   "订单管理": { en: "Orders", ar: "الطلبات" },
   "计费定价": { en: "Pricing", ar: "التسعير" },
@@ -45,8 +44,12 @@ const NAV: Record<string, Pair> = {
   "资产台账": { en: "Asset Ledger", ar: "سجل الأصول" },
   "在线运行": { en: "Live Ops", ar: "التشغيل المباشر" },
   "资产流转": { en: "Asset Flow", ar: "حركة الأصول" },
-  "场地资产": { en: "Site Assets", ar: "أصول المواقع" },
-  "场地方机构": { en: "Venue Partners", ar: "شركاء الأماكن" },
+  // 2026-09-23 菜单收敛第二步：「站点与点位」L1 撤销，七项并入运营管理。
+  // 原两个分组（场地资产 / 场地方机构）随之作废，换成下面按动线切的三组。
+  "场地与合同": { en: "Venues & Contracts", ar: "الأماكن والعقود" },
+  "拓展": { en: "Business Development", ar: "تطوير الأعمال" },
+  "场站报表": { en: "Site Reports", ar: "تقارير المواقع" },
+  "计费与调价": { en: "Pricing & Adjustments", ar: "التسعير والتعديلات" },
   "机构档案": { en: "Partner Profile", ar: "ملف الشريك" },
   "机构收益": { en: "Partner Earnings", ar: "أرباح الشريك" },
   "机构经营": { en: "Partner Performance", ar: "أداء الشريك" },
@@ -173,7 +176,7 @@ const NAV: Record<string, Pair> = {
   "OpenAPI 应用": { en: "OpenAPI Apps", ar: "تطبيقات OpenAPI" },
   // 运营管理新菜单（2026-09-22）
   "运营管理": { en: "Operations", ar: "إدارة العمليات" },
-  "场站管理": { en: "Sites & Pricing", ar: "المواقع والتسعير" },
+  "场站管理": { en: "Site Operations", ar: "تشغيل المواقع" },
   "基础管理": { en: "Base Data", ar: "البيانات الأساسية" },
   "站点概览": { en: "Site Overview", ar: "نظرة عامة على المواقع" },
   "收费方案": { en: "Fee Plans", ar: "خطط الرسوم" },

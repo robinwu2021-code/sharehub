@@ -25,7 +25,7 @@ const sectionKeys = (role: Role) => visibleSections(role).map((s) => s.key);
 // L1 顺序即 Rail 顺序；改动必须是有意识的产品决策，连带更新 docs。
 const L1_KEYS = [
   "my-biz", "my-asset", "my-service", // 代理端门户（portalFor: AGENT）
-  "dashboard", "operation", "device", "alarm", "workorder", "location", "agent", "order",
+  "dashboard", "operation", "device", "alarm", "workorder", "agent", "order",
   "pricing", "finance", "user", "marketing", "cs", "report", "org", "system",
 ];
 // 叶子五元组 href|label|perm|phase|group —— 2026-07-30 层级重构前后逐条比对为零差异。
@@ -34,6 +34,11 @@ const L1_KEYS = [
 //   站点与点位 › 站点管理、计费定价 › 计费模板 + 活动/时段价、
 //   系统设置 › 应用版本 + 银行管理 + 问题管理、营销管理 › 公告管理。
 // 同一张表不留两个维护入口 —— 否则「在哪个入口改的」决定别人看不看得见。
+// 2026-09-23 第二步：撤销「站点与点位」L1，它剩下的七项并入运营管理并重新分组
+// （场站管理 / 场地与合同 / 拓展 / 计费与调价 / 基础管理 / 场站报表），
+// href 一律保持 /locations?tab=…（页面没搬，只换菜单位置）。
+// 顺带：BD 拓展 CRM 补上 location:lead:read —— 它此前无 perm，跟随 section 可见，
+// 并入跨模块的运营管理后会漏给客服。
 // 2026-09-23 有意变更：phase 从三值(1/2/3)改为四值 L0-L3，28 个叶子按分级矩阵重标，
 // 并新增代理门户「申请提现」(AGT-06)。依据 docs/requirements/功能清单-分级矩阵.md §六/§七。
 const LEAF_TUPLES = [
@@ -46,14 +51,21 @@ const LEAF_TUPLES = [
   "/work-orders?view=list|设备报修|workorder:wo:create||报修与跟进",
   "/operation/overview|站点概览|location:overview:read||场站管理",
   "/operation/sites|站点管理|location:poi:read||场站管理",
-  "/operation/fee-plans|收费方案|pricing:plan:read||场站管理",
-  "/operation/fee-adjustments|预约调价|pricing:adjustment:read||场站管理",
-  "/operation/site-sharing|站点分成|finance:share_rule:read||场站管理",
-  "/operation/payee-sharing|分成方分成|finance:share_rule:read||场站管理",
+  "/locations?tab=points|点位管理|location:poi:read||场站管理",
+  "/locations?tab=venues|场地方|location:venue:read||场地与合同",
+  "/locations?tab=contracts|进场合同|location:contract:read||场地与合同",
+  "/locations?tab=crm|BD 拓展 CRM|location:lead:read||拓展",
+  "/locations?tab=onboarding|门店 Onboarding|location:venue:read|2|拓展",
+  "/locations?tab=lifecycle|门店生命周期|location:venue:read|3|拓展",
+  "/operation/fee-plans|收费方案|pricing:plan:read||计费与调价",
+  "/operation/fee-adjustments|预约调价|pricing:adjustment:read||计费与调价",
   "/operation/app-versions|应用版本|system:app_version:read||基础管理",
   "/operation/banks|银行管理|system:bank:read||基础管理",
   "/operation/problems|问题管理|system:problem:read||基础管理",
-  "/operation/notices|公告管理|marketing:notice:read||公告管理",
+  "/operation/notices|公告管理|marketing:notice:read||基础管理",
+  "/operation/site-sharing|站点分成|finance:share_rule:read||场站报表",
+  "/operation/payee-sharing|分成方分成|finance:share_rule:read||场站报表",
+  "/locations?tab=analysis|站点坪效|location:analysis:read|3|场站报表",
   "/devices|设备台账|device:cabinet:read||资产台账",
   "/devices?tab=powerbanks|充电宝管理|device:powerbank:read||资产台账",
   "/devices?tab=monitor|实时监控|device:cabinet:read||在线运行",
@@ -70,13 +82,6 @@ const LEAF_TUPLES = [
   "/work-orders?view=board|工单看板|workorder:wo:read||",
   "/work-orders?view=sla|SLA 管理||2|",
   "/work-orders?view=inspection|巡检计划||2|",
-  "/locations?tab=points|点位管理|location:poi:read||场地资产",
-  "/locations?tab=analysis|站点坪效|location:analysis:read|3|场地资产",
-  "/locations?tab=venues|场地方|location:venue:read||场地方机构",
-  "/locations?tab=contracts|进场合同|location:contract:read||场地方机构",
-  "/locations?tab=onboarding|门店 Onboarding|location:venue:read|2|场地方机构",
-  "/locations?tab=lifecycle|门店生命周期|location:venue:read|3|场地方机构",
-  "/locations?tab=crm|BD 拓展 CRM|||场地方机构",
   "/agents|代理商档案|agent:agent:read||机构档案",
   "/agents?tab=accounts|代理账号管理|agent:agent:update||机构档案",
   "/agents?tab=assign|设备/点位划拨|agent:scope:assign||机构档案",
@@ -146,9 +151,10 @@ const LEAF_TUPLES = [
   "/system?tab=openapi|OpenAPI 应用|system:openapi:read|3|开放与市场"];
 
 describe("结构回归基线（层级重构不改内容）", () => {
-  it("L1 = 16 个运营项 + 3 个代理门户项，顺序固定", () => {
+  // 2026-09-23 菜单收敛第二步：撤销「站点与点位」（16 → 15），它剩下的七项并入运营管理。
+  it("L1 = 15 个运营项 + 3 个代理门户项，顺序固定", () => {
     expect(NAV.map((s) => s.key)).toEqual(L1_KEYS);
-    expect(NAV.filter((s) => !s.portalFor)).toHaveLength(16);
+    expect(NAV.filter((s) => !s.portalFor)).toHaveLength(15);
     expect(NAV.filter((s) => s.portalFor)).toHaveLength(3);
   });
   it("叶子五元组集合与顺序逐条不变（href|label|perm|phase|group）", () => {
@@ -163,21 +169,20 @@ describe("结构回归基线（层级重构不改内容）", () => {
 });
 
 describe("A.9 角色×L1 可见性矩阵（抽查）", () => {
-  it("ADMIN 见全部 16 个运营项", () => {
+  it("ADMIN 见全部 15 个运营项", () => {
     expect(sectionKeys("ADMIN")).toEqual([
-      "dashboard", "operation", "device", "alarm", "workorder", "location", "agent", "order",
+      "dashboard", "operation", "device", "alarm", "workorder", "agent", "order",
       "pricing", "finance", "user", "marketing", "cs", "report", "org", "system",
     ]);
   });
   it("VIEWER 不见 用户/营销/客服/员工与权限/系统设置", () => {
     const keys = sectionKeys("VIEWER");
     for (const k of ["user", "marketing", "cs", "org", "system"]) expect(keys).not.toContain(k);
-    expect(keys).toEqual(expect.arrayContaining(["dashboard", "device", "location", "order", "finance", "report"]));
+    expect(keys).toEqual(expect.arrayContaining(["dashboard", "operation", "device", "order", "finance", "report"]));
   });
-  it("BD 不见 设备/告警/工单；CS 不见 站点与点位/数据报表", () => {
+  it("BD 不见 设备/告警/工单；CS 不见 数据报表", () => {
     for (const k of ["device", "alarm", "workorder"]) expect(sectionKeys("BD")).not.toContain(k);
     const cs = sectionKeys("CS");
-    expect(cs).not.toContain("location");
     expect(cs).not.toContain("report");
   });
   // 2026-07-29 对标补齐后语义变更：税率/提现规则/支付渠道属财务职责，FINANCE 因此能进系统设置
@@ -238,13 +243,14 @@ describe("L3 叶子过滤（4.2-2）", () => {
   it("VIEWER 无 agent:settlement:read → 财务不出现代理分润配置深链", () => {
     expect(visibleLeaves(finance(), "VIEWER").map((l) => l.label)).not.toContain("代理分润配置");
   });
-  it("OPS 的站点与点位：无 进场合同/站点坪效", () => {
-    const labels = visibleLeaves(sec("location"), "OPS").map((l) => l.label);
+  // 2026-09-23：这几项已并入运营管理，按 perm 过滤的结论不变——OPS 有 poi/venue，没有 contract/analysis/lead。
+  it("OPS 在运营管理：有 点位管理/场地方，无 进场合同/站点坪效/BD 拓展 CRM", () => {
+    const labels = visibleLeaves(sec("operation"), "OPS").map((l) => l.label);
+    expect(labels).toContain("点位管理");
+    expect(labels).toContain("场地方");
     expect(labels).not.toContain("进场合同");
     expect(labels).not.toContain("站点坪效");
-    // 「站点管理」2026-09-23 已归并到运营管理，本 section 只留点位
-    expect(labels).not.toContain("站点管理");
-    expect(labels).toContain("点位管理");
+    expect(labels).not.toContain("BD 拓展 CRM");
   });
 });
 
@@ -303,7 +309,8 @@ describe("默认落地与面包屑", () => {
   it("section 默认落地 = 首个可点叶子", () => {
     expect(sectionDefaultHref(sec("order"), "FINANCE")).toBe("/orders");
     expect(sectionDefaultHref(sec("device"), "OPS")).toBe("/devices");
-    expect(sectionDefaultHref(sec("location"), "FINANCE")).toBe("/locations?tab=venues");
+    // 站点与点位撤销后，FINANCE 在运营管理的首个可点叶子仍是「站点概览」
+    expect(sectionDefaultHref(sec("operation"), "FINANCE")).toBe("/operation/overview");
   });
   it("客服管理：报障受理/客服会话为 Phase 2，P1 下首个可点叶子 = 退款/补偿(/orders)", () => {
     expect(sectionDefaultHref(sec("cs"), "CS")).toBe("/orders");
@@ -350,9 +357,10 @@ describe("L2 分组（按机构/对象聚类，2026-07-29 结构优化）", () =
     const segs = groupedLeaves(visibleLeaves(sec("finance"), "ADMIN"));
     expect(segs.map((x) => x.group)).toEqual(["分润与结算", "平台账", "伙伴账", "用户账"]);
   });
-  it("站点与点位分两组：场地资产（物理）/ 场地方机构（主体）", () => {
-    const segs = groupedLeaves(visibleLeaves(sec("location"), "ADMIN"));
-    expect(segs.map((x) => x.group)).toEqual(["场地资产", "场地方机构"]);
+  // 2026-09-23：站点与点位撤销，原两组（场地资产/场地方机构）换成按动线切的分组，见下方运营管理用例。
+  it("运营管理按动线分六组", () => {
+    const segs = groupedLeaves(visibleLeaves(sec("operation"), "ADMIN"));
+    expect(segs.map((x) => x.group)).toEqual(["场站管理", "场地与合同", "拓展", "计费与调价", "基础管理", "场站报表"]);
   });
   it("RBAC 过滤后不产生空组（VIEWER 看财务）", () => {
     const segs = groupedLeaves(visibleLeaves(sec("finance"), "VIEWER"));
@@ -488,13 +496,31 @@ describe("运营管理：跨模块 section", () => {
 
   it("各角色可见的子页面与后端权限码一致", () => {
     expect(leafLabels("ADMIN")).toEqual([
-      "站点概览", "站点管理", "收费方案", "预约调价", "站点分成", "分成方分成",
+      "站点概览", "站点管理", "点位管理",
+      "场地方", "进场合同",
+      "BD 拓展 CRM", "门店 Onboarding", "门店生命周期",
+      "收费方案", "预约调价",
       "应用版本", "银行管理", "问题管理", "公告管理",
+      "站点分成", "分成方分成", "站点坪效",
     ]);
-    expect(leafLabels("OPS")).toEqual(["站点概览", "站点管理", "应用版本"]);
-    expect(leafLabels("FINANCE")).toEqual(["站点概览", "收费方案", "预约调价", "站点分成", "分成方分成", "银行管理"]);
-    expect(leafLabels("BD")).toEqual(["站点概览", "站点管理", "站点分成", "分成方分成", "公告管理"]);
-    expect(leafLabels("VIEWER")).toEqual(["站点概览", "站点管理", "站点分成", "分成方分成"]);
+    // 门店 Onboarding / 门店生命周期 用的是 location:venue:read，与「场地方」同码 ——
+    // 凡有场地方读权的角色都看得到（它们是 L2/L3，界面上灰显，不是可点项）。
+    expect(leafLabels("OPS")).toEqual([
+      "站点概览", "站点管理", "点位管理", "场地方", "门店 Onboarding", "门店生命周期", "应用版本",
+    ]);
+    expect(leafLabels("FINANCE")).toEqual([
+      "站点概览", "场地方", "进场合同", "门店 Onboarding", "门店生命周期", "收费方案", "预约调价",
+      "银行管理", "站点分成", "分成方分成", "站点坪效",
+    ]);
+    expect(leafLabels("BD")).toEqual([
+      "站点概览", "站点管理", "点位管理", "场地方", "进场合同",
+      "BD 拓展 CRM", "门店 Onboarding", "门店生命周期",
+      "公告管理", "站点分成", "分成方分成", "站点坪效",
+    ]);
+    expect(leafLabels("VIEWER")).toEqual([
+      "站点概览", "站点管理", "点位管理", "场地方", "门店 Onboarding", "门店生命周期",
+      "站点分成", "分成方分成", "站点坪效",
+    ]);
   });
 
   it("CS 没有 location 模块权限，也能通过 system/marketing 看到运营管理（多模块规则）", () => {
@@ -514,8 +540,9 @@ describe("运营管理：跨模块 section", () => {
     }
   });
 
-  it("三个分组与简电一致且顺序固定", () => {
-    expect(groupedLeaves(visibleLeaves(op(), "ADMIN")).map((g) => g.group)).toEqual(["场站管理", "基础管理", "公告管理"]);
+  it("分组与顺序固定（公告已并进「基础管理」：原先那一组只有一条同名叶子）", () => {
+    expect(groupedLeaves(visibleLeaves(op(), "ADMIN")).map((g) => g.group))
+      .toEqual(["场站管理", "场地与合同", "拓展", "计费与调价", "基础管理", "场站报表"]);
   });
 
   it("多个独立页面：路径反推与高亮按页面路径", () => {
@@ -523,14 +550,20 @@ describe("运营管理：跨模块 section", () => {
     expect(findActiveSection("/operation/site-sharing/", "ADMIN")?.key).toBe("operation");
     const leaves = visibleLeaves(op(), "ADMIN");
     expect(leaves[activeLeafIndex(leaves, "/operation/site-sharing", null, null)]?.label).toBe("站点分成");
-    expect(breadcrumb("/operation/fee-adjustments", null, null, "ADMIN")).toEqual(["运营管理", "场站管理", "预约调价"]);
+    expect(breadcrumb("/operation/fee-adjustments", null, null, "ADMIN")).toEqual(["运营管理", "计费与调价", "预约调价"]);
+    // 并进来的七项：URL 没变，归属按 match 的 /locations 前缀落到运营管理
+    expect(findActiveSection("/locations", "ADMIN")?.key).toBe("operation");
+    expect(breadcrumb("/locations", "venues", null, "ADMIN")).toEqual(["运营管理", "场地与合同", "场地方"]);
+    expect(breadcrumb("/locations", "crm", null, "BD")).toEqual(["运营管理", "拓展", "BD 拓展 CRM"]);
     // 旧菜单的同名功能不受影响
     expect(findActiveSection("/system", "ADMIN")?.key).toBe("system");
   });
 
   it("灰显完全由 backend-ready 决定（当前两种模式都不灰）", () => {
-    const rows = (op().children ?? []).map((l) =>
-      [l.href.replace("/operation/", ""), l.label, l.perm ?? "", l.group ?? ""] as [OperationPage, string, string, string]);
+    // 只有 /operation/<page> 这些叶子走 backend-ready；并进来的 /locations?tab= 七项不参与灰显。
+    const rows = (op().children ?? [])
+      .filter((l) => l.href.startsWith("/operation/"))
+      .map((l) => [l.href.replace("/operation/", ""), l.label, l.perm ?? "", l.group ?? ""] as [OperationPage, string, string, string]);
     // 2026-09-23 后端补齐后，真实模式下也不再有灰显项。
     // 这条断言**不删**：它守的是「灰显完全由 backend-ready 决定」这条机制，
     // 哪天再有新页面未就绪，它会立刻把那一项列出来。

@@ -162,24 +162,50 @@ export const NAV: NavSection[] = [
     // soon 由 backend-ready.ts 决定：真实后端模式下接口未就绪的页面灰显，mock 模式恒可点。
     key: "operation", label: "运营管理", icon: "Store", module: "location",
     modules: ["location", "pricing", "finance", "system", "marketing"],
-    href: "/operation/overview", match: ["/operation"],
-    // 2026-09-23 菜单重合收敛（docs/technical/菜单重合梳理与优化方案.md §A 类）：
-    // 下面 10 项此前**每一项都有第二个入口**，且调同一组 API —— 站点在「站点与点位」、
-    // 收费方案与时段倍率在「计费定价」、应用版本/银行/问题在「系统设置」、公告在「营销管理」。
-    // 同一张表两个维护入口，结果是「在哪个入口改的，决定别人看不看得见」。
-    // 一律**并到运营管理这一份**，旧入口连页面代码一起撤，不留跳转壳子。
-    children: opLeaves([
-      ["overview", "站点概览", "location:overview:read", "场站管理"],
-      ["sites", "站点管理", "location:poi:read", "场站管理"],
-      ["fee-plans", "收费方案", "pricing:plan:read", "场站管理"],
-      ["fee-adjustments", "预约调价", "pricing:adjustment:read", "场站管理"],
-      ["site-sharing", "站点分成", "finance:share_rule:read", "场站管理"],
-      ["payee-sharing", "分成方分成", "finance:share_rule:read", "场站管理"],
-      ["app-versions", "应用版本", "system:app_version:read", "基础管理"],
-      ["banks", "银行管理", "system:bank:read", "基础管理"],
-      ["problems", "问题管理", "system:problem:read", "基础管理"],
-      ["notices", "公告管理", "marketing:notice:read", "公告管理"],
-    ]),
+    // match 带 /locations：场地方那几页的 URL 不变（见下），面包屑与 Rail 高亮按前缀归到本 section。
+    href: "/operation/overview", match: ["/operation", "/locations"],
+    // 2026-09-23 菜单收敛（docs/technical/菜单重合梳理与优化方案.md）：
+    //
+    // 第一步（A 类重合）：站点管理、收费方案、时段倍率、应用版本、银行、问题、公告
+    // 此前**每一项都有第二个入口**且调同一组 API。一律并到本 section，旧入口连页面代码一起撤。
+    //
+    // 第二步：撤销「站点与点位」L1，它剩下的七项（点位 / 场地方 / 合同 / 进件 /
+    // 生命周期 / BD CRM / 坪效）也并进来。理由不是实体分类，是**动线**——
+    // BD 的路径是「线索 → 进件 → 签约 → 建站点 → 配收费方案 → 看分成」，而它本来就住在这里；
+    // 独立成 L1 只会把这条动线从头切成两段。场地方的全部操作都挂在站点上，
+    // 不像代理商有账号/划拨/结算/绩效一整套只属于自己的操作，故不给它独立菜单。
+    // （详见 docs/technical/菜单收敛-第二步-场地方并入运营管理.md）
+    //
+    // ⚠️ 顺序即分组：groupedLeaves 只合并**相邻**的同名 group，插叶子时别打断连续段。
+    // 场地方那七条的 href 保持 /locations?tab=…，页面一行没动 —— 菜单位置与 URL 本就可以解耦。
+    children: [
+      ...opLeaves([
+        ["overview", "站点概览", "location:overview:read", "场站管理"],
+        ["sites", "站点管理", "location:poi:read", "场站管理"],
+      ]),
+      { href: "/locations?tab=points", label: "点位管理", perm: "location:poi:read", group: "场站管理" },
+      { href: "/locations?tab=venues", label: "场地方", perm: "location:venue:read", group: "场地与合同" },
+      { href: "/locations?tab=contracts", label: "进场合同", perm: "location:contract:read", group: "场地与合同" },
+      // 必须有显式 perm：无 perm 的叶子跟随 section，而本 section 是跨模块的
+      // （system/marketing 也能进来）—— 不给码的话客服也会看到 BD 的线索池。
+      // `location:lead:read` 在 功能权限清单 §BD CRM 有登记，BD 靠 location:* 命中。
+      { href: "/locations?tab=crm", label: "BD 拓展 CRM", perm: "location:lead:read", group: "拓展" },
+      { href: "/locations?tab=onboarding", label: "门店 Onboarding", perm: "location:venue:read", phase: 2, group: "拓展" },
+      { href: "/locations?tab=lifecycle", label: "门店生命周期", perm: "location:venue:read", phase: 3, group: "拓展" },
+      ...opLeaves([
+        ["fee-plans", "收费方案", "pricing:plan:read", "计费与调价"],
+        ["fee-adjustments", "预约调价", "pricing:adjustment:read", "计费与调价"],
+        // 公告并进「基础管理」：原先它自成一组，而组名与唯一那条叶子完全同名 ——
+        // 一个只为一条叶子存在的分组标题只是多一行噪音。四项都是运营日常要维护的基础内容。
+        ["app-versions", "应用版本", "system:app_version:read", "基础管理"],
+        ["banks", "银行管理", "system:bank:read", "基础管理"],
+        ["problems", "问题管理", "system:problem:read", "基础管理"],
+        ["notices", "公告管理", "marketing:notice:read", "基础管理"],
+        ["site-sharing", "站点分成", "finance:share_rule:read", "场站报表"],
+        ["payee-sharing", "分成方分成", "finance:share_rule:read", "场站报表"],
+      ]),
+      { href: "/locations?tab=analysis", label: "站点坪效", perm: "location:analysis:read", phase: 3, group: "场站报表" },
+    ],
   },
   {
     key: "device", label: "设备管理", icon: "Server", module: "device", href: "/devices",
@@ -213,21 +239,6 @@ export const NAV: NavSection[] = [
       { href: "/work-orders?view=board", label: "工单看板", perm: "workorder:wo:read" },
       { href: "/work-orders?view=sla", label: "SLA 管理", phase: 2 },
       { href: "/work-orders?view=inspection", label: "巡检计划", phase: 2 },
-    ],
-  },
-  {
-    key: "location", label: "站点与点位", icon: "MapPin", module: "location", href: "/locations?tab=points",
-    children: [
-      // 分组：物理资产（点位）↔ 合作机构（场地方主体及其合同/进件/生命周期）
-      // 2026-09-23 撤销「站点管理」：与「运营管理 › 站点管理」调同一组 API，是同一张表的
-      // 两个维护入口。留后者 —— 它是超集（详情 8 个页签 + 暂停营业 + 统计）。
-      { href: "/locations?tab=points", label: "点位管理", perm: "location:poi:read", group: "场地资产" },
-      { href: "/locations?tab=analysis", label: "站点坪效", perm: "location:analysis:read", phase: 3, group: "场地资产" },
-      { href: "/locations?tab=venues", label: "场地方", perm: "location:venue:read", group: "场地方机构" },
-      { href: "/locations?tab=contracts", label: "进场合同", perm: "location:contract:read", group: "场地方机构" },
-      { href: "/locations?tab=onboarding", label: "门店 Onboarding", perm: "location:venue:read", phase: 2, group: "场地方机构" },
-      { href: "/locations?tab=lifecycle", label: "门店生命周期", perm: "location:venue:read", phase: 3, group: "场地方机构" },
-      { href: "/locations?tab=crm", label: "BD 拓展 CRM", group: "场地方机构" },
     ],
   },
   {
