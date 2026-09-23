@@ -32,7 +32,18 @@ import java.util.function.Predicate;
 @Component
 public class SeedData {
 
-    private static final Instant BASE = Instant.parse("2026-07-11T12:00:00Z");
+    /**
+     * 所有演示数据的时间基准。
+     *
+     * <p><b>取「当前时刻」而不是写死一个日期</b>：此前这里固定为 2026-07-11，于是不论哪天灌种子，
+     * 订单、告警、工单全都落在那一天附近 —— 演示环境一打开，经营看板与站点概览的
+     * 近 7 日 / 近 30 日**全是 0**，趋势是一条平线、排行全零。
+     * 数据明明有，页面却像坏了，而真相只是「这批数据太老」。
+     *
+     * <p>按小时取整：一次灌库过程中 BASE 保持不变，同一批数据的相对关系是确定的
+     * （合同还有多少天到期、订单隔几小时一单），只是整体跟着灌库那天走。
+     */
+    private static final Instant BASE = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.HOURS);
 
     private static final List<String> VENDORS = List.of("cd-tech", "sd-power", "chargenow");
     private static final List<String> LOCS = List.of("Dubai Mall L1", "Mall of Emirates", "DXB T3",
