@@ -25,6 +25,15 @@ public class LocSite {
      */
     private String venueNo;
 
+    /**
+     * 以哪个品牌对 C 端呈现（→ {@code md_brand.brand_no}）。
+     *
+     * <p><b>一站一品牌是硬约束</b>（2026-09-23 定）：分成、坪效、工单都按站点统计，
+     * 一站两品牌会让「这笔钱算哪个品牌的」没有答案；ADR-028 的取价也把品牌当过滤条件，
+     * 一台设备必须能解出唯一品牌。所以是一列，不是关系表。
+     */
+    private String brandNo;
+
     private String venueName;
     private String agentNo;
     private String regionId;

@@ -2,12 +2,12 @@
 // 区域、系统参数、开放平台应用、市场国家、支付渠道、业务规则、登录设置、
 // App 版本、银行字典、常见问题、税率设置。
 import type {
-  PageQ, NotifyLogQ, NotifyBlacklistQ, AppVersionQ, BankQ, ProblemQ,
+  PageQ, ArchiveQ, NotifyLogQ, NotifyBlacklistQ, AppVersionQ, BankQ, ProblemQ,
 } from "../query";
 import type {
   PageResult, Vendor, NotifyTemplate, DictEntry, Region, SysParam, OpenApiApp,
   MarketCountry, PaymentChannel, NotifyLog, NotifyLogStats, NotifyBlacklist,
-  BizRules, LoginSetting, AppVersion, BankEntry, ProblemEntry, TaxSetting,
+  BizRules, LoginSetting, AppVersion, Brand, BankEntry, ProblemEntry, TaxSetting,
   VendorProbeResult, RegionNode, NotifyTemplatePreview, NotifyTestSendPayload,
   NotifyResendPayload,
 } from "../../types";
@@ -72,6 +72,12 @@ export interface SystemApi {
   saveAppVersion(x: Partial<AppVersion> & { versionId?: string }): Promise<AppVersion>;
   /** 版本回滚：置 ROLLBACK 且灰度归零，记录保留。 */
   rollbackAppVersion(versionId: string): Promise<AppVersion>;
+  /** 品牌字典（B1）。站点的「以哪个品牌运营」从这里选。 */
+  listBrands(q?: ArchiveQ): Promise<PageResult<Brand>>;
+  saveBrand(x: Partial<Brand> & { brandNo?: string }): Promise<Brand>;
+  archiveBrand(brandNo: string): Promise<Brand>;
+  unarchiveBrand(brandNo: string): Promise<Brand>;
+
   listBanks(q?: BankQ): Promise<PageResult<BankEntry>>;
   saveBank(x: Partial<BankEntry> & { bankCode?: string }): Promise<BankEntry>;
   listProblems(q?: ProblemQ): Promise<PageResult<ProblemEntry>>;

@@ -53,6 +53,10 @@ export {
   assignAgentAssets, reclaimAgentAssets, refreshAgentAssetCounts, AgentAssignError,
 } from "./agent";
 export type { AssignmentRecordQuery, AssignableAssetQuery } from "./agent";
+// 入驻申请（ADR-030 §三）：自助与代建同表同状态机
+export {
+  applies, listAgentApplies, acceptAgentApply, auditAgentApply, createAgentApply,
+} from "./apply";
 
 export {
   orders, orderExceptions, depositRecords, reservations, freeOrders,
@@ -158,6 +162,7 @@ export {
   bizRules, getBizRules, saveBizRules,
   loginSettings, listLoginSettings, saveLoginSetting,
   appVersions, listAppVersions, saveAppVersion, rollbackAppVersion,
+  brands, listBrands, saveBrand, archiveBrand, unarchiveBrand,
   banks, listBanks, saveBank,
   problems, listProblems, saveProblem,
   taxSettings, listTaxSettings, saveTaxSetting,

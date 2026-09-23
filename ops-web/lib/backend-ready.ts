@@ -13,7 +13,7 @@ export const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK !== "0";
 
 export type OperationPage =
   | "overview" | "sites" | "fee-plans" | "fee-adjustments" | "site-sharing" | "payee-sharing"
-  | "app-versions" | "banks" | "problems" | "notices";
+  | "app-versions" | "banks" | "brands" | "problems" | "notices";
 
 /** 整页后端就绪度。依据：后端 Controller 实际存在的端点（2026-09-22 核对）。 */
 export const BACKEND_READY: Record<OperationPage, boolean> = {
@@ -28,6 +28,8 @@ export const BACKEND_READY: Record<OperationPage, boolean> = {
   "payee-sharing": true,
   "app-versions": true,
   banks: true,
+  // 品牌（B1，V50 + SysDictController 的 /api/platform/brands 四端点，2026-09-23）
+  brands: true,
   problems: true,
   notices: true,
 };

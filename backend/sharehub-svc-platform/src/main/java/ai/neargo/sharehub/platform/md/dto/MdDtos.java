@@ -17,4 +17,14 @@ public final class MdDtos {
                             String country, String currency, String swiftPrefix,
                             Integer ibanLength, String status) {
     }
+
+    /**
+     * 品牌行，镜像前端 {@code Brand}。
+     *
+     * @param marketCode 归属市场；本期不校验（待 S2 区域 → 市场链路）
+     */
+    public record BrandEntry(String brandNo, String name, String nameEn, String nameAr,
+                             String logoUrl, String supportPhone, String marketCode,
+                             String status, String archivedAt) {
+    }
 }

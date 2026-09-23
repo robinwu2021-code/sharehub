@@ -12,7 +12,8 @@ package ai.neargo.sharehub.api.platform.dto;
  *
  * @param venueNo   归属场地方 —— VENUE 层取价用（机场统一价这类，约束来自进场合同）
  * @param sceneType 场景（商场 / 机场 / 医院…）—— SCENE 层取价用
+ * @param brandNo   以哪个品牌运营 —— ADR-028 的品牌过滤条件（B1 落地后才有值）
  */
 public record SiteBrief(String siteNo, String name, String regionId,
-                        String venueNo, String sceneType) {
+                        String venueNo, String sceneType, String brandNo) {
 }

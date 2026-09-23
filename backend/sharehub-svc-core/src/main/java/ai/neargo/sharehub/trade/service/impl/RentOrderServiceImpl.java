@@ -292,7 +292,7 @@ public class RentOrderServiceImpl implements RentOrderService {
             // 机柜查不到不在这里拦（弹仓那一步自然会失败），但取价要如实反映「什么都不知道」
             return PriceQuery.ofDeviceType(DEVICE_TYPE_POWERBANK, at);
         }
-        String venueNo = null, sceneType = null, regionId = null;
+        String venueNo = null, sceneType = null, regionId = null, brandNo = null;
         SiteQueryPort port = siteQuery.getIfAvailable();
         if (port != null && c.getSiteNo() != null && !c.getSiteNo().isBlank()) {
             SiteBrief b = port.briefsByNos(java.util.List.of(c.getSiteNo()))
@@ -301,13 +301,16 @@ public class RentOrderServiceImpl implements RentOrderService {
                 venueNo = b.venueNo();
                 sceneType = b.sceneType();
                 regionId = b.regionId();
+                brandNo = b.brandNo();
             }
         }
         return new PriceQuery(
                 c.getDeviceType() == null ? DEVICE_TYPE_POWERBANK : c.getDeviceType(),
                 c.getCabinetNo(), c.getLocationNo(), c.getSiteNo(),
                 venueNo, c.getAgentNo(), sceneType, regionId,
-                c.getVendorCode(), c.getModel(), null /* brandNo 待 B1 品牌落地 */, at);
+                // 品牌取自站点（一站一品牌，B1 已落地）；站点查不到时留 null，
+                // 那一维就不参与匹配 —— 与其它层一样，缺失不当成通配。
+                c.getVendorCode(), c.getModel(), brandNo, at);
     }
 
     /**

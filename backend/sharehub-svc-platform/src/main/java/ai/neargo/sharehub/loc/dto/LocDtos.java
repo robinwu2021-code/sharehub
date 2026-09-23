@@ -29,7 +29,7 @@ public final class LocDtos {
      * @param cabinetCount  机柜数，同上
      */
     public record Site(String siteNo, String name, String venueNo, String venueName, String agentNo,
-                      String regionId, String regionName,
+                      String brandNo, String regionId, String regionName,
                       String address, java.math.BigDecimal lng, java.math.BigDecimal lat,
                       String sceneType, Integer pointCount, Integer cabinetCount, String status) {
     }

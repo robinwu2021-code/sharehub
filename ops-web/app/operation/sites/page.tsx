@@ -64,6 +64,7 @@ const OPEN_HOURS_RE = "^([01]\\d|2[0-4]):[0-5]\\d-([01]\\d|2[0-4]):[0-5]\\d(,([0
 function fieldsFor(
   venues: { value: string; label: string }[],
   regions: { value: string; label: string }[],
+  brands: { value: string; label: string }[],
 ): FieldDef[] {
   return [
     { key: "name", label: "站点名称", required: true, maxLength: 128, section: "基本信息" },
@@ -71,6 +72,9 @@ function fieldsFor(
     { key: "venueNo", label: "场地方", type: "select", required: true, section: "基本信息",
       options: [{ value: "", label: "请选择场地方" }, ...venues],
       help: "分成按场地方结算；这里选的是档案里的场地方，不是手打名字" },
+    { key: "brandNo", label: "品牌", type: "select", required: true, section: "基本信息",
+      options: [{ value: "", label: "请选择品牌" }, ...brands],
+      help: "站点以哪个品牌对 C 端呈现。**一站一品牌**——分成与坪效都按站点统计，挂两个品牌会让「这笔钱算哪个品牌的」没有答案" },
     { key: "sceneType", label: "场景类型", type: "select", required: true, section: "基本信息", options: SCENES.map((s) => ({ value: s, label: s })) },
     { key: "regionId", label: "区域", type: "select", required: true, section: "位置",
       options: [{ value: "", label: "请选择区域" }, ...regions],
@@ -157,6 +161,10 @@ function SitesInner() {
     queryKey: ["op", "region-options"],
     queryFn: () => api.listRegions({ page: 1, size: UNPAGED_SIZE }),
   });
+  const brandQ = useQuery({
+    queryKey: ["op", "brand-options"],
+    queryFn: () => api.listBrands({ page: 1, size: UNPAGED_SIZE }),
+  });
   const venueOpts = useMemo(
     () => (venueQ.data?.list ?? []).map((v) => ({ value: v.venueNo, label: `${v.name}（${v.venueNo}）` })),
     [venueQ.data],
@@ -168,7 +176,13 @@ function SitesInner() {
       .map((r) => ({ value: r.regionId, label: `${r.name}（${r.regionId}）` })),
     [regionQ.data],
   );
-  const fields = useMemo(() => fieldsFor(venueOpts, regionOpts), [venueOpts, regionOpts]);
+  // 只列启用中的品牌：停用的品牌不该再被新站点选中（已挂着它的站点不受影响）
+  const brandOpts = useMemo(
+    () => (brandQ.data?.list ?? []).filter((b) => b.status === "ENABLED")
+      .map((b) => ({ value: b.brandNo, label: `${b.name}（${b.brandNo}）` })),
+    [brandQ.data],
+  );
+  const fields = useMemo(() => fieldsFor(venueOpts, regionOpts, brandOpts), [venueOpts, regionOpts, brandOpts]);
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["op", "sites"] });
 
@@ -187,13 +201,18 @@ function SitesInner() {
     onSuccess: () => { refresh(); notify.success("已恢复营业"); },
   });
 
-  const openNew = () => { setEditing(undefined); setForm({ sceneType: "商场", status: "ACTIVE" }); };
+  // 只有一个品牌时直接预选：让人在唯一选项上点一下，是没有意义的一步
+  const openNew = () => {
+    setEditing(undefined);
+    setForm({ sceneType: "商场", status: "ACTIVE", brandNo: brandOpts.length === 1 ? brandOpts[0].value : undefined });
+  };
   const openEdit = (s: Site) => { setEditing(s); setForm({ ...s }); };
   const submit = () => {
     if (!form) return;
     if (!(form.name ?? "").trim()) { notify.error("请填写站点名称"); return; }
     if (!form.venueNo) { notify.error("请选择场地方——分成按场地方结算"); return; }
     if (!form.regionId) { notify.error("请选择区域——数据权限按区域收敛"); return; }
+    if (!form.brandNo) { notify.error("请选择品牌——站点必须以某个品牌对 C 端呈现"); return; }
 
     const lat = Number(form.lat ?? 0), lng = Number(form.lng ?? 0);
     // 经纬度填反（把 55 填进纬度）在全球范围内完全合法，但会把站点扔到印度洋，

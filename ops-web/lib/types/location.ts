@@ -14,6 +14,12 @@ export interface Site extends Archivable {
   venueNo?: string | null;
   venueName: string;
   agentNo: string | null; // 归属代理，空=平台直营
+  /**
+   * 以哪个品牌对 C 端呈现（`brands.brandNo`）。**一站一品牌是硬约束**（B1，2026-09-23）：
+   * 分成、坪效、工单都按站点统计，一站两品牌会让「这笔钱算哪个品牌的」没有答案；
+   * ADR-028 的取价也把品牌当过滤条件，一台设备必须能解出唯一品牌。
+   */
+  brandNo?: string | null;
   /** 区域字典 ID（`regions.regionId`，如 `DU-MAR`）。台账 M11：原先误存区域名。 */
   regionId: string;
   /** 区域展示名（冗余自 `regions.name`）。存 ID 是因为区域名会变、ID 不会；列表要展示故冗余一份。 */

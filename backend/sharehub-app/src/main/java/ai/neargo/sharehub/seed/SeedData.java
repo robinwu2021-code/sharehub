@@ -140,6 +140,7 @@ public class SeedData {
             sites.add(new Site("ST" + (300 + i), p(LOCS, i),
                     "VEN" + (300 + i % VENUE_NAMES.size()), p(VENUE_NAMES, i),
                     i % 3 == 0 ? null : "AG" + String.format("%03d", (i % 9) + 1),
+                    "BR-DEFAULT",   // 一站一品牌（B1）：演示数据统一挂默认品牌
                     // 种子的 REGIONS 本身就是展示名，regionId 与 regionName 在演示数据里同值
                     p(REGIONS, i), p(REGIONS, i),
                     p(LOCS, i) + ", Dubai, UAE",

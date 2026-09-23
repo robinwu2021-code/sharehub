@@ -2,8 +2,11 @@ package ai.neargo.sharehub.portal.platform;
 
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.platform.md.dto.MdDtos.BankEntry;
+import ai.neargo.sharehub.platform.md.dto.MdDtos.BrandEntry;
 import ai.neargo.sharehub.platform.md.entity.MdBank;
+import ai.neargo.sharehub.platform.md.entity.MdBrand;
 import ai.neargo.sharehub.platform.md.service.BankService;
+import ai.neargo.sharehub.platform.md.service.BrandService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,9 +31,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 public class SysDictController {
 
     private final BankService bankService;
+    private final BrandService brandService;
 
-    public SysDictController(BankService bankService) {
+    public SysDictController(BankService bankService, BrandService brandService) {
         this.bankService = bankService;
+        this.brandService = brandService;
     }
 
     // —— 银行管理（菜单叶：系统设置 › 基础字典 › 银行管理）——
@@ -82,5 +87,67 @@ public class SysDictController {
     @PreAuthorize("@perm.can('system:bank:update')")
     public Object unarchiveBank(@PathVariable String no) {
         return bankService.unarchive(no);
+    }
+
+    // —— 品牌管理（B1；菜单叶：运营管理 › 基础管理 › 品牌管理）——
+    //
+    // 为什么放在这个控制器：品牌是**字典类**实体（低频维护、纯配置读写），
+    // 与银行/问题同族，走同一套通用 CRUD。菜单位置在运营管理是**使用动线**的选择
+    // （见菜单收敛方案），与后端按域归类不矛盾 —— 路径仍是 /api/platform。
+
+    @GetMapping("/brands")
+    @PreAuthorize("@perm.can('system:brand:read')")
+    public PageResult<BrandEntry> brands(@RequestParam(required = false) Integer page,
+                                         @RequestParam(required = false) Integer size,
+                                         @RequestParam(required = false) String keyword,
+                                         @RequestParam(required = false) String status,
+                                         @RequestParam(required = false) Boolean showArchived) {
+        // showArchived 走 filters（基类在 AbstractCrudService#page 里认这个键），不是单独的入参
+        return brandService.page(page, size, keyword,
+                Map.of("status", nz(status), "showArchived", nz(showArchived == null ? null : showArchived.toString())));
+    }
+
+    /*
+     * 写操作收 **DTO 而不是实体**（B3 纪律，EntityRequestBodyRatchetTest 守着）。
+     * 上面的 banks 收实体是历史包袱、已在台账里豁免；新端点不再增加。
+     * 实体当请求体等于把 id/version/deleted/tenantId/archivedAt 一起开放给客户端，
+     * 能不能改全靠服务层记得拦 —— 而「记得」不是一种机制。
+     */
+    @PostMapping("/brands")
+    @PreAuthorize("@perm.can('system:brand:update')")
+    public BrandEntry createBrand(@RequestBody BrandEntry body) {
+        return brandService.save(toEntity(body, body.brandNo()));
+    }
+
+    @PostMapping("/brands/{brandNo}")
+    @PreAuthorize("@perm.can('system:brand:update')")
+    public BrandEntry updateBrand(@PathVariable String brandNo, @RequestBody BrandEntry body) {
+        return brandService.save(toEntity(body, brandNo));   // 路径为准，防越权改他行
+    }
+
+    /** DTO → 实体。**只搬业务字段**：id/version/deleted/archivedAt 一律由服务端掌握。 */
+    private static MdBrand toEntity(BrandEntry in, String brandNo) {
+        MdBrand e = new MdBrand();
+        e.setBrandNo(brandNo);
+        e.setName(in.name());
+        e.setNameEn(in.nameEn());
+        e.setNameAr(in.nameAr());
+        e.setLogoUrl(in.logoUrl());
+        e.setSupportPhone(in.supportPhone());
+        e.setMarketCode(in.marketCode());
+        e.setStatus(in.status());
+        return e;
+    }
+
+    @PostMapping("/brands/{no}/archive")
+    @PreAuthorize("@perm.can('system:brand:update')")
+    public Object archiveBrand(@PathVariable String no) {
+        return brandService.archive(no);
+    }
+
+    @PostMapping("/brands/{no}/unarchive")
+    @PreAuthorize("@perm.can('system:brand:update')")
+    public Object unarchiveBrand(@PathVariable String no) {
+        return brandService.unarchive(no);
     }
 }

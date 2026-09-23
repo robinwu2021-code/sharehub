@@ -5332,7 +5332,7 @@
   {
    "verb": "GET",
    "path": "/api/ops/operation/overview",
-   "perm": "location:poi:read",
+   "perm": "location:overview:read",
    "handler": "OperationController#overview",
    "summary": "",
    "params": [
@@ -7202,6 +7202,10 @@
      "type": "String"
     },
     {
+     "name": "brandNo",
+     "type": "String"
+    },
+    {
      "name": "regionId",
      "type": "String"
     },
@@ -7280,6 +7284,10 @@
      "type": "String"
     },
     {
+     "name": "brandNo",
+     "type": "String"
+    },
+    {
      "name": "regionId",
      "type": "String"
     },
@@ -7335,6 +7343,10 @@
     },
     {
      "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "brandNo",
      "type": "String"
     },
     {
@@ -7457,6 +7469,10 @@
      "type": "String"
     },
     {
+     "name": "brandNo",
+     "type": "String"
+    },
+    {
      "name": "regionId",
      "type": "String"
     },
@@ -7532,6 +7548,10 @@
     },
     {
      "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "brandNo",
      "type": "String"
     },
     {
@@ -10451,6 +10471,313 @@
      "type": "String"
     }
    ]
+  },
+  {
+   "verb": "GET",
+   "path": "/api/platform/brands",
+   "perm": "system:brand:read",
+   "handler": "SysDictController#brands",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "keyword",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "status",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "showArchived",
+     "type": "Boolean",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<BrandEntry>",
+   "returnContainer": "PageResult",
+   "returnElement": "BrandEntry",
+   "responseShape": [
+    {
+     "name": "brandNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "nameEn",
+     "type": "String"
+    },
+    {
+     "name": "nameAr",
+     "type": "String"
+    },
+    {
+     "name": "logoUrl",
+     "type": "String"
+    },
+    {
+     "name": "supportPhone",
+     "type": "String"
+    },
+    {
+     "name": "marketCode",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/platform/brands",
+   "perm": "system:brand:update",
+   "handler": "SysDictController#createBrand",
+   "summary": "",
+   "params": [],
+   "bodyType": "BrandEntry",
+   "returnType": "BrandEntry",
+   "returnContainer": null,
+   "returnElement": "BrandEntry",
+   "responseShape": [
+    {
+     "name": "brandNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "nameEn",
+     "type": "String"
+    },
+    {
+     "name": "nameAr",
+     "type": "String"
+    },
+    {
+     "name": "logoUrl",
+     "type": "String"
+    },
+    {
+     "name": "supportPhone",
+     "type": "String"
+    },
+    {
+     "name": "marketCode",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "brandNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "nameEn",
+     "type": "String"
+    },
+    {
+     "name": "nameAr",
+     "type": "String"
+    },
+    {
+     "name": "logoUrl",
+     "type": "String"
+    },
+    {
+     "name": "supportPhone",
+     "type": "String"
+    },
+    {
+     "name": "marketCode",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/platform/brands/{brandNo}",
+   "perm": "system:brand:update",
+   "handler": "SysDictController#updateBrand",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "brandNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "BrandEntry",
+   "returnType": "BrandEntry",
+   "returnContainer": null,
+   "returnElement": "BrandEntry",
+   "responseShape": [
+    {
+     "name": "brandNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "nameEn",
+     "type": "String"
+    },
+    {
+     "name": "nameAr",
+     "type": "String"
+    },
+    {
+     "name": "logoUrl",
+     "type": "String"
+    },
+    {
+     "name": "supportPhone",
+     "type": "String"
+    },
+    {
+     "name": "marketCode",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "brandNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "nameEn",
+     "type": "String"
+    },
+    {
+     "name": "nameAr",
+     "type": "String"
+    },
+    {
+     "name": "logoUrl",
+     "type": "String"
+    },
+    {
+     "name": "supportPhone",
+     "type": "String"
+    },
+    {
+     "name": "marketCode",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/platform/brands/{no}/archive",
+   "perm": "system:brand:update",
+   "handler": "SysDictController#archiveBrand",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "no",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "Object",
+   "returnContainer": null,
+   "returnElement": "Object",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/platform/brands/{no}/unarchive",
+   "perm": "system:brand:update",
+   "handler": "SysDictController#unarchiveBrand",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "no",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "Object",
+   "returnContainer": null,
+   "returnElement": "Object",
+   "responseShape": null,
+   "requestShape": null
   },
   {
    "verb": "GET",
@@ -21693,6 +22020,10 @@
     {
      "name": "sceneType",
      "type": "String"
+    },
+    {
+     "name": "brandNo",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -23822,6 +24153,11 @@
    "UNREACHABLE",
    "REMOTE_ERROR"
   ],
+  "OutboxStatus": [
+   "PENDING",
+   "SENT",
+   "FAILED"
+  ],
   "ScopeLevel": [
    "DEVICE",
    "LOCATION",
@@ -23838,6 +24174,37 @@
    "GOOGLE",
    "PHONE"
   ],
+  "DeviceKind": [
+   "POWERBANK",
+   "EV_PILE",
+   "LOCKER"
+  ],
+  "OnlineStatus": [
+   "ONLINE"
+  ],
+  "CabinetStatus": [
+   "IN_STOCK",
+   "DEPLOYED",
+   "FAULT"
+  ],
+  "PowerbankStatus": [
+   "IN_STOCK",
+   "IN_CABINET",
+   "RENTED",
+   "FAULT",
+   "LOST",
+   "SOLD"
+  ],
+  "CsSessionStatus": [
+   "ACTIVE"
+  ],
+  "CsTicketStatus": [
+   "OPEN",
+   "PROCESSING"
+  ],
+  "CsSenderType": [
+   "USER"
+  ],
   "AlarmStatus": [
    "OPEN",
    "ACKED"
@@ -23852,6 +24219,17 @@
   "AlarmRuleStatus": [
    "ACTIVE"
   ],
+  "WorkOrderStatus": [
+   "CREATED",
+   "DISPATCHED",
+   "ACCEPTED",
+   "PROCESSING",
+   "DONE",
+   "AUDITED"
+  ],
+  "WoDispatchAction": [
+   "DISPATCH"
+  ],
   "WorkOrderType": [
    "FAULT",
    "REFILL",
@@ -23859,14 +24237,27 @@
    "INSTALL",
    "REMOVE",
    "COMPLAINT"
+  ],
+  "AgentStatus": [
+   "ENABLED"
+  ],
+  "ApplyStatus": [
+   "DRAFT",
+   "SUBMITTED",
+   "REVIEWING",
+   "APPROVED",
+   "SUBMITTED"
+  ],
+  "AccountStatus": [
+   "ACTIVE"
   ]
  },
  "conflicts": {},
  "stats": {
-  "endpoints": 387,
-  "records": 282,
-  "withPerm": 327,
-  "withBody": 156,
-  "shapedResponses": 293
+  "endpoints": 392,
+  "records": 283,
+  "withPerm": 332,
+  "withBody": 158,
+  "shapedResponses": 296
  }
 }

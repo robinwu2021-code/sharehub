@@ -273,6 +273,30 @@ export interface AppVersion {
   releasedAt: string | null;
 }
 
+// —— 品牌（B1，2026-09-23）——
+/**
+ * 品牌：运营方对 C 端呈现的**经营身份**（名称、Logo、客服、协议）。
+ *
+ * 两条边界（领域模型 §五）：
+ * - **归运营方，代理商不得拥有** —— 代理商用运营方的品牌，C 端无感知，故无 agentNo；
+ * - **呈现层不是隔离层** —— 设备与用户账户全平台共享，异地归还跨品牌照常。
+ *   做成隔离层等于把 ADR-026 刚砍掉的租户换个名字建回来。
+ *
+ * 站点侧是 `Site.brandNo` 一列（一站一品牌硬约束），不是多选。
+ */
+export interface Brand extends Archivable {
+  brandNo: string;
+  name: string;
+  nameEn: string;
+  nameAr: string;
+  logoUrl: string;
+  /** 该品牌的客服电话（C 端「联系客服」用）。 */
+  supportPhone: string;
+  /** 归属市场；**本期不校验**，待 S2 的区域 → 市场链路。 */
+  marketCode?: string | null;
+  status: "ENABLED" | "DISABLED";
+}
+
 // —— §14 银行管理（系统域 · 阶段 2）——
 // 竞品只有行名；我们带国家/币种/IBAN 长度——提现收款账户校验直接读这里。
 export interface BankEntry extends Archivable {

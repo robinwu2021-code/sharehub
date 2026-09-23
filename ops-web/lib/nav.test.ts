@@ -59,6 +59,7 @@ const LEAF_TUPLES = [
   "/operation/fee-adjustments|预约调价|pricing:adjustment:read||计费与调价",
   "/operation/app-versions|应用版本|system:app_version:read||基础管理",
   "/operation/banks|银行管理|system:bank:read||基础管理",
+  "/operation/brands|品牌管理|system:brand:read||基础管理",
   "/operation/problems|问题管理|system:problem:read||基础管理",
   "/operation/notices|公告管理|marketing:notice:read||基础管理",
   "/operation/site-sharing|站点分成|finance:share_rule:read||分成",
@@ -512,7 +513,7 @@ describe("运营管理：跨模块 section", () => {
     expect(leafLabels("ADMIN")).toEqual([
       "站点概览", "站点管理", "点位管理", "站点坪效",
       "收费方案", "预约调价",
-      "应用版本", "银行管理", "问题管理", "公告管理",
+      "应用版本", "银行管理", "品牌管理", "问题管理", "公告管理",
       "站点分成", "分成方分成",
     ]);
     expect(leafLabels("OPS")).toEqual(["站点概览", "站点管理", "点位管理", "应用版本"]);

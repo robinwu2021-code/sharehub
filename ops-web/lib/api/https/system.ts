@@ -57,6 +57,11 @@ export const systemHttp: SystemApi = {
   listAppVersions: (q?: AppVersionQ) => client.get("/api/platform/app-versions", q),
   saveAppVersion: (x) => client.post(x.versionId ? `/api/platform/app-versions/${x.versionId}` : "/api/platform/app-versions", x),
   rollbackAppVersion: (id) => client.post(`/api/platform/app-versions/${id}/rollback`, {}),
+  listBrands: (q) => client.get("/api/platform/brands", q),
+  saveBrand: (x) => client.post(x.brandNo ? `/api/platform/brands/${x.brandNo}` : "/api/platform/brands", x),
+  archiveBrand: (no) => client.post(`/api/platform/brands/${no}/archive`, {}),
+  unarchiveBrand: (no) => client.post(`/api/platform/brands/${no}/unarchive`, {}),
+
   listBanks: (q?: BankQ) => client.get("/api/platform/banks", q),
   saveBank: (x) => client.post(x.bankCode ? `/api/platform/banks/${x.bankCode}` : "/api/platform/banks", x),
   listProblems: (q?: ProblemQ) => client.get("/api/platform/problems", q),

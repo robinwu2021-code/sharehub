@@ -268,7 +268,7 @@ public class LocService {
 
     private Site toSite(LocSite e, Integer pointCount) {
         return new Site(e.getSiteNo(), e.getName(), e.getVenueNo(), e.getVenueName(), e.getAgentNo(),
-                e.getRegionId(), regionName(e.getRegionId()),
+                e.getBrandNo(), e.getRegionId(), regionName(e.getRegionId()),
                 e.getAddress(), e.getLng(), e.getLat(), e.getSceneType(),
                 pointCount,
                 /*

@@ -32,7 +32,7 @@ public class LocalSiteQuery implements SiteQueryPort {
                         .in(LocSite::getSiteNo, siteNos))
                 .stream()
                 .map(s -> new SiteBrief(s.getSiteNo(), s.getName(), s.getRegionId(),
-                        s.getVenueNo(), s.getSceneType()))
+                        s.getVenueNo(), s.getSceneType(), s.getBrandNo()))
                 .toList();
     }
 }

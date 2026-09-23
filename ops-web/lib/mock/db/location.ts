@@ -31,6 +31,8 @@ export const sites: Site[] = Array.from({ length: 12 }, (_, i) => ({
   // 所以这里用同一个下标算编号。此前 mock 只有名字没有编号 —— 与真实库当初的毛病一样，
   // 「合同选站点」这类按编号过滤的联动在 mock 下会一条都筛不出来。
   venueNo: `VEN${300 + (i % VENUE_NAMES.length)}`, venueName: p(VENUE_NAMES, i),
+  // 一站一品牌（B1）：演示数据里两个品牌都用上，页面上能看出「不同站点不同品牌」
+  brandNo: i % 4 === 0 ? "BR002" : "BR-DEFAULT",
   agentNo: i % 3 === 0 ? null : `AG${String((i % 9) + 1).padStart(3, "0")}`, regionId: p(REGIONS, i).id, regionName: p(REGIONS, i).name,
   address: `${p(LOCS, i)}, Dubai, UAE`,
   lat: jitter(p(REGIONS, i).lat, i, 7), lng: jitter(p(REGIONS, i).lng, i, 11),

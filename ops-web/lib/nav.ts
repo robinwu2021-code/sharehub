@@ -193,6 +193,7 @@ export const NAV: NavSection[] = [
         // 一个只为一条叶子存在的分组标题只是多一行噪音。四项都是运营日常要维护的基础内容。
         ["app-versions", "应用版本", "system:app_version:read", "基础管理"],
         ["banks", "银行管理", "system:bank:read", "基础管理"],
+        ["brands", "品牌管理", "system:brand:read", "基础管理"],
         ["problems", "问题管理", "system:problem:read", "基础管理"],
         ["notices", "公告管理", "marketing:notice:read", "基础管理"],
         // 「分成」不是报表：这两页展示的是钱**实际分给了谁、各多少**，是分账口径本身，

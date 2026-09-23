@@ -126,6 +126,7 @@ const NAV: Record<string, Pair> = {
   "触达拉黑": { en: "Notify Blacklist", ar: "قائمة حظر الإشعارات" },
   "登录设置": { en: "Sign-in Settings", ar: "إعدادات الدخول" },
   "应用版本": { en: "App Versions", ar: "إصدارات التطبيق" },
+  "品牌管理": { en: "Brands", ar: "العلامات التجارية" },
   "银行管理": { en: "Banks", ar: "البنوك" },
   "问题管理": { en: "Issue Types", ar: "أنواع المشكلات" },
   "税率与发票": { en: "Tax & Invoice", ar: "الضريبة والفواتير" },

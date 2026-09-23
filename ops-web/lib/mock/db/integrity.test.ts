@@ -277,6 +277,8 @@ const REFS: Ref[] = [
     "scopeRef", "sites.sceneType", setOf(db.sites, (s) => s.sceneType)),
   ref("planScopes.planNo", db.planScopes, "planNo", "pricePlans.planNo",
     setOf(db.pricePlans, (p) => p.planNo)),
+  // 一站一品牌（B1）：悬空的 brandNo 会让 C 端呈现与取价的品牌过滤同时落空，且不报错
+  ref("sites.brandNo", db.sites, "brandNo", "brands.brandNo", setOf(db.brands, (b) => b.brandNo)),
 ];
 
 /** 逐条比对，返回可读的违规清单（空数组 = 通过）。 */

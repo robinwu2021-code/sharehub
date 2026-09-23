@@ -6,7 +6,7 @@
 import type {
   NotifyTemplate, DictEntry, Region, RegionNode, SysParam, OpenApiApp, MarketCountry, PaymentChannel,
   NotifyLog, NotifyLogStats, NotifyBlacklist, BizRules, LoginSetting,
-  AppVersion, BankEntry, ProblemEntry, TaxSetting, PageQuery,
+  AppVersion, Brand, BankEntry, ProblemEntry, TaxSetting, PageQuery,
   VendorProbeResult, NotifyTemplatePreview, NotifyTestSendPayload, NotifyResendPayload,
 } from "../../types";
 import { p, iso } from "./internal";
@@ -562,6 +562,32 @@ export function rollbackAppVersion(versionId: string): AppVersion {
 
 // —— §14 银行管理 ——
 // IBAN 长度是各国固定值（AE 23 / SA 24 / EG 29 …），提现收款账户按此校验。
+/**
+ * 品牌（B1）。**必须有一个可用品牌** —— 建站点时「品牌」是必填，一个都没有就建不了站点。
+ * 与后端 V50 的默认品牌同号（BR-DEFAULT），两边演示数据对得上。
+ */
+export const brands: Brand[] = [
+  { brandNo: "BR-DEFAULT", name: "ShareHub", nameEn: "ShareHub", nameAr: "شير هب",
+    logoUrl: "", supportPhone: "+97142000000", marketCode: "AE", status: "ENABLED", archivedAt: null },
+  { brandNo: "BR002", name: "迪拜快充", nameEn: "Dubai QuickCharge", nameAr: "شحن دبي السريع",
+    logoUrl: "", supportPhone: "+97142000111", marketCode: "AE", status: "ENABLED", archivedAt: null },
+  { brandNo: "BR003", name: "旧品牌（已停用）", nameEn: "Legacy Brand", nameAr: "علامة قديمة",
+    logoUrl: "", supportPhone: "", marketCode: null, status: "DISABLED", archivedAt: null },
+];
+export const listBrands = (q: PageQuery & { showArchived?: boolean } = {}) =>
+  paginate(brands.filter((x) => (q.showArchived ? true : !x.archivedAt)), q.page, q.size,
+    (x) => kwHit(q.keyword, x.brandNo, x.name, x.nameEn));
+export const saveBrand = (x: Partial<Brand>) => {
+  const name = (x.name ?? "").trim();
+  if (!name) fail("品牌名称不能为空", "Brand name is required");
+  // 同名品牌会让站点表单的下拉出现两个一模一样的选项，选错了看不出来
+  const clash = brands.find((b) => b.name === name && b.brandNo !== x.brandNo);
+  if (clash) fail(`品牌名「${name}」已被 ${clash.brandNo} 占用`, `Brand name "${name}" already exists`);
+  return upsert(brands, x, "brandNo", () => nextNo("BR", brands));
+};
+export const archiveBrand = (no: string) => archiveRow(brands, "brandNo", no);
+export const unarchiveBrand = (no: string) => unarchiveRow(brands, "brandNo", no);
+
 export const banks: BankEntry[] = [
   { bankCode: "ENBD", bankName: "阿联酋国民银行", bankNameEn: "Emirates NBD", country: "AE", currency: "AED", swiftPrefix: "EBILAEAD", ibanLength: 23, status: "ENABLED", archivedAt: null },
   { bankCode: "FAB", bankName: "阿布扎比第一银行", bankNameEn: "First Abu Dhabi Bank", country: "AE", currency: "AED", swiftPrefix: "NBADAEAA", ibanLength: 23, status: "ENABLED", archivedAt: null },
