@@ -1,0 +1,33 @@
+-- ============================================================
+-- ShareHub · 退役 v1 告警表 dev_alert
+--
+-- 【这张表为什么还在】
+-- V2 建 dev_alert（v1）；V6 建 dev_alarm 取代它，注释写明「v1 dev_alert 改造并更名」；
+-- V8 §1 写好了数据迁移 + `RENAME TABLE dev_alert TO dev_alert_deprecated_v1`，
+-- **整段被注释掉**，附言「⚠️ 先确认 dev_alarm 已建、且 dev_alert 数据已核对，再取消注释执行」。
+--
+-- 没人回来取消注释。后果：这张死表至今存在于每个库，V10__audit_columns.sql:279
+-- 还在**给一张没有任何代码读写的表加审计列**，领域模型也一直把它当现行对象登记。
+--
+-- 教训比这张表本身重要：**「以后再处理」的注释块没有任何东西会提醒你回来。**
+-- 要么现在做，要么写进待办让它显形 —— 注释掉的 SQL 两者都不是。
+--
+-- 【为什么是改名不是 DROP】
+-- 本机 pb_core 实测 0 行、无外键、无视图引用，代码零读写（仅 3 处注释提到它）。
+-- 但**别的环境的行数无法在这里确认**，所以只改名：数据原样保留、随时可改回来，
+-- 而它已经从活跃 schema 里消失。DROP 留给确认过各环境行数之后的单独一次迁移。
+--
+-- V8 里那段 dev_alert → dev_alarm 的数据搬运**仍然不执行**：列映射
+-- （alert_no→alarm_no / severity→level / code→alarm_code / message→remark）
+-- 需要人工复核，而未经复核的搬运比不搬更糟 —— 它会把错的值变成"正式数据"。
+-- 若某环境确有存量行，它们在 dev_alert_deprecated_v1 里，随时可查可搬。
+--
+-- 依据：docs/technical/实体-领域对象对账表.md §2.1.1（L0 对账裁定 1）
+-- ============================================================
+SET NAMES utf8mb4;
+
+-- IF EXISTS：重复执行安全；写法与 V16 的 `RENAME TABLE IF EXISTS ord_rent TO ord_order` 一致。
+-- 只有这一条语句 —— 本想再 `ALTER TABLE ... COMMENT` 标注"已退役"，但那条没有 IF EXISTS，
+-- 在 dev_alert 已被手工改过的库上会让整个迁移失败。表名里的 `_deprecated_v1` 已经把话说清楚，
+-- **为一句注释换来一种失败方式不划算**。
+RENAME TABLE IF EXISTS dev_alert TO dev_alert_deprecated_v1;

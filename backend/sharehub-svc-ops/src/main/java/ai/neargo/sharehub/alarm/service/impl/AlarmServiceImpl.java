@@ -151,9 +151,13 @@ public class AlarmServiceImpl implements AlarmService {
     public int autoRaiseWorkOrders() {
         // 只捞「未处理且尚无工单」的 —— wo_no 非空即已开过单，跳过。
         // **幂等靠这个条件本身**，不靠调用方记得别点两次。
+        //
+        // 状态值取自 AlarmStateMachine 的常量，不写裸串：这里原本写的是 "ACK"，
+        // 而 "ACK" 是**事件名**，落库的状态是 ACKED —— 于是已受理的告警永远开不出工单，
+        // 不报错、不留日志。差一个字母，编译器无从分辨。由 AlarmStatusVocabularyTest 守住。
         var w = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<DevAlarm>()
                 .isNull(DevAlarm::getWoNo)
-                .in(DevAlarm::getStatus, java.util.List.of("OPEN", "ACK"));
+                .in(DevAlarm::getStatus, List.of(AlarmStateMachine.OPEN, AlarmStateMachine.ACKED));
         java.util.List<DevAlarm> pending = mapper.selectList(w);
         int n = 0;
         for (DevAlarm a : pending) {
