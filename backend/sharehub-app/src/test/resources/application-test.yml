@@ -1,0 +1,74 @@
+# 测试环境配置（B2 · TDD-test-db-isolation）
+#
+# 2026-09-23 之前**测试直接连开发库 pb_core**：src/test/resources 下只有 fixtures，
+# 没有任何配置，于是 @SpringBootTest 加载主 application.yml，跑测试就是在写开发数据。
+# 两个会话并行时谁都拿不到可信的全量结果 —— B7 那天基线 11 个失败、半小时后 6 个，
+# 失败集合随另一个会话的进度漂移，每次都要先跑一遍基线才能分清"谁的失败"。
+#
+# 为什么用真 MariaDB 而不是 H2：
+#   实测 43 个迁移建 149 张表，其中 127 处 ON UPDATE CURRENT_TIMESTAMP、147 处 UNSIGNED、
+#   47 处 JSON、7 处 PARTITION —— H2 即便 MODE=MySQL 也不支持。写翻译脚本不只是工作量问题：
+#   **被翻译过的 schema 会与真迁移悄悄分叉**，测试通过的那个库结构不是生产的那个。
+#   用同引擎的真库，迁移原样跑，顺带把迁移本身也测了。Docker 不可用，Testcontainers 出局。
+
+# 库名为什么是 test_sharehub 而不是 pb_core_test：
+#   `powerbank` 账号没有 CREATE DATABASE 权限，建 pb_core_test 要等 root，一等就是一整天，
+#   期间**所有 Spring 测试都跑不了**。而 MariaDB 默认给 PUBLIC 授了
+#   `GRANT ... ON \`test\_%\`.* TO PUBLIC` —— 任何账号都能自建 test_ 开头的库并读写。
+#   一个不需要任何人批准的方案，胜过一个更好听但要等权限的名字。
+
+spring:
+  datasource:
+    # 库名可配：两个会话并行时各自设 SHAREHUB_TEST_DB（同样要以 test_ 开头才免权限），
+    # 避免再次撞库 —— 今天就被并行会话的在途迁移撞停过两次。
+    url: jdbc:mysql://127.0.0.1:3306/${SHAREHUB_TEST_DB:test_sharehub}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=UTF-8&createDatabaseIfNotExist=false
+    username: ${PB_DB_USER:powerbank}
+    password: ${PB_DB_PASS:powerbank}
+
+    hikari:
+      # 全量跑时会起很多个 Spring 上下文（属性集不同就是一个新上下文），**每个各持一个连接池**。
+      # 默认 maximumPoolSize=10，二十来个上下文就能把 MariaDB 的 max_connections 吃光 ——
+      # 表现是某个测试类报 "Too many connections"，而它自己一点问题都没有，
+      # 且**每次挂的类还不一样**（谁先跑到上限谁挂）。这种失败最容易被当成偶发而放过。
+      maximum-pool-size: 4
+      # 上下文用完不释放会攒着；测试里没有真实并发，回收积极些没有代价
+      idle-timeout: 10000
+      minimum-idle: 0
+
+  # 迁移在测试库上原样跑 —— 这既是建表，也是对 43 个迁移的一次真实验证。
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # 测试库允许从空库开始；不设 baseline 会在非空库上报错，而空库正是我们要的起点
+    baseline-on-migrate: true
+
+sharehub:
+  # ⚠️ **不要在这里全局开 seed**。2026-09-23 试过，两处立刻红：
+  #   · SecurityHotfixTest.seedersNotWiredByDefault —— 它守的正是「默认不灌演示数据」
+  #     这条生产姿态，注释明写「本类没有设 seed.enabled，走 application.yml 的默认值」。
+  #     profile 里全局开，等于把这条断言废掉，而它不会告诉你原因。
+  #   · 每个测试类各起一次上下文，种子就被灌一次 → Duplicate entry 'ST300'。
+  # 需要种子的测试**自己在类上声明**（SmokeTest 就是这么做的），谁用谁负责。
+  #
+  # 多角色免密登录（真实账号登录要等 A3 的凭据库）；生产姿态由 SecurityHotfixTest 专门守
+  dev-mode:
+    enabled: true
+  outbox:
+    dispatch:
+      # 后台轮询会和测试抢 outbox 行，让断言变成竞态
+      enabled: false
+
+  security:
+    # 登录标识哈希的 pepper。主配置默认留空且**没配就拒绝启动**（手机号取值空间小到
+    # 可以穷举，裸哈希等于明文存储）—— 这个 fail-closed 是对的，所以测试要显式给一个。
+    #
+    # 这里的值**只对测试库有意义**：pepper 一换，全表 hash 失效。测试库每次可从空库重建，
+    # 所以固定写死反而是对的 —— 随机值会让「同一条手机号两次运行算出不同 hash」这类
+    # 断言变成随机失败。生产的 pepper 走 SHAREHUB_IDENTITY_PEPPER 环境变量，与此无关。
+    identity-pepper: test-only-pepper-do-not-use-in-any-real-environment
+    identity-pepper-version: 1
+
+logging:
+  level:
+    # 迁移与建表噪音很大，出问题时再单独开
+    org.flywaydb: WARN
