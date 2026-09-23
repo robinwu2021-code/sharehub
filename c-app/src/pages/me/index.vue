@@ -25,8 +25,8 @@ function goLogin() {
 function go(url: string) {
   uni.navigateTo({ url });
 }
-function logout() {
-  userStore.logout();
+async function logout() {
+  await userStore.logout();
   wallet.value = null;
 }
 </script>

@@ -80,6 +80,9 @@ export interface McpApi {
   sendOtp(p: OtpParams): Promise<{ cooldown: number }>;
   register(p: RegisterParams): Promise<LoginResult>;
   resetPassword(p: ResetPwdParams): Promise<{ ok: true }>;
+  // 登出：**让后端真正吊销 token**。只清本地 storage 等于没登出 ——
+  // 令牌在服务端一直有效到过期（`POST /mp/auth/logout` 早就实现了吊销，前端从没调过）。
+  logout(): Promise<void>;
   getProfile(): Promise<UserProfile>;
   updateProfile(p: ProfilePatch): Promise<UserProfile>;
   // 公告

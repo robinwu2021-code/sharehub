@@ -2,11 +2,13 @@
 import { onLaunch } from "@dcloudio/uni-app";
 import { useAppStore } from "@/stores/app";
 import { useThemeStore } from "@/stores/theme";
+import { useUserStore } from "@/stores/user";
 import { initPush } from "@/ports/push";
 
 onLaunch(() => {
   useThemeStore().init(); // 皮肤 + 明暗
   useAppStore().initLocale(); // 语言 + RTL
+  useUserStore().installSessionGuard(); // 401 → 清会话并回登录页
   initPush();
 });
 </script>

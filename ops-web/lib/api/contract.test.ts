@@ -12,7 +12,7 @@ import { httpApi, HTTP_SLICES } from "./http";
 
 /** Api interface 的运行时锚：按域分组，顺序与 contracts/*.ts 一致。 */
 const API_METHODS: Record<string, readonly string[]> = {
-  dashboard: ["login", "getDashboard"],
+  dashboard: ["login", "logout", "getDashboard"],
   device: ["listCabinets", "getCabinet", "saveCabinet", "sendCommand", "listPowerbanks", "listCabinetMonitor", "listCommandRecords", "listInventoryTransfers", "listOtaRollouts", "savePowerbank", "saveInventoryTransfer", "saveOtaRollout", "listOtaReleases", "saveOtaRelease", "listOtaTasks", "listDeviceLogs", "listDeviceCodeBatches", "saveDeviceCodeBatch", "archiveCabinet", "unarchiveCabinet", "archivePowerbank", "unarchivePowerbank", "importCabinets"],
   alarm: ["listAlarmRecords", "listAlarmNotices", "listAlarmCodes", "listAlarmRules", "saveAlarmCode", "saveAlarmRule", "raiseAlarmWorkOrder", "ackAlarm", "autoRaiseWorkOrders", "resendAlarmNotice", "archiveAlarmCode", "unarchiveAlarmCode", "archiveAlarmRule", "unarchiveAlarmRule"],
   workorder: ["listWorkOrders", "createWorkOrder", "dispatchWorkOrder", "acceptWorkOrder", "processWorkOrder", "completeWorkOrder", "closeWorkOrder", "rejectWorkOrder", "reworkWorkOrder", "listSlaRules", "listInspectionPlans", "saveSlaRule", "saveInspectionPlan", "runInspectionPlan"],
@@ -85,7 +85,7 @@ describe("域切片划分", () => {
     expect(sorted(keysOf((HTTP_SLICES as Record<string, object>)[domain]))).toEqual(expected);
   });
 
-  it("方法总数仍为 279（新增/删除 API 时须自觉更新此数）", () => {
-    expect(ALL_METHODS.length).toBe(279);
+  it("方法总数仍为 280（新增/删除 API 时须自觉更新此数）", () => {
+    expect(ALL_METHODS.length).toBe(280);
   });
 });

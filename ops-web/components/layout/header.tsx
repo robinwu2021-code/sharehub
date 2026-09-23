@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { IS_MOCK } from "@/lib/api";
+import { signOut } from "@/lib/api/session";
 import { breadcrumb } from "@/lib/nav";
 import { useI18n } from "@/lib/i18n";
 import { Badge } from "@/components/ui/badge";
@@ -34,7 +35,7 @@ function Breadcrumb() {
 }
 
 export function Header() {
-  const { username, role, agentNo, logout } = useAuth();
+  const { username, role, agentNo } = useAuth();
   const { t } = useI18n();
   const router = useRouter();
   return (
@@ -57,8 +58,10 @@ export function Header() {
           variant="ghost"
           aria-label={t("common.logout")}
           title={t("common.logout")}
-          onClick={() => {
-            logout();
+          onClick={async () => {
+            // signOut 会先请后端吊销 token 再清本地 —— 只调 store 的 logout()
+            // 等于令牌在服务端一直有效到过期（本次修复前的实际行为）。
+            await signOut();
             router.push("/login");
           }}
         >

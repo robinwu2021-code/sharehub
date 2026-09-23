@@ -10,6 +10,30 @@ const BASE = import.meta.env.VITE_API_BASE || "";
 
 type Method = "GET" | "POST" | "PUT";
 
+/**
+ * 会话失效（401）回调。
+ *
+ * 为什么是「注册回调」而不是直接 import user store：
+ * store 依赖 api，api 依赖本文件 —— 本文件再 import store 就成环。
+ * 而直接在这里清 storage 也不对：pinia 里那份 token 还在内存中，
+ * 页面读的是内存那份，会出现「storage 清了、界面仍是登录态」。
+ * 所以把"怎么清"交回给 store，本文件只负责判定"什么时候该清"。
+ */
+let onUnauthorized: (() => void) | null = null;
+export function setUnauthorizedHandler(fn: () => void) {
+  onUnauthorized = fn;
+}
+
+/**
+ * 这个端点的 401 该不该当作会话失效。
+ *
+ * **认证端点除外**：验证码错、密码错时后端也返回 401，若按会话失效处理，
+ * 用户看到的是被踢回登录页，而不是"验证码错误" —— 错误提示被自己的跳转吃掉了。
+ */
+export function isSessionSensitive(path: string): boolean {
+  return !path.startsWith("/mp/auth/");
+}
+
 function authHeaders(): Record<string, string> {
   const token = uni.getStorageSync(STORAGE.token) as string;
   const h: Record<string, string> = { "Content-Type": "application/json" };
@@ -33,6 +57,10 @@ function request<T>(
         if (ok && body && body.code === 0) {
           resolve(body.data as T);
         } else {
+          // 401 = 服务端不认这个会话了（过期 / 被吊销 / 换了设备）。
+          // 不处理的话 token 还留在 storage 里，isLoggedIn 仍为真，
+          // 界面照常显示已登录，而每个请求各弹一个错。
+          if (res.statusCode === 401 && isSessionSensitive(path)) onUnauthorized?.();
           reject(new Error(body?.msg || `HTTP ${res.statusCode}`));
         }
       },

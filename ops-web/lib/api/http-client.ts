@@ -3,6 +3,7 @@
 import { currentAuth } from "../auth";
 import type { Result } from "../types";
 import { ApiError } from "./error";
+import { sessionExpired, isSessionSensitive } from "./session";
 import { useLocaleStore } from "../stores/locale";
 import { translate, LOCALE_TAG } from "../i18n";
 
@@ -45,6 +46,10 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   }
   const body = (await r.json().catch(() => ({}))) as Partial<Result<T>>;
   if (!r.ok || (body.code !== undefined && body.code !== 0)) {
+    // 401 = 服务端不认这个会话了（过期 / 被吊销 / 另一端登出）。
+    // 不处理的话，token 还留在 localStorage 里，loggedIn() 仍为真，
+    // 于是外壳照常渲染、每个请求各弹一个错 —— **已失效的会话看起来仍是登录态**。
+    if (r.status === 401 && isSessionSensitive(path)) sessionExpired();
     // 后端已本地化 message 优先；否则用状态码映射的 i18n 文案
     const msg = body.message || translate(curLocale(), statusKey(r.status));
     throw new ApiError(body.code ?? r.status, msg);

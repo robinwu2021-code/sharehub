@@ -14,7 +14,7 @@
 //   ⚠️ ready 认证的是**前端静态功能**，不是后端贯通 —— 见 NavLeaf.ready 的说明。
 // - 深链沿用 ?tab= / ?view=；本文件为纯数据+纯函数（无 React），可单测。
 import type { Role } from "./auth";
-import { can, canModule } from "./permissions";
+import { can, canModule, type MaybeRole } from "./permissions";
 import type { Phase } from "./phase";
 import { isPhaseLocked } from "./phase";
 import { pageReady, type OperationPage } from "./backend-ready";
@@ -393,7 +393,7 @@ export function leafParts(href: string): { path: string; tab: string | null; vie
 /**
  * L1 可见性 = canModule；门户 section 与通用运营 section 互斥（见 NavSection.portalFor）。
  */
-export function visibleSections(role: Role | undefined): NavSection[] {
+export function visibleSections(role: MaybeRole): NavSection[] {
   const portals = NAV.filter((s) => role && s.portalFor?.includes(role));
   const pool = portals.length > 0 ? portals : NAV.filter((s) => !s.portalFor);
   return pool.filter((s) => {
@@ -405,7 +405,7 @@ export function visibleSections(role: Role | undefined): NavSection[] {
 }
 
 /** L3 可见性 = leaf.perm ? can() : 跟随 section。phase-locked 叶子保留（灰显）。 */
-export function visibleLeaves(section: NavSection, role: Role | undefined): NavLeaf[] {
+export function visibleLeaves(section: NavSection, role: MaybeRole): NavLeaf[] {
   return (section.children ?? []).filter((l) => (l.perm ? can(role, l.perm) : true));
 }
 
@@ -428,7 +428,7 @@ export function visibleLeaves(section: NavSection, role: Role | undefined): NavL
  * @returns 已按权限过滤、按 specs 顺序排列的 tab；phase 原样带出（由 TabHeader 决定是否隐藏）
  */
 export function navTabs(
-  path: string, specs: readonly PageTabSpec[], role: Role | undefined, defaultKey?: string,
+  path: string, specs: readonly PageTabSpec[], role: MaybeRole, defaultKey?: string,
 ): { key: string; label: string; phase?: Phase }[] {
   return resolveTabs(path, specs, role, false, defaultKey).tabs;
 }

@@ -101,13 +101,23 @@ function match(pattern: string, code: string): boolean {
 }
 
 /** 按钮/操作级鉴权：角色是否拥有该权限码。 */
-export function can(role: Role | undefined, code: string): boolean {
+/**
+ * 「可能没有角色」—— 未登录（空串）与未知（undefined）在鉴权上是同一件事：**都没有权限**。
+ *
+ * 之所以让空串进类型而不是在 11 个调用点各写一次 `role || undefined`：
+ * 下面每个消费者运行时本来就 fail-closed（`if (!role) return false`），
+ * 把"没有身份"表达进类型，比让每个调用方记得转换要可靠 —— 漏转一处不会报错，
+ * 只会让未登录状态走进某个 `role === "ADMIN"` 分支。
+ */
+export type MaybeRole = Role | "" | undefined;
+
+export function can(role: MaybeRole, code: string): boolean {
   if (!role) return false;
   return ROLE_PERMS[role]?.some((p) => match(p, code)) ?? false;
 }
 
 /** 模块级（导航/页面）：角色对某模块前缀是否有任一权限。 */
-export function canModule(role: Role | undefined, module: string): boolean {
+export function canModule(role: MaybeRole, module: string): boolean {
   if (!role) return false;
   return ROLE_PERMS[role]?.some((p) => p === "*" || p === module || p.startsWith(module + ":")) ?? false;
 }

@@ -4,5 +4,6 @@ import type { DashboardApi } from "../contracts/dashboard";
 
 export const dashboardHttp: DashboardApi = {
   login: (username, password, role, agentNo) => client.post("/api/auth/login", { username, password, role, agentNo }),
+  logout: () => client.post("/api/auth/logout"),
   getDashboard: () => client.get("/api/ops/dashboard"),
 };
