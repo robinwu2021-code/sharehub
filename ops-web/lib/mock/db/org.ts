@@ -5,7 +5,7 @@ import type {
   Department, StaffPerformance, PermissionItem, PageQuery,
 } from "../../types";
 import type { Role } from "../../auth"; // 仅取角色码联合类型（type-only，不引入 store 运行时）
-import { can } from "../../permissions";
+import { roleHas } from "../../permissions";
 import { notFound, fail } from "@/lib/biz-error";
 import { VENDORS, p, iso } from "./internal";
 import { paginate, kwHit, upsert, nextNo, liveHit, archiveRow, unarchiveRow } from "./helpers";
@@ -114,8 +114,11 @@ const PERM_CATALOG: ReadonlyArray<readonly [string, string]> = [
   ["pricing:plan:create", "计费模板 新增"],
   ["pricing:plan:update", "计费模板 编辑"],
   ["pricing:plan:delete", "计费模板 归档"],
-  ["pricing:rule:read", "差异化定价 查看"],
-  ["pricing:rule:update", "差异化定价 编辑"],
+  // 2026-09-23：差异化定价退役后，这两个码由**时段倍率**继续使用（后端 PricingController
+  // 的 pricing-schedules 三个端点、前端 fee-plans 的 canSchedule）。码没变，名字得改 ——
+  // 权限树上写着一个已经不存在的功能，勾的人不知道自己在授权什么。
+  ["pricing:rule:read", "时段倍率 查看"],
+  ["pricing:rule:update", "时段倍率 编辑"],
 
   ["finance:share_rule:read", "分润规则 查看"],
   ["finance:share_rule:create", "分润规则 新增"],
@@ -232,7 +235,7 @@ const PERM_CODES = new Set(permissions.map((x) => x.code));
  * 在目录上展开得到 —— 两份手写清单必然漂移，而 permCount 与勾选树读的是同一个来源才自洽。
  */
 const rolePermMap: Record<string, string[]> = Object.fromEntries(
-  roles.map((r) => [r.roleNo, permissions.filter((x) => can(r.code as Role, x.code)).map((x) => x.code)]),
+  roles.map((r) => [r.roleNo, permissions.filter((x) => roleHas(r.code as Role, x.code)).map((x) => x.code)]),
 );
 // permCount ≡ 已分配码数（org-perm.test.ts 断言这条恒等式）
 roles.forEach((r) => { r.permCount = rolePermMap[r.roleNo].length; });

@@ -1,4 +1,4 @@
-// 覆盖范围：计费域（trade）——计费模板、差异化定价规则、时段调价。
+// 覆盖范围：计费域（trade）——收费方案、适用范围（取价唯一依据）、时段倍率。
 //
 // ⚠️ 计费字段命名规范（2026-07-29 统一，台账 T2）。曾经四处各起一套名
 // （PricePlan / PricingDiff / BillingDefaultRule / TenantConfig），后端 DTO 会被直接传染，故收敛为：

@@ -1,4 +1,4 @@
-// 覆盖范围：计费定价 —— 价格方案、差异化定价规则、分时定价规则。
+// 覆盖范围：计费定价 —— 收费方案、适用范围（取价唯一依据）、分时倍率。
 import * as db from "../../mock/db";
 import type { PricingApi } from "../contracts/pricing";
 import type { PageQ, ArchiveQ } from "../query";

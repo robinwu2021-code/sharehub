@@ -33,7 +33,6 @@ const NAV: Record<string, Pair> = {
   "工单管理": { en: "Work Orders", ar: "أوامر العمل" },
   "代理商管理": { en: "Agents", ar: "الوكلاء" },
   "订单管理": { en: "Orders", ar: "الطلبات" },
-  "计费定价": { en: "Pricing", ar: "التسعير" },
   "财务管理": { en: "Finance", ar: "المالية" },
   "用户管理": { en: "Users", ar: "المستخدمون" },
   "营销管理": { en: "Marketing", ar: "التسويق" },
