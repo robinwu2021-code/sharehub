@@ -31,10 +31,6 @@ public final class SysCtx {
                 .orElse(TENANT_MAIN);
     }
 
-    /** 当前操作人（employee_no）；无会话返回 {@code system}，用于 {@code updated_by} 留痕。 */
-    public static String operator() {
-        return SecurityUtils.currentUser().map(LoginUser::userNo).orElse("system");
-    }
 
     /** {@code LocalDateTime} → 出参字符串（时间列统一 String，避免序列化格式分歧）。 */
     public static String fmt(LocalDateTime t) {

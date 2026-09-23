@@ -41,10 +41,34 @@ public class AuditMetaObjectHandler implements MetaObjectHandler {
         strictInsertFill(metaObject, "updatedBy", String.class, who);
     }
 
+    /**
+     * 更新填充：<b>无条件覆盖</b>。
+     *
+     * <p>⚠️ 这里<b>不能</b>用 {@code strictUpdateFill} —— 它走的是
+     * {@code strictFillStrategy}，只在<b>字段为 null 时</b>才填：
+     *
+     * <pre>
+     * if (metaObject.getValue(fieldName) == null) { ... }
+     * </pre>
+     *
+     * <p>而真实的更新路径是「查出实体 → 改字段 → updateById」，查出来的 {@code updatedBy}
+     * <b>一定有值</b>，于是这两行永远被跳过。结果是 {@code updatedBy} 停在第一次写入时的
+     * 那个人，之后无论谁改都不变。
+     *
+     * <p><b>这个缺陷没有任何症状</b>：页面照常保存、接口照常返回 200，只有事后查
+     * 「这行是谁改的」时才会发现答案一直是错的 —— 而那时已经查不回来了。
+     * 2026-09-23 修复，守卫见 {@code AuditFillTest}。
+     *
+     * <p>{@code setFieldValByName} 内部有 {@code hasSetter} 判断，
+     * 所以 append 表（没有 {@code updated_*} 列）依旧安全，与 insert 侧的 strict 策略同理。
+     *
+     * <p><b>insert 侧刻意保留 strict</b>（只填空值）：数据迁移与灰度脚本会自带
+     * {@code createdBy}，那是有意的作者信息，不该被 {@code SYSTEM} 盖掉。
+     */
     @Override
     public void updateFill(MetaObject metaObject) {
-        strictUpdateFill(metaObject, "updatedAt", LocalDateTime.class, LocalDateTime.now());
-        strictUpdateFill(metaObject, "updatedBy", String.class, currentActor());
+        setFieldValByName("updatedAt", LocalDateTime.now(), metaObject);
+        setFieldValByName("updatedBy", currentActor(), metaObject);
     }
 
     private String currentActor() {

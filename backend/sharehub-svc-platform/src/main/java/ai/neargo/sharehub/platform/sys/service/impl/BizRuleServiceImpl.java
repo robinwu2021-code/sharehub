@@ -104,12 +104,13 @@ public class BizRuleServiceImpl implements BizRuleService {
             e.setCategory(category);
             e.setRule(body);
             e.setCurrency(currency == null || currency.isBlank() ? DEFAULT_CURRENCY : currency);
-            e.setUpdatedBy(SysCtx.operator());
+            // updatedBy 由 AuditMetaObjectHandler 统一写，业务不手写（见该类注释）。
+            // 此前这里手写 SysCtx.operator()，无登录态时给的是小写 "system"，
+            // 与全局审计约定的 "SYSTEM" 不一致 —— 同一个概念两种写法，聚合时会分成两行。
             mapper.insert(e);
         } else {
             cur.setRule(body);
             if (currency != null && !currency.isBlank()) cur.setCurrency(currency);
-            cur.setUpdatedBy(SysCtx.operator());
             mapper.updateById(cur);
         }
     }
