@@ -162,36 +162,26 @@ export const NAV: NavSection[] = [
     // soon 由 backend-ready.ts 决定：真实后端模式下接口未就绪的页面灰显，mock 模式恒可点。
     key: "operation", label: "运营管理", icon: "Store", module: "location",
     modules: ["location", "pricing", "finance", "system", "marketing"],
-    // match 带 /locations：场地方那几页的 URL 不变（见下），面包屑与 Rail 高亮按前缀归到本 section。
     href: "/operation/overview", match: ["/operation", "/locations"],
     // 2026-09-23 菜单收敛（docs/technical/菜单重合梳理与优化方案.md）：
     //
     // 第一步（A 类重合）：站点管理、收费方案、时段倍率、应用版本、银行、问题、公告
     // 此前**每一项都有第二个入口**且调同一组 API。一律并到本 section，旧入口连页面代码一起撤。
     //
-    // 第二步：撤销「站点与点位」L1，它剩下的七项（点位 / 场地方 / 合同 / 进件 /
-    // 生命周期 / BD CRM / 坪效）也并进来。理由不是实体分类，是**动线**——
-    // BD 的路径是「线索 → 进件 → 签约 → 建站点 → 配收费方案 → 看分成」，而它本来就住在这里；
-    // 独立成 L1 只会把这条动线从头切成两段。场地方的全部操作都挂在站点上，
-    // 不像代理商有账号/划拨/结算/绩效一整套只属于自己的操作，故不给它独立菜单。
-    // （详见 docs/technical/菜单收敛-第二步-场地方并入运营管理.md）
+    // 第二步：撤销「站点与点位」L1，点位与坪效并进来（URL 仍是 /locations，故 match 带它）。
+    //
+    // 第三步：场地方 / 合同 / BD CRM / 进件 / 生命周期 **移出本 section**，
+    // 独立成「场地方与拓展」L1 —— 拓展是签约前的获客，不是经营已有站点；
+    // 而分成是分账动作、不是报表，故原「场站报表」组改名「分成」，坪效归回场站管理。
     //
     // ⚠️ 顺序即分组：groupedLeaves 只合并**相邻**的同名 group，插叶子时别打断连续段。
-    // 场地方那七条的 href 保持 /locations?tab=…，页面一行没动 —— 菜单位置与 URL 本就可以解耦。
     children: [
       ...opLeaves([
         ["overview", "站点概览", "location:overview:read", "场站管理"],
         ["sites", "站点管理", "location:poi:read", "场站管理"],
       ]),
       { href: "/locations?tab=points", label: "点位管理", perm: "location:poi:read", group: "场站管理" },
-      { href: "/locations?tab=venues", label: "场地方", perm: "location:venue:read", group: "场地与合同" },
-      { href: "/locations?tab=contracts", label: "进场合同", perm: "location:contract:read", group: "场地与合同" },
-      // 必须有显式 perm：无 perm 的叶子跟随 section，而本 section 是跨模块的
-      // （system/marketing 也能进来）—— 不给码的话客服也会看到 BD 的线索池。
-      // `location:lead:read` 在 功能权限清单 §BD CRM 有登记，BD 靠 location:* 命中。
-      { href: "/locations?tab=crm", label: "BD 拓展 CRM", perm: "location:lead:read", group: "拓展" },
-      { href: "/locations?tab=onboarding", label: "门店 Onboarding", perm: "location:venue:read", phase: 2, group: "拓展" },
-      { href: "/locations?tab=lifecycle", label: "门店生命周期", perm: "location:venue:read", phase: 3, group: "拓展" },
+      { href: "/locations?tab=analysis", label: "站点坪效", perm: "location:analysis:read", phase: 3, group: "场站管理" },
       ...opLeaves([
         ["fee-plans", "收费方案", "pricing:plan:read", "计费与调价"],
         ["fee-adjustments", "预约调价", "pricing:adjustment:read", "计费与调价"],
@@ -201,10 +191,11 @@ export const NAV: NavSection[] = [
         ["banks", "银行管理", "system:bank:read", "基础管理"],
         ["problems", "问题管理", "system:problem:read", "基础管理"],
         ["notices", "公告管理", "marketing:notice:read", "基础管理"],
-        ["site-sharing", "站点分成", "finance:share_rule:read", "场站报表"],
-        ["payee-sharing", "分成方分成", "finance:share_rule:read", "场站报表"],
+        // 「分成」不是报表：这两页展示的是钱**实际分给了谁、各多少**，是分账口径本身，
+        // 不是给人分析用的统计。组名叫报表会让人以为它可改可不看。
+        ["site-sharing", "站点分成", "finance:share_rule:read", "分成"],
+        ["payee-sharing", "分成方分成", "finance:share_rule:read", "分成"],
       ]),
-      { href: "/locations?tab=analysis", label: "站点坪效", perm: "location:analysis:read", phase: 3, group: "场站报表" },
     ],
   },
   {
@@ -239,6 +230,24 @@ export const NAV: NavSection[] = [
       { href: "/work-orders?view=board", label: "工单看板", perm: "workorder:wo:read" },
       { href: "/work-orders?view=sla", label: "SLA 管理", phase: 2 },
       { href: "/work-orders?view=inspection", label: "巡检计划", phase: 2 },
+    ],
+  },
+  {
+    // 2026-09-23 第三步新增：场地方这条线从运营管理拆出。
+    // 与「代理商管理」对称 —— 两类合作主体各有自己的档案、协议与生命周期。
+    // 为什么不塞在运营管理里：**拓展是签约前的获客**（线索 → 进件 → 签约），
+    // 与经营已有站点是两件事、两拨人；混在一个菜单里，运营每天要从一堆线索里找自己的站点。
+    // 页面在 /venues（从 /locations 拆出）：一个 URL 只能属于一个 L1，
+    // 否则面包屑与 Rail 高亮必错一边（findActiveSection 按路径前缀定归属）。
+    key: "venue", label: "场地方与拓展", icon: "Building2", module: "location", href: "/venues?tab=venues",
+    match: ["/venues"],
+    children: [
+      { href: "/venues?tab=venues", label: "场地方", perm: "location:venue:read", group: "机构档案" },
+      { href: "/venues?tab=contracts", label: "进场合同", perm: "location:contract:read", group: "机构档案" },
+      // 必须有显式 perm：无 perm 的叶子跟随 section，客服/运维不该看到 BD 的线索池。
+      { href: "/venues?tab=crm", label: "BD 拓展 CRM", perm: "location:lead:read", group: "拓展" },
+      { href: "/venues?tab=onboarding", label: "门店 Onboarding", perm: "location:venue:read", phase: 2, group: "拓展" },
+      { href: "/venues?tab=lifecycle", label: "门店生命周期", perm: "location:venue:read", phase: 3, group: "拓展" },
     ],
   },
   {

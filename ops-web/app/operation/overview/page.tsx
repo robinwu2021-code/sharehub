@@ -57,8 +57,8 @@ const KIND_LABEL: Record<AttentionItem["kind"], string> = {
 const KIND_FIX: Record<AttentionItem["kind"], { href: string; label: string }> = {
   ALL_OFFLINE: { href: "/devices", label: "查看设备" },
   NO_CABINET: { href: "/operation/sites", label: "查看站点" },
-  CONTRACT_EXPIRED: { href: "/locations?tab=contracts", label: "查看合同" },
-  CONTRACT_SOON: { href: "/locations?tab=contracts", label: "查看合同" },
+  CONTRACT_EXPIRED: { href: "/venues?tab=contracts", label: "查看合同" },
+  CONTRACT_SOON: { href: "/venues?tab=contracts", label: "查看合同" },
   NO_PRICE_PLAN: { href: "/operation/fee-plans", label: "配置方案" },
   NO_SHARING: { href: "/finance?tab=rules", label: "配置分成" },
   NO_ORDER: { href: "/operation/sites", label: "查看站点" },
