@@ -9,6 +9,9 @@ import type { Site, SitePoint } from "../../types";
 import { wait } from "./_wait";
 
 export const locationMock: LocationApi = {
+  listSiteAgents: (siteNo) => wait(db.listSiteAgents(siteNo)),
+  saveSiteAgent: async (siteNo, x) => wait(db.saveSiteAgent(siteNo, x), 350),
+  removeSiteAgent: async (siteNo, id) => wait(db.removeSiteAgent(siteNo, id), 350),
   listSites: (q: ArchiveQ = {}) =>
     wait(db.paginate(db.sites, q.page, q.size, (s) => db.liveHit(s, q.showArchived) && db.kwHit(q.keyword, s.name, s.venueName, s.regionId))),
   // async：让 assertSiteCoords 抛的 SiteCoordError 变成 rejected promise，交给全局 MutationCache 弹错

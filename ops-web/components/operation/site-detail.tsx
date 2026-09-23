@@ -9,7 +9,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus } from "lucide-react";
 import { RECENT_LIMIT, UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
-import type { Site, SitePoint, Cabinet, Contract, PlanScope, ShareRule, AuditEntry } from "@/lib/types";
+import type {
+  Site, SitePoint, Cabinet, Contract, PlanScope, ShareRule, AuditEntry, SiteAgent, SiteAgentRole,
+} from "@/lib/types";
+import { SITE_AGENT_ROLES } from "@/lib/types";
 import { useCan } from "@/lib/hooks/use-can";
 import { notify } from "@/lib/notify";
 import { money, fmtTime } from "@/lib/utils";
@@ -18,6 +21,7 @@ import { Drawer } from "@/components/ui/drawer";
 import { Tabs } from "@/components/ui/tabs";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
+import { Notice } from "@/components/ui/notice";
 import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState, Skeleton } from "@/components/ui/misc";
@@ -29,6 +33,7 @@ const TABS = [
   { key: "points", label: "点位" },
   { key: "cabinets", label: "机柜" },
   { key: "contracts", label: "合同" },
+  { key: "partners", label: "合作伙伴" },
   { key: "pricing", label: "计费" },
   { key: "sharing", label: "分成" },
   { key: "stats", label: "统计" },
@@ -66,6 +71,7 @@ export function SiteDetailDrawer({
   const active = TABS.some((t) => t.key === tab) ? tab! : "basic";
   const [pointForm, setPointForm] = useState<Partial<SitePoint> | null>(null);
   const [editingPoint, setEditingPoint] = useState<SitePoint | undefined>();
+  const [partnerForm, setPartnerForm] = useState<Partial<SiteAgent> | null>(null);
 
   // 站点本体：列表页已有数据，但深链直接打开时列表可能还没加载，故独立取一次
   const siteQ = useQuery({
@@ -90,6 +96,34 @@ export function SiteDetailDrawer({
     queryFn: () => api.listContracts({ page: 1, size: UNPAGED_SIZE }),
     enabled: !!siteNo && ["contracts", "sharing"].includes(active),
   });
+  /*
+   * 站点上的伙伴责任（ADR-027 §三）。一个站点上有四件事各有其人：
+   * 谁出的钱、谁找来的、谁在维护、谁牵的线 —— 压成一个比例就不可追溯，
+   * 结算争议时说不清「这 8% 里几个点是运维、几个点是出资」。
+   */
+  const partnersQ = useQuery({
+    queryKey: ["op", "site-agents", siteNo],
+    queryFn: () => api.listSiteAgents(siteNo!),
+    enabled: !!siteNo && active === "partners",
+  });
+  const agentOptsQ = useQuery({
+    queryKey: ["op", "agent-options-for-site"],
+    queryFn: () => api.listAgents({ page: 1, size: UNPAGED_SIZE }),
+    enabled: !!siteNo && active === "partners",
+  });
+  const savePartner = useMutation({
+    mutationFn: (v: Partial<SiteAgent>) => api.saveSiteAgent(siteNo!, v),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["op", "site-agents", siteNo] });
+      notify.success("已保存");
+      setPartnerForm(null);
+    },
+  });
+  const removePartner = useMutation({
+    mutationFn: (id: number) => api.removeSiteAgent(siteNo!, id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["op", "site-agents", siteNo] }); notify.success("已撤销"); },
+  });
+
   const pricingQ = useQuery({
     queryKey: ["op", "site-pricing", siteNo],
     queryFn: async () => {
@@ -251,6 +285,94 @@ export function SiteDetailDrawer({
           empty="这个站点没有进场合同。合同决定给场地方的分成比例，没有合同意味着分成无依据。"
         />
       )}
+
+      {site && active === "partners" && (() => {
+        const ROLE: StatusMap<SiteAgentRole> = {
+          INVEST: { label: "出资", tone: "outline" },
+          DEVELOP: { label: "拓展", tone: "default" },
+          OPERATE: { label: "运维", tone: "success" },
+          REFER: { label: "牵线", tone: "muted" },
+        };
+        const WHY: Record<SiteAgentRole, string> = {
+          INVEST: "买设备的人，分资产收益",
+          DEVELOP: "找场地、谈判、签合同的人",
+          OPERATE: "装机补货维修接工单，并负责经营优化",
+          REFER: "只介绍关系不谈判；介绍费签约时一次性付，不进逐单分润",
+        };
+        const agentOpts = (agentOptsQ.data?.list ?? [])
+          .filter((a) => !a.archivedAt)
+          .map((a) => ({ value: a.agentNo, label: `${a.name}（${a.agentNo}）` }));
+        const fields: FieldDef[] = [
+          { key: "agentNo", label: "合作伙伴", type: "select", required: true, section: "责任",
+            options: [{ value: "", label: "请选择合作伙伴" }, ...agentOpts] },
+          { key: "role", label: "承担的责任", type: "select", required: true, section: "责任",
+            options: SITE_AGENT_ROLES.map((r) => ({ value: r, label: `${ROLE[r].label} —— ${WHY[r]}` })),
+            help: "同一个人在同一个站点，「牵线」与「拓展」只能算其一——牵线是拓展的弱形式" },
+          { key: "remark", label: "依据", maxLength: 256, section: "责任",
+            placeholder: "如：全程谈下进场合同",
+            help: "结算争议时用它回答「凭什么是这个责任」，一句人话即可" },
+          { key: "effectiveFrom", label: "生效起", type: "date", section: "生效期", help: "留空 = 立即" },
+          { key: "effectiveTo", label: "生效止", type: "date", section: "生效期", help: "留空 = 长期" },
+        ];
+        const cols: Column<SiteAgent>[] = [
+          { header: "伙伴", cell: (r) => (
+            <div className="min-w-0">
+              <div className="truncate">{r.agentName ?? r.agentNo}</div>
+              <div className="truncate txt-caption text-muted-foreground">
+                {r.agentNo}{r.agentType === "CITY_PARTNER" ? " · 城市合伙人" : ""}
+              </div>
+            </div>
+          ) },
+          { header: "责任", className: "whitespace-nowrap", cell: (r) => <StatusBadge map={ROLE} value={r.role} /> },
+          { header: "依据", cell: (r) => <span className="txt-caption text-muted-foreground">{r.remark || "—"}</span> },
+          { header: "生效期", className: "whitespace-nowrap", cell: (r) => (
+            <span className="txt-caption text-muted-foreground">
+              {(r.effectiveFrom ?? "").slice(0, 10) || "立即"} ~ {(r.effectiveTo ?? "").slice(0, 10) || "长期"}
+            </span>
+          ) },
+          { header: "操作", cell: (r) => (
+            <div className="flex w-max gap-2">
+              <Button size="sm" variant="outline" onClick={() => setPartnerForm({ ...r })}>编辑</Button>
+              <Button size="sm" variant="outline" onClick={() => r.id != null && removePartner.mutate(r.id)}>撤销</Button>
+            </div>
+          ) },
+        ];
+        return (
+          <div>
+            <Notice>
+              一个站点上「谁出的钱、谁找来的、谁在维护、谁牵的线」各有其位，各拿各的钱。
+              <b>责任决定分钱，只有运营方能配。</b>
+              目前配了也不改变分账 —— 按责任分条生成分润是下一批（A2-2）。
+            </Notice>
+            <div className="my-3">
+              <Button size="sm" onClick={() => setPartnerForm({ role: "OPERATE" })}>
+                <Plus className="size-4" /> 新增责任
+              </Button>
+            </div>
+            <DataTable
+              rowKey={(r: SiteAgent) => String(r.id)}
+              columns={cols}
+              rows={partnersQ.data}
+              loading={partnersQ.isLoading}
+              error={partnersQ.error}
+              onRetry={partnersQ.refetch}
+              empty="这个站点还没有配责任。没有责任行时，分账按站点归属的那个代理走老路（A2-2 之后仍有回落）。"
+            />
+            <FormDrawer
+              open={!!partnerForm}
+              onOpenChange={(o) => !o && setPartnerForm(null)}
+              titleNew="新增责任"
+              titleEdit="编辑责任"
+              isEdit={partnerForm?.id != null}
+              fields={fields}
+              value={(partnerForm ?? {}) as Record<string, unknown>}
+              onChange={(v) => setPartnerForm(v as Partial<SiteAgent>)}
+              onSubmit={() => partnerForm && savePartner.mutate(partnerForm)}
+              submitting={savePartner.isPending}
+            />
+          </div>
+        );
+      })()}
 
       {site && active === "pricing" && (
         <div>

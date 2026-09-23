@@ -8,6 +8,9 @@ import ai.neargo.sharehub.operation.dto.OperationDtos.SiteSharingRow;
 import ai.neargo.sharehub.operation.dto.OperationDtos.SiteStats;
 import ai.neargo.sharehub.operation.service.OperationOverviewService;
 import ai.neargo.sharehub.operation.service.SharingQueryService;
+import ai.neargo.sharehub.common.OkResult;
+import ai.neargo.sharehub.loc.ext.dto.SiteAgentDtos.SiteAgentRow;
+import ai.neargo.sharehub.loc.ext.service.SiteAgentService;
 import ai.neargo.sharehub.trade.price.service.PriceAdjustmentService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -31,12 +34,14 @@ public class OperationController {
     private final OperationOverviewService overview;
     private final SharingQueryService sharing;
     private final PriceAdjustmentService adjustments;
+    private final SiteAgentService siteAgents;
 
     public OperationController(OperationOverviewService overview, SharingQueryService sharing,
-                               PriceAdjustmentService adjustments) {
+                               PriceAdjustmentService adjustments, SiteAgentService siteAgents) {
         this.overview = overview;
         this.sharing = sharing;
         this.adjustments = adjustments;
+        this.siteAgents = siteAgents;
     }
 
     // ——— 站点概览 / 单站统计 ———
@@ -153,5 +158,31 @@ public class OperationController {
                                                     @RequestParam(required = false) String keyword,
                                                     @RequestParam(required = false) String payeeType) {
         return sharing.pagePayees(page, size, keyword, payeeType);
+    }
+
+    // —— 站点上的伙伴责任（ADR-027 §三 / TDD-A2 第 1 批）——
+    //
+    // 只有运营方能配：责任直接决定分钱，伙伴自助是 L3 的事。
+    // 权限码复用 location:poi:*（它就是「站点档案维护」的码）—— 责任是站点档案的一部分，
+    // 不为它新造一个码：新码要先补 SSOT、再给角色、再对前后端两处，而语义与站点维护并无区别。
+
+    @GetMapping("/api/ops/sites/{siteNo}/agents")
+    @PreAuthorize("@perm.can('location:poi:read')")
+    public List<SiteAgentRow> siteAgents(@PathVariable String siteNo) {
+        return siteAgents.ofSite(siteNo);
+    }
+
+    @PostMapping("/api/ops/sites/{siteNo}/agents")
+    @PreAuthorize("@perm.can('location:poi:update')")
+    public SiteAgentRow saveSiteAgent(@PathVariable String siteNo, @RequestBody SiteAgentRow body) {
+        return siteAgents.upsert(siteNo, body);   // 路径为准，body 里的 siteNo 不采信
+    }
+
+    /** 契约禁止 delete*，用 remove。撤销就是删这一行（见实体注释：数组列的读-改-写会静默覆盖）。 */
+    @PostMapping("/api/ops/sites/{siteNo}/agents/{id}/remove")
+    @PreAuthorize("@perm.can('location:poi:update')")
+    public OkResult removeSiteAgent(@PathVariable String siteNo, @PathVariable Long id) {
+        siteAgents.remove(siteNo, id);
+        return new OkResult(true);
     }
 }

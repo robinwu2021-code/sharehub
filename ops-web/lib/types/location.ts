@@ -166,6 +166,40 @@ export interface LeadFollowUpReq {
   owner?: string;
   nextAt?: string;
 }
+/**
+ * 伙伴在某个站点承担的责任（ADR-027 §二）。
+ *
+ * 4 档而不是 ADR 原议的 5 档：效果管理（MANAGE）先并进 `OPERATE` —— 首批伙伴多半两件都做，
+ * 分开只会让每站多配一行、每单多一条分润记录，而受益方与比例完全一样。
+ * 要分时再加一档不迁移任何数据；反向（把合并过的拆回去）才要迁。
+ */
+export const SITE_AGENT_ROLES = ["INVEST", "DEVELOP", "OPERATE", "REFER"] as const;
+export type SiteAgentRole = (typeof SITE_AGENT_ROLES)[number];
+
+/**
+ * 站点上的一行伙伴责任。
+ *
+ * **一行一责任**，撤销就是删这一行 —— 不用数组列：数组上撤销单个角色是读-改-写，
+ * 两人同时改会互相覆盖，而覆盖的后果是有人多分了钱且不报错。
+ */
+export interface SiteAgent {
+  /** 本表没有业务号（它是站点与伙伴之间的一条关系），故用 id。新增时为空。 */
+  id?: number;
+  siteNo: string;
+  agentNo: string;
+  /** 冗余展示名，出参才有；入参传了也不采信。 */
+  agentName?: string | null;
+  /** 伙伴的登记类型（A1），只作展示。 */
+  agentType?: string | null;
+  role: SiteAgentRole;
+  /** 该责任对应的分润规则；空 = 用登记类型默认费率。 */
+  ruleNo?: string | null;
+  effectiveFrom?: string | null;
+  effectiveTo?: string | null;
+  /** 为什么是这个责任 —— 结算争议时的人话依据。 */
+  remark?: string;
+}
+
 export interface SiteAnalysis {
   siteNo: string;
   siteName: string;

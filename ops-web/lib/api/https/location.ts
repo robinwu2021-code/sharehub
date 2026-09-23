@@ -5,6 +5,9 @@ import type { LocationApi } from "../contracts/location";
 import type { PageQ, ArchiveQ , ReportQ } from "../query";
 
 export const locationHttp: LocationApi = {
+  listSiteAgents: (siteNo) => client.get(`/api/ops/sites/${siteNo}/agents`),
+  saveSiteAgent: (siteNo, x) => client.post(`/api/ops/sites/${siteNo}/agents`, x),
+  removeSiteAgent: (siteNo, id) => client.post(`/api/ops/sites/${siteNo}/agents/${id}/remove`, {}),
   listSites: (q?: ArchiveQ) => client.get("/api/ops/sites", q),
   saveSite: (s) => client.post(s.siteNo ? `/api/ops/sites/${s.siteNo}` : "/api/ops/sites", s),
   listLocations: (q?: ArchiveQ) => client.get("/api/ops/locations", q),

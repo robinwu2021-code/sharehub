@@ -4,10 +4,16 @@ import type { PageQ, ArchiveQ , ReportQ } from "../query";
 import type {
   PageResult, Site, SitePoint, Venue, Contract, ContractAttachmentReq,
   Lead, LeadFollowUp, LeadFollowUpReq, SiteAnalysis,
-  VenueOnboarding, SiteLifecycle, SiteStageChangeReq,
+  VenueOnboarding, SiteLifecycle, SiteStageChangeReq, SiteAgent,
 } from "../../types";
 
 export interface LocationApi {
+  /** 站点上的伙伴责任（ADR-027）。只有运营方能配——责任直接决定分钱。 */
+  listSiteAgents(siteNo: string): Promise<SiteAgent[]>;
+  saveSiteAgent(siteNo: string, x: Partial<SiteAgent>): Promise<SiteAgent>;
+  /** 契约禁止 delete*，用 remove。撤销就是删这一行。 */
+  removeSiteAgent(siteNo: string, id: number): Promise<{ ok: boolean }>;
+
   listSites(q?: ArchiveQ): Promise<PageResult<Site>>;
   saveSite(s: Partial<Site> & { siteNo?: string }): Promise<Site>;
   listLocations(q?: ArchiveQ): Promise<PageResult<SitePoint>>;
