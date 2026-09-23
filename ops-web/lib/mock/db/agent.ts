@@ -4,12 +4,13 @@
 import type {
   Agent, AgentAssignment, AgentPerformance, AgentAccount, AgentCommission,
   AgentAssignmentRecord, AssignableAsset, AssignAssetsPayload, ReclaimAssetsPayload,
-  AssetType, AssignAction, PageQuery,
+  AssetType, AssignAction, PageQuery, SiteAgent,
 } from "../../types";
 import { p, iso, phone, OPERATORS } from "./internal";
 import { paginate, kwHit, upsert, nextNo, archiveRow, unarchiveRow } from "./helpers";
 import { cabinets } from "./device";
 import { sites } from "./location";
+import { fail, notFound } from "@/lib/biz-error";
 
 export const agents: Agent[] = Array.from({ length: 9 }, (_, i) => ({
   agentNo: `AG${String(i + 1).padStart(3, "0")}`, name: p(["North Hub", "Marina Partner", "Deira Agent", "Airport Ops", "JBR Franchise"], i),
@@ -107,8 +108,23 @@ const agentNameOf = (agentNo: string) => {
   return a.name;
 };
 
-/** 划拨流水（审计）。种子取「当前确实归属某代理」的前几项资产，保证流水与归属现状不矛盾。 */
-export const agentAssignmentRecords: AgentAssignmentRecord[] = [
+/**
+ * 划拨流水（审计）。种子取「当前确实归属某代理」的前几项资产，保证流水与归属现状不矛盾。
+ *
+ * ⚠️ **惰性初始化，不能在模块顶层就地求值**。
+ *
+ * 它读的 `cabinets` / `sites` 来自 device / location 两个模块，而那两个模块（直接或间接）
+ * 又会 import 本模块 —— 只要这条环存在，本模块被先求值时 `cabinets` 就是 `undefined`，
+ * 表现是 `Cannot read properties of undefined (reading 'filter')`，**整批 mock 测试全挂**，
+ * 而错误信息完全看不出真正的成因是「谁 import 了谁」。
+ *
+ * 2026-09-23 实测：location 新增一行 `import { agents } from "./agent"` 就闭合了
+ * `device → location → agent → device`，当场炸掉 20 余个测试文件。
+ * 改成 getter 之后，求值推迟到第一次读取，那时三个模块都已初始化完 —— 环还在，但不再致命。
+ */
+let _assignmentRecords: AgentAssignmentRecord[] | null = null;
+function buildAssignmentRecords(): AgentAssignmentRecord[] {
+  return [
   ...cabinets.filter((c) => c.agentNo).slice(0, 6).map((c, i) => ({
     assignmentNo: `ASG${5000 + i}`, agentNo: c.agentNo!, agentName: agentNameOf(c.agentNo!),
     assetType: "CABINET" as AssetType, assetNo: c.cabinetNo, action: "ASSIGN" as AssignAction,
@@ -120,6 +136,44 @@ export const agentAssignmentRecords: AgentAssignmentRecord[] = [
     operatorName: p(OPERATORS, i + 1), createdAt: iso((i + 2) * 86400_000),
   })),
 ].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+}
+
+/**
+ * 用 getter 而不是函数，是为了**不改调用方**：现有 13 处都是当数组用的
+ * （`db.agentAssignmentRecords.filter(...)`），改成函数要逐处加括号。
+ */
+export const agentAssignmentRecords: AgentAssignmentRecord[] = new Proxy([] as AgentAssignmentRecord[], {
+  /*
+   * ⚠️ **五个 trap 一个都不能少**，尤其是 set。
+   * 少了 set 的话，`push` 写的是那个空的 target 而不是真数组 ——
+   * 读得到种子、却读不到刚写进去的划拨流水，而且不报任何错。
+   * （实测：只写 get/has/ownKeys 时，assign.test.ts 的 4 条断言全挂在这上面。）
+   */
+  get(_t, prop, recv) {
+    _assignmentRecords ??= buildAssignmentRecords();
+    return Reflect.get(_assignmentRecords, prop, recv);
+  },
+  set(_t, prop, value) {
+    _assignmentRecords ??= buildAssignmentRecords();
+    return Reflect.set(_assignmentRecords, prop, value);
+  },
+  deleteProperty(_t, prop) {
+    _assignmentRecords ??= buildAssignmentRecords();
+    return Reflect.deleteProperty(_assignmentRecords, prop);
+  },
+  has(_t, prop) {
+    _assignmentRecords ??= buildAssignmentRecords();
+    return Reflect.has(_assignmentRecords, prop);
+  },
+  ownKeys() {
+    _assignmentRecords ??= buildAssignmentRecords();
+    return Reflect.ownKeys(_assignmentRecords);
+  },
+  getOwnPropertyDescriptor(_t, prop) {
+    _assignmentRecords ??= buildAssignmentRecords();
+    return Reflect.getOwnPropertyDescriptor(_assignmentRecords, prop);
+  },
+});
 
 export type AssignmentRecordQuery = PageQuery & { agentNo?: string; assetType?: string; action?: string };
 export const listAgentAssignmentRecords = (q: AssignmentRecordQuery = {}) =>
@@ -226,3 +280,101 @@ export function reclaimAgentAssets(x: ReclaimAssetsPayload): AgentAssignmentReco
 
 // 种子归属就位后先对齐一次计数（否则首屏 agents.cabinetCount 全是占位的 0）
 refreshAgentAssetCounts();
+
+/**
+ * 站点上的伙伴责任（ADR-027 §三）。
+ *
+ * ⚠️ 放在 agent.ts 而不是 location.ts：本模块**本来就**依赖 `./location` 的 sites，
+ * 反过来让 location 依赖 agents 会成环 —— 实测症状是模块初始化时对方还是 undefined，
+ * 报一句 `Cannot read properties of undefined (reading 'filter')`，
+ * 而堆栈指向一个与本次改动无关的测试文件，极难定位。依赖方向只能有一个。
+ *
+ * 种子刻意铺出「A 牵线、B 经营」与「同一人既出资又运维」两种形态 ——
+ * 这正是 ADR 说「开站一个月内就会出现」的那两种，页面上要能看见。
+ */
+export const siteAgents: SiteAgent[] = [];
+
+/**
+ * 种子**惰性铺**，不在模块顶层碰 `sites`。
+ *
+ * 顶层直接 `sites.filter(...)` 会在模块初始化期跨模块取值；本目录里 agent ↔ device ↔ location
+ * 之间已有依赖环，实测报的是
+ * `'get' on proxy: property '0' is a read-only and non-configurable data property` ——
+ * 而堆栈指向一个与本次改动毫无关系的测试文件（划拨），极难定位。
+ * 推迟到第一次真正用的时候，环就不在初始化期上了。
+ */
+let seeded = false;
+function ensureSeed() {
+  if (seeded) return;
+  seeded = true;
+  const withAgent = sites.filter((s) => s.agentNo).slice(0, 6);
+  withAgent.forEach((s, i) => siteAgents.push({
+    id: 100 + i, siteNo: s.siteNo, agentNo: s.agentNo!, role: "OPERATE",
+    remark: "由站点归属回填", ruleNo: null, effectiveFrom: null, effectiveTo: null,
+  }));
+  // 刻意铺出 ADR 说「开站一个月内就会出现」的两种形态，页面上要能看见
+  siteAgents.push(
+    // 同一站点两个伙伴：A 出资、B 运维
+    { id: 200, siteNo: sites[1].siteNo, agentNo: "AG005", role: "INVEST",
+      remark: "出资方，只分资产收益", ruleNo: null, effectiveFrom: null, effectiveTo: null },
+    // 牵线：只介绍关系，不谈判；介绍费签约时一次性付，不进逐单分润
+    { id: 201, siteNo: sites[2].siteNo, agentNo: "AG008", role: "REFER",
+      remark: "介绍商场招商负责人", ruleNo: null, effectiveFrom: null, effectiveTo: null },
+    // 拓展：找场地、谈判、签合同
+    { id: 202, siteNo: sites[3].siteNo, agentNo: "AG002", role: "DEVELOP",
+      remark: "全程谈下进场合同", ruleNo: null, effectiveFrom: null, effectiveTo: null },
+  );
+}
+
+export const listSiteAgents = (siteNo: string) => {
+  ensureSeed();
+  const ORDER: SiteAgent["role"][] = ["INVEST", "DEVELOP", "OPERATE", "REFER"];
+  return siteAgents.filter((x) => x.siteNo === siteNo)
+    .map((x) => ({ ...x, agentName: agents.find((a) => a.agentNo === x.agentNo)?.name ?? null }))
+    // 按责任层序排，不按 id —— 同一个站点两次打开顺序要一致
+    .sort((a, b) => ORDER.indexOf(a.role) - ORDER.indexOf(b.role));
+};
+
+export const saveSiteAgent = (siteNo: string, x: Partial<SiteAgent>) => {
+  ensureSeed();
+  if (!x.agentNo) fail("请选择合作伙伴", "Partner is required");
+  const role = x.role ?? "OPERATE";
+  // 悬空的 agentNo 会让分润按一个不存在的受益方生成记录，而且不报错
+  const agent = agents.find((a) => a.agentNo === x.agentNo);
+  if (!agent) notFound("合作伙伴", "Partner", x.agentNo!);
+  if (x.effectiveFrom && x.effectiveTo && x.effectiveTo < x.effectiveFrom) {
+    fail("生效止不能早于生效起", "Effective end must not precede start");
+  }
+  const LABEL: Record<string, string> = { INVEST: "出资", DEVELOP: "拓展", OPERATE: "运维", REFER: "牵线" };
+  for (const e of siteAgents.filter((a) => a.siteNo === siteNo && a.agentNo === x.agentNo)) {
+    if (x.id != null && e.id === x.id) continue;
+    if (e.role === role) {
+      fail(`${agent!.name} 在本站点已经有「${LABEL[role]}」这条责任了，直接改那一行即可。`,
+        `${agent!.name} already has the "${role}" role on this site.`);
+    }
+    // 牵线是拓展的弱形式，同一人同一站点只能算其一——否则同一件事付两份钱
+    const xor = (a: string, b: string) => (a === "REFER" && b === "DEVELOP") || (a === "DEVELOP" && b === "REFER");
+    if (xor(role, e.role)) {
+      fail(`「${LABEL[role]}」与「${LABEL[e.role]}」不能并存：牵线是拓展的弱形式，同一个人在同一个站点只能算其一。`,
+        `"${role}" conflicts with "${e.role}" for the same partner on the same site.`);
+    }
+  }
+  const row: SiteAgent = {
+    id: x.id ?? Math.max(0, ...siteAgents.map((a) => a.id ?? 0)) + 1,
+    siteNo, agentNo: x.agentNo!, role,
+    ruleNo: x.ruleNo ?? null,
+    effectiveFrom: x.effectiveFrom ?? null, effectiveTo: x.effectiveTo ?? null,
+    remark: x.remark ?? "",
+  };
+  const at = siteAgents.findIndex((a) => a.id === row.id);
+  if (at >= 0) siteAgents[at] = row; else siteAgents.push(row);
+  return { ...row, agentName: agent!.name };
+};
+
+export const removeSiteAgent = (siteNo: string, id: number) => {
+  ensureSeed();
+  const at = siteAgents.findIndex((a) => a.id === id && a.siteNo === siteNo);
+  if (at < 0) notFound("责任行", "Site partner role", String(id));
+  siteAgents.splice(at, 1);
+  return { ok: true };
+};

@@ -54,7 +54,12 @@ export const agentHttp: AgentApi = {
   listAgentApplies: (q) => client.get("/api/agent/applies", q),
   acceptAgentApply: (applyNo) => client.post(`/api/agent/applies/${applyNo}/accept`, {}),
   auditAgentApply: ({ applyNo, ...body }) => client.post(`/api/agent/applies/${applyNo}/audit`, body),
-  // 代建走复数端点（判 agent:apply:create）；单数 /apply 是免鉴权的自助入口，D5 的公开页用
+  // 自助注册三件套：全部免鉴权，防刷靠 OTP + 单 IP 限流 + 同手机号至多一张在途
+  sendApplyOtp: (phone) => client.post("/api/agent/apply/otp", { phone }),
+  selfServiceApply: (x) => client.post("/api/agent/apply", x),
+  myApply: (phone, otp) => client.get("/api/agent/apply/mine", { phone, otp }),
+
+  // 代建走复数端点（判 agent:apply:create）；单数 /apply 是免鉴权的自助入口
   createAgentApply: (x) => client.post("/api/agent/applies", x),
 
   listAssignableAssets: (q?: AssignableAssetQ) => client.get("/api/agent/assignable-assets", q),

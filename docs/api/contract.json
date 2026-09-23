@@ -281,6 +281,10 @@
      "type": "String"
     },
     {
+     "name": "agentType",
+     "type": "String"
+    },
+    {
      "name": "shareRate",
      "type": "double"
     },
@@ -331,6 +335,10 @@
      "type": "String"
     },
     {
+     "name": "agentType",
+     "type": "String"
+    },
+    {
      "name": "shareRate",
      "type": "double"
     },
@@ -358,6 +366,10 @@
     },
     {
      "name": "regionScope",
+     "type": "String"
+    },
+    {
+     "name": "agentType",
      "type": "String"
     },
     {
@@ -694,7 +706,7 @@
    "path": "/api/agent/apply",
    "perm": null,
    "handler": "AgentApplyController#selfServiceApply",
-   "summary": "提交入驻申请 —— **自助与代建共用同一个端点**。",
+   "summary": "**自助注册**：商家自己提交（免鉴权 + 手机号 OTP）。",
    "params": [],
    "bodyType": "SubmitReq",
    "returnType": "ApplyResult",
@@ -803,6 +815,20 @@
      "type": "LocalDateTime"
     }
    ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/agent/apply/otp",
+   "perm": null,
+   "handler": "AgentApplyController#applyOtp",
+   "summary": "提交入驻申请 —— **自助与代建共用同一个端点**。",
+   "params": [],
+   "bodyType": "Map<String, String>",
+   "returnType": "Map<String, Object>",
+   "returnContainer": null,
+   "returnElement": "Map<String, Object>",
+   "responseShape": null,
    "requestShape": null
   },
   {
@@ -7487,6 +7513,203 @@
    "returnContainer": null,
    "returnElement": "Object",
    "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/sites/{siteNo}/agents",
+   "perm": "location:poi:read",
+   "handler": "OperationController#siteAgents",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "siteNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "List<SiteAgentRow>",
+   "returnContainer": "List",
+   "returnElement": "SiteAgentRow",
+   "responseShape": [
+    {
+     "name": "id",
+     "type": "Long"
+    },
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "agentName",
+     "type": "String"
+    },
+    {
+     "name": "agentType",
+     "type": "String"
+    },
+    {
+     "name": "role",
+     "type": "String"
+    },
+    {
+     "name": "ruleNo",
+     "type": "String"
+    },
+    {
+     "name": "effectiveFrom",
+     "type": "String"
+    },
+    {
+     "name": "effectiveTo",
+     "type": "String"
+    },
+    {
+     "name": "remark",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/sites/{siteNo}/agents",
+   "perm": "location:poi:update",
+   "handler": "OperationController#saveSiteAgent",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "siteNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "SiteAgentRow",
+   "returnType": "SiteAgentRow",
+   "returnContainer": null,
+   "returnElement": "SiteAgentRow",
+   "responseShape": [
+    {
+     "name": "id",
+     "type": "Long"
+    },
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "agentName",
+     "type": "String"
+    },
+    {
+     "name": "agentType",
+     "type": "String"
+    },
+    {
+     "name": "role",
+     "type": "String"
+    },
+    {
+     "name": "ruleNo",
+     "type": "String"
+    },
+    {
+     "name": "effectiveFrom",
+     "type": "String"
+    },
+    {
+     "name": "effectiveTo",
+     "type": "String"
+    },
+    {
+     "name": "remark",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "id",
+     "type": "Long"
+    },
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "agentName",
+     "type": "String"
+    },
+    {
+     "name": "agentType",
+     "type": "String"
+    },
+    {
+     "name": "role",
+     "type": "String"
+    },
+    {
+     "name": "ruleNo",
+     "type": "String"
+    },
+    {
+     "name": "effectiveFrom",
+     "type": "String"
+    },
+    {
+     "name": "effectiveTo",
+     "type": "String"
+    },
+    {
+     "name": "remark",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/sites/{siteNo}/agents/{id}/remove",
+   "perm": "location:poi:update",
+   "handler": "OperationController#removeSiteAgent",
+   "summary": "契约禁止 delete*，用 remove。",
+   "params": [
+    {
+     "in": "path",
+     "name": "siteNo",
+     "type": "String",
+     "required": true
+    },
+    {
+     "in": "path",
+     "name": "id",
+     "type": "Long",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "OkResult",
+   "returnContainer": null,
+   "returnElement": "OkResult",
+   "responseShape": [
+    {
+     "name": "ok",
+     "type": "boolean"
+    }
+   ],
    "requestShape": null
   },
   {
@@ -22089,199 +22312,6 @@
    "requestShape": null
   },
   {
-   "verb": "GET",
-   "path": "/internal/platform/tenants",
-   "perm": null,
-   "handler": "SysSettingController#tenants",
-   "summary": "",
-   "params": [
-    {
-     "in": "query",
-     "name": "page",
-     "type": "Integer",
-     "required": false
-    },
-    {
-     "in": "query",
-     "name": "size",
-     "type": "Integer",
-     "required": false
-    },
-    {
-     "in": "query",
-     "name": "keyword",
-     "type": "String",
-     "required": false
-    },
-    {
-     "in": "query",
-     "name": "status",
-     "type": "String",
-     "required": false
-    }
-   ],
-   "bodyType": null,
-   "returnType": "PageResult<TenantEntry>",
-   "returnContainer": "PageResult",
-   "returnElement": "TenantEntry",
-   "responseShape": [
-    {
-     "name": "tenantNo",
-     "type": "String"
-    },
-    {
-     "name": "name",
-     "type": "String"
-    },
-    {
-     "name": "brandName",
-     "type": "String"
-    },
-    {
-     "name": "status",
-     "type": "String"
-    },
-    {
-     "name": "plan",
-     "type": "String"
-    },
-    {
-     "name": "cabinetCount",
-     "type": "Integer"
-    },
-    {
-     "name": "expireAt",
-     "type": "String"
-    }
-   ],
-   "requestShape": null
-  },
-  {
-   "verb": "POST",
-   "path": "/internal/platform/tenants",
-   "perm": null,
-   "handler": "SysSettingController#saveTenant",
-   "summary": "",
-   "params": [],
-   "bodyType": "Tenant",
-   "returnType": "TenantEntry",
-   "returnContainer": null,
-   "returnElement": "TenantEntry",
-   "responseShape": [
-    {
-     "name": "tenantNo",
-     "type": "String"
-    },
-    {
-     "name": "name",
-     "type": "String"
-    },
-    {
-     "name": "brandName",
-     "type": "String"
-    },
-    {
-     "name": "status",
-     "type": "String"
-    },
-    {
-     "name": "plan",
-     "type": "String"
-    },
-    {
-     "name": "cabinetCount",
-     "type": "Integer"
-    },
-    {
-     "name": "expireAt",
-     "type": "String"
-    }
-   ],
-   "requestShape": null
-  },
-  {
-   "verb": "GET",
-   "path": "/internal/platform/tenants/{tenantNo}/config",
-   "perm": null,
-   "handler": "SysSettingController#tenantConfig",
-   "summary": "",
-   "params": [
-    {
-     "in": "path",
-     "name": "tenantNo",
-     "type": "String",
-     "required": true
-    },
-    {
-     "in": "query",
-     "name": "category",
-     "type": "String",
-     "required": false
-    }
-   ],
-   "bodyType": null,
-   "returnType": "List<TenantConfigEntry>",
-   "returnContainer": "List",
-   "returnElement": "TenantConfigEntry",
-   "responseShape": [
-    {
-     "name": "tenantNo",
-     "type": "String"
-    },
-    {
-     "name": "category",
-     "type": "String"
-    },
-    {
-     "name": "configKey",
-     "type": "String"
-    },
-    {
-     "name": "configValue",
-     "type": "String"
-    }
-   ],
-   "requestShape": null
-  },
-  {
-   "verb": "POST",
-   "path": "/internal/platform/tenants/{tenantNo}/config",
-   "perm": null,
-   "handler": "SysSettingController#saveTenantConfig",
-   "summary": "租户配置 upsert。",
-   "params": [
-    {
-     "in": "path",
-     "name": "tenantNo",
-     "type": "String",
-     "required": true
-    }
-   ],
-   "bodyType": "TenantConfig",
-   "returnType": "TenantConfigEntry",
-   "returnContainer": null,
-   "returnElement": "TenantConfigEntry",
-   "responseShape": [
-    {
-     "name": "tenantNo",
-     "type": "String"
-    },
-    {
-     "name": "category",
-     "type": "String"
-    },
-    {
-     "name": "configKey",
-     "type": "String"
-    },
-    {
-     "name": "configValue",
-     "type": "String"
-    }
-   ],
-   "requestShape": null
-  },
-  {
    "verb": "POST",
    "path": "/internal/trade/orders/{orderNo}/return",
    "perm": null,
@@ -24278,6 +24308,35 @@
    "LOST",
    "SOLD"
   ],
+  "ShareRecordStatus": [
+   "PENDING"
+  ],
+  "SettlementStatus": [
+   "GEN",
+   "CONFIRMED"
+  ],
+  "ReconTaskStatus": [
+   "MATCHED"
+  ],
+  "ShareMode": [
+   "CHANNEL_SPLIT"
+  ],
+  "SettlementRefType": [
+   "ORDER"
+  ],
+  "InvoiceStatus": [
+   "DRAFT",
+   "ISSUED"
+  ],
+  "WithdrawalStatus": [
+   "APPLY",
+   "AUDIT",
+   "PAYING",
+   "PAID"
+  ],
+  "VendorStatus": [
+   "ENABLED"
+  ],
   "CsSessionStatus": [
    "ACTIVE"
   ],
@@ -24321,8 +24380,16 @@
    "REMOVE",
    "COMPLAINT"
   ],
+  "SiteAgentRole": [
+   "INVEST",
+   "DEVELOP",
+   "OPERATE"
+  ],
   "AgentStatus": [
    "ENABLED"
+  ],
+  "AgentType": [
+   "AGENT"
   ],
   "ApplyStatus": [
    "DRAFT",
@@ -24338,9 +24405,9 @@
  "conflicts": {},
  "stats": {
   "endpoints": 393,
-  "records": 283,
-  "withPerm": 333,
+  "records": 282,
+  "withPerm": 336,
   "withBody": 159,
-  "shapedResponses": 297
+  "shapedResponses": 296
  }
 }

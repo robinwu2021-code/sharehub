@@ -44,7 +44,7 @@ export {
 } from "./location";
 
 export {
-  agents, agentAssignments, agentPerformances, agentAccounts, agentCommissions,
+  agents, siteAgents, listSiteAgents, saveSiteAgent, removeSiteAgent, agentAssignments, agentPerformances, agentAccounts, agentCommissions,
   listAgentAssignments, listAgentAccounts, listAgentCommissions,
   saveAgentAccount, saveAgentCommission,
   archiveAgent, unarchiveAgent,
@@ -57,6 +57,7 @@ export type { AssignmentRecordQuery, AssignableAssetQuery } from "./agent";
 // 缺了它 lib/api/mocks/agent.ts 的四个入驻方法会编译不过（tsc 会红）。
 export {
   applies, listAgentApplies, acceptAgentApply, auditAgentApply, createAgentApply,
+  sendApplyOtp, selfServiceApply, myApply,
 } from "./apply";
 
 export {

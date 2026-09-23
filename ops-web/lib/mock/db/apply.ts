@@ -175,6 +175,52 @@ export function auditAgentApply(x: {
   return strip(r);
 }
 
+/**
+ * mock 发码。**固定 000000** —— 与后端 dev-mode 的固定码一致。
+ *
+ * 真实现有重发间隔与有效期；mock 不模拟那些，因为它们只会让离线调页面变难，
+ * 而「码错了会怎样」这条路径在 verify 里照样验得到。
+ */
+export function sendApplyOtp(phone: string): { sent: boolean; devCode?: string } {
+  if (!phone?.trim()) fail("手机号必填", "Phone is required");
+  return { sent: true, devCode: "000000" };
+}
+
+/** mock 验码：只认 000000。错的码要真的拒，否则页面上「验证码填错」这条路径测不到。 */
+function checkOtp(otp: string) {
+  if (otp !== "000000") fail("验证码错误或已过期", "Invalid or expired code");
+}
+
+/** 自助提交。与代建**落同一个 createAgentApply**，只是 source 不同。 */
+export function selfServiceApply(x: {
+  phone: string; otp: string; email: string;
+  operatorName: string; operatorType: OperatorType;
+  regionScope?: string; payload?: string;
+}): { applyNo: string; status: ApplyStatus } {
+  checkOtp(x.otp);
+  const row = createAgentApply(x);
+  // source 由入口决定 —— 这里是自助那一侧
+  const saved = applies.find((r) => r.applyNo === row.applyNo)!;
+  saved.source = "SELF_SERVICE";
+  saved.submittedBy = saved.phoneMask;
+  return { applyNo: row.applyNo, status: row.status };
+}
+
+/** 申请人查进度。只返回掩码与状态 —— 公开页不能多给任何可枚举的信息。 */
+export function myApply(phone: string, otp: string) {
+  checkOtp(otp);
+  const key = phoneKey(phone);
+  const rows = applies.filter((r) => r._phoneKey === key);
+  if (!rows.length) notFound("申请单", "Application", phone);
+  // 取最新一张：驳回后重提会有多张，申请人关心的总是最后那张
+  const r = rows[rows.length - 1];
+  return {
+    applyNo: r.applyNo, status: r.status, operatorName: r.operatorName,
+    phoneMask: r.phoneMask, emailMask: r.emailMask,
+    rejectReason: r.rejectReason, submittedAt: r.submittedAt,
+  };
+}
+
 export function createAgentApply(x: {
   phone: string; email: string; operatorName: string; operatorType: OperatorType;
   regionScope?: string; shareRate?: number; payload?: string;

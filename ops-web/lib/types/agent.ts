@@ -79,6 +79,23 @@ export interface AgentApply {
   knownEmailMask: string | null;
 }
 
+/**
+ * 申请人视角：**只看得到掩码与状态**，看不到内部字段。
+ *
+ * 公开页面向的是陌生人，任何多给的信息都是可枚举面 ——
+ * 比如「这个手机号已经有主体了」就不能说，那等于给了一个查号工具。
+ */
+export interface MyApplyView {
+  applyNo: string;
+  status: ApplyStatus;
+  operatorName: string;
+  phoneMask: string;
+  emailMask: string;
+  /** 驳回原因，**原样回显** —— 不告诉申请人错在哪，他只能反复猜着重提。 */
+  rejectReason: string | null;
+  submittedAt: string | null;
+}
+
 // —— 代理商 · 待建功能补全（agt 域）——
 export interface AgentAssignment {
   agentNo: string;

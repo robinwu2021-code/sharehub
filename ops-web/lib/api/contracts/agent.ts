@@ -3,7 +3,7 @@ import type { PageQ, ArchiveQ, AssignmentRecordQ, AssignableAssetQ , ReportQ, Ap
 import type {
   PageResult, Agent, AgentAssignment, AgentPerformance, AgentAccount, AgentCommission,
   AgentAssignmentRecord, AssignableAsset, AssignAssetsPayload, ReclaimAssetsPayload,
-  AgentApply, ApplyStatus, OperatorType,
+  AgentApply, ApplyStatus, OperatorType, MyApplyView,
 } from "../../types";
 
 export interface AgentApi {
@@ -47,6 +47,23 @@ export interface AgentApi {
     phone: string; email: string; operatorName: string; operatorType: OperatorType;
     regionScope?: string; shareRate?: number; payload?: string;
   }): Promise<AgentApply>;
+
+  // === 自助注册（公开页 /apply 用，**免鉴权**）===
+  /**
+   * 发码。生产只回 `{sent:true}`；dev-mode 回 `devCode` 便于联调。
+   *
+   * ⚠️ 服务端发码时会先把手机号规范化，**与验码用的是同一个函数** ——
+   * 否则「收到码了但验不过」，且只在带空格/连字符/国际区号的输入上出现。
+   */
+  sendApplyOtp(phone: string): Promise<{ sent: boolean; devCode?: string }>;
+  /** 自助提交。落的是 `source=SELF_SERVICE`（由路由决定，不从这里传）。 */
+  selfServiceApply(x: {
+    phone: string; otp: string; email: string;
+    operatorName: string; operatorType: OperatorType;
+    regionScope?: string; payload?: string;
+  }): Promise<{ applyNo: string; status: ApplyStatus }>;
+  /** 申请人查自己的进度与驳回原因（凭手机号 + OTP）。 */
+  myApply(phone: string, otp: string): Promise<MyApplyView>;
 
   // === S1 设备/点位划拨（权限码 agent:scope:assign）===
   /** 可划拨资产池（机柜 + 站点），带当前归属。抽屉一次拉全量（size 传大值），不做无限滚动。 */

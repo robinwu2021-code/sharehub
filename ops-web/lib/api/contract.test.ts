@@ -16,8 +16,8 @@ const API_METHODS: Record<string, readonly string[]> = {
   device: ["listCabinets", "getCabinet", "saveCabinet", "sendCommand", "listPowerbanks", "listCabinetMonitor", "listCommandRecords", "listInventoryTransfers", "listOtaRollouts", "savePowerbank", "saveInventoryTransfer", "saveOtaRollout", "listOtaReleases", "saveOtaRelease", "listOtaTasks", "listDeviceLogs", "listDeviceCodeBatches", "saveDeviceCodeBatch", "archiveCabinet", "unarchiveCabinet", "archivePowerbank", "unarchivePowerbank", "importCabinets"],
   alarm: ["listAlarmRecords", "listAlarmNotices", "listAlarmCodes", "listAlarmRules", "saveAlarmCode", "saveAlarmRule", "raiseAlarmWorkOrder", "ackAlarm", "autoRaiseWorkOrders", "resendAlarmNotice", "archiveAlarmCode", "unarchiveAlarmCode", "archiveAlarmRule", "unarchiveAlarmRule"],
   workorder: ["listWorkOrders", "createWorkOrder", "dispatchWorkOrder", "acceptWorkOrder", "processWorkOrder", "completeWorkOrder", "closeWorkOrder", "rejectWorkOrder", "reworkWorkOrder", "listSlaRules", "listInspectionPlans", "saveSlaRule", "saveInspectionPlan", "runInspectionPlan"],
-  location: ["listSites", "saveSite", "listLocations", "savePoint", "listVenues", "listContracts", "listLeads", "listSiteAnalysis", "saveLead", "saveVenue", "saveContract", "listLeadFollowUps", "addLeadFollowUp", "addContractAttachment", "removeContractAttachment", "listVenueOnboardings", "saveVenueOnboarding", "listSiteLifecycles", "changeSiteStage", "archiveSite", "unarchiveSite", "archivePoint", "unarchivePoint", "archiveVenue", "unarchiveVenue"],
-  agent: ["listAgents", "saveAgent", "listAgentAssignments", "listAgentPerformance", "listAgentAccounts", "saveAgentAccount", "listAgentApplies", "acceptAgentApply", "auditAgentApply", "createAgentApply", "listAssignableAssets", "assignAgentAssets", "reclaimAgentAssets", "listAgentAssignmentRecords", "listAgentCommissions", "saveAgentCommission", "archiveAgent", "unarchiveAgent"],
+  location: ["listSiteAgents", "saveSiteAgent", "removeSiteAgent", "listSites", "saveSite", "listLocations", "savePoint", "listVenues", "listContracts", "listLeads", "listSiteAnalysis", "saveLead", "saveVenue", "saveContract", "listLeadFollowUps", "addLeadFollowUp", "addContractAttachment", "removeContractAttachment", "listVenueOnboardings", "saveVenueOnboarding", "listSiteLifecycles", "changeSiteStage", "archiveSite", "unarchiveSite", "archivePoint", "unarchivePoint", "archiveVenue", "unarchiveVenue"],
+  agent: ["listAgents", "saveAgent", "listAgentAssignments", "listAgentPerformance", "listAgentAccounts", "saveAgentAccount", "listAgentApplies", "acceptAgentApply", "auditAgentApply", "createAgentApply", "sendApplyOtp", "selfServiceApply", "myApply", "listAssignableAssets", "assignAgentAssets", "reclaimAgentAssets", "listAgentAssignmentRecords", "listAgentCommissions", "saveAgentCommission", "archiveAgent", "unarchiveAgent"],
   order: ["listOrders", "getOrder", "interveneOrder", "listOrderInterventions", "listOrderExceptions", "handleOrderException", "listDepositRecords", "releaseDeposit", "buyoutDeposit", "dunArrears", "listOrderComplaints", "createOrderComplaint", "handleOrderComplaint", "raiseComplaintWorkOrder", "listRefundRecords", "createRefund", "auditRefund", "listReservations", "cancelReservation", "listFreeOrders", "getFreeOrderStats"],
   pricing: ["listPricePlans", "listPricingSchedules", "savePricePlan", "savePricingSchedule", "listPlanScopes", "savePlanScope", "removePlanScope", "archivePricePlan", "unarchivePricePlan"],
   finance: ["listShareRules", "listLedger", "getVoucher", "createVoucher", "listSettlements", "listWithdrawals", "auditWithdrawal", "generateSettlements", "confirmSettlement", "listSettlementRecords", "listShareRecords", "listReconciles", "listInvoices", "saveShareRule", "saveInvoice", "listReconDiffs", "handleRecon", "getReconStats", "issueInvoice", "voidInvoice", "listShareSummaries", "listRechargeOrders"],
@@ -27,11 +27,7 @@ const API_METHODS: Record<string, readonly string[]> = {
   report: ["listReportDevice", "listReportLocation", "listReportFinance", "listReportScreen", "listReportCustom", "getReportTrend", "getScreenBoard", "listReportMetrics", "getConsumerInsight"],
   org: ["listEmployees", "listRoles", "listAudits", "listDepartments", "listStaffPerformance", "saveDepartment", "saveRoleRow", "saveEmployee", "saveRoleDataScope", "listPermissions", "listRolePermissions", "saveRolePermissions", "getAuditDetail", "archiveRole", "unarchiveRole"],
   system: ["listBrands", "saveBrand", "archiveBrand", "unarchiveBrand", "listVendors", "saveVendor", "testVendorConnectivity", "listNotifyTemplates", "listDictEntries", "listRegions", "listSysParams", "listOpenApiApps", "listMarketCountries", "saveNotifyTemplate", "saveDictEntry", "saveRegion", "saveSysParam", "saveOpenApiApp", "saveMarketCountry", "listRegionTree", "previewNotifyTemplate", "testSendNotifyTemplate", "resetOpenApiAppSecret", "listPaymentChannels", "savePaymentChannel", "listNotifyLogs", "getNotifyLogStats", "resendNotifyLog", "listNotifyBlacklist", "saveNotifyBlacklist", "releaseNotifyBlacklist", "getBizRules", "saveBizRules", "listLoginSettings", "saveLoginSetting", "listAppVersions", "saveAppVersion", "rollbackAppVersion", "listBanks", "saveBank", "listProblems", "saveProblem", "listTaxSettings", "saveTaxSetting", "archiveBank", "unarchiveBank", "archiveProblem", "unarchiveProblem"],
-  operation: [
-    "getOperationOverview", "getSiteStats", "pauseSite", "resumeSite",
-    "listPriceAdjustments", "savePriceAdjustment", "cancelPriceAdjustment", "revertPriceAdjustment", "retryPriceAdjustment",
-    "listSiteSharing", "getSiteSharingStats", "listPayeeSharing",
-  ],
+  operation: ["getOperationOverview", "getSiteStats", "pauseSite", "resumeSite", "listPriceAdjustments", "savePriceAdjustment", "cancelPriceAdjustment", "revertPriceAdjustment", "retryPriceAdjustment", "listSiteSharing", "getSiteSharingStats", "listPayeeSharing"],
 };
 
 const ALL_METHODS = Object.values(API_METHODS).flat();
@@ -85,9 +81,10 @@ describe("域切片划分", () => {
     expect(sorted(keysOf((HTTP_SLICES as Record<string, object>)[domain]))).toEqual(expected);
   });
 
-  it("方法总数仍为 289（新增/删除 API 时须自觉更新此数）", () => {
+  it("方法总数仍为 295（新增/删除 API 时须自觉更新此数）", () => {
     // 2026-09-23：差异化定价 2 个退役，适用范围 3 个新增（ADR-028 / V49），净 +1。
     // 2026-09-23 B1：品牌四个端点（list/save/archive/unarchive）。
-    expect(ALL_METHODS.length).toBe(289);
+        // 2026-09-23 A2-1：站点伙伴责任三个端点。
+    expect(ALL_METHODS.length).toBe(295);
   });
 });

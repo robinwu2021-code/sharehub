@@ -29,6 +29,10 @@ export const agentMock: AgentApi = {
   acceptAgentApply: (applyNo, operatorName) => wait(db.acceptAgentApply(applyNo, operatorName), 350),
   auditAgentApply: (x) => wait(db.auditAgentApply(x), 400),
   createAgentApply: (x) => wait(db.createAgentApply(x), 400),
+  // 自助注册（公开页）：与代建落同一份数据，只是 source 不同
+  sendApplyOtp: (phone) => wait(db.sendApplyOtp(phone), 300),
+  selfServiceApply: (x) => wait(db.selfServiceApply(x), 400),
+  myApply: (phone, otp) => wait(db.myApply(phone, otp), 300),
 
   // S1 设备/点位划拨：写操作一律走 db 层的 assign/reclaim（校验 + 落流水 + 刷新汇总都在那）
   listAssignableAssets: (q: AssignableAssetQ = {}) => wait(db.listAssignableAssets(q)),
