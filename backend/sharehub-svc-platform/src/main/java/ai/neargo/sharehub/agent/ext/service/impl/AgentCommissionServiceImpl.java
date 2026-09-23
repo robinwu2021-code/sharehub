@@ -67,6 +67,10 @@ public class AgentCommissionServiceImpl extends AbstractCrudService<AgtCommissio
 
     @Override
     protected void beforeUpdate(AgtCommission e, AgtCommission current) {
+        // 归属代理决定这条分润规则**算给谁**，改了等于把钱划到别人账上。
+        // 代理归属的变更有专门入口（代理划拨 /assignments），不许经更新接口顺手改。
+        // —— 2026-09-23 批量赋值加固（TDD-mass-assignment-hardening）
+        e.setAgentNo(current.getAgentNo());
         if (e.getDimension() == null || e.getDimension().isBlank()) e.setDimension(current.getDimension());
         if (e.getCurrency() == null || e.getCurrency().isBlank()) e.setCurrency(current.getCurrency());
         checkDimension(e);

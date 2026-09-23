@@ -61,6 +61,18 @@ public class AppVersionServiceImpl extends AbstractCrudService<SysAppVersion, Ap
         return new String[]{"platform", "status"};
     }
 
+    /**
+     * 状态由**专门入口**迁移（{@link #rollback} 软回滚、发布流程），不许经通用更新接口改。
+     *
+     * <p>否则「回滚」形同虚设：回滚把 status 置为 ROLLBACK，而更新接口能原样改回 RELEASED——
+     * 事故版本可以被一次普通保存重新推给用户。
+     * —— 2026-09-23 批量赋值加固（TDD-mass-assignment-hardening）
+     */
+    @Override
+    protected void beforeUpdate(SysAppVersion e, SysAppVersion current) {
+        e.setStatus(current.getStatus());
+    }
+
     @Override
     protected void beforeCreate(SysAppVersion e) {
         if (e.getStatus() == null) e.setStatus("DRAFT");

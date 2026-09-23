@@ -142,9 +142,22 @@ public abstract class AbstractCrudService<E extends BaseEntity, V> implements Cr
             beforeCreate(body);
             mapper.insert(body);
         } else {
+            // ── 批量赋值加固（2026-09-23，TDD-mass-assignment-hardening）──────────────
+            // MyBatis-Plus 的 updateById **只写非 null 字段** —— 也就是说
+            // 「客户端选择传哪些字段，就能改哪些字段」。此前只强制 id 与 version，
+            // tenantId 还写成「客户端没传才取库里的」，于是传了就能把这行数据搬到别的租户。
+            //
+            // 下面这几个字段由**服务端**决定，一律从 current 取，不看客户端传了什么：
             body.setId(current.getId());
             body.setVersion(current.getVersion());
-            if (body.getTenantId() == null) body.setTenantId(current.getTenantId());
+            body.setTenantId(current.getTenantId());      // 越租户搬数据
+            body.setDeleted(current.getDeleted());        // 绕过归档语义软删/反删（归档走 archive/unarchive）
+            body.setCreatedAt(current.getCreatedAt());    // 伪造审计痕迹：createdAt/By 是 fill = INSERT，
+            body.setCreatedBy(current.getCreatedBy());    // 更新时不会被 AuditMetaObjectHandler 覆盖
+            // updatedAt / updatedBy 不用管：fill = INSERT_UPDATE，strictUpdateFill 会盖掉客户端传的值。
+            //
+            // **域字段**（agentNo 等归属、status 等状态、金额）不能在这里一刀切 ——
+            // 哪些该锁取决于「有没有专门的迁移入口」，由各 service 覆写 beforeUpdate 显式保护。
             beforeUpdate(body, current);
             mapper.updateById(body);
         }

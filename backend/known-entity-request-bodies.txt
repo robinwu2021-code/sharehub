@@ -1,0 +1,56 @@
+# 「实体直接作 @RequestBody」的台账 —— **只准变短，不准变长**。
+#
+# 为什么要盯：MyBatis-Plus 的 updateById 只写非 null 字段，所以实体当请求体时
+# **客户端选择传哪些字段就能改哪些字段**。2026-09-23 之前连 tenantId 都能改
+# （AbstractCrudService 里写的是「客户端没传才取库里的」），等于可以把一行数据搬到别的租户。
+#
+# 已做的集中加固（AbstractCrudService.save）把 BaseEntity 管的字段锁死了：
+#   tenantId · deleted · createdAt · createdBy —— 一律从库里取，不看客户端。
+# 域字段（归属 / 状态 / 金额）由各 service 覆写 beforeUpdate 显式保护，判据是
+# **「这个字段有没有专门的迁移入口」**：有（审批、划拨、状态机、回滚）就锁，
+# 没有、本来就该在表单里改的（如字典的 enabled）就不锁。
+#
+# 但这是**黑名单**：以后谁给实体加个字段，它默认就是客户端可写的。
+# 所以要这份台账托住 —— 彻底的解法是 Req/Command DTO（白名单：只有声明过的字段能进来），
+# 随 B5 包归位增量迁移，迁完一个就从这里删一条。**新端点不许再用实体当请求体。**
+#
+# 格式：一行一个实体类型名
+AdCampaign
+AdSlot
+AgtAccount
+AgtCommission
+CouponTpl
+DevAlarmCode
+DevAlarmRule
+DevCodeBatch
+DictItem
+IamDept
+IamEmployee
+InvTransfer
+LocLead
+MdBank
+MdMarketCountry
+MdProblem
+MdRegion
+MktCampaign
+MktNotice
+MktPush
+NotifyBlacklist
+NotifyTemplate
+OpenapiApp
+PricePlan
+PriceRule
+PriceSchedule
+ShareRule
+SysAppVersion
+SysLoginSetting
+SysParam
+SysTaxSetting
+Tenant
+TenantConfig
+UsrFreeWhitelist
+UsrInvoice
+UsrInvoiceTitle
+UsrRechargePkg
+WoInspectionPlan
+WoSlaRule
