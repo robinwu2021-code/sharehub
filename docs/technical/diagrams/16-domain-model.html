@@ -141,22 +141,23 @@
 
 <div class="wrap">
 <header>
-  <div class="eyebrow">领域模型 · 本体与关系 · v2 · 2026-09-23</div>
+  <div class="eyebrow">领域模型 · 本体与关系 · v3 · 2026-09-23</div>
   <h1>ShareHub 领域模型</h1>
-  <p class="lede">一个运营商、多个品牌、若干代理商，在别人的场地上放设备。三张图：谁指向谁，谁是谁的一种，谁的行为离不开谁。</p>
+  <p class="lede">一个运营商、多个品牌、若干代理商，在别人的场地上放设备。四张图：谁指向谁，<strong>一个人手里的主体能分出多少东西</strong>，谁是谁的一种，谁的行为离不开谁。</p>
 </header>
 
 <ul class="terms" aria-label="术语裁定">
-  <li><span class="no">商户</span><span class="to">禁用词</span></li>
+  <li><b>商户 Merchant</b><span class="to">只在</span>支付语境（收款号）</li>
   <li><b>加盟商 / 代理商 / 城市合伙人</b><span class="to">→</span>代理商 Agent</li>
   <li><b>门店 / 站点</b><span class="to">→</span>站点 Site</li>
   <li><b>租户</b><span class="to">不存在</span>（ADR-026）</li>
   <li><b>品牌</b><span class="to">归运营商</span>，代理商不得拥有</li>
   <li><b>机柜</b><span class="to">→</span>设备 Device（ADR-021）</li>
-  <li><b>主体 Entity</b><span class="to">不抽</span>（无多执照场景）</li>
+  <li><b>运营主体 Operator</b><span class="to">=</span>平台自营 / 代理商 / 城市合伙人（ADR-029）</li>
+  <li><b>账号 × 主体</b><span class="to">N : M</span>（ADR-030）</li>
 </ul>
 
-<nav class="jump" aria-label="跳转"><a href="#assoc">一 · 关联</a><a href="#gen">二 · 泛化</a><a href="#dep">三 · 依赖</a></nav>
+<nav class="jump" aria-label="跳转"><a href="#assoc">一 · 关联</a><a href="#fan">二 · 扇出</a><a href="#gen">三 · 泛化</a><a href="#dep">四 · 依赖</a></nav>
 
 <section id="assoc">
   <h2>一、关联 — 谁指向谁</h2>
@@ -260,8 +261,80 @@
   </figure>
 </section>
 
+<section id="fan">
+  <h2>二、扇出 — 一个账号手里有多少东西</h2>
+  <p class="sub">「一个账号对应多个主体，每个主体多个商户、多个站点」——这条链成立，但<strong>三段的形状各不相同</strong>，当成一棵树去实现会错三处。</p>
+  <figure>
+    <div class="scroll">
+    <svg viewBox="0 0 1240 620" role="img" aria-label="扇出关系图：一个自然人的手机号对多个运营主体是多对多的成员关系；每个运营主体向下分出两条并列的一对多——商户按通道乘市场乘适用范围，站点按主责归属；站点与商户之间没有外键，收款号按适用范围逐级解析；站点另有多对多的责任行用于分钱，以及正交的场地方归属。">
+      <defs>
+        <marker id="arF" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0,0 L10,5 L0,10 z"/></marker>
+      </defs>
+
+      <!-- 自然人 -->
+      <g class="n n-user"><rect x="30" y="250" width="190" height="80" rx="10"/><text x="46" y="280">自然人</text><text class="s" x="46" y="300">手机号 13800138000</text><text class="m" x="46" y="319">凭据挂号码，不挂主体</text></g>
+
+      <!-- 两个主体 -->
+      <g class="n n-base"><rect x="320" y="170" width="180" height="76" rx="10"/><text x="334" y="198">运营主体 AG001</text><text class="s" x="334" y="217">属主 · 默认主体</text><text class="m" x="334" y="235">is_owner=1 is_primary=1</text></g>
+      <g class="n n-base"><rect x="320" y="330" width="180" height="76" rx="10"/><text x="334" y="358">运营主体 AG002</text><text class="s" x="334" y="377">属主 · 非默认</text><text class="m" x="334" y="395">is_owner=1 is_primary=0</text></g>
+
+      <!-- 商户 -->
+      <g class="n n-money"><rect x="620" y="60" width="290" height="62" rx="9"/><text x="634" y="87">商户 PM001</text><text class="m" x="634" y="107">CHANNEL_A · AE · scope=ALL</text></g>
+      <g class="n n-money"><rect x="620" y="140" width="290" height="62" rx="9"/><text x="634" y="167">商户 PM002</text><text class="m" x="634" y="187">CHANNEL_A · SA · scope=SITE:S001</text></g>
+
+      <!-- 站点 -->
+      <g class="n n-place n-hub"><rect x="620" y="290" width="290" height="62" rx="10"/><text x="634" y="317">站点 S001</text><text class="m" x="634" y="337">operator_no = AG001（主责）</text></g>
+      <g class="n n-place"><rect x="620" y="370" width="290" height="62" rx="10"/><text x="634" y="397">站点 S002</text><text class="m" x="634" y="417">operator_no = AG001（主责）</text></g>
+
+      <!-- 责任行 / 场地方 -->
+      <g class="n n-gray"><rect x="990" y="266" width="225" height="106" rx="9"/><text x="1004" y="292">责任 loc_site_operator</text><text class="m" x="1004" y="314">AG001 · OPERATE</text><text class="m" x="1004" y="333">AG002 · INVEST</text><text class="s" x="1004" y="356">M : N —— 分钱依据</text></g>
+      <g class="n n-gray n-ext"><rect x="990" y="400" width="225" height="58" rx="9"/><text x="1004" y="425">场地方 Venue</text><text class="m" x="1004" y="445">venue_no · 正交归属</text></g>
+
+      <!-- ① 账号 → 主体 -->
+      <path class="edge" d="M220,278 C272,278 272,208 320,208" marker-end="url(#arF)"/>
+      <path class="edge" d="M220,318 C272,318 272,368 320,368" marker-end="url(#arF)"/>
+      <text class="lbl" x="230" y="226">① N : M</text>
+      <text class="lbl m" x="30" y="356">同一手机号的多行，不是一行多主体</text>
+
+      <!-- ② 主体 → 商户 -->
+      <path class="edge" d="M500,192 C580,192 580,91 620,91" marker-end="url(#arF)"/>
+      <path class="edge" d="M500,200 C580,200 580,171 620,171" marker-end="url(#arF)"/>
+      <text class="lbl" x="508" y="136">② 1 : N</text>
+      <text class="lbl m" x="622" y="44">② 的 N = 通道 × 市场 × 适用范围</text>
+
+      <!-- ③ 主体 → 站点 -->
+      <path class="edge" d="M500,224 C580,224 580,321 620,321" marker-end="url(#arF)"/>
+      <path class="edge" d="M500,232 C588,232 588,401 620,401" marker-end="url(#arF)"/>
+      <text class="lbl" x="508" y="276">③ 1 : N</text>
+      <text class="lbl m" x="508" y="294">主责归属</text>
+
+      <!-- ④ 站点 ↔ 商户：无外键，按 scope 解析 -->
+      <path class="edge dash" d="M910,304 H950 V178 H910" marker-end="url(#arF)"/>
+      <text class="lbl" x="700" y="244">④ 按 scope 解析 · 没有外键</text>
+
+      <!-- ⑤ 站点 × 主体 责任 -->
+      <path class="edge" d="M910,330 H990" marker-end="url(#arF)"/>
+      <text class="lbl m" x="916" y="324">⑤</text>
+
+      <!-- ⑥ 场地方 -->
+      <path class="edge" d="M910,406 C950,406 950,429 990,429" marker-end="url(#arF)"/>
+      <text class="lbl m" x="916" y="452">⑥</text>
+
+      <!-- 底部注记 -->
+      <g class="band"><rect x="30" y="496" width="1185" height="104" rx="8"/></g>
+      <text class="lbl" x="52" y="526">②③ 是从主体分出的<tspan font-weight="600">两条并列 1 : N</tspan>，不是「主体 → 商户 → 站点」的三级树。给站点加收款号外键，会与 ④ 的解析双写打架。</text>
+      <text class="lbl" x="52" y="552">④ 一笔订单的钱进哪个商户号，在站点上按 SITE → DEVICE_TYPE → ALL 取最先命中；<tspan font-weight="600">一个都没命中就抛错，绝不静默进错账户</tspan>。</text>
+      <text class="lbl" x="52" y="578">③ 的主责决定数据范围与订单归属，⑤ 的责任行决定分钱。<tspan font-weight="600">主责必须在责任行中持有 OPERATE</tspan>——否则看得见数据、分不到钱，且没有地方报错。</text>
+    </svg>
+    </div>
+    <figcaption><strong>三段读错各有各的代价：</strong>① 写成「一行挂主体数组」，撤销单个成员关系要读-改-写，并发下互相覆盖且不报错；
+    ② 写成「一个主体一个商户号」，一个渠道多商户号就放不下（ai-shop 为此改过唯一键，是有空窗期的高风险操作）；
+    ③ 与 ⑤ 混为一谈，「出资方」会自动获得运维操作权，或者换个运维方就改变了数据范围。</figcaption>
+  </figure>
+</section>
+
 <section id="gen">
-  <h2>二、泛化（继承）— 四处成立</h2>
+  <h2>三、泛化（继承）— 四处成立</h2>
   <p class="sub">空心三角指向父类型。四处都不是 Java 继承：设备靠注册表 + 策略，订单靠主表 + 扩展表，受益方与登录主体靠同一条链跑不同取值。</p>
   <figure>
     <div class="scroll">
@@ -332,7 +405,7 @@
 </section>
 
 <section id="dep">
-  <h2>三、依赖 — 单向</h2>
+  <h2>四、依赖 — 单向</h2>
   <p class="sub">实线是行为依赖，虚线是事件。场所层不知道交易层存在，交易层不知道资金层存在——只往下游发事件。</p>
   <figure>
     <div class="scroll">
@@ -360,7 +433,7 @@
 </section>
 
 <footer>
-  来源 <code>docs/technical/领域模型-本体与关系.md</code>（v2）· 依据 ADR-026 / ADR-012 / ADR-013 / ADR-021 / ADR-004 · 家族配色沿用 <code>diagrams/gen.py</code>
+  来源 <code>docs/technical/领域模型-本体与关系.md</code>（v3）· 依据 ADR-026 / ADR-012 / ADR-013 / ADR-021 / ADR-004 / ADR-027 / ADR-029 / ADR-030 · 家族配色沿用 <code>diagrams/gen.py</code>
 </footer>
 </div>
 
