@@ -6,6 +6,8 @@ import ai.neargo.sharehub.auth.SecurityUtils;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.wo.dto.WoDtos.WorkOrder;
 import ai.neargo.sharehub.wo.WoStateMachine;
+import ai.neargo.sharehub.wo.WoDispatchAction;
+import ai.neargo.sharehub.wo.WorkOrderStatus;
 import ai.neargo.sharehub.wo.entity.WoOrder;
 import ai.neargo.sharehub.wo.ext.WorkOrderType;
 import ai.neargo.sharehub.wo.ext.dto.WoExtDtos.AcceptReq;
@@ -101,7 +103,7 @@ public class WoOpsServiceImpl implements WoOpsService {
         e.setCabinetNo(draft.cabinetNo());
         e.setLocationName(draft.locationName());
         e.setDescription(draft.description());
-        e.setStatus("CREATED");
+        e.setStatus(WorkOrderStatus.CREATED.name());
         e.setWoCreatedAt(LocalDateTime.now().toString());
 
         // 按 SLA 规则算 due 时刻，落逐单计时行；顺带把 sla_due_at 冗余到工单上供列表直出
@@ -148,7 +150,7 @@ public class WoOpsServiceImpl implements WoOpsService {
         woMapper.updateById(e);
 
         // 与派单/驳回共用 append 表：同一根「这单转了几手」的时间轴
-        appendDispatch(woNo, resolveAssignee(req == null ? null : req.assigneeNo(), e), "ACCEPT");
+        appendDispatch(woNo, resolveAssignee(req == null ? null : req.assigneeNo(), e), WoDispatchAction.ACCEPT.name());
 
         // ACCEPTED 是响应 SLA 的度量终点（[db-design §9A.4]）—— 这就是该状态不能被删掉的原因
         markBreached(woNo, true);
@@ -164,7 +166,7 @@ public class WoOpsServiceImpl implements WoOpsService {
 
         // PROCESSING 上的重复提交是自环（前端 WO_TRANSITIONS.process），只留痕不改状态，
         // 故不喂给状态机 —— 状态机里没有自环边，喂进去会被当成非法迁移拒掉。
-        if (!"PROCESSING".equals(e.getStatus())) {
+        if (!WorkOrderStatus.PROCESSING.name().equals(e.getStatus())) {
             e.setStatus(stateMachine.next(e.getStatus(), "PROCESS"));   // ACCEPTED→PROCESSING
             woMapper.updateById(e);
         }
@@ -239,12 +241,12 @@ public class WoOpsServiceImpl implements WoOpsService {
         WoOrder e = byNo(woNo);
         // 从当前态一路走到 CLOSED；起点不在 DONE/AUDITED 上的由状态机拒（含 PROCESSING —— 需先 /complete）
         for (String event : List.of("AUDIT", "CLOSE")) {
-            if ("CLOSED".equals(e.getStatus())) break;
+            if (WorkOrderStatus.CLOSED.name().equals(e.getStatus())) break;
             if (isBefore(e.getStatus(), event)) {
                 e.setStatus(stateMachine.next(e.getStatus(), event));
             }
         }
-        if (!"CLOSED".equals(e.getStatus())) {
+        if (!WorkOrderStatus.CLOSED.name().equals(e.getStatus())) {
             // 兜底：上面的链没能走到终点说明起点非法，交给状态机给出统一的报错口径
             e.setStatus(stateMachine.next(e.getStatus(), "CLOSE"));
         }
@@ -277,7 +279,7 @@ public class WoOpsServiceImpl implements WoOpsService {
         e.setStatus(stateMachine.next(e.getStatus(), "DISPATCH"));   // CREATED→DISPATCHED，非法迁移拒
         e.setAssigneeName(assignee);
         woMapper.updateById(e);
-        appendDispatch(woNo, resolveAssignee(assignee, e), "DISPATCH");
+        appendDispatch(woNo, resolveAssignee(assignee, e), WoDispatchAction.DISPATCH.name());
         return toVO(e);
     }
 
@@ -313,8 +315,8 @@ public class WoOpsServiceImpl implements WoOpsService {
         java.util.Map<String, WoDispatch> accepted = new java.util.HashMap<>();
         for (WoDispatch d : dispatchMapper.selectList(new LambdaQueryWrapper<WoDispatch>()
                 .in(WoDispatch::getWoNo, nos).orderByAsc(WoDispatch::getId))) {
-            if ("DISPATCH".equals(d.getAction())) dispatchedAt.put(d.getWoNo(), d.getDispatchedAt());
-            if ("ACCEPT".equals(d.getAction())) accepted.put(d.getWoNo(), d);
+            if (WoDispatchAction.DISPATCH.name().equals(d.getAction())) dispatchedAt.put(d.getWoNo(), d.getDispatchedAt());
+            if (WoDispatchAction.ACCEPT.name().equals(d.getAction())) accepted.put(d.getWoNo(), d);
         }
         // handle 时间轴：最新一行（现场处理）+ 最新完工行（note 前缀 COMPLETE，见 appendHandle）
         java.util.Map<String, WoHandle> lastHandle = new java.util.HashMap<>();

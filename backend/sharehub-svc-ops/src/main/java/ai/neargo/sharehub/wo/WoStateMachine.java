@@ -30,26 +30,41 @@ import java.util.Set;
 @Component
 public class WoStateMachine {
 
-    // event → (fromStatus → toStatus)
-    // 注：「完工」用的是 DONE 事件（PROCESSING→DONE），端点名 /complete，不另加一条同义边。
-    private static final Map<String, Map<String, String>> TRANSITIONS = Map.of(
-            "DISPATCH", Map.of("CREATED", "DISPATCHED"),
-            "ACCEPT", Map.of("DISPATCHED", "ACCEPTED"),
-            "PROCESS", Map.of("ACCEPTED", "PROCESSING"),
-            "DONE", Map.of("PROCESSING", "DONE"),
-            "AUDIT", Map.of("DONE", "AUDITED"),
-            "CLOSE", Map.of("AUDITED", "CLOSED"),
-            "REJECT", Map.of("DISPATCHED", "CREATED", "ACCEPTED", "CREATED", "PROCESSING", "CREATED"),
-            "REWORK", Map.of("DONE", "PROCESSING"));
+    /**
+     * event → (fromStatus → toStatus)。
+     *
+     * <p>注：「完工」用的是 DONE 事件（PROCESSING→DONE），端点名 /complete，不另加一条同义边。
+     *
+     * <p><b>状态是 {@link WorkOrderStatus}，事件仍是字符串</b>：事件是动词、状态是名词，
+     * 类型不同让两者无法被混为一谈。告警域栽过这个跟头 —— 那里 {@code ACK} 是事件名，
+     * 却被写进了查状态的 {@code IN} 条件，已受理的告警于是永远开不出工单（见 AlarmStatus）。
+     */
+    private static final Map<String, Map<WorkOrderStatus, WorkOrderStatus>> TRANSITIONS = Map.of(
+            "DISPATCH", Map.of(WorkOrderStatus.CREATED, WorkOrderStatus.DISPATCHED),
+            "ACCEPT", Map.of(WorkOrderStatus.DISPATCHED, WorkOrderStatus.ACCEPTED),
+            "PROCESS", Map.of(WorkOrderStatus.ACCEPTED, WorkOrderStatus.PROCESSING),
+            "DONE", Map.of(WorkOrderStatus.PROCESSING, WorkOrderStatus.DONE),
+            "AUDIT", Map.of(WorkOrderStatus.DONE, WorkOrderStatus.AUDITED),
+            "CLOSE", Map.of(WorkOrderStatus.AUDITED, WorkOrderStatus.CLOSED),
+            "REJECT", Map.of(WorkOrderStatus.DISPATCHED, WorkOrderStatus.CREATED,
+                             WorkOrderStatus.ACCEPTED, WorkOrderStatus.CREATED,
+                             WorkOrderStatus.PROCESSING, WorkOrderStatus.CREATED),
+            "REWORK", Map.of(WorkOrderStatus.DONE, WorkOrderStatus.PROCESSING));
 
-    /** 校验并返回目标状态；非法迁移抛异常。 */
+    /**
+     * 校验并返回目标状态；非法迁移抛异常。
+     *
+     * <p>出入参仍是 {@code String}：落库的是字符串，边界转换一次，不动实体字段类型
+     * （那会牵出 MyBatis 类型处理器的连锁改动）。
+     */
     public String next(String from, String event) {
-        Map<String, String> m = TRANSITIONS.get(event);
-        String to = m == null ? null : m.get(from);
+        Map<WorkOrderStatus, WorkOrderStatus> m = TRANSITIONS.get(event);
+        // of() 对垃圾值直接抛，不做运行期兼容
+        WorkOrderStatus to = m == null ? null : m.get(WorkOrderStatus.of(from));
         if (to == null) {
             throw new IllegalArgumentException("工单状态非法迁移: " + from + " --" + event + "--> ?");
         }
-        return to;
+        return to.name();
     }
 
     public Set<String> events() {

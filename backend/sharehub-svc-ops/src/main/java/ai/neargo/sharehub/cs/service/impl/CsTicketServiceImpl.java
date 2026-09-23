@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.cs.service.impl;
 
+import ai.neargo.sharehub.cs.CsTicketStatus;
+
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.cs.ProblemActionResolver;
@@ -41,9 +43,9 @@ public class CsTicketServiceImpl implements CsTicketService {
 
     /** 状态机：当前态 → 允许迁往的态。CLOSED 是终态。 */
     private static final Map<String, Set<String>> TRANSITIONS = Map.of(
-            "OPEN", Set.of("PROCESSING", "CLOSED"),
-            "PROCESSING", Set.of("CLOSED"),
-            "CLOSED", Set.of());
+            CsTicketStatus.OPEN.name(), Set.of(CsTicketStatus.PROCESSING.name(), CsTicketStatus.CLOSED.name()),
+            CsTicketStatus.PROCESSING.name(), Set.of(CsTicketStatus.CLOSED.name()),
+            CsTicketStatus.CLOSED.name(), Set.of());
 
     private final CsTicketMapper mapper;
     private final ProblemActionResolver actionResolver;
@@ -144,25 +146,25 @@ public class CsTicketServiceImpl implements CsTicketService {
         e.setProblemNo(req == null ? null : req.problemNo());
         e.setIssue(req == null ? null : req.issue());
         e.setChannel(req == null || req.channel() == null || req.channel().isBlank() ? "APP" : req.channel());
-        e.setStatus("OPEN");
+        e.setStatus(CsTicketStatus.OPEN.name());
         mapper.insert(e); // 受理单必建 —— 分流失败也不能丢用户诉求
 
         // 分流依据来自字典，不是 if-else 硬编码（[api/README §6A.2]）
         String action = actionResolver.resolve(e.getProblemNo());
         String sessionNo = null;
         switch (action == null ? ProblemActionResolver.TO_CS : action) {
-            case ProblemActionResolver.SELF_SERVICE -> e.setStatus("CLOSED"); // 自助解决，直接关单
+            case ProblemActionResolver.SELF_SERVICE -> e.setStatus(CsTicketStatus.CLOSED.name()); // 自助解决，直接关单
             case ProblemActionResolver.TO_WORKORDER -> {
                 e.setWoNo(workOrderPort.createWorkOrder(e));
-                e.setStatus("PROCESSING");
+                e.setStatus(CsTicketStatus.PROCESSING.name());
             }
             case ProblemActionResolver.TO_REFUND -> {
                 e.setRefundNo(refundPort.createRefund(e));
-                e.setStatus("PROCESSING");
+                e.setStatus(CsTicketStatus.PROCESSING.name());
             }
             default -> { // TO_CS 及一切未知值：转人工，最安全的兜底方向
                 sessionNo = sessionService.openFor(cUserNo, e.getIssue());
-                e.setStatus("PROCESSING");
+                e.setStatus(CsTicketStatus.PROCESSING.name());
             }
         }
         mapper.updateById(e);
@@ -214,11 +216,11 @@ public class CsTicketServiceImpl implements CsTicketService {
 
     /** 转出后推进到 PROCESSING；已 CLOSED 的单不回退（转出是对既有诉求的补处置，不复活工单）。 */
     private void advanceToProcessing(CsTicket e) {
-        if ("OPEN".equals(e.getStatus())) e.setStatus("PROCESSING");
+        if (CsTicketStatus.OPEN.name().equals(e.getStatus())) e.setStatus(CsTicketStatus.PROCESSING.name());
     }
 
     private void assertTransition(String from, String to) {
-        Set<String> allowed = TRANSITIONS.get(from == null ? "OPEN" : from);
+        Set<String> allowed = TRANSITIONS.get(from == null ? CsTicketStatus.OPEN.name() : from);
         if (allowed == null) throw new IllegalStateException("未知报障状态: " + from);
         if (!allowed.contains(to)) {
             throw new IllegalStateException("报障状态非法迁移: " + from + " → " + to);

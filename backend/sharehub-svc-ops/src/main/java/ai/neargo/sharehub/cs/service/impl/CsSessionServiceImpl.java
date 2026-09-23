@@ -1,5 +1,8 @@
 package ai.neargo.sharehub.cs.service.impl;
 
+import ai.neargo.sharehub.cs.CsSenderType;
+import ai.neargo.sharehub.cs.CsSessionStatus;
+
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.cs.dto.CsDtos.CsMessageVO;
@@ -70,14 +73,14 @@ public class CsSessionServiceImpl implements CsSessionService {
         CsSession session = mapper.selectOne(new LambdaQueryWrapper<CsSession>()
                 .eq(CsSession::getSessionNo, sessionNo).last("limit 1"));
         if (session == null) throw new IllegalArgumentException("会话不存在: " + sessionNo);
-        if ("CLOSED".equals(session.getStatus())) {
+        if (CsSessionStatus.CLOSED.name().equals(session.getStatus())) {
             throw new IllegalStateException("会话已关闭，不能回复: " + sessionNo);
         }
 
         CsMessage m = new CsMessage();
         m.setTenantId(session.getTenantId() == null ? TENANT_MAIN : session.getTenantId());
         m.setSessionNo(sessionNo);
-        m.setSenderType("AGENT");
+        m.setSenderType(CsSenderType.AGENT.name());   // 客服坐席，不是代理商
         m.setSenderNo(senderNo);
         m.setContent(content);
         m.setAttach(attach);
@@ -96,7 +99,7 @@ public class CsSessionServiceImpl implements CsSessionService {
     public String openFor(String cUserNo, String firstMessage) {
         CsSession active = mapper.selectOne(new LambdaQueryWrapper<CsSession>()
                 .eq(CsSession::getCUserNo, cUserNo)
-                .eq(CsSession::getStatus, "ACTIVE")
+                .eq(CsSession::getStatus, CsSessionStatus.ACTIVE.name())
                 .orderByDesc(CsSession::getId)
                 .last("limit 1"));
         if (active != null) return active.getSessionNo(); // 幂等：一人同时只有一个活跃会话
@@ -105,7 +108,7 @@ public class CsSessionServiceImpl implements CsSessionService {
         e.setSessionNo(nextSessionNo());
         e.setTenantId(TENANT_MAIN);
         e.setCUserNo(cUserNo);
-        e.setStatus("ACTIVE");
+        e.setStatus(CsSessionStatus.ACTIVE.name());
         e.setLastMessage(summarize(firstMessage));
         mapper.insert(e);
 
@@ -113,7 +116,7 @@ public class CsSessionServiceImpl implements CsSessionService {
             CsMessage m = new CsMessage();
             m.setTenantId(TENANT_MAIN);
             m.setSessionNo(e.getSessionNo());
-            m.setSenderType("USER");
+            m.setSenderType(CsSenderType.USER.name());
             m.setSenderNo(cUserNo);
             m.setContent(firstMessage);
             m.setCreatedAt(LocalDateTime.now().format(TS));

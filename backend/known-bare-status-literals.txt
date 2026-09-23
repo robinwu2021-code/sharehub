@@ -44,14 +44,7 @@ OutboxEventBus#status=FAILED
 OutboxEventBus#status=PENDING
 OutboxEventBus#status=SENT
 
-# ── cs（7 条）──
-CsSessionServiceImpl#senderType=AGENT
-CsSessionServiceImpl#senderType=USER
-CsSessionServiceImpl#status=ACTIVE
-CsSessionServiceImpl#status=CLOSED
-CsTicketServiceImpl#status=CLOSED
-CsTicketServiceImpl#status=OPEN
-CsTicketServiceImpl#status=PROCESSING
+# ── cs：✅ 已收敛（CsTicketStatus / CsSessionStatus / CsSenderType）──
 
 # ── dev（13 条）──
 AssetAssignedListener#type=CABINET
@@ -171,9 +164,7 @@ UserInvoiceServiceImpl#status=APPLIED
 UserInvoiceServiceImpl#type=COMPANY
 WalletServiceImpl#status=PAID
 
-# ── wo（5 条）──
-WoOpsServiceImpl#action=ACCEPT
-WoOpsServiceImpl#action=DISPATCH
-WoOpsServiceImpl#status=CLOSED
-WoOpsServiceImpl#status=CREATED
-WoOpsServiceImpl#status=PROCESSING
+# ── wo：✅ 已收敛（WorkOrderStatus · WoDispatchAction）──
+#    起初以为 action=ACCEPT/DISPATCH 是"事件名不是状态"就直接从台账删了 —— 棘轮当场拦下。
+#    理由错在：wo_dispatch.action 是**落库的列**（且 DDL 里没有注释，取值域只存在于两处
+#    字面量里）。凡是落库的封闭取值都该有枚举，不管它叫 status 还是 action。

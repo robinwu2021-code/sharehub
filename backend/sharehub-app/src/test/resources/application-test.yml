@@ -42,6 +42,17 @@ spring:
     # 测试库允许从空库开始；不设 baseline 会在非空库上报错，而空库正是我们要的起点
     baseline-on-migrate: true
 
+    # **校验失败就重建整个测试库**。开发期迁移文件天天在改（尤其多会话并行时），
+    # 改一次就让已应用过它的库校验不过：`Migration checksum mismatch for version NN`，
+    # 而这个报错埋在一长串 bean 创建链末尾，指不到「去重建库」这件事上。
+    #
+    # 之所以敢这么做，是因为**测试库本来就是可抛弃的**：它每次从空库跑全部迁移，
+    # 没有任何需要保留的数据。生产/开发库绝不能开 clean —— 所以这两行只在
+    # test profile 里，且库名被限定在 test_ 前缀下（见文件头）。
+    # 注：clean-on-validation-error 在新版 Flyway 已不生效（试过，报错原样）。
+    # 自愈改由 TestFlywayStrategy 实现：migrate 前先 repair()。
+    clean-disabled: false
+
 sharehub:
   # ⚠️ **不要在这里全局开 seed**。2026-09-23 试过，两处立刻红：
   #   · SecurityHotfixTest.seedersNotWiredByDefault —— 它守的正是「默认不灌演示数据」
