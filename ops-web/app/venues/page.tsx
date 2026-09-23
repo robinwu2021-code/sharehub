@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { UNPAGED_SIZE, RECENT_LIMIT } from "@/lib/constants";
 import { api } from "@/lib/api";
@@ -150,6 +151,28 @@ function VenuesInner() {
   const onTabChange = () => { paging.reset(); setShowArchived(false); };
   const tabs = useNavTabs("/venues", TAB_KEYS);
   const { tab, setTab } = usePageTab(tabs, onTabChange);
+  /*
+   * 场地方的收款账户（B3）。
+   *
+   * 这一页**不做账户的增删改** —— 管理界面在 /finance?tab=payout-accounts，
+   * 在两处各造一套 CRUD 的结果一定是「在哪个入口改的」决定别人看不看得见
+   * （本仓 2026-09-23 的菜单收敛就是在清理这类重复）。
+   * 这里只回答一个问题：**这个场地方现在能不能收到钱**。
+   */
+  const canReadPayout = allow("finance:payout_account:read");
+  const payoutQ = useQuery({
+    queryKey: ["venue-payout-accounts"],
+    queryFn: () => api.listPayoutAccounts({ page: 1, size: UNPAGED_SIZE, payeeType: "VENUE" }),
+    enabled: canReadPayout && tab === "venues",
+  });
+  /** venueNo → 默认账户掩码；没有键就是没设置。 */
+  const payoutByVenue = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const a of payoutQ.data?.list ?? []) {
+      if (a.status === "ACTIVE" && a.isDefault) m.set(a.payeeNo, a.accountMasked);
+    }
+    return m;
+  }, [payoutQ.data]);
   const [keyword, setKeyword] = useState("");
   // 「显示已归档」开关（TDD §10.1：列表默认过滤已归档）。切 tab 复位，避免在合同页残留一个看不见的过滤态。
   const [showArchived, setShowArchived] = useState(false);
@@ -316,6 +339,20 @@ function VenuesInner() {
     { header: "联系方式", cell: (v) => <span className="text-muted-foreground">{v.contact}</span> },
     { header: "行业", cell: (v) => v.industry },
     { header: "站点数", className: "text-right", cell: (v) => <span className="tabular-nums">{v.locationCount}</span> },
+    ...(canReadPayout ? [{
+      header: "收款账户",
+      cell: (v: Venue) => {
+        const masked = payoutByVenue.get(v.venueNo);
+        return masked
+          ? <span className="font-mono txt-caption text-muted-foreground">{masked}</span>
+          : (
+            // 未设置就是「结算做完也打不出去」—— 标出来，别等审批被拒才发现
+            <Link href="/finance?tab=payout-accounts" className="txt-caption text-warning hover:underline">
+              未设置 · 去补录
+            </Link>
+          );
+      },
+    }] : []),
     ...archivedCols<Venue>(),
     {
       header: "操作",
