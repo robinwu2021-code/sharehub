@@ -178,7 +178,9 @@ export function SiteDetailDrawer({
       open={!!siteNo}
       onOpenChange={(o) => !o && onClose()}
       title={site ? site.name : "站点详情"}
-      desc={site ? `${site.siteNo} · ${site.venueName} · ${site.regionName}` : undefined}
+      // 逐段过滤空值再拼：缺一段时不要在标题里留下「· undefined」——
+      // 那既没告诉用户缺了什么，又让人怀疑整页数据都不可信
+      desc={site ? [site.siteNo, site.venueName, site.regionName || site.regionId].filter(Boolean).join(" · ") : undefined}
       width="w-[720px]"
     >
       <Tabs tabs={TABS} value={active} onChange={onTab} />
@@ -191,7 +193,7 @@ export function SiteDetailDrawer({
         <div>
           <Field label="站点名称">{site.name}{site.nameAr ? ` / ${site.nameAr}` : ""}</Field>
           <Field label="场地方">{site.venueName}</Field>
-          <Field label="区域 · 场景">{site.regionName} · {site.sceneType}</Field>
+          <Field label="区域 · 场景">{[site.regionName || site.regionId, site.sceneType].filter(Boolean).join(" · ") || "未设置"}</Field>
           <Field label="地址">{site.address}</Field>
           <Field label="营业时间">{site.openHours || <span className="text-muted-foreground">未设置（视为 24 小时营业）</span>}</Field>
           <Field label="经纬度">

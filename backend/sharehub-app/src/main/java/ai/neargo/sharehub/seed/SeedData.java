@@ -139,7 +139,9 @@ public class SeedData {
              */
             sites.add(new Site("ST" + (300 + i), p(LOCS, i),
                     "VEN" + (300 + i % VENUE_NAMES.size()), p(VENUE_NAMES, i),
-                    i % 3 == 0 ? null : "AG" + String.format("%03d", (i % 9) + 1), p(REGIONS, i),
+                    i % 3 == 0 ? null : "AG" + String.format("%03d", (i % 9) + 1),
+                    // 种子的 REGIONS 本身就是展示名，regionId 与 regionName 在演示数据里同值
+                    p(REGIONS, i), p(REGIONS, i),
                     p(LOCS, i) + ", Dubai, UAE",
                     java.math.BigDecimal.valueOf(5512_0000L + (i * 2_3000L), 6),
                     java.math.BigDecimal.valueOf(2505_0000L + (i * 1_9000L), 6),

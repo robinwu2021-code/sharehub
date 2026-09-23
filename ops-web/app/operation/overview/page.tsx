@@ -20,6 +20,7 @@ import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/utils";
 import { pageReady } from "@/lib/backend-ready";
 import { PageTitle, EmptyState, ErrorState, Skeleton } from "@/components/ui/misc";
+import { SiteDetailDrawer } from "@/components/operation/site-detail";
 import { Tabs } from "@/components/ui/tabs";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
@@ -68,6 +69,9 @@ function OverviewInner() {
   const [range, setRange] = useState("7");
   const [metric, setMetric] = useState<SiteRankMetric>("gmv");
   const [kindFilter, setKindFilter] = useState<string>("");
+  // 详情抽屉：只在本页内开合，不写进 URL —— 概览是「看一眼」的地方，不承担深链
+  const [detailNo, setDetailNo] = useState<string | null>(null);
+  const [detailTab, setDetailTab] = useState<string | null>(null);
 
   const days = Number(range);
   const to = new Date();
@@ -78,16 +82,23 @@ function OverviewInner() {
   });
   const d = q.data as OperationOverview | undefined;
 
+  /*
+   * 点站点名 = **就地打开这个站点的详情**，不跳去「站点管理」。
+   *
+   * 此前这里是 `<Link href="/operation/sites?no=…">`：点一下，左侧菜单从「站点概览」
+   * 跳到「站点管理」，看完还得自己走回来 —— 而用户的意图只是「看看这个站点怎么回事」，
+   * 并没有要换一个功能。详情抽屉本来就是独立组件，概览直接复用即可。
+   */
   const rankRows = [...(d?.ranking ?? [])]
     .sort((a, b) => (b[metric] as number) - (a[metric] as number))
     .slice(0, 10);
   const rankCols: Column<OperationOverview["ranking"][number]>[] = [
     { header: "#", className: "w-10", cell: (r) => rankRows.indexOf(r) + 1 },
     { header: "站点", cell: (r) => (
-      <Link href={`/operation/sites?no=${r.siteNo}`} className="min-w-0 hover:underline">
+      <SiteLink siteNo={r.siteNo} onOpen={setDetailNo}>
         <div className="truncate">{r.siteName}</div>
         <div className="truncate txt-caption text-muted-foreground">{r.siteNo} · {r.venueName}</div>
-      </Link>
+      </SiteLink>
     ) },
     { header: "机柜", className: "text-right", cell: (r) => r.cabinetCount },
     { header: "订单", className: "text-right", cell: (r) => r.orders },
@@ -104,10 +115,10 @@ function OverviewInner() {
     { header: "严重度", className: "whitespace-nowrap", cell: (a) => <StatusBadge map={SEVERITY} value={a.severity} /> },
     // 站点重名在真实数据里也会发生（同一商场的不同楼层），必须带编号，否则无法判断说的是哪一个
     { header: "站点", cell: (a) => (
-      <Link href={`/operation/sites?no=${a.siteNo}`} className="min-w-0 hover:underline">
+      <SiteLink siteNo={a.siteNo} onOpen={setDetailNo}>
         <div className="truncate">{a.siteName}</div>
         <div className="truncate txt-caption text-muted-foreground">{a.siteNo}</div>
-      </Link>
+      </SiteLink>
     ) },
     { header: "问题", className: "whitespace-nowrap", cell: (a) => KIND_LABEL[a.kind] },
     { header: "说明", cell: (a) => <span className="txt-caption text-muted-foreground">{a.detail}</span> },
@@ -223,7 +234,34 @@ function OverviewInner() {
           />
         </>
       )}
+
+      <SiteDetailDrawer
+        siteNo={detailNo}
+        tab={detailTab}
+        onTab={setDetailTab}
+        onClose={() => { setDetailNo(null); setDetailTab(null); }}
+      />
     </div>
+  );
+}
+
+/**
+ * 站点名：点开本页的详情抽屉，而不是跳到「站点管理」。
+ *
+ * 用 `<button>` 而不是 `<a>`：它不导航，写成链接会让人以为可以新标签页打开，
+ * 中键点一下却什么都不发生。
+ */
+function SiteLink({ siteNo, onOpen, children }: {
+  siteNo: string; onOpen: (no: string) => void; children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(siteNo)}
+      className="min-w-0 text-start hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ring-offset-bg)]"
+    >
+      {children}
+    </button>
   );
 }
 

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { AlertTriangle } from "lucide-react";
+import { HelpNote } from "./help-note";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 
@@ -64,13 +65,22 @@ export function Skeleton({ className }: { className?: string }) {
   return <div className={cn("animate-pulse rounded-field bg-muted", className)} />;
 }
 
-// 紧凑页头：标题与操作同一行；说明作为标题后的小字（面包屑已在顶栏给出位置，故从简）。
+/**
+ * 紧凑页头：标题 + 可选操作。
+ *
+ * <b>与 `TabHeader` 视觉一致</b>（同 `mb-3`、同 `txt-title`）—— 两者的分工是
+ * 「这一页有没有页内 tab」，而不该表现为两种长相。运营管理是一叶一路由、没有页内 tab，
+ * 此前用的是「标题 + 一行灰色说明」，于是整个菜单的页头和全站都不一样。
+ *
+ * <b>`desc` 收进浮层而不是常驻</b>：它说的是「这一页是什么」，对第一次来的人有用，
+ * 对每天开同一页的操作员是纯噪声，而且它把内容整体往下推了一行。判据见 `HelpNote`。
+ */
 export function PageTitle({ title, desc, action }: { title: string; desc?: string; action?: React.ReactNode }) {
   return (
     <div className="mb-3 flex items-center justify-between gap-4">
-      <div className="flex items-baseline gap-2 min-w-0">
-        <h1 className="txt-title shrink-0">{title}</h1>
-        {desc && <p className="truncate txt-caption text-muted-foreground">{desc}</p>}
+      <div className="flex min-w-0 items-center gap-1">
+        <h1 className="truncate txt-title">{title}</h1>
+        {desc && <HelpNote title={undefined}>{desc}</HelpNote>}
       </div>
       {action && <div className="shrink-0">{action}</div>}
     </div>

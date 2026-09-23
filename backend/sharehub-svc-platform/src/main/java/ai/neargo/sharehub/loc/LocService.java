@@ -31,10 +31,13 @@ public class LocService {
     private final VenueMapper venueMapper;
     private final ContractMapper contractMapper;
     private final ai.neargo.sharehub.loc.ext.mapper.LocContractAttachMapper attachMapper;
+    private final ai.neargo.sharehub.platform.md.mapper.MdRegionMapper regions;
 
     public LocService(SiteMapper siteMapper, LocationMapper locationMapper,
                       VenueMapper venueMapper, ContractMapper contractMapper,
-                      ai.neargo.sharehub.loc.ext.mapper.LocContractAttachMapper attachMapper) {
+                      ai.neargo.sharehub.loc.ext.mapper.LocContractAttachMapper attachMapper,
+                      ai.neargo.sharehub.platform.md.mapper.MdRegionMapper regions) {
+        this.regions = regions;
         this.siteMapper = siteMapper;
         this.locationMapper = locationMapper;
         this.venueMapper = venueMapper;
@@ -145,6 +148,17 @@ public class LocService {
         return out;
     }
 
+    /**
+     * 区域展示名。查不到就回落成 ID —— 显示一个陌生的 ID 也好过显示空白：
+     * 前者能让人去地区库里对，后者只会让人以为这个站点没设区域。
+     */
+    private String regionName(String regionId) {
+        if (regionId == null || regionId.isBlank()) return null;
+        var r = regions.selectOne(new LambdaQueryWrapper<ai.neargo.sharehub.platform.md.entity.MdRegion>()
+                .eq(ai.neargo.sharehub.platform.md.entity.MdRegion::getRegionId, regionId).last("limit 1"));
+        return r == null || r.getName() == null ? regionId : r.getName();
+    }
+
     private LocSite requireSite(String siteNo) {
         LocSite e = siteMapper.selectOne(new LambdaQueryWrapper<LocSite>()
                 .eq(LocSite::getSiteNo, siteNo).last("limit 1"));
@@ -248,13 +262,14 @@ public class LocService {
         return out;
     }
 
-    private static Site toSite(LocSite e) {
+    private Site toSite(LocSite e) {
         return toSite(e, null);
     }
 
-    private static Site toSite(LocSite e, Integer pointCount) {
+    private Site toSite(LocSite e, Integer pointCount) {
         return new Site(e.getSiteNo(), e.getName(), e.getVenueNo(), e.getVenueName(), e.getAgentNo(),
-                e.getRegionId(), e.getAddress(), e.getLng(), e.getLat(), e.getSceneType(),
+                e.getRegionId(), regionName(e.getRegionId()),
+                e.getAddress(), e.getLng(), e.getLat(), e.getSceneType(),
                 pointCount,
                 /*
                  * 机柜数**这一层算不出来**：`dev_cabinet` 属于 core，platform 不该反向依赖它。

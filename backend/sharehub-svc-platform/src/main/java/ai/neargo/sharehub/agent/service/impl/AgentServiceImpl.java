@@ -51,7 +51,7 @@ public class AgentServiceImpl implements AgentService {
         if (insert) { e = new AgtAgent(); e.setAgentNo(no); e.setTenantId("MAIN"); }
         e.setName(in.name());
         e.setContact(in.contact());
-        e.setRegionScope(in.regionScope());
+        e.setRegionScope(asJsonArray(in.regionScope()));
         e.setShareRate(in.shareRate());
         // 机柜数不回写：它是聚合值不是档案属性（实体与库里都已没有这一列）
         e.setStatus(in.status() == null ? "ENABLED" : in.status());
@@ -59,8 +59,32 @@ public class AgentServiceImpl implements AgentService {
         return toVO(e);
     }
 
+    /**
+     * `region_scope` 是 **JSON** 列（DDL 注释：辖域(区域数组)），而调用方传的是一个区域名。
+     * 直接写会触发 JSON 的 CHECK 约束、接口返回 500 —— 运营新建/编辑代理商时就撞得到。
+     *
+     * <p>已经是 JSON（`[...]` 或 `"..."`）就原样放行，否则包成单元素数组。
+     * 不在这里做更复杂的解析：这一列目前只承载「一个或几个区域名」，
+     * 提前造一套小语法只会让下一个人猜不到该传什么。
+     */
+    private static String asJsonArray(String v) {
+        if (v == null || v.isBlank()) return null;
+        String t = v.trim();
+        if (t.startsWith("[") || t.startsWith("\"")) return t;
+        return "[\"" + t.replace("\"", "\\\"") + "\"]";
+    }
+
+    /** 出参把 JSON 数组还原成人读的文本 —— 界面上要显示的是区域名，不是一段 JSON。 */
+    private static String plainScope(String json) {
+        if (json == null || json.isBlank()) return json;
+        String t = json.trim();
+        if (!t.startsWith("[")) return t.replaceAll("^\"|\"$", "");
+        return t.substring(1, Math.max(1, t.length() - 1))
+                .replaceAll("\"", "").trim();
+    }
+
     private static Agent toVO(AgtAgent e) {
-        return new Agent(e.getAgentNo(), e.getName(), e.getContact(), e.getRegionScope(),
+        return new Agent(e.getAgentNo(), e.getName(), e.getContact(), plainScope(e.getRegionScope()),
                 e.getShareRate() == null ? 0 : e.getShareRate(),
                 /*
                  * 机柜数：platform 算不出（dev_cabinet 属于 core），**给 0 而不是假装有值**。

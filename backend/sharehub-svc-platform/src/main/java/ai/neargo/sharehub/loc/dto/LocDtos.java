@@ -17,6 +17,9 @@ public final class LocDtos {
     /**
      * @param venueNo 归属场地方编号。**分成按它走**，不按 venueName ——
      *                种子里就有同名场地方，按名字连必然连错
+     * @param regionName 区域展示名（冗余自 `md_region.name`）。**存 ID 是因为区域名会变、ID 不会**，
+     *                   但列表与详情都要展示，所以出参带一份 —— 不带的话前端只能显示
+     *                   `undefined`（2026-09-23 站点详情抽屉上就是这样）
      * @param lng     经度；为空的后果不在运营端，是 C 端「找附近的柜」算不出距离
      * @param lat     纬度
      * @param pointCount    点位数。**只出不进**：它是按关系聚合出来的数，保存时不回写
@@ -26,7 +29,8 @@ public final class LocDtos {
      * @param cabinetCount  机柜数，同上
      */
     public record Site(String siteNo, String name, String venueNo, String venueName, String agentNo,
-                      String regionId, String address, java.math.BigDecimal lng, java.math.BigDecimal lat,
+                      String regionId, String regionName,
+                      String address, java.math.BigDecimal lng, java.math.BigDecimal lat,
                       String sceneType, Integer pointCount, Integer cabinetCount, String status) {
     }
 
