@@ -14,10 +14,21 @@ public class AgtAgent extends BaseEntity implements ai.neargo.sharehub.common.cr
     private String name;
     private String contact;
     private String regionScope;
+    /**
+     * 档案上的默认分润比例 —— 列名是 V1 就定的 `default_share_rate`。
+     *
+     * <p><b>必须显式指定列名</b>：字段叫 `shareRate`，按驼峰推导会得到 `share_rate`，
+     * 而那不是这张表的列。2026-09-23 曾据此加过一个 `share_rate` 影子列（V42），
+     * 结果是新值写进影子列、真列 `default_share_rate` 恒为 0 —— 界面显示正常，
+     * 而任何读真列的地方拿到的都是 0。V44 已删影子列。
+     *
+     * <p>⚠️ **分账不读这一列**，以 `share_rule` 为准（见 ShareGeneratorImpl）。
+     */
+    @com.baomidou.mybatisplus.annotation.TableField("default_share_rate")
     private Double shareRate;
     /*
      * 这里**没有** cabinetCount：同 LocVenue，机柜数是聚合值不是属性。
-     * shareRate 保留 —— 它是档案上的真实配置（V42 补列），
+     * shareRate 保留 —— 它是档案上的真实配置（列 `default_share_rate`，V1 就有），
      * 但**分账以 share_rule 为准**，别拿这一列去算钱。
      */
     private String status;
