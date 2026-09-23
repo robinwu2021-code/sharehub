@@ -111,6 +111,7 @@ const LEAF_TUPLES = [
   "/finance?tab=invoices|发票|finance:invoice:read|2|平台账",
   "/agents?tab=commission|代理分润配置|agent:settlement:read||伙伴账",
   "/finance?tab=withdrawals|提现审核|finance:withdrawal:read||伙伴账",
+  "/finance?tab=payout-accounts|收款账户|finance:payout_account:read||伙伴账",
   "/users?tab=wallets|用户钱包|user:wallet:read|2|用户账",
   "/finance?tab=recharges|充值订单|user:wallet:read|2|用户账",
   "/users|用户列表|user:cuser:read|1|用户主体",
@@ -244,9 +245,11 @@ describe("L3 叶子过滤（4.2-2）", () => {
     const labels = visibleLeaves(finance(), "VIEWER").map((l) => l.label);
     expect(labels).toEqual(["分润规则", "分润明细", "分润统计", "结算单", "提现审核"]);
   });
-  it("FINANCE 的财务：8 项 + 代理分润配置/用户钱包/充值订单 三条跨 section 深链", () => {
+  // 2026-09-23 B3：伙伴账新增「收款账户」—— 没有它提现审批放行不了，
+  // 所以它和提现审核同组、同样给 FINANCE。8 → 9 项。
+  it("FINANCE 的财务：9 项 + 代理分润配置/用户钱包/充值订单 三条跨 section 深链", () => {
     const labels = visibleLeaves(finance(), "FINANCE").map((l) => l.label);
-    expect(labels).toHaveLength(11);
+    expect(labels).toHaveLength(12);
     expect(labels).toContain("代理分润配置");
     expect(labels.at(-1)).toBe("充值订单"); // 用户账 分组殿后
   });

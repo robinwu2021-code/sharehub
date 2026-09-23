@@ -103,3 +103,9 @@ export interface ApplyQ extends PageQ {
   from?: string;
   to?: string;
 }
+
+/** 收款账户检索。**不按掩码搜** —— 同号段掩码可能相同，会捞出不相干的账户。 */
+export interface PayoutAccountQ extends PageQ {
+  payeeType?: string;
+  payeeNo?: string;
+}

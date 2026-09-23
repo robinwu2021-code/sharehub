@@ -350,3 +350,24 @@ export interface RechargeOrder {
   paidAt: string | null;
   psgTxnNo: string | null; // 支付网关流水号；未支付为空
 }
+
+// —— 收款账户（B3）——
+
+/**
+ * 收款账户 —— 钱最终打到哪里。
+ *
+ * ⚠️ `payeeType` 是 `AGENT` 不是 `OPERATOR`：`share_record` 与 `stl_withdrawal`
+ * 现网存的都是 AGENT，三张表要能对得上。改名是 ADR-029 §5.1 B 步的事，那时一起改。
+ */
+export interface PayoutAccount {
+  accountNo: string;
+  payeeType: "AGENT" | "VENUE";
+  payeeNo: string;
+  bankCode: string;
+  accountName: string;
+  /** 账号掩码。**只供显示** —— 同号段的掩码可能相同，不能拿它做任何等值判断。 */
+  accountMasked: string;
+  currency: string;
+  isDefault: boolean;
+  status: "ACTIVE" | "DISABLED";
+}

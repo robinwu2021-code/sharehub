@@ -35,7 +35,8 @@ import type {
   Reconcile, ReconAction, ReconHandleStatus, ReconDiff, ReconDiffType, Invoice, InvoiceStatus,
   ShareSummary, RechargeOrder, PageResult,
 
-  VoucherCreatePayload,} from "@/lib/types";
+  VoucherCreatePayload, PayoutAccount,
+} from "@/lib/types";
 import {
   SHARE_BASES,
   RECON_TRANSITIONS, RECON_TERMINAL, canReconTransition, canEditInvoiceFields, parseReconDiffDetail,
@@ -50,7 +51,7 @@ const periodLabel = (p: string) => REPORT_PERIODS.find((x) => x.value === p)?.la
 // 此前这里自己写了一份 label（把「提现审核」写成「提现」），且完全不判权：
 // 没有 finance:withdrawal:read 的角色照样看得到并点得动那个 tab。
 const TAB_KEYS = ["rules", "records", "summary", "settlements", "ledger",
-  "withdrawals", "reconcile", "invoices", "recharges"] as const;
+  "withdrawals", "payout-accounts", "reconcile", "invoices", "recharges"] as const;
 
 // 分润统计：维度切换器（竞品把「运营商佣金」「商户佣金」拆成两套菜单两张表，
 // 我们一张表切 dimension——列完全相同，少一次跳转）
@@ -76,6 +77,31 @@ const STL_STATUS: StatusMap<SettlementStatus> = {
 };
 // 提现状态：原先徽标直接印枚举值（"AUDIT"/"PAID"），那是系统内部词（规范 §13）。
 // 键序 = 资金流转顺序：申请 → 审批 → 打款 → 到账 / 驳回。
+/** 收款账户状态。停用不是删除 —— 历史提现单要能回溯到当时打给了哪条记录。 */
+const PA_STATUS: StatusMap<PayoutAccount["status"]> = {
+  ACTIVE: { label: "启用", tone: "success" },
+  DISABLED: { label: "已停用", tone: "muted" },
+};
+
+/**
+ * 收款账户字段。
+ *
+ * **账号填明文、只落掩码** —— 明文属于 PII，服务端不回传，所以编辑既有账户时
+ * 这一栏是空的（不是「丢了」），留空即不改。
+ */
+const PAYOUT_FIELDS: FieldDef[] = [
+  { key: "payeeType", label: "受益方类型", type: "select", required: true,
+    options: [{ value: "AGENT", label: "代理商" }, { value: "VENUE", label: "场地方" }] },
+  { key: "payeeNo", label: "受益方编号", required: true, placeholder: "如 AG001 / VN001" },
+  { key: "bankCode", label: "开户行", required: true, placeholder: "如 ENBD / ADCB / FAB" },
+  { key: "accountName", label: "户名", required: true,
+    placeholder: "须与主体法人名一致，否则银行会退回" },
+  { key: "accountMasked", label: "账号 / IBAN", required: true,
+    placeholder: "填完整账号；系统只保存后四位" },
+  { key: "currency", label: "币种", type: "select",
+    options: [{ value: "AED", label: "AED" }, { value: "SAR", label: "SAR" }] },
+];
+
 const WD_STATUS: StatusMap<Withdrawal["status"]> = {
   APPLY: { label: "待审批", tone: "warning" },
   AUDIT: { label: "审批中", tone: "warning" },
@@ -204,6 +230,8 @@ function FinanceInner() {
   const [wdApprove, setWdApprove] = useState("1");
   const [wdReject, setWdReject] = useState("");
   const username = useAuth((s) => s.username);
+  const realm = useAuth((s) => s.realm);
+  const currentOperatorNo = useAuth((s) => s.currentOperatorNo);
   // 分润统计：维度 / 周期 / 排序（排序受控，实际排序在 mock·后端做，翻页后仍成立）
   const [sumDim, setSumDim] = useState("VENUE");
   const [sumPeriod, setSumPeriod] = useState(SUMMARY_PERIODS[0]);
@@ -228,7 +256,7 @@ function FinanceInner() {
   // 差错明细是只读下钻，与「对账」菜单同一个权限码（nav.ts 上 /finance?tab=reconcile 就挂它）
   const canReadRecon = allow("finance:recon:read");
 
-  const q = useQuery<PageResult<ShareRule | Settlement | Withdrawal | LedgerEntry | ShareRecord | Reconcile | Invoice | ShareSummary | RechargeOrder>>({
+  const q = useQuery<PageResult<ShareRule | Settlement | Withdrawal | LedgerEntry | ShareRecord | Reconcile | Invoice | ShareSummary | RechargeOrder | PayoutAccount>>({
     queryKey: ["fin", tab, paging.page, paging.size, keyword, ruleDim, sumDim, sumPeriod, sumSortKey, sumSortDir, rcStatus, rcFrom, rcTo, stlStatus, reconStatusFilter, invStatusFilter, ledgerPeriod],
     queryFn: () =>
       tab === "rules" ? api.listShareRules({ page: paging.page, size: paging.size, keyword, dimension: ruleDim })
@@ -239,11 +267,67 @@ function FinanceInner() {
       : tab === "recharges" ? api.listRechargeOrders({ page: paging.page, size: paging.size, keyword, status: rcStatus || undefined, from: rcFrom || undefined, to: rcTo || undefined })
       : tab === "reconcile" ? api.listReconciles({ page: paging.page, size: paging.size, keyword, handleStatus: reconStatusFilter || undefined })
       : tab === "invoices" ? api.listInvoices({ page: paging.page, size: paging.size, keyword, status: invStatusFilter || undefined })
+      : tab === "payout-accounts" ? api.listPayoutAccounts({ page: paging.page, size: paging.size, keyword })
       : api.listWithdrawals({ page: paging.page, size: paging.size, keyword }),
     placeholderData: keepPreviousData,
   });
 
   const canAuditWithdrawal = allow("finance:withdrawal:audit");
+  // —— 收款账户（B3）：读写分开发码，能看账户不等于能改账户 ——
+  const canEditPayout = allow("finance:payout_account:update");
+  const [payoutForm, setPayoutForm] = useState<Record<string, unknown> | null>(null);
+  /*
+   * 代理门户的「你还不能收款」判据（B3）。
+   *
+   * **判据是有没有可用收款账户，不是主体状态** —— agt_agent.status=ENABLED 只说明能经营
+   * （能铺设备、能产生分润明细），能不能提现看这里（ADR-030 §3.6）。
+   * ai-shop 因为没分开，出现过「商家能卖、订单在来、结算单在生成，而收款号解析不到，
+   * 账单留空钱欠着，商家一路上没收到任何提示」。
+   */
+  const myPayoutQ = useQuery({
+    queryKey: ["fin", "my-payout", currentOperatorNo],
+    // 只为判断「有没有默认账户」，一次取全量（同本页其它下拉的做法）
+    queryFn: () => api.listPayoutAccounts({ page: 1, size: UNPAGED_SIZE, payeeType: "AGENT", payeeNo: currentOperatorNo }),
+    enabled: realm === "AGENT" && !!currentOperatorNo && tab === "withdrawals",
+  });
+  const cannotGetPaidYet = realm === "AGENT" && myPayoutQ.isSuccess
+    && !(myPayoutQ.data?.list ?? []).some((a) => a.status === "ACTIVE" && a.isDefault);
+
+  const afterPayoutWrite = () => {
+    qc.invalidateQueries({ queryKey: ["fin", "payout-accounts"] });
+    // 提现审批读的是同一份账户 —— 账户变了，「能不能放行」也跟着变
+    qc.invalidateQueries({ queryKey: ["fin", "withdrawals"] });
+  };
+  const savePayout = useMutation({
+    mutationFn: (v: Record<string, unknown>) => api.savePayoutAccount({
+      accountNo: v.accountNo ? String(v.accountNo) : undefined,
+      payeeType: (v.payeeType as PayoutAccount["payeeType"]) ?? "AGENT",
+      payeeNo: String(v.payeeNo ?? ""),
+      bankCode: String(v.bankCode ?? ""),
+      accountName: String(v.accountName ?? ""),
+      accountMasked: String(v.accountMasked ?? ""),
+      currency: v.currency ? String(v.currency) : undefined,
+      makeDefault: v.makeDefault === true,
+    }),
+    onSuccess: () => { notify.success("收款账户已保存"); setPayoutForm(null); afterPayoutWrite(); },
+    onError: (e: Error) => notify.error(e.message),
+  });
+  const setPayoutDefault = useMutation({
+    mutationFn: (a: PayoutAccount) => api.savePayoutAccount({
+      accountNo: a.accountNo, payeeType: a.payeeType, payeeNo: a.payeeNo,
+      bankCode: a.bankCode, accountName: a.accountName,
+      // 改默认时原样回传掩码：服务端见 **** 开头不再二次掩码，账号不变
+      accountMasked: a.accountMasked,
+      currency: a.currency, makeDefault: true,
+    }),
+    onSuccess: () => { notify.success("已设为默认收款账户"); afterPayoutWrite(); },
+    onError: (e: Error) => notify.error(e.message),
+  });
+  const disablePayout = useMutation({
+    mutationFn: (no: string) => api.disablePayoutAccount(no),
+    onSuccess: () => { notify.success("已停用"); afterPayoutWrite(); },
+    onError: (e: Error) => notify.error(e.message),
+  });
   // —— 提现手续费接「业务规则」（S7）——
   // 费率/封顶/最低提现额的唯一来源是 系统设置 · 业务规则（/system?tab=rules），页面上原先写死 0.6%
   // 与它并存：改了规则页提现页不动，正是「口径分叉 → 对账差钱」。这里改成读同一份配置。
@@ -802,6 +886,46 @@ function FinanceInner() {
     },
   ];
 
+  const payoutColumns: Column<PayoutAccount>[] = [
+    { header: "受益方", cell: (a) => (
+      <div>
+        <div>{a.payeeNo}</div>
+        <div className="txt-caption text-muted-foreground">{PAYEE_TYPE_LABEL[a.payeeType]}</div>
+      </div>
+    ) },
+    { header: "户名", cell: (a) => a.accountName },
+    { header: "开户行 / 账号", cell: (a) => (
+      <div className="txt-caption">
+        <div>{a.bankCode}</div>
+        {/* 只显示掩码。同号段的掩码可能相同 —— 不能拿它做任何等值判断 */}
+        <div className="font-mono text-muted-foreground">{a.accountMasked}</div>
+      </div>
+    ) },
+    { header: "币种", cell: (a) => <span className="tabular-nums">{a.currency}</span> },
+    { header: "状态", cell: (a) => (
+      <div className="flex items-center gap-1.5">
+        <StatusBadge map={PA_STATUS} value={a.status} />
+        {a.isDefault && <Badge tone="info">默认</Badge>}
+      </div>
+    ) },
+    { header: "操作", cell: (a) => {
+      if (!canEditPayout) return <span className="text-muted-foreground">-</span>;
+      if (a.status === "DISABLED") return <span className="txt-caption text-muted-foreground">已停用</span>;
+      return (
+        <div className="flex gap-2">
+          {!a.isDefault && (
+            <Button size="sm" variant="outline" disabled={setPayoutDefault.isPending}
+              onClick={() => setPayoutDefault.mutate(a)}>设为默认</Button>
+          )}
+          <Button size="sm" variant="outline"
+            onClick={() => setPayoutForm({ ...a, accountMasked: "" })}>编辑</Button>
+          <Button size="sm" variant="outline" disabled={disablePayout.isPending}
+            onClick={() => disablePayout.mutate(a.accountNo)}>停用</Button>
+        </div>
+      );
+    } },
+  ];
+
   return (
     <div>
       <TabHeader tabs={tabs} value={tab} onChange={setTab} />
@@ -882,6 +1006,33 @@ function FinanceInner() {
           <FilterSelect value={stlStatus} onChange={(v) => { setStlStatus(v); paging.reset(); }} allLabel="全部状态" options={STL_STATUS} />
         </Toolbar>
       )}
+      {tab === "payout-accounts" && (
+        <>
+          {!canEditPayout && (
+            <ReadOnlyNotice
+              what="收款账户的增改与停用"
+              perm="finance:payout_account:update"
+              note="与提现审核分开发码 —— 同一个人不应既能改钱去哪、又能放行这笔钱"
+            />
+          )}
+          <Toolbar
+            search={keyword}
+            onSearch={(v) => { setKeyword(v); paging.reset(); }}
+            searchPlaceholder="搜户名 / 受益方编号"
+            onAdd={() => setPayoutForm({ payeeType: "AGENT", currency: "AED" })}
+            addLabel="新增收款账户"
+            canAdd={canEditPayout}
+          />
+          <DataTable
+            rows={(q.data?.list ?? []) as PayoutAccount[]}
+            loading={q.isPending}
+            rowKey={(a) => a.accountNo}
+            empty="还没有收款账户 —— 没有它，这些受益方的提现审批放行不了（审批完不知道往哪打钱）"
+            columns={payoutColumns}
+          />
+        </>
+      )}
+
       {tab === "withdrawals" && (
         <Toolbar
           search={keyword}
@@ -1071,6 +1222,20 @@ function FinanceInner() {
       {tab === "settlements" && <DataTable rowKey={(s: Settlement) => s.settleNo} columns={stlCols} rows={q.data?.list as Settlement[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无结算单——点右上「生成结算单」按周期出账（金额取该周期分润明细汇总），或放宽筛选条件" />}
       {tab === "withdrawals" && !canAuditWithdrawal && <ReadOnlyNotice what="提现审批" perm="finance:withdrawal:audit" />}
       {/* 手续费口径必须写明出处：审批人看到的数从哪来、改哪里能改，否则「唯一来源」只是一句话 */}
+      {/*
+        * 「你还不能收款」。放在提现页最上面 —— 代理商是在这一页发现自己提不了现的，
+        * 而不是在审批被拒之后。ai-shop 的教训：结算侧的兜底「保证了不出错，没保证有人知道」。
+        */}
+      {tab === "withdrawals" && cannotGetPaidYet && (
+        <div className="mb-3 rounded-card border border-warning/40 bg-warning/5 p-3">
+          <div className="txt-body font-medium">你还不能收款</div>
+          <div className="mt-1 txt-body text-muted-foreground">
+            主体已启用、分润也在正常产生，但还没有设置默认收款账户 ——
+            提现申请提交后会在审批环节被退回。请联系运营补录收款账户后再申请。
+          </div>
+        </div>
+      )}
+
       {tab === "withdrawals" && (
         <Notice>
           {feeRule ? (
@@ -1178,6 +1343,20 @@ function FinanceInner() {
       </Drawer>
 
       {/* 生成结算单：类型 + 周期 + 多选对象；金额不在这里填——由服务端按分润明细汇总 */}
+      {/* 收款账户表单。账号填明文、只落掩码 —— 编辑时这一栏是空的（不是丢了），留空即不改 */}
+      <FormDrawer
+        open={!!payoutForm}
+        onOpenChange={(o) => !o && setPayoutForm(null)}
+        titleNew="新增收款账户"
+        titleEdit={`编辑收款账户 ${payoutForm?.accountNo ?? ""}`}
+        isEdit={!!payoutForm?.accountNo}
+        fields={PAYOUT_FIELDS}
+        value={payoutForm ?? {}}
+        onChange={(v) => setPayoutForm(v)}
+        onSubmit={() => payoutForm && savePayout.mutate(payoutForm)}
+        submitting={savePayout.isPending}
+      />
+
       <FormDrawer
         open={!!genForm}
         onOpenChange={(o) => !o && setGenForm(null)}

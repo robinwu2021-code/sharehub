@@ -93,6 +93,8 @@ export {
   // 账务分录：凭证下钻 + 借贷平衡 + 期间筛选 + 手工记账（借贷平衡在 db 层强制）
   listVoucherEntries, voucherBalance, listLedgerInPeriod, createVoucher, VoucherError,
   issueInvoice, voidInvoice, InvoiceError,
+  // 收款账户（B3）：提现审批的前置 —— 没有它审批完不知道往哪打钱
+  payoutAccounts, listPayoutAccounts, defaultPayoutAccountOf, savePayoutAccount, disablePayoutAccount,
 } from "./finance";
 export type { ShareSummaryQuery, RechargeQuery, SettlementQuery, ShareRecordQuery, ReconQuery, InvoiceQuery } from "./finance";
 

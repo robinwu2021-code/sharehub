@@ -1,13 +1,29 @@
 // 覆盖范围：分账规则与流水、总账、结算、提现审批、对账、发票、分润统计、充值订单。
-import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ , ReportQ } from "../query";
+import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ , ReportQ, PayoutAccountQ } from "../query";
 import type {
   PageResult, ShareRule, LedgerEntry, Settlement, SettlementDraft, Withdrawal,
   ShareRecord, Reconcile, ReconAction, ReconDiff, ReconStats, Invoice, ShareSummary, RechargeOrder,
 
   VoucherDetail,
-  VoucherCreatePayload,} from "../../types";
+  VoucherCreatePayload, PayoutAccount,
+} from "../../types";
 
 export interface FinanceApi {
+  // === 收款账户（B3）===
+  /**
+   * 收款账户列表。代理端也持 `finance:payout_account:read` ——
+   * 代理门户要显示「你还不能收款」，判据就是这里有没有可用账户。
+   */
+  listPayoutAccounts(q?: PayoutAccountQ): Promise<PageResult<PayoutAccount>>;
+  /** 新增 / 修改。写权限与提现审核**分开发码**：合用的话「能审批」顺带变成「能改收款账号」。 */
+  savePayoutAccount(x: {
+    accountNo?: string; payeeType: "AGENT" | "VENUE"; payeeNo: string;
+    bankCode: string; accountName: string; accountMasked: string;
+    currency?: string; makeDefault?: boolean;
+  }): Promise<PayoutAccount>;
+  /** 停用。不做物理删除 —— 历史提现单要能回溯到当时打给了哪条账户记录。 */
+  disablePayoutAccount(accountNo: string): Promise<PayoutAccount>;
+
   /** 分润规则：`dimension` 是双向视图的视角参数——一份规则按分成主体分开看，不是两套规则。 */
   listShareRules(q?: ShareRuleQ): Promise<PageResult<ShareRule>>;
   /** 账务分录。period 复用报表域 ReportQ（同一套周期口径）。 */

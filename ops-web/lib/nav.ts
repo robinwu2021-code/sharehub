@@ -302,6 +302,8 @@ export const NAV: NavSection[] = [
       // 此处回链避免找不到入口；面包屑按 URL 归属「代理商管理」。
       { href: "/agents?tab=commission", label: "代理分润配置", perm: "agent:settlement:read", group: "伙伴账" },
       { href: "/finance?tab=withdrawals", label: "提现审核", perm: "finance:withdrawal:read", group: "伙伴账" },
+      // 排在提现审核之后：没有收款账户，提现审批根本放行不了（B3）
+      { href: "/finance?tab=payout-accounts", label: "收款账户", perm: "finance:payout_account:read", group: "伙伴账" },
       { href: "/users?tab=wallets", label: "用户钱包", perm: "user:wallet:read", phase: 2, group: "用户账" },
       { href: "/finance?tab=recharges", label: "充值订单", perm: "user:wallet:read", phase: 2, group: "用户账" },
     ],

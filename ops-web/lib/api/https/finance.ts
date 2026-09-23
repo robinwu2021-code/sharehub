@@ -5,6 +5,10 @@ import type { FinanceApi } from "../contracts/finance";
 import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ , ReportQ } from "../query";
 
 export const financeHttp: FinanceApi = {
+  listPayoutAccounts: (q) => client.get("/api/trade/payout-accounts", q),
+  savePayoutAccount: (x) => client.post("/api/trade/payout-accounts", x),
+  disablePayoutAccount: (no) => client.post(`/api/trade/payout-accounts/${no}/disable`, {}),
+
   // ⚠️ 后端缺口（参数级）：GET /api/trade/share-rules（TradeController#shareRules）只收 page/size/keyword，
   //    不认 dimension。双向视图的视角参数照传，后端补上 dimension 过滤前，切视角在真后端下不生效
   //    （不改成前端自己筛：一筛就只筛当前页，翻页立刻打脸）。

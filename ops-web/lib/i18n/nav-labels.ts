@@ -138,6 +138,7 @@ const NAV: Record<string, Pair> = {
   "账务分录": { en: "Ledger", ar: "القيود المحاسبية" },
   "结算单": { en: "Settlements", ar: "التسويات" },
   "提现审核": { en: "Withdrawals", ar: "طلبات السحب" },
+  "收款账户": { en: "Payout Accounts", ar: "حسابات التحويل" },
   "对账": { en: "Reconcile", ar: "المطابقة" },
   "发票": { en: "Invoices", ar: "الفواتير" },
   "用户列表": { en: "Users", ar: "المستخدمون" },

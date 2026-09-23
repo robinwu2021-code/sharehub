@@ -7,6 +7,7 @@ import type {
   ShareSummary, RechargeOrder, RechargePackage, PageQuery,
   ReconHandleStatus, ReconHandleResult, ReconAction, ReconStats,
   InvoiceStatus, InvoiceAction,
+  PayoutAccount,
 } from "../../types";
 import {
   STL_TRANSITIONS, canSettlementTransition,
@@ -15,6 +16,7 @@ import {
   computeWithdrawFee,
 } from "../../types";
 import { VENUE_NAMES, p, iso } from "./internal";
+import { fail, notFound } from "@/lib/biz-error";
 import { paginate, kwHit, upsert, nextNo, liveHit, archiveRow, unarchiveRow } from "./helpers";
 import { agents } from "./agent";
 import { venues } from "./location";
@@ -763,3 +765,93 @@ export const listRechargeOrders = (q: RechargeQuery = {}) =>
 // —— G1 软删除：充值套餐 ——
 export const archiveRechargePackage = (no: string) => archiveRow(rechargePackages, "packageNo", no);
 export const unarchiveRechargePackage = (no: string) => unarchiveRow(rechargePackages, "packageNo", no);
+
+// —— 收款账户（B3）：在它之前提现审批能点通过，而审批完不知道往哪打钱 ——
+
+export const payoutAccounts: PayoutAccount[] = [
+  { accountNo: "PA001", payeeType: "AGENT", payeeNo: "AG001", bankCode: "ENBD",
+    accountName: "迪拜湾畔科技有限公司", accountMasked: "****3456", currency: "AED",
+    isDefault: true, status: "ACTIVE" },
+  { accountNo: "PA002", payeeType: "AGENT", payeeNo: "AG001", bankCode: "ADCB",
+    accountName: "迪拜湾畔科技有限公司", accountMasked: "****7788", currency: "AED",
+    isDefault: false, status: "ACTIVE" },
+  { accountNo: "PA003", payeeType: "VENUE", payeeNo: "VN001", bankCode: "FAB",
+    accountName: "商业湾购物中心", accountMasked: "****9012", currency: "AED",
+    isDefault: true, status: "ACTIVE" },
+  // AG002 **故意没有账户** —— 代理门户「你还不能收款」那条路径要有数据能走到
+];
+
+export function listPayoutAccounts(q: { page?: number; size?: number; keyword?: string; payeeType?: string; payeeNo?: string } = {}) {
+  return paginate(payoutAccounts, q.page, q.size, (a) => {
+    if (q.payeeType && a.payeeType !== q.payeeType) return false;
+    if (q.payeeNo && a.payeeNo !== q.payeeNo) return false;
+    // 只搜户名与受益方号；**不搜掩码**（同号段掩码可能相同）
+    return kwHit(q.keyword, a.accountName, a.payeeNo);
+  });
+}
+
+/** 该受益方当前可用的默认账户；没有就是**还不能拿钱**。 */
+export function defaultPayoutAccountOf(payeeType: string, payeeNo: string): PayoutAccount | undefined {
+  return payoutAccounts.find((a) => a.payeeType === payeeType && a.payeeNo === payeeNo
+    && a.status === "ACTIVE" && a.isDefault);
+}
+
+export function savePayoutAccount(x: Partial<PayoutAccount> & { makeDefault?: boolean }): PayoutAccount {
+  if (!x.payeeNo) fail("受益方编号必填", "Payee is required");
+  if (!x.bankCode) fail("开户行必填", "Bank is required");
+  if (!x.accountName) fail("户名必填", "Account name is required");
+  if (!x.accountMasked) fail("账号必填", "Account number is required");
+
+  // 上面四个 fail() 是 never 返回，但 TS 不据此收窄解构出的字段 —— 固化成局部常量
+  const payeeNo = x.payeeNo;
+  const bankCode = x.bankCode;
+  const accountName = x.accountName;
+  const idx = payoutAccounts.findIndex((a) => a.accountNo === x.accountNo);
+  const insert = idx < 0;
+  const raw = String(x.accountMasked).replace(/\s/g, "");
+  const merged: PayoutAccount = {
+    accountNo: x.accountNo ?? `PA${String(payoutAccounts.length + 1).padStart(3, "0")}`,
+    payeeType: (x.payeeType ?? "AGENT") as PayoutAccount["payeeType"],
+    payeeNo,
+    bankCode,
+    accountName,
+    // 入参给明文，只落掩码（与服务端同一取舍）
+    accountMasked: raw.startsWith("****") ? raw : `****${raw.slice(-4)}`,
+    currency: x.currency ?? "AED",
+    isDefault: insert
+      ? (x.makeDefault ?? payoutAccounts.every((a) => a.payeeNo !== payeeNo || a.payeeType !== x.payeeType))
+      : (x.makeDefault ?? payoutAccounts[idx].isDefault),
+    status: insert ? "ACTIVE" : payoutAccounts[idx].status,
+  };
+  if (insert) payoutAccounts.push(merged); else payoutAccounts[idx] = merged;
+
+  // 「恰好一个默认」：置默认时把同受益方其它账户清零
+  if (merged.isDefault) {
+    payoutAccounts.forEach((a) => {
+      if (a.accountNo !== merged.accountNo && a.payeeType === merged.payeeType && a.payeeNo === merged.payeeNo) {
+        a.isDefault = false;
+      }
+    });
+  }
+  return merged;
+}
+
+export function disablePayoutAccount(accountNo: string): PayoutAccount {
+  const a = payoutAccounts.find((x) => x.accountNo === accountNo);
+  if (!a) notFound("收款账户", "Payout account", accountNo);
+  /*
+   * 停用默认账户要挡住：停完这个受益方就没有可用账户了，而提现照样能申请 ——
+   * 直到审批那一刻才发现打不出去。
+   */
+  if (a.isDefault) {
+    const others = payoutAccounts.filter((x) => x.accountNo !== accountNo
+      && x.payeeType === a.payeeType && x.payeeNo === a.payeeNo && x.status === "ACTIVE");
+    if (others.length > 0) {
+      fail("这是默认收款账户，请先把默认切到其它账户再停用",
+           "This is the default account; switch the default first");
+    }
+  }
+  a.status = "DISABLED";
+  a.isDefault = false;
+  return a;
+}

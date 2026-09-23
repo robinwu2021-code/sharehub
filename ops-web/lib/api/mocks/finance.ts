@@ -6,6 +6,11 @@ import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRec
 import { wait } from "./_wait";
 
 export const financeMock: FinanceApi = {
+  // 收款账户（B3）：写操作走 db 层（「恰好一个默认」与「默认不能直接停」都在那强制）
+  listPayoutAccounts: (q = {}) => wait(db.listPayoutAccounts(q)),
+  savePayoutAccount: (x) => wait(db.savePayoutAccount(x), 350),
+  disablePayoutAccount: (no) => wait(db.disablePayoutAccount(no), 350),
+
   // 视角（dimension）在这一层筛：与分润统计同口径，翻页/搜索都在筛过之后进行
   listShareRules: (q: ShareRuleQ = {}) => wait(db.paginate(db.shareRules, q.page, q.size,
     (s) => (!q.dimension || s.dimension === q.dimension) && db.kwHit(q.keyword, s.payeeName, s.ruleNo))),
