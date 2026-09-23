@@ -44,10 +44,18 @@ public class TradeSeeder implements CommandLineRunner {
             e.setPowerbankNo(o.powerbankNo());
             e.setLocationName(o.locationName());
             e.setStatus(o.status());
-            e.setRentStartAt(o.rentStartAt());
-            e.setRentEndAt(o.rentEndAt());
+            e.setRentStartAt(SeedTime.dt(o.rentStartAt()));
+            e.setRentEndAt(SeedTime.dt(o.rentEndAt()));
             e.setDurationMin(o.durationMin());
             e.setFeeAmount(o.feeAmount());
+            /*
+             * **amount 也要写**。`fee_amount` 是旧列、`amount` 是 V16 共性化之后的应收合计，
+             * 而经营看板、站点概览、报表读的全是 `amount` —— 只写 fee_amount 的结果是
+             * 演示环境里 120 单俱在，GMV 却是 0，页面看着像坏了。
+             * 代码里其余写入路径（RentOrderServiceImpl）本来就是双写的，这里跟上。
+             */
+            e.setAmount(java.math.BigDecimal.valueOf(o.feeAmount()));
+            e.setDeviceType("POWERBANK");
             e.setDepositAmount(o.depositAmount());
             e.setCurrency(o.currency());
             mapper.insert(e);

@@ -134,7 +134,7 @@ public class DemoOpsFinanceSeeder implements CommandLineRunner {
                 a.setAlarmCode(codes[i]);
                 a.setLevel(levels[i]);
                 a.setSource("DEVICE");
-                a.setOccurredAt(LocalDateTime.now().minusHours(i + 1L).toString());
+                a.setOccurredAt(SeedTime.dt(LocalDateTime.now().minusHours(i + 1L).toString()));
                 a.setStatus(states[i]);
                 a.setDedupKey(c.getCabinetNo() + ":" + codes[i]);
                 a.setCount(1);
@@ -200,7 +200,7 @@ public class DemoOpsFinanceSeeder implements CommandLineRunner {
                 .map(String::trim).filter(x -> !x.isBlank()).toList()));
         e.setFrequency(freq);
         e.setCron(cron);
-        e.setNextAt(LocalDate.now().plusDays(1).atTime(9, 0).toString());
+        e.setNextAt(SeedTime.dt(LocalDate.now().plusDays(1).atTime(9, 0).toString()));
         e.setAssigneeNo(assignee);
         e.setActive(1);
         plans.insert(e);
@@ -358,7 +358,7 @@ public class DemoOpsFinanceSeeder implements CommandLineRunner {
         e.setCurrency(CCY);
         e.setSummary(summary);
         e.setBizType(bizType);
-        e.setCreatedAt(LocalDateTime.now().toString());
+        e.setCreatedAt(SeedTime.dt(LocalDateTime.now().toString()));
         ledgers.insert(e);
     }
 
@@ -406,7 +406,7 @@ public class DemoOpsFinanceSeeder implements CommandLineRunner {
         e.setInvoiceCode(code);
         e.setInvoiceNumber(number);
         if ("ISSUED".equals(status)) {
-            e.setIssuedAt(LocalDateTime.now().minusDays(1).toString());
+            e.setIssuedAt(SeedTime.dt(LocalDateTime.now().minusDays(1).toString()));
             e.setIssuedBy("finance");
         }
         invoices.insert(e);
@@ -418,7 +418,7 @@ public class DemoOpsFinanceSeeder implements CommandLineRunner {
         t.setTenantId(TENANT);
         t.setChannel("nearpay");
         t.setPeriod(period);
-        t.setBillDate(LocalDate.now().minusDays(daysAgo).toString());
+        t.setBillDate(SeedTime.date(LocalDate.now().minusDays(daysAgo).toString()));
         t.setNearpayTotal(channel);
         t.setLedgerTotal(ledger);
         t.setDiff(channel.subtract(ledger));

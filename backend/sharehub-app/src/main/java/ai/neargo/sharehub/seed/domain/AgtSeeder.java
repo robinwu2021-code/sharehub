@@ -39,7 +39,14 @@ public class AgtSeeder implements CommandLineRunner {
             e.setTenantId("MAIN");
             e.setName(a.name());
             e.setContact(a.contact());
-            e.setRegionScope(a.regionScope());
+            /*
+             * `region_scope` 是 **JSON** 列（DDL 注释：辖域(区域数组)），
+             * 而种子给的是一个裸区域名 —— 直接写会触发 JSON 的 CHECK 约束
+             * 「CONSTRAINT `agt_agent.region_scope` failed」，灌种失败、应用起不来。
+             * 按列的本意包成单元素数组。
+             */
+            e.setRegionScope(a.regionScope() == null ? null
+                    : "[\"" + a.regionScope().replace("\"", "\\\"") + "\"]");
             e.setShareRate(a.shareRate());
             // 机柜数不落库：聚合值，实体与库里都已没有这一列
             e.setStatus(a.status());

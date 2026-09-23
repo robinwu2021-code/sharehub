@@ -1,6 +1,8 @@
 package ai.neargo.sharehub.seed.domain;
 
 import ai.neargo.sharehub.dev.entity.DevCabinet;
+import ai.neargo.sharehub.loc.entity.LocLocation;
+import ai.neargo.sharehub.loc.entity.LocSite;
 import ai.neargo.sharehub.dev.mapper.CabinetMapper;
 import ai.neargo.sharehub.dto.Dto;
 import ai.neargo.sharehub.dev.dto.DevLegacyDtos.Cabinet;
@@ -23,10 +25,16 @@ public class DevSeeder implements CommandLineRunner {
 
     private final SeedData seed;
     private final CabinetMapper mapper;
+    private final ai.neargo.sharehub.loc.mapper.LocMappers.LocationMapper locations;
+    private final ai.neargo.sharehub.loc.mapper.LocMappers.SiteMapper sites;
 
-    public DevSeeder(SeedData seed, CabinetMapper mapper) {
+    public DevSeeder(SeedData seed, CabinetMapper mapper,
+                     ai.neargo.sharehub.loc.mapper.LocMappers.LocationMapper locations,
+                     ai.neargo.sharehub.loc.mapper.LocMappers.SiteMapper sites) {
         this.seed = seed;
         this.mapper = mapper;
+        this.locations = locations;
+        this.sites = sites;
     }
 
     @Override
@@ -43,12 +51,27 @@ public class DevSeeder implements CommandLineRunner {
             e.setModel(c.model());
             e.setLocationNo(c.locationNo());
             e.setLocationName(c.locationName());
+            /*
+             * **站点/代理按点位反查回填**（V9 的数据范围锚点列，口径同 CabinetService#save）。
+             * 不填的后果不在设备页，而在经营侧：概览把订单按 `dev_cabinet.site_no` 归到站点，
+             * 空的话站点排行、单站统计、场景 GMV 全是 0 —— 120 单俱在，页面却像没生意。
+             */
+            LocLocation loc = c.locationNo() == null ? null : locations.selectOne(
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<LocLocation>()
+                            .eq(LocLocation::getLocationNo, c.locationNo()).last("limit 1"));
+            if (loc != null) {
+                e.setSiteNo(loc.getSiteNo());
+                LocSite site = loc.getSiteNo() == null ? null : sites.selectOne(
+                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<LocSite>()
+                                .eq(LocSite::getSiteNo, loc.getSiteNo()).last("limit 1"));
+                if (site != null) e.setAgentNo(site.getAgentNo());
+            }
             e.setSlotTotal(c.slotTotal());
             e.setAvailableCount(c.availableCount());
             e.setOnlineStatus(c.onlineStatus());
             e.setStatus(c.status());
             e.setFwVersion(c.fwVersion());
-            e.setLastHeartbeatAt(c.lastHeartbeatAt());
+            e.setLastHeartbeatAt(SeedTime.dt(c.lastHeartbeatAt()));
             mapper.insert(e);
         }
     }

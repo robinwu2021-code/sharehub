@@ -1,6 +1,7 @@
 package ai.neargo.sharehub.seed.domain;
 
 import ai.neargo.sharehub.loc.dto.LocDtos.Site;
+import java.util.Map;
 import ai.neargo.sharehub.loc.dto.LocDtos.Location;
 import ai.neargo.sharehub.loc.dto.LocDtos.Venue;
 import ai.neargo.sharehub.loc.dto.LocDtos.Contract;
@@ -94,19 +95,47 @@ public class LocSeeder implements CommandLineRunner {
             }
         }
         if (contractMapper.selectCount(null) == 0) {
+            Map<String, String> venueNoByName = new java.util.HashMap<>();
+            for (Venue v : seed.venues()) venueNoByName.put(v.name(), v.venueNo());
+            Map<String, String> siteNoByName = new java.util.HashMap<>();
+            for (Site st : seed.sites()) siteNoByName.putIfAbsent(st.name(), st.siteNo());
+
             for (Contract c : seed.contracts()) {
                 LocContract e = new LocContract();
                 e.setContractNo(c.contractNo());
                 e.setTenantId("MAIN");
+                /*
+                 * **编号必须填**：`venue_no` / `site_no` 是 NOT NULL 且无默认值，
+                 * 而种子的 Contract 只带名字 —— 干净库上这一行会直接
+                 * 「Field 'venue_no' doesn't have a default value」，灌种失败、应用起不来。
+                 * （2026-09-23 生产上就是这样起不来的。）
+                 *
+                 * 按名字反查编号在这里是可靠的：种子内部的场地方名与站点名都唯一。
+                 * **只有种子能这么做** —— 业务代码一律按编号走（同名场地方会把钱分错家）。
+                 */
+                e.setVenueNo(venueNoByName.get(c.venueName()));
+                e.setSiteNo(siteNoByName.get(c.siteName()));
                 e.setVenueName(c.venueName());
                 e.setSiteName(c.siteName());
+                e.setCurrency("AED");
                 e.setShareRate(c.shareRate());
                 e.setEntryFee(c.entryFee());
-                e.setStartAt(c.startAt());
-                e.setEndAt(c.endAt());
+                /*
+                 * `start_at` / `end_at` 是 **DATE** 列，而种子给的是完整 UTC ISO
+                 * （`2026-09-23T03:00:00Z`）—— 直接写会
+                 * 「Incorrect date value … Data truncation」。
+                 * 干净库上这一步一直是失败的，只是从没有人在干净库上灌过种。
+                 */
+                e.setStartAt(SeedTime.date(c.startAt()));
+                e.setEndAt(SeedTime.date(c.endAt()));
                 e.setStatus(c.status());
                 contractMapper.insert(e);
             }
         }
+    }
+
+    /** ISO 时刻 → DATE 列能吃的 {@code YYYY-MM-DD}。传 null 原样返回。 */
+    private static String dateOf(String iso) {
+        return iso == null ? null : (iso.length() >= 10 ? iso.substring(0, 10) : iso);
     }
 }

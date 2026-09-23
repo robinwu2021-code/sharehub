@@ -52,7 +52,7 @@ public class WoSeeder implements CommandLineRunner {
             e.setLocationName(w.locationName());
             e.setStatus(w.status());
             e.setAssigneeName(w.assigneeName());
-            e.setSlaDueAt(w.slaDueAt());
+            e.setSlaDueAt(SeedTime.dt(w.slaDueAt()));
             e.setDescription(w.description());
             e.setWoCreatedAt(w.createdAt());
             mapper.insert(e);
