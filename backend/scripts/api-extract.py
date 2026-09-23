@@ -237,10 +237,14 @@ def parse_controller(path, records):
         ann, i = read_annotations(src, start)
         verb = VERBS[am.group(1)]
 
-        sub = ''
-        sm = re.search(r'"([^"]*)"', ann.get(am.group(1), '') or '')
-        if sm:
-            sub = sm.group(1)
+        # **取全部路径，不是第一个** —— @PostMapping({"", "/{agentNo}"}) 这种多值映射
+        # 一个注解映射两个路径。2026-09-23 之前这里用 re.search 只取第一个，
+        # 多值映射的第二个路径被静默丢掉：contract.json 里只有 POST /api/agent/agents，
+        # 没有 /{agentNo}。后果是 api-align.py 把前端对编辑接口的调用报成
+        # **「前端在调、后端没有」的运行期 404**，而后端明明有 —— 一次凭空的假警报，
+        # 且方向最误导：它指着能用的功能说它坏了。
+        # 全 app 有 4 处这种写法（agents / cabinets / sites / locations 的新建+编辑合一）。
+        subs = re.findall(r'"([^"]*)"', ann.get(am.group(1), '') or '') or ['']
 
         perm = None
         pre = ann.get('PreAuthorize')
@@ -258,8 +262,6 @@ def parse_controller(path, records):
                        ('public', 'protected', 'private', 'final', 'static'))
         args_raw, _ = read_balanced(src, src.find('(', i))
 
-        full = (cls_prefix + sub) or cls_prefix or '/'
-        full = re.sub(r'//+', '/', full)
         jd = javadoc_before(start)
 
         params, body_type = [], None
@@ -290,13 +292,16 @@ def parse_controller(path, records):
             else:
                 params.append({'in': kind, 'name': nm, 'type': typ, 'required': required})
 
-        endpoints.append(OrderedDict([
-            ('verb', verb), ('path', full), ('perm', perm),
-            ('handler', '%s#%s' % (os.path.basename(path)[:-5], mname)),
-            ('summary', first_sentence(jd)),
-            ('params', params), ('bodyType', body_type),
-            ('returnType', ' '.join(ret.split())),
-        ]))
+        for sub in subs:
+            full = (cls_prefix + sub) or cls_prefix or '/'
+            full = re.sub(r'//+', '/', full)
+            endpoints.append(OrderedDict([
+                ('verb', verb), ('path', full), ('perm', perm),
+                ('handler', '%s#%s' % (os.path.basename(path)[:-5], mname)),
+                ('summary', first_sentence(jd)),
+                ('params', params), ('bodyType', body_type),
+                ('returnType', ' '.join(ret.split())),
+            ]))
     return endpoints
 
 

@@ -388,6 +388,93 @@
   },
   {
    "verb": "POST",
+   "path": "/api/agent/agents/{agentNo}",
+   "perm": "agent:agent:update",
+   "handler": "AgentController#save",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "agentNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "Agent",
+   "returnType": "Agent",
+   "returnContainer": null,
+   "returnElement": "Agent",
+   "responseShape": [
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "contact",
+     "type": "String"
+    },
+    {
+     "name": "regionScope",
+     "type": "String"
+    },
+    {
+     "name": "agentType",
+     "type": "String"
+    },
+    {
+     "name": "shareRate",
+     "type": "double"
+    },
+    {
+     "name": "cabinetCount",
+     "type": "int"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "contact",
+     "type": "String"
+    },
+    {
+     "name": "regionScope",
+     "type": "String"
+    },
+    {
+     "name": "agentType",
+     "type": "String"
+    },
+    {
+     "name": "shareRate",
+     "type": "double"
+    },
+    {
+     "name": "cabinetCount",
+     "type": "int"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
    "path": "/api/agent/agents/{no}/archive",
    "perm": "agent:agent:update",
    "handler": "AgentController#archiveAgent",
@@ -2830,6 +2917,27 @@
   },
   {
    "verb": "POST",
+   "path": "/api/ops/cabinets/{cabinetNo}",
+   "perm": "device:cabinet:create",
+   "handler": "OpsController#saveCabinet",
+   "summary": "机柜建档 / 编辑。",
+   "params": [
+    {
+     "in": "path",
+     "name": "cabinetNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "java.util.Map<String, Object>",
+   "returnType": "Object",
+   "returnContainer": null,
+   "returnElement": "Object",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
    "path": "/api/ops/cabinets/{cabinetNo}/commands",
    "perm": "device:command:send",
    "handler": "OpsController#sendCommand",
@@ -4687,6 +4795,14 @@
      "type": "String"
     },
     {
+     "name": "ownerType",
+     "type": "String"
+    },
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
      "name": "expectSites",
      "type": "Integer"
     },
@@ -4731,6 +4847,14 @@
     },
     {
      "name": "owner",
+     "type": "String"
+    },
+    {
+     "name": "ownerType",
+     "type": "String"
+    },
+    {
+     "name": "siteNo",
      "type": "String"
     },
     {
@@ -4788,6 +4912,14 @@
      "type": "String"
     },
     {
+     "name": "ownerType",
+     "type": "String"
+    },
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
      "name": "expectSites",
      "type": "Integer"
     },
@@ -4839,6 +4971,14 @@
     },
     {
      "name": "owner",
+     "type": "String"
+    },
+    {
+     "name": "ownerType",
+     "type": "String"
+    },
+    {
+     "name": "siteNo",
      "type": "String"
     },
     {
@@ -4992,6 +5132,85 @@
   {
    "verb": "POST",
    "path": "/api/ops/locations",
+   "perm": "location:poi:create",
+   "handler": "OpsController#savePoint",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "locationNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "Location",
+   "returnType": "Location",
+   "returnContainer": null,
+   "returnElement": "Location",
+   "responseShape": [
+    {
+     "name": "locationNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "siteName",
+     "type": "String"
+    },
+    {
+     "name": "spotDesc",
+     "type": "String"
+    },
+    {
+     "name": "cabinetCount",
+     "type": "Integer"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "locationNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "siteName",
+     "type": "String"
+    },
+    {
+     "name": "spotDesc",
+     "type": "String"
+    },
+    {
+     "name": "cabinetCount",
+     "type": "Integer"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/locations/{locationNo}",
    "perm": "location:poi:create",
    "handler": "OpsController#savePoint",
    "summary": "",
@@ -7514,6 +7733,149 @@
    "returnElement": "Object",
    "responseShape": null,
    "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/sites/{siteNo}",
+   "perm": "location:poi:create",
+   "handler": "OpsController#saveSite",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "siteNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "Site",
+   "returnType": "Site",
+   "returnContainer": null,
+   "returnElement": "Site",
+   "responseShape": [
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "venueNo",
+     "type": "String"
+    },
+    {
+     "name": "venueName",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "brandNo",
+     "type": "String"
+    },
+    {
+     "name": "regionId",
+     "type": "String"
+    },
+    {
+     "name": "regionName",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "lng",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "lat",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "sceneType",
+     "type": "String"
+    },
+    {
+     "name": "pointCount",
+     "type": "Integer"
+    },
+    {
+     "name": "cabinetCount",
+     "type": "Integer"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "venueNo",
+     "type": "String"
+    },
+    {
+     "name": "venueName",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "brandNo",
+     "type": "String"
+    },
+    {
+     "name": "regionId",
+     "type": "String"
+    },
+    {
+     "name": "regionName",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "lng",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "lat",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "sceneType",
+     "type": "String"
+    },
+    {
+     "name": "pointCount",
+     "type": "Integer"
+    },
+    {
+     "name": "cabinetCount",
+     "type": "Integer"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "GET",
@@ -24636,6 +24998,9 @@
    "DEVELOP",
    "OPERATE"
   ],
+  "LeadOwnerType": [
+   "STAFF"
+  ],
   "AgentStatus": [
    "ENABLED"
   ],
@@ -24652,10 +25017,10 @@
  },
  "conflicts": {},
  "stats": {
-  "endpoints": 396,
+  "endpoints": 400,
   "records": 286,
-  "withPerm": 339,
-  "withBody": 160,
-  "shapedResponses": 299
+  "withPerm": 343,
+  "withBody": 164,
+  "shapedResponses": 302
  }
 }
