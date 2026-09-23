@@ -1,10 +1,11 @@
 "use client";
 
 import { Suspense, useEffect, useState, type ReactNode } from "react";
-import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Pagination } from "@/components/ui/misc";
+import { usePaging } from "@/lib/hooks/use-paging";
+import { useNavTabs, usePageTab } from "@/lib/hooks/use-page-tab";
 import { TabHeader } from "@/components/ui/tab-header";
 import { Input, Select } from "@/components/ui/input";
 import { Drawer, Field } from "@/components/ui/drawer";
@@ -39,16 +40,9 @@ import type {
   MemberBenefit, MemberCard, MemberCardType, RentOrder, UserProfile,
 } from "@/lib/types";
 
-const SIZE = 10;
-const TABS = [
-  { key: "list", label: "用户", phase: 2 as const },
-  { key: "risk", label: "风控用户", phase: 2 as const },
-  { key: "blacklist", label: "黑名单", phase: 2 as const },
-  { key: "whitelist", label: "免费用户白名单", phase: 2 as const },
-  { key: "members", label: "会员/次卡", phase: 3 as const },
-  { key: "wallets", label: "钱包", phase: 3 as const },
-  { key: "recharge", label: "充值套餐", phase: 3 as const },
-];
+// tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）。
+// 「用户」在菜单里叫「用户列表」——以菜单为准。
+const TAB_KEYS = ["list", "risk", "blacklist", "whitelist", "members", "wallets", "recharge"] as const;
 
 // —— 账号 / 风控 / 黑名单三张表的状态映射 ——
 // 拉黑与否不是后端枚举，但同一对徽标在列表页和详情抽屉各出现一次，
@@ -224,10 +218,9 @@ const WALLET_FIELDS: FieldDef[] = [
 ];
 
 function UsersInner() {
-  const sp = useSearchParams();
-  const qTab = sp.get("tab");
-  const [tab, setTab] = useState(TABS.some((t) => t.key === qTab) ? (qTab as string) : "list");
-  const [page, setPage] = useState(1);
+  const paging = usePaging();
+  const tabs = useNavTabs("/users", TAB_KEYS);
+  const { tab, setTab } = usePageTab(tabs, () => goTabReset());
   const [keyword, setKeyword] = useState("");
   const [memberForm, setMemberForm] = useState<Partial<Member> | null>(null);
   const [walletForm, setWalletForm] = useState<Partial<Wallet> | null>(null);
@@ -238,11 +231,11 @@ function UsersInner() {
   const qc = useQueryClient();
   const allow = useCan();
   const { t } = useI18n();
-  useEffect(() => { if (qTab && TABS.some((t) => t.key === qTab)) { setTab(qTab); setPage(1); setSelectedUsers([]); setShowArchived(false); } }, [qTab]);
 
-  const goTab = (k: string) => { setTab(k); setPage(1); setSelectedUsers([]); setShowArchived(false); };
-  const goPage = (p: number) => { setPage(p); setSelectedUsers([]); };
-  const search = (v: string) => { setKeyword(v); setPage(1); setSelectedUsers([]); };
+  const goTabReset = () => { paging.reset(); setSelectedUsers([]); setShowArchived(false); };
+  // 翻页清勾选：第 2 页留着第 1 页的勾选，批量操作会作用到看不见的行上
+  const goPage = (p: number) => { paging.setPage(p); setSelectedUsers([]); };
+  const search = (v: string) => { setKeyword(v); paging.reset(); setSelectedUsers([]); };
 
   const canEditMember = allow("user:member:update");
   const canEditWallet = allow("user:wallet:update");
@@ -251,8 +244,8 @@ function UsersInner() {
   const { confirm, dialog } = useConfirm();
 
   const users = useQuery({
-    queryKey: ["users", page, keyword],
-    queryFn: () => api.listUsers({ page, size: SIZE, keyword }),
+    queryKey: ["users", paging.page, paging.size, keyword],
+    queryFn: () => api.listUsers({ page: paging.page, size: paging.size, keyword }),
     placeholderData: keepPreviousData,
     enabled: tab === "list",
   });
@@ -268,8 +261,8 @@ function UsersInner() {
   });
 
   const members = useQuery({
-    queryKey: ["members", page, keyword],
-    queryFn: () => api.listMembers({ page, size: SIZE, keyword }),
+    queryKey: ["members", paging.page, paging.size, keyword],
+    queryFn: () => api.listMembers({ page: paging.page, size: paging.size, keyword }),
     placeholderData: keepPreviousData,
     enabled: tab === "members",
   });
@@ -322,26 +315,26 @@ function UsersInner() {
   };
 
   const wallets = useQuery({
-    queryKey: ["wallets", page, keyword],
-    queryFn: () => api.listWallets({ page, size: SIZE, keyword }),
+    queryKey: ["wallets", paging.page, paging.size, keyword],
+    queryFn: () => api.listWallets({ page: paging.page, size: paging.size, keyword }),
     placeholderData: keepPreviousData,
     enabled: tab === "wallets",
   });
   // —— 钱包流水抽屉：余额只是结果，运营真正要查的是「这钱怎么来怎么没的」——
   // 独立的 txnPage：抽屉分页不能和外层列表共用 page，否则关掉抽屉外层就跳到别的页去了。
   const [txnFor, setTxnFor] = useState<Wallet | null>(null);
-  const [txnPage, setTxnPage] = useState(1);
+  const txnPaging = usePaging();
   const [txnType, setTxnType] = useState("");
   const txns = useQuery({
-    queryKey: ["wallet-txns", txnFor?.userNo, txnPage, txnType],
-    queryFn: () => api.listWalletTxns(txnFor!.userNo, { page: txnPage, size: SIZE, type: txnType || undefined }),
+    queryKey: ["wallet-txns", txnFor?.userNo, txnPaging.page, txnPaging.size, txnType],
+    queryFn: () => api.listWalletTxns(txnFor!.userNo, { page: txnPaging.page, size: txnPaging.size, type: txnType || undefined }),
     placeholderData: keepPreviousData,
     enabled: !!txnFor,
   });
 
   const risks = useQuery({
-    queryKey: ["user-risks", page, keyword],
-    queryFn: () => api.listUserRisks({ page, size: SIZE, keyword }),
+    queryKey: ["user-risks", paging.page, paging.size, keyword],
+    queryFn: () => api.listUserRisks({ page: paging.page, size: paging.size, keyword }),
     placeholderData: keepPreviousData,
     enabled: tab === "risk",
   });
@@ -379,8 +372,8 @@ function UsersInner() {
     },
   });
   const blacklisted = useQuery({
-    queryKey: ["user-blacklist", page, keyword],
-    queryFn: () => api.listUserBlacklist({ page, size: SIZE, keyword }),
+    queryKey: ["user-blacklist", paging.page, paging.size, keyword],
+    queryFn: () => api.listUserBlacklist({ page: paging.page, size: paging.size, keyword }),
     placeholderData: keepPreviousData,
     enabled: tab === "blacklist",
   });
@@ -390,8 +383,8 @@ function UsersInner() {
   const [wlStatus, setWlStatus] = useState("");
   const [wlForm, setWlForm] = useState<Partial<FreeUserWhitelist> | null>(null);
   const whitelist = useQuery({
-    queryKey: ["free-whitelist", page, keyword, wlReason, wlStatus],
-    queryFn: () => api.listFreeWhitelist({ page, size: SIZE, keyword, reason: wlReason || undefined, status: wlStatus || undefined }),
+    queryKey: ["free-whitelist", paging.page, paging.size, keyword, wlReason, wlStatus],
+    queryFn: () => api.listFreeWhitelist({ page: paging.page, size: paging.size, keyword, reason: wlReason || undefined, status: wlStatus || undefined }),
     placeholderData: keepPreviousData,
     enabled: tab === "whitelist",
   });
@@ -425,8 +418,8 @@ function UsersInner() {
   const [pkgForm, setPkgForm] = useState<Partial<RechargePackage> | null>(null);
   const packages = useQuery({
     // showArchived 必须进 queryKey，否则切开关不重新拉数据
-    queryKey: ["recharge-packages", page, keyword, pkgStatus, showArchived],
-    queryFn: () => api.listRechargePackages({ page, size: SIZE, keyword, status: pkgStatus || undefined, showArchived }),
+    queryKey: ["recharge-packages", paging.page, paging.size, keyword, pkgStatus, showArchived],
+    queryFn: () => api.listRechargePackages({ page: paging.page, size: paging.size, keyword, status: pkgStatus || undefined, showArchived }),
     placeholderData: keepPreviousData,
     enabled: tab === "recharge",
   });
@@ -619,7 +612,7 @@ function UsersInner() {
       // 「流水」只读，进得来这张表就有 user:wallet:read，故不再额外判权；调余额才要写权限
       cell: (w) => (
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => { setTxnFor(w); setTxnPage(1); setTxnType(""); }}>流水</Button>
+          <Button size="sm" variant="outline" onClick={() => { setTxnFor(w); txnPaging.reset(); setTxnType(""); }}>流水</Button>
           {canEditWallet && <Button size="sm" variant="outline" onClick={() => setWalletForm(w)}>调整余额</Button>}
         </div>
       ),
@@ -740,7 +733,7 @@ function UsersInner() {
   // 跳之前先关详情：两层 radix 抽屉叠着会互相抢焦点、遮罩还会叠成两层黑。
   const openTxnsFromProfile = (w: Wallet) => {
     setTxnFor(w);
-    setTxnPage(1);
+    txnPaging.reset();
     setTxnType("");
     setProfileNo(null);
   };
@@ -769,7 +762,7 @@ function UsersInner() {
 
   return (
     <div>
-      <TabHeader tabs={TABS} value={tab} onChange={goTab} />
+      <TabHeader tabs={tabs} value={tab} onChange={setTab} />
       {tab === "list" && (
         <>
           <Toolbar
@@ -798,7 +791,7 @@ function UsersInner() {
             rowKey={(u: CUser) => u.cUserNo}
             columns={userCols}
             rows={users.data?.list}
-            loading={users.isLoading}
+            loading={users.isLoading} error={users.error} onRetry={users.refetch}
             selectable={canBlacklist}
             selectedKeys={selectedUsers}
             onSelectedChange={setSelectedUsers}
@@ -822,7 +815,7 @@ function UsersInner() {
             rowKey={(b: MemberBenefit) => b.level}
             columns={benefitCols}
             rows={benefits.data?.list}
-            loading={benefits.isLoading}
+            loading={benefits.isLoading} error={benefits.error} onRetry={benefits.refetch}
             rowClassName={(b: MemberBenefit) => (b.status === "ENABLED" ? undefined : "opacity-60")}
             empty="权益表为空——等级是固定三档，这里为空说明种子数据缺失"
           />
@@ -848,7 +841,7 @@ function UsersInner() {
               </Button>
             )}
           </Toolbar>
-          <DataTable rowKey={(m: Member) => m.userNo} columns={memberCols} rows={members.data?.list} loading={members.isLoading}
+          <DataTable rowKey={(m: Member) => m.userNo} columns={memberCols} rows={members.data?.list} loading={members.isLoading} error={members.error} onRetry={members.refetch}
             empty="暂无会员/次卡——尚未有用户开通会员或购买次卡；点右上「新增会员」可手工登记，或「发放次卡」直接发卡" />
         </>
       )}
@@ -870,7 +863,7 @@ function UsersInner() {
             ], risks.data?.list ?? [])}
           />
           {!canAdjustCredit && <ReadOnlyNotice what="用户风控" perm="user:risk:update" note="不能调整信用分" />}
-          <DataTable rowKey={(r: UserRisk) => r.riskNo} columns={riskCols} rows={risks.data?.list} loading={risks.isLoading}
+          <DataTable rowKey={(r: UserRisk) => r.riskNo} columns={riskCols} rows={risks.data?.list} loading={risks.isLoading} error={risks.error} onRetry={risks.refetch}
             empty="暂无风控用户——没有用户触发风控规则，或风控规则尚未配置（系统设置 · 业务规则）" />
         </>
       )}
@@ -890,7 +883,7 @@ function UsersInner() {
               { header: "状态", value: (b) => (b.status === "ACTIVE" ? "拉黑中" : "已解除") },
             ], blacklisted.data?.list ?? [])}
           />
-          <DataTable rowKey={(b: UserBlacklist) => b.blacklistNo} columns={blacklistCols} rows={blacklisted.data?.list} loading={blacklisted.isLoading}
+          <DataTable rowKey={(b: UserBlacklist) => b.blacklistNo} columns={blacklistCols} rows={blacklisted.data?.list} loading={blacklisted.isLoading} error={blacklisted.error} onRetry={blacklisted.refetch}
             empty="暂无黑名单用户——没有用户被拉黑；可在「用户」页勾选后批量拉黑" />
         </>
       )}
@@ -918,7 +911,7 @@ function UsersInner() {
           >
             <FilterSelect
               value={wlReason}
-              onChange={(v) => { setWlReason(v); setPage(1); }}
+              onChange={(v) => { setWlReason(v); paging.reset(); }}
               allLabel="全部用途"
               options={REASON_OPTIONS}
               aria-label="按用途筛选"
@@ -926,7 +919,7 @@ function UsersInner() {
             {/* 选项由 WL_STATUS 派生：筛选项文案与状态列徽标文案永远同源 */}
             <FilterSelect
               value={wlStatus}
-              onChange={(v) => { setWlStatus(v); setPage(1); }}
+              onChange={(v) => { setWlStatus(v); paging.reset(); }}
               allLabel="全部状态"
               options={WL_STATUS}
               aria-label="按状态筛选"
@@ -937,7 +930,7 @@ function UsersInner() {
             rowKey={(w: FreeUserWhitelist) => w.userNo}
             columns={whitelistCols}
             rows={whitelist.data?.list}
-            loading={whitelist.isLoading}
+            loading={whitelist.isLoading} error={whitelist.error} onRetry={whitelist.refetch}
             rowClassName={(w) => (w.status === "ACTIVE" ? undefined : "opacity-60")}
             empty="暂无免费用户——内测/VIP/BD 演示/商户自用需要免单时在此登记，登记后订单会落到「订单 · 免费订单」"
           />
@@ -966,12 +959,12 @@ function UsersInner() {
           >
             <FilterSelect
               value={pkgStatus}
-              onChange={(v) => { setPkgStatus(v); setPage(1); }}
+              onChange={(v) => { setPkgStatus(v); paging.reset(); }}
               allLabel="全部状态"
               options={PKG_STATUS}
               aria-label="按状态筛选"
             />
-            <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); setPage(1); }} />
+            <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); paging.reset(); }} />
           </Toolbar>
           {!canEditPackage && <ReadOnlyNotice what="充值套餐维护" perm="user:wallet:update" note="不能新增、编辑或归档套餐" />}
           <DataTable
@@ -980,7 +973,7 @@ function UsersInner() {
             // 已归档与已下架都整行弱化：归档优先（archivedRowClass 命中即返回）
             rowClassName={(p: RechargePackage) => archivedRowClass(p) ?? (p.status === "ENABLED" ? undefined : "opacity-60")}
             rows={packages.data?.list}
-            loading={packages.isLoading}
+            loading={packages.isLoading} error={packages.error} onRetry={packages.refetch}
             empty={showArchived
               ? "没有套餐——包含已归档在内也没有记录；点右上「新增套餐」建一条"
               : "暂无充值套餐——先配置「充 X 送 Y」套餐，C 端钱包页才有充值选项；已归档的套餐可打开「显示已归档」查看"}
@@ -1007,11 +1000,11 @@ function UsersInner() {
             ], wallets.data?.list ?? [])}
           />
           {!canEditWallet && <ReadOnlyNotice what="钱包调整" perm="user:wallet:update" note="不能手工调整余额或赠额" />}
-          <DataTable rowKey={(w: Wallet) => w.userNo} columns={walletCols} rows={wallets.data?.list} loading={wallets.isLoading}
+          <DataTable rowKey={(w: Wallet) => w.userNo} columns={walletCols} rows={wallets.data?.list} loading={wallets.isLoading} error={wallets.error} onRetry={wallets.refetch}
             empty="暂无钱包记录——用户首次充值或产生余额后才会在此出现" />
         </>
       )}
-      {active.data && <Pagination page={page} size={SIZE} total={active.data.total} onPage={goPage} />}
+      {active.data && <Pagination page={paging.page} size={paging.size} total={active.data.total} onPage={goPage} onSize={paging.setSize} />}
 
       <FormDrawer
         open={!!memberForm}
@@ -1101,7 +1094,7 @@ function UsersInner() {
       */}
       <Drawer
         open={!!txnFor}
-        onOpenChange={(o) => { if (!o) { setTxnFor(null); setTxnPage(1); setTxnType(""); } }}
+        onOpenChange={(o) => { if (!o) { setTxnFor(null); txnPaging.reset(); setTxnType(""); } }}
         title={txnWallet ? `钱包流水 · ${txnWallet.userNo} ${txnWallet.nickname}` : ""}
         desc="金额带符号：正为入账、负为出账；最新在前"
         width="w-[760px]"
@@ -1117,7 +1110,7 @@ function UsersInner() {
               <FilterSelect
                 className="w-full"
                 value={txnType}
-                onChange={(v) => { setTxnType(v); setTxnPage(1); }}
+                onChange={(v) => { setTxnType(v); txnPaging.reset(); }}
                 /* 选项由 TXN_TYPE 派生：流水类型的筛选项与徽标文案同源，改文案只改映射表 */
                 options={TXN_TYPE}
                 allLabel="全部类型"
@@ -1128,12 +1121,12 @@ function UsersInner() {
               rowKey={(x: WalletTxn) => x.txnNo}
               columns={txnCols}
               rows={txns.data?.list}
-              loading={txns.isLoading}
+              loading={txns.isLoading} error={txns.error} onRetry={txns.refetch}
               empty={txnType
                 ? "该类型下没有流水——清掉类型筛选再看一次"
                 : "暂无钱包流水——该用户还没有充值、消费或退款记录"}
             />
-            {txns.data && <Pagination page={txnPage} size={SIZE} total={txns.data.total} onPage={setTxnPage} />}
+            {txns.data && <Pagination page={txnPaging.page} size={txnPaging.size} total={txns.data.total} onPage={txnPaging.setPage} onSize={txnPaging.setSize} />}
           </>
         )}
       </Drawer>

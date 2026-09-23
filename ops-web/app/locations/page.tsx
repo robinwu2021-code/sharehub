@@ -1,10 +1,11 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PageTitle, Pagination } from "@/components/ui/misc";
+import { usePaging } from "@/lib/hooks/use-paging";
+import { useNavTabs, usePageTab } from "@/lib/hooks/use-page-tab";
 import { Input, Select } from "@/components/ui/input";
 import { TabHeader } from "@/components/ui/tab-header";
 import { Toolbar } from "@/components/ui/toolbar";
@@ -34,14 +35,9 @@ import { ReadOnlyNotice } from "@/components/read-only-notice";
 import { nextSiteStages, SITE_COORD_BOUNDS, LEAD_FOLLOW_CHANNELS, ATTACH_EXTS, ATTACH_MAX_SIZE } from "@/lib/types";
 import type { Site, SitePoint, Venue, Contract, Lead, LeadStage, LeadFollowChannel, SiteAnalysis, VenueOnboarding, SiteLifecycle, SiteStage, PageResult, Region } from "@/lib/types";
 
-const SIZE = 10;
-const TABS = [
-  { key: "sites", label: "站点" }, { key: "points", label: "点位" },
-  { key: "venues", label: "场地方" }, { key: "contracts", label: "合同", phase: 2 as const },
-  { key: "onboarding", label: "门店 Onboarding", phase: 2 as const },
-  { key: "crm", label: "BD 拓展 CRM", phase: 3 as const }, { key: "analysis", label: "站点坪效", phase: 3 as const },
-  { key: "lifecycle", label: "门店生命周期", phase: 3 as const },
-];
+// tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）。
+// 「站点/点位/合同」在菜单里叫「站点管理 / 点位管理 / 进场合同」——以菜单为准。
+const TAB_KEYS = ["sites", "points", "venues", "contracts", "onboarding", "crm", "analysis", "lifecycle"] as const;
 const LEAD_STAGE: StatusMap<LeadStage> = {
   NEW: { label: "新线索", tone: "muted" },
   CONTACTED: { label: "已接触", tone: "outline" },
@@ -119,18 +115,17 @@ const ONBOARDING_FIELDS: FieldDef[] = [
 function LocationsInner() {
   const qc = useQueryClient();
   const allow = useCan();
-  const sp = useSearchParams();
   const { confirm, dialog } = useConfirm();
-  const qTab = sp.get("tab");
-  const [tab, setTab] = useState(TABS.some((t) => t.key === qTab) ? (qTab as string) : "sites");
-  const [page, setPage] = useState(1);
+  const paging = usePaging();
+  const onTabChange = () => { paging.reset(); setShowArchived(false); };
+  const tabs = useNavTabs("/locations", TAB_KEYS);
+  const { tab, setTab } = usePageTab(tabs, onTabChange);
   const [keyword, setKeyword] = useState("");
   // 「显示已归档」开关（TDD §10.1：列表默认过滤已归档）。切 tab 复位，避免在合同页残留一个看不见的过滤态。
   const [showArchived, setShowArchived] = useState(false);
   // 站点坪效周期。复用报表域的 REPORT_PERIODS/缺省值 —— 自己拼一套 label，
   // 「近 30 日」在坪效页和点位报表页就会是两个窗口。
   const [period, setPeriod] = useState<ReportPeriod>(REPORT_PERIOD_DEFAULT);
-  useEffect(() => { if (qTab && TABS.some((t) => t.key === qTab)) { setTab(qTab); setPage(1); setShowArchived(false); } }, [qTab]);
   const [siteForm, setSiteForm] = useState<Partial<Site> | null>(null);
   const [pointForm, setPointForm] = useState<Partial<SitePoint> | null>(null);
   const [venueForm, setVenueForm] = useState<Partial<Venue> | null>(null);
@@ -160,16 +155,16 @@ function LocationsInner() {
   const regionsQ = useQuery({ queryKey: ["regions-dict"], queryFn: () => api.listRegions({ page: 1, size: 100 }) });
   const q = useQuery<PageResult<Site | SitePoint | Venue | Contract | Lead | SiteAnalysis | VenueOnboarding | SiteLifecycle>>({
     // showArchived 必须进 queryKey，否则切开关不重新拉数据
-    queryKey: ["place", tab, page, keyword, showArchived, period],
+    queryKey: ["place", tab, paging.page, paging.size, keyword, showArchived, period],
     queryFn: () =>
-      tab === "sites" ? api.listSites({ page, size: SIZE, keyword, showArchived })
-      : tab === "points" ? api.listLocations({ page, size: SIZE, keyword, showArchived })
-      : tab === "venues" ? api.listVenues({ page, size: SIZE, keyword, showArchived })
-      : tab === "crm" ? api.listLeads({ page, size: SIZE, keyword })
-      : tab === "analysis" ? api.listSiteAnalysis({ page, size: SIZE, keyword, period })
-      : tab === "onboarding" ? api.listVenueOnboardings({ page, size: SIZE, keyword })
-      : tab === "lifecycle" ? api.listSiteLifecycles({ page, size: SIZE, keyword })
-      : api.listContracts({ page, size: SIZE, keyword }),
+      tab === "sites" ? api.listSites({ page: paging.page, size: paging.size, keyword, showArchived })
+      : tab === "points" ? api.listLocations({ page: paging.page, size: paging.size, keyword, showArchived })
+      : tab === "venues" ? api.listVenues({ page: paging.page, size: paging.size, keyword, showArchived })
+      : tab === "crm" ? api.listLeads({ page: paging.page, size: paging.size, keyword })
+      : tab === "analysis" ? api.listSiteAnalysis({ page: paging.page, size: paging.size, keyword, period })
+      : tab === "onboarding" ? api.listVenueOnboardings({ page: paging.page, size: paging.size, keyword })
+      : tab === "lifecycle" ? api.listSiteLifecycles({ page: paging.page, size: paging.size, keyword })
+      : api.listContracts({ page: paging.page, size: paging.size, keyword }),
     placeholderData: keepPreviousData,
   });
 
@@ -424,7 +419,7 @@ function LocationsInner() {
     },
   ];
 
-  const onSearch = (v: string) => { setKeyword(v); setPage(1); };
+  const onSearch = (v: string) => { setKeyword(v); paging.reset(); };
 
   // —— 导出（TDD §10.2）：当页数据，列与表格可见列严格一致 ——
   function pageRows<T>(): T[] { return (q.data?.list ?? []) as T[]; }
@@ -517,11 +512,11 @@ function LocationsInner() {
   }
   // 无数据时不给导出按钮：导出一个空 CSV 只会让人以为功能坏了
   const onExport = q.data?.list?.length ? exportCurrent : undefined;
-  const archivedToggle = <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); setPage(1); }} />;
+  const archivedToggle = <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); paging.reset(); }} />;
 
   return (
     <div>
-      <TabHeader tabs={TABS} value={tab} onChange={(k) => { setTab(k); setPage(1); setShowArchived(false); }} />
+      <TabHeader tabs={tabs} value={tab} onChange={setTab} />
       {tab === "sites" && (
         <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索站点号 / 名称" onExport={onExport}
           onAdd={allow("location:poi:create") ? () => setSiteForm({ status: "ACTIVE", sceneType: "商场", agentNo: null }) : undefined} addLabel="新增站点">
@@ -552,7 +547,7 @@ function LocationsInner() {
         <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索站点号 / 名称" onExport={onExport}>
           <FilterSelect
             value={period}
-            onChange={(v) => { setPeriod(v as ReportPeriod); setPage(1); }}
+            onChange={(v) => { setPeriod(v as ReportPeriod); paging.reset(); }}
             options={REPORT_PERIODS.map((x) => ({ value: x.value, label: x.label }))}
             aria-label="按统计周期筛选"
           />
@@ -565,23 +560,23 @@ function LocationsInner() {
       {tab === "lifecycle" && (
         <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索站点号 / 名称 / 负责人" onExport={onExport} />
       )}
-      {tab === "sites" && <DataTable rowKey={(s: Site) => s.siteNo} columns={siteCols} rows={q.data?.list as Site[]} loading={q.isLoading} rowClassName={archivedRowClass}
+      {tab === "sites" && <DataTable rowKey={(s: Site) => s.siteNo} columns={siteCols} rows={q.data?.list as Site[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} rowClassName={archivedRowClass}
         empty={showArchived ? "没有匹配的站点——换个关键词，或先「新增站点」建档" : "没有在用的站点——可能都已归档（打开「显示已归档」查看），或先「新增站点」建档"} />}
-      {tab === "points" && <DataTable rowKey={(l: SitePoint) => l.locationNo} columns={pointCols} rows={q.data?.list as SitePoint[]} loading={q.isLoading} rowClassName={archivedRowClass}
+      {tab === "points" && <DataTable rowKey={(l: SitePoint) => l.locationNo} columns={pointCols} rows={q.data?.list as SitePoint[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} rowClassName={archivedRowClass}
         empty={showArchived ? "没有匹配的点位——换个关键词，或先「新增点位」" : "没有在用的点位——点位隶属站点，先建站点再在此新增，或打开「显示已归档」查看已归档点位"} />}
-      {tab === "venues" && <DataTable rowKey={(v: Venue) => v.venueNo} columns={venueCols} rows={q.data?.list as Venue[]} loading={q.isLoading} rowClassName={archivedRowClass}
+      {tab === "venues" && <DataTable rowKey={(v: Venue) => v.venueNo} columns={venueCols} rows={q.data?.list as Venue[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} rowClassName={archivedRowClass}
         empty={showArchived ? "没有匹配的场地方——换个关键词，或先「新增场地方」" : "没有在用的场地方——可能都已归档（打开「显示已归档」查看），或先「新增场地方」建档"} />}
-      {tab === "contracts" && <DataTable rowKey={(c: Contract) => c.contractNo} columns={ctCols} rows={q.data?.list as Contract[]} loading={q.isLoading}
+      {tab === "contracts" && <DataTable rowKey={(c: Contract) => c.contractNo} columns={ctCols} rows={q.data?.list as Contract[]} loading={q.isLoading} error={q.error} onRetry={q.refetch}
         empty="暂无合同——合同绑定「场地方 × 站点」，请先建好两者再「新增合同」" />}
-      {tab === "crm" && <DataTable rowKey={(l: Lead) => l.leadNo} columns={leadCols} rows={q.data?.list as Lead[]} loading={q.isLoading}
+      {tab === "crm" && <DataTable rowKey={(l: Lead) => l.leadNo} columns={leadCols} rows={q.data?.list as Lead[]} loading={q.isLoading} error={q.error} onRetry={q.refetch}
         empty="暂无线索——BD 拓展的场地线索会出现在这里，可点「新增线索」手工录入" />}
-      {tab === "analysis" && <DataTable rowKey={(a: SiteAnalysis) => a.siteNo} columns={analysisCols} rows={q.data?.list as SiteAnalysis[]} loading={q.isLoading}
+      {tab === "analysis" && <DataTable rowKey={(a: SiteAnalysis) => a.siteNo} columns={analysisCols} rows={q.data?.list as SiteAnalysis[]} loading={q.isLoading} error={q.error} onRetry={q.refetch}
         empty={`${periodLabel(period)}内没有坪效数据——统计截至昨日（T+1），新站点需先产生订单；可换更长的周期再看`} />}
-      {tab === "onboarding" && <DataTable rowKey={(o: VenueOnboarding) => o.onboardingNo} columns={onboardingCols} rows={q.data?.list as VenueOnboarding[]} loading={q.isLoading}
+      {tab === "onboarding" && <DataTable rowKey={(o: VenueOnboarding) => o.onboardingNo} columns={onboardingCols} rows={q.data?.list as VenueOnboarding[]} loading={q.isLoading} error={q.error} onRetry={q.refetch}
         empty="暂无入驻申请——门店自助提交的申请会进入此列表待审核，也可点「新增申请」代录" />}
-      {tab === "lifecycle" && <DataTable rowKey={(l: SiteLifecycle) => l.siteNo} columns={lifecycleCols} rows={q.data?.list as SiteLifecycle[]} loading={q.isLoading}
+      {tab === "lifecycle" && <DataTable rowKey={(l: SiteLifecycle) => l.siteNo} columns={lifecycleCols} rows={q.data?.list as SiteLifecycle[]} loading={q.isLoading} error={q.error} onRetry={q.refetch}
         empty="暂无生命周期记录——站点签约后自动进入跟踪，尚无签约站点时此处为空" />}
-      {q.data && <Pagination page={page} size={SIZE} total={q.data.total} onPage={setPage} />}
+      {q.data && <Pagination page={paging.page} size={paging.size} total={q.data.total} onPage={paging.setPage} onSize={paging.setSize} />}
 
       {/* 站点 新增/编辑 */}
       <Drawer

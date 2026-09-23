@@ -36,14 +36,16 @@ export interface PageTab {
  * 取本页 tab（名字与权限都来自 nav.ts，页面不再自己写一份文案）。
  * 切语言由 `tNav` 负责 —— 与左侧菜单同一条翻译链路，不会出现菜单已翻、tab 还是中文。
  */
-export function useNavTabs(path: string, specs: readonly PageTabSpec[]): PageTab[] {
+export function useNavTabs(
+  path: string, specs: readonly PageTabSpec[], defaultKey?: string,
+): PageTab[] {
   const role = useAuth((s) => s.role);
   const { tNav } = useI18n();
   return React.useMemo(
-    () => navTabs(path, specs, role).map((t) => ({ ...t, label: tNav(t.label) })),
+    () => navTabs(path, specs, role, defaultKey).map((t) => ({ ...t, label: tNav(t.label) })),
     // specs 是页面模块级常量，引用稳定；列进依赖会让 useMemo 每次都失效
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [path, role, tNav],
+    [path, role, tNav, defaultKey],
   );
 }
 
@@ -55,9 +57,11 @@ export function useNavTabs(path: string, specs: readonly PageTabSpec[]): PageTab
  *
  * 调用方所在的组件必须在 `<Suspense>` 内（静态导出 + `useSearchParams` 的硬要求）。
  */
-export function usePageTab(tabs: PageTab[], onChange?: () => void) {
+export function usePageTab(tabs: PageTab[], onChange?: () => void, param: "tab" | "view" = "tab") {
   const sp = useSearchParams();
-  const qTab = sp.get("tab");
+  // 页内切换参数有两种写法：多数页 `?tab=`，工单页 `?view=`。菜单里那条叶子用哪个，
+  // 这里就得读哪个 —— 读错的表现是深链点进去永远落在默认 tab。
+  const qTab = sp.get(param);
   const fallback = tabs[0]?.key ?? "";
   const valid = React.useCallback((k: string | null): k is string => !!k && tabs.some((t) => t.key === k), [tabs]);
   const [tab, setTabState] = React.useState(() => (valid(qTab) ? qTab : fallback));

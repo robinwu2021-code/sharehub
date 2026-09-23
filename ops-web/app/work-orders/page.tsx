@@ -4,10 +4,11 @@
 // 状态机定义在 lib/types/workorder.ts（WO_TRANSITIONS），页面按钮与 mock/后端校验共用同一份；
 // 页面只负责「不给点非法动作」，真正的拒绝在服务端（mock 层抛 WorkOrderTransitionError）。
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Pagination } from "@/components/ui/misc";
+import { usePaging } from "@/lib/hooks/use-paging";
+import { useNavTabs, usePageTab } from "@/lib/hooks/use-page-tab";
 import { Input, Select } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { DataTable, type Column } from "@/components/ui/data-table";
@@ -36,7 +37,6 @@ import type {
   WoAuditResult, SlaRule, InspectionPlan,
 } from "@/lib/types";
 
-const SIZE = 10;
 /**
  * 优先级：文案 + 色调 + **形状阶梯**（规范 §11.4）。
  * 紧急与高同为 danger 色 —— 红绿色盲（男性约 8%）看不出「紧急比高更急」，
@@ -54,10 +54,9 @@ const BOARD_COLS: { key: string; label: string }[] = [
   { key: "CREATED", label: "待派单" }, { key: "DISPATCHED", label: "已派单" },
   { key: "PROCESSING", label: "处理中" }, { key: "DONE", label: "已完成" }, { key: "CLOSED", label: "已关闭" },
 ];
-const TABS = [
-  { key: "list", label: "列表" }, { key: "board", label: "看板" },
-  { key: "sla", label: "SLA 管理", phase: 2 as const }, { key: "inspection", label: "巡检计划", phase: 2 as const },
-];
+// tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）。
+// 本页用的是 `?view=` 而不是 `?tab=`，菜单里那四条叶子也是 view —— 两边必须一致。
+const TAB_KEYS = ["list", "board", "sla", "inspection"] as const;
 type View = "list" | "board" | "sla" | "inspection";
 
 const ACTION_LABEL: Record<WorkOrderAction, string> = {
@@ -126,11 +125,9 @@ function WorkOrdersInner() {
   const qc = useQueryClient();
   const allow = useCan();
   const { t } = useI18n();
-  const sp = useSearchParams();
-  const qView = sp.get("view");
-  const [view, setView] = useState<View>(TABS.some((t) => t.key === qView) ? (qView as View) : "list");
-  useEffect(() => { if (qView && TABS.some((t) => t.key === qView)) { setView(qView as View); setSelected([]); } }, [qView]);
-  const [page, setPage] = useState(1);
+  const paging = usePaging();
+  const tabs = useNavTabs("/work-orders", TAB_KEYS);
+  const { tab: view, setTab: setView } = usePageTab(tabs, () => { paging.reset(); setSelected([]); }, "view");
   const [keyword, setKeyword] = useState("");
   const [status, setStatus] = useState("");
   const [type, setType] = useState("");
@@ -139,7 +136,8 @@ function WorkOrdersInner() {
   const [selected, setSelected] = useState<string[]>([]);
   const [batchAssignee, setBatchAssignee] = useState(STAFF[0]);
   const clearSel = () => setSelected([]);
-  const goPage = (p: number) => { setPage(p); clearSel(); };
+  // 翻页要清掉勾选：第 2 页留着第 1 页的勾选，批量操作会作用到看不见的行上
+  const goPage = (p: number) => { paging.setPage(p); clearSel(); };
 
   // —— 抽屉状态：开单 / 派单 / 处理·完成 / 验收关单 / 驳回 / 详情 ——
   const [woForm, setWoForm] = useState<Partial<WorkOrderDraft> | null>(null);
@@ -164,8 +162,8 @@ function WorkOrdersInner() {
 
   // 列表分页；看板一次取较多再按状态分列
   const list = useQuery({
-    queryKey: ["workorders", page, keyword, status, type],
-    queryFn: () => api.listWorkOrders({ page, size: SIZE, keyword, status: status || undefined, type: type || undefined }),
+    queryKey: ["workorders", paging.page, paging.size, keyword, status, type],
+    queryFn: () => api.listWorkOrders({ page: paging.page, size: paging.size, keyword, status: status || undefined, type: type || undefined }),
     placeholderData: keepPreviousData, enabled: view === "list",
   });
   const board = useQuery({
@@ -174,13 +172,13 @@ function WorkOrdersInner() {
     enabled: view === "board",
   });
   const sla = useQuery({
-    queryKey: ["sla-rules", page, slaKw],
-    queryFn: () => api.listSlaRules({ page, size: SIZE, keyword: slaKw }),
+    queryKey: ["sla-rules", paging.page, paging.size, slaKw],
+    queryFn: () => api.listSlaRules({ page: paging.page, size: paging.size, keyword: slaKw }),
     placeholderData: keepPreviousData, enabled: view === "sla",
   });
   const inspection = useQuery({
-    queryKey: ["inspection-plans", page, inspKw],
-    queryFn: () => api.listInspectionPlans({ page, size: SIZE, keyword: inspKw }),
+    queryKey: ["inspection-plans", paging.page, paging.size, inspKw],
+    queryFn: () => api.listInspectionPlans({ page: paging.page, size: paging.size, keyword: inspKw }),
     placeholderData: keepPreviousData, enabled: view === "inspection",
   });
   // 开单时机柜下拉：与设备台账同一份数据，避免手打错柜号
@@ -448,13 +446,13 @@ function WorkOrdersInner() {
 
   return (
     <div>
-      <TabHeader tabs={TABS} value={view} onChange={(k) => { setView(k as View); setPage(1); clearSel(); }} />
+      <TabHeader tabs={tabs} value={view} onChange={setView} />
 
       {(view === "list" || view === "board") && (
         <>
           <Toolbar
             search={keyword}
-            onSearch={(v) => { setKeyword(v); setPage(1); clearSel(); }}
+            onSearch={(v) => { setKeyword(v); paging.reset(); clearSel(); }}
             searchPlaceholder="搜索工单号 / 柜机 / 点位 / 来源单号 / 处理人"
             onAdd={canCreate ? () => setWoForm({ ...NEW_WO }) : undefined}
             addLabel="新建工单"
@@ -471,10 +469,10 @@ function WorkOrdersInner() {
             }
             onClearSelection={clearSel}
           >
-            <FilterSelect value={type} onChange={(v) => { setType(v); setPage(1); clearSel(); }}
+            <FilterSelect value={type} onChange={(v) => { setType(v); paging.reset(); clearSel(); }}
               allLabel="全部类型" options={WO_TYPE_OPTIONS} aria-label="按工单类型筛选" />
             {view === "list" && (
-              <FilterSelect value={status} onChange={(v) => { setStatus(v); setPage(1); clearSel(); }}
+              <FilterSelect value={status} onChange={(v) => { setStatus(v); paging.reset(); clearSel(); }}
                 allLabel="全部状态" options={WO_STATUS_OPTIONS} aria-label="按工单状态筛选" />
             )}
           </Toolbar>
@@ -492,7 +490,7 @@ function WorkOrdersInner() {
         <>
           <Toolbar
             search={slaKw}
-            onSearch={(v) => { setSlaKw(v); setPage(1); }}
+            onSearch={(v) => { setSlaKw(v); paging.reset(); }}
             searchPlaceholder="搜索 SLA 编号 / 类型 / 升级对象"
             onAdd={canSla ? () => setSlaForm({ woType: "FAULT", responseMins: 30, resolveMins: 240, escalateTo: "", active: true }) : undefined}
             addLabel="新增 SLA"
@@ -505,9 +503,9 @@ function WorkOrdersInner() {
               { header: "状态", value: (s) => (s.active ? "启用" : "停用") },
             ], sla.data?.list ?? [])}
           />
-          <DataTable rowKey={(s: SlaRule) => s.slaNo} columns={slaCols} rows={sla.data?.list} loading={sla.isLoading}
+          <DataTable rowKey={(s: SlaRule) => s.slaNo} columns={slaCols} rows={sla.data?.list} loading={sla.isLoading} error={sla.error} onRetry={sla.refetch}
             empty="暂无 SLA 规则——尚未配置响应/解决时限，工单不会触发超时升级；点右上「新增 SLA」建一条。" />
-          {sla.data && <Pagination page={page} size={SIZE} total={sla.data.total} onPage={setPage} />}
+          {sla.data && <Pagination page={paging.page} size={paging.size} total={sla.data.total} onPage={paging.setPage} onSize={paging.setSize} />}
         </>
       )}
 
@@ -515,7 +513,7 @@ function WorkOrdersInner() {
         <>
           <Toolbar
             search={inspKw}
-            onSearch={(v) => { setInspKw(v); setPage(1); }}
+            onSearch={(v) => { setInspKw(v); paging.reset(); }}
             searchPlaceholder="搜索计划编号 / 路线 / 负责人"
             onAdd={canInspection ? () => setInspForm({ route: "", frequency: "每周", nextAt: "", assignee: "", active: true }) : undefined}
             addLabel="新增巡检计划"
@@ -535,20 +533,20 @@ function WorkOrdersInner() {
             ⚠️ 后端目前没有触发端点（也没有定时任务），此动作在真实后端下暂不可用。
           </Notice>
           {!canRunPlan && !canInspection && <ReadOnlyNotice what="巡检计划维护/执行" perm={["workorder:inspection:update", "workorder:wo:create"]} note="不能新增、编辑或立即执行" />}
-          <DataTable rowKey={(p: InspectionPlan) => p.planNo} columns={inspectionCols} rows={inspection.data?.list} loading={inspection.isLoading}
+          <DataTable rowKey={(p: InspectionPlan) => p.planNo} columns={inspectionCols} rows={inspection.data?.list} loading={inspection.isLoading} error={inspection.error} onRetry={inspection.refetch}
             empty="暂无巡检计划——巡检工单目前只能手工开；点右上「新增巡检计划」按路线周期自动开单。" />
-          {inspection.data && <Pagination page={page} size={SIZE} total={inspection.data.total} onPage={setPage} />}
+          {inspection.data && <Pagination page={paging.page} size={paging.size} total={inspection.data.total} onPage={paging.setPage} onSize={paging.setSize} />}
         </>
       )}
 
       {view === "list" && (
         <>
-          <DataTable rowKey={(w: WorkOrder) => w.woNo} columns={cols} rows={list.data?.list} loading={list.isLoading}
+          <DataTable rowKey={(w: WorkOrder) => w.woNo} columns={cols} rows={list.data?.list} loading={list.isLoading} error={list.error} onRetry={list.refetch}
             selectable={canDispatch}
             selectedKeys={selected}
             onSelectedChange={setSelected}
             empty="没有符合条件的工单——可能是筛选条件太窄，或告警/投诉尚未转工单；换个状态筛选，或点右上「新建工单」。" />
-          {list.data && <Pagination page={page} size={SIZE} total={list.data.total} onPage={goPage} />}
+          {list.data && <Pagination page={paging.page} size={paging.size} total={list.data.total} onPage={goPage} onSize={paging.setSize} />}
         </>
       )}
 
