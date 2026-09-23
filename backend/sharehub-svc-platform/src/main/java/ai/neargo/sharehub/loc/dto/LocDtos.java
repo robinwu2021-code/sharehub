@@ -14,8 +14,15 @@ public final class LocDtos {
     private LocDtos() {
     }
 
-    public record Site(String siteNo, String name, String venueName, String agentNo, String regionId,
-                      String address, String sceneType, int pointCount, int cabinetCount, String status) {
+    /**
+     * @param venueNo 归属场地方编号。**分成按它走**，不按 venueName ——
+     *                种子里就有同名场地方，按名字连必然连错
+     * @param lng     经度；为空的后果不在运营端，是 C 端「找附近的柜」算不出距离
+     * @param lat     纬度
+     */
+    public record Site(String siteNo, String name, String venueNo, String venueName, String agentNo,
+                      String regionId, String address, java.math.BigDecimal lng, java.math.BigDecimal lat,
+                      String sceneType, int pointCount, int cabinetCount, String status) {
     }
 
     public record Location(String locationNo, String name, String siteNo, String siteName,

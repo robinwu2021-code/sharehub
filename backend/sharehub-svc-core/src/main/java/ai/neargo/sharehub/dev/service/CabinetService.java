@@ -16,6 +16,21 @@ public interface CabinetService {
     java.util.List<Cabinet> bySite(String siteNo);
     CommandResult sendCommand(String cabinetNo, String type, Map<String, Object> params);
 
+    /**
+     * 机柜建档 / 编辑（upsert）。
+     *
+     * <p><b>为什么补这个</b>：此前只有批量导入 `importRows`，**没有单台新建的入口** ——
+     * 前端契约里有 `saveCabinet`，后端连路径都没有，于是「上一台新设备」只能靠往库里灌数据。
+     * 这是 MVP ④「上设备并绑定归属」那一环的缺口。
+     *
+     * <p><b>归属随点位级联</b>：`siteNo` / `agentNo` 不接受调用方直接指定，
+     * 一律由 `locationNo` 反查得出 —— 三者各填各的必然互相矛盾，
+     * 而矛盾之后「这台柜子归谁」就没有答案了（同 {@code AssetAssignedListener} 的级联口径）。
+     *
+     * @param cabinetNo 为空表示新建；非空表示编辑该台
+     */
+    Cabinet save(String cabinetNo, Map<String, Object> body);
+
     /** 归档机柜：盖 archivedAt 时间戳。**不是删除**，可 unarchive 恢复。 */
     Cabinet archive(String no);
 

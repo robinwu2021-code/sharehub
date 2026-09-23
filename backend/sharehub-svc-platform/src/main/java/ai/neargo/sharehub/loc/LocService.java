@@ -67,10 +67,15 @@ public class LocService {
         boolean insert = (e == null);
         if (insert) { e = new LocSite(); e.setSiteNo(no); e.setTenantId("MAIN"); }
         e.setName(in.name());
+        e.setVenueNo(in.venueNo());
         e.setVenueName(in.venueName());
         e.setAgentNo(in.agentNo());
         e.setRegionId(in.regionId());
         e.setAddress(in.address());
+        // 经纬度：**只在显式给了值时才写**。表单没填就把已有坐标清成 null，
+        // 会让这个站点从 C 端「找附近」里静默消失，而运营完全不知道自己做了什么。
+        if (in.lng() != null) e.setLng(in.lng());
+        if (in.lat() != null) e.setLat(in.lat());
         e.setSceneType(in.sceneType());
         e.setPointCount(in.pointCount());
         e.setCabinetCount(in.cabinetCount());
@@ -155,8 +160,8 @@ public class LocService {
     }
 
     private static Site toSite(LocSite e) {
-        return new Site(e.getSiteNo(), e.getName(), e.getVenueName(), e.getAgentNo(), e.getRegionId(),
-                e.getAddress(), e.getSceneType(),
+        return new Site(e.getSiteNo(), e.getName(), e.getVenueNo(), e.getVenueName(), e.getAgentNo(),
+                e.getRegionId(), e.getAddress(), e.getLng(), e.getLat(), e.getSceneType(),
                 e.getPointCount() == null ? 0 : e.getPointCount(),
                 e.getCabinetCount() == null ? 0 : e.getCabinetCount(), e.getStatus());
     }

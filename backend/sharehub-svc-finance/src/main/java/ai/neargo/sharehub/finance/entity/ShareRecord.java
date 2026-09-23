@@ -55,6 +55,14 @@ public class ShareRecord extends BaseEntity {
     /** 分润基数（GMV 快照，V34：不再由 amount/rate 反推 —— 固定额/阶梯分润反推必错）。 */
     private BigDecimal grossAmount;
 
+    /**
+     * 费率来源：合同号（VENUE）或规则号（AGENT）。V37。
+     *
+     * <p>排错时「这笔为什么是 15%」要能当场回答。只存 rate 不存来源的话，
+     * 规则或合同一改，历史分润的依据就永远查不回来了。
+     */
+    private String sourceNo;
+
     // createdAt / updatedAt / version / deleted 见 BaseEntity，**不重复声明**（[SKELETON_BRIEF §4]）。
     // 统计口径里的 period（YYYY-MM）就是从 created_at 现算的，本表没有也不需要 period 列。
 }

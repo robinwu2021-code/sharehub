@@ -2274,6 +2274,27 @@
   },
   {
    "verb": "POST",
+   "path": "/api/ops/cabinets",
+   "perm": "device:cabinet:create",
+   "handler": "OpsController#saveCabinet",
+   "summary": "机柜建档 / 编辑。",
+   "params": [
+    {
+     "in": "path",
+     "name": "cabinetNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "java.util.Map<String, Object>",
+   "returnType": "Object",
+   "returnContainer": null,
+   "returnElement": "Object",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
    "path": "/api/ops/cabinets/import",
    "perm": "device:cabinet:create",
    "handler": "OpsController#importCabinets",
@@ -6622,6 +6643,10 @@
      "type": "String"
     },
     {
+     "name": "venueNo",
+     "type": "String"
+    },
+    {
      "name": "venueName",
      "type": "String"
     },
@@ -6636,6 +6661,14 @@
     {
      "name": "address",
      "type": "String"
+    },
+    {
+     "name": "lng",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "lat",
+     "type": "java.math.BigDecimal"
     },
     {
      "name": "sceneType",
@@ -6684,6 +6717,10 @@
      "type": "String"
     },
     {
+     "name": "venueNo",
+     "type": "String"
+    },
+    {
      "name": "venueName",
      "type": "String"
     },
@@ -6698,6 +6735,14 @@
     {
      "name": "address",
      "type": "String"
+    },
+    {
+     "name": "lng",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "lat",
+     "type": "java.math.BigDecimal"
     },
     {
      "name": "sceneType",
@@ -6726,6 +6771,10 @@
      "type": "String"
     },
     {
+     "name": "venueNo",
+     "type": "String"
+    },
+    {
      "name": "venueName",
      "type": "String"
     },
@@ -6740,6 +6789,14 @@
     {
      "name": "address",
      "type": "String"
+    },
+    {
+     "name": "lng",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "lat",
+     "type": "java.math.BigDecimal"
     },
     {
      "name": "sceneType",
@@ -22571,10 +22628,10 @@
  },
  "conflicts": {},
  "stats": {
-  "endpoints": 368,
-  "records": 256,
-  "withPerm": 311,
-  "withBody": 151,
+  "endpoints": 369,
+  "records": 259,
+  "withPerm": 312,
+  "withBody": 152,
   "shapedResponses": 281
  }
 }

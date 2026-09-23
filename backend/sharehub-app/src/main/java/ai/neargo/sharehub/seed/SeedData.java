@@ -118,9 +118,21 @@ public class SeedData {
 
         // —— 场所：站点（12）/ 点位（30）/ 场地方（5）/ 合同（18）——
         for (int i = 0; i < 12; i++) {
-            sites.add(new Site("ST" + (300 + i), p(LOCS, i), p(VENUE_NAMES, i),
+            /*
+             * venueNo 与 VENUE_NAMES 同一个下标取 —— 两处都用 p(...) 循环取模，
+             * 编号与名字才对得上。分成链路按编号走，对不上就会把钱分给另一家场地方。
+             *
+             * 经纬度给**真实的迪拜坐标**（25.05~25.28N / 55.12~55.40E 网格）：
+             * 留空的话 C 端「找附近的柜」算不出距离，整个找柜入口在演示里是废的 ——
+             * 而这正是 MVP 里标着「线上无数据」的那一条。
+             */
+            sites.add(new Site("ST" + (300 + i), p(LOCS, i),
+                    "VEN" + (300 + i % VENUE_NAMES.size()), p(VENUE_NAMES, i),
                     i % 3 == 0 ? null : "AG" + String.format("%03d", (i % 9) + 1), p(REGIONS, i),
-                    p(LOCS, i) + ", Dubai, UAE", p(List.of("商场", "机场", "餐饮", "地铁", "写字楼"), i),
+                    p(LOCS, i) + ", Dubai, UAE",
+                    java.math.BigDecimal.valueOf(5512_0000L + (i * 2_3000L), 6),
+                    java.math.BigDecimal.valueOf(2505_0000L + (i * 1_9000L), 6),
+                    p(List.of("商场", "机场", "餐饮", "地铁", "写字楼"), i),
                     1 + (i % 4), 2 + (i * 3) % 10, i % 8 == 0 ? "PAUSED" : "ACTIVE"));
         }
         for (int i = 0; i < 30; i++) {

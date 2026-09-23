@@ -22,9 +22,76 @@ import java.util.Map;
 public class CabinetServiceImpl implements CabinetService {
 
     private final CabinetMapper mapper;
+    private final ai.neargo.sharehub.api.platform.port.LocationQueryPort locationQuery;
 
-    public CabinetServiceImpl(CabinetMapper mapper) {
+    public CabinetServiceImpl(CabinetMapper mapper,
+                              ai.neargo.sharehub.api.platform.port.LocationQueryPort locationQuery) {
         this.mapper = mapper;
+        this.locationQuery = locationQuery;
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public Cabinet save(String cabinetNo, java.util.Map<String, Object> body) {
+        java.util.Map<String, Object> in = body == null ? java.util.Map.of() : body;
+        String no = cabinetNo != null && !cabinetNo.isBlank() ? cabinetNo : str(in.get("cabinetNo"));
+        if (no == null || no.isBlank()) throw new IllegalArgumentException("机柜编号 cabinetNo 必填");
+
+        DevCabinet e = mapper.selectOne(new LambdaQueryWrapper<DevCabinet>()
+                .eq(DevCabinet::getCabinetNo, no).last("limit 1"));
+        boolean creating = e == null;
+        if (creating) {
+            if (cabinetNo != null && !cabinetNo.isBlank()) {
+                // 走 /cabinets/{no} 却查不到：是编辑一个不存在的柜子，而不是「顺手新建」。
+                // 静默新建会把打错的编号变成一台真实设备。
+                throw new IllegalArgumentException("机柜不存在: " + no);
+            }
+            e = new DevCabinet();
+            e.setCabinetNo(no);
+            e.setTenantId("MAIN");
+            e.setDeviceType("POWERBANK");
+            // 新建默认在库：还没上架就置 ONLINE 会让它出现在 C 端可借列表里
+            e.setStatus("IN_STOCK");
+            e.setOnlineStatus("OFFLINE");
+        }
+        if (in.containsKey("sn")) e.setSn(str(in.get("sn")));
+        if (in.containsKey("vendorCode")) e.setVendorCode(str(in.get("vendorCode")));
+        if (in.containsKey("model")) e.setModel(str(in.get("model")));
+        if (in.containsKey("slotTotal")) e.setSlotTotal(intOf(in.get("slotTotal")));
+        if (in.containsKey("status") && !creating) e.setStatus(str(in.get("status")));
+
+        /*
+         * 归属：**只认 locationNo，siteNo/agentNo 一律反查**（见接口注释）。
+         * 调用方传来的 siteNo/agentNo 直接忽略 —— 接受它们就等于允许三者互相矛盾。
+         */
+        if (in.containsKey("locationNo")) {
+            String locNo = str(in.get("locationNo"));
+            if (locNo == null || locNo.isBlank()) {
+                e.setLocationNo(null); e.setLocationName(null); e.setSiteNo(null); e.setAgentNo(null);
+            } else {
+                var own = locationQuery.ownershipOf(locNo);
+                if (own == null) throw new IllegalArgumentException("点位不存在: " + locNo);
+                e.setLocationNo(own.locationNo());
+                e.setLocationName(own.locationName());
+                e.setSiteNo(own.siteNo());
+                e.setAgentNo(own.agentNo());
+            }
+        }
+        if (creating) mapper.insert(e); else mapper.updateById(e);
+        return toVO(e);
+    }
+
+    private static String str(Object v) {
+        return v == null ? null : String.valueOf(v);
+    }
+
+    private static Integer intOf(Object v) {
+        if (v == null) return null;
+        try {
+            return Integer.valueOf(String.valueOf(v).trim());
+        } catch (NumberFormatException ex) {
+            throw new IllegalArgumentException("仓位数 slotTotal 必须是整数，收到: " + v);
+        }
     }
 
     @Override

@@ -20,6 +20,10 @@ import ai.neargo.sharehub.trade.price.engine.PriceResolver;
 import ai.neargo.sharehub.trade.price.engine.ChargeChain;
 import ai.neargo.sharehub.trade.mapper.OrdMapper;
 import ai.neargo.sharehub.trade.service.RentOrderService;
+import ai.neargo.sharehub.api.core.event.OrderSettledEvent;
+import ai.neargo.sharehub.common.event.DomainEventBus;
+import ai.neargo.sharehub.dev.entity.DevCabinet;
+import ai.neargo.sharehub.dev.mapper.CabinetMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.stereotype.Service;
@@ -45,11 +49,16 @@ public class RentOrderServiceImpl implements RentOrderService {
     private final PriceResolver priceResolver;
     private final PriceEngine priceEngine;
     private final ChargeChain chargeChain;
+    private final CabinetMapper cabinetMapper;
+    private final DomainEventBus eventBus;
 
     public RentOrderServiceImpl(OrdMapper mapper, OrdStateMachine stateMachine,
                                 OrdRentExtMapper rentExtMapper, InterventionMapper interventionMapper,
                                 PriceResolver priceResolver, PriceEngine priceEngine,
-                                ChargeChain chargeChain) {
+                                ChargeChain chargeChain, CabinetMapper cabinetMapper,
+                                DomainEventBus eventBus) {
+        this.cabinetMapper = cabinetMapper;
+        this.eventBus = eventBus;
         this.chargeChain = chargeChain;
         this.rentExtMapper = rentExtMapper;
         this.interventionMapper = interventionMapper;
@@ -232,7 +241,39 @@ public class RentOrderServiceImpl implements RentOrderService {
         e.setFeeAmount(charged.payable().doubleValue());   // 过渡期双写，待前端与报表切到 amount 后移除
         e.setStatus(stateMachine.next(e.getStatus(), "SETTLE"));   // RETURNED→SETTLED（支付为骨架）
         mapper.updateById(e);
+
+        publishSettled(e);
         return new OkResult(true);
+    }
+
+    /**
+     * 结算完成 → 发「订单已结算」，finance 据此生成分润明细。
+     *
+     * <p><b>为什么在这里发</b>：这是订单第一次、也是唯一一次拿到最终金额的位置。
+     * 在此之前发，基数是错的；不发，订单的收入就永远不会变成任何人的分成 ——
+     * 在补上这一段之前，`share_record` 只有演示数据在写，结算单永远是空的。
+     *
+     * <p><b>基数取实收 {@code amount} 而不是 {@code gross}</b>：免单与券抵扣的部分
+     * 没有真实现金流，按应收分账等于用平台的钱替用户给场地方付分成。
+     *
+     * <p><b>站点/代理由这里解析</b>：`dev_cabinet` 上有归属冗余列（V9 的数据范围锚点），
+     * core 自己就持有。让 finance 回查 core 等于把同步调用藏在事件里
+     * （见 {@code DomainEvent} 的约定）。
+     *
+     * <p>归属链断了（机柜没绑点位/站点）时仍然发事件、由消费方告警并跳过 ——
+     * <b>不在这里静默不发</b>：那样「这笔钱本该分给谁」会连一行日志都不留。
+     */
+    private void publishSettled(OrdOrder e) {
+        DevCabinet cab = e.getCabinetNo() == null ? null : cabinetMapper.selectOne(
+                new LambdaQueryWrapper<DevCabinet>()
+                        .eq(DevCabinet::getCabinetNo, e.getCabinetNo()).last("limit 1"));
+        // 归属周期按**结算时刻**定格，不用「今天」—— 跨月补算时用今天会把钱记进错的月份
+        String period = java.time.LocalDate.now().toString().substring(0, 7);
+        eventBus.publish(new OrderSettledEvent(
+                e.getOrderNo(), e.getCabinetNo(),
+                cab == null ? null : cab.getSiteNo(),
+                cab == null ? null : cab.getAgentNo(),
+                e.getAmount(), e.getCurrency(), period));
     }
 
     /**

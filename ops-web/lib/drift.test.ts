@@ -35,13 +35,13 @@ function run(script: string): string {
 }
 
 describe("前后端漂移棘轮（数字只许降）", () => {
-  it("契约缺口 ≤ 12、动词不符 ≤ 7", () => {
+  it("契约缺口 ≤ 12、动词不符 ≤ 6", () => {
     const head = run("check-backend-parity.py").split("\n")[0];
     const gap = Number(head.match(/缺 (\d+)/)?.[1]);
     const verb = Number(head.match(/动词不符 (\d+)/)?.[1]);
     expect(Number.isFinite(gap) && Number.isFinite(verb), `没解析出数字：${head}`).toBe(true);
     expect(gap, head).toBeLessThanOrEqual(12);
-    expect(verb, head).toBeLessThanOrEqual(7);
+    expect(verb, head).toBeLessThanOrEqual(6);
   });
 
   it("幽灵权限码 ≤ 19", () => {

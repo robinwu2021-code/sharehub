@@ -70,6 +70,18 @@ public class OpsController {
         return cabinetService.detail(cabinetNo);
     }
 
+    /**
+     * 机柜建档 / 编辑。归属随点位级联（siteNo/agentNo 由后端反查，不接受前端指定）。
+     *
+     * <p>两条路径共用：不带 {@code cabinetNo} = 新建，带 = 编辑该台 —— 与 sites/locations 同构。
+     */
+    @PostMapping({"/cabinets", "/cabinets/{cabinetNo}"})
+    @PreAuthorize("@perm.can('device:cabinet:create')")
+    public Object saveCabinet(@PathVariable(required = false) String cabinetNo,
+                              @RequestBody java.util.Map<String, Object> body) {
+        return cabinetService.save(cabinetNo, body);
+    }
+
     @PostMapping("/cabinets/{cabinetNo}/commands")
     @PreAuthorize("@perm.can('device:command:send')")
     public CommandResult sendCommand(@PathVariable String cabinetNo, @RequestBody(required = false) Map<String, Object> body) {

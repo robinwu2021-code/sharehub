@@ -6,6 +6,12 @@ import type { Archivable } from "./common";
 export interface Site extends Archivable {
   siteNo: string;
   name: string;
+  /**
+   * 归属场地方编号（`venues.venueNo`）。**分成按它走**，不按 venueName ——
+   * 种子里就有同名场地方，按名字连必然把钱分给另一家。
+   * 2026-09-23：后端 `loc_site.venue_no` 列早就有、实体与 DTO 此前漏映射，已补。
+   */
+  venueNo?: string | null;
   venueName: string;
   agentNo: string | null; // 归属代理，空=平台直营
   /** 区域字典 ID（`regions.regionId`，如 `DU-MAR`）。台账 M11：原先误存区域名。 */

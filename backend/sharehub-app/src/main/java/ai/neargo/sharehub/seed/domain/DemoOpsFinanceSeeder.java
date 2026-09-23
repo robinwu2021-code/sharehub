@@ -1,6 +1,8 @@
 package ai.neargo.sharehub.seed.domain;
 
 import ai.neargo.sharehub.alarm.entity.DevAlarm;
+import ai.neargo.sharehub.agent.entity.AgtAgent;
+import ai.neargo.sharehub.agent.mapper.AgentMapper;
 import ai.neargo.sharehub.alarm.entity.DevAlarmCode;
 import ai.neargo.sharehub.alarm.mapper.DevAlarmCodeMapper;
 import ai.neargo.sharehub.alarm.mapper.DevAlarmMapper;
@@ -62,6 +64,7 @@ public class DemoOpsFinanceSeeder implements CommandLineRunner {
     private final FinInvoiceMapper invoices;
     private final ShareRecordMapper shareRecords;
     private final ShareRuleMapper shareRules;
+    private final AgentMapper agents;
     private final AcctLedgerMapper ledgers;
     private final AcctAccountMapper accounts;
     private final IamDeptMapper depts;
@@ -74,6 +77,7 @@ public class DemoOpsFinanceSeeder implements CommandLineRunner {
                                 StlSettlementMapper settlements, StlSettlementDetailMapper settlementDetails,
                                 FinInvoiceMapper invoices, ShareRecordMapper shareRecords,
                                 ShareRuleMapper shareRules,
+                                AgentMapper agents,
                                 AcctLedgerMapper ledgers, AcctAccountMapper accounts,
                                 IamDeptMapper depts, IamEmployeeMapper employees, OrdMapper orders) {
         this.alarmCodes = alarmCodes;
@@ -88,6 +92,7 @@ public class DemoOpsFinanceSeeder implements CommandLineRunner {
         this.invoices = invoices;
         this.shareRecords = shareRecords;
         this.shareRules = shareRules;
+        this.agents = agents;
         this.ledgers = ledgers;
         this.accounts = accounts;
         this.depts = depts;
@@ -206,10 +211,25 @@ public class DemoOpsFinanceSeeder implements CommandLineRunner {
     private void seedFinance() {
         String period = LocalDate.now().toString().substring(0, 7);
 
+        /*
+         * 分润规则必须挂在**真实存在的分成方**上。
+         *
+         * 此前这里写死了 VEN001 / AG001 —— 而实际种子里场地方是 VEN300+、代理是 AG001~AG009，
+         * 站点上挂的也是 AG002/AG006 这些。于是规则看着有三条、任何一笔真实订单都命中不了，
+         * 「分润算不出来」的原因藏在编号里，从界面上完全看不出来（2026-09-23 实测）。
+         *
+         * 现在按库里已有的代理逐个建 AGENT 规则。VENUE 维度**故意不建**：
+         * 场地方分成以进场合同为准（见 ShareGeneratorImpl 的 D2 取舍），
+         * 这里再建一份只会让「到底按哪个」重新变成一笔糊涂账。
+         */
         if (shareRules.selectCount(null) == 0) {
-            insertShareRule("SHR001", "VENUE", "VEN001", "Dubai Mall 运营方", new BigDecimal("0.3500"), 10);
-            insertShareRule("SHR002", "AGENT", "AG001", "AG001 代理商", new BigDecimal("0.2000"), 20);
-            insertShareRule("SHR003", "VENUE", "VEN002", "Mall of Emirates 运营方", new BigDecimal("0.3000"), 30);
+            List<AgtAgent> all = agents.selectList(null);
+            int i = 0;
+            for (AgtAgent a : all) {
+                if (a.getAgentNo() == null || a.getAgentNo().isBlank()) continue;
+                insertShareRule("SHR" + String.format("%03d", ++i), "AGENT", a.getAgentNo(),
+                        a.getName(), new BigDecimal("0.2000"), 10 + i);
+            }
         }
 
         if (accounts.selectCount(null) == 0) {

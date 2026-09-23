@@ -17,12 +17,21 @@ public class LocContract {
     private Long id;
     private String contractNo;
     private String tenantId;
+    /** 场地方编号。与 {@link LocSite#getVenueNo()} 一样，列早就有、实体此前漏映射。 */
+    private String venueNo;
+
+    /** 站点编号 —— 合同是**按站点**签的，这是「站点级分成比例」的唯一存放处。 */
+    private String siteNo;
+
     private String venueName;
     private String siteName;
     private Double shareRate;
     private Double entryFee;
     private String startAt;
     private String endAt;
+    /** [db-design §1.5]：带金额语义的表一律有币种。 */
+    private String currency;
+
     private String status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
