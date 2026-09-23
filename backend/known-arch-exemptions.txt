@@ -1,0 +1,46 @@
+# arch-guard 的豁免与警告基线 —— **只准变短，不准变长**。
+#
+# 背景：2026-09-23 之前 arch-guard 报「✅ 四个卡口全部通过」，但它**只扫了 62 个文件**
+# （`EXTRA_SRC` 算出来却从没被用过，三处 os.walk 全是 sharehub-app 一个目录），
+# 且 G4 找的是早已改名的 `powerbank-common`，目录不存在就 return [] —— 静默全绿。
+# 修好后扫描面从 76 个类变成 662 个类、0 个实体变成 136 个，才看见下面这些。
+#
+# 本文件的作用：把「当前已接受的例外」钉死。新增一条豁免必须显式加进来，
+# 在 review 里显形 —— 否则豁免会慢慢变成垃圾桶，卡口又回到「永远全绿」。
+#
+# 格式：<类名> 注入 <类型 字段名>
+
+# ── G3 豁免类别一：app 层跨域只读编排（v4/09 §九 · v4/12 §4.3）────────────────
+# 报表 / 看板 / 运营总览天然横跨订单、设备、场地、分润；强行经 Port 会退化成
+# N 次远程调用再在内存里 JOIN，比直接读更糟。
+# **只豁免读**：这些包里一旦出现 insert/update/delete/save/remove，仍判违规。
+# 反向对照实测（2026-09-23）：在 operation/ 下放一个带写操作的探针类 → 违规 1；
+# 把写改成读 → 豁免 14；删除探针 → 回到 13。规则确实生效，不是摆设。
+SharingQueryService 注入 SiteMapper sites
+OperationOverviewService 注入 CabinetStatMapper cabinets
+OperationOverviewService 注入 OrderStatMapper orders
+OperationOverviewService 注入 ShareRuleMapper shareRules
+
+# ── G3 豁免类别二：演示种子 ────────────────────────────────────────────────
+# 职责就是把各域样例数据一次性灌进去，跨域是本分；且默认不装配
+# （`sharehub.seed.enabled=false`），不在任何生产代码路径上。
+# **B4 会把它物理移到 `support/sharehub-seed`，届时这 9 条可以整体删除。**
+DemoOpsFinanceSeeder 注入 AgentMapper agents
+DemoOpsFinanceSeeder 注入 CabinetMapper cabinets
+DemoOpsFinanceSeeder 注入 DevAlarmCodeMapper alarmCodes
+DemoOpsFinanceSeeder 注入 DevAlarmMapper alarms
+DemoOpsFinanceSeeder 注入 IamDeptMapper depts
+DemoOpsFinanceSeeder 注入 IamEmployeeMapper employees
+DemoOpsFinanceSeeder 注入 OrdMapper orders
+DemoOpsFinanceSeeder 注入 WoInspectionPlanMapper plans
+DemoOpsFinanceSeeder 注入 WoSlaRuleMapper slaRules
+
+# ── 已知盲区（不是豁免，是检测器的局限，写在这里免得被当成「已覆盖」）────────
+# G3 靠「方法体里出现哪些实体名」反推类的服务归属。**纯编排类**（只调 Port 或别的
+# service、不直接碰实体）拿不到归属 → 被整类跳过，它的跨域注入检测不到。
+# 反向对照实测：探针类若不在方法体里提到实体名，即便注入别域 Mapper 并写，也抓不到。
+# 拆成 svc-* 模块后改为按 Maven 模块判定归属，这个盲区才会消失（B4）。
+#
+# G2 的 5 处「仅读跨界」是警告不是违规，按 v4/09 的分层规则它们属于允许的跨域读：
+#   OrderSettledListener#on · AgentAssignmentServiceImpl#{assign,reclaim}
+#   InspectionPlanServiceImpl#run · CabinetServiceImpl#save

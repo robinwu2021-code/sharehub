@@ -42,12 +42,47 @@ SRC = os.path.join(ROOT, 'backend/sharehub-app/src/main/java')
 EXTRA_SRC = [os.path.join(ROOT, 'backend', m, 'src/main/java')
              for m in ('sharehub-svc-gateway', 'sharehub-svc-finance', 'sharehub-svc-platform', 'sharehub-svc-ops', 'sharehub-svc-core', 'sharehub-api')]
 EXTRA_SRC = [p for p in EXTRA_SRC if os.path.isdir(p)]
+# 2026-09-23：EXTRA_SRC 此前**算出来却从没被用过** —— 三处 os.walk 全是 SRC 一个目录，
+# 只扫 sharehub-app（62 个文件），业务代码所在的 5 个 svc 模块（约 567 个）一个没扫，
+# 于是四个卡口长期报「违规 0」。ALL_SRC 是唯一的扫描入口，新增模块只改这里。
+ALL_SRC = [SRC] + EXTRA_SRC
+
+
+def walk_java():
+    """遍历全部扫描根下的 .java，产出 (绝对路径, 相对模块根的短路径)。
+
+    短路径统一去掉 `ai/neargo/sharehub/` 前缀，使白名单与台账里的条目
+    在哪个模块都写成同一种形状（如 `report/mapper/ReportMappers.java`）。
+    """
+    for root in ALL_SRC:
+        for base, _, fs in os.walk(root):
+            for f in fs:
+                if not f.endswith('.java'):
+                    continue
+                p = os.path.join(base, f)
+                yield p, os.path.relpath(p, root).replace('ai/neargo/sharehub/', '')
 
 # ── 白名单。每条都要写清「为什么可以例外」，否则白名单会变成垃圾桶 ──
 JOIN_WHITELIST = {
     # 报表是跨域读模型，单体期直接 JOIN；拆分时改为订阅事件落宽表（总纲 §5.2）。
     'report/mapper/ReportMappers.java',
 }
+
+# ── G3 的两类豁免（2026-09-23 修好扫描面后新增；每条都写清「为什么可以例外」）──
+#
+# 1) app 层的**跨域只读编排**：v4/09 §九 与 v4/12 §4.3 明确规定
+#    「跨域报表 / 看板是唯一允许跨域读的地方」—— 报表天然要横跨订单、设备、场地、分润，
+#    强行经 Port 会退化成 N 次远程调用再在内存里 JOIN，比直接读更糟。
+#    **但只豁免读**：这些包里一旦出现写操作（insert/update/delete），仍判违规 ——
+#    跨域写必须经 Port，否则拆分时事务边界就断了（这正是 G2 守的东西）。
+G3_READONLY_ORCHESTRATION = ('portal/report/', 'portal/dashboard/', 'operation/')
+#
+# 2) 演示种子：它的职责就是把各域的样例数据一次性灌进去，跨域是本分。
+#    且默认不装配（`sharehub.seed.enabled=false`），不在任何生产代码路径上。
+#    B4 会把它物理移到 `support/sharehub-seed`，届时这条豁免可以删掉。
+G3_SEED_EXEMPT = ('seed/',)
+# 写操作特征：MyBatis-Plus 的写方法 + 自定义 mapper 的常见写前缀
+WRITE_CALL = re.compile(r'\.\s*(insert|update|delete|save|remove)\w*\s*\(')
 
 
 def load_module_graph():
@@ -114,14 +149,10 @@ def scan_classes(tbl2svc):
     cls_svc, cls_fields, cls_methods, cls_file = {}, {}, {}, {}
     ent_table = {}
 
-    files = []
-    for base, _, fs in os.walk(SRC):
-        for f in fs:
-            if f.endswith('.java'):
-                files.append(os.path.join(base, f))
+    files = list(walk_java())          # [(绝对路径, 短路径)]
 
     # 一轮：实体 → 表
-    for p in files:
+    for p, _rel in files:
         src = simplify_fqn(strip_comments(io.open(p, encoding='utf-8').read()))
         for m in re.finditer(r'@TableName\s*\(([^)]*)\)\s*(?:@\w+(?:\([^)]*\))?\s*)*'
                              r'(?:public\s+)?(?:final\s+)?class\s+(\w+)', src):
@@ -130,10 +161,9 @@ def scan_classes(tbl2svc):
                 ent_table[m.group(2)] = tm.group(1)
 
     # 二轮：类结构
-    for p in files:
+    for p, rel in files:
         raw = io.open(p, encoding='utf-8').read()
         src = simplify_fqn(strip_comments(raw))
-        rel = os.path.relpath(p, SRC).replace('ai/neargo/sharehub/', '')
         for m in re.finditer(r'\b(?:public\s+|final\s+|abstract\s+)*(?:class|interface)\s+(\w+)', src):
             name = m.group(1)
             body_start = src.find('{', m.end())
@@ -161,7 +191,7 @@ def scan_classes(tbl2svc):
     # 改从 `extends BaseMapper<实体>` 的泛型参数取。
     mapper_ent = {}
     impls = defaultdict(set)          # 接口 → 实现类
-    for p2 in files:
+    for p2, _rel2 in files:
         src2 = simplify_fqn(strip_comments(io.open(p2, encoding='utf-8').read()))
         for mm in re.finditer(r'interface\s+(\w+)\s+extends\s+\w*Mapper\s*<\s*(\w+)\s*>', src2):
             mapper_ent[mm.group(1)] = mm.group(2)
@@ -180,12 +210,8 @@ def scan_classes(tbl2svc):
 
 def g1_cross_join(tbl2svc):
     bad = []
-    for base, _, fs in os.walk(SRC):
-        for f in fs:
-            if not f.endswith('.java'):
-                continue
-            p = os.path.join(base, f)
-            rel = os.path.relpath(p, SRC).replace('ai/neargo/sharehub/', '')
+    for p, rel in walk_java():
+        if True:
             src = simplify_fqn(strip_comments(io.open(p, encoding='utf-8').read()))
             if '@Select' not in src and '@Update' not in src and '@Delete' not in src:
                 continue
@@ -251,12 +277,8 @@ def g2_cross_tx(tbl2svc, cls_fields, cls_methods, cls_file, ent_table, impls):
         return out
 
     bad, warn = [], []
-    for base, _, fs in os.walk(SRC):
-        for f in fs:
-            if not f.endswith('.java'):
-                continue
-            p = os.path.join(base, f)
-            rel = os.path.relpath(p, SRC).replace('ai/neargo/sharehub/', '')
+    for p, rel in walk_java():
+        if True:
             src = simplify_fqn(strip_comments(io.open(p, encoding='utf-8').read()))
             if '@Transactional' not in src:
                 continue
@@ -308,20 +330,40 @@ def g3_cross_injection(tbl2svc, cls_fields, cls_methods, cls_file, ent_table, ma
             cache[c] = svc_of(c)
         return cache[c]
 
-    bad = []
+    def exempt_reason(cls):
+        """返回豁免理由；None = 不豁免。见 G3_READONLY_ORCHESTRATION / G3_SEED_EXEMPT。"""
+        rel = cls_file.get(cls, '')
+        if rel.startswith(G3_SEED_EXEMPT):
+            return '演示种子（默认不装配，B4 移入 support/sharehub-seed）'
+        if rel.startswith(G3_READONLY_ORCHESTRATION):
+            # 只豁免只读：本类任一方法体里出现写调用就不再豁免
+            for bodies in cls_methods.get(cls, {}).values():
+                for b in bodies:
+                    if WRITE_CALL.search(b):
+                        return None          # 有写 → 仍判违规
+            return 'app 层跨域只读编排（v4/09 §九）'
+        return None
+
+    bad, exempted = [], []
     for cls, fields in cls_fields.items():
         mine = svc_cached(cls)
         if not mine:
             continue
+        why = exempt_reason(cls)
         for fname, ftype in fields.items():
             if not re.search(r'(ServiceImpl|Mapper)$', ftype):
                 continue
             theirs = svc_cached(ftype)
             if theirs and theirs != mine:
-                bad.append({'class': cls, 'file': cls_file.get(cls, '?'),
-                            'field': '%s %s' % (ftype, fname),
-                            'from': mine, 'to': theirs})
-    return bad
+                rec = {'class': cls, 'file': cls_file.get(cls, '?'),
+                       'field': '%s %s' % (ftype, fname),
+                       'from': mine, 'to': theirs}
+                if why:
+                    rec['exempt'] = why
+                    exempted.append(rec)
+                else:
+                    bad.append(rec)
+    return bad, exempted
 
 
 # ─────────────────────────── G4 common 零业务依赖 ───────────────────────────
@@ -334,9 +376,11 @@ def g4_common_purity():
     Maven 层面的 enforcer 拦不住这个（common 不声明业务依赖也能 import 同仓的类，
     因为拆分前它们还在一个 jar 里），所以只能靠源码扫描。
     """
-    root = os.path.join(ROOT, 'backend/powerbank-common/src/main/java')
+    # 2026-09-23：此前写的是 `powerbank-common` —— 模块早已改名 `sharehub-common`，
+    # 目录不存在就静默 return []，于是 G4 从改名那天起**一次都没真正跑过**。
+    root = os.path.join(ROOT, 'backend/sharehub-common/src/main/java')
     if not os.path.isdir(root):
-        return []
+        raise SystemExit('arch-guard: 找不到 common 模块源码根 ' + root + ' —— 模块改名后请同步此处')
     allow = ('ai.neargo.sharehub.common', 'ai.neargo.sharehub.auth')
     bad = []
     for base, _, fs in os.walk(root):
@@ -403,12 +447,34 @@ def main():
     n_bad += len(t)
 
     # G3
-    i3 = g3_cross_injection(tbl2svc, cls_fields, cls_methods, cls_file, ent_table, mapper_ent)
+    i3, i3_exempt = g3_cross_injection(tbl2svc, cls_fields, cls_methods, cls_file, ent_table, mapper_ent)
+    # ── 棘轮：台账外的新豁免一律判失败 ──
+    # 没有这一步，「豁免」就是一张无限额的白条：下次有人跨域注入，只要把类放进
+    # operation/ 或 seed/ 就自动免检，卡口又回到永远全绿。
+    ledger = os.path.join(ROOT, 'backend/known-arch-exemptions.txt')
+    known = set()
+    if os.path.isfile(ledger):
+        for line in io.open(ledger, encoding='utf-8'):
+            line = line.strip()
+            if line and not line.startswith('#'):
+                known.add(line)
+    new_exempt = [x for x in i3_exempt
+                  if '%s 注入 %s' % (x['class'], x['field']) not in known]
+
     print('\n── G3 跨服务注入实现类 ──')
-    print('   **违规 %d**' % len(i3))
+    print('   **违规 %d**（豁免 %d，台账 %d）' % (len(i3), len(i3_exempt), len(known)))
+    if new_exempt:
+        print('   ❌ 台账外的新豁免 %d 处 —— 要么改用 Port，要么把理由写进 '
+              'known-arch-exemptions.txt：' % len(new_exempt))
+        for x in new_exempt:
+            print('      + %s 注入 %s（%s → %s）' % (x['class'], x['field'], x['from'], x['to']))
+        n_bad += len(new_exempt)
     for x in i3:
         print('   ⚠️ %s 注入了 %s' % (x['class'], x['field']))
         print('      %s → %s   应改为经 api-%s 的 Port 接口' % (x['from'], x['to'], x['to']))
+    if i3_exempt and '-v' in sys.argv:
+        for x in i3_exempt:
+            print('   ○ 豁免：%s 注入 %s —— %s' % (x['class'], x['field'], x['exempt']))
     n_bad += len(i3)
 
     g4 = g4_common_purity()
