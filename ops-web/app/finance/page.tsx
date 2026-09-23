@@ -37,6 +37,7 @@ import type {
 
   VoucherCreatePayload,} from "@/lib/types";
 import {
+  SHARE_BASES,
   RECON_TRANSITIONS, RECON_TERMINAL, canReconTransition, canEditInvoiceFields, parseReconDiffDetail,
   withdrawFeeOf, withdrawNetOf, WITHDRAW_FEE_PENDING,
   // 记账期间复用报表域枚举：与站点坪效/代理绩效/绩效报表同一套周期口径
@@ -84,6 +85,14 @@ const WD_STATUS: StatusMap<Withdrawal["status"]> = {
   FAILED: { label: "驳回 / 失败", tone: "danger" },
 };
 const PAYEE_TYPE_LABEL = { VENUE: "场地方", AGENT: "代理商" } as const;
+/**
+ * 分成依据（ADR-027 §四）。一单里同一个伙伴可以有出资 + 运维两条，
+ * **靠这一列区分** —— 没有它，明细里就是几条看起来一模一样、金额却不同的行。
+ * 空串 = 不适用（场地方维度；以及 V53 之前配的老规则）。
+ */
+const SHARE_BASIS_LABEL: Record<string, string> = {
+  INVEST: "出资", DEVELOP: "拓展", OPERATE: "运维", REFER: "牵线",
+};
 /** multiselect + csv 的值是逗号分隔业务号串。 */
 const csvArr = (v: unknown) => String(v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 
@@ -91,6 +100,13 @@ const RULE_FIELDS: FieldDef[] = [
   { key: "ruleNo", label: "规则号", readOnlyOnEdit: true, placeholder: "新增留空自动生成" },
   { key: "dimension", label: "维度", type: "select", options: [{ value: "VENUE", label: "场地方" }, { value: "AGENT", label: "代理商" }] },
   { key: "payeeName", label: "分成方", placeholder: "如 XX 商场" },
+  // 留空 = 该分成方的通用规则：任何依据找不到专属规则时都回落到它。
+  // 所以「不填」是有意义的一档，不能做成必填。
+  {
+    key: "basis", label: "分成依据", type: "select", help: "留空 = 通用规则（该分成方的任何责任都能回落到它）",
+    options: [{ value: "", label: "通用（不分责任）" },
+      ...SHARE_BASES.map((b) => ({ value: b, label: SHARE_BASIS_LABEL[b] }))],
+  },
   { key: "mode", label: "模式", type: "select", options: [{ value: "CHANNEL_SPLIT", label: "渠道分账" }, { value: "LEDGER", label: "平台记账" }] },
   { key: "rate", label: "比例（0~1，如 0.3）", type: "number" },
   { key: "priority", label: "优先级", type: "number" },
@@ -579,6 +595,8 @@ function FinanceInner() {
     { header: "订单", cell: (r) => <span className="text-muted-foreground tabular-nums">{r.orderNo}</span> },
     { header: "维度", cell: (r) => PAYEE_TYPE_LABEL[r.dimension] },
     { header: "分成方", cell: (r) => <span>{r.payeeName} <span className="text-muted-foreground tabular-nums">{r.payeeNo}</span></span> },
+    // 依据：同一单同一伙伴可能有两条（出资 + 运维），不显示这列就分不清哪条是哪条
+    { header: "依据", cell: (r) => r.basis ? SHARE_BASIS_LABEL[r.basis] ?? r.basis : <span className="text-muted-foreground">—</span> },
     { header: "金额", className: "text-right", cell: (r) => <span className="tabular-nums">{money(r.amount, r.currency)}</span> },
     { header: "比例", className: "text-right", cell: (r) => <span className="tabular-nums">{(r.rate * 100).toFixed(0)}%</span> },
     // 周期是结算单的汇总键：明细上直接看得到它归哪一期，才对得上结算单

@@ -31,6 +31,10 @@ import { daysOf } from "./report";
 const PAYEE_NAMES = [...VENUE_NAMES, ...agents.slice(0, 2).map((a) => a.name)];
 export const shareRules: ShareRule[] = Array.from({ length: 12 }, (_, i) => ({
   ruleNo: `SR${600 + i}`, dimension: i % 3 === 0 ? "AGENT" : "VENUE", payeeName: p(PAYEE_NAMES, i),
+  // 代理商规则带依据（出资/拓展/运维轮着来），场地方维度没有责任细分故留空。
+  // 留一条 AGENT 的空依据（i === 9）当通用规则：取价找不到专属规则时就回落到它，
+  // 这条回落路径没有样本的话，页面上看不出「留空是有意义的一档」。
+  basis: i % 3 === 0 ? (i === 9 ? "" : (["INVEST", "DEVELOP", "OPERATE"] as const)[(i / 3) % 3]) : "",
   mode: i % 4 === 0 ? "CHANNEL_SPLIT" : "LEDGER", rate: [0.15, 0.2, 0.25][i % 3], priority: (i % 3) + 1,
 }));
 // ————————————————————————————————————————————————————————————————
@@ -58,6 +62,8 @@ export const shareRecords: ShareRecord[] = SHARE_PERIODS.flatMap((period, pi) =>
         recordNo: `SREC${9000 + seq}`,
         orderNo: orders[(seq * 7) % orders.length].orderNo,
         dimension: payee.dimension, payeeNo: payee.payeeNo, payeeName: payee.payeeName,
+        // 代理明细带依据：同一伙伴在一单里可以有出资 + 运维两条，靠它区分（V53）
+        basis: payee.dimension === "AGENT" ? (["OPERATE", "INVEST", "DEVELOP"] as const)[k % 3] : "",
         amount: Number((gmv * rate).toFixed(2)), rate, currency: "AED",
         period,
         // 明细时间必须落在它声明的周期内，否则「按周期汇总」和「按时间筛选」会互相打脸

@@ -2,10 +2,21 @@ import type { AuditTrail } from "./common";
 // 覆盖范围：财务域（trade）——分润规则/明细/统计、结算、提现、账务分录、
 // 对账、发票、充值订单。
 
+/**
+ * 分成依据（ADR-027 §四 / V53）：这笔钱凭什么分。
+ *
+ * 一个伙伴在一个站点上可以既出资又运维，两份钱的比例与去向都不同。
+ * 空串 = 不适用（VENUE 维度，维度本身即依据），也用于 V53 之前配的老规则。
+ */
+export const SHARE_BASES = ["INVEST", "DEVELOP", "OPERATE", "REFER"] as const;
+export type ShareBasis = (typeof SHARE_BASES)[number];
+
 export interface ShareRule {
   ruleNo: string;
   dimension: "VENUE" | "AGENT";
   payeeName: string;
+  /** 见 SHARE_BASES。留空 = 该分成方的通用规则（任何依据都能回落到它）。 */
+  basis?: ShareBasis | "";
   mode: "CHANNEL_SPLIT" | "LEDGER";
   rate: number; // 0..1
   priority: number;
@@ -131,6 +142,11 @@ export interface ShareRecord {
   /** 分成方业务号（VEN3xx / AG00x）。结算单按 (dimension, payeeNo, period) 汇总本表。 */
   payeeNo: string;
   payeeName: string;
+  /**
+   * 分成依据（V53）。一单里同一个伙伴可以有出资 + 运维两条，**靠这一列区分** ——
+   * 没有它，分润明细里会出现几条看起来一模一样的行，而金额不同。
+   */
+  basis?: ShareBasis | "";
   amount: number;
   rate: number; // 0..1
   currency: string;
