@@ -113,9 +113,19 @@ class ArchitectureTest {
     void controllersDoNotTouchMappersDirectly() throws IOException {
         Set<String> offenders = offendingControllers();
 
-        // 扫描必须有效：一个控制器都没扫到，说明命名约定或导入面变了
-        assertThat(ALL.stream().filter(ArchitectureTest::isController).count())
-                .as("应当扫描到控制器").isGreaterThan(20);
+        // 扫描必须有效 —— 但哨兵要绑在**被守的东西**上，而不是一个武断的数字。
+        //
+        // 第一版写的是「控制器数 > 20」，2026-09-23 实测假失败过一次：
+        // 刚 install 完某个 svc 模块紧接着跑全量时只扫到 15 个，而代码毫无问题。
+        // 一个会假失败的卡口，下一个人只会把阈值调低或加豁免 —— 比没有卡口更糟。
+        //
+        // 改成：台账里的 IamAdminController 必须在导入面里。它在 sharehub-svc-platform，
+        // 扫不到它就说明导入没覆盖到 svc 模块，此时「零违规」毫无意义 —— 而这正是
+        // 本条规则唯一会失效的方式。哨兵与被守对象绑定，就不会两边各说各话。
+        assertThat(ALL.stream().anyMatch(c -> c.getSimpleName().equals("IamAdminController")))
+                .as("导入面必须覆盖 svc 模块（台账里的 IamAdminController 在 sharehub-svc-platform）；"
+                        + "扫不到它时的「零违规」是假的")
+                .isTrue();
 
         Set<String> known = readLedger(ledgerPath());
 

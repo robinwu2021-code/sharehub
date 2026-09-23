@@ -83,7 +83,20 @@ public class IamSeeder implements ApplicationRunner {
                 ds.setScopeType("AGENT".equals(code) ? "AGENT" : "ALL");
                 dataScopeMapper.insert(ds);
             });
-            // 演示自定义（非内置）角色，供后台改权限 + 口径 B 在线生效验证
+        }
+
+        // 演示自定义（非内置）角色，供后台改权限 + 口径 B 在线生效验证。
+        //
+        // **独立守卫，不能跟着内置角色那个 if 走**：内置角色由 V1__loc_agt_iam.sql
+        // 迁移直接 INSERT，所以任何新库启动时 roleMapper.selectCount(null) 都 != 0，
+        // 上面整块被跳过 —— CUSTOM 于是永远建不出来。
+        // 共用开发库里它早就存在（比那条迁移还早），所以这个缺陷一直看不见，
+        // 直到 2026-09-23 测试换到独立空库，OrgReadSideGapTest 立刻 400。
+        //
+        // 教训是守卫的**粒度**：用「有没有角色」判断「CUSTOM 在不在」，
+        // 在只有一个来源时碰巧等价，多一个来源就不再等价，而且不会报错。
+        if (roleMapper.selectCount(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<IamRole>()
+                .eq(IamRole::getCode, "CUSTOM")) == 0) {
             IamRole custom = new IamRole();
             custom.setRoleNo("CUSTOM");
             custom.setTenantId("MAIN");
