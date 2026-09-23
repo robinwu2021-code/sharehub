@@ -82,10 +82,27 @@ public class OperationController {
         return adjustments.page(page, size, keyword, planNo, status);
     }
 
-    @PostMapping("/api/trade/price-adjustments")
+    /**
+     * 新建或编辑调价单。
+     *
+     * <p><b>两个路径映射同一个方法</b>，与 {@code AgentController#save} /
+     * {@code OpsController} 的机柜·站点·点位同一房规：前端 {@code saveXxx} 一律写成
+     * {@code x.no ? POST /xxx/{no} : POST /xxx}，两种都得接得住。
+     *
+     * <p>2026-09-23 之前只映射了集合路径，编辑一张调价单必 404 —— 而
+     * {@code PriceAdjustmentServiceImpl.save} 本来就从 body 读 {@code adjustNo} 做 upsert，
+     * 能力是全的，缺的只是这一条路由。本地 ops-web 跑 mock 所以一直没暴露。
+     *
+     * <p>路径上的 {@code adjustNo} 会覆盖 body 里的同名字段：**路径是更强的意图表达**，
+     * 两者不一致时以路径为准，否则「在 A 的编辑页保存出 B」这种事没有任何东西拦得住。
+     */
+    @PostMapping({"/api/trade/price-adjustments", "/api/trade/price-adjustments/{adjustNo}"})
     @PreAuthorize("@perm.can('pricing:rule:config')")
-    public Map<String, Object> saveAdjustment(@RequestBody Map<String, Object> body) {
-        return adjustments.save(body);
+    public Map<String, Object> saveAdjustment(@PathVariable(required = false) String adjustNo,
+                                              @RequestBody Map<String, Object> body) {
+        Map<String, Object> in = body == null ? new java.util.HashMap<>() : new java.util.HashMap<>(body);
+        if (adjustNo != null && !adjustNo.isBlank()) in.put("adjustNo", adjustNo);
+        return adjustments.save(in);
     }
 
     @PostMapping("/api/trade/price-adjustments/{adjustNo}/cancel")

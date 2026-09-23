@@ -6,6 +6,7 @@ import ai.neargo.sharehub.cs.dto.CsDtos.CsMessageVO;
 import ai.neargo.sharehub.cs.dto.CsDtos.CsSessionVO;
 import ai.neargo.sharehub.cs.dto.CsDtos.CsTicketVO;
 import ai.neargo.sharehub.cs.dto.CsDtos.ReplyReq;
+import ai.neargo.sharehub.cs.dto.CsDtos.TicketCreateReq;
 import ai.neargo.sharehub.cs.dto.CsDtos.TicketUpdateReq;
 import ai.neargo.sharehub.cs.service.CsSessionService;
 import ai.neargo.sharehub.cs.service.CsTicketService;
@@ -53,6 +54,22 @@ public class CsController {
     }
 
     /** 受理 / 更新（状态、处理人、补充描述）。非法状态迁移由 service 抛异常。 */
+    /**
+     * 运营端手工建单（客服接到来电后登记）。
+     *
+     * <p>2026-09-23 补：此前只有 {@code POST /tickets/{ticketNo}}（受理/更新），
+     * 而页面右上就有「新增工单」按钮、空态文案也写着「也可点右上『新增工单』手工建单」——
+     * **按钮在、接口不在**，点了 404。本地 ops-web 跑 mock 所以一直没暴露。
+     *
+     * <p>与 C 端 {@code POST /mp/user/report} 的区别在 service：那边走分流
+     * （可能判为自助解决直接关单），这边不走。
+     */
+    @PostMapping("/tickets")
+    @PreAuthorize("@perm.can('cs:ticket:handle')")
+    public CsTicketVO createTicket(@RequestBody TicketCreateReq body) {
+        return ticketService.create(body);
+    }
+
     @PostMapping("/tickets/{ticketNo}")
     @PreAuthorize("@perm.can('cs:ticket:update')")
     public CsTicketVO updateTicket(@PathVariable String ticketNo, @RequestBody TicketUpdateReq body) {

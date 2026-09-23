@@ -3497,10 +3497,106 @@
   },
   {
    "verb": "POST",
+   "path": "/api/ops/cs/tickets",
+   "perm": "cs:ticket:handle",
+   "handler": "CsController#createTicket",
+   "summary": "受理 / 更新（状态、处理人、补充描述）。",
+   "params": [],
+   "bodyType": "TicketCreateReq",
+   "returnType": "CsTicketVO",
+   "returnContainer": null,
+   "returnElement": "CsTicketVO",
+   "responseShape": [
+    {
+     "name": "ticketNo",
+     "type": "String"
+    },
+    {
+     "name": "userNo",
+     "type": "String"
+    },
+    {
+     "name": "orderNo",
+     "type": "String"
+    },
+    {
+     "name": "cabinetNo",
+     "type": "String"
+    },
+    {
+     "name": "problemNo",
+     "type": "String"
+    },
+    {
+     "name": "issue",
+     "type": "String"
+    },
+    {
+     "name": "channel",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "handlerNo",
+     "type": "String"
+    },
+    {
+     "name": "woNo",
+     "type": "String"
+    },
+    {
+     "name": "refundNo",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "ticketNo",
+     "type": "String"
+    },
+    {
+     "name": "cUserNo",
+     "type": "String"
+    },
+    {
+     "name": "orderNo",
+     "type": "String"
+    },
+    {
+     "name": "cabinetNo",
+     "type": "String"
+    },
+    {
+     "name": "problemNo",
+     "type": "String"
+    },
+    {
+     "name": "issue",
+     "type": "String"
+    },
+    {
+     "name": "channel",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
    "path": "/api/ops/cs/tickets/{ticketNo}",
    "perm": "cs:ticket:update",
    "handler": "CsController#updateTicket",
-   "summary": "受理 / 更新（状态、处理人、补充描述）。",
+   "summary": "",
    "params": [
     {
      "in": "path",
@@ -16827,8 +16923,36 @@
    "path": "/api/trade/price-adjustments",
    "perm": "pricing:rule:config",
    "handler": "OperationController#saveAdjustment",
-   "summary": "",
-   "params": [],
+   "summary": "新建或编辑调价单。",
+   "params": [
+    {
+     "in": "path",
+     "name": "adjustNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "Map<String, Object>",
+   "returnType": "Map<String, Object>",
+   "returnContainer": null,
+   "returnElement": "Map<String, Object>",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/trade/price-adjustments/{adjustNo}",
+   "perm": "pricing:rule:config",
+   "handler": "OperationController#saveAdjustment",
+   "summary": "新建或编辑调价单。",
+   "params": [
+    {
+     "in": "path",
+     "name": "adjustNo",
+     "type": "String",
+     "required": true
+    }
+   ],
    "bodyType": "Map<String, Object>",
    "returnType": "Map<String, Object>",
    "returnContainer": null,
@@ -25017,10 +25141,10 @@
  },
  "conflicts": {},
  "stats": {
-  "endpoints": 400,
-  "records": 286,
-  "withPerm": 343,
-  "withBody": 164,
-  "shapedResponses": 302
+  "endpoints": 402,
+  "records": 287,
+  "withPerm": 345,
+  "withBody": 166,
+  "shapedResponses": 303
  }
 }

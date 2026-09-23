@@ -27,6 +27,13 @@ public interface CsTicketService {
     CsTicketVO update(String ticketNo, TicketUpdateReq req);
 
     /**
+     * 运营端手工建单（{@code POST /api/ops/cs/tickets}）。
+     *
+     * <p><b>不走分流</b> —— 与 {@link #report} 的区别见 {@code TicketCreateReq} 类注释。
+     */
+    CsTicketVO create(ai.neargo.sharehub.cs.dto.CsDtos.TicketCreateReq req);
+
+    /**
      * 出口①：转工单（{@code POST /api/ops/cs/tickets/{ticketNo}/work-order}）。
      *
      * <p><b>幂等</b>：{@code wo_no} 已非空则直接返回既有单，不建第二张工单。

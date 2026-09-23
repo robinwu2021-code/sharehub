@@ -37,6 +37,21 @@ public final class CsDtos {
     public record TicketUpdateReq(String status, String handlerNo, String issue) {
     }
 
+    /**
+     * 运营端手工建单入参（{@code POST /api/ops/cs/tickets}）。
+     *
+     * <p><b>与 {@link ReportReq} 是两回事，不要合并</b>：
+     * 报障是消费者发起、要走**自动分流**（可能直接判为自助解决而关单）；
+     * 手工建单是客服接到来电后登记 —— 人已经在处理了，再被分流关掉是荒谬的。
+     * 页面空态写的就是「用户来电/APP 报障后在此登记，也可点右上「新增工单」手工建单」。
+     *
+     * <p>{@code cUserNo} 在这里**可空**：来电的人未必报得出账号，
+     * 而「登记不下来」比「记录里缺个账号」糟得多。
+     */
+    public record TicketCreateReq(String ticketNo, String cUserNo, String orderNo, String cabinetNo,
+                                  String problemNo, String issue, String channel, String status) {
+    }
+
     /** C 端自助报障入参（{@code POST /mp/user/report}）。{@code cUserNo} 由会话决定，不从这里取。 */
     public record ReportReq(String problemNo, String orderNo, String cabinetNo,
                             String issue, String channel) {

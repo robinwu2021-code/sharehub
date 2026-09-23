@@ -8,6 +8,7 @@ import ai.neargo.sharehub.cs.ProblemActionResolver;
 import ai.neargo.sharehub.cs.dto.CsDtos.CsTicketVO;
 import ai.neargo.sharehub.cs.dto.CsDtos.ReportReq;
 import ai.neargo.sharehub.cs.dto.CsDtos.ReportResultVO;
+import ai.neargo.sharehub.cs.dto.CsDtos.TicketCreateReq;
 import ai.neargo.sharehub.cs.dto.CsDtos.TicketUpdateReq;
 import ai.neargo.sharehub.cs.entity.CsTicket;
 import ai.neargo.sharehub.cs.mapper.CsTicketMapper;
@@ -86,6 +87,49 @@ public class CsTicketServiceImpl implements CsTicketService {
         CsTicket e = find(ticketNo);
         return e == null ? null : toVO(e);
     }
+
+    /**
+     * 运营端手工建单 —— **刻意不走分流**。
+     *
+     * <p>{@link #report} 会按 {@code problemNo} 查字典决定自助/转工单/转退款，
+     * 其中「自助解决」直接把单关掉。客服接到来电时人已经在处理了，
+     * 再被判成自助解决关单，等于把刚登记的诉求当场丢掉。
+     *
+     * <p>状态默认 {@link CsTicketStatus#OPEN}；前端表单允许直接选 PROCESSING
+     * （客服边接电话边处理），所以入参给了就用入参 —— 但**必须是合法取值**，
+     * 走 {@code CsTicketStatus.of} 而不是原样落库。
+     *
+     * <p>{@code ticketNo} 留空自动生成（表单占位符就是这么写的）；给了则沿用，
+     * 便于把线下已有的单号登记进来。
+     */
+    @Override
+    @Transactional
+    public CsTicketVO create(TicketCreateReq req) {
+        if (req == null || req.issue() == null || req.issue().isBlank()) {
+            // 没有问题描述的工单是一行空记录 —— 它会进列表、占 SLA，却谁也不知道要做什么
+            throw new IllegalArgumentException("问题描述必填");
+        }
+        CsTicket e = new CsTicket();
+        e.setTicketNo(req.ticketNo() == null || req.ticketNo().isBlank() ? nextTicketNo() : req.ticketNo().trim());
+        e.setTenantId(TENANT_MAIN);
+        e.setCUserNo(blank(req.cUserNo()));
+        e.setOrderNo(blank(req.orderNo()));
+        e.setCabinetNo(blank(req.cabinetNo()));
+        e.setProblemNo(blank(req.problemNo()));
+        e.setIssue(req.issue().trim());
+        e.setChannel(req.channel() == null || req.channel().isBlank() ? "MANUAL" : req.channel().trim());
+        e.setStatus(req.status() == null || req.status().isBlank()
+                ? CsTicketStatus.OPEN.name()
+                : CsTicketStatus.of(req.status()).name());
+        mapper.insert(e);
+        return toVO(e);
+    }
+
+    /** 空串归一成 null：落库存空串会让「有没有填」这个问题在查询里分成两种写法。 */
+    private static String blank(String v) {
+        return v == null || v.isBlank() ? null : v.trim();
+    }
+
 
     @Override
     @Transactional
