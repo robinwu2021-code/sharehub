@@ -1,0 +1,20 @@
+# 绕过 service 直连 Mapper 的控制器 —— **只准变短，不准变长**
+#
+# 由 ArchitectureTest 执行（字节码级判定，按 ..mapper.. 包而非类名后缀 ——
+# IamMappers$RoleMapper 这种嵌套 Mapper 按后缀会漏掉一整类写法）。
+#
+# 【为什么要盯】
+# 控制器直连 Mapper 等于把「这段业务逻辑归谁」这个问题悬空：同一段查询下次
+# 在 service 里再写一遍，两份慢慢分叉，而没有任何东西会报错。
+# 它也让 L4 的 Port 化无从下手 —— Port 的签名应当由 service 的 Command/VO 决定，
+# 而控制器直连 Mapper 的那部分根本没有 service。
+#
+# 【怎么变短】
+# 把查询下沉到对应域的 service，控制器只留编排。随 L3（Service 层整理）做。
+#
+# 依据：docs/technical/v4/09-后端代码架构.md §九 · TDD-backend-layer-cleanup-order L3/L5
+
+# ── platform ──
+# 16 处依赖，全在这一个类：角色/权限/菜单的读写全部写在控制器里，
+# 没有对应的 service。它同时也是「胖控制器」台账的常客，随 IAM 域的 L3 一并整改。
+IamAdminController
