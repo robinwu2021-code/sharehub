@@ -443,13 +443,32 @@ public class RentOrderServiceImpl implements RentOrderService {
         return Math.max(0, Duration.between(parseTs(startIso), parseTs(endIso)).toMinutes());
     }
 
-    /** 兼容两种历史格式：无 Z（当前写入格式）与带 Z（旧数据/其它来源）。 */
+    /**
+     * 兼容三种格式的时间串。
+     *
+     * <ol>
+     *   <li>{@code 2026-09-23T10:41:09.501} —— 写入时的格式（{@link #nowUtc()}）</li>
+     *   <li>{@code 2026-09-23 10:41:09.501} —— **从库里读回来的格式**。列是 {@code DATETIME(3)}、
+     *       而实体字段是 String，JDBC 取回时给的是空格分隔，没有 {@code T}</li>
+     *   <li>{@code …Z} —— 旧数据 / 其它来源</li>
+     * </ol>
+     *
+     * <p>第 2 种是 2026-09-23 才发现的：<b>归还订单在任何干净库上必然 500</b>。
+     * 下单与归还是两个请求，归还时订单是从库里重新读出来的 —— 于是拿到的是空格格式，
+     * 而这里只认 {@code T} 和 {@code Z}，直接抛 DateTimeParseException。
+     * 开发库上一直没暴露，是因为那边的数据与连接会话的历史状态掩盖了它；
+     * 另一个会话把测试切到「按迁移从零建的干净库」之后，第一次照出来。
+     * <b>与「实体有字段、迁移没建列」是同一类：开发库的历史状态让真缺陷在本地永远复现不出来。</b>
+     */
     private static Instant parseTs(String ts) {
         if (ts == null || ts.isBlank()) throw new IllegalStateException("租借时间为空，无法计费");
+        String v = ts.trim();
+        // 空格分隔 → 补回 T，再走 ISO 解析。只替换第一个空格，避免动到带时区的写法。
+        if (v.length() > 10 && v.charAt(10) == ' ') v = v.substring(0, 10) + "T" + v.substring(11);
         try {
-            return LocalDateTime.parse(ts).toInstant(ZoneOffset.UTC);
+            return LocalDateTime.parse(v).toInstant(ZoneOffset.UTC);
         } catch (DateTimeParseException ignored) {
-            return Instant.parse(ts);   // 带 Z 的旧值；仍解析不了则由本异常向上抛，不静默计 0
+            return Instant.parse(v);   // 带 Z 的旧值；仍解析不了则由本异常向上抛，不静默计 0
         }
     }
 

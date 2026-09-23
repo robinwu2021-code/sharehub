@@ -113,9 +113,11 @@ public class PricePlanServiceImpl extends AbstractCrudService<PricePlan, PricePl
         e.setScopeType(level.name());
         e.setScopeRef(ref);
         e.setDeviceType(deviceType);
-        e.setVendorCode(trim(in.vendorCode()));
-        e.setModel(trim(in.model()));
-        e.setBrandNo(trim(in.brandNo()));
+        // 「不限」落**空串**不落 null：MariaDB 的唯一索引把 NULL 视为互不相同，
+        // 用 null 表示不限会让 uk_scope_target 在最常见的情形下完全不生效。
+        e.setVendorCode(blank(in.vendorCode()));
+        e.setModel(blank(in.model()));
+        e.setBrandNo(blank(in.brandNo()));
         e.setPriority(in.priority() == null ? 0 : in.priority());
         e.setEffectiveFrom(time(in.effectiveFrom()));
         e.setEffectiveTo(time(in.effectiveTo()));
@@ -152,6 +154,11 @@ public class PricePlanServiceImpl extends AbstractCrudService<PricePlan, PricePl
 
     private static String trim(String s) {
         return s == null || s.isBlank() ? null : s.trim();
+    }
+
+    /** 过滤列专用：空白归一为空串（见 upsertScope 里的说明）。 */
+    private static String blank(String s) {
+        return s == null ? "" : s.trim();
     }
 
     private static java.time.LocalDateTime time(String iso) {
