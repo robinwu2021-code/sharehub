@@ -52,19 +52,14 @@ AgentCommissionServiceImpl#status=ACTIVE
 #    各域自己声明。做成 common 的枚举等于让 sharehub-common 反向依赖每个业务域 ——
 #    正是 arch-guard G4 禁止的形状。改为引用声明方的 AssetAssignedEvent.TYPE 常量。
 
-# ── finance（9 条）──
-InvoiceServiceImpl#status=ISSUED
-InvoiceServiceImpl#status=VOID
-ReconcileServiceImpl#status=MATCHED
-SettlementServiceImpl#refType=SHARE
-SettlementServiceImpl#status=DONE
-SettlementServiceImpl#status=GEN
-ShareGeneratorImpl#mode=LEDGER
-ShareGeneratorImpl#status=PENDING
-WithdrawalServiceImpl#status=APPLY
+# ── finance：✅ 已收敛 ──
+#    InvoiceStatus · ReconTaskStatus · SettlementStatus · SettlementRefType
+#    · WithdrawalStatus · ShareMode · ShareRecordStatus
+#
+#    ⚠️ 收敛时钉住的一处易错语义：ShareRecordStatus.DONE 的意思是「已纳入某张结算单」，
+#    **不是「已打款」** —— 打款看 SettlementStatus.PAID。两处都叫"完成"而含义不同。
 
-# ── gw（1 条）──
-VendorServiceImpl#status=ENABLED
+# ── gw：✅ 已收敛（VendorStatus）──
 
 # ── loc（6 条）──
 LocService#status=ACTIVE
@@ -74,11 +69,13 @@ VenueOnboardingServiceImpl#status=APPROVED
 VenueOnboardingServiceImpl#status=PENDING
 VenueOnboardingServiceImpl#status=REJECTED
 
-# ── operation（2 条）──
+# ── operation（2 条）── 读的是 loc_site.status（ACTIVE/PAUSED）。
+#    **暂不收**：枚举该落在 loc 域，而 loc/ext 有 ADR-029 的在途文件（SiteAgentRole 等）。
+#    等那批落地后与 loc 一起做。
 OperationOverviewService#status=ACTIVE
 SharingQueryService#status=ACTIVE
 
-# ── platform（23 条）──
+# ── platform（22 条；TenantServiceImpl 那条随 tenant 域退役一并消失，ADR-026）──
 AppVersionServiceImpl#status=DRAFT
 AppVersionServiceImpl#status=RELEASED
 AppVersionServiceImpl#status=ROLLBACK
@@ -101,7 +98,6 @@ PermissionService#scopeType=ALL
 PermissionService#subjectType=ROLE
 ProblemServiceImpl#status=ENABLED
 ProblemServiceImpl#suggestedAction=SELF_SERVICE
-TenantServiceImpl#status=ENABLED
 
 # ── seed（8 条）──
 DemoOpsFinanceSeeder#handleStatus=OPEN

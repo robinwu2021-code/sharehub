@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.finance.service.impl;
 
+import ai.neargo.sharehub.finance.InvoiceStatus;
+
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.auth.SecurityUtils;
 import ai.neargo.sharehub.common.BizKey;
@@ -81,7 +83,7 @@ public class InvoiceServiceImpl implements InvoiceService {
             e.setInvoiceNo(FinNos.nextNo(mapper, "invoice_no", BizKey.INVOICE_OPS, 6));
         } else {
             e = require(no);
-            if ("VOID".equals(e.getStatus())) {
+            if (InvoiceStatus.VOID.name().equals(e.getStatus())) {
                 // 红冲后的发票是终态凭证，再改就等于改了已交付给对方的税务单据
                 throw new IllegalArgumentException("已红冲的发票不可修改: " + no);
             }
@@ -95,7 +97,7 @@ public class InvoiceServiceImpl implements InvoiceService {
         e.setCurrency(req.currency());
         String status = (req.status() == null || req.status().isBlank()) ? "DRAFT" : req.status();
         e.setStatus(status);
-        if ("ISSUED".equals(status) && e.getIssuedAt() == null) {
+        if (InvoiceStatus.ISSUED.name().equals(status) && e.getIssuedAt() == null) {
             e.setIssuedAt(LocalDateTime.now().format(TS)); // 开票时间只在首次开出时落，重复保存不覆盖
         }
 
@@ -147,14 +149,14 @@ public class InvoiceServiceImpl implements InvoiceService {
     @Transactional
     public InvoiceView issue(String invoiceNo) {
         FinInvoice e = require(invoiceNo);
-        if ("VOID".equals(e.getStatus())) {
+        if (InvoiceStatus.VOID.name().equals(e.getStatus())) {
             throw new IllegalStateException("已作废的发票不能开具: " + invoiceNo);
         }
-        if ("ISSUED".equals(e.getStatus())) {
+        if (InvoiceStatus.ISSUED.name().equals(e.getStatus())) {
             // 幂等：重复开具直接返回，不报错也不重复盖时间 —— 运营点两次不该失败。
             return detail(invoiceNo);
         }
-        e.setStatus("ISSUED");
+        e.setStatus(InvoiceStatus.ISSUED.name());
         e.setIssuedAt(java.time.LocalDateTime.now().toString().replace('T', ' '));
         e.setIssuedBy(currentOperator());
         mapper.updateById(e);
@@ -169,10 +171,10 @@ public class InvoiceServiceImpl implements InvoiceService {
             throw new IllegalArgumentException("作废发票必须填写作废原因");
         }
         FinInvoice e = require(invoiceNo);
-        if ("VOID".equals(e.getStatus())) {
+        if (InvoiceStatus.VOID.name().equals(e.getStatus())) {
             throw new IllegalStateException("发票已作废: " + invoiceNo);
         }
-        e.setStatus("VOID");
+        e.setStatus(InvoiceStatus.VOID.name());
         e.setVoidReason(voidReason.trim());
         e.setVoidedAt(java.time.LocalDateTime.now());
         e.setVoidedBy(currentOperator());

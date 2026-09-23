@@ -1,5 +1,9 @@
 package ai.neargo.sharehub.finance.service.impl;
 
+import ai.neargo.sharehub.finance.SettlementRefType;
+import ai.neargo.sharehub.finance.SettlementStatus;
+import ai.neargo.sharehub.finance.ShareRecordStatus;
+
 import ai.neargo.sharehub.auth.SecurityUtils;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.finance.FinNos;
@@ -111,7 +115,7 @@ public class SettlementServiceImpl implements SettlementService {
         }
 
         QueryWrapper<ShareRecord> w = new QueryWrapper<>();
-        w.eq("status", "PENDING");
+        w.eq("status", ShareRecordStatus.PENDING.name());
         // 按归属账期列取（V34）：创建时刻不等于归属周期，且函数包列无法走索引
         w.eq("period", period);
         if (payeeType != null && !payeeType.isBlank()) w.eq("payee_type", payeeType);
@@ -150,21 +154,21 @@ public class SettlementServiceImpl implements SettlementService {
             s.setPeriod(period);
             s.setTotalAmount(total);
             s.setCurrency(head.getCurrency());
-            s.setStatus("GEN");
+            s.setStatus(SettlementStatus.GEN.name());
             mapper.insert(s);
 
             for (ShareRecord r : group) {
                 StlSettlementDetail d = new StlSettlementDetail();
                 d.setTenantId(tenantId);
                 d.setSettleNo(s.getSettleNo());
-                d.setRefType("SHARE"); // 明细指向分润记录，不是订单——一单可能有多条分润
+                d.setRefType(SettlementRefType.SHARE.name()); // 明细指向分润记录，不是订单——一单可能有多条分润
                 d.setRefNo(r.getRecordNo());
                 d.setAmount(r.getAmount());
                 detailMapper.insert(d);
 
                 // 回填结算号并置 DONE：下一次出账就不会再把它捞进来（这是防重复结算的第二道闸）
                 r.setSettleNo(s.getSettleNo());
-                r.setStatus("DONE");
+                r.setStatus(ShareRecordStatus.DONE.name());
                 recordMapper.updateById(r);
             }
             created.add(s.getSettleNo());

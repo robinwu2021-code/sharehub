@@ -3,19 +3,13 @@ package ai.neargo.sharehub.dev;
 /**
  * OTA 投放状态（{@code dev_ota_rollout.status}）。
  *
- * <h2>⚠️ DDL 注释与实际取值几乎完全不相交</h2>
- * 列注释写的是 {@code 'RUNNING/PAUSED/COMPLETED/CANCELED'}，而
- * {@code OtaServiceImpl.ROLLOUT_TRANSITIONS} 实际用的是
- * {@code PENDING → RUNNING → DONE → ROLLBACK} —— <b>四个值里只有 RUNNING 重合</b>：
- * <ul>
- *   <li>注释里的 {@code PAUSED} / {@code COMPLETED} / {@code CANCELED} <b>没有任何代码会写</b>；</li>
- *   <li>实际在用的 {@code PENDING} / {@code DONE} / {@code ROLLBACK} <b>注释里一个都没有</b>。</li>
- * </ul>
- * 本枚举以**实际写入方**为准。照注释写过滤条件的人会得到一个空列表，且不会有任何报错 ——
- * 这正是「注释不是约束」能造成的最大伤害：两套词表并存，谁也不会红。
+ * <p><b>与 DDL 当前定义逐项一致</b>：{@code V8__v2_alter.sql} 把注释改成了
+ * {@code 'PENDING/RUNNING/DONE/ROLLBACK'}，与 {@code OtaServiceImpl.ROLLOUT_TRANSITIONS} 吻合。
  *
- * <p>{@code CANCELED} 那个拼法还顺带暴露了另一处分叉：全仓其余地方写的是
- * {@code CANCELLED}（双 L）。既然它从没被写过，这里直接不收录。
+ * <p>⚠️ {@code V2__device_gateway.sql} 的原始注释写的是 {@code 'RUNNING/PAUSED/COMPLETED/CANCELED'}，
+ * 与实际几乎不相交。我曾据此断定「DDL 是错的」——<b>那个判断错了</b>，V8 早已修正。
+ * <b>看 DDL 必须看当前 schema。</b>（顺带：那个 {@code CANCELED} 是单 L 拼法，
+ * 全仓其余地方都写 {@code CANCELLED}；它随 V8 一起消失了。）
  */
 public enum OtaRolloutStatus {
 

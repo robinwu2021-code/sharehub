@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.finance.service.impl;
 
+import ai.neargo.sharehub.finance.ReconTaskStatus;
+
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.common.OkResult;
 import ai.neargo.sharehub.finance.dto.FinDtos.ReconDiffRow;
@@ -105,7 +107,7 @@ public class ReconcileServiceImpl implements ReconcileService {
         boolean allDone = unresolved == null || unresolved == 0;
 
         ReconTask t = requireTask(batchNo);
-        if (allDone) t.setStatus("MATCHED");
+        if (allDone) t.setStatus(ReconTaskStatus.MATCHED.name());
         t.setHandleStatus(allDone ? "RESOLVED" : "HANDLING");
         t.setHandleResult(result);
         t.setHandleNote(handleNote.trim());

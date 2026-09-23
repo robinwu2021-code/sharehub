@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.gw.service.impl;
 
+import ai.neargo.sharehub.gw.VendorStatus;
+
 import ai.neargo.sharehub.gw.driver.DriverRegistry;
 import ai.neargo.sharehub.gw.dto.GwDtos.VendorProbeResult;
 import ai.neargo.sharehub.gw.dto.GwDtos.VendorVO;
@@ -46,7 +48,7 @@ public class VendorServiceImpl implements VendorService {
         }
         if (body.get("name") != null) v.setName(String.valueOf(body.get("name")));
         if (body.get("accessMode") != null) v.setAccessMode(String.valueOf(body.get("accessMode")));
-        v.setStatus(body.get("status") == null ? (v.getStatus() == null ? "ENABLED" : v.getStatus())
+        v.setStatus(body.get("status") == null ? (v.getStatus() == null ? VendorStatus.ENABLED.name() : v.getStatus())
                 : String.valueOf(body.get("status")));
         if (body.containsKey("apiBase")) {
             v.setApiBase(body.get("apiBase") == null ? null : String.valueOf(body.get("apiBase")));
@@ -78,7 +80,7 @@ public class VendorServiceImpl implements VendorService {
                 ? "gateway://" + vendorCode : v.getApiBase();
         boolean hasDriver = drivers.manifests().stream()
                 .anyMatch(m -> m.vendorCode().equalsIgnoreCase(vendorCode));
-        boolean enabled = "ENABLED".equals(v.getStatus());
+        boolean enabled = VendorStatus.ENABLED.name().equals(v.getStatus());
         boolean ok = hasDriver && enabled;
         String message = !hasDriver ? "未注册接入驱动，无法探测"
                 : !enabled ? "供应商已停用，跳过探测"

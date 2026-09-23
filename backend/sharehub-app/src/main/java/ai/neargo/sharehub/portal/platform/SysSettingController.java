@@ -18,11 +18,6 @@ import ai.neargo.sharehub.platform.sys.service.BizRuleService;
 import ai.neargo.sharehub.platform.sys.service.LoginSettingService;
 import ai.neargo.sharehub.platform.sys.service.OpenApiAppService;
 import ai.neargo.sharehub.platform.sys.service.TaxSettingService;
-import ai.neargo.sharehub.platform.tenant.dto.TenantDtos.TenantConfigEntry;
-import ai.neargo.sharehub.platform.tenant.dto.TenantDtos.TenantEntry;
-import ai.neargo.sharehub.platform.tenant.entity.Tenant;
-import ai.neargo.sharehub.platform.tenant.entity.TenantConfig;
-import ai.neargo.sharehub.platform.tenant.service.TenantService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -30,11 +25,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 系统设置 · 业务规则（[api/README §7.4]）+ 开放与市场（§7.6）+ 租户（§7.7 🔒）。
+ * 系统设置 · 业务规则（[api/README §7.4]）+ 开放与市场（§7.6）。
  *
- * <p><b>本控制器没有类级 {@code @RequestMapping}</b>：它同时承载 {@code /api/platform/**}
- * 与 {@code /internal/platform/tenants**} 两个前缀 —— 租户是休眠口子，
- * 必须留在 {@code /internal}，绝不能因为「顺手放进 /api」而漏进产品菜单。
+ * <p><b>本控制器没有类级 {@code @RequestMapping}</b>：路径逐个写在方法上。
+ * （§7.7 租户的四个 {@code /internal/platform/tenants**} 端点已随 ADR-026 退役。）
  *
  * <p>三条容易写反的语义，改之前先看 service 注释：
  * <ul>
@@ -52,19 +46,16 @@ public class SysSettingController {
     private final TaxSettingService taxSettings;
     private final MarketService markets;
     private final OpenApiAppService openApiApps;
-    private final TenantService tenants;
 
     public SysSettingController(BizRuleService bizRules, LoginSettingService loginSettings,
                                 AppVersionService appVersions, TaxSettingService taxSettings,
-                                MarketService markets, OpenApiAppService openApiApps,
-                                TenantService tenants) {
+                                MarketService markets, OpenApiAppService openApiApps) {
         this.bizRules = bizRules;
         this.loginSettings = loginSettings;
         this.appVersions = appVersions;
         this.taxSettings = taxSettings;
         this.markets = markets;
         this.openApiApps = openApiApps;
-        this.tenants = tenants;
     }
 
     // ——————————————— §7.4 业务规则（单例，三分区）———————————————
@@ -234,40 +225,11 @@ public class SysSettingController {
         return openApiApps.resetSecret(appNo);
     }
 
-    // ——————————————— §7.7 租户（🔒 内部，无 UI）———————————————
-    // 内网受信（运营端安全链需服务凭证），与 /internal/trade、/internal/gw 同链，故不挂 @perm。
-    // **不要**把这几个端点搬到 /api：产品层没有租户概念，暴露即造成「可从 UI 建第二个租户」的错觉。
-
-    @GetMapping("/internal/platform/tenants")
-    public PageResult<TenantEntry> tenants(@RequestParam(required = false) Integer page,
-                                           @RequestParam(required = false) Integer size,
-                                           @RequestParam(required = false) String keyword,
-                                           @RequestParam(required = false) String status) {
-        return tenants.page(page, size, keyword, Map.of("status", nz(status)));
-    }
-
-    @PostMapping("/internal/platform/tenants")
-    public TenantEntry saveTenant(@RequestBody Tenant body) {
-        return tenants.save(body);
-    }
-
-    @GetMapping("/internal/platform/tenants/{tenantNo}/config")
-    public List<TenantConfigEntry> tenantConfig(@PathVariable String tenantNo,
-                                                @RequestParam(required = false) String category) {
-        return tenants.configs(tenantNo, category);
-    }
-
-    /**
-     * 租户配置 upsert。
-     *
-     * <p>[api/README §7.7] 写的是 {@code PUT}，此处用 {@code POST} 与全站写操作形态（§1.5）保持一致；
-     * 该端点无 UI、无外部调用方，改动无破坏面。差异已在交付报告里登记。
-     */
-    @PostMapping("/internal/platform/tenants/{tenantNo}/config")
-    public TenantConfigEntry saveTenantConfig(@PathVariable String tenantNo, @RequestBody TenantConfig body) {
-        body.setTenantNo(tenantNo);
-        return tenants.saveConfig(body);
-    }
+    // §7.7 租户端点已随 ADR-026 退役（2026-09-23）。
+    // 产品层没有租户概念，这四个口子无 UI、无前端调用、无测试覆盖 —— 控制器自己的注释
+    // 把它们叫做「休眠口子」。留着的代价不是运行时开销，而是**下一个读代码的人会
+    // 合理地认为这个系统支持多租户**，进而照着它设计新功能。
+    // tenant/tenant_config 两张表保留（同 tenant_id 降级为历史列的处置）。
 
     /** {@code Map.of} 不接受 null，统一转空串；空串在 CRUD 基类里等价于「不过滤」。 */
     private static String nz(String s) {

@@ -3,16 +3,12 @@ package ai.neargo.sharehub.dev;
 /**
  * 充电宝状态（{@code dev_powerbank.status}）—— {@link PowerbankStateMachine} 的取值域。
  *
- * <h2>⚠️ DDL 注释是错的，别照着它写</h2>
- * {@code V2__device_gateway.sql} 上的列注释是
- * {@code 'IN_STOCK/DEPLOYED/IN_USE/RETURNED/SCRAP/LOST'} —— 其中
- * {@code IN_USE} / {@code RETURNED} 是**订单**的状态（见 {@code OrdStateMachine}），
- * {@code DEPLOYED} 是**机柜**的状态。那条注释抄的是别的对象的词表。
+ * <p><b>本枚举与 DDL 当前定义逐项一致</b>（{@code V8__v2_alter.sql} 的 MODIFY COLUMN）。
  *
- * <p>本枚举以 {@link PowerbankStateMachine} 为准 —— 它是唯一真正写这一列的地方。
- * 七个值里有四个（IN_CABINET / RENTED / FAILT→FAULT / SOLD）从没出现在 DDL 注释里，
- * 而注释列的三个值没有任何代码会写。这正是"注释不是约束"的代价：
- * **两边各写各的，谁也不会红**。
+ * <p>⚠️ 写这个枚举时我曾据 {@code V2__device_gateway.sql} 的原始建表注释断定「DDL 注释是错的」——
+ * <b>那个判断本身是错的</b>：V2 的注释确实与代码对不上，但 V8 早已 MODIFY 修正。
+ * 50 个迁移里列定义会被后续 ALTER 改写，<b>看 DDL 必须看当前 schema，不是最初的建表语句</b>。
+ * 这条留着，是因为下一个人很可能重犯同一个错。
  *
  * <h2>终态有两个，且含义不同</h2>
  * {@link #SOLD} 与 {@link #SCRAP} 是终态；{@link #LOST} 是**半终态** ——

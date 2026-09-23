@@ -1,5 +1,8 @@
 package ai.neargo.sharehub.finance.service.impl;
 
+import ai.neargo.sharehub.finance.ShareMode;
+import ai.neargo.sharehub.finance.ShareRecordStatus;
+
 import ai.neargo.sharehub.api.core.event.OrderSettledEvent;
 import ai.neargo.sharehub.api.platform.dto.SiteSharingBrief;
 import ai.neargo.sharehub.api.platform.port.SiteSharingQueryPort;
@@ -144,8 +147,8 @@ public class ShareGeneratorImpl implements ShareGenerator {
         // 向下取整到分：分账合计不得超过基数
         r.setAmount(gross.multiply(rate).setScale(2, RoundingMode.DOWN));
         r.setCurrency(currency == null ? e.currency() : currency);
-        r.setMode("LEDGER");
-        r.setStatus("PENDING");
+        r.setMode(ShareMode.LEDGER.name());
+        r.setStatus(ShareRecordStatus.PENDING.name());
         r.setPeriod(e.period());
         r.setSourceNo(sourceNo);
         try {

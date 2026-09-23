@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.finance.service.impl;
 
+import ai.neargo.sharehub.finance.WithdrawalStatus;
+
 import ai.neargo.sharehub.auth.LoginUser;
 import ai.neargo.sharehub.auth.SecurityUtils;
 import ai.neargo.sharehub.common.BizKey;
@@ -77,7 +79,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         e.setFee(fee);                     // 服务端算，不接受入参
         e.setCurrency(req.currency());
         e.setBankCode(req.bankCode());
-        e.setStatus("APPLY");              // 状态由服务端置，不接受入参
+        e.setStatus(WithdrawalStatus.APPLY.name());              // 状态由服务端置，不接受入参
         e.setAppliedAt(LocalDateTime.now().format(TS));
         e.setApplicantNo(SecurityUtils.userNo());
         mapper.insert(e);
