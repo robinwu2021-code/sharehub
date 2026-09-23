@@ -8,7 +8,7 @@ import * as React from "react";
 import { ChevronRight } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { isPhaseLocked, type Phase } from "@/lib/phase";
-import { usePortalTitle } from "@/lib/use-portal-title";
+import { usePortalTitle } from "@/lib/hooks/use-portal-title";
 import { cn } from "@/lib/utils";
 import { segmentedItemClass, segmentedTrackClass } from "@/components/ui/segmented";
 

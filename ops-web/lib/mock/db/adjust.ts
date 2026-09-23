@@ -6,7 +6,7 @@
 import type { PriceAdjustment, PriceAdjustPatch, PricePlan, PageQuery } from "../../types";
 import { ApiError } from "@/lib/api/error";
 import { fail } from "@/lib/biz-error";
-import { ADJUSTABLE, validateAdjustment } from "../../pricing-rules";
+import { ADJUSTABLE, validateAdjustment } from "../../rules/pricing-rules";
 import { paginate, kwHit, upsert, nextNo } from "./helpers";
 import { pricePlans } from "./pricing";
 

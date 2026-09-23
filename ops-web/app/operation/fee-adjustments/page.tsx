@@ -14,14 +14,14 @@ import { Ban, Eye, Pencil, RotateCcw, Undo2 } from "lucide-react";
 import { UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
 import type { PriceAdjustment, PriceAdjustPatch, PricePlan } from "@/lib/types";
-import { useCan } from "@/lib/use-can";
+import { useCan } from "@/lib/hooks/use-can";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
 import { money } from "@/lib/utils";
-import { ADJUSTABLE, ADJUST_STATUS_LABEL, adjustSummary, simulate, validateAdjustment } from "@/lib/pricing-rules";
+import { ADJUSTABLE, ADJUST_STATUS_LABEL, adjustSummary, simulate, validateAdjustment } from "@/lib/rules/pricing-rules";
 import {
   MARKET_TZ, formatMarketTime, formatOffset, tzOffsetMinutes, marketLocalToUtcIso, marketNowLocal,
-} from "@/lib/market-time";
+} from "@/lib/rules/market-time";
 import { PageTitle, EmptyState } from "@/components/ui/misc";
 import { Tabs } from "@/components/ui/tabs";
 import { Toolbar } from "@/components/ui/toolbar";

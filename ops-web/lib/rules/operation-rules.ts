@@ -5,7 +5,7 @@
 // 已记入 TDD-运营管理菜单-前端.md 的后端待办；后端补上前，前端这一层是唯一的防线。
 //
 // 纯函数、无 React、无 mock 依赖，可单测。时间统一由参数注入（now），便于测到点行为。
-import type { AppVersion, BankEntry, ProblemEntry, Notice } from "./types";
+import type { AppVersion, BankEntry, ProblemEntry, Notice } from "../types";
 
 // ——— 应用版本 ————————————————————————————————————————————————
 

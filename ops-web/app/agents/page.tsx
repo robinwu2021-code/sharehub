@@ -24,7 +24,7 @@ import {
 import { exportCsv } from "@/lib/export-csv";
 import { money, fmtTime } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
-import { useCan } from "@/lib/use-can";
+import { useCan } from "@/lib/hooks/use-can";
 import { notify } from "@/lib/notify";
 import { FilterSelect } from "@/components/ui/filter-select";
 // 绩效周期复用报表域枚举：代理 GMV = 名下站点营收之和，必须与站点坪效同一套周期口径

@@ -3,7 +3,7 @@ import {
   compareSemver, currentReleased, grayRelease, validateAppVersion, canTransitVersion,
   validateBank, moveProblem, noticeView, validateNotice, canTransitNotice, MAX_PINNED,
 } from "./operation-rules";
-import type { AppVersion, BankEntry, ProblemEntry, Notice } from "./types";
+import type { AppVersion, BankEntry, ProblemEntry, Notice } from "../types";
 
 const v = (x: Partial<AppVersion>): AppVersion => ({
   versionId: `${x.platform ?? "IOS"}-${x.versionNo ?? "1.0.0"}`, versionNo: "1.0.0", platform: "IOS", buildNo: 100,

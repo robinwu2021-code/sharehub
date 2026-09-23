@@ -29,7 +29,7 @@ import { ReadOnlyNotice } from "@/components/read-only-notice";
 import { WoStatusBadge, EnabledBadge, WO_TYPE_LABEL } from "@/components/status";
 import { exportCsv, type CsvColumn } from "@/lib/export-csv";
 import { fmtTime } from "@/lib/utils";
-import { useCan } from "@/lib/use-can";
+import { useCan } from "@/lib/hooks/use-can";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
 import { nextActions, inspectionPeriodKey, inspectionRunnable } from "@/lib/types";

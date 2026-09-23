@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { attentionOf, buildOverview, buildSiteStats, siteNoOfOrder, cabinetOnline, type OverviewInput } from "./operation-overview";
-import type { Site, SitePoint, Contract } from "./types/location";
-import type { Cabinet } from "./types/device";
-import type { RentOrder } from "./types/order";
+import type { Site, SitePoint, Contract } from "../types/location";
+import type { Cabinet } from "../types/device";
+import type { RentOrder } from "../types/order";
 
 const now = new Date("2026-09-22T12:00:00Z");
 

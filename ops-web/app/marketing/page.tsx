@@ -22,7 +22,7 @@ import { FilterSelect } from "@/components/ui/filter-select";
 // 公告实体类型也叫 Notice，提示条改名导入以免撞名
 import { Notice as InfoNotice } from "@/components/ui/notice";
 import { money, fmtTime } from "@/lib/utils";
-import { useCan } from "@/lib/use-can";
+import { useCan } from "@/lib/hooks/use-can";
 import { useI18n } from "@/lib/i18n";
 import { isPhaseLocked } from "@/lib/phase";
 import { notify } from "@/lib/notify";

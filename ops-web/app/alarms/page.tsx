@@ -18,7 +18,7 @@ import { StatusBadge, statusOptions, type StatusMap } from "@/components/ui/stat
 import { EnabledBadge } from "@/components/status";
 import { Drawer, Field } from "@/components/ui/drawer";
 import { fmtTime } from "@/lib/utils";
-import { useCan } from "@/lib/use-can";
+import { useCan } from "@/lib/hooks/use-can";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
 import { exportCsv, type CsvColumn } from "@/lib/export-csv";

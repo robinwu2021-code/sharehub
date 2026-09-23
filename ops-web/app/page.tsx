@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
 import { QuickActions } from "@/components/quick-actions";
 import { money } from "@/lib/utils";
-import { usePortalTitle } from "@/lib/use-portal-title";
+import { usePortalTitle } from "@/lib/hooks/use-portal-title";
 import type { DashboardAlert } from "@/lib/types";
 
 // 告警类型 → 文案 + 色调。原为就地三目（类型判两遍：一遍出色、一遍出字），

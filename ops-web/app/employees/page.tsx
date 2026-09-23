@@ -26,7 +26,7 @@ import { FilterSelect } from "@/components/ui/filter-select";
 import { REPORT_PERIODS, REPORT_PERIOD_DEFAULT, type ReportPeriod } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { fmtTime } from "@/lib/utils";
-import { useCan } from "@/lib/use-can";
+import { useCan } from "@/lib/hooks/use-can";
 import { notify } from "@/lib/notify";
 import { exportCsv, type CsvColumn } from "@/lib/export-csv";
 import { useConfirm } from "@/components/ui/confirm-dialog";

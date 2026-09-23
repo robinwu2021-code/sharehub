@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   planSummary, simulate, validatePricePlan, validateAdjustment, canTransitAdjust, adjustSummary,
 } from "./pricing-rules";
-import type { PricePlan, PriceAdjustment } from "./types";
+import type { PricePlan, PriceAdjustment } from "../types";
 
 const plan = (x: Partial<PricePlan> = {}): PricePlan => ({
   planNo: "PP001", name: "标准", freeMinutes: 5, unitMinutes: 30, unitPrice: 3,

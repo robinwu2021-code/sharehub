@@ -28,7 +28,7 @@ import {
   archiveConfirm, unarchiveConfirm,
 } from "@/components/archive";
 import { fmtTime, cn } from "@/lib/utils";
-import { useCan } from "@/lib/use-can";
+import { useCan } from "@/lib/hooks/use-can";
 import { notify } from "@/lib/notify";
 import { exportCsv } from "@/lib/export-csv";
 import { parseImport, templateCsv, type ImportColumn, type RowError } from "@/lib/import-csv";

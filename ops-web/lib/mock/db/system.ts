@@ -12,7 +12,7 @@ import type {
 import { p, iso } from "./internal";
 import { ApiError } from "@/lib/api/error";
 import { fail, notFound } from "@/lib/biz-error";
-import { validateAppVersion, validateBank } from "../../operation-rules";
+import { validateAppVersion, validateBank } from "../../rules/operation-rules";
 import { paginate, kwHit, upsert, nextNo, liveHit, archiveRow, unarchiveRow } from "./helpers";
 // 供应商台账住在 device.ts（设备域），连通性探测是系统设置页的动作，故读取而不搬迁。
 import { vendors } from "./device";

@@ -26,7 +26,10 @@
 | `segmentedTrackClass` / `segmentedItemClass` | `ui/segmented.ts` | 分段控件（灰槽+全圆+白色药丸）的 className 拼装，供 `Tabs` 与 `TabHeader` 共用；两者场景不同（内容切换 vs URL 导航）不合并组件，只共享形状 |
 | `Progress` | `ui/progress.tsx` | |
 | `Notice` | `ui/notice.tsx` | 页内灰底提示条。权限降级用业务件 `ReadOnlyNotice` |
-| `StatCard` / `EmptyState` / `Skeleton` / `PageTitle` / `Pagination` | `ui/misc.tsx` | |
+| `StatCard` / `EmptyState` / `ErrorState` / `Skeleton` / `PageTitle` / `Pagination` | `ui/misc.tsx` | `ErrorState` 与 `EmptyState` **不许互相顶替**：空态说「按这个条件没有东西」，失败态说「没取到，别信这一屏」。`Pagination` 的 `onSize` 不给 = 这张表条数不可调（是决定，不是遗漏） |
+| `SummaryCard` | `ui/summary-card.tsx` | 状态摘要卡。副文案是「比上周 +12%」用 `StatCard`，是「共 8 台机柜」用它（`StatCard` 的副文案恒绿，会被读成利好） |
+| `SectionHeader` | `ui/section-header.tsx` | 页内小节标题 + 右侧计数。**不要再手写 `<h2>/<h3>`**：整理前 20 处长出 11 种写法，两种绕开了七档字阶 |
+| `HelpNote` | `ui/help-note.tsx` | 常驻说明性文字收进浮层。**条件渲染的 `Notice` 不许换**（它出现本身就是信息），带「暂未开放/只读」这类当前限制的也不许换 |
 | `Tooltip` | `ui/tooltip.tsx` | |
 | `Checkbox` / `CheckboxField` | `ui/checkbox.tsx` | 三态（含半选）。`DataTable` 的行选择用它 |
 | `RadioGroup` / `RadioGroupItem` / `Radio` | `ui/radio-group.tsx` | 选项 ≤4 且需全部可见时用它，别用下拉 |
@@ -42,7 +45,8 @@
 
 | 组件 | 文件 | 说明 |
 |---|---|---|
-| `DataTable` | `ui/data-table.tsx` | 列表页表格：列配置 + 加载/空态 + 行选择/展开/排序/行样式 |
+| `DataTable` | `ui/data-table.tsx` | 列表页表格：列配置 + 加载/空态/**失败态** + 行选择/展开/排序/行样式。由 `useQuery` 支撑就**必须接 `error`/`onRetry`**，否则 500 渲染成「暂无数据」 |
+| `PagedTable` | `ui/paged-table.tsx` | **分页列表用它**：`query` + `paging` 一交，rows/loading/error/onRetry/total 五项没地方可漏，`onSize` 是必填。不分页的有界配置表继续用 `DataTable` + `UNPAGED_SIZE` |
 | `FormDrawer` | `ui/form-drawer.tsx` | 配置化编辑抽屉（`FieldDef[]` → 表单 + 校验 + 分区 + 联动） |
 | `Drawer` / `Field` | `ui/drawer.tsx` | 右侧抽屉 + **详情行**（`Field` 全站唯一一份，见下） |
 | `Toolbar` | `ui/toolbar.tsx` | 搜索 + 筛选槽 + 导出/新增；选中时切批量操作条 |

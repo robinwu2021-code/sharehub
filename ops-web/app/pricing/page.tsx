@@ -21,7 +21,7 @@ import {
 } from "@/components/archive";
 import { exportCsv } from "@/lib/export-csv";
 import { money, fmtTime } from "@/lib/utils";
-import { useCan } from "@/lib/use-can";
+import { useCan } from "@/lib/hooks/use-can";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
 import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";

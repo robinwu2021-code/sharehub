@@ -14,10 +14,10 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tansta
 import { Pencil, Power } from "lucide-react";
 import { api } from "@/lib/api";
 import type { BankEntry } from "@/lib/types";
-import { useCan } from "@/lib/use-can";
+import { useCan } from "@/lib/hooks/use-can";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
-import { IBAN_LENGTH_BY_COUNTRY, CURRENCY_BY_COUNTRY, validateBank } from "@/lib/operation-rules";
+import { IBAN_LENGTH_BY_COUNTRY, CURRENCY_BY_COUNTRY, validateBank } from "@/lib/rules/operation-rules";
 import { PageTitle } from "@/components/ui/misc";
 import { PagedTable } from "@/components/ui/paged-table";
 import { usePaging } from "@/lib/hooks/use-paging";

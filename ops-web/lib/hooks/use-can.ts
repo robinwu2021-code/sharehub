@@ -1,7 +1,7 @@
 "use client";
 
-import { useAuth } from "./auth";
-import { can } from "./permissions";
+import { useAuth } from "../auth";
+import { can } from "../permissions";
 
 /** 页面内按钮级鉴权：const allow = useCan(); allow('order:refund:audit')。 */
 export function useCan() {

@@ -2,8 +2,8 @@
 //
 // 与 operation-rules 一样：**页面校验与 mock 写入共用这一份**，单测钉住。
 // 试算口径必须与真实计费一致——页面上显示「这样收费」，实际扣的却是另一个数，比没有试算更糟。
-import type { PricePlan, PriceAdjustment, PriceAdjustPatch } from "./types";
-import { money } from "./utils";
+import type { PricePlan, PriceAdjustment, PriceAdjustPatch } from "../types";
+import { money } from "../utils";
 
 // ——— 计费摘要与试算 ————————————————————————————————————————
 

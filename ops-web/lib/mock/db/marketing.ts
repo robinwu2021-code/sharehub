@@ -3,7 +3,7 @@
 // 广告位挂载的机柜号引用 device.ts 的 cabinets。
 import { AD_CAMPAIGN_TRANSITIONS, adWindowPassed } from "../../types";
 import { ApiError } from "@/lib/api/error";
-import { validateNotice } from "../../operation-rules";
+import { validateNotice } from "../../rules/operation-rules";
 import type {
   Coupon, Campaign, PushMessage, Referral, AdSlot, AdCampaign, AdDelivery, Notice, PageQuery,
   AudienceSpec, AudienceResolved, AudienceType, CouponIssueRecord, CouponIssuePayload,

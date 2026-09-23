@@ -29,7 +29,7 @@ import {
 } from "@/components/archive";
 import { exportCsv, type CsvColumn } from "@/lib/export-csv";
 import { money, fmtTime } from "@/lib/utils";
-import { useCan } from "@/lib/use-can";
+import { useCan } from "@/lib/hooks/use-can";
 import { notify } from "@/lib/notify";
 import { useAuth } from "@/lib/auth";
 import { ReadOnlyNotice } from "@/components/read-only-notice";

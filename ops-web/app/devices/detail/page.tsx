@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CabinetStatusBadge, OnlineBadge } from "@/components/status";
 import { fmtTime } from "@/lib/utils";
-import { useCan } from "@/lib/use-can";
+import { useCan } from "@/lib/hooks/use-can";
 import { ChevronLeft, RotateCw } from "lucide-react";
 
 // 静态导出（output: export）用 query 参数而非动态段（对齐 ai-boss/ops-web 的 /detail 模式）。

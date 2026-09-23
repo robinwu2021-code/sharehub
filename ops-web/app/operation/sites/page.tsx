@@ -14,7 +14,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tansta
 import { BarChart3, Pause, Pencil, Play } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Site } from "@/lib/types";
-import { useCan } from "@/lib/use-can";
+import { useCan } from "@/lib/hooks/use-can";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
 import { featureReady } from "@/lib/backend-ready";

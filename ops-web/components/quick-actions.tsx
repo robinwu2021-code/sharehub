@@ -17,7 +17,7 @@ import { Radio, ClipboardPlus, Search } from "lucide-react";
 import { SEARCH_PREVIEW_SIZE, UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
 import { notify } from "@/lib/notify";
-import { useCan } from "@/lib/use-can";
+import { useCan } from "@/lib/hooks/use-can";
 import { money, fmtTime } from "@/lib/utils";
 import type { Cabinet, RentOrder, WorkOrderDraft } from "@/lib/types";
 import { Button } from "@/components/ui/button";

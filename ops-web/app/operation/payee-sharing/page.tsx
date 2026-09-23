@@ -9,7 +9,7 @@ import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { PayeeSharingRow } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
-import { useCan } from "@/lib/use-can";
+import { useCan } from "@/lib/hooks/use-can";
 import { money } from "@/lib/utils";
 import { PageTitle } from "@/components/ui/misc";
 import { Tabs } from "@/components/ui/tabs";
