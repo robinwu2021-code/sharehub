@@ -267,7 +267,7 @@ export const NAV: NavSection[] = [
       { href: "/agents", label: "代理商档案", perm: "agent:agent:read", group: "机构档案" },
       { href: "/agents?tab=accounts", label: "代理账号管理", perm: "agent:agent:update", group: "机构档案" },
       { href: "/agents?tab=assign", label: "设备/点位划拨", perm: "agent:scope:assign", group: "机构档案" },
-      { href: "/agents?tab=commission", label: "分润配置", perm: "agent:settlement:read", group: "机构收益" },
+      { href: "/agents?tab=commission", label: "分润配置", perm: "agent:share:config", group: "机构收益" },
       // 跨 section 深链（D3）：复用财务结算单，面包屑按 URL 归属财务管理
       { href: "/finance?tab=settlements", label: "代理收益结算", perm: "agent:settlement:read", group: "机构收益" },
       { href: "/agents?tab=performance", label: "代理绩效", perm: "agent:performance:read", phase: 2, group: "机构经营" },
@@ -300,7 +300,7 @@ export const NAV: NavSection[] = [
       { href: "/finance?tab=invoices", label: "发票", perm: "finance:invoice:read", phase: 2, ready: true, group: "平台账" },
       // 跨 section 深链（导航审查 #4）：FINANCE 岗管场地方分润在本页、代理分润在 /agents，
       // 此处回链避免找不到入口；面包屑按 URL 归属「代理商管理」。
-      { href: "/agents?tab=commission", label: "代理分润配置", perm: "agent:settlement:read", group: "伙伴账" },
+      { href: "/agents?tab=commission", label: "代理分润配置", perm: "agent:share:config", group: "伙伴账" },
       { href: "/finance?tab=withdrawals", label: "提现审核", perm: "finance:withdrawal:read", group: "伙伴账" },
       // 排在提现审核之后：没有收款账户，提现审批根本放行不了（B3）
       { href: "/finance?tab=payout-accounts", label: "收款账户", perm: "finance:payout_account:read", group: "伙伴账" },

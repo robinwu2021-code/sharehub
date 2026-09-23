@@ -92,7 +92,7 @@ const LEAF_TUPLES = [
   "/agents|代理商档案|agent:agent:read||机构档案",
   "/agents?tab=accounts|代理账号管理|agent:agent:update||机构档案",
   "/agents?tab=assign|设备/点位划拨|agent:scope:assign||机构档案",
-  "/agents?tab=commission|分润配置|agent:settlement:read||机构收益",
+  "/agents?tab=commission|分润配置|agent:share:config||机构收益",
   "/finance?tab=settlements|代理收益结算|agent:settlement:read||机构收益",
   "/agents?tab=performance|代理绩效|agent:performance:read|2|机构经营",
   "/orders|订单列表|order:order:read||交易流水",
@@ -109,7 +109,7 @@ const LEAF_TUPLES = [
   "/finance?tab=ledger|账务分录|finance:ledger:read|2|平台账",
   "/finance?tab=reconcile|对账|finance:recon:read|1|平台账",
   "/finance?tab=invoices|发票|finance:invoice:read|2|平台账",
-  "/agents?tab=commission|代理分润配置|agent:settlement:read||伙伴账",
+  "/agents?tab=commission|代理分润配置|agent:share:config||伙伴账",
   "/finance?tab=withdrawals|提现审核|finance:withdrawal:read||伙伴账",
   "/finance?tab=payout-accounts|收款账户|finance:payout_account:read||伙伴账",
   "/users?tab=wallets|用户钱包|user:wallet:read|2|用户账",
@@ -253,7 +253,7 @@ describe("L3 叶子过滤（4.2-2）", () => {
     expect(labels).toContain("代理分润配置");
     expect(labels.at(-1)).toBe("充值订单"); // 用户账 分组殿后
   });
-  it("VIEWER 无 agent:settlement:read → 财务不出现代理分润配置深链", () => {
+  it("VIEWER 无 agent:share:config → 财务不出现代理分润配置深链", () => {
     expect(visibleLeaves(finance(), "VIEWER").map((l) => l.label)).not.toContain("代理分润配置");
   });
   // OPS 有 poi/venue，没有 contract/analysis/lead —— 拆成两个 L1 后按 perm 过滤的结论不变。

@@ -1,0 +1,32 @@
+# 菜单权限码 ↔ 后端端点权限码 不一致的台账 —— **只准变短**
+#
+# 由 MenuPermissionContractTest 执行。新增一条 → 测试红。
+#
+# 【为什么会不一致，且谁都发现不了】
+# 菜单可见性用 `can(role, perm)` 过滤（ops-web/lib/nav.ts），
+# 接口鉴权用 `@PreAuthorize("@perm.can(...)")`。
+# 两边各查各的码，**没有任何东西要求它们一致**。表现只有两种：
+#   · 看得见点不开（菜单码有、接口码没有 → 403）
+#   · 能用但找不到（接口码有、菜单上无入口）
+# 都不报错。功能权限清单 §末 的第 2、3 条问题就是这么来的，已在案但一直没修。
+#
+# 【条目格式】 菜单权限码 → 说明
+#
+# 依据：docs/requirements/功能权限清单.md（RBAC 真源）· scripts/feature-align.py
+
+# ── 待裁决：需要产品决定，不是技术选择 ──
+# 「我的结算」(/finance?tab=settlements) 与「代理收益结算」挂 agent:settlement:read，
+# 而 /api/trade/settlements 挂 finance:settlement:read，AGENT 不持有后者。
+# 权限清单 §末 第 2 条给了二选一：
+#   (a) 把 agent:settlement:read 挂到结算端点的代理视图（新增一个代理作用域端点）
+#   (b) 让 AGENT 持 finance:settlement:read，靠 ADR-012 的数据范围限定到自己 agent_no
+# (b) 更省，但它给外部伙伴角色发了一个 finance:* 的码 —— 这是产品/安全决定。
+agent:settlement:read
+
+# ── 待并行会话腾出 RolePerms.java ──
+# 预约调价：权限清单声明 pricing:adjustment:read/:create/:cancel（FIN ✓），
+# 而端点挂的是 pricing:rule:read / :config，且**零个角色持有 adjustment 码**
+# （ADMIN 是 "*" 通配所以只有 ADMIN 看得见这个菜单）。
+# 完整修法要同时改三处：端点码 + RolePerms 授予 + 菜单码保持不变。
+# 只改其中一处都会更糟（改端点码而没人持有 = 谁都调不了），故整条留到能原子改时再做。
+pricing:adjustment:read
