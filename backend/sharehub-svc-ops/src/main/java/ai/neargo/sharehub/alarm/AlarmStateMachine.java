@@ -19,24 +19,34 @@ import java.util.Set;
 @Component
 public class AlarmStateMachine {
 
-    public static final String OPEN = "OPEN";
-    public static final String ACKED = "ACKED";
-    public static final String CLOSED = "CLOSED";
-
-    /** event → (from → to)。 */
-    private static final Map<String, Map<String, String>> TRANSITIONS = Map.of(
-            "ACK", Map.of(OPEN, ACKED),
+    /**
+     * event → (from → to)。
+     *
+     * <p>键与值都是 {@link AlarmStatus} 而非字符串：状态**是**取值域里的一个成员，
+     * 写错就编译不过。事件名（{@code ACK}/{@code CLOSE}）仍是字符串 ——
+     * 它是动词不是状态，两者曾被混为一谈过（`status IN ('OPEN','ACK')` 那次），
+     * 类型不同正好让这种混淆无处发生。
+     */
+    private static final Map<String, Map<AlarmStatus, AlarmStatus>> TRANSITIONS = Map.of(
+            "ACK", Map.of(AlarmStatus.OPEN, AlarmStatus.ACKED),
             // 未受理即可直接关闭（误报/自愈），故 CLOSE 接受两个前态
-            "CLOSE", Map.of(OPEN, CLOSED, ACKED, CLOSED));
+            "CLOSE", Map.of(AlarmStatus.OPEN, AlarmStatus.CLOSED,
+                            AlarmStatus.ACKED, AlarmStatus.CLOSED));
 
-    /** 校验并返回目标状态；非法迁移抛异常（由主控统一映射 409）。 */
+    /**
+     * 校验并返回目标状态；非法迁移抛异常（由主控统一映射 409）。
+     *
+     * <p>出入参仍是 {@code String}：落库的是字符串，边界上转换一次，
+     * 不动实体字段类型（那会牵出 MyBatis 类型处理器的连锁改动）。
+     */
     public String next(String from, String event) {
-        Map<String, String> m = TRANSITIONS.get(event);
-        String to = m == null ? null : m.get(from);
+        Map<AlarmStatus, AlarmStatus> m = TRANSITIONS.get(event);
+        // of() 对垃圾值直接抛 —— v1 的 ACK / RESOLVED 走到这里就是非法值，不做运行期兼容
+        AlarmStatus to = m == null ? null : m.get(AlarmStatus.of(from));
         if (to == null) {
             throw new IllegalArgumentException("告警状态非法迁移: " + from + " --" + event + "--> ?");
         }
-        return to;
+        return to.name();
     }
 
     public Set<String> events() {

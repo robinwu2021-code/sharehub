@@ -2,6 +2,7 @@ package ai.neargo.sharehub.alarm.service.impl;
 
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.common.crud.AbstractCrudService;
+import ai.neargo.sharehub.alarm.AlarmRuleStatus;
 import ai.neargo.sharehub.alarm.dto.AlarmDtos.AlarmRule;
 import ai.neargo.sharehub.alarm.entity.DevAlarmRule;
 import ai.neargo.sharehub.alarm.mapper.DevAlarmRuleMapper;
@@ -52,7 +53,7 @@ public class AlarmRuleServiceImpl extends AbstractCrudService<DevAlarmRule, Alar
     @Override
     protected void beforeCreate(DevAlarmRule e) {
         if (e.getMethod() == null || e.getMethod().isBlank()) e.setMethod("INSTANT");
-        if (e.getStatus() == null || e.getStatus().isBlank()) e.setStatus("ACTIVE");
+        if (e.getStatus() == null || e.getStatus().isBlank()) e.setStatus(AlarmRuleStatus.ACTIVE.name());
         validateQuiet(e);
     }
 

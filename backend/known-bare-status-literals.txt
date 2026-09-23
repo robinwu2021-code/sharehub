@@ -37,10 +37,7 @@ AgentAssignmentServiceImpl#status=ENABLED
 AgentCommissionServiceImpl#mode=LEDGER
 AgentCommissionServiceImpl#status=ACTIVE
 
-# ── alarm（3 条）──
-AlarmCodeServiceImpl#level=WARN
-AlarmRuleServiceImpl#status=ACTIVE
-AlarmServiceImpl#status=SENT
+# ── alarm：✅ 已收敛（AlarmStatus / AlarmLevel / AlarmRuleStatus / AlarmNoticeStatus）──
 
 # ── common（3 条）──
 OutboxEventBus#status=FAILED

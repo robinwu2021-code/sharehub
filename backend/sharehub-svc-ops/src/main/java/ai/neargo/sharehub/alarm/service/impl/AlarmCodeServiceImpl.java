@@ -1,6 +1,7 @@
 package ai.neargo.sharehub.alarm.service.impl;
 
 import ai.neargo.sharehub.common.crud.AbstractCrudService;
+import ai.neargo.sharehub.alarm.AlarmLevel;
 import ai.neargo.sharehub.alarm.dto.AlarmDtos.AlarmCode;
 import ai.neargo.sharehub.alarm.entity.DevAlarmCode;
 import ai.neargo.sharehub.alarm.mapper.DevAlarmCodeMapper;
@@ -59,7 +60,7 @@ public class AlarmCodeServiceImpl extends AbstractCrudService<DevAlarmCode, Alar
 
     @Override
     protected void beforeCreate(DevAlarmCode e) {
-        if (e.getLevel() == null || e.getLevel().isBlank()) e.setLevel("WARN");
+        if (e.getLevel() == null || e.getLevel().isBlank()) e.setLevel(AlarmLevel.WARN.name());
         if (e.getAutoWorkOrder() == null) e.setAutoWorkOrder(0); // 默认不自动开单，开单是要人干活的，得显式打开
     }
 

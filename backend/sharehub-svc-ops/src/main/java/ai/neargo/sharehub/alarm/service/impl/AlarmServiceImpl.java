@@ -1,7 +1,9 @@
 package ai.neargo.sharehub.alarm.service.impl;
 
 import ai.neargo.common.core.PageResult;
+import ai.neargo.sharehub.alarm.AlarmNoticeStatus;
 import ai.neargo.sharehub.alarm.AlarmStateMachine;
+import ai.neargo.sharehub.alarm.AlarmStatus;
 import ai.neargo.sharehub.alarm.dto.AlarmDtos.AckResult;
 import ai.neargo.sharehub.alarm.dto.AlarmDtos.AlarmNotice;
 import ai.neargo.sharehub.alarm.dto.AlarmDtos.AlarmRecord;
@@ -157,7 +159,7 @@ public class AlarmServiceImpl implements AlarmService {
         // 不报错、不留日志。差一个字母，编译器无从分辨。由 AlarmStatusVocabularyTest 守住。
         var w = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<DevAlarm>()
                 .isNull(DevAlarm::getWoNo)
-                .in(DevAlarm::getStatus, List.of(AlarmStateMachine.OPEN, AlarmStateMachine.ACKED));
+                .in(DevAlarm::getStatus, List.of(AlarmStatus.OPEN.name(), AlarmStatus.ACKED.name()));
         java.util.List<DevAlarm> pending = mapper.selectList(w);
         int n = 0;
         for (DevAlarm a : pending) {
@@ -196,7 +198,8 @@ public class AlarmServiceImpl implements AlarmService {
         e.setChannel(src.getChannel());
         e.setTarget(src.getTarget());
         e.setSentAt(java.time.LocalDateTime.now().toString());
-        e.setStatus("SENT");   // 触达通道未接（notify 域 stub），先落 SENT 占位；接通后回写真实回执
+        // 触达通道未接（notify 域 stub），先落 SENT 占位；接通后回写真实回执（见 AlarmNoticeStatus 类注释）
+        e.setStatus(AlarmNoticeStatus.SENT.name());
         e.setIdempotencyKey(idempotencyKey);
         e.setResendOf(noticeNo);
         noticeMapper.insert(e);

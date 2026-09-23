@@ -1,6 +1,7 @@
 package ai.neargo.sharehub.scenario;
 
 import ai.neargo.sharehub.alarm.AlarmStateMachine;
+import ai.neargo.sharehub.alarm.AlarmStatus;
 import ai.neargo.sharehub.alarm.service.AlarmService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p><b>这条测试守的是一个曾经无症状的真缺陷</b>：{@code autoRaiseWorkOrders()} 原本查
  * {@code status IN ('OPEN','ACK')}，但 {@code "ACK"} 是<b>事件名</b>不是状态 ——
- * {@link AlarmStateMachine} 落库的是 {@code ACKED}，DDL 注释写 {@code OPEN/ACKED/CLOSED}，
+ * {@link AlarmStatus} 落库的是 {@code ACKED}，DDL 注释写 {@code OPEN/ACKED/CLOSED}，
  * 演示数据写的也是 {@code ACKED}。<b>没有任何一行数据的 status 会等于 {@code "ACK"}</b>，
  * 于是已受理的告警永远开不出工单 —— 不报错、不留日志、少的那部分工单不会自己喊疼。
  *
@@ -26,6 +27,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p><b>为什么三个状态都要断言</b>：只断言 ACKED 会被一个"把条件放开到查全表"的错误修法蒙混过去。
  * CLOSED 那条是边界 —— 已关闭的告警<b>不该</b>再开单。
+ *
+ * <p><b>本类只留需要库的那部分</b>：词表本身与状态机迁移是纯逻辑，已移到
+ * {@code ai.neargo.sharehub.alarm.AlarmVocabularyTest}（不起 Spring）——
+ * 开发库一有迁移失败，那些断言不该跟着一起验不了。
  */
 @SpringBootTest
 class AlarmStatusVocabularyTest {
@@ -41,9 +46,9 @@ class AlarmStatusVocabularyTest {
     @BeforeEach
     void seedThreeStates() {
         prefix = "ALMVOC" + System.nanoTime();
-        insert(prefix + "-OPEN", AlarmStateMachine.OPEN);
-        insert(prefix + "-ACKED", AlarmStateMachine.ACKED);
-        insert(prefix + "-CLOSED", AlarmStateMachine.CLOSED);
+        insert(prefix + "-OPEN", AlarmStatus.OPEN.name());
+        insert(prefix + "-ACKED", AlarmStatus.ACKED.name());
+        insert(prefix + "-CLOSED", AlarmStatus.CLOSED.name());
     }
 
     @AfterEach
@@ -85,21 +90,4 @@ class AlarmStatusVocabularyTest {
                 .isNull();
     }
 
-    @Test
-    @DisplayName("状态机只认 v2 词表，不接受 v1 的 ACK / RESOLVED")
-    void stateMachineRejectsV1Vocabulary() {
-        // v1 dev_alert 的词表是 OPEN/ACK/RESOLVED，v2 是 OPEN/ACKED/CLOSED。
-        // 状态机类注释写明「只认 v2 值，历史值必须在迁移期换掉，不在运行期兼容」—— 这里把它钉住。
-        assertThat(AlarmStateMachine.ACKED).isEqualTo("ACKED");
-
-        org.assertj.core.api.Assertions
-                .assertThatThrownBy(() -> new AlarmStateMachine().next("ACK", "CLOSE"))
-                .as("'ACK' 是事件名，不是合法前态")
-                .isInstanceOf(IllegalArgumentException.class);
-
-        org.assertj.core.api.Assertions
-                .assertThatThrownBy(() -> new AlarmStateMachine().next("RESOLVED", "CLOSE"))
-                .as("'RESOLVED' 是 v1 词表里的值")
-                .isInstanceOf(IllegalArgumentException.class);
-    }
 }
