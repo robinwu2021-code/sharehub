@@ -371,7 +371,7 @@ ai-shop 因为没分开，出现过「商家能卖、订单在来、结算单在
 
 ## 4. 代码调整
 
-### 4.1 P0 · 修 `updated_by` 永不更新
+### 4.1 P0 · 修 `updated_by` 永不更新 —— ✅ **已完成 2026-09-23**（commit `b4139c5`）
 
 `backend/sharehub-common/.../AuditMetaObjectHandler.java`
 
@@ -472,7 +472,7 @@ public void updateFill(MetaObject metaObject) {
 
 | 批 | 内容 | 迁移 | 级 |
 |:-:|---|---|:-:|
-| **B1** | 修 `updateFill` + 测试 | — | **P0** |
+| ~~**B1**~~ | ~~修 `updateFill` + 测试~~ ✅ **已完成**（`b4139c5`）：先写测试复现、再改无条件覆盖；顺带清掉 `BizRuleServiceImpl` 两处手写与无调用者的 `SysCtx.operator()`（它无登录态返回小写 `system`，与约定的 `SYSTEM` 不一致） | — | **P0** |
 | **B2** | 运营主体：`operator_type` + `PLATFORM` 哨兵 + 6 列去 NULL + §4.3 五处 | V46 · V47 | **L1** |
 | **B3** | 收款账户 + 场地方关联 + 提现落快照 + §4.6 读侧 | V48 | **L1**（解 L0 阻塞「提现不知道打给谁」） |
 | **B4** | 幂等键修复 + `basis` + 责任表 + `ShareGenerator` 改写 | V49 · V50 | L1 |
