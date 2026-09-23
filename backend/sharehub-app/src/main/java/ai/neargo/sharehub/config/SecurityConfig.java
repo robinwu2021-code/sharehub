@@ -87,6 +87,7 @@ public class SecurityConfig {
                         // **只放自助那一个**（单数 /apply）。代建走 POST /api/agent/applies（复数），
                         // 它判 agent:apply:create，不能出现在这份白名单里。
                         .requestMatchers(HttpMethod.POST, "/api/agent/apply").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/agent/apply/otp").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/agent/apply/mine").permitAll()
                         .requestMatchers("/actuator/**", "/notify/**").permitAll()
                         /*

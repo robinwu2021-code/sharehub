@@ -19,6 +19,14 @@ import ai.neargo.sharehub.agent.apply.dto.ApplyDtos.SubmitReq;
 public interface ApplyService {
 
     /**
+     * 自助注册发码。返回码本身，**是否展示由调用方决定**（生产不回传）。
+     *
+     * <p>放在 service 而不是 controller，是为了让手机号规范化只有一个实现 ——
+     * 发码与验码用的必须是同一个形式。
+     */
+    String sendOtp(String rawPhone);
+
+    /**
      * 提交申请。
      *
      * @param staffNo 经办员工业务键；<b>非 null 即代建</b>（{@code OPS_CREATED}），

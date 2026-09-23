@@ -48,7 +48,10 @@ public class ApplyRateLimitFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest req) {
         String p = req.getRequestURI();
-        return !(p.equals("/api/agent/apply") || p.equals("/api/agent/apply/mine"));
+        // 发码端点尤其要拦：OtpService 自己有重发间隔，但那是**按手机号**的 ——
+        // 换个号就能接着发，单 IP 限流才拦得住批量刷号
+        return !(p.equals("/api/agent/apply") || p.equals("/api/agent/apply/mine")
+                || p.equals("/api/agent/apply/otp"));
     }
 
     @Override

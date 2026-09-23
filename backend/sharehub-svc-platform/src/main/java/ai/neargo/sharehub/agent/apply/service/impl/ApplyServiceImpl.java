@@ -20,7 +20,7 @@ import ai.neargo.sharehub.agent.ext.mapper.AgtPrincipalMapper;
 import ai.neargo.sharehub.agent.mapper.AgentMapper;
 import ai.neargo.sharehub.identity.IdentifierHasher;
 import ai.neargo.sharehub.identity.IdentifierNormalizer;
-import ai.neargo.sharehub.agent.apply.service.OtpVerifier;
+import ai.neargo.sharehub.agent.apply.service.OtpGate;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.stereotype.Service;
@@ -51,19 +51,32 @@ public class ApplyServiceImpl implements ApplyService {
     private final AgentMapper agentMapper;
     private final IdentifierNormalizer normalizer;
     private final IdentifierHasher hasher;
-    private final OtpVerifier otpVerifier;
+    private final OtpGate otpGate;
 
     public ApplyServiceImpl(AgtApplyMapper applyMapper, AgtPrincipalMapper principalMapper,
                             AgtAccountMapper accountMapper, AgentMapper agentMapper,
                             IdentifierNormalizer normalizer, IdentifierHasher hasher,
-                            OtpVerifier otpVerifier) {
+                            OtpGate otpGate) {
         this.applyMapper = applyMapper;
         this.principalMapper = principalMapper;
         this.accountMapper = accountMapper;
         this.agentMapper = agentMapper;
         this.normalizer = normalizer;
         this.hasher = hasher;
-        this.otpVerifier = otpVerifier;
+        this.otpGate = otpGate;
+    }
+
+    // ——————————————————————— 发码 ———————————————————————
+
+    @Override
+    public String sendOtp(String rawPhone) {
+        /*
+         * **规范化必须走同一个函数** —— 发码用 trim 后的原串、验码用规范化后的串，
+         * 两者就对不上：用户收到了码却怎么也验不过，而且只在带空格 / 连字符 / 国际区号的
+         * 输入上出现（"+971 50 123 4567" 与 "971501234567" 是两个 key）。
+         * 把发码也收进 service，就是为了让这一步没有第二个实现。
+         */
+        return otpGate.issue(normalizer.phone(rawPhone));
     }
 
     // ——————————————————————— 提交 ———————————————————————
@@ -91,7 +104,7 @@ public class ApplyServiceImpl implements ApplyService {
          */
         if (!opsCreated) {
             requireText(req.otp(), "验证码必填");
-            otpVerifier.verify(phone, req.otp());
+            otpGate.verify(phone, req.otp());
         }
 
         String phoneHash = hasher.hash(phone);
@@ -142,7 +155,7 @@ public class ApplyServiceImpl implements ApplyService {
     public MyApplyView mine(String phone, String otp) {
         String normalized = normalizer.phone(phone);
         requireText(otp, "验证码必填");
-        otpVerifier.verify(normalized, otp);
+        otpGate.verify(normalized, otp);
 
         AgtApply e = applyMapper.selectOne(new QueryWrapper<AgtApply>()
                 .eq("phone_hash", hasher.hash(normalized)).eq("deleted", 0)

@@ -7,6 +7,7 @@ import ai.neargo.sharehub.agent.apply.dto.ApplyDtos.AuditReq;
 import ai.neargo.sharehub.agent.apply.dto.ApplyDtos.MyApplyView;
 import ai.neargo.sharehub.agent.apply.dto.ApplyDtos.SubmitReq;
 import ai.neargo.sharehub.agent.apply.service.ApplyService;
+import ai.neargo.sharehub.auth.DevMode;
 import ai.neargo.sharehub.auth.SecurityUtils;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,6 +17,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
 
 /**
  * 入驻申请：**两条入口、一个端点**（ADR-030 §三）。
@@ -34,9 +37,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AgentApplyController {
 
     private final ApplyService applyService;
+    private final DevMode devMode;
 
-    public AgentApplyController(ApplyService applyService) {
+    public AgentApplyController(ApplyService applyService, DevMode devMode) {
         this.applyService = applyService;
+        this.devMode = devMode;
     }
 
     /**
@@ -45,6 +50,22 @@ public class AgentApplyController {
      * <p><b>{@code source} 由这里判定，不从请求体取</b>：带 STAFF 令牌即代建，否则自助。
      * 让客户端传的话，自助申请可以自称代建，绕开 OTP 与限流（ADR-030 §3.2）。
      */
+    /**
+     * **自助注册发码**（免鉴权）。
+     *
+     * <p>这是自助入口唯一能证明「申请人确实持有这个手机号」的手段 —— 没有它，
+     * 任何人都能拿别人的号提交申请，而那个人只会在审核电话打来时才知道。
+     *
+     * <p>生产只回 {@code {"sent": true}}，码由短信通道送达；dev-mode 下回传便于联调
+     * （与 C 端 {@code /mp/auth/otp} 同一个取舍，也共用同一套 OtpService 的限流与有效期 ——
+     * 各写一套的结果一定是两套配置慢慢分叉，而分叉出来的那一套通常没人测）。
+     */
+    @PostMapping("/apply/otp")
+    public Map<String, Object> applyOtp(@RequestBody Map<String, String> body) {
+        String code = applyService.sendOtp(body.get("phone"));
+        return devMode.isEnabled() ? Map.of("sent", true, "devCode", code) : Map.of("sent", true);
+    }
+
     /**
      * **自助注册**：商家自己提交（免鉴权 + 手机号 OTP）。
      *
