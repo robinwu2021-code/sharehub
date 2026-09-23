@@ -1,6 +1,6 @@
 package ai.neargo.sharehub.agent.service.impl;
 
-import ai.neargo.sharehub.agent.AgentType;
+import ai.neargo.sharehub.api.platform.dto.AgentType;
 import ai.neargo.sharehub.agent.entity.AgtAgent;
 import org.springframework.transaction.annotation.Transactional;
 import ai.neargo.sharehub.agent.mapper.AgentMapper;

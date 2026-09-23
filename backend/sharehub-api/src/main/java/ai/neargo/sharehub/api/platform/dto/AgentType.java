@@ -1,4 +1,4 @@
-package ai.neargo.sharehub.agent;
+package ai.neargo.sharehub.api.platform.dto;
 
 /**
  * 代理商登记类型（ADR-027 §一）。
@@ -9,6 +9,11 @@ package ai.neargo.sharehub.agent;
  * <p>类型只定「他大体是哪种人」。「他在**这个站点**做了什么」由 A2 的
  * 「伙伴 × 站点 × 责任」表达；两者都要，否则「这个人在 A 站是介绍人、
  * 在 B 站是代理商」无处安放。
+ *
+ * <p><b>为什么在 {@code sharehub-api} 而不在 agent 域</b>：它被 loc 侧的
+ * 「站点伙伴责任」读来做展示，是**跨域使用的词表**。词表一旦跨域就是契约的一部分 ——
+ * 留在 agent 域会让 loc 反向依赖 agent，而站点在业务上不依赖代理商（平台直营的站点
+ * 一个代理都没有），那个方向的依赖本身就是越界。
  */
 public enum AgentType {
 
