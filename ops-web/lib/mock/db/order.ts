@@ -14,6 +14,7 @@ import {
   EXCEPTION_HANDLINGS, canHandleException,
 } from "../../types";
 import { NICKS, p, iso } from "./internal";
+import { notFound, fail } from "@/lib/biz-error";
 import { paginate, kwHit, nextNo } from "./helpers";
 import { cabinets, cabNo, powerbanks } from "./device";
 import { sites } from "./location";
@@ -166,8 +167,8 @@ export const listReservations = (q: PageQuery & { status?: string; type?: string
 /** 取消预约：仅 PENDING 可取消（非 PENDING 直接原样返回，由前端按钮先行拦截）。 */
 export const cancelReservation = (no: string): Reservation => {
   const i = reservations.findIndex((r) => r.reservationNo === no);
-  if (i < 0) throw new Error(`预约不存在：${no}`);
-  if (reservations[i].status !== "PENDING") throw new Error("仅待履约（PENDING）的预约可取消");
+  if (i < 0) throw notFound("预约", "Reservation", no);
+  if (reservations[i].status !== "PENDING") throw fail("仅待履约（PENDING）的预约可取消", "Only a PENDING reservation can be cancelled", "يمكن إلغاء الحجز فقط وهو قيد الانتظار (PENDING)");
   reservations[i] = { ...reservations[i], status: "CANCELLED", holdFee: 0 };
   return reservations[i];
 };

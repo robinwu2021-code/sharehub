@@ -10,6 +10,8 @@ import type {
   VendorProbeResult, NotifyTemplatePreview, NotifyTestSendPayload, NotifyResendPayload,
 } from "../../types";
 import { p, iso } from "./internal";
+import { ApiError } from "@/lib/api/error";
+import { fail, notFound } from "@/lib/biz-error";
 import { validateAppVersion, validateBank } from "../../operation-rules";
 import { paginate, kwHit, upsert, nextNo, liveHit, archiveRow, unarchiveRow } from "./helpers";
 // 供应商台账住在 device.ts（设备域），连通性探测是系统设置页的动作，故读取而不搬迁。
@@ -391,7 +393,7 @@ export function resendNotifyLog(logNo: string, x: NotifyResendPayload): NotifyLo
  */
 export function resetOpenApiAppSecret(appNo: string): OpenApiApp {
   const i = openApiApps.findIndex((x) => x.appNo === appNo);
-  if (i < 0) throw new Error(`OpenAPI 应用 ${appNo} 不存在`);
+  if (i < 0) notFound("OpenAPI 应用", "OpenAPI app", appNo);
   // 掩码后四位跟着重置变化，否则运营看不出"到底换没换"
   const tail = String(1000 + (Date.now() % 9000));
   openApiApps[i] = { ...openApiApps[i], appSecretMasked: `sk_live_****${tail}`, secretResetAt: iso(0) };
@@ -421,7 +423,7 @@ export const saveNotifyBlacklist = (x: Partial<NotifyBlacklist>) =>
 /** 解除拉黑：软删除——把到期时间置为当下，保留拉黑历史供审计（决策 §八-4）。 */
 export function releaseNotifyBlacklist(blockNo: string): NotifyBlacklist {
   const i = notifyBlacklist.findIndex((x) => x.blockNo === blockNo);
-  if (i < 0) throw new Error("拉黑记录不存在");
+  if (i < 0) throw fail("拉黑记录不存在", "Blacklist entry not found", "سجل الحظر غير موجود");
   notifyBlacklist[i] = { ...notifyBlacklist[i], expireAt: iso(0) };
   return notifyBlacklist[i];
 }
@@ -540,7 +542,9 @@ export const saveAppVersion = (x: Partial<AppVersion>) => {
   const prev = appVersions.find((v) => v.versionId === withId.versionId);
   const merged = { ...(prev ?? {}), ...withId } as AppVersion;
   const errors = validateAppVersion(merged, prev, appVersions);
-  if (errors.length) throw new Error(errors[0]);
+  // 消息来自各自的 validate*（目前仍是单语中文，见 TDD R4 未尽项）；
+  // 这里至少把类型对齐成 ApiError，页面据此区分业务拒绝与系统故障
+  if (errors.length) throw new ApiError(400, errors[0]);
   // 发布时刻由系统记录，不信任客户端传值
   const releasedAt = merged.status === "RELEASED" && prev?.status !== "RELEASED" ? new Date().toISOString() : merged.releasedAt ?? null;
   return upsert(appVersions, { ...withId, releasedAt }, "versionId", () => `${x.platform ?? "IOS"}-${x.versionNo ?? "0.0.0"}`);
@@ -548,9 +552,9 @@ export const saveAppVersion = (x: Partial<AppVersion>) => {
 /** 回滚：置 ROLLBACK 且灰度归零（立即停止下发），保留记录不物理删。 */
 export function rollbackAppVersion(versionId: string): AppVersion {
   const i = appVersions.findIndex((x) => x.versionId === versionId);
-  if (i < 0) throw new Error("版本不存在");
+  if (i < 0) throw fail("版本不存在", "Version not found", "الإصدار غير موجود");
   if (appVersions[i].status !== "RELEASED") {
-    throw new Error("只有已发布的版本可以回滚");
+    throw fail("只有已发布的版本可以回滚", "Only a released version can be rolled back", "يمكن التراجع فقط عن إصدار منشور");
   }
   appVersions[i] = { ...appVersions[i], status: "ROLLBACK", rolloutPercent: 0 };
   return appVersions[i];
@@ -585,7 +589,9 @@ export const saveBank = (x: Partial<BankEntry>) => {
   const prev = banks.find((b) => b.bankCode === norm.bankCode);
   // 编辑时调用方可能只传部分字段，按合并后的完整记录校验
   const errors = validateBank({ ...(prev ?? {}), ...norm }, prev, banks);
-  if (errors.length) throw new Error(errors[0]);
+  // 消息来自各自的 validate*（目前仍是单语中文，见 TDD R4 未尽项）；
+  // 这里至少把类型对齐成 ApiError，页面据此区分业务拒绝与系统故障
+  if (errors.length) throw new ApiError(400, errors[0]);
   return upsert(banks, norm, "bankCode", () => nextNo("BK", banks));
 };
 

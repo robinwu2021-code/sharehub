@@ -7,6 +7,7 @@ import type {
 
   AutoWorkOrderResult,} from "../../types";
 import { LOCS, OPERATORS, p, iso, phone } from "./internal";
+import { notFound, fail } from "@/lib/biz-error";
 import { paginate, kwHit, upsert, nextNo, liveHit, archiveRow, unarchiveRow } from "./helpers";
 import { cabinets } from "./device";
 // 触达拉黑与脱敏口径住在 system.ts（系统设置域）：告警通知与业务通知走同一条触达链路，
@@ -100,7 +101,7 @@ export const saveAlarmRule = (x: Partial<AlarmRule>) => upsert(alarmRules, x, "r
  */
 export function raiseAlarmWorkOrder(alarmNo: string): AlarmWorkOrderRef {
   const a = alarmRecords.find((x) => x.alarmNo === alarmNo);
-  if (!a) throw new Error(`告警不存在：${alarmNo}`);
+  if (!a) throw notFound("告警", "Alarm", alarmNo);
   const existed = a.workOrderNo;
   if (!existed) {
     a.workOrderNo = nextNo("WO", alarmRecords.filter((x) => x.workOrderNo), 70200);
@@ -143,8 +144,8 @@ export function autoRaiseWorkOrders(): AutoWorkOrderResult {
  */
 export function ackAlarm(alarmNo: string, remark?: string): AlarmAckResult {
   const a = alarmRecords.find((x) => x.alarmNo === alarmNo);
-  if (!a) throw new Error(`告警不存在：${alarmNo}`);
-  if (a.status !== "OPEN") throw new Error("仅待处理（OPEN）的告警可确认");
+  if (!a) throw notFound("告警", "Alarm", alarmNo);
+  if (a.status !== "OPEN") throw fail("仅待处理（OPEN）的告警可确认", "Only an OPEN alarm can be acknowledged", "يمكن الإقرار فقط بإنذار مفتوح (OPEN)");
   a.status = "ACKED";
   if (remark?.trim()) a.remark = remark.trim(); // 备注为空则保留原上报说明，不要抹掉
   return { alarmNo: a.alarmNo, status: a.status };

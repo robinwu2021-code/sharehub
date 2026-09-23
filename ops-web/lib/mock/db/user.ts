@@ -14,6 +14,7 @@ import {
   MEMBER_LEVEL_ORDER, MEMBER_CARD_LABEL, MEMBER_CARD_NONE, PROFILE_RECENT_TXNS,
 } from "../../types";
 import { OPERATORS, REASONS, p, iso } from "./internal";
+import { notFound } from "@/lib/biz-error";
 import { paginate, kwHit, upsert, nextNo } from "./helpers";
 
 /**
@@ -40,6 +41,7 @@ export const cUsers: CUser[] = Array.from({ length: 60 }, (_, i) => ({
 // 第三套号，cUsers 里根本没有，点进去查无此人）。昵称/手机号/信用分一律由 cUsers 反查，不再手写。
 const userOf = (no: string): CUser => {
   const u = cUsers.find((x) => x.cUserNo === no);
+  // 这条**不翻译**：它不是业务拒绝，是 mock 种子数据自相矛盾的 bug 信号，只给开发看
   if (!u) throw new Error(`mock 数据不自洽：用户 ${no} 不存在于 cUsers`);
   return u;
 };
@@ -347,7 +349,7 @@ export const saveFreeWhitelist = (x: Partial<FreeUserWhitelist>) =>
 /** 撤销白名单：置 REVOKED（软撤销，保留审计痕迹，对齐决策 §八-4）。 */
 export const revokeFreeWhitelist = (userNo: string): FreeUserWhitelist => {
   const i = freeWhitelist.findIndex((w) => w.userNo === userNo);
-  if (i < 0) throw new Error(`白名单不存在：${userNo}`);
+  if (i < 0) throw notFound("白名单", "Whitelist entry", userNo);
   freeWhitelist[i] = { ...freeWhitelist[i], status: "REVOKED" };
   return freeWhitelist[i];
 };
@@ -558,7 +560,7 @@ export type UserProfileBase = Omit<UserProfile, "orders" | "orderStats">;
 
 export function getUserProfileBase(cUserNo: string): UserProfileBase {
   const user = cUsers.find((x) => x.cUserNo === cUserNo);
-  if (!user) throw new Error(`用户 ${cUserNo} 不存在`);
+  if (!user) notFound("用户", "User", cUserNo);
   return {
     user: { ...user },
     risk: userRisks.find((r) => r.userNo === cUserNo) ?? null,

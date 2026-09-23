@@ -2,6 +2,7 @@
 // 广告位 adSlots · 广告计划 adCampaigns · 投放数据 adDeliveries / 公告 notices（三语）。
 // 广告位挂载的机柜号引用 device.ts 的 cabinets。
 import { AD_CAMPAIGN_TRANSITIONS, adWindowPassed } from "../../types";
+import { ApiError } from "@/lib/api/error";
 import { validateNotice } from "../../operation-rules";
 import type {
   Coupon, Campaign, PushMessage, Referral, AdSlot, AdCampaign, AdDelivery, Notice, PageQuery,
@@ -347,7 +348,9 @@ export const saveNotice = (x: Partial<Notice>) => {
   // 状态机、置顶上限、生效期在 mock 层强制（与运营管理页面共用 lib/operation-rules）
   const prev = x.noticeNo ? notices.find((n) => n.noticeNo === x.noticeNo) : undefined;
   const errors = validateNotice({ ...(prev ?? {}), ...x }, prev, notices);
-  if (errors.length) throw new Error(errors[0]);
+  // 消息来自各自的 validate*（目前仍是单语中文，见 TDD R4 未尽项）；
+  // 这里至少把类型对齐成 ApiError，页面据此区分业务拒绝与系统故障
+  if (errors.length) throw new ApiError(400, errors[0]);
   return upsert(notices, x, "noticeNo", () => nextNo("NTC", notices));
 };
 

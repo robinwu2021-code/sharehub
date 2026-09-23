@@ -3,6 +3,7 @@
 // 聚合口径全部走 lib/operation-overview 的纯函数——与后端将来实现的是同一份规则，
 // 单测钉在那边；这里只负责把 db 的各张表喂进去，以及站点状态的写入。
 import type { OperationOverview, SiteStats } from "../../types/operation";
+import { notFound, fail } from "@/lib/biz-error";
 import type { Site } from "../../types/location";
 import { buildOverview, buildSiteStats, type OverviewInput } from "../../operation-overview";
 import { sites, locations, contracts } from "./location";
@@ -61,26 +62,26 @@ export function getOperationOverview(q: { from?: string; to?: string; regionId?:
 }
 
 export function getSiteStats(siteNo: string, q: { from?: string; to?: string } = {}): SiteStats {
-  if (!sites.some((s) => s.siteNo === siteNo)) throw new Error(`站点不存在：${siteNo}`);
+  if (!sites.some((s) => s.siteNo === siteNo)) throw notFound("站点", "Site", siteNo);
   return buildSiteStats(siteNo, inputOf(q.from, q.to));
 }
 
 /** 暂停营业。已归档的站点不允许改营业状态（先恢复归档再操作）。 */
 export function pauseSite(siteNo: string, reason: string): Site {
   const s = sites.find((x) => x.siteNo === siteNo);
-  if (!s) throw new Error(`站点不存在：${siteNo}`);
-  if (s.archivedAt) throw new Error("已归档的站点不能暂停营业");
-  if (s.status === "PAUSED") throw new Error("站点已处于暂停营业状态");
-  if (!reason.trim()) throw new Error("请填写暂停原因");
+  if (!s) throw notFound("站点", "Site", siteNo);
+  if (s.archivedAt) throw fail("已归档的站点不能暂停营业", "An archived site cannot be suspended", "لا يمكن تعليق موقع مؤرشف");
+  if (s.status === "PAUSED") throw fail("站点已处于暂停营业状态", "This site is already suspended", "هذا الموقع معلّق بالفعل");
+  if (!reason.trim()) throw fail("请填写暂停原因", "A reason is required to suspend", "سبب التعليق مطلوب");
   s.status = "PAUSED";
   return s;
 }
 
 export function resumeSite(siteNo: string): Site {
   const s = sites.find((x) => x.siteNo === siteNo);
-  if (!s) throw new Error(`站点不存在：${siteNo}`);
-  if (s.archivedAt) throw new Error("已归档的站点不能恢复营业");
-  if (s.status === "ACTIVE") throw new Error("站点已在营业中");
+  if (!s) throw notFound("站点", "Site", siteNo);
+  if (s.archivedAt) throw fail("已归档的站点不能恢复营业", "An archived site cannot be reopened", "لا يمكن إعادة فتح موقع مؤرشف");
+  if (s.status === "ACTIVE") throw fail("站点已在营业中", "This site is already open", "هذا الموقع مفتوح بالفعل");
   s.status = "ACTIVE";
   return s;
 }

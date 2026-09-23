@@ -7,6 +7,7 @@ import type {
   ComplaintCreatePayload, RefundApplyPayload,
 } from "../../types";
 import { OPERATORS, p, iso } from "./internal";
+import { notFound, fail } from "@/lib/biz-error";
 import { paginate, kwHit, upsert, nextNo } from "./helpers";
 import { cabNo } from "./device";
 import { orders } from "./order";
@@ -55,9 +56,11 @@ export const saveCsTicket = (x: Partial<CsTicket>) => upsert(csTickets, x, "tick
  */
 export function refundCsTicket(ticketNo: string): CsTicket {
   const tk = csTickets.find((x) => x.ticketNo === ticketNo);
-  if (!tk) throw new Error(`报障单不存在：${ticketNo}`);
+  if (!tk) throw notFound("报障单", "Support ticket", ticketNo);
   if (tk.refundNo) return tk;
-  if (!tk.orderNo) throw new Error(`报障单 ${ticketNo} 未关联订单，无法转退款`);
+  if (!tk.orderNo) fail(`报障单 ${ticketNo} 未关联订单，无法转退款`,
+    `Ticket ${ticketNo} is not linked to an order, so it cannot be turned into a refund`,
+    `التذكرة ${ticketNo} غير مرتبطة بطلب، لذا لا يمكن تحويلها إلى استرداد`);
 
   tk.refundNo = applyRefund(tk.orderNo, `报障 ${ticketNo} 转退款：${tk.issue}`).refundNo;
   if (tk.status === "OPEN") tk.status = "PROCESSING"; // 已 CLOSED 的单不复活，与后端 advanceToProcessing 同
@@ -71,7 +74,7 @@ export function refundCsTicket(ticketNo: string): CsTicket {
  */
 export function woCsTicket(ticketNo: string): CsTicket {
   const tk = csTickets.find((x) => x.ticketNo === ticketNo);
-  if (!tk) throw new Error(`报障单不存在：${ticketNo}`);
+  if (!tk) throw notFound("报障单", "Support ticket", ticketNo);
   if (tk.woNo) return tk;
 
   // 工单号基数 70400：告警转单用 70200、投诉转单用 70300，三个来源各占一段，
@@ -94,8 +97,10 @@ export const listCsMessages = (sessionNo: string, limit?: number): CsMessage[] =
  */
 export function replyCsSession(sessionNo: string, content: string, attach?: string): CsMessage {
   const s = csSessions.find((x) => x.sessionNo === sessionNo);
-  if (!s) throw new Error(`会话不存在：${sessionNo}`);
-  if (s.status === "CLOSED") throw new Error(`会话已关闭，不能回复：${sessionNo}`);
+  if (!s) throw notFound("会话", "Session", sessionNo);
+  if (s.status === "CLOSED") fail(`会话已关闭，不能回复：${sessionNo}`,
+    `Session ${sessionNo} is closed and cannot be replied to`,
+    `الجلسة ${sessionNo} مغلقة ولا يمكن الرد عليها`);
 
   const m: CsMessage = {
     id: Math.max(0, ...csMessages.map((x) => x.id)) + 1,
@@ -188,12 +193,12 @@ export const saveOrderComplaint = (x: Partial<OrderComplaint>) =>
  */
 export function createOrderComplaint(x: ComplaintCreatePayload): OrderComplaint {
   const orderNo = x?.orderNo?.trim();
-  if (!orderNo) throw new Error("投诉登记必须填写关联订单号");
+  if (!orderNo) throw fail("投诉登记必须填写关联订单号", "A complaint must reference an order number", "يجب أن تشير الشكوى إلى رقم طلب");
   // 关联订单必须真实存在：挂在查不到的单上，后续退款/工单都无从核对
   const o = orders.find((r) => r.orderNo === orderNo);
-  if (!o) throw new Error(`订单不存在：${orderNo}`);
+  if (!o) throw notFound("订单", "Order", orderNo);
   const description = x.description?.trim();
-  if (!description) throw new Error("投诉登记必须填写用户描述");
+  if (!description) throw fail("投诉登记必须填写用户描述", "A complaint must include what the user reported", "يجب أن تتضمن الشكوى وصف المستخدم");
 
   const created: OrderComplaint = {
     complaintNo: nextNo("CPL", orderComplaints, 60000, "complaintNo"),
@@ -265,15 +270,15 @@ export function applyRefund(orderNo: string, reason = "客服代客申请退款"
  */
 export function createRefund(x: RefundApplyPayload): RefundRecord {
   const key = x?.idempotencyKey?.trim();
-  if (!key) throw new Error("退款申请必须携带幂等键（idempotencyKey）——重复提交会真的退两笔钱");
+  if (!key) throw fail("退款申请必须携带幂等键（idempotencyKey）——重复提交会真的退两笔钱", "A refund request must carry an idempotencyKey — without it a double submit really refunds twice", "يجب أن يحمل طلب الاسترداد مفتاح idempotencyKey — بدونه يؤدي الإرسال المكرر إلى استرداد مزدوج فعلي");
   const orderNo = x.orderNo?.trim();
-  if (!orderNo) throw new Error("退款申请必须填写关联订单号");
+  if (!orderNo) throw fail("退款申请必须填写关联订单号", "A refund request must reference an order number", "يجب أن يشير طلب الاسترداد إلى رقم طلب");
   // 订单必须真实存在：退款要对得上原支付流水，挂空单号的退款审批时无从核对
   const o = orders.find((r) => r.orderNo === orderNo);
-  if (!o) throw new Error(`订单不存在：${orderNo}`);
+  if (!o) throw notFound("订单", "Order", orderNo);
   const amount = Number(x.amount);
-  if (!(amount > 0)) throw new Error("退款金额必须大于 0");
-  if (!x.reason?.trim()) throw new Error("退款申请必须填写退款原因");
+  if (!(amount > 0)) throw fail("退款金额必须大于 0", "Refund amount must be greater than 0", "يجب أن يكون مبلغ الاسترداد أكبر من 0");
+  if (!x.reason?.trim()) throw fail("退款申请必须填写退款原因", "A refund request must state a reason", "يجب ذكر سبب الاسترداد");
 
   return insertRefund({
     orderNo, userNo: x.userNo?.trim() || o.cUserNo, amount: Number(amount.toFixed(2)),

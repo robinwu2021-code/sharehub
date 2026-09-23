@@ -5,6 +5,7 @@ import type {
   WorkOrderHandlePayload, WorkOrderClosePayload, SlaRule, InspectionPlan, InspectionRunResult, PageQuery,
 } from "../../types";
 import { WO_TRANSITIONS, canTransition, inspectionPeriodKey, inspectionRunnable } from "../../types";
+import { fail } from "@/lib/biz-error";
 import { LOCS, p, iso } from "./internal";
 import { paginate, kwHit, upsert, nextNo } from "./helpers";
 import { cabinets } from "./device";
@@ -122,9 +123,9 @@ export function transitionWorkOrder(woNo: string, action: WorkOrderAction, patch
 }
 
 export function createWorkOrder(x: WorkOrderDraft): WorkOrder {
-  if (!x.type) throw new Error("工单类型必填");
-  if (!x.cabinetNo?.trim()) throw new Error("机柜号必填");
-  if (!x.description?.trim()) throw new Error("问题描述必填");
+  if (!x.type) throw fail("工单类型必填", "Work order type is required", "نوع أمر العمل مطلوب");
+  if (!x.cabinetNo?.trim()) throw fail("机柜号必填", "Cabinet number is required", "رقم الخزانة مطلوب");
+  if (!x.description?.trim()) throw fail("问题描述必填", "A problem description is required", "وصف المشكلة مطلوب");
   const cab = cabinets.find((c) => c.cabinetNo === x.cabinetNo);
   const created: WorkOrder = {
     // 手工开单从 WO70400 起，避开告警转工单(70200+)/投诉转工单(70300+)两段号段
@@ -148,7 +149,7 @@ export function createWorkOrder(x: WorkOrderDraft): WorkOrder {
 }
 
 export const dispatchWorkOrder = (woNo: string, assignee: string) => {
-  if (!assignee?.trim()) throw new Error("派单必须指定处理人");
+  if (!assignee?.trim()) throw fail("派单必须指定处理人", "Dispatching requires an assignee", "الإسناد يتطلب تحديد منفّذ");
   return transitionWorkOrder(woNo, "dispatch", { assigneeName: assignee, dispatchedAt: now() });
 };
 
@@ -160,7 +161,7 @@ export const acceptWorkOrder = (woNo: string, handler?: string) =>
 
 /** 提交处理结果（不改状态，可多次追加）。处理说明必填，换件记录可选。 */
 export const processWorkOrder = (woNo: string, x: WorkOrderHandlePayload) => {
-  if (!x.handleNote?.trim()) throw new Error("处理说明必填");
+  if (!x.handleNote?.trim()) throw fail("处理说明必填", "Handling notes are required", "ملاحظات المعالجة مطلوبة");
   return transitionWorkOrder(woNo, "process", {
     handlerName: x.handlerName || find(woNo)?.handlerName || find(woNo)?.assigneeName || null,
     handledAt: now(), handleNote: x.handleNote, partsReplaced: x.partsReplaced || find(woNo)?.partsReplaced || null,
@@ -168,7 +169,7 @@ export const processWorkOrder = (woNo: string, x: WorkOrderHandlePayload) => {
 };
 
 export const completeWorkOrder = (woNo: string, x: WorkOrderHandlePayload) => {
-  if (!x.handleNote?.trim()) throw new Error("处理说明必填");
+  if (!x.handleNote?.trim()) throw fail("处理说明必填", "Handling notes are required", "ملاحظات المعالجة مطلوبة");
   return transitionWorkOrder(woNo, "complete", {
     handlerName: x.handlerName || find(woNo)?.handlerName || find(woNo)?.assigneeName || null,
     handledAt: now(), handleNote: x.handleNote,
@@ -179,7 +180,7 @@ export const completeWorkOrder = (woNo: string, x: WorkOrderHandlePayload) => {
 
 /** 验收关单：**必须有验收结论**，否则拒绝（关单是终态，无结论就无从追责）。 */
 export const closeWorkOrder = (woNo: string, x: WorkOrderClosePayload) => {
-  if (!x.auditResult) throw new Error("关单必须给出验收结论");
+  if (!x.auditResult) throw fail("关单必须给出验收结论", "Closing requires an acceptance result", "الإغلاق يتطلب نتيجة قبول");
   return transitionWorkOrder(woNo, "close", {
     auditorName: x.auditorName || "admin", auditedAt: now(),
     auditResult: x.auditResult, auditNote: x.auditNote || null,
@@ -188,7 +189,7 @@ export const closeWorkOrder = (woNo: string, x: WorkOrderClosePayload) => {
 
 /** 验收不合格退回返工：**原因必填**，回到 PROCESSING（处理人不变，无需重新派单）。 */
 export const reworkWorkOrder = (woNo: string, reason: string) => {
-  if (!reason?.trim()) throw new Error("退回返工必须填写不合格原因");
+  if (!reason?.trim()) throw fail("退回返工必须填写不合格原因", "Sending back for rework requires the reason it failed acceptance", "الإعادة للتصحيح تتطلب ذكر سبب عدم القبول");
   const cur = find(woNo);
   return transitionWorkOrder(woNo, "rework", {
     auditorName: "admin", auditedAt: now(), auditResult: "FAIL", auditNote: reason,
@@ -198,7 +199,7 @@ export const reworkWorkOrder = (woNo: string, reason: string) => {
 
 /** 驳回退回重派：**原因必填**（沿用退款审批口径），退回 CREATED 并清空处理人。 */
 export const rejectWorkOrder = (woNo: string, reason: string) => {
-  if (!reason?.trim()) throw new Error("驳回必须填写原因");
+  if (!reason?.trim()) throw fail("驳回必须填写原因", "Rejecting requires a reason", "الرفض يتطلب ذكر السبب");
   const cur = find(woNo);
   return transitionWorkOrder(woNo, "reject", {
     rejectReason: reason, rejectCount: (cur?.rejectCount ?? 0) + 1,

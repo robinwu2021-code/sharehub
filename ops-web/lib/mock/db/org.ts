@@ -6,6 +6,7 @@ import type {
 } from "../../types";
 import type { Role } from "../../auth"; // 仅取角色码联合类型（type-only，不引入 store 运行时）
 import { can } from "../../permissions";
+import { notFound, fail } from "@/lib/biz-error";
 import { VENDORS, p, iso } from "./internal";
 import { paginate, kwHit, upsert, nextNo, liveHit, archiveRow, unarchiveRow } from "./helpers";
 // 只取周期→天数换算：绩效周期必须与报表域同一套 REPORT_PERIODS，不自造窗口
@@ -245,10 +246,12 @@ export const listRolePermissions = (roleNo: string): string[] => [...(rolePermMa
  */
 export function saveRolePermissions(roleNo: string, perms: string[]): RoleRow {
   const i = roles.findIndex((r) => r.roleNo === roleNo);
-  if (i < 0) throw new Error(`角色不存在：${roleNo}`);
-  if (roles[i].builtin) throw new Error("内置角色只读，不可改权限");
+  if (i < 0) throw notFound("角色", "Role", roleNo);
+  if (roles[i].builtin) throw fail("内置角色只读，不可改权限", "Built-in roles are read-only; their permissions cannot be changed", "الأدوار المدمجة للقراءة فقط ولا يمكن تغيير صلاحياتها");
   const unknown = perms.filter((c) => !PERM_CODES.has(c));
-  if (unknown.length) throw new Error(`权限码不在目录中：${unknown.join(", ")}`);
+  if (unknown.length) fail(`权限码不在目录中：${unknown.join(", ")}`,
+    `Permission codes not in the catalog: ${unknown.join(", ")}`,
+    `رموز صلاحيات غير موجودة في الدليل: ${unknown.join(", ")}`);
   const next = [...new Set(perms)];
   rolePermMap[roleNo] = next;
   roles[i] = { ...roles[i], permCount: next.length };
@@ -301,7 +304,7 @@ const AUDIT_CHANGES: Record<string, AuditFieldChange[]> = {
 /** 审计详情（含改动前后对比）。id 不存在时抛错，不返回空壳详情。 */
 export function getAuditDetail(id: string): AuditDetail {
   const a = audits.find((x) => x.id === id);
-  if (!a) throw new Error(`审计记录不存在：${id}`);
+  if (!a) throw notFound("审计记录", "Audit entry", id);
   return {
     ...a,
     requestId: `req-${a.id.toLowerCase()}-${a.createdAt.slice(11, 13)}${a.createdAt.slice(14, 16)}`,
@@ -378,11 +381,11 @@ export const listStaffPerformance = (q: PageQuery & { period?: string } = {}) =>
 export function saveDepartment(x: Partial<Department>): Department {
   const parent = x.parent ?? "";
   if (parent) {
-    if (parent === x.deptNo) throw new Error("上级部门不能是自己");
-    if (!departments.some((d) => d.deptNo === parent)) throw new Error(`上级部门不存在：${parent}`);
+    if (parent === x.deptNo) throw fail("上级部门不能是自己", "A department cannot be its own parent", "لا يمكن أن يكون القسم أبًا لنفسه");
+    if (!departments.some((d) => d.deptNo === parent)) throw notFound("上级部门", "Parent department", parent);
     // 往上爬一遍：若沿 parent 链能回到自己，就是成环
     for (let cur = parent, hop = 0; cur && hop <= departments.length; hop++) {
-      if (cur === x.deptNo) throw new Error("上级部门不能选自己的下级（会形成环）");
+      if (cur === x.deptNo) throw fail("上级部门不能选自己的下级（会形成环）", "A department cannot sit under one of its own children — that would form a cycle", "لا يمكن وضع القسم تحت أحد فروعه — سيشكّل ذلك حلقة");
       cur = departments.find((d) => d.deptNo === cur)?.parent ?? "";
     }
   }
@@ -411,13 +414,13 @@ export const normalizeScopeValues = (csv?: string): string =>
  */
 export function saveRoleDataScope(roleCode: string, scope: DataScope, scopeValues?: string): RoleRow {
   const i = roles.findIndex((r) => r.code === roleCode);
-  if (i < 0) throw new Error(`角色不存在：${roleCode}`);
+  if (i < 0) throw notFound("角色", "Role", roleCode);
   // ⚠️ AGENT 角色的数据范围**服务端强制**为「自己 agent_no」，不接受任何越权配置。
   // 功能权限清单 §二：「AGENT 数据范围强制 = 自己 agent_no」。
   // 前端已禁用该选项，但门必须锁在服务端——绕过 UI 直接调接口同样要被拒。
   // 后端实现本端点时须保留这条守卫。
   if (roleCode === "AGENT" && (scope !== "AGENT" || normalizeScopeValues(scopeValues))) {
-    throw new Error("代理商角色的数据范围强制为自己 agent_no，不可更改或指定其它代理");
+    throw fail("代理商角色的数据范围强制为自己 agent_no，不可更改或指定其它代理", "An agent role is locked to its own agent_no; it cannot be changed or pointed at another agent", "دور الوكيل مقيّد برقم وكيله ولا يمكن تغييره أو توجيهه إلى وكيل آخر");
   }
   const values = scope === "ALL" || scope === "SELF" ? "" : normalizeScopeValues(scopeValues);
   roles[i] = { ...roles[i], dataScope: scope, scopeValues: values };
@@ -430,7 +433,7 @@ export const saveEmployee = (x: Partial<Employee>) => upsert(employees, x, "empl
 // 这道门必须同时锁在服务端，前端只是提前拦一次。
 export function archiveRole(no: string) {
   const r = roles.find((x) => x.roleNo === no);
-  if (r?.builtin) throw new Error("内置角色不可归档");
+  if (r?.builtin) throw fail("内置角色不可归档", "Built-in roles cannot be archived", "لا يمكن أرشفة الأدوار المدمجة");
   return archiveRow(roles, "roleNo", no);
 }
 export const unarchiveRole = (no: string) => unarchiveRow(roles, "roleNo", no);

@@ -1,5 +1,6 @@
 // 计费域：计费模板 pricePlans / 场景差异化定价 pricingDiffs / 时段策略 pricingSchedules。
 import type { PricePlan, PricingDiff, PricingSchedule, PageQuery } from "../../types";
+import { notFound, fail } from "@/lib/biz-error";
 import { parsePeriod, formatPeriod } from "../../types";
 import { p } from "./internal";
 import { sites, locations } from "./location";
@@ -66,17 +67,19 @@ export const savePricingDiff = (x: Partial<PricingDiff>) => {
   let derived: Pick<PricingDiff, "siteNo" | "scene" | "locationName">;
   if (dimension === "SITE") {
     const site = sites.find((s) => s.siteNo === matchRef);
-    if (!site) throw new Error(`站点不存在：${matchRef || "(未选择)"}`);
+    if (!site) throw notFound("站点", "Site", matchRef || "(未选择)");
     derived = { siteNo: site.siteNo, scene: site.sceneType, locationName: site.name };
   } else if (dimension === "LOCATION") {
     const loc = locations.find((l) => l.locationNo === matchRef);
-    if (!loc) throw new Error(`点位不存在：${matchRef || "(未选择)"}`);
+    if (!loc) throw notFound("点位", "Point", matchRef || "(未选择)");
     const site = sites.find((s) => s.siteNo === loc.siteNo);
     derived = { siteNo: loc.siteNo, scene: site?.sceneType ?? "", locationName: loc.name };
   } else {
     // SCENE：场景值必须在站点表里真实出现过——挂在没有任何站点的场景上，规则永远命中不到
     if (!sites.some((s) => s.sceneType === matchRef)) {
-      throw new Error(`场景不存在（没有任何站点属于它）：${matchRef || "(未选择)"}`);
+      fail(`场景不存在（没有任何站点属于它）：${matchRef || "(未选择)"}`,
+        `Scene not found (no site belongs to it): ${matchRef || "(none selected)"}`,
+        `المشهد غير موجود (لا يوجد موقع ينتمي إليه): ${matchRef || "(لم يتم الاختيار)"}`);
     }
     derived = { siteNo: "", scene: matchRef, locationName: "" };
   }
@@ -89,7 +92,7 @@ export const savePricingDiff = (x: Partial<PricingDiff>) => {
  */
 export const savePricingSchedule = (x: Partial<PricingSchedule>) => {
   const period = (x.period ?? "").trim();
-  if (!period) throw new Error("时段不能为空：请选星期/时刻，或填自定义表达式");
+  if (!period) throw fail("时段不能为空：请选星期/时刻，或填自定义表达式", "Time window is required: pick weekdays/hours, or enter a custom expression", "النطاق الزمني مطلوب: اختر الأيام/الساعات أو أدخل تعبيرًا مخصصًا");
   const spec = parsePeriod(period);
   return upsert(pricingSchedules, { ...x, period: spec.kind === "RANGE" ? formatPeriod(spec) : period }, "ruleNo", () => nextNo("PS", pricingSchedules));
 };

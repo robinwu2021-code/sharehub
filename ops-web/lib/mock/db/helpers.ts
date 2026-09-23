@@ -2,6 +2,7 @@
 // 覆盖：分页 paginate / 关键词命中 kwHit / 新增编辑 upsert / 业务号生成 nextNo /
 //       归档过滤 liveHit + 归档落库 setArchived（G1 软删除）。
 import type { PageResult, Archivable } from "../../types";
+import { notFound } from "@/lib/biz-error";
 
 export function paginate<T>(all: T[], page = 1, size = 10, filter?: (t: T) => boolean): PageResult<T> {
   const rows = filter ? all.filter(filter) : all;
@@ -70,7 +71,7 @@ export function setArchived<T extends Archivable>(
   arr: T[], keyField: keyof T, key: string, at: string | null,
 ): T {
   const i = arr.findIndex((x) => (x[keyField] as unknown as string) === key);
-  if (i < 0) throw new Error(`记录不存在：${key}`);
+  if (i < 0) throw notFound("记录", "Record", key);
   arr[i] = { ...arr[i], archivedAt: at };
   return arr[i];
 }

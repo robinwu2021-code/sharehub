@@ -4,6 +4,8 @@
 // 先把已到时间的调价执行掉。时间通过参数注入（tick(now)），单测可以拨时钟验证。
 // 幂等：以调价单号 + 状态判断，重复 tick 不会重复改价（服务重启后补执行也走同一条路）。
 import type { PriceAdjustment, PriceAdjustPatch, PricePlan, PageQuery } from "../../types";
+import { ApiError } from "@/lib/api/error";
+import { fail } from "@/lib/biz-error";
 import { ADJUSTABLE, validateAdjustment } from "../../pricing-rules";
 import { paginate, kwHit, upsert, nextNo } from "./helpers";
 import { pricePlans } from "./pricing";
@@ -118,7 +120,9 @@ export function savePriceAdjustment(x: Partial<PriceAdjustment>): PriceAdjustmen
     siblings: priceAdjustments.filter((a) => a.planNo === merged.planNo),
     plan, now: new Date(),
   });
-  if (errors.length) throw new Error(errors[0]);
+  // 消息来自各自的 validate*（目前仍是单语中文，见 TDD R4 未尽项）；
+  // 这里至少把类型对齐成 ApiError，页面据此区分业务拒绝与系统故障
+  if (errors.length) throw new ApiError(400, errors[0]);
   const row: Partial<PriceAdjustment> = {
     ...merged,
     planName: plan?.name ?? merged.planName,
@@ -136,9 +140,11 @@ export function savePriceAdjustment(x: Partial<PriceAdjustment>): PriceAdjustmen
 export function cancelPriceAdjustment(adjustNo: string, reason: string): PriceAdjustment {
   tickAdjustments();
   const a = priceAdjustments.find((x) => x.adjustNo === adjustNo);
-  if (!a) throw new Error("调价单不存在");
-  if (a.status !== "SCHEDULED") throw new Error(`「${a.status}」状态的调价单不能撤销，只有待生效可以`);
-  if (!reason.trim()) throw new Error("请填写撤销原因");
+  if (!a) throw fail("调价单不存在", "Price adjustment not found", "أمر تعديل السعر غير موجود");
+  if (a.status !== "SCHEDULED") fail(`「${a.status}」状态的调价单不能撤销，只有待生效可以`,
+    `An adjustment in ${a.status} cannot be cancelled — only a scheduled one can`,
+    `لا يمكن إلغاء تعديل بحالة ${a.status} — فقط المجدول يمكن إلغاؤه`);
+  if (!reason.trim()) throw fail("请填写撤销原因", "A reason is required to cancel", "سبب الإلغاء مطلوب");
   a.status = "CANCELLED";
   a.failReason = `已撤销：${reason}`;
   return a;
@@ -148,11 +154,11 @@ export function cancelPriceAdjustment(adjustNo: string, reason: string): PriceAd
 export function revertPriceAdjustment(adjustNo: string): PriceAdjustment {
   tickAdjustments();
   const a = priceAdjustments.find((x) => x.adjustNo === adjustNo);
-  if (!a) throw new Error("调价单不存在");
-  if (a.status !== "APPLIED") throw new Error("只有已生效的调价单可以恢复");
+  if (!a) throw fail("调价单不存在", "Price adjustment not found", "أمر تعديل السعر غير موجود");
+  if (a.status !== "APPLIED") throw fail("只有已生效的调价单可以恢复", "Only an applied adjustment can be reverted", "يمكن التراجع فقط عن تعديل سارٍ");
   const plan = planOf(a.planNo);
-  if (!plan) throw new Error("目标方案不存在，无法恢复");
-  if (!stillMatches(plan, a.patch)) throw new Error("方案在调价期间被人工修改过，请人工确认后处理，避免覆盖别人的改动");
+  if (!plan) throw fail("目标方案不存在，无法恢复", "The target plan no longer exists, so it cannot be reverted", "الخطة المستهدفة لم تعد موجودة، لذا يتعذر التراجع");
+  if (!stillMatches(plan, a.patch)) throw fail("方案在调价期间被人工修改过，请人工确认后处理，避免覆盖别人的改动", "The plan was edited by hand while the adjustment was in effect. Review it manually first so you do not overwrite someone else's change", "تم تعديل الخطة يدويًا أثناء سريان التعديل. راجعها يدويًا أولًا حتى لا تلغي تغيير شخص آخر");
   applyPatch(plan, a.beforeSnapshot ?? {});
   a.status = "REVERTED";
   a.revertedAt = new Date().toISOString();
@@ -167,8 +173,8 @@ export function revertPriceAdjustment(adjustNo: string): PriceAdjustment {
  */
 export function retryPriceAdjustment(adjustNo: string): PriceAdjustment {
   const a = priceAdjustments.find((x) => x.adjustNo === adjustNo);
-  if (!a) throw new Error("调价单不存在");
-  if (a.status !== "FAILED") throw new Error("只有执行失败的调价单需要重试");
+  if (!a) throw fail("调价单不存在", "Price adjustment not found", "أمر تعديل السعر غير موجود");
+  if (a.status !== "FAILED") throw fail("只有执行失败的调价单需要重试", "Only a failed adjustment needs a retry", "إعادة المحاولة تلزم فقط لتعديل فشل تنفيذه");
   a.failReason = null;
   if (a.appliedAt) {
     a.status = "APPLIED";
