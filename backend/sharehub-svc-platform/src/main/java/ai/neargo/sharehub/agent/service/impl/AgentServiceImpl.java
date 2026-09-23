@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.agent.service.impl;
 
+import ai.neargo.sharehub.agent.AgentType;
 import ai.neargo.sharehub.agent.entity.AgtAgent;
 import org.springframework.transaction.annotation.Transactional;
 import ai.neargo.sharehub.agent.mapper.AgentMapper;
@@ -53,9 +54,8 @@ public class AgentServiceImpl implements AgentService {
         e.setContact(in.contact());
         e.setRegionScope(asJsonArray(in.regionScope()));
         e.setShareRate(in.shareRate());
-        // 类型只认两个值；传别的一律落 AGENT —— 落一个不认识的值等于让将来按类型分支的
-        // 分润逻辑走到一条没写的分支，而那要到结算时才暴露。
-        e.setAgentType("CITY_PARTNER".equals(in.agentType()) ? "CITY_PARTNER" : "AGENT");
+        // 类型只认两个值；归一规则与理由见 AgentType.of
+        e.setAgentType(AgentType.of(in.agentType()).name());
         // 机柜数不回写：它是聚合值不是档案属性（实体与库里都已没有这一列）
         e.setStatus(in.status() == null ? "ENABLED" : in.status());
         if (insert) mapper.insert(e); else mapper.updateById(e);
@@ -89,7 +89,7 @@ public class AgentServiceImpl implements AgentService {
     private static Agent toVO(AgtAgent e) {
         return new Agent(e.getAgentNo(), e.getName(), e.getContact(), plainScope(e.getRegionScope()),
                 // 存量行与缺省一律 AGENT：出参里给空会让前端多处理一个「没有类型」的不存在状态
-                e.getAgentType() == null || e.getAgentType().isBlank() ? "AGENT" : e.getAgentType(),
+                AgentType.of(e.getAgentType()).name(),
                 e.getShareRate() == null ? 0 : e.getShareRate(),
                 /*
                  * 机柜数：platform 算不出（dev_cabinet 属于 core），**给 0 而不是假装有值**。
