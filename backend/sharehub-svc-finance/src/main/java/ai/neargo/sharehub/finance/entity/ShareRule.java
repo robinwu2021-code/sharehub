@@ -31,6 +31,14 @@ public class ShareRule extends BaseEntity {
     private String payeeName;
 
     /** CHANNEL_SPLIT（渠道直分）/ LEDGER（账务记账后结算）。 */
+    /**
+     * 分成依据（V53 / ADR-027）：INVEST / DEVELOP / OPERATE / REFER；VENUE 维度留空串。
+     *
+     * <p>同一个代理可以有多条规则，各对应一项责任 —— 「他出资拿 5%、运维拿 8%」。
+     * 取价时按 {@code (dimension, payeeNo, basis)} 找，找不到再退回同分成方的通用规则。
+     */
+    private String basis;
+
     private String mode;
 
     /** 分成比率，0..1。 */

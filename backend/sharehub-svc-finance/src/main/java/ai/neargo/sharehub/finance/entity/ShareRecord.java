@@ -56,6 +56,18 @@ public class ShareRecord extends BaseEntity {
     private BigDecimal grossAmount;
 
     /**
+     * 分成依据（V53 / ADR-027）：INVEST / DEVELOP / OPERATE / REFER。
+     *
+     * <p>一个代理在一个站点上可以既出资又运维，两笔钱的比例与去向都不同。
+     * 没有这一列时它们只能合成一条，**结算争议里说不清「这 8% 里几个点是运维」**。
+     *
+     * <p>VENUE 维度留空串（维度本身即依据）。<b>不可为 null</b> ——
+     * 幂等键 {@code uk_srec_order_payee_basis} 含本列，而唯一索引把 NULL 之间视为互不相同，
+     * 可空就等于幂等保护形同虚设且不报错（V49 的 uk_scope_target 已实测踩过一次）。
+     */
+    private String basis;
+
+    /**
      * 费率来源：合同号（VENUE）或规则号（AGENT）。V37。
      *
      * <p>排错时「这笔为什么是 15%」要能当场回答。只存 rate 不存来源的话，

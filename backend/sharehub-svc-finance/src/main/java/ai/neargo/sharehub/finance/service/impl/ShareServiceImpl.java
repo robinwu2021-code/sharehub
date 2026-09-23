@@ -189,12 +189,12 @@ public class ShareServiceImpl implements ShareService {
     private static FinDtos.ShareRule toRuleVO(ShareRule e) {
         if (e == null) return null;
         return new FinDtos.ShareRule(e.getRuleNo(), e.getDimension(), e.getPayeeNo(), e.getPayeeName(),
-                e.getMode(), e.getRate(), e.getPriority(), e.getFormula(), e.getCurrency());
+                e.getBasis(), e.getMode(), e.getRate(), e.getPriority(), e.getFormula(), e.getCurrency());
     }
 
     private static FinDtos.ShareRecord toRecordVO(ShareRecord e) {
         return new FinDtos.ShareRecord(e.getRecordNo(), e.getOrderNo(), e.getDimension(), e.getPayeeNo(),
-                e.getPayeeName(), e.getAmount(), e.getRate(), e.getCurrency(), e.getMode(),
+                e.getPayeeName(), e.getBasis(), e.getAmount(), e.getRate(), e.getCurrency(), e.getMode(),
                 e.getStatus(), e.getSettleNo(), fmt(e.getCreatedAt()),
                 e.getPeriod(), e.getGrossAmount());
     }

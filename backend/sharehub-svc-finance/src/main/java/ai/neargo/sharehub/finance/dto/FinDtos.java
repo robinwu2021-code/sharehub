@@ -23,15 +23,15 @@ public final class FinDtos {
 
     /** 分润规则行，镜像前端 {@code ShareRule}（+ 落库补的 payeeNo/formula/currency）。 */
     public record ShareRule(String ruleNo, String dimension, String payeeNo, String payeeName,
-                            String mode, BigDecimal rate, Integer priority,
+                            String basis, String mode, BigDecimal rate, Integer priority,
                             String formula, String currency) {
     }
 
     /** 分润明细行（逐单），镜像前端 {@code ShareRecord}。 */
     public record ShareRecord(String recordNo, String orderNo, String dimension, String payeeNo,
-                              String payeeName, BigDecimal amount, BigDecimal rate, String currency,
-                              String mode, String status, String settleNo, String createdAt,
-                              String period, BigDecimal grossAmount) {
+                              String payeeName, String basis, BigDecimal amount, BigDecimal rate,
+                              String currency, String mode, String status, String settleNo,
+                              String createdAt, String period, BigDecimal grossAmount) {
     }
 
     /**

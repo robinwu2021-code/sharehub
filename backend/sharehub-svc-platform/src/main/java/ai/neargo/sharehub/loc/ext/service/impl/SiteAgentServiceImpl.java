@@ -93,7 +93,19 @@ public class SiteAgentServiceImpl implements SiteAgentService {
             }
         }
 
-        LocSiteAgent e = in.id() == null ? new LocSiteAgent() : mapper.selectById(in.id());
+        // 撤销过的同名行会复活，而不是插一条新的。撤销是逻辑删除（deleted=1），而唯一键
+        // uk_site_agent_role 不含 deleted —— 那一行仍占着键。不复活就会撞键，
+        // 且常规查询看不见它，上面那句友好提示永远轮不到，直接漏成 500。
+        Long revivedId = in.id();
+        if (revivedId == null) {
+            Long dead = mapper.findRevokedId(siteNo, in.agentNo(), role.name());
+            if (dead != null) {
+                mapper.revive(dead);
+                revivedId = dead;
+            }
+        }
+
+        LocSiteAgent e = revivedId == null ? new LocSiteAgent() : mapper.selectById(revivedId);
         if (e == null) throw new IllegalArgumentException("责任行不存在: " + in.id());
         e.setSiteNo(siteNo);
         e.setAgentNo(in.agentNo());

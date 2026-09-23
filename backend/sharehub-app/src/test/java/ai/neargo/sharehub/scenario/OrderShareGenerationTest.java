@@ -33,6 +33,9 @@ class OrderShareGenerationTest extends ApiTestSupport {
     /** ST305 挂着场地方 VEN300，且有生效合同 CT405（V38 回填）。 */
     private static final String SITE = "ST305";
     private static final String AGENT = "AG006";
+
+    /** 责任分账用另一个站点：ST305 被上面几条用例占着，往它身上加责任行会改掉它们的期望条数。 */
+    private static final String MULTI_SITE = "ST307";
     private static final String CABINET = "CAB1005";
     private static final String PHONE = "+971500009101";
 
@@ -105,6 +108,144 @@ class OrderShareGenerationTest extends ApiTestSupport {
         // outbox 重投是设计内的：第二次必须一条都不新增，且不报错
         assertThat(generator.generate(event(no, new BigDecimal("80.00")))).isZero();
         assertThat(sharesOf(no, login("ADMIN"))).hasSize(first);
+    }
+
+    // ══════════ 按责任分账（A2-2 / ADR-027 §四）══════════
+
+    private OrderSettledEvent eventAt(String site, String orderNo, BigDecimal gross) {
+        return new OrderSettledEvent(orderNo, CABINET, site, null, gross, "AED",
+                LocalDate.now().toString().substring(0, 7));
+    }
+
+    /** 建一条带依据的分润规则，返回规则号。 */
+    private String rule(String admin, String agentNo, String basis, double rate) {
+        return post("/api/trade/share-rules", Map.of("dimension", "AGENT", "payeeNo", agentNo,
+                "payeeName", "测试伙伴 " + agentNo, "basis", basis, "mode", "LEDGER",
+                "rate", rate, "priority", 5), admin).okData().path("ruleNo").asText();
+    }
+
+    /** 给站点配一行责任，返回行 id（便于用例收尾时撤掉）。 */
+    private long responsibility(String admin, String site, String agentNo, String role) {
+        return post("/api/ops/sites/" + site + "/agents",
+                Map.of("agentNo", agentNo, "role", role), admin).okData().path("id").asLong();
+    }
+
+    private void unresponsibility(String admin, String site, long id) {
+        post("/api/ops/sites/" + site + "/agents/" + id + "/remove", Map.of(), admin).okData();
+    }
+
+    @Test
+    void each_responsibility_gets_its_own_record_with_its_own_rate() {
+        // 一个站点上「谁出的钱、谁在维护」不是同一个人。压成一条的代价不是不精确，
+        // 是**不可追溯** —— 结算争议时说不清这 8% 里几个点是运维、几个点是出资。
+        String admin = login("ADMIN");
+        rule(admin, "AG008", "OPERATE", 0.08);
+        rule(admin, "AG002", "INVEST", 0.05);
+        // 两行都由用例自己配。**不依赖 V52 的回填**：回填跑在迁移里、种子插在迁移之后，
+        // 所以全新测试库里 loc_site_agent 是空的 —— 依赖它的用例只在「迁移过的老库」上绿。
+        long operate = responsibility(admin, MULTI_SITE, "AG008", "OPERATE");
+        long invest = responsibility(admin, MULTI_SITE, "AG002", "INVEST");
+        try {
+            String no = orderNo("R");
+            generator.generate(eventAt(MULTI_SITE, no, new BigDecimal("100.00")));
+
+            JsonNode shares = sharesOf(no, admin);
+            Map<String, Double> byBasis = new java.util.HashMap<>();
+            for (JsonNode r : shares) {
+                if (!"AGENT".equals(r.path("dimension").asText())) continue;
+                byBasis.put(r.path("basis").asText(), r.path("amount").asDouble());
+            }
+            assertThat(byBasis).as("出资与运维各应有自己的一条，而不是合并成一条")
+                    .containsOnlyKeys("OPERATE", "INVEST");
+            assertThat(byBasis.get("OPERATE")).as("运维 8%").isEqualTo(8.00);
+            assertThat(byBasis.get("INVEST")).as("出资 5%").isEqualTo(5.00);
+        } finally {
+            unresponsibility(admin, MULTI_SITE, invest);
+            unresponsibility(admin, MULTI_SITE, operate);
+        }
+    }
+
+    @Test
+    void refer_is_not_paid_per_order() {
+        // 牵线的对价是「把关系介绍过来」这个一次性动作。按逐单比例付会变成
+        // **介绍一次、分十年** —— 它走签约事件（A2-4），不在逐单分润里。
+        String admin = login("ADMIN");
+        rule(admin, "AG008", "OPERATE", 0.08);
+        rule(admin, "AG005", "REFER", 0.03);
+        // 配一行 OPERATE，让站点走「有责任行」的分支 —— 否则测的是回落路径，REFER 根本没被读到
+        long operate = responsibility(admin, MULTI_SITE, "AG008", "OPERATE");
+        long refer = responsibility(admin, MULTI_SITE, "AG005", "REFER");
+        try {
+            String no = orderNo("N");
+            generator.generate(eventAt(MULTI_SITE, no, new BigDecimal("100.00")));
+            for (JsonNode r : sharesOf(no, admin)) {
+                assertThat(r.path("basis").asText()).as("REFER 不该出现在逐单分润里").isNotEqualTo("REFER");
+            }
+        } finally {
+            unresponsibility(admin, MULTI_SITE, refer);
+            unresponsibility(admin, MULTI_SITE, operate);
+        }
+    }
+
+    @Test
+    void site_without_responsibility_rows_falls_back_instead_of_paying_nothing() {
+        // 责任表是逐站点配的。没配的站点不能因此不分账 ——
+        // 那是**静默少付合作伙伴**，与「静默免单」同一性质。
+        String admin = login("ADMIN");
+        post("/api/trade/share-rules", Map.of("dimension", "AGENT", "payeeNo", AGENT,
+                "payeeName", "测试代理 " + AGENT, "mode", "LEDGER", "rate", 0.2, "priority", 5), admin).okData();
+
+        // ST303 没有 agent_no，故 V52 没给它回填责任行；事件自带 agentNo 走回落分支
+        String no = orderNo("B");
+        OrderSettledEvent e = new OrderSettledEvent(no, CABINET, "ST303", AGENT,
+                new BigDecimal("100.00"), "AED", LocalDate.now().toString().substring(0, 7));
+        generator.generate(e);
+
+        JsonNode agent = null;
+        for (JsonNode r : sharesOf(no, login("ADMIN"))) {
+            if ("AGENT".equals(r.path("dimension").asText())) agent = r;
+        }
+        assertThat(agent).as("没配责任行 ≠ 不分账").isNotNull();
+        assertThat(agent.path("basis").asText()).as("回落记为运维分成（今天那条的实际含义）")
+                .isEqualTo("OPERATE");
+    }
+
+    @Test
+    void two_responsibilities_of_one_partner_still_idempotent() {
+        // 幂等键从 (order,dimension,payee) 放宽到含 basis。放宽是为了让同一个伙伴
+        // 在一单里有出资 + 运维两条 —— 但**重投仍然必须一条都不新增**。
+        String admin = login("ADMIN");
+        rule(admin, "AG008", "OPERATE", 0.08);
+        rule(admin, "AG008", "INVEST", 0.05);
+        long operate = responsibility(admin, MULTI_SITE, "AG008", "OPERATE");
+        long invest = responsibility(admin, MULTI_SITE, "AG008", "INVEST");
+        try {
+            String no = orderNo("D");
+            int first = generator.generate(eventAt(MULTI_SITE, no, new BigDecimal("100.00")));
+            assertThat(first).as("同一伙伴的两项责任应各分一条").isGreaterThanOrEqualTo(2);
+            assertThat(generator.generate(eventAt(MULTI_SITE, no, new BigDecimal("100.00"))))
+                    .as("事件重投必须一条都不新增").isZero();
+            assertThat(sharesOf(no, admin)).hasSize(first);
+        } finally {
+            unresponsibility(admin, MULTI_SITE, invest);
+            unresponsibility(admin, MULTI_SITE, operate);
+        }
+    }
+
+    @Test
+    void revoked_responsibility_can_be_added_back() {
+        // 撤销是逻辑删除，而唯一键不含 deleted —— 那一行仍占着键。
+        // 没有「复活」的话，运营撤销一条责任之后再想加回来就是一个 500，
+        // 而且提示里什么都看不出来（常规查询看不见已撤销的行）。
+        String admin = login("ADMIN");
+        long first = responsibility(admin, MULTI_SITE, "AG003", "INVEST");
+        unresponsibility(admin, MULTI_SITE, first);
+        long again = responsibility(admin, MULTI_SITE, "AG003", "INVEST");
+        try {
+            assertThat(again).as("复活的是原来那一行，历史不丢").isEqualTo(first);
+        } finally {
+            unresponsibility(admin, MULTI_SITE, again);
+        }
     }
 
     @Test
