@@ -418,9 +418,27 @@ export function navTabs(
   path: string, specs: readonly PageTabSpec[], role: Role | undefined,
 ): { key: string; label: string; phase?: Phase }[] {
   const target = normPath(path);
-  // 只在当前角色可见的 section 里找：门户角色与通用运营 section 互斥，
-  // 同一个 href 在两边都登记时（如 /finance?tab=settlements），要取他这一侧的名字
-  const pool = [...visibleSections(role), ...NAV];
+  const keys = specs.map((x) => (typeof x === "string" ? x : x.key));
+  /*
+   * **先认这一页主属的那个 section**。
+   *
+   * 同一个 href 可能在多个 section 登记：`/finance?tab=settlements` 在
+   * 「代理商管理 › 代理收益结算」和「财务管理 › 结算单」各有一条。按 NAV 顺序取第一个
+   * 会拿到「代理收益结算」—— 在财务页上是错的名字（实测 2026-09-23 就是这样）。
+   * 判据：**命中本页 tab 最多的那个 section 就是这一页的归属**，先从它取名，
+   * 剩下的再去别处找（门户角色的 section 优先参与评分）。
+   */
+  const score = (sec: NavSection) => (sec.children ?? []).filter((l) => {
+    const parts = leafParts(l.href);
+    return parts.path === target && parts.tab !== null && keys.includes(parts.tab);
+  }).length;
+  const visible = visibleSections(role);
+  const ranked = [...visible, ...NAV.filter((x) => !visible.includes(x))]
+    .map((sec, i) => ({ sec, s: score(sec), i }))
+    .filter((x) => x.s > 0)
+    .sort((a, b) => b.s - a.s || a.i - b.i)
+    .map((x) => x.sec);
+  const pool = [...ranked, ...visible, ...NAV];
   const out: { key: string; label: string; phase?: Phase }[] = [];
   for (const spec of specs) {
     const key = typeof spec === "string" ? spec : spec.key;

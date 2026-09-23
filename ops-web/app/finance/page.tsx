@@ -6,6 +6,8 @@ import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PageTitle, Pagination, StatCard } from "@/components/ui/misc";
+import { usePaging } from "@/lib/hooks/use-paging";
+import { useNavTabs, usePageTab } from "@/lib/hooks/use-page-tab";
 import { TabHeader } from "@/components/ui/tab-header";
 import { Toolbar } from "@/components/ui/toolbar";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
@@ -40,10 +42,13 @@ import {
   REPORT_PERIODS, REPORT_PERIOD_DEFAULT, type ReportPeriod,
 } from "@/lib/types";
 
-const SIZE = 10;
 /** 周期码 → 中文标签。取自 REPORT_PERIODS，不另抄一份。 */
 const periodLabel = (p: string) => REPORT_PERIODS.find((x) => x.value === p)?.label ?? p;
-const TABS = [{ key: "rules", label: "分润规则" }, { key: "records", label: "分润明细" }, { key: "summary", label: "分润统计", phase: 2 as const }, { key: "settlements", label: "结算单" }, { key: "ledger", label: "账务分录", phase: 2 as const }, { key: "withdrawals", label: "提现", phase: 2 as const }, { key: "reconcile", label: "对账", phase: 3 as const }, { key: "invoices", label: "发票", phase: 3 as const }, { key: "recharges", label: "充值订单", phase: 3 as const }];
+// tab 只声明「有哪些、什么顺序」。名字与权限来自 nav.ts（见 navTabs）——
+// 此前这里自己写了一份 label（把「提现审核」写成「提现」），且完全不判权：
+// 没有 finance:withdrawal:read 的角色照样看得到并点得动那个 tab。
+const TAB_KEYS = ["rules", "records", "summary", "settlements", "ledger",
+  "withdrawals", "reconcile", "invoices", "recharges"] as const;
 
 // 分润统计：维度切换器（竞品把「运营商佣金」「商户佣金」拆成两套菜单两张表，
 // 我们一张表切 dimension——列完全相同，少一次跳转）
@@ -138,9 +143,9 @@ const INVOICE_FIELDS_BASE: FieldDef[] = [
 
 function FinanceInner() {
   const sp = useSearchParams();
-  const qTab = sp.get("tab");
-  const [tab, setTab] = useState(TABS.some((t) => t.key === qTab) ? (qTab as string) : "rules");
-  const [page, setPage] = useState(1);
+  const paging = usePaging();
+  const tabs = useNavTabs("/finance", TAB_KEYS);
+  const { tab, setTab } = usePageTab(tabs, paging.reset);
   // 账务分录期间（缺省近 30 日，与坪效/绩效同一套 REPORT_PERIODS）
   const [ledgerPeriod, setLedgerPeriod] = useState<ReportPeriod>(REPORT_PERIOD_DEFAULT);
   // 凭证下钻：会计上有意义的单位是「凭证」而非单条分录（一借一贷必须等额）
@@ -191,7 +196,6 @@ function FinanceInner() {
   const [rcStatus, setRcStatus] = useState("");
   const [rcFrom, setRcFrom] = useState("");
   const [rcTo, setRcTo] = useState("");
-  useEffect(() => { if (qTab && TABS.some((t) => t.key === qTab)) { setTab(qTab); setPage(1); } }, [qTab]);
   useEffect(() => { setKeyword(""); }, [tab]);
   // 从分润统计深链过来：/finance?tab=records&payee=xxx —— 把 payee 落成分润明细的搜索词，
   // 不静默丢弃参数（本 effect 必须排在上面的清空 effect 之后，否则会被清掉）
@@ -208,17 +212,17 @@ function FinanceInner() {
   const canReadRecon = allow("finance:recon:read");
 
   const q = useQuery<PageResult<ShareRule | Settlement | Withdrawal | LedgerEntry | ShareRecord | Reconcile | Invoice | ShareSummary | RechargeOrder>>({
-    queryKey: ["fin", tab, page, keyword, ruleDim, sumDim, sumPeriod, sumSortKey, sumSortDir, rcStatus, rcFrom, rcTo, stlStatus, reconStatusFilter, invStatusFilter, ledgerPeriod],
+    queryKey: ["fin", tab, paging.page, paging.size, keyword, ruleDim, sumDim, sumPeriod, sumSortKey, sumSortDir, rcStatus, rcFrom, rcTo, stlStatus, reconStatusFilter, invStatusFilter, ledgerPeriod],
     queryFn: () =>
-      tab === "rules" ? api.listShareRules({ page, size: SIZE, keyword, dimension: ruleDim })
-      : tab === "ledger" ? api.listLedger({ page, size: SIZE, keyword, period: ledgerPeriod })
-      : tab === "settlements" ? api.listSettlements({ page, size: SIZE, keyword, status: stlStatus || undefined })
-      : tab === "records" ? api.listShareRecords({ page, size: SIZE, keyword })
-      : tab === "summary" ? api.listShareSummaries({ page, size: SIZE, keyword, dimension: sumDim, period: sumPeriod, sortKey: sumSortKey, sortDir: sumSortDir })
-      : tab === "recharges" ? api.listRechargeOrders({ page, size: SIZE, keyword, status: rcStatus || undefined, from: rcFrom || undefined, to: rcTo || undefined })
-      : tab === "reconcile" ? api.listReconciles({ page, size: SIZE, keyword, handleStatus: reconStatusFilter || undefined })
-      : tab === "invoices" ? api.listInvoices({ page, size: SIZE, keyword, status: invStatusFilter || undefined })
-      : api.listWithdrawals({ page, size: SIZE, keyword }),
+      tab === "rules" ? api.listShareRules({ page: paging.page, size: paging.size, keyword, dimension: ruleDim })
+      : tab === "ledger" ? api.listLedger({ page: paging.page, size: paging.size, keyword, period: ledgerPeriod })
+      : tab === "settlements" ? api.listSettlements({ page: paging.page, size: paging.size, keyword, status: stlStatus || undefined })
+      : tab === "records" ? api.listShareRecords({ page: paging.page, size: paging.size, keyword })
+      : tab === "summary" ? api.listShareSummaries({ page: paging.page, size: paging.size, keyword, dimension: sumDim, period: sumPeriod, sortKey: sumSortKey, sortDir: sumSortDir })
+      : tab === "recharges" ? api.listRechargeOrders({ page: paging.page, size: paging.size, keyword, status: rcStatus || undefined, from: rcFrom || undefined, to: rcTo || undefined })
+      : tab === "reconcile" ? api.listReconciles({ page: paging.page, size: paging.size, keyword, handleStatus: reconStatusFilter || undefined })
+      : tab === "invoices" ? api.listInvoices({ page: paging.page, size: paging.size, keyword, status: invStatusFilter || undefined })
+      : api.listWithdrawals({ page: paging.page, size: paging.size, keyword }),
     placeholderData: keepPreviousData,
   });
 
@@ -781,14 +785,14 @@ function FinanceInner() {
 
   return (
     <div>
-      <TabHeader tabs={TABS} value={tab} onChange={(k) => { setTab(k); setPage(1); }} />
+      <TabHeader tabs={tabs} value={tab} onChange={setTab} />
       {tab === "rules" && (
         <>
           {/* 双向视图：切的是同一张表的 dimension 参数（同分润统计的维度切换器），不是两个 tab 两套规则 */}
-          <Tabs tabs={RULE_VIEWS} value={ruleDim} onChange={(k) => { setRuleDim(k as "VENUE" | "AGENT"); setPage(1); }} />
+          <Tabs tabs={RULE_VIEWS} value={ruleDim} onChange={(k) => { setRuleDim(k as "VENUE" | "AGENT"); paging.reset(); }} />
           <Toolbar
             search={keyword}
-            onSearch={(v) => { setKeyword(v); setPage(1); }}
+            onSearch={(v) => { setKeyword(v); paging.reset(); }}
             searchPlaceholder={`搜索${RULE_VIEW_LABEL[ruleDim]}名称/规则号`}
             // 新增默认落在当前视角：在「按代理商看」下点新增却建出一条场地方规则，会当场从列表里消失
             onAdd={canEditRule ? () => setRuleForm({ dimension: ruleDim, mode: "CHANNEL_SPLIT", rate: ruleDim === "AGENT" ? 0.3 : 0.2, priority: 1 }) : undefined}
@@ -807,7 +811,7 @@ function FinanceInner() {
       {tab === "ledger" && (
         <Toolbar
           search={keyword}
-          onSearch={(v) => { setKeyword(v); setPage(1); }}
+          onSearch={(v) => { setKeyword(v); paging.reset(); }}
           searchPlaceholder="搜索账户/订单/凭证"
           onExport={() => exportCsv<LedgerEntry>("账务分录", [
             { header: "分录号", value: (l) => l.entryNo },
@@ -829,7 +833,7 @@ function FinanceInner() {
           )}
           <FilterSelect
             value={ledgerPeriod}
-            onChange={(v) => { setLedgerPeriod(v as ReportPeriod); setPage(1); }}
+            onChange={(v) => { setLedgerPeriod(v as ReportPeriod); paging.reset(); }}
             options={REPORT_PERIODS.map((x) => ({ value: x.value, label: x.label }))}
             aria-label="按记账期间筛选"
           />
@@ -838,7 +842,7 @@ function FinanceInner() {
       {tab === "settlements" && (
         <Toolbar
           search={keyword}
-          onSearch={(v) => { setKeyword(v); setPage(1); }}
+          onSearch={(v) => { setKeyword(v); paging.reset(); }}
           searchPlaceholder="搜索结算单号/对象/周期/确认人"
           onAdd={canGenSettlement ? () => setGenForm({ payeeType: "VENUE", period: SUMMARY_PERIODS[0], payeeNos: "" }) : undefined}
           addLabel="生成结算单"
@@ -856,13 +860,13 @@ function FinanceInner() {
             { header: "确认时间", value: (s) => s.confirmedAt },
           ], (q.data?.list ?? []) as Settlement[])}
         >
-          <FilterSelect value={stlStatus} onChange={(v) => { setStlStatus(v); setPage(1); }} allLabel="全部状态" options={STL_STATUS} />
+          <FilterSelect value={stlStatus} onChange={(v) => { setStlStatus(v); paging.reset(); }} allLabel="全部状态" options={STL_STATUS} />
         </Toolbar>
       )}
       {tab === "withdrawals" && (
         <Toolbar
           search={keyword}
-          onSearch={(v) => { setKeyword(v); setPage(1); }}
+          onSearch={(v) => { setKeyword(v); paging.reset(); }}
           searchPlaceholder="搜索提现号/对象/审批人"
           onExport={() => exportCsv<Withdrawal>("提现", [
             { header: "提现号", value: (w) => w.withdrawNo },
@@ -884,7 +888,7 @@ function FinanceInner() {
       {tab === "records" && (
         <Toolbar
           search={keyword}
-          onSearch={(v) => { setKeyword(v); setPage(1); }}
+          onSearch={(v) => { setKeyword(v); paging.reset(); }}
           searchPlaceholder="搜索明细号/订单/分成方编号或名称"
           onExport={() => exportCsv<ShareRecord>("分润明细", [
             { header: "明细号", value: (r) => r.recordNo },
@@ -903,10 +907,10 @@ function FinanceInner() {
       {tab === "summary" && (
         <>
           {/* 维度切换器：切的是同一张表的 dimension 参数，不是两个 tab */}
-          <Tabs tabs={SUMMARY_DIMS} value={sumDim} onChange={(k) => { setSumDim(k); setPage(1); }} />
+          <Tabs tabs={SUMMARY_DIMS} value={sumDim} onChange={(k) => { setSumDim(k); paging.reset(); }} />
           <Toolbar
             search={keyword}
-            onSearch={(v) => { setKeyword(v); setPage(1); }}
+            onSearch={(v) => { setKeyword(v); paging.reset(); }}
             searchPlaceholder="搜索分成方名称/编号"
             onExport={() => exportCsv<ShareSummary>(`分润统计-${sumDim === "VENUE" ? "场地方" : "代理商"}-${sumPeriod}`, [
               { header: "分成方", value: (s) => s.payeeName },
@@ -921,14 +925,14 @@ function FinanceInner() {
               { header: "币种", value: (s) => s.currency },
             ], (q.data?.list ?? []) as ShareSummary[])}
           >
-            <FilterSelect value={sumPeriod} onChange={(v) => { setSumPeriod(v); setPage(1); }} options={PERIOD_OPTIONS} />
+            <FilterSelect value={sumPeriod} onChange={(v) => { setSumPeriod(v); paging.reset(); }} options={PERIOD_OPTIONS} />
           </Toolbar>
         </>
       )}
       {tab === "recharges" && (
         <Toolbar
           search={keyword}
-          onSearch={(v) => { setKeyword(v); setPage(1); }}
+          onSearch={(v) => { setKeyword(v); paging.reset(); }}
           searchPlaceholder="搜索充值单号/用户/网关流水号"
           onExport={() => exportCsv<RechargeOrder>("充值订单", [
             { header: "充值单号", value: (r) => r.rechargeNo },
@@ -946,11 +950,11 @@ function FinanceInner() {
             { header: "网关流水号", value: (r) => r.psgTxnNo },
           ], (q.data?.list ?? []) as RechargeOrder[])}
         >
-          <FilterSelect value={rcStatus} onChange={(v) => { setRcStatus(v); setPage(1); }} allLabel="全部状态" options={RECHARGE_STATUS} />
+          <FilterSelect value={rcStatus} onChange={(v) => { setRcStatus(v); paging.reset(); }} allLabel="全部状态" options={RECHARGE_STATUS} />
           {/* 日期范围按下单时间：待支付/失败单没有支付时间，用支付时间会把它们全筛掉 */}
-          <DateInput className="w-40" aria-label="下单时间起" value={rcFrom} onChange={(e) => { setRcFrom(e.target.value); setPage(1); }} />
+          <DateInput className="w-40" aria-label="下单时间起" value={rcFrom} onChange={(e) => { setRcFrom(e.target.value); paging.reset(); }} />
           <span className="text-muted-foreground">~</span>
-          <DateInput className="w-40" aria-label="下单时间止" value={rcTo} onChange={(e) => { setRcTo(e.target.value); setPage(1); }} />
+          <DateInput className="w-40" aria-label="下单时间止" value={rcTo} onChange={(e) => { setRcTo(e.target.value); paging.reset(); }} />
         </Toolbar>
       )}
       {tab === "reconcile" && (
@@ -982,7 +986,7 @@ function FinanceInner() {
           </div>
           <Toolbar
             search={keyword}
-            onSearch={(v) => { setKeyword(v); setPage(1); }}
+            onSearch={(v) => { setKeyword(v); paging.reset(); }}
             searchPlaceholder="搜索批次号/周期/处理人/结论"
             onExport={() => exportCsv<Reconcile>("对账", [
               { header: "批次号", value: (r) => r.batchNo },
@@ -1001,14 +1005,14 @@ function FinanceInner() {
               { header: "跑批时间", value: (r) => r.createdAt },
             ], (q.data?.list ?? []) as Reconcile[])}
           >
-            <FilterSelect value={reconStatusFilter} onChange={(v) => { setReconStatusFilter(v); setPage(1); }} allLabel="全部处置进度" options={RECON_HANDLE_STATUS} />
+            <FilterSelect value={reconStatusFilter} onChange={(v) => { setReconStatusFilter(v); paging.reset(); }} allLabel="全部处置进度" options={RECON_HANDLE_STATUS} />
           </Toolbar>
         </>
       )}
       {tab === "invoices" && (
         <Toolbar
           search={keyword}
-          onSearch={(v) => { setKeyword(v); setPage(1); }}
+          onSearch={(v) => { setKeyword(v); paging.reset(); }}
           searchPlaceholder="搜索发票号/抬头/税号/来源单号/票号"
           onAdd={canEditInvoice ? () => setInvoiceForm({ currency: "AED", amount: 0 }) : undefined}
           addLabel="登记发票草稿"
@@ -1029,7 +1033,7 @@ function FinanceInner() {
             { header: "作废原因", value: (i) => i.voidReason },
           ], (q.data?.list ?? []) as Invoice[])}
         >
-          <FilterSelect value={invStatusFilter} onChange={(v) => { setInvStatusFilter(v); setPage(1); }} allLabel="全部状态" options={INV_STATUS} />
+          <FilterSelect value={invStatusFilter} onChange={(v) => { setInvStatusFilter(v); paging.reset(); }} allLabel="全部状态" options={INV_STATUS} />
         </Toolbar>
       )}
       {tab === "rules" && (
@@ -1037,15 +1041,15 @@ function FinanceInner() {
           rowKey={(r: ShareRule) => r.ruleNo}
           columns={ruleCols}
           rows={q.data?.list as ShareRule[]}
-          loading={q.isLoading}
+          loading={q.isLoading} error={q.error} onRetry={q.refetch}
           empty={`当前视角（${RULE_VIEW_LABEL[ruleDim]}）暂无分润规则——换个视角看看，或点右上新增为该${RULE_VIEW_LABEL[ruleDim]}配置分成比例，否则订单收入全归平台`}
         />
       )}
-      {tab === "ledger" && <DataTable rowKey={(l: LedgerEntry) => l.entryNo} columns={ledgerCols} rows={q.data?.list as LedgerEntry[]} loading={q.isLoading} empty={`${periodLabel(ledgerPeriod)}内没有账务分录——订单结算与分账完成后自动记账，可换更长的期间或放宽搜索条件`} />}
+      {tab === "ledger" && <DataTable rowKey={(l: LedgerEntry) => l.entryNo} columns={ledgerCols} rows={q.data?.list as LedgerEntry[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty={`${periodLabel(ledgerPeriod)}内没有账务分录——订单结算与分账完成后自动记账，可换更长的期间或放宽搜索条件`} />}
       {tab === "settlements" && !canGenSettlement && !canConfirmSettlement && (
         <ReadOnlyNotice what="结算单生成/确认" perm={["finance:settlement:generate", ":confirm"]} />
       )}
-      {tab === "settlements" && <DataTable rowKey={(s: Settlement) => s.settleNo} columns={stlCols} rows={q.data?.list as Settlement[]} loading={q.isLoading} empty="暂无结算单——点右上「生成结算单」按周期出账（金额取该周期分润明细汇总），或放宽筛选条件" />}
+      {tab === "settlements" && <DataTable rowKey={(s: Settlement) => s.settleNo} columns={stlCols} rows={q.data?.list as Settlement[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无结算单——点右上「生成结算单」按周期出账（金额取该周期分润明细汇总），或放宽筛选条件" />}
       {tab === "withdrawals" && !canAuditWithdrawal && <ReadOnlyNotice what="提现审批" perm="finance:withdrawal:audit" />}
       {/* 手续费口径必须写明出处：审批人看到的数从哪来、改哪里能改，否则「唯一来源」只是一句话 */}
       {tab === "withdrawals" && (
@@ -1066,18 +1070,18 @@ function FinanceInner() {
           )}
         </Notice>
       )}
-      {tab === "withdrawals" && <DataTable rowKey={(w: Withdrawal) => w.withdrawNo} columns={wdCols} rows={q.data?.list as Withdrawal[]} loading={q.isLoading} empty="暂无提现申请——场地方/代理商发起提现后在此审批，通过才会进入打款队列" />}
-      {tab === "records" && <DataTable rowKey={(r: ShareRecord) => r.recordNo} columns={recordCols} rows={q.data?.list as ShareRecord[]} loading={q.isLoading} empty="暂无分润明细——订单结算时按「分润规则」逐笔生成，先确认规则已配置" />}
+      {tab === "withdrawals" && <DataTable rowKey={(w: Withdrawal) => w.withdrawNo} columns={wdCols} rows={q.data?.list as Withdrawal[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无提现申请——场地方/代理商发起提现后在此审批，通过才会进入打款队列" />}
+      {tab === "records" && <DataTable rowKey={(r: ShareRecord) => r.recordNo} columns={recordCols} rows={q.data?.list as ShareRecord[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无分润明细——订单结算时按「分润规则」逐笔生成，先确认规则已配置" />}
       {tab === "summary" && (
         <DataTable
           rowKey={(s: ShareSummary) => `${s.dimension}-${s.payeeNo}-${s.period}`}
           columns={summaryCols}
           rows={q.data?.list as ShareSummary[]}
-          loading={q.isLoading}
+          loading={q.isLoading} error={q.error} onRetry={q.refetch}
           empty={`${sumPeriod} 该维度暂无分润统计 —— 换个周期，或确认该周期已有已结算订单`}
           sortKey={sumSortKey}
           sortDir={sumSortDir}
-          onSortChange={(k, d) => { setSumSortKey(k); setSumSortDir(d); setPage(1); }}
+          onSortChange={(k, d) => { setSumSortKey(k); setSumSortDir(d); paging.reset(); }}
         />
       )}
       {tab === "recharges" && (
@@ -1085,19 +1089,22 @@ function FinanceInner() {
           rowKey={(r: RechargeOrder) => r.rechargeNo}
           columns={rechargeCols}
           rows={q.data?.list as RechargeOrder[]}
-          loading={q.isLoading}
+          loading={q.isLoading} error={q.error} onRetry={q.refetch}
           empty="暂无充值订单 —— 该筛选条件下没有记录，或用户尚未使用钱包充值"
         />
       )}
       {tab === "reconcile" && !canHandleRecon && (
         <ReadOnlyNotice what="对账差错处理" perm="finance:recon:handle" />
       )}
-      {tab === "reconcile" && <DataTable rowKey={(r: Reconcile) => r.batchNo} columns={reconcileCols} rows={q.data?.list as Reconcile[]} loading={q.isLoading} empty="暂无对账批次——每日与 nearpay 流水自动跑批比对，本周期尚未生成批次；也可能是「处置进度」筛窄了" />}
+      {tab === "reconcile" && <DataTable rowKey={(r: Reconcile) => r.batchNo} columns={reconcileCols} rows={q.data?.list as Reconcile[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无对账批次——每日与 nearpay 流水自动跑批比对，本周期尚未生成批次；也可能是「处置进度」筛窄了" />}
       {tab === "invoices" && !canEditInvoice && !canVoidInvoice && (
         <ReadOnlyNotice what="发票开具/作废" perm={["finance:invoice:issue", ":void"]} />
       )}
-      {tab === "invoices" && <DataTable rowKey={(i: Invoice) => i.invoiceNo} columns={invoiceCols} rows={q.data?.list as Invoice[]} loading={q.isLoading} empty="暂无发票——商户提出开票需求后点右上「登记发票草稿」挂到对应结算单，再开具" />}
-      {q.data && <Pagination page={page} size={SIZE} total={q.data.total} onPage={setPage} />}
+      {tab === "invoices" && <DataTable rowKey={(i: Invoice) => i.invoiceNo} columns={invoiceCols} rows={q.data?.list as Invoice[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无发票——商户提出开票需求后点右上「登记发票草稿」挂到对应结算单，再开具" />}
+      {/* 9 个 tab 共用同一个查询与同一条分页条，所以这里是 DataTable + Pagination
+          而不是 PagedTable：共用查询是 union 类型，逐 tab 断言反而更容易出错。
+          代价是错误态要自己接——上面每个列表都接了，棘轮 lib/table-wiring.test.ts 守住不回退。 */}
+      {q.data && <Pagination page={paging.page} size={paging.size} total={q.data.total} onPage={paging.setPage} onSize={paging.setSize} />}
 
       {/* 提现审批抽屉：通过 → 转打款中；驳回必填原因；审批人取当前登录账号 */}
       <Drawer
@@ -1195,6 +1202,8 @@ function FinanceInner() {
               columns={recordCols.filter((c) => c.header !== "维度" && c.header !== "分成方")}
               rows={stlRecordsQ.data?.list}
               loading={stlRecordsQ.isLoading}
+              error={stlRecordsQ.error}
+              onRetry={stlRecordsQ.refetch}
               empty="该周期没有分润明细——理论上不该出现（无明细不允许出单），若看到请核对分润规则"
             />
           </>
@@ -1386,6 +1395,8 @@ function FinanceInner() {
               columns={reconDiffCols}
               rows={reconDiffsQ.data}
               loading={reconDiffsQ.isLoading}
+              error={reconDiffsQ.error}
+              onRetry={reconDiffsQ.refetch}
               empty="该批次没有差错明细——理论上不该出现（有差额必有逐笔差错），若看到请核对跑批作业"
             />
           </>
