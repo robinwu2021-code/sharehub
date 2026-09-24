@@ -21081,7 +21081,7 @@
    "handler": "FinanceController#createShareRule",
    "summary": "",
    "params": [],
-   "bodyType": "ShareRule",
+   "bodyType": "FinDtos.ShareRuleReq",
    "returnType": "FinDtos.ShareRule",
    "returnContainer": null,
    "returnElement": "FinDtos.ShareRule",
@@ -21154,15 +21154,15 @@
     },
     {
      "name": "rate",
-     "type": "BigDecimal"
-    },
-    {
-     "name": "priority",
-     "type": "Integer"
+     "type": "java.math.BigDecimal"
     },
     {
      "name": "formula",
      "type": "String"
+    },
+    {
+     "name": "priority",
+     "type": "Integer"
     },
     {
      "name": "currency",
@@ -21187,7 +21187,7 @@
      "required": true
     }
    ],
-   "bodyType": "ShareRule",
+   "bodyType": "FinDtos.ShareRuleReq",
    "returnType": "FinDtos.ShareRule",
    "returnContainer": null,
    "returnElement": "FinDtos.ShareRule",
@@ -21260,15 +21260,15 @@
     },
     {
      "name": "rate",
-     "type": "BigDecimal"
-    },
-    {
-     "name": "priority",
-     "type": "Integer"
+     "type": "java.math.BigDecimal"
     },
     {
      "name": "formula",
      "type": "String"
+    },
+    {
+     "name": "priority",
+     "type": "Integer"
     },
     {
      "name": "currency",
@@ -28075,6 +28075,16 @@
    "PAID",
    "FAILED"
   ],
+  "AudienceType": [
+   "ALL",
+   "MEMBER_LEVEL",
+   "SEGMENT"
+  ],
+  "PushStatus": [
+   "DRAFT",
+   "SCHEDULED",
+   "SENDING"
+  ],
   "Provider": [
    "WECHAT_MP",
    "WECHAT_OA",
@@ -28240,7 +28250,7 @@
  "conflicts": {},
  "stats": {
   "endpoints": 421,
-  "records": 294,
+  "records": 295,
   "withPerm": 361,
   "withBody": 183,
   "shapedResponses": 317

@@ -28,7 +28,7 @@ public interface ShareService {
                                                String period, String sortKey, String sortDir);
 
     /** 规则 upsert：{@code ruleNo} 为空则取号新建（前缀 {@code SR}），否则按业务键更新。 */
-    FinDtos.ShareRule saveRule(ShareRule body);
+    FinDtos.ShareRule saveRule(FinDtos.ShareRuleReq req);
 
     /** 分润规则分页。{@code keyword} 匹配规则号/收款方编号/收款方名。 */
     PageResult<FinDtos.ShareRule> pageRules(Integer page, Integer size, String keyword);

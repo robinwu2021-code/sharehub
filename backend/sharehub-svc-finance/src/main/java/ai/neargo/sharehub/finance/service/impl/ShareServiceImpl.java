@@ -137,8 +137,26 @@ public class ShareServiceImpl implements ShareService {
     // ——————————————————————— 分润规则 ———————————————————————
 
     @Override
-    public FinDtos.ShareRule saveRule(ShareRule body) {
-        if (body == null) throw new IllegalArgumentException("分润规则不能为空");
+    public FinDtos.ShareRule saveRule(FinDtos.ShareRuleReq req) {
+        if (req == null) throw new IllegalArgumentException("分润规则不能为空");
+        /*
+         * **入参是 Req 白名单，不再是实体。**
+         * 本方法是手写保存（不走 AbstractCrudService），那次批量赋值集中加固对它不生效 ——
+         * 此前只回填了 id/version/tenantId，而实体还带着 deleted/createdAt/createdBy，
+         * 客户端传什么就写什么：传 {"deleted":1} 能绕过归档语义软删，传 createdBy 能伪造审计。
+         * 现在这些字段**根本不在入参里**，多传的键 Jackson 直接丢掉。
+         */
+        ShareRule body = new ShareRule();
+        body.setRuleNo(req.ruleNo());
+        body.setDimension(req.dimension());
+        body.setPayeeNo(req.payeeNo());
+        body.setPayeeName(req.payeeName());
+        body.setBasis(req.basis());
+        body.setMode(req.mode());
+        body.setRate(req.rate());
+        body.setFormula(req.formula());
+        body.setPriority(req.priority());
+        body.setCurrency(req.currency());
         // 取价按 payee_no **精确匹配**（ShareGeneratorImpl.ruleOf）。没有编号的规则
         // 一条都命中不了 —— 界面上看着配好了，分账时那个分成方却拿不到钱，而且不报错。
         // 这是「按名字连」那类错误里最贵的一种：错的不是显示，是钱。

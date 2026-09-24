@@ -22,6 +22,24 @@ public final class FinDtos {
     // ——————————————————————— 分润 ———————————————————————
 
     /** 分润规则行，镜像前端 {@code ShareRule}（+ 落库补的 payeeNo/formula/currency）。 */
+    /**
+     * 分润规则**写入参**（白名单）。
+     *
+     * <p>此前这两个端点直接收实体 {@code finance.entity.ShareRule} —— 它继承 BaseEntity，
+     * 带着 {@code deleted} / {@code createdAt} / {@code createdBy}。而 saveRule 是**手写保存**，
+     * 不走 AbstractCrudService，那次集中加固对它**不生效**：只回填了 id/version/tenantId，
+     * 剩下三个客户端传什么就写什么（MyBatis-Plus 的 updateById 只写非 null 字段）。
+     * 于是往编辑端点传 {@code {"deleted":1}} 能绕过归档语义软删一条规则，
+     * 传 {@code createdBy} 能伪造审计痕迹 —— 而分润规则正是结算争议时要翻的那张表。
+     *
+     * <p>改成只声明**业务上真该由表单改的字段**：多传的键会被 Jackson 丢掉，
+     * 不再需要逐个记得去锁（黑名单 → 白名单）。
+     */
+    public record ShareRuleReq(String ruleNo, String dimension, String payeeNo, String payeeName,
+                               String basis, String mode, java.math.BigDecimal rate, String formula,
+                               Integer priority, String currency) {
+    }
+
     public record ShareRule(String ruleNo, String dimension, String payeeNo, String payeeName,
                             String basis, String mode, BigDecimal rate, Integer priority,
                             String formula, String currency) {

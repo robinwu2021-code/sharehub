@@ -108,6 +108,38 @@ class AuditFieldChangesTest extends AuditTestSupport {
      * 第一版用错了，测试红在「没有 diff」上，而真实原因是它一直在新建 ——
      * 新建没有「改前」，本来就不该有 diff。
      */
+    @Test
+    @DisplayName("★★★ 往分润规则的编辑端点塞 deleted / createdBy —— 一个都不许生效")
+    void editing_a_share_rule_cannot_soft_delete_it_or_forge_its_audit_trail() {
+        String admin = login("ADMIN");
+        String ruleNo = createRule(admin, "0.08");
+
+        /*
+         * 2026-09-24 之前这两个字段是**真能写进去**的：
+         * 端点收的是实体 ShareRule（继承 BaseEntity，带 deleted / createdAt / createdBy），
+         * 而 saveRule 是手写保存、不走 AbstractCrudService —— 那次批量赋值集中加固
+         * 对它不生效，只回填了 id/version/tenantId。于是：
+         *   · {"deleted":1}   → 绕过归档语义把规则软删掉；
+         *   · {"createdBy":…} → 伪造审计痕迹，而分润规则正是结算争议时要翻的那张表。
+         * 改成 ShareRuleReq 白名单后，这些键根本不在入参里。
+         */
+        Map<String, Object> poisoned = ruleBody(ruleNo, "0.05");
+        poisoned.put("deleted", 1);
+        poisoned.put("createdBy", "forged.user");
+        poisoned.put("tenantId", "OTHER_TENANT");
+        post("/api/trade/share-rules/" + ruleNo, poisoned, admin).okData();
+
+        // 还查得到 = 没被软删；列表按 tenant 隔离，查得到也说明没被搬走
+        JsonNode after = get("/api/trade/share-rules?keyword=" + ruleNo, admin).okData();
+        JsonNode row = after.path("list").path(0);
+        assertThat(row.path("ruleNo").asText())
+                .as("规则被 deleted:1 软删了 —— 编辑端点不该能删东西")
+                .isEqualTo(ruleNo);
+        assertThat(row.path("rate").asText())
+                .as("正常字段仍应改得动（别把白名单收得过窄）")
+                .isEqualTo("0.05");
+    }
+
     private String createRule(String admin, String rate) {
         Map<String, Object> b = ruleBody(null, rate);
         b.put("payeeName", "[改前改后测试] 分成方");

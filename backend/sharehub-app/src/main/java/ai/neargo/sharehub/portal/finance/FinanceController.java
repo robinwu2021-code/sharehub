@@ -104,16 +104,23 @@ public class FinanceController {
 
     @PostMapping("/api/trade/share-rules")
     @PreAuthorize("@perm.can('finance:share_rule:create')")
-    public FinDtos.ShareRule createShareRule(@RequestBody ShareRule body) {
-        body.setRuleNo(null); // 新建一律服务端取号，忽略 body 里的键
-        return shareService.saveRule(body);
+    public FinDtos.ShareRule createShareRule(@RequestBody FinDtos.ShareRuleReq body) {
+        // 新建一律服务端取号，忽略 body 里的键。record 不可变，重建一个把 ruleNo 清掉
+        return shareService.saveRule(withRuleNo(body, null));
     }
 
     @PostMapping("/api/trade/share-rules/{ruleNo}")
     @PreAuthorize("@perm.can('finance:share_rule:create')")
-    public FinDtos.ShareRule updateShareRule(@PathVariable String ruleNo, @RequestBody ShareRule body) {
-        body.setRuleNo(ruleNo); // 路径为准，防越权改他人规则
-        return shareService.saveRule(body);
+    public FinDtos.ShareRule updateShareRule(@PathVariable String ruleNo,
+                                            @RequestBody FinDtos.ShareRuleReq body) {
+        // 路径为准，防越权改他人规则
+        return shareService.saveRule(withRuleNo(body, ruleNo));
+    }
+
+    /** 只替换 ruleNo，其余照抄 —— record 不可变，没有 setter。 */
+    private static FinDtos.ShareRuleReq withRuleNo(FinDtos.ShareRuleReq r, String ruleNo) {
+        return new FinDtos.ShareRuleReq(ruleNo, r.dimension(), r.payeeNo(), r.payeeName(),
+                r.basis(), r.mode(), r.rate(), r.formula(), r.priority(), r.currency());
     }
 
     // ——————————————————————— 结算（菜单叶：结算单 / 代理收益结算）———————————————————————

@@ -247,16 +247,6 @@ PricePlan.scope
 PricePlan.status
 PricePlan.unitMinutes
 PricePlan.unitPrice
-ShareRule.basis
-ShareRule.currency
-ShareRule.dimension
-ShareRule.formula
-ShareRule.mode
-ShareRule.payeeName
-ShareRule.payeeNo
-ShareRule.priority
-ShareRule.rate
-ShareRule.ruleNo
 SysAppVersion.buildNo
 SysAppVersion.downloadUrl
 SysAppVersion.forceUpdate
