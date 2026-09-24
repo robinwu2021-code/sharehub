@@ -40,7 +40,16 @@ export interface AuthState {
    */
   role: Role | "";
   /**
-   * **后端下发的权限码**（`GET /api/auth/me` 的 `perms`）。判权唯一依据。
+   * **后端下发的权限码**。判权唯一依据。
+   *
+   * 来源是**登录响应**（`POST /api/auth/login`）与**切主体响应**
+   * （`POST /api/auth/operators/{agentNo}/switch`）—— 两者都直接带 `perms`。
+   * 此处原先写着「`GET /api/auth/me` 的 perms」，但那个端点前端**从未调用过**，
+   * 它只存在于这条注释里。2026-09-24 改为事实。
+   *
+   * ⚠️ 已知限制：perms 只在登录与切主体时刷新。管理员中途改了某人的权限，
+   * 当事人必须重新登录才生效。后端备有 `GET /api/auth/me` 与
+   * `GET /api/auth/permissions` 可用于刷新，接不接是产品决定，别顺手接。
    *
    * `["*"]` = 超管通配。空数组 = 零权限（**不是「还没加载」**：未登录本来就该什么都看不见）。
    *
@@ -81,8 +90,6 @@ export interface AuthState {
    * 只改 operatorNo 而不换 token，会出现「界面切了、数据还是上一家」且不报错。
    */
   switchOperator: (operatorNo: string, session: { token: string; perms: string[]; username: string }) => void;
-  /** 覆盖身份（切主体后重拉 `/me` 的结果落这里）。 */
-  refreshIdentity: (v: { role: Role | ""; perms: string[] }) => void;
   /** **只清本地状态**，不发请求。吊销服务端会话用 `signOut()`（lib/api/session）。 */
   logout: () => void;
   loggedIn: () => boolean;
@@ -125,7 +132,6 @@ export const useAuth = create<AuthState>()(
           operatorGen: get().operatorGen + 1,
         });
       },
-      refreshIdentity: (v) => set({ role: v.role, perms: v.perms }),
       // perms / memberships 也要清：漏掉任一个，登出后 localStorage 里还留着
       // 上一个人的权限，而 http-client 是直接读 localStorage 的。
       logout: () => set({ ...EMPTY, operatorGen: get().operatorGen + 1 }),

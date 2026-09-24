@@ -7,8 +7,8 @@ import { UI_PERM_MAP, UNIMPLEMENTED } from "./perm-map";
 /**
  * 后端角色表的**前端镜像**。
  *
- * ⚠️ **它不再是判权依据**（2026-09-23，D6a）。判权读的是后端 `GET /api/auth/me` 下发的
- * `perms`，见 {@link can}。这份镜像只剩两个用途：
+ * ⚠️ **它不再是判权依据**（2026-09-23，D6a）。判权读的是**后端下发的** `perms`
+ * —— 来自登录响应与切主体响应，见 {@link can}。这份镜像只剩两个用途：
  *
  * 1. **mock 模式**（`NEXT_PUBLIC_USE_MOCK != 0`）—— 离线开发时没有后端可下发，按角色展开；
  * 2. **对账** —— `permissions.test.ts` 拿它与后端 `RolePerms.java` 比对，漂了就红。
