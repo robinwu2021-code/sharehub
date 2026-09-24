@@ -4,7 +4,7 @@
 // 重开抽屉又变回原值——用户完全看不出来。这里断言 saveRoleDataScope 真的改了数据、
 // 并且 ALL/SELF 会清空 scopeRefs（否则残留脏 refs 会被后端 DataScopeHandler 误用）。
 import { describe, expect, it, beforeEach } from "vitest";
-import { roles, saveRoleDataScope, normalizeScopeValues } from "./org";
+import { roles, saveDataScope, getDataScope, normalizeScopeValues } from "./org";
 import { regions } from "./system";
 import { sites } from "./location";
 import { agents } from "./agent";
@@ -20,37 +20,37 @@ beforeEach(() => {
 
 describe("saveRoleDataScope 真的改了数据", () => {
   it("写入后从 roles 数组读回的就是新值（重开抽屉能读回）", () => {
-    const ret = saveRoleDataScope("OPS", "LOCATION", "ST300,ST301");
-    expect(ret.dataScope).toBe("LOCATION");
+    const ret = saveDataScope("ROLE", "OPS", "SITE", "ST300,ST301");
+    expect(ret.scopeType).toBe("SITE");
     expect(ret.scopeRefs).toBe("ST300,ST301");
     // 关键：不是只改了返回值的副本，数组里那条记录本身也变了
-    expect(find("OPS").dataScope).toBe("LOCATION");
+    expect(find("OPS").dataScope).toBe("SITE");
     expect(find("OPS").scopeRefs).toBe("ST300,ST301");
   });
 
   it("连续两次写入以最后一次为准（覆盖写语义）", () => {
-    saveRoleDataScope("BD", "REGION", "AE-DU");
-    saveRoleDataScope("BD", "AGENT", "AG003");
+    saveDataScope("ROLE", "BD", "REGION", "AE-DU");
+    saveDataScope("ROLE", "BD", "AGENT", "AG003");
     expect(find("BD")).toMatchObject({ dataScope: "AGENT", scopeRefs: "AG003" });
   });
 
   it("角色码不存在时抛错（不静默新建脏角色）", () => {
-    expect(() => saveRoleDataScope("NO_SUCH_ROLE", "ALL")).toThrow();
+    expect(() => saveDataScope("ROLE", "NO_SUCH_ROLE", "ALL")).toThrow();
     expect(roles.some((r) => r.code === "NO_SUCH_ROLE")).toBe(false);
   });
 });
 
 describe("ALL / SELF 清空 scopeRefs", () => {
   it("原本有范围值的角色改成 ALL → scopeRefs 清空", () => {
-    saveRoleDataScope("OPS", "REGION", "AE-DU,AE-AZ");
+    saveDataScope("ROLE", "OPS", "REGION", "AE-DU,AE-AZ");
     expect(find("OPS").scopeRefs).toBe("AE-DU,AE-AZ");
-    saveRoleDataScope("OPS", "ALL", "AE-DU,AE-AZ"); // 即使调用方仍传了值
+    saveDataScope("ROLE", "OPS", "ALL", "AE-DU,AE-AZ"); // 即使调用方仍传了值
     expect(find("OPS").scopeRefs).toBe("");
   });
 
   it("改成 SELF → scopeRefs 清空", () => {
     // 用 CS 而非 AGENT：AGENT 角色的数据范围被服务端守卫锁死（见下方越权守卫用例）
-    saveRoleDataScope("CS", "SELF", "AG001,AG002");
+    saveDataScope("ROLE", "CS", "SELF", "AG001,AG002");
     expect(find("CS")).toMatchObject({ dataScope: "SELF", scopeRefs: "" });
   });
 });
@@ -62,7 +62,7 @@ describe("CSV 归一", () => {
     expect(normalizeScopeValues("")).toBe("");
   });
   it("saveRoleDataScope 落库前也走归一", () => {
-    saveRoleDataScope("CS", "REGION", "AE-DU, AE-DU ,AE-SH");
+    saveDataScope("ROLE", "CS", "REGION", "AE-DU, AE-DU ,AE-SH");
     expect(find("CS").scopeRefs).toBe("AE-DU,AE-SH");
   });
 });
@@ -82,7 +82,7 @@ describe("scopeRefs 引用真实主数据（配合 integrity.test.ts，CSV 字�
         continue;
       }
       const [pool, to] = r.dataScope === "REGION" ? [regionIds, "regions.regionId"]
-        : r.dataScope === "LOCATION" ? [siteNos, "sites.siteNo"]
+        : r.dataScope === "SITE" ? [siteNos, "sites.siteNo"]
         : [agentNos, "agents.agentNo"];
       for (const v of values) {
         if (!(pool as Set<string>).has(v)) bad.push(`roles[${r.code}].scopeRefs 的 "${v}" 不存在于 ${to}`);
@@ -94,15 +94,42 @@ describe("scopeRefs 引用真实主数据（配合 integrity.test.ts，CSV 字�
 
 describe("AGENT 角色数据范围越权守卫", () => {
   it("不能把 AGENT 角色改成别的范围档", () => {
-    expect(() => saveRoleDataScope("AGENT", "ALL")).toThrow(/强制为自己 agent_no/);
-    expect(() => saveRoleDataScope("AGENT", "REGION", "AE-DU")).toThrow(/强制为自己 agent_no/);
+    expect(() => saveDataScope("ROLE", "AGENT", "ALL")).toThrow(/强制为自己 agent_no/);
+    expect(() => saveDataScope("ROLE", "AGENT", "REGION", "AE-DU")).toThrow(/强制为自己 agent_no/);
   });
   it("不能给 AGENT 角色指定其它代理（绕过 UI 直调接口同样被拒）", () => {
-    expect(() => saveRoleDataScope("AGENT", "AGENT", "AG001,AG002")).toThrow(/不可更改或指定其它代理/);
+    expect(() => saveDataScope("ROLE", "AGENT", "AGENT", "AG001,AG002")).toThrow(/不可更改或指定其它代理/);
   });
   it("AGENT 保持自身语义（AGENT 档 + 空范围值）是允许的", () => {
-    const r = saveRoleDataScope("AGENT", "AGENT", "");
-    expect(r.dataScope).toBe("AGENT");
+    const r = saveDataScope("ROLE", "AGENT", "AGENT", "");
+    expect(r.scopeType).toBe("AGENT");
     expect(r.scopeRefs).toBe("");
+  });
+});
+
+describe("员工级数据范围（A3）", () => {
+  // 后端这个端点本来就是 ROLE|EMPLOYEE 通用的，而前端此前把 subjectType 写死成 ROLE。
+  // 后果：「某个员工要比他的角色看得更窄/更宽」做不到，只能给他单开一个角色 ——
+  // 而角色是给一类人用的，为一个人开一个会让角色表迅速失去意义。
+  it("员工的范围与角色的范围互不干扰", () => {
+    saveDataScope("ROLE", "OPS", "SITE", "ST300");
+    saveDataScope("EMPLOYEE", "E101", "AGENT", "AG002");
+
+    expect(getDataScope("EMPLOYEE", "E101").scopeType).toBe("AGENT");
+    expect(getDataScope("EMPLOYEE", "E101").scopeRefs).toBe("AG002");
+    // 角色那一条没被员工的写入带偏
+    expect(getDataScope("ROLE", "OPS").scopeType).toBe("SITE");
+  });
+
+  it("没配过的员工读回 ALL——而不是报错或空值", () => {
+    // 抽屉要拿它当初始值。返回空值的话，运营点一下保存就把范围设成了「什么都没选」。
+    expect(getDataScope("EMPLOYEE", "E-never-configured").scopeType).toBe("ALL");
+  });
+
+  it("写入后读得回来（重开抽屉不会变回原值）", () => {
+    saveDataScope("EMPLOYEE", "E102", "REGION", "R1,R2");
+    expect(getDataScope("EMPLOYEE", "E102").scopeRefs).toBe("R1,R2");
+    saveDataScope("EMPLOYEE", "E102", "ALL");
+    expect(getDataScope("EMPLOYEE", "E102").scopeRefs).toBe("");
   });
 });

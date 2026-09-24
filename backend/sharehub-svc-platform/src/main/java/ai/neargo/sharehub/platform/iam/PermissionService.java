@@ -6,6 +6,8 @@ import ai.neargo.common.security.rbac.AuthSubject;
 import ai.neargo.common.security.rbac.PermissionResolver;
 import ai.neargo.sharehub.auth.LoginUser;
 import ai.neargo.sharehub.auth.PrincipalRefresher;
+import ai.neargo.sharehub.platform.org.service.DataScopeSubject;
+import ai.neargo.sharehub.platform.org.service.DataScopeType;
 import ai.neargo.sharehub.auth.Realm;
 import ai.neargo.sharehub.platform.iam.entity.IamEntities.IamDataScope;
 import ai.neargo.sharehub.platform.iam.entity.IamEntities.IamRolePerm;
@@ -73,17 +75,18 @@ public class PermissionService implements PrincipalRefresher, PermissionResolver
      */
     public DataScopeSpec scopeOf(List<String> roleCodes, Realm realm, String agentNo, String userNo) {
         if (realm == Realm.AGENT && agentNo != null && !agentNo.isBlank()) {
-            return DataScopeSpec.of("AGENT", Set.of(agentNo));
+            return DataScopeSpec.of(DataScopeType.AGENT.name(), Set.of(agentNo));
         }
         if (userNo != null && !userNo.isBlank()) {
             IamDataScope own = dataScopeMapper.selectOne(new LambdaQueryWrapper<IamDataScope>()
-                    .eq(IamDataScope::getSubjectType, "EMPLOYEE")
+                    .eq(IamDataScope::getSubjectType, DataScopeSubject.EMPLOYEE.name())
                     .eq(IamDataScope::getSubjectNo, userNo)
                     .last("limit 1"));
             if (own != null) return specOf(List.of(own), userNo);
         }
         List<IamDataScope> rows = dataScopeMapper.selectList(new LambdaQueryWrapper<IamDataScope>()
-                .eq(IamDataScope::getSubjectType, "ROLE").in(IamDataScope::getSubjectNo, roleCodes));
+                .eq(IamDataScope::getSubjectType, DataScopeSubject.ROLE.name())
+                .in(IamDataScope::getSubjectNo, roleCodes));
         return specOf(rows, userNo);
     }
 
@@ -97,7 +100,7 @@ public class PermissionService implements PrincipalRefresher, PermissionResolver
      * fail-closed 拼成 {@code 1=0}（看不到），错也错在安全的那一侧。
      */
     private DataScopeSpec specOf(List<IamDataScope> rows, String userNo) {
-        if (rows.isEmpty() || rows.stream().anyMatch(r -> "ALL".equals(r.getScopeType()))) {
+        if (rows.isEmpty() || rows.stream().anyMatch(r -> DataScopeType.ALL.is(r.getScopeType()))) {
             return DataScopeSpec.ALL;
         }
         List<DataScopeSpec.Rule> rules = rows.stream()
@@ -107,7 +110,7 @@ public class PermissionService implements PrincipalRefresher, PermissionResolver
     }
 
     private static Set<String> refsOf(IamDataScope r, String userNo) {
-        if ("SELF".equals(r.getScopeType())) {
+        if (DataScopeType.SELF.is(r.getScopeType())) {
             return userNo == null || userNo.isBlank() ? Set.of() : Set.of(userNo);
         }
         return parseRefs(r.getScopeRefs());

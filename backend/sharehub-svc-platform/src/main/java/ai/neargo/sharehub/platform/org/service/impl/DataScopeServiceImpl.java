@@ -5,6 +5,8 @@ import ai.neargo.sharehub.auth.PermVersion;
 import ai.neargo.sharehub.platform.iam.entity.IamEntities.IamDataScope;
 import ai.neargo.sharehub.platform.iam.mapper.IamMappers.DataScopeMapper;
 import ai.neargo.sharehub.platform.org.dto.OrgDtos.DataScopeEntry;
+import ai.neargo.sharehub.platform.org.service.DataScopeSubject;
+import ai.neargo.sharehub.platform.org.service.DataScopeType;
 import ai.neargo.sharehub.platform.org.service.DataScopeService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.springframework.stereotype.Service;
@@ -27,11 +29,14 @@ import java.util.stream.Collectors;
 @Service
 public class DataScopeServiceImpl implements DataScopeService {
 
-    private static final Set<String> SUBJECT_TYPES = Set.of("ROLE", "EMPLOYEE");
+    /** 词表收在枚举里，这里只做校验 —— 三处各写一份字面量正是 L1.5 要收的那种分叉。 */
+    private static final Set<String> SUBJECT_TYPES =
+            Arrays.stream(DataScopeSubject.values()).map(Enum::name).collect(Collectors.toUnmodifiableSet());
     private static final Set<String> SCOPE_TYPES =
-            Set.of("ALL", "REGION", "SITE", "LOCATION", "VENUE", "AGENT", "SELF");
+            Arrays.stream(DataScopeType.values()).map(Enum::name).collect(Collectors.toUnmodifiableSet());
     /** 这两种范围语义上不需要附加值，落库前清空，避免残留旧 refs 造成"看似有范围"的误解。 */
-    private static final Set<String> NO_REF_SCOPES = Set.of("ALL", "SELF");
+    private static final Set<String> NO_REF_SCOPES = DataScopeType.WITHOUT_REFS.stream()
+            .map(Enum::name).collect(Collectors.toUnmodifiableSet());
 
     private final DataScopeMapper mapper;
     private final PermVersion permVersion;

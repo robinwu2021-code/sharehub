@@ -4,6 +4,7 @@ import type { PageQ, ArchiveQ , ReportQ } from "../query";
 import type {
   PageResult, Employee, RoleRow, AuditEntry, AuditDetail, Department, StaffPerformance, DataScope,
   PermissionItem,
+  DataScopeSubject, DataScopeEntry,
 } from "../../types";
 
 export interface OrgApi {
@@ -25,7 +26,21 @@ export interface OrgApi {
    * scopeRefs 为逗号分隔的 ID 列表（REGION→regionId / LOCATION→siteNo / AGENT→agentNo）；
    * scope 为 ALL / SELF 时无附加值，服务端会清空。
    */
-  saveRoleDataScope(roleCode: string, scope: DataScope, scopeRefs?: string): Promise<RoleRow>;
+  /**
+   * 读某个主体当前的数据范围。
+   *
+   * 角色不用它（`RoleRow` 出参已带 dataScope/scopeRefs），**员工必须用** ——
+   * 员工列表不带范围信息，而保存是**整体覆盖**：
+   * 抽屉打开时若显示的是空值，运营点一下保存就把原设置抹了。
+   */
+  getDataScope(subjectType: DataScopeSubject, subjectNo: string): Promise<DataScopeEntry>;
+  /**
+   * 覆盖写数据范围。`subjectType` 不再写死 ROLE ——
+   * 后端这个端点本来就是 ROLE|EMPLOYEE 通用的，写死的那一版让
+   * 「某个员工要比他的角色看得更窄/更宽」只能靠给他单开一个角色。
+   */
+  saveDataScope(subjectType: DataScopeSubject, subjectNo: string,
+                scope: DataScope, scopeRefs?: string): Promise<DataScopeEntry>;
 
   // === 功能权限（S6 权限码勾选树）===
   /** 权限码目录，构建勾选树用。全量一次拉完（~150 条），不分页。 */

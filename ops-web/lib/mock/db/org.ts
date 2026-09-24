@@ -2,6 +2,7 @@
 // 操作审计 audits / 部门 departments / 员工绩效 staffPerformances。
 import type {
   Tenant, TenantConfig, Employee, RoleRow, AuditEntry, AuditDetail, AuditFieldChange, DataScope,
+  DataScopeSubject, DataScopeEntry,
   Department, StaffPerformance, PermissionItem, PageQuery,
 } from "../../types";
 import type { Role } from "../../auth"; // 仅取角色码联合类型（type-only，不引入 store 运行时）
@@ -454,7 +455,34 @@ export const normalizeScopeValues = (csv?: string): string =>
  * 角色数据权限落库（G7）：就地改 roles 数组，重开抽屉能读回。
  * ALL / SELF 语义上不带范围值，一律清空，避免残留脏数据被后端 DataScopeHandler 误用。
  */
-export function saveRoleDataScope(roleCode: string, scope: DataScope, scopeRefs?: string): RoleRow {
+/**
+ * 员工级数据范围。角色的存在 `roles[i]` 上，员工的没地方放 —— 单开一张表。
+ * **必须真落 db**（本仓库约定：重开能读回），否则抽屉看起来能存、刷新就没了。
+ */
+const employeeScopes: Record<string, { scopeType: DataScope; scopeRefs: string }> = {};
+
+export function getDataScope(subjectType: DataScopeSubject, subjectNo: string): DataScopeEntry {
+  if (subjectType === "EMPLOYEE") {
+    const v = employeeScopes[subjectNo] ?? { scopeType: "ALL" as DataScope, scopeRefs: "" };
+    return { subjectType, subjectNo, scopeType: v.scopeType, scopeRefs: v.scopeRefs };
+  }
+  const r = roles.find((x) => x.code === subjectNo);
+  if (!r) throw notFound("角色", "Role", subjectNo);
+  return { subjectType, subjectNo, scopeType: r.dataScope, scopeRefs: r.scopeRefs ?? "" };
+}
+
+export function saveDataScope(subjectType: DataScopeSubject, subjectNo: string,
+                              scope: DataScope, scopeRefs?: string): DataScopeEntry {
+  if (subjectType === "EMPLOYEE") {
+    const values = scope === "ALL" || scope === "SELF" ? "" : normalizeScopeValues(scopeRefs);
+    employeeScopes[subjectNo] = { scopeType: scope, scopeRefs: values };
+    return { subjectType, subjectNo, scopeType: scope, scopeRefs: values };
+  }
+  const r = saveRoleDataScope(subjectNo, scope, scopeRefs);
+  return { subjectType, subjectNo, scopeType: r.dataScope, scopeRefs: r.scopeRefs ?? "" };
+}
+
+function saveRoleDataScope(roleCode: string, scope: DataScope, scopeRefs?: string): RoleRow {
   const i = roles.findIndex((r) => r.code === roleCode);
   if (i < 0) throw notFound("角色", "Role", roleCode);
   // ⚠️ AGENT 角色的数据范围**服务端强制**为「自己 agent_no」，不接受任何越权配置。

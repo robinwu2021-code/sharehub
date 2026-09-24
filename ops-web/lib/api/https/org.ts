@@ -21,13 +21,15 @@ export const orgHttp: OrgApi = {
   // 覆盖写（PUT），对齐《权限体系设计》§9「数据范围配置」。
   // T0-4：真实端点是 OrgController 的 PUT /api/platform/data-scopes/{subjectType}/{subjectNo}
   // （不是 iam/roles/{code}/data-scope —— IamAdminController 只管 roles/{no}/permissions）。
-  // subjectType 固定 ROLE（后端 SUBJECT_TYPES = ROLE|EMPLOYEE）；
+  // subjectType 由调用方给（后端 SUBJECT_TYPES = ROLE|EMPLOYEE）；
   // body 字段名是 scopeType/scopeRefs（后端 DataScopeReq），不是 scope/scopeRefs。
-  // subjectType 走变量而非写死 "ROLE"：后端这个端点是通用的（SUBJECT_TYPES = ROLE|EMPLOYEE），
-  // 写死字面量会让 scripts/check-backend-parity.py 把它误判成「后端缺端点」——
-  // 归一化后 `/data-scopes/ROLE/{}` 对不上后端的 `/data-scopes/{}/{}`。
-  saveRoleDataScope: (code, scope, values) =>
-    client.put(`/api/platform/data-scopes/${ROLE_SUBJECT}/${code}`, { scopeType: scope, scopeRefs: values ?? "" }),
+  // subjectType 走参数：后端这个端点是通用的（SUBJECT_TYPES = ROLE|EMPLOYEE）。
+  // 此前写死 ROLE，于是「某个员工要比他的角色看得更窄/更宽」做不到，
+  // 只能为他单开一个角色 —— 而角色是给一类人用的，为一个人开一个角色会让角色表迅速失去意义。
+  getDataScope: (subjectType, subjectNo) =>
+    client.get(`/api/platform/data-scopes/${subjectType}/${subjectNo}`),
+  saveDataScope: (subjectType, subjectNo, scope, values) =>
+    client.put(`/api/platform/data-scopes/${subjectType}/${subjectNo}`, { scopeType: scope, scopeRefs: values ?? "" }),
 
   // 功能权限（S6）。目录与覆盖写都走 IamAdminController，前缀是 /api/platform/**iam**/**
   // （类上 @RequestMapping("/api/platform/iam")，与 PlatformController 的 /api/platform/roles 分开）。

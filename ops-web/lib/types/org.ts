@@ -13,7 +13,34 @@ export interface Employee {
 }
 
 // —— 角色 · 审计（platform 域）——
-export type DataScope = "ALL" | "REGION" | "LOCATION" | "AGENT" | "SELF";
+/**
+ * 数据范围档位。**只列后端「数据范围注册表」真正登记过的**。
+ *
+ * ⚠️ 这里曾经有 `LOCATION`，而它在 `DataScopeRegistration` 里**一张表都没登记** ——
+ * 后端 handler 是 fail-closed（维度找不到锚点列就生成 `1=0`），
+ * 所以选了它的人**什么都看不见，而且不报错**。
+ * 更糟的是那个档位的选择器给的是「站点」，存下去却是 LOCATION ——
+ * 从一开始就没有任何一行数据能匹配上。
+ *
+ * 真正实现的是 `SITE`（登记在 loc_site / loc_location / dev_cabinet / ord_order / wo_order 五张表）。
+ * `VENUE` 同样未登记，故不列。
+ *
+ * 后端的 `SCOPE_TYPES` 是这里的**超集**（它还接受 LOCATION/VENUE）——
+ * 前端不该把后端「接受」的当成「实现了」。DataScopeOptionsTest 盯住这条。
+ */
+export type DataScope = "ALL" | "REGION" | "SITE" | "AGENT" | "SELF";
+/** 数据范围挂在谁身上。后端 SUBJECT_TYPES = ROLE | EMPLOYEE。 */
+export type DataScopeSubject = "ROLE" | "EMPLOYEE";
+
+/** 数据范围出参，镜像后端 `DataScopeEntry`。 */
+export interface DataScopeEntry {
+  subjectType: DataScopeSubject;
+  subjectNo: string;
+  scopeType: DataScope;
+  /** 逗号分隔的 ID；ALL / SELF 语义上不带值，后端落库前会清空。 */
+  scopeRefs: string | null;
+}
+
 export interface RoleRow extends Archivable {
   roleNo: string;
   code: string;

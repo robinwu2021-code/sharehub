@@ -55,7 +55,7 @@ export const agentAccounts: AgentAccount[] = Array.from({ length: 12 }, (_, i) =
   const a = p(agents, i);
   return {
     accountNo: `AA${7000 + i}`, username: `ag${1000 + i}`, agentNo: a.agentNo, agentName: a.name, loginPhone: phone(i, "+9714"),
-    status: i % 6 === 0 ? "DISABLED" : "ACTIVE", dataScope: p(["AGENT", "REGION", "LOCATION"] as const, i),
+    status: i % 6 === 0 ? "DISABLED" : "ACTIVE", dataScope: p(["AGENT", "REGION", "SITE"] as const, i),
     createdAt: iso(i * 86400_000),
   };
 });

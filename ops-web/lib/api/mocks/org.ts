@@ -15,7 +15,9 @@ export const orgMock: OrgApi = {
   saveDepartment: (x) => wait(db.saveDepartment(x), 350),
   saveRoleRow: (x) => wait(db.saveRoleRow(x), 350),
   saveEmployee: (x) => wait(db.saveEmployee(x), 350),
-  saveRoleDataScope: (code, scope, values) => wait(db.saveRoleDataScope(code, scope, values), 350),
+  getDataScope: (subjectType, subjectNo) => wait(db.getDataScope(subjectType, subjectNo)),
+  saveDataScope: (subjectType, subjectNo, scope, values) =>
+    wait(db.saveDataScope(subjectType, subjectNo, scope, values), 350),
 
   // 功能权限（S6）
   listPermissions: () => wait(db.permissions),

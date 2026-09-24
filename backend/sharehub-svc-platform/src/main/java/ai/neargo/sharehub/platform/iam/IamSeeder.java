@@ -12,6 +12,8 @@ import ai.neargo.sharehub.platform.iam.mapper.IamMappers.RoleMapper;
 import ai.neargo.sharehub.platform.iam.mapper.IamMappers.RolePermMapper;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import ai.neargo.sharehub.platform.org.service.DataScopeSubject;
+import ai.neargo.sharehub.platform.org.service.DataScopeType;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -69,7 +71,7 @@ public class IamSeeder implements ApplicationRunner {
                 r.setCode(code);
                 r.setName(ROLE_NAME.getOrDefault(code, code));
                 r.setBuiltin(1);              // 内置只读
-                r.setDataScope("AGENT".equals(code) ? "AGENT" : "ALL");
+                r.setDataScope(scopeOfRole(code));
                 roleMapper.insert(r);
                 perms.forEach(pc -> {
                     IamRolePerm rp = new IamRolePerm();
@@ -78,9 +80,9 @@ public class IamSeeder implements ApplicationRunner {
                     rolePermMapper.insert(rp);
                 });
                 IamDataScope ds = new IamDataScope();
-                ds.setSubjectType("ROLE");
+                ds.setSubjectType(DataScopeSubject.ROLE.name());
                 ds.setSubjectNo(code);
-                ds.setScopeType("AGENT".equals(code) ? "AGENT" : "ALL");
+                ds.setScopeType(scopeOfRole(code));
                 dataScopeMapper.insert(ds);
             });
         }
@@ -103,7 +105,7 @@ public class IamSeeder implements ApplicationRunner {
             custom.setCode("CUSTOM");
             custom.setName("自定义演示角色");
             custom.setBuiltin(0);            // 可改
-            custom.setDataScope("ALL");
+            custom.setDataScope(DataScopeType.ALL.name());
             roleMapper.insert(custom);
             for (String pc : List.of("dashboard:overview:read", "device:cabinet:read")) {
                 IamRolePerm rp = new IamRolePerm();
@@ -112,9 +114,9 @@ public class IamSeeder implements ApplicationRunner {
                 rolePermMapper.insert(rp);
             }
             IamDataScope cds = new IamDataScope();
-            cds.setSubjectType("ROLE");
+            cds.setSubjectType(DataScopeSubject.ROLE.name());
             cds.setSubjectNo("CUSTOM");
-            cds.setScopeType("ALL");
+            cds.setScopeType(DataScopeType.ALL.name());
             dataScopeMapper.insert(cds);
         }
         // 内置角色权限**增量对齐**（无论是否首灌都跑）：RolePerms 后加的码补进 iam_role_perm。
@@ -158,4 +160,9 @@ public class IamSeeder implements ApplicationRunner {
             }
         }
     }
+    /** 代理角色只看自己 agent_no，其余内置角色看全部（功能权限清单 §二）。 */
+    private static String scopeOfRole(String roleCode) {
+        return (DataScopeType.AGENT.is(roleCode) ? DataScopeType.AGENT : DataScopeType.ALL).name();
+    }
+
 }

@@ -39,8 +39,11 @@ import type {
 const periodLabel = (p: string) => REPORT_PERIODS.find((x) => x.value === p)?.label ?? p;
 // 数据范围文案与 app/employees 同源（台账 T5：AgentAccount.dataScope 原为 string
 // 且 mock 里存的是中文展示文案，收紧为 DataScope 枚举后统一走映射渲染）
-const SCOPE_LABEL: Record<DataScope, string> = { ALL: "全部数据", REGION: "按区域", LOCATION: "按点位", AGENT: "按代理(自己)", SELF: "仅自己经手" };
-const SCOPE_OPTIONS = (["ALL", "REGION", "LOCATION", "AGENT", "SELF"] as DataScope[]).map((s) => ({ value: s, label: SCOPE_LABEL[s] }));
+// 「按站点」而不是「按点位」：后端实现的档位是 SITE（登记在 loc_site / loc_location /
+// dev_cabinet / ord_order / wo_order 五张表），选中的也是站点。
+// 此前这里是 LOCATION —— 一个后端一张表都没登记的档位，选了就什么都看不见（见 DataScope 注释）。
+const SCOPE_LABEL: Record<DataScope, string> = { ALL: "全部数据", REGION: "按区域", SITE: "按站点", AGENT: "按代理(自己)", SELF: "仅自己经手" };
+const SCOPE_OPTIONS = (["ALL", "REGION", "SITE", "AGENT", "SELF"] as DataScope[]).map((s) => ({ value: s, label: SCOPE_LABEL[s] }));
 /**
  * 入驻申请状态。
  *

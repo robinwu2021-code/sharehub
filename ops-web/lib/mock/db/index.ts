@@ -149,7 +149,7 @@ export {
 export {
   tenants, tenantConfigs, employees, roles, audits, departments, staffPerformances,
   listEmployees, listDepartments, listStaffPerformance,
-  saveDepartment, saveRoleRow, saveEmployee, saveRoleDataScope,
+  saveDepartment, saveRoleRow, saveEmployee, getDataScope, saveDataScope,
   listRoles, archiveRole, unarchiveRole,
   // S6 功能权限勾选树 + 审计详情
   permissions, listRolePermissions, saveRolePermissions, getAuditDetail,
