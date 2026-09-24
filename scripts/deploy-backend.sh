@@ -123,6 +123,40 @@ if [ "$NOW" != "$BEFORE" ]; then
 fi
 ok "线上仍是出发时那一版，可以切"
 
+# ── 迁移顺序预检：**在碰生产之前**拦住乱序
+#
+# 2026-09-24 22:49 的事故：两个会话并行，V76 先提交、V75 后提交。
+# 上一次部署时 HEAD 里只有 V76，于是生产**跑了 76 没跑 75**；
+# 等 V75 提交后再部署，Flyway 判定乱序、**拒绝启动，生产宕了**。
+# 同一类事故这是第二次（上一次是 V47/V48，见部署 README）。
+#
+# 症状极具迷惑性：jar 是好的、迁移本身也是好的，坏的只是**它们到达的顺序**。
+# 而发现时机是「重启之后」——那时服务已经停了。
+#
+# 这里在切软链之前比一次：本次 jar 里**尚未应用**的迁移，
+# 若有任何一个版本号小于生产已应用的最大版本号，就是乱序，直接退出。
+say "迁移顺序预检"
+JAR_VERSIONS=$(unzip -Z1 "$WT/$JAR_IN_REPO" 'BOOT-INF/classes/db/migration/V*__*.sql' 2>/dev/null     | sed 's|.*/V||; s|__.*||' | grep -E '^[0-9]+$' | sort -n | uniq)
+APPLIED=$(ssh "$HOST" "sudo mariadb -N -e \"select version from pb_core.flyway_schema_history where success=1\"" 2>/dev/null     | grep -E '^[0-9]+$' | sort -n | uniq)
+if [ -n "$JAR_VERSIONS" ] && [ -n "$APPLIED" ]; then
+    MAX_APPLIED=$(echo "$APPLIED" | tail -1)
+    PENDING=$(comm -23 <(echo "$JAR_VERSIONS") <(echo "$APPLIED"))
+    OUT_OF_ORDER=$(echo "$PENDING" | awk -v m="$MAX_APPLIED" 'NF && $1+0 < m+0')
+    if [ -n "$OUT_OF_ORDER" ]; then
+        die "迁移乱序，**没有动生产**：生产已应用到 V$MAX_APPLIED，
+    而本次要补跑的版本里有比它小的：$(echo "$OUT_OF_ORDER" | tr '\n' ' ')
+
+    多半是并行会话的版本号撞了：有人的迁移后提交、号却更小。
+    两条路，先确认那几条迁移与已应用的是否碰同一张表：
+      · 无关 → 一次性放行：在 $REMOTE_DIR/sharehub-app.env 里加
+        SPRING_FLYWAY_OUT_OF_ORDER=true，部署完**立刻删掉并重启**；
+      · 有关 → 让作者改号重排，不要硬灌。"
+    fi
+    ok "顺序正常（生产 V$MAX_APPLIED；本次待跑 $(echo "$PENDING" | tr '\n' ' ' | sed 's/ *$//' || echo 无)）"
+else
+    warn "取不到迁移清单或生产已应用列表，跳过顺序预检"
+fi
+
 ssh "$HOST" "sudo install -o root -g root -m 644 /tmp/$JAR_NAME '$REMOTE_DIR/$JAR_NAME' \
     && sudo ln -sfn '$JAR_NAME' '$LINK' \
     && rm -f /tmp/$JAR_NAME"
