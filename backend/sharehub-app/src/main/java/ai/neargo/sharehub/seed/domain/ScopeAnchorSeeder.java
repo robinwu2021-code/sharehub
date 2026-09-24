@@ -18,6 +18,17 @@ import org.springframework.stereotype.Component;
  * {@code DataScopeHandler} 按 `agent_no` 过滤，代理商登录后**什么都看不到**，
  * 而且不报错，界面只是空的。
  *
+ * <h2>2026-09-24：这里曾经是唯一的写入者</h2>
+ * 在此之前，{@code ord_order} 的三列<b>根本没有写入路径</b> ——
+ * {@code OrdOrder} 实体缺这三个字段，下单时写不进去；工单那边虽然写，
+ * 但值取自请求体，而 ops-web 压根不传。于是真实流程产生的单据锚点一律为空，
+ * 而本类 {@code @ConditionalOnProperty(sharehub.seed.enabled=true)} 在生产是关的 ——
+ * <b>也就是说生产上根本没人填过它们</b>。
+ *
+ * <p>写入路径已经补上（{@code RentOrderServiceImpl.rent} 与
+ * {@code WoOpsServiceImpl.create} 都从机柜反查），存量由 V62 回填。
+ * 本类因此退回它本来的职责：<b>只管种子数据</b>。
+ *
  * <p>本机库之所以一直正常，是因为它的数据早于 V9、被那次回填覆盖过。
  * 2026-09-23 把本机库清空重灌后，10 条数据范围相关的用例当场全红 —— 这一步就是它们逼出来的。
  *

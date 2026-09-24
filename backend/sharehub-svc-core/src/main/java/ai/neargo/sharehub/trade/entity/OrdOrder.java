@@ -33,6 +33,20 @@ public class OrdOrder extends BaseEntity {
     private String cUserNo;
     private String cabinetNo;
     private String locationName;
+
+    /*
+     * —— 数据范围锚点（V9 加的列，实体一直没跟上）——
+     *
+     * 代理能看到哪些订单，靠 DataScopeHandler 按 agent_no / site_no 注入 WHERE。
+     * **实体没有这三个字段 = 下单时写不进去**，于是新单对代理是隐形的 ——
+     * 而页面照常渲染，只是少了行，不报错也不告警。
+     *
+     * 语义是「**下单时的快照**，不随设备后续调拨变动」（见 DataScopeRegistration
+     * 里 ord_order 那段注释）—— 所以这三列只在 rent() 写一次，此后任何调拨都不回改。
+     */
+    private String locationNo;
+    private String siteNo;
+    private String agentNo;
     private String status;
 
     /** 类型子状态（DISPENSING/PREPARING/IDLE）。**资金侧不读**，只影响端上展示与超时兜底。 */

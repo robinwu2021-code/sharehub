@@ -9,5 +9,8 @@ package ai.neargo.sharehub.api.core.dto;
  *
  * @param agentNo 当前归属代理；{@code null} = 平台直营
  */
-public record CabinetBrief(String cabinetNo, String name, String agentNo, String siteNo) {
+public record CabinetBrief(String cabinetNo, String name, String agentNo, String siteNo,
+                           /** 所属点位。与 siteNo/agentNo 同源（都取自机柜自己的冗余列），
+                               供调用方把三者作为**一整套归属快照**写下去，而不是拼半套。 */
+                           String locationNo) {
 }

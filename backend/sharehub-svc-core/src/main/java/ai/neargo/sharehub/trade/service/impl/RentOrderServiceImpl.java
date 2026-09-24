@@ -213,7 +213,39 @@ public class RentOrderServiceImpl implements RentOrderService {
          * 于是「差异化定价」那套按站点/场景取价的规则从未生效过，每一单都落到设备类型默认方案。
          * 配置再怎么改都不影响金额，而且不报任何错。现在按机柜反查出完整的取价上下文。
          */
-        PriceQuery pq = queryOf(cabinetNo, e.getStartedAt());
+        /*
+         * 反查机柜要**豁免数据范围** —— 这是服务端派生，不是用户在查数据。
+         *
+         * 下单发生在 C 端会话里，而 dev_cabinet 只登记了 AGENT / SITE 两个维度
+         * （DataScopeRegistration）。handler 是 fail-closed：消费者的维度没登记，
+         * 这次查询就被拼成 `1=0`，**机柜永远查不到**。
+         *
+         * 后果有两层，且都不报错：
+         *   · 归属三列写不进去 → 代理在自己后台里看不到这一单；
+         *   · 取价上下文（站点/场景/区域/品牌）全空 → 那几维不参与匹配，
+         *     一律落到设备类型默认方案。目前库里只有一个 ALL/* 方案，
+         *     所以还看不出差别 —— 等真配了按站点的价，差别就是钱。
+         *
+         * 同类方法（detail / returnOrder / buyout）早就是这么写的，rent() 漏了。
+         */
+        DevCabinet cab = DataScopeContext.executeWithoutScope(() ->
+                cabinetMapper.selectOne(new LambdaQueryWrapper<DevCabinet>()
+                        .eq(DevCabinet::getCabinetNo, cabinetNo).last("limit 1")));
+
+        /*
+         * 数据范围锚点：这三列决定**这一单归谁看**（DataScopeRegistration 里
+         * ord_order → AGENT:agent_no / SITE:site_no）。不写的话代理在自己后台里
+         * 一条都看不到 —— 而页面照常渲染，只是少了行，不报错也不告警。
+         *
+         * 取自机柜自己的冗余列，与 ScopeAnchorSeeder 的回填口径逐字一致。
+         * 机柜查不到就留空：宁可这一单谁都看不见，也不能瞎归一个代理 ——
+         * 归错的后果是把别人的营收摆在他面前。
+         */
+        e.setLocationNo(cab == null ? null : cab.getLocationNo());
+        e.setSiteNo(cab == null ? null : cab.getSiteNo());
+        e.setAgentNo(cab == null ? null : cab.getAgentNo());
+
+        PriceQuery pq = DataScopeContext.executeWithoutScope(() -> queryOf(cab, e.getStartedAt()));
         PriceResolver.Resolved priced = priceResolver.resolve(pq);
         // 时段倍率按**下单时刻**解析一次并随快照定格（ADR-028 §四：跨时段长单不分段）。
         priced = priced.withMultiplier(multipliers.resolve(pq.regionId(), pq.at()));
@@ -285,9 +317,8 @@ public class RentOrderServiceImpl implements RentOrderService {
      * 最终落到 {@code ALL} 层（默认方案）并在快照里如实记 {@code level=ALL}。
      * 不把缺失当成通配 —— 通配会命中一个本不该命中的方案，那正是这次要修的那类错。
      */
-    private PriceQuery queryOf(String cabinetNo, java.time.LocalDateTime at) {
-        DevCabinet c = cabinetMapper.selectOne(new LambdaQueryWrapper<DevCabinet>()
-                .eq(DevCabinet::getCabinetNo, cabinetNo).last("limit 1"));
+    /** 收已经查出来的机柜 —— 锚点与取价共用同一次查询，也保证两者看到的是同一行。 */
+    private PriceQuery queryOf(DevCabinet c, java.time.LocalDateTime at) {
         if (c == null) {
             // 机柜查不到不在这里拦（弹仓那一步自然会失败），但取价要如实反映「什么都不知道」
             return PriceQuery.ofDeviceType(DEVICE_TYPE_POWERBANK, at);

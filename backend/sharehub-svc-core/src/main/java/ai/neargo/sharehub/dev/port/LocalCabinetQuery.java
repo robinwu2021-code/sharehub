@@ -61,6 +61,6 @@ public class LocalCabinetQuery implements CabinetQueryPort {
         // 展示名取点位名 —— 运营认的是「哪个点位的柜子」，机柜编号只是二级识别
         String name = (c.getLocationName() == null || c.getLocationName().isBlank())
                 ? c.getCabinetNo() : c.getLocationName();
-        return new CabinetBrief(c.getCabinetNo(), name, c.getAgentNo(), c.getSiteNo());
+        return new CabinetBrief(c.getCabinetNo(), name, c.getAgentNo(), c.getSiteNo(), c.getLocationNo());
     }
 }

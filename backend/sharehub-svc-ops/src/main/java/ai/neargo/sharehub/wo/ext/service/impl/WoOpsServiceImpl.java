@@ -1,6 +1,8 @@
 package ai.neargo.sharehub.wo.ext.service.impl;
 
 import ai.neargo.common.core.IdGenerator;
+import ai.neargo.sharehub.api.core.dto.CabinetBrief;
+import ai.neargo.sharehub.api.core.port.CabinetQueryPort;
 import ai.neargo.sharehub.auth.LoginUser;
 import ai.neargo.sharehub.auth.SecurityUtils;
 import ai.neargo.sharehub.common.BizKey;
@@ -60,16 +62,20 @@ public class WoOpsServiceImpl implements WoOpsService {
     private final WoHandleMapper handleMapper;
     private final WoSlaMapper slaMapper;
     private final WoSlaRuleMapper slaRuleMapper;
+    /** 只用来反查机柜归属 —— 数据范围锚点必须服务端派生，见 create() 里的说明。 */
+    private final CabinetQueryPort cabinetQuery;
 
     public WoOpsServiceImpl(WoMapper woMapper, WoStateMachine stateMachine,
                             WoDispatchMapper dispatchMapper, WoHandleMapper handleMapper,
-                            WoSlaMapper slaMapper, WoSlaRuleMapper slaRuleMapper) {
+                            WoSlaMapper slaMapper, WoSlaRuleMapper slaRuleMapper,
+                            CabinetQueryPort cabinetQuery) {
         this.woMapper = woMapper;
         this.stateMachine = stateMachine;
         this.dispatchMapper = dispatchMapper;
         this.handleMapper = handleMapper;
         this.slaMapper = slaMapper;
         this.slaRuleMapper = slaRuleMapper;
+        this.cabinetQuery = cabinetQuery;
     }
 
     // ——————————————————————— 开单 ———————————————————————
@@ -117,15 +123,31 @@ public class WoOpsServiceImpl implements WoOpsService {
 
         woMapper.insert(e);
 
-        // source_ref / agent_no / site_no 不是 WoOrder 实体的字段（wo 主包边界），按列名补写。
-        // 与 insert 同事务；并发下的重复转单由 source_ref 的 UNIQUE 在此处抛出（DuplicateKeyException）。
+        /*
+         * source_ref / agent_no / site_no / location_no 不是 WoOrder 实体的字段
+         * （wo 主包边界），按列名补写。与 insert 同事务；并发下的重复转单由
+         * source_ref 的 UNIQUE 在此处抛出（DuplicateKeyException）。
+         *
+         * ⚠️ **归属三列一律从机柜反查，不采信 draft 传来的值。** 两个理由：
+         *   · 它们是数据范围锚点 —— 由调用方决定「这单归谁看」，等于让调用方
+         *     把工单塞进任意代理的视野，或者从该看到的人眼前藏起来；
+         *   · ops-web 的 WorkOrderDraft 里压根没有这三个字段，于是从界面开的工单
+         *     锚点一律为空 —— 代理看不到给自己柜子开的单，且没有任何报错。
+         *
+         * 本仓库对机柜早就是这个规矩（CabinetServiceImpl：「只认 locationNo，
+         * siteNo/agentNo 一律反查 —— 接受它们就等于允许三者互相矛盾」）。
+         */
+        CabinetBrief own = notBlank(draft.cabinetNo())
+                ? cabinetQuery.briefsByNos(java.util.List.of(draft.cabinetNo()))
+                        .stream().findFirst().orElse(null)
+                : null;
         UpdateWrapper<WoOrder> extra = new UpdateWrapper<>();
         extra.eq("wo_no", e.getWoNo());
         boolean anyExtra = false;
         if (sourceRef != null && !sourceRef.isBlank()) { extra.set("source_ref", sourceRef); anyExtra = true; }
-        if (notBlank(draft.agentNo())) { extra.set("agent_no", draft.agentNo()); anyExtra = true; }
-        if (notBlank(draft.siteNo())) { extra.set("site_no", draft.siteNo()); anyExtra = true; }
-        if (notBlank(draft.locationNo())) { extra.set("location_no", draft.locationNo()); anyExtra = true; }
+        if (own != null && notBlank(own.agentNo())) { extra.set("agent_no", own.agentNo()); anyExtra = true; }
+        if (own != null && notBlank(own.siteNo())) { extra.set("site_no", own.siteNo()); anyExtra = true; }
+        if (own != null && notBlank(own.locationNo())) { extra.set("location_no", own.locationNo()); anyExtra = true; }
         if (notBlank(draft.expectedAt())) { extra.set("expected_at", draft.expectedAt()); anyExtra = true; }
         if (anyExtra) woMapper.update(null, extra);
 
