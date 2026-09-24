@@ -18,7 +18,7 @@ const ORDER_STATES: OrderStatus[] = [
   "CREATED", "DISPENSING", "IN_USE", "RETURNED", "SETTLED", "EXCEPTION", "CLOSED",
 ];
 const WO_STATES: WorkOrderStatus[] = ["CREATED", "DISPATCHED", "PROCESSING", "DONE", "CLOSED"];
-const CAB_STATES: CabinetStatus[] = ["DEPLOYED", "FAULT", "RETIRED"];
+const CAB_STATES: CabinetStatus[] = ["IN_STOCK", "DEPLOYED", "FAULT", "RETIRED"];
 const ONLINE_STATES: OnlineStatus[] = ["ONLINE", "OFFLINE"];
 
 export function BusinessSections() {

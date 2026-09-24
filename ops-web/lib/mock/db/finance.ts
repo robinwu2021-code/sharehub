@@ -98,15 +98,15 @@ export function aggregateShareRecords(payeeType: Settlement["payeeType"], payeeN
 export const settlements: Settlement[] = ["2026-05", "2026-06"].flatMap((period, pi) =>
   SHARE_PAYEES.map((payee, i) => {
     const agg = aggregateShareRecords(payee.dimension, payee.payeeNo, period);
-    const status: SettlementStatus = pi === 0 ? "PAID" : i % 3 === 0 ? "DRAFT" : "CONFIRMED";
+    const status: SettlementStatus = pi === 0 ? "PAID" : i % 3 === 0 ? "GEN" : "CONFIRMED";
     const createdAt = `${period}-28T20:00:00.000Z`;
     return {
       settleNo: `STL${700 + pi * SHARE_PAYEES.length + i}`,
       payeeType: payee.dimension, payeeNo: payee.payeeNo, payeeName: payee.payeeName,
       period, totalAmount: agg.totalAmount, recordCount: agg.recordCount, currency: agg.currency,
       status, createdAt,
-      confirmedBy: status === "DRAFT" ? null : p(["Sara Ahmed", "Omar Khan", "admin"], i),
-      confirmedAt: status === "DRAFT" ? null : `${period}-29T06:30:00.000Z`,
+      confirmedBy: status === "GEN" ? null : p(["Sara Ahmed", "Omar Khan", "admin"], i),
+      confirmedAt: status === "GEN" ? null : `${period}-29T06:30:00.000Z`,
     };
   }));
 // 提现：APPLY/AUDIT = 未审批（审批四列为空）；PAYING/PAID = 已通过；FAILED = 已驳回（必带原因）
@@ -118,6 +118,20 @@ const payoutFailed = (i: number) => i % 10 === 4;
 /** 钱确实动过（成功或失败退回）的行才有渠道与流水号。 */
 const paidOrPayoutFailed = (status: Withdrawal["status"], i: number) =>
   status === "PAID" || (status === "FAILED" && payoutFailed(i));
+
+/**
+ * 种子提现单的收款账户快照。
+ *
+ * **写成静态映射而不是查 `payoutAccounts`**：那个常量定义在本文件更下方（TDZ），
+ * 这里取不到。值必须与它保持一致 —— 改账户种子时记得同步改这里。
+ * 只有 AG001 / VN001 在 payoutAccounts 里有账户，**其余一律 null 是故意的**：
+ * 真实情况就是不是每个收款方都登记过账户，而「没账户的单子长什么样」这条路径
+ * 也要有数据能走到（同 AG002 故意没账户的用意）。
+ */
+const SEED_PAYOUT: Record<string, { accountNo: string; bankCode: string }> = {
+  AG001: { accountNo: "PA001", bankCode: "ENBD" },
+  VN001: { accountNo: "PA003", bankCode: "FAB" },
+};
 
 export const withdrawals: Withdrawal[] = Array.from({ length: 20 }, (_, i) => {
   const status = p(["APPLY", "AUDIT", "PAYING", "PAID", "FAILED"] as const, i);
@@ -134,6 +148,9 @@ export const withdrawals: Withdrawal[] = Array.from({ length: 20 }, (_, i) => {
     // 原先写死 0.6% + 下限 2 AED，其中「下限」业务规则里根本没有这个字段 —— 是财务侧自己多存的阈值。
     fee: computeWithdrawFee(amount, bizRules.withdraw),
     currency: "AED", status, appliedAt: iso(i * 43200_000),
+    accountNo: SEED_PAYOUT[p(SHARE_PAYEES, i).payeeNo]?.accountNo ?? null,
+    bankCode: SEED_PAYOUT[p(SHARE_PAYEES, i).payeeNo]?.bankCode ?? null,
+    applicantNo: p(SHARE_PAYEES, i).payeeNo,   // 自助提现：申请人即收款主体
     auditorName: audited ? p(["Sara Ahmed", "Omar Khan", "admin"], i) : null,
     auditedAt: audited ? iso(i * 43200_000 - 7200_000) : null,
     /*
@@ -537,7 +554,7 @@ export function saveInvoice(x: Partial<Invoice>): Invoice {
   if (!sourceNo) throw new InvoiceError("来源结算单必填——发票金额只能来自已确认的结算单，不凭空开票");
   const src = invoiceSource({ sourceNo });
   if (!src) throw new InvoiceError(`来源结算单 ${sourceNo} 不存在`);
-  if (src.status === "DRAFT") throw new InvoiceError(`结算单 ${sourceNo} 尚未确认（待确认），确认后才能开票`);
+  if (src.status === "GEN") throw new InvoiceError(`结算单 ${sourceNo} 尚未确认（待确认），确认后才能开票`);
 
   return upsert(
     invoices,
@@ -627,6 +644,7 @@ export function applyWithdrawal(req: WithdrawApplyPayload, applicantNo?: string)
   if (bad) throw new WithdrawalError(bad);
   if (!req.payeeNo?.trim()) throw new WithdrawalError("收款主体必填");
 
+  const acct = defaultPayoutAccountOf(req.payeeType, req.payeeNo);
   const w: Withdrawal = {
     withdrawNo: nextNo("WD", withdrawals, 3000, "withdrawNo"),
     payeeType: req.payeeType, payeeNo: req.payeeNo, payeeName: req.payeeName,
@@ -635,13 +653,17 @@ export function applyWithdrawal(req: WithdrawApplyPayload, applicantNo?: string)
     currency: req.currency || "AED",
     status: "APPLY",
     appliedAt: new Date().toISOString(),
+    // 收款账户**在此刻快照**：审批可能发生在几天后，那时对方的默认账户可能已经换了。
+    // 查不到账户时落 null 而不是猜一个 —— 审批页据此提示「该收款方未登记账户」。
+    accountNo: acct?.accountNo ?? null,
+    bankCode: acct?.bankCode ?? null,
+    applicantNo: applicantNo ?? req.payeeNo,
     // 审批四件套一律留空：这张单子还没人看过
     auditorName: null, auditedAt: null, rejectReason: null,
     payChannel: null, payRef: null, payerName: null, failReason: null, paidAt: null,
   };
   // 新单排在最前 —— 列表默认按申请时间倒序，追加到末尾的话提交完看不见自己刚提的那张
   withdrawals.unshift(w);
-  void applicantNo;   // 真后端从会话取；mock 无会话，留参数是为了签名与契约一致
   return w;
 }
 
@@ -758,7 +780,7 @@ export function generateSettlements(x: SettlementDraft): Settlement[] {
       settleNo: nextNo("STL", settlements, 700, "settleNo"),
       payeeType, payeeNo: no, payeeName: names[i], period,
       totalAmount: agg.totalAmount, recordCount: agg.recordCount, currency: agg.currency,
-      status: "DRAFT", createdAt: new Date().toISOString(), confirmedBy: null, confirmedAt: null,
+      status: "GEN", createdAt: new Date().toISOString(), confirmedBy: null, confirmedAt: null,
     };
     settlements.unshift(s);
     return s;
@@ -830,7 +852,7 @@ export const shareSummaries: ShareSummary[] = SHARE_PERIODS.flatMap((period) =>
 function refreshSettledAmounts(): void {
   for (const s of shareSummaries) {
     const settled = settlements
-      .filter((x) => x.payeeType === s.dimension && x.payeeNo === s.payeeNo && x.period === s.period && x.status !== "DRAFT")
+      .filter((x) => x.payeeType === s.dimension && x.payeeNo === s.payeeNo && x.period === s.period && x.status !== "GEN")
       .reduce((sum, x) => sum + x.totalAmount, 0);
     // 已结算不可能超过分润额（同源汇总本来就相等，取 min 是兜住手工改数的意外）
     s.settledAmount = Number(Math.min(settled, s.shareAmount).toFixed(2));

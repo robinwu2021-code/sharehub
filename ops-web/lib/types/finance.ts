@@ -46,9 +46,16 @@ export interface ShareRule {
   priority: number;
 }
 // —— 结算单（trade 域 · S1）——
-// 状态语义：DRAFT=已生成待确认（金额可重算/可作废）→ CONFIRMED=财务确认（进入应付）→ PAID=已打款。
-// 原枚举首值为 `GEN`，与「草稿态」的通行叫法不一致（发票用的就是 DRAFT），统一为 DRAFT。
-export type SettlementStatus = "DRAFT" | "CONFIRMED" | "PAID";
+// 状态语义：GEN=已生成待确认（金额可重算/可作废）→ CONFIRMED=财务确认（进入应付）→ PAID=已打款。
+//
+// ⚠️ 这里曾经写作 `DRAFT`，理由是「DRAFT 是草稿态的通行叫法（发票用的就是 DRAFT）」。
+// 那个理由本身没错，错在**只改了一侧**：DDL 列注释、后端 SettlementStatus 枚举、
+// 库里的存量数据都仍是 `GEN`。于是 GEN 状态的结算单在运营端是个未知值 ——
+// 徽标映射不上、按「待确认」筛一条都查不到，而两边都不报错。
+//
+// 「叫法更通行」是**标签**的事，不是**值**的事：下面 STL_STATUS 里它显示为「待确认」，
+// 用户从来看不到 GEN 这三个字母。值以 DDL 为准，标签随便挑好听的。
+export type SettlementStatus = "GEN" | "CONFIRMED" | "PAID";
 export type SettlementAction = "confirm" | "pay";
 
 export interface Settlement {
@@ -83,7 +90,7 @@ export interface SettlementDraft {
  * `pay`（打款）暂未开放动作入口，但合法迁移必须在这里声明清楚，否则种子里的 PAID 无从解释。
  */
 export const STL_TRANSITIONS: Record<SettlementAction, { from: SettlementStatus[]; to: SettlementStatus; label: string }> = {
-  confirm: { from: ["DRAFT"], to: "CONFIRMED", label: "确认结算" },
+  confirm: { from: ["GEN"], to: "CONFIRMED", label: "确认结算" },
   pay: { from: ["CONFIRMED"], to: "PAID", label: "打款" },
 };
 export const canSettlementTransition = (from: SettlementStatus, action: SettlementAction) =>
@@ -101,6 +108,19 @@ export interface Withdrawal extends AuditTrail {
   appliedAt: string;
   // —— 资金审批合规四件套（对标补齐）——
   fee: number; // 提现手续费（与 amount 同币种，实际到账 = amount - fee）
+  // —— 申请时的收款账户**快照**（后端一直在返回，前端此前没声明 → 界面看不到）——
+  //
+  // 为什么必须是快照而不是现查：审批页此前只能查「这个收款方**当前**有没有默认账户」，
+  // 若申请之后对方改了默认账户，界面显示的是新账户、而单子是按旧账户报的 ——
+  // 审批人核对的对象与实际打款对象不是同一个，且不报错。
+  // 同 ADR「数据范围锚点 = 下单时快照」的口径。
+  accountNo: string | null;   // → PayoutAccount.accountNo
+  bankCode: string | null;    // 冗余一份：账户被停用/改名后仍要能回溯当时打给了哪家行
+  // 申请人编号。审计链此前只有 auditorName（谁批），缺「谁报的」这一半。
+  applicantNo: string | null;
+  // ⚠️ 后端还返回 netAmount，**故意不接**：未审批的单子要按**现行**费率实时算
+  //（见下方 withdrawNetOf 的说明），落库的 netAmount 是申请时的旧数。
+  //  接上它等于给审批人两个都叫「实际到账」的数，而点「通过」时扣的是另一个。
   // —— 打款回执（⑮，V57）。批准之后钱到底出去没有，此前无处可答 ——
   payChannel: "NEARPAY" | "MANUAL" | null;
   payRef: string | null;   // 渠道流水号：银行回单号 / nearpay 打款单号

@@ -72,7 +72,7 @@ const RECHARGE_STATUS: StatusMap<RechargeOrder["status"]> = {
 
 // 结算单状态：全站同色（待确认=warning / 已确认=default / 已打款=success）
 const STL_STATUS: StatusMap<SettlementStatus> = {
-  DRAFT: { label: "待确认", tone: "warning" },
+  GEN: { label: "待确认", tone: "warning" },
   CONFIRMED: { label: "已确认", tone: "default" },
   PAID: { label: "已打款", tone: "success" },
 };
@@ -334,6 +334,28 @@ function FinanceInner() {
   const cannotGetPaidYet = realm === "AGENT" && myPayoutQ.isSuccess
     && !(myPayoutQ.data?.list ?? []).some((a) => a.status === "ACTIVE" && a.isDefault);
 
+  /*
+   * 审批抽屉里的收款账户核对。**只在抽屉打开时取**，且按这张单子的收款方取 ——
+   * 列表页那份账户查询只在「收款账户」标签下跑，审批时拿不到。
+   *
+   * 为什么要取：单子上带的是**申请那一刻的账户快照**（V57 起后端就在返回，
+   * 前端此前没声明所以看不到）。申请到审批之间对方可能换了默认账户，
+   * 而审批人核对的必须是「这张单子会打给谁」，不是「这个人现在的默认账户是谁」。
+   */
+  const wdAcctQ = useQuery({
+    queryKey: ["fin", "payout-accounts", "audit", wdAudit?.payeeType, wdAudit?.payeeNo],
+    queryFn: () => api.listPayoutAccounts({
+      page: 1, size: UNPAGED_SIZE,
+      payeeType: wdAudit!.payeeType, payeeNo: wdAudit!.payeeNo,
+    }),
+    enabled: !!wdAudit,
+  });
+  const wdAccts = wdAcctQ.data?.list ?? [];
+  /** 单子上快照的那个账户（可能已被停用或改名，所以按号找而不是按名字）。 */
+  const wdSnapAcct = wdAudit?.accountNo ? wdAccts.find((a) => a.accountNo === wdAudit.accountNo) : undefined;
+  /** 该收款方**现在**的默认账户。与快照不一致 = 申请后换过账户，必须让审批人看见。 */
+  const wdNowDefault = wdAccts.find((a) => a.isDefault && a.status === "ACTIVE");
+
   const afterPayoutWrite = () => {
     qc.invalidateQueries({ queryKey: ["fin", "payout-accounts"] });
     // 提现审批读的是同一份账户 —— 账户变了，「能不能放行」也跟着变
@@ -582,7 +604,7 @@ function FinanceInner() {
       // 结果「看着已选 STL700、抬头金额却是空的」——保存时才报错，太晚
       { value: "", label: "请选择来源结算单" },
       ...(invSettlementsQ.data?.list ?? [])
-        .filter((s) => s.status !== "DRAFT")
+        .filter((s) => s.status !== "GEN")
         .map((s) => ({ value: s.settleNo, label: `${s.settleNo} · ${s.payeeName} · ${s.period} · ${money(s.totalAmount, s.currency)}` })),
     ],
     [invSettlementsQ.data],
@@ -687,7 +709,7 @@ function FinanceInner() {
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => setStlDetail(s)}>明细</Button>
           {/* 只有 DRAFT 能确认（状态机 STL_TRANSITIONS），其余状态不给按钮 */}
-          {s.status === "DRAFT" && canConfirmSettlement && (
+          {s.status === "GEN" && canConfirmSettlement && (
             <Button size="sm" onClick={() => askConfirmSettlement(s)} disabled={confirmSettlement.isPending}>确认结算</Button>
           )}
         </div>
@@ -1477,6 +1499,35 @@ function FinanceInner() {
         {wdAudit && (
           <>
             <Field label="提现对象">{wdAudit.payeeName}</Field>
+            <Field label="收款账户">
+              {!wdAudit.accountNo ? (
+                /* 单子上没账户号：这单没法打款，批了也只是转进打款队列然后失败 */
+                <Badge tone="danger">申请时未登记收款账户</Badge>
+              ) : wdAcctQ.isLoading ? (
+                <span className="text-muted-foreground">核对中…</span>
+              ) : (
+                <>
+                  <span className="tabular-nums">
+                    {wdSnapAcct
+                      ? `${wdSnapAcct.accountName} ${wdSnapAcct.accountMasked}`
+                      : wdAudit.accountNo}
+                  </span>
+                  {wdAudit.bankCode && (
+                    <span className="ml-2 text-muted-foreground">{wdAudit.bankCode}</span>
+                  )}
+                  {/* 账户在申请后被停用：钱打不出去，批之前就该知道 */}
+                  {wdSnapAcct && wdSnapAcct.status !== "ACTIVE" && (
+                    <Badge tone="danger" className="ml-2">该账户已停用</Badge>
+                  )}
+                  {/* 申请后换了默认账户 —— 快照与现状不一致，审批人必须知道打给的是哪个 */}
+                  {wdNowDefault && wdNowDefault.accountNo !== wdAudit.accountNo && (
+                    <Badge tone="warning" className="ml-2">
+                      申请后已改默认账户（现为 {wdNowDefault.accountMasked}），本单仍按申请时的账户打款
+                    </Badge>
+                  )}
+                </>
+              )}
+            </Field>
             <Field label="申请金额">
               {money(wdAudit.amount, wdAudit.currency)}
               {/* 低于业务规则的最低提现额是该被看见的：批过去就是违反自己定的规则 */}
@@ -1646,7 +1697,7 @@ function FinanceInner() {
         desc="金额 = 下方分润明细之和；确认后进入应付，金额锁定"
         width="w-[760px]"
         footer={
-          stlDetail?.status === "DRAFT" && canConfirmSettlement && (
+          stlDetail?.status === "GEN" && canConfirmSettlement && (
             <Button disabled={confirmSettlement.isPending} onClick={() => askConfirmSettlement(stlDetail)}>确认结算</Button>
           )
         }

@@ -5,7 +5,16 @@
 import type { Archivable } from "./common";
 
 export type OnlineStatus = "ONLINE" | "OFFLINE";
-export type CabinetStatus = "DEPLOYED" | "FAULT" | "RETIRED";
+/**
+ * 机柜状态。
+ *
+ * ⚠️ `IN_STOCK`（在库未投放）此前**漏在这里** —— 而后端新建机柜默认就是它
+ * （CabinetServiceImpl：「还没上架就置 ONLINE 会让它出现在 C 端可借列表里」），
+ * 「库存调拨」整个功能管的也正是这批柜子（IN_STOCK ↔ DEPLOYED 来回流转）。
+ * 结果是仓库里的机柜在运营端**全是未知状态**：徽标映射不上、按状态筛不出来，
+ * 而两边都不报错。（后端 StatusVocabularyAcrossEndsTest 现在盯着这类不一致。）
+ */
+export type CabinetStatus = "IN_STOCK" | "DEPLOYED" | "FAULT" | "RETIRED";
 export interface Cabinet extends Archivable {
   cabinetNo: string;
   sn: string;

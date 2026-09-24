@@ -304,6 +304,9 @@ const cabinetFields = (
     options: [{ value: "", label: "未上架（到货待部署）" }, ...points.map((p) => ({ value: p.locationNo, label: `${p.locationNo} · ${p.name}` }))],
     help: `归属站点由点位反查，不单独维护 —— 当前：${siteHint}` },
   { key: "status", label: "设备状态", type: "select", required: true, section: "上架归属", options: [
+    // 在库（到货未投放）也要能选：编辑一台仓库里的柜子时，少了这一档会让
+    // 必填的状态框显示空值，逼着运营把它改成「在用」——那就把它错误地投放了
+    { value: "IN_STOCK", label: "在库" },
     { value: "DEPLOYED", label: "在用" }, { value: "FAULT", label: "故障" }, { value: "RETIRED", label: "报废" },
   ] },
 ];
@@ -463,7 +466,7 @@ function CabinetsTab({ canWrite }: { canWrite: boolean }) {
           { header: "可借", value: (c) => c.availableCount },
           { header: "仓位数", value: (c) => c.slotTotal },
           { header: "在线", value: (c) => (c.onlineStatus === "ONLINE" ? "在线" : "离线") },
-          { header: "状态", value: (c) => ({ DEPLOYED: "在用", FAULT: "故障", RETIRED: "报废" })[c.status] },
+          { header: "状态", value: (c) => ({ IN_STOCK: "在库", DEPLOYED: "在用", FAULT: "故障", RETIRED: "报废" })[c.status] },
           { header: "固件", value: (c) => c.fwVersion },
           { header: "最后心跳", value: (c) => c.lastHeartbeatAt },
           { header: "归档时间", value: (c) => c.archivedAt },
@@ -479,7 +482,7 @@ function CabinetsTab({ canWrite }: { canWrite: boolean }) {
         <FilterSelect
           value={status}
           onChange={(v) => resetPage(() => setStatus(v))}
-          options={[{ value: "DEPLOYED", label: "在用" }, { value: "FAULT", label: "故障" }, { value: "RETIRED", label: "报废" }]}
+          options={[{ value: "IN_STOCK", label: "在库" }, { value: "DEPLOYED", label: "在用" }, { value: "FAULT", label: "故障" }, { value: "RETIRED", label: "报废" }]}
           allLabel="全部状态"
           aria-label="按机柜状态筛选"
         />

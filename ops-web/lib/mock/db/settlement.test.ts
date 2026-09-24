@@ -3,7 +3,7 @@
 // 结算单页从前是纯只读，`finance:settlement:generate/:confirm` 两个权限码定义了从没被用过。
 // 补上写操作后，三件事必须由服务端（本 db 层）兜住，不能指望页面自觉：
 //  ① 金额只能来自分润明细汇总（不凭空造数）；② 同 对象+周期 幂等，不许重复出账；
-//  ③ 状态机强制——DRAFT 之外的状态不允许再确认。
+//  ③ 状态机强制——GEN 之外的状态不允许再确认。
 import { describe, expect, it } from "vitest";
 import {
   settlements, generateSettlements, confirmSettlement, listSettlementRecords,
@@ -17,14 +17,14 @@ const NO_RECORD_PERIOD = "2026-04";
 const venueNoAt = (i: number) => venues[i].venueNo;
 
 describe("生成结算单", () => {
-  it("金额 = 该周期分润明细汇总，状态为 DRAFT，明细笔数对得上", () => {
+  it("金额 = 该周期分润明细汇总，状态为 GEN，明细笔数对得上", () => {
     const payeeNo = venueNoAt(0);
     const agg = aggregateShareRecords("VENUE", payeeNo, OPEN_PERIOD);
     expect(agg.recordCount).toBeGreaterThan(0);
 
     const [s] = generateSettlements({ payeeType: "VENUE", payeeNos: [payeeNo], period: OPEN_PERIOD });
 
-    expect(s.status).toBe("DRAFT");
+    expect(s.status).toBe("GEN");
     expect(s.totalAmount).toBe(agg.totalAmount);
     expect(s.recordCount).toBe(agg.recordCount);
     expect(s.confirmedBy).toBeNull();
@@ -82,7 +82,7 @@ describe("生成结算单", () => {
 });
 
 describe("确认结算：状态机强制", () => {
-  it("DRAFT → CONFIRMED，记确认人与确认时间", () => {
+  it("GEN → CONFIRMED，记确认人与确认时间", () => {
     const [s] = generateSettlements({ payeeType: "AGENT", payeeNos: ["AG001"], period: OPEN_PERIOD });
     const done = confirmSettlement(s.settleNo, "Sara Ahmed");
 
