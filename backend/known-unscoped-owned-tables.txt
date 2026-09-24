@@ -1,0 +1,74 @@
+# 带归属列、却没登记数据范围的表 —— **只准变短，不准变长**
+#
+# 由 DataScopeCoverageRatchetTest 执行。新增一张 → 测试红。
+#
+# 【为什么要盯】
+# DataScopeRegistration 的类注释第一句就写着：
+#   「未注册的表 = 全局放行 —— 这是本机制最危险的性质：漏注册不会报错、不会告警，
+#     只会静默地让越权数据流出去。所以新增带归属语义的表时，注册是建表的一部分，不是可选项。」
+# 而在此之前，**没有任何东西在执行这句话**。
+#
+# 2026-09-24 实测的代价：dev_alarm 上 agent_no/site_no/region_id 三列俱全、一个都没注册，
+# 于是代理登录后工作台列的是全平台最近 10 条告警 —— AG002 看到了 AG006 的柜机号。
+# 列表页都没事（那些表注册了），偏偏是聚合首屏漏的，而页面照常渲染。
+#
+# 【条目格式】 表名  # 该表有哪些归属列
+#
+# 【怎么变短】二选一，都要在 review 里显形：
+#   · 该管 → 在 DataScopeRegistration 里登记（⚠️ 把该表有列可用的**所有已提供维度**一起登记，
+#     handler 是 fail-closed，漏一个维度 = 那类主体 1=0 全瞎）；
+#   · 本就该全局可见（码表、字典、平台级配置）→ 从本台账删掉之前先想清楚：
+#     「谁都能看」和「没人想起来要管」在代码里长得一模一样。
+#
+# 注：本台账按**库里的列**判定，不看实体 —— 列在库里而实体没映射，数据一样会流出去。
+agt_account  # agent_no
+agt_agent  # agent_no
+agt_agent_region  # agent_no region_id
+agt_assignment  # agent_no
+agt_commission  # agent_no
+cs_session  # c_user_no region_id
+cs_ticket  # c_user_no region_id
+fin_invoice  # region_id
+inv_warehouse  # region_id
+loc_contract  # site_no
+loc_lead  # region_id site_no
+loc_site_agent  # agent_no site_no
+loc_site_lifecycle  # site_no
+loc_site_lifecycle_log  # site_no
+loc_venue  # region_id
+loc_venue_onboarding  # region_id
+md_region  # region_id
+mkt_campaign  # region_id
+mkt_notice  # region_id
+mkt_push  # region_id
+mkt_referral  # region_id
+ord_complaint  # c_user_no region_id
+ord_deposit  # c_user_no region_id
+ord_exception  # c_user_no region_id
+ord_refund  # c_user_no region_id
+ord_reservation  # c_user_no region_id site_no
+pay_auth  # c_user_no
+pay_order  # c_user_no
+price_rule_deprecated_v1  # site_no
+price_schedule  # region_id
+recon_task  # region_id
+usr_blacklist  # c_user_no region_id
+usr_consent  # c_user_no
+usr_coupon  # c_user_no
+usr_credit  # c_user_no
+usr_credit_change  # c_user_no
+usr_favorite  # c_user_no site_no
+usr_free_whitelist  # c_user_no region_id
+usr_identity  # c_user_no
+usr_invoice  # c_user_no
+usr_invoice_title  # c_user_no
+usr_logoff  # c_user_no
+usr_membership  # c_user_no
+usr_message  # c_user_no
+usr_notify_pref  # c_user_no
+usr_push_token  # c_user_no
+usr_recharge_order  # c_user_no region_id
+usr_recharge_pkg  # region_id
+usr_user  # c_user_no
+usr_wallet  # c_user_no
+usr_wallet_txn  # c_user_no

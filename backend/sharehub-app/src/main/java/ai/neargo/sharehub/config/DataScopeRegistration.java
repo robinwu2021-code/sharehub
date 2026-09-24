@@ -42,6 +42,21 @@ public class DataScopeRegistration implements DataScopeRegistrar {
     @Override
     public void register(DataScopeTableRegistry registry) {
 
+        /*
+         * ⚠️ **一张表登记了一个维度，就不该漏掉它有列可用的其它已提供维度**。
+         * handler 是 fail-closed：REGION 主体查一张「登记了 AGENT/SITE 却没登记 REGION」的表，
+         * 拿到的是 1=0 —— 不是少几行，是一行都没有，且不报错。
+         *
+         * 本仓提供的档位是 ALL/REGION/SITE/AGENT/SELF（ops-web 的 DataScope）。
+         * dev_cabinet / ord_order / wo_order 三张表都有 region_id，
+         * 而此前只有 loc_site 登记了 REGION —— 按区域收敛的员工能看到站点，
+         * 却在机柜/订单/工单三个页面一条都看不到。今天没人配 REGION（库里只有 ALL 与 SITE），
+         * 所以还没人踩到；档位在下拉里摆着，踩到只是时间问题。
+         * 这与 LOCATION 那次是同一个病：**档位提供了，而承载它的表没准备好**。
+         *
+         * location_no 不登记：LOCATION 已不在提供的档位里（那次清理的结论），
+         * 给一个没人能选的维度登记锚点只会让下一个人以为它还在用。
+         */
         // —— 场地：站点是归属的权威源，点位随站点 ——
         registry.register("loc_site", Map.of(
                 "AGENT", "agent_no",
@@ -55,7 +70,8 @@ public class DataScopeRegistration implements DataScopeRegistrar {
         // —— 设备：机柜归属随点位 ——
         registry.register("dev_cabinet", Map.of(
                 "AGENT", "agent_no",
-                "SITE", "site_no"));
+                "SITE", "site_no",
+                "REGION", "region_id"));
 
         // —— 交易：订单归属随借出机柜（下单时快照，不随设备后续调拨变动）——
         // SELF → c_user_no 必须注册，理由见类注释「关于 SELF」一节：handler 是 fail-closed，
@@ -63,12 +79,14 @@ public class DataScopeRegistration implements DataScopeRegistrar {
         registry.register("ord_order", Map.of(
                 "AGENT", "agent_no",
                 "SITE", "site_no",
-                "SELF", "c_user_no"));
+                "SELF", "c_user_no",
+                "REGION", "region_id"));
 
         // —— 运维：工单归属随设备 ——
         registry.register("wo_order", Map.of(
                 "AGENT", "agent_no",
-                "SITE", "site_no"));
+                "SITE", "site_no",
+                "REGION", "region_id"));
 
         /*
          * —— 告警 ——
