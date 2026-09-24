@@ -54,12 +54,11 @@ function pageFiles(): string[] {
 /**
  * 还没改过来的页面。**这个清单只准变短**（同 design-tokens.test.ts 的棘轮约定）。
  *
- * 这两个不是漏了：2026-09-24 改这一批时，它们正被另一个会话改着
- * （devices 在加「在库」档位、finance 在把 DRAFT 收敛成 GEN）。
- * 按仓库的并发纪律不碰别人的在途文件，于是先挂在这里 ——
- * 而不是把卡口调松，那样下一个新页面就又能悄悄加一处。
+ * 现在是空的 —— 全站九处都改完了（devices / finance 两页当时被另一个会话占着，
+ * 等它们提交后补上）。留着这个空数组不是摆设：下一次再出现「明知有问题但这轮改不到」
+ * 的页面时，该挂进来而不是把上面的卡口调松。
  */
-const KNOWN_OFFENDERS = ["app/devices/page.tsx", "app/finance/page.tsx"];
+const KNOWN_OFFENDERS: string[] = [];
 
 describe("多 tab 共用一个 query 的页面", () => {
   it("不许用 keepPreviousData——换 tab 会拿上一个 tab 的行渲染新 tab 的列", () => {

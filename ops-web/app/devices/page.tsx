@@ -7,7 +7,7 @@ import { UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
 import { Pagination } from "@/components/ui/misc";
 import { usePaging } from "@/lib/hooks/use-paging";
-import { useNavTabs, usePageTab } from "@/lib/hooks/use-page-tab";
+import { useNavTabs, usePageTab, keepWithinTab } from "@/lib/hooks/use-page-tab";
 import { Select } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/date-input";
 import { TabHeader } from "@/components/ui/tab-header";
@@ -1404,7 +1404,7 @@ function DevicesInner() {
       : tab === "commands" ? api.listCommandRecords({ page: paging.page, size: paging.size, keyword })
       : tab === "inventory" ? api.listInventoryTransfers({ page: paging.page, size: paging.size, keyword })
       : api.listOtaRollouts({ page: paging.page, size: paging.size, keyword }),
-    placeholderData: keepPreviousData,
+    placeholderData: keepWithinTab(tab),
     enabled: !isStandalone,
   });
 
