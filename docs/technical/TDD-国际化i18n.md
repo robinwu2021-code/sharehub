@@ -87,6 +87,37 @@
 - [x] FE：`components/status.tsx`（枚举→色调保留，文案走 t）、`money/fmtTime` 随 locale、`Pagination/DataTable 空态/Rail/SecondaryNav/Header 面包屑/login` 全本地化；`nav-labels.ts` 三语 overlay（nav.ts 中文 SSOT 不动）
 - [x] BE：`config/I18nConfig`(ReloadableResourceBundleMessageSource+AcceptHeaderLocaleResolver) + `common/Messages` + 改 `GlobalExceptionHandler`（ErrorCode→key 按 locale 解析，兼容旧成品串）+ `resources/i18n/messages{,_en,_ar}.properties`
 - [x] 测试：FE `lib/i18n/i18n.test.ts`（三语齐平/插值/回退，vitest 38 过）+ BE `MessagesTest`（三语解析）+ `tsc`/`next build`(19 路由)/`mvn test-compile`(JDK21) 全绿 + 实机 zh↔en↔ar 切换 + ar 全站 RTL + 货币/日期随 locale
+**P3 数据侧多语言字段（2026-09-24 补记，与 P2 是两件事）**
+
+P2 说的是**界面文案**（表头/按钮/枚举 map）外化成 key。这里说的是**数据记录自己带的
+多语言字段** —— 后端表上就有 `name_ar` / `message_en` 这类列，随记录一起返回。
+两者的做法完全不同：前者查 catalog，后者要按当前 locale 从记录里挑一个字段。
+
+现状（对齐工作中逐个查证）：
+
+| 字段 | 前端 | 展示 |
+|---|---|---|
+| `Site.nameAr` | 表单字段 ✓（`b779f4b` 补，此前库里有列而实体没映射） | 仍用 `name` |
+| `Brand.nameAr` | 表单字段 ✓ | 仍用 `name` |
+| `PaymentChannel.channelNameEn/Ar` | 表单字段 ✓（本轮补，此前只能由 DBA 改库） | 仍用 `channelName` |
+| `AlarmCode.messageAr/messageEn` | **未接** | — |
+
+**共同的缺口：仓里没有「按当前 locale 从记录里取名」的统一做法。**
+所以上面几个都只接成了表单字段（能编辑、能存），展示一律回落主语言。
+这是有意的 —— 各页面自己写 `locale === "ar" ? x.nameAr : x.name` 会散成一片，
+且回落规则（阿语为空时退英文还是退中文）各写各的必然不一致。
+
+待做：
+
+- [ ] 定一个 `localizedName(record, locale)` 口径：字段命名约定（`xxxAr`/`xxxEn`）、
+      **回落链**（ar → en → zh？还是 ar → zh？）、空串与 null 是否同等对待
+- [ ] 按该口径把上表四处的展示接上；`AlarmCode.messageAr/messageEn` 一并补类型与表单
+      （它现在还挂在 `backend/known-api-align-gaps.txt` 里）
+- [ ] C 端同步 —— 多语言名字对 C 端的意义比运营端大得多
+
+⚠️ **别在单个页面里顺手接**：先有口径再接，否则第二个页面就会出现第二套回落规则。
+本轮对齐工作刻意没接，原因即此。
+
 **P2 全量文案外化（另起，建议 workflow 按域并行）**
 - [ ] 16 页面 + C 端所有中文串（页面标题/表头/筛选/按钮/抽屉/各页枚举 map）→ key + zh/en/ar；ar 人工校对
 - [ ] `lang-switcher`/`nav-prefs toggle` 等少量 aria-label 本地化；图表坐标轴/tooltip RTL 复核

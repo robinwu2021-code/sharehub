@@ -17,6 +17,11 @@
 #
 # A 类（前端在调、后端没有 = 运行期 404）不进本台账：零容忍。
 
+# ⚠️ 下面两条**不在本线修**，已转 i18n：
+#   它们是「数据记录自带的多语言字段」，与界面文案外化是两件事。
+#   仓里还没有「按当前 locale 从记录里取名」的统一口径 —— 没口径就接，
+#   第二个页面必然出现第二套回落规则（ar 为空退英文还是退中文？）。
+#   见 docs/technical/TDD-国际化i18n.md §6 P3（同处还列了另外三处同类字段）。
 B GET /api/ops/alarms/codes AlarmCode 后端有前端无:messageAr
 B GET /api/ops/alarms/codes AlarmCode 后端有前端无:messageEn
 # ⚠️ 下面这条是**有意不接**，不是待办：
