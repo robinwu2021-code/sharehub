@@ -50,6 +50,19 @@ public class PlatformController {
         return roleQueryService.list("1".equals(showArchived) || "true".equals(showArchived));
     }
 
+    /** 新建 / 修改角色。此前只有列表与归档 —— 前端「新增/编辑角色」在真后端下必 404。 */
+    @PostMapping("/roles")
+    @PreAuthorize("@perm.can('org:role:update')")
+    public RoleRowVO createRole(@RequestBody RoleRowVO body) {
+        return roleQueryService.save(null, body);   // 新建一律服务端取号
+    }
+
+    @PostMapping("/roles/{roleNo}")
+    @PreAuthorize("@perm.can('org:role:update')")
+    public RoleRowVO updateRole(@PathVariable String roleNo, @RequestBody RoleRowVO body) {
+        return roleQueryService.save(roleNo, body); // 路径为准，防越权改他人角色
+    }
+
     /** 归档角色（内置角色服务端拒绝）。**不是删除**，可 unarchive 恢复。 */
     @PostMapping("/roles/{roleNo}/archive")
     @PreAuthorize("@perm.can('org:role:update')")

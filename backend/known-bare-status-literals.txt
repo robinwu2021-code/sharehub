@@ -143,7 +143,6 @@ NoticeServiceImpl#type=SYSTEM
 PushServiceImpl#status=DRAFT
 PushServiceImpl#status=SENT
 RechargePackageServiceImpl#status=ENABLED
-ReferralServiceImpl#status=ENABLED
 UserCouponServiceImpl#status=ACTIVE
 UserCouponServiceImpl#status=UNUSED
 UserInvoiceServiceImpl#status=APPLIED

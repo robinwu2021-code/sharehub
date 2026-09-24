@@ -20,6 +20,20 @@ public final class UserAssetDtos {
      * {@code rechargeCount}/{@code rechargeAmount} 来自 {@code usr_recharge_order}，
      * 均按 {@code c_user_no} 现算。落到 {@code usr_wallet} 上必然与订单页不自洽。
      */
+    /**
+     * 手工调账入参。
+     *
+     * <p><b>不复用 {@link WalletRow}</b>：那是读模型，`orderCount` 这类**聚合出来的**字段
+     * 在里面是 primitive，请求体里没带就直接 500（Jackson 无法把 null 映射成 long）——
+     * 而前端的编辑表单本来就只填余额/赠额。更要紧的是：把聚合字段放进入参，
+     * 等于邀请调用方去「设置」一个算出来的数。
+     *
+     * @param balance 调整后的余额；null = 不动
+     * @param bonus   调整后的赠额；null = 不动
+     */
+    public record WalletAdjustReq(String userNo, BigDecimal balance, BigDecimal bonus, String currency) {
+    }
+
     public record WalletRow(String userNo, String nickname, BigDecimal balance, BigDecimal bonus,
                             String currency, String updatedAt,
                             long orderCount, BigDecimal orderAmount,

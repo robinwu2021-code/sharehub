@@ -158,6 +158,25 @@ public class UserOpsController {
         return wallets.page(page, size, keyword);
     }
 
+    /**
+     * 运营手工调整钱包。此前只有 GET —— 前端「调整钱包」在真后端下必 404。
+     *
+     * <p>两条路径都收：无 {@code userNo} 的那条要求 body 里带（服务端拒绝凭空开户）。
+     */
+    @PostMapping("/wallets")
+    @PreAuthorize("@perm.can('user:wallet:update')")
+    public WalletRow adjustWallet(
+            @RequestBody ai.neargo.sharehub.user.asset.dto.UserAssetDtos.WalletAdjustReq body) {
+        return wallets.adjust(body.userNo(), body, currentOperator());
+    }
+
+    @PostMapping("/wallets/{userNo}")
+    @PreAuthorize("@perm.can('user:wallet:update')")
+    public WalletRow adjustWalletOf(@PathVariable String userNo,
+            @RequestBody ai.neargo.sharehub.user.asset.dto.UserAssetDtos.WalletAdjustReq body) {
+        return wallets.adjust(userNo, body, currentOperator()); // 路径为准，防越权改他人钱包
+    }
+
     @GetMapping("/wallets/{userNo}/txns")
     @PreAuthorize("@perm.can('user:wallet:read')")
     public PageResult<WalletTxnRow> walletTxns(@PathVariable String userNo,
@@ -287,5 +306,10 @@ public class UserOpsController {
                                      @RequestParam(required = false) Integer size,
                                      @RequestParam(required = false) String cUserNo) {
         return creditScoreService.pageChanges(page, size, cUserNo);
+    }
+
+    /** 操作人以会话为准，不信前端传值 —— 手工调账必须回答「谁改的」。 */
+    private static String currentOperator() {
+        return ai.neargo.sharehub.auth.SecurityUtils.currentUser().map(u -> u.userNo()).orElse("SYSTEM");
     }
 }

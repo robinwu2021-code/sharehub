@@ -123,6 +123,13 @@ public class NotifyController {
         return blacklistService.block(body);
     }
 
+    /** 修改拉黑记录（只改渠道/原因，target 冻结 —— 见 service 注释）。 */
+    @PostMapping("/api/platform/notify-blacklist/{blockNo}")
+    @PreAuthorize("@perm.can('system:notify_blacklist:update')")
+    public NotifyBlacklistVO updateBlock(@PathVariable String blockNo, @RequestBody NotifyBlacklist body) {
+        return blacklistService.update(blockNo, body);
+    }
+
     /** 解除（软删：{@code status=RELEASED} + 留痕，不物理删）。 */
     @PostMapping("/api/platform/notify-blacklist/{blockNo}/release")
     @PreAuthorize("@perm.can('system:notify_blacklist:update')")

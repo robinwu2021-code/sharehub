@@ -343,6 +343,21 @@ public class MarketingController {
         return userCouponService.pageIssueRecords(page, size, couponNo);
     }
 
+    /** 新建 / 修改裂变规则。此前只有 GET —— 前端「新增/编辑」在真后端下必 404。 */
+    @PostMapping("/api/user/referral-rules")
+    @PreAuthorize("@perm.can('marketing:referral:update')")
+    public Object createReferralRule(
+            @RequestBody ai.neargo.sharehub.user.marketing.dto.MarketingDtos.ReferralRuleVO body) {
+        return referralService.saveRule(null, body);   // 新建一律服务端取号
+    }
+
+    @PostMapping("/api/user/referral-rules/{ruleNo}")
+    @PreAuthorize("@perm.can('marketing:referral:update')")
+    public Object updateReferralRule(@PathVariable String ruleNo,
+            @RequestBody ai.neargo.sharehub.user.marketing.dto.MarketingDtos.ReferralRuleVO body) {
+        return referralService.saveRule(ruleNo, body); // 路径为准
+    }
+
     /** 裂变规则列表。 */
     @GetMapping("/api/user/referral-rules")
     @PreAuthorize("@perm.can('marketing:referral:read')")

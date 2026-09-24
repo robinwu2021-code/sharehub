@@ -116,6 +116,9 @@ public final class BizKey {
     public static final String CAMPAIGN = "CMP";
     public static final String PUSH_MESSAGE = "PM";
     public static final String REFERRAL = "RF";
+    /** 裂变**规则**。与 {@link #REFERRAL}（一条邀请关系）分前缀：同域重名的业务键
+     *  会让「按号查」查出另一类东西来（[db-design §1.4.1] 登记过五个这样的键）。 */
+    public static final String REFERRAL_RULE = "RFR";
     public static final String NOTICE = "NTC";
     public static final String AD_SLOT = "AS";
     public static final String AD_CAMPAIGN = "AD";

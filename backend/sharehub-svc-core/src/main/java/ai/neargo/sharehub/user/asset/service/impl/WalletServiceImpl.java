@@ -48,10 +48,17 @@ public class WalletServiceImpl implements WalletService {
     private final UsrRechargeOrderMapper recharges;
     private final OrdMapper orders;
     private final NicknameLookup nicknames;
+    /** 手工调账流水的业务类型：审计时要能把「人改的」单独筛出来。 */
+    private static final String BIZ_MANUAL_ADJUST = "MANUAL_ADJUST";
+
+    /** 手工调账要先确认用户真实存在 —— 给一个不存在的用户开钱包，那笔钱永远没人认领。 */
+    private final ai.neargo.sharehub.user.mapper.UserMappers.UsrUserMapper users;
 
     public WalletServiceImpl(UsrWalletMapper wallets, UsrWalletTxnMapper txns,
                              UsrRechargeOrderMapper recharges, OrdMapper orders,
-                             NicknameLookup nicknames) {
+                             NicknameLookup nicknames,
+                             ai.neargo.sharehub.user.mapper.UserMappers.UsrUserMapper users) {
+        this.users = users;
         this.wallets = wallets;
         this.txns = txns;
         this.recharges = recharges;
@@ -122,6 +129,99 @@ public class WalletServiceImpl implements WalletService {
         }
         return new WalletOverview(e.getBalance(), e.getGiftBalance(), e.getDepositAmount(),
                 e.getFrozenAmount(), e.getCurrency());
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public WalletRow adjust(String cUserNo, ai.neargo.sharehub.user.asset.dto.UserAssetDtos.WalletAdjustReq in, String operator) {
+        if (cUserNo == null || cUserNo.isBlank()) {
+            // 钱包属于用户。凭空建一个不对应任何用户的钱包，只会让它永远没人认领，
+            // 却出现在所有统计里 —— 所以这里不开户，只调整。
+            throw new IllegalArgumentException("请指定要调整的用户钱包（userNo 必填）");
+        }
+        // 用户必须真实存在。给一个不存在的用户开钱包，那笔钱永远没人认领，
+        // 却会出现在所有统计里。
+        boolean userExists = users.selectCount(
+                new LambdaQueryWrapper<ai.neargo.sharehub.user.entity.UsrUser>()
+                        .eq(ai.neargo.sharehub.user.entity.UsrUser::getCUserNo, cUserNo)) > 0;
+        if (!userExists) throw new IllegalArgumentException("用户不存在: " + cUserNo);
+
+        UsrWallet w = wallets.selectOne(new LambdaQueryWrapper<UsrWallet>()
+                .eq(UsrWallet::getCUserNo, cUserNo).last("limit 1"));
+        if (w == null) {
+            // 用户存在但还没有钱包行：这里开户。**目前全后端没有任何地方建钱包**
+            // （充值、注册都不建），不在这里开的话这个端点永远无事可做。
+            w = new UsrWallet();
+            w.setWalletNo(ai.neargo.common.core.IdGenerator.next("WA"));
+            w.setTenantId("MAIN");
+            w.setCUserNo(cUserNo);
+            w.setBalance(BigDecimal.ZERO);
+            w.setGiftBalance(BigDecimal.ZERO);
+            w.setDepositAmount(BigDecimal.ZERO);
+            w.setFrozenAmount(BigDecimal.ZERO);
+            w.setCurrency(in.currency() == null || in.currency().isBlank() ? "AED" : in.currency());
+            wallets.insert(w);
+        }
+
+        BigDecimal beforeBalance = nz(w.getBalance());
+        BigDecimal beforeBonus = nz(w.getGiftBalance());
+        BigDecimal afterBalance = in.balance() == null ? beforeBalance : in.balance();
+        BigDecimal afterBonus = in.bonus() == null ? beforeBonus : in.bonus();
+        if (afterBalance.signum() < 0 || afterBonus.signum() < 0) {
+            throw new IllegalArgumentException("余额 / 赠额不能调成负数");
+        }
+
+        BigDecimal dBalance = afterBalance.subtract(beforeBalance);
+        BigDecimal dBonus = afterBonus.subtract(beforeBonus);
+        if (dBalance.signum() == 0 && dBonus.signum() == 0) {
+            return rowOf(w);   // 没动数就不记流水：一条 0 元流水只会污染对账
+        }
+
+        w.setBalance(afterBalance);
+        w.setGiftBalance(afterBonus);
+        if (in.currency() != null && !in.currency().isBlank()) w.setCurrency(in.currency());
+        wallets.updateById(w);
+
+        String who = (operator == null || operator.isBlank()) ? "SYSTEM" : operator;
+        // 加钱记 REFUND（入账）而不是 RECHARGE：运营补款不是用户充值，
+        // 混进去会让「充值次数/充值金额」这两个经营指标凭空变大。
+        if (dBalance.signum() != 0) {
+            writeTxn(w, dBalance.signum() > 0 ? "REFUND" : "SPEND",
+                    "运营手工调整余额（" + who + "）", dBalance);
+        }
+        if (dBonus.signum() != 0) {
+            writeTxn(w, "BONUS", "运营手工调整赠额（" + who + "）", dBonus);
+        }
+        return rowOf(w);
+    }
+
+    /**
+     * 手工调账的流水。**必须与余额在同一事务里写** ——
+     * 只改余额不记流水，「流水合计 === 余额」当场被破坏，而对账时没人说得清差额从哪来。
+     */
+    private void writeTxn(UsrWallet w, String type, String title, BigDecimal amount) {
+        UsrWalletTxn t = new UsrWalletTxn();
+        t.setTxnNo(ai.neargo.common.core.IdGenerator.next(ai.neargo.sharehub.common.BizKey.WALLET_TXN));
+        t.setWalletNo(w.getWalletNo());
+        t.setCUserNo(w.getCUserNo());
+        t.setType(type);
+        t.setDirection(amount.signum() > 0 ? "IN" : "OUT");
+        t.setTitle(title);
+        t.setAmount(amount);
+        t.setCurrency(w.getCurrency());
+        t.setBizType(BIZ_MANUAL_ADJUST);   // 手工调账要能被单独筛出来审计
+        t.setBizNo("");
+        t.setCreatedAt(java.time.LocalDateTime.now().toString());
+        txns.insert(t);
+    }
+
+    private WalletRow rowOf(UsrWallet w) {
+        return new WalletRow(w.getCUserNo(), null, nz(w.getBalance()), nz(w.getGiftBalance()),
+                w.getCurrency(), w.getUpdatedAt(), 0L, BigDecimal.ZERO, 0L, BigDecimal.ZERO);
+    }
+
+    private static BigDecimal nz(BigDecimal v) {
+        return v == null ? BigDecimal.ZERO : v;
     }
 
     private List<OrdOrder> ordersOf(List<String> userNos) {

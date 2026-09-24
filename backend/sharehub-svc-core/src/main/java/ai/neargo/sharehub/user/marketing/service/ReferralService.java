@@ -20,4 +20,13 @@ public interface ReferralService {
     /** 邀请规则分页（{@code mkt_referral_rule}，V31/V33 —— 不再翻邀请记录表，D-3 已修）。 */
     ai.neargo.common.core.PageResult<ai.neargo.sharehub.user.marketing.dto.MarketingDtos.ReferralRuleVO>
             pageRules(Integer page, Integer size);
+
+    /**
+     * 新建 / 修改裂变规则。
+     *
+     * <p><b>奖励金额是「单侧」的</b>：`rewardTo=BOTH` 时双方**各得**此额，不是均分 ——
+     * 均分会让运营写的「奖 10」变成各 5，与活动文案不符。
+     */
+    ai.neargo.sharehub.user.marketing.dto.MarketingDtos.ReferralRuleVO saveRule(
+            String ruleNo, ai.neargo.sharehub.user.marketing.dto.MarketingDtos.ReferralRuleVO in);
 }

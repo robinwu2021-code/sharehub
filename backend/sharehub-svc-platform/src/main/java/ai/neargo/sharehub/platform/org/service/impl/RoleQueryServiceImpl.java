@@ -46,6 +46,41 @@ public class RoleQueryServiceImpl implements RoleQueryService {
     }
 
     @Override
+    public RoleRowVO save(String roleNo, RoleRowVO in) {
+        if (in == null || in.name() == null || in.name().isBlank()) {
+            throw new IllegalArgumentException("角色名称必填");
+        }
+        boolean create = roleNo == null || roleNo.isBlank();
+        IamRole r;
+        if (create) {
+            if (in.code() == null || in.code().isBlank()) {
+                throw new IllegalArgumentException("角色编码必填");
+            }
+            if (roles.selectCount(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<IamRole>()
+                    .eq(IamRole::getCode, in.code().trim())) > 0) {
+                // 编码是权限判定的连接键，重了就有两套权限抢同一个 code
+                throw new IllegalArgumentException("角色编码已存在: " + in.code());
+            }
+            r = new IamRole();
+            r.setRoleNo(ai.neargo.common.core.IdGenerator.next(ai.neargo.sharehub.common.BizKey.ROLE));
+            r.setTenantId("MAIN");
+            r.setCode(in.code().trim());
+            r.setBuiltin(0);   // 内置角色只能由种子产生，接口一律建普通角色
+        } else {
+            r = require(roleNo);
+            if (r.getBuiltin() != null && r.getBuiltin() == 1) {
+                throw new IllegalArgumentException("内置角色不可修改: " + roleNo);
+            }
+            // code 不受理：RolePerms 按 code 认角色，改掉等于把一整套权限判定
+            // 悄悄指向一个不存在的角色 —— 页面不报错，只是那个角色的人忽然什么都看不见。
+        }
+        r.setName(in.name().trim());
+        // dataScope / scopeRefs 不在这里写：它们有专门的写入口（saveRoleDataScope）。
+        if (create) roles.insert(r); else roles.updateById(r);
+        return toVO(require(r.getRoleNo()), 0L, 0L);
+    }
+
+    @Override
     public RoleRowVO archive(String roleNo) {
         IamRole r = require(roleNo);
         if (r.getBuiltin() != null && r.getBuiltin() == 1) {

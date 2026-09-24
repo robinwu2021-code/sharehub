@@ -20,6 +20,16 @@ public interface NotifyBlacklistService {
     NotifyBlacklistVO release(String blockNo, String operator);
 
     /**
+     * 修改一条拉黑记录。**只改 channel / reason**。
+     *
+     * <p><b>target 冻结</b>：它是脱敏后存的（`+9715****1234`），改掉等于换了一个人被拉黑，
+     * 而从掩码上根本看不出换没换。要拉黑别人就新建一条。
+     *
+     * <p><b>已解除的不可改</b>：那是一条历史记录，解除动作是对当时那份内容做的。
+     */
+    NotifyBlacklistVO update(String blockNo, NotifyBlacklist body);
+
+    /**
      * <b>发送前必查</b>：目标在该渠道是否被拉黑。
      *
      * <p>命中规则：{@code status=ACTIVE} 且未过 {@code expireAt}，且渠道匹配 ——

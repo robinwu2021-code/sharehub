@@ -76,6 +76,22 @@ public class NotifyBlacklistServiceImpl implements NotifyBlacklistService {
     }
 
     @Override
+    public NotifyBlacklistVO update(String blockNo, NotifyBlacklist body) {
+        NotifyBlacklist e = selectByNo(blockNo);
+        if (e == null) throw new IllegalArgumentException("拉黑记录不存在: " + blockNo);
+        if (RELEASED.equals(e.getStatus())) {
+            // 已解除的是历史记录：解除动作是对当时那份内容做的，事后改内容就对不上了
+            throw new IllegalArgumentException("已解除的拉黑记录不可修改: " + blockNo);
+        }
+        // target 不受理：它是脱敏存的，改掉等于换了一个人被拉黑，而从掩码上看不出换没换。
+        // 拉黑别人请新建一条 —— 那样才留得下「谁在什么时候被拉黑」这条痕。
+        if (body.getChannel() != null && !body.getChannel().isBlank()) e.setChannel(body.getChannel());
+        if (body.getReason() != null && !body.getReason().isBlank()) e.setReason(body.getReason());
+        mapper.updateById(e);
+        return toVO(e);
+    }
+
+    @Override
     public NotifyBlacklistVO release(String blockNo, String operator) {
         NotifyBlacklist e = selectByNo(blockNo);
         if (e == null) throw new IllegalArgumentException("拉黑记录不存在: " + blockNo);

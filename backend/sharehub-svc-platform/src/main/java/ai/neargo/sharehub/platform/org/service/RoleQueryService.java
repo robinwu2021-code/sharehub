@@ -17,6 +17,17 @@ public interface RoleQueryService {
     List<RoleRowVO> list(boolean showArchived);
 
     /** 归档角色。内置角色（builtin=1）拒绝：内置角色是权限体系的地基。 */
+    /**
+     * 新建 / 修改角色。
+     *
+     * <p><b>不写 dataScope</b>：数据范围有专门的写入口（`saveRoleDataScope`）。
+     * 同一个字段开两条写路径，迟早有一条忘了校验 —— 而这个字段决定谁能看到谁的数据。
+     *
+     * <p><b>内置角色不可改</b>：`RolePerms` 按 `code` 认它们，改掉 code 等于把一整套
+     * 权限判定悄悄指向一个不存在的角色（同 {@link #archive} 拒绝内置的理由）。
+     */
+    RoleRowVO save(String roleNo, RoleRowVO in);
+
     RoleRowVO archive(String roleNo);
 
     /** 取消归档。 */
