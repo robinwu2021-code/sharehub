@@ -162,7 +162,8 @@ public class SeedData {
         }
         List<Double> shareRates = List.of(0.15, 0.2, 0.25, 0.3);
         for (int i = 0; i < 18; i++) {
-            contracts.add(new Contract("CT" + (400 + i), p(VENUE_NAMES, i), p(LOCS, i), p(shareRates, i),
+            contracts.add(new Contract("CT" + (400 + i), null, null,
+                    p(VENUE_NAMES, i), p(LOCS, i), p(shareRates, i),
                     (i % 4) * 500, iso(i * 30L * 86400_000L), iso(-(365L - i * 10) * 86400_000L),
                     i % 9 == 0 ? "EXPIRED" : "ACTIVE"));
         }

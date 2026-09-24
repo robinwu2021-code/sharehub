@@ -46,7 +46,33 @@ public final class PriceDtos {
      *
      * <p>{@code multiplier} 是**倍率**（可 &gt; 1），不是 0..1 的比率。
      */
+    /**
+     * 分时调价规则入参。
+     *
+     * <p><b>不收实体</b>：实体的 {@code active} 是 {@code Integer}（0/1），
+     * 而前端契约里它是 {@code boolean} —— Jackson 不会把 {@code true} 塞进 Integer，
+     * 直接抛 → **保存分时规则必 500**，页面上只显示「服务器错误」。
+     * 入参用自己的形状，0/1 的转换留在服务端。
+     */
+    public record PricingScheduleReq(String ruleNo, String regionId, String name, String period,
+                                     String days, String timeFrom, String timeTo, String expr,
+                                     BigDecimal multiplier, Boolean active) {
+    }
+
+    /**
+     * 分时调价规则行。
+     *
+     * <p><b>结构化字段必须带出来</b>（V49 起）：判倍率读的是 {@code days/timeFrom/timeTo}，
+     * 而 {@code period} 只是给人看的中文串。只回 period 的话，运营端的编辑抽屉拿不到
+     * 真正生效的那几个值 —— 界面上是空的，一保存就把它们清掉，而倍率从此按空条件命中。
+     *
+     * @param days     生效星期 CSV，{@code 1}=周一…{@code 7}=周日；空 = 每天
+     * @param timeFrom {@code HH:mm}；与 {@code timeTo} 同时为空 = 全天
+     * @param timeTo   {@code HH:mm}；可跨零点（{@code 22:00-06:00} 合法）
+     * @param expr     结构化表达式原文，排错时用
+     */
     public record PricingSchedule(String ruleNo, String name, String period,
+                                  String days, String timeFrom, String timeTo, String expr,
                                   BigDecimal multiplier, boolean active) {
     }
 

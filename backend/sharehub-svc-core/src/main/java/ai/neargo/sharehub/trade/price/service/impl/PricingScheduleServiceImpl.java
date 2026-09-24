@@ -73,7 +73,8 @@ public class PricingScheduleServiceImpl extends AbstractCrudService<PriceSchedul
 
     @Override
     protected PricingSchedule toVO(PriceSchedule e) {
-        return new PricingSchedule(e.getRuleNo(), e.getName(), e.getPeriod(), e.getMultiplier(),
+        return new PricingSchedule(e.getRuleNo(), e.getName(), e.getPeriod(),
+                e.getDays(), e.getTimeFrom(), e.getTimeTo(), e.getExpr(), e.getMultiplier(),
                 e.getActive() != null && e.getActive() == 1);
     }
 

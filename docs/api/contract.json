@@ -3329,6 +3329,14 @@
      "type": "String"
     },
     {
+     "name": "venueNo",
+     "type": "String"
+    },
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
      "name": "venueName",
      "type": "String"
     },
@@ -3377,6 +3385,14 @@
    "responseShape": [
     {
      "name": "contractNo",
+     "type": "String"
+    },
+    {
+     "name": "venueNo",
+     "type": "String"
+    },
+    {
+     "name": "siteNo",
      "type": "String"
     },
     {
@@ -3435,6 +3451,14 @@
    "responseShape": [
     {
      "name": "contractNo",
+     "type": "String"
+    },
+    {
+     "name": "venueNo",
+     "type": "String"
+    },
+    {
+     "name": "siteNo",
      "type": "String"
     },
     {
@@ -5484,6 +5508,12 @@
      "in": "query",
      "name": "keyword",
      "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "showArchived",
+     "type": "Boolean",
      "required": false
     }
    ],
@@ -7873,6 +7903,12 @@
      "name": "keyword",
      "type": "String",
      "required": false
+    },
+    {
+     "in": "query",
+     "name": "showArchived",
+     "type": "Boolean",
+     "required": false
     }
    ],
    "bodyType": null,
@@ -9052,6 +9088,94 @@
    "requestShape": null
   },
   {
+   "verb": "POST",
+   "path": "/api/ops/venue-onboardings",
+   "perm": "location:venue:create",
+   "handler": "LocExtController#createOnboarding",
+   "summary": "审核。",
+   "params": [],
+   "bodyType": "VenueOnboarding",
+   "returnType": "VenueOnboarding",
+   "returnContainer": null,
+   "returnElement": "VenueOnboarding",
+   "responseShape": [
+    {
+     "name": "onboardingNo",
+     "type": "String"
+    },
+    {
+     "name": "venueName",
+     "type": "String"
+    },
+    {
+     "name": "contact",
+     "type": "String"
+    },
+    {
+     "name": "industry",
+     "type": "String"
+    },
+    {
+     "name": "requestedAt",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "reviewAt",
+     "type": "String"
+    },
+    {
+     "name": "reviewNote",
+     "type": "String"
+    },
+    {
+     "name": "venueNo",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "onboardingNo",
+     "type": "String"
+    },
+    {
+     "name": "venueName",
+     "type": "String"
+    },
+    {
+     "name": "contact",
+     "type": "String"
+    },
+    {
+     "name": "industry",
+     "type": "String"
+    },
+    {
+     "name": "requestedAt",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "reviewAt",
+     "type": "String"
+    },
+    {
+     "name": "reviewNote",
+     "type": "String"
+    },
+    {
+     "name": "venueNo",
+     "type": "String"
+    }
+   ]
+  },
+  {
    "verb": "GET",
    "path": "/api/ops/venue-onboardings/{onboardingNo}",
    "perm": "location:venue:read",
@@ -9111,10 +9235,105 @@
   },
   {
    "verb": "POST",
+   "path": "/api/ops/venue-onboardings/{onboardingNo}",
+   "perm": "location:venue:update",
+   "handler": "LocExtController#updateOnboarding",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "onboardingNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "VenueOnboarding",
+   "returnType": "VenueOnboarding",
+   "returnContainer": null,
+   "returnElement": "VenueOnboarding",
+   "responseShape": [
+    {
+     "name": "onboardingNo",
+     "type": "String"
+    },
+    {
+     "name": "venueName",
+     "type": "String"
+    },
+    {
+     "name": "contact",
+     "type": "String"
+    },
+    {
+     "name": "industry",
+     "type": "String"
+    },
+    {
+     "name": "requestedAt",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "reviewAt",
+     "type": "String"
+    },
+    {
+     "name": "reviewNote",
+     "type": "String"
+    },
+    {
+     "name": "venueNo",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "onboardingNo",
+     "type": "String"
+    },
+    {
+     "name": "venueName",
+     "type": "String"
+    },
+    {
+     "name": "contact",
+     "type": "String"
+    },
+    {
+     "name": "industry",
+     "type": "String"
+    },
+    {
+     "name": "requestedAt",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "reviewAt",
+     "type": "String"
+    },
+    {
+     "name": "reviewNote",
+     "type": "String"
+    },
+    {
+     "name": "venueNo",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
    "path": "/api/ops/venue-onboardings/{onboardingNo}/review",
    "perm": "location:venue:create",
    "handler": "LocExtController#review",
-   "summary": "审核。",
+   "summary": "",
    "params": [
     {
      "in": "path",
@@ -9204,11 +9423,52 @@
      "name": "keyword",
      "type": "String",
      "required": false
+    },
+    {
+     "in": "query",
+     "name": "showArchived",
+     "type": "Boolean",
+     "required": false
     }
    ],
    "bodyType": null,
    "returnType": "PageResult<Venue>",
    "returnContainer": "PageResult",
+   "returnElement": "Venue",
+   "responseShape": [
+    {
+     "name": "venueNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "contact",
+     "type": "String"
+    },
+    {
+     "name": "industry",
+     "type": "String"
+    },
+    {
+     "name": "locationCount",
+     "type": "int"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/venues",
+   "perm": "location:venue:create",
+   "handler": "OpsController#createVenue",
+   "summary": "新建 / 修改场地方。",
+   "params": [],
+   "bodyType": "LocVenue",
+   "returnType": "Venue",
+   "returnContainer": null,
    "returnElement": "Venue",
    "responseShape": [
     {
@@ -9274,6 +9534,48 @@
    "returnContainer": null,
    "returnElement": "Object",
    "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/venues/{venueNo}",
+   "perm": "location:venue:update",
+   "handler": "OpsController#updateVenue",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "venueNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "LocVenue",
+   "returnType": "Venue",
+   "returnContainer": null,
+   "returnElement": "Venue",
+   "responseShape": [
+    {
+     "name": "venueNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "contact",
+     "type": "String"
+    },
+    {
+     "name": "industry",
+     "type": "String"
+    },
+    {
+     "name": "locationCount",
+     "type": "int"
+    }
+   ],
    "requestShape": null
   },
   {
@@ -13001,6 +13303,68 @@
   },
   {
    "verb": "POST",
+   "path": "/api/platform/notify-blacklist/{blockNo}",
+   "perm": "system:notify_blacklist:update",
+   "handler": "NotifyController#updateBlock",
+   "summary": "修改拉黑记录（只改渠道/原因，target 冻结 —— 见 service 注释）。",
+   "params": [
+    {
+     "in": "path",
+     "name": "blockNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "NotifyBlacklist",
+   "returnType": "NotifyBlacklistVO",
+   "returnContainer": null,
+   "returnElement": "NotifyBlacklistVO",
+   "responseShape": [
+    {
+     "name": "blockNo",
+     "type": "String"
+    },
+    {
+     "name": "target",
+     "type": "String"
+    },
+    {
+     "name": "channel",
+     "type": "String"
+    },
+    {
+     "name": "reason",
+     "type": "String"
+    },
+    {
+     "name": "blockedAt",
+     "type": "String"
+    },
+    {
+     "name": "blockedBy",
+     "type": "String"
+    },
+    {
+     "name": "expireAt",
+     "type": "String"
+    },
+    {
+     "name": "releasedAt",
+     "type": "String"
+    },
+    {
+     "name": "releasedBy",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
    "path": "/api/platform/notify-blacklist/{blockNo}/release",
    "perm": "system:notify_blacklist:update",
    "handler": "NotifyController#release",
@@ -14447,6 +14811,189 @@
     }
    ],
    "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/platform/roles",
+   "perm": "org:role:update",
+   "handler": "PlatformController#createRole",
+   "summary": "新建 / 修改角色。",
+   "params": [],
+   "bodyType": "RoleRowVO",
+   "returnType": "RoleRowVO",
+   "returnContainer": null,
+   "returnElement": "RoleRowVO",
+   "responseShape": [
+    {
+     "name": "roleNo",
+     "type": "String"
+    },
+    {
+     "name": "code",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "permCount",
+     "type": "Long"
+    },
+    {
+     "name": "memberCount",
+     "type": "Long"
+    },
+    {
+     "name": "builtin",
+     "type": "Boolean"
+    },
+    {
+     "name": "dataScope",
+     "type": "String"
+    },
+    {
+     "name": "scopeRefs",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "roleNo",
+     "type": "String"
+    },
+    {
+     "name": "code",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "permCount",
+     "type": "Long"
+    },
+    {
+     "name": "memberCount",
+     "type": "Long"
+    },
+    {
+     "name": "builtin",
+     "type": "Boolean"
+    },
+    {
+     "name": "dataScope",
+     "type": "String"
+    },
+    {
+     "name": "scopeRefs",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/platform/roles/{roleNo}",
+   "perm": "org:role:update",
+   "handler": "PlatformController#updateRole",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "roleNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "RoleRowVO",
+   "returnType": "RoleRowVO",
+   "returnContainer": null,
+   "returnElement": "RoleRowVO",
+   "responseShape": [
+    {
+     "name": "roleNo",
+     "type": "String"
+    },
+    {
+     "name": "code",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "permCount",
+     "type": "Long"
+    },
+    {
+     "name": "memberCount",
+     "type": "Long"
+    },
+    {
+     "name": "builtin",
+     "type": "Boolean"
+    },
+    {
+     "name": "dataScope",
+     "type": "String"
+    },
+    {
+     "name": "scopeRefs",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "roleNo",
+     "type": "String"
+    },
+    {
+     "name": "code",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "permCount",
+     "type": "Long"
+    },
+    {
+     "name": "memberCount",
+     "type": "Long"
+    },
+    {
+     "name": "builtin",
+     "type": "Boolean"
+    },
+    {
+     "name": "dataScope",
+     "type": "String"
+    },
+    {
+     "name": "scopeRefs",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -17925,6 +18472,22 @@
      "type": "String"
     },
     {
+     "name": "days",
+     "type": "String"
+    },
+    {
+     "name": "timeFrom",
+     "type": "String"
+    },
+    {
+     "name": "timeTo",
+     "type": "String"
+    },
+    {
+     "name": "expr",
+     "type": "String"
+    },
+    {
      "name": "multiplier",
      "type": "BigDecimal"
     },
@@ -17942,7 +18505,7 @@
    "handler": "PricingController#createPricingSchedule",
    "summary": "",
    "params": [],
-   "bodyType": "PriceSchedule",
+   "bodyType": "ai.neargo.sharehub.trade.price.dto.PriceDtos.PricingScheduleReq",
    "returnType": "PricingSchedule",
    "returnContainer": null,
    "returnElement": "PricingSchedule",
@@ -17960,6 +18523,22 @@
      "type": "String"
     },
     {
+     "name": "days",
+     "type": "String"
+    },
+    {
+     "name": "timeFrom",
+     "type": "String"
+    },
+    {
+     "name": "timeTo",
+     "type": "String"
+    },
+    {
+     "name": "expr",
+     "type": "String"
+    },
+    {
      "name": "multiplier",
      "type": "BigDecimal"
     },
@@ -17968,7 +18547,48 @@
      "type": "boolean"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "ruleNo",
+     "type": "String"
+    },
+    {
+     "name": "regionId",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "period",
+     "type": "String"
+    },
+    {
+     "name": "days",
+     "type": "String"
+    },
+    {
+     "name": "timeFrom",
+     "type": "String"
+    },
+    {
+     "name": "timeTo",
+     "type": "String"
+    },
+    {
+     "name": "expr",
+     "type": "String"
+    },
+    {
+     "name": "multiplier",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "active",
+     "type": "Boolean"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -17984,7 +18604,7 @@
      "required": true
     }
    ],
-   "bodyType": "PriceSchedule",
+   "bodyType": "ai.neargo.sharehub.trade.price.dto.PriceDtos.PricingScheduleReq",
    "returnType": "PricingSchedule",
    "returnContainer": null,
    "returnElement": "PricingSchedule",
@@ -18002,6 +18622,22 @@
      "type": "String"
     },
     {
+     "name": "days",
+     "type": "String"
+    },
+    {
+     "name": "timeFrom",
+     "type": "String"
+    },
+    {
+     "name": "timeTo",
+     "type": "String"
+    },
+    {
+     "name": "expr",
+     "type": "String"
+    },
+    {
      "name": "multiplier",
      "type": "BigDecimal"
     },
@@ -18010,7 +18646,48 @@
      "type": "boolean"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "ruleNo",
+     "type": "String"
+    },
+    {
+     "name": "regionId",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "period",
+     "type": "String"
+    },
+    {
+     "name": "days",
+     "type": "String"
+    },
+    {
+     "name": "timeFrom",
+     "type": "String"
+    },
+    {
+     "name": "timeTo",
+     "type": "String"
+    },
+    {
+     "name": "expr",
+     "type": "String"
+    },
+    {
+     "name": "multiplier",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "active",
+     "type": "Boolean"
+    }
+   ]
   },
   {
    "verb": "GET",
@@ -22231,6 +22908,123 @@
    "requestShape": null
   },
   {
+   "verb": "POST",
+   "path": "/api/user/referral-rules",
+   "perm": "marketing:referral:update",
+   "handler": "MarketingController#createReferralRule",
+   "summary": "新建 / 修改裂变规则。",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.user.marketing.dto.MarketingDtos.ReferralRuleVO",
+   "returnType": "Object",
+   "returnContainer": null,
+   "returnElement": "Object",
+   "responseShape": null,
+   "requestShape": [
+    {
+     "name": "ruleNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "rewardTo",
+     "type": "String"
+    },
+    {
+     "name": "rewardAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "trigger",
+     "type": "String"
+    },
+    {
+     "name": "maxPerInviter",
+     "type": "Integer"
+    },
+    {
+     "name": "startAt",
+     "type": "String"
+    },
+    {
+     "name": "endAt",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/user/referral-rules/{ruleNo}",
+   "perm": "marketing:referral:update",
+   "handler": "MarketingController#updateReferralRule",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "ruleNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "ai.neargo.sharehub.user.marketing.dto.MarketingDtos.ReferralRuleVO",
+   "returnType": "Object",
+   "returnContainer": null,
+   "returnElement": "Object",
+   "responseShape": null,
+   "requestShape": [
+    {
+     "name": "ruleNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "rewardTo",
+     "type": "String"
+    },
+    {
+     "name": "rewardAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "trigger",
+     "type": "String"
+    },
+    {
+     "name": "maxPerInviter",
+     "type": "Integer"
+    },
+    {
+     "name": "startAt",
+     "type": "String"
+    },
+    {
+     "name": "endAt",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ]
+  },
+  {
    "verb": "GET",
    "path": "/api/user/referrals",
    "perm": "marketing:campaign:read",
@@ -23045,6 +23839,157 @@
     }
    ],
    "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/user/wallets",
+   "perm": "user:wallet:update",
+   "handler": "UserOpsController#adjustWallet",
+   "summary": "运营手工调整钱包。",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.user.asset.dto.UserAssetDtos.WalletAdjustReq",
+   "returnType": "WalletRow",
+   "returnContainer": null,
+   "returnElement": "WalletRow",
+   "responseShape": [
+    {
+     "name": "userNo",
+     "type": "String"
+    },
+    {
+     "name": "nickname",
+     "type": "String"
+    },
+    {
+     "name": "balance",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "bonus",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "updatedAt",
+     "type": "String"
+    },
+    {
+     "name": "orderCount",
+     "type": "long"
+    },
+    {
+     "name": "orderAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "rechargeCount",
+     "type": "long"
+    },
+    {
+     "name": "rechargeAmount",
+     "type": "BigDecimal"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "userNo",
+     "type": "String"
+    },
+    {
+     "name": "balance",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "bonus",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/user/wallets/{userNo}",
+   "perm": "user:wallet:update",
+   "handler": "UserOpsController#adjustWalletOf",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "userNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "ai.neargo.sharehub.user.asset.dto.UserAssetDtos.WalletAdjustReq",
+   "returnType": "WalletRow",
+   "returnContainer": null,
+   "returnElement": "WalletRow",
+   "responseShape": [
+    {
+     "name": "userNo",
+     "type": "String"
+    },
+    {
+     "name": "nickname",
+     "type": "String"
+    },
+    {
+     "name": "balance",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "bonus",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "updatedAt",
+     "type": "String"
+    },
+    {
+     "name": "orderCount",
+     "type": "long"
+    },
+    {
+     "name": "orderAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "rechargeCount",
+     "type": "long"
+    },
+    {
+     "name": "rechargeAmount",
+     "type": "BigDecimal"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "userNo",
+     "type": "String"
+    },
+    {
+     "name": "balance",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "bonus",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "GET",
@@ -25622,10 +26567,10 @@
  },
  "conflicts": {},
  "stats": {
-  "endpoints": 408,
-  "records": 290,
-  "withPerm": 348,
-  "withBody": 170,
-  "shapedResponses": 308
+  "endpoints": 419,
+  "records": 293,
+  "withPerm": 359,
+  "withBody": 181,
+  "shapedResponses": 317
  }
 }

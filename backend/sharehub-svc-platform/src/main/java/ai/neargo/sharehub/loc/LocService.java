@@ -306,7 +306,8 @@ public class LocService {
             }
         }
         List<Contract> rows = r.getRecords().stream()
-                .map(c -> new Contract(c.getContractNo(), c.getVenueName(), c.getSiteName(),
+                .map(c -> new Contract(c.getContractNo(), c.getVenueNo(), c.getSiteNo(),
+                        c.getVenueName(), c.getSiteName(),
                         c.getShareRate(), c.getEntryFee(), c.getStartAt(), c.getEndAt(), c.getStatus(),
                         attachByNo.getOrDefault(c.getContractNo(), java.util.List.of())))
                 .toList();
@@ -394,7 +395,8 @@ public class LocService {
                                 a.getAttachNo(), a.getFileName(), a.getSize(), a.getUploadedBy(),
                                 a.getUploadedAt() == null ? null : a.getUploadedAt().toString()))
                         .toList();
-        return new Contract(c.getContractNo(), c.getVenueName(), c.getSiteName(),
+        return new Contract(c.getContractNo(), c.getVenueNo(), c.getSiteNo(),
+                c.getVenueName(), c.getSiteName(),
                 c.getShareRate(), c.getEntryFee(), c.getStartAt(), c.getEndAt(), c.getStatus(), atts);
     }
 

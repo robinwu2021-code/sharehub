@@ -47,16 +47,25 @@ public final class LocDtos {
     public record Venue(String venueNo, String name, String contact, String industry, int locationCount) {
     }
 
-    /** 合同行，镜像前端 {@code Contract}（含附件列表，来自 {@code loc_contract_attach} 从表）。 */
-    public record Contract(String contractNo, String venueName, String siteName, double shareRate,
+    /**
+     * 合同行，镜像前端 {@code Contract}（含附件列表，来自 {@code loc_contract_attach} 从表）。
+     *
+     * <p><b>必须带 venueNo / siteNo</b>：合同是场地方分成的唯一依据，按**编号**连；
+     * 名字只是展示冗余（同一商场不同楼层会有同名站点，按名字连必然连错）。
+     * 列与实体一直都有，只是这个读 DTO 没带出来 —— 于是运营端打开「编辑合同」时
+     * 场地方/站点两个必填下拉是空的，表单根本提交不了。
+     */
+    public record Contract(String contractNo, String venueNo, String siteNo,
+                          String venueName, String siteName, double shareRate,
                           double entryFee, String startAt, String endAt, String status,
                           java.util.List<ContractAttachment> attachments) {
 
-        /** 兼容旧 8 参调用（详情/upsert 回包），附件缺省空列表。 */
-        public Contract(String contractNo, String venueName, String siteName, double shareRate,
+        /** 兼容旧调用（详情/upsert 回包），附件缺省空列表。 */
+        public Contract(String contractNo, String venueNo, String siteNo, String venueName,
+                        String siteName, double shareRate,
                         double entryFee, String startAt, String endAt, String status) {
-            this(contractNo, venueName, siteName, shareRate, entryFee, startAt, endAt, status,
-                    java.util.List.of());
+            this(contractNo, venueNo, siteNo, venueName, siteName, shareRate, entryFee,
+                    startAt, endAt, status, java.util.List.of());
         }
     }
 

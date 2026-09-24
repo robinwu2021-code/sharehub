@@ -112,15 +112,36 @@ public class PricingController {
 
     @PostMapping("/pricing-schedules")
     @PreAuthorize("@perm.can('pricing:rule:update')")
-    public PricingSchedule createPricingSchedule(@RequestBody PriceSchedule body) {
-        return scheduleService.save(body);
+    public PricingSchedule createPricingSchedule(
+            @RequestBody ai.neargo.sharehub.trade.price.dto.PriceDtos.PricingScheduleReq body) {
+        return scheduleService.save(toEntity(null, body));
     }
 
     @PostMapping("/pricing-schedules/{ruleNo}")
     @PreAuthorize("@perm.can('pricing:rule:update')")
-    public PricingSchedule updatePricingSchedule(@PathVariable String ruleNo, @RequestBody PriceSchedule body) {
-        body.setRuleNo(ruleNo);
-        return scheduleService.save(body);
+    public PricingSchedule updatePricingSchedule(@PathVariable String ruleNo,
+            @RequestBody ai.neargo.sharehub.trade.price.dto.PriceDtos.PricingScheduleReq body) {
+        return scheduleService.save(toEntity(ruleNo, body));
+    }
+
+    /**
+     * 入参 → 实体。{@code active} 在契约里是布尔、在库里是 0/1，转换只该有这一处。
+     * 让前端传 0/1，或者让实体直接当请求体，都会把这个差异漏到某个没人测的角落。
+     */
+    private static PriceSchedule toEntity(String ruleNo,
+            ai.neargo.sharehub.trade.price.dto.PriceDtos.PricingScheduleReq in) {
+        PriceSchedule e = new PriceSchedule();
+        e.setRuleNo(ruleNo != null ? ruleNo : in.ruleNo());   // 路径为准
+        e.setRegionId(in.regionId());
+        e.setName(in.name());
+        e.setPeriod(in.period());
+        e.setDays(in.days());
+        e.setTimeFrom(in.timeFrom());
+        e.setTimeTo(in.timeTo());
+        e.setExpr(in.expr());
+        e.setMultiplier(in.multiplier());
+        e.setActive(in.active() == null ? null : (in.active() ? 1 : 0));
+        return e;
     }
 
     /** {@code Map.of} 不接受 null，统一转空串；空串在基类里等价于「不过滤」。 */

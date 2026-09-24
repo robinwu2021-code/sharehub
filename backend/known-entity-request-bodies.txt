@@ -40,7 +40,6 @@ NotifyTemplate
 OpenapiApp
 PricePlan
 PriceRule
-PriceSchedule
 ShareRule
 SysAppVersion
 SysLoginSetting

@@ -53,7 +53,13 @@ export const venues: Venue[] = VENUE_NAMES.map((name, i) => ({
   industry: p(["零售", "航空", "地产", "餐饮"], i), locationCount: 3 + i * 2, archivedAt: null,
 }));
 export const contracts: Contract[] = Array.from({ length: 18 }, (_, i) => ({
-  contractNo: `CT${400 + i}`, venueName: p(VENUE_NAMES, i), siteName: p(LOCS, i),
+  contractNo: `CT${400 + i}`,
+  // 编号必须给：合同是场地方分成的唯一依据，按**编号**连（名字只是展示冗余）。
+  // 缺了它，「编辑合同」的场地方/站点两个必填下拉是空的，表单根本提交不了 ——
+  // 而这正是真后端侧同一个缺口的镜像（读 DTO 也一直没带出这两列）。
+  venueNo: venues[i % venues.length].venueNo,
+  siteNo: sites[i % sites.length].siteNo,
+  venueName: p(VENUE_NAMES, i), siteName: p(LOCS, i),
   shareRate: [0.15, 0.2, 0.25, 0.3][i % 4], entryFee: (i % 4) * 500, startAt: iso(i * 30 * 86400_000),
   endAt: iso(-(365 - i * 10) * 86400_000), status: i % 9 === 0 ? "EXPIRED" : "ACTIVE",
   // 附件只给一部分合同：空态（「这份合同还没扫描件」）与已上传态都要能在页面上看到。
