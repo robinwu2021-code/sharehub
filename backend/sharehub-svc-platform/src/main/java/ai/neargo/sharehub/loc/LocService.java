@@ -1,6 +1,7 @@
 package ai.neargo.sharehub.loc;
 
 import ai.neargo.common.core.PageResult;
+import ai.neargo.sharehub.audit.AuditChanges;
 import java.time.LocalDateTime;
 import org.springframework.transaction.annotation.Transactional;
 import ai.neargo.sharehub.loc.dto.LocDtos.Site;
@@ -91,6 +92,16 @@ public class LocService {
         LocSite e = siteMapper.selectOne(new LambdaQueryWrapper<LocSite>().eq(LocSite::getSiteNo, no));
         boolean insert = (e == null);
         if (insert) { e = new LocSite(); e.setSiteNo(no); e.setTenantId("MAIN"); }
+        if (!insert) {
+            // **先记后改**：下面全是就地 set，赋值之后旧值就没了。
+            AuditChanges.record("名称", e.getName(), in.name());
+            AuditChanges.record("场地方", e.getVenueNo(), in.venueNo());
+            // 归属代理是**数据范围的锚点**：改了它，原代理就不该再看得见这个站点的单子。
+            // 「谁在什么时候把它从某个代理改成直营」是排查范围问题时第一个要问的 ——
+            // 而在此之前，这个问题在库里查不到答案。
+            AuditChanges.record("归属代理", e.getAgentNo(), in.agentNo());
+            AuditChanges.record("状态", e.getStatus(), in.status() == null ? "ACTIVE" : in.status());
+        }
         e.setName(in.name());
         e.setVenueNo(in.venueNo());
         e.setVenueName(in.venueName());
@@ -366,6 +377,14 @@ public class LocService {
             // LocContract 不继承 BaseEntity，没有 createdBy —— 审计列在 V10 加到了表上，
             // 但实体没跟着加。这里不顺手补：补了要连带确认 AuditMetaObjectHandler 的填充范围，
             // 是另一件事（见《实体-领域对象对账表》里那批漂移）。
+            // 合同的费率与期限是场地方分成的取价依据。只记一条「改过合同」，
+            // 事后对不上账时仍然答不出「这单按 8% 还是 5% 算的」。
+            AuditChanges.record("场地方分成比率", current.getShareRate(), body.getShareRate());
+            AuditChanges.record("进场费", current.getEntryFee(), body.getEntryFee());
+            AuditChanges.record("生效起", current.getStartAt(), body.getStartAt());
+            AuditChanges.record("生效止", current.getEndAt(), body.getEndAt());
+            AuditChanges.record("状态", current.getStatus(), body.getStatus());
+            AuditChanges.record("绑定站点", current.getSiteNo(), body.getSiteNo());
             contractMapper.updateById(body);
         }
 

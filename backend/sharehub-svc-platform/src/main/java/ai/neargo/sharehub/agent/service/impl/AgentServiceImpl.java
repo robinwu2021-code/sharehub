@@ -7,6 +7,7 @@ import ai.neargo.sharehub.agent.mapper.AgentMapper;
 import ai.neargo.sharehub.agent.service.AgentService;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.agent.dto.AgentDtos.Agent;
+import ai.neargo.sharehub.audit.AuditChanges;
 import ai.neargo.common.core.IdGenerator;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -50,6 +51,16 @@ public class AgentServiceImpl implements AgentService {
         AgtAgent e = mapper.selectOne(new LambdaQueryWrapper<AgtAgent>().eq(AgtAgent::getAgentNo, no));
         boolean insert = (e == null);
         if (insert) { e = new AgtAgent(); e.setAgentNo(no); e.setTenantId("MAIN"); }
+        if (!insert) {
+            // 先记后改（就地 set）。分成比例与状态是这里最该留痕的两个：
+            // 前者直接决定分多少钱，后者决定这个代理还能不能开展业务 ——
+            // 「他什么时候被停用的、谁停的」是争议里必问的。
+            AuditChanges.record("名称", e.getName(), in.name());
+            AuditChanges.record("联系人", e.getContact(), in.contact());
+            AuditChanges.record("分成比例", e.getShareRate(), in.shareRate());
+            AuditChanges.record("类型", e.getAgentType(), AgentType.of(in.agentType()).name());
+            AuditChanges.record("状态", e.getStatus(), in.status() == null ? "ENABLED" : in.status());
+        }
         e.setName(in.name());
         e.setContact(in.contact());
         e.setRegionScope(ai.neargo.sharehub.agent.RegionScopeJson.toJson(in.regionScope()));

@@ -174,11 +174,16 @@ public class ShareServiceImpl implements ShareService {
                  * 而只记一条「POST /api/trade/share-rules」答不出来：
                  * 去库里查当前值，查到的正是被改过之后的那个。
                  *
-                 * 字段是**白名单**（见 AuditChanges 类注释里「为什么不自动 diff」）：
-                 * 这六个是会影响分多少钱给谁的，其余（时间戳、版本号、租户）不进审计。
+                 * 字段是**白名单**（见 AuditChanges 类注释）：这六个会影响分多少钱给谁，
+                 * 其余（时间戳、版本号、租户）不进审计。
+                 * 标签写运营在界面上看到的名字，不是列名 —— 详情页直接显示这个字符串。
                  */
-                AuditChanges.compare(current, body,
-                        "rate", "mode", "basis", "priority", "payeeNo", "payeeName");
+                AuditChanges.record("分润比率", current.getRate(), body.getRate());
+                AuditChanges.record("分账方式", current.getMode(), body.getMode());
+                AuditChanges.record("分润依据", current.getBasis(), body.getBasis());
+                AuditChanges.record("优先级", current.getPriority(), body.getPriority());
+                AuditChanges.record("分成方编号", current.getPayeeNo(), body.getPayeeNo());
+                AuditChanges.record("分成方名称", current.getPayeeName(), body.getPayeeName());
                 ruleMapper.updateById(body);
             }
         }

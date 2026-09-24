@@ -36,7 +36,7 @@ class AuditFieldChangesTest extends AuditTestSupport {
         JsonNode changes = changesOfDetail(auditOfThisRequest("admin.user", traceIdOf(tp)));
         assertThat(changes).as("改了费率却没有任何 diff —— 详情页那张表又是空的").isNotEmpty();
 
-        JsonNode rate = findChange(changes, "rate");
+        JsonNode rate = findChange(changes, "分润比率");
         assertThat(rate.path("before").asText()).as("改前").isEqualTo("0.08");
         assertThat(rate.path("after").asText()).as("改后").isEqualTo("0.05");
     }
@@ -55,8 +55,8 @@ class AuditFieldChangesTest extends AuditTestSupport {
         // 同一次保存里 payeeNo/payeeName/mode/basis/priority 都没动
         for (JsonNode c : changes) {
             assertThat(c.path("field").asText())
-                    .as("只有 rate 变了，别的字段不该出现（「X → X」二十条会把唯一有用的那条藏起来）")
-                    .isEqualTo("rate");
+                    .as("只有费率变了，别的字段不该出现（「X → X」二十条会把唯一有用的那条藏起来）")
+                    .isEqualTo("分润比率");
         }
     }
 

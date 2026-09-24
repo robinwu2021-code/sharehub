@@ -6,6 +6,7 @@ import ai.neargo.sharehub.dev.OnlineStatus;
 
 import ai.neargo.common.core.PageResult;
 import org.springframework.transaction.annotation.Transactional;
+import ai.neargo.sharehub.audit.AuditChanges;
 import ai.neargo.sharehub.dev.entity.DevCabinet;
 import ai.neargo.sharehub.dev.mapper.CabinetMapper;
 import ai.neargo.sharehub.dev.service.CabinetService;
@@ -58,6 +59,15 @@ public class CabinetServiceImpl implements CabinetService {
             e.setStatus(CabinetStatus.IN_STOCK.name());
             e.setOnlineStatus(OnlineStatus.OFFLINE.name());
         }
+        /*
+         * 机柜是**部分更新**（只改传了的键），所以先取快照、set 完再比 ——
+         * 在 setter 前逐个判 containsKey 等于把那段逻辑抄一遍，抄错就会记出假的改动。
+         * 没传的键前后相等，自然不会留下 diff。
+         */
+        String oldSn = e.getSn(), oldVendor = e.getVendorCode(), oldModel = e.getModel();
+        String oldStatus = e.getStatus(), oldLocation = e.getLocationNo(), oldAgent = e.getAgentNo();
+        Integer oldSlots = e.getSlotTotal();
+
         if (in.containsKey("sn")) e.setSn(str(in.get("sn")));
         if (in.containsKey("vendorCode")) e.setVendorCode(str(in.get("vendorCode")));
         if (in.containsKey("model")) e.setModel(str(in.get("model")));
@@ -80,6 +90,17 @@ public class CabinetServiceImpl implements CabinetService {
                 e.setSiteNo(own.siteNo());
                 e.setAgentNo(own.agentNo());
             }
+        }
+        if (!creating) {
+            AuditChanges.record("序列号", oldSn, e.getSn());
+            AuditChanges.record("供应商", oldVendor, e.getVendorCode());
+            AuditChanges.record("型号", oldModel, e.getModel());
+            AuditChanges.record("仓位数", oldSlots, e.getSlotTotal());
+            AuditChanges.record("状态", oldStatus, e.getStatus());
+            // 换点位会连带改掉 site_no / agent_no —— 也就是**这台柜子归谁看**。
+            // 两条都记：只记点位的话，「为什么这个代理突然看得见这台柜子」还是答不出来。
+            AuditChanges.record("所属点位", oldLocation, e.getLocationNo());
+            AuditChanges.record("归属代理", oldAgent, e.getAgentNo());
         }
         if (creating) mapper.insert(e); else mapper.updateById(e);
         return toVO(e);

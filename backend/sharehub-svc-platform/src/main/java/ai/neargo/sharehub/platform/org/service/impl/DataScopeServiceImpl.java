@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.platform.org.service.impl;
 
+import ai.neargo.sharehub.audit.AuditChanges;
 import ai.neargo.sharehub.auth.PermVersion;
 import ai.neargo.sharehub.platform.iam.entity.IamEntities.IamDataScope;
 import ai.neargo.sharehub.platform.iam.mapper.IamMappers.DataScopeMapper;
@@ -65,6 +66,10 @@ public class DataScopeServiceImpl implements DataScopeService {
             mapper.insert(e);
             current = e;
         } else {
+            // 数据范围就是「这个人能看到什么」。改错了是越权，而越权在界面上看不出来 ——
+            // 只会表现为某个人多看到了一些不该看的行。先记后改（就地 set）。
+            AuditChanges.record("数据范围", current.getScopeType(), scopeType);
+            AuditChanges.record("范围明细", current.getScopeRefs(), refs);
             current.setScopeType(scopeType);
             current.setScopeRefs(refs);
             current.setUpdatedAt(LocalDateTime.now());

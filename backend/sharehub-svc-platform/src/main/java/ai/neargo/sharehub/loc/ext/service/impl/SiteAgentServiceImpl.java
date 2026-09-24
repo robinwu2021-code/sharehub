@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.loc.ext.service.impl;
 
+import ai.neargo.sharehub.audit.AuditChanges;
 import ai.neargo.sharehub.api.platform.dto.AgentBrief;
 import ai.neargo.sharehub.api.platform.port.AgentDirectoryPort;
 import ai.neargo.sharehub.loc.ext.SiteAgentRole;
@@ -107,6 +108,16 @@ public class SiteAgentServiceImpl implements SiteAgentService {
 
         LocSiteAgent e = revivedId == null ? new LocSiteAgent() : mapper.selectById(revivedId);
         if (e == null) throw new IllegalArgumentException("责任行不存在: " + in.id());
+        if (e.getId() != null) {
+            // 先记后改（就地 set）。这一行决定「这个站点的钱分给谁、按哪条规则分」——
+            // 结算争议时要问的正是它什么时候变成现在这样的。
+            AuditChanges.record("责任", e.getRole(), role.name());
+            AuditChanges.record("分润规则", e.getRuleNo(), blankToNull(in.ruleNo()));
+            AuditChanges.record("一次性对价", e.getOneOffAmount(),
+                    role == SiteAgentRole.REFER ? in.oneOffAmount() : null);
+            AuditChanges.record("生效起", e.getEffectiveFrom(), from);
+            AuditChanges.record("生效止", e.getEffectiveTo(), to);
+        }
         e.setSiteNo(siteNo);
         e.setAgentNo(in.agentNo());
         e.setRole(role.name());

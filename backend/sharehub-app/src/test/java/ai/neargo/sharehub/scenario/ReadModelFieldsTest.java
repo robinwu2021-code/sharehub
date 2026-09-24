@@ -39,9 +39,17 @@ class ReadModelFieldsTest extends ApiTestSupport {
         c.put("status", "ACTIVE");
         String no = post("/api/ops/contracts", c, admin).okData().path("contractNo").asText();
 
+        // 翻页找，别只看第一页：loc_contract 已经 208 行、页大小 200，
+        // 而列表的 keyword **只匹配场地方名/站点名、不匹配合同号**（LocService.pageContracts），
+        // 所以也不能靠过滤。测试库是累积的，任何「一页就是全量」的写法都只是还没到线。
         JsonNode found = null;
-        for (JsonNode row : get("/api/ops/contracts?page=1&size=200", admin).okData().path("list")) {
-            if (no.equals(row.path("contractNo").asText())) { found = row; break; }
+        outer:
+        for (int page = 1; page <= 50; page++) {
+            JsonNode body = get("/api/ops/contracts?page=" + page + "&size=200", admin).okData();
+            for (JsonNode row : body.path("list")) {
+                if (no.equals(row.path("contractNo").asText())) { found = row; break outer; }
+            }
+            if ((long) page * 200 >= body.path("total").asLong()) break;
         }
         assertThat(found).as("前提：刚建的合同在列表里").isNotNull();
         assertThat(found.path("venueNo").asText(null)).as("场地方编号不能缺").isEqualTo("VEN301");
