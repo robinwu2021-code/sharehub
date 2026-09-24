@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.platform.org.service.impl;
 
+import ai.neargo.sharehub.platform.iam.EmployeeStatus;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.common.crud.AbstractCrudService;
 import ai.neargo.sharehub.platform.iam.entity.IamEntities.IamRole;
@@ -84,7 +85,7 @@ public class EmployeeServiceImpl extends AbstractCrudService<IamEmployee, Employ
 
     @Override
     protected void beforeCreate(IamEmployee e) {
-        if (e.getStatus() == null || e.getStatus().isBlank()) e.setStatus("ACTIVE");
+        if (e.getStatus() == null || e.getStatus().isBlank()) e.setStatus(EmployeeStatus.ACTIVE.name());
         e.setPhone(maskPhone(e.getPhone()));
     }
 

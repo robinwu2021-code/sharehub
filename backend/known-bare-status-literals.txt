@@ -87,7 +87,6 @@ AppVersionServiceImpl#status=DRAFT
 AppVersionServiceImpl#status=RELEASED
 AppVersionServiceImpl#status=ROLLBACK
 DepartmentServiceImpl#status=ACTIVE
-EmployeeServiceImpl#status=ACTIVE
 MarketServiceImpl#status=PLANNED
 MenuService#status=ACTIVE
 OpenApiAppServiceImpl#status=ENABLED

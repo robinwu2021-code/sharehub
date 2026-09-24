@@ -50,7 +50,7 @@ public class EmployeeRoles {
         if (loginName == null || loginName.isBlank()) return List.of();
         IamEmployee e = employeeMapper.selectOne(new LambdaQueryWrapper<IamEmployee>()
                 .eq(IamEmployee::getEmployeeNo, loginName).last("limit 1"));
-        if (e == null || !"ACTIVE".equals(e.getStatus())) return List.of();
+        if (e == null || !EmployeeStatus.ACTIVE.is(e.getStatus())) return List.of();
         return employeeRoleMapper.selectList(new LambdaQueryWrapper<IamEmployeeRole>()
                         .eq(IamEmployeeRole::getEmployeeNo, e.getEmployeeNo()))
                 .stream().map(IamEmployeeRole::getRoleNo)

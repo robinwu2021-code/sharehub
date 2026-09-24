@@ -2,6 +2,9 @@
 
 import type { Archivable } from "./common";
 
+/** 与后端 `EmployeeStatus` 枚举同名同值。具名是为了进两端同名词表比对 ——
+ *  这个词表管的是授权（不是 ACTIVE 就一个角色都不给），漂了不会报错。 */
+export type EmployeeStatus = "ACTIVE" | "LEFT";
 export interface Employee {
   employeeNo: string;
   name: string;
@@ -9,7 +12,7 @@ export interface Employee {
   email: string; // 登录/通知邮箱
   deptName: string | null;
   roleName: string;
-  status: "ACTIVE" | "LEFT";
+  status: EmployeeStatus;
 }
 
 // —— 角色 · 审计（platform 域）——
