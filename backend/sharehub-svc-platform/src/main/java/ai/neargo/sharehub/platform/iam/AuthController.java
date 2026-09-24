@@ -57,12 +57,16 @@ public class AuthController {
     /** 代理端实名登录（④⑤）。入驻建出来的号靠它才登得进来 —— 见 AgentIdentityPort 类注释。 */
     private final AgentIdentityPort agentLogin;
 
+    private final EmployeeRoles employeeRoles;
+
     public AuthController(TokenStore tokenStore, PermissionResolver permissionResolver,
+                          EmployeeRoles employeeRoles,
                           DataScopeResolver dataScopeResolver, MenuService menuService,
                           PermVersion permVersion, DevMode devMode, AgentIdentityPort agentLogin) {
         this.agentLogin = agentLogin;
         this.devMode = devMode;
         this.tokenStore = tokenStore;
+        this.employeeRoles = employeeRoles;
         this.permissionResolver = permissionResolver;
         this.dataScopeResolver = dataScopeResolver;
         this.menuService = menuService;
@@ -126,10 +130,26 @@ public class AuthController {
             role = "VIEWER";
             perms = List.copyOf(permissionResolver.resolvePermissions(rolesOnly(username, role)));
         }
+        /*
+         * **认得出员工就用员工档案上的角色**（iam_employee_role，多角色取并集）。
+         *
+         * 在此之前会话的角色来自请求或配置，与员工档案毫无关系 ——
+         * 「按用户动态展示菜单」里的「用户」实际上不存在。
+         *
+         * 认不出就沿用上面那套：生产的登录名今天是 admin，不等于任何 employee_no，
+         * 为此拒绝登录会把唯一能用的账号锁在外面。
+         * 边界与后续见 EmployeeRoles 的类注释。
+         */
+        List<String> fromDirectory = employeeRoles.rolesOf(username);
+        if (!fromDirectory.isEmpty()) {
+            role = fromDirectory.get(0);   // 展示用主角色；判权看的是下面那份并集
+            perms = List.copyOf(permissionResolver.resolvePermissions(
+                    new AuthSubject(Realm.STAFF.name(), username, fromDirectory, "MAIN", Map.of("agentNo", ""))));
+        }
         boolean isAgent = "AGENT".equals(role);
         String agentNo = isAgent ? (in.agentNo() == null || in.agentNo().isBlank() ? "AG001" : in.agentNo()) : "";
         Realm realm = isAgent ? Realm.AGENT : Realm.STAFF;
-        List<String> roleNos = List.of(role);
+        List<String> roleNos = fromDirectory.isEmpty() ? List.of(role) : fromDirectory;
         AuthSubject subject = new AuthSubject(realm.name(), username, roleNos, "MAIN", Map.of("agentNo", agentNo));
         DataScopeSpec scope = dataScopeResolver.resolveDataScope(subject);
         LoginUser user = new LoginUser(realm, username, username, role, perms, "MAIN", agentNo, scope);
