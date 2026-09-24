@@ -23,8 +23,11 @@ B GET /api/ops/alarms/records AlarmRecord 后端有前端无:agentNo
 B GET /api/ops/alarms/records AlarmRecord 后端有前端无:dedupKey
 B GET /api/ops/alarms/records AlarmRecord 后端有前端无:source
 B GET /api/ops/inspection-plans InspectionPlan 后端有前端无:cron
+# ⚠️ 下面这条是**有意不接**，不是待办：
+#   path 是后端为子树查询冗余的祖先路径（LIKE '/D1/%' 避免递归 CTE，见 IamDept 注释）。
+#   前端是按 parent 客户端建树、filterDepts 也已自行保留祖先链，
+#   接了只是把一份后端实现细节固化进契约。
 B GET /api/platform/departments Department 后端有前端无:path
-B GET /api/platform/departments Department 后端有前端无:sort
 B GET /api/platform/payment-channels PaymentChannelEntry 后端有前端无:apiSecretMasked
 B GET /api/platform/payment-channels PaymentChannelEntry 后端有前端无:channelNameAr
 B GET /api/platform/payment-channels PaymentChannelEntry 后端有前端无:channelNameEn

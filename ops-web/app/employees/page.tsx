@@ -120,6 +120,14 @@ const TAB_KEYS = ["employees", "roles", "org", "audit", "performance"] as const;
  * 不是丢掉：mock 自洽性由 org-tree.test.ts 兜，但真实后端一旦回来一条脏数据，
  * 静默吞掉整棵子树是最难查的那种 bug，宁可让它显眼地漂在顶层。
  */
+/**
+ * 同级按 sort 升序；sort 相同再按 deptNo 兜底，**保证顺序稳定**。
+ * 此前完全不排序 —— 同级顺序由接口返回顺序决定，后台配好的次序不生效，
+ * 换个查询条件还可能变，而这种"顺序不对"在页面上很难被认出是 bug。
+ */
+const bySort = (ds: Department[]) =>
+  [...ds].sort((a, b) => a.sort - b.sort || a.deptNo.localeCompare(b.deptNo));
+
 function buildDeptTree(rows: Department[], renderExtra: (d: Department) => ReactNode): TreeNode[] {
   const byNo = new Map(rows.map((d) => [d.deptNo, d]));
   const childrenOf = new Map<string, Department[]>();
@@ -136,9 +144,9 @@ function buildDeptTree(rows: Department[], renderExtra: (d: Department) => React
       </span>
     ),
     extra: renderExtra(d),
-    children: (childrenOf.get(d.deptNo) ?? []).map(node),
+    children: bySort(childrenOf.get(d.deptNo) ?? []).map(node),
   });
-  return (childrenOf.get("") ?? []).map(node);
+  return bySort(childrenOf.get("") ?? []).map(node);
 }
 
 /** 关键词命中时连**祖先链**一起留下，否则命中的子部门会因为父节点被滤掉而整支消失。 */
