@@ -10,7 +10,10 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 数据权限落库实现（G7 缺口的对端）。
@@ -52,7 +55,7 @@ public class DataScopeServiceImpl implements DataScopeService {
         if (scopeType == null || !SCOPE_TYPES.contains(scopeType)) {
             throw new IllegalArgumentException("非法 scopeType: " + scopeType);
         }
-        String refs = NO_REF_SCOPES.contains(scopeType) ? null : scopeRefs;
+        String refs = NO_REF_SCOPES.contains(scopeType) ? null : toJsonArray(scopeRefs);
 
         IamDataScope current = selectOne(subjectType, subjectNo);
         if (current == null) {
@@ -87,6 +90,41 @@ public class DataScopeServiceImpl implements DataScopeService {
     }
 
     private static DataScopeEntry toVO(IamDataScope e) {
-        return new DataScopeEntry(e.getSubjectType(), e.getSubjectNo(), e.getScopeType(), e.getScopeRefs());
+        return new DataScopeEntry(e.getSubjectType(), e.getSubjectNo(), e.getScopeType(),
+                toCsv(e.getScopeRefs()));
+    }
+
+    /**
+     * 逗号串 → JSON 数组文本。
+     *
+     * <p><b>{@code scope_refs} 是 JSON 列</b>（V1 建表），MariaDB 的 JSON 是带
+     * {@code json_valid} 约束的 LONGTEXT。此前这里把前端传来的逗号串原样落库 ——
+     * 于是**只要选了 ALL/SELF 之外的任何范围，保存就 500**。
+     * mock 下一路顺，切真后端当场炸，而且炸在一个没人会去点第二次的抽屉里。
+     *
+     * <p>入参两种形态都收（前端传逗号串，历史数据是 JSON），出参统一成逗号串 ——
+     * 「存什么形态」是库的事，接口不该把它漏给前端。
+     */
+    static String toJsonArray(String raw) {
+        List<String> items = split(raw);
+        if (items.isEmpty()) return null;
+        return items.stream()
+                // 范围值是业务编号（ST301 / AE-DU / AG002），不会出现引号与反斜杠；
+                // 真出现了就是脏数据，直接剔掉而不是拼出一段非法 JSON 让整条保存失败。
+                .filter(v -> v.indexOf('"') < 0 && v.indexOf('\\') < 0)
+                .map(v -> '"' + v + '"')
+                .collect(Collectors.joining(",", "[", "]"));
+    }
+
+    /** JSON 数组文本 → 逗号串（前端抽屉绑的就是逗号串）。 */
+    static String toCsv(String raw) {
+        List<String> items = split(raw);
+        return items.isEmpty() ? null : String.join(",", items);
+    }
+
+    private static List<String> split(String raw) {
+        if (raw == null || raw.isBlank()) return List.of();
+        return Arrays.stream(raw.replaceAll("[\\[\\]\"]", "").split(","))
+                .map(String::trim).filter(v -> !v.isEmpty()).distinct().toList();
     }
 }

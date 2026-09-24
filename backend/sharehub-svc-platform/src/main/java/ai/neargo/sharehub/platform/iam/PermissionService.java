@@ -57,20 +57,60 @@ public class PermissionService implements PrincipalRefresher, PermissionResolver
         permCache.clear();
     }
 
-    /** 数据范围：AGENT realm 覆盖式硬过滤；否则 iam_data_scope(ROLE) 并集（任一 ALL→ALL）。dim 用 String（通用）。 */
-    public DataScopeSpec scopeOfRoles(List<String> roleCodes, Realm realm, String agentNo) {
+    /**
+     * 数据范围。优先级 **AGENT realm → 员工级 → 角色级并集**。
+     *
+     * <p><b>员工级覆盖而不是取交/并</b>：它存在的理由就是「这个人要比他的角色看得更窄或更宽」
+     * （见 {@code docs/technical/运营端-后端已就绪但未接的能力.md} A3）。
+     * 取交集的话「更宽」永远实现不了，取并集的话「更窄」永远实现不了 ——
+     * 两种都会让管理员配了却不生效，而界面上看不出任何异常。
+     *
+     * <p><b>员工级按 {@code userNo} 认人</b>（{@code LoginUser.userNo} = 运营端 username/employee_no）。
+     * ⚠️ 在真实员工登录落地之前（v4/06 A3 凭据库），生产的会话 userNo 是 {@code admin}，
+     * 匹配不到任何 {@code employee_no} —— 员工级范围**存得下、匹配不上**，
+     * 走的仍是角色级那条路。这不是本方法的缺陷，但它会让「配了没反应」看起来像 bug，
+     * 所以写在这里而不是留给人去猜。
+     */
+    public DataScopeSpec scopeOf(List<String> roleCodes, Realm realm, String agentNo, String userNo) {
         if (realm == Realm.AGENT && agentNo != null && !agentNo.isBlank()) {
             return DataScopeSpec.of("AGENT", Set.of(agentNo));
         }
+        if (userNo != null && !userNo.isBlank()) {
+            IamDataScope own = dataScopeMapper.selectOne(new LambdaQueryWrapper<IamDataScope>()
+                    .eq(IamDataScope::getSubjectType, "EMPLOYEE")
+                    .eq(IamDataScope::getSubjectNo, userNo)
+                    .last("limit 1"));
+            if (own != null) return specOf(List.of(own), userNo);
+        }
         List<IamDataScope> rows = dataScopeMapper.selectList(new LambdaQueryWrapper<IamDataScope>()
                 .eq(IamDataScope::getSubjectType, "ROLE").in(IamDataScope::getSubjectNo, roleCodes));
+        return specOf(rows, userNo);
+    }
+
+    /**
+     * 若干条 {@code iam_data_scope} 行 → 一个 spec。任一 ALL → ALL；没有行 → ALL。
+     *
+     * <p><b>SELF 要带上本人的号</b>。此前 SELF 落库时 refs 被清空，而这里又把
+     * refs 为空的规则滤掉 —— 于是「仅自己经手」**解析出来等于全部数据**，
+     * 方向恰好反了，而且没有任何地方会报错。
+     * 带上 userNo 之后，没登记 SELF 锚点的表由 {@code DataScopeHandler} 的
+     * fail-closed 拼成 {@code 1=0}（看不到），错也错在安全的那一侧。
+     */
+    private DataScopeSpec specOf(List<IamDataScope> rows, String userNo) {
         if (rows.isEmpty() || rows.stream().anyMatch(r -> "ALL".equals(r.getScopeType()))) {
             return DataScopeSpec.ALL;
         }
         List<DataScopeSpec.Rule> rules = rows.stream()
-                .map(r -> new DataScopeSpec.Rule(r.getScopeType(), parseRefs(r.getScopeRefs())))
+                .map(r -> new DataScopeSpec.Rule(r.getScopeType(), refsOf(r, userNo)))
                 .filter(r -> !r.refs().isEmpty()).toList();
         return rules.isEmpty() ? DataScopeSpec.ALL : new DataScopeSpec(false, rules);
+    }
+
+    private static Set<String> refsOf(IamDataScope r, String userNo) {
+        if ("SELF".equals(r.getScopeType())) {
+            return userNo == null || userNo.isBlank() ? Set.of() : Set.of(userNo);
+        }
+        return parseRefs(r.getScopeRefs());
     }
 
     // ===== SPI 实现（infra 契约 auth.PermissionResolver / DataScopeResolver）=====
@@ -84,7 +124,8 @@ public class PermissionService implements PrincipalRefresher, PermissionResolver
     /** {@link DataScopeResolver}：主体 → 数据范围（iam_data_scope + AGENT 硬过滤，agentNo 从 attributes 取）。 */
     @Override
     public DataScopeSpec resolveDataScope(AuthSubject subject) {
-        return scopeOfRoles(subject.roles(), Realm.valueOf(subject.realm()), subject.attr("agentNo"));
+        return scopeOf(subject.roles(), Realm.valueOf(subject.realm()), subject.attr("agentNo"),
+                subject.subjectId());
     }
 
     /** 口径 B：按角色重建会话主体（权限/范围变更后刷新）。实现 {@link PrincipalRefresher}，走 SPI 保持一致。 */
