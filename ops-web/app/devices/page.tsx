@@ -772,9 +772,39 @@ const OTA_STATUS: StatusMap<OtaRollout["status"]> = {
 };
 
 // —— 各扩展 tab 列定义 ——
-const pbCols: Column<Powerbank>[] = [
-  { header: "充电宝号", cell: (r) => <span className="font-medium">{r.powerbankNo}</span> },
-  { header: "所属柜机", cell: (r) => r.cabinetNo },
+/**
+ * 充电宝列。**做成函数**是为了把厂商编码翻成厂商名 —— 解析要用 vendorsQ，
+ * 那是组件内的数据，模块级常量取不到。本组列只有 pbColsFull 一个调用方。
+ */
+const pbColsOf = (vendorName: (code: string | null) => string): Column<Powerbank>[] => [
+  {
+    header: "充电宝号",
+    cell: (r) => (
+      <>
+        <span className="font-medium">{r.powerbankNo}</span>
+        {/* sn 跟在下面：退换货、保修、跟厂商对故障都只认它 */}
+        {r.sn && <div className="truncate txt-caption text-muted-foreground">{r.sn}</div>}
+      </>
+    ),
+  },
+  {
+    header: "供应商",
+    // 混合硬件接入：同一批故障集中在某个厂商上是第一个要看的信号
+    cell: (r) => <span className="text-muted-foreground">{vendorName(r.vendorCode)}</span>,
+  },
+  {
+    header: "所属柜机",
+    cell: (r) => (
+      <>
+        {r.cabinetNo}
+        {/* 借出中的不在柜子里，仓位为 null —— 显示「借出中」而不是空白，
+            空白读起来像数据缺失，而这是这块电的真实状态 */}
+        <div className="truncate txt-caption text-muted-foreground">
+          {r.slotIndex === null ? "借出中" : `${r.slotIndex} 号仓`}
+        </div>
+      </>
+    ),
+  },
   { header: "电量", cell: (r) => <span className="tabular-nums">{Math.round(r.battery)}%</span> },
   { header: "状态", cell: (r) => <StatusBadge map={PB_STATUS} value={r.status} /> },
   { header: "健康", cell: (r) => <StatusBadge map={HEALTH} value={r.health} /> },
@@ -932,7 +962,11 @@ const EXPORTS: Record<string, { name: string; run: (rows: Row[]) => void }> = {
     name: "充电宝管理",
     run: (rows) => exportCsv<Powerbank>("充电宝管理", [
       { header: "充电宝号", value: (r) => r.powerbankNo },
+      // 导出跟着表格补：盘点/退换货拿这份去对，缺的恰好是厂商唯一认的 sn
+      { header: "设备SN", value: (r) => r.sn },
+      { header: "供应商", value: (r) => r.vendorCode },
       { header: "所属柜机", value: (r) => r.cabinetNo },
+      { header: "仓位", value: (r) => r.slotIndex },
       { header: "电量(%)", value: (r) => Math.round(r.battery) },
       { header: "状态", value: (r) => PB_STATUS_CSV(r.status) },
       { header: "健康", value: (r) => HEALTH[r.health].label },
@@ -1466,8 +1500,17 @@ function DevicesInner() {
   const editCell = (on: () => void, can: boolean) =>
     can ? <Button size="sm" variant="outline" onClick={on}>编辑</Button> : <span className="text-muted-foreground">-</span>;
 
+  /*
+   * 厂商主数据。与 ImportCabinetsDrawer 里那个是**同一个 queryKey** ——
+   * React Query 按 key 去重共用缓存，不会多发一次请求。
+   */
+  const vendorsQ = useQuery({ queryKey: ["vendors"], queryFn: () => api.listVendors() });
+  /** 厂商编码 → 名字。取不到（未加载 / 已下线的厂商）时退回编码本身，不显示空白。 */
+  const vendorName = (code: string | null) =>
+    (vendorsQ.data ?? []).find((v) => v.vendorCode === code)?.name ?? code ?? "-";
+
   const pbColsFull: Column<Powerbank>[] = [
-    ...pbCols,
+    ...pbColsOf(vendorName),
     ...(showArchived ? [{ header: "归档时间", cell: (r: Powerbank) => <ArchivedAt at={r.archivedAt} /> }] : []),
     {
       header: "操作",

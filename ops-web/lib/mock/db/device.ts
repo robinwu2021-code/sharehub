@@ -80,8 +80,16 @@ export const vendors: Vendor[] = [
 
 export const powerbanks: Powerbank[] = Array.from({ length: 30 }, (_, i) => {
   const st = p(["IN_CABINET", "IN_CABINET", "RENTED", "FAULT", "RETIRED"] as const, i);
+  const cab = p(cabinets, i);
   return {
-    powerbankNo: `PB${20000 + i}`, cabinetNo: cabNo(i),
+    powerbankNo: `PB${20000 + i}`,
+    sn: `PBSN${70000 + i}`,
+    // 充电宝的厂商**跟所在机柜同源**：现实里是整柜配套采购的，
+    // 各自随机取一个厂商会让「某厂商故障集中」这类排查看到假信号。
+    vendorCode: cab.vendorCode,
+    cabinetNo: cab.cabinetNo,
+    // 借出中的不在任何柜子里 → 仓位为 null。给它编一个仓位号等于谎称它还在柜子上。
+    slotIndex: st === "RENTED" ? null : (i % 8) + 1,
     battery: st === "RENTED" ? 20 + (i * 7) % 60 : 60 + (i * 11) % 40,
     status: st, health: st === "FAULT" ? "FAULT" : "OK", cycles: 40 + (i * 37) % 900,
     archivedAt: null,

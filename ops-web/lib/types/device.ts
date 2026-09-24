@@ -64,7 +64,22 @@ export interface Slot {
 // —— 设备 · 待建功能补全（ops/gw 域）——
 export interface Powerbank extends Archivable {
   powerbankNo: string;
+  /**
+   * 硬件序列号。与 {@link powerbankNo}（业务编号）不是一回事 ——
+   * 退换货、保修、跟厂商对故障都只认 sn；只有业务号时要先回查一次映射。
+   */
+  sn: string | null;
+  /**
+   * 供应商编码（→ `Vendor.vendorCode`）。**本平台是混合硬件接入**，
+   * 同一批故障集中在某个厂商上是第一个要看的信号，而按充电宝号看不出来。
+   */
+  vendorCode: string | null;
   cabinetNo: string;
+  /**
+   * 当前所在仓位。借出中（RENTED）为 null —— 它不在任何柜子里。
+   * 没有它时，工单只能说「去 CAB1000 找这块充电宝」，找哪一仓靠人逐个看。
+   */
+  slotIndex: number | null;
   battery: number; // 0..100
   status: "IN_CABINET" | "RENTED" | "FAULT" | "RETIRED";
   health: "OK" | "FAULT";
