@@ -13,9 +13,10 @@
  * 1. **UNIMPLEMENTED 标记** —— 既没有端点判它、也没有角色持有它的码，一律判 false：
  *    **入口不该存在**。让它显示然后点出 404 或 403，比藏起来坏得多。
  *    **当前为 0 条**：D6d 逐条查证后，原先 7 个候选里有 5 个其实是「需要翻译」而非「未实现」
- *    （见下），另 2 个（`org:employee:update` `system:region:update`）端点确实不存在但
- *    功能权限清单列了，属于**待建功能**，留恒等映射以免将来做好时忘了接回来。
- * 2. **翻译** —— 界面功能没有独立端点时映到覆盖它的码。**目前 5 条**（D6d 逐个查证）：
+ *    （见下）。另 2 个（`org:employee:update` `system:region:update`）当时判成「端点确实不存在」，
+ *    2026-09-24 复查发现**都有端点、只是判着别的码**，已改成翻译 —— 恒等映射留着的那段时间里，
+ *    它们门的是一个谁都不持有的码。
+ * 2. **翻译** —— 界面功能没有独立端点时映到覆盖它的码。**目前 8 条**：
  *
  *    | UI 码 | 实际端点判的码 |
  *    |---|---|
@@ -23,6 +24,9 @@
  *    | `order:arrears:dun` · `order:deposit:manage` | `order:deposit:update` |
  *    | `order:reservation:cancel` | `order:order:update` |
  *    | `system:notify_log:resend` | `system:notify_log:update` |
+ *    | `device:ota:publish` | `device:ota:manage` |
+ *    | `pricing:adjustment:create` · `pricing:adjustment:cancel` | `pricing:rule:config` |
+ *    | `system:region:update` | `system:dict:update` |
  *
  *    这 5 个 UI 码**在后端一个端点都没有**。不翻译的话 `can()` 判 false，
  *    对应的菜单叶与按钮整片消失 —— 「站点概览」「预约取消」「押金处置 / 欠费催缴」
@@ -79,7 +83,8 @@ export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   "device:inventory:transfer": "device:inventory:transfer",
   "device:inventory:update": "device:inventory:transfer",   // 翻译：界面守的是调拨单新建/编辑 → POST /api/ops/inventory-transfers（后端无 :update 这个码）
   "device:ota:manage": "device:ota:manage",   // ⚠️ D6d：后端无角色持有 → 除 ADMIN 外必 403
-  "device:ota:publish": "device:ota:publish",   // ⚠️ D6d：后端无角色持有 → 除 ADMIN 外必 403
+  // 投放的建/改都判 device:ota:manage（DeviceController）；ota:publish 后端一个端点都没有
+  "device:ota:publish": "device:ota:manage",
   "device:ota:read": "device:ota:read",
   "device:ota:rollback": "device:ota:rollback",
   "device:powerbank:read": "device:powerbank:read",
@@ -180,8 +185,11 @@ export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   "org:role:read": "org:role:read",   // ⚠️ D6d：后端无角色持有 → 除 ADMIN 外必 403
   "org:role:update": "org:role:update",   // ⚠️ D6d：后端无角色持有 → 除 ADMIN 外必 403
   // ——— pricing ———
-  "pricing:adjustment:cancel": "pricing:adjustment:cancel",
-  "pricing:adjustment:create": "pricing:adjustment:create",
+  // 调价单的建/改/取消/恢复/重试**同判一个码**（OperationController 五个端点都是 pricing:rule:config）。
+  // 界面保留 create / cancel 两个名字是为了文案说得清，判权则必须落到后端真判的那一个 ——
+  // 否则「取消」按钮门的是一个谁都不持有的码。
+  "pricing:adjustment:cancel": "pricing:rule:config",
+  "pricing:adjustment:create": "pricing:rule:config",
   "pricing:adjustment:read": "pricing:adjustment:read",
   "pricing:plan:create": "pricing:plan:create",
   "pricing:plan:delete": "pricing:plan:delete",
@@ -233,7 +241,9 @@ export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   "system:problem:read": "system:problem:read",
   "system:problem:update": "system:problem:update",   // ⚠️ D6d：后端无角色持有 → 除 ADMIN 外必 403
   "system:region:read": "system:region:read",
-  "system:region:update": "system:region:update",   // ⚠️ D6d：后端无角色持有 → 除 ADMIN 外必 403
+  // 地区库的写走 POST /regions，判的是 system:dict:update（SysConfigController）——
+  // 地区是字典的一种，后端没给它单独的写码。读那一侧倒是有 system:region:read。
+  "system:region:update": "system:dict:update",
   "system:tax:read": "system:tax:read",
   "system:tax:update": "system:tax:update",   // ⚠️ D6d：后端无角色持有 → 除 ADMIN 外必 403
   // ——— user ———
