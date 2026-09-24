@@ -80,7 +80,7 @@ export {
 
 export {
   shareRules, settlements, withdrawals, ledger, shareRecords, reconciles, invoices,
-  listShareRecords, listReconciles, listInvoices, saveShareRule, saveInvoice, auditWithdrawal, payWithdrawal,
+  listShareRecords, listReconciles, listInvoices, saveShareRule, saveInvoice, auditWithdrawal, payWithdrawal, applyWithdrawal,
   shareSummaries, listShareSummaries,
   rechargeOrders, listRechargeOrders,
   rechargePackages, listRechargePackages, saveRechargePackage,

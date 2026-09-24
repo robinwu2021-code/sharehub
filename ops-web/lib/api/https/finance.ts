@@ -25,6 +25,7 @@ export const financeHttp: FinanceApi = {
   // 打款回执：与 audit 分开的端点、分开的权限码（finance:withdrawal:pay）——
   // 审批是「同意打出去」，回执是「确实出去了」，中间隔着一次真实资金动作
   payWithdrawal: (no, body) => client.post(`/api/trade/withdrawals/${no}/pay`, body),
+  applyWithdrawal: (body) => client.post("/api/trade/withdrawals", body),
 
   // S1 结算单闭环：生成/确认都是动作端点（状态迁移），详情明细挂在结算单资源下
   //

@@ -1,11 +1,11 @@
 // 覆盖范围：分账规则与流水、总账、结算、提现审批、对账、发票、分润统计、充值订单。
-import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ , ReportQ, PayoutAccountQ } from "../query";
+import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ , ReportQ, PayoutAccountQ, WithdrawalQ } from "../query";
 import type {
   PageResult, ShareRule, LedgerEntry, Settlement, SettlementDraft, Withdrawal,
   ShareRecord, Reconcile, ReconAction, ReconDiff, ReconStats, Invoice, ShareSummary, RechargeOrder,
 
   VoucherDetail,
-  VoucherCreatePayload, PayoutAccount, PayReceiptPayload,
+  VoucherCreatePayload, PayoutAccount, PayReceiptPayload, WithdrawApplyPayload,
 } from "../../types";
 
 export interface FinanceApi {
@@ -40,7 +40,7 @@ export interface FinanceApi {
    */
   createVoucher(x: VoucherCreatePayload): Promise<LedgerEntry[]>;
   listSettlements(q?: SettlementQ): Promise<PageResult<Settlement>>;
-  listWithdrawals(q?: PageQ): Promise<PageResult<Withdrawal>>;
+  listWithdrawals(q?: WithdrawalQ): Promise<PageResult<Withdrawal>>;
   /** 提现审批：驳回必须带原因；auditorName 取当前登录用户（后端以会话为准，前端透传便于 mock）。 */
   auditWithdrawal(withdrawNo: string, approve: boolean, rejectReason?: string, auditorName?: string): Promise<Withdrawal>;
   /**
@@ -51,6 +51,13 @@ export interface FinanceApi {
    * 成功必填渠道流水号，失败必填原因，判据见 `payReceiptError`。
    */
   payWithdrawal(withdrawNo: string, body: PayReceiptPayload): Promise<Withdrawal>;
+  /**
+   * 提现申请。由**代理商/场地方本人**发起（api/README §六·A：运营端没有也不该有创建入口）。
+   *
+   * 手续费 / 状态 / 申请人三者一律服务端定，入参里没有这些字段 ——
+   * 让前端传 fee 的话，改一行请求体就能少交手续费。
+   */
+  applyWithdrawal(body: WithdrawApplyPayload): Promise<Withdrawal>;
 
   // === S1 结算单闭环（权限码 finance:settlement:generate / :confirm）===
   /**

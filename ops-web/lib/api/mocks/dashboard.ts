@@ -8,11 +8,16 @@ import type { Role } from "../../auth";
 
 /** dev-mode 固定验证码，与后端 OtpService.DEV_MASTER 同值 —— 两边不一致就「收到码了但验不过」。 */
 const DEV_OTP = "000000";
-/** 一个人名下的主体。刻意给两个：只有多主体才试得出切换器，单主体的话那个入口永远不显示。 */
-const agentOperators = () => [
-  { operatorNo: "AG001", name: "示例代理商甲", isOwner: true, isPrimary: true },
-  { operatorNo: "AG002", name: "示例代理商乙", isOwner: false, isPrimary: false },
-];
+/**
+ * 一个人名下的主体。刻意给两个：只有多主体才试得出切换器，单主体的话那个入口永远不显示。
+ *
+ * **名字取自 agents 种子而不是另编一套**：提现、分润、结算都按 agentNo 关联，
+ * 而界面显示的是名字。两边各编一套的话，代理登录后会看到切换器写着「示例代理商甲」、
+ * 自己的提现单却署名「North Hub」—— 看上去像筛错了数据。
+ */
+const agentOperators = () => db.agents.slice(0, 2).map((a, i) => ({
+  operatorNo: a.agentNo, name: a.name, isOwner: i === 0, isPrimary: i === 0,
+}));
 
 export const dashboardMock: DashboardApi = {
   /*

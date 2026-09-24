@@ -41,7 +41,7 @@ import {
   SHARE_BASES,
   RECON_TRANSITIONS, RECON_TERMINAL, canReconTransition, canEditInvoiceFields, parseReconDiffDetail,
   withdrawFeeOf, withdrawNetOf, WITHDRAW_FEE_PENDING,
-  canPayWithdrawal, payReceiptError, PAY_CHANNELS,
+  canPayWithdrawal, payReceiptError, PAY_CHANNELS, withdrawApplyError, computeWithdrawFee,
   // 记账期间复用报表域枚举：与站点坪效/代理绩效/绩效报表同一套周期口径
   REPORT_PERIODS, REPORT_PERIOD_DEFAULT, type ReportPeriod,
 } from "@/lib/types";
@@ -228,6 +228,9 @@ function FinanceInner() {
   const [invStatusFilter, setInvStatusFilter] = useState("");
   // 提现审批：走抽屉而非行内按钮——驳回必须留原因，是资金审批的留痕底线
   const [wdAudit, setWdAudit] = useState<Withdrawal | null>(null);
+  // 申请提现（代理端自助）。运营端没有也不该有创建入口（api/README §六·A）
+  const [wdApplyOpen, setWdApplyOpen] = useState(false);
+  const [wdApplyAmount, setWdApplyAmount] = useState("");
   // 打款回执（⑮）。与审批分开的抽屉 —— 它们是两次不同的动作，隔着一次真实资金流动
   const [wdPay, setWdPay] = useState<Withdrawal | null>(null);
   const [payOk, setPayOk] = useState("1");
@@ -239,6 +242,13 @@ function FinanceInner() {
   const username = useAuth((s) => s.username);
   const realm = useAuth((s) => s.realm);
   const currentOperatorNo = useAuth((s) => s.currentOperatorNo);
+  const memberships = useAuth((s) => s.memberships);
+  /*
+   * 当前主体的**名字**。不能用 username —— 代理端登录后它是手机号，
+   * 切过一次主体才变成主体名。提现单上的收款方写成手机号，审批人看到的就是一串号码。
+   */
+  const currentOperatorName = memberships.find((m) => m.operatorNo === currentOperatorNo)?.name
+    ?? currentOperatorNo;
   // 分润统计：维度 / 周期 / 排序（排序受控，实际排序在 mock·后端做，翻页后仍成立）
   const [sumDim, setSumDim] = useState("VENUE");
   const [sumPeriod, setSumPeriod] = useState(SUMMARY_PERIODS[0]);
@@ -264,7 +274,10 @@ function FinanceInner() {
   const canReadRecon = allow("finance:recon:read");
 
   const q = useQuery<PageResult<ShareRule | Settlement | Withdrawal | LedgerEntry | ShareRecord | Reconcile | Invoice | ShareSummary | RechargeOrder | PayoutAccount>>({
-    queryKey: ["fin", tab, paging.page, paging.size, keyword, ruleDim, sumDim, sumPeriod, sumSortKey, sumSortDir, rcStatus, rcFrom, rcTo, stlStatus, reconStatusFilter, invStatusFilter, ledgerPeriod],
+    // currentOperatorNo 进 key：代理端的列表是按主体收敛的，换了主体就是另一份数据。
+    // 切换器那边也会 qc.clear()，但那是**另一处代码**的善后 —— 依赖它等于把正确性
+    // 押在「以后没人改那行」上。key 带上它，这里自己就说得通。
+    queryKey: ["fin", tab, paging.page, paging.size, keyword, ruleDim, sumDim, sumPeriod, sumSortKey, sumSortDir, rcStatus, rcFrom, rcTo, stlStatus, reconStatusFilter, invStatusFilter, ledgerPeriod, currentOperatorNo],
     queryFn: () =>
       tab === "rules" ? api.listShareRules({ page: paging.page, size: paging.size, keyword, dimension: ruleDim })
       : tab === "ledger" ? api.listLedger({ page: paging.page, size: paging.size, keyword, period: ledgerPeriod })
@@ -275,7 +288,13 @@ function FinanceInner() {
       : tab === "reconcile" ? api.listReconciles({ page: paging.page, size: paging.size, keyword, handleStatus: reconStatusFilter || undefined })
       : tab === "invoices" ? api.listInvoices({ page: paging.page, size: paging.size, keyword, status: invStatusFilter || undefined })
       : tab === "payout-accounts" ? api.listPayoutAccounts({ page: paging.page, size: paging.size, keyword })
-      : api.listWithdrawals({ page: paging.page, size: paging.size, keyword }),
+      // 代理端只看自己的单子。**这是展示过滤，不是安全边界** ——
+      // 真正管住「只能看自己的」的是服务端 AGENT 数据范围硬过滤，前端传什么它都会再交一次集。
+      // 不传的话 mock 下代理会看到全平台的提现，页面看着像越权。
+      : api.listWithdrawals({
+          page: paging.page, size: paging.size, keyword,
+          payeeNo: realm === "AGENT" ? currentOperatorNo : undefined,
+        }),
     placeholderData: keepPreviousData,
   });
 
@@ -356,6 +375,24 @@ function FinanceInner() {
       setWdAudit(null);
     },
   });
+
+  const canApplyWithdrawal = allow("finance:withdrawal:apply");
+  const applyWithdraw = useMutation({
+    mutationFn: (amount: number) => api.applyWithdrawal({
+      payeeType: "AGENT", payeeNo: currentOperatorNo, payeeName: currentOperatorName,
+      amount, currency: "AED",
+    }),
+    onSuccess: (w) => {
+      notify.success(`提现申请 ${w.withdrawNo} 已提交，等待审核`);
+      qc.invalidateQueries({ queryKey: ["fin"] });
+      setWdApplyOpen(false); setWdApplyAmount("");
+    },
+  });
+  /** 申请金额的校验与 mock/后端共用同一份判据，不各写一遍。 */
+  const applyAmountErr = () => withdrawApplyError(
+    Number(wdApplyAmount),
+    feeRule ? { ...feeRule, minAmount: bizRulesQ.data?.withdraw?.minAmount } : undefined,
+  );
 
   const payReceipt = useMutation({
     mutationFn: (v: { no: string; body: PayReceiptPayload }) => api.payWithdrawal(v.no, v.body),
@@ -1283,6 +1320,17 @@ function FinanceInner() {
         * 「你还不能收款」。放在提现页最上面 —— 代理商是在这一页发现自己提不了现的，
         * 而不是在审批被拒之后。ai-shop 的教训：结算侧的兜底「保证了不出错，没保证有人知道」。
         */}
+      {/* 代理端自助提现入口。运营端不显示 —— 运营没有也不该有创建入口（api/README §六·A）：
+          替别人发起提现，等于绕开「本人申请」这道最基本的授权。
+          没有可用收款账户时**按钮直接禁用**，而不是让人填完金额提交、再在审批环节被退回。 */}
+      {tab === "withdrawals" && realm === "AGENT" && canApplyWithdrawal && (
+        <div className="mb-3 flex justify-end">
+          <Button disabled={cannotGetPaidYet} onClick={() => { setWdApplyOpen(true); setWdApplyAmount(""); }}>
+            申请提现
+          </Button>
+        </div>
+      )}
+
       {tab === "withdrawals" && cannotGetPaidYet && (
         <div className="mb-3 rounded-card border border-warning/40 bg-warning/5 p-3">
           <div className="txt-body font-medium">你还不能收款</div>
@@ -1395,6 +1443,47 @@ function FinanceInner() {
                 <Input className="w-full" value={wdReject} placeholder="如：银行账户与合同主体不一致" onChange={(e) => setWdReject(e.target.value)} />
               </Field>
             )}
+          </>
+        )}
+      </Drawer>
+
+      {/* 申请提现（代理端自助）。手续费与实际到账当场算给本人看 ——
+          此前审批页已经这么做了，申请这一侧却没有，于是申请人直到收到钱才知道扣了多少。 */}
+      <Drawer
+        open={wdApplyOpen}
+        onOpenChange={(o) => !o && setWdApplyOpen(false)}
+        title="申请提现"
+        desc="提交后进入运营审核；手续费按当前业务规则计算"
+        footer={
+          <Button
+            disabled={applyWithdraw.isPending || !!applyAmountErr()}
+            onClick={() => applyWithdraw.mutate(Number(wdApplyAmount))}
+          >提交申请</Button>
+        }
+      >
+        <Field label="收款主体">{currentOperatorName}</Field>
+        <Field label="提现金额（AED）">
+          <Input
+            className="w-full" inputMode="decimal" value={wdApplyAmount}
+            placeholder={feeRule ? `不低于 ${bizRulesQ.data?.withdraw?.minAmount ?? 0}` : "请输入金额"}
+            onChange={(e) => setWdApplyAmount(e.target.value)}
+          />
+          {/* 校验文案即时显示：等到点提交才报错的话，人已经填完一轮了 */}
+          {wdApplyAmount && applyAmountErr() && (
+            <div className="mt-1 txt-caption text-destructive">{applyAmountErr()}</div>
+          )}
+        </Field>
+        {feeRule && Number(wdApplyAmount) > 0 && !applyAmountErr() && (
+          <>
+            <Field label="手续费">
+              {money(computeWithdrawFee(Number(wdApplyAmount), feeRule), "AED")}
+              <span className="ml-2 text-muted-foreground">
+                费率 {(feeRule.feeRate * 100).toFixed(2)}% · 封顶 {money(feeRule.feeCap, "AED")}
+              </span>
+            </Field>
+            <Field label="实际到账">
+              {money(Number(wdApplyAmount) - computeWithdrawFee(Number(wdApplyAmount), feeRule), "AED")}
+            </Field>
           </>
         )}
       </Drawer>

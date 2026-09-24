@@ -233,6 +233,9 @@ const REFS: Ref[] = [
   ref("settlements", db.settlements, "payeeNo", "venues.venueNo ∪ agents.agentNo",
     new Set([...venueNos, ...agentNos])),
   ref("withdrawals", db.withdrawals, "payeeName", "venues.name ∪ agents.name", payeeNames),
+  // 提现的对象号：代理端「我的提现」按 payeeNo 筛，号悬空就会筛出空白或别人的单子
+  ref("withdrawals", db.withdrawals, "payeeNo", "venues.venueNo ∪ agents.agentNo",
+    new Set([...venueNos, ...agentNos])),
   ref("invoices", db.invoices, "payeeName", "venues.name ∪ agents.name", payeeNames),
   // S2：发票金额不自造，一律挂在一张结算单上——来源单号必须是真实结算单
   ref("invoices", db.invoices, "sourceNo", "settlements.settleNo",

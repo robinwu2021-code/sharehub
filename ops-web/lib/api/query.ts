@@ -109,3 +109,15 @@ export interface PayoutAccountQ extends PageQ {
   payeeType?: string;
   payeeNo?: string;
 }
+
+/**
+ * 提现检索。
+ *
+ * `payeeNo` 是**展示过滤，不是安全边界** —— 代理端拿它筛出「我的提现」，
+ * 但真正管住「只能看自己的」的是服务端的 AGENT 数据范围硬过滤
+ * （`PermissionService.resolveDataScope`）。前端传什么，服务端都会再交一次集。
+ */
+export interface WithdrawalQ extends PageQ {
+  payeeNo?: string;
+  status?: string;
+}

@@ -7,13 +7,13 @@ import type {
   ShareSummary, RechargeOrder, RechargePackage, PageQuery,
   ReconHandleStatus, ReconHandleResult, ReconAction, ReconStats,
   InvoiceStatus, InvoiceAction,
-  PayoutAccount, PayReceiptPayload,
+  PayoutAccount, PayReceiptPayload, WithdrawApplyPayload,
 } from "../../types";
 import {
   STL_TRANSITIONS, canSettlementTransition,
   RECON_TRANSITIONS, canReconTransition, RECON_TERMINAL,
   INV_TRANSITIONS, canInvoiceTransition, canEditInvoiceFields,
-  computeWithdrawFee, canPayWithdrawal, payReceiptError,
+  computeWithdrawFee, canPayWithdrawal, payReceiptError, withdrawApplyError,
 } from "../../types";
 import { VENUE_NAMES, p, iso } from "./internal";
 import { fail, notFound } from "@/lib/biz-error";
@@ -114,7 +114,12 @@ export const withdrawals: Withdrawal[] = Array.from({ length: 20 }, (_, i) => {
   const amount = 500 + (i * 211) % 3000;
   const audited = status === "PAYING" || status === "PAID" || status === "FAILED";
   return {
-    withdrawNo: `WD${3000 + i}`, payeeName: p(PAYEE_NAMES, i), amount,
+    // 收款方从 SHARE_PAYEES 取**整个主体**（号 + 名一起），不再只取名字：
+    // 号与名分别生成的话，代理端按号筛出来的单子会显示成别人的名字，
+    // 而这种错在只看页面时完全像是「筛错了」。
+    withdrawNo: `WD${3000 + i}`,
+    payeeType: p(SHARE_PAYEES, i).dimension, payeeNo: p(SHARE_PAYEES, i).payeeNo,
+    payeeName: p(SHARE_PAYEES, i).payeeName, amount,
     // 手续费不在这里定口径：费率/封顶取「系统设置 · 业务规则」的 withdraw 分区（唯一来源）。
     // 原先写死 0.6% + 下限 2 AED，其中「下限」业务规则里根本没有这个字段 —— 是财务侧自己多存的阈值。
     fee: computeWithdrawFee(amount, bizRules.withdraw),
@@ -571,6 +576,36 @@ export function auditWithdrawal(withdrawNo: string, approve: boolean, rejectReas
     w.status = "FAILED";
     w.rejectReason = rejectReason ?? "";
   }
+  return w;
+}
+
+/**
+ * 提现申请（mock）：落 APPLY。
+ *
+ * **手续费服务端现算、状态服务端定、申请人服务端填** —— 入参里根本没有这三样。
+ * 让前端传 fee 的话，改一行请求体就能少交手续费；让前端传 status 的话，
+ * 可以直接提交一张「已通过」的单子。后端 `WithdrawalServiceImpl.apply()` 同款。
+ */
+export function applyWithdrawal(req: WithdrawApplyPayload, applicantNo?: string): Withdrawal {
+  const bad = withdrawApplyError(req.amount, { ...bizRules.withdraw, minAmount: bizRules.withdraw.minAmount });
+  if (bad) throw new WithdrawalError(bad);
+  if (!req.payeeNo?.trim()) throw new WithdrawalError("收款主体必填");
+
+  const w: Withdrawal = {
+    withdrawNo: nextNo("WD", withdrawals, 3000, "withdrawNo"),
+    payeeType: req.payeeType, payeeNo: req.payeeNo, payeeName: req.payeeName,
+    amount: req.amount,
+    fee: computeWithdrawFee(req.amount, bizRules.withdraw),
+    currency: req.currency || "AED",
+    status: "APPLY",
+    appliedAt: new Date().toISOString(),
+    // 审批四件套一律留空：这张单子还没人看过
+    auditorName: null, auditedAt: null, rejectReason: null,
+    payChannel: null, payRef: null, payerName: null, failReason: null, paidAt: null,
+  };
+  // 新单排在最前 —— 列表默认按申请时间倒序，追加到末尾的话提交完看不见自己刚提的那张
+  withdrawals.unshift(w);
+  void applicantNo;   // 真后端从会话取；mock 无会话，留参数是为了签名与契约一致
   return w;
 }
 

@@ -135,7 +135,7 @@ export const NAV: NavSection[] = [
       // 2026-09-23 分级矩阵 AGT-06：代理自助提现是 L0（⑦ 分钱的最后一步），权限码 finance:withdrawal:apply
       // 前后端与 POST /api/trade/withdrawals 三处一致。soon = 申请侧页面未建（/finance?tab=withdrawals
       // 是运营方的审核页，要 finance:withdrawal:read，AGENT 不持有）——先登记入口，页建好再去掉 soon。
-      { href: "/finance?tab=withdrawals", label: "申请提现", perm: "finance:withdrawal:apply", soon: true, group: "经营概览" },
+      { href: "/finance?tab=withdrawals", label: "申请提现", perm: "finance:withdrawal:apply", group: "经营概览" },
     ],
   },
   {
@@ -518,11 +518,30 @@ function resolveTabs(
   const missing: string[] = [];
   for (const spec of specs) {
     const key = typeof spec === "string" ? spec : spec.key;
+    /*
+     * 同一个 tab key 可能在**多个 section 登记，且权限码不同**：
+     * `/finance?tab=withdrawals` 在「财务管理 › 提现审核」判 `finance:withdrawal:read`，
+     * 在「我的经营 › 申请提现」判 `finance:withdrawal:apply`。
+     *
+     * 只取排名最高的那一条会出错：财务管理的 /finance 叶子多、评分高，于是代理商
+     * 拿到的是「提现审核」那条 —— 他没有 `:read`，整个 tab 就被丢掉了，
+     * **尽管他持有 `:apply`、菜单里那条叶子也确实是给他的**。
+     * 表现是「菜单点得进来，页面上却没有对应的 tab」，且不报任何错。
+     *
+     * 所以按 pool 顺序找**第一条该访问者进得去的**；都进不去时回落到第一条，
+     * 由下面的判权把 tab 丢掉（回落这一步是为了让 missingTabs 仍能报出未登记，
+     * 而不是把「无权限」误报成「没登记」）。
+     */
     let leaf: NavLeaf | undefined;
-    for (const section of pool) {
-      leaf = (section.children ?? []).find((l) => tabOf(l.href) === key);
-      if (leaf) break;
+    let firstMatch: NavLeaf | undefined;
+    outer: for (const section of pool) {
+      for (const l of section.children ?? []) {
+        if (tabOf(l.href) !== key) continue;
+        firstMatch ??= l;
+        if (!l.perm || can(perms, l.perm)) { leaf = l; break outer; }
+      }
     }
+    leaf ??= firstMatch;
     if (!leaf) {
       if (typeof spec === "string") {
         // 菜单里没登记、页面也没自带名字 —— 这不是显示问题，是**这个功能在菜单里进不去**。

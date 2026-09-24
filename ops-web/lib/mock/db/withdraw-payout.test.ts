@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { withdrawals, payWithdrawal, auditWithdrawal, WithdrawalError } from "./finance";
+import { withdrawals, payWithdrawal, auditWithdrawal, applyWithdrawal, WithdrawalError } from "./finance";
+import { bizRules } from "./system";
 import { canPayWithdrawal, payReceiptError } from "../../types";
 import type { Withdrawal } from "../../types";
 
@@ -146,5 +147,61 @@ describe("留痕", () => {
     const failed = withdrawals.filter((w) => w.status === "FAILED" && !w.withdrawNo.startsWith("WD-TEST-"));
     expect(failed.some((w) => w.rejectReason)).toBe(true);
     expect(failed.some((w) => w.failReason)).toBe(true);
+  });
+});
+
+describe("代理自助申请提现", () => {
+  const req = (amount: number) => ({
+    payeeType: "AGENT" as const, payeeNo: "AG001", payeeName: "North Hub",
+    amount, currency: "AED",
+  });
+
+  it("落 APPLY，且审批四件套全空——这张单还没人看过", () => {
+    const w = applyWithdrawal(req(1000));
+    expect(w.status).toBe("APPLY");
+    expect(w.auditorName).toBeNull();
+    expect(w.auditedAt).toBeNull();
+    expect(w.paidAt).toBeNull();
+    withdrawals.splice(withdrawals.indexOf(w), 1);
+  });
+
+  it("手续费服务端算，入参里根本没有这个字段", () => {
+    const w = applyWithdrawal(req(1000));
+    // 传不进去：WithdrawApplyPayload 里没有 fee。这里验的是它确实按业务规则算出来了
+    expect(w.fee).toBeGreaterThan(0);
+    expect(w.fee).toBeLessThan(w.amount);
+    withdrawals.splice(withdrawals.indexOf(w), 1);
+  });
+
+  it("低于最低提现额被拒", () => {
+    const below = bizRules.withdraw.minAmount - 1;
+    expect(() => applyWithdrawal(req(below))).toThrow(/最低提现额/);
+  });
+
+  it("金额为 0 或负数被拒", () => {
+    expect(() => applyWithdrawal(req(0))).toThrow(/大于 0/);
+    expect(() => applyWithdrawal(req(-100))).toThrow(/大于 0/);
+  });
+
+  it("新单排在最前——追加到末尾的话，提交完在第一页看不见自己刚提的那张", () => {
+    const w = applyWithdrawal(req(1000));
+    expect(withdrawals[0].withdrawNo).toBe(w.withdrawNo);
+    withdrawals.splice(0, 1);
+  });
+
+  it("单号不与既有的撞", () => {
+    const a = applyWithdrawal(req(1000));
+    const b = applyWithdrawal(req(1000));
+    expect(a.withdrawNo).not.toBe(b.withdrawNo);
+    expect(withdrawals.filter((x) => x.withdrawNo === a.withdrawNo)).toHaveLength(1);
+    withdrawals.splice(0, 2);
+  });
+
+  it("走得完整条链：申请 → 审批 → 打款回执", () => {
+    const w = applyWithdrawal(req(1000));
+    expect(auditWithdrawal(w.withdrawNo, true).status).toBe("PAYING");
+    const paid = payWithdrawal(w.withdrawNo, { success: true, channel: "MANUAL", payRef: `E2E-${Date.now()}` });
+    expect(paid.status).toBe("PAID");
+    withdrawals.splice(withdrawals.indexOf(paid), 1);
   });
 });

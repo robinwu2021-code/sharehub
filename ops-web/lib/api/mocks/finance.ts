@@ -2,7 +2,7 @@
 import * as db from "../../mock/db";
 // 走具体模块不改变行为——同一份模块级状态，只是绕过桶文件
 import type { FinanceApi } from "../contracts/finance";
-import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ , ReportQ } from "../query";
+import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ , ReportQ, WithdrawalQ } from "../query";
 import { wait } from "./_wait";
 
 export const financeMock: FinanceApi = {
@@ -20,7 +20,13 @@ export const financeMock: FinanceApi = {
   createVoucher: (x) => wait(db.createVoucher(x), 400),
   getVoucher: (no) => wait({ voucherNo: no, entries: db.listVoucherEntries(no), ...db.voucherBalance(no) }),
   listSettlements: (q: SettlementQ = {}) => wait(db.listSettlements(q)),
-  listWithdrawals: (q: PageQ = {}) => wait(db.paginate(db.withdrawals, q.page, q.size, (w) => db.kwHit(q.keyword, w.payeeName, w.withdrawNo, w.auditorName))),
+  // payeeNo 过滤：代理端「我的提现」用它。真后端另有 AGENT 数据范围硬过滤兜底，
+  // 这里补上是为了让 mock 下的代理视图也只显示自己的单子 —— 否则页面看着像越权
+  listWithdrawals: (q: WithdrawalQ = {}) => wait(db.paginate(db.withdrawals, q.page, q.size, (w) =>
+    db.kwHit(q.keyword, w.payeeName, w.withdrawNo, w.auditorName)
+    && (!q.payeeNo || w.payeeNo === q.payeeNo)
+    && (!q.status || w.status === q.status))),
+  applyWithdrawal: (body) => wait(db.applyWithdrawal(body), 400),
   auditWithdrawal: (no, approve, rejectReason, auditorName) => wait(db.auditWithdrawal(no, approve, rejectReason, auditorName), 400),
   payWithdrawal: (no, body) => wait(db.payWithdrawal(no, body), 400),
 

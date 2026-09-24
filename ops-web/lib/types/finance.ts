@@ -66,6 +66,10 @@ export const canSettlementTransition = (from: SettlementStatus, action: Settleme
   STL_TRANSITIONS[action].from.includes(from);
 export interface Withdrawal extends AuditTrail {
   withdrawNo: string;
+  // 收款主体的**号**，不只是名字：代理端只能看自己的单子，按名字筛会把同名主体混进来。
+  // 与 settlements / shareRecords 用同一套 (payeeType, payeeNo) 口径，否则对不上账。
+  payeeType: "VENUE" | "AGENT";
+  payeeNo: string;
   payeeName: string;
   amount: number;
   currency: string;
@@ -80,6 +84,37 @@ export interface Withdrawal extends AuditTrail {
   failReason: string | null; // 打款失败原因。**不是** rejectReason（那是审批驳回）
   paidAt: string | null;
 }
+
+/**
+ * 提现申请入参。
+ *
+ * **没有 fee 字段**：手续费一律服务端按业务规则现算（口径 SSOT 见本文件
+ * `computeWithdrawFee`）。让前端传费用的话，改一行请求体就能少交手续费。
+ * 状态与申请人同理，都不在入参里。
+ */
+export interface WithdrawApplyPayload {
+  payeeType: Withdrawal["payeeType"];
+  payeeNo: string;
+  payeeName: string;
+  amount: number;
+  currency: string;
+}
+
+/**
+ * 申请金额的校验，返回错误文案；通过返回 null。
+ *
+ * 页面禁用按钮与 mock 校验共用这一份 —— 分开写的话会出现
+ * 「按钮能点、点了报错」或更糟的「按钮不能点、其实是允许的」。
+ */
+export const withdrawApplyError = (amount: number, rule?: WithdrawFeeRule & { minAmount?: number }): string | null => {
+  if (!(amount > 0)) return "提现金额必须大于 0";
+  if (rule?.minAmount != null && amount < rule.minAmount) {
+    return `低于最低提现额 ${rule.minAmount}`;
+  }
+  // 手续费吃掉全部本金的申请不该受理：批下去实际到账是 0 或负数
+  if (rule && computeWithdrawFee(amount, rule) >= amount) return "手续费不得大于等于提现金额，请提高提现额度";
+  return null;
+};
 
 /** 打款渠道。MANUAL = 人工转账后回填 —— nearpay 接通前这是唯一的真实路径。 */
 export const PAY_CHANNELS = ["MANUAL", "NEARPAY"] as const;
