@@ -31,7 +31,10 @@ export const employees: Employee[] = Array.from({ length: 20 }, (_, i) => ({
   employeeNo: `E${100 + i}`, name: p(["Ali Hassan", "Omar Khan", "Sara Ahmed", "Wang Lei", "Fatima N."], i),
   phone: `+9715${String(1000000 + i * 137).slice(0, 7)}`, deptName: p(["运营", "运维", "客服", "财务"], i),
   email: `${p(["ali", "omar", "sara", "wang", "fatima"], i)}.${100 + i}@sharehub.ae`,
-  roleName: p(["运维", "客服", "财务", "租户管理员"], i), status: i % 11 === 0 ? "LEFT" : "ACTIVE",
+  roleNo: p(["OPS", "CS", "FINANCE", "ADMIN"], i),
+  roleName: p(["运维", "客服", "财务", "租户管理员"], i),
+  roleNos: [p(["OPS", "CS", "FINANCE", "ADMIN"], i)],
+  status: i % 11 === 0 ? "LEFT" : "ACTIVE",
 }));
 // scopeRefs 里的 ID 一律引用真实主数据：REGION→system.regions.regionId、
 // LOCATION→location.sites.siteNo、AGENT→agent.agents.agentNo（role-scope.test.ts 断言这一点）。
@@ -498,7 +501,25 @@ function saveRoleDataScope(roleCode: string, scope: DataScope, scopeRefs?: strin
   roles[i] = { ...roles[i], dataScope: scope, scopeRefs: values };
   return roles[i];
 }
-export const saveEmployee = (x: Partial<Employee>) => upsert(employees, x, "employeeNo", () => nextNo("E", employees, 100));
+/**
+ * 保存员工。**角色的三种语义与后端一致**（EmployeeSaveReq）：
+ * `roleNos === undefined` 不动角色 · 非空数组覆盖写 · 空数组清掉附加角色。
+ * 主角色总会被并回集合 —— 「列表显示 OPS、授权表里没有 OPS」是最难查的那种不一致。
+ */
+export const saveEmployee = (x: Partial<Employee>) => {
+  const prev = employees.find((e) => e.employeeNo === x.employeeNo);
+  const roleNo = x.roleNo ?? prev?.roleNo ?? "";
+  const roleNos = x.roleNos === undefined
+    ? (prev?.roleNos ?? (roleNo ? [roleNo] : []))
+    : [...new Set([...(roleNo ? [roleNo] : []), ...x.roleNos])];
+  return upsert(employees, { ...x, roleNo, roleNos, roleName: roleLabel(roleNo) },
+    "employeeNo", () => nextNo("E", employees, 100));
+};
+
+/** 角色编号 → 中文名。取自角色表，不另编一套 —— 两套名字迟早对不上。 */
+function roleLabel(roleNo: string): string {
+  return roles.find((r) => r.roleNo === roleNo || r.code === roleNo)?.name ?? roleNo;
+}
 
 // —— G1 软删除：角色 ——
 // 内置角色（builtin）不允许归档：登录/鉴权依赖它们存在，归档等于把人锁在门外。

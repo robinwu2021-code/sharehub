@@ -5,6 +5,7 @@ import ai.neargo.sharehub.platform.org.dto.OrgDtos.DataScopeEntry;
 import ai.neargo.sharehub.platform.org.dto.OrgDtos.DataScopeReq;
 import ai.neargo.sharehub.platform.org.dto.OrgDtos.Department;
 import ai.neargo.sharehub.platform.org.dto.OrgDtos.Employee;
+import ai.neargo.sharehub.platform.org.dto.OrgDtos.EmployeeSaveReq;
 import ai.neargo.sharehub.platform.org.dto.OrgDtos.StaffPerformance;
 import ai.neargo.sharehub.platform.org.entity.IamDept;
 import ai.neargo.sharehub.platform.org.entity.IamEmployee;
@@ -50,7 +51,7 @@ public class OrgController {
 
     @PostMapping("/employees")
     @PreAuthorize("@perm.can('org:employee:create')")
-    public Employee createEmployee(@RequestBody IamEmployee body) {
+    public Employee createEmployee(@RequestBody EmployeeSaveReq body) {
         return employeeService.save(body);
     }
 
@@ -59,9 +60,10 @@ public class OrgController {
     // 此前改员工也判 :create。新增那个端点保持 :create 不动。
     // （两码当前都只有 ADMIN 持有，访问面不变。）
     @PreAuthorize("@perm.can('org:employee:update')")
-    public Employee updateEmployee(@PathVariable String employeeNo, @RequestBody IamEmployee body) {
-        body.setEmployeeNo(employeeNo); // 路径为准，忽略 body 里的键，防越权改他人
-        return employeeService.save(body);
+    public Employee updateEmployee(@PathVariable String employeeNo, @RequestBody EmployeeSaveReq body) {
+        // 路径为准，忽略 body 里的键，防越权改他人。record 无 setter，重建一个。
+        return employeeService.save(new EmployeeSaveReq(employeeNo, body.name(), body.phone(),
+                body.email(), body.deptNo(), body.roleNo(), body.roleNos(), body.status()));
     }
 
     // —— 组织架构（菜单叶：员工与权限 › 组织架构）——

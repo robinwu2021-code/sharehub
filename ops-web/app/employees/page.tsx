@@ -70,15 +70,33 @@ const ROLE_FIELDS: FieldDef[] = [
   { key: "memberCount", label: "成员数", type: "number" },
   { key: "builtin", label: "内置角色", type: "switch" },
 ];
-const EMP_FIELDS: FieldDef[] = [
-  { key: "employeeNo", label: "工号", readOnlyOnEdit: true, placeholder: "留空自动生成" },
-  { key: "name", label: "姓名", placeholder: "Ali Hassan" },
-  { key: "phone", label: "手机", placeholder: "+9715xxxxxxx" },
-  { key: "email", label: "邮箱", placeholder: "ali.hassan@sharehub.ae" },
-  { key: "deptName", label: "部门", placeholder: "运维" },
-  { key: "roleName", label: "角色", placeholder: "运维" },
-  { key: "status", label: "状态", type: "select", options: [{ value: "ACTIVE", label: "在职" }, { value: "LEFT", label: "离职" }] },
-];
+/**
+ * 员工表单。**角色必须选编号，不能填名字** ——
+ * 此前这里是一个自由文本框（key 为 `roleName`），而后端认的是 `roleNo`：
+ * 填进去的名字不是任何一列，**被静默丢弃**，那个人的角色一直是空的，
+ * 于是他登录后什么菜单都没有，而表单上明明写着「运维」。
+ */
+function empFields(roles: RoleRow[]): FieldDef[] {
+  const opts = roles.filter((r) => !r.archivedAt)
+    .map((r) => ({ value: r.roleNo, label: `${r.name}（${r.code}）` }));
+  return [
+    { key: "employeeNo", label: "工号", readOnlyOnEdit: true, placeholder: "留空自动生成" },
+    { key: "name", label: "姓名", placeholder: "Ali Hassan" },
+    { key: "phone", label: "手机", placeholder: "+9715xxxxxxx" },
+    { key: "email", label: "邮箱", placeholder: "ali.hassan@sharehub.ae" },
+    { key: "deptName", label: "部门", placeholder: "运维" },
+    {
+      key: "roleNo", label: "主角色", type: "select", options: opts, required: true,
+      help: "列表显示的就是它；权限取下面「全部角色」的并集，主角色总在其中",
+    },
+    {
+      key: "roleNos", label: "全部角色", type: "multiselect", options: opts,
+      placeholder: "只有主角色时可以不选",
+      help: "会话权限 = 这些角色的并集。主角色会自动并进来，不必重复勾",
+    },
+    { key: "status", label: "状态", type: "select", options: [{ value: "ACTIVE", label: "在职" }, { value: "LEFT", label: "离职" }] },
+  ];
+}
 // 绩效评分档位。原先是内联 `Badge tone={score>=90?…}`：颜色成了「好/差」的唯一线索（§11.4），
 // 且阈值口径写在渲染处。拆成「数值列 + 档位徽标」——数值给精度，档位给结论。
 /** 周期码 → 中文标签。取自 REPORT_PERIODS，不另抄一份。 */
@@ -269,6 +287,16 @@ function EmployeesInner() {
   });
   // showArchived 必须进 queryKey，否则切开关不重新拉数据
   const roles = useQuery({ queryKey: ["roles", showArchived], queryFn: () => api.listRoles({ showArchived }), enabled: tab === "roles" });
+  /*
+   * 员工表单的角色下拉要用角色表，而上面那个 query 只在「角色」tab 才拉
+   * （enabled: tab === "roles"）。单开一个按需的，别去松上面那个的 enabled ——
+   * 那会让「员工」tab 每次都白拉一遍角色列表。
+   */
+  const roleOptsQ = useQuery({
+    queryKey: ["role-options"],
+    queryFn: () => api.listRoles({}),
+    enabled: !!empForm,
+  });
   const audit = useQuery({
     queryKey: ["audit", paging.page, paging.size, keyword], queryFn: () => api.listAudits({ page: paging.page, size: paging.size, keyword }),
     placeholderData: keepPreviousData, enabled: tab === "audit",
@@ -425,7 +453,15 @@ function EmployeesInner() {
     { header: "手机", cell: (e) => <span className="text-muted-foreground">{e.phone}</span> },
     { header: "邮箱", cell: (e) => <span className="text-muted-foreground">{e.email}</span> },
     { header: "部门", cell: (e) => <span className="text-muted-foreground">{e.deptName}</span> },
-    { header: "角色", cell: (e) => <Badge tone="outline">{e.roleName}</Badge> },
+    { header: "角色", cell: (e) => (
+      // 显示全部角色而不只是主角色 —— 权限取的是并集，只显示一个会让人以为他只有那些权限
+      <div className="flex flex-wrap gap-1">
+        <Badge tone="outline">{e.roleName}</Badge>
+        {(e.roleNos ?? []).filter((r) => r !== e.roleNo).map((r) => (
+          <Badge key={r} tone="muted">{r}</Badge>
+        ))}
+      </div>
+    ) },
     { header: "状态", cell: (e) => e.status === "ACTIVE" ? <Badge tone="success">在职</Badge> : <Badge tone="muted">离职</Badge> },
     {
       header: "操作",
@@ -585,7 +621,7 @@ function EmployeesInner() {
             search={keyword}
             onSearch={onSearch}
             searchPlaceholder="搜索工号 / 姓名 / 手机 / 邮箱"
-            onAdd={canEditEmp ? () => setEmpForm({ name: "", phone: "", email: "", deptName: "", roleName: "", status: "ACTIVE" }) : undefined}
+            onAdd={canEditEmp ? () => setEmpForm({ name: "", phone: "", email: "", deptName: "", roleNo: "", roleNos: [], status: "ACTIVE" }) : undefined}
             addLabel="新增员工"
             onExport={onExportOf<Employee>("员工", [
               { header: "工号", value: (e) => e.employeeNo },
@@ -730,7 +766,7 @@ function EmployeesInner() {
         titleNew="新增员工"
         titleEdit={`编辑员工 ${empForm?.employeeNo ?? ""}`}
         isEdit={!!empForm?.employeeNo}
-        fields={EMP_FIELDS}
+        fields={empFields(roleOptsQ.data ?? [])}
         value={(empForm ?? {}) as Record<string, unknown>}
         onChange={(v) => setEmpForm(v as Partial<Employee>)}
         onSubmit={() => empForm && saveEmp.mutate(empForm)}

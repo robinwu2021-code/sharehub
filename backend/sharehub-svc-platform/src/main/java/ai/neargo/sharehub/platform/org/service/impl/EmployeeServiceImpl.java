@@ -6,6 +6,7 @@ import ai.neargo.sharehub.common.crud.AbstractCrudService;
 import ai.neargo.sharehub.platform.iam.entity.IamEntities.IamRole;
 import ai.neargo.sharehub.platform.iam.mapper.IamMappers.RoleMapper;
 import ai.neargo.sharehub.platform.org.dto.OrgDtos.Employee;
+import ai.neargo.sharehub.platform.org.dto.OrgDtos.EmployeeSaveReq;
 import ai.neargo.sharehub.platform.org.entity.IamDept;
 import ai.neargo.sharehub.platform.org.entity.IamEmployee;
 import ai.neargo.sharehub.platform.org.entity.IamEmployeeRole;
@@ -16,6 +17,8 @@ import ai.neargo.sharehub.platform.org.service.EmployeeService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.LinkedHashSet;
+import java.util.List;
 
 /**
  * 员工实现。
@@ -96,35 +99,65 @@ public class EmployeeServiceImpl extends AbstractCrudService<IamEmployee, Employ
         if (e.getPhone() == null) e.setPhone(current.getPhone());
     }
 
-    /** 保存后把主角色同步进映射表（覆盖写：一人一主角色，多角色由后续授权页扩展）。 */
-    @Override
+    /** 保存后把角色同步进映射表。{@code roleNos == null} 表示不动角色，见 {@link #syncRoles}。 */
     @Transactional
-    public Employee save(IamEmployee body) {
+    public Employee save(EmployeeSaveReq req) {
+        IamEmployee body = new IamEmployee();
+        body.setEmployeeNo(req.employeeNo());
+        body.setName(req.name());
+        body.setPhone(req.phone());
+        body.setEmail(req.email());
+        body.setDeptNo(req.deptNo());
+        body.setRoleNo(req.roleNo());
+        body.setStatus(req.status());
         Employee vo = super.save(body);
         IamEmployee saved = selectByKey(vo.employeeNo());
-        syncPrimaryRole(saved.getEmployeeNo(), saved.getRoleNo());
-        return vo;
+        syncRoles(saved.getEmployeeNo(), saved.getRoleNo(), req.roleNos());
+        // 角色变了要重新出 VO —— 否则返回的 roleNos 还是改之前那份
+        return toVO(selectByKey(vo.employeeNo()));
     }
 
-    private void syncPrimaryRole(String employeeNo, String roleNo) {
-        if (roleNo == null || roleNo.isBlank()) return;
-        boolean exists = employeeRoleMapper.exists(new LambdaQueryWrapper<IamEmployeeRole>()
-                .eq(IamEmployeeRole::getEmployeeNo, employeeNo)
-                .eq(IamEmployeeRole::getRoleNo, roleNo));
-        if (exists) return;
-        // 映射行是无软删的纯关系行，改绑定即删旧插新（员工本体不受影响）
+    /**
+     * 覆盖写这个人的角色集合。
+     *
+     * <p><b>{@code roleNos == null} 表示「不动角色」</b> —— 改个电话号码不该把角色清掉。
+     * 此前这里是「删光再插主角色那一条」：一旦有了多角色，
+     * 任何一次无关编辑都会把多出来的角色**静默抹掉**，而页面上看不出来。
+     *
+     * <p>主角色 {@code roleNo} 只要给了就并进集合：
+     * 「列表显示 OPS、而授权表里没有 OPS」是最难查的那种不一致。
+     */
+    private void syncRoles(String employeeNo, String roleNo, List<String> roleNos) {
+        if (roleNos == null) return;
+        LinkedHashSet<String> want = new LinkedHashSet<>();
+        if (roleNo != null && !roleNo.isBlank()) want.add(roleNo);
+        roleNos.stream().filter(r -> r != null && !r.isBlank()).forEach(want::add);
+
+        // 映射行是无软删的纯关系行，覆盖写即删旧插新（员工本体不受影响）
         employeeRoleMapper.delete(new LambdaQueryWrapper<IamEmployeeRole>()
                 .eq(IamEmployeeRole::getEmployeeNo, employeeNo));
-        IamEmployeeRole er = new IamEmployeeRole();
-        er.setEmployeeNo(employeeNo);
-        er.setRoleNo(roleNo);
-        employeeRoleMapper.insert(er);
+        for (String r : want) {
+            IamEmployeeRole er = new IamEmployeeRole();
+            er.setEmployeeNo(employeeNo);
+            er.setRoleNo(r);
+            employeeRoleMapper.insert(er);
+        }
     }
 
     @Override
     protected Employee toVO(IamEmployee e) {
         return new Employee(e.getEmployeeNo(), e.getName(), maskPhone(e.getPhone()), e.getEmail(),
-                deptName(e.getDeptNo()), roleName(e.getRoleNo()), e.getStatus());
+                deptName(e.getDeptNo()), e.getRoleNo(), roleName(e.getRoleNo()),
+                rolesOf(e.getEmployeeNo()), e.getStatus());
+    }
+
+    /** 该员工的全部角色。出参必须带 —— 不带的话前端连「这个人有哪几个角色」都看不出来。 */
+    private List<String> rolesOf(String employeeNo) {
+        if (employeeNo == null || employeeNo.isBlank()) return List.of();
+        return employeeRoleMapper.selectList(new LambdaQueryWrapper<IamEmployeeRole>()
+                        .eq(IamEmployeeRole::getEmployeeNo, employeeNo))
+                .stream().map(IamEmployeeRole::getRoleNo)
+                .filter(r -> r != null && !r.isBlank()).distinct().sorted().toList();
     }
 
     private String deptName(String deptNo) {

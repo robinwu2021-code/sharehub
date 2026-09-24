@@ -11,7 +11,16 @@ export interface Employee {
   phone: string;
   email: string; // 登录/通知邮箱
   deptName: string | null;
+  /** 主角色编号。列表显示用 roleName，**提交必须用它** —— 后端认的是编号。 */
+  roleNo: string;
   roleName: string;
+  /**
+   * 这个人的全部角色（`iam_employee_role`）。**会话权限取它们的并集**。
+   *
+   * ⚠️ 提交时 `undefined` = 不动角色（改个电话不该把角色清掉），
+   * 空数组 = 清掉附加角色（主角色摘不掉）。两者语义不同，别混。
+   */
+  roleNos: string[];
   status: EmployeeStatus;
 }
 

@@ -45,7 +45,6 @@ DevAlarmRule
 DevCodeBatch
 DictItem
 IamDept
-IamEmployee
 InvTransfer
 LocLead
 MdBank

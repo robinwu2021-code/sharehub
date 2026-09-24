@@ -21,7 +21,29 @@ public final class OrgDtos {
      * {@code phone} 出参即掩码（[api/README §1.6]）。
      */
     public record Employee(String employeeNo, String name, String phone, String email,
-                           String deptName, String roleName, String status) {
+                           String deptName, String roleNo, String roleName,
+                           /** 该员工的全部角色（iam_employee_role）。主角色 roleNo 只是其中显示用的那个。 */
+                           java.util.List<String> roleNos,
+                           String status) {
+    }
+
+    /**
+     * 员工保存入参。**不再直接收实体** —— 实体当请求体时客户端传哪些字段就能改哪些字段
+     * （见 known-entity-request-bodies.txt 头部）。
+     *
+     * <p>{@code roleNos} 的语义分三种，别混：
+     * <ul>
+     *   <li><b>null = 不动角色</b>。改个电话号码不该把这个人的角色清掉 ——
+     *       此前的 syncPrimaryRole 是「删光再插一条」，多角色会被静默抹掉；</li>
+     *   <li>非空列表 = 这就是他的全部角色，覆盖写；</li>
+     *   <li>空列表 = 清掉附加角色；**主角色摘不掉**（它总会被并回来）——
+     *       「页面显示 OPS、而授权表里没有 OPS」是最难查的那种不一致。
+     *       要真正停掉一个人，改他的状态而不是清这张表。</li>
+     * </ul>
+     */
+    public record EmployeeSaveReq(String employeeNo, String name, String phone, String email,
+                                  String deptNo, String roleNo, java.util.List<String> roleNos,
+                                  String status) {
     }
 
     /**
