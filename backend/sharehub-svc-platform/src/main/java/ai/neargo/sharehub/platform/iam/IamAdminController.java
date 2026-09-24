@@ -31,15 +31,18 @@ public class IamAdminController {
     private final MenuMapper menuMapper;
     private final PermissionService permissionService;
     private final PermVersion permVersion;
+    private final MenuService menuService;
 
     public IamAdminController(RoleMapper roleMapper, RolePermMapper rolePermMapper, PermissionMapper permissionMapper,
-                              MenuMapper menuMapper, PermissionService permissionService, PermVersion permVersion) {
+                              MenuMapper menuMapper, PermissionService permissionService, PermVersion permVersion,
+                              MenuService menuService) {
         this.roleMapper = roleMapper;
         this.rolePermMapper = rolePermMapper;
         this.permissionMapper = permissionMapper;
         this.menuMapper = menuMapper;
         this.permissionService = permissionService;
         this.permVersion = permVersion;
+        this.menuService = menuService;
     }
 
     /** 权限码目录（构建分配选择器）。 */
@@ -114,10 +117,21 @@ public class IamAdminController {
         return Map.of("roleNo", roleNo, "perms", perms, "permVersion", v);
     }
 
-    /** 全量菜单树（后台维护用）。 */
+    /**
+     * **完整**菜单树（不按权限剪枝）。两个用途，都要求看得见全部：
+     * <ul>
+     *   <li>菜单管理界面 —— 要能看到、编辑那些当前管理员自己也看不到的菜单；</li>
+     *   <li>角色的「可见菜单预览」—— 拿某个角色的权限码去算他会看到什么，
+     *       起点必须是全量树，用当前会话那棵（已剪枝）算出来的是错的。</li>
+     * </ul>
+     *
+     * <p>与 {@code GET /api/auth/menus} 的分工：那个是**我**看得到的（已剪枝，前端直接渲染），
+     * 这个是**全部**（管理用）。此前本方法直接返回实体 {@code IamMenu} ——
+     * 与仓库「不拿实体当出参」的方向相反，且少了 children 结构，改成同一个 MenuNode。
+     */
     @GetMapping("/menus")
     @PreAuthorize("@perm.can('org:role:read')")
-    public List<IamMenu> menus() {
-        return menuMapper.selectList(new LambdaQueryWrapper<IamMenu>().orderByAsc(IamMenu::getSort));
+    public List<MenuService.MenuNode> menus() {
+        return menuService.tree();
     }
 }

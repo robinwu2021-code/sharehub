@@ -444,9 +444,14 @@ export function leafParts(href: string): { path: string; tab: string | null; vie
 /**
  * L1 可见性 = canModule；门户 section 与通用运营 section 互斥（见 NavSection.portalFor）。
  */
-export function visibleSections(v: ViewerLike): NavSection[] {
+/**
+ * @param tree 要算的那棵树。缺省是界面正在用的那棵；
+ *   **「某个角色会看到什么」的预览必须显式传全量树** ——
+ *   当前会话那棵已经按自己的权限剪过枝，拿它去算别人会少算一片。
+ */
+export function visibleSections(v: ViewerLike, tree?: NavSection[]): NavSection[] {
   const { perms, role } = asViewer(v);
-  const all = navTree();
+  const all = tree ?? navTree();
   const portals = all.filter((s) => role && s.portalFor?.includes(role as Role));
   const pool = portals.length > 0 ? portals : all.filter((s) => !s.portalFor);
   /*

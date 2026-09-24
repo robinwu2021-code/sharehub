@@ -5,6 +5,9 @@ import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
+import { visibleSections, visibleLeaves } from "@/lib/nav";
+import { toNavSections } from "@/lib/menu-source";
+import type { Role } from "@/lib/auth";
 import { PageTitle, Pagination, EmptyState } from "@/components/ui/misc";
 import { TabHeader } from "@/components/ui/tab-header";
 import { usePaging } from "@/lib/hooks/use-paging";
@@ -310,6 +313,27 @@ function EmployeesInner() {
     enabled: !!permRole,
   });
   const picked = permDraft ?? rolePermsQ.data ?? [];
+  /*
+   * 勾选结果 → 这个角色会看到哪些菜单。**边勾边看**，不用保存。
+   *
+   * 为什么值得做：勾的是权限码，看的是菜单，两者之间隔着
+   * 「菜单挂了哪个码」这一层 —— 不给预览的话，管理员只能靠试：
+   * 保存、换个号登录、看菜单、再回来调。而「少给了一个码」的表现是
+   * 某个菜单不见了，没有任何东西会说是哪个码导致的。
+   *
+   * 必须用**全量**菜单树：当前会话那棵已经按自己的权限剪过枝，
+   * 拿它算别人会少算一片（见 visibleSections 的 tree 参数）。
+   */
+  const allMenusQ = useQuery({
+    queryKey: ["all-menus"], queryFn: () => api.listAllMenus(), enabled: !!permRole,
+  });
+  const previewMenus = useMemo(() => {
+    const tree = allMenusQ.data ? toNavSections(allMenusQ.data) : [];
+    if (!tree.length || !permRole) return [];
+    return visibleSections({ role: permRole.code as Role, perms: picked }, tree)
+      .map((sec) => ({ sec, leaves: visibleLeaves(sec, { role: permRole.code as Role, perms: picked }) }))
+      .filter((x) => x.leaves.length || !(x.sec.children ?? []).length);
+  }, [allMenusQ.data, permRole, picked]);
 
   const auditDetailQ = useQuery({
     queryKey: ["audit-detail", auditId], queryFn: () => api.getAuditDetail(auditId!), enabled: !!auditId,
@@ -841,6 +865,35 @@ function EmployeesInner() {
           collapseFrom={permFilter ? undefined : 0}
           empty={permFilter ? "没有匹配的权限码——换个关键词（可搜码或中文名）。" : "权限码目录为空——后端 iam_permission 未初始化。"}
         />
+
+        {/* 勾了这些码，他会看到这些菜单 —— 边勾边变，不用保存后换号登录去试 */}
+        <div className="mt-4 rounded-card border border-[var(--border)] p-3">
+          <div className="mb-2 flex items-center gap-2">
+            <span className="txt-strong">可见菜单预览</span>
+            <span className="txt-caption text-muted-foreground">
+              按当前勾选实时计算 · {previewMenus.reduce((n, x) => n + x.leaves.length, 0)} 项
+            </span>
+          </div>
+          {allMenusQ.isLoading ? (
+            <div className="txt-body text-muted-foreground">读取菜单树…</div>
+          ) : !previewMenus.length ? (
+            // 一个菜单都看不到的角色，登录后是一片空白外壳 —— 说清楚，别只给个空框
+            <div className="txt-body text-[var(--destructive)]">
+              这些权限下他看不到任何菜单——登录后会是一片空的外壳。至少勾一个带菜单入口的码。
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {previewMenus.map(({ sec, leaves }) => (
+                <div key={sec.key} className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                  <span className="txt-body font-medium">{sec.label}</span>
+                  {leaves.length ? leaves.map((l) => (
+                    <span key={l.href} className="txt-caption text-muted-foreground">{l.label}</span>
+                  )) : <span className="txt-caption text-muted-foreground">（无子项）</span>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </Drawer>
 
       {/* 审计详情（S4）：只有列表时「改了什么」全靠猜，这里给字段级前后对比 */}

@@ -1,3 +1,4 @@
+import type { MenuNode } from "./dashboard";
 // 覆盖范围：组织与权限 —— 员工、角色、审计日志、部门、员工绩效。
 // （无租户管理，租户仅后端兼容层）
 import type { PageQ, ArchiveQ , ReportQ } from "../query";
@@ -44,6 +45,14 @@ export interface OrgApi {
 
   // === 功能权限（S6 权限码勾选树）===
   /** 权限码目录，构建勾选树用。全量一次拉完（~150 条），不分页。 */
+  /**
+   * **完整**菜单树（不按权限剪枝），管理用。
+   *
+   * 与 `getMenus()`（我看得到的那棵，已剪枝）分工不同：
+   * 菜单管理要能看到管理员自己都看不到的项；
+   * 角色的可见菜单预览也必须从全量树起算 —— 拿已剪枝的那棵算别人会少算一片。
+   */
+  listAllMenus(): Promise<MenuNode[]>;
   listPermissions(): Promise<PermissionItem[]>;
   /** 某角色已分配的权限码。 */
   listRolePermissions(roleNo: string): Promise<string[]>;

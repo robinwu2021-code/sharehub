@@ -47,6 +47,13 @@ export const roles: RoleRow[] = [
   { roleNo: "R5", code: "BD", name: "拓展", permCount: 0, memberCount: 5, builtin: true, dataScope: "REGION", scopeRefs: "DU-MAR,DU-DEI,DU-DT", archivedAt: null },
   { roleNo: "R6", code: "VIEWER", name: "只读", permCount: 0, memberCount: 2, builtin: true, dataScope: "ALL", scopeRefs: "", archivedAt: null },
   { roleNo: "R7", code: "AGENT", name: "代理商", permCount: 0, memberCount: 9, builtin: true, dataScope: "AGENT", scopeRefs: "AG001,AG002", archivedAt: null },
+  /*
+   * 自定义（非内置）角色。**没有它，离线根本走不通「改角色权限」这条路** ——
+   * 内置角色只读，勾选树、全选/清空、可见菜单预览全是禁用态。
+   * 后端的 IamSeeder 早就为此建了一个同名的 CUSTOM（注释写着「供后台改权限 +
+   * 口径 B 在线生效验证」），mock 这边一直缺，于是这条路只能连真后端才试得出来。
+   */
+  { roleNo: "CUSTOM", code: "CUSTOM", name: "自定义演示角色", permCount: 2, memberCount: 0, builtin: false, dataScope: "ALL", scopeRefs: "", archivedAt: null },
 ];
 
 // —————————————————————————————————————————————————————————————
@@ -243,6 +250,12 @@ const PERM_CODES = new Set(permissions.map((x) => x.code));
 const rolePermMap: Record<string, string[]> = Object.fromEntries(
   roles.map((r) => [r.roleNo, permissions.filter((x) => roleHas(r.code as Role, x.code)).map((x) => x.code)]),
 );
+/*
+ * 自定义角色不在 BACKEND_ROLE_PERMS 里（那份只镜像内置角色），展开出来是空的。
+ * 初值**与后端 IamSeeder 给 CUSTOM 的那两条一字不差** ——
+ * mock 与后端在同一个角色上给出不同的初始权限，离线调出来的结论就是错的。
+ */
+rolePermMap.CUSTOM = ["dashboard:overview:read", "device:cabinet:read"];
 // permCount ≡ 已分配码数（org-perm.test.ts 断言这条恒等式）
 roles.forEach((r) => { r.permCount = rolePermMap[r.roleNo].length; });
 
