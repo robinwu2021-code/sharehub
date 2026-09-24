@@ -14,6 +14,27 @@
 # 所以要这份台账托住 —— 彻底的解法是 Req/Command DTO（白名单：只有声明过的字段能进来），
 # 随 B5 包归位增量迁移，迁完一个就从这里删一条。**新端点不许再用实体当请求体。**
 #
+# ── 第一批（2026-09-24，ShareRule / UsrInvoice / PricePlan / CouponTpl）的经验 ──
+#
+# 逐个转下来，**四个里只有一个事前是守好的**（CouponTpl 的 issued 在 create/update
+# 两处都锁了）。另外三个各缺一块：
+#   · ShareRule   —— saveRule 是**手写保存**，不走 AbstractCrudService，
+#                    那次集中加固（tenantId/deleted/createdAt/createdBy）对它不生效；
+#   · PricePlan   —— 走了基类，但**没有 beforeUpdate**，域字段全裸；
+#                    archivedAt 有专门的 archive|unarchive 端点，却能从保存接口改
+#                    （LocService 早就防着同一件事，只是没推广开）；
+#   · UsrInvoice  —— C 端端点，service 拦得不错，但 fileUrl **全后端零写入路径**，
+#                    唯一来源就是请求体。
+#
+# 所以判一个实体危不危险，**别只看它走不走 AbstractCrudService** ——
+# 基类只管 BaseEntity 那四个；域字段要么有 beforeUpdate，要么全裸。
+# 优先看「这个字段有没有专门的迁移入口」：归档、状态机、审批、划拨、计数器。
+#
+# ⚠️ 另有两个发现与批量赋值无关，但都是逐个看才撞出来的，值得一并留意：
+#   · CouponTpl.toVO 把 archivedAt 硬写 null（注释说「本表无归档列」，而 V22 早加了）
+#     —— 券归档了运营端看不出来；
+#   · 转换时顺手核对 VO 有没有丢字段，比事后靠 api-align 发现便宜。
+#
 # 格式：一行一个实体类型名
 AdCampaign
 AdSlot
