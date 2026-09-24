@@ -14,6 +14,9 @@ import type { DataScope } from "./org";
  */
 export type AgentType = "AGENT" | "CITY_PARTNER";
 
+/** 与后端 `AgentStatus` 枚举同名同值。**具名不是风格** —— 两端同名词表比对只认
+ *  具名 `export type`，内联在 interface 里的联合它一个都发现不了。 */
+export type AgentStatus = "ENABLED" | "SUSPENDED";
 export interface Agent extends Archivable {
   agentNo: string;
   name: string;
@@ -23,7 +26,7 @@ export interface Agent extends Archivable {
   agentType: AgentType;
   shareRate: number; // 默认分润比例 0..1
   cabinetCount: number;
-  status: "ENABLED" | "SUSPENDED";
+  status: AgentStatus;
 }
 
 // —— 入驻申请（ADR-030 §三）——

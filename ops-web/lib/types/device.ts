@@ -188,6 +188,9 @@ export interface InventoryTransferDetail {
   items: TransferItem[];
 }
 
+/** 与后端 `OtaRolloutStatus` 枚举同名同值。**具名不是风格** —— 两端同名词表比对只认
+ *  具名 `export type`，内联在 interface 里的联合它一个都发现不了。 */
+export type OtaRolloutStatus = "PENDING" | "RUNNING" | "DONE" | "ROLLBACK";
 export interface OtaRollout {
   rolloutNo: string;
   /**
@@ -217,7 +220,7 @@ export interface OtaRollout {
   targetRef: string | null;
   strategy: "GRAY" | "FULL";
   progress: number; // 0..100
-  status: "PENDING" | "RUNNING" | "DONE" | "ROLLBACK";
+  status: OtaRolloutStatus;
   createdAt: string;
 }
 

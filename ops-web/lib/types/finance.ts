@@ -275,6 +275,9 @@ export interface LedgerEntry {
 }
 
 // —— 财务 · 待建功能补全（trade 域）——
+/** 与后端 `ShareRecordStatus` 枚举同名同值。**具名不是风格** —— 两端同名词表比对只认
+ *  具名 `export type`，内联在 interface 里的联合它一个都发现不了。 */
+export type ShareRecordStatus = "PENDING" | "DONE";
 export interface ShareRecord {
   recordNo: string;
   mode: ShareMode;
@@ -291,7 +294,7 @@ export interface ShareRecord {
   /** 分润基数（GMV 快照）。有它才能在页面上验「基数 × 比例 = 金额」。 */
   grossAmount: number;
   /** PENDING=待结算 / DONE=已结算。财务对账第一个问的就是这笔结没结。 */
-  status: "PENDING" | "DONE";
+  status: ShareRecordStatus;
   /** 已结算时归属的结算单号；未结为 null。 */
   settleNo: string | null;
   amount: number;

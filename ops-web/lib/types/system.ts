@@ -36,11 +36,14 @@ export interface TenantConfig {
 
 // —— 供应商接入（access-gateway / gw 域）——
 export type AccessMode = "TCP" | "MQTT" | "HTTP_API";
+/** 与后端 `VendorStatus` 枚举同名同值。**具名不是风格** —— 两端同名词表比对只认
+ *  具名 `export type`，内联在 interface 里的联合它一个都发现不了。 */
+export type VendorStatus = "ENABLED" | "DISABLED";
 export interface Vendor {
   vendorCode: string;
   name: string;
   accessMode: AccessMode;
-  status: "ENABLED" | "DISABLED";
+  status: VendorStatus;
   apiBase: string | null;
   deviceCount: number;
 }

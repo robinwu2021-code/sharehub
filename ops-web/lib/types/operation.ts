@@ -107,6 +107,9 @@ export interface PriceAdjustPatch {
   buyoutPrice?: number;
 }
 
+/** 与后端 `PriceAdjustmentStatus` 枚举同名同值。**具名不是风格** —— 两端同名词表比对只认
+ *  具名 `export type`，内联在 interface 里的联合它一个都发现不了。 */
+export type PriceAdjustmentStatus = "SCHEDULED" | "APPLIED" | "CANCELLED" | "REVERTED" | "FAILED";
 export interface PriceAdjustment {
   adjustNo: string;
   planNo: string;
@@ -118,7 +121,7 @@ export interface PriceAdjustment {
   effectiveAt: string;       // UTC ISO
   revertAt: string | null;   // UTC ISO，空 = 不自动恢复
   reason: string;
-  status: "SCHEDULED" | "APPLIED" | "REVERTED" | "CANCELLED" | "FAILED";
+  status: PriceAdjustmentStatus;
   appliedAt: string | null;
   revertedAt: string | null;
   failReason: string | null;

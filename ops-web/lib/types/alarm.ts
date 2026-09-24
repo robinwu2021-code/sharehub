@@ -80,13 +80,16 @@ export interface AutoWorkOrderResult {
 }
 
 // 告警通知：触达流水（谁/何时/何渠道/成功失败）
+/** 与后端 `AlarmNoticeStatus` 枚举同名同值。**具名不是风格** —— 两端同名词表比对只认
+ *  具名 `export type`，内联在 interface 里的联合它一个都发现不了。 */
+export type AlarmNoticeStatus = "SENT" | "FAILED";
 export interface AlarmNotice {
   noticeNo: string;
   alarmNo: string;
   channel: "SMS" | "EMAIL" | "PUSH" | "WEBHOOK";
   target: string; // 接收人（手机号/邮箱/工号/回调地址）
   sentAt: string;
-  status: "SENT" | "FAILED";
+  status: AlarmNoticeStatus;
   failReason: string | null;
   /**
    * 本条对外真发时用的幂等键（历史流水为 null：seed 里没有重发链）。
@@ -114,6 +117,9 @@ export interface AlarmCode extends Archivable {
 }
 
 // 通知规则：比竞品多「静默窗口」「升级策略」——防夜间轰炸与告警风暴
+/** 与后端 `AlarmRuleStatus` 枚举同名同值。**具名不是风格** —— 两端同名词表比对只认
+ *  具名 `export type`，内联在 interface 里的联合它一个都发现不了。 */
+export type AlarmRuleStatus = "ACTIVE" | "INACTIVE";
 export interface AlarmRule extends Archivable {
   ruleNo: string;
   alarmCode: string;
@@ -123,5 +129,5 @@ export interface AlarmRule extends Archivable {
   quietStart: string; // 静默窗口起（HH:mm）
   quietEnd: string; // 静默窗口止（HH:mm）
   escalateMinutes: number; // N 分钟未处理则升级（0=不升级）
-  status: "ACTIVE" | "INACTIVE";
+  status: AlarmRuleStatus;
 }

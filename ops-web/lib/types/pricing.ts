@@ -8,6 +8,9 @@
 
 import type { Archivable } from "./common";
 
+/** 与后端 `PricePlanStatus` 枚举同名同值。**具名不是风格** —— 两端同名词表比对只认
+ *  具名 `export type`，内联在 interface 里的联合它一个都发现不了。 */
+export type PricePlanStatus = "ACTIVE" | "DISABLED";
 export interface PricePlan extends Archivable {
   planNo: string;
   name: string;
@@ -18,7 +21,7 @@ export interface PricePlan extends Archivable {
   buyoutPrice: number; // 买断价
   currency: string;
   scope: string; // 默认/点位/场景
-  status: "ACTIVE" | "DISABLED";
+  status: PricePlanStatus;
 }
 
 // —— 适用范围：取价的唯一依据（ADR-028）——
