@@ -37,7 +37,7 @@ export {
   sites, locations, venues, contracts, leads,
   venueOnboardings, siteLifecycles,
   listLeads, listVenueOnboardings, listSiteLifecycles,
-  saveLead, saveVenue, saveContract, saveVenueOnboarding,
+  saveLead, saveVenue, saveContract, saveVenueOnboarding, reviewVenueOnboarding,
   archiveSite, unarchiveSite, archivePoint, unarchivePoint, archiveVenue, unarchiveVenue,
   // 门店生命周期阶段流转（后端 POST /api/ops/site-lifecycles/{siteNo}/stage 的前端入口）
   siteLifecycleLogs, changeSiteStage, SiteLifecycleError,

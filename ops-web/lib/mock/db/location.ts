@@ -11,6 +11,7 @@ import {
 } from "../../types";
 import { LOCS, VENUE_NAMES, OPERATORS, p, iso, phone } from "./internal";
 import { paginate, kwHit, upsert, nextNo, archiveRow, unarchiveRow } from "./helpers";
+import { fail, notFound } from "@/lib/biz-error";
 
 // 台账 M11：站点的区域必须挂 regions 字典里真实存在的三级区域 ID（原先存的是"Dubai North"
 // 这类字典里根本没有的名字）。ID 与展示名成对，展示名冗余自字典。
@@ -171,7 +172,49 @@ export const saveContract = (x: Partial<Contract>) => {
   const cur = contracts.find((c) => c.contractNo === x.contractNo);
   return upsert(contracts, { ...x, attachments: x.attachments ?? cur?.attachments ?? [] }, "contractNo", () => nextNo("CT", contracts));
 };
-export const saveVenueOnboarding = (x: Partial<VenueOnboarding>) => upsert(venueOnboardings, x, "onboardingNo", () => nextNo("OB", venueOnboardings));
+/**
+ * 进件保存 —— **只改内容，不改状态**（与后端 `VenueOnboardingServiceImpl.save` 同口径）。
+ *
+ * 状态由「审核」这个动作推动，见 {@link reviewVenueOnboarding}。
+ * 此前这里是裸 upsert：表单里把「审核状态」下拉改成「已通过」也能存进去，
+ * 而真后端根本不受理状态 —— **mock 绿、线上静默不动**，两边口径就是这么分叉的。
+ */
+export const saveVenueOnboarding = (x: Partial<VenueOnboarding>) => {
+  const cur = x.onboardingNo ? venueOnboardings.find((o) => o.onboardingNo === x.onboardingNo) : undefined;
+  if (cur && cur.status !== "PENDING") {
+    // 审核结论是对「当时那份内容」做的，事后改内容结论就对不上它审过的东西了
+    fail(`进件 ${cur.onboardingNo} 已审核，内容不可再改`,
+      `Onboarding ${cur.onboardingNo} is already reviewed and can no longer be edited`);
+  }
+  const next = { ...x, status: cur?.status ?? ("PENDING" as const) };
+  return upsert(venueOnboardings, next, "onboardingNo", () => nextNo("OB", venueOnboardings));
+};
+
+/**
+ * 进件审核。状态机在这一层强制：**只有 PENDING 能审**，重复审核抛错。
+ *
+ * 通过时**真的建出场地方并回填 venueNo** —— 后端就是这么做的（`RealVenueCreator`）。
+ * 只翻状态不建场地方的话，运营下一步想给它签合同时才会发现查无此人。
+ */
+export const reviewVenueOnboarding = (onboardingNo: string, approve: boolean, note?: string) => {
+  const e = venueOnboardings.find((o) => o.onboardingNo === onboardingNo);
+  if (!e) notFound("进件", "Onboarding", onboardingNo);
+  if (e!.status !== "PENDING") {
+    fail(`进件 ${onboardingNo} 已审核，不可重复审核`, `Onboarding ${onboardingNo} is already reviewed`);
+  }
+  if (!approve && !(note ?? "").trim()) {
+    // 不给原因的驳回，申请人只能反复猜着重提，每次都要运营再看一遍
+    fail("驳回必须填写原因", "A rejection reason is required");
+  }
+  e!.status = approve ? "APPROVED" : "REJECTED";
+  e!.reviewAt = new Date().toISOString();
+  e!.reviewNote = (note ?? "").trim() || null;
+  if (approve) {
+    const v = saveVenue({ name: e!.venueName, contact: e!.contact, industry: e!.industry });
+    e!.venueNo = v.venueNo;
+  }
+  return { ...e! };
+};
 
 // ————————————————————————————————————————————————————————————————
 // 站点坐标校验（saveSite 的写入闸门）

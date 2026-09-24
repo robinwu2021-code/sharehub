@@ -161,13 +161,21 @@ function leadFieldsFor(
     ...LEAD_FIELDS.slice(4),
   ];
 }
+/** 驳回原因：必填。不给原因的话，申请人只能反复猜着重提，每次都要运营再看一遍。 */
+const REJECT_FIELDS: FieldDef[] = [
+  { key: "note", label: "驳回原因", required: true, maxLength: 200,
+    placeholder: "如：营业执照照片不清晰，请重新上传",
+    help: "申请人会原样看到这句话" },
+];
 const ONBOARDING_FIELDS: FieldDef[] = [
   { key: "onboardingNo", label: "申请号", readOnlyOnEdit: true, placeholder: "新增自动生成" },
   { key: "venueName", label: "场地名称", placeholder: "Al Barsha Mall" },
   { key: "contact", label: "联系人", placeholder: "姓名 + 电话" },
   { key: "industry", label: "行业", placeholder: "购物中心" },
-  { key: "status", label: "审核状态", type: "select", options: [{ value: "PENDING", label: "待审核" }, { value: "APPROVED", label: "已通过" }, { value: "REJECTED", label: "已驳回" }] },
-  { key: "reviewNote", label: "审核备注", placeholder: "通过/驳回原因" },
+  // 「审核状态」与「审核备注」**不放进表单**：审核是一个有状态机的动作
+  // （只有待审能审、通过要建出场地方、驳回必须给原因），不是一个可以随手改的字段。
+  // 此前它们在这里，于是把状态改成「已通过」也能保存成功 ——
+  // 而后端那条路径根本不受理状态，**线上静默不动**。改走行内的「通过 / 驳回」。
 ];
 
 function VenuesInner() {
@@ -207,6 +215,9 @@ function VenuesInner() {
   const [contractForm, setContractForm] = useState<Partial<Contract> | null>(null);
   const [leadForm, setLeadForm] = useState<Partial<Lead> | null>(null);
   const [onboardingForm, setOnboardingForm] = useState<Partial<VenueOnboarding> | null>(null);
+  // 驳回单独一个抽屉：confirm 对话框只支持「照抄指定文本」，收不了自由文本，
+  // 而驳回原因是必须写清楚的（申请人会看到它）
+  const [rejectForm, setRejectForm] = useState<{ onboardingNo: string; note: string } | null>(null);
   // 阶段流转抽屉：目标阶段与备注独立于行数据，开抽屉时按「第一个合法目标」初始化
   const [stageRow, setStageRow] = useState<SiteLifecycle | null>(null);
   const [stageTo, setStageTo] = useState<SiteStage>("SIGNED");
@@ -294,6 +305,16 @@ function VenuesInner() {
   const saveLead = useMutation({
     mutationFn: (l: Partial<Lead>) => api.saveLead(l),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["venue-bd", "crm"] }); notify.success("保存成功"); setLeadForm(null); },
+  });
+  const reviewOnboarding = useMutation({
+    mutationFn: (v: { no: string; approve: boolean; note?: string }) =>
+      api.reviewVenueOnboarding(v.no, v.approve, v.note),
+    onSuccess: (o) => {
+      qc.invalidateQueries({ queryKey: ["venue-bd", "onboarding"] });
+      // 通过会建出场地方，场地方列表与下拉都得跟着刷，否则下一步签合同时选不到它
+      qc.invalidateQueries({ queryKey: ["venues-dict"] });
+      notify.success(o.status === "APPROVED" ? `已通过，场地方 ${o.venueNo ?? ""} 已建档` : "已驳回");
+    },
   });
   const saveOnboarding = useMutation({
     mutationFn: (o: Partial<VenueOnboarding>) => api.saveVenueOnboarding(o),
@@ -490,7 +511,27 @@ function VenuesInner() {
         : <span className="text-muted-foreground">—</span>,
     },
     { header: "备注", cell: (o) => <span className="text-muted-foreground">{o.reviewNote ?? "-"}</span> },
-    { header: "操作", cell: (o) => canVenue ? <Button size="sm" variant="outline" onClick={() => setOnboardingForm(o)}>审核</Button> : <span className="text-muted-foreground">-</span> },
+    {
+      header: "操作",
+      cell: (o) => {
+        if (!canVenue) return <span className="text-muted-foreground">-</span>;
+        // 审过的进件不再给任何写入口：结论是对当时那份内容做的
+        if (o.status !== "PENDING") return <span className="text-muted-foreground">已审</span>;
+        return (
+          <div className="flex w-max gap-2">
+            <Button size="sm" variant="outline" onClick={() => setOnboardingForm(o)}>编辑</Button>
+            <Button size="sm" variant="outline" onClick={async () => {
+              if (await confirm({
+                title: "通过这份进件？",
+                desc: `通过后会按「${o.venueName}」建出场地方档案，并把场地方号回填到本申请上。`,
+              })) reviewOnboarding.mutate({ no: o.onboardingNo, approve: true });
+            }}>通过</Button>
+            <Button size="sm" variant="outline"
+              onClick={() => setRejectForm({ onboardingNo: o.onboardingNo, note: "" })}>驳回</Button>
+          </div>
+        );
+      },
+    },
   ];
   const lifecycleCols: Column<SiteLifecycle>[] = [
     { header: "站点号", cell: (l) => <span className="txt-strong tabular-nums">{l.siteNo}</span> },
@@ -606,6 +647,24 @@ function VenuesInner() {
       {tab === "lifecycle" && <DataTable rowKey={(l: SiteLifecycle) => l.siteNo} columns={lifecycleCols} rows={q.data?.list as SiteLifecycle[]} loading={q.isLoading} error={q.error} onRetry={q.refetch}
         empty="暂无生命周期记录——站点签约后自动进入跟踪，尚无签约站点时此处为空" />}
       {q.data && <Pagination page={paging.page} size={paging.size} total={q.data.total} onPage={paging.setPage} onSize={paging.setSize} />}
+
+      {/* 进件驳回：只收一个原因 */}
+      <FormDrawer
+        open={!!rejectForm}
+        onOpenChange={(o) => !o && setRejectForm(null)}
+        titleNew=""
+        titleEdit={`驳回申请 ${rejectForm?.onboardingNo ?? ""}`}
+        isEdit
+        fields={REJECT_FIELDS}
+        value={(rejectForm ?? {}) as Record<string, unknown>}
+        onChange={(v) => setRejectForm(v as { onboardingNo: string; note: string })}
+        onSubmit={() => {
+          if (!rejectForm?.note?.trim()) return;   // 服务端也拦；这里先省一次往返
+          reviewOnboarding.mutate({ no: rejectForm.onboardingNo, approve: false, note: rejectForm.note });
+          setRejectForm(null);
+        }}
+        submitting={reviewOnboarding.isPending}
+      />
 
       {/* 场地方 新增/编辑 */}
       <FormDrawer

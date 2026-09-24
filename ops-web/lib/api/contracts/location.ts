@@ -46,6 +46,13 @@ export interface LocationApi {
   removeContractAttachment(contractNo: string, attachNo: string): Promise<Contract>;
 
   // === 门店 Onboarding / 生命周期 ===
+  /**
+   * 进件审核。**审核是动作，不是改字段** —— 它有状态机（只有 PENDING 能审）、
+   * 通过时要建出场地方并回填 `venueNo`、驳回必须给原因。
+   * 走 `saveVenueOnboarding` 改 `status` 是改不动的：后端那条路径根本不受理状态。
+   */
+  reviewVenueOnboarding(onboardingNo: string, approve: boolean, note?: string): Promise<VenueOnboarding>;
+
   listVenueOnboardings(q?: PageQ): Promise<PageResult<VenueOnboarding>>;
   saveVenueOnboarding(x: Partial<VenueOnboarding> & { onboardingNo?: string }): Promise<VenueOnboarding>;
   listSiteLifecycles(q?: PageQ): Promise<PageResult<SiteLifecycle>>;

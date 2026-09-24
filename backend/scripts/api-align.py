@@ -51,7 +51,11 @@ def scan_frontend_calls():
     return out
 
 
-VERB_CALL = re.compile(r'\b(get|post|put|del|delete|patch)\s*(?:<[^>()]*>)?\s*\(')
+# 泛型实参允许**嵌套**：`client.get<PageResult<RentOrder>>("/mp/trade/orders")` 这种写法，
+# 用 `<[^>()]*>` 会在内层 `>` 处截断、整条调用匹配不上 —— 于是 c-app 明明调了，
+# 报告里却说「前端未调用」。排除 `()` 而不排除 `>`：括号排除保证不会跨到下一个调用去。
+# （与本文件上一条注释里那个 84% 误报是同一类错：正则把真实写法挡在外面。）
+VERB_CALL = re.compile(r'\b(get|post|put|del|delete|patch)\s*(?:<[^()]*>)?\s*\(')
 PATH_LIT = re.compile(r'[`"\'](/(?:api|internal|mp)/[^`"\']*)[`"\']')
 
 
@@ -175,8 +179,17 @@ def main():
     # A. 前端在调、后端没有
     missing = [c for c in calls if (c['verb'], c['path']) not in be]
     # C. 后端有、前端没调
+    #
+    # **先按受众分三类再数**，否则这个数字永远不可信：
+    #   · /internal/* 是服务间调用（定时任务、网关、跨服务），**设计上就没有前端调用者** ——
+    #     把它们算成「前端未接线」是拿错了比对对象，而且永远清不掉；
+    #   · /mp/*  是 C 端端点，调用方是 c-app，不是 ops-web；
+    #   · /api/* 才是运营端，未调用才真的可能是待办或废端点。
+    # 混在一起数出来的 42，实际只有 16 条值得看。
     called = {(c['verb'], c['path']) for c in calls}
-    unused = [e for k, e in be.items() if k not in called]
+    unused_all = [e for k, e in be.items() if k not in called]
+    unused = [e for e in unused_all if not e['path'].startswith('/internal/')]
+    internal_unused = [e for e in unused_all if e['path'].startswith('/internal/')]
 
     # B/D. 出参形状 vs 前端类型：按 record 名同名匹配
     shape_issues, no_type = [], []
@@ -221,11 +234,11 @@ def main():
     print('\nD. 后端出参无对应前端类型                   %d' % len(no_type))
     for t in no_type[:15]:
         print('   %-26s %s' % (t['type'], t['endpoint']))
-    write_md(missing, shape_issues, unused, no_type, len(eps), len(calls))
+    write_md(missing, shape_issues, unused, no_type, len(eps), len(calls), internal_unused)
     print('\n明细 → /tmp/api_align.json · 文档 → docs/api/前后端对齐缺口.md')
 
 
-def write_md(missing, shape_issues, unused, no_type, n_be, n_fe):
+def write_md(missing, shape_issues, unused, no_type, n_be, n_fe, internal_unused=()):
     out = os.path.join(ROOT, 'docs/api/前后端对齐缺口.md')
     L = ['# 前后端对齐缺口\n',
          '> **本文件由脚本生成，不要手改** —— '
@@ -265,12 +278,27 @@ def write_md(missing, shape_issues, unused, no_type, n_be, n_fe):
     L.append('')
 
     L.append('## C. 后端有、前端没调（%d）\n' % len(unused))
-    L.append('两种可能，**必须逐条区分**：前端还没接（待办），或后端端点已废弃（该删）。'
-             '混在一起会让「未接线」永远显得像「待办」。\n')
-    L.append('| 方法 | 路径 | 落在 |\n|---|---|---|')
-    for e in sorted(unused, key=lambda x: x['path']):
-        L.append('| %s | `%s` | `%s` |' % (e['verb'], e['path'], e['handler']))
-    L.append('')
+    L.append('**已排除 `/internal/*`**（%d 条）：那是服务间调用，设计上就没有前端调用者，'
+             '算进来只会让这个数字永远清不掉。\n' % len(internal_unused))
+    L.append('仍需**逐条区分**：前端还没接（待办），或后端端点已废弃（该删）。'
+             '混在一起会让「未接线」永远显得像「待办」。'
+             '按受众分开看 —— `/api/*` 归运营端 ops-web，`/mp/*` 归 C 端 c-app。\n')
+    for title, pref in (('运营端 `/api/*`', '/api/'), ('C 端 `/mp/*`', '/mp/')):
+        rows = [e for e in unused if e['path'].startswith(pref)]
+        if not rows:
+            continue
+        L.append('### %s（%d）\n' % (title, len(rows)))
+        L.append('| 方法 | 路径 | 落在 |\n|---|---|---|')
+        for e in sorted(rows, key=lambda x: x['path']):
+            L.append('| %s | `%s` | `%s` |' % (e['verb'], e['path'], e['handler']))
+        L.append('')
+    other = [e for e in unused if not e['path'].startswith('/api/') and not e['path'].startswith('/mp/')]
+    if other:
+        L.append('### 其它（%d）\n' % len(other))
+        L.append('| 方法 | 路径 | 落在 |\n|---|---|---|')
+        for e in sorted(other, key=lambda x: x['path']):
+            L.append('| %s | `%s` | `%s` |' % (e['verb'], e['path'], e['handler']))
+        L.append('')
 
     L.append('## D. 后端出参无对应前端类型（%d）\n' % len(no_type))
     L.append('| 结构 | 首个端点 |\n|---|---|')

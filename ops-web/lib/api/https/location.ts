@@ -32,6 +32,8 @@ export const locationHttp: LocationApi = {
   // 门店 Onboarding / 生命周期
   listVenueOnboardings: (q?: PageQ) => client.get("/api/ops/venue-onboardings", q),
   saveVenueOnboarding: (x) => client.post(x.onboardingNo ? `/api/ops/venue-onboardings/${x.onboardingNo}` : "/api/ops/venue-onboardings", x),
+  reviewVenueOnboarding: (onboardingNo, approve, note) =>
+    client.post(`/api/ops/venue-onboardings/${onboardingNo}/review`, { approve, note }),
   listSiteLifecycles: (q?: PageQ) => client.get("/api/ops/site-lifecycles", q),
   changeSiteStage: (siteNo, req) => client.post(`/api/ops/site-lifecycles/${siteNo}/stage`, req),
 

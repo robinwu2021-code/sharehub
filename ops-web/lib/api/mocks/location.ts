@@ -110,7 +110,11 @@ export const locationMock: LocationApi = {
 
   // 门店 Onboarding / 生命周期
   listVenueOnboardings: (q: PageQ = {}) => wait(db.listVenueOnboardings(q)),
-  saveVenueOnboarding: (x) => wait(db.saveVenueOnboarding(x), 350),
+  // async：校验抛的 ApiError 要变成 rejected promise，否则全局 MutationCache 接不到
+  reviewVenueOnboarding: async (no, approve, note) =>
+    wait(db.reviewVenueOnboarding(no, approve, note), 350),
+  // async：save 现在会校验「已审核不可再改」，同步抛出的 ApiError 到不了全局 MutationCache
+  saveVenueOnboarding: async (x) => wait(db.saveVenueOnboarding(x), 350),
   listSiteLifecycles: (q: PageQ = {}) => wait(db.listSiteLifecycles(q)),
   // async：让 db 抛的 SiteLifecycleError 变成 rejected promise，交给全局 MutationCache 弹错，不默默吞掉非法流转
   changeSiteStage: async (siteNo, req) => wait(loc.changeSiteStage(siteNo, req), 350),
