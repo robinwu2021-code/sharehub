@@ -588,6 +588,16 @@ function UsersInner() {
     { header: "手机", cell: (b) => <span className="text-muted-foreground tabular-nums">{b.phone}</span> },
     { header: "原因", cell: (b) => b.reason },
     { header: "拉黑时间", cell: (b) => <span className="text-muted-foreground">{fmtTime(b.blacklistedAt)}</span> },
+    // 合规要能回答「谁拉黑、谁放开」
+    {
+      header: "操作人",
+      cell: (b) => (
+        <span className="txt-caption text-muted-foreground">
+          {b.blacklistedBy ?? "—"}
+          {b.releasedBy ? ` → ${b.releasedBy}` : ""}
+        </span>
+      ),
+    },
     { header: "状态", cell: (b) => <StatusBadge map={BL_STATUS} value={b.status} /> },
     {
       header: "操作",

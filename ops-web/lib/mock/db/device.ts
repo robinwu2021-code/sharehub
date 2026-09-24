@@ -104,7 +104,14 @@ export const commandRecords: CommandRecord[] = Array.from({ length: 30 }, (_, i)
   };
 });
 export const inventoryTransfers: InventoryTransfer[] = Array.from({ length: 16 }, (_, i) => ({
-  transferNo: `TR${60000 + i}`, fromLocation: p(LOCS, i), toLocation: p(LOCS, i + 2),
+  transferNo: `TR${60000 + i}`,
+  // 类型 + 引用：名字是给人看的，跳转与盘点要靠编号。
+  // 一半从仓库出、一半站点之间调，两种形态都要有样本。
+  fromType: i % 2 === 0 ? "WAREHOUSE" : "SITE",
+  fromRef: i % 2 === 0 ? `WH0${1 + (i % 2)}` : `ST${300 + (i % 12)}`,
+  toType: "SITE", toRef: `ST${300 + ((i + 2) % 12)}`,
+  itemType: "POWERBANK",
+  fromLocation: p(LOCS, i), toLocation: p(LOCS, i + 2),
   powerbankCount: 5 + (i * 3) % 40, status: p(["DRAFT", "IN_TRANSIT", "DONE"] as const, i),
   operator: p(OPERATORS, i), createdAt: iso(i * 43200_000),
 }));

@@ -321,14 +321,14 @@ export function getAuditDetail(id: string): AuditDetail {
 // —— 员工域：部门 / 绩效 ——
 // parent 存上级 deptNo（顶级为空串）。三层：运营中心 → 运维部 → 大区/支持组。
 export const departments: Department[] = [
-  { deptNo: "D1", name: "运营中心", parent: "", memberCount: 42, leader: "Ahmed Ops" },
-  { deptNo: "D2", name: "运维部", parent: "D1", memberCount: 18, leader: "Omar Khan" },
-  { deptNo: "D3", name: "客服部", parent: "D1", memberCount: 12, leader: "Sara Ahmed" },
-  { deptNo: "D4", name: "财务部", parent: "D1", memberCount: 6, leader: "Fatima N." },
-  { deptNo: "D5", name: "市场拓展部", parent: "D1", memberCount: 9, leader: "Yusuf BD" },
-  { deptNo: "D6", name: "Dubai 大区", parent: "D2", memberCount: 8, leader: "Ali Hassan" },
-  { deptNo: "D7", name: "Abu Dhabi 大区", parent: "D2", memberCount: 5, leader: "Khalid R." },
-  { deptNo: "D8", name: "技术支持组", parent: "D2", memberCount: 4, leader: "Wang Lei" },
+  { deptNo: "D1", name: "运营中心", parent: "", memberCount: 42, leader: "Ahmed Ops", status: "ACTIVE" },
+  { deptNo: "D2", name: "运维部", parent: "D1", memberCount: 18, leader: "Omar Khan", status: "ACTIVE" },
+  { deptNo: "D3", name: "客服部", parent: "D1", memberCount: 12, leader: "Sara Ahmed", status: "ACTIVE" },
+  { deptNo: "D4", name: "财务部", parent: "D1", memberCount: 6, leader: "Fatima N.", status: "ACTIVE" },
+  { deptNo: "D5", name: "市场拓展部", parent: "D1", memberCount: 9, leader: "Yusuf BD", status: "ACTIVE" },
+  { deptNo: "D6", name: "Dubai 大区", parent: "D2", memberCount: 8, leader: "Ali Hassan", status: "ACTIVE" },
+  { deptNo: "D7", name: "Abu Dhabi 大区", parent: "D2", memberCount: 5, leader: "Khalid R.", status: "ACTIVE" },
+  { deptNo: "D8", name: "技术支持组", parent: "D2", memberCount: 4, leader: "Wang Lei", status: "ACTIVE" },
 ];
 /**
  * 员工名册投影：只给工号/姓名/角色，三个指标恒 0 —— 真值由 {@link buildStaffPerformances}
@@ -338,6 +338,8 @@ export const departments: Department[] = [
 export const staffPerformances: StaffPerformance[] = Array.from({ length: 20 }, (_, i) => ({
   employeeNo: `E${100 + i}`, name: p(["Ali Hassan", "Omar Khan", "Sara Ahmed", "Wang Lei", "Fatima N."], i),
   role: p(["运维", "客服", "财务", "拓展"], i),
+  // 统计周期：不知道数字覆盖哪段时间，这页的数就没法用
+  period: "2026-09",
   handled: 0, avgResolveMins: 0, score: 0,
 }));
 

@@ -60,11 +60,11 @@ export const userRisks: UserRisk[] = [
 // ACTIVE 的四条恰好是 cUsers 里 `blacklisted: true` 的四位（U3000/U3017/U3034/U3051），
 // RELEASED 的一条挂在已解封（blacklisted: false）的用户上——两页状态互相印证。
 export const userBlacklist: UserBlacklist[] = [
-  { blacklistNo: "BL0001", userNo: "U3000", reason: "恶意刷单", blacklistedAt: "2026-07-01T12:00:00Z", releasedAt: null, status: "ACTIVE" as const },
-  { blacklistNo: "BL0002", userNo: "U3017", reason: "骚扰客服", blacklistedAt: "2026-06-20T10:00:00Z", releasedAt: null, status: "ACTIVE" as const },
-  { blacklistNo: "BL0003", userNo: "U3034", reason: "超时未还且拒不沟通", blacklistedAt: "2026-06-02T08:00:00Z", releasedAt: null, status: "ACTIVE" as const },
-  { blacklistNo: "BL0004", userNo: "U3051", reason: "多设备批量薅免费额度", blacklistedAt: "2026-05-28T16:00:00Z", releasedAt: null, status: "ACTIVE" as const },
-  { blacklistNo: "BL0005", userNo: "U3009", reason: "历史黑名单（申诉成立已解除）", blacklistedAt: "2026-05-15T09:00:00Z", releasedAt: "2026-07-01T00:00:00Z", status: "RELEASED" as const },
+  { blacklistNo: "BL0001", userNo: "U3000", reason: "恶意刷单", blacklistedAt: "2026-07-01T12:00:00Z", blacklistedBy: "admin", releasedBy: null, releasedAt: null, status: "ACTIVE" as const },
+  { blacklistNo: "BL0002", userNo: "U3017", reason: "骚扰客服", blacklistedAt: "2026-06-20T10:00:00Z", blacklistedBy: "admin", releasedBy: null, releasedAt: null, status: "ACTIVE" as const },
+  { blacklistNo: "BL0003", userNo: "U3034", reason: "超时未还且拒不沟通", blacklistedAt: "2026-06-02T08:00:00Z", blacklistedBy: "admin", releasedBy: null, releasedAt: null, status: "ACTIVE" as const },
+  { blacklistNo: "BL0004", userNo: "U3051", reason: "多设备批量薅免费额度", blacklistedAt: "2026-05-28T16:00:00Z", blacklistedBy: "admin", releasedBy: null, releasedAt: null, status: "ACTIVE" as const },
+  { blacklistNo: "BL0005", userNo: "U3009", reason: "历史黑名单（申诉成立已解除）", blacklistedAt: "2026-05-15T09:00:00Z", blacklistedBy: "admin", releasedBy: "Sara Ahmed", releasedAt: "2026-07-01T00:00:00Z", status: "RELEASED" as const },
 ].map((b) => {
   const u = userOf(b.userNo);
   return { ...b, nickname: u.nickname, phone: u.phone };
@@ -115,6 +115,8 @@ export const freeWhitelist: FreeUserWhitelist[] = Array.from({ length: 14 }, (_,
   const quotaValue = quotaType === "UNLIMITED" ? 0 : quotaType === "TIMES" ? 10 + (i % 4) * 10 : 100 + (i % 5) * 50;
   const u = userOf(`U${3000 + i}`);
   return {
+    // 限额型才有币种含义；限次/不限留空，免得页面显示「10 次 AED」这种怪话
+    currency: quotaType === "AMOUNT" ? "AED" : null,
     userNo: u.cUserNo,
     nickname: u.nickname,
     phone: u.phone,

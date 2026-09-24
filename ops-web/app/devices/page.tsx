@@ -792,8 +792,19 @@ const cmdCols: Column<CommandRecord>[] = [
 ];
 const invCols: Column<InventoryTransfer>[] = [
   { header: "调拨单号", cell: (r) => <span className="font-medium">{r.transferNo}</span> },
-  { header: "调出点位", cell: (r) => r.fromLocation },
-  { header: "调入点位", cell: (r) => r.toLocation },
+  // 名字是给人看的，编号才说得清「到底去了哪个站点/仓库」
+  { header: "调出", cell: (r) => (
+    <div className="min-w-0">
+      <div className="truncate">{r.fromLocation}</div>
+      {r.fromRef ? <div className="truncate txt-caption text-muted-foreground tabular-nums">{r.fromRef}</div> : null}
+    </div>
+  ) },
+  { header: "调入", cell: (r) => (
+    <div className="min-w-0">
+      <div className="truncate">{r.toLocation}</div>
+      {r.toRef ? <div className="truncate txt-caption text-muted-foreground tabular-nums">{r.toRef}</div> : null}
+    </div>
+  ) },
   { header: "充电宝数", cell: (r) => <span className="tabular-nums">{Math.round(r.powerbankCount)}</span> },
   { header: "状态", cell: (r) => <StatusBadge map={TRANSFER_STATUS} value={r.status} /> },
   { header: "操作人", cell: (r) => <span className="text-muted-foreground">{r.operator}</span> },

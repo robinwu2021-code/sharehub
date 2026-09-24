@@ -117,6 +117,10 @@ const PAYEE_TYPE_LABEL = { VENUE: "场地方", AGENT: "代理商" } as const;
  * **靠这一列区分** —— 没有它，明细里就是几条看起来一模一样、金额却不同的行。
  * 空串 = 不适用（场地方维度；以及 V53 之前配的老规则）。
  */
+/** 分录的业务来源类型 → 中文。未登记的码原样显示，不吞。 */
+const LEDGER_BIZ_LABEL: Record<string, string> = {
+  ORDER: "订单", SETTLEMENT: "结算", REFUND: "退款", RECHARGE: "充值",
+};
 const SHARE_BASIS_LABEL: Record<string, string> = {
   INVEST: "出资", DEVELOP: "拓展", OPERATE: "运维", REFER: "牵线",
 };
@@ -783,8 +787,16 @@ function FinanceInner() {
         >{l.voucherNo}</button>
       ),
     },
-    { header: "订单", cell: (l) => <span className="text-muted-foreground">{l.orderNo ?? "-"}</span> },
-    { header: "账户", cell: (l) => l.account },
+    // 业务来源：订单只是来源之一（还有结算/退款/充值）。
+    // 追一笔分录「这是哪来的」靠的是 bizType + bizNo，只显示订单号会让非订单来源的行一片「-」
+    {
+      header: "业务来源",
+      cell: (l) => l.bizType
+        ? <span><span className="text-muted-foreground">{LEDGER_BIZ_LABEL[l.bizType] ?? l.bizType}</span>{" "}
+            <span className="tabular-nums">{l.bizNo ?? l.orderNo ?? ""}</span></span>
+        : <span className="text-muted-foreground tabular-nums">{l.orderNo ?? "—"}</span>,
+    },
+    { header: "账户", cell: (l) => <span>{l.account}{l.accountNo ? <span className="ms-1 txt-caption text-muted-foreground tabular-nums">{l.accountNo}</span> : null}</span> },
     { header: "方向", cell: (l) => l.direction === "DEBIT" ? <Badge tone="outline">借</Badge> : <Badge tone="muted">贷</Badge> },
     { header: "金额", className: "text-right", cell: (l) => <span className="tabular-nums">{money(l.amount, l.currency)}</span> },
     { header: "摘要", cell: (l) => <span className="text-muted-foreground">{l.summary}</span> },
@@ -798,8 +810,17 @@ function FinanceInner() {
     { header: "分成方", cell: (r) => <span>{r.payeeName} <span className="text-muted-foreground tabular-nums">{r.payeeNo}</span></span> },
     // 依据：同一单同一伙伴可能有两条（出资 + 运维），不显示这列就分不清哪条是哪条
     { header: "依据", cell: (r) => r.basis ? SHARE_BASIS_LABEL[r.basis] ?? r.basis : <span className="text-muted-foreground">—</span> },
+    // 基数与比例并排：金额对不上时，一眼看出是基数错还是比例错
+    { header: "基数", className: "text-right", cell: (r) => <span className="tabular-nums text-muted-foreground">{money(r.grossAmount, r.currency)}</span> },
     { header: "金额", className: "text-right", cell: (r) => <span className="tabular-nums">{money(r.amount, r.currency)}</span> },
     { header: "比例", className: "text-right", cell: (r) => <span className="tabular-nums">{(r.rate * 100).toFixed(0)}%</span> },
+    // 「这笔结没结、算进哪张单」是财务对账第一个问的
+    {
+      header: "结算",
+      cell: (r) => r.status === "DONE" && r.settleNo
+        ? <span className="tabular-nums">{r.settleNo}</span>
+        : <span className="text-muted-foreground">待结算</span>,
+    },
     // 周期是结算单的汇总键：明细上直接看得到它归哪一期，才对得上结算单
     { header: "周期", cell: (r) => <span className="tabular-nums">{r.period}</span> },
     { header: "时间", cell: (r) => <span className="text-muted-foreground">{fmtTime(r.createdAt)}</span> },
@@ -851,6 +872,17 @@ function FinanceInner() {
   const reconcileCols: Column<Reconcile>[] = [
     { header: "批次号", cell: (r) => <span className="txt-strong">{r.batchNo}</span> },
     { header: "周期", cell: (r) => <span className="tabular-nums">{r.period}</span> },
+    // 账单日 + 渠道 = 这个批次的身份。缺了它，同一周期的几行长得一模一样，
+    // 差错处置时根本分不清在处理哪一批
+    {
+      header: "账单日 · 渠道",
+      cell: (r) => (
+        <span className="whitespace-nowrap">
+          <span className="tabular-nums">{r.billDate ?? "—"}</span>
+          {r.channel ? <span className="ms-2 txt-caption text-muted-foreground">{r.channel}</span> : null}
+        </span>
+      ),
+    },
     { header: "nearpay 汇总", className: "text-right", cell: (r) => <span className="tabular-nums">{money(r.nearpayTotal, r.currency)}</span> },
     { header: "账务汇总", className: "text-right", cell: (r) => <span className="tabular-nums">{money(r.ledgerTotal, r.currency)}</span> },
     // 差额同时给「多少钱」和「往哪边偏」——方向就是 diff 的正负，不是另造的分类

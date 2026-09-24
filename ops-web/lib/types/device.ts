@@ -96,6 +96,18 @@ export interface CommandRecord {
 }
 export interface InventoryTransfer {
   transferNo: string;
+  /**
+   * 调出 / 调入的**类型 + 引用**（如 `SITE`+`ST300`、`WAREHOUSE`+`WH01`）。
+   *
+   * `fromLocation`/`toLocation` 是拼给人看的名字。只有名字时，
+   * 调拨单看不出东西到底去了哪个站点/仓库，也没法从这里跳过去。
+   */
+  fromType: string | null;
+  fromRef: string | null;
+  toType: string | null;
+  toRef: string | null;
+  /** 调拨物类型（充电宝 / 机柜…）：不同物类的盘点口径不同。 */
+  itemType: string | null;
   fromLocation: string;
   toLocation: string;
   powerbankCount: number;

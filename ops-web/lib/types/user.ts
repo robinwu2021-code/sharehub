@@ -94,6 +94,9 @@ export interface UserBlacklist {
   phone: string;
   reason: string;
   blacklistedAt: string;
+  /** 谁拉黑、谁解除 —— 合规要能回答这两个问题。 */
+  blacklistedBy: string | null;
+  releasedBy: string | null;
   releasedAt: string | null;
   status: "ACTIVE" | "RELEASED";
 }
@@ -240,6 +243,8 @@ export interface FreeUserWhitelist {
   reason: WhitelistReason; // 必填用途（枚举，非自由文本）
   quotaType: "UNLIMITED" | "TIMES" | "AMOUNT";
   quotaValue: number; // 额度（次数 / 金额）
+  /** 额度币种（`quotaType=AMOUNT` 时才有意义）；多市场下缺币种金额含义不明。 */
+  currency: string | null;
   usedValue: number; // 已用
   validFrom: string;
   validTo: string;

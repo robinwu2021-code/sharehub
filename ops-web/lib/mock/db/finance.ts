@@ -41,6 +41,7 @@ export const shareRules: ShareRule[] = Array.from({ length: 12 }, (_, i) => ({
   // 留一条 AGENT 的空依据（i === 9）当通用规则：取价找不到专属规则时就回落到它，
   // 这条回落路径没有样本的话，页面上看不出「留空是有意义的一档」。
   basis: i % 3 === 0 ? (i === 9 ? "" : (["INVEST", "DEVELOP", "OPERATE"] as const)[(i / 3) % 3]) : "",
+  currency: "AED",
   mode: i % 4 === 0 ? "CHANNEL_SPLIT" : "LEDGER", rate: [0.15, 0.2, 0.25][i % 3], priority: (i % 3) + 1,
 }));
 // ————————————————————————————————————————————————————————————————
@@ -70,6 +71,12 @@ export const shareRecords: ShareRecord[] = SHARE_PERIODS.flatMap((period, pi) =>
         dimension: payee.dimension, payeeNo: payee.payeeNo, payeeName: payee.payeeName,
         // 代理明细带依据：同一伙伴在一单里可以有出资 + 运维两条，靠它区分（V53）
         basis: payee.dimension === "AGENT" ? (["OPERATE", "INVEST", "DEVELOP"] as const)[k % 3] : "",
+        grossAmount: gmv,
+        // 老周期的明细已结算、当期的还挂着：两种状态都要有样本，
+        // 否则「这笔结没结」在页面上看不出差别。
+        ...(pi === 0
+          ? { status: "PENDING" as const, settleNo: null }
+          : { status: "DONE" as const, settleNo: `STL${7000 + pi * 10 + i}` }),
         amount: Number((gmv * rate).toFixed(2)), rate, currency: "AED",
         period,
         // 明细时间必须落在它声明的周期内，否则「按周期汇总」和「按时间筛选」会互相打脸
@@ -153,7 +160,11 @@ export const ledger: LedgerEntry[] = Array.from({ length: 60 }, (_, i) => {
   const amt = 3 + (pair * 7) % 25;
   return {
     entryNo: `LE${9000 + i}`, voucherNo: `V${2000 + pair}`, orderNo: `ORD${500000 + pair}`,
-    account: debit ? "现金-nearpay" : p(ACCTS.slice(1), pair), direction: debit ? "DEBIT" : "CREDIT",
+    account: debit ? "现金-nearpay" : p(ACCTS.slice(1), pair),
+    accountNo: `ACC${100 + (debit ? 0 : 1 + (pair % 4))}`,
+    // 业务来源：追一笔分录「这是哪来的」就靠这两个
+    bizType: p(["ORDER", "SETTLEMENT", "REFUND", "RECHARGE"], pair), bizNo: `ORD${500000 + pair}`,
+    direction: debit ? "DEBIT" : "CREDIT",
     amount: amt, currency: "AED", summary: debit ? "收款入账" : p(["平台分成", "场地方分润", "代理分润", "押金冻结"], pair),
     createdAt: iso(i * 1800_000),
   };
@@ -261,6 +272,8 @@ export const reconciles: Reconcile[] = Array.from({ length: 12 }, (_, i) => {
   const seeded = handleStatus && handleStatus !== "OPEN" ? RECON_SEEDED[handleStatus] : null;
   return {
     batchNo: `RC${2026000 + i}`, period: `2026-${String((i % 12) + 1).padStart(2, "0")}`,
+    // 账单日 + 渠道 = 对账批次的身份；没有它，列表里几行长得一模一样
+    billDate: iso(-(i + 1) * 86400_000).slice(0, 10), channel: p(["nearpay", "stripe"], i),
     nearpayTotal: nearpay, ledgerTotal: nearpay - diff, diff, currency: "AED",
     status: diff === 0 ? "MATCHED" : "DIFF", createdAt: iso(i * 86400_000),
     handleStatus,
@@ -329,7 +342,9 @@ export const invoices: Invoice[] = Array.from({ length: 18 }, (_, i) => {
   const issued = status !== "DRAFT";
   const issuedAt = issued ? iso(i * 172800_000) : null;
   return {
-    invoiceNo: `INV${2026000 + i}`, payeeName: src.payeeName,
+    invoiceNo: `INV${2026000 + i}`,
+    // 收款方按**编号**连，名字只作展示（同合同/分润规则的理由）
+    payeeType: src.payeeType, payeeNo: src.payeeNo, payeeName: src.payeeName,
     amount: src.totalAmount, vatTrn: `100${String(1000000000000 + i * 137).slice(0, 12)}`,
     currency: src.currency, status,
     sourceType: "SETTLEMENT" as const, sourceNo: src.settleNo,

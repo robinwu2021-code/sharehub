@@ -187,7 +187,17 @@ function AlarmsInner() {
   const recordCols: Column<AlarmRecord>[] = [
     // 业务号列 body-strong（类型阶 txt-strong = 14/500）作扫描锚点（规范 §12.3）；
     // 一张表只加强一列 —— 告警码同时加粗就没有锚点了，故它只保留等宽
-    { header: "告警号", cell: (a) => <span className="txt-strong tabular-nums">{a.alarmNo}</span> },
+    {
+      header: "告警号",
+      // 合并次数只在 >1 时显示：绝大多数告警只来一次，给每行都挂个「×1」是纯噪音，
+      // 而「×47」正是值班时第一眼要看到的东西
+      cell: (a) => (
+        <span className="txt-strong tabular-nums">
+          {a.alarmNo}
+          {a.count > 1 ? <Badge tone="warning" className="ms-2">×{a.count}</Badge> : null}
+        </span>
+      ),
+    },
     { header: "柜机 / 站点", cell: (a) => <>{a.cabinetNo} <span className="text-muted-foreground">· {a.siteName}</span></> },
     { header: "厂商", cell: (a) => <Badge tone="outline">{a.vendorCode}</Badge> },
     // 双列并存 = 多厂商错误码归一化：平台统一码用于规则/统计，厂商原始码用于对厂商排障

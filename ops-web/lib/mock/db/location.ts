@@ -81,6 +81,11 @@ export const leads: Lead[] = Array.from({ length: 20 }, (_, i) => ({
     ? { ownerType: "AGENT" as const, owner: `AG00${1 + (i % 6)}` }
     : { ownerType: "STAFF" as const, owner: p(["BD-Layla", "BD-Yusuf", "BD-Ahmed"], i) }),
   expectSites: 1 + (i * 3) % 12,
+  // 下次跟进日与跟进记录同源：只有未到终态的线索才有（签约/流失后再约人是无意义的待办）。
+  // 两边算法必须一致，否则列表显示「3 天后跟进」而时间线里根本没有这条计划。
+  nextFollowAt: p([...LEAD_STAGES], i) !== "SIGNED" && p([...LEAD_STAGES], i) !== "LOST"
+    ? iso(-(3 + (i % 5)) * 86400_000).slice(0, 10)
+    : null,
   updatedAt: iso(i * 21600_000),
 }));
 

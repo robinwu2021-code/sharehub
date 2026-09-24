@@ -501,6 +501,8 @@ function AgentsInner() {
     { header: "账号编号", cell: (a) => <span className="txt-strong tabular-nums">{a.accountNo}</span> },
     { header: "代理编号", cell: (a) => <span className="text-muted-foreground tabular-nums">{a.agentNo}</span> },
     { header: "代理名称", cell: (a) => a.agentName },
+    // 手机号可能多账号共用，运营找「是哪个账号」靠登录名
+    { header: "登录名", cell: (a) => a.username ? <span className="tabular-nums">{a.username}</span> : <span className="text-muted-foreground">—</span> },
     { header: "登录手机", cell: (a) => <span className="tabular-nums">{a.loginPhone}</span> },
     { header: "状态", cell: (a) => a.status === "ACTIVE" ? <Badge tone="success">启用</Badge> : <Badge tone="muted">停用</Badge> },
     { header: "数据范围", cell: (a) => <Badge tone="outline">{SCOPE_LABEL[a.dataScope]}</Badge> },
@@ -513,7 +515,14 @@ function AgentsInner() {
     { header: "代理编号", cell: (c) => <span className="text-muted-foreground tabular-nums">{c.agentNo}</span> },
     { header: "代理名称", cell: (c) => c.agentName },
     { header: "计佣基数", cell: (c) => <Badge tone="outline">{c.basis === "GMV" ? "GMV" : "订单量"}</Badge> },
-    { header: "分润比例", className: "text-right", cell: (c) => <span className="tabular-nums">{(c.rate * 100).toFixed(0)}%</span> },
+    // 固定额与比例是二选一：只显示比例的话，配了固定额的那几条看起来像「0%」
+    {
+      header: "分润",
+      className: "text-right",
+      cell: (c) => c.fixedAmount != null && c.fixedAmount > 0
+        ? <span className="tabular-nums">{money(c.fixedAmount, c.currency ?? "AED")}</span>
+        : <span className="tabular-nums">{(c.rate * 100).toFixed(0)}%</span>,
+    },
     { header: "结算模式", cell: (c) => c.mode === "CHANNEL_SPLIT" ? "渠道分成" : "账务分录" },
     { header: "生效日期", cell: (c) => <span className="text-muted-foreground">{c.effectiveAt}</span> },
     { header: "状态", cell: (c) => c.status === "ACTIVE" ? <Badge tone="success">启用</Badge> : <Badge tone="muted">停用</Badge> },

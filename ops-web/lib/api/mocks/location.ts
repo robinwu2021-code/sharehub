@@ -90,6 +90,8 @@ export const locationMock: LocationApi = {
           orderNo: saved.contractNo,          // 来源单据就是合同，不是某一张订单
           dimension: "AGENT", payeeNo: r.agentNo, payeeName: r.agentName ?? r.agentNo,
           basis: "REFER",
+          // 一次性对价没有「基数」，基数就是它自己（与后端 ReferFeeGeneratorImpl 同口径）
+          grossAmount: r.oneOffAmount, status: "PENDING", settleNo: null,
           amount: r.oneOffAmount, rate: 0,    // 与比例无关：一次性对价不随 GMV 走
           currency: "AED",
           period: new Date().toISOString().slice(0, 7),

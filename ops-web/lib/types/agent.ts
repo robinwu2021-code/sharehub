@@ -165,6 +165,8 @@ export interface AgentAccount {
   accountNo: string;
   agentNo: string;
   agentName: string;
+  /** 登录名。运营找「是哪个账号」靠它，手机号可能多账号共用。 */
+  username: string | null;
   loginPhone: string;
   status: "ACTIVE" | "DISABLED";
   dataScope: DataScope; // 台账 T5：原为 string，与 RoleRow.dataScope 统一
@@ -178,6 +180,10 @@ export interface AgentCommission {
   agentName: string;
   basis: "GMV" | "ORDER_COUNT";
   rate: number; // 0~1
+  /** 固定额佣金（与 rate 二选一；两者都配时以固定额为准）。 */
+  fixedAmount: number | null;
+  /** 币种。多市场下只给金额不给币种，数字没有意义。 */
+  currency: string | null;
   mode: "CHANNEL_SPLIT" | "LEDGER";
   effectiveAt: string;
   status: "ACTIVE" | "INACTIVE";

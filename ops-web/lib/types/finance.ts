@@ -25,6 +25,8 @@ export interface ShareRule {
   payeeName: string;
   /** 见 SHARE_BASES。留空 = 该分成方的通用规则（任何依据都能回落到它）。 */
   basis?: ShareBasis | "";
+  /** 币种。多市场下只给比例不给币种，结算时不知道按哪个币算固定额。 */
+  currency?: string | null;
   mode: "CHANNEL_SPLIT" | "LEDGER";
   rate: number; // 0..1
   priority: number;
@@ -211,6 +213,11 @@ export interface LedgerEntry {
   voucherNo: string;
   orderNo: string | null;
   account: string; // 账户：现金/应付场地方/应付代理/平台收入…
+  /** 科目编号。`account` 是人话名称，连表/导出要用编号。 */
+  accountNo: string | null;
+  /** 业务来源类型 + 单号：追一笔分录「这是哪来的」就靠这两个。 */
+  bizType: string | null;
+  bizNo: string | null;
   direction: "DEBIT" | "CREDIT"; // 借/贷
   amount: number;
   currency: string;
@@ -231,6 +238,12 @@ export interface ShareRecord {
    * 没有它，分润明细里会出现几条看起来一模一样的行，而金额不同。
    */
   basis?: ShareBasis | "";
+  /** 分润基数（GMV 快照）。有它才能在页面上验「基数 × 比例 = 金额」。 */
+  grossAmount: number;
+  /** PENDING=待结算 / DONE=已结算。财务对账第一个问的就是这笔结没结。 */
+  status: "PENDING" | "DONE";
+  /** 已结算时归属的结算单号；未结为 null。 */
+  settleNo: string | null;
   amount: number;
   rate: number; // 0..1
   currency: string;
@@ -251,6 +264,9 @@ export type ReconHandleResult = "VERIFIED_OK" | "PLATFORM_ERROR" | "CHANNEL_ERRO
 export interface Reconcile {
   batchNo: string;
   period: string;
+  /** 账单日与渠道 —— 对账批次的身份。没有它，列表里几行长得一模一样。 */
+  billDate: string | null;
+  channel: string | null;
   nearpayTotal: number;
   ledgerTotal: number;
   /** 差额 = nearpayTotal − ledgerTotal。>0 渠道多、账务少记；<0 账务多记、渠道少到账。 */
@@ -366,6 +382,9 @@ export type InvoiceAction = "issue" | "void";
 
 export interface Invoice {
   invoiceNo: string;
+  /** 收款方类型 + 编号。按**编号**连，名字只作展示（同合同/分润规则的理由）。 */
+  payeeType: "VENUE" | "AGENT" | null;
+  payeeNo: string | null;
   payeeName: string;
   amount: number;
   vatTrn: string;

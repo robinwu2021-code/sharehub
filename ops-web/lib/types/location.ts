@@ -151,6 +151,13 @@ export interface Lead {
    */
   siteNo?: string;
   expectSites: number;
+  /**
+   * 下次跟进日（`YYYY-MM-DD`），空 = 未约。
+   *
+   * BD CRM 的核心作业字段 ——「今天该打谁的电话」靠它排。
+   * 后端一直有，列表不显示等于这张表少了排程。
+   */
+  nextFollowAt?: string | null;
   /** 最后一次跟进时间 —— 与 `leadFollowUps` 里最新一条的 `createdAt` 必须一致（列表按它排序）。 */
   updatedAt: string;
 }
@@ -239,6 +246,13 @@ export interface SiteAnalysis {
 // —— 门店自助 Onboarding（场地域 · P2）——
 export interface VenueOnboarding {
   onboardingNo: string;
+  /**
+   * 审核通过后建出的场地方编号。
+   *
+   * 这个字段**直到场地方写入口补齐后才真正有意义** —— 在那之前占位实现只取号不落行，
+   * 号回填了却查无此人。现在它是从进件跳到场地方档案的唯一线索。
+   */
+  venueNo?: string | null;
   venueName: string;
   contact: string;
   industry: string;

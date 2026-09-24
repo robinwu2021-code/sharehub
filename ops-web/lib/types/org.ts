@@ -91,11 +91,15 @@ export interface Department {
   parent: string;
   memberCount: number;
   leader: string;
+  /** 停用的部门不该再出现在「选部门」的下拉里，但档案要留着。 */
+  status: "ACTIVE" | "DISABLED" | null;
 }
 export interface StaffPerformance {
   employeeNo: string;
   name: string;
   role: string;
+  /** 统计周期（`2026-09`）。不知道数字覆盖哪段时间，这页的数就没法用。 */
+  period: string | null;
   handled: number;
   avgResolveMins: number;
   score: number;

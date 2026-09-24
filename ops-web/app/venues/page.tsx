@@ -455,6 +455,13 @@ function VenuesInner() {
       ),
     },
     { header: "预计站点数", className: "text-right", cell: (l) => <span className="tabular-nums">{l.expectSites}</span> },
+    // 「今天该打谁的电话」靠它排 —— 后端一直有，不显示等于这张表少了排程
+    {
+      header: "下次跟进",
+      cell: (l) => l.nextFollowAt
+        ? <span className="tabular-nums">{l.nextFollowAt.slice(0, 10)}</span>
+        : <span className="text-muted-foreground">未约</span>,
+    },
     // 更新时间就是最后一次跟进时间（db 层保证两者同源），所以这一列点进详情能一眼对上时间线首条
     { header: "最后跟进", cell: (l) => <span className="text-muted-foreground">{fmtTime(l.updatedAt)}</span> },
     {
@@ -474,6 +481,14 @@ function VenuesInner() {
     { header: "行业", cell: (o) => o.industry },
     { header: "申请时间", cell: (o) => <span className="text-muted-foreground">{fmtTime(o.requestedAt)}</span> },
     { header: "审核状态", cell: (o) => <StatusBadge map={OB_STATUS} value={o.status} /> },
+    // 通过后建出的场地方号：从进件跳到档案的唯一线索
+    //（这个字段直到场地方写入口补齐后才真正有意义——在那之前号回填了却查无此人）
+    {
+      header: "场地方",
+      cell: (o) => o.venueNo
+        ? <span className="tabular-nums">{o.venueNo}</span>
+        : <span className="text-muted-foreground">—</span>,
+    },
     { header: "备注", cell: (o) => <span className="text-muted-foreground">{o.reviewNote ?? "-"}</span> },
     { header: "操作", cell: (o) => canVenue ? <Button size="sm" variant="outline" onClick={() => setOnboardingForm(o)}>审核</Button> : <span className="text-muted-foreground">-</span> },
   ];

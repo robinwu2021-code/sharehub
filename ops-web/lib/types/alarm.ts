@@ -10,6 +10,8 @@ export type AlarmLevel = "INFO" | "WARN" | "CRITICAL";
 export interface AlarmRecord {
   alarmNo: string;
   cabinetNo: string;
+  /** 站点编号。只有 siteName 时同名站点连不准（同合同「按编号连」的理由）。 */
+  siteNo: string | null;
   siteName: string;
   vendorCode: string; // 设备厂商（cd-tech / sd-power / chargenow）
   alarmCode: string; // 平台统一告警码，如 SLOT_STUCK
@@ -18,6 +20,13 @@ export interface AlarmRecord {
   occurredAt: string;
   status: "OPEN" | "ACKED" | "CLOSED"; // 待处理 / 已受理 / 已关闭
   workOrderNo: string | null; // 关联工单号（转工单后回填）
+  /**
+   * 同源重复告警的合并次数（后端按 dedupKey 合并计数）。
+   *
+   * 「重复了 47 次」与「1 次」是噪音与火情的区别 —— 不显示它，
+   * 列表里两者长得一模一样，值班的人无从排优先级。
+   */
+  count: number;
   remark: string;
 }
 

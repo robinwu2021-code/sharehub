@@ -38,10 +38,14 @@ export const alarmRecords: AlarmRecord[] = Array.from({ length: 14 }, (_, i) => 
   const cab = p(cabinets, i * 3);
   const st = p(["OPEN", "OPEN", "ACKED", "CLOSED"] as const, i);
   return {
-    alarmNo: `ALM${40000 + i}`, cabinetNo: cab.cabinetNo, siteName: cab.locationName ?? p(LOCS, i),
+    alarmNo: `ALM${40000 + i}`, cabinetNo: cab.cabinetNo,
+    siteNo: cab.siteNo ?? null, siteName: cab.locationName ?? p(LOCS, i),
     vendorCode: cab.vendorCode, alarmCode: def.code, vendorErrorCode: vendorErr(cab.vendorCode, i),
     level: def.level, occurredAt: iso(i * 5400_000), status: st,
     workOrderNo: st === "OPEN" ? null : `WO${70000 + (i % 64)}`,
+    // 合并次数：多数告警只来一次，少数刷屏。两种都要有样本，
+    // 否则「按次数排优先级」这件事在页面上看不出来。
+    count: i % 5 === 0 ? 8 + (i % 40) : 1,
     remark: p(["心跳超时 10 分钟未恢复", "用户反馈取宝失败", "巡检现场发现", "厂商云回调上报", "监控脚本自动触发"], i),
   };
 });
