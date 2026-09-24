@@ -1,0 +1,89 @@
+# 权限码真源表 × 后端强制 已知缺口台账 —— **只准变短**
+#
+# 由 backend/scripts/perm-ssot-align.py --strict 执行（挂在 check:drift 下）。
+#
+# 【两类的含义】
+#   声明未强制 <码>  真源表写了这个能力，但没有任何端点用它鉴权 ——
+#                    要么后端漏了 @PreAuthorize（**能力没有闸**），
+#                    要么这条能力已取消而表没删（表在说谎）。
+#   强制未声明 <码>  后端拿它鉴权，但真源表里没有 —— 真源表不再是真源。
+#                    CLAUDE.md 专门点过这个复发问题。
+#
+# 【为什么允许有已知缺口】
+# 接入时双向合计 70 条。一次清完不现实，而"全绿才过"会让卡口常红，
+# 常红的卡口等于没有卡口。故冻结现状为基线，只拦新增。
+#
+# 【口径限制】
+# "后端强制"只看端点级 @PreAuthorize（contract.json 的 endpoint.perm）。
+# 只在 service 层校验的码会被误报成"声明未强制"，遇到请在此注明后登记。
+
+声明未强制 agent:agent:create
+声明未强制 agent:agent:delete
+声明未强制 agent:settlement:read
+声明未强制 dashboard:platform:read
+声明未强制 dashboard:todo:read
+声明未强制 device:cabinet:assign
+声明未强制 device:cabinet:delete
+声明未强制 device:cabinet:export
+声明未强制 device:cabinet:import
+声明未强制 device:command:batch
+声明未强制 device:inventory:stocktake
+声明未强制 device:ota:publish
+声明未强制 device:ota:rollback
+声明未强制 device:slot:read
+声明未强制 finance:invoice:void
+声明未强制 finance:recon:handle
+声明未强制 finance:share_rule:delete
+声明未强制 finance:share_rule:update
+声明未强制 location:contract:delete
+声明未强制 location:poi:delete
+声明未强制 location:venue:delete
+声明未强制 marketing:campaign:create
+声明未强制 marketing:coupon:delete
+声明未强制 order:arrears:dun
+声明未强制 order:deposit:manage
+声明未强制 order:order:export
+声明未强制 order:reservation:cancel
+声明未强制 org:dept:delete
+声明未强制 org:dept:update
+声明未强制 org:employee:delete
+声明未强制 org:employee:update
+声明未强制 org:role:assign
+声明未强制 pricing:adjustment:cancel
+声明未强制 pricing:adjustment:create
+声明未强制 pricing:adjustment:read
+声明未强制 pricing:plan:delete
+声明未强制 system:app_version:release
+声明未强制 system:openapi:config
+声明未强制 tenant:billing:read
+声明未强制 workorder:alarm:config
+声明未强制 workorder:sla:update
+强制未声明 cs:session:reply
+强制未声明 cs:ticket:update
+强制未声明 device:ota:manage
+强制未声明 finance:invoice:update
+强制未声明 finance:recon:resolve
+强制未声明 finance:reconcile:read
+强制未声明 location:site:update
+强制未声明 marketing:ad:read
+强制未声明 marketing:ad:update
+强制未声明 marketing:push:update
+强制未声明 marketing:recharge:update
+强制未声明 order:deposit:update
+强制未声明 pricing:rule:config
+强制未声明 report:consumer:read
+强制未声明 report:device:read
+强制未声明 report:finance:read
+强制未声明 report:location:read
+强制未声明 system:app_version:update
+强制未声明 system:biz_rule:read
+强制未声明 system:login_setting:read
+强制未声明 system:notify_log:update
+强制未声明 system:openapi:update
+强制未声明 system:param:read
+强制未声明 system:param:update
+强制未声明 system:region:read
+强制未声明 system:tax:read
+强制未声明 user:risk:read
+强制未声明 workorder:alarm:update
+强制未声明 workorder:wo:update
