@@ -99,6 +99,37 @@ public final class SysDtos {
      * <p><b>只出掩码与重置时间，永不出密钥明文或哈希</b>：`app_secret_hash` 的库注释已经
      * 定了口径（明文落 KMS/vault、不入库、不出参）。掩码由服务端算，前端拿不到可还原的信息。
      */
+    /**
+     * 开放平台应用**写入参**（白名单）。
+     *
+     * <p>不声明 {@code appSecretHash} 与 {@code secretResetAt} —— 它们**只由
+     * {@code POST /api/platform/openapi-apps/{appNo}/reset-secret} 维护**
+     * （那里生成明文、取 SHA-256、落 secretResetAt，明文只在方法栈内存在）。
+     *
+     * <p>此前这两个端点收的是实体，而 beforeUpdate 的保护是
+     * {@code if (e.getAppSecretHash() == null) e.setAppSecretHash(current...)} ——
+     * **只在客户端「不传」时生效**。注释写的是「更新请求不带它时保留原值」，
+     * 作者的意图是「别被清空」，不是「不许被设置」。于是往编辑端点传
+     * {@code {"appSecretHash":"<自己算的哈希>"}} 就把该应用的密钥换成了已知值，
+     * 等于拿到它的全部 API 权限 —— 而这个端点只需要 system:openapi:update。
+     *
+     * <p>{@code appKey} 保留：运营端表单里本来就有它（后端从不生成），是正当入参。
+     */
+    public record OpenApiAppReq(String appNo, String name, String appKey,
+                                String scopes, Integer rateLimit, String status) {
+        /** 映射到实体。**appSecretHash / secretResetAt 有意不设**（见类注释）。 */
+        public ai.neargo.sharehub.platform.sys.entity.OpenapiApp toEntity() {
+            var e = new ai.neargo.sharehub.platform.sys.entity.OpenapiApp();
+            e.setAppNo(appNo);
+            e.setName(name);
+            e.setAppKey(appKey);
+            e.setScopes(scopes);
+            e.setRateLimit(rateLimit);
+            e.setStatus(status);
+            return e;
+        }
+    }
+
     public record OpenApiApp(String appNo, String name, String appKey, Integer rateLimit,
                              String status, String createdAt,
                              String appSecretMasked, String secretResetAt) {

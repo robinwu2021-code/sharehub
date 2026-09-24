@@ -57,7 +57,6 @@ MktNotice
 MktPush
 NotifyBlacklist
 NotifyTemplate
-OpenapiApp
 SysAppVersion
 SysLoginSetting
 SysParam

@@ -216,14 +216,6 @@ NotifyTemplate.params
 NotifyTemplate.scene
 NotifyTemplate.status
 NotifyTemplate.templateNo
-OpenapiApp.appKey
-OpenapiApp.appNo
-OpenapiApp.appSecretHash
-OpenapiApp.name
-OpenapiApp.rateLimit
-OpenapiApp.scopes
-OpenapiApp.secretResetAt
-OpenapiApp.status
 SysAppVersion.buildNo
 SysAppVersion.downloadUrl
 SysAppVersion.forceUpdate

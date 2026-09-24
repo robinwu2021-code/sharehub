@@ -7,6 +7,7 @@ import ai.neargo.sharehub.platform.md.service.MarketService;
 import ai.neargo.sharehub.platform.sys.dto.SysDtos.AppVersion;
 import ai.neargo.sharehub.platform.sys.dto.SysDtos.BizRules;
 import ai.neargo.sharehub.platform.sys.dto.SysDtos.LoginSetting;
+import ai.neargo.sharehub.platform.sys.dto.SysDtos.OpenApiAppReq;
 import ai.neargo.sharehub.platform.sys.dto.SysDtos.OpenApiApp;
 import ai.neargo.sharehub.platform.sys.dto.SysDtos.TaxSetting;
 import ai.neargo.sharehub.platform.sys.entity.OpenapiApp;
@@ -200,15 +201,16 @@ public class SysSettingController {
 
     @PostMapping("/api/platform/openapi-apps")
     @PreAuthorize("@perm.can('system:openapi:update')")
-    public OpenApiApp createOpenApiApp(@RequestBody OpenapiApp body) {
-        return openApiApps.save(body);
+    public OpenApiApp createOpenApiApp(@RequestBody OpenApiAppReq body) {
+        return openApiApps.save(body.toEntity());
     }
 
     @PostMapping("/api/platform/openapi-apps/{appNo}")
     @PreAuthorize("@perm.can('system:openapi:update')")
-    public OpenApiApp updateOpenApiApp(@PathVariable String appNo, @RequestBody OpenapiApp body) {
-        body.setAppNo(appNo);
-        return openApiApps.save(body);
+    public OpenApiApp updateOpenApiApp(@PathVariable String appNo, @RequestBody OpenApiAppReq body) {
+        OpenapiApp e = body.toEntity();
+        e.setAppNo(appNo);
+        return openApiApps.save(e);
     }
 
     /**
