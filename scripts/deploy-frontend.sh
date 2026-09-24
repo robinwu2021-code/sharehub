@@ -14,13 +14,17 @@ case "$APP" in
     ops-web)
         # ⚠️ NEXT_PUBLIC_USE_MOCK=0 必须给：默认是 mock，漏配就静默跑 mock，
         # ai-shop 2026-09-01 踩过 —— 「登录看似无权限」而请求根本没到后端。
-        BUILD_CMD='NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE= npm run build'
+        # ops-web 用 pnpm（c-app 仍是 npm）。--frozen-lockfile 是 `npm ci` 的对应物：
+        # 锁文件与 package.json 不一致就报错，而不是静默解析出另一套版本。
+        INSTALL_CMD='pnpm install --frozen-lockfile --reporter=silent'
+        BUILD_CMD='NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE= pnpm run build'
         OUT='out'
         URL_PATH='/'
         ;;
     c-app)
         # ⚠️ H5_BASE 必须给：站在 /c/ 下，不给的话产物写成 `/assets/…` 而实际在
         # `/c/assets/…` —— **整站白屏而 index.html 200**。同 ai-shop 踩坑。
+        INSTALL_CMD='npm install --no-audit --no-fund --loglevel=error'
         BUILD_CMD='H5_BASE=/c/ VITE_API_BASE= npm run build:h5'
         OUT='dist/build/h5'
         URL_PATH='/c/'
@@ -67,7 +71,7 @@ git worktree add -q --detach "$WT" HEAD
 say "构建（干净副本，$APP）"
 (
     cd "$WT/$APP"
-    npm install --no-audit --no-fund --loglevel=error 2>&1 | tail -5
+    eval "$INSTALL_CMD" 2>&1 | tail -5
     eval "$BUILD_CMD"
 ) || die "构建失败"
 
