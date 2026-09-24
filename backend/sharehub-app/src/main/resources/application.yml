@@ -97,8 +97,22 @@ sharehub:
       max-attempts: 6
   # 可切换会话存储：memory(默认) | ehcache(单节点TTL) | redis(多实例推荐) | mysql(强持久sys_token)
   auth:
-    token-store: memory
+    # 令牌存储。四选一，随时可切，业务代码不感知（都走 TokenStore 接口）：
+    #   mysql+ehcache  缺省 —— MySQL 持久 + 本地热层。会话活过重启，又不必每个请求查一次库
+    #   mysql          纯持久，每次鉴权一次查库。正确但热路径上多一次 IO
+    #   ehcache        纯本地，重启即掉线、多副本各记各的
+    #   memory         **只给单测与本地起服**，语义同 ehcache
+    #   redis          多副本/将来水平扩展时切这个；换法见 TokenStoreConfig 的注释（改一行）
+    #
+    # 2026-09-24 缺省从 memory 改为 mysql+ehcache ——「默认给一个重启就掉全部登录态的实现」
+    # 是个只会在生产上暴露的默认值。
+    token-store: ${SHAREHUB_TOKEN_STORE:mysql+ehcache}
     token-ttl: 2h
+    # 热层 TTL，**与 token-ttl 是两回事，别配成一样**：
+    # 前者是「最多容忍多久看不见别处的吊销」，后者是「会话本身多久过期」。
+    # 主动吊销（登出/改权限）不受它影响 —— CachedTokenStore 会立刻清本地。
+    # 多副本部署时它就是跨副本吊销延迟的上界；配 0 = 直通不缓存。
+    token-cache-ttl: ${SHAREHUB_TOKEN_CACHE_TTL:30s}
     # 手机验证码（内存实现，落库见 A3）
     otp:
       ttl: 5m                 # 有效期

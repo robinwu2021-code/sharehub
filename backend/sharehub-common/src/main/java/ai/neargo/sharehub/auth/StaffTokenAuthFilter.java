@@ -53,6 +53,8 @@ public class StaffTokenAuthFilter extends OncePerRequestFilter {
                         .map(SimpleGrantedAuthority::new).toList();
                 var auth = new UsernamePasswordAuthenticationToken(u, null, authorities);
                 SecurityContextHolder.getContext().setAuthentication(auth);
+                // 与 SecurityContext 成对写，理由同 CallContext：非 web 线程也要读得到身份
+                CurrentUser.set(u);
                 DataScopeContext.set(u.dataScope());                  // 供 DataScopeHandler 注入 SQL
                 // 原始 token 另存一份供跨服务透传：SecurityContext 里只有解析后的 LoginUser，
                 // token 本身已经不在了。**透传 token 而非身份声明**，红线（不信客户端 X-Roles）不破。
@@ -67,6 +69,7 @@ public class StaffTokenAuthFilter extends OncePerRequestFilter {
                 DataScopeContext.clear();
                 // 线程池复用下不清会把上一个请求的身份泄露给下一个
                 CallContext.clear();
+                CurrentUser.clear();
             }
         }
     }

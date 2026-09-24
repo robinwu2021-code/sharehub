@@ -27,6 +27,18 @@
   <packaging>jar</packaging>
 
   <dependencies>
+    <!--
+      测试依赖。**sharehub-common 此前没有测试目录** —— 它的类只能跟着 sharehub-app 一起测，
+      而 app 模块常年被并行会话的在途改动挡住编译（2026-09-24 实测连续 10 分钟不可用）。
+      基座模块的东西（CurrentUser / CachedTokenStore）本来就不依赖 app，
+      让它们能独立跑测试，既是分层该有的样子，也让基座的验证不被上层阻塞。
+    -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+
     <!-- neargo commons：Result/PageResult/ErrorCode · 受信头与权限 SPI · 数据范围 -->
     <dependency>
       <groupId>ai.neargo</groupId>

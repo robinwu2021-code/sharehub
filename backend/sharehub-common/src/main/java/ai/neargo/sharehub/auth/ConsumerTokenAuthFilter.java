@@ -39,6 +39,9 @@ public class ConsumerTokenAuthFilter extends OncePerRequestFilter {
                 var auth = new UsernamePasswordAuthenticationToken(
                         d.user(), null, List.of(new SimpleGrantedAuthority("ROLE_CONSUMER")));
                 SecurityContextHolder.getContext().setAuthentication(auth);
+                // 与 SecurityContext 成对写：后者只在 web 请求线程上有值，
+                // 而 CurrentUser 让非 web 线程（@Async、定时任务）也读得到当前身份
+                CurrentUser.set(d.user());
                 DataScopeContext.set(d.user().dataScope());
                 scopeSet = true;
             }
@@ -48,6 +51,8 @@ public class ConsumerTokenAuthFilter extends OncePerRequestFilter {
         } finally {
             if (scopeSet) {
                 DataScopeContext.clear();
+                // 线程池会复用线程 —— 不清的话下一个请求读到的不是「空身份」而是「别人的身份」
+                CurrentUser.clear();
             }
         }
     }
