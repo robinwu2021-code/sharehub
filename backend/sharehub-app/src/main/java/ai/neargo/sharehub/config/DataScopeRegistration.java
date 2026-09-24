@@ -70,10 +70,28 @@ public class DataScopeRegistration implements DataScopeRegistrar {
                 "AGENT", "agent_no",
                 "SITE", "site_no"));
 
-        // ⚠️ 待表建好后补注册（[TDD §5.2] 清单剩余项，当前开发库尚无这三张表）：
-        //   dev_alarm      → AGENT: agent_no, SITE: site_no
-        //   share_record   → AGENT: payee_no（仅 payee_type='AGENT' 时成立，
-        //                    需 handler 支持「带条件的锚点」，直接注册会误伤 VENUE 维度的行）
-        //   stl_settlement → AGENT: payee_no（同上）
+        /*
+         * —— 资金四表（V58）——
+         *
+         * 此前这里写着「需 handler 支持『带条件的锚点』」而搁置：registry 只能登记
+         * 「维度 → 列」一对一，表达不了 `payee_type='AGENT' AND payee_no IN (...)`。
+         *
+         * V58 把那个条件**挪进了列定义** —— agent_no 是生成列
+         * `CASE WHEN payee_type='AGENT' THEN payee_no END`，VENUE 行为 NULL，
+         * 而 IN (...) 天然不匹配 NULL。于是不必改共享框架，也不会误伤 VENUE 的行。
+         *
+         * 搁置的代价是实打实的：代理端实名登录打通后实测，一个名下零条资金记录的新代理
+         * 能读到分润明细 108 行、收款账户 150 行（全平台的户名与银行账号掩码）。
+         * 回归见 AgentDataScopeProbeTest。
+         */
+        registry.register("share_record", Map.of("AGENT", "agent_no"));
+        registry.register("stl_payout_account", Map.of("AGENT", "agent_no"));
+        // 这两张代理当前还没有读取权限码，先注册：漏的后果是「哪天给了码就立刻泄露」，
+        // 而多注册的后果只是 fail-closed 方向的「看不到」——两种错的代价不对称。
+        registry.register("stl_withdrawal", Map.of("AGENT", "agent_no"));
+        registry.register("stl_settlement", Map.of("AGENT", "agent_no"));
+
+        // ⚠️ 待表建好后补注册（[TDD §5.2] 清单剩余项）：
+        //   dev_alarm → AGENT: agent_no, SITE: site_no
     }
 }
