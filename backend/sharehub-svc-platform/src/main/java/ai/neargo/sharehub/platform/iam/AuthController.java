@@ -223,12 +223,27 @@ public class AuthController {
         return SecurityUtils.requireUser().perms();
     }
 
+    /**
+     * 当前会话的身份与**当场重算的权限码**。ops-web 进应用与标签页重新可见时会拉它刷新 perms。
+     *
+     * <p><b>不用 {@code Map.of}</b>：它遇到任何一个 null 值就抛 NPE。
+     * {@code CurrentUser.system()} 的 {@code agentNo} 就是 null，
+     * 而本端点现在是前端的常规调用 —— 一旦 500，前端的 perms-sync 会把异常吞掉
+     * （那是对的：一次刷新失败不该把人弹回登录页），于是**权限从此不再刷新，且毫无症状**。
+     * 用 HashMap 收 null，把「少一个字段」留在数据里，而不是变成一次 500。
+     */
     @GetMapping("/me")
     public Map<String, Object> me() {
         return SecurityUtils.currentUser()
-                .<Map<String, Object>>map(u -> Map.of(
-                        "authenticated", true, "username", u.username(), "role", u.role(),
-                        "agentNo", u.agentNo(), "perms", u.perms()))
+                .<Map<String, Object>>map(u -> {
+                    Map<String, Object> m = new java.util.HashMap<>();
+                    m.put("authenticated", true);
+                    m.put("username", u.username());
+                    m.put("role", u.role());
+                    m.put("agentNo", u.agentNo() == null ? "" : u.agentNo());
+                    m.put("perms", u.perms() == null ? List.of() : u.perms());
+                    return m;
+                })
                 .orElse(Map.of("authenticated", false));
     }
 

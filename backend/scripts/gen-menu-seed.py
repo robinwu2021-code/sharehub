@@ -31,10 +31,12 @@ def main(path):
     for si, s in enumerate(nav, 1):
         no = "M_" + s["key"]
         rows.append(dict(
+            # type 两档：MENU（分组）/ ITEM（叶子）。词表由 V68 钉死在列注释上，
+            # 并有 StoredValueInVocabularyTest 守着 —— 别再引入第三套命名。
             menu_no=no, parent_no=None, name=s["label"], type="MENU",
             path=s.get("href"), icon=s.get("icon"), group_name=None, sort=si,
             # ready 是叶子级的解锁标记，对 section 无意义；列是 NOT NULL，发 0 不发 NULL
-            perm=None, phase=s.get("phase", 1), ready=0,
+            perm=s.get("perm"), phase=s.get("phase", 1), ready=0,
             module=s.get("module"), modules=s.get("modules"),
             match_paths=s.get("match"), pin_bottom=1 if s.get("pinBottom") else 0,
             portal_for=s.get("portalFor"),

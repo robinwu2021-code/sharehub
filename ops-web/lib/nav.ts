@@ -90,6 +90,14 @@ export interface NavSection {
    */
   modules?: string[];
   href: string; // section 首页
+  /**
+   * section 自身的权限码。**只有没有叶子的 section 才需要它**（目前仅「经营看板」）——
+   * 有叶子的 section，可见性就是「有没有可见叶子」：那既是 {@link sectionDefaultHref}
+   * 的语义（落到第一个可见叶子），也避免「L1 显示、点开一片空」。
+   *
+   * 菜单真源迁进 iam_menu 后（V67）这个字段随行落库，服务端按同一条规则过滤。
+   */
+  perm?: string;
   match?: string[]; // 路径归属前缀（默认 = href 的 path 部分）；如 system 归属 /system
   soon?: boolean; // 整 section 待建（页面不存在）
   phase?: Phase; // 产品分期（缺省=P1）；整 section 按期屏蔽
@@ -155,7 +163,8 @@ export const NAV: NavSection[] = [
   },
 
   // ── 运营端 16 项 ────────────────────────────────────────────────────
-  { key: "dashboard", label: "经营看板", icon: "LayoutDashboard", module: "dashboard", href: "/" },
+  // 它没有叶子，可见性只能看自己这一个码（别的 section 看「有没有可见叶子」）
+  { key: "dashboard", label: "经营看板", icon: "LayoutDashboard", module: "dashboard", href: "/", perm: "dashboard:overview:read" },
   {
     // 2026-09-22 新菜单：对标简电云「运营管理」三个分组（场站管理 / 基础管理 / 公告管理），
     // 不在旧菜单上叠加，将来替换站点/计费/系统设置/营销里的对应项。

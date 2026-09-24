@@ -1,12 +1,10 @@
 package ai.neargo.sharehub.platform.iam;
 
 import ai.neargo.sharehub.platform.iam.entity.IamEntities.IamDataScope;
-import ai.neargo.sharehub.platform.iam.entity.IamEntities.IamMenu;
 import ai.neargo.sharehub.platform.iam.entity.IamEntities.IamPermission;
 import ai.neargo.sharehub.platform.iam.entity.IamEntities.IamRole;
 import ai.neargo.sharehub.platform.iam.entity.IamEntities.IamRolePerm;
 import ai.neargo.sharehub.platform.iam.mapper.IamMappers.DataScopeMapper;
-import ai.neargo.sharehub.platform.iam.mapper.IamMappers.MenuMapper;
 import ai.neargo.sharehub.platform.iam.mapper.IamMappers.PermissionMapper;
 import ai.neargo.sharehub.platform.iam.mapper.IamMappers.RoleMapper;
 import ai.neargo.sharehub.platform.iam.mapper.IamMappers.RolePermMapper;
@@ -31,34 +29,27 @@ public class IamSeeder implements ApplicationRunner {
             "BD", "拓展", "VIEWER", "只读", "AGENT", "代理商");
 
     // 12 模块菜单：{module, name, path, icon, 代表查看码}
-    private static final String[][] MENUS = {
-            {"dashboard", "经营看板", "/", "LayoutDashboard", "dashboard:overview:read"},
-            {"device", "设备管理", "/devices", "Server", "device:cabinet:read"},
-            {"location", "站点与点位", "/locations", "MapPin", "location:poi:read"},
-            {"order", "订单管理", "/orders", "ReceiptText", "order:order:read"},
-            {"pricing", "计费定价", "/pricing", "Tag", "pricing:plan:read"},
-            {"finance", "财务管理", "/finance", "Wallet", "finance:share_rule:read"},
-            {"workorder", "工单管理", "/work-orders", "Wrench", "workorder:wo:read"},
-            {"user", "用户管理", "/users", "UserCircle", "user:cuser:read"},
-            {"marketing", "营销管理", "/marketing", "Ticket", "marketing:coupon:read"},
-            {"agent", "代理商管理", "/agents", "Handshake", "agent:agent:read"},
-            {"org", "员工与权限", "/employees", "Users", "org:employee:read"},
-            {"system", "系统设置", "/system/vendors", "Settings", "system:dict:read"},
-    };
+    /*
+     * 菜单种子已删（2026-09-24）。真源是 iam_menu，由 V67__menu_from_nav.sql 灌 127 行
+     * （backend/scripts/gen-menu-seed.py 从 ops-web/lib/nav.ts 生成）。
+     *
+     * 这里原有一份 12 行的 MENUS 数组，守卫是 `menuMapper.selectCount(null) == 0`。
+     * V67 之后它**永远不会执行**，但留着就是菜单的第二份定义，而且是旧的那份 ——
+     * 与本文件上面记过的 CUSTOM 那个坑同一类：守卫的粒度碰巧等价，
+     * 多一个来源就不再等价，且不会报错。所以删，而不是留着「反正跑不到」。
+     */
 
     private final RoleMapper roleMapper;
     private final RolePermMapper rolePermMapper;
     private final PermissionMapper permissionMapper;
     private final DataScopeMapper dataScopeMapper;
-    private final MenuMapper menuMapper;
 
     public IamSeeder(RoleMapper roleMapper, RolePermMapper rolePermMapper, PermissionMapper permissionMapper,
-                     DataScopeMapper dataScopeMapper, MenuMapper menuMapper) {
+                     DataScopeMapper dataScopeMapper) {
         this.roleMapper = roleMapper;
         this.rolePermMapper = rolePermMapper;
         this.permissionMapper = permissionMapper;
         this.dataScopeMapper = dataScopeMapper;
-        this.menuMapper = menuMapper;
     }
 
     @Override
@@ -142,22 +133,6 @@ public class IamSeeder implements ApplicationRunner {
                 p.setName(code);
                 permissionMapper.insert(p);
             });
-        }
-        if (menuMapper.selectCount(null) == 0) {
-            int sort = 1;
-            for (String[] m : MENUS) {
-                IamMenu menu = new IamMenu();
-                menu.setMenuNo("M_" + m[0]);
-                menu.setName(m[1]);
-                menu.setType("MENU");
-                menu.setPath(m[2]);
-                menu.setIcon(m[3]);
-                menu.setPerm(m[4]);
-                menu.setSort(sort++);
-                menu.setVisible(1);
-                menu.setStatus("ACTIVE");
-                menuMapper.insert(menu);
-            }
         }
     }
     /** 代理角色只看自己 agent_no，其余内置角色看全部（功能权限清单 §二）。 */

@@ -92,6 +92,23 @@ class PermsRefreshWithoutReloginTest extends ApiTestSupport {
     }
 
     @Test
+    void me_never_500s_on_a_missing_field() {
+        /*
+         * /me 曾用 Map.of 拼响应 —— 它遇到任何一个 null 值就抛 NPE → 500。
+         * CurrentUser.system() 的 agentNo 就是 null。
+         *
+         * 这条之所以值得单独守：前端的 perms-sync 会**吞掉**这个异常
+         * （一次刷新失败不该把人弹回登录页，那是对的），于是 500 的表现是
+         * 「权限从此不再刷新」，而界面上一点异常都没有。
+         */
+        String token = login(ROLE, "custom.shape", null);
+        JsonNode me = get("/api/auth/me", token).okData();
+        assertThat(me.path("agentNo").isMissingNode()).as("字段要在，哪怕是空串").isFalse();
+        assertThat(me.path("perms").isArray()).as("perms 必须是数组").isTrue();
+        assertThat(me.path("username").asText()).isNotBlank();
+    }
+
+    @Test
     void me_says_not_authenticated_for_a_revoked_session() {
         // 前端按这个字段判「该回登录页了」。返回 200 + authenticated=false
         // 与返回 401 是两条不同的前端分支，必须知道实际走的是哪条。

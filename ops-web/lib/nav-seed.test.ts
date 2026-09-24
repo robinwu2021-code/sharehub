@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { NAV } from "./nav";
 
 /**
- * 菜单真源从 `nav.ts` 迁到 `iam_menu`（V67）——**切换那一刻两边必须逐节点相等**。
+ * 菜单真源从 `nav.ts` 迁到 `iam_menu`（V67 建表灌数，V71 补 section 码）——**切换那一刻两边必须逐节点相等**。
  *
  * <h3>为什么非要有这一条</h3>
  * 迁移里那 127 行 INSERT 是 `backend/scripts/gen-menu-seed.py` 生成的。
@@ -20,12 +20,12 @@ import { NAV } from "./nav";
  * cd ops-web && npx vitest run lib/nav-seed.test.ts   # 看差在哪
  * # 改完 nav.ts 后重新导出并生成，步骤见 gen-menu-seed.py 的文档串
  * ```
- * 注意 V67 已经上过线的话，要新开一个迁移，而不是改 V67 ——
- * 改已执行过的迁移 Flyway 会因校验和不符拒绝启动。
+ * **永远新开一个迁移，不要改已提交的那个** —— 别人的库可能已经跑过它，
+ * 改了 Flyway 会因校验和不符拒绝启动。V71 就是这么来的。
  */
 
 // 相对**仓库根**，不是相对本文件 —— vitest 的 cwd 是 ops-web/
-const MIGRATION = "../backend/sharehub-app/src/main/resources/db/migration/V67__menu_from_nav.sql";
+const MIGRATION = "../backend/sharehub-app/src/main/resources/db/migration/V71__menu_section_perm.sql";
 
 type Row = Record<string, string>;
 
@@ -76,9 +76,12 @@ function rowsFromNav(): Row[] {
   const out: Row[] = [];
   NAV.forEach((s, si) => {
     out.push({
-      menu_no: `M_${s.key}`, parent_no: "NULL", name: s.label, type: "MENU",
+      menu_no: `M_${s.key}`, parent_no: "NULL", name: s.label,
+      // DIR=目录、MENU=可点页面，对齐冻结契约；没有叶子的 section 自己就是一页
+      // 两档：MENU（分组）/ ITEM（叶子），词表由 V68 钉在列注释上
+      type: "MENU",
       path: s.href, icon: s.icon ?? "NULL", group_name: "NULL", sort: String(si + 1),
-      perm: "NULL", phase: String(s.phase ?? 1), ready: "0",
+      perm: s.perm ?? "NULL", phase: String(s.phase ?? 1), ready: "0",
       module: s.module ?? "NULL", modules: j(s.modules), match_paths: j(s.match),
       pin_bottom: s.pinBottom ? "1" : "0", portal_for: j(s.portalFor as string[] | undefined),
     });
