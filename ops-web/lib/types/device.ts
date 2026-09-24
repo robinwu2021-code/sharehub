@@ -96,11 +96,29 @@ export const SLOT_REQUIRED_COMMANDS: readonly CommandType[] = ["LOCK"];
 
 export interface CommandRecord {
   commandId: string;
+  /**
+   * 设备硬件序列号。与 {@link cabinetNo}（业务编号）不是一回事 ——
+   * 跟厂商对日志时对方只认 sn，只有柜机号就得先来回查一次映射。
+   */
+  sn: string | null;
   cabinetNo: string;
   type: CommandType;
   slotIndex: number | null;
   status: "SENT" | "ACKED" | "TIMEOUT" | "FAILED";
+  /**
+   * 下发重试次数。**一次成功和重试三次才成功是两种设备状态**，
+   * 而两者的 status 都是 ACKED —— 只看状态永远看不出后者。
+   */
+  retry: number | null;
   operator: string;
+  /** 触发这条指令的订单（借出/归还）。运维手动下发的为 null。 */
+  orderNo: string | null;
+  /**
+   * 下发时刻 / 设备确认时刻。**只有 createdAt 时，「设备多久才认」这个排障里
+   * 第一个要问的数答不出来** —— 落库就有这两列，出参也一直在给。
+   */
+  sentAt: string | null;
+  confirmedAt: string | null;
   createdAt: string;
 }
 export interface InventoryTransfer {

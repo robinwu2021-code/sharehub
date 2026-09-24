@@ -98,11 +98,31 @@ export const cabinetMonitors: CabinetMonitor[] = Array.from({ length: 24 }, (_, 
 });
 export const commandRecords: CommandRecord[] = Array.from({ length: 30 }, (_, i) => {
   const type = p(["EJECT", "LOCK", "REBOOT", "LOCATE"] as const, i);
+  const status = p(["ACKED", "ACKED", "SENT", "TIMEOUT", "FAILED"] as const, i);
+  const createdAt = iso(i * 900_000);
+  /*
+   * 排障四件套的种子值要**彼此自洽**，否则新列看着有数、实际互相矛盾：
+   *   · 只有 ACKED 才有 confirmedAt（设备认了才叫确认）；
+   *   · TIMEOUT/FAILED 的 retry 必然 >1（重试完才判定失败），ACKED 多为 1；
+   *   · SENT 还在途：发了、没确认；
+   *   · EJECT 是订单驱动（借出/归还），REBOOT/LOCATE 是运维手动下发 → orderNo 为 null。
+   */
+  const acked = status === "ACKED";
+  const failedish = status === "TIMEOUT" || status === "FAILED";
   return {
-    commandId: `CMD${880000 + i}`, cabinetNo: cabNo(i), type,
+    commandId: `CMD${880000 + i}`,
+    // 与同一台机柜的 sn 对上 —— 跟厂商对日志时对方只认 sn
+    sn: p(cabinets, i).sn,
+    cabinetNo: cabNo(i), type,
     slotIndex: type === "EJECT" || type === "LOCK" ? (i % 8) + 1 : null,
-    status: p(["ACKED", "ACKED", "SENT", "TIMEOUT", "FAILED"] as const, i),
-    operator: p(OPERATORS, i), createdAt: iso(i * 900_000),
+    status,
+    retry: failedish ? 2 + (i % 3) : 1,
+    operator: p(OPERATORS, i),
+    orderNo: type === "EJECT" ? `ORD${20260900 + i}` : null,
+    // 下发比创建晚几秒（排队），确认再晚几秒（设备往返）
+    sentAt: iso(i * 900_000 - 3_000),
+    confirmedAt: acked ? iso(i * 900_000 - 3_000 - (2_000 + (i % 7) * 1_500)) : null,
+    createdAt,
   };
 });
 /**
@@ -440,10 +460,15 @@ export function recordCommand(cabinetNo: string, type: string, params?: Record<s
     throw new CommandError(`仓位号应在 1~${cab.slotTotal} 之间（${cabinetNo} 共 ${cab.slotTotal} 仓）`);
   }
   const operator = typeof params?.operator === "string" && params.operator.trim() ? params.operator.trim() : "admin";
+  const now = new Date().toISOString();
   const rec: CommandRecord = {
     commandId: nextNo("CMD", commandRecords, 880000, "commandId"),
+    sn: cab.sn,
     cabinetNo, type: t, slotIndex, status: "SENT", operator,
-    createdAt: new Date().toISOString(),
+    // 刚下发：发了、设备还没认，重试 1 次。**confirmedAt 必须是 null 而不是 now** ——
+    // 填上当前时间等于谎称设备秒确认，而这条指令可能永远不会被确认。
+    retry: 1, orderNo: null, sentAt: now, confirmedAt: null,
+    createdAt: now,
   };
   commandRecords.unshift(rec);
   return rec;

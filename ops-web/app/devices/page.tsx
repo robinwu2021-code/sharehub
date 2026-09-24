@@ -789,12 +789,60 @@ const monCols: Column<CabinetMonitor>[] = [
   { header: "温度", cell: (r) => <span className="tabular-nums">{Math.round(r.temp)}°C</span> },
   { header: "故障数", cell: (r) => r.faultCount > 0 ? <Badge tone="danger">{Math.round(r.faultCount)}</Badge> : <span className="tabular-nums text-muted-foreground">0</span> },
 ];
+/**
+ * 下发 → 设备确认的往返耗时。**排障第一个要问的数**，而只有 createdAt 时答不出来
+ * （创建、下发、确认是三个时刻，此前界面只有第一个）。
+ * 未确认一律返回 null 而不是 0 —— 0 会被读成「秒确认」。
+ */
+const ackCost = (r: CommandRecord) => {
+  if (!r.sentAt || !r.confirmedAt) return null;
+  const ms = Date.parse(r.confirmedAt) - Date.parse(r.sentAt);
+  if (!Number.isFinite(ms) || ms < 0) return null;
+  return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
+};
+
 const cmdCols: Column<CommandRecord>[] = [
   { header: "指令ID", cell: (r) => <span className="font-medium">{r.commandId}</span> },
-  { header: "柜机号", cell: (r) => r.cabinetNo },
+  {
+    header: "柜机号",
+    cell: (r) => (
+      <>
+        {r.cabinetNo}
+        {/* sn 跟在下面：跟厂商对日志时对方只认 sn，只有柜机号就得先回查一次映射 */}
+        {r.sn && <div className="truncate txt-caption text-muted-foreground">{r.sn}</div>}
+      </>
+    ),
+  },
   { header: "类型", cell: (r) => <Badge tone="outline">{CMD_TYPE[r.type]}</Badge> },
   { header: "仓位", cell: (r) => <span className="tabular-nums">{r.slotIndex ?? "-"}</span> },
-  { header: "状态", cell: (r) => <StatusBadge map={CMD_STATUS} value={r.status} /> },
+  {
+    header: "状态",
+    cell: (r) => (
+      <>
+        <StatusBadge map={CMD_STATUS} value={r.status} />
+        {/* **只在 >1 时显示**：给每行挂「重试 1 次」是纯噪音，而「重试 4 次」正是要看的。
+            一次成功与重试三次才成功都是 ACKED，只看状态永远看不出后者。 */}
+        {(r.retry ?? 1) > 1 && <Badge tone="warning" className="ml-1">重试 {r.retry}</Badge>}
+      </>
+    ),
+  },
+  {
+    header: "关联订单",
+    cell: (r) => (r.orderNo
+      ? <span className="tabular-nums">{r.orderNo}</span>
+      /* 运维手动下发的没有订单。用「手动」而不是「-」：后者读起来像数据缺失 */
+      : <span className="text-muted-foreground">手动</span>),
+  },
+  {
+    header: "确认耗时",
+    className: "text-right",
+    cell: (r) => {
+      const c = ackCost(r);
+      return c
+        ? <span className="tabular-nums">{c}</span>
+        : <span className="text-muted-foreground">未确认</span>;
+    },
+  },
   { header: "操作人", cell: (r) => <span className="text-muted-foreground">{r.operator}</span> },
   { header: "时间", cell: (r) => <span className="text-muted-foreground">{fmtTime(r.createdAt)}</span> },
 ];
@@ -909,10 +957,17 @@ const EXPORTS: Record<string, { name: string; run: (rows: Row[]) => void }> = {
     run: (rows) => exportCsv<CommandRecord>("远程指令记录", [
       { header: "指令ID", value: (r) => r.commandId },
       { header: "柜机号", value: (r) => r.cabinetNo },
+      // 导出跟着表格一起补：表上有、导出没有的话，拿导出去跟厂商对日志时
+      // 恰好缺的就是对方唯一认的那列（sn）与「发了几次」。
+      { header: "设备SN", value: (r) => r.sn },
       { header: "类型", value: (r) => CMD_TYPE[r.type] },
       { header: "仓位", value: (r) => r.slotIndex },
       { header: "状态", value: (r) => CMD_STATUS[r.status].label },
+      { header: "重试次数", value: (r) => r.retry },
+      { header: "关联订单", value: (r) => r.orderNo },
       { header: "操作人", value: (r) => r.operator },
+      { header: "下发时间", value: (r) => r.sentAt },
+      { header: "确认时间", value: (r) => r.confirmedAt },
       { header: "时间", value: (r) => r.createdAt },
     ], rows as CommandRecord[]),
   },

@@ -22,11 +22,6 @@ B GET /api/ops/alarms/codes AlarmCode 后端有前端无:messageEn
 B GET /api/ops/alarms/records AlarmRecord 后端有前端无:agentNo
 B GET /api/ops/alarms/records AlarmRecord 后端有前端无:dedupKey
 B GET /api/ops/alarms/records AlarmRecord 后端有前端无:source
-B GET /api/ops/command-records CommandRecord 后端有前端无:confirmedAt
-B GET /api/ops/command-records CommandRecord 后端有前端无:orderNo
-B GET /api/ops/command-records CommandRecord 后端有前端无:retry
-B GET /api/ops/command-records CommandRecord 后端有前端无:sentAt
-B GET /api/ops/command-records CommandRecord 后端有前端无:sn
 B GET /api/ops/inspection-plans InspectionPlan 后端有前端无:cron
 B GET /api/ops/ota-rollouts OtaRolloutRow 后端有前端无:releaseNo
 B GET /api/ops/ota-rollouts OtaRolloutRow 后端有前端无:scope
