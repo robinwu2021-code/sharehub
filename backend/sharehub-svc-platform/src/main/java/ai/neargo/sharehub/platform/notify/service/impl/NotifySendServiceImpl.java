@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.platform.notify.service.impl;
 
+import ai.neargo.sharehub.platform.notify.NotifyLogStatus;
 import ai.neargo.sharehub.platform.notify.dto.NotifyDtos.NotifyLogVO;
 import ai.neargo.sharehub.platform.notify.dto.NotifyDtos.SendReq;
 import ai.neargo.sharehub.platform.notify.dto.NotifyDtos.SendResult;
@@ -51,15 +52,15 @@ public class NotifySendServiceImpl implements NotifySendService {
 
         // —— 发送前必查黑名单（唯一正门，见 NotifySendService 类注释）——
         if (blacklistService.isBlocked(req.target(), channel)) {
-            e.setStatus("FAILED");
+            e.setStatus(NotifyLogStatus.FAILED.name());
             e.setFailReason("BLACKLISTED");
             e.setCost(java.math.BigDecimal.ZERO); // 未投递 → 不计费
             NotifyLogVO vo = logService.append(e);
-            return new SendResult(vo.logNo(), "FAILED", true, "BLACKLISTED");
+            return new SendResult(vo.logNo(), NotifyLogStatus.FAILED.name(), true, "BLACKLISTED");
         }
 
         // TODO(接入层)：调用渠道商投递，按其回执回填 status/failReason/cost。
-        e.setStatus("SENT");
+        e.setStatus(NotifyLogStatus.SENT.name());
         e.setSentAt(LocalDateTime.now().format(TS));
         e.setCost(req.cost());
         NotifyLogVO vo = logService.append(e);

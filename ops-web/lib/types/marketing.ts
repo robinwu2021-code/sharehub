@@ -164,12 +164,17 @@ export interface Referral {
   createdAt: string;
   currency: string;
 }
+/**
+ * 广告位占用与否。具名的理由同 `NotifyTemplateStatus`：内联联合进不了两端比对，
+ * 而这一列的建表默认值曾是两端都不认识的 `ACTIVE`（V65 已改）。
+ */
+export type AdSlotStatus = "IDLE" | "OCCUPIED";
 export interface AdSlot {
   slotNo: string;
   cabinetNo: string;
   position: "SCREEN" | "BODY";
   size: string;
-  status: "IDLE" | "OCCUPIED";
+  status: AdSlotStatus;
   createdAt: string;
 }
 export interface AdCampaign {

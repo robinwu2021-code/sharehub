@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.platform.notify.service.impl;
 
+import ai.neargo.sharehub.platform.notify.NotifyTemplateStatus;
+import ai.neargo.sharehub.platform.notify.NotifyLogStatus;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.platform.notify.service.NotifyLogService;
 import ai.neargo.sharehub.platform.notify.entity.NotifyLog;
@@ -65,7 +67,7 @@ public class NotifyTemplateServiceImpl extends AbstractCrudService<NotifyTemplat
 
     @Override
     protected void beforeCreate(NotifyTemplate e) {
-        if (e.getStatus() == null || e.getStatus().isBlank()) e.setStatus("ENABLED");
+        if (e.getStatus() == null || e.getStatus().isBlank()) e.setStatus(NotifyTemplateStatus.ENABLED.name());
         if (e.getLang() == null || e.getLang().isBlank()) e.setLang("en");
     }
 
@@ -128,7 +130,7 @@ public class NotifyTemplateServiceImpl extends AbstractCrudService<NotifyTemplat
         log.setTemplateNo(templateNo);
         log.setTarget(req.target());          // append() 会做脱敏，明文不入库
         log.setScene("TEST_SEND");
-        log.setStatus("SENT");
+        log.setStatus(NotifyLogStatus.SENT.name());
         log.setIdempotencyKey(req.idempotencyKey());
         return notifyLogService.append(log);
     }

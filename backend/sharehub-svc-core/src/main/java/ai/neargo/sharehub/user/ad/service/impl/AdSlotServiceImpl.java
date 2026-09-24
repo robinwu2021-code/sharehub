@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.user.ad.service.impl;
 
+import ai.neargo.sharehub.user.ad.AdSlotStatus;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.common.crud.AbstractCrudService;
 import ai.neargo.sharehub.user.ad.dto.AdDtos.AdSlotVO;
@@ -52,7 +53,7 @@ public class AdSlotServiceImpl extends AbstractCrudService<AdSlot, AdSlotVO> imp
 
     @Override
     protected void beforeCreate(AdSlot e) {
-        if (e.getStatus() == null || e.getStatus().isBlank()) e.setStatus("IDLE");
+        if (e.getStatus() == null || e.getStatus().isBlank()) e.setStatus(AdSlotStatus.IDLE.name());
         if (e.getPosition() == null || e.getPosition().isBlank()) e.setPosition("SCREEN");
     }
 

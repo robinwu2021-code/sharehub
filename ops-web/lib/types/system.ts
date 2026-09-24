@@ -60,12 +60,19 @@ export interface VendorProbeResult {
 }
 
 // —— 系统 · 待建功能补全（platform 域）——
+/**
+ * 模板启用与否。**具名而不是写在 interface 里的内联联合**：
+ * 两端同名词表比对（后端 StatusVocabularyAcrossEndsTest）只认具名 `export type`，
+ * 内联的联合它一个都发现不了 —— 而这一列正好出过事：
+ * 建表默认值给的是 `ACTIVE`，两端都不认识（V65 已改）。
+ */
+export type NotifyTemplateStatus = "ENABLED" | "DISABLED";
 export interface NotifyTemplate {
   templateNo: string;
   name: string;
   channel: "SMS" | "EMAIL" | "PUSH" | "WHATSAPP";
   lang: "ar" | "en";
-  status: "ENABLED" | "DISABLED";
+  status: NotifyTemplateStatus;
   // 下面三个字段后端实体（platform/notify/entity/NotifyTemplate）早就有，前端此前没接——
   // 没有 content 就没法做「预览」，模板页只能改元数据，改不了真正会发出去的文案。
   scene: string; // 场景键：OTP / RENT_OK / RETURN_OK …
@@ -163,6 +170,8 @@ export interface PaymentChannel {
 // —— §9 发送记录（系统域 · 阶段 2，对标简电云「短信记录」）——
 // 我们更清晰：全渠道（短信/邮件/Push/WhatsApp）而非仅短信，且每条带计费——OTP 是真金白银。
 export type NotifyLogChannel = "SMS" | "EMAIL" | "PUSH" | "WHATSAPP";
+/** 发出去了没有。`FAILED` 含「被黑名单拦下」——「没发出去」与「从没尝试过」要分得开。 */
+export type NotifyLogStatus = "SENT" | "FAILED";
 export interface NotifyLog {
   logNo: string;
   channel: NotifyLogChannel;
@@ -170,7 +179,7 @@ export interface NotifyLog {
   target: string; // 目标（手机/邮箱/push token），**已脱敏中间位**，前端不承载完整联系方式
   scene: string; // 场景：OTP / 订单完成 / 告警 …
   sentAt: string;
-  status: "SENT" | "FAILED";
+  status: NotifyLogStatus;
   failReason: string | null;
   cost: number; // 单条计费
   currency: string; // 计费币种（AED）

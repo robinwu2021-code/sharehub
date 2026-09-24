@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.platform.notify.service.impl;
 
+import ai.neargo.sharehub.platform.notify.NotifyLogStatus;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.platform.notify.NotifyTargets;
@@ -76,9 +77,9 @@ public class NotifyLogServiceImpl implements NotifyLogService {
         LocalDateTime dayStart = LocalDate.now().atStartOfDay();
 
         long sent = mapper.selectCount(new QueryWrapper<NotifyLog>()
-                .ge("created_at", dayStart).eq("status", "SENT"));
+                .ge("created_at", dayStart).eq("status", NotifyLogStatus.SENT.name()));
         long failed = mapper.selectCount(new QueryWrapper<NotifyLog>()
-                .ge("created_at", dayStart).eq("status", "FAILED"));
+                .ge("created_at", dayStart).eq("status", NotifyLogStatus.FAILED.name()));
 
         long total = sent + failed;
         BigDecimal failRate = total == 0 ? BigDecimal.ZERO
@@ -101,7 +102,7 @@ public class NotifyLogServiceImpl implements NotifyLogService {
         if (e.getTenantId() == null) e.setTenantId(TENANT_MAIN);
         if (e.getLogNo() == null || e.getLogNo().isBlank()) e.setLogNo(nextLogNo());
         e.setTarget(NotifyTargets.maskTarget(e.getTarget())); // 存储即脱敏，明文不入库
-        if (e.getStatus() == null || e.getStatus().isBlank()) e.setStatus("SENT");
+        if (e.getStatus() == null || e.getStatus().isBlank()) e.setStatus(NotifyLogStatus.SENT.name());
         if (e.getCost() == null) e.setCost(BigDecimal.ZERO);
         if (e.getCurrency() == null || e.getCurrency().isBlank()) e.setCurrency("AED");
         if (e.getCreatedAt() == null) e.setCreatedAt(LocalDateTime.now());
@@ -161,7 +162,7 @@ public class NotifyLogServiceImpl implements NotifyLogService {
         e.setCurrency(src.getCurrency());
         e.setSentAt(LocalDateTime.now().toString().replace('T', ' '));
         e.setCreatedAt(LocalDateTime.now());
-        e.setStatus("SENT");
+        e.setStatus(NotifyLogStatus.SENT.name());
         e.setIdempotencyKey(idempotencyKey);
         e.setResendOf(logNo);
         try {

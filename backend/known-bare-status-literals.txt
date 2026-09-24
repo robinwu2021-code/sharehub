@@ -3,8 +3,8 @@
 # 由 BareStatusLiteralRatchetTest 执行。新增一条 → 测试红。
 #
 # 【为什么要盯】
-# 业务状态的合法取值在三处各写一遍、互不相认：建表 DDL 注释（55 套词表）、
-# 领域模型文档（12 个对象）、Java 代码里的裸字符串（业务状态 enum：0 个）。
+# 业务状态的合法取值在三处各写一遍、互不相认：建表 DDL 注释、
+# 领域模型文档（12 个对象）、Java 代码里的裸字符串。
 # 没有任何一处对另外两处有约束力，于是分叉是必然的，而且**没有症状**：
 #
 #   · ACK / ACKED    —— AlarmServiceImpl 查 status IN ('OPEN','ACK')，但 ACK 是事件名、
@@ -12,6 +12,14 @@
 #   · CANCELLED / CANCELED —— 两种拼法都在 DDL 里，代码只用前者。
 #   · RECLAIM / REVOKE     —— 领域模型写 RECLAIM，DDL 与代码白名单都是 REVOKE，
 #                        RECLAIM 从未被任何代码写入过。已修文档。
+#
+# 【两条配套的卡口，各管一段】
+#   · 本台账管「Java 侧还剩多少裸字符串」；
+#   · DDL 侧那一段由 known-undocumented-status-columns.txt 管：
+#     没有列注释的状态列 = 词表没有裁定依据，写错了也没人能说它错（V65 修的两条就是这么来的）。
+#   · 两端是否一致由 StatusVocabularyAcrossEndsTest 比 —— **它只认具名类型**，
+#     所以收敛时顺手把运营端内联在 interface 里的联合提成 `export type`，让它进入覆盖。
+#
 #
 # 【条目格式】 类名#字段=字面量
 #
@@ -84,11 +92,6 @@ IamSeeder#status=ACTIVE
 IamSeeder#type=MENU
 MarketServiceImpl#status=PLANNED
 MenuService#status=ACTIVE
-NotifyLogServiceImpl#status=SENT
-NotifySendServiceImpl#status=FAILED
-NotifySendServiceImpl#status=SENT
-NotifyTemplateServiceImpl#status=ENABLED
-NotifyTemplateServiceImpl#status=SENT
 OpenApiAppServiceImpl#status=ENABLED
 ProblemServiceImpl#status=ENABLED
 ProblemServiceImpl#suggestedAction=SELF_SERVICE
@@ -113,7 +116,6 @@ RentOrderServiceImpl#status=IN_USE
 
 # ── user（19 条）──
 AdCampaignServiceImpl#status=DRAFT
-AdSlotServiceImpl#status=IDLE
 CampaignServiceImpl#status=DRAFT
 ConsumerAuthService#status=ACTIVE
 CouponTplServiceImpl#status=ACTIVE

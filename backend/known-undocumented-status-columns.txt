@@ -1,0 +1,50 @@
+# 没有词表注释的状态列台账 —— **只准变短，不准变长**
+#
+# 由 DdlStatusVocabularyCommentTest 执行。新增一列 → 测试红。
+#
+# 【为什么这一栏空着是有代价的】
+# 本仓库把 **DDL 列注释当作词表的裁定依据**：两端对不上时，以它为准改另一边
+# （见 StatusVocabularyAcrossEndsTest 的失败提示、V64 与 V65 的迁移说明）。
+# 一列没有注释，就没有裁定依据 —— 于是任何一处写进去的值都无从证伪。
+#
+# 这不是推想，V65 修的两条就是这么来的：
+#
+#   · notify_template.status  建表 DEFAULT 'ACTIVE'，而服务写 ENABLED、
+#                             运营端只认 ENABLED/DISABLED；
+#   · ad_slot.status          建表 DEFAULT 'ACTIVE'，而服务写 IDLE、
+#                             运营端只认 IDLE/OCCUPIED。
+#
+# 两列都没有注释，于是那个 ACTIVE 躺了很久没人能说它不对。走服务建的行没事，
+# **所有不走服务的插入路径**（种子 SQL、数据导入、手工补行）落进去的都是
+# 一个两端都不认识的值：徽标映射不上、按状态筛一条都查不到，且不报错。
+#
+# 【怎么变短】
+# 查清这一列真实的取值（后端写进去的 + 运营端联合类型 + 领域模型文档，打架的当场裁定），
+# 加一条 `ALTER TABLE x MODIFY COLUMN status VARCHAR(16) NOT NULL DEFAULT '…' COMMENT 'A/B/C'`
+# 的迁移（参考 V65），**顺手核对默认值是否在词表里** —— 那正是上面两条被抓出来的方式。
+#
+# ⚠️ MODIFY COLUMN 要把类型 / 可空 / 默认值**原样重写一遍**，漏写等于悄悄改掉它们。
+#    动手前先 `SELECT column_type, is_nullable, column_default FROM information_schema.columns`
+#    抄下来，别照着建表 DDL 猜 —— 中间可能有别的迁移改过。
+#
+# 【判据为什么查库而不是查迁移脚本】
+# 迁移是「建了什么」，库是「现在有什么」。注释可以由后来的 ALTER 补上
+# （pay_channel.mode 就是这样，建表时没有、后来补了），只看建表语句会把它误判成缺注释。
+#
+# 【条目格式】 表名.列名
+ad_campaign.status
+ad_placement.status
+agt_account.status
+coupon_tpl.status
+dict_item.status
+gw_vendor_device_type.status
+iam_menu.status
+loc_location.status
+mbr_benefit.status
+md_device_type.status
+price_plan.status
+price_plan_item.status
+share_record.mode
+usr_user.status
+usr_membership.status
+wo_inspection_plan.status
