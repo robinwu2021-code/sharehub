@@ -246,11 +246,22 @@ def parse_controller(path, records):
         # 全 app 有 4 处这种写法（agents / cabinets / sites / locations 的新建+编辑合一）。
         subs = re.findall(r'"([^"]*)"', ann.get(am.group(1), '') or '') or ['']
 
+        # 一个 @PreAuthorize 里可能挂**多个**码：
+        #   @PreAuthorize("@perm.can('a') or @perm.can('b')")
+        # 只取第一个的话，契约会少记一半 —— 而 contract.json 正是五个对齐检查器
+        # 与 API 文档的输入。实测 ReportController 的三码端点就一直只记着第一个，
+        # 于是那个端点在文档和卡口眼里的可访问面是错的，且没有任何症状。
+        #
+        # `perm` 保持「第一个码」不变（老的消费者不受影响），
+        # 另出 `perms` 给需要判断「到底哪些码放行」的检查器用。
         perm = None
+        perms = []
         pre = ann.get('PreAuthorize')
         if pre:
-            pc = re.search(r"'([^']+)'", pre)
-            perm = pc.group(1) if pc else pre.strip().strip('"')
+            perms = re.findall(r"'([^']+)'", pre)
+            perm = perms[0] if perms else pre.strip().strip('"')
+            if not perms:
+                perms = [perm]
 
         # 注解读完，i 指向签名开头：[修饰符] 返回类型 方法名(
         sig = src[i:src.find('(', i)] if src.find('(', i) > 0 else ''
@@ -296,7 +307,7 @@ def parse_controller(path, records):
             full = (cls_prefix + sub) or cls_prefix or '/'
             full = re.sub(r'//+', '/', full)
             endpoints.append(OrderedDict([
-                ('verb', verb), ('path', full), ('perm', perm),
+                ('verb', verb), ('path', full), ('perm', perm), ('perms', perms),
                 ('handler', '%s#%s' % (os.path.basename(path)[:-5], mname)),
                 ('summary', first_sentence(jd)),
                 ('params', params), ('bodyType', body_type),

@@ -4,6 +4,9 @@
    "verb": "GET",
    "path": "/api/agent/accounts",
    "perm": "agent:account:manage",
+   "perms": [
+    "agent:account:manage"
+   ],
    "handler": "AgentExtController#accounts",
    "summary": "",
    "params": [
@@ -82,6 +85,9 @@
    "verb": "POST",
    "path": "/api/agent/accounts",
    "perm": "agent:account:manage",
+   "perms": [
+    "agent:account:manage"
+   ],
    "handler": "AgentExtController#createAccount",
    "summary": "",
    "params": [],
@@ -129,6 +135,9 @@
    "verb": "GET",
    "path": "/api/agent/accounts/{accountNo}",
    "perm": "agent:account:manage",
+   "perms": [
+    "agent:account:manage"
+   ],
    "handler": "AgentExtController#account",
    "summary": "",
    "params": [
@@ -183,6 +192,9 @@
    "verb": "POST",
    "path": "/api/agent/accounts/{accountNo}",
    "perm": "agent:account:manage",
+   "perms": [
+    "agent:account:manage"
+   ],
    "handler": "AgentExtController#updateAccount",
    "summary": "",
    "params": [
@@ -237,6 +249,9 @@
    "verb": "GET",
    "path": "/api/agent/agents",
    "perm": "agent:agent:read",
+   "perms": [
+    "agent:agent:read"
+   ],
    "handler": "AgentController#agents",
    "summary": "agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +",
    "params": [
@@ -307,6 +322,9 @@
    "verb": "POST",
    "path": "/api/agent/agents",
    "perm": "agent:agent:update",
+   "perms": [
+    "agent:agent:update"
+   ],
    "handler": "AgentController#save",
    "summary": "",
    "params": [
@@ -402,6 +420,9 @@
    "verb": "POST",
    "path": "/api/agent/agents/{agentNo}",
    "perm": "agent:agent:update",
+   "perms": [
+    "agent:agent:update"
+   ],
    "handler": "AgentController#save",
    "summary": "",
    "params": [
@@ -497,6 +518,9 @@
    "verb": "POST",
    "path": "/api/agent/agents/{no}/archive",
    "perm": "agent:agent:update",
+   "perms": [
+    "agent:agent:update"
+   ],
    "handler": "AgentController#archiveAgent",
    "summary": "归档Agent。",
    "params": [
@@ -518,6 +542,9 @@
    "verb": "POST",
    "path": "/api/agent/agents/{no}/unarchive",
    "perm": "agent:agent:update",
+   "perms": [
+    "agent:agent:update"
+   ],
    "handler": "AgentController#unarchiveAgent",
    "summary": "取消归档Agent：清空时间戳，回到默认列表。",
    "params": [
@@ -539,6 +566,9 @@
    "verb": "GET",
    "path": "/api/agent/applies",
    "perm": "agent:apply:read",
+   "perms": [
+    "agent:apply:read"
+   ],
    "handler": "AgentApplyController#applies",
    "summary": "运营端待办队列与历史检索。",
    "params": [
@@ -667,6 +697,9 @@
    "verb": "POST",
    "path": "/api/agent/applies",
    "perm": "agent:apply:create",
+   "perms": [
+    "agent:apply:create"
+   ],
    "handler": "AgentApplyController#opsCreateApply",
    "summary": "**运营代建**：替线下签约的商家录入（`source = OPS_CREATED`）。",
    "params": [],
@@ -727,6 +760,9 @@
    "verb": "POST",
    "path": "/api/agent/applies/{applyNo}/accept",
    "perm": "agent:apply:approve",
+   "perms": [
+    "agent:apply:approve"
+   ],
    "handler": "AgentApplyController#accept",
    "summary": "受理：SUBMITTED → REVIEWING。",
    "params": [
@@ -761,6 +797,9 @@
    "verb": "POST",
    "path": "/api/agent/applies/{applyNo}/audit",
    "perm": "agent:apply:approve",
+   "perms": [
+    "agent:apply:approve"
+   ],
    "handler": "AgentApplyController#audit",
    "summary": "审核：通过 / 驳回。",
    "params": [
@@ -812,6 +851,7 @@
    "verb": "POST",
    "path": "/api/agent/apply",
    "perm": null,
+   "perms": [],
    "handler": "AgentApplyController#selfServiceApply",
    "summary": "**自助注册**：商家自己提交（免鉴权 + 手机号 OTP）。",
    "params": [],
@@ -872,6 +912,7 @@
    "verb": "GET",
    "path": "/api/agent/apply/mine",
    "perm": null,
+   "perms": [],
    "handler": "AgentApplyController#mine",
    "summary": "申请人查进度与驳回原因（免鉴权，凭手机号 + OTP）。",
    "params": [
@@ -928,6 +969,7 @@
    "verb": "POST",
    "path": "/api/agent/apply/otp",
    "perm": null,
+   "perms": [],
    "handler": "AgentApplyController#applyOtp",
    "summary": "提交入驻申请 —— **自助与代建共用同一个端点**。",
    "params": [],
@@ -942,6 +984,9 @@
    "verb": "GET",
    "path": "/api/agent/assignable-assets",
    "perm": "agent:scope:assign",
+   "perms": [
+    "agent:scope:assign"
+   ],
    "handler": "AgentExtController#assignableAssets",
    "summary": "可划拨资产候选池（划拨抽屉的选项源）。",
    "params": [
@@ -981,6 +1026,9 @@
    "verb": "GET",
    "path": "/api/agent/assignments",
    "perm": "agent:scope:assign",
+   "perms": [
+    "agent:scope:assign"
+   ],
    "handler": "AgentExtController#assignments",
    "summary": "归属**现状**（每个代理手上有多少台柜/多少个站）。",
    "params": [
@@ -1038,6 +1086,9 @@
    "verb": "POST",
    "path": "/api/agent/assignments",
    "perm": "agent:scope:assign",
+   "perms": [
+    "agent:scope:assign"
+   ],
    "handler": "AgentExtController#assign",
    "summary": "划拨 / 收回，留痕到 `agt_assignment`（append）。",
    "params": [],
@@ -1102,6 +1153,9 @@
    "verb": "POST",
    "path": "/api/agent/assignments/reclaim",
    "perm": "agent:scope:assign",
+   "perms": [
+    "agent:scope:assign"
+   ],
    "handler": "AgentExtController#reclaim",
    "summary": "批量回收到平台直营。",
    "params": [],
@@ -1129,6 +1183,9 @@
    "verb": "GET",
    "path": "/api/agent/commissions",
    "perm": "agent:share:config",
+   "perms": [
+    "agent:share:config"
+   ],
    "handler": "AgentExtController#commissions",
    "summary": "",
    "params": [
@@ -1221,6 +1278,9 @@
    "verb": "POST",
    "path": "/api/agent/commissions",
    "perm": "agent:share:config",
+   "perms": [
+    "agent:share:config"
+   ],
    "handler": "AgentExtController#createCommission",
    "summary": "",
    "params": [],
@@ -1276,6 +1336,9 @@
    "verb": "GET",
    "path": "/api/agent/commissions/{ruleNo}",
    "perm": "agent:share:config",
+   "perms": [
+    "agent:share:config"
+   ],
    "handler": "AgentExtController#commission",
    "summary": "",
    "params": [
@@ -1338,6 +1401,9 @@
    "verb": "POST",
    "path": "/api/agent/commissions/{ruleNo}",
    "perm": "agent:share:config",
+   "perms": [
+    "agent:share:config"
+   ],
    "handler": "AgentExtController#updateCommission",
    "summary": "",
    "params": [
@@ -1400,6 +1466,9 @@
    "verb": "GET",
    "path": "/api/agent/performance",
    "perm": "agent:performance:read",
+   "perms": [
+    "agent:performance:read"
+   ],
    "handler": "AgentExtController#performance",
    "summary": "读模型：`agt_agent ⋈ ord_order`/`dev_cabinet` 聚合，不落表。",
    "params": [
@@ -1474,6 +1543,7 @@
    "verb": "POST",
    "path": "/api/auth/login",
    "perm": null,
+   "perms": [],
    "handler": "AuthController#login",
    "summary": "登录出参。",
    "params": [],
@@ -1572,6 +1642,7 @@
    "verb": "POST",
    "path": "/api/auth/logout",
    "perm": null,
+   "perms": [],
    "handler": "AuthController#logout",
    "summary": "",
    "params": [
@@ -1593,6 +1664,7 @@
    "verb": "GET",
    "path": "/api/auth/me",
    "perm": null,
+   "perms": [],
    "handler": "AuthController#me",
    "summary": "当前会话的身份与**当场重算的权限码**。",
    "params": [],
@@ -1607,6 +1679,7 @@
    "verb": "GET",
    "path": "/api/auth/menus",
    "perm": null,
+   "perms": [],
    "handler": "AuthController#menus",
    "summary": "当前登录人可见菜单树（动态，随权限增减）。",
    "params": [],
@@ -1854,6 +1927,7 @@
    "verb": "GET",
    "path": "/api/auth/operators",
    "perm": null,
+   "perms": [],
    "handler": "AuthController#operators",
    "summary": "我的运营主体列表（必要功能清单 ⑤ / ADR-030 §2.2）。",
    "params": [],
@@ -1897,6 +1971,7 @@
    "verb": "POST",
    "path": "/api/auth/operators/{agentNo}/switch",
    "perm": null,
+   "perms": [],
    "handler": "AuthController#switchOperator",
    "summary": "切换当前运营主体：**换发 token**，而不是改会话里的一个字段。",
    "params": [
@@ -1983,6 +2058,7 @@
    "verb": "POST",
    "path": "/api/auth/otp",
    "perm": null,
+   "perms": [],
    "handler": "AuthController#loginOtp",
    "summary": "发送代理端登录验证码（匿名）。",
    "params": [],
@@ -1997,6 +2073,7 @@
    "verb": "GET",
    "path": "/api/auth/permissions",
    "perm": null,
+   "perms": [],
    "handler": "AuthController#permissions",
    "summary": "当前登录人权限码集合（前端 can() 用）。",
    "params": [],
@@ -2011,6 +2088,9 @@
    "verb": "GET",
    "path": "/api/ops/ad-slots",
    "perm": "marketing:ad:read",
+   "perms": [
+    "marketing:ad:read"
+   ],
    "handler": "MarketingController#adSlots",
    "summary": "",
    "params": [
@@ -2087,6 +2167,9 @@
    "verb": "POST",
    "path": "/api/ops/ad-slots",
    "perm": "marketing:ad:update",
+   "perms": [
+    "marketing:ad:update"
+   ],
    "handler": "MarketingController#createAdSlot",
    "summary": "",
    "params": [],
@@ -2126,6 +2209,9 @@
    "verb": "POST",
    "path": "/api/ops/ad-slots/{slotNo}",
    "perm": "marketing:ad:update",
+   "perms": [
+    "marketing:ad:update"
+   ],
    "handler": "MarketingController#updateAdSlot",
    "summary": "",
    "params": [
@@ -2172,6 +2258,9 @@
    "verb": "POST",
    "path": "/api/ops/alarms/auto-work-orders",
    "perm": "workorder:alarm:update",
+   "perms": [
+    "workorder:alarm:update"
+   ],
    "handler": "AlarmController#autoRaiseWorkOrders",
    "summary": "未处理告警批量自动开单。",
    "params": [],
@@ -2186,6 +2275,9 @@
    "verb": "GET",
    "path": "/api/ops/alarms/codes",
    "perm": "workorder:wo:read",
+   "perms": [
+    "workorder:wo:read"
+   ],
    "handler": "AlarmController#codes",
    "summary": "",
    "params": [
@@ -2264,6 +2356,9 @@
    "verb": "POST",
    "path": "/api/ops/alarms/codes",
    "perm": "workorder:alarm:config",
+   "perms": [
+    "workorder:alarm:config"
+   ],
    "handler": "AlarmController#createCode",
    "summary": "",
    "params": [],
@@ -2311,6 +2406,9 @@
    "verb": "POST",
    "path": "/api/ops/alarms/codes/{code}",
    "perm": "workorder:alarm:config",
+   "perms": [
+    "workorder:alarm:config"
+   ],
    "handler": "AlarmController#updateCode",
    "summary": "",
    "params": [
@@ -2365,6 +2463,9 @@
    "verb": "POST",
    "path": "/api/ops/alarms/codes/{no}/archive",
    "perm": "workorder:alarm:update",
+   "perms": [
+    "workorder:alarm:update"
+   ],
    "handler": "AlarmController#archiveAlarmCode",
    "summary": "`Map.of` 不接受 null，统一转空串；空串在 CRUD 基类里等价于「不过滤」。",
    "params": [
@@ -2386,6 +2487,9 @@
    "verb": "POST",
    "path": "/api/ops/alarms/codes/{no}/unarchive",
    "perm": "workorder:alarm:update",
+   "perms": [
+    "workorder:alarm:update"
+   ],
    "handler": "AlarmController#unarchiveAlarmCode",
    "summary": "取消归档AlarmCode：清空时间戳，回到默认列表。",
    "params": [
@@ -2407,6 +2511,9 @@
    "verb": "GET",
    "path": "/api/ops/alarms/notices",
    "perm": "workorder:wo:read",
+   "perms": [
+    "workorder:wo:read"
+   ],
    "handler": "AlarmController#notices",
    "summary": "",
    "params": [
@@ -2495,6 +2602,9 @@
    "verb": "POST",
    "path": "/api/ops/alarms/notices/{noticeNo}/resend",
    "perm": "workorder:alarm:update",
+   "perms": [
+    "workorder:alarm:update"
+   ],
    "handler": "AlarmController#resendAlarmNotice",
    "summary": "重发告警通知。",
    "params": [
@@ -2516,6 +2626,9 @@
    "verb": "GET",
    "path": "/api/ops/alarms/records",
    "perm": "workorder:wo:read",
+   "perms": [
+    "workorder:wo:read"
+   ],
    "handler": "AlarmController#records",
    "summary": "",
    "params": [
@@ -2632,6 +2745,9 @@
    "verb": "POST",
    "path": "/api/ops/alarms/records/{alarmNo}/ack",
    "perm": "workorder:wo:read",
+   "perms": [
+    "workorder:wo:read"
+   ],
    "handler": "AlarmController#ack",
    "summary": "确认告警（OPEN → ACKED）。",
    "params": [
@@ -2662,6 +2778,9 @@
    "verb": "POST",
    "path": "/api/ops/alarms/records/{alarmNo}/work-order",
    "perm": "workorder:wo:create",
+   "perms": [
+    "workorder:wo:create"
+   ],
    "handler": "AlarmController#toWorkOrder",
    "summary": "一键转工单，**以 `alarmNo` 为幂等键**（[api/README §3.3]）。",
    "params": [
@@ -2696,6 +2815,9 @@
    "verb": "GET",
    "path": "/api/ops/alarms/rules",
    "perm": "workorder:wo:read",
+   "perms": [
+    "workorder:wo:read"
+   ],
    "handler": "AlarmController#rules",
    "summary": "",
    "params": [
@@ -2794,6 +2916,9 @@
    "verb": "POST",
    "path": "/api/ops/alarms/rules",
    "perm": "workorder:alarm:config",
+   "perms": [
+    "workorder:alarm:config"
+   ],
    "handler": "AlarmController#createRule",
    "summary": "",
    "params": [],
@@ -2849,6 +2974,9 @@
    "verb": "POST",
    "path": "/api/ops/alarms/rules/{no}/archive",
    "perm": "workorder:alarm:update",
+   "perms": [
+    "workorder:alarm:update"
+   ],
    "handler": "AlarmController#archiveAlarmRule",
    "summary": "归档AlarmRule。",
    "params": [
@@ -2870,6 +2998,9 @@
    "verb": "POST",
    "path": "/api/ops/alarms/rules/{no}/unarchive",
    "perm": "workorder:alarm:update",
+   "perms": [
+    "workorder:alarm:update"
+   ],
    "handler": "AlarmController#unarchiveAlarmRule",
    "summary": "取消归档AlarmRule：清空时间戳，回到默认列表。",
    "params": [
@@ -2891,6 +3022,9 @@
    "verb": "POST",
    "path": "/api/ops/alarms/rules/{ruleNo}",
    "perm": "workorder:alarm:config",
+   "perms": [
+    "workorder:alarm:config"
+   ],
    "handler": "AlarmController#updateRule",
    "summary": "",
    "params": [
@@ -2953,6 +3087,9 @@
    "verb": "GET",
    "path": "/api/ops/cabinet-monitor",
    "perm": "device:cabinet:read",
+   "perms": [
+    "device:cabinet:read"
+   ],
    "handler": "DeviceController#cabinetMonitor",
    "summary": "",
    "params": [
@@ -3021,6 +3158,9 @@
    "verb": "GET",
    "path": "/api/ops/cabinets",
    "perm": "device:cabinet:read",
+   "perms": [
+    "device:cabinet:read"
+   ],
    "handler": "OpsController#cabinets",
    "summary": "",
    "params": [
@@ -3127,6 +3267,9 @@
    "verb": "POST",
    "path": "/api/ops/cabinets",
    "perm": "device:cabinet:create",
+   "perms": [
+    "device:cabinet:create"
+   ],
    "handler": "OpsController#saveCabinet",
    "summary": "机柜建档 / 编辑。",
    "params": [
@@ -3148,6 +3291,9 @@
    "verb": "POST",
    "path": "/api/ops/cabinets/import",
    "perm": "device:cabinet:create",
+   "perms": [
+    "device:cabinet:create"
+   ],
    "handler": "OpsController#importCabinets",
    "summary": "批量导入机柜。",
    "params": [],
@@ -3162,6 +3308,9 @@
    "verb": "GET",
    "path": "/api/ops/cabinets/{cabinetNo}",
    "perm": "device:cabinet:read",
+   "perms": [
+    "device:cabinet:read"
+   ],
    "handler": "OpsController#cabinet",
    "summary": "",
    "params": [
@@ -3276,6 +3425,9 @@
    "verb": "POST",
    "path": "/api/ops/cabinets/{cabinetNo}",
    "perm": "device:cabinet:create",
+   "perms": [
+    "device:cabinet:create"
+   ],
    "handler": "OpsController#saveCabinet",
    "summary": "机柜建档 / 编辑。",
    "params": [
@@ -3297,6 +3449,9 @@
    "verb": "POST",
    "path": "/api/ops/cabinets/{cabinetNo}/commands",
    "perm": "device:command:send",
+   "perms": [
+    "device:command:send"
+   ],
    "handler": "OpsController#sendCommand",
    "summary": "",
    "params": [
@@ -3323,6 +3478,9 @@
    "verb": "POST",
    "path": "/api/ops/cabinets/{no}/archive",
    "perm": "device:cabinet:update",
+   "perms": [
+    "device:cabinet:update"
+   ],
    "handler": "OpsController#archiveCabinet",
    "summary": "归档Cabinet。",
    "params": [
@@ -3344,6 +3502,9 @@
    "verb": "POST",
    "path": "/api/ops/cabinets/{no}/unarchive",
    "perm": "device:cabinet:update",
+   "perms": [
+    "device:cabinet:update"
+   ],
    "handler": "OpsController#unarchiveCabinet",
    "summary": "取消归档Cabinet：清空时间戳，回到默认列表。",
    "params": [
@@ -3365,6 +3526,9 @@
    "verb": "GET",
    "path": "/api/ops/command-records",
    "perm": "device:command:send",
+   "perms": [
+    "device:command:send"
+   ],
    "handler": "InventoryController#commandRecords",
    "summary": "",
    "params": [
@@ -3465,6 +3629,9 @@
    "verb": "GET",
    "path": "/api/ops/contracts",
    "perm": "location:contract:read",
+   "perms": [
+    "location:contract:read"
+   ],
    "handler": "OpsController#contracts",
    "summary": "",
    "params": [
@@ -3543,6 +3710,9 @@
    "verb": "POST",
    "path": "/api/ops/contracts",
    "perm": "location:contract:create",
+   "perms": [
+    "location:contract:create"
+   ],
    "handler": "OpsController#createContract",
    "summary": "新建 / 修改进场合同。",
    "params": [],
@@ -3602,6 +3772,9 @@
    "verb": "POST",
    "path": "/api/ops/contracts/{contractNo}",
    "perm": "location:contract:update",
+   "perms": [
+    "location:contract:update"
+   ],
    "handler": "OpsController#updateContract",
    "summary": "",
    "params": [
@@ -3668,6 +3841,9 @@
    "verb": "POST",
    "path": "/api/ops/contracts/{contractNo}/attachments",
    "perm": "location:contract:update",
+   "perms": [
+    "location:contract:update"
+   ],
    "handler": "LocExtController#addContractAttachment",
    "summary": "添加合同附件元数据。",
    "params": [
@@ -3689,6 +3865,9 @@
    "verb": "POST",
    "path": "/api/ops/contracts/{contractNo}/attachments/{attachNo}/remove",
    "perm": "location:contract:update",
+   "perms": [
+    "location:contract:update"
+   ],
    "handler": "LocExtController#removeContractAttachment",
    "summary": "移除合同附件。",
    "params": [
@@ -3716,6 +3895,9 @@
    "verb": "GET",
    "path": "/api/ops/cs/sessions",
    "perm": "cs:session:read",
+   "perms": [
+    "cs:session:read"
+   ],
    "handler": "CsController#sessions",
    "summary": "",
    "params": [
@@ -3780,6 +3962,9 @@
    "verb": "GET",
    "path": "/api/ops/cs/sessions/{sessionNo}/messages",
    "perm": "cs:session:read",
+   "perms": [
+    "cs:session:read"
+   ],
    "handler": "CsController#messages",
    "summary": "",
    "params": [
@@ -3836,6 +4021,9 @@
    "verb": "POST",
    "path": "/api/ops/cs/sessions/{sessionNo}/messages",
    "perm": "cs:session:reply",
+   "perms": [
+    "cs:session:reply"
+   ],
    "handler": "CsController#reply",
    "summary": "客服回复。",
    "params": [
@@ -3895,6 +4083,9 @@
    "verb": "GET",
    "path": "/api/ops/cs/tickets",
    "perm": "cs:ticket:read",
+   "perms": [
+    "cs:ticket:read"
+   ],
    "handler": "CsController#tickets",
    "summary": "",
    "params": [
@@ -3989,6 +4180,9 @@
    "verb": "POST",
    "path": "/api/ops/cs/tickets",
    "perm": "cs:ticket:handle",
+   "perms": [
+    "cs:ticket:handle"
+   ],
    "handler": "CsController#createTicket",
    "summary": "受理 / 更新（状态、处理人、补充描述）。",
    "params": [],
@@ -4085,6 +4279,9 @@
    "verb": "POST",
    "path": "/api/ops/cs/tickets/{ticketNo}",
    "perm": "cs:ticket:update",
+   "perms": [
+    "cs:ticket:update"
+   ],
    "handler": "CsController#updateTicket",
    "summary": "",
    "params": [
@@ -4168,6 +4365,9 @@
    "verb": "POST",
    "path": "/api/ops/cs/tickets/{ticketNo}/refund",
    "perm": "order:refund:apply",
+   "perms": [
+    "order:refund:apply"
+   ],
    "handler": "CsController#toRefund",
    "summary": "出口②：报障 → 转退款申请。",
    "params": [
@@ -4238,6 +4438,9 @@
    "verb": "POST",
    "path": "/api/ops/cs/tickets/{ticketNo}/work-order",
    "perm": "workorder:wo:create",
+   "perms": [
+    "workorder:wo:create"
+   ],
    "handler": "CsController#toWorkOrder",
    "summary": "出口①：报障 → 转工单。",
    "params": [
@@ -4308,6 +4511,9 @@
    "verb": "GET",
    "path": "/api/ops/dashboard",
    "perm": "dashboard:overview:read",
+   "perms": [
+    "dashboard:overview:read"
+   ],
    "handler": "OpsController#dashboard",
    "summary": "工作台聚合：真表实算（报表域读模型），内存种子骨架已退役。",
    "params": [],
@@ -4435,6 +4641,9 @@
    "verb": "GET",
    "path": "/api/ops/device-code-batches",
    "perm": "device:cabinet:read",
+   "perms": [
+    "device:cabinet:read"
+   ],
    "handler": "DeviceController#codeBatches",
    "summary": "",
    "params": [
@@ -4523,6 +4732,9 @@
    "verb": "POST",
    "path": "/api/ops/device-code-batches",
    "perm": "device:cabinet:update",
+   "perms": [
+    "device:cabinet:update"
+   ],
    "handler": "DeviceController#createCodeBatch",
    "summary": "",
    "params": [],
@@ -4574,6 +4786,9 @@
    "verb": "POST",
    "path": "/api/ops/device-code-batches/{batchNo}",
    "perm": "device:cabinet:update",
+   "perms": [
+    "device:cabinet:update"
+   ],
    "handler": "DeviceController#updateCodeBatch",
    "summary": "",
    "params": [
@@ -4632,6 +4847,9 @@
    "verb": "GET",
    "path": "/api/ops/device-logs",
    "perm": "device:cabinet:read",
+   "perms": [
+    "device:cabinet:read"
+   ],
    "handler": "DeviceController#deviceLogs",
    "summary": "双流日志（`stream=COMMAND|REPORT` + `from/to`）。",
    "params": [
@@ -4720,6 +4938,9 @@
    "verb": "GET",
    "path": "/api/ops/inspection-plans",
    "perm": "workorder:wo:read",
+   "perms": [
+    "workorder:wo:read"
+   ],
    "handler": "WoExtController#inspectionPlans",
    "summary": "",
    "params": [
@@ -4800,6 +5021,9 @@
    "verb": "POST",
    "path": "/api/ops/inspection-plans",
    "perm": "workorder:wo:update",
+   "perms": [
+    "workorder:wo:update"
+   ],
    "handler": "WoExtController#createInspectionPlan",
    "summary": "",
    "params": [],
@@ -4855,6 +5079,9 @@
    "verb": "GET",
    "path": "/api/ops/inspection-plans/{planNo}",
    "perm": "workorder:wo:read",
+   "perms": [
+    "workorder:wo:read"
+   ],
    "handler": "WoExtController#inspectionPlan",
    "summary": "",
    "params": [
@@ -4917,6 +5144,9 @@
    "verb": "POST",
    "path": "/api/ops/inspection-plans/{planNo}",
    "perm": "workorder:wo:update",
+   "perms": [
+    "workorder:wo:update"
+   ],
    "handler": "WoExtController#updateInspectionPlan",
    "summary": "",
    "params": [
@@ -4979,6 +5209,9 @@
    "verb": "POST",
    "path": "/api/ops/inspection-plans/{planNo}/run",
    "perm": "workorder:inspection:update",
+   "perms": [
+    "workorder:inspection:update"
+   ],
    "handler": "WoExtController#runInspectionPlan",
    "summary": "立即执行一次巡检计划。",
    "params": [
@@ -5000,6 +5233,9 @@
    "verb": "GET",
    "path": "/api/ops/inventory-transfers",
    "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
    "handler": "InventoryController#transfers",
    "summary": "",
    "params": [
@@ -5094,6 +5330,9 @@
    "verb": "POST",
    "path": "/api/ops/inventory-transfers",
    "perm": "device:inventory:transfer",
+   "perms": [
+    "device:inventory:transfer"
+   ],
    "handler": "InventoryController#createTransfer",
    "summary": "建调拨单（落 DRAFT）。",
    "params": [],
@@ -5157,6 +5396,9 @@
    "verb": "GET",
    "path": "/api/ops/inventory-transfers/{transferNo}",
    "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
    "handler": "InventoryController#transfer",
    "summary": "单据详情（含逐件明细，收货核对用）。",
    "params": [
@@ -5251,6 +5493,9 @@
    "verb": "POST",
    "path": "/api/ops/inventory-transfers/{transferNo}",
    "perm": "device:inventory:transfer",
+   "perms": [
+    "device:inventory:transfer"
+   ],
    "handler": "InventoryController#updateTransfer",
    "summary": "更新调拨单：发出（→IN_TRANSIT）/ 收货（→DONE）/ 草稿期改单头。",
    "params": [
@@ -5321,6 +5566,9 @@
    "verb": "GET",
    "path": "/api/ops/leads",
    "perm": "location:crm:read",
+   "perms": [
+    "location:crm:read"
+   ],
    "handler": "LocExtController#leads",
    "summary": "",
    "params": [
@@ -5407,6 +5655,9 @@
    "verb": "POST",
    "path": "/api/ops/leads",
    "perm": "location:crm:update",
+   "perms": [
+    "location:crm:update"
+   ],
    "handler": "LocExtController#createLead",
    "summary": "",
    "params": [],
@@ -5462,6 +5713,9 @@
    "verb": "GET",
    "path": "/api/ops/leads/{leadNo}",
    "perm": "location:crm:read",
+   "perms": [
+    "location:crm:read"
+   ],
    "handler": "LocExtController#lead",
    "summary": "",
    "params": [
@@ -5524,6 +5778,9 @@
    "verb": "POST",
    "path": "/api/ops/leads/{leadNo}",
    "perm": "location:crm:update",
+   "perms": [
+    "location:crm:update"
+   ],
    "handler": "LocExtController#updateLead",
    "summary": "",
    "params": [
@@ -5586,6 +5843,9 @@
    "verb": "GET",
    "path": "/api/ops/leads/{leadNo}/follow-ups",
    "perm": "location:lead:read",
+   "perms": [
+    "location:lead:read"
+   ],
    "handler": "LocExtController#leadFollowUps",
    "summary": "`Map.of` 不接受 null，统一转空串；空串在 CRUD 基类里等价于「不过滤」。",
    "params": [
@@ -5619,6 +5879,9 @@
    "verb": "POST",
    "path": "/api/ops/leads/{leadNo}/follow-ups",
    "perm": "location:lead:update",
+   "perms": [
+    "location:lead:update"
+   ],
    "handler": "LocExtController#addLeadFollowUp",
    "summary": "记一条跟进，**可同时推进线索阶段**（同事务）。",
    "params": [
@@ -5657,6 +5920,9 @@
    "verb": "GET",
    "path": "/api/ops/locations",
    "perm": "location:poi:read",
+   "perms": [
+    "location:poi:read"
+   ],
    "handler": "OpsController#locations",
    "summary": "",
    "params": [
@@ -5725,6 +5991,9 @@
    "verb": "POST",
    "path": "/api/ops/locations",
    "perm": "location:poi:create",
+   "perms": [
+    "location:poi:create"
+   ],
    "handler": "OpsController#savePoint",
    "summary": "",
    "params": [
@@ -5804,6 +6073,9 @@
    "verb": "POST",
    "path": "/api/ops/locations/{locationNo}",
    "perm": "location:poi:create",
+   "perms": [
+    "location:poi:create"
+   ],
    "handler": "OpsController#savePoint",
    "summary": "",
    "params": [
@@ -5883,6 +6155,9 @@
    "verb": "POST",
    "path": "/api/ops/locations/{no}/archive",
    "perm": "location:poi:update",
+   "perms": [
+    "location:poi:update"
+   ],
    "handler": "OpsController#archiveLocation",
    "summary": "",
    "params": [
@@ -5904,6 +6179,9 @@
    "verb": "POST",
    "path": "/api/ops/locations/{no}/unarchive",
    "perm": "location:poi:update",
+   "perms": [
+    "location:poi:update"
+   ],
    "handler": "OpsController#unarchiveLocation",
    "summary": "",
    "params": [
@@ -5925,6 +6203,9 @@
    "verb": "GET",
    "path": "/api/ops/marketing/notices",
    "perm": "marketing:notice:read",
+   "perms": [
+    "marketing:notice:read"
+   ],
    "handler": "MarketingController#notices",
    "summary": "",
    "params": [
@@ -6031,6 +6312,9 @@
    "verb": "POST",
    "path": "/api/ops/marketing/notices",
    "perm": "marketing:notice:update",
+   "perms": [
+    "marketing:notice:update"
+   ],
    "handler": "MarketingController#createNotice",
    "summary": "",
    "params": [],
@@ -6106,6 +6390,9 @@
    "verb": "POST",
    "path": "/api/ops/marketing/notices/{noticeNo}",
    "perm": "marketing:notice:update",
+   "perms": [
+    "marketing:notice:update"
+   ],
    "handler": "MarketingController#updateNotice",
    "summary": "",
    "params": [
@@ -6188,6 +6475,9 @@
    "verb": "POST",
    "path": "/api/ops/marketing/notices/{no}/archive",
    "perm": "marketing:notice:update",
+   "perms": [
+    "marketing:notice:update"
+   ],
    "handler": "MarketingController#archiveNotice",
    "summary": "`Map.of` 不接受 null，统一转空串；空串在 CRUD 基类里等价于「不过滤」。",
    "params": [
@@ -6209,6 +6499,9 @@
    "verb": "POST",
    "path": "/api/ops/marketing/notices/{no}/unarchive",
    "perm": "marketing:notice:update",
+   "perms": [
+    "marketing:notice:update"
+   ],
    "handler": "MarketingController#unarchiveNotice",
    "summary": "取消归档Notice：清空时间戳，回到默认列表。",
    "params": [
@@ -6230,6 +6523,9 @@
    "verb": "GET",
    "path": "/api/ops/operation/overview",
    "perm": "location:overview:read",
+   "perms": [
+    "location:overview:read"
+   ],
    "handler": "OperationController#overview",
    "summary": "",
    "params": [
@@ -6448,6 +6744,9 @@
    "verb": "GET",
    "path": "/api/ops/ota-releases",
    "perm": "device:ota:manage",
+   "perms": [
+    "device:ota:manage"
+   ],
    "handler": "DeviceController#otaReleases",
    "summary": "",
    "params": [
@@ -6540,6 +6839,9 @@
    "verb": "POST",
    "path": "/api/ops/ota-releases",
    "perm": "device:ota:manage",
+   "perms": [
+    "device:ota:manage"
+   ],
    "handler": "DeviceController#createOtaRelease",
    "summary": "",
    "params": [],
@@ -6595,6 +6897,9 @@
    "verb": "GET",
    "path": "/api/ops/ota-rollouts",
    "perm": "device:ota:read",
+   "perms": [
+    "device:ota:read"
+   ],
    "handler": "DeviceController#otaRollouts",
    "summary": "",
    "params": [
@@ -6687,6 +6992,9 @@
    "verb": "POST",
    "path": "/api/ops/ota-rollouts",
    "perm": "device:ota:manage",
+   "perms": [
+    "device:ota:manage"
+   ],
    "handler": "DeviceController#createOtaRollout",
    "summary": "",
    "params": [],
@@ -6742,6 +7050,9 @@
    "verb": "POST",
    "path": "/api/ops/ota-rollouts/{rolloutNo}",
    "perm": "device:ota:manage",
+   "perms": [
+    "device:ota:manage"
+   ],
    "handler": "DeviceController#updateOtaRollout",
    "summary": "更新投放（灰度比例调整、回滚 `status=ROLLBACK`）。",
    "params": [
@@ -6804,6 +7115,9 @@
    "verb": "GET",
    "path": "/api/ops/ota-rollouts/{rolloutNo}/tasks",
    "perm": "device:ota:read",
+   "perms": [
+    "device:ota:read"
+   ],
    "handler": "DeviceController#otaTasks",
    "summary": "投放的逐设备任务明细（`dev_ota_task` 下钻）。",
    "params": [
@@ -6854,6 +7168,9 @@
    "verb": "GET",
    "path": "/api/ops/powerbanks",
    "perm": "device:powerbank:read",
+   "perms": [
+    "device:powerbank:read"
+   ],
    "handler": "DeviceController#powerbanks",
    "summary": "",
    "params": [
@@ -6940,6 +7257,9 @@
    "verb": "POST",
    "path": "/api/ops/powerbanks",
    "perm": "device:powerbank:update",
+   "perms": [
+    "device:powerbank:update"
+   ],
    "handler": "DeviceController#createPowerbank",
    "summary": "",
    "params": [],
@@ -7036,6 +7356,9 @@
    "verb": "POST",
    "path": "/api/ops/powerbanks/{no}/archive",
    "perm": "device:powerbank:update",
+   "perms": [
+    "device:powerbank:update"
+   ],
    "handler": "DeviceController#archivePowerbank",
    "summary": "`Map.of` 不接受 null，统一转空串；空串在 CRUD 基类里等价于「不过滤」。",
    "params": [
@@ -7057,6 +7380,9 @@
    "verb": "POST",
    "path": "/api/ops/powerbanks/{no}/unarchive",
    "perm": "device:powerbank:update",
+   "perms": [
+    "device:powerbank:update"
+   ],
    "handler": "DeviceController#unarchivePowerbank",
    "summary": "取消归档Powerbank：清空时间戳，回到默认列表。",
    "params": [
@@ -7078,6 +7404,9 @@
    "verb": "POST",
    "path": "/api/ops/powerbanks/{powerbankNo}",
    "perm": "device:powerbank:update",
+   "perms": [
+    "device:powerbank:update"
+   ],
    "handler": "DeviceController#updatePowerbank",
    "summary": "状态变更（报废/丢失/投放…）与属性更新；状态迁移由 `PowerbankStateMachine` 把关。",
    "params": [
@@ -7181,6 +7510,9 @@
    "verb": "GET",
    "path": "/api/ops/reports/consumer-insight",
    "perm": "report:consumer:read",
+   "perms": [
+    "report:consumer:read"
+   ],
    "handler": "ReportController#consumerInsight",
    "summary": "",
    "params": [],
@@ -7248,6 +7580,9 @@
    "verb": "GET",
    "path": "/api/ops/reports/consumer-segments",
    "perm": "report:consumer:read",
+   "perms": [
+    "report:consumer:read"
+   ],
    "handler": "ReportController#consumerSegments",
    "summary": "人群分层表。",
    "params": [
@@ -7306,6 +7641,9 @@
    "verb": "GET",
    "path": "/api/ops/reports/custom",
    "perm": "report:custom:read",
+   "perms": [
+    "report:custom:read"
+   ],
    "handler": "ReportController#custom",
    "summary": "",
    "params": [
@@ -7370,6 +7708,9 @@
    "verb": "GET",
    "path": "/api/ops/reports/device",
    "perm": "report:device:read",
+   "perms": [
+    "report:device:read"
+   ],
    "handler": "ReportController#device",
    "summary": "",
    "params": [
@@ -7434,6 +7775,9 @@
    "verb": "GET",
    "path": "/api/ops/reports/finance",
    "perm": "report:finance:read",
+   "perms": [
+    "report:finance:read"
+   ],
    "handler": "ReportController#finance",
    "summary": "",
    "params": [
@@ -7498,6 +7842,9 @@
    "verb": "GET",
    "path": "/api/ops/reports/location",
    "perm": "report:location:read",
+   "perms": [
+    "report:location:read"
+   ],
    "handler": "ReportController#location",
    "summary": "",
    "params": [
@@ -7566,6 +7913,9 @@
    "verb": "GET",
    "path": "/api/ops/reports/metrics",
    "perm": "report:custom:read",
+   "perms": [
+    "report:custom:read"
+   ],
    "handler": "ReportController#metrics",
    "summary": "",
    "params": [],
@@ -7593,6 +7943,9 @@
    "verb": "GET",
    "path": "/api/ops/reports/screen",
    "perm": "report:screen:read",
+   "perms": [
+    "report:screen:read"
+   ],
    "handler": "ReportController#screen",
    "summary": "",
    "params": [
@@ -7643,6 +7996,9 @@
    "verb": "GET",
    "path": "/api/ops/reports/screen-board",
    "perm": "report:screen:read",
+   "perms": [
+    "report:screen:read"
+   ],
    "handler": "ReportController#screenBoard",
    "summary": "",
    "params": [],
@@ -7746,6 +8102,11 @@
    "verb": "GET",
    "path": "/api/ops/reports/trend",
    "perm": "report:device:read",
+   "perms": [
+    "report:device:read",
+    "report:location:read",
+    "report:finance:read"
+   ],
    "handler": "ReportController#trend",
    "summary": "",
    "params": [
@@ -7846,6 +8207,9 @@
    "verb": "GET",
    "path": "/api/ops/site-analysis",
    "perm": "location:analysis:read",
+   "perms": [
+    "location:analysis:read"
+   ],
    "handler": "LocExtController#siteAnalysis",
    "summary": "读模型：`loc_site ⋈ ord_order` 聚合，不落表。",
    "params": [
@@ -7924,6 +8288,9 @@
    "verb": "GET",
    "path": "/api/ops/site-lifecycles",
    "perm": "location:venue:read",
+   "perms": [
+    "location:venue:read"
+   ],
    "handler": "LocExtController#siteLifecycles",
    "summary": "",
    "params": [
@@ -7992,6 +8359,9 @@
    "verb": "POST",
    "path": "/api/ops/site-lifecycles/{siteNo}/stage",
    "perm": "location:venue:update",
+   "perms": [
+    "location:venue:update"
+   ],
    "handler": "LocExtController#changeStage",
    "summary": "阶段流转，留痕到 `loc_site_lifecycle_log`。",
    "params": [
@@ -8063,6 +8433,9 @@
    "verb": "GET",
    "path": "/api/ops/sites",
    "perm": "location:poi:read",
+   "perms": [
+    "location:poi:read"
+   ],
    "handler": "OpsController#sites",
    "summary": "",
    "params": [
@@ -8175,6 +8548,9 @@
    "verb": "POST",
    "path": "/api/ops/sites",
    "perm": "location:poi:create",
+   "perms": [
+    "location:poi:create"
+   ],
    "handler": "OpsController#saveSite",
    "summary": "",
    "params": [
@@ -8342,6 +8718,9 @@
    "verb": "POST",
    "path": "/api/ops/sites/{no}/archive",
    "perm": "location:site:update",
+   "perms": [
+    "location:site:update"
+   ],
    "handler": "OpsController#archiveSite",
    "summary": "",
    "params": [
@@ -8363,6 +8742,9 @@
    "verb": "POST",
    "path": "/api/ops/sites/{no}/unarchive",
    "perm": "location:site:update",
+   "perms": [
+    "location:site:update"
+   ],
    "handler": "OpsController#unarchiveSite",
    "summary": "",
    "params": [
@@ -8384,6 +8766,9 @@
    "verb": "POST",
    "path": "/api/ops/sites/{siteNo}",
    "perm": "location:poi:create",
+   "perms": [
+    "location:poi:create"
+   ],
    "handler": "OpsController#saveSite",
    "summary": "",
    "params": [
@@ -8551,6 +8936,9 @@
    "verb": "GET",
    "path": "/api/ops/sites/{siteNo}/agents",
    "perm": "location:poi:read",
+   "perms": [
+    "location:poi:read"
+   ],
    "handler": "OperationController#siteAgents",
    "summary": "",
    "params": [
@@ -8617,6 +9005,9 @@
    "verb": "POST",
    "path": "/api/ops/sites/{siteNo}/agents",
    "perm": "location:poi:update",
+   "perms": [
+    "location:poi:update"
+   ],
    "handler": "OperationController#saveSiteAgent",
    "summary": "",
    "params": [
@@ -8728,6 +9119,9 @@
    "verb": "POST",
    "path": "/api/ops/sites/{siteNo}/agents/{id}/remove",
    "perm": "location:poi:update",
+   "perms": [
+    "location:poi:update"
+   ],
    "handler": "OperationController#removeSiteAgent",
    "summary": "契约禁止 delete*，用 remove。",
    "params": [
@@ -8760,6 +9154,9 @@
    "verb": "POST",
    "path": "/api/ops/sites/{siteNo}/pause",
    "perm": "location:poi:update",
+   "perms": [
+    "location:poi:update"
+   ],
    "handler": "OpsController#pauseSite",
    "summary": "暂停 / 恢复营业（运营管理清单 OM-S3）。",
    "params": [
@@ -8854,6 +9251,9 @@
    "verb": "POST",
    "path": "/api/ops/sites/{siteNo}/resume",
    "perm": "location:poi:update",
+   "perms": [
+    "location:poi:update"
+   ],
    "handler": "OpsController#resumeSite",
    "summary": "",
    "params": [
@@ -8948,6 +9348,9 @@
    "verb": "GET",
    "path": "/api/ops/sites/{siteNo}/stats",
    "perm": "location:poi:read",
+   "perms": [
+    "location:poi:read"
+   ],
    "handler": "OperationController#siteStats",
    "summary": "",
    "params": [
@@ -9078,6 +9481,9 @@
    "verb": "GET",
    "path": "/api/ops/sla-rules",
    "perm": "workorder:wo:read",
+   "perms": [
+    "workorder:wo:read"
+   ],
    "handler": "WoExtController#slaRules",
    "summary": "",
    "params": [
@@ -9148,6 +9554,9 @@
    "verb": "POST",
    "path": "/api/ops/sla-rules",
    "perm": "workorder:sla:update",
+   "perms": [
+    "workorder:sla:update"
+   ],
    "handler": "WoExtController#createSlaRule",
    "summary": "",
    "params": [],
@@ -9187,6 +9596,9 @@
    "verb": "GET",
    "path": "/api/ops/sla-rules/{slaNo}",
    "perm": "workorder:wo:read",
+   "perms": [
+    "workorder:wo:read"
+   ],
    "handler": "WoExtController#slaRule",
    "summary": "",
    "params": [
@@ -9233,6 +9645,9 @@
    "verb": "POST",
    "path": "/api/ops/sla-rules/{slaNo}",
    "perm": "workorder:sla:update",
+   "perms": [
+    "workorder:sla:update"
+   ],
    "handler": "WoExtController#updateSlaRule",
    "summary": "",
    "params": [
@@ -9279,6 +9694,9 @@
    "verb": "GET",
    "path": "/api/ops/venue-onboardings",
    "perm": "location:venue:read",
+   "perms": [
+    "location:venue:read"
+   ],
    "handler": "LocExtController#onboardings",
    "summary": "",
    "params": [
@@ -9355,6 +9773,9 @@
    "verb": "POST",
    "path": "/api/ops/venue-onboardings",
    "perm": "location:venue:create",
+   "perms": [
+    "location:venue:create"
+   ],
    "handler": "LocExtController#createOnboarding",
    "summary": "审核。",
    "params": [],
@@ -9443,6 +9864,9 @@
    "verb": "GET",
    "path": "/api/ops/venue-onboardings/{onboardingNo}",
    "perm": "location:venue:read",
+   "perms": [
+    "location:venue:read"
+   ],
    "handler": "LocExtController#onboarding",
    "summary": "",
    "params": [
@@ -9501,6 +9925,9 @@
    "verb": "POST",
    "path": "/api/ops/venue-onboardings/{onboardingNo}",
    "perm": "location:venue:update",
+   "perms": [
+    "location:venue:update"
+   ],
    "handler": "LocExtController#updateOnboarding",
    "summary": "",
    "params": [
@@ -9596,6 +10023,9 @@
    "verb": "POST",
    "path": "/api/ops/venue-onboardings/{onboardingNo}/review",
    "perm": "location:venue:create",
+   "perms": [
+    "location:venue:create"
+   ],
    "handler": "LocExtController#review",
    "summary": "",
    "params": [
@@ -9667,6 +10097,9 @@
    "verb": "GET",
    "path": "/api/ops/venues",
    "perm": "location:venue:read",
+   "perms": [
+    "location:venue:read"
+   ],
    "handler": "OpsController#venues",
    "summary": "",
    "params": [
@@ -9731,6 +10164,9 @@
    "verb": "POST",
    "path": "/api/ops/venues",
    "perm": "location:venue:create",
+   "perms": [
+    "location:venue:create"
+   ],
    "handler": "OpsController#createVenue",
    "summary": "新建 / 修改场地方。",
    "params": [],
@@ -9770,6 +10206,9 @@
    "verb": "POST",
    "path": "/api/ops/venues/{no}/archive",
    "perm": "location:venue:update",
+   "perms": [
+    "location:venue:update"
+   ],
    "handler": "OpsController#archiveVenue",
    "summary": "",
    "params": [
@@ -9791,6 +10230,9 @@
    "verb": "POST",
    "path": "/api/ops/venues/{no}/unarchive",
    "perm": "location:venue:update",
+   "perms": [
+    "location:venue:update"
+   ],
    "handler": "OpsController#unarchiveVenue",
    "summary": "",
    "params": [
@@ -9812,6 +10254,9 @@
    "verb": "POST",
    "path": "/api/ops/venues/{venueNo}",
    "perm": "location:venue:update",
+   "perms": [
+    "location:venue:update"
+   ],
    "handler": "OpsController#updateVenue",
    "summary": "",
    "params": [
@@ -9858,6 +10303,9 @@
    "verb": "GET",
    "path": "/api/ops/work-orders",
    "perm": "workorder:wo:read",
+   "perms": [
+    "workorder:wo:read"
+   ],
    "handler": "OpsController#workOrders",
    "summary": "",
    "params": [
@@ -10008,6 +10456,9 @@
    "verb": "POST",
    "path": "/api/ops/work-orders",
    "perm": "workorder:wo:create",
+   "perms": [
+    "workorder:wo:create"
+   ],
    "handler": "WoExtController#createWorkOrder",
    "summary": "手工开单（补 [api/README §6] 的 G6 缺口）。",
    "params": [],
@@ -10172,6 +10623,9 @@
    "verb": "POST",
    "path": "/api/ops/work-orders/{woNo}/accept",
    "perm": "workorder:wo:process",
+   "perms": [
+    "workorder:wo:process"
+   ],
    "handler": "WoExtController#accept",
    "summary": "",
    "params": [
@@ -10303,6 +10757,9 @@
    "verb": "POST",
    "path": "/api/ops/work-orders/{woNo}/close",
    "perm": "workorder:wo:audit",
+   "perms": [
+    "workorder:wo:audit"
+   ],
    "handler": "WoExtController#close",
    "summary": "完成 / 审核关单。",
    "params": [
@@ -10446,6 +10903,9 @@
    "verb": "POST",
    "path": "/api/ops/work-orders/{woNo}/complete",
    "perm": "workorder:wo:handle",
+   "perms": [
+    "workorder:wo:handle"
+   ],
    "handler": "WoExtController#complete",
    "summary": "完工：`PROCESSING → DONE`。",
    "params": [
@@ -10593,6 +11053,9 @@
    "verb": "POST",
    "path": "/api/ops/work-orders/{woNo}/dispatch",
    "perm": "workorder:wo:dispatch",
+   "perms": [
+    "workorder:wo:dispatch"
+   ],
    "handler": "OpsController#dispatch",
    "summary": "",
    "params": [
@@ -10719,6 +11182,9 @@
    "verb": "POST",
    "path": "/api/ops/work-orders/{woNo}/handle",
    "perm": "workorder:wo:process",
+   "perms": [
+    "workorder:wo:process"
+   ],
    "handler": "WoExtController#handle",
    "summary": "",
    "params": [
@@ -10866,6 +11332,9 @@
    "verb": "POST",
    "path": "/api/ops/work-orders/{woNo}/reject",
    "perm": "workorder:wo:dispatch",
+   "perms": [
+    "workorder:wo:dispatch"
+   ],
    "handler": "WoExtController#reject",
    "summary": "驳回退回待派单：`DISPATCHED/ACCEPTED/PROCESSING → CREATED`，`reason` 必填。",
    "params": [
@@ -10997,6 +11466,9 @@
    "verb": "POST",
    "path": "/api/ops/work-orders/{woNo}/rework",
    "perm": "workorder:wo:close",
+   "perms": [
+    "workorder:wo:close"
+   ],
    "handler": "WoExtController#rework",
    "summary": "验收不合格退回返工：`DONE → PROCESSING`，`reason` 必填，受理人不变。",
    "params": [
@@ -11128,6 +11600,9 @@
    "verb": "GET",
    "path": "/api/platform/app-versions",
    "perm": "system:app_version:read",
+   "perms": [
+    "system:app_version:read"
+   ],
    "handler": "SysSettingController#appVersions",
    "summary": "",
    "params": [
@@ -11226,6 +11701,9 @@
    "verb": "POST",
    "path": "/api/platform/app-versions",
    "perm": "system:app_version:release",
+   "perms": [
+    "system:app_version:release"
+   ],
    "handler": "SysSettingController#createAppVersion",
    "summary": "",
    "params": [],
@@ -11293,6 +11771,9 @@
    "verb": "POST",
    "path": "/api/platform/app-versions/{versionId}",
    "perm": "system:app_version:release",
+   "perms": [
+    "system:app_version:release"
+   ],
    "handler": "SysSettingController#updateAppVersion",
    "summary": "",
    "params": [
@@ -11367,6 +11848,9 @@
    "verb": "POST",
    "path": "/api/platform/app-versions/{versionId}/rollback",
    "perm": "system:app_version:release",
+   "perms": [
+    "system:app_version:release"
+   ],
    "handler": "SysSettingController#rollbackAppVersion",
    "summary": "软回滚：`status=ROLLBACK` + `rolloutPercent=0`，**记录保留**。",
    "params": [
@@ -11441,6 +11925,9 @@
    "verb": "GET",
    "path": "/api/platform/audit-logs",
    "perm": "org:audit:read",
+   "perms": [
+    "org:audit:read"
+   ],
    "handler": "PlatformController#auditLogs",
    "summary": "操作审计列表（WORM 只增）。",
    "params": [
@@ -11527,6 +12014,9 @@
    "verb": "GET",
    "path": "/api/platform/audit-logs/{id}",
    "perm": "org:audit:read",
+   "perms": [
+    "org:audit:read"
+   ],
    "handler": "PlatformController#auditLogDetail",
    "summary": "审计详情（列表行点开抽屉）。",
    "params": [
@@ -11613,6 +12103,9 @@
    "verb": "GET",
    "path": "/api/platform/banks",
    "perm": "system:bank:read",
+   "perms": [
+    "system:bank:read"
+   ],
    "handler": "SysDictController#banks",
    "summary": "",
    "params": [
@@ -11701,6 +12194,9 @@
    "verb": "POST",
    "path": "/api/platform/banks",
    "perm": "system:bank:update",
+   "perms": [
+    "system:bank:update"
+   ],
    "handler": "SysDictController#createBank",
    "summary": "",
    "params": [],
@@ -11752,6 +12248,9 @@
    "verb": "POST",
    "path": "/api/platform/banks/{bankCode}",
    "perm": "system:bank:update",
+   "perms": [
+    "system:bank:update"
+   ],
    "handler": "SysDictController#updateBank",
    "summary": "",
    "params": [
@@ -11810,6 +12309,9 @@
    "verb": "POST",
    "path": "/api/platform/banks/{no}/archive",
    "perm": "system:bank:update",
+   "perms": [
+    "system:bank:update"
+   ],
    "handler": "SysDictController#archiveBank",
    "summary": "`Map.of` 不接受 null，统一转空串；空串在基类里等价于「不过滤」。",
    "params": [
@@ -11831,6 +12333,9 @@
    "verb": "POST",
    "path": "/api/platform/banks/{no}/unarchive",
    "perm": "system:bank:update",
+   "perms": [
+    "system:bank:update"
+   ],
    "handler": "SysDictController#unarchiveBank",
    "summary": "取消归档Bank：清空时间戳，回到默认列表。",
    "params": [
@@ -11852,6 +12357,9 @@
    "verb": "GET",
    "path": "/api/platform/biz-rules",
    "perm": "system:biz_rule:read",
+   "perms": [
+    "system:biz_rule:read"
+   ],
    "handler": "SysSettingController#bizRules",
    "summary": "读全量三分区；缺失分区由 service 兜默认值，前端不必再写一遍默认。",
    "params": [],
@@ -11953,6 +12461,9 @@
    "verb": "POST",
    "path": "/api/platform/biz-rules",
    "perm": "system:biz_rule:update",
+   "perms": [
+    "system:biz_rule:update"
+   ],
    "handler": "SysSettingController#saveBizRules",
    "summary": "分区保存：body 是 `Partial`，页面三个保存按钮 → 三次独立 POST。",
    "params": [],
@@ -12141,6 +12652,9 @@
    "verb": "GET",
    "path": "/api/platform/brands",
    "perm": "system:brand:read",
+   "perms": [
+    "system:brand:read"
+   ],
    "handler": "SysDictController#brands",
    "summary": "",
    "params": [
@@ -12223,6 +12737,9 @@
    "verb": "POST",
    "path": "/api/platform/brands",
    "perm": "system:brand:update",
+   "perms": [
+    "system:brand:update"
+   ],
    "handler": "SysDictController#createBrand",
    "summary": "",
    "params": [],
@@ -12311,6 +12828,9 @@
    "verb": "POST",
    "path": "/api/platform/brands/{brandNo}",
    "perm": "system:brand:update",
+   "perms": [
+    "system:brand:update"
+   ],
    "handler": "SysDictController#updateBrand",
    "summary": "",
    "params": [
@@ -12406,6 +12926,9 @@
    "verb": "POST",
    "path": "/api/platform/brands/{no}/archive",
    "perm": "system:brand:update",
+   "perms": [
+    "system:brand:update"
+   ],
    "handler": "SysDictController#archiveBrand",
    "summary": "",
    "params": [
@@ -12427,6 +12950,9 @@
    "verb": "POST",
    "path": "/api/platform/brands/{no}/unarchive",
    "perm": "system:brand:update",
+   "perms": [
+    "system:brand:update"
+   ],
    "handler": "SysDictController#unarchiveBrand",
    "summary": "",
    "params": [
@@ -12448,6 +12974,9 @@
    "verb": "GET",
    "path": "/api/platform/data-scopes/{subjectType}/{subjectNo}",
    "perm": "org:role:read",
+   "perms": [
+    "org:role:read"
+   ],
    "handler": "OrgController#dataScope",
    "summary": "",
    "params": [
@@ -12492,6 +13021,9 @@
    "verb": "PUT",
    "path": "/api/platform/data-scopes/{subjectType}/{subjectNo}",
    "perm": "org:role:update",
+   "perms": [
+    "org:role:update"
+   ],
    "handler": "OrgController#saveDataScope",
    "summary": "保存数据权限（整体覆盖）。",
    "params": [
@@ -12545,6 +13077,9 @@
    "verb": "GET",
    "path": "/api/platform/departments",
    "perm": "org:dept:read",
+   "perms": [
+    "org:dept:read"
+   ],
    "handler": "OrgController#departments",
    "summary": "",
    "params": [
@@ -12623,6 +13158,9 @@
    "verb": "POST",
    "path": "/api/platform/departments",
    "perm": "org:dept:create",
+   "perms": [
+    "org:dept:create"
+   ],
    "handler": "OrgController#createDepartment",
    "summary": "",
    "params": [],
@@ -12670,6 +13208,9 @@
    "verb": "POST",
    "path": "/api/platform/departments/{deptNo}",
    "perm": "org:dept:create",
+   "perms": [
+    "org:dept:create"
+   ],
    "handler": "OrgController#updateDepartment",
    "summary": "",
    "params": [
@@ -12724,6 +13265,9 @@
    "verb": "GET",
    "path": "/api/platform/dict-entries",
    "perm": "system:dict:read",
+   "perms": [
+    "system:dict:read"
+   ],
    "handler": "SysConfigController#dictEntries",
    "summary": "",
    "params": [
@@ -12794,6 +13338,9 @@
    "verb": "POST",
    "path": "/api/platform/dict-entries",
    "perm": "system:dict:update",
+   "perms": [
+    "system:dict:update"
+   ],
    "handler": "SysConfigController#createDictEntry",
    "summary": "",
    "params": [],
@@ -12833,6 +13380,9 @@
    "verb": "POST",
    "path": "/api/platform/dict-entries/{dictNo}",
    "perm": "system:dict:update",
+   "perms": [
+    "system:dict:update"
+   ],
    "handler": "SysConfigController#updateDictEntry",
    "summary": "",
    "params": [
@@ -12879,6 +13429,9 @@
    "verb": "GET",
    "path": "/api/platform/employees",
    "perm": "org:employee:read",
+   "perms": [
+    "org:employee:read"
+   ],
    "handler": "PlatformController#employees",
    "summary": "",
    "params": [
@@ -12941,6 +13494,9 @@
    "verb": "POST",
    "path": "/api/platform/employees",
    "perm": "org:employee:create",
+   "perms": [
+    "org:employee:create"
+   ],
    "handler": "OrgController#createEmployee",
    "summary": "",
    "params": [],
@@ -12984,6 +13540,9 @@
    "verb": "POST",
    "path": "/api/platform/employees/{employeeNo}",
    "perm": "org:employee:update",
+   "perms": [
+    "org:employee:update"
+   ],
    "handler": "OrgController#updateEmployee",
    "summary": "",
    "params": [
@@ -13034,6 +13593,9 @@
    "verb": "GET",
    "path": "/api/platform/iam/menus",
    "perm": "org:role:read",
+   "perms": [
+    "org:role:read"
+   ],
    "handler": "IamAdminController#menus",
    "summary": "全量菜单树（后台维护用）。",
    "params": [],
@@ -13048,6 +13610,9 @@
    "verb": "GET",
    "path": "/api/platform/iam/permissions",
    "perm": "org:role:read",
+   "perms": [
+    "org:role:read"
+   ],
    "handler": "IamAdminController#permissions",
    "summary": "权限码目录（构建分配选择器）。",
    "params": [],
@@ -13062,6 +13627,9 @@
    "verb": "GET",
    "path": "/api/platform/iam/roles",
    "perm": "org:role:read",
+   "perms": [
+    "org:role:read"
+   ],
    "handler": "IamAdminController#roles",
    "summary": "角色列表。",
    "params": [],
@@ -13076,6 +13644,9 @@
    "verb": "GET",
    "path": "/api/platform/iam/roles/{roleNo}/permissions",
    "perm": "org:role:read",
+   "perms": [
+    "org:role:read"
+   ],
    "handler": "IamAdminController#rolePermissions",
    "summary": "读某角色已分配的权限码（勾选树回显）。",
    "params": [
@@ -13097,6 +13668,9 @@
    "verb": "PUT",
    "path": "/api/platform/iam/roles/{roleNo}/permissions",
    "perm": "org:role:update",
+   "perms": [
+    "org:role:update"
+   ],
    "handler": "IamAdminController#setRolePermissions",
    "summary": "给角色分配权限码（覆盖写）→ 失效缓存 + bump 版本（在线员工下一请求即生效）。",
    "params": [
@@ -13118,6 +13692,9 @@
    "verb": "GET",
    "path": "/api/platform/login-settings",
    "perm": "system:login_setting:read",
+   "perms": [
+    "system:login_setting:read"
+   ],
    "handler": "SysSettingController#loginSettings",
    "summary": "",
    "params": [
@@ -13194,6 +13771,9 @@
    "verb": "POST",
    "path": "/api/platform/login-settings",
    "perm": "system:login_setting:update",
+   "perms": [
+    "system:login_setting:update"
+   ],
    "handler": "SysSettingController#createLoginSetting",
    "summary": "",
    "params": [],
@@ -13245,6 +13825,9 @@
    "verb": "POST",
    "path": "/api/platform/login-settings/{country}",
    "perm": "system:login_setting:update",
+   "perms": [
+    "system:login_setting:update"
+   ],
    "handler": "SysSettingController#updateLoginSetting",
    "summary": "",
    "params": [
@@ -13303,6 +13886,9 @@
    "verb": "GET",
    "path": "/api/platform/markets",
    "perm": "system:market:read",
+   "perms": [
+    "system:market:read"
+   ],
    "handler": "SysSettingController#markets",
    "summary": "",
    "params": [
@@ -13377,6 +13963,9 @@
    "verb": "POST",
    "path": "/api/platform/markets",
    "perm": "system:market:update",
+   "perms": [
+    "system:market:update"
+   ],
    "handler": "SysSettingController#createMarket",
    "summary": "",
    "params": [],
@@ -13420,6 +14009,9 @@
    "verb": "POST",
    "path": "/api/platform/markets/{countryCode}",
    "perm": "system:market:update",
+   "perms": [
+    "system:market:update"
+   ],
    "handler": "SysSettingController#updateMarket",
    "summary": "",
    "params": [
@@ -13470,6 +14062,9 @@
    "verb": "GET",
    "path": "/api/platform/notify-blacklist",
    "perm": "system:notify_blacklist:read",
+   "perms": [
+    "system:notify_blacklist:read"
+   ],
    "handler": "NotifyController#blacklist",
    "summary": "",
    "params": [
@@ -13562,6 +14157,9 @@
    "verb": "POST",
    "path": "/api/platform/notify-blacklist",
    "perm": "system:notify_blacklist:update",
+   "perms": [
+    "system:notify_blacklist:update"
+   ],
    "handler": "NotifyController#block",
    "summary": "",
    "params": [],
@@ -13617,6 +14215,9 @@
    "verb": "POST",
    "path": "/api/platform/notify-blacklist/{blockNo}",
    "perm": "system:notify_blacklist:update",
+   "perms": [
+    "system:notify_blacklist:update"
+   ],
    "handler": "NotifyController#updateBlock",
    "summary": "修改拉黑记录（只改渠道/原因，target 冻结 —— 见 service 注释）。",
    "params": [
@@ -13679,6 +14280,9 @@
    "verb": "POST",
    "path": "/api/platform/notify-blacklist/{blockNo}/release",
    "perm": "system:notify_blacklist:update",
+   "perms": [
+    "system:notify_blacklist:update"
+   ],
    "handler": "NotifyController#release",
    "summary": "解除（软删：`status=RELEASED` + 留痕，不物理删）。",
    "params": [
@@ -13741,6 +14345,9 @@
    "verb": "GET",
    "path": "/api/platform/notify-logs",
    "perm": "system:notify_log:read",
+   "perms": [
+    "system:notify_log:read"
+   ],
    "handler": "NotifyController#notifyLogs",
    "summary": "`sort` 受控：仅 `sentAt|cost`，其它值由 service 拒绝（防注入）。",
    "params": [
@@ -13853,6 +14460,9 @@
    "verb": "GET",
    "path": "/api/platform/notify-logs/stats",
    "perm": "system:notify_log:read",
+   "perms": [
+    "system:notify_log:read"
+   ],
    "handler": "NotifyController#notifyLogStats",
    "summary": "页头统计（全量口径，非当前分页合计）。",
    "params": [],
@@ -13888,6 +14498,9 @@
    "verb": "POST",
    "path": "/api/platform/notify-logs/{no}/resend",
    "perm": "system:notify_log:update",
+   "perms": [
+    "system:notify_log:update"
+   ],
    "handler": "NotifyController#resendLog",
    "summary": "重发一条发送记录。",
    "params": [
@@ -13914,6 +14527,9 @@
    "verb": "GET",
    "path": "/api/platform/notify-templates",
    "perm": "system:notify_template:read",
+   "perms": [
+    "system:notify_template:read"
+   ],
    "handler": "NotifyController#templates",
    "summary": "",
    "params": [
@@ -14004,6 +14620,9 @@
    "verb": "POST",
    "path": "/api/platform/notify-templates",
    "perm": "system:notify_template:update",
+   "perms": [
+    "system:notify_template:update"
+   ],
    "handler": "NotifyController#createTemplate",
    "summary": "",
    "params": [],
@@ -14051,6 +14670,9 @@
    "verb": "POST",
    "path": "/api/platform/notify-templates/{no}/preview",
    "perm": "system:notify_template:read",
+   "perms": [
+    "system:notify_template:read"
+   ],
    "handler": "NotifyController#previewTemplate",
    "summary": "当前操作人；无会话（域间/定时任务）时记 SYSTEM。",
    "params": [
@@ -14072,6 +14694,9 @@
    "verb": "POST",
    "path": "/api/platform/notify-templates/{no}/test-send",
    "perm": "system:notify_template:update",
+   "perms": [
+    "system:notify_template:update"
+   ],
    "handler": "NotifyController#testSendTemplate",
    "summary": "模板试发。",
    "params": [
@@ -14106,6 +14731,9 @@
    "verb": "POST",
    "path": "/api/platform/notify-templates/{templateNo}",
    "perm": "system:notify_template:update",
+   "perms": [
+    "system:notify_template:update"
+   ],
    "handler": "NotifyController#updateTemplate",
    "summary": "",
    "params": [
@@ -14160,6 +14788,9 @@
    "verb": "GET",
    "path": "/api/platform/openapi-apps",
    "perm": "system:openapi:read",
+   "perms": [
+    "system:openapi:read"
+   ],
    "handler": "SysSettingController#openApiApps",
    "summary": "",
    "params": [
@@ -14232,6 +14863,9 @@
    "verb": "POST",
    "path": "/api/platform/openapi-apps",
    "perm": "system:openapi:update",
+   "perms": [
+    "system:openapi:update"
+   ],
    "handler": "SysSettingController#createOpenApiApp",
    "summary": "",
    "params": [],
@@ -14279,6 +14913,9 @@
    "verb": "POST",
    "path": "/api/platform/openapi-apps/{appNo}",
    "perm": "system:openapi:update",
+   "perms": [
+    "system:openapi:update"
+   ],
    "handler": "SysSettingController#updateOpenApiApp",
    "summary": "",
    "params": [
@@ -14333,6 +14970,9 @@
    "verb": "POST",
    "path": "/api/platform/openapi-apps/{appNo}/reset-secret",
    "perm": "system:openapi:update",
+   "perms": [
+    "system:openapi:update"
+   ],
    "handler": "SysSettingController#resetOpenApiAppSecret",
    "summary": "重置 OpenAPI 应用密钥。",
    "params": [
@@ -14387,6 +15027,9 @@
    "verb": "GET",
    "path": "/api/platform/payment-channels",
    "perm": "system:payment_channel:read",
+   "perms": [
+    "system:payment_channel:read"
+   ],
    "handler": "PaymentChannelController#channels",
    "summary": "",
    "params": [
@@ -14489,6 +15132,9 @@
    "verb": "POST",
    "path": "/api/platform/payment-channels",
    "perm": "system:payment_channel:update",
+   "perms": [
+    "system:payment_channel:update"
+   ],
    "handler": "PaymentChannelController#createChannel",
    "summary": "",
    "params": [],
@@ -14560,6 +15206,9 @@
    "verb": "POST",
    "path": "/api/platform/payment-channels/{channelCode}",
    "perm": "system:payment_channel:update",
+   "perms": [
+    "system:payment_channel:update"
+   ],
    "handler": "PaymentChannelController#updateChannel",
    "summary": "",
    "params": [
@@ -14638,6 +15287,9 @@
    "verb": "GET",
    "path": "/api/platform/problems",
    "perm": "system:problem:read",
+   "perms": [
+    "system:problem:read"
+   ],
    "handler": "SysConfigController#problems",
    "summary": "",
    "params": [
@@ -14738,6 +15390,9 @@
    "verb": "POST",
    "path": "/api/platform/problems",
    "perm": "system:problem:update",
+   "perms": [
+    "system:problem:update"
+   ],
    "handler": "SysConfigController#createProblem",
    "summary": "",
    "params": [],
@@ -14801,6 +15456,9 @@
    "verb": "POST",
    "path": "/api/platform/problems/{no}/archive",
    "perm": "system:problem:update",
+   "perms": [
+    "system:problem:update"
+   ],
    "handler": "SysConfigController#archiveProblem",
    "summary": "`Map.of` 不接受 null，统一转空串；空串在 CRUD 基类里等价于「不过滤」。",
    "params": [
@@ -14822,6 +15480,9 @@
    "verb": "POST",
    "path": "/api/platform/problems/{no}/unarchive",
    "perm": "system:problem:update",
+   "perms": [
+    "system:problem:update"
+   ],
    "handler": "SysConfigController#unarchiveProblem",
    "summary": "取消归档问题目录项。",
    "params": [
@@ -14843,6 +15504,9 @@
    "verb": "POST",
    "path": "/api/platform/problems/{problemNo}",
    "perm": "system:problem:update",
+   "perms": [
+    "system:problem:update"
+   ],
    "handler": "SysConfigController#updateProblem",
    "summary": "",
    "params": [
@@ -14913,6 +15577,9 @@
    "verb": "GET",
    "path": "/api/platform/regions",
    "perm": "system:dict:read",
+   "perms": [
+    "system:dict:read"
+   ],
    "handler": "SysConfigController#regions",
    "summary": "",
    "params": [
@@ -14983,6 +15650,9 @@
    "verb": "POST",
    "path": "/api/platform/regions",
    "perm": "system:dict:update",
+   "perms": [
+    "system:dict:update"
+   ],
    "handler": "SysConfigController#createRegion",
    "summary": "",
    "params": [],
@@ -15022,6 +15692,9 @@
    "verb": "GET",
    "path": "/api/platform/regions/tree",
    "perm": "system:region:read",
+   "perms": [
+    "system:region:read"
+   ],
    "handler": "SysConfigController#regionTree",
    "summary": "地区树：一次查全表在内存建树（地区是百量级且极少变动，递归 SQL 换不来收益）。",
    "params": [],
@@ -15036,6 +15709,9 @@
    "verb": "POST",
    "path": "/api/platform/regions/{regionId}",
    "perm": "system:dict:update",
+   "perms": [
+    "system:dict:update"
+   ],
    "handler": "SysConfigController#updateRegion",
    "summary": "",
    "params": [
@@ -15082,6 +15758,9 @@
    "verb": "GET",
    "path": "/api/platform/roles",
    "perm": "org:role:read",
+   "perms": [
+    "org:role:read"
+   ],
    "handler": "PlatformController#roles",
    "summary": "",
    "params": [
@@ -15140,6 +15819,9 @@
    "verb": "POST",
    "path": "/api/platform/roles",
    "perm": "org:role:update",
+   "perms": [
+    "org:role:update"
+   ],
    "handler": "PlatformController#createRole",
    "summary": "新建 / 修改角色。",
    "params": [],
@@ -15228,6 +15910,9 @@
    "verb": "POST",
    "path": "/api/platform/roles/{roleNo}",
    "perm": "org:role:update",
+   "perms": [
+    "org:role:update"
+   ],
    "handler": "PlatformController#updateRole",
    "summary": "",
    "params": [
@@ -15323,6 +16008,9 @@
    "verb": "POST",
    "path": "/api/platform/roles/{roleNo}/archive",
    "perm": "org:role:update",
+   "perms": [
+    "org:role:update"
+   ],
    "handler": "PlatformController#archiveRole",
    "summary": "归档角色（内置角色服务端拒绝）。",
    "params": [
@@ -15381,6 +16069,9 @@
    "verb": "POST",
    "path": "/api/platform/roles/{roleNo}/unarchive",
    "perm": "org:role:update",
+   "perms": [
+    "org:role:update"
+   ],
    "handler": "PlatformController#unarchiveRole",
    "summary": "",
    "params": [
@@ -15439,6 +16130,9 @@
    "verb": "GET",
    "path": "/api/platform/staff-performance",
    "perm": "org:performance:read",
+   "perms": [
+    "org:performance:read"
+   ],
    "handler": "OrgController#staffPerformance",
    "summary": "",
    "params": [
@@ -15513,6 +16207,9 @@
    "verb": "GET",
    "path": "/api/platform/sys-params",
    "perm": "system:param:read",
+   "perms": [
+    "system:param:read"
+   ],
    "handler": "SysConfigController#sysParams",
    "summary": "",
    "params": [
@@ -15573,6 +16270,9 @@
    "verb": "POST",
    "path": "/api/platform/sys-params",
    "perm": "system:param:update",
+   "perms": [
+    "system:param:update"
+   ],
    "handler": "SysConfigController#createSysParam",
    "summary": "",
    "params": [],
@@ -15608,6 +16308,9 @@
    "verb": "POST",
    "path": "/api/platform/sys-params/{paramKey}",
    "perm": "system:param:update",
+   "perms": [
+    "system:param:update"
+   ],
    "handler": "SysConfigController#updateSysParam",
    "summary": "",
    "params": [
@@ -15650,6 +16353,9 @@
    "verb": "GET",
    "path": "/api/platform/tax-settings",
    "perm": "system:tax:read",
+   "perms": [
+    "system:tax:read"
+   ],
    "handler": "SysSettingController#taxSettings",
    "summary": "",
    "params": [
@@ -15722,6 +16428,9 @@
    "verb": "POST",
    "path": "/api/platform/tax-settings",
    "perm": "system:tax:update",
+   "perms": [
+    "system:tax:update"
+   ],
    "handler": "SysSettingController#createTaxSetting",
    "summary": "",
    "params": [],
@@ -15769,6 +16478,9 @@
    "verb": "POST",
    "path": "/api/platform/tax-settings/{country}",
    "perm": "system:tax:update",
+   "perms": [
+    "system:tax:update"
+   ],
    "handler": "SysSettingController#updateTaxSetting",
    "summary": "",
    "params": [
@@ -15823,6 +16535,9 @@
    "verb": "GET",
    "path": "/api/trade/complaints",
    "perm": "order:exception:read",
+   "perms": [
+    "order:exception:read"
+   ],
    "handler": "OrderOpsController#complaints",
    "summary": "",
    "params": [
@@ -15921,6 +16636,9 @@
    "verb": "POST",
    "path": "/api/trade/complaints",
    "perm": "order:exception:handle",
+   "perms": [
+    "order:exception:handle"
+   ],
    "handler": "OrderOpsController#createComplaint",
    "summary": "客服代客登记（电话/线下投诉）；C 端提交走 `POST /mp/user/report` 自动派生。",
    "params": [],
@@ -16009,6 +16727,9 @@
    "verb": "POST",
    "path": "/api/trade/complaints/{no}/handle",
    "perm": "order:exception:handle",
+   "perms": [
+    "order:exception:handle"
+   ],
    "handler": "OrderOpsController#handleComplaint",
    "summary": "",
    "params": [
@@ -16092,6 +16813,9 @@
    "verb": "POST",
    "path": "/api/trade/complaints/{no}/work-order",
    "perm": "workorder:wo:create",
+   "perms": [
+    "workorder:wo:create"
+   ],
    "handler": "OrderOpsController#complaintToWorkOrder",
    "summary": "转工单（**幂等**）：已转过则返回已有 `workOrderNo`，不重复开单。",
    "params": [
@@ -16166,6 +16890,9 @@
    "verb": "GET",
    "path": "/api/trade/deposits",
    "perm": "order:order:read",
+   "perms": [
+    "order:order:read"
+   ],
    "handler": "OrderOpsController#deposits",
    "summary": "",
    "params": [
@@ -16270,6 +16997,9 @@
    "verb": "POST",
    "path": "/api/trade/deposits/{depositNo}/buyout",
    "perm": "order:deposit:update",
+   "perms": [
+    "order:deposit:update"
+   ],
    "handler": "FinanceController#buyoutDeposit",
    "summary": "押金转买断：用户不还了，押金抵购机款，充电宝转 SOLD。",
    "params": [
@@ -16291,6 +17021,9 @@
    "verb": "POST",
    "path": "/api/trade/deposits/{depositNo}/dun",
    "perm": "order:deposit:update",
+   "perms": [
+    "order:deposit:update"
+   ],
    "handler": "FinanceController#dunDeposit",
    "summary": "欠款催缴：**只留痕不改状态** —— 催缴不改变欠款事实，改状态会让「已催缴」被误读成「已解决」。",
    "params": [
@@ -16312,6 +17045,9 @@
    "verb": "POST",
    "path": "/api/trade/deposits/{no}/release",
    "perm": "order:intervene:execute",
+   "perms": [
+    "order:intervene:execute"
+   ],
    "handler": "OrderOpsController#releaseDeposit",
    "summary": "",
    "params": [
@@ -16338,6 +17074,9 @@
    "verb": "GET",
    "path": "/api/trade/free-orders",
    "perm": "order:order:read",
+   "perms": [
+    "order:order:read"
+   ],
    "handler": "OrderOpsController#freeOrders",
    "summary": "",
    "params": [
@@ -16422,6 +17161,9 @@
    "verb": "GET",
    "path": "/api/trade/free-orders/stats",
    "perm": "order:order:read",
+   "perms": [
+    "order:order:read"
+   ],
    "handler": "OrderOpsController#freeOrderStats",
    "summary": "页头统计：**全量口径**（本月单量/累计减免额），不是当前页合计。",
    "params": [],
@@ -16449,6 +17191,9 @@
    "verb": "GET",
    "path": "/api/trade/invoices",
    "perm": "finance:invoice:read",
+   "perms": [
+    "finance:invoice:read"
+   ],
    "handler": "FinanceController#invoices",
    "summary": "",
    "params": [
@@ -16561,6 +17306,9 @@
    "verb": "POST",
    "path": "/api/trade/invoices",
    "perm": "finance:invoice:issue",
+   "perms": [
+    "finance:invoice:issue"
+   ],
    "handler": "FinanceController#createInvoice",
    "summary": "",
    "params": [],
@@ -16695,6 +17443,9 @@
    "verb": "GET",
    "path": "/api/trade/invoices/{invoiceNo}",
    "perm": "finance:invoice:read",
+   "perms": [
+    "finance:invoice:read"
+   ],
    "handler": "FinanceController#invoice",
    "summary": "",
    "params": [
@@ -16799,6 +17550,9 @@
    "verb": "POST",
    "path": "/api/trade/invoices/{invoiceNo}",
    "perm": "finance:invoice:issue",
+   "perms": [
+    "finance:invoice:issue"
+   ],
    "handler": "FinanceController#updateInvoice",
    "summary": "",
    "params": [
@@ -16940,6 +17694,9 @@
    "verb": "POST",
    "path": "/api/trade/invoices/{invoiceNo}/issue",
    "perm": "finance:invoice:update",
+   "perms": [
+    "finance:invoice:update"
+   ],
    "handler": "FinanceController#issueInvoice",
    "summary": "开具发票。",
    "params": [
@@ -16961,6 +17718,9 @@
    "verb": "POST",
    "path": "/api/trade/invoices/{invoiceNo}/void",
    "perm": "finance:invoice:void",
+   "perms": [
+    "finance:invoice:void"
+   ],
    "handler": "FinanceController#voidInvoice",
    "summary": "作废发票。",
    "params": [
@@ -16982,6 +17742,9 @@
    "verb": "GET",
    "path": "/api/trade/ledger",
    "perm": "finance:ledger:read",
+   "perms": [
+    "finance:ledger:read"
+   ],
    "handler": "FinanceController#ledger",
    "summary": "账务分录列表（自 `TradeController` SeedData 骨架迁入，走 `acct_ledger` 表）。",
    "params": [
@@ -17076,6 +17839,9 @@
    "verb": "POST",
    "path": "/api/trade/ledger/vouchers",
    "perm": "finance:ledger:create",
+   "perms": [
+    "finance:ledger:create"
+   ],
    "handler": "FinanceController#createVoucher",
    "summary": "建凭证 = 记一组借贷分录（服务端校验借贷平衡，不平拒收）。",
    "params": [],
@@ -17137,6 +17903,9 @@
    "verb": "GET",
    "path": "/api/trade/ledger/vouchers/{voucherNo}",
    "perm": "finance:ledger:read",
+   "perms": [
+    "finance:ledger:read"
+   ],
    "handler": "FinanceController#voucherDetail",
    "summary": "凭证下钻：同一 voucherNo 的全部分录 + 借贷合计与平衡判定。",
    "params": [
@@ -17158,6 +17927,9 @@
    "verb": "GET",
    "path": "/api/trade/order-exceptions",
    "perm": "order:exception:read",
+   "perms": [
+    "order:exception:read"
+   ],
    "handler": "OrderOpsController#orderExceptions",
    "summary": "",
    "params": [
@@ -17264,6 +18036,9 @@
    "verb": "POST",
    "path": "/api/trade/order-exceptions/{no}/handle",
    "perm": "order:exception:handle",
+   "perms": [
+    "order:exception:handle"
+   ],
    "handler": "OrderOpsController#handleOrderException",
    "summary": "",
    "params": [
@@ -17311,6 +18086,9 @@
    "verb": "GET",
    "path": "/api/trade/order-interventions",
    "perm": "order:order:read",
+   "perms": [
+    "order:order:read"
+   ],
    "handler": "TradeController#interventions",
    "summary": "干预留痕分页（审计视图，append-only 表 `ord_intervention`）。",
    "params": [
@@ -17391,6 +18169,9 @@
    "verb": "GET",
    "path": "/api/trade/orders",
    "perm": "order:order:read",
+   "perms": [
+    "order:order:read"
+   ],
    "handler": "TradeController#orders",
    "summary": "",
    "params": [
@@ -17499,6 +18280,9 @@
    "verb": "GET",
    "path": "/api/trade/orders/{orderNo}",
    "perm": "order:order:read",
+   "perms": [
+    "order:order:read"
+   ],
    "handler": "TradeController#order",
    "summary": "",
    "params": [
@@ -17589,6 +18373,9 @@
    "verb": "POST",
    "path": "/api/trade/orders/{orderNo}/intervene",
    "perm": "order:intervene:execute",
+   "perms": [
+    "order:intervene:execute"
+   ],
    "handler": "TradeController#intervene",
    "summary": "",
    "params": [
@@ -17748,6 +18535,9 @@
    "verb": "GET",
    "path": "/api/trade/payee-sharing",
    "perm": "finance:share_rule:read",
+   "perms": [
+    "finance:share_rule:read"
+   ],
    "handler": "OperationController#payeeSharing",
    "summary": "",
    "params": [
@@ -17834,6 +18624,9 @@
    "verb": "GET",
    "path": "/api/trade/payout-accounts",
    "perm": "finance:payout_account:read",
+   "perms": [
+    "finance:payout_account:read"
+   ],
    "handler": "FinanceController#payoutAccounts",
    "summary": "收款账户列表。",
    "params": [
@@ -17916,6 +18709,9 @@
    "verb": "POST",
    "path": "/api/trade/payout-accounts",
    "perm": "finance:payout_account:update",
+   "perms": [
+    "finance:payout_account:update"
+   ],
    "handler": "FinanceController#savePayoutAccount",
    "summary": "新增 / 修改收款账户。",
    "params": [],
@@ -18000,6 +18796,9 @@
    "verb": "POST",
    "path": "/api/trade/payout-accounts/{accountNo}/disable",
    "perm": "finance:payout_account:update",
+   "perms": [
+    "finance:payout_account:update"
+   ],
    "handler": "FinanceController#disablePayoutAccount",
    "summary": "停用收款账户。",
    "params": [
@@ -18057,7 +18856,10 @@
   {
    "verb": "GET",
    "path": "/api/trade/price-adjustments",
-   "perm": "pricing:rule:read",
+   "perm": "pricing:adjustment:read",
+   "perms": [
+    "pricing:adjustment:read"
+   ],
    "handler": "OperationController#adjustments",
    "summary": "",
    "params": [
@@ -18102,7 +18904,10 @@
   {
    "verb": "POST",
    "path": "/api/trade/price-adjustments",
-   "perm": "pricing:rule:config",
+   "perm": "pricing:adjustment:create",
+   "perms": [
+    "pricing:adjustment:create"
+   ],
    "handler": "OperationController#saveAdjustment",
    "summary": "新建或编辑调价单。",
    "params": [
@@ -18123,7 +18928,10 @@
   {
    "verb": "POST",
    "path": "/api/trade/price-adjustments/{adjustNo}",
-   "perm": "pricing:rule:config",
+   "perm": "pricing:adjustment:create",
+   "perms": [
+    "pricing:adjustment:create"
+   ],
    "handler": "OperationController#saveAdjustment",
    "summary": "新建或编辑调价单。",
    "params": [
@@ -18144,7 +18952,10 @@
   {
    "verb": "POST",
    "path": "/api/trade/price-adjustments/{adjustNo}/cancel",
-   "perm": "pricing:rule:config",
+   "perm": "pricing:adjustment:cancel",
+   "perms": [
+    "pricing:adjustment:cancel"
+   ],
    "handler": "OperationController#cancelAdjustment",
    "summary": "",
    "params": [
@@ -18165,7 +18976,10 @@
   {
    "verb": "POST",
    "path": "/api/trade/price-adjustments/{adjustNo}/retry",
-   "perm": "pricing:rule:config",
+   "perm": "pricing:adjustment:create",
+   "perms": [
+    "pricing:adjustment:create"
+   ],
    "handler": "OperationController#retryAdjustment",
    "summary": "",
    "params": [
@@ -18186,7 +19000,10 @@
   {
    "verb": "POST",
    "path": "/api/trade/price-adjustments/{adjustNo}/revert",
-   "perm": "pricing:rule:config",
+   "perm": "pricing:adjustment:cancel",
+   "perms": [
+    "pricing:adjustment:cancel"
+   ],
    "handler": "OperationController#revertAdjustment",
    "summary": "",
    "params": [
@@ -18208,6 +19025,9 @@
    "verb": "GET",
    "path": "/api/trade/price-plans",
    "perm": "pricing:plan:read",
+   "perms": [
+    "pricing:plan:read"
+   ],
    "handler": "PricingController#pricePlans",
    "summary": "",
    "params": [
@@ -18292,6 +19112,9 @@
    "verb": "POST",
    "path": "/api/trade/price-plans",
    "perm": "pricing:plan:create",
+   "perms": [
+    "pricing:plan:create"
+   ],
    "handler": "PricingController#createPlan",
    "summary": "",
    "params": [],
@@ -18392,6 +19215,9 @@
    "verb": "POST",
    "path": "/api/trade/price-plans/{no}/archive",
    "perm": "pricing:plan:update",
+   "perms": [
+    "pricing:plan:update"
+   ],
    "handler": "PricingController#archivePricePlan",
    "summary": "`Map.of` 不接受 null，统一转空串；空串在基类里等价于「不过滤」。",
    "params": [
@@ -18413,6 +19239,9 @@
    "verb": "POST",
    "path": "/api/trade/price-plans/{no}/unarchive",
    "perm": "pricing:plan:update",
+   "perms": [
+    "pricing:plan:update"
+   ],
    "handler": "PricingController#unarchivePricePlan",
    "summary": "取消归档PricePlan：清空时间戳，回到默认列表。",
    "params": [
@@ -18434,6 +19263,9 @@
    "verb": "POST",
    "path": "/api/trade/price-plans/{planNo}",
    "perm": "pricing:plan:create",
+   "perms": [
+    "pricing:plan:create"
+   ],
    "handler": "PricingController#updatePlan",
    "summary": "",
    "params": [
@@ -18541,6 +19373,9 @@
    "verb": "GET",
    "path": "/api/trade/price-plans/{planNo}/scopes",
    "perm": "pricing:plan:read",
+   "perms": [
+    "pricing:plan:read"
+   ],
    "handler": "PricingController#planScopes",
    "summary": "",
    "params": [
@@ -18607,6 +19442,9 @@
    "verb": "POST",
    "path": "/api/trade/price-plans/{planNo}/scopes",
    "perm": "pricing:plan:create",
+   "perms": [
+    "pricing:plan:create"
+   ],
    "handler": "PricingController#savePlanScope",
    "summary": "",
    "params": [
@@ -18718,6 +19556,9 @@
    "verb": "POST",
    "path": "/api/trade/price-plans/{planNo}/scopes/{id}/remove",
    "perm": "pricing:plan:create",
+   "perms": [
+    "pricing:plan:create"
+   ],
    "handler": "PricingController#removePlanScope",
    "summary": "契约禁止 delete*，用 remove（软删语义由实体的",
    "params": [
@@ -18750,6 +19591,9 @@
    "verb": "GET",
    "path": "/api/trade/pricing-schedules",
    "perm": "pricing:rule:read",
+   "perms": [
+    "pricing:rule:read"
+   ],
    "handler": "PricingController#pricingSchedules",
    "summary": "",
    "params": [
@@ -18826,6 +19670,9 @@
    "verb": "POST",
    "path": "/api/trade/pricing-schedules",
    "perm": "pricing:rule:update",
+   "perms": [
+    "pricing:rule:update"
+   ],
    "handler": "PricingController#createPricingSchedule",
    "summary": "",
    "params": [],
@@ -18918,6 +19765,9 @@
    "verb": "POST",
    "path": "/api/trade/pricing-schedules/{ruleNo}",
    "perm": "pricing:rule:update",
+   "perms": [
+    "pricing:rule:update"
+   ],
    "handler": "PricingController#updatePricingSchedule",
    "summary": "",
    "params": [
@@ -19017,6 +19867,9 @@
    "verb": "GET",
    "path": "/api/trade/reconciles",
    "perm": "finance:recon:read",
+   "perms": [
+    "finance:recon:read"
+   ],
    "handler": "FinanceController#reconciles",
    "summary": "审批入参。",
    "params": [
@@ -19123,6 +19976,9 @@
    "verb": "GET",
    "path": "/api/trade/reconciles/stats",
    "perm": "finance:reconcile:read",
+   "perms": [
+    "finance:reconcile:read"
+   ],
    "handler": "FinanceController#reconcileStats",
    "summary": "对账页头统计：任务数 / 差异数 / 已处理 / 待处理。",
    "params": [
@@ -19144,6 +20000,9 @@
    "verb": "GET",
    "path": "/api/trade/reconciles/{batchNo}/diffs",
    "perm": "finance:recon:read",
+   "perms": [
+    "finance:recon:read"
+   ],
    "handler": "FinanceController#reconDiffs",
    "summary": "",
    "params": [
@@ -19190,6 +20049,9 @@
    "verb": "POST",
    "path": "/api/trade/reconciles/{batchNo}/resolve",
    "perm": "finance:recon:handle",
+   "perms": [
+    "finance:recon:handle"
+   ],
    "handler": "FinanceController#resolveRecon",
    "summary": "差错平账处置。",
    "params": [
@@ -19272,6 +20134,9 @@
    "verb": "GET",
    "path": "/api/trade/refunds",
    "perm": "order:refund:audit",
+   "perms": [
+    "order:refund:audit"
+   ],
    "handler": "OrderOpsController#refunds",
    "summary": "",
    "params": [
@@ -19368,6 +20233,9 @@
    "verb": "POST",
    "path": "/api/trade/refunds",
    "perm": "order:refund:apply",
+   "perms": [
+    "order:refund:apply"
+   ],
    "handler": "OrderOpsController#applyRefund",
    "summary": "退款申请。",
    "params": [],
@@ -19464,6 +20332,9 @@
    "verb": "POST",
    "path": "/api/trade/refunds/{refundNo}/audit",
    "perm": "order:refund:audit",
+   "perms": [
+    "order:refund:audit"
+   ],
    "handler": "OrderOpsController#auditRefund",
    "summary": "退款审批。",
    "params": [
@@ -19551,6 +20422,9 @@
    "verb": "GET",
    "path": "/api/trade/reservations",
    "perm": "order:order:read",
+   "perms": [
+    "order:order:read"
+   ],
    "handler": "OrderOpsController#reservations",
    "summary": "",
    "params": [
@@ -19645,6 +20519,9 @@
    "verb": "POST",
    "path": "/api/trade/reservations/{no}/cancel",
    "perm": "order:order:update",
+   "perms": [
+    "order:order:update"
+   ],
    "handler": "OrderOpsController#cancelReservation",
    "summary": "取消预约：**仅 PENDING 可取消，服务端复校**。",
    "params": [
@@ -19671,6 +20548,10 @@
    "verb": "GET",
    "path": "/api/trade/settlements",
    "perm": "finance:settlement:read",
+   "perms": [
+    "finance:settlement:read",
+    "agent:settlement:read"
+   ],
    "handler": "FinanceController#settlements",
    "summary": "结算单列表（自 `TradeController` SeedData 骨架迁入，走 `stl_settlement` 表）。",
    "params": [
@@ -19759,6 +20640,9 @@
    "verb": "POST",
    "path": "/api/trade/settlements/generate",
    "perm": "finance:settlement:generate",
+   "perms": [
+    "finance:settlement:generate"
+   ],
    "handler": "FinanceController#generateSettlementsPublic",
    "summary": "周期出账（运营端手动触发入口）。",
    "params": [],
@@ -19773,6 +20657,10 @@
    "verb": "GET",
    "path": "/api/trade/settlements/{settleNo}",
    "perm": "finance:settlement:read",
+   "perms": [
+    "finance:settlement:read",
+    "agent:settlement:read"
+   ],
    "handler": "FinanceController#settlement",
    "summary": "",
    "params": [
@@ -19867,6 +20755,9 @@
    "verb": "POST",
    "path": "/api/trade/settlements/{settleNo}/confirm",
    "perm": "finance:settlement:confirm",
+   "perms": [
+    "finance:settlement:confirm"
+   ],
    "handler": "FinanceController#confirmSettlement",
    "summary": "",
    "params": [
@@ -19961,6 +20852,10 @@
    "verb": "GET",
    "path": "/api/trade/settlements/{settleNo}/records",
    "perm": "finance:settlement:read",
+   "perms": [
+    "finance:settlement:read",
+    "agent:settlement:read"
+   ],
    "handler": "FinanceController#settlementRecords",
    "summary": "结算单构成明细：这张单的钱是哪几笔分润凑出来的。",
    "params": [
@@ -19994,6 +20889,9 @@
    "verb": "GET",
    "path": "/api/trade/share-records",
    "perm": "finance:share_record:read",
+   "perms": [
+    "finance:share_record:read"
+   ],
    "handler": "FinanceController#shareRecords",
    "summary": "",
    "params": [
@@ -20100,6 +20998,9 @@
    "verb": "GET",
    "path": "/api/trade/share-rules",
    "perm": "finance:share_rule:read",
+   "perms": [
+    "finance:share_rule:read"
+   ],
    "handler": "FinanceController#shareRules",
    "summary": "分润规则列表（自 `TradeController` SeedData 骨架迁入，走 `share_rule` 表）。",
    "params": [
@@ -20174,6 +21075,9 @@
    "verb": "POST",
    "path": "/api/trade/share-rules",
    "perm": "finance:share_rule:create",
+   "perms": [
+    "finance:share_rule:create"
+   ],
    "handler": "FinanceController#createShareRule",
    "summary": "",
    "params": [],
@@ -20270,6 +21174,9 @@
    "verb": "POST",
    "path": "/api/trade/share-rules/{ruleNo}",
    "perm": "finance:share_rule:create",
+   "perms": [
+    "finance:share_rule:create"
+   ],
    "handler": "FinanceController#updateShareRule",
    "summary": "",
    "params": [
@@ -20373,6 +21280,9 @@
    "verb": "GET",
    "path": "/api/trade/share-summaries",
    "perm": "finance:share_record:read",
+   "perms": [
+    "finance:share_record:read"
+   ],
    "handler": "FinanceController#shareSummaries",
    "summary": "分润统计 —— **读模型，无对应表**：由 `share_record` 按 (dimension, payeeNo, period) 聚合。",
    "params": [
@@ -20465,6 +21375,9 @@
    "verb": "GET",
    "path": "/api/trade/site-sharing",
    "perm": "finance:share_rule:read",
+   "perms": [
+    "finance:share_rule:read"
+   ],
    "handler": "OperationController#siteSharing",
    "summary": "",
    "params": [
@@ -20571,6 +21484,9 @@
    "verb": "GET",
    "path": "/api/trade/site-sharing/stats",
    "perm": "finance:share_rule:read",
+   "perms": [
+    "finance:share_rule:read"
+   ],
    "handler": "OperationController#siteSharingStats",
    "summary": "",
    "params": [],
@@ -20602,6 +21518,9 @@
    "verb": "GET",
    "path": "/api/trade/withdrawals",
    "perm": "finance:withdrawal:read",
+   "perms": [
+    "finance:withdrawal:read"
+   ],
    "handler": "FinanceController#withdrawals",
    "summary": "提现审核队列（菜单叶：财务管理 › 提现审核）。",
    "params": [
@@ -20726,6 +21645,9 @@
    "verb": "POST",
    "path": "/api/trade/withdrawals",
    "perm": "finance:withdrawal:apply",
+   "perms": [
+    "finance:withdrawal:apply"
+   ],
    "handler": "FinanceController#applyWithdrawal",
    "summary": "提现申请。",
    "params": [],
@@ -20854,6 +21776,9 @@
    "verb": "POST",
    "path": "/api/trade/withdrawals/{withdrawNo}/audit",
    "perm": "finance:withdrawal:audit",
+   "perms": [
+    "finance:withdrawal:audit"
+   ],
    "handler": "FinanceController#auditWithdrawal",
    "summary": "提现审批。",
    "params": [
@@ -20969,6 +21894,9 @@
    "verb": "POST",
    "path": "/api/trade/withdrawals/{withdrawNo}/pay",
    "perm": "finance:withdrawal:pay",
+   "perms": [
+    "finance:withdrawal:pay"
+   ],
    "handler": "FinanceController#payWithdrawal",
    "summary": "打款回执登记：把「出款在途」推到终态（必要功能清单 ⑮）。",
    "params": [
@@ -21092,6 +22020,9 @@
    "verb": "GET",
    "path": "/api/user/ad-campaigns",
    "perm": "marketing:ad:read",
+   "perms": [
+    "marketing:ad:read"
+   ],
    "handler": "MarketingController#adCampaigns",
    "summary": "",
    "params": [
@@ -21178,6 +22109,9 @@
    "verb": "POST",
    "path": "/api/user/ad-campaigns",
    "perm": "marketing:ad:update",
+   "perms": [
+    "marketing:ad:update"
+   ],
    "handler": "MarketingController#createAdCampaign",
    "summary": "",
    "params": [],
@@ -21233,6 +22167,9 @@
    "verb": "POST",
    "path": "/api/user/ad-campaigns/{adNo}",
    "perm": "marketing:ad:update",
+   "perms": [
+    "marketing:ad:update"
+   ],
    "handler": "MarketingController#updateAdCampaign",
    "summary": "",
    "params": [
@@ -21295,6 +22232,9 @@
    "verb": "POST",
    "path": "/api/user/ad-campaigns/{adNo}/{action}",
    "perm": "marketing:ad:update",
+   "perms": [
+    "marketing:ad:update"
+   ],
    "handler": "MarketingController#transitionAdCampaign",
    "summary": "广告投放状态迁移，语义同活动。",
    "params": [
@@ -21322,6 +22262,9 @@
    "verb": "GET",
    "path": "/api/user/ad-deliveries",
    "perm": "marketing:ad:read",
+   "perms": [
+    "marketing:ad:read"
+   ],
    "handler": "MarketingController#adDeliveries",
    "summary": "投放与曝光统计。",
    "params": [
@@ -21402,6 +22345,9 @@
    "verb": "GET",
    "path": "/api/user/blacklist",
    "perm": "user:risk:read",
+   "perms": [
+    "user:risk:read"
+   ],
    "handler": "UserOpsController#blacklist",
    "summary": "",
    "params": [
@@ -21482,6 +22428,9 @@
    "verb": "GET",
    "path": "/api/user/campaigns",
    "perm": "marketing:campaign:read",
+   "perms": [
+    "marketing:campaign:read"
+   ],
    "handler": "MarketingController#campaigns",
    "summary": "",
    "params": [
@@ -21556,6 +22505,9 @@
    "verb": "POST",
    "path": "/api/user/campaigns",
    "perm": "marketing:campaign:update",
+   "perms": [
+    "marketing:campaign:update"
+   ],
    "handler": "MarketingController#createCampaign",
    "summary": "",
    "params": [],
@@ -21599,6 +22551,9 @@
    "verb": "POST",
    "path": "/api/user/campaigns/{campaignNo}",
    "perm": "marketing:campaign:update",
+   "perms": [
+    "marketing:campaign:update"
+   ],
    "handler": "MarketingController#updateCampaign",
    "summary": "",
    "params": [
@@ -21649,6 +22604,9 @@
    "verb": "POST",
    "path": "/api/user/campaigns/{campaignNo}/{action}",
    "perm": "marketing:campaign:update",
+   "perms": [
+    "marketing:campaign:update"
+   ],
    "handler": "MarketingController#transitionCampaign",
    "summary": "活动状态迁移（start/pause/end）。",
    "params": [
@@ -21676,6 +22634,9 @@
    "verb": "GET",
    "path": "/api/user/coupon-issue-records",
    "perm": "marketing:coupon:read",
+   "perms": [
+    "marketing:coupon:read"
+   ],
    "handler": "MarketingController#couponIssueRecords",
    "summary": "券发放记录（append，只增不改）。",
    "params": [
@@ -21709,6 +22670,9 @@
    "verb": "GET",
    "path": "/api/user/coupons",
    "perm": "marketing:coupon:read",
+   "perms": [
+    "marketing:coupon:read"
+   ],
    "handler": "UserController#coupons",
    "summary": "",
    "params": [
@@ -21783,6 +22747,9 @@
    "verb": "POST",
    "path": "/api/user/coupons",
    "perm": "marketing:coupon:create",
+   "perms": [
+    "marketing:coupon:create"
+   ],
    "handler": "MarketingController#createCoupon",
    "summary": "",
    "params": [],
@@ -21838,6 +22805,9 @@
    "verb": "POST",
    "path": "/api/user/coupons/{couponNo}",
    "perm": "marketing:coupon:create",
+   "perms": [
+    "marketing:coupon:create"
+   ],
    "handler": "MarketingController#updateCoupon",
    "summary": "",
    "params": [
@@ -21900,6 +22870,9 @@
    "verb": "POST",
    "path": "/api/user/coupons/{no}/archive",
    "perm": "marketing:coupon:update",
+   "perms": [
+    "marketing:coupon:update"
+   ],
    "handler": "MarketingController#archiveCoupon",
    "summary": "归档Coupon。",
    "params": [
@@ -21921,6 +22894,9 @@
    "verb": "POST",
    "path": "/api/user/coupons/{no}/unarchive",
    "perm": "marketing:coupon:update",
+   "perms": [
+    "marketing:coupon:update"
+   ],
    "handler": "MarketingController#unarchiveCoupon",
    "summary": "取消归档Coupon：清空时间戳，回到默认列表。",
    "params": [
@@ -21942,6 +22918,9 @@
    "verb": "POST",
    "path": "/api/user/coupons/{tplNo}/issue",
    "perm": "marketing:coupon:issue",
+   "perms": [
+    "marketing:coupon:issue"
+   ],
    "handler": "MarketingController#issueCoupon",
    "summary": "定向发券。",
    "params": [
@@ -22008,6 +22987,9 @@
    "verb": "GET",
    "path": "/api/user/credit-score-changes",
    "perm": "user:risk:read",
+   "perms": [
+    "user:risk:read"
+   ],
    "handler": "UserOpsController#creditScoreChanges",
    "summary": "信用分变更流水（append，只增不改）。",
    "params": [
@@ -22041,6 +23023,9 @@
    "verb": "GET",
    "path": "/api/user/free-whitelist",
    "perm": "user:risk:read",
+   "perms": [
+    "user:risk:read"
+   ],
    "handler": "UserOpsController#freeWhitelist",
    "summary": "",
    "params": [
@@ -22139,6 +23124,9 @@
    "verb": "POST",
    "path": "/api/user/free-whitelist",
    "perm": "user:risk:update",
+   "perms": [
+    "user:risk:update"
+   ],
    "handler": "UserOpsController#grantWhitelist",
    "summary": "",
    "params": [],
@@ -22206,6 +23194,9 @@
    "verb": "POST",
    "path": "/api/user/free-whitelist/{userNo}",
    "perm": "user:risk:update",
+   "perms": [
+    "user:risk:update"
+   ],
    "handler": "UserOpsController#updateWhitelist",
    "summary": "",
    "params": [
@@ -22280,6 +23271,9 @@
    "verb": "POST",
    "path": "/api/user/free-whitelist/{userNo}/revoke",
    "perm": "user:risk:update",
+   "perms": [
+    "user:risk:update"
+   ],
    "handler": "UserOpsController#revokeWhitelist",
    "summary": "撤销 = 软删除（`status=REVOKED` 留记录），不是 DELETE（[api §1.5] 全站零 DELETE）。",
    "params": [
@@ -22354,6 +23348,9 @@
    "verb": "GET",
    "path": "/api/user/member-benefits",
    "perm": "user:member:read",
+   "perms": [
+    "user:member:read"
+   ],
    "handler": "UserOpsController#memberBenefits",
    "summary": "会员等级权益，**按等级由低到高**返回（页面排序与单调性校验共用同一顺序）。",
    "params": [],
@@ -22368,6 +23365,9 @@
    "verb": "POST",
    "path": "/api/user/member-benefits/{level}",
    "perm": "user:member:update",
+   "perms": [
+    "user:member:update"
+   ],
    "handler": "UserOpsController#saveMemberBenefit",
    "summary": "保存某等级的权益。",
    "params": [
@@ -22434,6 +23434,9 @@
    "verb": "GET",
    "path": "/api/user/member-cards",
    "perm": "user:member:read",
+   "perms": [
+    "user:member:read"
+   ],
    "handler": "UserOpsController#memberCards",
    "summary": "会员卡列表。",
    "params": [
@@ -22473,6 +23476,9 @@
    "verb": "POST",
    "path": "/api/user/member-cards",
    "perm": "user:member:update",
+   "perms": [
+    "user:member:update"
+   ],
    "handler": "UserOpsController#grantMemberCard",
    "summary": "发卡。",
    "params": [],
@@ -22504,6 +23510,9 @@
    "verb": "GET",
    "path": "/api/user/members",
    "perm": "user:member:read",
+   "perms": [
+    "user:member:read"
+   ],
    "handler": "UserOpsController#members",
    "summary": "",
    "params": [
@@ -22576,6 +23585,9 @@
    "verb": "POST",
    "path": "/api/user/members",
    "perm": "user:member:update",
+   "perms": [
+    "user:member:update"
+   ],
    "handler": "UserOpsController#createMember",
    "summary": "",
    "params": [],
@@ -22623,6 +23635,9 @@
    "verb": "POST",
    "path": "/api/user/members/{userNo}",
    "perm": "user:member:update",
+   "perms": [
+    "user:member:update"
+   ],
    "handler": "UserOpsController#updateMember",
    "summary": "",
    "params": [
@@ -22677,6 +23692,9 @@
    "verb": "GET",
    "path": "/api/user/push-messages",
    "perm": "marketing:push:send",
+   "perms": [
+    "marketing:push:send"
+   ],
    "handler": "MarketingController#pushMessages",
    "summary": "",
    "params": [
@@ -22755,6 +23773,9 @@
    "verb": "POST",
    "path": "/api/user/push-messages",
    "perm": "marketing:push:send",
+   "perms": [
+    "marketing:push:send"
+   ],
    "handler": "MarketingController#createPush",
    "summary": "",
    "params": [],
@@ -22802,6 +23823,9 @@
    "verb": "POST",
    "path": "/api/user/push-messages/{pushNo}",
    "perm": "marketing:push:send",
+   "perms": [
+    "marketing:push:send"
+   ],
    "handler": "MarketingController#updatePush",
    "summary": "",
    "params": [
@@ -22856,6 +23880,9 @@
    "verb": "POST",
    "path": "/api/user/push-messages/{pushNo}/send",
    "perm": "marketing:push:update",
+   "perms": [
+    "marketing:push:update"
+   ],
    "handler": "MarketingController#sendPushMessage",
    "summary": "发送推送。",
    "params": [
@@ -22877,6 +23904,9 @@
    "verb": "GET",
    "path": "/api/user/recharge-orders",
    "perm": "user:wallet:read",
+   "perms": [
+    "user:wallet:read"
+   ],
    "handler": "UserOpsController#rechargeOrders",
    "summary": "",
    "params": [
@@ -22981,6 +24011,9 @@
    "verb": "GET",
    "path": "/api/user/recharge-packages",
    "perm": "user:wallet:read",
+   "perms": [
+    "user:wallet:read"
+   ],
    "handler": "UserOpsController#rechargePackages",
    "summary": "",
    "params": [
@@ -23061,6 +24094,9 @@
    "verb": "POST",
    "path": "/api/user/recharge-packages",
    "perm": "user:wallet:update",
+   "perms": [
+    "user:wallet:update"
+   ],
    "handler": "UserOpsController#createRechargePackage",
    "summary": "",
    "params": [],
@@ -23116,6 +24152,9 @@
    "verb": "POST",
    "path": "/api/user/recharge-packages/{no}/archive",
    "perm": "marketing:recharge:update",
+   "perms": [
+    "marketing:recharge:update"
+   ],
    "handler": "UserOpsController#archiveRechargePackage",
    "summary": "`Map.of` 不接受 null，统一转空串；空串在 CRUD 基类里等价于「不过滤」。",
    "params": [
@@ -23137,6 +24176,9 @@
    "verb": "POST",
    "path": "/api/user/recharge-packages/{no}/unarchive",
    "perm": "marketing:recharge:update",
+   "perms": [
+    "marketing:recharge:update"
+   ],
    "handler": "UserOpsController#unarchiveRechargePackage",
    "summary": "取消归档RechargePackage：清空时间戳，回到默认列表。",
    "params": [
@@ -23158,6 +24200,9 @@
    "verb": "POST",
    "path": "/api/user/recharge-packages/{packageNo}",
    "perm": "user:wallet:update",
+   "perms": [
+    "user:wallet:update"
+   ],
    "handler": "UserOpsController#updateRechargePackage",
    "summary": "",
    "params": [
@@ -23220,6 +24265,9 @@
    "verb": "GET",
    "path": "/api/user/referral-rules",
    "perm": "marketing:referral:read",
+   "perms": [
+    "marketing:referral:read"
+   ],
    "handler": "MarketingController#referralRules",
    "summary": "裂变规则列表。",
    "params": [
@@ -23247,6 +24295,9 @@
    "verb": "POST",
    "path": "/api/user/referral-rules",
    "perm": "marketing:referral:update",
+   "perms": [
+    "marketing:referral:update"
+   ],
    "handler": "MarketingController#createReferralRule",
    "summary": "新建 / 修改裂变规则。",
    "params": [],
@@ -23302,6 +24353,9 @@
    "verb": "POST",
    "path": "/api/user/referral-rules/{ruleNo}",
    "perm": "marketing:referral:update",
+   "perms": [
+    "marketing:referral:update"
+   ],
    "handler": "MarketingController#updateReferralRule",
    "summary": "",
    "params": [
@@ -23364,6 +24418,9 @@
    "verb": "GET",
    "path": "/api/user/referrals",
    "perm": "marketing:campaign:read",
+   "perms": [
+    "marketing:campaign:read"
+   ],
    "handler": "MarketingController#referrals",
    "summary": "",
    "params": [
@@ -23438,6 +24495,9 @@
    "verb": "GET",
    "path": "/api/user/risk-users",
    "perm": "user:risk:read",
+   "perms": [
+    "user:risk:read"
+   ],
    "handler": "UserOpsController#riskUsers",
    "summary": "",
    "params": [
@@ -23510,6 +24570,9 @@
    "verb": "GET",
    "path": "/api/user/users",
    "perm": "user:cuser:read",
+   "perms": [
+    "user:cuser:read"
+   ],
    "handler": "UserController#users",
    "summary": "",
    "params": [
@@ -23576,6 +24639,9 @@
    "verb": "POST",
    "path": "/api/user/users/{cUserNo}/credit-score",
    "perm": "user:risk:update",
+   "perms": [
+    "user:risk:update"
+   ],
    "handler": "UserOpsController#adjustCreditScore",
    "summary": "调整信用分。",
    "params": [
@@ -23606,6 +24672,9 @@
    "verb": "GET",
    "path": "/api/user/users/{cUserNo}/profile",
    "perm": "user:cuser:read",
+   "perms": [
+    "user:cuser:read"
+   ],
    "handler": "UserController#profile",
    "summary": "用户 360 档案（列表行点开的详情抽屉），镜像前端 `UserProfile`。",
    "params": [
@@ -24106,6 +25175,9 @@
    "verb": "GET",
    "path": "/api/user/wallets",
    "perm": "user:wallet:read",
+   "perms": [
+    "user:wallet:read"
+   ],
    "handler": "UserOpsController#wallets",
    "summary": "",
    "params": [
@@ -24180,6 +25252,9 @@
    "verb": "POST",
    "path": "/api/user/wallets",
    "perm": "user:wallet:update",
+   "perms": [
+    "user:wallet:update"
+   ],
    "handler": "UserOpsController#adjustWallet",
    "summary": "运营手工调整钱包。",
    "params": [],
@@ -24252,6 +25327,9 @@
    "verb": "POST",
    "path": "/api/user/wallets/{userNo}",
    "perm": "user:wallet:update",
+   "perms": [
+    "user:wallet:update"
+   ],
    "handler": "UserOpsController#adjustWalletOf",
    "summary": "",
    "params": [
@@ -24331,6 +25409,9 @@
    "verb": "GET",
    "path": "/api/user/wallets/{userNo}/txns",
    "perm": "user:wallet:read",
+   "perms": [
+    "user:wallet:read"
+   ],
    "handler": "UserOpsController#walletTxns",
    "summary": "",
    "params": [
@@ -24407,6 +25488,7 @@
    "verb": "GET",
    "path": "/internal/dev/cabinets/assignable",
    "perm": null,
+   "perms": [],
    "handler": "CabinetQueryInternalController#assignable",
    "summary": "`CabinetQueryPort` 的服务端（仅服务间调用）。",
    "params": [
@@ -24461,6 +25543,7 @@
    "verb": "POST",
    "path": "/internal/dev/cabinets/briefs",
    "perm": null,
+   "perms": [],
    "handler": "CabinetQueryInternalController#briefs",
    "summary": "",
    "params": [],
@@ -24496,6 +25579,7 @@
    "verb": "POST",
    "path": "/internal/dev/ownership/by-locations",
    "perm": null,
+   "perms": [],
    "handler": "OwnershipInternalController#byLocations",
    "summary": "`DeviceOwnershipPort` 的服务端（仅服务间调用）。",
    "params": [],
@@ -24510,6 +25594,7 @@
    "verb": "POST",
    "path": "/internal/dev/ownership/cabinet",
    "perm": null,
+   "perms": [],
    "handler": "OwnershipInternalController#cabinet",
    "summary": "",
    "params": [],
@@ -24524,6 +25609,7 @@
    "verb": "GET",
    "path": "/internal/dev/ownership/exists",
    "perm": null,
+   "perms": [],
    "handler": "OwnershipInternalController#exists",
    "summary": "",
    "params": [
@@ -24545,6 +25631,7 @@
    "verb": "GET",
    "path": "/internal/gw/heartbeats",
    "perm": null,
+   "perms": [],
    "handler": "TelemetryInternalController#heartbeats",
    "summary": "`TelemetryQueryPort` 的服务端（仅服务间调用）。",
    "params": [
@@ -24585,6 +25672,9 @@
    "verb": "GET",
    "path": "/internal/gw/vendors",
    "perm": "device:vendor:read",
+   "perms": [
+    "device:vendor:read"
+   ],
    "handler": "VendorController#vendors",
    "summary": "",
    "params": [],
@@ -24624,6 +25714,9 @@
    "verb": "POST",
    "path": "/internal/gw/vendors/{vendorCode}/config",
    "perm": "device:vendor:config",
+   "perms": [
+    "device:vendor:config"
+   ],
    "handler": "VendorController#saveConfig",
    "summary": "",
    "params": [
@@ -24670,6 +25763,9 @@
    "verb": "POST",
    "path": "/internal/gw/vendors/{vendorCode}/test",
    "perm": "device:vendor:config",
+   "perms": [
+    "device:vendor:config"
+   ],
    "handler": "VendorController#test",
    "summary": "连通性探测（S7）：「配置能存」≠「对得上」，填错要在配置页当场知道。",
    "params": [
@@ -24720,6 +25816,7 @@
    "verb": "POST",
    "path": "/internal/platform/notify/send",
    "perm": null,
+   "perms": [],
    "handler": "NotifyController#send",
    "summary": "",
    "params": [],
@@ -24780,6 +25877,7 @@
    "verb": "POST",
    "path": "/internal/platform/sites/briefs",
    "perm": null,
+   "perms": [],
    "handler": "SiteInternalController#briefs",
    "summary": "`SiteQueryPort` 的服务端（`/internal/**`，仅服务间调用，不对外暴露）。",
    "params": [],
@@ -24819,6 +25917,7 @@
    "verb": "POST",
    "path": "/internal/trade/orders/{orderNo}/return",
    "perm": null,
+   "perms": [],
    "handler": "TradeInternalController#returnOrder",
    "summary": "归还结单：IN_USE→RETURNED→SETTLED（计费）。",
    "params": [
@@ -24845,6 +25944,7 @@
    "verb": "POST",
    "path": "/internal/trade/price-adjustments/tick",
    "perm": null,
+   "perms": [],
    "handler": "OperationController#tick",
    "summary": "执行到点的调价 / 到期的恢复。",
    "params": [],
@@ -24859,6 +25959,7 @@
    "verb": "POST",
    "path": "/internal/trade/settlements/generate",
    "perm": null,
+   "perms": [],
    "handler": "FinanceController#generateSettlements",
    "summary": "周期出账（[api/README §4.3]）—— **批处理作业调用，非页面入口**，内网受信， 故不挂 `",
    "params": [],
@@ -24873,6 +25974,9 @@
    "verb": "POST",
    "path": "/internal/user/credit/blacklist",
    "perm": "user:risk:update",
+   "perms": [
+    "user:risk:update"
+   ],
    "handler": "UserController#blacklist",
    "summary": "内部拉黑/解除。",
    "params": [],
@@ -24892,6 +25996,7 @@
    "verb": "GET",
    "path": "/mp/app/version",
    "perm": null,
+   "perms": [],
    "handler": "MpMetaController#version",
    "summary": "版本检查：取该平台 `RELEASED` 且灰度 &gt; 0 的最高构建号版本。",
    "params": [
@@ -24948,6 +26053,7 @@
    "verb": "POST",
    "path": "/mp/auth/login",
    "perm": null,
+   "perms": [],
    "handler": "ConsumerAuthController#login",
    "summary": "统一登录：grantType 分发（phone_otp/wechat_miniapp/wechat_oauth/apple/google）。",
    "params": [],
@@ -25028,6 +26134,7 @@
    "verb": "POST",
    "path": "/mp/auth/logout",
    "perm": null,
+   "perms": [],
    "handler": "ConsumerAuthController#logout",
    "summary": "",
    "params": [
@@ -25049,6 +26156,7 @@
    "verb": "POST",
    "path": "/mp/auth/otp",
    "perm": null,
+   "perms": [],
    "handler": "ConsumerAuthController#otp",
    "summary": "发送 OTP。",
    "params": [],
@@ -25063,6 +26171,7 @@
    "verb": "POST",
    "path": "/mp/auth/password/reset",
    "perm": null,
+   "perms": [],
    "handler": "ConsumerAuthController#resetPassword",
    "summary": "密码重置：**能力未开通**（凭据库 pb_auth 未建，[未完成清单 B6]）——如实 400，不假 ok。",
    "params": [],
@@ -25077,6 +26186,7 @@
    "verb": "POST",
    "path": "/mp/auth/register",
    "perm": null,
+   "perms": [],
    "handler": "ConsumerAuthController#register",
    "summary": "注册 = OTP 验证 + 建户 + 直接发 token（复用 phone_otp 登录链路，带显式昵称）。",
    "params": [],
@@ -25091,6 +26201,7 @@
    "verb": "GET",
    "path": "/mp/faq",
    "perm": null,
+   "perms": [],
    "handler": "MpMetaController#faq",
    "summary": "帮助中心 FAQ / 报障问题列表（只取启用项，按排序号升序）。",
    "params": [
@@ -25143,6 +26254,7 @@
    "verb": "GET",
    "path": "/mp/nearby/cabinets",
    "perm": null,
+   "perms": [],
    "handler": "MpNearbyController#nearby",
    "summary": "附近机柜（镜像 c-app `NearbyCabinet[]`）。",
    "params": [
@@ -25182,6 +26294,7 @@
    "verb": "GET",
    "path": "/mp/nearby/cabinets/{cabinetNo}/availability",
    "perm": null,
+   "perms": [],
    "handler": "MpNearbyController#availability",
    "summary": "借出可用性校验（借出确认页，镜像 c-app `CabinetAvailability`）。",
    "params": [
@@ -25203,6 +26316,7 @@
    "verb": "GET",
    "path": "/mp/notice",
    "perm": null,
+   "perms": [],
    "handler": "MpSupportController#notices",
    "summary": "运营公告（首页公告条 + 公告页）。",
    "params": [
@@ -25285,6 +26399,7 @@
    "verb": "GET",
    "path": "/mp/sites/{siteNo}",
    "perm": null,
+   "perms": [],
    "handler": "MpNearbyController#site",
    "summary": "门店详情（镜像 c-app `StoreDetail`）。",
    "params": [
@@ -25306,6 +26421,7 @@
    "verb": "POST",
    "path": "/mp/trade/deposit/free",
    "perm": null,
+   "perms": [],
    "handler": "RentController#depositFree",
    "summary": "免押预授权（借出前）：冻结额度走 `pay_auth`（StubPaymentPort，ADR-005 不真扣款）。",
    "params": [],
@@ -25320,6 +26436,7 @@
    "verb": "GET",
    "path": "/mp/trade/orders",
    "perm": null,
+   "perms": [],
    "handler": "RentController#myOrders",
    "summary": "我的订单（属主过滤，只见自己）。",
    "params": [
@@ -25416,6 +26533,7 @@
    "verb": "GET",
    "path": "/mp/trade/orders/ongoing",
    "perm": null,
+   "perms": [],
    "handler": "RentController#ongoing",
    "summary": "进行中订单（首页快捷入口）：无则 200 + null data，端上按无单渲染。",
    "params": [],
@@ -25499,6 +26617,7 @@
    "verb": "POST",
    "path": "/mp/trade/orders/rent",
    "perm": null,
+   "perms": [],
    "handler": "RentController#rent",
    "summary": "扫码借出：`{cabinetNo`} → 创单（免押/弹仓骨架），返回订单号 + 充电宝 + 指令号。",
    "params": [],
@@ -25526,6 +26645,7 @@
    "verb": "GET",
    "path": "/mp/trade/orders/{orderNo}",
    "perm": null,
+   "perms": [],
    "handler": "RentController#detail",
    "summary": "订单详情：属主鉴权，非本人 → 403（防横向越权 IDOR）。",
    "params": [
@@ -25616,6 +26736,7 @@
    "verb": "POST",
    "path": "/mp/trade/orders/{orderNo}/buyout",
    "perm": null,
+   "perms": [],
    "handler": "RentController#buyout",
    "summary": "买断：不还了，按 `sys_biz_rule` 计费兜底分区的买断价结单（属主鉴权）。",
    "params": [
@@ -25706,6 +26827,7 @@
    "verb": "POST",
    "path": "/mp/trade/pay",
    "perm": null,
+   "perms": [],
    "handler": "RentController#pay",
    "summary": "支付（`scene`=ORDER/…）。",
    "params": [],
@@ -25720,6 +26842,7 @@
    "verb": "GET",
    "path": "/mp/user/coupons",
    "perm": null,
+   "perms": [],
    "handler": "MpSupportController#myCoupons",
    "summary": "我的券包 / 领券中心。",
    "params": [
@@ -25798,6 +26921,7 @@
    "verb": "POST",
    "path": "/mp/user/coupons/{couponNo}/claim",
    "perm": null,
+   "perms": [],
    "handler": "MpSupportController#claim",
    "summary": "领券。",
    "params": [
@@ -25864,6 +26988,7 @@
    "verb": "GET",
    "path": "/mp/user/favorites",
    "perm": null,
+   "perms": [],
    "handler": "MpUserController#favorites",
    "summary": "",
    "params": [
@@ -25904,6 +27029,7 @@
    "verb": "POST",
    "path": "/mp/user/favorites/{siteNo}",
    "perm": null,
+   "perms": [],
    "handler": "MpUserController#toggleFavorite",
    "summary": "收藏 / 取消收藏（切换）。",
    "params": [
@@ -25925,6 +27051,7 @@
    "verb": "GET",
    "path": "/mp/user/invoice-titles",
    "perm": null,
+   "perms": [],
    "handler": "MpUserController#invoiceTitles",
    "summary": "",
    "params": [
@@ -25973,6 +27100,7 @@
    "verb": "POST",
    "path": "/mp/user/invoice-titles",
    "perm": null,
+   "perms": [],
    "handler": "MpUserController#saveInvoiceTitle",
    "summary": "",
    "params": [],
@@ -26008,6 +27136,7 @@
    "verb": "GET",
    "path": "/mp/user/invoices",
    "perm": null,
+   "perms": [],
    "handler": "MpUserController#invoices",
    "summary": "",
    "params": [
@@ -26078,6 +27207,7 @@
    "verb": "POST",
    "path": "/mp/user/invoices",
    "perm": null,
+   "perms": [],
    "handler": "MpUserController#applyInvoice",
    "summary": "",
    "params": [],
@@ -26129,6 +27259,7 @@
    "verb": "POST",
    "path": "/mp/user/logoff",
    "perm": null,
+   "perms": [],
    "handler": "MpUserController#applyLogoff",
    "summary": "提交注销申请；返回冷静期截止时间，期内可撤销。",
    "params": [],
@@ -26164,6 +27295,7 @@
    "verb": "GET",
    "path": "/mp/user/membership",
    "perm": null,
+   "perms": [],
    "handler": "MpUserController#membership",
    "summary": "会员方案列表（C-MB 选购页）：全部在售方案 + 我是否已开通。",
    "params": [],
@@ -26203,6 +27335,7 @@
    "verb": "GET",
    "path": "/mp/user/messages",
    "perm": null,
+   "perms": [],
    "handler": "MpUserController#messages",
    "summary": "",
    "params": [
@@ -26271,6 +27404,7 @@
    "verb": "POST",
    "path": "/mp/user/messages/{messageNo}/read",
    "perm": null,
+   "perms": [],
    "handler": "MpUserController#markRead",
    "summary": "",
    "params": [
@@ -26321,6 +27455,7 @@
    "verb": "GET",
    "path": "/mp/user/profile",
    "perm": null,
+   "perms": [],
    "handler": "MpUserController#profile",
    "summary": "我的资料（镜像 c-app `UserProfile`）。",
    "params": [],
@@ -26335,6 +27470,7 @@
    "verb": "POST",
    "path": "/mp/user/profile",
    "perm": null,
+   "perms": [],
    "handler": "MpUserController#updateProfile",
    "summary": "资料编辑：仅 `nickname`/`avatar`。",
    "params": [],
@@ -26349,6 +27485,7 @@
    "verb": "GET",
    "path": "/mp/user/recharge-packages",
    "perm": null,
+   "perms": [],
    "handler": "MpUserController#rechargePackages",
    "summary": "可购充值套餐，按用户所在市场过滤。",
    "params": [
@@ -26411,6 +27548,7 @@
    "verb": "POST",
    "path": "/mp/user/report",
    "perm": null,
+   "perms": [],
    "handler": "MpSupportController#report",
    "summary": "自助报障 —— 落 `cs_ticket`（C 端诉求的**唯一受理单**，[api/README §6A.2]）， 随即按 `md_problem.suggested_action` 字典分流到工单 / 退款 / 人工会话。",
    "params": [],
@@ -26475,6 +27613,7 @@
    "verb": "GET",
    "path": "/mp/user/reports",
    "perm": null,
+   "perms": [],
    "handler": "MpSupportController#myReports",
    "summary": "我的报障列表。",
    "params": [
@@ -26557,6 +27696,7 @@
    "verb": "GET",
    "path": "/mp/user/reports/{reportNo}",
    "perm": null,
+   "perms": [],
    "handler": "MpSupportController#myReport",
    "summary": "报障进度 / 结果（联动工单与退款状态）。",
    "params": [
@@ -26627,6 +27767,7 @@
    "verb": "GET",
    "path": "/mp/user/wallet",
    "perm": null,
+   "perms": [],
    "handler": "MpUserController#wallet",
    "summary": "",
    "params": [],
@@ -26662,6 +27803,7 @@
    "verb": "GET",
    "path": "/mp/user/wallet/txns",
    "perm": null,
+   "perms": [],
    "handler": "MpUserController#walletTxns",
    "summary": "路径是 `/txns` 不是 `/transactions`（[api §十 冲突裁决 4]，以 c-app 现状为准）。",
    "params": [

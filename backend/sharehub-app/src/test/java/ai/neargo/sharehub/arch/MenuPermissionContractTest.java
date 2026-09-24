@@ -174,6 +174,15 @@ class MenuPermissionContractTest {
                 .readTree(repoRoot().resolve("docs/api/contract.json").toFile());
         Set<String> out = new LinkedHashSet<>();
         for (JsonNode e : root.path("endpoints")) {
+            // 一个端点可能挂多个码（`can('a') or can('b')`）——「菜单码有没有人强制」
+            // 要按**全部**码判，只看 perm（第一个）会把第二个码误判成没人强制。
+            JsonNode all = e.path("perms");
+            if (all.isArray() && !all.isEmpty()) {
+                all.forEach(c -> {
+                    if (!c.asText("").isBlank()) out.add(c.asText());
+                });
+                continue;
+            }
             String p = e.path("perm").asText(null);
             if (p != null && !p.isBlank()) out.add(p);
         }

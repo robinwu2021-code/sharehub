@@ -14,19 +14,17 @@
 #
 # 依据：docs/requirements/功能权限清单.md（RBAC 真源）· scripts/feature-align.py
 
-# ── 待裁决：需要产品决定，不是技术选择 ──
-# 「我的结算」(/finance?tab=settlements) 与「代理收益结算」挂 agent:settlement:read，
-# 而 /api/trade/settlements 挂 finance:settlement:read，AGENT 不持有后者。
-# 权限清单 §末 第 2 条给了二选一：
-#   (a) 把 agent:settlement:read 挂到结算端点的代理视图（新增一个代理作用域端点）
-#   (b) 让 AGENT 持 finance:settlement:read，靠 ADR-012 的数据范围限定到自己 agent_no
-# (b) 更省，但它给外部伙伴角色发了一个 finance:* 的码 —— 这是产品/安全决定。
-agent:settlement:read
-
-# ── 待并行会话腾出 RolePerms.java ──
-# 预约调价：权限清单声明 pricing:adjustment:read/:create/:cancel（FIN ✓），
-# 而端点挂的是 pricing:rule:read / :config，且**零个角色持有 adjustment 码**
-# （ADMIN 是 "*" 通配所以只有 ADMIN 看得见这个菜单）。
-# 完整修法要同时改三处：端点码 + RolePerms 授予 + 菜单码保持不变。
-# 只改其中一处都会更糟（改端点码而没人持有 = 谁都调不了），故整条留到能原子改时再做。
-pricing:adjustment:read
+# ── 空了（2026-09-24）──
+# 最后两条的结局记在这里，省得下一个人以为「一直是空的」：
+#
+#   · agent:settlement:read —— 代理门户「我的结算」点进去必 403，挂了一年。
+#     结算三个**读**端点改成两码任一（finance:settlement:read 或 agent:settlement:read），
+#     靠既有数据范围（stl_settlement / share_record → AGENT/agent_no）区分谁看到哪些行。
+#     没有新开代理专用端点：那会让两端共用的页面按角色分叉去调不同接口。
+#
+#   · pricing:adjustment:read —— 菜单码在后端一个端点都没挂。
+#     预约调价四个端点改挂真源表声明的 pricing:adjustment:*（原先是 pricing:rule:read/:config，
+#     而 :config 根本不在真源表里）。副作用：BD 失去预约调价的读 —— 按真源它本来就只给 FIN。
+#
+# 这条台账**清零了，但别删文件**：它是「菜单码必须有端点强制」这条规矩的落点，
+# 下次有人想加豁免时，空文件比不存在的文件更容易让人停一下。

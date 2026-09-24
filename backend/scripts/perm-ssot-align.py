@@ -67,7 +67,10 @@ def declared_codes():
 
 def enforced_codes():
     eps = json.loads(io.open(CONTRACT, encoding='utf-8').read())['endpoints']
-    return {e['perm'] for e in eps if e.get('perm') and e['perm'] != '*'}
+    # 一个端点可能挂多个码（`can('a') or can('b')`），**逐个都算强制** ——
+    # 只看 e['perm'] 会把第二个码算成「声明未强制」，而它其实正在放行。
+    return {c for e in eps for c in (e.get('perms') or ([e['perm']] if e.get('perm') else []))
+            if c and c != '*'}
 
 
 def keys(declared, enforced):

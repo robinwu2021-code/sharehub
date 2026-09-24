@@ -112,10 +112,13 @@ org:performance:read	绩效报表 查看	org	1
 org:role:read	角色 查看	org	1
 org:role:update	角色 增改删/授权	org	1
 pricing:*	计费 全部	pricing	0
+pricing:adjustment:cancel	预约调价 撤销	pricing	1
+pricing:adjustment:create	预约调价 新建编辑	pricing	1
+pricing:adjustment:read	预约调价 查看	pricing	1
 pricing:plan:create	计费模板 新增	pricing	1
 pricing:plan:read	计费模板 查看	pricing	1
 pricing:plan:update	计费模板 编辑	pricing	1
-pricing:rule:config	调价单 配置	pricing	1
+pricing:rule:config	调价单 配置	pricing	0
 pricing:rule:read	时段倍率 查看	pricing	1
 pricing:rule:update	时段倍率 编辑	pricing	1
 report:*	报表 全部	report	0

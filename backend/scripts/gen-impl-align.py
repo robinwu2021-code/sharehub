@@ -186,7 +186,8 @@ def main():
         if not e.get('perm') and e['path'].startswith('/api/') and not e['path'].startswith('/api/auth'):
             marks.append('P')
         rows.append({
-            'verb': e['verb'], 'path': e['path'], 'perm': e.get('perm') or '',
+            'verb': e['verb'], 'path': e['path'],
+            'perm': ' 或 '.join(e.get('perms') or ([e['perm']] if e.get('perm') else [])),
             'handler': e['handler'], 'module': cls_module.get(ctrl, '?'),
             'services': services, 'pairs': sorted(set(pairs)),
             'status': status, 'marks': marks,

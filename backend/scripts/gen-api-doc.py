@@ -158,7 +158,9 @@ def main():
             L.append('### `%s %s`\n' % (e['verb'], e['path']))
             if e['summary']:
                 L.append('%s\n' % e['summary'])
-            bits = ['权限码 `%s`' % e['perm'] if e['perm'] else '**无权限码**',
+            codes = e.get('perms') or ([e['perm']] if e['perm'] else [])
+            # 多码端点写成「A 或 B」—— 只印第一个会让读文档的人以为访问面更窄
+            bits = ['权限码 ' + ' 或 '.join('`%s`' % c for c in codes) if codes else '**无权限码**',
                     '`%s`' % e['handler']]
             L.append('%s\n' % ' · '.join(bits))
 

@@ -25,10 +25,12 @@
  *    | `order:reservation:cancel` | `order:order:update` |
  *    | `system:notify_log:resend` | `system:notify_log:update` |
  *    | `device:ota:publish` | `device:ota:manage` |
- *    | `pricing:adjustment:create` · `pricing:adjustment:cancel` | `pricing:rule:config` |
  *    | `system:region:update` | `system:dict:update` |
  *
- *    这 5 个 UI 码**在后端一个端点都没有**。不翻译的话 `can()` 判 false，
+ *    （原先这里还有一条 `pricing:adjustment:create` · `:cancel` → `pricing:rule:config`，
+ *    已去掉：预约调价的端点改挂真源表声明的 `pricing:adjustment:*` 了，两端同码，不需要翻译。）
+ *
+ *    这 4 个 UI 码**在后端一个端点都没有**。不翻译的话 `can()` 判 false，
  *    对应的菜单叶与按钮整片消失 —— 「站点概览」「预约取消」「押金处置 / 欠费催缴」
  *    「发送记录重发」都会在界面上不见，而后端其实是允许的。
  *
@@ -188,8 +190,8 @@ export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   // 调价单的建/改/取消/恢复/重试**同判一个码**（OperationController 五个端点都是 pricing:rule:config）。
   // 界面保留 create / cancel 两个名字是为了文案说得清，判权则必须落到后端真判的那一个 ——
   // 否则「取消」按钮门的是一个谁都不持有的码。
-  "pricing:adjustment:cancel": "pricing:rule:config",
-  "pricing:adjustment:create": "pricing:rule:config",
+  "pricing:adjustment:cancel": "pricing:adjustment:cancel",
+  "pricing:adjustment:create": "pricing:adjustment:create",
   "pricing:adjustment:read": "pricing:adjustment:read",
   "pricing:plan:create": "pricing:plan:create",
   "pricing:plan:delete": "pricing:plan:delete",

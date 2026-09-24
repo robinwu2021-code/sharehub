@@ -72,9 +72,23 @@ public class OperationController {
     }
 
     // ——— 预约调价 ———
+    /*
+     * 预约调价这一组挂**真源表声明的码**（功能权限清单 §5：pricing:adjustment:read /
+     * :create / :cancel，仅 FIN），此前挂的是 pricing:rule:read / :config。
+     *
+     * 两个后果：① pricing:rule:config 根本不在真源表里（属「强制未声明」的幽灵码）；
+     * ② BD 持 pricing:rule:read，于是**能调这个列表接口却在菜单上看不到入口** ——
+     * 卡口说的「能用但找不到」。按真源，预约调价只给 FIN。
+     *
+     * 清单只声明了三个码而这里有四个写动作，revert / retry 的归属是判断题：
+     *   · revert（提前恢复原价）→ :cancel —— 撤销一张仍在生效的调价；
+     *   · retry （重试失败的执行）→ :create —— 它会**真的把价格改过去**。
+     *     归到 :cancel 的话，只持撤销权的人就能触发一次价格变更，那是提权；
+     *     归到 :create 不是提权：能新建调价的人本来就能安排任意价格变化。
+     */
 
     @GetMapping("/api/trade/price-adjustments")
-    @PreAuthorize("@perm.can('pricing:rule:read')")
+    @PreAuthorize("@perm.can('pricing:adjustment:read')")
     public PageResult<Map<String, Object>> adjustments(@RequestParam(required = false) Integer page,
                                                        @RequestParam(required = false) Integer size,
                                                        @RequestParam(required = false) String keyword,
@@ -98,7 +112,7 @@ public class OperationController {
      * 两者不一致时以路径为准，否则「在 A 的编辑页保存出 B」这种事没有任何东西拦得住。
      */
     @PostMapping({"/api/trade/price-adjustments", "/api/trade/price-adjustments/{adjustNo}"})
-    @PreAuthorize("@perm.can('pricing:rule:config')")
+    @PreAuthorize("@perm.can('pricing:adjustment:create')")
     public Map<String, Object> saveAdjustment(@PathVariable(required = false) String adjustNo,
                                               @RequestBody Map<String, Object> body) {
         Map<String, Object> in = body == null ? new java.util.HashMap<>() : new java.util.HashMap<>(body);
@@ -107,7 +121,7 @@ public class OperationController {
     }
 
     @PostMapping("/api/trade/price-adjustments/{adjustNo}/cancel")
-    @PreAuthorize("@perm.can('pricing:rule:config')")
+    @PreAuthorize("@perm.can('pricing:adjustment:cancel')")
     public Map<String, Object> cancelAdjustment(@PathVariable String adjustNo,
                                                 @RequestBody(required = false) Map<String, Object> body) {
         Object reason = body == null ? null : body.get("reason");
@@ -115,13 +129,13 @@ public class OperationController {
     }
 
     @PostMapping("/api/trade/price-adjustments/{adjustNo}/revert")
-    @PreAuthorize("@perm.can('pricing:rule:config')")
+    @PreAuthorize("@perm.can('pricing:adjustment:cancel')")
     public Map<String, Object> revertAdjustment(@PathVariable String adjustNo) {
         return adjustments.revert(adjustNo);
     }
 
     @PostMapping("/api/trade/price-adjustments/{adjustNo}/retry")
-    @PreAuthorize("@perm.can('pricing:rule:config')")
+    @PreAuthorize("@perm.can('pricing:adjustment:create')")
     public Map<String, Object> retryAdjustment(@PathVariable String adjustNo) {
         return adjustments.retry(adjustNo);
     }

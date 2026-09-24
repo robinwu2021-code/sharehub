@@ -118,9 +118,30 @@ public class FinanceController {
 
     // ——————————————————————— 结算（菜单叶：结算单 / 代理收益结算）———————————————————————
 
+    /*
+     * 三个**读**端点同时接受 finance:settlement:read 与 agent:settlement:read。
+     *
+     * 起因：菜单两处叶子（代理端「我的结算」、机构侧「代理收益结算」）挂的都是
+     * agent:settlement:read，而这里此前只认 finance:settlement:read ——
+     * AGENT 不持有后者，**代理点进去必 403**。功能权限清单 §末 第 2 条在案已久。
+     *
+     * 为什么是「两码任一」而不是新开一个代理专用端点：数据范围已经在管这件事
+     * （DataScopeRegistration：stl_settlement / share_record → AGENT/agent_no，
+     * handler fail-closed），同一个端点对不同主体本来就返回不同的行，这正是 ADR-012 的模型。
+     * 新开端点会让运营端与代理端**共用的那个页面**按角色分叉去调不同接口 ——
+     * 漏一处就是 403 或越权，而且不会有任何东西报红。
+     *
+     * 写动作不放开：confirm / generate 仍只认 finance:settlement:*。
+     *
+     * 谁因此多了权限：BD（持 agent:settlement:read、数据范围非 AGENT）现在读得到全量结算单。
+     * 这不是新暴露 —— BD 本就持 finance:share_record:read（逐单分润明细，比结算单细）
+     * 与 report:*，而结算单只是这些行按账期的聚合，且不含任何银行/证件信息；
+     * 更弱的 VIEWER 角色早就持有 finance:settlement:read。
+     */
+
     /** 结算单列表（自 {@code TradeController} SeedData 骨架迁入，走 {@code stl_settlement} 表）。 */
     @GetMapping("/api/trade/settlements")
-    @PreAuthorize("@perm.can('finance:settlement:read')")
+    @PreAuthorize("@perm.can('finance:settlement:read') or @perm.can('agent:settlement:read')")
     public PageResult<FinDtos.Settlement> settlements(@RequestParam(required = false) Integer page,
                                                       @RequestParam(required = false) Integer size,
                                                       @RequestParam(required = false) String keyword,
@@ -129,7 +150,7 @@ public class FinanceController {
     }
 
     @GetMapping("/api/trade/settlements/{settleNo}")
-    @PreAuthorize("@perm.can('finance:settlement:read')")
+    @PreAuthorize("@perm.can('finance:settlement:read') or @perm.can('agent:settlement:read')")
     public FinDtos.SettlementView settlement(@PathVariable String settleNo) {
         return settlementService.detail(settleNo);
     }
@@ -390,7 +411,7 @@ public class FinanceController {
 
     /** 结算单构成明细：这张单的钱是哪几笔分润凑出来的。 */
     @GetMapping("/api/trade/settlements/{settleNo}/records")
-    @PreAuthorize("@perm.can('finance:settlement:read')")
+    @PreAuthorize("@perm.can('finance:settlement:read') or @perm.can('agent:settlement:read')")
     public Object settlementRecords(@PathVariable String settleNo,
                                     @RequestParam(required = false) Integer page,
                                     @RequestParam(required = false) Integer size) {

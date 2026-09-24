@@ -19,7 +19,6 @@
 
 声明未强制 agent:agent:create
 声明未强制 agent:agent:delete
-声明未强制 agent:settlement:read
 声明未强制 dashboard:platform:read
 声明未强制 dashboard:todo:read
 声明未强制 device:cabinet:assign
@@ -46,9 +45,6 @@
 声明未强制 org:dept:update
 声明未强制 org:employee:delete
 声明未强制 org:role:assign
-声明未强制 pricing:adjustment:cancel
-声明未强制 pricing:adjustment:create
-声明未强制 pricing:adjustment:read
 声明未强制 pricing:plan:delete
 声明未强制 system:openapi:config
 声明未强制 tenant:billing:read
@@ -63,7 +59,6 @@
 强制未声明 marketing:push:update
 强制未声明 marketing:recharge:update
 强制未声明 order:deposit:update
-强制未声明 pricing:rule:config
 强制未声明 report:consumer:read
 强制未声明 report:device:read
 强制未声明 report:finance:read
