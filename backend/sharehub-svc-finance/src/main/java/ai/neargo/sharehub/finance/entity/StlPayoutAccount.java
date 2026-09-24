@@ -26,7 +26,15 @@ public class StlPayoutAccount extends BaseEntity {
 
     private String accountNo;
 
-    /** OPERATOR 运营主体 / VENUE 场地方 —— 与 {@code stl_withdrawal.payee_type} 同一套取值。 */
+    /**
+     * {@code AGENT} 代理商 / {@code VENUE} 场地方 —— 与 {@code stl_withdrawal.payee_type}
+     * 和 {@code share_record.payee_type} 同一套取值（现网两张表存的都是 AGENT）。
+     *
+     * <p><b>不是 OPERATOR</b>，尽管 ADR-029 把代理商抽象成了「运营主体 Operator」：
+     * 一张表用新词、另两张用旧词就 join 不上，也查不出「这笔打给了谁」。
+     * 改名的窗口是 ADR-029 §5.1 的 B 步（随 ADR-021 的 S1），<b>那时三张表一起改</b>。
+     * 判定见 {@code PayoutAccountServiceImpl.PAYEE_TYPES}。
+     */
     private String payeeType;
 
     private String payeeNo;

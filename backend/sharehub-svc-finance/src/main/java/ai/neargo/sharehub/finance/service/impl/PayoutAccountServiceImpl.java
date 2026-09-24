@@ -84,7 +84,9 @@ public class PayoutAccountServiceImpl implements PayoutAccountService {
     public PayoutAccount save(PayoutAccountReq req) {
         requireText(req.payeeNo(), "受益方编号必填");
         if (!PAYEE_TYPES.contains(req.payeeType())) {
-            throw new IllegalArgumentException("受益方类型只能是 OPERATOR 或 VENUE");
+            // 提示必须与 PAYEE_TYPES 同源：原文写的是「只能是 OPERATOR 或 VENUE」，
+            // 而 OPERATOR 恰恰是会被这一行拒掉的值 —— 照着提示改一遍照样 400。
+            throw new IllegalArgumentException("受益方类型只能是 " + String.join(" 或 ", PAYEE_TYPES));
         }
         requireText(req.bankCode(), "开户行必填");
         requireText(req.accountName(), "户名必填");
