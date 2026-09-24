@@ -132,8 +132,23 @@ export const adSlots: AdSlot[] = Array.from({ length: 20 }, (_, i) => ({
   size: i % 2 === 0 ? p(["1080x1920", "720x1280"], i) : p(["A4贴片", "半身贴"], i),
   status: i % 3 === 0 ? "IDLE" : "OCCUPIED", createdAt: iso(i * 86400_000),
 }));
+/**
+ * 广告主：**编号与名字同源**，不各取各的 —— 两者分别生成的话，
+ * 按编号筛出来的活动会显示成别家的名字，而这种错只看页面完全像是「筛错了」。
+ * （前端还没有广告主档案页，后端有 AdvertiserVO；建档案页时这份应改为引用它。）
+ */
+const ADVERTISERS = [
+  { no: "ADV01", name: "Emirates NBD" },
+  { no: "ADV02", name: "Careem" },
+  { no: "ADV03", name: "Noon" },
+  { no: "ADV04", name: "Talabat" },
+  { no: "ADV05", name: "Etisalat" },
+];
 export const adCampaigns: AdCampaign[] = Array.from({ length: 14 }, (_, i) => ({
-  adNo: `AD${700 + i}`, advertiser: p(["Emirates NBD", "Careem", "Noon", "Talabat", "Etisalat"], i),
+  adNo: `AD${700 + i}`,
+  advertiserNo: p(ADVERTISERS, i).no, advertiser: p(ADVERTISERS, i).name,
+  // 预算按活动规模拉开档次：全是同一个数的话，「这条广告能花多少」这一列没有信息量
+  budget: 5000 + (i % 5) * 12000, currency: "AED",
   creative: p(["品牌视频30s", "开屏图", "轮播图", "互动H5"], i), targeting: p(["全城", "机场点位", "商场点位", "白金会员"], i),
   status: p(["DRAFT", "RUNNING", "RUNNING", "ENDED"] as const, i),
   // 窗口挂**真实当前时间**（同 campaigns 的取舍）：原先锚定 iso 固定基准，随日历自然全部过期——
@@ -144,6 +159,9 @@ export const adCampaigns: AdCampaign[] = Array.from({ length: 14 }, (_, i) => ({
 }));
 export const adDeliveries: AdDelivery[] = Array.from({ length: 24 }, (_, i) => ({
   deliveryNo: `DLV${5000 + i}`, adNo: `AD${700 + (i % 14)}`, slotNo: `AS${600 + (i % 20)}`,
+  // 柜机号**取自对应广告位**，不另生成：同一个位号在不同柜机上是不同的物理屏，
+  // 两处各说一套的话，「这条广告在哪台机器上播的」会给出两个答案。
+  cabinetNo: adSlots[i % adSlots.length].cabinetNo,
   impressions: 1000 + (i * 733) % 50000, plays: 800 + (i * 511) % 40000,
   date: iso(i * 86400_000).slice(0, 10),
 }));

@@ -179,7 +179,20 @@ export interface AdSlot {
 }
 export interface AdCampaign {
   adNo: string;
+  /**
+   * 广告主编号（→ `Advertiser.advertiserNo`）。
+   * {@link advertiser} 是展示名 —— 按名字连不回广告主档案，改个名就断链。
+   * 同本仓「一律按编号连、名字只作展示」的口径。
+   */
+  advertiserNo: string;
   advertiser: string;
+  /**
+   * 投放预算与币种。后端注释写明这几个字段是「供运营核对」的 ——
+   * 没有它时，界面上看不出这条广告**被允许花多少钱**，
+   * 只能看到曝光与播放数，核对不了投放是否超了额度。
+   */
+  budget: number;
+  currency: string;
   creative: string;
   targeting: string;
   status: "DRAFT" | "RUNNING" | "ENDED";
@@ -243,6 +256,12 @@ export interface AdDelivery {
   deliveryNo: string;
   adNo: string;
   slotNo: string;
+  /**
+   * 这条投放实际发生在哪台柜机。
+   * {@link slotNo} 只说广告位，同一个位号在不同柜机上是不同的物理屏 ——
+   * 「这条广告到底在哪台机器上播的」此前答不出来。
+   */
+  cabinetNo: string;
   impressions: number;
   plays: number;
   date: string;

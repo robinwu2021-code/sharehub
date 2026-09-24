@@ -603,7 +603,23 @@ function MarketingInner() {
 
   const adCampaignCols: Column<AdCampaign>[] = [
     { header: "广告号", cell: (a) => <span className="font-medium">{a.adNo}</span> },
-    { header: "广告主", cell: (a) => a.advertiser },
+    {
+      header: "广告主",
+      cell: (a) => (
+        <>
+          {a.advertiser}
+          {/* 名字只作展示，编号才是能连回广告主档案的那个 */}
+          <div className="truncate txt-caption text-muted-foreground tabular-nums">{a.advertiserNo}</div>
+        </>
+      ),
+    },
+    {
+      header: "预算",
+      className: "text-right",
+      // 后端注释写明这几个字段是「供运营核对」的：没有它时界面上只有曝光与播放数，
+      // 核对不了这条广告**被允许花多少钱**、投放有没有超额度。
+      cell: (a) => <span className="tabular-nums">{money(a.budget, a.currency)}</span>,
+    },
     { header: "创意", cell: (a) => <span className="text-muted-foreground">{a.creative}</span> },
     { header: "定向", cell: (a) => <span className="text-muted-foreground">{a.targeting}</span> },
     { header: "状态", cell: (a) => <StatusBadge map={AD_CAMPAIGN_STATUS} value={a.status} /> },
@@ -631,7 +647,17 @@ function MarketingInner() {
   const deliveryCols: Column<AdDelivery>[] = [
     { header: "投放号", cell: (d) => <span className="font-medium">{d.deliveryNo}</span> },
     { header: "广告号", cell: (d) => <span className="text-muted-foreground">{d.adNo}</span> },
-    { header: "广告位", cell: (d) => <span className="text-muted-foreground">{d.slotNo}</span> },
+    {
+      header: "广告位",
+      cell: (d) => (
+        <>
+          <span className="text-muted-foreground tabular-nums">{d.slotNo}</span>
+          {/* 同一个位号在不同柜机上是不同的物理屏 —— 「这条广告在哪台机器上播的」
+              此前答不出来 */}
+          <div className="truncate txt-caption text-muted-foreground tabular-nums">{d.cabinetNo}</div>
+        </>
+      ),
+    },
     { header: "曝光", cell: (d) => <span className="tabular-nums">{Math.round(d.impressions)}</span> },
     { header: "播放", cell: (d) => <span className="tabular-nums">{Math.round(d.plays)}</span> },
     { header: "日期", cell: (d) => <span className="text-muted-foreground">{d.date}</span> },
