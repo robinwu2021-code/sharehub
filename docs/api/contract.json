@@ -1594,7 +1594,7 @@
    "path": "/api/auth/me",
    "perm": null,
    "handler": "AuthController#me",
-   "summary": "",
+   "summary": "当前会话的身份与**当场重算的权限码**。",
    "params": [],
    "bodyType": null,
    "returnType": "Map<String, Object>",
