@@ -208,13 +208,12 @@ public class AuthController {
     /**
      * 菜单树（真源，2026-09-24 起前端消费它，不再用本地 nav.ts）。
      *
-     * <p>**不按权限剪枝** —— 可见性由前端那一套规则决定，理由见 {@link MenuService}。
-     * 仍需登录：菜单名与路径不该对匿名者下发。
+     * <p>**已按权限剪枝**（2026-09-24，P1）——规则见 {@link MenuService}。
+     * 前端拿到就渲染，不必再筛。
      */
     @GetMapping("/menus")
     public List<MenuNode> menus() {
-        SecurityUtils.requireUser();
-        return menuService.tree();
+        return menuService.visibleFor(SecurityUtils.requireUser());
     }
 
     /** 当前登录人权限码集合（前端 can() 用）。 */

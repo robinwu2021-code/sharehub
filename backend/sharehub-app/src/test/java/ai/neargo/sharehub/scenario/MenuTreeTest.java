@@ -23,25 +23,35 @@ class MenuTreeTest extends ApiTestSupport {
     }
 
     @Test
-    void the_whole_tree_is_delivered() {
+    void admin_sees_every_operations_menu() {
+        /*
+         * ADMIN 持 `*`，所以他看得到**除代理门户外**的全部 ——
+         * 门户是排他的（ADR-012：代理只看门户，运营看不到门户），
+         * 所以是 15 个 section 而不是 18。
+         *
+         * 端点从 P1 起**按权限剪枝**（此前下发完整树、前端自己筛）。
+         * 要全量树用 MenuService.tree()，那是给菜单管理界面留的。
+         */
         JsonNode t = tree(login("ADMIN"));
-        assertThat(t.size()).as("顶级菜单数").isEqualTo(18);
+        assertThat(t.size()).as("运营侧 section 数（18 个里 3 个是代理门户）").isEqualTo(15);
         int leaves = 0;
         for (JsonNode s : t) leaves += s.path("children").size();
-        assertThat(leaves).as("叶子数").isEqualTo(109);
+        assertThat(leaves).as("ADMIN 看得到的叶子数").isEqualTo(102);
     }
 
     @Test
     void the_six_new_columns_survive_the_whole_chain() {
         // 实体没映射 / DTO 没带 / JSON 没序列化 —— 三处任一漏掉都只是「少一种修饰」，不报错
-        JsonNode t = tree(login("ADMIN"));
+        // 门户只在代理的树里，运营的树里没有 —— 所以两个角色各取一棵
         JsonNode operation = null, myBiz = null;
-        for (JsonNode s : t) {
+        for (JsonNode s : tree(login("ADMIN"))) {
             if ("M_operation".equals(s.path("menuNo").asText())) operation = s;
+        }
+        for (JsonNode s : tree(login("AGENT"))) {
             if ("M_my-biz".equals(s.path("menuNo").asText())) myBiz = s;
         }
-        assertThat(operation).as("前提：运营管理在树里").isNotNull();
-        assertThat(myBiz).as("前提：代理门户在树里").isNotNull();
+        assertThat(operation).as("前提：运营管理在运营的树里").isNotNull();
+        assertThat(myBiz).as("前提：代理门户在代理的树里").isNotNull();
 
         assertThat(operation.path("module").asText()).isNotBlank();
         assertThat(operation.path("modules")).as("跨模块 section 的 modules 是数组").hasSize(5);
@@ -67,16 +77,20 @@ class MenuTreeTest extends ApiTestSupport {
     }
 
     @Test
-    void the_tree_is_not_filtered_by_permission() {
+    void a_narrower_role_gets_a_smaller_tree() {
         /*
-         * 后端**刻意不按 perm 剪枝**：前端的 can() 会先经 UI_PERM_MAP 把界面码
-         * 翻译成后端码再判（目前 8 条），后端没有这层翻译。在这里剪枝会把
-         * 带翻译码的叶子剪掉，而前端本来是显示的 —— 菜单少一项，不报错。
-         * 可见性只由前端那一套规则决定（它还要处理 module/portalFor/phase/ready）。
+         * P1 起服务端按权限剪枝。此前这条用例断言的恰好相反
+         * （「只读角色拿到的树与管理员一样大」），理由是「后端没有 UI_PERM_MAP
+         * 翻译层，过滤会误剪」—— **该理由经实测对菜单不成立**：
+         * 109 个带码的菜单叶，需要翻译的是 0 个，那 8 条翻译全服务于页内按钮。
+         *
+         * 只断言「更小」而不写死数字：具体几项由角色权限决定，
+         * 钉死的那份逐项清单在 MenuVisibilityParityTest（与前端快照对拍）。
          */
-        assertThat(tree(login("VIEWER")).size())
-                .as("只读角色拿到的树与管理员一样大")
-                .isEqualTo(tree(login("ADMIN")).size());
+        int viewer = tree(login("VIEWER")).size();
+        int admin = tree(login("ADMIN")).size();
+        assertThat(viewer).as("只读角色看得到的 section 比管理员少").isLessThan(admin);
+        assertThat(viewer).as("但不该是空的").isGreaterThan(0);
     }
 
     @Test

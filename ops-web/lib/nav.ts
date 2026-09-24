@@ -429,11 +429,26 @@ export function visibleSections(v: ViewerLike): NavSection[] {
   const { perms, role } = asViewer(v);
   const portals = NAV.filter((s) => role && s.portalFor?.includes(role as Role));
   const pool = portals.length > 0 ? portals : NAV.filter((s) => !s.portalFor);
+  /*
+   * **可见性 = 有没有可见叶子**，不再看 canModule（2026-09-24，P1-3）。
+   *
+   * 跨模块 section 早就这么判了（「防出现点开是空的 L1」）；这次把单模块的也统一过来，
+   * 因为 canModule 在两个方向上都不准：
+   *   · 松：有该模块某个码、但本 section 的叶子一个都不可见 → L1 显示、点开是空的；
+   *   · 紧：**叶子的码不属于本 section 的模块时，整段看不到**。
+   *     实测就有两处：「财务 › 用户钱包 / 充值订单」挂的是 user:wallet:read，
+   *     CS 持有这个码、端点也判这个码 —— CS 本来就能用这两个页面，
+   *     却因为 canModule('finance') 为假而**在菜单上找不到入口**。
+   *     这正是 MenuPermissionContractTest 说的「能用但找不到」。
+   *
+   * 没有叶子的 section（只有「经营看板」）看它自己的 perm。
+   * 服务端 MenuService.visibleFor 用的是同一条规则，两边由
+   * MenuVisibilityParityTest 逐项对拍。
+   */
   return pool.filter((s) => {
-    if (!s.modules) return canModule(perms, s.module);
-    // 跨模块 section：有任一模块权限，且至少一个叶子可见（防出现点开是空的 L1）
-    return s.modules.some((m) => canModule(perms, m))
-      && (s.children ?? []).some((l) => (l.perm ? can(perms, l.perm) : true));
+    const leaves = s.children ?? [];
+    if (!leaves.length) return s.perm ? can(perms, s.perm) : canModule(perms, s.module);
+    return leaves.some((l) => (l.perm ? can(perms, l.perm) : true));
   });
 }
 
