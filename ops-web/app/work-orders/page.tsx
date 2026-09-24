@@ -51,8 +51,20 @@ const PRIO: StatusMap<WorkOrderPriority> = {
   URGENT: { label: "▲▲ 紧急", tone: "danger" },
 };
 const STAFF = ["Ali", "Omar", "Sara", "Wang"];
+/**
+ * 状态的列/标签/筛选项**同一份**（下面三处都从它派生）。
+ *
+ * ⚠️ 少一档的代价是三重的，而且都不报错：看板上那些单子**整列消失**
+ * （渲染按 `status === col.key` 精确匹配），列表里状态显示成英文原文
+ * （`WO_STATUS_LABEL` 找不到就 `?? s` 回落），筛选下拉里也选不到。
+ * ACCEPTED 此前就不在这儿 —— 真后端接单后工单正是这个状态。
+ *
+ * AUDITED 有意不列：后端 /close 一次走完 AUDIT→CLOSE，它只是事务内的过程态，
+ * 从不落库（见 WoOpsServiceImpl.close）。列出来就是一列永远为空的看板。
+ */
 const BOARD_COLS: { key: string; label: string }[] = [
   { key: "CREATED", label: "待派单" }, { key: "DISPATCHED", label: "已派单" },
+  { key: "ACCEPTED", label: "已接单" },
   { key: "PROCESSING", label: "处理中" }, { key: "DONE", label: "已完成" }, { key: "CLOSED", label: "已关闭" },
 ];
 // tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）。
@@ -570,7 +582,7 @@ function WorkOrdersInner() {
       )}
 
       {view === "board" && (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-5">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-6">
           {BOARD_COLS.map((col) => {
             const items = rows.filter((w) => w.status === col.key);
             return (
