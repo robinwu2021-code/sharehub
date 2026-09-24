@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { NAV } from "./nav";
 
 /**
- * 菜单真源从 `nav.ts` 迁到 `iam_menu`（V67 建表灌数，V71 补 section 码）——**切换那一刻两边必须逐节点相等**。
+ * 菜单真源从 `nav.ts` 迁到 `iam_menu`（V67 建表灌数，V71 补 section 码，V74 补叶子码）——**切换那一刻两边必须逐节点相等**。
  *
  * <h3>为什么非要有这一条</h3>
  * 迁移里那 127 行 INSERT 是 `backend/scripts/gen-menu-seed.py` 生成的。
@@ -25,7 +25,7 @@ import { NAV } from "./nav";
  */
 
 // 相对**仓库根**，不是相对本文件 —— vitest 的 cwd 是 ops-web/
-const MIGRATION = "../backend/sharehub-app/src/main/resources/db/migration/V71__menu_section_perm.sql";
+const MIGRATION = "../backend/sharehub-app/src/main/resources/db/migration/V74__menu_leaf_perms.sql";
 
 type Row = Record<string, string>;
 

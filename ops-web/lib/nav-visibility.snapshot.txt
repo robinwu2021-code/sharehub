@@ -152,7 +152,7 @@ report›实时大屏
 report›自定义报表
 report›消费者分析
 
-## CS（40 项）
+## CS（35 项）
 operation›问题管理
 operation›公告管理
 device›设备台账
@@ -181,12 +181,7 @@ user›会员/次卡
 user›钱包
 user›充值套餐
 marketing›优惠券
-marketing›活动
 marketing›推送触达
-marketing›邀请裂变
-marketing›广告位管理
-marketing›广告活动
-marketing›投放与曝光
 cs›报障受理
 cs›客服会话
 cs›退款/补偿
@@ -242,7 +237,7 @@ system›支付渠道
 system›业务规则
 system›税率与发票
 
-## OPS（43 项）
+## OPS（39 项）
 operation›站点概览
 operation›站点管理
 operation›点位管理
@@ -275,10 +270,6 @@ order›押金与欠费
 order›免费订单
 report›设备运营分析
 report›点位坪效
-report›财务报表
-report›实时大屏
-report›自定义报表
-report›消费者分析
 system›供应商接入
 system›通知模板
 system›发送记录

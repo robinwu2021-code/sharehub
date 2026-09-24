@@ -38,6 +38,14 @@ const L1_KEYS = [
 // （场站管理 / 场地与合同 / 拓展 / 计费与调价 / 基础管理 / 场站报表），
 // href 一律保持 /locations?tab=…（页面没搬，只换菜单位置）。
 // 顺带：BD 拓展 CRM 补上 location:lead:read —— 它此前无 perm，跟随 section 可见。
+// 2026-09-24 有意变更（P1 第二步，见 docs/technical/权限与菜单-用户角色资源统一方案.md）：
+// **最后 13 个无 perm 的叶子各补上码**，码逐个查自该页**列表接口**实际强制的那个，
+// 不按命名习惯猜（第一版猜错 3 个：SLA/巡检的列表判 workorder:wo:read 而不是
+// :update，邀请裂变判 marketing:campaign:read 而不是 referral:read）。
+// 至此 109 个叶子全部带码，「无 perm 跟随父模块」这条隐式规则不再有使用者 ——
+// 服务端按码过滤才表达得了可见性（P1 第三、四步）。
+// 可见性变化恰好 9 项，全是「看得见点不开」的入口被收掉，
+// 逐项见 lib/nav-visibility.snapshot.txt 的 diff。
 // 2026-09-23 第三步：拓展不属于「经营已有站点」，场地方那条线整体拆成「场地方与拓展」L1
 // （页面从 /locations 拆到 /venues —— 一个 URL 只能属于一个 L1）；
 // 「分成」不是报表，原「场站报表」组改名「分成」，站点坪效归回场站管理。
@@ -81,8 +89,8 @@ const LEAF_TUPLES = [
   "/alarms?tab=rules|通知规则|workorder:wo:read||规则配置",
   "/work-orders?view=list|工单列表|workorder:wo:read||",
   "/work-orders?view=board|工单看板|workorder:wo:read||",
-  "/work-orders?view=sla|SLA 管理||2|",
-  "/work-orders?view=inspection|巡检计划||2|",
+  "/work-orders?view=sla|SLA 管理|workorder:wo:read|2|",
+  "/work-orders?view=inspection|巡检计划|workorder:wo:read|2|",
   "/venues?tab=venues|场地方|location:venue:read||机构档案",
   "/venues?tab=contracts|进场合同|location:contract:read||机构档案",
   "/venues?tab=crm|BD 拓展 CRM|location:lead:read||拓展",
@@ -122,22 +130,22 @@ const LEAF_TUPLES = [
   "/users?tab=wallets|钱包|user:wallet:read|2|用户资产",
   "/users?tab=recharge|充值套餐|user:wallet:read|2|用户资产",
   "/marketing|优惠券|marketing:coupon:read|2|促销玩法",
-  "/marketing?tab=campaigns|活动||2|促销玩法",
+  "/marketing?tab=campaigns|活动|marketing:campaign:read|2|促销玩法",
   "/marketing?tab=push|推送触达|marketing:push:send|3|促销玩法",
-  "/marketing?tab=referral|邀请裂变||3|促销玩法",
-  "/marketing?tab=ad-slots|广告位管理||3|广告经营",
-  "/marketing?tab=ad-campaigns|广告活动||3|广告经营",
-  "/marketing?tab=ad-delivery|投放与曝光||3|广告经营",
-  "/cs|报障受理||1|",
-  "/cs?tab=sessions|客服会话||2|",
+  "/marketing?tab=referral|邀请裂变|marketing:campaign:read|3|促销玩法",
+  "/marketing?tab=ad-slots|广告位管理|marketing:ad:read|3|广告经营",
+  "/marketing?tab=ad-campaigns|广告活动|marketing:ad:read|3|广告经营",
+  "/marketing?tab=ad-delivery|投放与曝光|marketing:ad:read|3|广告经营",
+  "/cs|报障受理|cs:ticket:read|1|",
+  "/cs?tab=sessions|客服会话|cs:session:read|2|",
   "/orders|退款/补偿|order:refund:apply||",
   "/users|黑名单处理|user:risk:update|1|",
   "/reports?tab=device|设备运营分析|report:device:read|2|",
   "/reports?tab=location|点位坪效|report:location:read|2|",
-  "/reports?tab=finance|财务报表||2|",
-  "/reports?tab=screen|实时大屏||3|",
-  "/reports?tab=custom|自定义报表||3|",
-  "/reports?tab=consumer|消费者分析||3|",
+  "/reports?tab=finance|财务报表|report:finance:read|2|",
+  "/reports?tab=screen|实时大屏|report:screen:read|3|",
+  "/reports?tab=custom|自定义报表|report:custom:read|3|",
+  "/reports?tab=consumer|消费者分析|report:consumer:read|3|",
   "/employees?tab=employees|员工|org:employee:read||人与组织",
   "/employees?tab=org|组织架构|org:employee:read|2|人与组织",
   "/employees?tab=roles|角色权限|org:role:read||授权",

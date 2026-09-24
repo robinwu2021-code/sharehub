@@ -244,8 +244,8 @@ export const NAV: NavSection[] = [
     children: [
       { href: "/work-orders?view=list", label: "工单列表", perm: "workorder:wo:read" },
       { href: "/work-orders?view=board", label: "工单看板", perm: "workorder:wo:read" },
-      { href: "/work-orders?view=sla", label: "SLA 管理", phase: 2 },
-      { href: "/work-orders?view=inspection", label: "巡检计划", phase: 2 },
+      { href: "/work-orders?view=sla", label: "SLA 管理", phase: 2, perm: "workorder:wo:read" },
+      { href: "/work-orders?view=inspection", label: "巡检计划", phase: 2, perm: "workorder:wo:read" },
     ],
   },
   {
@@ -336,20 +336,20 @@ export const NAV: NavSection[] = [
       // 公告管理 2026-09-23 并入 运营管理 › 公告管理（同一组 listNotices/saveNotice/archiveNotice）。
       // c-app 首页 Hub 的「公告条」发布口仍在，只是换了一个菜单位置。
       { href: "/marketing", label: "优惠券", perm: "marketing:coupon:read", phase: 2, ready: true, group: "促销玩法" },
-      { href: "/marketing?tab=campaigns", label: "活动", phase: 2, group: "促销玩法" },
+      { href: "/marketing?tab=campaigns", label: "活动", phase: 2, group: "促销玩法", perm: "marketing:campaign:read" },
       { href: "/marketing?tab=push", label: "推送触达", perm: "marketing:push:send", phase: 3, ready: true, group: "促销玩法" },
-      { href: "/marketing?tab=referral", label: "邀请裂变", phase: 3, group: "促销玩法" },
-      { href: "/marketing?tab=ad-slots", label: "广告位管理", phase: 3, group: "广告经营" },
-      { href: "/marketing?tab=ad-campaigns", label: "广告活动", phase: 3, group: "广告经营" },
-      { href: "/marketing?tab=ad-delivery", label: "投放与曝光", phase: 3, group: "广告经营" },
+      { href: "/marketing?tab=referral", label: "邀请裂变", phase: 3, group: "促销玩法", perm: "marketing:campaign:read" },
+      { href: "/marketing?tab=ad-slots", label: "广告位管理", phase: 3, group: "广告经营", perm: "marketing:ad:read" },
+      { href: "/marketing?tab=ad-campaigns", label: "广告活动", phase: 3, group: "广告经营", perm: "marketing:ad:read" },
+      { href: "/marketing?tab=ad-delivery", label: "投放与曝光", phase: 3, group: "广告经营", perm: "marketing:ad:read" },
     ],
   },
   {
     // 复用项为跨 section 深链，可点
     key: "cs", label: "客服管理", icon: "Headset", module: "cs", href: "/cs",
     children: [
-      { href: "/cs", label: "报障受理", phase: 1 },
-      { href: "/cs?tab=sessions", label: "客服会话", phase: 2 },
+      { href: "/cs", label: "报障受理", phase: 1, perm: "cs:ticket:read" },
+      { href: "/cs?tab=sessions", label: "客服会话", phase: 2, perm: "cs:session:read" },
       { href: "/orders", label: "退款/补偿", perm: "order:refund:apply" },
       { href: "/users", label: "黑名单处理", perm: "user:risk:update", phase: 1 },
     ],
@@ -362,10 +362,10 @@ export const NAV: NavSection[] = [
     children: [
       { href: "/reports?tab=device", label: "设备运营分析", perm: "report:device:read", phase: 2 },
       { href: "/reports?tab=location", label: "点位坪效", perm: "report:location:read", phase: 2 },
-      { href: "/reports?tab=finance", label: "财务报表", phase: 2 },
-      { href: "/reports?tab=screen", label: "实时大屏", phase: 3 },
-      { href: "/reports?tab=custom", label: "自定义报表", phase: 3 },
-      { href: "/reports?tab=consumer", label: "消费者分析", phase: 3 },
+      { href: "/reports?tab=finance", label: "财务报表", phase: 2, perm: "report:finance:read" },
+      { href: "/reports?tab=screen", label: "实时大屏", phase: 3, perm: "report:screen:read" },
+      { href: "/reports?tab=custom", label: "自定义报表", phase: 3, perm: "report:custom:read" },
+      { href: "/reports?tab=consumer", label: "消费者分析", phase: 3, perm: "report:consumer:read" },
     ],
   },
   {
