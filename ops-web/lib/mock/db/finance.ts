@@ -124,13 +124,13 @@ const paidOrPayoutFailed = (status: Withdrawal["status"], i: number) =>
  *
  * **写成静态映射而不是查 `payoutAccounts`**：那个常量定义在本文件更下方（TDZ），
  * 这里取不到。值必须与它保持一致 —— 改账户种子时记得同步改这里。
- * 只有 AG001 / VN001 在 payoutAccounts 里有账户，**其余一律 null 是故意的**：
+ * 只有 AG001 / VEN300 在 payoutAccounts 里有账户，**其余一律 null 是故意的**：
  * 真实情况就是不是每个收款方都登记过账户，而「没账户的单子长什么样」这条路径
  * 也要有数据能走到（同 AG002 故意没账户的用意）。
  */
 const SEED_PAYOUT: Record<string, { accountNo: string; bankCode: string }> = {
   AG001: { accountNo: "PA001", bankCode: "ENBD" },
-  VN001: { accountNo: "PA003", bankCode: "FAB" },
+  VEN300: { accountNo: "PA003", bankCode: "FAB" },
 };
 
 export const withdrawals: Withdrawal[] = Array.from({ length: 20 }, (_, i) => {
@@ -951,8 +951,11 @@ export const payoutAccounts: PayoutAccount[] = [
   { accountNo: "PA002", payeeType: "AGENT", payeeNo: "AG001", bankCode: "ADCB",
     accountName: "迪拜湾畔科技有限公司", accountMasked: "****7788", currency: "AED",
     isDefault: false, status: "ACTIVE" },
-  { accountNo: "PA003", payeeType: "VENUE", payeeNo: "VN001", bankCode: "FAB",
-    accountName: "商业湾购物中心", accountMasked: "****9012", currency: "AED",
+  // ⚠️ 原先登记给 "VN001" —— **没有任何场地方是这个号**（venues 用 VEN300 起，
+  // 见 mock/db/location.ts）。于是这个账户永远查不到，mock 里**任何场地方都拿不到款**，
+  // 而「收款账户」列表照样显示它，看上去一切正常。2026-09-24 改为真实存在的场地方。
+  { accountNo: "PA003", payeeType: "VENUE", payeeNo: "VEN300", bankCode: "FAB",
+    accountName: "Emaar Malls", accountMasked: "****9012", currency: "AED",
     isDefault: true, status: "ACTIVE" },
   // AG002 **故意没有账户** —— 代理门户「你还不能收款」那条路径要有数据能走到
 ];

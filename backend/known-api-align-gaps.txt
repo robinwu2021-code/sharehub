@@ -46,9 +46,6 @@ B GET /api/trade/invoices Invoice 后端有前端无:fileUrl
 B GET /api/trade/order-exceptions OrderException 后端有前端无:exceptionNo
 B GET /api/trade/share-records ShareRecord 后端有前端无:mode
 B GET /api/trade/share-rules ShareRule 后端有前端无:formula
-B GET /api/trade/withdrawals Withdrawal 后端有前端无:accountNo
-B GET /api/trade/withdrawals Withdrawal 后端有前端无:applicantNo
-B GET /api/trade/withdrawals Withdrawal 后端有前端无:bankCode
 B GET /api/trade/withdrawals Withdrawal 后端有前端无:netAmount
 B GET /api/user/ad-campaigns AdCampaignVO 后端有前端无:advertiserNo
 B GET /api/user/ad-campaigns AdCampaignVO 后端有前端无:budget
