@@ -32,6 +32,13 @@ import { daysOf } from "./report";
 const PAYEE_NAMES = [...VENUE_NAMES, ...agents.slice(0, 2).map((a) => a.name)];
 export const shareRules: ShareRule[] = Array.from({ length: 12 }, (_, i) => ({
   ruleNo: `SR${600 + i}`, dimension: i % 3 === 0 ? "AGENT" : "VENUE",
+  /*
+   * 只给**少数几条**阶梯规则（i % 5 === 2），其余为空 —— 简单比例规则本来就占多数。
+   * 全给或全不给都验不出界面「有阶梯时要提示、没阶梯时别加噪音」这件事。
+   */
+  formula: i % 5 === 2
+    ? '{"tiers":[{"lt":5000,"rate":0.15},{"lt":20000,"rate":0.2},{"rate":0.25}]}'
+    : null,
   // 分成方存**编号**：取价按 payeeNo 精确匹配，只有名字的规则一条都命中不了
   ...(i % 3 === 0
     ? { payeeNo: agents[i % agents.length].agentNo, payeeName: agents[i % agents.length].name }
@@ -66,6 +73,12 @@ export const shareRecords: ShareRecord[] = SHARE_PERIODS.flatMap((period, pi) =>
       const gmv = 40 + (seq * 13) % 260; // 该笔结算批次对应的交易额
       return {
         recordNo: `SREC${9000 + seq}`,
+        /*
+         * 两种分账模式都要有数据：渠道直分（钱在收单时就分走了）与台账结算
+         * （钱还在平台账上）。只种一种的话，界面上区分这两者的那一列永远同值，
+         * 等于没加。按 seq 取模而不是随机 —— 种子要可重现。
+         */
+        mode: (seq % 3 === 0 ? "CHANNEL_SPLIT" : "LEDGER") as ShareRecord["mode"],
         orderNo: orders[(seq * 7) % orders.length].orderNo,
         dimension: payee.dimension, payeeNo: payee.payeeNo, payeeName: payee.payeeName,
         // 代理明细带依据：同一伙伴在一单里可以有出资 + 运维两条，靠它区分（V53）
@@ -359,6 +372,9 @@ export const invoices: Invoice[] = Array.from({ length: 18 }, (_, i) => {
   const issuedAt = issued ? iso(i * 172800_000) : null;
   return {
     invoiceNo: `INV${2026000 + i}`,
+    // PDF **开票后才有**：草稿态一律 null。给草稿也塞个地址等于谎称票已出，
+    // 而界面上「下载」按钮的出现与否正是据此判断的。
+    fileUrl: issued ? `https://inv.example/pdf/INV${2026000 + i}.pdf` : null,
     // 收款方按**编号**连，名字只作展示（同合同/分润规则的理由）
     payeeType: src.payeeType, payeeNo: src.payeeNo, payeeName: src.payeeName,
     amount: src.totalAmount, vatTrn: `100${String(1000000000000 + i * 137).slice(0, 12)}`,

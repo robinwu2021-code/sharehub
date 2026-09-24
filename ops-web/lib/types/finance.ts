@@ -25,8 +25,23 @@ export type RechargeOrderStatus = "PENDING" | "PAID" | "FAILED" | "REFUNDED";
 export const SHARE_BASES = ["INVEST", "DEVELOP", "OPERATE", "REFER"] as const;
 export type ShareBasis = (typeof SHARE_BASES)[number];
 
+/**
+ * 分账模式。**本平台是「全支付 + 双分账」**，两条路子结算口径完全不同：
+ * - `CHANNEL_SPLIT` 支付渠道直接分账，钱在收单时就分走了；
+ * - `LEDGER` 先全额入账、按台账结算，钱还在平台账上。
+ * 界面上看不出走的哪条时，对账对不上也说不清该找渠道还是找自己。
+ */
+export type ShareMode = "CHANNEL_SPLIT" | "LEDGER";
+
 export interface ShareRule {
   ruleNo: string;
+  /**
+   * 阶梯 / 复合规则表达式（JSON 文本）；简单比例规则为空。
+   *
+   * **不为空时 `rate` 不是全部真相** —— 界面只显示 rate 会把一条阶梯规则
+   * 呈现成一个固定比例，而实际分多少取决于落在哪一档。
+   */
+  formula: string | null;
   dimension: "VENUE" | "AGENT";
   /**
    * 分成方**业务号**（VEN3xx / AG00x）—— 取价就是按它匹配的。
@@ -41,7 +56,7 @@ export interface ShareRule {
   basis?: ShareBasis | "";
   /** 币种。多市场下只给比例不给币种，结算时不知道按哪个币算固定额。 */
   currency?: string | null;
-  mode: "CHANNEL_SPLIT" | "LEDGER";
+  mode: ShareMode;
   rate: number; // 0..1
   priority: number;
 }
@@ -262,6 +277,7 @@ export interface LedgerEntry {
 // —— 财务 · 待建功能补全（trade 域）——
 export interface ShareRecord {
   recordNo: string;
+  mode: ShareMode;
   orderNo: string;
   dimension: "VENUE" | "AGENT";
   /** 分成方业务号（VEN3xx / AG00x）。结算单按 (dimension, payeeNo, period) 汇总本表。 */
@@ -427,6 +443,13 @@ export interface InvoiceView {
 
 export interface Invoice {
   invoiceNo: string;
+  /**
+   * 出票 PDF 地址，开票后由后端回填；未开票为 null。
+   *
+   * 后端一直在返回，前端没声明 —— 于是**开完票在界面上拿不到票**，
+   * 要去库里捞。发票页此前连「下载 / 查看」入口都没有。
+   */
+  fileUrl: string | null;
   /** 收款方类型 + 编号。按**编号**连，名字只作展示（同合同/分润规则的理由）。 */
   payeeType: "VENUE" | "AGENT" | null;
   payeeNo: string | null;

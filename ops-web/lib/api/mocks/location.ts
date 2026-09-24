@@ -87,6 +87,8 @@ export const locationMock: LocationApi = {
         if (already) continue;
         db.shareRecords.push({
           recordNo: `SREC${9000 + db.shareRecords.length}`,
+          // 推荐返佣是平台事后结给代理的，不经支付渠道分账 → 台账模式
+          mode: "LEDGER",
           orderNo: saved.contractNo,          // 来源单据就是合同，不是某一张订单
           dimension: "AGENT", payeeNo: r.agentNo, payeeName: r.agentName ?? r.agentNo,
           basis: "REFER",

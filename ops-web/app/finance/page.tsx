@@ -681,7 +681,18 @@ function FinanceInner() {
     { header: "规则号", cell: (r) => <span className="txt-strong">{r.ruleNo}</span> },
     { header: RULE_VIEW_LABEL[ruleDim], cell: (r) => r.payeeName },
     { header: "模式", cell: (r) => <Badge tone="outline">{r.mode === "CHANNEL_SPLIT" ? "渠道分账" : "平台记账"}</Badge> },
-    { header: "比例", className: "text-right", cell: (r) => <span className="tabular-nums">{(r.rate * 100).toFixed(0)}%</span> },
+    {
+      header: "比例",
+      className: "text-right",
+      cell: (r) => (
+        <>
+          <span className="tabular-nums">{(r.rate * 100).toFixed(0)}%</span>
+          {/* 有阶梯表达式时 rate **不是全部真相**：实际分多少取决于落在哪一档。
+              只在有 formula 时出标，没有的占多数、加了就是噪音。 */}
+          {r.formula && <Badge tone="warning" className="ml-1">阶梯</Badge>}
+        </>
+      ),
+    },
     { header: "优先级", className: "text-right", cell: (r) => <span className="tabular-nums">{r.priority}</span> },
     { header: t("common.actions"), cell: (r) => canEditRule ? <Button size="sm" variant="outline" onClick={() => setRuleForm(r)}>{t("common.edit")}</Button> : <span className="text-muted-foreground">-</span> },
   ];
@@ -836,7 +847,15 @@ function FinanceInner() {
   const recordCols: Column<ShareRecord>[] = [
     { header: "明细号", cell: (r) => <span className="txt-strong">{r.recordNo}</span> },
     { header: "订单", cell: (r) => <span className="text-muted-foreground tabular-nums">{r.orderNo}</span> },
-    { header: "维度", cell: (r) => PAYEE_TYPE_LABEL[r.dimension] },
+    // 加「模式」列后这一列被挤到竖排成「场/地/方」，nowrap 让它宁可撑宽表也别折行
+    { header: "维度", className: "whitespace-nowrap", cell: (r) => PAYEE_TYPE_LABEL[r.dimension] },
+    {
+      header: "模式",
+      className: "whitespace-nowrap",
+      // 与「分润规则」页同一套措辞。对不上账时，这一列决定该找渠道还是找自己：
+      // 渠道分账的钱在收单时就分走了，平台记账的还在平台账上。
+      cell: (r) => <Badge tone="outline">{r.mode === "CHANNEL_SPLIT" ? "渠道分账" : "平台记账"}</Badge>,
+    },
     { header: "分成方", cell: (r) => <span>{r.payeeName} <span className="text-muted-foreground tabular-nums">{r.payeeNo}</span></span> },
     // 依据：同一单同一伙伴可能有两条（出资 + 运维），不显示这列就分不清哪条是哪条
     { header: "依据", cell: (r) => r.basis ? SHARE_BASIS_LABEL[r.basis] ?? r.basis : <span className="text-muted-foreground">—</span> },
@@ -1044,6 +1063,17 @@ function FinanceInner() {
       header: t("common.actions"),
       cell: (i) => (
         <div className="flex items-center gap-2">
+          {/*
+            * 出票 PDF。后端开票后就回填了 fileUrl，前端此前没声明 ——
+            * **开完票在界面上拿不到票**，只能去库里捞。
+            * 只在真有地址时出按钮：草稿没有票，ISSUED 但地址为空说明出票还没回调，
+            * 这两种情况给个死链比不给更糟。
+            */}
+          {i.fileUrl && (
+            <Button size="sm" variant="outline" asChild>
+              <a href={i.fileUrl} target="_blank" rel="noreferrer">查看 PDF</a>
+            </Button>
+          )}
           {/* 草稿：可改可开。开具后抬头/金额锁定——编辑按钮禁用并写明原因，不静默消失 */}
           {canEditInvoiceFields(i.status) ? (
             <>
