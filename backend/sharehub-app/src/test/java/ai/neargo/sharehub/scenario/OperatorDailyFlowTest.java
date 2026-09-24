@@ -148,6 +148,12 @@ class OperatorDailyFlowTest extends ApiTestSupport {
      */
     @Test @Order(7)
     void step07_finance_audit_withdrawal() {
+        // B3 之后「审批通过」要求受益方先有可用收款账户（审批完得知道往哪打钱）。
+        // 这个前提**本用例自己备好**：收款账户不在迁移里、也不在种子里，是别的用例建出来的 ——
+        // 于是在共享库上它早就在（前面的运行攒下的），在全新库上要看谁先跑。
+        // 这条用例此前就是这么「共享库绿、全新库红」的，而全新库那一半没人看。
+        ensurePayoutAccount("AGENT", "AG002");
+
         Map<String, Object> req = new HashMap<>();
         req.put("payeeType", "AGENT");
         req.put("payeeNo", "AG002");
@@ -161,5 +167,28 @@ class OperatorDailyFlowTest extends ApiTestSupport {
                 Map.of("approve", true), financeToken).okData();
         assertThat(w.path("status").asText()).isEqualTo("PAYING");
         assertThat(w.path("auditorName").asText()).as("审批人由服务端回填").isNotBlank();
+    }
+
+    /**
+     * 确保该受益方有一个可用的默认收款账户 —— **先查后建**，已有就复用。
+     *
+     * <p>不无条件新建：同一受益方多建一条会把 `is_default` 抢过来，
+     * 而别的用例可能正依赖原来那条。（同 `9cc7fde` 对责任行的处理。）
+     */
+    private void ensurePayoutAccount(String payeeType, String payeeNo) {
+        JsonNode list = get("/api/trade/payout-accounts?page=1&size=50&payeeType=" + payeeType
+                + "&payeeNo=" + payeeNo, financeToken).okData().path("list");
+        for (JsonNode a : list) {
+            if ("ACTIVE".equals(a.path("status").asText())) return;
+        }
+        Map<String, Object> acct = new HashMap<>();
+        acct.put("payeeType", payeeType);
+        acct.put("payeeNo", payeeNo);
+        acct.put("bankCode", "ENBD");
+        acct.put("accountName", "日常流程测试账户");
+        acct.put("accountMasked", "AE07033123456789012345");
+        acct.put("currency", "AED");
+        acct.put("makeDefault", true);
+        post("/api/trade/payout-accounts", acct, financeToken).okData();
     }
 }
