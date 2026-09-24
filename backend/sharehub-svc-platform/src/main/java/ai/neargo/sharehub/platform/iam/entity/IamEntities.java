@@ -86,11 +86,27 @@ public final class IamEntities {
         private String parentNo;
         private String name;
         private String nameAr;
-        private String type;          // DIR / MENU
+        private String nameEn;
+        private String type;          // MENU（一级）/ ITEM（叶子）
         private String path;
         private String icon;
+        /** L2 分组标题：同 group 的连续叶子共用一个小标题（仅 ITEM 行）。 */
+        private String groupName;
         private Integer sort;
-        private String perm;          // 所需权限码（空=公开）
+        private String perm;          // 所需权限码（空=跟随所属 section）
+        /** 产品分期；phase > 当前期时灰显不可点。 */
+        private Integer phase;
+        /** 就绪度覆盖：无视 phase 直接解锁（逐叶推进，见 nav.ts NavLeaf.ready）。 */
+        private Integer ready;
+        /** 权限码模块前缀（canModule 过滤，仅 MENU 行）。 */
+        private String module;
+        /** 跨模块 section 的全部模块前缀，JSON 数组；任一可见即显示。 */
+        private String modules;
+        /** 路径归属前缀，JSON 数组；缺省取 path 的 path 部分。 */
+        private String matchPaths;
+        private Integer pinBottom;
+        /** 专属门户角色，JSON 数组；命中者只看得到门户 section。 */
+        private String portalFor;
         private Integer visible;
         private String status;
         private LocalDateTime createdAt;
