@@ -68,6 +68,7 @@ public class AlarmCodeServiceImpl extends AbstractCrudService<DevAlarmCode, Alar
     protected AlarmCode toVO(DevAlarmCode e) {
         return new AlarmCode(e.getCode(), e.getMessage(), e.getMessageEn(), e.getMessageAr(),
                 e.getLevel(), e.getSuggestion(),
-                e.getAutoWorkOrder() != null && e.getAutoWorkOrder() == 1);
+                e.getAutoWorkOrder() != null && e.getAutoWorkOrder() == 1,
+                e.getArchivedAt() == null ? null : e.getArchivedAt().toString());
     }
 }

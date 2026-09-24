@@ -147,7 +147,7 @@ public class SeedData {
                     java.math.BigDecimal.valueOf(5512_0000L + (i * 2_3000L), 6),
                     java.math.BigDecimal.valueOf(2505_0000L + (i * 1_9000L), 6),
                     p(List.of("商场", "机场", "餐饮", "地铁", "写字楼"), i),
-                    1 + (i % 4), 2 + (i * 3) % 10, i % 8 == 0 ? "PAUSED" : "ACTIVE"));
+                    1 + (i % 4), 2 + (i * 3) % 10, i % 8 == 0 ? "PAUSED" : "ACTIVE", null));
         }
         for (int i = 0; i < 30; i++) {
             Site site = sites.get(i % sites.size());
@@ -158,7 +158,7 @@ public class SeedData {
         }
         for (int i = 0; i < VENUE_NAMES.size(); i++) {
             venues.add(new Venue("VEN" + (300 + i), VENUE_NAMES.get(i), "+9714" + first7(2000000 + i * 311),
-                    p(List.of("零售", "航空", "地产", "餐饮"), i), 3 + i * 2));
+                    p(List.of("零售", "航空", "地产", "餐饮"), i), 3 + i * 2, null));
         }
         List<Double> shareRates = List.of(0.15, 0.2, 0.25, 0.3);
         for (int i = 0; i < 18; i++) {
@@ -233,7 +233,7 @@ public class SeedData {
                     // 演示数据里两种类型都出现，页面上能看出区别（ADR-027）
                     i % 3 == 0 ? "CITY_PARTNER" : "AGENT",
                     p(agentRates, i), 4 + i * 3,
-                    i % 6 == 0 ? "SUSPENDED" : "ENABLED"));
+                    i % 6 == 0 ? "SUSPENDED" : "ENABLED", null));
         }
 
         // —— 员工（20）/ 角色（7）/ 审计（40）——

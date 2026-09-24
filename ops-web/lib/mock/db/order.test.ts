@@ -471,7 +471,7 @@ describe("新建退款申请（POST /api/trade/refunds）", () => {
     expect(r.currency).toBe(o.currency); // 币种跟随订单，退款与原收款必须同币种
     // 未审批未执行：审批人与 PSP 流水号都还是空的
     expect(r.auditorName).toBeNull();
-    expect(r.psgTxnNo).toBeNull();
+    expect(r.pspTxnNo).toBeNull();
   });
 
   it("幂等：必须带键，且同一把键第二次返回已有单而不再落新单（重复退款是真实资损）", () => {

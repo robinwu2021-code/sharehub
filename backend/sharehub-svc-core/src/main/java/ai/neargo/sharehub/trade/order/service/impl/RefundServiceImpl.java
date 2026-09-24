@@ -153,7 +153,7 @@ public class RefundServiceImpl implements RefundService {
                 .eq(OrdRefund::getIdempotencyKey, idem).last("limit 1"));
     }
 
-    /** {@code psp_txn_no} → 前端契约里叫 {@code psgTxnNo}，此处做唯一一处名字转换。 */
+    /** 字段名全链路统一 {@code pspTxnNo}（2026-09-24 拉齐，见 OrderDtos 头部）。 */
     private static RefundRecord toVO(OrdRefund e) {
         return new RefundRecord(e.getRefundNo(), e.getOrderNo(), e.getCUserNo(), e.getAmount(),
                 e.getCurrency(), e.getReason(), e.getApplicantName(), e.getAppliedAt(),

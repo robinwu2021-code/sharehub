@@ -99,6 +99,7 @@ public class ProblemServiceImpl extends AbstractCrudService<MdProblem, ProblemEn
         return new ProblemEntry(e.getProblemNo(), e.getCategory(),
                 e.getTitle(), e.getTitleEn(), e.getTitleAr(),
                 e.getAnswer(), e.getAnswerEn(), e.getAnswerAr(),
-                e.getSuggestedAction(), e.getSortNo(), e.getStatus());
+                e.getSuggestedAction(), e.getSortNo(), e.getStatus(),
+                e.getArchivedAt() == null ? null : e.getArchivedAt().toString());
     }
 }

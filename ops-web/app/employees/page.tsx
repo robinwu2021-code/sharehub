@@ -43,15 +43,15 @@ const TREE_SIZE = 500;
 const SCOPE_LABEL: Record<DataScope, string> = { ALL: "全部数据", REGION: "按区域", LOCATION: "按点位", AGENT: "按代理(自己)", SELF: "仅自己经手" };
 const SCOPE_OPTIONS = (["ALL", "REGION", "LOCATION", "AGENT", "SELF"] as DataScope[]).map((s) => ({ value: s, label: SCOPE_LABEL[s] }));
 // 数据权限抽屉的表单形状：三档范围值各占一个 key（共用一个 key 会被 disabledWhen 的清空逻辑互相抹掉），
-// 提交时按 dataScope 收敛成单个 scopeValues（逗号分隔 ID）。
+// 提交时按 dataScope 收敛成单个 scopeRefs（逗号分隔 ID）。
 type ScopeForm = { dataScope: DataScope; regionValues: string; locationValues: string; agentValues: string };
 const EMPTY_SCOPE_FORM: ScopeForm = { dataScope: "ALL", regionValues: "", locationValues: "", agentValues: "" };
 const scopeFormOf = (r: RoleRow): ScopeForm => ({
   ...EMPTY_SCOPE_FORM,
   dataScope: r.dataScope,
-  regionValues: r.dataScope === "REGION" ? (r.scopeValues ?? "") : "",
-  locationValues: r.dataScope === "LOCATION" ? (r.scopeValues ?? "") : "",
-  agentValues: r.dataScope === "AGENT" ? (r.scopeValues ?? "") : "",
+  regionValues: r.dataScope === "REGION" ? (r.scopeRefs ?? "") : "",
+  locationValues: r.dataScope === "LOCATION" ? (r.scopeRefs ?? "") : "",
+  agentValues: r.dataScope === "AGENT" ? (r.scopeRefs ?? "") : "",
 });
 const scopeValuesOf = (f: ScopeForm): string =>
   f.dataScope === "REGION" ? f.regionValues
@@ -371,7 +371,7 @@ function EmployeesInner() {
     {
       header: "数据范围",
       cell: (r) => {
-        const n = csvCount(r.scopeValues);
+        const n = csvCount(r.scopeRefs);
         const needValues = r.dataScope === "REGION" || r.dataScope === "LOCATION" || r.dataScope === "AGENT";
         return (
           <div className="flex items-center gap-1.5">
@@ -561,13 +561,13 @@ function EmployeesInner() {
             search={keyword}
             onSearch={onSearch}
             searchPlaceholder="搜索角色码 / 名称"
-            onAdd={canEditRole ? () => setRoleForm({ code: "", name: "", dataScope: "ALL", scopeValues: "", permCount: 0, memberCount: 0, builtin: false }) : undefined}
+            onAdd={canEditRole ? () => setRoleForm({ code: "", name: "", dataScope: "ALL", scopeRefs: "", permCount: 0, memberCount: 0, builtin: false }) : undefined}
             addLabel="新增角色"
             onExport={onExportOf<RoleRow>("角色", [
               { header: "角色码", value: (r) => r.code },
               { header: "名称", value: (r) => r.name },
               { header: "权限数", value: (r) => r.permCount },
-              { header: "数据范围", value: (r) => `${SCOPE_LABEL[r.dataScope]}${csvCount(r.scopeValues) > 0 ? ` · ${csvCount(r.scopeValues)} 个` : ""}` },
+              { header: "数据范围", value: (r) => `${SCOPE_LABEL[r.dataScope]}${csvCount(r.scopeRefs) > 0 ? ` · ${csvCount(r.scopeRefs)} 个` : ""}` },
               { header: "成员数", value: (r) => r.memberCount },
               { header: "类型", value: (r) => (r.builtin ? "内置" : "自定义") },
               ...(showArchived ? [{ header: "归档时间", value: (r: RoleRow) => r.archivedAt ? fmtTime(r.archivedAt) : "-" }] : []),

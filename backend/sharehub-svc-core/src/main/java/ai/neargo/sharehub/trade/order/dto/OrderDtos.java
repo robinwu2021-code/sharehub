@@ -12,7 +12,10 @@ import java.math.BigDecimal;
  * 两处刻意的命名差（与 DDL 列名不一致，见交付报告）：
  * <ul>
  *   <li>{@code c_user_no} → VO 里叫 {@code userNo}（前端全域统一用 userNo）；</li>
- *   <li>{@code ord_refund.psp_txn_no} → VO 里叫 {@code psgTxnNo}（前端既有拼写，不擅自改契约）。</li>
+ *   <li>{@code ord_refund.psp_txn_no} → VO 里也叫 {@code pspTxnNo}。<b>2026-09-24 拉齐</b>：
+ *       此前 VO 迁就前端的笔误写成 {@code psgTxnNo}，两边一起错所以对齐工具也看不出来；
+ *       而同族的 {@code RechargeOrderRow} 用的是正确的 {@code pspTxnNo}，于是**那一处前端一直读到 undefined**。
+ *       同一个字段两种拼法比错一次更贵，故全部收敛到 {@code psp_}（[db-design §6.2]）。</li>
  * </ul>
  */
 public final class OrderDtos {
@@ -41,7 +44,7 @@ public final class OrderDtos {
     /** 退款审批单行，镜像前端 {@code RefundRecord}（含 {@code AuditTrail} 三列）。 */
     public record RefundRecord(String refundNo, String orderNo, String userNo, BigDecimal amount,
                                String currency, String reason, String applicantName, String appliedAt,
-                               String status, String idempotencyKey, String psgTxnNo,
+                               String status, String idempotencyKey, String pspTxnNo,
                                String auditorName, String auditedAt, String rejectReason) {
     }
 

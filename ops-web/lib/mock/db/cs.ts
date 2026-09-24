@@ -166,7 +166,7 @@ export const refundRecords: RefundRecord[] = Array.from({ length: 13 }, (_, i) =
     rejectReason: st === "REJECTED" ? p(["订单计费无误，用户已确认", "超出退款申请时效", "同一订单已退款，重复提交"], i) : null,
     // 幂等键 = 订单号 + 申请序号：同一订单重复申请只会落到同一笔退款
     idempotencyKey: `RF-${o.orderNo}-${String(i % 3)}`,
-    psgTxnNo: executed ? `PSP${202607000000 + i * 137}` : null,
+    pspTxnNo: executed ? `PSP${202607000000 + i * 137}` : null,
   };
 });
 
@@ -176,7 +176,7 @@ export const listOrderComplaints = (q: PageQuery & { status?: string } = {}) =>
     (!q.status || x.status === q.status));
 export const listRefundRecords = (q: PageQuery & { status?: string } = {}) =>
   paginate(refundRecords, q.page, q.size, (x) =>
-    kwHit(q.keyword, x.refundNo, x.orderNo, x.userNo, x.applicantName, x.auditorName, x.psgTxnNo, x.idempotencyKey) &&
+    kwHit(q.keyword, x.refundNo, x.orderNo, x.userNo, x.applicantName, x.auditorName, x.pspTxnNo, x.idempotencyKey) &&
     (!q.status || x.status === q.status));
 
 export const saveOrderComplaint = (x: Partial<OrderComplaint>) =>
@@ -246,7 +246,7 @@ function insertRefund(x: RefundApplyPayload): RefundRecord {
     refundNo: nextNo("RFD", refundRecords, 80000), orderNo: x.orderNo,
     userNo: x.userNo, amount: x.amount, currency: x.currency ?? "AED",
     reason: x.reason, applicantName: "admin", appliedAt: new Date().toISOString(), status: "PENDING",
-    auditorName: null, auditedAt: null, rejectReason: null, idempotencyKey: x.idempotencyKey, psgTxnNo: null,
+    auditorName: null, auditedAt: null, rejectReason: null, idempotencyKey: x.idempotencyKey, pspTxnNo: null,
   };
   refundRecords.unshift(created);
   return created;
@@ -296,7 +296,7 @@ export function auditRefund(refundNo: string, approve: boolean, rejectReason?: s
   if (approve) {
     r.status = "EXECUTED";
     r.rejectReason = null;
-    r.psgTxnNo = r.psgTxnNo ?? `PSP${202607000000 + refundRecords.length * 137}`;
+    r.pspTxnNo = r.pspTxnNo ?? `PSP${202607000000 + refundRecords.length * 137}`;
   } else {
     r.status = "REJECTED";
     r.rejectReason = rejectReason ?? "";

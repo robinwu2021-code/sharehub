@@ -12,9 +12,11 @@ public final class DevDtos {
     }
 
     /** 充电宝行，镜像前端 {@code Powerbank}（status 为 [db-design §9A.1] 7 态）。 */
+    /** @param archivedAt 归档时间；`null` = 在用。运营端靠它把归档行置灰并显示归档时间。 */
     public record PowerbankRow(String powerbankNo, String sn, String vendorCode,
                                String cabinetNo, Integer slotIndex,
-                               Integer battery, Integer cycles, String health, String status) {
+                               Integer battery, Integer cycles, String health, String status,
+                               String archivedAt) {
     }
 
     /**

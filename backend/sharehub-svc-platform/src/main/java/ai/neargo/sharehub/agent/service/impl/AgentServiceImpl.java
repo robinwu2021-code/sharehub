@@ -74,7 +74,7 @@ public class AgentServiceImpl implements AgentService {
                  * 机柜数：platform 算不出（dev_cabinet 属于 core），**给 0 而不是假装有值**。
                  * 代理商的真实机柜数在「设备/点位划拨」页按关系现算。
                  */
-                0, e.getStatus());
+                0, e.getStatus(), e.getArchivedAt() == null ? null : e.getArchivedAt().toString());
     }
 
     // ── 归档 / 取消归档（前端契约 Archivable）──

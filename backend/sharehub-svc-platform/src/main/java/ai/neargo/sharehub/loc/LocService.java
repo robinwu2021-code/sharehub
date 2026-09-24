@@ -226,7 +226,7 @@ public class LocService {
         Map<String, Integer> counts = venueSiteCounts(r.getRecords().stream().map(LocVenue::getVenueNo).toList());
         List<Venue> rows = r.getRecords().stream()
                 .map(v -> new Venue(v.getVenueNo(), v.getName(), v.getContact(), v.getIndustry(),
-                        counts.getOrDefault(v.getVenueNo(), 0)))
+                        counts.getOrDefault(v.getVenueNo(), 0), str(v.getArchivedAt())))
                 .toList();
         return new PageResult<>(rows, r.getTotal());
     }
@@ -278,7 +278,7 @@ public class LocService {
                 .eq(LocVenue::getVenueNo, body.getVenueNo()).last("limit 1"));
         return new Venue(saved.getVenueNo(), saved.getName(), saved.getContact(), saved.getIndustry(),
                 venueSiteCounts(java.util.List.of(saved.getVenueNo()))
-                        .getOrDefault(saved.getVenueNo(), 0));
+                        .getOrDefault(saved.getVenueNo(), 0), str(saved.getArchivedAt()));
     }
 
     // —— 合同 ——
@@ -433,7 +433,12 @@ public class LocService {
                  * 返回 null 而不是 0 —— 0 会被读成「这个站点一台机柜都没有」，
                  * 而真相是「这里答不了」。调用方（运营端站点页）本来就按关系现算。
                  */
-                null, e.getStatus());
+                null, e.getStatus(), str(e.getArchivedAt()));
+    }
+
+    /** 归档时间统一转字符串；`null` 原样传下去（前端按它判在用/已归档）。 */
+    private static String str(java.time.LocalDateTime t) {
+        return t == null ? null : t.toString();
     }
 
     private static Location toLocation(LocLocation e) {
@@ -504,6 +509,7 @@ public class LocService {
         e.setArchivedAt(at);
         venueMapper.updateById(e);
         return new Venue(e.getVenueNo(), e.getName(), e.getContact(), e.getIndustry(),
-                venueSiteCounts(List.of(e.getVenueNo())).getOrDefault(e.getVenueNo(), 0));
+                venueSiteCounts(List.of(e.getVenueNo())).getOrDefault(e.getVenueNo(), 0),
+                str(e.getArchivedAt()));
     }
 }

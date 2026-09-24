@@ -887,14 +887,14 @@ export const rechargeOrders: RechargeOrder[] = Array.from({ length: 36 }, (_, i)
     channelCode: p(RECHARGE_CHANNELS, i), status,
     createdAt: iso(i * 21600_000),
     paidAt: settled ? iso(i * 21600_000 - 90_000) : null,
-    psgTxnNo: settled ? `PSG${20260700 + i}` : null,
+    pspTxnNo: settled ? `PSG${20260700 + i}` : null,
   };
 });
 
 export type RechargeQuery = PageQuery & { status?: string; from?: string; to?: string };
 export const listRechargeOrders = (q: RechargeQuery = {}) =>
   paginate(rechargeOrders, q.page, q.size, (x) =>
-    kwHit(q.keyword, x.rechargeNo, x.userNo, x.nickname, x.psgTxnNo, x.channelCode) &&
+    kwHit(q.keyword, x.rechargeNo, x.userNo, x.nickname, x.pspTxnNo, x.channelCode) &&
     (!q.status || x.status === q.status) &&
     // 日期范围按下单时间（PENDING/FAILED 没有 paidAt，用 paidAt 会把它们全筛掉）
     (!q.from || x.createdAt.slice(0, 10) >= q.from) &&

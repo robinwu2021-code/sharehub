@@ -60,7 +60,7 @@ public class OrdRefund extends BaseEntity {
     /** 幂等键 UNIQUE，申请时生成，防重复退款。 */
     private String idempotencyKey;
 
-    /** PSP 交易号（冗余便于对账）。注意前端 VO 里叫 {@code psgTxnNo}，见交付报告。 */
+    /** PSP 交易号（冗余便于对账）。VO / 前端同名 {@code pspTxnNo}（2026-09-24 拉齐）。 */
     private String pspTxnNo;
 
     /** → {@code pay_refund.refund_no}（渠道执行凭证），审批通过后才有值。 */

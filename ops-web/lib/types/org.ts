@@ -29,7 +29,7 @@ export interface RoleRow extends Archivable {
    * - AGENT    → agents.agentNo，如 "AG001"
    * - ALL / SELF → 语义上不需要附加值，一律为空串（保存时会被清空）
    */
-  scopeValues?: string;
+  scopeRefs?: string;
 }
 export interface AuditEntry {
   id: string;

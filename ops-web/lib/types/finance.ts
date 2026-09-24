@@ -451,7 +451,7 @@ export interface RechargeOrder {
   status: "PENDING" | "PAID" | "FAILED" | "REFUNDED";
   createdAt: string; // 下单时间：PENDING/FAILED 无 paidAt，日期范围筛选一律以本字段为准
   paidAt: string | null;
-  psgTxnNo: string | null; // 支付网关流水号；未支付为空
+  pspTxnNo: string | null; // 支付网关流水号；未支付为空
 }
 
 // —— 收款账户（B3）——

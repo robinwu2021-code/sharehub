@@ -66,7 +66,8 @@ public class AlarmRuleServiceImpl extends AbstractCrudService<DevAlarmRule, Alar
     protected AlarmRule toVO(DevAlarmRule e) {
         return new AlarmRule(e.getRuleNo(), e.getAlarmCode(), e.getTarget(), e.getChannel(),
                 e.getMethod(), e.getQuietStart(), e.getQuietEnd(),
-                e.getEscalateMinutes(), e.getStatus());
+                e.getEscalateMinutes(), e.getStatus(),
+                e.getArchivedAt() == null ? null : e.getArchivedAt().toString());
     }
 
     // ——————————————————————— 静默窗口 ———————————————————————

@@ -14,17 +14,30 @@ public final class DevLegacyDtos {
     private DevLegacyDtos() {
     }
 
+    /**
+     * @param agentNo    归属代理；`null` = 平台直营。前端列表按它显示归属，缺了就永远是「平台直营」
+     * @param archivedAt 归档时间；`null` = 在用。运营端靠它把归档行置灰并显示归档时间
+     */
     public record Cabinet(String cabinetNo, String sn, String vendorCode, String model,
                           String locationNo, String locationName, int slotTotal, int availableCount,
                           String onlineStatus, String status, String fwVersion, String lastHeartbeatAt,
-                          String siteNo) {
+                          String siteNo, String agentNo, String archivedAt) {
 
-        /** 兼容旧 12 参调用（种子/历史代码），siteNo 缺省 null。 */
+        /** 兼容旧 12 参调用（种子/历史代码），siteNo / agentNo / archivedAt 缺省 null。 */
         public Cabinet(String cabinetNo, String sn, String vendorCode, String model,
                        String locationNo, String locationName, int slotTotal, int availableCount,
                        String onlineStatus, String status, String fwVersion, String lastHeartbeatAt) {
             this(cabinetNo, sn, vendorCode, model, locationNo, locationName, slotTotal, availableCount,
-                    onlineStatus, status, fwVersion, lastHeartbeatAt, null);
+                    onlineStatus, status, fwVersion, lastHeartbeatAt, null, null, null);
+        }
+
+        /** 兼容旧 13 参调用（带 siteNo）。 */
+        public Cabinet(String cabinetNo, String sn, String vendorCode, String model,
+                       String locationNo, String locationName, int slotTotal, int availableCount,
+                       String onlineStatus, String status, String fwVersion, String lastHeartbeatAt,
+                       String siteNo) {
+            this(cabinetNo, sn, vendorCode, model, locationNo, locationName, slotTotal, availableCount,
+                    onlineStatus, status, fwVersion, lastHeartbeatAt, siteNo, null, null);
         }
     }
 

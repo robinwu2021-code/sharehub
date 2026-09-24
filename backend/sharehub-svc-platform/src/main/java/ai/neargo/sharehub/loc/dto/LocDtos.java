@@ -31,7 +31,8 @@ public final class LocDtos {
     public record Site(String siteNo, String name, String venueNo, String venueName, String agentNo,
                       String brandNo, String regionId, String regionName,
                       String address, java.math.BigDecimal lng, java.math.BigDecimal lat,
-                      String sceneType, Integer pointCount, Integer cabinetCount, String status) {
+                      String sceneType, Integer pointCount, Integer cabinetCount, String status,
+                      String archivedAt) {
     }
 
     /**
@@ -44,7 +45,15 @@ public final class LocDtos {
                           String spotDesc, Integer cabinetCount, String status) {
     }
 
-    public record Venue(String venueNo, String name, String contact, String industry, int locationCount) {
+    /**
+     * @param archivedAt 归档时间；`null` = 在用。
+     *
+     * <p><b>必须带出来</b>：运营端靠它把归档行置灰、并在「归档时间」列显示时间。
+     * 不回这个字段，勾上「显示已归档」之后归档行与在用行**长得完全一样** ——
+     * 而列表默认已按它过滤，所以平时看不出少了什么。
+     */
+    public record Venue(String venueNo, String name, String contact, String industry,
+                        int locationCount, String archivedAt) {
     }
 
     /**

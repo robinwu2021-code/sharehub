@@ -32,17 +32,17 @@ export const employees: Employee[] = Array.from({ length: 20 }, (_, i) => ({
   email: `${p(["ali", "omar", "sara", "wang", "fatima"], i)}.${100 + i}@sharehub.ae`,
   roleName: p(["运维", "客服", "财务", "租户管理员"], i), status: i % 11 === 0 ? "LEFT" : "ACTIVE",
 }));
-// scopeValues 里的 ID 一律引用真实主数据：REGION→system.regions.regionId、
+// scopeRefs 里的 ID 一律引用真实主数据：REGION→system.regions.regionId、
 // LOCATION→location.sites.siteNo、AGENT→agent.agents.agentNo（role-scope.test.ts 断言这一点）。
 export const roles: RoleRow[] = [
   // permCount 不在这里写死：它是「已分配权限码数」的派生量，见下方 rolePermMap 回填。
-  { roleNo: "R1", code: "ADMIN", name: "运营管理员", permCount: 0, memberCount: 3, builtin: true, dataScope: "ALL", scopeValues: "", archivedAt: null },
-  { roleNo: "R2", code: "OPS", name: "运维", permCount: 0, memberCount: 12, builtin: true, dataScope: "REGION", scopeValues: "AE-DU,AE-AZ", archivedAt: null },
-  { roleNo: "R3", code: "CS", name: "客服", permCount: 0, memberCount: 6, builtin: true, dataScope: "ALL", scopeValues: "", archivedAt: null },
-  { roleNo: "R4", code: "FINANCE", name: "财务", permCount: 0, memberCount: 4, builtin: true, dataScope: "ALL", scopeValues: "", archivedAt: null },
-  { roleNo: "R5", code: "BD", name: "拓展", permCount: 0, memberCount: 5, builtin: true, dataScope: "REGION", scopeValues: "DU-MAR,DU-DEI,DU-DT", archivedAt: null },
-  { roleNo: "R6", code: "VIEWER", name: "只读", permCount: 0, memberCount: 2, builtin: true, dataScope: "ALL", scopeValues: "", archivedAt: null },
-  { roleNo: "R7", code: "AGENT", name: "代理商", permCount: 0, memberCount: 9, builtin: true, dataScope: "AGENT", scopeValues: "AG001,AG002", archivedAt: null },
+  { roleNo: "R1", code: "ADMIN", name: "运营管理员", permCount: 0, memberCount: 3, builtin: true, dataScope: "ALL", scopeRefs: "", archivedAt: null },
+  { roleNo: "R2", code: "OPS", name: "运维", permCount: 0, memberCount: 12, builtin: true, dataScope: "REGION", scopeRefs: "AE-DU,AE-AZ", archivedAt: null },
+  { roleNo: "R3", code: "CS", name: "客服", permCount: 0, memberCount: 6, builtin: true, dataScope: "ALL", scopeRefs: "", archivedAt: null },
+  { roleNo: "R4", code: "FINANCE", name: "财务", permCount: 0, memberCount: 4, builtin: true, dataScope: "ALL", scopeRefs: "", archivedAt: null },
+  { roleNo: "R5", code: "BD", name: "拓展", permCount: 0, memberCount: 5, builtin: true, dataScope: "REGION", scopeRefs: "DU-MAR,DU-DEI,DU-DT", archivedAt: null },
+  { roleNo: "R6", code: "VIEWER", name: "只读", permCount: 0, memberCount: 2, builtin: true, dataScope: "ALL", scopeRefs: "", archivedAt: null },
+  { roleNo: "R7", code: "AGENT", name: "代理商", permCount: 0, memberCount: 9, builtin: true, dataScope: "AGENT", scopeRefs: "AG001,AG002", archivedAt: null },
 ];
 
 // —————————————————————————————————————————————————————————————
@@ -419,18 +419,18 @@ export const normalizeScopeValues = (csv?: string): string =>
  * 角色数据权限落库（G7）：就地改 roles 数组，重开抽屉能读回。
  * ALL / SELF 语义上不带范围值，一律清空，避免残留脏数据被后端 DataScopeHandler 误用。
  */
-export function saveRoleDataScope(roleCode: string, scope: DataScope, scopeValues?: string): RoleRow {
+export function saveRoleDataScope(roleCode: string, scope: DataScope, scopeRefs?: string): RoleRow {
   const i = roles.findIndex((r) => r.code === roleCode);
   if (i < 0) throw notFound("角色", "Role", roleCode);
   // ⚠️ AGENT 角色的数据范围**服务端强制**为「自己 agent_no」，不接受任何越权配置。
   // 功能权限清单 §二：「AGENT 数据范围强制 = 自己 agent_no」。
   // 前端已禁用该选项，但门必须锁在服务端——绕过 UI 直接调接口同样要被拒。
   // 后端实现本端点时须保留这条守卫。
-  if (roleCode === "AGENT" && (scope !== "AGENT" || normalizeScopeValues(scopeValues))) {
+  if (roleCode === "AGENT" && (scope !== "AGENT" || normalizeScopeValues(scopeRefs))) {
     throw fail("代理商角色的数据范围强制为自己 agent_no，不可更改或指定其它代理", "An agent role is locked to its own agent_no; it cannot be changed or pointed at another agent", "دور الوكيل مقيّد برقم وكيله ولا يمكن تغييره أو توجيهه إلى وكيل آخر");
   }
-  const values = scope === "ALL" || scope === "SELF" ? "" : normalizeScopeValues(scopeValues);
-  roles[i] = { ...roles[i], dataScope: scope, scopeValues: values };
+  const values = scope === "ALL" || scope === "SELF" ? "" : normalizeScopeValues(scopeRefs);
+  roles[i] = { ...roles[i], dataScope: scope, scopeRefs: values };
   return roles[i];
 }
 export const saveEmployee = (x: Partial<Employee>) => upsert(employees, x, "employeeNo", () => nextNo("E", employees, 100));

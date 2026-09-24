@@ -83,7 +83,7 @@ describe("G1 软删除：归档 / 恢复", () => {
   it("准备：新增一条非内置角色供归档用例使用", async () => {
     await api.saveRoleRow({
       roleNo: "__ARCHIVE_TEST__", code: "ARCHIVE_TEST", name: "归档测试角色",
-      permCount: 0, memberCount: 0, builtin: false, dataScope: "SELF", scopeValues: "",
+      permCount: 0, memberCount: 0, builtin: false, dataScope: "SELF", scopeRefs: "",
       archivedAt: null,
     });
     expect(await CASES[CASES.length - 1].keys(ALL)).toContain("__ARCHIVE_TEST__");

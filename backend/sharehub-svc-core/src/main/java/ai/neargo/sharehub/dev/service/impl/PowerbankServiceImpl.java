@@ -152,7 +152,8 @@ public class PowerbankServiceImpl implements PowerbankService {
     private static PowerbankRow toVO(DevPowerbank e) {
         return new PowerbankRow(e.getPowerbankNo(), e.getSn(), e.getVendorCode(),
                 e.getCabinetNo(), e.getSlotIndex(), e.getBattery(), e.getCycles(),
-                e.getHealth(), e.getStatus());
+                e.getHealth(), e.getStatus(),
+                e.getArchivedAt() == null ? null : e.getArchivedAt().toString());
     }
 
     // ── 归档 / 取消归档（前端契约 Archivable）──

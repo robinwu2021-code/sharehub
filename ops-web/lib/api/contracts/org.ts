@@ -22,10 +22,10 @@ export interface OrgApi {
 
   /**
    * 角色数据权限（G7）：覆盖写该角色的数据范围。
-   * scopeValues 为逗号分隔的 ID 列表（REGION→regionId / LOCATION→siteNo / AGENT→agentNo）；
+   * scopeRefs 为逗号分隔的 ID 列表（REGION→regionId / LOCATION→siteNo / AGENT→agentNo）；
    * scope 为 ALL / SELF 时无附加值，服务端会清空。
    */
-  saveRoleDataScope(roleCode: string, scope: DataScope, scopeValues?: string): Promise<RoleRow>;
+  saveRoleDataScope(roleCode: string, scope: DataScope, scopeRefs?: string): Promise<RoleRow>;
 
   // === 功能权限（S6 权限码勾选树）===
   /** 权限码目录，构建勾选树用。全量一次拉完（~150 条），不分页。 */

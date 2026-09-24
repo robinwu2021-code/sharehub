@@ -295,6 +295,10 @@
     {
      "name": "status",
      "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -349,6 +353,10 @@
     {
      "name": "status",
      "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -382,6 +390,10 @@
     },
     {
      "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
      "type": "String"
     }
    ]
@@ -436,6 +448,10 @@
     {
      "name": "status",
      "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -469,6 +485,10 @@
     },
     {
      "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
      "type": "String"
     }
    ]
@@ -2124,6 +2144,10 @@
     {
      "name": "autoWorkOrder",
      "type": "boolean"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -2167,6 +2191,10 @@
     {
      "name": "autoWorkOrder",
      "type": "boolean"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -2217,6 +2245,10 @@
     {
      "name": "autoWorkOrder",
      "type": "boolean"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -2642,6 +2674,10 @@
     {
      "name": "status",
      "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -2692,6 +2728,10 @@
     },
     {
      "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
      "type": "String"
     }
    ],
@@ -2792,6 +2832,10 @@
     },
     {
      "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
      "type": "String"
     }
    ],
@@ -2959,6 +3003,14 @@
     {
      "name": "siteNo",
      "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -3071,6 +3123,14 @@
       },
       {
        "name": "siteNo",
+       "type": "String"
+      },
+      {
+       "name": "agentNo",
+       "type": "String"
+      },
+      {
+       "name": "archivedAt",
        "type": "String"
       }
      ]
@@ -6760,6 +6820,10 @@
     {
      "name": "status",
      "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -6810,6 +6874,10 @@
     },
     {
      "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
      "type": "String"
     }
    ],
@@ -6951,6 +7019,10 @@
     },
     {
      "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
      "type": "String"
     }
    ],
@@ -7975,6 +8047,10 @@
     {
      "name": "status",
      "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -8057,6 +8133,10 @@
     {
      "name": "status",
      "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -8118,6 +8198,10 @@
     },
     {
      "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
      "type": "String"
     }
    ]
@@ -8242,6 +8326,10 @@
     {
      "name": "status",
      "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -8303,6 +8391,10 @@
     },
     {
      "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
      "type": "String"
     }
    ]
@@ -8594,6 +8686,10 @@
     {
      "name": "status",
      "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -8675,6 +8771,10 @@
     },
     {
      "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
      "type": "String"
     }
    ],
@@ -9455,6 +9555,10 @@
     {
      "name": "locationCount",
      "type": "int"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -9490,6 +9594,10 @@
     {
      "name": "locationCount",
      "type": "int"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -9574,6 +9682,10 @@
     {
      "name": "locationCount",
      "type": "int"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -11205,7 +11317,19 @@
      "type": "String"
     },
     {
+     "name": "clientCode",
+     "type": "String"
+    },
+    {
      "name": "action",
+     "type": "String"
+    },
+    {
+     "name": "outcome",
+     "type": "String"
+    },
+    {
+     "name": "traceId",
      "type": "String"
     },
     {
@@ -11267,7 +11391,19 @@
      "type": "String"
     },
     {
+     "name": "clientCode",
+     "type": "String"
+    },
+    {
      "name": "action",
+     "type": "String"
+    },
+    {
+     "name": "outcome",
+     "type": "String"
+    },
+    {
+     "name": "traceId",
      "type": "String"
     },
     {
@@ -11389,6 +11525,10 @@
     {
      "name": "status",
      "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -11435,6 +11575,10 @@
     },
     {
      "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
      "type": "String"
     }
    ],
@@ -11489,6 +11633,10 @@
     },
     {
      "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
      "type": "String"
     }
    ],
@@ -14414,6 +14562,10 @@
     {
      "name": "status",
      "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -14472,6 +14624,10 @@
     },
     {
      "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
      "type": "String"
     }
    ],
@@ -14580,6 +14736,10 @@
     },
     {
      "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
      "type": "String"
     }
    ],
@@ -19022,7 +19182,7 @@
      "type": "String"
     },
     {
-     "name": "psgTxnNo",
+     "name": "pspTxnNo",
      "type": "String"
     },
     {
@@ -19093,7 +19253,7 @@
      "type": "String"
     },
     {
-     "name": "psgTxnNo",
+     "name": "pspTxnNo",
      "type": "String"
     },
     {
@@ -19196,7 +19356,7 @@
      "type": "String"
     },
     {
-     "name": "psgTxnNo",
+     "name": "pspTxnNo",
      "type": "String"
     },
     {
@@ -22401,6 +22561,10 @@
      "type": "String"
     },
     {
+     "name": "content",
+     "type": "String"
+    },
+    {
      "name": "channel",
      "type": "String"
     },
@@ -22441,6 +22605,10 @@
     },
     {
      "name": "title",
+     "type": "String"
+    },
+    {
+     "name": "content",
      "type": "String"
     },
     {
@@ -22491,6 +22659,10 @@
     },
     {
      "name": "title",
+     "type": "String"
+    },
+    {
+     "name": "content",
      "type": "String"
     },
     {
@@ -26399,6 +26571,10 @@
    "LAST_13W",
    "LAST_12M"
   ],
+  "ClientCode": [
+   "OPS",
+   "AGENT"
+  ],
   "Realm": [
    "STAFF",
    "AGENT",
@@ -26550,6 +26726,10 @@
   ],
   "LeadOwnerType": [
    "STAFF"
+  ],
+  "AuditOutcome": [
+   "SUCCESS",
+   "DENIED"
   ],
   "AgentStatus": [
    "ENABLED"

@@ -45,7 +45,8 @@ public final class MdDtos2 {
     public record ProblemEntry(String problemNo, String category,
                                String title, String titleEn, String titleAr,
                                String answer, String answerEn, String answerAr,
-                               String suggestedAction, Integer sortNo, String status) {
+                               String suggestedAction, Integer sortNo, String status,
+                               String archivedAt) {
     }
 
     /**

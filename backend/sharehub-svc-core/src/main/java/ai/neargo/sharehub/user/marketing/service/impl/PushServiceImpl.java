@@ -69,7 +69,7 @@ public class PushServiceImpl extends AbstractCrudService<MktPush, PushMessageVO>
 
     @Override
     protected PushMessageVO toVO(MktPush e) {
-        return new PushMessageVO(e.getPushNo(), e.getTitle(), e.getChannel(), e.getAudience(),
+        return new PushMessageVO(e.getPushNo(), e.getTitle(), e.getContent(), e.getChannel(), e.getAudience(),
                 e.getSentCount(), e.getStatus(), e.getSentAt());
     }
 

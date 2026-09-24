@@ -58,6 +58,7 @@ public class BankServiceImpl extends AbstractCrudService<MdBank, BankEntry> impl
     @Override
     protected BankEntry toVO(MdBank e) {
         return new BankEntry(e.getBankCode(), e.getBankName(), e.getBankNameEn(),
-                e.getCountry(), e.getCurrency(), e.getSwiftPrefix(), e.getIbanLength(), e.getStatus());
+                e.getCountry(), e.getCurrency(), e.getSwiftPrefix(), e.getIbanLength(), e.getStatus(),
+                e.getArchivedAt() == null ? null : e.getArchivedAt().toString());
     }
 }

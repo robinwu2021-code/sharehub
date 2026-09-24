@@ -35,14 +35,17 @@ public final class AlarmDtos {
     }
 
     /** 告警代码字典行，镜像前端 {@code AlarmCode}（含建议处置 + 自动开单开关）。 */
+    /** {@code archivedAt}：归档时间，`null` = 在用。运营端靠它把归档行置灰并显示归档时间。 */
     public record AlarmCode(String code, String message, String messageEn, String messageAr,
-                            String level, String suggestion, boolean autoWorkOrder) {
+                            String level, String suggestion, boolean autoWorkOrder,
+                            String archivedAt) {
     }
 
     /** 通知规则行，镜像前端 {@code AlarmRule}（含静默窗口 + 升级策略）。 */
+    /** {@code archivedAt}：归档时间，`null` = 在用。运营端靠它把归档行置灰并显示归档时间。 */
     public record AlarmRule(String ruleNo, String alarmCode, String target, String channel,
                             String method, String quietStart, String quietEnd,
-                            Integer escalateMinutes, String status) {
+                            Integer escalateMinutes, String status, String archivedAt) {
     }
 
     /**

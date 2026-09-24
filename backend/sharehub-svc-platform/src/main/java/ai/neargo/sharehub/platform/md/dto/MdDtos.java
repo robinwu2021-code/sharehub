@@ -13,9 +13,10 @@ public final class MdDtos {
     }
 
     /** 银行字典行，镜像前端 {@code BankEntry}。 */
+    /** {@code archivedAt}：归档时间，`null` = 在用。运营端靠它把归档行置灰并显示归档时间。 */
     public record BankEntry(String bankCode, String bankName, String bankNameEn,
                             String country, String currency, String swiftPrefix,
-                            Integer ibanLength, String status) {
+                            Integer ibanLength, String status, String archivedAt) {
     }
 
     /**

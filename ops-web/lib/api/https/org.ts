@@ -22,7 +22,7 @@ export const orgHttp: OrgApi = {
   // T0-4：真实端点是 OrgController 的 PUT /api/platform/data-scopes/{subjectType}/{subjectNo}
   // （不是 iam/roles/{code}/data-scope —— IamAdminController 只管 roles/{no}/permissions）。
   // subjectType 固定 ROLE（后端 SUBJECT_TYPES = ROLE|EMPLOYEE）；
-  // body 字段名是 scopeType/scopeRefs（后端 DataScopeReq），不是 scope/scopeValues。
+  // body 字段名是 scopeType/scopeRefs（后端 DataScopeReq），不是 scope/scopeRefs。
   // subjectType 走变量而非写死 "ROLE"：后端这个端点是通用的（SUBJECT_TYPES = ROLE|EMPLOYEE），
   // 写死字面量会让 scripts/check-backend-parity.py 把它误判成「后端缺端点」——
   // 归一化后 `/data-scopes/ROLE/{}` 对不上后端的 `/data-scopes/{}/{}`。

@@ -866,7 +866,7 @@ function FinanceInner() {
     { header: "支付渠道", cell: (r) => <Badge tone="outline">{r.channelCode}</Badge> },
     { header: "状态", cell: (r) => <StatusBadge map={RECHARGE_STATUS} value={r.status} /> },
     { header: "支付时间", cell: (r) => <span className="text-muted-foreground">{r.paidAt ? fmtTime(r.paidAt) : "-"}</span> },
-    { header: "网关流水号", cell: (r) => <span className="text-muted-foreground tabular-nums">{r.psgTxnNo ?? "-"}</span> },
+    { header: "网关流水号", cell: (r) => <span className="text-muted-foreground tabular-nums">{r.pspTxnNo ?? "-"}</span> },
   ];
 
   const reconcileCols: Column<Reconcile>[] = [
@@ -1266,7 +1266,7 @@ function FinanceInner() {
             { header: "状态", value: (r) => RECHARGE_STATUS[r.status].label },
             { header: "下单时间", value: (r) => r.createdAt },
             { header: "支付时间", value: (r) => r.paidAt },
-            { header: "网关流水号", value: (r) => r.psgTxnNo },
+            { header: "网关流水号", value: (r) => r.pspTxnNo },
           ], (q.data?.list ?? []) as RechargeOrder[])}
         >
           <FilterSelect value={rcStatus} onChange={(v) => { setRcStatus(v); paging.reset(); }} allLabel="全部状态" options={RECHARGE_STATUS} />

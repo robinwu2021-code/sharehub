@@ -53,8 +53,19 @@ public final class MarketingDtos {
     }
 
     /** 推送触达行，镜像前端 {@code PushMessage}。 */
-    public record PushMessageVO(String pushNo, String title, String channel, String audience,
-                                Integer sentCount, String status, String sentAt) {
+    /**
+     * 推送消息行。
+     *
+     * <p><b>content 必须带出来</b>：前端类型里它是必填，不回就是 undefined —— 列表里那一列空白。
+     * 实体本来就有这一列，只是这个 DTO 漏了。
+     *
+     * <p>⚠️ 前端还期望 `audienceType` / `audienceValue` / `scheduledAt` /
+     * `targetCount` / `successCount` / `idempotencyKey` / `operatorName` ——
+     * **这些列实体里根本没有**，属于「前端先行、后端未建」，要补得先加列 + 补发送侧统计，
+     * 不是对齐能解决的。补之前它们在真后端下一律 undefined。
+     */
+    public record PushMessageVO(String pushNo, String title, String content, String channel,
+                                String audience, Integer sentCount, String status, String sentAt) {
     }
 
     /**

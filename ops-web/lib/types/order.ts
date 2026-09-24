@@ -300,7 +300,7 @@ export interface RefundApplyPayload {
 }
 
 // 退款记录：独立审批队列（申请→审批→执行），比竞品多一条审批链。
-// idempotencyKey / psgTxnNo 是资金操作可追溯的底线：前者防重复退款，后者对得上 PSP 流水。
+// idempotencyKey / pspTxnNo 是资金操作可追溯的底线：前者防重复退款，后者对得上 PSP 流水。
 export interface RefundRecord extends AuditTrail {
   refundNo: string;
   orderNo: string;
@@ -312,7 +312,7 @@ export interface RefundRecord extends AuditTrail {
   appliedAt: string;
   status: "PENDING" | "APPROVED" | "REJECTED" | "EXECUTED" | "FAILED";
   idempotencyKey: string; // 幂等键（同一键只退一次）
-  psgTxnNo: string | null; // PSP 支付流水号（未执行时为空）
+  pspTxnNo: string | null; // PSP 支付流水号（未执行时为空）
 }
 
 // —— 预约订单（阶段 2）——

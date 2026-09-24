@@ -157,7 +157,8 @@ public class CabinetServiceImpl implements CabinetService {
                 e.getSlotTotal() == null ? 0 : e.getSlotTotal(),
                 e.getAvailableCount() == null ? 0 : e.getAvailableCount(),
                 e.getOnlineStatus(), e.getStatus(), e.getFwVersion(), e.getLastHeartbeatAt(),
-                e.getSiteNo());
+                e.getSiteNo(), e.getAgentNo(),
+                e.getArchivedAt() == null ? null : e.getArchivedAt().toString());
     }
 
     // ── 归档 / 取消归档（前端契约 Archivable）──

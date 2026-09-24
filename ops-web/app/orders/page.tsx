@@ -587,7 +587,7 @@ function OrdersInner() {
     { header: "审批人", cell: (r) => r.auditorName ?? <span className="text-muted-foreground">-</span> },
     // 幂等键 + PSP 流水号 = 资金操作可追溯的底线（防重复退款 / 对得上支付侧流水）
     { header: "幂等键", cell: (r) => <span className="text-muted-foreground tabular-nums">{r.idempotencyKey}</span> },
-    { header: "PSP 流水号", cell: (r) => r.psgTxnNo ? <span className="tabular-nums">{r.psgTxnNo}</span> : <span className="text-muted-foreground">-</span> },
+    { header: "PSP 流水号", cell: (r) => r.pspTxnNo ? <span className="tabular-nums">{r.pspTxnNo}</span> : <span className="text-muted-foreground">-</span> },
     {
       header: "操作",
       cell: (r) => canAuditRefund && r.status === "PENDING"
@@ -857,7 +857,7 @@ function OrdersInner() {
               { header: "状态", value: (r) => RFD_STATUS[r.status].label },
               { header: "审批人", value: (r) => r.auditorName },
               { header: "幂等键", value: (r) => r.idempotencyKey },
-              { header: "PSP 流水号", value: (r) => r.psgTxnNo },
+              { header: "PSP 流水号", value: (r) => r.pspTxnNo },
             ], rfdQ.data?.list ?? [])}
             onAdd={openRfdNew}
             addLabel="新建退款"
@@ -1084,7 +1084,7 @@ function OrdersInner() {
             <Field label="退款原因">{rfdDetail.reason}</Field>
             <Field label="申请人 / 时间">{rfdDetail.applicantName} · {fmtTime(rfdDetail.appliedAt)}</Field>
             <Field label="幂等键">{rfdDetail.idempotencyKey}</Field>
-            <Field label="PSP 流水号">{rfdDetail.psgTxnNo ?? "未执行"}</Field>
+            <Field label="PSP 流水号">{rfdDetail.pspTxnNo ?? "未执行"}</Field>
             <Field label="审批结果">
               <Select className="w-full" value={rfdApprove} onChange={(e) => setRfdApprove(e.target.value)}>
                 <option value="1">通过（执行退款）</option>
