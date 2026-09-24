@@ -160,7 +160,18 @@
   归档进得去出不来，接口还返回 200），由 `ArchiveRoundTripTest` 钉住往返；
   写操作审计拦截器落地，`iam_audit_log` 有了第一个真生产者。
 - **脚本修正**：`entity-column-diff.py` 现读 `@TableField` 注解 —— 不读它的代价是 V13
-  给 6 张表建了一批**永远为 NULL 的 JSON 影子列**（删列迁移另行排期）。
+  照着误判的列名建了一批孤儿列（删列迁移另行排期）。
+
+  > **2026-09-24 更正**：上面这句原写作「给 6 张表建了一批**永远为 NULL 的 JSON 影子列**」，
+  > 实测两处都不符。V13 加的 JSON 列是 **9 张表 15 列**，而其中 **14 列都被实体映射着**
+  > —— `iam_audit_log.target_no`/`target_type` 更是 9063 行全非空（审计拦截器一直在写）。
+  > `ADD COLUMN IF NOT EXISTS` 对已存在的列是空操作，所以「建了一批影子列」本身不成立。
+  >
+  > 真正的孤儿是**另一类**，签名精确：`@TableField` 改了列名，而脚本按字段名又直译出一个。
+  > 共 4 个（`wo_dispatch` / `wo_handle` / `wo_inspection_plan` 的 `assignee_no`
+  > —— 真列是 `assignee_id`；以及 `dev_ota_release.lock_version` —— 真列是 `version_col`），
+  > 已由 `V63` 删除，并加卡口 `TableFieldOrphanTest` 盯住这个签名。
+  > **第四个是卡口自己抓出来的，手工扫描漏了它。**
 - 测试 109 → **113**（+3 记账口径守卫 +1 归档往返）。
 
 ---
