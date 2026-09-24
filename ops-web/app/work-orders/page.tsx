@@ -225,7 +225,7 @@ function WorkOrdersInner() {
   });
   const doAccept = useMutation({
     mutationFn: (no: string) => api.acceptWorkOrder(no),
-    onSuccess: ok("已接单，工单进入处理中"),
+    onSuccess: ok("已接单；到场后点「提交处理」进入处理中"),
   });
   const doHandle = useMutation({
     mutationFn: (v: { no: string; action: "process" | "complete"; handleNote: string; partsReplaced?: string }) =>
@@ -280,7 +280,7 @@ function WorkOrdersInner() {
       title: `批量派单 ${eligible.length} 张`,
       desc: `已选 ${picked.length} 张工单，其中 ${eligible.length} 张处于「待派单」可派给 ${batchAssignee}`
         + (skipped > 0 ? `，另 ${skipped} 张状态不符将跳过。` : "。")
-        + "派单后处理人需接单才进入处理中。",
+        + "派单后要处理人接单、到场提交处理，才进入处理中。",
       confirmText: `确认派给 ${batchAssignee}`,
     });
     if (ok) batchDispatch.mutate({ nos: eligible.map((w) => w.woNo), assignee: batchAssignee });
