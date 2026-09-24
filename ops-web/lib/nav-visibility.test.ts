@@ -71,13 +71,36 @@ describe("菜单可见性快照", () => {
     const saved = readFileSync(SNAPSHOT, "utf-8");
     if (saved === now) return;
 
-    // 直接比整段字符串的话，错误里是两大坨文本，看不出差在哪一行
-    const a = saved.split("\n");
-    const b = now.split("\n");
-    const onlyBefore = a.filter((l) => l.startsWith("  ") || (!l.startsWith("#") && !l.startsWith("##") && l && !b.includes(l)));
-    const onlyAfter = b.filter((l) => l && !l.startsWith("#") && !a.includes(l));
+    /*
+     * **按角色比，不能按行集合比。**
+     * 同一个叶子（如 `marketing›活动`）在多个角色名下都出现，
+     * 「CS 少了它」这件事会被「ADMIN 还有它」盖掉 ——
+     * 第一版就是这么写的，结果快照明明变了而测试是绿的。
+     * 这正是本卡口要防的那一类缺陷，先在它自己身上发生了一次。
+     */
+    const byRole = (text: string) => {
+      const m = new Map<string, Set<string>>();
+      let role = "";
+      for (const line of text.split("\n")) {
+        const h = /^## (\w+)/.exec(line);
+        if (h) { role = h[1]; m.set(role, new Set()); continue; }
+        if (!line || line.startsWith("#") || !role) continue;
+        m.get(role)!.add(line);
+      }
+      return m;
+    };
+    const before = byRole(saved);
+    const after = byRole(now);
+    const 少掉的: string[] = [];
+    const 多出的: string[] = [];
+    for (const role of new Set([...before.keys(), ...after.keys()])) {
+      const a = before.get(role) ?? new Set<string>();
+      const b = after.get(role) ?? new Set<string>();
+      for (const x of a) if (!b.has(x)) 少掉的.push(`${role}: ${x}`);
+      for (const x of b) if (!a.has(x)) 多出的.push(`${role}: ${x}`);
+    }
     expect(
-      { 少掉的: onlyBefore, 多出的: onlyAfter },
+      { 少掉的, 多出的 },
       `菜单可见性变了。确认是有意的之后：
   UPDATE_NAV_SNAPSHOT=1 npx vitest run lib/nav-visibility.test.ts
 并把快照的 diff 一起提交。`,
