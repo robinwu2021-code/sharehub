@@ -43,6 +43,24 @@ def registered_patterns():
     body = src[src.index("ROLE_PERMS"):src.index("function match")]
     return set(re.findall(r'"([a-z_*][a-z_:*]*)"', body))
 
+def ui_perm_map():
+    """lib/perm-map.ts 的 UI_PERM_MAP：**界面码 → 后端码**（值为 None 表示 UNIMPLEMENTED）。
+
+    `can()` 是**先翻译再比对**的，UI 码本来就允许是界面层的名字
+    （例：`system:notify_log:resend` 翻译成后端的 `system:notify_log:update`，
+    因为"重发"在后端没有独立权限码，而是挂在 update 下）。
+
+    本脚本此前**跳过这一层**，直接拿 allow() 里的字面码去比后端 —— 于是凡是被
+    正确翻译过的码都被误报成"前端以为在鉴权，其实没有"。2026-09-24 实测 18 个
+    报告里有 3 个是这种误报。
+    """
+    src = (OPS / "lib/perm-map.ts").read_text()
+    body = src[src.index("UI_PERM_MAP"):]
+    out = {}
+    for m in re.finditer(r'"([a-z_:]+)"\s*:\s*(?:"([a-z_:]+)"|UNIMPLEMENTED)', body):
+        out[m.group(1)] = m.group(2)      # group(2) 为 None ⇔ UNIMPLEMENTED
+    return out
+
 def frontend_used():
     """页面/组件里 allow("x") / can(role,"x") 实际做门禁用的码 → {code: [文件…]}。"""
     out = collections.defaultdict(list)
@@ -64,9 +82,20 @@ def covered(code, pats):
     return False
 
 be, pats, fe = backend_required(), registered_patterns(), frontend_used()
+umap = ui_perm_map()
 
 # (a) 前端拿来做门禁、后端却没有这个码 —— 门禁形同虚设
-ghost = {c: v for c, v in fe.items() if c not in be}
+#
+# **必须先过 UI_PERM_MAP**：界面码与后端码不要求同名，翻译过的不算漂移。
+# 映射为 UNIMPLEMENTED 的是**有意封掉**（后端还没这个功能），也不算漂移 ——
+# can() 对它直接返回 false，那是正确行为不是 bug。
+ghost = {}
+for _c, _v in fe.items():
+    _t = umap.get(_c, _c)          # 未登记 → 按字面码算（perm-map.test.ts 另有守卫）
+    if _t is None:                 # UNIMPLEMENTED
+        continue
+    if _t not in be:
+        ghost[_c] = _v
 # (b) 后端强制、前端没有任何角色覆盖 —— 功能除 ADMIN(*) 外无人可用
 uncovered = {c: v for c, v in be.items() if not covered(c, pats)}
 
@@ -75,9 +104,13 @@ print(f"后端强制 {len(be)} 个码 · 前端登记 {len(pats)} 项 · 页面�
 if ghost:
     print(f"\n❌ 前端在用但后端不存在的码（{len(ghost)} 个）—— 前端以为在鉴权，其实没有：")
     for c, files in sorted(ghost.items()):
-        near = [b for b in be if b.rsplit(":", 1)[0] == c.rsplit(":", 1)[0]]
+        tgt = umap.get(c, c)
+        via = "" if tgt == c else f"  （映射到 {tgt}，后端也没有）"
+        if c not in umap:
+            via = "  （**未登记进 UI_PERM_MAP** → can() 一律判无权限）"
+        near = [b for b in be if b.rsplit(":", 1)[0] == tgt.rsplit(":", 1)[0]]
         hint = f"  后端同资源有：{', '.join(sorted(near))}" if near else ""
-        print(f"  {c:34s} 用于 {sorted(set(files))[0]}{hint}")
+        print(f"  {c:34s} 用于 {sorted(set(files))[0]}{via}{hint}")
 
 if uncovered:
     print(f"\n⚠️ 后端强制但前端无角色覆盖的码（{len(uncovered)} 个）—— 除 ADMIN 外无人可用：")
