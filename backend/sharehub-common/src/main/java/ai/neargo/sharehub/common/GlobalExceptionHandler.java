@@ -63,8 +63,11 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public Result<Void> onError(Exception e) {
-        log.error("未处理异常 → 500", e);
+    public Result<Void> onError(Exception e, jakarta.servlet.http.HttpServletRequest req) {
+        // 带上方法与路径。这是出 500 时最先被读的一行，只写「未处理异常」
+        // 等于只告诉你「有东西坏了」——而日志里同时还有几十条别的请求，
+        // 光凭堆栈顶端的类名往往对不上是哪个接口（同一个服务被多个接口复用）。
+        log.error("未处理异常 → 500: {} {}", req.getMethod(), req.getRequestURI(), e);
         return Result.error(ErrorCode.INTERNAL_SERVER_ERROR.getCode(), Messages.msg("error.internal"));
     }
 }

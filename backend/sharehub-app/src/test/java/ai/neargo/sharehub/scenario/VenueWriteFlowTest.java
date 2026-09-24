@@ -29,10 +29,23 @@ class VenueWriteFlowTest extends ApiTestSupport {
         return m;
     }
 
+    /**
+     * 翻页找，别只看第一页 —— 测试库是累积的（见 application.properties），
+     * 现在 68 行还够，越过 200 之后这里会报「建完查不到」，而真实原因是分页。
+     *
+     * <p>为什么不用 {@code keyword} 过滤：venue 的 keyword **只匹配 name**
+     * （{@code LocService.pageVenues}），按编号传进去一条都匹配不上。
+     * 而按名字过滤同样不行 —— {@code venue_can_be_edited} 就在改名字。
+     */
     private JsonNode findVenue(String admin, String venueNo) {
-        JsonNode list = get("/api/ops/venues?page=1&size=200", admin).okData().path("list");
-        for (JsonNode v : list) {
-            if (venueNo.equals(v.path("venueNo").asText())) return v;
+        for (int page = 1; page <= 100; page++) {   // 上限兜底，别让接口异常变成死循环
+            JsonNode body = get("/api/ops/venues?page=" + page + "&size=200", admin).okData();
+            JsonNode list = body.path("list");
+            if (list.isEmpty()) return null;
+            for (JsonNode v : list) {
+                if (venueNo.equals(v.path("venueNo").asText())) return v;
+            }
+            if ((long) page * 200 >= body.path("total").asLong()) return null;
         }
         return null;
     }

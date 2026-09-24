@@ -62,8 +62,13 @@ class AgentApplyFlowTest extends ApiTestSupport {
                 .okData().path("applyNo").asText();
     }
 
+    /**
+     * 按编号过滤，别拉一页再翻。{@code agt_apply} 已经 456 行、页大小 200 ——
+     * 这里之所以还找得到，只是因为列表按 id 倒序、刚建的那条恰好落在第一页。
+     * 谁改一次排序，这个用例就会报「申请没找到」，而真实原因是分页。
+     */
     private JsonNode findApply(String applyNo, String token) {
-        JsonNode page = get("/api/agent/applies?page=1&size=200", token).okData();
+        JsonNode page = get("/api/agent/applies?page=1&size=200&keyword=" + applyNo, token).okData();
         for (JsonNode r : page.path("list")) {
             if (applyNo.equals(r.path("applyNo").asText())) return r;
         }
@@ -195,7 +200,10 @@ class AgentApplyFlowTest extends ApiTestSupport {
          * 若事务边界错了（比如主体插入后异常但没回滚），返回值照样是对的，
          * 而档案里查无此人。这种不一致只有跨接口查一次才暴露得出来。
          */
-        JsonNode agents = get("/api/agent/agents?page=1&size=200", admin).okData();
+        // 按编号过滤，**不要拉全表再翻**：库里代理商已经 215 个，
+        // 翻第一页 200 条时新建的那个正好掉到了页外，于是这条断言从
+        // 「派生没生效」变成了「分页没够着」—— 两种失败长得一模一样。
+        JsonNode agents = get("/api/agent/agents?page=1&size=200&keyword=" + operatorNo, admin).okData();
         boolean found = false;
         for (JsonNode a : agents.path("list")) {
             if (operatorNo.equals(a.path("agentNo").asText())) {

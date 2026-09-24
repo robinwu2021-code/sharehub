@@ -52,14 +52,24 @@ public class ScopeAnchorSeeder implements CommandLineRunner {
                 UPDATE dev_cabinet c JOIN loc_location l ON l.location_no = c.location_no
                    SET c.site_no = l.site_no, c.agent_no = l.agent_no
                  WHERE c.site_no IS NULL OR c.agent_no IS NULL""");
+        // 下面两句**重新派生而不是只补空**。原来带 `WHERE ... IS NULL`，
+        // 于是一个已经写错的锚点永远不会被纠正 —— 实测测试库里有 28 行如此：
+        // ST300 从 AG002 改成平台直营后，它的订单与工单仍挂着 agent_no=AG002，
+        // 代理登录后照样看得到那些单。锚点是**派生数据**，陈旧就等于错误，
+        // 没有「保留原值」这回事。
+        //
+        // ⚠️ 这只管种子库。生产上同样的陈旧会由「改站点归属」产生，
+        // 而应用代码里没有任何地方重新派生这两张表的锚点 —— 那是另一件事。
         int ord = jdbc.update("""
                 UPDATE ord_order o JOIN dev_cabinet c ON c.cabinet_no = o.cabinet_no
                    SET o.location_no = c.location_no, o.site_no = c.site_no, o.agent_no = c.agent_no
-                 WHERE o.site_no IS NULL OR o.agent_no IS NULL""");
+                 WHERE NOT (o.site_no <=> c.site_no) OR NOT (o.agent_no <=> c.agent_no)
+                    OR NOT (o.location_no <=> c.location_no)""");
         int wo = jdbc.update("""
                 UPDATE wo_order w JOIN dev_cabinet c ON c.cabinet_no = w.cabinet_no
                    SET w.location_no = c.location_no, w.site_no = c.site_no, w.agent_no = c.agent_no
-                 WHERE w.site_no IS NULL OR w.agent_no IS NULL""");
+                 WHERE NOT (w.site_no <=> c.site_no) OR NOT (w.agent_no <=> c.agent_no)
+                    OR NOT (w.location_no <=> c.location_no)""");
         if (loc + cab + ord + wo > 0) {
             log.info("数据范围锚点回填：点位 {} · 机柜 {} · 订单 {} · 工单 {}", loc, cab, ord, wo);
         }

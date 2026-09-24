@@ -1,59 +1,39 @@
 package ai.neargo.sharehub.auth;
 
-import ai.neargo.common.data.scope.DataScopeContext;
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
-import org.springframework.web.filter.OncePerRequestFilter;
 
-import java.io.IOException;
 import java.util.List;
 
 /**
- * C 端认证过滤器（与运营端 {@link StaffTokenAuthFilter} 分离）：{@code Bearer} → {@link TokenStore.SessionData}，
- * 只认 realm=CONSUMER，principal=LoginUser，authorities=ROLE_CONSUMER（C 端**无 RBAC**，授权靠
- * {@link ConsumerContext} 属主断言）。C 端无角色权限，无需口径 B 刷新。
+ * C 端认证过滤器（与运营端 {@link StaffTokenAuthFilter} 分离：两条 SecurityFilterChain、
+ * 两套 realm、两份数据）：{@code Bearer} → {@link TokenStore.SessionData}，只认
+ * realm=CONSUMER，principal={@link LoginUser}，authorities=ROLE_CONSUMER。
+ *
+ * <p>C 端**无 RBAC** —— 授权靠 {@link ConsumerContext} 的属主断言（或把
+ * {@code c_user_no} 下推到查询条件里，后者更好：查不到即不存在，连单号存在性都不泄露）。
+ * 所以这里挂一个固定角色就够了，也没有口径 B 的权限刷新。
+ *
+ * <p>流程部分全在 {@link AbstractTokenAuthFilter}。此前这个类自己写了一遍，
+ * 且已经与运营端那份分叉（不清 {@link CallContext}）—— 收进基类之后不会再分叉。
  */
 @Component
-public class ConsumerTokenAuthFilter extends OncePerRequestFilter {
+public class ConsumerTokenAuthFilter extends AbstractTokenAuthFilter {
 
-    private final TokenStore tokenStore;
+    private static final List<SimpleGrantedAuthority> CONSUMER =
+            List.of(new SimpleGrantedAuthority("ROLE_CONSUMER"));
 
     public ConsumerTokenAuthFilter(TokenStore tokenStore) {
-        this.tokenStore = tokenStore;
+        super(tokenStore);
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest req, HttpServletResponse resp, FilterChain chain)
-            throws ServletException, IOException {
-        boolean scopeSet = false;
-        String header = req.getHeader("Authorization");
-        if (header != null && header.startsWith("Bearer ")) {
-            TokenStore.SessionData d = tokenStore.get(header.substring(7).trim()).orElse(null);
-            if (d != null && d.user().realm() == Realm.CONSUMER) {
-                var auth = new UsernamePasswordAuthenticationToken(
-                        d.user(), null, List.of(new SimpleGrantedAuthority("ROLE_CONSUMER")));
-                SecurityContextHolder.getContext().setAuthentication(auth);
-                // 与 SecurityContext 成对写：后者只在 web 请求线程上有值，
-                // 而 CurrentUser 让非 web 线程（@Async、定时任务）也读得到当前身份
-                CurrentUser.set(d.user());
-                DataScopeContext.set(d.user().dataScope());
-                scopeSet = true;
-            }
-        }
-        try {
-            chain.doFilter(req, resp);
-        } finally {
-            if (scopeSet) {
-                DataScopeContext.clear();
-                // 线程池会复用线程 —— 不清的话下一个请求读到的不是「空身份」而是「别人的身份」
-                CurrentUser.clear();
-            }
-        }
+    protected boolean accepts(Realm realm) {
+        return realm == Realm.CONSUMER;
+    }
+
+    @Override
+    protected List<SimpleGrantedAuthority> authorities(LoginUser user) {
+        return CONSUMER;
     }
 }
