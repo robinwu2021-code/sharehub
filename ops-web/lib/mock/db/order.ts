@@ -47,6 +47,8 @@ const EXCEPTION_TYPES: OrderException["type"][] = ["NOT_EJECTED", "NOT_RETURNED"
 export const orderExceptions: OrderException[] = orders
   .filter((o) => o.status === "EXCEPTION")
   .map((o, i) => ({
+    // 异常单有自己的编号：一个订单可以有多条异常，不能拿 orderNo 当键
+    exceptionNo: `OEX${7000 + i}`,
     orderNo: o.orderNo, type: p(EXCEPTION_TYPES, i),
     cabinetNo: o.cabinetNo, userNo: o.cUserNo, amount: Number((3 + (i * 7) % 97).toFixed(2)),
     currency: "AED", status: "PENDING" as OrderExceptionStatus, createdAt: iso(i * 5400_000),

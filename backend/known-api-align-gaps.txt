@@ -28,7 +28,6 @@ B GET /api/platform/departments Department 后端有前端无:sort
 B GET /api/platform/payment-channels PaymentChannelEntry 后端有前端无:apiSecretMasked
 B GET /api/platform/payment-channels PaymentChannelEntry 后端有前端无:channelNameAr
 B GET /api/platform/payment-channels PaymentChannelEntry 后端有前端无:channelNameEn
-B GET /api/trade/order-exceptions OrderException 后端有前端无:exceptionNo
 # ⚠️ 下面这条是**有意不接**，不是待办 —— 别把它「修」掉：
 #   未审批的提现要按**现行**费率实时算（ops-web/lib/types/finance.ts 的 withdrawNetOf），
 #   审核页给的必须是点「通过」那一刻真会扣的数；落库的 netAmount 是申请时的旧数。

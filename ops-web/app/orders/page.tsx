@@ -597,7 +597,17 @@ function OrdersInner() {
   ];
 
   const excCols: Column<OrderException>[] = [
-    { header: "订单号", cell: (e) => <span className="txt-strong tabular-nums">{e.orderNo}</span> },
+    {
+      header: "订单号",
+      cell: (e) => (
+        <>
+          <span className="txt-strong tabular-nums">{e.orderNo}</span>
+          {/* 异常单号跟在下面：同一单可能有多条异常（先未弹出、后重复扣费），
+              沟通与工单里要能指到具体是哪一条 */}
+          <div className="truncate txt-caption text-muted-foreground tabular-nums">{e.exceptionNo}</div>
+        </>
+      ),
+    },
     { header: "异常类型", cell: (e) => <Badge tone="outline">{EXC_TYPE_LABEL[e.type]}</Badge> },
     { header: "柜机", cell: (e) => <span className="tabular-nums">{e.cabinetNo}</span> },
     { header: "用户", cell: (e) => <span className="text-muted-foreground tabular-nums">{e.userNo}</span> },
@@ -773,6 +783,8 @@ function OrdersInner() {
             onSearch={(v) => { setExcKeyword(v); excPaging.reset(); }}
             searchPlaceholder="搜索订单号 / 柜机 / 用户 / 工单号 / 退款号"
             onExport={() => exportCsv<OrderException>("异常订单", [
+              // 导出跟着表格补：同一单多条异常时，只有订单号分不出是哪一条
+              { header: "异常单号", value: (e) => e.exceptionNo },
               { header: "订单号", value: (e) => e.orderNo },
               { header: "异常类型", value: (e) => EXC_TYPE_LABEL[e.type] },
               { header: "柜机", value: (e) => e.cabinetNo },
@@ -793,7 +805,8 @@ function OrdersInner() {
           </Toolbar>
           {!canHandleExc && <ReadOnlyNotice what="异常订单处置" perm="order:exception:handle" />}
           <DataTable
-            rowKey={(e: OrderException) => e.orderNo}
+            // 行键用异常单号而非订单号：一个订单可以有多条异常
+            rowKey={(e: OrderException) => e.exceptionNo}
             columns={excCols}
             rows={excQ.data?.list}
             loading={excQ.isLoading} error={excQ.error} onRetry={excQ.refetch}

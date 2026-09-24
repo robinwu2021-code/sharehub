@@ -114,6 +114,14 @@ export interface OrderInterveneResult {
 export type OrderExceptionStatus = "PENDING" | "HANDLING" | "HANDLED";
 
 export interface OrderException {
+  /**
+   * 异常单自己的编号（后端主键）。
+   *
+   * **一个订单可以有多条异常**（先「未弹出」、后「重复扣费」），所以行键必须用它 ——
+   * 用 orderNo 做行键在 mock 下看不出问题（每单只造一条），真后端返回两条时
+   * React 行键重复，表现是选中/更新错行，而不会报错。
+   */
+  exceptionNo: string;
   orderNo: string;
   type: "NOT_EJECTED" | "NOT_RETURNED" | "OVERTIME_BUYOUT" | "DOUBLE_CHARGE";
   cabinetNo: string;
