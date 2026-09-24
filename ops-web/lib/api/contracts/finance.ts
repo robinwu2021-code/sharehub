@@ -5,7 +5,7 @@ import type {
   ShareRecord, Reconcile, ReconAction, ReconDiff, ReconStats, Invoice, ShareSummary, RechargeOrder,
 
   VoucherDetail,
-  VoucherCreatePayload, PayoutAccount,
+  VoucherCreatePayload, PayoutAccount, PayReceiptPayload,
 } from "../../types";
 
 export interface FinanceApi {
@@ -43,6 +43,14 @@ export interface FinanceApi {
   listWithdrawals(q?: PageQ): Promise<PageResult<Withdrawal>>;
   /** 提现审批：驳回必须带原因；auditorName 取当前登录用户（后端以会话为准，前端透传便于 mock）。 */
   auditWithdrawal(withdrawNo: string, approve: boolean, rejectReason?: string, auditorName?: string): Promise<Withdrawal>;
+  /**
+   * 打款回执登记：`PAYING` → `PAID` / `FAILED`（⑮）。
+   *
+   * 在此之前状态机的 `PAY`/`FAIL` 迁移**没有任何入口调用** —— 审批完的单子
+   * 永远停在「出款在途」：钱算得清、批得了，批完不会动。
+   * 成功必填渠道流水号，失败必填原因，判据见 `payReceiptError`。
+   */
+  payWithdrawal(withdrawNo: string, body: PayReceiptPayload): Promise<Withdrawal>;
 
   // === S1 结算单闭环（权限码 finance:settlement:generate / :confirm）===
   /**

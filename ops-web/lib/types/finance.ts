@@ -73,7 +73,48 @@ export interface Withdrawal extends AuditTrail {
   appliedAt: string;
   // —— 资金审批合规四件套（对标补齐）——
   fee: number; // 提现手续费（与 amount 同币种，实际到账 = amount - fee）
+  // —— 打款回执（⑮，V57）。批准之后钱到底出去没有，此前无处可答 ——
+  payChannel: "NEARPAY" | "MANUAL" | null;
+  payRef: string | null;   // 渠道流水号：银行回单号 / nearpay 打款单号
+  payerName: string | null; // 登记回执的人。与 auditorName 分开，才查得出是不是同一个人放的款
+  failReason: string | null; // 打款失败原因。**不是** rejectReason（那是审批驳回）
+  paidAt: string | null;
 }
+
+/** 打款渠道。MANUAL = 人工转账后回填 —— nearpay 接通前这是唯一的真实路径。 */
+export const PAY_CHANNELS = ["MANUAL", "NEARPAY"] as const;
+export type PayChannel = (typeof PAY_CHANNELS)[number];
+
+/**
+ * 打款回执入参。`success` 决定落 PAID 还是 FAILED。
+ *
+ * 成功必填 `payRef`、失败必填 `failReason` —— 页面与 mock 共用
+ * {@link payReceiptError} 这一份判据，不各写一遍。
+ */
+export interface PayReceiptPayload {
+  success: boolean;
+  channel: PayChannel;
+  payRef?: string;
+  failReason?: string;
+}
+
+/** 只有「出款在途」的单子能登记回执：APPLY/AUDIT 还没批，PAID/FAILED 已是终态。 */
+export const canPayWithdrawal = (status: Withdrawal["status"]) => status === "PAYING";
+
+/**
+ * 回执入参校验，返回错误文案；通过返回 null。
+ *
+ * 放在类型层而不是各自实现：按钮禁用、mock 校验、将来的后端错误回显要说同一句话，
+ * 否则「界面说能提交、提交回来说不行」。
+ */
+export const payReceiptError = (p: PayReceiptPayload): string | null => {
+  if (p.success && !p.payRef?.trim()) {
+    // 「已到账」要能在对账时被证实。没有流水号就只剩一句人说的话
+    return "登记到账必须填写渠道流水号（银行回单号 / nearpay 打款单号）";
+  }
+  if (!p.success && !p.failReason?.trim()) return "登记打款失败必须填写失败原因";
+  return null;
+};
 
 // —— 提现手续费口径（SSOT，S7）——
 // 费率与封顶只有一处来源：系统设置 · 业务规则 `BizRules.withdraw`（GET /api/platform/biz-rules）。

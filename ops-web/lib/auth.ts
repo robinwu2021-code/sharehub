@@ -70,7 +70,11 @@ export interface AuthState {
     memberships?: Membership[]; currentOperatorNo?: string;
   }) => void;
   /** 切主体。**只改 store**；重拉身份、清缓存、路由兜底由调用方做（D6b）。 */
-  switchOperator: (operatorNo: string) => void;
+  /**
+   * 切换当前运营主体。`session` 是**服务端换发的新会话** —— 见实现里的注释：
+   * 只改 operatorNo 而不换 token，会出现「界面切了、数据还是上一家」且不报错。
+   */
+  switchOperator: (operatorNo: string, session: { token: string; perms: string[]; username: string }) => void;
   /** 覆盖身份（切主体后重拉 `/me` 的结果落这里）。 */
   refreshIdentity: (v: { role: Role | ""; perms: string[] }) => void;
   /** **只清本地状态**，不发请求。吊销服务端会话用 `signOut()`（lib/api/session）。 */
@@ -96,12 +100,24 @@ export const useAuth = create<AuthState>()(
           ?? v.memberships?.find((m) => m.isPrimary)?.operatorNo ?? "",
         operatorGen: get().operatorGen + 1,
       }),
-      switchOperator: (operatorNo) => {
+      switchOperator: (operatorNo, session) => {
         // 前端也挡一层，但**这一层不算数** —— 真正的越权闸在服务端：
-        // X-Operator-No 是客户端可控的头，服务端必须校验它落在会话 memberships 内，
-        // 不在就整个丢弃、回落默认主体、不报错（ADR-030 §4.2）。
+        // 它校验目标主体落在会话 memberships 内，不在就拒（ADR-030 §4.2 / AgentIdentityPort）。
         if (!get().memberships.some((m) => m.operatorNo === operatorNo)) return;
-        set({ currentOperatorNo: operatorNo, operatorGen: get().operatorGen + 1 });
+        /*
+         * **必须换 token，不能只改这个字段**（2026-09-24）。
+         * agentNo 是数据范围的锚点，服务端按它做 AGENT 硬过滤 ——
+         * 只改本地字段的话，旧 token 仍拿着**旧主体的范围**去查数据，
+         * 界面显示已切换、拿回来的却还是上一家的数据，而且没有任何报错。
+         * 所以服务端换发、老 token 当场吊销，这里把新会话整体落下来。
+         */
+        set({
+          currentOperatorNo: operatorNo,
+          token: session.token,
+          perms: session.perms,
+          username: session.username,
+          operatorGen: get().operatorGen + 1,
+        });
       },
       refreshIdentity: (v) => set({ role: v.role, perms: v.perms }),
       // perms / memberships 也要清：漏掉任一个，登出后 localStorage 里还留着

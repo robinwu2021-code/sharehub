@@ -7,13 +7,13 @@ import type {
   ShareSummary, RechargeOrder, RechargePackage, PageQuery,
   ReconHandleStatus, ReconHandleResult, ReconAction, ReconStats,
   InvoiceStatus, InvoiceAction,
-  PayoutAccount,
+  PayoutAccount, PayReceiptPayload,
 } from "../../types";
 import {
   STL_TRANSITIONS, canSettlementTransition,
   RECON_TRANSITIONS, canReconTransition, RECON_TERMINAL,
   INV_TRANSITIONS, canInvoiceTransition, canEditInvoiceFields,
-  computeWithdrawFee,
+  computeWithdrawFee, canPayWithdrawal, payReceiptError,
 } from "../../types";
 import { VENUE_NAMES, p, iso } from "./internal";
 import { fail, notFound } from "@/lib/biz-error";
@@ -101,6 +101,14 @@ export const settlements: Settlement[] = ["2026-05", "2026-06"].flatMap((period,
   }));
 // 提现：APPLY/AUDIT = 未审批（审批四列为空）；PAYING/PAID = 已通过；FAILED = 已驳回（必带原因）
 const WD_REJECT = ["银行账户与合同主体不一致", "本期结算单未确认，暂缓打款", "超出单笔提现限额，需拆单重申"];
+/** 打款失败的理由（与审批驳回的理由 WD_REJECT 是两套话术，别混用）。 */
+const WD_PAY_FAIL = ["收款账号已销户", "银行拒收：户名与账号不符", "渠道超时，款项已退回"];
+/** 该条 FAILED 是「打款失败」而非「审批驳回」—— 让种子里两种来源各占一半。 */
+const payoutFailed = (i: number) => i % 10 === 4;
+/** 钱确实动过（成功或失败退回）的行才有渠道与流水号。 */
+const paidOrPayoutFailed = (status: Withdrawal["status"], i: number) =>
+  status === "PAID" || (status === "FAILED" && payoutFailed(i));
+
 export const withdrawals: Withdrawal[] = Array.from({ length: 20 }, (_, i) => {
   const status = p(["APPLY", "AUDIT", "PAYING", "PAID", "FAILED"] as const, i);
   const amount = 500 + (i * 211) % 3000;
@@ -113,7 +121,18 @@ export const withdrawals: Withdrawal[] = Array.from({ length: 20 }, (_, i) => {
     currency: "AED", status, appliedAt: iso(i * 43200_000),
     auditorName: audited ? p(["Sara Ahmed", "Omar Khan", "admin"], i) : null,
     auditedAt: audited ? iso(i * 43200_000 - 7200_000) : null,
-    rejectReason: status === "FAILED" ? p(WD_REJECT, i) : null,
+    /*
+     * FAILED 有**两种来源**，种子里必须两种都有，否则页面上「驳回原因 / 失败原因分列」
+     * 这件事永远看不出来，改错了也没人发现：
+     *   · 审批驳回（APPLY/AUDIT --REJECT-->）—— 钱从没打算出去，落 rejectReason
+     *   · 打款失败（PAYING --FAIL-->）      —— 钱出去了又退回来，落 failReason + 渠道
+     */
+    rejectReason: status === "FAILED" && !payoutFailed(i) ? p(WD_REJECT, i) : null,
+    failReason: status === "FAILED" && payoutFailed(i) ? p(WD_PAY_FAIL, i) : null,
+    payChannel: paidOrPayoutFailed(status, i) ? p(["MANUAL", "NEARPAY"] as const, i) : null,
+    payRef: paidOrPayoutFailed(status, i) ? `REF${20260900 + i}` : null,
+    payerName: paidOrPayoutFailed(status, i) ? p(["Sara Ahmed", "admin"], i) : null,
+    paidAt: status === "PAID" ? iso(i * 43200_000 - 3600_000) : null,
   };
 });
 
@@ -551,6 +570,54 @@ export function auditWithdrawal(withdrawNo: string, approve: boolean, rejectReas
   } else {
     w.status = "FAILED";
     w.rejectReason = rejectReason ?? "";
+  }
+  return w;
+}
+
+/** 提现打款回执违规（非法迁移 / 证据不全 / 流水号重复）。 */
+export class WithdrawalError extends Error {
+  constructor(msg: string) { super(msg); this.name = "WithdrawalError"; }
+}
+
+/**
+ * 打款回执登记（mock）：PAYING → PAID / FAILED（⑮）。
+ *
+ * 与后端 `WithdrawalServiceImpl.pay()` 逐条对齐，**三道校验一个都不能省**——
+ * mock 放行而后端拒绝的话，页面在 mock 下看着是通的，切后端立刻崩。
+ */
+export function payWithdrawal(withdrawNo: string, body: PayReceiptPayload, payerName?: string): Withdrawal {
+  const w = withdrawals.find((x) => x.withdrawNo === withdrawNo);
+  if (!w) throw new WithdrawalError(`提现单 ${withdrawNo} 不存在`);
+
+  // ① 状态机：只有「出款在途」能登记。APPLY/AUDIT 还没批（跳过去等于绕开审批），
+  //    PAID/FAILED 是终态、没有出边（再记一次等于同一笔钱记两遍）
+  if (!canPayWithdrawal(w.status)) {
+    throw new WithdrawalError(
+      `提现单 ${withdrawNo} 当前是「${w.status}」，只有出款在途（PAYING）的单子能登记打款回执`);
+  }
+
+  // ② 证据：成功必须有流水号，失败必须有原因（判据与页面共用同一个函数）
+  const bad = payReceiptError(body);
+  if (bad) throw new WithdrawalError(bad);
+
+  const ref = body.payRef?.trim() || null;
+  // ③ 幂等：同一笔渠道流水不能记到两张单上 —— 对账时会平白多出一笔钱。
+  //    后端由唯一键 uk_stl_withdrawal_payref 拦，这里手动扫一遍，报同样的话
+  if (ref && withdrawals.some((x) => x.withdrawNo !== withdrawNo && x.payChannel === body.channel && x.payRef === ref)) {
+    throw new WithdrawalError(`该渠道流水号已登记在另一张提现单上，请核对后重填：${ref}`);
+  }
+
+  w.payChannel = body.channel;
+  w.payRef = ref;
+  w.payerName = payerName || "admin";
+  if (body.success) {
+    w.status = "PAID";
+    w.paidAt = new Date().toISOString();
+    w.failReason = null;
+  } else {
+    w.status = "FAILED";
+    // 失败原因**不写进 rejectReason** —— 那是审批驳回，两者在对账和客诉里要分得开
+    w.failReason = body.failReason!.trim();
   }
   return w;
 }

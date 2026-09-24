@@ -35,12 +35,13 @@ import type {
   Reconcile, ReconAction, ReconHandleStatus, ReconDiff, ReconDiffType, Invoice, InvoiceStatus,
   ShareSummary, RechargeOrder, PageResult,
 
-  VoucherCreatePayload, PayoutAccount,
+  VoucherCreatePayload, PayoutAccount, PayReceiptPayload, PayChannel,
 } from "@/lib/types";
 import {
   SHARE_BASES,
   RECON_TRANSITIONS, RECON_TERMINAL, canReconTransition, canEditInvoiceFields, parseReconDiffDetail,
   withdrawFeeOf, withdrawNetOf, WITHDRAW_FEE_PENDING,
+  canPayWithdrawal, payReceiptError, PAY_CHANNELS,
   // 记账期间复用报表域枚举：与站点坪效/代理绩效/绩效报表同一套周期口径
   REPORT_PERIODS, REPORT_PERIOD_DEFAULT, type ReportPeriod,
 } from "@/lib/types";
@@ -227,6 +228,12 @@ function FinanceInner() {
   const [invStatusFilter, setInvStatusFilter] = useState("");
   // 提现审批：走抽屉而非行内按钮——驳回必须留原因，是资金审批的留痕底线
   const [wdAudit, setWdAudit] = useState<Withdrawal | null>(null);
+  // 打款回执（⑮）。与审批分开的抽屉 —— 它们是两次不同的动作，隔着一次真实资金流动
+  const [wdPay, setWdPay] = useState<Withdrawal | null>(null);
+  const [payOk, setPayOk] = useState("1");
+  const [payChannel, setPayChannel] = useState<PayChannel>("MANUAL");
+  const [payRef, setPayRef] = useState("");
+  const [payFail, setPayFail] = useState("");
   const [wdApprove, setWdApprove] = useState("1");
   const [wdReject, setWdReject] = useState("");
   const username = useAuth((s) => s.username);
@@ -273,6 +280,8 @@ function FinanceInner() {
   });
 
   const canAuditWithdrawal = allow("finance:withdrawal:audit");
+  // 独立权限码：审批「同意打出去」与回执「确实出去了」分开，便于将来做双人复核
+  const canPayWithdrawal_ = allow("finance:withdrawal:pay");
   // —— 收款账户（B3）：读写分开发码，能看账户不等于能改账户 ——
   const canEditPayout = allow("finance:payout_account:update");
   const [payoutForm, setPayoutForm] = useState<Record<string, unknown> | null>(null);
@@ -346,6 +355,20 @@ function FinanceInner() {
       qc.invalidateQueries({ queryKey: ["fin"] });
       setWdAudit(null);
     },
+  });
+
+  const payReceipt = useMutation({
+    mutationFn: (v: { no: string; body: PayReceiptPayload }) => api.payWithdrawal(v.no, v.body),
+    onSuccess: (_r, v) => {
+      notify.success(v.body.success ? "已登记到账" : "已登记打款失败");
+      qc.invalidateQueries({ queryKey: ["fin"] });
+      setWdPay(null);
+    },
+  });
+  /** 当前回执草稿。页面与 mock/后端共用 payReceiptError 这一份判据，不各写一遍。 */
+  const payDraft = (): PayReceiptPayload => ({
+    success: payOk === "1", channel: payChannel,
+    payRef: payRef, failReason: payFail,
   });
 
   // —— 结算单闭环（S1）——
@@ -624,12 +647,46 @@ function FinanceInner() {
     // 审批留痕三列：谁批的 / 何时批的 / 驳回为什么
     { header: "审批人", cell: (w) => w.auditorName ?? <span className="text-muted-foreground">未审批</span> },
     { header: "审批时间", cell: (w) => <span className="text-muted-foreground">{w.auditedAt ? fmtTime(w.auditedAt) : "-"}</span> },
+    /*
+     * 「没通过」有两种，分两列显示而不是合成一列：
+     *   驳回原因 = 审批没同意，钱从没打算出去
+     *   失败原因 = 批了、打了，钱又退回来了 —— 客诉与对账走的是完全不同的流程
+     */
     { header: "驳回原因", cell: (w) => <span className="text-muted-foreground">{w.rejectReason ?? "-"}</span> },
     {
+      header: "打款",
+      cell: (w) => (
+        w.failReason
+          ? <span className="text-destructive">{w.failReason}</span>
+          : w.payRef
+            ? (
+              <div>
+                <div className="tabular-nums">{w.payRef}</div>
+                <div className="text-xs text-muted-foreground">
+                  {w.payChannel === "NEARPAY" ? "nearpay" : "人工转账"}
+                  {w.payerName ? ` · ${w.payerName}` : ""}
+                </div>
+              </div>
+            )
+            : <span className="text-muted-foreground">-</span>
+      ),
+    },
+    {
       header: t("common.actions"),
-      cell: (w) => (w.status === "AUDIT" || w.status === "APPLY") && canAuditWithdrawal ? (
-        <Button size="sm" variant="outline" onClick={() => { setWdAudit(w); setWdApprove("1"); setWdReject(""); }}>审批</Button>
-      ) : <span className="text-muted-foreground">-</span>,
+      cell: (w) => {
+        if ((w.status === "AUDIT" || w.status === "APPLY") && canAuditWithdrawal) {
+          return <Button size="sm" variant="outline" onClick={() => { setWdAudit(w); setWdApprove("1"); setWdReject(""); }}>审批</Button>;
+        }
+        // 出款在途的单子此前**没有任何后续动作** —— 它会永远停在这个状态
+        if (canPayWithdrawal(w.status) && canPayWithdrawal_) {
+          return (
+            <Button size="sm" variant="outline" onClick={() => {
+              setWdPay(w); setPayOk("1"); setPayChannel("MANUAL"); setPayRef(""); setPayFail("");
+            }}>登记打款</Button>
+          );
+        }
+        return <span className="text-muted-foreground">-</span>;
+      },
     },
   ];
 
@@ -1336,6 +1393,64 @@ function FinanceInner() {
             {wdApprove === "0" && (
               <Field label="驳回原因（必填）">
                 <Input className="w-full" value={wdReject} placeholder="如：银行账户与合同主体不一致" onChange={(e) => setWdReject(e.target.value)} />
+              </Field>
+            )}
+          </>
+        )}
+      </Drawer>
+
+      {/* 打款回执（⑮）：PAYING → PAID / FAILED。
+          此前状态机有 PAY/FAIL 两条迁移却没有任何入口调用 —— 审批完的单子永远停在「出款在途」。
+          与审批分成两个抽屉，因为中间隔着一次真实的资金动作：可能失败、可能延迟几天。 */}
+      <Drawer
+        open={!!wdPay}
+        onOpenChange={(o) => !o && setWdPay(null)}
+        title={`登记打款 ${wdPay?.withdrawNo ?? ""}`}
+        desc="资金操作：登记后进入终态，不可撤销；登记人将留痕"
+        footer={
+          wdPay && canPayWithdrawal_ && (
+            <Button
+              disabled={payReceipt.isPending || !!payReceiptError(payDraft())}
+              variant={payOk === "0" ? "destructive" : "default"}
+              onClick={() => payReceipt.mutate({ no: wdPay.withdrawNo, body: payDraft() })}
+            >提交回执</Button>
+          )
+        }
+      >
+        {wdPay && (
+          <>
+            <Field label="提现对象">{wdPay.payeeName}</Field>
+            <Field label="应付金额">{money(withdrawNetOf(wdPay, feeRule), wdPay.currency)}</Field>
+            <Field label="审批人">{wdPay.auditorName ?? "-"}</Field>
+            <Field label="登记人">{username || "admin"}</Field>
+            <Field label="打款结果">
+              <Select className="w-full" value={payOk} onChange={(e) => setPayOk(e.target.value)}>
+                <option value="1">已到账</option>
+                <option value="0">打款失败</option>
+              </Select>
+            </Field>
+            <Field label="打款渠道">
+              <Select className="w-full" value={payChannel} onChange={(e) => setPayChannel(e.target.value as PayChannel)}>
+                {PAY_CHANNELS.map((c) => (
+                  <option key={c} value={c}>{c === "MANUAL" ? "人工转账" : "nearpay 代付"}</option>
+                ))}
+              </Select>
+            </Field>
+            {payOk === "1" ? (
+              <Field label="渠道流水号（必填）">
+                <Input className="w-full" value={payRef} placeholder="银行回单号 / nearpay 打款单号"
+                       onChange={(e) => setPayRef(e.target.value)} />
+                <div className="text-xs text-muted-foreground mt-1">
+                  「已到账」要能在对账时被证实 —— 没有流水号，事后只剩一句人说的话。
+                </div>
+              </Field>
+            ) : (
+              <Field label="失败原因（必填）">
+                <Input className="w-full" value={payFail} placeholder="如：收款账号已销户"
+                       onChange={(e) => setPayFail(e.target.value)} />
+                <div className="text-xs text-muted-foreground mt-1">
+                  失败原因与「审批驳回原因」分开记录：前者钱出去又退回来，后者钱从没打算出去。
+                </div>
               </Field>
             )}
           </>

@@ -109,6 +109,8 @@ export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   "finance:share_rule:update": "finance:share_rule:update",
   "finance:withdrawal:apply": "finance:withdrawal:apply",
   "finance:withdrawal:audit": "finance:withdrawal:audit",
+  // 打款回执，与 :audit 分码（功能权限清单 §6）——「同意打出去」与「确实出去了」是两次动作
+  "finance:withdrawal:pay": "finance:withdrawal:pay",
   "finance:withdrawal:read": "finance:withdrawal:read",
   "finance:payout_account:read": "finance:payout_account:read",
   "finance:payout_account:update": "finance:payout_account:update",

@@ -8,6 +8,7 @@ import { IS_MOCK } from "@/lib/api";
 import { signOut } from "@/lib/api/session";
 import { breadcrumb } from "@/lib/nav";
 import { useI18n } from "@/lib/i18n";
+import { OperatorSwitcher } from "./operator-switcher";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ThemeSwitcher } from "./theme-switcher";
@@ -37,7 +38,7 @@ function Breadcrumb() {
 }
 
 export function Header() {
-  const { username, role, currentOperatorNo } = useAuth();
+  const { username, role, currentOperatorNo, memberships } = useAuth();
   const { t } = useI18n();
   const router = useRouter();
   return (
@@ -46,7 +47,12 @@ export function Header() {
         <Suspense fallback={null}>
           <Breadcrumb />
         </Suspense>
-        {role === "AGENT" && <span>{t("common.agent")} <span className="text-foreground">{currentOperatorNo || "-"}</span></span>}
+        {/* 多主体时给切换器，单主体仍只显示一行字 —— 只有一个选项的下拉框是噪音 */}
+        {role === "AGENT" && (
+          memberships.length > 1
+            ? <><span>{t("common.agent")}</span><OperatorSwitcher /></>
+            : <span>{t("common.agent")} <span className="text-foreground">{currentOperatorNo || "-"}</span></span>
+        )}
         {IS_MOCK && <Badge tone="warning">{t("common.mockData")}</Badge>}
       </div>
       <div className="flex items-center gap-2 txt-body">

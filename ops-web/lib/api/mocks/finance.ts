@@ -22,6 +22,7 @@ export const financeMock: FinanceApi = {
   listSettlements: (q: SettlementQ = {}) => wait(db.listSettlements(q)),
   listWithdrawals: (q: PageQ = {}) => wait(db.paginate(db.withdrawals, q.page, q.size, (w) => db.kwHit(q.keyword, w.payeeName, w.withdrawNo, w.auditorName))),
   auditWithdrawal: (no, approve, rejectReason, auditorName) => wait(db.auditWithdrawal(no, approve, rejectReason, auditorName), 400),
+  payWithdrawal: (no, body) => wait(db.payWithdrawal(no, body), 400),
 
   // S1 结算单闭环：校验（幂等/无明细/状态机）全在 db 层，错误由全局 MutationCache 弹出
   generateSettlements: (x) => wait(db.generateSettlements(x), 500),
