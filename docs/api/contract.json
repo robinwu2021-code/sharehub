@@ -26655,6 +26655,25 @@
    "SENT",
    "FAILED"
   ],
+  "DepositStatus": [
+   "HELD",
+   "RELEASED",
+   "BOUGHT_OUT"
+  ],
+  "PayAuthStatus": [
+   "FROZEN",
+   "CAPTURED"
+  ],
+  "PayOrderStatus": [
+   "INIT",
+   "PAYING",
+   "PAID",
+   "FAILED"
+  ],
+  "PayRefundStatus": [
+   "INIT",
+   "SUCCESS"
+  ],
   "PricePlanStatus": [
    "ACTIVE"
   ],
@@ -26672,6 +26691,14 @@
    "AGENT",
    "SCENE",
    "REGION"
+  ],
+  "AdSlotStatus": [
+   "IDLE"
+  ],
+  "RechargeOrderStatus": [
+   "PENDING",
+   "PAID",
+   "FAILED"
   ],
   "Provider": [
    "WECHAT_MP",
@@ -26799,6 +26826,12 @@
   ],
   "LeadOwnerType": [
    "STAFF"
+  ],
+  "NotifyTemplateStatus": [
+   "ENABLED"
+  ],
+  "NotifyLogStatus": [
+   "SENT"
   ],
   "AuditOutcome": [
    "SUCCESS",

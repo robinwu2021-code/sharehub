@@ -11,7 +11,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run test",
-    "check:drift": "python3 scripts/check-backend-parity.py && python3 scripts/check-perm-parity.py && python3 ../backend/scripts/api-align.py --strict && python3 ../backend/scripts/feature-align.py --strict && python3 ../backend/scripts/perm-ssot-align.py --strict",
+    "check:drift": "python3 scripts/check-backend-parity.py && python3 scripts/check-perm-parity.py --strict && python3 ../backend/scripts/api-align.py --strict && python3 ../backend/scripts/feature-align.py --strict && python3 ../backend/scripts/perm-ssot-align.py --strict",
     "build:prod": "NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE= next build && node scripts/assert-prod-build.mjs"
   },
   "dependencies": {
