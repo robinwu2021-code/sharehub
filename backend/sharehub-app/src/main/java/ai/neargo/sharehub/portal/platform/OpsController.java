@@ -12,6 +12,7 @@ import ai.neargo.sharehub.loc.dto.LocDtos.Location;
 import ai.neargo.sharehub.loc.dto.LocDtos.Venue;
 import ai.neargo.sharehub.loc.dto.LocDtos.Contract;
 import ai.neargo.sharehub.loc.entity.LocContract;
+import ai.neargo.sharehub.loc.entity.LocVenue;
 import ai.neargo.sharehub.loc.LocService;
 import ai.neargo.sharehub.report.dto.ReportDtos.DashboardStats;
 import ai.neargo.sharehub.report.service.ReportService;
@@ -113,8 +114,9 @@ public class OpsController {
     @PreAuthorize("@perm.can('location:poi:read')")
     public PageResult<Site> sites(@RequestParam(required = false) Integer page,
                                 @RequestParam(required = false) Integer size,
-                                @RequestParam(required = false) String keyword) {
-        return loc.pageSites(page, size, keyword);
+                                @RequestParam(required = false) String keyword,
+                                  @RequestParam(required = false) Boolean showArchived) {
+        return loc.pageSites(page, size, keyword, showArchived);
     }
 
     @PostMapping({"/sites", "/sites/{siteNo}"})
@@ -146,8 +148,9 @@ public class OpsController {
     @PreAuthorize("@perm.can('location:poi:read')")
     public PageResult<Location> locations(@RequestParam(required = false) Integer page,
                                         @RequestParam(required = false) Integer size,
-                                        @RequestParam(required = false) String keyword) {
-        return loc.pageLocations(page, size, keyword);
+                                        @RequestParam(required = false) String keyword,
+                                          @RequestParam(required = false) Boolean showArchived) {
+        return loc.pageLocations(page, size, keyword, showArchived);
     }
 
     @PostMapping({"/locations", "/locations/{locationNo}"})
@@ -160,8 +163,29 @@ public class OpsController {
     @PreAuthorize("@perm.can('location:venue:read')")
     public PageResult<Venue> venues(@RequestParam(required = false) Integer page,
                                   @RequestParam(required = false) Integer size,
-                                  @RequestParam(required = false) String keyword) {
-        return loc.pageVenues(page, size, keyword);
+                                  @RequestParam(required = false) String keyword,
+                                    @RequestParam(required = false) Boolean showArchived) {
+        return loc.pageVenues(page, size, keyword, showArchived);
+    }
+
+    /**
+     * 新建 / 修改场地方。
+     *
+     * <p>此前只有 GET 与归档 —— 前端的「新增/编辑场地方」在 {@code USE_MOCK=0} 下必 404，
+     * 整条「场地方 → 合同 → 站点 → 责任 → 分账」在真后端下从第一环就断了。
+     */
+    @PostMapping("/venues")
+    @PreAuthorize("@perm.can('location:venue:create')")
+    public Venue createVenue(@RequestBody LocVenue body) {
+        body.setVenueNo(null);   // 新建一律服务端取号，忽略 body 里的键
+        return loc.saveVenue(body);
+    }
+
+    @PostMapping("/venues/{venueNo}")
+    @PreAuthorize("@perm.can('location:venue:update')")
+    public Venue updateVenue(@PathVariable String venueNo, @RequestBody LocVenue body) {
+        body.setVenueNo(venueNo); // 路径为准，防越权改别家档案
+        return loc.saveVenue(body);
     }
 
     @GetMapping("/contracts")

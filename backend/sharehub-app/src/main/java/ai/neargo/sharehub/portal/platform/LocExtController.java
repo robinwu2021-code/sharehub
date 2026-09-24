@@ -104,6 +104,23 @@ public class LocExtController {
     }
 
     /** 审核。通过则由 service 建 {@code loc_venue} 并回填 {@code venueNo}（[api/README §3.4]）。 */
+    /**
+     * 新建 / 修改进件（运营代录）。自助提交渠道未开之前，
+     * 运营得能替客户把单子录进来 —— 否则这个菜单在真后端下只能看不能用。
+     */
+    @PostMapping("/venue-onboardings")
+    @PreAuthorize("@perm.can('location:venue:create')")
+    public VenueOnboarding createOnboarding(@RequestBody VenueOnboarding body) {
+        return onboardingService.save(null, body);
+    }
+
+    @PostMapping("/venue-onboardings/{onboardingNo}")
+    @PreAuthorize("@perm.can('location:venue:update')")
+    public VenueOnboarding updateOnboarding(@PathVariable String onboardingNo,
+                                            @RequestBody VenueOnboarding body) {
+        return onboardingService.save(onboardingNo, body);
+    }
+
     @PostMapping("/venue-onboardings/{onboardingNo}/review")
     @PreAuthorize("@perm.can('location:venue:create')")
     public VenueOnboarding review(@PathVariable String onboardingNo,

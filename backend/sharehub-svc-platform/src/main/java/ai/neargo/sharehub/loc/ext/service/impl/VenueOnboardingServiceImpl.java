@@ -25,6 +25,9 @@ import java.util.List;
 @Service
 public class VenueOnboardingServiceImpl implements VenueOnboardingService {
 
+    /** 唯一可改内容的状态；也是审核的唯一入态。 */
+    private static final String PENDING = "PENDING";
+
     private final LocVenueOnboardingMapper mapper;
     private final VenueCreator venueCreator;
 
@@ -59,10 +62,40 @@ public class VenueOnboardingServiceImpl implements VenueOnboardingService {
 
     @Override
     @Transactional
+    public VenueOnboarding save(String onboardingNo, VenueOnboarding in) {
+        if (in == null || in.venueName() == null || in.venueName().isBlank()) {
+            throw new IllegalArgumentException("门店名称必填");
+        }
+        LocVenueOnboarding e = (onboardingNo == null || onboardingNo.isBlank()) ? null : byNo(onboardingNo);
+        if (e != null && !PENDING.equals(e.getStatus())) {
+            // 审核结论是对「当时那份内容」做的。事后改内容，结论就对不上它审过的东西了。
+            throw new IllegalArgumentException("进件已审核，内容不可再改: " + onboardingNo
+                    + " status=" + e.getStatus());
+        }
+        boolean create = e == null;
+        if (create) {
+            e = new LocVenueOnboarding();
+            e.setOnboardingNo(ai.neargo.common.core.IdGenerator.next(
+                    ai.neargo.sharehub.common.BizKey.ONBOARDING));
+            e.setTenantId("MAIN");
+            e.setStatus(PENDING);
+            // 提交时刻由服务端定。让客户端传的话，补录的单子可以被写成一个月前提交的，
+            // 而进件的 SLA 正是按这个时刻算的。
+            e.setRequestedAt(LocalDateTime.now().toString());
+        }
+        e.setVenueName(in.venueName().trim());
+        e.setContact(in.contact());
+        e.setIndustry(in.industry());
+        if (create) mapper.insert(e); else mapper.updateById(e);
+        return toVO(byNo(e.getOnboardingNo()));
+    }
+
+    @Override
+    @Transactional
     public VenueOnboarding review(String onboardingNo, OnboardingReviewReq req) {
         LocVenueOnboarding e = byNo(onboardingNo);
         if (e == null) throw new IllegalArgumentException("进件不存在: " + onboardingNo);
-        if (!"PENDING".equals(e.getStatus())) {
+        if (!PENDING.equals(e.getStatus())) {
             throw new IllegalArgumentException("进件已审核，不可重复审核: " + onboardingNo + " status=" + e.getStatus());
         }
         if (req == null || req.approve() == null) {

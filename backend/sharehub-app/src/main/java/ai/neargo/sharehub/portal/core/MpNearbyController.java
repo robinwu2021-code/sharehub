@@ -63,7 +63,7 @@ public class MpNearbyController {
         ConsumerContext.require();
         return DataScopeContext.executeWithoutScope(() -> {
             List<Map<String, Object>> out = new ArrayList<>();
-            for (Site s : loc.pageSites(1, 50, keyword).getList()) {
+            for (Site s : loc.pageSites(1, 50, keyword, false).getList()) {
                 Quote q = quoteOf(s.siteNo(), s.sceneType());
                 for (Cabinet c : cabinets.bySite(s.siteNo())) {
                     int borrow = c.availableCount();
@@ -106,7 +106,7 @@ public class MpNearbyController {
     public Map<String, Object> site(@PathVariable String siteNo) {
         String me = ConsumerContext.userNo();
         return DataScopeContext.executeWithoutScope(() -> {
-            Site s = loc.pageSites(1, 200, null).getList().stream()
+            Site s = loc.pageSites(1, 200, null, false).getList().stream()
                     .filter(x -> siteNo.equals(x.siteNo())).findFirst()
                     .orElseThrow(() -> new IllegalArgumentException("站点不存在: " + siteNo));
             List<Cabinet> cs = cabinets.bySite(siteNo);
@@ -184,7 +184,7 @@ public class MpNearbyController {
     }
 
     private Site siteOf(Cabinet c) {
-        return loc.pageSites(1, 200, null).getList().stream()
+        return loc.pageSites(1, 200, null, false).getList().stream()
                 .filter(x -> x.siteNo() != null && x.siteNo().equals(c.siteNo()))
                 .findFirst().orElse(null);
     }

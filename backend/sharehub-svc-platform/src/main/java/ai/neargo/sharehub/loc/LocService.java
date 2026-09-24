@@ -56,9 +56,21 @@ public class LocService {
     private static boolean kw(String k) { return k != null && !k.isBlank(); }
 
     // —— 站点 ——
-    public PageResult<Site> pageSites(Integer page, Integer size, String keyword) {
+    /**
+     * 「默认不看已归档」的统一口径。
+     *
+     * <p><b>补的是一个让归档形同虚设的缺陷</b>：场所域三张表的归档端点一直在写
+     * {@code archived_at}，而三个列表查询**从来没有读过它** —— 归了档的场地方/站点/点位
+     * 照样出现在列表里，前端传的 {@code showArchived} 也被整个丢掉。
+     * 运营点了归档、提示成功、东西还在原地。
+     *
+     * <p>其余 15 个可归档资源走 {@code AbstractCrudService}，本来就有这个语义；
+     * 场所域因为是三资源合一的服务没继承它，于是漏掉了。
+     */
+    public PageResult<Site> pageSites(Integer page, Integer size, String keyword, Boolean showArchived) {
         Page<LocSite> p = new Page<>(pg(page), sz(size));
         LambdaQueryWrapper<LocSite> w = new LambdaQueryWrapper<>();
+        if (!Boolean.TRUE.equals(showArchived)) w.isNull(LocSite::getArchivedAt);
         if (kw(keyword)) {
             w.and(q -> q.like(LocSite::getName, keyword).or().like(LocSite::getVenueName, keyword)
                     .or().like(LocSite::getRegionId, keyword));
@@ -173,9 +185,10 @@ public class LocService {
     }
 
     // —— 点位 ——
-    public PageResult<Location> pageLocations(Integer page, Integer size, String keyword) {
+    public PageResult<Location> pageLocations(Integer page, Integer size, String keyword, Boolean showArchived) {
         Page<LocLocation> p = new Page<>(pg(page), sz(size));
         LambdaQueryWrapper<LocLocation> w = new LambdaQueryWrapper<>();
+        if (!Boolean.TRUE.equals(showArchived)) w.isNull(LocLocation::getArchivedAt);
         if (kw(keyword)) {
             w.and(q -> q.like(LocLocation::getName, keyword).or().like(LocLocation::getSiteName, keyword));
         }
@@ -203,9 +216,10 @@ public class LocService {
     }
 
     // —— 场地方 ——
-    public PageResult<Venue> pageVenues(Integer page, Integer size, String keyword) {
+    public PageResult<Venue> pageVenues(Integer page, Integer size, String keyword, Boolean showArchived) {
         Page<LocVenue> p = new Page<>(pg(page), sz(size));
         LambdaQueryWrapper<LocVenue> w = new LambdaQueryWrapper<>();
+        if (!Boolean.TRUE.equals(showArchived)) w.isNull(LocVenue::getArchivedAt);
         if (kw(keyword)) w.like(LocVenue::getName, keyword);
         w.orderByAsc(LocVenue::getId);
         Page<LocVenue> r = venueMapper.selectPage(p, w);
@@ -215,6 +229,56 @@ public class LocService {
                         counts.getOrDefault(v.getVenueNo(), 0)))
                 .toList();
         return new PageResult<>(rows, r.getTotal());
+    }
+
+    /**
+     * 新建 / 修改场地方。
+     *
+     * <p><b>这条链的第一环此前是断的</b>：`loc_venue` 只有种子在写，
+     * 前端的「新增/编辑场地方」在 {@code USE_MOCK=0} 下必 404。
+     * 于是运营能签合同、能配站点责任、能按责任分账，**却建不出一个新场地方** ——
+     * 而场地方是「场地方 → 合同 → 站点 → 责任 → 分账」整条链的起点。
+     *
+     * <p><b>同名不拦</b>：同一个品牌在不同城市各有主体、同名不同主体是常态
+     *（`Emaar Malls` 在这份种子里就出现两次）。靠名字判重会把合法的第二家挡在门外，
+     * 而运营只能改名绕过去 —— 绕出来的名字日后没人认得。判重靠业务键。
+     */
+    @org.springframework.transaction.annotation.Transactional
+    public Venue saveVenue(LocVenue body) {
+        if (body.getName() == null || body.getName().isBlank()) {
+            throw new IllegalArgumentException("场地方名称必填");
+        }
+        body.setName(body.getName().trim());
+
+        String no = body.getVenueNo();
+        LocVenue current = (no == null || no.isBlank()) ? null
+                : venueMapper.selectOne(new LambdaQueryWrapper<LocVenue>()
+                        .eq(LocVenue::getVenueNo, no).last("limit 1"));
+
+        if (current == null) {
+            if (no == null || no.isBlank()) {
+                body.setVenueNo(ai.neargo.common.core.IdGenerator.next(
+                        ai.neargo.sharehub.common.BizKey.VENUE));
+            }
+            if (body.getTenantId() == null) body.setTenantId("MAIN");
+            venueMapper.insert(body);
+        } else {
+            // 服务端决定的字段一律从库取，不看客户端传了什么（同 AbstractCrudService 的批量赋值加固）。
+            // archivedAt 也在其中：归档/恢复有专门端点，编辑表单不该顺手把一个已归档的场地方复活。
+            body.setId(current.getId());
+            body.setVersion(current.getVersion());
+            body.setTenantId(current.getTenantId());
+            body.setDeleted(current.getDeleted());
+            body.setCreatedAt(current.getCreatedAt());
+            body.setArchivedAt(current.getArchivedAt());
+            venueMapper.updateById(body);
+        }
+
+        LocVenue saved = venueMapper.selectOne(new LambdaQueryWrapper<LocVenue>()
+                .eq(LocVenue::getVenueNo, body.getVenueNo()).last("limit 1"));
+        return new Venue(saved.getVenueNo(), saved.getName(), saved.getContact(), saved.getIndustry(),
+                venueSiteCounts(java.util.List.of(saved.getVenueNo()))
+                        .getOrDefault(saved.getVenueNo(), 0));
     }
 
     // —— 合同 ——
