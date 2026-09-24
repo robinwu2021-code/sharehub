@@ -1,6 +1,7 @@
 package ai.neargo.sharehub.finance.service;
 
 import ai.neargo.common.core.PageResult;
+import ai.neargo.sharehub.finance.dto.FinDtos.PayReceiptReq;
 import ai.neargo.sharehub.finance.dto.FinDtos.WithdrawApplyReq;
 import ai.neargo.sharehub.finance.dto.FinDtos.Withdrawal;
 
@@ -36,4 +37,22 @@ public interface WithdrawalService {
      * {@code TradeController} 占用，本方法是给它（及后续迁移）用的落库实现。
      */
     Withdrawal audit(String withdrawNo, boolean approve, String rejectReason);
+
+    /**
+     * 打款回执登记：把「出款在途」的单子推到终态（必要功能清单 ⑮）。
+     *
+     * <p>此前这一步<b>整个是缺的</b>：状态机有 {@code PAY}/{@code FAIL} 迁移，
+     * 但没有任何入口调用，审批完的单子永远停在 {@code PAYING}。
+     *
+     * <p>三条规则：
+     * <ol>
+     *   <li><b>成功必须有渠道流水号</b>——没有凭据的「已到账」在对账时无法证实；</li>
+     *   <li><b>失败必须有原因</b>，与审批驳回分列（{@code fail_reason} ≠ {@code reject_reason}）；</li>
+     *   <li><b>登记人服务端回填</b>，且与审批人分列存，事后查得出是不是同一个人。</li>
+     * </ol>
+     *
+     * <p>重复登记同一笔渠道流水会撞唯一键 {@code uk_stl_withdrawal_payref}——
+     * <b>宁可报错也不要静默写两遍</b>，两条「已付」记录在对账时没人分得清哪条是真的。
+     */
+    Withdrawal pay(String withdrawNo, PayReceiptReq req);
 }

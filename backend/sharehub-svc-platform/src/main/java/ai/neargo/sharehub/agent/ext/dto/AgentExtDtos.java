@@ -89,4 +89,5 @@ public final class AgentExtDtos {
                                    Integer cabinetCount, BigDecimal onlineRate,
                                    Integer rank, String currency) {
     }
+
 }

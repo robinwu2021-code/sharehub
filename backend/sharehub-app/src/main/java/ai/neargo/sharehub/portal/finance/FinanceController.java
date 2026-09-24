@@ -195,6 +195,25 @@ public class FinanceController {
         return withdrawalService.audit(withdrawNo, approve, reason);
     }
 
+    /**
+     * 打款回执登记：把「出款在途」推到终态（必要功能清单 ⑮）。
+     *
+     * <p><b>为什么要单独一个端点，而不是并进 audit</b>：审批是「同意把钱打出去」，
+     * 回执是「钱确实出去了」——中间隔着一次真实的资金动作，可能失败、可能延迟几天。
+     * 合成一步就等于默认审批必然成功，那 {@code PAYING} 这个状态本身就没有意义了。
+     *
+     * <p>权限用新码 {@code finance:withdrawal:pay}（功能权限清单 §6）：
+     * 与 {@code :audit} 分开发码，机构做双人复核时才有地方落——
+     * 虽然 FINANCE 当前持 {@code finance:*} 通配、两码都有，但**码分开了，
+     * 将来收紧只是改角色配置；码没分开，收紧就得改代码**。
+     */
+    @PostMapping("/api/trade/withdrawals/{withdrawNo}/pay")
+    @PreAuthorize("@perm.can('finance:withdrawal:pay')")
+    public FinDtos.Withdrawal payWithdrawal(@PathVariable String withdrawNo,
+                                            @RequestBody FinDtos.PayReceiptReq body) {
+        return withdrawalService.pay(withdrawNo, body);
+    }
+
     // ——————————————————— 收款账户（B3）———————————————————
 
     /**

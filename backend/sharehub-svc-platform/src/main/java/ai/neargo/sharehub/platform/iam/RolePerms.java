@@ -84,7 +84,12 @@ public final class RolePerms {
                     // 说不通。倾向清单漏标，确认后补进清单。
                     "workorder:wo:create", "workorder:wo:read", "order:order:read",
                     "finance:share_record:read", "finance:withdrawal:apply",
-                    "agent:settlement:read", "location:poi:read"));
+                    "agent:settlement:read", "location:poi:read",
+                    // 代理门户要显示「你还不能收款」，判据是有没有可用收款账户 ——
+                    // 没有这个码的话 can() 判 false、查询被 disable，那条提示**永远不显示**，
+                    // 而代理商会一路提交到审批被拒才知道。**只给读，不给 update**：
+                    // 账户一改钱就换个地方进，那个动作留在运营侧（功能权限清单 §6 注）
+                    "finance:payout_account:read"));
 
     public static List<String> of(String role) {
         return MAP.getOrDefault(role, List.of());

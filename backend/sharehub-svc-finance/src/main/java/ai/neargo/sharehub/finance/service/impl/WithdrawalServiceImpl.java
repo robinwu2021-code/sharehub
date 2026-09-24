@@ -10,6 +10,7 @@ import ai.neargo.sharehub.finance.WithdrawFeePolicy;
 import ai.neargo.sharehub.finance.WithdrawalStateMachine;
 import ai.neargo.sharehub.finance.dto.FinDtos.PayoutAccount;
 import ai.neargo.sharehub.finance.service.PayoutAccountService;
+import ai.neargo.sharehub.finance.dto.FinDtos.PayReceiptReq;
 import ai.neargo.sharehub.finance.dto.FinDtos.WithdrawApplyReq;
 import ai.neargo.sharehub.finance.dto.FinDtos.Withdrawal;
 import ai.neargo.sharehub.finance.entity.StlWithdrawal;
@@ -18,12 +19,14 @@ import ai.neargo.sharehub.finance.service.WithdrawalService;
 import ai.neargo.common.core.PageResult;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 import java.util.Optional;
 
 /**
@@ -42,6 +45,9 @@ import java.util.Optional;
 public class WithdrawalServiceImpl implements WithdrawalService {
 
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+    /** 打款渠道白名单。MANUAL = 人工转账后回填（nearpay 未接前的唯一真实路径）。 */
+    private static final java.util.Set<String> PAY_CHANNELS = java.util.Set.of("NEARPAY", "MANUAL");
 
     private final StlWithdrawalMapper mapper;
     private final WithdrawFeePolicy feePolicy;
@@ -157,6 +163,67 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         return toVO(require(withdrawNo));
     }
 
+    @Override
+    @Transactional
+    public Withdrawal pay(String withdrawNo, PayReceiptReq req) {
+        if (req == null || req.success() == null) {
+            throw new IllegalArgumentException("请说明打款结果：成功还是失败");
+        }
+        StlWithdrawal e = require(withdrawNo);
+        boolean ok = Boolean.TRUE.equals(req.success());
+
+        /*
+         * —— 成功必须带渠道流水号 ——
+         * 「已到账」这三个字在对账时要能被证实。没有流水号的话，事后只有一句人说的话，
+         * 既对不上银行回单，出了纠纷也无从查起。**失败则不强制**：
+         * 有些失败（余额不足、账号不存在）根本没产生流水。
+         */
+        if (ok && (req.payRef() == null || req.payRef().isBlank())) {
+            throw new IllegalArgumentException("登记到账必须填写渠道流水号（银行回单号 / nearpay 打款单号）");
+        }
+        if (!ok && (req.failReason() == null || req.failReason().isBlank())) {
+            throw new IllegalArgumentException("登记打款失败必须填写失败原因");
+        }
+
+        // 非法迁移由状态机拦（例如对 APPLY/PAID 的单子登记回执）——
+        // 在这里抛，而不是让 UPDATE 静默改掉一条不该动的记录
+        e.setStatus(stateMachine.next(e.getStatus(), ok ? "PAY" : "FAIL"));
+
+        String channel = (req.channel() == null || req.channel().isBlank())
+                ? "MANUAL" : req.channel().trim().toUpperCase(Locale.ROOT);
+        if (!PAY_CHANNELS.contains(channel)) {
+            throw new IllegalArgumentException("打款渠道非法: " + channel + "（仅 " + PAY_CHANNELS + "）");
+        }
+        e.setPayChannel(channel);
+        e.setPayRef(req.payRef() == null || req.payRef().isBlank() ? null : req.payRef().trim());
+
+        // 登记人服务端回填，且**与审批人分列** —— 查「谁批的、谁放的款」不用翻操作日志
+        LoginUser u = SecurityUtils.currentUser().orElse(null);
+        e.setPayerNo(Optional.ofNullable(u).map(LoginUser::userNo).orElse(null));
+        e.setPayerName(Optional.ofNullable(u).map(LoginUser::username).orElse(null));
+
+        if (ok) {
+            e.setPaidAt(LocalDateTime.now().format(TS));
+            e.setFailReason(null);
+        } else {
+            e.setFailReason(req.failReason().trim());
+        }
+
+        /*
+         * 撞唯一键 uk_stl_withdrawal_payref = 这笔渠道流水已经记在另一张单上。
+         * **必须翻译成人看得懂的话**：裸的 DuplicateKeyException 会变成 500「服务器错误」，
+         * 而这恰恰是对账时最需要看清的一条 —— 财务得知道是「流水号填重了」，
+         * 而不是以为系统坏了、换个浏览器再试一遍。
+         */
+        try {
+            mapper.updateById(e);
+        } catch (DuplicateKeyException dup) {
+            throw new IllegalArgumentException(
+                    "该渠道流水号已登记在另一张提现单上，请核对后重填：" + e.getPayRef());
+        }
+        return toVO(require(withdrawNo));
+    }
+
     private StlWithdrawal require(String withdrawNo) {
         StlWithdrawal e = mapper.selectOne(new LambdaQueryWrapper<StlWithdrawal>()
                 .eq(StlWithdrawal::getWithdrawNo, withdrawNo).last("limit 1"));
@@ -171,6 +238,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
                 e.getPayeeName(), amount, fee,
                 amount.subtract(fee),   // 实际到账 = amount - fee，派生值不落库（[db-design §5.5]）
                 e.getCurrency(), e.getBankCode(), e.getStatus(), e.getAppliedAt(), e.getApplicantNo(),
-                e.getAuditorName(), e.getAuditedAt(), e.getRejectReason(), e.getPaidAt());
+                e.getAuditorName(), e.getAuditedAt(), e.getRejectReason(), e.getPaidAt(),
+                e.getPayChannel(), e.getPayRef(), e.getPayerName(), e.getFailReason());
     }
 }

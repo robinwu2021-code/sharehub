@@ -28,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   <li><b>安全链与限流过滤器在 Spring MVC 之外返回错误</b>，信封是
  *       {@code getWriter().write()} 手写的字符串 —— 绕过 {@code ApiResponseWrapper}，
  *       <b>没有任何类型能约束它</b>。2026-09-23 实测：{@code SecurityConfig} 与
- *       {@code ApplyRateLimitFilter} 写 {@code "msg"}，{@code InternalTokenFilter} 写
+ *       {@code AnonymousRateLimitFilter} 写 {@code "msg"}，{@code InternalTokenFilter} 写
  *       {@code "message"}，三处并存；运营端读 {@code body.message}，
  *       于是 <b>401/403/429 的后端文案永远显示不出来</b>。</li>
  *   <li><b>前端自己声明一份类型</b>。c-app 曾写 {@code PageResult{records,total}}，

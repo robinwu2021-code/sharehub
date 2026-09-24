@@ -72,13 +72,17 @@ public class SecurityConfig {
                 .authorizeHttpRequests(reg -> reg
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/login", "/api/auth/logout").permitAll()
+                        // 代理端登录发码（必要功能清单 ④）：匿名可达是必然的 —— 还没登录哪来的令牌。
+                        // 两道闸兜着：AnonymousRateLimitFilter 单 IP 限速 + OtpGate 按手机号的重发间隔。
+                        // 查无此号也返回 ok（见 AgentLoginService），所以它不能被用来枚举代理商手机号。
+                        .requestMatchers(HttpMethod.POST, "/api/auth/otp").permitAll()
                         /*
                          * 入驻申请的两个免鉴权端点（ADR-030 §三）。
                          *
                          * 自助注册面向**还没有账号的陌生人**，天然进不了任何鉴权链路。
                          * 防刷靠三道闸，缺一不可：
                          *   ① 手机号 OTP（证明申请人持有该号，与 C 端注册同档）
-                         *   ② 单 IP 限流（见 ApplyRateLimitFilter）
+                         *   ② 单 IP 限流（见 AnonymousRateLimitFilter）
                          *   ③ agt_apply.active_key 生成列 —— 同手机号至多一张在途
                          *
                          * ⚠️ 放行的是「不带令牌也能调」，**不是「带了令牌也当匿名」**：

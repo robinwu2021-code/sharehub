@@ -1455,7 +1455,7 @@
    "path": "/api/auth/login",
    "perm": null,
    "handler": "AuthController#login",
-   "summary": "登录入参。",
+   "summary": "登录出参。",
    "params": [],
    "bodyType": "LoginReq",
    "returnType": "LoginResp",
@@ -1481,6 +1481,44 @@
     {
      "name": "perms",
      "type": "List<String>"
+    },
+    {
+     "name": "principalNo",
+     "type": "String"
+    },
+    {
+     "name": "operators",
+     "type": "List<OperatorMembership>",
+     "fields": [
+      {
+       "name": "agentNo",
+       "type": "String"
+      },
+      {
+       "name": "agentName",
+       "type": "String"
+      },
+      {
+       "name": "accountNo",
+       "type": "String"
+      },
+      {
+       "name": "displayName",
+       "type": "String"
+      },
+      {
+       "name": "isOwner",
+       "type": "Boolean"
+      },
+      {
+       "name": "isPrimary",
+       "type": "Boolean"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      }
+     ]
     }
    ],
    "requestShape": [
@@ -1498,6 +1536,14 @@
     },
     {
      "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "otp",
      "type": "String"
     }
    ]
@@ -1674,6 +1720,149 @@
      ]
     }
    ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/auth/operators",
+   "perm": null,
+   "handler": "AuthController#operators",
+   "summary": "我的运营主体列表（必要功能清单 ⑤ / ADR-030 §2.2）。",
+   "params": [],
+   "bodyType": null,
+   "returnType": "List<OperatorMembership>",
+   "returnContainer": "List",
+   "returnElement": "OperatorMembership",
+   "responseShape": [
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "agentName",
+     "type": "String"
+    },
+    {
+     "name": "accountNo",
+     "type": "String"
+    },
+    {
+     "name": "displayName",
+     "type": "String"
+    },
+    {
+     "name": "isOwner",
+     "type": "Boolean"
+    },
+    {
+     "name": "isPrimary",
+     "type": "Boolean"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/auth/operators/{agentNo}/switch",
+   "perm": null,
+   "handler": "AuthController#switchOperator",
+   "summary": "切换当前运营主体：**换发 token**，而不是改会话里的一个字段。",
+   "params": [
+    {
+     "in": "path",
+     "name": "agentNo",
+     "type": "String",
+     "required": true
+    },
+    {
+     "in": "header",
+     "name": "auth",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "LoginResp",
+   "returnContainer": null,
+   "returnElement": "LoginResp",
+   "responseShape": [
+    {
+     "name": "token",
+     "type": "String"
+    },
+    {
+     "name": "username",
+     "type": "String"
+    },
+    {
+     "name": "role",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "perms",
+     "type": "List<String>"
+    },
+    {
+     "name": "principalNo",
+     "type": "String"
+    },
+    {
+     "name": "operators",
+     "type": "List<OperatorMembership>",
+     "fields": [
+      {
+       "name": "agentNo",
+       "type": "String"
+      },
+      {
+       "name": "agentName",
+       "type": "String"
+      },
+      {
+       "name": "accountNo",
+       "type": "String"
+      },
+      {
+       "name": "displayName",
+       "type": "String"
+      },
+      {
+       "name": "isOwner",
+       "type": "Boolean"
+      },
+      {
+       "name": "isPrimary",
+       "type": "Boolean"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      }
+     ]
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/auth/otp",
+   "perm": null,
+   "handler": "AuthController#loginOtp",
+   "summary": "发送代理端登录验证码（匿名）。",
+   "params": [],
+   "bodyType": "Map<String, String>",
+   "returnType": "Map<String, Object>",
+   "returnContainer": null,
+   "returnElement": "Map<String, Object>",
+   "responseShape": null,
    "requestShape": null
   },
   {
@@ -3133,6 +3322,115 @@
    "bodyType": null,
    "returnType": "PageResult<Contract>",
    "returnContainer": "PageResult",
+   "returnElement": "Contract",
+   "responseShape": [
+    {
+     "name": "contractNo",
+     "type": "String"
+    },
+    {
+     "name": "venueName",
+     "type": "String"
+    },
+    {
+     "name": "siteName",
+     "type": "String"
+    },
+    {
+     "name": "shareRate",
+     "type": "double"
+    },
+    {
+     "name": "entryFee",
+     "type": "double"
+    },
+    {
+     "name": "startAt",
+     "type": "String"
+    },
+    {
+     "name": "endAt",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "attachments",
+     "type": "java.util.List<ContractAttachment>"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/contracts",
+   "perm": "location:contract:create",
+   "handler": "OpsController#createContract",
+   "summary": "新建 / 修改进场合同。",
+   "params": [],
+   "bodyType": "LocContract",
+   "returnType": "Contract",
+   "returnContainer": null,
+   "returnElement": "Contract",
+   "responseShape": [
+    {
+     "name": "contractNo",
+     "type": "String"
+    },
+    {
+     "name": "venueName",
+     "type": "String"
+    },
+    {
+     "name": "siteName",
+     "type": "String"
+    },
+    {
+     "name": "shareRate",
+     "type": "double"
+    },
+    {
+     "name": "entryFee",
+     "type": "double"
+    },
+    {
+     "name": "startAt",
+     "type": "String"
+    },
+    {
+     "name": "endAt",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "attachments",
+     "type": "java.util.List<ContractAttachment>"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/contracts/{contractNo}",
+   "perm": "location:contract:update",
+   "handler": "OpsController#updateContract",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "contractNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "LocContract",
+   "returnType": "Contract",
+   "returnContainer": null,
    "returnElement": "Contract",
    "responseShape": [
     {
@@ -8021,6 +8319,10 @@
      "type": "String"
     },
     {
+     "name": "oneOffAmount",
+     "type": "java.math.BigDecimal"
+    },
+    {
      "name": "effectiveFrom",
      "type": "String"
     },
@@ -8083,6 +8385,10 @@
      "type": "String"
     },
     {
+     "name": "oneOffAmount",
+     "type": "java.math.BigDecimal"
+    },
+    {
      "name": "effectiveFrom",
      "type": "String"
     },
@@ -8123,6 +8429,10 @@
     {
      "name": "ruleNo",
      "type": "String"
+    },
+    {
+     "name": "oneOffAmount",
+     "type": "java.math.BigDecimal"
     },
     {
      "name": "effectiveFrom",
@@ -19391,6 +19701,22 @@
     {
      "name": "paidAt",
      "type": "String"
+    },
+    {
+     "name": "payChannel",
+     "type": "String"
+    },
+    {
+     "name": "payRef",
+     "type": "String"
+    },
+    {
+     "name": "payerName",
+     "type": "String"
+    },
+    {
+     "name": "failReason",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -19473,6 +19799,22 @@
     },
     {
      "name": "paidAt",
+     "type": "String"
+    },
+    {
+     "name": "payChannel",
+     "type": "String"
+    },
+    {
+     "name": "payRef",
+     "type": "String"
+    },
+    {
+     "name": "payerName",
+     "type": "String"
+    },
+    {
+     "name": "failReason",
      "type": "String"
     }
    ],
@@ -19593,6 +19935,22 @@
     {
      "name": "paidAt",
      "type": "String"
+    },
+    {
+     "name": "payChannel",
+     "type": "String"
+    },
+    {
+     "name": "payRef",
+     "type": "String"
+    },
+    {
+     "name": "payerName",
+     "type": "String"
+    },
+    {
+     "name": "failReason",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -19602,6 +19960,129 @@
     },
     {
      "name": "rejectReason",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/trade/withdrawals/{withdrawNo}/pay",
+   "perm": "finance:withdrawal:pay",
+   "handler": "FinanceController#payWithdrawal",
+   "summary": "打款回执登记：把「出款在途」推到终态（必要功能清单 ⑮）。",
+   "params": [
+    {
+     "in": "path",
+     "name": "withdrawNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "FinDtos.PayReceiptReq",
+   "returnType": "FinDtos.Withdrawal",
+   "returnContainer": null,
+   "returnElement": "FinDtos.Withdrawal",
+   "responseShape": [
+    {
+     "name": "withdrawNo",
+     "type": "String"
+    },
+    {
+     "name": "accountNo",
+     "type": "String"
+    },
+    {
+     "name": "payeeType",
+     "type": "String"
+    },
+    {
+     "name": "payeeNo",
+     "type": "String"
+    },
+    {
+     "name": "payeeName",
+     "type": "String"
+    },
+    {
+     "name": "amount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "fee",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "netAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "bankCode",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "appliedAt",
+     "type": "String"
+    },
+    {
+     "name": "applicantNo",
+     "type": "String"
+    },
+    {
+     "name": "auditorName",
+     "type": "String"
+    },
+    {
+     "name": "auditedAt",
+     "type": "String"
+    },
+    {
+     "name": "rejectReason",
+     "type": "String"
+    },
+    {
+     "name": "paidAt",
+     "type": "String"
+    },
+    {
+     "name": "payChannel",
+     "type": "String"
+    },
+    {
+     "name": "payRef",
+     "type": "String"
+    },
+    {
+     "name": "payerName",
+     "type": "String"
+    },
+    {
+     "name": "failReason",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "success",
+     "type": "Boolean"
+    },
+    {
+     "name": "channel",
+     "type": "String"
+    },
+    {
+     "name": "payRef",
+     "type": "String"
+    },
+    {
+     "name": "failReason",
      "type": "String"
     }
    ]
@@ -25141,10 +25622,10 @@
  },
  "conflicts": {},
  "stats": {
-  "endpoints": 402,
-  "records": 287,
-  "withPerm": 345,
-  "withBody": 166,
-  "shapedResponses": 303
+  "endpoints": 408,
+  "records": 290,
+  "withPerm": 348,
+  "withBody": 170,
+  "shapedResponses": 308
  }
 }

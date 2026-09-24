@@ -70,7 +70,7 @@ public class AgentApplyController {
      * **自助注册**：商家自己提交（免鉴权 + 手机号 OTP）。
      *
      * 这个端点要接待「还没有账号的陌生人」，所以整体放行；防刷靠三道闸：
-     * OTP · 单 IP 限流（{@code ApplyRateLimitFilter}）· 同手机号至多一张在途（生成列 {@code active_key}）。
+     * OTP · 单 IP 限流（{@code AnonymousRateLimitFilter}）· 同手机号至多一张在途（生成列 {@code active_key}）。
      *
      * <p>{@code source} 由**路由**决定（恒为 {@code SELF_SERVICE}），不从请求体取、
      * 也不靠「有没有带令牌」去猜 —— 后者是隐式分支，读代码的人看不出这里有两种行为。

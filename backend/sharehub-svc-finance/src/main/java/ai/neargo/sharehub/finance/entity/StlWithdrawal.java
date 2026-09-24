@@ -80,4 +80,19 @@ public class StlWithdrawal extends BaseEntity {
     private String rejectReason;
 
     private String paidAt;
+
+    /** 打款渠道 NEARPAY/MANUAL。V3 的 nearpay_payout_no 是死列，由本列 + payRef 取代（V57 注）。 */
+    private String payChannel;
+
+    /** 渠道流水号；与 payChannel 组成回执幂等键，重复登记会撞唯一键而不是悄悄写两遍。 */
+    private String payRef;
+
+    /** 登记回执的人。与 auditorNo 分开存，才查得出「审批人是否自己给自己放款」。 */
+    private String payerNo;
+
+    /** 快照：登记人姓名。 */
+    private String payerName;
+
+    /** 打款失败原因。**不要与 rejectReason 合并** —— 那是审批驳回（钱从没打算出去）。 */
+    private String failReason;
 }

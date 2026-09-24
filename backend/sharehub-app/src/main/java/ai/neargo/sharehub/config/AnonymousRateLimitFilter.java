@@ -16,10 +16,14 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * 入驻自助入口的单 IP 限流（ADR-030 §三 的第二道闸）。
+ * 面向陌生人的匿名入口的单 IP 限流（ADR-030 §三 的第二道闸）。
  *
- * <p>{@code POST /api/agent/apply} 与 {@code GET /api/agent/apply/mine} 是全站
- * <b>唯一面向陌生人的两个写/读入口</b>，也因此是唯一的滥用面。三道闸：
+ * <p><b>2026-09-23 更名</b>（原 {@code ApplyRateLimitFilter}）：覆盖面已不止入驻申请 ——
+ * 代理端登录发码 {@code POST /api/auth/otp} 同样匿名、同样是发短信的写入口，
+ * 挂进来才不会留一个没人限速的刷短信口子。名字里的 Apply 会让人以为登录发码不在管辖内。
+ *
+ * <p>当前覆盖：入驻自助三个端点 + 登录发码。它们是全站
+ * <b>仅有的面向陌生人的入口</b>，也因此是唯一的滥用面。三道闸：
  * OTP（证明持号）· <b>本过滤器</b>（限速）· {@code active_key} 生成列（同号至多一张在途）。
  *
  * <p><b>只拦匿名调用</b>：带了 STAFF 令牌的是运营代建，走员工自己的配额，不该被这里挡。
@@ -29,14 +33,14 @@ import java.util.concurrent.atomic.AtomicInteger;
  * <b>这一点必须说清楚，免得有人以为已经防住了。</b>
  */
 @Component
-public class ApplyRateLimitFilter extends OncePerRequestFilter {
+public class AnonymousRateLimitFilter extends OncePerRequestFilter {
 
     private static final Duration WINDOW = Duration.ofMinutes(1);
 
     private final int maxPerMinute;
     private final Map<String, Counter> counters = new ConcurrentHashMap<>();
 
-    public ApplyRateLimitFilter(@Value("${sharehub.security.apply-rate-per-minute:10}") int maxPerMinute) {
+    public AnonymousRateLimitFilter(@Value("${sharehub.security.apply-rate-per-minute:10}") int maxPerMinute) {
         this.maxPerMinute = maxPerMinute;
     }
 
@@ -51,7 +55,10 @@ public class ApplyRateLimitFilter extends OncePerRequestFilter {
         // 发码端点尤其要拦：OtpService 自己有重发间隔，但那是**按手机号**的 ——
         // 换个号就能接着发，单 IP 限流才拦得住批量刷号
         return !(p.equals("/api/agent/apply") || p.equals("/api/agent/apply/mine")
-                || p.equals("/api/agent/apply/otp"));
+                || p.equals("/api/agent/apply/otp")
+                // 登录发码：与入驻发码同性质 —— OtpGate 的重发间隔是**按手机号**的，
+                // 换个号就能接着发，只有单 IP 限流拦得住批量刷短信
+                || p.equals("/api/auth/otp"));
     }
 
     @Override

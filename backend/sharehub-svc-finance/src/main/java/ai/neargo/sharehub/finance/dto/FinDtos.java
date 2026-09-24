@@ -85,7 +85,24 @@ public final class FinDtos {
                              String payeeName, BigDecimal amount, BigDecimal fee, BigDecimal netAmount,
                              String currency, String bankCode, String status, String appliedAt,
                              String applicantNo, String auditorName, String auditedAt, String rejectReason,
-                             String paidAt) {
+                             String paidAt,
+                             // —— 打款回执（V57）。列表要能一眼回答「钱到底出去没有、走的哪条道」——
+                             String payChannel, String payRef, String payerName, String failReason) {
+    }
+
+    /**
+     * 打款回执登记入参（必要功能清单 ⑮）。
+     *
+     * <p><b>为什么由人来登记，而不是等 nearpay 回调</b>：nearpay 未接（MVP 硬阻塞 2），
+     * 而第一批提现是人工转账。回执入口与代付通道是**两件事**——通道通了以后，
+     * 回调只是换一个调用方来调同一个服务方法，这里的状态机与幂等不用重写。
+     *
+     * @param success  true=已到账（→PAID）；false=打款失败（→FAILED）
+     * @param channel  NEARPAY / MANUAL
+     * @param payRef   渠道流水号；**成功时必填**，它是这笔钱在渠道侧的唯一凭据，也是重复登记的拦截键
+     * @param failReason 失败原因；**失败时必填**
+     */
+    public record PayReceiptReq(Boolean success, String channel, String payRef, String failReason) {
     }
 
     // ——————————————————————— 对账 ———————————————————————

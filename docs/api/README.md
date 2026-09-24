@@ -100,7 +100,7 @@
 
 ---
 
-## 二、`/api/auth` —— 运营端认证（4 端点）
+## 二、`/api/auth` —— 认证与主体（8 端点）
 
 | Method Path | 用途 | 权限码 |
 |---|---|---|
@@ -108,8 +108,43 @@
 | `POST /api/auth/logout` | 登出（作废 token） | — |
 | `GET /api/auth/me` | 当前登录人（角色/数据范围/权限集） | — |
 | `GET /api/auth/menus` | **动态菜单树**（按 RBAC + phase 过滤） | — |
+| `GET /api/auth/permissions` | 当前登录人权限码集合 | — |
+| `POST /api/auth/otp` 🆕 | 代理端登录发码（**匿名**） | — |
+| `GET /api/auth/operators` 🆕 | 我的运营主体列表（ADR-030） | — |
+| `POST /api/auth/operators/{agentNo}/switch` 🆕 | 切换当前主体（**换发 token**） | — |
 
 > 菜单来自 `iam_menu` 表，与前端 `lib/nav.ts` 的 98 叶 1:1。前端目前用本地 nav.ts，切后端后改读本端点（见[前端-动态菜单权限接入指引](../technical/前端-动态菜单权限接入指引.md)）。
+
+### 2.1 代理端实名登录：三个裁决（2026-09-23）
+
+补这三个端点是为了接上一处**静默的断裂**：入驻审核通过后 `ApplyService.activate()`
+会建出 `agt_principal` + `agt_account`，而 `AuthController` 里 `agt_account` 出现
+**0 次** —— 生产登录只认一个硬编码的 `admin`，**入驻建出来的号登不进去**。
+两边的测试当时都是绿的，因为没有任何一条用例跨过入驻与登录的边界。
+
+**① 登录只认「手机号 + 验证码」，不做口令、不做邮箱**
+
+| 为什么不做 | 理由 |
+|---|---|
+| 口令 | 全仓没有凭据存储：`iam_user` 无口令列，`cred_credential` 在 `V4` 里是**注释掉的设计**，归属 `pb_auth` / auth-core。现在另起一张平行凭据表，auth-core 落地时要做数据迁移 —— 而 OTP 登录本身就是完整的登录方式，不是权宜之计 |
+| 邮箱 | 发码要明文，而 `activate()` 只写了 `email_hash`/`email_mask`，**`email_enc` 是空的**、掩码不可逆 —— 发不出去。手机号同理，所以必须由用户**自己输入**，服务端规范化后按 hash 反查 |
+
+**② 查无此号也返回成功**
+
+`POST /api/auth/otp` 对未注册手机号**静默返回 ok**，登录失败时「号不存在」与「码不对」
+说**同一句话**。分开的话，这两个接口合起来就是一台代理商手机号探测器。
+代价是输错号的人会等一条永远不到的短信 —— 这个代价值得付。
+
+**③ 切换主体换发 token，而不是改会话字段**
+
+`agentNo` 是数据范围的锚点（`PermissionService.resolveDataScope` 按它做 AGENT 硬过滤）。
+原地改字段的话，旧 token 仍在别处使用时会拿着**旧范围**继续跑；换发后老 token 立刻吊销，
+没有两个范围并存的窗口。
+
+> **接口在 `platform`、实现在 `agent`**：`AuthController` 直接依赖 `agent` 会闭合
+> `agent → loc → platform → agent` 的环（ArchUnit `noCyclesBetweenDomains` 会红）。
+> 按依赖倒置由消费方声明端口 `platform.iam.port.AgentIdentityPort`，`agent` 去实现 ——
+> 与既有的 `OtpGate` 同手法，方向相反。
 
 ---
 
@@ -300,6 +335,18 @@
 | `GET /api/trade/withdrawals` | 提现审核队列 | `finance:withdrawal:read` | 提现审核 |
 | `POST /api/trade/withdrawals/{no}/audit` | 提现审批（**驳回必填原因**；手续费口径取 `sys_biz_rule(WITHDRAW)`） | `finance:withdrawal:audit` | 提现审核 |
 | `POST /api/trade/withdrawals` | 提现申请（代理端/商户端发起） | `finance:withdrawal:apply` | —（代理端）|
+| `POST /api/trade/withdrawals/{no}/pay` 🆕 | **打款回执登记**（成功必填流水号 / 失败必填原因） | `finance:withdrawal:pay` | 提现审核 |
+| `GET/POST /api/trade/payout-accounts` · `/{no}/disable` | 收款账户（审批通过的前置） | `finance:payout_account:read` `:update` | 收款账户 |
+
+> **`:pay` 为什么与 `:audit` 分开发码**：审批是「同意把钱打出去」，回执是「钱确实出去了」——
+> 中间隔着一次真实资金动作，可能失败、可能延迟几天。合成一步就等于默认审批必然成功，
+> `PAYING` 这个状态本身也就没有意义了。FINANCE 当前持 `finance:*` 通配、两码都有，
+> **但码分开了，将来要做双人复核只是改角色配置；码没分开，就得改代码**。
+>
+> 在此之前状态机里的 `PAY`/`FAIL` 迁移**没有任何入口调用** —— 审批完的单子永远停在
+> `PAYING`：钱算得清、批得了，批完不会动。回执入口与代付通道（nearpay，硬阻塞 2）是
+> **两件事**：通道接通后只是换一个调用方来调同一个服务方法，状态机与幂等不必重写。
+> 幂等键 `uk_stl_withdrawal_payref(pay_channel, pay_ref)` 拦「同一笔银行流水记到两张单上」。
 
 > 「代理分润配置」「用户钱包」两叶是跨域深链（→ `/agents?tab=commission`、`/users?tab=wallets`）；「充值订单」端点在 `/api/user`（§五）。
 

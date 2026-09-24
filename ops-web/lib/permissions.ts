@@ -70,7 +70,7 @@ export const BACKEND_ROLE_PERMS: Record<Role, string[]> = {
   AGENT: [
     "dashboard:overview:read", "device:cabinet:read", "device:slot:read", "workorder:wo:create",
     "workorder:wo:read", "order:order:read", "finance:share_record:read",
-    "finance:withdrawal:apply", "agent:settlement:read", "location:poi:read",
+    "finance:withdrawal:apply", "agent:settlement:read", "location:poi:read", "finance:payout_account:read",
   ],
 };
 
