@@ -105,22 +105,12 @@ TradeSeeder#deviceType=POWERBANK
 
 # ── trade（19 条）──
 ComplaintServiceImpl#status=REJECT
-DepositServiceImpl#status=BUYOUT
-DepositServiceImpl#status=RELEASED
 PaymentChannelServiceImpl#mode=DELEGATED
 PaymentChannelServiceImpl#status=DISABLED
 PaymentChannelServiceImpl#status=ENABLED
 PaymentServiceImpl#status=FROZEN
 PaymentServiceImpl#status=INIT
 PaymentServiceImpl#status=PAID
-PriceAdjustmentServiceImpl#status=ACTIVE
-PriceAdjustmentServiceImpl#status=APPLIED
-PriceAdjustmentServiceImpl#status=CANCELLED
-PriceAdjustmentServiceImpl#status=FAILED
-PriceAdjustmentServiceImpl#status=REVERTED
-PriceAdjustmentServiceImpl#status=SCHEDULED
-PricePlanServiceImpl#status=ACTIVE
-PriceResolver#status=ACTIVE
 PriceResolver#status=ENABLED
 RentOrderServiceImpl#status=IN_USE
 

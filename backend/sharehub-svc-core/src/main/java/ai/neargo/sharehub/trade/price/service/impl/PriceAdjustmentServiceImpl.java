@@ -1,5 +1,8 @@
 package ai.neargo.sharehub.trade.price.service.impl;
 
+import ai.neargo.sharehub.trade.price.PriceAdjustmentStatus;
+import ai.neargo.sharehub.trade.price.PricePlanStatus;
+
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.trade.price.entity.PriceAdjustment;
 import ai.neargo.sharehub.trade.price.entity.PricePlan;
@@ -76,7 +79,7 @@ public class PriceAdjustmentServiceImpl implements PriceAdjustmentService {
         Map<String, Object> in = body == null ? Map.of() : body;
         String no = str(in.get("adjustNo"));
         PriceAdjustment e = no == null || no.isBlank() ? null : find(no);
-        if (e != null && !"SCHEDULED".equals(e.getStatus())) {
+        if (e != null && !PriceAdjustmentStatus.SCHEDULED.is(e.getStatus())) {
             // 已生效/已撤销的不能改：界面上的历史会对不上账
             throw new IllegalArgumentException("只有待生效的调价单可以修改，当前状态：" + e.getStatus());
         }
@@ -97,7 +100,7 @@ public class PriceAdjustmentServiceImpl implements PriceAdjustmentService {
             e = new PriceAdjustment();
             e.setAdjustNo(nextNo());
             e.setTenantId("MAIN");
-            e.setStatus("SCHEDULED");
+            e.setStatus(PriceAdjustmentStatus.SCHEDULED.name());
         }
         e.setPlanNo(planNo);
         e.setName(str(in.get("name")) == null ? plan.getName() + " 调价" : str(in.get("name")));
@@ -113,11 +116,11 @@ public class PriceAdjustmentServiceImpl implements PriceAdjustmentService {
     @Transactional
     public Map<String, Object> cancel(String adjustNo, String reason) {
         PriceAdjustment e = require(adjustNo);
-        if (!"SCHEDULED".equals(e.getStatus())) {
+        if (!PriceAdjustmentStatus.SCHEDULED.is(e.getStatus())) {
             throw new IllegalArgumentException("「" + e.getStatus() + "」状态的调价单不能撤销，只有待生效可以");
         }
         if (reason == null || reason.isBlank()) throw new IllegalArgumentException("请填写撤销原因");
-        e.setStatus("CANCELLED");
+        e.setStatus(PriceAdjustmentStatus.CANCELLED.name());
         e.setReason(reason.trim());
         mapper.updateById(e);
         return toVO(e);
@@ -127,7 +130,7 @@ public class PriceAdjustmentServiceImpl implements PriceAdjustmentService {
     @Transactional
     public Map<String, Object> revert(String adjustNo) {
         PriceAdjustment e = require(adjustNo);
-        if (!"APPLIED".equals(e.getStatus())) {
+        if (!PriceAdjustmentStatus.APPLIED.is(e.getStatus())) {
             throw new IllegalArgumentException("只有已生效的调价单可以恢复");
         }
         doRevert(e, LocalDateTime.now());
@@ -138,18 +141,18 @@ public class PriceAdjustmentServiceImpl implements PriceAdjustmentService {
     @Transactional
     public Map<String, Object> retry(String adjustNo) {
         PriceAdjustment e = require(adjustNo);
-        if (!"FAILED".equals(e.getStatus())) {
+        if (!PriceAdjustmentStatus.FAILED.is(e.getStatus())) {
             throw new IllegalArgumentException("只有执行失败的调价单需要重试");
         }
         LocalDateTime now = LocalDateTime.now();
         // 失败在哪一步，就从哪一步重来：还没生效过 → 重新生效；已生效过 → 重新恢复
         if (e.getAppliedAt() == null) {
-            e.setStatus("SCHEDULED");
+            e.setStatus(PriceAdjustmentStatus.SCHEDULED.name());
             e.setFailReason(null);
             mapper.updateById(e);
             doApply(e, now);
         } else {
-            e.setStatus("APPLIED");
+            e.setStatus(PriceAdjustmentStatus.APPLIED.name());
             e.setFailReason(null);
             mapper.updateById(e);
             doRevert(e, now);
@@ -163,8 +166,8 @@ public class PriceAdjustmentServiceImpl implements PriceAdjustmentService {
         LocalDateTime now = LocalDateTime.now();
         List<String> touched = new ArrayList<>();
         for (PriceAdjustment a : mapper.selectList(new LambdaQueryWrapper<PriceAdjustment>()
-                .in(PriceAdjustment::getStatus, List.of("SCHEDULED", "APPLIED")))) {
-            if ("SCHEDULED".equals(a.getStatus()) && !a.getEffectiveAt().isAfter(now)) {
+                .in(PriceAdjustment::getStatus, List.of(PriceAdjustmentStatus.SCHEDULED.name(), PriceAdjustmentStatus.APPLIED.name())))) {
+            if (PriceAdjustmentStatus.SCHEDULED.is(a.getStatus()) && !a.getEffectiveAt().isAfter(now)) {
                 doApply(a, now);
                 touched.add(a.getAdjustNo());
             }
@@ -173,7 +176,7 @@ public class PriceAdjustmentServiceImpl implements PriceAdjustmentService {
              * 一张「昨天生效、今早恢复」的单子必须两步都走完。
              * 所以这里不是 else if：用 else if 会让它停在 APPLIED，价格一直挂着活动价。
              */
-            if ("APPLIED".equals(a.getStatus()) && a.getRevertAt() != null && !a.getRevertAt().isAfter(now)) {
+            if (PriceAdjustmentStatus.APPLIED.is(a.getStatus()) && a.getRevertAt() != null && !a.getRevertAt().isAfter(now)) {
                 doRevert(a, now);
                 if (!touched.contains(a.getAdjustNo())) touched.add(a.getAdjustNo());
             }
@@ -185,7 +188,7 @@ public class PriceAdjustmentServiceImpl implements PriceAdjustmentService {
 
     private void doApply(PriceAdjustment a, LocalDateTime now) {
         PricePlan plan = planOf(a.getPlanNo());
-        if (plan == null || plan.getArchivedAt() != null || !"ACTIVE".equals(plan.getStatus())) {
+        if (plan == null || plan.getArchivedAt() != null || !PricePlanStatus.ACTIVE.is(plan.getStatus())) {
             fail(a, "目标方案不可用（不存在 / 已归档 / 已停用），调价未执行");
             return;
         }
@@ -196,7 +199,7 @@ public class PriceAdjustmentServiceImpl implements PriceAdjustmentService {
         applyTo(plan, patch);
         plans.updateById(plan);
         a.setBeforeSnapshot(write(before));
-        a.setStatus("APPLIED");
+        a.setStatus(PriceAdjustmentStatus.APPLIED.name());
         a.setAppliedAt(now);
         a.setFailReason(null);
         mapper.updateById(a);
@@ -220,7 +223,7 @@ public class PriceAdjustmentServiceImpl implements PriceAdjustmentService {
         }
         applyTo(plan, patchOf(a.getBeforeSnapshot()));
         plans.updateById(plan);
-        a.setStatus("REVERTED");
+        a.setStatus(PriceAdjustmentStatus.REVERTED.name());
         a.setRevertedAt(now);
         a.setFailReason(null);
         mapper.updateById(a);
@@ -228,7 +231,7 @@ public class PriceAdjustmentServiceImpl implements PriceAdjustmentService {
     }
 
     private void fail(PriceAdjustment a, String why) {
-        a.setStatus("FAILED");
+        a.setStatus(PriceAdjustmentStatus.FAILED.name());
         a.setFailReason(why);
         mapper.updateById(a);
         log.warn("调价 {} 执行失败：{}", a.getAdjustNo(), why);

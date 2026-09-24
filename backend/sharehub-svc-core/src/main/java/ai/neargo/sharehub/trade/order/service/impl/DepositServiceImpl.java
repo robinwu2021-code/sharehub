@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.trade.order.service.impl;
 
+import ai.neargo.sharehub.trade.order.DepositStatus;
+
 import ai.neargo.common.core.PageResult;
 import org.springframework.transaction.annotation.Transactional;
 import ai.neargo.sharehub.common.OkResult;
@@ -24,8 +26,6 @@ import java.util.List;
 @Service
 public class DepositServiceImpl implements DepositService {
 
-    private static final String STATUS_HELD = "HELD";
-    private static final String STATUS_RELEASED = "RELEASED";
 
     private final OrdDepositMapper mapper;
     private final OrderEventLogService eventLog;
@@ -56,14 +56,14 @@ public class DepositServiceImpl implements DepositService {
     public OkResult release(String depositNo) {
         OrdDeposit e = selectByNo(depositNo);
         if (e == null) throw new IllegalArgumentException("押金记录不存在: " + depositNo);
-        if (!STATUS_HELD.equals(e.getStatus())) {
+        if (!DepositStatus.HELD.is(e.getStatus())) {
             throw new IllegalStateException("仅 HELD 押金可解冻: " + depositNo + " → " + e.getStatus());
         }
-        e.setStatus(STATUS_RELEASED);
+        e.setStatus(DepositStatus.RELEASED.name());
         e.setReleasedAt(OrderSupport.now());
         mapper.updateById(e);
 
-        eventLog.append(e.getOrderNo(), STATUS_HELD, STATUS_RELEASED,
+        eventLog.append(e.getOrderNo(), DepositStatus.HELD.name(), DepositStatus.RELEASED.name(),
                 "DEPOSIT_RELEASE", OrderSupport.currentName());
         return new OkResult(true);
     }
@@ -89,14 +89,16 @@ public class DepositServiceImpl implements DepositService {
     @Transactional
     public DepositRecord buyout(String depositNo, String note) {
         OrdDeposit e = require(depositNo);
-        if ("RELEASED".equals(e.getStatus())) {
+        if (DepositStatus.RELEASED.is(e.getStatus())) {
             throw new IllegalStateException("押金已解冻，不能再买断: " + depositNo);
         }
         // 买断金额 = 押金全额。**不得超过押金额** —— 押金抵购机款，抵不了更多；
         // 差额部分若真要收，那是另一笔应收，不该混进押金单。
         e.setBuyoutAmount(e.getAmount());
         e.setBuyoutAt(java.time.LocalDateTime.now());
-        e.setStatus("BUYOUT");
+        // 词表是 BOUGHT_OUT（DDL / 实体 javadoc / 运营端联合类型都是它）——
+        // 这里曾写成 "BUYOUT"，于是买断后的状态在运营端根本不在取值集里
+        e.setStatus(DepositStatus.BOUGHT_OUT.name());
         e.setOperatorName(ai.neargo.sharehub.auth.SecurityUtils.currentUser()
                 .map(ai.neargo.sharehub.auth.LoginUser::username).orElse(null));
         e.setNote(note);

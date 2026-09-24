@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.trade.price.service.impl;
 
+import ai.neargo.sharehub.trade.price.PricePlanStatus;
+
 import ai.neargo.sharehub.common.crud.AbstractCrudService;
 import ai.neargo.sharehub.trade.price.dto.PriceDtos.PlanScopeEntry;
 import ai.neargo.sharehub.trade.price.dto.PriceDtos.PricePlanEntry;
@@ -63,7 +65,7 @@ public class PricePlanServiceImpl extends AbstractCrudService<PricePlan, PricePl
 
     @Override
     protected void beforeCreate(PricePlan e) {
-        if (e.getStatus() == null || e.getStatus().isBlank()) e.setStatus("ACTIVE");
+        if (e.getStatus() == null || e.getStatus().isBlank()) e.setStatus(PricePlanStatus.ACTIVE.name());
         if (e.getCurrency() == null || e.getCurrency().isBlank()) e.setCurrency("AED");
     }
 

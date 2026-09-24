@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.trade.price.engine;
 
+import ai.neargo.sharehub.trade.price.PricePlanStatus;
+
 import ai.neargo.sharehub.common.Json;
 import ai.neargo.sharehub.trade.price.entity.PricePlan;
 import ai.neargo.sharehub.trade.price.entity.PricePlanScope;
@@ -110,7 +112,7 @@ public class PriceResolver {
 
         // 只有 ACTIVE 的方案能被选中。一次取回方案状态，避免逐行回表（N+1）。
         Set<String> active = plans.selectList(new LambdaQueryWrapper<PricePlan>()
-                        .eq(PricePlan::getStatus, "ACTIVE"))
+                        .eq(PricePlan::getStatus, PricePlanStatus.ACTIVE.name()))
                 .stream().map(PricePlan::getPlanNo).collect(Collectors.toSet());
 
         record Cand(PricePlanScope row, ScopeLevel level, int filters) {
