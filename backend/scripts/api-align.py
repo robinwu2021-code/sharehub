@@ -137,10 +137,15 @@ def top_level_fields(body):
     return fields
 
 
-def scan_frontend_types():
-    """抽 ops-web `lib/types/*.ts` 的 interface / type 字面量字段。"""
+def scan_frontend_types(root=None, sub='lib/types'):
+    """抽前端 `types` 目录里的 interface / type 字面量字段。
+
+    **两端各有一套**：运营端 `ops-web/lib/types`、C 端 `c-app/src/types`。
+    拿 ops-web 的类型去比 `/mp/*` 的出参，结果只能是「C 端类型全都缺」——
+    比对对象错了，数字再准也没意义（同 C 类那 26 条的病根）。
+    """
     types = {}
-    d = os.path.join(OPS, 'lib/types')
+    d = os.path.join(root or OPS, sub)
     if not os.path.isdir(d):
         return types
     for f in sorted(os.listdir(d)):
@@ -149,8 +154,14 @@ def scan_frontend_types():
         s = io.open(os.path.join(d, f), encoding='utf-8').read()
         s = re.sub(r'//[^\n]*', '', s)
         s = re.sub(r'/\*.*?\*/', '', s, flags=re.S)
-        for m in re.finditer(r'\b(?:export\s+)?(?:interface|type)\s+(\w+)\s*=?\s*\{', s):
+        # `extends` 必须认：`export interface Venue extends Archivable {` 用
+        # `\s*=?\s*\{` 是匹配不上的，于是**整个类型看不见** —— 它会被报成
+        # 「后端出参无前端类型」(D)，而它明明就在那儿。实测 21 个带 extends 的接口里
+        # 有 11 个是这么被误报的。
+        for m in re.finditer(
+                r'\b(?:export\s+)?(?:interface|type)\s+(\w+)\s*(?:extends\s+([^{=]+?))?\s*=?\s*\{', s):
             name = m.group(1)
+            parents = [x.strip() for x in (m.group(2) or '').split(',') if x.strip()]
             i, depth = m.end() - 1, 0
             while i < len(s):
                 if s[i] == '{':
@@ -163,7 +174,19 @@ def scan_frontend_types():
             body = s[m.end():i]
             fields = top_level_fields(body)
             if fields:
-                types[name] = {'file': 'lib/types/' + f, 'fields': fields}
+                types[name] = {'file': 'lib/types/' + f, 'fields': fields, 'parents': parents}
+
+    # 继承来的字段要并进来，否则 `Venue extends Archivable` 会被判成「少了 archivedAt」——
+    # 把一个修好的 D 类误报换成一个新的 B 类误报，等于没修。
+    for name, t in types.items():
+        seen, stack = set(), list(t.get('parents') or [])
+        while stack:
+            pname = stack.pop()
+            if pname in seen or pname not in types:
+                continue
+            seen.add(pname)
+            t['fields'] = t['fields'] + types[pname]['fields']
+            stack.extend(types[pname].get('parents') or [])
     return types
 
 
@@ -174,7 +197,8 @@ def main():
     eps = contract['endpoints']
     be = {(e['verb'], normalize(e['path'])): e for e in eps}
     calls = scan_frontend_calls()
-    ftypes = scan_frontend_types()
+    ftypes = scan_frontend_types()                      # 运营端
+    ctypes = scan_frontend_types(CAPP, 'src/types')     # C 端
 
     # A. 前端在调、后端没有
     missing = [c for c in calls if (c['verb'], c['path']) not in be]
@@ -191,8 +215,31 @@ def main():
     unused = [e for e in unused_all if not e['path'].startswith('/internal/')]
     internal_unused = [e for e in unused_all if e['path'].startswith('/internal/')]
 
-    # B/D. 出参形状 vs 前端类型：按 record 名同名匹配
-    shape_issues, no_type = [], []
+    # B/D. 出参形状 vs 前端类型
+    #
+    # **按名字直接相等匹配会数出一堆假的**，实测 83 条里只有 16 条是真的。三件事要先做：
+    #   ① 比对对象按受众选：`/mp/*` 比 c-app 的类型，`/api/*` 比 ops-web 的，
+    #      `/internal/*` 设计上就没有前端类型，不参与比对；
+    #   ② 剥**分层后缀**再比：后端叫 `RoleRowVO` / `BrandEntry`，前端叫 `RoleRow` / `Brand` ——
+    #      同一个概念，两层的命名习惯不同而已（35 条）；
+    #   ③ **形状后缀不剥**：`CabinetDetail` / `InvoiceView` 是另一个投影，不是同一个类型。
+    #      把它们映射到裸名去逐字段比，只会把 D 的假阳性换成 B 的假阳性，等于没修。
+    LAYER_SUFFIX = ('VO', 'Entry', 'Row')
+    SHAPE_SUFFIX = ('Detail', 'Brief', 'View', 'Result', 'Item')
+
+    def resolve(name, pool):
+        """→ (前端类型, 命中方式)；对不上返回 (None, 原因)。"""
+        if name in pool:
+            return pool[name], 'exact'
+        for suf in LAYER_SUFFIX:
+            if name.endswith(suf) and name[:-len(suf)] in pool:
+                return pool[name[:-len(suf)]], 'layer:' + suf
+        for suf in SHAPE_SUFFIX:
+            if name.endswith(suf) and name[:-len(suf)] in pool:
+                return None, 'shape:' + suf     # 另一个投影，不当缺失也不逐字段比
+        return None, 'missing'
+
+    shape_issues, no_type, other_projection, internal_types = [], [], [], []
     checked = set()
     for e in eps:
         shape = e.get('responseShape')
@@ -200,9 +247,16 @@ def main():
         if not shape or not elem or elem in checked:
             continue
         checked.add(elem)
-        ft = ftypes.get(elem)
-        if not ft:
-            no_type.append({'type': elem, 'endpoint': '%s %s' % (e['verb'], e['path'])})
+        path = e['path']
+        if path.startswith('/internal/'):
+            internal_types.append({'type': elem, 'endpoint': '%s %s' % (e['verb'], path)})
+            continue
+        pool = ctypes if path.startswith('/mp/') else ftypes
+        ft, how = resolve(elem, pool)
+        if ft is None:
+            rec = {'type': elem, 'endpoint': '%s %s' % (e['verb'], path),
+                   'audience': 'c-app' if path.startswith('/mp/') else 'ops-web'}
+            (other_projection if how.startswith('shape:') else no_type).append(rec)
             continue
         bf = {f['name'] for f in shape}
         ff = {f['name'] for f in ft['fields']}
@@ -234,11 +288,13 @@ def main():
     print('\nD. 后端出参无对应前端类型                   %d' % len(no_type))
     for t in no_type[:15]:
         print('   %-26s %s' % (t['type'], t['endpoint']))
-    write_md(missing, shape_issues, unused, no_type, len(eps), len(calls), internal_unused)
+    write_md(missing, shape_issues, unused, no_type, len(eps), len(calls), internal_unused,
+             other_projection, internal_types)
     print('\n明细 → /tmp/api_align.json · 文档 → docs/api/前后端对齐缺口.md')
 
 
-def write_md(missing, shape_issues, unused, no_type, n_be, n_fe, internal_unused=()):
+def write_md(missing, shape_issues, unused, no_type, n_be, n_fe, internal_unused=(),
+             other_projection=(), internal_types=()):
     out = os.path.join(ROOT, 'docs/api/前后端对齐缺口.md')
     L = ['# 前后端对齐缺口\n',
          '> **本文件由脚本生成，不要手改** —— '
@@ -301,10 +357,30 @@ def write_md(missing, shape_issues, unused, no_type, n_be, n_fe, internal_unused
         L.append('')
 
     L.append('## D. 后端出参无对应前端类型（%d）\n' % len(no_type))
-    L.append('| 结构 | 首个端点 |\n|---|---|')
-    for t in sorted(no_type, key=lambda x: x['type']):
-        L.append('| `%s` | `%s` |' % (t['type'], t['endpoint']))
-    L.append('')
+    L.append('**已排除三类**（合计 %d 条），它们不是缺口：\n' % (len(internal_types) + len(other_projection)))
+    L.append('- `/internal/*` 的出参 %d 条 —— 服务间调用，设计上就没有前端类型；' % len(internal_types))
+    L.append('- **另一个投影** %d 条 —— `CabinetDetail` / `InvoiceView` 这类，'
+             '前端有对应的裸类型但形状本就不同，硬当同名去逐字段比只会造出假的字段差异；'
+             % len(other_projection))
+    L.append('- **分层后缀**（`VO` / `Entry` / `Row`）—— 后端 `RoleRowVO`、前端 `RoleRow`，'
+             '同一概念两层命名习惯不同，已自动对齐后按字段比（结果进 B 类）。\n')
+    L.append('下表按**受众**分开：`/api/*` 比 ops-web 的类型，`/mp/*` 比 c-app 的。\n')
+    for aud, title in (('ops-web', '运营端 ops-web'), ('c-app', 'C 端 c-app')):
+        rows = [t for t in no_type if t.get('audience') == aud]
+        if not rows:
+            continue
+        L.append('### %s（%d）\n' % (title, len(rows)))
+        L.append('| 结构 | 首个端点 |\n|---|---|')
+        for t in sorted(rows, key=lambda x: x['type']):
+            L.append('| `%s` | `%s` |' % (t['type'], t['endpoint']))
+        L.append('')
+    rest = [t for t in no_type if t.get('audience') not in ('ops-web', 'c-app')]
+    if rest:
+        L.append('### 其它（%d）\n' % len(rest))
+        L.append('| 结构 | 首个端点 |\n|---|---|')
+        for t in sorted(rest, key=lambda x: x['type']):
+            L.append('| `%s` | `%s` |' % (t['type'], t['endpoint']))
+        L.append('')
 
     io.open(out, 'w', encoding='utf-8').write('\n'.join(L) + '\n')
 

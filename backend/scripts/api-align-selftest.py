@@ -122,13 +122,49 @@ def test_align_nested():
           '取到 %s（泄漏 %s）' % (sorted(names), sorted(leaked)))
 
 
+# ───────────── ④ align：带 extends 的接口必须认得出来 ─────────────
+#
+# `export interface Venue extends Archivable {` 用 `\s*=?\s*\{` 匹配不上，
+# 于是整个类型看不见、被报成「后端出参无前端类型」。实测 21 个带 extends 的接口
+# 里有 11 个这么被误报；而且继承来的字段要并进来，否则又会反过来被报成「少了 archivedAt」。
+
+TS_EXTENDS = """
+export interface Archivable {
+  archivedAt: string | null;
+}
+export interface Venue extends Archivable {
+  venueNo: string;
+  name: string;
+}
+"""
+
+
+def test_align_extends(tmpdir):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('apialign4', os.path.join(HERE, 'api-align.py'))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    d = os.path.join(tmpdir, 'lib', 'types')
+    os.makedirs(d, exist_ok=True)
+    io.open(os.path.join(d, 'demo.ts'), 'w', encoding='utf-8').write(TS_EXTENDS)
+    types = mod.scan_frontend_types(tmpdir)
+    fields = {f['name'] for f in types.get('Venue', {}).get('fields', [])}
+    check('④ align 认得带 extends 的接口，且把父接口字段并进来',
+          'Venue' in types and fields == {'venueNo', 'name', 'archivedAt'},
+          '取到 %s（字段 %s）' % (sorted(types), sorted(fields)))
+
+
 if __name__ == '__main__':
+    import tempfile
     print('对齐工具链自测（量尺自己的卡口）')
     test_extract_multivalue()
     test_align_ternary()
     test_align_nested()
+    with tempfile.TemporaryDirectory() as td:
+        test_align_extends(td)
     print()
     if fails:
         print('❌ %d 条未通过 —— 量尺坏了，此时它给出的任何数字都不能用来排期' % len(fails))
         sys.exit(1)
-    print('✅ 三条全过')
+    print('✅ 四条全过')
