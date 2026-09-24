@@ -8051,6 +8051,14 @@
     {
      "name": "archivedAt",
      "type": "String"
+    },
+    {
+     "name": "nameAr",
+     "type": "String"
+    },
+    {
+     "name": "openHours",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -8137,6 +8145,14 @@
     {
      "name": "archivedAt",
      "type": "String"
+    },
+    {
+     "name": "nameAr",
+     "type": "String"
+    },
+    {
+     "name": "openHours",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -8202,6 +8218,14 @@
     },
     {
      "name": "archivedAt",
+     "type": "String"
+    },
+    {
+     "name": "nameAr",
+     "type": "String"
+    },
+    {
+     "name": "openHours",
      "type": "String"
     }
    ]
@@ -8330,6 +8354,14 @@
     {
      "name": "archivedAt",
      "type": "String"
+    },
+    {
+     "name": "nameAr",
+     "type": "String"
+    },
+    {
+     "name": "openHours",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -8395,6 +8427,14 @@
     },
     {
      "name": "archivedAt",
+     "type": "String"
+    },
+    {
+     "name": "nameAr",
+     "type": "String"
+    },
+    {
+     "name": "openHours",
      "type": "String"
     }
    ]
@@ -8690,6 +8730,14 @@
     {
      "name": "archivedAt",
      "type": "String"
+    },
+    {
+     "name": "nameAr",
+     "type": "String"
+    },
+    {
+     "name": "openHours",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -8775,6 +8823,14 @@
     },
     {
      "name": "archivedAt",
+     "type": "String"
+    },
+    {
+     "name": "nameAr",
+     "type": "String"
+    },
+    {
+     "name": "openHours",
      "type": "String"
     }
    ],
@@ -24285,6 +24341,10 @@
     {
      "name": "siteNo",
      "type": "String"
+    },
+    {
+     "name": "locationNo",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -24315,6 +24375,10 @@
     },
     {
      "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "locationNo",
      "type": "String"
     }
    ],

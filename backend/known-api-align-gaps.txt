@@ -34,8 +34,6 @@ B GET /api/ops/ota-rollouts OtaRolloutRow 后端有前端无:targetRef
 B GET /api/ops/powerbanks PowerbankRow 后端有前端无:slotIndex
 B GET /api/ops/powerbanks PowerbankRow 后端有前端无:sn
 B GET /api/ops/powerbanks PowerbankRow 后端有前端无:vendorCode
-B GET /api/ops/sites Site 前端有后端无:nameAr
-B GET /api/ops/sites Site 前端有后端无:openHours
 B GET /api/platform/departments Department 后端有前端无:path
 B GET /api/platform/departments Department 后端有前端无:sort
 B GET /api/platform/notify-blacklist NotifyBlacklistVO 后端有前端无:releasedAt

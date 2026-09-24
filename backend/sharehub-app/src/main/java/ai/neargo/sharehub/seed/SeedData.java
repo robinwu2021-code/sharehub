@@ -48,6 +48,9 @@ public class SeedData {
     private static final List<String> VENDORS = List.of("cd-tech", "sd-power", "chargenow");
     private static final List<String> LOCS = List.of("Dubai Mall L1", "Mall of Emirates", "DXB T3",
             "Marina Walk", "City Centre Deira", "Yas Mall", "Ibn Battuta");
+    /** LOCS 的阿语名，**逐项对应**（同索引同一个站点）—— 顺序错开会让演示数据自相矛盾。 */
+    private static final List<String> LOCS_AR = List.of("دبي مول الطابق الأول", "مول الإمارات",
+            "مطار دبي المبنى 3", "مرسى دبي", "سيتي سنتر ديرة", "مول ياس", "ابن بطوطة");
     private static final List<String> VENUE_NAMES = List.of("Emaar Malls", "Majid Al Futtaim",
             "DXB Airports", "Aldar", "Nakheel");
     private static final List<String> REGIONS = List.of("Dubai North", "Dubai Marina", "Deira", "DXB", "JBR");
@@ -147,7 +150,10 @@ public class SeedData {
                     java.math.BigDecimal.valueOf(5512_0000L + (i * 2_3000L), 6),
                     java.math.BigDecimal.valueOf(2505_0000L + (i * 1_9000L), 6),
                     p(List.of("商场", "机场", "餐饮", "地铁", "写字楼"), i),
-                    1 + (i % 4), 2 + (i * 3) % 10, i % 8 == 0 ? "PAUSED" : "ACTIVE", null));
+                    1 + (i % 4), 2 + (i * 3) % 10, i % 8 == 0 ? "PAUSED" : "ACTIVE", null,
+                    // 演示数据给上阿语名与营业时段：这两列 C 端找柜在用，
+                    // 种子里留空会让 /mp/nearby 的演示看起来像"功能没做"。
+                    p(LOCS_AR, i), "09:00-22:00"));
         }
         for (int i = 0; i < 30; i++) {
             Site site = sites.get(i % sites.size());

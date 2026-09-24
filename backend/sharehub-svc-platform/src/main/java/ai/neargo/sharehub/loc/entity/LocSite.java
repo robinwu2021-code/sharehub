@@ -34,6 +34,18 @@ public class LocSite {
      */
     private String brandNo;
 
+    /**
+     * 站点名（阿语）。列在 V1 就有，实体此前漏映射 —— 于是 `GET /api/ops/sites` 不返回它，
+     * 而运营端编辑页有「站点名称（العربية）」这一格：**编辑已有站点时该格永远是空的**，
+     * 保存就把库里的阿语名抹掉。三语（zh/en/ar）那条线上这类漏映射是静默的。
+     */
+    private String nameAr;
+    /**
+     * 营业时段展示文本（如 09:00-22:00）。列由 V31 为 C 端找柜补上，
+     * 实体未映射 —— 运营端「营业时间」一格同样是空的，且保存会清掉 C 端在用的值。
+     */
+    private String openHours;
+
     private String venueName;
     private String agentNo;
     private String regionId;

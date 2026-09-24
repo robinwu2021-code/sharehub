@@ -452,7 +452,8 @@ public class LocService {
                  * 返回 null 而不是 0 —— 0 会被读成「这个站点一台机柜都没有」，
                  * 而真相是「这里答不了」。调用方（运营端站点页）本来就按关系现算。
                  */
-                null, e.getStatus(), str(e.getArchivedAt()));
+                null, e.getStatus(), str(e.getArchivedAt()),
+                e.getNameAr(), e.getOpenHours());
     }
 
     /** 归档时间统一转字符串；`null` 原样传下去（前端按它判在用/已归档）。 */

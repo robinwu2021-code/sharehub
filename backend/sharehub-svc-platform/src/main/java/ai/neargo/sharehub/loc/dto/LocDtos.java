@@ -32,7 +32,11 @@ public final class LocDtos {
                       String brandNo, String regionId, String regionName,
                       String address, java.math.BigDecimal lng, java.math.BigDecimal lat,
                       String sceneType, Integer pointCount, Integer cabinetCount, String status,
-                      String archivedAt) {
+                      String archivedAt,
+                      // 追加在**末尾**而非插进语义相近的位置：本 record 的参数几乎全是 String，
+                      // 插中间会让两个构造点的位置参数错位，而类型相同 → 编译器抓不到，
+                      // 表现为「站点名变成了营业时间」这种要到界面上才发现的错。
+                      String nameAr, String openHours) {
     }
 
     /**
