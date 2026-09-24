@@ -41,3 +41,6 @@ yarn-error.log*
 # ── 测试 / 覆盖率 ──
 coverage/
 **/coverage/
+
+# 本地跑出来的日志目录（生产走 SHAREHUB_LOG_DIR 指向 /data/log）
+logs/

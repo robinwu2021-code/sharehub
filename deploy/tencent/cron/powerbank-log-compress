@@ -1,0 +1,29 @@
+# powerbank · 日志压缩（超过 5 天的）
+#
+# 为什么不用 logrotate 的 compress/delaycompress：
+# `delaycompress` 只延迟**一轮**（日切就是一天），做不到「5 天后」。
+# 而把 rotate 周期拉长又会让单个文件过大。
+# 用 find -mtime 是唯一与「5 天」这个口径逐字对应的写法。
+#
+# ## 文件名必须照实写，否则是个静默空转的任务
+#
+# 这里曾经写 `-name '*.log.*'`，**一个文件都匹配不到** —— 任务每天照跑、
+# 照样返回 0，磁盘照样涨。实际会出现的名字只有两类：
+#   logback  切出来   sharehub-app-2026-09-18.0.log   ← 以 .log 结尾
+#   logrotate 切出来  sharehub-app.log-20260918       ← 以 .log-日期 结尾
+# 所以匹配 `*.log` 或 `*.log-*` 两种，再把三个**正在写**的文件按名字排除
+# （sharehub-app.log / sharehub-app-error.log / stdout.log）——
+# 压一个正在写的文件会让后续日志直接掉地上。
+#
+# `! -name '*.gz'` 不是多余的：logrotate 名字里日期在后，
+# `sharehub-app.log-20260918.gz` 也命中 `*.log-*`，不排除就会每天重压一遍。
+#
+# 安装：sudo cp cron/powerbank-log-compress /etc/cron.d/powerbank-log-compress
+# 验证：把下面的 find 去掉 -exec 先跑一遍，**确认它有输出**再装。
+#       （改完 glob 必须这样确认 —— 空匹配和"没有过期文件"长得一模一样。）
+
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+# 每天 03:20 —— 避开整点的其它定时任务，也避开业务高峰
+20 3 * * * root find /data/log/powerbank -type f \( -name '*.log' -o -name '*.log-*' \) ! -name '*.gz' ! -name 'sharehub-app.log' ! -name 'sharehub-app-error.log' ! -name 'stdout.log' -mtime +5 -exec gzip -9 {} \; >/dev/null 2>&1

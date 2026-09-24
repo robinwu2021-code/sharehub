@@ -96,6 +96,19 @@ sharehub:
       batch-size: 200
       max-attempts: 6
   # 可切换会话存储：memory(默认) | ehcache(单节点TTL) | redis(多实例推荐) | mysql(强持久sys_token)
+  # 日志落盘（logback-spring.xml 读这几个键）。
+  # 保留 20 天、5 天后压缩 —— 压缩由 deploy/tencent/cron/powerbank-log-compress 做，
+  # 不是 logback 的职责（见 logback-spring.xml 顶部「切分与压缩的分工」）。
+  log:
+    # 默认相对路径 —— 绝对路径只在部署环境经 SHAREHUB_LOG_DIR 注入。
+    # 理由见 logback-spring.xml 里 LOG_DIR 的注释。
+    dir: ${SHAREHUB_LOG_DIR:logs}
+    keep-days: ${SHAREHUB_LOG_KEEP_DAYS:20}
+    max-file-size: ${SHAREHUB_LOG_MAX_FILE:200MB}
+    # 容量上限管的是**异常情况**：一次异常风暴能几小时写满磁盘，而磁盘满会让数据库一起停。
+    # 保留天数管正常情况，两者都要。
+    total-size-cap: ${SHAREHUB_LOG_TOTAL_CAP:10GB}
+
   auth:
     # 令牌存储。四选一，随时可切，业务代码不感知（都走 TokenStore 接口）：
     #   mysql+ehcache  缺省 —— MySQL 持久 + 本地热层。会话活过重启，又不必每个请求查一次库

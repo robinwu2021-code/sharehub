@@ -1,0 +1,36 @@
+# powerbank · 日志轮转
+#
+# 与 ai-shop 同机共存，路径前缀不同（/data/log/powerbank vs /data/log/ai-shop），
+# 各自一份配置互不干扰。
+#
+# ## 与 logback 的分工
+#
+# **切分由 logback 做**（见 sharehub-app 的 logback-spring.xml）——
+# 它知道一条日志何时写完，切在记录边界上；外部工具切会把多行异常栈劈成两半。
+# 本文件只做两件事：删除过期的、兜底应用自己没清掉的。
+#
+# ## 压缩为什么不在这里做
+#
+# logrotate 的 `delaycompress` **只延迟一轮，不是 5 天** —— 这是个常见误解。
+# 要逐字对应「超过 5 天自动压缩」，用 cron/powerbank-log-compress 里那行
+# `find -mtime +5 -exec gzip`，语义与需求一一对应，不需要理解 logrotate 的轮次。
+#
+# 安装：sudo cp logrotate/powerbank /etc/logrotate.d/powerbank
+# 验证：sudo logrotate -d /etc/logrotate.d/powerbank   （-d 只演练不执行）
+
+# 两条路径：*/*.log 是 logback 的 app//error/；stdout.log 只有一层，
+# 是 systemd 接的 JVM 崩溃/OOM 输出 —— 用一个 glob 盖不住两种深度。
+/data/log/powerbank/*/*.log
+/data/log/powerbank/stdout.log {
+    su root root
+    daily
+    rotate 20                 # 与 sharehub.log.keep-days 对齐
+    missingok                 # 服务没起过时目录是空的，不该报错
+    notifempty
+    # copytruncate：不需要应用支持重开文件（logback 自己在切，这里只是兜底）
+    # 代价是切的瞬间可能丢极少量正在写的字节 —— 对兜底路径可接受
+    copytruncate
+    dateext
+    dateformat -%Y%m%d
+    # 不加 compress：压缩交给 cron 按「5 天」这个业务口径做，见上
+}

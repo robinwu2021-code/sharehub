@@ -56,6 +56,32 @@ class="txt-body font-medium leading-none"   →  实测 14px / 400 / 21px
 
 ---
 
+## 日志打印规范（`LoggingConventionTest` 会拦）
+
+**三个禁止**（现为 0，已锁死）：`e.printStackTrace()` · `System.out` · `System.err`。
+它们绕过 logback，于是同时失去四样：不落盘、不带 `traceId`/`actor`、不受级别控制、
+不受容量上限约束。`printStackTrace` 尤其危险 —— 它**看起来记了日志**，
+于是没人再补 `log.error`，而那个栈其实谁也找不到。
+
+**四条写法**：
+
+1. **异常必须带业务键**：`log.error("归还失败 orderNo={}", no, e)`。
+   只有 `log.error(e)` 等于只说了「NullPointerException」，对排障毫无帮助。
+2. **参数化不拼接**：`log.debug("x={}", x)`，不是 `log.debug("x=" + x)` ——
+   后者在级别关闭时仍然求值。
+3. **不打敏感信息**：手机号/证件/令牌/支付凭据。脱敏用现成的 `NotifyTargets.maskTarget`。
+4. **每条 WARN/ERROR 都要能回答「谁该做什么」**，否则它是噪音，
+   而噪音会让真告警被忽略。
+
+**级别口径**：ERROR = 需要人介入且不介入会持续出错 · WARN = 异常但能自处理
+· INFO = 状态变更（事后要能还原发生了什么）· DEBUG = 排障用，生产默认关。
+
+**日志落在哪**：`/data/log/powerbank/{app,error}/`，保留 20 天、5 天后压缩，
+全部可配（`sharehub.log.*`）。格式带 `%X{traceId}` 与 `%X{actor}` ——
+没有前者跨进程排障只能比时间戳，没有后者只知道「出错了」不知道「谁在操作时出错」。
+
+---
+
 ## 并发开发纪律
 
 - **提交只用显式文件路径，绝不用 `git add -A` 或目录级 `add`。**
