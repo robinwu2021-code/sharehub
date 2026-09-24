@@ -11117,7 +11117,7 @@
   {
    "verb": "POST",
    "path": "/api/platform/app-versions",
-   "perm": "system:app_version:update",
+   "perm": "system:app_version:release",
    "handler": "SysSettingController#createAppVersion",
    "summary": "",
    "params": [],
@@ -11184,7 +11184,7 @@
   {
    "verb": "POST",
    "path": "/api/platform/app-versions/{versionId}",
-   "perm": "system:app_version:update",
+   "perm": "system:app_version:release",
    "handler": "SysSettingController#updateAppVersion",
    "summary": "",
    "params": [
@@ -11258,7 +11258,7 @@
   {
    "verb": "POST",
    "path": "/api/platform/app-versions/{versionId}/rollback",
-   "perm": "system:app_version:update",
+   "perm": "system:app_version:release",
    "handler": "SysSettingController#rollbackAppVersion",
    "summary": "软回滚：`status=ROLLBACK` + `rolloutPercent=0`，**记录保留**。",
    "params": [
@@ -12875,7 +12875,7 @@
   {
    "verb": "POST",
    "path": "/api/platform/employees/{employeeNo}",
-   "perm": "org:employee:create",
+   "perm": "org:employee:update",
    "handler": "OrgController#updateEmployee",
    "summary": "",
    "params": [
@@ -26654,6 +26654,15 @@
    "PENDING",
    "SENT",
    "FAILED"
+  ],
+  "PricePlanStatus": [
+   "ACTIVE"
+  ],
+  "PriceAdjustmentStatus": [
+   "SCHEDULED",
+   "APPLIED",
+   "CANCELLED",
+   "REVERTED"
   ],
   "ScopeLevel": [
    "DEVICE",

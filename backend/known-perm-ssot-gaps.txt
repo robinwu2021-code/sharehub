@@ -45,13 +45,11 @@
 声明未强制 org:dept:delete
 声明未强制 org:dept:update
 声明未强制 org:employee:delete
-声明未强制 org:employee:update
 声明未强制 org:role:assign
 声明未强制 pricing:adjustment:cancel
 声明未强制 pricing:adjustment:create
 声明未强制 pricing:adjustment:read
 声明未强制 pricing:plan:delete
-声明未强制 system:app_version:release
 声明未强制 system:openapi:config
 声明未强制 tenant:billing:read
 强制未声明 cs:session:reply
@@ -70,7 +68,6 @@
 强制未声明 report:device:read
 强制未声明 report:finance:read
 强制未声明 report:location:read
-强制未声明 system:app_version:update
 强制未声明 system:biz_rule:read
 强制未声明 system:login_setting:read
 强制未声明 system:notify_log:update

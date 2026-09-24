@@ -55,7 +55,10 @@ public class OrgController {
     }
 
     @PostMapping("/employees/{employeeNo}")
-    @PreAuthorize("@perm.can('org:employee:create')")
+    // 改用 :update —— 清单 §员工「增/改/删」把 create/update/delete 分成三个码，
+    // 此前改员工也判 :create。新增那个端点保持 :create 不动。
+    // （两码当前都只有 ADMIN 持有，访问面不变。）
+    @PreAuthorize("@perm.can('org:employee:update')")
     public Employee updateEmployee(@PathVariable String employeeNo, @RequestBody IamEmployee body) {
         body.setEmployeeNo(employeeNo); // 路径为准，忽略 body 里的键，防越权改他人
         return employeeService.save(body);

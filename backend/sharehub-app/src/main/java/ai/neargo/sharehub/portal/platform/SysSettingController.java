@@ -115,13 +115,16 @@ public class SysSettingController {
     }
 
     @PostMapping("/api/platform/app-versions")
-    @PreAuthorize("@perm.can('system:app_version:update')")
+    // 清单 §系统「应用版本 查/发布」只声明 read 与 release，**没有 :update 这个码**。
+    // 三个写端点（建版本/改版本/回滚）都属"发布"，统一判 :release。
+    // （两码当前都只有 ADMIN 持有，访问面不变。）
+    @PreAuthorize("@perm.can('system:app_version:release')")
     public AppVersion createAppVersion(@RequestBody SysAppVersion body) {
         return appVersions.save(body); // versionId 由 service 按 平台-版本号 拼出
     }
 
     @PostMapping("/api/platform/app-versions/{versionId}")
-    @PreAuthorize("@perm.can('system:app_version:update')")
+    @PreAuthorize("@perm.can('system:app_version:release')")
     public AppVersion updateAppVersion(@PathVariable String versionId, @RequestBody SysAppVersion body) {
         body.setVersionId(versionId);
         return appVersions.save(body);
@@ -129,7 +132,7 @@ public class SysSettingController {
 
     /** 软回滚：{@code status=ROLLBACK} + {@code rolloutPercent=0}，**记录保留**。 */
     @PostMapping("/api/platform/app-versions/{versionId}/rollback")
-    @PreAuthorize("@perm.can('system:app_version:update')")
+    @PreAuthorize("@perm.can('system:app_version:release')")
     public AppVersion rollbackAppVersion(@PathVariable String versionId) {
         return appVersions.rollback(versionId);
     }
