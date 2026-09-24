@@ -70,6 +70,37 @@ class EntityRequestBodyRatchetTest {
                 .isSubsetOf(known);
     }
 
+    /** `private 类型 字段名;`（实体里 Lombok @Data 的普通字段） */
+    private static final Pattern ENTITY_FIELD =
+            Pattern.compile("private\\s+(?:final\\s+)?[A-Za-z0-9_.<>\\[\\]]+\\s+([a-z][A-Za-z0-9_]*)\\s*;");
+
+    @Test
+    @DisplayName("实体请求体上不许**悄悄**多出可写字段")
+    void noNewWritableFieldsOnEntityRequestBodies() throws IOException {
+        Path backend = backendRoot();
+        Set<String> known = readLedger(backend.resolve("known-entity-request-bodies.txt"));
+
+        Set<String> actual = new LinkedHashSet<>();
+        for (Path f : mainJavaFiles(backend)) {
+            String src = Files.readString(f, StandardCharsets.UTF_8);
+            Matcher decl = ENTITY_DECL.matcher(src);
+            if (!decl.find()) continue;
+            String entity = decl.group(1);
+            if (!known.contains(entity)) continue;     // 只盯还在当请求体的那些
+            for (Matcher m = ENTITY_FIELD.matcher(src); m.find(); ) {
+                actual.add(entity + "." + m.group(1));
+            }
+        }
+        assertThat(actual).as("应当扫描到实体字段").isNotEmpty();
+
+        Set<String> fieldLedger = readLedger(backend.resolve("known-entity-writable-fields.txt"));
+        assertThat(actual)
+                .as("实体请求体上新增的字段。**新字段默认就是客户端可写的** —— "
+                        + "先判它该不该锁（有专门迁移入口的归属/状态/金额要在 beforeUpdate 里锁死），"
+                        + "再把它加进 known-entity-writable-fields.txt")
+                .isSubsetOf(fieldLedger);
+    }
+
     /** 台账只准变短：实测集合若比台账小，提醒把已迁移的条目删掉（不失败，避免卡住迁移节奏）。 */
     @Test
     @DisplayName("台账不该比实际还长（迁移完记得删条目）")
