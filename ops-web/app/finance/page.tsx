@@ -451,6 +451,14 @@ function FinanceInner() {
     [ruleForm?.dimension, rulePayeeOpts],
   );
 
+  // 发票详情：抽屉打开才拉 —— 它比列表多一样东西「这张票由哪几笔订单开出来」，
+  // 而那正是税务或客户质疑金额时第一个要答的问题
+  const invDetailQ = useQuery({
+    queryKey: ["inv-detail", invDetail?.invoiceNo ?? ""],
+    queryFn: () => api.getInvoice(invDetail!.invoiceNo),
+    enabled: !!invDetail,
+  });
+
   // 结算单构成明细：这张单的钱是哪几笔分润凑出来的
   const stlRecordsQ = useQuery({
     queryKey: ["stl-records", stlDetail?.settleNo ?? ""],
@@ -1975,6 +1983,23 @@ function FinanceInner() {
               {invDetail.voidedBy ? `${invDetail.voidedBy} · ${fmtTime(invDetail.voidedAt!)}` : "-"}
             </Field>
             <Field label="作废原因">{invDetail.voidReason ?? "-"}</Field>
+            {/* 这张票由哪几笔订单开出来 —— 列表与本屉此前都没有，只能靠人去结算单里倒推 */}
+            <Field label="对应订单">
+              {invDetailQ.isLoading ? <span className="text-muted-foreground">加载中…</span>
+                : invDetailQ.error ? <span className="text-[var(--destructive)]">读取失败</span>
+                : (invDetailQ.data?.orderNos?.length ?? 0) === 0
+                  ? <span className="text-muted-foreground">无 —— 该票来源结算单下没有分润明细，开票金额的出处存疑</span>
+                  : (
+                    <div className="flex max-h-40 flex-wrap gap-x-3 gap-y-1 overflow-auto tabular-nums">
+                      {invDetailQ.data!.orderNos.map((no) => <span key={no}>{no}</span>)}
+                    </div>
+                  )}
+            </Field>
+            {(invDetailQ.data?.orderNos?.length ?? 0) > 0 && (
+              <div className="mb-2 txt-caption text-muted-foreground">
+                共 {invDetailQ.data!.orderNos.length} 笔订单
+              </div>
+            )}
             {/* 「为什么这屉里改不了」原先是手写灰底块，圆角还取自 Tailwind 默认阶（已废弃）。
                 收敛到 Notice 原语：形状与字号跟着规范走，不各页各一套 */}
             {invDetail.status !== "DRAFT" && (

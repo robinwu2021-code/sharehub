@@ -19,6 +19,7 @@ export const deviceHttp: DeviceApi = {
   listCabinetMonitor: (q?: PageQ) => client.get("/api/ops/cabinet-monitor", q),
   listCommandRecords: (q?: PageQ) => client.get("/api/ops/command-records", q),
   listInventoryTransfers: (q?: PageQ) => client.get("/api/ops/inventory-transfers", q),
+  getInventoryTransfer: (transferNo) => client.get(`/api/ops/inventory-transfers/${transferNo}`),
   listOtaRollouts: (q?: PageQ) => client.get("/api/ops/ota-rollouts", q),
   savePowerbank: (x) => client.post(x.powerbankNo ? `/api/ops/powerbanks/${x.powerbankNo}` : "/api/ops/powerbanks", x),
   saveInventoryTransfer: (x) => client.post(x.transferNo ? `/api/ops/inventory-transfers/${x.transferNo}` : "/api/ops/inventory-transfers", x),

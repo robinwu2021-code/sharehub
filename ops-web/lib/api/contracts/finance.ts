@@ -2,7 +2,7 @@
 import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ , ReportQ, PayoutAccountQ, WithdrawalQ } from "../query";
 import type {
   PageResult, ShareRule, LedgerEntry, Settlement, SettlementDraft, Withdrawal,
-  ShareRecord, Reconcile, ReconAction, ReconDiff, ReconStats, Invoice, ShareSummary, RechargeOrder,
+  ShareRecord, Reconcile, ReconAction, ReconDiff, ReconStats, Invoice, InvoiceView, ShareSummary, RechargeOrder,
 
   VoucherDetail,
   VoucherCreatePayload, PayoutAccount, PayReceiptPayload, WithdrawApplyPayload,
@@ -74,6 +74,8 @@ export interface FinanceApi {
   listShareRecords(q?: ShareRecordQ): Promise<PageResult<ShareRecord>>;
   listReconciles(q?: ReconQ): Promise<PageResult<Reconcile>>;
   listInvoices(q?: InvoiceQ): Promise<PageResult<Invoice>>;
+  /** 发票详情：发票 + 它由哪几笔订单开出来。列表里没有订单号清单。 */
+  getInvoice(invoiceNo: string): Promise<InvoiceView>;
   saveShareRule(x: Partial<ShareRule> & { ruleNo?: string }): Promise<ShareRule>;
   /** 登记/编辑发票草稿。开具后（ISSUED/VOID）抬头与金额由服务端拒绝修改。 */
   saveInvoice(x: Partial<Invoice> & { invoiceNo?: string }): Promise<Invoice>;

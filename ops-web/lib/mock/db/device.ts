@@ -2,12 +2,14 @@
 // cabinets 是全库的“机柜号来源”，其他域（订单/告警/客服/营销广告位…）一律通过 cabNo() 引用，不复制数据。
 import type {
   Cabinet, CabinetStatus, Slot, Vendor, Powerbank, CabinetMonitor, CommandRecord, CommandType,
-  InventoryTransfer, OtaRollout, OtaRelease, OtaTask, DeviceLog, DeviceCodeBatch, PageQuery,
+  InventoryTransfer, InventoryTransferDetail, TransferItem,
+  OtaRollout, OtaRelease, OtaTask, DeviceLog, DeviceCodeBatch, PageQuery,
 } from "../../types";
 // 指令词表是 types 层 SSOT：抽屉里的选项、这里的落库校验同源，避免「界面能选、落库不认」
 import { COMMAND_TYPES, SLOT_REQUIRED_COMMANDS } from "../../types";
 import { VENDORS, LOCS, OPERATORS, p, iso } from "./internal";
 import { paginate, kwHit, upsert, nextNo, liveHit, archiveRow, unarchiveRow } from "./helpers";
+import { notFound } from "@/lib/biz-error";
 // 机柜归属站点（A1）取自场所域的真实点位，**不另造字符串**。依赖方向 device → location
 // 是单向的（location.ts 不引用设备），与 agent.ts 反过来引用 cabinets 的做法不冲突。
 import { locations } from "./location";
@@ -103,6 +105,31 @@ export const commandRecords: CommandRecord[] = Array.from({ length: 30 }, (_, i)
     operator: p(OPERATORS, i), createdAt: iso(i * 900_000),
   };
 });
+/**
+ * 调拨明细：**逐台**列出这一单调了哪些设备，以及收货时有没有逐台核对过。
+ *
+ * 条数必须等于单据上的 `powerbankCount` —— 两个数对不上，
+ * 盘点时就会变成「单据说 12 台、明细只有 9 行」这种没人说得清的差异。
+ * 已完成（DONE）的单视为全部核对过；在途/草稿只核对了一部分。
+ */
+export const transferItemsOf = (transferNo: string): TransferItem[] => {
+  const t = inventoryTransfers.find((x) => x.transferNo === transferNo);
+  if (!t) return [];
+  const base = Number(transferNo.replace(/\D/g, "")) || 0;
+  return Array.from({ length: t.powerbankCount }, (_, k) => ({
+    transferNo,
+    // 余数不能只在 30 以内取——单据最多 44 台，那样同一单里会出现两行同号
+    itemNo: `PB${20000 + (base * 97 + k) % 900}`,
+    checked: t.status === "DONE" || k < Math.floor(t.powerbankCount / 2),
+  }));
+};
+
+export const getInventoryTransfer = (transferNo: string): InventoryTransferDetail => {
+  const transfer = inventoryTransfers.find((x) => x.transferNo === transferNo);
+  if (!transfer) notFound("调拨单", "Transfer", transferNo);
+  return { transfer: transfer!, items: transferItemsOf(transferNo) };
+};
+
 export const inventoryTransfers: InventoryTransfer[] = Array.from({ length: 16 }, (_, i) => ({
   transferNo: `TR${60000 + i}`,
   // 类型 + 引用：名字是给人看的，跳转与盘点要靠编号。

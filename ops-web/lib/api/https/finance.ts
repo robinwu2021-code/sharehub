@@ -46,6 +46,7 @@ export const financeHttp: FinanceApi = {
   listShareRecords: (q?: ShareRecordQ) => client.get("/api/trade/share-records", q),
   listReconciles: (q?: ReconQ) => client.get("/api/trade/reconciles", q),
   listInvoices: (q?: InvoiceQ) => client.get("/api/trade/invoices", q),
+  getInvoice: (invoiceNo) => client.get(`/api/trade/invoices/${invoiceNo}`),
   saveShareRule: (x) => client.post(x.ruleNo ? `/api/trade/share-rules/${x.ruleNo}` : "/api/trade/share-rules", x),
   saveInvoice: (x) => client.post(x.invoiceNo ? `/api/trade/invoices/${x.invoiceNo}` : "/api/trade/invoices", x),
 

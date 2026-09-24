@@ -37,7 +37,8 @@ import { ReadOnlyNotice } from "@/components/read-only-notice";
 // 值导入：指令的「必须指定仓位」规则与 mock 落库校验同源，不在页面里另写一份
 import { SLOT_REQUIRED_COMMANDS } from "@/lib/types";
 import type {
-  Cabinet, Powerbank, CabinetMonitor, CommandRecord, CommandType, InventoryTransfer, OtaRollout, PageResult,
+  Cabinet, Powerbank, CabinetMonitor, CommandRecord, CommandType, InventoryTransfer,
+  InventoryTransferDetail, TransferItem, OtaRollout, PageResult,
   OtaRelease, OtaTask, DeviceLog, DeviceCodeBatch,
 } from "@/lib/types";
 
@@ -756,6 +757,10 @@ const TRANSFER_STATUS: StatusMap<InventoryTransfer["status"]> = {
   IN_TRANSIT: { label: "在途", tone: "warning" },
   DONE: { label: "已完成", tone: "success" },
 };
+const ITEM_CHECKED: StatusMap<"CHECKED" | "UNCHECKED"> = {
+  CHECKED: { label: "已核对", tone: "success" },
+  UNCHECKED: { label: "待核对", tone: "warning" },
+};
 const OTA_STATUS: StatusMap<OtaRollout["status"]> = {
   PENDING: { label: "待发布", tone: "muted" },
   RUNNING: { label: "升级中", tone: "warning" },
@@ -790,8 +795,16 @@ const cmdCols: Column<CommandRecord>[] = [
   { header: "操作人", cell: (r) => <span className="text-muted-foreground">{r.operator}</span> },
   { header: "时间", cell: (r) => <span className="text-muted-foreground">{fmtTime(r.createdAt)}</span> },
 ];
-const invCols: Column<InventoryTransfer>[] = [
-  { header: "调拨单号", cell: (r) => <span className="font-medium">{r.transferNo}</span> },
+/**
+ * 调拨列表只说得出「从哪到哪、多少台」。**盘点对不上时要查的是「具体哪几台」**，
+ * 那一层在详情里（列表的出参类型根本没有明细行）。故单号做成详情入口。
+ */
+function invColsWith(onOpen: (r: InventoryTransfer) => void): Column<InventoryTransfer>[] {
+  return [
+  { header: "调拨单号", cell: (r) => (
+    <button type="button" className="font-medium tabular-nums underline-offset-4 hover:underline"
+      onClick={() => onOpen(r)}>{r.transferNo}</button>
+  ) },
   // 名字是给人看的，编号才说得清「到底去了哪个站点/仓库」
   { header: "调出", cell: (r) => (
     <div className="min-w-0">
@@ -809,7 +822,8 @@ const invCols: Column<InventoryTransfer>[] = [
   { header: "状态", cell: (r) => <StatusBadge map={TRANSFER_STATUS} value={r.status} /> },
   { header: "操作人", cell: (r) => <span className="text-muted-foreground">{r.operator}</span> },
   { header: "创建时间", cell: (r) => <span className="text-muted-foreground">{fmtTime(r.createdAt)}</span> },
-];
+  ];
+}
 const otaCols: Column<OtaRollout>[] = [
   { header: "发布单号", cell: (r) => <span className="font-medium">{r.rolloutNo}</span> },
   { header: "固件版本", cell: (r) => r.fwVersion },
@@ -1093,6 +1107,55 @@ function OtaReleasesTab({ canManage, viewSwitch }: { canManage: boolean; viewSwi
 }
 
 /** 投放的逐设备任务明细：整体百分比是这批任务的均值，卡住时要看具体哪台、卡在哪一步。 */
+/**
+ * 调拨明细抽屉：单据只说「多少台」，**盘点对不上时要查的是「具体哪几台」**。
+ * `checked` 是收货方逐台核对的结果 —— 没核到的那几台就是差异的落点，
+ * 所以未核对的排在前面，不用翻着找。
+ */
+function TransferDetailDrawer({ transfer, onOpenChange }: { transfer: InventoryTransfer | null; onOpenChange: (o: boolean) => void }) {
+  const { data, isLoading, error, refetch } = useQuery<InventoryTransferDetail>({
+    queryKey: ["transfer-detail", transfer?.transferNo],
+    queryFn: () => api.getInventoryTransfer(transfer!.transferNo),
+    enabled: !!transfer,
+  });
+  const items = data?.items ?? [];
+  const rows = [...items].sort((a, b) => Number(a.checked) - Number(b.checked));
+  const checked = items.filter((i) => i.checked).length;
+
+  const cols: Column<TransferItem>[] = [
+    { header: "设备编号", cell: (i) => <span className="font-medium tabular-nums">{i.itemNo}</span> },
+    { header: "核对", cell: (i) => (
+      <StatusBadge map={ITEM_CHECKED} value={i.checked ? "CHECKED" : "UNCHECKED"} />
+    ) },
+  ];
+
+  return (
+    <Drawer
+      open={!!transfer}
+      onOpenChange={onOpenChange}
+      width="w-[560px]"
+      title={`调拨明细 ${transfer?.transferNo ?? ""}`}
+      desc={transfer ? `${transfer.fromLocation} → ${transfer.toLocation} · 单据 ${Math.round(transfer.powerbankCount)} 台` : undefined}
+    >
+      {data && (
+        // 单据台数与明细行数对不上，本身就是要查的线索，所以两个数都摆出来
+        <div className="mb-3 txt-body text-muted-foreground">
+          明细 {items.length} 台 · 已核对 {checked} · 待核对 {items.length - checked}
+        </div>
+      )}
+      <DataTable
+        rowKey={(i: TransferItem) => i.itemNo}
+        columns={cols}
+        rows={rows}
+        loading={isLoading}
+        error={error}
+        onRetry={refetch}
+        empty="这张调拨单没有逐台明细——按台数登记的旧单据不会留下明细行"
+      />
+    </Drawer>
+  );
+}
+
 function OtaTasksDrawer({ rollout, onOpenChange }: { rollout: OtaRollout | null; onOpenChange: (o: boolean) => void }) {
   const { data, isLoading } = useQuery({
     queryKey: ["ota-tasks", rollout?.rolloutNo],
@@ -1228,6 +1291,7 @@ function DevicesInner() {
   const [keyword, setKeyword] = useState("");
   const [pbForm, setPbForm] = useState<Partial<Powerbank> | null>(null);
   const [invForm, setInvForm] = useState<Partial<InventoryTransfer> | null>(null);
+  const [invDetail, setInvDetail] = useState<InventoryTransfer | null>(null);
   const [otaForm, setOtaForm] = useState<Partial<OtaRollout> | null>(null);
   // 指令记录 tab 的下发抽屉：null = 关，对象 = 打开并按内容预填（「重新下发」带着原记录进来）
   const [cmdDraft, setCmdDraft] = useState<CmdDraft | null>(null);
@@ -1365,7 +1429,10 @@ function DevicesInner() {
       ),
     },
   ];
-  const invColsFull: Column<InventoryTransfer>[] = [...invCols, { header: "操作", cell: (r) => editCell(() => setInvForm(r), canEditInventory) }];
+  const invColsFull: Column<InventoryTransfer>[] = [
+    ...invColsWith(setInvDetail),
+    { header: "操作", cell: (r) => editCell(() => setInvForm(r), canEditInventory) },
+  ];
   // 指令记录不可编辑（历史流水），能做的只有「照这条再发一次」——超时/失败的指令最常见的处置
   const cmdColsFull: Column<CommandRecord>[] = canSendCommand ? [...cmdCols, {
     header: "操作",
@@ -1497,6 +1564,7 @@ function DevicesInner() {
         onSubmit={() => otaForm && saveOta.mutate(otaForm)}
         submitting={saveOta.isPending}
       />
+      <TransferDetailDrawer transfer={invDetail} onOpenChange={(o) => !o && setInvDetail(null)} />
       <OtaTasksDrawer rollout={taskRollout} onOpenChange={(o) => !o && setTaskRollout(null)} />
       <SendCommandDrawer draft={cmdDraft} onOpenChange={(o) => !o && setCmdDraft(null)} />
     </div>

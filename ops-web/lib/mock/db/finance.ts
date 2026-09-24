@@ -7,8 +7,7 @@ import type {
   ShareSummary, RechargeOrder, RechargePackage, PageQuery,
   ReconHandleStatus, ReconHandleResult, ReconAction, ReconStats,
   InvoiceStatus, InvoiceAction,
-  PayoutAccount, PayReceiptPayload, WithdrawApplyPayload,
-} from "../../types";
+  PayoutAccount, PayReceiptPayload, WithdrawApplyPayload, InvoiceView,} from "../../types";
 import {
   STL_TRANSITIONS, canSettlementTransition,
   RECON_TRANSITIONS, canReconTransition, RECON_TERMINAL,
@@ -784,6 +783,22 @@ export const confirmSettlement = (settleNo: string, operatorName?: string) =>
   });
 
 /** 结算单构成明细：钱是怎么来的，逐笔可查（与生成时的汇总口径同一个函数）。 */
+/**
+ * 发票详情 = 发票 + **它由哪几笔订单开出来**。
+ *
+ * 订单号不独立造：发票开在结算单上，结算单由分润明细汇总而来，明细自带 `orderNo` ——
+ * 从那条链上取，三页的口径才对得上。凭空生成一串订单号，对账时会发现它们哪儿都查不到。
+ */
+export const getInvoice = (invoiceNo: string): InvoiceView => {
+  const invoice = invoices.find((x) => x.invoiceNo === invoiceNo);
+  if (!invoice) notFound("发票", "Invoice", invoiceNo);
+  const s = settlements.find((x) => x.settleNo === invoice!.sourceNo);
+  const orderNos = s
+    ? [...new Set(aggregateShareRecords(s.payeeType, s.payeeNo, s.period).rows.map((r) => r.orderNo))]
+    : [];
+  return { invoice: invoice!, orderNos };
+};
+
 export const listSettlementRecords = (settleNo: string, q: PageQuery = {}) => {
   const s = findSettlement(settleNo);
   return paginate(aggregateShareRecords(s.payeeType, s.payeeNo, s.period).rows, q.page, q.size ?? 50);

@@ -115,6 +115,25 @@ export interface InventoryTransfer {
   operator: string;
   createdAt: string;
 }
+/**
+ * 调拨单里的一台设备。
+ *
+ * 列表只说得出「从哪到哪、多少台」；**盘点对不上时要查的是「具体哪几台」**，
+ * 那就只能看这一层。`checked` = 收货时是否已逐台核对过。
+ */
+export interface TransferItem {
+  transferNo: string;
+  /** 设备业务号（充电宝 PB* / 机柜 CAB*），按 `itemType` 决定是哪一类。 */
+  itemNo: string;
+  checked: boolean;
+}
+
+/** 调拨单详情 = 单据 + 明细行。后端 `GET /api/ops/inventory-transfers/{transferNo}`。 */
+export interface InventoryTransferDetail {
+  transfer: InventoryTransfer;
+  items: TransferItem[];
+}
+
 export interface OtaRollout {
   rolloutNo: string;
   fwVersion: string;

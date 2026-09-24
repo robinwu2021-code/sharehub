@@ -12,7 +12,7 @@ export { dashboard } from "./dashboard";
 export {
   cabinets, slotsOf, vendors, powerbanks, cabinetMonitors, commandRecords,
   inventoryTransfers, otaRollouts, otaReleases, otaTasks, deviceLogs, deviceCodeBatches,
-  listPowerbanks, listCabinetMonitor, listCommandRecords, listInventoryTransfers,
+  listPowerbanks, listCabinetMonitor, listCommandRecords, listInventoryTransfers, getInventoryTransfer,
   listOtaRollouts, listOtaReleases, listOtaTasks, listDeviceLogs, listDeviceCodeBatches,
   savePowerbank, saveInventoryTransfer, saveOtaRollout, saveOtaRelease, saveDeviceCodeBatch,
   // 机柜建档 + 单柜指令下发留痕（S8）
@@ -80,7 +80,7 @@ export {
 
 export {
   shareRules, settlements, withdrawals, ledger, shareRecords, reconciles, invoices,
-  listShareRecords, listReconciles, listInvoices, saveShareRule, saveInvoice, auditWithdrawal, payWithdrawal, applyWithdrawal,
+  listShareRecords, listReconciles, listInvoices, getInvoice, saveShareRule, saveInvoice, auditWithdrawal, payWithdrawal, applyWithdrawal,
   shareSummaries, listShareSummaries,
   rechargeOrders, listRechargeOrders,
   rechargePackages, listRechargePackages, saveRechargePackage,

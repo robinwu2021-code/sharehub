@@ -23,6 +23,9 @@ export const deviceMock: DeviceApi = {
   listCabinetMonitor: (q: PageQ = {}) => wait(db.listCabinetMonitor(q)),
   listCommandRecords: (q: PageQ = {}) => wait(db.listCommandRecords(q)),
   listInventoryTransfers: (q: PageQ = {}) => wait(db.listInventoryTransfers(q)),
+  // async：单号查不到时 notFound 是同步抛的，不加 async 就不是 rejected promise，
+  // 抽屉会一直停在 loading 而不是显示「查不到」（同 saveSite 那处的理由）
+  getInventoryTransfer: async (transferNo) => wait(db.getInventoryTransfer(transferNo)),
   listOtaRollouts: (q: PageQ = {}) => wait(db.listOtaRollouts(q)),
   savePowerbank: (x) => wait(db.savePowerbank(x), 350),
   saveInventoryTransfer: (x) => wait(db.saveInventoryTransfer(x), 350),

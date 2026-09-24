@@ -2,7 +2,7 @@
 import type { PageQ, CabinetQ, DeviceLogQ, ArchiveQ, OtaReleaseQ } from "../query";
 import type {
   PageResult, Cabinet, Slot, Powerbank, CabinetMonitor, CommandRecord,
-  InventoryTransfer, OtaRollout, OtaRelease, OtaTask, DeviceLog, DeviceCodeBatch,
+  InventoryTransfer, InventoryTransferDetail, OtaRollout, OtaRelease, OtaTask, DeviceLog, DeviceCodeBatch,
 } from "../../types";
 
 export interface DeviceApi {
@@ -20,6 +20,8 @@ export interface DeviceApi {
   listCabinetMonitor(q?: PageQ): Promise<PageResult<CabinetMonitor>>;
   listCommandRecords(q?: PageQ): Promise<PageResult<CommandRecord>>;
   listInventoryTransfers(q?: PageQ): Promise<PageResult<InventoryTransfer>>;
+  /** 调拨单详情：单据 + 明细行。列表那个类型**没有 items**，「具体调了哪几台」只能从这里拿。 */
+  getInventoryTransfer(transferNo: string): Promise<InventoryTransferDetail>;
   listOtaRollouts(q?: PageQ): Promise<PageResult<OtaRollout>>;
   savePowerbank(x: Partial<Powerbank> & { powerbankNo?: string }): Promise<Powerbank>;
   saveInventoryTransfer(x: Partial<InventoryTransfer> & { transferNo?: string }): Promise<InventoryTransfer>;

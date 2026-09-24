@@ -380,6 +380,17 @@ export interface ReconStats {
 export type InvoiceStatus = "DRAFT" | "ISSUED" | "VOID";
 export type InvoiceAction = "issue" | "void";
 
+/**
+ * 发票详情 = 发票 + **它是由哪几笔订单开出来的**。
+ *
+ * 后端 `GET /api/trade/invoices/{invoiceNo}`。税务或客户质疑金额时，
+ * 第一个要答的就是这份订单号清单 —— 列表里没有它。
+ */
+export interface InvoiceView {
+  invoice: Invoice;
+  orderNos: string[];
+}
+
 export interface Invoice {
   invoiceNo: string;
   /** 收款方类型 + 编号。按**编号**连，名字只作展示（同合同/分润规则的理由）。 */
