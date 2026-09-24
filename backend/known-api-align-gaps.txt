@@ -99,3 +99,8 @@ D WorkOrderRef POST /api/ops/alarms/records/{alarmNo}/work-order
 #   JobHandler 接口类根本引不进来。调度器就绪后把 PushService.sweepDue 挂成 JobHandler
 #   即可，业务代码不动；届时这个端点与本条一起删。
 C POST /api/user/push-messages/sweep-due
+# ⚠️ 下面两条来自**另一条在做的线**（员工多角色，EmployeeRoles / iam_menu 那批）：
+#   后端已返回 roleNo / roleNos，运营端类型还没声明。不是遗漏，是前后半没同时落地。
+#   接上前端后棘轮会提示「已修复，请删掉」—— 由那条线的人删。
+B GET /api/platform/employees Employee 后端有前端无:roleNo
+B GET /api/platform/employees Employee 后端有前端无:roleNos

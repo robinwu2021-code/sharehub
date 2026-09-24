@@ -13480,8 +13480,16 @@
      "type": "String"
     },
     {
+     "name": "roleNo",
+     "type": "String"
+    },
+    {
      "name": "roleName",
      "type": "String"
+    },
+    {
+     "name": "roleNos",
+     "type": "java.util.List<String>"
     },
     {
      "name": "status",
@@ -13526,8 +13534,16 @@
      "type": "String"
     },
     {
+     "name": "roleNo",
+     "type": "String"
+    },
+    {
      "name": "roleName",
      "type": "String"
+    },
+    {
+     "name": "roleNos",
+     "type": "java.util.List<String>"
     },
     {
      "name": "status",
@@ -13579,8 +13595,16 @@
      "type": "String"
     },
     {
+     "name": "roleNo",
+     "type": "String"
+    },
+    {
      "name": "roleName",
      "type": "String"
+    },
+    {
+     "name": "roleNos",
+     "type": "java.util.List<String>"
     },
     {
      "name": "status",
@@ -14869,7 +14893,7 @@
    "handler": "SysSettingController#createOpenApiApp",
    "summary": "",
    "params": [],
-   "bodyType": "OpenapiApp",
+   "bodyType": "OpenApiAppReq",
    "returnType": "OpenApiApp",
    "returnContainer": null,
    "returnElement": "OpenApiApp",
@@ -14907,7 +14931,32 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "appNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "appKey",
+     "type": "String"
+    },
+    {
+     "name": "scopes",
+     "type": "String"
+    },
+    {
+     "name": "rateLimit",
+     "type": "Integer"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -14926,7 +14975,7 @@
      "required": true
     }
    ],
-   "bodyType": "OpenapiApp",
+   "bodyType": "OpenApiAppReq",
    "returnType": "OpenApiApp",
    "returnContainer": null,
    "returnElement": "OpenApiApp",
@@ -14964,7 +15013,32 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "appNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "appKey",
+     "type": "String"
+    },
+    {
+     "name": "scopes",
+     "type": "String"
+    },
+    {
+     "name": "rateLimit",
+     "type": "Integer"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -19118,7 +19192,7 @@
    "handler": "PricingController#createPlan",
    "summary": "",
    "params": [],
-   "bodyType": "PricePlan",
+   "bodyType": "PricePlanReq",
    "returnType": "PricePlanEntry",
    "returnContainer": null,
    "returnElement": "PricePlanEntry",
@@ -19179,23 +19253,23 @@
     },
     {
      "name": "freeMinutes",
-     "type": "int"
+     "type": "Integer"
     },
     {
      "name": "unitMinutes",
-     "type": "int"
+     "type": "Integer"
     },
     {
      "name": "unitPrice",
-     "type": "double"
+     "type": "java.math.BigDecimal"
     },
     {
      "name": "capDaily",
-     "type": "double"
+     "type": "java.math.BigDecimal"
     },
     {
      "name": "capTotal",
-     "type": "double"
+     "type": "java.math.BigDecimal"
     },
     {
      "name": "currency",
@@ -19206,7 +19280,7 @@
      "type": "String"
     },
     {
-     "name": "status",
+     "name": "deviceType",
      "type": "String"
     }
    ]
@@ -19276,7 +19350,7 @@
      "required": true
     }
    ],
-   "bodyType": "PricePlan",
+   "bodyType": "PricePlanReq",
    "returnType": "PricePlanEntry",
    "returnContainer": null,
    "returnElement": "PricePlanEntry",
@@ -19337,23 +19411,23 @@
     },
     {
      "name": "freeMinutes",
-     "type": "int"
+     "type": "Integer"
     },
     {
      "name": "unitMinutes",
-     "type": "int"
+     "type": "Integer"
     },
     {
      "name": "unitPrice",
-     "type": "double"
+     "type": "java.math.BigDecimal"
     },
     {
      "name": "capDaily",
-     "type": "double"
+     "type": "java.math.BigDecimal"
     },
     {
      "name": "capTotal",
-     "type": "double"
+     "type": "java.math.BigDecimal"
     },
     {
      "name": "currency",
@@ -19364,7 +19438,7 @@
      "type": "String"
     },
     {
-     "name": "status",
+     "name": "deviceType",
      "type": "String"
     }
    ]
@@ -22753,7 +22827,7 @@
    "handler": "MarketingController#createCoupon",
    "summary": "",
    "params": [],
-   "bodyType": "CouponTpl",
+   "bodyType": "CouponTplReq",
    "returnType": "CouponTplVO",
    "returnContainer": null,
    "returnElement": "CouponTplVO",
@@ -22799,7 +22873,44 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "tplNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "type",
+     "type": "String"
+    },
+    {
+     "name": "value",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "threshold",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "validRule",
+     "type": "String"
+    },
+    {
+     "name": "stock",
+     "type": "Integer"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -22818,7 +22929,7 @@
      "required": true
     }
    ],
-   "bodyType": "CouponTpl",
+   "bodyType": "CouponTplReq",
    "returnType": "CouponTplVO",
    "returnContainer": null,
    "returnElement": "CouponTplVO",
@@ -22864,7 +22975,44 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "tplNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "type",
+     "type": "String"
+    },
+    {
+     "name": "value",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "threshold",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "validRule",
+     "type": "String"
+    },
+    {
+     "name": "stock",
+     "type": "Integer"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -27336,7 +27484,7 @@
    "handler": "MpUserController#applyInvoice",
    "summary": "",
    "params": [],
-   "bodyType": "UsrInvoice",
+   "bodyType": "InvoiceApplyReq",
    "returnType": "InvoiceItem",
    "returnContainer": null,
    "returnElement": "InvoiceItem",
@@ -27378,7 +27526,20 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "titleNo",
+     "type": "String"
+    },
+    {
+     "name": "amount",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -28233,6 +28394,9 @@
   "DataScopeSubject": [
    "ROLE"
   ],
+  "EmployeeStatus": [
+   "ACTIVE"
+  ],
   "AgentStatus": [
    "ENABLED"
   ],
@@ -28250,7 +28414,7 @@
  "conflicts": {},
  "stats": {
   "endpoints": 421,
-  "records": 295,
+  "records": 300,
   "withPerm": 361,
   "withBody": 183,
   "shapedResponses": 317
