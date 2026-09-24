@@ -173,7 +173,46 @@ def main():
                'orphanPage': orphan_page},
               io.open('/tmp/feature_align.json', 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
     print('\n明细 → /tmp/feature_align.json')
-    return 0
+
+    if '--strict' not in sys.argv:
+        return 0
+
+    # ── 卡口 ──
+    # ①③ 零容忍：菜单指向不存在的页面 = 点了 404；后端整个资源在菜单上无入口 =
+    #    功能建好了没人找得到。两者都没有「暂时接受」的余地，且当前都是 0。
+    # ②   不在这里判 —— 它由 backend/known-menu-perm-mismatch.txt +
+    #     MenuPermissionContractTest 管着（那是棘轮台账，有产品裁决记录）。
+    #     两处都判会让同一条缺口报两次，且台账改了这边不改就自相矛盾。
+    # ④   孤儿页多为深链目标（/login、/apply/status 之类），是正常的，故走基线。
+    rc = 0
+    if bad_route:
+        print('\n❌ ① 菜单叶指向的页面不存在（点了 404）：%d 条' % len(bad_route))
+        rc = 1
+    if orphan_be:
+        print('\n❌ ③ 后端整个资源在菜单上无入口：%d 条' % len(orphan_be))
+        rc = 1
+
+    base_f = os.path.join(ROOT, 'backend/known-orphan-pages.txt')
+    base = set()
+    if os.path.exists(base_f):
+        base = {l.strip() for l in io.open(base_f, encoding='utf-8')
+                if l.strip() and not l.strip().startswith('#')}
+    new = sorted(set(orphan_page) - base)
+    gone = sorted(base - set(orphan_page))
+    if new:
+        print('\n❌ ④ 新增孤儿页（不在菜单上，也不在台账里）：')
+        for r in new:
+            print('   %s' % r)
+        print('\n   要么给它加菜单入口，要么写进 %s 并说明它是深链目标。' % base_f)
+        rc = 1
+    if gone:
+        print('\n✅ ④ 这些页面已不再是孤儿，请从台账删掉：')
+        for r in gone:
+            print('   %s' % r)
+        rc = 1
+    if rc == 0:
+        print('\n✅ 功能对齐卡口通过。')
+    return rc
 
 
 if __name__ == '__main__':

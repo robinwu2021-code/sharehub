@@ -15,6 +15,7 @@ import io
 import json
 import os
 import re
+import sys
 from collections import OrderedDict, Counter
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -292,6 +293,122 @@ def main():
              other_projection, internal_types)
     print('\n明细 → /tmp/api_align.json · 文档 → docs/api/前后端对齐缺口.md')
 
+    if '--write-baseline' in sys.argv:
+        write_baseline(shape_issues, unused, no_type)
+        return 0
+    if '--strict' in sys.argv:
+        sys.exit(gate(missing, shape_issues, unused, no_type))
+
+
+# ─────────────────────────── 卡口（--strict） ───────────────────────────
+#
+# 为什么要台账而不是「全绿才过」：接入时 B/C/D 合计 76 条，直接卡死等于
+# 卡口常红，而常红的卡口三天内就会被所有人无视 —— 那还不如没有。
+# 照搬 backend/known-menu-perm-mismatch.txt 已验证的「只准变短」棘轮：
+# 基线内的不红，**新增才红**；修好一条就从台账里删一条。
+#
+# A 类（前端在调、后端没有 = 运行期 404）**不进台账**：它当前为 0，
+# 且后果是确定的线上 404，没有「暂时接受」的余地。
+
+BASELINE = os.path.join(ROOT, 'backend/known-api-align-gaps.txt')
+
+def _keys(shape_issues, unused, no_type):
+    """把三类缺口压成稳定的单行键。
+
+    B 类按**字段**逐条记（而非按端点），这样修好一个字段台账就短一行 ——
+    按端点记的话，修掉 7 个字段里的 6 个，台账纹丝不动，棘轮就失效了。
+    """
+    out = set()
+    for s_ in shape_issues:
+        for f in s_.get('backendOnly') or []:
+            out.add('B %s %s 后端有前端无:%s' % (s_['endpoint'], s_['type'], f))
+        for f in s_.get('frontendOnly') or []:
+            out.add('B %s %s 前端有后端无:%s' % (s_['endpoint'], s_['type'], f))
+    for e in unused:
+        out.add('C %s %s' % (e['verb'], normalize(e['path'])))
+    for t in no_type:
+        out.add('D %s %s' % (t['type'], t['endpoint']))
+    return out
+
+def _load_baseline():
+    if not os.path.exists(BASELINE):
+        return None
+    out = set()
+    for ln in io.open(BASELINE, encoding='utf-8'):
+        ln = ln.strip()
+        if ln and not ln.startswith('#'):
+            out.add(ln)
+    return out
+
+def _assert_fresh():
+    """contract.json 比 Controller 旧 → 整个比对建立在陈旧真值上，结论全不可信。
+
+    故意**不在这里重新生成**：contract.json 受版本管理，让一个检查脚本顺手改它
+    会污染并行会话的 git status（本仓长期多会话并行）。改为报错并让人显式去生成。
+
+    ⚠️ **mtime 会撒谎，本校验只拦得住常见情形**（编辑了 Controller 却忘了重跑）。
+    2026-09-24 实测到反例：contract.json 的 mtime 比所有 Controller 都新，
+    内容却是旧的（少了一批 locationNo 参数）—— checkout、stash、换分支都会
+    刷新 mtime 而不刷新内容。**唯一可靠的判据是重新生成后比对内容**，
+    但那要覆盖受版本管理的文件，故不放在这里。
+    定期手工核对：`python3 backend/scripts/api-extract.py && git diff --stat docs/api/contract.json`
+    """
+    cj = os.path.join(ROOT, 'docs/api/contract.json')
+    if not os.path.exists(cj):
+        return ['缺少 docs/api/contract.json']
+    t = os.path.getmtime(cj)
+    stale = []
+    for dirpath, _dirs, files in os.walk(os.path.join(ROOT, 'backend')):
+        if '/target/' in dirpath or '/test/' in dirpath:
+            continue
+        for f in files:
+            if f.endswith('Controller.java'):
+                fp = os.path.join(dirpath, f)
+                if os.path.getmtime(fp) > t:
+                    stale.append(os.path.relpath(fp, ROOT))
+    return stale
+
+
+def gate(missing, shape_issues, unused, no_type):
+    rc = 0
+    stale = _assert_fresh()
+    if stale:
+        print('\n❌ docs/api/contract.json 已过期，%d 个 Controller 比它新：' % len(stale))
+        for f in stale[:8]:
+            print('   %s' % f)
+        print('\n   先跑：python3 backend/scripts/api-extract.py')
+        return 1
+    if missing:
+        print('\n❌ A 类不进台账：前端在调、后端没有 %d 条（运行期 404）' % len(missing))
+        for c in missing:
+            print('   %s %s  ← %s' % (c['verb'], c['raw'], c['file']))
+        rc = 1
+
+    base = _load_baseline()
+    if base is None:
+        print('\n❌ 缺少台账 %s' % BASELINE)
+        print('   首次接入请生成：python3 backend/scripts/api-align.py --write-baseline')
+        return 1
+
+    cur = _keys(shape_issues, unused, no_type)
+    new = sorted(cur - base)
+    fixed = sorted(base - cur)
+
+    if new:
+        print('\n❌ 新增缺口 %d 条（不在台账里）：' % len(new))
+        for k in new:
+            print('   %s' % k)
+        print('\n   修掉它，或在确有理由时写进 %s（要写清为什么暂时接受）。' % BASELINE)
+        rc = 1
+    if fixed:
+        print('\n✅ 已修复 %d 条，请从台账里删掉这些行（台账只准变短）：' % len(fixed))
+        for k in fixed:
+            print('   %s' % k)
+        rc = 1
+    if not new and not fixed and not missing:
+        print('\n✅ 对齐卡口通过：%d 条已知缺口，无新增。' % len(cur))
+    return rc
+
 
 def write_md(missing, shape_issues, unused, no_type, n_be, n_fe, internal_unused=(),
              other_projection=(), internal_types=()):
@@ -383,6 +500,33 @@ def write_md(missing, shape_issues, unused, no_type, n_be, n_fe, internal_unused
         L.append('')
 
     io.open(out, 'w', encoding='utf-8').write('\n'.join(L) + '\n')
+
+
+def write_baseline(shape_issues, unused, no_type):
+    hdr = [
+        '# 前后端对齐 已知缺口台账 —— **只准变短**',
+        '#',
+        '# 由 backend/scripts/api-align.py --strict 执行（挂在 ops-web 的 npm run check:drift 下）。',
+        '# 新增一条 → 红。修好一条 → 也红，提示你把它从本文件删掉。',
+        '#',
+        '# 【为什么允许有已知缺口】',
+        '# 接入卡口时 B/C/D 合计 76 条，一次性清完不现实；但「全绿才过」会让卡口常红，',
+        '# 常红的卡口等于没有卡口。故照搬 known-menu-perm-mismatch.txt 的棘轮做法：',
+        '# 冻结现状为基线，只拦新增。',
+        '#',
+        '# 【三类的含义】',
+        '#   B <端点> <类型> <方向>:<字段>  出参形状与前端类型不符',
+        '#       「前端有后端无」= 界面读了后端不返回的字段，**运行期 undefined，用户可见**',
+        '#       「后端有前端无」= 后端返回了前端没声明的字段，浪费但不报错',
+        '#   C <动词> <路径>               后端有、运营端未调用（可能是待办，也可能是废端点）',
+        '#   D <类型> <端点>               后端出参在前端没有对应类型',
+        '#',
+        '# A 类（前端在调、后端没有 = 运行期 404）不进本台账：零容忍。',
+        '',
+    ]
+    body = sorted(_keys(shape_issues, unused, no_type))
+    io.open(BASELINE, 'w', encoding='utf-8').write('\n'.join(hdr + body) + '\n')
+    print('\n已写入台账 %s（%d 条）' % (BASELINE, len(body)))
 
 
 if __name__ == '__main__':

@@ -1,0 +1,127 @@
+# 前后端对齐 已知缺口台账 —— **只准变短**
+#
+# 由 backend/scripts/api-align.py --strict 执行（挂在 ops-web 的 npm run check:drift 下）。
+# 新增一条 → 红。修好一条 → 也红，提示你把它从本文件删掉。
+#
+# 【为什么允许有已知缺口】
+# 接入卡口时 B/C/D 合计 76 条，一次性清完不现实；但「全绿才过」会让卡口常红，
+# 常红的卡口等于没有卡口。故照搬 known-menu-perm-mismatch.txt 的棘轮做法：
+# 冻结现状为基线，只拦新增。
+#
+# 【三类的含义】
+#   B <端点> <类型> <方向>:<字段>  出参形状与前端类型不符
+#       「前端有后端无」= 界面读了后端不返回的字段，**运行期 undefined，用户可见**
+#       「后端有前端无」= 后端返回了前端没声明的字段，浪费但不报错
+#   C <动词> <路径>               后端有、运营端未调用（可能是待办，也可能是废端点）
+#   D <类型> <端点>               后端出参在前端没有对应类型
+#
+# A 类（前端在调、后端没有 = 运行期 404）不进本台账：零容忍。
+
+B GET /api/ops/alarms/codes AlarmCode 后端有前端无:messageAr
+B GET /api/ops/alarms/codes AlarmCode 后端有前端无:messageEn
+B GET /api/ops/alarms/records AlarmRecord 后端有前端无:agentNo
+B GET /api/ops/alarms/records AlarmRecord 后端有前端无:dedupKey
+B GET /api/ops/alarms/records AlarmRecord 后端有前端无:source
+B GET /api/ops/command-records CommandRecord 后端有前端无:confirmedAt
+B GET /api/ops/command-records CommandRecord 后端有前端无:orderNo
+B GET /api/ops/command-records CommandRecord 后端有前端无:retry
+B GET /api/ops/command-records CommandRecord 后端有前端无:sentAt
+B GET /api/ops/command-records CommandRecord 后端有前端无:sn
+B GET /api/ops/inspection-plans InspectionPlan 后端有前端无:cron
+B GET /api/ops/ota-rollouts OtaRolloutRow 后端有前端无:releaseNo
+B GET /api/ops/ota-rollouts OtaRolloutRow 后端有前端无:scope
+B GET /api/ops/ota-rollouts OtaRolloutRow 后端有前端无:targetRef
+B GET /api/ops/powerbanks PowerbankRow 后端有前端无:slotIndex
+B GET /api/ops/powerbanks PowerbankRow 后端有前端无:sn
+B GET /api/ops/powerbanks PowerbankRow 后端有前端无:vendorCode
+B GET /api/ops/sites Site 前端有后端无:nameAr
+B GET /api/ops/sites Site 前端有后端无:openHours
+B GET /api/platform/departments Department 后端有前端无:path
+B GET /api/platform/departments Department 后端有前端无:sort
+B GET /api/platform/notify-blacklist NotifyBlacklistVO 后端有前端无:releasedAt
+B GET /api/platform/notify-blacklist NotifyBlacklistVO 后端有前端无:releasedBy
+B GET /api/platform/notify-blacklist NotifyBlacklistVO 后端有前端无:status
+B GET /api/platform/payment-channels PaymentChannelEntry 后端有前端无:apiSecretMasked
+B GET /api/platform/payment-channels PaymentChannelEntry 后端有前端无:channelNameAr
+B GET /api/platform/payment-channels PaymentChannelEntry 后端有前端无:channelNameEn
+B GET /api/trade/invoices Invoice 后端有前端无:fileUrl
+B GET /api/trade/order-exceptions OrderException 后端有前端无:exceptionNo
+B GET /api/trade/share-records ShareRecord 后端有前端无:mode
+B GET /api/trade/share-rules ShareRule 后端有前端无:formula
+B GET /api/trade/withdrawals Withdrawal 后端有前端无:accountNo
+B GET /api/trade/withdrawals Withdrawal 后端有前端无:applicantNo
+B GET /api/trade/withdrawals Withdrawal 后端有前端无:bankCode
+B GET /api/trade/withdrawals Withdrawal 后端有前端无:netAmount
+B GET /api/user/ad-campaigns AdCampaignVO 后端有前端无:advertiserNo
+B GET /api/user/ad-campaigns AdCampaignVO 后端有前端无:budget
+B GET /api/user/ad-campaigns AdCampaignVO 后端有前端无:currency
+B GET /api/user/ad-deliveries AdDeliveryVO 后端有前端无:cabinetNo
+B GET /api/user/free-whitelist FreeUserWhitelist 后端有前端无:whitelistNo
+B GET /api/user/members MemberRow 后端有前端无:planNo
+B GET /api/user/members MemberRow 后端有前端无:status
+B GET /api/user/push-messages PushMessageVO 前端有后端无:audienceType
+B GET /api/user/push-messages PushMessageVO 前端有后端无:audienceValue
+B GET /api/user/push-messages PushMessageVO 前端有后端无:idempotencyKey
+B GET /api/user/push-messages PushMessageVO 前端有后端无:operatorName
+B GET /api/user/push-messages PushMessageVO 前端有后端无:scheduledAt
+B GET /api/user/push-messages PushMessageVO 前端有后端无:successCount
+B GET /api/user/push-messages PushMessageVO 前端有后端无:targetCount
+B GET /api/user/users CUserRow 后端有前端无:avatar
+B POST /mp/user/report ReportResultVO 后端有前端无:createdAt
+B POST /mp/user/report ReportResultVO 后端有前端无:refundNo
+B POST /mp/user/report ReportResultVO 后端有前端无:sessionNo
+B POST /mp/user/report ReportResultVO 后端有前端无:suggestedAction
+C GET /api/agent/accounts/{}
+C GET /api/agent/commissions/{}
+C GET /api/auth/me
+C GET /api/auth/menus
+C GET /api/auth/permissions
+C GET /api/ops/inspection-plans/{}
+C GET /api/ops/leads/{}
+C GET /api/ops/sla-rules/{}
+C GET /api/ops/venue-onboardings/{}
+C GET /api/platform/data-scopes/{}/{}
+C GET /api/platform/iam/menus
+C GET /api/platform/iam/roles
+C GET /api/trade/settlements/{}
+C GET /mp/app/version
+C GET /mp/faq
+C GET /mp/user/invoice-titles
+C GET /mp/user/invoices
+C GET /mp/user/messages
+C GET /mp/user/recharge-packages
+C GET /mp/user/reports
+C GET /mp/user/reports/{}
+C POST /mp/user/coupons/{}/claim
+C POST /mp/user/invoice-titles
+C POST /mp/user/invoices
+C POST /mp/user/logoff
+C POST /mp/user/messages/{}/read
+D AckResult POST /api/ops/alarms/records/{alarmNo}/ack
+D AppVersionCheck GET /mp/app/version
+D ApplyResult POST /api/agent/applies
+D ApplyView GET /api/agent/applies
+D AssignmentLog POST /api/agent/assignments
+D AuditLogEntry GET /api/platform/audit-logs
+D CodeBatchRow GET /api/ops/device-code-batches
+D CommandResult POST /api/ops/cabinets/{cabinetNo}/commands
+D ConsumerLoginVO POST /mp/auth/login
+D CouponTplVO GET /api/user/coupons
+D DataScopeEntry GET /api/platform/data-scopes/{subjectType}/{subjectNo}
+D FaqItem GET /mp/faq
+D FavoriteItem GET /mp/user/favorites
+D InvoiceItem GET /mp/user/invoices
+D InvoiceTitleItem GET /mp/user/invoice-titles
+D Location GET /api/ops/locations
+D LoginResp POST /api/auth/login
+D LogoffItem POST /mp/user/logoff
+D MembershipPlanVO GET /mp/user/membership
+D MenuNode GET /api/auth/menus
+D MessageItem GET /mp/user/messages
+D OkResult POST /api/ops/sites/{siteNo}/agents/{id}/remove
+D OperatorMembership GET /api/auth/operators
+D RentResult POST /mp/trade/orders/rent
+D SharingStats GET /api/trade/site-sharing/stats
+D UserCouponVO POST /api/user/coupons/{tplNo}/issue
+D WalletOverview GET /mp/user/wallet
+D WorkOrderRef POST /api/ops/alarms/records/{alarmNo}/work-order
