@@ -265,6 +265,15 @@ function AgentsInner() {
 
   // —— 划拨相关查询（都只在划拨 tab / 抽屉打开时才拉）——
   const canAssign = allow("agent:scope:assign");
+  /*
+   * 分润配置的**写**按钮。此前门的是 `agent:settlement:read` ——
+   * 一个「读」码守一个「写」动作，而且不是后端校验的那个码
+   * （`AgentExtController` 上挂的是 `agent:share:config`，本页菜单项也是它，
+   * 见 nav.ts）。生产里 AGENT 角色恰好持有 settlement:read 而没有 share:config，
+   * 于是代理商从 URL 进到这一页时**看得到「新增/编辑分润规则」按钮**，
+   * 点下去 403 —— 而那正是决定运营付他多少钱的规则。
+   */
+  const canConfigCommission = allow("agent:share:config");
   // 目标代理商下拉：取在用（未归档）代理商，一次拉全量，抽屉里不再分页
   const agentOptionsQ = useQuery({
     queryKey: ["agent-options"],
@@ -529,7 +538,7 @@ function AgentsInner() {
     { header: "结算模式", cell: (c) => c.mode === "CHANNEL_SPLIT" ? "渠道分成" : "账务分录" },
     { header: "生效日期", cell: (c) => <span className="text-muted-foreground">{c.effectiveAt}</span> },
     { header: "状态", cell: (c) => c.status === "ACTIVE" ? <Badge tone="success">启用</Badge> : <Badge tone="muted">停用</Badge> },
-    { header: "操作", cell: (c) => allow("agent:settlement:read") ? <Button size="sm" variant="outline" onClick={() => setCommissionForm(c)}>编辑</Button> : <span className="text-muted-foreground">-</span> },
+    { header: "操作", cell: (c) => canConfigCommission ? <Button size="sm" variant="outline" onClick={() => setCommissionForm(c)}>编辑</Button> : <span className="text-muted-foreground">-</span> },
   ];
 
   // —— 导出（TDD §10.2）：当页数据，列与表格可见列严格一致 ——
@@ -735,7 +744,7 @@ function AgentsInner() {
             onSearch={(v) => { setKeyword(v); paging.reset(); }}
             searchPlaceholder="搜索规则号 / 代理编号 / 名称"
             onExport={exportIf(exportCommissions, commissions.data?.list?.length)}
-            onAdd={allow("agent:settlement:read") ? () => setCommissionForm({ status: "ACTIVE", basis: "GMV", mode: "CHANNEL_SPLIT", rate: 0.1 }) : undefined}
+            onAdd={canConfigCommission ? () => setCommissionForm({ status: "ACTIVE", basis: "GMV", mode: "CHANNEL_SPLIT", rate: 0.1 }) : undefined}
             addLabel="新增分润规则"
           />
           <DataTable rowKey={(c: AgentCommission) => c.ruleNo} columns={commissionCols} rows={commissions.data?.list} loading={commissions.isLoading} error={commissions.error} onRetry={commissions.refetch}
