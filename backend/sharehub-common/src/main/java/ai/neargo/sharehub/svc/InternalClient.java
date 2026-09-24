@@ -41,6 +41,21 @@ public class InternalClient {
     /** 服务凭证头。与 {@code InternalTokenFilter} 必须一致。 */
     public static final String TOKEN_HEADER = "X-Internal-Token";
 
+    /**
+     * 调用方服务名，落进对端审计的 {@code actor}（{@code SYSTEM:<service>}）。
+     *
+     * <p><b>这是自报的，不是验证过的</b> —— 内部凭证是一把共享密钥，
+     * 持有它的任何一方都能声称自己是任何服务。所以这个头的定位是
+     * <b>排障线索</b>，不是身份证明：它回答「哪个服务说是它做的」，
+     * 在对端审计里看到 {@code SYSTEM:sharehub-gateway} 时，
+     * 可信的部分是「有人拿着内部密钥做了这件事」，服务名只是它自己说的。
+     *
+     * <p>与 {@code clientCode} 的区别在这里：那个头如果采信，
+     * <b>任何一个浏览器改个 header 就能伪造</b>；而这个要先拿到服务密钥，
+     * 拿到密钥的人本来就能做这件事了。所以前者一律不采信，后者记下来并标明出处。
+     */
+    public static final String CALLER_HEADER = "X-Internal-Caller";
+
     /** 调用结果的四种形态。 */
     public enum Outcome {
         /** 2xx。 */
@@ -78,10 +93,15 @@ public class InternalClient {
      */
     private final String token;
 
+    /** 自报的服务名（{@code spring.application.name}）。 */
+    private final String appName;
+
     public InternalClient(ServiceLocator locator,
-                          @Value("${sharehub.services.internal-token:}") String token) {
+                          @Value("${sharehub.services.internal-token:}") String token,
+                          @Value("${spring.application.name:unknown}") String appName) {
         this.locator = locator;
         this.token = token == null ? "" : token.trim();
+        this.appName = (appName == null || appName.isBlank()) ? "unknown" : appName.trim();
     }
 
     public Result get(String service, String path, int timeoutSec) {
@@ -115,6 +135,8 @@ public class InternalClient {
                 .header(TOKEN_HEADER, token)
                 // 带上当前链路：没有它，两个进程的日志只能靠时间戳猜
                 .header(TraceContext.HEADER, TraceContext.currentOrNew())
+                // 自报服务名，落进对端审计的 actor（定位见 CALLER_HEADER 注释）
+                .header(CALLER_HEADER, appName)
                 .timeout(Duration.ofSeconds(timeoutSec));
         HttpRequest req = (jsonBody == null
                 ? builder.GET()

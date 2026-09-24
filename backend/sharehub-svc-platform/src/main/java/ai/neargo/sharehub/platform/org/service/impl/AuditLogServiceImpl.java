@@ -7,6 +7,7 @@ import ai.neargo.sharehub.platform.org.dto.OrgDtos.AuditLogEntry;
 import ai.neargo.sharehub.platform.org.entity.IamAuditLog;
 import ai.neargo.sharehub.platform.org.mapper.IamAuditLogMapper;
 import ai.neargo.sharehub.platform.org.service.AuditLogService;
+import ai.neargo.sharehub.platform.org.service.AuditOutcome;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -64,7 +65,11 @@ public class AuditLogServiceImpl implements AuditLogService {
     /**
      * 单条详情。id 非数字（种子的 {@code A9000} 形态）或库里查不到 → 返回 null 交控制器回落。
      *
-     * <p>{@code requestId}/{@code userAgent} 现有 DDL 无对应列，一律出空串；
+     * <p>{@code requestId} 现在出的是 {@code trace_id} —— 它就是「那次请求」的标识，
+     * 拿它去运行日志里 grep {@code %X{traceId}} 能看到那次请求的全部过程。
+     * 此前这一栏因为没有对应列而恒为空串：<b>界面上有一栏、永远是空的，
+     * 比没有这一栏更让人困惑</b>（会以为是数据丢了）。
+     * {@code userAgent} 仍无对应列，继续出空串；
      * {@code changes} 只从 {@code detail} 这一列的 JSON 里**读**（见 {@link #changesOf}），
      * 读不出就是空数组 —— 绝不按「猜 action 语义」编造前后值。
      */
@@ -85,8 +90,9 @@ public class AuditLogServiceImpl implements AuditLogService {
         }
         AuditLogEntry row = toVO(e);
         return new AuditDetail(row.id(), row.actor(), row.actorName(), row.clientCode(), row.action(),
+                row.outcome(), row.traceId(),
                 row.targetType(), row.targetNo(), row.target(), row.detail(), row.ip(), row.createdAt(),
-                "", "", changesOf(row.detail()));
+                row.traceId() == null ? "" : row.traceId(), "", changesOf(row.detail()));
     }
 
     /**
@@ -124,18 +130,21 @@ public class AuditLogServiceImpl implements AuditLogService {
     }
 
     @Override
-    public void append(String actor, String actorName, String clientCode, String action,
-                       String targetType, String targetNo, String detail, String ip) {
+    public void append(Entry in) {
         IamAuditLog e = new IamAuditLog();
         e.setTenantId(TENANT_MAIN);
-        e.setActor(actor);
-        e.setActorName(actorName);
-        e.setClientCode(clientCode);
-        e.setAction(action);
-        e.setTargetType(targetType);
-        e.setTargetNo(targetNo);
-        e.setDetail(detail);
-        e.setIp(ip);
+        e.setActor(in.actor());
+        e.setActorName(in.actorName());
+        e.setClientCode(in.clientCode() == null ? null : in.clientCode().name());
+        e.setAction(in.action());
+        // outcome 列 NOT NULL —— 没传就是调用方漏了，当成功记会让「被拒绝的操作」凭空消失，
+        // 所以宁可记成 FAILED（看得见、查得出），也不默默当成功
+        e.setOutcome((in.outcome() == null ? AuditOutcome.FAILED : in.outcome()).name());
+        e.setTraceId(in.traceId());
+        e.setTargetType(in.targetType());
+        e.setTargetNo(in.targetNo());
+        e.setDetail(in.detail());
+        e.setIp(in.ip());
         e.setCreatedAt(LocalDateTime.now());
         mapper.insert(e);
     }
@@ -146,7 +155,7 @@ public class AuditLogServiceImpl implements AuditLogService {
         String target = targetType == null ? targetNo
                 : targetType + ":" + (targetNo == null ? "" : targetNo);
         return new AuditLogEntry(String.valueOf(e.getId()), e.getActor(), e.getActorName(),
-                e.getClientCode(), e.getAction(),
+                e.getClientCode(), e.getAction(), e.getOutcome(), e.getTraceId(),
                 targetType, targetNo, target, unjson(e.getDetail()), e.getIp(),
                 e.getCreatedAt() == null ? null : e.getCreatedAt().toString());
     }

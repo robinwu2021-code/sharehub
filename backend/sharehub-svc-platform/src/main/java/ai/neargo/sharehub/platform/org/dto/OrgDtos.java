@@ -46,6 +46,7 @@ public final class OrgDtos {
      * 两者都出，{@code target} 是拼好的展示值，保证前端不改也能渲染。
      */
     public record AuditLogEntry(String id, String actor, String actorName, String clientCode, String action,
+                                String outcome, String traceId,
                                 String targetType, String targetNo, String target,
                                 String detail, String ip, String createdAt) {
     }
@@ -72,6 +73,7 @@ public final class OrgDtos {
      * 假的审计比没有审计更危险。补列方案见交付报告的 DDL 清单。
      */
     public record AuditDetail(String id, String actor, String actorName, String clientCode, String action,
+                              String outcome, String traceId,
                               String targetType, String targetNo, String target,
                               String detail, String ip, String createdAt,
                               String requestId, String userAgent, java.util.List<AuditFieldChange> changes) {

@@ -99,12 +99,15 @@ public abstract class ApiTestSupport {
      * 带一个自定义请求头的 POST。用途只有一个：**验证服务端不采信某个头**。
      * 正常业务不该需要它 —— 需要的话说明有个本该由服务端决定的东西交给了客户端。
      */
-    protected Resp postWithHeader(String path, Object body, String token, String header, String value) {
-        HttpRequest.Builder b = reqBuilder(path, token)
-                .header("Content-Type", "application/json")
-                .header(header, value)
-                .POST(HttpRequest.BodyPublishers.ofString(toJson(body)));
-        return send(b.build());
+    protected Resp postWithHeaders(String path, Object body, String token, String... headerPairs) {
+        if (headerPairs.length % 2 != 0) {
+            throw new IllegalArgumentException("请求头要成对给（名, 值）：" + headerPairs.length + " 个");
+        }
+        HttpRequest.Builder b = reqBuilder(path, token).header("Content-Type", "application/json");
+        for (int i = 0; i < headerPairs.length; i += 2) {
+            b.header(headerPairs[i], headerPairs[i + 1]);
+        }
+        return send(b.POST(HttpRequest.BodyPublishers.ofString(toJson(body))).build());
     }
 
     /** PUT（全站仅「整体覆盖」语义用它：角色权限、数据范围）。 */

@@ -36,7 +36,9 @@ public class I18nConfig implements WebMvcConfigurer {
      */
     @Override
     public void addInterceptors(org.springframework.web.servlet.config.annotation.InterceptorRegistry registry) {
-        registry.addInterceptor(auditTrail).addPathPatterns("/api/**");
+        // 路径来自拦截器自己，别在这里另写一份 —— 两处各写一份的后果是
+        // 改了一边、另一边默默保持旧范围，而代码看起来完全正确。
+        registry.addInterceptor(auditTrail).addPathPatterns(AuditTrailInterceptor.pathPatterns());
     }
 
     @Bean

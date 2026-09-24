@@ -1,6 +1,5 @@
 package ai.neargo.sharehub.audit;
 
-import ai.neargo.sharehub.support.ApiTestSupport;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,15 +26,15 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 它的价值不在现在，在于<b>将来谁把它「优化」成读请求头时会当场红</b>，
  * 而不是等到某次审计对不上才发现。
  */
-class AuditClientCodeTest extends ApiTestSupport {
+class AuditClientCodeTest extends AuditTestSupport {
 
     @Test
     @DisplayName("运营台的写操作记为 OPS")
     void writes_from_the_ops_console_are_tagged_as_ops() {
         String admin = login("ADMIN");
-        createWorkOrder(admin, "[审计端标识] 运营建单");
+        String traceId = createWorkOrder(admin, "[审计端标识] 运营建单");
 
-        assertThat(latestAuditOf("admin.user").path("clientCode").asText())
+        assertThat(auditOfThisRequest("admin.user", traceId).path("clientCode").asText())
                 .as("运营台的写操作应记为 OPS").isEqualTo("OPS");
     }
 
@@ -43,9 +42,9 @@ class AuditClientCodeTest extends ApiTestSupport {
     @DisplayName("★ 代理自己的写操作记为 AGENT —— 这条区分不出来，这一列就白加了")
     void writes_from_the_agent_portal_are_tagged_as_agent() {
         String agent = loginAgent("AG002");
-        createWorkOrder(agent, "[审计端标识] 代理报修");
+        String traceId = createWorkOrder(agent, "[审计端标识] 代理报修");
 
-        assertThat(latestAuditOf("agent.AG002").path("clientCode").asText())
+        assertThat(auditOfThisRequest("agent.AG002", traceId).path("clientCode").asText())
                 .as("代理自己做的应记为 AGENT，而不是跟着运营一起记成 OPS")
                 .isEqualTo("AGENT");
     }
@@ -54,11 +53,14 @@ class AuditClientCodeTest extends ApiTestSupport {
     @DisplayName("★★ 伪造 X-Client 请求头改不了审计里记的端")
     void a_forged_client_header_cannot_change_the_recorded_client() {
         String admin = login("ADMIN");
-        Map<String, Object> body = woBody("[审计端标识] 带伪造头");
+        String tp = newTraceparent();
 
-        postWithHeader("/api/ops/work-orders", body, admin, "X-Client", "MP").okData();
+        // 同时带真的 traceparent 与伪造的 X-Client：前者用来精确定位这一行，
+        // 后者是被测的那个「不采信」。
+        postWithHeaders("/api/ops/work-orders", woBody("[审计端标识] 带伪造头"), admin,
+                "traceparent", tp, "X-Client", "MP").okData();
 
-        assertThat(latestAuditOf("admin.user").path("clientCode").asText())
+        assertThat(auditOfThisRequest("admin.user", traceIdOf(tp)).path("clientCode").asText())
                 .as("""
                         clientCode 必须由服务端从会话 realm 派生。
                         这条红了说明有人改成读请求头了 —— 那等于让被审计方自己填「我是从哪个端做的」，
@@ -77,19 +79,10 @@ class AuditClientCodeTest extends ApiTestSupport {
         return b;
     }
 
-    private void createWorkOrder(String token, String desc) {
-        post("/api/ops/work-orders", woBody(desc), token).okData();
-    }
-
-    /**
-     * 该操作人最新的一条审计。列表按 id 倒序（{@code AuditLogServiceImpl.page}），
-     * 所以刚写完的那条就在第一行 —— 用 keyword 过滤到本人，避免并行用例互相干扰。
-     */
-    private JsonNode latestAuditOf(String actor) {
-        // 固定用 ADMIN 读 —— 审计查询要 org:audit:read，代理没有这个码
-        JsonNode list = get("/api/platform/audit-logs?page=1&size=5&keyword=" + actor, login("ADMIN"))
-                .okData().path("list");
-        assertThat(list).as("审计里应能查到 %s 刚才的写操作", actor).isNotEmpty();
-        return list.get(0);
+    /** 建一个工单并返回本次请求的 traceId —— 按它回找审计行，不靠「最新一条」。 */
+    private String createWorkOrder(String token, String desc) {
+        String tp = newTraceparent();
+        postWithHeaders("/api/ops/work-orders", woBody(desc), token, "traceparent", tp).okData();
+        return traceIdOf(tp);
     }
 }

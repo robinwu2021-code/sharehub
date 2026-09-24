@@ -1,6 +1,7 @@
 package ai.neargo.sharehub.platform.org.service;
 
 import ai.neargo.common.core.PageResult;
+import ai.neargo.sharehub.auth.ClientCode;
 import ai.neargo.sharehub.platform.org.dto.OrgDtos.AuditDetail;
 import ai.neargo.sharehub.platform.org.dto.OrgDtos.AuditLogEntry;
 
@@ -26,12 +27,23 @@ public interface AuditLogService {
     AuditDetail detail(String id);
 
     /**
-     * 追加一条审计。调用方（各域 service/切面）在完成写操作后调用。
+     * 一条待追加的审计。
      *
-     * @param clientCode 从哪个端发起（OPS/AGENT/MP）。**必须由服务端从会话 realm 派生**，
+     * <p><b>为什么是记录而不是一串参数</b>：这里有八个字符串，位置写错编译器一声不吭，
+     * 而症状是审计里「操作对象」那一栏长期显示着 IP。调用方从一个变成三个
+     * （拦截器 · {@code /internal} 切面 · {@code @Audited}）之后，这个风险就不是理论上的了。
+     *
+     * @param clientCode 从哪个端发起。<b>必须由服务端从会话 realm 派生</b>，
      *                   不能来自请求头 —— 能被被审计方设置的审计字段比没有更糟。
-     * @param detail     脱敏摘要（JSON 文本）；**不得放明文手机号/密钥**
+     * @param outcome    成没成。<b>失败的也要记</b>，理由见 {@link AuditOutcome}。
+     * @param traceId    那次请求的链路 id —— 审计与运行日志之间唯一的那根线。
+     * @param detail     脱敏摘要（JSON 文本）；<b>不得放明文手机号/密钥</b>
      */
-    void append(String actor, String actorName, String clientCode, String action,
-                String targetType, String targetNo, String detail, String ip);
+    record Entry(String actor, String actorName, ClientCode clientCode, String action,
+                 AuditOutcome outcome, String traceId,
+                 String targetType, String targetNo, String detail, String ip) {
+    }
+
+    /** 追加一条审计。调用方（拦截器/切面/各域 service）在写操作完成后调用。 */
+    void append(Entry entry);
 }

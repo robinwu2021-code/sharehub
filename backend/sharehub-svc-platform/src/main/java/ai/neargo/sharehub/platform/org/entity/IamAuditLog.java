@@ -37,6 +37,12 @@ public class IamAuditLog {
     private String clientCode;
     /** 权限码/动作，如 {@code org:employee:create}。 */
     private String action;
+
+    /** 成没成：SUCCESS/DENIED/FAILED。**失败的也记**——被拒绝的操作是安全信号，见 AuditOutcome。 */
+    private String outcome;
+
+    /** 那次请求的链路 id，用于跳到运行日志（%X{traceId}）。 */
+    private String traceId;
     /** 对象类型，如 EMPLOYEE / ROLE / CABINET。 */
     private String targetType;
     /** 对象业务键。 */
