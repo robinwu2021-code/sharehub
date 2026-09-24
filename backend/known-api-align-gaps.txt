@@ -25,9 +25,6 @@ B GET /api/ops/alarms/records AlarmRecord 后端有前端无:source
 B GET /api/ops/inspection-plans InspectionPlan 后端有前端无:cron
 B GET /api/platform/departments Department 后端有前端无:path
 B GET /api/platform/departments Department 后端有前端无:sort
-B GET /api/platform/notify-blacklist NotifyBlacklistVO 后端有前端无:releasedAt
-B GET /api/platform/notify-blacklist NotifyBlacklistVO 后端有前端无:releasedBy
-B GET /api/platform/notify-blacklist NotifyBlacklistVO 后端有前端无:status
 B GET /api/platform/payment-channels PaymentChannelEntry 后端有前端无:apiSecretMasked
 B GET /api/platform/payment-channels PaymentChannelEntry 后端有前端无:channelNameAr
 B GET /api/platform/payment-channels PaymentChannelEntry 后端有前端无:channelNameEn

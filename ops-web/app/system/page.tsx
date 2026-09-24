@@ -735,8 +735,18 @@ function SystemInner() {
     },
   ];
 
-  // —— §10 触达拉黑：到期时间在过去 = 已解除（软删除保留审计痕迹）——
-  const isReleased = (b: NotifyBlacklist) => !!b.expireAt && new Date(b.expireAt).getTime() <= Date.now();
+  /*
+   * —— §10 触达拉黑 ——
+   *
+   * 「已解除」与「已到期」是**两件事**，此前都按 expireAt 推，于是自然到期的
+   * 条目被显示成「已解除」—— 而根本没人解除过它，合规要问的「谁放开的」也答不出来。
+   * 现在解除只看后端的 status，到期单独判。
+   */
+  const isReleased = (b: NotifyBlacklist) => b.status === "RELEASED";
+  const isExpired = (b: NotifyBlacklist) =>
+    b.status === "ACTIVE" && !!b.expireAt && new Date(b.expireAt).getTime() <= Date.now();
+  /** 还拦不拦得住：解除了、或已到期，都不再拦。 */
+  const isInactive = (b: NotifyBlacklist) => isReleased(b) || isExpired(b);
   const blacklistCols: Column<NotifyBlacklist>[] = [
     { header: "拉黑号", cell: (b) => <span className="font-medium tabular-nums">{b.blockNo}</span> },
     { header: "目标", cell: (b) => <span className="tabular-nums">{b.target}</span> },
@@ -745,11 +755,27 @@ function SystemInner() {
     { header: "拉黑时间", cell: (b) => <span className="text-muted-foreground">{fmtTime(b.blockedAt)}</span> },
     { header: "操作人", cell: (b) => <span className="text-muted-foreground">{b.blockedBy}</span> },
     { header: "到期时间", cell: (b) => b.expireAt ? <span className="text-muted-foreground">{fmtTime(b.expireAt)}</span> : <Badge tone="warning">永久</Badge> },
-    { header: "状态", cell: (b) => isReleased(b) ? <Badge tone="muted">已解除</Badge> : <Badge tone="danger">拉黑中</Badge> },
+    {
+      header: "状态",
+      className: "whitespace-nowrap",
+      cell: (b) => isReleased(b)
+        ? (
+          <>
+            <Badge tone="muted">已解除</Badge>
+            {/* 合规要能回答「何时被谁放开」—— 此前这半条信息在界面上根本不存在 */}
+            <div className="truncate txt-caption text-muted-foreground">
+              {b.releasedBy} · {fmtTime(b.releasedAt)}
+            </div>
+          </>
+        )
+        /* 到期不是解除：没人动过它，只是时间到了。混在一起会让人以为有人放行过 */
+        : isExpired(b) ? <Badge tone="outline">已到期</Badge>
+          : <Badge tone="danger">生效中</Badge>,
+    },
     {
       header: t("common.actions"),
       cell: (b) => !canBlacklist ? <span className="text-muted-foreground">-</span>
-        : isReleased(b) ? <span className="text-muted-foreground">已解除</span>
+        : isInactive(b) ? <span className="text-muted-foreground">{isReleased(b) ? "已解除" : "已到期"}</span>
         : (
           <Button
             size="sm"

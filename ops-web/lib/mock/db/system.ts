@@ -372,6 +372,9 @@ export function resendNotifyLog(logNo: string, x: NotifyResendPayload): NotifyLo
   if (src.status !== "FAILED") throw new NotifySendError(`记录 ${logNo} 是「已发送」，不允许重发——重复发送会重复扣费`);
   const blocked = notifyBlacklist.find((b) =>
     b.target === src.target && (b.channel === "ALL" || b.channel === src.channel) &&
+    // 解除后不再拦：此前只看 expireAt，而解除现在走 status，漏了这一条
+    // 就会出现「界面显示已解除、发送仍被拒」且两边都不报错。
+    b.status === "ACTIVE" &&
     (!b.expireAt || new Date(b.expireAt).getTime() > Date.now()));
   if (blocked) throw new NotifySendError(`目标已在触达拉黑（${blocked.blockNo}），不允许重发`);
   if (usedNotifyKeys.has(key)) throw new NotifySendError(`幂等键 ${key} 已提交过，拒绝重复发送`);
@@ -403,7 +406,21 @@ export function resetOpenApiAppSecret(appNo: string): OpenApiApp {
 // —— §10 触达拉黑 ——
 // 编号前缀 `NBL`（Notify BlackList）：`BL` 已归用户黑名单（user.ts 的 BL0001+）所有，
 // 两套 `BL` 号并存时「按号搜索」会跨页搜出无关记录（台账 M10）。
-export const notifyBlacklist: NotifyBlacklist[] = [
+/**
+ * 手工解除过的（`status=RELEASED`）与解除人。其余为 ACTIVE。
+ *
+ * **三种状态都要有数据能走到**，否则界面区分不了这两件事的改动没法验：
+ *   · 生效中 —— ACTIVE 且未到期（或永久）
+ *   · 已到期 —— **仍是 ACTIVE**，只是 expireAt 落在过去（NBL905）；没人解除过它
+ *   · 已解除 —— RELEASED + releasedBy；有人手工放开
+ * 此前界面把后两者都显示成「已解除」，正是本次要修的。
+ */
+const BL_RELEASED: Record<string, string> = {
+  NBL902: "Sara Ahmed",   // 硬退信后用户申诉，人工放开
+  NBL907: "admin",
+};
+
+const BL_SEED: Omit<NotifyBlacklist, "status" | "releasedAt" | "releasedBy">[] = [
   { blockNo: "NBL901", target: maskTarget("+9715012345678"), channel: "SMS", reason: "USER_OPT_OUT", blockedAt: iso(3 * 86400_000), blockedBy: "系统（用户回复 STOP）", expireAt: null },
   { blockNo: "NBL902", target: maskTarget("omar.k@example.sa"), channel: "EMAIL", reason: "HARD_BOUNCE", blockedAt: iso(6 * 86400_000), blockedBy: "系统（SES 硬退信）", expireAt: null },
   { blockNo: "NBL903", target: maskTarget("+966501234567"), channel: "ALL", reason: "ABUSE", blockedAt: iso(9 * 86400_000), blockedBy: "风控值班组", expireAt: iso(-21 * 86400_000) },
@@ -413,6 +430,16 @@ export const notifyBlacklist: NotifyBlacklist[] = [
   { blockNo: "NBL907", target: maskTarget("+201001234567"), channel: "WHATSAPP", reason: "HARD_BOUNCE", blockedAt: iso(31 * 86400_000), blockedBy: "系统（WhatsApp 未注册）", expireAt: null },
   { blockNo: "NBL908", target: maskTarget("+9715077788899"), channel: "ALL", reason: "MANUAL", blockedAt: iso(40 * 86400_000), blockedBy: "运营中心", expireAt: iso(-60 * 86400_000) },
 ];
+export const notifyBlacklist: NotifyBlacklist[] = BL_SEED.map((b, i) => {
+  const by = BL_RELEASED[b.blockNo];
+  return {
+    ...b,
+    status: (by ? "RELEASED" : "ACTIVE") as NotifyBlacklist["status"],
+    // 解除时刻定在拉黑之后：放在拉黑之前的话，时间线自相矛盾而页面看不出来
+    releasedAt: by ? iso(i * 3600_000) : null,
+    releasedBy: by ?? null,
+  };
+});
 export const listNotifyBlacklist = (q: PageQuery & { channel?: string; reason?: string } = {}) =>
   paginate(notifyBlacklist, q.page, q.size, (x) =>
     (!q.channel || x.channel === q.channel) &&
@@ -424,7 +451,18 @@ export const saveNotifyBlacklist = (x: Partial<NotifyBlacklist>) =>
 export function releaseNotifyBlacklist(blockNo: string): NotifyBlacklist {
   const i = notifyBlacklist.findIndex((x) => x.blockNo === blockNo);
   if (i < 0) throw fail("拉黑记录不存在", "Blacklist entry not found", "سجل الحظر غير موجود");
-  notifyBlacklist[i] = { ...notifyBlacklist[i], expireAt: iso(0) };
+  /*
+   * **解除是软删 + 留痕**（后端 NotifyBlacklist 实体注释）：置 status=RELEASED
+   * 并回填 releasedAt/releasedBy，**不动 expireAt**。
+   * 此前这里把 expireAt 改成当下，等于把「手工解除」伪装成「刚好到期」——
+   * 于是合规要问的「何时被谁放开」在数据里就不存在了。
+   */
+  notifyBlacklist[i] = {
+    ...notifyBlacklist[i],
+    status: "RELEASED",
+    releasedAt: new Date().toISOString(),
+    releasedBy: "admin",   // 真后端从会话取
+  };
   return notifyBlacklist[i];
 }
 

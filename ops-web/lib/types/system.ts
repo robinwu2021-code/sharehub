@@ -207,6 +207,12 @@ export interface NotifyLogStats {
 // —— §10 触达拉黑（系统域 · 阶段 2，对标简电云「短信拉黑」）——
 // 我们更清晰：全渠道拉黑（含 ALL），且原因是枚举而非自由文本，便于统计退订来源。
 export type NotifyBlockReason = "USER_OPT_OUT" | "HARD_BOUNCE" | "ABUSE" | "MANUAL";
+/**
+ * 拉黑是否仍生效。**具名而不是内联联合**：两端同名词表比对
+ * （后端 StatusVocabularyAcrossEndsTest）只认具名 `export type`。
+ */
+export type NotifyBlacklistStatus = "ACTIVE" | "RELEASED";
+
 export interface NotifyBlacklist {
   blockNo: string; // 业务键（target+channel 是自然键，但复合键不便做行键/编辑，故另立单号）
   target: string; // 号码 / 邮箱
@@ -216,7 +222,23 @@ export interface NotifyBlacklist {
   reason: NotifyBlockReason;
   blockedAt: string;
   blockedBy: string;
-  expireAt: string | null; // 空 = 永久；「解除」即把到期时间置为当下（软删除，保留审计痕迹）
+  /**
+   * 到期自动失效；空 = 永久。
+   *
+   * ⚠️ **到期与「被解除」是两条并存的路径，不等价**（后端 NotifyBlacklist 实体注释）。
+   * 此处原先写着「『解除』即把到期时间置为当下」—— 那是前端自己的模型，代价有二：
+   * 自然到期的条目在界面上被显示成「已解除」（**根本没人解除过它**），
+   * 以及合规要问的「何时被谁放开」答不出来。2026-09-24 改读后端的 status/releasedBy。
+   */
+  expireAt: string | null;
+  /**
+   * 拉黑是否仍然生效。**判「是否已解除」只看它**，不要再用 expireAt 推 ——
+   * `RELEASED` 是有人手工放开，而 expireAt 过去只是到期。
+   */
+  status: NotifyBlacklistStatus;
+  /** 手工解除的时刻与操作人；未解除为 null。合规要能回答「何时被谁放开」。 */
+  releasedAt: string | null;
+  releasedBy: string | null;
 }
 
 // —— §11 业务规则（系统域 · 阶段 2）——
