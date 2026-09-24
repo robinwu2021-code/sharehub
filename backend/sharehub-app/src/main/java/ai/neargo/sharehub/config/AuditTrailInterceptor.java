@@ -161,7 +161,10 @@ public class AuditTrailInterceptor implements HandlerInterceptor {
                     req.getMethod() + " " + uri,
                     AuditOutcome.ofStatus(res.getStatus()),
                     TraceContext.currentTraceId(),
-                    json(t.type()), json(t.no()),
+                    // **不包 json**：这两列存的是业务值（资源名 / 业务键），不是 JSON。
+                    // 以前包是为了过 json_valid CHECK，代价是按值过滤永远匹配不上
+                    // （存的是 "cabinets"，而过滤传的是 cabinets）。V79 已去掉那个约束。
+                    t.type(), t.no(),
                     detailOf(req),
                     clientIp(req)));
         } catch (RuntimeException e) {

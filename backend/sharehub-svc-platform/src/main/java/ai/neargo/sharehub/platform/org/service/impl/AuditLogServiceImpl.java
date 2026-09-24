@@ -164,6 +164,10 @@ public class AuditLogServiceImpl implements AuditLogService {
      * JSON 列解包：{@code target_no}/{@code target_type}/{@code detail} 是 JSON 类型列
      * （V13 对账产物，带 {@code json_valid} CHECK），纯文本值以 JSON 字符串字面量存储
      * （{@code "CAB1001"} 带引号）。出参还原为业务值；非字符串 JSON（对象/数组）原样透出。
+     *
+     * <p><b>V79 之后新写入的是裸值</b>（约束去掉了、拦截器不再包），本方法因此对新行是无操作。
+     * 保留它是为了**还没跑到 V79 的环境**里的历史行 —— 那些行仍然带引号。
+     * 等所有环境都过了 V79 且确认 {@code target_type LIKE '"%"'} 为 0，可以删。
      */
     private static String unjson(String raw) {
         if (raw == null || raw.length() < 2 || raw.charAt(0) != '"') {
