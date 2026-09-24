@@ -57,9 +57,21 @@ export interface Slot {
   health: "OK" | "FAULT";
 }
 
-// 注：曾有一个未被使用的 PowerbankStatus（IN_STOCK/DEPLOYED/IN_USE/RETURNED/SCRAP/LOST），
-// 与实际在用的 Powerbank.status（IN_CABINET/RENTED/FAULT/RETIRED）是两套词表，已删（台账 T1）。
-// ⚠️ 后端建表时词表要重新定：真实业务的「在库/已投放/在租/已归还/报废/丢失」比现在的 4 值更完整。
+/**
+ * 充电宝生命周期。**七档，照 `dev_powerbank.status` 的 DDL 列注释与后端
+ * `PowerbankStatus` 枚举、`PowerbankStateMachine` 逐个对过**。
+ *
+ * 此前这里是内联在 `Powerbank` 里的四值联合（IN_CABINET/RENTED/FAULT/**RETIRED**），
+ * 而后端从来没有 RETIRED，也从来有 IN_STOCK/LOST/SOLD/SCRAP。后果两个方向都有：
+ * 入库未投放、丢失待追偿、买断、报废这四类在运营端是**未知值**（徽标映射不上、
+ * 按状态筛一条都查不到），而 RETIRED 是前端自造的，筛它永远是空。
+ *
+ * 这不是没人想到 —— 原来那条注释就写着「后端建表时词表要重新定，比现在的 4 值更完整」。
+ * 后端定完了，没人回来改前端，而**没有任何东西会因此报红**：
+ * 两端同名词表比对只认具名 `export type`，内联联合它一个都发现不了。具名就是为了进那个卡口。
+ */
+export type PowerbankStatus =
+  | "IN_STOCK" | "IN_CABINET" | "RENTED" | "FAULT" | "LOST" | "SOLD" | "SCRAP";
 
 // —— 设备 · 待建功能补全（ops/gw 域）——
 export interface Powerbank extends Archivable {
@@ -81,7 +93,7 @@ export interface Powerbank extends Archivable {
    */
   slotIndex: number | null;
   battery: number; // 0..100
-  status: "IN_CABINET" | "RENTED" | "FAULT" | "RETIRED";
+  status: PowerbankStatus;
   health: "OK" | "FAULT";
   cycles: number;
 }

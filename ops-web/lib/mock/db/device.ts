@@ -79,7 +79,8 @@ export const vendors: Vendor[] = [
 ];
 
 export const powerbanks: Powerbank[] = Array.from({ length: 30 }, (_, i) => {
-  const st = p(["IN_CABINET", "IN_CABINET", "RENTED", "FAULT", "RETIRED"] as const, i);
+  // 七档照 DDL 铺开（原来这里有 RETIRED —— 后端词表里没有这个值）。
+  const st = p(["IN_CABINET", "IN_CABINET", "RENTED", "FAULT", "IN_STOCK", "LOST", "SOLD", "SCRAP"] as const, i);
   const cab = p(cabinets, i);
   return {
     powerbankNo: `PB${20000 + i}`,

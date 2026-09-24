@@ -737,10 +737,14 @@ function CodesTab({ canEdit }: { canEdit: boolean }) {
 
 // —— 状态/枚举 → 中文标签 + 色调 ——
 const PB_STATUS: StatusMap<Powerbank["status"]> = {
+  IN_STOCK: { label: "在库", tone: "info" },
   IN_CABINET: { label: "在仓", tone: "success" },
   RENTED: { label: "借出中", tone: "warning" },
   FAULT: { label: "故障", tone: "danger" },
-  RETIRED: { label: "报废", tone: "muted" },
+  // 丢失是**半终态**：追回来还能回仓（后端 RECOVER 边），所以不是 muted 而是要能看见
+  LOST: { label: "丢失待追偿", tone: "danger" },
+  SOLD: { label: "已买断", tone: "muted" },
+  SCRAP: { label: "已报废", tone: "muted" },
 };
 const HEALTH: StatusMap<"OK" | "FAULT"> = {
   OK: { label: "正常", tone: "success" },
@@ -944,9 +948,11 @@ const PB_FIELDS: FieldDef[] = [
   { key: "powerbankNo", label: "充电宝号", readOnlyOnEdit: true, placeholder: "系统生成" },
   { key: "cabinetNo", label: "所属柜机", placeholder: "CAB-0001" },
   { key: "battery", label: "电量（%）", type: "number" },
+  // 选项与 PB_STATUS 同源：手工建宝只该落在「在库 / 在仓 / 故障」，
+  // 借出中 / 丢失 / 买断 / 报废是业务流转出来的结果，不给人在表单里直接选
   { key: "status", label: "状态", type: "select", options: [
-    { value: "IN_CABINET", label: "在仓" }, { value: "RENTED", label: "借出中" },
-    { value: "FAULT", label: "故障" }, { value: "RETIRED", label: "报废" },
+    { value: "IN_STOCK", label: "在库" }, { value: "IN_CABINET", label: "在仓" },
+    { value: "FAULT", label: "故障" },
   ] },
   { key: "health", label: "健康", type: "select", options: [
     { value: "OK", label: "正常" }, { value: "FAULT", label: "故障" },
