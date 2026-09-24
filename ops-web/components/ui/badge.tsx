@@ -6,7 +6,9 @@ const badgeVariants = cva(
   // 形态取自 C 端 pb-tag：药丸 + 字重 700 + 11px（原为 rounded-field/500，偏"方"）
   // 12px/600：11px + 700 看着"更醒目"，实际笔画在小字号下糊成一团反而更难认。
   // 规范定的字号下限就是 12px。
-  "inline-flex items-center rounded-chip px-2.5 py-0.5 text-[12px] font-semibold leading-[1.5]",
+  // whitespace-nowrap：徽标是**一个标签**，不是一段文字。窄列里换行会把
+  // 「运营台」竖排成三行单字 —— 那比溢出更难认，而且看上去像三个徽标。
+  "inline-flex items-center whitespace-nowrap rounded-chip px-2.5 py-0.5 text-[12px] font-semibold leading-[1.5]",
   {
     variants: {
       tone: {

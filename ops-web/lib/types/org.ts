@@ -31,10 +31,41 @@ export interface RoleRow extends Archivable {
    */
   scopeRefs?: string;
 }
+/**
+ * 一次被审计的操作成没成。
+ *
+ * **失败的也记**：被拒绝的操作恰恰是最该留痕的那一类 ——
+ * 有人拿没权限的账号反复点某个危险操作是安全信号，
+ * 而不记的话，事后查「谁试过改分润规则」得到的答案是「没有人」，
+ * 且这个答案和「真的没人试过」长得一模一样。
+ */
+export type AuditOutcome = "SUCCESS" | "DENIED" | "FAILED";
+
+/** 从哪个端发起。由会话 realm 派生，**不采信请求头**（能被被审计方设置的审计字段比没有更糟）。 */
+export type AuditClient = "OPS" | "AGENT" | "MP";
+
 export interface AuditEntry {
   id: string;
+  /** 操作人账号/工号。内部调用记 `SYSTEM:<服务名>`。 */
   actor: string;
+  /** 操作人姓名（种子行与内部调用可能为 null）。 */
+  actorName?: string | null;
+  /**
+   * 从哪个端做的。运营端与代理端共用 `/api/**` 与同一套审计，
+   * 只看 actor 分不清「运营替代理做的」还是「代理自己做的」——
+   * 而这是结算争议里第一个被问到的。
+   * ⚠️ **历史行为空**：该列上线前没有这个信息，填任何值都是编造。
+   */
+  clientCode?: AuditClient;
   action: string;
+  /** 成没成。历史行一律 SUCCESS —— 此前的实现只在 2xx 时才写。 */
+  outcome: AuditOutcome;
+  /**
+   * 那次请求的链路 id。拿它去运行日志里 grep `%X{traceId}` 能看到那次请求的全过程 ——
+   * 审计回答「谁改了什么」，日志回答「那次请求发生了什么」，这是两者之间唯一的那根线。
+   * ⚠️ 历史行为空。
+   */
+  traceId?: string;
   target: string;
   detail: string;
   ip: string;
@@ -53,15 +84,16 @@ export interface AuditFieldChange {
  */
 export interface AuditDetail extends AuditEntry {
   /**
-   * 链路追踪号，串联后端日志与本条留痕。
-   * ⚠️ 目前恒为**空串**：`iam_audit_log` 没有这一列，后端也还没有 requestId/traceId 概念。
+   * 链路追踪号 = {@link AuditEntry.traceId}（后端 V60 起有 `trace_id` 列）。
+   * 此前它恒为空串（表无此列），界面上有这一栏、永远是空的 ——
+   * 看的人会以为是数据丢了。现在有值了，但**该列上线前的历史行仍然是空**。
    * 渲染时把空串当「无」处理（短横），不要当成 0 长度的合法追踪号。
    */
   requestId: string;
   /** ⚠️ 同 requestId，表无此列，恒为空串。 */
   userAgent: string;
-  /** 后端可能回带的补充字段（种子行为 null）；缺省不影响渲染。 */
-  actorName?: string | null;
+  /** 后端可能回带的补充字段（种子行为 null）；缺省不影响渲染。
+      actorName 已上移到 AuditEntry —— 列表也要显示它，两处各声明一份迟早会分叉。 */
   targetType?: string | null;
   targetNo?: string | null;
   /** 空数组 = 该动作不改字段（远程指令、导出这类纯动作），不是「没记全」。 */

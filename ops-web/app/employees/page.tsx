@@ -35,7 +35,7 @@ import {
   archiveConfirm, unarchiveConfirm,
 } from "@/components/archive";
 import type {
-  Employee, RoleRow, AuditEntry, DataScope, Department, StaffPerformance, PermissionItem,
+  Employee, RoleRow, AuditEntry, AuditOutcome, AuditClient, DataScope, Department, StaffPerformance, PermissionItem,
 } from "@/lib/types";
 
 // 组织架构与权限目录都要整棵拉（树不能分页——少半棵树等于错的树），单独给个大 size。
@@ -86,6 +86,24 @@ const PERF_GRADE: StatusMap<"EXCELLENT" | "GOOD" | "WATCH"> = {
   GOOD: { label: "达标", tone: "default" },
   WATCH: { label: "待改进", tone: "warning" },
 };
+/**
+ * 审计结果。**失败的也记**，所以界面必须分得出三种 ——
+ * 此前无论成败都渲染成绿色的「成功」徽标，一条被拒绝的操作看上去和成功的一模一样。
+ */
+const AUDIT_OUTCOME: StatusMap<AuditOutcome> = {
+  SUCCESS: { label: "成功", tone: "success" },
+  // 用 danger 不用 warning：这是「有人试图做他没权限做的事」，是安全信号不是小毛病
+  DENIED: { label: "被拒绝", tone: "danger" },
+  FAILED: { label: "未完成", tone: "warning" },
+};
+
+/** 从哪个端做的。结算争议里第一个被问到的就是「这是运营改的还是代理自己改的」。 */
+const AUDIT_CLIENT: StatusMap<AuditClient> = {
+  OPS: { label: "运营台", tone: "default" },
+  AGENT: { label: "代理端", tone: "info" },
+  MP: { label: "C 端", tone: "info" },
+};
+
 const gradeOf = (score: number): keyof typeof PERF_GRADE =>
   score >= 90 ? "EXCELLENT" : score >= 75 ? "GOOD" : "WATCH";
 
@@ -466,10 +484,15 @@ function EmployeesInner() {
   ];
   const auditCols: Column<AuditEntry>[] = [
     { header: "时间", cell: (a) => <span className="text-muted-foreground">{fmtTime(a.createdAt)}</span> },
-    { header: "操作人", cell: (a) => a.actor },
+    // 姓名 + 账号：只给账号看的人得再查一次「omar 是谁」；只给姓名则重名分不清
+    { header: "操作人", cell: (a) => a.actorName ? <>{a.actorName} <span className="text-muted-foreground">({a.actor})</span></> : a.actor },
+    // 内部调用（SYSTEM:xxx）没有「从哪个端」—— 出短横，别编一个
+    { header: "来源", cell: (a) => a.clientCode ? <StatusBadge map={AUDIT_CLIENT} value={a.clientCode} /> : <span className="text-muted-foreground">—</span> },
     { header: "动作", cell: (a) => a.action },
     { header: "对象", cell: (a) => <span className="text-muted-foreground">{a.target}</span> },
-    { header: "结果", cell: (a) => a.detail },
+    // 这一列原来渲染的是 detail —— 真后端下那是一串 JSON（{"query":…,"changes":[…]}）。
+    // 「结果」该回答的是成没成，detail 是明细，两件事。
+    { header: "结果", cell: (a) => <StatusBadge map={AUDIT_OUTCOME} value={a.outcome} /> },
     { header: "IP", cell: (a) => <span className="text-muted-foreground">{a.ip}</span> },
     { header: "操作", cell: (a) => <Button size="sm" variant="outline" onClick={() => setAuditId(a.id)}>详情</Button> },
   ];
@@ -726,21 +749,35 @@ function EmployeesInner() {
           <>
             <div className="grid grid-cols-2 gap-x-4">
               <Field className="mb-3" label="时间">{fmtTime(auditDetailQ.data.createdAt)}</Field>
-              <Field className="mb-3" label="操作人">{auditDetailQ.data.actor}</Field>
+              <Field className="mb-3" label="操作人">
+                {auditDetailQ.data.actorName ? `${auditDetailQ.data.actorName} (${auditDetailQ.data.actor})` : auditDetailQ.data.actor}
+              </Field>
+              <Field className="mb-3" label="来源">
+                {auditDetailQ.data.clientCode
+                  ? <StatusBadge map={AUDIT_CLIENT} value={auditDetailQ.data.clientCode} />
+                  : <span className="text-muted-foreground">—</span>}
+              </Field>
               <Field className="mb-3" label="动作">{auditDetailQ.data.action}</Field>
               <Field className="mb-3" label="对象">{auditDetailQ.data.target}</Field>
-              <Field className="mb-3" label="结果"><Badge tone="success">{auditDetailQ.data.detail}</Badge></Field>
+              {/* 原来无论成败都是绿色的「成功」——一条被拒绝的操作看上去和成功的一模一样。 */}
+              <Field className="mb-3" label="结果"><StatusBadge map={AUDIT_OUTCOME} value={auditDetailQ.data.outcome} /></Field>
               <Field className="mb-3" label="来源 IP">{auditDetailQ.data.ip}</Field>
-              {/* 请求号 / UA 后端目前恒为空串（iam_audit_log 无这两列，也还没有 requestId 概念）——
-                  空串渲染成短横，别让它看起来像「有个长度为 0 的合法追踪号」。 */}
-              <Field className="mb-3" label="请求号">{auditDetailQ.data.requestId || "—"}</Field>
+              {/* 链路号 = 后端 trace_id。拿它去运行日志 grep %X{traceId} 能看到那次请求的全过程。
+                  该列上线前的历史行仍是空 —— 空串渲染成短横，别让它看起来像「长度为 0 的合法号」。 */}
+              <Field className="mb-3" label="链路号">
+                <span className="break-all font-mono text-xs">{auditDetailQ.data.requestId || "—"}</span>
+              </Field>
             </div>
             <Field label="User-Agent">
               <span className="break-all text-xs text-muted-foreground">{auditDetailQ.data.userAgent || "—"}</span>
             </Field>
             <div className="mb-2 text-xs text-muted-foreground">改动前后对比</div>
             {auditDetailQ.data.changes.length === 0 ? (
-              <Notice>该动作不改业务字段（远程指令、导出这类纯动作），只留痕不产生前后对比。</Notice>
+              <Notice>
+                {auditDetailQ.data.outcome === "SUCCESS"
+                  ? "该动作不改业务字段（远程指令、导出这类纯动作），只留痕不产生前后对比。"
+                  : "这次操作没有做成，因此没有改动任何字段——请求在鉴权/校验处就被挡下了。"}
+              </Notice>
             ) : (
               <Table>
                 <THead>

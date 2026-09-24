@@ -266,12 +266,38 @@ export function saveRolePermissions(roleNo: string, perms: string[]): RoleRow {
 // —————————————————————————————————————————————————————————————
 // 操作审计
 // —————————————————————————————————————————————————————————————
-export const audits: AuditEntry[] = Array.from({ length: 40 }, (_, i) => ({
-  id: `A${9000 + i}`, actor: p(["admin", "ali", "omar", "sara"], i),
-  action: p(["设备远程弹出", "工单派单", "订单退款", "租户配置修改", "员工新增", "提现审核"], i),
-  target: p(["CAB1005", "WO70012", "ORD500003", "T10", "E101", "WD3001"], i),
-  detail: "操作成功", ip: `10.165.${i % 255}.${(i * 7) % 255}`, createdAt: iso(i * 1800_000),
-}));
+/**
+ * 操作审计。
+ *
+ * **每 7 条掺一条非成功的**（i % 7）：全是 SUCCESS 的话，界面上「被拒绝/失败」
+ * 那两种样式在 mock 下永远看不到，第一次见到它们就是在生产环境里 ——
+ * 而那时它们长什么样、够不够显眼，已经来不及改了。
+ *
+ * 同理掺入 AGENT 与一条 SYSTEM 内部调用：运营端与代理端共用同一套审计，
+ * 「分不分得出是谁做的」这件事必须在 mock 下就能看见。
+ */
+export const audits: AuditEntry[] = Array.from({ length: 40 }, (_, i) => {
+  const denied = i % 7 === 3;
+  const failed = i % 7 === 5;
+  const internal = i % 11 === 4;
+  return {
+    id: `A${9000 + i}`,
+    actor: internal ? "SYSTEM:sharehub-scheduler" : p(["admin", "ali", "omar", "sara"], i),
+    actorName: internal ? undefined : p(["管理员", "Ali Hassan", "Omar Said", "Sara Aziz"], i),
+    // 内部调用没有「从哪个端」—— 留空比编一个 OPS 诚实
+    clientCode: internal ? undefined : (i % 5 === 2 ? "AGENT" : "OPS"),
+    // 内部调用做的是定时任务那类事。让调度器去「员工新增」在语义上讲不通，
+    // 而讲不通的假数据会让人照着它推断系统行为。
+    action: internal ? "结算单生成" : p(["设备远程弹出", "工单派单", "订单退款", "租户配置修改", "员工新增", "提现审核"], i),
+    outcome: denied ? "DENIED" : failed ? "FAILED" : "SUCCESS",
+    // 32 位十六进制，与后端 W3C traceparent 里的 traceId 同形
+    traceId: `${(i + 1).toString(16).padStart(8, "0")}${"a3ce929d0e0e4736c0ffee00".slice(0, 24)}`,
+    target: internal ? "2026-09" : p(["CAB1005", "WO70012", "ORD500003", "T10", "E101", "WD3001"], i),
+    detail: denied ? "无此权限，已拒绝" : failed ? "参数不合法，未执行" : "操作成功",
+    ip: `10.165.${i % 255}.${(i * 7) % 255}`,
+    createdAt: iso(i * 1800_000),
+  };
+});
 
 /**
  * 各动作的字段级改动模板。
@@ -312,9 +338,18 @@ export function getAuditDetail(id: string): AuditDetail {
   if (!a) throw notFound("审计记录", "Audit entry", id);
   return {
     ...a,
-    requestId: `req-${a.id.toLowerCase()}-${a.createdAt.slice(11, 13)}${a.createdAt.slice(14, 16)}`,
-    userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/126.0 Safari/537.36",
-    changes: (AUDIT_CHANGES[a.action] ?? []).map((c) => ({ ...c })),
+    // requestId 就是 traceId（后端 V60 起有 trace_id 列）。此前 mock 自造了一个
+    // `req-xxx` 形态，与真后端对不上 —— 那种"看起来有值"的假数据最难发现。
+    requestId: a.traceId ?? "",
+    // 内部调用没有浏览器 —— 给定时任务挂一个 Mac Chrome 的 UA，
+    // 会让排查的人以为「有人用浏览器触发了它」，而那是条死路。
+    userAgent: a.actor.startsWith("SYSTEM:") ? ""
+      : "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/126.0 Safari/537.36",
+    // **被拒绝/未完成的操作没有改动任何字段** —— 真后端也是这样：
+    // 请求在鉴权或校验处就被挡下，根本没到服务层，自然没有 diff 可记。
+    // 不按 outcome 过滤的话，一条 DENIED 记录会列出一串「改动前后」，
+    // 而复盘的人会照着它认定「改过了」。
+    changes: a.outcome === "SUCCESS" ? (AUDIT_CHANGES[a.action] ?? []).map((c) => ({ ...c })) : [],
   };
 }
 
