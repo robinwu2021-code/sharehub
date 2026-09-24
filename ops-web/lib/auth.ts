@@ -52,7 +52,13 @@ export interface AuthState {
 
   // —— 多主体（仅 AGENT realm，ADR-030）——
   memberships: Membership[];
-  /** 本次请求生效的主体；随 `X-Operator-No` 头发出。 */
+  /**
+   * 本次会话生效的主体。
+   *
+   * **不再随请求头发出**（2026-09-24）：主体写在 token 里，切换靠
+   * `POST /api/auth/operators/{agentNo}/switch` 换发。这里留它是给界面用的
+   * （顶栏显示、按主体收敛列表、queryKey），不是传给服务端的凭据。
+   */
   currentOperatorNo: string;
   /**
    * 切换世代号。参与 react-query 的 queryKey，也用于丢弃在途响应。
