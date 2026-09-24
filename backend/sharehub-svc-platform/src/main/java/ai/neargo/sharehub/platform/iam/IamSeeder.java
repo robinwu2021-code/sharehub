@@ -1,11 +1,9 @@
 package ai.neargo.sharehub.platform.iam;
 
 import ai.neargo.sharehub.platform.iam.entity.IamEntities.IamDataScope;
-import ai.neargo.sharehub.platform.iam.entity.IamEntities.IamPermission;
 import ai.neargo.sharehub.platform.iam.entity.IamEntities.IamRole;
 import ai.neargo.sharehub.platform.iam.entity.IamEntities.IamRolePerm;
 import ai.neargo.sharehub.platform.iam.mapper.IamMappers.DataScopeMapper;
-import ai.neargo.sharehub.platform.iam.mapper.IamMappers.PermissionMapper;
 import ai.neargo.sharehub.platform.iam.mapper.IamMappers.RoleMapper;
 import ai.neargo.sharehub.platform.iam.mapper.IamMappers.RolePermMapper;
 import org.springframework.boot.ApplicationArguments;
@@ -41,14 +39,12 @@ public class IamSeeder implements ApplicationRunner {
 
     private final RoleMapper roleMapper;
     private final RolePermMapper rolePermMapper;
-    private final PermissionMapper permissionMapper;
     private final DataScopeMapper dataScopeMapper;
 
-    public IamSeeder(RoleMapper roleMapper, RolePermMapper rolePermMapper, PermissionMapper permissionMapper,
+    public IamSeeder(RoleMapper roleMapper, RolePermMapper rolePermMapper,
                      DataScopeMapper dataScopeMapper) {
         this.roleMapper = roleMapper;
         this.rolePermMapper = rolePermMapper;
-        this.permissionMapper = permissionMapper;
         this.dataScopeMapper = dataScopeMapper;
     }
 
@@ -125,15 +121,19 @@ public class IamSeeder implements ApplicationRunner {
                 rolePermMapper.insert(rp);
             });
         });
-        if (permissionMapper.selectCount(null) == 0) {
-            RolePerms.MAP.values().stream().flatMap(List::stream).distinct().forEach(code -> {
-                IamPermission p = new IamPermission();
-                p.setCode(code);
-                p.setModule(code.contains(":") ? code.substring(0, code.indexOf(':')) : code);
-                p.setName(code);
-                permissionMapper.insert(p);
-            });
-        }
+        /*
+         * 权限码目录的种子已删（2026-09-24）。真源是 iam_permission，
+         * 由 V72__perm_catalog_full.sql 灌 176 条
+         * （backend/scripts/gen-perm-catalog.py 扫 @perm.can 生成，中文名读同目录的 tsv）。
+         *
+         * 这里原来灌的是 `RolePerms.MAP.values()` —— 那是「**内置角色持有**的码」，
+         * 不是「**后端强制**的码」。两者从来不是一回事（64 vs 158），
+         * 于是目录长期只有 57 条，**118 个真实权限在角色勾选树上选不到**，
+         * 而管理员只会以为「这个权限没做」。
+         *
+         * 而且它把 name 设成 code 本身 —— 勾选树上那一行长得像乱码，没人会回来补。
+         * 卡口：PermCatalogCoverageTest。
+         */
     }
     /** 代理角色只看自己 agent_no，其余内置角色看全部（功能权限清单 §二）。 */
     private static String scopeOfRole(String roleCode) {
