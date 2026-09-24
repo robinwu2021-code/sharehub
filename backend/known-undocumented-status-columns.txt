@@ -37,17 +37,11 @@
 # 两条合起来才是完整的：这条问「有没有声明」，那条问「存的东西算不算数」。
 #
 # 【条目格式】 表名.列名
-ad_campaign.status
 ad_placement.status
-agt_account.status
-coupon_tpl.status
 dict_item.status
 gw_vendor_device_type.status
 iam_menu.status
-loc_location.status
-mbr_benefit.status
 md_device_type.status
-price_plan.status
 price_plan_item.status
 usr_user.status
 usr_membership.status
