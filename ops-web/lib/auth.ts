@@ -47,9 +47,11 @@ export interface AuthState {
    * 此处原先写着「`GET /api/auth/me` 的 perms」，但那个端点前端**从未调用过**，
    * 它只存在于这条注释里。2026-09-24 改为事实。
    *
-   * ⚠️ 已知限制：perms 只在登录与切主体时刷新。管理员中途改了某人的权限，
-   * 当事人必须重新登录才生效。后端备有 `GET /api/auth/me` 与
-   * `GET /api/auth/permissions` 可用于刷新，接不接是产品决定，别顺手接。
+   * 之后由 {@link AuthState.syncPerms} 持续对齐 —— 来源是 `GET /api/auth/me`
+   * （2026-09-24 接入，见 `lib/perms-sync.ts`）。后端每请求按 `PermVersion`
+   * 重算会话权限（口径 B），所以 `/me` 给的是**现在**的权限而非登录快照；
+   * 这一条有后端用例守着（`PermsRefreshWithoutReloginTest`）——
+   * 若哪天它变回快照，前端定时拉只是把同一份旧权限反复写回，**看不出任何异常**。
    *
    * `["*"]` = 超管通配。空数组 = 零权限（**不是「还没加载」**：未登录本来就该什么都看不见）。
    *
@@ -90,6 +92,16 @@ export interface AuthState {
    * 只改 operatorNo 而不换 token，会出现「界面切了、数据还是上一家」且不报错。
    */
   switchOperator: (operatorNo: string, session: { token: string; perms: string[]; username: string }) => void;
+  /**
+   * 用 `/me` 回来的权限码覆盖 {@link perms}。**只动 perms 与 role，别的一律不碰** ——
+   * `/me` 不带 token / memberships / subjectNo，顺手整体覆盖会把它们写空。
+   *
+   * `gen` 是调用方发请求**之前**读到的 {@link operatorGen}：对不上说明这中间
+   * 切过主体或登出过，这份响应属于上一个身份，丢弃。没有这道闸的话，
+   * 切主体瞬间在途的那个 /me 回来会把**上一家的权限**写进新主体 ——
+   * 界面照常渲染，只是多出/少掉几个入口，没有任何报错。
+   */
+  syncPerms: (v: { perms: string[]; role?: Role | "" }, gen: number) => void;
   /** **只清本地状态**，不发请求。吊销服务端会话用 `signOut()`（lib/api/session）。 */
   logout: () => void;
   loggedIn: () => boolean;
@@ -131,6 +143,28 @@ export const useAuth = create<AuthState>()(
           username: session.username,
           operatorGen: get().operatorGen + 1,
         });
+      },
+      syncPerms: ({ perms, role }, gen) => {
+        const cur = get();
+        if (cur.operatorGen !== gen || !cur.token) return;
+        const next: Partial<AuthState> = {};
+        // 同值不写：zustand 的 set 会通知订阅者，每次心跳都换一个新数组
+        // 等于让判权相关的组件按心跳重渲染。
+        if (perms.length !== cur.perms.length || perms.some((p, i) => p !== cur.perms[i])) {
+          next.perms = perms;
+        }
+        /*
+         * role 只管菜单分组（NavSection.portalFor），不判权。跟着刷是为了
+         * 「改了角色但菜单还按老角色分组」不再发生。
+         *
+         * **跨 realm 的不跟**：/me 不带 realm / memberships，把 STAFF 的人写成
+         * AGENT 角色会得到一个「是代理但没有任何主体」的身份 —— 切换器空白、
+         * 按主体收敛的列表全空，而这些都不报错。那种情况该重新登录。
+         */
+        if (role && role !== cur.role && (role === "AGENT") === (cur.realm === "AGENT")) {
+          next.role = role;
+        }
+        if (Object.keys(next).length) set(next);
       },
       // perms / memberships 也要清：漏掉任一个，登出后 localStorage 里还留着
       // 上一个人的权限，而 http-client 是直接读 localStorage 的。

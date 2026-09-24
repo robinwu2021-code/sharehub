@@ -13,6 +13,7 @@ export const dashboardHttp: DashboardApi = {
   sendLoginOtp: (phone) => client.post("/api/auth/otp", { phone }),
   listOperators: () => client.get("/api/auth/operators"),
   switchOperator: (agentNo) => client.post(`/api/auth/operators/${agentNo}/switch`, {}),
+  me: () => client.get("/api/auth/me"),
   logout: () => client.post("/api/auth/logout"),
   getDashboard: () => client.get("/api/ops/dashboard"),
 };

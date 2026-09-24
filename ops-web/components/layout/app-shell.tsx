@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
+import { usePermsSync } from "@/lib/perms-sync";
 import { Rail } from "./rail";
 import { SecondaryNav } from "./secondary-nav";
 import { Header } from "./header";
@@ -26,6 +27,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const loggedIn = useAuth((s) => s.loggedIn());
   const [ready, setReady] = useState(false);
+  // 权限码与服务端对齐（进应用 + 标签页重新可见）。挂在这里而不是各页面：
+  // 判权入口散在全站，任何一页少挂一次就是「那一页还按旧权限渲染」。
+  usePermsSync();
 
   // trailingSlash:true → pathname 可能带尾斜杠，归一化后再比较。
   const norm = pathname.replace(/\/+$/, "") || "/";

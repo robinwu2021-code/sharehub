@@ -71,7 +71,6 @@ B POST /mp/user/report ReportResultVO 后端有前端无:sessionNo
 B POST /mp/user/report ReportResultVO 后端有前端无:suggestedAction
 C GET /api/agent/accounts/{}
 C GET /api/agent/commissions/{}
-C GET /api/auth/me
 C GET /api/auth/menus
 C GET /api/auth/permissions
 C GET /api/ops/inspection-plans/{}

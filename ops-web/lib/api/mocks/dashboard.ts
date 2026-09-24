@@ -4,7 +4,7 @@ import type { DashboardApi } from "../contracts/dashboard";
 import { wait } from "./_wait";
 import { permsOf } from "../../permissions";
 import { fail } from "../../biz-error";
-import type { Role } from "../../auth";
+import { currentAuth, type Role } from "../../auth";
 
 /** dev-mode 固定验证码，与后端 OtpService.DEV_MASTER 同值 —— 两边不一致就「收到码了但验不过」。 */
 const DEV_OTP = "000000";
@@ -54,6 +54,21 @@ export const dashboardMock: DashboardApi = {
       token: `mock-AGENT-${agentNo}`, subjectNo: "PR0001", username: hit.name, role: "AGENT" as Role,
       perms: permsOf("AGENT" as Role),
       operators: all, currentOperatorNo: agentNo,
+    });
+  },
+  /*
+   * mock 的 /me：离线开发没有后端可重算权限，只能按**当前 store 里的角色**展开。
+   *
+   * 于是 mock 下它天然是恒等的 —— **测不出「权限变了」那条路径**。
+   * 这是 mock 的边界，不是实现偷懒：真正的收敛验证在后端
+   * `PermsRefreshWithoutReloginTest`，前端那一半由 perms-sync.test.ts 打桩验。
+   */
+  me: () => {
+    const { token, username, role } = currentAuth() ?? { token: "", username: "", role: "" };
+    if (!token) return wait({ authenticated: false });
+    return wait({
+      authenticated: true, username, role,
+      perms: permsOf(role as Role | ""),
     });
   },
   // mock 没有服务端会话可吊销，但**必须存在** —— 契约测试要求 mock 与 http 同形，

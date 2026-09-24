@@ -17,6 +17,21 @@ export interface LoginResp {
   currentOperatorNo?: string;
 }
 
+/**
+ * `GET /api/auth/me` 的出参。
+ *
+ * ⚠️ 它**不是**登录响应的子集：没有 `token` / `operators` / `subjectNo`。
+ * 只拿它来刷新 perms，别拿它重建身份 —— 缺的那几样会被写成空。
+ */
+export interface MeResp {
+  authenticated: boolean;
+  username?: string;
+  role?: string;
+  agentNo?: string;
+  /** 后端**当场重算**的权限码（口径 B），不是登录那一刻的快照。 */
+  perms?: string[];
+}
+
 export interface DashboardApi {
   /**
    * 登录。
@@ -45,6 +60,17 @@ export interface DashboardApi {
    * 会拿着旧范围继续跑；换发之后老 token 立刻吊销，没有两个范围并存的窗口。
    */
   switchOperator(agentNo: string): Promise<LoginResp>;
+  /**
+   * 当前会话的身份与**当场重算的权限码**。
+   *
+   * 后端每个请求都会比对会话戳与全局 `PermVersion`，变了就按角色重建会话
+   * （`StaffTokenAuthFilter` 口径 B）—— 所以这里拿到的是**现在**的权限，
+   * 不是登录那一刻的快照。前端据此收敛入口，见 `lib/perms-sync.ts`。
+   *
+   * 令牌失效时后端返回 **401**（不是 200 + `authenticated:false`），
+   * 由 http-client 统一转成会话失效跳转。
+   */
+  me(): Promise<MeResp>;
   // 登出：**让后端真正吊销 token**。只清本地状态等于没登出 —— 令牌在服务端一直有效到过期，
   // 共用电脑上点完"退出"走人，下一个人拿 localStorage 里的旧令牌仍能调接口。
   logout(): Promise<void>;
