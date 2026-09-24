@@ -33,6 +33,9 @@ export const cUsers: CUser[] = Array.from({ length: 60 }, (_, i) => ({
   cUserNo: `U${3000 + i}`, nickname: p(["Ahmed", "Mohammed", "Fatima", "Layla", "Yusuf", "李明"], i),
   phone: `+9715${String(5000000 + i * 173).slice(0, 7)}`, creditScore: 550 + (i * 7) % 300,
   blacklisted: i % 17 === 0,
+  // 头像**只给三分之二**：C 端用户不是人人都传头像，全给的话
+  // 「没有头像时长什么样」这条路径没有数据能走到。
+  avatar: i % 3 === 2 ? null : `https://avatar.example/u/${3000 + i}.png`,
   orders: i < SEEDED_ORDER_USERS ? ORDERS_PER_SEEDED_USER : 0,
   registeredAt: iso(i * 86400_000),
 }));
@@ -84,6 +87,13 @@ export const members: Member[] = Array.from({ length: 24 }, (_, i) => {
   const ct = seedCardType(i);
   return {
     userNo: `U${3000 + i}`, nickname: userOf(`U${3000 + i}`).nickname,
+    // 方案编号跟 cardType 同源：ct 为空（没买过卡）时也没有方案
+    planNo: ct ? `PLAN-${ct}` : "",
+    /*
+     * 三态都要有样本，**尤其是 CANCELLED**：它的到期日仍在未来，
+     * 只看到期时间的话界面上看着还有效 —— 这正是本次要能分辨的那种情况。
+     */
+    status: (i % 9 === 4 ? "CANCELLED" : i % 7 === 5 ? "EXPIRED" : "ACTIVE") as Member["status"],
     level: p(["SILVER", "GOLD", "PLATINUM"] as const, i),
     points: (i * 137) % 5000,
     cardType: ct ? MEMBER_CARD_LABEL[ct] : MEMBER_CARD_NONE,
@@ -115,6 +125,8 @@ export const freeWhitelist: FreeUserWhitelist[] = Array.from({ length: 14 }, (_,
   const quotaValue = quotaType === "UNLIMITED" ? 0 : quotaType === "TIMES" ? 10 + (i % 4) * 10 : 100 + (i % 5) * 50;
   const u = userOf(`U${3000 + i}`);
   return {
+    // 白名单记录自己的编号：同一个用户可以有多条（不同时段/额度），不能拿 userNo 当键
+    whitelistNo: `FWL${500 + i}`,
     // 限额型才有币种含义；限次/不限留空，免得页面显示「10 次 AED」这种怪话
     currency: quotaType === "AMOUNT" ? "AED" : null,
     userNo: u.cUserNo,
@@ -545,7 +557,7 @@ export function grantMemberCard(payload: MemberCardGrantPayload): MemberCardGran
   memberCards.unshift(card);
   // 会员行不存在就补一条（最低档、0 积分）：名单里查不到这个人，发出去的卡就没人管
   if (!members.some((m) => m.userNo === userNo)) {
-    members.unshift({ userNo, nickname: u.nickname, level: "SILVER", points: 0, cardType: MEMBER_CARD_NONE, expireAt: "" });
+    members.unshift({ userNo, nickname: u.nickname, planNo: "", status: "ACTIVE", level: "SILVER", points: 0, cardType: MEMBER_CARD_NONE, expireAt: "" });
   }
   syncCardColumns(userNo);
   return { card, member: { ...members.find((m) => m.userNo === userNo)! } };

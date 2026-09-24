@@ -9,6 +9,13 @@ import type { RentOrder } from "./order";
 export interface CUser {
   cUserNo: string;
   nickname: string;
+  /**
+   * 头像地址；未设置为 null。C 端用户自己传的，后端一直在返回。
+   *
+   * 这是**展示便利**，不是缺陷修复 —— 昵称 + 手机号本来就够定位到人。
+   * 补它是因为列表里有头像时扫得更快，且仓里已有 Avatar 组件承载。
+   */
+  avatar: string | null;
   phone: string;
   creditScore: number;
   blacklisted: boolean;
@@ -102,9 +109,27 @@ export interface UserBlacklist {
 }
 
 // —— 用户 · 待建功能补全（user 域）——
+/**
+ * 会员状态。**具名而不是内联联合**：两端同名词表比对
+ * （后端 StatusVocabularyAcrossEndsTest）只认具名 `export type`。
+ */
+export type MembershipStatus = "ACTIVE" | "EXPIRED" | "CANCELLED";
+
 export interface Member {
   userNo: string;
   nickname: string;
+  /**
+   * 会员方案编号（→ `mbr_plan.plan_no`）。
+   * {@link cardType} 是展示名 —— 按名字连不回方案档案，改个方案名就断链。
+   * 同本仓「一律按编号连、名字只作展示」的口径。
+   */
+  planNo: string;
+  /**
+   * 会员状态。**不要用 expireAt 推** —— `CANCELLED`（主动取消）与
+   * `EXPIRED`（自然到期）是两回事：已取消的会员到期日还在未来，
+   * 只看到期时间的话界面上看着仍然有效。
+   */
+  status: MembershipStatus;
   level: "SILVER" | "GOLD" | "PLATINUM";
   points: number;
   cardType: string;
@@ -237,6 +262,14 @@ export type WhitelistReason = "INTERNAL_TEST" | "VIP" | "BD_DEMO" | "MERCHANT_SE
 // —— 免费用户白名单（阶段 2）——
 // 竞品「免费用户」放订单域；我们归**用户域**（它本质是用户属性），并强制标注用途。
 export interface FreeUserWhitelist {
+  /**
+   * 白名单记录自己的编号（后端主键）。
+   *
+   * **同一个用户可以有多条白名单**（不同时段、不同额度），所以行键必须用它 ——
+   * 用 userNo 做行键在 mock 下看不出问题（每人只造一条），真后端返回两条时
+   * React 行键重复，表现是选中/更新错行，而不会报错。
+   */
+  whitelistNo: string;
   userNo: string;
   nickname: string;
   phone: string;

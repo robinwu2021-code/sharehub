@@ -11,6 +11,7 @@ import { TabHeader } from "@/components/ui/tab-header";
 import { Input, Select } from "@/components/ui/input";
 import { Drawer, Field } from "@/components/ui/drawer";
 import { Timeline } from "@/components/ui/timeline";
+import { AvatarLabel } from "@/components/ui/avatar";
 import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { ReadOnlyNotice } from "@/components/read-only-notice";
@@ -48,6 +49,12 @@ const TAB_KEYS = ["list", "risk", "blacklist", "whitelist", "members", "wallets"
 // —— 账号 / 风控 / 黑名单三张表的状态映射 ——
 // 拉黑与否不是后端枚举，但同一对徽标在列表页和详情抽屉各出现一次，
 // 收成映射表后两处不可能配出不同颜色。
+/** 会员三态。CANCELLED 与 EXPIRED 分开：前者是人主动退的，到期日还在未来。 */
+const MEMBER_STATUS: StatusMap<Member["status"]> = {
+  ACTIVE: { label: "有效", tone: "success" },
+  EXPIRED: { label: "已到期", tone: "muted" },
+  CANCELLED: { label: "已取消", tone: "warning" },
+};
 const ACCOUNT_STATUS: StatusMap<"NORMAL" | "BLACKLISTED"> = {
   NORMAL: { label: "正常", tone: "success" },
   BLACKLISTED: { label: "黑名单", tone: "danger" },
@@ -492,7 +499,9 @@ function UsersInner() {
   // 计数/金额列 text-right + tabular-nums：右对齐让位数对齐，整列不跳动（规范 §12.4）。
   const userCols: Column<CUser>[] = [
     { header: "用户号", cell: (u) => <span className="txt-strong tabular-nums">{u.cUserNo}</span> },
-    { header: "昵称", cell: (u) => u.nickname },
+    // 头像 + 昵称走仓里已有的 AvatarLabel：没有头像时它自己退回首字母底色，
+    // 不需要在这里判空。这是展示便利，不是缺陷修复。
+    { header: "昵称", cell: (u) => <AvatarLabel src={u.avatar ?? undefined} name={u.nickname} size="sm" /> },
     { header: "手机", cell: (u) => <span className="text-muted-foreground tabular-nums">{u.phone}</span> },
     { header: "信用分", className: "text-right", cell: (u) => <span className="tabular-nums">{u.creditScore}</span> },
     { header: "订单数", className: "text-right", cell: (u) => <span className="tabular-nums">{u.orders}</span> },
@@ -521,6 +530,13 @@ function UsersInner() {
     { header: "积分", className: "text-right", cell: (m) => <span className="tabular-nums">{Math.round(m.points)}</span> },
     // 次卡/到期两列由生效卡派生（发放时服务端同步），故这里只读、无卡弱化显示
     { header: "次卡", cell: (m) => m.cardType === MEMBER_CARD_NONE ? <span className="text-muted-foreground">{MEMBER_CARD_NONE}</span> : <Badge tone="outline">{m.cardType}</Badge> },
+    {
+      header: "状态",
+      className: "whitespace-nowrap",
+      // 放在「到期」之前：先看还有效没有，再看到期日。
+      // CANCELLED 的到期日仍在未来 —— 只看到期时间会以为它还有效。
+      cell: (m) => <StatusBadge map={MEMBER_STATUS} value={m.status} />,
+    },
     { header: "到期", cell: (m) => <span className="text-muted-foreground">{fmtTime(m.expireAt)}</span> },
     {
       header: t("common.actions"),
@@ -938,7 +954,8 @@ function UsersInner() {
           </Toolbar>
           {!canEditWhitelist && <ReadOnlyNotice what="白名单维护" perm="user:risk:update" note="不能新增、编辑或撤销白名单" />}
           <DataTable
-            rowKey={(w: FreeUserWhitelist) => w.userNo}
+            // 行键用白名单编号而非用户号：同一个用户可以有多条白名单
+            rowKey={(w: FreeUserWhitelist) => w.whitelistNo}
             columns={whitelistCols}
             rows={whitelist.data?.list}
             loading={whitelist.isLoading} error={whitelist.error} onRetry={whitelist.refetch}

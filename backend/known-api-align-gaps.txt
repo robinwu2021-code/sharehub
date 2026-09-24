@@ -39,9 +39,6 @@ B GET /api/user/ad-campaigns AdCampaignVO 后端有前端无:advertiserNo
 B GET /api/user/ad-campaigns AdCampaignVO 后端有前端无:budget
 B GET /api/user/ad-campaigns AdCampaignVO 后端有前端无:currency
 B GET /api/user/ad-deliveries AdDeliveryVO 后端有前端无:cabinetNo
-B GET /api/user/free-whitelist FreeUserWhitelist 后端有前端无:whitelistNo
-B GET /api/user/members MemberRow 后端有前端无:planNo
-B GET /api/user/members MemberRow 后端有前端无:status
 B GET /api/user/push-messages PushMessageVO 前端有后端无:audienceType
 B GET /api/user/push-messages PushMessageVO 前端有后端无:audienceValue
 B GET /api/user/push-messages PushMessageVO 前端有后端无:idempotencyKey
@@ -49,7 +46,6 @@ B GET /api/user/push-messages PushMessageVO 前端有后端无:operatorName
 B GET /api/user/push-messages PushMessageVO 前端有后端无:scheduledAt
 B GET /api/user/push-messages PushMessageVO 前端有后端无:successCount
 B GET /api/user/push-messages PushMessageVO 前端有后端无:targetCount
-B GET /api/user/users CUserRow 后端有前端无:avatar
 B POST /mp/user/report ReportResultVO 后端有前端无:createdAt
 B POST /mp/user/report ReportResultVO 后端有前端无:refundNo
 B POST /mp/user/report ReportResultVO 后端有前端无:sessionNo
