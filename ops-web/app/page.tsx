@@ -88,14 +88,18 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
             </Link>
-            <Link href="/orders?tab=exceptions">
-              <Card className="hover:border-primary/50 transition-colors cursor-pointer">
-                <CardContent className="pt-5">
-                  <p className="text-muted-foreground text-sm">待退款/补偿</p>
-                  <p className="text-3xl font-bold tabular-nums mt-1">{data.todos.pendingRefunds}</p>
-                </CardContent>
-              </Card>
-            </Link>
+            {/* 受限主体（代理）拿不到这个数——它是全平台口径，且退款不是他们的动作。
+                后端直接不发（见 ReportServiceImpl.dashboard），这里按 null 不渲染整格。 */}
+            {data.todos.pendingRefunds !== null && (
+              <Link href="/orders?tab=exceptions">
+                <Card className="hover:border-primary/50 transition-colors cursor-pointer">
+                  <CardContent className="pt-5">
+                    <p className="text-muted-foreground text-sm">待退款/补偿</p>
+                    <p className="text-3xl font-bold tabular-nums mt-1">{data.todos.pendingRefunds}</p>
+                  </CardContent>
+                </Card>
+              </Link>
+            )}
             <Link href="/finance?tab=withdrawals">
               <Card className="hover:border-primary/50 transition-colors cursor-pointer">
                 <CardContent className="pt-5">

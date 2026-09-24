@@ -65,4 +65,29 @@ class AgentDashboardScopeTest extends ApiTestSupport {
                 foreign, mine)
                 .isEmpty();
     }
+
+    @Test
+    @DisplayName("★★ 代理拿不到「待退款」这个数——它是全平台口径，而且退款不是代理的动作")
+    void the_agent_does_not_receive_the_platform_wide_refund_count() {
+        JsonNode agentTodos = get("/api/ops/dashboard", loginAgent(AGENT)).okData().path("todos");
+        JsonNode adminTodos = get("/api/ops/dashboard", login("ADMIN")).okData().path("todos");
+
+        assertThat(adminTodos.path("pendingRefunds").isNumber())
+                .as("前置：全域主体应当拿得到这个数，否则本用例证明不了「只是受限主体拿不到」")
+                .isTrue();
+
+        assertThat(agentTodos.path("pendingRefunds").isNull()
+                        || agentTodos.path("pendingRefunds").isMissingNode())
+                .as("""
+                        代理拿到了「待退款」的数。ord_refund 没有归属列，那个 COUNT 是**全平台**的
+                        （实测超管与代理都是 189）——不是少算，是把平台的待办摆在伙伴的首屏上。
+
+                        不能靠前端藏：藏起来的数字仍在响应体里，抓一次接口就看到了。
+                        判据在 ReportServiceImpl.dashboard，按当前会话的数据范围裁。""")
+                .isTrue();
+
+        // 另两格必须还在：它们被数据范围管住，是这个代理自己的，删了是丢信息
+        assertThat(agentTodos.path("pendingWorkOrders").isNumber()).as("待派单仍应返回").isTrue();
+        assertThat(agentTodos.path("pendingWithdrawals").isNumber()).as("待审提现仍应返回").isTrue();
+    }
 }

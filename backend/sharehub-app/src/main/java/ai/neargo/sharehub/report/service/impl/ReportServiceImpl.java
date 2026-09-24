@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.report.service.impl;
 
+import ai.neargo.common.data.scope.DataScopeContext;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.common.Kw;
 import ai.neargo.sharehub.common.Pages;
@@ -420,8 +421,23 @@ public class ReportServiceImpl implements ReportService {
             trend.add(new DashboardTrendDay(ReportPeriods.fmt(dd), a.gmv(), a.orders));
         }
 
+        /*
+         * 待退款只给全域主体看。
+         *
+         * 另外两格都被数据范围管住了（wo_order / stl_withdrawal 都登记了 AGENT），
+         * 代理看到的是自己的；而 ord_refund **没有归属列**，那个 COUNT 是全平台的 ——
+         * 实测代理与超管拿到的都是 189。
+         *
+         * 不补列而是不给：退款由消费者发起、客服与财务处置，代理既不审也不执行，
+         * 补一列归属（refund→order→cabinet→agent 派生并回填）换来的仍是一个与他无关的数字。
+         *
+         * **在这里裁掉而不是让前端藏**：前端藏起来的数字仍然躺在响应体里，
+         * 抓一次接口就看到了。判据用当前会话的数据范围，不是角色名 ——
+         * 将来多一个受限角色也不必回来改这里。
+         */
+        boolean globalScope = DataScopeContext.current() == null || DataScopeContext.current().all();
         DashboardTodos todos = new DashboardTodos(woFacts.pendingDispatchCount(),
-                refundFacts.pendingCount(), withdrawFacts.pendingCount());
+                globalScope ? refundFacts.pendingCount() : null, withdrawFacts.pendingCount());
 
         List<DashboardAlert> alerts = alarmFacts.openAlarms().stream().map(r -> {
             String cab = str(r.get("cabinetNo"));

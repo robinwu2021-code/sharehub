@@ -22,7 +22,12 @@ export interface DashboardStats {
   openWorkOrders: number;
   currency: string;
   trend: { day: string; gmv: number; orders: number }[];
-  todos: { pendingWorkOrders: number; pendingRefunds: number; pendingWithdrawals: number };
+  /**
+   * 待办三格。`pendingRefunds` **可能为 null**：ord_refund 没有归属列，
+   * 那个数是全平台的，所以后端只发给全域主体（代理等受限主体拿到 null）。
+   * 另两格被数据范围管住，各人看各人的。
+   */
+  todos: { pendingWorkOrders: number; pendingRefunds: number | null; pendingWithdrawals: number };
   alerts: DashboardAlert[];
   rankings: DashboardRankItem[];
 }
