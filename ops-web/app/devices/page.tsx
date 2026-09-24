@@ -912,7 +912,7 @@ function invColsWith(onOpen: (r: InventoryTransfer) => void): Column<InventoryTr
 /** 投放范围的人话。ALL 不写「全部」而写「全部设备」—— 前者容易被读成「全部站点」。 */
 const rolloutScope = (r: OtaRollout) =>
   r.scope === "ALL" ? "全部设备"
-    : r.scope === "SITE" ? `站点 ${r.targetRef ?? "-"}`
+    : r.scope === "LOCATION" ? `点位 ${r.targetRef ?? "-"}`
       : `单台 ${r.targetRef ?? "-"}`;
 
 const otaCols: Column<OtaRollout>[] = [
@@ -1080,6 +1080,9 @@ const RELEASE_STATUS: StatusMap<OtaRelease["status"]> = {
   PUBLISHED: { label: "已发布", tone: "success" },
   PAUSED: { label: "已暂停", tone: "warning" },
   COMPLETED: { label: "已完结", tone: "outline" },
+  // 归档＝退出投放候选但记录留着（后端 OtaReleaseStatus 的第五档）。
+  // 少这一档时，已归档的发布在列表里是未知值，按它筛也一条查不到。
+  ARCHIVED: { label: "已归档", tone: "muted" },
 };
 // 固件类型是后端自由文本（厂商随时会上报新类型）：已知才翻译，未知原样显示，不能因此空白
 const FW_TYPE: Record<string, string> = { MCU: "主控", SLOT: "仓门", MODEM: "通信模组" };

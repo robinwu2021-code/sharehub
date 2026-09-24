@@ -205,8 +205,15 @@ export interface OtaRollout {
    * （灰度/全量），scope 说「发给谁」（单台 / 整站 / 全部）。
    * 只有 strategy 时，一条灰度投放看不出它究竟影响了多少设备。
    */
-  scope: "DEVICE" | "SITE" | "ALL";
-  /** scope 的目标：DEVICE→柜机号、SITE→站点号；ALL 为 null。 */
+  /**
+   * **LOCATION 是点位不是站点**。后端 `dev_ota_rollout.scope` 的词表是
+   * DEVICE/LOCATION/ALL，实体注释写明「LOCATION 时 targetRef 为 locationNo」。
+   * 这里此前写的是 SITE，而本仓 SITE(站点) 与 LOCATION(点位) 是两级不同的东西 ——
+   * 按站点投放会把**站点号**塞进后端当作点位号解析的字段，投放目标对不上，
+   * 而这件事不报错：任务照常建出来，只是发给了错的一批（或一台都没有）。
+   */
+  scope: "DEVICE" | "LOCATION" | "ALL";
+  /** scope 的目标：DEVICE→柜机号、LOCATION→点位号；ALL 为 null。 */
   targetRef: string | null;
   strategy: "GRAY" | "FULL";
   progress: number; // 0..100
@@ -219,6 +226,15 @@ export interface OtaRollout {
  * 原先前端只有投放（OtaRollout）没有版本库，于是「投的是哪个包、校验和是多少、是否强制升级」
  * 全都无处可看——投放页填的固件版本号只是一个自由文本。
  */
+/**
+ * 固件发布的生命周期。**五档，与后端 `OtaReleaseStatus` 枚举、
+ * `dev_ota_release.status` 的 DDL 词表逐个对过**。
+ *
+ * 此前这里是内联的四值联合，少了 ARCHIVED —— 已归档的发布在运营端是未知值：
+ * 徽标映射不上、按它筛一条都查不到。具名是为了进两端同名词表比对
+ * （那个卡口只认具名 `export type`）。
+ */
+export type OtaReleaseStatus = "DRAFT" | "PUBLISHED" | "PAUSED" | "COMPLETED" | "ARCHIVED";
 export interface OtaRelease {
   releaseNo: string;
   /**
@@ -235,7 +251,7 @@ export interface OtaRelease {
   artifactUrl: string;
   checksum: string;
   mandatory: boolean;
-  status: "DRAFT" | "PUBLISHED" | "PAUSED" | "COMPLETED";
+  status: OtaReleaseStatus;
   releaseNotes: string;
 }
 

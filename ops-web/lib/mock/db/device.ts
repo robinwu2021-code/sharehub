@@ -221,7 +221,7 @@ const ROLLOUT_SEEDS = Array.from({ length: 14 }, (_, i) => {
    * 范围与策略要自洽：全量（FULL）必然是 ALL；灰度（GRAY）才谈得上
    * 只发某个站点或某台设备。反过来配（FULL + 单台）在业务上讲不通。
    */
-  const scope: OtaRollout["scope"] = strategy === "FULL" ? "ALL" : (i % 2 === 0 ? "SITE" : "DEVICE");
+  const scope: OtaRollout["scope"] = strategy === "FULL" ? "ALL" : (i % 2 === 0 ? "LOCATION" : "DEVICE");
   return {
     rolloutNo: `OTA${5000 + i}`,
     releaseNo: rel.releaseNo,
@@ -233,7 +233,7 @@ const ROLLOUT_SEEDS = Array.from({ length: 14 }, (_, i) => {
     scope,
     // 站点号沿用 location.ts 的 `ST${300 + i}` 形态。**不 import 那个模块** ——
     // device 不依赖 location，引进来有循环依赖风险。改了那边的编号规则记得同步。
-    targetRef: scope === "ALL" ? null : scope === "SITE" ? `ST${300 + (i % 5)}` : cabNo(i),
+    targetRef: scope === "ALL" ? null : scope === "LOCATION" ? `LOC${200 + (i % 5)}` : cabNo(i),
     status: p(["PENDING", "RUNNING", "DONE", "ROLLBACK"] as const, i),
     createdAt: iso(i * 86400_000),
   };

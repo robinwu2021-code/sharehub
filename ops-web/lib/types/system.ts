@@ -70,7 +70,12 @@ export type NotifyTemplateStatus = "ENABLED" | "DISABLED";
 export interface NotifyTemplate {
   templateNo: string;
   name: string;
-  channel: "SMS" | "EMAIL" | "PUSH" | "WHATSAPP";
+  /**
+   * 与发送记录同一套取值：后端建发送记录时**直接把模板的 channel 拷过去**
+   * （NotifyTemplateServiceImpl 的试发）。两边词表不同的话，拷过去的值
+   * 在发送记录页就是未知值。
+   */
+  channel: NotifyLogChannel;
   lang: "ar" | "en";
   status: NotifyTemplateStatus;
   // 下面三个字段后端实体（platform/notify/entity/NotifyTemplate）早就有，前端此前没接——
