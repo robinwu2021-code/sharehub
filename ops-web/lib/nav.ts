@@ -20,6 +20,7 @@ import { asViewer, can, canModule, type MaybeRole, type ViewerLike } from "./per
 import type { Phase } from "./phase";
 import { isPhaseLocked } from "./phase";
 import { pageReady, type OperationPage } from "./backend-ready";
+import { useMenuStore } from "./menu-source";
 
 export const NAV_PREFS_STORAGE_KEY = "ops-nav-prefs";
 
@@ -130,6 +131,13 @@ export function opLeaves(
   });
 }
 
+/**
+ * **静态菜单定义**。两个用途：
+ * 1. `backend/scripts/gen-menu-seed.py` 从它生成 `iam_menu` 的行（卡口 nav-seed.test.ts）；
+ * 2. 服务端菜单没启用 / 没到 / 拉失败时的**兜底**。
+ *
+ * ⚠️ **界面不要直接读它，读 {@link navTree}()** —— 否则开了服务端菜单也没用。
+ */
 export const NAV: NavSection[] = [
   // ── 代理端门户（方案 §六 方案 A：不建新工程/新页，AGENT 登录后只出「我的」三项，
   //    深链复用运营端既有页面，数据由后端按 agent_no 收敛）。
@@ -413,6 +421,17 @@ export const NAV: NavSection[] = [
 // ── 纯函数 helper（无 React 依赖，可单测） ──────────────────────────────
 
 /** trailingSlash:true 下 pathname 带尾斜杠，比较前归一化。 */
+/**
+ * 界面该读的那棵树：启用且已拿到服务端菜单时用它，否则用静态的 {@link NAV}。
+ *
+ * 写成函数而不是常量：数据是运行时到的，常量会被别处提前捕获成旧值。
+ * 非 React 代码（面包屑、路由归属判断）也要能调，所以不做成 hook ——
+ * 重渲染由 AppShell 订阅 store 触发。
+ */
+export function navTree(): NavSection[] {
+  return useMenuStore.getState().tree ?? NAV;
+}
+
 export const normPath = (p: string) => p.replace(/\/+$/, "") || "/";
 
 /** 拆 href 为 path + tab + view。 */
@@ -427,8 +446,9 @@ export function leafParts(href: string): { path: string; tab: string | null; vie
  */
 export function visibleSections(v: ViewerLike): NavSection[] {
   const { perms, role } = asViewer(v);
-  const portals = NAV.filter((s) => role && s.portalFor?.includes(role as Role));
-  const pool = portals.length > 0 ? portals : NAV.filter((s) => !s.portalFor);
+  const all = navTree();
+  const portals = all.filter((s) => role && s.portalFor?.includes(role as Role));
+  const pool = portals.length > 0 ? portals : all.filter((s) => !s.portalFor);
   /*
    * **可见性 = 有没有可见叶子**，不再看 canModule（2026-09-24，P1-3）。
    *
@@ -532,12 +552,12 @@ function resolveTabs(
     return k !== undefined && keys.includes(k);
   }).length;
   const visible = visibleSections(v);
-  const ranked = [...visible, ...NAV.filter((x) => !visible.includes(x))]
+  const ranked = [...visible, ...navTree().filter((x) => !visible.includes(x))]
     .map((sec, i) => ({ sec, s: score(sec), i }))
     .filter((x) => x.s > 0)
     .sort((a, b) => b.s - a.s || a.i - b.i)
     .map((x) => x.sec);
-  const pool = [...ranked, ...visible, ...NAV];
+  const pool = [...ranked, ...visible, ...navTree()];
   const out: { key: string; label: string; phase?: Phase }[] = [];
   const missing: string[] = [];
   for (const spec of specs) {
@@ -601,7 +621,7 @@ export function portalTitleOverride(
 ): string | undefined {
   const { role } = asViewer(v);
   const p = normPath(pathname);
-  for (const section of NAV) {
+  for (const section of navTree()) {
     if (!role || !section.portalFor?.includes(role)) continue;
     for (const leaf of section.children ?? []) {
       const parts = leafParts(leaf.href);
@@ -660,7 +680,7 @@ export function findActiveSection(pathname: string, v?: ViewerLike): NavSection 
   // （/、/devices、/orders…）。不限定的话，排在前面的门户项会对所有角色命中，
   // 运营人员的面包屑会变成「我的经营 › …」。传 role 时只在该角色可见的 section 里找；
   // 不传时排除门户 section（对运营端是安全默认值）。
-  const pool = v !== undefined && asViewer(v).role ? visibleSections(v) : NAV.filter((s) => !s.portalFor);
+  const pool = v !== undefined && asViewer(v).role ? visibleSections(v) : navTree().filter((s) => !s.portalFor);
   let best: { section: NavSection; len: number } | undefined;
   for (const section of pool) {
     for (const prefix of sectionMatchPrefixes(section)) {

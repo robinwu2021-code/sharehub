@@ -71,6 +71,44 @@ export const dashboardMock: DashboardApi = {
       perms: permsOf(role as Role | ""),
     });
   },
+  /*
+   * mock 的菜单：**按前端那份静态 NAV 反推服务端形状**。
+   *
+   * 不另编一套数据 —— 编出来的那份和 nav.ts 一漂，离线开发时看到的菜单
+   * 就和线上不是一回事，而这种差异要到切后端那天才发现。
+   * 可见性沿用 mock 的角色权限（同真后端的规则：门户排他 + 按 perm + 剪空 section）。
+   */
+  getMenus: async () => {
+    const { NAV } = await import("../../nav");
+    const { currentAuth } = await import("../../auth");
+    const { can } = await import("../../permissions");
+    const a = currentAuth();
+    const perms = a?.perms ?? [];
+    const role = a?.role ?? "";
+    const portalUser = NAV.some((s) => s.portalFor?.includes(role as never));
+    const ok = (p?: string) => !p || can(perms, p);
+    const nodes = NAV
+      .filter((s) => (portalUser ? s.portalFor?.includes(role as never) : !s.portalFor))
+      .map((s) => {
+        const kids = (s.children ?? []).filter((l) => ok(l.perm)).map((l, i) => ({
+          menuNo: `M_${s.key}__${i + 1}`, parentNo: `M_${s.key}`, name: l.label,
+          nameEn: null, nameAr: null, type: "ITEM" as const, path: l.href, icon: null,
+          group: l.group ?? null, sort: i + 1, perm: l.perm ?? null,
+          phase: l.phase ?? 1, ready: !!l.ready, module: null, modules: [], match: [],
+          pinBottom: false, portalFor: [], children: [],
+        }));
+        return { s, kids };
+      })
+      .filter(({ s, kids }) => ((s.children ?? []).length ? kids.length > 0 : ok(s.perm)))
+      .map(({ s, kids }, i) => ({
+        menuNo: `M_${s.key}`, parentNo: null, name: s.label, nameEn: null, nameAr: null,
+        type: "MENU" as const, path: s.href, icon: s.icon ?? null, group: null, sort: i + 1,
+        perm: s.perm ?? null, phase: s.phase ?? 1, ready: false, module: s.module ?? null,
+        modules: s.modules ?? [], match: s.match ?? [], pinBottom: !!s.pinBottom,
+        portalFor: (s.portalFor ?? []) as string[], children: kids,
+      }));
+    return wait(nodes);
+  },
   // mock 没有服务端会话可吊销，但**必须存在** —— 契约测试要求 mock 与 http 同形，
   // 缺一个方法会让 mock 模式在点登出时直接 TypeError。
   logout: () => wait(undefined as void),

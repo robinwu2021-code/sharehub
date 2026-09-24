@@ -14,6 +14,7 @@ export const dashboardHttp: DashboardApi = {
   listOperators: () => client.get("/api/auth/operators"),
   switchOperator: (agentNo) => client.post(`/api/auth/operators/${agentNo}/switch`, {}),
   me: () => client.get("/api/auth/me"),
+  getMenus: () => client.get("/api/auth/menus"),
   logout: () => client.post("/api/auth/logout"),
   getDashboard: () => client.get("/api/ops/dashboard"),
 };

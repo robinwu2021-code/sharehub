@@ -32,7 +32,46 @@ export interface MeResp {
   perms?: string[];
 }
 
+/**
+ * 服务端菜单节点。字段与 `NavSection`/`NavLeaf` **一一对应**（后端 V67 起刻意如此）——
+ * 少一个前端就得为它留一份本地数据，那就又回到「两处真源」。
+ *
+ * ⚠️ 没有 `soon`：它由 `pageReady(page, useMock)` 算，取决于这份产物连的是
+ * mock 还是真后端 —— **构建的属性，不是菜单的属性**，所以库里没有这一列。
+ */
+export interface MenuNode {
+  menuNo: string;
+  parentNo: string | null;
+  name: string;
+  nameEn: string | null;
+  nameAr: string | null;
+  /** MENU（分组）/ ITEM（叶子）。词表由后端 V68 钉在列注释上。 */
+  type: "MENU" | "ITEM";
+  path: string | null;
+  icon: string | null;
+  /** L2 分组标题（仅叶子）。 */
+  group: string | null;
+  sort: number;
+  perm: string | null;
+  phase: number | null;
+  ready: boolean;
+  module: string | null;
+  modules: string[];
+  match: string[];
+  pinBottom: boolean;
+  portalFor: string[];
+  children: MenuNode[];
+}
+
 export interface DashboardApi {
+  /**
+   * 当前登录人**可见的**菜单树（服务端已按权限剪枝，前端拿到就渲染）。
+   *
+   * 规则见后端 MenuService：门户排他 · 叶子按 perm · section 看有没有可见叶子。
+   * 前端只再施加两样：phase/ready 的分期门禁、soon 的就绪度 ——
+   * 那两样是产品分期与构建属性，不是权限。
+   */
+  getMenus(): Promise<MenuNode[]>;
   /**
    * 登录。
    *

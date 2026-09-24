@@ -4,6 +4,8 @@ import { Suspense, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { usePermsSync } from "@/lib/perms-sync";
+import { useMenuTree } from "@/lib/use-menu-tree";
+import { useMenuStore } from "@/lib/menu-source";
 import { Rail } from "./rail";
 import { SecondaryNav } from "./secondary-nav";
 import { Header } from "./header";
@@ -30,6 +32,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // 权限码与服务端对齐（进应用 + 标签页重新可见）。挂在这里而不是各页面：
   // 判权入口散在全站，任何一页少挂一次就是「那一页还按旧权限渲染」。
   usePermsSync();
+  // 服务端菜单（开关打开才拉；拉不到就用本地那份，见 use-menu-tree）
+  useMenuTree();
+  const menuLoading = useMenuStore((s) => s.loading);
+  // 订阅 tree：它到了要让整个外壳重渲染，否则导航还是上一份
+  useMenuStore((s) => s.tree);
 
   // trailingSlash:true → pathname 可能带尾斜杠，归一化后再比较。
   const norm = pathname.replace(/\/+$/, "") || "/";
@@ -45,6 +52,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   if (isPublic) return <>{children}</>;
   if (!ready || !loggedIn) return null;
+  /*
+   * 菜单在途时先不渲染导航。渲染的话会先闪一份**本地**菜单、再跳成服务端那份 ——
+   * 两者不一致时那一下看着像「菜单自己少了几项」。
+   * 只在开关打开时才会进这一支（关掉时 loading 恒为 false）。
+   */
+  if (menuLoading) return null;
 
   return (
     // 规范：设计规范-布局与外壳.md §2 —— 只用两级色调，全幅铺满不留边距。
