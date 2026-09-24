@@ -1628,6 +1628,10 @@
      "type": "String"
     },
     {
+     "name": "nameEn",
+     "type": "String"
+    },
+    {
      "name": "nameAr",
      "type": "String"
     },
@@ -1644,12 +1648,44 @@
      "type": "String"
     },
     {
+     "name": "group",
+     "type": "String"
+    },
+    {
      "name": "sort",
      "type": "Integer"
     },
     {
      "name": "perm",
      "type": "String"
+    },
+    {
+     "name": "phase",
+     "type": "Integer"
+    },
+    {
+     "name": "ready",
+     "type": "boolean"
+    },
+    {
+     "name": "module",
+     "type": "String"
+    },
+    {
+     "name": "modules",
+     "type": "List<String>"
+    },
+    {
+     "name": "match",
+     "type": "List<String>"
+    },
+    {
+     "name": "pinBottom",
+     "type": "boolean"
+    },
+    {
+     "name": "portalFor",
+     "type": "List<String>"
     },
     {
      "name": "children",
@@ -1665,6 +1701,10 @@
       },
       {
        "name": "name",
+       "type": "String"
+      },
+      {
+       "name": "nameEn",
        "type": "String"
       },
       {
@@ -1684,12 +1724,44 @@
        "type": "String"
       },
       {
+       "name": "group",
+       "type": "String"
+      },
+      {
        "name": "sort",
        "type": "Integer"
       },
       {
        "name": "perm",
        "type": "String"
+      },
+      {
+       "name": "phase",
+       "type": "Integer"
+      },
+      {
+       "name": "ready",
+       "type": "boolean"
+      },
+      {
+       "name": "module",
+       "type": "String"
+      },
+      {
+       "name": "modules",
+       "type": "List<String>"
+      },
+      {
+       "name": "match",
+       "type": "List<String>"
+      },
+      {
+       "name": "pinBottom",
+       "type": "boolean"
+      },
+      {
+       "name": "portalFor",
+       "type": "List<String>"
       },
       {
        "name": "children",
@@ -1705,6 +1777,10 @@
         },
         {
          "name": "name",
+         "type": "String"
+        },
+        {
+         "name": "nameEn",
          "type": "String"
         },
         {
@@ -1724,12 +1800,44 @@
          "type": "String"
         },
         {
+         "name": "group",
+         "type": "String"
+        },
+        {
          "name": "sort",
          "type": "Integer"
         },
         {
          "name": "perm",
          "type": "String"
+        },
+        {
+         "name": "phase",
+         "type": "Integer"
+        },
+        {
+         "name": "ready",
+         "type": "boolean"
+        },
+        {
+         "name": "module",
+         "type": "String"
+        },
+        {
+         "name": "modules",
+         "type": "List<String>"
+        },
+        {
+         "name": "match",
+         "type": "List<String>"
+        },
+        {
+         "name": "pinBottom",
+         "type": "boolean"
+        },
+        {
+         "name": "portalFor",
+         "type": "List<String>"
         },
         {
          "name": "children",
