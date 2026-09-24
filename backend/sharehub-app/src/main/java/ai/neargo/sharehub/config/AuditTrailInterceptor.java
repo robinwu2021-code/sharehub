@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.config;
 
+import ai.neargo.sharehub.audit.AuditChanges;
 import ai.neargo.sharehub.auth.ClientCode;
 import ai.neargo.sharehub.auth.LoginUser;
 import ai.neargo.sharehub.auth.SecurityUtils;
@@ -13,6 +14,7 @@ import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -86,6 +88,21 @@ public class AuditTrailInterceptor implements HandlerInterceptor {
         this.auditLogs = auditLogs;
     }
 
+    /**
+     * 请求开始就清一次 {@link AuditChanges}。
+     *
+     * <p>不是多余的：本拦截器只挂在 {@code /api/**} 与 {@code /internal/**} 上，
+     * 别的路径（比如 {@code /mp/**}）压根不走 {@code afterCompletion}。
+     * 那边若有服务记了改动，值会留在线程上，等这个线程下次服务一个被审计的请求时
+     * 被 drain 进去 —— <b>那条审计不是少了信息，是记了别人的改动</b>。
+     * 在入口清掉，这个请求看到的一定只有自己产生的。
+     */
+    @Override
+    public boolean preHandle(HttpServletRequest req, HttpServletResponse res, Object handler) {
+        AuditChanges.clear();
+        return true;
+    }
+
     @Override
     public void afterCompletion(HttpServletRequest req, HttpServletResponse res,
                                 Object handler, @Nullable Exception ex) {
@@ -110,7 +127,7 @@ public class AuditTrailInterceptor implements HandlerInterceptor {
                     AuditOutcome.ofStatus(res.getStatus()),
                     TraceContext.currentTraceId(),
                     json(t.type()), json(t.no()),
-                    json(Map.of("query", req.getQueryString() == null ? "" : req.getQueryString())),
+                    detailOf(req),
                     clientIp(req)));
         } catch (RuntimeException e) {
             // 审计写失败**不让业务 500**（见类注释的取舍），但必须是 ERROR 而不是 WARN：
@@ -120,6 +137,10 @@ public class AuditTrailInterceptor implements HandlerInterceptor {
             log.error("审计写入失败，这条操作没有留痕：uri={} actor={}。"
                             + "连续出现说明审计已经在静默失效，先查 iam_audit_log 是否可写。",
                     req.getRequestURI(), SecurityUtils.currentUser().map(LoginUser::userNo).orElse("?"), e);
+        } finally {
+            // 兜住所有提前 return 的路径（非写方法、免审前缀、/api 上无身份）——
+            // 那些路径走不到 drain()，不清的话改动会漏给下一个请求
+            AuditChanges.clear();
         }
     }
 
@@ -168,6 +189,21 @@ public class AuditTrailInterceptor implements HandlerInterceptor {
     }
 
     /** {@code iam_audit_log} 的 target_type/target_no/detail 都是 JSON 列（V13，带 json_valid CHECK）。 */
+    /**
+     * detail：查询串 + 本次请求记下的字段改动。
+     *
+     * <p>{@code changes} 的形状与读侧 {@code AuditLogServiceImpl.changesOf} 约定的一致。
+     * 没有服务接入 {@link AuditChanges} 时这里就是空数组 —— 读侧本来也这么处理，
+     * 所以接入是<b>逐个资源增量</b>的，不需要一次改完。
+     */
+    private static String detailOf(HttpServletRequest req) {
+        Map<String, Object> d = new LinkedHashMap<>();
+        d.put("query", req.getQueryString() == null ? "" : req.getQueryString());
+        List<AuditChanges.Change> changes = AuditChanges.drain();
+        if (!changes.isEmpty()) d.put("changes", changes);
+        return json(d);
+    }
+
     private static String json(Object v) {
         return ai.neargo.sharehub.common.Json.write(v);
     }

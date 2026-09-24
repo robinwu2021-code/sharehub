@@ -1,6 +1,7 @@
 package ai.neargo.sharehub.finance.service.impl;
 
 import ai.neargo.common.core.PageResult;
+import ai.neargo.sharehub.audit.AuditChanges;
 import ai.neargo.sharehub.auth.SecurityUtils;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.finance.FinNos;
@@ -167,6 +168,17 @@ public class ShareServiceImpl implements ShareService {
                 body.setId(current.getId());
                 body.setVersion(current.getVersion());
                 if (body.getTenantId() == null) body.setTenantId(current.getTenantId());
+                /*
+                 * 改前改后进审计（T3-2）。分润规则是第一个接入的，因为它最需要 ——
+                 * 结算争议时要问的是「费率是从 8% 改成 5% 的，还是一直就是 5%」，
+                 * 而只记一条「POST /api/trade/share-rules」答不出来：
+                 * 去库里查当前值，查到的正是被改过之后的那个。
+                 *
+                 * 字段是**白名单**（见 AuditChanges 类注释里「为什么不自动 diff」）：
+                 * 这六个是会影响分多少钱给谁的，其余（时间戳、版本号、租户）不进审计。
+                 */
+                AuditChanges.compare(current, body,
+                        "rate", "mode", "basis", "priority", "payeeNo", "payeeName");
                 ruleMapper.updateById(body);
             }
         }
