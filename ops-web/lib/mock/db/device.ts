@@ -207,14 +207,36 @@ export const otaReleases: OtaRelease[] = [
 ];
 
 /** 投放种子：progress 缺席（由任务算），fwVersion 取自 otaReleases 里已发布/已暂停的主控版本。 */
-const ROLLOUT_SEEDS = Array.from({ length: 14 }, (_, i) => ({
-  rolloutNo: `OTA${5000 + i}`,
-  fwVersion: p(["1.4.0", "1.4.1", "1.5.0", "2.0.0"], i),
-  vendorCode: p(VENDORS, i),
-  strategy: (i % 3 === 0 ? "FULL" : "GRAY") as OtaRollout["strategy"],
-  status: p(["PENDING", "RUNNING", "DONE", "ROLLBACK"] as const, i),
-  createdAt: iso(i * 86400_000),
-}));
+const ROLLOUT_SEEDS = Array.from({ length: 14 }, (_, i) => {
+  const fwVersion = p(["1.4.0", "1.4.1", "1.5.0", "2.0.0"], i);
+  /*
+   * 投放必然引用版本库里的一条（`dev_ota_rollout.release_no` 是 NOT NULL）。
+   * **厂商也跟着这条走**，不再各自随机取 —— 否则种子里会出现
+   * 「cd-tech 的投放发了 sd-power 的固件包」，而这种矛盾在页面上看不出来。
+   */
+  const rel = otaReleases.find((r) => r.version === fwVersion)!;
+  const strategy = (i % 3 === 0 ? "FULL" : "GRAY") as OtaRollout["strategy"];
+  /*
+   * 范围与策略要自洽：全量（FULL）必然是 ALL；灰度（GRAY）才谈得上
+   * 只发某个站点或某台设备。反过来配（FULL + 单台）在业务上讲不通。
+   */
+  const scope: OtaRollout["scope"] = strategy === "FULL" ? "ALL" : (i % 2 === 0 ? "SITE" : "DEVICE");
+  return {
+    rolloutNo: `OTA${5000 + i}`,
+    releaseNo: rel.releaseNo,
+    fwVersion,
+    // OtaRelease.vendorCode 类型上可空、OtaRollout.vendorCode 不可空（前端这两处
+    // 本身不一致）。mock 的版本库条条都有厂商，兜底只为类型成立，不是真会走到。
+    vendorCode: rel.vendorCode ?? p(VENDORS, i),
+    strategy,
+    scope,
+    // 站点号沿用 location.ts 的 `ST${300 + i}` 形态。**不 import 那个模块** ——
+    // device 不依赖 location，引进来有循环依赖风险。改了那边的编号规则记得同步。
+    targetRef: scope === "ALL" ? null : scope === "SITE" ? `ST${300 + (i % 5)}` : cabNo(i),
+    status: p(["PENDING", "RUNNING", "DONE", "ROLLBACK"] as const, i),
+    createdAt: iso(i * 86400_000),
+  };
+});
 
 const codeOf = (version: string) => otaReleases.find((r) => r.version === version)?.versionCode ?? 0;
 /** 升级前版本只能取「版本库里比目标低的档位」——出现 1.5.0 → 1.5.0 这种就不是升级了。 */

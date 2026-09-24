@@ -905,9 +905,31 @@ function invColsWith(onOpen: (r: InventoryTransfer) => void): Column<InventoryTr
   { header: "创建时间", cell: (r) => <span className="text-muted-foreground">{fmtTime(r.createdAt)}</span> },
   ];
 }
+/** 投放范围的人话。ALL 不写「全部」而写「全部设备」—— 前者容易被读成「全部站点」。 */
+const rolloutScope = (r: OtaRollout) =>
+  r.scope === "ALL" ? "全部设备"
+    : r.scope === "SITE" ? `站点 ${r.targetRef ?? "-"}`
+      : `单台 ${r.targetRef ?? "-"}`;
+
 const otaCols: Column<OtaRollout>[] = [
   { header: "发布单号", cell: (r) => <span className="font-medium">{r.rolloutNo}</span> },
-  { header: "固件版本", cell: (r) => r.fwVersion },
+  {
+    header: "固件版本",
+    cell: (r) => (
+      <>
+        {r.fwVersion}
+        {/* releaseNo 才是指向版本库的真链接：版本号只是文本，
+            同一个版本号在不同厂商下可能是两个包 */}
+        <div className="truncate txt-caption text-muted-foreground">{r.releaseNo}</div>
+      </>
+    ),
+  },
+  {
+    header: "投放范围",
+    // 与「策略」是两个维度：策略说怎么发（灰度/全量），范围说发给谁。
+    // 只有策略时，一条灰度投放看不出它究竟影响了多少设备。
+    cell: (r) => <span className="text-muted-foreground">{rolloutScope(r)}</span>,
+  },
   { header: "供应商", cell: (r) => r.vendorCode },
   { header: "策略", cell: (r) => <Badge tone="outline">{r.strategy === "FULL" ? "全量" : "灰度"}</Badge> },
   { header: "进度", cell: (r) => <span className="tabular-nums">{Math.round(r.progress)}%</span> },
@@ -1022,6 +1044,9 @@ const EXPORTS: Record<string, { name: string; run: (rows: Row[]) => void }> = {
     run: (rows) => exportCsv<OtaRollout>("固件OTA", [
       { header: "发布单号", value: (r) => r.rolloutNo },
       { header: "固件版本", value: (r) => r.fwVersion },
+      // 导出跟着表格补：只有版本号文本时，事后复盘答不出「投的哪个包」
+      { header: "版本库编号", value: (r) => r.releaseNo },
+      { header: "投放范围", value: (r) => rolloutScope(r) },
       { header: "供应商", value: (r) => r.vendorCode },
       { header: "策略", value: (r) => (r.strategy === "FULL" ? "全量" : "灰度") },
       { header: "进度(%)", value: (r) => Math.round(r.progress) },

@@ -178,8 +178,24 @@ export interface InventoryTransferDetail {
 
 export interface OtaRollout {
   rolloutNo: string;
+  /**
+   * 投放的是版本库里的**哪一条**（→ `OtaRelease.releaseNo`，表上 NOT NULL）。
+   *
+   * {@link fwVersion} 只是展示用的版本号文本 —— 同一个版本号在不同厂商下
+   * 可能是两个包，靠它无法回答「到底投的哪个包、校验和是多少、是否强制升级」。
+   * 版本库（OtaRelease）后来补上了，而**投放指向版本库的这根线一直没接**。
+   */
+  releaseNo: string;
   fwVersion: string;
   vendorCode: string;
+  /**
+   * 投放范围。与 {@link strategy} 是**两个维度**：strategy 说「怎么发」
+   * （灰度/全量），scope 说「发给谁」（单台 / 整站 / 全部）。
+   * 只有 strategy 时，一条灰度投放看不出它究竟影响了多少设备。
+   */
+  scope: "DEVICE" | "SITE" | "ALL";
+  /** scope 的目标：DEVICE→柜机号、SITE→站点号；ALL 为 null。 */
+  targetRef: string | null;
   strategy: "GRAY" | "FULL";
   progress: number; // 0..100
   status: "PENDING" | "RUNNING" | "DONE" | "ROLLBACK";
