@@ -4,6 +4,7 @@ import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.common.OkResult;
 import ai.neargo.sharehub.trade.price.dto.PriceDtos.PlanScopeEntry;
 import ai.neargo.sharehub.trade.price.dto.PriceDtos.PricePlanEntry;
+import ai.neargo.sharehub.trade.price.dto.PriceDtos.PricePlanReq;
 import ai.neargo.sharehub.trade.price.dto.PriceDtos.PricingSchedule;
 import ai.neargo.sharehub.trade.price.entity.PricePlan;
 import ai.neargo.sharehub.trade.price.entity.PriceSchedule;
@@ -50,15 +51,17 @@ public class PricingController {
 
     @PostMapping("/price-plans")
     @PreAuthorize("@perm.can('pricing:plan:create')")
-    public PricePlanEntry createPlan(@RequestBody PricePlan body) {
-        return planService.save(body);
+    public PricePlanEntry createPlan(@RequestBody PricePlanReq body) {
+        return planService.save(body.toEntity());
     }
 
     @PostMapping("/price-plans/{planNo}")
     @PreAuthorize("@perm.can('pricing:plan:create')")
-    public PricePlanEntry updatePlan(@PathVariable String planNo, @RequestBody PricePlan body) {
-        body.setPlanNo(planNo); // 路径为准，忽略 body 里的键，防越权改他单
-        return planService.save(body);
+    public PricePlanEntry updatePlan(@PathVariable String planNo,
+                                     @RequestBody PricePlanReq body) {
+        PricePlan e = body.toEntity();
+        e.setPlanNo(planNo); // 路径为准，忽略 body 里的键，防越权改他单
+        return planService.save(e);
     }
 
     /*

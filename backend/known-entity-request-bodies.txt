@@ -38,14 +38,10 @@ MktPush
 NotifyBlacklist
 NotifyTemplate
 OpenapiApp
-PricePlan
-PriceRule
 SysAppVersion
 SysLoginSetting
 SysParam
 SysTaxSetting
-Tenant
-TenantConfig
 UsrFreeWhitelist
 UsrInvoiceTitle
 UsrRechargePkg

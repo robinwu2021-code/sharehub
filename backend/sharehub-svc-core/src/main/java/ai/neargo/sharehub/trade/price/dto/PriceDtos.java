@@ -22,6 +22,41 @@ public final class PriceDtos {
      * <p>{@code archivedAt} 不可省：前端类型继承 {@code Archivable}，页面靠它区分「在用/已归档」。
      * 出参漏了它，归档行与在用行在页面上长得一模一样。
      */
+    /**
+     * 计费方案**写入参**（白名单）。
+     *
+     * <p>相比实体 {@code PricePlan} 少两个字段，都是**有专门入口的**：
+     * <ul>
+     *   <li>{@code archivedAt} —— 归档走 {@code /price-plans/{no}/archive|unarchive}
+     *       （本仓契约禁止 delete*，软删一律走 archive）。从保存接口改它等于绕过那条路径，
+     *       而 LocService 早就防着同一件事（{@code body.setArchivedAt(current.getArchivedAt())}）；</li>
+     *   <li>{@code status} —— 运营端表单里没有这一项，beforeCreate 兜底 ACTIVE。</li>
+     * </ul>
+     *
+     * <p>两者不在入参里 → 映射出的实体该字段为 null → MyBatis-Plus 的 updateById 不写它
+     * → 原值保留。既安全，又不需要在 beforeUpdate 里逐个记得去锁。
+     */
+    public record PricePlanReq(String planNo, String name, Integer freeMinutes, Integer unitMinutes,
+                               java.math.BigDecimal unitPrice, java.math.BigDecimal capDaily,
+                               java.math.BigDecimal capTotal, String currency, String scope,
+                               String deviceType) {
+        /** 映射到实体。**status / archivedAt 有意不设**（见类注释）。 */
+        public ai.neargo.sharehub.trade.price.entity.PricePlan toEntity() {
+            var e = new ai.neargo.sharehub.trade.price.entity.PricePlan();
+            e.setPlanNo(planNo);
+            e.setName(name);
+            e.setFreeMinutes(freeMinutes);
+            e.setUnitMinutes(unitMinutes);
+            e.setUnitPrice(unitPrice);
+            e.setCapDaily(capDaily);
+            e.setCapTotal(capTotal);
+            e.setCurrency(currency);
+            e.setScope(scope);
+            e.setDeviceType(deviceType);
+            return e;
+        }
+    }
+
     public record PricePlanEntry(String planNo, String name, Integer freeMinutes, Integer unitMinutes,
                                  BigDecimal unitPrice, BigDecimal capDaily, BigDecimal buyoutPrice,
                                  String currency, String scope, String status, String archivedAt) {
