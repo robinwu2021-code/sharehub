@@ -71,6 +71,29 @@ public class DataScopeRegistration implements DataScopeRegistrar {
                 "SITE", "site_no"));
 
         /*
+         * —— 告警 ——
+         *
+         * ⚠️ **工作台是聚合，一张表漏注册就够了**。AGENT 持有 dashboard:overview:read，
+         * 而 /api/ops/dashboard 的提醒条取自 AlarmFactMapper.openAlarms()
+         * （手写 @Select，无任何归属条件）。本表此前一个维度都没注册 ——
+         * 于是代理的首屏列的是**全平台**最近 10 条未处理告警：
+         * 实测 AG002 登录后看到 CAB1000/CAB1003/CAB1005，其中 CAB1005 是 AG006 的。
+         * 列表页没事（那些表都注册了），偏偏是首屏漏的，而它不报错也不告警。
+         *
+         * 三个维度都登记：本表 agent_no / site_no / region_id 三列俱全，
+         * 而 handler 是 fail-closed —— 只登记 AGENT 的话，按区域或站点收敛的运营人员
+         * 会一条告警都看不到（见本类开头的说明）。
+         *
+         * SELF 有意不登记：本表没有 c_user_no，C 端也不该读运营告警。
+         * 将来若真要读，用 DataScopeContext.executeWithoutScope(...) 显式豁免，
+         * **不要**给它编一个假的 SELF 锚点。
+         */
+        registry.register("dev_alarm", Map.of(
+                "AGENT", "agent_no",
+                "SITE", "site_no",
+                "REGION", "region_id"));
+
+        /*
          * —— 资金四表（V58）——
          *
          * 此前这里写着「需 handler 支持『带条件的锚点』」而搁置：registry 只能登记
