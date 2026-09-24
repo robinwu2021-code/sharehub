@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.user.marketing.service.impl;
 
+import ai.neargo.sharehub.user.marketing.AudienceType;
+import ai.neargo.sharehub.user.marketing.PushStatus;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.common.crud.AbstractCrudService;
 import ai.neargo.sharehub.user.marketing.dto.MarketingDtos.PushMessageVO;
@@ -48,12 +50,12 @@ public class PushServiceImpl extends AbstractCrudService<MktPush, PushMessageVO>
 
     @Override
     protected void beforeCreate(MktPush e) {
-        if (e.getStatus() == null || e.getStatus().isBlank()) e.setStatus("DRAFT");
+        if (e.getStatus() == null || e.getStatus().isBlank()) e.setStatus(PushStatus.DRAFT.name());
         if (e.getChannel() == null || e.getChannel().isBlank()) e.setChannel("APP_PUSH");
         if (e.getSentCount() == null) e.setSentCount(0);
         if (e.getTargetCount() == null) e.setTargetCount(0);
         if (e.getSuccessCount() == null) e.setSuccessCount(0);
-        if (e.getAudienceType() == null || e.getAudienceType().isBlank()) e.setAudienceType("ALL");
+        if (e.getAudienceType() == null || e.getAudienceType().isBlank()) e.setAudienceType(AudienceType.ALL.name());
         e.setAudience(audienceLabel(e.getAudienceType(), e.getAudienceValue()));
     }
 
@@ -63,27 +65,29 @@ public class PushServiceImpl extends AbstractCrudService<MktPush, PushMessageVO>
      */
     private static String audienceLabel(String type, String value) {
         if (type == null) return "全部用户";
-        return switch (type) {
-            case "MEMBER_LEVEL" -> "会员等级 " + (value == null || value.isBlank() ? "-" : value);
-            case "SEGMENT" -> "分群 " + (value == null || value.isBlank() ? "-" : value);
+        // case 上用枚举常量而不是字面量：打错字不会报错，只会静默落到 default，
+        // 于是「发给会员等级 GOLD」在列表上显示成「全部用户」——**看起来完全正常**。
+        return switch (AudienceType.of(type).orElse(AudienceType.ALL)) {
+            case MEMBER_LEVEL -> "会员等级 " + (value == null || value.isBlank() ? "-" : value);
+            case SEGMENT -> "分群 " + (value == null || value.isBlank() ? "-" : value);
             // 用户号列表可能很长，标签只报个数，真值在 audienceValue 里
-            case "USER_LIST" -> "指定用户 " + (value == null || value.isBlank()
+            case USER_LIST -> "指定用户 " + (value == null || value.isBlank()
                     ? "0" : String.valueOf(value.split(",").length)) + " 人";
-            default -> "全部用户";
+            case ALL -> "全部用户";
         };
     }
 
     @Override
     protected void beforeUpdate(MktPush e, MktPush current) {
         // 已下发的推送不可再改内容/受众 —— 否则历史触达记录与本单不自洽
-        if ("SENT".equals(current.getStatus())) {
+        if (PushStatus.SENT.is(current.getStatus())) {
             e.setTitle(current.getTitle());
             e.setContent(current.getContent());
             e.setAudience(current.getAudience());
             e.setChannel(current.getChannel());
             e.setSentCount(current.getSentCount());
             e.setSentAt(current.getSentAt());
-            e.setStatus("SENT");
+            e.setStatus(PushStatus.SENT.name());
         }
         /*
          * 触达统计与幂等键**一律从库里取**，不接受客户端传 ——
@@ -132,8 +136,8 @@ public class PushServiceImpl extends AbstractCrudService<MktPush, PushMessageVO>
         }
         MktPush e = selectByKey(pushNo);
         if (e == null) throw new IllegalArgumentException("推送不存在: " + pushNo);
-        requireStatus(e, "排期", "DRAFT");
-        e.setStatus("SCHEDULED");
+        requireStatus(e, "排期", PushStatus.DRAFT.name());
+        e.setStatus(PushStatus.SCHEDULED.name());
         e.setScheduledAt(scheduledAt);
         if (operatorName != null && !operatorName.isBlank()) e.setOperatorName(operatorName);
         mapper.updateById(e);
@@ -159,8 +163,8 @@ public class PushServiceImpl extends AbstractCrudService<MktPush, PushMessageVO>
          */
         if (idempotencyKey.equals(e.getIdempotencyKey())) return toVO(e);
 
-        requireStatus(e, "发送", "DRAFT", "SCHEDULED");
-        e.setStatus("SENDING");
+        requireStatus(e, "发送", PushStatus.DRAFT.name(), PushStatus.SCHEDULED.name());
+        e.setStatus(PushStatus.SENDING.name());
         e.setIdempotencyKey(idempotencyKey);
         if (operatorName != null && !operatorName.isBlank()) e.setOperatorName(operatorName);
         e.setSentAt(java.time.Instant.now().toString());
@@ -173,8 +177,8 @@ public class PushServiceImpl extends AbstractCrudService<MktPush, PushMessageVO>
     public Object finish(String pushNo, Integer targetCount, Integer successCount) {
         MktPush e = selectByKey(pushNo);
         if (e == null) throw new IllegalArgumentException("推送不存在: " + pushNo);
-        if ("SENT".equals(e.getStatus())) return toVO(e);   // 重复收尾按幂等处理
-        requireStatus(e, "收尾", "SENDING");
+        if (PushStatus.SENT.is(e.getStatus())) return toVO(e);   // 重复收尾按幂等处理
+        requireStatus(e, "收尾", PushStatus.SENDING.name());
         int t = targetCount == null ? 0 : targetCount;
         int ok = successCount == null ? 0 : successCount;
         if (ok > t) {
@@ -182,7 +186,7 @@ public class PushServiceImpl extends AbstractCrudService<MktPush, PushMessageVO>
             // 而看到的人只会以为是显示错了。
             throw new IllegalArgumentException("成功触达数不能大于目标人数");
         }
-        e.setStatus("SENT");
+        e.setStatus(PushStatus.SENT.name());
         e.setTargetCount(t);
         e.setSuccessCount(ok);
         e.setSentCount(ok);      // 兼容既有列表列「触达数」，与 successCount 同值
@@ -196,7 +200,7 @@ public class PushServiceImpl extends AbstractCrudService<MktPush, PushMessageVO>
         String at = (now == null || now.isBlank()) ? java.time.Instant.now().toString() : now;
         java.util.List<MktPush> due = mapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<MktPush>()
-                        .eq("status", "SCHEDULED")
+                        .eq("status", PushStatus.SCHEDULED.name())
                         .le("scheduled_at", at));
         int n = 0;
         for (MktPush e : due) {
