@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.seed.domain;
 
+import ai.neargo.sharehub.finance.ShareMode;
 import ai.neargo.sharehub.alarm.entity.DevAlarm;
 import ai.neargo.sharehub.agent.entity.AgtAgent;
 import ai.neargo.sharehub.agent.mapper.AgentMapper;
@@ -258,7 +259,9 @@ public class DemoOpsFinanceSeeder implements CommandLineRunner {
                 r.setPeriod(period);              // 归属账期定格（V34）：不再由 created_at 现推
                 r.setAmount(gross.multiply(new BigDecimal("0.35")).setScale(2, java.math.RoundingMode.HALF_UP));
                 r.setCurrency(CCY);
-                r.setMode("RATE");
+                // RATE 不是这一列的取值 —— mode 是**结算路径**（钱怎么走），
+                // 不是「按比例还是按固定额」（那是 rate 这一列的事）。词表见 ShareMode。
+                r.setMode(ShareMode.LEDGER.name());
                 r.setStatus("PENDING");
                 shareRecords.insert(r);
             }
@@ -318,7 +321,7 @@ public class DemoOpsFinanceSeeder implements CommandLineRunner {
         r.setDimension(dimension);
         r.setPayeeNo(payeeNo);
         r.setPayeeName(payeeName);
-        r.setMode("RATE");
+        r.setMode(ShareMode.LEDGER.name());
         r.setRate(rate);          // [db-design §1.5] rate 是 0..1 小数，不是百分数
         r.setPriority(priority);
         r.setCurrency(CCY);

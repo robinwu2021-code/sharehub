@@ -31,6 +31,11 @@
 # 迁移是「建了什么」，库是「现在有什么」。注释可以由后来的 ALTER 补上
 # （pay_channel.mode 就是这样，建表时没有、后来补了），只看建表语句会把它误判成缺注释。
 #
+# 【配套的另一条卡口】
+# StoredValueInVocabularyTest 拿**库里实际存的值**跟列注释比（零容忍、无台账）。
+# 它只管有注释的列 —— 所以本台账每短一条，那条卡口的覆盖面就大一列。
+# 两条合起来才是完整的：这条问「有没有声明」，那条问「存的东西算不算数」。
+#
 # 【条目格式】 表名.列名
 ad_campaign.status
 ad_placement.status
@@ -44,7 +49,6 @@ mbr_benefit.status
 md_device_type.status
 price_plan.status
 price_plan_item.status
-share_record.mode
 usr_user.status
 usr_membership.status
 wo_inspection_plan.status

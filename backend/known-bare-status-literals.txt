@@ -98,7 +98,6 @@ ProblemServiceImpl#suggestedAction=SELF_SERVICE
 
 # ── seed（8 条）──
 DemoOpsFinanceSeeder#handleStatus=OPEN
-DemoOpsFinanceSeeder#mode=RATE
 DemoOpsFinanceSeeder#refType=SHARE
 DemoOpsFinanceSeeder#sourceType=SETTLEMENT
 DemoOpsFinanceSeeder#status=ACTIVE
