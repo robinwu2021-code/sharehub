@@ -1,6 +1,7 @@
 package ai.neargo.sharehub.config;
 
 import ai.neargo.sharehub.audit.AuditChanges;
+import ai.neargo.sharehub.audit.AuditNoop;
 import ai.neargo.sharehub.auth.ClientCode;
 import ai.neargo.sharehub.auth.LoginUser;
 import ai.neargo.sharehub.auth.SecurityUtils;
@@ -17,6 +18,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 运营端写操作审计（{@code iam_audit_log} 的生产者）。
@@ -35,6 +37,11 @@ import java.util.Map;
  * <b>ops-web 今天就在用员工令牌调</b>（见 {@code InternalTokenFilter} 的说明）——
  * 结算生成、信用拉黑都在里面，而它们至今<b>一条审计都没有</b>。
  * 现在：有登录人就记登录人，没有就记 {@code SYSTEM:<服务名>}。
+ *
+ * <p><b>写方法不等于操作</b>，有两处近似不成立，各有各的挡法：
+ * 路径整条就不是操作的（用 POST 传长列表的读）进 {@link #NOT_AN_OPERATION}；
+ * 路径是操作、<b>但这一次什么也没做</b>的（定时端点空转）由端点自己
+ * {@link AuditNoop#mark} —— 后者不能整条豁免，因为<b>干了活的那一次必须留痕</b>。
  *
  * <p><b>成没成都记</b>（{@link AuditOutcome}）。此前遇到 {@code >=400} 直接跳过，
  * 理由是「没做成的记进去会让『谁改了什么』失真」—— 顾虑对，结论反了：
@@ -82,6 +89,30 @@ public class AuditTrailInterceptor implements HandlerInterceptor {
      */
     private static final List<String> SKIP_PREFIXES = List.of("/api/auth/");
 
+    /**
+     * 写方法，但<b>不是操作</b> —— 这些路径不进审计。
+     *
+     * <p>这里只收<b>整条路径就不是操作</b>的那一类，判据是<b>另有更好的留痕</b>，
+     * 不是「这个不重要」。所以每条都写明那份留痕在哪 —— 哪天它没了，这条豁免也就不成立了。
+     *
+     * <p>「路径是操作，但这一次什么也没做」不走这里，走 {@link AuditNoop#mark}：
+     * 整条豁免会把<b>干了活的那一次</b>一起丢掉，而那一次恰恰是最该留痕的。
+     *
+     * <p>反过来，<b>凡是代表某个人的决定的</b>（结算生成、信用拉黑、归属改派、
+     * 供应商配置、归还结单）一律不许进这张表 —— 审计是它们唯一的留痕。
+     *
+     * <p>公开是为了能被直接断言：「豁免了哪几条」是本类最该被看住的决定
+     * （同 {@code InternalTokenFilter.appliesTo} 的理由）。
+     */
+    public static final Set<String> NOT_AN_OPERATION = Set.of(
+            // 批量读：编号可能几百个，塞进 query string 会超长度限制，所以用了 POST
+            // （见各自控制器的注释）。它什么都没改，审计行只能说「有人读了一批数据」。
+            "/internal/platform/sites/briefs",
+            "/internal/dev/cabinets/briefs",
+            // 通知投递。每一次发送（含被黑名单拦下的）都落 notify_log：
+            // 渠道/模板/目标/场景/状态/失败原因/费用都在那儿，审计行一个都带不出来。
+            "/internal/platform/notify/send");
+
     private final AuditLogService auditLogs;
 
     public AuditTrailInterceptor(AuditLogService auditLogs) {
@@ -111,6 +142,10 @@ public class AuditTrailInterceptor implements HandlerInterceptor {
             if (AUDITED_PREFIXES.stream().noneMatch(uri::startsWith)
                     || !WRITE_METHODS.contains(req.getMethod())) return;
             if (SKIP_PREFIXES.stream().anyMatch(uri::startsWith)) return;
+            if (NOT_AN_OPERATION.contains(uri)) return;
+            // 端点自己算出来「这次什么也没做」（定时端点空转）——
+            // 见 AuditNoop：整条豁免会连干了活的那一次一起丢掉，所以按次判断。
+            if (AuditNoop.marked(req)) return;
             LoginUser u = SecurityUtils.currentUser().orElse(null);
             // /api 上没有身份 = 还没认证（401）。审计记不出「谁」，
             // 这属于安全日志而非操作审计。/internal 则相反：那里本来就可能没有人。

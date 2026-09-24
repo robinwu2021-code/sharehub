@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.portal.platform;
 
+import ai.neargo.sharehub.audit.AuditNoop;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.operation.dto.OperationDtos.OperationOverview;
 import ai.neargo.sharehub.operation.dto.OperationDtos.PayeeSharingRow;
@@ -148,6 +149,13 @@ public class OperationController {
                     org.springframework.http.HttpStatus.FORBIDDEN, "该端点只接受本机调用");
         }
         List<String> touched = adjustments.tick();
+        /*
+         * 空转的那些不进审计。cron 一分钟一次，九成九的执行什么也没做 ——
+         * 全记下来是一天 1440 行不带对象、不带改动的行，真正的操作会被埋在里面
+         * （见 AuditNoop）。干了活的那一次照常留痕：它是审计里唯一能看到
+         * 「系统自己改了价格」的地方，traceId 接到日志里那几行「调价 X 已生效」。
+         */
+        if (touched.isEmpty()) AuditNoop.mark(req);
         return Map.of("touched", touched, "count", touched.size());
     }
 

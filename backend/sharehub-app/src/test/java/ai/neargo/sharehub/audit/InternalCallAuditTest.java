@@ -28,6 +28,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 记 {@code SYSTEM:<服务名>}。服务名是调用方自报的 —— 内部凭证是一把共享密钥，
  * 持有它的任何一方都能声称自己是任何服务，所以那一段是<b>排障线索而非身份证明</b>。
  * 可信的部分是 {@code SYSTEM}：确实有人拿着内部密钥做了这件事。
+ *
+ * <p>那一半的用例在 {@code AuditNotAnOperationTest} —— 今天能匿名调的
+ * {@code /internal} 写端点只有调价 tick（别的都要求登录身份，见 {@code SecurityConfig}），
+ * 而它同时还要证明「空转不留痕」，两件事绑在同一次执行上，放在一起写才说得清。
  */
 class InternalCallAuditTest extends AuditTestSupport {
 
@@ -46,23 +50,5 @@ class InternalCallAuditTest extends AuditTestSupport {
                 .as("记的应当是触发的那个人，而不是 SYSTEM").isEqualTo("admin.user");
         assertThat(row.path("action").asText()).contains("/internal/trade/settlements/generate");
         assertThat(row.path("outcome").asText()).isEqualTo("SUCCESS");
-    }
-
-    @Test
-    @DisplayName("没有登录人的内部调用记成 SYSTEM:<服务名>")
-    void an_internal_write_without_a_person_is_recorded_as_system() {
-        String tp = newTraceparent();
-
-        // 调价 tick：允许匿名（只接受回环调用），代表「定时器/别的服务触发」那一类
-        postWithHeaders("/internal/trade/price-adjustments/tick", Map.of(), null,
-                "traceparent", tp, "X-Internal-Caller", "sharehub-scheduler").okData();
-
-        JsonNode row = auditOfThisRequest("SYSTEM", traceIdOf(tp));
-        assertThat(row.path("actor").asText())
-                .as("SYSTEM 是可信的那半截（确实是内部触发），冒号后面是调用方自报的")
-                .isEqualTo("SYSTEM:sharehub-scheduler");
-        assertThat(row.path("clientCode").isNull() || row.path("clientCode").asText().isEmpty())
-                .as("没有人就没有「从哪个端」——留空比编一个 OPS 诚实")
-                .isTrue();
     }
 }

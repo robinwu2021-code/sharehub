@@ -10,7 +10,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -42,15 +41,14 @@ class TableFieldOrphanTest extends ApiTestSupport {
     @Autowired
     private JdbcTemplate jdbc;
 
-    /** 主代码里所有实体源文件。 */
-    private static final List<Path> MODULES = List.of(
-            Path.of("..", "sharehub-svc-platform", "src", "main", "java"),
-            Path.of("..", "sharehub-svc-core", "src", "main", "java"),
-            Path.of("..", "sharehub-svc-ops", "src", "main", "java"),
-            Path.of("..", "sharehub-svc-finance", "src", "main", "java"),
-            Path.of("..", "sharehub-svc-gateway", "src", "main", "java"),
-            Path.of("..", "sharehub-common", "src", "main", "java"),
-            Path.of("src", "main", "java"));
+    /**
+     * 主代码里所有实体源文件。
+     *
+     * <p><b>从 backend 根自动发现，不写模块清单</b>：清单漏一个模块，那个模块里的孤儿列
+     * 就永远扫不到 —— 而卡口照样是绿的。这个方向的失误没有任何症状。
+     * 同 {@code scripts/_modules.py}（Python 侧被同一类失误咬了五次之后改的就是这个）。
+     */
+    private static final Path BACKEND_ROOT = Path.of("..");
 
     private static final Pattern TABLE_NAME = Pattern.compile("@TableName\\(\"(\\w+)\"\\)");
     /** {@code @TableField("col") ... private T fieldName;} —— 只要显式改了列名的。 */
@@ -71,22 +69,21 @@ class TableFieldOrphanTest extends ApiTestSupport {
     void a_renamed_column_leaves_no_orphan_behind() throws IOException {
         Set<String> found = new TreeSet<>();
 
-        for (Path module : MODULES) {
-            if (!Files.exists(module)) continue;
-            try (var files = Files.walk(module)) {
-                for (Path p : files.filter(f -> f.toString().endsWith(".java")).toList()) {
-                    String src = Files.readString(p, StandardCharsets.UTF_8);
-                    // 一个文件里可能有多个 @TableName（IamEntities 就是），逐段切
-                    Matcher t = TABLE_NAME.matcher(src);
-                    int prev = -1;
-                    String prevTable = null;
-                    while (t.find()) {
-                        if (prevTable != null) collect(src.substring(prev, t.start()), prevTable, found);
-                        prevTable = t.group(1);
-                        prev = t.end();
-                    }
-                    if (prevTable != null) collect(src.substring(prev), prevTable, found);
+        try (var files = Files.walk(BACKEND_ROOT)) {
+            for (Path p : files.filter(f -> f.toString().endsWith(".java"))
+                    .filter(f -> f.toString().contains("/src/main/java/"))
+                    .filter(f -> !f.toString().contains("/target/")).toList()) {
+                String src = Files.readString(p, StandardCharsets.UTF_8);
+                // 一个文件里可能有多个 @TableName（IamEntities 就是），逐段切
+                Matcher t = TABLE_NAME.matcher(src);
+                int prev = -1;
+                String prevTable = null;
+                while (t.find()) {
+                    if (prevTable != null) collect(src.substring(prev, t.start()), prevTable, found);
+                    prevTable = t.group(1);
+                    prev = t.end();
                 }
+                if (prevTable != null) collect(src.substring(prev), prevTable, found);
             }
         }
 
