@@ -136,12 +136,15 @@ ok "线上仍是出发时那一版，可以切"
 # 这里在切软链之前比一次：本次 jar 里**尚未应用**的迁移，
 # 若有任何一个版本号小于生产已应用的最大版本号，就是乱序，直接退出。
 say "迁移顺序预检"
-JAR_VERSIONS=$(unzip -Z1 "$WT/$JAR_IN_REPO" 'BOOT-INF/classes/db/migration/V*__*.sql' 2>/dev/null     | sed 's|.*/V||; s|__.*||' | grep -E '^[0-9]+$' | sort -n | uniq)
-APPLIED=$(ssh "$HOST" "sudo mariadb -N -e \"select version from pb_core.flyway_schema_history where success=1\"" 2>/dev/null     | grep -E '^[0-9]+$' | sort -n | uniq)
+# `|| true` 不能省：set -e 下 grep 无匹配就是退出码 1，会让整个脚本**静默退出** ——
+# 一个「不说话就把部署停掉」的卡口本身就是缺陷。2026-09-24 第一次跑就这样了。
+# 另外 jar 在 $WT/backend/ 下，脚本里本来就有 LOCAL_JAR，别再拼一次路径。
+JAR_VERSIONS=$(unzip -Z1 "$LOCAL_JAR" 'BOOT-INF/classes/db/migration/V*__*.sql' 2>/dev/null     | sed 's|.*/V||; s|__.*||' | grep -E '^[0-9]+$' | sort -n | uniq || true)
+APPLIED=$(ssh "$HOST" "sudo mariadb -N -e \"select version from pb_core.flyway_schema_history where success=1\"" 2>/dev/null     | grep -E '^[0-9]+$' | sort -n | uniq || true)
 if [ -n "$JAR_VERSIONS" ] && [ -n "$APPLIED" ]; then
     MAX_APPLIED=$(echo "$APPLIED" | tail -1)
     PENDING=$(comm -23 <(echo "$JAR_VERSIONS") <(echo "$APPLIED"))
-    OUT_OF_ORDER=$(echo "$PENDING" | awk -v m="$MAX_APPLIED" 'NF && $1+0 < m+0')
+    OUT_OF_ORDER=$(echo "$PENDING" | awk -v m="$MAX_APPLIED" 'NF && $1+0 < m+0' || true)
     if [ -n "$OUT_OF_ORDER" ]; then
         die "迁移乱序，**没有动生产**：生产已应用到 V$MAX_APPLIED，
     而本次要补跑的版本里有比它小的：$(echo "$OUT_OF_ORDER" | tr '\n' ' ')
