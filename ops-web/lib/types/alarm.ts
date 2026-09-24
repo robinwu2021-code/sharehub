@@ -7,12 +7,31 @@ import type { Archivable } from "./common";
 export type AlarmLevel = "INFO" | "WARN" | "CRITICAL";
 
 // 告警记录：多厂商错误码归一化 —— alarmCode 是平台统一码，vendorErrorCode 是厂商原始码。
+/**
+ * 告警来源。**具名而不是内联联合**：两端同名词表比对
+ * （后端 StatusVocabularyAcrossEndsTest）只认具名 `export type`。
+ */
+export type AlarmSource = "DEVICE" | "OTA" | "RENT";
+
 export interface AlarmRecord {
   alarmNo: string;
   cabinetNo: string;
   /** 站点编号。只有 siteName 时同名站点连不准（同合同「按编号连」的理由）。 */
   siteNo: string | null;
   siteName: string;
+  /**
+   * 站点归属的代理商编号；直营站点为 null。
+   *
+   * 告警要派给谁修，取决于这个站是谁在运营 —— 只有站点名时，值班得先去站点档案
+   * 查一次归属。代理门户按自己的 agentNo 收敛数据，也靠它。
+   */
+  agentNo: string | null;
+  /**
+   * 告警从哪条路来的。三者排查路径完全不同：
+   * `DEVICE` 设备自己上报 · `OTA` 固件投放过程中产生 · `RENT` 租借流程中判定。
+   * 只看告警码时，一条 OTA 期间的批量告警和设备真故障长得一样。
+   */
+  source: AlarmSource;
   vendorCode: string; // 设备厂商（cd-tech / sd-power / chargenow）
   alarmCode: string; // 平台统一告警码，如 SLOT_STUCK
   vendorErrorCode: string; // 厂商原始错误码，各家风格不同（E203 / ERR-17 / 0x1F04）

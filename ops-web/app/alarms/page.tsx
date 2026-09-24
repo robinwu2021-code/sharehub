@@ -39,6 +39,13 @@ const TAB_KEYS = ["records", "notices", "codes", "rules"] as const;
  * 对红绿色盲（男性约 8%）几乎同色，故文案里带一条与颜色无关的阶梯：▫ < ▲ < ▲▲。
  * 键序 = 下拉选项顺序。
  */
+/** 告警来源的人话。短词优先 —— 这一列只用来分流，写全称会把表撑宽。 */
+const ALARM_SOURCE: Record<AlarmRecord["source"], string> = {
+  DEVICE: "设备",
+  OTA: "OTA",
+  RENT: "租借",
+};
+
 const LEVEL: StatusMap<AlarmLevel> = {
   INFO: { label: "▫ 提示", tone: "muted" },
   WARN: { label: "▲ 警告", tone: "warning" },
@@ -198,8 +205,28 @@ function AlarmsInner() {
         </span>
       ),
     },
-    { header: "柜机 / 站点", cell: (a) => <>{a.cabinetNo} <span className="text-muted-foreground">· {a.siteName}</span></> },
+    {
+      header: "柜机 / 站点",
+      cell: (a) => (
+        <>
+          <span>{a.cabinetNo} <span className="text-muted-foreground">· {a.siteName}</span></span>
+          {/* 告警派给谁修取决于这个站是谁在运营。只有站点名时，值班得先去
+              站点档案查一次归属；直营站没有代理，写「直营」而不是留空 —— 
+              空白读起来像数据缺失。 */}
+          <div className="truncate txt-caption text-muted-foreground">
+            {a.agentNo ?? "平台直营"}
+          </div>
+        </>
+      ),
+    },
     { header: "厂商", cell: (a) => <Badge tone="outline">{a.vendorCode}</Badge> },
+    {
+      header: "来源",
+      className: "whitespace-nowrap",
+      // 三者排查路径完全不同：设备真故障 / 固件投放期间的批量告警 / 租借流程判定。
+      // 只看告警码时，一批 OTA 期间的告警和设备故障长得一模一样。
+      cell: (a) => <Badge tone="outline">{ALARM_SOURCE[a.source]}</Badge>,
+    },
     // 双列并存 = 多厂商错误码归一化：平台统一码用于规则/统计，厂商原始码用于对厂商排障
     { header: "告警码", cell: (a) => <span className="tabular-nums">{a.alarmCode}</span> },
     { header: "厂商错误码", cell: (a) => <span className="text-muted-foreground tabular-nums">{a.vendorErrorCode}</span> },

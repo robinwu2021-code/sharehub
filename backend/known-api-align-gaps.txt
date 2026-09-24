@@ -19,9 +19,11 @@
 
 B GET /api/ops/alarms/codes AlarmCode 后端有前端无:messageAr
 B GET /api/ops/alarms/codes AlarmCode 后端有前端无:messageEn
-B GET /api/ops/alarms/records AlarmRecord 后端有前端无:agentNo
+# ⚠️ 下面这条是**有意不接**，不是待办：
+#   dedupKey 是「同源重复合并计数」的内部键（DDL: 去重键）。
+#   它的可见结果是 count，前端已有并在告警号旁以「×47」显示。
+#   把内部键也接进来只是把实现细节固化进契约。
 B GET /api/ops/alarms/records AlarmRecord 后端有前端无:dedupKey
-B GET /api/ops/alarms/records AlarmRecord 后端有前端无:source
 B GET /api/ops/inspection-plans InspectionPlan 后端有前端无:cron
 # ⚠️ 下面这条是**有意不接**，不是待办：
 #   path 是后端为子树查询冗余的祖先路径（LIKE '/D1/%' 避免递归 CTE，见 IamDept 注释）。

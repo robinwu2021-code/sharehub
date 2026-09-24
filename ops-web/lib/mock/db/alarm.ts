@@ -40,6 +40,16 @@ export const alarmRecords: AlarmRecord[] = Array.from({ length: 14 }, (_, i) => 
   return {
     alarmNo: `ALM${40000 + i}`, cabinetNo: cab.cabinetNo,
     siteNo: cab.siteNo ?? null, siteName: cab.locationName ?? p(LOCS, i),
+    // 代理归属**跟机柜走**，不另生成：两处不一致的话，「这条告警派给谁」
+    // 在告警页和设备台账上会给出两个答案，而页面上看不出矛盾。
+    // 机柜 agentNo 为空 = 平台直营，告警也就没有代理。
+    agentNo: cab.agentNo ?? null,
+    /*
+     * 来源三种都要有样本：DEVICE 占多数（设备自己上报），少量 OTA（固件投放
+     * 过程中产生）与 RENT（租借流程判定）。只种 DEVICE 的话，「按来源分流」
+     * 这件事在页面上永远是同一个值，等于没加这一列。
+     */
+    source: (i % 7 === 3 ? "OTA" : i % 5 === 2 ? "RENT" : "DEVICE") as AlarmRecord["source"],
     vendorCode: cab.vendorCode, alarmCode: def.code, vendorErrorCode: vendorErr(cab.vendorCode, i),
     level: def.level, occurredAt: iso(i * 5400_000), status: st,
     workOrderNo: st === "OPEN" ? null : `WO${70000 + (i % 64)}`,
