@@ -37,8 +37,21 @@ export default function DashboardPage() {
       ) : (
         <>
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-            <StatCard label="今日 GMV" value={money(data.gmvToday, data.currency)} sub="+8.2% 环比" />
-            <StatCard label="今日订单" value={data.ordersToday} sub="+5.1% 环比" />
+            {/*
+              2026-09-24：撤掉两张卡片上写死的 `+8.2% 环比` / `+5.1% 环比`。
+              它们是**字面量**，不是算出来的 —— 首屏最显眼的两个经营指标是假的，
+              而看的人会拿它做决策。**假数据比缺数据危险**：缺了看得出来，假的看不出来。
+
+              为什么不顺手用 trend 算一个：后端 `trend` 里昨天那个点是**全天**，
+              而 `gmvToday` 是**今天到此刻**。半天比全天，每天早上都会显示
+              「-60% 环比」—— 那比没有更糟，因为它看起来像在报警。
+              要算对需要「昨日同时刻」的口径，后端目前不提供（见 ReportServiceImpl 的口径说明）。
+
+              补法：后端 DashboardStats 增加 `gmvSameTimeYesterday` / `ordersSameTimeYesterday`，
+              前端再显示。在那之前宁可不显示。
+            */}
+            <StatCard label="今日 GMV" value={money(data.gmvToday, data.currency)} />
+            <StatCard label="今日订单" value={data.ordersToday} />
             <StatCard label="在线设备" value={data.activeCabinets} />
             <StatCard label="设备在线率" value={`${(data.onlineRate * 100).toFixed(1)}%`} sub={data.onlineRate < 0.9 ? "低于目标" : "达标"} tone={data.onlineRate < 0.9 ? "down" : "up"} />
             <StatCard label="待处理工单" value={data.openWorkOrders} />
