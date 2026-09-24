@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.user.core.service;
 
+import ai.neargo.sharehub.user.core.dto.UserCoreDtos;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.user.core.dto.UserCoreDtos.InvoiceItem;
 import ai.neargo.sharehub.user.core.dto.UserCoreDtos.InvoiceTitleItem;
@@ -33,5 +34,5 @@ public interface UserInvoiceService {
      *
      * @throws IllegalArgumentException 抬头不存在或不属于该用户
      */
-    InvoiceItem apply(String cUserNo, UsrInvoice body);
+    InvoiceItem apply(String cUserNo, UserCoreDtos.InvoiceApplyReq req);
 }

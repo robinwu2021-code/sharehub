@@ -10,6 +10,7 @@ import ai.neargo.sharehub.user.asset.service.MembershipService;
 import ai.neargo.sharehub.user.asset.service.RechargePackageService;
 import ai.neargo.sharehub.user.asset.service.WalletService;
 import ai.neargo.sharehub.user.core.dto.UserCoreDtos.FavoriteItem;
+import ai.neargo.sharehub.user.core.dto.UserCoreDtos.InvoiceApplyReq;
 import ai.neargo.sharehub.user.core.dto.UserCoreDtos.InvoiceItem;
 import ai.neargo.sharehub.user.core.dto.UserCoreDtos.InvoiceTitleItem;
 import ai.neargo.sharehub.user.core.dto.UserCoreDtos.LogoffItem;
@@ -145,7 +146,7 @@ public class MpUserController {
     }
 
     @PostMapping("/invoices")
-    public InvoiceItem applyInvoice(@RequestBody UsrInvoice body) {
+    public InvoiceItem applyInvoice(@RequestBody InvoiceApplyReq body) {
         return invoices.apply(ConsumerContext.userNo(), body);
     }
 

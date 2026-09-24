@@ -293,16 +293,6 @@ UsrFreeWhitelist.usedValue
 UsrFreeWhitelist.validFrom
 UsrFreeWhitelist.validTo
 UsrFreeWhitelist.whitelistNo
-UsrInvoice.amount
-UsrInvoice.appliedAt
-UsrInvoice.cUserNo
-UsrInvoice.currency
-UsrInvoice.fileUrl
-UsrInvoice.invoiceNo
-UsrInvoice.issuedAt
-UsrInvoice.status
-UsrInvoice.title
-UsrInvoice.titleNo
 UsrInvoiceTitle.cUserNo
 UsrInvoiceTitle.isDefault
 UsrInvoiceTitle.title

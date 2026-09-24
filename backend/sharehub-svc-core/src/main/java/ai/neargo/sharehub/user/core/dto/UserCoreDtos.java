@@ -56,6 +56,26 @@ public final class UserCoreDtos {
                                    boolean isDefault) {
     }
 
+    /**
+     * 开票申请**写入参**（白名单）。
+     *
+     * <p>此前 {@code POST /mp/user/invoices} 直接收实体 {@code UsrInvoice} —— 而这是
+     * **C 端端点，构造请求的是终端用户**。service 已经把大部分字段按服务端口径覆盖掉了
+     * （invoiceNo / cUserNo / title / status / appliedAt / issuedAt 都是服务端定的），
+     * 但漏了一个：
+     *
+     * <p>{@code fileUrl} —— 出票 PDF 地址，本该开票后由服务端回填。
+     * 实测 {@code setFileUrl} 在整个后端**从未被调用**，也就是说它没有任何服务端写入路径，
+     * 唯一来源就是客户端请求体：用户可以在申请开票时塞一个自己的 URL 进去，
+     * 之后凡是展示这张票的地方都会指向它。
+     *
+     * <p>改成白名单后这个字段根本进不来。{@code amount} 仍由客户端给 ——
+     * 它的正确性依赖「订单已结算 + 未开过票」的校验，那条 TODO 还挂在 service 里，
+     * 不在本次范围；但至少它现在是**显式声明**的入参，而不是跟着实体一起漏进来的。
+     */
+    public record InvoiceApplyReq(String titleNo, java.math.BigDecimal amount, String currency) {
+    }
+
     /** 开票申请 / 发票记录。业务键前缀 {@code UINV}（与运营侧 {@code INV} 分开）。 */
     public record InvoiceItem(String invoiceNo, String titleNo, String title, BigDecimal amount,
                               String currency, String status, String fileUrl,

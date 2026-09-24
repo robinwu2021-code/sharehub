@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.user.core.service.impl;
 
+import ai.neargo.sharehub.user.core.dto.UserCoreDtos;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.user.core.dto.UserCoreDtos.InvoiceItem;
@@ -97,7 +98,18 @@ public class UserInvoiceServiceImpl implements UserInvoiceService {
     }
 
     @Override
-    public InvoiceItem apply(String cUserNo, UsrInvoice body) {
+    public InvoiceItem apply(String cUserNo, UserCoreDtos.InvoiceApplyReq req) {
+        /*
+         * **入参是白名单，不再是实体。**
+         * 这是 C 端端点，构造请求的是终端用户。此前收 UsrInvoice 实体，
+         * 而 fileUrl 没有任何服务端写入路径（setFileUrl 全后端没人调）——
+         * 它唯一的来源就是请求体，用户能在申请时塞一个自己的 URL 进去。
+         */
+        UsrInvoice body = new UsrInvoice();
+        body.setTitleNo(req.titleNo());
+        body.setAmount(req.amount());
+        body.setCurrency(req.currency());
+
         UsrInvoiceTitle title = titles.selectOne(new LambdaQueryWrapper<UsrInvoiceTitle>()
                 .eq(UsrInvoiceTitle::getTitleNo, body.getTitleNo())
                 .eq(UsrInvoiceTitle::getCUserNo, cUserNo)

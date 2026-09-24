@@ -47,7 +47,6 @@ SysTaxSetting
 Tenant
 TenantConfig
 UsrFreeWhitelist
-UsrInvoice
 UsrInvoiceTitle
 UsrRechargePkg
 WoInspectionPlan
