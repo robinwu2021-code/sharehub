@@ -8,6 +8,20 @@ import type { AuditTrail } from "./common";
  * 一个伙伴在一个站点上可以既出资又运维，两份钱的比例与去向都不同。
  * 空串 = 不适用（VENUE 维度，维度本身即依据），也用于 V53 之前配的老规则。
  */
+/**
+ * 提现单状态。与后端 `WithdrawalStatus` **必须一字不差** ——
+ * 对不上的症状是「筛了什么都没有」而不是报错（后端 StatusVocabularyAcrossEndsTest 盯着）。
+ */
+export type WithdrawalStatus = "APPLY" | "AUDIT" | "PAYING" | "PAID" | "FAILED";
+
+/**
+ * 钱包充值单状态。与后端 `RechargeOrderStatus` 必须一字不差。
+ *
+ * ⚠️ 与支付单（`pay_order`）不是同一套：那边初始态是 `INIT`、还有 `PAYING`/`CLOSED`。
+ * 两者都有 `PAID`/`FAILED` —— 相像但不相同，合并过一次就会变成「充值单永远查不到」。
+ */
+export type RechargeOrderStatus = "PENDING" | "PAID" | "FAILED" | "REFUNDED";
+
 export const SHARE_BASES = ["INVEST", "DEVELOP", "OPERATE", "REFER"] as const;
 export type ShareBasis = (typeof SHARE_BASES)[number];
 
@@ -83,7 +97,7 @@ export interface Withdrawal extends AuditTrail {
   payeeName: string;
   amount: number;
   currency: string;
-  status: "APPLY" | "AUDIT" | "PAYING" | "PAID" | "FAILED";
+  status: WithdrawalStatus;
   appliedAt: string;
   // —— 资金审批合规四件套（对标补齐）——
   fee: number; // 提现手续费（与 amount 同币种，实际到账 = amount - fee）
@@ -459,7 +473,7 @@ export interface RechargeOrder {
   creditAmount: number; // 到账 = 实付 + 赠送
   currency: string;
   channelCode: string; // NEARPAY / STRIPE / TAP …（关联 PaymentChannel.channelCode）
-  status: "PENDING" | "PAID" | "FAILED" | "REFUNDED";
+  status: RechargeOrderStatus;
   createdAt: string; // 下单时间：PENDING/FAILED 无 paidAt，日期范围筛选一律以本字段为准
   paidAt: string | null;
   pspTxnNo: string | null; // 支付网关流水号；未支付为空

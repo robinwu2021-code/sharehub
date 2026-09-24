@@ -25,33 +25,33 @@ public class StubPaymentPort implements PaymentPort {
 
     @Override
     public PayResult pay(PayRequest req) {
-        return new PayResult(req.payNo(), ref("STUBTXN"), "PAID", req.amount(), req.currency(), null);
+        return new PayResult(req.payNo(), ref("STUBTXN"), PayOrderStatus.PAID.name(), req.amount(), req.currency(), null);
     }
 
     @Override
     public AuthResult preAuth(AuthRequest req) {
-        return new AuthResult(req.authNo(), ref("STUBAUTH"), "FROZEN",
+        return new AuthResult(req.authNo(), ref("STUBAUTH"), PayAuthStatus.FROZEN.name(),
                 req.freezeAmount(), BigDecimal.ZERO, null);
     }
 
     @Override
     public AuthResult capture(String authRef, BigDecimal amount, String idempotencyKey) {
-        return new AuthResult(null, authRef, "CAPTURED", amount, amount, null);
+        return new AuthResult(null, authRef, PayAuthStatus.CAPTURED.name(), amount, amount, null);
     }
 
     @Override
     public AuthResult release(String authRef, String idempotencyKey) {
-        return new AuthResult(null, authRef, "RELEASED", BigDecimal.ZERO, BigDecimal.ZERO, null);
+        return new AuthResult(null, authRef, PayAuthStatus.RELEASED.name(), BigDecimal.ZERO, BigDecimal.ZERO, null);
     }
 
     @Override
     public RefundResult refund(RefundRequest req) {
-        return new RefundResult(req.refundNo(), ref("STUBRFD"), "SUCCESS", req.amount(), null);
+        return new RefundResult(req.refundNo(), ref("STUBRFD"), PayRefundStatus.SUCCESS.name(), req.amount(), null);
     }
 
     @Override
     public PayResult query(String txnRef) {
-        return new PayResult(null, txnRef, "PAID", null, null, null);
+        return new PayResult(null, txnRef, PayOrderStatus.PAID.name(), null, null, null);
     }
 
     private String ref(String prefix) {

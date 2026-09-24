@@ -108,9 +108,6 @@ ComplaintServiceImpl#status=REJECT
 PaymentChannelServiceImpl#mode=DELEGATED
 PaymentChannelServiceImpl#status=DISABLED
 PaymentChannelServiceImpl#status=ENABLED
-PaymentServiceImpl#status=FROZEN
-PaymentServiceImpl#status=INIT
-PaymentServiceImpl#status=PAID
 PriceResolver#status=ENABLED
 RentOrderServiceImpl#status=IN_USE
 
@@ -132,7 +129,6 @@ UserCouponServiceImpl#status=ACTIVE
 UserCouponServiceImpl#status=UNUSED
 UserInvoiceServiceImpl#status=APPLIED
 UserInvoiceServiceImpl#type=COMPANY
-WalletServiceImpl#status=PAID
 
 # ── wo：✅ 已收敛（WorkOrderStatus · WoDispatchAction）──
 #    起初以为 action=ACCEPT/DISPATCH 是"事件名不是状态"就直接从台账删了 —— 棘轮当场拦下。

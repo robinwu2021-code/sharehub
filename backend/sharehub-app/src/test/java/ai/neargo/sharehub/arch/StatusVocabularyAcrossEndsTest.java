@@ -43,7 +43,11 @@ class StatusVocabularyAcrossEndsTest {
     /** 后端枚举源文件（相对 sharehub-app） → 运营端类型文件里的联合类型名。 */
     private static final Map<String, String> PAIRS = new LinkedHashMap<>(Map.of(
             "../sharehub-svc-core/src/main/java/ai/neargo/sharehub/trade/order/DepositStatus.java",
-            "DepositStatus"));
+            "DepositStatus",
+            "../sharehub-svc-finance/src/main/java/ai/neargo/sharehub/finance/WithdrawalStatus.java",
+            "WithdrawalStatus",
+            "../sharehub-svc-core/src/main/java/ai/neargo/sharehub/user/asset/RechargeOrderStatus.java",
+            "RechargeOrderStatus"));
 
     private static final Path FRONTEND_TYPES = Path.of("..", "..", "ops-web", "lib", "types");
 

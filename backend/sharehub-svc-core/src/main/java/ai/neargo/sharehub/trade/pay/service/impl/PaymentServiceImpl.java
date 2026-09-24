@@ -1,5 +1,9 @@
 package ai.neargo.sharehub.trade.pay.service.impl;
 
+import ai.neargo.sharehub.trade.pay.PayAuthStatus;
+import ai.neargo.sharehub.trade.pay.PayOrderStatus;
+import ai.neargo.sharehub.trade.pay.PayRefundStatus;
+
 import ai.neargo.sharehub.trade.pay.PayBizKey;
 import ai.neargo.sharehub.trade.pay.PaymentPort;
 import ai.neargo.sharehub.trade.pay.dto.PayDtos.PayAuthEntry;
@@ -60,7 +64,7 @@ public class PaymentServiceImpl implements PaymentService {
         e.setAmount(amount);
         e.setCurrency(currency == null || currency.isBlank() ? "AED" : currency);
         e.setChannelCode(channelCode);
-        e.setStatus("INIT");
+        e.setStatus(PayOrderStatus.INIT.name());
         payMapper.insert(e);
 
         PaymentPort.PayResult r = port.pay(new PaymentPort.PayRequest(
@@ -86,7 +90,7 @@ public class PaymentServiceImpl implements PaymentService {
         e.setCUserNo(cUserNo);
         e.setFreezeAmount(freezeAmount);
         e.setCapturedAmount(BigDecimal.ZERO);
-        e.setStatus("FROZEN");
+        e.setStatus(PayAuthStatus.FROZEN.name());
         authMapper.insert(e);
 
         PaymentPort.AuthResult r = port.preAuth(new PaymentPort.AuthRequest(
@@ -102,7 +106,7 @@ public class PaymentServiceImpl implements PaymentService {
     @Transactional
     public PayAuthEntry capture(String authNo, BigDecimal amount, String idempotencyKey) {
         PayAuth e = mustAuth(authNo);
-        if (!"FROZEN".equals(e.getStatus())) {
+        if (!PayAuthStatus.FROZEN.is(e.getStatus())) {
             throw new IllegalStateException("仅 FROZEN 可请款，当前：" + e.getStatus());
         }
         requirePositive(amount, "amount");
@@ -121,7 +125,7 @@ public class PaymentServiceImpl implements PaymentService {
     @Transactional
     public PayAuthEntry release(String authNo, String idempotencyKey) {
         PayAuth e = mustAuth(authNo);
-        if (!"FROZEN".equals(e.getStatus())) {
+        if (!PayAuthStatus.FROZEN.is(e.getStatus())) {
             throw new IllegalStateException("仅 FROZEN 可释放，当前：" + e.getStatus());
         }
         PaymentPort.AuthResult r = port.release(e.getNearpayAuthNo(), idempotencyKey);
@@ -139,7 +143,7 @@ public class PaymentServiceImpl implements PaymentService {
         PayOrder pay = payMapper.selectOne(new LambdaQueryWrapper<PayOrder>()
                 .eq(PayOrder::getPayNo, payNo).last("limit 1"));
         if (pay == null) throw new IllegalArgumentException("支付单不存在: " + payNo);
-        if (!"PAID".equals(pay.getStatus())) {
+        if (!PayOrderStatus.PAID.is(pay.getStatus())) {
             throw new IllegalStateException("仅 PAID 的支付单可退款，当前：" + pay.getStatus());
         }
         requirePositive(amount, "amount");
@@ -154,7 +158,7 @@ public class PaymentServiceImpl implements PaymentService {
         e.setOrdRefundNo(ordRefundNo);
         e.setAmount(amount);
         e.setReason(reason);
-        e.setStatus("INIT");
+        e.setStatus(PayRefundStatus.INIT.name());
         refundMapper.insert(e);
 
         PaymentPort.RefundResult r = port.refund(new PaymentPort.RefundRequest(
@@ -172,7 +176,7 @@ public class PaymentServiceImpl implements PaymentService {
         PayOrder e = payMapper.selectOne(new LambdaQueryWrapper<PayOrder>()
                 .eq(PayOrder::getNearpayTxnNo, txnRef).last("limit 1"));
         if (e == null) throw new IllegalArgumentException("未知 nearpay 交易引用: " + txnRef);
-        if ("PAID".equals(e.getStatus()) && !"PAID".equals(status)) {
+        if (PayOrderStatus.PAID.is(e.getStatus()) && !PayOrderStatus.PAID.is(status)) {
             throw new IllegalStateException("已支付的单不接受回退到 " + status);
         }
         e.setStatus(status);

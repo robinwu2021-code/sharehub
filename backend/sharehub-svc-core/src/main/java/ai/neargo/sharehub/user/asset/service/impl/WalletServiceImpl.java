@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.user.asset.service.impl;
 
+import ai.neargo.sharehub.user.asset.RechargeOrderStatus;
+
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.trade.entity.OrdOrder;
 import ai.neargo.sharehub.trade.mapper.OrdMapper;
@@ -235,6 +237,6 @@ public class WalletServiceImpl implements WalletService {
         if (userNos.isEmpty()) return List.of();
         return recharges.selectList(new LambdaQueryWrapper<UsrRechargeOrder>()
                 .in(UsrRechargeOrder::getCUserNo, userNos)
-                .eq(UsrRechargeOrder::getStatus, "PAID"));
+                .eq(UsrRechargeOrder::getStatus, RechargeOrderStatus.PAID.name()));
     }
 }
