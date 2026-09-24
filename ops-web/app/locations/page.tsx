@@ -10,12 +10,12 @@
 // 点位不单独占菜单的那条路走不通：站点详情抽屉里能维护本站点的点位，
 // 但**跨站点批量看/改点位**只有这里能做，所以它留着。
 import { Suspense, useState } from "react";
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
 import { Pagination } from "@/components/ui/misc";
 import { usePaging } from "@/lib/hooks/use-paging";
-import { useNavTabs, usePageTab } from "@/lib/hooks/use-page-tab";
+import { useNavTabs, usePageTab, keepWithinTab } from "@/lib/hooks/use-page-tab";
 import { Input, Select } from "@/components/ui/input";
 import { TabHeader } from "@/components/ui/tab-header";
 import { Toolbar } from "@/components/ui/toolbar";
@@ -67,7 +67,7 @@ function LocationsInner() {
       tab === "points"
         ? api.listLocations({ page: paging.page, size: paging.size, keyword, showArchived })
         : api.listSiteAnalysis({ page: paging.page, size: paging.size, keyword, period }),
-    placeholderData: keepPreviousData,
+    placeholderData: keepWithinTab(tab),
   });
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["loc"] });

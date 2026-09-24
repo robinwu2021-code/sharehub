@@ -6,7 +6,7 @@ import { UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
 import { PageTitle, Pagination } from "@/components/ui/misc";
 import { usePaging } from "@/lib/hooks/use-paging";
-import { useNavTabs, usePageTab } from "@/lib/hooks/use-page-tab";
+import { useNavTabs, usePageTab, keepWithinTab } from "@/lib/hooks/use-page-tab";
 import { TabHeader } from "@/components/ui/tab-header";
 import { Toolbar } from "@/components/ui/toolbar";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
@@ -445,7 +445,7 @@ function MarketingInner() {
       : tab === "ad-slots" ? api.listAdSlots({ page: paging.page, size: paging.size, keyword })
       : tab === "ad-campaigns" ? api.listAdCampaigns({ page: paging.page, size: paging.size, keyword })
       : api.listAdDeliveries({ page: paging.page, size: paging.size, keyword, period }),
-    placeholderData: keepPreviousData,
+    placeholderData: keepWithinTab(tab),
   });
 
   // 归档时间列只在「显示已归档」打开时插入：默认视图里它整列都是 "-"，白占宽度。

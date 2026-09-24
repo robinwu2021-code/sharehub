@@ -107,3 +107,30 @@ export function usePageTab(tabs: PageTab[], onChange?: () => void, opts: PageTab
 
   return { tab, setTab };
 }
+
+/**
+ * 分页翻页时保留上一页数据（不闪白），**但换 tab 时不保留**。
+ *
+ * <h3>为什么需要它</h3>
+ * 这些页面是「一个 `useQuery` 喂多个 tab」：`tab` 在 `queryKey` 里，
+ * `queryFn` 按 tab 分流。换 tab 得到的是一个**新的 key**，
+ * 而 `placeholderData: keepPreviousData` 的语义是「key 变了就把上一次的数据先顶上」——
+ * 它分不出「翻页」和「换 tab」。
+ *
+ * 于是切 tab 的那一帧，**新 tab 的列拿着上一个 tab 的行**去渲染：
+ * `rowKey` 全是 undefined（React 报重复 key），`StatusBadge` 查不到状态直接抛
+ * （`Cannot read properties of undefined (reading 'tone')`）。
+ * 2026-09-24 在财务页实测复现：从「分润规则」点到「发票」，dev 下弹红遮罩。
+ *
+ * <h3>为什么不是干脆去掉 keepPreviousData</h3>
+ * 翻页时它是对的 —— 去掉之后每翻一页表格都会先塌成空态再撑开，那是另一种难受。
+ * 要分的是「同一个 tab 内翻页」与「换了 tab」，而不是全有或全无。
+ *
+ * 用法：`placeholderData: keepWithinTab(tab)` 替换 `placeholderData: keepPreviousData`。
+ */
+export function keepWithinTab<T>(tab: string) {
+  return (prev: T | undefined, prevQuery?: { queryKey: readonly unknown[] }): T | undefined =>
+    // 约定：这些页面的 queryKey 形如 [域名, tab, …]，tab 固定在第 2 位。
+    // 取不到上一次的 key（首次加载）时一律不顶 —— 顶错的代价远大于闪一下。
+    prevQuery && prevQuery.queryKey[1] === tab ? prev : undefined;
+}

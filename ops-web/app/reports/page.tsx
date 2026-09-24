@@ -11,7 +11,7 @@ import { UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
 import { Pagination, Skeleton, StatCard } from "@/components/ui/misc";
 import { usePaging } from "@/lib/hooks/use-paging";
-import { useNavTabs, usePageTab } from "@/lib/hooks/use-page-tab";
+import { useNavTabs, usePageTab, keepWithinTab } from "@/lib/hooks/use-page-tab";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FilterSelect } from "@/components/ui/filter-select";
@@ -463,7 +463,7 @@ function ReportsInner() {
       : tab === "finance" ? api.listReportFinance({ page: paging.page, size: paging.size, keyword, period })
       : api.listConsumerSegments({ page: paging.page, size: paging.size }),
     enabled: isPeriodTab || tab === "consumer",
-    placeholderData: keepPreviousData,
+    placeholderData: keepWithinTab(tab),
   });
 
   // 趋势与汇总条：与表格同一个周期入参，同一份桶 —— 表变图必变。
@@ -471,7 +471,7 @@ function ReportsInner() {
     queryKey: ["report-trend", tab, period],
     queryFn: () => api.getReportTrend({ kind: TREND_KIND[tab], period }),
     enabled: isPeriodTab,
-    placeholderData: keepPreviousData,
+    placeholderData: keepWithinTab(tab),
   });
 
   const insightQ = useQuery<ConsumerInsight>({

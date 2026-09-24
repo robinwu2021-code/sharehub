@@ -2,12 +2,12 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { UNPAGED_SIZE, RECENT_LIMIT } from "@/lib/constants";
 import { api } from "@/lib/api";
 import { PageTitle, Pagination } from "@/components/ui/misc";
 import { usePaging } from "@/lib/hooks/use-paging";
-import { useNavTabs, usePageTab } from "@/lib/hooks/use-page-tab";
+import { useNavTabs, usePageTab, keepWithinTab } from "@/lib/hooks/use-page-tab";
 import { Input, Select } from "@/components/ui/input";
 import { TabHeader } from "@/components/ui/tab-header";
 import { Toolbar } from "@/components/ui/toolbar";
@@ -281,7 +281,7 @@ function VenuesInner() {
       : tab === "onboarding" ? api.listVenueOnboardings({ page: paging.page, size: paging.size, keyword })
       : tab === "lifecycle" ? api.listSiteLifecycles({ page: paging.page, size: paging.size, keyword })
       : api.listContracts({ page: paging.page, size: paging.size, keyword }),
-    placeholderData: keepPreviousData,
+    placeholderData: keepWithinTab(tab),
   });
 
   const saveVenue = useMutation({

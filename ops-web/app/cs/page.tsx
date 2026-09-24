@@ -1,11 +1,11 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { PageTitle, Pagination } from "@/components/ui/misc";
 import { usePaging } from "@/lib/hooks/use-paging";
-import { useNavTabs, usePageTab } from "@/lib/hooks/use-page-tab";
+import { useNavTabs, usePageTab, keepWithinTab } from "@/lib/hooks/use-page-tab";
 import { TabHeader } from "@/components/ui/tab-header";
 import { Toolbar } from "@/components/ui/toolbar";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
@@ -116,7 +116,7 @@ function CsInner() {
     queryFn: () =>
       tab === "sessions" ? api.listCsSessions({ page: paging.page, size: paging.size, keyword })
       : api.listCsTickets({ page: paging.page, size: paging.size, keyword }),
-    placeholderData: keepPreviousData,
+    placeholderData: keepWithinTab(tab),
   });
 
   const ticketCols: Column<CsTicket>[] = [
