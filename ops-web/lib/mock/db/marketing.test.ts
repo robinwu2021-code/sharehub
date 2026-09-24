@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { adWindowPassed, adActionAllowed, adCampaignActions } from "../../types";
 import {
   coupons, couponIssueRecords, issueCoupon, listCouponIssueRecords, CouponIssueError,
-  pushMessages, savePushMessage, sendPushMessage, transitionPush, PushError,
+  pushMessages, savePushMessage, sendPushMessage, finishPushMessage, transitionPush, PushError,
   resolveAudience, AudienceError,
   campaigns, listCampaigns, saveCampaign, transitionCampaign, CampaignError,
  adCampaigns, transitionAdCampaign, saveReferralRule,} from "./marketing";
@@ -121,19 +121,36 @@ describe("优惠券发放", () => {
 describe("推送触达发送", () => {
   const draftAt = (n: number) => pushMessages.filter((p) => p.status === "DRAFT")[n];
 
-  it("立即发送：DRAFT → SENT，落 sentAt / targetCount / successCount", () => {
+  it("立即发送：DRAFT → SENDING（**不是 SENT**），落 sentAt / targetCount", () => {
     const p = draftAt(0);
     const expectedTarget = resolveAudience({ targetType: p.audienceType, targetValue: p.audienceValue }).size;
 
     const r = sendPushMessage(p.pushNo, { idempotencyKey: `K-${p.pushNo}-1` });
 
-    expect(r.status).toBe("SENT");
+    // 2026-09-24：此前 mock 发完立刻 finish（自己编一个 94% 成功率），于是 mock 下
+    // 推送永远"秒达"，而真后端只能停在发送中等推送通道回执 —— 两边行为不一致，
+    // 正是 mock 该消除的分叉。成功数要等收尾时落。
+    expect(r.status).toBe("SENDING");
     expect(r.sentAt).not.toBe("");
     expect(r.targetCount).toBe(expectedTarget);
-    expect(r.successCount).toBeGreaterThan(0);
-    expect(r.successCount).toBeLessThanOrEqual(r.targetCount);
-    expect(r.sentCount).toBe(r.successCount);
+    expect(r.successCount).toBe(0);
     expect(r.idempotencyKey).toBe(`K-${p.pushNo}-1`);
+  });
+
+  it("收尾：SENDING → SENT，落触达统计；成功数不得大于目标数", () => {
+    const p = draftAt(1);
+    const sent = sendPushMessage(p.pushNo, { idempotencyKey: `K-${p.pushNo}-f` });
+    expect(sent.status).toBe("SENDING");
+
+    expect(() => finishPushMessage(p.pushNo, { targetCount: 10, successCount: 30 }))
+      .toThrow(/成功触达数不能大于目标人数/);
+
+    const done = finishPushMessage(p.pushNo, { targetCount: sent.targetCount, successCount: 3 });
+    expect(done.status).toBe("SENT");
+    expect(done.successCount).toBe(3);
+    expect(done.sentCount).toBe(3);   // 兼容既有「触达数」列，与 successCount 同值
+    // 重复收尾按幂等处理，不抛
+    expect(finishPushMessage(p.pushNo, { targetCount: sent.targetCount, successCount: 3 }).status).toBe("SENT");
   });
 
   it("定时发送：DRAFT → SCHEDULED，记排期时间且还没真发（successCount = 0）", () => {
@@ -145,9 +162,9 @@ describe("推送触达发送", () => {
     expect(r.scheduledAt).toBe(at);
     expect(r.successCount).toBe(0);
     expect(r.sentAt).toBe("");
-    // 排期后仍可真发（SCHEDULED → SENDING → SENT），换一把幂等键
+    // 排期后仍可真发（SCHEDULED → SENDING），换一把幂等键
     const sent = sendPushMessage(p.pushNo, { idempotencyKey: `K-${p.pushNo}-go` });
-    expect(sent.status).toBe("SENT");
+    expect(sent.status).toBe("SENDING");
   });
 
   it("已发送的不能重发（SENT 是终态，状态机拦住）", () => {
@@ -169,7 +186,7 @@ describe("推送触达发送", () => {
 
     const KEY = "K-DUP-ONCE";
     const sent = sendPushMessage(first.pushNo, { idempotencyKey: KEY });
-    expect(sent.status).toBe("SENT");
+    expect(sent.status).toBe("SENDING");
 
     // 换一条草稿、同一把键：照样拒绝（键是全局唯一的，防「换个推送号把同一批内容再发一遍」）
     const other = draftAt(0);
@@ -177,7 +194,7 @@ describe("推送触达发送", () => {
     expect(() => sendPushMessage(other.pushNo, { idempotencyKey: KEY })).toThrow(/拒绝重复发送/);
     expect(other.status).toBe("DRAFT"); // 被拒的那条毫发无伤
     // 换一把新键就能正常发
-    expect(sendPushMessage(other.pushNo, { idempotencyKey: "K-DUP-FRESH" }).status).toBe("SENT");
+    expect(sendPushMessage(other.pushNo, { idempotencyKey: "K-DUP-FRESH" }).status).toBe("SENDING");
   });
 
   it("发送失败不烧掉幂等键（状态非法时键仍可复用）", () => {
@@ -186,7 +203,7 @@ describe("推送触达发送", () => {
     expect(() => sendPushMessage(sent.pushNo, { idempotencyKey: KEY })).toThrow(PushError);
 
     const fresh = savePushMessage({ title: "键未被烧掉", content: "正文", audienceType: "ALL" });
-    expect(sendPushMessage(fresh.pushNo, { idempotencyKey: KEY }).status).toBe("SENT");
+    expect(sendPushMessage(fresh.pushNo, { idempotencyKey: KEY }).status).toBe("SENDING");
   });
 
   it("草稿保存不能伪造发送结果（status / sentAt / 计数一律被剥离）", () => {

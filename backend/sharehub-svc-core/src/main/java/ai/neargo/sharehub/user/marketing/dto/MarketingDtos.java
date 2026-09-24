@@ -64,8 +64,22 @@ public final class MarketingDtos {
      * **这些列实体里根本没有**，属于「前端先行、后端未建」，要补得先加列 + 补发送侧统计，
      * 不是对齐能解决的。补之前它们在真后端下一律 undefined。
      */
+    /**
+     * 推送行，镜像前端 {@code PushMessage}。
+     *
+     * <p>V75 起补齐排期/触达/幂等/人群六项：此前前端界面正在渲染的
+     * {@code operatorName}/{@code targetCount}/{@code successCount}/{@code scheduledAt}
+     * 后端根本不返回（**存储也没建过**），表现是「操作人」列全空、
+     * 「目标 undefined 人 / 成功 undefined 人」。
+     *
+     * <p>{@code audience} 是派生的可读标签，{@code audienceType}/{@code audienceValue}
+     * 才是权威值 —— 编辑时要靠后两者回填下拉。
+     */
     public record PushMessageVO(String pushNo, String title, String content, String channel,
-                                String audience, Integer sentCount, String status, String sentAt) {
+                                String audience, String audienceType, String audienceValue,
+                                Integer targetCount, Integer successCount, Integer sentCount,
+                                String status, String scheduledAt, String sentAt,
+                                String operatorName, String idempotencyKey) {
     }
 
     /**

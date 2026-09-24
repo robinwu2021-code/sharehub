@@ -3,7 +3,7 @@ import type { PageQ, ArchiveQ, CouponIssueQ, CampaignQ , ReportQ } from "../quer
 import type {
   PageResult, Coupon, Campaign, CampaignAction, PushMessage, Referral,
   AdSlot, AdCampaign, AdDelivery, Notice,
-  CouponIssueRecord, CouponIssuePayload, CouponIssueResult, PushSendPayload,
+  CouponIssueRecord, CouponIssuePayload, CouponIssueResult, PushSendPayload, PushFinishPayload,
 
   AdCampaignAction,
   ReferralRule,} from "../../types";
@@ -49,6 +49,13 @@ export interface MarketingApi {
    * **必须携带幂等键**，同键重复提交由服务端拒绝（重复提交＝消息真发两遍）。
    */
   sendPushMessage(pushNo: string, x: PushSendPayload): Promise<PushMessage>;
+  /**
+   * 收尾：SENDING → SENT，落触达统计。
+   *
+   * 真实触达由推送通道回执驱动（**尚未接入**），在那之前由运营显式收尾 ——
+   * 让单子停在「发送中」也比假装已送达强：后者会让「成功 N 人」是编的。
+   */
+  finishPushMessage(pushNo: string, x: PushFinishPayload): Promise<PushMessage>;
   saveAdSlot(x: Partial<AdSlot> & { slotNo?: string }): Promise<AdSlot>;
   saveAdCampaign(x: Partial<AdCampaign> & { adNo?: string }): Promise<AdCampaign>;
 

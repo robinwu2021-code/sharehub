@@ -39,20 +39,12 @@ B GET /api/platform/departments Department 后端有前端无:path
 #   审核页给的必须是点「通过」那一刻真会扣的数；落库的 netAmount 是申请时的旧数。
 #   接上它等于给审批人两个都叫「实际到账」的数，而放款时扣的是另一个。
 B GET /api/trade/withdrawals Withdrawal 后端有前端无:netAmount
-B GET /api/user/push-messages PushMessageVO 前端有后端无:audienceType
-B GET /api/user/push-messages PushMessageVO 前端有后端无:audienceValue
-B GET /api/user/push-messages PushMessageVO 前端有后端无:idempotencyKey
-B GET /api/user/push-messages PushMessageVO 前端有后端无:operatorName
-B GET /api/user/push-messages PushMessageVO 前端有后端无:scheduledAt
-B GET /api/user/push-messages PushMessageVO 前端有后端无:successCount
-B GET /api/user/push-messages PushMessageVO 前端有后端无:targetCount
 B POST /mp/user/report ReportResultVO 后端有前端无:createdAt
 B POST /mp/user/report ReportResultVO 后端有前端无:refundNo
 B POST /mp/user/report ReportResultVO 后端有前端无:sessionNo
 B POST /mp/user/report ReportResultVO 后端有前端无:suggestedAction
 C GET /api/agent/accounts/{}
 C GET /api/agent/commissions/{}
-C GET /api/auth/menus
 C GET /api/auth/permissions
 C GET /api/ops/inspection-plans/{}
 C GET /api/ops/leads/{}
@@ -101,3 +93,9 @@ D SharingStats GET /api/trade/site-sharing/stats
 D UserCouponVO POST /api/user/coupons/{tplNo}/issue
 D WalletOverview GET /mp/user/wallet
 D WorkOrderRef POST /api/ops/alarms/records/{alarmNo}/work-order
+# ⚠️ 下面这条是**临时入口**，不是遗漏：
+#   本该由共用调度器按 cron 回调（v4/07 的 JobHandler），但那要等 ai-shop 的任务服务
+#   做完多系统改造 —— backend/pom.xml 的 enforcer 明令禁止依赖 ai.neargo.shop:*，
+#   JobHandler 接口类根本引不进来。调度器就绪后把 PushService.sweepDue 挂成 JobHandler
+#   即可，业务代码不动；届时这个端点与本条一起删。
+C POST /api/user/push-messages/sweep-due

@@ -14,5 +14,19 @@ import ai.neargo.sharehub.user.marketing.entity.MktPush;
 public interface PushService extends CrudService<MktPush, PushMessageVO> {
 
     /** 发送推送。**必带幂等键** —— 推送是真推到用户手机上，双击不该推两次。 */
-    Object send(String pushNo, String idempotencyKey);
+    Object send(String pushNo, String idempotencyKey, String operatorName);
+
+    /** 排期：DRAFT → SCHEDULED。{@code scheduledAt} 为 ISO 时刻。 */
+    Object schedule(String pushNo, String scheduledAt, String operatorName);
+
+    /** 收尾：SENDING → SENT，落触达统计。SENT 是终态，不可重发。 */
+    Object finish(String pushNo, Integer targetCount, Integer successCount);
+
+    /**
+     * 扫描到点的排期推送并发出去，返回处理条数。
+     *
+     * <p>**将来挂成共用调度器的 JobHandler**（v4/07）；在那之前由运营端手动端点触发。
+     * 两者调的是同一个方法，接线时业务代码不用改 —— 这也是本方法自身必须幂等的原因。
+     */
+    int sweepDue(String now);
 }

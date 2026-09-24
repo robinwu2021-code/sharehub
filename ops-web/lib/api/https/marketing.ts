@@ -35,6 +35,7 @@ export const marketingHttp: MarketingApi = {
   savePushMessage: (x) => client.post(x.pushNo ? `/api/user/push-messages/${x.pushNo}` : "/api/user/push-messages", x),
   // 幂等键随 body 走（同 order 域退款），后端按 (pushNo, idempotencyKey) 去重
   sendPushMessage: (no, x) => client.post(`/api/user/push-messages/${no}/send`, x),
+  finishPushMessage: (no, x) => client.post(`/api/user/push-messages/${no}/finish`, x),
   saveAdSlot: (x) => client.post(x.slotNo ? `/api/ops/ad-slots/${x.slotNo}` : "/api/ops/ad-slots", x),
   saveAdCampaign: (x) => client.post(x.adNo ? `/api/user/ad-campaigns/${x.adNo}` : "/api/user/ad-campaigns", x),
 

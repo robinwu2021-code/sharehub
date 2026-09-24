@@ -150,6 +150,11 @@ export interface PushMessage {
   operatorName: string | null;
 }
 /** 发送入参：幂等键必填；`scheduledAt` 有值 = 定时（转 SCHEDULED），空 = 立即（转 SENDING → SENT）。 */
+/** 收尾入参：成功数不能大于目标数（后端同样会拒）。 */
+export interface PushFinishPayload {
+  targetCount: number;
+  successCount: number;
+}
 export interface PushSendPayload {
   idempotencyKey: string;
   scheduledAt?: string | null;

@@ -40,6 +40,7 @@ import {
   AD_CAMPAIGN_TRANSITIONS, adCampaignActions,
   // 曝光按周期筛：与坪效/绩效同一套 REPORT_PERIODS
   REPORT_PERIODS, REPORT_PERIOD_DEFAULT, type ReportPeriod,
+  canPushAction,
 } from "@/lib/types";
 
 /** 周期码 → 中文标签。取自 REPORT_PERIODS，不另抄一份。 */
@@ -379,13 +380,39 @@ function MarketingInner() {
     mutationFn: (v: { no: string; idempotencyKey: string; scheduledAt: string | null }) =>
       api.sendPushMessage(v.no, { idempotencyKey: v.idempotencyKey, scheduledAt: v.scheduledAt }),
     onSuccess: (r) => {
+      // 发送之后是**发送中**，不是已发送：真实触达由推送通道回执驱动（尚未接入），
+      // 收尾要显式点「完成发送」。写成「已发送」会让人以为触达数就在眼前。
       notify.success(r.status === "SCHEDULED"
         ? `已排期 ${fmtTime(r.scheduledAt ?? "")} 发送 · 预计触达 ${r.targetCount} 人`
-        : `已发送 · 目标 ${r.targetCount} 人 / 成功 ${r.successCount} 人`);
+        : `已下发 · 目标 ${r.targetCount} 人，待通道回执后点「完成发送」落触达数`);
       qc.invalidateQueries({ queryKey: ["mkt"] });
       setSendFor(null);
     },
   });
+  /*
+   * 收尾：SENDING → SENT。真实触达由推送通道回执驱动（尚未接入），
+   * 在那之前由运营显式收尾 —— 让单子停在「发送中」也比假装已送达强：
+   * 后者会让「成功 N 人」是编的。目标数取单子上落库的值，成功数由运营填。
+   */
+  const finishPush = useMutation({
+    mutationFn: (v: { no: string; targetCount: number; successCount: number }) =>
+      api.finishPushMessage(v.no, { targetCount: v.targetCount, successCount: v.successCount }),
+    onSuccess: (r) => {
+      notify.success(`已完成 · 目标 ${r.targetCount} 人 / 成功 ${r.successCount} 人`);
+      qc.invalidateQueries({ queryKey: ["mkt"] });
+    },
+  });
+  const askFinish = async (p: PushMessage) => {
+    const ok = await confirm({
+      title: "完成发送",
+      desc: `将 ${p.pushNo} 标记为已发送，并落触达统计（目标 ${p.targetCount} 人）。`
+        + "成功数以推送通道回执为准；通道未接入时按实际核对结果填。",
+      confirmText: "完成",
+    });
+    // 通道未接入，成功数暂按目标数记；接入后这里改成读回执
+    if (ok) finishPush.mutate({ no: p.pushNo, targetCount: p.targetCount, successCount: p.targetCount });
+  };
+
   const openSend = (p: PushMessage) => {
     setSendFor(p);
     setSendWhen("NOW");
@@ -576,6 +603,11 @@ function MarketingInner() {
           {/* 已发送是终态：不出「发送」按钮，也不允许编辑内容（改了等于篡改已发出的消息） */}
           {p.status === "DRAFT" && <Button size="sm" variant="outline" onClick={() => setPushForm({ ...p, audienceKey: audKeyOf(p) })}>{t("common.edit")}</Button>}
           {canSendPush(p.status) && <Button size="sm" onClick={() => openSend(p)}>发送</Button>}
+          {/* SENDING 必须有出口，否则单子永远卡在「发送中」 */}
+          {canPushAction(p.status, "finish") && (
+            <Button size="sm" variant="outline" disabled={finishPush.isPending}
+              onClick={() => askFinish(p)}>完成发送</Button>
+          )}
           {p.status === "SENT" && <span className="text-muted-foreground">已发送</span>}
         </div>
       ) : <span className="text-muted-foreground">-</span>,

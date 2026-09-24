@@ -7,7 +7,7 @@ import { validateNotice } from "../../rules/operation-rules";
 import type {
   Coupon, Campaign, PushMessage, Referral, AdSlot, AdCampaign, AdDelivery, Notice, PageQuery,
   AudienceSpec, AudienceResolved, AudienceType, CouponIssueRecord, CouponIssuePayload,
-  CouponIssueResult, PushAction, PushSendPayload, CampaignAction,
+  CouponIssueResult, PushAction, PushSendPayload, PushFinishPayload, CampaignAction,
 
   AdCampaignAction,
   ReferralRule,} from "../../types";
@@ -522,13 +522,39 @@ export function sendPushMessage(pushNo: string, x: PushSendPayload): PushMessage
       successCount: 0, sentCount: 0, idempotencyKey: key, operatorName,
     });
   }
-  transitionPush(pushNo, "send", {
+  /*
+   * **停在 SENDING，不一路走到 SENT。**
+   * 此前这里 send 完立刻 finish（自己编一个 94% 成功率），于是 mock 下推送永远"秒达"，
+   * 而真后端只能停在发送中等推送通道回执 —— 两边行为不一致，正是 mock 该消除的分叉。
+   * 收尾走 finishPushMessage（同后端的 /finish 端点）。
+   */
+  return transitionPush(pushNo, "send", {
     scheduledAt: null, audience: aud.targetDesc, targetCount: aud.size,
-    idempotencyKey: key, operatorName,
+    idempotencyKey: key, operatorName, sentAt: now(),
   });
-  // 成功率 ~94%：关推送权限 / 停机 / 触达黑名单必然吃掉一部分，successCount 恒 ≤ targetCount
-  const success = Math.round(aud.size * 0.94);
-  return transitionPush(pushNo, "finish", { sentAt: now(), successCount: success, sentCount: success });
+}
+
+/**
+ * 收尾：SENDING → SENT，落触达统计。
+ *
+ * 真实触达由推送通道回执驱动（尚未接入），在那之前由运营显式收尾 ——
+ * 让单子停在「发送中」也比假装已送达强：后者会让「成功 N 人」是编的。
+ */
+export function finishPushMessage(pushNo: string, x: PushFinishPayload): PushMessage {
+  const target = findPush(pushNo);
+  if (target.status === "SENT") return target;        // 重复收尾按幂等处理
+  if (!canPushAction(target.status, "finish")) {
+    throw new PushError(`推送 ${pushNo} 当前状态「${target.status}」不允许执行「完成发送」`);
+  }
+  const t = Number(x?.targetCount ?? 0);
+  const ok = Number(x?.successCount ?? 0);
+  if (ok > t) {
+    // 放过去的话页面上会出现「目标 10 人 / 成功 30 人」，而看到的人只会以为是显示错了
+    throw new PushError("成功触达数不能大于目标人数");
+  }
+  return transitionPush(pushNo, "finish", {
+    targetCount: t, successCount: ok, sentCount: ok, sentAt: target.sentAt || now(),
+  });
 }
 
 // ============================================================================

@@ -23755,6 +23755,22 @@
      "type": "String"
     },
     {
+     "name": "audienceType",
+     "type": "String"
+    },
+    {
+     "name": "audienceValue",
+     "type": "String"
+    },
+    {
+     "name": "targetCount",
+     "type": "Integer"
+    },
+    {
+     "name": "successCount",
+     "type": "Integer"
+    },
+    {
      "name": "sentCount",
      "type": "Integer"
     },
@@ -23763,7 +23779,19 @@
      "type": "String"
     },
     {
+     "name": "scheduledAt",
+     "type": "String"
+    },
+    {
      "name": "sentAt",
+     "type": "String"
+    },
+    {
+     "name": "operatorName",
+     "type": "String"
+    },
+    {
+     "name": "idempotencyKey",
      "type": "String"
     }
    ],
@@ -23805,6 +23833,22 @@
      "type": "String"
     },
     {
+     "name": "audienceType",
+     "type": "String"
+    },
+    {
+     "name": "audienceValue",
+     "type": "String"
+    },
+    {
+     "name": "targetCount",
+     "type": "Integer"
+    },
+    {
+     "name": "successCount",
+     "type": "Integer"
+    },
+    {
      "name": "sentCount",
      "type": "Integer"
     },
@@ -23813,10 +23857,39 @@
      "type": "String"
     },
     {
+     "name": "scheduledAt",
+     "type": "String"
+    },
+    {
      "name": "sentAt",
+     "type": "String"
+    },
+    {
+     "name": "operatorName",
+     "type": "String"
+    },
+    {
+     "name": "idempotencyKey",
      "type": "String"
     }
    ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/user/push-messages/sweep-due",
+   "perm": "marketing:push:update",
+   "perms": [
+    "marketing:push:update"
+   ],
+   "handler": "MarketingController#sweepDuePushMessages",
+   "summary": "扫描到点的排期推送并发出。",
+   "params": [],
+   "bodyType": "java.util.Map<String, Object>",
+   "returnType": "Object",
+   "returnContainer": null,
+   "returnElement": "Object",
+   "responseShape": null,
    "requestShape": null
   },
   {
@@ -23862,6 +23935,22 @@
      "type": "String"
     },
     {
+     "name": "audienceType",
+     "type": "String"
+    },
+    {
+     "name": "audienceValue",
+     "type": "String"
+    },
+    {
+     "name": "targetCount",
+     "type": "Integer"
+    },
+    {
+     "name": "successCount",
+     "type": "Integer"
+    },
+    {
      "name": "sentCount",
      "type": "Integer"
     },
@@ -23870,10 +23959,46 @@
      "type": "String"
     },
     {
+     "name": "scheduledAt",
+     "type": "String"
+    },
+    {
      "name": "sentAt",
+     "type": "String"
+    },
+    {
+     "name": "operatorName",
+     "type": "String"
+    },
+    {
+     "name": "idempotencyKey",
      "type": "String"
     }
    ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/user/push-messages/{pushNo}/finish",
+   "perm": "marketing:push:update",
+   "perms": [
+    "marketing:push:update"
+   ],
+   "handler": "MarketingController#finishPushMessage",
+   "summary": "推送收尾：SENDING → SENT，落触达统计。",
+   "params": [
+    {
+     "in": "path",
+     "name": "pushNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "java.util.Map<String, Object>",
+   "returnType": "Object",
+   "returnContainer": null,
+   "returnElement": "Object",
+   "responseShape": null,
    "requestShape": null
   },
   {
@@ -28114,10 +28239,10 @@
  },
  "conflicts": {},
  "stats": {
-  "endpoints": 419,
+  "endpoints": 421,
   "records": 294,
-  "withPerm": 359,
-  "withBody": 181,
+  "withPerm": 361,
+  "withBody": 183,
   "shapedResponses": 317
  }
 }

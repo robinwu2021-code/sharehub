@@ -125,7 +125,7 @@ export {
   // 广告投放动作 + 曝光按周期过滤（动作挂广告活动，不挂曝光事实行）
   transitionAdCampaign, AdCampaignError, listAdDeliveriesInPeriod,
   referralRules, listReferralRules, saveReferralRule, ReferralRuleError,
-  resolveAudience, MEMBER_LEVELS, sendPushMessage, transitionPush,
+  resolveAudience, MEMBER_LEVELS, sendPushMessage, finishPushMessage, transitionPush,
   CouponIssueError, PushError, AudienceError,
 } from "./marketing";
 

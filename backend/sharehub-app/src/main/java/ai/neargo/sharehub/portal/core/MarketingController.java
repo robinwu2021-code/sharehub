@@ -325,13 +325,60 @@ public class MarketingController {
         return adCampaignService.transition(adNo, action);
     }
 
-    /** 发送推送。**必带幂等键** —— 推送是真的推到用户手机上，双击不该推两次。 */
+    /**
+     * 发送推送。**必带幂等键** —— 推送是真的推到用户手机上，双击不该推两次。
+     *
+     * <p>一个端点两种语义（沿用前端既有契约 {@code PushSendPayload}）：
+     * {@code scheduledAt} 有值 = 排期（转 SCHEDULED，到点由扫描发出）；空 = 立即发送。
+     * 不拆成两个端点，是因为前端本来就是一个「发送」按钮 + 一个可选时间。
+     */
     @PostMapping("/api/user/push-messages/{pushNo}/send")
     @PreAuthorize("@perm.can('marketing:push:update')")
     public Object sendPushMessage(@PathVariable String pushNo,
                                   @RequestBody(required = false) java.util.Map<String, Object> body) {
-        Object k = body == null ? null : body.get("idempotencyKey");
-        return pushService.send(pushNo, k == null ? null : String.valueOf(k));
+        String key = str(body, "idempotencyKey");
+        String at = str(body, "scheduledAt");
+        String by = str(body, "operatorName");
+        return (at == null || at.isBlank())
+                ? pushService.send(pushNo, key, by)
+                : pushService.schedule(pushNo, at, by);
+    }
+
+    /**
+     * 推送收尾：SENDING → SENT，落触达统计。
+     *
+     * <p>真实触达由推送通道回执驱动（尚未接入），在那之前由运营/联调显式收尾 ——
+     * 让单子停在 SENDING 也比**假装已送达**强：后者会让"成功 N 人"是编的。
+     */
+    @PostMapping("/api/user/push-messages/{pushNo}/finish")
+    @PreAuthorize("@perm.can('marketing:push:update')")
+    public Object finishPushMessage(@PathVariable String pushNo,
+                                    @RequestBody(required = false) java.util.Map<String, Object> body) {
+        return pushService.finish(pushNo, intOf(body, "targetCount"), intOf(body, "successCount"));
+    }
+
+    /**
+     * 扫描到点的排期推送并发出。
+     *
+     * <p>**这是临时入口**：本该由共用调度器按 cron 回调（v4/07 的 JobHandler），
+     * 但那要等 ai-shop 的任务服务做完多系统改造 —— 目前 backend/pom.xml 的 enforcer
+     * 明令禁止依赖 {@code ai.neargo.shop:*}，接口类根本引不进来。
+     * 调度器就绪后把 {@link PushService#sweepDue} 挂成 JobHandler 即可，业务代码不动。
+     */
+    @PostMapping("/api/user/push-messages/sweep-due")
+    @PreAuthorize("@perm.can('marketing:push:update')")
+    public Object sweepDuePushMessages(@RequestBody(required = false) java.util.Map<String, Object> body) {
+        return java.util.Map.of("handled", pushService.sweepDue(str(body, "now")));
+    }
+
+    private static String str(java.util.Map<String, Object> body, String k) {
+        Object v = body == null ? null : body.get(k);
+        return v == null ? null : String.valueOf(v);
+    }
+
+    private static Integer intOf(java.util.Map<String, Object> body, String k) {
+        Object v = body == null ? null : body.get(k);
+        return v == null ? null : Integer.valueOf(String.valueOf(v));
     }
 
     /** 券发放记录（append，只增不改）。 */

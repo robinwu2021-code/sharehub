@@ -31,6 +31,7 @@ export const marketingMock: MarketingApi = {
   transitionCampaign: (no, action) => wait(transitionCampaign(no, action), 350),
   savePushMessage: (x) => wait(db.savePushMessage(x), 350),
   sendPushMessage: (no, x) => wait(db.sendPushMessage(no, x), 350),
+  finishPushMessage: (no, x) => wait(db.finishPushMessage(no, x), 350),
   saveAdSlot: (x) => wait(db.saveAdSlot(x), 350),
   saveAdCampaign: (x) => wait(db.saveAdCampaign(x), 350),
 
