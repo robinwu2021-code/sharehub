@@ -30,9 +30,6 @@ B GET /api/ops/inspection-plans InspectionPlan 后端有前端无:cron
 #   前端是按 parent 客户端建树、filterDepts 也已自行保留祖先链，
 #   接了只是把一份后端实现细节固化进契约。
 B GET /api/platform/departments Department 后端有前端无:path
-B GET /api/platform/payment-channels PaymentChannelEntry 后端有前端无:apiSecretMasked
-B GET /api/platform/payment-channels PaymentChannelEntry 后端有前端无:channelNameAr
-B GET /api/platform/payment-channels PaymentChannelEntry 后端有前端无:channelNameEn
 # ⚠️ 下面这条是**有意不接**，不是待办 —— 别把它「修」掉：
 #   未审批的提现要按**现行**费率实时算（ops-web/lib/types/finance.ts 的 withdrawNetOf），
 #   审核页给的必须是点「通过」那一刻真会扣的数；落库的 netAmount 是申请时的旧数。

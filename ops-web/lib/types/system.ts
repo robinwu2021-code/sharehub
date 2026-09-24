@@ -156,6 +156,15 @@ export interface MarketCountry {
 export interface PaymentChannel {
   channelCode: string; // NEARPAY / STRIPE / PAYPAL ...
   channelName: string;
+  /**
+   * 渠道名的英文 / 阿语版本。后端一直存着也一直在返回，前端既没声明、
+   * 表单里也没有这两项 —— 于是**只能由 DBA 直接改库**。
+   *
+   * 展示仍用 {@link channelName}：本仓还没有「按当前语言取名」的统一做法
+   * （品牌、站点的 nameAr 同样只作表单字段），那是 i18n 线的事，不在这里顺手开。
+   */
+  channelNameEn: string;
+  channelNameAr: string;
   mode: "DELEGATED" | "DIRECT"; // 委托（聚合/代收）/ 直连（自有商户号）
   status: "ENABLED" | "DISABLED";
   countries: string; // 适用国家，ISO alpha-2 逗号分隔，如 "AE,SA"
@@ -164,6 +173,14 @@ export interface PaymentChannel {
   apiBase: string;
   merchantId: string;
   apiKeyMasked: string; // 密钥仅掩码展示（真实密钥永不落前端，占位 sk_test_****）
+  /**
+   * API Secret 的掩码。口径同 {@link apiKeyMasked} 与 OpenApiApp.appSecretMasked ——
+   * 前端只承载掩码，真实值仅后端保存。
+   *
+   * 此前前端没声明、表单里也没有 —— 而多数支付网关是 key + secret 成对使用的，
+   * **等于渠道的 secret 从界面上根本配不了**，也看不出配没配。
+   */
+  apiSecretMasked: string;
   updatedAt: string;
 }
 

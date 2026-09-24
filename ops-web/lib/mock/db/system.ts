@@ -170,42 +170,51 @@ export function testVendorConnectivity(vendorCode: string): VendorProbeResult {
 // 一页承载渠道列表 + 配置抽屉：NEARPAY 为当前主通道，其余为未来可插拔占位。
 // 注意：mock 不写任何真实密钥，一律占位掩码。
 // ============================================================================
+// secret 掩码**故意只给一半渠道**（NEARPAY/STRIPE/TAP 有，其余空）：
+// 「这个渠道的 secret 配没配」是运营要一眼看出来的事，全给或全不给都验不出来。
+// 与 status 不耦合 —— 渠道可以配好了却停用，两件事各自独立。
 export const paymentChannels: PaymentChannel[] = [
   {
     channelCode: "NEARPAY", channelName: "NearPay（聚合收单）", mode: "DELEGATED", status: "ENABLED",
     countries: "AE", currencies: "AED", capabilities: "支付,退款,预授权,分账",
     apiBase: "https://api.nearpay.example", merchantId: "MID-AE-100286",
-    apiKeyMasked: "sk_test_****", updatedAt: iso(2 * 86400_000),
+    channelNameEn: "NearPay (Aggregated)", channelNameAr: "نير باي",
+    apiKeyMasked: "sk_test_****", apiSecretMasked: "whsec_****", updatedAt: iso(2 * 86400_000),
   },
   {
     channelCode: "STRIPE", channelName: "Stripe", mode: "DIRECT", status: "DISABLED",
     countries: "AE,SA", currencies: "AED,SAR,USD", capabilities: "支付,退款,预授权",
     apiBase: "https://api.stripe.com", merchantId: "acct_****",
-    apiKeyMasked: "sk_test_****", updatedAt: iso(20 * 86400_000),
+    channelNameEn: "Stripe", channelNameAr: "سترايب",
+    apiKeyMasked: "sk_test_****", apiSecretMasked: "whsec_****", updatedAt: iso(20 * 86400_000),
   },
   {
     channelCode: "PAYPAL", channelName: "PayPal", mode: "DIRECT", status: "DISABLED",
     countries: "AE,EG", currencies: "USD,EUR", capabilities: "支付,退款",
     apiBase: "https://api-m.paypal.com", merchantId: "PP-****",
-    apiKeyMasked: "sk_test_****", updatedAt: iso(30 * 86400_000),
+    channelNameEn: "PayPal", channelNameAr: "باي بال",
+    apiKeyMasked: "sk_test_****", apiSecretMasked: "", updatedAt: iso(30 * 86400_000),
   },
   {
     channelCode: "TAP", channelName: "Tap Payments（海湾本地卡）", mode: "DIRECT", status: "DISABLED",
     countries: "AE,SA,KW,BH", currencies: "AED,SAR,KWD,BHD", capabilities: "支付,退款,预授权",
     apiBase: "https://api.tap.company", merchantId: "MID-GCC-****",
-    apiKeyMasked: "sk_test_****", updatedAt: iso(35 * 86400_000),
+    channelNameEn: "Tap Payments", channelNameAr: "تاب",
+    apiKeyMasked: "sk_test_****", apiSecretMasked: "whsec_****", updatedAt: iso(35 * 86400_000),
   },
   {
     channelCode: "CHECKOUT", channelName: "Checkout.com", mode: "DIRECT", status: "DISABLED",
     countries: "AE,SA,QA", currencies: "AED,SAR,QAR", capabilities: "支付,退款,预授权,分账",
     apiBase: "https://api.checkout.com", merchantId: "MID-CKO-****",
-    apiKeyMasked: "sk_test_****", updatedAt: iso(45 * 86400_000),
+    channelNameEn: "Checkout.com", channelNameAr: "تشيك أوت",
+    apiKeyMasked: "sk_test_****", apiSecretMasked: "", updatedAt: iso(45 * 86400_000),
   },
   {
     channelCode: "HYPERPAY", channelName: "HyperPay（沙特本地）", mode: "DELEGATED", status: "DISABLED",
     countries: "SA,JO,EG", currencies: "SAR,JOD,EGP", capabilities: "支付,退款",
     apiBase: "https://eu-prod.oppwa.com", merchantId: "MID-SA-****",
-    apiKeyMasked: "sk_test_****", updatedAt: iso(50 * 86400_000),
+    channelNameEn: "Hyperpay", channelNameAr: "HYPERPAY",
+    apiKeyMasked: "sk_test_****", apiSecretMasked: "", updatedAt: iso(50 * 86400_000),
   },
 ];
 

@@ -98,6 +98,10 @@ const PARAM_FIELDS: FieldDef[] = [
 const PAYMENT_FIELDS: FieldDef[] = [
   { key: "channelCode", label: "渠道码", readOnlyOnEdit: true, placeholder: "NEARPAY / STRIPE / PAYPAL" },
   { key: "channelName", label: "渠道名称", placeholder: "NearPay（聚合收单）" },
+  // 英/阿名后端一直存着，此前表单里没有 —— 等于只能由 DBA 直接改库。
+  // 展示仍用 channelName：本仓还没有「按当前语言取名」的统一做法（品牌/站点同理）。
+  { key: "channelNameEn", label: "渠道名称（English）", placeholder: "NearPay (Aggregated)" },
+  { key: "channelNameAr", label: "渠道名称（العربية）", placeholder: "نير باي" },
   { key: "mode", label: "接入模式", type: "select", options: [{ value: "DELEGATED", label: "委托" }, { value: "DIRECT", label: "直连" }] },
   { key: "status", label: "状态", type: "select", options: [{ value: "ENABLED", label: "启用" }, { value: "DISABLED", label: "停用" }] },
   { key: "countries", label: "适用国家", placeholder: "AE,SA" },
@@ -106,6 +110,9 @@ const PAYMENT_FIELDS: FieldDef[] = [
   { key: "apiBase", label: "API 基址", placeholder: "https://api.nearpay.example" },
   { key: "merchantId", label: "商户号", placeholder: "MID-AE-100286" },
   { key: "apiKeyMasked", label: "API 密钥（掩码）", type: "password", placeholder: "sk_test_****" },
+  // 多数支付网关是 key + secret 成对使用的，此前表单只有 key ——
+  // **渠道的 secret 从界面上根本配不了**，也看不出配没配。
+  { key: "apiSecretMasked", label: "API Secret（掩码）", type: "password", placeholder: "whsec_****" },
 ];
 
 // 国家码是业务主键（ISO alpha-2），新增必填、编辑只读
@@ -573,6 +580,17 @@ function SystemInner() {
   const paymentCols: Column<PaymentChannel>[] = [
     { header: "渠道码", cell: (c) => <span className="font-medium">{c.channelCode}</span> },
     { header: "名称", cell: (c) => c.channelName },
+    {
+      header: "密钥",
+      className: "whitespace-nowrap",
+      // 只说"配没配"，不显示掩码本身 —— 列表是扫描用的，掩码要看进抽屉。
+      // key 有 secret 没有是最常见的半配状态，单独标出来。
+      cell: (c) => !c.apiKeyMasked
+        ? <Badge tone="danger">未配置</Badge>
+        : !c.apiSecretMasked
+          ? <Badge tone="warning">缺 Secret</Badge>
+          : <Badge tone="success">已配置</Badge>,
+    },
     { header: "模式", cell: (c) => <Badge tone="outline">{c.mode === "DELEGATED" ? "委托" : "直连"}</Badge> },
     { header: "适用国家", cell: (c) => <span className="tabular-nums">{c.countries}</span> },
     { header: "币种", cell: (c) => <span className="tabular-nums">{c.currencies}</span> },
