@@ -6,15 +6,15 @@
 
 | | |
 |---|---|
-| 表 | **148** |
-| 列 | **2330**，其中业务列 **1319**、标准列 1011 |
+| 表 | **155** |
+| 列 | **2489**，其中业务列 **1430**、标准列 1059 |
 | 结构来源 | 实际库 `information_schema`（**不是 DDL 文件** —— `IF NOT EXISTS` 落到既有表上是空操作，文件写了不代表库里有） |
-| 注释来源 | 业务列中库内 774 列自带；另 43 列库里为空、回落到 `docs/technical/ddl/` 同名列（表格中标 `†`）；仍缺 502 列 |
-| 实体映射 | 137 张表有对应 Java 实体，10 张没有 |
+| 注释来源 | 业务列中库内 944 列自带；另 0 列库里为空、回落到 `docs/technical/ddl/` 同名列（表格中标 `†`）；仍缺 486 列 |
+| 实体映射 | 141 张表有对应 Java 实体，13 张没有 |
 
 ## 标准列（每张表都有，下文各表不再重复列出）
 
-这 8 列由 `BaseEntity` + 租户 + 审计约定统一提供，在 148 张表上共占 1011 列。逐表列出来只有噪音，会把真正的业务列淹掉，所以这里讲一次，各表只标注「标准列是否齐备」。
+这 8 列由 `BaseEntity` + 租户 + 审计约定统一提供，在 155 张表上共占 1059 列。逐表列出来只有噪音，会把真正的业务列淹掉，所以这里讲一次，各表只标注「标准列是否齐备」。
 
 | 列 | 说明 |
 |---|---|
@@ -31,36 +31,36 @@
 
 设计里还有 `pb_pii`（个人信息隔离）与 `pb_auth`（凭证隔离）两个库，**开发库尚未创建**，相关字段目前仍在 `pb_core` 内。上线前必须拆出去，否则 PDPL 的「个人信息与业务数据物理隔离」这条对不上。
 
-## 无对应实体的表（10）
+## 无对应实体的表（13）
 
 这些表没有 `@TableName` 指向，要么是纯关联表（由主实体的 mapper 直接操作），要么是**建了但代码还没接**。后者在补业务逻辑时会被漏掉，逐张确认过再删本节。
 
-`dev_alert` · `gw_vendor_device_type` · `iam_data_scope` · `iam_menu` · `iam_permission` · `iam_role` · `iam_role_perm` · `md_device_type` · `ord_charge_ext` · `ord_locker_ext`
+`dev_alert_deprecated_v1` · `gw_vendor_device_type` · `iam_data_scope` · `iam_menu` · `iam_permission` · `iam_role` · `iam_role_perm` · `md_device_type` · `ord_charge_ext` · `ord_locker_ext` · `price_rule_deprecated_v1` · `tenant` · `tenant_config`
 
 ## 目录
 
 - **账务（`acct_*`）** — 2 张：`acct_account`、`acct_ledger`
 - **广告（`ad_*`）** — 6 张：`ad_advertiser`、`ad_campaign`、`ad_creative`、`ad_impression`、`ad_placement`、`ad_slot`
-- **代理商（`agt_*`）** — 5 张：`agt_account`、`agt_agent`、`agt_agent_region`、`agt_assignment`、`agt_commission`
+- **代理商（`agt_*`）** — 7 张：`agt_account`、`agt_agent`、`agt_agent_region`、`agt_apply`、`agt_assignment`、`agt_commission`、`agt_principal`
 - **其他** — 8 张：`coupon_tpl`、`mbr_benefit`、`mbr_plan`、`openapi_app`、`recon_diff`、`recon_task`、`tenant`、`tenant_config`
 - **客服（`cs_*`）** — 3 张：`cs_message`、`cs_session`、`cs_ticket`
-- **设备（`dev_*`）** — 14 张：`dev_alarm`、`dev_alarm_code`、`dev_alarm_notice`、`dev_alarm_rule`、`dev_alert`、`dev_cabinet`、`dev_code_batch`、`dev_heartbeat`、`dev_ota_release`、`dev_ota_rollout`、`dev_ota_task`、`dev_powerbank`、`dev_shadow`、`dev_slot`
+- **设备（`dev_*`）** — 14 张：`dev_alarm`、`dev_alarm_code`、`dev_alarm_notice`、`dev_alarm_rule`、`dev_alert_deprecated_v1`、`dev_cabinet`、`dev_code_batch`、`dev_heartbeat`、`dev_ota_release`、`dev_ota_rollout`、`dev_ota_task`、`dev_powerbank`、`dev_shadow`、`dev_slot`
 - **数据字典（`dict_*`）** — 1 张：`dict_item`
 - **财务（`fin_*`）** — 2 张：`fin_invoice`、`fin_invoice_item`
 - **迁移元数据（`flyway_*`）** — 1 张：`flyway_schema_history`
 - **设备网关（`gw_*`）** — 6 张：`gw_command_log`、`gw_device_binding`、`gw_message_log`、`gw_vendor`、`gw_vendor_config`、`gw_vendor_device_type`
 - **身份与权限（`iam_*`）** — 10 张：`iam_audit_log`、`iam_data_scope`、`iam_dept`、`iam_employee`、`iam_employee_role`、`iam_menu`、`iam_permission`、`iam_role`、`iam_role_perm`、`iam_staff_perf`
 - **库存（`inv_*`）** — 4 张：`inv_stock`、`inv_transfer`、`inv_transfer_item`、`inv_warehouse`
-- **场地与点位（`loc_*`）** — 10 张：`loc_contract`、`loc_contract_attach`、`loc_lead`、`loc_lead_follow`、`loc_location`、`loc_site`、`loc_site_lifecycle`、`loc_site_lifecycle_log`、`loc_venue`、`loc_venue_onboarding`
-- **主数据（`md_*`）** — 5 张：`md_bank`、`md_device_type`、`md_market_country`、`md_problem`、`md_region`
+- **场地与点位（`loc_*`）** — 11 张：`loc_contract`、`loc_contract_attach`、`loc_lead`、`loc_lead_follow`、`loc_location`、`loc_site`、`loc_site_agent`、`loc_site_lifecycle`、`loc_site_lifecycle_log`、`loc_venue`、`loc_venue_onboarding`
+- **主数据（`md_*`）** — 6 张：`md_bank`、`md_brand`、`md_device_type`、`md_market_country`、`md_problem`、`md_region`
 - **营销（`mkt_*`）** — 5 张：`mkt_campaign`、`mkt_notice`、`mkt_push`、`mkt_referral`、`mkt_referral_rule`
 - **通知（`notify_*`）** — 3 张：`notify_blacklist`、`notify_log`、`notify_template`
 - **订单（`ord_*`）** — 11 张：`ord_charge_ext`、`ord_complaint`、`ord_deposit`、`ord_event_log`、`ord_exception`、`ord_intervention`、`ord_locker_ext`、`ord_order`、`ord_refund`、`ord_rent_ext`、`ord_reservation`
 - **支付（`pay_*`）** — 6 张：`pay_auth`、`pay_channel`、`pay_channel_scope`、`pay_event_log`、`pay_order`、`pay_refund`
-- **计价（`price_*`）** — 6 张：`price_ladder`、`price_plan`、`price_plan_item`、`price_plan_scope`、`price_rule`、`price_schedule`
+- **计价（`price_*`）** — 7 张：`price_adjustment`、`price_ladder`、`price_plan`、`price_plan_item`、`price_plan_scope`、`price_rule_deprecated_v1`、`price_schedule`
 - **分润（`share_*`）** — 2 张：`share_record`、`share_rule`
-- **结算（`stl_*`）** — 3 张：`stl_settlement`、`stl_settlement_detail`、`stl_withdrawal`
-- **系统配置（`sys_*`）** — 7 张：`sys_app_version`、`sys_biz_rule`、`sys_login_setting`、`sys_outbox`、`sys_param`、`sys_tax_setting`、`sys_token`
+- **结算（`stl_*`）** — 4 张：`stl_payout_account`、`stl_settlement`、`stl_settlement_detail`、`stl_withdrawal`
+- **系统配置（`sys_*`）** — 8 张：`sys_app_version`、`sys_biz_rule`、`sys_event_consumed`、`sys_login_setting`、`sys_outbox`、`sys_param`、`sys_tax_setting`、`sys_token`
 - **用户（`usr_*`）** — 22 张：`usr_blacklist`、`usr_consent`、`usr_coupon`、`usr_coupon_issue`、`usr_credit`、`usr_credit_change`、`usr_favorite`、`usr_free_whitelist`、`usr_identity`、`usr_invoice`、`usr_invoice_title`、`usr_logoff`、`usr_membership`、`usr_message`、`usr_notify_pref`、`usr_push_token`、`usr_recharge_order`、`usr_recharge_pkg`、`usr_recharge_pkg_market`、`usr_user`、`usr_wallet`、`usr_wallet_txn`
 - **工单（`wo_*`）** — 6 张：`wo_dispatch`、`wo_handle`、`wo_inspection_plan`、`wo_order`、`wo_sla`、`wo_sla_rule`
 
@@ -99,7 +99,7 @@
 | `amount` | `decimal(18,2)` | 否 | — |  | — |
 | `currency` | `varchar(8)` | 否 | `'AED'` |  | — |
 | `summary` | `varchar(128)` | 是 | — |  | — |
-| `account_no` | `varchar(36)` | 是 | — |  | 既有DDL同名列×1 |
+| `account_no` | `varchar(36)` | 是 | — |  | 既有DDL同名列×2 |
 | `biz_no` | `varchar(36)` | 是 | — |  | 既有DDL同名列×1 |
 | `biz_type` | `varchar(24)` | 是 | — |  | 既有DDL同名列×1 |
 
@@ -138,7 +138,7 @@
 | `ad_no` | `varchar(36)` | 是 | — |  | 约定:业务键 |
 | `advertiser` | `longtext` | 是 | — |  | db-design 标 JSON |
 | `creative` | `longtext` | 是 | — |  | db-design 标 JSON |
-| `currency` | `varchar(8)` | 是 | — |  | 既有DDL同名列×23 |
+| `currency` | `varchar(8)` | 是 | — |  | 既有DDL同名列×31 |
 | `targeting` | `longtext` | 是 | — |  | db-design 标 JSON |
 
 索引：`idx_campaign_adv`(advertiser_no) · `uk_campaign_no`(campaign_no) **UNIQUE**
@@ -203,7 +203,7 @@
 | `ad_slot_no` | `varchar(36)` | 否 | — | UQ | — |
 | `cabinet_no` | `varchar(36)` | 否 | — | IX | — |
 | `type` | `varchar(16)` | 否 | `'SCREEN'` |  | SCREEN/BODY |
-| `status` | `varchar(16)` | 否 | `'ACTIVE'` |  | — |
+| `status` | `varchar(16)` | 否 | `'IDLE'` |  | IDLE/OCCUPIED(被投放占用) |
 | `position` | `varchar(32)` | 是 | — |  | 约定:枚举/短码 |
 | `size` | `varchar(32)` | 是 | — |  | 约定:枚举/短码 |
 | `slot_no` | `varchar(36)` | 是 | — |  | 约定:业务键 |
@@ -217,7 +217,7 @@
 
 ### `agt_account` — 代理登录账号
 
-实体 `AgtAccount` · 业务列 7 · 标准列齐备
+实体 `AgtAccount` · 业务列 11 · 标准列齐备
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
@@ -228,27 +228,30 @@
 | `status` | `varchar(16)` | 否 | `'ACTIVE'` |  | — |
 | `agent_name` | `varchar(64)` | 是 | — |  | 既有DDL同名列×1 |
 | `login_phone` | `varchar(32)` | 是 | — |  | 人工定型：手机号（含国际区号），明文脱敏值；完整明文在 pb_pii |
+| `principal_no` | `varchar(36)` | 是 | — | IX | → agt_principal.principal_no；取代 username/login_phone 做键 |
+| `is_owner` | `tinyint(1)` | 否 | `1` |  | 主体属主：全站点全权限、不进授权表（ADR-030 §5.1） |
+| `is_primary` | `tinyint(1)` | 否 | `1` |  | 该人的默认主体；同一人至多一个 |
+| `display_name` | `varchar(64)` | 是 | — |  | 在该主体下的显示名 |
 
-索引：`idx_agt_account_agent`(agent_no) · `uk_agt_account_no`(account_no) **UNIQUE** · `uk_agt_username`(tenant_id,username) **UNIQUE**
+索引：`idx_agt_account_agent`(agent_no) · `idx_agt_account_pr`(principal_no,is_primary) · `uk_agt_account_member`(agent_no,principal_no) **UNIQUE** · `uk_agt_account_no`(account_no) **UNIQUE**
 
-### `agt_agent`
+### `agt_agent` — 代理商
 
-实体 `AgtAgent` · 业务列 10 · 标准列齐备
+实体 `AgtAgent` · 业务列 9 · 标准列齐备
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
 | `agent_no` | `varchar(36)` | 否 | — | UQ | — |
-| `name` | `varchar(128)` | 否 | — |  | 代理名称 † |
-| `contact` | `varchar(64)` | 是 | — |  | 敏感明文落 pii † |
-| `region_scope` | `varchar(128)` | 是 | — |  | 辖域(区域数组) † |
-| `share_rate` | `decimal(6,4)` | 否 | `0.0000` |  | — |
-| `cabinet_count` | `int(11)` | 否 | `0` |  | — |
-| `status` | `varchar(16)` | 否 | `'ENABLED'` |  | ENABLED/SUSPENDED † |
+| `name` | `varchar(128)` | 否 | — |  | 代理名称 |
+| `contact` | `varchar(64)` | 是 | — |  | 敏感明文落 pii |
+| `region_scope` | `longtext` | 是 | — |  | 辖域(区域数组) |
 | `default_share_rate` | `decimal(5,4)` | 否 | `0.0000` |  | 默认分润比例 |
 | `settle_account` | `varchar(128)` | 是 | — |  | 结算账户(nearpay 收款方) |
+| `status` | `varchar(16)` | 否 | `'ENABLED'` |  | ENABLED/SUSPENDED |
 | `archived_at` | `datetime(3)` | 是 | — |  | 归档时间；null=在用 |
+| `agent_type` | `varchar(24)` | 否 | `'AGENT'` | IX | 登记类型：AGENT 代理商 / CITY_PARTNER 城市合伙人（ADR-027） |
 
-索引：`idx_agent_archived`(tenant_id,archived_at) · `uk_agent_no`(agent_no) **UNIQUE**
+索引：`idx_agent_archived`(tenant_id,archived_at) · `idx_agent_tenant`(tenant_id) · `idx_agent_type`(agent_type) · `uk_agent_no`(agent_no) **UNIQUE**
 
 ### `agt_agent_region` — 代理辖域(多值拆表)
 
@@ -261,18 +264,50 @@
 
 索引：`idx_agent_region_region`(region_id) · `uk_agent_region`(agent_no,region_id) **UNIQUE**
 
-### `agt_assignment` — ä»£ç†è®¾å¤‡/ç‚¹ä½åˆ’æ‹¨è®°å½•(append)
+### `agt_apply` — 运营主体入驻申请
+
+实体 `AgtApply` · 业务列 23 · 标准列齐备
+
+| 列 | 类型 | 空 | 默认 | 键 | 说明 |
+|---|---|---|---|---|---|
+| `apply_no` | `varchar(36)` | 否 | — | UQ | 申请单业务键 AP* |
+| `source` | `varchar(16)` | 否 | — |  | SELF_SERVICE 商家自助 / OPS_CREATED 运营商代建；**由服务端按令牌判定，客户端不得传** |
+| `phone_hash` | `varchar(64)` | 否 | — | IX | HMAC(规范化手机号)；已存在不是重复注册，是多主体申请 |
+| `phone_mask` | `varchar(32)` | 否 | — |  | 仅显示 |
+| `phone_enc` | `varbinary(256)` | 是 | — |  | — |
+| `email_hash` | `varchar(64)` | 否 | — | IX | HMAC(lower(trim(邮箱)))；用户 2026-09-23 定必填 |
+| `email_mask` | `varchar(64)` | 否 | — |  | 仅显示 |
+| `email_enc` | `varbinary(512)` | 是 | — |  | — |
+| `hash_ver` | `tinyint(4)` | 否 | `1` |  | pepper 版本，同 agt_principal |
+| `principal_no` | `varchar(36)` | 是 | — |  | 命中已有自然人时回填；空=新人 |
+| `operator_name` | `varchar(128)` | 否 | — |  | 拟建主体名称 |
+| `operator_type` | `varchar(16)` | 否 | — |  | AGENT / CITY_PARTNER；**决定必填项，source 不决定** |
+| `region_scope` | `longtext` | 是 | — |  | 申请辖域 |
+| `share_rate` | `decimal(5,4)` | 是 | — |  | 拟定默认分润比例，审核时定 |
+| `payload` | `longtext` | 是 | — |  | 资质材料；敏感件只存 sharehub_pii 引用，不落明文（PDPL） |
+| `status` | `varchar(16)` | 否 | `'DRAFT'` | IX | DRAFT/SUBMITTED/REVIEWING/APPROVED/REJECTED |
+| `reject_reason` | `varchar(512)` | 是 | — |  | 驳回原因；**原样回显给申请人**，不只给运营看 |
+| `submitted_by` | `varchar(36)` | 是 | — |  | 自助=phone_hash 前 12 位；代建=经办 employee_no |
+| `submitted_at` | `datetime(3)` | 是 | — |  | — |
+| `reviewed_by` | `varchar(36)` | 是 | — |  | 审核人；代建一键通过时与 submitted_by 同值，**照写不省** |
+| `reviewed_at` | `datetime(3)` | 是 | — |  | — |
+| `operator_no` | `varchar(36)` | 是 | — | IX | 通过后回写，申请↔主体双向可查 |
+| `active_key` | `varchar(64)` | 是 | — | UQ | 在途取 phone_hash、终态取 apply_no；全程非空，约束真实生效 |
+
+索引：`idx_agt_apply_email`(email_hash) · `idx_agt_apply_operator`(operator_no) · `idx_agt_apply_phone`(phone_hash) · `idx_agt_apply_queue`(status,submitted_at) · `uk_agt_apply_active`(active_key) **UNIQUE** · `uk_agt_apply_no`(apply_no) **UNIQUE**
+
+### `agt_assignment` — 代理设备/点位划拨记录(append)
 
 实体 `AgtAssignment` · 业务列 6 · 标准列缺 `updated_at`/`updated_by`/`version`/`deleted` ⚠️
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
-| `assign_no` | `varchar(36)` | 否 | — | UQ | ä¸šåŠ¡é”® |
-| `agent_no` | `varchar(36)` | 否 | — | IX | ä»£ç†å•† |
+| `assign_no` | `varchar(36)` | 否 | — | UQ | 业务键 |
+| `agent_no` | `varchar(36)` | 否 | — | IX | 代理商 |
 | `target_type` | `varchar(16)` | 否 | — | IX | CABINET/LOCATION/SITE |
-| `target_no` | `varchar(36)` | 否 | — |  | è¢«åˆ’æ‹¨å¯¹è±¡ä¸šåŠ¡é”® |
+| `target_no` | `varchar(36)` | 否 | — |  | 被划拨对象业务键 |
 | `action` | `varchar(16)` | 否 | — |  | ASSIGN/REVOKE |
-| `operator` | `varchar(64)` | 是 | — |  | æ“ä½œäºº(employee_no) |
+| `operator` | `varchar(64)` | 是 | — |  | 操作人(employee_no) |
 
 索引：`idx_assign_agent_time`(agent_no,created_at) · `idx_assign_target`(target_type,target_no) · `uk_assign_no`(assign_no) **UNIQUE**
 
@@ -295,6 +330,25 @@
 
 索引：`idx_agt_commission_agent`(tenant_id,agent_no,status) · `uk_agt_commission_no`(rule_no) **UNIQUE**
 
+### `agt_principal` — 代理端自然人（登录主体）
+
+实体 `AgtPrincipal` · 业务列 10 · 标准列齐备
+
+| 列 | 类型 | 空 | 默认 | 键 | 说明 |
+|---|---|---|---|---|---|
+| `principal_no` | `varchar(36)` | 否 | — | UQ | 业务键 PR* |
+| `phone_hash` | `varchar(64)` | 否 | — | UQ | HMAC-SHA256(规范化手机号, pepper)；登录查找键 |
+| `phone_mask` | `varchar(32)` | 否 | — |  | 138****8000；仅显示，不得进唯一键或等值条件 |
+| `phone_enc` | `varbinary(256)` | 是 | — |  | 可逆加密明文；pb_pii 建成后迁出 |
+| `email_hash` | `varchar(64)` | 否 | — | UQ | HMAC-SHA256(lower(trim(邮箱)), pepper) |
+| `email_mask` | `varchar(64)` | 否 | — |  | a***@example.com；仅显示 |
+| `email_enc` | `varbinary(512)` | 是 | — |  | — |
+| `hash_ver` | `tinyint(4)` | 否 | `1` |  | pepper 版本；轮换靠 *_enc 全表重算后统一切版，唯一键不动 |
+| `cred_ref` | `varchar(64)` | 是 | — |  | sharehub_auth.cred 引用(realm=AGENT)；一个人一套，不按主体分 |
+| `status` | `varchar(16)` | 否 | `'ACTIVE'` | IX | ACTIVE / DISABLED |
+
+索引：`idx_agt_principal_status`(status) · `uk_agt_principal_email`(email_hash) **UNIQUE** · `uk_agt_principal_no`(principal_no) **UNIQUE** · `uk_agt_principal_phone`(phone_hash) **UNIQUE**
+
 
 ---
 
@@ -315,7 +369,7 @@
 | `stock` | `int(11)` | 否 | `0` |  | — |
 | `issued` | `int(11)` | 否 | `0` |  | — |
 | `status` | `varchar(16)` | 否 | `'ACTIVE'` |  | — |
-| `currency` | `varchar(8)` | 是 | — |  | 既有DDL同名列×23 |
+| `currency` | `varchar(8)` | 是 | — |  | 既有DDL同名列×31 |
 | `archived_at` | `datetime(3)` | 是 | — |  | 归档时间；null=在用 |
 
 索引：`uk_tpl_no`(tpl_no) **UNIQUE**
@@ -419,7 +473,7 @@
 
 ### `tenant` — 租户(休眠口子·全局表)
 
-实体 `Tenant` · 业务列 8 · 标准列缺 `tenant_id`（追加表/全局表，符合预期）
+**无实体** · 业务列 8 · 标准列缺 `tenant_id`（追加表/全局表，符合预期）
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
@@ -436,7 +490,7 @@
 
 ### `tenant_config` — 租户配置(休眠口子)
 
-实体 `TenantConfig` · 业务列 4 · 标准列缺 `tenant_id`（追加表/全局表，符合预期）
+**无实体** · 业务列 4 · 标准列缺 `tenant_id`（追加表/全局表，符合预期）
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
@@ -586,7 +640,7 @@
 
 索引：`idx_alarm_rule_code`(alarm_code) · `idx_alarm_rule_tenant`(tenant_id,status) · `uk_alarm_rule_no`(rule_no) **UNIQUE**
 
-### `dev_alert` — 设备告警
+### `dev_alert_deprecated_v1` — 设备告警
 
 **无实体** · 业务列 9 · 标准列缺 `updated_by`/`version`/`deleted` ⚠️
 
@@ -604,31 +658,31 @@
 
 索引：`idx_alert_cabinet`(cabinet_no) · `idx_alert_dedup`(dedup_key) · `uk_alert_no`(alert_no) **UNIQUE**
 
-### `dev_cabinet`
+### `dev_cabinet` — 机柜/充电桩
 
 实体 `DevCabinet` · 业务列 17 · 标准列齐备
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
-| `cabinet_no` | `varchar(36)` | 否 | — | UQ | 机柜业务键 † |
-| `sn` | `varchar(64)` | 是 | — |  | 设备序列号(全局唯一) † |
-| `vendor_code` | `varchar(32)` | 是 | — |  | 供应商 † |
-| `model` | `varchar(32)` | 是 | — |  | — |
-| `location_no` | `varchar(36)` | 是 | — |  | 归属点位 † |
-| `site_no` | `varchar(36)` | 是 | — |  | 归属站点(冗余·随点位，数据范围锚点) |
-| `agent_no` | `varchar(36)` | 是 | — |  | 归属代理(冗余·随站点，数据范围锚点) |
-| `location_name` | `varchar(128)` | 是 | — |  | — |
-| `slot_total` | `int(11)` | 否 | `0` |  | — |
-| `available_count` | `int(11)` | 否 | `0` |  | — |
-| `online_status` | `varchar(16)` | 否 | `'OFFLINE'` |  | ONLINE/OFFLINE † |
-| `status` | `varchar(16)` | 否 | `'IN_STOCK'` |  | IN_STOCK 入库未投放(location_no 空)/DEPLOYED 已投放/FAULT 故障停用/RETIRED 退役(终态) |
-| `fw_version` | `varchar(32)` | 是 | — |  | — |
-| `last_heartbeat_at` | `varchar(40)` | 是 | — |  | — |
+| `cabinet_no` | `varchar(36)` | 否 | — | UQ | 机柜业务键 |
 | `region_id` | `varchar(36)` | 是 | — |  | — |
+| `agent_no` | `varchar(36)` | 是 | — | IX | 归属代理(冗余,随站点) |
+| `location_no` | `varchar(36)` | 是 | — | IX | 归属点位 |
+| `sn` | `varchar(64)` | 否 | — | UQ | 设备序列号(全局唯一) |
+| `vendor_code` | `varchar(32)` | 否 | — | IX | 供应商 |
+| `model` | `varchar(32)` | 是 | — |  | — |
+| `slot_total` | `int(11)` | 否 | `0` |  | — |
+| `online_status` | `varchar(16)` | 否 | `'OFFLINE'` |  | ONLINE/OFFLINE |
+| `last_heartbeat_at` | `datetime(3)` | 是 | — |  | — |
+| `fw_version` | `varchar(32)` | 是 | — |  | — |
+| `status` | `varchar(16)` | 否 | `'IN_STOCK'` |  | IN_STOCK 入库未投放(location_no 空)/DEPLOYED 已投放/FAULT 故障停用/RETIRED 退役(终态) |
+| `site_no` | `varchar(36)` | 是 | — |  | 归属站点(冗余·随点位，数据范围锚点) |
 | `archived_at` | `datetime(3)` | 是 | — |  | 归档时间；null=在用 |
 | `device_type` | `varchar(32)` | 是 | — |  | 设备类型 POWERBANK/EV_PILE/LOCKER；容器本身设备无关，靠这列区分 |
+| `location_name` | `varchar(128)` | 是 | — |  | 点位名快照(冗余·不随源改名回溯) |
+| `available_count` | `int(11)` | 是 | — |  | 可用仓位数快照(与 slot_total 配对) |
 
-索引：`idx_cabinet_archived`(tenant_id,archived_at) · `idx_cabinet_device_type`(tenant_id,device_type,status) · `idx_cab_scope`(tenant_id,agent_no,status) · `uk_cabinet_no`(cabinet_no) **UNIQUE**
+索引：`idx_cabinet_archived`(tenant_id,archived_at) · `idx_cabinet_device_type`(tenant_id,device_type,status) · `idx_cab_agent`(agent_no) · `idx_cab_location`(location_no) · `idx_cab_scope`(tenant_id,agent_no,status) · `idx_cab_tenant`(tenant_id) · `idx_cab_vendor`(vendor_code) · `uk_cabinet_no`(cabinet_no) **UNIQUE** · `uk_cabinet_sn`(sn) **UNIQUE**
 
 ### `dev_code_batch` — 设备编码批次
 
@@ -662,22 +716,21 @@
 
 ### `dev_ota_release` — OTA 版本
 
-实体 `DevOtaRelease` · 业务列 12 · 标准列齐备
+实体 `DevOtaRelease` · 业务列 11 · 标准列齐备
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
 | `release_no` | `varchar(36)` | 否 | — | UQ | — |
 | `fw_type` | `varchar(32)` | 否 | — |  | — |
 | `vendor_code` | `varchar(32)` | 是 | — |  | 供应商(逻辑引用 gw_vendor) |
-| `fw_version` | `varchar(32)` | 否 | — |  | 固件版本号(如 1.4.2) |
+| `fw_version` | `varchar(32)` | 否 | — |  | 固件版本号(如 1.4.2)。不能叫 version —— 那是乐观锁列名 |
 | `version_code` | `int(11)` | 否 | — |  | — |
 | `artifact_url` | `varchar(512)` | 是 | — |  | — |
 | `checksum` | `varchar(128)` | 是 | — |  | — |
 | `mandatory` | `tinyint(1)` | 否 | `0` |  | — |
-| `status` | `varchar(16)` | 否 | `'DRAFT'` |  | DRAFT/PUBLISHED/PAUSED/COMPLETED |
+| `status` | `varchar(16)` | 否 | `'DRAFT'` |  | DRAFT/PUBLISHED/PAUSED/COMPLETED/ARCHIVED |
 | `release_notes` | `text` | 是 | — |  | — |
-| `version_col` | `bigint(20)` | 否 | `0` |  | — |
-| `lock_version` | `bigint(20)` | 是 | — |  | 约定:整数 |
+| `version_col` | `bigint(20)` | 否 | `0` |  | 乐观锁（version 列已被固件版本占用） |
 
 索引：`uk_ota_release_no`(release_no) **UNIQUE**
 
@@ -689,14 +742,14 @@
 |---|---|---|---|---|---|
 | `rollout_no` | `varchar(36)` | 否 | — | UQ | — |
 | `release_no` | `varchar(36)` | 否 | — | IX | — |
-| `fw_version` | `varchar(32)` | 是 | — |  | 冗余展示(取自 release) |
-| `vendor_code` | `varchar(32)` | 是 | — |  | — |
 | `scope` | `varchar(16)` | 否 | — |  | DEVICE/LOCATION/ALL |
 | `target_ref` | `varchar(36)` | 是 | — |  | — |
-| `strategy` | `varchar(16)` | 否 | `'GRAY'` |  | GRAY 灰度/FULL 全量 |
-| `progress` | `decimal(5,2)` | 否 | `0.00` |  | 完成百分比 0..100 |
 | `forced` | `tinyint(1)` | 否 | `0` |  | — |
 | `status` | `varchar(16)` | 否 | `'PENDING'` |  | PENDING/RUNNING/DONE/ROLLBACK |
+| `fw_version` | `varchar(32)` | 是 | — |  | 冗余展示(取自 release) |
+| `vendor_code` | `varchar(32)` | 是 | — |  | — |
+| `strategy` | `varchar(16)` | 否 | `'GRAY'` |  | GRAY 灰度/FULL 全量 |
+| `progress` | `decimal(5,2)` | 否 | `0.00` |  | 完成百分比 0..100 |
 
 索引：`idx_rollout_release`(release_no) · `uk_rollout_no`(rollout_no) **UNIQUE**
 
@@ -726,11 +779,11 @@
 | `sn` | `varchar(64)` | 否 | — | UQ | — |
 | `vendor_code` | `varchar(32)` | 是 | — |  | — |
 | `battery` | `int(11)` | 是 | — |  | — |
-| `cycles` | `int(11)` | 否 | `0` |  | 循环次数(健康度) |
-| `health` | `varchar(8)` | 否 | `'OK'` |  | OK/FAULT |
 | `status` | `varchar(16)` | 否 | `'IN_STOCK'` |  | IN_STOCK 入库未投放/IN_CABINET 在仓可借/RENTED 借出中/FAULT 故障待修/LOST 丢失待追偿(半终态可回收)/SOLD 买断(终态)/SCRAP 报废(终态) |
 | `cabinet_no` | `varchar(36)` | 是 | — | IX | 当前所在机柜 |
 | `slot_index` | `int(11)` | 是 | — |  | — |
+| `cycles` | `int(11)` | 否 | `0` |  | 循环次数(健康度) |
+| `health` | `varchar(8)` | 否 | `'OK'` |  | OK/FAULT |
 | `archived_at` | `datetime(3)` | 是 | — |  | 归档时间；null=在用 |
 
 索引：`idx_pb_cabinet`(cabinet_no) · `uk_powerbank_no`(powerbank_no) **UNIQUE** · `uk_powerbank_sn`(sn) **UNIQUE**
@@ -784,7 +837,7 @@
 | `value_ar` | `varchar(128)` | 是 | — |  | — |
 | `sort` | `int(11)` | 否 | `0` |  | — |
 | `status` | `varchar(16)` | 否 | `'ACTIVE'` |  | — |
-| `code` | `varchar(32)` | 是 | — |  | 既有DDL同名列×2 |
+| `code` | `varchar(32)` | 是 | — |  | 既有DDL同名列×3 |
 | `dict_no` | `varchar(36)` | 是 | — |  | 约定:业务键 |
 | `enabled` | `tinyint(1)` | 是 | — |  | 既有DDL同名列×1 |
 | `group_code` | `varchar(32)` | 是 | — |  | 人工定型：字典分组码，短码 |
@@ -814,8 +867,8 @@
 | `status` | `varchar(16)` | 否 | `'DRAFT'` |  | DRAFT/ISSUED/VOID |
 | `issued_at` | `datetime(3)` | 是 | — |  | 空=尚未开具 |
 | `file_url` | `varchar(512)` | 是 | — |  | — |
-| `payee_no` | `varchar(36)` | 是 | — |  | 既有DDL同名列×2 |
-| `payee_type` | `varchar(16)` | 是 | — |  | 既有DDL同名列×2 |
+| `payee_no` | `varchar(36)` | 是 | — |  | 既有DDL同名列×4 |
+| `payee_type` | `varchar(16)` | 是 | — |  | 既有DDL同名列×3 |
 | `issued_by` | `varchar(64)` | 是 | — |  | 开票人（服务端取登录态） |
 | `void_reason` | `varchar(255)` | 是 | — |  | 作废原因；作废时必填 |
 | `voided_at` | `datetime(3)` | 是 | — |  | 作废时间 |
@@ -888,7 +941,7 @@
 | `retry` | `int(11)` | 是 | — |  | 约定:整数 |
 | `sent_at` | `datetime(3)` | 是 | — |  | 既有DDL同名列×3 |
 | `slot_index` | `longtext` | 是 | — |  | db-design 标 JSON |
-| `sn` | `varchar(64)` | 是 | — |  | 既有DDL同名列×3 |
+| `sn` | `varchar(64)` | 是 | — |  | 既有DDL同名列×4 |
 
 索引：`idx_cmd_cabinet`(cabinet_no) · `uk_command_id`(command_id) **UNIQUE**
 
@@ -904,7 +957,7 @@
 | `session_at` | `datetime(3)` | 是 | — |  | — |
 | `bound_at` | `datetime(3)` | 是 | — |  | 既有DDL同名列×1 |
 | `raw_identity` | `varchar(128)` | 是 | — |  | 人工定型：供应商原始标识，形态各厂商不一，留宽；进 UK(vendor_code,raw_identity) |
-| `vendor_code` | `varchar(32)` | 是 | — |  | 既有DDL同名列×3 |
+| `vendor_code` | `varchar(32)` | 是 | — |  | 既有DDL同名列×8 |
 
 索引：`idx_binding_instance`(instance_id) · `uk_binding_sn`(sn) **UNIQUE**
 
@@ -918,7 +971,7 @@
 | `direction` | `varchar(8)` | 否 | — |  | UP/DOWN |
 | `vendor_code` | `varchar(32)` | 是 | — |  | — |
 | `raw` | `varbinary(2048)` | 是 | — |  | 原始报文(脱敏) |
-| `cabinet_no` | `varchar(36)` | 是 | — |  | 既有DDL同名列×6 |
+| `cabinet_no` | `varchar(36)` | 是 | — |  | 既有DDL同名列×18 |
 | `event_type` | `longtext` | 是 | — |  | db-design 标 JSON |
 | `occurred_at` | `datetime(3)` | 是 | — |  | 既有DDL同名列×1 |
 | `parsed_event` | `longtext` | 是 | — |  | db-design 标 JSON |
@@ -982,31 +1035,34 @@
 
 ### `iam_audit_log` — 操作审计(append,可按月分区)
 
-实体 `IamAuditLog` · 业务列 8 · 标准列缺 `updated_at`/`updated_by`/`version`/`deleted` ⚠️
+实体 `IamAuditLog` · 业务列 11 · 标准列缺 `updated_at`/`updated_by`/`version`/`deleted` ⚠️
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
 | `actor` | `varchar(64)` | 是 | — | IX | 操作人 |
 | `action` | `varchar(64)` | 否 | — |  | 权限码/动作 |
+| `outcome` | `varchar(16)` | 否 | `'SUCCESS'` | IX | SUCCESS 成功 / DENIED 无权限被拒 / FAILED 出错未完成。历史行均为 SUCCESS（此前只记成功的） |
+| `trace_id` | `varchar(32)` | 是 | — | IX | 那次请求的链路 id，用于跳到运行日志（%X{traceId}）。NULL=该列上线前的历史行 |
 | `target` | `varchar(128)` | 是 | — |  | 对象业务键 |
 | `detail` | `longtext` | 是 | — |  | 脱敏摘要 |
 | `ip` | `varchar(45)` | 是 | — |  | — |
 | `actor_name` | `varchar(128)` | 是 | — |  | 约定:名称 |
+| `client_code` | `varchar(16)` | 是 | — | IX | 从哪个端发起：OPS 运营端 / AGENT 代理端 / MP C端。由会话 realm 派生，不采信请求头。NULL=该列上线前的历史行 |
 | `target_no` | `longtext` | 是 | — |  | db-design 标 JSON |
 | `target_type` | `longtext` | 是 | — |  | db-design 标 JSON |
 
-索引：`idx_audit_actor`(actor) · `idx_audit_tenant_time`(tenant_id,created_at)
+索引：`idx_audit_actor`(actor) · `idx_audit_client_created`(client_code,created_at) · `idx_audit_outcome_created`(outcome,created_at) · `idx_audit_tenant_time`(tenant_id,created_at) · `idx_audit_trace`(trace_id)
 
-### `iam_data_scope`
+### `iam_data_scope` — 数据权限范围
 
 **无实体** · 业务列 4 · 标准列缺 `tenant_id`/`version`/`deleted`（追加表/全局表，符合预期）
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
-| `subject_type` | `varchar(16)` | 否 | — | IX | ROLE/EMPLOYEE(员工级覆盖角色默认，二者并集) † |
+| `subject_type` | `varchar(16)` | 否 | — | IX | ROLE/EMPLOYEE(员工级覆盖角色默认，二者并集) |
 | `subject_no` | `varchar(36)` | 否 | — |  | — |
-| `scope_type` | `varchar(16)` | 否 | — |  | ALL/REGION/SITE/LOCATION/VENUE/AGENT/SELF † |
-| `scope_refs` | `varchar(512)` | 是 | — |  | 区域/站点/点位/代理 列表 † |
+| `scope_type` | `varchar(16)` | 否 | — |  | ALL/REGION/SITE/LOCATION/VENUE/AGENT/SELF |
+| `scope_refs` | `longtext` | 是 | — |  | 区域/站点/点位/代理 列表 |
 
 索引：`uk_scope_subject`(subject_type,subject_no) **UNIQUE**
 
@@ -1058,65 +1114,71 @@
 
 索引：`uk_emp_role`(employee_no,role_no) **UNIQUE**
 
-### `iam_menu`
+### `iam_menu` — 菜单树(动态导航 SSOT)
 
-**无实体** · 业务列 14 · 标准列缺 `tenant_id`/`version`/`deleted`（追加表/全局表，符合预期）
+**无实体** · 业务列 20 · 标准列缺 `tenant_id`/`version`/`deleted`（追加表/全局表，符合预期）
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
 | `menu_no` | `varchar(36)` | 否 | — | UQ | — |
 | `parent_no` | `varchar(36)` | 是 | — | IX | — |
 | `name` | `varchar(64)` | 否 | — |  | — |
+| `name_en` | `varchar(64)` | 是 | — |  | — |
 | `name_ar` | `varchar(64)` | 是 | — |  | — |
-| `type` | `varchar(8)` | 否 | `'MENU'` |  | DOMAIN(L1)/MODULE(L2)/MENU(L3)/DEEPLINK † |
-| `path` | `varchar(128)` | 是 | — |  | 路由(可含 ?tab=/?view=) † |
+| `type` | `varchar(8)` | 否 | `'MENU'` |  | MENU(分组)/ITEM(叶子) |
+| `path` | `varchar(128)` | 是 | — |  | 路由(可含 ?tab=/?view=) |
 | `icon` | `varchar(32)` | 是 | — |  | — |
+| `group_name` | `varchar(32)` | 是 | — |  | L3 分组小标题(如「资产台账」) |
 | `sort` | `int(11)` | 否 | `0` |  | — |
-| `perm` | `varchar(64)` | 是 | — |  | 权限码(空=跟随父模块) † |
+| `perm` | `varchar(64)` | 是 | — |  | 权限码(空=跟随父模块) |
+| `phase` | `tinyint(4)` | 否 | `1` |  | 对外交付批次 1/2/3(分期屏蔽) |
 | `visible` | `tinyint(1)` | 否 | `1` |  | — |
 | `status` | `varchar(16)` | 否 | `'ACTIVE'` |  | — |
-| `group_name` | `varchar(32)` | 是 | — |  | L3 分组小标题(如「资产台账」) |
-| `name_en` | `varchar(64)` | 是 | — |  | — |
-| `phase` | `tinyint(4)` | 否 | `1` |  | 对外交付批次 1/2/3(分期屏蔽) |
+| `module` | `varchar(32)` | 是 | — |  | 权限码模块前缀（canModule 过滤用，仅 MENU 行） |
+| `modules` | `longtext` | 是 | — |  | 跨模块 section 的全部模块前缀，任一可见即显示 |
+| `match_paths` | `longtext` | 是 | — |  | 路径归属前缀；缺省取 path 的 path 部分 |
+| `ready` | `tinyint(1)` | 否 | `0` |  | 就绪度覆盖：无视 phase 直接解锁（逐叶推进） |
+| `pin_bottom` | `tinyint(1)` | 否 | `0` |  | Rail 固定底部 |
+| `portal_for` | `longtext` | 是 | — |  | 专属门户：命中的角色只看得到门户 section |
 
 索引：`idx_menu_parent`(parent_no,sort) · `uk_menu_no`(menu_no) **UNIQUE**
 
-### `iam_permission`
+### `iam_permission` — 权限码字典
 
 **无实体** · 业务列 3 · 标准列缺 `tenant_id`/`version`/`deleted`（追加表/全局表，符合预期）
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
-| `code` | `varchar(64)` | 否 | — | UQ | 如 order:refund:audit † |
-| `module` | `varchar(32)` | 否 | — | IX | 模块前缀 † |
+| `code` | `varchar(64)` | 否 | — | UQ | 如 order:refund:audit |
+| `module` | `varchar(32)` | 否 | — | IX | 模块前缀 |
 | `name` | `varchar(64)` | 否 | — |  | — |
 
 索引：`idx_perm_module`(module) · `uk_perm_code`(code) **UNIQUE**
 
-### `iam_role`
+### `iam_role` — 角色(功能权限集+数据范围)
 
 **无实体** · 业务列 7 · 标准列齐备
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
 | `role_no` | `varchar(36)` | 否 | — | UQ | — |
-| `code` | `varchar(32)` | 否 | — |  | ADMIN/OPS/CS/FINANCE/BD/VIEWER/AGENT † |
+| `code` | `varchar(32)` | 否 | — |  | ADMIN/OPS/CS/FINANCE/BD/VIEWER/AGENT |
 | `name` | `varchar(64)` | 否 | — |  | — |
-| `builtin` | `tinyint(1)` | 否 | `0` |  | 内置角色只读 † |
-| `data_scope` | `varchar(16)` | 否 | `'ALL'` |  | ALL/REGION/LOCATION/AGENT/SELF † |
-| `scope_refs` | `varchar(512)` | 是 | — |  | 范围明细(区域/站点/代理 列表) † |
+| `builtin` | `tinyint(1)` | 否 | `0` |  | 内置角色只读 |
+| `data_scope` | `varchar(16)` | 否 | `'ALL'` |  | ALL/REGION/LOCATION/AGENT/SELF |
+| `scope_refs` | `longtext` | 是 | — |  | 范围明细(区域/站点/代理 列表) |
 | `archived_at` | `datetime(3)` | 是 | — |  | 归档时间；null=在用 |
 
-索引：`uk_role_no`(role_no) **UNIQUE**
+索引：`uk_role_code`(tenant_id,code) **UNIQUE** · `uk_role_no`(role_no) **UNIQUE**
 
-### `iam_role_perm`
+### `iam_role_perm` — 角色权限映射
 
 **无实体** · 业务列 2 · 标准列缺 `tenant_id`/`version`/`deleted`（追加表/全局表，符合预期）
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
 | `role_no` | `varchar(36)` | 否 | — | IX | — |
-| `perm_code` | `varchar(64)` | 否 | — |  | 支持通配 * / device:* † |
+| `perm_code` | `varchar(64)` | 否 | — |  | 支持通配 * / device:* |
 
 索引：`uk_role_perm`(role_no,perm_code) **UNIQUE**
 
@@ -1208,27 +1270,27 @@
 
 ## 场地与点位（`loc_*`）
 
-### `loc_contract`
+### `loc_contract` — 进场合同
 
 实体 `LocContract` · 业务列 13 · 标准列齐备
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
 | `contract_no` | `varchar(36)` | 否 | — | UQ | — |
-| `venue_name` | `varchar(128)` | 是 | — |  | — |
-| `site_name` | `varchar(128)` | 是 | — |  | — |
-| `share_rate` | `decimal(5,4)` | 否 | `0.0000` |  | — |
-| `entry_fee` | `decimal(18,2)` | 否 | `0.00` |  | — |
-| `start_at` | `varchar(40)` | 是 | — |  | — |
-| `end_at` | `varchar(40)` | 是 | — |  | — |
-| `status` | `varchar(16)` | 否 | `'ACTIVE'` |  | ACTIVE/EXPIRED † |
-| `attach_url` | `varchar(512)` | 是 | — |  | 合同附件 |
+| `venue_no` | `varchar(36)` | 否 | — | IX | 场地方 |
+| `site_no` | `varchar(36)` | 否 | — | IX | 站点 |
+| `share_rate` | `decimal(5,4)` | 否 | `0.0000` |  | 场地方分成率 0..1 |
+| `entry_fee` | `decimal(18,2)` | 否 | `0.00` |  | 进场费 |
 | `currency` | `varchar(8)` | 否 | `'AED'` |  | — |
 | `settle_period` | `varchar(16)` | 是 | — |  | MONTH/QUARTER |
-| `site_no` | `varchar(36)` | 是 | — |  | 站点 |
-| `venue_no` | `varchar(36)` | 是 | — |  | 场地方 |
+| `start_at` | `date` | 是 | — |  | — |
+| `end_at` | `date` | 是 | — |  | — |
+| `attach_url` | `varchar(512)` | 是 | — |  | 合同附件 |
+| `status` | `varchar(16)` | 否 | `'ACTIVE'` |  | ACTIVE/EXPIRED |
+| `venue_name` | `varchar(128)` | 是 | — |  | 场地方名快照(冗余·不随源改名回溯) |
+| `site_name` | `varchar(128)` | 是 | — |  | 站点名快照(冗余·不随源改名回溯) |
 
-索引：`uk_contract_no`(contract_no) **UNIQUE**
+索引：`idx_contract_site`(site_no) · `idx_contract_venue`(venue_no) · `uk_contract_no`(contract_no) **UNIQUE**
 
 ### `loc_contract_attach` — 合同附件元数据（不含字节流）
 
@@ -1247,7 +1309,7 @@
 
 ### `loc_lead` — BD 拓展 CRM 商机
 
-实体 `LocLead` · 业务列 8 · 标准列齐备
+实体 `LocLead` · 业务列 10 · 标准列齐备
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
@@ -1259,8 +1321,10 @@
 | `owner` | `varchar(64)` | 是 | — | IX | 负责人(employee_no) |
 | `expect_sites` | `int(11)` | 否 | `0` |  | 预计可铺站点数 |
 | `next_follow_at` | `date` | 是 | — |  | 下次跟进日(仅日期) |
+| `owner_type` | `varchar(16)` | 否 | `'STAFF'` | IX | 归属方类型：STAFF=员工(owner 存 employee_no) / AGENT=伙伴(owner 存 agent_no) |
+| `site_no` | `varchar(36)` | 是 | — |  | 这条商机最终落成的站点；拓展佣金的责任行写在它身上 |
 
-索引：`idx_lead_owner`(owner) · `idx_lead_tenant_stage`(tenant_id,stage,updated_at) · `uk_lead_no`(lead_no) **UNIQUE**
+索引：`idx_lead_owner`(owner) · `idx_lead_owner_type`(owner_type,owner) · `idx_lead_tenant_stage`(tenant_id,stage,updated_at) · `uk_lead_no`(lead_no) **UNIQUE**
 
 ### `loc_lead_follow` — 线索跟进记录（append）
 
@@ -1279,48 +1343,65 @@
 
 索引：`idx_lead_follow`(tenant_id,lead_no,created_at) · `uk_lead_follow_no`(follow_no) **UNIQUE**
 
-### `loc_location`
+### `loc_location` — 点位
 
-实体 `LocLocation` · 业务列 9 · 标准列齐备
+实体 `LocLocation` · 业务列 8 · 标准列齐备
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
-| `location_no` | `varchar(36)` | 否 | — | UQ | 业务键(点位) † |
-| `name` | `varchar(128)` | 否 | — |  | 点位名(如 L1 东门) † |
-| `site_no` | `varchar(36)` | 是 | — |  | 归属站点 † |
-| `site_name` | `varchar(128)` | 是 | — |  | — |
-| `agent_no` | `varchar(36)` | 是 | — |  | 归属代理(冗余·随站点，数据范围锚点) |
-| `spot_desc` | `varchar(256)` | 是 | — |  | 位置描述 † |
-| `cabinet_count` | `int(11)` | 否 | `0` |  | — |
+| `location_no` | `varchar(36)` | 否 | — | UQ | 业务键(点位) |
+| `site_no` | `varchar(36)` | 否 | — | IX | 归属站点 |
+| `agent_no` | `varchar(36)` | 是 | — |  | 冗余(随站点,便于查询) |
+| `name` | `varchar(128)` | 否 | — |  | 点位名(如 L1 东门) |
+| `spot_desc` | `varchar(256)` | 是 | — |  | 位置描述 |
 | `status` | `varchar(16)` | 否 | `'ACTIVE'` |  | — |
 | `archived_at` | `datetime(3)` | 是 | — |  | 归档时间；null=在用 |
+| `site_name` | `varchar(128)` | 是 | — |  | 站点名（冗余自 loc_site.name，仅展示） |
 
-索引：`idx_loc_scope`(tenant_id,agent_no) · `uk_location_no`(location_no) **UNIQUE**
+索引：`idx_loc_scope`(tenant_id,agent_no) · `idx_loc_site`(site_no) · `idx_loc_tenant`(tenant_id) · `uk_location_no`(location_no) **UNIQUE**
 
-### `loc_site`
+### `loc_site` — 站点/网点
 
-实体 `LocSite` · 业务列 16 · 标准列齐备
+实体 `LocSite` · 业务列 17 · 标准列齐备
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
-| `site_no` | `varchar(36)` | 否 | — | UQ | 业务键 † |
-| `name` | `varchar(128)` | 否 | — |  | 站点名称 † |
-| `venue_name` | `varchar(128)` | 是 | — |  | — |
-| `agent_no` | `varchar(36)` | 是 | — |  | 归属代理(空=平台直营) † |
-| `region_id` | `varchar(64)` | 是 | — |  | 区域(数据权限) † |
-| `address` | `varchar(256)` | 是 | — |  | — |
-| `scene_type` | `varchar(32)` | 是 | — |  | 商场/机场/餐饮/地铁/写字楼 † |
-| `point_count` | `int(11)` | 否 | `0` |  | — |
-| `cabinet_count` | `int(11)` | 否 | `0` |  | — |
-| `status` | `varchar(16)` | 否 | `'ACTIVE'` |  | ACTIVE/PAUSED † |
-| `lat` | `decimal(10,6)` | 是 | — |  | — |
-| `lng` | `decimal(10,6)` | 是 | — |  | — |
+| `site_no` | `varchar(36)` | 否 | — | UQ | 业务键 |
+| `region_id` | `varchar(36)` | 是 | — | IX | 区域(数据权限) |
+| `venue_no` | `varchar(36)` | 是 | — | IX | 归属场地方(逻辑引用) |
+| `agent_no` | `varchar(36)` | 是 | — | IX | 归属代理(空=平台直营) |
+| `name` | `varchar(128)` | 否 | — |  | 站点名称 |
 | `name_ar` | `varchar(128)` | 是 | — |  | — |
-| `venue_no` | `varchar(36)` | 是 | — |  | 归属场地方(逻辑引用) |
+| `address` | `varchar(256)` | 是 | — |  | — |
+| `lng` | `decimal(10,6)` | 是 | — |  | — |
+| `lat` | `decimal(10,6)` | 是 | — |  | — |
+| `scene_type` | `varchar(32)` | 是 | — |  | 商场/机场/餐饮/地铁/写字楼 |
+| `status` | `varchar(16)` | 否 | `'ACTIVE'` |  | ACTIVE/PAUSED |
 | `archived_at` | `datetime(3)` | 是 | — |  | 归档时间；null=在用 |
 | `open_hours` | `varchar(64)` | 是 | — |  | 营业时段展示文本,如 09:00-22:00 |
+| `venue_name` | `varchar(128)` | 是 | — |  | 场地方名快照(冗余·不随源改名回溯) |
+| `pause_reason` | `varchar(255)` | 是 | — |  | 暂停营业原因；恢复营业时清空 |
+| `paused_at` | `datetime(3)` | 是 | — |  | 暂停时刻 |
+| `brand_no` | `varchar(36)` | 是 | — | IX | → md_brand.brand_no；一站一品牌（硬约束） |
 
-索引：`idx_site_archived`(tenant_id,archived_at) · `uk_site_no`(site_no) **UNIQUE**
+索引：`idx_site_agent`(agent_no) · `idx_site_archived`(tenant_id,archived_at) · `idx_site_brand`(brand_no) · `idx_site_region`(region_id) · `idx_site_tenant`(tenant_id) · `idx_site_venue`(venue_no) · `uk_site_no`(site_no) **UNIQUE**
+
+### `loc_site_agent` — 站点上的伙伴责任（ADR-027）
+
+实体 `LocSiteAgent` · 业务列 8 · 标准列齐备
+
+| 列 | 类型 | 空 | 默认 | 键 | 说明 |
+|---|---|---|---|---|---|
+| `site_no` | `varchar(36)` | 否 | — | IX | → loc_site.site_no |
+| `agent_no` | `varchar(36)` | 否 | — | IX | → agt_agent.agent_no |
+| `role` | `varchar(16)` | 否 | — |  | INVEST 出资 / DEVELOP 拓展 / OPERATE 运维 / REFER 牵线 |
+| `rule_no` | `varchar(36)` | 是 | — |  | 该责任对应的分润规则；空 = 用登记类型默认费率 |
+| `effective_from` | `datetime(3)` | 是 | — |  | 生效起；空 = 立即 |
+| `effective_to` | `datetime(3)` | 是 | — |  | 生效止；空 = 长期 |
+| `remark` | `varchar(256)` | 否 | `''` |  | 为什么是这个责任——结算争议时的人话依据 |
+| `one_off_amount` | `decimal(18,2)` | 是 | — |  | 一次性对价（牵线费），签约时付；仅 REFER 用。NULL=没配，与 0（明确不付）不是一回事 |
+
+索引：`idx_sa_agent`(agent_no) · `idx_sa_site`(site_no) · `uk_site_agent_role`(site_no,agent_no,role) **UNIQUE**
 
 ### `loc_site_lifecycle` — 门店生命周期
 
@@ -1352,23 +1433,23 @@
 
 索引：`idx_site_lc_log_site`(site_no,created_at)
 
-### `loc_venue`
+### `loc_venue` — 场地方
 
 实体 `LocVenue` · 业务列 9 · 标准列齐备
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
-| `venue_no` | `varchar(36)` | 否 | — | UQ | 业务键 † |
-| `name` | `varchar(128)` | 否 | — |  | 场地方名称 † |
-| `contact` | `varchar(64)` | 是 | — |  | 联系方式(明文脱敏;敏感落 pii) † |
-| `industry` | `varchar(32)` | 是 | — |  | 行业 † |
-| `location_count` | `int(11)` | 否 | `0` |  | — |
-| `name_ar` | `varchar(128)` | 是 | — |  | 名称(阿语) |
+| `venue_no` | `varchar(36)` | 否 | — | UQ | 业务键 |
 | `region_id` | `varchar(36)` | 是 | — |  | 区域 |
+| `name` | `varchar(128)` | 否 | — |  | 场地方名称 |
+| `name_ar` | `varchar(128)` | 是 | — |  | 名称(阿语) |
+| `contact` | `varchar(64)` | 是 | — |  | 联系方式(明文脱敏;敏感落 pii) |
+| `industry` | `varchar(32)` | 是 | — |  | 行业 |
 | `status` | `varchar(16)` | 否 | `'ACTIVE'` |  | ACTIVE/PAUSED |
 | `archived_at` | `datetime(3)` | 是 | — |  | 归档时间；null=在用 |
+| `operator_no` | `varchar(36)` | 是 | — | UQ | 同一法人：本场地方同时是这个运营主体（商场自投自营）；NULL = 纯场地方 |
 
-索引：`uk_venue_no`(venue_no) **UNIQUE**
+索引：`idx_venue_tenant`(tenant_id) · `uk_venue_no`(venue_no) **UNIQUE** · `uk_venue_operator`(operator_no) **UNIQUE**
 
 ### `loc_venue_onboarding` — 门店自助进件
 
@@ -1414,6 +1495,24 @@
 | `archived_at` | `datetime(3)` | 是 | — |  | 归档时间；null=在用 |
 
 索引：`idx_bank_country`(country,status) · `uk_bank_code`(bank_code) **UNIQUE**
+
+### `md_brand` — 品牌（运营方对 C 端的经营身份）
+
+实体 `MdBrand` · 业务列 9 · 标准列缺 `tenant_id`（追加表/全局表，符合预期）
+
+| 列 | 类型 | 空 | 默认 | 键 | 说明 |
+|---|---|---|---|---|---|
+| `brand_no` | `varchar(36)` | 否 | — | UQ | 业务键，前缀 BR |
+| `name` | `varchar(64)` | 否 | — | UQ | 品牌名（中文） |
+| `name_en` | `varchar(96)` | 否 | `''` |  | 品牌名（English） |
+| `name_ar` | `varchar(96)` | 否 | `''` |  | 品牌名（العربية） |
+| `logo_url` | `varchar(256)` | 否 | `''` |  | C 端展示的 Logo |
+| `support_phone` | `varchar(32)` | 否 | `''` |  | 该品牌的客服电话（C 端「联系客服」用） |
+| `market_code` | `varchar(16)` | 是 | — |  | 归属市场；**本期不校验**，待 S2 区域→市场链路 |
+| `status` | `varchar(16)` | 否 | `'ENABLED'` |  | ENABLED/DISABLED |
+| `archived_at` | `datetime(3)` | 是 | — |  | 软删（G1：归档而非删除） |
+
+索引：`uk_brand_name`(name) **UNIQUE** · `uk_brand_no`(brand_no) **UNIQUE**
 
 ### `md_device_type` — 设备类型注册表（全局，无 tenant_id）
 
@@ -1650,9 +1749,9 @@
 | `code` | `varchar(64)` | 否 | — |  | — |
 | `content` | `text` | 是 | — |  | — |
 | `content_ar` | `text` | 是 | — |  | — |
-| `status` | `varchar(16)` | 否 | `'ACTIVE'` |  | — |
+| `status` | `varchar(16)` | 否 | `'ENABLED'` |  | ENABLED/DISABLED |
 | `lang` | `varchar(8)` | 是 | — |  | 既有DDL同名列×2 |
-| `name` | `varchar(64)` | 是 | — |  | 既有DDL同名列×10 |
+| `name` | `varchar(64)` | 是 | — |  | 既有DDL同名列×12 |
 | `params` | `longtext` | 是 | — |  | db-design 标 JSON |
 | `scene` | `longtext` | 是 | — |  | db-design 标 JSON |
 
@@ -1797,31 +1896,31 @@
 | `overtime_min` | `int(11)` | 是 | — |  | 超期占用分钟 |
 | `item_note` | `varchar(128)` | 是 | — |  | 存物备注 |
 
-### `ord_order`
+### `ord_order` — 租借订单(聚合根)
 
 实体 `OrdOrder` · 业务列 32 · 标准列齐备
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
 | `order_no` | `varchar(36)` | 否 | — | UQ | — |
-| `c_user_no` | `varchar(36)` | 是 | — | IX | — |
-| `cabinet_no` | `varchar(36)` | 是 | — |  | — |
-| `location_no` | `varchar(36)` | 是 | — |  | 借出点位 |
-| `site_no` | `varchar(36)` | 是 | — |  | 借出站点(冗余·数据范围锚点) |
-| `agent_no` | `varchar(36)` | 是 | — |  | 归属代理(冗余·数据范围锚点) |
-| `return_cabinet_no` | `varchar(36)` | 是 | — |  | — |
-| `powerbank_no` | `varchar(36)` | 是 | — |  | — |
-| `location_name` | `varchar(128)` | 是 | — |  | — |
-| `status` | `varchar(24)` | 否 | `'CREATED'` | IX | — |
-| `rent_start_at` | `varchar(32)` | 是 | — |  | — |
-| `rent_end_at` | `varchar(32)` | 是 | — |  | — |
-| `duration_min` | `int(11)` | 是 | — |  | — |
-| `fee_amount` | `decimal(12,2)` | 否 | `0.00` |  | — |
-| `deposit_amount` | `decimal(12,2)` | 否 | `0.00` |  | — |
-| `currency` | `varchar(8)` | 否 | `'AED'` |  | — |
-| `price_plan_no` | `varchar(36)` | 是 | — |  | — |
 | `region_id` | `varchar(36)` | 是 | — |  | — |
+| `c_user_no` | `varchar(36)` | 否 | — | IX | — |
+| `cabinet_no` | `varchar(36)` | 否 | — | IX | 借出机柜 |
+| `return_cabinet_no` | `varchar(36)` | 是 | — |  | 归还机柜(异地归还) |
+| `powerbank_no` | `varchar(36)` | 是 | — |  | — |
+| `site_no` | `varchar(36)` | 是 | — | IX | 借出站点(归属/分润) |
+| `agent_no` | `varchar(36)` | 是 | — |  | 归属代理(冗余·数据权限过滤) |
+| `price_plan_no` | `varchar(36)` | 是 | — |  | — |
+| `status` | `varchar(16)` | 否 | `'CREATED'` |  | CREATED/DISPENSING/IN_USE/RETURNED/SETTLED/CLOSED/EXCEPTION |
+| `rent_start_at` | `datetime(3)` | 是 | — |  | — |
+| `rent_end_at` | `datetime(3)` | 是 | — |  | — |
+| `duration_min` | `int(11)` | 是 | — |  | — |
+| `fee_amount` | `decimal(18,2)` | 否 | `0.00` |  | — |
+| `deposit_amount` | `decimal(18,2)` | 否 | `0.00` |  | — |
+| `currency` | `varchar(8)` | 否 | `'AED'` |  | — |
 | `coupon_no` | `varchar(36)` | 是 | — |  | 结算所用券(逻辑引用 usr_coupon) |
+| `location_no` | `varchar(36)` | 是 | — |  | 借出点位(逻辑引用 loc_location) |
+| `location_name` | `varchar(128)` | 是 | — |  | 点位名快照(冗余·不随源改名回溯) |
 | `buyout` | `tinyint(1)` | 否 | `0` |  | 是否买断转持有 |
 | `free_reason` | `varchar(24)` | 是 | — |  | 免费单原因(空=正常单)：INTERNAL_TEST/VIP/BD_DEMO/MERCHANT_SELF，源 usr_free_whitelist.reason |
 | `waived_amount` | `decimal(18,2)` | 否 | `0.00` |  | 减免金额(免费单统计口径) |
@@ -1836,7 +1935,7 @@
 | `partner_no` | `varchar(36)` | 是 | — |  | 互联互通伙伴（intc_partner） |
 | `price_snapshot` | `longtext` | 是 | — |  | 计价方案的**展开结构**快照，非 plan_no 引用 —— 改价不影响在途单 |
 
-索引：`idx_ord_free`(tenant_id,free_reason,created_at) · `idx_ord_owner`(c_user_no) · `idx_ord_scope`(tenant_id,agent_no,status,created_at) · `idx_ord_status`(status) · `idx_ord_type`(tenant_id,device_type,status,created_at) · `uk_ord_order_no`(order_no) **UNIQUE**
+索引：`idx_ord_agent`(tenant_id,agent_no) · `idx_ord_cabinet`(cabinet_no) · `idx_ord_free`(tenant_id,free_reason,created_at) · `idx_ord_owner`(tenant_id,c_user_no,created_at) · `idx_ord_scope`(tenant_id,agent_no,status,created_at) · `idx_ord_site`(site_no) · `idx_ord_tenant_status`(tenant_id,status) · `idx_ord_type`(tenant_id,device_type,status,created_at) · `idx_ord_user`(c_user_no) · `uk_order_no`(order_no) **UNIQUE**
 
 ### `ord_refund` — 退款审批单(业务侧·聚合根,幂等)
 
@@ -1917,7 +2016,7 @@
 | `captured_amount` | `decimal(18,2)` | 否 | `0.00` |  | — |
 | `status` | `varchar(16)` | 否 | `'FROZEN'` |  | FROZEN/CAPTURED/RELEASED |
 | `nearpay_auth_no` | `varchar(64)` | 是 | — |  | — |
-| `c_user_no` | `varchar(36)` | 是 | — |  | 既有DDL同名列×18 |
+| `c_user_no` | `varchar(36)` | 是 | — |  | 既有DDL同名列×26 |
 | `expire_at` | `datetime(3)` | 是 | — |  | 既有DDL同名列×2 |
 
 索引：`idx_auth_order`(order_no) · `uk_auth_no`(auth_no) **UNIQUE**
@@ -1980,10 +2079,10 @@
 | `type` | `varchar(16)` | 否 | — |  | DEPOSIT/RENT/BUYOUT/RECHARGE/MEMBERSHIP |
 | `amount` | `decimal(18,2)` | 否 | `0.00` |  | — |
 | `currency` | `varchar(8)` | 否 | `'AED'` |  | — |
-| `channel_code` | `varchar(32)` | 是 | — |  | 支付渠道(逻辑引用 pay_channel) |
 | `status` | `varchar(16)` | 否 | `'INIT'` |  | INIT/PAYING/PAID/FAILED/CLOSED |
 | `nearpay_txn_no` | `varchar(64)` | 是 | — | IX | nearpay 交易引用 |
 | `paid_at` | `datetime(3)` | 是 | — |  | — |
+| `channel_code` | `varchar(32)` | 是 | — |  | 支付渠道(逻辑引用 pay_channel) |
 
 索引：`idx_pay_nearpay`(nearpay_txn_no) · `idx_pay_order`(order_no) · `idx_pay_owner`(tenant_id,c_user_no,created_at) · `uk_pay_no`(pay_no) **UNIQUE**
 
@@ -2007,6 +2106,27 @@
 ---
 
 ## 计价（`price_*`）
+
+### `price_adjustment` — 预约调价单
+
+实体 `PriceAdjustment` · 业务列 12 · 标准列齐备
+
+| 列 | 类型 | 空 | 默认 | 键 | 说明 |
+|---|---|---|---|---|---|
+| `adjust_no` | `varchar(36)` | 否 | — | UQ | 业务键，前缀 PA |
+| `plan_no` | `varchar(36)` | 否 | — |  | 目标收费方案 price_plan.plan_no |
+| `name` | `varchar(128)` | 否 | — |  | 调价单名称，如「国庆上调」 |
+| `patch` | `longtext` | 是 | — |  | 要改成什么：{freeMinutes,unitMinutes,unitPrice,capDaily,buyoutPrice} 的子集 |
+| `before_snapshot` | `longtext` | 是 | — |  | 生效那刻被改字段的原值；未生效为 NULL |
+| `effective_at` | `datetime(3)` | 否 | — |  | 生效时刻(UTC) |
+| `revert_at` | `datetime(3)` | 是 | — |  | 自动恢复时刻(UTC)；NULL = 不自动恢复 |
+| `reason` | `varchar(255)` | 是 | — |  | 调价原因 |
+| `status` | `varchar(16)` | 否 | `'SCHEDULED'` | IX | SCHEDULED/APPLIED/REVERTED/CANCELLED/FAILED |
+| `applied_at` | `datetime(3)` | 是 | — |  | — |
+| `reverted_at` | `datetime(3)` | 是 | — |  | — |
+| `fail_reason` | `varchar(255)` | 是 | — |  | 执行失败原因；运营据此决定改单还是重试 |
+
+索引：`idx_pa_due`(status,effective_at) · `idx_pa_plan`(tenant_id,plan_no,status) · `idx_pa_revert`(status,revert_at) · `uk_price_adjust_no`(adjust_no) **UNIQUE**
 
 ### `price_ladder` — 计价阶梯
 
@@ -2066,19 +2186,26 @@
 
 ### `price_plan_scope` — 计费模板适用范围(多值拆表)
 
-实体 `PricePlanScope` · 业务列 3 · 标准列齐备
+实体 `PricePlanScope` · 业务列 10 · 标准列齐备
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
 | `plan_no` | `varchar(36)` | 否 | — | IX | — |
-| `scope_type` | `varchar(16)` | 否 | — | IX | SITE/SCENE/ALL |
+| `scope_type` | `varchar(16)` | 否 | — | IX | 层：DEVICE/LOCATION/SITE/VENUE/AGENT/SCENE/REGION/ALL，越靠前越具体 |
 | `scope_ref` | `varchar(64)` | 否 | `'*'` |  | site_no / scene_type / *(ALL) |
+| `device_type` | `varchar(32)` | 否 | `'POWERBANK'` | IX | 设备类型，硬过滤（修缺陷 1） |
+| `vendor_code` | `varchar(32)` | 否 | `''` |  | 厂商过滤；空串=不限 |
+| `model` | `varchar(64)` | 否 | `''` |  | 型号过滤；空串=不限 |
+| `brand_no` | `varchar(36)` | 否 | `''` |  | 消费者品牌过滤；空串=不限（待 B1 品牌落地） |
+| `priority` | `int(11)` | 否 | `0` |  | 同层同范围并列时降序裁决 |
+| `effective_from` | `datetime(3)` | 是 | — |  | 生效起；空=立即 |
+| `effective_to` | `datetime(3)` | 是 | — |  | 生效止；空=长期 |
 
-索引：`idx_pscope_ref`(scope_type,scope_ref) · `uk_plan_scope`(plan_no,scope_type,scope_ref) **UNIQUE**
+索引：`idx_pscope_plan`(plan_no) · `idx_pscope_ref`(scope_type,scope_ref) · `uk_scope_target`(device_type,scope_type,scope_ref,vendor_code,model,brand_no) **UNIQUE**
 
-### `price_rule` — 差异化定价(按站点/场景)
+### `price_rule_deprecated_v1` — 差异化定价(按站点/场景)
 
-实体 `PriceRule` · 业务列 12 · 标准列齐备
+**无实体** · 业务列 12 · 标准列齐备
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
@@ -2099,7 +2226,7 @@
 
 ### `price_schedule` — 活动/时段价
 
-实体 `PriceSchedule` · 业务列 8 · 标准列齐备
+实体 `PriceSchedule` · 业务列 12 · 标准列齐备
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
@@ -2111,6 +2238,10 @@
 | `active` | `tinyint(1)` | 否 | `1` |  | — |
 | `item_no` | `varchar(36)` | 是 | — |  | 作用的费用项；NULL=作用于方案的全部项 |
 | `mode` | `varchar(16)` | 是 | — |  | MULTIPLY 系数 / REPLACE 替换价 |
+| `days` | `varchar(16)` | 是 | — |  | 生效星期 CSV，1=周一…7=周日；空=每天 |
+| `time_from` | `char(5)` | 是 | — |  | HH:mm；与 time_to 同时为空=全天 |
+| `time_to` | `char(5)` | 是 | — |  | HH:mm；可跨零点（22:00-06:00 合法） |
+| `expr` | `varchar(64)` | 是 | — |  | 节假日等日历表达式；本期不参与计算，原样保留 |
 
 索引：`idx_psched_tenant`(tenant_id,active) · `uk_price_sched_no`(rule_no) **UNIQUE**
 
@@ -2121,7 +2252,7 @@
 
 ### `share_record` — 逐单分润记录
 
-实体 `ShareRecord` · 业务列 14 · 标准列齐备
+实体 `ShareRecord` · 业务列 17 · 标准列齐备
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
@@ -2131,7 +2262,7 @@
 | `payee_no` | `varchar(36)` | 是 | — |  | — |
 | `amount` | `decimal(18,2)` | 否 | `0.00` |  | — |
 | `currency` | `varchar(8)` | 否 | `'AED'` |  | — |
-| `mode` | `varchar(16)` | 否 | `'LEDGER'` |  | — |
+| `mode` | `varchar(16)` | 否 | `'LEDGER'` |  | CHANNEL_SPLIT/LEDGER |
 | `settle_no` | `varchar(36)` | 是 | — |  | 归属结算单 |
 | `dimension` | `varchar(16)` | 是 | — |  | 既有DDL同名列×2 |
 | `payee_name` | `varchar(128)` | 是 | — |  | 既有DDL同名列×1 |
@@ -2139,12 +2270,15 @@
 | `status` | `varchar(16)` | 是 | — |  | 既有DDL同名列×72 |
 | `period` | `varchar(7)` | 是 | — | IX | 归属结算周期 YYYY-MM（写入定格，不再由 created_at 现推） |
 | `gross_amount` | `decimal(18,2)` | 是 | — |  | 分润基数(GMV快照)；写入定格，不再由 amount/rate 反推 |
+| `source_no` | `varchar(36)` | 是 | — |  | 费率来源：合同号或规则号 |
+| `basis` | `varchar(16)` | 否 | `''` |  | 分成依据：INVEST/DEVELOP/OPERATE/REFER；VENUE 维度留空 |
+| `agent_no` | `varchar(36)` | 是 | — | IX | 数据范围锚点：仅 payee_type=AGENT 时有值，VENUE 行为 NULL（IN 不匹配 NULL） |
 
-索引：`idx_share_record_period`(period,payee_no) · `idx_srec_order`(order_no) · `idx_srec_payee`(payee_type,payee_no) · `uk_share_record_no`(record_no) **UNIQUE**
+索引：`idx_share_record_agent`(agent_no) · `idx_share_record_period`(period,payee_no) · `idx_srec_order`(order_no) · `idx_srec_payee`(payee_type,payee_no) · `uk_share_record_no`(record_no) **UNIQUE** · `uk_srec_order_payee_basis`(order_no,dimension,payee_no,basis) **UNIQUE**
 
 ### `share_rule` — 分润规则
 
-实体 `ShareRule` · 业务列 9 · 标准列齐备
+实体 `ShareRule` · 业务列 10 · 标准列齐备
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
@@ -2157,17 +2291,37 @@
 | `currency` | `varchar(8)` | 是 | — |  | 既有DDL同名列×31 |
 | `formula` | `longtext` | 是 | — |  | db-design 标 JSON |
 | `payee_name` | `varchar(128)` | 是 | — |  | 既有DDL同名列×1 |
+| `basis` | `varchar(16)` | 否 | `''` |  | 分成依据：INVEST/DEVELOP/OPERATE/REFER；VENUE 维度留空 |
 
-索引：`idx_srule_payee`(dimension,payee_no) · `uk_share_rule_no`(rule_no) **UNIQUE**
+索引：`idx_srule_payee`(dimension,payee_no) · `idx_srule_payee_basis`(dimension,payee_no,basis) · `uk_share_rule_no`(rule_no) **UNIQUE**
 
 
 ---
 
 ## 结算（`stl_*`）
 
+### `stl_payout_account` — 收款账户（打款用；运营主体与场地方共用）
+
+实体 `StlPayoutAccount` · 业务列 10 · 标准列齐备
+
+| 列 | 类型 | 空 | 默认 | 键 | 说明 |
+|---|---|---|---|---|---|
+| `account_no` | `varchar(36)` | 否 | — | UQ | 业务键 PA* |
+| `payee_type` | `varchar(16)` | 否 | — | IX | OPERATOR 运营主体 / VENUE 场地方 |
+| `payee_no` | `varchar(36)` | 否 | — |  | agt_agent.agent_no æˆ– loc_venue.venue_no |
+| `bank_code` | `varchar(32)` | 否 | — |  | → md_bank.bank_code |
+| `account_name` | `varchar(128)` | 否 | — |  | 户名；须与主体法人名一致，否则银行会退回 |
+| `account_masked` | `varchar(64)` | 否 | — |  | IBAN 掩码；明文入 sharehub_pii。**掩码不可做等值判断** |
+| `currency` | `varchar(8)` | 否 | `'AED'` |  | — |
+| `is_default` | `tinyint(1)` | 否 | `1` |  | 同一受益方恰好一个默认账户（应用层保证，见下） |
+| `status` | `varchar(16)` | 否 | `'ACTIVE'` |  | ACTIVE / DISABLED |
+| `agent_no` | `varchar(36)` | 是 | — | IX | 数据范围锚点：同上 |
+
+索引：`idx_payout_account_agent`(agent_no) · `idx_stl_payout_account_payee`(payee_type,payee_no,status) · `uk_stl_payout_account_no`(account_no) **UNIQUE**
+
 ### `stl_settlement` — 结算单
 
-实体 `StlSettlement` · 业务列 10 · 标准列齐备
+实体 `StlSettlement` · 业务列 11 · 标准列齐备
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
@@ -2181,8 +2335,9 @@
 | `payee_name` | `varchar(128)` | 是 | — |  | 既有DDL同名列×1 |
 | `confirmed_by` | `varchar(36)` | 是 | — |  | 确认人 |
 | `confirmed_at` | `datetime(3)` | 是 | — |  | 确认时间 |
+| `agent_no` | `varchar(36)` | 是 | — | IX | 数据范围锚点：同上 |
 
-索引：`idx_stl_payee`(payee_type,payee_no) · `uk_settle_no`(settle_no) **UNIQUE** · `uk_settle_period`(payee_type,payee_no,period) **UNIQUE**
+索引：`idx_settlement_agent`(agent_no) · `idx_stl_payee`(payee_type,payee_no) · `uk_settle_no`(settle_no) **UNIQUE** · `uk_settle_period`(payee_type,payee_no,period) **UNIQUE**
 
 ### `stl_settlement_detail` — 结算明细
 
@@ -2200,30 +2355,39 @@
 
 ### `stl_withdrawal` — 提现
 
-实体 `StlWithdrawal` · 业务列 18 · 标准列齐备
+实体 `StlWithdrawal` · 业务列 27 · 标准列齐备
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
 | `withdraw_no` | `varchar(36)` | 否 | — | UQ | — |
 | `payee_type` | `varchar(16)` | 否 | — | IX | — |
 | `payee_no` | `varchar(36)` | 否 | — |  | — |
-| `payee_name` | `varchar(128)` | 是 | — |  | 收款方名快照(冗余) |
-| `account_no` | `varchar(36)` | 是 | — |  | 账户(逻辑引用 acct_account) |
-| `bank_code` | `varchar(32)` | 是 | — |  | 收款银行(逻辑引用 md_bank) |
 | `amount` | `decimal(18,2)` | 否 | `0.00` |  | — |
-| `fee` | `decimal(18,2)` | 否 | `0.00` |  | 提现手续费(取 sys_biz_rule WITHDRAW) |
 | `currency` | `varchar(8)` | 否 | `'AED'` |  | — |
 | `status` | `varchar(16)` | 否 | `'APPLY'` |  | APPLY/AUDIT/PAYING/PAID/FAILED |
 | `nearpay_payout_no` | `varchar(64)` | 是 | — |  | nearpay 打款单 |
 | `applied_at` | `datetime(3)` | 否 | `current_timestamp(3)` |  | — |
+| `payee_name` | `varchar(128)` | 是 | — |  | 收款方名快照(冗余) |
+| `account_no` | `varchar(36)` | 是 | — |  | 账户(逻辑引用 acct_account) |
+| `bank_code` | `varchar(32)` | 是 | — |  | 收款银行(逻辑引用 md_bank) |
+| `fee` | `decimal(18,2)` | 否 | `0.00` |  | 提现手续费(取 sys_biz_rule WITHDRAW) |
 | `applicant_no` | `varchar(36)` | 是 | — |  | 申请人(代理账号/员工) |
 | `auditor_no` | `varchar(36)` | 是 | — |  | 审批人(服务端回填,不信前端) |
 | `auditor_name` | `varchar(64)` | 是 | — |  | 审批人名快照 |
 | `audited_at` | `datetime(3)` | 是 | — |  | 审批时间(NULL=未审) |
 | `reject_reason` | `varchar(256)` | 是 | — |  | 驳回原因(驳回时必填) |
 | `paid_at` | `datetime(3)` | 是 | — |  | 打款到账时间 |
+| `payout_account_no` | `varchar(36)` | 是 | — |  | → stl_payout_account.account_no；审批通过时落定 |
+| `payout_account_name` | `varchar(128)` | 是 | — |  | 快照：户名 |
+| `payout_account_masked` | `varchar(64)` | 是 | — |  | 快照：账号掩码 |
+| `pay_channel` | `varchar(16)` | 是 | — | IX | 打款渠道 NEARPAY/MANUAL；取代 V3 的 nearpay_payout_no（死列，保留不删） |
+| `pay_ref` | `varchar(64)` | 是 | — |  | 渠道流水号（nearpay 打款单号 / 银行回单号）；回执幂等键 |
+| `payer_no` | `varchar(36)` | 是 | — |  | 登记回执的人；与 auditor_no 分开，便于查「审批人是否自己给自己放款」 |
+| `payer_name` | `varchar(64)` | 是 | — |  | 快照：登记人姓名 |
+| `fail_reason` | `varchar(255)` | 是 | — |  | 打款失败原因；与 reject_reason（审批驳回）分列，勿合并 |
+| `agent_no` | `varchar(36)` | 是 | — | IX | 数据范围锚点：同上 |
 
-索引：`idx_wd_audit`(tenant_id,status,applied_at) · `idx_wd_payee`(payee_type,payee_no) · `uk_withdraw_no`(withdraw_no) **UNIQUE**
+索引：`idx_wd_audit`(tenant_id,status,applied_at) · `idx_wd_payee`(payee_type,payee_no) · `idx_withdrawal_agent`(agent_no) · `uk_stl_withdrawal_payref`(pay_channel,pay_ref) **UNIQUE** · `uk_withdraw_no`(withdraw_no) **UNIQUE**
 
 
 ---
@@ -2264,6 +2428,19 @@
 
 索引：`uk_biz_rule`(tenant_id,category) **UNIQUE**
 
+### `sys_event_consumed` — 事件消费去重（至少一次投递的消费端闸门）
+
+实体 `SysEventConsumed` · 业务列 4 · 标准列缺 `tenant_id`/`created_at`/`created_by`/`updated_at`/`updated_by`/`version`/`deleted` ⚠️
+
+| 列 | 类型 | 空 | 默认 | 键 | 说明 |
+|---|---|---|---|---|---|
+| `event_no` | `varchar(36)` | 否 | — | IX | 事件编号，对应 sys_outbox.event_no |
+| `handler` | `varchar(128)` | 否 | — |  | 消费者标识，一般是实现类名 |
+| `event_type` | `varchar(64)` | 是 | — |  | 冗余，排错时不必回查 outbox |
+| `consumed_at` | `datetime(3)` | 否 | `current_timestamp(3)` | IX | — |
+
+索引：`idx_event_consumed_at`(consumed_at) · `uk_event_consumed`(event_no,handler) **UNIQUE**
+
 ### `sys_login_setting` — 登录设置(按国家)
 
 实体 `SysLoginSetting` · 业务列 9 · 标准列齐备
@@ -2293,7 +2470,7 @@
 | `aggregate_id` | `varchar(64)` | 否 | — |  | 聚合业务键，如 ASG0001 / ORD0001 |
 | `event_type` | `varchar(64)` | 否 | — |  | 事件类型，如 ASSET_ASSIGNED / ORDER_SETTLED |
 | `payload` | `longtext` | 否 | — |  | 事件载荷。**必须自带消费方所需全部字段** —— 让消费方回查等于把同步调用藏进事件 |
-| `status` | `varchar(16)` | 否 | `'PENDING'` | IX | PENDING/SENT/FAILED |
+| `status` | `varchar(16)` | 否 | `'PENDING'` | IX | PENDING 待投递 / SENT 已送达 / FAILED 待重投 / DEAD 超过重试上限，需人工介入 |
 | `retry_count` | `int(11)` | 否 | `0` |  | — |
 | `next_retry_at` | `datetime(3)` | 是 | — |  | 下次重试时间；PENDING 且 <= now 才会被取走 |
 | `last_error` | `varchar(512)` | 是 | — |  | — |
@@ -2422,12 +2599,12 @@
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
-| `risk_no` | `varchar(36)` | 是 | — | UQ | 业务键 RK* |
 | `c_user_no` | `varchar(36)` | 否 | — | UQ | — |
 | `score` | `int(11)` | 否 | `600` |  | — |
-| `risk_level` | `varchar(8)` | 是 | — |  | HIGH/MEDIUM/LOW |
 | `blacklisted` | `tinyint(1)` | 否 | `0` |  | — |
 | `reason` | `varchar(256)` | 是 | — |  | — |
+| `risk_no` | `varchar(36)` | 是 | — | UQ | 业务键 RK* |
+| `risk_level` | `varchar(8)` | 是 | — |  | HIGH/MEDIUM/LOW |
 | `flagged_at` | `datetime(3)` | 是 | — |  | 标记时间 |
 
 索引：`idx_credit_level`(tenant_id,risk_level) · `uk_credit_risk_no`(risk_no) **UNIQUE** · `uk_credit_user`(c_user_no) **UNIQUE**
@@ -2480,16 +2657,16 @@
 
 索引：`idx_ufw_tenant_status`(tenant_id,status,valid_to) · `idx_ufw_user`(tenant_id,c_user_no,status) · `uk_whitelist_no`(whitelist_no) **UNIQUE**
 
-### `usr_identity`
+### `usr_identity` — C端多渠道身份绑定(登录归并)
 
 实体 `UsrIdentity` · 业务列 5 · 标准列缺 `version`/`deleted`（追加表/全局表，符合预期）
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
 | `c_user_no` | `varchar(36)` | 否 | — | IX | — |
-| `provider` | `varchar(16)` | 否 | — |  | WECHAT_MP/WECHAT_OA/APPLE/GOOGLE/PHONE † |
-| `provider_uid` | `varchar(128)` | 否 | — |  | openid / apple·google sub / hash(phone) † |
-| `union_key` | `varchar(128)` | 否 | — |  | 微信 unionid，或 provider:uid（跨渠道归并键） † |
+| `provider` | `varchar(16)` | 否 | — |  | WECHAT_MP/WECHAT_OA/APPLE/GOOGLE/PHONE |
+| `provider_uid` | `varchar(128)` | 否 | — |  | openid / apple·google sub / hash(phone) |
+| `union_key` | `varchar(128)` | 否 | — |  | 微信 unionid，或 provider:uid（跨渠道归并键） |
 | `bound_at` | `datetime(3)` | 否 | `current_timestamp(3)` |  | — |
 
 索引：`idx_identity_union`(tenant_id,union_key) · `idx_identity_user`(c_user_no) · `uk_identity_provider_uid`(tenant_id,provider,provider_uid) **UNIQUE**
@@ -2657,7 +2834,7 @@
 
 索引：`idx_rpkgm_country`(country_code) · `uk_rpkg_market`(package_no,country_code) **UNIQUE**
 
-### `usr_user`
+### `usr_user` — C端用户(多渠道登录,身份见 usr_identity)
 
 实体 `UsrUser` · 业务列 7 · 标准列齐备
 
@@ -2715,7 +2892,7 @@
 
 ### `wo_dispatch` — 派单记录
 
-实体 `WoDispatch` · 业务列 6 · 标准列缺 `tenant_id`/`updated_at`/`updated_by`/`version`/`deleted` ⚠️
+实体 `WoDispatch` · 业务列 5 · 标准列缺 `tenant_id`/`updated_at`/`updated_by`/`version`/`deleted` ⚠️
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
@@ -2724,13 +2901,12 @@
 | `strategy` | `varchar(16)` | 否 | `'MANUAL'` |  | NEAREST/LOAD/MANUAL/GRAB |
 | `action` | `varchar(24)` | 是 | — |  | — |
 | `dispatched_at` | `datetime(3)` | 否 | `current_timestamp(3)` |  | — |
-| `assignee_no` | `varchar(36)` | 是 | — |  | 约定:业务键 |
 
 索引：`idx_wdisp_wo`(wo_no)
 
 ### `wo_handle` — 现场处理
 
-实体 `WoHandle` · 业务列 8 · 标准列缺 `tenant_id`/`updated_at`/`updated_by`/`version`/`deleted` ⚠️
+实体 `WoHandle` · 业务列 7 · 标准列缺 `tenant_id`/`updated_at`/`updated_by`/`version`/`deleted` ⚠️
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
@@ -2741,13 +2917,12 @@
 | `part_changed` | `tinyint(1)` | 否 | `0` |  | — |
 | `device_changed` | `tinyint(1)` | 否 | `0` |  | — |
 | `handled_at` | `datetime(3)` | 否 | `current_timestamp(3)` |  | — |
-| `assignee_no` | `longtext` | 是 | — |  | db-design 标 JSON |
 
 索引：`idx_whandle_wo`(wo_no)
 
 ### `wo_inspection_plan` — 巡检计划
 
-实体 `WoInspectionPlan` · 业务列 12 · 标准列齐备
+实体 `WoInspectionPlan` · 业务列 11 · 标准列齐备
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
@@ -2757,7 +2932,6 @@
 | `assignee_id` | `varchar(36)` | 是 | — |  | — |
 | `status` | `varchar(16)` | 否 | `'ACTIVE'` |  | — |
 | `active` | `tinyint(1)` | 是 | — |  | 既有DDL同名列×3 |
-| `assignee_no` | `varchar(36)` | 是 | — |  | 约定:业务键 |
 | `frequency` | `varchar(32)` | 是 | — |  | 约定:枚举/短码 |
 | `next_at` | `datetime(3)` | 是 | — |  | 约定:时间列(实体用String映射) |
 | `last_run_at` | `datetime(3)` | 是 | — |  | 上次执行时间 |
@@ -2766,40 +2940,40 @@
 
 索引：`uk_insp_plan_no`(plan_no) **UNIQUE**
 
-### `wo_order`
+### `wo_order` — 工单(聚合根)
 
 实体 `WoOrder` · 业务列 26 · 标准列齐备
 
 | 列 | 类型 | 空 | 默认 | 键 | 说明 |
 |---|---|---|---|---|---|
 | `wo_no` | `varchar(36)` | 否 | — | UQ | — |
-| `type` | `varchar(16)` | 是 | — |  | FAULT/REFILL/INSPECT/INSTALL/REMOVE/COMPLAINT/CLEAN † |
-| `source` | `varchar(16)` | 是 | — |  | ALERT/USER/VENUE/MANUAL † |
-| `priority` | `varchar(8)` | 是 | — |  | — |
+| `region_id` | `varchar(36)` | 是 | — |  | — |
+| `type` | `varchar(16)` | 否 | — |  | FAULT/REFILL/INSPECT/INSTALL/REMOVE/COMPLAINT/CLEAN |
+| `source` | `varchar(16)` | 否 | — |  | ALERT/USER/VENUE/MANUAL |
+| `priority` | `varchar(8)` | 否 | `'MEDIUM'` |  | — |
 | `cabinet_no` | `varchar(36)` | 是 | — |  | — |
-| `location_no` | `varchar(36)` | 是 | — |  | 点位 |
-| `site_no` | `varchar(36)` | 是 | — |  | 站点(冗余·数据范围锚点) |
-| `agent_no` | `varchar(36)` | 是 | — |  | 归属代理(冗余·数据范围锚点) |
-| `location_name` | `varchar(128)` | 是 | — |  | — |
-| `status` | `varchar(16)` | 否 | `'CREATED'` |  | CREATED/DISPATCHED/ACCEPTED/PROCESSING/DONE/AUDITED/CLOSED † |
-| `assignee_name` | `varchar(64)` | 是 | — |  | — |
-| `sla_due_at` | `varchar(40)` | 是 | — |  | — |
+| `site_no` | `varchar(36)` | 是 | — | IX | 站点归属(派单) |
+| `agent_no` | `varchar(36)` | 是 | — |  | 归属代理(冗余·数据权限过滤) |
+| `status` | `varchar(16)` | 否 | `'CREATED'` |  | CREATED/DISPATCHED/ACCEPTED/PROCESSING/DONE/AUDITED/CLOSED |
+| `assignee_id` | `varchar(36)` | 是 | — | IX | — |
+| `sla_due_at` | `datetime(3)` | 是 | — |  | — |
 | `description` | `varchar(512)` | 是 | — |  | — |
-| `wo_created_at` | `varchar(40)` | 是 | — |  | — |
 | `close_reason` | `varchar(16)` | 是 | — |  | 关单原因(status=CLOSED 时必填)：RESOLVED 正常完结/INVALID 误报/DUPLICATE 重复单/WITHDRAWN 撤单 |
 | `closed_at` | `datetime(3)` | 是 | — |  | 关单时间 |
 | `audited_by` | `varchar(36)` | 是 | — |  | 验收人(AUDITED 时回填,服务端写) |
 | `audited_at` | `datetime(3)` | 是 | — |  | 验收时间 |
-| `assignee_id` | `varchar(36)` | 是 | — |  | — |
-| `region_id` | `varchar(36)` | 是 | — |  | — |
+| `location_no` | `varchar(36)` | 是 | — |  | 点位 |
 | `reject_reason` | `varchar(256)` | 是 | — |  | 最近一次退回原因(reject 驳回退回 / rework 验收退回返工,均必填) |
 | `reject_count` | `int(11)` | 否 | `0` |  | 累计退回次数(驳回+返工),反复退回=派单或工单描述有问题 |
 | `expected_at` | `datetime(3)` | 是 | — |  | 期望完成时间(开单时填,超期提示用) |
 | `audit_result` | `varchar(16)` | 是 | — |  | 验收结论：PASS/PASS_WITH_ISSUE/FAIL（与前端 WoAuditResult 同值域） |
 | `audit_note` | `varchar(255)` | 是 | — |  | 验收说明 |
 | `source_ref` | `varchar(64)` | 是 | — | UQ | 来源单据引用(告警号/投诉号/巡检键)，手工开单为 NULL |
+| `location_name` | `varchar(128)` | 是 | — |  | 点位名（冗余，仅展示） |
+| `assignee_name` | `varchar(64)` | 是 | — |  | 处理人名（冗余，仅展示） |
+| `wo_created_at` | `varchar(32)` | 是 | — |  | 单据建单时间(UTC ISO)，与审计列 created_at 不同 |
 
-索引：`idx_wo_scope`(tenant_id,agent_no,status,created_at) · `uk_wo_no`(wo_no) **UNIQUE** · `uk_wo_source_ref`(source_ref) **UNIQUE**
+索引：`idx_wo_agent`(tenant_id,agent_no) · `idx_wo_assignee`(assignee_id) · `idx_wo_scope`(tenant_id,agent_no,status,created_at) · `idx_wo_site`(site_no) · `idx_wo_tenant_status`(tenant_id,status) · `uk_wo_no`(wo_no) **UNIQUE** · `uk_wo_source_ref`(source_ref) **UNIQUE**
 
 ### `wo_sla` — SLA 计时
 

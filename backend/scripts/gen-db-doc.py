@@ -26,8 +26,12 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _modules import source_roots  # noqa: E402
 SRC_ROOTS = source_roots()
 OUT = os.path.join(ROOT, 'docs/technical/db-schema-reference.md')
-DB = 'pb_core'
-MYSQL = ['mysql', '-upowerbank', '-ppowerbank', '-N', '-B', DB, '-e']
+DB = os.environ.get('SHAREHUB_DOC_DB', 'pb_core')
+MIGRATION_DIR = os.path.join(ROOT, 'backend/sharehub-app/src/main/resources/db/migration')
+# 显式指定字符集：不指定就取决于跑脚本那台机器的 locale，
+# 而「文档在某台机器上生成会带乱码」是查不出来的那种问题。
+MYSQL = ['mysql', '--default-character-set=utf8mb4',
+         '-upowerbank', '-ppowerbank', '-N', '-B', DB, '-e']
 
 
 def q(sql):
@@ -35,6 +39,58 @@ def q(sql):
     if r.returncode != 0:
         raise SystemExit('查库失败：%s' % r.stderr.strip())
     return [line.split('\t') for line in r.stdout.strip('\n').split('\n') if line]
+
+
+def assert_db_is_current():
+    """库落后于迁移文件就**拒绝生成**，不是警告一句继续写。
+
+    本文件回答的是「现在到底是什么」，读的人拿它当真源。
+    从一个落后 N 个迁移的库生成出来的文档**看起来完全正常** ——
+    没有报错、没有空洞，只是少了那 N 个迁移带来的表与列，
+    而少了什么恰恰是看不出来的。写出去比不写更糟。
+
+    实测：2026-09-24 本机 pb_core 停在 V50，而迁移文件已到 V68 —— 差 18 个。
+    那次若照常生成，会把这段时间所有的新表新列从文档里抹掉。
+    """
+    have = {int(r[0]) for r in q("SELECT version FROM flyway_schema_history "
+                                 "WHERE version IS NOT NULL AND version REGEXP '^[0-9]+$'")
+            if r and r[0]}
+    want = set()
+    for f in os.listdir(MIGRATION_DIR):
+        m = re.match(r'V(\d+)(?:_\d+)?__', f)
+        if m:
+            want.add(int(m.group(1)))
+    missing = sorted(want - have)
+    if missing:
+        raise SystemExit(
+            '拒绝生成：库 `%s` 落后于迁移文件 %d 个版本 —— 缺 V%s\n'
+            '  从落后的库生成的文档看起来完全正常，只是悄悄少了那些表与列。\n'
+            '  先把迁移跑到这个库上（起一次应用，或 flyway migrate），或用\n'
+            '  SHAREHUB_DOC_DB=<已跑完迁移的库> python3 backend/scripts/gen-db-doc.py'
+            % (DB, len(missing), ', V'.join(str(v) for v in missing[:8])
+               + ('…' if len(missing) > 8 else '')))
+
+
+# 双重编码的签名：UTF-8 中文被当成 latin1 再编码一次之后，落在这一段里
+MOJIBAKE = re.compile('[\u00c0-\u00ff][\u0080-\u00bf\u2000-\u203a]')
+
+
+def assert_comments_readable(rows):
+    """注释读出来是乱码就**拒绝生成**。
+
+    乱码可能来自两处：库里存的就是双重编码（本机 pb_core 的 agt_apply 就是），
+    或客户端字符集不对。两种都不该被写进文档 ——
+    **一份带乱码的参考文档，下一个人会照着它把乱码抄进代码注释里。**
+    """
+    bad = sorted({r[0] for r in rows if len(r) > 1 and r[1] and MOJIBAKE.search(r[1])})
+    if bad:
+        raise SystemExit(
+            '拒绝生成：%d 张表/列的注释读出来是乱码（双重编码），例如 %s\n'
+            '  先确认库里存的是什么：\n'
+            '    mysql --default-character-set=utf8mb4 -N -B %s -e "SELECT table_name, table_comment '
+            'FROM information_schema.tables WHERE table_schema=DATABASE()"\n'
+            '  库里就是坏的 → 重建那张表的注释；库里是好的 → 是客户端字符集问题，本脚本已显式指定 utf8mb4。'
+            % (len(bad), '、'.join(bad[:5]), DB))
 
 
 def ddl_comments():
@@ -77,12 +133,16 @@ def entity_map():
 
 
 def main():
+    # 两道闸在最前面：宁可什么都不写，也不写一份看起来正常的错文档
+    assert_db_is_current()
     tables = q("SELECT table_name, IFNULL(table_comment,''), IFNULL(table_rows,0) "
                "FROM information_schema.tables WHERE table_schema='%s' ORDER BY table_name" % DB)
     cols = q("SELECT table_name, column_name, column_type, is_nullable, IFNULL(column_default,'—'), "
              "column_key, IFNULL(column_comment,''), extra "
              "FROM information_schema.columns WHERE table_schema='%s' "
              "ORDER BY table_name, ordinal_position" % DB)
+    assert_comments_readable(tables)                       # 表注释：(表名, 注释, 行数)
+    assert_comments_readable([(r[0] + '.' + r[1], r[6]) for r in cols if len(r) > 6])
     idx = q("SELECT table_name, index_name, GROUP_CONCAT(column_name ORDER BY seq_in_index), non_unique "
             "FROM information_schema.statistics WHERE table_schema='%s' "
             "GROUP BY table_name, index_name, non_unique ORDER BY table_name, index_name" % DB)
