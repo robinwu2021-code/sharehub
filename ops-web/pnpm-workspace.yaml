@@ -1,0 +1,5 @@
+# sharp 是 next 的可选依赖（图片优化用）。本项目 output:"export" +
+# images.unoptimized，Next 不会调它——build 已验证通过。故显式禁掉它的
+# 构建脚本，而不是留 pnpm 生成的占位符（那既非 true 也非 false）。
+allowBuilds:
+  sharp: false
