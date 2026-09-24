@@ -135,13 +135,42 @@ class OrderShareGenerationTest extends ApiTestSupport {
                 "rate", rate, "priority", 5), admin).okData().path("ruleNo").asText();
     }
 
-    /** 给站点配一行责任，返回行 id（便于用例收尾时撤掉）。 */
+    /** 本用例**自己新建**的责任行。只有这些该在收尾时撤掉 —— 见下面两个方法的注释。 */
+    private final java.util.Set<Long> mine = new java.util.HashSet<>();
+
+    /**
+     * 确保站点上有这一行责任，返回行 id。
+     *
+     * <p><b>必须幂等，不能直接 POST 新建。</b>V52 把 {@code loc_site.agent_no} 回填成一行
+     * OPERATE，而种子（站点、伙伴）不在迁移里、是运行期 seeder 插的。于是那行 OPERATE
+     * 在不在，**取决于这个库上「种子」和「V52」谁先跑**：
+     * <ul>
+     *   <li>先种子后 V52（共享的 test_sharehub 就是这样）→ ST307/AG008/OPERATE 已存在；</li>
+     *   <li>先 V52 后种子（或从没种过）→ {@code loc_site_agent} 是空的。</li>
+     * </ul>
+     * 这不是代码的性质，是那个库的历史。所以用例不能对它有任何假设 ——
+     * 直接 POST 在第一种库上会撞服务层的「已经有这条责任了」，拿到 400。
+     */
     private long responsibility(String admin, String site, String agentNo, String role) {
-        return post("/api/ops/sites/" + site + "/agents",
+        for (JsonNode r : get("/api/ops/sites/" + site + "/agents", admin).okData()) {
+            if (agentNo.equals(r.path("agentNo").asText()) && role.equals(r.path("role").asText())) {
+                return r.path("id").asLong();   // 复用（回填的，或上一条用例留下的）
+            }
+        }
+        long id = post("/api/ops/sites/" + site + "/agents",
                 Map.of("agentNo", agentNo, "role", role), admin).okData().path("id").asLong();
+        mine.add(id);
+        return id;
     }
 
+    /**
+     * 撤掉本用例建的责任行。
+     *
+     * <p>不是本用例建的就**不能撤** —— 那多半是 V52 回填的行，撤掉它等于让后续用例
+     * 跑在一个和全新库不一样的库上，而且症状会飘到别的用例身上。
+     */
     private void unresponsibility(String admin, String site, long id) {
+        if (!mine.remove(id)) return;
         post("/api/ops/sites/" + site + "/agents/" + id + "/remove", Map.of(), admin).okData();
     }
 
@@ -152,8 +181,7 @@ class OrderShareGenerationTest extends ApiTestSupport {
         String admin = login("ADMIN");
         rule(admin, "AG008", "OPERATE", 0.08);
         rule(admin, "AG002", "INVEST", 0.05);
-        // 两行都由用例自己配。**不依赖 V52 的回填**：回填跑在迁移里、种子插在迁移之后，
-        // 所以全新测试库里 loc_site_agent 是空的 —— 依赖它的用例只在「迁移过的老库」上绿。
+        // 两行都只保证「存在」，不保证「由本用例新建」—— 见 responsibility() 注释里的两种库。
         long operate = responsibility(admin, MULTI_SITE, "AG008", "OPERATE");
         long invest = responsibility(admin, MULTI_SITE, "AG002", "INVEST");
         try {
