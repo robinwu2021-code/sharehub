@@ -68,11 +68,8 @@ class AgentApplyFlowTest extends ApiTestSupport {
      * 谁改一次排序，这个用例就会报「申请没找到」，而真实原因是分页。
      */
     private JsonNode findApply(String applyNo, String token) {
-        JsonNode page = get("/api/agent/applies?page=1&size=200&keyword=" + applyNo, token).okData();
-        for (JsonNode r : page.path("list")) {
-            if (applyNo.equals(r.path("applyNo").asText())) return r;
-        }
-        return null;
+        // keyword 保留（申请单的 keyword 匹配 apply_no），翻页兜底
+        return findInPages("/api/agent/applies?keyword=" + applyNo, "applyNo", applyNo, token);
     }
 
     // ——————————————————— 自助入口 ———————————————————
@@ -203,16 +200,10 @@ class AgentApplyFlowTest extends ApiTestSupport {
         // 按编号过滤，**不要拉全表再翻**：库里代理商已经 215 个，
         // 翻第一页 200 条时新建的那个正好掉到了页外，于是这条断言从
         // 「派生没生效」变成了「分页没够着」—— 两种失败长得一模一样。
-        JsonNode agents = get("/api/agent/agents?page=1&size=200&keyword=" + operatorNo, admin).okData();
-        boolean found = false;
-        for (JsonNode a : agents.path("list")) {
-            if (operatorNo.equals(a.path("agentNo").asText())) {
-                found = true;
-                assertThat(a.path("name").asText()).isEqualTo("派生检查公司");
-                assertThat(a.path("status").asText()).isEqualTo("ENABLED");
-            }
-        }
-        assertThat(found).as("审核通过派生出的主体 %s 应能在代理商档案里查到", operatorNo).isTrue();
+        JsonNode a = findInPages("/api/agent/agents?keyword=" + operatorNo, "agentNo", operatorNo, admin);
+        assertThat(a).as("审核通过派生出的主体 %s 应能在代理商档案里查到", operatorNo).isNotNull();
+        assertThat(a.path("name").asText()).isEqualTo("派生检查公司");
+        assertThat(a.path("status").asText()).isEqualTo("ENABLED");
     }
 
     @Test

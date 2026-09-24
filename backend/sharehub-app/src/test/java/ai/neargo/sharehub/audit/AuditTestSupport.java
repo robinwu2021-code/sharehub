@@ -40,22 +40,17 @@ abstract class AuditTestSupport extends ApiTestSupport {
      * @param traceId 本次请求的链路 id —— 精确定位靠它，不靠「最新一条」
      */
     protected JsonNode auditOfThisRequest(String actor, String traceId) {
-        JsonNode list = get("/api/platform/audit-logs?page=1&size=20&keyword=" + actor, login("ADMIN"))
-                .okData().path("list");
-        for (JsonNode row : list) {
-            if (traceId.equals(row.path("traceId").asText())) return row;
+        JsonNode row = findInPages("/api/platform/audit-logs?keyword=" + actor, "traceId", traceId, login("ADMIN"));
+        if (row == null) {
+            throw new AssertionError("本次操作没有在审计里留痕：actor=" + actor + " traceId=" + traceId);
         }
-        throw new AssertionError("本次操作没有在审计里留痕：actor=" + actor + " traceId=" + traceId
-                + "。查到 " + list.size() + " 条该操作人的近期记录，但没有一条属于本次请求。");
+        return row;
     }
 
     /** 审计查询要 org:audit:read —— 代理没有这个码，所以固定用 ADMIN 读。 */
     protected void assertNoAuditFor(String actor, String traceId) {
-        JsonNode list = get("/api/platform/audit-logs?page=1&size=20&keyword=" + actor, login("ADMIN"))
-                .okData().path("list");
-        for (JsonNode row : list) {
-            assertThat(traceId).as("这次请求不该留痕，却查到了一条").isNotEqualTo(row.path("traceId").asText());
-        }
+        assertThat(findInPages("/api/platform/audit-logs?keyword=" + actor, "traceId", traceId, login("ADMIN")))
+                .as("这次请求不该留痕，却查到了一条").isNull();
     }
 
     private static String hex(int bytes) {

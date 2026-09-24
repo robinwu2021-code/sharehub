@@ -37,11 +37,7 @@ class ArchiveRoundTripTest extends ApiTestSupport {
                 .isTrue();
 
         // 再从列表读回一次：出参对了但库里没改的话，这一步才会露馅
-        JsonNode reread = get("/api/trade/price-plans?page=1&size=50", token).okData();
-        JsonNode row = null;
-        for (JsonNode r : reread.path("list")) {
-            if (planNo.equals(r.path("planNo").asText())) row = r;
-        }
+        JsonNode row = findInPages("/api/trade/price-plans", "planNo", planNo, token);
         assertThat(row).as("取消归档后该行应回到默认列表（默认过滤已归档）").isNotNull();
         assertThat(row.path("archivedAt").isNull()).as("库里 archived_at 应确实为 NULL").isTrue();
     }

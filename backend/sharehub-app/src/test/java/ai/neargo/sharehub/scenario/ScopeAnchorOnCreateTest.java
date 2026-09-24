@@ -114,15 +114,7 @@ class ScopeAnchorOnCreateTest extends ApiTestSupport {
         return orderNo;
     }
 
-    /** 翻页找 —— 测试库是累积的，任何「一页就是全量」的写法都只是还没到线。 */
     private boolean listContains(String path, String key, String value, String token) {
-        for (int page = 1; page <= 50; page++) {
-            JsonNode body = get(path + "?page=" + page + "&size=200", token).okData();
-            for (JsonNode row : body.path("list")) {
-                if (value.equals(row.path(key).asText())) return true;
-            }
-            if ((long) page * 200 >= body.path("total").asLong()) return false;
-        }
-        return false;
+        return findInPages(path, key, value, token) != null;
     }
 }

@@ -9,7 +9,9 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -93,6 +95,65 @@ public abstract class ApiTestSupport {
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(payload));
         return send(b.build());
+    }
+
+    // ——————————————————————— 翻页 ———————————————————————
+
+    /**
+     * 分页接口的页大小上限，本仓库统一是 200（各 service 的 {@code Math.min(size, 200)}）。
+     */
+    private static final int PAGE_SIZE = 200;
+
+    /** 翻页上限，纯兜底 —— 接口返回异常的 total 时不至于死循环。 */
+    private static final int MAX_PAGES = 50;
+
+    /**
+     * 翻页找一条记录，找不到返回 {@code null}。
+     *
+     * <h3>为什么不能 {@code page=1&size=200} 了事</h3>
+     * <b>测试库是累积的</b>（见 application.properties）。「取第一页再在里面找」
+     * 这种写法在表小的时候一直是对的，越过页大小的那天忽然开始失败 ——
+     * 而失败的样子是<b>「刚建的东西查不到」</b>，看起来像功能坏了，
+     * 实际是分页没够着。本轮为此查错方向过好几次：
+     * 分润对账、代理商档案、合同列表、场地方、站点、申请单。
+     *
+     * <h3>为什么也不能靠 keyword 过滤</h3>
+     * 各列表的 keyword 匹配哪些列**各不相同**：代理商/提现/申请单匹配业务号，
+     * 而场地方只匹配名称、站点只匹配名称与区域、合同只匹配场地方名与站点名。
+     * 按编号传进去一条都匹配不上 —— 而「过滤后空列表」与「确实没有」长得一模一样。
+     *
+     * @param path  列表端点，可以自带查询参数（如 {@code "...?status=APPLY"}）
+     * @param field 用哪个字段比对（如 {@code "orderNo"}）
+     * @param value 要找的值
+     */
+    protected JsonNode findInPages(String path, String field, String value, String token) {
+        String sep = path.contains("?") ? "&" : "?";
+        for (int page = 1; page <= MAX_PAGES; page++) {
+            JsonNode body = get(path + sep + "page=" + page + "&size=" + PAGE_SIZE, token).okData();
+            for (JsonNode row : body.path("list")) {
+                if (value.equals(row.path(field).asText())) return row;
+            }
+            if ((long) page * PAGE_SIZE >= body.path("total").asLong()) return null;
+        }
+        throw new AssertionError("翻了 " + MAX_PAGES + " 页还没到头：" + path
+                + " —— 接口的 total 不对，还是真有这么多数据？");
+    }
+
+    /**
+     * 翻完所有页。用于「对全量做聚合」的断言 ——
+     * 只取第一页去和另一个全量数字比，差的那部分会被当成业务错误报出来。
+     */
+    protected List<JsonNode> pageAll(String path, String token) {
+        String sep = path.contains("?") ? "&" : "?";
+        List<JsonNode> out = new ArrayList<>();
+        for (int page = 1; page <= MAX_PAGES; page++) {
+            JsonNode body = get(path + sep + "page=" + page + "&size=" + PAGE_SIZE, token).okData();
+            JsonNode list = body.path("list");
+            if (list.isEmpty()) return out;
+            list.forEach(out::add);
+            if (out.size() >= body.path("total").asLong()) return out;
+        }
+        throw new AssertionError("翻了 " + MAX_PAGES + " 页还没到头：" + path);
     }
 
     /**

@@ -77,14 +77,9 @@ class AuditChangesCoverageTest extends AuditTestSupport {
     // ——————————————————————— 脚手架 ———————————————————————
 
     private JsonNode findSite(String admin, String siteNo) {
-        for (int page = 1; page <= 50; page++) {
-            JsonNode body = get("/api/ops/sites?page=" + page + "&size=200", admin).okData();
-            for (JsonNode s : body.path("list")) {
-                if (siteNo.equals(s.path("siteNo").asText())) return s;
-            }
-            if ((long) page * 200 >= body.path("total").asLong()) break;
-        }
-        throw new AssertionError("站点不存在: " + siteNo);
+        JsonNode site = findInPages("/api/ops/sites", "siteNo", siteNo, admin);
+        if (site == null) throw new AssertionError("站点不存在: " + siteNo);
+        return site;
     }
 
     /** 照抄读回来的站点，只换归属代理 —— 保存是整体覆盖，少传字段会把它们清空。 */

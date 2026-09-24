@@ -107,7 +107,10 @@ class PayoutAccountTest extends ApiTestSupport {
     @Test
     void approving_a_withdrawal_without_an_account_is_refused() {
         String admin = login("ADMIN");
-        JsonNode pending = get("/api/trade/withdrawals?page=1&size=50&status=APPLY", admin).okData();
+        // 翻完整个待审队列再挑：APPLY 已经 76 条而页大小是 50，只看第一页的话，
+        // 「前 50 个都有账户」会被当成「所有人都有账户」而静默跳过 ——
+        // 跳过看起来和通过一模一样，正是下面注释要避免的那种假绿。
+        java.util.List<JsonNode> pending = pageAll("/api/trade/withdrawals?status=APPLY", admin);
 
         /*
          * 必须自己找出「当前确实没有收款账户」的那个受益方 —— 不能拿队列第一条就用。
@@ -116,7 +119,7 @@ class PayoutAccountTest extends ApiTestSupport {
          * （入驻那批用随机手机号解决的是同一类污染。）
          */
         String target = null;
-        for (JsonNode w : pending.path("list")) {
+        for (JsonNode w : pending) {
             String type = w.path("payeeType").asText();
             String no = w.path("payeeNo").asText();
             boolean hasAccount = !get("/api/trade/payout-accounts?payeeType=" + type + "&payeeNo=" + no, admin)
@@ -136,6 +139,7 @@ class PayoutAccountTest extends ApiTestSupport {
     @Test
     void approving_snapshots_the_account_so_later_edits_do_not_rewrite_history() {
         String admin = login("ADMIN");
+        // 这里只要「任意一条待审的」，取第一页第一条是对的 —— 不是在找某条特定记录。
         JsonNode pending = get("/api/trade/withdrawals?page=1&size=50&status=APPLY", admin).okData();
         if (pending.path("list").isEmpty()) return;
 
@@ -156,17 +160,14 @@ class PayoutAccountTest extends ApiTestSupport {
         renamed.put("accountNo", acctNo);
         save(renamed, admin);
 
-        JsonNode after = get("/api/trade/withdrawals?page=1&size=200&keyword=" + payeeNo, admin).okData();
-        for (JsonNode r : after.path("list")) {
-            if (withdrawNo.equals(r.path("withdrawNo").asText())) {
-                // 出参里若暴露了快照字段就断言它；没暴露也不算失败（读侧是否透出是另一件事）
-                JsonNode snap = r.path("payoutAccountName");
-                if (!snap.isMissingNode() && !snap.asText().isEmpty()) {
-                    assertThat(snap.asText())
-                            .as("★ 快照必须停在审批那一刻 —— 否则对不上当初的打款回单")
-                            .isEqualTo("审批时的户名");
-                }
-            }
+        JsonNode r = findInPages("/api/trade/withdrawals", "withdrawNo", withdrawNo, admin);
+        assertThat(r).as("刚审批的提现单应当还在列表里").isNotNull();
+        // 出参里若暴露了快照字段就断言它；没暴露也不算失败（读侧是否透出是另一件事）
+        JsonNode snap = r.path("payoutAccountName");
+        if (!snap.isMissingNode() && !snap.asText().isEmpty()) {
+            assertThat(snap.asText())
+                    .as("★ 快照必须停在审批那一刻 —— 否则对不上当初的打款回单")
+                    .isEqualTo("审批时的户名");
         }
     }
 

@@ -130,12 +130,9 @@ class OperatorDailyFlowTest extends ApiTestSupport {
         assertThat(loc.path("locationNo").asText()).isEqualTo(locNo);
 
         // 复查：新站点可被关键词检索到（走 MariaDB，重启存活）
-        JsonNode found = get("/api/ops/sites?keyword=JBR&page=1&size=20", bdToken).okData();
-        boolean hit = false;
-        for (JsonNode s : found.path("list")) {
-            if (siteNo.equals(s.path("siteNo").asText())) hit = true;
-        }
-        assertThat(hit).as("新建站点 %s 应可检索", siteNo).isTrue();
+        // keyword 保留 —— 这条用例测的就是「关键词检索得到」；翻页只是去掉「一页就是全量」的假设
+        assertThat(findInPages("/api/ops/sites?keyword=JBR", "siteNo", siteNo, bdToken))
+                .as("新建站点 %s 应可检索", siteNo).isNotNull();
     }
 
     /**

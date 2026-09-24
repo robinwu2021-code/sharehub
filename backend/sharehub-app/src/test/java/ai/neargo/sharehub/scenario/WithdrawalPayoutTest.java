@@ -222,11 +222,10 @@ class WithdrawalPayoutTest extends ApiTestSupport {
     }
 
     private JsonNode find(String token, String withdrawNo) {
-        JsonNode page = get("/api/trade/withdrawals?page=1&size=200&keyword=" + withdrawNo, token).okData();
-        for (JsonNode r : page.path("list")) {
-            if (withdrawNo.equals(r.path("withdrawNo").asText())) return r;
-        }
-        throw new AssertionError("提现单查不到: " + withdrawNo);
+        // 保留 keyword（提现列表的 keyword 确实匹配 withdraw_no），同时翻页兜底
+        JsonNode r = findInPages("/api/trade/withdrawals?keyword=" + withdrawNo, "withdrawNo", withdrawNo, token);
+        if (r == null) throw new AssertionError("提现单查不到: " + withdrawNo);
+        return r;
     }
 
     private String statusOf(String token, String withdrawNo) {

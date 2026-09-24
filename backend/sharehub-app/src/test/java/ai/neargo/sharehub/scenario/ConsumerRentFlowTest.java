@@ -37,10 +37,10 @@ class ConsumerRentFlowTest extends ApiTestSupport {
         assertThat(rent.path("commandId").asText()).startsWith("CMD");
 
         // 2) 我的订单（属主过滤）含该单，且详情为 IN_USE
-        JsonNode mine = get("/mp/trade/orders?page=1&size=50", tokenA).okData();
-        boolean found = false;
-        for (JsonNode o : mine.path("list")) if (orderNo.equals(o.path("orderNo").asText())) found = true;
-        assertThat(found).as("我的订单应含新单 %s", orderNo).isTrue();
+        // 翻页找：这个测试手机号的订单会**每跑一次多一单**，取第一页迟早够不着新单，
+        // 而那时报出来的是「我的订单里没有新单」—— 看起来像属主过滤坏了。
+        assertThat(findInPages("/mp/trade/orders", "orderNo", orderNo, tokenA))
+                .as("我的订单应含新单 %s", orderNo).isNotNull();
         assertThat(get("/mp/trade/orders/" + orderNo, tokenA).okData().path("status").asText()).isEqualTo("IN_USE");
 
         // 3) 属主鉴权：另一消费者查看 A 的订单 → 403（防 IDOR）

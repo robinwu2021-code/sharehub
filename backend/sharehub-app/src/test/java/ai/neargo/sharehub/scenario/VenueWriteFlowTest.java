@@ -38,16 +38,7 @@ class VenueWriteFlowTest extends ApiTestSupport {
      * 而按名字过滤同样不行 —— {@code venue_can_be_edited} 就在改名字。
      */
     private JsonNode findVenue(String admin, String venueNo) {
-        for (int page = 1; page <= 100; page++) {   // 上限兜底，别让接口异常变成死循环
-            JsonNode body = get("/api/ops/venues?page=" + page + "&size=200", admin).okData();
-            JsonNode list = body.path("list");
-            if (list.isEmpty()) return null;
-            for (JsonNode v : list) {
-                if (venueNo.equals(v.path("venueNo").asText())) return v;
-            }
-            if ((long) page * 200 >= body.path("total").asLong()) return null;
-        }
-        return null;
+        return findInPages("/api/ops/venues", "venueNo", venueNo, admin);
     }
 
     @Test

@@ -42,15 +42,7 @@ class ReadModelFieldsTest extends ApiTestSupport {
         // 翻页找，别只看第一页：loc_contract 已经 208 行、页大小 200，
         // 而列表的 keyword **只匹配场地方名/站点名、不匹配合同号**（LocService.pageContracts），
         // 所以也不能靠过滤。测试库是累积的，任何「一页就是全量」的写法都只是还没到线。
-        JsonNode found = null;
-        outer:
-        for (int page = 1; page <= 50; page++) {
-            JsonNode body = get("/api/ops/contracts?page=" + page + "&size=200", admin).okData();
-            for (JsonNode row : body.path("list")) {
-                if (no.equals(row.path("contractNo").asText())) { found = row; break outer; }
-            }
-            if ((long) page * 200 >= body.path("total").asLong()) break;
-        }
+        JsonNode found = findInPages("/api/ops/contracts", "contractNo", no, admin);
         assertThat(found).as("前提：刚建的合同在列表里").isNotNull();
         assertThat(found.path("venueNo").asText(null)).as("场地方编号不能缺").isEqualTo("VEN301");
         assertThat(found.path("siteNo").asText(null)).as("站点编号不能缺").isEqualTo("ST311");
@@ -72,10 +64,7 @@ class ReadModelFieldsTest extends ApiTestSupport {
         s.put("active", true);
         String ruleNo = post("/api/trade/pricing-schedules", s, admin).okData().path("ruleNo").asText();
 
-        JsonNode found = null;
-        for (JsonNode row : get("/api/trade/pricing-schedules?page=1&size=200", admin).okData().path("list")) {
-            if (ruleNo.equals(row.path("ruleNo").asText())) { found = row; break; }
-        }
+        JsonNode found = findInPages("/api/trade/pricing-schedules", "ruleNo", ruleNo, admin);
         assertThat(found).as("前提：刚建的时段在列表里").isNotNull();
         assertThat(found.path("days").asText(null)).as("生效星期是判定条件，不能只留展示串").isEqualTo("6,7");
         assertThat(found.path("timeFrom").asText(null)).isEqualTo("18:00");

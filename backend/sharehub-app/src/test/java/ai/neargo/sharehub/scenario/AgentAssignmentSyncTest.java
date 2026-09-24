@@ -49,11 +49,8 @@ class AgentAssignmentSyncTest extends ApiTestSupport {
         assertThat(visibleSiteNos()).as("划拨后站点应对代理可见").contains(SITE);
 
         // 级联到点位：该站点下的点位都应可见
-        JsonNode locations = get("/api/ops/locations?page=1&size=500", agentToken()).okData();
-        long locsOfSite = 0;
-        for (JsonNode l : locations.path("list")) {
-            if (SITE.equals(l.path("siteNo").asText())) locsOfSite++;
-        }
+        long locsOfSite = pageAll("/api/ops/locations", agentToken()).stream()
+                .filter(l -> SITE.equals(l.path("siteNo").asText())).count();
         assertThat(locsOfSite).as("级联后该站点下的点位应对代理可见").isGreaterThan(0);
 
         // 级联到机柜：机柜数应随之增加（数据范围锚点是 dev_cabinet.agent_no）

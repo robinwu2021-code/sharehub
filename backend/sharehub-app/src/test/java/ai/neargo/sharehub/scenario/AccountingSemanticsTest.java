@@ -30,7 +30,7 @@ class AccountingSemanticsTest extends ApiTestSupport {
         // 左边少算了尾巴、右边的统计却仍覆盖全部，于是这条断言从
         // 「两种折法对不上」变成了「一边少数了几行」——而它报出来的样子一样。
         // 测试库是累积的（见 application.properties），越过 200 只是时间问题。
-        List<JsonNode> records = allOf("/api/trade/share-records", token);
+        List<JsonNode> records = pageAll("/api/trade/share-records", token);
         if (records.isEmpty()) return;   // 无分润数据时该断言无意义
 
         BigDecimal grossSum = BigDecimal.ZERO;
@@ -41,7 +41,7 @@ class AccountingSemanticsTest extends ApiTestSupport {
         }
 
         BigDecimal summaryGmv = BigDecimal.ZERO;
-        for (JsonNode s : allOf("/api/trade/share-summaries", token)) {
+        for (JsonNode s : pageAll("/api/trade/share-summaries", token)) {
             summaryGmv = summaryGmv.add(s.path("gmv").decimalValue());
         }
         assertThat(summaryGmv).as("统计 GMV 应等于明细基数快照之和（同一份事实的两种折法）")
@@ -89,22 +89,6 @@ class AccountingSemanticsTest extends ApiTestSupport {
         assertThat(v.path("debit").decimalValue())
                 .as("借方合计应等于贷方合计")
                 .isEqualByComparingTo(v.path("credit").decimalValue());
-    }
-
-    /**
-     * 翻完所有页。分页接口的默认上限是 200，而测试库是**累积**的 ——
-     * 任何「取一页就当全量」的断言都只是还没到线。
-     */
-    private List<JsonNode> allOf(String path, String token) {
-        List<JsonNode> out = new java.util.ArrayList<>();
-        for (int page = 1; page <= 100; page++) {   // 上限兜底，别让接口异常变成死循环
-            JsonNode r = get(path + "?page=" + page + "&size=200", token).okData();
-            JsonNode list = r.path("list");
-            if (list.isEmpty()) break;
-            list.forEach(out::add);
-            if (out.size() >= r.path("total").asLong()) break;
-        }
-        return out;
     }
 
 }
