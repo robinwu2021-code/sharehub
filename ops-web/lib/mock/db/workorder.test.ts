@@ -34,6 +34,7 @@ describe("状态机定义", () => {
   it("nextActions 给出当前状态的下一步（看板按钮据此渲染）", () => {
     expect(nextActions("CREATED")).toEqual(["dispatch"]);
     expect(nextActions("DISPATCHED").sort()).toEqual(["accept", "reject"]);
+    expect(nextActions("ACCEPTED").sort()).toEqual(["process", "reject"]);
     expect(nextActions("PROCESSING").sort()).toEqual(["complete", "process", "reject"]);
     expect(nextActions("DONE")).toEqual(["close", "rework"]);
     expect(nextActions("CLOSED")).toEqual([]); // 终态：没有下一步
@@ -49,13 +50,20 @@ describe("合法迁移", () => {
     expect(r.dispatchedAt).toBeTruthy();
   });
 
-  it("DISPATCHED --accept--> PROCESSING（处理人默认取派单对象）", () => {
+  it("DISPATCHED --accept--> ACCEPTED（处理人默认取派单对象）", () => {
     const w = fixture("CREATED");
     dispatchWorkOrder(w.woNo, "Omar");
     const r = acceptWorkOrder(w.woNo);
-    expect(r.status).toBe("PROCESSING");
+    // **不是 PROCESSING**：后端 WoStateMachine 的 ACCEPT 边落 ACCEPTED，
+    // 接单与到场处理是两步。此前这里写 PROCESSING，于是真后端接完单之后
+    // 工单停在 ACCEPTED，而当时没有任何动作的 from 含它 —— 界面上一个按钮都没有。
+    expect(r.status).toBe("ACCEPTED");
     expect(r.handlerName).toBe("Omar");
     expect(r.acceptedAt).toBeTruthy();
+  });
+
+  it("★ ACCEPTED 必须有下一步——没有的话工单在界面上就卡死了", () => {
+    expect(nextActions("ACCEPTED").sort()).toEqual(["process", "reject"]);
   });
 
   it("PROCESSING --process--> PROCESSING（只留痕不改状态，可多次追加）", () => {
@@ -120,6 +128,7 @@ describe("合法迁移", () => {
     rejectWorkOrder(w.woNo, "排班冲突");
     dispatchWorkOrder(w.woNo, "Omar");
     acceptWorkOrder(w.woNo);
+    processWorkOrder(w.woNo, { handleNote: "到场处理" });   // ACCEPTED→PROCESSING，少了这步 complete 会被拒
     completeWorkOrder(w.woNo, { handleNote: "已处理" });
     expect(closeWorkOrder(w.woNo, { auditResult: "PASS_WITH_ISSUE", auditNote: "遗留：需下次巡检复查" }).status).toBe("CLOSED");
   });
@@ -224,6 +233,7 @@ describe("验收不合格退回返工（rework）", () => {
   const toDone = (no: string) => {
     dispatchWorkOrder(no, "王工");
     acceptWorkOrder(no, "王工");
+    processWorkOrder(no, { handlerName: "王工", handleNote: "到场处理" });   // ACCEPTED→PROCESSING
     completeWorkOrder(no, { handlerName: "王工", handleNote: "已更换仓门电机" });
   };
   it("DONE 验收不合格 → 退回 PROCESSING，处理人保留（无需重新派单）", () => {

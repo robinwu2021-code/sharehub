@@ -41,11 +41,20 @@ export type WoAuditResult = "PASS" | "PASS_WITH_ISSUE" | "FAIL";
  */
 export const WO_TRANSITIONS: Record<WorkOrderAction, { from: readonly WorkOrderStatus[]; to: WorkOrderStatus }> = {
   dispatch: { from: ["CREATED"], to: "DISPATCHED" },
-  accept: { from: ["DISPATCHED"], to: "PROCESSING" },
-  process: { from: ["PROCESSING"], to: "PROCESSING" },
+  // 接单落 ACCEPTED，**不是直接跳 PROCESSING**：后端 WoStateMachine 的 ACCEPT 边就是
+  // DISPATCHED→ACCEPTED，而这里此前写成 →PROCESSING。
+  // 后果不是「状态名不好看」：真后端接完单工单停在 ACCEPTED，
+  // 而这张表里没有任何动作的 from 含 ACCEPTED —— nextActions() 返回空数组，
+  // **那张工单在界面上一个按钮都没有**，处理/完工/驳回全部消失，且不报错。
+  accept: { from: ["DISPATCHED"], to: "ACCEPTED" },
+  // ACCEPTED→PROCESSING 是真迁移；PROCESSING→PROCESSING 是自环（处理中可多次提交进展，
+  // 只留痕不改状态）。后端 handle() 对 PROCESSING 显式跳过状态机，就是为了这个自环。
+  process: { from: ["ACCEPTED", "PROCESSING"], to: "PROCESSING" },
   complete: { from: ["PROCESSING"], to: "DONE" },
+  // 后端 /close 一次走完 AUDIT→CLOSE（DONE→AUDITED→CLOSED）：AUDITED 是过程态，
+  // 不单独出按钮，所以这里直接 DONE→CLOSED。
   close: { from: ["DONE"], to: "CLOSED" },
-  reject: { from: ["DISPATCHED", "PROCESSING"], to: "CREATED" },
+  reject: { from: ["DISPATCHED", "ACCEPTED", "PROCESSING"], to: "CREATED" },
   // 验收不合格退回返工：回到 PROCESSING 而非 CREATED —— 处理人不变，不用重新派单
   rework: { from: ["DONE"], to: "PROCESSING" },
 };
@@ -129,10 +138,30 @@ export interface SlaRule {
   escalateTo: string;
   active: boolean;
 }
+/**
+ * 巡检频率。**具名而不是内联联合**：两端同名词表比对
+ * （后端 StatusVocabularyAcrossEndsTest）只认具名 `export type`。
+ */
+export type InspectionFrequency = "DAILY" | "WEEKLY" | "BIWEEKLY" | "MONTHLY";
+
 export interface InspectionPlan {
   planNo: string;
   route: string;
-  frequency: string;
+  /**
+   * 巡检频率。**值是后端枚举（DAILY/WEEKLY/…），不是中文标签** ——
+   * 此前这里是 string 且全链路存的是「每日」「每周」，而后端返回 DAILY/WEEKLY：
+   * {@link inspectionPeriodKey} 按中文字面匹配，真后端下**一个分支都匹配不上**，
+   * 全部落到兜底的「按天」——「同一计划同一周期只开一批」的幂等保护
+   * 就此退化成「按天」，周计划可以每天开一次，而且不报错。
+   * 中文是展示层的事（见 work-orders 页的 INSPECT_FREQ 标签表）。
+   */
+  frequency: InspectionFrequency;
+  /**
+   * 调度表达式，**执行口径以此为准**（后端 WoInspectionPlan 注释原话）。
+   * {@link frequency} 是它的人读描述，两者一旦不一致，只看 frequency 的界面
+   * 就在谎报这个计划什么时候真的跑。
+   */
+  cron: string;
   nextAt: string;
   assignee: string;
   active: boolean;
@@ -163,11 +192,13 @@ export const inspectionPeriodKey = (frequency: string, at: Date = new Date()): s
   const y = at.getUTCFullYear();
   const day = `${y}-${String(at.getUTCMonth() + 1).padStart(2, "0")}-${String(at.getUTCDate()).padStart(2, "0")}`;
   const week = Math.floor((Date.UTC(y, at.getUTCMonth(), at.getUTCDate()) - Date.UTC(y, 0, 1)) / 604800_000) + 1;
-  if (frequency === "每日") return day;
-  if (frequency === "每周") return `${y}-W${String(week).padStart(2, "0")}`;
-  if (frequency === "双周") return `${y}-B${String(Math.ceil(week / 2)).padStart(2, "0")}`;
-  if (frequency === "每月") return day.slice(0, 7);
-  // 未知频率（表单是下拉，但导入/后端可能给别的值）：退化到按天，宁可粒度细也不放开幂等
+  if (frequency === "DAILY") return day;
+  if (frequency === "WEEKLY") return `${y}-W${String(week).padStart(2, "0")}`;
+  if (frequency === "BIWEEKLY") return `${y}-B${String(Math.ceil(week / 2)).padStart(2, "0")}`;
+  if (frequency === "MONTHLY") return day.slice(0, 7);
+  // 未知频率（导入或后端给了枚举外的值）：退化到按天。
+  // **退化意味着幂等保护变弱**（周计划会变成每天可开一次），所以这里不是
+  // 「安全默认」而是「最后兜底」—— 真出现了应该去查为什么会有枚举外的值。
   return day;
 };
 
