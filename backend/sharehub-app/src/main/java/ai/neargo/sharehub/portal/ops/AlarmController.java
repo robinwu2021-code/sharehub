@@ -107,13 +107,15 @@ public class AlarmController {
     }
 
     @PostMapping("/codes")
-    @PreAuthorize("@perm.can('workorder:wo:update')")
+    // 清单 §告警「告警代码 / 通知规则 配置」的码是 workorder:alarm:config，
+    // 此前挂通用的 wo:update —— 配置告警与处理工单是两件事。（OPS 持 workorder:* 通配，访问面不变。）
+    @PreAuthorize("@perm.can('workorder:alarm:config')")
     public AlarmCode createCode(@RequestBody DevAlarmCode body) {
         return codeService.save(body);
     }
 
     @PostMapping("/codes/{code}")
-    @PreAuthorize("@perm.can('workorder:wo:update')")
+    @PreAuthorize("@perm.can('workorder:alarm:config')")
     public AlarmCode updateCode(@PathVariable String code, @RequestBody DevAlarmCode body) {
         body.setCode(code); // 路径为准，忽略 body 里的键，防越权改他码
         return codeService.save(body);
@@ -136,13 +138,13 @@ public class AlarmController {
     }
 
     @PostMapping("/rules")
-    @PreAuthorize("@perm.can('workorder:wo:update')")
+    @PreAuthorize("@perm.can('workorder:alarm:config')")
     public AlarmRule createRule(@RequestBody DevAlarmRule body) {
         return ruleService.save(body);
     }
 
     @PostMapping("/rules/{ruleNo}")
-    @PreAuthorize("@perm.can('workorder:wo:update')")
+    @PreAuthorize("@perm.can('workorder:alarm:config')")
     public AlarmRule updateRule(@PathVariable String ruleNo, @RequestBody DevAlarmRule body) {
         body.setRuleNo(ruleNo);
         return ruleService.save(body);

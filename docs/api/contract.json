@@ -2155,7 +2155,7 @@
   {
    "verb": "POST",
    "path": "/api/ops/alarms/codes",
-   "perm": "workorder:wo:update",
+   "perm": "workorder:alarm:config",
    "handler": "AlarmController#createCode",
    "summary": "",
    "params": [],
@@ -2202,7 +2202,7 @@
   {
    "verb": "POST",
    "path": "/api/ops/alarms/codes/{code}",
-   "perm": "workorder:wo:update",
+   "perm": "workorder:alarm:config",
    "handler": "AlarmController#updateCode",
    "summary": "",
    "params": [
@@ -2685,7 +2685,7 @@
   {
    "verb": "POST",
    "path": "/api/ops/alarms/rules",
-   "perm": "workorder:wo:update",
+   "perm": "workorder:alarm:config",
    "handler": "AlarmController#createRule",
    "summary": "",
    "params": [],
@@ -2782,7 +2782,7 @@
   {
    "verb": "POST",
    "path": "/api/ops/alarms/rules/{ruleNo}",
-   "perm": "workorder:wo:update",
+   "perm": "workorder:alarm:config",
    "handler": "AlarmController#updateRule",
    "summary": "",
    "params": [
@@ -9039,7 +9039,7 @@
   {
    "verb": "POST",
    "path": "/api/ops/sla-rules",
-   "perm": "workorder:wo:update",
+   "perm": "workorder:sla:update",
    "handler": "WoExtController#createSlaRule",
    "summary": "",
    "params": [],
@@ -9124,7 +9124,7 @@
   {
    "verb": "POST",
    "path": "/api/ops/sla-rules/{slaNo}",
-   "perm": "workorder:wo:update",
+   "perm": "workorder:sla:update",
    "handler": "WoExtController#updateSlaRule",
    "summary": "",
    "params": [
@@ -16852,7 +16852,7 @@
   {
    "verb": "POST",
    "path": "/api/trade/invoices/{invoiceNo}/void",
-   "perm": "finance:invoice:update",
+   "perm": "finance:invoice:void",
    "handler": "FinanceController#voidInvoice",
    "summary": "作废发票。",
    "params": [
@@ -19081,7 +19081,7 @@
   {
    "verb": "POST",
    "path": "/api/trade/reconciles/{batchNo}/resolve",
-   "perm": "finance:recon:resolve",
+   "perm": "finance:recon:handle",
    "handler": "FinanceController#resolveRecon",
    "summary": "差错平账处置。",
    "params": [
@@ -26794,6 +26794,17 @@
   "AuditOutcome": [
    "SUCCESS",
    "DENIED"
+  ],
+  "DataScopeType": [
+   "ALL",
+   "REGION",
+   "SITE",
+   "LOCATION",
+   "VENUE",
+   "AGENT"
+  ],
+  "DataScopeSubject": [
+   "ROLE"
   ],
   "AgentStatus": [
    "ENABLED"

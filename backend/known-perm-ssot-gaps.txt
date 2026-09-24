@@ -31,8 +31,6 @@
 声明未强制 device:ota:publish
 声明未强制 device:ota:rollback
 声明未强制 device:slot:read
-声明未强制 finance:invoice:void
-声明未强制 finance:recon:handle
 声明未强制 finance:share_rule:delete
 声明未强制 finance:share_rule:update
 声明未强制 location:contract:delete
@@ -56,13 +54,10 @@
 声明未强制 system:app_version:release
 声明未强制 system:openapi:config
 声明未强制 tenant:billing:read
-声明未强制 workorder:alarm:config
-声明未强制 workorder:sla:update
 强制未声明 cs:session:reply
 强制未声明 cs:ticket:update
 强制未声明 device:ota:manage
 强制未声明 finance:invoice:update
-强制未声明 finance:recon:resolve
 强制未声明 finance:reconcile:read
 强制未声明 location:site:update
 强制未声明 marketing:ad:read

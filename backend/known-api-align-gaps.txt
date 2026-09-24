@@ -77,7 +77,6 @@ C GET /api/ops/inspection-plans/{}
 C GET /api/ops/leads/{}
 C GET /api/ops/sla-rules/{}
 C GET /api/ops/venue-onboardings/{}
-C GET /api/platform/data-scopes/{}/{}
 C GET /api/platform/iam/menus
 C GET /api/platform/iam/roles
 C GET /api/trade/settlements/{}
@@ -104,7 +103,6 @@ D CodeBatchRow GET /api/ops/device-code-batches
 D CommandResult POST /api/ops/cabinets/{cabinetNo}/commands
 D ConsumerLoginVO POST /mp/auth/login
 D CouponTplVO GET /api/user/coupons
-D DataScopeEntry GET /api/platform/data-scopes/{subjectType}/{subjectNo}
 D FaqItem GET /mp/faq
 D FavoriteItem GET /mp/user/favorites
 D InvoiceItem GET /mp/user/invoices

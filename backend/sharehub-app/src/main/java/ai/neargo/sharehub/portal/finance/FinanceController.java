@@ -279,7 +279,8 @@ public class FinanceController {
      * {@code diffId} 指定单条，不带则处置该批次全部未处置差错。返回处置后的批次行（契约形状）。
      */
     @PostMapping("/api/trade/reconciles/{batchNo}/resolve")
-    @PreAuthorize("@perm.can('finance:recon:resolve')")
+    // 清单 §对账 的码是 :handle（差错处理），此前后端自造了 :resolve。
+    @PreAuthorize("@perm.can('finance:recon:handle')")
     public FinDtos.Reconcile resolveRecon(@PathVariable String batchNo,
                                           @RequestBody(required = false) Map<String, Object> body) {
         Object raw = body == null ? null : body.get("diffId");
@@ -412,7 +413,10 @@ public class FinanceController {
 
     /** 作废发票。**必须填原因** —— 没有原因的作废，稽查时无法解释。 */
     @PostMapping("/api/trade/invoices/{invoiceNo}/void")
-    @PreAuthorize("@perm.can('finance:invoice:update')")
+    // 作废用专属码而非 :update —— 功能权限清单 §发票 注记（2026-07-30 S2）：
+    // 作废比开具更危险，已开具的票一旦作废账面凭空少一张且不可撤销，故 :void 与 :issue 拆开。
+    // 此前挂 :update，清单定了但后端没实现。（FINANCE 持 finance:* 通配，访问面不变。）
+    @PreAuthorize("@perm.can('finance:invoice:void')")
     public Object voidInvoice(@PathVariable String invoiceNo,
                               @RequestBody java.util.Map<String, Object> body) {
         Object r = body == null ? null : body.get("voidReason");

@@ -139,13 +139,15 @@ public class WoExtController {
     }
 
     @PostMapping("/sla-rules")
-    @PreAuthorize("@perm.can('workorder:wo:update')")
+    // 清单 §工单「SLA 配置」的码是 workorder:sla:update，此前挂通用的 wo:update。
+    // （OPS 持 workorder:* 通配，访问面不变。）
+    @PreAuthorize("@perm.can('workorder:sla:update')")
     public SlaRule createSlaRule(@RequestBody WoSlaRule body) {
         return slaRuleService.save(body);
     }
 
     @PostMapping("/sla-rules/{slaNo}")
-    @PreAuthorize("@perm.can('workorder:wo:update')")
+    @PreAuthorize("@perm.can('workorder:sla:update')")
     public SlaRule updateSlaRule(@PathVariable String slaNo, @RequestBody WoSlaRule body) {
         body.setSlaNo(slaNo);
         return slaRuleService.save(body);
