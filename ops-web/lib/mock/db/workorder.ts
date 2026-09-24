@@ -219,7 +219,12 @@ export const slaRules: SlaRule[] = Array.from({ length: 12 }, (_, i) => ({
 }));
 export const inspectionPlans: InspectionPlan[] = Array.from({ length: 14 }, (_, i) => ({
   planNo: `IP${200 + i}`, route: `${p(LOCS, i)} → ${p(LOCS, i + 1)}`,
-  frequency: p(["每日", "每周", "双周", "每月"], i), nextAt: iso(-(i % 7) * 86400_000),
+  // 值用后端枚举，不是中文标签 —— 中文是展示层的事（见 work-orders 页 INSPECT_FREQ）。
+  // 此前存中文，而 inspectionPeriodKey 按中文匹配，切真后端后幂等周期会退化成按天。
+  frequency: p(["DAILY", "WEEKLY", "BIWEEKLY", "MONTHLY"] as const, i),
+  // 执行口径以 cron 为准；与 frequency 对应，别让两者说两套话
+  cron: p(["0 8 * * *", "0 8 * * 1", "0 8 * * 1/2", "0 8 1 * *"], i),
+  nextAt: iso(-(i % 7) * 86400_000),
   assignee: p(["Ali Hassan", "Omar Khan", "Sara Ahmed", "Wang Lei"], i), active: i % 8 !== 0,
   // 种子一律「本周期未执行过」：否则页面一进来一半计划的按钮就是灰的，看不出功能在哪
   lastRunAt: null, lastRunPeriod: null, lastRunWoNos: [],

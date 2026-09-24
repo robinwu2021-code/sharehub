@@ -35,7 +35,7 @@ import { notify } from "@/lib/notify";
 import { nextActions, inspectionPeriodKey, inspectionRunnable } from "@/lib/types";
 import type {
   WorkOrder, WorkOrderAction, WorkOrderDraft, WorkOrderPriority, WorkOrderStatus,
-  WoAuditResult, SlaRule, InspectionPlan,
+  WoAuditResult, SlaRule, InspectionPlan, InspectionFrequency,
 } from "@/lib/types";
 
 /**
@@ -93,6 +93,11 @@ const WO_CSV_COLS: CsvColumn<WorkOrder>[] = [
   { header: "创建", value: (w) => fmtTime(w.createdAt) },
 ];
 
+/** 巡检频率的中文标签。**值是后端枚举，中文只在展示层出现。** */
+const INSPECT_FREQ: Record<InspectionFrequency, string> = {
+  DAILY: "每日", WEEKLY: "每周", BIWEEKLY: "双周", MONTHLY: "每月",
+};
+
 const WO_TYPE_OPTIONS = Object.entries(WO_TYPE_LABEL).map(([value, label]) => ({ value, label }));
 // 优先级选项与徽标同源（含形状阶梯）：表单里选的形状 = 表格里看到的形状
 const PRIO_OPTIONS = statusOptions(PRIO);
@@ -110,8 +115,10 @@ const SLA_FIELDS: FieldDef[] = [
 const INSPECTION_FIELDS: FieldDef[] = [
   { key: "planNo", label: "计划编号", readOnlyOnEdit: true, placeholder: "自动生成" },
   { key: "route", label: "巡检路线", placeholder: "市中心 A 线" },
+  // 值是后端枚举、label 才是中文 —— 此前 value 也存中文，而周期键按枚举判。
   { key: "frequency", label: "频率", type: "select", options: [
-    { value: "每日", label: "每日" }, { value: "每周", label: "每周" }, { value: "双周", label: "双周" }, { value: "每月", label: "每月" },
+    { value: "DAILY", label: "每日" }, { value: "WEEKLY", label: "每周" },
+    { value: "BIWEEKLY", label: "双周" }, { value: "MONTHLY", label: "每月" },
   ] },
   { key: "nextAt", label: "下次巡检（ISO 时间）", placeholder: "2026-07-20T09:00:00Z" },
   { key: "assignee", label: "负责人", placeholder: "Ali" },
@@ -408,7 +415,17 @@ function WorkOrdersInner() {
   const inspectionCols: Column<InspectionPlan>[] = [
     { header: "计划编号", cell: (p) => <span className="txt-strong tabular-nums">{p.planNo}</span> },
     { header: "巡检路线", cell: (p) => p.route },
-    { header: "频率", cell: (p) => <Badge tone="outline">{p.frequency}</Badge> },
+    {
+      header: "频率",
+      cell: (p) => (
+        <>
+          <Badge tone="outline">{INSPECT_FREQ[p.frequency] ?? p.frequency}</Badge>
+          {/* cron 是执行口径（后端原话）。两者不一致时，只看频率标签会以为
+              计划按标签跑 —— 把真表达式摆出来，不一致一眼可见。 */}
+          <div className="truncate txt-caption text-muted-foreground tabular-nums">{p.cron}</div>
+        </>
+      ),
+    },
     { header: "下次巡检", cell: (p) => <span className="text-muted-foreground">{fmtTime(p.nextAt)}</span> },
     { header: "负责人", cell: (p) => <span className="text-muted-foreground">{p.assignee}</span> },
     { header: "状态", cell: (p) => <EnabledBadge on={p.active} /> },
@@ -516,12 +533,13 @@ function WorkOrdersInner() {
             search={inspKw}
             onSearch={(v) => { setInspKw(v); paging.reset(); }}
             searchPlaceholder="搜索计划编号 / 路线 / 负责人"
-            onAdd={canInspection ? () => setInspForm({ route: "", frequency: "每周", nextAt: "", assignee: "", active: true }) : undefined}
+            onAdd={canInspection ? () => setInspForm({ route: "", frequency: "WEEKLY", nextAt: "", assignee: "", active: true }) : undefined}
             addLabel="新增巡检计划"
             onExport={() => exportCsv<InspectionPlan>("巡检计划", [
               { header: "计划编号", value: (p) => p.planNo },
               { header: "巡检路线", value: (p) => p.route },
-              { header: "频率", value: (p) => p.frequency },
+              { header: "频率", value: (p) => INSPECT_FREQ[p.frequency] ?? p.frequency },
+              { header: "调度表达式", value: (p) => p.cron },
               { header: "下次巡检", value: (p) => fmtTime(p.nextAt) },
               { header: "负责人", value: (p) => p.assignee },
               { header: "状态", value: (p) => (p.active ? "启用" : "停用") },

@@ -18,7 +18,7 @@ let seq = 0;
 const stops = () => [cabinets[0].locationName!, cabinets[1].locationName!];
 function fixture(over: Partial<Parameters<typeof saveInspectionPlan>[0]> = {}) {
   return saveInspectionPlan({
-    route: stops().join(" → "), frequency: "每月", nextAt: "2026-08-01T09:00:00Z",
+    route: stops().join(" → "), frequency: "MONTHLY", nextAt: "2026-08-01T09:00:00Z",
     assignee: `巡检员${++seq}`, active: true, ...over,
   });
 }
@@ -72,12 +72,12 @@ describe("幂等：同周期不重复开单", () => {
     expect(inspectionRunnable(plan)).toMatch(/已执行过/);
   });
 
-  it("周期键随频率变粒度：每日按天、每月按月，未知频率退化到按天", () => {
+  it("周期键随频率变粒度：DAILY 按天、MONTHLY 按月，未知值退化到按天（**幂等会变弱**）", () => {
     const at = new Date("2026-07-30T10:00:00Z");
-    expect(inspectionPeriodKey("每日", at)).toBe("2026-07-30");
-    expect(inspectionPeriodKey("每月", at)).toBe("2026-07");
-    expect(inspectionPeriodKey("每周", at)).toMatch(/^2026-W\d{2}$/);
-    expect(inspectionPeriodKey("双周", at)).toMatch(/^2026-B\d{2}$/);
+    expect(inspectionPeriodKey("DAILY", at)).toBe("2026-07-30");
+    expect(inspectionPeriodKey("MONTHLY", at)).toBe("2026-07");
+    expect(inspectionPeriodKey("WEEKLY", at)).toMatch(/^2026-W\d{2}$/);
+    expect(inspectionPeriodKey("BIWEEKLY", at)).toMatch(/^2026-B\d{2}$/);
     expect(inspectionPeriodKey("每两小时", at)).toBe("2026-07-30");
   });
 
