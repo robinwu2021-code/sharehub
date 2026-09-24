@@ -51,17 +51,6 @@ AgtCommission.mode
 AgtCommission.rate
 AgtCommission.ruleNo
 AgtCommission.status
-CouponTpl.archivedAt
-CouponTpl.currency
-CouponTpl.issued
-CouponTpl.name
-CouponTpl.status
-CouponTpl.stock
-CouponTpl.threshold
-CouponTpl.tplNo
-CouponTpl.type
-CouponTpl.validRule
-CouponTpl.value
 DevAlarmCode.archivedAt
 DevAlarmCode.autoWorkOrder
 DevAlarmCode.code

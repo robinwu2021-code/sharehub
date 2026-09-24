@@ -68,6 +68,9 @@ public class CouponTplServiceImpl extends AbstractCrudService<CouponTpl, CouponT
         return new CouponTplVO(e.getTplNo(), e.getName(), e.getType(),
                 e.getValue(), e.getThreshold(), e.getCurrency(),
                 e.getStock(), e.getIssued(), e.getStatus(),
-                null); // archivedAt：前端 Archivable 字段，本表无归档列，恒 null
+                // 2026-09-24：此前这里硬写 null，附注「本表无归档列」——**那句是过期的**。
+                // V22__archivable.sql 给 coupon_tpl 加了 archived_at，归档/恢复端点也在用。
+                // 于是券归档了、库里也写了，运营端却永远看不出来：列表上它和在用的券长得一样。
+                e.getArchivedAt() == null ? null : e.getArchivedAt().toString());
     }
 }

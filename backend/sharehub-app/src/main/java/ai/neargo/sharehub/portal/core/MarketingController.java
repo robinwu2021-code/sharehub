@@ -10,6 +10,7 @@ import ai.neargo.sharehub.user.ad.service.AdCampaignService;
 import ai.neargo.sharehub.user.ad.service.AdDeliveryService;
 import ai.neargo.sharehub.user.ad.service.AdSlotService;
 import ai.neargo.sharehub.user.marketing.dto.MarketingDtos.CampaignVO;
+import ai.neargo.sharehub.user.marketing.dto.MarketingDtos.CouponTplReq;
 import ai.neargo.sharehub.user.marketing.dto.MarketingDtos.CouponTplVO;
 import ai.neargo.sharehub.user.marketing.dto.MarketingDtos.NoticeVO;
 import ai.neargo.sharehub.user.marketing.dto.MarketingDtos.PushMessageVO;
@@ -87,15 +88,16 @@ public class MarketingController {
 
     @PostMapping("/api/user/coupons")
     @PreAuthorize("@perm.can('marketing:coupon:create')")
-    public CouponTplVO createCoupon(@RequestBody CouponTpl body) {
-        return couponTplService.save(body);
+    public CouponTplVO createCoupon(@RequestBody CouponTplReq body) {
+        return couponTplService.save(body.toEntity());
     }
 
     @PostMapping("/api/user/coupons/{couponNo}")
     @PreAuthorize("@perm.can('marketing:coupon:create')")
-    public CouponTplVO updateCoupon(@PathVariable String couponNo, @RequestBody CouponTpl body) {
-        body.setTplNo(couponNo); // 路径为准，忽略 body 里的键，防越权改他单
-        return couponTplService.save(body);
+    public CouponTplVO updateCoupon(@PathVariable String couponNo, @RequestBody CouponTplReq body) {
+        CouponTpl e = body.toEntity();
+        e.setTplNo(couponNo); // 路径为准，忽略 body 里的键，防越权改他单
+        return couponTplService.save(e);
     }
 
     /** 定向发券。{@code cUserNos} 是收券人列表，{@code expireAt} 可空（走模板 validRule）。 */

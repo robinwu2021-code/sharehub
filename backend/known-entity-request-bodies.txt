@@ -19,7 +19,6 @@ AdCampaign
 AdSlot
 AgtAccount
 AgtCommission
-CouponTpl
 DevAlarmCode
 DevAlarmRule
 DevCodeBatch

@@ -21,6 +21,36 @@ public final class MarketingDtos {
      * <p><b>注意 {@code couponNo} 这里装的是 {@code tpl_no}</b> —— 前端字段名如此，为不改前端而保留。
      * 用户手里那张券的号在 {@link UserCouponVO#couponNo()}，两者不是一个东西。
      */
+    /**
+     * 券模板**写入参**（白名单）。
+     *
+     * <p>比实体少两个，都有专门入口：
+     * <ul>
+     *   <li>{@code issued} 已发放数 —— 由发券动作维护。service 的 beforeCreate/beforeUpdate
+     *       本来就锁着它（「已发放数不可被编辑覆盖」），这里不声明是**第二道**：
+     *       锁是黑名单，得有人记得写；不声明是白名单，新人照抄也漏不掉；</li>
+     *   <li>{@code archivedAt} —— 归档走 /coupons/{no}/archive|unarchive。</li>
+     * </ul>
+     */
+    public record CouponTplReq(String tplNo, String name, String type,
+                               BigDecimal value, BigDecimal threshold, String currency,
+                               String validRule, Integer stock, String status) {
+        /** 映射到实体。**issued / archivedAt 有意不设**（见类注释）。 */
+        public ai.neargo.sharehub.user.marketing.entity.CouponTpl toEntity() {
+            var e = new ai.neargo.sharehub.user.marketing.entity.CouponTpl();
+            e.setTplNo(tplNo);
+            e.setName(name);
+            e.setType(type);
+            e.setValue(value);
+            e.setThreshold(threshold);
+            e.setCurrency(currency);
+            e.setValidRule(validRule);
+            e.setStock(stock);
+            e.setStatus(status);
+            return e;
+        }
+    }
+
     public record CouponTplVO(String couponNo, String name, String type,
                               BigDecimal value, BigDecimal threshold, String currency,
                               Integer stock, Integer issued, String status,
