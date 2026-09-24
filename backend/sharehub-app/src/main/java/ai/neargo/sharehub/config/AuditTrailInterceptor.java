@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.config;
 
+import ai.neargo.sharehub.auth.ClientCode;
 import ai.neargo.sharehub.auth.LoginUser;
 import ai.neargo.sharehub.auth.SecurityUtils;
 import ai.neargo.sharehub.platform.org.service.AuditLogService;
@@ -62,7 +63,10 @@ public class AuditTrailInterceptor implements HandlerInterceptor {
             if (u == null) return;   // 无身份即非运营端写入（过滤链已挡住匿名写）
 
             Target t = targetOf(uri);
-            auditLogs.append(u.userNo(), u.username(), req.getMethod() + " " + uri,
+            // 端来自**会话的 realm**，不来自请求头：能被被审计方自己设置的字段，
+            // 会让人以为它可信，而改个 header 就能伪造，伪造出来的和真的长得一样。
+            auditLogs.append(u.userNo(), u.username(), ClientCode.of(u.realm()).name(),
+                    req.getMethod() + " " + uri,
                     json(t.type()), json(t.no()),
                     json(Map.of("query", req.getQueryString() == null ? "" : req.getQueryString())),
                     clientIp(req));

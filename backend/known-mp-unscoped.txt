@@ -1,0 +1,39 @@
+# C 端 `/mp/**` 里**不经 ConsumerContext** 的端点台账 —— 只准变短
+#
+# 由 MpOwnershipContractTest 执行。新增一条 → 测试红。
+#
+# 【这道卡口在防什么】
+# C 端**没有 RBAC**。一个消费者能不能看这条数据，全靠服务端自己用
+# 当前登录人的 c_user_no 收口 —— 要么下推到查询条件（`.eq(CUserNo, me)`，
+# 更好：他人单号查不到 = 不存在，连存在性都不泄露），要么取出来再 assertOwner。
+# 这个动作**没有任何框架会替你做**：忘了写，接口照常 200，返回的是别人的数据。
+# 这就是 IDOR，而它在界面上完全看不出来——每一页都正常渲染。
+#
+# 所以规则是：`/mp/**` 的处理方法必须出现 ConsumerContext。
+# 出现它不等于用对了（还得真下推到查询里），但**不出现它一定是漏了**。
+#
+# 【下面这 9 条为什么可以不用】
+# 它们都不返回「某个人的」数据：
+#
+#   /mp/auth/*                 登录/注册/验证码/登出 —— 此时还没有当前登录人
+#   /mp/app/version            客户端版本，全体一份
+#   /mp/faq                    帮助文案，全体一份
+#   /mp/notice                 公告，全体一份
+#   /mp/user/recharge-packages 充值套餐目录，全体一份（挂在 /user 下只是路径归类，
+#                              它返回的是**商品**不是**我的**——别被路径骗了）
+#
+# 判断标准很简单：**这个接口的返回值会因为换一个人登录而不同吗？**
+# 会 → 必须收口；不会 → 才能进这张表。
+#
+# 加一条之前先回答上面那个问题，并把理由写在这里。理由写不出来的，
+# 多半就是该收口的那一条。
+
+/mp/app/version
+/mp/auth/login
+/mp/auth/logout
+/mp/auth/otp
+/mp/auth/password/reset
+/mp/auth/register
+/mp/faq
+/mp/notice
+/mp/user/recharge-packages

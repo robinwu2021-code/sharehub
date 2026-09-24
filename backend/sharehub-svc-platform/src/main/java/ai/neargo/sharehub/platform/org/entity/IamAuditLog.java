@@ -31,6 +31,10 @@ public class IamAuditLog {
     private String actor;
     /** 操作人姓名快照。 */
     private String actorName;
+
+    /** 从哪个端发起（OPS/AGENT/MP）。由会话 realm 派生，**不采信请求头**——见 ClientCode。
+        历史行为 NULL：该列上线前没有这个信息，填任何值都是编造。 */
+    private String clientCode;
     /** 权限码/动作，如 {@code org:employee:create}。 */
     private String action;
     /** 对象类型，如 EMPLOYEE / ROLE / CABINET。 */

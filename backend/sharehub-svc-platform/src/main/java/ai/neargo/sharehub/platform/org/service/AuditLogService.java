@@ -28,8 +28,10 @@ public interface AuditLogService {
     /**
      * 追加一条审计。调用方（各域 service/切面）在完成写操作后调用。
      *
-     * @param detail 脱敏摘要（JSON 文本）；**不得放明文手机号/密钥**
+     * @param clientCode 从哪个端发起（OPS/AGENT/MP）。**必须由服务端从会话 realm 派生**，
+     *                   不能来自请求头 —— 能被被审计方设置的审计字段比没有更糟。
+     * @param detail     脱敏摘要（JSON 文本）；**不得放明文手机号/密钥**
      */
-    void append(String actor, String actorName, String action,
+    void append(String actor, String actorName, String clientCode, String action,
                 String targetType, String targetNo, String detail, String ip);
 }

@@ -45,7 +45,7 @@ public final class OrgDtos {
      * <p>前端只有单个 {@code target}，v2 表拆成了 {@code targetType}+{@code targetNo}：
      * 两者都出，{@code target} 是拼好的展示值，保证前端不改也能渲染。
      */
-    public record AuditLogEntry(String id, String actor, String actorName, String action,
+    public record AuditLogEntry(String id, String actor, String actorName, String clientCode, String action,
                                 String targetType, String targetNo, String target,
                                 String detail, String ip, String createdAt) {
     }
@@ -71,7 +71,7 @@ public final class OrgDtos {
      * 因此这三项一律**如实出空**（空串 / 空数组），<b>不构造假 diff</b>：
      * 假的审计比没有审计更危险。补列方案见交付报告的 DDL 清单。
      */
-    public record AuditDetail(String id, String actor, String actorName, String action,
+    public record AuditDetail(String id, String actor, String actorName, String clientCode, String action,
                               String targetType, String targetNo, String target,
                               String detail, String ip, String createdAt,
                               String requestId, String userAgent, java.util.List<AuditFieldChange> changes) {

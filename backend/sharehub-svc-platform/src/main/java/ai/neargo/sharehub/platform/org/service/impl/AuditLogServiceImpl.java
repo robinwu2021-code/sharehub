@@ -84,7 +84,7 @@ public class AuditLogServiceImpl implements AuditLogService {
             return null;
         }
         AuditLogEntry row = toVO(e);
-        return new AuditDetail(row.id(), row.actor(), row.actorName(), row.action(),
+        return new AuditDetail(row.id(), row.actor(), row.actorName(), row.clientCode(), row.action(),
                 row.targetType(), row.targetNo(), row.target(), row.detail(), row.ip(), row.createdAt(),
                 "", "", changesOf(row.detail()));
     }
@@ -124,12 +124,13 @@ public class AuditLogServiceImpl implements AuditLogService {
     }
 
     @Override
-    public void append(String actor, String actorName, String action,
+    public void append(String actor, String actorName, String clientCode, String action,
                        String targetType, String targetNo, String detail, String ip) {
         IamAuditLog e = new IamAuditLog();
         e.setTenantId(TENANT_MAIN);
         e.setActor(actor);
         e.setActorName(actorName);
+        e.setClientCode(clientCode);
         e.setAction(action);
         e.setTargetType(targetType);
         e.setTargetNo(targetNo);
@@ -144,7 +145,8 @@ public class AuditLogServiceImpl implements AuditLogService {
         String targetNo = unjson(e.getTargetNo());
         String target = targetType == null ? targetNo
                 : targetType + ":" + (targetNo == null ? "" : targetNo);
-        return new AuditLogEntry(String.valueOf(e.getId()), e.getActor(), e.getActorName(), e.getAction(),
+        return new AuditLogEntry(String.valueOf(e.getId()), e.getActor(), e.getActorName(),
+                e.getClientCode(), e.getAction(),
                 targetType, targetNo, target, unjson(e.getDetail()), e.getIp(),
                 e.getCreatedAt() == null ? null : e.getCreatedAt().toString());
     }
