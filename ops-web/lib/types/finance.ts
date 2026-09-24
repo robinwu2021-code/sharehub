@@ -14,6 +14,14 @@ export type ShareBasis = (typeof SHARE_BASES)[number];
 export interface ShareRule {
   ruleNo: string;
   dimension: "VENUE" | "AGENT";
+  /**
+   * 分成方**业务号**（VEN3xx / AG00x）—— 取价就是按它匹配的。
+   *
+   * 缺了它的规则在分账时一条都命中不了：`ShareGenerator` 按 `payee_no` 精确查，
+   * 而 `payee_no` 为空就永远匹配不上。**界面上看着配好了，钱却分不出去，且不报错。**
+   * 所以分成方必须是「选」出来的，不能手打名字（同合同「按编号连」的理由）。
+   */
+  payeeNo: string;
   payeeName: string;
   /** 见 SHARE_BASES。留空 = 该分成方的通用规则（任何依据都能回落到它）。 */
   basis?: ShareBasis | "";

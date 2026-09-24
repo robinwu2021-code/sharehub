@@ -138,6 +138,15 @@ public class ShareServiceImpl implements ShareService {
     @Override
     public FinDtos.ShareRule saveRule(ShareRule body) {
         if (body == null) throw new IllegalArgumentException("分润规则不能为空");
+        // 取价按 payee_no **精确匹配**（ShareGeneratorImpl.ruleOf）。没有编号的规则
+        // 一条都命中不了 —— 界面上看着配好了，分账时那个分成方却拿不到钱，而且不报错。
+        // 这是「按名字连」那类错误里最贵的一种：错的不是显示，是钱。
+        if (body.getPayeeNo() == null || body.getPayeeNo().isBlank()) {
+            throw new IllegalArgumentException("分成方编号必填：取价按编号匹配，只有名字的规则永远命中不了");
+        }
+        // 不在这里校验「这个编号真的存在」：场地方/代理商主数据在 platform，
+        // 为一次校验新开一条跨模块查询接口不划算。运营端的下拉已经只给真实主数据，
+        // 且 mock 层做了存在性校验（绕过 UI 直调同样被拒）。
         if (body.getRate() != null
                 && (body.getRate().signum() < 0 || body.getRate().compareTo(BigDecimal.ONE) > 0)) {
             // [db-design §1.5]：*_rate 是 0..1 的小数，不是百分数。传 30 表示 30% 是最常见的踩坑

@@ -32,7 +32,11 @@ import { daysOf } from "./report";
 // agents 里没有这两个名字，分润规则/结算单/提现单点进去都对不上代理商档案）。
 const PAYEE_NAMES = [...VENUE_NAMES, ...agents.slice(0, 2).map((a) => a.name)];
 export const shareRules: ShareRule[] = Array.from({ length: 12 }, (_, i) => ({
-  ruleNo: `SR${600 + i}`, dimension: i % 3 === 0 ? "AGENT" : "VENUE", payeeName: p(PAYEE_NAMES, i),
+  ruleNo: `SR${600 + i}`, dimension: i % 3 === 0 ? "AGENT" : "VENUE",
+  // 分成方存**编号**：取价按 payeeNo 精确匹配，只有名字的规则一条都命中不了
+  ...(i % 3 === 0
+    ? { payeeNo: agents[i % agents.length].agentNo, payeeName: agents[i % agents.length].name }
+    : { payeeNo: venues[i % venues.length].venueNo, payeeName: venues[i % venues.length].name }),
   // 代理商规则带依据（出资/拓展/运维轮着来），场地方维度没有责任细分故留空。
   // 留一条 AGENT 的空依据（i === 9）当通用规则：取价找不到专属规则时就回落到它，
   // 这条回落路径没有样本的话，页面上看不出「留空是有意义的一档」。
@@ -359,7 +363,25 @@ export const listInvoices = (q: InvoiceQuery = {}) =>
     kwHit(q.keyword, x.invoiceNo, x.payeeName, x.vatTrn, x.sourceNo, x.invoiceCode, x.invoiceNumber) &&
     (!q.status || x.status === q.status));
 
-export const saveShareRule = (x: Partial<ShareRule>) => upsert(shareRules, x, "ruleNo", () => nextNo("SR", shareRules));
+/**
+ * 分润规则保存。
+ *
+ * **分成方编号必填且必须真实存在**：取价按 `payeeNo` 精确匹配，
+ * 存不出编号的规则在分账时一条都命中不了 —— 界面上看着配好了，钱却分不出去，
+ * 而且不报错。守卫落在服务端（mock）而不是只在表单上：绕过 UI 直调同样被拒。
+ */
+export const saveShareRule = (x: Partial<ShareRule>) => {
+  const dimension = x.dimension ?? "VENUE";
+  if (!x.payeeNo) fail("请选择分成方", "Payee is required");
+  const known = dimension === "AGENT"
+    ? agents.find((a) => a.agentNo === x.payeeNo)
+    : venues.find((v) => v.venueNo === x.payeeNo);
+  // 悬空的分成方编号 = 规则永远命中不了，且看不出为什么
+  if (!known) notFound(dimension === "AGENT" ? "代理商" : "场地方", "Payee", x.payeeNo!);
+  // 名字只是展示冗余，一律以编号对应的主数据为准，不采信入参
+  return upsert(shareRules, { ...x, dimension, payeeName: known!.name }, "ruleNo",
+    () => nextNo("SR", shareRules));
+};
 
 // ————————————————————————————————————————————————————————————————
 // 对账差错处理（S2）：OPEN → HANDLING → RESOLVED / IGNORED

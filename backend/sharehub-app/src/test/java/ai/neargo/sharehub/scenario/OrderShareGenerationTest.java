@@ -86,6 +86,17 @@ class OrderShareGenerationTest extends ApiTestSupport {
     }
 
     @Test
+    void rule_without_payee_no_is_refused() {
+        // 取价按 payee_no **精确匹配**。没有编号的规则一条都命中不了 ——
+        // 运营在界面上配完看着好好的，分账时那个分成方却拿不到钱，而且不报错。
+        // 这是本仓库「按名字连」那类错误里最贵的一种：错的不是显示，是钱。
+        String admin = login("ADMIN");
+        assertThat(post("/api/trade/share-rules", Map.of("dimension", "AGENT",
+                "payeeName", "只有名字没有编号", "mode", "LEDGER", "rate", 0.2), admin).status)
+                .as("缺分成方编号必须当场拒，而不是存下一条永远不生效的规则").isEqualTo(400);
+    }
+
+    @Test
     void free_order_generates_nothing() {
         // 免单与全额券抵扣没有真实现金流。按应收分账 = 用平台的钱替用户给场地方付分成。
         assertThat(generator.generate(event(orderNo("F"), BigDecimal.ZERO))).isZero();

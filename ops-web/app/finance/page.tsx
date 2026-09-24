@@ -123,10 +123,18 @@ const SHARE_BASIS_LABEL: Record<string, string> = {
 /** multiselect + csv 的值是逗号分隔业务号串。 */
 const csvArr = (v: unknown) => String(v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 
-const RULE_FIELDS: FieldDef[] = [
+/**
+ * 分成方必须是「选」出来的：取价按 `payeeNo` 精确匹配，手打名字存不出编号，
+ * 规则在分账时**一条都命中不了** —— 界面上看着配好了，钱却分不出去，且不报错。
+ * 候选集跟着「维度」切换：场地方选 venues、代理商选 agents，两个命名空间不能混。
+ */
+function ruleFieldsFor(dimension: string, payees: { value: string; label: string }[]): FieldDef[] {
+  return [
   { key: "ruleNo", label: "规则号", readOnlyOnEdit: true, placeholder: "新增留空自动生成" },
   { key: "dimension", label: "维度", type: "select", options: [{ value: "VENUE", label: "场地方" }, { value: "AGENT", label: "代理商" }] },
-  { key: "payeeName", label: "分成方", placeholder: "如 XX 商场" },
+  { key: "payeeNo", label: "分成方", type: "select", required: true,
+    options: [{ value: "", label: dimension === "AGENT" ? "请选择代理商" : "请选择场地方" }, ...payees],
+    help: "存编号不存名字——取价按编号匹配" },
   // 留空 = 该分成方的通用规则：任何依据找不到专属规则时都回落到它。
   // 所以「不填」是有意义的一档，不能做成必填。
   {
@@ -137,7 +145,8 @@ const RULE_FIELDS: FieldDef[] = [
   { key: "mode", label: "模式", type: "select", options: [{ value: "CHANNEL_SPLIT", label: "渠道分账" }, { value: "LEDGER", label: "平台记账" }] },
   { key: "rate", label: "比例（0~1，如 0.3）", type: "number" },
   { key: "priority", label: "优先级", type: "number" },
-];
+  ];
+}
 // —— 对账差错（S2）——
 // 跑批结果与处置进度是两列：status 是机器算的事实，handleStatus 是人推的进度，不混为一谈。
 const RECON_HANDLE_STATUS: StatusMap<ReconHandleStatus> = {
@@ -417,13 +426,27 @@ function FinanceInner() {
   const venuesQ = useQuery({
     queryKey: ["stl-venues"],
     queryFn: () => api.listVenues({ page: 1, size: UNPAGED_SIZE }),
-    enabled: !!genForm && genForm.payeeType === "VENUE",
+    // 规则抽屉也要用同一份候选（场地方），所以两个触发条件取并集
+    enabled: (!!genForm && genForm.payeeType === "VENUE") || (!!ruleForm && ruleForm.dimension !== "AGENT"),
   });
   const agentsQ = useQuery({
     queryKey: ["stl-agents"],
     queryFn: () => api.listAgents({ page: 1, size: UNPAGED_SIZE }),
-    enabled: !!genForm && genForm.payeeType === "AGENT",
+    enabled: (!!genForm && genForm.payeeType === "AGENT") || (!!ruleForm && ruleForm.dimension === "AGENT"),
   });
+  // 分润规则抽屉的「分成方」候选：跟着维度切换，两个命名空间不混用
+  const rulePayeeOpts = useMemo(() => {
+    const agent = ruleForm?.dimension === "AGENT";
+    const rows = agent ? (agentsQ.data?.list ?? []) : (venuesQ.data?.list ?? []);
+    return agent
+      ? (rows as { agentNo: string; name: string }[]).map((a) => ({ value: a.agentNo, label: `${a.name}（${a.agentNo}）` }))
+      : (rows as { venueNo: string; name: string }[]).map((v) => ({ value: v.venueNo, label: `${v.name}（${v.venueNo}）` }));
+  }, [ruleForm?.dimension, agentsQ.data, venuesQ.data]);
+  const ruleFields = useMemo(
+    () => ruleFieldsFor(String(ruleForm?.dimension ?? "VENUE"), rulePayeeOpts),
+    [ruleForm?.dimension, rulePayeeOpts],
+  );
+
   // 结算单构成明细：这张单的钱是哪几笔分润凑出来的
   const stlRecordsQ = useQuery({
     queryKey: ["stl-records", stlDetail?.settleNo ?? ""],
@@ -1618,7 +1641,7 @@ function FinanceInner() {
         titleNew="新增分润规则"
         titleEdit={`编辑分润规则 ${ruleForm?.ruleNo ?? ""}`}
         isEdit={!!ruleForm?.ruleNo}
-        fields={RULE_FIELDS}
+        fields={ruleFields}
         value={(ruleForm ?? {}) as Record<string, unknown>}
         onChange={(v) => setRuleForm(v as Partial<ShareRule>)}
         onSubmit={() => ruleForm && saveRule.mutate(ruleForm)}
