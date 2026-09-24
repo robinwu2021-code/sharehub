@@ -79,7 +79,11 @@ describe("UI 权限码映射表", () => {
       real.has(c) || (c.endsWith(":*") && [...real].some((r) => r.startsWith(c.slice(0, -1))));
 
     /*
-     * **棘轮，不是白名单**：当前有 45 个 UI 码映射到「后端一个端点都没判过」的码。
+     * **棘轮，不是白名单**：当前有 39 个 UI 码映射到「后端一个端点都没判过」的码。
+     * （2026-09-24：43 → 39。四个界面码补上了翻译 —— inventory:update→:transfer、
+     * share_rule:config→:create、ad:manage→:update、alarm:notice_resend→alarm:update，
+     * 后端本来就有这些端点，只是界面码没译过去。顺带收掉基线里原有的 2 格余量：
+     * 基线写 45 而实测 43，余量会让两次新增漂移不报警。）
      * 它们是待建功能（清单里定了、端点还没做）与历史遗留的混合，逐个查证不在本批范围；
      * 但这个数字**只准降不准升** —— 加一个新的没有端点的码，这条就红。
      *
@@ -90,7 +94,7 @@ describe("UI 权限码映射表", () => {
      * ⚠️ 契约禁止 `delete*`（软删除语义，用 `archive*`），所以 `*:delete` 这类
      * 本来就不该有端点 —— 它们该从码表里退役，不是补端点。
      */
-    const DANGLING_BASELINE = 45;
+    const DANGLING_BASELINE = 39;
 
     const dangling = Object.entries(UI_PERM_MAP)
       .filter(([, m]) => m !== UNIMPLEMENTED && !covered(m as string))

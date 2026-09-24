@@ -77,7 +77,7 @@ export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   "device:inventory:read": "device:inventory:read",
   "device:inventory:stocktake": "device:inventory:stocktake",
   "device:inventory:transfer": "device:inventory:transfer",
-  "device:inventory:update": "device:inventory:update",
+  "device:inventory:update": "device:inventory:transfer",   // 翻译：界面守的是调拨单新建/编辑 → POST /api/ops/inventory-transfers（后端无 :update 这个码）
   "device:ota:manage": "device:ota:manage",   // ⚠️ D6d：后端无角色持有 → 除 ADMIN 外必 403
   "device:ota:publish": "device:ota:publish",   // ⚠️ D6d：后端无角色持有 → 除 ADMIN 外必 403
   "device:ota:read": "device:ota:read",
@@ -102,7 +102,7 @@ export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   "finance:settlement:generate": "finance:settlement:generate",
   "finance:settlement:read": "finance:settlement:read",
   "finance:share_record:read": "finance:share_record:read",
-  "finance:share_rule:config": "finance:share_rule:config",
+  "finance:share_rule:config": "finance:share_rule:create",   // 翻译：后端新建与改都挂 create → POST /api/trade/share-rules 与 /{ruleNo}
   "finance:share_rule:create": "finance:share_rule:create",
   "finance:share_rule:delete": "finance:share_rule:delete",
   "finance:share_rule:read": "finance:share_rule:read",
@@ -135,7 +135,7 @@ export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   "location:venue:read": "location:venue:read",
   "location:venue:update": "location:venue:update",
   // ——— marketing ———
-  "marketing:ad:manage": "marketing:ad:manage",
+  "marketing:ad:manage": "marketing:ad:update",   // 翻译：ad-slots / ad-campaigns 的所有写操作都挂 update
   "marketing:ad:read": "marketing:ad:read",
   "marketing:ad:update": "marketing:ad:update",
   "marketing:campaign:create": "marketing:campaign:create",
@@ -246,7 +246,7 @@ export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   "user:wallet:update": "user:wallet:update",   // ⚠️ D6d：后端无角色持有 → 除 ADMIN 外必 403
   // ——— workorder ———
   "workorder:alarm:config": "workorder:alarm:config",
-  "workorder:alarm:notice_resend": "workorder:alarm:notice_resend",
+  "workorder:alarm:notice_resend": "workorder:alarm:update",   // 翻译：界面功能无独立端点 → POST /api/ops/alarms/notices/{noticeNo}/resend
   "workorder:alarm:update": "workorder:alarm:update",
   "workorder:inspection:update": "workorder:inspection:update",
   "workorder:sla:update": "workorder:sla:update",
