@@ -8,13 +8,14 @@ import type {
   CreditScoreChange, CreditScoreAdjustPayload, CreditScoreAdjustResult,
   MemberBenefit, MemberCard, MemberCardType, MemberCardGrantPayload, MemberCardGrantResult,
   UserProfile,
+  LogoffItem, CUserInvoiceRow,
 } from "../../types";
 import {
   CREDIT_SCORE_MIN, CREDIT_SCORE_MAX, RISK_MEDIUM_BELOW, riskLevelOf,
   MEMBER_LEVEL_ORDER, MEMBER_CARD_LABEL, MEMBER_CARD_NONE, PROFILE_RECENT_TXNS,
 } from "../../types";
 import { OPERATORS, REASONS, p, iso } from "./internal";
-import { notFound } from "@/lib/biz-error";
+import { notFound, fail } from "@/lib/biz-error";
 import { paginate, kwHit, upsert, nextNo } from "./helpers";
 
 /**
@@ -589,4 +590,93 @@ export function getUserProfileBase(cUserNo: string): UserProfileBase {
     member: members.find((m) => m.userNo === cUserNo) ?? null,
     cards: listMemberCards({ userNo: cUserNo, size: 100 }).list,
   };
+}
+
+// ————————————————————————————————————————————————————————————————
+// 注销申请队列（2026-09-25）
+//
+// 三种状态各给样本，否则筛选与徽标改了也验不出来；冷静期**一条快到期、一条还早**，
+// 因为这个队列的排序口径就是「还来得及处理的排前面」。
+export const logoffs: LogoffItem[] = [
+  { cUserNo: "CU0007", requestedAt: "2026-09-21 09:12:00", coolingUntil: "2026-10-06 09:12:00", status: "PENDING", purgedAt: null },
+  { cUserNo: "CU0013", requestedAt: "2026-09-12 20:40:00", coolingUntil: "2026-09-27 20:40:00", status: "PENDING", purgedAt: null },
+  { cUserNo: "CU0004", requestedAt: "2026-08-30 11:05:00", coolingUntil: "2026-09-14 11:05:00", status: "CANCELLED", purgedAt: null },
+  { cUserNo: "CU0002", requestedAt: "2026-08-01 08:00:00", coolingUntil: "2026-08-16 08:00:00", status: "DONE", purgedAt: "2026-08-16 08:05:00" },
+];
+
+export const listLogoffs = (q: PageQuery & { status?: string } = {}) =>
+  paginate(
+    // 冷静期快到的排前面 —— 与后端同一口径
+    [...logoffs].sort((a, b) => a.coolingUntil.localeCompare(b.coolingUntil)),
+    q.page, q.size,
+    (x) => kwHit(q.keyword, x.cUserNo) && (!q.status || x.status === q.status),
+  );
+
+/** 代为撤销。冷静期已过就拒 —— 那时数据可能已在清除，说「撤销成功」是对用户说假话。 */
+export const revokeLogoff = (cUserNo: string): LogoffItem => {
+  const i = logoffs.findIndex((x) => x.cUserNo === cUserNo);
+  if (i < 0) throw notFound("注销申请", "Logoff request", cUserNo);
+  if (logoffs[i].status !== "PENDING") {
+    fail(`没有进行中的注销申请，当前状态：${logoffs[i].status}`,
+      `No pending deletion request (current: ${logoffs[i].status})`,
+      `لا يوجد طلب حذف قيد التنفيذ (الحالة: ${logoffs[i].status})`);
+  }
+  if (logoffs[i].coolingUntil < nowTs()) {
+    fail(`冷静期已过（${logoffs[i].coolingUntil}），不可撤销`,
+      `Cooling-off period ended on ${logoffs[i].coolingUntil}; it can no longer be revoked`,
+      `انتهت فترة التهدئة في ${logoffs[i].coolingUntil}؛ لم يعد الإلغاء ممكناً`);
+  }
+  logoffs[i] = { ...logoffs[i], status: "CANCELLED" };
+  return logoffs[i];
+};
+
+// ————————————————————————————————————————————————————————————————
+// C 端开票申请队列（2026-09-25）
+export const cuserInvoices: CUserInvoiceRow[] = [
+  { invoiceNo: "UINV000003", cUserNo: "CU0009", nickname: "Fatima", titleNo: "ITL000004", title: "Fatima Al Zahra", amount: 36, currency: "AED", status: "APPLIED", fileUrl: null, rejectReason: null, handledBy: null, handledAt: null, appliedAt: "2026-09-23 10:02:00", issuedAt: null },
+  { invoiceNo: "UINV000002", cUserNo: "CU0005", nickname: "Omar", titleNo: "ITL000002", title: "Gulf Trading LLC", amount: 120, currency: "AED", status: "ISSUED", fileUrl: "https://example.com/uinv000002.pdf", rejectReason: null, handledBy: "EMP0003", handledAt: "2026-09-20 16:30:00", appliedAt: "2026-09-19 14:20:00", issuedAt: "2026-09-20 16:30:00" },
+  { invoiceNo: "UINV000001", cUserNo: "CU0002", nickname: "Layla", titleNo: "ITL000001", title: "Layla Hassan", amount: 18, currency: "AED", status: "REJECTED", fileUrl: null, rejectReason: "抬头与实名信息不符，请修改抬头后重新提交", handledBy: "EMP0003", handledAt: "2026-09-18 09:10:00", appliedAt: "2026-09-17 19:44:00", issuedAt: null },
+];
+
+export const listCUserInvoices = (q: PageQuery & { status?: string } = {}) =>
+  paginate(
+    // 先来先办：待受理按申请时间正序，否则老单永远沉在后面
+    [...cuserInvoices].sort((a, b) => a.appliedAt.localeCompare(b.appliedAt)),
+    q.page, q.size,
+    (x) => kwHit(q.keyword, x.invoiceNo, x.cUserNo, x.nickname ?? "", x.title) && (!q.status || x.status === q.status),
+  );
+
+/** 只有 APPLIED 可受理：已开具/已驳回再动一次，消费者那边的状态会凭空变回去。 */
+const requireApplied = (invoiceNo: string): number => {
+  const i = cuserInvoices.findIndex((x) => x.invoiceNo === invoiceNo);
+  if (i < 0) throw notFound("开票申请", "Invoice request", invoiceNo);
+  if (cuserInvoices[i].status !== "APPLIED") {
+    fail(`该开票申请已处理过，当前状态：${cuserInvoices[i].status}`,
+      `This invoice request was already handled (current: ${cuserInvoices[i].status})`,
+      `تمت معالجة طلب الفاتورة هذا بالفعل (الحالة: ${cuserInvoices[i].status})`);
+  }
+  return i;
+};
+
+export const issueCUserInvoice = (invoiceNo: string, fileUrl: string): CUserInvoiceRow => {
+  const i = requireApplied(invoiceNo);
+  cuserInvoices[i] = { ...cuserInvoices[i], status: "ISSUED", fileUrl: fileUrl || null,
+    handledBy: "EMP0001", handledAt: nowTs(), issuedAt: nowTs() };
+  return cuserInvoices[i];
+};
+
+export const rejectCUserInvoice = (invoiceNo: string, reason: string): CUserInvoiceRow => {
+  // 原因必填：只说「已驳回」等于让用户无从改正后重提，而他会做的事是再提一次
+  if (!reason || !reason.trim()) {
+    fail("驳回必须写明原因", "A rejection reason is required", "سبب الرفض مطلوب");
+  }
+  const i = requireApplied(invoiceNo);
+  cuserInvoices[i] = { ...cuserInvoices[i], status: "REJECTED", rejectReason: reason.trim(),
+    handledBy: "EMP0001", handledAt: nowTs() };
+  return cuserInvoices[i];
+};
+
+/** 与后端同格式的当前时间（yyyy-MM-dd HH:mm:ss）—— mock 出 ISO 会让排序与展示在两种源下表现不同。 */
+function nowTs(): string {
+  return new Date().toISOString().slice(0, 19).replace("T", " ");
 }

@@ -23,7 +23,7 @@ export {
 export {
   alarmCodes, alarmRecords, alarmNotices, alarmRules,
   listAlarmRecords, listAlarmNotices, listAlarmCodes, listAlarmRules,
-  saveAlarmCode, saveAlarmRule, raiseAlarmWorkOrder, ackAlarm,
+  saveAlarmCode, saveAlarmRule, raiseAlarmWorkOrder, ackAlarm, closeAlarm,
   resendAlarmNotice, AlarmNoticeSendError, autoRaiseWorkOrders,
   archiveAlarmCode, unarchiveAlarmCode, archiveAlarmRule, unarchiveAlarmRule,
 } from "./alarm";
@@ -104,6 +104,9 @@ export {
   listMembers, listWallets, listUserRisks, listUserBlacklist, listConsumerSegments,
   saveMember, saveWallet,
   listFreeWhitelist, saveFreeWhitelist, revokeFreeWhitelist,
+  // 2026-09-25 消费者受理队列：C 端在产生数据、运营端此前没有动作面
+  logoffs, listLogoffs, revokeLogoff,
+  cuserInvoices, listCUserInvoices, issueCUserInvoice, rejectCUserInvoice,
   // S2：信用分调整（上下限强制 + 风控等级联动 + 变更留痕）
   creditScoreChanges, adjustCreditScore, listCreditScoreChanges, CreditScoreError,
   // 钱包流水（后端 /api/user/wallets/{userNo}/txns 的前端入口）

@@ -118,15 +118,3 @@ C POST /api/user/push-messages/sweep-due
 # ── NoticeVO：已在同一批里改对（公告三语取列 + 已读态归还给站内信），本块不再有它 ──
 #
 # ── CsTicketVO：已在同一批的「报障进度」里接上，本块不再有它 ──
-
-# ⏳ 下面 7 条是 2026-09-25 新补的「注销申请受理 / C 端开票受理」后端面。
-#   运营端页面在**紧接着的下一个提交**里接上（/users 的两个新 tab），
-#   届时这 7 行一起删。之所以先落一次：本仓库长期多会话并行，
-#   攒着不提交的改动被别人的 git 操作冲掉过。
-C GET /api/user/logoffs
-C POST /api/user/logoffs/{}/revoke
-C GET /api/user/cuser-invoices
-C POST /api/user/cuser-invoices/{}/issue
-C POST /api/user/cuser-invoices/{}/reject
-D LogoffItem GET /api/user/logoffs
-D CUserInvoiceRow GET /api/user/cuser-invoices

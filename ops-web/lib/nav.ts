@@ -342,12 +342,17 @@ export const NAV: NavSection[] = [
     children: [
       // 按「用户主体 / 风险治理 / 用户资产」分组
       { href: "/users", label: "用户列表", perm: "user:cuser:read", phase: 1, group: "用户主体" },
+      { href: "/users?tab=logoffs", label: "注销申请", perm: "user:logoff:read", phase: 2, group: "用户主体" },
       { href: "/users?tab=risk", label: "风控用户", perm: "user:risk:read", phase: 1, ready: true, group: "风险治理" },
       { href: "/users?tab=blacklist", label: "黑名单", perm: "user:risk:update", phase: 1, group: "风险治理" },
       { href: "/users?tab=whitelist", label: "免费用户白名单", perm: "user:risk:update", phase: 2, group: "风险治理" },
       { href: "/users?tab=members", label: "会员/次卡", perm: "user:member:read", phase: 2, group: "用户资产" },
       { href: "/users?tab=wallets", label: "钱包", perm: "user:wallet:read", phase: 2, group: "用户资产" },
       { href: "/users?tab=recharge", label: "充值套餐", perm: "user:wallet:read", phase: 2, group: "用户资产" },
+      // 2026-09-25：C 端一直在产生这两类待办，而运营端此前没有入口 ——
+      // 不报错、不红、用户也不会投诉，因为他们不知道本该有。
+      // 同名 group 的叶子必须相邻：「注销申请」在用户主体组里，「开票申请」跟在用户资产组末尾。
+      { href: "/users?tab=invoices", label: "开票申请", perm: "user:invoice:read", phase: 2, group: "用户资产" },
     ],
   },
   {

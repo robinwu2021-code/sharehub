@@ -3,7 +3,7 @@
 import type { PageQ, WhitelistQ, PackageQ, WalletTxnQ, MemberCardQ } from "../query";
 import type {
   PageResult, CUser, Member, Wallet, WalletTxn, UserRisk, UserBlacklist,
-  ConsumerSegment, FreeUserWhitelist, RechargePackage,
+  ConsumerSegment, FreeUserWhitelist, RechargePackage, LogoffItem, CUserInvoiceRow,
   CreditScoreChange, CreditScoreAdjustPayload, CreditScoreAdjustResult,
   MemberBenefit, MemberCard, MemberCardGrantPayload, MemberCardGrantResult, UserProfile,
 } from "../../types";
@@ -78,4 +78,20 @@ export interface UserApi {
   // === G1 软删除（TDD §10.1）：归档而非删除，**契约里禁止出现 deleteXxx** ===
   archiveRechargePackage(packageNo: string): Promise<RechargePackage>;
   unarchiveRechargePackage(packageNo: string): Promise<RechargePackage>;
+
+  // —— 注销申请受理（user:logoff:read / :revoke）——
+  //
+  // 没有「立即执行」：冷静期到点由清除作业执行，给一个手动提前销毁的按钮，
+  // 等于给了一个不可逆的误操作入口。
+
+  listLogoffs(q?: PageQ & { status?: string }): Promise<PageResult<LogoffItem>>;
+  /** 代为撤销。冷静期已过后端会拒（400）—— 那时数据可能已在清除，说「撤销成功」是假话。 */
+  revokeLogoff(cUserNo: string): Promise<LogoffItem>;
+
+  // —— C 端开票受理（user:invoice:read / :handle）——
+
+  listCUserInvoices(q?: PageQ & { status?: string }): Promise<PageResult<CUserInvoiceRow>>;
+  issueCUserInvoice(invoiceNo: string, fileUrl: string): Promise<CUserInvoiceRow>;
+  /** 驳回原因必填：只说「已驳回」，用户无从改正后重提，他会做的事是再提一次。 */
+  rejectCUserInvoice(invoiceNo: string, reason: string): Promise<CUserInvoiceRow>;
 }

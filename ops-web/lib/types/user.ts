@@ -337,3 +337,55 @@ export interface RechargePackage extends Archivable {
   sortNo: number;
   status: "ENABLED" | "DISABLED";
 }
+
+// —— 注销申请受理（2026-09-25，权限码 user:logoff:read / :revoke）——
+//
+// C 端 9-25 已接上真接口（提交 / 看冷静期 / 自助撤销），而运营端此前**零入口**：
+// 用户打电话说「我点错了」时，客服既看不到队列也无从代为撤销，
+// 只能让他自己在 App 里找 —— 而他正是因为找不到才打的电话。
+
+/**
+ * 注销申请（镜像后端 `LogoffItem`）。
+ *
+ * ⚠️ 字段只有用户号与三个时间戳，**不含手机号与姓名** ——
+ * 这是它能给只读角色（VIEWER）看的前提，改动前先想清楚这一条。
+ */
+export interface LogoffItem {
+  cUserNo: string;
+  requestedAt: string;
+  coolingUntil: string;
+  /** PENDING（冷静期内，可撤销）/ CANCELLED（已撤销）/ DONE（已清除） */
+  status: "PENDING" | "CANCELLED" | "DONE";
+  /** 空 = 尚未清除 */
+  purgedAt: string | null;
+}
+
+// —— C 端开票受理（2026-09-25，权限码 user:invoice:read / :handle）——
+//
+// 运营端「发票」那个菜单叶管的是 fin_invoice —— 给场地方/代理商开的**结算发票**，
+// 与消费者开票是两个对象、两张表、两套业务键。于是 C 端能提交，提交之后无人受理。
+
+/**
+ * C 端开票申请（镜像后端 `CUserInvoiceRow`）。
+ *
+ * ⚠️ 不复用 C 端自己的 `InvoiceItem`：那是消费者看自己的单、没有 `cUserNo`，
+ * 运营端拿它做列表，第一列「是谁申请的」就填不出来。
+ */
+export interface CUserInvoiceRow {
+  invoiceNo: string;
+  cUserNo: string;
+  nickname: string | null;
+  titleNo: string;
+  title: string;
+  amount: number;
+  currency: string;
+  /** APPLIED（待受理）/ ISSUED（已开具）/ REJECTED（已驳回） */
+  status: "APPLIED" | "ISSUED" | "REJECTED";
+  fileUrl: string | null;
+  /** 驳回原因。只说「已驳回」等于让用户无从改正后重提 —— 所以驳回时必填。 */
+  rejectReason: string | null;
+  handledBy: string | null;
+  handledAt: string | null;
+  appliedAt: string;
+  issuedAt: string | null;
+}

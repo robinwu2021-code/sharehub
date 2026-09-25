@@ -77,8 +77,6 @@ public final class RolePerms {
                     "finance:share_rule:read", "finance:share_record:read", "report:*"),
             "VIEWER", List.of(
                     "dashboard:overview:read", "dashboard:todo:read",
-                    // 注销量与开票量都是该被看见的经营指标；两个出参都不含手机号姓名
-                    "user:logoff:read", "user:invoice:read",
                     "device:cabinet:read", "device:slot:read", "order:order:read",
                     "location:poi:read", "location:venue:read", "location:analysis:read", "location:overview:read",
                     "finance:share_rule:read", "finance:share_record:read", "finance:settlement:read",

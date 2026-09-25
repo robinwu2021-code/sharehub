@@ -26,7 +26,7 @@ import { tNav } from "./i18n/nav-labels";
  */
 
 // 相对**仓库根**，不是相对本文件 —— vitest 的 cwd 是 ops-web/
-const MIGRATION = "../backend/sharehub-app/src/main/resources/db/migration/V81__menu_admin_leaf_and_i18n.sql";
+const MIGRATION = "../backend/sharehub-app/src/main/resources/db/migration/V89__menu_consumer_queue_leaves.sql";
 
 type Row = Record<string, string>;
 

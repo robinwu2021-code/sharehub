@@ -43,4 +43,9 @@ export const userHttp: UserApi = {
   // G1 软删除：归档 / 恢复。REST 上是「状态迁移」而非 DELETE —— 后端不得实现物理删除。
   archiveRechargePackage: (no) => client.post(`/api/user/recharge-packages/${no}/archive`, {}),
   unarchiveRechargePackage: (no) => client.post(`/api/user/recharge-packages/${no}/unarchive`, {}),
+  listLogoffs: (q) => client.get("/api/user/logoffs", q),
+  revokeLogoff: (no) => client.post(`/api/user/logoffs/${no}/revoke`, {}),
+  listCUserInvoices: (q) => client.get("/api/user/cuser-invoices", q),
+  issueCUserInvoice: (no, fileUrl) => client.post(`/api/user/cuser-invoices/${no}/issue`, { fileUrl }),
+  rejectCUserInvoice: (no, reason) => client.post(`/api/user/cuser-invoices/${no}/reject`, { reason }),
 };

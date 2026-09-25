@@ -120,6 +120,8 @@ const NAV: Record<string, Pair> = {
   "分润统计": { en: "Sharing Summary", ar: "ملخص التقسيم" },
   "充值订单": { en: "Top-up Orders", ar: "طلبات الشحن" },
   "充值套餐": { en: "Top-up Packages", ar: "باقات الشحن" },
+  "注销申请": { en: "Account Deletions", ar: "طلبات حذف الحساب" },
+  "开票申请": { en: "Invoice Requests", ar: "طلبات الفواتير" },
   "免费用户白名单": { en: "Free Users", ar: "المستخدمون المجانيون" },
   "公告管理": { en: "Announcements", ar: "الإعلانات العامة" },
   "支付渠道": { en: "Payment Channels", ar: "قنوات الدفع" },

@@ -64,4 +64,9 @@ export const userMock: UserApi = {
   // G1 软删除：归档 / 恢复（禁止物理删除）
   archiveRechargePackage: async (no) => wait(db.archiveRechargePackage(no), 350),
   unarchiveRechargePackage: async (no) => wait(db.unarchiveRechargePackage(no), 350),
+  listLogoffs: (q) => wait(db.listLogoffs(q)),
+  revokeLogoff: (no) => wait(db.revokeLogoff(no), 400),
+  listCUserInvoices: (q) => wait(db.listCUserInvoices(q)),
+  issueCUserInvoice: (no, fileUrl) => wait(db.issueCUserInvoice(no, fileUrl), 400),
+  rejectCUserInvoice: (no, reason) => wait(db.rejectCUserInvoice(no, reason), 400),
 };

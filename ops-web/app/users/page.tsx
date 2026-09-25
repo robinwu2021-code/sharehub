@@ -40,11 +40,12 @@ import type {
   CUser, Member, Wallet, WalletTxn, UserRisk, UserBlacklist,
   FreeUserWhitelist, RechargePackage, WhitelistReason,
   MemberBenefit, MemberCard, MemberCardType, RentOrder, UserProfile,
+  LogoffItem, CUserInvoiceRow,
 } from "@/lib/types";
 
 // tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）。
 // 「用户」在菜单里叫「用户列表」——以菜单为准。
-const TAB_KEYS = ["list", "risk", "blacklist", "whitelist", "members", "wallets", "recharge"] as const;
+const TAB_KEYS = ["list", "risk", "blacklist", "whitelist", "members", "wallets", "recharge", "logoffs", "invoices"] as const;
 
 // —— 账号 / 风控 / 黑名单三张表的状态映射 ——
 // 拉黑与否不是后端枚举，但同一对徽标在列表页和详情抽屉各出现一次，
@@ -93,6 +94,31 @@ const WL_STATUS: StatusMap<FreeUserWhitelist["status"]> = {
   EXPIRED: { label: "已过期", tone: "muted" },
   REVOKED: { label: "已撤销", tone: "danger" },
 };
+
+// —— 注销申请 / C 端开票（2026-09-25）——
+// 两处的共同形状：C 端已经在产生数据，运营端此前没有对应的动作面。
+const LOGOFF_STATUS: StatusMap<LogoffItem["status"]> = {
+  PENDING: { label: "冷静期内", tone: "warning" },
+  CANCELLED: { label: "已撤销", tone: "muted" },
+  DONE: { label: "已清除", tone: "danger" },
+};
+
+const CUINV_STATUS: StatusMap<CUserInvoiceRow["status"]> = {
+  APPLIED: { label: "待受理", tone: "warning" },
+  ISSUED: { label: "已开具", tone: "success" },
+  REJECTED: { label: "已驳回", tone: "danger" },
+};
+
+const ISSUE_FIELDS: FieldDef[] = [
+  { key: "fileUrl", label: "发票文件地址", required: true, placeholder: "https://…/invoice.pdf",
+    help: "开具后消费者在 App 里点开的就是这个地址；留空等于告诉他「已开具」却拿不到票" },
+];
+
+const REJECT_FIELDS: FieldDef[] = [
+  { key: "reason", label: "驳回原因", required: true, maxLength: 200, type: "textarea",
+    placeholder: "例如：抬头与实名信息不符，请修改抬头后重新提交",
+    help: "必填。只说「已驳回」，用户无从改正后重提 —— 他会做的事是再提一次" },
+];
 
 const WHITELIST_FIELDS: FieldDef[] = [
   { key: "userNo", label: "用户号", readOnlyOnEdit: true, required: true, section: "用户", placeholder: "U3001" },
@@ -779,12 +805,92 @@ function UsersInner() {
     setProfileNo(null);
   };
 
+  // —— 注销申请受理（user:logoff:read / :revoke）——
+  const [logoffStatus, setLogoffStatus] = useState("");
+  const canRevokeLogoff = allow("user:logoff:revoke");
+  const logoffs = useQuery({
+    queryKey: ["logoffs", paging.page, paging.size, keyword, logoffStatus],
+    queryFn: () => api.listLogoffs({ page: paging.page, size: paging.size, keyword, status: logoffStatus }),
+    placeholderData: keepPreviousData,
+    enabled: tab === "logoffs",
+  });
+  const revokeLogoff = useMutation({
+    mutationFn: (cUserNo: string) => api.revokeLogoff(cUserNo),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["logoffs"] }); notify.success("已代为撤销，用户在 App 里看到的也会同步"); },
+  });
+  const askRevokeLogoff = async (x: LogoffItem) => {
+    const ok = await confirm({
+      title: `撤销 ${x.cUserNo} 的注销申请`,
+      desc: `冷静期至 ${x.coolingUntil}。撤销后账号恢复正常，用户在 App 里看到的状态也会跟着变。`,
+      confirmText: "确认撤销",
+    });
+    if (ok) revokeLogoff.mutate(x.cUserNo);
+  };
+
+  const logoffCols: Column<LogoffItem>[] = [
+    { header: "用户号", cell: (x) => <span className="txt-strong tabular-nums">{x.cUserNo}</span> },
+    { header: "申请时间", cell: (x) => <span className="text-muted-foreground tabular-nums">{x.requestedAt}</span> },
+    { header: "冷静期至", cell: (x) => <span className="tabular-nums">{x.coolingUntil}</span> },
+    { header: "状态", cell: (x) => <StatusBadge map={LOGOFF_STATUS} value={x.status} /> },
+    { header: "清除时间", cell: (x) => <span className="text-muted-foreground tabular-nums">{x.purgedAt ?? "-"}</span> },
+    {
+      header: t("common.actions"),
+      // 只有冷静期内的能撤销。已清除的单摆个灰按钮比不摆更糟 —— 那是一个点了会失败的按钮
+      cell: (x) => canRevokeLogoff && x.status === "PENDING"
+        ? <Button size="sm" variant="outline" disabled={revokeLogoff.isPending} onClick={() => askRevokeLogoff(x)}>代为撤销</Button>
+        : <span className="text-muted-foreground">-</span>,
+    },
+  ];
+
+  // —— C 端开票受理（user:invoice:read / :handle）——
+  const [invStatus, setInvStatus] = useState("");
+  const [issueForm, setIssueForm] = useState<{ invoiceNo: string; fileUrl: string } | null>(null);
+  const [rejectForm, setRejectForm] = useState<{ invoiceNo: string; reason: string } | null>(null);
+  const canHandleInvoice = allow("user:invoice:handle");
+  const cuserInvoices = useQuery({
+    queryKey: ["cuser-invoices", paging.page, paging.size, keyword, invStatus],
+    queryFn: () => api.listCUserInvoices({ page: paging.page, size: paging.size, keyword, status: invStatus }),
+    placeholderData: keepPreviousData,
+    enabled: tab === "invoices",
+  });
+  const issueInv = useMutation({
+    mutationFn: (v: { invoiceNo: string; fileUrl: string }) => api.issueCUserInvoice(v.invoiceNo, v.fileUrl),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["cuser-invoices"] }); setIssueForm(null); notify.success("已开具"); },
+  });
+  const rejectInv = useMutation({
+    mutationFn: (v: { invoiceNo: string; reason: string }) => api.rejectCUserInvoice(v.invoiceNo, v.reason),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["cuser-invoices"] }); setRejectForm(null); notify.success("已驳回"); },
+  });
+
+  const cuserInvoiceCols: Column<CUserInvoiceRow>[] = [
+    { header: "申请号", cell: (x) => <span className="txt-strong tabular-nums">{x.invoiceNo}</span> },
+    { header: "申请人", cell: (x) => <span>{x.nickname ?? "-"}<span className="ms-2 text-muted-foreground tabular-nums">{x.cUserNo}</span></span> },
+    { header: "抬头", cell: (x) => x.title },
+    { header: "金额", cell: (x) => <span className="tabular-nums">{x.currency} {x.amount.toFixed(2)}</span> },
+    { header: "状态", cell: (x) => <StatusBadge map={CUINV_STATUS} value={x.status} /> },
+    // 驳回原因就显示在列表里：藏进详情的话，客服接到电话还得点一下才知道为什么被驳
+    { header: "驳回原因", cell: (x) => <span className="text-muted-foreground">{x.rejectReason ?? "-"}</span> },
+    { header: "受理人", cell: (x) => <span className="text-muted-foreground">{x.handledBy ?? "-"}</span> },
+    { header: "申请时间", cell: (x) => <span className="text-muted-foreground tabular-nums">{x.appliedAt}</span> },
+    {
+      header: t("common.actions"),
+      cell: (x) => canHandleInvoice && x.status === "APPLIED" ? (
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setIssueForm({ invoiceNo: x.invoiceNo, fileUrl: "" })}>开具</Button>
+          <Button size="sm" variant="outline" onClick={() => setRejectForm({ invoiceNo: x.invoiceNo, reason: "" })}>驳回</Button>
+        </div>
+      ) : <span className="text-muted-foreground">-</span>,
+    },
+  ];
+
   const active = tab === "list" ? users
     : tab === "members" ? members
     : tab === "wallets" ? wallets
     : tab === "risk" ? risks
     : tab === "whitelist" ? whitelist
     : tab === "recharge" ? packages
+    : tab === "logoffs" ? logoffs
+    : tab === "invoices" ? cuserInvoices
     : blacklisted;
 
   return (
@@ -1033,6 +1139,102 @@ function UsersInner() {
         </>
       )}
       {active.data && <Pagination page={paging.page} size={paging.size} total={active.data.total} onPage={goPage} onSize={paging.setSize} />}
+
+      {tab === "logoffs" && (
+        <>
+          <Toolbar
+            search={keyword}
+            onSearch={search}
+            searchPlaceholder="搜索用户号"
+            onExport={() => exportCsv<LogoffItem>("注销申请", [
+              { header: "用户号", value: (x) => x.cUserNo },
+              { header: "申请时间", value: (x) => x.requestedAt },
+              { header: "冷静期至", value: (x) => x.coolingUntil },
+              { header: "状态", value: (x) => LOGOFF_STATUS[x.status].label },
+              { header: "清除时间", value: (x) => x.purgedAt ?? "" },
+            ], logoffs.data?.list ?? [])}
+          >
+            <FilterSelect
+              value={logoffStatus}
+              onChange={(v) => { setLogoffStatus(v); paging.reset(); }}
+              allLabel="全部状态"
+              options={LOGOFF_STATUS}
+              aria-label="按状态筛选"
+            />
+          </Toolbar>
+          {!canRevokeLogoff && <ReadOnlyNotice what="注销申请" perm="user:logoff:revoke" note="不能代为撤销" />}
+          <DataTable
+            rowKey={(x: LogoffItem) => x.cUserNo}
+            columns={logoffCols}
+            rows={logoffs.data?.list}
+            loading={logoffs.isLoading} error={logoffs.error} onRetry={logoffs.refetch}
+            empty="没有注销申请——这是好事。若确信有人提交过，先把状态筛选清空再看一次"
+          />
+        </>
+      )}
+      {tab === "invoices" && (
+        <>
+          <Toolbar
+            search={keyword}
+            onSearch={search}
+            searchPlaceholder="搜索申请号 / 用户号 / 昵称 / 抬头"
+            onExport={() => exportCsv<CUserInvoiceRow>("C端开票申请", [
+              { header: "申请号", value: (x) => x.invoiceNo },
+              { header: "用户号", value: (x) => x.cUserNo },
+              { header: "昵称", value: (x) => x.nickname ?? "" },
+              { header: "抬头", value: (x) => x.title },
+              { header: "金额", value: (x) => x.amount },
+              { header: "币种", value: (x) => x.currency },
+              { header: "状态", value: (x) => CUINV_STATUS[x.status].label },
+              { header: "驳回原因", value: (x) => x.rejectReason ?? "" },
+              { header: "受理人", value: (x) => x.handledBy ?? "" },
+              { header: "申请时间", value: (x) => x.appliedAt },
+            ], cuserInvoices.data?.list ?? [])}
+          >
+            <FilterSelect
+              value={invStatus}
+              onChange={(v) => { setInvStatus(v); paging.reset(); }}
+              allLabel="全部状态"
+              options={CUINV_STATUS}
+              aria-label="按状态筛选"
+            />
+          </Toolbar>
+          {!canHandleInvoice && <ReadOnlyNotice what="C 端开票申请" perm="user:invoice:handle" note="不能开具或驳回" />}
+          <DataTable
+            rowKey={(x: CUserInvoiceRow) => x.invoiceNo}
+            columns={cuserInvoiceCols}
+            rows={cuserInvoices.data?.list}
+            loading={cuserInvoices.isLoading} error={cuserInvoices.error} onRetry={cuserInvoices.refetch}
+            empty="没有开票申请——C 端尚未有人提交，或状态筛选太窄"
+          />
+        </>
+      )}
+
+      <FormDrawer
+        open={!!issueForm}
+        onOpenChange={(o) => !o && setIssueForm(null)}
+        titleNew={`开具发票 · ${issueForm?.invoiceNo ?? ""}`}
+        titleEdit={`开具发票 · ${issueForm?.invoiceNo ?? ""}`}
+        isEdit={false}
+        fields={ISSUE_FIELDS}
+        value={(issueForm ?? {}) as Record<string, unknown>}
+        onChange={(v) => setIssueForm(v as { invoiceNo: string; fileUrl: string })}
+        onSubmit={() => issueForm && issueInv.mutate(issueForm)}
+        submitting={issueInv.isPending}
+      />
+
+      <FormDrawer
+        open={!!rejectForm}
+        onOpenChange={(o) => !o && setRejectForm(null)}
+        titleNew={`驳回开票申请 · ${rejectForm?.invoiceNo ?? ""}`}
+        titleEdit={`驳回开票申请 · ${rejectForm?.invoiceNo ?? ""}`}
+        isEdit={false}
+        fields={REJECT_FIELDS}
+        value={(rejectForm ?? {}) as Record<string, unknown>}
+        onChange={(v) => setRejectForm(v as { invoiceNo: string; reason: string })}
+        onSubmit={() => rejectForm && rejectInv.mutate(rejectForm)}
+        submitting={rejectInv.isPending}
+      />
 
       <FormDrawer
         open={!!memberForm}

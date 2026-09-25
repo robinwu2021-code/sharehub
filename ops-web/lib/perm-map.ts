@@ -256,6 +256,11 @@ export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   "user:risk:update": "user:risk:update",
   "user:wallet:read": "user:wallet:read",
   "user:wallet:update": "user:wallet:update",   // ⚠️ D6d：后端无角色持有 → 除 ADMIN 外必 403
+  // 2026-09-25 新增：注销申请受理 / C 端开票受理（真源表 §8 已登记，后端已强制）
+  "user:logoff:read": "user:logoff:read",
+  "user:logoff:revoke": "user:logoff:revoke",
+  "user:invoice:read": "user:invoice:read",
+  "user:invoice:handle": "user:invoice:handle",
   // ——— workorder ———
   "workorder:alarm:config": "workorder:alarm:config",
   "workorder:alarm:notice_resend": "workorder:alarm:update",   // 翻译：界面功能无独立端点 → POST /api/ops/alarms/notices/{noticeNo}/resend

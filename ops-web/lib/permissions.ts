@@ -38,6 +38,8 @@ export const BACKEND_ROLE_PERMS: Record<Role, string[]> = {
     "device:command:send", "order:order:read", "order:order:export", "order:exception:read",
     "order:exception:handle", "order:intervene:execute", "order:refund:apply",
     "user:cuser:read", "user:risk:update", "user:member:read", "user:wallet:read",
+    // 注销队列与代为撤销（2026-09-25）：用户打电话说「我点错了」的入口就在客服
+    "user:logoff:read", "user:logoff:revoke", "user:invoice:read",
     "workorder:wo:read", "workorder:wo:create", "cs:*", "marketing:coupon:read",
     "marketing:coupon:issue", "marketing:push:send", "marketing:notice:read",
     "system:notify_log:read", "system:notify_blacklist:read", "system:notify_blacklist:update",
@@ -49,7 +51,10 @@ export const BACKEND_ROLE_PERMS: Record<Role, string[]> = {
     "order:refund:audit", "pricing:*", "finance:*", "agent:agent:read", "agent:share:config",
     "agent:settlement:read", "agent:performance:read", "location:venue:read",
     "location:contract:read", "location:analysis:read", "location:overview:read",
-    "user:cuser:read", "user:member:read", "user:wallet:read", "report:*", "org:audit:read",
+    "user:cuser:read", "user:member:read", "user:wallet:read",
+    // C 端开票受理（2026-09-25）：开票涉及税务凭据，处理权只给财务
+    "user:invoice:read", "user:invoice:handle",
+    "report:*", "org:audit:read",
     "system:bank:read", "system:bank:update", "system:tax:update", "system:biz_rule:update",
     "system:payment_channel:read",
   ],
