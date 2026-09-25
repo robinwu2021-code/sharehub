@@ -306,7 +306,10 @@ public class DemoOpsFinanceSeeder implements CommandLineRunner {
                 d.setTenantId(TENANT);
                 d.setBatchNo("RCN0002");
                 d.setPayNo("PAY" + (7001 + i));
-                d.setDiffType(i == 0 ? "AMOUNT_MISMATCH" : "MISSING_IN_LEDGER");
+                // 词表见 recon_diff.diff_type 列注释：MISSING_LOCAL/MISSING_CHANNEL/
+                //   AMOUNT_MISMATCH/STATUS_MISMATCH/DUPLICATE。
+                // 原先写的 MISSING_IN_LEDGER 是这里自己造的名字（语义＝本地账里缺）。
+                d.setDiffType(i == 0 ? "AMOUNT_MISMATCH" : "MISSING_LOCAL");
                 // detail 是 JSON 列（V13，json_valid CHECK）：写 JSON 对象而非裸文本
                 d.setDetail(ai.neargo.sharehub.common.Json.write(java.util.Map.of(
                         "reason", i == 0 ? "渠道 40.00 / 账务 25.00" : "渠道有单账务无分录")));
