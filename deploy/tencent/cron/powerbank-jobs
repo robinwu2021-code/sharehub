@@ -1,0 +1,64 @@
+# powerbank · 业务定时任务（由 JobCronCoverageTest 按任务声明生成，请勿手改 —— 红了就按失败信息整份覆盖）
+#
+# 为什么是系统 cron：v4/08 禁止进程内定时（定时的东西必须在运营台可见可控），
+# 而共用调度器（v4/14 的 M0 + H1/H4）尚未接通。系统 cron 天然单实例，是单体阶段更小的代价；
+# 与 powerbank-price-adjustment 同一套做法。调度器接通后本文件删除，它调的是同一个端点。
+#
+# 每行：flock -n 防同一任务重叠执行（上一轮没跑完，这一轮直接跳过）；curl 超时 = 声明的 lockAtMostSec。
+# 时间按本机时区解释，与应用 JVM 时区一致（同一台机器）；任务内部的营业日口径按 Asia/Dubai 自行换算。
+# /internal/job/** 只接受回环地址（InternalJobController 自判），这里不带鉴权。
+#
+# 安装：sudo cp deploy/tencent/cron/powerbank-jobs /etc/cron.d/
+#       sudo chown root:root /etc/cron.d/powerbank-jobs && sudo chmod 644 /etc/cron.d/powerbank-jobs
+# 手工补跑：curl -s -X POST 'http://127.0.0.1:8082/internal/job/<任务名>/trigger?type=MANUAL'
+# 核对清单：curl -s http://127.0.0.1:8082/internal/job/declarations
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+# agent-ops-assessment · 代理运维月度考核（platform.agent）· 声明 cron: 0 30 2 1 * *
+30 2 1 * * deploy flock -n /run/lock/powerbank-job-agent-ops-assessment.lock curl -s -m 1200 -X POST 'http://127.0.0.1:8082/internal/job/agent-ops-assessment/trigger' -o /dev/null
+
+# contract-lifecycle · 合同生效 / 到期 / 终止（platform.loc）· 声明 cron: 0 5 * * * *
+5 * * * * deploy flock -n /run/lock/powerbank-job-contract-lifecycle.lock curl -s -m 300 -X POST 'http://127.0.0.1:8082/internal/job/contract-lifecycle/trigger' -o /dev/null
+
+# lead-followup · 商机跟进提醒 / 回收 / 重新激活（platform.loc）· 声明 cron: 0 0 9 * * *
+0 9 * * * deploy flock -n /run/lock/powerbank-job-lead-followup.lock curl -s -m 300 -X POST 'http://127.0.0.1:8082/internal/job/lead-followup/trigger' -o /dev/null
+
+# site-golive-reconcile · 站点上线对账（platform.loc）· 声明 cron: 0 10 * * * *
+10 * * * * deploy flock -n /run/lock/powerbank-job-site-golive-reconcile.lock curl -s -m 300 -X POST 'http://127.0.0.1:8082/internal/job/site-golive-reconcile/trigger' -o /dev/null
+
+# file-temp-purge · 临时 / 已移除文件清理（platform.file）· 声明 cron: 0 40 4 * * *
+40 4 * * * deploy flock -n /run/lock/powerbank-job-file-temp-purge.lock curl -s -m 600 -X POST 'http://127.0.0.1:8082/internal/job/file-temp-purge/trigger' -o /dev/null
+
+# ownership-reconcile · 设备归属重投（agent）· 声明 cron: 0 10 3 * * *
+10 3 * * * deploy flock -n /run/lock/powerbank-job-ownership-reconcile.lock curl -s -m 120 -X POST 'http://127.0.0.1:8082/internal/job/ownership-reconcile/trigger' -o /dev/null
+
+# powerbank-aging · 充电宝老化标记（core.dev）· 声明 cron: 0 10 4 * * *
+10 4 * * * deploy flock -n /run/lock/powerbank-job-powerbank-aging.lock curl -s -m 300 -X POST 'http://127.0.0.1:8082/internal/job/powerbank-aging/trigger' -o /dev/null
+
+# trial-rent-expire · 试借还超时（core.dev）· 声明 cron: 0 */5 * * * *
+*/5 * * * * deploy flock -n /run/lock/powerbank-job-trial-rent-expire.lock curl -s -m 240 -X POST 'http://127.0.0.1:8082/internal/job/trial-rent-expire/trigger' -o /dev/null
+
+# order-overdue-buyout · 逾期达封顶转买断（trade）· 声明 cron: 0 15 * * * *
+15 * * * * deploy flock -n /run/lock/powerbank-job-order-overdue-buyout.lock curl -s -m 900 -X POST 'http://127.0.0.1:8082/internal/job/order-overdue-buyout/trigger' -o /dev/null
+
+# push-sweep-due · 定时推送出队（user.marketing）· 声明 cron: 0 * * * * *
+* * * * * deploy flock -n /run/lock/powerbank-job-push-sweep-due.lock curl -s -m 60 -X POST 'http://127.0.0.1:8082/internal/job/push-sweep-due/trigger' -o /dev/null
+
+# alarm-rule-eval · 业务告警判定（ops.alarm）· 声明 cron: 0 * * * * *
+* * * * * deploy flock -n /run/lock/powerbank-job-alarm-rule-eval.lock curl -s -m 55 -X POST 'http://127.0.0.1:8082/internal/job/alarm-rule-eval/trigger' -o /dev/null
+
+# alarm-site-profile · 告警站点画像（ops.alarm）· 声明 cron: 0 20 3 * * *
+20 3 * * * deploy flock -n /run/lock/powerbank-job-alarm-site-profile.lock curl -s -m 900 -X POST 'http://127.0.0.1:8082/internal/job/alarm-site-profile/trigger' -o /dev/null
+
+# inspection-plan-run · 巡检计划生成工单（ops.wo）· 声明 cron: 0 0 6 * * *
+0 6 * * * deploy flock -n /run/lock/powerbank-job-inspection-plan-run.lock curl -s -m 300 -X POST 'http://127.0.0.1:8082/internal/job/inspection-plan-run/trigger' -o /dev/null
+
+# wo-sla-breach-scan · SLA 超时扫描（ops.wo）· 声明 cron: 0 */5 * * * *
+*/5 * * * * deploy flock -n /run/lock/powerbank-job-wo-sla-breach-scan.lock curl -s -m 120 -X POST 'http://127.0.0.1:8082/internal/job/wo-sla-breach-scan/trigger' -o /dev/null
+
+# settlement-generate · 周期出账（finance）· 声明 cron: 0 0 2 1 * *
+0 2 1 * * deploy flock -n /run/lock/powerbank-job-settlement-generate.lock curl -s -m 300 -X POST 'http://127.0.0.1:8082/internal/job/settlement-generate/trigger' -o /dev/null
+
+# outbox-dispatch —— 不在本清单：OutboxDispatchScheduler（进程内，登记在 known-inprocess-schedules.txt；秒级间隔 cron 表达不了）
+# price-adjust-apply —— 不在本清单：deploy/tencent/cron/powerbank-price-adjustment（每分钟调 /internal/trade/price-adjustments/tick）

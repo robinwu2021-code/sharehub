@@ -102,6 +102,12 @@ public class SecurityConfig {
                          */
                         .requestMatchers(HttpMethod.POST, "/internal/trade/price-adjustments/tick").permitAll()
                         /*
+                         * 任务触发与声明下发，同样给本机 cron 调（deploy/tencent/cron/powerbank-jobs），
+                         * 由 {@code InternalJobController} 再判回环地址。共用调度器接通后它调的也是这两个。
+                         */
+                        .requestMatchers(HttpMethod.POST, "/internal/job/*/trigger").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/internal/job/declarations").permitAll()
+                        /*
                          * 本地存储的**限时签名链接**（测试 / 离线开发）。签名即授权：链接由已鉴权的
                          * GET /api/platform/files/{no}/url 发放，5 分钟有效，个人数据文件不发链接。
                          * 生产走 COS 预签名地址，不经过这里。
