@@ -6,7 +6,7 @@ import type {
   ExceptionHandleAction, OrderExceptionHandlePayload,
   DepositRecord, DepositStatus, DepositAction,
   DepositBuyoutPayload, ArrearsDunPayload,
-  OrderIntervention, OrderInterventionAction, OrderIntervenePayload, OrderInterveneResult,
+  OrderIntervention, OrderInterventionAction, OrderIntervenePayload, OrderInterveneResult, OrderEvent,
   Reservation, FreeOrder, FreeOrderStats, PageQuery, WorkOrderType,
 } from "../../types";
 import {
@@ -281,7 +281,12 @@ export function interveneOrder(
   }
 
   const to = ORDER_INTERVENTIONS[action].to;
-  if (to) o.status = to;
+  if (to) {
+    o.status = to;
+    // 只在**状态真的变了**时写流水：to 为 null 的干预（免单/补偿/退款申请）
+    // 改的是钱不是状态，它没有一条状态流转可记 —— 那些留在干预历史里。
+    appendOrderEvent(orderNo, beforeStatus, to, action.toUpperCase(), payload.operatorName);
+  }
 
   const intervention: OrderIntervention = {
     interventionNo: nextNo("OIV", orderInterventions, 90000, "interventionNo"),
@@ -291,6 +296,34 @@ export function interveneOrder(
   orderInterventions.unshift(intervention);
   return { order: { ...o }, intervention };
 }
+
+// ============================================================================
+// 订单状态流转留痕（ord_event_log）
+// ----------------------------------------------------------------------------
+// 后端四个 service（退款/押金/异常/投诉）一直在往这张表写。mock 若不写，
+// 时间线在 mock 下永远是空的 —— 而**空时间线与「功能没做」长得一模一样**，
+// 下一个人会以为没接通，然后去重做一遍。
+// ============================================================================
+
+/** append-only：只插不改。时间正序（与后端 timeline 一致）。 */
+export const orderEvents: OrderEvent[] = [];
+
+/** 追加一条流水。`from` 为空表示建单那一条。 */
+export function appendOrderEvent(
+  orderNo: string, fromStatus: string | null, toStatus: string, event: string, operator?: string | null,
+): void {
+  orderEvents.push({
+    orderNo, fromStatus, toStatus, event,
+    operator: operator?.trim() || "admin", createdAt: now(),
+  });
+}
+
+/**
+ * 按订单号取时间线，**时间正序**（与后端 `OrderEventLogService.timeline` 一致）。
+ * 不分页：一张订单的事件是有界的。
+ */
+export const listOrderEvents = (orderNo: string): OrderEvent[] =>
+  orderEvents.filter((x) => x.orderNo === orderNo);
 
 /** 干预记录查询：`orderNo` 精确过滤（订单详情抽屉的时间线），keyword 覆盖号/人/原因。 */
 export const listOrderInterventions = (q: PageQuery & { orderNo?: string; action?: string } = {}) =>
@@ -419,7 +452,9 @@ export function handleOrderException(
     e.refundNo = payload.refundNo;
   }
 
+  const exBefore = e.status;
   e.status = EXCEPTION_HANDLINGS[action].to;
+  appendOrderEvent(orderNo, exBefore, e.status, `EXCEPTION_${action.toUpperCase()}`, payload.operatorName);
   e.handleAction = action;
   e.handleResult = result;
   e.handledBy = payload.operatorName?.trim() || "admin";

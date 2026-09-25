@@ -23,6 +23,7 @@ export const orderMock: OrderApi = {
     return wait(db.interveneOrder(no, action, payload), 400);
   },
   listOrderInterventions: (q: PageQ = {}) => wait(db.listOrderInterventions(q)),
+  listOrderEvents: (orderNo: string) => wait(db.listOrderEvents(orderNo)),
 
   // 订单扩展
   listOrderExceptions: (q: StatusQ & { type?: string } = {}) => wait(db.listOrderExceptions(q)),

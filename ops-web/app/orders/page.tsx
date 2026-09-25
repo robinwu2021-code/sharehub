@@ -199,6 +199,18 @@ function OrdersInner() {
     enabled: !!detail,
   });
 
+  /**
+   * 状态流转留痕（ord_event_log）。**与干预历史并列而非合并**：
+   * 这里是「状态怎么走的」，那里是「人做了什么」。合并会丢信息 ——
+   * 干预里有 to: null 的只留痕动作（免单/补偿/退款申请改的是钱不是状态），
+   * 它根本不产生一条状态流转。
+   */
+  const evHistoryQ = useQuery({
+    queryKey: ["order-events", detail?.orderNo],
+    queryFn: () => api.listOrderEvents(detail!.orderNo),
+    enabled: !!detail,
+  });
+
   const intervene = useMutation({
     mutationFn: (v: { no: string; action: OrderInterventionAction; reason: string; amount?: number }) =>
       api.interveneOrder(v.no, v.action, { reason: v.reason, amount: v.amount }),
@@ -206,6 +218,10 @@ function OrdersInner() {
       notify.success(`${IV_LABEL[v.action]}已执行 · ${r.intervention.interventionNo} · 状态 ${t(`orderStatus.${r.intervention.beforeStatus}`)} → ${t(`orderStatus.${r.intervention.afterStatus}`)}`);
       qc.invalidateQueries({ queryKey: ["orders"] });
       qc.invalidateQueries({ queryKey: ["order-interventions"] });
+      // 状态流转时间线与干预历史是两条查询，**都要失效** —— 只失效前者的话，
+      // 干预执行后抽屉里状态已经变了、而「状态流转」还显示空态，
+      // 看上去像「这个功能没接通」。（浏览器里实测撞到过。）
+      qc.invalidateQueries({ queryKey: ["order-events"] });
       // 申请退款会落一条退款申请，刷新审批队列
       if (v.action === "refund_apply") qc.invalidateQueries({ queryKey: ["refunds"] });
       setDetail(r.order); // 详情抽屉立刻显示落库后的新状态与金额
@@ -237,6 +253,8 @@ function OrdersInner() {
             : `异常单 ${r.orderNo} 已关闭`,
       );
       qc.invalidateQueries({ queryKey: ["order-exceptions"] });
+      // 异常处置也会往 ord_event_log 写一条（EXCEPTION_*），同样要失效
+      qc.invalidateQueries({ queryKey: ["order-events"] });
       // 转工单会真的落一条工单、发起退款会落一条退款申请，两处列表同步刷新
       if (v.action === "work_order") qc.invalidateQueries({ queryKey: ["workorders"] });
       if (v.action === "refund") qc.invalidateQueries({ queryKey: ["refunds"] });
@@ -1166,6 +1184,18 @@ function OrdersInner() {
             {!!detail.ejectCount && <Field label="远程弹出">{detail.ejectCount} 次 · 最近 {detail.lastEjectAt ? fmtTime(detail.lastEjectAt) : "-"}</Field>}
             {!!detail.waivedAmount && <Field label="已免单金额">{money(detail.waivedAmount, detail.currency)}</Field>}
             {!!detail.compensateAmount && <Field label="已补偿金额">{money(detail.compensateAmount, detail.currency)}（补至用户余额）</Field>}
+            <Field label="状态流转">
+              <Timeline
+                loading={evHistoryQ.isLoading}
+                empty="无状态流转记录——该单还没走过任何迁移"
+                items={(evHistoryQ.data ?? []).map((x, i) => ({
+                  key: `${x.createdAt}-${i}`,
+                  badge: { label: x.event, tone: "outline" as const },
+                  meta: `${fmtTime(x.createdAt)}${x.operator ? ` · ${x.operator}` : ""}`,
+                  change: `${x.fromStatus ? t(`orderStatus.${x.fromStatus}`) : "—"} → ${t(`orderStatus.${x.toStatus}`)}`,
+                }))}
+              />
+            </Field>
             <Field label="干预历史">
               <Timeline
                 loading={ivHistoryQ.isLoading}

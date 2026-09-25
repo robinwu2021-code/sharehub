@@ -5,7 +5,7 @@ import type {
   PageResult, RentOrder, OrderException, DepositRecord,
   OrderComplaint, ComplaintResolution, ComplaintCreatePayload,
   RefundRecord, RefundApplyPayload,
-  OrderIntervention, OrderInterventionAction, OrderIntervenePayload, OrderInterveneResult,
+  OrderIntervention, OrderInterventionAction, OrderIntervenePayload, OrderInterveneResult, OrderEvent,
   ExceptionHandleAction, OrderExceptionHandlePayload,
   DepositBuyoutPayload, ArrearsDunPayload,
   Reservation, FreeOrder, FreeOrderStats,
@@ -22,6 +22,12 @@ export interface OrderApi {
   interveneOrder(orderNo: string, action: OrderInterventionAction, payload: OrderIntervenePayload): Promise<OrderInterveneResult>;
   /** 干预记录（审计）：订单详情抽屉的时间线按 `orderNo` 精确过滤。 */
   listOrderInterventions(q?: PageQ & { orderNo?: string; action?: string }): Promise<PageResult<OrderIntervention>>;
+  /**
+   * 订单状态流转时间线。**不分页** —— 一张订单的事件是有界的（十几条封顶，
+   * 不随时间增长），分页只会让调用方多写一圈翻页代码去翻一页。
+   * 干预之所以分页，是因为它还兼作跨订单的审计列表。
+   */
+  listOrderEvents(orderNo: string): Promise<OrderEvent[]>;
 
   // === 订单扩展 tab ===
   listOrderExceptions(q?: StatusQ & { type?: string }): Promise<PageResult<OrderException>>;

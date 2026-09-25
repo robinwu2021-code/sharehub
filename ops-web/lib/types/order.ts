@@ -61,6 +61,28 @@ export const ORDER_INTERVENTIONS: Record<OrderInterventionAction, { from: readon
   refund_apply: { from: ["RETURNED", "SETTLED", "CLOSED", "EXCEPTION"], to: null },
 };
 
+/**
+ * 订单状态流转留痕一条（`ord_event_log`，append 表）。
+ *
+ * **与干预历史（`OrderIntervention`）是两件事**：这里是「状态怎么走的」，
+ * 那里是「人做了什么」。不合并，因为干预里有 `to: null` 的只留痕动作
+ * （免单/补偿/退款申请改的是钱不是状态），它根本不产生一条状态流转。
+ *
+ * 后端四个 service（退款/押金/异常/投诉）一直在往这张表写，而在 2026-09-25
+ * 补上读端点之前**写进去的东西谁也读不到** —— 排障时「这单怎么走到 EXCEPTION 的」
+ * 只能翻日志。
+ */
+export interface OrderEvent {
+  orderNo: string;
+  /** 迁移前状态；建单那条为 null。 */
+  fromStatus: string | null;
+  toStatus: string;
+  /** 事件名（动词，如 RETURN / SETTLE）——与状态是两套词汇，别混用。 */
+  event: string;
+  operator: string | null;
+  createdAt: string;
+}
+
 /** 该干预在当前订单状态下是否合法（页面按钮据此渲染，与 mock/后端校验同一份定义）。 */
 export const canIntervene = (status: OrderStatus, action: OrderInterventionAction) =>
   ORDER_INTERVENTIONS[action].from.includes(status);

@@ -10,6 +10,7 @@ export const orderHttp: OrderApi = {
   getOrder: (no) => client.get(`/api/trade/orders/${no}`),
   interveneOrder: (no, action, payload) => client.post(`/api/trade/orders/${no}/intervene`, { action, ...payload }),
   listOrderInterventions: (q?: PageQ & { orderNo?: string; action?: string }) => client.get("/api/trade/order-interventions", q),
+  listOrderEvents: (orderNo: string) => client.get("/api/trade/order-events", { orderNo }),
 
   // 订单扩展
   listOrderExceptions: (q?: StatusQ & { type?: string }) => client.get("/api/trade/order-exceptions", q),

@@ -255,6 +255,7 @@ describe("押金状态机", () => {
 import type { OrderException, OrderExceptionStatus } from "../../types";
 import { EXCEPTION_HANDLINGS, exceptionHandleActions } from "../../types";
 import { orderExceptions, handleOrderException, OrderExceptionError, listOrderExceptions } from "./order";
+import { orderEvents, listOrderEvents } from "./order";
 import { workOrders } from "./workorder";
 
 /** 造一条指定状态的异常单（直接落数组，绕开状态机——测试夹具允许，业务代码不允许）。 */
@@ -498,5 +499,51 @@ describe("新建退款申请（POST /api/trade/refunds）", () => {
     expect(() => createRefund({ orderNo: orders[0].orderNo, userNo: "U3001", amount: 5, reason: " ", idempotencyKey: "RF-TEST-4" }))
       .toThrow(/必须填写退款原因/);
     expect(refundRecords.length).toBe(before);
+  });
+});
+
+describe("订单状态流转留痕 ord_event_log（B1）", () => {
+  // 此前后端四个 service 一直在写这张表，而读侧一个调用方都没有 —— 写进去的东西
+  // 谁也看不到。mock 若不写，时间线在 mock 下永远是空的，而**空时间线与
+  // 「功能没做」长得一模一样**，下一个人会以为没接通然后重做一遍。
+  //
+  // 用 order() 夹具自己造单，不从种子里捞：靠种子剩余量的写法会随
+  // 「前面加了几个用例」而时红时绿（marketing 那条幂等用例栽过）。
+
+  it("改状态的干预会写一条流水，from/to 与实际迁移一致", () => {
+    const o = order("IN_USE");
+    const n = listOrderEvents(o.orderNo).length;
+    interveneOrder(o.orderNo, "force_return", { reason: "用户失联，按当前时间结单" });
+    const evs = listOrderEvents(o.orderNo);
+    expect(evs.length).toBe(n + 1);
+    expect(evs[evs.length - 1]).toMatchObject({
+      orderNo: o.orderNo, fromStatus: "IN_USE", toStatus: "SETTLED", event: "FORCE_RETURN",
+    });
+  });
+
+  it("**不改状态的干预不写流水** —— 免单改的是钱，没有状态流转可记", () => {
+    const o = order("SETTLED");
+    const n = listOrderEvents(o.orderNo).length;
+    interveneOrder(o.orderNo, "waive", { reason: "服务未达预期，全额免单" });
+    expect(listOrderEvents(o.orderNo).length).toBe(n);   // 一条都没多
+    expect(ORDER_INTERVENTIONS.waive.to).toBeNull();     // 这就是原因
+  });
+
+  it("只按订单号取，不串到别的单上", () => {
+    const a = order("IN_USE");
+    const b = order("IN_USE");
+    interveneOrder(a.orderNo, "force_return", { reason: "A 单强制归还" });
+    expect(listOrderEvents(a.orderNo).length).toBe(1);
+    expect(listOrderEvents(b.orderNo)).toEqual([]);
+  });
+
+  it("append-only：同一单的流水时间正序，与后端 timeline 一致", () => {
+    const grouped = new Map<string, string[]>();
+    for (const ev of orderEvents) {
+      grouped.set(ev.orderNo, [...(grouped.get(ev.orderNo) ?? []), ev.createdAt]);
+    }
+    for (const [, times] of grouped) {
+      expect(times).toEqual([...times].sort());
+    }
   });
 });

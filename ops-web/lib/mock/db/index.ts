@@ -66,6 +66,7 @@ export {
   listFreeOrders, getFreeOrderStats,
   // S1：订单干预（状态机 + 审计记录）与押金处置
   orderInterventions, interveneOrder, listOrderInterventions, OrderInterventionError,
+  orderEvents, appendOrderEvent, listOrderEvents,
   transitionDeposit, releaseDeposit, buyoutDeposit, dunArrears, DepositTransitionError,
   // S2：异常订单处置（转工单 / 发起退款 / 直接关闭）
   handleOrderException, OrderExceptionError,
