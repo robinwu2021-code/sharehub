@@ -20,6 +20,9 @@ import org.springframework.stereotype.Service;
 public class InspectionPlanServiceImpl extends AbstractCrudService<WoInspectionPlan, InspectionPlan>
         implements InspectionPlanService {
 
+    private static final org.slf4j.Logger log =
+            org.slf4j.LoggerFactory.getLogger(InspectionPlanServiceImpl.class);
+
     private final WoInspectionPlanMapper planMapper;
     private final WoOpsService woOps;
     private final CabinetQueryPort cabinetQuery;
@@ -155,6 +158,29 @@ public class InspectionPlanServiceImpl extends AbstractCrudService<WoInspectionP
         e.setLastRunWoNos(String.join(",", woNos));
         planMapper.updateById(e);
         return java.util.Map.of("planNo", planNo, "period", period, "woNos", woNos);
+    }
+
+    @Override
+    public java.util.List<String> runDue() {
+        java.util.List<WoInspectionPlan> plans = planMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WoInspectionPlan>()
+                        .eq(WoInspectionPlan::getActive, 1));
+        java.util.List<String> ran = new java.util.ArrayList<>();
+        for (WoInspectionPlan p : plans) {
+            try {
+                run(p.getPlanNo());
+                ran.add(p.getPlanNo());
+            } catch (IllegalArgumentException e) {
+                /*
+                 * 逐个计划独立成败（见接口注释）。这里**只吞 IllegalArgumentException** ——
+                 * run() 用它表达全部业务拒绝（停用 / 本周期已跑过 / 路线为空 / 站点无在册机柜）。
+                 * 别用 catch (Exception)：那会把数据库连不上这类真故障也吞成「这条跳过」，
+                 * 于是任务返回成功而一张工单都没生成。
+                 */
+                log.info("巡检计划本次未生成工单 planNo={} 原因={}", p.getPlanNo(), e.getMessage());
+            }
+        }
+        return ran;
     }
 
     /** 周期键（与前端 {@code inspectionPeriodKey} 同口径）：每日按天/每周按周序/双周折半/每月按月。 */
