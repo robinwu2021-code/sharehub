@@ -73,6 +73,11 @@ public abstract class AbstractTokenAuthFilter extends OncePerRequestFilter {
      * 会话就绪后、写入上下文之前的钩子。运营端用它做口径 B 的权限重建。
      * <p>放在写上下文**之前**是有意的：钩子抛异常时，三个 ThreadLocal 一个都还没设，
      * 不存在"设了一半"的中间态。
+     *
+     * @return 刷新后的会话；<b>返回 {@code null} = 该会话已失效</b>（主体离职/停用），
+     *         本次请求按**未认证**处理。给钩子这个出口，是因为「令牌本身有效、
+     *         但持有它的人已经不该进来了」是一种真实状态 —— 从前它无处表达，
+     *         于是停用一个员工之后他手里的令牌照样能用。
      */
     protected TokenStore.SessionData onSession(String token, TokenStore.SessionData data) {
         return data;
@@ -92,16 +97,21 @@ public abstract class AbstractTokenAuthFilter extends OncePerRequestFilter {
         if (token != null && mayBelongHere(token)) {
             TokenStore.SessionData d = tokenStore.get(token).orElse(null);
             if (d != null && accepts(d.user().realm()) && prefixAgrees(token, d.user())) {
+                // 返回 null = 主体已失效（离职/停用）→ 不认证，后续由 Security 出 401/403。
+                // **必须嵌在这一层里**：把它拆成平级的第二个 if 会让「realm 不对 / 前缀不符」
+                // 的会话也落进认证分支 —— 那是把一道门改成了摆设。
                 d = onSession(token, d);
-                LoginUser u = d.user();
-                SecurityContextHolder.getContext().setAuthentication(
-                        new UsernamePasswordAuthenticationToken(u, null, authorities(u)));
-                // 与 SecurityContext 成对写：后者只在 web 请求线程上有值，
-                // CurrentUser 让非 web 线程（@Async、定时任务）也读得到当前身份
-                CurrentUser.set(u);
-                DataScopeContext.set(u.dataScope());   // 供 DataScopeHandler 注入 SQL
-                if (carriesToken()) CallContext.setToken(token);
-                authenticated = true;
+                if (d != null) {
+                    LoginUser u = d.user();
+                    SecurityContextHolder.getContext().setAuthentication(
+                            new UsernamePasswordAuthenticationToken(u, null, authorities(u)));
+                    // 与 SecurityContext 成对写：后者只在 web 请求线程上有值，
+                    // CurrentUser 让非 web 线程（@Async、定时任务）也读得到当前身份
+                    CurrentUser.set(u);
+                    DataScopeContext.set(u.dataScope());   // 供 DataScopeHandler 注入 SQL
+                    if (carriesToken()) CallContext.setToken(token);
+                    authenticated = true;
+                }
             }
         }
         try {

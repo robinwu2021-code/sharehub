@@ -42,11 +42,22 @@ public class StaffTokenAuthFilter extends AbstractTokenAuthFilter {
         return user.perms().stream().map(SimpleGrantedAuthority::new).toList();
     }
 
-    /** 口径 B：权限版本变了就按会话角色重建，并把新会话写回存储。 */
+    /**
+     * 口径 B：权限版本变了就按会话角色重建，并把新会话写回存储。
+     *
+     * <p><b>重建返回 null = 这个人已经不该进来了</b>（离职/停用）——
+     * 此时把令牌<b>撤掉</b>再返回 null：不撤的话，下一次请求会再查一遍库、
+     * 再判一次失效，一张已经作废的令牌能无限次触发这条路径。
+     * 撤掉之后第二次请求连 {@code tokenStore.get} 都取不到。
+     */
     @Override
     protected TokenStore.SessionData onSession(String token, TokenStore.SessionData d) {
         if (d.permStamp() == permVersion.get()) return d;
         LoginUser rebuilt = refresher.rebuild(d.user(), d.roleNos());
+        if (rebuilt == null) {
+            tokenStore.revoke(token);
+            return null;
+        }
         TokenStore.SessionData fresh = new TokenStore.SessionData(rebuilt, d.roleNos(), permVersion.get());
         tokenStore.refresh(token, fresh);
         return fresh;

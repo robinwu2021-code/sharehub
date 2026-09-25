@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.platform.org.service.impl;
 
+import ai.neargo.sharehub.auth.PermVersion;
 import ai.neargo.sharehub.platform.iam.EmployeeStatus;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.common.crud.AbstractCrudService;
@@ -37,13 +38,15 @@ public class EmployeeServiceImpl extends AbstractCrudService<IamEmployee, Employ
     private final IamEmployeeRoleMapper employeeRoleMapper;
     private final IamDeptMapper deptMapper;
     private final RoleMapper roleMapper;
+    private final PermVersion permVersion;
 
     public EmployeeServiceImpl(IamEmployeeMapper mapper, IamEmployeeRoleMapper employeeRoleMapper,
-                               IamDeptMapper deptMapper, RoleMapper roleMapper) {
+                               IamDeptMapper deptMapper, RoleMapper roleMapper, PermVersion permVersion) {
         super(mapper);
         this.employeeRoleMapper = employeeRoleMapper;
         this.deptMapper = deptMapper;
         this.roleMapper = roleMapper;
+        this.permVersion = permVersion;
     }
 
     @Override
@@ -113,6 +116,21 @@ public class EmployeeServiceImpl extends AbstractCrudService<IamEmployee, Employ
         Employee vo = super.save(body);
         IamEmployee saved = selectByKey(vo.employeeNo());
         syncRoles(saved.getEmployeeNo(), saved.getRoleNo(), req.roleNos());
+
+        // 在线生效：状态（离职）与角色（授权）变更都要让在线会话下一次请求重建。
+        // **不分状态改了还是角色改了** —— 两者都影响授权，分开判就要维护一个
+        // 「哪些字段算授权相关」的清单，那种清单会漂（加个字段没人记得加进去），
+        // 而多 bump 一次的代价只是所有在线会话各多做一次重建。
+        //
+        // 停用之所以能把人挡在门外，是 bump 与 PermissionService.rebuild 的在职回查
+        // **两件事合起来**：只 bump 不回查，会话照原样重算一遍然后放行；
+        // 只回查不 bump，戳没变就压根不会走到重建那一步。
+        //
+        // ⚠️ PermVersion 是进程内 AtomicLong：多副本部署时一个副本 bump 不会传到
+        // 另一个副本，「在线生效」只对自己这台成立。切 token-store: redis 做水平扩展时
+        // 必须一起解决，见 docs/technical/待办-状态机与领域缺口-执行计划.md B3。
+        permVersion.bump();
+
         // 角色变了要重新出 VO —— 否则返回的 roleNos 还是改之前那份
         return toVO(selectByKey(vo.employeeNo()));
     }

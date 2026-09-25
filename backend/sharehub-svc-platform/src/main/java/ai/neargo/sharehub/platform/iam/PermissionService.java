@@ -13,6 +13,8 @@ import ai.neargo.sharehub.platform.iam.entity.IamEntities.IamDataScope;
 import ai.neargo.sharehub.platform.iam.entity.IamEntities.IamRolePerm;
 import ai.neargo.sharehub.platform.iam.mapper.IamMappers.DataScopeMapper;
 import ai.neargo.sharehub.platform.iam.mapper.IamMappers.RolePermMapper;
+import ai.neargo.sharehub.platform.org.entity.IamEmployee;
+import ai.neargo.sharehub.platform.org.mapper.IamEmployeeMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.springframework.stereotype.Service;
 
@@ -32,9 +34,12 @@ public class PermissionService implements PrincipalRefresher, PermissionResolver
 
     private final RolePermMapper rolePermMapper;
     private final DataScopeMapper dataScopeMapper;
+    private final IamEmployeeMapper employeeMapper;
     private final ConcurrentHashMap<String, List<String>> permCache = new ConcurrentHashMap<>(); // roleCode → perms
 
-    public PermissionService(RolePermMapper rolePermMapper, DataScopeMapper dataScopeMapper) {
+    public PermissionService(RolePermMapper rolePermMapper, DataScopeMapper dataScopeMapper,
+                             IamEmployeeMapper employeeMapper) {
+        this.employeeMapper = employeeMapper;
         this.rolePermMapper = rolePermMapper;
         this.dataScopeMapper = dataScopeMapper;
     }
@@ -134,11 +139,46 @@ public class PermissionService implements PrincipalRefresher, PermissionResolver
     /** 口径 B：按角色重建会话主体（权限/范围变更后刷新）。实现 {@link PrincipalRefresher}，走 SPI 保持一致。 */
     @Override
     public LoginUser rebuild(LoginUser old, List<String> roleCodes) {
+        // 主体还在不在职？—— 只有回查这一句，停用一个员工才真的把他挡在门外。
+        // 此前本方法只按会话带来的 roleCodes 重算权限，不读 iam_employee，
+        // 于是「停用 + bump」之后那个人的会话照原样重算一遍然后放行。
+        if (!subjectStillValid(old)) {
+            return null;
+        }
         AuthSubject subject = new AuthSubject(old.realm().name(), old.userNo(), roleCodes, old.tenantId(),
                 java.util.Map.of("agentNo", old.agentNo() == null ? "" : old.agentNo()));
         return new LoginUser(old.realm(), old.userNo(), old.username(), old.role(),
                 List.copyOf(resolvePermissions(subject)), old.tenantId(), old.agentNo(),
                 resolveDataScope(subject));
+    }
+
+    /**
+     * 主体是否仍然有效。
+     *
+     * <p><b>只覆盖 {@link Realm#STAFF}</b>。AGENT 的主体有效性（{@code agt_account}
+     * 停用、所属运营主体停用、多主体成员关系撤销）是 IAM 多角色那条线的范围，
+     * 规则比员工复杂得多；在这里顺手加一个半对的判断，
+     * 比不加更危险 —— <b>半对的鉴权会让人以为已经覆盖了</b>。
+     * 那一侧补上之前，本方法对 AGENT 一律放行，与改动前行为一致。
+     *
+     * <p><b>查不到这个员工 → 判有效，不是判失效。</b>会话里的 {@code userNo} 是**登录名**，
+     * 而登录名不一定等于 {@code employee_no} —— {@code AuthController.login} 的注释
+     * 写得很明白：「生产的登录名今天是 admin，不等于任何 employee_no，
+     * 为此拒绝登录会把唯一能用的账号锁在外面」，所以它认不出员工时是沿用配置角色放行的。
+     *
+     * <p>这里必须与那一侧保持同一个立场。第一版写成了「查不到也判失效」——
+     * 看起来更保守，实际是<b>一次 bump 就把所有人（含 admin 与全部集成测试账号）
+     * 挡在门外</b>：认不出员工是常态，不是异常。
+     * 本方法只回答一个问题：<b>这个人如果是员工，他还在职吗。</b>
+     */
+    private boolean subjectStillValid(LoginUser old) {
+        if (old.realm() != Realm.STAFF) {
+            return true;
+        }
+        IamEmployee e = employeeMapper.selectOne(new LambdaQueryWrapper<IamEmployee>()
+                .eq(IamEmployee::getEmployeeNo, old.userNo())
+                .last("limit 1"));
+        return e == null || EmployeeStatus.ACTIVE.is(e.getStatus());
     }
 
     static Set<String> parseRefs(String s) {
