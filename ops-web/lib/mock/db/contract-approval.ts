@@ -27,6 +27,8 @@ let seq = 7000;
 
 const now = () => new Date().toISOString();
 const today = () => now().slice(0, 10);
+/** 两种形态都认：纯日期原样返回，ISO 串取前 10 位。 */
+const dateOnly = (v: string): string => (v ?? "").slice(0, 10);
 
 function find(contractNo: string): Contract {
   const c = contracts.find((x) => x.contractNo === contractNo);
@@ -70,8 +72,15 @@ function must(c: Contract, action: keyof typeof CONTRACT_TRANSITIONS): ContractS
 export const getContract = (no: string): Contract => {
   const c = find(no);
   flowOf(c);
-  // remainingDays 由服务端算；mock 也算一份，但按**日期**减，不按毫秒——差一天正是时区坑
-  const end = Date.parse(`${c.endAt}T00:00:00`);
+  /*
+   * remainingDays 由服务端算；mock 也算一份，但按**日期**减，不按毫秒 —— 差一天正是时区坑。
+   *
+   * ⚠️ endAt 有两种形态：种子里是完整 ISO 串（2027-07-01T12:00:00.000Z），
+   * 而新建的合同是纯日期（2027-07-01）。第一版写死 `${c.endAt}T00:00:00`，
+   * 拼到 ISO 串上就成了非法日期 → remainingDays 恒为 null，
+   * 界面上「距到期 N 天」**一次都没显示过**，而它不报错。
+   */
+  const end = Date.parse(`${dateOnly(c.endAt)}T00:00:00`);
   c.remainingDays = Number.isNaN(end) ? null : Math.ceil((end - Date.parse(`${today()}T00:00:00`)) / 86_400_000);
   return c;
 };
