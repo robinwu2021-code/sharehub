@@ -10,6 +10,7 @@ import ai.neargo.sharehub.trade.dto.InterventionDtos;
 import ai.neargo.sharehub.trade.dto.TradeLegacyDtos.RentOrder;
 import ai.neargo.sharehub.trade.dto.TradeLegacyDtos.RentResult;
 import ai.neargo.sharehub.trade.OrdStateMachine;
+import ai.neargo.sharehub.trade.OrderStatus;
 import ai.neargo.sharehub.trade.entity.OrdIntervention;
 import ai.neargo.sharehub.trade.entity.OrdOrder;
 import ai.neargo.sharehub.trade.mapper.InterventionMapper;
@@ -397,9 +398,9 @@ public class RentOrderServiceImpl implements RentOrderService {
 
         OrdOrder e = require(orderNo);
         String before = e.getStatus();
-        if (!rule.from().contains(before))
+        if (!rule.from().contains(OrderStatus.of(before)))
             throw new IllegalArgumentException("状态 " + before + " 不允许 " + req.action() + "，允许自: " + rule.from());
-        String after = rule.to() == null ? before : rule.to();
+        String after = rule.to() == null ? before : rule.to().name();
         if (rule.to() != null) {
             e.setStatus(after);
             mapper.updateById(e);

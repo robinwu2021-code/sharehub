@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.trade.dto;
 
+import ai.neargo.sharehub.trade.OrderStatus;
+
 import ai.neargo.sharehub.trade.dto.TradeLegacyDtos.RentOrder;
 
 import java.math.BigDecimal;
@@ -45,17 +47,30 @@ public final class InterventionDtos {
      * 已关闭订单不再动账（{@code waive} 不含 {@code CLOSED}），但事后补偿仍允许。
      */
     public static final Map<String, Rule> RULES = Map.of(
-            "eject", new Rule(Set.of("CREATED", "DISPENSING", "EXCEPTION"), "DISPENSING"),
-            "force_return", new Rule(Set.of("DISPENSING", "IN_USE", "EXCEPTION"), "SETTLED"),
-            "waive", new Rule(Set.of("IN_USE", "RETURNED", "SETTLED", "EXCEPTION"), null),
-            "compensate", new Rule(Set.of("IN_USE", "RETURNED", "SETTLED", "CLOSED", "EXCEPTION"), null),
-            "refund_apply", new Rule(Set.of("RETURNED", "SETTLED", "CLOSED", "EXCEPTION"), null));
+            "eject", new Rule(Set.of(OrderStatus.CREATED, OrderStatus.DISPENSING, OrderStatus.EXCEPTION),
+                    OrderStatus.DISPENSING),
+            "force_return", new Rule(Set.of(OrderStatus.DISPENSING, OrderStatus.IN_USE, OrderStatus.EXCEPTION),
+                    OrderStatus.SETTLED),
+            "waive", new Rule(Set.of(OrderStatus.IN_USE, OrderStatus.RETURNED,
+                    OrderStatus.SETTLED, OrderStatus.EXCEPTION), null),
+            "compensate", new Rule(Set.of(OrderStatus.IN_USE, OrderStatus.RETURNED,
+                    OrderStatus.SETTLED, OrderStatus.CLOSED, OrderStatus.EXCEPTION), null),
+            "refund_apply", new Rule(Set.of(OrderStatus.RETURNED, OrderStatus.SETTLED,
+                    OrderStatus.CLOSED, OrderStatus.EXCEPTION), null));
 
     /** 动作列表（稳定顺序，供报错信息与文档使用）。 */
     public static final List<String> ACTIONS =
             List.of("eject", "force_return", "waive", "compensate", "refund_apply");
 
-    /** @param to {@code null} = 状态不变 */
-    public record Rule(Set<String> from, String to) {
+    /**
+     * @param to {@code null} = 状态不变
+     *
+     * <p><b>状态是 {@link OrderStatus} 而不是 String</b>：这张表是一台<b>状态机</b>
+     * （只是不叫 StateMachine，也不走 {@code OrdStateMachine} —— 干预本就是绕开正常流程的
+     * 人工处置，例如把 DISPENSING 的单直接强制结算）。既然是状态机，状态就该是名词类型，
+     * 动作名才是字符串。收敛之后它也自动进入 {@code StateMachineEdgeAcrossEndsTest}
+     * 与运营端 {@code ORDER_INTERVENTIONS} 的逐边比对 —— 此前两端各写一份、互不相认。
+     */
+    public record Rule(Set<OrderStatus> from, OrderStatus to) {
     }
 }

@@ -1,0 +1,77 @@
+# 后端状态机能走、而运营端没有对应动作的迁移 —— **只准变短**
+#
+# 由 StateMachineEdgeAcrossEndsTest（方向二）执行。新增一条 → 红；修好没删 → 也红。
+#
+# 【为什么这一向要台账，而方向一零容忍】
+# 方向一（前端有、后端无）是会当场报 400 的真缺陷，没有理由留。
+# 这一向（后端有、前端无）里有大量合法情况：过程态不单独出按钮、某些迁移只由
+# 设备回调 / 定时任务推进、运营端还没建那张表。一刀切零容忍会逼人写假豁免。
+#
+# 【三类，只有第三类是债】
+#   A 过程态：一次走完，不单独出按钮 —— 正常
+#   B 非人工推进：设备回调 / C 端动作 / 定时任务 —— 正常
+#   C **运营端没建迁移表，页面手写了一份 if** —— 这个才是债，见执行计划 A3
+#
+# 格式：<状态词表>: <FROM>-><TO>
+
+# ── A 过程态 ────────────────────────────────────────────────────────
+# 工单 /close 一次走完 AUDIT→CLOSE（DONE→AUDITED→CLOSED）：AUDITED 是过程态，
+# 不单独出按钮，所以运营端的 close 直接声明 DONE→CLOSED。
+# 方向一靠传递闭包认这条复合边，这一向则必须把中间两跳登记掉。
+WorkOrderStatus: DONE->AUDITED
+WorkOrderStatus: AUDITED->CLOSED
+
+# ── B 非人工推进 ────────────────────────────────────────────────────
+# 订单主链由 C 端归还动作与结算任务推进，运营端不手动点这三步。
+# 运营端能做的是**干预**（强制归还 / 免单 / 补偿），那张表是 ORDER_INTERVENTIONS，
+# 已与后端 InterventionDtos.RULES 逐边比对通过。
+OrderStatus: IN_USE->RETURNED
+OrderStatus: RETURNED->SETTLED
+OrderStatus: SETTLED->CLOSED
+
+# 充电宝的生命周期基本由设备事件推进（借出/归还/上报故障/超时）。
+# devices 页有明确注释：「借出中 / 丢失 / 买断 / 报废是业务流转出来的结果，
+# 不给人在表单里直接选」—— 这是**刻意的**产品决定，不是漏建。
+#
+# ⚠️ 但后端 PowerbankStateMachine.eventFor() 的注释写的是
+# 「运营端『报废/丢失』等直接改状态的入口用」—— 两边对这件事的说法不一致。
+# 不在本轮裁决：先如实登记，等产品确认到底给不给运营手动报废。
+# 若确认要给，SCRAP / LOST 相关的边要转成 C 类（建迁移表），其余留 B 类。
+PowerbankStatus: IN_STOCK->IN_CABINET
+PowerbankStatus: IN_CABINET->RENTED
+PowerbankStatus: RENTED->IN_CABINET
+PowerbankStatus: RENTED->FAULT
+PowerbankStatus: RENTED->LOST
+PowerbankStatus: RENTED->SOLD
+PowerbankStatus: LOST->IN_CABINET
+PowerbankStatus: LOST->SOLD
+PowerbankStatus: IN_CABINET->FAULT
+PowerbankStatus: IN_STOCK->FAULT
+PowerbankStatus: FAULT->IN_STOCK
+PowerbankStatus: FAULT->SCRAP
+PowerbankStatus: IN_STOCK->SCRAP
+PowerbankStatus: IN_CABINET->SCRAP
+
+# ── C 运营端没建迁移表，页面手写了 if ────────────────────────────────
+# 这三组是**债**，逐条见执行计划 A3。修法：在 ops-web/lib/types 里补对应的
+# `*_TRANSITIONS`，页面改读 canXxxAction()，然后从本台账删掉对应行。
+
+# 提现：finance/page.tsx:782 手写 `(w.status === "AUDIT" || w.status === "APPLY")`
+# —— 正是 WithdrawalStateMachine 的 APPROVE from 集抄了一份。
+# 抄一份不是风格问题：后端加一条边时，手抄处没有任何东西会提醒。
+WithdrawalStatus: APPLY->AUDIT
+WithdrawalStatus: APPLY->PAYING
+WithdrawalStatus: APPLY->FAILED
+WithdrawalStatus: AUDIT->PAYING
+WithdrawalStatus: AUDIT->FAILED
+WithdrawalStatus: PAYING->PAID
+WithdrawalStatus: PAYING->FAILED
+
+# 告警：alarms/page.tsx:244 手写 `a.status === "OPEN"`（ack 按钮）。
+AlarmStatus: OPEN->ACKED
+AlarmStatus: OPEN->CLOSED
+AlarmStatus: ACKED->CLOSED
+
+# 库存调拨：devices?tab=inventory 无迁移表。
+InvTransferStatus: DRAFT->IN_TRANSIT
+InvTransferStatus: IN_TRANSIT->DONE

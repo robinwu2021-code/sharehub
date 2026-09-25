@@ -181,7 +181,12 @@ describe("推送触达发送", () => {
   });
 
   it("幂等：必须带键，且同一把键第二次直接拒绝", () => {
-    const first = draftAt(0);
+    // **自己造两条草稿，不从种子里捞**：种子只有 3 条 DRAFT，而本 describe 里
+    // 前面的用例每发一条就消耗一条（发送落 SENDING，不再是 DRAFT）。
+    // 靠剩余量的写法会随「前面加了几个用例」而时红时绿 —— 失败信息还是
+    // `Cannot read properties of undefined`，根本看不出是用例互相干扰。
+    const first = savePushMessage({ title: "幂等用例-1", content: "x" });
+    const second = savePushMessage({ title: "幂等用例-2", content: "x" });
     expect(() => sendPushMessage(first.pushNo, { idempotencyKey: "  " })).toThrow(/必须携带幂等键/);
 
     const KEY = "K-DUP-ONCE";
@@ -189,7 +194,7 @@ describe("推送触达发送", () => {
     expect(sent.status).toBe("SENDING");
 
     // 换一条草稿、同一把键：照样拒绝（键是全局唯一的，防「换个推送号把同一批内容再发一遍」）
-    const other = draftAt(0);
+    const other = second;
     expect(other.pushNo).not.toBe(first.pushNo);
     expect(() => sendPushMessage(other.pushNo, { idempotencyKey: KEY })).toThrow(/拒绝重复发送/);
     expect(other.status).toBe("DRAFT"); // 被拒的那条毫发无伤
