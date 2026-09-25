@@ -72,10 +72,54 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   return body.data as T;
 }
 
+/**
+ * 上传：multipart + **上传进度**。
+ *
+ * <h3>为什么这一个不用 fetch</h3>
+ * `fetch` 至今没有上传进度事件（只有下载端的 stream）。合同扫描件可到 20MB，
+ * 没有进度条时用户会以为界面卡死而反复点按钮，**于是同一份文件传好几遍** ——
+ * 附件列表里出现三份一样的扫描件，谁也说不清哪份是最终版。所以这里退回 XHR。
+ *
+ * <h3>不要设 Content-Type</h3>
+ * 交给浏览器：它会带上 multipart 的 boundary。手写 `multipart/form-data`
+ * 没有 boundary，后端解析出零个 part，报的却是「缺少参数 file」——
+ * 从错误信息完全看不出是 Content-Type 的问题。
+ */
+function upload<T>(path: string, form: FormData, onProgress?: (p: number) => void): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${BASE}${path}`);
+    const h = headers();
+    for (const [k, v] of Object.entries(h)) {
+      if (k.toLowerCase() === "content-type") continue;   // 见上：必须让浏览器自己带 boundary
+      xhr.setRequestHeader(k, v);
+    }
+    if (onProgress) {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(e.loaded / e.total);
+      };
+    }
+    xhr.onerror = () => reject(new ApiError(-1, translate(curLocale(), "error.network")));
+    xhr.onload = () => {
+      let body: Partial<Result<T>> = {};
+      try { body = JSON.parse(xhr.responseText) as Partial<Result<T>>; } catch { /* 非 JSON：按状态码处理 */ }
+      const ok = xhr.status >= 200 && xhr.status < 300;
+      if (!ok || (body.code !== undefined && body.code !== 0)) {
+        if (xhr.status === 401 && isSessionSensitive(path)) sessionExpired();
+        reject(new ApiError(body.code ?? xhr.status, body.message || translate(curLocale(), statusKey(xhr.status))));
+        return;
+      }
+      resolve(body.data as T);
+    };
+    xhr.send(form);
+  });
+}
+
 export const client = {
   get: <T>(path: string, q?: object) => req<T>(`${path}${qs(q)}`),
   post: <T>(path: string, data?: unknown) => req<T>(path, { method: "POST", body: JSON.stringify(data ?? {}) }),
   put: <T>(path: string, data?: unknown) => req<T>(path, { method: "PUT", body: JSON.stringify(data ?? {}) }),
+  upload,
 };
 
 function qs(q?: object): string {

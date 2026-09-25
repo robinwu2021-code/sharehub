@@ -9,7 +9,7 @@ import type {
   MarketCountry, PaymentChannel, NotifyLog, NotifyLogStats, NotifyBlacklist,
   BizRules, LoginSetting, AppVersion, Brand, BankEntry, ProblemEntry, TaxSetting,
   VendorProbeResult, RegionNode, NotifyTemplatePreview, NotifyTestSendPayload,
-  NotifyResendPayload,
+  NotifyResendPayload, FileCategory, FileRef, SignedFileUrl,
 } from "../../types";
 
 export interface SystemApi {
@@ -90,4 +90,21 @@ export interface SystemApi {
   unarchiveBank(bankCode: string): Promise<BankEntry>;
   archiveProblem(problemNo: string): Promise<ProblemEntry>;
   unarchiveProblem(problemNo: string): Promise<ProblemEntry>;
+
+  // ——— 文件上传（平台域 · 2026-09-25）———
+  // 裁决：文件存 COS，**统一经应用服务器上传**，不做前端直传 ——
+  // 所以这里是「把 File 交给后端」，没有「取直传签名再自己 PUT」那一套。
+
+  /**
+   * 上传一个文件，拿回元数据。**二进制走 multipart，不进 JSON 信封。**
+   *
+   * @param category 用途。它决定谁能传、能传什么、存哪个桶（见 FILE_CATEGORY_RULES），
+   *                 所以必填且没有兜底档。
+   * @param onProgress 0..1。大文件（合同扫描件可到 20MB）没有进度条时，
+   *                   用户会以为界面卡死而反复点按钮，于是同一份文件传好几遍。
+   */
+  uploadFile(file: File, category: FileCategory, onProgress?: (p: number) => void): Promise<FileRef>;
+
+  /** 取限时下载地址。**每次要用时现取** —— expiresAt 过了就失效，别缓存成长期链接。 */
+  fileUrl(fileNo: string): Promise<SignedFileUrl>;
 }

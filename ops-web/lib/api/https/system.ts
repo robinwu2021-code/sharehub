@@ -74,4 +74,13 @@ export const systemHttp: SystemApi = {
   unarchiveBank: (code) => client.post(`/api/platform/banks/${code}/unarchive`, {}),
   archiveProblem: (no) => client.post(`/api/platform/problems/${no}/archive`, {}),
   unarchiveProblem: (no) => client.post(`/api/platform/problems/${no}/unarchive`, {}),
+
+  // —— 文件上传（经应用服务器，不做前端直传）——
+  uploadFile: (file, category, onProgress) => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("category", category);
+    return client.upload("/api/platform/files", form, onProgress);
+  },
+  fileUrl: (fileNo) => client.get(`/api/platform/files/${fileNo}/url`),
 };

@@ -1,6 +1,7 @@
 // 覆盖范围：系统设置 —— 供应商接入、通知模板 / 发送记录 / 通知黑名单、数据字典、
 // 区域、系统参数、开放平台应用、市场国家、支付渠道、业务规则、登录设置、
 // App 版本、银行字典、常见问题、税率设置。
+import * as fileDb from "../../mock/db/file";
 import * as db from "../../mock/db";
 import type { SystemApi } from "../contracts/system";
 import type { PageQ, NotifyLogQ, NotifyBlacklistQ, AppVersionQ, BankQ, ProblemQ } from "../query";
@@ -72,4 +73,15 @@ export const systemMock: SystemApi = {
   unarchiveBank: async (code) => wait(db.unarchiveBank(code), 350),
   archiveProblem: async (no) => wait(db.archiveProblem(no), 350),
   unarchiveProblem: async (no) => wait(db.unarchiveProblem(no), 350),
+
+  // —— 文件上传 ——
+  // 进度是**传输层**的事，db 只管落库：这里分几步喂给回调，
+  // 让离线开发也能看见进度条真的在动（不动的进度条与卡死长得一样）。
+  uploadFile: async (file, category, onProgress) => {
+    for (const p of [0.2, 0.5, 0.8]) { onProgress?.(p); await wait(null, 120); }
+    const ref = fileDb.uploadFile(file, category);
+    onProgress?.(1);
+    return wait(ref, 150);
+  },
+  fileUrl: async (fileNo) => wait(fileDb.fileUrl(fileNo), 120),
 };
