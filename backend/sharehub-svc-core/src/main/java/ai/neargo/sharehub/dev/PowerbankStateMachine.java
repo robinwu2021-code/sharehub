@@ -27,34 +27,46 @@ import java.util.Set;
 public class PowerbankStateMachine {
 
     /** 终态：不可再迁出。 */
-    public static final Set<String> TERMINAL = Set.of("SOLD", "SCRAP");
+    public static final Set<String> TERMINAL =
+            Set.of(PowerbankStatus.SOLD.name(), PowerbankStatus.SCRAP.name());
 
-    // event → (fromStatus → toStatus)
-    private static final Map<String, Map<String, String>> TRANSITIONS;
+    /**
+     * event → (fromStatus → toStatus)。
+     *
+     * <p><b>状态是 {@link PowerbankStatus}，事件仍是字符串</b>：事件是动词、状态是名词。
+     * 本机尤其需要这一层 —— 十条边里有四条的事件名与某个状态名高度相似
+     * （{@code SCRAP} 事件 vs {@code SCRAP} 状态、{@code REPORT_FAULT} vs {@code FAULT}），
+     * 裸串时把事件填进状态位不会有任何提示。
+     */
+    private static final Map<String, Map<PowerbankStatus, PowerbankStatus>> TRANSITIONS;
 
     static {
-        Map<String, Map<String, String>> m = new LinkedHashMap<>();
-        m.put("DEPLOY", Map.of("IN_STOCK", "IN_CABINET"));                       // 投放/补货
-        m.put("RENT", Map.of("IN_CABINET", "RENTED"));                           // 借出
-        m.put("RETURN", Map.of("RENTED", "IN_CABINET"));                         // 归还（任意柜）
-        m.put("FAULT_RETURN", Map.of("RENTED", "FAULT"));                        // 坏机归还
-        m.put("OVERDUE", Map.of("RENTED", "LOST"));                              // 超时未归还
-        m.put("RECOVER", Map.of("LOST", "IN_CABINET"));                          // 失而复得（LOST 是半终态）
-        m.put("BUYOUT", Map.of("RENTED", "SOLD", "LOST", "SOLD"));               // 买断付费（含超时买断）
-        m.put("REPORT_FAULT", Map.of("IN_CABINET", "FAULT", "IN_STOCK", "FAULT"));// 自检/上报故障
-        m.put("REPAIR", Map.of("FAULT", "IN_STOCK"));                            // 维修回仓
-        m.put("SCRAP", Map.of("FAULT", "SCRAP", "IN_STOCK", "SCRAP", "IN_CABINET", "SCRAP"));
+        Map<String, Map<PowerbankStatus, PowerbankStatus>> m = new LinkedHashMap<>();
+        m.put("DEPLOY", Map.of(PowerbankStatus.IN_STOCK, PowerbankStatus.IN_CABINET));      // 投放/补货
+        m.put("RENT", Map.of(PowerbankStatus.IN_CABINET, PowerbankStatus.RENTED));          // 借出
+        m.put("RETURN", Map.of(PowerbankStatus.RENTED, PowerbankStatus.IN_CABINET));        // 归还（任意柜）
+        m.put("FAULT_RETURN", Map.of(PowerbankStatus.RENTED, PowerbankStatus.FAULT));       // 坏机归还
+        m.put("OVERDUE", Map.of(PowerbankStatus.RENTED, PowerbankStatus.LOST));             // 超时未归还
+        m.put("RECOVER", Map.of(PowerbankStatus.LOST, PowerbankStatus.IN_CABINET));         // 失而复得（LOST 是半终态）
+        m.put("BUYOUT", Map.of(PowerbankStatus.RENTED, PowerbankStatus.SOLD,
+                               PowerbankStatus.LOST, PowerbankStatus.SOLD));                // 买断付费（含超时买断）
+        m.put("REPORT_FAULT", Map.of(PowerbankStatus.IN_CABINET, PowerbankStatus.FAULT,
+                                     PowerbankStatus.IN_STOCK, PowerbankStatus.FAULT));     // 自检/上报故障
+        m.put("REPAIR", Map.of(PowerbankStatus.FAULT, PowerbankStatus.IN_STOCK));           // 维修回仓
+        m.put("SCRAP", Map.of(PowerbankStatus.FAULT, PowerbankStatus.SCRAP,
+                              PowerbankStatus.IN_STOCK, PowerbankStatus.SCRAP,
+                              PowerbankStatus.IN_CABINET, PowerbankStatus.SCRAP));
         TRANSITIONS = Map.copyOf(m);
     }
 
     /** 校验并返回目标状态；非法迁移抛异常。 */
     public String next(String from, String event) {
-        Map<String, String> m = TRANSITIONS.get(event);
-        String to = m == null ? null : m.get(from);
+        Map<PowerbankStatus, PowerbankStatus> m = TRANSITIONS.get(event);
+        PowerbankStatus to = m == null ? null : m.get(PowerbankStatus.of(from));
         if (to == null) {
             throw new IllegalArgumentException("充电宝状态非法迁移: " + from + " --" + event + "--> ?");
         }
-        return to;
+        return to.name();
     }
 
     /**
@@ -65,8 +77,10 @@ public class PowerbankStateMachine {
         if (from != null && from.equals(to)) {
             throw new IllegalArgumentException("充电宝状态未变更: " + from);
         }
-        for (Map.Entry<String, Map<String, String>> e : TRANSITIONS.entrySet()) {
-            if (to != null && to.equals(e.getValue().get(from))) {
+        PowerbankStatus fromSt = PowerbankStatus.of(from);
+        for (Map.Entry<String, Map<PowerbankStatus, PowerbankStatus>> e : TRANSITIONS.entrySet()) {
+            PowerbankStatus hit = e.getValue().get(fromSt);
+            if (hit != null && hit.name().equals(to)) {
                 return e.getKey();
             }
         }

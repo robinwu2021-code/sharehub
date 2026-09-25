@@ -21,20 +21,28 @@ import java.util.Map;
 @Component
 public class WithdrawalStateMachine {
 
-    private static final Map<String, Map<String, String>> TRANSITIONS = Map.of(
-            "SUBMIT", Map.of("APPLY", "AUDIT"),
-            "APPROVE", Map.of("APPLY", "PAYING", "AUDIT", "PAYING"),
-            "REJECT", Map.of("APPLY", "FAILED", "AUDIT", "FAILED"),
-            "PAY", Map.of("PAYING", "PAID"),
-            "FAIL", Map.of("PAYING", "FAILED"));
+    /**
+     * event → (fromStatus → toStatus)。
+     *
+     * <p><b>状态是 {@link WithdrawalStatus}，事件仍是字符串</b>：事件是动词、状态是名词，
+     * 类型不同让两者无法被混为一谈。
+     */
+    private static final Map<String, Map<WithdrawalStatus, WithdrawalStatus>> TRANSITIONS = Map.of(
+            "SUBMIT", Map.of(WithdrawalStatus.APPLY, WithdrawalStatus.AUDIT),
+            "APPROVE", Map.of(WithdrawalStatus.APPLY, WithdrawalStatus.PAYING,
+                              WithdrawalStatus.AUDIT, WithdrawalStatus.PAYING),
+            "REJECT", Map.of(WithdrawalStatus.APPLY, WithdrawalStatus.FAILED,
+                             WithdrawalStatus.AUDIT, WithdrawalStatus.FAILED),
+            "PAY", Map.of(WithdrawalStatus.PAYING, WithdrawalStatus.PAID),
+            "FAIL", Map.of(WithdrawalStatus.PAYING, WithdrawalStatus.FAILED));
 
     /** 校验并返回目标状态；非法迁移抛异常。 */
     public String next(String from, String event) {
-        Map<String, String> m = TRANSITIONS.get(event);
-        String to = m == null ? null : m.get(from);
+        Map<WithdrawalStatus, WithdrawalStatus> m = TRANSITIONS.get(event);
+        WithdrawalStatus to = m == null ? null : m.get(WithdrawalStatus.of(from));
         if (to == null) {
             throw new IllegalArgumentException("提现单状态非法迁移: " + from + " --" + event + "--> ?");
         }
-        return to;
+        return to.name();
     }
 }

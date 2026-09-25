@@ -148,6 +148,17 @@ export interface CommandRecord {
   confirmedAt: string | null;
   createdAt: string;
 }
+/**
+ * 调拨单状态。
+ *
+ * **此前是内联在 interface 里的联合**（`status: "DRAFT" | …`）——
+ * `StatusVocabularyAcrossEndsTest` 的解析器只认具名 `export type`，
+ * 于是整个调拨域的词表两端从未被比对过。那条卡口的类注释把这种情况列为已知边界，
+ * 并写明「碰到了就把它提成具名类型，顺手也让它进入覆盖」——这就是那一下。
+ * 与后端 `InvTransferStatus` 枚举同名同值，改一边另一边会红。
+ */
+export type InvTransferStatus = "DRAFT" | "IN_TRANSIT" | "DONE";
+
 export interface InventoryTransfer {
   transferNo: string;
   /**
@@ -165,7 +176,7 @@ export interface InventoryTransfer {
   fromLocation: string;
   toLocation: string;
   powerbankCount: number;
-  status: "DRAFT" | "IN_TRANSIT" | "DONE";
+  status: InvTransferStatus;
   operator: string;
   createdAt: string;
 }

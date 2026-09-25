@@ -40,6 +40,7 @@ import type {
 import {
   SHARE_BASES,
   RECON_TRANSITIONS, RECON_TERMINAL, canReconTransition, canEditInvoiceFields, parseReconDiffDetail,
+  canSettlementTransition,
   withdrawFeeOf, withdrawNetOf, WITHDRAW_FEE_PENDING,
   canPayWithdrawal, payReceiptError, PAY_CHANNELS, withdrawApplyError, computeWithdrawFee,
   // 记账期间复用报表域枚举：与站点坪效/代理绩效/绩效报表同一套周期口径
@@ -719,8 +720,10 @@ function FinanceInner() {
       cell: (s) => (
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => setStlDetail(s)}>明细</Button>
-          {/* 只有 DRAFT 能确认（状态机 STL_TRANSITIONS），其余状态不给按钮 */}
-          {s.status === "GEN" && canConfirmSettlement && (
+          {/* 能不能确认由状态机说了算（STL_TRANSITIONS.confirm.from = ["GEN"]）。
+              这里此前手写 `status === "GEN"` 并在注释里把它写成 DRAFT —— 注释引了 SSOT
+              却引错了值，而代码根本没读那张表。后端加一条 from 时两处都不会有人想起来改。 */}
+          {canSettlementTransition(s.status, "confirm") && canConfirmSettlement && (
             <Button size="sm" onClick={() => askConfirmSettlement(s)} disabled={confirmSettlement.isPending}>确认结算</Button>
           )}
         </div>
@@ -1727,7 +1730,7 @@ function FinanceInner() {
         desc="金额 = 下方分润明细之和；确认后进入应付，金额锁定"
         width="w-[760px]"
         footer={
-          stlDetail?.status === "GEN" && canConfirmSettlement && (
+          stlDetail && canSettlementTransition(stlDetail.status, "confirm") && canConfirmSettlement && (
             <Button disabled={confirmSettlement.isPending} onClick={() => askConfirmSettlement(stlDetail)}>确认结算</Button>
           )
         }

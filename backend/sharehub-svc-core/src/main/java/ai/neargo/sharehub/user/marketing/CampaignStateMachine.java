@@ -18,12 +18,19 @@ public final class CampaignStateMachine {
     }
 
     /** action → (允许的来源状态, 目标状态)。 */
+    /**
+     * action → 迁移。<b>状态是 {@link CampaignStatus}</b>，动作名仍是字符串
+     * （与运营端 {@code CAMPAIGN_TRANSITIONS} 的 key 一致，是接口词汇不是状态）。
+     */
     private static final Map<String, Transition> T = Map.of(
-            "start", new Transition(List.of("DRAFT", "PAUSED"), "RUNNING", "启动"),
-            "pause", new Transition(List.of("RUNNING"), "PAUSED", "暂停"),
-            "end", new Transition(List.of("RUNNING", "PAUSED"), "ENDED", "结束"));
+            "start", new Transition(List.of(CampaignStatus.DRAFT, CampaignStatus.PAUSED),
+                                    CampaignStatus.RUNNING, "启动"),
+            "pause", new Transition(List.of(CampaignStatus.RUNNING),
+                                    CampaignStatus.PAUSED, "暂停"),
+            "end", new Transition(List.of(CampaignStatus.RUNNING, CampaignStatus.PAUSED),
+                                  CampaignStatus.ENDED, "结束"));
 
-    public record Transition(List<String> from, String to, String label) {
+    public record Transition(List<CampaignStatus> from, CampaignStatus to, String label) {
     }
 
     /**
@@ -37,11 +44,11 @@ public final class CampaignStateMachine {
         if (t == null) {
             throw new IllegalArgumentException("未知活动动作: " + action + "，可用: " + T.keySet());
         }
-        if (!t.from().contains(currentStatus)) {
+        if (!t.from().contains(CampaignStatus.of(currentStatus))) {
             throw new IllegalStateException(String.format(
                     "活动状态 %s 不能执行「%s」，允许的来源状态: %s",
                     currentStatus, t.label(), t.from()));
         }
-        return t.to();
+        return t.to().name();
     }
 }

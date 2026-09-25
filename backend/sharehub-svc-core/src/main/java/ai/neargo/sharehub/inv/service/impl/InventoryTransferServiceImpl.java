@@ -3,6 +3,7 @@ package ai.neargo.sharehub.inv.service.impl;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.inv.InvTransferStateMachine;
+import ai.neargo.sharehub.inv.InvTransferStatus;
 import ai.neargo.sharehub.inv.dto.InvDtos.InventoryTransfer;
 import ai.neargo.sharehub.inv.dto.InvDtos.InventoryTransferDetail;
 import ai.neargo.sharehub.inv.dto.InvDtos.TransferItem;
@@ -82,7 +83,7 @@ public class InventoryTransferServiceImpl implements InventoryTransferService {
             validateEndpoints(body);
             body.setTransferNo(nextTransferNo());
             body.setTenantId(TENANT_MAIN);
-            body.setStatus(InvTransferStateMachine.DRAFT); // 建单一律 DRAFT，不接受调用方直接开在途单
+            body.setStatus(InvTransferStatus.DRAFT.name()); // 建单一律 DRAFT，不接受调用方直接开在途单
             if (body.getPowerbankCount() == null) body.setPowerbankCount(0);
             mapper.insert(body);
             return toVO(selectByNo(body.getTransferNo()));
@@ -99,9 +100,12 @@ public class InventoryTransferServiceImpl implements InventoryTransferService {
         String target = body.getStatus();
         if (notBlank(target) && !target.equals(current.getStatus())) {
             // 目标状态 → 事件，交状态机裁决；未定义的跃迁（如 DRAFT 直接到 DONE）在这里被拒
-            String event = switch (target) {
-                case InvTransferStateMachine.IN_TRANSIT -> "SHIP";
-                case InvTransferStateMachine.DONE -> "RECEIVE";
+            // switch 改切在枚举上：非法字符串在 of() 就被挡住并说清楚哪个值不合法，
+            // 而不是一路走到 default 报「不支持的目标状态」——后者把「拼错了」
+            // 与「这一步不让走」混成同一句话。
+            String event = switch (InvTransferStatus.of(target)) {
+                case IN_TRANSIT -> "SHIP";
+                case DONE -> "RECEIVE";
                 default -> throw new IllegalArgumentException("不支持的目标状态: " + target);
             };
             if ("RECEIVE".equals(event)) requireAllChecked(no);
@@ -109,7 +113,7 @@ public class InventoryTransferServiceImpl implements InventoryTransferService {
         }
 
         // 单头可改字段：只有 DRAFT 期允许改两端与数量，在途单改数量等于事后编账
-        if (InvTransferStateMachine.DRAFT.equals(current.getStatus())) {
+        if (InvTransferStatus.DRAFT.name().equals(current.getStatus())) {
             if (notBlank(body.getFromType())) current.setFromType(body.getFromType());
             if (notBlank(body.getFromRef())) current.setFromRef(body.getFromRef());
             if (notBlank(body.getFromName())) current.setFromName(body.getFromName());

@@ -14,19 +14,26 @@ import java.util.Map;
 @Component
 public class OrdStateMachine {
 
-    // event → (fromStatus → toStatus)
-    private static final Map<String, Map<String, String>> TRANSITIONS = Map.of(
-            "RETURN", Map.of("IN_USE", "RETURNED"),
-            "SETTLE", Map.of("RETURNED", "SETTLED"),
-            "CLOSE", Map.of("SETTLED", "CLOSED"));
+    /**
+     * event → (fromStatus → toStatus)。
+     *
+     * <p><b>状态是 {@link OrderStatus}，事件仍是字符串</b>：事件是动词、状态是名词。
+     * 注意本机只有三条边，而 {@code OrderStatus} 有七个值 —— {@code CREATED} 是建单初值、
+     * {@code DISPENSING} 由弹仓回调推进、{@code EXCEPTION} 由异常处置写入，都不走这里。
+     * 枚举是**取值域**，状态机是**迁移图**，两者本就不必相等。
+     */
+    private static final Map<String, Map<OrderStatus, OrderStatus>> TRANSITIONS = Map.of(
+            "RETURN", Map.of(OrderStatus.IN_USE, OrderStatus.RETURNED),
+            "SETTLE", Map.of(OrderStatus.RETURNED, OrderStatus.SETTLED),
+            "CLOSE", Map.of(OrderStatus.SETTLED, OrderStatus.CLOSED));
 
     /** 校验并返回目标状态；非法迁移抛异常。 */
     public String next(String from, String event) {
-        Map<String, String> m = TRANSITIONS.get(event);
-        String to = m == null ? null : m.get(from);
+        Map<OrderStatus, OrderStatus> m = TRANSITIONS.get(event);
+        OrderStatus to = m == null ? null : m.get(OrderStatus.of(from));
         if (to == null) {
             throw new IllegalArgumentException("订单状态非法迁移: " + from + " --" + event + "--> ?");
         }
-        return to;
+        return to.name();
     }
 }
