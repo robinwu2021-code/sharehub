@@ -27,6 +27,20 @@ public class IamEmployee extends BaseEntity {
     private String roleNo;
     /** pb_auth 凭据引用（realm=STAFF）。 */
     private String userId;
+
+    /**
+     * 邮箱的 HMAC 哈希（V114）。登录按它等值查 —— 明文 email 列不参与查找。
+     *
+     * <p>可空：存量员工里有大量没有邮箱的行（测试库 200 个在职里 195 个邮箱手机皆空）。
+     * 由 {@code staff-identity-backfill} 任务回填，SQL 算不出来（需要运行期的 pepper）。
+     */
+    private String emailHash;
+
+    /** 手机号的 HMAC 哈希（V114）。同 {@link #emailHash}。 */
+    private String phoneHash;
+
+    /** pepper 版本。轮换后据它判断哪些行还没重算。 */
+    private Integer hashVer;
     /** ACTIVE / LEFT */
     private String status;
 }
