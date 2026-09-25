@@ -158,6 +158,29 @@ public class MpUserController {
         return logoff.apply(ConsumerContext.userNo());
     }
 
+    /**
+     * 当前注销申请；没有则返回 {@code null}。
+     *
+     * <p><b>没有这个端点，冷静期就是个说法</b>：用户提交之后看不到「几号生效」，
+     * 也无从知道自己还能不能反悔 —— 而 {@code UserLogoffService} 一直实现着 current/cancel，
+     * 只是没人把它们接出来。少了这两个口，注销在产品上是<b>单向门</b>。
+     */
+    @GetMapping("/logoff")
+    public LogoffItem currentLogoff() {
+        return logoff.current(ConsumerContext.userNo());
+    }
+
+    /**
+     * 冷静期内撤销注销。无 PENDING 申请或冷静期已过 → 400（服务层抛 IllegalStateException）。
+     *
+     * <p>过期之后不允许撤销不是吝啬：到期后清除作业可能已经在跑，
+     * 这时候「撤销成功」会是一句假话 —— 数据已经开始删了。
+     */
+    @PostMapping("/logoff/cancel")
+    public LogoffItem cancelLogoff() {
+        return logoff.cancel(ConsumerContext.userNo());
+    }
+
     // —— 个人资料（C-ME，自 MpController 演示端点移入，真表实现）——
 
     /** 我的资料（镜像 c-app {@code UserProfile}）。{@code phone} 出参即脱敏。 */

@@ -25,7 +25,8 @@ public interface UserLogoffService {
     /**
      * 冷静期内撤销注销。
      *
-     * @throws IllegalStateException 无 PENDING 申请，或冷静期已过（此时数据可能已开始清除）
+     * @throws IllegalArgumentException 无 PENDING 申请，或冷静期已过（此时数据可能已开始清除）——
+     *         用前者不用 IllegalStateException：这是调用方的问题，本仓只把前者映射成 400
      */
     LogoffItem cancel(String cUserNo);
 }
