@@ -57,6 +57,5 @@ SysParam
 SysTaxSetting
 UsrFreeWhitelist
 UsrInvoiceTitle
-UsrRechargePkg
 WoInspectionPlan
 WoSlaRule

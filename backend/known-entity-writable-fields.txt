@@ -215,16 +215,6 @@ UsrInvoiceTitle.title
 UsrInvoiceTitle.titleNo
 UsrInvoiceTitle.type
 UsrInvoiceTitle.vatTrn
-UsrRechargePkg.archivedAt
-UsrRechargePkg.currency
-UsrRechargePkg.giftAmount
-UsrRechargePkg.name
-UsrRechargePkg.packageNo
-UsrRechargePkg.payAmount
-UsrRechargePkg.regionId
-UsrRechargePkg.sortNo
-UsrRechargePkg.status
-UsrRechargePkg.validDays
 WoInspectionPlan.active
 WoInspectionPlan.assigneeNo
 WoInspectionPlan.cron
