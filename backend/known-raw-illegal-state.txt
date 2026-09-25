@@ -1,0 +1,44 @@
+# 裸 IllegalStateException 台账 —— 只准变短，且**每次变化都要改数字**（在 review 里显形）。
+#
+# 由 BizRejectionNotRawIllegalStateTest 卡住：格式 `类名 处数`，按类**精确相等**比对。
+# 精确相等而不是「不超过」：同一个类里删一处又加一处会互相抵消，那样棘轮就是摆设。
+#
+# ───────────────────────────────────────────────────────────────
+# 为什么这些**该**留在 500
+#
+# 业务拒绝（调用方换个做法就能成功、不需要任何人介入）已在 2026-09-25 全部改成
+# `ServerException.of(ErrorCode.CONFLICT, …)` → HTTP 409 + 原话。方案见
+# docs/technical/待办-业务拒绝的状态码.md。
+#
+# 下面这些不是业务拒绝，**一刀切改成 4xx 会比现在更糟** —— 它们需要人介入，
+# 而 4xx 既不触发告警也不再记录堆栈，等于把一个真故障藏起来。
+# ───────────────────────────────────────────────────────────────
+
+# —— 环境 / 依赖坏了：不介入会持续出错 ——
+IdentifierHasher 3          # HMAC 不可用 / 盐未配置
+IdentifierNormalizer 1      # 规范化能力不可用
+Json 1                      # JSON 序列化失败
+OpenApiAppServiceImpl 1     # SHA-256 不可用（JDK 保证有，走到就是环境坏了）
+RedisTokenStore 2           # 会话序列化/反序列化失败
+MysqlTokenStore 2           # 同上
+DriverRegistry 1            # 找不到设备驱动
+OwnershipReconciler 1       # 载荷无法反序列化
+RemoteCaller 5              # 跨服务调用失败/无响应体 —— 对侧不可用，要人看
+
+# —— 包裹底层异常（`IllegalStateException(e)`，无业务消息）——
+PhoneOtpStrategy 1          # 摘要计算失败
+PriceAdjustmentServiceImpl 1 # JSON 序列化失败
+
+# —— 配置缺失 / 数据不一致：要运营或排障介入 ——
+PriceResolver 3             # 未匹配到计价方案 / 方案不存在 / 方案无费用项。
+                            # ⚠️ 其中「未匹配到计价方案」调用方是**正在扫码借电宝的用户**，
+                            # 他看到的是「服务器错误」。保持 500 还是对 C 端回 409
+                            # 「该点位暂不可借」（日志仍打 ERROR）是**待裁决**，见方案文档。
+RentOrderServiceImpl 1      # 租借时间为空，无法计费 —— 订单数据不一致
+CsTicketServiceImpl 1       # 未知报障状态 —— 词表坏了。
+                            # ⚠️ 同一个方法里紧邻的「非法迁移」那行**已改成 409**，
+                            # 两行判断相反，按 grep 结果批量改一定会连坐。
+
+# —— 已被控制器 catch 成更准确的状态码：改了抛出类型会让 catch 静默失配 ——
+OtpService 1                # 发送过于频繁 → AuthController:178 catch 成 429
+AgentLoginServiceImpl 1     # 名下无可用主体 → AuthController:285 catch 成 403
