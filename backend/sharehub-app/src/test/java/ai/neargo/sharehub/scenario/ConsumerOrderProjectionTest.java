@@ -34,7 +34,24 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class ConsumerOrderProjectionTest extends ApiTestSupport {
 
-    private static final String CABINET = "CAB1005";
+    /**
+     * 借哪台不重要，**有货**才重要。
+     *
+     * <p>原先写死 CAB1005 —— 共享测试库是累积的，跑过若干次之后那台会被借空，
+     * 而 2026-09-25 新增的设备生命周期闸门会直接回「该设备暂不可借」。
+     * 于是这条用例会在某一天开始红，而红的原因跟它要验的东西毫无关系。
+     * 改成从找柜列表里现挑一台还有货的。
+     */
+    private String borrowableCabinet(String token) {
+        for (JsonNode c : get("/mp/nearby/cabinets", token).okData()) {
+            // 有货还不够，站点还得是营业中：找柜列表**刻意保留** PAUSED/WITHDRAWING 的点位
+            // （那两态是「停借保还」，手里有充电宝的人正需要看到它们），从那里挑就会借不出来。
+            if (c.path("availableBorrow").asInt() > 0 && "ACTIVE".equals(c.path("status").asText())) {
+                return c.path("cabinetNo").asText();
+            }
+        }
+        throw new IllegalStateException("测试库里没有任何一台有货的机柜 —— 先补种子再跑");
+    }
 
     private String consumerToken() {
         String phone = "+9715004" + (100_000 + ThreadLocalRandom.current().nextInt(800_000));
@@ -47,13 +64,15 @@ class ConsumerOrderProjectionTest extends ApiTestSupport {
     @DisplayName("★★ 订单详情带得动一个页面：门店名 / 费用明细 / 状态时间线")
     void detail_carries_what_the_page_renders() {
         String token = consumerToken();
-        String orderNo = post("/mp/trade/orders/rent", Map.of("cabinetNo", CABINET), token)
-                .okData().path("orderNo").asText();
+        String cabinet = borrowableCabinet(token);
+        Resp rent = post("/mp/trade/orders/rent", Map.of("cabinetNo", cabinet), token);
+        assertThat(rent.status).as("借出失败，后端说：%s", rent.body.path("message").asText()).isEqualTo(200);
+        String orderNo = rent.okData().path("orderNo").asText();
 
         JsonNode d = get("/mp/trade/orders/" + orderNo, token).okData();
 
         // 借出端：店名取不到时至少要有机柜号，页面按 siteName ?? locationName ?? cabinetNo 兜
-        assertThat(d.path("cabinetNo").asText()).as("借出机柜号").isEqualTo(CABINET);
+        assertThat(d.path("cabinetNo").asText()).as("借出机柜号").isEqualTo(cabinet);
         assertThat(d.hasNonNull("siteName") || d.hasNonNull("locationName"))
                 .as("店名或点位名至少要有一个，否则列表上那一行没有标题").isTrue();
 
@@ -81,8 +100,9 @@ class ConsumerOrderProjectionTest extends ApiTestSupport {
     @DisplayName("★★ 运营干预统计不给消费者——注释说不给，代码一直在给")
     void ops_intervention_stats_never_reach_the_consumer() {
         String token = consumerToken();
-        String orderNo = post("/mp/trade/orders/rent", Map.of("cabinetNo", CABINET), token)
-                .okData().path("orderNo").asText();
+        Resp rent = post("/mp/trade/orders/rent", Map.of("cabinetNo", borrowableCabinet(token)), token);
+        assertThat(rent.status).as("借出失败，后端说：%s", rent.body.path("message").asText()).isEqualTo(200);
+        String orderNo = rent.okData().path("orderNo").asText();
 
         JsonNode d = get("/mp/trade/orders/" + orderNo, token).okData();
         for (String leaked : new String[]{"waivedAmount", "compensateAmount", "ejectCount", "lastEjectAt"}) {
@@ -94,7 +114,7 @@ class ConsumerOrderProjectionTest extends ApiTestSupport {
     @DisplayName("★ 列表刻意不带 timeline（挂上去就是 N+1），但该有的字段一个不少")
     void list_omits_timeline_but_keeps_the_rest() {
         String token = consumerToken();
-        post("/mp/trade/orders/rent", Map.of("cabinetNo", CABINET), token).okData();
+        post("/mp/trade/orders/rent", Map.of("cabinetNo", borrowableCabinet(token)), token).okData();
 
         JsonNode rows = get("/mp/trade/orders", token).okData().path("list");
         assertThat(rows).isNotEmpty();

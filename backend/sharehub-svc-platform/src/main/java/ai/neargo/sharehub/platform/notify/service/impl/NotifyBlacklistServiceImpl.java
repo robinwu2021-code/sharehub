@@ -62,7 +62,7 @@ public class NotifyBlacklistServiceImpl implements NotifyBlacklistService {
     @Override
     public NotifyBlacklistVO block(NotifyBlacklist body) {
         if (body.getTarget() == null || body.getTarget().isBlank()) {
-            throw new IllegalArgumentException("target 必填");
+            throw BizException.badRequest("error.notify.target_required");
         }
         body.setTenantId(TENANT_MAIN);
         body.setTarget(NotifyTargets.maskTarget(body.getTarget())); // 脱敏存储，与 notify_log 同口径

@@ -87,8 +87,8 @@ public class AgentAssignmentServiceImpl implements AgentAssignmentService {
     @Transactional
     public AssignmentLog assign(AssignReq req) {
         if (req == null) throw new IllegalArgumentException("划拨入参必填");
-        if (req.agentNo() == null || req.agentNo().isBlank()) throw new IllegalArgumentException("agentNo 必填");
-        if (req.targetNo() == null || req.targetNo().isBlank()) throw new IllegalArgumentException("targetNo 必填");
+        if (req.agentNo() == null || req.agentNo().isBlank()) throw BizException.badRequest("error.common.missing_parameter", "agentNo");
+        if (req.targetNo() == null || req.targetNo().isBlank()) throw BizException.badRequest("error.common.missing_parameter", "targetNo");
         if (!TARGET_TYPES.contains(req.targetType())) {
             throw new IllegalArgumentException("划拨对象类型非法: " + req.targetType());
         }

@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.user.core.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.ServerException;
 import ai.neargo.common.core.ErrorCode;
 import ai.neargo.common.core.PageResult;
@@ -116,7 +117,7 @@ public class FreeWhitelistServiceImpl implements FreeWhitelistService {
 
     private void validate(UsrFreeWhitelist e) {
         if (e.getCUserNo() == null || e.getCUserNo().isBlank()) {
-            throw new IllegalArgumentException("cUserNo 必填");
+            throw BizException.badRequest("error.common.missing_parameter", "cUserNo");
         }
         if (!REASONS.contains(e.getReason())) {
             throw new IllegalArgumentException("reason 必须是 " + REASONS + "，收到: " + e.getReason());

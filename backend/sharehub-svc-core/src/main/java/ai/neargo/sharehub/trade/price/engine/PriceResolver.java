@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.trade.price.engine;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.trade.price.PricePlanStatus;
 
 import ai.neargo.sharehub.common.Json;
@@ -59,6 +60,15 @@ import java.util.stream.Collectors;
 @Component
 public class PriceResolver {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PriceResolver.class);
+
+    /**
+     * 给终端用户的说法。三处计价失败的**成因不同**（没配方案 / 适用范围指向的方案没了 /
+     * 方案没有费用项），但对站在柜机前的人**结果是同一件事**：这儿借不了，换一家。
+     * 成因写进日志给运维，不写进界面 —— 他既看不懂，也做不了什么。
+     */
+    private static final String NOT_BORROWABLE = "error.pricing.not_borrowable";
+
     private final PricePlanScopeMapper scopes;
     private final PricePlanMapper plans;
     private final PricePlanItemMapper items;
@@ -80,14 +90,19 @@ public class PriceResolver {
     public Resolved resolve(PriceQuery q) {
         Hit hit = match(q);
         if (hit == null) {
-            throw new IllegalStateException(
-                    "未匹配到计价方案：" + q + "。**拒绝结算而非按 0 收费** —— 静默免单无法被发现。"
-                            + " 至少要为设备类型 " + q.deviceType() + " 配一条 ALL 层的默认方案。");
+            // **拒绝结算而非按 0 收费** —— 静默免单无法被发现。这一条没变。
+            // 变的是**谁看到什么**：调用方是正在柜机前扫码的消费者，此前他看到「服务器错误」，
+            // 而这件事对他其实是可行动的（换一家店）。运维侧一点不少：ERROR + 完整上下文照旧，
+            // ⚠️ 但它从此不再计入 5xx —— 按 5xx 比例做的告警要改成盯这条日志，否则是一次静默的监控降级。
+            log.error("未匹配到计价方案，拒绝结算 query={} deviceType={} —— "
+                    + "至少要为该设备类型配一条 ALL 层的默认方案", q, q.deviceType());
+            throw BizException.conflict(NOT_BORROWABLE);
         }
         PricePlan plan = plans.selectOne(new LambdaQueryWrapper<PricePlan>()
                 .eq(PricePlan::getPlanNo, hit.planNo()).last("limit 1"));
         if (plan == null) {
-            throw new IllegalStateException("适用范围指向的方案不存在: " + hit.planNo());
+            log.error("适用范围指向的计价方案不存在 planNo={}（适用范围与方案表不一致，要人修）", hit.planNo());
+            throw BizException.conflict(NOT_BORROWABLE);
         }
         return new Resolved(hit.planNo(), plan.getCurrency(), expand(hit.planNo()), hit, null);
     }
@@ -201,7 +216,8 @@ public class PriceResolver {
                 .eq(PricePlanItem::getStatus, "ENABLED")
                 .orderByAsc(PricePlanItem::getSort));
         if (its.isEmpty()) {
-            throw new IllegalStateException("方案没有任何费用项，无法计价: " + planNo);
+            log.error("计价方案没有任何启用的费用项，无法计价 planNo={}", planNo);
+            throw BizException.conflict(NOT_BORROWABLE);
         }
 
         // 一次取回全部阶梯再分组，避免逐项回表（N+1）

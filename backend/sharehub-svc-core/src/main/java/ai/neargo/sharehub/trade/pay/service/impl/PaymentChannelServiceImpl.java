@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.trade.pay.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.common.crud.AbstractCrudService;
 import ai.neargo.sharehub.trade.pay.dto.PayDtos.ChannelScopeEntry;
 import ai.neargo.sharehub.trade.pay.dto.PayDtos.PaymentChannelDetail;
@@ -136,8 +137,8 @@ public class PaymentChannelServiceImpl extends AbstractCrudService<PayChannel, P
     @Override
     @Transactional
     public void replaceScope(String channelCode, String scopeType, List<String> scopeValues) {
-        if (channelCode == null || channelCode.isBlank()) throw new IllegalArgumentException("channelCode 不能为空");
-        if (scopeType == null || scopeType.isBlank()) throw new IllegalArgumentException("scopeType 不能为空");
+        if (channelCode == null || channelCode.isBlank()) throw BizException.badRequest("error.common.missing_parameter", "channelCode");
+        if (scopeType == null || scopeType.isBlank()) throw BizException.badRequest("error.common.missing_parameter", "scopeType");
 
         scopeMapper.delete(new LambdaQueryWrapper<PayChannelScope>()
                 .eq(PayChannelScope::getChannelCode, channelCode)

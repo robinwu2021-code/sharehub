@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.user.asset.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.user.asset.dto.UserAssetDtos.MemberRow;
@@ -73,7 +74,7 @@ public class MembershipServiceImpl implements MembershipService {
     @Override
     public MemberRow save(UsrMembership body) {
         if (body.getCUserNo() == null || body.getCUserNo().isBlank()) {
-            throw new IllegalArgumentException("cUserNo 必填");
+            throw BizException.badRequest("error.common.missing_parameter", "cUserNo");
         }
         UsrMembership current = findByUser(body.getCUserNo());
         if (current == null) {

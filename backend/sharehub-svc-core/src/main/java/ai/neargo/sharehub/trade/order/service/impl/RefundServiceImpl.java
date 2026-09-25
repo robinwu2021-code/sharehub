@@ -72,10 +72,10 @@ public class RefundServiceImpl implements RefundService {
     @Override
     public RefundRecord apply(RefundApplyReq req) {
         if (req == null || !OrderSupport.has(req.orderNo())) {
-            throw new IllegalArgumentException("orderNo 必填");
+            throw BizException.badRequest("error.common.missing_parameter", "orderNo");
         }
         if (!OrderSupport.has(req.userNo())) {
-            throw new IllegalArgumentException("userNo 必填");
+            throw BizException.badRequest("error.common.missing_parameter", "userNo");
         }
         if (req.amount() == null || req.amount().compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("amount 必须大于 0");
@@ -87,7 +87,7 @@ public class RefundServiceImpl implements RefundService {
         // 只有调用方知道「这两个请求是同一次点击」，所以键必须由调用方给。
         // ops-web 的 RefundApplyPayload.idempotencyKey 已是必填；后端不依赖调用方守规矩。
         if (!OrderSupport.has(req.idempotencyKey())) {
-            throw new IllegalArgumentException("idempotencyKey 必填（资金动作禁止服务端自补幂等键）");
+            throw BizException.badRequest("error.common.missing_parameter", "idempotencyKey");
         }
         String idem = req.idempotencyKey().trim();
 
@@ -119,7 +119,7 @@ public class RefundServiceImpl implements RefundService {
         OrdRefund e = selectByNo(refundNo);
         if (e == null) throw BizException.notFound(refundNo);
         if (req == null || req.approved() == null) {
-            throw new IllegalArgumentException("approved 必填");
+            throw BizException.badRequest("error.common.missing_parameter", "approved");
         }
         if (!STATUS_PENDING.equals(e.getStatus())) {
             throw ServerException.of(ErrorCode.CONFLICT, "退款单非 PENDING，不可审批: " + refundNo + " → " + e.getStatus());

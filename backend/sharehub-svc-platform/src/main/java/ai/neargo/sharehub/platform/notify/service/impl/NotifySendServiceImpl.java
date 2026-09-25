@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.platform.notify.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.platform.notify.NotifyLogStatus;
 import ai.neargo.sharehub.platform.notify.dto.NotifyDtos.NotifyLogVO;
 import ai.neargo.sharehub.platform.notify.dto.NotifyDtos.SendReq;
@@ -38,7 +39,7 @@ public class NotifySendServiceImpl implements NotifySendService {
     @Override
     public SendResult send(SendReq req) {
         if (req == null || req.target() == null || req.target().isBlank()) {
-            throw new IllegalArgumentException("target 必填");
+            throw BizException.badRequest("error.notify.target_required");
         }
         String channel = (req.channel() == null || req.channel().isBlank()) ? "SMS" : req.channel();
 

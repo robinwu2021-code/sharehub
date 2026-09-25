@@ -187,8 +187,8 @@ public class PricePlanServiceImpl extends AbstractCrudService<PricePlan, PricePl
     @Override
     @Transactional
     public void replaceScope(String planNo, String scopeType, List<String> scopeRefs) {
-        if (planNo == null || planNo.isBlank()) throw new IllegalArgumentException("planNo 不能为空");
-        if (scopeType == null || scopeType.isBlank()) throw new IllegalArgumentException("scopeType 不能为空");
+        if (planNo == null || planNo.isBlank()) throw BizException.badRequest("error.common.missing_parameter", "planNo");
+        if (scopeType == null || scopeType.isBlank()) throw BizException.badRequest("error.common.missing_parameter", "scopeType");
 
         // 先软删该类型下的全部旧行（@TableLogic），再逐行插入 —— UK 三列，重复值由库兜底
         scopeMapper.delete(new LambdaQueryWrapper<PricePlanScope>()

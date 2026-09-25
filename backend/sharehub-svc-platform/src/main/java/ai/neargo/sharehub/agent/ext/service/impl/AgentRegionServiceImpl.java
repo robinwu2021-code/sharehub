@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.agent.ext.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.agent.ext.entity.AgtAgentRegion;
 import ai.neargo.sharehub.agent.ext.mapper.AgtAgentRegionMapper;
 import ai.neargo.sharehub.agent.ext.service.AgentRegionService;
@@ -47,7 +48,7 @@ public class AgentRegionServiceImpl implements AgentRegionService {
     @Override
     @Transactional
     public List<String> replace(String agentNo, String csv) {
-        if (agentNo == null || agentNo.isBlank()) throw new IllegalArgumentException("agentNo 必填");
+        if (agentNo == null || agentNo.isBlank()) throw BizException.badRequest("error.common.missing_parameter", "agentNo");
 
         List<String> regions = parse(csv);
 

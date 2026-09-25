@@ -62,9 +62,13 @@ class ConsumerStoreCardTest extends ApiTestSupport {
 
         long withCoords = 0;
         for (JsonNode r : rows) {
-            if (!r.path("lat").isNull() && r.path("lat").asDouble() != 0) withCoords++;
+            // ⚠️ 没录坐标的站点回的是 **null**，而 Jackson 的 asDouble() 对 null 也给 0.0 ——
+            // 第一版直接断言「asDouble() != 0」，库里一加进没坐标的站点就红，
+            // 而那不是缺陷、恰恰是「算不出就回 null」的正确表现。先判 isNull 再判值。
+            if (r.path("lat").isNull()) continue;
+            withCoords++;
             assertThat(r.path("lat").asDouble())
-                    .as("lat 不该是 0 —— 0,0 是几内亚湾，没录坐标要回 null").isNotEqualTo(0.0);
+                    .as("有坐标就不该出 0 —— 0,0 是几内亚湾，没录坐标要回 null 而不是 0").isNotEqualTo(0.0);
         }
         assertThat(withCoords).as("库里有带坐标的站点，列表就该带出来").isGreaterThan(0);
     }

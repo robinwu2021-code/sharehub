@@ -117,7 +117,7 @@ public class AppVersionServiceImpl extends AbstractCrudService<SysAppVersion, Ap
     @Override
     public AppVersionCheck check(String platform, String lang) {
         if (platform == null || platform.isBlank()) {
-            throw new IllegalArgumentException("platform 必填（IOS/ANDROID/H5）");
+            throw BizException.badRequest("error.app_version.platform_required");
         }
         SysAppVersion e = versionMapper.selectOne(new LambdaQueryWrapper<SysAppVersion>()
                 .eq(SysAppVersion::getPlatform, platform)

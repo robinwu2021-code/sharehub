@@ -6,6 +6,7 @@ import ai.neargo.sharehub.auth.ConsumerContext;
 import ai.neargo.sharehub.dev.dto.DevLegacyDtos.Cabinet;
 import ai.neargo.sharehub.dev.service.CabinetService;
 import ai.neargo.sharehub.loc.LocService;
+import ai.neargo.sharehub.loc.SiteStatus;
 import ai.neargo.sharehub.loc.dto.LocDtos.Site;
 import ai.neargo.sharehub.platform.sys.service.BizRuleService;
 import ai.neargo.sharehub.portal.core.StoreCardAssembler.Quote;
@@ -75,6 +76,7 @@ public class MpNearbyController {
         return DataScopeContext.executeWithoutScope(() -> {
             List<NearbyCabinetVO> out = new ArrayList<>();
             for (Site s : loc.pageSites(1, 50, keyword, false).getList()) {
+                if (!consumerVisible(s)) continue;
                 Quote q = cards.quoteOf(s.siteNo(), s.sceneType());
                 for (Cabinet c : cabinets.bySite(s.siteNo())) {
                     int ret = Math.max(0, c.slotTotal() - c.availableCount());
@@ -112,6 +114,7 @@ public class MpNearbyController {
             if (mine.isEmpty()) return out;
             for (Site s : loc.pageSites(1, 200, null, false).getList()) {
                 if (!mine.contains(s.siteNo())) continue;
+                if (!consumerVisible(s)) continue;   // 收藏了一家后来关掉的店，不该还挂在列表上
                 Quote q = cards.quoteOf(s.siteNo(), s.sceneType());
                 for (Cabinet c : cabinets.bySite(s.siteNo())) {
                     out.add(cards.card(c, s, q, lat, lng));
@@ -184,6 +187,23 @@ public class MpNearbyController {
                     "return", Math.max(0, c.slotTotal() - c.availableCount()))).toList());
             return out;
         });
+    }
+
+    /**
+     * 这个站点该不该出现在 C 端。
+     *
+     * <p>站点生命周期 2026-09-25 扩成五态（PREPARING / ACTIVE / PAUSED / WITHDRAWING / CLOSED），
+     * 而本控制器原先**不按状态过滤** —— 于是筹备中和已关闭的站点会一起列进找柜结果，
+     * 用户点进去才发现借不了。实测那次改动落地后，库里 39 个站点有 11 个 PREPARING、1 个 CLOSED。
+     *
+     * <p><b>PAUSED 与 WITHDRAWING 保留</b>：它们的语义是「停借保还」——
+     * 手里有充电宝的人正需要看到这些点位才能还回去。出参里的 status 会是 PAUSED，
+     * 端上据此置灰「借」而保留「还」。
+     * <b>PREPARING / CLOSED 直接不出</b>：前者还没开业、后者已经没了，列出来只会浪费一次点击。
+     */
+    private static boolean consumerVisible(Site s) {
+        String st = s.status();
+        return !SiteStatus.PREPARING.name().equals(st) && !SiteStatus.CLOSED.name().equals(st);
     }
 
     // ——————————————————————— 组装 ———————————————————————

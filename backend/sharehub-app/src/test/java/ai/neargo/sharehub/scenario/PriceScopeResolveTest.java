@@ -172,8 +172,12 @@ class PriceScopeResolveTest {
         try {
             r.resolve(q);
             throw new AssertionError("匹配不到方案时必须抛异常，不能静默返回空规格");
-        } catch (IllegalStateException expected) {
-            assertThat(expected).hasMessageContaining("拒绝结算");
+        } catch (ai.neargo.sharehub.common.BizException expected) {
+            // 2026-09-25：改成 409 + 一句用户看得懂的话（「该点位暂不可借」）。
+            // **拒绝结算这一条没变**，变的是谁看到什么：诊断信息（未匹配到哪条 query、
+            // 该给哪个设备类型配默认方案）移进了 ERROR 日志，因为站在柜机前的人
+            // 既看不懂也做不了什么。message 位置现在是 i18n key。
+            assertThat(expected).hasMessage("error.pricing.not_borrowable");
         }
     }
 

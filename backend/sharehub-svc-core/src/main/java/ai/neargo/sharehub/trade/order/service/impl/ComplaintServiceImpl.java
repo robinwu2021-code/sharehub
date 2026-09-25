@@ -74,10 +74,10 @@ public class ComplaintServiceImpl implements ComplaintService {
     @Override
     public OrderComplaint create(ComplaintCreateReq req) {
         if (req == null || !OrderSupport.has(req.orderNo())) {
-            throw new IllegalArgumentException("orderNo 必填");
+            throw BizException.badRequest("error.common.missing_parameter", "orderNo");
         }
         if (!OrderSupport.has(req.userNo())) {
-            throw new IllegalArgumentException("userNo 必填");
+            throw BizException.badRequest("error.common.missing_parameter", "userNo");
         }
         String issueType = OrderSupport.has(req.issueType()) ? req.issueType() : "OTHER";
         if (!ISSUE_TYPES.contains(issueType)) {
@@ -105,7 +105,7 @@ public class ComplaintServiceImpl implements ComplaintService {
     public OrderComplaint handle(String complaintNo, ComplaintHandleReq req) {
         OrdComplaint e = require(complaintNo);
         if (req == null || !OrderSupport.has(req.resolution())) {
-            throw new IllegalArgumentException("resolution 必填");
+            throw BizException.badRequest("error.complaint.resolution_required");
         }
         if (!RESOLUTIONS.contains(req.resolution())) {
             throw new IllegalArgumentException("非法 resolution: " + req.resolution());

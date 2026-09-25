@@ -57,8 +57,11 @@ public class WoOpsServiceImpl implements WoOpsService {
             Set.of("RESOLVED", "INVALID", "DUPLICATE", "WITHDRAWN");
 
     private static final Set<String> SOURCES = Set.of("ALERT", "USER", "VENUE", "MANUAL", "PLAN");
-    private static final Set<String> PRIORITIES = Set.of("LOW", "MEDIUM", "HIGH", "URGENT");
     private static final String TENANT_MAIN = "MAIN";
+    private static final String WO_REVIEW_FAILED = ai.neargo.sharehub.wo.WoReviewStatus.FAILED.name();
+    private static final String SYSTEM = "SYSTEM";
+    /** 自动派单的「运维主管」角色：无责任人可派时通知他们。 */
+    private static final Set<String> OPS_LEAD_ROLES = Set.of("OPS");
 
     private final WoMapper woMapper;
     private final WoStateMachine stateMachine;
@@ -68,11 +71,30 @@ public class WoOpsServiceImpl implements WoOpsService {
     private final WoSlaRuleMapper slaRuleMapper;
     /** 只用来反查机柜归属 —— 数据范围锚点必须服务端派生，见 create() 里的说明。 */
     private final CabinetQueryPort cabinetQuery;
+    // —— 2026-09-25 承接业务告警 ——
+    private final ai.neargo.sharehub.api.platform.port.SiteQueryPort siteQuery;
+    private final ai.neargo.sharehub.api.platform.port.AgentDirectoryPort agents;
+    private final ai.neargo.sharehub.api.platform.port.EmployeeDirectoryPort employees;
+    private final ai.neargo.sharehub.api.platform.port.FileBindingPort files;
+    private final ai.neargo.sharehub.api.platform.port.NotifyPort notify;
+    private final ai.neargo.sharehub.common.event.DomainEventBus events;
 
     public WoOpsServiceImpl(WoMapper woMapper, WoStateMachine stateMachine,
                             WoDispatchMapper dispatchMapper, WoHandleMapper handleMapper,
                             WoSlaMapper slaMapper, WoSlaRuleMapper slaRuleMapper,
-                            CabinetQueryPort cabinetQuery) {
+                            CabinetQueryPort cabinetQuery,
+                            ai.neargo.sharehub.api.platform.port.SiteQueryPort siteQuery,
+                            ai.neargo.sharehub.api.platform.port.AgentDirectoryPort agents,
+                            ai.neargo.sharehub.api.platform.port.EmployeeDirectoryPort employees,
+                            ai.neargo.sharehub.api.platform.port.FileBindingPort files,
+                            ai.neargo.sharehub.api.platform.port.NotifyPort notify,
+                            ai.neargo.sharehub.common.event.DomainEventBus events) {
+        this.siteQuery = siteQuery;
+        this.agents = agents;
+        this.employees = employees;
+        this.files = files;
+        this.notify = notify;
+        this.events = events;
         this.woMapper = woMapper;
         this.stateMachine = stateMachine;
         this.dispatchMapper = dispatchMapper;
@@ -92,8 +114,9 @@ public class WoOpsServiceImpl implements WoOpsService {
         String type = WorkOrderType.of(draft.type()).name();
         String source = (draft.source() == null || draft.source().isBlank()) ? "MANUAL" : draft.source();
         if (!SOURCES.contains(source)) throw new IllegalArgumentException("工单来源非法: " + source);
-        String priority = (draft.priority() == null || draft.priority().isBlank()) ? "MEDIUM" : draft.priority();
-        if (!PRIORITIES.contains(priority)) throw new IllegalArgumentException("工单优先级非法: " + priority);
+        String priority = (draft.priority() == null || draft.priority().isBlank())
+                ? ai.neargo.sharehub.wo.WoPriority.MEDIUM.name()
+                : ai.neargo.sharehub.wo.WoPriority.of(draft.priority()).name();
 
         // 幂等（[db-design §1.6]）：告警/投诉转工单重复点「转工单」应返回首次结果，不产生第二张单。
         // 落点是 wo_order.source_ref 上的 UNIQUE。手工开单 source_ref 为空，不参与幂等。
@@ -115,9 +138,10 @@ public class WoOpsServiceImpl implements WoOpsService {
         e.setDescription(draft.description());
         e.setStatus(WorkOrderStatus.CREATED.name());
         e.setWoCreatedAt(LocalDateTime.now().toString());
+        if (sourceRef != null && !sourceRef.isBlank()) e.setSourceRef(sourceRef);   // 撞唯一键发生在 insert 本身（见实体注释）
 
         // 按 SLA 规则算 due 时刻，落逐单计时行；顺带把 sla_due_at 冗余到工单上供列表直出
-        WoSlaRule rule = activeRule(type);
+        WoSlaRule rule = activeRule(type, priority);
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime respondDue = (rule == null || rule.getResponseMins() == null || rule.getResponseMins() <= 0)
                 ? null : now.plusMinutes(rule.getResponseMins());
@@ -217,10 +241,35 @@ public class WoOpsServiceImpl implements WoOpsService {
         WoOrder e = byNo(woNo);
         // 起点必须是 PROCESSING；CREATED/DISPATCHED/ACCEPTED（还没开工）与 DONE/AUDITED/CLOSED
         // （已经报过完工）都由状态机拒 → 400。不在这里补 if，报错口径统一走状态机。
-        e.setStatus(stateMachine.next(e.getStatus(), "DONE"));
-        woMapper.updateById(e);
+        String to = stateMachine.next(e.getStatus(), "DONE");
 
-        appendHandle(e, req, "COMPLETE");
+        // 2026-09-25 收紧：维修 / 装机 / 撤机必须有现场照片；故障单必须给原因分类
+        String type = e.getType();
+        List<String> fileNos = req == null || req.fileNos() == null ? List.of()
+                : req.fileNos().stream().filter(WoOpsServiceImpl::notBlank).distinct().toList();
+        boolean needPhoto = Set.of(WorkOrderType.FAULT.name(), WorkOrderType.INSTALL.name(), WorkOrderType.REMOVE.name()).contains(type);
+        if (needPhoto && fileNos.isEmpty() && (req == null || !notBlank(req.photos()))) {
+            throw new IllegalArgumentException("请上传至少一张现场照片");
+        }
+        String faultReason = req == null || !notBlank(req.faultReasonCode()) ? null
+                : ai.neargo.sharehub.wo.WoFaultReason.of(req.faultReasonCode()).name();
+        if (WorkOrderType.FAULT.name().equals(type) && faultReason == null) {
+            throw new IllegalArgumentException("请选择故障原因");
+        }
+        if (!fileNos.isEmpty()) files.bind(fileNos, "WORK_ORDER", woNo, e.getAgentNo());   // 同事务：完工失败则照片仍是临时文件
+
+        e.setStatus(to);
+        woMapper.updateById(e);
+        if (faultReason != null) woMapper.update(null, new UpdateWrapper<WoOrder>().eq("wo_no", woNo).set("fault_reason_code", faultReason));
+
+        WoHandle h = appendHandle(e, req, "COMPLETE");
+        if (faultReason != null || !fileNos.isEmpty()) {
+            handleMapper.update(null, new UpdateWrapper<WoHandle>().eq("id", h.getId())
+                    .set("fault_reason_code", faultReason).set("file_nos", fileNos.isEmpty() ? null : String.join(",", fileNos)));
+        }
+        // 告警域据此做完工复核（关联告警已恢复 → 自动验收）；wo 不认识 alarm，只发事件
+        events.publish(new ai.neargo.sharehub.api.ops.event.WorkOrderCompletedEvent(woNo, type, e.getSource(),
+                e.getSourceRef(), e.getSiteNo(), e.getCabinetNo(), LocalDateTime.now().toString()));
         return toVO(e);
     }
 
@@ -265,6 +314,10 @@ public class WoOpsServiceImpl implements WoOpsService {
         }
 
         WoOrder e = byNo(woNo);
+        // 复核未通过还要放行，必须写明理由 —— 否则「系统说没修好、人说修好了」这件事查不到依据
+        if (WO_REVIEW_FAILED.equals(e.getReviewStatus()) && (req == null || !notBlank(req.auditNote()))) {
+            throw new IllegalArgumentException("复核未通过的工单人工验收时，请在验收说明里写明放行理由");
+        }
         // 从当前态一路走到 CLOSED；起点不在 DONE/AUDITED 上的由状态机拒（含 PROCESSING —— 需先 /complete）
         for (String event : List.of("AUDIT", "CLOSE")) {
             if (WorkOrderStatus.CLOSED.name().equals(e.getStatus())) break;
@@ -488,7 +541,7 @@ public class WoOpsServiceImpl implements WoOpsService {
     }
 
     /** 落一行 {@code wo_handle}（handle 自环留痕与 complete 完工记录共用）。 */
-    private void appendHandle(WoOrder e, HandleReq req, String notePrefix) {
+    private WoHandle appendHandle(WoOrder e, HandleReq req, String notePrefix) {
         String woNo = e.getWoNo();
         WoHandle h = new WoHandle();
         h.setWoNo(woNo);
@@ -500,6 +553,7 @@ public class WoOpsServiceImpl implements WoOpsService {
         h.setDeviceChanged(bool(req == null ? null : req.deviceChanged()));
         h.setHandledAt(LocalDateTime.now().toString());
         handleMapper.insert(h);
+        return h;
     }
 
     /** 落一行 {@code wo_dispatch}（派单/接单/驳回共用同一根「转了几手」的时间轴）。 */
@@ -523,7 +577,7 @@ public class WoOpsServiceImpl implements WoOpsService {
     }
 
     private WoOrder byNo(String woNo) {
-        if (woNo == null || woNo.isBlank()) throw new IllegalArgumentException("woNo 必填");
+        if (woNo == null || woNo.isBlank()) throw BizException.badRequest("error.common.missing_parameter", "woNo");
         WoOrder e = woMapper.selectOne(new LambdaQueryWrapper<WoOrder>()
                 .eq(WoOrder::getWoNo, woNo).last("limit 1"));
         if (e == null) throw BizException.notFound(woNo);
@@ -582,12 +636,14 @@ public class WoOpsServiceImpl implements WoOpsService {
     }
 
     /** 取该工单类型当前启用的 SLA 规则；没有配置则不计时（due 为空，永不超时）。 */
-    private WoSlaRule activeRule(String woType) {
-        return slaRuleMapper.selectOne(new LambdaQueryWrapper<WoSlaRule>()
+    /** SLA 规则：先找「类型 × 优先级」专属档，无则类型默认（priority='*'），再无则不设 SLA。 */
+    private WoSlaRule activeRule(String woType, String priority) {
+        List<WoSlaRule> rows = slaRuleMapper.selectList(new LambdaQueryWrapper<WoSlaRule>()
                 .eq(WoSlaRule::getWoType, woType)
                 .eq(WoSlaRule::getActive, 1)
-                .orderByDesc(WoSlaRule::getId)
-                .last("limit 1"));
+                .orderByDesc(WoSlaRule::getId));
+        return rows.stream().filter(r -> priority != null && priority.equals(r.getPriority())).findFirst()
+                .orElse(rows.stream().filter(r -> r.getPriority() == null || "*".equals(r.getPriority())).findFirst().orElse(null));
     }
 
     /**
@@ -634,5 +690,254 @@ public class WoOpsServiceImpl implements WoOpsService {
         return new WorkOrder(e.getWoNo(), e.getType(), e.getSource(), e.getPriority(), e.getCabinetNo(),
                 e.getLocationName(), e.getStatus(), e.getAssigneeName(), e.getSlaDueAt(),
                 e.getDescription(), e.getWoCreatedAt());
+    }
+
+    // ——————————————————————— 承接业务告警（2026-09-25，TDD-运营核心流程/06）———————————————————————
+
+    @Override
+    @Transactional
+    public String openOrAttach(ai.neargo.sharehub.wo.ext.dto.WoExtDtos.AlarmDraft d) {
+        if (d == null || !notBlank(d.mergeKey())) throw new IllegalArgumentException("合并键必填");
+        ai.neargo.sharehub.wo.WoPriority p = ai.neargo.sharehub.wo.WoPriority.of(d.priority());
+        String type = WorkOrderType.of(d.type()).name();
+        List<WoOrder> same = woMapper.selectList(new LambdaQueryWrapper<WoOrder>()
+                .and(w -> w.eq(WoOrder::getSourceRef, d.mergeKey()).or().likeRight(WoOrder::getSourceRef, d.mergeKey() + "#"))
+                .orderByDesc(WoOrder::getId));
+        WoOrder live = same.stream().filter(o -> !WorkOrderStatus.CLOSED.name().equals(o.getStatus())).findFirst().orElse(null);
+        if (live != null) {
+            // 未完结（含 DONE 待验收：复核会把新挂上的告警一并看）→ 挂靠
+            if (p.higherThan(ai.neargo.sharehub.wo.WoPriority.of(live.getPriority()))) {
+                raisePriority(live.getWoNo(), p.name(), "新增关联告警 " + d.alarmNo());
+            }
+            annotate(live.getWoNo(), "新增关联告警 " + d.alarmNo());
+            return live.getWoNo();
+        }
+        // 完结后复发 = 新问题：新键新单（键带序号，唯一约束仍然成立）
+        String key = same.isEmpty() ? d.mergeKey() : d.mergeKey() + "#" + (same.size() + 1);
+        String woNo;
+        try {
+            woNo = create(new WorkOrderDraft(type, "ALERT", key, p.name(), d.cabinetNo(), null, null, null, null,
+                    d.description(), null)).woNo();
+        } catch (org.springframework.dao.DuplicateKeyException race) {
+            // 并发下另一方刚用同一合并键开了单：以它为准
+            WoOrder won = woMapper.selectOne(new LambdaQueryWrapper<WoOrder>().eq(WoOrder::getSourceRef, key).last("limit 1"));
+            if (won == null) throw race;
+            return won.getWoNo();
+        }
+        // 站点级告警没有机柜，归属三列反查不到 —— 按站点补写（站点归属本身就是数据范围锚点）
+        if (!notBlank(d.cabinetNo()) && notBlank(d.siteNo())) {
+            ai.neargo.sharehub.api.platform.dto.SiteBrief site = siteBrief(d.siteNo());
+            woMapper.update(null, new UpdateWrapper<WoOrder>().eq("wo_no", woNo).set("site_no", d.siteNo())
+                    .set(site != null && notBlank(site.agentNo()), "agent_no", site == null ? null : site.agentNo()));
+        }
+        String[] owner = resolveOwner(d.siteNo());
+        if (owner != null) {
+            dispatchAs(woNo, owner[0], owner[1], "OWNER");
+        } else {
+            log.warn("告警工单无可派责任人 woNo={} siteNo={} —— 需运维主管手工派单，并为该站点补运维责任人", woNo, d.siteNo());
+            for (var lead : employees.activeByRoles(OPS_LEAD_ROLES, 5)) {
+                notify.push(lead.employeeNo(), "WO_UNASSIGNED", "工单 " + woNo + " 无可派责任人（站点 " + d.siteNo() + "），请手工派单");
+            }
+        }
+        return woNo;
+    }
+
+    /** 站点运维责任人：生效的 OPERATE 代理（未暂停）优先，否则平台员工责任人（在职）。返回 [type, no] 或 null。 */
+    private String[] resolveOwner(String siteNo) {
+        ai.neargo.sharehub.api.platform.dto.SiteBrief s = siteBrief(siteNo);
+        if (s == null) return null;
+        if (notBlank(s.operateAgentNo())) {
+            ai.neargo.sharehub.api.platform.dto.AgentBrief a = agents.briefOf(s.operateAgentNo());
+            if (a != null && a.enabled()) return new String[]{"AGENT", s.operateAgentNo()};
+        }
+        if (notBlank(s.opsEmployeeNo())) {
+            var emp = employees.briefsOf(List.of(s.opsEmployeeNo())).get(s.opsEmployeeNo());
+            if (emp != null && emp.active()) return new String[]{"EMPLOYEE", s.opsEmployeeNo()};
+        }
+        return null;
+    }
+
+    private ai.neargo.sharehub.api.platform.dto.SiteBrief siteBrief(String siteNo) {
+        if (!notBlank(siteNo)) return null;
+        return ai.neargo.common.data.scope.DataScopeContext.executeWithoutScope(() -> siteQuery.briefsByNos(List.of(siteNo)))
+                .stream().findFirst().orElse(null);
+    }
+
+    private void dispatchAs(String woNo, String assigneeType, String assigneeNo, String strategy) {
+        WoOrder e = byNo(woNo);
+        e.setStatus(stateMachine.next(e.getStatus(), "DISPATCH"));
+        e.setAssigneeName(assigneeNo);
+        woMapper.updateById(e);
+        woMapper.update(null, new UpdateWrapper<WoOrder>().eq("wo_no", woNo).set("assignee_type", assigneeType)
+                .set("assignee_id", assigneeNo).set("dispatch_strategy", strategy));
+        WoDispatch d = new WoDispatch();
+        d.setWoNo(woNo);
+        d.setAssigneeNo(assigneeNo);
+        d.setStrategy(strategy);
+        d.setAction(WoDispatchAction.DISPATCH.name());
+        d.setDispatchedAt(LocalDateTime.now().toString());
+        dispatchMapper.insert(d);
+        notify.push(assigneeNo, "WO_DISPATCHED", "新工单 " + woNo + "（" + e.getType() + " · " + e.getPriority() + "）");
+    }
+
+    @Override
+    @Transactional
+    public void raisePriority(String woNo, String priority, String reason) {
+        WoOrder e = byNo(woNo);
+        ai.neargo.sharehub.wo.WoPriority p = ai.neargo.sharehub.wo.WoPriority.of(priority);
+        if (!p.higherThan(ai.neargo.sharehub.wo.WoPriority.of(e.getPriority()))) return;
+        woMapper.update(null, new UpdateWrapper<WoOrder>().eq("wo_no", woNo).set("priority", p.name()));
+        // SLA 只提前不推后：按新档位重算，比原截止时刻早才生效
+        WoSlaRule rule = activeRule(e.getType(), p.name());
+        WoSla sla = slaMapper.selectOne(new LambdaQueryWrapper<WoSla>().eq(WoSla::getWoNo, woNo).last("limit 1"));
+        if (rule != null && sla != null) {
+            LocalDateTime created = parseDue(e.getWoCreatedAt());
+            LocalDateTime base = created == null ? LocalDateTime.now() : created;
+            LocalDateTime respond = rule.getResponseMins() == null || rule.getResponseMins() <= 0 ? null : base.plusMinutes(rule.getResponseMins());
+            LocalDateTime resolve = rule.getResolveMins() == null || rule.getResolveMins() <= 0 ? null : base.plusMinutes(rule.getResolveMins());
+            LocalDateTime oldRespond = parseDue(sla.getRespondDueAt()), oldResolve = parseDue(sla.getResolveDueAt());
+            boolean changed = false;
+            if (respond != null && (oldRespond == null || respond.isBefore(oldRespond))) { sla.setRespondDueAt(respond.toString()); changed = true; }
+            if (resolve != null && (oldResolve == null || resolve.isBefore(oldResolve))) {
+                sla.setResolveDueAt(resolve.toString());
+                woMapper.update(null, new UpdateWrapper<WoOrder>().eq("wo_no", woNo).set("sla_due_at", resolve.toString()));
+                changed = true;
+            }
+            if (changed) slaMapper.updateById(sla);
+        }
+        appendDispatch(woNo, SYSTEM, "PRIORITY_UP");
+        annotate(woNo, "优先级 " + e.getPriority() + " → " + p.name() + (notBlank(reason) ? "：" + reason : ""));
+        log.info("工单升优先级 woNo={} {}→{}", woNo, e.getPriority(), p);
+    }
+
+    @Override
+    @Transactional
+    public void withdraw(String woNo, String reason) {
+        WoOrder e = byNo(woNo);
+        String before = e.getStatus();
+        e.setStatus(stateMachine.next(before, "WITHDRAW"));   // 只接受 CREATED / DISPATCHED
+        woMapper.updateById(e);
+        woMapper.update(null, new UpdateWrapper<WoOrder>().eq("wo_no", woNo).set("close_reason", "WITHDRAWN")
+                .set("closed_at", LocalDateTime.now()));
+        appendDispatch(woNo, SYSTEM, "WITHDRAW");
+        annotate(woNo, "撤单：" + reason);
+        if (WorkOrderStatus.DISPATCHED.name().equals(before) && notBlank(e.getAssigneeName())) {
+            notify.push(e.getAssigneeName(), "WO_WITHDRAWN", "工单 " + woNo + " 已撤销：" + reason + "，无需前往");
+        }
+        log.info("工单撤销 woNo={} from={} reason={}", woNo, before, reason);
+    }
+
+    @Override
+    @Transactional
+    public void annotate(String woNo, String note) {
+        WoHandle h = new WoHandle();
+        h.setWoNo(woNo);
+        h.setAssigneeNo(SYSTEM);
+        h.setNote("NOTE: " + note);
+        h.setPartChanged(0);
+        h.setDeviceChanged(0);
+        h.setHandledAt(LocalDateTime.now().toString());
+        handleMapper.insert(h);
+    }
+
+    @Override
+    @Transactional
+    public void markAlarmRecovered(String woNo, LocalDateTime at) {
+        woMapper.update(null, new UpdateWrapper<WoOrder>().eq("wo_no", woNo).isNull("alarm_recovered_at")
+                .set("alarm_recovered_at", at == null ? LocalDateTime.now() : at));
+        annotate(woNo, "关联告警已恢复（已接单，不撤单；到场后请确认现场）");
+    }
+
+    @Override
+    @Transactional
+    public void mergeInto(String fromWoNo, String toWoNo, String reason) {
+        if (fromWoNo.equals(toWoNo)) return;
+        WoOrder from = byNo(fromWoNo);
+        WoOrder to = byNo(toWoNo);
+        from.setStatus(stateMachine.next(from.getStatus(), "MERGE"));
+        woMapper.updateById(from);
+        woMapper.update(null, new UpdateWrapper<WoOrder>().eq("wo_no", fromWoNo).set("close_reason", "DUPLICATE")
+                .set("merged_into_wo_no", toWoNo).set("closed_at", LocalDateTime.now()));
+        appendDispatch(fromWoNo, SYSTEM, "MERGE");
+        annotate(toWoNo, "并入工单 " + fromWoNo + (notBlank(reason) ? "：" + reason : ""));
+        raisePriority(toWoNo, from.getPriority(), "并入 " + fromWoNo);
+    }
+
+    @Override
+    @Transactional
+    public void recordReview(String woNo, boolean passed,
+                             List<ai.neargo.sharehub.wo.ext.dto.WoExtDtos.ReviewItem> items) {
+        WoOrder e = byNo(woNo);
+        if (e.getReviewStatus() != null) return;   // 已复核（事件重投）：幂等跳过
+        String detail = items == null ? "[]" : items.stream()
+                .map(i -> String.format("{\"alarmNo\":\"%s\",\"code\":\"%s\",\"passed\":%s,\"note\":\"%s\"}",
+                        i.alarmNo(), i.code(), i.passed(), i.note() == null ? "" : i.note().replace("\"", "'")))
+                .collect(java.util.stream.Collectors.joining(",", "[", "]"));
+        String status = passed ? ai.neargo.sharehub.wo.WoReviewStatus.PASSED.name() : WO_REVIEW_FAILED;
+        woMapper.update(null, new UpdateWrapper<WoOrder>().eq("wo_no", woNo).set("review_status", status)
+                .set("review_detail", detail.length() > 2000 ? detail.substring(0, 2000) : detail).set("reviewed_at", LocalDateTime.now()));
+        appendDispatch(woNo, SYSTEM, "REVIEW");
+        if (passed && WorkOrderStatus.DONE.name().equals(e.getStatus())) {
+            e.setStatus(stateMachine.next(stateMachine.next(e.getStatus(), "AUDIT"), "CLOSE"));
+            woMapper.updateById(e);
+            woMapper.update(null, new UpdateWrapper<WoOrder>().eq("wo_no", woNo).set("close_reason", "RESOLVED")
+                    .set("audit_result", "PASS").set("audit_note", "复核通过，自动验收").set("audited_by", SYSTEM)
+                    .set("audited_at", LocalDateTime.now()).set("closed_at", LocalDateTime.now()));
+            markBreached(woNo, false);
+            log.info("工单复核通过自动验收 woNo={}", woNo);
+        } else if (!passed) {
+            log.info("工单复核未通过 woNo={}，等待人工返工或放行", woNo);
+        }
+    }
+
+    @Override
+    public List<ai.neargo.sharehub.wo.ext.dto.WoExtDtos.AssigneeCandidate> candidates(String siteNo) {
+        List<ai.neargo.sharehub.wo.ext.dto.WoExtDtos.AssigneeCandidate> out = new java.util.ArrayList<>();
+        Set<String> seen = new java.util.HashSet<>();
+        String[] owner = resolveOwner(siteNo);
+        ai.neargo.sharehub.api.platform.dto.SiteBrief s = siteBrief(siteNo);
+        if (owner != null) {
+            String name = "AGENT".equals(owner[0])
+                    ? java.util.Optional.ofNullable(agents.briefOf(owner[1])).map(ai.neargo.sharehub.api.platform.dto.AgentBrief::name).orElse(owner[1])
+                    : java.util.Optional.ofNullable(employees.briefsOf(List.of(owner[1])).get(owner[1])).map(ai.neargo.sharehub.api.platform.dto.EmployeeBrief::name).orElse(owner[1]);
+            out.add(new ai.neargo.sharehub.wo.ext.dto.WoExtDtos.AssigneeCandidate(owner[0], owner[1], name, true));
+            seen.add(owner[1]);
+        }
+        if (s != null && notBlank(s.operateAgentNo()) && seen.add(s.operateAgentNo())) {
+            var a = agents.briefOf(s.operateAgentNo());
+            if (a != null && a.enabled()) out.add(new ai.neargo.sharehub.wo.ext.dto.WoExtDtos.AssigneeCandidate("AGENT", a.agentNo(), a.name(), false));
+        }
+        for (var emp : employees.activeByRoles(OPS_LEAD_ROLES, 100)) {
+            if (seen.add(emp.employeeNo())) {
+                out.add(new ai.neargo.sharehub.wo.ext.dto.WoExtDtos.AssigneeCandidate("EMPLOYEE", emp.employeeNo(), emp.name(), false));
+            }
+        }
+        return out;
+    }
+
+    @Override
+    public ai.neargo.sharehub.wo.ext.dto.WoExtDtos.WoSummary summary() {
+        long toDispatch = woMapper.selectCount(new LambdaQueryWrapper<WoOrder>().eq(WoOrder::getStatus, WorkOrderStatus.CREATED.name()));
+        List<String> open = List.of(WorkOrderStatus.CREATED.name(), WorkOrderStatus.DISPATCHED.name(),
+                WorkOrderStatus.ACCEPTED.name(), WorkOrderStatus.PROCESSING.name());
+        LocalDateTime now = LocalDateTime.now();
+        long dueSoon = 0, overdue = 0;
+        for (WoOrder o : woMapper.selectList(new LambdaQueryWrapper<WoOrder>().select(WoOrder::getSlaDueAt)
+                .in(WoOrder::getStatus, open).isNotNull(WoOrder::getSlaDueAt))) {
+            LocalDateTime due = parseDue(o.getSlaDueAt());
+            if (due == null) continue;
+            if (due.isBefore(now)) overdue++;
+            else if (due.isBefore(now.plusHours(2))) dueSoon++;
+        }
+        long reviewFailed = woMapper.selectCount(new LambdaQueryWrapper<WoOrder>().eq(WoOrder::getStatus, WorkOrderStatus.DONE.name())
+                .eq(WoOrder::getReviewStatus, WO_REVIEW_FAILED));
+        return new ai.neargo.sharehub.wo.ext.dto.WoExtDtos.WoSummary(toDispatch, dueSoon, overdue, reviewFailed);
+    }
+
+    @Override
+    public String statusOf(String woNo) {
+        WoOrder e = ai.neargo.common.data.scope.DataScopeContext.executeWithoutScope(() -> woMapper.selectOne(
+                new LambdaQueryWrapper<WoOrder>().eq(WoOrder::getWoNo, woNo).last("limit 1")));
+        return e == null ? null : e.getStatus();
     }
 }

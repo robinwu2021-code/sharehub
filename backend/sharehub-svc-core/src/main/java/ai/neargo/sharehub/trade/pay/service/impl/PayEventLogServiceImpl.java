@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.trade.pay.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.trade.pay.entity.PayEventLog;
 import ai.neargo.sharehub.trade.pay.mapper.PayEventLogMapper;
 import ai.neargo.sharehub.trade.pay.service.PayEventLogService;
@@ -38,8 +39,8 @@ public class PayEventLogServiceImpl implements PayEventLogService {
 
     @Override
     public boolean record(String refNo, String eventType, String raw) {
-        if (refNo == null || refNo.isBlank()) throw new IllegalArgumentException("refNo 不能为空");
-        if (eventType == null || eventType.isBlank()) throw new IllegalArgumentException("eventType 不能为空");
+        if (refNo == null || refNo.isBlank()) throw BizException.badRequest("error.common.missing_parameter", "refNo");
+        if (eventType == null || eventType.isBlank()) throw BizException.badRequest("error.common.missing_parameter", "eventType");
 
         PayEventLog e = new PayEventLog();
         e.setSource("NEARPAY");
