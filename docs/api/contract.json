@@ -27159,10 +27159,59 @@
     }
    ],
    "bodyType": null,
-   "returnType": "List<Map<String, Object>>",
+   "returnType": "List<NearbyCabinetVO>",
    "returnContainer": "List",
-   "returnElement": "Map<String, Object>",
-   "responseShape": null,
+   "returnElement": "NearbyCabinetVO",
+   "responseShape": [
+    {
+     "name": "cabinetNo",
+     "type": "String"
+    },
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "siteName",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "distanceM",
+     "type": "Integer"
+    },
+    {
+     "name": "lat",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "lng",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "availableBorrow",
+     "type": "int"
+    },
+    {
+     "name": "availableReturn",
+     "type": "int"
+    },
+    {
+     "name": "pricePerHour",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ],
    "requestShape": null
   },
   {
@@ -27283,6 +27332,18 @@
      "name": "siteNo",
      "type": "String",
      "required": true
+    },
+    {
+     "in": "query",
+     "name": "lat",
+     "type": "Double",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "lng",
+     "type": "Double",
+     "required": false
     }
    ],
    "bodyType": null,
@@ -27912,27 +27973,31 @@
    "path": "/mp/user/favorites",
    "perm": null,
    "perms": [],
-   "handler": "MpUserController#favorites",
-   "summary": "",
+   "handler": "MpNearbyController#myFavorites",
+   "summary": "我的收藏（镜像 c-app `NearbyCabinet[]`）—— 与找柜列表**同一张卡片、同一个出参**。",
    "params": [
     {
      "in": "query",
-     "name": "page",
-     "type": "Integer",
+     "name": "lat",
+     "type": "Double",
      "required": false
     },
     {
      "in": "query",
-     "name": "size",
-     "type": "Integer",
+     "name": "lng",
+     "type": "Double",
      "required": false
     }
    ],
    "bodyType": null,
-   "returnType": "PageResult<FavoriteItem>",
-   "returnContainer": "PageResult",
-   "returnElement": "FavoriteItem",
+   "returnType": "List<NearbyCabinetVO>",
+   "returnContainer": "List",
+   "returnElement": "NearbyCabinetVO",
    "responseShape": [
+    {
+     "name": "cabinetNo",
+     "type": "String"
+    },
     {
      "name": "siteNo",
      "type": "String"
@@ -27942,7 +28007,39 @@
      "type": "String"
     },
     {
-     "name": "createdAt",
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "distanceM",
+     "type": "Integer"
+    },
+    {
+     "name": "lat",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "lng",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "availableBorrow",
+     "type": "int"
+    },
+    {
+     "name": "availableReturn",
+     "type": "int"
+    },
+    {
+     "name": "pricePerHour",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "status",
      "type": "String"
     }
    ],
@@ -29205,9 +29302,9 @@
  "conflicts": {},
  "stats": {
   "endpoints": 425,
-  "records": 303,
+  "records": 304,
   "withPerm": 362,
   "withBody": 185,
-  "shapedResponses": 324
+  "shapedResponses": 325
  }
 }

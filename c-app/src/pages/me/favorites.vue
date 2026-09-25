@@ -46,7 +46,7 @@ function borrow(c: NearbyCabinet) {
             <view class="flex-1">
               <text class="pb-h2">{{ c.siteName }}</text>
               <view class="mt-[8rpx] flex items-center gap-[8rpx] text-[24rpx] text-sub">
-                <pb-icon name="pin" :size="26" /><text>{{ c.address }} · {{ distance(c.distanceM) }}</text>
+                <pb-icon name="pin" :size="26" /><text>{{ c.address }}{{ distance(c.distanceM) ? " · " + distance(c.distanceM) : "" }}</text>
               </view>
               <view class="mt-[18rpx] flex gap-[12rpx]">
                 <pb-tag :type="c.availableBorrow > 0 ? 'success' : 'neutral'">{{ $t("home.canBorrow") }} {{ c.availableBorrow }}</pb-tag>

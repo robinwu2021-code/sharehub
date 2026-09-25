@@ -108,8 +108,9 @@ export interface McpApi {
   nearbyCabinets(q?: NearbyQ): Promise<NearbyCabinet[]>;
   cabinetAvailability(cabinetNo: string): Promise<CabinetAvailability>;
   storeDetail(siteNo: string): Promise<StoreDetail>;
-  // 收藏门店
-  listFavorites(): Promise<NearbyCabinet[]>;
+  // 收藏门店。列表返的是**门店卡片**（与找柜同一形状）—— 收藏页要展示地址、可借可还、价格。
+  // 给了坐标才算得出距离；不给则 distanceM 为 null，界面不显示那一段（不是显示 0）。
+  listFavorites(at?: { lat?: number; lng?: number }): Promise<NearbyCabinet[]>;
   toggleFavorite(siteNo: string): Promise<{ favorite: boolean }>;
   // 借还
   rentOrder(p: RentParams): Promise<RentOrder>;

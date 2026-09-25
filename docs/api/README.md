@@ -573,10 +573,10 @@ SELF_SERVICE  TO_WORKORDER    TO_REFUND         TO_CS      （争议类问题额
 ### 8.2 找柜与地图（C-MAP，模块 2）
 | Method Path | 用途 | 编号 | 状态 |
 |---|---|---|---|
-| `GET /mp/nearby/cabinets` | 附近网点（`lat/lng/keyword/returnable`，含可借可还数） | C-MAP-01/02/05 | ✅ |
+| `GET /mp/nearby/cabinets` | 附近网点（`lat/lng/keyword/returnable`）。出参 `NearbyCabinetVO`；给了 `lat/lng` 按距离升序，**算不出的距离/坐标回 null 不回 0** | C-MAP-01/02/05 | ✅ |
 | `GET /mp/nearby/cabinets/{cabinetNo}/availability` | 借出前可借校验 + 价格/押金/免押额 | C-RT-02 | ✅ |
 | `GET /mp/sites/{siteNo}` | 网点详情（地址/营业时间/柜机列表/价格/是否收藏） | C-MAP-03 | ✅ |
-| `GET /mp/user/favorites` | 我的收藏门店 | — | ✅ |
+| `GET /mp/user/favorites` | 我的收藏门店 —— 与找柜**同一张门店卡片**（`NearbyCabinetVO`），可带 `lat/lng` 算距离 | — | ✅ |
 | `POST /mp/user/favorites/{siteNo}` | 收藏 / 取消收藏（toggle） | — | ✅ |
 
 ### 8.3 借还主流程（C-RT / C-US / C-RE，模块 3/6/7）

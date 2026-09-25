@@ -36,14 +36,21 @@ export type OrderStatus =
   | "EXCEPTION"; // 异常/报障
 
 // 附近网点（找柜与地图）
+/**
+ * 门店卡片（镜像后端 `NearbyCabinetVO`）—— 找柜列表与**收藏列表**是同一张卡片、同一个出参。
+ *
+ * ⚠️ `distanceM`/`lat`/`lng` 可为 null，含义是**算不出 / 没录坐标**，不是 0。
+ * 后端此前把这三个硬编码成 0（注释写着「DDL 缺口」，而列早就补上了），于是
+ * 地图把每一家店都钉在 0,0，列表里写着「0 m」——读起来是「你就站在店里」。
+ */
 export interface NearbyCabinet {
   cabinetNo: string;
   siteNo: string;
   siteName: string;
   address: string;
-  distanceM: number;
-  lat: number;
-  lng: number;
+  distanceM: number | null;
+  lat: number | null;
+  lng: number | null;
   availableBorrow: number; // 可借充电宝数
   availableReturn: number; // 可还空仓数
   pricePerHour: number;
@@ -366,9 +373,9 @@ export interface StoreDetail {
   siteName: string;
   address: string;
   openHours: string;
-  lat: number;
-  lng: number;
-  distanceM: number;
+  lat: number | null;
+  lng: number | null;
+  distanceM: number | null; // null = 没给定位或站点没录坐标，不是 0
   availableBorrow: number;
   availableReturn: number;
   pricePerHour: number;

@@ -5118,7 +5118,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | 查询 | `lat` | `Double` | 否 |
 | 查询 | `lng` | `Double` | 否 |
 
-**出参** `List<对象（自由键）>`
+**出参** 数组<[`NearbyCabinetVO`](#nearbycabinetvo)>
 
 ### `GET /mp/nearby/cabinets/{cabinetNo}/availability`
 
@@ -5159,6 +5159,8 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | 位置 | 名 | 类型 | 必填 |
 |---|---|---|---|
 | 路径 | `siteNo` | `String` | 是 |
+| 查询 | `lat` | `Double` | 否 |
+| 查询 | `lng` | `Double` | 否 |
 
 **出参** `对象（自由键）`
 
@@ -5283,16 +5285,18 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 ### `GET /mp/user/favorites`
 
-**无权限码** · `MpUserController#favorites`
+我的收藏（镜像 c-app `NearbyCabinet[]`）—— 与找柜列表**同一张卡片、同一个出参**。
+
+**无权限码** · `MpNearbyController#myFavorites`
 
 **入参**
 
 | 位置 | 名 | 类型 | 必填 |
 |---|---|---|---|
-| 查询 | `page` | `Integer` | 否 |
-| 查询 | `size` | `Integer` | 否 |
+| 查询 | `lat` | `Double` | 否 |
+| 查询 | `lng` | `Double` | 否 |
 
-**出参** 分页<[`FavoriteItem`](#favoriteitem)>
+**出参** 数组<[`NearbyCabinetVO`](#nearbycabinetvo)>
 
 ### `POST /mp/user/favorites/{siteNo}`
 
@@ -6542,14 +6546,6 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `suggestedAction` | `String` |
 | `sortNo` | `Integer` |
 
-### FavoriteItem
-
-| 字段 | 类型 |
-|---|---|
-| `siteNo` | `String` |
-| `siteName` | `String` |
-| `createdAt` | `String` |
-
 ### FreeOrder
 
 | 字段 | 类型 |
@@ -6996,6 +6992,23 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `emailMask` | `String` |
 | `rejectReason` | `String` |
 | `submittedAt` | `LocalDateTime` |
+
+### NearbyCabinetVO
+
+| 字段 | 类型 |
+|---|---|
+| `cabinetNo` | `String` |
+| `siteNo` | `String` |
+| `siteName` | `String` |
+| `address` | `String` |
+| `distanceM` | `Integer` |
+| `lat` | `BigDecimal` |
+| `lng` | `BigDecimal` |
+| `availableBorrow` | `int` |
+| `availableReturn` | `int` |
+| `pricePerHour` | `BigDecimal` |
+| `currency` | `String` |
+| `status` | `String` |
 
 ### NoticeVO
 

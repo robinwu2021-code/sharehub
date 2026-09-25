@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // 门店详情底部弹层（地图点选后）。地址/营业/可借可还/价格/导航/借出/收藏。
 import type { StoreDetail } from "@/types";
+import { distance } from "@/shared/format";
 defineProps<{ visible: boolean; store: StoreDetail | null }>();
 const emit = defineEmits<{
   (e: "update:visible", v: boolean): void;
@@ -25,7 +26,7 @@ function close() {
         </view>
       </view>
       <view class="mt-[12rpx] flex items-center gap-[10rpx] text-[24rpx] text-sub">
-        <pb-icon name="pin" :size="26" /><text>{{ store.address }} · {{ (store.distanceM / 1000).toFixed(1) }} km</text>
+        <pb-icon name="pin" :size="26" /><text>{{ store.address }}{{ distance(store.distanceM) ? " · " + distance(store.distanceM) : "" }}</text>
       </view>
       <view class="mt-[8rpx] flex items-center gap-[10rpx] text-[24rpx] text-sub">
         <pb-icon name="clock" :size="26" /><text>{{ store.openHours }}</text>

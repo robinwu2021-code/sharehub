@@ -80,12 +80,6 @@ D AuditLogEntry GET /api/platform/audit-logs
 D CodeBatchRow GET /api/ops/device-code-batches
 D CommandResult POST /api/ops/cabinets/{cabinetNo}/commands
 D CouponTplVO GET /api/user/coupons
-# ⚠️ 收藏页比「类型没对上」更严重：后端 FavoriteItem 只有 {siteNo,siteName,createdAt}，
-#   而页面渲染的是门店卡片（cabinetNo/address/distanceM/availableBorrow/availableReturn）。
-#   切到真后端时整列表只剩店名，key 用的 cabinetNo 还会全撞在 undefined 上，
-#   点进去是 confirm?cabinetNo=undefined。要么后端把收藏出参补成门店卡片所需，
-#   要么前端拿 siteNo 逐个查门店详情 —— 是个接口口径决策，单独排。
-D FavoriteItem GET /mp/user/favorites
 D InvoiceItem GET /mp/user/invoices
 D InvoiceTitleItem GET /mp/user/invoice-titles
 D Location GET /api/ops/locations

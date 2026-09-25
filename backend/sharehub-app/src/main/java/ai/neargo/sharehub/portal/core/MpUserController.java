@@ -11,7 +11,6 @@ import ai.neargo.sharehub.user.asset.service.MembershipService;
 import ai.neargo.sharehub.user.asset.service.RechargePackageService;
 import ai.neargo.sharehub.user.asset.service.RechargeService;
 import ai.neargo.sharehub.user.asset.service.WalletService;
-import ai.neargo.sharehub.user.core.dto.UserCoreDtos.FavoriteItem;
 import ai.neargo.sharehub.user.core.dto.UserCoreDtos.InvoiceApplyReq;
 import ai.neargo.sharehub.user.core.dto.UserCoreDtos.InvoiceItem;
 import ai.neargo.sharehub.user.core.dto.UserCoreDtos.InvoiceTitleItem;
@@ -119,12 +118,9 @@ public class MpUserController {
     }
 
     // —— 收藏门店 ——
-
-    @GetMapping("/favorites")
-    public PageResult<FavoriteItem> favorites(@RequestParam(required = false) Integer page,
-                                              @RequestParam(required = false) Integer size) {
-        return favorites.pageByOwner(ConsumerContext.userNo(), page, size);
-    }
+    //
+    // 列表在 MpNearbyController（`GET /mp/user/favorites`）：收藏页渲染的是**门店卡片**，
+    // 要把站点 × 机柜 × 报价组合起来，而那是找柜 BFF 的活。这里只留写侧。
 
     /** 收藏 / 取消收藏（切换）。返回切换后是否已收藏。 */
     @PostMapping("/favorites/{siteNo}")
