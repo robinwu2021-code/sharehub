@@ -58,6 +58,23 @@ public final class MarketingDtos {
     }
 
     /**
+     * 领券中心的一行（{@code GET /mp/user/coupons/claimable}）—— **可领的券模板**，不是用户手里的券。
+     *
+     * <p>键叫 {@code tplNo} 而不是 {@code couponNo}：领券要传的是模板号，
+     * 而 C 端同时还有一份 {@link UserCouponVO} 列表，那里的 {@code couponNo} 是券实例号（{@code CP…}，见 {@code BizKey.COUPON}）。
+     * 两个列表都摆在券页面上，键名一样就一定有人传错 —— 传错的结果是 400「券模板不存在」，
+     * 看起来像数据问题，其实是传了另一张表的主键。
+     *
+     * <p>{@code remaining} 为 null 表示**不限量**（coupon_tpl.stock=0 的语义，[db-design §6.3]），
+     * 不是「剩 0 张」；{@code claimed}=true 表示当前用户已有该模板的未使用券，
+     * 按钮该置灰 —— 后端 claim 是幂等的，但让用户点了才知道「你已经领过」是糟糕的交互。
+     */
+    public record ClaimableCouponVO(String tplNo, String name, String type,
+                                    BigDecimal value, BigDecimal threshold, String currency,
+                                    Integer remaining, boolean claimed) {
+    }
+
+    /**
      * 用户手里的券（usr_coupon）。运营端按 {@code cUserNo} 查某人券包，C 端只能查自己的。
      * {@code tpl*} 是模板快照，免得 C 端券包列表逐行回查模板。
      */

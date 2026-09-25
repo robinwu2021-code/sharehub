@@ -607,8 +607,9 @@ SELF_SERVICE  TO_WORKORDER    TO_REFUND         TO_CS      （争议类问题额
 | `GET /mp/user/membership` | 会员方案 + 我的会员（有效期/剩余次数/权益） | C-MB-01/03 | ✅ |
 | `POST /mp/user/membership` | 购买会员/次卡 | C-MB-01 | 🆕 |
 | `DELETE /mp/user/membership/auto-renew` | 取消自动续费 | C-MB-04 | 🆕 |
-| `GET /mp/user/coupons` | 我的券包 / 领券中心 | C-CP-01/02 | ✅ |
-| `POST /mp/user/coupons/{couponNo}/claim` | 领券（防重复领 + 库存校验） | C-CP-01 | 🆕 |
+| `GET /mp/user/coupons` | 我的券包（**已领到手的券实例**，PageResult） | C-CP-02 | ✅ |
+| `GET /mp/user/coupons/claimable` | 领券中心（可领的**券模板**，带 `claimed`/剩余量） | C-CP-01 | ✅ |
+| `POST /mp/user/coupons/{couponNo}/claim` | 领券（幂等 + 库存校验）。路径上传的是**模板号** `tplNo`，不是券包里的 `couponNo` | C-CP-01 | ✅ |
 | `GET /mp/notice` | 运营公告（首页公告条 + 公告页） | C-CP-04 | ✅ |
 | `GET /mp/user/invite` | 邀请码/邀请链接 | C-SH-01 | 🆕 |
 | `POST /mp/user/invite/bind` | 新用户绑定邀请人（归因/反作弊） | C-SH-03 | 🆕 |

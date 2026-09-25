@@ -7,7 +7,8 @@ import type {
   RentOrder,
   UserProfile,
   Wallet,
-  Coupon,
+  UserCoupon,
+  ClaimableCoupon,
   Membership,
   ReportInput,
   ReportResult,
@@ -114,6 +115,10 @@ export interface McpApi {
   // 钱包 / 营销
   getWallet(): Promise<Wallet>;
   walletTxns(q?: PageQ): Promise<PageResult<WalletTxn>>;
-  listCoupons(): Promise<Coupon[]>;
+  // 券包与领券中心是**两份不同的东西**：前者是已领到手的券实例（键 couponNo，CP…），
+  // 后者是可领的券模板（键 tplNo）。claim 要传的是 tplNo —— 传券实例号会 400「券模板不存在」。
+  listCoupons(): Promise<UserCoupon[]>;
+  listClaimableCoupons(): Promise<ClaimableCoupon[]>;
+  claimCoupon(tplNo: string): Promise<UserCoupon>;
   listMemberships(): Promise<Membership[]>;
 }

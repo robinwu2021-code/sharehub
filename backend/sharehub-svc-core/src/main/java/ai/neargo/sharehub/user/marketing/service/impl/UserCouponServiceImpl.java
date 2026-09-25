@@ -2,6 +2,7 @@ package ai.neargo.sharehub.user.marketing.service.impl;
 
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.common.BizKey;
+import ai.neargo.sharehub.user.marketing.dto.MarketingDtos.ClaimableCouponVO;
 import ai.neargo.sharehub.user.marketing.dto.MarketingDtos.UserCouponVO;
 import ai.neargo.sharehub.user.marketing.entity.CouponTpl;
 import ai.neargo.sharehub.user.marketing.entity.UsrCoupon;
@@ -81,6 +82,35 @@ public class UserCouponServiceImpl implements UserCouponService {
         if (!out.isEmpty()) {
             tpl.setIssued(issued + out.size());
             tplMapper.updateById(tpl);
+        }
+        return out;
+    }
+
+    @Override
+    public List<ClaimableCouponVO> claimable(String cUserNo) {
+        List<CouponTpl> tpls = tplMapper.selectList(new LambdaQueryWrapper<CouponTpl>()
+                .eq(CouponTpl::getStatus, "ACTIVE")
+                .isNull(CouponTpl::getArchivedAt)
+                .orderByDesc(CouponTpl::getId));
+
+        // 已领过哪些模板：一次查完，不要逐行 findUnused（列表长了就是 N+1）
+        java.util.Set<String> mine = tpls.isEmpty() ? java.util.Set.of()
+                : mapper.selectList(new LambdaQueryWrapper<UsrCoupon>()
+                        .eq(UsrCoupon::getCUserNo, cUserNo)
+                        .eq(UsrCoupon::getStatus, "UNUSED")
+                        .in(UsrCoupon::getTplNo, tpls.stream().map(CouponTpl::getTplNo).toList()))
+                .stream().map(UsrCoupon::getTplNo).collect(java.util.stream.Collectors.toSet());
+
+        List<ClaimableCouponVO> out = new ArrayList<>();
+        for (CouponTpl t : tpls) {
+            int stock = t.getStock() == null ? 0 : t.getStock();
+            int issued = t.getIssued() == null ? 0 : t.getIssued();
+            boolean claimed = mine.contains(t.getTplNo());
+            // 发完的模板不再展示（已领过的除外 —— 那张券还在用户手里，列表里消失会让人以为券丢了）
+            if (stock != 0 && issued >= stock && !claimed) continue;
+            Integer remaining = stock == 0 ? null : Math.max(0, stock - issued);
+            out.add(new ClaimableCouponVO(t.getTplNo(), t.getName(), t.getType(),
+                    t.getValue(), t.getThreshold(), t.getCurrency(), remaining, claimed));
         }
         return out;
     }

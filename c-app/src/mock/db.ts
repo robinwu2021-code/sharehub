@@ -5,7 +5,8 @@ import type {
   RentOrder,
   UserProfile,
   Wallet,
-  Coupon,
+  UserCoupon,
+  ClaimableCoupon,
   Membership,
   Notice,
   StoreDetail,
@@ -124,10 +125,20 @@ export const walletTxns: WalletTxn[] = [
   { txnNo: "TX-01", type: "RECHARGE", title: "Top-up", amount: 10, currency: CURRENCY, at: "2026-07-01T09:00:00Z" },
 ];
 
-export const coupons: Coupon[] = [
-  { couponNo: "CP-01", title: "New user AED 5 off", amount: 5, threshold: 0, status: "UNUSED", expireAt: "2026-08-01" },
-  { couponNo: "CP-02", title: "AED 3 off over 10", amount: 3, threshold: 10, status: "UNUSED", expireAt: "2026-07-20" },
-  { couponNo: "CP-03", title: "Weekend AED 2", amount: 2, threshold: 0, status: "USED", expireAt: "2026-07-06" },
+// 我的券包（已领到手的券实例）。字段照 UserCouponVO —— mock 与真后端同形，
+// 否则切到真后端才发现页面读的是不存在的字段。
+export const coupons: UserCoupon[] = [
+  { couponNo: "CP000001", tplNo: "CTPL-NEW", tplName: "New user AED 5 off", tplType: "CUT", value: 5, threshold: 0, currency: CURRENCY, status: "UNUSED", expireAt: "2026-08-01" },
+  { couponNo: "CP000002", tplNo: "CTPL-OVER10", tplName: "AED 3 off over 10", tplType: "CUT", value: 3, threshold: 10, currency: CURRENCY, status: "UNUSED", expireAt: "2026-07-20" },
+  { couponNo: "CP000003", tplNo: "CTPL-WEEKEND", tplName: "Weekend AED 2", tplType: "CUT", value: 2, threshold: 0, currency: CURRENCY, status: "USED", usedOrderNo: "ORD000031", expireAt: "2026-07-06" },
+];
+
+// 领券中心（可领的券模板）。前两个已在券包里 → claimed 由 mock 按 coupons 现算，不写死。
+export const couponTpls: Omit<ClaimableCoupon, "claimed">[] = [
+  { tplNo: "CTPL-NEW", name: "New user AED 5 off", type: "CUT", value: 5, threshold: 0, currency: CURRENCY, remaining: null },
+  { tplNo: "CTPL-OVER10", name: "AED 3 off over 10", type: "CUT", value: 3, threshold: 10, currency: CURRENCY, remaining: 120 },
+  { tplNo: "CTPL-SUMMER", name: "Summer AED 8 off over 30", type: "CUT", value: 8, threshold: 30, currency: CURRENCY, remaining: 7 },
+  { tplNo: "CTPL-VIP", name: "VIP 20% off", type: "DISCOUNT", value: 0.8, threshold: 0, currency: CURRENCY, remaining: null },
 ];
 
 export const memberships: Membership[] = [

@@ -18552,6 +18552,55 @@
   },
   {
    "verb": "GET",
+   "path": "/api/trade/order-events",
+   "perm": "order:order:read",
+   "perms": [
+    "order:order:read"
+   ],
+   "handler": "TradeController#orderEvents",
+   "summary": "订单状态流转留痕（审计视图，append 表 `ord_event_log`）。",
+   "params": [
+    {
+     "in": "query",
+     "name": "orderNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "List<OrderDtos.OrderEvent>",
+   "returnContainer": "List",
+   "returnElement": "OrderDtos.OrderEvent",
+   "responseShape": [
+    {
+     "name": "orderNo",
+     "type": "String"
+    },
+    {
+     "name": "fromStatus",
+     "type": "String"
+    },
+    {
+     "name": "toStatus",
+     "type": "String"
+    },
+    {
+     "name": "event",
+     "type": "String"
+    },
+    {
+     "name": "operator",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
    "path": "/api/trade/order-exceptions",
    "perm": "order:exception:read",
    "perms": [
@@ -27670,7 +27719,7 @@
    "perm": null,
    "perms": [],
    "handler": "MpSupportController#myCoupons",
-   "summary": "我的券包 / 领券中心。",
+   "summary": "我的券包（**已领到手的券实例**，不含可领模板；后者见下面的 claimable）。",
    "params": [
     {
      "in": "query",
@@ -27739,6 +27788,54 @@
     {
      "name": "expireAt",
      "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/mp/user/coupons/claimable",
+   "perm": null,
+   "perms": [],
+   "handler": "MpSupportController#claimableCoupons",
+   "summary": "领券中心 —— 当前可领的券模板。",
+   "params": [],
+   "bodyType": null,
+   "returnType": "List<ClaimableCouponVO>",
+   "returnContainer": "List",
+   "returnElement": "ClaimableCouponVO",
+   "responseShape": [
+    {
+     "name": "tplNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "type",
+     "type": "String"
+    },
+    {
+     "name": "value",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "threshold",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "remaining",
+     "type": "Integer"
+    },
+    {
+     "name": "claimed",
+     "type": "boolean"
     }
    ],
    "requestShape": null
@@ -29055,10 +29152,10 @@
  },
  "conflicts": {},
  "stats": {
-  "endpoints": 422,
-  "records": 301,
-  "withPerm": 361,
+  "endpoints": 424,
+  "records": 302,
+  "withPerm": 362,
   "withBody": 184,
-  "shapedResponses": 321
+  "shapedResponses": 323
  }
 }

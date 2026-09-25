@@ -9,7 +9,8 @@ import type {
   RentOrder,
   UserProfile,
   Wallet,
-  Coupon,
+  UserCoupon,
+  ClaimableCoupon,
   Membership,
   ReportInput,
   ReportResult,
@@ -55,6 +56,10 @@ export const httpApi: McpApi = {
 
   getWallet: () => client.get<Wallet>("/mp/user/wallet"),
   walletTxns: (q?: PageQ) => client.get<PageResult<WalletTxn>>("/mp/user/wallet/txns", q), // 待定
-  listCoupons: () => client.get<Coupon[]>("/mp/user/coupons"),
+  // 后端这个口回的是 PageResult 而不是数组。原来按数组取，拿到的是 {list,total} 对象，
+  // v-for 照样能跑（遍历对象的值），于是券包里出现两行空卡片而不是报错。
+  listCoupons: () => client.get<PageResult<UserCoupon>>("/mp/user/coupons", { size: 200 }).then((r) => r.list),
+  listClaimableCoupons: () => client.get<ClaimableCoupon[]>("/mp/user/coupons/claimable"),
+  claimCoupon: (tplNo: string) => client.post<UserCoupon>(`/mp/user/coupons/${tplNo}/claim`),
   listMemberships: () => client.get<Membership[]>("/mp/user/membership"),
 };

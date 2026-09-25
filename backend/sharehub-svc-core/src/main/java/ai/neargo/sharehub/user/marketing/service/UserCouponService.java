@@ -1,6 +1,7 @@
 package ai.neargo.sharehub.user.marketing.service;
 
 import ai.neargo.common.core.PageResult;
+import ai.neargo.sharehub.user.marketing.dto.MarketingDtos.ClaimableCouponVO;
 import ai.neargo.sharehub.user.marketing.dto.MarketingDtos.UserCouponVO;
 
 import java.util.List;
@@ -29,6 +30,18 @@ public interface UserCouponService {
      * 同一模板对同一用户已有未使用券则跳过（防重复发）。返回实际发出的券。
      */
     List<UserCouponVO> issue(String tplNo, List<String> cUserNos, String expireAt);
+
+    /**
+     * 领券中心（{@code GET /mp/user/coupons/claimable}）—— 当前**可领**的券模板。
+     *
+     * <p>没有这个接口时 {@link #claim} 是**够不着的**：C 端另一个列表
+     * （{@code GET /mp/user/coupons}）返的是用户已有的券实例，从里面拿不到任何可领的模板号。
+     * 于是「领券中心」在文档里存在、在后端存在，唯独在界面上无从发起 —— 不报错，只是永远没有券可领。
+     *
+     * <p>过滤：{@code status=ACTIVE} 且未归档；{@code stock>0} 时还要 {@code issued < stock}。
+     * 每行带 {@code claimed}（该用户是否已有未使用券），供按钮置灰。
+     */
+    List<ClaimableCouponVO> claimable(String cUserNo);
 
     /**
      * C 端领券（{@code POST /mp/user/coupons/{couponNo}/claim}）。

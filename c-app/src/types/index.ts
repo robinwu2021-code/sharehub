@@ -118,13 +118,37 @@ export interface WalletTxn {
   at: string;
 }
 
-export interface Coupon {
-  couponNo: string;
-  title: string;
-  amount: number;
+/**
+ * 我的券包里的一张券（镜像后端 `UserCouponVO`）。
+ *
+ * ⚠️ 名字必须和后端 DTO 对得上（`UserCouponVO` 剥掉 `VO` 后缀）——
+ * 叫 `Coupon` 的时候对齐脚本配不上对，于是这里少了两个字段也没人知道：
+ * 页面读 `title`/`amount`，后端回的是 `tplName`/`value`，卡片上的券名和金额**全是空的**，
+ * 而且不报错。
+ */
+export interface UserCoupon {
+  couponNo: string; // 券实例号（CP…），不是模板号
+  tplNo: string;
+  tplName: string;
+  tplType: "CUT" | "DISCOUNT";
+  value: number; // CUT=减免金额；DISCOUNT=折扣率（0..1）
   threshold: number;
+  currency: string;
   status: "UNUSED" | "USED" | "EXPIRED";
+  usedOrderNo?: string;
   expireAt: string;
+}
+
+/** 领券中心的一行（镜像后端 `ClaimableCouponVO`）—— 是**券模板**，领券要传的是 `tplNo`。 */
+export interface ClaimableCoupon {
+  tplNo: string;
+  name: string;
+  type: "CUT" | "DISCOUNT";
+  value: number;
+  threshold: number;
+  currency: string;
+  remaining: number | null; // null = 不限量，不是「剩 0 张」
+  claimed: boolean;
 }
 
 export interface Membership {

@@ -64,7 +64,6 @@ C GET /api/trade/settlements/{}
 #
 # ── A 组：已上线功能的闭环缺一半（后端已实现 + c-app 页面已存在，差接线）──
 # 用户现在就会撞上，不是「功能没做」，是「功能做了半截」。
-C POST /mp/user/coupons/{}/claim   # 领券：GET /mp/user/coupons 已接 → 看得到券却领不了（页面 coupons）
 C GET /mp/user/recharge-packages   # 充值：/mp/user/wallet(+/txns) 已接 → 看得到余额却充不了（页面 wallet）
 C GET /mp/user/reports             # 报障进度：POST /mp/user/report 已接（能提交）→ 提交完查不到（页面 me）
 C GET /mp/user/reports/{}          # 同上，详情

@@ -6,6 +6,7 @@ import ai.neargo.sharehub.cs.dto.CsDtos.CsTicketVO;
 import ai.neargo.sharehub.cs.dto.CsDtos.ReportReq;
 import ai.neargo.sharehub.cs.dto.CsDtos.ReportResultVO;
 import ai.neargo.sharehub.cs.service.CsTicketService;
+import ai.neargo.sharehub.user.marketing.dto.MarketingDtos.ClaimableCouponVO;
 import ai.neargo.sharehub.user.marketing.dto.MarketingDtos.NoticeVO;
 import ai.neargo.sharehub.user.marketing.dto.MarketingDtos.UserCouponVO;
 import ai.neargo.sharehub.user.marketing.service.NoticeService;
@@ -53,7 +54,7 @@ public class MpSupportController {
         return noticeService.visibleNotices(limit);
     }
 
-    /** 我的券包 / 领券中心。属主恒为当前会话用户。 */
+    /** 我的券包（**已领到手的券实例**，不含可领模板；后者见下面的 claimable）。属主恒为当前会话用户。 */
     @GetMapping("/mp/user/coupons")
     public PageResult<UserCouponVO> myCoupons(@RequestParam(required = false) Integer page,
                                               @RequestParam(required = false) Integer size,
@@ -62,7 +63,21 @@ public class MpSupportController {
     }
 
     /**
-     * 领券。路径上的 {@code couponNo} 是领券中心的券模板号（沿用前端命名）。
+     * 领券中心 —— 当前可领的券模板。
+     *
+     * <p>这个接口补的是一个**闭合不了的环**：上面的 {@code /mp/user/coupons} 返的是
+     * 用户已有的券实例，从里面取不到任何可领的模板号，于是下面的 claim 无从发起。
+     * 文档（[C端功能清单 C-CP-01]）把「领券中心」和「我的券包」都指到了同一个端点上，
+     * 但那个端点只能回答后者。
+     */
+    @GetMapping("/mp/user/coupons/claimable")
+    public List<ClaimableCouponVO> claimableCoupons() {
+        return userCouponService.claimable(ConsumerContext.userNo());
+    }
+
+    /**
+     * 领券。路径上的 {@code couponNo} 是领券中心的券模板号（沿用前端命名）——
+     * 即 {@link ClaimableCouponVO#tplNo()}，**不是**券包里那个 {@code CP…} 券实例号。
      * 幂等：已领过则返回已有那张，不发第二张。
      */
     @PostMapping("/mp/user/coupons/{couponNo}/claim")

@@ -1,7 +1,7 @@
 // Mock 实现（McpApi）。全部走 mock/db 内存数据 + 模拟延迟。后端未就绪即可跑通全部 UI。
 import * as db from "@/mock/db";
 import type { McpApi, LoginParams, RentParams, PayParams, OrderQ, NearbyQ } from "./contract";
-import type { RentOrder, LogoffItem } from "@/types";
+import type { RentOrder, LogoffItem, UserCoupon } from "@/types";
 
 /** 注销申请的 mock 状态。模块级而非 db 里：它是会话内的一次性流程，不是种子数据。 */
 let mockLogoff: LogoffItem | null = null;
@@ -119,5 +119,35 @@ export const mockApi: McpApi = {
   getWallet: () => db.delay(db.wallet),
   walletTxns: (q = {}) => db.delay(db.paginate(db.walletTxns, q.page, q.size)),
   listCoupons: () => db.delay(db.coupons),
+  // claimed 现算而不是写死：领完之后再进页面，那一行必须已经是「已领取」。
+  listClaimableCoupons: () =>
+    db.delay(
+      db.couponTpls.map((t) => ({
+        ...t,
+        claimed: db.coupons.some((c) => c.tplNo === t.tplNo && c.status === "UNUSED"),
+      })),
+    ),
+  claimCoupon: (tplNo: string) => {
+    const tpl = db.couponTpls.find((t) => t.tplNo === tplNo);
+    if (!tpl) return Promise.reject(new Error("券模板不存在"));
+    // 幂等，与后端一致：已有未使用券就返回那一张，不发第二张
+    const exist = db.coupons.find((c) => c.tplNo === tplNo && c.status === "UNUSED");
+    if (exist) return db.delay(exist, 300);
+    if (tpl.remaining !== null && tpl.remaining <= 0) return Promise.reject(new Error("券已领完"));
+    const got: UserCoupon = {
+      couponNo: "CP" + String(db.coupons.length + 1).padStart(6, "0"),
+      tplNo: tpl.tplNo,
+      tplName: tpl.name,
+      tplType: tpl.type,
+      value: tpl.value,
+      threshold: tpl.threshold,
+      currency: tpl.currency,
+      status: "UNUSED",
+      expireAt: "2026-12-31",
+    };
+    db.coupons.unshift(got); // 真改 db：重开页面能读回
+    if (tpl.remaining !== null) tpl.remaining -= 1;
+    return db.delay(got, 420);
+  },
   listMemberships: () => db.delay(db.memberships),
 };
