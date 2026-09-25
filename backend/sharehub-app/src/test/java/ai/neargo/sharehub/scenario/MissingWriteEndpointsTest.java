@@ -100,7 +100,11 @@ class MissingWriteEndpointsTest extends ApiTestSupport {
     void duplicate_role_code_is_refused() {
         // 编码是权限判定的连接键，重了就有两套权限抢同一个 code。
         String admin = login("ADMIN");
-        String code = "DUP" + System.nanoTime() % 100000;
+        // 全精度 nanoTime，不取模：test_sharehub 是**有状态共享库**，每跑一次留一个
+        // DUP 角色（现已积累 50+）。取模到 5 位后空间只有 10 万，而 nanoTime 的低位
+        // 在很多平台上粒度很粗（常是千的倍数），撞码概率远高于 1/100000 ——
+        // 撞上时红的是**第一个** post（400 "编码已存在"），看起来像「新建角色坏了」。
+        String code = "DUP" + System.nanoTime();
         Map<String, Object> body = new HashMap<>();
         body.put("code", code);
         body.put("name", "重码测试");

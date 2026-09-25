@@ -51,6 +51,23 @@ public class CampaignServiceImpl extends AbstractCrudService<MktCampaign, Campai
         if (e.getStatus() == null || e.getStatus().isBlank()) e.setStatus("DRAFT");
     }
 
+
+    /**
+     * <b>状态不接受客户端传入</b> —— 只能由 {@code POST /api/user/campaigns/{campaignNo}/{action}}（start/pause/end） 走状态机改。
+     *
+     * 实体就是请求体（见 {@code known-entity-request-bodies.txt}），而 MyBatis-Plus 的
+     * {@code updateById} 只写非 null 字段 —— 不锁的话保存端点就是绕过状态机的第二条路：
+     * {@code POST /api/user/campaigns/{campaignNo}  {"status":"ENDED"}}
+     * 一条边都不用走，直接落终态。运营端的迁移表、两端的边卡口、mock 守卫，
+     * 守的全是动作端点那条路；<b>卡口守住一条路、另一条敞着，等于没守</b>。
+     *
+     * 写法同 {@code FreeWhitelistServiceImpl.save}（那里早就这么锁了）。
+     */
+    @Override
+    protected void beforeUpdate(MktCampaign e, MktCampaign current) {
+        e.setStatus(current.getStatus());
+    }
+
     @Override
     protected CampaignVO toVO(MktCampaign e) {
         return new CampaignVO(e.getCampaignNo(), e.getName(), e.getKind(), e.getRule(),

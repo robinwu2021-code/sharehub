@@ -79,6 +79,20 @@ public class PushServiceImpl extends AbstractCrudService<MktPush, PushMessageVO>
 
     @Override
     protected void beforeUpdate(MktPush e, MktPush current) {
+        /*
+         * **状态不接受客户端传入** —— 只能由 /schedule · /send · /finish 走状态机改。
+         *
+         * 实体就是请求体（见 known-entity-request-bodies.txt），而 MyBatis-Plus 的
+         * updateById 只写非 null 字段 —— 不锁的话保存端点就是绕过状态机的第二条路：
+         *   POST /api/user/push-messages/{pushNo}  {"status":"SENT"}
+         * 草稿直接变「已发送」：既没真发、也没有发送记录，而列表上白纸黑字写着已发送。
+         * 下面那个 `SENT 之后不可改内容` 的守卫也会被它反过来利用 ——
+         * 先把状态刷成 SENT，内容就此冻结成假的。
+         *
+         * 此前这里只在 current 已经是 SENT 时才回填状态，DRAFT/SCHEDULED/SENDING 一律放行。
+         */
+        e.setStatus(current.getStatus());
+
         // 已下发的推送不可再改内容/受众 —— 否则历史触达记录与本单不自洽
         if (PushStatus.SENT.is(current.getStatus())) {
             e.setTitle(current.getTitle());
@@ -87,7 +101,6 @@ public class PushServiceImpl extends AbstractCrudService<MktPush, PushMessageVO>
             e.setChannel(current.getChannel());
             e.setSentCount(current.getSentCount());
             e.setSentAt(current.getSentAt());
-            e.setStatus(PushStatus.SENT.name());
         }
         /*
          * 触达统计与幂等键**一律从库里取**，不接受客户端传 ——
