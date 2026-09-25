@@ -4,7 +4,7 @@ import type { PageQ, ArchiveQ , ReportQ } from "../query";
 import type {
   PageResult, Site, SitePoint, Venue, Contract, ContractAttachmentReq,
   Lead, LeadFollowUp, LeadFollowUpReq, SiteAnalysis,
-  VenueOnboarding, LifecycleRow, FunnelStage, SiteAgent,
+  VenueOnboarding, LifecycleRow, FunnelStage, SiteAgent, ContractSummary, ContractLogItem,
 } from "../../types";
 
 export interface LocationApi {
@@ -44,6 +44,38 @@ export interface LocationApi {
   addContractAttachment(contractNo: string, req: ContractAttachmentReq): Promise<Contract>;
   /** 移除误传的扫描件。⚠️ **后端缺口**，同上。 */
   removeContractAttachment(contractNo: string, attachNo: string): Promise<Contract>;
+
+  // ——— 合同审批（2026-09-25 裁决：进场合同走审批）———
+  // 状态机见 CONTRACT_TRANSITIONS。**没有「直接生效」的口子**：
+  // SIGNED→ACTIVE 与 ACTIVE→EXPIRED 是系统边，由 contract-tick 按生效日/到期日推进。
+
+  /** 合同详情（含 terms / flow / remainingDays，列表不返回这三块）。 */
+  getContract(contractNo: string): Promise<Contract>;
+  /** 摘要条：六个都是要人动手的事，不是统计口径。 */
+  contractSummary(): Promise<ContractSummary>;
+  /** 流转留痕，详情抽屉的时间线。 */
+  listContractLogs(contractNo: string): Promise<ContractLogItem[]>;
+
+  /** 提交审批：DRAFT → PENDING（进运营环节）。 */
+  submitContract(contractNo: string): Promise<Contract>;
+  /** 撤回：PENDING → DRAFT。审批中反悔用它，不要去驳回自己的单。 */
+  withdrawContract(contractNo: string, note?: string): Promise<Contract>;
+  /** 运营审批。`result=REJECT` 时 reason 必填——驳回不说理由，提交人只能猜。 */
+  auditContract(contractNo: string, result: "APPROVE" | "REJECT", reason?: string): Promise<Contract>;
+  /** 财务会签（第二环节）。同样 REJECT 要理由。 */
+  cosignContract(contractNo: string, result: "APPROVE" | "REJECT", reason?: string): Promise<Contract>;
+  /** 签署：登记签署日与扫描件。签署件缺失是摘要条里单列的一项，别跳过。 */
+  signContract(contractNo: string, signedAt: string, fileNos: string[]): Promise<Contract>;
+
+  /** 申请提前终止。**审批期间合同照常生效**，获批后到 effectiveAt 才终止。 */
+  terminateContract(contractNo: string, reason: string, effectiveAt?: string): Promise<Contract>;
+  /** 终止申请的审批。 */
+  auditContractTermination(contractNo: string, result: "APPROVE" | "REJECT", reason?: string): Promise<Contract>;
+
+  /** 续签：按原合同生成新草稿（prevContractNo 指回原合同）。 */
+  renewContract(contractNo: string): Promise<Contract>;
+  /** 补充协议：只定生效日（缺省明天），条款在生成的草稿上改，到期日跟原合同。 */
+  supplementContract(contractNo: string, startAt?: string): Promise<Contract>;
 
   // === 门店 Onboarding / 生命周期 ===
   /**

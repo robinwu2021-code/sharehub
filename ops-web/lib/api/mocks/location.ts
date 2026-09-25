@@ -1,5 +1,6 @@
 // 覆盖范围：场所域 —— 站点 / 点位 / 场地方 / 合同 / 商机线索 / 选址分析 /
 // 门店 Onboarding / 站点生命周期。
+import * as ca from "../../mock/db/contract-approval";
 import * as db from "../../mock/db";
 // 阶段流转走子模块直取（同 mocks/workorder.ts 的 `wo`）：校验与留痕都在 db 层，本文件只延迟透传。
 import * as loc from "../../mock/db/location";
@@ -127,4 +128,18 @@ export const locationMock: LocationApi = {
   unarchivePoint: async (no) => wait(db.unarchivePoint(no), 350),
   archiveVenue: async (no) => wait(db.archiveVenue(no), 350),
   unarchiveVenue: async (no) => wait(db.unarchiveVenue(no), 350),
+
+  // —— 合同审批（状态机在 db 层强制，非法迁移抛错 → rejected promise → 全局 MutationCache 弹错）——
+  getContract: (no) => wait(ca.getContract(no)),
+  contractSummary: () => wait(ca.contractSummary()),
+  listContractLogs: (no) => wait(ca.listContractLogs(no)),
+  submitContract: async (no) => wait(ca.submitContract(no), 350),
+  withdrawContract: async (no, note) => wait(ca.withdrawContract(no, note), 350),
+  auditContract: async (no, result, reason) => wait(ca.auditContract(no, result, reason), 350),
+  cosignContract: async (no, result, reason) => wait(ca.cosignContract(no, result, reason), 350),
+  signContract: async (no, signedAt, fileNos) => wait(ca.signContract(no, signedAt, fileNos), 350),
+  terminateContract: async (no, reason, effectiveAt) => wait(ca.terminateContract(no, reason, effectiveAt), 350),
+  auditContractTermination: async (no, result, reason) => wait(ca.auditContractTermination(no, result, reason), 350),
+  renewContract: async (no) => wait(ca.renewContract(no), 350),
+  supplementContract: async (no, startAt) => wait(ca.supplementContract(no, startAt), 350),
 };

@@ -44,4 +44,19 @@ export const locationHttp: LocationApi = {
   unarchivePoint: (no) => client.post(`/api/ops/locations/${no}/unarchive`, {}),
   archiveVenue: (no) => client.post(`/api/ops/venues/${no}/archive`, {}),
   unarchiveVenue: (no) => client.post(`/api/ops/venues/${no}/unarchive`, {}),
+
+  // —— 合同审批 ——
+  getContract: (no) => client.get(`/api/ops/contracts/${no}`),
+  contractSummary: () => client.get("/api/ops/contracts/summary"),
+  listContractLogs: (no) => client.get(`/api/ops/contracts/${no}/logs`),
+  submitContract: (no) => client.post(`/api/ops/contracts/${no}/submit`, {}),
+  withdrawContract: (no, note) => client.post(`/api/ops/contracts/${no}/withdraw`, { note }),
+  auditContract: (no, result, reason) => client.post(`/api/ops/contracts/${no}/audit`, { result, reason }),
+  cosignContract: (no, result, reason) => client.post(`/api/ops/contracts/${no}/cosign`, { result, reason }),
+  signContract: (no, signedAt, fileNos) => client.post(`/api/ops/contracts/${no}/sign`, { signedAt, fileNos }),
+  terminateContract: (no, reason, effectiveAt) => client.post(`/api/ops/contracts/${no}/terminate`, { reason, effectiveAt }),
+  auditContractTermination: (no, result, reason) =>
+    client.post(`/api/ops/contracts/${no}/termination/audit`, { result, reason }),
+  renewContract: (no) => client.post(`/api/ops/contracts/${no}/renew`, {}),
+  supplementContract: (no, startAt) => client.post(`/api/ops/contracts/${no}/supplement`, { startAt }),
 };

@@ -128,6 +128,119 @@ export const CONTRACT_TRANSITIONS = {
   terminate: { from: ["ACTIVE"] as ContractStatus[], to: "TERMINATED" as ContractStatus },
 } as const;
 
+/**
+ * 合同分成模式（`loc_contract.share_mode` 列注释为真源）。
+ *
+ * <p>⚠️ **不要叫 `ShareMode`**：后端确实有个同名枚举，但那是
+ * `share_rule.mode` 的**结算路径**（CHANNEL_SPLIT / LEDGER），与本词表毫无关系。
+ * 同名会被跨端词表卡口配成一对，然后它会去强制两段本来无关的耦合 ——
+ * 那比没覆盖更糟（见 `lib/types/inline-status-union.test.ts`）。
+ */
+export type ContractShareMode = "SHARE" | "ENTRY_FEE" | "GUARANTEE" | "FREE";
+
+/** 分成基数：按净额还是毛额算。`loc_contract.share_base`。 */
+export type ContractShareBase = "NET" | "GROSS";
+
+/** 结算周期。`loc_contract.settle_period`。 */
+export type ContractSettlePeriod = "MONTH" | "QUARTER";
+
+/** 合同种类（与后端 `loc.ContractKind` 同名同值）。补充协议挂在主合同下。 */
+export type ContractKind = "MAIN" | "SUPPLEMENT";
+
+/**
+ * 审批环节（与后端 `loc.ContractAuditStage` 同名同值）。
+ *
+ * <p>两段式：运营审条款 → 财务会签。**两段都在 PENDING 状态内** ——
+ * 状态只说「在审批中」，是谁的活由本字段说。合并成一个状态的话，
+ * 「待我审批」这个数就分不出运营和财务，两边互相等。
+ */
+export type ContractAuditStage = "OPS" | "FINANCE";
+
+/** 提前终止申请的状态。`loc_contract.term_req_status`。 */
+export type ContractTerminationStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+/** 合同条款（后端 `ContractTerms`）。与流程信息分开，避免 Contract 平铺二十个字段。 */
+export interface ContractTerms {
+  shareMode: ContractShareMode | null;
+  shareBase: ContractShareBase | null;
+  guaranteeAmount: number | null;
+  currency: string | null;
+  settlePeriod: ContractSettlePeriod | null;
+  depositAmount: number | null;
+  depositTerms: string | null;
+  exclusive: boolean | null;
+  deviceQuota: number | null;
+  placementNote: string | null;
+  autoRenew: boolean | null;
+  signerName: string | null;
+  remark: string | null;
+}
+
+/**
+ * 提前终止申请（裁决 #4）。
+ *
+ * <p>**审批期间合同照常生效**，获批后到 `effectiveAt` 才由定时任务终止 ——
+ * 提交申请就停止计费的话，审批被驳回时那几天的账没法补。
+ */
+export interface ContractTermination {
+  status: ContractTerminationStatus;
+  reason: string | null;
+  effectiveAt: string | null;
+  requestedBy: string | null;
+  requestedAt: string | null;
+  auditedBy: string | null;
+  auditedAt: string | null;
+  auditNote: string | null;
+}
+
+/** 流程信息（后端 `ContractFlow`）：谁在什么时候推进到了哪一步。 */
+export interface ContractFlow {
+  signedAt: string | null;
+  submittedBy: string | null;
+  submittedAt: string | null;
+  auditedBy: string | null;
+  auditedAt: string | null;
+  auditNote: string | null;
+  activatedAt: string | null;
+  endedAt: string | null;
+  endReason: string | null;
+  prevContractNo: string | null;
+  sourceLeadNo: string | null;
+  contractKind: ContractKind | null;
+  parentContractNo: string | null;
+  auditStage: ContractAuditStage | null;
+  financeAuditedBy: string | null;
+  financeAuditedAt: string | null;
+  financeAuditNote: string | null;
+  termination: ContractTermination | null;
+}
+
+/** 合同流转留痕的一行（后端 `ContractLogItem`）。详情抽屉的时间线按它渲染。 */
+export interface ContractLogItem {
+  event: string;
+  fromStatus: ContractStatus | null;
+  toStatus: ContractStatus | null;
+  operator: string | null;
+  note: string | null;
+  at: string;
+}
+
+/**
+ * 合同摘要条（后端 `ContractSummary`）。
+ *
+ * <p>六个数都是**要人动手的事**，不是统计口径：待我审批 / 待财务会签 /
+ * 终止待审批 / 60 天内到期 / 已到期未续 / 缺签署件。
+ * 放「合同总数」这类数字没有意义 —— 摘要条是待办入口，不是仪表盘。
+ */
+export interface ContractSummary {
+  pendingMine: number;
+  pendingCosign: number;
+  terminationPending: number;
+  expiring60: number;
+  expiredNotRenewed: number;
+  missingScan: number;
+}
+
 export interface Contract {
   contractNo: string;
   /**
@@ -146,6 +259,12 @@ export interface Contract {
   status: ContractStatus;
   /** 合同扫描件。内嵌而非另开列表接口：一份合同的附件个数是个位数，单独分页没有意义。 */
   attachments: ContractAttachment[];
+  /** 条款。列表不返回（只详情给），故可空。 */
+  terms?: ContractTerms | null;
+  /** 流程。列表不返回（只详情给），故可空。 */
+  flow?: ContractFlow | null;
+  /** 距到期天数。负数 = 已过期。由服务端算，前端不要自己按 endAt 减 —— 时区会差一天。 */
+  remainingDays?: number | null;
 }
 
 /**
