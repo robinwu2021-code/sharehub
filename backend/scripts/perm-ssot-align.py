@@ -67,7 +67,17 @@ def declared_codes():
        在这里展开成具体码做不到：真源表不知道 report 下有哪几个资源。
     """
     out = set()
+    # 已取消的小节整段跳过。标题形如 `## 15. ~~多租户 / 平台~~ —— **已取消（2026-09-23）**`，
+    # 底下那段说明里会把被取消的码逐个列出来解释「不再实现、不再登记」——
+    # 而展开器照样把它们读成「声明」，于是 tenant:billing:read / dashboard:platform:read /
+    # device:cabinet:assign 三条常年挂在「声明未强制」里。
+    # **一段说自己已取消的文字，不该被当成声明。**（2026-09-25 补，本展开器第三个盲区。）
+    cancelled = False
     for line in io.open(DOC, encoding='utf-8'):
+        if line.startswith('#'):
+            cancelled = '~~' in line and '取消' in line
+        if cancelled:
+            continue
         prefix = None
         for c in re.findall(r'`(%s|:[a-z_]+)`' % FULL, line):
             if c.startswith(':'):

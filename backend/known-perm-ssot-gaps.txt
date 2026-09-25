@@ -18,9 +18,6 @@
 # 只在 service 层校验的码会被误报成"声明未强制"，遇到请在此注明后登记。
 
 声明未强制 agent:agent:create
-声明未强制 dashboard:platform:read
-声明未强制 dashboard:todo:read
-声明未强制 device:cabinet:assign
 声明未强制 device:cabinet:export
 声明未强制 device:cabinet:import
 声明未强制 device:command:batch
@@ -36,14 +33,11 @@
 声明未强制 order:reservation:cancel
 声明未强制 org:dept:update
 声明未强制 org:role:assign
-# 2026-09-25 修展开器（认中段通配）之后**新显形**的一条：
-# 真源表第 237 行声明「报表 导出」给了 OPS/FIN/BD/VIEW 四个角色，
-# 而后端**一个导出端点都没有** —— 不是漏加闸，是这个能力压根没实现。
-# 在此之前它被 report:*:read 的假报盖住了。
-# 处置：确认导出到底做不做；不做就删表里那一行（表在说谎），做就补端点。
+# 2026-09-25 修展开器（认中段通配）后**新显形**：真源表把「报表 导出」给了
+# OPS/FIN/BD/VIEW 四个角色，而 13 个报表端点**全是 read**，一个导出都没有。
+# 不是漏加闸，是这个功能压根没做。做不做由产品定。
 声明未强制 report:*:export
 声明未强制 system:openapi:config
-声明未强制 tenant:billing:read
 强制未声明 cs:session:reply
 强制未声明 cs:ticket:update
 强制未声明 device:ota:manage
