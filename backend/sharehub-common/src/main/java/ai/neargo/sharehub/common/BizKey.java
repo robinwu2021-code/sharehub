@@ -142,4 +142,14 @@ public final class BizKey {
     /** 问题字典 —— 注意与 {@link #POWERBANK} 区分。 */
     public static final String PROBLEM = "ISS";
     public static final String OPENAPI_APP = "APP";
+    /** 文件 sys_file.file_no。 */
+    public static final String FILE = "FL";
+
+    // —— 运营核心流程（2026-09-25）——
+    /** 设备保护动作 dev_protection.protection_no。 */
+    public static final String PROTECTION = "PRT";
+    /** 试借还 dev_trial_rent.trial_no。 */
+    public static final String TRIAL_RENT = "TRL";
+    /** 告警待办 dev_alarm_todo.todo_no。不用 TD：与租户前缀 T 起首相同，按号查易混。 */
+    public static final String ALARM_TODO = "ATD";
 }

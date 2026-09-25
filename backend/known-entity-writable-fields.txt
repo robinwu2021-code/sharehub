@@ -21,6 +21,26 @@ AdSlot.size
 AdSlot.slotNo
 AdSlot.status
 DevAlarmCode.archivedAt
+# 2026-09-25 业务告警码：以下字段为运营可调的判定 / 处置参数；builtin 与内置码的 domain/subjectType/evalType/supersedes
+# 在 AlarmCodeServiceImpl.beforeUpdate 锁死（内置码身份不可改），builtin 在 beforeCreate 强制为 0
+DevAlarmCode.basePriority
+DevAlarmCode.builtin
+DevAlarmCode.businessHoursOnly
+DevAlarmCode.disposition
+DevAlarmCode.domain
+DevAlarmCode.enabled
+DevAlarmCode.evalType
+DevAlarmCode.holdMinutes
+DevAlarmCode.impactAdjust
+DevAlarmCode.mergeScope
+DevAlarmCode.ownerRole
+DevAlarmCode.recoverHoldMinutes
+DevAlarmCode.recoverRule
+DevAlarmCode.subjectType
+DevAlarmCode.supersedes
+DevAlarmCode.threshold
+DevAlarmCode.windowMinutes
+DevAlarmCode.woDelayMinutes
 DevAlarmCode.autoWorkOrder
 DevAlarmCode.code
 DevAlarmCode.level
@@ -73,16 +93,38 @@ IamEmployee.phone
 IamEmployee.roleNo
 IamEmployee.status
 IamEmployee.userId
+# 2026-09-25 商机批次 B（V104）：contractNo / inPool / pooledAt / prevOwner / remindAt / lastFollowAt / lostAt / reactivatedAt
+# 由服务端写，LeadServiceImpl.beforeCreate 清空、beforeUpdate 从库取（锁死）；lostReason 只在迁到 LOST 时可写；
+# 在池商机的 owner / ownerType 锁死（只能经认领改）。address / venueNo / 竞品 / 谈判条款是 BD 表单字段，可写。
+LocLead.address
+LocLead.competitorExclusiveUntil
+LocLead.competitorName
 LocLead.contact
+LocLead.contractNo
+LocLead.entryFee
+LocLead.exclusiveFlag
 LocLead.expectSites
+LocLead.guaranteeAmount
+LocLead.inPool
+LocLead.lastFollowAt
 LocLead.leadNo
+LocLead.lostAt
+LocLead.lostReason
 LocLead.nextFollowAt
 LocLead.owner
 LocLead.ownerType
+LocLead.pooledAt
+LocLead.prevOwner
+LocLead.reactivatedAt
 LocLead.regionId
+LocLead.remindAt
+LocLead.shareMode
+LocLead.shareRate
 LocLead.siteNo
 LocLead.stage
+LocLead.termMonths
 LocLead.venueName
+LocLead.venueNo
 MdBank.archivedAt
 MdBank.bankCode
 MdBank.bankName
@@ -189,6 +231,10 @@ WoInspectionPlan.planNo
 WoInspectionPlan.route
 WoSlaRule.active
 WoSlaRule.escalateTo
+# 2026-09-25 SLA 按类型 × 优先级：表单字段，SlaRuleServiceImpl.normalize 收敛到 * / WoPriority
+WoSlaRule.priority
+# 2026-09-25 批次 E2：解决超时升级对象，SLA 规则表单字段
+WoSlaRule.resolveEscalateTo
 WoSlaRule.resolveMins
 WoSlaRule.responseMins
 WoSlaRule.slaNo

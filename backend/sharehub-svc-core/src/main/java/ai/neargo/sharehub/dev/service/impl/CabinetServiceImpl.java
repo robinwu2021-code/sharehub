@@ -59,6 +59,7 @@ public class CabinetServiceImpl implements CabinetService {
             // 新建默认在库：还没上架就置 ONLINE 会让它出现在 C 端可借列表里
             e.setStatus(CabinetStatus.IN_STOCK.name());
             e.setOnlineStatus(OnlineStatus.OFFLINE.name());
+            e.setQcStatus(ai.neargo.sharehub.dev.QcStatus.PENDING.name());   // 新到货先质检，过了才能调拨 / 上线（C3）
         }
         /*
          * 机柜是**部分更新**（只改传了的键），所以先取快照、set 完再比 ——
@@ -73,13 +74,18 @@ public class CabinetServiceImpl implements CabinetService {
         if (in.containsKey("vendorCode")) e.setVendorCode(str(in.get("vendorCode")));
         if (in.containsKey("model")) e.setModel(str(in.get("model")));
         if (in.containsKey("slotTotal")) e.setSlotTotal(intOf(in.get("slotTotal")));
-        if (in.containsKey("status") && !creating) e.setStatus(str(in.get("status")));
+        // status 不再经编辑接口改（2026-09-25 机柜状态机）：请求体里带了也忽略，状态只经 CabinetLifecycleService 的动作改
 
         /*
          * 归属：**只认 locationNo，siteNo/agentNo 一律反查**（见接口注释）。
          * 调用方传来的 siteNo/agentNo 直接忽略 —— 接受它们就等于允许三者互相矛盾。
          */
-        if (in.containsKey("locationNo")) {
+        if (in.containsKey("locationNo") && !java.util.Objects.equals(str(in.get("locationNo")), e.getLocationNo())) {
+            // 已布放 / 故障的设备换点位 = 搬机，必须先撤机：否则站点门禁、在借订单与试借还结果都会指错地方
+            if (!creating && !CabinetStatus.IN_STOCK.name().equals(e.getStatus())) {
+                throw ai.neargo.sharehub.common.BizException.conflict("error.device.relocate_deployed");
+            }
+            e.setBoundAt(java.time.LocalDateTime.now());   // 试借还结果早于它即失效
             String locNo = str(in.get("locationNo"));
             if (locNo == null || locNo.isBlank()) {
                 e.setLocationNo(null); e.setLocationName(null); e.setSiteNo(null); e.setAgentNo(null);
@@ -173,7 +179,7 @@ public class CabinetServiceImpl implements CabinetService {
         return slots;
     }
 
-    private static Cabinet toVO(DevCabinet e) {
+    static Cabinet toVO(DevCabinet e) {
         return new Cabinet(e.getCabinetNo(), e.getSn(), e.getVendorCode(), e.getModel(),
                 e.getLocationNo(), e.getLocationName(),
                 e.getSlotTotal() == null ? 0 : e.getSlotTotal(),
@@ -230,6 +236,7 @@ public class CabinetServiceImpl implements CabinetService {
             if (r.get("vendorCode") != null) e.setVendorCode(String.valueOf(r.get("vendorCode")));
             e.setDeviceType(DeviceKind.POWERBANK.name());
             e.setStatus(CabinetStatus.IN_STOCK.name());
+            e.setQcStatus(ai.neargo.sharehub.dev.QcStatus.PENDING.name());
             mapper.insert(e);
             n++;
         }

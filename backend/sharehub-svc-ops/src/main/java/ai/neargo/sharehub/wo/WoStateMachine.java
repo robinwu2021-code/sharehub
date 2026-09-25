@@ -49,7 +49,15 @@ public class WoStateMachine {
             "REJECT", Map.of(WorkOrderStatus.DISPATCHED, WorkOrderStatus.CREATED,
                              WorkOrderStatus.ACCEPTED, WorkOrderStatus.CREATED,
                              WorkOrderStatus.PROCESSING, WorkOrderStatus.CREATED),
-            "REWORK", Map.of(WorkOrderStatus.DONE, WorkOrderStatus.PROCESSING));
+            "REWORK", Map.of(WorkOrderStatus.DONE, WorkOrderStatus.PROCESSING),
+            // 2026-09-25 业务告警：关联告警自动恢复且尚未接单 → 撤单（close_reason=WITHDRAWN）
+            "WITHDRAW", Map.of(WorkOrderStatus.CREATED, WorkOrderStatus.CLOSED,
+                               WorkOrderStatus.DISPATCHED, WorkOrderStatus.CLOSED),
+            // 并入其他工单（下层告警被上层取代）→ close_reason=DUPLICATE
+            "MERGE", Map.of(WorkOrderStatus.CREATED, WorkOrderStatus.CLOSED,
+                            WorkOrderStatus.DISPATCHED, WorkOrderStatus.CLOSED,
+                            WorkOrderStatus.ACCEPTED, WorkOrderStatus.CLOSED,
+                            WorkOrderStatus.PROCESSING, WorkOrderStatus.CLOSED));
 
     /**
      * 校验并返回目标状态；非法迁移抛异常。

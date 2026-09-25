@@ -50,6 +50,30 @@ public interface WoOpsService {
      */
     WorkOrder complete(String woNo, HandleReq req);
 
+    /**
+     * 巡检派生维修 / 补宝 / 清洁单（D4）。来源 INSPECTION，source_ref = 巡检单号:类型:机柜 ——
+     * 前缀即巡检单号（来源链可追溯），同一巡检同一机柜同类问题只派生一张（幂等）。
+     */
+    WorkOrder derive(String inspectionWoNo, ai.neargo.sharehub.wo.ext.dto.WoExtDtos.DeriveReq req);
+
+    /** 抢单池（E3）：还没派出去的工单（CREATED），按当前人的数据范围可见 —— 区域员工看到的就是本区域的池。 */
+    ai.neargo.common.core.PageResult<WorkOrder> pool(Integer page, Integer size, String type);
+
+    /** 抢单（E3）：CREATED → 派给自己并接单（ACCEPTED），派单方式记 GRAB。被别人先抢 → 409。 */
+    WorkOrder grab(String woNo);
+
+    /** 代理停用（F2）：名下未完结（待派 / 已派 / 已接 / 处理中）的工单改派平台员工；找不到人退回待派单池并通知主管。返回改派数。 */
+    int reassignFromAgent(String agentNo, String reason);
+
+    /** 工单成本汇总（G4）：[from, to) 内完工的工单按承担方聚合；bearerType 空 = 全部。 */
+    java.util.List<ai.neargo.sharehub.wo.ext.dto.WoExtDtos.CostRow> costSummary(java.time.LocalDate from, java.time.LocalDate to, String bearerType);
+
+    /**
+     * 平台接管（F4，裁决 #1）：代理的单 SLA 已超时 → 改派平台员工（指定或按站点责任人 / 区域负载选），
+     * 记接管来源（taken_over_from），月度考核计被接管数。不逐单扣分润。
+     */
+    WorkOrder takeover(String woNo, String employeeNo, String reason);
+
     /** 验收关单：{@code DONE → AUDITED → CLOSED}，{@code closeReason} 必填。 */
     WorkOrder close(String woNo, CloseReq req);
 
@@ -87,4 +111,45 @@ public interface WoOpsService {
      * @return 本次新标记的条数（响应 + 解决）
      */
     int sweepSlaBreaches();
+
+    // ——————————— 2026-09-25 承接业务告警（TDD-运营核心流程/06）———————————
+
+    /**
+     * 按合并键开单或挂靠：同键已有未完结工单 → 挂靠并返回其号（必要时上调优先级）；
+     * 否则新开并按站点运维责任人派单（代理优先，代理暂停则落到员工；都没有就留 CREATED 并通知运维主管）。
+     */
+    String openOrAttach(ai.neargo.sharehub.wo.ext.dto.WoExtDtos.AlarmDraft draft);
+
+    /** 只升不降；SLA 截止时刻随之只提前、不推后。 */
+    void raisePriority(String woNo, String priority, String reason);
+
+    /** 关联告警自动恢复且尚未接单：CREATED / DISPATCHED → CLOSED(WITHDRAWN)，通知被派人。 */
+    void withdraw(String woNo, String reason);
+
+    /** 追加一条备注到派单时间轴（action=NOTE）。 */
+    void annotate(String woNo, String note);
+
+    void markAlarmRecovered(String woNo, java.time.LocalDateTime at);
+
+    /** 并单：from → CLOSED(DUPLICATE)，to 优先级取两者较高。 */
+    void mergeInto(String fromWoNo, String toWoNo, String reason);
+
+    /** 告警域的完工复核结果：通过 → 自动验收关单；未通过 → 保持 DONE 等人工。 */
+    void recordReview(String woNo, boolean passed, java.util.List<ai.neargo.sharehub.wo.ext.dto.WoExtDtos.ReviewItem> items);
+
+    java.util.List<ai.neargo.sharehub.wo.ext.dto.WoExtDtos.AssigneeCandidate> candidates(String siteNo);
+
+    ai.neargo.sharehub.wo.ext.dto.WoExtDtos.WoSummary summary();
+
+    /** 列表（带运营维度的筛选与出参）。{@link #pageRich} 是它的旧签名。 */
+    ai.neargo.common.core.PageResult<WorkOrder> page(ai.neargo.sharehub.wo.ext.dto.WoExtDtos.WoQuery q);
+
+    /** 详情：行 + 处理时间线 + 现场照片（带范围读）。 */
+    ai.neargo.sharehub.wo.ext.dto.WoExtDtos.WorkOrderDetail detail(String woNo);
+
+    /** 各工单的关单原因（未关的不在结果里）。告警码统计「撤单率」用。 */
+    java.util.Map<String, String> closeReasons(java.util.Collection<String> woNos);
+
+    /** 工单当前状态（告警联动判断撤单 / 标记用）；不存在返回 null。 */
+    String statusOf(String woNo);
 }

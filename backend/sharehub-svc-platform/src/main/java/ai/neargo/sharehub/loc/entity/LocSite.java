@@ -83,4 +83,14 @@ public class LocSite {
     private String pauseReason;
 
     private java.time.LocalDateTime pausedAt;
+
+    // —— 2026-09-25 站点状态机（V96）——
+    /** 平台员工运维责任人（代理运维责任人在 loc_site_agent.role=OPERATE，不在这里）。 */
+    private String opsEmployeeNo;
+    private java.time.LocalDateTime firstLiveAt;
+    private java.time.LocalDate pauseUntil;
+    private String withdrawReason;
+    private java.time.LocalDate withdrawPlannedAt;
+    private java.time.LocalDateTime withdrawStartedAt;
+    private java.time.LocalDateTime closedAt;
 }

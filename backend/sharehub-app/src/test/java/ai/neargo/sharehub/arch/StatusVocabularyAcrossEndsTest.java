@@ -106,6 +106,9 @@ class StatusVocabularyAcrossEndsTest {
                 int semi = body.indexOf(';');
                 if (semi >= 0) body = body.substring(0, semi);
                 body = body.replaceAll("(?s)/\\*.*?\\*/", "").replaceAll("//[^\\n]*", "");
+                // 带构造参数 / 常量体的枚举（如 FileCategory("…", Set.of(PDF, JPEG), …)）：
+                // 括号与花括号里的大写标识符是参数，不是常量 —— 只留顶层的常量名
+                body = topLevelOnly(body.replaceAll("\"(?:\\\\.|[^\"\\\\])*\"", "\"\""));
                 Set<String> vals = new TreeSet<>();
                 Matcher v = Pattern.compile("\\b([A-Z][A-Z0-9_]*)\\b").matcher(body);
                 while (v.find()) vals.add(v.group(1));
@@ -113,6 +116,18 @@ class StatusVocabularyAcrossEndsTest {
             }
         }
         return out;
+    }
+
+    /** 去掉所有 ( … ) 与 { … } 里的内容（可嵌套），只留枚举常量声明的顶层。 */
+    static String topLevelOnly(String body) {
+        StringBuilder out = new StringBuilder(body.length());
+        int depth = 0;
+        for (char c : body.toCharArray()) {
+            if (c == '(' || c == '{') depth++;
+            else if (c == ')' || c == '}') depth = Math.max(0, depth - 1);
+            else if (depth == 0) out.append(c);
+        }
+        return out.toString();
     }
 
     private static boolean isMainJava(Path p) {

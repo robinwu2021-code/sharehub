@@ -28,4 +28,7 @@ public class LocContractAttach extends BaseEntity {
 
     private String uploadedBy;
     private LocalDateTime uploadedAt;
+
+    /** → sys_file.file_no（V94）。空 = 接入对象存储前的历史附件，只有名字没有字节。 */
+    private String fileNo;
 }

@@ -102,6 +102,12 @@ public class SecurityConfig {
                          */
                         .requestMatchers(HttpMethod.POST, "/internal/trade/price-adjustments/tick").permitAll()
                         /*
+                         * 本地存储的**限时签名链接**（测试 / 离线开发）。签名即授权：链接由已鉴权的
+                         * GET /api/platform/files/{no}/url 发放，5 分钟有效，个人数据文件不发链接。
+                         * 生产走 COS 预签名地址，不经过这里。
+                         */
+                        .requestMatchers(HttpMethod.GET, "/api/platform/files/raw/**").permitAll()
+                        /*
                          * **跨进程**事件投递走服务凭证（X-Internal-Token），不走员工令牌：
                          * 这条链路代表「服务 A 要做这件事」，不是「某个用户要做这件事」。
                          * 认证由 InternalTokenFilter 完成并授予 ROLE_INTERNAL；

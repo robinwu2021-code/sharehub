@@ -118,3 +118,79 @@ C POST /api/user/push-messages/sweep-due
 # ── NoticeVO：已在同一批里改对（公告三语取列 + 已读态归还给站内信），本块不再有它 ──
 #
 # ── CsTicketVO：已在同一批的「报障进度」里接上，本块不再有它 ──
+
+# ⚠️ 2026-09-25 运营核心流程 P1–P4 **后端先行**：以下为新端点 / 新出参，运营端尚未接入 —— 是待办，不是废端点。
+#   接入计划见 docs/technical/TDD-运营核心流程/08-前端实现.md 与 docs/technical/方案-ops-web运营流程页面完善.md；
+#   前端每接一页，删掉对应行（卡口会提示）。门店生命周期 GET 的出参已换成只读漏斗行（LifecycleRow），
+#   旧页面读的 SiteLifecycle 字段会显示为空 —— 随 08 的生命周期页一起改。
+B GET /api/ops/alarms/codes AlarmCode 后端有前端无:business
+B GET /api/ops/alarms/records AlarmRecord 后端有前端无:business
+C GET /api/platform/files/raw/{}
+C GET /api/platform/files/{}
+C POST /api/platform/files
+D AlarmDetail GET /api/ops/alarms/records/{alarmNo}
+D SignedUrl GET /api/platform/files/{fileNo}/url
+# 2026-09-25 工单详情 / 运营维度（同上，后端先行）：随 TDD/08 工单页接入后删除
+B GET /api/ops/work-orders WorkOrder 后端有前端无:ops
+# 2026-09-25 运营核心流程批次 B（合同会签 / 终止审批 / 补充协议；商机阶段机 / 线索池 / 签约转化）：后端先行，
+# 随 TDD/08 合同页与 BD CRM 页接入后删除。前端未接之前这些端点只是「没有入口」，不会与界面分叉（商机阶段的分叉见 known-missing-ui-transitions）。
+B GET /api/ops/leads Lead 后端有前端无:address
+B GET /api/ops/leads Lead 后端有前端无:competitorExclusiveUntil
+B GET /api/ops/leads Lead 后端有前端无:competitorName
+B GET /api/ops/leads Lead 后端有前端无:contractNo
+B GET /api/ops/leads Lead 后端有前端无:inPool
+B GET /api/ops/leads Lead 后端有前端无:lastFollowAt
+B GET /api/ops/leads Lead 后端有前端无:lostAt
+B GET /api/ops/leads Lead 后端有前端无:lostReason
+B GET /api/ops/leads Lead 后端有前端无:prevOwner
+B GET /api/ops/leads Lead 后端有前端无:reactivatedAt
+B GET /api/ops/leads Lead 后端有前端无:terms
+B GET /api/ops/leads Lead 后端有前端无:venueNo
+C POST /api/ops/leads/{}/claim
+C POST /api/ops/leads/{}/convert
+D LeadConversion POST /api/ops/leads/{leadNo}/convert
+# 2026-09-25 运营核心流程批次 C（勘测 / 入库质检 / 调拨逐件签收与资产差异 / 结算调整项）：后端先行，
+# 随 TDD/08 站点页、设备页、库存调拨页、财务结算页接入后删除。
+C GET /api/ops/asset-diffs
+C GET /api/ops/qc-records
+C GET /api/ops/settlement-adjustments
+C GET /api/ops/sites/{}/surveys
+C POST /api/ops/asset-diffs/{}/resolve
+C POST /api/ops/devices/{}/qc
+C POST /api/ops/inventory-transfers/{}/items
+C POST /api/ops/inventory-transfers/{}/receive
+C POST /api/ops/inventory-transfers/{}/ship
+C POST /api/ops/powerbanks/{}/qc
+C POST /api/ops/settlement-adjustments/{}/confirm
+C POST /api/ops/settlement-adjustments/{}/void
+C POST /api/ops/sites/{}/surveys
+D Adjustment GET /api/ops/settlement-adjustments
+D AssetDiff GET /api/ops/asset-diffs
+D QcRecord POST /api/ops/devices/{cabinetNo}/qc
+D ReceiveResult POST /api/ops/inventory-transfers/{transferNo}/receive
+D SiteSurvey GET /api/ops/sites/{siteNo}/surveys
+# 2026-09-25 运营核心流程批次 D4（巡检派生工单）：后端先行，随工单页接入后删除
+# 2026-09-25 运营核心流程批次 E3（抢单池 / 抢单）：后端先行，随工单页接入后删除
+C GET /api/ops/work-orders/pool
+C POST /api/ops/work-orders/{}/grab
+
+# 2026-09-25 运营核心流程批次 F（平台接管 / 代理清退 / 运维考核）：后端先行，随工单页与代理页接入后删除
+C GET /api/agent/agents/{}/ops-assessments
+C GET /api/agent/exits/{}
+C GET /api/agent/exits/{}/gate
+C POST /api/agent/agents/{}/exit
+C POST /api/agent/exits/{}/advance
+D AgentExit POST /api/agent/agents/{agentNo}/exit
+# 2026-09-25 ops-web 接入运营核心流程（另一会话批次 1–3a）带出的差异：门店漏斗前端要 label，后端给 kind / avgDaysInPhase。
+# 标签应由前端按 phase 词表三语翻译（后端不出中文标签），kind / avgDaysInPhase 待前端接 —— 前端那条线收口后删除
+B GET /api/ops/site-lifecycles/funnel FunnelStage 前端有后端无:label
+B GET /api/ops/site-lifecycles/funnel FunnelStage 后端有前端无:avgDaysInPhase
+B GET /api/ops/site-lifecycles/funnel FunnelStage 后端有前端无:kind
+
+# 2026-09-25 运营核心流程批次 G（运营指标 / 工单成本 / 场地方对账单）：后端先行，随报表与财务页接入后删除
+C GET /api/ops/ops-flow-metrics
+C GET /api/ops/work-orders/costs
+C GET /api/trade/settlements/{}/statement
+C GET /api/trade/settlements/{}/statement.html
+D OpsFlowMetrics GET /api/ops/ops-flow-metrics
+D Statement GET /api/trade/settlements/{settleNo}/statement

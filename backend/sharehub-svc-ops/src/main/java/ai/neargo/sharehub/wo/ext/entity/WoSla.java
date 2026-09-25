@@ -45,4 +45,8 @@ public class WoSla {
 
     /** 升级时刻；空 = 尚未升级（[db-design §1.5] 可空时间戳语义）。 */
     private String escalatedAt;
+
+    /** 响应 / 解决超时的升级通知已发时刻（V109，幂等：发过就不再发）。 */
+    private java.time.LocalDateTime respondEscalatedAt;
+    private java.time.LocalDateTime resolveEscalatedAt;
 }

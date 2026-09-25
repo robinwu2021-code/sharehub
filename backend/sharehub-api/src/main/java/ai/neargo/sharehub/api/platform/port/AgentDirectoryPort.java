@@ -3,6 +3,7 @@ package ai.neargo.sharehub.api.platform.port;
 import ai.neargo.sharehub.api.platform.dto.AgentBrief;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -38,4 +39,17 @@ public interface AgentDirectoryPort {
 
     /** 单个取；不存在返回 {@code null}。用于写入前的存在性校验。 */
     AgentBrief briefOf(String agentNo);
+
+    /**
+     * 运维分成系数（批次 F5，裁决 #1）：该代理在 {@code period}（YYYY-MM，订单归属账期）适用的系数 ——
+     * 取上一月考核的结果；没有考核记录按 1（不打折）。乘在 OPERATE 分润比例上。
+     */
+    java.math.BigDecimal opsCoefficient(String agentNo, String period);
+
+    /** 作用于 {@code applyPeriod} 的考核里，SLA 达成率低于 {@code threshold} 的（不达标告警用）。 */
+    List<OpsAssessmentBrief> assessmentsBelow(String applyPeriod, java.math.BigDecimal threshold);
+
+    record OpsAssessmentBrief(String agentNo, String period, java.math.BigDecimal slaRate, int woTotal, int takenOver,
+                              java.math.BigDecimal coefficient) {
+    }
 }

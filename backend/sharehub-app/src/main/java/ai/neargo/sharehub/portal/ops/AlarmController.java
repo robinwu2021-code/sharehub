@@ -38,9 +38,11 @@ public class AlarmController {
     private final AlarmService alarmService;
     private final AlarmCodeService codeService;
     private final AlarmRuleService ruleService;
+    private final ai.neargo.sharehub.alarm.engine.AlarmEngine engine;
 
     public AlarmController(AlarmService alarmService, AlarmCodeService codeService,
-                           AlarmRuleService ruleService) {
+                           AlarmRuleService ruleService, ai.neargo.sharehub.alarm.engine.AlarmEngine engine) {
+        this.engine = engine;
         this.alarmService = alarmService;
         this.codeService = codeService;
         this.ruleService = ruleService;
@@ -55,8 +57,71 @@ public class AlarmController {
                                            @RequestParam(required = false) String keyword,
                                            @RequestParam(required = false) String level,
                                            @RequestParam(required = false) String status,
-                                           @RequestParam(required = false) String cabinetNo) {
-        return alarmService.page(page, size, keyword, level, status, cabinetNo);
+                                           @RequestParam(required = false) String cabinetNo,
+                                           // 2026-09-25 业务告警筛选
+                                           @RequestParam(required = false) String domain,
+                                           @RequestParam(required = false) String subjectType,
+                                           @RequestParam(required = false) String siteNo,
+                                           @RequestParam(required = false) String cause,
+                                           @RequestParam(required = false) String disposition,
+                                           @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+                                           @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to,
+                                           @RequestParam(required = false) Boolean topOnly) {
+        return alarmService.page(new AlarmService.AlarmQuery(page, size, keyword, level, status, cabinetNo, domain, subjectType,
+                siteNo, cause, disposition, from, to, topOnly));
+    }
+
+    /** 告警中心摘要条：按业务域的未关闭 / 严重数，已处置未关闭，今日自动恢复。 */
+    @GetMapping("/summary")
+    @PreAuthorize("@perm.can('workorder:alarm:read')")
+    public ai.neargo.sharehub.alarm.dto.AlarmDtos.AlarmSummary summary() {
+        return alarmService.summary();
+    }
+
+    /** 告警详情：证据、时间线、同对象近 7 天。 */
+    @GetMapping("/records/{alarmNo}")
+    @PreAuthorize("@perm.can('workorder:alarm:read')")
+    public ai.neargo.sharehub.alarm.dto.AlarmDtos.AlarmDetail detail(@PathVariable String alarmNo) {
+        return alarmService.detail(alarmNo);
+    }
+
+    /** 处置预览：现在处置会开什么单、派给谁、是否并入已有工单。 */
+    @GetMapping("/records/{alarmNo}/disposition-preview")
+    @PreAuthorize("@perm.can('workorder:alarm:read')")
+    public ai.neargo.sharehub.alarm.dto.AlarmDtos.DispositionPreview dispositionPreview(@PathVariable String alarmNo) {
+        return engine.preview(alarmNo);
+    }
+
+    /** 人工立即处置（忽略开单延迟）。幂等：已处置返回首次单号。 */
+    @PostMapping("/records/{alarmNo}/dispose")
+    @PreAuthorize("@perm.can('workorder:wo:create')")
+    public java.util.Map<String, Object> dispose(@PathVariable String alarmNo) {
+        String ref = engine.disposeNow(alarmNo, java.time.LocalDateTime.now());
+        java.util.Map<String, Object> out = new java.util.HashMap<>();
+        out.put("alarmNo", alarmNo);
+        out.put("dispositionRef", ref);
+        return out;
+    }
+
+    /** 根因路由：同一业务告警，根因不同派的活不同。 */
+    @GetMapping("/codes/{code}/routes")
+    @PreAuthorize("@perm.can('workorder:alarm:read')")
+    public java.util.List<ai.neargo.sharehub.alarm.dto.AlarmDtos.AlarmRoute> routes(@PathVariable String code) {
+        return alarmService.routes(code);
+    }
+
+    @PostMapping("/codes/{code}/routes")
+    @PreAuthorize("@perm.can('workorder:alarm:config')")
+    public java.util.List<ai.neargo.sharehub.alarm.dto.AlarmDtos.AlarmRoute> saveRoutes(@PathVariable String code,
+            @RequestBody java.util.List<ai.neargo.sharehub.alarm.dto.AlarmDtos.RouteReq> body) {
+        return alarmService.saveRoutes(code, body);
+    }
+
+    /** 每码统计（近 N 天）：数量、误报率、自愈率 —— 调规则的依据。 */
+    @GetMapping("/codes/stats")
+    @PreAuthorize("@perm.can('workorder:alarm:read')")
+    public java.util.List<ai.neargo.sharehub.alarm.dto.AlarmDtos.CodeStat> codeStats(@RequestParam(required = false, defaultValue = "30") int days) {
+        return alarmService.codeStats(days);
     }
 
     /** 确认告警（OPEN → ACKED）。可带处置备注。 */

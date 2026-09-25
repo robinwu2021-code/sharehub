@@ -185,6 +185,33 @@ public abstract class ApiTestSupport {
         return b;
     }
 
+    /** 自定义请求（multipart 上传等）走同一套响应解析。 */
+    protected Resp sendRequest(HttpRequest req) {
+        return send(req);
+    }
+
+    /** 经文件服务上传（multipart），返回 FileRef。合同签署、工单完工等要绑定真实文件的流程用。 */
+    protected JsonNode uploadFile(String category, String name, byte[] bytes, String token) {
+        String boundary = "----sharehub" + java.util.UUID.randomUUID();
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        String head = "--" + boundary + "\r\nContent-Disposition: form-data; name=\"category\"\r\n\r\n" + category + "\r\n"
+                + "--" + boundary + "\r\nContent-Disposition: form-data; name=\"file\"; filename=\"" + name + "\"\r\n"
+                + "Content-Type: application/octet-stream\r\n\r\n";
+        out.writeBytes(head.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        out.writeBytes(bytes);
+        out.writeBytes(("\r\n--" + boundary + "--\r\n").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        HttpRequest req = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/platform/files"))
+                .header("Authorization", "Bearer " + token)
+                .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+                .POST(HttpRequest.BodyPublishers.ofByteArray(out.toByteArray())).build();
+        return send(req).okData();
+    }
+
+    /** 最小合法 PDF（过文件头嗅探）。 */
+    protected static byte[] minimalPdf() {
+        return "%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+    }
+
     private Resp send(HttpRequest req) {
         try {
             HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());

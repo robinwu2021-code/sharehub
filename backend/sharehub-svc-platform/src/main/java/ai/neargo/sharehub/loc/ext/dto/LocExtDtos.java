@@ -23,7 +23,36 @@ public final class LocExtDtos {
     public record Lead(String leadNo, String venueName, String contact, String stage,
                        String owner, String ownerType, String siteNo,
                        Integer expectSites, String nextFollowAt,
-                       String updatedAt) {
+                       String updatedAt,
+                       // 批次 B（V104）
+                       String address, String venueNo, String contractNo, String lostReason,
+                       java.time.LocalDateTime lostAt, java.time.LocalDateTime lastFollowAt, boolean inPool,
+                       String prevOwner, String competitorName, java.time.LocalDate competitorExclusiveUntil,
+                       java.time.LocalDateTime reactivatedAt, LeadTerms terms) {
+    }
+
+    /** 商机上的谈判条款：签约转化时带进合同草稿。 */
+    public record LeadTerms(String shareMode, BigDecimal shareRate, BigDecimal entryFee, BigDecimal guaranteeAmount,
+                            Integer termMonths, Boolean exclusive) {
+    }
+
+    /**
+     * 签约转化入参（对齐清单 B8 · E1）。全部可空：空的从商机上取（场地方名 / 地址 / 区域 / 谈判条款）。
+     *
+     * @param venueNo 关联已有场地方；空则按商机的场地名新建
+     * @param siteNo  关联已有站点（须属于该场地方）；空则新建一个筹备中的站点
+     */
+    public record LeadConvertReq(String venueNo, String siteNo, String siteName, String regionId, String address,
+                                 String openHours, String shareMode, BigDecimal shareRate, BigDecimal entryFee,
+                                 BigDecimal guaranteeAmount, java.time.LocalDate startAt, Integer termMonths,
+                                 Boolean exclusive) {
+    }
+
+    public record LeadConversion(String leadNo, String venueNo, boolean venueCreated, String siteNo, boolean siteCreated,
+                                 String contractNo) {
+    }
+
+    public record LeadTickResult(int reminded, int pooled, int reactivated) {
     }
 
     /** 门店进件行，镜像前端 {@code VenueOnboarding}（+ {@code venueNo}：通过后回填的场地方号）。 */

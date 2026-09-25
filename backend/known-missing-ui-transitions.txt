@@ -28,6 +28,11 @@ WorkOrderStatus: AUDITED->CLOSED
 OrderStatus: IN_USE->RETURNED
 OrderStatus: RETURNED->SETTLED
 OrderStatus: SETTLED->CLOSED
+# 机柜运输中（2026-09-25 批次 C4）：由调拨单的发货 / 签收驱动（AssetOpsController），机柜页不单独出按钮
+CabinetStatus: IN_STOCK->IN_TRANSIT
+CabinetStatus: IN_TRANSIT->IN_STOCK
+# 2026-09-25 业务告警自愈：出宝失败（一直停在出宝中）的订单由 RENT_NOT_DELIVERED 自动撤销，运营端不出按钮。
+OrderStatus: DISPENSING->CLOSED
 
 # 充电宝的生命周期基本由设备事件推进（借出/归还/上报故障/超时）。
 # devices 页有明确注释：「借出中 / 丢失 / 买断 / 报废是业务流转出来的结果，
@@ -57,6 +62,20 @@ PowerbankStatus: FAULT->SCRAP
 PowerbankStatus: IN_STOCK->SCRAP
 PowerbankStatus: IN_CABINET->SCRAP
 
+# 运营核心流程（2026-09-25，TDD-运营核心流程/02·03）：定时任务 / 设备事件推进，运营端不出按钮。
+#   合同到开始日由 contract-lifecycle 生效、过到期日到期；签署动作在开始日已到时顺带生效（同一条边）。
+#   站点首台设备上线由 CabinetWentLiveEvent 转营业，site-golive-reconcile 兜底。
+ContractStatus: SIGNED->ACTIVE
+ContractStatus: ACTIVE->EXPIRED
+SiteStatus: PREPARING->ACTIVE
+#   试借还全程由设备回执 / 仓位识别 / 超时推进，运营端只有「发起」（新建一条 EJECTING）。
+TrialRentStatus: EJECTING->WAIT_RETURN
+TrialRentStatus: WAIT_RETURN->PASSED
+TrialRentStatus: EJECTING->FAILED
+TrialRentStatus: WAIT_RETURN->FAILED
+TrialRentStatus: EJECTING->EXPIRED
+TrialRentStatus: WAIT_RETURN->EXPIRED
+
 # ── C 运营端没建迁移表，页面手写了 if ────────────────────────────────
 # 这三组是**债**，逐条见执行计划 A3。修法：在 ops-web/lib/types 里补对应的
 # `*_TRANSITIONS`，页面改读 canXxxAction()，然后从本台账删掉对应行。
@@ -64,3 +83,42 @@ PowerbankStatus: IN_CABINET->SCRAP
 # 告警的两条 CLOSE 边已于 2026-09-25 接通（AlarmService.close + workorder:alarm:close
 # + 运营端 ALARM_TRANSITIONS.close），从本台账删除。
 
+# 运营核心流程（2026-09-25）：后端动作端点已就位（ContractController / SiteController / DeviceOpsController），
+# 运营端的 CONTRACT_TRANSITIONS / SITE_TRANSITIONS / CABINET_TRANSITIONS 随 TDD-运营核心流程/08 前端实现补齐后删除以下各行。
+# 在那之前运营端页面仍是旧的 ACTIVE/PAUSED 两态，不会出现「界面手写 if 与后端分叉」—— 是缺入口，不是分叉。
+ContractStatus: DRAFT->PENDING
+ContractStatus: PENDING->DRAFT
+ContractStatus: PENDING->SIGNED
+ContractStatus: ACTIVE->TERMINATED
+SiteStatus: ACTIVE->PAUSED
+SiteStatus: PAUSED->ACTIVE
+SiteStatus: ACTIVE->WITHDRAWING
+SiteStatus: PAUSED->WITHDRAWING
+SiteStatus: WITHDRAWING->CLOSED
+SiteStatus: PREPARING->CLOSED
+CabinetStatus: IN_STOCK->DEPLOYED
+CabinetStatus: DEPLOYED->FAULT
+CabinetStatus: FAULT->DEPLOYED
+CabinetStatus: DEPLOYED->IN_STOCK
+CabinetStatus: FAULT->IN_STOCK
+CabinetStatus: IN_STOCK->RETIRED
+CabinetStatus: FAULT->RETIRED
+
+# 商机阶段机（2026-09-25，运营核心流程批次 B5）：后端 LeadStateMachine 定了顺序推进 / LOST 必填原因 / 重新激活，
+# 运营端 BD CRM 页仍是「阶段下拉随便选」（LEAD_STAGES 只是取值表，没有迁移表）—— 这是**分叉**：
+# 界面能选出后端会 400 的跳阶（如 NEW→NEGOTIATING）。修法：ops-web/lib/types/location.ts 补 LEAD_TRANSITIONS，
+# 下拉只列可达阶段、选 LOST 时要求填原因，然后删掉以下各行。
+LeadStatus: NEW->CONTACTED
+LeadStatus: CONTACTED->NEGOTIATING
+LeadStatus: NEGOTIATING->CONTACTED
+LeadStatus: NEGOTIATING->SIGNED
+LeadStatus: NEW->LOST
+LeadStatus: CONTACTED->LOST
+LeadStatus: NEGOTIATING->LOST
+LeadStatus: LOST->NEW
+
+# 代理清退（2026-09-25 批次 F3）：后端 AgentExitStateMachine 三步顺序门禁已就位（AgentExitController），
+# 运营端还没有清退页 —— 缺入口、不是分叉。随代理页补 AGENT_EXIT_TRANSITIONS 后删除。
+AgentExitStatus: RECLAIMING->SETTLING
+AgentExitStatus: SETTLING->CLOSING
+AgentExitStatus: CLOSING->CLOSED

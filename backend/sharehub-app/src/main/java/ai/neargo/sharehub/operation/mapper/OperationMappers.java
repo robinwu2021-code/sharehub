@@ -35,6 +35,9 @@ public final class OperationMappers {
                 SELECT COUNT(*)                                                          AS total,
                        SUM(CASE WHEN status = 'ACTIVE' THEN 1 ELSE 0 END)                AS active,
                        SUM(CASE WHEN status = 'PAUSED' THEN 1 ELSE 0 END)                AS paused,
+                       SUM(CASE WHEN status = 'PREPARING' THEN 1 ELSE 0 END)             AS preparing,
+                       SUM(CASE WHEN status = 'WITHDRAWING' THEN 1 ELSE 0 END)           AS withdrawing,
+                       SUM(CASE WHEN status = 'CLOSED' THEN 1 ELSE 0 END)                AS closed,
                        SUM(CASE WHEN lng IS NOT NULL AND lat IS NOT NULL THEN 1 ELSE 0 END) AS withGeo
                   FROM loc_site
                  WHERE deleted = 0 AND archived_at IS NULL

@@ -35,6 +35,12 @@ public class WoSlaRule extends BaseEntity {
     /** 超时升级到（role_no / employee_no）。 */
     private String escalateTo;
 
+    /** 解决超时升级到（角色码 / 员工号，逗号分隔；V109）。响应超时用 {@link #escalateTo}。 */
+    private String resolveEscalateTo;
+
     /** 是否启用（0/1）。 */
     private Integer active;
+
+    /** 优先级（V99）：* = 该类型默认；LOW / MEDIUM / HIGH / URGENT 为专属档。 */
+    private String priority;
 }

@@ -11,5 +11,23 @@ package ai.neargo.sharehub.api.platform.dto;
  * @param name      名称
  * @param agentType 登记类型；查不到时为 {@code null}
  */
-public record AgentBrief(String agentNo, String name, AgentType agentType) {
+public record AgentBrief(String agentNo, String name, AgentType agentType,
+                         // 2026-09-25 追加：ENABLED / SUSPENDED —— 自动派单不派给已暂停的代理（E8）
+                         String status,
+                         // 批次 F3：清退单处于「结清中」—— 停用代理这时要能把钱提走，否则清退永远结不清
+                         boolean settlingExit) {
+
+    /** 兼容旧构造点。 */
+    public AgentBrief(String agentNo, String name, AgentType agentType) {
+        this(agentNo, name, agentType, null, false);
+    }
+
+    /** 兼容构造点（无清退信息）。 */
+    public AgentBrief(String agentNo, String name, AgentType agentType, String status) {
+        this(agentNo, name, agentType, status, false);
+    }
+
+    public boolean enabled() {
+        return status == null || "ENABLED".equals(status);
+    }
 }

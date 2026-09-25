@@ -34,9 +34,86 @@ public final class WoExtDtos {
     public record AcceptReq(String assigneeNo) {
     }
 
+    /**
+     * 巡检派生（D4）：巡检现场发现问题直接开单，来源记巡检单号。type ∈ FAULT / REFILL / CLEAN；
+     * cabinetNo 空 = 巡检单上的机柜；priority 空 = MEDIUM。
+     */
+    public record DeriveReq(String type, String priority, String cabinetNo, String description) {
+    }
+
+    /** 工单成本汇总一行（G4）：按承担方（站点 / 代理）聚合。 */
+    public record CostRow(String bearerType, String bearerNo, long orders, java.math.BigDecimal total, String currency) {
+    }
+
+    /** 平台接管（F4）：employeeNo 空 = 按站点员工责任人 / 区域负载自动选。 */
+    public record TakeoverReq(String employeeNo, String reason) {
+    }
+
     /** 现场处理入参，镜像前端 {@code WorkOrderHandlePayload}（+ 照片/换件标记）。 */
     public record HandleReq(String assigneeNo, String photos, String handleNote,
-                            Boolean partChanged, Boolean deviceChanged) {
+                            Boolean partChanged, Boolean deviceChanged,
+                            // 2026-09-25 完工收紧：故障原因分类（字典 wo_fault_reason）+ 现场照片（文件服务 fileNo）
+                            String faultReasonCode, java.util.List<String> fileNos,
+                            // 批次 C：装机现场扫码的点位（C5）· 撤机现场清点的宝数（C8，撤机单必填）
+                            String locationNo, Integer countedQty,
+                            // 批次 G4：工单成本（配件 / 人工金额，完工时填；归属见 WoOpsServiceImpl#recordCost）
+                            java.math.BigDecimal partCost, java.math.BigDecimal laborCost) {
+
+        /** 兼容旧构造点。 */
+        public HandleReq(String assigneeNo, String photos, String handleNote, Boolean partChanged, Boolean deviceChanged) {
+            this(assigneeNo, photos, handleNote, partChanged, deviceChanged, null, null, null, null, null, null);
+        }
+
+        /** 兼容构造点（无装机 / 撤机现场数据）。 */
+        public HandleReq(String assigneeNo, String photos, String handleNote, Boolean partChanged, Boolean deviceChanged,
+                         String faultReasonCode, java.util.List<String> fileNos) {
+            this(assigneeNo, photos, handleNote, partChanged, deviceChanged, faultReasonCode, fileNos, null, null, null, null);
+        }
+
+        /** 兼容构造点（无成本）。 */
+        public HandleReq(String assigneeNo, String photos, String handleNote, Boolean partChanged, Boolean deviceChanged,
+                         String faultReasonCode, java.util.List<String> fileNos, String locationNo, Integer countedQty) {
+            this(assigneeNo, photos, handleNote, partChanged, deviceChanged, faultReasonCode, fileNos, locationNo, countedQty, null, null);
+        }
+    }
+
+    /**
+     * 业务告警的开单草稿（{@code openOrAttach}）。
+     *
+     * @param mergeKey 合并键，写 {@code wo_order.source_ref}：同键未完结的工单直接挂靠
+     */
+    public record AlarmDraft(String type, String priority, String mergeKey, String cabinetNo, String siteNo,
+                             String description, String alarmNo) {
+    }
+
+    /** 完工复核的一项（每条关联告警一项）。 */
+    public record ReviewItem(String alarmNo, String code, boolean passed, String note) {
+    }
+
+    /** 派单候选人。{@code siteOwner} = 站点运维责任人（置顶）。 */
+    public record AssigneeCandidate(String type, String no, String name, boolean siteOwner) {
+    }
+
+    public record WoSummary(long toDispatch, long dueSoon, long overdue, long reviewFailed) {
+    }
+
+    /**
+     * 工单列表筛选（2026-09-25 追加）。
+     *
+     * @param slaState DUE_SOON 两小时内到期 / OVERDUE 已超时（只看未完工的）
+     */
+    public record WoQuery(Integer page, Integer size, String keyword, String status, String type, String priority,
+                          String source, String siteNo, String assigneeNo, String slaState, String reviewStatus) {
+    }
+
+    /** 处理时间线的一条：派单时间轴（wo_dispatch）与处理记录（wo_handle）合并按时间排序。 */
+    public record TimelineItem(String kind, String action, String actor, String note, String faultReasonCode,
+                               java.util.List<String> fileNos, String at) {
+    }
+
+    /** 工单详情（wo 侧）：行 + 时间线 + 现场照片。关联告警由 portal 层编排追加。 */
+    public record WorkOrderDetail(ai.neargo.sharehub.wo.dto.WoDtos.WorkOrder order, java.util.List<TimelineItem> timeline,
+                                  java.util.List<ai.neargo.sharehub.api.platform.dto.FileRef> photos) {
     }
 
     /**

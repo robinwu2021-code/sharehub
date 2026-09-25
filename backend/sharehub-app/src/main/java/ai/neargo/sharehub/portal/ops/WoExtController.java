@@ -46,9 +46,11 @@ public class WoExtController {
     private final WoOpsService woOpsService;
     private final SlaRuleService slaRuleService;
     private final InspectionPlanService inspectionPlanService;
+    private final WorkOrderAssembler assembler;
 
-    public WoExtController(WoOpsService woOpsService, SlaRuleService slaRuleService,
+    public WoExtController(WoOpsService woOpsService, SlaRuleService slaRuleService, WorkOrderAssembler assembler,
                            InspectionPlanService inspectionPlanService) {
+        this.assembler = assembler;
         this.woOpsService = woOpsService;
         this.slaRuleService = slaRuleService;
         this.inspectionPlanService = inspectionPlanService;
@@ -61,6 +63,28 @@ public class WoExtController {
     @PreAuthorize("@perm.can('workorder:wo:create')")
     public WorkOrder createWorkOrder(@RequestBody WorkOrderDraft body) {
         return woOpsService.create(body);
+    }
+
+    /** 工单摘要条：待派 · 即将超时（2 小时内）· 已超时 · 复核未通过（2026-09-25）。 */
+    @GetMapping("/work-orders/summary")
+    @PreAuthorize("@perm.can('workorder:wo:read')")
+    public ai.neargo.sharehub.wo.ext.dto.WoExtDtos.WoSummary summary() {
+        return woOpsService.summary();
+    }
+
+    /** 工单详情：处理时间线（派单 + 现场处理合并）、现场照片、关联的业务告警。 */
+    @GetMapping("/work-orders/{woNo}")
+    @PreAuthorize("@perm.can('workorder:wo:read')")
+    public WorkOrderAssembler.WorkOrderDetailView detail(@PathVariable String woNo) {
+        return assembler.detail(woNo);
+    }
+
+    /** 派单候选人：站点运维责任人置顶，其后是该站点运营代理与 OPS 角色员工。 */
+    @GetMapping("/work-orders/assignee-candidates")
+    @PreAuthorize("@perm.can('workorder:wo:dispatch')")
+    public java.util.List<ai.neargo.sharehub.wo.ext.dto.WoExtDtos.AssigneeCandidate> assigneeCandidates(
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String siteNo) {
+        return woOpsService.candidates(siteNo);
     }
 
     @PostMapping("/work-orders/{woNo}/accept")
@@ -84,6 +108,47 @@ public class WoExtController {
     @PreAuthorize("@perm.can('workorder:wo:handle')")
     public WorkOrder complete(@PathVariable String woNo, @RequestBody(required = false) HandleReq body) {
         return woOpsService.complete(woNo, body);
+    }
+
+    /** 巡检派生（D4）：巡检现场发现问题直接开维修 / 补宝 / 清洁单，来源挂巡检单号。权限随处理人（巡检员）。 */
+    @PostMapping("/work-orders/{woNo}/derive")
+    @PreAuthorize("@perm.can('workorder:wo:handle')")
+    public WorkOrder derive(@PathVariable String woNo, @RequestBody ai.neargo.sharehub.wo.ext.dto.WoExtDtos.DeriveReq body) {
+        return woOpsService.derive(woNo, body);
+    }
+
+    /** 平台接管（F4）：代理的单 SLA 超时后改派平台员工；employeeNo 空 = 按站点责任人 / 区域负载选。 */
+    @PostMapping("/work-orders/{woNo}/takeover")
+    @PreAuthorize("@perm.can('workorder:wo:dispatch')")
+    public WorkOrder takeover(@PathVariable String woNo,
+                              @RequestBody(required = false) ai.neargo.sharehub.wo.ext.dto.WoExtDtos.TakeoverReq body) {
+        return woOpsService.takeover(woNo, body == null ? null : body.employeeNo(), body == null ? null : body.reason());
+    }
+
+    /** 工单成本汇总（G4）：按承担方（站点效益 / 代理运维）聚合完工工单的配件 + 人工金额。 */
+    @GetMapping("/work-orders/costs")
+    @PreAuthorize("@perm.can('workorder:wo:read')")
+    public java.util.List<ai.neargo.sharehub.wo.ext.dto.WoExtDtos.CostRow> costs(
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to,
+            @RequestParam(required = false) String bearerType) {
+        return woOpsService.costSummary(from, to, bearerType);
+    }
+
+    /** 抢单池（E3）：未派出的工单，按数据范围 —— 区域员工看到本区域的池。 */
+    @GetMapping("/work-orders/pool")
+    @PreAuthorize("@perm.can('workorder:wo:handle')")
+    public ai.neargo.common.core.PageResult<WorkOrder> pool(@RequestParam(required = false) Integer page,
+                                                          @RequestParam(required = false) Integer size,
+                                                          @RequestParam(required = false) String type) {
+        return woOpsService.pool(page, size, type);
+    }
+
+    /** 抢单（E3）：派给自己并接单。 */
+    @PostMapping("/work-orders/{woNo}/grab")
+    @PreAuthorize("@perm.can('workorder:wo:handle')")
+    public WorkOrder grab(@PathVariable String woNo) {
+        return woOpsService.grab(woNo);
     }
 
     /** 完成 / 审核关单。{@code closeReason} 必填，空则 400。 */

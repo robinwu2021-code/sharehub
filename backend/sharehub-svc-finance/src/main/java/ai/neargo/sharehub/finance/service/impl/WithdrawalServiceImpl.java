@@ -54,10 +54,13 @@ public class WithdrawalServiceImpl implements WithdrawalService {
     private final WithdrawFeePolicy feePolicy;
     private final WithdrawalStateMachine stateMachine;
     private final PayoutAccountService payoutAccounts;
+    private final ai.neargo.sharehub.api.platform.port.AgentDirectoryPort agents;
 
     public WithdrawalServiceImpl(StlWithdrawalMapper mapper, WithdrawFeePolicy feePolicy,
                                  WithdrawalStateMachine stateMachine,
-                                 PayoutAccountService payoutAccounts) {
+                                 PayoutAccountService payoutAccounts,
+                                 ai.neargo.sharehub.api.platform.port.AgentDirectoryPort agents) {
+        this.agents = agents;
         this.mapper = mapper;
         this.feePolicy = feePolicy;
         this.stateMachine = stateMachine;
@@ -75,6 +78,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
             throw new IllegalArgumentException("收款主体 payeeNo 必填");
         }
 
+        requireAgentNotSuspended(req.payeeType(), req.payeeNo());
         BigDecimal fee = feePolicy.feeOf(req.amount(), req.currency(), req.payeeType());
         if (fee != null && fee.compareTo(req.amount()) >= 0) {
             throw new IllegalArgumentException("手续费不得大于等于提现金额，请提高提现额度");
@@ -117,10 +121,24 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         return new PageResult<>(r.getRecords().stream().map(WithdrawalServiceImpl::toVO).toList(), r.getTotal());
     }
 
+    /**
+     * 代理停用冻结提现（对齐清单 F1 · E8）：停用期间不能申请、不能审批通过、不能确认打款 ——
+     * 已提交的单停在原状态即「挂起」，恢复启用后继续走。分润照常计提，钱没丢，只是暂时拿不走。
+     */
+    private void requireAgentNotSuspended(String payeeType, String payeeNo) {
+        if (!"AGENT".equalsIgnoreCase(payeeType) || payeeNo == null) return;
+        var a = agents.briefOf(payeeNo);
+        // 清退「结清中」例外：这一步就是要把钱结给它，冻着就永远结不清
+        if (a != null && !a.enabled() && !a.settlingExit()) {
+            throw ai.neargo.sharehub.common.BizException.conflict("error.withdrawal.agent_suspended", payeeNo);
+        }
+    }
+
     @Override
     @Transactional
     public Withdrawal audit(String withdrawNo, boolean approve, String rejectReason) {
         StlWithdrawal e = require(withdrawNo);
+        if (approve) requireAgentNotSuspended(e.getPayeeType(), e.getPayeeNo());   // 驳回照常可做：停用期间的单可以直接驳掉
 
         // —— 合规下界：驳回必须留原因，没有原因的驳回等于没有审批记录 ——
         if (!approve && (rejectReason == null || rejectReason.isBlank())) {
@@ -172,6 +190,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         }
         StlWithdrawal e = require(withdrawNo);
         boolean ok = Boolean.TRUE.equals(req.success());
+        if (ok) requireAgentNotSuspended(e.getPayeeType(), e.getPayeeNo());
 
         /*
          * —— 成功必须带渠道流水号 ——

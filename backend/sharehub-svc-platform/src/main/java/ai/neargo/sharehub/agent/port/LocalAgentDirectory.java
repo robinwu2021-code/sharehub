@@ -23,9 +23,33 @@ import java.util.Map;
 public class LocalAgentDirectory implements AgentDirectoryPort {
 
     private final AgentMapper agents;
+    private final ai.neargo.sharehub.agent.ext.mapper.AgtExitMapper exits;
+    private final ai.neargo.sharehub.agent.ext.mapper.AgtOpsAssessmentMapper assessments;
 
-    public LocalAgentDirectory(AgentMapper agents) {
+    public LocalAgentDirectory(AgentMapper agents, ai.neargo.sharehub.agent.ext.mapper.AgtExitMapper exits,
+                               ai.neargo.sharehub.agent.ext.mapper.AgtOpsAssessmentMapper assessments) {
         this.agents = agents;
+        this.exits = exits;
+        this.assessments = assessments;
+    }
+
+    @Override
+    public java.math.BigDecimal opsCoefficient(String agentNo, String period) {
+        if (agentNo == null || period == null) return java.math.BigDecimal.ONE;
+        var a = assessments.selectOne(new LambdaQueryWrapper<ai.neargo.sharehub.agent.ext.entity.AgtOpsAssessment>()
+                .eq(ai.neargo.sharehub.agent.ext.entity.AgtOpsAssessment::getAgentNo, agentNo)
+                .eq(ai.neargo.sharehub.agent.ext.entity.AgtOpsAssessment::getApplyPeriod, period).last("limit 1"));
+        return a == null || a.getCoefficient() == null ? java.math.BigDecimal.ONE : a.getCoefficient();
+    }
+
+    @Override
+    public List<OpsAssessmentBrief> assessmentsBelow(String applyPeriod, java.math.BigDecimal threshold) {
+        return assessments.selectList(new LambdaQueryWrapper<ai.neargo.sharehub.agent.ext.entity.AgtOpsAssessment>()
+                        .eq(ai.neargo.sharehub.agent.ext.entity.AgtOpsAssessment::getApplyPeriod, applyPeriod)
+                        .isNotNull(ai.neargo.sharehub.agent.ext.entity.AgtOpsAssessment::getSlaRate)
+                        .lt(ai.neargo.sharehub.agent.ext.entity.AgtOpsAssessment::getSlaRate, threshold))
+                .stream().map(x -> new OpsAssessmentBrief(x.getAgentNo(), x.getPeriod(), x.getSlaRate(), x.getWoTotal(),
+                        x.getTakenOver(), x.getCoefficient())).toList();
     }
 
     @Override
@@ -51,7 +75,10 @@ public class LocalAgentDirectory implements AgentDirectoryPort {
         return a == null ? null : toBrief(a);
     }
 
-    private static AgentBrief toBrief(AgtAgent a) {
-        return new AgentBrief(a.getAgentNo(), a.getName(), AgentType.of(a.getAgentType()));
+    private AgentBrief toBrief(AgtAgent a) {
+        boolean settling = !ai.neargo.sharehub.agent.AgentStatus.ENABLED.name().equals(a.getStatus()) && exits.selectCount(new LambdaQueryWrapper<ai.neargo.sharehub.agent.ext.entity.AgtExit>()
+                .eq(ai.neargo.sharehub.agent.ext.entity.AgtExit::getAgentNo, a.getAgentNo())
+                .eq(ai.neargo.sharehub.agent.ext.entity.AgtExit::getStatus, ai.neargo.sharehub.agent.ext.AgentExitStatus.SETTLING.name())) > 0;
+        return new AgentBrief(a.getAgentNo(), a.getName(), AgentType.of(a.getAgentType()), a.getStatus(), settling);
     }
 }

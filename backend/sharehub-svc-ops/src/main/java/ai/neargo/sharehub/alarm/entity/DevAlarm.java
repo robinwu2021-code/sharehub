@@ -80,4 +80,27 @@ public class DevAlarm extends BaseEntity {
 
     /** 关闭时间。 */
     private java.time.LocalDateTime closedAt;
+
+    // —— 2026-09-25 业务告警（V98）。open_key 是生成列，不映射（插入时不能写它）——
+    private String regionId;
+    private String domain;
+    private String subjectType;
+    private String subjectNo;
+    private String cause;
+    private String impactScope;
+    private String impactPeriod;
+    private String siteTier;
+    private Integer inFlightOrders;
+    private String priority;
+    /** 证据 JSON，最多 20 条。 */
+    private String evidence;
+    private String dispositionType;
+    private String dispositionRef;
+    private java.time.LocalDateTime firstOccurredAt;
+    private java.time.LocalDateTime lastOccurredAt;
+    private java.time.LocalDateTime dueAt;
+    /** 恢复信号时刻（防抖期起点）；复发时清空，故更新时要能写 NULL。 */
+    @com.baomidou.mybatisplus.annotation.TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
+    private java.time.LocalDateTime recoveredAt;
+    private String parentAlarmNo;
 }

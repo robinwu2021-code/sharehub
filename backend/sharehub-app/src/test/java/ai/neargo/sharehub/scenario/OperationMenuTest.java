@@ -36,8 +36,11 @@ class OperationMenuTest extends ApiTestSupport {
 
         // 规模：站点/机柜的存量，不随时间筛选变化
         assertThat(d.path("scale").path("siteTotal").asInt()).isPositive();
-        assertThat(d.path("scale").path("siteActive").asInt() + d.path("scale").path("sitePaused").asInt())
-                .as("营业中 + 暂停 应等于总数（归档的不计入）")
+        // 2026-09-25 站点五态：五档之和等于总数（归档的不计入）
+        JsonNode sc = d.path("scale");
+        assertThat(sc.path("siteActive").asInt() + sc.path("sitePaused").asInt() + sc.path("sitePreparing").asInt()
+                + sc.path("siteWithdrawing").asInt() + sc.path("siteClosed").asInt())
+                .as("五个状态之和应等于总数（归档的不计入）")
                 .isEqualTo(d.path("scale").path("siteTotal").asInt());
         assertThat(d.path("scale").path("onlineRate").asDouble()).isBetween(0.0, 1.0);
 

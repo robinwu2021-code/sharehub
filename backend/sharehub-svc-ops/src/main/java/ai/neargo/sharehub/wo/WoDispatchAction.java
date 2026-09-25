@@ -17,7 +17,11 @@ public enum WoDispatchAction {
     /** 派单：记录派给了谁、什么时候派的。 */
     DISPATCH,
     /** 接单：记录谁接的、什么时候接的。 */
-    ACCEPT;
+    ACCEPT,
+    /** 代理停用改派（批次 F2）：名下未完结工单转给平台员工。 */
+    REASSIGN,
+    /** 平台接管（批次 F4）：代理的单超时，平台改派自己的运维。 */
+    TAKEOVER;
 
     /** 宽松解析：非法值抛 {@link IllegalArgumentException}（全局映射 400）。 */
     public static WoDispatchAction of(String v) {

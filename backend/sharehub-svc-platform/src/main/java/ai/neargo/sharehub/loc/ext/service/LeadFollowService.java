@@ -22,9 +22,5 @@ public interface LeadFollowService {
 
     List<ContractAttachment> attachments(String contractNo);
 
-    /** 添加附件元数据。**不接收字节流** —— 见 {@code LocContractAttach} 类注释。 */
-    ContractAttachment addAttachment(String contractNo, String fileName, Long size);
-
-    /** 移除附件。软删（BaseEntity.deleted），元数据保留可追溯。 */
-    boolean removeAttachment(String contractNo, String attachNo);
+    // 合同附件的写入已迁入 ContractService.attach / removeAttachment（接入文件服务）。
 }

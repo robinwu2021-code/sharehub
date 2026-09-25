@@ -67,6 +67,16 @@ public class DataScopeRegistration implements DataScopeRegistrar {
                 "AGENT", "agent_no",
                 "SITE", "site_no"));
 
+        // —— 运营核心流程批次 C（V107）：只挂站点维度 —— 勘测 / 资产差异 / 结算调整项是平台运营与财务的活，
+        // 没有代理列；代理身份查它们按 fail-closed 一行都看不到，这正是想要的（代理不参与撤场结清与仓库对账）
+        registry.register("loc_site_survey", Map.of("SITE", "site_no"));
+        registry.register("inv_asset_diff", Map.of("SITE", "site_no"));
+        registry.register("stl_adjustment", Map.of("SITE", "site_no"));
+
+        // 批次 F（V110）：清退单与运维考核归代理 —— 代理身份只看得到自己的
+        registry.register("agt_exit", Map.of("AGENT", "agent_no"));
+        registry.register("agt_ops_assessment", Map.of("AGENT", "agent_no"));
+
         // —— 设备：机柜归属随点位 ——
         registry.register("dev_cabinet", Map.of(
                 "AGENT", "agent_no",
@@ -131,6 +141,20 @@ public class DataScopeRegistration implements DataScopeRegistrar {
         // 而多注册的后果只是 fail-closed 方向的「看不到」——两种错的代价不对称。
         registry.register("stl_withdrawal", Map.of("AGENT", "agent_no"));
         registry.register("stl_settlement", Map.of("AGENT", "agent_no"));
+
+        /*
+         * —— 运营核心流程（2026-09-25，TDD-运营核心流程）——
+         *
+         * 带归属列的新表全部登记（handler fail-closed：表上有哪一维的列就必须登记哪一维）。
+         * 合同与两张日志表没有 agent_no：代理维度恒空 —— 与现状一致（代理没有合同读权限）。
+         */
+        registry.register("loc_contract", Map.of("SITE", "site_no"));
+        registry.register("loc_site_status_log", Map.of("SITE", "site_no"));
+        registry.register("sys_file", Map.of("AGENT", "agent_no"));
+        registry.register("dev_protection", Map.of("AGENT", "agent_no", "SITE", "site_no"));
+        registry.register("dev_trial_rent", Map.of("AGENT", "agent_no", "SITE", "site_no"));
+        registry.register("dev_alarm_todo", Map.of("AGENT", "agent_no", "SITE", "site_no"));
+        registry.register("dev_alarm_site_profile", Map.of("SITE", "site_no"));
 
         // ⚠️ 待表建好后补注册（[TDD §5.2] 清单剩余项）：
         //   dev_alarm → AGENT: agent_no, SITE: site_no

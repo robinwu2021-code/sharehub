@@ -39,9 +39,12 @@ public class OpsController {
     private final CabinetService cabinetService;
     private final WoOpsService woOpsService;
     private final ReportService reportService;
+    private final ai.neargo.sharehub.portal.ops.WorkOrderAssembler workOrders;
 
     public OpsController(LocService loc, CabinetService cabinetService,
-                         WoOpsService woOpsService, ReportService reportService) {
+                         WoOpsService woOpsService, ReportService reportService,
+                         ai.neargo.sharehub.portal.ops.WorkOrderAssembler workOrders) {
+        this.workOrders = workOrders;
         this.loc = loc;
         this.cabinetService = cabinetService;
         this.woOpsService = woOpsService;
@@ -98,8 +101,16 @@ public class OpsController {
                                           @RequestParam(required = false) Integer size,
                                           @RequestParam(required = false) String keyword,
                                           @RequestParam(required = false) String status,
-                                          @RequestParam(required = false) String type) {
-        return woOpsService.pageRich(page, size, keyword, status, type);
+                                          @RequestParam(required = false) String type,
+                                          // 2026-09-25 承接业务告警：运营维度筛选；出参追加 ops（SLA 剩余、关联告警数、复核结果…）
+                                          @RequestParam(required = false) String priority,
+                                          @RequestParam(required = false) String source,
+                                          @RequestParam(required = false) String siteNo,
+                                          @RequestParam(required = false) String assigneeNo,
+                                          @RequestParam(required = false) String slaState,
+                                          @RequestParam(required = false) String reviewStatus) {
+        return workOrders.page(new ai.neargo.sharehub.wo.ext.dto.WoExtDtos.WoQuery(page, size, keyword, status, type,
+                priority, source, siteNo, assigneeNo, slaState, reviewStatus));
     }
 
     @PostMapping("/work-orders/{woNo}/dispatch")
@@ -109,41 +120,7 @@ public class OpsController {
         return woOpsService.dispatch(woNo, assignee);   // 迁移 + wo_dispatch 时间轴留痕（ext 编排）
     }
 
-    // —— 场所：站点 / 点位 / 场地方 / 合同（MariaDB 持久化，经 LocService，P4）——
-    @GetMapping("/sites")
-    @PreAuthorize("@perm.can('location:poi:read')")
-    public PageResult<Site> sites(@RequestParam(required = false) Integer page,
-                                @RequestParam(required = false) Integer size,
-                                @RequestParam(required = false) String keyword,
-                                  @RequestParam(required = false) Boolean showArchived) {
-        return loc.pageSites(page, size, keyword, showArchived);
-    }
-
-    @PostMapping({"/sites", "/sites/{siteNo}"})
-    @PreAuthorize("@perm.can('location:poi:create')")
-    public Site saveSite(@PathVariable(required = false) String siteNo, @RequestBody Site in) {
-        return loc.saveSite(siteNo, in);
-    }
-
-    /**
-     * 暂停 / 恢复营业（运营管理清单 OM-S3）。
-     *
-     * <p>与「归档」分开：归档是「这个站点不在经营范围里了」，停业是「暂时不做生意」。
-     * 两者混成一个开关的话，运营想临时停业就只能归档，而归档会把它从所有列表里拿掉。
-     */
-    @PostMapping("/sites/{siteNo}/pause")
-    @PreAuthorize("@perm.can('location:poi:update')")
-    public Site pauseSite(@PathVariable String siteNo, @RequestBody(required = false) java.util.Map<String, Object> body) {
-        Object reason = body == null ? null : body.get("reason");
-        return loc.pauseSite(siteNo, reason == null ? null : String.valueOf(reason));
-    }
-
-    @PostMapping("/sites/{siteNo}/resume")
-    @PreAuthorize("@perm.can('location:poi:update')")
-    public Site resumeSite(@PathVariable String siteNo) {
-        return loc.resumeSite(siteNo);
-    }
-
+    // —— 场所：点位 / 场地方（站点已迁入 SiteController：状态机 + 门禁；合同在 ContractController）——
     @GetMapping("/locations")
     @PreAuthorize("@perm.can('location:poi:read')")
     public PageResult<Location> locations(@RequestParam(required = false) Integer page,
@@ -188,34 +165,7 @@ public class OpsController {
         return loc.saveVenue(body);
     }
 
-    @GetMapping("/contracts")
-    @PreAuthorize("@perm.can('location:contract:read')")
-    public PageResult<Contract> contracts(@RequestParam(required = false) Integer page,
-                                        @RequestParam(required = false) Integer size,
-                                        @RequestParam(required = false) String keyword) {
-        return loc.pageContracts(page, size, keyword);
-    }
-
-    /**
-     * 新建 / 修改进场合同。
-     *
-     * <p><b>此前这个端点根本不存在</b>：合同只有种子在写，前端的「新增/编辑」按钮
-     * 在 {@code USE_MOCK=0} 下必 404。而合同是场地方分成的唯一依据 ——
-     * 建不了合同，场地方费率就只能靠改库。
-     */
-    @PostMapping("/contracts")
-    @PreAuthorize("@perm.can('location:contract:create')")
-    public Contract createContract(@RequestBody LocContract body) {
-        body.setContractNo(null);   // 新建一律服务端取号，忽略 body 里的键
-        return loc.saveContract(body);
-    }
-
-    @PostMapping("/contracts/{contractNo}")
-    @PreAuthorize("@perm.can('location:contract:update')")
-    public Contract updateContract(@PathVariable String contractNo, @RequestBody LocContract body) {
-        body.setContractNo(contractNo); // 路径为准，防越权改别人的合同
-        return loc.saveContract(body);
-    }
+    // 合同的读写已迁入 ContractController（2026-09-25：合同走审批，状态只经动作接口改）。
 
     /**
      * 归档Cabinet。**不是删除** —— 行仍在，勾「显示已归档」可见，可 unarchive 恢复。
@@ -239,18 +189,6 @@ public class OpsController {
     // ───────────── 场所域归档（前端契约 Archivable）─────────────
     // 站点/点位/场地方共用 LocService 的归档实现：archivedAt 时间戳，null=在用。
     // **不是删除** —— 勾「显示已归档」可见，可恢复。
-
-    @PostMapping("/sites/{no}/archive")
-    @PreAuthorize("@perm.can('location:site:update')")
-    public Object archiveSite(@PathVariable String no) {
-        return loc.archiveSite(no);
-    }
-
-    @PostMapping("/sites/{no}/unarchive")
-    @PreAuthorize("@perm.can('location:site:update')")
-    public Object unarchiveSite(@PathVariable String no) {
-        return loc.unarchiveSite(no);
-    }
 
     @PostMapping("/locations/{no}/archive")
     @PreAuthorize("@perm.can('location:poi:update')")

@@ -15,6 +15,8 @@ public enum CabinetStatus {
 
     /** 在库，未上架 —— 新建机柜的初始态。**DDL 注释里没有它**，见类注释。 */
     IN_STOCK,
+    /** 运输中：随调拨单发出，签收后回 IN_STOCK（V107，对齐清单 C4）。 */
+    IN_TRANSIT,
     /** 已部署在站点上（DDL 默认值）。 */
     DEPLOYED,
     /** 故障。 */
@@ -28,7 +30,7 @@ public enum CabinetStatus {
         try {
             return valueOf(v.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("机柜状态非法: " + v + "（仅 IN_STOCK/DEPLOYED/FAULT/RETIRED）");
+            throw new IllegalArgumentException("机柜状态非法: " + v + "（仅 IN_STOCK/IN_TRANSIT/DEPLOYED/FAULT/RETIRED）");
         }
     }
 }

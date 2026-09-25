@@ -28,7 +28,69 @@ public final class AlarmDtos {
                               // 关闭信息（2026-09-25）。**必须回传** —— 落了库却不出参，
                               // 症状就是「关了，但列表上看不出为什么关的」，
                               // 而「误报率」正是靠 closeReason 算出来的。
-                              String closeReason, String closeNote, String closedBy, String closedAt) {
+                              String closeReason, String closeNote, String closedBy, String closedAt,
+                              // 2026-09-25 业务告警：业务维度收成一个子对象追加在末尾（设备告警的存量行为 null）
+                              BusinessInfo business) {
+
+        /** 兼容旧构造点。 */
+        public AlarmRecord(String alarmNo, String cabinetNo, String siteNo, String siteName, String agentNo, String vendorCode,
+                           String alarmCode, String vendorErrorCode, String level, String source, String occurredAt,
+                           String status, String workOrderNo, String remark, String dedupKey, Integer count,
+                           String closeReason, String closeNote, String closedBy, String closedAt) {
+            this(alarmNo, cabinetNo, siteNo, siteName, agentNo, vendorCode, alarmCode, vendorErrorCode, level, source,
+                    occurredAt, status, workOrderNo, remark, dedupKey, count, closeReason, closeNote, closedBy, closedAt, null);
+        }
+    }
+
+    /** 业务告警维度：域 · 主体 · 根因 · 影响 · 优先级 · 处置。 */
+    public record BusinessInfo(String domain, String subjectType, String subjectNo, String cause, String priority,
+                               String impactScope, String impactPeriod, String siteTier, Integer inFlightOrders,
+                               String dispositionType, String dispositionRef, java.time.LocalDateTime firstOccurredAt,
+                               java.time.LocalDateTime lastOccurredAt, java.time.LocalDateTime dueAt,
+                               java.time.LocalDateTime recoveredAt, String parentAlarmNo) {
+    }
+
+    /** 告警详情：记录 + 证据 + 时间线 + 同对象近 7 天。 */
+    public record AlarmDetail(AlarmRecord record, String codeName, String suggestion, String evidence,
+                              java.util.List<AlarmLogItem> timeline, java.util.List<AlarmRecord> recentSameSubject) {
+    }
+
+    public record AlarmLogItem(String event, String note, String operator, java.time.LocalDateTime at) {
+    }
+
+    /** 告警中心摘要：按域的未关闭数 / 其中严重数；已处置未关闭；今日自动恢复。 */
+    public record AlarmSummary(java.util.Map<String, DomainCount> byDomain, long disposedOpen, long autoRecoveredToday) {
+    }
+
+    public record DomainCount(long open, long critical) {
+    }
+
+    /** 处置预览：现在处置会发生什么（人工「立即处置」前给运营看）。 */
+    public record DispositionPreview(String type, String woType, String priority, String assigneeType, String assigneeNo,
+                                     String mergeIntoWoNo, String todoRole, String fallback) {
+    }
+
+    public record AlarmRoute(String alarmCode, String cause, String disposition, String woType, Integer priorityDelta,
+                             String fallback) {
+    }
+
+    public record RouteReq(String cause, String disposition, String woType, Integer priorityDelta, String fallback) {
+    }
+
+    /** 每码统计（近 N 天）：数量、误报率、自愈率、撤单率。 */
+    public record CodeStat(String code, long total, double falseAlarmRate, double selfHealRate, double withdrawnRate) {
+    }
+
+    public record AlarmTodo(String todoNo, String alarmNo, String alarmCode, String roleCode, String assigneeNo, String title,
+                            String status, String siteNo, java.time.LocalDateTime createdAt, java.time.LocalDateTime doneAt,
+                            String doneBy, String doneNote) {
+    }
+
+    public record NoteReq(String note) {
+    }
+
+    /** 判定一轮的计数。 */
+    public record TickResult(int opened, int recovered, int closed, int disposed) {
     }
 
     /** 告警通知流水行，镜像前端 {@code AlarmNotice}。 */
@@ -42,7 +104,22 @@ public final class AlarmDtos {
     /** {@code archivedAt}：归档时间，`null` = 在用。运营端靠它把归档行置灰并显示归档时间。 */
     public record AlarmCode(String code, String message, String messageEn, String messageAr,
                             String level, String suggestion, boolean autoWorkOrder,
-                            String archivedAt) {
+                            String archivedAt,
+                            // 2026-09-25 业务告警码配置（设备码存量行为 null）
+                            BusinessCode business) {
+
+        /** 兼容旧构造点。 */
+        public AlarmCode(String code, String message, String messageEn, String messageAr, String level, String suggestion,
+                         boolean autoWorkOrder, String archivedAt) {
+            this(code, message, messageEn, messageAr, level, suggestion, autoWorkOrder, archivedAt, null);
+        }
+    }
+
+    /** 业务告警码的判定与处置配置（码即处置预案）。 */
+    public record BusinessCode(String domain, String subjectType, String evalType, Integer holdMinutes, Integer windowMinutes,
+                               java.math.BigDecimal threshold, boolean businessHoursOnly, String basePriority, boolean impactAdjust,
+                               String disposition, String ownerRole, Integer woDelayMinutes, String mergeScope, String recoverRule,
+                               Integer recoverHoldMinutes, String supersedes, boolean enabled, boolean builtin) {
     }
 
     /** 通知规则行，镜像前端 {@code AlarmRule}（含静默窗口 + 升级策略）。 */

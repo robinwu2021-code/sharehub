@@ -1,5 +1,8 @@
 package ai.neargo.sharehub.finance.service.impl;
 
+import ai.neargo.sharehub.finance.AdjustmentStatus;
+import ai.neargo.sharehub.finance.entity.StlAdjustment;
+import ai.neargo.sharehub.finance.mapper.StlAdjustmentMapper;
 import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.finance.SettlementRefType;
 import ai.neargo.sharehub.finance.SettlementStatus;
@@ -43,13 +46,19 @@ public class SettlementServiceImpl implements SettlementService {
     private final StlSettlementDetailMapper detailMapper;
     private final ShareRecordMapper recordMapper;
     private final SettlementStateMachine stateMachine;
+    private final StlAdjustmentMapper adjustmentMapper;
+    private final ai.neargo.sharehub.finance.service.AdjustmentService adjustmentService;
 
     public SettlementServiceImpl(StlSettlementMapper mapper, StlSettlementDetailMapper detailMapper,
-                                 ShareRecordMapper recordMapper, SettlementStateMachine stateMachine) {
+                                 ShareRecordMapper recordMapper, SettlementStateMachine stateMachine,
+                                 StlAdjustmentMapper adjustmentMapper,
+                                 ai.neargo.sharehub.finance.service.AdjustmentService adjustmentService) {
+        this.adjustmentService = adjustmentService;
         this.mapper = mapper;
         this.detailMapper = detailMapper;
         this.recordMapper = recordMapper;
         this.stateMachine = stateMachine;
+        this.adjustmentMapper = adjustmentMapper;
     }
 
     @Override
@@ -128,12 +137,27 @@ public class SettlementServiceImpl implements SettlementService {
             byPayee.computeIfAbsent(r.getPayeeNo(), k -> new ArrayList<>()).add(r);
         }
 
+        // 保底补差（G2）：先把本账期的补差算出来（已确认），下面随调整项一起并入场地方结算单
+        if (payeeType == null || payeeType.isBlank() || "VENUE".equalsIgnoreCase(payeeType)) adjustmentService.topUpGuarantees(period);
+
+        // 已确认、尚未出账的结算调整项（撤场结清押金 / 进场费，V107）：并入该收款方本期结算单。
+        // 没有分润、只有调整项的收款方同样要出一张单 —— 撤场后的站点正是这样
+        LambdaQueryWrapper<StlAdjustment> aw = new LambdaQueryWrapper<StlAdjustment>()
+                .eq(StlAdjustment::getStatus, AdjustmentStatus.CONFIRMED.name()).isNull(StlAdjustment::getSettleNo);
+        if (payeeType != null && !payeeType.isBlank()) aw.eq(StlAdjustment::getPayeeType, payeeType);
+        Map<String, List<StlAdjustment>> adjByPayee = new LinkedHashMap<>();
+        for (StlAdjustment a : adjustmentMapper.selectList(aw)) {
+            adjByPayee.computeIfAbsent(a.getPayeeNo(), k -> new ArrayList<>()).add(a);
+            byPayee.putIfAbsent(a.getPayeeNo(), new ArrayList<>());
+        }
+
         String tenantId = SecurityUtils.tenantId();
         List<String> created = new ArrayList<>();
 
         for (Map.Entry<String, List<ShareRecord>> en : byPayee.entrySet()) {
             String payeeNo = en.getKey();
             List<ShareRecord> group = en.getValue();
+            List<StlAdjustment> adjs = adjByPayee.getOrDefault(payeeNo, List.of());
 
             // 幂等：同一 (payeeNo, period) 已出过账则跳过，批处理重跑不会出重单
             Long exists = mapper.selectCount(new LambdaQueryWrapper<StlSettlement>()
@@ -144,17 +168,19 @@ public class SettlementServiceImpl implements SettlementService {
             BigDecimal total = group.stream()
                     .map(r -> r.getAmount() == null ? BigDecimal.ZERO : r.getAmount())
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
+            total = total.add(adjs.stream().map(StlAdjustment::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add));
 
-            ShareRecord head = group.get(0);
+            ShareRecord head = group.isEmpty() ? null : group.get(0);
+            StlAdjustment adjHead = adjs.isEmpty() ? null : adjs.get(0);
             StlSettlement s = new StlSettlement();
             s.setTenantId(tenantId);
             s.setSettleNo(FinNos.nextNo(mapper, "settle_no", BizKey.SETTLEMENT, 6));
-            s.setPayeeType(head.getPayeeType() != null ? head.getPayeeType() : head.getDimension());
+            s.setPayeeType(head != null ? (head.getPayeeType() != null ? head.getPayeeType() : head.getDimension()) : adjHead.getPayeeType());
             s.setPayeeNo(payeeNo);
-            s.setPayeeName(head.getPayeeName());
+            s.setPayeeName(head != null ? head.getPayeeName() : adjHead.getPayeeName());
             s.setPeriod(period);
             s.setTotalAmount(total);
-            s.setCurrency(head.getCurrency());
+            s.setCurrency(head != null ? head.getCurrency() : adjHead.getCurrency());
             s.setStatus(SettlementStatus.GEN.name());
             mapper.insert(s);
 
@@ -171,6 +197,19 @@ public class SettlementServiceImpl implements SettlementService {
                 r.setSettleNo(s.getSettleNo());
                 r.setStatus(ShareRecordStatus.DONE.name());
                 recordMapper.updateById(r);
+            }
+            for (StlAdjustment a : adjs) {
+                StlSettlementDetail d = new StlSettlementDetail();
+                d.setTenantId(tenantId);
+                d.setSettleNo(s.getSettleNo());
+                d.setRefType(SettlementRefType.ADJUST.name());
+                d.setRefNo(a.getAdjNo());
+                d.setAmount(a.getAmount());
+                detailMapper.insert(d);
+                // 条件更新：只认 CONFIRMED 且未出账的 —— 并发出账时第二张单拿不到它
+                adjustmentMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<StlAdjustment>()
+                        .eq(StlAdjustment::getId, a.getId()).eq(StlAdjustment::getStatus, AdjustmentStatus.CONFIRMED.name())
+                        .set(StlAdjustment::getStatus, AdjustmentStatus.SETTLED.name()).set(StlAdjustment::getSettleNo, s.getSettleNo()));
             }
             created.add(s.getSettleNo());
         }

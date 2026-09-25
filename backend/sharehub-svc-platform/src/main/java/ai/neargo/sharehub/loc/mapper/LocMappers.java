@@ -3,6 +3,7 @@ package ai.neargo.sharehub.loc.mapper;
 import ai.neargo.sharehub.loc.entity.LocContract;
 import ai.neargo.sharehub.loc.entity.LocLocation;
 import ai.neargo.sharehub.loc.entity.LocSite;
+import ai.neargo.sharehub.loc.entity.LocSiteSurvey;
 import ai.neargo.sharehub.loc.entity.LocVenue;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 
@@ -21,5 +22,8 @@ public final class LocMappers {
     }
 
     public interface ContractMapper extends BaseMapper<LocContract> {
+    }
+
+    public interface SiteSurveyMapper extends BaseMapper<LocSiteSurvey> {
     }
 }

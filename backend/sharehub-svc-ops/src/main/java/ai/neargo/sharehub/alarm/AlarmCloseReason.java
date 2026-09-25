@@ -18,7 +18,16 @@ public enum AlarmCloseReason {
     /** 误报：设备其实没问题，是规则或阈值太敏感 —— 这一档是调规则的依据。 */
     FALSE_ALARM,
     /** 自愈：再次上报时已恢复，无需人工处理。 */
-    SELF_HEALED;
+    SELF_HEALED,
+    /** 系统自愈动作成功（撤销未出宝订单、按宝入柜时刻结单）—— 只由判定引擎写。 */
+    AUTO_FIXED,
+    /** 被上层告警取代（柜级并入站点级）—— 只由判定引擎写。 */
+    SUPERSEDED;
+
+    /** 人工关闭可选的档位：系统档不给人选，否则「自愈率」这类指标会被手工值污染。 */
+    public boolean manual() {
+        return this == RESOLVED || this == FALSE_ALARM || this == SELF_HEALED;
+    }
 
     /** 宽松解析：非法值抛 {@link IllegalArgumentException}（全局映射 400）。 */
     public static AlarmCloseReason of(String v) {

@@ -104,7 +104,9 @@ public class PriceResolver {
             log.error("适用范围指向的计价方案不存在 planNo={}（适用范围与方案表不一致，要人修）", hit.planNo());
             throw BizException.conflict(NOT_BORROWABLE);
         }
-        return new Resolved(hit.planNo(), plan.getCurrency(), expand(hit.planNo()), hit, null);
+        // 总封顶（= 买断价）随快照定格：0 / 空表示不封顶
+        BigDecimal cap = plan.getCapTotal() == null || plan.getCapTotal().signum() <= 0 ? null : plan.getCapTotal();
+        return new Resolved(hit.planNo(), plan.getCurrency(), expand(hit.planNo()), hit, null, cap);
     }
 
     /**
@@ -246,12 +248,20 @@ public class PriceResolver {
      * @param multiplier 时段倍率；{@code null} 表示本单不加倍
      */
     public record Resolved(String planNo, String currency, List<PriceItemSpec> specs,
-                           Hit hit, BigDecimal multiplier) {
+                           Hit hit, BigDecimal multiplier,
+                           // 2026-09-25 总封顶（方案的 cap_total，前端叫「买断价」）；null = 不封顶。
+                           // 此前结算时总封顶一律传 null —— 借得越久付得越多、永不触顶，「逾期达封顶转买断」也就无从谈起
+                           BigDecimal capTotal) {
+
+        /** 兼容旧构造点：不封顶。 */
+        public Resolved(String planNo, String currency, List<PriceItemSpec> specs, Hit hit, BigDecimal multiplier) {
+            this(planNo, currency, specs, hit, multiplier, null);
+        }
 
         /** 带上时段倍率（下单时解析一次，随快照定格）。 */
         public Resolved withMultiplier(BigDecimal m) {
             return new Resolved(planNo, currency, specs,
-                    hit == null ? null : hit.withMultiplier(m), m);
+                    hit == null ? null : hit.withMultiplier(m), m, capTotal);
         }
 
         /** 序列化为订单快照。改价不影响在途单的实现手段。 */
@@ -260,6 +270,7 @@ public class PriceResolver {
             m.put("planNo", planNo);
             m.put("currency", currency);
             m.put("items", specs);
+            if (capTotal != null) m.put("capTotal", capTotal.toPlainString());
             if (hit != null) {
                 // 命中原因不是可选装饰：没有它，事后只能用**今天的配置**去解释昨天的订单。
                 m.put("hit", Map.of(
@@ -283,6 +294,16 @@ public class PriceResolver {
         if (m == null) return null;
         if (!(m.get("hit") instanceof Map<?, ?> hit)) return null;
         Object v = hit.get("multiplier");
+        String s = v == null ? "" : String.valueOf(v);
+        return s.isBlank() ? null : new BigDecimal(s);
+    }
+
+    /** 从快照读回总封顶；旧快照（2026-09-25 之前）没有这一项 → null，按原口径不封顶。 */
+    @SuppressWarnings("unchecked")
+    public static BigDecimal capTotalFromSnapshot(String snapshot) {
+        if (snapshot == null || snapshot.isBlank()) return null;
+        Map<String, Object> m = Json.read(snapshot, Map.class);
+        Object v = m == null ? null : m.get("capTotal");
         String s = v == null ? "" : String.valueOf(v);
         return s.isBlank() ? null : new BigDecimal(s);
     }

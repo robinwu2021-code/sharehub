@@ -55,6 +55,7 @@ public class SlaRuleServiceImpl extends AbstractCrudService<WoSlaRule, SlaRule> 
     @Override
     protected void beforeUpdate(WoSlaRule e, WoSlaRule current) {
         if (e.getWoType() == null || e.getWoType().isBlank()) e.setWoType(current.getWoType());
+        if (e.getPriority() == null || e.getPriority().isBlank()) e.setPriority(current.getPriority());
         if (e.getActive() == null) e.setActive(current.getActive());
         normalize(e);
     }
@@ -62,6 +63,9 @@ public class SlaRuleServiceImpl extends AbstractCrudService<WoSlaRule, SlaRule> 
     /** 类型收敛到 {@link WorkOrderType}；时限做基本合理性校验。 */
     private static void normalize(WoSlaRule e) {
         e.setWoType(WorkOrderType.of(e.getWoType()).name());
+        // 2026-09-25 SLA 按「类型 × 优先级」：* = 该类型默认档
+        e.setPriority(e.getPriority() == null || e.getPriority().isBlank() || "*".equals(e.getPriority().trim())
+                ? "*" : ai.neargo.sharehub.wo.WoPriority.of(e.getPriority()).name());
         if (e.getActive() == null) e.setActive(1);
         if (e.getResponseMins() == null) e.setResponseMins(0);
         if (e.getResolveMins() == null) e.setResolveMins(0);

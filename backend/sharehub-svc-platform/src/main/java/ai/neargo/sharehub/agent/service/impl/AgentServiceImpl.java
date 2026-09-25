@@ -25,7 +25,10 @@ public class AgentServiceImpl implements AgentService {
 
     private final AgentMapper mapper;
 
-    public AgentServiceImpl(AgentMapper mapper) {
+    private final ai.neargo.sharehub.common.event.DomainEventBus events;
+
+    public AgentServiceImpl(AgentMapper mapper, ai.neargo.sharehub.common.event.DomainEventBus events) {
+        this.events = events;
         this.mapper = mapper;
     }
 
@@ -69,8 +72,14 @@ public class AgentServiceImpl implements AgentService {
         // 类型只认两个值；归一规则与理由见 AgentType.of
         e.setAgentType(AgentType.of(in.agentType()).name());
         // 机柜数不回写：它是聚合值不是档案属性（实体与库里都已没有这一列）
-        e.setStatus(in.status() == null ? "ENABLED" : in.status());
+        String before = insert ? null : e.getStatus();
+        e.setStatus(ai.neargo.sharehub.agent.AgentStatus.of(in.status() == null ? ai.neargo.sharehub.agent.AgentStatus.ENABLED.name() : in.status()).name());
         if (insert) mapper.insert(e); else mapper.updateById(e);
+        if (!insert && !java.util.Objects.equals(before, e.getStatus())) {
+            // 停用 → 工单侧改派名下未完结工单（F2）；提现侧在服务层按实时状态拦，不靠事件
+            events.publish(new ai.neargo.sharehub.api.platform.event.AgentStatusChangedEvent(no, before, e.getStatus(), null,
+                    java.time.LocalDateTime.now().toString()));
+        }
         return toVO(e);
     }
 

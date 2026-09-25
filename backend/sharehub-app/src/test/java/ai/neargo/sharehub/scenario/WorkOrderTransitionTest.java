@@ -49,7 +49,7 @@ class WorkOrderTransitionTest extends ApiTestSupport {
 
         // 完工：新端点 POST /complete，PROCESSING → DONE
         assertThat(status(post("/api/ops/work-orders/" + woNo + "/complete",
-                Map.of("handleNote", "换锁扣模块 ×1"), opsToken))).isEqualTo("DONE");
+                Map.of("handleNote", "换锁扣模块 ×1", "faultReasonCode", "LOCK", "photos", "[\"site.jpg\"]"), opsToken))).isEqualTo("DONE");
 
         // 验收关单：DONE → AUDITED → CLOSED（AUDITED 不跳过，见 WoOpsServiceImpl#close）
         assertThat(status(post("/api/ops/work-orders/" + woNo + "/close",
@@ -96,7 +96,7 @@ class WorkOrderTransitionTest extends ApiTestSupport {
 
         // 返工后可以再完工再关单，闭环回得去
         assertThat(status(post("/api/ops/work-orders/" + woNo + "/complete",
-                Map.of("handleNote", "二次处理完成"), opsToken))).isEqualTo("DONE");
+                Map.of("handleNote", "二次处理完成", "faultReasonCode", "LOCK", "photos", "[\"site.jpg\"]"), opsToken))).isEqualTo("DONE");
         assertThat(status(post("/api/ops/work-orders/" + woNo + "/close",
                 Map.of("closeReason", "RESOLVED"), opsToken))).isEqualTo("CLOSED");
     }
@@ -206,7 +206,8 @@ class WorkOrderTransitionTest extends ApiTestSupport {
         post("/api/ops/work-orders/" + woNo + "/accept", Map.of("assigneeNo", "E-001"), opsToken).okData();
         post("/api/ops/work-orders/" + woNo + "/handle", Map.of("handleNote", "处理中"), opsToken).okData();
         assertThat(status(post("/api/ops/work-orders/" + woNo + "/complete",
-                Map.of("handleNote", "完工"), opsToken))).isEqualTo("DONE");
+                // 2026-09-25 完工收紧：故障单必须给故障原因与现场照片
+                Map.of("handleNote", "完工", "faultReasonCode", "LOCK", "photos", "[\"site.jpg\"]"), opsToken))).isEqualTo("DONE");
     }
 
     private static String status(Resp r) {

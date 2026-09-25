@@ -56,4 +56,32 @@ public interface AlarmService {
 
     /** 重发告警通知。**必带幂等键** —— 通知是真发真扣钱，双击不该发两条。 */
     Object resendNotice(String noticeNo, String idempotencyKey);
+
+    // ——————————— 2026-09-25 业务告警（TDD-运营核心流程/05 §九）———————————
+
+    /** 列表筛选（在旧参数之上追加业务维度）。{@code topOnly} = 只看未被取代的（parent 为空）。 */
+    record AlarmQuery(Integer page, Integer size, String keyword, String level, String status, String cabinetNo,
+                      String domain, String subjectType, String siteNo, String cause, String disposition,
+                      java.time.LocalDate from, java.time.LocalDate to, Boolean topOnly) {
+    }
+
+    PageResult<AlarmRecord> page(AlarmQuery q);
+
+    ai.neargo.sharehub.alarm.dto.AlarmDtos.AlarmDetail detail(String alarmNo);
+
+    ai.neargo.sharehub.alarm.dto.AlarmDtos.AlarmSummary summary();
+
+    java.util.List<ai.neargo.sharehub.alarm.dto.AlarmDtos.AlarmRoute> routes(String code);
+
+    /** 整体替换该码的路由（内置码的路由也允许调：路由是运营策略，不是码的身份）。 */
+    java.util.List<ai.neargo.sharehub.alarm.dto.AlarmDtos.AlarmRoute> saveRoutes(String code,
+            java.util.List<ai.neargo.sharehub.alarm.dto.AlarmDtos.RouteReq> routes);
+
+    java.util.List<ai.neargo.sharehub.alarm.dto.AlarmDtos.CodeStat> codeStats(int days);
+
+    /** 以该工单为处置的告警（工单详情「关联告警」）。 */
+    java.util.List<AlarmRecord> byWorkOrder(String woNo);
+
+    /** 每张工单关联的告警数（工单列表）。 */
+    java.util.Map<String, Integer> countByWorkOrders(java.util.Collection<String> woNos);
 }

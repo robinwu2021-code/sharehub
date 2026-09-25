@@ -36,7 +36,31 @@ public final class LocDtos {
                       // 追加在**末尾**而非插进语义相近的位置：本 record 的参数几乎全是 String，
                       // 插中间会让两个构造点的位置参数错位，而类型相同 → 编译器抓不到，
                       // 表现为「站点名变成了营业时间」这种要到界面上才发现的错。
-                      String nameAr, String openHours) {
+                      String nameAr, String openHours,
+                      // 2026-09-25 站点状态机：运营信息收成一个子对象追加在末尾
+                      ai.neargo.sharehub.loc.dto.SiteDtos.SiteOps ops,
+                      // 运营端要平铺的员工责任人（与 ops.opsEmployeeNo 同值；前端列表 / 表单直接读它）
+                      String opsEmployeeNo) {
+
+        /** 兼容构造点：平铺字段从运营信息里取。 */
+        public Site(String siteNo, String name, String venueNo, String venueName, String agentNo, String brandNo,
+                    String regionId, String regionName, String address, java.math.BigDecimal lng,
+                    java.math.BigDecimal lat, String sceneType, Integer pointCount, Integer cabinetCount,
+                    String status, String archivedAt, String nameAr, String openHours,
+                    ai.neargo.sharehub.loc.dto.SiteDtos.SiteOps ops) {
+            this(siteNo, name, venueNo, venueName, agentNo, brandNo, regionId, regionName, address, lng, lat,
+                    sceneType, pointCount, cabinetCount, status, archivedAt, nameAr, openHours, ops,
+                    ops == null ? null : ops.opsEmployeeNo());
+        }
+
+        /** 兼容旧构造点：无运营信息。 */
+        public Site(String siteNo, String name, String venueNo, String venueName, String agentNo, String brandNo,
+                    String regionId, String regionName, String address, java.math.BigDecimal lng,
+                    java.math.BigDecimal lat, String sceneType, Integer pointCount, Integer cabinetCount,
+                    String status, String archivedAt, String nameAr, String openHours) {
+            this(siteNo, name, venueNo, venueName, agentNo, brandNo, regionId, regionName, address, lng, lat,
+                    sceneType, pointCount, cabinetCount, status, archivedAt, nameAr, openHours, null, null);
+        }
     }
 
     /**
@@ -71,7 +95,12 @@ public final class LocDtos {
     public record Contract(String contractNo, String venueNo, String siteNo,
                           String venueName, String siteName, double shareRate,
                           double entryFee, String startAt, String endAt, String status,
-                          java.util.List<ContractAttachment> attachments) {
+                          java.util.List<ContractAttachment> attachments,
+                          // 2026-09-25 合同走审批：追加在末尾（本 record 参数多为同类型，插中间会让构造点位置错位）。
+                          // 条款与流程各收成一个子对象，避免再平铺二十个位置参数。
+                          ai.neargo.sharehub.loc.dto.ContractDtos.ContractTerms terms,
+                          ai.neargo.sharehub.loc.dto.ContractDtos.ContractFlow flow,
+                          Integer remainingDays) {
 
         /** 兼容旧调用（详情/upsert 回包），附件缺省空列表。 */
         public Contract(String contractNo, String venueNo, String siteNo, String venueName,
@@ -80,10 +109,25 @@ public final class LocDtos {
             this(contractNo, venueNo, siteNo, venueName, siteName, shareRate, entryFee,
                     startAt, endAt, status, java.util.List.of());
         }
+
+        /** 兼容旧调用：无条款 / 流程信息。 */
+        public Contract(String contractNo, String venueNo, String siteNo, String venueName,
+                        String siteName, double shareRate, double entryFee, String startAt, String endAt,
+                        String status, java.util.List<ContractAttachment> attachments) {
+            this(contractNo, venueNo, siteNo, venueName, siteName, shareRate, entryFee,
+                    startAt, endAt, status, attachments, null, null, null);
+        }
     }
 
     /** 合同附件行，镜像前端 {@code ContractAttachment}。 */
     public record ContractAttachment(String attachNo, String fileName, Long size,
-                                     String uploadedBy, String uploadedAt) {
+                                     String uploadedBy, String uploadedAt,
+                                     // 2026-09-25 接入文件服务：fileNo 为空 = 接入对象存储前的历史附件
+                                     String fileNo, String contentType, Boolean previewable) {
+
+        /** 兼容旧调用：历史附件（只有名字，没有文件）。 */
+        public ContractAttachment(String attachNo, String fileName, Long size, String uploadedBy, String uploadedAt) {
+            this(attachNo, fileName, size, uploadedBy, uploadedAt, null, null, null);
+        }
     }
 }

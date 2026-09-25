@@ -23,7 +23,9 @@ public final class OperationDtos {
                                 int pointTotal, int cabinetTotal, int cabinetOnline,
                                 double onlineRate,
                                 int powerbankTotal, int powerbankInCabinet,
-                                int powerbankRented, int powerbankFault) {
+                                int powerbankRented, int powerbankFault,
+                                // 2026-09-25 站点五态：筹备中 / 撤场中 / 已关闭（营业 + 暂停不再等于总数）
+                                int sitePreparing, int siteWithdrawing, int siteClosed) {
     }
 
     /** 经营指标（随时间筛选变化）。 */

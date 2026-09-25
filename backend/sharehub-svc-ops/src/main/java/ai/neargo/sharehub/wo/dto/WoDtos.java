@@ -29,7 +29,31 @@ public final class WoDtos {
                            String handlerName, String handledAt, String handleNote, String partsReplaced,
                            String completedAt,
                            String auditorName, String auditedAt, String auditResult, String auditNote,
-                           String rejectReason, Integer rejectCount) {
+                           String rejectReason, Integer rejectCount,
+                           // 2026-09-25 承接业务告警：运营维度收成一个子对象追加在末尾
+                           WoOps ops) {
+
+        /** 兼容旧 26 参调用。 */
+        public WorkOrder(String woNo, String type, String source, String priority, String cabinetNo,
+                         String locationName, String status, String assigneeName, String slaDueAt,
+                         String description, String createdAt, String sourceNo, String expectedAt,
+                         String dispatchedAt, String acceptedAt, String handlerName, String handledAt, String handleNote,
+                         String partsReplaced, String completedAt, String auditorName, String auditedAt, String auditResult,
+                         String auditNote, String rejectReason, Integer rejectCount) {
+            this(woNo, type, source, priority, cabinetNo, locationName, status, assigneeName, slaDueAt, description,
+                    createdAt, sourceNo, expectedAt, dispatchedAt, acceptedAt, handlerName, handledAt, handleNote,
+                    partsReplaced, completedAt, auditorName, auditedAt, auditResult, auditNote, rejectReason, rejectCount, null);
+        }
+
+        /** 关联告警数由 portal 层编排填入（wo 不认识 alarm）。 */
+        public WorkOrder withAlarmCount(int alarmCount) {
+            WoOps o = ops == null ? new WoOps(null, null, null, null, null, null, null, null, 0) : ops;
+            return new WorkOrder(woNo, type, source, priority, cabinetNo, locationName, status, assigneeName, slaDueAt,
+                    description, createdAt, sourceNo, expectedAt, dispatchedAt, acceptedAt, handlerName, handledAt,
+                    handleNote, partsReplaced, completedAt, auditorName, auditedAt, auditResult, auditNote, rejectReason,
+                    rejectCount, new WoOps(o.siteNo(), o.assigneeType(), o.slaRemainMinutes(), o.reviewStatus(),
+                    o.faultReasonCode(), o.closeReason(), o.mergedIntoWoNo(), o.alarmRecoveredAt(), alarmCount));
+        }
 
         /** 兼容旧 11 参调用（动作端点回包/历史代码），留痕字段缺省 null。 */
         public WorkOrder(String woNo, String type, String source, String priority, String cabinetNo,
@@ -37,7 +61,18 @@ public final class WoDtos {
                          String description, String createdAt) {
             this(woNo, type, source, priority, cabinetNo, locationName, status, assigneeName, slaDueAt,
                     description, createdAt, null, null, null, null, null, null, null, null, null,
-                    null, null, null, null, null, null);
+                    null, null, null, null, null, null, null);
         }
+    }
+
+    /**
+     * 工单的运营维度（2026-09-25）。
+     *
+     * @param slaRemainMinutes 距解决时限的分钟数；已超时为负；已完工 / 无 SLA 为 null
+     * @param alarmCount       关联的业务告警数（portal 层编排填入）
+     */
+    public record WoOps(String siteNo, String assigneeType, Long slaRemainMinutes, String reviewStatus,
+                        String faultReasonCode, String closeReason, String mergedIntoWoNo, String alarmRecoveredAt,
+                        int alarmCount) {
     }
 }

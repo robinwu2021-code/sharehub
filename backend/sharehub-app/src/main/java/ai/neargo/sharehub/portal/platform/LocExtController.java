@@ -4,13 +4,16 @@ import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.loc.ext.dto.LocExtDtos.Lead;
 import ai.neargo.sharehub.loc.ext.dto.LocExtDtos.OnboardingReviewReq;
 import ai.neargo.sharehub.report.dto.ReportDtos.SiteAnalysis;
-import ai.neargo.sharehub.loc.ext.dto.LocExtDtos.SiteLifecycle;
-import ai.neargo.sharehub.loc.ext.dto.LocExtDtos.StageChangeReq;
+import ai.neargo.sharehub.loc.dto.SiteDtos.FunnelStage;
+import ai.neargo.sharehub.loc.dto.SiteDtos.LifecycleRow;
 import ai.neargo.sharehub.loc.ext.dto.LocExtDtos.VenueOnboarding;
 import ai.neargo.sharehub.loc.ext.entity.LocLead;
+import ai.neargo.sharehub.loc.ext.dto.LocExtDtos.LeadConversion;
+import ai.neargo.sharehub.loc.ext.dto.LocExtDtos.LeadConvertReq;
+import ai.neargo.sharehub.loc.ext.service.LeadOpsService;
 import ai.neargo.sharehub.loc.ext.service.LeadService;
 import ai.neargo.sharehub.report.service.SiteAnalysisService;
-import ai.neargo.sharehub.loc.ext.service.SiteLifecycleService;
+import ai.neargo.sharehub.loc.service.SiteService;
 import ai.neargo.sharehub.loc.ext.service.VenueOnboardingService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -38,20 +42,23 @@ import java.util.Map;
 public class LocExtController {
 
     private final LeadService leadService;
+    private final LeadOpsService leadOps;
     private final ai.neargo.sharehub.loc.ext.service.LeadFollowService leadFollowService;
     private final VenueOnboardingService onboardingService;
-    private final SiteLifecycleService lifecycleService;
+    private final SiteService siteService;
     private final SiteAnalysisService siteAnalysisService;
 
     public LocExtController(LeadService leadService,
                             VenueOnboardingService onboardingService,
-                            SiteLifecycleService lifecycleService,
+                            SiteService siteService,
                             SiteAnalysisService siteAnalysisService,
-                            ai.neargo.sharehub.loc.ext.service.LeadFollowService leadFollowService) {
+                            ai.neargo.sharehub.loc.ext.service.LeadFollowService leadFollowService,
+                            LeadOpsService leadOps) {
         this.leadFollowService = leadFollowService;
+        this.leadOps = leadOps;
         this.leadService = leadService;
         this.onboardingService = onboardingService;
-        this.lifecycleService = lifecycleService;
+        this.siteService = siteService;
         this.siteAnalysisService = siteAnalysisService;
     }
 
@@ -63,8 +70,24 @@ public class LocExtController {
                                   @RequestParam(required = false) Integer size,
                                   @RequestParam(required = false) String keyword,
                                   @RequestParam(required = false) String stage,
-                                  @RequestParam(required = false) String owner) {
-        return leadService.page(page, size, keyword, Map.of("stage", nz(stage), "owner", nz(owner)));
+                                  @RequestParam(required = false) String owner,
+                                  @RequestParam(required = false) Boolean inPool) {
+        return leadService.page(page, size, keyword, Map.of("stage", nz(stage), "owner", nz(owner),
+                "inPool", inPool == null ? "" : inPool ? "1" : "0"));
+    }
+
+    /** 从公共线索池认领（超 M 天无跟进的商机会被回收进池）。 */
+    @PostMapping("/leads/{leadNo}/claim")
+    @PreAuthorize("@perm.can('location:crm:update')")
+    public Lead claimLead(@PathVariable String leadNo) {
+        return leadOps.claim(leadNo);
+    }
+
+    /** 签约转化：场地方 + 站点（筹备中）+ 带谈判条款的合同草稿，一次生成，不重复录入。 */
+    @PostMapping("/leads/{leadNo}/convert")
+    @PreAuthorize("@perm.can('location:crm:update')")
+    public LeadConversion convertLead(@PathVariable String leadNo, @RequestBody(required = false) LeadConvertReq r) {
+        return leadOps.convert(leadNo, r);
     }
 
     @GetMapping("/leads/{leadNo}")
@@ -130,20 +153,25 @@ public class LocExtController {
 
     // —— 门店生命周期（菜单叶：站点与点位 › 门店生命周期）——
 
+    /**
+     * 只读漏斗（2026-09-25：站点状态与门店生命周期合并）：签约前是商机阶段，签约后是站点状态。
+     * 原「阶段流转」端点已删除 —— 阶段不再可任选，站点状态只经 SiteController 的动作改。
+     */
     @GetMapping("/site-lifecycles")
     @PreAuthorize("@perm.can('location:venue:read')")
-    public PageResult<SiteLifecycle> siteLifecycles(@RequestParam(required = false) Integer page,
-                                                    @RequestParam(required = false) Integer size,
-                                                    @RequestParam(required = false) String keyword,
-                                                    @RequestParam(required = false) String stage) {
-        return lifecycleService.page(page, size, keyword, stage);
+    public PageResult<LifecycleRow> siteLifecycles(@RequestParam(required = false) Integer page,
+                                                   @RequestParam(required = false) Integer size,
+                                                   @RequestParam(required = false) String keyword,
+                                                   @RequestParam(required = false) String phase) {
+        return siteService.lifecycle(page, size, keyword, phase);
     }
 
-    /** 阶段流转，留痕到 {@code loc_site_lifecycle_log}。 */
-    @PostMapping("/site-lifecycles/{siteNo}/stage")
-    @PreAuthorize("@perm.can('location:venue:update')")
-    public SiteLifecycle changeStage(@PathVariable String siteNo, @RequestBody StageChangeReq body) {
-        return lifecycleService.changeStage(siteNo, body);
+    // 旧的 POST /site-lifecycles/{siteNo}/stage（409 桩）已删：运营端已改用只读漏斗（ops-web 346c631）。
+
+    @GetMapping("/site-lifecycles/funnel")
+    @PreAuthorize("@perm.can('location:venue:read')")
+    public List<FunnelStage> siteLifecycleFunnel() {
+        return siteService.funnel();
     }
 
     // —— 站点坪效（菜单叶：站点与点位 › 站点坪效）——
@@ -188,23 +216,5 @@ public class LocExtController {
         return leadFollowService.addFollowUp(leadNo, req);
     }
 
-    /** 添加合同附件元数据。**不接收字节流** —— 接对象存储前不编假地址。 */
-    @PostMapping("/contracts/{contractNo}/attachments")
-    @PreAuthorize("@perm.can('location:contract:update')")
-    public Object addContractAttachment(@PathVariable String contractNo,
-                                        @RequestBody java.util.Map<String, Object> body) {
-        Object fn = body == null ? null : body.get("fileName");
-        Object sz = body == null ? null : body.get("size");
-        return leadFollowService.addAttachment(contractNo,
-                fn == null ? null : String.valueOf(fn),
-                sz == null ? 0L : Long.valueOf(String.valueOf(sz)));
-    }
-
-    /** 移除合同附件。软删 —— 「曾经有过一个附件后来被删了」本身是信息。 */
-    @PostMapping("/contracts/{contractNo}/attachments/{attachNo}/remove")
-    @PreAuthorize("@perm.can('location:contract:update')")
-    public Object removeContractAttachment(@PathVariable String contractNo,
-                                           @PathVariable String attachNo) {
-        return java.util.Map.of("ok", leadFollowService.removeAttachment(contractNo, attachNo));
-    }
+    // 合同附件的增删已迁入 ContractController（2026-09-25：接入文件服务，入参改为 fileNos）。
 }

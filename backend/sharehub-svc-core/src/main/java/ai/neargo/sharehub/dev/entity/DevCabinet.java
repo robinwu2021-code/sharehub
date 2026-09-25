@@ -32,4 +32,20 @@ public class DevCabinet extends BaseEntity implements ai.neargo.sharehub.common.
 
     /** 归档时间；null=在用。**不是 deleted** —— 归档是业务停用、可恢复，见 Archivable。 */
     private java.time.LocalDateTime archivedAt;
+
+    // —— 2026-09-25 机柜状态机 / 上线门禁（V97）——
+    /** 最近一次上线时刻。 */
+    private java.time.LocalDateTime wentLiveAt;
+    /** 最近一次试借还通过时刻；早于 {@link #boundAt} 即失效（换点位后需重测）。 */
+    private java.time.LocalDateTime trialPassedAt;
+    /** 最近一次绑定点位时刻。 */
+    private java.time.LocalDateTime boundAt;
+    private String faultReason;
+    private java.time.LocalDateTime retiredAt;
+
+    // —— 批次 C（V107）——
+    /** 入库质检：PENDING / PASSED / FAILED；null = 质检上线前的存量，免检（{@link ai.neargo.sharehub.dev.QcStatus}）。 */
+    private String qcStatus;
+    /** 在库时所在仓（调拨签收回写）。 */
+    private String warehouseNo;
 }

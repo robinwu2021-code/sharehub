@@ -16,6 +16,9 @@ import ai.neargo.sharehub.loc.ext.entity.LocLead;
 import ai.neargo.sharehub.loc.ext.mapper.LocLeadMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import ai.neargo.sharehub.loc.ext.LeadStateMachine;
+import ai.neargo.sharehub.loc.ext.LeadStatus;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,13 +36,15 @@ public class LeadFollowServiceImpl implements LeadFollowService {
     private final LocLeadFollowMapper followMapper;
     private final LocContractAttachMapper attachMapper;
     private final LocLeadMapper leadMapper;
+    private final LeadStateMachine sm;
 
     public LeadFollowServiceImpl(LocLeadFollowMapper followMapper,
                                  LocContractAttachMapper attachMapper,
-                                 LocLeadMapper leadMapper) {
+                                 LocLeadMapper leadMapper, LeadStateMachine sm) {
         this.followMapper = followMapper;
         this.attachMapper = attachMapper;
         this.leadMapper = leadMapper;
+        this.sm = sm;
     }
 
     @Override
@@ -58,14 +63,17 @@ public class LeadFollowServiceImpl implements LeadFollowService {
     @Transactional
     public LeadFollowUp addFollowUp(String leadNo, LeadFollowUpReq req) {
         if (req == null || req.content() == null || req.content().isBlank()) {
-            throw new IllegalArgumentException("跟进内容必填");
+            throw BizException.badRequest("error.common.missing_parameter", "content");
         }
         LocLead lead = leadMapper.selectOne(new LambdaQueryWrapper<LocLead>()
                 .eq(LocLead::getLeadNo, leadNo).last("limit 1"));
         if (lead == null) throw BizException.notFound(leadNo);
+        // 池里的商机没有负责人：先认领再跟进，否则「谁在跟」又说不清了
+        if (lead.getInPool() != null && lead.getInPool() == 1) throw BizException.conflict("error.lead.in_pool", leadNo);
 
         String from = lead.getStage();
         String to = (req.toStage() == null || req.toStage().isBlank()) ? from : req.toStage();
+        String event = sm.check(from, to);
 
         LocLeadFollow e = new LocLeadFollow();
         e.setFollowNo("LF" + UUID.randomUUID().toString().replace("-", "").substring(0, 16));
@@ -83,11 +91,21 @@ public class LeadFollowServiceImpl implements LeadFollowService {
         followMapper.insert(e);
 
         // 跟进与推进阶段**同事务** —— 分成两个接口的话，会出现「有跟进记录但阶段没动」
-        // 或「阶段跳了却查不到是谁推的」。
-        if (!to.equals(from)) {
-            lead.setStage(to);
-            leadMapper.updateById(lead);
+        // 或「阶段跳了却查不到是谁推的」。条件更新按原阶段：并发两人推同一条，只一人赢。
+        LocalDateTime now = LocalDateTime.now();
+        LambdaUpdateWrapper<LocLead> u = new LambdaUpdateWrapper<LocLead>().eq(LocLead::getId, lead.getId())
+                .eq(LocLead::getStage, from)
+                .set(LocLead::getLastFollowAt, now).set(LocLead::getRemindAt, null);   // 跟进即重新计时
+        if (e.getNextAt() != null) u.set(LocLead::getNextFollowAt, e.getNextAt().toString());
+        if (event != null) {
+            u.set(LocLead::getStage, to);
+            if (LeadStatus.LOST.name().equals(to)) {
+                // 跟进内容就是丢单原因（必填已由上面的 content 校验保证）
+                u.set(LocLead::getLostReason, e.getContent()).set(LocLead::getLostAt, now);
+            }
+            if (LeadStatus.NEW.name().equals(to) && LeadStatus.LOST.name().equals(from)) u.set(LocLead::getReactivatedAt, now);
         }
+        if (leadMapper.update(null, u) == 0) throw BizException.conflict("error.common.state_changed");
         return toVO(e);
     }
 
@@ -99,34 +117,6 @@ public class LeadFollowServiceImpl implements LeadFollowService {
                 .stream().map(LeadFollowServiceImpl::toVO).toList();
     }
 
-    @Override
-    @Transactional
-    public ContractAttachment addAttachment(String contractNo, String fileName, Long size) {
-        if (fileName == null || fileName.isBlank()) {
-            throw new IllegalArgumentException("文件名必填");
-        }
-        LocContractAttach e = new LocContractAttach();
-        e.setAttachNo("ATT" + UUID.randomUUID().toString().replace("-", "").substring(0, 16));
-        e.setTenantId(TENANT_MAIN);
-        e.setContractNo(contractNo);
-        e.setFileName(fileName);
-        e.setSize(size == null ? 0L : size);
-        e.setUploadedBy(SecurityUtils.currentUser().map(LoginUser::username).orElse(null));
-        e.setUploadedAt(LocalDateTime.now());
-        attachMapper.insert(e);
-        return toVO(e);
-    }
-
-    @Override
-    @Transactional
-    public boolean removeAttachment(String contractNo, String attachNo) {
-        LocContractAttach e = attachMapper.selectOne(new LambdaQueryWrapper<LocContractAttach>()
-                .eq(LocContractAttach::getContractNo, contractNo)
-                .eq(LocContractAttach::getAttachNo, attachNo).last("limit 1"));
-        if (e == null) return false;
-        // 软删：元数据保留可追溯 —— 「这份合同曾经有过一个附件后来被删了」本身是信息。
-        return attachMapper.deleteById(e.getId()) > 0;
-    }
 
     private static LeadFollowUp toVO(LocLeadFollow e) {
         return new LeadFollowUp(e.getFollowNo(), e.getLeadNo(), e.getChannel(),

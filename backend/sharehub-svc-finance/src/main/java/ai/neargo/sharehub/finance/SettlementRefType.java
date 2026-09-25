@@ -11,7 +11,9 @@ public enum SettlementRefType {
     /** 指向订单。 */
     ORDER,
     /** 指向分润记录（当前出账路径）。 */
-    SHARE;
+    SHARE,
+    /** 指向结算调整项（撤场结清押金 / 进场费，V107）。 */
+    ADJUST;
 
     /** 宽松解析：非法值抛 {@link IllegalArgumentException}（全局映射 400）。 */
     public static SettlementRefType of(String v) {
@@ -19,7 +21,7 @@ public enum SettlementRefType {
         try {
             return valueOf(v.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("结算明细类型非法: " + v + "（仅 ORDER/SHARE）");
+            throw new IllegalArgumentException("结算明细类型非法: " + v + "（仅 ORDER/SHARE/ADJUST）");
         }
     }
 }

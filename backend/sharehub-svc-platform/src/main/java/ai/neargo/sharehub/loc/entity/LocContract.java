@@ -33,6 +33,51 @@ public class LocContract {
     private String currency;
 
     private String status;
+
+    // —— 2026-09-25 合同走审批（V95）——
+    private String shareMode;
+    private String shareBase;
+    private java.math.BigDecimal guaranteeAmount;
+    private String settlePeriod;
+    private java.math.BigDecimal depositAmount;
+    private String depositTerms;
+    private Boolean exclusiveFlag;
+    private Integer deviceQuota;
+    private String placementNote;
+    private Boolean autoRenew;
+    private String signerName;
+    private java.time.LocalDate signedAt;
+    private String submittedBy;
+    private LocalDateTime submittedAt;
+    private String auditedBy;
+    private LocalDateTime auditedAt;
+    private String auditNote;
+    private LocalDateTime activatedAt;
+    private LocalDateTime endedAt;
+    private String endReason;
+    private String prevContractNo;
+    private String sourceLeadNo;
+    private String remark;
+
+    // —— 批次 B（V104）：补充协议 / 财务会签 / 终止审批 ——
+    /** MAIN / SUPPLEMENT（{@link ai.neargo.sharehub.loc.ContractKind}）。 */
+    private String contractKind;
+    private String parentContractNo;
+    /** 仅 PENDING 时有值：OPS / FINANCE（{@link ai.neargo.sharehub.loc.ContractAuditStage}）。 */
+    private String auditStage;
+    private String financeAuditedBy;
+    private LocalDateTime financeAuditedAt;
+    private String financeAuditNote;
+    /** 提前终止申请：PENDING / APPROVED / REJECTED（{@link ai.neargo.sharehub.loc.ContractTermReqStatus}）。 */
+    private String termReqStatus;
+    private String termReqReason;
+    private java.time.LocalDate termReqEffectiveAt;
+    private String termReqBy;
+    private LocalDateTime termReqAt;
+    private String termAuditBy;
+    private LocalDateTime termAuditAt;
+    private String termAuditNote;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     @Version

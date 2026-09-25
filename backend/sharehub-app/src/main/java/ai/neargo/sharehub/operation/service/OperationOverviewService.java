@@ -83,7 +83,8 @@ public class OperationOverviewService {
                 pointTotal(), cabTotal, cabOnline, rate(cabOnline, cabTotal),
                 // 充电宝四项暂由机柜仓位推不出来，交给设备域的真实统计——这里**如实给 0**
                 // 而不是编一个近似值：概览上的假数字会被当真数字用来做决策
-                0, 0, 0, 0);
+                0, 0, 0, 0,
+                i(siteScale.get("preparing")), i(siteScale.get("withdrawing")), i(siteScale.get("closed")));
 
         OverviewBusiness business = new OverviewBusiness(orderCount, gmv, CURRENCY,
                 orderCount == 0 ? BigDecimal.ZERO : gmv.divide(BigDecimal.valueOf(orderCount), 2, RoundingMode.HALF_UP),

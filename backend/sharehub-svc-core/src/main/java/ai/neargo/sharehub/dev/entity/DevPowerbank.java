@@ -45,4 +45,9 @@ public class DevPowerbank extends BaseEntity implements ai.neargo.sharehub.commo
 
     /** 归档时间；null=在用。**不是 deleted** —— 归档是业务停用、可恢复，见 Archivable。 */
     private java.time.LocalDateTime archivedAt;
+
+    // —— 批次 C（V107）——
+    /** 入库质检：PENDING / PASSED / FAILED；null = 存量免检。 */
+    private String qcStatus;
+    private String warehouseNo;
 }

@@ -25,7 +25,9 @@ public class OrdStateMachine {
     private static final Map<String, Map<OrderStatus, OrderStatus>> TRANSITIONS = Map.of(
             "RETURN", Map.of(OrderStatus.IN_USE, OrderStatus.RETURNED),
             "SETTLE", Map.of(OrderStatus.RETURNED, OrderStatus.SETTLED),
-            "CLOSE", Map.of(OrderStatus.SETTLED, OrderStatus.CLOSED));
+            "CLOSE", Map.of(OrderStatus.SETTLED, OrderStatus.CLOSED),
+            // 2026-09-25 业务告警自愈：出宝失败（一直停在出宝中）的订单撤销，不收费（RENT_NOT_DELIVERED）
+            "CANCEL", Map.of(OrderStatus.DISPENSING, OrderStatus.CLOSED));
 
     /** 校验并返回目标状态；非法迁移抛异常。 */
     public String next(String from, String event) {

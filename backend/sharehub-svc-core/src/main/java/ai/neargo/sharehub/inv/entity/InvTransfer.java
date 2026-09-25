@@ -56,4 +56,14 @@ public class InvTransfer extends BaseEntity {
 
     /** 经办人（employee_no）。 */
     private String operatorNo;
+
+    // —— 批次 C（V107）：来源与签收 ——
+    /** MANUAL / REMOVAL（{@link ai.neargo.sharehub.inv.TransferSource}）。 */
+    private String sourceType;
+    /** REMOVAL 时为撤机工单号（幂等键：一张撤机单只生成一张回仓单）。 */
+    private String sourceRef;
+    private java.time.LocalDateTime shippedAt;
+    private java.time.LocalDateTime receivedAt;
+    private String receivedBy;
+    private String receiveNote;
 }

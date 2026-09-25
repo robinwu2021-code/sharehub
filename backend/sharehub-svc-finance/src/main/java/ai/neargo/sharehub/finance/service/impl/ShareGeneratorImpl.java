@@ -76,9 +76,12 @@ public class ShareGeneratorImpl implements ShareGenerator {
     private final ShareRuleMapper rules;
     private final SiteSharingQueryPort siteSharing;
     private final SiteAgentQueryPort siteAgents;
+    private final ai.neargo.sharehub.api.platform.port.AgentDirectoryPort agentDirectory;
 
     public ShareGeneratorImpl(ShareRecordMapper records, ShareRuleMapper rules,
-                              SiteSharingQueryPort siteSharing, SiteAgentQueryPort siteAgents) {
+                              SiteSharingQueryPort siteSharing, SiteAgentQueryPort siteAgents,
+                              ai.neargo.sharehub.api.platform.port.AgentDirectoryPort agentDirectory) {
+        this.agentDirectory = agentDirectory;
         this.records = records;
         this.rules = rules;
         this.siteSharing = siteSharing;
@@ -149,7 +152,7 @@ public class ShareGeneratorImpl implements ShareGenerator {
             log.info("站点 {} 未配责任行，代理分成回落到 share_rule(AGENT, {})，依据记为 {}",
                     e.siteNo(), e.agentNo(), FALLBACK_BASIS);
             return write(e, "AGENT", FALLBACK_BASIS, e.agentNo(), r == null ? null : r.getPayeeName(),
-                    r == null ? null : r.getRate(), r == null ? null : r.getRuleNo(), gross, null);
+                    opsAdjusted(e, e.agentNo(), FALLBACK_BASIS, r == null ? null : r.getRate()), r == null ? null : r.getRuleNo(), gross, null);
         }
 
         int n = 0;
@@ -161,9 +164,22 @@ public class ShareGeneratorImpl implements ShareGenerator {
             String name = role.agentName() != null ? role.agentName()
                     : (r == null ? null : r.getPayeeName());
             n += write(e, "AGENT", role.role(), role.agentNo(), name,
-                    r == null ? null : r.getRate(), r == null ? null : r.getRuleNo(), gross, null);
+                    opsAdjusted(e, role.agentNo(), role.role(), r == null ? null : r.getRate()), r == null ? null : r.getRuleNo(), gross, null);
         }
         return n;
+    }
+
+    /**
+     * 运维分成系数（批次 F5，裁决 #1）：OPERATE 份额乘上该代理本账期适用的系数（上月考核的结果，没有考核按 1）。
+     * 不逐单扣 —— 一张单超时被接管不扣这张单的钱，月度达成率低才整体下调，写进代理协议。拓展（DEVELOP）不受影响。
+     */
+    private BigDecimal opsAdjusted(OrderSettledEvent e, String agentNo, String basis, BigDecimal rate) {
+        if (rate == null || !FALLBACK_BASIS.equalsIgnoreCase(basis)) return rate;
+        BigDecimal coef = agentDirectory.opsCoefficient(agentNo, e.period());
+        if (coef == null || coef.compareTo(BigDecimal.ONE) == 0) return rate;
+        BigDecimal adjusted = rate.multiply(coef).setScale(4, RoundingMode.DOWN);
+        log.info("运维分成系数 orderNo={} agentNo={} period={} {} × {} = {}", e.orderNo(), agentNo, e.period(), rate, coef, adjusted);
+        return adjusted;
     }
 
     /** 责任行指名了规则号时按号取 —— 指名就是运营的明确意图，不该再被 priority 覆盖。 */

@@ -22,7 +22,7 @@
 #   他们提交时本卡口会红 —— **那正是它该做的事**：先让这批可见，
 #   再按顶部「怎么修」的三类形状收口，而不是提交完就没人记得了。
 #
-TOTAL 294
+TOTAL 280
 
 AccountStatus
 AdDtos
@@ -77,8 +77,6 @@ InvoiceServiceImpl
 InvoiceStatus
 JobRegistry
 Json
-LeadFollowServiceImpl
-LeadServiceImpl
 LedgerServiceImpl
 LocService
 MarketingDtos
@@ -122,7 +120,6 @@ ShareMode
 ShareRecordStatus
 ShareServiceImpl
 SiteAgentServiceImpl
-SiteLifecycleServiceImpl
 SlaRuleServiceImpl
 UserAssetDtos
 UserBlacklistServiceImpl

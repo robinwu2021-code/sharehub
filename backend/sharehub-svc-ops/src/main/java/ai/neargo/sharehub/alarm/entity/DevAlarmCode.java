@@ -50,4 +50,24 @@ public class DevAlarmCode extends BaseEntity implements ai.neargo.sharehub.commo
 
     /** 归档时间；null=在用。**不是 deleted** —— 归档是业务停用、可恢复，见 Archivable。 */
     private java.time.LocalDateTime archivedAt;
+
+    // —— 2026-09-25 业务告警码（V98）：码即处置预案 ——
+    private String domain;
+    private String subjectType;
+    private String evalType;
+    private Integer holdMinutes;
+    private Integer windowMinutes;
+    private java.math.BigDecimal threshold;
+    private Integer businessHoursOnly;
+    private String basePriority;
+    private Integer impactAdjust;
+    private String disposition;
+    private String ownerRole;
+    private Integer woDelayMinutes;
+    private String mergeScope;
+    private String recoverRule;
+    private Integer recoverHoldMinutes;
+    private String supersedes;
+    private Integer enabled;
+    private Integer builtin;
 }
