@@ -121,6 +121,28 @@ scripts/deploy-frontend.sh c-app         # C 端 H5
 > ⚠️ **换 pepper = 全表哈希失效**。轮换必须走 `agt_principal.*_enc`（可逆加密的明文）
 > 全表重算后统一切 `hash_ver`，不能直接改 env 重启 —— 那样所有人都登不进去，且查不出原因。
 
+> ⚠️ **发布前必查（2026-09-25 新增）· 文件存储落点**：不配就落 `/tmp`，而那是会被清理的。
+> ```bash
+> ssh soukmind-tx 'sudo grep -cE "^SHAREHUB_STORAGE_LOCAL_ROOT=/data/" /data/app/powerbank/sharehub-app/sharehub-app.env'
+> # 期望 1。为 0 说明还在用默认值 ${java.io.tmpdir}/sharehub-files
+> ```
+> `LocalFileStorage` 的类注释自己写着「单元 / 集成测试与离线开发」—— 它不是为生产设计的，
+> 而 `sharehub.storage.type` 的默认值恰恰是 `local`（`matchIfMissing = true`）。两件事凑起来的后果是：
+> 合同扫描件、工单照片、踏勘照片落进 `/tmp`，**重启或系统清理后文件全没了，而 `sys_file` 里记录还在** ——
+> 界面上文件列得好好的，点开 404。不报错、不告警，只有点的人知道。
+>
+> 签名密钥同理：`SHAREHUB_STORAGE_LOCAL_SIGN_SECRET` 不配就是 `dev-only-local-file-sign`
+> （名字里就写着 dev-only），**任何人都能按公开算法伪造限时下载链接**。
+>
+> 本次上线已配（2026-09-25）：
+> ```
+> SHAREHUB_STORAGE_TYPE=local
+> SHAREHUB_STORAGE_LOCAL_ROOT=/data/app/powerbank/files     # 属主 deploy:deploy 750，随应用盘备份
+> SHAREHUB_STORAGE_LOCAL_SIGN_SECRET=<openssl rand -base64 36 生成的 48 位>
+> ```
+> **换 COS 只改这几行**（`type=cos` + region / secret / 三个桶名）；`CosFileStorage` 有启动自检，
+> 缺任一项直接启动失败 —— 那是对的，半配好的存储比没配更糟。
+
 > ⚠️ **发布前必查 · 迁移号顺序**（并行开发特有的坑）：
 > Flyway 没开 `out-of-order`，`validate-on-migrate` 是 `true` —— 意味着
 > **版本号低于「现网已应用的最高版本」的迁移，再也进不去**，而且会让启动直接失败。
