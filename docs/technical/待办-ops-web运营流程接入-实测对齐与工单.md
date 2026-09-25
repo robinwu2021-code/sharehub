@@ -19,7 +19,18 @@
 对着未提交的形状接前端，对方一改就得重对。
 
 **开工前确认**：`git log --oneline -- backend/sharehub-svc-platform/.../loc/` 能看到那批提交，
-且 `docs/api/contract.json` 已刷新。在那之前只能做 §2 的「纯前端」那一档。
+且 `docs/api/contract.json` 已刷新。
+
+⚠️ **2026-09-25 复核：「先做不依赖后端的那一档」基本不成立。** 逐个查过：
+58 个待接端点**全部**落在未提交的控制器里（`ContractController` · `SiteController` ·
+`FileController` · `DeviceOpsController` · `AlarmTodoController` · `DeviceSignalController`
+都是 `??`；`AlarmController` · `WoExtController` · `LocExtController` · `OpsController` 是 `M`），
+三个新枚举同样是未跟踪文件，连 §3 里 `SiteServiceImpl:95` 的 `IN_TRANSIT` 引用
+也来自未提交的新文件（所以那不是存量缺陷，是他们在途工作的一部分）。
+已提交控制器里的 C 类只剩 3 条详情端点（`settlements/{}` · `agent/accounts/{}` ·
+`agent/commissions/{}`），且页面未必需要它们。
+
+⇒ **除了下面 §2 末记的那件（卡口可见性），这条链上没有可以提前开工的部分。**
 
 ---
 
@@ -51,6 +62,30 @@
 | **合同** | 6 态 `DRAFT/PENDING/SIGNED/ACTIVE/EXPIRED/TERMINATED`（`loc/ContractStatus.java`） | `lib/types/location.ts:89` **`status: "ACTIVE" \| "EXPIRED"`** | 4 个态前端不认。走审批的合同在列表里显示原始英文值，按状态筛也筛不出 |
 | **站点** | `PREPARING/ACTIVE/PAUSED/WITHDRAWING/CLOSED`（`loc/SiteStatus.java`） | `location.ts:268` `SITE_STAGES = PROSPECTING/SIGNED/LIVE/ACTIVE/CHURNED/CLOSED` | **两套完全不同的词表**，只有 `ACTIVE`/`CLOSED` 偶然重合。不是补几个值，是整套换掉：`SITE_STAGES` · `nextSiteStages` · `canSiteStageTransition` 三个一起删 |
 | **告警** | `AlarmDomain` 等一组新枚举 | `lib/types/alarm.ts` **一个都没有** | 业务告警的域 / 成因 / 影响面在界面上无处落脚 |
+
+### ⚠️ 为什么卡口没提前抓到这三处（2026-09-25 补）
+
+`StatusVocabularyAcrossEndsTest` 的判据是**两端同名即比对** ——
+扫后端 `public enum X`、扫 `ops-web/lib/types` 下 `export type X = "A" | "B"`，
+名字相同才成对。它的类注释写着「自动发现，不靠人登记」，
+**但那只对具名类型成立**。
+
+`Contract.status` 写成 `status: "ACTIVE" | "EXPIRED";` **内联在 interface 里**，
+它配不上对 —— 一个字都比不了，于是差 4 个态而卡口全绿。
+
+实测规模：后端 90 个枚举，能比对上的只有 **34 对**，而 `lib/types` 下有
+**75 处内联联合**。与 `StoredValueInVocabularyTest` 的列名单盲区是同一个形状：
+**卡口声称自动覆盖，实际覆盖取决于一个没写在标题里的前提。**
+
+已做（commit `9be8bc7`）：抽出 4 个取值集有辨识度、后端同名枚举已提交的
+（`CsSenderType` · `DeviceCodeType` · `CodeBatchStatus` · `ReconTaskStatus`），
+并加 `lib/types/inline-status-union.test.ts` 棘轮（基线 71，只准降）。
+**刻意不动其余 71 处** —— `ACTIVE|DISABLED` 这类通用两值集在后端会撞上
+一堆无关枚举，硬起名字只会造出假配对，让卡口强制一段本来无关的耦合。
+
+**`Contract.status` / `Site.status` 这两处抽成具名要等后端提交**：
+那两个新枚举已在工作树里，现在抽会立刻让共享工作树变红。
+后端提交后，抽名与对齐取值在同一个提交里做完。
 
 ### 为什么这一档必须单独一个提交
 
