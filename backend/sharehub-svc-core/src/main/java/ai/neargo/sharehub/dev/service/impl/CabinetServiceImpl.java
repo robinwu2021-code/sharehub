@@ -29,11 +29,18 @@ public class CabinetServiceImpl implements CabinetService {
 
     private final CabinetMapper mapper;
     private final ai.neargo.sharehub.api.platform.port.LocationQueryPort locationQuery;
+    /**
+     * 仓位图。此前是 {@code slotsOf(DevCabinet)} 凭 slotTotal/availableCount 两个数字算出来的
+     * —— 宝号编的、电量是公式、锁仓完全不看 dev_protection。见 {@link SlotAssembler}。
+     */
+    private final SlotAssembler slots;
 
     public CabinetServiceImpl(CabinetMapper mapper,
-                              ai.neargo.sharehub.api.platform.port.LocationQueryPort locationQuery) {
+                              ai.neargo.sharehub.api.platform.port.LocationQueryPort locationQuery,
+                              SlotAssembler slots) {
         this.mapper = mapper;
         this.locationQuery = locationQuery;
+        this.slots = slots;
     }
 
     @Override
@@ -156,27 +163,13 @@ public class CabinetServiceImpl implements CabinetService {
     public CabinetDetail detail(String cabinetNo) {
         DevCabinet e = mapper.selectOne(new LambdaQueryWrapper<DevCabinet>().eq(DevCabinet::getCabinetNo, cabinetNo));
         if (e == null) throw BizException.notFound(cabinetNo);
-        return new CabinetDetail(toVO(e), slotsOf(e));
+        return new CabinetDetail(toVO(e), slots.of(e));
     }
 
     @Override
     public CommandResult sendCommand(String cabinetNo, String type, Map<String, Object> params) {
         // 骨架：回执 commandId；真实链路经 access-gateway /internal/gw/commands（幂等下发）。
         return new CommandResult("CMD" + System.nanoTime());
-    }
-
-    /** 派生仓位（与内存种子同规则）。 */
-    private static List<Slot> slotsOf(DevCabinet c) {
-        int total = c.getSlotTotal() == null ? 8 : c.getSlotTotal();
-        int avail = c.getAvailableCount() == null ? 0 : c.getAvailableCount();
-        List<Slot> slots = new ArrayList<>();
-        for (int i = 0; i < total; i++) {
-            boolean filled = i < avail;
-            String health = (i == total - 1 && CabinetStatus.FAULT.name().equals(c.getStatus())) ? "FAULT" : "OK";
-            slots.add(new Slot(i + 1, filled ? "PB" + c.getCabinetNo().substring(3) + (i + 1) : null,
-                    filled ? 40 + (i * 13) % 60 : null, filled ? "LOCKED" : "UNLOCKED", health));
-        }
-        return slots;
     }
 
     static Cabinet toVO(DevCabinet e) {
