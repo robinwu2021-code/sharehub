@@ -6,23 +6,18 @@
 # 于是界面切到英文/阿语之后，页面是英文、报错还是中文 —— 不报错，只是读不懂。
 #
 # ───────────── 两条规则 ─────────────
-# ① TOTAL 必须与实测**完全相等**：修好几条就把数字改小。
-#    要求相等而不是「不超过」，是为了让每一次变化都在 review 里显形。
-# ② 下面的类名集合**只准变短**：允许在已列出的类里增减（重构时难免），
-#    但**不许让这个模式出现在新的类里**。
+# ① # ═══ 2026-09-25 第二次：TOTAL 从 318 涨到 377，**不是变坏了，是尺子变宽了** ═══
 #
-# ⚠️ 为什么不按类逐个计数（像 known-bare-status-literals 那样）：
-#    这个台账会被每一条并行开发的线碰到，按类计数意味着任何一次无关重构都要改这个文件，
-#    而本仓库长期多会话并行 —— 一个天天冲突的台账，第三天就会有人直接删断言。
-#    代价是「A 类删一条、B 类加一条」能互相抵消；规则 ② 兜住了最坏的那种（扩散到新类）。
+# 原来只扫 `throw new IllegalArgumentException("中文")`。而本仓库正在从它迁往
+# `ServerException` / `BizException`（业务码 → HTTP 状态，2026-09-25 落地）——
+# 卡口只盯旧形状的话，**迁移路径本身就是个洞**：当天新写的站点/合同/借出闸门
+# 已经在新形状上攒了 55 条硬编码中文，而卡口一声没吭。
+# 一个只覆盖旧写法的棘轮比没有更糟：它让人以为这件事有人管着。
 #
-# ───────────── 怎么修 ─────────────
-# 不是逐条翻译。先看形状（判据见 docs/technical/待办-业务拒绝的状态码.md 同族的分类）：
-#   · 「xxx不存在: 键」→ BizException.notFound(键)          （已收口 85 处）
-#   · 「<字段名> 必填」→ BizException.badRequest("error.common.missing_parameter", 字段名)（已收口 22 处）
-#   · 真正给人看的表单校验 → 自己的 key + 三语，见 messages*.properties
+# 新增的那批多半是当天刚写的（SiteServiceImpl / ContractServiceImpl / RentabilityGuard …），
+# 属另一条线在做的运营流程改造。**记在这里不等于接受**，是先让它可见、别再长。
 #
-TOTAL 318
+TOTAL 377
 
 AccountStatus
 AdDtos
@@ -41,6 +36,7 @@ AlarmRuleStatus
 AlarmServiceImpl
 AlarmStateMachine
 AlarmStatus
+AlarmTodoServiceImpl
 AppVersionServiceImpl
 AppleStrategy
 ApplyServiceImpl
@@ -60,10 +56,13 @@ ContractServiceImpl
 ContractStateMachine
 CreditScoreServiceImpl
 CsSenderType
+CsSessionServiceImpl
 CsSessionStatus
+CsTicketServiceImpl
 CsTicketStatus
 DataScopeServiceImpl
 DepartmentServiceImpl
+DepositServiceImpl
 DeviceCodeType
 DeviceKind
 DeviceSignalServiceImpl
@@ -86,6 +85,7 @@ Json
 LeadFollowServiceImpl
 LeadServiceImpl
 LedgerServiceImpl
+LocExtController
 LocService
 LocalFileStorage
 MarketingDtos
@@ -120,6 +120,8 @@ ReferralServiceImpl
 RefundServiceImpl
 RentController
 RentOrderServiceImpl
+RentabilityGuard
+ReservationServiceImpl
 RoleQueryServiceImpl
 SettlementRefType
 SettlementServiceImpl
@@ -132,9 +134,13 @@ SiteAgentServiceImpl
 SiteServiceImpl
 SiteStateMachine
 SlaRuleServiceImpl
+TrialRentServiceImpl
 TrialRentStateMachine
 UserAssetDtos
+UserBlacklistServiceImpl
+UserCouponServiceImpl
 UserInvoiceServiceImpl
+UserLogoffServiceImpl
 VendorStatus
 VenueOnboardingServiceImpl
 WalletServiceImpl

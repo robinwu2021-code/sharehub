@@ -41,9 +41,21 @@ class ChineseErrorLiteralRatchetTest {
 
     private static final String LEDGER = "known-chinese-error-literals.txt";
 
-    /** 只认**字面量**参数；拼接表达式（`"x" + no`）的首段同样算，因为首段就是那句中文。 */
-    private static final Pattern RAW =
-            Pattern.compile("throw new IllegalArgumentException\\(\"([^\"]*)\"");
+    /**
+     * 三种形状都算。只认**字面量**参数；拼接表达式（`"x" + no`）的首段同样算，
+     * 因为首段就是那句中文。
+     *
+     * <p><b>为什么第二、三种也要扫</b>：本仓库正在从 {@code IllegalArgumentException}
+     * 迁往 {@code ServerException}/{@link ai.neargo.sharehub.common.BizException}（业务码 → HTTP 状态）。
+     * 卡口若只盯旧形状，**迁移路径本身就是个洞** —— 实测 2026-09-25 当天
+     * 新写的站点/合同/借出闸门已经在新形状上攒了 55 条硬编码中文，而卡口一声没吭。
+     * 一个只覆盖旧写法的棘轮比没有更糟：它让人以为这件事有人管着。
+     */
+    private static final Pattern[] RAW = {
+            Pattern.compile("throw new IllegalArgumentException\\(\"([^\"]*)\""),
+            Pattern.compile("ServerException\\.of\\([^,)]*,\\s*\"([^\"]*)\""),
+            Pattern.compile("BizException\\.(?:conflict|badRequest|of)\\(\\s*(?:[A-Za-z.]+,\\s*)?\"([^\"]*)\""),
+    };
 
     private static final Pattern CJK = Pattern.compile("[\\u4e00-\\u9fff]");
 
@@ -72,8 +84,10 @@ class ChineseErrorLiteralRatchetTest {
             String cls = f.getFileName().toString().replaceFirst("\\.java$", "");
             String src = Files.readString(f, StandardCharsets.UTF_8);
             int n = 0;
-            for (Matcher m = RAW.matcher(src); m.find(); ) {
-                if (CJK.matcher(m.group(1)).find()) n++;
+            for (Pattern pat : RAW) {
+                for (Matcher m = pat.matcher(src); m.find(); ) {
+                    if (CJK.matcher(m.group(1)).find()) n++;
+                }
             }
             if (n > 0) {
                 actualTotal += n;
