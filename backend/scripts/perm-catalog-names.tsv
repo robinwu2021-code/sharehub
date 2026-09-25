@@ -166,6 +166,10 @@ user:risk:read	风控名单 查看	user	1
 user:risk:update	风控/黑名单 处置	user	1
 user:wallet:read	钱包 查看	user	1
 user:wallet:update	用户钱包 调账	user	1
+user:logoff:read	注销申请 查看	user	1
+user:logoff:revoke	注销申请 代为撤销	user	1
+user:invoice:read	C端开票申请 查看	user	1
+user:invoice:handle	C端开票申请 处理	user	1
 workorder:*	工单 全部	workorder	0
 workorder:alarm:config	告警代码/通知规则 配置	workorder	1
 workorder:alarm:update	告警规则 维护	workorder	1

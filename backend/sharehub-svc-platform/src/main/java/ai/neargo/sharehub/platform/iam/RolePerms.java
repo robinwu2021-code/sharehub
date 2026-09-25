@@ -42,6 +42,8 @@ public final class RolePerms {
                     "order:order:read", "order:order:export", "order:exception:read", "order:exception:handle",
                     "order:intervene:execute", "order:refund:apply",
                     "user:cuser:read", "user:risk:update", "user:member:read", "user:wallet:read",
+                    // 注销队列与代为撤销（2026-09-25）：用户打电话说「我点错了」的入口就在客服
+                    "user:logoff:read", "user:logoff:revoke", "user:invoice:read",
                     "workorder:wo:read", "workorder:wo:create", "cs:*",
                     "marketing:coupon:read", "marketing:coupon:issue", "marketing:push:send",
                     // —— D6d 权限对账补配（2026-09-23）——
@@ -61,6 +63,8 @@ public final class RolePerms {
                     // 而后端此前没有任何端点用它 —— 前端拿它渲染入口、后端拿更宽的 poi:read 判访问。
                     "location:overview:read",
                     "user:cuser:read", "user:member:read", "user:wallet:read",
+                    // C 端开票受理（2026-09-25）：开票涉及税务凭据，处理权只给财务
+                    "user:invoice:read", "user:invoice:handle",
                     "report:*", "org:audit:read",
                     // —— D6d 权限对账补配（2026-09-23）——
                     // 判据：功能权限清单（RBAC SSOT）明确给了本角色 + 端点确实存在，
@@ -73,6 +77,8 @@ public final class RolePerms {
                     "finance:share_rule:read", "finance:share_record:read", "report:*"),
             "VIEWER", List.of(
                     "dashboard:overview:read", "dashboard:todo:read",
+                    // 注销量与开票量都是该被看见的经营指标；两个出参都不含手机号姓名
+                    "user:logoff:read", "user:invoice:read",
                     "device:cabinet:read", "device:slot:read", "order:order:read",
                     "location:poi:read", "location:venue:read", "location:analysis:read", "location:overview:read",
                     "finance:share_rule:read", "finance:share_record:read", "finance:settlement:read",

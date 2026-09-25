@@ -16,6 +16,18 @@ public interface UserLogoffService {
     LogoffItem current(String cUserNo);
 
     /**
+     * 运营端注销队列（{@code GET /api/user/logoffs}）。
+     *
+     * <p>补这个口是因为**冷静期在运营端是看不见的**：C 端能提交、能自己撤销，
+     * 而运营端零入口 —— 用户打电话说「我点错了」时，客服既看不到队列、也无从代为撤销，
+     * 只能让他自己在 App 里找（而他正是因为找不到才打电话的）。
+     *
+     * <p>出参 {@link LogoffItem} 只有用户号与三个时间戳，**不含手机号与姓名** ——
+     * 这也是它能给只读角色看的前提。
+     */
+    ai.neargo.common.core.PageResult<LogoffItem> pageForOps(Integer page, Integer size, String status);
+
+    /**
      * 提交注销申请。
      *
      * @throws IllegalStateException 已有 PENDING 申请（同一用户至多一条，DDL 不设 UK 由此保证）

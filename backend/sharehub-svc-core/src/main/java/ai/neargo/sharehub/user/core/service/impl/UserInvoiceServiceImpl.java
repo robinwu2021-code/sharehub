@@ -31,12 +31,19 @@ public class UserInvoiceServiceImpl implements UserInvoiceService {
     private static final String TENANT_MAIN = "MAIN";
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
+    private static final String APPLIED = "APPLIED";
+    private static final String ISSUED = "ISSUED";
+    private static final String REJECTED = "REJECTED";
+
     private final UsrInvoiceTitleMapper titles;
     private final UsrInvoiceMapper invoices;
+    private final ai.neargo.sharehub.user.core.service.NicknameLookup nicknames;
 
-    public UserInvoiceServiceImpl(UsrInvoiceTitleMapper titles, UsrInvoiceMapper invoices) {
+    public UserInvoiceServiceImpl(UsrInvoiceTitleMapper titles, UsrInvoiceMapper invoices,
+                                 ai.neargo.sharehub.user.core.service.NicknameLookup nicknames) {
         this.titles = titles;
         this.invoices = invoices;
+        this.nicknames = nicknames;
     }
 
     @Override
@@ -144,5 +151,81 @@ public class UserInvoiceServiceImpl implements UserInvoiceService {
     private static InvoiceItem toVO(UsrInvoice e) {
         return new InvoiceItem(e.getInvoiceNo(), e.getTitleNo(), e.getTitle(), e.getAmount(),
                 e.getCurrency(), e.getStatus(), e.getFileUrl(), e.getAppliedAt(), e.getIssuedAt());
+    }
+
+    // ─────────────────────── 运营端受理 ───────────────────────
+
+    @Override
+    public PageResult<UserCoreDtos.CUserInvoiceRow> pageForOps(Integer page, Integer size,
+                                                               String keyword, String status) {
+        int p = (page == null || page < 1) ? 1 : page;
+        int sz = (size == null || size < 1) ? 10 : Math.min(size, 200);
+        LambdaQueryWrapper<UsrInvoice> w = new LambdaQueryWrapper<UsrInvoice>()
+                .eq(status != null && !status.isBlank(), UsrInvoice::getStatus, status);
+        if (keyword != null && !keyword.isBlank()) {
+            w.and(q -> q.like(UsrInvoice::getInvoiceNo, keyword)
+                    .or().like(UsrInvoice::getCUserNo, keyword)
+                    .or().like(UsrInvoice::getTitle, keyword));
+        }
+        // 先来先办：待受理的队列按申请时间正序，否则老单永远沉在后面
+        w.orderByAsc(UsrInvoice::getAppliedAt);
+
+        Page<UsrInvoice> r = invoices.selectPage(new Page<>(p, sz), w);
+        java.util.Map<String, String> nick = nicknames.byUserNos(
+                r.getRecords().stream().map(UsrInvoice::getCUserNo).toList());
+        return new PageResult<>(r.getRecords().stream().map(e -> opsRow(e, nick.get(e.getCUserNo()))).toList(),
+                r.getTotal());
+    }
+
+    @Override
+    @Transactional
+    public UserCoreDtos.CUserInvoiceRow issue(String invoiceNo, String fileUrl, String operator) {
+        UsrInvoice e = requireApplied(invoiceNo);
+        e.setStatus(ISSUED);
+        e.setFileUrl(fileUrl);
+        e.setIssuedAt(LocalDateTime.now().format(TS));
+        stamp(e, operator);
+        invoices.updateById(e);
+        return opsRow(e, nicknames.byUserNo(e.getCUserNo()));
+    }
+
+    @Override
+    @Transactional
+    public UserCoreDtos.CUserInvoiceRow reject(String invoiceNo, String reason, String operator) {
+        if (reason == null || reason.isBlank()) {
+            // 只说「已驳回」等于让用户无从改正后重提 —— 而他会做的事是再提一次
+            throw new IllegalArgumentException("驳回必须写明原因");
+        }
+        UsrInvoice e = requireApplied(invoiceNo);
+        e.setStatus(REJECTED);
+        e.setRejectReason(reason);
+        stamp(e, operator);
+        invoices.updateById(e);
+        return opsRow(e, nicknames.byUserNo(e.getCUserNo()));
+    }
+
+    /** 只有 APPLIED 可受理。已开具/已驳回再动一次，会让消费者那边的状态凭空变回去。 */
+    private UsrInvoice requireApplied(String invoiceNo) {
+        UsrInvoice e = invoices.selectOne(new LambdaQueryWrapper<UsrInvoice>()
+                .eq(UsrInvoice::getInvoiceNo, invoiceNo).last("limit 1"));
+        if (e == null) throw new IllegalArgumentException("开票申请不存在: " + invoiceNo);
+        if (!APPLIED.equals(e.getStatus())) {
+            throw ai.neargo.common.core.ServerException.of(ai.neargo.common.core.ErrorCode.CONFLICT,
+                    "该开票申请已处理过，当前状态: " + e.getStatus());
+        }
+        return e;
+    }
+
+    /** 受理人与受理时间。缺了它，事后问「这单谁开的」答不出来。 */
+    private static void stamp(UsrInvoice e, String operator) {
+        e.setHandledBy(operator == null || operator.isBlank() ? "SYSTEM" : operator);
+        e.setHandledAt(LocalDateTime.now().format(TS));
+    }
+
+    private static UserCoreDtos.CUserInvoiceRow opsRow(UsrInvoice e, String nickname) {
+        return new UserCoreDtos.CUserInvoiceRow(e.getInvoiceNo(), e.getCUserNo(), nickname,
+                e.getTitleNo(), e.getTitle(), e.getAmount(), e.getCurrency(),
+                e.getStatus(), e.getFileUrl(), e.getRejectReason(),
+                e.getHandledBy(), e.getHandledAt(), e.getAppliedAt(), e.getIssuedAt());
     }
 }

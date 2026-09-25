@@ -1334,7 +1334,7 @@
    "handler": "AgentExtController#createCommission",
    "summary": "",
    "params": [],
-   "bodyType": "AgtCommission",
+   "bodyType": "AgentExtDtos.AgentCommissionReq",
    "returnType": "AgentCommission",
    "returnContainer": null,
    "returnElement": "AgentCommission",
@@ -1380,7 +1380,40 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "ruleNo",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "dimension",
+     "type": "String"
+    },
+    {
+     "name": "rate",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "fixedAmount",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "mode",
+     "type": "String"
+    },
+    {
+     "name": "effectiveAt",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "GET",
@@ -1464,7 +1497,7 @@
      "required": true
     }
    ],
-   "bodyType": "AgtCommission",
+   "bodyType": "AgentExtDtos.AgentCommissionReq",
    "returnType": "AgentCommission",
    "returnContainer": null,
    "returnElement": "AgentCommission",
@@ -1510,7 +1543,40 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "ruleNo",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "dimension",
+     "type": "String"
+    },
+    {
+     "name": "rate",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "fixedAmount",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "mode",
+     "type": "String"
+    },
+    {
+     "name": "effectiveAt",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "GET",
@@ -23945,6 +24011,267 @@
   },
   {
    "verb": "GET",
+   "path": "/api/user/cuser-invoices",
+   "perm": "user:invoice:read",
+   "perms": [
+    "user:invoice:read"
+   ],
+   "handler": "UserOpsController#cuserInvoices",
+   "summary": "C 端开票申请队列。",
+   "params": [
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "keyword",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "status",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<CUserInvoiceRow>",
+   "returnContainer": "PageResult",
+   "returnElement": "CUserInvoiceRow",
+   "responseShape": [
+    {
+     "name": "invoiceNo",
+     "type": "String"
+    },
+    {
+     "name": "cUserNo",
+     "type": "String"
+    },
+    {
+     "name": "nickname",
+     "type": "String"
+    },
+    {
+     "name": "titleNo",
+     "type": "String"
+    },
+    {
+     "name": "title",
+     "type": "String"
+    },
+    {
+     "name": "amount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "fileUrl",
+     "type": "String"
+    },
+    {
+     "name": "rejectReason",
+     "type": "String"
+    },
+    {
+     "name": "handledBy",
+     "type": "String"
+    },
+    {
+     "name": "handledAt",
+     "type": "String"
+    },
+    {
+     "name": "appliedAt",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/user/cuser-invoices/{invoiceNo}/issue",
+   "perm": "user:invoice:handle",
+   "perms": [
+    "user:invoice:handle"
+   ],
+   "handler": "UserOpsController#issueCUserInvoice",
+   "summary": "开具：置 ISSUED 并回填发票文件地址。",
+   "params": [
+    {
+     "in": "path",
+     "name": "invoiceNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "Map<String, String>",
+   "returnType": "CUserInvoiceRow",
+   "returnContainer": null,
+   "returnElement": "CUserInvoiceRow",
+   "responseShape": [
+    {
+     "name": "invoiceNo",
+     "type": "String"
+    },
+    {
+     "name": "cUserNo",
+     "type": "String"
+    },
+    {
+     "name": "nickname",
+     "type": "String"
+    },
+    {
+     "name": "titleNo",
+     "type": "String"
+    },
+    {
+     "name": "title",
+     "type": "String"
+    },
+    {
+     "name": "amount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "fileUrl",
+     "type": "String"
+    },
+    {
+     "name": "rejectReason",
+     "type": "String"
+    },
+    {
+     "name": "handledBy",
+     "type": "String"
+    },
+    {
+     "name": "handledAt",
+     "type": "String"
+    },
+    {
+     "name": "appliedAt",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/user/cuser-invoices/{invoiceNo}/reject",
+   "perm": "user:invoice:handle",
+   "perms": [
+    "user:invoice:handle"
+   ],
+   "handler": "UserOpsController#rejectCUserInvoice",
+   "summary": "驳回：原因必填 —— 只说「已驳回」等于让用户无从改正后重提。",
+   "params": [
+    {
+     "in": "path",
+     "name": "invoiceNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "Map<String, String>",
+   "returnType": "CUserInvoiceRow",
+   "returnContainer": null,
+   "returnElement": "CUserInvoiceRow",
+   "responseShape": [
+    {
+     "name": "invoiceNo",
+     "type": "String"
+    },
+    {
+     "name": "cUserNo",
+     "type": "String"
+    },
+    {
+     "name": "nickname",
+     "type": "String"
+    },
+    {
+     "name": "titleNo",
+     "type": "String"
+    },
+    {
+     "name": "title",
+     "type": "String"
+    },
+    {
+     "name": "amount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "fileUrl",
+     "type": "String"
+    },
+    {
+     "name": "rejectReason",
+     "type": "String"
+    },
+    {
+     "name": "handledBy",
+     "type": "String"
+    },
+    {
+     "name": "handledAt",
+     "type": "String"
+    },
+    {
+     "name": "appliedAt",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
    "path": "/api/user/free-whitelist",
    "perm": "user:risk:read",
    "perms": [
@@ -24263,6 +24590,108 @@
     },
     {
      "name": "status",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/user/logoffs",
+   "perm": "user:logoff:read",
+   "perms": [
+    "user:logoff:read"
+   ],
+   "handler": "UserOpsController#logoffs",
+   "summary": "操作人以会话为准，不信前端传值 —— 手工调账必须回答「谁改的」。",
+   "params": [
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "status",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<LogoffItem>",
+   "returnContainer": "PageResult",
+   "returnElement": "LogoffItem",
+   "responseShape": [
+    {
+     "name": "cUserNo",
+     "type": "String"
+    },
+    {
+     "name": "requestedAt",
+     "type": "String"
+    },
+    {
+     "name": "coolingUntil",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "purgedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/user/logoffs/{cUserNo}/revoke",
+   "perm": "user:logoff:revoke",
+   "perms": [
+    "user:logoff:revoke"
+   ],
+   "handler": "UserOpsController#revokeLogoff",
+   "summary": "代为撤销注销申请。",
+   "params": [
+    {
+     "in": "path",
+     "name": "cUserNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "LogoffItem",
+   "returnContainer": null,
+   "returnElement": "LogoffItem",
+   "responseShape": [
+    {
+     "name": "cUserNo",
+     "type": "String"
+    },
+    {
+     "name": "requestedAt",
+     "type": "String"
+    },
+    {
+     "name": "coolingUntil",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "purgedAt",
      "type": "String"
     }
    ],
@@ -25215,7 +25644,7 @@
    "handler": "UserOpsController#createRechargePackage",
    "summary": "",
    "params": [],
-   "bodyType": "UsrRechargePkg",
+   "bodyType": "UserAssetDtos.RechargePackageReq",
    "returnType": "RechargePackageRow",
    "returnContainer": null,
    "returnElement": "RechargePackageRow",
@@ -25261,7 +25690,44 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "packageNo",
+     "type": "String"
+    },
+    {
+     "name": "regionId",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "payAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "giftAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "validDays",
+     "type": "Integer"
+    },
+    {
+     "name": "sortNo",
+     "type": "Integer"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -25328,7 +25794,7 @@
      "required": true
     }
    ],
-   "bodyType": "UsrRechargePkg",
+   "bodyType": "UserAssetDtos.RechargePackageReq",
    "returnType": "RechargePackageRow",
    "returnContainer": null,
    "returnElement": "RechargePackageRow",
@@ -25374,7 +25840,44 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "packageNo",
+     "type": "String"
+    },
+    {
+     "name": "regionId",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "payAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "giftAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "validDays",
+     "type": "Integer"
+    },
+    {
+     "name": "sortNo",
+     "type": "Integer"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "GET",
@@ -29621,10 +30124,10 @@
  },
  "conflicts": {},
  "stats": {
-  "endpoints": 425,
-  "records": 312,
-  "withPerm": 362,
-  "withBody": 185,
-  "shapedResponses": 325
+  "endpoints": 430,
+  "records": 315,
+  "withPerm": 367,
+  "withBody": 187,
+  "shapedResponses": 330
  }
 }

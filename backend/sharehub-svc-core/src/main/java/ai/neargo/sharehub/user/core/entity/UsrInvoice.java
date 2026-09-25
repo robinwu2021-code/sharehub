@@ -44,4 +44,13 @@ public class UsrInvoice extends BaseEntity {
 
     /** 空 = 尚未开具。 */
     private String issuedAt;
+
+    /** 驳回原因（V87）。{@code status=REJECTED} 必填 —— 只说「已驳回」等于让用户无从改正后重提。 */
+    private String rejectReason;
+
+    /** 受理人（员工号），开具或驳回时回填。 */
+    private String handledBy;
+
+    /** 受理时间，开具或驳回时回填。 */
+    private String handledAt;
 }

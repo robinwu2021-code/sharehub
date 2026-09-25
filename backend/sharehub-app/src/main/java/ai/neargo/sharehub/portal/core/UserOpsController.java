@@ -2,6 +2,7 @@ package ai.neargo.sharehub.portal.core;
 
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.auth.StaffContext;
+import ai.neargo.sharehub.user.asset.dto.UserAssetDtos;
 import ai.neargo.sharehub.user.asset.dto.UserAssetDtos.MemberRow;
 import ai.neargo.sharehub.user.asset.dto.UserAssetDtos.RechargeOrderRow;
 import ai.neargo.sharehub.user.asset.dto.UserAssetDtos.RechargePackageRow;
@@ -13,11 +14,15 @@ import ai.neargo.sharehub.user.asset.service.MembershipService;
 import ai.neargo.sharehub.user.asset.service.RechargeOrderService;
 import ai.neargo.sharehub.user.asset.service.RechargePackageService;
 import ai.neargo.sharehub.user.asset.service.WalletService;
+import ai.neargo.sharehub.user.core.dto.UserCoreDtos.CUserInvoiceRow;
 import ai.neargo.sharehub.user.core.dto.UserCoreDtos.FreeUserWhitelist;
+import ai.neargo.sharehub.user.core.dto.UserCoreDtos.LogoffItem;
 import ai.neargo.sharehub.user.core.dto.UserCoreDtos.UserBlacklist;
 import ai.neargo.sharehub.user.core.dto.UserCoreDtos.UserRisk;
 import ai.neargo.sharehub.user.core.entity.UsrFreeWhitelist;
 import ai.neargo.sharehub.user.core.service.FreeWhitelistService;
+import ai.neargo.sharehub.user.core.service.UserInvoiceService;
+import ai.neargo.sharehub.user.core.service.UserLogoffService;
 import ai.neargo.sharehub.user.core.service.UserBlacklistService;
 import ai.neargo.sharehub.user.core.service.UserRiskService;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -42,6 +47,8 @@ import java.util.Map;
 @RequestMapping("/api/user")
 public class UserOpsController {
 
+    private final UserLogoffService logoffs;
+    private final UserInvoiceService cuserInvoices;
     private final UserRiskService risks;
     private final UserBlacklistService blacklist;
     private final FreeWhitelistService whitelist;
@@ -57,7 +64,10 @@ public class UserOpsController {
                              WalletService wallets, RechargePackageService packages,
                              RechargeOrderService rechargeOrders,
                              ai.neargo.sharehub.user.member.service.MemberService memberService,
-                             ai.neargo.sharehub.user.member.service.CreditScoreService creditScoreService) {
+                             ai.neargo.sharehub.user.member.service.CreditScoreService creditScoreService,
+                              UserLogoffService logoffs, UserInvoiceService cuserInvoices) {
+        this.logoffs = logoffs;
+        this.cuserInvoices = cuserInvoices;
         this.memberService = memberService;
         this.creditScoreService = creditScoreService;
         this.risks = risks;
@@ -199,16 +209,17 @@ public class UserOpsController {
 
     @PostMapping("/recharge-packages")
     @PreAuthorize("@perm.can('user:wallet:update')")
-    public RechargePackageRow createRechargePackage(@RequestBody UsrRechargePkg body) {
-        return packages.save(body);
+    public RechargePackageRow createRechargePackage(@RequestBody UserAssetDtos.RechargePackageReq body) {
+        return packages.save(body.toEntity());
     }
 
     @PostMapping("/recharge-packages/{packageNo}")
     @PreAuthorize("@perm.can('user:wallet:update')")
     public RechargePackageRow updateRechargePackage(@PathVariable String packageNo,
-                                                    @RequestBody UsrRechargePkg body) {
-        body.setPackageNo(packageNo);
-        return packages.save(body);
+                                                    @RequestBody UserAssetDtos.RechargePackageReq body) {
+        UsrRechargePkg e = body.toEntity();
+        e.setPackageNo(packageNo);
+        return packages.save(e);
     }
 
     // —— 充值订单（只读；下单与回调走支付域）——
@@ -311,5 +322,67 @@ public class UserOpsController {
     /** 操作人以会话为准，不信前端传值 —— 手工调账必须回答「谁改的」。 */
     private static String currentOperator() {
         return ai.neargo.sharehub.auth.SecurityUtils.currentUser().map(u -> u.userNo()).orElse("SYSTEM");
+    }
+
+    // —— 注销申请受理（C-AC-05 的运营侧；权限码 user:logoff:*，2026-09-25 新增）——
+    //
+    // C 端 2026-09-25 已接上真接口（提交 / 看冷静期 / 自助撤销），而运营端**零入口** ——
+    // 用户打电话说「我点错了」时，客服既看不到队列也无从代为撤销，
+    // 只能让他自己在 App 里找，而他正是因为找不到才打的电话。
+
+    /** 注销队列。出参只有用户号与三个时间戳，不含手机号姓名 —— 这也是它能给只读角色看的前提。 */
+    @GetMapping("/logoffs")
+    @PreAuthorize("@perm.can('user:logoff:read')")
+    public PageResult<LogoffItem> logoffs(@RequestParam(required = false) Integer page,
+                                          @RequestParam(required = false) Integer size,
+                                          @RequestParam(required = false) String status) {
+        return logoffs.pageForOps(page, size, status);
+    }
+
+    /**
+     * 代为撤销注销申请。
+     *
+     * <p><b>没有「立即执行」的对应动作</b>：冷静期到点由清除作业执行，
+     * 给一个手动提前销毁的按钮，等于给了一个不可逆的误操作入口。
+     *
+     * <p>冷静期已过则拒（400）—— 那时数据可能已在清除，说「撤销成功」是对用户说假话。
+     */
+    @PostMapping("/logoffs/{cUserNo}/revoke")
+    @PreAuthorize("@perm.can('user:logoff:revoke')")
+    public LogoffItem revokeLogoff(@PathVariable String cUserNo) {
+        return logoffs.cancel(cUserNo);
+    }
+
+    // —— C 端开票受理（C-IV-03 的运营侧；权限码 user:invoice:*，2026-09-25 新增）——
+    //
+    // 运营端「发票」那个菜单叶管的是 fin_invoice —— 给场地方/代理商开的**结算发票**，
+    // 与消费者开票是两个对象、两张表、两套业务键。于是 C 端能提交，提交之后无人受理。
+
+    /** C 端开票申请队列。待受理的按申请时间正序 —— 否则老单永远沉在后面。 */
+    @GetMapping("/cuser-invoices")
+    @PreAuthorize("@perm.can('user:invoice:read')")
+    public PageResult<CUserInvoiceRow> cuserInvoices(@RequestParam(required = false) Integer page,
+                                                     @RequestParam(required = false) Integer size,
+                                                     @RequestParam(required = false) String keyword,
+                                                     @RequestParam(required = false) String status) {
+        return cuserInvoices.pageForOps(page, size, keyword, status);
+    }
+
+    /** 开具：置 ISSUED 并回填发票文件地址。受理人取当前登录人，不信前端传值。 */
+    @PostMapping("/cuser-invoices/{invoiceNo}/issue")
+    @PreAuthorize("@perm.can('user:invoice:handle')")
+    public CUserInvoiceRow issueCUserInvoice(@PathVariable String invoiceNo,
+                                             @RequestBody(required = false) Map<String, String> body) {
+        String fileUrl = body == null ? null : body.get("fileUrl");
+        return cuserInvoices.issue(invoiceNo, fileUrl, StaffContext.require().userNo());
+    }
+
+    /** 驳回：原因必填 —— 只说「已驳回」等于让用户无从改正后重提。 */
+    @PostMapping("/cuser-invoices/{invoiceNo}/reject")
+    @PreAuthorize("@perm.can('user:invoice:handle')")
+    public CUserInvoiceRow rejectCUserInvoice(@PathVariable String invoiceNo,
+                                              @RequestBody(required = false) Map<String, String> body) {
+        String reason = body == null ? null : body.get("reason");
+        return cuserInvoices.reject(invoiceNo, reason, StaffContext.require().userNo());
     }
 }

@@ -1,4 +1,4 @@
-# 接口参考（全量 425 个端点）
+# 接口参考（全量 430 个端点）
 
 > **本文件由脚本生成，不要手改**：
 >
@@ -24,10 +24,10 @@
 
 | | |
 |---|---|
-| 端点 | **425** |
-| 带功能权限码 | 362 |
-| 有请求体 | 185 |
-| 数据结构 | 237 个（文末统一定义） |
+| 端点 | **430** |
+| 带功能权限码 | 367 |
+| 有请求体 | 187 |
+| 数据结构 | 240 个（文末统一定义） |
 
 ### ⚠️ 3 个 `/api/**` 端点没有功能权限码
 
@@ -2907,7 +2907,7 @@
 
 ## 用户：账号 · 钱包 · 券 · 会员 · 客服
 
-53 个端点。
+58 个端点。
 
 ### `GET /api/user/ad-campaigns`
 
@@ -3161,6 +3161,55 @@
 
 **出参** `Object`
 
+### `GET /api/user/cuser-invoices`
+
+C 端开票申请队列。
+
+权限码 `user:invoice:read` · `UserOpsController#cuserInvoices`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `page` | `Integer` | 否 |
+| 查询 | `size` | `Integer` | 否 |
+| 查询 | `keyword` | `String` | 否 |
+| 查询 | `status` | `String` | 否 |
+
+**出参** 分页<[`CUserInvoiceRow`](#cuserinvoicerow)>
+
+### `POST /api/user/cuser-invoices/{invoiceNo}/issue`
+
+开具：置 ISSUED 并回填发票文件地址。
+
+权限码 `user:invoice:handle` · `UserOpsController#issueCUserInvoice`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `invoiceNo` | `String` | 是 |
+
+**请求体** `对象（字符串值）`
+
+**出参** [`CUserInvoiceRow`](#cuserinvoicerow)
+
+### `POST /api/user/cuser-invoices/{invoiceNo}/reject`
+
+驳回：原因必填 —— 只说「已驳回」等于让用户无从改正后重提。
+
+权限码 `user:invoice:handle` · `UserOpsController#rejectCUserInvoice`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `invoiceNo` | `String` | 是 |
+
+**请求体** `对象（字符串值）`
+
+**出参** [`CUserInvoiceRow`](#cuserinvoicerow)
+
 ### `GET /api/user/free-whitelist`
 
 权限码 `user:risk:read` · `UserOpsController#freeWhitelist`
@@ -3212,6 +3261,36 @@
 | 路径 | `userNo` | `String` | 是 |
 
 **出参** [`FreeUserWhitelist`](#freeuserwhitelist)
+
+### `GET /api/user/logoffs`
+
+操作人以会话为准，不信前端传值 —— 手工调账必须回答「谁改的」。
+
+权限码 `user:logoff:read` · `UserOpsController#logoffs`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 查询 | `page` | `Integer` | 否 |
+| 查询 | `size` | `Integer` | 否 |
+| 查询 | `status` | `String` | 否 |
+
+**出参** 分页<[`LogoffItem`](#logoffitem)>
+
+### `POST /api/user/logoffs/{cUserNo}/revoke`
+
+代为撤销注销申请。
+
+权限码 `user:logoff:revoke` · `UserOpsController#revokeLogoff`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `cUserNo` | `String` | 是 |
+
+**出参** [`LogoffItem`](#logoffitem)
 
 ### `GET /api/user/member-benefits`
 
@@ -3417,7 +3496,7 @@
 
 权限码 `user:wallet:update` · `UserOpsController#createRechargePackage`
 
-**请求体** `UsrRechargePkg`
+**请求体** [`RechargePackageReq`](#rechargepackagereq)
 
 **出参** [`RechargePackageRow`](#rechargepackagerow)
 
@@ -3459,7 +3538,7 @@
 |---|---|---|---|
 | 路径 | `packageNo` | `String` | 是 |
 
-**请求体** `UsrRechargePkg`
+**请求体** [`RechargePackageReq`](#rechargepackagereq)
 
 **出参** [`RechargePackageRow`](#rechargepackagerow)
 
@@ -3929,7 +4008,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 权限码 `agent:share:config` · `AgentExtController#createCommission`
 
-**请求体** `AgtCommission`
+**请求体** [`AgentCommissionReq`](#agentcommissionreq)
 
 **出参** [`AgentCommission`](#agentcommission)
 
@@ -3955,7 +4034,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 |---|---|---|---|
 | 路径 | `ruleNo` | `String` | 是 |
 
-**请求体** `AgtCommission`
+**请求体** [`AgentCommissionReq`](#agentcommissionreq)
 
 **出参** [`AgentCommission`](#agentcommission)
 
@@ -5693,7 +5772,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 ## 数据结构
 
-共 237 个。同一结构常被多个端点复用，故在此定义一次、上文引用。
+共 240 个。同一结构常被多个端点复用，故在此定义一次、上文引用。
 
 ### AcceptReq
 
@@ -5812,6 +5891,19 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `mode` | `String` |
 | `effectiveAt` | `String` |
 | `status` | `String` |
+
+### AgentCommissionReq
+
+| 字段 | 类型 |
+|---|---|
+| `ruleNo` | `String` |
+| `agentNo` | `String` |
+| `dimension` | `String` |
+| `rate` | `BigDecimal` |
+| `fixedAmount` | `BigDecimal` |
+| `currency` | `String` |
+| `mode` | `String` |
+| `effectiveAt` | `String` |
 
 ### AgentPerformance
 
@@ -6077,6 +6169,25 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `marketCode` | `String` |
 | `status` | `String` |
 | `archivedAt` | `String` |
+
+### CUserInvoiceRow
+
+| 字段 | 类型 |
+|---|---|
+| `invoiceNo` | `String` |
+| `cUserNo` | `String` |
+| `nickname` | `String` |
+| `titleNo` | `String` |
+| `title` | `String` |
+| `amount` | `BigDecimal` |
+| `currency` | `String` |
+| `status` | `String` |
+| `fileUrl` | `String` |
+| `rejectReason` | `String` |
+| `handledBy` | `String` |
+| `handledAt` | `String` |
+| `appliedAt` | `String` |
+| `issuedAt` | `String` |
 
 ### CUserRow
 
@@ -7640,6 +7751,20 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `createdAt` | `String` |
 | `paidAt` | `String` |
 | `pspTxnNo` | `String` |
+
+### RechargePackageReq
+
+| 字段 | 类型 |
+|---|---|
+| `packageNo` | `String` |
+| `regionId` | `String` |
+| `name` | `String` |
+| `payAmount` | `BigDecimal` |
+| `giftAmount` | `BigDecimal` |
+| `currency` | `String` |
+| `validDays` | `Integer` |
+| `sortNo` | `Integer` |
+| `status` | `String` |
 
 ### RechargePackageRow
 

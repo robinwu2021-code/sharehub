@@ -77,6 +77,20 @@ public class UserLogoffServiceImpl implements UserLogoffService {
     }
 
     /** 冷静期是否已过。{@code coolingUntil} 存的是 {@code yyyy-MM-dd HH:mm:ss} 文本（与 requestedAt 同源）。 */
+    @Override
+    public ai.neargo.common.core.PageResult<LogoffItem> pageForOps(Integer page, Integer size, String status) {
+        int p = (page == null || page < 1) ? 1 : page;
+        int sz = (size == null || size < 1) ? 10 : Math.min(size, 200);
+        LambdaQueryWrapper<UsrLogoff> w = new LambdaQueryWrapper<UsrLogoff>()
+                .eq(status != null && !status.isBlank(), UsrLogoff::getStatus, status)
+                // 冷静期快到的排前面：这个队列存在的意义就是「还来得及处理的那些」
+                .orderByAsc(UsrLogoff::getCoolingUntil);
+        var r = mapper.selectPage(
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(p, sz), w);
+        return new ai.neargo.common.core.PageResult<>(
+                r.getRecords().stream().map(UserLogoffServiceImpl::toVO).toList(), r.getTotal());
+    }
+
     private static boolean expired(UsrLogoff e) {
         String until = e.getCoolingUntil();
         if (until == null || until.isBlank()) return false;   // 没有截止时间 → 不拿它拒人

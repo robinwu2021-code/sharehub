@@ -82,6 +82,20 @@ public final class UserCoreDtos {
                               String appliedAt, String issuedAt) {
     }
 
+    /**
+     * 运营端看的 C 端开票申请行。
+     *
+     * <p><b>不复用 {@link InvoiceItem}</b>：那是消费者看自己的单，没有 {@code cUserNo} ——
+     * 运营端拿它做列表，第一列「是谁申请的」就填不出来。
+     * 同一个 DTO 服务两个受众的代价已经在订单那边付过一次（见 {@code MpTradeDtos} 类注释）。
+     */
+    public record CUserInvoiceRow(String invoiceNo, String cUserNo, String nickname,
+                                  String titleNo, String title, BigDecimal amount, String currency,
+                                  String status, String fileUrl, String rejectReason,
+                                  String handledBy, String handledAt,
+                                  String appliedAt, String issuedAt) {
+    }
+
     /** 注销申请（PDPL 冷静期）。{@code coolingUntil} 之前用户可撤销。 */
     public record LogoffItem(String cUserNo, String requestedAt, String coolingUntil,
                              String status, String purgedAt) {
