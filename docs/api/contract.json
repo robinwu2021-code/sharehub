@@ -11857,7 +11857,7 @@
    "handler": "SysSettingController#createAppVersion",
    "summary": "",
    "params": [],
-   "bodyType": "SysAppVersion",
+   "bodyType": "SysDtos.AppVersionReq",
    "returnType": "AppVersion",
    "returnContainer": null,
    "returnElement": "AppVersion",
@@ -11915,7 +11915,56 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "versionId",
+     "type": "String"
+    },
+    {
+     "name": "versionNo",
+     "type": "String"
+    },
+    {
+     "name": "platform",
+     "type": "String"
+    },
+    {
+     "name": "buildNo",
+     "type": "Integer"
+    },
+    {
+     "name": "releaseNote",
+     "type": "String"
+    },
+    {
+     "name": "releaseNoteEn",
+     "type": "String"
+    },
+    {
+     "name": "releaseNoteAr",
+     "type": "String"
+    },
+    {
+     "name": "forceUpdate",
+     "type": "Boolean"
+    },
+    {
+     "name": "minSupported",
+     "type": "String"
+    },
+    {
+     "name": "rolloutPercent",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "downloadUrl",
+     "type": "String"
+    },
+    {
+     "name": "releasedAt",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -11934,7 +11983,7 @@
      "required": true
     }
    ],
-   "bodyType": "SysAppVersion",
+   "bodyType": "SysDtos.AppVersionReq",
    "returnType": "AppVersion",
    "returnContainer": null,
    "returnElement": "AppVersion",
@@ -11992,7 +12041,56 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "versionId",
+     "type": "String"
+    },
+    {
+     "name": "versionNo",
+     "type": "String"
+    },
+    {
+     "name": "platform",
+     "type": "String"
+    },
+    {
+     "name": "buildNo",
+     "type": "Integer"
+    },
+    {
+     "name": "releaseNote",
+     "type": "String"
+    },
+    {
+     "name": "releaseNoteEn",
+     "type": "String"
+    },
+    {
+     "name": "releaseNoteAr",
+     "type": "String"
+    },
+    {
+     "name": "forceUpdate",
+     "type": "Boolean"
+    },
+    {
+     "name": "minSupported",
+     "type": "String"
+    },
+    {
+     "name": "rolloutPercent",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "downloadUrl",
+     "type": "String"
+    },
+    {
+     "name": "releasedAt",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -29929,6 +30027,15 @@
    "UNREACHABLE",
    "REMOTE_ERROR"
   ],
+  "Status": [
+   "SUCCESS",
+   "FAILED",
+   "SKIPPED"
+  ],
+  "Type": [
+   "SCHEDULED",
+   "MANUAL"
+  ],
   "OutboxStatus": [
    "PENDING",
    "SENT",
@@ -30178,7 +30285,7 @@
  "conflicts": {},
  "stats": {
   "endpoints": 431,
-  "records": 315,
+  "records": 319,
   "withPerm": 368,
   "withBody": 188,
   "shapedResponses": 331

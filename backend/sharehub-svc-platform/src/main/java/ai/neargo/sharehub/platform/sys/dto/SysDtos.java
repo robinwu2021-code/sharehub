@@ -69,6 +69,50 @@ public final class SysDtos {
     // ——————————————————— 应用版本 ———————————————————
 
     /** 应用版本行，镜像前端 {@code AppVersion}。{@code rolloutPercent} 为 0..100。 */
+    /**
+     * App 版本**写入参**（白名单）。管的是 C 端强制更新，写错一行影响所有装着 App 的人。
+     *
+     * <p><b>{@code forceUpdate} 在这里是 {@code Boolean}，不是实体的 {@code Integer}。</b>
+     * 出参 {@link AppVersion} 回的是 {@code SysCtx.bool(...)} —— 也就是布尔；
+     * 而实体当请求体时入参要的是 0/1。运营端类型里 {@code forceUpdate: boolean}、
+     * 表单是个开关，于是<b>把读到的原样回传就 500</b>（Jackson 反序列化失败）。
+     * 读写口径不一致这类毛病不报错在写的时候，报在<b>下一次编辑</b>的时候。
+     *
+     * <p><b>不声明 {@code status}</b>：状态由回滚 / 发布专门入口迁移。
+     * service 的 {@code beforeUpdate} 里也锁着（2026-09-23 加固：不锁的话回滚形同虚设，
+     * 回滚置 ROLLBACK 而更新接口能改回 RELEASED），这里不声明是第二道 ——
+     * 锁是黑名单得有人记得写，不声明是白名单，新人照抄也漏不掉。
+     *
+     * <p><b>{@code platform} 只在建单时生效，编辑时由 service 回填原值</b>：
+     * 业务键 {@code versionId} 是 {@code platform + "-" + versionNo} 拼出来的，
+     * 改了 platform 键就不再自洽 —— 一条 {@code IOS-…} 的记录 platform 变成 ANDROID 之后，
+     * C 端按 platform 查会把它选出来，下发的是**另一个平台的安装包地址**。
+     * 症状不是报错，是「安卓用户点更新下到一个 ipa」。
+     */
+    public record AppVersionReq(String versionId, String versionNo, String platform, Integer buildNo,
+                                String releaseNote, String releaseNoteEn, String releaseNoteAr,
+                                Boolean forceUpdate, String minSupported,
+                                java.math.BigDecimal rolloutPercent, String downloadUrl,
+                                String releasedAt) {
+        /** 映射到实体。**status 有意不设**；forceUpdate 布尔转 0/1。 */
+        public ai.neargo.sharehub.platform.sys.entity.SysAppVersion toEntity() {
+            var e = new ai.neargo.sharehub.platform.sys.entity.SysAppVersion();
+            e.setVersionId(versionId);
+            e.setVersionNo(versionNo);
+            e.setPlatform(platform);
+            e.setBuildNo(buildNo);
+            e.setReleaseNote(releaseNote);
+            e.setReleaseNoteEn(releaseNoteEn);
+            e.setReleaseNoteAr(releaseNoteAr);
+            e.setForceUpdate(forceUpdate == null ? null : (forceUpdate ? 1 : 0));
+            e.setMinSupported(minSupported);
+            e.setRolloutPercent(rolloutPercent);
+            e.setDownloadUrl(downloadUrl);
+            e.setReleasedAt(releasedAt);
+            return e;
+        }
+    }
+
     public record AppVersion(String versionId, String versionNo, String platform, Integer buildNo,
                              String releaseNote, String releaseNoteEn, String releaseNoteAr,
                              Boolean forceUpdate, String minSupported, BigDecimal rolloutPercent,

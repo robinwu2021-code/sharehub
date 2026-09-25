@@ -4,6 +4,7 @@ import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.platform.md.dto.MdDtos2.MarketCountry;
 import ai.neargo.sharehub.platform.md.entity.MdMarketCountry;
 import ai.neargo.sharehub.platform.md.service.MarketService;
+import ai.neargo.sharehub.platform.sys.dto.SysDtos;
 import ai.neargo.sharehub.platform.sys.dto.SysDtos.AppVersion;
 import ai.neargo.sharehub.platform.sys.dto.SysDtos.BizRules;
 import ai.neargo.sharehub.platform.sys.dto.SysDtos.LoginSetting;
@@ -120,15 +121,17 @@ public class SysSettingController {
     // 三个写端点（建版本/改版本/回滚）都属"发布"，统一判 :release。
     // （两码当前都只有 ADMIN 持有，访问面不变。）
     @PreAuthorize("@perm.can('system:app_version:release')")
-    public AppVersion createAppVersion(@RequestBody SysAppVersion body) {
-        return appVersions.save(body); // versionId 由 service 按 平台-版本号 拼出
+    public AppVersion createAppVersion(@RequestBody SysDtos.AppVersionReq body) {
+        return appVersions.save(body.toEntity()); // versionId 由 service 按 平台-版本号 拼出
     }
 
     @PostMapping("/api/platform/app-versions/{versionId}")
     @PreAuthorize("@perm.can('system:app_version:release')")
-    public AppVersion updateAppVersion(@PathVariable String versionId, @RequestBody SysAppVersion body) {
-        body.setVersionId(versionId);
-        return appVersions.save(body);
+    public AppVersion updateAppVersion(@PathVariable String versionId,
+                                       @RequestBody SysDtos.AppVersionReq body) {
+        SysAppVersion e = body.toEntity();
+        e.setVersionId(versionId);
+        return appVersions.save(e);
     }
 
     /** 软回滚：{@code status=ROLLBACK} + {@code rolloutPercent=0}，**记录保留**。 */

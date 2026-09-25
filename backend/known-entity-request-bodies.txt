@@ -51,7 +51,6 @@ MdRegion
 MktNotice
 NotifyBlacklist
 NotifyTemplate
-SysAppVersion
 SysLoginSetting
 SysParam
 SysTaxSetting

@@ -71,6 +71,11 @@ public class AppVersionServiceImpl extends AbstractCrudService<SysAppVersion, Ap
     @Override
     protected void beforeUpdate(SysAppVersion e, SysAppVersion current) {
         e.setStatus(current.getStatus());
+        // 业务键 versionId = platform + "-" + versionNo，建单时拼好。改 platform 会让键不再自洽：
+        // 一条 IOS-… 的记录 platform 变成 ANDROID 之后，C 端 check 按 platform 查会把它选出来，
+        // 下发的是**另一个平台的安装包地址** —— 症状不是报错，是「安卓用户点更新下到一个 ipa」。
+        // 换平台应当新建一条（版本号相同也无妨，键含平台，不会撞）。
+        e.setPlatform(current.getPlatform());
     }
 
     @Override
