@@ -34,6 +34,7 @@ export const orgHttp: OrgApi = {
   // 功能权限（S6）。目录与覆盖写都走 IamAdminController，前缀是 /api/platform/**iam**/**
   // （类上 @RequestMapping("/api/platform/iam")，与 PlatformController 的 /api/platform/roles 分开）。
   listAllMenus: () => client.get("/api/platform/iam/menus"),
+  updateMenu: (menuNo, patch) => client.put(`/api/platform/iam/menus/${menuNo}`, patch),
   listPermissions: () => client.get("/api/platform/iam/permissions"),
   // 读侧（2026-07-30 后端已补）：直接读 iam_role_perm 表 —— 不走 PermissionService，
   // 那一层有进程内缓存，会滞后于刚提交的覆盖写，勾选树会回显旧值。

@@ -7,6 +7,9 @@ import { UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
 import { visibleSections, visibleLeaves } from "@/lib/nav";
 import { toNavSections } from "@/lib/menu-source";
+import { refreshMenuTree } from "@/lib/use-menu-tree";
+import type { MenuNode } from "@/lib/api/contracts/dashboard";
+import type { MenuPatch } from "@/lib/api/contracts/org";
 import type { Role } from "@/lib/auth";
 import { PageTitle, Pagination, EmptyState } from "@/components/ui/misc";
 import { TabHeader } from "@/components/ui/tab-header";
@@ -133,7 +136,9 @@ const gradeOf = (score: number): keyof typeof PERF_GRADE =>
 
 // tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）。
 // 本页原先自己判权（这点是对的，多数页面连这个都没有），只是名字与权限各存一份。
-const TAB_KEYS = ["employees", "roles", "org", "audit", "performance"] as const;
+const TAB_KEYS = ["employees", "roles", "menus", "org", "audit", "performance"] as const;
+/** 回得来的那扇门。与后端 IamAdminController.ADMIN_SECTION、mock db 三处同值。 */
+const ADMIN_MENU = "M_org";
 
 // —— 组织架构树 ——
 /**
@@ -269,6 +274,10 @@ function EmployeesInner() {
   // 不用「打开时 setState 灌一次」那套：react-query 命中缓存时 data 的引用不变，
   // 重开同一个角色的 effect 不会再跑，抽屉里就会出现「一项都没勾」的假象。
   const [permRole, setPermRole] = useState<RoleRow | null>(null);
+  /** 菜单管理：正在编辑的那一项（null = 抽屉关着）。 */
+  const [menuForm, setMenuForm] = useState<MenuNode | null>(null);
+  /** 停用态不在 MenuNode 上（下发的树里本就没有隐藏项），单独存。 */
+  const [menuVisible, setMenuVisible] = useState(1);
   const [permDraft, setPermDraft] = useState<string[] | null>(null);
   const [permFilter, setPermFilter] = useState("");
   const [auditId, setAuditId] = useState<string | null>(null);
@@ -306,7 +315,7 @@ function EmployeesInner() {
   });
 
   // 功能权限：目录 + 该角色已分配码（只在抽屉打开时拉）
-  const permsQ = useQuery({ queryKey: ["permissions"], queryFn: () => api.listPermissions(), enabled: !!permRole });
+  const permsQ = useQuery({ queryKey: ["permissions"], queryFn: () => api.listPermissions(), enabled: !!permRole || !!menuForm });
   const rolePermsQ = useQuery({
     queryKey: ["role-perms", permRole?.roleNo],
     queryFn: () => api.listRolePermissions(permRole!.roleNo),
@@ -325,7 +334,21 @@ function EmployeesInner() {
    * 拿它算别人会少算一片（见 visibleSections 的 tree 参数）。
    */
   const allMenusQ = useQuery({
-    queryKey: ["all-menus"], queryFn: () => api.listAllMenus(), enabled: !!permRole,
+    // 菜单管理这一页也读它，所以不能只在权限抽屉打开时才拉
+    queryKey: ["all-menus"], queryFn: () => api.listAllMenus(), enabled: !!permRole || tab === "menus",
+  });
+  const saveMenu = useMutation({
+    mutationFn: (v: { menuNo: string; patch: MenuPatch }) => api.updateMenu(v.menuNo, v.patch),
+    onSuccess: () => {
+      notify.success("已保存");
+      setMenuForm(null);
+      qc.invalidateQueries({ queryKey: ["all-menus"] });
+      /*
+       * 自己的导航也要跟着变：改完看不到效果，人会以为没保存成功。
+       * 动态菜单开关关闭时这一步无害（外壳本来就用本地那份）。
+       */
+      void refreshMenuTree();
+    },
   });
   const previewMenus = useMemo(() => {
     const tree = allMenusQ.data ? toNavSections(allMenusQ.data) : [];
@@ -696,6 +719,53 @@ function EmployeesInner() {
           />
         </Toolbar>
       )}
+      {tab === "menus" && (
+        <>
+          {!canEditRole && <ReadOnlyNotice what="菜单维护" perm="org:role:update" note="只能查看" />}
+          <Notice>
+            这里只改「怎么显示、谁看得到」：名称（三语）· 分组标题 · 排序 · 停用/恢复 · 挂哪个权限码。
+            路径与层级跟着代码走 —— 在这里填一个不存在的路径，得到的是点进去白屏的入口。
+            没有删除，只有停用（可恢复）。
+          </Notice>
+          {allMenusQ.isLoading ? (
+            <div className="txt-body text-muted-foreground">读取菜单树…</div>
+          ) : (
+            <div className="mt-3 flex flex-col gap-3">
+              {(allMenusQ.data ?? []).map((sec) => (
+                <div key={sec.menuNo} className="rounded-card border border-[var(--border)] p-3">
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <span className="txt-strong">{sec.name}</span>
+                    <span className="txt-caption text-muted-foreground">{sec.path}</span>
+                    {sec.perm ? <Badge tone="outline">{sec.perm}</Badge>
+                      : <span className="txt-caption text-muted-foreground">按子项可见性</span>}
+                    {canEditRole && (
+                      <Button size="sm" variant="outline" onClick={() => { setMenuForm(sec); setMenuVisible(1); }}>编辑</Button>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    {sec.children.map((leaf) => (
+                      <div key={leaf.menuNo} className="flex flex-wrap items-center gap-2 border-t border-[var(--border)] pt-1">
+                        <span className="txt-body min-w-[7rem]">{leaf.name}</span>
+                        <span className="txt-caption text-muted-foreground">{leaf.path}</span>
+                        {leaf.group ? <Badge tone="muted">{leaf.group}</Badge> : null}
+                        {leaf.perm ? <Badge tone="outline">{leaf.perm}</Badge>
+                          : <Badge tone="warning">没挂码·谁都看得到</Badge>}
+                        {canEditRole && (
+                          <Button size="sm" variant="ghost" onClick={() => { setMenuForm(leaf); setMenuVisible(1); }}>编辑</Button>
+                        )}
+                      </div>
+                    ))}
+                    {!sec.children.length && (
+                      <span className="txt-caption text-muted-foreground">这一项自己就是一页，没有子项</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
       {tab === "roles" && (
         <>
           <Toolbar
@@ -894,6 +964,98 @@ function EmployeesInner() {
             </div>
           )}
         </div>
+      </Drawer>
+
+      {/* 菜单项编辑。字段刻意只有这几样——path/层级/新增/删除后端都不收 */}
+      <Drawer
+        open={!!menuForm}
+        onOpenChange={(o) => !o && setMenuForm(null)}
+        width="w-[520px]"
+        title={`编辑菜单 ${menuForm?.name ?? ""}`}
+        desc={menuForm?.path ?? undefined}
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setMenuForm(null)}>取消</Button>
+            <Button
+              disabled={saveMenu.isPending || !menuForm}
+              onClick={() => menuForm && saveMenu.mutate({
+                menuNo: menuForm.menuNo,
+                patch: {
+                  name: menuForm.name, nameEn: menuForm.nameEn ?? "", nameAr: menuForm.nameAr ?? "",
+                  groupName: menuForm.group ?? "", sort: menuForm.sort,
+                  perm: menuForm.perm ?? "", visible: menuVisible,
+                },
+              })}
+            >
+              {saveMenu.isPending ? "保存中…" : "保存"}
+            </Button>
+          </>
+        }
+      >
+        {menuForm && (
+          <div className="flex flex-col gap-3">
+            {/* 改名会废掉 overlay 里的译文，所以三语放在一起改 */}
+            <Notice>
+              改名字时请连英文/阿语一起改：菜单译名跟着菜单走，只改中文会让另外两语回落成中文。
+            </Notice>
+            <Field label="名称（中）">
+              <Input value={menuForm.name} onChange={(e) => setMenuForm({ ...menuForm, name: e.target.value })} />
+            </Field>
+            <Field label="名称（EN）">
+              <Input value={menuForm.nameEn ?? ""} onChange={(e) => setMenuForm({ ...menuForm, nameEn: e.target.value })} />
+            </Field>
+            <Field label="名称（AR）">
+              <Input value={menuForm.nameAr ?? ""} onChange={(e) => setMenuForm({ ...menuForm, nameAr: e.target.value })} />
+            </Field>
+            {menuForm.parentNo && (
+              <Field label="分组标题">
+                <Input value={menuForm.group ?? ""} placeholder="同组的相邻叶子共用一个小标题"
+                  onChange={(e) => setMenuForm({ ...menuForm, group: e.target.value })} />
+              </Field>
+            )}
+            <Field label="排序">
+              <Input type="number" value={String(menuForm.sort)}
+                onChange={(e) => setMenuForm({ ...menuForm, sort: Number(e.target.value) || 0 })} />
+            </Field>
+            <Field label="是否启用">
+              <select
+                className="h-9 w-full rounded-control border border-[var(--border)] bg-[var(--surface)] px-2"
+                value={String(menuVisible)}
+                disabled={menuForm.menuNo === ADMIN_MENU}
+                onChange={(e) => setMenuVisible(Number(e.target.value))}
+              >
+                <option value="1">启用</option>
+                <option value="0">停用（不显示，可恢复）</option>
+              </select>
+              {menuForm.menuNo === ADMIN_MENU && (
+                // 护栏在界面上先说清楚，而不是让人点了才吃一个 500
+                <div className="mt-1 txt-caption text-muted-foreground">
+                  「员工与权限」停不掉——菜单是运营端唯一的入口，停了之后谁都进不来把它改回去。
+                </div>
+              )}
+            </Field>
+            <Field label="权限码">
+              {/* 只能从目录里选：自由输入的结果是「对谁都不可见且不报错」 */}
+              <select
+                className="h-9 w-full rounded-control border border-[var(--border)] bg-[var(--surface)] px-2"
+                value={menuForm.perm ?? ""}
+                disabled={!menuForm.parentNo && (menuForm.children?.length ?? 0) > 0}
+                onChange={(e) => setMenuForm({ ...menuForm, perm: e.target.value || null })}
+              >
+                <option value="">（不限 · 谁都看得到）</option>
+                {(permsQ.data ?? []).map((p) => (
+                  <option key={p.code} value={p.code}>{p.name}（{p.code}）</option>
+                ))}
+              </select>
+              {!menuForm.parentNo && (menuForm.children?.length ?? 0) > 0 && (
+                // 有子项的 section 走「有没有可见子项」，它自己的码不参与判定
+                <div className="mt-1 txt-caption text-muted-foreground">
+                  这一项有子菜单，可见性由「有没有可见的子项」决定，改它自己的码不起作用。
+                </div>
+              )}
+            </Field>
+          </div>
+        )}
       </Drawer>
 
       {/* 审计详情（S4）：只有列表时「改了什么」全靠猜，这里给字段级前后对比 */}

@@ -20,6 +20,21 @@ import { dynamicMenuEnabled, useMenuStore, toNavSections } from "./menu-source";
  * <h3>换人要重拉</h3>
  * `operatorGen` 进依赖：登录、登出、切主体都会推进它，而这三件事都换了可见菜单。
  */
+/**
+ * 立刻重拉一次服务端菜单。**改完菜单要叫它** ——
+ * 否则改了自己的导航不动，人会以为没保存成功。
+ * 开关关闭时是个空操作（外壳本来就用本地那份）。
+ */
+export async function refreshMenuTree(): Promise<void> {
+  if (!dynamicMenuEnabled() || !useAuth.getState().token) return;
+  try {
+    const nodes = await api.getMenus();
+    useMenuStore.getState().set(nodes?.length ? toNavSections(nodes) : null);
+  } catch {
+    // 失败保持原样：菜单拿不到就整站没入口，宁可用旧的
+  }
+}
+
 export function useMenuTree(): void {
   const loggedIn = useAuth((s) => s.loggedIn());
   const operatorGen = useAuth((s) => s.operatorGen);

@@ -8,6 +8,18 @@ import type {
   DataScopeSubject, DataScopeEntry,
 } from "../../types";
 
+/** 菜单可改的字段。**不含 path / 父子 / 类型** —— 理由见 {@link OrgApi.updateMenu}。 */
+export interface MenuPatch {
+  name?: string;
+  nameEn?: string;
+  nameAr?: string;
+  groupName?: string;
+  sort?: number;
+  /** 1 可见 / 0 停用。没有物理删除。 */
+  visible?: number;
+  perm?: string;
+}
+
 export interface OrgApi {
   listEmployees(q?: PageQ): Promise<PageResult<Employee>>;
   listRoles(q?: ArchiveQ): Promise<RoleRow[]>;
@@ -53,6 +65,14 @@ export interface OrgApi {
    * 角色的可见菜单预览也必须从全量树起算 —— 拿已剪枝的那棵算别人会少算一片。
    */
   listAllMenus(): Promise<MenuNode[]>;
+  /**
+   * 改一个菜单项。**只改「怎么显示、谁看得到」，不改「指向哪」** ——
+   * path 必须指向真实存在的前端路由，界面上填一个 /foo 得到的是点进去白屏的入口。
+   * 没有新增、没有物理删除（停用用 visible=0，可逆）。
+   *
+   * 后端两道闸（mock 同样强制）：perm 必须在目录里 · 不能把「员工与权限」藏掉。
+   */
+  updateMenu(menuNo: string, patch: MenuPatch): Promise<MenuNode>;
   listPermissions(): Promise<PermissionItem[]>;
   /** 某角色已分配的权限码。 */
   listRolePermissions(roleNo: string): Promise<string[]>;
