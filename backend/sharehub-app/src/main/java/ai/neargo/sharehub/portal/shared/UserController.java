@@ -102,7 +102,11 @@ public class UserController {
                 .filter(w -> cUserNo.equals(w.userNo())).findFirst().orElse(null);
         List<WalletTxnRow> walletTxns = wallets.txnsOf(cUserNo, 1, 5, null).getList();
         MemberRow member = memberships.get(cUserNo);
-        List<MemberCard> cards = members.pageCards(1, 50, cUserNo, null).getList();
+        // 同上：keyword 是 LIKE，必须再按业务键精确过滤。
+        // 这一行此前不过滤也没出事，只因为 pageCards 恒返空 —— 让它真的返数据之后，
+        // CU-0001 的档案就会**带出 CU-00012 的会员卡**（前者是后者的子串）。
+        List<MemberCard> cards = members.pageCards(1, 50, cUserNo, null).getList().stream()
+                .filter(c -> cUserNo.equals(c.cUserNo())).toList();
 
         PageResult<RentOrder> orderPage = rentOrders.pageByOwner(cUserNo, 1, 200);
         List<RentOrder> orders = orderPage.getList();

@@ -243,6 +243,7 @@ export default {
   member: {
     active: "مفعّلة",
     buy: "اشترِ الآن",
+    buySoon: "شراء العضوية قريباً",
     perMonth: "/شهر",
     validTo: "صالحة حتى",
     benefits: "المزايا",

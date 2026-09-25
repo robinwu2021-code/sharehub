@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "@/api";
+import { t } from "@/i18n";
 import type { MembershipPlan } from "@/types";
 
 const list = ref<MembershipPlan[]>([]);
@@ -17,8 +18,20 @@ async function load() {
 }
 onShow(load);
 
-function buy(m: MembershipPlan) {
-  uni.showToast({ title: m.name, icon: "none" });
+/**
+ * 购买入口尚未接通 —— 这里**如实说出来**。
+ *
+ * 原先它弹的是套餐名（`m.name`）：按钮写着「立即购买」，点下去冒出一个套餐名，
+ * 读起来像下单成功了。同一个仓库里 `profile.vue` 的 `bindPhone` 早就是
+ * 「即将上线」的写法，这里跟着它走。
+ *
+ * **为什么不干脆把购买做通**：`mbr_plan.rights`（免费时长 / 折扣率 / 免押提额）
+ * 一处都没接进计价链（`trade` 里 grep 不到任何 Membership），
+ * 现在能买等于收了钱不给权益 —— 那比「即将上线」糟得多。
+ * 顺序是先接权益计费（C-MB-02），再开购买（C-MB-01）。
+ */
+function buy(_m: MembershipPlan) {
+  uni.showToast({ title: t("member.buySoon"), icon: "none" });
 }
 </script>
 

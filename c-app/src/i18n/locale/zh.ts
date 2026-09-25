@@ -243,6 +243,7 @@ export default {
   member: {
     active: "生效中",
     buy: "立即购买",
+    buySoon: "会员购买即将上线",
     perMonth: "/月",
     validTo: "有效期至",
     benefits: "权益",

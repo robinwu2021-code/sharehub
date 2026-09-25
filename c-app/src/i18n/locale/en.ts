@@ -243,6 +243,7 @@ export default {
   member: {
     active: "Active",
     buy: "Buy now",
+    buySoon: "Membership purchase is coming soon",
     perMonth: "/mo",
     validTo: "Valid until",
     benefits: "Benefits",

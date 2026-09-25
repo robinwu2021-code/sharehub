@@ -7,6 +7,7 @@ import ai.neargo.sharehub.user.member.dto.MemberDtos.MemberBenefit;
 import ai.neargo.sharehub.user.member.dto.MemberDtos.MemberCard;
 import ai.neargo.sharehub.user.member.dto.MemberDtos.MemberCardGrantReq;
 import ai.neargo.sharehub.user.member.entity.MbrBenefit;
+import ai.neargo.sharehub.user.asset.entity.UsrMembership;
 import ai.neargo.sharehub.user.member.mapper.MbrBenefitMapper;
 import ai.neargo.sharehub.user.member.service.MemberService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -37,9 +38,13 @@ public class MemberServiceImpl implements MemberService {
     private static final String TENANT_MAIN = "MAIN";
 
     private final MbrBenefitMapper mapper;
+    /** 会员卡就是 {@code usr_membership} 的另一个投影；本服务只读它，写入在开通/续费流程里。 */
+    private final ai.neargo.sharehub.user.asset.mapper.UserAssetMappers.UsrMembershipMapper memberships;
 
-    public MemberServiceImpl(MbrBenefitMapper mapper) {
+    public MemberServiceImpl(MbrBenefitMapper mapper,
+                             ai.neargo.sharehub.user.asset.mapper.UserAssetMappers.UsrMembershipMapper memberships) {
         this.mapper = mapper;
+        this.memberships = memberships;
     }
 
     @Override
@@ -120,10 +125,35 @@ public class MemberServiceImpl implements MemberService {
         }
     }
 
+    /**
+     * 会员卡列表 —— {@code usr_membership} 的投影。
+     *
+     * <p><b>此前这里无条件返回空页</b>，而上面那行注释（「本服务只读它」）读起来像是已经读了。
+     * 两处因此一直是空的：运营端「会员卡」列表，以及<b>用户 360 档案</b>里的 cards ——
+     * 后者更难发现，因为同一个响应里的「会员」块是真的（走 {@code MembershipService.get}），
+     * 只有「会员卡」是空的，看起来像这个人没开过卡。
+     *
+     * <p>{@code keyword} 同时匹配卡号与用户号：360 档案就是把 {@code cUserNo} 当 keyword 传进来的。
+     */
     @Override
     public PageResult<MemberCard> pageCards(Integer page, Integer size, String keyword, String level) {
-        // 会员卡由 usr_membership 投影；本服务只读它，写入在开通/续费流程里。
-        return new PageResult<>(List.of(), 0L);
+        int p = (page == null || page < 1) ? 1 : page;
+        int s = (size == null || size < 1) ? 10 : Math.min(size, 200);
+
+        LambdaQueryWrapper<UsrMembership> w = new LambdaQueryWrapper<UsrMembership>()
+                .eq(level != null && !level.isBlank(), UsrMembership::getLevel, level)
+                .orderByDesc(UsrMembership::getId);
+        if (keyword != null && !keyword.isBlank()) {
+            w.and(q -> q.like(UsrMembership::getMbrNo, keyword).or().like(UsrMembership::getCUserNo, keyword));
+        }
+        Page<UsrMembership> r = memberships.selectPage(new Page<>(p, s), w);
+        return new PageResult<>(r.getRecords().stream().map(MemberServiceImpl::toCard).toList(), r.getTotal());
+    }
+
+    private static MemberCard toCard(UsrMembership e) {
+        return new MemberCard(e.getMbrNo(), e.getCUserNo(), e.getPlanNo(), e.getLevel(),
+                e.getStartAt(), e.getEndAt(), e.getStatus(), e.getPoints(),
+                Integer.valueOf(1).equals(e.getAutoRenew()));
     }
 
     @Override
