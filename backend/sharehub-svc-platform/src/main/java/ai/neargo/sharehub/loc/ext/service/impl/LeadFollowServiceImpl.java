@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.loc.ext.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.auth.LoginUser;
 import ai.neargo.sharehub.auth.SecurityUtils;
@@ -61,7 +62,7 @@ public class LeadFollowServiceImpl implements LeadFollowService {
         }
         LocLead lead = leadMapper.selectOne(new LambdaQueryWrapper<LocLead>()
                 .eq(LocLead::getLeadNo, leadNo).last("limit 1"));
-        if (lead == null) throw new IllegalArgumentException("线索不存在: " + leadNo);
+        if (lead == null) throw BizException.notFound(leadNo);
 
         String from = lead.getStage();
         String to = (req.toStage() == null || req.toStage().isBlank()) ? from : req.toStage();

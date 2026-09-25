@@ -6,18 +6,23 @@
 # 于是界面切到英文/阿语之后，页面是英文、报错还是中文 —— 不报错，只是读不懂。
 #
 # ───────────── 两条规则 ─────────────
-# ① # ═══ 2026-09-25 第二次：TOTAL 从 318 涨到 377，**不是变坏了，是尺子变宽了** ═══
+# ① # ═══ 2026-09-25 第二次：扫描面扩到三种形状 ═══
 #
 # 原来只扫 `throw new IllegalArgumentException("中文")`。而本仓库正在从它迁往
-# `ServerException` / `BizException`（业务码 → HTTP 状态，2026-09-25 落地）——
-# 卡口只盯旧形状的话，**迁移路径本身就是个洞**：当天新写的站点/合同/借出闸门
-# 已经在新形状上攒了 55 条硬编码中文，而卡口一声没吭。
+# `ServerException` / `BizException`（业务码 → HTTP 状态，同日落地）——
+# 卡口只盯旧形状的话，**迁移路径本身就是个洞**。
 # 一个只覆盖旧写法的棘轮比没有更糟：它让人以为这件事有人管着。
 #
-# 新增的那批多半是当天刚写的（SiteServiceImpl / ContractServiceImpl / RentabilityGuard …），
-# 属另一条线在做的运营流程改造。**记在这里不等于接受**，是先让它可见、别再长。
+# ⚠️ **TOTAL 按 HEAD（已提交的代码）量，不按工作区量。**
+#   第一版写的是 377 —— 那是我本地工作区的数，里面既有我未提交的转换、
+#   也有另一条线未提交的新代码。任何人一 checkout 就会红，而他什么都没做错。
+#   台账是给**所有人**的判据，只能以大家都能看到的那份代码为准。
 #
-TOTAL 377
+# ⚠️ 另一条线的运营流程改造（站点/合同/借出闸门）目前未提交，里面有约 80 条新的中文字面量。
+#   他们提交时本卡口会红 —— **那正是它该做的事**：先让这批可见，
+#   再按顶部「怎么修」的三类形状收口，而不是提交完就没人记得了。
+#
+TOTAL 294
 
 AccountStatus
 AdDtos
@@ -27,8 +32,6 @@ AgentCommissionServiceImpl
 AgentOwnershipSync
 AgentStatus
 AlarmCloseReason
-AlarmCodeServiceImpl
-AlarmEngineImpl
 AlarmLevel
 AlarmNoticeStatus
 AlarmRuleServiceImpl
@@ -36,24 +39,19 @@ AlarmRuleStatus
 AlarmServiceImpl
 AlarmStateMachine
 AlarmStatus
-AlarmTodoServiceImpl
 AppVersionServiceImpl
 AppleStrategy
 ApplyServiceImpl
 ApplyStatus
 AssignTargetType
 BizRuleServiceImpl
-CabinetLifecycleServiceImpl
 CabinetServiceImpl
-CabinetStateMachine
 CabinetStatus
 CampaignStateMachine
 CampaignStatus
 CodeBatchStatus
 ComplaintServiceImpl
 ConsumerAuthController
-ContractServiceImpl
-ContractStateMachine
 CreditScoreServiceImpl
 CsSenderType
 CsSessionServiceImpl
@@ -65,10 +63,7 @@ DepartmentServiceImpl
 DepositServiceImpl
 DeviceCodeType
 DeviceKind
-DeviceSignalServiceImpl
 DriverManifest
-FileCategory
-FileServiceImpl
 FreeWhitelistServiceImpl
 GoogleStrategy
 IamAdminController
@@ -85,9 +80,7 @@ Json
 LeadFollowServiceImpl
 LeadServiceImpl
 LedgerServiceImpl
-LocExtController
 LocService
-LocalFileStorage
 MarketingDtos
 MemberServiceImpl
 MpUserController
@@ -112,7 +105,6 @@ PriceAdjustmentServiceImpl
 PriceEngine
 PricePlanServiceImpl
 PricingScheduleServiceImpl
-ProtectionServiceImpl
 PushServiceImpl
 ReconTaskStatus
 ReconcileServiceImpl
@@ -120,7 +112,6 @@ ReferralServiceImpl
 RefundServiceImpl
 RentController
 RentOrderServiceImpl
-RentabilityGuard
 ReservationServiceImpl
 RoleQueryServiceImpl
 SettlementRefType
@@ -131,11 +122,8 @@ ShareMode
 ShareRecordStatus
 ShareServiceImpl
 SiteAgentServiceImpl
-SiteServiceImpl
-SiteStateMachine
+SiteLifecycleServiceImpl
 SlaRuleServiceImpl
-TrialRentServiceImpl
-TrialRentStateMachine
 UserAssetDtos
 UserBlacklistServiceImpl
 UserCouponServiceImpl

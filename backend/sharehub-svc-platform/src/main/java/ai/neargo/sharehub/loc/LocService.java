@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.loc;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.audit.AuditChanges;
 import java.time.LocalDateTime;
@@ -191,7 +192,7 @@ public class LocService {
     private LocSite requireSite(String siteNo) {
         LocSite e = siteMapper.selectOne(new LambdaQueryWrapper<LocSite>()
                 .eq(LocSite::getSiteNo, siteNo).last("limit 1"));
-        if (e == null) throw new IllegalArgumentException("站点不存在：" + siteNo);
+        if (e == null) throw BizException.notFound(siteNo);
         return e;
     }
 
@@ -487,7 +488,7 @@ public class LocService {
     private Site setSiteArchived(String siteNo, LocalDateTime at) {
         LocSite e = siteMapper.selectOne(
                 new LambdaQueryWrapper<LocSite>().eq(LocSite::getSiteNo, siteNo).last("limit 1"));
-        if (e == null) throw new IllegalArgumentException("站点不存在: " + siteNo);
+        if (e == null) throw BizException.notFound(siteNo);
         e.setArchivedAt(at);
         siteMapper.updateById(e);
         return toSite(e);
@@ -506,7 +507,7 @@ public class LocService {
     private Location setLocationArchived(String locationNo, LocalDateTime at) {
         LocLocation e = locationMapper.selectOne(
                 new LambdaQueryWrapper<LocLocation>().eq(LocLocation::getLocationNo, locationNo).last("limit 1"));
-        if (e == null) throw new IllegalArgumentException("点位不存在: " + locationNo);
+        if (e == null) throw BizException.notFound(locationNo);
         e.setArchivedAt(at);
         locationMapper.updateById(e);
         return toLocation(e);
@@ -525,7 +526,7 @@ public class LocService {
     private Venue setVenueArchived(String venueNo, LocalDateTime at) {
         LocVenue e = venueMapper.selectOne(
                 new LambdaQueryWrapper<LocVenue>().eq(LocVenue::getVenueNo, venueNo).last("limit 1"));
-        if (e == null) throw new IllegalArgumentException("场地方不存在: " + venueNo);
+        if (e == null) throw BizException.notFound(venueNo);
         e.setArchivedAt(at);
         venueMapper.updateById(e);
         return new Venue(e.getVenueNo(), e.getName(), e.getContact(), e.getIndustry(),
