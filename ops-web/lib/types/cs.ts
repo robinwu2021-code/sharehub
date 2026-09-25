@@ -36,10 +36,19 @@ export interface CsSession {
  * 会话消息（append-only，只增不改）。
  * `senderType` 区分用户与客服 —— 时间线左右分栏靠它，不靠 senderNo 猜。
  */
+/**
+ * CsSenderType
+ *
+ * <p>抽成**具名** `export type` 而不是内联在 interface 里：跨端词表卡口
+ * `StatusVocabularyAcrossEndsTest` 是「两端同名即比对」——
+ * 内联的联合类型它**配不上对，一个字都比不了**。后端同名枚举 `CsSenderType` 取值一致。
+ */
+export type CsSenderType = "USER" | "AGENT";
+
 export interface CsMessage {
   id: number;
   sessionNo: string;
-  senderType: "USER" | "AGENT";
+  senderType: CsSenderType;
   senderNo: string;
   content: string;
   attach: string | null;

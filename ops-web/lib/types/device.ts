@@ -339,14 +339,32 @@ export interface DeviceLog {
 
 // —— 设备编码（阶段 2）——
 // 对标竞品「充电桩编码」（平铺列表）。我们按**批次 + 供应商**归集，并跟踪绑定进度。
+/**
+ * DeviceCodeType
+ *
+ * <p>抽成**具名** `export type` 而不是内联在 interface 里：跨端词表卡口
+ * `StatusVocabularyAcrossEndsTest` 是「两端同名即比对」——
+ * 内联的联合类型它**配不上对，一个字都比不了**。后端同名枚举 `DeviceCodeType` 取值一致。
+ */
+export type DeviceCodeType = "QR" | "SN";
+
+/**
+ * CodeBatchStatus
+ *
+ * <p>抽成**具名** `export type` 而不是内联在 interface 里：跨端词表卡口
+ * `StatusVocabularyAcrossEndsTest` 是「两端同名即比对」——
+ * 内联的联合类型它**配不上对，一个字都比不了**。后端同名枚举 `CodeBatchStatus` 取值一致。
+ */
+export type CodeBatchStatus = "PENDING" | "PARTIAL" | "BOUND" | "VOID";
+
 export interface DeviceCodeBatch {
   batchNo: string;
   vendorCode: string;
-  codeType: "QR" | "SN"; // 二维码 / 出厂序列号
+  codeType: DeviceCodeType; // 二维码 / 出厂序列号
   rangeStart: string;
   rangeEnd: string;
   total: number;
   bound: number; // 已绑定数（列表显示 已绑定/总数 + 进度条）
   producedAt: string;
-  status: "PENDING" | "PARTIAL" | "BOUND" | "VOID";
+  status: CodeBatchStatus;
 }

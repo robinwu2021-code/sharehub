@@ -359,6 +359,15 @@ export type ReconAction = "verify" | "platform" | "channel" | "compensate";
 /** 处置结论分类：终态/中间态都要留下「判成了哪一类差错」，否则复盘时只剩一段自由文本。 */
 export type ReconHandleResult = "VERIFIED_OK" | "PLATFORM_ERROR" | "CHANNEL_ERROR" | "COMPENSATED";
 
+/**
+ * ReconTaskStatus
+ *
+ * <p>抽成**具名** `export type` 而不是内联在 interface 里：跨端词表卡口
+ * `StatusVocabularyAcrossEndsTest` 是「两端同名即比对」——
+ * 内联的联合类型它**配不上对，一个字都比不了**。后端同名枚举 `ReconTaskStatus` 取值一致。
+ */
+export type ReconTaskStatus = "MATCHED" | "DIFF";
+
 export interface Reconcile {
   batchNo: string;
   period: string;
@@ -371,7 +380,7 @@ export interface Reconcile {
   diff: number;
   currency: string;
   /** 跑批比对结果（只读事实，不因人工处置而变）。 */
-  status: "MATCHED" | "DIFF";
+  status: ReconTaskStatus;
   createdAt: string;
   /** 处置进度；已平批次为 null（无差错可处理）。 */
   handleStatus: ReconHandleStatus | null;
