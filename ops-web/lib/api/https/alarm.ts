@@ -29,4 +29,16 @@ export const alarmHttp: AlarmApi = {
   unarchiveAlarmCode: (code) => client.post(`/api/ops/alarms/codes/${code}/unarchive`, {}),
   archiveAlarmRule: (no) => client.post(`/api/ops/alarms/rules/${no}/archive`, {}),
   unarchiveAlarmRule: (no) => client.post(`/api/ops/alarms/rules/${no}/unarchive`, {}),
+
+  // —— 业务告警与待办 ——
+  alarmSummary: () => client.get("/api/ops/alarms/summary"),
+  getAlarmRecord: (no) => client.get(`/api/ops/alarms/records/${no}`),
+  alarmDispositionPreview: (no) => client.get(`/api/ops/alarms/records/${no}/disposition-preview`),
+  disposeAlarm: (no) => client.post(`/api/ops/alarms/records/${no}/dispose`, {}),
+  listAlarmRoutes: (code) => client.get(`/api/ops/alarms/codes/${code}/routes`),
+  saveAlarmRoutes: (code, routes) => client.post(`/api/ops/alarms/codes/${code}/routes`, routes),
+  alarmCodeStats: () => client.get("/api/ops/alarms/codes/stats"),
+  listAlarmTodos: (q) => client.get("/api/ops/alarm-todos", q),
+  alarmTodoCount: () => client.get("/api/ops/alarm-todos/count"),
+  doneAlarmTodo: (no, note) => client.post(`/api/ops/alarm-todos/${no}/done`, { note }),
 };

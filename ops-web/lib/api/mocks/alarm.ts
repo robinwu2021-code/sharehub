@@ -1,4 +1,5 @@
 // 覆盖范围：告警治理 —— 告警记录 / 通知流水 / 告警代码字典 / 通知规则 / 告警转工单。
+import * as ba from "../../mock/db/business-alarm";
 import * as db from "../../mock/db";
 // 重发尚未汇出到 mock/db/index.ts（该文件由主干集中合并），故直接引子模块（同 lib/api/mocks/cs.ts 的做法）。
 import { resendAlarmNotice } from "../../mock/db/alarm";
@@ -24,4 +25,16 @@ export const alarmMock: AlarmApi = {
   unarchiveAlarmCode: async (code) => wait(db.unarchiveAlarmCode(code), 350),
   archiveAlarmRule: async (no) => wait(db.archiveAlarmRule(no), 350),
   unarchiveAlarmRule: async (no) => wait(db.unarchiveAlarmRule(no), 350),
+
+  // —— 业务告警与待办 ——
+  alarmSummary: () => wait(ba.alarmSummary()),
+  getAlarmRecord: (no) => wait(ba.getAlarmRecord(no)),
+  alarmDispositionPreview: (no) => wait(ba.alarmDispositionPreview(no)),
+  disposeAlarm: async (no) => wait(ba.disposeAlarm(no), 350),
+  listAlarmRoutes: (code) => wait(ba.listAlarmRoutes(code)),
+  saveAlarmRoutes: async (code, routes) => wait(ba.saveAlarmRoutes(code, routes), 350),
+  alarmCodeStats: () => wait(ba.alarmCodeStats()),
+  listAlarmTodos: (q) => wait(ba.listAlarmTodos(q ?? {})),
+  alarmTodoCount: () => wait(ba.alarmTodoCount()),
+  doneAlarmTodo: async (no, note) => wait(ba.doneAlarmTodo(no, note), 350),
 };

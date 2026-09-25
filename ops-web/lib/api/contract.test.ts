@@ -14,7 +14,7 @@ import { httpApi, HTTP_SLICES } from "./http";
 const API_METHODS: Record<string, readonly string[]> = {
   dashboard: ["login", "logout", "me", "getMenus", "getDashboard", "sendLoginOtp", "listOperators", "switchOperator"],
   device: ["goLiveGate", "goLive", "markDeviceFault", "repairDevice", "undeployDevice", "retireDevice", "listTrialRents", "startTrialRent", "listProtections", "applyProtection", "releaseProtection", "listSignalCodes", "listCabinets", "getCabinet", "saveCabinet", "sendCommand", "listPowerbanks", "listCabinetMonitor", "listCommandRecords", "listInventoryTransfers", "getInventoryTransfer", "listOtaRollouts", "savePowerbank", "saveInventoryTransfer", "saveOtaRollout", "listOtaReleases", "saveOtaRelease", "listOtaTasks", "listDeviceLogs", "listDeviceCodeBatches", "saveDeviceCodeBatch", "archiveCabinet", "unarchiveCabinet", "archivePowerbank", "unarchivePowerbank", "importCabinets"],
-  alarm: ["listAlarmRecords", "listAlarmNotices", "listAlarmCodes", "listAlarmRules", "saveAlarmCode", "saveAlarmRule", "raiseAlarmWorkOrder", "ackAlarm", "closeAlarm", "autoRaiseWorkOrders", "resendAlarmNotice", "archiveAlarmCode", "unarchiveAlarmCode", "archiveAlarmRule", "unarchiveAlarmRule"],
+  alarm: ["alarmSummary", "getAlarmRecord", "alarmDispositionPreview", "disposeAlarm", "listAlarmRoutes", "saveAlarmRoutes", "alarmCodeStats", "listAlarmTodos", "alarmTodoCount", "doneAlarmTodo", "listAlarmRecords", "listAlarmNotices", "listAlarmCodes", "listAlarmRules", "saveAlarmCode", "saveAlarmRule", "raiseAlarmWorkOrder", "ackAlarm", "closeAlarm", "autoRaiseWorkOrders", "resendAlarmNotice", "archiveAlarmCode", "unarchiveAlarmCode", "archiveAlarmRule", "unarchiveAlarmRule"],
   workorder: ["listWorkOrders", "createWorkOrder", "dispatchWorkOrder", "acceptWorkOrder", "processWorkOrder", "completeWorkOrder", "closeWorkOrder", "rejectWorkOrder", "reworkWorkOrder", "listSlaRules", "listInspectionPlans", "saveSlaRule", "saveInspectionPlan", "runInspectionPlan"],
   location: ["listSiteAgents", "saveSiteAgent", "removeSiteAgent", "listSites", "saveSite", "listLocations", "savePoint", "listVenues", "listContracts", "listLeads", "listSiteAnalysis", "saveLead", "saveVenue", "saveContract", "listLeadFollowUps", "addLeadFollowUp", "addContractAttachment", "removeContractAttachment", "listVenueOnboardings", "saveVenueOnboarding", "reviewVenueOnboarding", "listSiteLifecycles", "siteLifecycleFunnel", "getContract", "contractSummary", "listContractLogs", "submitContract", "withdrawContract", "auditContract", "cosignContract", "signContract", "terminateContract", "auditContractTermination", "renewContract", "supplementContract", "getSite", "siteSummary", "listSiteStatusLogs", "siteOpeningChecklist", "siteCloseGate", "withdrawSite", "closeSite", "archiveSite", "unarchiveSite", "archivePoint", "unarchivePoint", "archiveVenue", "unarchiveVenue"],
   agent: ["listAgents", "saveAgent", "listAgentAssignments", "listAgentPerformance", "listAgentAccounts", "saveAgentAccount", "listAgentApplies", "acceptAgentApply", "auditAgentApply", "createAgentApply", "sendApplyOtp", "selfServiceApply", "myApply", "listAssignableAssets", "assignAgentAssets", "reclaimAgentAssets", "listAgentAssignmentRecords", "listAgentCommissions", "saveAgentCommission", "archiveAgent", "unarchiveAgent"],
@@ -81,7 +81,7 @@ describe("域切片划分", () => {
     expect(sorted(keysOf((HTTP_SLICES as Record<string, object>)[domain]))).toEqual(expected);
   });
 
-  it("方法总数仍为 352（新增/删除 API 时须自觉更新此数）", () => {
+  it("方法总数仍为 362（新增/删除 API 时须自觉更新此数）", () => {
     // 2026-09-23：差异化定价 2 个退役，适用范围 3 个新增（ADR-028 / V49），净 +1。
     // 2026-09-23 B1：品牌四个端点（list/save/archive/unarchive）。
         // 2026-09-23 A2-1：站点伙伴责任三个端点。
@@ -99,6 +99,8 @@ describe("域切片划分", () => {
     //   goLive 也不在其列——首台设备上线由后端推进，是系统边。
     // 2026-09-25 运营流程批次5a：设备运维 12 个（上线门禁/上线/故障/修复/撤机/报废
     //   + 试借还 2 + 保护 3 + 信号码字典）。
-    expect(ALL_METHODS.length).toBe(352);
+    // 2026-09-25 运营流程批次6a：业务告警与待办 10 个（摘要/详情/处置预览/处置
+    //   + 路由读写 + 每码统计 + 待办列表/计数/办结）。
+    expect(ALL_METHODS.length).toBe(362);
   });
 });
