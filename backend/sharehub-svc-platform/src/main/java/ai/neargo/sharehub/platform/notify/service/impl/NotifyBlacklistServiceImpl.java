@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.platform.notify.service.impl;
 
+import ai.neargo.sharehub.auth.StaffContext;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.platform.notify.NotifyTargets;
@@ -68,6 +69,11 @@ public class NotifyBlacklistServiceImpl implements NotifyBlacklistService {
         if (body.getReason() == null || body.getReason().isBlank()) body.setReason("MANUAL");
         if (body.getBlockedAt() == null || body.getBlockedAt().isBlank()) body.setBlockedAt(now());
         body.setStatus(ACTIVE);
+        // 谁拉的黑：按当前登录人回填，不接受客户端传。
+        // 这张表其余字段本来守得很全（update 只受理 channel/reason，target 脱敏后存），
+        // 唯独这一个漏了 —— 而拉黑会挡掉一个人收**所有**通知（含欠费催缴、退款通知），
+        // 「谁拉的」是事后唯一能追的线索。同一形状本轮在公告 publishedBy 上撞过一次。
+        body.setBlockedBy(StaffContext.require().userNo());
         body.setReleasedAt(null);
         body.setReleasedBy(null);
         if (body.getBlockNo() == null || body.getBlockNo().isBlank()) body.setBlockNo(nextBlockNo());
