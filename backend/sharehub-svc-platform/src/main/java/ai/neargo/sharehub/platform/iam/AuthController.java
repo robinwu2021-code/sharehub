@@ -111,7 +111,7 @@ public class AuthController {
             // 正常路径：账号 + 口令都对才放行；**角色只由账号决定**，前端传的 role 一概不认
             // （此前闸门关闭时前端可自选 ADMIN —— v4/06 §〇 第 1 条）。
             if (!"admin".equals(username) || !adminPassword.equals(in.password())) {
-                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "用户名或密码错误");
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "error.auth.bad_credentials");
             }
             role = adminRole;
         } else if (devMode.isEnabled()) {
@@ -168,7 +168,7 @@ public class AuthController {
     public Map<String, Object> loginOtp(@RequestBody Map<String, String> body) {
         String phone = body == null ? null : body.get("phone");
         if (phone == null || phone.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "请填写手机号");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "error.auth.phone_required");
         }
         String code;
         try {
@@ -208,7 +208,7 @@ public class AuthController {
                                     @RequestHeader(value = "Authorization", required = false) String auth) {
         LoginUser u = SecurityUtils.requireUser();
         if (u.realm() != Realm.AGENT) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "只有代理端会话可以切换运营主体");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "error.auth.agent_session_only");
         }
         OperatorMembership m;
         try {

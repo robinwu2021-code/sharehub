@@ -22,6 +22,9 @@ OpenApiAppServiceImpl 1     # SHA-256 不可用（JDK 保证有，走到就是�
 RedisTokenStore 2           # 会话序列化/反序列化失败
 MysqlTokenStore 2           # 同上
 DriverRegistry 1            # 找不到设备驱动
+JobRegistry 3               # 任务名重复 / 声明与实现对不上。**启动期装配断言**，不在请求路径上 ——
+                            # 走到这里应用就不该起来，4xx 语义压根不适用。
+                            # （2026-09-25 由另一条线随 S1 任务接口引入，本卡口当场红了。）
 OwnershipReconciler 1       # 载荷无法反序列化
 RemoteCaller 5              # 跨服务调用失败/无响应体 —— 对侧不可用，要人看
 

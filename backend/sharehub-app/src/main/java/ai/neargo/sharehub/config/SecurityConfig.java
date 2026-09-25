@@ -55,8 +55,8 @@ public class SecurityConfig {
                         .anyRequest().authenticated())
                 .addFilterBefore(consumerFilter, UsernamePasswordAuthenticationFilter.class)
                 .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint((req, resp, e) -> writeJson(resp, 401, "未认证或会话失效"))
-                        .accessDeniedHandler((req, resp, e) -> writeJson(resp, 403, "无权访问")));
+                        .authenticationEntryPoint((req, resp, e) -> writeJson(req, resp, 401, "error.unauthorized"))
+                        .accessDeniedHandler((req, resp, e) -> writeJson(req, resp, 403, "error.forbidden")));
         return http.build();
     }
 
@@ -120,8 +120,8 @@ public class SecurityConfig {
                 .addFilterBefore(internalFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(staffFilter, UsernamePasswordAuthenticationFilter.class)
                 .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint((req, resp, e) -> writeJson(resp, 401, "未认证或会话失效"))
-                        .accessDeniedHandler((req, resp, e) -> writeJson(resp, 403, "无权限")));
+                        .authenticationEntryPoint((req, resp, e) -> writeJson(req, resp, 401, "error.unauthorized"))
+                        .accessDeniedHandler((req, resp, e) -> writeJson(req, resp, 403, "error.forbidden")));
         return http.build();
     }
 
@@ -136,12 +136,40 @@ public class SecurityConfig {
         return src;
     }
 
-    private static void writeJson(HttpServletResponse resp, int code, String msg) throws java.io.IOException {
+    /**
+     * 401/403 的 JSON 出参。
+     *
+     * <p>字段名是 message 不是 msg：契约是 neargo-common-core 的 {@code Result{code,message,data}}，
+     * 与 ApiResponseWrapper 包出来的形状必须一致。2026-09-23 之前这里写 msg ——
+     * 运营端读 body.message 拿到 undefined，**401/403 的后端文案永远显示不出来**。
+     *
+     * <p><b>文案走 i18n key，Locale 自己从请求头解析</b>：这两个处理器在过滤器里跑，
+     * 而 {@code LocaleResolver} 要等 DispatcherServlet 才写 {@code LocaleContextHolder} ——
+     * 直接调 {@code Messages.msg(key)} 拿到的永远是默认语。
+     * 此前这里干脆写死中文，于是英文/阿语界面上**最常见的那两种错误一直是中文**。
+     */
+    private static void writeJson(jakarta.servlet.http.HttpServletRequest req, HttpServletResponse resp,
+                                  int code, String key) throws java.io.IOException {
         resp.setStatus(code);
         resp.setContentType("application/json;charset=UTF-8");
-        // 字段名是 message 不是 msg：契约是 neargo-common-core 的 Result{code,message,data}，
-        // 与 ApiResponseWrapper 包出来的形状必须一致。2026-09-23 之前这里写 msg ——
-        // 运营端读 body.message 拿到 undefined，**401/403 的后端文案永远显示不出来**。
-        resp.getWriter().write("{\"code\":" + code + ",\"message\":\"" + msg + "\",\"data\":null}");
+        String msg = ai.neargo.sharehub.common.Messages.msg(localeOf(req), key);
+        resp.getWriter().write("{\"code\":" + code + ",\"message\":\"" + escape(msg) + "\",\"data\":null}");
+    }
+
+    /** Accept-Language → 支持的 Locale；解析不出就交给 Messages 用默认语。 */
+    private static java.util.Locale localeOf(jakarta.servlet.http.HttpServletRequest req) {
+        String header = req == null ? null : req.getHeader("Accept-Language");
+        if (header == null || header.isBlank()) return null;
+        try {
+            java.util.List<java.util.Locale.LanguageRange> ranges = java.util.Locale.LanguageRange.parse(header);
+            return java.util.Locale.lookup(ranges, I18nConfig.SUPPORTED);
+        } catch (IllegalArgumentException e) {
+            return null;   // 头是脏的（常见于爬虫），按默认语走，不要因此 500
+        }
+    }
+
+    /** 手拼 JSON 就得自己转义 —— 阿语文案里有引号或反斜杠时，不转义会直接产出非法 JSON。 */
+    private static String escape(String s) {
+        return s == null ? "" : s.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }

@@ -36,7 +36,8 @@ class MenuTreeTest extends ApiTestSupport {
         assertThat(t.size()).as("运营侧 section 数（18 个里 3 个是代理门户）").isEqualTo(15);
         int leaves = 0;
         for (JsonNode s : t) leaves += s.path("children").size();
-        assertThat(leaves).as("ADMIN 看得到的叶子数").isEqualTo(103);
+        // 2026-09-25 +2：用户管理 › 注销申请 / 开票申请（C 端一直在产生这两类待办，运营端此前没有入口）
+        assertThat(leaves).as("ADMIN 看得到的叶子数").isEqualTo(105);
     }
 
     @Test

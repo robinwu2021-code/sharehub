@@ -1,4 +1,4 @@
-# 接口参考（全量 430 个端点）
+# 接口参考（全量 431 个端点）
 
 > **本文件由脚本生成，不要手改**：
 >
@@ -24,10 +24,10 @@
 
 | | |
 |---|---|
-| 端点 | **430** |
-| 带功能权限码 | 367 |
-| 有请求体 | 187 |
-| 数据结构 | 240 个（文末统一定义） |
+| 端点 | **431** |
+| 带功能权限码 | 368 |
+| 有请求体 | 188 |
+| 数据结构 | 241 个（文末统一定义） |
 
 ### ⚠️ 3 个 `/api/**` 端点没有功能权限码
 
@@ -122,7 +122,7 @@
 
 ## 运营：设备 · 场地 · 工单 · 告警 · 库存
 
-131 个端点。
+132 个端点。
 
 ### `GET /api/ops/ad-slots`
 
@@ -173,7 +173,7 @@
 
 ### `GET /api/ops/alarms/codes`
 
-权限码 `workorder:wo:read` · `AlarmController#codes`
+权限码 `workorder:alarm:read` · `AlarmController#codes`
 
 **入参**
 
@@ -239,7 +239,7 @@
 
 ### `GET /api/ops/alarms/notices`
 
-权限码 `workorder:wo:read` · `AlarmController#notices`
+权限码 `workorder:alarm:read` · `AlarmController#notices`
 
 **入参**
 
@@ -272,7 +272,7 @@
 
 ### `GET /api/ops/alarms/records`
 
-权限码 `workorder:wo:read` · `AlarmController#records`
+权限码 `workorder:alarm:read` · `AlarmController#records`
 
 **入参**
 
@@ -291,7 +291,23 @@
 
 确认告警（OPEN → ACKED）。
 
-权限码 `workorder:wo:read` · `AlarmController#ack`
+权限码 `workorder:alarm:ack` · `AlarmController#ack`
+
+**入参**
+
+| 位置 | 名 | 类型 | 必填 |
+|---|---|---|---|
+| 路径 | `alarmNo` | `String` | 是 |
+
+**请求体** `对象（自由键）`
+
+**出参** [`AckResult`](#ackresult)
+
+### `POST /api/ops/alarms/records/{alarmNo}/close`
+
+关闭告警。
+
+权限码 `workorder:alarm:close` · `AlarmController#closeAlarm`
 
 **入参**
 
@@ -319,7 +335,7 @@
 
 ### `GET /api/ops/alarms/rules`
 
-权限码 `workorder:wo:read` · `AlarmController#rules`
+权限码 `workorder:alarm:read` · `AlarmController#rules`
 
 **入参**
 
@@ -4081,7 +4097,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 权限码 `system:app_version:release` · `SysSettingController#createAppVersion`
 
-**请求体** `SysAppVersion`
+**请求体** [`AppVersionReq`](#appversionreq)
 
 **出参** [`AppVersion`](#appversion)
 
@@ -4095,7 +4111,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 |---|---|---|---|
 | 路径 | `versionId` | `String` | 是 |
 
-**请求体** `SysAppVersion`
+**请求体** [`AppVersionReq`](#appversionreq)
 
 **出参** [`AppVersion`](#appversion)
 
@@ -5772,7 +5788,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 ## 数据结构
 
-共 240 个。同一结构常被多个端点复用，故在此定义一次、上文引用。
+共 241 个。同一结构常被多个端点复用，故在此定义一次、上文引用。
 
 ### AcceptReq
 
@@ -5964,6 +5980,10 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `remark` | `String` |
 | `dedupKey` | `String` |
 | `count` | `Integer` |
+| `closeReason` | `String` |
+| `closeNote` | `String` |
+| `closedBy` | `String` |
+| `closedAt` | `String` |
 
 ### AlarmRule
 
@@ -6009,6 +6029,23 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `minSupported` | `String` |
 | `releaseNote` | `String` |
 | `downloadUrl` | `String` |
+
+### AppVersionReq
+
+| 字段 | 类型 |
+|---|---|
+| `versionId` | `String` |
+| `versionNo` | `String` |
+| `platform` | `String` |
+| `buildNo` | `Integer` |
+| `releaseNote` | `String` |
+| `releaseNoteEn` | `String` |
+| `releaseNoteAr` | `String` |
+| `forceUpdate` | `Boolean` |
+| `minSupported` | `String` |
+| `rolloutPercent` | `BigDecimal` |
+| `downloadUrl` | `String` |
+| `releasedAt` | `String` |
 
 ### ApplyResult
 
@@ -8799,6 +8836,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 - **AdSlotStatus** — `IDLE`
 - **AgentStatus** — `ENABLED`
 - **AgentType** — `AGENT`
+- **AlarmCloseReason** — `RESOLVED` `FALSE_ALARM`
 - **AlarmLevel** — `INFO` `WARN`
 - **AlarmNoticeStatus** — `SENT`
 - **AlarmRuleStatus** — `ACTIVE`
@@ -8849,6 +8887,8 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 - **ShareMode** — `CHANNEL_SPLIT`
 - **ShareRecordStatus** — `PENDING`
 - **SiteAgentRole** — `INVEST` `DEVELOP` `OPERATE`
+- **Status** — `SUCCESS` `FAILED` `SKIPPED`
+- **Type** — `SCHEDULED` `MANUAL`
 - **VendorStatus** — `ENABLED`
 - **WithdrawalStatus** — `APPLY` `AUDIT` `PAYING` `PAID`
 - **WoDispatchAction** — `DISPATCH`
