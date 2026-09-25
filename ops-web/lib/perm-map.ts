@@ -47,13 +47,16 @@
  */
 
 /** 后端既无端点、也无角色持有。判 false，入口不渲染。 */
+// 2026-09-25：十个 `:delete` 码已从这里与真源表一起删除。
+// 全站零 DELETE —— **归档走的是 `:update`**（/api/ops/cabinets/{no}/archive
+// 用 device:cabinet:update），`:delete` 这一档从头到尾没有对应能力。
+// 留着它们的后果是角色勾选树上多一个勾不出任何东西的「删」。
 export const UNIMPLEMENTED = Symbol("backend-unimplemented");
 
 export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   // ——— agent ———
   "agent:account:manage": "agent:account:manage",
   "agent:agent:create": "agent:agent:create",
-  "agent:agent:delete": "agent:agent:delete",
   "agent:agent:read": "agent:agent:read",
   "agent:agent:update": "agent:agent:update",
   "agent:apply:approve": "agent:apply:approve",
@@ -73,7 +76,6 @@ export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   "dashboard:todo:read": "dashboard:todo:read",
   // ——— device ———
   "device:cabinet:create": "device:cabinet:create",
-  "device:cabinet:delete": "device:cabinet:delete",
   "device:cabinet:export": "device:cabinet:export",
   "device:cabinet:import": "device:cabinet:import",
   "device:cabinet:read": "device:cabinet:read",
@@ -111,7 +113,6 @@ export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   "finance:share_record:read": "finance:share_record:read",
   "finance:share_rule:config": "finance:share_rule:create",   // 翻译：后端新建与改都挂 create → POST /api/trade/share-rules 与 /{ruleNo}
   "finance:share_rule:create": "finance:share_rule:create",
-  "finance:share_rule:delete": "finance:share_rule:delete",
   "finance:share_rule:read": "finance:share_rule:read",
   "finance:share_rule:update": "finance:share_rule:update",
   "finance:withdrawal:apply": "finance:withdrawal:apply",
@@ -124,7 +125,6 @@ export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   // ——— location ———
   "location:analysis:read": "location:analysis:read",
   "location:contract:create": "location:contract:create",
-  "location:contract:delete": "location:contract:delete",
   "location:contract:read": "location:contract:read",
   "location:contract:update": "location:contract:update",
   "location:crm:read": "location:crm:read",
@@ -133,12 +133,10 @@ export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   "location:lead:update": "location:lead:update",
   "location:overview:read": "location:overview:read",   // D6d：端点已改判此专属码，恢复恒等
   "location:poi:create": "location:poi:create",
-  "location:poi:delete": "location:poi:delete",
   "location:poi:read": "location:poi:read",
   "location:poi:update": "location:poi:update",
   "location:site:update": "location:site:update",
   "location:venue:create": "location:venue:create",
-  "location:venue:delete": "location:venue:delete",
   "location:venue:read": "location:venue:read",
   "location:venue:update": "location:venue:update",
   // ——— marketing ———
@@ -149,7 +147,6 @@ export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   "marketing:campaign:read": "marketing:campaign:read",
   "marketing:campaign:update": "marketing:campaign:update",
   "marketing:coupon:create": "marketing:coupon:create",
-  "marketing:coupon:delete": "marketing:coupon:delete",
   "marketing:coupon:issue": "marketing:coupon:issue",
   "marketing:coupon:read": "marketing:coupon:read",
   "marketing:coupon:update": "marketing:coupon:update",
@@ -175,11 +172,9 @@ export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   // ——— org ———
   "org:audit:read": "org:audit:read",
   "org:dept:create": "org:dept:create",
-  "org:dept:delete": "org:dept:delete",
   "org:dept:read": "org:dept:read",
   "org:dept:update": "org:dept:update",
   "org:employee:create": "org:employee:create",
-  "org:employee:delete": "org:employee:delete",
   "org:employee:read": "org:employee:read",   // ⚠️ D6d：后端无角色持有 → 除 ADMIN 外必 403
   "org:employee:update": "org:employee:update",   // ⚠️ D6d：后端无角色持有 → 除 ADMIN 外必 403
   "org:performance:read": "org:performance:read",
@@ -194,7 +189,6 @@ export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   "pricing:adjustment:create": "pricing:adjustment:create",
   "pricing:adjustment:read": "pricing:adjustment:read",
   "pricing:plan:create": "pricing:plan:create",
-  "pricing:plan:delete": "pricing:plan:delete",
   "pricing:plan:read": "pricing:plan:read",
   "pricing:plan:update": "pricing:plan:update",
   "pricing:rule:config": "pricing:rule:config",
