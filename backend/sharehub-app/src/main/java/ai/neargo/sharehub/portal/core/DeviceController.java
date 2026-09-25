@@ -44,6 +44,7 @@ import java.util.Map;
 public class DeviceController {
 
     private final PowerbankService powerbankService;
+    private final ai.neargo.sharehub.dev.service.PowerbankLossService powerbankLoss;
     private final MonitorService monitorService;
     private final DeviceLogService deviceLogService;
     private final CodeBatchService codeBatchService;
@@ -51,8 +52,9 @@ public class DeviceController {
 
     public DeviceController(PowerbankService powerbankService, MonitorService monitorService,
                             DeviceLogService deviceLogService, CodeBatchService codeBatchService,
-                            OtaService otaService) {
+                            OtaService otaService, ai.neargo.sharehub.dev.service.PowerbankLossService powerbankLoss) {
         this.powerbankService = powerbankService;
+        this.powerbankLoss = powerbankLoss;
         this.monitorService = monitorService;
         this.deviceLogService = deviceLogService;
         this.codeBatchService = codeBatchService;
@@ -67,8 +69,26 @@ public class DeviceController {
                                                @RequestParam(required = false) Integer size,
                                                @RequestParam(required = false) String keyword,
                                                @RequestParam(required = false) String status,
-                                               @RequestParam(required = false) String cabinetNo) {
-        return powerbankService.page(page, size, keyword, status, cabinetNo);
+                                               @RequestParam(required = false) String cabinetNo,
+                                               @RequestParam(required = false) Boolean suspectedLost) {
+        return powerbankService.page(page, size, keyword, status, cabinetNo, suspectedLost);
+    }
+
+    /**
+     * 疑似丢失经核实：确认丢失（RENTED → LOST，状态机 CONFIRM_LOST）。只对打了疑似标记的宝开放 ——
+     * 没被系统怀疑过的宝要标丢失，说明判断依据不在系统里，应先查清再说。
+     */
+    @PostMapping("/powerbanks/{powerbankNo}/confirm-lost")
+    @PreAuthorize("@perm.can('device:powerbank:update')")
+    public PowerbankRow confirmLost(@PathVariable String powerbankNo, @RequestBody(required = false) Map<String, String> body) {
+        return powerbankLoss.confirmLost(powerbankNo, body == null ? null : body.get("note"));
+    }
+
+    /** 疑似丢失经核实：已找回 / 误判 —— 清标记并重置失联计时。说明必填（找回在哪、为什么误判）。 */
+    @PostMapping("/powerbanks/{powerbankNo}/dismiss-lost")
+    @PreAuthorize("@perm.can('device:powerbank:update')")
+    public PowerbankRow dismissLost(@PathVariable String powerbankNo, @RequestBody(required = false) Map<String, String> body) {
+        return powerbankLoss.dismiss(powerbankNo, body == null ? null : body.get("note"));
     }
 
     @PostMapping("/powerbanks")

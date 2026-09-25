@@ -14,6 +14,7 @@ import java.util.Set;
  *                          ▲                  │
  *                          └──── RETURN ──────┤
  *                                             ├── OVERDUE ──▶ LOST ──RECOVER──▶ IN_CABINET
+ *                                             ├── CONFIRM_LOST ─▶ LOST  （疑似丢失经人工核实，V113）
  *                                             ├── BUYOUT  ──▶ SOLD   (终态)
  *                                             └── FAULT_RETURN ─▶ FAULT
  * IN_CABINET ──REPORT_FAULT──▶ FAULT ──REPAIR──▶ IN_STOCK
@@ -47,6 +48,7 @@ public class PowerbankStateMachine {
         m.put("RETURN", Map.of(PowerbankStatus.RENTED, PowerbankStatus.IN_CABINET));        // 归还（任意柜）
         m.put("FAULT_RETURN", Map.of(PowerbankStatus.RENTED, PowerbankStatus.FAULT));       // 坏机归还
         m.put("OVERDUE", Map.of(PowerbankStatus.RENTED, PowerbankStatus.LOST));             // 超时未归还
+        m.put("CONFIRM_LOST", Map.of(PowerbankStatus.RENTED, PowerbankStatus.LOST));        // 疑似丢失经人工核实（V113；与 OVERDUE 同终点，来源不同）
         m.put("RECOVER", Map.of(PowerbankStatus.LOST, PowerbankStatus.IN_CABINET));         // 失而复得（LOST 是半终态）
         m.put("BUYOUT", Map.of(PowerbankStatus.RENTED, PowerbankStatus.SOLD,
                                PowerbankStatus.LOST, PowerbankStatus.SOLD));                // 买断付费（含超时买断）

@@ -50,4 +50,10 @@ public class DevPowerbank extends BaseEntity implements ai.neargo.sharehub.commo
     /** 入库质检：PENDING / PASSED / FAILED；null = 存量免检。 */
     private String qcStatus;
     private String warehouseNo;
+
+    // —— 疑似丢失（V113）：标记不是状态，宝仍是 RENTED ——
+    /** 失联满 N 天打的标记；确认丢失 / 找回后清空。 */
+    private java.time.LocalDateTime suspectedLostAt;
+    /** 疑似丢失久未处理、已升级通知的时间（每轮疑似只升级一次）。 */
+    private java.time.LocalDateTime lostEscalatedAt;
 }

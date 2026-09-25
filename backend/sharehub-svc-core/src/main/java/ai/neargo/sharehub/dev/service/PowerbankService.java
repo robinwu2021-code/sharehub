@@ -11,7 +11,9 @@ import ai.neargo.sharehub.dev.dto.DevDtos.PowerbankRow;
 public interface PowerbankService {
 
     /** 分页：keyword 匹配 powerbank_no/sn；status/cabinetNo 等值筛选。 */
-    PageResult<PowerbankRow> page(Integer page, Integer size, String keyword, String status, String cabinetNo);
+    /** @param suspectedLost true = 只看打了疑似丢失标记的（V113） */
+    PageResult<PowerbankRow> page(Integer page, Integer size, String keyword, String status, String cabinetNo,
+                                  Boolean suspectedLost);
 
     /** 按业务键单查；不存在返回 {@code null}。 */
     PowerbankRow get(String powerbankNo);

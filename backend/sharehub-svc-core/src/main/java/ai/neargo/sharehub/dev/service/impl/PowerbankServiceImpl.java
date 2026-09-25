@@ -43,7 +43,8 @@ public class PowerbankServiceImpl implements PowerbankService {
     }
 
     @Override
-    public PageResult<PowerbankRow> page(Integer page, Integer size, String keyword, String status, String cabinetNo) {
+    public PageResult<PowerbankRow> page(Integer page, Integer size, String keyword, String status, String cabinetNo,
+                                         Boolean suspectedLost) {
         int p = (page == null || page < 1) ? 1 : page;
         int s = (size == null || size < 1) ? 10 : Math.min(size, 200);
 
@@ -53,6 +54,7 @@ public class PowerbankServiceImpl implements PowerbankService {
         }
         if (status != null && !status.isBlank()) w.eq(DevPowerbank::getStatus, status);
         if (cabinetNo != null && !cabinetNo.isBlank()) w.eq(DevPowerbank::getCabinetNo, cabinetNo);
+        if (Boolean.TRUE.equals(suspectedLost)) w.isNotNull(DevPowerbank::getSuspectedLostAt);
         w.orderByDesc(DevPowerbank::getId);
 
         Page<DevPowerbank> r = mapper.selectPage(new Page<>(p, s), w);
@@ -150,11 +152,12 @@ public class PowerbankServiceImpl implements PowerbankService {
         return prefix + String.format("%04d", n + 1);
     }
 
-    private static PowerbankRow toVO(DevPowerbank e) {
+    static PowerbankRow toVO(DevPowerbank e) {
         return new PowerbankRow(e.getPowerbankNo(), e.getSn(), e.getVendorCode(),
                 e.getCabinetNo(), e.getSlotIndex(), e.getBattery(), e.getCycles(),
                 e.getHealth(), e.getStatus(),
-                e.getArchivedAt() == null ? null : e.getArchivedAt().toString());
+                e.getArchivedAt() == null ? null : e.getArchivedAt().toString(),
+                e.getSuspectedLostAt() == null ? null : e.getSuspectedLostAt().toString());
     }
 
     // ── 归档 / 取消归档（前端契约 Archivable）──

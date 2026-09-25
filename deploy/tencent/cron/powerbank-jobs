@@ -36,6 +36,9 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 # powerbank-aging · 充电宝老化标记（core.dev）· 声明 cron: 0 10 4 * * *
 10 4 * * * deploy flock -n /run/lock/powerbank-job-powerbank-aging.lock curl -s -m 300 -X POST 'http://127.0.0.1:8082/internal/job/powerbank-aging/trigger' -o /dev/null
 
+# powerbank-lost-suspect · 充电宝疑似丢失标记（core.dev）· 声明 cron: 0 30 4 * * *
+30 4 * * * deploy flock -n /run/lock/powerbank-job-powerbank-lost-suspect.lock curl -s -m 300 -X POST 'http://127.0.0.1:8082/internal/job/powerbank-lost-suspect/trigger' -o /dev/null
+
 # trial-rent-expire · 试借还超时（core.dev）· 声明 cron: 0 */5 * * * *
 */5 * * * * deploy flock -n /run/lock/powerbank-job-trial-rent-expire.lock curl -s -m 240 -X POST 'http://127.0.0.1:8082/internal/job/trial-rent-expire/trigger' -o /dev/null
 

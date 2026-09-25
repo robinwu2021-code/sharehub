@@ -16,7 +16,9 @@ public final class DevDtos {
     public record PowerbankRow(String powerbankNo, String sn, String vendorCode,
                                String cabinetNo, Integer slotIndex,
                                Integer battery, Integer cycles, String health, String status,
-                               String archivedAt) {
+                               String archivedAt,
+                               /* 疑似丢失标记时间（V113）；null = 未被怀疑。宝仍是 RENTED，这只是「待人核实」 */
+                               String suspectedLostAt) {
     }
 
     /**
