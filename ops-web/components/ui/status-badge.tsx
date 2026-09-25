@@ -15,11 +15,26 @@ import { Badge, type BadgeTone } from "./badge";
  */
 export type StatusMap<K extends string> = Record<K, { label: string; tone: BadgeTone }>;
 
-/** `<StatusBadge map={RES_STATUS} value={r.status} />` */
+/**
+ * `<StatusBadge map={RES_STATUS} value={r.status} />`
+ *
+ * <h3>映射不到时降级显示，不抛</h3>
+ * 原来是 `map[value].tone` —— 后端给一个映射表里没有的值，这里就 TypeError，
+ * 而它在表格 cell 里，于是**整页白屏**。36 个文件、181 处用到本组件，
+ * 任何一处枚举与后端对不上都能把那一页干掉，且 TS 拦不住（`K` 是编译期契约，
+ * 真实响应是运行时数据）。实跑对着真后端遇到过：告警等级前端认 INFO/WARN/CRITICAL，
+ * 库里存的是 HIGH（种子把工单优先级词表写进了告警等级），/alarms 直接白屏。
+ *
+ * 降级成「原样显示这个值 + 中性色」：页面还能用，而那个没见过的值**明晃晃摆在界面上**，
+ * 比白屏好查得多 —— 白屏只告诉你「坏了」，这个告诉你「坏在哪个值上」。
+ */
 export function StatusBadge<K extends string>({
   map, value, className,
 }: { map: StatusMap<K>; value: K; className?: string }) {
   const s = map[value];
+  if (!s) {
+    return <Badge tone="outline" className={className}>{String(value ?? "-")}</Badge>;
+  }
   return <Badge tone={s.tone} className={className}>{s.label}</Badge>;
 }
 

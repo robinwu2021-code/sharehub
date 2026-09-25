@@ -62,6 +62,18 @@ describe("设计 token 守卫", () => {
     expect(offenders, `颜色一律走 token：\n${offenders.join("\n")}`).toEqual([]);
   });
 
+  it("<StatusBadge> 映射不到时必须降级，不许直接取 .tone", () => {
+    /*
+     * 后端给一个映射表里没有的枚举值时，`map[value].tone` 会 TypeError；
+     * 它在表格 cell 里，于是**整页白屏**。36 个文件、181 处用本组件，
+     * TS 拦不住（`K` 是编译期契约，真实响应是运行时数据）。
+     * 实跑遇到过：告警等级前端认 INFO/WARN/CRITICAL，库里是 HIGH，/alarms 白屏。
+     * 这条守住那个兜底分支不被"顺手简化"掉。
+     */
+    const src = readFileSync("components/ui/status-badge.tsx", "utf8");
+    expect(src, "取不到映射时要 early-return 一个降级徽标").toMatch(/if\s*\(!s\)/);
+  });
+
   it("豁免清单不许变长", () => {
     // 这条是防止"顺手加豁免"的棘轮。要加豁免必须先改这个数字，
     // 从而在 code review 里显形。
