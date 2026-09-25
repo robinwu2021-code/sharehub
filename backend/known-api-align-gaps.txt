@@ -45,14 +45,10 @@ B POST /mp/user/report ReportResultVO 后端有前端无:sessionNo
 B POST /mp/user/report ReportResultVO 后端有前端无:suggestedAction
 C GET /api/agent/accounts/{}
 C GET /api/agent/commissions/{}
-C GET /api/auth/permissions
 C GET /api/ops/inspection-plans/{}
 C GET /api/ops/leads/{}
 C GET /api/ops/sla-rules/{}
 C GET /api/ops/venue-onboardings/{}
-C GET /api/platform/iam/roles
-C PUT /api/platform/iam/menus/{}   # 菜单编辑端点，随「菜单真源迁进 iam_menu」新落地，
-#                                    运营台的编辑入口还在建（GET 那条已接上并从本台账移除）
 C GET /api/trade/settlements/{}
 
 # ══════════════════════════════════════════════════════════════════════
@@ -76,7 +72,6 @@ C GET /mp/user/messages            # 站内信：只接了 /mp/notice（公告�
 C POST /mp/user/messages/{}/read   # 同上，已读回执
 #
 # ── B 组：整块没做（c-app 连页面都没有）──
-C POST /mp/user/logoff             # 注销账号。**应用商店硬要求**（App Store 5.1.1(v) / Google Play
 #                                    都要求提供账号删除入口），后端 logoff.apply 已就绪，不做上不了架
 C GET /mp/user/invoices            # 开票（4 条一组）：to-B 需求，取决于目标市场口径
 C POST /mp/user/invoices           #   同上
@@ -105,7 +100,6 @@ D InvoiceItem GET /mp/user/invoices
 D InvoiceTitleItem GET /mp/user/invoice-titles
 D Location GET /api/ops/locations
 D LoginResp POST /api/auth/login
-D LogoffItem POST /mp/user/logoff
 D MembershipPlanVO GET /mp/user/membership
 D MenuNode GET /api/auth/menus
 D MessageItem GET /mp/user/messages

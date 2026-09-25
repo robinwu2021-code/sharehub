@@ -57,12 +57,6 @@ public class IamAdminController {
                 .orderByAsc(IamPermission::getModule));
     }
 
-    /** 角色列表。 */
-    @GetMapping("/roles")
-    @PreAuthorize("@perm.can('org:role:read')")
-    public List<IamRole> roles() {
-        return roleMapper.selectList(new LambdaQueryWrapper<IamRole>().orderByAsc(IamRole::getId));
-    }
 
     /**
      * 读某角色已分配的权限码（勾选树回显）。

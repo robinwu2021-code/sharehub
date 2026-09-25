@@ -236,12 +236,6 @@ public class AuthController {
         return menuService.visibleFor(SecurityUtils.requireUser());
     }
 
-    /** 当前登录人权限码集合（前端 can() 用）。 */
-    @GetMapping("/permissions")
-    public List<String> permissions() {
-        return SecurityUtils.requireUser().perms();
-    }
-
     /**
      * 当前会话的身份与**当场重算的权限码**。ops-web 进应用与标签页重新可见时会拉它刷新 perms。
      *

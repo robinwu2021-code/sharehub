@@ -82,7 +82,8 @@ class AgentLoginFlowTest extends ApiTestSupport {
         JsonNode me = get("/api/auth/me", token).okData();
         assertThat(me.path("authenticated").asBoolean()).isTrue();
         assertThat(me.path("agentNo").asText()).startsWith("AG");
-        assertThat(get("/api/auth/permissions", token).okData().size())
+        // 权限码从 /me 里看 —— GET /api/auth/permissions 与它重复，已删（P5）
+        assertThat(me.path("perms").size())
                 .as("代理会话要真的带着权限码，否则登进来也什么都干不了").isPositive();
     }
 
