@@ -12,6 +12,8 @@ import type {
   StoreDetail,
   WalletTxn,
   RechargePackage,
+  FaqItem,
+  CsTicket,
 } from "@/types";
 import { CURRENCY, MOCK_DELAY_MS } from "@/shared/constants";
 
@@ -149,6 +151,21 @@ export const couponTpls: Omit<ClaimableCoupon, "claimed">[] = [
   { tplNo: "CTPL-OVER10", name: "AED 3 off over 10", type: "CUT", value: 3, threshold: 10, currency: CURRENCY, remaining: 120 },
   { tplNo: "CTPL-SUMMER", name: "Summer AED 8 off over 30", type: "CUT", value: 8, threshold: 30, currency: CURRENCY, remaining: 7 },
   { tplNo: "CTPL-VIP", name: "VIP 20% off", type: "DISCOUNT", value: 0.8, threshold: 0, currency: CURRENCY, remaining: null },
+];
+
+// 问题字典（/mp/faq）。suggestedAction 决定报障提交后往哪走 ——
+// 这里四条各覆盖一个出口，免得 mock 下永远只看得到「转人工」那一种。
+export const faqs: FaqItem[] = [
+  { problemNo: "ISS000001", category: "RENT", title: "充电宝没弹出来", answer: "请确认柜机指示灯是否常亮；30 秒内未弹出会自动退单。", suggestedAction: "TO_WORKORDER", sortNo: 1 },
+  { problemNo: "ISS000002", category: "RETURN", title: "还不进去 / 柜机已满", answer: "可在地图上筛选「可还」的柜机，附近满柜时请就近改还。", suggestedAction: "TO_CS", sortNo: 2 },
+  { problemNo: "ISS000003", category: "BILLING", title: "扣费比预期多", answer: "计费按小时取整，达每日封顶后不再计费。", suggestedAction: "TO_REFUND", sortNo: 3 },
+  { problemNo: "ISS000004", category: "DEVICE", title: "充电宝充不上电", answer: "请更换一根线或换一个接口再试；仍不行可就近归还并重新借出。", suggestedAction: "SELF_SERVICE", sortNo: 4 },
+];
+
+// 我的报障（可变：提交报障会往里加）
+export const tickets: CsTicket[] = [
+  { ticketNo: "TK000002", userNo: "CU-0001", orderNo: "ORD000031", cabinetNo: "CAB1005", problemNo: "ISS000003", issue: "归还后还在计费", channel: "APP", status: "PROCESSING", handlerNo: null, woNo: null, refundNo: "RF000003", createdAt: "2026-09-20 10:12:00" },
+  { ticketNo: "TK000001", userNo: "CU-0001", orderNo: "ORD000021", cabinetNo: "CAB1002", problemNo: "ISS000001", issue: "扫码后没弹出充电宝", channel: "APP", status: "CLOSED", handlerNo: "EMP0007", woNo: "WO000011", refundNo: null, createdAt: "2026-09-12 19:40:00" },
 ];
 
 export const memberships: Membership[] = [

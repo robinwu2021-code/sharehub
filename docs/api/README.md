@@ -618,10 +618,10 @@ SELF_SERVICE  TO_WORKORDER    TO_REFUND         TO_CS      （争议类问题额
 ### 8.6 报障与客服（C-CS，模块 12）
 | Method Path | 用途 | 编号 | 状态 |
 |---|---|---|---|
-| `POST /mp/user/report` | 自助报障（未弹出/无法归还/多扣费）→ `cs_ticket` | C-CS-01 | ✅ |
-| `GET /mp/user/reports` | 我的报障列表 | C-CS-02 | 🆕 |
-| `GET /mp/user/reports/{reportNo}` | 报障进度/结果（联动工单/退款状态） | C-CS-02/03 | 🆕 |
-| `GET /mp/faq` | 帮助中心 FAQ（读 `md_problem`，三语） | C-CS-05 | 🆕 |
+| `POST /mp/user/report` | 自助报障 → `cs_ticket`。入参 `problemNo` 取自 `/mp/faq`，**分流全靠它** | C-CS-01 | ✅ |
+| `GET /mp/user/reports` | 我的报障列表 | C-CS-02 | ✅ |
+| `GET /mp/user/reports/{reportNo}` | 报障进度/结果（联动工单/退款状态） | C-CS-02/03 | ✅ |
+| `GET /mp/faq` | 帮助中心 FAQ（读 `md_problem`，三语）。**同时是报障问题下拉的唯一来源** | C-CS-05 | ✅ |
 | `GET /mp/cs/session` · `POST /mp/cs/messages` | 客服会话 | C-CS-04 | 🆕 |
 
 > **报障问题类型来自 `md_problem` 字典**（运营端「问题管理」维护），端上不硬编码；字典的 `suggestedAction` 决定报障提交后是自助解决、转工单、转退款还是转人工。

@@ -17,6 +17,7 @@
     { "path": "pages/order/confirm" },
     { "path": "pages/order/detail" },
     { "path": "pages/order/feedback" },
+    { "path": "pages/reports/index" },
     { "path": "pages/coupons/index" },
     { "path": "pages/membership/index" },
     { "path": "pages/wallet/index" },

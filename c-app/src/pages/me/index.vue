@@ -83,6 +83,7 @@ async function logout() {
             <pb-cell icon="heart" :title="$t('me.favorites')" is-link @click="go('/pages/me/favorites')" />
             <pb-cell icon="ticket" :title="$t('me.coupons')" is-link @click="go('/pages/coupons/index')" />
             <pb-cell icon="card" :title="$t('me.membership')" is-link @click="go('/pages/membership/index')" />
+            <pb-cell icon="receipt" :title="$t('reports.title')" is-link @click="go('/pages/reports/index')" />
             <pb-cell icon="sparkles" :title="$t('theme.title')" is-link @click="sheet = true" />
             <pb-cell icon="lock" :title="$t('settings.title')" is-link @click="go('/pages/me/settings')" />
           </view>

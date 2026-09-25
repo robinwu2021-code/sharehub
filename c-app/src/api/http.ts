@@ -16,6 +16,8 @@ import type {
   Membership,
   ReportInput,
   ReportResult,
+  CsTicket,
+  FaqItem,
   LoginResult,
   Notice,
   StoreDetail,
@@ -54,7 +56,10 @@ export const httpApi: McpApi = {
   depositFree: (cabinetNo: string) => client.post<{ authNo: string; frozen: number }>("/mp/trade/deposit/free", { cabinetNo }),
   pay: (p: PayParams) => client.post<PayResult>("/mp/trade/pay", p),
 
+  listFaq: (category?: string) => client.get<FaqItem[]>("/mp/faq", { category }),
   report: (p: ReportInput) => client.post<ReportResult>("/mp/user/report", p),
+  listReports: (q?: PageQ & { status?: string }) => client.get<PageResult<CsTicket>>("/mp/user/reports", q),
+  getReport: (reportNo: string) => client.get<CsTicket | null>(`/mp/user/reports/${reportNo}`),
 
   getWallet: () => client.get<Wallet>("/mp/user/wallet"),
   listRechargePackages: () => client.get<RechargePackage[]>("/mp/user/recharge-packages"),

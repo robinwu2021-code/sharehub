@@ -14,6 +14,8 @@ import type {
   Membership,
   ReportInput,
   ReportResult,
+  CsTicket,
+  FaqItem,
   LoginResult,
   Notice,
   StoreDetail,
@@ -112,8 +114,12 @@ export interface McpApi {
   // 支付 / 免押（经 PaymentPort→nearpay，MVP Stub）
   depositFree(cabinetNo: string): Promise<{ authNo: string; frozen: number }>;
   pay(p: PayParams): Promise<PayResult>;
-  // 售后
+  // 售后。问题字典（/mp/faq）既是帮助中心的内容，也是报障的下拉来源 ——
+  // 两处各存一份的话，运营改一处就会不一致。
+  listFaq(category?: string): Promise<FaqItem[]>;
   report(p: ReportInput): Promise<ReportResult>;
+  listReports(q?: PageQ & { status?: string }): Promise<PageResult<CsTicket>>;
+  getReport(reportNo: string): Promise<CsTicket | null>;
   // 钱包 / 营销
   getWallet(): Promise<Wallet>;
   // 充值：**只传套餐号**。金额由服务端按套餐算 —— 端上传金额等于把定价权交给端。

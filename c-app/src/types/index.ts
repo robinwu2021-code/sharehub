@@ -201,15 +201,60 @@ export interface Membership {
   expireAt?: string;
 }
 
+/**
+ * 报障入参（镜像后端 `ReportReq`）。
+ *
+ * ⚠️ `problemNo` 是**分流的唯一依据**（来自 `md_problem.suggested_action`）。
+ * 不传它，后端一律兜底成「转人工客服」—— 自助解答、自动开工单、自动发起退款
+ * 这三条路全都走不到，而且不报错。此前前端传的是本地写死的 `type`/`desc`，
+ * 两个字段后端都不认，于是**每一条报障都进了人工队列**。
+ */
 export interface ReportInput {
+  problemNo: string;
   orderNo?: string;
-  type: string;
-  desc: string;
+  cabinetNo?: string;
+  issue: string; // 用户自己描述的问题
+  channel?: string; // APP / MP，缺省由后端填 APP
 }
+
+/** 报障受理结果（镜像后端 `ReportResultVO`）。`suggestedAction` 决定提交后往哪跳。 */
 export interface ReportResult {
   reportNo: string;
-  woNo: string;
   status: string;
+  suggestedAction: "SELF_SERVICE" | "TO_WORKORDER" | "TO_REFUND" | "TO_CS";
+  woNo: string | null;
+  refundNo: string | null;
+  sessionNo: string | null;
+  createdAt: string;
+}
+
+/** 我的报障单（镜像后端 `CsTicketVO`）。`woNo`/`refundNo` 是处置去向，用来展示进度。 */
+export interface CsTicket {
+  ticketNo: string;
+  userNo: string;
+  orderNo: string | null;
+  cabinetNo: string | null;
+  problemNo: string | null;
+  issue: string;
+  channel: string;
+  status: "OPEN" | "PROCESSING" | "CLOSED";
+  handlerNo: string | null;
+  woNo: string | null;
+  refundNo: string | null;
+  createdAt: string;
+}
+
+/**
+ * 帮助中心 / 报障问题条目（镜像后端 `FaqItem`）。
+ * 后端按 `lang` 挑好单语再下发，端上不做三选一。
+ */
+export interface FaqItem {
+  problemNo: string;
+  category: string;
+  title: string;
+  answer: string;
+  suggestedAction: "SELF_SERVICE" | "TO_WORKORDER" | "TO_REFUND" | "TO_CS";
+  sortNo: number;
 }
 
 export interface LoginResult {

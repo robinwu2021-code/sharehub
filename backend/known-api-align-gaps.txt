@@ -39,10 +39,6 @@ B GET /api/platform/departments Department 后端有前端无:path
 #   审核页给的必须是点「通过」那一刻真会扣的数；落库的 netAmount 是申请时的旧数。
 #   接上它等于给审批人两个都叫「实际到账」的数，而放款时扣的是另一个。
 B GET /api/trade/withdrawals Withdrawal 后端有前端无:netAmount
-B POST /mp/user/report ReportResultVO 后端有前端无:createdAt
-B POST /mp/user/report ReportResultVO 后端有前端无:refundNo
-B POST /mp/user/report ReportResultVO 后端有前端无:sessionNo
-B POST /mp/user/report ReportResultVO 后端有前端无:suggestedAction
 C GET /api/agent/accounts/{}
 C GET /api/agent/commissions/{}
 C GET /api/ops/inspection-plans/{}
@@ -64,8 +60,6 @@ C GET /api/trade/settlements/{}
 #
 # ── A 组：已上线功能的闭环缺一半（后端已实现 + c-app 页面已存在，差接线）──
 # 用户现在就会撞上，不是「功能没做」，是「功能做了半截」。
-C GET /mp/user/reports             # 报障进度：POST /mp/user/report 已接（能提交）→ 提交完查不到（页面 me）
-C GET /mp/user/reports/{}          # 同上，详情
 C GET /mp/user/messages            # 站内信：只接了 /mp/notice（公告）→ 有广播没私信（页面 notice）
 C POST /mp/user/messages/{}/read   # 同上，已读回执
 #
@@ -75,7 +69,6 @@ C GET /mp/user/invoices            # 开票（4 条一组）：to-B 需求，取
 C POST /mp/user/invoices           #   同上
 C GET /mp/user/invoice-titles      #   同上，抬头管理
 C POST /mp/user/invoice-titles     #   同上
-C GET /mp/faq                      # 帮助中心，小件
 C GET /mp/app/version              # 版本检查，小件（配合强更策略）
 #
 # 每接一条的完成定义：接 c-app/src/api 的 http 切片 → 去掉 mock 分支 →
@@ -92,7 +85,6 @@ D CodeBatchRow GET /api/ops/device-code-batches
 D CommandResult POST /api/ops/cabinets/{cabinetNo}/commands
 D ConsumerLoginVO POST /mp/auth/login
 D CouponTplVO GET /api/user/coupons
-D FaqItem GET /mp/faq
 D FavoriteItem GET /mp/user/favorites
 D InvoiceItem GET /mp/user/invoices
 D InvoiceTitleItem GET /mp/user/invoice-titles
@@ -118,12 +110,13 @@ C POST /api/user/push-messages/sweep-due
 #   后端已返回 roleNo / roleNos，运营端类型还没声明。不是遗漏，是前后半没同时落地。
 #   接上前端后棘轮会提示「已修复，请删掉」—— 由那条线的人删。
 
-# ═══ 以下 39 条是 2026-09-25 修好对齐脚本的一个盲区之后**第一次显形**的，不是新出现的缺口 ═══
+# ═══ 以下这批是 2026-09-25 修好对齐脚本的一个盲区之后**第一次显形**的，不是新出现的缺口 ═══
 #
 # 盲区：api-align.py 里 `checked` 这个去重集合是**全局**的，而同一个 VO 常常两端都用。
 # 于是先被扫到的那个端点把类型名占掉，另一端就再也不比了 —— `/api/*` 先出现，
 # `/mp/*` 的 c-app 那一半从来没被比过。三个类型正好落在这个洞里：
 # NoticeVO / RentOrder / CsTicketVO。改成按 (受众, 类型名) 去重后它们才露出来。
+# （CsTicketVO 那条已当场接上，所以下面实际剩 38 条。）
 #
 # ── RentOrder（22 条）：C 端订单页**每一个字段**都对不上 ──
 #   前端读 amount/startAt/endAt/powerBankNo（大写 B）/siteNameBorrow/fees/timeline…，
@@ -137,8 +130,7 @@ C POST /api/user/push-messages/sweep-due
 #   前端的 `read`（已读标记）后端没有 —— 公告已读态要么落 usr_message，要么端上本地存，
 #   先定下来再改，别急着加列。
 #
-# ── CsTicketVO（1 条）：报障进度列表，c-app 还没有对应类型 ──
-#   下一批「报障进度」接线时一并补，届时这条自然消失。
+# ── CsTicketVO：已在同一批的「报障进度」里接上，本块不再有它 ──
 B GET /mp/notice NoticeVO 前端有后端无:body
 B GET /mp/notice NoticeVO 前端有后端无:date
 B GET /mp/notice NoticeVO 前端有后端无:read
@@ -177,4 +169,3 @@ B GET /mp/trade/orders RentOrder 后端有前端无:rentEndAt
 B GET /mp/trade/orders RentOrder 后端有前端无:rentStartAt
 B GET /mp/trade/orders RentOrder 后端有前端无:returnCabinetNo
 B GET /mp/trade/orders RentOrder 后端有前端无:waivedAmount
-D CsTicketVO GET /mp/user/reports

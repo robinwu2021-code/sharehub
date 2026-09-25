@@ -1,7 +1,7 @@
 // Mock 实现（McpApi）。全部走 mock/db 内存数据 + 模拟延迟。后端未就绪即可跑通全部 UI。
 import * as db from "@/mock/db";
 import type { McpApi, LoginParams, RentParams, PayParams, OrderQ, NearbyQ } from "./contract";
-import type { RentOrder, LogoffItem, UserCoupon, RechargeResult } from "@/types";
+import type { RentOrder, LogoffItem, UserCoupon, RechargeResult, CsTicket, ReportResult } from "@/types";
 
 /** 注销申请的 mock 状态。模块级而非 db 里：它是会话内的一次性流程，不是种子数据。 */
 let mockLogoff: LogoffItem | null = null;
@@ -114,7 +114,40 @@ export const mockApi: McpApi = {
   depositFree: (_cabinetNo: string) => db.delay({ authNo: `AUTH${Math.floor(performance.now())}`, frozen: 100 }, 420),
   pay: (p: PayParams) => db.delay({ payNo: `PAY${Math.floor(performance.now())}`, status: "SUCCESS" as const, cashierParams: { scene: p.scene } }, 480),
 
-  report: (_p) => db.delay({ reportNo: `RP${Math.floor(performance.now())}`, woNo: `WO${Math.floor(performance.now())}`, status: "OPEN" }, 400),
+  listFaq: (category?: string) =>
+    db.delay(category ? db.faqs.filter((f) => f.category === category) : db.faqs),
+
+  // 分流照后端的规矩来：出口由字典里的 suggestedAction 决定，不是前端挑的。
+  // mock 里也走这条，否则 mock 下永远看不到「自助解答」和「转退款」两种出口。
+  report: (p) => {
+    const faq = db.faqs.find((f) => f.problemNo === p.problemNo);
+    const action = faq ? faq.suggestedAction : "TO_CS"; // 未知问题兜底转人工，与后端一致
+    const seq = db.tickets.length + 3;
+    const ticketNo = "TK" + String(seq).padStart(6, "0");
+    const at = new Date().toISOString().slice(0, 19).replace("T", " ");
+    const woNo = action === "TO_WORKORDER" ? "WO" + String(seq).padStart(6, "0") : null;
+    const refundNo = action === "TO_REFUND" ? "RF" + String(seq).padStart(6, "0") : null;
+    const sessionNo = action === "TO_CS" ? "CS" + String(seq).padStart(6, "0") : null;
+    const status = action === "SELF_SERVICE" ? "CLOSED" : "PROCESSING";
+    db.tickets.unshift({
+      ticketNo,
+      userNo: db.profile.cUserNo,
+      orderNo: p.orderNo ?? null,
+      cabinetNo: p.cabinetNo ?? null,
+      problemNo: p.problemNo,
+      issue: p.issue,
+      channel: p.channel ?? "APP",
+      status: status as CsTicket["status"],
+      handlerNo: null,
+      woNo,
+      refundNo,
+      createdAt: at,
+    });
+    const r: ReportResult = { reportNo: ticketNo, status, suggestedAction: action, woNo, refundNo, sessionNo, createdAt: at };
+    return db.delay(r, 400);
+  },
+  listReports: (q = {}) => db.delay(db.paginate(db.tickets.filter((t) => !q.status || t.status === q.status), q.page, q.size)),
+  getReport: (reportNo: string) => db.delay(db.tickets.find((t) => t.ticketNo === reportNo) ?? null),
 
   getWallet: () => db.delay(db.wallet),
   listRechargePackages: () => db.delay(db.rechargePackages.filter((p) => p.status === "ENABLED")),
