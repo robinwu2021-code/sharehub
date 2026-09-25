@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.finance.service.impl;
 
+import ai.neargo.common.core.ServerException;
+import ai.neargo.common.core.ErrorCode;
 import ai.neargo.sharehub.finance.InvoiceStatus;
 
 import ai.neargo.common.core.PageResult;
@@ -150,7 +152,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     public InvoiceView issue(String invoiceNo) {
         FinInvoice e = require(invoiceNo);
         if (InvoiceStatus.VOID.name().equals(e.getStatus())) {
-            throw new IllegalStateException("已作废的发票不能开具: " + invoiceNo);
+            throw ServerException.of(ErrorCode.CONFLICT, "已作废的发票不能开具: " + invoiceNo);
         }
         if (InvoiceStatus.ISSUED.name().equals(e.getStatus())) {
             // 幂等：重复开具直接返回，不报错也不重复盖时间 —— 运营点两次不该失败。
@@ -172,7 +174,7 @@ public class InvoiceServiceImpl implements InvoiceService {
         }
         FinInvoice e = require(invoiceNo);
         if (InvoiceStatus.VOID.name().equals(e.getStatus())) {
-            throw new IllegalStateException("发票已作废: " + invoiceNo);
+            throw ServerException.of(ErrorCode.CONFLICT, "发票已作废: " + invoiceNo);
         }
         e.setStatus(InvoiceStatus.VOID.name());
         e.setVoidReason(voidReason.trim());

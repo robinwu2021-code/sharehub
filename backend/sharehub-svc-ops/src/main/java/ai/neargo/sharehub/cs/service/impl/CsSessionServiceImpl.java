@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.cs.service.impl;
 
+import ai.neargo.common.core.ServerException;
+import ai.neargo.common.core.ErrorCode;
 import ai.neargo.sharehub.cs.CsSenderType;
 import ai.neargo.sharehub.cs.CsSessionStatus;
 
@@ -74,7 +76,7 @@ public class CsSessionServiceImpl implements CsSessionService {
                 .eq(CsSession::getSessionNo, sessionNo).last("limit 1"));
         if (session == null) throw new IllegalArgumentException("会话不存在: " + sessionNo);
         if (CsSessionStatus.CLOSED.name().equals(session.getStatus())) {
-            throw new IllegalStateException("会话已关闭，不能回复: " + sessionNo);
+            throw ServerException.of(ErrorCode.CONFLICT, "会话已关闭，不能回复: " + sessionNo);
         }
 
         CsMessage m = new CsMessage();

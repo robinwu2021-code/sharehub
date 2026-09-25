@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.user.core.service.impl;
 
+import ai.neargo.common.core.ServerException;
+import ai.neargo.common.core.ErrorCode;
 import ai.neargo.sharehub.user.core.dto.UserCoreDtos.LogoffItem;
 import ai.neargo.sharehub.user.core.entity.UsrLogoff;
 import ai.neargo.sharehub.user.core.mapper.UserCoreMappers.UsrLogoffMapper;
@@ -37,7 +39,7 @@ public class UserLogoffServiceImpl implements UserLogoffService {
     public LogoffItem apply(String cUserNo) {
         UsrLogoff last = latest(cUserNo);
         if (last != null && PENDING.equals(last.getStatus())) {
-            throw new IllegalStateException("已有进行中的注销申请，冷静期至 " + last.getCoolingUntil());
+            throw ServerException.of(ErrorCode.CONFLICT, "已有进行中的注销申请，冷静期至 " + last.getCoolingUntil());
         }
         LocalDateTime now = LocalDateTime.now();
         UsrLogoff e = new UsrLogoff();

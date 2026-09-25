@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.platform.notify.service.impl;
 
+import ai.neargo.common.core.ServerException;
+import ai.neargo.common.core.ErrorCode;
 import ai.neargo.sharehub.platform.notify.NotifyLogStatus;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.common.BizKey;
@@ -169,7 +171,7 @@ public class NotifyLogServiceImpl implements NotifyLogService {
             mapper.insert(e);
         } catch (org.springframework.dao.DuplicateKeyException dup) {
             // 唯一索引是**执行手段**：并发下应用层先查后插会漏，只有约束拦得住。
-            throw new IllegalStateException("该操作已提交过（idempotencyKey 重复），未重复发送");
+            throw ServerException.of(ErrorCode.CONFLICT, "该操作已提交过（idempotencyKey 重复），未重复发送");
         }
         return toVO(mapper.selectOne(new QueryWrapper<NotifyLog>()
                 .eq("log_no", e.getLogNo()).last("limit 1")));

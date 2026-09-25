@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.user.marketing.service.impl;
 
+import ai.neargo.common.core.ServerException;
+import ai.neargo.common.core.ErrorCode;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.user.marketing.dto.MarketingDtos.ClaimableCouponVO;
@@ -68,7 +70,7 @@ public class UserCouponServiceImpl implements UserCouponService {
         int issued = tpl.getIssued() == null ? 0 : tpl.getIssued();
         // stock=0 按 db-design §6.3 语义是「不限量」；否则按剩余量截断而不是整批失败
         int remaining = stock == 0 ? Integer.MAX_VALUE : stock - issued;
-        if (remaining <= 0) throw new IllegalStateException("券模板库存已发完: " + tplNo);
+        if (remaining <= 0) throw ServerException.of(ErrorCode.CONFLICT, "券模板库存已发完: " + tplNo);
 
         List<UserCouponVO> out = new ArrayList<>();
         for (String userNo : cUserNos) {
@@ -125,7 +127,7 @@ public class UserCouponServiceImpl implements UserCouponService {
 
         int stock = tpl.getStock() == null ? 0 : tpl.getStock();
         int issued = tpl.getIssued() == null ? 0 : tpl.getIssued();
-        if (stock != 0 && issued >= stock) throw new IllegalStateException("券已领完: " + tplNo);
+        if (stock != 0 && issued >= stock) throw ServerException.of(ErrorCode.CONFLICT, "券已领完: " + tplNo);
 
         UsrCoupon e = insert(cUserNo, tpl, null);
         tpl.setIssued(issued + 1);
@@ -139,7 +141,7 @@ public class UserCouponServiceImpl implements UserCouponService {
         CouponTpl tpl = tplMapper.selectOne(new LambdaQueryWrapper<CouponTpl>()
                 .eq(CouponTpl::getTplNo, tplNo).last("limit 1"));
         if (tpl == null) throw new IllegalArgumentException("券模板不存在: " + tplNo);
-        if (!"ACTIVE".equals(tpl.getStatus())) throw new IllegalStateException("券模板已停用: " + tplNo);
+        if (!"ACTIVE".equals(tpl.getStatus())) throw ServerException.of(ErrorCode.CONFLICT, "券模板已停用: " + tplNo);
         return tpl;
     }
 

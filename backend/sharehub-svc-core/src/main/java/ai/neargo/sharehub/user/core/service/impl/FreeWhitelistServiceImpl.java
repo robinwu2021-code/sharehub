@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.user.core.service.impl;
 
+import ai.neargo.common.core.ServerException;
+import ai.neargo.common.core.ErrorCode;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.user.core.dto.UserCoreDtos.FreeUserWhitelist;
@@ -103,7 +105,7 @@ public class FreeWhitelistServiceImpl implements FreeWhitelistService {
     public FreeUserWhitelist revoke(String cUserNo, String operatorNo) {
         UsrFreeWhitelist e = findLatest(cUserNo);
         if (e == null || !ACTIVE.equals(e.getStatus())) {
-            throw new IllegalStateException("该用户没有生效中的免费白名单，无法撤销: " + cUserNo);
+            throw ServerException.of(ErrorCode.CONFLICT, "该用户没有生效中的免费白名单，无法撤销: " + cUserNo);
         }
         e.setStatus(REVOKED);
         mapper.updateById(e); // 软删除：改状态、留记录，不 deleteById

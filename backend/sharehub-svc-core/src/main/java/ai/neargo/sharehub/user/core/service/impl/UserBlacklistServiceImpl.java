@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.user.core.service.impl;
 
+import ai.neargo.common.core.ServerException;
+import ai.neargo.common.core.ErrorCode;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.user.core.dto.UserCoreDtos.UserBlacklist;
@@ -80,7 +82,7 @@ public class UserBlacklistServiceImpl implements UserBlacklistService {
     public UserBlacklist release(String cUserNo, String operatorNo) {
         UsrBlacklist e = findActive(cUserNo);
         if (e == null) {
-            throw new IllegalStateException("该用户当前不在黑名单中，无法解除: " + cUserNo);
+            throw ServerException.of(ErrorCode.CONFLICT, "该用户当前不在黑名单中，无法解除: " + cUserNo);
         }
         e.setStatus(RELEASED);
         e.setReleasedAt(LocalDateTime.now().format(TS));

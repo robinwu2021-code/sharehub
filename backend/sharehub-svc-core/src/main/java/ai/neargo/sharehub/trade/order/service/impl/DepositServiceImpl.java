@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.trade.order.service.impl;
 
+import ai.neargo.common.core.ServerException;
+import ai.neargo.common.core.ErrorCode;
 import ai.neargo.sharehub.trade.order.DepositStatus;
 
 import ai.neargo.common.core.PageResult;
@@ -57,7 +59,7 @@ public class DepositServiceImpl implements DepositService {
         OrdDeposit e = selectByNo(depositNo);
         if (e == null) throw new IllegalArgumentException("押金记录不存在: " + depositNo);
         if (!DepositStatus.HELD.is(e.getStatus())) {
-            throw new IllegalStateException("仅 HELD 押金可解冻: " + depositNo + " → " + e.getStatus());
+            throw ServerException.of(ErrorCode.CONFLICT, "仅 HELD 押金可解冻: " + depositNo + " → " + e.getStatus());
         }
         e.setStatus(DepositStatus.RELEASED.name());
         e.setReleasedAt(OrderSupport.now());
@@ -90,7 +92,7 @@ public class DepositServiceImpl implements DepositService {
     public DepositRecord buyout(String depositNo, String note) {
         OrdDeposit e = require(depositNo);
         if (DepositStatus.RELEASED.is(e.getStatus())) {
-            throw new IllegalStateException("押金已解冻，不能再买断: " + depositNo);
+            throw ServerException.of(ErrorCode.CONFLICT, "押金已解冻，不能再买断: " + depositNo);
         }
         // 买断金额 = 押金全额。**不得超过押金额** —— 押金抵购机款，抵不了更多；
         // 差额部分若真要收，那是另一笔应收，不该混进押金单。

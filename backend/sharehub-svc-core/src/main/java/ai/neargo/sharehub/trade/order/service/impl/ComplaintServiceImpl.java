@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.trade.order.service.impl;
 
+import ai.neargo.common.core.ServerException;
+import ai.neargo.common.core.ErrorCode;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.trade.order.dto.OrderDtos.ComplaintCreateReq;
@@ -108,7 +110,7 @@ public class ComplaintServiceImpl implements ComplaintService {
             throw new IllegalArgumentException("非法 resolution: " + req.resolution());
         }
         if (STATUS_RESOLVED.equals(e.getStatus()) || STATUS_REJECTED.equals(e.getStatus())) {
-            throw new IllegalStateException("投诉已结案，不可重复处理: " + complaintNo + " → " + e.getStatus());
+            throw ServerException.of(ErrorCode.CONFLICT, "投诉已结案，不可重复处理: " + complaintNo + " → " + e.getStatus());
         }
 
         String from = e.getStatus();

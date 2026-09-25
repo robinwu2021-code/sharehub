@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.user.marketing;
 
+import ai.neargo.common.core.ServerException;
+import ai.neargo.common.core.ErrorCode;
 import java.util.List;
 import java.util.Map;
 
@@ -45,7 +47,7 @@ public final class CampaignStateMachine {
             throw new IllegalArgumentException("未知活动动作: " + action + "，可用: " + T.keySet());
         }
         if (!t.from().contains(CampaignStatus.of(currentStatus))) {
-            throw new IllegalStateException(String.format(
+            throw ServerException.of(ErrorCode.CONFLICT, String.format(
                     "活动状态 %s 不能执行「%s」，允许的来源状态: %s",
                     currentStatus, t.label(), t.from()));
         }

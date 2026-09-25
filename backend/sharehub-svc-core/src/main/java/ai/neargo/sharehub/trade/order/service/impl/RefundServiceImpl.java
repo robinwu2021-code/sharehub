@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.trade.order.service.impl;
 
+import ai.neargo.common.core.ServerException;
+import ai.neargo.common.core.ErrorCode;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.trade.order.dto.OrderDtos.RefundApplyReq;
@@ -119,7 +121,7 @@ public class RefundServiceImpl implements RefundService {
             throw new IllegalArgumentException("approved 必填");
         }
         if (!STATUS_PENDING.equals(e.getStatus())) {
-            throw new IllegalStateException("退款单非 PENDING，不可审批: " + refundNo + " → " + e.getStatus());
+            throw ServerException.of(ErrorCode.CONFLICT, "退款单非 PENDING，不可审批: " + refundNo + " → " + e.getStatus());
         }
 
         boolean approved = req.approved();

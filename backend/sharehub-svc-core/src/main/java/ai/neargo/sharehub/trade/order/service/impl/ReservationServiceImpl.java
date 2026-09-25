@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.trade.order.service.impl;
 
+import ai.neargo.common.core.ServerException;
+import ai.neargo.common.core.ErrorCode;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.common.OkResult;
 import ai.neargo.sharehub.trade.order.dto.OrderDtos.Reservation;
@@ -56,7 +58,7 @@ public class ReservationServiceImpl implements ReservationService {
         if (e == null) throw new IllegalArgumentException("预约不存在: " + reservationNo);
         if (!STATUS_PENDING.equals(e.getStatus())) {
             // 服务端复校（[api/README §4.1] 明确要求）：只有 PENDING 可取消
-            throw new IllegalStateException("仅 PENDING 预约可取消: " + reservationNo + " → " + e.getStatus());
+            throw ServerException.of(ErrorCode.CONFLICT, "仅 PENDING 预约可取消: " + reservationNo + " → " + e.getStatus());
         }
         e.setStatus(STATUS_CANCELLED);
         mapper.updateById(e);

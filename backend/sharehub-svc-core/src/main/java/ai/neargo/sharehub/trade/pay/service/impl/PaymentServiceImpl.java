@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.trade.pay.service.impl;
 
+import ai.neargo.common.core.ServerException;
+import ai.neargo.common.core.ErrorCode;
 import ai.neargo.sharehub.trade.pay.PayAuthStatus;
 import ai.neargo.sharehub.trade.pay.PayOrderStatus;
 import ai.neargo.sharehub.trade.pay.PayRefundStatus;
@@ -107,7 +109,7 @@ public class PaymentServiceImpl implements PaymentService {
     public PayAuthEntry capture(String authNo, BigDecimal amount, String idempotencyKey) {
         PayAuth e = mustAuth(authNo);
         if (!PayAuthStatus.FROZEN.is(e.getStatus())) {
-            throw new IllegalStateException("仅 FROZEN 可请款，当前：" + e.getStatus());
+            throw ServerException.of(ErrorCode.CONFLICT, "仅 FROZEN 可请款，当前：" + e.getStatus());
         }
         requirePositive(amount, "amount");
         if (amount.compareTo(e.getFreezeAmount()) > 0) {
@@ -126,7 +128,7 @@ public class PaymentServiceImpl implements PaymentService {
     public PayAuthEntry release(String authNo, String idempotencyKey) {
         PayAuth e = mustAuth(authNo);
         if (!PayAuthStatus.FROZEN.is(e.getStatus())) {
-            throw new IllegalStateException("仅 FROZEN 可释放，当前：" + e.getStatus());
+            throw ServerException.of(ErrorCode.CONFLICT, "仅 FROZEN 可释放，当前：" + e.getStatus());
         }
         PaymentPort.AuthResult r = port.release(e.getNearpayAuthNo(), idempotencyKey);
         e.setStatus(r.status());
@@ -144,7 +146,7 @@ public class PaymentServiceImpl implements PaymentService {
                 .eq(PayOrder::getPayNo, payNo).last("limit 1"));
         if (pay == null) throw new IllegalArgumentException("支付单不存在: " + payNo);
         if (!PayOrderStatus.PAID.is(pay.getStatus())) {
-            throw new IllegalStateException("仅 PAID 的支付单可退款，当前：" + pay.getStatus());
+            throw ServerException.of(ErrorCode.CONFLICT, "仅 PAID 的支付单可退款，当前：" + pay.getStatus());
         }
         requirePositive(amount, "amount");
         if (amount.compareTo(pay.getAmount()) > 0) {
@@ -177,7 +179,7 @@ public class PaymentServiceImpl implements PaymentService {
                 .eq(PayOrder::getNearpayTxnNo, txnRef).last("limit 1"));
         if (e == null) throw new IllegalArgumentException("未知 nearpay 交易引用: " + txnRef);
         if (PayOrderStatus.PAID.is(e.getStatus()) && !PayOrderStatus.PAID.is(status)) {
-            throw new IllegalStateException("已支付的单不接受回退到 " + status);
+            throw ServerException.of(ErrorCode.CONFLICT, "已支付的单不接受回退到 " + status);
         }
         e.setStatus(status);
         if (paidAt != null) e.setPaidAt(paidAt);

@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.cs.service.impl;
 
+import ai.neargo.common.core.ServerException;
+import ai.neargo.common.core.ErrorCode;
 import ai.neargo.sharehub.cs.CsTicketStatus;
 
 import ai.neargo.common.core.PageResult;
@@ -267,7 +269,7 @@ public class CsTicketServiceImpl implements CsTicketService {
         Set<String> allowed = TRANSITIONS.get(from == null ? CsTicketStatus.OPEN.name() : from);
         if (allowed == null) throw new IllegalStateException("未知报障状态: " + from);
         if (!allowed.contains(to)) {
-            throw new IllegalStateException("报障状态非法迁移: " + from + " → " + to);
+            throw ServerException.of(ErrorCode.CONFLICT, "报障状态非法迁移: " + from + " → " + to);
         }
     }
 
