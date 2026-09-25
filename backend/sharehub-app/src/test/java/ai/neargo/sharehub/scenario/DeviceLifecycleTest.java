@@ -88,6 +88,18 @@ class DeviceLifecycleTest extends ApiTestSupport {
     }
 
     @Test
+    @DisplayName("V112 词表约束：库层拒绝空串 / 词表外的机柜状态（NOT NULL 拦不住空串，CAB1001 就是这么进来的）")
+    void cabinet_status_outside_vocabulary_is_rejected_by_db() {
+        Fx f = fixture(false);
+        assertThatThrownBy(() -> jdbc.update("UPDATE dev_cabinet SET status='' WHERE cabinet_no=?", f.cabinet()))
+                .hasMessageContaining("chk_dev_cabinet_status");
+        assertThatThrownBy(() -> jdbc.update("UPDATE dev_cabinet SET status='ONLINE' WHERE cabinet_no=?", f.cabinet()))
+                .hasMessageContaining("chk_dev_cabinet_status");
+        // 正对照：词表内的值照常可写 —— 否则上面两条红可能只是约束写错了、把什么都拒了
+        assertThat(jdbc.update("UPDATE dev_cabinet SET status='IN_TRANSIT' WHERE cabinet_no=?", f.cabinet())).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("③⑨ 编辑带 status 被忽略；已布放换点位 409；撤机后换点位 → 试借还项重新未通过")
     void editIgnoresStatusAndRelocation() {
         Fx f = fixture(true);
