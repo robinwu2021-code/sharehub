@@ -17,6 +17,8 @@ import ai.neargo.sharehub.user.marketing.dto.MarketingDtos.PushMessageVO;
 import ai.neargo.sharehub.user.marketing.dto.MarketingDtos.ReferralVO;
 import ai.neargo.sharehub.user.marketing.dto.MarketingDtos.UserCouponVO;
 import ai.neargo.sharehub.user.marketing.entity.CouponTpl;
+import ai.neargo.sharehub.user.marketing.dto.MarketingDtos;
+import ai.neargo.sharehub.user.ad.dto.AdDtos;
 import ai.neargo.sharehub.user.marketing.entity.MktCampaign;
 import ai.neargo.sharehub.user.marketing.entity.MktNotice;
 import ai.neargo.sharehub.user.marketing.entity.MktPush;
@@ -124,15 +126,17 @@ public class MarketingController {
 
     @PostMapping("/api/user/campaigns")
     @PreAuthorize("@perm.can('marketing:campaign:update')")
-    public CampaignVO createCampaign(@RequestBody MktCampaign body) {
-        return campaignService.save(body);
+    public CampaignVO createCampaign(@RequestBody MarketingDtos.CampaignReq body) {
+        return campaignService.save(body.toEntity());
     }
 
     @PostMapping("/api/user/campaigns/{campaignNo}")
     @PreAuthorize("@perm.can('marketing:campaign:update')")
-    public CampaignVO updateCampaign(@PathVariable String campaignNo, @RequestBody MktCampaign body) {
-        body.setCampaignNo(campaignNo);
-        return campaignService.save(body);
+    public CampaignVO updateCampaign(@PathVariable String campaignNo,
+                                     @RequestBody MarketingDtos.CampaignReq body) {
+        MktCampaign e = body.toEntity();
+        e.setCampaignNo(campaignNo);
+        return campaignService.save(e);
     }
 
     // ——————————————— 推送触达（菜单叶：营销管理 › 推送触达）———————————————
@@ -149,15 +153,17 @@ public class MarketingController {
 
     @PostMapping("/api/user/push-messages")
     @PreAuthorize("@perm.can('marketing:push:send')")
-    public PushMessageVO createPush(@RequestBody MktPush body) {
-        return pushService.save(body);
+    public PushMessageVO createPush(@RequestBody MarketingDtos.PushReq body) {
+        return pushService.save(body.toEntity());
     }
 
     @PostMapping("/api/user/push-messages/{pushNo}")
     @PreAuthorize("@perm.can('marketing:push:send')")
-    public PushMessageVO updatePush(@PathVariable String pushNo, @RequestBody MktPush body) {
-        body.setPushNo(pushNo);
-        return pushService.save(body);
+    public PushMessageVO updatePush(@PathVariable String pushNo,
+                                    @RequestBody MarketingDtos.PushReq body) {
+        MktPush e = body.toEntity();
+        e.setPushNo(pushNo);
+        return pushService.save(e);
     }
 
     // ——————————————— 邀请裂变（只读，记录由 C 端注册链路自动产生）———————————————
@@ -187,15 +193,17 @@ public class MarketingController {
 
     @PostMapping("/api/user/ad-campaigns")
     @PreAuthorize("@perm.can('marketing:ad:update')")
-    public AdCampaignVO createAdCampaign(@RequestBody AdCampaign body) {
-        return adCampaignService.save(body);
+    public AdCampaignVO createAdCampaign(@RequestBody AdDtos.AdCampaignReq body) {
+        return adCampaignService.save(body.toEntity());
     }
 
     @PostMapping("/api/user/ad-campaigns/{adNo}")
     @PreAuthorize("@perm.can('marketing:ad:update')")
-    public AdCampaignVO updateAdCampaign(@PathVariable String adNo, @RequestBody AdCampaign body) {
-        body.setAdNo(adNo);
-        return adCampaignService.save(body);
+    public AdCampaignVO updateAdCampaign(@PathVariable String adNo,
+                                         @RequestBody AdDtos.AdCampaignReq body) {
+        AdCampaign e = body.toEntity();
+        e.setAdNo(adNo);
+        return adCampaignService.save(e);
     }
 
     /** 投放与曝光统计。只读 —— 曝光数是广告主的结算依据，不提供人工增改口。 */

@@ -15,16 +15,6 @@
 #
 # 实体迁到 Req/Command DTO 后，把它的所有行一起删掉。
 
-AdCampaign.adNo
-AdCampaign.advertiser
-AdCampaign.advertiserNo
-AdCampaign.budget
-AdCampaign.creative
-AdCampaign.currency
-AdCampaign.endAt
-AdCampaign.startAt
-AdCampaign.status
-AdCampaign.targeting
 AdSlot.cabinetNo
 AdSlot.position
 AdSlot.size
@@ -162,13 +152,6 @@ MdRegion.nameAr
 MdRegion.nameEn
 MdRegion.parentId
 MdRegion.regionId
-MktCampaign.campaignNo
-MktCampaign.endAt
-MktCampaign.kind
-MktCampaign.name
-MktCampaign.rule
-MktCampaign.startAt
-MktCampaign.status
 MktNotice.archivedAt
 MktNotice.content
 MktNotice.contentAr
@@ -183,21 +166,6 @@ MktNotice.title
 MktNotice.titleAr
 MktNotice.titleEn
 MktNotice.type
-MktPush.audience
-MktPush.audienceType
-MktPush.audienceValue
-MktPush.channel
-MktPush.content
-MktPush.idempotencyKey
-MktPush.operatorName
-MktPush.pushNo
-MktPush.scheduledAt
-MktPush.sentAt
-MktPush.sentCount
-MktPush.status
-MktPush.successCount
-MktPush.targetCount
-MktPush.title
 NotifyBlacklist.blockNo
 NotifyBlacklist.blockedAt
 NotifyBlacklist.blockedBy

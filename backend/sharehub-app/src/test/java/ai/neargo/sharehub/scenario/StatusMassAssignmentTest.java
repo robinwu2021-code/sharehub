@@ -162,4 +162,59 @@ class StatusMassAssignmentTest extends ApiTestSupport {
     private String statusOfPush(String admin, String no) {
         return findInPages("/api/user/push-messages", "pushNo", no, admin).path("status").asText();
     }
+
+    // ───────────────────── 白名单是第二道 ─────────────────────
+
+    /*
+     * 2026-09-25 第二步：这三个对象已从「实体当 @RequestBody」转成写入参 DTO
+     * （CampaignReq / PushReq / AdCampaignReq），DTO 里**不声明 status**。
+     *
+     * 于是有了两道：service 的 beforeUpdate 是**黑名单**（得有人记得写），
+     * DTO 不声明是**白名单**（新人照抄也漏不掉）。上面那几条守的是合起来的效果，
+     * 下面这条单独守白名单 —— 它即使在锁被人删掉之后也该拦得住。
+     */
+
+    @Test
+    @DisplayName("白名单：DTO 里没有 status 这个字段，多传的键被直接丢弃")
+    void unknown_keys_are_dropped_by_the_request_dto() {
+        String admin = login("ADMIN");
+        Map<String, Object> create = new HashMap<>();
+        create.put("name", uniq("白名单探针-"));
+        create.put("kind", "DISCOUNT");
+        create.put("status", "RUNNING");          // 建单时就想跳过 DRAFT
+        String no = post("/api/user/campaigns", create, admin).okData().path("campaignNo").asText();
+
+        assertThat(statusOfCampaign(admin, no))
+                .as("建单一律 DRAFT —— status 根本没进 DTO，更没到实体")
+                .isEqualTo("DRAFT");
+    }
+
+    // ───────────────────── 必填：400 而不是 500 ─────────────────────
+
+    @Test
+    @DisplayName("必填缺失返回 400 而不是 500——此前是撞数据库 NOT NULL 约束")
+    void missing_required_field_is_a_bad_request_not_a_server_error() {
+        String admin = login("ADMIN");
+
+        // ad_campaign.advertiser_no 是 NOT NULL 无默认；转 DTO 之前不传它会一路走到
+        // INSERT 才炸，客户端看到的是 500「服务器错误」，而这明明是他自己少传了字段。
+        Map<String, Object> noAdvertiser = new HashMap<>();
+        noAdvertiser.put("advertiser", "缺编号的广告主");
+        noAdvertiser.put("currency", "AED");
+        assertThat(post("/api/user/ad-campaigns", noAdvertiser, admin).status)
+                .as("少传必填是客户端的错，该 400")
+                .isEqualTo(400);
+
+        Map<String, Object> noName = new HashMap<>();
+        noName.put("kind", "DISCOUNT");
+        assertThat(post("/api/user/campaigns", noName, admin).status)
+                .as("活动名必填")
+                .isEqualTo(400);
+
+        Map<String, Object> noTitle = new HashMap<>();
+        noTitle.put("content", "无标题");
+        assertThat(post("/api/user/push-messages", noTitle, admin).status)
+                .as("推送标题必填")
+                .isEqualTo(400);
+    }
 }

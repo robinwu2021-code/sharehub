@@ -36,7 +36,6 @@
 #   · 转换时顺手核对 VO 有没有丢字段，比事后靠 api-align 发现便宜。
 #
 # 格式：一行一个实体类型名
-AdCampaign
 AdSlot
 AgtAccount
 AgtCommission
@@ -51,9 +50,7 @@ MdBank
 MdMarketCountry
 MdProblem
 MdRegion
-MktCampaign
 MktNotice
-MktPush
 NotifyBlacklist
 NotifyTemplate
 SysAppVersion

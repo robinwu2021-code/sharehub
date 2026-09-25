@@ -32,6 +32,74 @@ public final class MarketingDtos {
      *   <li>{@code archivedAt} —— 归档走 /coupons/{no}/archive|unarchive。</li>
      * </ul>
      */
+    /**
+     * 营销活动**写入参**（白名单）。
+     *
+     * <p><b>比实体少一个 {@code status}</b> —— 它只能由
+     * {@code POST /api/user/campaigns/{campaignNo}/{action}} 走 {@code CampaignStateMachine} 改。
+     *
+     * <p>service 的 {@code beforeUpdate} 里也锁着它，这里不声明是**第二道**，
+     * 而且是更靠得住的那一道：<b>锁是黑名单，得有人记得写；不声明是白名单，
+     * 新人照抄也漏不掉。</b>
+     * （2026-09-25 实测过：不锁时 {@code POST /api/user/campaigns/{no} {"status":"ENDED"}}
+     * 能让草稿直接落终态，一条边都不走。）
+     *
+     * @param name 活动名，必填 —— 不校验的话落库时撞 NOT NULL，返回 500 而不是 400
+     */
+    public record CampaignReq(String campaignNo, String name, String kind, String rule,
+                              String startAt, String endAt) {
+        /** 映射到实体。**status 有意不设**（见类注释）。 */
+        public ai.neargo.sharehub.user.marketing.entity.MktCampaign toEntity() {
+            if (name == null || name.isBlank()) {
+                throw new IllegalArgumentException("活动名必填");
+            }
+            var e = new ai.neargo.sharehub.user.marketing.entity.MktCampaign();
+            e.setCampaignNo(campaignNo);
+            e.setName(name);
+            e.setKind(kind);
+            e.setRule(rule);
+            e.setStartAt(startAt);
+            e.setEndAt(endAt);
+            return e;
+        }
+    }
+
+    /**
+     * 推送触达**写入参**（白名单）。
+     *
+     * <p>比实体少**七个**，全都有专门来源，一个都不该由客户端给：
+     * <ul>
+     *   <li>{@code status} —— 只能由 {@code /schedule} · {@code /send} · {@code /finish} 改；</li>
+     *   <li>{@code sentAt} / {@code sentCount} / {@code targetCount} / {@code successCount}
+     *       —— 触达统计由发送链路落。不锁的话任何人都能把「成功 3 人」改成「成功 30000 人」，
+     *       而这几个数正是运营判断触达效果的依据；</li>
+     *   <li>{@code idempotencyKey} —— 幂等键由发送动作登记；</li>
+     *   <li>{@code operatorName} —— 操作人由服务端按当前登录人回填，传进来就能冒名。</li>
+     * </ul>
+     *
+     * @param title 标题，必填
+     */
+    public record PushReq(String pushNo, String title, String content, String channel,
+                          String audience, String audienceType, String audienceValue,
+                          String scheduledAt) {
+        /** 映射到实体。**状态 / 统计 / 幂等键 / 操作人有意不设**（见类注释）。 */
+        public ai.neargo.sharehub.user.marketing.entity.MktPush toEntity() {
+            if (title == null || title.isBlank()) {
+                throw new IllegalArgumentException("推送标题必填");
+            }
+            var e = new ai.neargo.sharehub.user.marketing.entity.MktPush();
+            e.setPushNo(pushNo);
+            e.setTitle(title);
+            e.setContent(content);
+            e.setChannel(channel);
+            e.setAudience(audience);
+            e.setAudienceType(audienceType);
+            e.setAudienceValue(audienceValue);
+            e.setScheduledAt(scheduledAt);
+            return e;
+        }
+    }
+
     public record CouponTplReq(String tplNo, String name, String type,
                                BigDecimal value, BigDecimal threshold, String currency,
                                String validRule, Integer stock, String status) {
