@@ -47,20 +47,16 @@ OrderStatus: DISPENSING->CLOSED
 # 其余 6 条已于 2026-09-25 由 WITHDRAW_TRANSITIONS 接管（A3-1），从本台账删除。
 WithdrawalStatus: APPLY->AUDIT
 
+# 2026-09-25 批次 5b（方案 §6.4 裁定给运营手动「标记故障 / 维修回仓 / 标记丢失 / 找回 / 报废」）：
+# 这 7 条由 POWERBANK_TRANSITIONS 接管、已删除；剩下的是借出 / 归还 / 买断 / 投放，仍由订单与设备事件推进（B 类）。
+# RENTED->LOST 刻意不进前端通用迁移表：V113 起只经「疑似丢失 → 人工核实」专用端点（confirm-lost）落。
+PowerbankStatus: RENTED->LOST
 PowerbankStatus: IN_STOCK->IN_CABINET
 PowerbankStatus: IN_CABINET->RENTED
 PowerbankStatus: RENTED->IN_CABINET
 PowerbankStatus: RENTED->FAULT
-PowerbankStatus: RENTED->LOST
 PowerbankStatus: RENTED->SOLD
-PowerbankStatus: LOST->IN_CABINET
 PowerbankStatus: LOST->SOLD
-PowerbankStatus: IN_CABINET->FAULT
-PowerbankStatus: IN_STOCK->FAULT
-PowerbankStatus: FAULT->IN_STOCK
-PowerbankStatus: FAULT->SCRAP
-PowerbankStatus: IN_STOCK->SCRAP
-PowerbankStatus: IN_CABINET->SCRAP
 
 # 运营核心流程（2026-09-25，TDD-运营核心流程/02·03）：定时任务 / 设备事件推进，运营端不出按钮。
 #   合同到开始日由 contract-lifecycle 生效、过到期日到期；签署动作在开始日已到时顺带生效（同一条边）。
@@ -84,7 +80,8 @@ TrialRentStatus: WAIT_RETURN->EXPIRED
 # + 运营端 ALARM_TRANSITIONS.close），从本台账删除。
 
 # 运营核心流程（2026-09-25）：后端动作端点已就位（ContractController / SiteController / DeviceOpsController），
-# 运营端的 CONTRACT_TRANSITIONS / SITE_TRANSITIONS / CABINET_TRANSITIONS 随 TDD-运营核心流程/08 前端实现补齐后删除以下各行。
+# 运营端的 CONTRACT_TRANSITIONS / SITE_TRANSITIONS 随 TDD-运营核心流程/08 前端实现补齐后删除以下各行。
+# （CabinetStatus 的七条已于 2026-09-25 批次 5b 由 CABINET_TRANSITIONS 接管，从本台账删除。）
 # 在那之前运营端页面仍是旧的 ACTIVE/PAUSED 两态，不会出现「界面手写 if 与后端分叉」—— 是缺入口，不是分叉。
 ContractStatus: DRAFT->PENDING
 ContractStatus: PENDING->DRAFT
@@ -96,13 +93,6 @@ SiteStatus: ACTIVE->WITHDRAWING
 SiteStatus: PAUSED->WITHDRAWING
 SiteStatus: WITHDRAWING->CLOSED
 SiteStatus: PREPARING->CLOSED
-CabinetStatus: IN_STOCK->DEPLOYED
-CabinetStatus: DEPLOYED->FAULT
-CabinetStatus: FAULT->DEPLOYED
-CabinetStatus: DEPLOYED->IN_STOCK
-CabinetStatus: FAULT->IN_STOCK
-CabinetStatus: IN_STOCK->RETIRED
-CabinetStatus: FAULT->RETIRED
 
 # 商机阶段机（2026-09-25，运营核心流程批次 B5）：后端 LeadStateMachine 定了顺序推进 / LOST 必填原因 / 重新激活，
 # 运营端 BD CRM 页仍是「阶段下拉随便选」（LEAD_STAGES 只是取值表，没有迁移表）—— 这是**分叉**：
@@ -117,8 +107,3 @@ LeadStatus: CONTACTED->LOST
 LeadStatus: NEGOTIATING->LOST
 LeadStatus: LOST->NEW
 
-# 代理清退（2026-09-25 批次 F3）：后端 AgentExitStateMachine 三步顺序门禁已就位（AgentExitController），
-# 运营端还没有清退页 —— 缺入口、不是分叉。随代理页补 AGENT_EXIT_TRANSITIONS 后删除。
-AgentExitStatus: RECLAIMING->SETTLING
-AgentExitStatus: SETTLING->CLOSING
-AgentExitStatus: CLOSING->CLOSED

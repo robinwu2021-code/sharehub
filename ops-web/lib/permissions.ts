@@ -59,6 +59,8 @@ export const BACKEND_ROLE_PERMS: Record<Role, string[]> = {
     "order:refund:audit", "pricing:*", "finance:*", "agent:agent:read", "agent:share:config",
     "agent:settlement:read", "agent:performance:read", "location:venue:read",
     "location:contract:read", "location:analysis:read", "location:overview:read",
+    // 合同财务会签（2026-09-25 运营核心流程）：分成 / 进场费 / 保底超阈值的合同，运营通过后还需财务会签
+    "location:contract:cosign",
     "user:cuser:read", "user:member:read", "user:wallet:read",
     // C 端开票受理（2026-09-25）：开票涉及税务凭据，处理权只给财务
     "user:invoice:read", "user:invoice:handle",

@@ -22,9 +22,11 @@ const draft = (over: Partial<Parameters<typeof saveCabinet>[0]> = {}) => ({
 });
 
 describe("机柜建档：只接受建档字段", () => {
-  it("新建自动生成柜机号，且默认离线无心跳、无归属代理", () => {
+  it("新建自动生成柜机号，且默认在库、离线无心跳、无归属代理", () => {
     const c = saveCabinet(draft());
     expect(c.cabinetNo).toMatch(/^CAB\d+$/);
+    // 新建一律在库（同后端）：表单传 DEPLOYED 也不采信 —— 没过上线门禁就在用，会出现在 C 端可借列表里
+    expect(c.status).toBe("IN_STOCK");
     expect(cabinets.find((x) => x.cabinetNo === c.cabinetNo)).toBe(c);
     // 新柜没上报过任何东西：在线态/心跳/可借数都不能凭表单变成「像在跑」
     expect(c.onlineStatus).toBe("OFFLINE");
@@ -56,9 +58,11 @@ describe("机柜建档：只接受建档字段", () => {
   it("编辑不动设备上报出来的事实（可借数 / 心跳 / 归属代理）", () => {
     const live = cabinets.find((c) => c.availableCount > 0 && c.agentNo)!;
     const before = { avail: live.availableCount, agent: live.agentNo, hb: live.lastHeartbeatAt };
-    const r = saveCabinet({ cabinetNo: live.cabinetNo, sn: live.sn, vendorCode: live.vendorCode, model: "M12", slotTotal: 12, locationNo: live.locationNo, status: "FAULT" });
+    const status = live.status;
+    // 状态也不经编辑改（R1，同后端「编辑不再改状态」）：传了 FAULT 也不采信，状态只由动作推进
+    const r = saveCabinet({ cabinetNo: live.cabinetNo, sn: live.sn, vendorCode: live.vendorCode, model: "M12", slotTotal: 12, locationNo: live.locationNo, status: status === "FAULT" ? "DEPLOYED" : "FAULT" });
     expect(r.model).toBe("M12");
-    expect(r.status).toBe("FAULT");
+    expect(r.status).toBe(status);
     expect(r.availableCount).toBe(before.avail);
     expect(r.agentNo).toBe(before.agent);
     expect(r.lastHeartbeatAt).toBe(before.hb);

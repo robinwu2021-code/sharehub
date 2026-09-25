@@ -1,5 +1,6 @@
 // 覆盖范围：机柜与仓位、下发指令、充电宝、实时监控、指令记录、调拨、OTA、设备日志、设备编码批次。
 import * as dg from "../../mock/db/device-gate";
+import * as da from "../../mock/db/device-asset";
 import * as db from "../../mock/db";
 import type { DeviceApi } from "../contracts/device";
 import type { PageQ, CabinetQ, DeviceLogQ, ArchiveQ, OtaReleaseQ } from "../query";
@@ -28,8 +29,9 @@ export const deviceMock: DeviceApi = {
   // 抽屉会一直停在 loading 而不是显示「查不到」（同 saveSite 那处的理由）
   getInventoryTransfer: async (transferNo) => wait(db.getInventoryTransfer(transferNo)),
   listOtaRollouts: (q: PageQ = {}) => wait(db.listOtaRollouts(q)),
-  savePowerbank: (x) => wait(db.savePowerbank(x), 350),
-  saveInventoryTransfer: (x) => wait(db.saveInventoryTransfer(x), 350),
+  savePowerbank: async (x) => wait(db.savePowerbank(x), 350),
+  // async：非法两端 / 非法迁移是同步抛的，不加 async 就不是 rejected promise，全局 MutationCache 接不到
+  saveInventoryTransfer: async (x) => wait(db.saveInventoryTransfer(x), 350),
   saveOtaRollout: (x) => wait(db.saveOtaRollout(x), 350),
 
   // 固件 OTA 补齐：版本库 + 逐设备任务
@@ -52,16 +54,27 @@ export const deviceMock: DeviceApi = {
   importCabinets: async (rows) => wait(db.importCabinets(rows), 600),
 
   // —— 设备运维：上线门禁 / 试借还 / 保护 ——
-  goLiveGate: (no) => wait(dg.goLiveGate(no)),
+  goLiveGate: async (no) => wait(dg.goLiveGate(no)),
   goLive: async (no) => wait(dg.goLive(no), 350),
   markDeviceFault: async (no, reason) => wait(dg.markDeviceFault(no, reason), 350),
   repairDevice: async (no) => wait(dg.repairDevice(no), 350),
   undeployDevice: async (no, reason) => wait(dg.undeployDevice(no, reason), 350),
   retireDevice: async (no, reason) => wait(dg.retireDevice(no, reason), 350),
-  listTrialRents: (no) => wait(dg.listTrialRents(no)),
+  listTrialRents: async (no) => wait(dg.listTrialRents(no)),
   startTrialRent: async (no) => wait(dg.startTrialRent(no), 400),
-  listProtections: (no, activeOnly) => wait(dg.listProtections(no, activeOnly)),
+  listProtections: async (no, activeOnly) => wait(dg.listProtections(no, activeOnly)),
   applyProtection: async (no, req) => wait(dg.applyProtection(no, req), 350),
   releaseProtection: async (pno, reason) => wait(dg.releaseProtection(pno, reason), 350),
   listSignalCodes: () => wait(dg.listSignalCodes()),
+
+  // —— 批次 5b：充电宝动作 · 入库质检 · 调拨作业 · 资产差异 ——
+  transitPowerbank: async (no, action) => wait(da.transitPowerbank(no, action), 350),
+  inspectCabinet: async (no, req) => wait(da.inspectCabinet(no, req), 350),
+  inspectPowerbank: async (no, req) => wait(da.inspectPowerbank(no, req), 350),
+  listQcRecords: async (itemNo) => wait(da.listQcRecords(itemNo)),
+  setTransferItems: async (no, itemNos) => wait(da.setTransferItems(no, itemNos), 350),
+  shipTransfer: async (no) => wait(da.shipTransfer(no), 400),
+  receiveTransfer: async (no, receivedNos, note) => wait(da.receiveTransfer(no, receivedNos, note), 400),
+  listAssetDiffs: async (q = {}) => wait(da.listAssetDiffs(q)),
+  resolveAssetDiff: async (diffNo, note) => wait(da.resolveAssetDiff(diffNo, note), 350),
 };

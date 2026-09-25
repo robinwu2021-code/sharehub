@@ -1,9 +1,16 @@
 "use client";
 
-// 工单闭环（G6）：开单 → 派单 → 接单 → 处理 → 完成 → 验收关单，全程留痕。
+// 工单闭环（G6）：开单 → 派单 → 接单 → 处理 → 完工 → （复核）→ 验收关单，全程留痕。
 // 状态机定义在 lib/types/workorder.ts（WO_TRANSITIONS），页面按钮与 mock/后端校验共用同一份；
 // 页面只负责「不给点非法动作」，真正的拒绝在服务端（mock 层抛 WorkOrderTransitionError）。
-import { Suspense, useEffect, useMemo, useState } from "react";
+//
+// 2026-09-25 批次 7b（方案 §8.4–8.7）：
+//   · 列表：可点击摘要条（R2）、SLA 剩余列、关联告警数、来源 RefLink（R3）、`?no=` 深链打开详情；
+//   · 详情抽屉：DetailHeader + 步骤条 + StateActions（状态只由动作改，R1）、关联告警与复核、时间线、照片；
+//   · 派单候选人取后端（替换写死的 STAFF）、完工按类型必填（照片 / 故障原因 / 清点数 / 成本）；
+//   · 列表页内的两个子视图：抢单池、成本汇总（不开新菜单 —— 菜单改动要走库迁移）。
+import { Suspense, useMemo, useState, type ReactNode } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
@@ -11,46 +18,47 @@ import { Pagination } from "@/components/ui/misc";
 import { usePaging } from "@/lib/hooks/use-paging";
 import { useNavTabs, usePageTab } from "@/lib/hooks/use-page-tab";
 import { Input, Select } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Drawer, Field } from "@/components/ui/drawer";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { RowActions } from "@/components/ui/dropdown-menu";
+import { Tabs } from "@/components/ui/tabs";
 import { TabHeader } from "@/components/ui/tab-header";
 import { Toolbar } from "@/components/ui/toolbar";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
 import { FilterSelect } from "@/components/ui/filter-select";
-import { StatusBadge, statusOptions, type StatusMap } from "@/components/ui/status-badge";
+import { StatusBadge, statusOptions } from "@/components/ui/status-badge";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Notice } from "@/components/ui/notice";
 import { ReadOnlyNotice } from "@/components/read-only-notice";
+import { StateActions, type ActionSpec } from "@/components/state-actions";
+import { RefLink } from "@/components/ref-link";
 import { WoStatusBadge, EnabledBadge, WO_TYPE_LABEL } from "@/components/status";
+import { WoSummaryBar, summaryFilter, type WoSummaryKey } from "@/components/workorder/wo-summary-bar";
+import { SlaRemain } from "@/components/workorder/sla-remain";
+import { WoDetailDrawer } from "@/components/workorder/wo-detail-drawer";
+import { WoAssignDrawer } from "@/components/workorder/wo-assign-drawer";
+import { WoHandleDrawer } from "@/components/workorder/wo-handle-drawer";
+import { WoCloseDrawer } from "@/components/workorder/wo-close-drawer";
+import { WoDeriveDrawer } from "@/components/workorder/wo-derive-drawer";
+import { WoPoolView } from "@/components/workorder/wo-pool-view";
+import { WoCostsView } from "@/components/workorder/wo-costs-view";
+import { PRIO, REVIEW, SOURCE_LABEL } from "@/components/workorder/wo-meta";
 import { exportCsv, type CsvColumn } from "@/lib/export-csv";
 import { fmtTime } from "@/lib/utils";
 import { useCan } from "@/lib/hooks/use-can";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
-import { nextActions, inspectionPeriodKey, inspectionRunnable } from "@/lib/types";
+import {
+  WO_TRANSITIONS, canTransition, inspectionPeriodKey, inspectionRunnable, woDeriveBlocked, woTakeoverBlocked,
+  woSlaRemain, fmtMinutes,
+} from "@/lib/types";
 import type {
-  WorkOrder, WorkOrderAction, WorkOrderDraft, WorkOrderPriority, WorkOrderStatus,
-  WoAuditResult, SlaRule, InspectionPlan, InspectionFrequency,
+  WorkOrder, WorkOrderAction, WorkOrderDraft, WorkOrderStatus,
+  SlaRule, InspectionPlan, InspectionFrequency,
 } from "@/lib/types";
 
-/**
- * 优先级：文案 + 色调 + **形状阶梯**（规范 §11.4）。
- * 紧急与高同为 danger 色 —— 红绿色盲（男性约 8%）看不出「紧急比高更急」，
- * 而优先级直接决定值班响应顺序，故在文案里带一条与颜色无关的阶梯：▫ < ▪ < ▲ < ▲▲。
- * 键序 = 下拉选项顺序（低→紧急，沿用原 PRIO_OPTIONS 的升序）。
- */
-const PRIO: StatusMap<WorkOrderPriority> = {
-  LOW: { label: "▫ 低", tone: "muted" },
-  MEDIUM: { label: "▪ 中", tone: "warning" },
-  HIGH: { label: "▲ 高", tone: "danger" },
-  URGENT: { label: "▲▲ 紧急", tone: "danger" },
-};
-const STAFF = ["Ali", "Omar", "Sara", "Wang"];
 /**
  * 状态的列/标签/筛选项**同一份**（下面三处都从它派生）。
  *
@@ -69,27 +77,34 @@ const BOARD_COLS: { key: string; label: string }[] = [
 ];
 // tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）。
 // 本页用的是 `?view=` 而不是 `?tab=`，菜单里那四条叶子也是 view —— 两边必须一致。
+// 抢单池 / 成本汇总不进这里：它们是「工单列表」下的子视图（`?sub=`），开成 tab 就得加菜单叶，而菜单改动要走库迁移。
 const TAB_KEYS = ["list", "board", "sla", "inspection"] as const;
-type View = "list" | "board" | "sla" | "inspection";
+type Sub = "all" | "pool" | "costs";
 
 const ACTION_LABEL: Record<WorkOrderAction, string> = {
-  dispatch: "派单", accept: "接单", process: "提交处理", complete: "完成", close: "验收关单", reject: "驳回", rework: "退回返工",
+  dispatch: "派单", accept: "接单", process: "提交处理", complete: "完工", close: "验收", reject: "驳回", rework: "退回返工",
+};
+/** 动作 → 所需权限码（列表 / 看板 / 详情共用一份）。 */
+const PERM_OF: Record<WorkOrderAction, string> = {
+  dispatch: "workorder:wo:dispatch", reject: "workorder:wo:dispatch",
+  accept: "workorder:wo:handle", process: "workorder:wo:handle", complete: "workorder:wo:handle",
+  close: "workorder:wo:close", rework: "workorder:wo:close",
 };
 /**
- * 操作列的**主动作** = 该状态下推进流程的那一步；其余动作收进「更多」菜单。
- * 原先是 `acts.slice(0, 2)`：处理中有三个动作（提交处理/完成/驳回），第三个被静默截掉，
- * 只能进详情抽屉才找得到 —— 截掉的偏偏是「驳回」这种需要显形的动作。
+ * 每个状态下推进流程的那一步 = 主动作（按钮）；其余收进「更多」。
+ * ACCEPTED 此前没有主动作 —— 接完单的工单在列表上只剩一个「⋯」，没人看得出下一步是到场提交处理。
  */
 const PRIMARY_ACTION: Partial<Record<WorkOrderStatus, WorkOrderAction>> = {
-  CREATED: "dispatch", DISPATCHED: "accept", PROCESSING: "complete", DONE: "close",
+  CREATED: "dispatch", DISPATCHED: "accept", ACCEPTED: "process", PROCESSING: "complete", DONE: "close",
 };
-const SOURCE_LABEL: Record<WorkOrder["source"], string> = {
-  ALERT: "告警转入", USER: "投诉转入", VENUE: "场地方报障", MANUAL: "手工开单", PLAN: "巡检计划",
-};
-const AUDIT_LABEL: Record<WoAuditResult, string> = { PASS: "验收合格", PASS_WITH_ISSUE: "有条件通过（有遗留）", FAIL: "验收不合格（退回返工）" };
+const OPEN_STATUSES: WorkOrderStatus[] = ["DISPATCHED", "ACCEPTED", "PROCESSING"];
 
 /** 状态中文名：与列表 Badge、看板列头同一份口径 */
 const WO_STATUS_LABEL = (s: string) => BOARD_COLS.find((c) => c.key === s)?.label ?? s;
+const slaText = (w: WorkOrder) => {
+  const r = woSlaRemain(w);
+  return r == null ? "" : r < 0 ? `超 ${fmtMinutes(r)}` : `剩 ${fmtMinutes(r)}`;
+};
 
 /** 导出列与表格可见列一致（操作列除外）。 */
 const WO_CSV_COLS: CsvColumn<WorkOrder>[] = [
@@ -98,10 +113,11 @@ const WO_CSV_COLS: CsvColumn<WorkOrder>[] = [
   { header: "来源", value: (w) => `${SOURCE_LABEL[w.source]}${w.sourceNo ? ` · ${w.sourceNo}` : ""}` },
   { header: "柜机", value: (w) => w.cabinetNo },
   { header: "点位", value: (w) => w.locationName },
-  { header: "优先级", value: (w) => PRIO[w.priority].label },
+  { header: "优先级", value: (w) => PRIO[w.priority]?.label ?? w.priority },
   { header: "状态", value: (w) => WO_STATUS_LABEL(w.status) },
   { header: "处理人", value: (w) => w.handlerName ?? w.assigneeName ?? "未派单" },
-  { header: "期望完成", value: (w) => (w.expectedAt ? fmtTime(w.expectedAt) : "") },
+  { header: "SLA", value: slaText },
+  { header: "关联告警", value: (w) => w.ops?.alarmCount ?? 0 },
   { header: "创建", value: (w) => fmtTime(w.createdAt) },
 ];
 
@@ -115,6 +131,7 @@ const WO_TYPE_OPTIONS = Object.entries(WO_TYPE_LABEL).map(([value, label]) => ({
 const PRIO_OPTIONS = statusOptions(PRIO);
 // 状态筛选项与看板列头同一份文案，不另抄一遍
 const WO_STATUS_OPTIONS = BOARD_COLS.map((c) => ({ value: c.key, label: c.label }));
+const SOURCE_OPTIONS = Object.entries(SOURCE_LABEL).map(([value, label]) => ({ value, label }));
 
 const SLA_FIELDS: FieldDef[] = [
   { key: "slaNo", label: "SLA 编号", readOnlyOnEdit: true, placeholder: "自动生成" },
@@ -141,50 +158,99 @@ const NEW_WO: Partial<WorkOrderDraft> = {
   type: "FAULT", priority: "MEDIUM", cabinetNo: "", locationName: "", description: "", expectedAt: "",
 };
 
+/** 列表「来源」列：业务号能跳就跳（R3）。告警来源的 sourceNo 在真后端是合并键（ALM:柜号:类型），不是告警号。 */
+function SourceCell({ w }: { w: WorkOrder }) {
+  const label = SOURCE_LABEL[w.source] ?? w.source;
+  const no = w.sourceNo;
+  let ref: ReactNode = null;
+  if (no && w.source === "ALERT" && !no.includes(":")) ref = <RefLink kind="alarm" no={no} />;
+  else if (no && w.source === "INSPECTION") ref = <RefLink kind="wo" no={no.split(":")[0]} />;
+  else if (no && w.source !== "ALERT") ref = <span className="tabular-nums">{no}</span>;
+  return <span className="text-muted-foreground">{label}{ref && <> · {ref}</>}</span>;
+}
+
 function WorkOrdersInner() {
   const qc = useQueryClient();
   const allow = useCan();
   const { t } = useI18n();
   const paging = usePaging();
+  const router = useRouter();
+  const pathname = usePathname();
+  const sp = useSearchParams();
   const tabs = useNavTabs("/work-orders", TAB_KEYS);
   const { tab: view, setTab: setView } = usePageTab(tabs, () => { paging.reset(); setSelected([]); }, { param: "view" });
   const [keyword, setKeyword] = useState("");
   const [status, setStatus] = useState("");
   const [type, setType] = useState("");
+  const [priority, setPriority] = useState("");
+  const [source, setSource] = useState("");
+  const [siteNo, setSiteNo] = useState("");
+  const [summary, setSummary] = useState<WoSummaryKey | null>(null);
   const { confirm, dialog } = useConfirm();
   // 列表批量选中（G3）。翻页/切视图/改筛选都要清空——否则会对「看不见的行」下手。
   const [selected, setSelected] = useState<string[]>([]);
-  const [batchAssignee, setBatchAssignee] = useState(STAFF[0]);
+  const [batchAssignee, setBatchAssignee] = useState("");
   const clearSel = () => setSelected([]);
+  const refilter = () => { paging.reset(); clearSel(); };
   // 翻页要清掉勾选：第 2 页留着第 1 页的勾选，批量操作会作用到看不见的行上
   const goPage = (p: number) => { paging.setPage(p); clearSel(); };
 
-  // —— 抽屉状态：开单 / 派单 / 处理·完成 / 验收关单 / 驳回 / 详情 ——
+  // —— URL：`?no=` 详情深链（RefLink 的 wo 路由就指向这里）、`?sub=` 列表子视图 ——
+  const setParam = (k: string, v: string | null) => {
+    const q = new URLSearchParams(sp.toString());
+    if (v) q.set(k, v); else q.delete(k);
+    router.replace(q.size ? `${pathname}?${q.toString()}` : pathname, { scroll: false });
+  };
+  const detailNo = sp.get("no");
+  const openDetail = (no: string) => setParam("no", no);
+  const closeDetail = () => setParam("no", null);
+
+  const canCreate = allow("workorder:wo:create");
+  const canDispatch = allow("workorder:wo:dispatch");
+  const canHandle = allow("workorder:wo:handle");
+  const canClose = allow("workorder:wo:close");
+  const canSla = allow("workorder:sla:update");
+  const canInspection = allow("workorder:inspection:update");
+  // 「立即执行一次」= 改计划留痕 + 开工单，两件事都做，故两个权限码都要有（不新造权限码）
+  const canRunPlan = canInspection && canCreate;
+  const canAny = canCreate || canDispatch || canHandle || canClose;
+
+  // 子视图：抢单池要 wo:handle 才看得到（后端 pool 端点的码），成本汇总跟列表同码
+  const subs = useMemo(() => [
+    { key: "all", label: "全部工单" },
+    ...(canHandle ? [{ key: "pool", label: "抢单池" }] : []),
+    { key: "costs", label: "成本汇总" },
+  ], [canHandle]);
+  const rawSub = sp.get("sub");
+  const sub: Sub = subs.some((s) => s.key === rawSub) ? (rawSub as Sub) : "all";
+
+  // —— 抽屉状态 ——
   const [woForm, setWoForm] = useState<Partial<WorkOrderDraft> | null>(null);
-  const [dispatch, setDispatch] = useState<WorkOrder | null>(null);
-  const [assignee, setAssignee] = useState(STAFF[0]);
+  const [assign, setAssign] = useState<{ wo: WorkOrder; mode: "dispatch" | "takeover" } | null>(null);
   const [handle, setHandle] = useState<{ wo: WorkOrder; action: "process" | "complete" } | null>(null);
-  const [handleNote, setHandleNote] = useState("");
-  const [parts, setParts] = useState("");
   const [closing, setClosing] = useState<WorkOrder | null>(null);
-  const [auditResult, setAuditResult] = useState<WoAuditResult>("PASS");
-  const [auditNote, setAuditNote] = useState("");
   const [rejecting, setRejecting] = useState<WorkOrder | null>(null);
   const [rejectReason, setRejectReason] = useState("");
-  // 同一个「填原因」抽屉服务两个动作：driver 驳回退回待派单 / rework 验收不合格退回返工
+  // 同一个「填原因」抽屉服务两个动作：reject 驳回退回待派单 / rework 验收不合格退回返工
   const [rejectMode, setRejectMode] = useState<"reject" | "rework">("reject");
-  const [detail, setDetail] = useState<WorkOrder | null>(null);
+  const [deriveFrom, setDeriveFrom] = useState<WorkOrder | null>(null);
 
   const [slaKw, setSlaKw] = useState("");
   const [inspKw, setInspKw] = useState("");
   const [slaForm, setSlaForm] = useState<Partial<SlaRule> | null>(null);
   const [inspForm, setInspForm] = useState<Partial<InspectionPlan> | null>(null);
 
-  // 列表分页；看板一次取较多再按状态分列
+  // 摘要卡是筛选的一种：它给的 status / slaState / reviewStatus 覆盖下拉里的状态
+  const filters = {
+    keyword, type: type || undefined, status: status || undefined, priority: priority || undefined,
+    source: source || undefined, siteNo: siteNo || undefined, ...summaryFilter(summary),
+  };
+
+  const summaryQ = useQuery({ queryKey: ["wo-summary"], queryFn: () => api.woSummary(), enabled: view === "list" && sub === "all" });
   const list = useQuery({
-    queryKey: ["workorders", paging.page, paging.size, keyword, status, type],
-    queryFn: () => api.listWorkOrders({ page: paging.page, size: paging.size, keyword, status: status || undefined, type: type || undefined }),
-    placeholderData: keepPreviousData, enabled: view === "list",
+    queryKey: ["workorders", paging.page, paging.size, filters],
+    queryFn: () => api.listWorkOrders({ page: paging.page, size: paging.size, ...filters }),
+    placeholderData: keepPreviousData, enabled: view === "list" && sub === "all",
   });
   const board = useQuery({
     queryKey: ["workorders-board", keyword, type],
@@ -207,57 +273,46 @@ function WorkOrdersInner() {
     queryFn: () => api.listCabinets({ page: 1, size: UNPAGED_SIZE }),
     enabled: !!woForm,
   });
+  // 站点筛选的选项：站点表有界（以运营站点数为上界），一次取完；没有站点查看权限就不出这个筛选
+  const canSites = allow("location:poi:read");
+  const siteOpts = useQuery({
+    queryKey: ["wo-site-options"],
+    queryFn: () => api.listSites({ page: 1, size: UNPAGED_SIZE }),
+    enabled: view === "list" && sub === "all" && canSites,
+    staleTime: 5 * 60_000,
+  });
+  // 批量派单的处理人：与派单抽屉同一个候选人接口（不带站点 = 没有责任人置顶）
+  const batchCands = useQuery({
+    queryKey: ["wo-candidates", ""],
+    queryFn: () => api.assigneeCandidates(),
+    enabled: selected.length > 0 && canDispatch,
+  });
+  const batchPick = batchAssignee || batchCands.data?.[0]?.no || "";
 
   const refreshWo = () => {
-    qc.invalidateQueries({ queryKey: ["workorders"] });
-    qc.invalidateQueries({ queryKey: ["workorders-board"] });
+    for (const k of ["workorders", "workorders-board", "wo-summary", "wo-detail", "wo-pool", "wo-costs"]) {
+      qc.invalidateQueries({ queryKey: [k] });
+    }
   };
-  /** 流转成功统一收口：提示 + 刷新列表与看板 + 关抽屉；失败走全局 MutationCache.onError（含非法迁移报错）。 */
-  const ok = (msg: string, after?: () => void) => () => { notify.success(msg); refreshWo(); after?.(); };
+  /** 流转成功统一收口：提示 + 刷新；失败走全局 MutationCache.onError（含非法迁移报错）。 */
+  const done = (after: () => void) => (msg: string) => { notify.success(msg); refreshWo(); after(); };
 
   const doCreate = useMutation({
     mutationFn: (v: WorkOrderDraft) => api.createWorkOrder(v),
-    onSuccess: ok("工单已创建", () => setWoForm(null)),
-  });
-  const doDispatch = useMutation({
-    mutationFn: (v: { no: string; assignee: string }) => api.dispatchWorkOrder(v.no, v.assignee),
-    onSuccess: ok("已派单", () => setDispatch(null)),
+    onSuccess: () => done(() => setWoForm(null))("工单已创建"),
   });
   const doAccept = useMutation({
     mutationFn: (no: string) => api.acceptWorkOrder(no),
-    onSuccess: ok("已接单；到场后点「提交处理」进入处理中"),
-  });
-  const doHandle = useMutation({
-    mutationFn: (v: { no: string; action: "process" | "complete"; handleNote: string; partsReplaced?: string }) =>
-      v.action === "complete"
-        ? api.completeWorkOrder(v.no, { handleNote: v.handleNote, partsReplaced: v.partsReplaced })
-        : api.processWorkOrder(v.no, { handleNote: v.handleNote, partsReplaced: v.partsReplaced }),
-    onSuccess: ok("处理结果已提交", () => setHandle(null)),
-  });
-  const doClose = useMutation({
-    mutationFn: (v: { no: string; auditResult: WoAuditResult; auditNote: string }) =>
-      api.closeWorkOrder(v.no, { auditResult: v.auditResult, auditNote: v.auditNote }),
-    onSuccess: ok("验收通过，工单已关闭", () => setClosing(null)),
+    onSuccess: () => done(() => undefined)("已接单；到场后点「提交处理」进入处理中"),
   });
   const doReject = useMutation({
     mutationFn: (v: { no: string; reason: string }) => api.rejectWorkOrder(v.no, v.reason),
-    onSuccess: ok("已驳回，工单退回待派单", () => setRejecting(null)),
+    onSuccess: () => done(() => setRejecting(null))("已驳回，工单退回待派单"),
   });
-  // 验收不合格退回返工：与 reject 复用同一个「填原因」抽屉，靠 rejecting.mode 区分
   const doRework = useMutation({
     mutationFn: (v: { no: string; reason: string }) => api.reworkWorkOrder(v.no, v.reason),
-    onSuccess: ok("已退回返工，工单回到处理中", () => setRejecting(null)),
+    onSuccess: () => done(() => setRejecting(null))("已退回返工，工单回到处理中"),
   });
-
-  const canCreate = allow("workorder:wo:create");
-  const canDispatch = allow("workorder:wo:dispatch");
-  const canHandle = allow("workorder:wo:handle");
-  const canClose = allow("workorder:wo:close");
-  const canSla = allow("workorder:sla:update");
-  const canInspection = allow("workorder:inspection:update");
-  // 「立即执行一次」= 改计划留痕 + 开工单，两件事都做，故两个权限码都要有（不新造权限码）
-  const canRunPlan = canInspection && canCreate;
-  const canAny = canCreate || canDispatch || canHandle || canClose;
 
   // —— 批量派单（G3）——
   // 工单有状态机：只有 CREATED（待派单）能派单，其余状态服务端会拒。
@@ -273,52 +328,65 @@ function WorkOrdersInner() {
     const eligible = picked.filter((w) => w.status === "CREATED");
     const skipped = picked.length - eligible.length;
     if (eligible.length === 0) {
-      notify.error(`已选 ${picked.length} 张工单均不处于「待派单」，无法派单；请先筛选状态为「待派单」再选`);
+      notify.error(`已选 ${picked.length} 张工单均不处于「待派单」，无法派单；请先点摘要条「待派单」再选`);
       return;
     }
+    const name = batchCands.data?.find((c) => c.no === batchPick)?.name ?? batchPick;
     const ok = await confirm({
       title: `批量派单 ${eligible.length} 张`,
-      desc: `已选 ${picked.length} 张工单，其中 ${eligible.length} 张处于「待派单」可派给 ${batchAssignee}`
+      desc: `已选 ${picked.length} 张工单，其中 ${eligible.length} 张处于「待派单」可派给 ${name}`
         + (skipped > 0 ? `，另 ${skipped} 张状态不符将跳过。` : "。")
-        + "派单后要处理人接单、到场提交处理，才进入处理中。",
-      confirmText: `确认派给 ${batchAssignee}`,
+        + "批量派单不看站点责任人；要按责任人派，请逐张打开派单抽屉。",
+      confirmText: `确认派给 ${name}`,
     });
-    if (ok) batchDispatch.mutate({ nos: eligible.map((w) => w.woNo), assignee: batchAssignee });
+    if (ok) batchDispatch.mutate({ nos: eligible.map((w) => w.woNo), assignee: batchPick });
   };
 
-  /** 动作 → 所需权限码（列表/看板/详情三处共用，避免各写一套） */
-  const permOf = (a: WorkOrderAction) =>
-    a === "dispatch" || a === "reject" ? canDispatch : a === "close" || a === "rework" ? canClose : canHandle;
-
   const openAction = (w: WorkOrder, a: WorkOrderAction) => {
-    if (a === "dispatch") { setDispatch(w); setAssignee(w.assigneeName ?? STAFF[0]); return; }
+    if (a === "dispatch") { setAssign({ wo: w, mode: "dispatch" }); return; }
     if (a === "accept") { doAccept.mutate(w.woNo); return; }
-    if (a === "process" || a === "complete") { setHandle({ wo: w, action: a }); setHandleNote(""); setParts(w.partsReplaced ?? ""); return; }
-    if (a === "close") { setClosing(w); setAuditResult("PASS"); setAuditNote(""); return; }
+    if (a === "process" || a === "complete") { setHandle({ wo: w, action: a }); return; }
+    if (a === "close") { setClosing(w); return; }
     setRejectMode(a === "rework" ? "rework" : "reject");
     setRejecting(w); setRejectReason("");
   };
 
-  /** 当前状态下有权执行的动作。列表操作列出主动作，其余进「更多」菜单；详情抽屉出全部。 */
-  const actionsOf = (w: WorkOrder) => nextActions(w.status).filter(permOf);
+  const busy = doAccept.isPending || doReject.isPending || doRework.isPending;
 
-  const busy = doDispatch.isPending || doAccept.isPending || doHandle.isPending || doClose.isPending || doReject.isPending || doRework.isPending;
-
-  const ActionButtons = ({ w, max }: { w: WorkOrder; max?: number }) => {
-    const acts = actionsOf(w);
-    const shown = max ? acts.slice(0, max) : acts;
-    return (
-      <div className="flex flex-wrap items-center gap-1.5">
-        {shown.map((a) => (
-          <Button
-            key={a} size="sm" disabled={busy}
-            variant={a === "reject" || a === "rework" ? "outline" : "default"}
-            onClick={() => openAction(w, a)}
-          >{ACTION_LABEL[a]}</Button>
-        ))}
-        {acts.length === 0 && <span className="text-muted-foreground">-</span>}
-      </div>
-    );
+  /**
+   * 当前工单的全部动作（StateActions 描述）。**列表行、看板卡片、详情头共用这一份**：
+   * 合法与否按迁移表（when），缺权限渲染禁用 + 提示缺哪个码（不静默隐藏），
+   * 业务上暂不可用的（派生 / 接管）也渲染禁用并写明原因。
+   */
+  const actionsOf = (w: WorkOrder): ActionSpec[] => {
+    const specs: ActionSpec[] = (Object.keys(WO_TRANSITIONS) as WorkOrderAction[]).map((a) => ({
+      key: a,
+      label: ACTION_LABEL[a],
+      perm: PERM_OF[a],
+      when: canTransition(w.status, a),
+      primary: PRIMARY_ACTION[w.status] === a,
+      danger: a === "reject" || a === "rework",
+      blockedReason: busy ? "处理中…" : null,
+      // 接单没有抽屉可兜底，是直接生效的动作 —— 要确认（R4）
+      confirm: a === "accept"
+        ? { title: `接单 ${w.woNo}`, desc: "接单即响应：SLA 响应计时到此为止，之后到场提交处理。", confirmText: "确认接单" }
+        : undefined,
+      onRun: () => openAction(w, a),
+    }));
+    specs.push({
+      key: "derive", label: "派生子单", perm: "workorder:wo:handle",
+      when: w.type === "INSPECT" && w.status !== "CLOSED" && w.status !== "AUDITED",
+      blockedReason: woDeriveBlocked(w),
+      onRun: () => setDeriveFrom(w),
+    });
+    specs.push({
+      key: "takeover", label: "平台接管", perm: "workorder:wo:dispatch",
+      // 只有代理承接的未完工单才谈得上接管；SLA 未超时时按钮在、但禁用并写明「剩多久」
+      when: w.ops?.assigneeType === "AGENT" && OPEN_STATUSES.includes(w.status),
+      blockedReason: woTakeoverBlocked(w),
+      onRun: () => setAssign({ wo: w, mode: "takeover" }),
+    });
+    return specs;
   };
 
   const WO_FIELDS: FieldDef[] = useMemo(() => {
@@ -341,8 +409,12 @@ function WorkOrdersInner() {
     mutationFn: (v: Partial<SlaRule>) => api.saveSlaRule(v),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["sla-rules"] }); notify.success(t("common.success")); setSlaForm(null); },
   });
-  // 「立即执行一次」：mock 没有定时器，用它手动触发一次「按计划开工单」。
-  // 生成的工单会真的进列表/看板，故成功后连工单查询一起失效。
+  // 编辑前取单条最新值：列表可能是几分钟前的，拿旧行覆盖会把别人刚改的时限冲掉
+  const editSla = useMutation({
+    mutationFn: (no: string) => api.getSlaRule(no),
+    onSuccess: (r) => setSlaForm(r),
+  });
+  // 「立即执行一次」：生成的工单会真的进列表/看板，故成功后连工单查询一起失效。
   const runPlan = useMutation({
     mutationFn: (no: string) => api.runInspectionPlan(no),
     onSuccess: (r) => {
@@ -374,55 +446,67 @@ function WorkOrdersInner() {
   });
 
   const cols: Column<WorkOrder>[] = [
-    // 业务号列 body-strong（类型阶 txt-strong = 14/500）作扫描锚点（规范 §12.3）
-    { header: "工单号", cell: (w) => <span className="txt-strong tabular-nums">{w.woNo}</span> },
-    { header: "类型", cell: (w) => WO_TYPE_LABEL[w.type] },
-    { header: "来源", cell: (w) => <span className="text-muted-foreground">{SOURCE_LABEL[w.source]}{w.sourceNo ? ` · ${w.sourceNo}` : ""}</span> },
-    { header: "柜机", cell: (w) => w.cabinetNo },
-    { header: "点位", cell: (w) => <span className="text-muted-foreground">{w.locationName}</span> },
+    // 业务号列 body-strong（类型阶 txt-strong = 14/500）作扫描锚点（规范 §12.3）；点开详情
+    {
+      header: "工单号",
+      cell: (w) => (
+        <button type="button" className="txt-strong tabular-nums underline-offset-2 hover:underline" onClick={() => openDetail(w.woNo)}>{w.woNo}</button>
+      ),
+    },
+    { header: "类型", cell: (w) => WO_TYPE_LABEL[w.type] ?? w.type },
+    { header: "来源", cell: (w) => <SourceCell w={w} /> },
+    { header: "柜机 / 点位", cell: (w) => <span className="text-muted-foreground">{w.cabinetNo ?? "-"} · {w.locationName ?? "-"}</span> },
     // nowrap：形状标记让文案变宽，窄列里会把「▲▲ 紧急」折成两行、把整行行高撑起来
     { header: "优先级", cell: (w) => <StatusBadge map={PRIO} value={w.priority} className="whitespace-nowrap" /> },
-    { header: "状态", cell: (w) => <WoStatusBadge s={w.status} /> },
-    { header: "处理人", cell: (w) => <span className="text-muted-foreground">{w.handlerName ?? w.assigneeName ?? "未派单"}</span> },
-    { header: "期望完成", cell: (w) => <span className="text-muted-foreground">{w.expectedAt ? fmtTime(w.expectedAt) : "-"}</span> },
+    {
+      header: "状态",
+      cell: (w) => (
+        <div className="flex flex-wrap items-center gap-1">
+          <WoStatusBadge s={w.status} />
+          {w.ops?.reviewStatus === "FAILED" && w.status === "DONE" && <StatusBadge map={REVIEW} value="FAILED" />}
+        </div>
+      ),
+    },
+    {
+      header: "处理人",
+      cell: (w) => (
+        <span className="text-muted-foreground">
+          {w.handlerName ?? w.assigneeName ?? "未派单"}{w.ops?.assigneeType === "AGENT" && "（代理）"}
+        </span>
+      ),
+    },
+    { header: "SLA 剩余", cell: (w) => <SlaRemain w={w} /> },
+    {
+      header: "关联告警", className: "text-end",
+      cell: (w) => <span className={w.ops?.alarmCount ? "tabular-nums" : "tabular-nums text-muted-foreground"}>{w.ops?.alarmCount ?? 0}</span>,
+    },
     { header: "创建", cell: (w) => <span className="text-muted-foreground">{fmtTime(w.createdAt)}</span> },
     {
       header: t("common.actions"),
-      // 主动作 + 详情常驻，其余（提交处理 / 驳回 / 退回返工）进「更多」。
-      // 驳回与退回返工标 danger：RowActions 会把它们排到分隔线之下，方向键连按不会误中；
-      // 两者都还要在抽屉里填原因才生效，不存在「一点就炸」。
-      cell: (w) => {
-        const acts = actionsOf(w);
-        const primary = PRIMARY_ACTION[w.status];
-        return (
-          <div className="flex items-center gap-1.5">
-            {acts.filter((a) => a === primary).map((a) => (
-              <Button key={a} size="sm" disabled={busy} onClick={() => openAction(w, a)}>{ACTION_LABEL[a]}</Button>
-            ))}
-            <Button size="sm" variant="outline" onClick={() => setDetail(w)}>详情</Button>
-            <RowActions
-              actions={acts.filter((a) => a !== primary).map((a) => ({
-                label: ACTION_LABEL[a],
-                onSelect: () => openAction(w, a),
-                disabled: busy,
-                danger: a === "reject" || a === "rework",
-              }))}
-            />
-          </div>
-        );
-      },
+      // 主动作按钮 + 详情常驻，其余（驳回 / 退回返工 / 派生 / 接管…）进「更多」；缺权限的禁用并说明缺哪个码
+      cell: (w) => (
+        <div className="flex items-center gap-1.5">
+          <StateActions actions={actionsOf(w)} />
+          <Button size="sm" variant="outline" onClick={() => openDetail(w.woNo)}>详情</Button>
+        </div>
+      ),
     },
   ];
 
   const slaCols: Column<SlaRule>[] = [
     { header: "SLA 编号", cell: (s) => <span className="txt-strong tabular-nums">{s.slaNo}</span> },
-    { header: "工单类型", cell: (s) => <Badge tone="outline">{s.woType}</Badge> },
+    { header: "工单类型", cell: (s) => <Badge tone="outline">{WO_TYPE_LABEL[s.woType] ?? s.woType}</Badge> },
     // 时限是纯数量：右对齐 + 等宽，位数才对得齐（规范 §12.4）
     { header: "响应时限", className: "text-end", cell: (s) => <span className="tabular-nums">{s.responseMins} 分钟</span> },
     { header: "解决时限", className: "text-end", cell: (s) => <span className="tabular-nums">{s.resolveMins} 分钟</span> },
     { header: "升级至", cell: (s) => <span className="text-muted-foreground">{s.escalateTo}</span> },
     { header: "状态", cell: (s) => <EnabledBadge on={s.active} /> },
-    { header: t("common.actions"), cell: (s) => canSla ? <Button size="sm" variant="outline" onClick={() => setSlaForm(s)}>{t("common.edit")}</Button> : <span className="text-muted-foreground">-</span> },
+    {
+      header: t("common.actions"),
+      cell: (s) => canSla
+        ? <Button size="sm" variant="outline" disabled={editSla.isPending} onClick={() => editSla.mutate(s.slaNo)}>{t("common.edit")}</Button>
+        : <span className="text-muted-foreground">-</span>,
+    },
   ];
   const inspectionCols: Column<InspectionPlan>[] = [
     { header: "计划编号", cell: (p) => <span className="txt-strong tabular-nums">{p.planNo}</span> },
@@ -473,37 +557,60 @@ function WorkOrdersInner() {
   ];
 
   const rows = board.data?.list ?? [];
+  const siteOptions = (siteOpts.data?.list ?? []).map((s) => ({ value: s.siteNo, label: `${s.name}（${s.siteNo}）` }));
 
   return (
     <div>
       <TabHeader tabs={tabs} value={view} onChange={setView} />
 
-      {(view === "list" || view === "board") && (
+      {view === "list" && (
+        <Tabs tabs={subs} value={sub} onChange={(k) => { setParam("sub", k === "all" ? null : k); refilter(); }} />
+      )}
+
+      {view === "list" && sub === "pool" && <WoPoolView onOpen={openDetail} onChanged={refreshWo} />}
+      {view === "list" && sub === "costs" && <WoCostsView />}
+
+      {view === "list" && sub === "all" && (
+        <WoSummaryBar data={summaryQ.data} loading={summaryQ.isLoading} active={summary}
+          onPick={(k) => { setSummary(k); if (k) setStatus(""); refilter(); }} />
+      )}
+
+      {((view === "list" && sub === "all") || view === "board") && (
         <>
           <Toolbar
             search={keyword}
-            onSearch={(v) => { setKeyword(v); paging.reset(); clearSel(); }}
-            searchPlaceholder="搜索工单号 / 柜机 / 点位 / 来源单号 / 处理人"
+            onSearch={(v) => { setKeyword(v); refilter(); }}
+            searchPlaceholder="搜索工单号 / 柜机 / 来源单号"
             onAdd={canCreate ? () => setWoForm({ ...NEW_WO }) : undefined}
             addLabel="新建工单"
             onExport={view === "list" ? () => exportCsv<WorkOrder>("工单列表", WO_CSV_COLS, list.data?.list ?? []) : undefined}
             selectedCount={view === "list" ? selected.length : 0}
             batchActions={
               <>
-                {/* 处理人沿用派单抽屉的同一份名单，不另造 */}
-                <Select className="h-8" value={batchAssignee} onChange={(e) => setBatchAssignee(e.target.value)} aria-label="批量派单处理人">
-                  {STAFF.map((s) => <option key={s} value={s}>{s}</option>)}
+                {/* 处理人与派单抽屉同一个候选人接口，不另造名单 */}
+                <Select className="h-8" value={batchPick} onChange={(e) => setBatchAssignee(e.target.value)} aria-label="批量派单处理人">
+                  {(batchCands.data ?? []).map((c) => <option key={c.no} value={c.no}>{c.name}（{c.no}）</option>)}
                 </Select>
-                <Button size="sm" disabled={batchDispatch.isPending} onClick={askBatchDispatch}>批量派单</Button>
+                <Button size="sm" disabled={batchDispatch.isPending || !batchPick} onClick={askBatchDispatch}>批量派单</Button>
               </>
             }
             onClearSelection={clearSel}
           >
-            <FilterSelect value={type} onChange={(v) => { setType(v); paging.reset(); clearSel(); }}
+            <FilterSelect value={type} onChange={(v) => { setType(v); refilter(); }}
               allLabel="全部类型" options={WO_TYPE_OPTIONS} aria-label="按工单类型筛选" />
             {view === "list" && (
-              <FilterSelect value={status} onChange={(v) => { setStatus(v); paging.reset(); clearSel(); }}
-                allLabel="全部状态" options={WO_STATUS_OPTIONS} aria-label="按工单状态筛选" />
+              <>
+                <FilterSelect value={status} onChange={(v) => { setStatus(v); setSummary(null); refilter(); }}
+                  allLabel="全部状态" options={WO_STATUS_OPTIONS} aria-label="按工单状态筛选" />
+                <FilterSelect value={priority} onChange={(v) => { setPriority(v); refilter(); }}
+                  allLabel="全部优先级" options={PRIO} aria-label="按优先级筛选" />
+                <FilterSelect value={source} onChange={(v) => { setSource(v); refilter(); }}
+                  allLabel="全部来源" options={SOURCE_OPTIONS} aria-label="按来源筛选" />
+                {canSites && (
+                  <FilterSelect value={siteNo} onChange={(v) => { setSiteNo(v); refilter(); }}
+                    allLabel="全部站点" options={siteOptions} aria-label="按站点筛选" />
+                )}
+              </>
             )}
           </Toolbar>
           {!canAny && (
@@ -557,11 +664,11 @@ function WorkOrdersInner() {
               { header: "状态", value: (p) => (p.active ? "启用" : "停用") },
             ], inspection.data?.list ?? [])}
           />
-          {/* 说清「立即执行一次」到底做了什么、为什么同周期点不了第二次，以及它还不是真定时器 */}
+          {/* 说清「立即执行一次」到底做了什么、为什么同周期点不了第二次 */}
           <Notice>
             「立即执行一次」按路线真的生成巡检工单（来源「巡检计划」，在工单列表搜计划号即可找到），
             并派给计划负责人；同一计划同周期只能执行一次，重复点击会被拒绝。
-            ⚠️ 后端目前没有触发端点（也没有定时任务），此动作在真实后端下暂不可用。
+            定时自动执行尚未上线（多副本要分布式锁），目前只能手动触发。
           </Notice>
           {!canRunPlan && !canInspection && <ReadOnlyNotice what="巡检计划维护/执行" perm={["workorder:inspection:update", "workorder:wo:create"]} note="不能新增、编辑或立即执行" />}
           <DataTable rowKey={(p: InspectionPlan) => p.planNo} columns={inspectionCols} rows={inspection.data?.list} loading={inspection.isLoading} error={inspection.error} onRetry={inspection.refetch}
@@ -570,13 +677,15 @@ function WorkOrdersInner() {
         </>
       )}
 
-      {view === "list" && (
+      {view === "list" && sub === "all" && (
         <>
           <DataTable rowKey={(w: WorkOrder) => w.woNo} columns={cols} rows={list.data?.list} loading={list.isLoading} error={list.error} onRetry={list.refetch}
             selectable={canDispatch}
             selectedKeys={selected}
             onSelectedChange={setSelected}
-            empty="没有符合条件的工单——可能是筛选条件太窄，或告警/投诉尚未转工单；换个状态筛选，或点右上「新建工单」。" />
+            empty={summary
+              ? "这个待办子集里没有工单——好消息；再点一次上面那张卡取消筛选，看全部工单。"
+              : "没有符合条件的工单——可能是筛选条件太窄，或告警/投诉尚未转工单；放宽筛选，或点右上「新建工单」。"} />
           {list.data && <Pagination page={paging.page} size={paging.size} total={list.data.total} onPage={goPage} onSize={paging.setSize} />}
         </>
       )}
@@ -587,27 +696,32 @@ function WorkOrdersInner() {
             const items = rows.filter((w) => w.status === col.key);
             return (
               <div key={col.key} className="rounded-card bg-muted/40 p-2">
-                <div className="mb-2 flex items-center justify-between px-1 text-sm font-medium">
+                <div className="mb-2 flex items-center justify-between px-1 txt-strong">
                   <span>{col.label}</span>
-                  <Badge tone="muted">{items.length}</Badge>
+                  <span className="txt-caption tabular-nums text-muted-foreground">{items.length}</span>
                 </div>
                 <div className="space-y-2">
                   {items.map((w) => (
-                    <Card key={w.woNo} className="p-3 text-sm">
-                      <div className="flex items-center justify-between">
-                        <button type="button" className="txt-strong tabular-nums underline-offset-2 hover:underline" onClick={() => setDetail(w)}>{w.woNo}</button>
+                    <Card key={w.woNo} className="p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <button type="button" className="txt-strong tabular-nums underline-offset-2 hover:underline" onClick={() => openDetail(w.woNo)}>{w.woNo}</button>
                         <StatusBadge map={PRIO} value={w.priority} className="whitespace-nowrap" />
                       </div>
-                      <div className="mt-1 text-xs text-muted-foreground">{WO_TYPE_LABEL[w.type]} · {w.cabinetNo}</div>
-                      <div className="mt-1 text-xs text-muted-foreground">{w.description}</div>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5 txt-caption text-muted-foreground">
+                        <Badge tone="outline">{WO_TYPE_LABEL[w.type] ?? w.type}</Badge>
+                        <span>{w.cabinetNo}</span>
+                      </div>
+                      <div className="mt-1 line-clamp-2 txt-caption text-muted-foreground">{w.description}</div>
+                      {/* SLA 标记：形状 + 颜色（▲ 超时 / ◆ 即将超时），与列表同一个组件 */}
+                      <div className="mt-1 txt-caption"><SlaRemain w={w} /></div>
                       <div className="mt-2 flex items-center justify-between gap-2">
-                        <span className="text-xs text-muted-foreground">{w.handlerName ?? w.assigneeName ?? "未派单"}</span>
+                        <span className="truncate txt-caption text-muted-foreground">{w.handlerName ?? w.assigneeName ?? "未派单"}</span>
                         {/* 看板不做拖拽（静态导出下拖拽库成本高收益低），用「下一步动作」按钮改状态 */}
-                        <ActionButtons w={w} max={2} />
+                        <div className="flex shrink-0 items-center gap-1"><StateActions actions={actionsOf(w)} /></div>
                       </div>
                     </Card>
                   ))}
-                  {items.length === 0 && <div className="px-1 py-4 text-center text-xs text-muted-foreground">—</div>}
+                  {items.length === 0 && <div className="px-1 py-4 text-center txt-caption text-muted-foreground">—</div>}
                 </div>
               </div>
             );
@@ -629,99 +743,36 @@ function WorkOrdersInner() {
         submitting={doCreate.isPending}
       />
 
-      {/* 派单 */}
-      <Drawer
-        open={!!dispatch}
-        onOpenChange={(o) => !o && setDispatch(null)}
-        title={`派单 ${dispatch?.woNo ?? ""}`}
-        desc={dispatch ? `${WO_TYPE_LABEL[dispatch.type]} · ${dispatch.description}` : ""}
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setDispatch(null)}>取消</Button>
-            <Button disabled={doDispatch.isPending || !assignee} onClick={() => dispatch && doDispatch.mutate({ no: dispatch.woNo, assignee })}>确认派单</Button>
-          </>
-        }
-      >
-        <Field label="柜机 / 点位">{dispatch?.cabinetNo} · {dispatch?.locationName}</Field>
-        {dispatch?.rejectReason && <Field label="上次驳回原因">{dispatch.rejectReason}（已驳回 {dispatch.rejectCount ?? 1} 次）</Field>}
-        <Field label="指派给">
-          <Select className="w-full" value={assignee} onChange={(e) => setAssignee(e.target.value)}>
-            {STAFF.map((s) => <option key={s} value={s}>{s}</option>)}
-          </Select>
-        </Field>
-      </Drawer>
+      {/* 详情（?no= 深链）：头部动作与列表同一份 actionsOf */}
+      <WoDetailDrawer woNo={detailNo} onClose={closeDetail} actions={actionsOf} />
 
-      {/* 处理 / 完成：处理说明必填，换件记录可选 */}
-      <Drawer
-        open={!!handle}
-        onOpenChange={(o) => !o && setHandle(null)}
-        title={`${handle?.action === "complete" ? "完成工单" : "提交处理结果"} ${handle?.wo.woNo ?? ""}`}
-        desc={handle?.action === "complete" ? "提交后工单进入「已完成」，等待验收关单" : "记录处理进展，工单仍留在「处理中」，可多次提交"}
-        footer={
-          handle && (
-            <>
-              <Button variant="outline" onClick={() => setHandle(null)}>取消</Button>
-              <Button
-                disabled={doHandle.isPending || !handleNote.trim()}
-                onClick={() => doHandle.mutate({ no: handle.wo.woNo, action: handle.action, handleNote, partsReplaced: parts })}
-              >{handle.action === "complete" ? "确认完成" : "提交"}</Button>
-            </>
-          )
-        }
-      >
-        {handle && (
-          <>
-            <Field label="柜机 / 点位">{handle.wo.cabinetNo} · {handle.wo.locationName}</Field>
-            <Field label="问题描述">{handle.wo.description}</Field>
-            <Field label="处理说明（必填）">
-              {/* 手写 textarea 的类名串已与 Input 漂移（圆角/焦点环偏移都不一致），改用原语 */}
-              <Textarea
-                rows={4} value={handleNote} onChange={setHandleNote}
-                placeholder="到场时间、排查过程、处理动作、复测结果"
-              />
-            </Field>
-            <Field label="换件记录（可选）">
-              <Input value={parts} placeholder="如：锁扣模块 ×1、充电宝 PB1023 换出" onChange={(e) => setParts(e.target.value)} />
-            </Field>
-          </>
-        )}
-      </Drawer>
+      {/* 派单 / 平台接管：候选人取后端，责任人置顶 */}
+      <WoAssignDrawer
+        wo={assign?.wo ?? null}
+        mode={assign?.mode ?? "dispatch"}
+        onClose={() => setAssign(null)}
+        onDone={done(() => setAssign(null))}
+      />
 
-      {/* 验收关单：结论必填（终态，无结论无从追责） */}
-      <Drawer
-        open={!!closing}
-        onOpenChange={(o) => !o && setClosing(null)}
-        title={`验收关单 ${closing?.woNo ?? ""}`}
-        desc="关单是终态：确认现场处理结果已复核，验收结论会随工单永久留痕"
-        footer={
-          closing && (
-            <>
-              <Button variant="outline" onClick={() => setClosing(null)}>取消</Button>
-              <Button disabled={doClose.isPending || !auditResult} onClick={() => doClose.mutate({ no: closing.woNo, auditResult, auditNote })}>确认关单</Button>
-            </>
-          )
-        }
-      >
-        {closing && (
-          <>
-            <Field label="柜机 / 点位">{closing.cabinetNo} · {closing.locationName}</Field>
-            <Field label="处理人 / 完成时间">{closing.handlerName ?? "-"} · {closing.completedAt ? fmtTime(closing.completedAt) : "-"}</Field>
-            <Field label="处理说明">{closing.handleNote ?? "-"}</Field>
-            <Field label="换件记录">{closing.partsReplaced ?? "无"}</Field>
-            <Field label="验收结论（必填）">
-              <Select className="w-full" value={auditResult} onChange={(e) => setAuditResult(e.target.value as WoAuditResult)}>
-                <option value="PASS">{AUDIT_LABEL.PASS}</option>
-                <option value="PASS_WITH_ISSUE">{AUDIT_LABEL.PASS_WITH_ISSUE}</option>
-              </Select>
-            </Field>
-            <Field label={auditResult === "PASS_WITH_ISSUE" ? "遗留问题说明（建议填写）" : "验收备注"}>
-              <Input value={auditNote} placeholder="如：抽检一次弹出正常；遗留：广告屏仍偶发花屏" onChange={(e) => setAuditNote(e.target.value)} />
-            </Field>
-          </>
-        )}
-      </Drawer>
+      {/* 提交处理 / 完工：完工按类型必填 */}
+      <WoHandleDrawer target={handle} onClose={() => setHandle(null)} onDone={done(() => setHandle(null))} />
 
-      {/* 驳回退回：原因为空则提交禁用（沿用退款审批口径） */}
+      {/* 验收：顶部先给复核结果 */}
+      <WoCloseDrawer
+        wo={closing}
+        onClose={() => setClosing(null)}
+        onDone={done(() => setClosing(null))}
+        onRework={canClose ? (w) => { setClosing(null); openAction(w, "rework"); } : undefined}
+      />
+
+      {/* 巡检派生 */}
+      <WoDeriveDrawer
+        parent={deriveFrom}
+        onClose={() => setDeriveFrom(null)}
+        onDone={(child) => done(() => setDeriveFrom(null))(`已派生 ${child.woNo}（${WO_TYPE_LABEL[child.type] ?? child.type}），进入待派单`)}
+      />
+
+      {/* 驳回退回 / 退回返工：原因为空则提交禁用 */}
       <Drawer
         open={!!rejecting}
         onOpenChange={(o) => !o && setRejecting(null)}
@@ -745,37 +796,10 @@ function WorkOrdersInner() {
         {rejecting && (
           <>
             <Field label="当前处理人">{rejecting.handlerName ?? rejecting.assigneeName ?? "-"}</Field>
-            <Field label="驳回原因（必填）">
-              <Input value={rejectReason} placeholder="说明退回理由，回写给派单人" onChange={(e) => setRejectReason(e.target.value)} />
+            <Field label={rejectMode === "rework" ? "不合格原因（必填）" : "驳回原因（必填）"}>
+              <Input value={rejectReason} placeholder={rejectMode === "rework" ? "说明哪里没修好，回写给处理人" : "说明退回理由，回写给派单人"}
+                onChange={(e) => setRejectReason(e.target.value)} />
             </Field>
-          </>
-        )}
-      </Drawer>
-
-      {/* 详情：全链路留痕 + 当前状态下的全部可执行动作 */}
-      <Drawer
-        open={!!detail}
-        onOpenChange={(o) => !o && setDetail(null)}
-        title={`工单 ${detail?.woNo ?? ""}`}
-        desc="从开单到关单的完整留痕"
-        footer={detail && <ActionButtons w={detail} />}
-      >
-        {detail && (
-          <>
-            <Field label="状态 / 优先级"><WoStatusBadge s={detail.status} /> <StatusBadge map={PRIO} value={detail.priority} /></Field>
-            <Field label="类型 / 来源">{WO_TYPE_LABEL[detail.type]} · {SOURCE_LABEL[detail.source]}{detail.sourceNo ? ` · ${detail.sourceNo}` : ""}</Field>
-            <Field label="柜机 / 点位">{detail.cabinetNo} · {detail.locationName}</Field>
-            <Field label="问题描述">{detail.description}</Field>
-            <Field label="创建 / 期望完成">{fmtTime(detail.createdAt)} · {detail.expectedAt ? fmtTime(detail.expectedAt) : "未设定"}</Field>
-            <Field label="派单">{detail.assigneeName ? `${detail.assigneeName} · ${detail.dispatchedAt ? fmtTime(detail.dispatchedAt) : "-"}` : "未派单"}</Field>
-            <Field label="接单">{detail.acceptedAt ? `${detail.handlerName ?? "-"} · ${fmtTime(detail.acceptedAt)}` : "未接单"}</Field>
-            <Field label="处理">{detail.handledAt ? `${detail.handlerName ?? "-"} · ${fmtTime(detail.handledAt)}` : "未处理"}</Field>
-            <Field label="处理说明">{detail.handleNote ?? "-"}</Field>
-            <Field label="换件记录">{detail.partsReplaced ?? "无"}</Field>
-            <Field label="完成时间">{detail.completedAt ? fmtTime(detail.completedAt) : "未完成"}</Field>
-            <Field label="验收">{detail.auditedAt ? `${detail.auditorName ?? "-"} · ${fmtTime(detail.auditedAt)} · ${detail.auditResult ? AUDIT_LABEL[detail.auditResult] : "-"}` : "未验收"}</Field>
-            <Field label="验收备注">{detail.auditNote ?? "-"}</Field>
-            {!!detail.rejectCount && <Field label="驳回记录">{`已驳回 ${detail.rejectCount} 次；最近原因：${detail.rejectReason ?? "-"}`}</Field>}
           </>
         )}
       </Drawer>

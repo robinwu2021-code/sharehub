@@ -7,6 +7,13 @@ import { mockApi } from "../../api/mock";
  * 盯的是**不报错、只安静算错钱**的那几件事：没签就先把佣金依据写出去 ·
  * 签了却没落成责任行 · 每存一次多记一份佣金 · 归因失败把商机本身也存不上。
  */
+/**
+ * 每条用例一个场地名：新建商机会**查重**（同场地名 90 天内别人在跟就拒），
+ * 共用一个名字的话，第二条用例建员工商机时会撞上第一条的伙伴商机（后端同款测试用纳秒后缀）。
+ */
+let venueSeq = 0;
+const uniqVenue = () => `归因测试场地 ${Date.now()}-${venueSeq++}`;
+
 describe("商机拓展归因", () => {
   const SITE = "ST309";
   const PARTNER = "AG004";
@@ -22,7 +29,7 @@ describe("商机拓展归因", () => {
   it("签下且归属伙伴 → 落成一行「拓展」责任", async () => {
     await clean();
     await mockApi.saveLead({
-      venueName: "归因测试场地", stage: "SIGNED", ownerType: "AGENT", owner: PARTNER, siteNo: SITE,
+      venueName: uniqVenue(), stage: "SIGNED", ownerType: "AGENT", owner: PARTNER, siteNo: SITE,
     });
     expect(await develops(), "签下且归属伙伴 = 拓展佣金的依据，必须落成责任行").toHaveLength(1);
     await clean();
@@ -32,7 +39,7 @@ describe("商机拓展归因", () => {
     // 没谈成也分钱，是反向的静默错账
     await clean();
     await mockApi.saveLead({
-      venueName: "归因测试场地", stage: "NEGOTIATING", ownerType: "AGENT", owner: PARTNER, siteNo: SITE,
+      venueName: uniqVenue(), stage: "NEGOTIATING", ownerType: "AGENT", owner: PARTNER, siteNo: SITE,
     });
     expect(await develops()).toHaveLength(0);
   });
@@ -41,7 +48,7 @@ describe("商机拓展归因", () => {
     // 自己人谈下来的不付对外佣金。归属类型判错的后果是白付一笔。
     await clean();
     await mockApi.saveLead({
-      venueName: "归因测试场地", stage: "SIGNED", ownerType: "STAFF", owner: "BD-Layla", siteNo: SITE,
+      venueName: uniqVenue(), stage: "SIGNED", ownerType: "STAFF", owner: "BD-Layla", siteNo: SITE,
     });
     expect(await develops()).toHaveLength(0);
   });
@@ -51,7 +58,7 @@ describe("商机拓展归因", () => {
     // 这一类商机的佣金依据永远不会被写出来。
     await clean();
     const l = await mockApi.saveLead({
-      venueName: "归因测试场地", stage: "SIGNED", ownerType: "AGENT", owner: PARTNER,
+      venueName: uniqVenue(), stage: "SIGNED", ownerType: "AGENT", owner: PARTNER,
     });
     expect(await develops(), "前提：还没指定站点时不写").toHaveLength(0);
 
@@ -64,7 +71,7 @@ describe("商机拓展归因", () => {
     // 商机会被反复编辑。每存一次多一行，就是每存一次多付一份佣金。
     await clean();
     const l = await mockApi.saveLead({
-      venueName: "归因测试场地", stage: "SIGNED", ownerType: "AGENT", owner: PARTNER, siteNo: SITE,
+      venueName: uniqVenue(), stage: "SIGNED", ownerType: "AGENT", owner: PARTNER, siteNo: SITE,
     });
     await mockApi.saveLead({ ...l });
     expect(await develops()).toHaveLength(1);
@@ -77,7 +84,7 @@ describe("商机拓展归因", () => {
     await clean();
     const refer = await mockApi.saveSiteAgent(SITE, { agentNo: PARTNER, role: "REFER" });
     const l = await mockApi.saveLead({
-      venueName: "归因测试场地", stage: "SIGNED", ownerType: "AGENT", owner: PARTNER, siteNo: SITE,
+      venueName: uniqVenue(), stage: "SIGNED", ownerType: "AGENT", owner: PARTNER, siteNo: SITE,
     });
     expect(l.leadNo, "归因写不成，商机本身仍要存下来").toBeTruthy();
     expect(await develops(), "互斥的责任不该被写进去").toHaveLength(0);

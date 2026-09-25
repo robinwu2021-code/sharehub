@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState, useMemo, type ReactNode } from "react";
-import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
@@ -35,12 +35,17 @@ import { parseImport, templateCsv, type ImportColumn, type RowError } from "@/li
 import { SiteMap, type MapPoint } from "@/components/ui/site-map";
 import { ReadOnlyNotice } from "@/components/read-only-notice";
 // 值导入：指令的「必须指定仓位」规则与 mock 落库校验同源，不在页面里另写一份
-import { SLOT_REQUIRED_COMMANDS, nextTransferStatuses } from "@/lib/types";
+import { SLOT_REQUIRED_COMMANDS } from "@/lib/types";
 import type {
-  Cabinet, Powerbank, CabinetMonitor, CommandRecord, CommandType, InventoryTransfer,
-  InventoryTransferDetail, TransferItem, OtaRollout, PageResult, InvTransferStatus,
-  OtaRelease, OtaTask, DeviceLog, DeviceCodeBatch,
+  Cabinet, Powerbank, CabinetMonitor, CommandRecord, CommandType, InventoryTransfer, InvTransferReq,
+  OtaRollout, PageResult, OtaRelease, OtaTask, DeviceLog, DeviceCodeBatch,
 } from "@/lib/types";
+import { RefLink } from "@/components/ref-link";
+import { CAB_STATUS, PB_STATUS, PB_HEALTH, TRANSFER_STATUS } from "@/components/device/device-maps";
+import { TransferForm, TransferDetailDrawer, AssetDiffsTable } from "@/components/device/transfer";
+import { PowerbankActions } from "@/components/device/powerbank-actions";
+import { QcDrawer, type QcTarget } from "@/components/device/qc";
+import { CabinetSummaryStrip } from "@/components/device/cabinet-summary";
 
 // tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）。
 // 「机柜」在菜单里叫「设备台账」、「远程指令记录」叫「远程控制·指令记录」——以菜单为准。
@@ -302,13 +307,9 @@ const cabinetFields = (
   // 点位是唯一的「归属入口」：站点号与站点名都从它反查，所以这里给的是选择而非输入
   { key: "locationNo", label: "点位", type: "select", section: "上架归属",
     options: [{ value: "", label: "未上架（到货待部署）" }, ...points.map((p) => ({ value: p.locationNo, label: `${p.locationNo} · ${p.name}` }))],
-    help: `归属站点由点位反查，不单独维护 —— 当前：${siteHint}` },
-  { key: "status", label: "设备状态", type: "select", required: true, section: "上架归属", options: [
-    // 在库（到货未投放）也要能选：编辑一台仓库里的柜子时，少了这一档会让
-    // 必填的状态框显示空值，逼着运营把它改成「在用」——那就把它错误地投放了
-    { value: "IN_STOCK", label: "在库" },
-    { value: "DEPLOYED", label: "在用" }, { value: "FAULT", label: "故障" }, { value: "RETIRED", label: "报废" },
-  ] },
+    help: `归属站点由点位反查，不单独维护 —— 当前：${siteHint}。新建的柜子一律在库，过了上线门禁才在用` },
+  // **没有状态字段**（R1，同后端「编辑不再改状态」）：上线 / 标故障 / 撤机 / 报废都在设备详情页走动作，
+  // 此前这里的状态下拉能把一台没过门禁的柜子直接改成「在用」
 ];
 
 function CabinetsTab({ canWrite }: { canWrite: boolean }) {
@@ -370,8 +371,8 @@ function CabinetsTab({ canWrite }: { canWrite: boolean }) {
   // 服务端虽然不采信，但请求体里出现「表单改得了在线态」的假象本身就是误导
   const submitCab = () => {
     if (!cabForm) return;
-    const { cabinetNo, sn, vendorCode, model, slotTotal, locationNo, fwVersion, status } = cabForm;
-    saveCab.mutate({ cabinetNo, sn, vendorCode, model, slotTotal, locationNo: locationNo || null, fwVersion, status });
+    const { cabinetNo, sn, vendorCode, model, slotTotal, locationNo, fwVersion } = cabForm;
+    saveCab.mutate({ cabinetNo, sn, vendorCode, model, slotTotal, locationNo: locationNo || null, fwVersion });
   };
 
   const onArchive = async (c: Cabinet) => {
@@ -402,11 +403,12 @@ function CabinetsTab({ canWrite }: { canWrite: boolean }) {
   };
 
   const cabCols: Column<Cabinet>[] = [
-    { header: "柜机号", cell: (c) => <span className="font-medium">{c.cabinetNo}</span> },
-    { header: "点位", cell: (c) => <span className="text-muted-foreground">{c.locationName}</span> },
+    // 柜机号就是详情入口（R3）：门禁、试借还、保护、质检都在详情页
+    { header: "柜机号", cell: (c) => <RefLink kind="cabinet" no={c.cabinetNo} /> },
+    { header: "点位", cell: (c) => <span className="text-muted-foreground">{c.locationName ?? "未上架"}</span> },
     // 归属站点（偏差 A1）：站点号 + 点位名同列，便于与站点坪效/门店生命周期对号；
     // 未上架（无点位）或后端尚未提供该列时一律显示「未归属」，不猜
-    { header: "归属站点", cell: (c) => <span className="text-muted-foreground tabular-nums">{c.siteNo ?? "未归属"}</span> },
+    { header: "归属站点", cell: (c) => (c.siteNo ? <RefLink kind="site" no={c.siteNo} /> : <span className="text-muted-foreground">未归属</span>) },
     { header: "供应商", cell: (c) => c.vendorCode },
     { header: "可借/仓位", cell: (c) => <span className="tabular-nums">{c.availableCount}/{c.slotTotal}</span> },
     { header: "在线", cell: (c) => <OnlineBadge s={c.onlineStatus} /> },
@@ -425,7 +427,6 @@ function CabinetsTab({ canWrite }: { canWrite: boolean }) {
           onUnarchive={() => void onUnarchive(c)}
           actions={
             <>
-              <Link className="text-primary hover:underline" href={`/devices/detail?no=${c.cabinetNo}`}>详情</Link>
               {canWrite && <Button size="sm" variant="outline" onClick={() => setCabForm(c)}>编辑</Button>}
             </>
           }
@@ -436,6 +437,10 @@ function CabinetsTab({ canWrite }: { canWrite: boolean }) {
 
   return (
     <div>
+      <CabinetSummaryStrip
+        active={{ onlineStatus: online || undefined, status: status || undefined }}
+        onPick={(f) => resetPage(() => { setOnline(f.onlineStatus ?? ""); setStatus(f.status ?? ""); })}
+      />
       <Toolbar
         search={keyword}
         onSearch={(v) => resetPage(() => setKeyword(v))}
@@ -453,7 +458,7 @@ function CabinetsTab({ canWrite }: { canWrite: boolean }) {
         }
         // 主按钮给「新增机柜」（到货补一台是日常动作），导入退到筛选区——
         // 为了加一台机柜先编一个 CSV 是原先最别扭的一处
-        onAdd={canWrite ? () => setCabForm({ vendorCode: vendorsQ.data?.[0]?.vendorCode ?? "cd-tech", model: "", sn: "", slotTotal: 8, locationNo: "", fwVersion: "", status: "DEPLOYED" }) : undefined}
+        onAdd={canWrite ? () => setCabForm({ vendorCode: vendorsQ.data?.[0]?.vendorCode ?? "cd-tech", model: "", sn: "", slotTotal: 8, locationNo: "", fwVersion: "" }) : undefined}
         addLabel="新增机柜"
         onExport={() => exportCsv<Cabinet>("机柜台账", [
           { header: "柜机号", value: (c) => c.cabinetNo },
@@ -466,7 +471,7 @@ function CabinetsTab({ canWrite }: { canWrite: boolean }) {
           { header: "可借", value: (c) => c.availableCount },
           { header: "仓位数", value: (c) => c.slotTotal },
           { header: "在线", value: (c) => (c.onlineStatus === "ONLINE" ? "在线" : "离线") },
-          { header: "状态", value: (c) => ({ IN_STOCK: "在库", DEPLOYED: "在用", FAULT: "故障", RETIRED: "报废" })[c.status] },
+          { header: "状态", value: (c) => CAB_STATUS[c.status]?.label ?? c.status },
           { header: "固件", value: (c) => c.fwVersion },
           { header: "最后心跳", value: (c) => c.lastHeartbeatAt },
           { header: "归档时间", value: (c) => c.archivedAt },
@@ -482,7 +487,7 @@ function CabinetsTab({ canWrite }: { canWrite: boolean }) {
         <FilterSelect
           value={status}
           onChange={(v) => resetPage(() => setStatus(v))}
-          options={[{ value: "IN_STOCK", label: "在库" }, { value: "DEPLOYED", label: "在用" }, { value: "FAULT", label: "故障" }, { value: "RETIRED", label: "报废" }]}
+          options={CAB_STATUS}
           allLabel="全部状态"
           aria-label="按机柜状态筛选"
         />
@@ -736,20 +741,7 @@ function CodesTab({ canEdit }: { canEdit: boolean }) {
 }
 
 // —— 状态/枚举 → 中文标签 + 色调 ——
-const PB_STATUS: StatusMap<Powerbank["status"]> = {
-  IN_STOCK: { label: "在库", tone: "info" },
-  IN_CABINET: { label: "在仓", tone: "success" },
-  RENTED: { label: "借出中", tone: "warning" },
-  FAULT: { label: "故障", tone: "danger" },
-  // 丢失是**半终态**：追回来还能回仓（后端 RECOVER 边），所以不是 muted 而是要能看见
-  LOST: { label: "丢失待追偿", tone: "danger" },
-  SOLD: { label: "已买断", tone: "muted" },
-  SCRAP: { label: "已报废", tone: "muted" },
-};
-const HEALTH: StatusMap<"OK" | "FAULT"> = {
-  OK: { label: "正常", tone: "success" },
-  FAULT: { label: "故障", tone: "danger" },
-};
+// 充电宝状态 / 健康、调拨状态的映射在 components/device/device-maps.ts（详情页与调拨抽屉共用）
 const CMD_TYPE: Record<CommandRecord["type"], string> = {
   EJECT: "弹出", LOCK: "锁仓", REBOOT: "重启", LOCATE: "定位", FW_SYNC: "同步固件版本",
 };
@@ -759,21 +751,15 @@ const CMD_STATUS: StatusMap<CommandRecord["status"]> = {
   TIMEOUT: { label: "超时", tone: "muted" },
   FAILED: { label: "失败", tone: "danger" },
 };
-const TRANSFER_STATUS: StatusMap<InventoryTransfer["status"]> = {
-  DRAFT: { label: "草稿", tone: "muted" },
-  IN_TRANSIT: { label: "在途", tone: "warning" },
-  DONE: { label: "已完成", tone: "success" },
-};
-const ITEM_CHECKED: StatusMap<"CHECKED" | "UNCHECKED"> = {
-  CHECKED: { label: "已核对", tone: "success" },
-  UNCHECKED: { label: "待核对", tone: "warning" },
-};
 const OTA_STATUS: StatusMap<OtaRollout["status"]> = {
   PENDING: { label: "待发布", tone: "muted" },
   RUNNING: { label: "升级中", tone: "warning" },
   DONE: { label: "已完成", tone: "success" },
   ROLLBACK: { label: "已回滚", tone: "danger" },
 };
+
+/** 充电宝报废循环上限（后端系统参数 device.powerbank.retire_cycles 的默认值）。 */
+const PB_RETIRE_CYCLES = 500;
 
 // —— 各扩展 tab 列定义 ——
 /**
@@ -800,19 +786,33 @@ const pbColsOf = (vendorName: (code: string | null) => string): Column<Powerbank
     header: "所属柜机",
     cell: (r) => (
       <>
-        {r.cabinetNo}
-        {/* 借出中的不在柜子里，仓位为 null —— 显示「借出中」而不是空白，
-            空白读起来像数据缺失，而这是这块电的真实状态 */}
+        {r.cabinetNo ? <RefLink kind="cabinet" no={r.cabinetNo} /> : <span className="text-muted-foreground">-</span>}
+        {/* 不在柜子里的宝仓位为 null —— 按状态说清它在哪，而不是空白（空白读起来像数据缺失） */}
         <div className="truncate txt-caption text-muted-foreground">
-          {r.slotIndex === null ? "借出中" : `${r.slotIndex} 号仓`}
+          {r.slotIndex != null ? `${r.slotIndex} 号仓`
+            : r.status === "RENTED" ? "借出中"
+              : r.status === "IN_STOCK" ? "在库（未入柜）"
+                : r.status === "LOST" ? "去向不明" : "不在柜内"}
         </div>
       </>
     ),
   },
   { header: "电量", cell: (r) => <span className="tabular-nums">{Math.round(r.battery)}%</span> },
   { header: "状态", cell: (r) => <StatusBadge map={PB_STATUS} value={r.status} /> },
-  { header: "健康", cell: (r) => <StatusBadge map={HEALTH} value={r.health} /> },
-  { header: "循环次数", cell: (r) => <span className="tabular-nums">{Math.round(r.cycles)}</span> },
+  { header: "健康", cell: (r) => <StatusBadge map={PB_HEALTH} value={r.health} /> },
+  {
+    header: "循环次数",
+    cell: (r) => (
+      <span className="tabular-nums">
+        {Math.round(r.cycles)}
+        {/* 阈值标记：超过报废循环上限（后端默认 500）的宝会被每日任务标成「老化待报废」、停止借出。
+            提前看见「快到了」的，补货时就不必再把它投出去 */}
+        {r.health !== "AGED" && r.cycles > PB_RETIRE_CYCLES * 0.9 && (
+          <span className="txt-caption text-warning-ink"> · {r.cycles > PB_RETIRE_CYCLES ? "超上限" : "临近上限"}</span>
+        )}
+      </span>
+    ),
+  },
 ];
 const monCols: Column<CabinetMonitor>[] = [
   { header: "柜机号", cell: (r) => <span className="font-medium">{r.cabinetNo}</span> },
@@ -944,43 +944,27 @@ const otaCols: Column<OtaRollout>[] = [
 type Row = Powerbank | CabinetMonitor | CommandRecord | InventoryTransfer | OtaRollout;
 
 // —— 可编辑实体的表单字段定义 ——
+/**
+ * 充电宝建档 / 改属性。**没有状态字段**（R1）：建档一律在库（后端强制），此后的状态
+ * 只由行上的动作（标记故障 / 维修回仓 / 标记丢失 / 找回 / 报废）推进，交后端状态机裁决。
+ *
+ * @form POST /api/ops/powerbanks
+ * @form POST /api/ops/powerbanks/{powerbankNo}
+ */
 const PB_FIELDS: FieldDef[] = [
   { key: "powerbankNo", label: "充电宝号", readOnlyOnEdit: true, placeholder: "系统生成" },
-  { key: "cabinetNo", label: "所属柜机", placeholder: "CAB-0001" },
-  { key: "battery", label: "电量（%）", type: "number" },
-  // 选项与 PB_STATUS 同源：手工建宝只该落在「在库 / 在仓 / 故障」，
-  // 借出中 / 丢失 / 买断 / 报废是业务流转出来的结果，不给人在表单里直接选
-  { key: "status", label: "状态", type: "select", options: [
-    { value: "IN_STOCK", label: "在库" }, { value: "IN_CABINET", label: "在仓" },
-    { value: "FAULT", label: "故障" },
+  // SN 必填：后端 dev_powerbank.sn 非空（实测不填直接 500）；退换货、保修、跟厂商对故障都只认它
+  { key: "sn", label: "硬件序列号 SN", required: true, maxLength: 64, placeholder: "PBSN70001" },
+  { key: "vendorCode", label: "供应商", type: "select", options: [
+    { value: "", label: "未指定" }, { value: "cd-tech", label: "cd-tech" },
+    { value: "sd-power", label: "sd-power" }, { value: "chargenow", label: "chargenow" },
   ] },
+  { key: "cabinetNo", label: "所属柜机", placeholder: "CAB1001", help: "新到货在库的宝留空；入柜由设备上报" },
+  { key: "battery", label: "电量（%）", type: "number", min: 0, max: 100 },
   { key: "health", label: "健康", type: "select", options: [
-    { value: "OK", label: "正常" }, { value: "FAULT", label: "故障" },
-  ] },
-  { key: "cycles", label: "循环次数", type: "number" },
-];
-/**
- * 调拨单表单。**状态下拉按状态机现算**，不是写死的三选 ——
- * 写死的话一张 DRAFT 的单也能选「已完成」，点下去后端按非法迁移拒
- * （界面给得出的选项，后端就该收得下）。
- *
- * 新建时后端强制置 DRAFT（`body.setStatus(InvTransferStatus.DRAFT)`，不接受调用方
- * 直接开在途单），所以没有 `status` 时按 DRAFT 算。
- */
-const invFields = (status?: InvTransferStatus | null): FieldDef[] => [
-  { key: "transferNo", label: "调拨单号", readOnlyOnEdit: true, placeholder: "系统生成" },
-  { key: "fromLocation", label: "调出点位" },
-  { key: "toLocation", label: "调入点位" },
-  { key: "powerbankCount", label: "充电宝数", type: "number" },
-  {
-    key: "status", label: "状态", type: "select",
-    options: nextTransferStatuses(status ?? "DRAFT")
-      .map((v) => ({ value: v, label: TRANSFER_STATUS[v].label })),
-    // requireAllChecked 是**前置条件不是状态机的边**（见 TRANSFER_TRANSITIONS 注释），
-    // 所以在这里单独说一句 —— 否则被拒时用户分不清是「这一步不让走」还是「还没核对完」。
-    help: status === "IN_TRANSIT" ? "确认收货前，明细必须全部核对过" : undefined,
-  },
-  { key: "operator", label: "操作人" },
+    { value: "OK", label: "正常" }, { value: "FAULT", label: "故障" }, { value: "AGED", label: "老化待报废" },
+  ], help: "老化一般由每日任务按循环次数自动标记，手工改只用于纠错" },
+  { key: "cycles", label: "循环次数", type: "number", min: 0 },
 ];
 const OTA_FIELDS: FieldDef[] = [
   { key: "rolloutNo", label: "发布单号", readOnlyOnEdit: true, placeholder: "系统生成" },
@@ -997,7 +981,7 @@ const OTA_FIELDS: FieldDef[] = [
 ];
 
 // —— G2 导出：共用 Toolbar 的四个 tab 各自的 CSV 列（与表格可见列一致）——
-const PB_STATUS_CSV = (s: Powerbank["status"]) => PB_STATUS[s].label;
+const PB_STATUS_CSV = (s: Powerbank["status"]) => PB_STATUS[s]?.label ?? s;
 const EXPORTS: Record<string, { name: string; run: (rows: Row[]) => void }> = {
   powerbanks: {
     name: "充电宝管理",
@@ -1010,7 +994,7 @@ const EXPORTS: Record<string, { name: string; run: (rows: Row[]) => void }> = {
       { header: "仓位", value: (r) => r.slotIndex },
       { header: "电量(%)", value: (r) => Math.round(r.battery) },
       { header: "状态", value: (r) => PB_STATUS_CSV(r.status) },
-      { header: "健康", value: (r) => HEALTH[r.health].label },
+      { header: "健康", value: (r) => PB_HEALTH[r.health]?.label ?? r.health },
       { header: "循环次数", value: (r) => Math.round(r.cycles) },
       { header: "归档时间", value: (r) => r.archivedAt },
     ], rows as Powerbank[]),
@@ -1053,7 +1037,7 @@ const EXPORTS: Record<string, { name: string; run: (rows: Row[]) => void }> = {
       { header: "调出点位", value: (r) => r.fromLocation },
       { header: "调入点位", value: (r) => r.toLocation },
       { header: "充电宝数", value: (r) => Math.round(r.powerbankCount) },
-      { header: "状态", value: (r) => TRANSFER_STATUS[r.status].label },
+      { header: "状态", value: (r) => TRANSFER_STATUS[r.status]?.label ?? r.status },
       { header: "操作人", value: (r) => r.operator },
       { header: "创建时间", value: (r) => r.createdAt },
     ], rows as InventoryTransfer[]),
@@ -1246,55 +1230,6 @@ function OtaReleasesTab({ canManage, viewSwitch }: { canManage: boolean; viewSwi
 }
 
 /** 投放的逐设备任务明细：整体百分比是这批任务的均值，卡住时要看具体哪台、卡在哪一步。 */
-/**
- * 调拨明细抽屉：单据只说「多少台」，**盘点对不上时要查的是「具体哪几台」**。
- * `checked` 是收货方逐台核对的结果 —— 没核到的那几台就是差异的落点，
- * 所以未核对的排在前面，不用翻着找。
- */
-function TransferDetailDrawer({ transfer, onOpenChange }: { transfer: InventoryTransfer | null; onOpenChange: (o: boolean) => void }) {
-  const { data, isLoading, error, refetch } = useQuery<InventoryTransferDetail>({
-    queryKey: ["transfer-detail", transfer?.transferNo],
-    queryFn: () => api.getInventoryTransfer(transfer!.transferNo),
-    enabled: !!transfer,
-  });
-  const items = data?.items ?? [];
-  const rows = [...items].sort((a, b) => Number(a.checked) - Number(b.checked));
-  const checked = items.filter((i) => i.checked).length;
-
-  const cols: Column<TransferItem>[] = [
-    { header: "设备编号", cell: (i) => <span className="font-medium tabular-nums">{i.itemNo}</span> },
-    { header: "核对", cell: (i) => (
-      <StatusBadge map={ITEM_CHECKED} value={i.checked ? "CHECKED" : "UNCHECKED"} />
-    ) },
-  ];
-
-  return (
-    <Drawer
-      open={!!transfer}
-      onOpenChange={onOpenChange}
-      width="w-[560px]"
-      title={`调拨明细 ${transfer?.transferNo ?? ""}`}
-      desc={transfer ? `${transfer.fromLocation} → ${transfer.toLocation} · 单据 ${Math.round(transfer.powerbankCount)} 台` : undefined}
-    >
-      {data && (
-        // 单据台数与明细行数对不上，本身就是要查的线索，所以两个数都摆出来
-        <div className="mb-3 txt-body text-muted-foreground">
-          明细 {items.length} 台 · 已核对 {checked} · 待核对 {items.length - checked}
-        </div>
-      )}
-      <DataTable
-        rowKey={(i: TransferItem) => i.itemNo}
-        columns={cols}
-        rows={rows}
-        loading={isLoading}
-        error={error}
-        onRetry={refetch}
-        empty="这张调拨单没有逐台明细——按台数登记的旧单据不会留下明细行"
-      />
-    </Drawer>
-  );
-}
-
 function OtaTasksDrawer({ rollout, onOpenChange }: { rollout: OtaRollout | null; onOpenChange: (o: boolean) => void }) {
   const { data, isLoading } = useQuery({
     queryKey: ["ota-tasks", rollout?.rolloutNo],
@@ -1429,8 +1364,24 @@ function DevicesInner() {
   const { tab, setTab } = usePageTab(tabs, () => { paging.reset(); setKeyword(""); });
   const [keyword, setKeyword] = useState("");
   const [pbForm, setPbForm] = useState<Partial<Powerbank> | null>(null);
-  const [invForm, setInvForm] = useState<Partial<InventoryTransfer> | null>(null);
-  const [invDetail, setInvDetail] = useState<InventoryTransfer | null>(null);
+  const [invForm, setInvForm] = useState<Partial<InvTransferReq> | null>(null);
+  // 调拨详情：支持 `?no=` 深链（RefLink transfer → /devices?tab=inventory&no=），关抽屉时把参数清掉
+  const sp = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [invDetail, setInvDetailState] = useState<string | null>(() => sp.get("no"));
+  const setInvDetail = (no: string | null) => {
+    setInvDetailState(no);
+    if (!no && sp.get("no")) {
+      const q = new URLSearchParams(sp.toString());
+      q.delete("no");
+      router.replace(`${pathname}?${q.toString()}`, { scroll: false });
+    }
+  };
+  useEffect(() => { const n = sp.get("no"); if (n) setInvDetailState(n); }, [sp]);
+  // 库存调拨 tab 的两个视图：调拨单 / 资产差异（签收差异、撤机清点差异逐条查清）
+  const [invView, setInvView] = useState<"transfers" | "diffs">("transfers");
+  const [qcTarget, setQcTarget] = useState<QcTarget | null>(null);
   const [otaForm, setOtaForm] = useState<Partial<OtaRollout> | null>(null);
   // 指令记录 tab 的下发抽屉：null = 关，对象 = 打开并按内容预填（「重新下发」带着原记录进来）
   const [cmdDraft, setCmdDraft] = useState<CmdDraft | null>(null);
@@ -1462,13 +1413,16 @@ function DevicesInner() {
   const isCabinets = tab === "cabinets";
   // 版本库视图与自建 tab 同类：自带筛选/查询/分页，页面共用的 Toolbar 与 q 都不参与
   const isReleases = tab === "ota" && otaView === "releases";
-  const isStandalone = STANDALONE_TABS.includes(tab) || isReleases;
+  // 资产差异视图同理：AssetDiffsTable 自带筛选与分页
+  const isDiffs = tab === "inventory" && invView === "diffs";
+  const isStandalone = STANDALONE_TABS.includes(tab) || isReleases || isDiffs;
   const canEditCabinet = allow("device:cabinet:update");
   // 自动开工单借用工单域的码：能不能开单由工单域授权说了算，不是「有设备权限就能批量开单」
   const canRaiseWo = allow("workorder:wo:create");
   const canEditCode = canEditCabinet;
   const canEditPowerbank = allow("device:powerbank:update");
-  const canEditInventory = allow("device:inventory:update");
+  // 调拨的建单 / 发出 / 签收后端都判 device:inventory:transfer（perm-map 里 :update 也翻译成它）
+  const canEditInventory = allow("device:inventory:transfer");
   const canEditOta = allow("device:ota:publish");
   // 指令下发与「看指令记录」是两个权限：能看流水不等于能动设备（后端 sendCommand 也这么标）
   const canSendCommand = allow("device:command:send");
@@ -1488,10 +1442,6 @@ function DevicesInner() {
   const savePb = useMutation({
     mutationFn: (v: Partial<Powerbank>) => api.savePowerbank(v),
     onSuccess: () => { invalidate(); notify.success("保存成功"); setPbForm(null); },
-  });
-  const saveInv = useMutation({
-    mutationFn: (v: Partial<InventoryTransfer>) => api.saveInventoryTransfer(v),
-    onSuccess: () => { invalidate(); notify.success("保存成功"); setInvForm(null); },
   });
   const saveOta = useMutation({
     mutationFn: (v: Partial<OtaRollout>) => api.saveOtaRollout(v),
@@ -1544,8 +1494,6 @@ function DevicesInner() {
     enabled: !isStandalone,
   });
 
-  const editCell = (on: () => void, can: boolean) =>
-    can ? <Button size="sm" variant="outline" onClick={on}>编辑</Button> : <span className="text-muted-foreground">-</span>;
 
   /*
    * 厂商主数据。与 ImportCabinetsDrawer 里那个是**同一个 queryKey** ——
@@ -1572,14 +1520,28 @@ function DevicesInner() {
           onUnarchive={async () => {
             if (await confirm(unarchiveConfirm("充电宝", r.powerbankNo))) unarchivePb.mutate(r.powerbankNo);
           }}
-          actions={<Button size="sm" variant="outline" onClick={() => setPbForm(r)}>编辑</Button>}
+          actions={
+            <>
+              <Button size="sm" variant="outline" onClick={() => setPbForm(r)}>编辑</Button>
+              {/* 状态动作（报故障 / 维修 / 丢失 / 找回 / 报废）与入库质检：由迁移表决定出现哪几个 */}
+              <PowerbankActions pb={r} onQc={(pb) => setQcTarget({ itemType: "POWERBANK", itemNo: pb.powerbankNo })} />
+            </>
+          }
         />
       ),
     },
   ];
   const invColsFull: Column<InventoryTransfer>[] = [
-    ...invColsWith(setInvDetail),
-    { header: "操作", cell: (r) => editCell(() => setInvForm(r), canEditInventory) },
+    ...invColsWith((r) => setInvDetail(r.transferNo)),
+    {
+      header: "操作",
+      cell: (r) => (
+        <Button size="sm" variant="outline" onClick={() => setInvDetail(r.transferNo)}>
+          {/* 动作按状态给名字：草稿要设明细发出、在途要签收，完成的只剩查看 */}
+          {!canEditInventory ? "查看" : r.status === "DRAFT" ? "明细 / 发出" : r.status === "IN_TRANSIT" ? "签收" : "查看"}
+        </Button>
+      ),
+    },
   ];
   // 指令记录不可编辑（历史流水），能做的只有「照这条再发一次」——超时/失败的指令最常见的处置
   const cmdColsFull: Column<CommandRecord>[] = canSendCommand ? [...cmdCols, {
@@ -1612,8 +1574,8 @@ function DevicesInner() {
           onSearch={(v) => { setKeyword(v); paging.reset(); }}
           searchPlaceholder={SEARCH_HINT[tab]}
           onAdd={
-            tab === "powerbanks" && canEditPowerbank ? () => setPbForm({ cabinetNo: "", battery: 100, status: "IN_CABINET", health: "OK", cycles: 0 })
-            : tab === "inventory" && canEditInventory ? () => setInvForm({ fromLocation: "", toLocation: "", powerbankCount: 1, status: "DRAFT", operator: "" })
+            tab === "powerbanks" && canEditPowerbank ? () => setPbForm({ sn: "", vendorCode: "", cabinetNo: "", battery: 100, health: "OK", cycles: 0 })
+            : tab === "inventory" && canEditInventory ? () => setInvForm({ itemType: "CABINET", fromType: "WAREHOUSE", fromRef: "", toType: "SITE", toRef: "" })
             : tab === "ota" && canEditOta ? () => setOtaForm({ fwVersion: "", vendorCode: "", strategy: "GRAY", progress: 0, status: "PENDING" })
             // 指令记录 tab 的下发入口：默认预填「重启」（最常用的整机处置），机柜由用户选
             : tab === "commands" && canSendCommand ? () => setCmdDraft({ type: "REBOOT", cabinetNo: "", slotIndex: "" })
@@ -1638,6 +1600,14 @@ function DevicesInner() {
           )}
           {/* 固件 OTA：投放列表 / 版本库 双视图。版本库是投放引用的「货架」，同一张 tab 内切换 */}
           {tab === "ota" && otaViewSwitch}
+          {tab === "inventory" && (
+            <ViewSwitch
+              label="库存调拨视图"
+              value={invView}
+              options={[{ value: "transfers", label: "调拨单" }, { value: "diffs", label: "资产差异" }] as const}
+              onChange={(v) => { setInvView(v); paging.reset(); setKeyword(""); }}
+            />
+          )}
           {/* 充电宝是可归档实体，故只有它需要「显示已归档」开关 */}
           {tab === "powerbanks" && (
             <ShowArchivedToggle
@@ -1670,7 +1640,27 @@ function DevicesInner() {
           <DataTable rowKey={(r: CommandRecord) => r.commandId} columns={cmdColsFull} rows={q.data?.list as CommandRecord[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} />
         </>
       )}
-      {tab === "inventory" && <DataTable rowKey={(r: InventoryTransfer) => r.transferNo} columns={invColsFull} rows={q.data?.list as InventoryTransfer[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} />}
+      {tab === "inventory" && !isDiffs && (
+        <>
+          {!canEditInventory && <ReadOnlyNotice what="调拨执行" perm="device:inventory:transfer" note="不能建单、发出或签收" />}
+          <DataTable rowKey={(r: InventoryTransfer) => r.transferNo} columns={invColsFull} rows={q.data?.list as InventoryTransfer[]} loading={q.isLoading} error={q.error} onRetry={q.refetch}
+            empty="还没有调拨单——仓库之间、仓库与站点之间搬设备前先建单，发出与签收都按单逐件核对" />
+        </>
+      )}
+      {isDiffs && (
+        <div>
+          {/* 自建视图不走共用 Toolbar，段控在这里再给一份，否则切进来就切不回去 */}
+          <div className="mb-3">
+            <ViewSwitch
+              label="库存调拨视图"
+              value={invView}
+              options={[{ value: "transfers", label: "调拨单" }, { value: "diffs", label: "资产差异" }] as const}
+              onChange={(v) => setInvView(v)}
+            />
+          </div>
+          <AssetDiffsTable />
+        </div>
+      )}
       {isReleases && <OtaReleasesTab canManage={canManageOta} viewSwitch={otaViewSwitch} />}
       {tab === "ota" && !isReleases && <DataTable rowKey={(r: OtaRollout) => r.rolloutNo} columns={otaColsFull} rows={q.data?.list as OtaRollout[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} />}
       {!isStandalone && q.data && <Pagination page={paging.page} size={paging.size} total={q.data.total} onPage={paging.setPage} onSize={paging.setSize} />}
@@ -1685,21 +1675,15 @@ function DevicesInner() {
         fields={PB_FIELDS}
         value={(pbForm ?? {}) as Record<string, unknown>}
         onChange={(v) => setPbForm(v as Partial<Powerbank>)}
-        onSubmit={() => pbForm && savePb.mutate(pbForm)}
+        onSubmit={() => {
+          if (!pbForm) return;
+          // 只提交属性：整行回传会把 status 一起带过去，看起来像「表单能改状态」（R1）
+          const { powerbankNo, sn, vendorCode, cabinetNo, battery, health, cycles } = pbForm;
+          savePb.mutate({ powerbankNo, sn, vendorCode: vendorCode || null, cabinetNo: cabinetNo || null, battery, health, cycles });
+        }}
         submitting={savePb.isPending}
       />
-      <FormDrawer
-        open={!!invForm}
-        onOpenChange={(o) => !o && setInvForm(null)}
-        titleNew="新增调拨单"
-        titleEdit={`编辑调拨单 ${invForm?.transferNo ?? ""}`}
-        isEdit={!!invForm?.transferNo}
-        fields={invFields(invForm?.status)}
-        value={(invForm ?? {}) as Record<string, unknown>}
-        onChange={(v) => setInvForm(v as Partial<InventoryTransfer>)}
-        onSubmit={() => invForm && saveInv.mutate(invForm)}
-        submitting={saveInv.isPending}
-      />
+      <TransferForm value={invForm} onClose={() => setInvForm(null)} />
       <FormDrawer
         open={!!otaForm}
         onOpenChange={(o) => !o && setOtaForm(null)}
@@ -1712,7 +1696,8 @@ function DevicesInner() {
         onSubmit={() => otaForm && saveOta.mutate(otaForm)}
         submitting={saveOta.isPending}
       />
-      <TransferDetailDrawer transfer={invDetail} onOpenChange={(o) => !o && setInvDetail(null)} />
+      <TransferDetailDrawer transferNo={invDetail} onClose={() => setInvDetail(null)} onEdit={(t) => setInvForm(t)} />
+      <QcDrawer target={qcTarget} onClose={() => setQcTarget(null)} />
       <OtaTasksDrawer rollout={taskRollout} onOpenChange={(o) => !o && setTaskRollout(null)} />
       <SendCommandDrawer draft={cmdDraft} onOpenChange={(o) => !o && setCmdDraft(null)} />
     </div>

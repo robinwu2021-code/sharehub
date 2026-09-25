@@ -6,6 +6,7 @@ import { permsOf } from "../../permissions";
 import { fail } from "../../biz-error";
 import { currentAuth, type Role } from "../../auth";
 import * as menuDb from "../../mock/db/menu";
+import { opsFlowMetrics } from "../../mock/db/ops-flow-metrics";
 
 /** dev-mode 固定验证码，与后端 OtpService.DEV_MASTER 同值 —— 两边不一致就「收到码了但验不过」。 */
 const DEV_OTP = "000000";
@@ -84,4 +85,5 @@ export const dashboardMock: DashboardApi = {
   // 缺一个方法会让 mock 模式在点登出时直接 TypeError。
   logout: () => wait(undefined as void),
   getDashboard: () => wait(db.dashboard),
+  getOpsFlowMetrics: (q) => wait(opsFlowMetrics(q ?? {})),
 };

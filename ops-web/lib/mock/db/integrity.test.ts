@@ -155,9 +155,13 @@ const REFS: Ref[] = [
   ref("inventoryTransfers", db.inventoryTransfers, "toLocation", "sites.name", siteNames),
 
   // —— 告警 / 工单 ——
-  ref("alarmRecords", db.alarmRecords, "cabinetNo", "cabinets.cabinetNo", cabinetNos),
+  ref("alarmRecords", db.alarmRecords, "cabinetNo", "cabinets.cabinetNo", cabinetNos, {
+    nullableReason: "业务告警的主体不一定是柜（站点 / 订单 / 合同……），此时 cabinetNo 为 null（后端同）",
+  }),
   ref("alarmRecords", db.alarmRecords, "siteName", "sites.name", siteNames),
-  ref("alarmRecords", db.alarmRecords, "vendorCode", "vendors.vendorCode", vendorCodes),
+  ref("alarmRecords", db.alarmRecords, "vendorCode", "vendors.vendorCode", vendorCodes, {
+    nullableReason: "业务告警由判定引擎产出（source=EVAL），没有厂商（后端同）",
+  }),
   ref("alarmRecords", db.alarmRecords, "alarmCode", "alarmCodes.code", alarmCodeValues),
   ref("alarmRecords", db.alarmRecords, "workOrderNo", "workOrders.woNo", workOrderNos, {
     nullableReason: "未转工单的告警（status=OPEN）没有关联工单号",

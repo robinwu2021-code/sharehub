@@ -69,7 +69,7 @@ export const zh = {
     CREATED: "待派单", DISPATCHED: "已派单", ACCEPTED: "已接单",
     PROCESSING: "处理中", DONE: "已完成", AUDITED: "已审核", CLOSED: "已关闭",
   },
-  cabStatus: { IN_STOCK: "在库", DEPLOYED: "在用", FAULT: "故障", RETIRED: "报废" },
+  cabStatus: { IN_STOCK: "在库", IN_TRANSIT: "运输中", DEPLOYED: "在用", FAULT: "故障", RETIRED: "报废" },
   woType: {
     FAULT: "故障维修", REFILL: "缺货补货", INSPECT: "巡检", INSTALL: "安装",
     REMOVE: "撤机", COMPLAINT: "投诉", CLEAN: "清洁",

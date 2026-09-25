@@ -5,7 +5,8 @@ import * as ca from "../../mock/db/contract-approval";
 import * as db from "../../mock/db";
 // 阶段流转走子模块直取（同 mocks/workorder.ts 的 `wo`）：校验与留痕都在 db 层，本文件只延迟透传。
 import * as loc from "../../mock/db/location";
-import type { LocationApi } from "../contracts/location";
+import * as svy from "../../mock/db/location-survey";
+import type { LocationApi, ContractQ } from "../contracts/location";
 import type { PageQ, ArchiveQ , ReportQ } from "../query";
 import type { Site, SitePoint } from "../../types";
 import { wait } from "./_wait";
@@ -36,10 +37,31 @@ export const locationMock: LocationApi = {
   },
   listVenues: (q: ArchiveQ = {}) =>
     wait(db.paginate(db.venues, q.page, q.size, (v) => db.liveHit(v, q.showArchived) && db.kwHit(q.keyword, v.name))),
-  listContracts: (q: PageQ = {}) => wait(db.paginate(db.contracts, q.page, q.size, (c) => db.kwHit(q.keyword, c.venueName, c.siteName))),
+  listContracts: (q: ContractQ = {}) => wait(db.paginate(db.contracts, q.page, q.size, (c) =>
+    db.kwHit(q.keyword, c.contractNo, c.venueName, c.siteName)
+    && (!q.status || c.status === q.status)
+    && (!q.venueNo || c.venueNo === q.venueNo)
+    && (!q.siteNo || c.siteNo === q.siteNo)
+    && (!q.endFrom || c.endAt.slice(0, 10) >= q.endFrom)
+    && (!q.endTo || c.endAt.slice(0, 10) <= q.endTo)
+    // mock 没有「提交人 ≠ 我」这层：待我审批 = 审批中的全部
+    && (!q.pendingMine || c.status === "PENDING"))),
 
   // 场所扩展
-  listLeads: (q: PageQ = {}) => wait(db.listLeads(q)),
+  listLeads: (q = {}) => wait(db.listLeads(q)),
+  getLead: async (no) => wait(loc.getLead(no)),
+  claimLead: async (no) => wait(loc.claimLead(no), 350),
+  /** 转化后同样补写拓展归因（与后端 convert → writeAttribution 同一条规则，见 saveLead 的注释）。 */
+  convertLead: async (no, req) => {
+    const r = loc.convertLead(no, req);
+    const lead = loc.getLead(no);
+    if (lead.ownerType === "AGENT" && lead.owner) {
+      try {
+        db.saveSiteAgent(r.siteNo, { agentNo: lead.owner, role: "DEVELOP", remark: `来自商机 ${lead.leadNo}：${lead.venueName}` });
+      } catch { /* 与 saveLead 同：业务冲突留给运营看，不让转化失败 */ }
+    }
+    return wait(r, 450);
+  },
   listSiteAnalysis: (q: ReportQ = {}) => wait(db.listSiteAnalysis(q)),
   /**
    * 商机保存 + 拓展归因（ADR-027 §五）——与后端 `LeadServiceImpl.save` 同一条规则。
@@ -53,7 +75,7 @@ export const locationMock: LocationApi = {
    * 组合写在这一层而不是 db 层：责任行住在 agent 模块，从 db/location 里 import 它
    * 会闭合 device → location → agent → device 的环（实测整批 mock 测试加载失败）。
    */
-  saveLead: (x) => {
+  saveLead: async (x) => {
     const saved = db.saveLead(x);
     if (saved.stage === "SIGNED" && saved.ownerType === "AGENT" && saved.siteNo && saved.owner) {
       try {
@@ -114,6 +136,7 @@ export const locationMock: LocationApi = {
 
   // 门店 Onboarding / 生命周期
   listVenueOnboardings: (q: PageQ = {}) => wait(db.listVenueOnboardings(q)),
+  getVenueOnboarding: async (no) => wait(loc.getVenueOnboarding(no)),
   // async：校验抛的 ApiError 要变成 rejected promise，否则全局 MutationCache 接不到
   reviewVenueOnboarding: async (no, approve, note) =>
     wait(db.reviewVenueOnboarding(no, approve, note), 350),
@@ -152,4 +175,6 @@ export const locationMock: LocationApi = {
   siteCloseGate: (no) => wait(ss.siteCloseGate(no)),
   withdrawSite: async (no, reason, plannedAt) => wait(ss.withdrawSite(no, reason, plannedAt), 350),
   closeSite: async (no, note) => wait(ss.closeSite(no, note), 350),
+  listSiteSurveys: async (no) => wait(svy.listSiteSurveys(no)),
+  recordSiteSurvey: async (no, req) => wait(svy.recordSiteSurvey(no, req), 350),
 };

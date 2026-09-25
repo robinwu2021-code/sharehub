@@ -14,7 +14,8 @@ export type OnlineStatus = "ONLINE" | "OFFLINE";
  * 结果是仓库里的机柜在运营端**全是未知状态**：徽标映射不上、按状态筛不出来，
  * 而两边都不报错。（后端 StatusVocabularyAcrossEndsTest 现在盯着这类不一致。）
  */
-export type CabinetStatus = "IN_STOCK" | "DEPLOYED" | "FAULT" | "RETIRED";
+// IN_TRANSIT（运输中，2026-09-25 批次 C4）：随调拨单发出、签收后回 IN_STOCK，由调拨驱动、不单独出按钮
+export type CabinetStatus = "IN_STOCK" | "IN_TRANSIT" | "DEPLOYED" | "FAULT" | "RETIRED";
 export interface Cabinet extends Archivable {
   cabinetNo: string;
   sn: string;
@@ -73,6 +74,15 @@ export interface Slot {
 export type PowerbankStatus =
   | "IN_STOCK" | "IN_CABINET" | "RENTED" | "FAULT" | "LOST" | "SOLD" | "SCRAP";
 
+/**
+ * 充电宝健康（与后端 `PowerbankHealth` 同名同值）。
+ *
+ * `AGED` = 循环次数超过上限、**已停止借出、待回收报废**（后端每天定时标记，批次 D2）。
+ * 此前前端只有 OK/FAULT：老化的宝在运营端是未知值，而它恰恰是「为什么这台柜子
+ * 明明有宝却借不出」的答案之一。
+ */
+export type PowerbankHealth = "OK" | "FAULT" | "AGED";
+
 // —— 设备 · 待建功能补全（ops/gw 域）——
 export interface Powerbank extends Archivable {
   powerbankNo: string;
@@ -86,7 +96,8 @@ export interface Powerbank extends Archivable {
    * 同一批故障集中在某个厂商上是第一个要看的信号，而按充电宝号看不出来。
    */
   vendorCode: string | null;
-  cabinetNo: string;
+  /** 所在机柜。在库（未入柜）/ 借出 / 丢失的宝为 null（实测后端建档后即为 null）。 */
+  cabinetNo: string | null;
   /**
    * 当前所在仓位。借出中（RENTED）为 null —— 它不在任何柜子里。
    * 没有它时，工单只能说「去 CAB1000 找这块充电宝」，找哪一仓靠人逐个看。
@@ -94,7 +105,7 @@ export interface Powerbank extends Archivable {
   slotIndex: number | null;
   battery: number; // 0..100
   status: PowerbankStatus;
-  health: "OK" | "FAULT";
+  health: PowerbankHealth;
   cycles: number;
 }
 export interface CabinetMonitor {
@@ -367,4 +378,249 @@ export interface DeviceCodeBatch {
   bound: number; // 已绑定数（列表显示 已绑定/总数 + 进度条）
   producedAt: string;
   status: CodeBatchStatus;
+}
+
+// ─────────────────────────────────────────────────────────────
+// 设备运维：上线门禁 · 试借还 · 保护动作（`/api/ops/devices/**`）
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * 保护动作（SSOT，与后端 `ProtectionAction` 同名同值）。
+ *
+ * <p>四档按**影响面**从大到小：停租整柜 → 禁用仓位 → 锁定仓位 → 降额。
+ * 它们不是互斥的状态，而是**可叠加的约束**：同一台设备可能同时挂着
+ * 信号触发的停租和人工挂的仓位禁用，所以下面用「引用计数」的方式解除
+ * （见 {@link Protection.holderType}）。
+ */
+export type ProtectionAction = "STOP_RENT" | "SLOT_DISABLE" | "SLOT_LOCK" | "DERATE";
+
+/**
+ * 保护的持有方（`dev_protection.holder_type`）。
+ *
+ * <p>**这是保护能不能被解除的依据**：信号（SIGNAL）与告警（ALARM）挂的保护
+ * 由系统在条件恢复时自己撤，人工（MANUAL）挂的只能人工撤。
+ * 不分持有方的话，运维手一抖把告警挂的停租解了，设备会在故障未恢复时重新接客。
+ */
+export type ProtectionHolderType = "SIGNAL" | "ALARM" | "MANUAL";
+
+/**
+ * 试借还状态（SSOT，与后端 `TrialRentStatus` 同名同值）。
+ *
+ * <p>上线门禁里最硬的一关：**新装的柜子必须真借出一个宝、再真还回去**，
+ * 才算证明了弹仓与回收都通。只查配置不试一次的话，
+ * 第一个真实用户就是试验品，而那时现场已经没人了。
+ */
+export type TrialRentStatus = "EJECTING" | "WAIT_RETURN" | "PASSED" | "FAILED" | "EXPIRED";
+
+/** 一次试借还（后端 `TrialRent`）。 */
+export interface TrialRent {
+  trialNo: string;
+  cabinetNo: string;
+  slotIndex: number | null;
+  powerbankNo: string | null;
+  status: TrialRentStatus;
+  ejectedAt: string | null;
+  returnedAt: string | null;
+  failReason: string | null;
+  operator: string | null;
+  createdAt: string;
+}
+
+/** 一条保护（后端 `Protection`）。 */
+export interface Protection {
+  protectionNo: string;
+  cabinetNo: string;
+  /** 空 = 整柜级；有值 = 只作用于该仓位。 */
+  slotIndex: number | null;
+  action: ProtectionAction;
+  holderType: ProtectionHolderType;
+  /** 持有方的业务号：信号码 / 告警号 / 操作人。解除时要核对它。 */
+  holderRef: string | null;
+  reason: string | null;
+  active: boolean;
+  createdAt: string;
+  releasedAt: string | null;
+  releaseReason: string | null;
+}
+
+/** 挂保护的入参。 */
+export interface ProtectionReq {
+  action: ProtectionAction;
+  slotIndex?: number | null;
+  reason: string;
+}
+
+/** 设备信号码字典（后端 `SignalCode`）—— 设备错误码降级后的「信号」。 */
+export interface SignalCode {
+  code: string;
+  name: string;
+  nameEn: string | null;
+  /** 分类：通信 / 电源 / 仓位 … */
+  category: string | null;
+  /** 作用范围：整柜还是仓位。 */
+  scope: string | null;
+  /**
+   * 命中后的止损动作。**比 {@link ProtectionAction} 宽**（实测 `/api/ops/device-signals`）：
+   * 「只记录不保护」写的是字面量 `NONE` 而不是 null；仓位卡宝是 `AUTO_EJECT_RETRY`（自动重弹，
+   * 不落保护表）。两者都不是保护，页面按「不挂保护」展示。
+   */
+  protectiveAction: ProtectionAction | "NONE" | "AUTO_EJECT_RETRY" | null;
+  /** 哪个信号码能清除它（成对出现的信号，如 离线/恢复）。 */
+  clearsCode: string | null;
+  /** 它喂给哪些业务告警。信号本身**不是**告警——业务告警才是人要看的那层。 */
+  feeds: string | null;
+}
+
+// ─────────────────────────────────────────────────────────────
+// 机柜 / 充电宝状态机 · 入库质检 · 调拨作业 · 资产差异（批次 5b）
+// ─────────────────────────────────────────────────────────────
+
+/** 机柜上的人工动作。IN_TRANSIT 的两条边由调拨单的发货 / 签收驱动，不在这里（见 known-missing-ui-transitions）。 */
+export type CabinetAction = "goLive" | "markFault" | "repair" | "undeploy" | "retire";
+
+/**
+ * 机柜状态机（SSOT）：详情页的动作按钮与 mock 校验共用同一份。
+ * 逐边照抄后端 `CabinetStateMachine`（GO_LIVE / MARK_FAULT / REPAIR / UNDEPLOY / RETIRE），
+ * `StateMachineEdgeAcrossEndsTest` 两端比对。
+ *
+ * 在用（DEPLOYED）**不能直接报废** —— 先撤机回库，否则站点上会留下一台账面已报废、现场还在接客的柜子。
+ * 「上线」除了这条边还有一道门禁（`goLiveGate`），门禁是前置条件、不是边，所以不在表里。
+ */
+export const CABINET_TRANSITIONS: Record<CabinetAction,
+  { from: readonly CabinetStatus[]; to: CabinetStatus; label: string; event: string }> = {
+  goLive: { from: ["IN_STOCK"], to: "DEPLOYED", label: "上线", event: "GO_LIVE" },
+  markFault: { from: ["DEPLOYED"], to: "FAULT", label: "标记故障", event: "MARK_FAULT" },
+  repair: { from: ["FAULT"], to: "DEPLOYED", label: "修复完成", event: "REPAIR" },
+  undeploy: { from: ["DEPLOYED", "FAULT"], to: "IN_STOCK", label: "撤机回库", event: "UNDEPLOY" },
+  retire: { from: ["IN_STOCK", "FAULT"], to: "RETIRED", label: "报废", event: "RETIRE" },
+};
+
+export const canCabinetAction = (status: CabinetStatus, action: CabinetAction) =>
+  CABINET_TRANSITIONS[action].from.includes(status);
+
+/**
+ * 充电宝上的人工动作（方案 §6.4）。借出 / 归还 / 买断 / 投放由订单与设备事件推进，不给按钮。
+ * `event` 是发给后端 `POST /powerbanks/{no}` 的事件名（`PowerbankCmd.event`），由后端状态机裁决。
+ */
+export type PowerbankAction = "reportFault" | "repair" | "recover" | "scrap";
+
+/**
+ * 逐边照抄后端 `PowerbankStateMachine` 里人工可触发的那几条（REPORT_FAULT / REPAIR / RECOVER / SCRAP）。
+ *
+ * **刻意没有「标记丢失」**（RENTED → LOST）：后端 V113 把它收成「疑似丢失 → 人工核实」
+ * （`/powerbanks/{no}/confirm-lost`，只对系统打了疑似标记的宝开放 —— 没被系统怀疑过的宝要标丢失，
+ * 说明判断依据不在系统里）。用通用事件 OVERDUE 在这里再开一个口子，就绕过了那道核实。
+ */
+export const POWERBANK_TRANSITIONS: Record<PowerbankAction,
+  { from: readonly PowerbankStatus[]; to: PowerbankStatus; label: string; event: string }> = {
+  reportFault: { from: ["IN_CABINET", "IN_STOCK"], to: "FAULT", label: "标记故障", event: "REPORT_FAULT" },
+  repair: { from: ["FAULT"], to: "IN_STOCK", label: "维修回仓", event: "REPAIR" },
+  recover: { from: ["LOST"], to: "IN_CABINET", label: "找回", event: "RECOVER" },
+  scrap: { from: ["FAULT", "IN_STOCK", "IN_CABINET"], to: "SCRAP", label: "报废", event: "SCRAP" },
+};
+
+export const canPowerbankAction = (status: PowerbankStatus, action: PowerbankAction) =>
+  POWERBANK_TRANSITIONS[action].from.includes(status);
+
+/**
+ * 入库质检状态（与后端 `QcStatus` 同名同值）。
+ * **null 不是一个值**：是质检上线之前就入库的存量设备，后端按「放行」处理（门禁显示「存量设备免检」）。
+ * PENDING / FAILED 的设备不能发货调拨、不能上线。
+ */
+export type QcStatus = "PENDING" | "PASSED" | "FAILED";
+
+/** 质检对象类型（`dev_qc_record.item_type`）。 */
+export type QcItemType = "CABINET" | "POWERBANK";
+
+/**
+ * 入库质检入参（后端 `QcReq`）。机柜看 powerOn / slotsOk，充电宝看 battery / cycles。
+ * `result` 空 = 按检查项判定；人可以把「过了」判成不过（须写 note），**不能把「不过」判成过**。
+ */
+export interface QcReq {
+  powerOn?: boolean | null;
+  slotsOk?: boolean | null;
+  battery?: number | null;
+  cycles?: number | null;
+  result?: QcStatus | null;
+  note?: string | null;
+}
+
+/** 一条质检记录（后端 `QcRecord`）。 */
+export interface QcRecord {
+  qcNo: string;
+  itemType: QcItemType;
+  itemNo: string;
+  powerOn: boolean | null;
+  slotsOk: boolean | null;
+  battery: number | null;
+  cycles: number | null;
+  result: QcStatus;
+  note: string | null;
+  inspectedBy: string;
+  inspectedAt: string;
+}
+
+/** 调拨两端的类型（与后端 `TransferEndpointType` 同名同值）：决定 fromRef / toRef 指向仓库、站点还是点位。 */
+export type TransferEndpointType = "WAREHOUSE" | "SITE" | "LOCATION";
+
+/** 调拨物类型。后端按它决定明细号是机柜号还是充电宝号，且只有机柜会随发货 / 签收改状态。 */
+export type TransferItemType = "CABINET" | "POWERBANK";
+
+/**
+ * 调拨单写入面（后端 `InvTransferReq`）。**名字字段是 fromName / toName**，不是列表出参里的
+ * fromLocation / toLocation —— 此前表单按出参字段名提交，后端静默忽略，名字永远存不进去。
+ * 不含经办人：服务端按当前登录人落。状态也不经这里改（R1）—— 发货 / 签收走专门的端点。
+ */
+export interface InvTransferReq {
+  transferNo?: string;
+  fromType: TransferEndpointType;
+  fromRef: string;
+  fromName?: string | null;
+  toType: TransferEndpointType;
+  toRef: string;
+  toName?: string | null;
+  itemType: TransferItemType;
+  powerbankCount?: number | null;
+}
+
+/** 资产差异处理状态（与后端 `AssetDiffStatus` 同名同值）。处理 = 查清去向并写明结论，不改差异本身。 */
+export type AssetDiffStatus = "OPEN" | "RESOLVED";
+
+/** 资产差异种类（与后端 `AssetDiffKind` 同名同值）。 */
+export type AssetDiffKind = "MISSING" | "EXTRA" | "COUNT_MISMATCH";
+
+/**
+ * 一条资产差异（后端 `AssetDiff`）。来源是调拨签收（sourceType=TRANSFER，sourceRef=调拨单号）
+ * 或撤机清点（sourceRef=工单号）。**签收不因差异而卡住** —— 差异逐件落这里等人查清去向。
+ */
+export interface AssetDiff {
+  diffNo: string;
+  sourceType: string;
+  sourceRef: string;
+  kind: AssetDiffKind;
+  itemType: TransferItemType;
+  /** 件号；COUNT_MISMATCH（撤机清点数对不上）没有具体件号。 */
+  itemNo: string | null;
+  siteNo: string | null;
+  cabinetNo: string | null;
+  expectedQty: number | null;
+  actualQty: number | null;
+  status: AssetDiffStatus;
+  resolveNote: string | null;
+  resolvedBy: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+}
+
+/**
+ * 签收结果（后端 `ReceiveResult`）。单上有而没收到的记 missing，收到而单上没有的记 extra，
+ * 两者都已落成资产差异（diffs）—— 页面据此当场告诉人「少了哪几台」，而不是月底盘点才发现。
+ */
+export interface ReceiveResult {
+  transferNo: string;
+  status: InvTransferStatus;
+  received: number;
+  missing: string[];
+  extra: string[];
+  diffs: AssetDiff[];
 }

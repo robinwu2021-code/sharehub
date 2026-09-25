@@ -4,7 +4,7 @@
 // 非法迁移返回 4xx（前端按钮禁用只是体验，不是防线）。
 import { client } from "../http-client";
 import type { WorkOrderApi } from "../contracts/workorder";
-import type { PageQ, WoQ } from "../query";
+import type { PageQ, WoQ, WoPoolQ, WoCostQ } from "../query";
 
 export const workOrderHttp: WorkOrderApi = {
   listWorkOrders: (q?: WoQ) => client.get("/api/ops/work-orders", q),
@@ -14,8 +14,7 @@ export const workOrderHttp: WorkOrderApi = {
   // T0-1：后端动作名是 /handle（WoExtController），此前前端发 /process 直接 404。
   processWorkOrder: (no, x) => client.post(`/api/ops/work-orders/${no}/handle`, x),
   closeWorkOrder: (no, x) => client.post(`/api/ops/work-orders/${no}/close`, x),
-  // ⚠️ T1-C 后端缺口：下列三个动作端点后端尚未实现（WoExtController 只有
-  // dispatch/accept/handle/close）。USE_MOCK=0 时必然 404 —— 页面按钮需同步禁用或后端补齐。
+  // 完工 / 驳回 / 返工：WoExtController 已补齐（原 T1-C 缺口）。完工入参即后端 HandleReq。
   completeWorkOrder: (no, x) => client.post(`/api/ops/work-orders/${no}/complete`, x),
   rejectWorkOrder: (no, reason) => client.post(`/api/ops/work-orders/${no}/reject`, { reason }),
   reworkWorkOrder: (no, reason) => client.post(`/api/ops/work-orders/${no}/rework`, { reason }),
@@ -23,12 +22,11 @@ export const workOrderHttp: WorkOrderApi = {
   // 工单扩展
   listSlaRules: (q?: PageQ) => client.get("/api/ops/sla-rules", q),
   listInspectionPlans: (q?: PageQ) => client.get("/api/ops/inspection-plans", q),
+  getSlaRule: (no) => client.get(`/api/ops/sla-rules/${no}`),
+  getInspectionPlan: (no) => client.get(`/api/ops/inspection-plans/${no}`),
   saveSlaRule: (x) => client.post(x.slaNo ? `/api/ops/sla-rules/${x.slaNo}` : "/api/ops/sla-rules", x),
   saveInspectionPlan: (x) => client.post(x.planNo ? `/api/ops/inspection-plans/${x.planNo}` : "/api/ops/inspection-plans", x),
-  // ⚠️ S7 后端缺口：巡检计划的「立即执行一次」后端**没有任何端点**（WoExtController 只有
-  // inspection-plans 的 list/get/create/update，无 run，也没有定时任务）。USE_MOCK=0 时必然 404。
-  // 端点名按现有 `/{no}/{action}` 约定先占位；后端补齐时必须同时实现幂等：
-  // 同 planNo + 同周期键的第二次请求要拒绝（幂等键由服务端按 frequency 算，不能信前端传）。
+  // 巡检计划「立即执行一次」：后端 InspectionPlanService.run（幂等：同计划同周期只一次，周期键服务端算）。
   runInspectionPlan: (no) => client.post(`/api/ops/inspection-plans/${no}/run`),
 
   // —— 工单增强 ——
@@ -37,4 +35,7 @@ export const workOrderHttp: WorkOrderApi = {
   assigneeCandidates: (siteNo) => client.get("/api/ops/work-orders/assignee-candidates", { siteNo }),
   deriveWorkOrder: (no, req) => client.post(`/api/ops/work-orders/${no}/derive`, req),
   takeoverWorkOrder: (no, req) => client.post(`/api/ops/work-orders/${no}/takeover`, req),
+  listWoPool: (q?: WoPoolQ) => client.get("/api/ops/work-orders/pool", q),
+  grabWorkOrder: (no) => client.post(`/api/ops/work-orders/${no}/grab`),
+  listWoCosts: (q?: WoCostQ) => client.get("/api/ops/work-orders/costs", q),
 };

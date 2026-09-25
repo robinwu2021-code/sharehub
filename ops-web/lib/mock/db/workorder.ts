@@ -3,6 +3,7 @@
 import type {
   WorkOrder, WorkOrderType, WorkOrderStatus, WorkOrderAction, WorkOrderDraft,
   WorkOrderHandlePayload, WorkOrderClosePayload, SlaRule, InspectionPlan, InspectionRunResult, PageQuery,
+  WoTimelineItem,
 } from "../../types";
 import { WO_TRANSITIONS, canTransition, inspectionPeriodKey, inspectionRunnable } from "../../types";
 import { fail } from "@/lib/biz-error";
@@ -109,6 +110,37 @@ export class WorkOrderTransitionError extends Error {
 const find = (woNo: string) => workOrders.find((x) => x.woNo === woNo);
 const now = () => iso(0);
 
+// ————————————————————————————————————————————————————————————————
+// 处理时间线（后端 wo_dispatch + wo_handle 合并按时间排）。
+// **每个动作都在这里留一条**，放在状态机同一个文件里而不是 workorder-ext：
+// 动作函数在这里，留痕跟着动作走才不会漏 —— 放在外面的话，
+// 任何绕过 ext 直接调本文件动作的地方（巡检计划执行、告警转工单…）都会留下没有记录的迁移。
+// kind / action 取后端同名值：kind ∈ DISPATCH / HANDLE（mock 另有 CREATE），
+// action ∈ DISPATCH / ACCEPT / REJECT / TAKEOVER / REVIEW / NOTE / HANDLE / COMPLETE / REWORK / CLOSE。
+// ————————————————————————————————————————————————————————————————
+const timelines = new Map<string, WoTimelineItem[]>();
+
+/** 追加一条时间线（按发生顺序追加，与后端「按时间升序」一致）。 */
+export function woTimelineAppend(
+  woNo: string, kind: string, action: string, note?: string | null, fileNos: string[] = [],
+  opts: { actor?: string | null; faultReasonCode?: string | null } = {},
+): void {
+  const list = timelines.get(woNo) ?? [];
+  list.push({
+    kind, action, actor: opts.actor ?? "admin", note: note ?? null,
+    faultReasonCode: opts.faultReasonCode ?? null, fileNos, at: new Date().toISOString(),
+  });
+  timelines.set(woNo, list);
+}
+
+/** 该工单的时间线；从未有过动作的种子单返回 null（详情层会补一条建单记录）。 */
+export const woTimelineOf = (woNo: string): WoTimelineItem[] | null => timelines.get(woNo) ?? null;
+
+/** 仅供测试重置。 */
+export function __resetTimelines(): void {
+  timelines.clear();
+}
+
 /**
  * 统一迁移入口：查单 → 校验合法性 → 打补丁 → 落状态。
  * 所有对外动作（dispatch/accept/process/complete/close/reject）都必须走这里，
@@ -145,66 +177,85 @@ export function createWorkOrder(x: WorkOrderDraft): WorkOrder {
     rejectCount: 0,
   };
   workOrders.unshift(created);
+  woTimelineAppend(created.woNo, "CREATE", "CREATE", x.sourceNo ? `来源 ${x.sourceNo}` : x.description);
   return created;
 }
 
 export const dispatchWorkOrder = (woNo: string, assignee: string) => {
   if (!assignee?.trim()) throw fail("派单必须指定处理人", "Dispatching requires an assignee", "الإسناد يتطلب تحديد منفّذ");
-  return transitionWorkOrder(woNo, "dispatch", { assigneeName: assignee, dispatchedAt: now() });
+  const w = transitionWorkOrder(woNo, "dispatch", { assigneeName: assignee, dispatchedAt: now() });
+  woTimelineAppend(woNo, "DISPATCH", "DISPATCH", "MANUAL", [], { actor: assignee });
+  return w;
 };
 
-export const acceptWorkOrder = (woNo: string, handler?: string) =>
-  transitionWorkOrder(woNo, "accept", {
+export const acceptWorkOrder = (woNo: string, handler?: string) => {
+  const w = transitionWorkOrder(woNo, "accept", {
     acceptedAt: now(),
     handlerName: handler || find(woNo)?.assigneeName || null,
   });
+  woTimelineAppend(woNo, "DISPATCH", "ACCEPT", null, [], { actor: w.handlerName });
+  return w;
+};
 
 /** 提交处理结果（不改状态，可多次追加）。处理说明必填，换件记录可选。 */
 export const processWorkOrder = (woNo: string, x: WorkOrderHandlePayload) => {
   if (!x.handleNote?.trim()) throw fail("处理说明必填", "Handling notes are required", "ملاحظات المعالجة مطلوبة");
-  return transitionWorkOrder(woNo, "process", {
+  const w = transitionWorkOrder(woNo, "process", {
     handlerName: x.handlerName || find(woNo)?.handlerName || find(woNo)?.assigneeName || null,
     handledAt: now(), handleNote: x.handleNote, partsReplaced: x.partsReplaced || find(woNo)?.partsReplaced || null,
   });
+  woTimelineAppend(woNo, "HANDLE", "HANDLE", x.handleNote, x.fileNos ?? [], { actor: w.handlerName });
+  return w;
 };
 
 export const completeWorkOrder = (woNo: string, x: WorkOrderHandlePayload) => {
   if (!x.handleNote?.trim()) throw fail("处理说明必填", "Handling notes are required", "ملاحظات المعالجة مطلوبة");
-  return transitionWorkOrder(woNo, "complete", {
+  const w = transitionWorkOrder(woNo, "complete", {
     handlerName: x.handlerName || find(woNo)?.handlerName || find(woNo)?.assigneeName || null,
     handledAt: now(), handleNote: x.handleNote,
     partsReplaced: x.partsReplaced || find(woNo)?.partsReplaced || null,
     completedAt: now(),
   });
+  // 照片与故障原因挂在「完工」这一步上：修之前 / 修之后拍的，靠它分得清
+  woTimelineAppend(woNo, "HANDLE", "COMPLETE", `COMPLETE: ${x.handleNote}`, x.fileNos ?? [],
+    { actor: w.handlerName, faultReasonCode: x.faultReasonCode ?? null });
+  return w;
 };
 
 /** 验收关单：**必须有验收结论**，否则拒绝（关单是终态，无结论就无从追责）。 */
 export const closeWorkOrder = (woNo: string, x: WorkOrderClosePayload) => {
   if (!x.auditResult) throw fail("关单必须给出验收结论", "Closing requires an acceptance result", "الإغلاق يتطلب نتيجة قبول");
-  return transitionWorkOrder(woNo, "close", {
+  const w = transitionWorkOrder(woNo, "close", {
     auditorName: x.auditorName || "admin", auditedAt: now(),
     auditResult: x.auditResult, auditNote: x.auditNote || null,
   });
+  woTimelineAppend(woNo, "DISPATCH", "CLOSE", x.auditNote || x.auditResult, [], { actor: w.auditorName });
+  return w;
 };
 
 /** 验收不合格退回返工：**原因必填**，回到 PROCESSING（处理人不变，无需重新派单）。 */
 export const reworkWorkOrder = (woNo: string, reason: string) => {
   if (!reason?.trim()) throw fail("退回返工必须填写不合格原因", "Sending back for rework requires the reason it failed acceptance", "الإعادة للتصحيح تتطلب ذكر سبب عدم القبول");
   const cur = find(woNo);
-  return transitionWorkOrder(woNo, "rework", {
+  const w = transitionWorkOrder(woNo, "rework", {
     auditorName: "admin", auditedAt: now(), auditResult: "FAIL", auditNote: reason,
     rejectCount: (cur?.rejectCount ?? 0) + 1, completedAt: null,
   });
+  woTimelineAppend(woNo, "HANDLE", "REWORK", `REWORK: ${reason}`);
+  return w;
 };
 
 /** 驳回退回重派：**原因必填**（沿用退款审批口径），退回 CREATED 并清空处理人。 */
 export const rejectWorkOrder = (woNo: string, reason: string) => {
   if (!reason?.trim()) throw fail("驳回必须填写原因", "Rejecting requires a reason", "الرفض يتطلب ذكر السبب");
   const cur = find(woNo);
-  return transitionWorkOrder(woNo, "reject", {
+  const from = cur?.handlerName ?? cur?.assigneeName ?? null;
+  const w = transitionWorkOrder(woNo, "reject", {
     rejectReason: reason, rejectCount: (cur?.rejectCount ?? 0) + 1,
     assigneeName: null, handlerName: null, acceptedAt: null, dispatchedAt: null,
   });
+  woTimelineAppend(woNo, "DISPATCH", "REJECT", reason, [], { actor: from });
+  return w;
 };
 
 export const listWorkOrders = (q: PageQuery & { status?: string; type?: string } = {}) =>
@@ -232,6 +283,17 @@ export const inspectionPlans: InspectionPlan[] = Array.from({ length: 14 }, (_, 
 
 export const listSlaRules = (q: PageQuery = {}) => paginate(slaRules, q.page, q.size, (x) => kwHit(q.keyword, x.slaNo, x.woType, x.escalateTo));
 export const listInspectionPlans = (q: PageQuery = {}) => paginate(inspectionPlans, q.page, q.size, (x) => kwHit(q.keyword, x.planNo, x.route, x.assignee));
+/** 单条 SLA 规则 / 巡检计划（后端 GET /{no}）。不存在报错，不返回 undefined 让页面去猜。 */
+export function getSlaRule(slaNo: string): SlaRule {
+  const r = slaRules.find((x) => x.slaNo === slaNo);
+  if (!r) fail(`SLA 规则不存在：${slaNo}`, `SLA rule not found: ${slaNo}`, `قاعدة SLA غير موجودة: ${slaNo}`);
+  return r;
+}
+export function getInspectionPlan(planNo: string): InspectionPlan {
+  const r = inspectionPlans.find((x) => x.planNo === planNo);
+  if (!r) fail(`巡检计划不存在：${planNo}`, `Inspection plan not found: ${planNo}`, `خطة الفحص غير موجودة: ${planNo}`);
+  return r;
+}
 export const saveSlaRule = (x: Partial<SlaRule>) => upsert(slaRules, x, "slaNo", () => nextNo("SLA", slaRules));
 
 /**

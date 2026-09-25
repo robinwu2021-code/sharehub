@@ -64,6 +64,46 @@ export interface SiteOps {
   activeContractNo: string | null;
 }
 
+/**
+ * 现场勘测结论（与后端 `loc.SurveyResult` 同名同值）。以站点**最近一次**勘测为准，
+ * 开业清单里的「现场勘测」一项读它 —— 首台设备上线要求最近一次是 PASS。
+ */
+export type SurveyResult = "PASS" | "FAIL";
+
+/**
+ * 勘测时的现场信号强度（与后端 `loc.SignalLevel` 同名同值）。
+ * NONE 时勘测不能判通过：没信号的柜子借不出也还不了。
+ */
+export type SignalLevel = "STRONG" | "GOOD" | "WEAK" | "NONE";
+
+/** 一条勘测记录（后端 `SiteSurvey`）。只增不改：复勘就再记一条，历史留着对账。 */
+export interface SiteSurvey {
+  surveyNo: string;
+  siteNo: string;
+  signalLevel: SignalLevel;
+  powerOk: boolean;
+  placementNote: string | null;
+  /** 现场照片（文件服务的 fileNo，用途 SURVEY_PHOTO）。 */
+  fileNos: string[];
+  result: SurveyResult;
+  note: string | null;
+  surveyedBy: string | null;
+  surveyedAt: string;
+}
+
+/**
+ * 记一次勘测（后端 `SurveyReq`）。服务端规则：PASS 要求信号不是 NONE 且能接电；
+ * FAIL 必须写 note（不写原因，下一个去复勘的人不知道该看什么）。
+ */
+export interface SurveyReq {
+  signalLevel: SignalLevel;
+  powerOk: boolean;
+  placementNote?: string;
+  fileNos?: string[];
+  result: SurveyResult;
+  note?: string;
+}
+
 /** 站点状态流转留痕的一行。 */
 export interface SiteStatusLogItem {
   event: string;
@@ -277,9 +317,21 @@ export interface ContractFlow {
   termination: ContractTermination | null;
 }
 
+/**
+ * 合同留痕事件（后端 `ContractServiceImpl.writeLog / transit` 写入的 event 值，逐字一致）。
+ *
+ * <p>审批四步各有自己的词：运营审 APPROVE / REJECT，财务会签 COSIGN / COSIGN_REJECT，
+ * 终止申请 TERM_REQUEST → TERM_APPROVE（随后一条 TERMINATE 记状态变化）/ TERM_REJECT。
+ * RENEW / SUPPLEMENT 记在**新生成的草稿**上；EXPIRE / TERMINATE 也可能由系统写（操作人为空）。
+ */
+export type ContractLogEvent =
+  | "CREATE" | "UPDATE" | "SUBMIT" | "WITHDRAW" | "APPROVE" | "REJECT"
+  | "COSIGN" | "COSIGN_REJECT" | "SIGN" | "ACTIVATE" | "EXPIRE" | "TERMINATE"
+  | "RENEW" | "SUPPLEMENT" | "TERM_REQUEST" | "TERM_APPROVE" | "TERM_REJECT";
+
 /** 合同流转留痕的一行（后端 `ContractLogItem`）。详情抽屉的时间线按它渲染。 */
 export interface ContractLogItem {
-  event: string;
+  event: ContractLogEvent;
   fromStatus: ContractStatus | null;
   toStatus: ContractStatus | null;
   operator: string | null;
@@ -330,39 +382,80 @@ export interface Contract {
 }
 
 /**
- * 合同附件（扫描件）元数据。
+ * 合同附件（扫描件）元数据（后端 `ContractAttachment`）。
  *
- * **拍板点 #3：mock 阶段做假上传** —— 只存文件名 + 大小，字节流不传、不读。
- * 所以这里故意没有 `url` / `storageKey`：接后端时由服务端返回对象存储地址再补字段，
- * 前端先编一个假地址的话，「点开看不了」会比「明确没有下载入口」更难查。
+ * <p>2026-09-25 起接入文件服务：先 `uploadFile(file, "CONTRACT_SCAN")` 拿到 fileNo，
+ * 再 `addContractAttachment(no, { fileNos })` 挂上合同。下载地址按 fileNo 现取
+ * （`fileUrl`，限时签名），**不存进附件行**——签名地址过期后留着只会是一个点不开的链接。
  */
 export interface ContractAttachment {
   attachNo: string;
   fileName: string;
-  size: number; // 字节；由 File.size 直取，不做换算，展示层再格式化
+  size: number; // 字节；展示层再格式化
   uploadedBy: string;
   uploadedAt: string;
+  /** 文件服务编号：取下载地址用。mock 早期假上传的种子没有它 —— 那几条没有「查看」入口。 */
+  fileNo?: string | null;
+  contentType?: string | null;
+  /** 能否在抽屉里直接预览（图片可以，PDF 走下载）。由后端按类型判定。 */
+  previewable?: boolean;
 }
 /**
- * 附件限制（SSOT）：抽屉的 `accept` 属性与提示文案、mock 落库校验共用一份。
- * 分开写会出现「input 不让选、但接口收」或反过来——两种都会被当成 bug 报上来。
+ * 附件限制（SSOT，mock 落库校验用）。页面的 accept 与提示走 `FILE_CATEGORY_RULES.CONTRACT_SCAN`，
+ * 那是文件服务的约束镜像 —— 真后端下上传就被它挡，这里的数与它保持一致。
  */
 export const ATTACH_EXTS = ["pdf", "jpg", "jpeg", "png"] as const;
-/** 单份上限 10MB：合同扫描件超过这个量级基本是没压缩的整本 PDF，先挡住而不是让它进库。 */
-export const ATTACH_MAX_SIZE = 10 * 1024 * 1024;
+export const ATTACH_MAX_SIZE = 20 * 1024 * 1024;
 
-/** 上传入参。`uploadedBy` 留空由服务端取当前登录人（与流转留痕的 operator 同口径）。 */
+/** 挂附件入参（后端 `AttachReq`）：已上传文件的 fileNo 列表。上传人由服务端取当前登录人。 */
 export interface ContractAttachmentReq {
-  fileName: string;
-  size: number;
-  uploadedBy?: string;
+  fileNos: string[];
 }
 
-// —— 场所 · 待建功能补全（ops 域）——
+// —— 场所 · BD 拓展 CRM（商机）——
 
+/**
+ * 商机阶段（SSOT）。与后端 `loc.ext.LeadStatus` 同名同值（跨端词表卡口按名字配对，故叫 Status）。
+ *
+ * <p>页面上一律叫「阶段」，代码里 {@link LeadStage} 是它的别名 —— 两个名字指同一套值。
+ */
+export type LeadStatus = "NEW" | "CONTACTED" | "NEGOTIATING" | "SIGNED" | "LOST";
 /** 线索阶段取值域（SSOT）：页面徽标/筛选、mock 校验、跟进记录的阶段快照共用一份。 */
-export const LEAD_STAGES = ["NEW", "CONTACTED", "NEGOTIATING", "SIGNED", "LOST"] as const;
-export type LeadStage = (typeof LEAD_STAGES)[number];
+export const LEAD_STAGES: readonly LeadStatus[] = ["NEW", "CONTACTED", "NEGOTIATING", "SIGNED", "LOST"];
+export type LeadStage = LeadStatus;
+
+/** 商机动作（后端 `LeadStateMachine` 的事件名，小驼峰化）。 */
+export type LeadAction = "contact" | "negotiate" | "stepBack" | "sign" | "lose" | "reactivate";
+
+/**
+ * 商机阶段迁移表（SSOT）—— 逐边照抄后端 `LeadStateMachine`，跨端边卡口两向比对。
+ *
+ * <p>顺序推进 NEW → CONTACTED → NEGOTIATING → SIGNED；在跟阶段都可 LOST（原因必填）；
+ * LOST 可重新激活回 NEW；允许一步回退 NEGOTIATING → CONTACTED（谈崩了重新接触是日常）。
+ * SIGNED 是终态：签下后的变化在合同上发生。
+ *
+ * <p>**阶段只经动作改**（规则 R1）：记跟进时顺带推进、标记丢单、签约转化。编辑表单里没有阶段。
+ * `sign` 这条边由「签约转化」走（它同时生成场地方 / 站点 / 合同草稿），不单独出按钮。
+ */
+export const LEAD_TRANSITIONS: Record<LeadAction, { from: readonly LeadStatus[]; to: LeadStatus }> = {
+  contact: { from: ["NEW"], to: "CONTACTED" },
+  negotiate: { from: ["CONTACTED"], to: "NEGOTIATING" },
+  stepBack: { from: ["NEGOTIATING"], to: "CONTACTED" },
+  sign: { from: ["NEGOTIATING"], to: "SIGNED" },
+  lose: { from: ["NEW", "CONTACTED", "NEGOTIATING"], to: "LOST" },
+  reactivate: { from: ["LOST"], to: "NEW" },
+};
+
+/** from → to 是否是一条合法迁移（同阶段 = 未推进，放行）。页面下拉与 mock 校验共用。 */
+export function leadStageMoveOk(from: LeadStatus, to: LeadStatus): boolean {
+  if (from === to) return true;
+  return Object.values(LEAD_TRANSITIONS).some((t) => t.to === to && t.from.includes(from));
+}
+
+/** 从 from 能去的阶段（不含自身）。记跟进时「顺带推进」的下拉只给这些。 */
+export function leadNextStages(from: LeadStatus): LeadStatus[] {
+  return LEAD_STAGES.filter((s) => s !== from && leadStageMoveOk(from, s));
+}
 
 /**
  * 商机归属方类型（ADR-027 §五 / V55）。决定 `owner` 里那个号属于哪个命名空间。
@@ -372,13 +465,23 @@ export type LeadStage = (typeof LEAD_STAGES)[number];
 export const LEAD_OWNER_TYPES = ["STAFF", "AGENT"] as const;
 export type LeadOwnerType = (typeof LEAD_OWNER_TYPES)[number];
 
+/** 商机上谈下来的条款（后端 `LeadTerms`）。签约转化时带进合同草稿，不必再录一遍。 */
+export interface LeadTerms {
+  shareMode: ContractShareMode | null;
+  shareRate: number | null;
+  entryFee: number | null;
+  guaranteeAmount: number | null;
+  termMonths: number | null;
+  exclusive: boolean | null;
+}
+
 export interface Lead {
   leadNo: string;
   venueName: string;
-  contact: string;
+  contact: string | null;
   stage: LeadStage;
-  /** 归属方业务号：`ownerType=STAFF` 时是 employeeNo，`AGENT` 时是 agentNo。 */
-  owner: string;
+  /** 归属方业务号：`ownerType=STAFF` 时是 employeeNo，`AGENT` 时是 agentNo。在线索池里时为空。 */
+  owner: string | null;
   /** 见 LEAD_OWNER_TYPES。缺省 STAFF（这一列出现之前只可能是员工）。 */
   ownerType?: LeadOwnerType;
   /**
@@ -387,46 +490,145 @@ export interface Lead {
    * 拓展归因只有落到站点上才能变成钱 —— 责任行挂在「伙伴 × 站点」上，
    * 而商机谈的是场地、站点是之后才建的。签下且归属是伙伴时，据此写 DEVELOP 责任行。
    */
-  siteNo?: string;
+  siteNo?: string | null;
   expectSites: number;
   /**
    * 下次跟进日（`YYYY-MM-DD`），空 = 未约。
    *
    * BD CRM 的核心作业字段 ——「今天该打谁的电话」靠它排。
-   * 后端一直有，列表不显示等于这张表少了排程。
    */
   nextFollowAt?: string | null;
-  /** 最后一次跟进时间 —— 与 `leadFollowUps` 里最新一条的 `createdAt` 必须一致（列表按它排序）。 */
   updatedAt: string;
+  /** 场地地址。查重按「场地名或地址」任一相同判（后端 `lead.dedup.days` 天内）。 */
+  address?: string | null;
+  /** 签约转化后回填：关联 / 新建的场地方。 */
+  venueNo?: string | null;
+  /** 签约转化后回填：生成的合同草稿。有值 = 已转化，不能再转。 */
+  contractNo?: string | null;
+  /** 丢单原因（迁到 LOST 时必填；重新激活后保留作历史）。 */
+  lostReason?: string | null;
+  lostAt?: string | null;
+  /**
+   * 最后一次跟进时间（服务端维护）。**提醒与回收都按它算**：超 N 天未跟进提醒，
+   * 超 M 天回收进公共线索池。列表的「最后跟进」读它，不读 updatedAt（改个联系人也会动后者）。
+   */
+  lastFollowAt?: string | null;
+  /** 在公共线索池里（没有负责人，谁都能认领）。池里的商机要先认领才能跟进。 */
+  inPool?: boolean;
+  /** 被回收进池之前的负责人 —— 认领时让人知道「这条以前是谁在跟」。 */
+  prevOwner?: string | null;
+  /** 丢给了哪家竞品。 */
+  competitorName?: string | null;
+  /**
+   * 竞品独家到期日。到期前 N 天由定时任务把 LOST 的商机**自动重新激活**回 NEW ——
+   * 所以丢单时填上它，是给半年后的自己留一个提醒。
+   */
+  competitorExclusiveUntil?: string | null;
+  reactivatedAt?: string | null;
+  terms?: LeadTerms | null;
 }
 
-/** 跟进方式。后端尚无此表，取值域由前端先定（见 contracts/location.ts 的缺口标注）。 */
+/**
+ * 商机保存入参。后端收的是 `LocLead` 实体：谈判条款是**平铺**的（出参里收成 `terms`），
+ * 独家叫 `exclusiveFlag`。`stage` 只在新建时生效（补录历史商机可直接落在某阶段），
+ * 编辑时改阶段走动作 —— 表单里不放它（R1）。
+ */
+export interface LeadSaveReq {
+  leadNo?: string;
+  venueName?: string;
+  contact?: string | null;
+  address?: string | null;
+  regionId?: string | null;
+  stage?: LeadStage;
+  owner?: string | null;
+  ownerType?: LeadOwnerType;
+  siteNo?: string | null;
+  expectSites?: number;
+  nextFollowAt?: string | null;
+  lostReason?: string | null;
+  competitorName?: string | null;
+  competitorExclusiveUntil?: string | null;
+  shareMode?: ContractShareMode | null;
+  shareRate?: number | null;
+  entryFee?: number | null;
+  guaranteeAmount?: number | null;
+  termMonths?: number | null;
+  exclusiveFlag?: boolean | null;
+}
+
+/** 商机列表筛选。`inPool=true` 即「公共线索池」视图。 */
+export interface LeadQ {
+  page?: number;
+  size?: number;
+  keyword?: string;
+  stage?: string;
+  owner?: string;
+  inPool?: boolean;
+}
+
+/**
+ * 签约转化入参（后端 `LeadConvertReq`）。全部可空：空的从商机上取（场地名 / 地址 / 谈判条款）。
+ * `venueNo` / `siteNo` 给了就关联已有的（站点须属于该场地方），不给就新建。
+ */
+export interface LeadConvertReq {
+  venueNo?: string;
+  siteNo?: string;
+  siteName?: string;
+  regionId?: string;
+  address?: string;
+  openHours?: string;
+  shareMode?: ContractShareMode;
+  shareRate?: number;
+  entryFee?: number;
+  guaranteeAmount?: number;
+  startAt?: string;
+  termMonths?: number;
+  exclusive?: boolean;
+}
+
+/** 签约转化结果（后端 `LeadConversion`）：三个编号 + 各自是新建还是关联。 */
+export interface LeadConversion {
+  leadNo: string;
+  venueNo: string;
+  venueCreated: boolean;
+  siteNo: string;
+  siteCreated: boolean;
+  contractNo: string;
+}
+
+/** 跟进方式。后端存字符串，取值域由前端定。 */
 export const LEAD_FOLLOW_CHANNELS = ["CALL", "VISIT", "WHATSAPP", "EMAIL", "OTHER"] as const;
 export type LeadFollowChannel = (typeof LEAD_FOLLOW_CHANNELS)[number];
 
 /**
- * 线索跟进记录（append-only 流水，对应设想中的 `loc_lead_follow_up`）。
+ * 线索跟进记录（append-only 流水，后端 `loc_lead_follow`）。
  *
- * 阶段快照记 `fromStage`/`toStage` 而不是只记「当时阶段」：CRM 里真正要回答的问题是
- * **哪一次跟进推动了阶段变化**，只存单值的话时间线上看不出推进点。
+ * 阶段快照记 `fromStage`/`toStage`：CRM 里真正要回答的问题是**哪一次跟进推动了阶段变化**。
+ * ⚠️ 后端**每条都写 fromStage**（未推进时 from == to）；mock 旧数据首条为 null。
+ * 判断「这一条推进了阶段」一律用 `fromStage && fromStage !== toStage`。
  */
 export interface LeadFollowUp {
   followNo: string;
   leadNo: string;
   channel: LeadFollowChannel;
-  fromStage: LeadStage | null; // 首条建档跟进没有来源阶段
+  fromStage: LeadStage | null;
   toStage: LeadStage;
-  owner: string;
+  /** 记录人（服务端取当前登录人，入参里没有这一项）。 */
+  owner: string | null;
   content: string;
   nextAt: string | null; // 下次跟进计划日（YYYY-MM-DD），空=未约
   createdAt: string;
 }
-/** 记一条跟进。`stage` 不传=只留痕不动阶段；传了且与当前不同则同时推进线索阶段。 */
+/**
+ * 记一条跟进（后端 `LeadFollowUpReq`）。
+ *
+ * `toStage` 不传 = 只留痕不动阶段；传了且与当前不同 = **同事务**推进阶段（须是合法迁移）。
+ * 推到 LOST 时，本条内容就是丢单原因。记录人由服务端取当前登录人，不收 `owner`。
+ */
 export interface LeadFollowUpReq {
   content: string;
   channel: LeadFollowChannel;
-  stage?: LeadStage;
-  owner?: string;
+  toStage?: LeadStage;
   nextAt?: string;
 }
 /**
@@ -525,9 +727,15 @@ export interface LifecycleRow {
   owner: string | null;
 }
 
-/** 漏斗每一档的计数。`phase` 取值域同 {@link LifecycleRow.phase}。 */
+/**
+ * 漏斗每一档（后端 `FunnelStage`）。`phase` 取值域同 {@link LifecycleRow.phase}。
+ *
+ * <p>**没有 label**：档位名由前端按 `kind + phase` 查映射表出（三语各自翻），
+ * 后端给中文名只会让阿语界面冒出一格中文。`avgDaysInPhase` 空 = 该档没有对象。
+ */
 export interface FunnelStage {
-  phase: string;
-  label: string;
+  kind: LifecycleRow["kind"];
+  phase: LeadStage | SiteStatus;
   count: number;
+  avgDaysInPhase: number | null;
 }

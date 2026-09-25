@@ -51,7 +51,9 @@ describe("门店生命周期漏斗", () => {
   it("★ 漏斗把零的档位也返回——缺档会让漏斗看起来「跳过了一步」", () => {
     const f = siteLifecycleFunnel();
     expect(f.length).toBeGreaterThanOrEqual(10);
-    expect(f.every((x) => x.label && x.label !== x.phase), "每档都要有中文标签").toBe(true);
+    // 与后端 FunnelStage 同形：kind + phase + count + avgDaysInPhase，**没有 label**（档位名由前端按三语查表）
+    expect(f.every((x) => (x.kind === "LEAD" || x.kind === "SITE") && !("label" in x))).toBe(true);
+    expect(f.filter((x) => x.count === 0).every((x) => x.avgDaysInPhase === null), "空档的平均停留是「没有」不是 0").toBe(true);
     const rows = listSiteLifecycles({ size: 500 }).list;
     expect(f.reduce((n, x) => n + x.count, 0)).toBe(rows.length);
   });

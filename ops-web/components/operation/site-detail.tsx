@@ -10,7 +10,7 @@ import { Pencil, Plus } from "lucide-react";
 import { RECENT_LIMIT, UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
 import type {
-  Site, SitePoint, Cabinet, Contract, PlanScope, ShareRule, AuditEntry, SiteAgent, SiteAgentRole,
+  Site, SitePoint, Cabinet, Contract, PlanScope, ShareRule, AuditEntry, SiteAgent, SiteAgentRole, Checklist,
 } from "@/lib/types";
 import { SITE_AGENT_ROLES } from "@/lib/types";
 import { useCan } from "@/lib/hooks/use-can";
@@ -27,6 +27,12 @@ import { Button } from "@/components/ui/button";
 import { EmptyState, Skeleton } from "@/components/ui/misc";
 import { SummaryCard } from "@/components/ui/summary-card";
 import { SiteStatsPanel } from "@/components/operation/site-stats";
+import { DetailHeader } from "@/components/ui/detail-header";
+import { StatusStepper, type Step } from "@/components/ui/status-stepper";
+import { GateChecklist } from "@/components/gate-checklist";
+import { RefLink } from "@/components/ref-link";
+import { SiteSurveyPanel } from "@/components/location/site-survey";
+import { CONTRACT_STATUS } from "@/components/location/contract-detail";
 
 /**
  * 站点五态（2026-09-25 起，与「门店生命周期」合并后的唯一一套）。
@@ -43,8 +49,34 @@ export const SITE_STATUS: StatusMap<Site["status"]> = {
 };
 
 
+/** 主线四步；「撤场中 → 已关闭」接在营业之后，暂停是营业中的旁支（步骤条上按营业中显示）。 */
+const SITE_STEPS: Step[] = [
+  { key: "PREPARING", label: "筹备中" },
+  { key: "ACTIVE", label: "营业中" },
+  { key: "WITHDRAWING", label: "撤场中" },
+  { key: "CLOSED", label: "已关闭" },
+];
+
+/**
+ * 后端门禁的 fixHref 按「/sites/{no}?tab=…」拼（那是它设想的站点详情路由），
+ * 运营端的站点详情是 `/operation/sites?no=&tab=` 抽屉，页签名也不同（locations → points）。
+ * 在这里翻一次：不翻的话「去处理」点进去是 404。
+ */
+export function siteFixHref(href: string | null): string | null {
+  if (!href) return href;
+  const m = /^\/sites\/([^/?#]+)(?:\?(.*))?$/.exec(href);
+  if (!m) return href;
+  const qs = new URLSearchParams(m[2] ?? "");
+  const tab = qs.get("tab");
+  const mapped = tab === "locations" ? "points" : tab || "basic";
+  return `/operation/sites?no=${encodeURIComponent(m[1])}&tab=${mapped}`;
+}
+const fixHrefs = (c: Checklist | undefined): Checklist | undefined =>
+  c && { ...c, items: c.items.map((i) => ({ ...i, fixHref: siteFixHref(i.fixHref) })) };
+
 const TABS = [
   { key: "basic", label: "基本信息" },
+  { key: "survey", label: "现场勘测" },
   { key: "points", label: "点位" },
   { key: "cabinets", label: "机柜" },
   { key: "contracts", label: "合同" },
@@ -68,6 +100,7 @@ const POINT_FIELDS: FieldDef[] = [
   { key: "spotDesc", label: "位置描述", maxLength: 256, placeholder: "B1 层扶梯口左侧，靠近收银台" },
 ];
 
+/** 本抽屉的紧凑行（标签在左）。与 ui/drawer 的 Field（标签在上）并存：九个页签挤在 720px 里，竖排放不下。 */
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex gap-3 py-1.5">
@@ -88,13 +121,20 @@ export function SiteDetailDrawer({
   const [editingPoint, setEditingPoint] = useState<SitePoint | undefined>();
   const [partnerForm, setPartnerForm] = useState<Partial<SiteAgent> | null>(null);
 
-  // 站点本体：列表页已有数据，但深链直接打开时列表可能还没加载，故独立取一次
+  // 站点本体走详情接口：列表不返回 ops（运维责任人 / 首次上线 / 生效合同），且深链直接打开时列表可能还没加载
   const siteQ = useQuery({
     queryKey: ["op", "site", siteNo],
-    queryFn: async () => (await api.listSites({ page: 1, size: UNPAGED_SIZE })).list.find((s) => s.siteNo === siteNo),
+    queryFn: () => api.getSite(siteNo!),
     enabled: !!siteNo,
+    retry: false,
   });
   const site = siteQ.data as Site | undefined;
+  // 筹备中看开业清单、撤场中看关闭门禁 —— 放在页签之上：它回答的是「这个站点下一步卡在哪」
+  const gateQ = useQuery({
+    queryKey: ["op", "site-opening", siteNo, site?.status],
+    queryFn: () => (site!.status === "WITHDRAWING" ? api.siteCloseGate(siteNo!) : api.siteOpeningChecklist(siteNo!)),
+    enabled: !!site && (site.status === "PREPARING" || site.status === "WITHDRAWING"),
+  });
 
   const pointsQ = useQuery({
     queryKey: ["op", "site-points", siteNo],
@@ -108,7 +148,8 @@ export function SiteDetailDrawer({
   });
   const contractsQ = useQuery({
     queryKey: ["op", "site-contracts", siteNo],
-    queryFn: () => api.listContracts({ page: 1, size: UNPAGED_SIZE }),
+    // 按站点号筛（服务端），不再拉全量后按站点名比 —— 同一商场不同楼层有同名站点，按名字连必然连错
+    queryFn: () => api.listContracts({ page: 1, size: UNPAGED_SIZE, siteNo: siteNo! }),
     enabled: !!siteNo && ["contracts", "sharing"].includes(active),
   });
   /*
@@ -174,7 +215,7 @@ export function SiteDetailDrawer({
   const siteCabinets = (cabinetsQ.data?.list ?? []).filter(
     (c) => c.siteNo === siteNo || points.some((p) => p.locationNo === c.locationNo),
   );
-  const siteContracts = (contractsQ.data?.list ?? []).filter((c) => c.siteName === site?.name);
+  const siteContracts = (contractsQ.data?.list ?? []).filter((c) => c.siteNo === siteNo);
 
   const pointCols: Column<SitePoint>[] = [
     { header: "点位", cell: (p) => (
@@ -209,7 +250,8 @@ export function SiteDetailDrawer({
   ];
 
   const contractCols: Column<Contract>[] = [
-    { header: "合同", cell: (c) => <span className="font-mono">{c.contractNo}</span> },
+    { header: "合同", cell: (c) => <RefLink kind="contract" no={c.contractNo} /> },
+    { header: "状态", className: "whitespace-nowrap", cell: (c) => <StatusBadge map={CONTRACT_STATUS} value={c.status} /> },
     { header: "场地方", cell: (c) => c.venueName },
     { header: "分成比例", className: "text-right", cell: (c) => `${(c.shareRate * 100).toFixed(1)}%` },
     { header: "进场费", className: "text-right", cell: (c) => money(c.entryFee) },
@@ -235,6 +277,28 @@ export function SiteDetailDrawer({
       desc={site ? [site.siteNo, site.venueName, site.regionName || site.regionId].filter(Boolean).join(" · ") : undefined}
       width="w-[720px]"
     >
+      {site && (
+        <DetailHeader
+          no={site.siteNo}
+          badge={<StatusBadge map={SITE_STATUS} value={site.status} />}
+          meta={site.status === "PAUSED" && site.ops?.pauseReason ? `暂停原因：${site.ops.pauseReason}${site.ops.pauseUntil ? ` · 预计 ${site.ops.pauseUntil} 恢复` : ""}`
+            : site.status === "WITHDRAWING" && site.ops?.withdrawReason ? `撤场原因：${site.ops.withdrawReason}${site.ops.withdrawPlannedAt ? ` · 计划 ${site.ops.withdrawPlannedAt} 撤完` : ""}`
+            : undefined}
+          stepper={<StatusStepper steps={SITE_STEPS} current={site.status === "PAUSED" ? "ACTIVE" : site.status} />}
+          className="mb-4"
+        />
+      )}
+      {site && (site.status === "PREPARING" || site.status === "WITHDRAWING") && (
+        <div className="mb-4">
+          <div className="mb-2 txt-label text-muted-foreground">{site.status === "PREPARING" ? "开业清单" : "关闭门禁"}</div>
+          <GateChecklist
+            data={fixHrefs(gateQ.data)}
+            loading={gateQ.isLoading}
+            passedHint={site.status === "PREPARING" ? "清单已齐：首台设备通过上线门禁后，站点自动转营业" : "已全部了结，可以在列表上「关闭站点」"}
+            blockedHint={site.status === "PREPARING" ? "还差 {n} 项才能开业 —— 逐条「去处理」" : "还有 {n} 项没了结，关不了站"}
+          />
+        </div>
+      )}
       <Tabs tabs={TABS} value={active} onChange={onTab} />
       {siteQ.isLoading && <Skeleton className="h-40" />}
       {!siteQ.isLoading && !site && (
@@ -258,9 +322,23 @@ export function SiteDetailDrawer({
               ? <>{site.agentNo}<span className="ms-2 txt-caption text-muted-foreground">改归属请走「代理商管理 › 资产划拨」，那里会连同点位与机柜一起变更并留流水</span></>
               : <>平台直营<span className="ms-2 txt-caption text-muted-foreground">如需划给代理，请走「代理商管理 › 资产划拨」</span></>}
           </Field>
-          <Field label="状态"><StatusBadge map={SITE_STATUS} value={site.status} /></Field>
+          <Field label="运维责任人">
+            {site.ops?.operateAgentNo
+              ? <>{site.ops.operateAgentNo}<span className="ms-2 txt-caption text-muted-foreground">运维代理</span></>
+              : site.ops?.opsEmployeeNo ?? site.opsEmployeeNo
+                ?? <span className="text-warning-ink">未指定 —— 出故障时自动工单派不出去</span>}
+          </Field>
+          <Field label="生效合同">
+            {site.ops?.activeContractNo
+              ? <RefLink kind="contract" no={site.ops.activeContractNo} />
+              : <span className="text-muted-foreground">没有生效中的合同</span>}
+          </Field>
+          <Field label="首次上线">{site.ops?.firstLiveAt ? fmtTime(site.ops.firstLiveAt) : <span className="text-muted-foreground">尚未上线</span>}</Field>
+          {site.ops?.closedAt && <Field label="关闭于">{fmtTime(site.ops.closedAt)}</Field>}
         </div>
       )}
+
+      {site && active === "survey" && <SiteSurveyPanel siteNo={site.siteNo} siteStatus={site.status} />}
 
       {site && active === "points" && (
         <div>
@@ -297,7 +375,7 @@ export function SiteDetailDrawer({
           columns={contractCols}
           rows={contractsQ.isLoading ? undefined : siteContracts}
           loading={contractsQ.isLoading}
-          empty="这个站点没有进场合同。合同决定给场地方的分成比例，没有合同意味着分成无依据。"
+          empty="该站点还没有进场合同 —— 没有生效合同站点无法上线，分成也无依据。到「场地方与拓展 › 进场合同」新建。"
         />
       )}
 

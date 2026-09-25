@@ -11,6 +11,8 @@ import { Toolbar } from "@/components/ui/toolbar";
 import { TabHeader } from "@/components/ui/tab-header";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { MultiSelect } from "@/components/ui/multi-select";
+import { FileField } from "@/components/ui/file-field";
+import type { FileCategory, FileRef } from "@/lib/types";
 import { StatusBadge, statusOptions, type StatusMap } from "@/components/ui/status-badge";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { Timeline, type TimelineItem } from "@/components/ui/timeline";
@@ -29,6 +31,7 @@ export function CompositeSections() {
       <TabHeaderSection />
       <ConfirmSection />
       <MultiSelectSection />
+      <FileFieldSection />
       <StatusBadgeSection />
       <FilterSelectSection />
       <TimelineSection />
@@ -371,6 +374,38 @@ function MultiSelectSection() {
       <Row label="无可选项"><div className="w-64"><MultiSelect value={[]} options={[]} onChange={() => {}} placeholder="（无可选项）" /></div></Row>
       <Hint>
         本区块只**读**这个组件不改它 —— 另有一路在改 multi-select.tsx。此处呈现的是本次快照下的现状。
+      </Hint>
+    </Section>
+  );
+}
+
+// ────────────────────────────────────────────────────────────── FileField
+/** 本页不真传文件：注入一个假上传（逐步进度；文件名含 fail 的必失败，用来看「重试」）。 */
+const fakeUpload = async (file: File, category: FileCategory, onProgress?: (p: number) => void): Promise<FileRef> => {
+  for (const p of [0.25, 0.5, 0.75]) { onProgress?.(p); await new Promise((r) => setTimeout(r, 250)); }
+  if (/fail/i.test(file.name)) throw new Error("网络中断（演示）");
+  onProgress?.(1);
+  return {
+    fileNo: `DEMO${Date.now() % 100000}`, category, status: "TEMP", originalName: file.name,
+    contentType: file.type, sizeBytes: file.size, previewable: file.type.startsWith("image/"),
+    imageWidth: null, imageHeight: null, uploadedAt: new Date().toISOString(),
+  };
+};
+
+function FileFieldSection() {
+  const [a, setA] = React.useState<string[]>([]);
+  const [b, setB] = React.useState<string[]>([]);
+  return (
+    <Section id="file-field" name="FileField（FormDrawer type: file）" layer="组合件" file="ui/file-field.tsx" purpose="多文件上传：进度、失败重试、图片缩略图；按用途提示类型与大小。值 = 上传成功的 fileNo 数组。">
+      <Row label="空（WO_PHOTO）" stack><div className="w-[420px]"><FileField value={a} onChange={setA} category="WO_PHOTO" upload={fakeUpload} /></div></Row>
+      <Row label="选文件后：进度 → 缩略图" note="文件名含 fail 的会失败，出「重试」" stack>
+        <div className="w-[420px]"><FileField value={b} onChange={setB} category="WO_PHOTO" max={3} upload={fakeUpload} /></div>
+      </Row>
+      <Row label="invalid（必填未传）" stack><div className="w-[420px]"><FileField value={[]} onChange={() => {}} category="CONTRACT_SCAN" invalid upload={fakeUpload} /></div></Row>
+      <Row label="disabled" stack><div className="w-[420px]"><FileField value={[]} onChange={() => {}} category="WO_PHOTO" disabled upload={fakeUpload} /></div></Row>
+      <Hint>
+        选文件即上传（不等保存）：现场照片几 MB，保存时才传会让保存按钮转十几秒，且任一张失败整张表单失败。
+        上传中 / 失败的不进值 —— 否则还没传完的 fileNo 会随表单提交。超类型 / 超大小在选择时就拦下，不白等一次 400。
       </Hint>
     </Section>
   );

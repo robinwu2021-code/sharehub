@@ -4,6 +4,7 @@ import type {
   PageResult, Cabinet, Slot, Powerbank, CabinetMonitor, CommandRecord,
   InventoryTransfer, InventoryTransferDetail, OtaRollout, OtaRelease, OtaTask, DeviceLog, DeviceCodeBatch,
   Checklist, TrialRent, Protection, ProtectionReq, SignalCode,
+  InvTransferReq, QcReq, QcRecord, ReceiveResult, AssetDiff, AssetDiffStatus, PowerbankAction,
 } from "../../types";
 
 export interface DeviceApi {
@@ -25,7 +26,11 @@ export interface DeviceApi {
   getInventoryTransfer(transferNo: string): Promise<InventoryTransferDetail>;
   listOtaRollouts(q?: PageQ): Promise<PageResult<OtaRollout>>;
   savePowerbank(x: Partial<Powerbank> & { powerbankNo?: string }): Promise<Powerbank>;
-  saveInventoryTransfer(x: Partial<InventoryTransfer> & { transferNo?: string }): Promise<InventoryTransfer>;
+  /**
+   * 建调拨单 / 改草稿单头。入参是后端写入面 `InvTransferReq`（名字字段叫 fromName / toName）。
+   * **不改状态**（R1）：发货 / 签收走 {@link shipTransfer} / {@link receiveTransfer}。
+   */
+  saveInventoryTransfer(x: InvTransferReq): Promise<InventoryTransfer>;
   saveOtaRollout(x: Partial<OtaRollout> & { rolloutNo?: string }): Promise<OtaRollout>;
 
   // === 固件 OTA 补齐：版本库 + 逐设备任务（后端 DeviceController 早已实现，前端一直没入口）===
@@ -87,4 +92,34 @@ export interface DeviceApi {
 
   /** 设备信号码字典。信号**不是**告警——业务告警才是人要看的那层。 */
   listSignalCodes(): Promise<SignalCode[]>;
+
+  // ——— 充电宝人工动作 · 入库质检 · 调拨作业 · 资产差异（批次 5b）———
+
+  /**
+   * 充电宝人工状态动作（报故障 / 维修回仓 / 标记丢失 / 找回 / 报废）。
+   * 发的是**事件**（`PowerbankCmd.event`）而不是目标状态，由后端状态机裁决。
+   */
+  transitPowerbank(powerbankNo: string, action: PowerbankAction): Promise<Powerbank>;
+
+  /** 机柜入库质检。**只在在库时能做** —— 已布放的设备出问题走故障 / 维修。 */
+  inspectCabinet(cabinetNo: string, req: QcReq): Promise<QcRecord>;
+  /** 充电宝入库质检（看电量与循环次数，阈值在系统参数里）。 */
+  inspectPowerbank(powerbankNo: string, req: QcReq): Promise<QcRecord>;
+  /** 某台设备（机柜号或充电宝号）的质检记录，新的在前。 */
+  listQcRecords(itemNo: string): Promise<QcRecord[]>;
+
+  /** 草稿期设定调拨明细（整体替换）。每件都要在库且质检已过。 */
+  setTransferItems(transferNo: string, itemNos: string[]): Promise<InventoryTransferDetail>;
+  /** 发货：DRAFT → IN_TRANSIT；机柜类随之 IN_STOCK → IN_TRANSIT。发货这一刻再核一遍在库与质检。 */
+  shipTransfer(transferNo: string): Promise<InventoryTransferDetail>;
+  /**
+   * 逐件签收：传现场实收的件号。**签收不因差异而卡住** ——
+   * 少的记缺件、多的记多件，都落资产差异，返回里当场告诉你是哪几件。
+   */
+  receiveTransfer(transferNo: string, receivedNos: string[], note?: string): Promise<ReceiveResult>;
+
+  /** 资产差异列表（调拨签收 / 撤机清点产生）。 */
+  listAssetDiffs(q?: PageQ & { status?: AssetDiffStatus; sourceType?: string; sourceRef?: string }): Promise<PageResult<AssetDiff>>;
+  /** 处理一条差异：写明去向结论。**结论必填** —— 没有结论的「已处理」等于把差异藏起来。 */
+  resolveAssetDiff(diffNo: string, note: string): Promise<AssetDiff>;
 }

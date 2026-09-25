@@ -10,17 +10,13 @@
 ops-web/app/agents/page.tsx::APPLY_FIELDS
 ops-web/app/agents/page.tsx::accountFieldsFor
 ops-web/app/agents/page.tsx::commissionFieldsFor
-ops-web/app/alarms/page.tsx::CODE_FIELDS
-ops-web/app/alarms/page.tsx::RULE_FIELDS
 ops-web/app/cs/page.tsx::TICKET_FIELDS
 ops-web/app/dev/ui/composites.tsx::DEMO_FIELDS
 ops-web/app/devices/page.tsx::CODE_FIELDS
 ops-web/app/devices/page.tsx::OTA_FIELDS
-ops-web/app/devices/page.tsx::PB_FIELDS
 ops-web/app/devices/page.tsx::RELEASE_FIELDS
 ops-web/app/devices/page.tsx::cabinetFields
 ops-web/app/devices/page.tsx::commandFields
-ops-web/app/devices/page.tsx::invFields
 ops-web/app/employees/page.tsx::ROLE_FIELDS
 ops-web/app/employees/page.tsx::empFields
 ops-web/app/finance/page.tsx::INVOICE_FIELDS_BASE

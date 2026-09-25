@@ -154,9 +154,9 @@ describe("留痕与摘要", () => {
   it("★ 每一步都留痕，最新在前", () => {
     toSigned();
     const events = ca.listContractLogs(no).map((l) => l.event);
-    expect(events[0]).toBe("COSIGN_APPROVE");
+    expect(events[0]).toBe("COSIGN");
     expect(events).toContain("SUBMIT");
-    expect(events).toContain("AUDIT_APPROVE");
+    expect(events).toContain("APPROVE");
   });
 
   it("摘要条的六个数都是「要人动手的事」，且能随状态变化", () => {

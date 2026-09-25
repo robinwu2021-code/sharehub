@@ -30,6 +30,26 @@ const MIGRATION = "../backend/sharehub-app/src/main/resources/db/migration/V89__
 
 type Row = Record<string, string>;
 
+/**
+ * V89 之后**只改个别字段**的菜单迁移（不整表重灌 —— 那会冲掉「菜单管理」里的线上改动）。
+ * 每条补丁都要：①断言迁移文件里真有这条 UPDATE（防止补丁与迁移各说各话）；②在解析出的行上重放。
+ * 新增补丁迁移时在这里加一项；种子整表重生成后清空本列表并把 MIGRATION 指向新文件。
+ */
+const MIGRATION_DIR = "../backend/sharehub-app/src/main/resources/db/migration/";
+const PATCHES: { file: string; mustContain: string; apply: (rows: Row[]) => void }[] = [
+  {
+    // 告警四个菜单叶：workorder:wo:read → workorder:alarm:read
+    file: "V92__menu_alarm_perm.sql",
+    mustContain: "UPDATE iam_menu SET perm = 'workorder:alarm:read'",
+    apply: (rows) => {
+      const paths = ["/alarms", "/alarms?tab=notices", "/alarms?tab=codes", "/alarms?tab=rules"];
+      for (const r of rows) {
+        if (paths.includes(r.path) && r.perm === "workorder:wo:read") r.perm = "workorder:alarm:read";
+      }
+    },
+  },
+];
+
 const COLS = [
   "menu_no", "parent_no", "name", "name_en", "name_ar", "type", "path", "icon", "group_name", "sort",
   "perm", "phase", "ready", "module", "modules", "match_paths", "pin_bottom", "portal_for",
@@ -104,6 +124,10 @@ function rowsFromNav(): Row[] {
 describe("iam_menu 的种子必须与 nav.ts 逐节点相等", () => {
   const sql = readFileSync(MIGRATION, "utf-8");
   const fromSql = parseRows(sql);
+  for (const p of PATCHES) {
+    expect(readFileSync(MIGRATION_DIR + p.file, "utf-8"), `${p.file} 里找不到补丁语句`).toContain(p.mustContain);
+    p.apply(fromSql);
+  }
   const fromNav = rowsFromNav();
 
   it("节点数一致——少一行就是菜单里少一项，而那不会报错", () => {

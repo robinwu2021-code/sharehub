@@ -1,5 +1,6 @@
 // 覆盖范围：分账规则与流水、总账、结算、提现审批、对账、发票、分润统计、充值订单。
 import * as db from "../../mock/db";
+import * as sa from "../../mock/db/settlement-adjust";
 // 走具体模块不改变行为——同一份模块级状态，只是绕过桶文件
 import type { FinanceApi } from "../contracts/finance";
 import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ , ReportQ, WithdrawalQ } from "../query";
@@ -34,6 +35,14 @@ export const financeMock: FinanceApi = {
   generateSettlements: (x) => wait(db.generateSettlements(x), 500),
   confirmSettlement: (no, operatorName) => wait(db.confirmSettlement(no, operatorName), 400),
   listSettlementRecords: (no, q: PageQ = {}) => wait(db.listSettlementRecords(no, q)),
+  getSettlement: async (no) => wait(sa.getSettlementView(no)),
+  getSettlementStatement: async (no) => wait(sa.getSettlementStatement(no)),
+  getSettlementStatementHtml: async (no, lang) => wait(sa.settlementStatementHtml(no, lang), 300),
+
+  // 结算调整项：确认 / 作废的状态机与必填在 db 层（settlement-adjust.ts）强制
+  listSettlementAdjustments: async (q = {}) => wait(sa.listSettlementAdjustments(q)),
+  confirmSettlementAdjustment: async (no, body) => wait(sa.confirmSettlementAdjustment(no, body), 400),
+  voidSettlementAdjustment: async (no, reason) => wait(sa.voidSettlementAdjustment(no, reason), 400),
 
   // 财务扩展
   listShareRecords: (q: ShareRecordQ = {}) => wait(db.listShareRecords(q)),

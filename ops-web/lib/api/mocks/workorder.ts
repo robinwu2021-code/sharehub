@@ -10,19 +10,22 @@ import type { PageQ, WoQ } from "../query";
 import { wait } from "./_wait";
 
 export const workOrderMock: WorkOrderApi = {
-  listWorkOrders: (q: WoQ = {}) => wait(wo.listWorkOrders(q)),
+  // 列表走 ext：带运营维度（ops）与全部筛选；动作里有「补一列」需要的（派单 / 驳回 / 完工 / 关单）也走 ext
+  listWorkOrders: (q: WoQ = {}) => wait(we.listWorkOrdersRich(q)),
   createWorkOrder: async (x) => wait(wo.createWorkOrder(x), 400),
-  dispatchWorkOrder: async (no, assignee) => wait(wo.dispatchWorkOrder(no, assignee), 400),
+  dispatchWorkOrder: async (no, assignee) => wait(we.dispatchWorkOrderExt(no, assignee), 400),
   acceptWorkOrder: async (no, handler) => wait(wo.acceptWorkOrder(no, handler), 400),
   processWorkOrder: async (no, x) => wait(wo.processWorkOrder(no, x), 400),
-  completeWorkOrder: async (no, x) => wait(wo.completeWorkOrder(no, x), 400),
-  closeWorkOrder: async (no, x) => wait(wo.closeWorkOrder(no, x), 400),
-  rejectWorkOrder: async (no, reason) => wait(wo.rejectWorkOrder(no, reason), 400),
+  completeWorkOrder: async (no, x) => wait(we.completeWorkOrderExt(no, x), 400),
+  closeWorkOrder: async (no, x) => wait(we.closeWorkOrderExt(no, x), 400),
+  rejectWorkOrder: async (no, reason) => wait(we.rejectWorkOrderExt(no, reason), 400),
   reworkWorkOrder: async (no, reason) => wait(wo.reworkWorkOrder(no, reason), 400),
 
   // 工单扩展
   listSlaRules: (q: PageQ = {}) => wait(db.listSlaRules(q)),
   listInspectionPlans: (q: PageQ = {}) => wait(db.listInspectionPlans(q)),
+  getSlaRule: async (no) => wait(wo.getSlaRule(no)),
+  getInspectionPlan: async (no) => wait(wo.getInspectionPlan(no)),
   saveSlaRule: (x) => wait(db.saveSlaRule(x), 350),
   saveInspectionPlan: (x) => wait(db.saveInspectionPlan(x), 350),
   // 立即执行一次：db 层抛 InspectionRunError（停用/本周期已执行/站点无机柜），
@@ -35,4 +38,7 @@ export const workOrderMock: WorkOrderApi = {
   assigneeCandidates: (siteNo) => wait(we.assigneeCandidates(siteNo)),
   deriveWorkOrder: async (no, req) => wait(we.deriveWorkOrder(no, req), 350),
   takeoverWorkOrder: async (no, req) => wait(we.takeoverWorkOrder(no, req), 350),
+  listWoPool: (q = {}) => wait(we.listWoPool(q)),
+  grabWorkOrder: async (no) => wait(we.grabWorkOrder(no), 350),
+  listWoCosts: (q = {}) => wait(we.listWoCosts(q)),
 };

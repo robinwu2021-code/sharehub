@@ -1,14 +1,15 @@
 // 进场合同附件（扫描件）与站点坐标两道写入闸门。
 //
-// 附件是**假上传**（拍板点 #3）：只登记文件名 + 大小，字节流不传。正因为内容不可校验，
-// 名称/格式/大小/同名这几道判断就是唯一的把关点，必须在 db 层而不是页面上。
+// 附件走文件服务（2026-09-25）：先 uploadFile 拿 fileNo，再按 fileNo 挂到合同上。
+// 类型 / 大小由文件服务按用途把关；挂附件这一步管的是「文件存在、用途对、合同还没结束、不重复挂」。
 // 站点坐标合并在此文件：两者都属「本次补的写入入口」，且都靠 db 层守卫兜住脏数据。
 import { describe, expect, it } from "vitest";
 import {
   contracts, addContractAttachment, removeContractAttachment, ContractAttachmentError,
   saveContract, assertSiteCoords, SiteCoordError,
 } from "./location";
-import { ATTACH_EXTS, ATTACH_MAX_SIZE, SITE_COORD_BOUNDS } from "../../types";
+import { ATTACH_EXTS, ATTACH_MAX_SIZE, SITE_COORD_BOUNDS, type FileCategory } from "../../types";
+import { uploadFile, getFile } from "./file";
 
 const ctOf = (no: string) => contracts.find((c) => c.contractNo === no)!;
 const withAttachment = () => contracts.find((c) => c.attachments.length > 0)!;
@@ -36,53 +37,59 @@ describe("种子自洽：附件流水不与合同打架", () => {
   });
 });
 
-describe("附件登记守卫", () => {
+describe("附件登记守卫（先经文件服务上传，再按 fileNo 挂）", () => {
   const target = "CT401";
+  const up = (name: string, size = 2048, category: FileCategory = "CONTRACT_SCAN") =>
+    uploadFile(new File([new Uint8Array(size)], name), category).fileNo;
 
   it("合同不存在直接拒绝", () => {
-    expect(() => addContractAttachment("CT9999", { fileName: "a.pdf", size: 100 })).toThrow(ContractAttachmentError);
+    expect(() => addContractAttachment("CT9999", { fileNos: [up("a.pdf")] })).toThrow(ContractAttachmentError);
   });
 
-  it("格式白名单：不在 ATTACH_EXTS 内一律拒绝（含无扩展名）", () => {
-    for (const bad of ["合同.docx", "合同.zip", "合同"]) {
-      expect(() => addContractAttachment(target, { fileName: bad, size: 1000 })).toThrow(/不支持的文件格式/);
-    }
-    // 白名单里的格式必须都能过
+  it("fileNos 必填：不先上传就挂不上", () => {
+    expect(() => addContractAttachment(target, { fileNos: [] })).toThrow(/fileNos/);
+  });
+
+  it("文件必须存在且用途是合同扫描件 —— 工单照片挂到合同上会让对账凭据张冠李戴", () => {
+    expect(() => addContractAttachment(target, { fileNos: ["F-NOPE"] })).toThrow(/文件不存在/);
+    expect(() => addContractAttachment(target, { fileNos: [up("site.jpg", 100, "WO_PHOTO")] })).toThrow(/不是合同扫描件/);
+  });
+
+  it("白名单格式都能挂上；名字与大小取文件服务的记录，不信前端声明", () => {
     for (const ext of ATTACH_EXTS) {
-      expect(addContractAttachment(target, { fileName: `ok-${ext}.${ext}`, size: 2048 }).attachments[0].fileName).toBe(`ok-${ext}.${ext}`);
+      const fileNo = up(`ok-${ext}.${ext}`, 3000);
+      const a = addContractAttachment(target, { fileNos: [fileNo] }).attachments[0];
+      expect(a).toMatchObject({ fileName: `ok-${ext}.${ext}`, size: 3000, fileNo });
     }
+    expect(ATTACH_MAX_SIZE).toBeGreaterThan(0);
   });
 
-  it("大小：空文件与超限文件都拒绝", () => {
-    expect(() => addContractAttachment(target, { fileName: "empty.pdf", size: 0 })).toThrow(/文件大小非法/);
-    expect(() => addContractAttachment(target, { fileName: "huge.pdf", size: ATTACH_MAX_SIZE + 1 })).toThrow(/上限/);
-    expect(() => addContractAttachment(target, { fileName: "edge.pdf", size: ATTACH_MAX_SIZE })).not.toThrow();
+  it("同一文件重复挂只算一次（幂等）", () => {
+    const fileNo = up("dup.pdf");
+    const n = addContractAttachment(target, { fileNos: [fileNo] }).attachments.length;
+    expect(addContractAttachment(target, { fileNos: [fileNo, fileNo] }).attachments.length).toBe(n);
   });
 
-  it("同名拒绝：没有内容哈希可比，允许同名就分不出哪份是最新的", () => {
-    addContractAttachment(target, { fileName: "dup.pdf", size: 1000 });
-    expect(() => addContractAttachment(target, { fileName: "dup.pdf", size: 2000 })).toThrow(/同名附件已存在/);
-    // 换一份合同同名是合法的（同名约束按合同收敛）
-    expect(() => addContractAttachment("CT402", { fileName: "dup.pdf", size: 1000 })).not.toThrow();
-  });
-
-  it("文件名必填，前后空白不算内容", () => {
-    expect(() => addContractAttachment(target, { fileName: "   ", size: 1000 })).toThrow(/文件名必填/);
+  it("★ 已到期 / 已终止的合同不再收附件 —— 结束后补进来的「签署件」说明不了签署时的状态", () => {
+    const ended = contracts.find((c) => c.status === "EXPIRED")!;
+    expect(() => addContractAttachment(ended.contractNo, { fileNos: [up("late.pdf")] })).toThrow(/已结束/);
   });
 });
 
 describe("附件登记与移除", () => {
-  it("登记：返回整份合同，新件置顶，上传人/时间落库", () => {
-    const c = addContractAttachment("CT403", { fileName: "扫描件-新.pdf", size: 555_000, uploadedBy: "Sara Ops" });
+  it("登记：返回整份合同，新件置顶，上传人/时间落库，文件转 BOUND", () => {
+    const f = uploadFile(new File([new Uint8Array(555)], "扫描件-新.pdf"), "CONTRACT_SCAN");
+    expect(getFile(f.fileNo)?.status).toBe("TEMP");
+    const c = addContractAttachment("CT403", { fileNos: [f.fileNo] });
     expect(c.contractNo).toBe("CT403");
-    expect(c.attachments[0]).toMatchObject({ fileName: "扫描件-新.pdf", size: 555_000, uploadedBy: "Sara Ops" });
+    expect(c.attachments[0]).toMatchObject({ fileName: "扫描件-新.pdf", size: 555, uploadedBy: "admin" });
     expect(c.attachments[0].uploadedAt).toBeTruthy();
-    // 不传上传人时退化为 admin（与流转留痕同口径）
-    expect(addContractAttachment("CT403", { fileName: "扫描件-2.pdf", size: 1000 }).attachments[0].uploadedBy).toBe("admin");
+    expect(getFile(f.fileNo)?.status, "挂上即被引用，清理任务不能再动它").toBe("BOUND");
   });
 
   it("移除：只掉指定那份，移除不存在的报错", () => {
-    const c = addContractAttachment("CT404", { fileName: "待撤回.pdf", size: 1000 });
+    const f = uploadFile(new File([new Uint8Array(10)], "待撤回.pdf"), "CONTRACT_SCAN");
+    const c = addContractAttachment("CT404", { fileNos: [f.fileNo] });
     const no = c.attachments[0].attachNo;
     const kept = c.attachments.length - 1;
     expect(removeContractAttachment("CT404", no).attachments.length).toBe(kept);

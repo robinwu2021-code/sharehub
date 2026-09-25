@@ -1,8 +1,42 @@
 // 覆盖范围：分账规则与流水、总账、结算、提现审批、对账、发票、分润统计、充值订单。
 // 端点前缀：/api/trade/**；充值订单与钱包同主体，归 /api/user/**。
 import { client } from "../http-client";
+import { ApiError } from "../error";
+import { currentAuth } from "../../auth";
+import { useLocaleStore } from "../../stores/locale";
+import { translate, LOCALE_TAG } from "../../i18n";
 import type { FinanceApi } from "../contracts/finance";
 import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ , ReportQ } from "../query";
+
+/**
+ * 非信封端点（整页 HTML）的取数：带同一套 Authorization / Accept-Language，返回文本。
+ *
+ * 为什么不直接给个 `<a href>`：令牌在请求头里，普通链接带不上，打开就是 401。
+ * 出错时后端仍回 JSON 信封（查不到结算单先抛业务异常），这里按信封取 message。
+ */
+const raw = {
+  get: async (path: string, q?: Record<string, string>): Promise<string> => {
+    const base = process.env.NEXT_PUBLIC_API_BASE || "";
+    const qs = q ? `?${new URLSearchParams(q).toString()}` : "";
+    const token = currentAuth()?.token;
+    let r: Response;
+    try {
+      r = await fetch(`${base}${path}${qs}`, {
+        headers: {
+          Accept: "text/html",
+          "Accept-Language": LOCALE_TAG[useLocaleStore.getState().locale],
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+    } catch {
+      throw new ApiError(-1, translate(useLocaleStore.getState().locale, "error.network"));
+    }
+    const type = r.headers.get("content-type") ?? "";
+    if (r.ok && type.includes("text/html")) return r.text();
+    const body = (await r.json().catch(() => ({}))) as { code?: number; message?: string };
+    throw new ApiError(body.code ?? r.status, body.message || translate(useLocaleStore.getState().locale, "error.unknown"));
+  },
+};
 
 export const financeHttp: FinanceApi = {
   listPayoutAccounts: (q) => client.get("/api/trade/payout-accounts", q),
@@ -41,6 +75,15 @@ export const financeHttp: FinanceApi = {
   confirmSettlement: (no, operatorName) => client.post(`/api/trade/settlements/${no}/confirm`, { operatorName }),
   // ⚠️ T1-D 后端缺口：结算单明细子资源无端点。
   listSettlementRecords: (no, q?: PageQ) => client.get(`/api/trade/settlements/${no}/records`, q),
+  getSettlement: (no) => client.get(`/api/trade/settlements/${no}`),
+  getSettlementStatement: (no) => client.get(`/api/trade/settlements/${no}/statement`),
+  // 整页 HTML、不走 Result 信封：走 raw.get（带令牌的 fetch → 文本），不能用 client.get 拆包
+  getSettlementStatementHtml: (no, lang) => raw.get(`/api/trade/settlements/${no}/statement.html`, { lang }),
+
+  // 结算调整项（AdjustmentController，挂在 /api/ops 下）
+  listSettlementAdjustments: (q) => client.get("/api/ops/settlement-adjustments", q),
+  confirmSettlementAdjustment: (no, body) => client.post(`/api/ops/settlement-adjustments/${no}/confirm`, body),
+  voidSettlementAdjustment: (no, reason) => client.post(`/api/ops/settlement-adjustments/${no}/void`, { reason }),
 
   // 财务扩展
   listShareRecords: (q?: ShareRecordQ) => client.get("/api/trade/share-records", q),

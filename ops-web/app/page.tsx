@@ -8,6 +8,8 @@ import { StatCard, PageTitle, Skeleton } from "@/components/ui/misc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
 import { QuickActions } from "@/components/quick-actions";
+import { AlarmTodoPanel } from "@/components/dashboard/alarm-todo-panel";
+import { OpsFlowMetricsPanel } from "@/components/dashboard/ops-flow-metrics";
 import { money } from "@/lib/utils";
 import { usePortalTitle } from "@/lib/hooks/use-portal-title";
 import type { DashboardAlert } from "@/lib/types";
@@ -78,6 +80,9 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
+          {/* 运营指标（dashboard:overview:read，组件内自判权限）：流程结果看这里，经营结果看上面 */}
+          <OpsFlowMetricsPanel />
+
           {/* 待办中心 */}
           <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Link href="/work-orders?view=list">
@@ -109,6 +114,9 @@ export default function DashboardPage() {
               </Card>
             </Link>
           </div>
+
+          {/* 告警待办（方案 §8.2a）：合作 / 经营 / 资金类告警落到岗位上办理，BD、财务不必进告警中心 */}
+          <AlarmTodoPanel />
 
           {/* 实时告警 */}
           {data.alerts.length > 0 && (

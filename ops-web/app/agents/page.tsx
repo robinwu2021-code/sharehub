@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
@@ -28,6 +29,8 @@ import { useCan } from "@/lib/hooks/use-can";
 import { notify } from "@/lib/notify";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
+import { AgentDetailDrawer, AGENT_STATUS } from "@/components/agent/agent-detail";
+import { AgentExitDrawer } from "@/components/agent/agent-exit-drawer";
 // 绩效周期复用报表域枚举：代理 GMV = 名下站点营收之和，必须与站点坪效同一套周期口径
 import { REPORT_PERIODS, REPORT_PERIOD_DEFAULT, type ReportPeriod } from "@/lib/types";
 import type {
@@ -146,8 +149,18 @@ function accountFieldsFor(agents: { value: string; label: string }[]): FieldDef[
 function AgentsInner() {
   const paging = usePaging();
   const onTabChange = () => { paging.reset(); setKeyword(""); setShowArchived(false); };
-  const tabs = useNavTabs("/agents", TAB_KEYS);
-  const { tab, setTab } = usePageTab(tabs, onTabChange);
+  /*
+   * 第三个参数是**页面默认 tab**，不传会退回 `TAB_KEYS[0]`（applies）——
+   * 而菜单里不带 `?tab=` 的那条裸叶 `/agents` 是「代理商档案」（profiles）。
+   * 不传的后果不是显示错名字，是 `profiles` 在菜单里找不到 → navTabs 抛错 → **整页白屏**。
+   *
+   * 下一行的 `defaultKey` 要**同一个值**：前者管「这个 tab 叫什么」，后者管
+   * 「URL 没带 `?tab=` 时落在哪一个」。只改前者的话页面不再白屏，但从菜单点进来
+   * 面包屑写着「代理商档案」、内容却是「入驻审核」（落在 TAB_KEYS[0]）——
+   * 两处都对上才算修好。`nav-page-tabs.test.ts` 会拦不一致。
+   */
+  const tabs = useNavTabs("/agents", TAB_KEYS, "profiles");
+  const { tab, setTab } = usePageTab(tabs, onTabChange, { defaultKey: "profiles" });
   // —— 入驻审核（ADR-030 §三）——
   /** 状态筛选；空 = 待办队列（SUBMITTED + REVIEWING），由后端/mock 决定，不在前端拼。 */
   const [applyStatus, setApplyStatus] = useState("");
@@ -179,6 +192,23 @@ function AgentsInner() {
   const canApprove = allow("agent:apply:approve");
   const canCreateApply = allow("agent:apply:create");
   const { confirm, dialog } = useConfirm();
+
+  // 详情与清退进度写进 URL（?no= / ?exit=），刷新与分享不丢。
+  // 清退单号必须留在 URL 上：后端没有「按代理查清退单」的端点，丢了就只能凭记忆找单号
+  const sp = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const detailNo = sp.get("no");
+  const exitNo = sp.get("exit");
+  // 清退进度抽屉：从深链进来（带 exit）直接打开；关掉只收抽屉、不丢单号
+  const [exitShown, setExitShown] = useState(() => !!sp.get("exit"));
+  const patchQuery = (patch: Record<string, string | null>) => {
+    const q = new URLSearchParams(sp.toString());
+    for (const [k, v] of Object.entries(patch)) { if (v) q.set(k, v); else q.delete(k); }
+    router.replace(q.size ? `${pathname}?${q.toString()}` : pathname, { scroll: false });
+  };
+  const openAgent = (no: string) => patchQuery({ no, exit: null });
+  const openExit = (no: string) => { patchQuery({ exit: no }); setExitShown(true); };
   // 「显示已归档」只作用于代理商档案 tab（TDD §10.1），切 tab 复位
   const [showArchived, setShowArchived] = useState(false);
 
@@ -437,14 +467,22 @@ function AgentsInner() {
 
   // 业务号列一律 txt-strong（§12.3 主键列加强）；比例/计数/金额列 text-right + tabular-nums（§12.4）
   const profileCols: Column<Agent>[] = [
-    { header: "代理编号", cell: (a) => <span className="txt-strong tabular-nums">{a.agentNo}</span> },
+    {
+      header: "代理编号",
+      cell: (a) => (
+        <button type="button" className="txt-strong tabular-nums underline-offset-4 hover:underline" onClick={() => openAgent(a.agentNo)}>
+          {a.agentNo}
+        </button>
+      ),
+    },
     { header: "名称", cell: (a) => a.name },
     { header: "类型", className: "whitespace-nowrap", cell: (a) => <StatusBadge map={AGENT_TYPE} value={a.agentType ?? "AGENT"} /> },
     { header: "辖域", cell: (a) => <span className="text-muted-foreground">{a.regionScope}</span> },
     { header: "联系方式", cell: (a) => <span className="text-muted-foreground">{a.contact}</span> },
     { header: "分润比例", className: "text-right", cell: (a) => <span className="tabular-nums">{(a.shareRate * 100).toFixed(0)}%</span> },
     { header: "设备数", className: "text-right", cell: (a) => <span className="tabular-nums">{a.cabinetCount}</span> },
-    { header: "状态", cell: (a) => a.status === "ENABLED" ? <Badge tone="success">启用</Badge> : <Badge tone="muted">停用</Badge> },
+    // 状态只由详情里的动作改（停用 / 恢复 / 清退，规则 R1）；这里只显示
+    { header: "状态", cell: (a) => <StatusBadge map={AGENT_STATUS} value={a.status} /> },
     // 归档时间列只在「显示已归档」打开时出现，默认视图里整列都是 `-` 属于噪音
     ...(showArchived ? [{ header: "归档时间", cell: (a: Agent) => <ArchivedAt at={a.archivedAt} /> }] : []),
     {
@@ -453,7 +491,10 @@ function AgentsInner() {
         <ArchiveActions
           archived={!!a.archivedAt}
           canWrite={allow("agent:agent:update")}
-          actions={<Button size="sm" variant="outline" onClick={() => open(a)}>配置</Button>}
+          actions={<>
+            <Button size="sm" variant="outline" onClick={() => openAgent(a.agentNo)}>详情</Button>
+            <Button size="sm" variant="outline" onClick={() => open(a)}>配置</Button>
+          </>}
           // 代理商是主数据：要求手输代理编号确认
           onArchive={async () => { if (await confirm(archiveConfirm("代理商", a.agentNo, a.agentNo))) archiveAgent.mutate(a.agentNo); }}
           onUnarchive={async () => { if (await confirm(unarchiveConfirm("代理商", a.agentNo))) unarchiveAgent.mutate(a.agentNo); }}
@@ -1001,6 +1042,15 @@ function AgentsInner() {
         onSubmit={() => commissionForm && saveCommission.mutate({ ...commissionForm, agentName: agentNameOf(commissionForm.agentNo, commissionForm.agentName) })}
         submitting={saveCommission.isPending}
       />
+
+      <AgentDetailDrawer
+        agentNo={detailNo}
+        exitNo={exitNo}
+        onClose={() => patchQuery({ no: null, exit: null })}
+        onOpenExit={openExit}
+        onEdit={(a) => open(a)}
+      />
+      <AgentExitDrawer exitNo={exitShown ? exitNo : null} onClose={() => setExitShown(false)} />
 
       {dialog}
     </div>

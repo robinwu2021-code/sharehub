@@ -4,6 +4,7 @@ import type {
   PageResult, AlarmRecord, AlarmNotice, AlarmCode, AlarmRule, AlarmAckResult, AlarmWorkOrderRef,
   AlarmNoticeResendPayload, AutoWorkOrderResult, AlarmCloseReason,
   AlarmSummary, DispositionPreview, AlarmRoute, AlarmRouteReq, AlarmCodeStat, AlarmTodo,
+  AlarmDetail, AlarmDisposeResult, AlarmTodoQ,
 } from "../../types";
 
 export interface AlarmApi {
@@ -51,28 +52,37 @@ export interface AlarmApi {
 
   /** 摘要：按域计数 + 已处置未关闭 + 今日自愈。 */
   alarmSummary(): Promise<AlarmSummary>;
-  /** 单条告警详情。 */
-  getAlarmRecord(alarmNo: string): Promise<AlarmRecord>;
+  /**
+   * 单条告警详情：记录 + 码名称与预案 + 证据 + 时间线 + 同主体近 7 天。
+   * （6a 曾命名 getAlarmRecord 并声明回整行 AlarmRecord —— 后端回的一直是包了一层的 AlarmDetail。）
+   */
+  getAlarmDetail(alarmNo: string): Promise<AlarmDetail>;
   /**
    * 处置预览：**点下去之前先让人看见会发生什么** ——
    * 开哪类工单、派给谁、会不会并进已有的单。
    * 不给预览的话，运营点完才知道系统把单派给了错的人，而工单已经开出去了。
    */
   alarmDispositionPreview(alarmNo: string): Promise<DispositionPreview>;
-  /** 执行处置（按路由规则开单 / 转客服 / 自愈 / 通知）。 */
-  disposeAlarm(alarmNo: string): Promise<Record<string, unknown>>;
+  /**
+   * 立即处置（忽略开单延迟；按路由开单 / 转客服 / 挂待办 / 自愈 / 通知）。
+   * **幂等**：已处置过返回首次的单号。权限 `workorder:wo:create` —— 这一下可能真的开出一张工单。
+   */
+  disposeAlarm(alarmNo: string): Promise<AlarmDisposeResult>;
 
   /** 告警码的处置路由。 */
   listAlarmRoutes(code: string): Promise<AlarmRoute[]>;
   /** 保存该码的路由（整组覆盖）。 */
   saveAlarmRoutes(code: string, routes: AlarmRouteReq[]): Promise<AlarmRoute[]>;
-  /** 每码统计：误报率 / 自愈率 / 撤单率——调规则的依据。 */
-  alarmCodeStats(): Promise<AlarmCodeStat[]>;
+  /** 每码统计（近 `days` 天，缺省 30）：误报率 / 自愈率 / 撤单率——调规则的依据。 */
+  alarmCodeStats(days?: number): Promise<AlarmCodeStat[]>;
 
-  /** 待办列表。`mine=true` 只看该我办的。 */
-  listAlarmTodos(q?: { mine?: boolean; page?: number; size?: number }): Promise<PageResult<AlarmTodo>>;
-  /** 未完成待办数（看板红点）。 */
-  alarmTodoCount(): Promise<Record<string, number>>;
-  /** 办结一条待办。 */
+  /** 待办列表。`mine` 缺省 true：只看派给我 / 我这个岗位的。 */
+  listAlarmTodos(q?: AlarmTodoQ): Promise<PageResult<AlarmTodo>>;
+  /** 我的未完成待办数（看板角标）。 */
+  alarmTodoCount(): Promise<{ open: number }>;
+  /**
+   * 办结一条待办。告警条件已不成立 → 关联告警随之关闭（RESOLVED）；
+   * 仍成立 → 告警清空处置、下一轮重新生成待办（不是办完就算了）。
+   */
   doneAlarmTodo(todoNo: string, note?: string): Promise<AlarmTodo>;
 }

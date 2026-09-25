@@ -52,9 +52,20 @@ describe("合法迁移放行，非法迁移拒", () => {
   });
 
   it("不传 status 或传当前状态：只改单头字段，不当成迁移", () => {
-    const t = mk("TR-SM-5", "IN_TRANSIT");
-    expect(saveInventoryTransfer({ transferNo: t.transferNo, powerbankCount: 20 }).status).toBe("IN_TRANSIT");
-    expect(saveInventoryTransfer({ transferNo: t.transferNo, status: "IN_TRANSIT" }).powerbankCount).toBe(20);
+    const t = mk("TR-SM-5", "DRAFT");
+    expect(saveInventoryTransfer({ transferNo: t.transferNo, powerbankCount: 20 }).status).toBe("DRAFT");
+    expect(saveInventoryTransfer({ transferNo: t.transferNo, status: "DRAFT" }).powerbankCount).toBe(20);
+  });
+
+  it("单头只有草稿期可改——在途单改台数等于事后编账（同后端）", () => {
+    const t = mk("TR-SM-6", "IN_TRANSIT");
+    const before = t.powerbankCount;
+    expect(saveInventoryTransfer({ transferNo: t.transferNo, powerbankCount: before + 5 }).powerbankCount).toBe(before);
+  });
+
+  it("已完成的单任何字段都不能再改——要退回开反向单", () => {
+    const t = mk("TR-SM-7", "DONE");
+    expect(() => saveInventoryTransfer({ transferNo: t.transferNo, powerbankCount: 1 })).toThrow(TransferError);
   });
 });
 

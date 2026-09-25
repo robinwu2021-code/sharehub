@@ -71,7 +71,7 @@ export const en: Messages = {
     CREATED: "To dispatch", DISPATCHED: "Dispatched", ACCEPTED: "Accepted",
     PROCESSING: "Processing", DONE: "Done", AUDITED: "Audited", CLOSED: "Closed",
   },
-  cabStatus: { IN_STOCK: "In stock", DEPLOYED: "Deployed", FAULT: "Fault", RETIRED: "Retired" },
+  cabStatus: { IN_STOCK: "In stock", IN_TRANSIT: "In transit", DEPLOYED: "Deployed", FAULT: "Fault", RETIRED: "Retired" },
   woType: {
     FAULT: "Repair", REFILL: "Refill", INSPECT: "Inspection", INSTALL: "Install",
     REMOVE: "Removal", COMPLAINT: "Complaint", CLEAN: "Cleaning",

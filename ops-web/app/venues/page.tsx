@@ -1,14 +1,14 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { UNPAGED_SIZE, RECENT_LIMIT } from "@/lib/constants";
+import { UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
-import { PageTitle, Pagination } from "@/components/ui/misc";
+import { Pagination } from "@/components/ui/misc";
 import { usePaging } from "@/lib/hooks/use-paging";
 import { useNavTabs, usePageTab, keepWithinTab } from "@/lib/hooks/use-page-tab";
-import { Input, Select } from "@/components/ui/input";
 import { TabHeader } from "@/components/ui/tab-header";
 import { Toolbar } from "@/components/ui/toolbar";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
@@ -17,95 +17,80 @@ import { Drawer, Field } from "@/components/ui/drawer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
-import { StatusBadge, statusOptions, type StatusMap } from "@/components/ui/status-badge";
-// 坪效周期复用报表域的枚举与缺省值：同一套 REPORT_PERIODS，避免「近 30 日」两处含义不同
-import { Timeline } from "@/components/ui/timeline";
-import { DateInput } from "@/components/ui/date-input";
+import { FilterSelect } from "@/components/ui/filter-select";
+import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
+import { FileField } from "@/components/ui/file-field";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   ShowArchivedToggle, archivedRowClass, ArchivedAt, ArchiveActions,
   archiveConfirm, unarchiveConfirm,
 } from "@/components/archive";
 import { exportCsv, type CsvColumn } from "@/lib/export-csv";
-import { money, fmtTime } from "@/lib/utils";
+import { fmtTime } from "@/lib/utils";
 import { useCan } from "@/lib/hooks/use-can";
 import { notify } from "@/lib/notify";
-import { useAuth } from "@/lib/auth";
 import { ReadOnlyNotice } from "@/components/read-only-notice";
+import { StateActions } from "@/components/state-actions";
+import { RefLink } from "@/components/ref-link";
 import { ContractDetailDrawer, CONTRACT_STATUS } from "@/components/location/contract-detail";
+import { useContractActions } from "@/components/location/contract-actions";
+import { LeadDetailDrawer } from "@/components/location/lead-detail";
+import { OnboardingDetailDrawer, OB_STATUS } from "@/components/location/onboarding-detail";
+import { FilterCard } from "@/components/location/filter-card";
 import { SummaryCard } from "@/components/ui/summary-card";
-import { LEAD_FOLLOW_CHANNELS, ATTACH_EXTS, ATTACH_MAX_SIZE, CONTRACT_TRANSITIONS } from "@/lib/types";
-import type { Venue, Contract, Lead, LeadStage, LeadFollowChannel, VenueOnboarding, LifecycleRow, SiteStatus, PageResult } from "@/lib/types";
+import { FileLink } from "@/components/location/file-link";
+import { LEAD_STAGE, SHARE_MODE_LABEL, FOLLOW_DUE, followDue } from "@/components/location/lead-meta";
+import { FILE_CATEGORY_RULES, fileSize } from "@/lib/types";
+import type {
+  Venue, Contract, Lead, LeadStage, LeadSaveReq, VenueOnboarding, LifecycleRow, SiteStatus, PageResult, FunnelStage,
+} from "@/lib/types";
 
 // tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）。
-// 「站点/点位/合同」在菜单里叫「站点管理 / 点位管理 / 进场合同」——以菜单为准。
-// 2026-09-23 移除 "sites"：站点管理与「运营管理 › 站点管理」调同一组 API（listSites/saveSite/
-// archiveSite），是同一张表的两个维护入口。保留后者 —— 它是超集：详情抽屉有 8 个页签
-// （基本信息/点位/机柜/合同/计费/分成/统计/操作记录），还带暂停营业与统计。
-// 本页保留「点位管理」：站点详情里能维护点位，但跨站点批量看点位仍只有这里能做。
-// 顺序与菜单分组一致（机构档案 / 拓展）——页内 tab 条和左侧二级面板是同一批东西，
-// 两处顺序不同会让人以为少了一项。
 // 2026-09-23 第三步：本页从 /locations 拆出，承载「场地方与拓展」这条线 ——
 // 场地方档案与合同（签下来的关系）+ 拓展（线索 → 进件 → 生命周期）。
 // 点位管理与站点坪效留在 /locations（属运营管理）。拆页的硬原因：
-// findActiveSection 按**路径前缀**定归属，一个 URL 只能属于一个 L1；
-// 两拨东西分属两个 L1，就必须有两个 URL，否则面包屑与 Rail 高亮必错一边。
+// findActiveSection 按**路径前缀**定归属，一个 URL 只能属于一个 L1。
+//
+// 详情抽屉读 `?no=`（RefLink 的路由规则只在 components/ref-link.tsx 一处维护）：
+//   /venues?tab=crm&no=LD…  商机详情 · /venues?tab=contracts&no=CT…  合同详情 · /venues?tab=onboarding&no=OB…  进件详情
 const TAB_KEYS = ["venues", "contracts", "crm", "onboarding", "lifecycle"] as const;
-const LEAD_STAGE: StatusMap<LeadStage> = {
-  NEW: { label: "新线索", tone: "muted" },
-  CONTACTED: { label: "已接触", tone: "outline" },
-  NEGOTIATING: { label: "洽谈中", tone: "warning" },
-  SIGNED: { label: "已签约", tone: "success" },
-  LOST: { label: "已流失", tone: "danger" },
-};
-/** 入驻审核状态。原为组件内的就地 Record + 内联徽标（色调现取现用），收敛成 StatusMap 走 StatusBadge。 */
-const OB_STATUS: StatusMap<VenueOnboarding["status"]> = {
-  PENDING: { label: "待审核", tone: "warning" },
-  APPROVED: { label: "已通过", tone: "success" },
-  REJECTED: { label: "已驳回", tone: "danger" },
-};
+
 /**
- * 漏斗档位 = **商机阶段 ∪ 站点状态**（2026-09-25 合并后的唯一一套）。
- *
- * <p>键序 = 从线索到闭店的真实先后。原先这里是一套独立的六阶段
- * （PROSPECTING/SIGNED/LIVE/CHURNED…），与站点真实状态各说各话 ——
- * 同一个站点在「阶段」里是 LIVE、在「站点管理」里是 ACTIVE，谁也说不清它在哪。
+ * 漏斗档位 = **商机阶段 ∪ 站点状态**（2026-09-25 合并后的唯一一套）。键序 = 从线索到闭店的真实先后。
  */
 const LC_PHASE: StatusMap<LeadStage | SiteStatus> = {
-  NEW: { label: "新线索", tone: "muted" },
-  CONTACTED: { label: "已接触", tone: "outline" },
-  NEGOTIATING: { label: "洽谈中", tone: "warning" },
+  ...LEAD_STAGE,
   SIGNED: { label: "已签约", tone: "outline" },
-  LOST: { label: "已流失", tone: "danger" },
   PREPARING: { label: "筹备中", tone: "default" },
   ACTIVE: { label: "营业中", tone: "success" },
   PAUSED: { label: "暂停营业", tone: "warning" },
   WITHDRAWING: { label: "撤场中", tone: "warning" },
   CLOSED: { label: "已关闭", tone: "muted" },
 };
-// 下拉选项由徽标映射表派生：原先是手抄的第二份，改文案会漏一处
-const LEAD_STAGE_OPTIONS = statusOptions(LEAD_STAGE);
-const FOLLOW_CHANNEL_LABEL: Record<LeadFollowChannel, string> = {
-  CALL: "电话", VISIT: "拜访", WHATSAPP: "WhatsApp", EMAIL: "邮件", OTHER: "其他",
+const LC_KIND: StatusMap<LifecycleRow["kind"]> = {
+  LEAD: { label: "商机", tone: "outline" },
+  SITE: { label: "站点", tone: "default" },
 };
-/** 坐标展示：固定 6 位小数（与 DDL 的 DECIMAL(10,6) 同精度）；非数显示为「未填」而不是 NaN。 */
-/** 附件大小：只到 MB/KB，够判断「是不是整本没压缩的 PDF」。 */
-const fmtSize = (n: number) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
-// file input 的 accept 与提示文案都由 SSOT 派生，改格式白名单只改 lib/types/location.ts 一处
-const ATTACH_ACCEPT = ATTACH_EXTS.map((e) => `.${e}`).join(",");
-const ATTACH_ACCEPT_LABEL = ATTACH_EXTS.join(" / ").toUpperCase();
-const ATTACH_MAX_MB = ATTACH_MAX_SIZE / 1024 / 1024;
+
+/** 商机视图：我在跟的（默认，含全部在跟）/ 公共线索池。池是一个独立的待办面，不是一个筛选条件。 */
+const LEAD_VIEW: StatusMap<"ACTIVE" | "POOL"> = {
+  ACTIVE: { label: "在跟商机", tone: "default" },
+  POOL: { label: "公共线索池", tone: "warning" },
+};
+
+const SHARE_MODE_OPTS = (Object.keys(SHARE_MODE_LABEL) as (keyof typeof SHARE_MODE_LABEL)[])
+  .map((k) => ({ value: k, label: SHARE_MODE_LABEL[k] }));
+
 const VENUE_FIELDS: FieldDef[] = [
   { key: "venueNo", label: "编号", readOnlyOnEdit: true, placeholder: "新增自动生成" },
   { key: "name", label: "名称", required: true, maxLength: 128, placeholder: "Dubai Mall" },
   { key: "contact", label: "联系方式", placeholder: "姓名 / 电话" },
   { key: "industry", label: "行业", placeholder: "购物中心" },
-  // 「站点数」曾是一个可编辑的数字框——它是**聚合值**（名下有几个站点），不是属性，
-  // 手填必然与实际脱节（[db-design §1.4]「计数不是列，是聚合」）。列表列照常展示，表单不再收。
+  // 「站点数」是**聚合值**（名下有几个站点），不是属性，手填必然与实际脱节 —— 表单不收。
 ];
 /**
- * 合同字段。场地方 / 站点必须**选**不能**打** —— 合同是场地方分成的唯一依据，
- * 按名字连必然连错（同一商场不同楼层会有同名站点），所以存编号、名字只作展示冗余。
+ * 合同字段。场地方 / 站点必须**选**不能**打** —— 合同是场地方分成的唯一依据，按名字连必然连错。
+ * **没有状态**（R1）：新建一律草稿，推进走提交 / 审批 / 签署等动作；只有草稿能编辑。
  */
 function contractFieldsFor(
   venues: { value: string; label: string }[],
@@ -123,22 +108,28 @@ function contractFieldsFor(
     { key: "entryFee", label: "进场费", type: "number", min: 0 },
     { key: "startAt", label: "生效时间", type: "date", required: true },
     { key: "endAt", label: "到期时间", type: "date", required: true },
-    { key: "status", label: "状态", type: "select", options: [{ value: "ACTIVE", label: "有效" }, { value: "EXPIRED", label: "过期" }] },
   ];
 }
+/** 商机档案字段。**没有阶段**（R1）：阶段只经动作改（记跟进顺带推进 / 标记丢单 / 签约转化）。 */
 const LEAD_FIELDS: FieldDef[] = [
-  { key: "leadNo", label: "线索号", readOnlyOnEdit: true, placeholder: "新增自动生成" },
-  { key: "venueName", label: "场地名称", placeholder: "某商场" },
-  { key: "contact", label: "联系人", placeholder: "姓名 / 电话" },
-  { key: "stage", label: "阶段", type: "select", options: LEAD_STAGE_OPTIONS },
-  { key: "expectSites", label: "预计站点数", type: "number", min: 0 },
+  { key: "leadNo", label: "线索号", readOnlyOnEdit: true, placeholder: "新增自动生成", section: "场地" },
+  { key: "venueName", label: "场地名称", required: true, maxLength: 128, placeholder: "某商场", section: "场地",
+    help: "新建时按场地名或地址查重：90 天内别人在跟的场地不能重复建，会告诉你是谁在跟" },
+  { key: "address", label: "地址", maxLength: 256, placeholder: "楼宇 / 街道", section: "场地" },
+  { key: "contact", label: "联系人", placeholder: "姓名 / 电话", section: "场地" },
+  { key: "expectSites", label: "预计站点数", type: "number", min: 0, section: "场地" },
+  { key: "nextFollowAt", label: "下次跟进", type: "date", section: "场地", help: "「今天该打谁的电话」按它排" },
+  { key: "shareMode", label: "分成模式", type: "select", section: "谈判条款（转化时带进合同草稿）",
+    options: [{ value: "", label: "未定" }, ...SHARE_MODE_OPTS] },
+  { key: "shareRate", label: "分成比例（0~1）", type: "number", min: 0, max: 1, section: "谈判条款（转化时带进合同草稿）" },
+  { key: "entryFee", label: "进场费", type: "number", min: 0, section: "谈判条款（转化时带进合同草稿）" },
+  { key: "guaranteeAmount", label: "保底金额", type: "number", min: 0, section: "谈判条款（转化时带进合同草稿）" },
+  { key: "termMonths", label: "期限（月）", type: "number", min: 1, section: "谈判条款（转化时带进合同草稿）" },
+  { key: "exclusiveFlag", label: "独家", type: "switch", section: "谈判条款（转化时带进合同草稿）" },
 ];
 /**
- * 负责人单独拼：`loc_lead.owner` 存的是**业务号**（以前填姓名对不上人），
- * 而它是员工号还是伙伴号由 `ownerType` 说了算。
- *
+ * 负责人单独拼：`loc_lead.owner` 存的是**业务号**，它是员工号还是伙伴号由 `ownerType` 说了算。
  * 归属是伙伴时，商机签下并指定落成站点后会自动写一行「拓展」责任 —— 那是拓展佣金的依据。
- * 所以这两个字段不是登记信息，是**算钱的输入**。
  */
 function leadFieldsFor(
   ownerType: string,
@@ -148,29 +139,29 @@ function leadFieldsFor(
 ): FieldDef[] {
   const partner = ownerType === "AGENT";
   return [
-    ...LEAD_FIELDS.slice(0, 4),
+    ...LEAD_FIELDS.slice(0, 6),
     {
-      key: "ownerType", label: "归属方类型", type: "select",
+      key: "ownerType", label: "归属方类型", type: "select", section: "归属",
       options: [{ value: "STAFF", label: "自己人（员工）" }, { value: "AGENT", label: "伙伴（代理商）" }],
       help: "伙伴谈下来的，签下后自动记一行「拓展」责任，作为拓展佣金的依据",
     },
     // 切换类型时候选集整个换掉：两个命名空间的号混填进同一列，对不上人且不报错
     partner
-      ? { key: "owner", label: "归属伙伴", type: "select",
+      ? { key: "owner", label: "归属伙伴", type: "select", section: "归属",
           options: [{ value: "", label: "请选择伙伴" }, ...agents], help: "存代理商编号" }
-      : { key: "owner", label: "负责人", type: "select",
-          options: [{ value: "", label: "请选择负责人" }, ...employees], help: "存员工编号，不是姓名" },
+      : { key: "owner", label: "负责人", type: "select", section: "归属",
+          options: [{ value: "", label: "我（当前登录人）" }, ...employees], help: "存员工编号，不是姓名" },
     ...(partner
       ? [{
-          key: "siteNo", label: "落成站点", type: "select" as const,
+          key: "siteNo", label: "落成站点", type: "select" as const, section: "归属",
           options: [{ value: "", label: "尚未建站" }, ...sites],
           help: "先签后建站是常态：这里留空不影响保存，站点补填上去的那一次会补写拓展责任",
         }]
       : []),
-    ...LEAD_FIELDS.slice(4),
+    ...LEAD_FIELDS.slice(6),
   ];
 }
-/** 驳回原因：必填。不给原因的话，申请人只能反复猜着重提，每次都要运营再看一遍。 */
+/** 驳回原因：必填。不给原因的话，申请人只能反复猜着重提。 */
 const REJECT_FIELDS: FieldDef[] = [
   { key: "note", label: "驳回原因", required: true, maxLength: 200,
     placeholder: "如：营业执照照片不清晰，请重新上传",
@@ -181,26 +172,57 @@ const ONBOARDING_FIELDS: FieldDef[] = [
   { key: "venueName", label: "场地名称", placeholder: "Al Barsha Mall" },
   { key: "contact", label: "联系人", placeholder: "姓名 + 电话" },
   { key: "industry", label: "行业", placeholder: "购物中心" },
-  // 「审核状态」与「审核备注」**不放进表单**：审核是一个有状态机的动作
-  // （只有待审能审、通过要建出场地方、驳回必须给原因），不是一个可以随手改的字段。
-  // 此前它们在这里，于是把状态改成「已通过」也能保存成功 ——
-  // 而后端那条路径根本不受理状态，**线上静默不动**。改走行内的「通过 / 驳回」。
+  // 「审核状态 / 审核备注」不放进表单：审核是一个有状态机的动作，不是可以随手改的字段。
 ];
+
+/** 出参 Lead（条款收在 terms 里）→ 编辑表单（条款平铺，与保存入参同形）。 */
+const leadToForm = (l: Lead): LeadSaveReq => ({
+  leadNo: l.leadNo, venueName: l.venueName, address: l.address, contact: l.contact,
+  expectSites: l.expectSites, nextFollowAt: l.nextFollowAt?.slice(0, 10) ?? null,
+  ownerType: l.ownerType, owner: l.owner, siteNo: l.siteNo,
+  shareMode: l.terms?.shareMode ?? null, shareRate: l.terms?.shareRate ?? null, entryFee: l.terms?.entryFee ?? null,
+  guaranteeAmount: l.terms?.guaranteeAmount ?? null, termMonths: l.terms?.termMonths ?? null,
+  exclusiveFlag: l.terms?.exclusive ?? null,
+});
 
 function VenuesInner() {
   const qc = useQueryClient();
   const allow = useCan();
   const { confirm, dialog } = useConfirm();
   const paging = usePaging();
-  const onTabChange = () => { paging.reset(); setShowArchived(false); };
+  const router = useRouter();
+  const pathname = usePathname();
+  const sp = useSearchParams();
   const tabs = useNavTabs("/venues", TAB_KEYS);
+  const onTabChange = () => { paging.reset(); setShowArchived(false); setFilters({}); };
   const { tab, setTab } = usePageTab(tabs, onTabChange);
+
+  // —— 深链：?no= 打开当前 tab 的详情抽屉；打开 / 关闭都回写 URL，刷新与分享不丢 ——
+  const detailNo = sp.get("no");
+  /** 站点开业清单「生效合同」一项的去处是 `/venues?tab=contracts&siteNo=`：只看这个站点的合同。 */
+  const siteNoParam = tab === "contracts" ? sp.get("siteNo") : null;
+  const openDetail = (no: string) => {
+    const q = new URLSearchParams(sp.toString());
+    q.set("tab", tab);
+    q.set("no", no);
+    router.replace(`${pathname}?${q.toString()}`, { scroll: false });
+  };
+  const closeDetail = () => {
+    const q = new URLSearchParams(sp.toString());
+    q.delete("no");
+    router.replace(q.size ? `${pathname}?${q.toString()}` : pathname, { scroll: false });
+  };
+  const switchTab = (k: string) => {
+    // 换 tab 时丢掉 no：它属于上一个 tab 的对象，带过去会在新 tab 里打开一个查无此号的抽屉
+    const q = new URLSearchParams(sp.toString());
+    q.delete("no");
+    q.set("tab", k);
+    router.replace(`${pathname}?${q.toString()}`, { scroll: false });
+    setTab(k);
+  };
+
   /*
-   * 场地方的收款账户（B3）。
-   *
-   * 这一页**不做账户的增删改** —— 管理界面在 /finance?tab=payout-accounts，
-   * 在两处各造一套 CRUD 的结果一定是「在哪个入口改的」决定别人看不看得见
-   * （本仓 2026-09-23 的菜单收敛就是在清理这类重复）。
+   * 场地方的收款账户（B3）。这一页**不做账户的增删改** —— 管理界面在 /finance?tab=payout-accounts。
    * 这里只回答一个问题：**这个场地方现在能不能收到钱**。
    */
   const canReadPayout = allow("finance:payout_account:read");
@@ -209,7 +231,6 @@ function VenuesInner() {
     queryFn: () => api.listPayoutAccounts({ page: 1, size: UNPAGED_SIZE, payeeType: "VENUE" }),
     enabled: canReadPayout && tab === "venues",
   });
-  /** venueNo → 默认账户掩码；没有键就是没设置。 */
   const payoutByVenue = useMemo(() => {
     const m = new Map<string, string>();
     for (const a of payoutQ.data?.list ?? []) {
@@ -217,43 +238,25 @@ function VenuesInner() {
     }
     return m;
   }, [payoutQ.data]);
+
   const [keyword, setKeyword] = useState("");
-  // 「显示已归档」开关（TDD §10.1：列表默认过滤已归档）。切 tab 复位，避免在合同页残留一个看不见的过滤态。
   const [showArchived, setShowArchived] = useState(false);
+  /** 各 tab 的筛选（切 tab 清空）。键即后端查询参数名。 */
+  const [filters, setFilters] = useState<Record<string, string>>({});
+  const setFilter = (k: string, v: string) => { setFilters((f) => ({ ...f, [k]: v })); paging.reset(); };
+  const toggleFilter = (k: string, v: string) => setFilter(k, filters[k] === v ? "" : v);
   const [venueForm, setVenueForm] = useState<Partial<Venue> | null>(null);
   const [contractForm, setContractForm] = useState<Partial<Contract> | null>(null);
-  const [leadForm, setLeadForm] = useState<Partial<Lead> | null>(null);
+  const [leadForm, setLeadForm] = useState<LeadSaveReq | null>(null);
   const [onboardingForm, setOnboardingForm] = useState<Partial<VenueOnboarding> | null>(null);
-  // 驳回单独一个抽屉：confirm 对话框只支持「照抄指定文本」，收不了自由文本，
-  // 而驳回原因是必须写清楚的（申请人会看到它）
   const [rejectForm, setRejectForm] = useState<{ onboardingNo: string; note: string } | null>(null);
-  // 合同审批：详情 / 审批 / 签署 / 终止 四个抽屉各自独立 ——
-  // 合成一个「合同操作」抽屉的话，里面要按状态切四套表单，条件分支比四个抽屉还多
-  const [detailNo, setDetailNo] = useState<string | null>(null);
-  const [auditRow, setAuditRow] = useState<Contract | null>(null);
-  const [auditNote, setAuditNote] = useState("");
-  const [signRow, setSignRow] = useState<Contract | null>(null);
-  const [signedAt, setSignedAt] = useState("");
-  const [termRow, setTermRow] = useState<Contract | null>(null);
-  const [termReason, setTermReason] = useState("");
-  const [termEffectiveAt, setTermEffectiveAt] = useState("");
-  // 线索详情抽屉：与「编辑」分开——编辑改的是档案字段，详情看的是跟进流水，混在一个抽屉里会让
-  // 「改了字段但没记跟进」变成常态（阶段悄悄变了没人知道为什么，正是本次要补的窟窿）
-  const [leadDetail, setLeadDetail] = useState<Lead | null>(null);
-  const [fuContent, setFuContent] = useState("");
-  const [fuChannel, setFuChannel] = useState<LeadFollowChannel>("CALL");
-  const [fuStage, setFuStage] = useState<LeadStage | "">(""); // 空=只记跟进不动阶段
-  const [fuNextAt, setFuNextAt] = useState("");
-  // 合同附件抽屉（假上传，拍板点 #3）
   const [attachRow, setAttachRow] = useState<Contract | null>(null);
+  const [attachFiles, setAttachFiles] = useState<string[]>([]);
 
-  const username = useAuth((s) => s.username);
   const canVenue = allow("location:venue:update");
-  const canContract = allow("location:contract:update");
-  const canLead = allow("location:lead:update");
+  const canCrm = allow("location:crm:update");
 
-  // 关联字段的下拉数据源。三份都是小字典，一次拉全量不分页；单独开 query 是为了
-  // 不被主列表的 tab 切换连带作废（切到合同页时场地方列表还在，不必重拉）。
+  // 关联字段的下拉数据源：小字典，一次拉全量不分页
   const venuesQ = useQuery({ queryKey: ["venues-dict"], queryFn: () => api.listVenues({ page: 1, size: UNPAGED_SIZE }) });
   const sitesQ = useQuery({ queryKey: ["sites-dict"], queryFn: () => api.listSites({ page: 1, size: UNPAGED_SIZE }) });
   const employeesQ = useQuery({ queryKey: ["employees-dict"], queryFn: () => api.listEmployees({ page: 1, size: UNPAGED_SIZE }) });
@@ -287,15 +290,23 @@ function VenuesInner() {
     () => leadFieldsFor(String(leadForm?.ownerType ?? "STAFF"), employeeOpts, agentOpts, siteOpts),
     [leadForm?.ownerType, employeeOpts, agentOpts, siteOpts],
   );
+
+  const inPool = tab === "crm" && filters.view === "POOL";
   const q = useQuery<PageResult<Venue | Contract | Lead | VenueOnboarding | LifecycleRow>>({
-    // showArchived 必须进 queryKey，否则切开关不重新拉数据
-    queryKey: ["venue-bd", tab, paging.page, paging.size, keyword, showArchived],
-    queryFn: () =>
-      tab === "venues" ? api.listVenues({ page: paging.page, size: paging.size, keyword, showArchived })
-      : tab === "crm" ? api.listLeads({ page: paging.page, size: paging.size, keyword })
-      : tab === "onboarding" ? api.listVenueOnboardings({ page: paging.page, size: paging.size, keyword })
-      : tab === "lifecycle" ? api.listSiteLifecycles({ page: paging.page, size: paging.size, keyword })
-      : api.listContracts({ page: paging.page, size: paging.size, keyword }),
+    queryKey: ["venue-bd", tab, paging.page, paging.size, keyword, showArchived, filters, siteNoParam],
+    queryFn: () => {
+      const base = { page: paging.page, size: paging.size, keyword };
+      switch (tab) {
+        case "venues": return api.listVenues({ ...base, showArchived });
+        case "crm": return api.listLeads({ ...base, stage: filters.stage || undefined, inPool });
+        case "onboarding": return api.listVenueOnboardings(base);
+        case "lifecycle": return api.listSiteLifecycles({ ...base, phase: filters.phase || undefined });
+        default: return api.listContracts({
+          ...base, siteNo: siteNoParam || undefined, status: filters.status || undefined, pendingMine: filters.pendingMine === "1" || undefined,
+          endFrom: filters.endFrom || undefined, endTo: filters.endTo || undefined,
+        });
+      }
+    },
     placeholderData: keepWithinTab(tab),
   });
 
@@ -303,7 +314,7 @@ function VenuesInner() {
     mutationFn: (v: Partial<Venue>) => api.saveVenue(v),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["venue-bd", "venues"] }); notify.success("保存成功"); setVenueForm(null); },
   });
-  // 合同提交：名字由所选编号带出（不让编号与名字各说各话），并挡住「到期早于生效」。
+  // 合同保存：名字由所选编号带出（不让编号与名字各说各话），并挡住「到期早于生效」。
   const submitContract = () => {
     const c = contractForm;
     if (!c) return;
@@ -312,20 +323,46 @@ function VenuesInner() {
     const siteName = sitesQ.data?.list.find((x) => x.siteNo === c.siteNo)?.name ?? c.siteName ?? "";
     saveContract.mutate({ ...c, venueName, siteName });
   };
-
   const saveContract = useMutation({
     mutationFn: (c: Partial<Contract>) => api.saveContract(c),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["venue-bd", "contracts"] }); notify.success("保存成功"); setContractForm(null); },
+    onSuccess: (c) => {
+      qc.invalidateQueries({ queryKey: ["venue-bd", "contracts"] });
+      qc.invalidateQueries({ queryKey: ["contract-detail", c.contractNo] });
+      notify.success(contractForm?.contractNo ? "保存成功" : `已建草稿 ${c.contractNo}，确认条款后「提交审批」`);
+      setContractForm(null);
+    },
   });
+  /**
+   * 商机保存。查重被拒时后端 409 的原话是「该场地已有商机 X 在跟进（负责人 Y）…」——
+   * 全局 MutationCache 会弹出这句；抽屉不关，改完场地名 / 地址可以直接再存。
+   */
   const saveLead = useMutation({
-    mutationFn: (l: Partial<Lead>) => api.saveLead(l),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["venue-bd", "crm"] }); notify.success("保存成功"); setLeadForm(null); },
+    mutationFn: (l: LeadSaveReq) => {
+      const num = (v: unknown) => (v === "" || v == null ? null : Number(v));
+      return api.saveLead({
+        ...l,
+        owner: l.owner || null, nextFollowAt: l.nextFollowAt || null, shareMode: l.shareMode || null,
+        shareRate: num(l.shareRate), entryFee: num(l.entryFee), guaranteeAmount: num(l.guaranteeAmount),
+        termMonths: num(l.termMonths), expectSites: num(l.expectSites) ?? 0,
+      });
+    },
+    onSuccess: (l) => {
+      qc.invalidateQueries({ queryKey: ["venue-bd", "crm"] });
+      qc.invalidateQueries({ queryKey: ["lead", l.leadNo] });
+      notify.success(leadForm?.leadNo ? "保存成功" : `已建商机 ${l.leadNo}`);
+      setLeadForm(null);
+    },
+  });
+  const claimLead = useMutation({
+    mutationFn: (no: string) => api.claimLead(no),
+    onSuccess: (l) => { qc.invalidateQueries({ queryKey: ["venue-bd", "crm"] }); qc.invalidateQueries({ queryKey: ["lead", l.leadNo] }); notify.success(`已认领 ${l.leadNo}`); },
   });
   const reviewOnboarding = useMutation({
     mutationFn: (v: { no: string; approve: boolean; note?: string }) =>
       api.reviewVenueOnboarding(v.no, v.approve, v.note),
     onSuccess: (o) => {
       qc.invalidateQueries({ queryKey: ["venue-bd", "onboarding"] });
+      qc.invalidateQueries({ queryKey: ["venue-onboarding", o.onboardingNo] });
       // 通过会建出场地方，场地方列表与下拉都得跟着刷，否则下一步签合同时选不到它
       qc.invalidateQueries({ queryKey: ["venues-dict"] });
       notify.success(o.status === "APPROVED" ? `已通过，场地方 ${o.venueNo ?? ""} 已建档` : "已驳回");
@@ -336,109 +373,46 @@ function VenuesInner() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["venue-bd", "onboarding"] }); notify.success("保存成功"); setOnboardingForm(null); },
   });
 
-  // 跟进流水：只查当前详情线索的记录（同订单干预历史的做法）
-  const followUpsQ = useQuery({
-    queryKey: ["lead-follow-ups", leadDetail?.leadNo],
-    queryFn: () => api.listLeadFollowUps(leadDetail!.leadNo, { size: RECENT_LIMIT }),
-    enabled: !!leadDetail,
-  });
-  const addFollowUp = useMutation({
-    mutationFn: (v: { leadNo: string }) =>
-      api.addLeadFollowUp(v.leadNo, {
-        content: fuContent, channel: fuChannel,
-        stage: fuStage || undefined, // 空串不能透传：后端按「阶段非法」拒绝
-        owner: username || undefined, nextAt: fuNextAt || undefined,
-      }),
-    onSuccess: (r) => {
-      qc.invalidateQueries({ queryKey: ["lead-follow-ups"] });
-      qc.invalidateQueries({ queryKey: ["venue-bd", "crm"] });
-      notify.success(r.fromStage ? `已记跟进并推进到「${LEAD_STAGE[r.toStage].label}」` : "已记跟进");
-      // 详情抽屉里的阶段/更新时间立刻跟上落库结果，不等列表刷新（抽屉盖着列表，看不见）
-      setLeadDetail((prev) => (prev ? { ...prev, stage: r.toStage, updatedAt: r.createdAt } : prev));
-      setFuContent(""); setFuStage(""); setFuNextAt("");
-    },
-  });
-
-  // 合同附件：两个动作都返回整份合同，直接回填抽屉，避免再拉一次列表
-  /**
-   * 回填附件抽屉。**必须浅拷贝**：mock 层返回的是库里那个对象本身，直接 setState 同一引用
-   * React 会判定没变而不重渲染，表现为「上传成功了但列表没动」。接真后端后是新对象，拷贝无害。
-   */
-  const refreshAttachRow = (c: Contract) => {
-    qc.invalidateQueries({ queryKey: ["venue-bd", "contracts"] });
-    setAttachRow({ ...c });
-  };
+  // 合同附件：先经文件服务上传（FileField），再按 fileNo 挂到合同上
   const addAttach = useMutation({
-    mutationFn: (v: { contractNo: string; fileName: string; size: number }) =>
-      api.addContractAttachment(v.contractNo, { fileName: v.fileName, size: v.size, uploadedBy: username || undefined }),
-    onSuccess: (c, v) => { refreshAttachRow(c); notify.success(`已登记附件 ${v.fileName}`); },
-  });
-  /** 摘要条。只在合同 tab 拉——别的 tab 打开时拉它等于白跑一次请求。 */
-  const summary = useQuery({
-    queryKey: ["contract-summary"],
-    queryFn: () => api.contractSummary(),
-    enabled: tab === "contracts",
-  });
-
-  /** 动作可用性一律问状态机 SSOT，页面不另写一套。 */
-  const can = (action: keyof typeof CONTRACT_TRANSITIONS, c: Contract) =>
-    CONTRACT_TRANSITIONS[action].from.includes(c.status);
-
-  /**
-   * 合同流转动作。合成一个 mutation 而不是七个：
-   * 它们的成功后处理完全一样（刷列表 + 刷摘要 + 关抽屉），分成七个会把这段抄七遍。
-   */
-  const act = useMutation({
-    mutationFn: (v:
-      | { kind: "submit" | "withdraw" | "renew"; no: string }
-      | { kind: "audit" | "cosign" | "termAudit"; no: string; result: "APPROVE" | "REJECT"; reason?: string }
-      | { kind: "sign"; no: string; signedAt: string }
-      | { kind: "terminate"; no: string; reason: string; effectiveAt?: string }) => {
-      switch (v.kind) {
-        case "submit": return api.submitContract(v.no);
-        case "withdraw": return api.withdrawContract(v.no);
-        case "renew": return api.renewContract(v.no);
-        case "audit": return api.auditContract(v.no, v.result, v.reason);
-        case "cosign": return api.cosignContract(v.no, v.result, v.reason);
-        case "termAudit": return api.auditContractTermination(v.no, v.result, v.reason);
-        case "sign": return api.signContract(v.no, v.signedAt, []);
-        case "terminate": return api.terminateContract(v.no, v.reason, v.effectiveAt || undefined);
-      }
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["venue-bd"] });
+    mutationFn: (v: { contractNo: string; fileNos: string[] }) => api.addContractAttachment(v.contractNo, { fileNos: v.fileNos }),
+    onSuccess: (c) => {
+      qc.invalidateQueries({ queryKey: ["venue-bd", "contracts"] });
+      qc.invalidateQueries({ queryKey: ["contract-detail", c.contractNo] });
       qc.invalidateQueries({ queryKey: ["contract-summary"] });
-      qc.invalidateQueries({ queryKey: ["contract-detail"] });
-      qc.invalidateQueries({ queryKey: ["contract-logs"] });
-      setAuditRow(null); setSignRow(null); setTermRow(null);
-      setAuditNote(""); setTermReason(""); setTermEffectiveAt("");
-      notify.success("已处理");
+      setAttachRow({ ...c });   // 浅拷贝：mock 返回库里同一个对象，同引用 setState 不重渲染
+      setAttachFiles([]);
+      notify.success("扫描件已挂到合同上");
     },
   });
-
   const removeAttach = useMutation({
     mutationFn: (v: { contractNo: string; attachNo: string }) => api.removeContractAttachment(v.contractNo, v.attachNo),
-    onSuccess: (c) => { refreshAttachRow(c); notify.success("附件已移除"); },
+    onSuccess: (c) => {
+      qc.invalidateQueries({ queryKey: ["venue-bd", "contracts"] });
+      qc.invalidateQueries({ queryKey: ["contract-detail", c.contractNo] });
+      setAttachRow({ ...c });
+      notify.success("附件已移除");
+    },
   });
+  const openAttach = (c: Contract) => { setAttachFiles([]); setAttachRow(c); };
 
-  /** 开线索详情：清掉上一条线索残留的跟进草稿，避免把 A 的跟进内容记到 B 头上。 */
-  const openLeadDetail = (l: Lead) => {
-    setFuContent(""); setFuChannel("CALL"); setFuStage(""); setFuNextAt("");
-    setLeadDetail(l);
-  };
+  /** 摘要条。只在合同 tab 拉。 */
+  const summary = useQuery({ queryKey: ["contract-summary"], queryFn: () => api.contractSummary(), enabled: tab === "contracts" });
+  /** 漏斗计数。只在生命周期 tab 拉。 */
+  const funnel = useQuery({ queryKey: ["site-lifecycle-funnel"], queryFn: () => api.siteLifecycleFunnel(), enabled: tab === "lifecycle" });
 
+  const contractActions = useContractActions({ onEdit: (c) => setContractForm(c), onAttach: openAttach });
 
   // 归档 / 恢复（G1 软删除）。错误由全局 MutationCache 接管，页面不重复 catch。
   const invalidatePlace = () => qc.invalidateQueries({ queryKey: ["venue-bd"] });
   const archiveVenue = useMutation({ mutationFn: (no: string) => api.archiveVenue(no), onSuccess: () => { invalidatePlace(); notify.success("已归档"); } });
   const unarchiveVenue = useMutation({ mutationFn: (no: string) => api.unarchiveVenue(no), onSuccess: () => { invalidatePlace(); notify.success("已恢复"); } });
 
-  /** 归档时间列：只在「显示已归档」打开时出现，默认视图里整列都是 `-` 属于噪音。 */
   function archivedCols<T extends { archivedAt: string | null }>(): Column<T>[] {
     return showArchived ? [{ header: "归档时间", cell: (r: T) => <ArchivedAt at={r.archivedAt} /> }] : [];
   }
 
-  // 业务号列一律 txt-strong（§12.3 主键列加强）；计数/金额列 text-right + tabular-nums（§12.4）
+  // 业务号列一律 txt-strong；计数/金额列 text-right + tabular-nums
   const venueCols: Column<Venue>[] = [
     { header: "编号", cell: (v) => <span className="txt-strong tabular-nums">{v.venueNo}</span> },
     { header: "名称", cell: (v) => v.name },
@@ -467,7 +441,6 @@ function VenuesInner() {
           archived={!!v.archivedAt}
           canWrite={canVenue}
           actions={<Button size="sm" variant="outline" onClick={() => setVenueForm(v)}>编辑</Button>}
-          // 场地方是主数据：要求手输编号确认
           onArchive={async () => { if (await confirm(archiveConfirm("场地方", v.venueNo, v.venueNo))) archiveVenue.mutate(v.venueNo); }}
           onUnarchive={async () => { if (await confirm(unarchiveConfirm("场地方", v.venueNo))) unarchiveVenue.mutate(v.venueNo); }}
         />
@@ -475,18 +448,34 @@ function VenuesInner() {
     },
   ];
   const ctCols: Column<Contract>[] = [
-    { header: "合同号", cell: (c) => <span className="txt-strong tabular-nums">{c.contractNo}</span> },
+    {
+      header: "合同号",
+      cell: (c) => (
+        <button className="txt-strong tabular-nums text-primary hover:underline" onClick={() => openDetail(c.contractNo)}>
+          {c.contractNo}
+        </button>
+      ),
+    },
     { header: "场地方", cell: (c) => c.venueName },
     { header: "站点", cell: (c) => <span className="text-muted-foreground">{c.siteName}</span> },
-    { header: "分成", className: "text-right", cell: (c) => <span className="tabular-nums">{(c.shareRate * 100).toFixed(0)}%</span> },
-    // 进场费不走 money()：Contract 上没有 currency 字段（见 lib/types/location.ts），
-    // 硬编一个币种反而会骗人；先按数字列对齐，币种待契约补上再接
-    { header: "进场费", className: "text-right", cell: (c) => <span className="tabular-nums">{c.entryFee}</span> },
+    {
+      header: "分成",
+      className: "text-right",
+      cell: (c) => (
+        <span className="tabular-nums">
+          {c.terms?.shareMode === "GUARANTEE" && c.terms.guaranteeAmount != null ? `保底 ${c.terms.guaranteeAmount} + ` : ""}
+          {(c.shareRate * 100).toFixed(0)}%
+        </span>
+      ),
+    },
+    {
+      header: "进场费",
+      className: "text-right",
+      cell: (c) => <span className="tabular-nums">{c.entryFee}{c.terms?.currency ? ` ${c.terms.currency}` : ""}</span>,
+    },
     { header: "到期", cell: (c) => <span className="text-muted-foreground">{fmtTime(c.endAt)}</span> },
     {
       header: "状态",
-      // 原先是三元：ACTIVE 绿、其余一律红「过期」——于是草稿与已终止看着一样，
-      // 而那是两件完全不同的事（一个还没开始，一个已经结束）
       cell: (c) => (
         <>
           <StatusBadge map={CONTRACT_STATUS} value={c.status} />
@@ -495,10 +484,13 @@ function VenuesInner() {
               {c.flow.auditStage === "FINANCE" ? "待财务" : "待运营"}
             </span>
           )}
+          {c.flow?.termination?.status === "PENDING" && (
+            <span className="ms-1 txt-caption text-warning-ink">终止待审</span>
+          )}
         </>
       ),
     },
-    // 附件数上列表：「哪些合同还没扫描件」是进场合同最常被问的一件事，藏在抽屉里就没人查
+    // 附件数上列表：「哪些合同还没扫描件」是进场合同最常被问的一件事
     {
       header: "扫描件",
       cell: (c) => c.attachments.length
@@ -507,90 +499,111 @@ function VenuesInner() {
     },
     {
       header: "操作",
+      // 动作可用性与权限码一律来自 useContractActions（详情头同一份），页面不另写一套
       cell: (c) => (
-        <div className="flex flex-wrap gap-2">
-          {/* 详情对只读角色也开：看合同卡在谁手上不需要写权限 */}
-          <Button size="sm" variant="outline" onClick={() => setDetailNo(c.contractNo)}>详情</Button>
-          <Button size="sm" variant="outline" onClick={() => setAttachRow(c)}>附件</Button>
-          {/* 可用性一律问 CONTRACT_TRANSITIONS，页面不另写一套状态规则 ——
-              另写一套就会出现「接口能做、按钮不给点」或反过来，两种都难查 */}
-          {canContract && can("submit", c) && (
-            <Button size="sm" variant="outline" disabled={act.isPending}
-              onClick={() => act.mutate({ kind: "submit", no: c.contractNo })}>提交审批</Button>
-          )}
-          {canContract && can("withdraw", c) && (
-            <Button size="sm" variant="outline" disabled={act.isPending}
-              onClick={() => act.mutate({ kind: "withdraw", no: c.contractNo })}>撤回</Button>
-          )}
-          {canContract && c.status === "PENDING" && (
-            <Button size="sm" variant="outline" onClick={() => setAuditRow(c)}>审批</Button>
-          )}
-          {canContract && c.status === "SIGNED" && (
-            <Button size="sm" variant="outline" onClick={() => setSignRow(c)}>登记签署</Button>
-          )}
-          {canContract && can("terminate", c) && !c.flow?.termination && (
-            <Button size="sm" variant="outline" onClick={() => setTermRow(c)}>申请终止</Button>
-          )}
-          {canContract && ["ACTIVE", "EXPIRED"].includes(c.status) && (
-            <Button size="sm" variant="outline" disabled={act.isPending}
-              onClick={() => act.mutate({ kind: "renew", no: c.contractNo })}>续签</Button>
-          )}
-          {/* 编辑只在草稿态开：审批中/已生效的合同改条款，改的是别人已经批过的东西 */}
-          {canContract && c.status === "DRAFT" && (
-            <Button size="sm" variant="outline" onClick={() => setContractForm(c)}>编辑</Button>
-          )}
+        <div className="flex w-max items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => openDetail(c.contractNo)}>详情</Button>
+          <StateActions actions={contractActions.actionsFor(c)} />
         </div>
       ),
     },
   ];
   const leadCols: Column<Lead>[] = [
-    { header: "线索号", cell: (l) => <span className="txt-strong tabular-nums">{l.leadNo}</span> },
-    { header: "场地名称", cell: (l) => l.venueName },
-    { header: "联系人", cell: (l) => <span className="text-muted-foreground">{l.contact}</span> },
-    { header: "阶段", cell: (l) => <StatusBadge map={LEAD_STAGE} value={l.stage} /> },
-    // 归属方要连类型一起显示：光一个编号看不出这是自己人还是伙伴，
-    // 而两者的差别是「这条商机要不要付拓展佣金」
     {
-      header: "归属",
+      header: "线索号",
       cell: (l) => (
-        <span>
-          {l.owner}
-          {l.ownerType === "AGENT" && <span className="ml-1 text-muted-foreground">伙伴</span>}
-          {l.ownerType === "AGENT" && l.stage === "SIGNED" && !l.siteNo && (
-            <span className="ml-1 text-muted-foreground">· 待指定站点</span>
-          )}
-        </span>
+        <button className="txt-strong tabular-nums text-primary hover:underline" onClick={() => openDetail(l.leadNo)}>
+          {l.leadNo}
+        </button>
       ),
     },
-    { header: "预计站点数", className: "text-right", cell: (l) => <span className="tabular-nums">{l.expectSites}</span> },
-    // 「今天该打谁的电话」靠它排 —— 后端一直有，不显示等于这张表少了排程
+    {
+      header: "场地",
+      cell: (l) => (
+        <div className="min-w-0">
+          <div className="truncate">{l.venueName}</div>
+          {l.address && <div className="truncate txt-caption text-muted-foreground">{l.address}</div>}
+        </div>
+      ),
+    },
+    { header: "联系人", cell: (l) => <span className="text-muted-foreground">{l.contact ?? "-"}</span> },
+    { header: "阶段", cell: (l) => <StatusBadge map={LEAD_STAGE} value={l.stage} /> },
+    // 归属方要连类型一起显示：两者的差别是「这条商机要不要付拓展佣金」
+    {
+      header: "归属",
+      cell: (l) => l.inPool
+        ? <span className="text-muted-foreground">池中{l.prevOwner ? ` · 原 ${l.prevOwner}` : ""}</span>
+        : (
+          <span>
+            {l.owner ?? "-"}
+            {l.ownerType === "AGENT" && <span className="ms-1 text-muted-foreground">伙伴</span>}
+            {l.ownerType === "AGENT" && l.stage === "SIGNED" && !l.siteNo && (
+              <span className="ms-1 text-muted-foreground">· 待指定站点</span>
+            )}
+          </span>
+        ),
+    },
+    { header: "预计站点", className: "text-right", cell: (l) => <span className="tabular-nums">{l.expectSites}</span> },
+    // 「今天该打谁的电话」靠它排：逾期与今天各给一个色，别让人自己比日期
     {
       header: "下次跟进",
-      cell: (l) => l.nextFollowAt
-        ? <span className="tabular-nums">{l.nextFollowAt.slice(0, 10)}</span>
-        : <span className="text-muted-foreground">未约</span>,
+      cell: (l) => {
+        const due = followDue(l.nextFollowAt);
+        return due === "NONE" || l.stage === "SIGNED" || l.stage === "LOST"
+          ? <span className="text-muted-foreground">{l.stage === "SIGNED" || l.stage === "LOST" ? "—" : "未约"}</span>
+          : <span className="inline-flex items-center gap-1.5">
+              <span className="tabular-nums">{l.nextFollowAt!.slice(0, 10)}</span>
+              {due !== "LATER" && <StatusBadge map={FOLLOW_DUE} value={due} />}
+            </span>;
+      },
     },
-    // 更新时间就是最后一次跟进时间（db 层保证两者同源），所以这一列点进详情能一眼对上时间线首条
-    { header: "最后跟进", cell: (l) => <span className="text-muted-foreground">{fmtTime(l.updatedAt)}</span> },
+    // 最后跟进读 lastFollowAt（服务端维护，提醒与回收都按它算），不读 updatedAt —— 改个联系人也会动后者
+    { header: "最后跟进", cell: (l) => <span className="text-muted-foreground">{fmtTime(l.lastFollowAt ?? l.updatedAt)}</span> },
+    { header: "合同", cell: (l) => <RefLink kind="contract" no={l.contractNo} /> },
     {
       header: "操作",
       cell: (l) => (
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => openLeadDetail(l)}>详情</Button>
-          {canLead && <Button size="sm" variant="outline" onClick={() => setLeadForm(l)}>编辑</Button>}
+        <div className="flex w-max gap-2">
+          <Button size="sm" variant="outline" onClick={() => openDetail(l.leadNo)}>详情</Button>
+          {l.inPool && canCrm && (
+            <Button size="sm" disabled={claimLead.isPending} onClick={async () => {
+              if (await confirm({ title: `认领 ${l.venueName}？`, desc: "认领后由你负责并重新计时；超期不跟进会再次回收进线索池。" })) claimLead.mutate(l.leadNo);
+            }}>认领</Button>
+          )}
         </div>
       ),
     },
   ];
+  const onboardingActions = (o: VenueOnboarding) => {
+    if (!canVenue || o.status !== "PENDING") return null;   // 审过的进件不再给任何写入口
+    return (
+      <div className="flex w-max gap-2">
+        <Button size="sm" variant="outline" onClick={() => setOnboardingForm(o)}>编辑</Button>
+        <Button size="sm" variant="outline" onClick={async () => {
+          if (await confirm({
+            title: "通过这份进件？",
+            desc: `通过后会按「${o.venueName}」建出场地方档案，并把场地方号回填到本申请上。`,
+          })) reviewOnboarding.mutate({ no: o.onboardingNo, approve: true });
+        }}>通过</Button>
+        <Button size="sm" variant="outline"
+          onClick={() => setRejectForm({ onboardingNo: o.onboardingNo, note: "" })}>驳回</Button>
+      </div>
+    );
+  };
   const onboardingCols: Column<VenueOnboarding>[] = [
-    { header: "申请号", cell: (o) => <span className="txt-strong tabular-nums">{o.onboardingNo}</span> },
+    {
+      header: "申请号",
+      cell: (o) => (
+        <button className="txt-strong tabular-nums text-primary hover:underline" onClick={() => openDetail(o.onboardingNo)}>
+          {o.onboardingNo}
+        </button>
+      ),
+    },
     { header: "场地名称", cell: (o) => o.venueName },
     { header: "联系人", cell: (o) => <span className="text-muted-foreground">{o.contact}</span> },
     { header: "行业", cell: (o) => o.industry },
     { header: "申请时间", cell: (o) => <span className="text-muted-foreground">{fmtTime(o.requestedAt)}</span> },
     { header: "审核状态", cell: (o) => <StatusBadge map={OB_STATUS} value={o.status} /> },
-    // 通过后建出的场地方号：从进件跳到档案的唯一线索
-    //（这个字段直到场地方写入口补齐后才真正有意义——在那之前号回填了却查无此人）
     {
       header: "场地方",
       cell: (o) => o.venueNo
@@ -600,37 +613,18 @@ function VenuesInner() {
     { header: "备注", cell: (o) => <span className="text-muted-foreground">{o.reviewNote ?? "-"}</span> },
     {
       header: "操作",
-      cell: (o) => {
-        if (!canVenue) return <span className="text-muted-foreground">-</span>;
-        // 审过的进件不再给任何写入口：结论是对当时那份内容做的
-        if (o.status !== "PENDING") return <span className="text-muted-foreground">已审</span>;
-        return (
-          <div className="flex w-max gap-2">
-            <Button size="sm" variant="outline" onClick={() => setOnboardingForm(o)}>编辑</Button>
-            <Button size="sm" variant="outline" onClick={async () => {
-              if (await confirm({
-                title: "通过这份进件？",
-                desc: `通过后会按「${o.venueName}」建出场地方档案，并把场地方号回填到本申请上。`,
-              })) reviewOnboarding.mutate({ no: o.onboardingNo, approve: true });
-            }}>通过</Button>
-            <Button size="sm" variant="outline"
-              onClick={() => setRejectForm({ onboardingNo: o.onboardingNo, note: "" })}>驳回</Button>
-          </div>
-        );
-      },
+      cell: (o) => onboardingActions(o) ?? <span className="text-muted-foreground">{o.status === "PENDING" ? "-" : "已审"}</span>,
     },
   ];
   /**
-   * 漏斗明细**只读**：没有「操作」列。
-   *
-   * <p>推商机走「BD 拓展 CRM」的跟进，推站点走「站点管理」的暂停/恢复/撤场/关闭。
-   * 这里再放一个推进按钮，就又是第二套事实 —— 点它不会改站点真实状态。
+   * 漏斗明细**只读**：没有「操作」列。推商机走 CRM 的动作，推站点走「站点管理」的状态动作。
    */
   const lifecycleCols: Column<LifecycleRow>[] = [
-    { header: "类型", cell: (l) => <Badge tone="outline">{l.kind === "LEAD" ? "商机" : "站点"}</Badge> },
-    { header: "编号", cell: (l) => <span className="txt-strong tabular-nums">{l.no}</span> },
+    { header: "类型", cell: (l) => <StatusBadge map={LC_KIND} value={l.kind} /> },
+    { header: "编号", cell: (l) => <RefLink kind={l.kind === "LEAD" ? "lead" : "site"} no={l.no} className="txt-strong" /> },
     { header: "名称", cell: (l) => l.name },
     { header: "当前阶段", cell: (l) => <StatusBadge map={LC_PHASE} value={l.phase} /> },
+    { header: "进入时间", cell: (l) => <span className="text-muted-foreground">{fmtTime(l.phaseSince)}</span> },
     {
       header: "停留",
       className: "text-right",
@@ -667,18 +661,21 @@ function VenuesInner() {
         { header: "分成", value: (c) => `${(c.shareRate * 100).toFixed(0)}%` },
         { header: "进场费", value: (c) => c.entryFee },
         { header: "到期", value: (c) => fmtTime(c.endAt) },
-        { header: "状态", value: (c) => (c.status === "ACTIVE" ? "有效" : "过期") },
+        { header: "状态", value: (c) => CONTRACT_STATUS[c.status]?.label ?? c.status },
         { header: "扫描件", value: (c) => (c.attachments.length ? `${c.attachments.length} 份` : "缺") },
       ], pageRows<Contract>());
     } else if (tab === "crm") {
       exportCsv<Lead>("BD 拓展 CRM", [
         { header: "线索号", value: (l) => l.leadNo },
         { header: "场地名称", value: (l) => l.venueName },
-        { header: "联系人", value: (l) => l.contact },
-        { header: "阶段", value: (l) => LEAD_STAGE[l.stage].label },
-        { header: "负责人", value: (l) => l.owner },
+        { header: "地址", value: (l) => l.address ?? "" },
+        { header: "联系人", value: (l) => l.contact ?? "" },
+        { header: "阶段", value: (l) => LEAD_STAGE[l.stage]?.label ?? l.stage },
+        { header: "归属", value: (l) => (l.inPool ? "公共线索池" : l.owner ?? "") },
         { header: "预计站点数", value: (l) => l.expectSites },
-        { header: "更新时间", value: (l) => fmtTime(l.updatedAt) },
+        { header: "下次跟进", value: (l) => l.nextFollowAt?.slice(0, 10) ?? "" },
+        { header: "最后跟进", value: (l) => fmtTime(l.lastFollowAt ?? l.updatedAt) },
+        { header: "合同", value: (l) => l.contractNo ?? "" },
       ], pageRows<Lead>());
     } else if (tab === "onboarding") {
       exportCsv<VenueOnboarding>("门店 Onboarding", [
@@ -692,61 +689,109 @@ function VenuesInner() {
       ], pageRows<VenueOnboarding>());
     } else if (tab === "lifecycle") {
       exportCsv<LifecycleRow>("门店生命周期", [
-        { header: "类型", value: (l) => (l.kind === "LEAD" ? "商机" : "站点") },
+        { header: "类型", value: (l) => LC_KIND[l.kind].label },
         { header: "编号", value: (l) => l.no },
         { header: "名称", value: (l) => l.name },
-        { header: "当前阶段", value: (l) => LC_PHASE[l.phase].label },
+        { header: "当前阶段", value: (l) => LC_PHASE[l.phase]?.label ?? l.phase },
         { header: "停留天数", value: (l) => (l.daysInPhase == null ? "" : String(l.daysInPhase)) },
         { header: "负责人", value: (l) => l.owner ?? "" },
       ], pageRows<LifecycleRow>());
     }
   }
-  // 无数据时不给导出按钮：导出一个空 CSV 只会让人以为功能坏了
   const onExport = q.data?.list?.length ? exportCurrent : undefined;
   const archivedToggle = <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); paging.reset(); }} />;
+  const funnelLabel = (f: FunnelStage) => LC_PHASE[f.phase]?.label ?? f.phase;
 
   return (
     <div>
-      <TabHeader tabs={tabs} value={tab} onChange={setTab} />
+      <TabHeader tabs={tabs} value={tab} onChange={switchTab} />
       {tab === "venues" && (
         <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索场地方名称" onExport={onExport}
           onAdd={canVenue ? () => setVenueForm({ locationCount: 0 }) : undefined} addLabel="新增场地方">
           {archivedToggle}
         </Toolbar>
       )}
-      {tab === "contracts" && (
-        <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索场地方 / 站点" onExport={onExport}
-          onAdd={canContract ? () => setContractForm({ shareRate: 0.15, entryFee: 0 }) : undefined} addLabel="新增合同" />
-      )}
-      {tab === "crm" && (
-        <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索线索号 / 场地 / 负责人" onExport={onExport}
-          onAdd={canLead ? () => setLeadForm({ stage: "NEW", expectSites: 1 }) : undefined} addLabel="新增线索" />
-      )}
-      {tab === "onboarding" && (
-        <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索场地名称 / 联系人" onExport={onExport}
-          onAdd={canVenue ? () => setOnboardingForm({ status: "PENDING", industry: "购物中心" }) : undefined} addLabel="新增申请" />
-      )}
-      {tab === "lifecycle" && (
-        <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索站点号 / 名称 / 负责人" onExport={onExport} />
-      )}
-      {tab === "venues" && <DataTable rowKey={(v: Venue) => v.venueNo} columns={venueCols} rows={q.data?.list as Venue[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} rowClassName={archivedRowClass}
-        empty={showArchived ? "没有匹配的场地方——换个关键词，或先「新增场地方」" : "没有在用的场地方——可能都已归档（打开「显示已归档」查看），或先「新增场地方」建档"} />}
       {tab === "contracts" && summary.data && (
-        /* 摘要条的六个数都是**要人动手的事**，不是统计口径 ——
-           放「合同总数」没有意义：它不会让任何人去做任何事 */
+        /* 摘要条的六个数都是**要人动手的事**；点一张卡 = 筛出那个待办子集（R2），再点取消 */
         <div className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-6">
-          <SummaryCard label="待我审批" value={summary.data.pendingMine} />
+          <FilterCard label="待我审批" value={summary.data.pendingMine}
+            active={filters.pendingMine === "1"} onClick={() => toggleFilter("pendingMine", "1")} />
+          {/* 后三张「不可点」：列表接口没有对应的筛选参数，做成按钮只会筛出一个不相干的集合 */}
           <SummaryCard label="待财务会签" value={summary.data.pendingCosign} />
           <SummaryCard label="终止待审批" value={summary.data.terminationPending} />
-          <SummaryCard label="60 天内到期" value={summary.data.expiring60} />
-          <SummaryCard label="已到期未续" value={summary.data.expiredNotRenewed} />
+          <FilterCard label="60 天内到期" value={summary.data.expiring60}
+            active={!!filters.endTo && filters.status === "ACTIVE"}
+            onClick={() => {
+              const on = !(filters.endTo && filters.status === "ACTIVE");
+              const today = new Date().toISOString().slice(0, 10);
+              const d60 = new Date(Date.now() + 60 * 86400_000).toISOString().slice(0, 10);
+              setFilters((f) => ({ ...f, status: on ? "ACTIVE" : "", endFrom: on ? today : "", endTo: on ? d60 : "" }));
+              paging.reset();
+            }} />
+          <FilterCard label="已到期未续" value={summary.data.expiredNotRenewed}
+            active={filters.status === "EXPIRED"} onClick={() => toggleFilter("status", "EXPIRED")} />
           <SummaryCard label="缺签署件" value={summary.data.missingScan} />
         </div>
       )}
+      {tab === "contracts" && (
+        <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索合同号 / 场地方 / 站点" onExport={onExport}
+          onAdd={allow("location:contract:create") ? () => setContractForm({
+            shareRate: 0.15, entryFee: 0,
+            ...(siteNoParam ? { siteNo: siteNoParam, venueNo: sitesQ.data?.list.find((x) => x.siteNo === siteNoParam)?.venueNo ?? undefined } : {}),
+          }) : undefined} addLabel="新增合同">
+          <FilterSelect aria-label="状态" value={filters.status ?? ""} onChange={(v) => setFilter("status", v)}
+            options={CONTRACT_STATUS} allLabel="全部状态" />
+        </Toolbar>
+      )}
+      {tab === "crm" && (
+        <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索线索号 / 场地 / 负责人" onExport={onExport}
+          onAdd={canCrm ? () => setLeadForm({ ownerType: "STAFF", expectSites: 1 }) : undefined} addLabel="新增线索">
+          <FilterSelect aria-label="视图" value={filters.view || "ACTIVE"} onChange={(v) => setFilter("view", v === "ACTIVE" ? "" : v)}
+            options={LEAD_VIEW} />
+          <FilterSelect aria-label="阶段" value={filters.stage ?? ""} onChange={(v) => setFilter("stage", v)}
+            options={LEAD_STAGE} allLabel="全部阶段" />
+        </Toolbar>
+      )}
+      {siteNoParam && (
+        <Notice>
+          只看站点 <RefLink kind="site" no={siteNoParam} /> 的合同。站点要营业，须有一份生效中的合同 ——
+          没有就「新增合同」绑定这个站点。
+          <button className="ms-2 text-primary hover:underline" onClick={() => {
+            const q2 = new URLSearchParams(sp.toString());
+            q2.delete("siteNo");
+            router.replace(`${pathname}?${q2.toString()}`, { scroll: false });
+          }}>看全部合同</button>
+        </Notice>
+      )}
+      {tab === "crm" && inPool && (
+        <Notice>公共线索池：超过 30 天没人跟进的商机会被回收到这里（系统参数 lead.pool.recycle_days），负责人清空。谁认领谁负责，并重新计时。</Notice>
+      )}
+      {tab === "onboarding" && (
+        <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索场地名称 / 联系人" onExport={onExport}
+          onAdd={allow("location:venue:create") ? () => setOnboardingForm({ status: "PENDING", industry: "购物中心" }) : undefined} addLabel="新增申请" />
+      )}
+      {tab === "lifecycle" && funnel.data && (
+        /* 连续漏斗：签约前是商机五阶段，签约后是站点五状态；点一格筛下方列表（R2） */
+        <div className="mb-3 grid grid-cols-2 gap-2 md:grid-cols-5 xl:grid-cols-10">
+          {funnel.data.map((f) => (
+            <FilterCard key={`${f.kind}:${f.phase}`} label={`${f.kind === "LEAD" ? "商机" : "站点"} · ${funnelLabel(f)}`}
+              value={f.count} sub={f.avgDaysInPhase == null ? "—" : `平均停留 ${f.avgDaysInPhase.toFixed(1)} 天`}
+              active={filters.phase === f.phase} onClick={() => toggleFilter("phase", f.phase)} />
+          ))}
+        </div>
+      )}
+      {tab === "lifecycle" && (
+        <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索编号 / 名称 / 负责人" onExport={onExport}>
+          <FilterSelect aria-label="阶段" value={filters.phase ?? ""} onChange={(v) => setFilter("phase", v)}
+            options={LC_PHASE} allLabel="全部阶段" />
+        </Toolbar>
+      )}
+      {tab === "venues" && <DataTable rowKey={(v: Venue) => v.venueNo} columns={venueCols} rows={q.data?.list as Venue[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} rowClassName={archivedRowClass}
+        empty={showArchived ? "没有匹配的场地方——换个关键词，或先「新增场地方」" : "没有在用的场地方——可能都已归档（打开「显示已归档」查看），或先「新增场地方」建档"} />}
       {tab === "contracts" && <DataTable rowKey={(c: Contract) => c.contractNo} columns={ctCols} rows={q.data?.list as Contract[]} loading={q.isLoading} error={q.error} onRetry={q.refetch}
-        empty="暂无合同——合同绑定「场地方 × 站点」，请先建好两者再「新增合同」" />}
+        empty={Object.values(filters).some(Boolean) ? "没有符合筛选条件的合同——再点一次摘要卡或清空状态筛选" : "暂无合同——合同绑定「场地方 × 站点」，请先建好两者再「新增合同」，或从商机「签约转化」生成草稿"} />}
       {tab === "crm" && <DataTable rowKey={(l: Lead) => l.leadNo} columns={leadCols} rows={q.data?.list as Lead[]} loading={q.isLoading} error={q.error} onRetry={q.refetch}
-        empty="暂无线索——BD 拓展的场地线索会出现在这里，可点「新增线索」手工录入" />}
+        empty={inPool ? "线索池是空的——没有超期未跟进的商机被回收" : "暂无线索——BD 拓展的场地线索会出现在这里，可点「新增线索」手工录入"} />}
       {tab === "onboarding" && <DataTable rowKey={(o: VenueOnboarding) => o.onboardingNo} columns={onboardingCols} rows={q.data?.list as VenueOnboarding[]} loading={q.isLoading} error={q.error} onRetry={q.refetch}
         empty="暂无入驻申请——门店自助提交的申请会进入此列表待审核，也可点「新增申请」代录" />}
       {tab === "lifecycle" && <DataTable rowKey={(l: LifecycleRow) => `${l.kind}:${l.no}`} columns={lifecycleCols} rows={q.data?.list as LifecycleRow[]} loading={q.isLoading} error={q.error} onRetry={q.refetch}
@@ -771,7 +816,6 @@ function VenuesInner() {
         submitting={reviewOnboarding.isPending}
       />
 
-      {/* 场地方 新增/编辑 */}
       <FormDrawer
         open={!!venueForm}
         onOpenChange={(o) => !o && setVenueForm(null)}
@@ -785,12 +829,11 @@ function VenuesInner() {
         submitting={saveVenue.isPending}
       />
 
-      {/* 合同 新增/编辑 */}
       <FormDrawer
         open={!!contractForm}
         onOpenChange={(o) => !o && setContractForm(null)}
-        titleNew="新增合同"
-        titleEdit={`编辑合同 ${contractForm?.contractNo ?? ""}`}
+        titleNew="新增合同（草稿）"
+        titleEdit={`编辑合同草稿 ${contractForm?.contractNo ?? ""}`}
         isEdit={!!contractForm?.contractNo}
         fields={contractFields}
         value={(contractForm ?? {}) as Record<string, unknown>}
@@ -799,12 +842,11 @@ function VenuesInner() {
         submitting={saveContract.isPending}
       />
 
-      {/* 门店 Onboarding 审核 */}
       <FormDrawer
         open={!!onboardingForm}
         onOpenChange={(o) => !o && setOnboardingForm(null)}
         titleNew="新增 Onboarding 申请"
-        titleEdit={`审核申请 ${onboardingForm?.onboardingNo ?? ""}`}
+        titleEdit={`编辑申请 ${onboardingForm?.onboardingNo ?? ""}`}
         isEdit={!!onboardingForm?.onboardingNo}
         fields={ONBOARDING_FIELDS}
         value={(onboardingForm ?? {}) as Record<string, unknown>}
@@ -813,224 +855,73 @@ function VenuesInner() {
         submitting={saveOnboarding.isPending}
       />
 
-      {/* 合同详情：条款 · 流程 · 留痕 */}
-      <ContractDetailDrawer contractNo={detailNo} onOpenChange={(o) => !o && setDetailNo(null)} />
-
-      {/* 审批：运营环节与财务会签共用一个抽屉——两者的表单完全一样（通过/驳回 + 理由），
-          差别只在调哪个端点，由 auditStage 决定 */}
-      <Drawer
-        open={!!auditRow}
-        onOpenChange={(o) => !o && setAuditRow(null)}
-        title={`审批合同 ${auditRow?.contractNo ?? ""}`}
-        desc="驳回必须写原因——提交人看到的只有这句话，不写他只能猜哪里不合适"
-        width="w-[520px]"
-      >
-        {auditRow && (() => {
-          const stage = auditRow.flow?.auditStage ?? "OPS";
-          const kind = stage === "FINANCE" ? "cosign" as const : "audit" as const;
-          return (
-            <>
-              <Field label="当前环节">{stage === "FINANCE" ? "财务会签" : "运营审条款"}</Field>
-              <Field label="场地方 / 站点">{auditRow.venueName} · {auditRow.siteName}</Field>
-              <Field label="分成 / 进场费">
-                <span className="tabular-nums">{(auditRow.shareRate * 100).toFixed(0)}%</span>
-                <span className="ms-3 tabular-nums">{auditRow.entryFee}</span>
-              </Field>
-              <Field label="意见">
-                <Input className="w-full" value={auditNote} placeholder="驳回时必填；通过可留空"
-                  onChange={(e) => setAuditNote(e.target.value)} />
-              </Field>
-              <div className="mt-4 flex gap-2">
-                <Button disabled={act.isPending}
-                  onClick={() => act.mutate({ kind, no: auditRow.contractNo, result: "APPROVE", reason: auditNote || undefined })}
-                >通过</Button>
-                <Button variant="outline" disabled={act.isPending || !auditNote.trim()}
-                  onClick={() => act.mutate({ kind, no: auditRow.contractNo, result: "REJECT", reason: auditNote })}
-                >驳回</Button>
-                {!auditNote.trim() && <span className="self-center txt-caption text-muted-foreground">驳回需先填写意见</span>}
-              </div>
-            </>
-          );
-        })()}
-      </Drawer>
-
-      {/* 登记签署：签署日 + 扫描件。扫描件走附件抽屉上传，这里只登记日期 */}
-      <Drawer
-        open={!!signRow}
-        onOpenChange={(o) => !o && setSignRow(null)}
-        title={`登记签署 ${signRow?.contractNo ?? ""}`}
-        desc="签署日是计费与到期的起算依据；扫描件请在「附件」里上传"
-        width="w-[460px]"
-        footer={signRow && (
-          <>
-            <Button variant="outline" onClick={() => setSignRow(null)}>取消</Button>
-            <Button disabled={act.isPending || !signedAt}
-              onClick={() => act.mutate({ kind: "sign", no: signRow.contractNo, signedAt })}>确认</Button>
-          </>
-        )}
-      >
-        {signRow && (
-          <>
-            <Field label="签署日">
-              <Input type="date" className="w-full" value={signedAt} onChange={(e) => setSignedAt(e.target.value)} />
-            </Field>
-            {!signRow.attachments.length && (
-              <Field label="提醒">
-                <span className="text-[var(--warning)]">这份合同还没有扫描件 —— 登记签署不会拦你，但对账时拿不出凭据</span>
-              </Field>
-            )}
-          </>
-        )}
-      </Drawer>
-
-      {/* 申请终止：审批期间合同照常生效，这一点要写在界面上，否则运营会以为点完就停了 */}
-      <Drawer
-        open={!!termRow}
-        onOpenChange={(o) => !o && setTermRow(null)}
-        title={`申请终止 ${termRow?.contractNo ?? ""}`}
-        desc="提交后进入审批。审批期间合同照常生效，获批后到生效日才真正终止"
-        width="w-[520px]"
-        footer={termRow && (
-          <>
-            <Button variant="outline" onClick={() => setTermRow(null)}>取消</Button>
-            <Button disabled={act.isPending || !termReason.trim()}
-              onClick={() => act.mutate({ kind: "terminate", no: termRow.contractNo, reason: termReason, effectiveAt: termEffectiveAt })}
-            >提交申请</Button>
-          </>
-        )}
-      >
-        {termRow && (
-          <>
-            <Field label="终止原因">
-              <Input className="w-full" value={termReason} placeholder="如：场地方要求提前撤场"
-                onChange={(e) => setTermReason(e.target.value)} />
-            </Field>
-            <Field label="生效日">
-              <Input type="date" className="w-full" value={termEffectiveAt}
-                onChange={(e) => setTermEffectiveAt(e.target.value)} />
-              <div className="mt-1 txt-caption text-muted-foreground">
-                留空 = 获批后立即终止；填了则到那一天由系统终止
-              </div>
-            </Field>
-          </>
-        )}
-      </Drawer>
-
-      {/* BD 线索 新增/编辑 */}
       <FormDrawer
         open={!!leadForm}
         onOpenChange={(o) => !o && setLeadForm(null)}
         titleNew="新增线索"
-        titleEdit={`编辑线索 ${leadForm?.leadNo ?? ""}`}
+        titleEdit={`编辑商机档案 ${leadForm?.leadNo ?? ""}`}
         isEdit={!!leadForm?.leadNo}
         fields={leadFields}
         value={(leadForm ?? {}) as Record<string, unknown>}
-        onChange={(v) => setLeadForm(v as Partial<Lead>)}
+        onChange={(v) => setLeadForm(v as LeadSaveReq)}
         onSubmit={() => leadForm && saveLead.mutate(leadForm)}
         submitting={saveLead.isPending}
+        width="w-[520px]"
       />
 
-      {/*
-        线索详情 + 跟进时间线。时间线与「记一条跟进」放同一个抽屉：BD 现实里是「看完历史顺手记一条」，
-        拆成两个抽屉会多一次开合，而记跟进恰恰是最需要低摩擦的动作（摩擦一大就没人记，阶段就变成黑箱）。
-      */}
-      <Drawer
-        open={!!leadDetail}
-        onOpenChange={(o) => !o && setLeadDetail(null)}
-        title={leadDetail ? `线索 ${leadDetail.leadNo} · ${leadDetail.venueName}` : ""}
-        desc="跟进记录是 append-only 流水：只能新增，不能改也不能删，阶段变化必须由某一条跟进来解释"
-        width="w-[560px]"
-      >
-        {leadDetail && (<>
-          <Field label="场地 / 联系人">{leadDetail.venueName} · {leadDetail.contact}</Field>
-          <Field label="当前阶段">
-            <StatusBadge map={LEAD_STAGE} value={leadDetail.stage} />
-            <span className="ml-2 text-muted-foreground">负责人 {leadDetail.owner} · 预计 {leadDetail.expectSites} 站</span>
-          </Field>
-          <Field label="跟进记录">
-            <Timeline
-              loading={followUpsQ.isLoading}
-              empty="尚无跟进记录——这条线索还没人接触过，可在下方记第一条"
-              items={(followUpsQ.data?.list ?? []).map((x) => ({
-                key: x.followNo,
-                badge: { label: FOLLOW_CHANNEL_LABEL[x.channel], tone: "outline" as const },
-                meta: `${fmtTime(x.createdAt)} · ${x.owner}${x.nextAt ? ` · 下次 ${x.nextAt}` : ""}`,
-                // 阶段没动的跟进只显示当时阶段，不造「A → A」的假迁移
-                change: x.fromStage
-                  ? `${LEAD_STAGE[x.fromStage].label} → ${LEAD_STAGE[x.toStage].label}`
-                  : `阶段 ${LEAD_STAGE[x.toStage].label}`,
-                text: x.content,
-              }))}
-            />
-          </Field>
+      {/* —— 详情抽屉：按当前 tab 与 ?no= 打开 —— */}
+      <ContractDetailDrawer
+        contractNo={tab === "contracts" ? detailNo : null}
+        onOpenChange={(o) => !o && closeDetail()}
+        onEdit={(c) => setContractForm(c)}
+        onAttach={openAttach}
+      />
+      <LeadDetailDrawer
+        leadNo={tab === "crm" ? detailNo : null}
+        onOpenChange={(o) => !o && closeDetail()}
+        onEdit={(l) => setLeadForm(leadToForm(l))}
+      />
+      <OnboardingDetailDrawer
+        onboardingNo={tab === "onboarding" ? detailNo : null}
+        onOpenChange={(o) => !o && closeDetail()}
+        actions={onboardingActions}
+      />
+      {contractActions.ui}
 
-          {canLead ? (
-            <div className="mt-4 border-t border-[var(--border)] pt-4">
-              <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">记一条跟进</div>
-              <Field label="跟进方式">
-                <Select className="w-full" value={fuChannel} onChange={(e) => setFuChannel(e.target.value as LeadFollowChannel)}>
-                  {LEAD_FOLLOW_CHANNELS.map((c) => <option key={c} value={c}>{FOLLOW_CHANNEL_LABEL[c]}</option>)}
-                </Select>
-              </Field>
-              <Field label="跟进内容">
-                <Input className="w-full" value={fuContent} placeholder="如：现场看点位，谈分成比例，对方要求月结"
-                  onChange={(e) => setFuContent(e.target.value)} />
-              </Field>
-              {/* 阶段与跟进同一次提交：先记录再改阶段会漏，改了阶段没记录更糟 */}
-              <Field label="顺带推进阶段（可不选）">
-                <Select className="w-full" value={fuStage} onChange={(e) => setFuStage(e.target.value as LeadStage | "")}>
-                  <option value="">不改阶段，仅记跟进</option>
-                  {LEAD_STAGE_OPTIONS.filter((o) => o.value !== leadDetail.stage).map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="下次跟进（可不填）">
-                <DateInput value={fuNextAt} onChange={(e) => setFuNextAt(e.target.value)} />
-              </Field>
-              <Button
-                size="sm"
-                disabled={addFollowUp.isPending || !fuContent.trim()}
-                onClick={() => addFollowUp.mutate({ leadNo: leadDetail.leadNo })}
-              >记录跟进</Button>
-            </div>
-          ) : (
-            <ReadOnlyNotice className="mt-4" what="线索跟进" perm="location:lead:update" note="不能新增跟进记录，也不能推进阶段" />
-          )}
-        </>)}
-      </Drawer>
-
-      {/*
-        合同扫描件（拍板点 #3：**做假上传**）。选文件后只取 File.name / File.size 登记一条记录，
-        字节流既不读也不传 —— 所以列表里没有「下载/预览」入口：给一个点不开的链接比明确没有更难查。
-        交互保留真实上传的全部环节（选文件 → 校验格式/大小 → 落库 → 列表出现 → 可移除）。
-      */}
+      {/* 合同扫描件：先经文件服务上传（选文件即传），再「挂到合同上」—— 没点挂上的文件不算合同附件 */}
       <Drawer
         open={!!attachRow}
         onOpenChange={(o) => !o && setAttachRow(null)}
-        title={attachRow ? `合同附件 ${attachRow.contractNo}` : ""}
-        desc="进场合同扫描件。当前为 mock 阶段：只登记文件名与大小，文件本体不会被上传或保存"
+        title={attachRow ? `合同扫描件 ${attachRow.contractNo}` : ""}
+        desc="盖章扫描件是对账时的凭据。已到期或已终止的合同不再收附件"
         width="w-[560px]"
+        footer={attachRow && allow("location:contract:update") && (<>
+          <Button variant="outline" onClick={() => setAttachRow(null)}>关闭</Button>
+          <Button disabled={addAttach.isPending || !attachFiles.length}
+            onClick={() => addAttach.mutate({ contractNo: attachRow.contractNo, fileNos: attachFiles })}>
+            挂到合同上{attachFiles.length ? `（${attachFiles.length}）` : ""}
+          </Button>
+        </>)}
       >
         {attachRow && (<>
           <Field label="合同">{attachRow.venueName} · {attachRow.siteName}</Field>
-          <Field label="已登记扫描件">
+          <Field label="已挂的扫描件">
             {attachRow.attachments.length === 0 ? (
-              <span className="text-muted-foreground">暂无扫描件——合同签回后请把扫描件登记在此，便于对账时追溯分成口径</span>
+              <span className="text-muted-foreground">还没有扫描件——合同签回后请把扫描件挂在这里，便于对账时追溯分成口径</span>
             ) : (
               <ul className="space-y-2">
                 {attachRow.attachments.map((a) => (
                   <li key={a.attachNo} className="flex items-center gap-2 rounded-field bg-muted px-3 py-2">
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium">{a.fileName}</div>
-                      <div className="text-xs text-muted-foreground tabular-nums">
-                        {a.attachNo} · {fmtSize(a.size)} · {a.uploadedBy} · {fmtTime(a.uploadedAt)}
+                      {a.fileNo ? <FileLink fileNo={a.fileNo} label={a.fileName} /> : <div className="truncate txt-body">{a.fileName}</div>}
+                      <div className="txt-caption text-muted-foreground tabular-nums">
+                        {a.attachNo} · {fileSize(a.size)} · {a.uploadedBy} · {fmtTime(a.uploadedAt)}
                       </div>
                     </div>
-                    {canContract && (
+                    {allow("location:contract:update") && (
                       <Button size="sm" variant="outline" disabled={removeAttach.isPending}
                         onClick={async () => {
-                          if (await confirm({ title: "移除附件", desc: `确认移除「${a.fileName}」？附件记录会直接消失，不进归档。`, confirmText: "移除", danger: true })) {
+                          if (await confirm({ title: "移除附件", desc: `确认移除「${a.fileName}」？移除会留痕，但合同上不再显示它。`, confirmText: "移除", danger: true })) {
                             removeAttach.mutate({ contractNo: attachRow.contractNo, attachNo: a.attachNo });
                           }
                         }}
@@ -1041,29 +932,11 @@ function VenuesInner() {
               </ul>
             )}
           </Field>
-
-          {canContract ? (<>
-            <Notice>
-              仅接受 {ATTACH_ACCEPT_LABEL}，单份不超过 {ATTACH_MAX_MB}MB。当前为假上传：文件内容不会离开本机，
-              系统只记下文件名、大小、上传人与时间；接后端后同一入口会改为真实上传。
-            </Notice>
-            {/* 圆角走五档：外框是控件槽（field），里面那颗按钮同档
-                ——原先外框取 --radius 别名、按钮取 Tailwind 默认阶 */}
-            <Field label="选择扫描件">
-              <input
-                type="file"
-                accept={ATTACH_ACCEPT}
-                disabled={addAttach.isPending}
-                className="block w-full cursor-pointer rounded-field bg-secondary p-2.5 text-sm file:me-3 file:cursor-pointer file:rounded-field file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-primary-foreground disabled:opacity-50"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  // 立刻清空 input：同一份文件被拒（超限/同名）后要能原样重选，否则 change 不再触发
-                  e.target.value = "";
-                  if (f) addAttach.mutate({ contractNo: attachRow.contractNo, fileName: f.name, size: f.size });
-                }}
-              />
+          {allow("location:contract:update") ? (
+            <Field label={`上传（${FILE_CATEGORY_RULES.CONTRACT_SCAN.accept}，单份不超过 ${FILE_CATEGORY_RULES.CONTRACT_SCAN.maxMb}MB）`}>
+              <FileField value={attachFiles} onChange={setAttachFiles} category="CONTRACT_SCAN" max={5} />
             </Field>
-          </>) : (
+          ) : (
             <ReadOnlyNotice className="mt-4" what="合同维护" perm="location:contract:update" note="不能上传或移除扫描件" />
           )}
         </>)}

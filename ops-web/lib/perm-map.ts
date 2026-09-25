@@ -123,8 +123,12 @@ export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   "finance:payout_account:update": "finance:payout_account:update",
   // ——— location ———
   "location:analysis:read": "location:analysis:read",
+  "location:contract:audit": "location:contract:audit",
+  "location:contract:cosign": "location:contract:cosign",
   "location:contract:create": "location:contract:create",
   "location:contract:read": "location:contract:read",
+  "location:contract:submit": "location:contract:submit",
+  "location:contract:terminate": "location:contract:terminate",
   "location:contract:update": "location:contract:update",
   "location:crm:read": "location:crm:read",
   "location:crm:update": "location:crm:update",

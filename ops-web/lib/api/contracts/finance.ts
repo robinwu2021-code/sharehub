@@ -1,11 +1,12 @@
 // 覆盖范围：分账规则与流水、总账、结算、提现审批、对账、发票、分润统计、充值订单。
-import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ , ReportQ, PayoutAccountQ, WithdrawalQ } from "../query";
+import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ , ReportQ, PayoutAccountQ, WithdrawalQ, AdjustmentQ } from "../query";
 import type {
   PageResult, ShareRule, LedgerEntry, Settlement, SettlementDraft, Withdrawal,
   ShareRecord, Reconcile, ReconAction, ReconDiff, ReconStats, Invoice, InvoiceView, ShareSummary, RechargeOrder,
 
   VoucherDetail,
   VoucherCreatePayload, PayoutAccount, PayReceiptPayload, WithdrawApplyPayload,
+  SettlementView, Statement, StatementLang, Adjustment, AdjustmentConfirmPayload,
 } from "../../types";
 
 export interface FinanceApi {
@@ -69,6 +70,22 @@ export interface FinanceApi {
   confirmSettlement(settleNo: string, operatorName?: string): Promise<Settlement>;
   /** 结算单构成明细：这张单的钱是哪几笔分润凑出来的。 */
   listSettlementRecords(settleNo: string, q?: PageQ): Promise<PageResult<ShareRecord>>;
+  /** 结算单详情（深链 `?no=` 用）：本体 + 构成行。权限码 `finance:settlement:read`。 */
+  getSettlement(settleNo: string): Promise<SettlementView>;
+  /** 场地方对账单（结构化）：订单汇总 + 按合同 × 比例的分成 + 调整项 → 本期应付。 */
+  getSettlementStatement(settleNo: string): Promise<Statement>;
+  /**
+   * 可打印对账单（整页 HTML，**不走统一信封**）。要带登录令牌，所以不能用普通链接打开 ——
+   * 取回 HTML 后由页面开 blob 窗口，用户在浏览器里「打印 → 存为 PDF」。
+   */
+  getSettlementStatementHtml(settleNo: string, lang: StatementLang): Promise<string>;
+
+  // === 结算调整项（C9 · G2）：撤场押金 / 进场费结清 / 保底补差，并入下一次出账 ===
+  listSettlementAdjustments(q?: AdjustmentQ): Promise<PageResult<Adjustment>>;
+  /** 确认（PENDING → CONFIRMED）。金额可改，**改了必须写 note**。权限码 `finance:settlement:confirm`。 */
+  confirmSettlementAdjustment(adjNo: string, body: AdjustmentConfirmPayload): Promise<Adjustment>;
+  /** 作废（PENDING / CONFIRMED → VOID），原因必填；已并入结算单的不能作废。 */
+  voidSettlementAdjustment(adjNo: string, reason: string): Promise<Adjustment>;
 
   // === 财务扩展 tab ===
   listShareRecords(q?: ShareRecordQ): Promise<PageResult<ShareRecord>>;

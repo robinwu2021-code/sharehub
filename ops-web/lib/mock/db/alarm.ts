@@ -4,18 +4,23 @@
 import type {
   AlarmCode, AlarmRecord, AlarmNotice, AlarmRule, AlarmAckResult, AlarmWorkOrderRef,
   AlarmNoticeResendPayload, PageQuery,
-
-  AutoWorkOrderResult, AlarmCloseReason,} from "../../types";
+  AutoWorkOrderResult, AlarmCloseReason, AlarmBusinessCode, AlarmBusinessInfo, AlarmLogItem,
+  AlarmLogEvent, AlarmTodo, AlarmDomain, AlarmSubjectType, AlarmCause, AlarmDisposition,
+  WorkOrderPriority, AlarmLevel,
+} from "../../types";
+import type { AlarmQ } from "../../api/query";
 import { ALARM_TRANSITIONS, canAlarmAction, ALARM_CLOSE_REASONS } from "../../types";
 import { LOCS, OPERATORS, p, iso, phone } from "./internal";
 import { notFound, fail } from "@/lib/biz-error";
 import { paginate, kwHit, upsert, nextNo, liveHit, archiveRow, unarchiveRow } from "./helpers";
 import { cabinets } from "./device";
+import { sites } from "./location";
 // 触达拉黑与脱敏口径住在 system.ts（系统设置域）：告警通知与业务通知走同一条触达链路，
 // 拉黑名单必须共用一份 —— 各域自己维护一份「谁退订了」等于拉黑形同不存在。
 import { notifyBlacklist, maskTarget } from "./system";
 
-export const alarmCodes: AlarmCode[] = [
+type DeviceCodeSeed = Omit<AlarmCode, "messageEn" | "messageAr" | "business">;
+const DEVICE_CODES: DeviceCodeSeed[] = [
   { code: "OFFLINE", message: "柜机离线", level: "CRITICAL", suggestion: "检查网络与供电；10 分钟未恢复派现场工单", autoWorkOrder: true, archivedAt: null },
   { code: "SLOT_STUCK", message: "卡槽卡宝", level: "CRITICAL", suggestion: "远程弹仓一次；仍失败则锁槽并派维修", autoWorkOrder: true, archivedAt: null },
   { code: "LOCK_FAIL", message: "锁扣异常", level: "CRITICAL", suggestion: "锁槽止损，安排更换锁扣模块", autoWorkOrder: true, archivedAt: null },
@@ -28,14 +33,64 @@ export const alarmCodes: AlarmCode[] = [
   { code: "SCREEN_FAULT", message: "广告屏异常", level: "INFO", suggestion: "不影响借还；并入巡检批量处理", autoWorkOrder: false, archivedAt: null },
 ];
 
+/**
+ * 业务告警码（2026-09-25 裁决 #3：设备错误码降为信号，告警中心只放业务告警）。
+ *
+ * 取自后端 V 迁移里的内置码（字段值逐个对过真后端 `/api/ops/alarms/codes`），挑每个域至少一条：
+ * mock 下只种一个域的话，「按域分段」在页面上永远只有一段有数，等于没做。
+ */
+const bizCode = (
+  code: string, message: string, messageEn: string, level: AlarmLevel, suggestion: string,
+  b: Partial<AlarmBusinessCode> & Pick<AlarmBusinessCode, "domain" | "subjectType" | "evalType" | "basePriority" | "disposition">,
+): AlarmCode => ({
+  code, message, messageEn, messageAr: null, level, suggestion, autoWorkOrder: false, archivedAt: null,
+  business: {
+    holdMinutes: null, windowMinutes: null, threshold: null, businessHoursOnly: false, impactAdjust: true,
+    ownerRole: null, woDelayMinutes: 0, mergeScope: "DEVICE", recoverRule: "SIGNAL_CLEAR", recoverHoldMinutes: 0,
+    supersedes: null, enabled: true, builtin: true, ...b,
+  },
+});
+
+export const BUSINESS_CODES: AlarmCode[] = [
+  bizCode("SITE_UNRENTABLE", "站点借不到", "Site unrentable", "CRITICAL", "整站没有可借的宝：离线先联系场地查电源网络，无宝安排补货",
+    { domain: "AVAILABILITY", subjectType: "SITE", evalType: "STATE", holdMinutes: 10, basePriority: "HIGH", disposition: "WORK_ORDER", mergeScope: "SITE", supersedes: "CABINET_UNRENTABLE" }),
+  bizCode("CABINET_UNRENTABLE", "单柜借不到", "Cabinet unrentable", "WARN", "该柜无可借宝：离线查网络供电，无宝补货，停借查故障",
+    { domain: "AVAILABILITY", subjectType: "CABINET", evalType: "STATE", holdMinutes: 10, basePriority: "MEDIUM", disposition: "WORK_ORDER", woDelayMinutes: 30 }),
+  bizCode("SITE_UNRETURNABLE", "站点还不了", "Site unreturnable", "CRITICAL", "整站无空仓：满柜取宝，离线或锁故障派维修；C 端已提示最近可还站点",
+    { domain: "RETURNABILITY", subjectType: "SITE", evalType: "STATE", holdMinutes: 10, basePriority: "HIGH", disposition: "WORK_ORDER", mergeScope: "SITE", supersedes: "CABINET_UNRETURNABLE" }),
+  bizCode("RENT_NOT_DELIVERED", "付了款没拿到宝", "Paid but not delivered", "CRITICAL", "系统自动撤单并释放预授权；失败转客服主动联系用户",
+    { domain: "TRANSACTION", subjectType: "ORDER", evalType: "STATE", holdMinutes: 5, basePriority: "HIGH", disposition: "AUTO_FIX", ownerRole: "CS" }),
+  bizCode("BATTERY_HAZARD", "充电宝有安全隐患", "Battery hazard", "CRITICAL", "已锁仓；立即派人现场处置，通知场地联系人",
+    { domain: "SAFETY", subjectType: "SLOT", evalType: "EVENT", basePriority: "URGENT", impactAdjust: false, disposition: "WORK_ORDER", recoverRule: "DISPOSITION_DONE" }),
+  bizCode("POWERBANK_MISSING", "充电宝失联", "Powerbank missing", "WARN", "仓管核查最后位置（最后所在柜、最后订单、调拨单）；找回后告警自动消除",
+    { domain: "ASSET", subjectType: "POWERBANK", evalType: "STATE", holdMinutes: 0, basePriority: "MEDIUM", disposition: "TODO", ownerRole: "OPS" }),
+  bizCode("SITE_LOW_YIELD", "低效站点", "Low-yield site", "INFO", "迁机或撤场评估：先看摆放位置、场地客流与竞品，再决定迁到高效站点还是发起撤场",
+    { domain: "REVENUE", subjectType: "SITE", evalType: "METRIC", threshold: 5, basePriority: "LOW", disposition: "TODO", ownerRole: "BD" }),
+  bizCode("SITE_OWNER_MISSING", "站点无人运维", "Site owner missing", "WARN", "指定运维责任人，否则自动工单派不出去",
+    { domain: "SERVICE", subjectType: "SITE", evalType: "STATE", holdMinutes: 0, basePriority: "MEDIUM", disposition: "TODO", ownerRole: "OPS" }),
+  bizCode("SITE_WITHOUT_CONTRACT", "无合同在营业", "Site without contract", "CRITICAL", "补签合同或发起撤场；站点不自动停业",
+    { domain: "PARTNER", subjectType: "SITE", evalType: "STATE", holdMinutes: 0, basePriority: "HIGH", disposition: "TODO", ownerRole: "BD" }),
+  bizCode("CONTRACT_EXPIRING", "合同即将到期", "Contract expiring", "INFO", "续签或撤场评估：60 天起报，30 / 7 天升级；续签合同提交后自动消除",
+    { domain: "PARTNER", subjectType: "CONTRACT", evalType: "STATE", holdMinutes: 0, threshold: 60, basePriority: "LOW", disposition: "TODO", ownerRole: "BD" }),
+  bizCode("REFUND_FAILED", "退款失败", "Refund failed", "WARN", "财务处理，并通知客服",
+    { domain: "FUND", subjectType: "PAYMENT", evalType: "EVENT", basePriority: "HIGH", disposition: "TODO", ownerRole: "FINANCE", recoverRule: "DISPOSITION_DONE" }),
+  bizCode("WO_SLA_BREACH", "工单超时", "Work order SLA breach", "WARN", "升级通知；代理的单可由平台接管",
+    { domain: "SERVICE", subjectType: "WORK_ORDER", evalType: "STATE", holdMinutes: 0, basePriority: "MEDIUM", disposition: "NOTIFY", ownerRole: "OPS", enabled: false }),
+];
+
+export const alarmCodes: AlarmCode[] = [
+  ...DEVICE_CODES.map((c) => ({ ...c, messageEn: null, messageAr: null, business: null })),
+  ...BUSINESS_CODES,
+];
+
 // 厂商原始错误码风格各不相同：cd-tech=E2xx，sd-power=ERR-nn，chargenow=0x1Fxx
 const vendorErr = (vendorCode: string, i: number) =>
   vendorCode === "cd-tech" ? `E${200 + (i % 40)}`
   : vendorCode === "sd-power" ? `ERR-${10 + (i % 30)}`
   : `0x1F${String(i % 100).padStart(2, "0")}`;
 
-export const alarmRecords: AlarmRecord[] = Array.from({ length: 14 }, (_, i) => {
-  const def = p(alarmCodes, i);
+const deviceAlarms: AlarmRecord[] = Array.from({ length: 14 }, (_, i) => {
+  const def = p(DEVICE_CODES, i);
   const cab = p(cabinets, i * 3);
   const st = p(["OPEN", "OPEN", "ACKED", "CLOSED"] as const, i);
   return {
@@ -64,8 +119,141 @@ export const alarmRecords: AlarmRecord[] = Array.from({ length: 14 }, (_, i) => 
     closeNote: st === "CLOSED" ? "现场确认后关闭" : null,
     closedBy: st === "CLOSED" ? "admin" : null,
     closedAt: st === "CLOSED" ? iso(-2 - (i % 5)) : null,
+    dedupKey: `${def.code}:${cab.cabinetNo}`,
+    // 存量设备告警没有业务维度（后端同样回 null）—— 页面必须能渲染这种行，而不是只认业务告警
+    business: null,
   };
 });
+
+/**
+ * 业务告警种子（source=EVAL）。每行的主体、成因、处置都按码的配置来 ——
+ * 随手编的话，「处置预览说开工单、而码配的是待办」这种自相矛盾在 mock 下就看不出来。
+ *
+ * 覆盖的形态：未处置（到期未开单）/ 已开单未关 / 挂待办 / 已自愈关闭 / 被站点级取代的柜级子告警 / 安全域。
+ */
+const bizAlarm = (
+  i: number, code: string, st: AlarmRecord["status"],
+  x: { subjectType: AlarmSubjectType; subjectNo: string; cause: AlarmCause; priority: WorkOrderPriority;
+       siteIdx: number; cabinetNo?: string | null; disposition?: AlarmDisposition | null; ref?: string | null;
+       parent?: string | null; inFlight?: number; closeReason?: AlarmCloseReason | null },
+): AlarmRecord => {
+  const def = BUSINESS_CODES.find((c) => c.code === code)!;
+  const site = p(sites, x.siteIdx);
+  const at = iso(i * 2400_000 + 600_000);
+  const biz: AlarmBusinessInfo = {
+    domain: def.business!.domain as AlarmDomain, subjectType: x.subjectType, subjectNo: x.subjectNo, cause: x.cause,
+    priority: x.priority, impactScope: x.subjectType === "SITE" ? "SITE" : x.subjectType === "CABINET" ? "CABINET"
+      : x.subjectType === "SLOT" ? "SLOT" : x.subjectType === "ORDER" ? "ORDER" : "ENTITY",
+    impactPeriod: i % 3 === 0 ? "PEAK" : "OPEN", siteTier: p(["A", "B", "C"], x.siteIdx), inFlightOrders: x.inFlight ?? 0,
+    dispositionType: x.disposition ?? null, dispositionRef: x.ref ?? null,
+    firstOccurredAt: at, lastOccurredAt: at, dueAt: at, recoveredAt: st === "CLOSED" ? iso(i * 2400_000) : null,
+    parentAlarmNo: x.parent ?? null,
+  };
+  return {
+    alarmNo: `ALM${48000 + i}`, cabinetNo: x.cabinetNo ?? null, siteNo: site.siteNo, siteName: site.name,
+    agentNo: site.agentNo ?? null, source: "EVAL", vendorCode: null, alarmCode: code,
+    vendorErrorCode: null, level: def.level, occurredAt: at, status: st,
+    workOrderNo: x.disposition === "WORK_ORDER" ? x.ref ?? null : null, count: 1, remark: null,
+    dedupKey: `${code}:${x.subjectType}:${x.subjectNo}`,
+    closeReason: st === "CLOSED" ? x.closeReason ?? "SELF_HEALED" : null,
+    closeNote: st === "CLOSED" ? "信号恢复，系统自动关闭" : null,
+    closedBy: st === "CLOSED" ? "SYSTEM" : null, closedAt: st === "CLOSED" ? iso(i * 2400_000) : null,
+    business: biz,
+  };
+};
+
+const cabOf = (i: number) => p(cabinets, i).cabinetNo;
+const businessAlarms: AlarmRecord[] = [
+  // 站点借不到：已开维修单，整站 · 高峰 → 紧急；下面挂一条被它取代的柜级告警
+  bizAlarm(0, "SITE_UNRENTABLE", "OPEN", { subjectType: "SITE", subjectNo: sites[0].siteNo, cause: "OFFLINE", priority: "URGENT", siteIdx: 0, disposition: "WORK_ORDER", ref: "WO70003", inFlight: 3 }),
+  bizAlarm(1, "CABINET_UNRENTABLE", "OPEN", { subjectType: "CABINET", subjectNo: cabOf(0), cabinetNo: cabOf(0), cause: "OFFLINE", priority: "MEDIUM", siteIdx: 0, parent: "ALM48000" }),
+  // 站点还不了：到期未处置（开单延迟内）—— 「立即处置」的样本
+  bizAlarm(2, "SITE_UNRETURNABLE", "OPEN", { subjectType: "SITE", subjectNo: sites[1].siteNo, cause: "FULL", priority: "HIGH", siteIdx: 1 }),
+  bizAlarm(3, "CABINET_UNRENTABLE", "ACKED", { subjectType: "CABINET", subjectNo: cabOf(6), cabinetNo: cabOf(6), cause: "NO_STOCK", priority: "MEDIUM", siteIdx: 2 }),
+  // 交易：付了款没拿到宝，自愈成功已关
+  bizAlarm(4, "RENT_NOT_DELIVERED", "CLOSED", { subjectType: "ORDER", subjectNo: "ORD100004", cause: "CANCEL_FAILED", priority: "HIGH", siteIdx: 3, disposition: "AUTO_FIX", closeReason: "AUTO_FIXED" }),
+  // 安全：只能随处置完成关闭
+  bizAlarm(5, "BATTERY_HAZARD", "OPEN", { subjectType: "SLOT", subjectNo: `${cabOf(9)}#3`, cabinetNo: cabOf(9), cause: "HAZARD", priority: "URGENT", siteIdx: 4, disposition: "WORK_ORDER", ref: "WO70009" }),
+  // 资产 / 经营 / 服务 / 合作 / 资金：落待办
+  bizAlarm(6, "POWERBANK_MISSING", "OPEN", { subjectType: "POWERBANK", subjectNo: "PB200017", cause: "MISSING", priority: "MEDIUM", siteIdx: 5, disposition: "TODO", ref: "ATD8001" }),
+  bizAlarm(7, "SITE_LOW_YIELD", "OPEN", { subjectType: "SITE", subjectNo: sites[6].siteNo, cause: "LOW_YIELD", priority: "LOW", siteIdx: 6, disposition: "TODO", ref: "ATD8002" }),
+  bizAlarm(8, "SITE_OWNER_MISSING", "OPEN", { subjectType: "SITE", subjectNo: sites[7].siteNo, cause: "SLA_BELOW", priority: "MEDIUM", siteIdx: 7 }),
+  bizAlarm(9, "SITE_WITHOUT_CONTRACT", "OPEN", { subjectType: "SITE", subjectNo: sites[8].siteNo, cause: "NO_CONTRACT", priority: "HIGH", siteIdx: 8, disposition: "TODO", ref: "ATD8003" }),
+  bizAlarm(10, "CONTRACT_EXPIRING", "OPEN", { subjectType: "CONTRACT", subjectNo: "CT401", cause: "EXPIRING", priority: "LOW", siteIdx: 1, disposition: "TODO", ref: "ATD8004" }),
+  bizAlarm(11, "REFUND_FAILED", "OPEN", { subjectType: "PAYMENT", subjectNo: "RF500011", cause: "CANCEL_FAILED", priority: "HIGH", siteIdx: 9, disposition: "TODO", ref: "ATD8005" }),
+  bizAlarm(12, "SITE_UNRENTABLE", "CLOSED", { subjectType: "SITE", subjectNo: sites[10].siteNo, cause: "NO_STOCK", priority: "HIGH", siteIdx: 10 }),
+];
+
+/**
+ * 存量设备告警在前、业务告警在后 —— 数组顺序只是种子顺序（alarm.test / 通知种子按下标取行），
+ * 列表的展示顺序由 {@link listAlarmRecords} 按发生时刻倒序排，与后端一致。
+ */
+export const alarmRecords: AlarmRecord[] = [...deviceAlarms, ...businessAlarms];
+
+// ————————————————————————————————————————————————————————————————
+// 告警待办（后端 dev_alarm_todo）与时间线（dev_alarm_log）
+// 放在这里而不是 business-alarm.ts：关闭告警要联动取消待办、写时间线，
+// 而 business-alarm.ts 依赖本文件 —— 反过来引会成环。
+// ————————————————————————————————————————————————————————————————
+
+const todoSeed = (todoNo: string, alarmNo: string, roleCode: string, title: string, siteIdx: number, ago: number): AlarmTodo => ({
+  todoNo, alarmNo, alarmCode: null, roleCode, assigneeNo: null, title, status: "OPEN",
+  siteNo: p(sites, siteIdx).siteNo, createdAt: iso(ago), doneAt: null, doneBy: null, doneNote: null,
+});
+
+/** 待办种子与上面告警行的 dispositionRef 一一对应（ATD8001…8005）：点告警上的待办号能找到它。 */
+export const alarmTodos: AlarmTodo[] = [
+  todoSeed("ATD8001", "ALM48006", "OPS", "充电宝 PB200017 已失联 24 小时：核查最后所在柜、最后订单与调拨单", 5, 6 * 3600_000),
+  todoSeed("ATD8002", "ALM48007", "BD", `站点 ${sites[6].siteNo} 近 30 天日均订单低于 5：评估迁机或撤场`, 6, 5 * 3600_000),
+  todoSeed("ATD8003", "ALM48009", "BD", `站点 ${sites[8].siteNo} 在营业但没有生效合同：请续签 / 补签，或发起撤场`, 8, 4 * 3600_000),
+  todoSeed("ATD8004", "ALM48010", "BD", "合同 CT401 将在 60 天内到期：发起续签或撤场评估", 1, 3 * 3600_000),
+  todoSeed("ATD8005", "ALM48011", "FINANCE", "退款 RF500011 失败：重新发起退款并通知客服", 9, 2 * 3600_000),
+];
+const TODO_SEED = alarmTodos.map((t) => ({ ...t }));
+
+const alarmLogs = new Map<string, AlarmLogItem[]>();
+/** 写一条时间线。操作人缺省 admin（mock 的当前员工）。 */
+export function logAlarm(alarmNo: string, event: AlarmLogEvent, note: string | null, operator = "admin"): void {
+  const list = alarmLogs.get(alarmNo) ?? [];
+  list.push({ event, note, operator, at: new Date().toISOString() });
+  alarmLogs.set(alarmNo, list);
+}
+/** 某条告警的时间线。种子行按自身字段补出「成立 / 处置 / 关闭」三条，之后的动作逐条追加。 */
+export function alarmTimeline(a: AlarmRecord): AlarmLogItem[] {
+  if (!alarmLogs.has(a.alarmNo)) {
+    const seed: AlarmLogItem[] = [{
+      event: "OPEN", operator: "SYSTEM", at: a.business?.firstOccurredAt ?? a.occurredAt,
+      note: a.business ? `成立：${a.business.cause ?? "-"} · 优先级 ${a.business.priority ?? "-"} · 影响 ${a.business.impactScope ?? "-"}/${a.business.impactPeriod ?? "-"}` : "设备上报",
+    }];
+    if (a.business?.parentAlarmNo) seed.push({ event: "SUPERSEDE", operator: "SYSTEM", at: a.occurredAt, note: `并入上层告警 ${a.business.parentAlarmNo}` });
+    if (a.business?.dispositionType) seed.push({ event: "DISPOSE", operator: "SYSTEM", at: a.business.dueAt ?? a.occurredAt, note: `${a.business.dispositionType} ${a.business.dispositionRef ?? ""}`.trim() });
+    if (a.status === "CLOSED" && a.closedAt) seed.push({ event: "CLOSE", operator: a.closedBy, at: a.closedAt, note: `${a.closeReason ?? ""} ${a.closeNote ?? ""}`.trim() });
+    alarmLogs.set(a.alarmNo, seed);
+  }
+  return alarmLogs.get(a.alarmNo)!;
+}
+
+/** 关闭时的联动：该告警名下未完成的待办一并取消（后端 AlarmEngine#close 同口径）。 */
+function cancelTodosOf(alarmNo: string, reason: string): void {
+  for (const t of alarmTodos) {
+    if (t.alarmNo === alarmNo && t.status === "OPEN") {
+      t.status = "CANCELLED";
+      t.doneAt = new Date().toISOString();
+      t.doneBy = "SYSTEM";
+      t.doneNote = `关联告警已关闭：${reason}`;
+    }
+  }
+}
+
+/** 仅供测试：时间线与待办回到种子。 */
+export function __resetTimelines(): void {
+  alarmLogs.clear();
+  alarmTodos.splice(0, alarmTodos.length, ...TODO_SEED.map((t) => ({ ...t })));
+}
+
+/** 按码查业务配置（设备码 / 未登记的码为 null）。 */
+export const businessOf = (code: string): AlarmBusinessCode | null =>
+  alarmCodes.find((c) => c.code === code)?.business ?? null;
 
 export const alarmNotices: AlarmNotice[] = Array.from({ length: 12 }, (_, i) => {
   const ch = p(["SMS", "EMAIL", "PUSH", "WEBHOOK"] as const, i);
@@ -101,10 +289,26 @@ export const alarmRules: AlarmRule[] = Array.from({ length: 10 }, (_, i) => {
   };
 });
 
-export const listAlarmRecords = (q: PageQuery & { level?: string; status?: string } = {}) =>
-  paginate(alarmRecords, q.page, q.size, (x) =>
-    kwHit(q.keyword, x.alarmNo, x.cabinetNo, x.siteName, x.alarmCode, x.vendorErrorCode, x.workOrderNo) &&
-    (!q.level || x.level === q.level) && (!q.status || x.status === q.status));
+/** 逗号分隔的多值筛选（后端 status / domain 按逗号拆成 IN）。 */
+const inList = (want: string | undefined, v: string | null | undefined) =>
+  !want || want.split(",").includes(v ?? "");
+
+/** 后端默认序：发生时刻倒序（同刻按插入倒序）。 */
+const byOccurredDesc = () => [...alarmRecords].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
+
+export const listAlarmRecords = (q: AlarmQ = {}) =>
+  paginate(byOccurredDesc(), q.page, q.size, (x) =>
+    kwHit(q.keyword, x.alarmNo, x.cabinetNo, x.siteName, x.alarmCode, x.vendorErrorCode, x.workOrderNo, x.siteNo, x.business?.subjectNo) &&
+    (!q.level || x.level === q.level) && inList(q.status, x.status) &&
+    (!q.cabinetNo || x.cabinetNo === q.cabinetNo) &&
+    // 存量设备告警没有域：后端 `domain IN (...)` 同样筛不到它们
+    (!q.domain || (!!x.business?.domain && inList(q.domain, x.business.domain))) &&
+    (!q.subjectType || x.business?.subjectType === q.subjectType) &&
+    (!q.siteNo || x.siteNo === q.siteNo) &&
+    (!q.cause || x.business?.cause === q.cause) &&
+    (!q.disposition || x.business?.dispositionType === q.disposition) &&
+    (!q.from || x.occurredAt.slice(0, 10) >= q.from) && (!q.to || x.occurredAt.slice(0, 10) <= q.to) &&
+    (!q.topOnly || !x.business?.parentAlarmNo));
 export const listAlarmNotices = (q: PageQuery = {}) => paginate(alarmNotices, q.page, q.size, (x) => kwHit(q.keyword, x.noticeNo, x.alarmNo, x.target));
 export const listAlarmCodes = (q: PageQuery = {}) =>
   paginate(alarmCodes, q.page, q.size, (x) => liveHit(x, q.showArchived) && kwHit(q.keyword, x.code, x.message, x.suggestion));
@@ -188,16 +392,32 @@ export function closeAlarm(alarmNo: string, reason: AlarmCloseReason, note?: str
       `Alarm ${alarmNo} is ${a.status} and cannot be closed`,
       `الإنذار ${alarmNo} في حالة ${a.status} ولا يمكن إغلاقه`);
   }
+  // ALARM_CLOSE_REASONS 只列人工档：AUTO_FIXED / SUPERSEDED 只由系统写（后端 AlarmCloseReason#manual）
   if (!ALARM_CLOSE_REASONS.some((r) => r.value === reason)) {
     throw fail("关闭原因必填（已解决 / 误报 / 已自愈）",
       "A close reason is required (RESOLVED / FALSE_ALARM / SELF_HEALED)",
       "سبب الإغلاق مطلوب");
   }
+  // 安全域与「随处置完成恢复」的业务告警，不许人工以「已解决」关 —— 与后端 closeManually 同一判据：
+  // 隐患宝锁着仓，人工点一下「已解决」就把锁放了，而现场可能根本没人去过。
+  const biz = a.source === "EVAL" ? businessOf(a.alarmCode) : null;
+  if (reason === "RESOLVED" && biz && (biz.domain === "SAFETY" || biz.recoverRule === "DISPOSITION_DONE")) {
+    throw fail("该告警只能随处置完成关闭（安全域 / 处置完成即恢复）",
+      "This alarm can only be closed by completing its disposition",
+      "لا يمكن إغلاق هذا الإنذار إلا بإكمال معالجته");
+  }
+  // 已解决 / 误报必须写说明：误报率是调规则的依据，没有说明的「误报」没人敢据此放宽阈值
+  if ((reason === "RESOLVED" || reason === "FALSE_ALARM") && !note?.trim()) {
+    throw fail("「已解决」「误报」必须填写说明", "A note is required for RESOLVED / FALSE_ALARM", "الملاحظة مطلوبة");
+  }
+  alarmTimeline(a); // 先落种子时间线，再改状态 —— 否则种子会按「已关闭」多补一条关闭
   a.status = ALARM_TRANSITIONS.close.to;
   a.closeReason = reason;
   if (note?.trim()) a.closeNote = note.trim();
   a.closedBy = "admin";
   a.closedAt = new Date().toISOString();
+  logAlarm(a.alarmNo, "CLOSE", `${reason}${note?.trim() ? ` ${note.trim()}` : ""}`);
+  cancelTodosOf(a.alarmNo, reason);
   return { alarmNo: a.alarmNo, status: a.status };
 }
 

@@ -8,7 +8,9 @@ export type FieldType =
   /** 日期 + 时间（精确到分钟）。值为「市场时区」的 `YYYY-MM-DDTHH:mm`，与 UTC 的换算由页面用 lib/market-time 做。 */
   | "datetime"
   /** 地址 + 地图选点。本字段存地址文本，经纬度另存于 FieldDef 的 latKey/lngKey 指定的两个键。 */
-  | "address";
+  | "address"
+  /** 文件（方案 C7）：值为已上传成功的 fileNo 数组；必填 = 至少一个。用途见 FieldDef.fileCategory。 */
+  | "file";
 
 export type FormValues = Record<string, unknown>;
 

@@ -1,10 +1,9 @@
 import type {
-  Contract, ContractStatus, ContractSummary, ContractLogItem, ContractFlow, ContractTermination,
+  Contract, ContractStatus, ContractLogEvent, ContractSummary, ContractLogItem, ContractFlow, ContractTermination,
 } from "../../types";
 import { CONTRACT_TRANSITIONS } from "../../types";
 import { fail } from "../../biz-error";
-import { contracts } from "./location";
-import { bindFile } from "./file";
+import { contracts, attachFiles } from "./location";
 
 /**
  * 合同审批的 mock。
@@ -49,7 +48,7 @@ function flowOf(c: Contract): ContractFlow {
   return c.flow;
 }
 
-function log(c: Contract, event: string, from: ContractStatus | null, to: ContractStatus | null, note?: string) {
+function log(c: Contract, event: ContractLogEvent, from: ContractStatus | null, to: ContractStatus | null, note?: string) {
   const list = logs.get(c.contractNo) ?? [];
   // 最新在前：时间线从上往下读就是倒序，与详情抽屉的渲染顺序一致
   list.unshift({ event, fromStatus: from, toStatus: to, operator: "admin", note: note ?? null, at: now() });
@@ -133,12 +132,12 @@ export function auditContract(no: string, result: "APPROVE" | "REJECT", reason?:
     const from = c.status;
     c.status = must(c, "reject");
     f.auditStage = null;
-    log(c, "AUDIT_REJECT", from, c.status, reason);
+    log(c, "REJECT", from, c.status, reason);
     return c;
   }
   // 通过 → 进财务会签，**状态仍是 PENDING**
   f.auditStage = "FINANCE";
-  log(c, "AUDIT_APPROVE", "PENDING", "PENDING", reason);
+  log(c, "APPROVE", "PENDING", "PENDING", reason);
   return c;
 }
 
@@ -161,7 +160,7 @@ export function cosignContract(no: string, result: "APPROVE" | "REJECT", reason?
   const from = c.status;
   c.status = result === "APPROVE" ? must(c, "approve") : must(c, "reject");
   f.auditStage = null;
-  log(c, result === "APPROVE" ? "COSIGN_APPROVE" : "COSIGN_REJECT", from, c.status, reason);
+  log(c, result === "APPROVE" ? "COSIGN" : "COSIGN_REJECT", from, c.status, reason);
   return c;
 }
 
@@ -175,7 +174,8 @@ export function signContract(no: string, signedAt: string, fileNos: string[]): C
   }
   const f = flowOf(c);
   f.signedAt = signedAt || today();
-  for (const fileNo of fileNos ?? []) bindFile(fileNo);   // TEMP → BOUND
+  // 签署件就是附件：挂到合同上（TEMP → BOUND），与后端 sign → attachFiles 同一条路径
+  if (fileNos?.length) attachFiles(c, fileNos);
   log(c, "SIGN", c.status, c.status, `签署日 ${f.signedAt}`);
   return c;
 }
@@ -199,7 +199,7 @@ export function terminateContract(no: string, reason: string, effectiveAt?: stri
     requestedBy: "admin", requestedAt: now(), auditedBy: null, auditedAt: null, auditNote: null,
   };
   f.termination = t;
-  log(c, "TERMINATION_REQUEST", c.status, c.status, reason);
+  log(c, "TERM_REQUEST", c.status, c.status, reason);
   return c;
 }
 
@@ -224,11 +224,11 @@ export function auditContractTermination(no: string, result: "APPROVE" | "REJECT
       c.status = must(c, "terminate");
       f.endedAt = now();
       f.endReason = f.termination.reason;
-      log(c, "TERMINATED", from, c.status, f.termination.reason ?? undefined);
+      log(c, "TERMINATE", from, c.status, f.termination.reason ?? undefined);
       return c;
     }
   }
-  log(c, result === "APPROVE" ? "TERMINATION_APPROVE" : "TERMINATION_REJECT", c.status, c.status, reason);
+  log(c, result === "APPROVE" ? "TERM_APPROVE" : "TERM_REJECT", c.status, c.status, reason);
   return c;
 }
 
@@ -252,7 +252,7 @@ export function renewContract(no: string): Contract {
       financeAuditedBy: null, financeAuditedAt: null, financeAuditNote: null, termination: null },
   };
   contracts.unshift(draft);
-  log(draft, "RENEW_FROM", null, "DRAFT", `续签自 ${c.contractNo}`);
+  log(draft, "RENEW", null, "DRAFT", `续签自 ${c.contractNo}`);
   return draft;
 }
 
@@ -278,7 +278,7 @@ export function supplementContract(no: string, startAt?: string): Contract {
       financeAuditedBy: null, financeAuditedAt: null, financeAuditNote: null, termination: null },
   };
   contracts.unshift(draft);
-  log(draft, "SUPPLEMENT_FROM", null, "DRAFT", `补充协议，主合同 ${c.contractNo}`);
+  log(draft, "SUPPLEMENT", null, "DRAFT", `补充协议，主合同 ${c.contractNo}`);
   return draft;
 }
 

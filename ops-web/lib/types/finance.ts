@@ -599,3 +599,118 @@ export interface PayoutAccount {
   isDefault: boolean;
   status: "ACTIVE" | "DISABLED";
 }
+
+// —— 结算单详情（后端 `FinDtos.SettlementView`：GET /api/trade/settlements/{settleNo}）——
+
+/** 结算单构成行：这张单由哪些来源凑成（SHARE = 分润明细；调整项并入时 refType 为调整项）。 */
+export interface SettlementDetail {
+  refType: string;
+  refNo: string;
+  amount: number;
+}
+/**
+ * 详情 = 结算单本体 + 构成行。
+ * ⚠️ 详情里的 `settlement.recordCount` 后端实测为 null（列表才算），界面以 `details.length` 为准。
+ */
+export interface SettlementView {
+  settlement: Settlement;
+  details: SettlementDetail[];
+}
+
+// —— 结算调整项（运营核心流程 C9 · G2，后端 AdjustmentController）——
+
+/**
+ * 调整项状态。与后端 `AdjustmentStatus` 同名同值：
+ * 系统出建议值（PENDING）→ 财务确认、可改金额（CONFIRMED）→ 下次出账并入结算单（SETTLED）；
+ * 待确认与已确认都可作废（VOID），已并入结算单的不能再作废 —— 那张单的钱已经算进去了。
+ */
+export type AdjustmentStatus = "PENDING" | "CONFIRMED" | "SETTLED" | "VOID";
+/** 调整项种类。与后端 `AdjustmentKind` 同名同值。 */
+export type AdjustmentKind = "DEPOSIT_REFUND" | "ENTRY_FEE_SETTLE" | "GUARANTEE_TOPUP";
+/**
+ * 来源。后端是字符串常量（无枚举）：SITE_CLOSED = 撤场关闭按合同生成；GUARANTEE = 保底补差（直接已确认）。
+ */
+export type AdjustmentSource = "SITE_CLOSED" | "GUARANTEE";
+export type AdjustmentAction = "confirm" | "void";
+
+/**
+ * 调整项迁移表（SSOT）：页面按钮与 mock 校验共用。
+ * 与后端 `AdjustmentServiceImpl` 一致：confirm 只认 PENDING；void 认 PENDING / CONFIRMED（SETTLED 不可作废）。
+ */
+export const ADJUSTMENT_TRANSITIONS: Record<AdjustmentAction, { from: AdjustmentStatus[]; to: AdjustmentStatus; label: string }> = {
+  confirm: { from: ["PENDING"], to: "CONFIRMED", label: "确认" },
+  void: { from: ["PENDING", "CONFIRMED"], to: "VOID", label: "作废" },
+};
+export const canAdjustmentTransition = (s: AdjustmentStatus, a: AdjustmentAction) =>
+  ADJUSTMENT_TRANSITIONS[a].from.includes(s);
+
+/**
+ * 后端 `AdjustmentService.Adjustment` 原样形状。
+ *
+ * 金额**带符号**：负数 = 场地方应返还平台（押金、进场费折算），正数 = 平台补给场地方（保底补差）。
+ * ⚠️ 后端出参里**没有 `period`**（实体有、VO 漏了）—— 保底补差按账期生成，界面暂时看不到它属于哪个月。
+ */
+export interface Adjustment {
+  adjNo: string;
+  payeeType: Settlement["payeeType"];
+  payeeNo: string;
+  payeeName: string | null;
+  kind: AdjustmentKind;
+  siteNo: string | null;
+  contractNo: string | null;
+  amount: number;
+  /** 系统建议值。确认金额与它不同时必须写说明。 */
+  suggestedAmount: number | null;
+  currency: string;
+  status: AdjustmentStatus;
+  /** 并入的结算单号；未出账为 null。 */
+  settleNo: string | null;
+  source: AdjustmentSource;
+  note: string | null;
+  confirmedBy: string | null;
+  confirmedAt: string | null;
+  createdAt: string | null;
+}
+/** 确认入参：金额可改（不传 = 按当前金额），改了必须写 note。 */
+export interface AdjustmentConfirmPayload {
+  amount?: number;
+  note?: string;
+}
+
+// —— 场地方对账单（运营核心流程 G3，后端 StatementService.Statement）——
+
+export interface StatementShareLine {
+  contractNo: string | null;
+  rate: number;
+  orders: number;
+  gross: number;
+  amount: number;
+}
+export interface StatementAdjustLine {
+  adjNo: string;
+  kind: AdjustmentKind;
+  contractNo: string | null;
+  siteNo: string | null;
+  period: string | null;
+  amount: number;
+  note: string | null;
+}
+/** 一张结算单一份对账单：订单汇总 + 按合同 × 比例的分成 + 调整项，`total` = 本期应付。 */
+export interface Statement {
+  settleNo: string;
+  payeeType: Settlement["payeeType"];
+  payeeNo: string;
+  payeeName: string;
+  period: string;
+  currency: string;
+  status: SettlementStatus;
+  orderCount: number;
+  grossTotal: number;
+  shareTotal: number;
+  shares: StatementShareLine[];
+  adjustTotal: number;
+  adjustments: StatementAdjustLine[];
+  total: number;
+}
+/** 可打印对账单的语言（后端 `statement.html?lang=`，ar 为右到左）。 */
+export type StatementLang = "zh" | "en" | "ar";

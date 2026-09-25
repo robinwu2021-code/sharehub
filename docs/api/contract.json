@@ -41695,6 +41695,101 @@
    "requestShape": null
   },
   {
+   "verb": "GET",
+   "path": "/internal/job/declarations",
+   "perm": null,
+   "perms": [],
+   "handler": "InternalJobController#declarations",
+   "summary": "全部任务声明（调度器接入后由它拉取；现在供运维核对 cron 清单）。",
+   "params": [],
+   "bodyType": null,
+   "returnType": "List<JobDeclaration>",
+   "returnContainer": "List",
+   "returnElement": "JobDeclaration",
+   "responseShape": [
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "title",
+     "type": "String"
+    },
+    {
+     "name": "ownerModule",
+     "type": "String"
+    },
+    {
+     "name": "defaultCron",
+     "type": "String"
+    },
+    {
+     "name": "timeoutSec",
+     "type": "int"
+    },
+    {
+     "name": "lockAtMostSec",
+     "type": "int"
+    },
+    {
+     "name": "manualTrigger",
+     "type": "boolean"
+    },
+    {
+     "name": "logEveryRun",
+     "type": "boolean"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/internal/job/{name}/trigger",
+   "perm": null,
+   "perms": [],
+   "handler": "InternalJobController#trigger",
+   "summary": "触发一个任务。",
+   "params": [
+    {
+     "in": "path",
+     "name": "name",
+     "type": "String",
+     "required": true
+    },
+    {
+     "in": "query",
+     "name": "type",
+     "type": "JobInvocation.Type",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "bizDate",
+     "type": "LocalDate",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "JobResult",
+   "returnContainer": null,
+   "returnElement": "JobResult",
+   "responseShape": [
+    {
+     "name": "status",
+     "type": "Status"
+    },
+    {
+     "name": "detail",
+     "type": "String"
+    },
+    {
+     "name": "error",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
    "verb": "POST",
    "path": "/internal/platform/notify/send",
    "perm": null,
@@ -44723,10 +44818,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 508,
+  "endpoints": 510,
   "records": 435,
   "withPerm": 440,
   "withBody": 216,
-  "shapedResponses": 400
+  "shapedResponses": 402
  }
 }

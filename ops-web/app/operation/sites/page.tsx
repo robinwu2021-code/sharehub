@@ -37,12 +37,19 @@ import { ReadOnlyNotice } from "@/components/read-only-notice";
 import {
   ShowArchivedToggle, archivedRowClass, ArchiveActions, archiveConfirm, unarchiveConfirm,
 } from "@/components/archive";
-import { SiteDetailDrawer, SITE_STATUS } from "@/components/operation/site-detail";
+import { SiteDetailDrawer, SITE_STATUS, siteFixHref } from "@/components/operation/site-detail";
 import { SummaryCard } from "@/components/ui/summary-card";
 import { Drawer, Field } from "@/components/ui/drawer";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 
+
+/**
+ * 撤场提前通知天数：镜像后端参数 `site.withdraw.lead_days`（缺省 7）。
+ * 只用来给日期框设下限、把规则写在界面上 —— 服务端才是权威，参数调了这里没跟上时以它的报错为准。
+ */
+const WITHDRAW_LEAD_DAYS = 7;
+const earliestWithdraw = () => new Date(Date.now() + WITHDRAW_LEAD_DAYS * 86400_000).toISOString().slice(0, 10);
 
 const SCENES = ["商场", "机场", "餐饮", "地铁", "写字楼", "酒店", "医院", "其他"];
 
@@ -201,8 +208,8 @@ function SitesInner() {
   });
   /** 撤场 / 关闭。合成一个：成功后处理完全一样，分两个会把这段抄两遍。 */
   const exitFlow = useMutation({
-    mutationFn: (v: { kind: "withdraw"; siteNo: string; reason: string; plannedAt?: string }
-      | { kind: "close"; siteNo: string; note?: string }) =>
+    mutationFn: (v: { kind: "withdraw"; siteNo: string; reason: string; plannedAt: string }
+      | { kind: "close"; siteNo: string; note: string }) =>
       v.kind === "withdraw"
         ? api.withdrawSite(v.siteNo, v.reason, v.plannedAt)
         : api.closeSite(v.siteNo, v.note),
@@ -210,7 +217,7 @@ function SitesInner() {
       refresh();
       qc.invalidateQueries({ queryKey: ["site-summary"] });
       notify.success(v.kind === "withdraw" ? "已进入撤场" : "站点已关闭");
-      setExitTarget(null); setExitReason(""); setExitPlannedAt("");
+      setExitTarget(null); setExitReason(""); setExitPlannedAt(""); setExitConfirm("");
     },
   });
   const resume = useMutation({
@@ -239,6 +246,8 @@ function SitesInner() {
   const [exitTarget, setExitTarget] = useState<{ site: Site; kind: "withdraw" | "close" } | null>(null);
   const [exitReason, setExitReason] = useState("");
   const [exitPlannedAt, setExitPlannedAt] = useState("");
+  /** 关站不可逆：手输站点号确认（R4）。 */
+  const [exitConfirm, setExitConfirm] = useState("");
 
   // 只有一个品牌时直接预选：让人在唯一选项上点一下，是没有意义的一步
   const openNew = () => {
@@ -327,13 +336,18 @@ function SitesInner() {
                   <Button size="sm" variant="outline" onClick={() => { setPauseTarget(s); setPauseForm({}); }}><Pause className="size-4" /> 暂停营业</Button>
                 )}
                 {canPause && SITE_TRANSITIONS.resume.from.includes(s.status) && (
-                  <Button size="sm" variant="outline" onClick={() => resume.mutate(s.siteNo)}><Play className="size-4" /> 恢复营业</Button>
+                  <Button size="sm" variant="outline" onClick={async () => {
+                    // 可逆但有副作用（C 端重新可借），走一次确认（R4）
+                    if (await confirm({ title: `恢复营业：${s.name}？`, desc: "恢复后 C 端附近列表重新显示该站点，站内机柜允许新借。站点须有生效合同。" })) {
+                      resume.mutate(s.siteNo);
+                    }
+                  }}><Play className="size-4" /> 恢复营业</Button>
                 )}
                 {canWrite && SITE_TRANSITIONS.withdraw.from.includes(s.status) && (
-                  <Button size="sm" variant="outline" onClick={() => { setExitTarget({ site: s, kind: "withdraw" }); setExitReason(""); setExitPlannedAt(""); }}>撤场</Button>
+                  <Button size="sm" variant="outline" onClick={() => { setExitTarget({ site: s, kind: "withdraw" }); setExitReason(""); setExitPlannedAt(earliestWithdraw()); }}>撤场</Button>
                 )}
                 {canWrite && SITE_TRANSITIONS.close.from.includes(s.status) && (
-                  <Button size="sm" variant="outline" onClick={() => { setExitTarget({ site: s, kind: "close" }); setExitReason(""); }}>关闭站点</Button>
+                  <Button size="sm" variant="outline" onClick={() => { setExitTarget({ site: s, kind: "close" }); setExitReason(""); setExitConfirm(""); }}>关闭站点</Button>
                 )}
               </>
             }
@@ -435,7 +449,7 @@ function SitesInner() {
                   {it.detail && <div className="txt-caption text-muted-foreground">{it.detail}</div>}
                   {/* 未通过必须给去处：只说缺什么而不给链接，门禁就成了拦路虎 */}
                   {!it.passed && it.fixHref && (
-                    <Link href={it.fixHref} className="txt-caption underline">去处理</Link>
+                    <Link href={siteFixHref(it.fixHref) ?? it.fixHref} className="txt-caption underline">去处理</Link>
                   )}
                 </div>
               </li>
@@ -450,38 +464,47 @@ function SitesInner() {
         onOpenChange={(o) => !o && setExitTarget(null)}
         title={exitTarget?.kind === "withdraw" ? `撤场 ${exitTarget?.site.name ?? ""}` : `关闭站点 ${exitTarget?.site.name ?? ""}`}
         desc={exitTarget?.kind === "withdraw"
-          ? "进入撤场后站点停止接单，设备要撤、账要结；全部了结后再「关闭站点」"
-          : "关闭**不可逆**。关了要重开只能另建站点——同一站点号跨两段经营期，报表再也对不上"}
+          ? "进入撤场后站点停止新借（已借出的照常归还），系统为每台在站机柜开撤机工单；全部了结后再「关闭站点」"
+          : "关闭不可逆。关了要重开只能另建站点——同一站点号跨两段经营期，报表再也对不上"}
         width="w-[520px]"
         footer={exitTarget && (
           <>
             <Button variant="outline" onClick={() => setExitTarget(null)}>取消</Button>
             <Button
-              disabled={exitFlow.isPending || (exitTarget.kind === "withdraw" && !exitReason.trim())}
+              variant={exitTarget.kind === "close" ? "destructive" : "default"}
+              disabled={exitFlow.isPending || !exitReason.trim() || (exitTarget.kind === "withdraw"
+                ? !exitPlannedAt || exitPlannedAt < earliestWithdraw()
+                : exitConfirm.trim() !== exitTarget.site.siteNo)}
               onClick={() => exitTarget.kind === "withdraw"
-                ? exitFlow.mutate({ kind: "withdraw", siteNo: exitTarget.site.siteNo, reason: exitReason, plannedAt: exitPlannedAt || undefined })
-                : exitFlow.mutate({ kind: "close", siteNo: exitTarget.site.siteNo, note: exitReason || undefined })}
+                ? exitFlow.mutate({ kind: "withdraw", siteNo: exitTarget.site.siteNo, reason: exitReason.trim(), plannedAt: exitPlannedAt })
+                : exitFlow.mutate({ kind: "close", siteNo: exitTarget.site.siteNo, note: exitReason.trim() })}
             >确认</Button>
           </>
         )}
       >
         {exitTarget && (
           <>
-            <Field label={exitTarget.kind === "withdraw" ? "撤场原因" : "备注"}>
+            <Field label={exitTarget.kind === "withdraw" ? "撤场原因（必填）" : "关闭说明（必填）"}>
               <Input className="w-full" value={exitReason}
-                placeholder={exitTarget.kind === "withdraw" ? "如：场地方收回场地" : "可留空"}
+                placeholder={exitTarget.kind === "withdraw" ? "如：合同到期不续 / 场地方收回 / 低效" : "如：设备已撤、账已结清"}
                 onChange={(e) => setExitReason(e.target.value)} />
             </Field>
             {exitTarget.kind === "withdraw" && (
-              <Field label="计划撤场日">
-                <Input type="date" className="w-full" value={exitPlannedAt} onChange={(e) => setExitPlannedAt(e.target.value)} />
+              <Field label="计划撤场日（必填）">
+                <Input type="date" className="w-full" min={earliestWithdraw()} value={exitPlannedAt} onChange={(e) => setExitPlannedAt(e.target.value)} />
+                <div className="mt-1 txt-caption text-muted-foreground">
+                  至少提前 {WITHDRAW_LEAD_DAYS} 天：给运维排撤机、给在借用户留归还时间（系统参数 site.withdraw.lead_days）
+                </div>
               </Field>
             )}
-            {exitTarget.kind === "close" && (
+            {exitTarget.kind === "close" && (<>
               <Field label="提醒">
-                <span className="text-muted-foreground">关闭前请先看「关闭门禁」——设备没撤完或合同还生效时会被拒</span>
+                <span className="text-muted-foreground">关闭前请先看「关闭门禁」——设备没撤完、工单没结或还有在借订单时会被拒</span>
               </Field>
-            )}
+              <Field label={`输入站点号 ${exitTarget.site.siteNo} 确认`}>
+                <Input className="w-full" value={exitConfirm} onChange={(e) => setExitConfirm(e.target.value)} />
+              </Field>
+            </>)}
           </>
         )}
       </Drawer>

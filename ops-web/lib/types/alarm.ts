@@ -3,6 +3,7 @@
 
 // 告警等级：提示 / 警告 / 严重
 import type { Archivable } from "./common";
+import type { WorkOrderPriority } from "./workorder";
 
 export type AlarmLevel = "INFO" | "WARN" | "CRITICAL";
 
@@ -11,7 +12,9 @@ export type AlarmLevel = "INFO" | "WARN" | "CRITICAL";
  * 告警来源。**具名而不是内联联合**：两端同名词表比对
  * （后端 StatusVocabularyAcrossEndsTest）只认具名 `export type`。
  */
-export type AlarmSource = "DEVICE" | "OTA" | "RENT";
+export type AlarmSource = "DEVICE" | "OTA" | "RENT"
+  // 2026-09-25 业务告警：判定引擎（AlarmEngine）产出的行，source 写 EVAL。后端无同名枚举（是列注释词表）
+  | "EVAL";
 
 /**
  * 告警状态。
@@ -38,7 +41,9 @@ export type AlarmAction = "ack" | "close";
  * 「这个月关了 300 条」，不知道其中多少是设备真故障、多少是规则太敏感。
  * 规则调不动，告警就会一直吵，吵到没人看。
  */
-export type AlarmCloseReason = "RESOLVED" | "FALSE_ALARM" | "SELF_HEALED";
+export type AlarmCloseReason = "RESOLVED" | "FALSE_ALARM" | "SELF_HEALED"
+  // 2026-09-25 业务告警：以下两档只由系统写（自愈动作成功 / 被上层告警取代），人工关闭不可选，故不进 ALARM_CLOSE_REASONS
+  | "AUTO_FIXED" | "SUPERSEDED";
 
 export const ALARM_CLOSE_REASONS: { value: AlarmCloseReason; label: string; hint: string }[] = [
   { value: "RESOLVED", label: "已解决", hint: "设备侧问题已处理，通常伴随一张完工的工单" },
@@ -72,10 +77,12 @@ export const alarmActions = (status: AlarmStatus): AlarmAction[] =>
 
 export interface AlarmRecord {
   alarmNo: string;
-  cabinetNo: string;
+  /** 业务告警的主体不一定是柜（站点 / 订单 / 合同……），此时为 null。 */
+  cabinetNo: string | null;
   /** 站点编号。只有 siteName 时同名站点连不准（同合同「按编号连」的理由）。 */
   siteNo: string | null;
-  siteName: string;
+  /** 后端业务告警行不回填站点名（null）；展示以 siteNo 的 RefLink 为准。 */
+  siteName: string | null;
   /**
    * 站点归属的代理商编号；直营站点为 null。
    *
@@ -89,9 +96,9 @@ export interface AlarmRecord {
    * 只看告警码时，一条 OTA 期间的批量告警和设备真故障长得一样。
    */
   source: AlarmSource;
-  vendorCode: string; // 设备厂商（cd-tech / sd-power / chargenow）
+  vendorCode: string | null; // 设备厂商（cd-tech / sd-power / chargenow）；业务告警为 null
   alarmCode: string; // 平台统一告警码，如 SLOT_STUCK
-  vendorErrorCode: string; // 厂商原始错误码，各家风格不同（E203 / ERR-17 / 0x1F04）
+  vendorErrorCode: string | null; // 厂商原始错误码，各家风格不同（E203 / ERR-17 / 0x1F04）；业务告警为 null
   level: AlarmLevel;
   occurredAt: string;
   status: AlarmStatus;
@@ -103,13 +110,21 @@ export interface AlarmRecord {
    * 列表里两者长得一模一样，值班的人无从排优先级。
    */
   count: number;
-  remark: string;
+  /**
+   * 去重键（业务告警形如 `SITE_UNRENTABLE:SITE:ST001`）。同源重复只累加 count，不另起一行。
+   * 2026-09-25 起接入：业务告警的去重键就是「码 + 主体」，详情里展示它能直接回答
+   * 「为什么这次没新开一条」—— 以前它只是内部实现细节，现在是运营排障要看的东西。
+   */
+  dedupKey: string | null;
+  remark: string | null;
   /** 关闭原因；未关闭为 null。关闭时必填，见 {@link ALARM_CLOSE_REASONS}。 */
   closeReason: AlarmCloseReason | null;
   /** 关闭备注：原因之外的补充。 */
   closeNote: string | null;
   closedBy: string | null;
   closedAt: string | null;
+  /** 业务告警维度；存量设备告警为 null（后端 `AlarmDtos.BusinessInfo`）。 */
+  business: AlarmBusinessInfo | null;
 }
 
 // 确认告警结果：回带落库后的状态，前端不自己猜 —— 状态迁移由后端状态机裁决（OPEN → ACKED）
@@ -174,9 +189,17 @@ export interface AlarmNoticeResendPayload {
 export interface AlarmCode extends Archivable {
   code: string;
   message: string;
+  /**
+   * 英 / 阿业务名称。**只声明、页面暂不按 locale 取**：「记录自带的多语言字段怎么回落」
+   * 仓里还没有统一口径（TDD-国际化i18n §6 P3），先各页自己选会出现两套回落规则。
+   */
+  messageEn: string | null;
+  messageAr: string | null;
   level: AlarmLevel;
   suggestion: string; // 建议处置
   autoWorkOrder: boolean; // 命中后是否自动开工单
+  /** 业务告警码的判定与处置配置；设备码为 null（后端 `AlarmDtos.BusinessCode`）。 */
+  business: AlarmBusinessCode | null;
 }
 
 // 通知规则：比竞品多「静默窗口」「升级策略」——防夜间轰炸与告警风暴
@@ -193,4 +216,286 @@ export interface AlarmRule extends Archivable {
   quietEnd: string; // 静默窗口止（HH:mm）
   escalateMinutes: number; // N 分钟未处理则升级（0=不升级）
   status: AlarmRuleStatus;
+}
+
+// ─────────────────────────────────────────────────────────────
+// 业务告警与告警待办（`/api/ops/alarms/**`、`/api/ops/alarm-todos`）
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * 业务告警域（SSOT，与后端 `AlarmDomain` 同名同值）。
+ *
+ * <p>2026-09-25 裁决 #3：**设备错误码降为「信号」，告警中心只放业务告警**。
+ * 这九个域回答的是「用户/生意受了什么影响」，而不是「哪个零件坏了」——
+ * 「E001 仓位卡阻」对运营没有意义，「这个站点还不了」才有。
+ */
+export type AlarmDomain =
+  | "AVAILABILITY"   // 借不到
+  | "RETURNABILITY"  // 还不了
+  | "TRANSACTION"    // 交易异常（付了款没拿到宝…）
+  | "FUND"           // 资金
+  | "REVENUE"        // 收入
+  | "ASSET"          // 资产
+  | "PARTNER"        // 合作方（无合同营业…）
+  | "SERVICE"        // 服务
+  | "SAFETY";        // 安全
+
+/** 告警主体类型（与后端 `AlarmSubjectType` 同名同值）。 */
+export type AlarmSubjectType =
+  | "SITE" | "CABINET" | "SLOT" | "POWERBANK" | "ORDER" | "USER"
+  | "AGENT" | "PAYEE" | "CONTRACT" | "PAYMENT" | "WORK_ORDER";
+
+/** 成因（与后端 `AlarmCause` 同名同值）。同一个域可由多种成因触发。 */
+export type AlarmCause =
+  | "OFFLINE" | "UNSTABLE" | "NO_STOCK" | "FULL" | "FAULT" | "LOW_BATTERY"
+  | "OVERHEAT" | "HAZARD" | "AGED" | "MISSING" | "MIXED" | "SN_SEEN"
+  | "NO_CONTRACT" | "EXPIRING" | "LOW_YIELD" | "SLA_BELOW" | "CANCEL_FAILED";
+
+/**
+ * 处置方式（与后端 `AlarmDisposition` 同名同值）。
+ *
+ * <p>**告警不是终点，处置才是**。一条告警最终要落到五者之一：
+ * 自愈、开工单、转客服、只挂待办、仅通知。没有处置的告警只会堆着，
+ * 堆到没人看 —— 而那时真正要紧的那条也一起被埋了。
+ *
+ * <p>`TODO` 与 `NOTIFY` 的差别：前者**要人办**（进待办、有人认领、能查办结率），
+ * 后者只是告知（不产生任何人的工作）。把该办的事发成通知，就等于没人负责。
+ *
+ * <p>⚠️ 这个 `TODO` 差点漏掉：提取后端枚举时我用 `grep -v "^TODO$"` 滤注释噪音，
+ * **把一个真常量一起滤掉了**，跨端词表卡口当场报「后端独有=[TODO]」。
+ * 滤噪音的规则会连真值一起吃，这类漏配只有卡口抓得到。
+ */
+export type AlarmDisposition = "AUTO_FIX" | "WORK_ORDER" | "CS_CASE" | "TODO" | "NOTIFY";
+
+/** 影响面（与后端 `ImpactScope` 同名同值）：优先级按它与时段算。 */
+export type ImpactScope = "SITE" | "CABINET" | "SLOT" | "ORDER" | "ENTITY";
+
+/** 影响时段（与后端 `ImpactPeriod` 同名同值）。高峰期同样的故障影响大得多。 */
+export type ImpactPeriod = "PEAK" | "OPEN" | "CLOSED";
+
+/** 判定方式（与后端 `AlarmEvalType` 同名同值）：事件即成立 / 持续 N 分钟 / 窗口内 N 次 / 周期指标。 */
+export type AlarmEvalType = "EVENT" | "STATE" | "COUNT" | "METRIC";
+
+/** 并单范围（与后端 `MergeScope` 同名同值）：同柜 / 同站 / 同区域的同类工单合并。 */
+export type MergeScope = "DEVICE" | "SITE" | "REGION";
+
+/** 恢复规则（与后端 `RecoverRule` 同名同值）。`DISPOSITION_DONE` = 只能随处置完成关闭。 */
+export type RecoverRule = "SIGNAL_CLEAR" | "DISPOSITION_DONE" | "NONE";
+
+/**
+ * 业务告警维度（后端 `AlarmDtos.BusinessInfo`，挂在 `AlarmRecord.business`）。
+ *
+ * <p>`priority` 是**处置优先级**（工单词表 LOW…URGENT），与告警等级 `level` 是两套词表：
+ * 等级说「这件事本身多严重」，处置优先级说「现在该多快去办」—— 同一条「站点借不到」
+ * 在午间高峰的 A 级站和凌晨的 C 级站，等级相同、优先级不同。
+ */
+export interface AlarmBusinessInfo {
+  domain: AlarmDomain | null;
+  subjectType: AlarmSubjectType | null;
+  /** 主体编号：站点号 / 柜号 / `柜号#仓位` / 订单号 / 合同号…… 按 subjectType 解读。 */
+  subjectNo: string | null;
+  cause: AlarmCause | null;
+  priority: WorkOrderPriority | null;
+  impactScope: ImpactScope | null;
+  impactPeriod: ImpactPeriod | null;
+  /** 站点分级（A/B/C），参与优先级加成。 */
+  siteTier: string | null;
+  /** 在途订单数：「3 位用户在途」比任何等级都更能说明这条要不要马上办。 */
+  inFlightOrders: number | null;
+  dispositionType: AlarmDisposition | null;
+  /** 处置产物号：工单号 / 客服单号 / 待办号；仅通知或自愈为 null。 */
+  dispositionRef: string | null;
+  firstOccurredAt: string | null;
+  lastOccurredAt: string | null;
+  /** 开单时刻（成立 + 开单延迟）：延迟内自愈的告警就不必派人跑一趟。 */
+  dueAt: string | null;
+  recoveredAt: string | null;
+  /** 非空 = 被这条上层告警取代（柜级并入站点级），列表默认只显示顶层。 */
+  parentAlarmNo: string | null;
+}
+
+/** 业务告警码的判定与处置配置（后端 `AlarmDtos.BusinessCode`）。码即处置预案。 */
+export interface AlarmBusinessCode {
+  domain: AlarmDomain | null;
+  subjectType: AlarmSubjectType | null;
+  evalType: AlarmEvalType | null;
+  holdMinutes: number | null;
+  windowMinutes: number | null;
+  threshold: number | null;
+  businessHoursOnly: boolean;
+  basePriority: WorkOrderPriority | null;
+  impactAdjust: boolean;
+  disposition: AlarmDisposition | null;
+  ownerRole: string | null;
+  woDelayMinutes: number | null;
+  mergeScope: MergeScope | null;
+  recoverRule: RecoverRule | null;
+  recoverHoldMinutes: number | null;
+  supersedes: string | null;
+  enabled: boolean;
+  /** 内置码：域 / 主体 / 判定方式 / 取代关系不可改（后端 beforeUpdate 强制回填）。 */
+  builtin: boolean;
+}
+
+/** 告警时间线事件（后端 `dev_alarm_log.event` 写入值；列注释词表，无同名枚举）。 */
+export type AlarmLogEvent =
+  | "OPEN" | "DISPOSE" | "CLOSE" | "FIX_TRY" | "FIX_FAIL" | "IMPACT_UP"
+  | "RECOVER" | "RELAPSE" | "SUPERSEDE";
+
+/** 告警时间线一条（后端 `AlarmDtos.AlarmLogItem`）。 */
+export interface AlarmLogItem {
+  event: AlarmLogEvent;
+  note: string | null;
+  operator: string | null;
+  at: string;
+}
+
+/**
+ * 告警证据（`AlarmDetail.evidence` 解析后的一条）。后端把它存成 JSON 字符串原样回传，
+ * 前端解析失败时按原文展示 —— 证据是排障的依据，解析不了也不能吞掉。
+ */
+export interface AlarmEvidence {
+  signal: string;
+  cabinetNo: string | null;
+  slot: number | null;
+  at: string | null;
+  note: string | null;
+}
+
+/**
+ * 告警详情（后端 `AlarmDtos.AlarmDetail`，`GET /records/{alarmNo}`）。
+ *
+ * <p>6a 的契约把它写成返回整行 `AlarmRecord` —— 真后端一直回的是这个包了一层的对象，
+ * 接上就会读到 `record.record`。
+ */
+export interface AlarmDetail {
+  record: AlarmRecord;
+  /** 码的业务名称（如「站点借不到」）；码已删 / 未登记为 null。 */
+  codeName: string | null;
+  /** 码的处置预案（业务语言）。 */
+  suggestion: string | null;
+  /** 证据：JSON 数组字符串，见 {@link AlarmEvidence}；设备告警为 null。 */
+  evidence: string | null;
+  timeline: AlarmLogItem[];
+  /** 同一主体近 7 天的其他告警。 */
+  recentSameSubject: AlarmRecord[];
+}
+
+/**
+ * 立即处置的结果（后端 `AlarmController#dispose` 的 Map 出参）。
+ * `dispositionRef` 为 null = 自愈成功或仅通知，没有单可跳。**幂等**：已处置过返回首次的单号。
+ */
+export interface AlarmDisposeResult {
+  alarmNo: string;
+  dispositionRef: string | null;
+}
+
+/** 待办状态（与后端 `AlarmTodoStatus` 同名同值）。 */
+export type AlarmTodoStatus = "OPEN" | "DONE" | "CANCELLED";
+
+/**
+ * 告警待办（后端 `AlarmTodo`）。
+ *
+ * <p>它解决的是「告警有人看但没人负责」：告警按 `roleCode` 落到岗位上，
+ * 谁认领谁办完。没有这一层的话，一条告警在列表里躺着，
+ * 每个人都以为别人会处理。
+ */
+export interface AlarmTodo {
+  todoNo: string;
+  alarmNo: string;
+  alarmCode: string | null;
+  /** 该办的岗位。与 assigneeNo 是「岗位兜底 + 个人认领」的关系。 */
+  roleCode: string | null;
+  assigneeNo: string | null;
+  title: string;
+  status: AlarmTodoStatus;
+  siteNo: string | null;
+  createdAt: string;
+  doneAt: string | null;
+  doneBy: string | null;
+  doneNote: string | null;
+}
+
+/** 待办列表筛选（后端 `GET /api/ops/alarm-todos`）。`mine` 缺省 true：只看派给我 / 我这个岗位的。 */
+export interface AlarmTodoQ {
+  mine?: boolean;
+  status?: AlarmTodoStatus;
+  page?: number;
+  size?: number;
+}
+
+/** 某个域的告警计数。 */
+export interface AlarmDomainCount {
+  open: number;
+  critical: number;
+}
+
+/**
+ * 告警摘要（后端 `AlarmSummary`）。
+ *
+ * <p>`disposedOpen` = **已处置但还没关闭**的数量，它是最容易被忽略的一格：
+ * 开了工单不等于问题好了，工单没完工之前告警还在。
+ * `autoRecoveredToday` 则是判断「规则是不是太敏感」的依据 —— 自愈率高说明在吵。
+ */
+export interface AlarmSummary {
+  /** 只含有未关闭告警的域；缺席的域 = 0。存量设备告警（无域）后端计入 AVAILABILITY。 */
+  byDomain: Partial<Record<AlarmDomain, AlarmDomainCount>>;
+  disposedOpen: number;
+  autoRecoveredToday: number;
+}
+
+/**
+ * 处置预览（后端 `DispositionPreview`）。
+ *
+ * <p>**点「处置」之前先让人看见会发生什么**：开哪类工单、派给谁、会不会并进已有的单。
+ * 不给预览的话，运营点下去才知道系统把单派给了错的人，而工单已经开出去了。
+ */
+export interface DispositionPreview {
+  type: AlarmDisposition | null;
+  woType: string | null;
+  priority: WorkOrderPriority | null;
+  assigneeType: string | null;
+  assigneeNo: string | null;
+  /** 非空 = 会并进这张已存在的工单，而不是新开一张。 */
+  mergeIntoWoNo: string | null;
+  todoRole: string | null;
+  /** 兜底策略：主路径不可用时走什么。 */
+  fallback: AlarmDisposition | null;
+}
+
+/** 路由表里的成因：具体成因，或 `"*"` = 该码的兜底路由（后端存库即 `*`）。 */
+export type AlarmRouteCause = AlarmCause | "*";
+
+/** 告警码 → 处置的路由规则（后端 `AlarmRoute`）。 */
+export interface AlarmRoute {
+  alarmCode: string;
+  cause: AlarmRouteCause | null;
+  disposition: AlarmDisposition | null;
+  woType: string | null;
+  /** 优先级增量（-2…+2 档，后端夹紧）：同一个码在不同成因下的紧急程度不同。 */
+  priorityDelta: number | null;
+  fallback: AlarmDisposition | null;
+}
+
+/** 保存路由的入参。`cause` 留空或 `"*"` 都存成兜底。 */
+export interface AlarmRouteReq {
+  cause?: AlarmRouteCause | null;
+  disposition: AlarmDisposition;
+  woType?: string | null;
+  priorityDelta?: number | null;
+  fallback?: AlarmDisposition | null;
+}
+
+/**
+ * 每码统计（后端 `CodeStat`，近 N 天）。
+ *
+ * <p>三个比率是**调规则的依据**：误报率高 = 规则太敏感，自愈率高 = 不该开单，
+ * 撤单率高 = 处置路由配错了。没有它们，「告警太吵」只能靠感觉说。
+ */
+export interface AlarmCodeStat {
+  code: string;
+  total: number;
+  falseAlarmRate: number;
+  selfHealRate: number;
+  withdrawnRate: number;
 }

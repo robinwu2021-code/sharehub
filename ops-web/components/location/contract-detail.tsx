@@ -7,12 +7,18 @@
 // 塞回列表页会让那个文件再长 200 行，且这三者的关系只有读代码才看得出来。
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { Contract, ContractStatus, ContractLogItem, ContractTerminationStatus } from "@/lib/types";
+import type { Contract, ContractStatus, ContractLogEvent, ContractLogItem, ContractTerminationStatus } from "@/lib/types";
 import { Drawer, Field } from "@/components/ui/drawer";
 
 import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
-import { Badge } from "@/components/ui/badge";
 import { Timeline, type TimelineItem } from "@/components/ui/timeline";
+import { DetailHeader } from "@/components/ui/detail-header";
+import { StatusStepper, type Step } from "@/components/ui/status-stepper";
+import { Skeleton, EmptyState } from "@/components/ui/misc";
+import { StateActions } from "@/components/state-actions";
+import { RefLink } from "@/components/ref-link";
+import { useContractActions } from "./contract-actions";
+import { FileLink } from "./file-link";
 
 /**
  * 合同六态。
@@ -31,6 +37,15 @@ export const CONTRACT_STATUS: StatusMap<ContractStatus> = {
   TERMINATED: { label: "已终止", tone: "muted" },
 };
 
+/** 主线五步；TERMINATED 是从「生效中」岔出去的分支终态。 */
+const CONTRACT_STEPS: Step[] = [
+  { key: "DRAFT", label: "草稿" },
+  { key: "PENDING", label: "审批中" },
+  { key: "SIGNED", label: "已签批" },
+  { key: "ACTIVE", label: "生效中" },
+  { key: "EXPIRED", label: "已到期" },
+];
+
 const SHARE_MODE: Record<string, string> = {
   SHARE: "纯分成", ENTRY_FEE: "进场费", GUARANTEE: "保底", FREE: "免费",
 };
@@ -46,11 +61,12 @@ const TERMINATION_STATUS: StatusMap<ContractTerminationStatus> = {
 };
 
 /** 留痕事件 → 人读文案。缺映射时**原样显示事件名**，不吞掉。 */
-const EVENT_LABEL: Record<string, string> = {
-  SUBMIT: "提交审批", WITHDRAW: "撤回", AUDIT_APPROVE: "运营通过", AUDIT_REJECT: "运营驳回",
-  COSIGN_APPROVE: "财务会签通过", COSIGN_REJECT: "财务会签驳回", SIGN: "登记签署件",
-  TERMINATION_REQUEST: "申请终止", TERMINATION_APPROVE: "终止获批", TERMINATION_REJECT: "终止驳回",
-  TERMINATED: "已终止", RENEW_FROM: "续签生成", SUPPLEMENT_FROM: "补充协议生成",
+const EVENT_LABEL: Record<ContractLogEvent, string> = {
+  CREATE: "新建", UPDATE: "修改", SUBMIT: "提交审批", WITHDRAW: "撤回",
+  APPROVE: "运营通过", REJECT: "运营驳回", COSIGN: "财务会签通过", COSIGN_REJECT: "财务会签驳回",
+  SIGN: "登记签署件", ACTIVATE: "生效", EXPIRE: "到期", TERMINATE: "已终止",
+  TERM_REQUEST: "申请终止", TERM_APPROVE: "终止获批", TERM_REJECT: "终止驳回",
+  RENEW: "续签生成", SUPPLEMENT: "补充协议生成",
 };
 
 const toTimeline = (logs: ContractLogItem[]): TimelineItem[] =>
@@ -65,12 +81,17 @@ const toTimeline = (logs: ContractLogItem[]): TimelineItem[] =>
   }));
 
 export function ContractDetailDrawer({
-  contractNo, onOpenChange,
+  contractNo, onOpenChange, onEdit, onAttach,
 }: {
   contractNo: string | null;
   onOpenChange: (open: boolean) => void;
+  /** 编辑草稿（表单在列表页）。 */
+  onEdit?: (c: Contract) => void;
+  /** 打开附件抽屉。 */
+  onAttach?: (c: Contract) => void;
 }) {
   const open = !!contractNo;
+  const { actionsFor, ui } = useContractActions({ onEdit, onAttach });
   const detail = useQuery<Contract>({
     queryKey: ["contract-detail", contractNo],
     queryFn: () => api.getContract(contractNo!),
@@ -91,26 +112,41 @@ export function ContractDetailDrawer({
       open={open}
       onOpenChange={onOpenChange}
       title={`合同 ${contractNo ?? ""}`}
-      desc="条款与流程都只读：改条款要回到草稿（撤回后编辑），推进流程用列表上的动作按钮"
+      desc="条款只读：改条款要回到草稿（撤回后编辑）。流程推进用头部的动作"
       width="w-[640px]"
     >
-      {detail.isLoading && <span className="text-muted-foreground">加载中…</span>}
-      {detail.error && <span className="text-[var(--danger)]">读取失败，请重试</span>}
+      {detail.isLoading && <Skeleton className="h-40" />}
+      {!detail.isLoading && !c && (
+        <EmptyState title="合同读不到" desc="这份合同可能不在你的数据范围内，或编号有误。回到列表重新选择。" />
+      )}
       {c && (
         <>
-          <Field label="状态">
-            <StatusBadge map={CONTRACT_STATUS} value={c.status} />
-            {/* 状态只说「在审批中」，是谁的活由 auditStage 说——不显示它就看不出卡在哪一关 */}
-            {c.status === "PENDING" && f?.auditStage && (
-              <span className="ms-2 text-muted-foreground">当前环节：{AUDIT_STAGE[f.auditStage] ?? f.auditStage}</span>
-            )}
-            {typeof c.remainingDays === "number" && c.status === "ACTIVE" && (
-              <span className="ms-2 text-muted-foreground tabular-nums">
+          <DetailHeader
+            no={c.contractNo}
+            title={`${c.venueName} · ${c.siteName}`}
+            badge={<StatusBadge map={CONTRACT_STATUS} value={c.status} />}
+            meta={f?.contractKind === "SUPPLEMENT" ? "补充协议" : f?.prevContractNo ? `续签自 ${f.prevContractNo}` : undefined}
+            stepper={<StatusStepper steps={CONTRACT_STEPS} current={c.status}
+              branch={c.status === "TERMINATED" ? { label: "已终止", after: "ACTIVE" } : null} />}
+            actions={<StateActions actions={actionsFor(c)} />}
+            className="mb-4"
+          />
+          {/* 状态只说「在审批中」，是谁的活由 auditStage 说——不显示它就看不出卡在哪一关 */}
+          {c.status === "PENDING" && f?.auditStage && (
+            <Field label="当前环节">{AUDIT_STAGE[f.auditStage] ?? f.auditStage}</Field>
+          )}
+          {typeof c.remainingDays === "number" && c.status === "ACTIVE" && (
+            <Field label="剩余">
+              <span className="tabular-nums">
                 {c.remainingDays >= 0 ? `距到期 ${c.remainingDays} 天` : `已过期 ${-c.remainingDays} 天`}
               </span>
-            )}
+            </Field>
+          )}
+          <Field label="场地方 / 站点">
+            {c.venueName}{c.venueNo && <span className="ms-1 txt-caption text-muted-foreground tabular-nums">{c.venueNo}</span>}
+            <span className="ms-2">· {c.siteName}</span>
+            <RefLink kind="site" no={c.siteNo} className="ms-2 txt-caption" />
           </Field>
-          <Field label="场地方 / 站点">{c.venueName} · {c.siteName}</Field>
           {/* 只显示到天：合同期是日粒度的业务概念，带上时分秒会让人以为它精确到那一刻 */}
           <Field label="合同期">{c.startAt?.slice(0, 10)} ~ {c.endAt?.slice(0, 10)}</Field>
 
@@ -150,13 +186,25 @@ export function ContractDetailDrawer({
           )}
 
           {f?.signedAt && <Field label="签署日">{f.signedAt.slice(0, 10)}</Field>}
-          {f?.prevContractNo && <Field label="续签自">{f.prevContractNo}</Field>}
-          {f?.parentContractNo && <Field label="主合同">{f.parentContractNo}</Field>}
+          {f?.prevContractNo && <Field label="续签自"><RefLink kind="contract" no={f.prevContractNo} /></Field>}
+          {f?.parentContractNo && <Field label="主合同"><RefLink kind="contract" no={f.parentContractNo} /></Field>}
+          {f?.sourceLeadNo && <Field label="来源商机"><RefLink kind="lead" no={f.sourceLeadNo} /></Field>}
+          {f?.auditNote && <Field label="运营审批意见">{f.auditNote}</Field>}
+          {f?.financeAuditNote && <Field label="财务会签意见">{f.financeAuditNote}</Field>}
 
           <Field label="扫描件">
             {c.attachments.length
-              ? c.attachments.map((a) => <Badge key={a.attachNo} tone="outline" className="me-1">{a.fileName}</Badge>)
-              : <span className="text-[var(--warning)]">缺签署件 —— 审批可以过，但对账时拿不出凭据</span>}
+              ? (
+                <ul className="space-y-1">
+                  {c.attachments.map((a) => (
+                    <li key={a.attachNo} className="flex items-center gap-2">
+                      {a.fileNo ? <FileLink fileNo={a.fileNo} label={a.fileName} /> : <span>{a.fileName}</span>}
+                      <span className="txt-caption text-muted-foreground">{a.uploadedBy} · {a.uploadedAt?.slice(0, 10)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )
+              : <span className="text-warning-ink">缺签署件 —— 审批可以过，但对账时拿不出凭据</span>}
           </Field>
 
           <div className="mt-4">
@@ -169,6 +217,7 @@ export function ContractDetailDrawer({
           </div>
         </>
       )}
+      {ui}
     </Drawer>
   );
 }

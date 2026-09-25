@@ -4,6 +4,7 @@ import type {
   PageResult, Agent, AgentAssignment, AgentPerformance, AgentAccount, AgentCommission,
   AgentAssignmentRecord, AssignableAsset, AssignAssetsPayload, ReclaimAssetsPayload,
   AgentApply, ApplyStatus, OperatorType, MyApplyView,
+  AgentExit, AgentOpsAssessment, Checklist,
 } from "../../types";
 
 export interface AgentApi {
@@ -78,6 +79,29 @@ export interface AgentApi {
   // === 代理分润 ===
   listAgentCommissions(q?: PageQ): Promise<PageResult<AgentCommission>>;
   saveAgentCommission(x: Partial<AgentCommission> & { ruleNo?: string }): Promise<AgentCommission>;
+
+  // === 单条读（详情抽屉 / 深链）===
+  /** 代理账号详情（权限码 `agent:account:manage`）。 */
+  getAgentAccount(accountNo: string): Promise<AgentAccount>;
+  /** 分润规则详情（权限码 `agent:share:config`）。 */
+  getAgentCommission(ruleNo: string): Promise<AgentCommission>;
+
+  // === 代理清退（运营核心流程 F3）===
+  /**
+   * 发起清退：**发起即停用**（冻结提现、名下未完结工单改派平台），之后按
+   * 收回资产 → 结清 → 关闭账号 逐步推进。原因必填；同一代理至多一张在途清退单。
+   * 权限码 `agent:agent:update`。
+   */
+  startAgentExit(agentNo: string, reason: string): Promise<AgentExit>;
+  getAgentExit(exitNo: string): Promise<AgentExit>;
+  /** 当前这一步的门禁（逐项、带数量、带去处）。`allPassed` 以服务端为准。 */
+  agentExitGate(exitNo: string): Promise<Checklist>;
+  /** 门禁全过 → 推进一步；最后一步停用全部登录账号并归档代理（不可逆）。服务端会重算门禁。 */
+  advanceAgentExit(exitNo: string): Promise<AgentExit>;
+
+  // === 运维月度考核（F5，权限码 `agent:performance:read`）===
+  /** 考核历史（按考核月倒序）：达成率（被接管算未达成）· 在线率 · 客诉 · 被接管数 → 下月运维分成系数。 */
+  listAgentOpsAssessments(agentNo: string): Promise<AgentOpsAssessment[]>;
 
   // === G1 软删除（TDD §10.1）：归档而非删除，**契约里禁止出现 deleteXxx** ===
   archiveAgent(agentNo: string): Promise<Agent>;

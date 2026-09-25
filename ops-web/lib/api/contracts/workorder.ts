@@ -10,14 +10,15 @@
 //    后端 ACCEPT 落 ACCEPTED，前端写的是 →PROCESSING —— 真后端接完单，界面上一个按钮都没有。
 //    谁是真源不由注释宣布，由卡口比对（backend WorkOrderStateMachineParityTest）。
 // 非法迁移必须由服务端拒绝（mock 抛 WorkOrderTransitionError），前端按钮只是「不给点」而非唯一防线。
-import type { PageQ, WoQ } from "../query";
+import type { PageQ, WoQ, WoPoolQ, WoCostQ } from "../query";
 import type {
   PageResult, WorkOrder, WorkOrderDraft, WorkOrderHandlePayload, WorkOrderClosePayload,
   SlaRule, InspectionPlan, InspectionRunResult,
-  WoSummary, WorkOrderDetail, AssigneeCandidate, WoDeriveReq, WoTakeoverReq,
+  WoSummary, WorkOrderDetail, AssigneeCandidate, WoDeriveReq, WoTakeoverReq, CostRow,
 } from "../../types";
 
 export interface WorkOrderApi {
+  /** 列表。筛选含运营维度（priority/source/siteNo/assigneeNo/slaState/reviewStatus），行带 `ops`。 */
   listWorkOrders(q?: WoQ): Promise<PageResult<WorkOrder>>;
   /** 开单（workorder:wo:create）。 */
   createWorkOrder(x: WorkOrderDraft): Promise<WorkOrder>;
@@ -27,9 +28,12 @@ export interface WorkOrderApi {
   acceptWorkOrder(woNo: string, handler?: string): Promise<WorkOrder>;
   /** 提交处理结果（workorder:wo:handle）：PROCESSING 内留痕，不改状态。 */
   processWorkOrder(woNo: string, x: WorkOrderHandlePayload): Promise<WorkOrder>;
-  /** 完成（workorder:wo:handle）：PROCESSING → DONE。 */
+  /**
+   * 完工（workorder:wo:handle）：PROCESSING → DONE。按类型收紧（见 woCompleteRules）：
+   * 维修 / 装机 / 撤机要照片，维修要故障原因，撤机要清点数。告警来源的单完工后自动复核。
+   */
   completeWorkOrder(woNo: string, x: WorkOrderHandlePayload): Promise<WorkOrder>;
-  /** 验收关单（workorder:wo:close）：DONE → CLOSED，验收结论必填。 */
+  /** 验收关单（workorder:wo:close）：DONE → CLOSED，验收结论必填；复核未通过时验收说明必填。 */
   closeWorkOrder(woNo: string, x: WorkOrderClosePayload): Promise<WorkOrder>;
   /** 驳回退回（workorder:wo:dispatch）：DISPATCHED/PROCESSING → CREATED，原因必填。 */
   rejectWorkOrder(woNo: string, reason: string): Promise<WorkOrder>;
@@ -39,6 +43,10 @@ export interface WorkOrderApi {
   // === 工单扩展 tab ===
   listSlaRules(q?: PageQ): Promise<PageResult<SlaRule>>;
   listInspectionPlans(q?: PageQ): Promise<PageResult<InspectionPlan>>;
+  /** 单条 SLA 规则（编辑前取最新，避免拿列表里的旧行覆盖别人刚改的时限）。 */
+  getSlaRule(slaNo: string): Promise<SlaRule>;
+  /** 单个巡检计划（工单来源是「巡检计划」时，详情里带出路线与负责人）。 */
+  getInspectionPlan(planNo: string): Promise<InspectionPlan>;
   saveSlaRule(x: Partial<SlaRule> & { slaNo?: string }): Promise<SlaRule>;
   saveInspectionPlan(x: Partial<InspectionPlan> & { planNo?: string }): Promise<InspectionPlan>;
   /**
@@ -64,6 +72,16 @@ export interface WorkOrderApi {
 
   /** 派生子单：现场发现的新问题另开一张，而不是塞进当前单的备注里。 */
   deriveWorkOrder(woNo: string, req: WoDeriveReq): Promise<WorkOrder>;
-  /** 接管：转给另一个人。原因必填——被接管的人要看得到为什么。 */
+  /**
+   * 平台接管（workorder:wo:dispatch，F4）：**代理承接、SLA 已超时**的单改派平台员工。
+   * 不满足的后端 409；界面按 woTakeoverBlocked 禁用并说明原因。
+   */
   takeoverWorkOrder(woNo: string, req: WoTakeoverReq): Promise<WorkOrder>;
+
+  /** 抢单池（workorder:wo:handle，E3）：未派出的工单，按数据范围 —— 区域员工看到本区域的池。 */
+  listWoPool(q?: WoPoolQ): Promise<PageResult<WorkOrder>>;
+  /** 抢单（workorder:wo:handle）：派给自己并接单（CREATED → ACCEPTED）。并发两人抢只一人成功。 */
+  grabWorkOrder(woNo: string): Promise<WorkOrder>;
+  /** 工单成本汇总（workorder:wo:read，G4）：按承担方（站点 / 代理）聚合完工单的配件 + 人工金额。 */
+  listWoCosts(q?: WoCostQ): Promise<CostRow[]>;
 }

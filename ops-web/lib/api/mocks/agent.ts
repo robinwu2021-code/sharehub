@@ -1,5 +1,7 @@
 // 覆盖范围：代理商主档、区域分配、业绩、资金账户、分润规则。
 import * as db from "../../mock/db";
+import * as ax from "../../mock/db/agent-exit";
+import { notFound } from "@/lib/biz-error";
 import type { AgentApi } from "../contracts/agent";
 import type { PageQ, ArchiveQ, AssignmentRecordQ, AssignableAssetQ , ReportQ } from "../query";
 import type { Agent } from "../../types";
@@ -13,8 +15,11 @@ export const agentMock: AgentApi = {
   },
   saveAgent: (a) => {
     const idx = db.agents.findIndex((x) => x.agentNo === a.agentNo);
+    const before = idx >= 0 ? db.agents[idx].status : null;
     const merged = { ...(db.agents[idx] ?? { name: "", contact: "", regionScope: "", shareRate: 0.3, cabinetCount: 0, status: "ENABLED", archivedAt: null, agentNo: `AG${db.agents.length + 1}` }), ...a } as Agent;
     if (idx >= 0) db.agents[idx] = merged; else db.agents.push(merged);
+    // 停用联动（F2）：名下未完结工单改派平台 —— 后端由 AgentStatusChangedEvent 的监听器做
+    if (before && before !== "SUSPENDED" && merged.status === "SUSPENDED") ax.onAgentSuspended(merged.agentNo);
     return wait(merged, 350);
   },
 
@@ -43,6 +48,16 @@ export const agentMock: AgentApi = {
   // 代理分润
   listAgentCommissions: (q: PageQ = {}) => wait(db.listAgentCommissions(q)),
   saveAgentCommission: (x) => wait(db.saveAgentCommission(x), 350),
+
+  getAgentAccount: async (no) => wait(db.agentAccounts.find((x) => x.accountNo === no) ?? notFound("代理账号", "Agent account", no)),
+  getAgentCommission: async (no) => wait(db.agentCommissions.find((x) => x.ruleNo === no) ?? notFound("分润规则", "Commission rule", no)),
+
+  // 代理清退 / 运维考核：状态机与门禁在 db 层（agent-exit.ts）强制；async 让抛错变成 rejected promise
+  startAgentExit: async (agentNo, reason) => wait(ax.startAgentExit(agentNo, reason), 400),
+  getAgentExit: async (no) => wait(ax.getAgentExit(no)),
+  agentExitGate: async (no) => wait(ax.agentExitGate(no)),
+  advanceAgentExit: async (no) => wait(ax.advanceAgentExit(no), 400),
+  listAgentOpsAssessments: async (agentNo) => wait(ax.listAgentOpsAssessments(agentNo)),
 
   // G1 软删除：归档 / 恢复（禁止物理删除）
   archiveAgent: async (no) => wait(db.archiveAgent(no), 350),

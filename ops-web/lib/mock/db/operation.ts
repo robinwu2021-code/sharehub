@@ -42,7 +42,7 @@ function inputOf(from?: string, to?: string, filter?: { regionId?: string; agent
     sites: siteRows,
     points: pointRows,
     cabinets: cabRows,
-    powerbanks: powerbanks.filter((p) => cabNos.has(p.cabinetNo)),
+    powerbanks: powerbanks.filter((p) => p.cabinetNo != null && cabNos.has(p.cabinetNo)),
     orders: orders.filter((o) => cabNos.has(o.cabinetNo)),
     contracts,
     // 分成现在按「分成方 + 站点名」关联（清单 D2 未定前的现状）：

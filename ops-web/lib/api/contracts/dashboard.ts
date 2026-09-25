@@ -1,5 +1,5 @@
 // 覆盖范围：认证登录 + 工作台首页统计。
-import type { DashboardStats } from "../../types";
+import type { DashboardStats, OpsFlowMetrics } from "../../types";
 
 /** 一个人在某运营主体下的成员关系（ADR-030）。仅 AGENT realm 返回。 */
 export interface OperatorRef { operatorNo: string; name: string; isOwner: boolean; isPrimary: boolean; }
@@ -115,4 +115,9 @@ export interface DashboardApi {
   logout(): Promise<void>;
   // 工作台
   getDashboard(): Promise<DashboardStats>;
+  /**
+   * 运营核心流程指标（`dashboard:overview:read`）。窗口 `[from, to)`，YYYY-MM-DD；缺省最近 30 天。
+   * 比率为 null = 分母为 0，**不是 0%**。
+   */
+  getOpsFlowMetrics(q?: { from?: string; to?: string }): Promise<OpsFlowMetrics>;
 }

@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
@@ -17,6 +17,8 @@ import { Drawer, Field } from "@/components/ui/drawer";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
 import { ReadOnlyNotice } from "@/components/read-only-notice";
+import { SettlementDetailDrawer, SETTLEMENT_STATUS } from "@/components/finance/settlement-detail";
+import { SettlementAdjustments } from "@/components/finance/settlement-adjustments";
 import { Notice } from "@/components/ui/notice";
 import { Tabs } from "@/components/ui/tabs";
 import { DateInput } from "@/components/ui/date-input";
@@ -71,12 +73,8 @@ const RECHARGE_STATUS: StatusMap<RechargeOrder["status"]> = {
   REFUNDED: { label: "已退款", tone: "muted" },
 };
 
-// 结算单状态：全站同色（待确认=warning / 已确认=default / 已打款=success）
-const STL_STATUS: StatusMap<SettlementStatus> = {
-  GEN: { label: "待确认", tone: "warning" },
-  CONFIRMED: { label: "已确认", tone: "default" },
-  PAID: { label: "已打款", tone: "success" },
-};
+// 结算单状态：全站同色（待确认=warning / 已确认=default / 已打款=success）。与详情抽屉共用一份
+const STL_STATUS: StatusMap<SettlementStatus> = SETTLEMENT_STATUS;
 // 提现状态：原先徽标直接印枚举值（"AUDIT"/"PAID"），那是系统内部词（规范 §13）。
 // 键序 = 资金流转顺序：申请 → 审批 → 打款 → 到账 / 驳回。
 /** 收款账户状态。停用不是删除 —— 历史提现单要能回溯到当时打给了哪条记录。 */
@@ -218,9 +216,18 @@ function FinanceInner() {
   const allow = useCan();
   const { t } = useI18n();
   const { confirm, dialog } = useConfirm();
-  // 结算单（S1）：生成抽屉 / 详情抽屉（详情展示构成它的分润明细）
+  // 结算单（S1）：生成抽屉 / 详情抽屉。详情与「结算单 / 调整项」视图都写进 URL（?no= / ?view=），刷新与分享不丢
   const [genForm, setGenForm] = useState<{ payeeType: string; period: string; payeeNos: string } | null>(null);
-  const [stlDetail, setStlDetail] = useState<Settlement | null>(null);
+  const router = useRouter();
+  const pathname = usePathname();
+  const patchQuery = (patch: Record<string, string | null>) => {
+    const q = new URLSearchParams(sp.toString());
+    for (const [k, v] of Object.entries(patch)) { if (v) q.set(k, v); else q.delete(k); }
+    router.replace(q.size ? `${pathname}?${q.toString()}` : pathname, { scroll: false });
+  };
+  const stlNo = sp.get("no");
+  const openStl = (no: string) => patchQuery({ tab: "settlements", no });
+  const stlView = sp.get("view") === "adjustments" ? "adjustments" : "list";
   const [stlStatus, setStlStatus] = useState("");
   const [ruleForm, setRuleForm] = useState<Partial<ShareRule> | null>(null);
   // 分润规则视角：默认场地方（规则数量最多的一侧）
@@ -276,7 +283,10 @@ function FinanceInner() {
   // 从分润统计深链过来：/finance?tab=records&payee=xxx —— 把 payee 落成分润明细的搜索词，
   // 不静默丢弃参数（本 effect 必须排在上面的清空 effect 之后，否则会被清掉）
   const qPayee = sp.get("payee");
-  useEffect(() => { if (qPayee && tab === "records") setKeyword(qPayee); }, [qPayee, tab]);
+  // 清退门禁的「去处理」也走这条：分润明细 / 结算单 / 提现三个页签都认 payee
+  useEffect(() => {
+    if (qPayee && (tab === "records" || tab === "settlements" || tab === "withdrawals")) setKeyword(qPayee);
+  }, [qPayee, tab]);
 
   const canEditRule = allow("finance:share_rule:config");
   // 发票：登记草稿与开具共用 `:issue`（功能权限清单 §财务域「发票 查 / 开具」）；
@@ -485,13 +495,6 @@ function FinanceInner() {
     enabled: !!invDetail,
   });
 
-  // 结算单构成明细：这张单的钱是哪几笔分润凑出来的
-  const stlRecordsQ = useQuery({
-    queryKey: ["stl-records", stlDetail?.settleNo ?? ""],
-    queryFn: () => api.listSettlementRecords(stlDetail!.settleNo, { page: 1, size: UNPAGED_SIZE }),
-    enabled: !!stlDetail,
-  });
-
   const payeeOptions = useMemo(() => {
     if (genForm?.payeeType === "AGENT") {
       return (agentsQ.data?.list ?? []).filter((a) => !a.archivedAt).map((a) => ({ value: a.agentNo, label: `${a.agentNo} · ${a.name}` }));
@@ -530,7 +533,7 @@ function FinanceInner() {
     onSuccess: (s) => {
       qc.invalidateQueries({ queryKey: ["fin"] });
       notify.success(`结算单 ${s.settleNo} 已确认`);
-      setStlDetail((cur) => (cur && cur.settleNo === s.settleNo ? s : cur));
+      qc.invalidateQueries({ queryKey: ["stl-view"] });
     },
   });
 
@@ -704,7 +707,7 @@ function FinanceInner() {
     {
       header: "结算单号",
       cell: (s) => (
-        <button type="button" className="txt-strong tabular-nums underline-offset-4 hover:underline" onClick={() => setStlDetail(s)}>
+        <button type="button" className="txt-strong tabular-nums underline-offset-4 hover:underline" onClick={() => openStl(s.settleNo)}>
           {s.settleNo}
         </button>
       ),
@@ -722,7 +725,7 @@ function FinanceInner() {
       header: t("common.actions"),
       cell: (s) => (
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => setStlDetail(s)}>明细</Button>
+          <Button size="sm" variant="outline" onClick={() => openStl(s.settleNo)}>详情</Button>
           {/* 能不能确认由状态机说了算（STL_TRANSITIONS.confirm.from = ["GEN"]）。
               这里此前手写 `status === "GEN"` 并在注释里把它写成 DRAFT —— 注释引了 SSOT
               却引错了值，而代码根本没读那张表。后端加一条 from 时两处都不会有人想起来改。 */}
@@ -1200,7 +1203,16 @@ function FinanceInner() {
           />
         </Toolbar>
       )}
+      {/* 结算单下两个视图：结算单列表 / 调整项（不开新菜单 —— 菜单变更要走库迁移） */}
       {tab === "settlements" && (
+        <Tabs
+          tabs={[{ key: "list", label: "结算单" }, { key: "adjustments", label: "调整项" }]}
+          value={stlView}
+          onChange={(k) => { patchQuery({ view: k === "adjustments" ? "adjustments" : null }); paging.reset(); }}
+        />
+      )}
+      {tab === "settlements" && stlView === "adjustments" && <SettlementAdjustments />}
+      {tab === "settlements" && stlView === "list" && (
         <Toolbar
           search={keyword}
           onSearch={(v) => { setKeyword(v); paging.reset(); }}
@@ -1434,10 +1446,10 @@ function FinanceInner() {
         />
       )}
       {tab === "ledger" && <DataTable rowKey={(l: LedgerEntry) => l.entryNo} columns={ledgerCols} rows={q.data?.list as LedgerEntry[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty={`${periodLabel(ledgerPeriod)}内没有账务分录——订单结算与分账完成后自动记账，可换更长的期间或放宽搜索条件`} />}
-      {tab === "settlements" && !canGenSettlement && !canConfirmSettlement && (
+      {tab === "settlements" && stlView === "list" && !canGenSettlement && !canConfirmSettlement && (
         <ReadOnlyNotice what="结算单生成/确认" perm={["finance:settlement:generate", ":confirm"]} />
       )}
-      {tab === "settlements" && <DataTable rowKey={(s: Settlement) => s.settleNo} columns={stlCols} rows={q.data?.list as Settlement[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无结算单——点右上「生成结算单」按周期出账（金额取该周期分润明细汇总），或放宽筛选条件" />}
+      {tab === "settlements" && stlView === "list" && <DataTable rowKey={(s: Settlement) => s.settleNo} columns={stlCols} rows={q.data?.list as Settlement[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无结算单——点右上「生成结算单」按周期出账（金额取该周期分润明细汇总），或放宽筛选条件" />}
       {tab === "withdrawals" && !canAuditWithdrawal_ && <ReadOnlyNotice what="提现审批" perm="finance:withdrawal:audit" />}
       {/* 手续费口径必须写明出处：审批人看到的数从哪来、改哪里能改，否则「唯一来源」只是一句话 */}
       {/*
@@ -1517,7 +1529,8 @@ function FinanceInner() {
       {/* 9 个 tab 共用同一个查询与同一条分页条，所以这里是 DataTable + Pagination
           而不是 PagedTable：共用查询是 union 类型，逐 tab 断言反而更容易出错。
           代价是错误态要自己接——上面每个列表都接了，棘轮 lib/table-wiring.test.ts 守住不回退。 */}
-      {q.data && <Pagination page={paging.page} size={paging.size} total={q.data.total} onPage={paging.setPage} onSize={paging.setSize} />}
+      {/* 调整项视图自带分页（PagedTable），这里的分页属于上面那张共享列表 */}
+      {q.data && !(tab === "settlements" && stlView === "adjustments") && <Pagination page={paging.page} size={paging.size} total={q.data.total} onPage={paging.setPage} onSize={paging.setSize} />}
 
       {/* 提现审批抽屉：通过 → 转打款中；驳回必填原因；审批人取当前登录账号 */}
       <Drawer
@@ -1728,42 +1741,8 @@ function FinanceInner() {
         submitting={genSettlements.isPending}
       />
 
-      {/* 结算单详情：金额是怎么来的——逐笔列出构成它的分润明细 */}
-      <Drawer
-        open={!!stlDetail}
-        onOpenChange={(o) => !o && setStlDetail(null)}
-        title={`结算单 ${stlDetail?.settleNo ?? ""}`}
-        desc="金额 = 下方分润明细之和；确认后进入应付，金额锁定"
-        width="w-[760px]"
-        footer={
-          stlDetail && canSettlementTransition(stlDetail.status, "confirm") && canConfirmSettlement && (
-            <Button disabled={confirmSettlement.isPending} onClick={() => askConfirmSettlement(stlDetail)}>确认结算</Button>
-          )
-        }
-      >
-        {stlDetail && (
-          <>
-            <Field label="结算对象">{stlDetail.payeeName}（{PAYEE_TYPE_LABEL[stlDetail.payeeType]} {stlDetail.payeeNo}）</Field>
-            <Field label="结算周期">{stlDetail.period}</Field>
-            <Field label="结算金额">{money(stlDetail.totalAmount, stlDetail.currency)}（{stlDetail.recordCount} 笔明细）</Field>
-            <Field label="状态"><StatusBadge map={STL_STATUS} value={stlDetail.status} /></Field>
-            <Field label="生成时间">{fmtTime(stlDetail.createdAt)}</Field>
-            <Field label="确认人 / 确认时间">
-              {stlDetail.confirmedBy ? `${stlDetail.confirmedBy} · ${fmtTime(stlDetail.confirmedAt!)}` : "未确认"}
-            </Field>
-            <div className="mb-2 mt-4 text-xs text-muted-foreground">构成明细（{stlDetail.period}）</div>
-            <DataTable
-              rowKey={(r: ShareRecord) => r.recordNo}
-              columns={recordCols.filter((c) => c.header !== "维度" && c.header !== "分成方")}
-              rows={stlRecordsQ.data?.list}
-              loading={stlRecordsQ.isLoading}
-              error={stlRecordsQ.error}
-              onRetry={stlRecordsQ.refetch}
-              empty="该周期没有分润明细——理论上不该出现（无明细不允许出单），若看到请核对分润规则"
-            />
-          </>
-        )}
-      </Drawer>
+      {/* 结算单详情（?no=）：对账单 · 构成明细 · 打印 */}
+      <SettlementDetailDrawer settleNo={tab === "settlements" ? stlNo : null} onClose={() => patchQuery({ no: null })} />
 
       <FormDrawer
         open={!!ruleForm}

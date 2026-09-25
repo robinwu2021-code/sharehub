@@ -1,7 +1,8 @@
 // 覆盖范围：场所域 —— 站点 / 点位 / 场地方 / 合同 / 商机线索 / 选址分析 /
 // 门店 Onboarding / 站点生命周期。端点前缀：/api/ops/**
 import { client } from "../http-client";
-import type { LocationApi } from "../contracts/location";
+import type { LocationApi, ContractQ } from "../contracts/location";
+import type { LeadQ } from "../../types";
 import type { PageQ, ArchiveQ , ReportQ } from "../query";
 
 export const locationHttp: LocationApi = {
@@ -13,17 +14,19 @@ export const locationHttp: LocationApi = {
   listLocations: (q?: ArchiveQ) => client.get("/api/ops/locations", q),
   savePoint: (l) => client.post(l.locationNo ? `/api/ops/locations/${l.locationNo}` : "/api/ops/locations", l),
   listVenues: (q?: ArchiveQ) => client.get("/api/ops/venues", q),
-  listContracts: (q?: PageQ) => client.get("/api/ops/contracts", q),
+  listContracts: (q?: ContractQ) => client.get("/api/ops/contracts", q),
 
   // 场所扩展
-  listLeads: (q?: PageQ) => client.get("/api/ops/leads", q),
+  listLeads: (q?: LeadQ) => client.get("/api/ops/leads", q),
+  getLead: (no) => client.get(`/api/ops/leads/${no}`),
+  claimLead: (no) => client.post(`/api/ops/leads/${no}/claim`, {}),
+  convertLead: (no, req) => client.post(`/api/ops/leads/${no}/convert`, req ?? {}),
   listSiteAnalysis: (q?: ReportQ) => client.get("/api/ops/site-analysis", q),
   saveLead: (x) => client.post(x.leadNo ? `/api/ops/leads/${x.leadNo}` : "/api/ops/leads", x),
   saveVenue: (x) => client.post(x.venueNo ? `/api/ops/venues/${x.venueNo}` : "/api/ops/venues", x),
   saveContract: (x) => client.post(x.contractNo ? `/api/ops/contracts/${x.contractNo}` : "/api/ops/contracts", x),
 
-  // ⚠️ 后端缺口：以下四个端点后端尚未实现（合同写入侧连 POST /contracts 都还没有）。
-  // 路径按既有命名规则拟定（子资源用复数、非幂等状态动作挂 /remove），后端补的时候照此实现即可。
+  // 跟进流水 / 合同附件（附件入参是 fileNos：先经文件服务上传）
   listLeadFollowUps: (leadNo, q?: PageQ) => client.get(`/api/ops/leads/${leadNo}/follow-ups`, q),
   addLeadFollowUp: (leadNo, req) => client.post(`/api/ops/leads/${leadNo}/follow-ups`, req),
   addContractAttachment: (contractNo, req) => client.post(`/api/ops/contracts/${contractNo}/attachments`, req),
@@ -31,6 +34,7 @@ export const locationHttp: LocationApi = {
 
   // 门店 Onboarding / 生命周期
   listVenueOnboardings: (q?: PageQ) => client.get("/api/ops/venue-onboardings", q),
+  getVenueOnboarding: (no) => client.get(`/api/ops/venue-onboardings/${no}`),
   saveVenueOnboarding: (x) => client.post(x.onboardingNo ? `/api/ops/venue-onboardings/${x.onboardingNo}` : "/api/ops/venue-onboardings", x),
   reviewVenueOnboarding: (onboardingNo, approve, note) =>
     client.post(`/api/ops/venue-onboardings/${onboardingNo}/review`, { approve, note }),
@@ -68,4 +72,6 @@ export const locationHttp: LocationApi = {
   siteCloseGate: (no) => client.get(`/api/ops/sites/${no}/close-gate`),
   withdrawSite: (no, reason, plannedAt) => client.post(`/api/ops/sites/${no}/withdraw`, { reason, plannedAt }),
   closeSite: (no, note) => client.post(`/api/ops/sites/${no}/close`, { note }),
+  listSiteSurveys: (no) => client.get(`/api/ops/sites/${no}/surveys`),
+  recordSiteSurvey: (no, req) => client.post(`/api/ops/sites/${no}/surveys`, req),
 };

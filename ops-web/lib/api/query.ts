@@ -14,8 +14,18 @@ export type OrderQ = StatusQ;
 
 /** status + type 双筛。原 WoQ / ReservationQ 结构相同，已合并。 */
 export type StatusTypeQ = PageQ & { status?: string; type?: string };
-/** 工单列表。等价于 StatusTypeQ，保留旧名。 */
-export type WoQ = StatusTypeQ;
+/**
+ * 工单列表。StatusTypeQ + 运营维度筛选（后端 `WoQuery`，2026-09-25）。
+ * `slaState`：DUE_SOON 两小时内到期 / OVERDUE 已超时；`reviewStatus`：PASSED / FAILED。
+ */
+export type WoQ = StatusTypeQ & {
+  priority?: string; source?: string; siteNo?: string; assigneeNo?: string;
+  slaState?: string; reviewStatus?: string;
+};
+/** 抢单池：只按类型筛（后端 pool 只收 page/size/type）。 */
+export type WoPoolQ = PageQ & { type?: string };
+/** 工单成本汇总：完工单创建日期区间 [from, to)（ISO 日期）+ 承担方类型。 */
+export interface WoCostQ { from?: string; to?: string; bearerType?: string }
 /** 预约订单列表。等价于 StatusTypeQ，保留旧名。 */
 export type ReservationQ = StatusTypeQ;
 
@@ -30,7 +40,16 @@ export type ArchiveQ = PageQ & { showArchived?: boolean };
 /** 设备：在线状态 + 业务状态双筛。 */
 export type CabinetQ = PageQ & { onlineStatus?: string; status?: string; showArchived?: boolean };
 /** 告警记录：级别 + 处理状态。 */
-export type AlarmQ = PageQ & { level?: string; status?: string };
+/**
+ * 告警记录筛选。`status` / `domain` 后端按逗号拆成 IN —— 「未关闭」就是 `OPEN,ACKED`，
+ * 运维的默认域是四个域一起看，不必为此另开参数。`topOnly` = 只看顶层（被站点级取代的柜级告警收起来）。
+ * `from` / `to` 为 YYYY-MM-DD，含端点。
+ */
+export type AlarmQ = PageQ & {
+  level?: string; status?: string; cabinetNo?: string;
+  domain?: string; subjectType?: string; siteNo?: string; cause?: string; disposition?: string;
+  from?: string; to?: string; topOnly?: boolean;
+};
 /** 设备日志：stream 双流筛选 + 日期范围（YYYY-MM-DD，含端点）。 */
 export type DeviceLogQ = PageQ & { stream?: string; from?: string; to?: string };
 /** 固件版本库：固件类型 + 供应商 + 发布状态三筛（投放列表用 PageQ 就够，版本库要按类型/厂商找包）。 */
@@ -46,6 +65,10 @@ export type AssignableAssetQ = PageQ & { assetType?: string; agentNo?: string; e
 export type ShareRuleQ = PageQ & { dimension?: string };
 /** 结算单：状态 + 对象类型 + 周期。 */
 export type SettlementQ = PageQ & { status?: string; payeeType?: string; period?: string };
+/**
+ * 结算调整项：后端只认 status / payeeNo / siteNo；kind / source 照传（后端补上前页面在当页内再筛一遍）。
+ */
+export type AdjustmentQ = PageQ & { status?: string; payeeNo?: string; siteNo?: string; kind?: string; source?: string };
 /** 分润明细：可按维度/对象/周期收敛（结算单详情就是「某对象某周期」的那批明细）。 */
 export type ShareRecordQ = PageQ & { dimension?: string; payeeNo?: string; period?: string };
 /** 分润统计：一张表两种主体，dimension 是维度切换器参数（VENUE / AGENT）。 */

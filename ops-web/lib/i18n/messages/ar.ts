@@ -72,7 +72,7 @@ export const ar: Messages = {
     CREATED: "بانتظار التوزيع", DISPATCHED: "تم التوزيع", ACCEPTED: "تم القبول",
     PROCESSING: "قيد المعالجة", DONE: "منجز", AUDITED: "تمت المراجعة", CLOSED: "مغلق",
   },
-  cabStatus: { IN_STOCK: "في المخزن", DEPLOYED: "قيد التشغيل", FAULT: "عطل", RETIRED: "مسحوب" },
+  cabStatus: { IN_STOCK: "في المخزن", IN_TRANSIT: "قيد النقل", DEPLOYED: "قيد التشغيل", FAULT: "عطل", RETIRED: "مسحوب" },
   woType: {
     FAULT: "إصلاح", REFILL: "إعادة تعبئة", INSPECT: "تفتيش", INSTALL: "تركيب",
     REMOVE: "إزالة", COMPLAINT: "شكوى", CLEAN: "تنظيف",

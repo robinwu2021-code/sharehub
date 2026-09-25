@@ -191,3 +191,66 @@ export interface AgentCommission {
   effectiveAt: string;
   status: "ACTIVE" | "INACTIVE";
 }
+
+// —— 代理清退（运营核心流程 F3 · 后端 AgentExitController）——
+
+/**
+ * 清退单状态。与后端 `AgentExitStatus` 枚举同名同值（两端词表比对只认具名 `export type`）。
+ * 严格按序：收回资产 → 结清 → 关闭账号 → 已清退。**没有回退边**：资产收回了再「退回收回中」没有业务含义。
+ */
+export type AgentExitStatus = "RECLAIMING" | "SETTLING" | "CLOSING" | "CLOSED";
+export type AgentExitAction = "reclaimed" | "settled" | "close";
+
+/**
+ * 清退迁移表（SSOT）。与后端 `AgentExitStateMachine.TRANSITIONS` 边对边一致
+ * （`StateMachineEdgeAcrossEndsTest` 两端比对）。每一步都要**当前步门禁全过**才放行，
+ * 门禁由服务端算（`GET /api/agent/exits/{exitNo}/gate`），这里只管「这一步之后是哪一步」。
+ */
+export const AGENT_EXIT_TRANSITIONS: Record<AgentExitAction, { from: AgentExitStatus[]; to: AgentExitStatus; label: string }> = {
+  reclaimed: { from: ["RECLAIMING"], to: "SETTLING", label: "资产已收回，进入结清" },
+  settled: { from: ["SETTLING"], to: "CLOSING", label: "已结清，进入关闭" },
+  close: { from: ["CLOSING"], to: "CLOSED", label: "关闭账号并归档" },
+};
+/** 当前状态下「推进」对应的动作；终态没有。 */
+export const agentExitActionOf = (s: AgentExitStatus): AgentExitAction | null =>
+  (Object.keys(AGENT_EXIT_TRANSITIONS) as AgentExitAction[]).find((a) => AGENT_EXIT_TRANSITIONS[a].from.includes(s)) ?? null;
+
+/** 后端 `AgentExitService.AgentExit` 原样形状。 */
+export interface AgentExit {
+  exitNo: string;
+  agentNo: string;
+  status: AgentExitStatus;
+  reason: string | null;
+  startedBy: string | null;
+  startedAt: string | null;
+  reclaimedAt: string | null;
+  settledAt: string | null;
+  closedAt: string | null;
+  closedBy: string | null;
+}
+
+/**
+ * 运维月度考核（后端实体 `AgtOpsAssessment`，V110）。
+ *
+ * 达成率 = 考核月内该代理完结且未超时的工单 ÷（完结的 + **被平台接管的**）——
+ * 被接管算没达成，否则「超时不管、等平台接走」反而不影响考核。
+ * 系数用于 `applyPeriod`（下一个月）的运维分成，不逐单扣分润。
+ * 比率类字段在「无从考核」时为 null（没有工单 / 没有在网设备），系数此时为 1。
+ */
+export interface AgentOpsAssessment {
+  id: number;
+  agentNo: string;
+  /** 考核月 `YYYY-MM`。 */
+  period: string;
+  /** 系数生效月（考核月 + 1）。 */
+  applyPeriod: string;
+  woTotal: number;
+  woInSla: number;
+  slaRate: number | null;
+  onlineRate: number | null;
+  complaints: number;
+  takenOver: number;
+  coefficient: number;
+  computedAt: string | null;
+  createdAt: string | null;
+}

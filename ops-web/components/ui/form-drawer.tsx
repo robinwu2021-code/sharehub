@@ -4,7 +4,7 @@
 // 用法：<FormDrawer open={!!form} onOpenChange fields={FIELDS} value={form} onChange={setForm} onSubmit=.../>
 //
 // 能力：
-// - 字段类型：text/number/select/switch/password/textarea/date/datetime/multiselect/address
+// - 字段类型：text/number/select/switch/password/textarea/date/datetime/multiselect/address/file
 // - 校验：blur 校验单字段 + 提交校验全部；错误在字段下方红字，输入框描边转 destructive；有错时保存按钮禁用
 // - 分区：相邻同名 section 合成一段，段首渲染小标题（样式对齐 secondary-nav 的分组小标题）
 // - 联动：disabledWhen(values) 为 true 时禁用该字段并清空其值（不提交隐藏字段的脏数据）
@@ -14,6 +14,8 @@ import { Input, Select } from "./input";
 import { DateInput } from "./date-input";
 import { MultiSelect } from "./multi-select";
 import { AddressPicker } from "./address-picker";
+import { FileField } from "./file-field";
+import type { FileCategory } from "@/lib/types";
 import { Button } from "./button";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -44,6 +46,10 @@ export type FieldDef = ValidatableField & {
   /** 仅 address：经纬度写到 values 的哪两个键（地图选点与手填都写这里）。 */
   latKey?: string;
   lngKey?: string;
+  /** 仅 file：文件用途（决定类型 / 大小限制与存储桶），必给 —— 没有兜底档。 */
+  fileCategory?: FileCategory;
+  /** 仅 file：最多几个，默认 9。 */
+  maxFiles?: number;
 };
 
 type FormValue = FormValues;
@@ -151,6 +157,20 @@ function InputForField({
         placeholder={f.placeholder}
         onBlur={onBlur}
         onChange={(v) => onChange({ ...value, [f.key]: v.address, [latK]: v.lat, [lngK]: v.lng })}
+      />
+    );
+  }
+  if (f.type === "file") {
+    // 值恒为 fileNo 数组；上传中 / 失败的文件不进值（见 FileField 文件头）
+    return (
+      <FileField
+        value={csvToArray(cur)}
+        onChange={(arr) => set(arr)}
+        category={f.fileCategory ?? "WO_PHOTO"}
+        max={f.maxFiles}
+        disabled={disabled}
+        invalid={invalid}
+        onBlur={onBlur}
       />
     );
   }
@@ -310,7 +330,7 @@ export function FormDrawer({
 /** 清空联动禁用字段时按类型给「空值」：multiselect(非 csv) 给 []，其余给 ""。 */
 function emptyValueFor(fields: FieldDef[], key: string): unknown {
   const f = fields.find((x) => x.key === key);
-  if (f?.type === "multiselect" && !f.csv) return [];
+  if ((f?.type === "multiselect" && !f.csv) || f?.type === "file") return [];
   if (f?.type === "switch") return false;
   return "";
 }

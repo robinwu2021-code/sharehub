@@ -4,6 +4,13 @@ import type {
 import { SITE_TRANSITIONS } from "../../types";
 import { fail } from "../../biz-error";
 import { sites, contracts, locations } from "./location";
+import { latestSurveyPassed } from "./location-survey";
+
+/**
+ * 撤场提前通知天数（后端参数 `site.withdraw.lead_days`，默认 7）。
+ * 计划撤场日至少在今天 + N 天之后：给运维排撤机、给在借用户留归还时间。
+ */
+export const SITE_WITHDRAW_LEAD_DAYS = 7;
 
 /**
  * 站点状态机与门禁的 mock。
@@ -96,6 +103,15 @@ export function siteOpeningChecklist(no: string): Checklist {
       detail: (o.opsEmployeeNo || o.operateAgentNo) ? null : "没有责任人 —— 出故障时没人认领",
       fixHref: (o.opsEmployeeNo || o.operateAgentNo) ? null : `/operation/sites?keyword=${no}`,
     },
+    (() => {
+      // 以最近一次勘测为准；「没勘测过」与「勘测没过」分开说 —— 前者去约人，后者去解决问题
+      const surveyed = latestSurveyPassed(no);
+      return {
+        key: "survey", label: "现场勘测通过", passed: surveyed === true,
+        detail: surveyed === true ? null : surveyed === null ? "还没有勘测记录" : "最近一次勘测不通过",
+        fixHref: surveyed === true ? null : `/operation/sites?no=${no}&tab=survey`,
+      };
+    })(),
     {
       key: "point", label: "至少有一个点位", passed: hasPoint,
       detail: hasPoint ? null : "还没有点位 —— 设备没地方放",
@@ -136,6 +152,14 @@ export function withdrawSite(no: string, reason: string, plannedAt?: string): Si
   const s = find(no);
   const to = must(s, "withdraw");
   if (!reason?.trim()) fail("撤场原因必填", "Withdraw reason required", "سبب الانسحاب مطلوب");
+  if (!plannedAt) fail("缺少参数：plannedAt", "Missing parameter: plannedAt", "معلمة مفقودة: plannedAt");
+  const earliest = new Date(Date.now() + SITE_WITHDRAW_LEAD_DAYS * 86400_000).toISOString().slice(0, 10);
+  if (plannedAt.slice(0, 10) < earliest) {
+    fail(
+      `计划撤场日须至少在 ${SITE_WITHDRAW_LEAD_DAYS} 天之后，给运维排撤机、给在借用户留归还时间`,
+      `Planned withdraw date must be at least ${SITE_WITHDRAW_LEAD_DAYS} days ahead`,
+    );
+  }
   const from = s.status;
   s.status = to;
   const o = opsOf(s);
@@ -164,6 +188,8 @@ export function closeSite(no: string, note?: string): Site {
       `لا يمكن الإغلاق: ${blocked}`,
     );
   }
+  // 说明必填（后端 error.common.note_required）：关站不可逆，事后要能回答「为什么关」
+  if (!note?.trim()) fail("请填写说明", "A note is required", "يرجى كتابة ملاحظة");
   const from = s.status;
   s.status = to;
   opsOf(s).closedAt = now();

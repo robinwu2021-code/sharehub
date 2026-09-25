@@ -28,12 +28,12 @@ export const alarmMock: AlarmApi = {
 
   // —— 业务告警与待办 ——
   alarmSummary: () => wait(ba.alarmSummary()),
-  getAlarmRecord: (no) => wait(ba.getAlarmRecord(no)),
+  getAlarmDetail: (no) => wait(ba.getAlarmDetail(no)),
   alarmDispositionPreview: (no) => wait(ba.alarmDispositionPreview(no)),
   disposeAlarm: async (no) => wait(ba.disposeAlarm(no), 350),
   listAlarmRoutes: (code) => wait(ba.listAlarmRoutes(code)),
   saveAlarmRoutes: async (code, routes) => wait(ba.saveAlarmRoutes(code, routes), 350),
-  alarmCodeStats: () => wait(ba.alarmCodeStats()),
+  alarmCodeStats: (days) => wait(ba.alarmCodeStats(days)),
   listAlarmTodos: (q) => wait(ba.listAlarmTodos(q ?? {})),
   alarmTodoCount: () => wait(ba.alarmTodoCount()),
   doneAlarmTodo: async (no, note) => wait(ba.doneAlarmTodo(no, note), 350),

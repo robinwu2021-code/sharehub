@@ -1,15 +1,15 @@
 // 设备域：机柜 / 仓位 / 充电宝 / 实时监控 / 远程指令 / 调拨 / OTA / 供应商接入 / 设备日志 / 设备编码批次。
 // cabinets 是全库的“机柜号来源”，其他域（订单/告警/客服/营销广告位…）一律通过 cabNo() 引用，不复制数据。
 import type {
-  Cabinet, CabinetStatus, Slot, Vendor, Powerbank, CabinetMonitor, CommandRecord, CommandType,
-  InventoryTransfer, InventoryTransferDetail, TransferItem, InvTransferStatus, TransferAction,
+  Cabinet, Slot, Vendor, Powerbank, CabinetMonitor, CommandRecord, CommandType,
+  InventoryTransfer, InventoryTransferDetail, TransferItem, InvTransferStatus, TransferAction, InvTransferReq,
   OtaRollout, OtaRelease, OtaTask, DeviceLog, DeviceCodeBatch, PageQuery,
 } from "../../types";
 // 指令词表是 types 层 SSOT：抽屉里的选项、这里的落库校验同源，避免「界面能选、落库不认」
 import { COMMAND_TYPES, SLOT_REQUIRED_COMMANDS, TRANSFER_TRANSITIONS, canTransferAction } from "../../types";
 import { VENDORS, LOCS, OPERATORS, p, iso } from "./internal";
 import { paginate, kwHit, upsert, nextNo, liveHit, archiveRow, unarchiveRow } from "./helpers";
-import { notFound } from "@/lib/biz-error";
+import { fail, notFound } from "@/lib/biz-error";
 // 机柜归属站点（A1）取自场所域的真实点位，**不另造字符串**。依赖方向 device → location
 // 是单向的（location.ts 不引用设备），与 agent.ts 反过来引用 cabinets 的做法不冲突。
 import { locations } from "./location";
@@ -141,16 +141,31 @@ export const commandRecords: CommandRecord[] = Array.from({ length: 30 }, (_, i)
  * 盘点时就会变成「单据说 12 台、明细只有 9 行」这种没人说得清的差异。
  * 已完成（DONE）的单视为全部核对过；在途/草稿只核对了一部分。
  */
+/**
+ * 明细的落库处。种子单据的明细按单号推算（见下），**第一次读到时落进这里**，
+ * 之后的设定明细 / 签收核对都改这份 —— 否则每次读都重算，签收勾过的件刷新后又变回未核对。
+ */
+export const transferItemStore = new Map<string, TransferItem[]>();
+
 export const transferItemsOf = (transferNo: string): TransferItem[] => {
+  const stored = transferItemStore.get(transferNo);
+  if (stored) return stored;
   const t = inventoryTransfers.find((x) => x.transferNo === transferNo);
   if (!t) return [];
+  // 新建的单（种子之外）一开始没有明细：明细要经「设定明细」逐件录入，不凭台数编
+  if (!SEED_TRANSFER_NOS.has(transferNo)) {
+    transferItemStore.set(transferNo, []);
+    return transferItemStore.get(transferNo)!;
+  }
   const base = Number(transferNo.replace(/\D/g, "")) || 0;
-  return Array.from({ length: t.powerbankCount }, (_, k) => ({
+  const seeded = Array.from({ length: t.powerbankCount }, (_, k) => ({
     transferNo,
     // 余数不能只在 30 以内取——单据最多 44 台，那样同一单里会出现两行同号
     itemNo: `PB${20000 + (base * 97 + k) % 900}`,
     checked: t.status === "DONE" || k < Math.floor(t.powerbankCount / 2),
   }));
+  transferItemStore.set(transferNo, seeded);
+  return seeded;
 };
 
 export const getInventoryTransfer = (transferNo: string): InventoryTransferDetail => {
@@ -171,6 +186,8 @@ export const inventoryTransfers: InventoryTransfer[] = Array.from({ length: 16 }
   powerbankCount: 5 + (i * 3) % 40, status: p(["DRAFT", "IN_TRANSIT", "DONE"] as const, i),
   operator: p(OPERATORS, i), createdAt: iso(i * 43200_000),
 }));
+/** 种子单据号：只有它们的明细按台数推算，新建的单明细从空开始。 */
+const SEED_TRANSFER_NOS = new Set(inventoryTransfers.map((t) => t.transferNo));
 // —— 固件 OTA：版本库（货架）→ 投放（灰度/全量）→ 逐设备任务（下钻）——
 // 三层共用一份种子，**投放不再自带 progress**：投放的百分比由它的任务均值算出，
 // 固件版本只能取版本库里已存在的版本。否则「列表 62% / 点开抽屉 4 台全 100%」这类
@@ -340,7 +357,21 @@ export const listCommandRecords = (q: PageQuery = {}) => paginate(commandRecords
 export const listInventoryTransfers = (q: PageQuery = {}) => paginate(inventoryTransfers, q.page, q.size, (x) => kwHit(q.keyword, x.transferNo, x.fromLocation, x.toLocation));
 export const listOtaRollouts = (q: PageQuery = {}) => paginate(otaRollouts, q.page, q.size, (x) => kwHit(q.keyword, x.rolloutNo, x.fwVersion, x.vendorCode));
 
-export const savePowerbank = (x: Partial<Powerbank>) => upsert(powerbanks, x, "powerbankNo", () => nextNo("PB", powerbanks));
+/**
+ * 充电宝建档 / 改属性（同后端 PowerbankServiceImpl）：**建档一律在库**，不接受调用方指定状态
+ * （否则可绕过状态机凭空造出一块「借出中」的宝）；编辑不改状态 —— 状态只经 `transitPowerbank`。
+ */
+export const savePowerbank = (x: Partial<Powerbank>) => {
+  const { status: _ignored, ...attrs } = x;
+  void _ignored;
+  const exists = !!x.powerbankNo && powerbanks.some((p) => p.powerbankNo === x.powerbankNo);
+  // SN 非空（后端 dev_powerbank.sn NOT NULL，不填建档直接失败）
+  if (!exists && !String(x.sn ?? "").trim()) fail("硬件序列号 SN 必填", "SN is required", "الرقم التسلسلي مطلوب");
+  return upsert(powerbanks, exists ? attrs : {
+    sn: null, vendorCode: null, slotIndex: null, battery: 100, cycles: 0, health: "OK", archivedAt: null,
+    ...attrs, cabinetNo: attrs.cabinetNo ?? "", status: "IN_STOCK",
+  }, "powerbankNo", () => nextNo("PB", powerbanks));
+};
 /**
  * 新增 / 编辑调拨单。
  *
@@ -352,16 +383,33 @@ export const savePowerbank = (x: Partial<Powerbank>) => upsert(powerbanks, x, "p
  * `requireAllChecked`（收货前明细必须全核对）**不在这里** —— 那是前置条件不是状态机的边，
  * 且 mock 的明细核对状态由另一条路径维护，硬塞会让两个概念混在一句报错里。
  */
-export function saveInventoryTransfer(x: Partial<InventoryTransfer>): InventoryTransfer {
+export function saveInventoryTransfer(
+  x: Partial<Omit<InventoryTransfer, "powerbankCount">> & Partial<InvTransferReq>,
+): InventoryTransfer {
   const existing = x.transferNo
     ? inventoryTransfers.find((t) => t.transferNo === x.transferNo)
     : undefined;
+  // 写入面叫 fromName / toName（后端 InvTransferReq），落到出参的 fromLocation / toLocation
+  const { fromName, toName, powerbankCount, ...rest } = x;
+  const head: Partial<InventoryTransfer> = {
+    ...rest,
+    ...(powerbankCount != null ? { powerbankCount } : {}),
+    ...(fromName ? { fromLocation: fromName } : {}),
+    ...(toName ? { toLocation: toName } : {}),
+  };
 
   if (!existing) {
-    // 建单一律 DRAFT，不接受调用方直接开在途单（同后端）
-    return upsert(inventoryTransfers, { ...x, status: "DRAFT" }, "transferNo",
+    const draft = { fromLocation: "", toLocation: "", powerbankCount: 0, operator: "admin", ...head };
+    validateEndpoints(draft);
+    // 建单一律 DRAFT，不接受调用方直接开在途单（同后端）；经办人按当前登录人落，不收请求体
+    return upsert(inventoryTransfers, { ...draft, status: "DRAFT", operator: "admin",
+      createdAt: new Date().toISOString() }, "transferNo",
       () => nextNo("TR", inventoryTransfers));
   }
+  if (existing.status === "DONE") {
+    throw new TransferError(`调拨单已完成，不可再修改: ${existing.transferNo}（如需退回请开一张反向调拨单，保留两条痕）`);
+  }
+  if (existing.status === "DRAFT") validateEndpoints({ ...existing, ...head });
 
   const target = x.status;
   if (target && target !== existing.status) {
@@ -377,7 +425,25 @@ export function saveInventoryTransfer(x: Partial<InventoryTransfer>): InventoryT
         + `（允许自：${TRANSFER_TRANSITIONS[action].from.join(" / ")}）`);
     }
   }
-  return upsert(inventoryTransfers, x, "transferNo", () => nextNo("TR", inventoryTransfers));
+  // 单头只有草稿期可改（同后端）：在途单改台数 / 两端等于事后编账，只接受状态迁移
+  const nextStatus = head.status ?? existing.status;
+  const patch = nextStatus === "DRAFT" ? head : { transferNo: existing.transferNo, status: nextStatus };
+  return upsert(inventoryTransfers, patch, "transferNo", () => nextNo("TR", inventoryTransfers));
+}
+
+/**
+ * 两端校验（同后端 `validateEndpoints`）。**只对带了类型的单据校验** ——
+ * 种子与早期用例只有名字没有类型，那是历史形态，不因新规则整批判非法。
+ */
+function validateEndpoints(t: Partial<InventoryTransfer>) {
+  if (t.fromType === undefined && t.toType === undefined && t.itemType === undefined) return;
+  const TYPES = ["WAREHOUSE", "SITE", "LOCATION"];
+  if (!TYPES.includes(t.fromType ?? "") || !TYPES.includes(t.toType ?? "")) {
+    throw new TransferError("fromType/toType 必须是 WAREHOUSE/SITE/LOCATION 之一");
+  }
+  if (!t.fromRef?.trim() || !t.toRef?.trim()) throw new TransferError("fromRef/toRef 不能为空");
+  if (t.fromType === t.toType && t.fromRef === t.toRef) throw new TransferError("调出方与调入方不能相同");
+  if (!["CABINET", "POWERBANK"].includes(t.itemType ?? "")) throw new TransferError("itemType 必须是 CABINET/POWERBANK 之一");
 }
 
 /** 报错里用中文说状态，与页面徽标同一套说法。 */
@@ -499,7 +565,8 @@ export function saveCabinet(x: Partial<Cabinet> & { cabinetNo?: string }): Cabin
     ...(prev ?? DEFAULT_CABINET),
     cabinetNo: prev?.cabinetNo ?? (no || nextNo("CAB", cabinets, 1000, "cabinetNo")),
     sn, vendorCode: x.vendorCode!, model, slotTotal, locationNo,
-    status: (x.status as CabinetStatus) ?? prev?.status ?? DEFAULT_CABINET.status,
+    // 状态只经动作改（R1，同后端「编辑不再改状态」）：新建一律在库，编辑保持原状态
+    status: prev?.status ?? DEFAULT_CABINET.status,
     fwVersion: String(x.fwVersion ?? "").trim() || prev?.fwVersion || DEFAULT_CABINET.fwVersion,
     ...cabinetPlacement(locationNo),
   };
@@ -555,6 +622,7 @@ const DEFAULT_CABINET: Cabinet = {
   // 导入的新机柜默认平台直营（agentNo=null）：归属只能经代理域的划拨动作落，不从 CSV 里塞
   // 未上架的机柜没有点位、也就没有归属站点（siteNo 由点位反查，见 siteNoOfLocation）
   cabinetNo: "", sn: "", vendorCode: "cd-tech", model: "X6", locationNo: null, siteNo: null, locationName: null, agentNo: null,
-  slotTotal: 8, availableCount: 0, onlineStatus: "OFFLINE", status: "DEPLOYED",
+  // 新建机柜默认在库（同后端 CabinetServiceImpl：还没上架就置在用会让它出现在 C 端可借列表里）
+  slotTotal: 8, availableCount: 0, onlineStatus: "OFFLINE", status: "IN_STOCK",
   fwVersion: "1.0.0", lastHeartbeatAt: null, archivedAt: null,
 };

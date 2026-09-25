@@ -3,6 +3,46 @@
 import { client } from "../http-client";
 import type { DeviceApi } from "../contracts/device";
 import type { PageQ, CabinetQ, DeviceLogQ, ArchiveQ, OtaReleaseQ } from "../query";
+import type { Checklist } from "../../types";
+import { POWERBANK_TRANSITIONS } from "../../types";
+
+/**
+ * 后端门禁清单里的 `fixHref` 是**路径式**（`/devices/CAB1000?tab=qc`、`/sites/ST300?tab=survey`），
+ * 而运营端是静态导出、详情一律 query 式（`/devices/detail?no=`、`/operation/sites?no=`）——
+ * 原样渲染的话「去处理」全是 404，而门禁的意义恰恰是「告诉你去哪处理」。
+ *
+ * 这里只做**已知形状的翻译**，认不出的原样返回（比吞掉链接好：至少看得见它指向哪）。
+ * 根治应在后端按运营端路由出链接，见批次 5b 回报。
+ */
+export function toOpsHref(href: string | null): string | null {
+  if (!href) return href;
+  const [path, query = ""] = href.split("?");
+  const qs = new URLSearchParams(query);
+  const dev = path.match(/^\/devices\/([^/]+)$/);
+  if (dev && dev[1] !== "detail") {
+    const out = new URLSearchParams({ no: decodeURIComponent(dev[1]) });
+    // `?edit=1`（去改点位）落到概览页签：点位编辑在台账的编辑抽屉里，详情页概览给了入口
+    const tab = qs.get("tab") ?? (qs.get("edit") ? "overview" : null);
+    if (tab) out.set("tab", tab);
+    return `/devices/detail?${out.toString()}`;
+  }
+  const site = path.match(/^\/sites\/([^/]+)$/);
+  if (site) {
+    const out = new URLSearchParams({ no: decodeURIComponent(site[1]) });
+    if (qs.get("tab")) out.set("tab", qs.get("tab")!);
+    return `/operation/sites?${out.toString()}`;
+  }
+  if (path === "/sites") return "/operation/sites";
+  if (path === "/work-orders" && !qs.get("view")) {
+    qs.set("view", "list");
+    return `/work-orders?${qs.toString()}`;
+  }
+  return href;
+}
+
+const withOpsHrefs = (c: Checklist): Checklist => ({
+  ...c, items: c.items.map((i) => ({ ...i, fixHref: toOpsHref(i.fixHref) })),
+});
 
 export const deviceHttp: DeviceApi = {
   listCabinets: (q?: CabinetQ) => client.get("/api/ops/cabinets", q),
@@ -22,7 +62,9 @@ export const deviceHttp: DeviceApi = {
   getInventoryTransfer: (transferNo) => client.get(`/api/ops/inventory-transfers/${transferNo}`),
   listOtaRollouts: (q?: PageQ) => client.get("/api/ops/ota-rollouts", q),
   savePowerbank: (x) => client.post(x.powerbankNo ? `/api/ops/powerbanks/${x.powerbankNo}` : "/api/ops/powerbanks", x),
-  saveInventoryTransfer: (x) => client.post(x.transferNo ? `/api/ops/inventory-transfers/${x.transferNo}` : "/api/ops/inventory-transfers", x),
+  // 单号只认路径（写入面里没有 transferNo），所以从 body 里摘掉
+  saveInventoryTransfer: ({ transferNo, ...body }) =>
+    client.post(transferNo ? `/api/ops/inventory-transfers/${transferNo}` : "/api/ops/inventory-transfers", body),
   saveOtaRollout: (x) => client.post(x.rolloutNo ? `/api/ops/ota-rollouts/${x.rolloutNo}` : "/api/ops/ota-rollouts", x),
 
   // 固件 OTA 补齐：版本库 + 逐设备任务。版本库**没有** `/{releaseNo}` 更新路由（后端只暴露集合 POST，
@@ -46,7 +88,7 @@ export const deviceHttp: DeviceApi = {
   importCabinets: (rows) => client.post("/api/ops/cabinets/import", { rows }),
 
   // —— 设备运维 ——
-  goLiveGate: (no) => client.get(`/api/ops/devices/${no}/go-live-gate`),
+  goLiveGate: (no) => client.get<Checklist>(`/api/ops/devices/${no}/go-live-gate`).then(withOpsHrefs),
   goLive: (no) => client.post(`/api/ops/devices/${no}/go-live`, {}),
   markDeviceFault: (no, reason) => client.post(`/api/ops/devices/${no}/mark-fault`, { reason }),
   repairDevice: (no) => client.post(`/api/ops/devices/${no}/repair`, {}),
@@ -58,4 +100,17 @@ export const deviceHttp: DeviceApi = {
   applyProtection: (no, req) => client.post(`/api/ops/devices/${no}/protections`, req),
   releaseProtection: (pno, reason) => client.post(`/api/ops/devices/protections/${pno}/release`, { reason }),
   listSignalCodes: () => client.get("/api/ops/device-signals"),
+
+  // —— 批次 5b：充电宝动作 · 入库质检 · 调拨作业 · 资产差异 ——
+  // 充电宝动作复用更新端点，只发事件：后端 PowerbankServiceImpl「event 优先」交状态机裁决
+  transitPowerbank: (no, action) =>
+    client.post(`/api/ops/powerbanks/${no}`, { event: POWERBANK_TRANSITIONS[action].event }),
+  inspectCabinet: (no, req) => client.post(`/api/ops/devices/${no}/qc`, req),
+  inspectPowerbank: (no, req) => client.post(`/api/ops/powerbanks/${no}/qc`, req),
+  listQcRecords: (itemNo) => client.get("/api/ops/qc-records", { itemNo }),
+  setTransferItems: (no, itemNos) => client.post(`/api/ops/inventory-transfers/${no}/items`, { itemNos }),
+  shipTransfer: (no) => client.post(`/api/ops/inventory-transfers/${no}/ship`, {}),
+  receiveTransfer: (no, receivedNos, note) => client.post(`/api/ops/inventory-transfers/${no}/receive`, { receivedNos, note }),
+  listAssetDiffs: (q) => client.get("/api/ops/asset-diffs", q),
+  resolveAssetDiff: (diffNo, note) => client.post(`/api/ops/asset-diffs/${diffNo}/resolve`, { note }),
 };

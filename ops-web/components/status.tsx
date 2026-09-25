@@ -18,7 +18,7 @@ const WO_TONE: Record<WorkOrderStatus, Tone> = {
 };
 const CAB_TONE: Record<CabinetStatus, Tone> = {
   // 在库用 info 不用 success：它还没在赚钱，与「在用」是两回事
-  IN_STOCK: "info", DEPLOYED: "success", FAULT: "danger", RETIRED: "muted",
+  IN_STOCK: "info", IN_TRANSIT: "warning", DEPLOYED: "success", FAULT: "danger", RETIRED: "muted",
 };
 
 export const OrderStatusBadge = ({ s }: { s: OrderStatus }) => {

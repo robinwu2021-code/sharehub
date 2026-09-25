@@ -3,10 +3,18 @@
 import type { PageQ, ArchiveQ , ReportQ } from "../query";
 import type {
   PageResult, Site, SitePoint, Venue, Contract, ContractAttachmentReq,
-  Lead, LeadFollowUp, LeadFollowUpReq, SiteAnalysis,
+  Lead, LeadQ, LeadSaveReq, LeadConvertReq, LeadConversion, LeadFollowUp, LeadFollowUpReq, SiteAnalysis,
   VenueOnboarding, LifecycleRow, FunnelStage, SiteAgent, ContractSummary, ContractLogItem,
-  SiteSummary, SiteStatusLogItem, Checklist,
+  SiteSummary, SiteStatusLogItem, Checklist, SiteSurvey, SurveyReq,
 } from "../../types";
+
+/**
+ * 合同列表筛选（后端 `ContractController.page`）。`pendingMine` = 摘要条「待我审批」那一格；
+ * `endFrom/endTo` 为到期日区间（YYYY-MM-DD，含端点）。
+ */
+export type ContractQ = PageQ & {
+  status?: string; venueNo?: string; siteNo?: string; endFrom?: string; endTo?: string; pendingMine?: boolean;
+};
 
 export interface LocationApi {
   /** 站点上的伙伴责任（ADR-027）。只有运营方能配——责任直接决定分钱。 */
@@ -20,30 +28,44 @@ export interface LocationApi {
   listLocations(q?: ArchiveQ): Promise<PageResult<SitePoint>>;
   savePoint(l: Partial<SitePoint> & { locationNo?: string }): Promise<SitePoint>;
   listVenues(q?: ArchiveQ): Promise<PageResult<Venue>>;
-  listContracts(q?: PageQ): Promise<PageResult<Contract>>;
+  listContracts(q?: ContractQ): Promise<PageResult<Contract>>;
 
   // === 场所扩展 tab ===
-  listLeads(q?: PageQ): Promise<PageResult<Lead>>;
+  /** 商机列表。`inPool=true` = 公共线索池视图（超 M 天无跟进被回收的商机，谁都能认领）。 */
+  listLeads(q?: LeadQ): Promise<PageResult<Lead>>;
+  /** 商机详情（深链 `/venues?tab=crm&no=` 直接打开时列表可能还没这一行）。 */
+  getLead(leadNo: string): Promise<Lead>;
+  /** 从公共线索池认领：认领人成为负责人并重新计时。已被别人认领时 409。 */
+  claimLead(leadNo: string): Promise<Lead>;
+  /**
+   * 签约转化：场地方 + 筹备中站点 + 带谈判条款的合同草稿一次生成（不重复录入）。
+   * 只有洽谈中（或已签未转化）的商机能转；已转化过的拒绝。
+   */
+  convertLead(leadNo: string, req?: LeadConvertReq): Promise<LeadConversion>;
   /** 站点坪效。period 复用报表域的 ReportQ —— 同一套周期枚举，避免「近 30 日」两处含义不同。 */
   listSiteAnalysis(q?: ReportQ): Promise<PageResult<SiteAnalysis>>;
-  saveLead(x: Partial<Lead> & { leadNo?: string }): Promise<Lead>;
+  /**
+   * 商机建档 / 编辑。新建时服务端**查重**（同场地名或地址、90 天内别人在跟 → 409 并说出是谁）；
+   * 编辑时改阶段须是合法迁移 —— 但页面不从这里改阶段（R1），阶段走跟进 / 转化动作。
+   */
+  saveLead(x: LeadSaveReq): Promise<Lead>;
   saveVenue(x: Partial<Venue> & { venueNo?: string }): Promise<Venue>;
   saveContract(x: Partial<Contract> & { contractNo?: string }): Promise<Contract>;
 
-  /**
-   * 线索跟进流水（BD CRM 时间线）。
-   * ⚠️ **后端缺口**：`LocExtController` 只有 `/leads` 与 `/leads/{leadNo}`，跟进记录表与端点都还没有。
-   */
+  /** 线索跟进流水（BD CRM 时间线），新的在前。 */
   listLeadFollowUps(leadNo: string, q?: PageQ): Promise<PageResult<LeadFollowUp>>;
-  /** 记一条跟进（可同时推进线索阶段）。⚠️ **后端缺口**，同上。 */
+  /**
+   * 记一条跟进，可**同事务**推进阶段（`toStage`）。推到 LOST 时内容即丢单原因。
+   * 池里的商机不能跟进（先认领）。
+   */
   addLeadFollowUp(leadNo: string, req: LeadFollowUpReq): Promise<LeadFollowUp>;
 
   /**
-   * 合同扫描件上传（拍板点 #3：mock 阶段假上传，只登记文件名 + 大小）。返回整份合同，便于抽屉一次刷新。
-   * ⚠️ **后端缺口**：合同侧后端目前只有 `GET /api/ops/contracts`，连 `POST /api/ops/contracts` 都没有，附件端点更没有。
+   * 挂合同扫描件：先 `uploadFile(file, "CONTRACT_SCAN")` 拿 fileNo，再按 fileNo 挂上。
+   * 返回整份合同，抽屉一次刷新。已到期 / 已终止的合同不再收。
    */
   addContractAttachment(contractNo: string, req: ContractAttachmentReq): Promise<Contract>;
-  /** 移除误传的扫描件。⚠️ **后端缺口**，同上。 */
+  /** 移除误传的扫描件（软删，留痕）。 */
   removeContractAttachment(contractNo: string, attachNo: string): Promise<Contract>;
 
   // ——— 合同审批（2026-09-25 裁决：进场合同走审批）———
@@ -87,6 +109,8 @@ export interface LocationApi {
   reviewVenueOnboarding(onboardingNo: string, approve: boolean, note?: string): Promise<VenueOnboarding>;
 
   listVenueOnboardings(q?: PageQ): Promise<PageResult<VenueOnboarding>>;
+  /** 进件详情。 */
+  getVenueOnboarding(onboardingNo: string): Promise<VenueOnboarding>;
   saveVenueOnboarding(x: Partial<VenueOnboarding> & { onboardingNo?: string }): Promise<VenueOnboarding>;
   /**
    * 门店生命周期漏斗的明细行（商机 + 站点拼成一条）。**只读** ——
@@ -118,10 +142,19 @@ export interface LocationApi {
   // 在两个切片各定义一份，`Api` 组合根会直接编译不过（属性签名不一致），
   // 而就算签名碰巧一致，页面也会不知道该调哪个。pauseUntil 加在 OperationApi 那一份上。
 
-  /** 撤场：进入 WITHDRAWING，设备要撤、账要结，完了再 close。 */
-  withdrawSite(siteNo: string, reason: string, plannedAt?: string): Promise<Site>;
-  /** 关闭：**不可逆**。关了要重开只能另建站点，否则同一站点号跨两段经营期，报表对不上。 */
-  closeSite(siteNo: string, note?: string): Promise<Site>;
+  /**
+   * 撤场：进入 WITHDRAWING，为每台在站机柜开撤机工单，完了再 close。
+   * `plannedAt` **必填**且至少在今天 + N 天之后（服务端参数 `site.withdraw.lead_days`，默认 7）。
+   */
+  withdrawSite(siteNo: string, reason: string, plannedAt: string): Promise<Site>;
+  /** 关闭：**不可逆**，说明必填。关了要重开只能另建站点，否则同一站点号跨两段经营期，报表对不上。 */
+  closeSite(siteNo: string, note: string): Promise<Site>;
+
+  // ——— 现场勘测（C1）———
+  /** 站点的勘测记录，新的在前。以最近一次为准（开业清单读它）。 */
+  listSiteSurveys(siteNo: string): Promise<SiteSurvey[]>;
+  /** 记一次勘测。PASS 要求有信号且能接电；FAIL 必须写说明。照片先经 uploadFile（SURVEY_PHOTO）。 */
+  recordSiteSurvey(siteNo: string, req: SurveyReq): Promise<SiteSurvey>;
 
   // === G1 软删除（TDD §10.1）：归档而非删除，**契约里禁止出现 deleteXxx** ===
   archiveSite(siteNo: string): Promise<Site>;

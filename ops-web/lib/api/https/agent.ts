@@ -3,7 +3,7 @@
 import { client } from "../http-client";
 import type { AgentApi } from "../contracts/agent";
 import type { PageQ, ArchiveQ, AssignmentRecordQ, AssignableAssetQ , ReportQ } from "../query";
-import type { AgentAssignmentRecord, AssetType, AssignAction } from "../../types/agent";
+import type { AgentAssignmentRecord, AssetType, AssignAction, AssignableAsset } from "../../types/agent";
 import type { PageResult } from "../../types/common";
 
 /**
@@ -62,7 +62,15 @@ export const agentHttp: AgentApi = {
   // 代建走复数端点（判 agent:apply:create）；单数 /apply 是免鉴权的自助入口
   createAgentApply: (x) => client.post("/api/agent/applies", x),
 
-  listAssignableAssets: (q?: AssignableAssetQ) => client.get("/api/agent/assignable-assets", q),
+  // 后端出参是**裸数组**（List<AssignableAsset>）、条数参数叫 limit、不认 excludeAgentNo ——
+  // 此前原样透传，真后端下 `.list` 是 undefined，划拨 / 回收抽屉的候选一条都没有。
+  // 这里包成 PageResult，并在前端做「排除目标代理已有的」（候选池有界：limit 封顶）。
+  listAssignableAssets: async (q?: AssignableAssetQ) => {
+    const { excludeAgentNo, size, page: _page, ...rest } = q ?? {};
+    const rows = await client.get<AssignableAsset[]>("/api/agent/assignable-assets", { ...rest, limit: size });
+    const list = (rows ?? []).filter((a) => !excludeAgentNo || a.currentAgentNo !== excludeAgentNo);
+    return { list, total: list.length };
+  },
 
   // T0-5：后端是**单资产**端点 POST /api/agent/assignments（AssignReq{agentNo,targetType,
   // targetNo,action,operator} → AssignmentLog），前端契约是**批量**。此处做扇出适配。
@@ -103,6 +111,16 @@ export const agentHttp: AgentApi = {
   // 代理分润
   listAgentCommissions: (q?: PageQ) => client.get("/api/agent/commissions", q),
   saveAgentCommission: (x) => client.post(x.ruleNo ? `/api/agent/commissions/${x.ruleNo}` : "/api/agent/commissions", x),
+
+  getAgentAccount: (no) => client.get(`/api/agent/accounts/${no}`),
+  getAgentCommission: (no) => client.get(`/api/agent/commissions/${no}`),
+
+  // 代理清退（AgentExitController）：发起挂在代理资源下，推进 / 门禁挂在清退单资源下
+  startAgentExit: (agentNo, reason) => client.post(`/api/agent/agents/${agentNo}/exit`, { reason }),
+  getAgentExit: (no) => client.get(`/api/agent/exits/${no}`),
+  agentExitGate: (no) => client.get(`/api/agent/exits/${no}/gate`),
+  advanceAgentExit: (no) => client.post(`/api/agent/exits/${no}/advance`, {}),
+  listAgentOpsAssessments: (agentNo) => client.get(`/api/agent/agents/${agentNo}/ops-assessments`),
 
   // G1 软删除：归档 / 恢复。REST 上是「状态迁移」而非 DELETE —— 后端不得实现物理删除。
   archiveAgent: (no) => client.post(`/api/agent/agents/${no}/archive`, {}),

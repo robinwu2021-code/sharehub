@@ -253,10 +253,10 @@ export const NAV: NavSection[] = [
     // 我们比它多一环：记录带「关联工单号」，规则带「静默窗口/升级策略」，字典带「建议处置/自动开工单」。
     key: "alarm", label: "告警管理", icon: "BellRing", module: "workorder", href: "/alarms",
     children: [
-      { href: "/alarms", label: "告警记录", perm: "workorder:wo:read", group: "告警处置" },
-      { href: "/alarms?tab=notices", label: "告警通知", perm: "workorder:wo:read", group: "告警处置" },
-      { href: "/alarms?tab=codes", label: "告警代码", perm: "workorder:wo:read", group: "规则配置" },
-      { href: "/alarms?tab=rules", label: "通知规则", perm: "workorder:wo:read", group: "规则配置" },
+      { href: "/alarms", label: "告警记录", perm: "workorder:alarm:read", group: "告警处置" },
+      { href: "/alarms?tab=notices", label: "告警通知", perm: "workorder:alarm:read", group: "告警处置" },
+      { href: "/alarms?tab=codes", label: "告警代码", perm: "workorder:alarm:read", group: "规则配置" },
+      { href: "/alarms?tab=rules", label: "通知规则", perm: "workorder:alarm:read", group: "规则配置" },
     ],
   },
   {
