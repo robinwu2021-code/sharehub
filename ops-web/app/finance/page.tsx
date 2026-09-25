@@ -575,7 +575,7 @@ function FinanceInner() {
   });
   const handleRecon = useMutation({
     mutationFn: (v: { batchNo: string; action: ReconAction; note: string; diffId?: number }) =>
-      api.handleRecon(v.batchNo, v.action, v.note, username || undefined, v.diffId),
+      api.handleRecon(v.batchNo, v.action, v.note, v.diffId),
     onSuccess: (r, v) => {
       qc.invalidateQueries({ queryKey: ["fin"] });
       // 逐条处置时批次进度可能还没动（半平不算平），所以提示按「处置了哪一条」说，不谎报批次已结案

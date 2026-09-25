@@ -101,12 +101,15 @@ describe("对账差错处理：状态机 + 汇总同源", () => {
 
   it("标记渠道侧差错 → HANDLING，记定责/结论/处理人/处理时间", () => {
     const r = openRecon(1);
-    const done = handleRecon(r.batchNo, "channel", "已提 nearpay 差错工单 NP-2026-0501", "Sara Ahmed");
+    const done = handleRecon(r.batchNo, "channel", "已提 nearpay 差错工单 NP-2026-0501");
 
     expect(done.handleStatus).toBe("HANDLING");
     expect(done.handleResult).toBe("CHANNEL_ERROR");
     expect(done.handleNote).toBe("已提 nearpay 差错工单 NP-2026-0501");
-    expect(done.handledBy).toBe("Sara Ahmed");
+    // 处置人按会话来，不是调用方说了算（mock 的会话就是 admin）。
+    // 此前这里传 "Sara Ahmed" 并断言记成 "Sara Ahmed" —— 那正是被修掉的行为：
+    // 后端原先是「有传参就用传参、否则才看会话」，而 handled_by 是对账要审的那一列。
+    expect(done.handledBy).toBe("admin");
     expect(done.handledAt).toBeTruthy();
   });
 
@@ -185,15 +188,18 @@ describe("对账差错明细：逐条处置（diffId）", () => {
     expect(found, "种子里应有差错行 >1 的批次").toBeTruthy();
     const { batch, diffs } = found;
 
-    const done = handleRecon(batch.batchNo, "compensate", "先补这一笔 ADJ-0001", "Sara Ahmed", diffs[0].id);
+    const done = handleRecon(batch.batchNo, "compensate", "先补这一笔 ADJ-0001", diffs[0].id);
     expect(diffs[0].resolved).toBe(true);
     expect(diffs.slice(1).every((d) => !d.resolved)).toBe(true);
     expect(done.handleStatus).toBe("OPEN"); // 还有没平的，进度不动
     expect(done.handleNote).toBe("先补这一笔 ADJ-0001"); // 但留痕要写（谁在什么时候平了一笔）
-    expect(done.handledBy).toBe("Sara Ahmed");
+    // 处置人按会话来，不是调用方说了算（mock 的会话就是 admin）。
+    // 此前这里传 "Sara Ahmed" 并断言记成 "Sara Ahmed" —— 那正是被修掉的行为：
+    // 后端原先是「有传参就用传参、否则才看会话」，而 handled_by 是对账要审的那一列。
+    expect(done.handledBy).toBe("admin");
 
     // 把剩下的逐条平掉，最后一条落地时批次才迁移
-    for (const d of diffs.slice(1)) handleRecon(batch.batchNo, "compensate", "补齐剩余", "Sara Ahmed", d.id);
+    for (const d of diffs.slice(1)) handleRecon(batch.batchNo, "compensate", "补齐剩余", d.id);
     expect(batch.handleStatus).toBe("RESOLVED");
     expect(batch.handleResult).toBe("COMPENSATED");
   });
@@ -208,28 +214,28 @@ describe("对账差错明细：逐条处置（diffId）", () => {
   it("diffId 不属于该批次 / 已平账的差错，都拒绝处置", () => {
     const { batch, diffs } = openReconWithDiffs(2);
     const alien = reconDiffs.find((d) => d.batchNo !== batch.batchNo)!;
-    expect(() => handleRecon(batch.batchNo, "verify", "越批处置", undefined, alien.id))
+    expect(() => handleRecon(batch.batchNo, "verify", "越批处置", alien.id))
       .toThrow(/不属于对账批次/);
-    expect(() => handleRecon(batch.batchNo, "verify", "不存在的明细", undefined, 999999))
+    expect(() => handleRecon(batch.batchNo, "verify", "不存在的明细", 999999))
       .toThrow(/不属于对账批次/);
 
-    handleRecon(batch.batchNo, "verify", "核对无误", undefined, diffs[0].id);
-    expect(() => handleRecon(batch.batchNo, "verify", "再来一次", undefined, diffs[0].id))
+    handleRecon(batch.batchNo, "verify", "核对无误", diffs[0].id);
+    expect(() => handleRecon(batch.batchNo, "verify", "再来一次", diffs[0].id))
       .toThrow(/已平账，不可重复处置/);
   });
 
   it("逐条处置同样吃状态机与结论必填两道闸门（diffId 不是后门）", () => {
     const { batch, diffs } = openReconWithDiffs(3);
-    expect(() => handleRecon(batch.batchNo, "verify", "  ", undefined, diffs[0].id)).toThrow(/结论必填/);
+    expect(() => handleRecon(batch.batchNo, "verify", "  ", diffs[0].id)).toThrow(/结论必填/);
     expect(diffs[0].resolved).toBe(false); // 拒绝后不留半平状态
 
-    handleRecon(batch.batchNo, "channel", "挂起等回执", undefined, diffs[0].id);
+    handleRecon(batch.batchNo, "channel", "挂起等回执", diffs[0].id);
     // channel 的 from 只含 OPEN；批次仍是 OPEN（半平不迁移）时可以再定责，
     // 但一旦进了 HANDLING 就不许再定责一次——用整批处置把它推进 HANDLING 再验
     const { batch: b2 } = openReconWithDiffs(3);
     handleRecon(b2.batchNo, "channel", "整批挂起等回执");
     expect(b2.handleStatus).toBe("HANDLING");
-    expect(() => handleRecon(b2.batchNo, "platform", "改判平台侧", undefined, undefined)).toThrow(/不允许执行/);
+    expect(() => handleRecon(b2.batchNo, "platform", "改判平台侧")).toThrow(/不允许执行/);
   });
 });
 

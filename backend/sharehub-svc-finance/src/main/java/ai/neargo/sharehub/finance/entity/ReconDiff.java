@@ -32,4 +32,20 @@ public class ReconDiff extends BaseEntity {
 
     /** 0 未处置 / 1 已平账（TINYINT(1)，[SKELETON_BRIEF §4] 布尔列用 Integer）。 */
     private Integer resolved;
+
+    /**
+     * 逐笔处置留痕。
+     *
+     * <p>此前只有 {@link #resolved} 一个标记，结论/说明/处置人全写在批次上；
+     * 而 resolve 端点本来就收 {@code diffId}（逐笔处置是支持的路径），
+     * 于是逐笔处置时后一笔会覆盖前一笔的批次留痕 —— 结论是人的判断，事后推不回来。
+     */
+    private String handleResult;
+
+    private String handleNote;
+
+    /** 处置人。**服务端按会话回填，不收前端传参**（审计事实不能由调用方提供）。 */
+    private String handledBy;
+
+    private java.time.LocalDateTime handledAt;
 }

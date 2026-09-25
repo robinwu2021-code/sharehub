@@ -58,7 +58,7 @@ export const financeMock: FinanceApi = {
   // S2：差错处置 / 发票开具作废——状态机、必填结论与原因、金额对平全在 db 层，
   // 错误由全局 MutationCache 弹出，页面不重复兜底
   listReconDiffs: (no) => wait(db.listReconDiffs(no)),
-  handleRecon: (no, action, note, operatorName, diffId) => wait(db.handleRecon(no, action, note, operatorName, diffId), 400),
+  handleRecon: (no, action, note, diffId) => wait(db.handleRecon(no, action, note, diffId), 400),
   getReconStats: () => wait(db.getReconStats()),
   issueInvoice: (no, operatorName) => wait(db.issueInvoice(no, operatorName), 400),
   voidInvoice: (no, voidReason, operatorName) => wait(db.voidInvoice(no, voidReason, operatorName), 400),

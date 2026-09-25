@@ -100,8 +100,8 @@ export const financeHttp: FinanceApi = {
   //    四种处置到后端会塌缩成同一个动作，且处置理由不留痕。字段照传，待后端补齐 ReconResolveReq。
   //    diffId 是后端唯一真读的字段，差错明细抽屉逐条处置时透传（不传 = 整批处置）。
   listReconDiffs: (no) => client.get(`/api/trade/reconciles/${no}/diffs`),
-  handleRecon: (no, action, handleNote, operatorName, diffId) =>
-    client.post(`/api/trade/reconciles/${no}/resolve`, { action, handleNote, operatorName, diffId }),
+  handleRecon: (no, action, handleNote, diffId) =>
+    client.post(`/api/trade/reconciles/${no}/resolve`, { action, handleNote, diffId }),
   // ⚠️ T1-D 后端缺口：/reconciles/stats 无端点（后端只有 /{batchNo}/diffs）。
   getReconStats: () => client.get("/api/trade/reconciles/stats"),
   // ⚠️ T1-D 后端缺口：开具/作废无动作端点（后端只有 POST /invoices 与 /invoices/{no} upsert）。

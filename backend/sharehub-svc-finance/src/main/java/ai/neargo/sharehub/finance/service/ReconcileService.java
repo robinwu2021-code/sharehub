@@ -34,7 +34,14 @@ public interface ReconcileService {
      * @param operator   处置人；空则记当前登录人
      * @return 处置后的批次行（契约 {@code handleRecon(): Promise<Reconcile>}）
      */
-    Reconcile resolve(String batchNo, Long diffId, String action, String handleNote, String operator);
+    /**
+     * 差错处置。
+     *
+     * <p><b>不收操作人形参</b>：处置人由本方法按当前会话回填。
+     * 原签名多一个 {@code operator}，实现里写的是「有传参就用传参、否则才看会话」——
+     * 服务端明明知道是谁，却优先信调用方说的，而 {@code handled_by} 正是要审的那一列。
+     */
+    Reconcile resolve(String batchNo, Long diffId, String action, String handleNote);
 
     /** 对账页头统计：任务数 / 差异数 / 已处理数。前端用它做「还有多少没对平」的概览。 */
     java.util.Map<String, Object> stats(String period);

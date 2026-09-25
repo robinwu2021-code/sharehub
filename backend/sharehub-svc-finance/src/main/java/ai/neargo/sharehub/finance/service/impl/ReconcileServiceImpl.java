@@ -63,7 +63,9 @@ public class ReconcileServiceImpl implements ReconcileService {
                         .orderByAsc(ReconDiff::getId))
                 .stream()
                 .map(d -> new ReconDiffRow(d.getId(), d.getBatchNo(), d.getPayNo(), d.getDiffType(),
-                        d.getDetail(), d.getResolved() != null && d.getResolved() == 1))
+                        d.getDetail(), d.getResolved() != null && d.getResolved() == 1,
+                        d.getHandleResult(), d.getHandleNote(), d.getHandledBy(),
+                        d.getHandledAt() == null ? null : d.getHandledAt().toString()))
                 .toList();
     }
 
@@ -74,7 +76,7 @@ public class ReconcileServiceImpl implements ReconcileService {
 
     @Override
     @Transactional
-    public Reconcile resolve(String batchNo, Long diffId, String action, String handleNote, String operator) {
+    public Reconcile resolve(String batchNo, Long diffId, String action, String handleNote) {
         requireTask(batchNo);
         // 处置分类与说明是留痕的主体（此前被静默丢弃，见 http.ts T0-2 注释）——空则拒
         String result = ACTION_RESULT.get(action == null ? "" : action);
@@ -94,8 +96,19 @@ public class ReconcileServiceImpl implements ReconcileService {
         List<ReconDiff> rows = diffMapper.selectList(w);
         if (rows.isEmpty()) throw new IllegalArgumentException("无待处置差错: " + batchNo);
 
+        // 处置人只认会话。此前是「有传参就用传参」，等于服务端知道是谁却优先信调用方说的
+        String operator = ai.neargo.sharehub.auth.SecurityUtils.currentUser()
+                .map(ai.neargo.sharehub.auth.LoginUser::username).orElse("system");
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+
         for (ReconDiff d : rows) {
             d.setResolved(1);
+            // 逐笔落结论/说明/人/时间：批次那份会被下一次处置覆盖，
+            // 而结论是人的判断，覆盖掉就再也推不回来
+            d.setHandleResult(result);
+            d.setHandleNote(handleNote.trim());
+            d.setHandledBy(operator);
+            d.setHandledAt(now);
             diffMapper.updateById(d);
         }
 
@@ -112,10 +125,8 @@ public class ReconcileServiceImpl implements ReconcileService {
         t.setHandleStatus(allDone ? "RESOLVED" : "HANDLING");
         t.setHandleResult(result);
         t.setHandleNote(handleNote.trim());
-        t.setHandledBy(operator != null && !operator.isBlank() ? operator
-                : ai.neargo.sharehub.auth.SecurityUtils.currentUser()
-                        .map(ai.neargo.sharehub.auth.LoginUser::username).orElse("system"));
-        t.setHandledAt(java.time.LocalDateTime.now());
+        t.setHandledBy(operator);
+        t.setHandledAt(now);
         taskMapper.updateById(t);
         return toVO(t);
     }

@@ -410,6 +410,18 @@ export interface ReconDiff {
   detail: string;
   /** 已平账标记：处置只翻这个标记，绝不回头改历史分录（分录是只增表，纠错要走红冲）。 */
   resolved: boolean;
+  /**
+   * 逐笔处置留痕。
+   *
+   * 批次那一份（`Reconcile.handleResult/handleNote/handledBy`）**会被下一次处置覆盖** ——
+   * 逐笔处置时把 A 判成 verify、再把 B 判成 channel，批次上只剩 channel。
+   * 这四个字段才答得出「这一笔是谁、以什么结论、什么时候处置的」。
+   * `handledBy` 由服务端按会话回填，前端不传（审计事实不能由调用方提供）。
+   */
+  handleResult?: string | null;
+  handleNote?: string | null;
+  handledBy?: string | null;
+  handledAt?: string | null;
 }
 
 /** `ReconDiff.detail` 解析后的形状（两侧金额与一句人读的上下文）。 */

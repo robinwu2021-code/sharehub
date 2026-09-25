@@ -468,7 +468,7 @@ export function listReconDiffs(batchNo: string): ReconDiff[] {
  * 否则批次显示「已结案」而抽屉里还挂着两笔没平的差错，比不显示更误导。
  */
 export function handleRecon(
-  batchNo: string, action: ReconAction, handleNote?: string, operatorName?: string, diffId?: number,
+  batchNo: string, action: ReconAction, handleNote?: string, diffId?: number,
 ): Reconcile {
   const r = findRecon(batchNo);
   if (r.status !== "DIFF" || r.handleStatus === null) {
@@ -494,14 +494,24 @@ export function handleRecon(
     if (one.resolved) throw new ReconError(`差错明细 #${diffId} 已平账，不可重复处置`);
     targets = [one];
   }
-  for (const d of targets) d.resolved = true;
+  // 逐笔落结论/说明/人/时间 —— 批次那份会被下一次处置覆盖，而结论是人的判断，覆盖掉就推不回来。
+  // 处置人按会话来（mock 没有真会话，固定 admin），前端不传：审计事实不能由调用方提供。
+  const operator = "admin";
+  const handledAt = new Date().toISOString();
+  for (const d of targets) {
+    d.resolved = true;
+    d.handleResult = tr.result;
+    d.handleNote = note;
+    d.handledBy = operator;
+    d.handledAt = handledAt;
+  }
 
   // 留痕（结论/处理人/时间）无论整批还是单条都要写；进度与定责只在这个批次全平了才迁移
   const stillOpen = batchDiffs.some((d) => !d.resolved);
   Object.assign(r, {
     handleNote: note,
-    handledBy: operatorName || "admin",
-    handledAt: new Date().toISOString(),
+    handledBy: operator,
+    handledAt,
     ...(stillOpen ? {} : { handleStatus: tr.to, handleResult: tr.result }),
   });
   return r;

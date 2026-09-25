@@ -109,7 +109,14 @@ export interface FinanceApi {
    *
    * `diffId` 指定处置**单条**差错；不传 = 处置该批次全部未处置差错（与后端 resolve 同口径）。
    */
-  handleRecon(batchNo: string, action: ReconAction, handleNote: string, operatorName?: string, diffId?: number): Promise<Reconcile>;
+  /**
+   * 差错处置。**不传处置人** —— 后端按会话回填。
+   *
+   * 原签名有个 `operatorName`，前端把自己会话里的用户名传过去，而后端是
+   * 「有传参就用传参、否则才看会话」：服务端明明知道是谁，却优先信调用方说的，
+   * 而 `handled_by` 正是对账要审的那一列。
+   */
+  handleRecon(batchNo: string, action: ReconAction, handleNote: string, diffId?: number): Promise<Reconcile>;
   /** 对账汇总条：未结差错笔数/金额与列表同源，处置一笔当场变（全量口径，不随列表筛选）。 */
   getReconStats(): Promise<ReconStats>;
 

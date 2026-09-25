@@ -135,7 +135,11 @@ public final class FinDtos {
 
     /** 对账差错明细行。 */
     public record ReconDiffRow(Long id, String batchNo, String payNo, String diffType,
-                               String detail, Boolean resolved) {
+                               String detail, Boolean resolved,
+                               // 逐笔处置留痕。批次那份会被下一次处置覆盖，这四列才答得出
+                               // 「这一笔是谁、以什么结论、什么时候处置的」
+                               String handleResult, String handleNote,
+                               String handledBy, String handledAt) {
     }
 
     // ——————————————————————— 发票 ———————————————————————

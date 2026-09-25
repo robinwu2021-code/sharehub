@@ -315,8 +315,10 @@ public class FinanceController {
         Long diffId = raw == null ? null : Long.valueOf(String.valueOf(raw));
         String action = body == null ? null : (String) body.get("action");
         String note = body == null ? null : (String) body.get("handleNote");
-        String operator = body == null ? null : (String) body.get("operatorName");
-        return reconcileService.resolve(batchNo, diffId, action, note, operator);
+        // operatorName **刻意不再从请求体读**：处置人是审计事实，服务端按会话回填。
+        // 此前前端传什么就记什么，且服务里是「有传参就用传参、否则才看会话」——
+        // 服务端明明知道是谁，却优先信调用方说的。对账差错的 handled_by 正是要审的那一列。
+        return reconcileService.resolve(batchNo, diffId, action, note);
     }
 
     // ——————————————————————— 发票（菜单叶：发票）———————————————————————
