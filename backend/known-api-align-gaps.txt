@@ -50,22 +50,45 @@ C GET /api/ops/inspection-plans/{}
 C GET /api/ops/leads/{}
 C GET /api/ops/sla-rules/{}
 C GET /api/ops/venue-onboardings/{}
-C GET /api/platform/iam/menus
 C GET /api/platform/iam/roles
+C PUT /api/platform/iam/menus/{}   # 菜单编辑端点，随「菜单真源迁进 iam_menu」新落地，
+#                                    运营台的编辑入口还在建（GET 那条已接上并从本台账移除）
 C GET /api/trade/settlements/{}
-C GET /mp/app/version
-C GET /mp/faq
-C GET /mp/user/invoice-titles
-C GET /mp/user/invoices
-C GET /mp/user/messages
-C GET /mp/user/recharge-packages
-C GET /mp/user/reports
-C GET /mp/user/reports/{}
-C POST /mp/user/coupons/{}/claim
-C POST /mp/user/invoice-titles
-C POST /mp/user/invoices
-C POST /mp/user/logoff
-C POST /mp/user/messages/{}/read
+
+# ══════════════════════════════════════════════════════════════════════
+# C 端（/mp/**）：后端建了、c-app 没调的 13 条
+#
+# 先澄清一个容易判错的前提：**这些不是「量尺拿错了比对对象」**。
+# api-align 两边都扫（ops-web/lib/api/https 与 c-app/src/api），
+# 而 c-app 确实一条都没调（全仓 grep，/mp/user/invoices 只出现在后端 DTO 里），
+# 机器上也没有第二个 C 端工程。所以它们是真欠账。
+#
+# c-app 目前调了 20 个 /mp 接口 —— **接的全是「看」的那一半**。
+# 下面按「差什么」分两组，处置方式完全不同。
+#
+# ── A 组：已上线功能的闭环缺一半（后端已实现 + c-app 页面已存在，差接线）──
+# 用户现在就会撞上，不是「功能没做」，是「功能做了半截」。
+C POST /mp/user/coupons/{}/claim   # 领券：GET /mp/user/coupons 已接 → 看得到券却领不了（页面 coupons）
+C GET /mp/user/recharge-packages   # 充值：/mp/user/wallet(+/txns) 已接 → 看得到余额却充不了（页面 wallet）
+C GET /mp/user/reports             # 报障进度：POST /mp/user/report 已接（能提交）→ 提交完查不到（页面 me）
+C GET /mp/user/reports/{}          # 同上，详情
+C GET /mp/user/messages            # 站内信：只接了 /mp/notice（公告）→ 有广播没私信（页面 notice）
+C POST /mp/user/messages/{}/read   # 同上，已读回执
+#
+# ── B 组：整块没做（c-app 连页面都没有）──
+C POST /mp/user/logoff             # 注销账号。**应用商店硬要求**（App Store 5.1.1(v) / Google Play
+#                                    都要求提供账号删除入口），后端 logoff.apply 已就绪，不做上不了架
+C GET /mp/user/invoices            # 开票（4 条一组）：to-B 需求，取决于目标市场口径
+C POST /mp/user/invoices           #   同上
+C GET /mp/user/invoice-titles      #   同上，抬头管理
+C POST /mp/user/invoice-titles     #   同上
+C GET /mp/faq                      # 帮助中心，小件
+C GET /mp/app/version              # 版本检查，小件（配合强更策略）
+#
+# 每接一条的完成定义：接 c-app/src/api 的 http 切片 → 去掉 mock 分支 →
+# contract 测试覆盖 → **从本文件删掉对应行**（卡口对「修好了还留着」同样报红）。
+# ══════════════════════════════════════════════════════════════════════
+
 D AckResult POST /api/ops/alarms/records/{alarmNo}/ack
 D AppVersionCheck GET /mp/app/version
 D ApplyResult POST /api/agent/applies
@@ -102,5 +125,3 @@ C POST /api/user/push-messages/sweep-due
 # ⚠️ 下面两条来自**另一条在做的线**（员工多角色，EmployeeRoles / iam_menu 那批）：
 #   后端已返回 roleNo / roleNos，运营端类型还没声明。不是遗漏，是前后半没同时落地。
 #   接上前端后棘轮会提示「已修复，请删掉」—— 由那条线的人删。
-B GET /api/platform/employees Employee 后端有前端无:roleNo
-B GET /api/platform/employees Employee 后端有前端无:roleNos

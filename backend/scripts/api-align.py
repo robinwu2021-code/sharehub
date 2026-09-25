@@ -336,7 +336,15 @@ def _load_baseline():
     out = set()
     for ln in io.open(BASELINE, encoding='utf-8'):
         ln = ln.strip()
-        if ln and not ln.startswith('#'):
+        if not ln or ln.startswith('#'):
+            continue
+        # **行尾注释要剥掉**：台账里每条都该写明「为什么还欠着」，而理由写在
+        # 条目同一行比飘在上面可靠（块注释会在条目增删时和条目错位，
+        # 而错位的理由比没有理由更坏）。只跳过整行注释的话，
+        # 带理由的条目会同时被判成「新增」和「已修复」——本文件的 13 条 C 端条目实测如此。
+        if '#' in ln:
+            ln = ln[:ln.index('#')].strip()
+        if ln:
             out.add(ln)
     return out
 

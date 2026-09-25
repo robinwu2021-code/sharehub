@@ -13508,7 +13508,7 @@
    "handler": "OrgController#createEmployee",
    "summary": "",
    "params": [],
-   "bodyType": "IamEmployee",
+   "bodyType": "EmployeeSaveReq",
    "returnType": "Employee",
    "returnContainer": null,
    "returnElement": "Employee",
@@ -13550,7 +13550,40 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "employeeNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "email",
+     "type": "String"
+    },
+    {
+     "name": "deptNo",
+     "type": "String"
+    },
+    {
+     "name": "roleNo",
+     "type": "String"
+    },
+    {
+     "name": "roleNos",
+     "type": "java.util.List<String>"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -13569,7 +13602,7 @@
      "required": true
     }
    ],
-   "bodyType": "IamEmployee",
+   "bodyType": "EmployeeSaveReq",
    "returnType": "Employee",
    "returnContainer": null,
    "returnElement": "Employee",
@@ -13611,7 +13644,40 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "employeeNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "email",
+     "type": "String"
+    },
+    {
+     "name": "deptNo",
+     "type": "String"
+    },
+    {
+     "name": "roleNo",
+     "type": "String"
+    },
+    {
+     "name": "roleNos",
+     "type": "java.util.List<String>"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "GET",
@@ -13621,14 +13687,533 @@
     "org:role:read"
    ],
    "handler": "IamAdminController#menus",
-   "summary": "全量菜单树（后台维护用）。",
+   "summary": "回得来的那扇门：菜单管理自己就在这一支下面。",
    "params": [],
    "bodyType": null,
-   "returnType": "List<IamMenu>",
+   "returnType": "List<MenuService.MenuNode>",
    "returnContainer": "List",
-   "returnElement": "IamMenu",
-   "responseShape": null,
+   "returnElement": "MenuService.MenuNode",
+   "responseShape": [
+    {
+     "name": "menuNo",
+     "type": "String"
+    },
+    {
+     "name": "parentNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "nameEn",
+     "type": "String"
+    },
+    {
+     "name": "nameAr",
+     "type": "String"
+    },
+    {
+     "name": "type",
+     "type": "String"
+    },
+    {
+     "name": "path",
+     "type": "String"
+    },
+    {
+     "name": "icon",
+     "type": "String"
+    },
+    {
+     "name": "group",
+     "type": "String"
+    },
+    {
+     "name": "sort",
+     "type": "Integer"
+    },
+    {
+     "name": "perm",
+     "type": "String"
+    },
+    {
+     "name": "phase",
+     "type": "Integer"
+    },
+    {
+     "name": "ready",
+     "type": "boolean"
+    },
+    {
+     "name": "module",
+     "type": "String"
+    },
+    {
+     "name": "modules",
+     "type": "List<String>"
+    },
+    {
+     "name": "match",
+     "type": "List<String>"
+    },
+    {
+     "name": "pinBottom",
+     "type": "boolean"
+    },
+    {
+     "name": "portalFor",
+     "type": "List<String>"
+    },
+    {
+     "name": "children",
+     "type": "List<MenuNode>",
+     "fields": [
+      {
+       "name": "menuNo",
+       "type": "String"
+      },
+      {
+       "name": "parentNo",
+       "type": "String"
+      },
+      {
+       "name": "name",
+       "type": "String"
+      },
+      {
+       "name": "nameEn",
+       "type": "String"
+      },
+      {
+       "name": "nameAr",
+       "type": "String"
+      },
+      {
+       "name": "type",
+       "type": "String"
+      },
+      {
+       "name": "path",
+       "type": "String"
+      },
+      {
+       "name": "icon",
+       "type": "String"
+      },
+      {
+       "name": "group",
+       "type": "String"
+      },
+      {
+       "name": "sort",
+       "type": "Integer"
+      },
+      {
+       "name": "perm",
+       "type": "String"
+      },
+      {
+       "name": "phase",
+       "type": "Integer"
+      },
+      {
+       "name": "ready",
+       "type": "boolean"
+      },
+      {
+       "name": "module",
+       "type": "String"
+      },
+      {
+       "name": "modules",
+       "type": "List<String>"
+      },
+      {
+       "name": "match",
+       "type": "List<String>"
+      },
+      {
+       "name": "pinBottom",
+       "type": "boolean"
+      },
+      {
+       "name": "portalFor",
+       "type": "List<String>"
+      },
+      {
+       "name": "children",
+       "type": "List<MenuNode>",
+       "fields": [
+        {
+         "name": "menuNo",
+         "type": "String"
+        },
+        {
+         "name": "parentNo",
+         "type": "String"
+        },
+        {
+         "name": "name",
+         "type": "String"
+        },
+        {
+         "name": "nameEn",
+         "type": "String"
+        },
+        {
+         "name": "nameAr",
+         "type": "String"
+        },
+        {
+         "name": "type",
+         "type": "String"
+        },
+        {
+         "name": "path",
+         "type": "String"
+        },
+        {
+         "name": "icon",
+         "type": "String"
+        },
+        {
+         "name": "group",
+         "type": "String"
+        },
+        {
+         "name": "sort",
+         "type": "Integer"
+        },
+        {
+         "name": "perm",
+         "type": "String"
+        },
+        {
+         "name": "phase",
+         "type": "Integer"
+        },
+        {
+         "name": "ready",
+         "type": "boolean"
+        },
+        {
+         "name": "module",
+         "type": "String"
+        },
+        {
+         "name": "modules",
+         "type": "List<String>"
+        },
+        {
+         "name": "match",
+         "type": "List<String>"
+        },
+        {
+         "name": "pinBottom",
+         "type": "boolean"
+        },
+        {
+         "name": "portalFor",
+         "type": "List<String>"
+        },
+        {
+         "name": "children",
+         "type": "List<MenuNode>"
+        }
+       ]
+      }
+     ]
+    }
+   ],
    "requestShape": null
+  },
+  {
+   "verb": "PUT",
+   "path": "/api/platform/iam/menus/{menuNo}",
+   "perm": "org:role:update",
+   "perms": [
+    "org:role:update"
+   ],
+   "handler": "IamAdminController#updateMenu",
+   "summary": "**完整**菜单树（不按权限剪枝）。",
+   "params": [
+    {
+     "in": "path",
+     "name": "menuNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "MenuPatch",
+   "returnType": "MenuService.MenuNode",
+   "returnContainer": null,
+   "returnElement": "MenuService.MenuNode",
+   "responseShape": [
+    {
+     "name": "menuNo",
+     "type": "String"
+    },
+    {
+     "name": "parentNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "nameEn",
+     "type": "String"
+    },
+    {
+     "name": "nameAr",
+     "type": "String"
+    },
+    {
+     "name": "type",
+     "type": "String"
+    },
+    {
+     "name": "path",
+     "type": "String"
+    },
+    {
+     "name": "icon",
+     "type": "String"
+    },
+    {
+     "name": "group",
+     "type": "String"
+    },
+    {
+     "name": "sort",
+     "type": "Integer"
+    },
+    {
+     "name": "perm",
+     "type": "String"
+    },
+    {
+     "name": "phase",
+     "type": "Integer"
+    },
+    {
+     "name": "ready",
+     "type": "boolean"
+    },
+    {
+     "name": "module",
+     "type": "String"
+    },
+    {
+     "name": "modules",
+     "type": "List<String>"
+    },
+    {
+     "name": "match",
+     "type": "List<String>"
+    },
+    {
+     "name": "pinBottom",
+     "type": "boolean"
+    },
+    {
+     "name": "portalFor",
+     "type": "List<String>"
+    },
+    {
+     "name": "children",
+     "type": "List<MenuNode>",
+     "fields": [
+      {
+       "name": "menuNo",
+       "type": "String"
+      },
+      {
+       "name": "parentNo",
+       "type": "String"
+      },
+      {
+       "name": "name",
+       "type": "String"
+      },
+      {
+       "name": "nameEn",
+       "type": "String"
+      },
+      {
+       "name": "nameAr",
+       "type": "String"
+      },
+      {
+       "name": "type",
+       "type": "String"
+      },
+      {
+       "name": "path",
+       "type": "String"
+      },
+      {
+       "name": "icon",
+       "type": "String"
+      },
+      {
+       "name": "group",
+       "type": "String"
+      },
+      {
+       "name": "sort",
+       "type": "Integer"
+      },
+      {
+       "name": "perm",
+       "type": "String"
+      },
+      {
+       "name": "phase",
+       "type": "Integer"
+      },
+      {
+       "name": "ready",
+       "type": "boolean"
+      },
+      {
+       "name": "module",
+       "type": "String"
+      },
+      {
+       "name": "modules",
+       "type": "List<String>"
+      },
+      {
+       "name": "match",
+       "type": "List<String>"
+      },
+      {
+       "name": "pinBottom",
+       "type": "boolean"
+      },
+      {
+       "name": "portalFor",
+       "type": "List<String>"
+      },
+      {
+       "name": "children",
+       "type": "List<MenuNode>",
+       "fields": [
+        {
+         "name": "menuNo",
+         "type": "String"
+        },
+        {
+         "name": "parentNo",
+         "type": "String"
+        },
+        {
+         "name": "name",
+         "type": "String"
+        },
+        {
+         "name": "nameEn",
+         "type": "String"
+        },
+        {
+         "name": "nameAr",
+         "type": "String"
+        },
+        {
+         "name": "type",
+         "type": "String"
+        },
+        {
+         "name": "path",
+         "type": "String"
+        },
+        {
+         "name": "icon",
+         "type": "String"
+        },
+        {
+         "name": "group",
+         "type": "String"
+        },
+        {
+         "name": "sort",
+         "type": "Integer"
+        },
+        {
+         "name": "perm",
+         "type": "String"
+        },
+        {
+         "name": "phase",
+         "type": "Integer"
+        },
+        {
+         "name": "ready",
+         "type": "boolean"
+        },
+        {
+         "name": "module",
+         "type": "String"
+        },
+        {
+         "name": "modules",
+         "type": "List<String>"
+        },
+        {
+         "name": "match",
+         "type": "List<String>"
+        },
+        {
+         "name": "pinBottom",
+         "type": "boolean"
+        },
+        {
+         "name": "portalFor",
+         "type": "List<String>"
+        },
+        {
+         "name": "children",
+         "type": "List<MenuNode>"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "nameEn",
+     "type": "String"
+    },
+    {
+     "name": "nameAr",
+     "type": "String"
+    },
+    {
+     "name": "groupName",
+     "type": "String"
+    },
+    {
+     "name": "sort",
+     "type": "Integer"
+    },
+    {
+     "name": "visible",
+     "type": "Integer"
+    },
+    {
+     "name": "perm",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "GET",
@@ -28191,6 +28776,18 @@
    "SENT",
    "FAILED"
   ],
+  "InvTransferStatus": [
+   "DRAFT",
+   "IN_TRANSIT"
+  ],
+  "OrderStatus": [
+   "CREATED",
+   "DISPENSING",
+   "IN_USE",
+   "RETURNED",
+   "SETTLED",
+   "CLOSED"
+  ],
   "DepositStatus": [
    "HELD",
    "RELEASED",
@@ -28235,6 +28832,11 @@
    "PENDING",
    "PAID",
    "FAILED"
+  ],
+  "CampaignStatus": [
+   "DRAFT",
+   "RUNNING",
+   "PAUSED"
   ],
   "AudienceType": [
    "ALL",
@@ -28413,10 +29015,10 @@
  },
  "conflicts": {},
  "stats": {
-  "endpoints": 421,
-  "records": 300,
-  "withPerm": 361,
-  "withBody": 183,
-  "shapedResponses": 317
+  "endpoints": 422,
+  "records": 301,
+  "withPerm": 362,
+  "withBody": 184,
+  "shapedResponses": 319
  }
 }
