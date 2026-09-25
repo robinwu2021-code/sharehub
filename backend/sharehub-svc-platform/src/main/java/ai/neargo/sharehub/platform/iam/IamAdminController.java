@@ -204,6 +204,10 @@ public class IamAdminController {
      * 后者落到兜底 handler、被抹成「服务器错误」。下面这段话正是操作者唯一能知道
      * 「为什么不让我改」的地方 —— 抹掉之后闸还在拦，但界面上只剩一个 500，
      * 于是看起来像系统坏了而不是像被拦了。实跑对着真后端验出来的（首次前后端联跑）。
+     *
+     * <p>消息里用**菜单名**而不是 {@code menuNo}：在界面上弹「M_org 对超管不可见了」，
+     * 操作者刚刚改的那一栏写着「员工与权限」，对不上号 —— 他得先知道 M_org 是什么
+     * 才能看懂这句拦截。内部编号是给日志看的，不是给人看的。
      */
     private void assertAdminCanStillGetBackIn() {
         LoginUser su = new LoginUser(Realm.STAFF, "__guard__", "__guard__", "ADMIN",
@@ -211,8 +215,11 @@ public class IamAdminController {
         boolean reachable = menuService.visibleFor(su).stream()
                 .anyMatch(n -> ADMIN_SECTION.equals(n.menuNo()));
         if (!reachable) {
+            IamMenu door = menuMapper.selectOne(new LambdaQueryWrapper<IamMenu>()
+                    .eq(IamMenu::getMenuNo, ADMIN_SECTION));
+            String name = door != null && door.getName() != null ? door.getName() : ADMIN_SECTION;
             throw new IllegalArgumentException(
-                    "这一改之后「" + ADMIN_SECTION + "」对超管也不可见了——菜单是运营端唯一的入口，"
+                    "这一改之后「" + name + "」对超管也不可见了——菜单是运营端唯一的入口，"
                             + "改成这样之后谁都进不来把它改回去。已回滚。");
         }
     }

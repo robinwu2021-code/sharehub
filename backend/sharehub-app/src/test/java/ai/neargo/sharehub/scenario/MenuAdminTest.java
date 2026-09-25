@@ -19,6 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class MenuAdminTest extends ApiTestSupport {
 
     private static final String MENUS = "/api/platform/iam/menus";
+    /** 回得来的那扇门。与被测代码同值——断言消息里**不出现**它。 */
+    private static final String ADMIN_SECTION = "M_org";
 
     private JsonNode node(String admin, String menuNo) {
         for (JsonNode s : get(MENUS, admin).okData()) {
@@ -88,7 +90,10 @@ class MenuAdminTest extends ApiTestSupport {
          */
         assertThat(resp.msg())
                 .as("拒绝的理由要送到调用方，否则界面上只剩一个没头没脑的 500")
-                .contains("谁都进不来");
+                .contains("谁都进不来")
+                // 用菜单名而不是 menuNo：操作者那一栏写着「员工与权限」，弹「M_org」对不上号
+                .contains("员工与权限")
+                .doesNotContain(ADMIN_SECTION);
 
         assertThat(node(admin, "M_org")).as("而且要回滚——它还得在").isNotNull();
         assertThat(get("/api/auth/menus", admin).okData().toString())
