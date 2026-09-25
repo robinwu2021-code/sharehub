@@ -27,6 +27,9 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 # site-golive-reconcile · 站点上线对账（platform.loc）· 声明 cron: 0 10 * * * *
 10 * * * * deploy flock -n /run/lock/powerbank-job-site-golive-reconcile.lock curl -s -m 300 -X POST 'http://127.0.0.1:8082/internal/job/site-golive-reconcile/trigger' -o /dev/null
 
+# staff-identity-backfill · 员工标识哈希回填（platform.cred）· 声明 cron: 0 40 4 * * *
+40 4 * * * deploy flock -n /run/lock/powerbank-job-staff-identity-backfill.lock curl -s -m 120 -X POST 'http://127.0.0.1:8082/internal/job/staff-identity-backfill/trigger' -o /dev/null
+
 # file-temp-purge · 临时 / 已移除文件清理（platform.file）· 声明 cron: 0 40 4 * * *
 40 4 * * * deploy flock -n /run/lock/powerbank-job-file-temp-purge.lock curl -s -m 600 -X POST 'http://127.0.0.1:8082/internal/job/file-temp-purge/trigger' -o /dev/null
 
