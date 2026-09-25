@@ -250,6 +250,7 @@ export default {
   },
   fee: {
     RENT: "Rental",
+    COUPON: "Coupon",
     WAIVE: "Discount",
     COMPENSATE: "Compensation",
     DEPOSIT: "Deposit",

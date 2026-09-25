@@ -250,6 +250,7 @@ export default {
   },
   fee: {
     RENT: "أجرة الاستئجار",
+    COUPON: "قسيمة",
     WAIVE: "خصم",
     COMPENSATE: "تعويض",
     DEPOSIT: "مبلغ التأمين",

@@ -31,6 +31,13 @@ export interface RentOrder {
   waivedAmount?: number;
   /** 累计补偿金额（compensate 干预写入；mock 口径为「补至用户余额」）。 */
   compensateAmount?: number;
+  /**
+   * 券抵扣金额（结算时落列）。
+   *
+   * 与 `feeAmount` 分开：后者是**折后**应付，只有它答不出「券抵了多少」，
+   * 而这个数事后推不回来（模板面额会改、折扣额还取决于当时应收）。
+   */
+  couponAmount?: number;
 }
 
 // —— 订单人工干预（S1：修 F0 伪实现）——

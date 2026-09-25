@@ -250,6 +250,7 @@ export default {
   },
   fee: {
     RENT: "租借费",
+    COUPON: "优惠券",
     WAIVE: "优惠减免",
     COMPENSATE: "赔偿",
     DEPOSIT: "押金",

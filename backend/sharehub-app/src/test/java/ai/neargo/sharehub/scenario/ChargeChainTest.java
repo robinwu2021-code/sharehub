@@ -17,6 +17,11 @@ class ChargeChainTest {
 
     private final ChargeChain chain = new ChargeChain();
 
+    /** 不限额免单。UNLIMITED / TIMES 额度都是这个形状（只有 AMOUNT 才有上限）。 */
+    private static ChargeChain.Waiver free(String reason) {
+        return new ChargeChain.Waiver(reason, null);
+    }
+
     /** 无门槛满减券。测试里绝大多数场景只关心「抵多少」，券的类型不是重点。 */
     private static ChargeChain.Coupon cut(String value) {
         return new ChargeChain.Coupon("CUT", new BigDecimal(value), null);
@@ -125,7 +130,7 @@ class ChargeChainTest {
      */
     @Test
     void free_order_records_what_would_have_been_charged() {
-        ChargeChain.Charged c = chain.charge(new BigDecimal("24"), null, null, null, "VIP");
+        ChargeChain.Charged c = chain.charge(new BigDecimal("24"), null, null, null, free("VIP"));
 
         assertThat(c.payable()).isEqualByComparingTo("0.00");
         assertThat(c.waivedAmount())
@@ -137,13 +142,50 @@ class ChargeChainTest {
     @Test
     void waived_amount_excludes_what_the_coupon_already_covered() {
         ChargeChain.Charged c = chain.charge(new BigDecimal("30"), null,
-                cut("10"), null, "BD_DEMO");
+                cut("10"), null, free("BD_DEMO"));
 
         assertThat(c.couponUsed()).isEqualByComparingTo("10");
         assertThat(c.waivedAmount())
                 .as("券已抵 10，平台实际让利 20，不该记 30")
                 .isEqualByComparingTo("20.00");
         assertThat(c.payable()).isEqualByComparingTo("0.00");
+    }
+
+    /**
+     * AMOUNT 额度只免得起剩余那么多，余额照收。
+     *
+     * <p>不兜上限的话「额度 100」会免出 130 来 —— 超出的 30 不会在任何地方报错，
+     * 它只是没收到的钱。
+     */
+    @Test
+    void amount_quota_caps_the_waiver_and_the_rest_is_still_charged() {
+        ChargeChain.Charged c = chain.charge(new BigDecimal("30"), null, null, null,
+                new ChargeChain.Waiver("VIP", new BigDecimal("10")));
+
+        assertThat(c.waivedAmount()).as("额度只剩 10").isEqualByComparingTo("10");
+        assertThat(c.payable()).as("剩下的 20 照收").isEqualByComparingTo("20.00");
+    }
+
+    /** 额度已用尽（剩余 0）等于没有免单授权，不是「免 0 块的免单单」。 */
+    @Test
+    void exhausted_quota_is_not_a_free_order() {
+        ChargeChain.Charged c = chain.charge(new BigDecimal("30"), null, null, null,
+                new ChargeChain.Waiver("VIP", BigDecimal.ZERO));
+
+        assertThat(c.waivedAmount()).isEqualByComparingTo("0");
+        assertThat(c.payable()).isEqualByComparingTo("30.00");
+    }
+
+    /** 券与免单叠加时，明细三项相加仍要等于实付 —— 这是账单那张表能不能看的前提。 */
+    @Test
+    void the_three_lines_add_up_to_what_is_paid() {
+        ChargeChain.Charged c = chain.charge(new BigDecimal("40"), null, cut("6"), null,
+                new ChargeChain.Waiver("VIP", new BigDecimal("10")));
+
+        assertThat(c.beforeDiscount()).isEqualByComparingTo("40.00");
+        assertThat(c.beforeDiscount().subtract(c.couponUsed()).subtract(c.waivedAmount()))
+                .as("折扣前应收 − 券 − 减免 = 实付")
+                .isEqualByComparingTo(c.payable());
     }
 
     // ─────────── 分时倍率与买断 ───────────

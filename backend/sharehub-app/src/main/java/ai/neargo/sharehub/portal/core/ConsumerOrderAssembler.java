@@ -32,6 +32,7 @@ public class ConsumerOrderAssembler {
 
     /** 费用明细的类型码；文案由端上按语言映射（见 {@link FeeItemVO}）。 */
     private static final String FEE_RENT = "RENT";
+    private static final String FEE_COUPON = "COUPON";
     private static final String FEE_WAIVE = "WAIVE";
     private static final String FEE_COMPENSATE = "COMPENSATE";
     private static final String FEE_DEPOSIT = "DEPOSIT";
@@ -89,14 +90,34 @@ public class ConsumerOrderAssembler {
      */
     private List<FeeItemVO> fees(RentOrder o) {
         List<FeeItemVO> out = new ArrayList<>();
-        add(out, FEE_RENT, BigDecimal.valueOf(o.feeAmount()));
-        // 减免记成负数：明细逐项相加要等于实付，否则这张表看着就不像账
-        if (o.waivedAmount() != null && o.waivedAmount().signum() != 0) {
-            add(out, FEE_WAIVE, o.waivedAmount().negate());
-        }
+        BigDecimal payable = BigDecimal.valueOf(o.feeAmount());
+        BigDecimal coupon = nz(o.couponAmount());
+        BigDecimal waived = nz(o.waivedAmount());
+
+        /*
+         * 租借费这一行是**折扣前**的应收，不是 feeAmount。
+         *
+         * feeAmount 存的是折后应付，而下面又把券与减免各记一条负数行 ——
+         * 直接拿它当租借费，这张表就加不出实付来：
+         *   · 免费单：feeAmount=0（0 不出行）、减免 -24 ⇒ 全表只有「优惠减免 -24.00」一行，
+         *     读起来像平台欠用户 24，而他实际付了 0；
+         *   · 用券单：应收 20、券 3、feeAmount=17 ⇒ 全表只有「租借费 17.00」，
+         *     用户特地挑的那张券在账单上**完全不出现**。
+         * 两种都不报错，只是账不对。
+         *
+         * 折扣前应收 = 折后应付 + 券抵扣 + 减免，三项都已落列，不必再存一列。
+         */
+        add(out, FEE_RENT, payable.add(coupon).add(waived));
+        // 券与减免记成负数：明细逐项相加要等于实付，否则这张表看着就不像账
+        add(out, FEE_COUPON, coupon.negate());
+        add(out, FEE_WAIVE, waived.negate());
         add(out, FEE_COMPENSATE, o.compensateAmount());
         add(out, FEE_DEPOSIT, BigDecimal.valueOf(o.depositAmount()));
         return out;
+    }
+
+    private static BigDecimal nz(BigDecimal v) {
+        return v == null ? BigDecimal.ZERO : v;
     }
 
     private static void add(List<FeeItemVO> out, String type, BigDecimal amount) {

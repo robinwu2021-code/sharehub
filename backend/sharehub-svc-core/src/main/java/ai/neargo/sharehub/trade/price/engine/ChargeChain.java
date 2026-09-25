@@ -35,10 +35,12 @@ public class ChargeChain {
      * @param coupon     券的抵扣规格；null 表示无券。**传规格而不是算好的金额** ——
      *                   门槛与折扣率都要按「封顶后的应收」算，而那个数只有本方法知道
      * @param capTotal   总封顶；null 表示不封顶。**在倍率之后、券之前应用**
-     * @param freeReason 免单原因；非空即免单
+     * @param waiver     免单授权；null 表示正常收费。**传授权而不是一个 reason 字符串** ——
+     *                   白名单的 AMOUNT 额度要按剩余量兜住本单的减免，
+     *                   而「能免多少」只有算出应收之后才谈得上
      */
     public Charged charge(BigDecimal gross, BigDecimal multiplier, Coupon coupon,
-                          BigDecimal capTotal, String freeReason) {
+                          BigDecimal capTotal, Waiver waiver) {
         BigDecimal amount = nz(gross);
 
         // ③ 分时倍率
@@ -68,9 +70,9 @@ public class ChargeChain {
 
         // 免单：先算后减免
         BigDecimal waived = BigDecimal.ZERO;
-        if (freeReason != null && !freeReason.isBlank()) {
-            waived = amount;              // 记录「本应收多少」，供减免统计
-            amount = BigDecimal.ZERO;
+        if (waiver != null && waiver.applies()) {
+            waived = waiver.cap() == null ? amount : waiver.cap().min(amount);
+            amount = amount.subtract(waived);   // 额度不够时只免一部分，余额照收
         }
 
         return new Charged(beforeDiscount, couponUsed, waived,
@@ -117,6 +119,20 @@ public class ChargeChain {
                         .setScale(MONEY_SCALE, RoundingMode.HALF_UP);
             }
             return BigDecimal.ZERO;
+        }
+    }
+
+    /**
+     * 免单授权。
+     *
+     * @param reason 免单原因（白名单的 reason 枚举）；空白即不免单
+     * @param cap    本单最多免多少；null=全免。<b>AMOUNT 额度必须传剩余量</b> ——
+     *               不传的话「额度 100」会免出 130 来，而超出的那 30 不会在任何地方报错
+     */
+    public record Waiver(String reason, BigDecimal cap) {
+
+        boolean applies() {
+            return reason != null && !reason.isBlank() && (cap == null || cap.signum() > 0);
         }
     }
 

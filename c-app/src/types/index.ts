@@ -78,8 +78,10 @@ export interface CabinetAvailability {
  * 而文案要跟着界面语言走（中/英/阿）—— 后端返一句中文，阿语界面上就是一句中文。
  */
 export interface FeeItem {
-  type: "RENT" | "WAIVE" | "COMPENSATE" | "DEPOSIT";
-  amount: number; // WAIVE 是负数：逐项相加要等于实付，否则这张表看着就不像账
+  type: "RENT" | "COUPON" | "WAIVE" | "COMPENSATE" | "DEPOSIT";
+  // COUPON / WAIVE 是负数，RENT 是**折扣前**应收：RENT + COUPON + WAIVE = 实付。
+  // 押金单列（要退回的，不是支出），赔偿单列（订单之外的追加）
+  amount: number;
 }
 
 /** 状态时间线的一步（镜像后端 `OrderStepVO`）。后端刻意不带 operator（内部员工号）。 */

@@ -82,6 +82,9 @@ public class RentOrderServiceImpl implements RentOrderService {
      */
     private final ai.neargo.sharehub.api.core.port.CouponUsePort coupons;
 
+    /** 免单白名单。同 {@link #coupons}，走端口是为了不把 trade 与 user 连成环。 */
+    private final ai.neargo.sharehub.api.core.port.FreeRentPort freeRents;
+
     public RentOrderServiceImpl(OrdMapper mapper, OrdStateMachine stateMachine,
                                 OrdRentExtMapper rentExtMapper, InterventionMapper interventionMapper,
                                 PriceResolver priceResolver, PriceEngine priceEngine,
@@ -91,7 +94,9 @@ public class RentOrderServiceImpl implements RentOrderService {
                                 ai.neargo.sharehub.trade.order.service.OrderEventLogService eventLog,
                                 ai.neargo.sharehub.trade.RentabilityGuard rentability,
                                 ai.neargo.sharehub.dev.port.PowerbankTracker powerbankTracker,
-                                ai.neargo.sharehub.api.core.port.CouponUsePort coupons) {
+                                ai.neargo.sharehub.api.core.port.CouponUsePort coupons,
+                                ai.neargo.sharehub.api.core.port.FreeRentPort freeRents) {
+        this.freeRents = freeRents;
         this.coupons = coupons;
         this.powerbankTracker = powerbankTracker;
         this.rentability = rentability;
@@ -165,7 +170,7 @@ public class RentOrderServiceImpl implements RentOrderService {
                     base.rentEndAt(), base.durationMin(), base.feeAmount(), base.depositAmount(),
                     base.currency(), e.getWaivedAmount(),
                     compensate.get(e.getOrderNo()), ejects.getOrDefault(e.getOrderNo(), 0),
-                    lastEject.get(e.getOrderNo()));
+                    lastEject.get(e.getOrderNo()), e.getCouponAmount());
         }).toList();
     }
 
@@ -307,6 +312,22 @@ public class RentOrderServiceImpl implements RentOrderService {
          * 静默忽略是更省事的写法，也是更坏的写法：用户在确认页选了券、下单成功、
          * 结算时却按原价扣款，中间没有任何一处报错，他只能事后来投诉。
          */
+        /*
+         * 免单白名单：**下单时定格 free_reason**，与计价快照同一个道理 ——
+         * 借的时候说好免单，还的时候因为白名单被撤销而变成收费，用户无法预期。
+         * 额度则在结算时按实际减免额扣（见 settle 里的 freeRents.consume）。
+         *
+         * 在此之前，`setFreeReason` 在全仓库出现 0 次：表、实体、服务、
+         * 运营端授予/撤销端点、ChargeChain 的免单分支全都在，唯独没人写这一列。
+         * 于是授了免单的 VIP 照样全额付费，而运营端「免费订单」那页永远是空的
+         * —— 看起来像「这个月没人用免单」。
+         */
+        var grant = freeRents.grantFor(cUserNo, e.getCurrency());
+        if (grant != null) {
+            e.setFreeReason(grant.reason());
+            log.info("命中免单白名单 orderNo={} cUserNo={} reason={}", e.getOrderNo(), cUserNo, grant.reason());
+        }
+
         if (couponNo != null && !couponNo.isBlank()) {
             if (coupons.offerOf(cUserNo, couponNo, e.getCurrency()) == null) {
                 throw BizException.badRequest("error.rent.coupon_unusable", couponNo);
@@ -390,7 +411,19 @@ public class RentOrderServiceImpl implements RentOrderService {
          */
         java.math.BigDecimal capTotal = PriceResolver.capTotalFromSnapshot(e.getPriceSnapshot());
         java.math.BigDecimal multiplier = PriceResolver.multiplierFromSnapshot(e.getPriceSnapshot());
-        ChargeChain.Charged charged = chargeChain.charge(gross, multiplier, couponOf(e), capTotal, e.getFreeReason());
+        ChargeChain.Waiver waiver = waiverOf(e);
+        ChargeChain.Charged charged = chargeChain.charge(gross, multiplier, couponOf(e), capTotal, waiver);
+
+        /*
+         * 免单额度与券同一个套路：**先算后扣，扣不动就按原价重算**。
+         * 额度是钱，两单并发用同一份额度时只能有一单扣到。
+         */
+        if (charged.waivedAmount().signum() > 0
+                && !freeRents.consume(e.getCUserNo(), orderNo, charged.waivedAmount())) {
+            e.setFreeReason(null);
+            waiver = null;
+            charged = chargeChain.charge(gross, multiplier, couponOf(e), capTotal, null);
+        }
 
         /*
          * 先算后核销，且**核销失败就重算** ——
@@ -405,7 +438,7 @@ public class RentOrderServiceImpl implements RentOrderService {
         if (charged.couponUsed().signum() > 0 && !coupons.consume(e.getCouponNo(), orderNo)) {
             log.warn("券已被其它订单核销，本单按无券结算 orderNo={} couponNo={}", orderNo, e.getCouponNo());
             e.setCouponNo(null);
-            charged = chargeChain.charge(gross, multiplier, null, capTotal, e.getFreeReason());
+            charged = chargeChain.charge(gross, multiplier, null, capTotal, waiver);
         }
 
         e.setAmount(charged.payable());
@@ -524,6 +557,24 @@ public class RentOrderServiceImpl implements RentOrderService {
      * <p>这里**重新校验一次可用性**，尽管下单时已经校验过：借出到归还之间可能过了有效期，
      * 也可能被别处用掉。过期的券静静地抵扣下去，账面上谁也看不出不对。
      */
+    /**
+     * 订单上定格的免单原因 → 带额度上限的免单授权；正常单返回 null。
+     *
+     * <p>上限**按结算时刻的剩余额度取**：下单时只定格「免不免」，
+     * 中间可能有别的单把 AMOUNT 额度吃掉了一部分。额度没了就按原价 ——
+     * 这时 {@code grantFor} 返回 null，本方法也返回 null。
+     */
+    private ChargeChain.Waiver waiverOf(OrdOrder e) {
+        if (e.getFreeReason() == null || e.getFreeReason().isBlank()) return null;
+        var grant = freeRents.grantFor(e.getCUserNo(), e.getCurrency());
+        if (grant == null) {
+            log.warn("结算时免单额度已不可用，本单按原价 orderNo={} reason={}", e.getOrderNo(), e.getFreeReason());
+            return null;
+        }
+        // reason 用订单上定格的那个，不用白名单当前的 —— 白名单改了用途不该改写历史订单
+        return new ChargeChain.Waiver(e.getFreeReason(), grant.capAmount());
+    }
+
     private ChargeChain.Coupon couponOf(OrdOrder e) {
         if (e.getCouponNo() == null || e.getCouponNo().isBlank()) return null;
         var offer = coupons.offerOf(e.getCUserNo(), e.getCouponNo(), e.getCurrency());

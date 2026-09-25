@@ -1,24 +1,37 @@
 package ai.neargo.sharehub.trade.order.service.impl;
 
 import ai.neargo.common.core.PageResult;
+import ai.neargo.sharehub.api.core.port.NicknameQueryPort;
+import ai.neargo.sharehub.api.platform.dto.SiteBrief;
+import ai.neargo.sharehub.api.platform.port.SiteQueryPort;
+import ai.neargo.sharehub.trade.entity.OrdOrder;
+import ai.neargo.sharehub.trade.mapper.OrdMapper;
 import ai.neargo.sharehub.trade.order.dto.OrderDtos.FreeOrder;
 import ai.neargo.sharehub.trade.order.dto.OrderDtos.FreeOrderStats;
 import ai.neargo.sharehub.trade.order.service.FreeOrderService;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 /**
- * 免费订单实现 —— **本类刻意不持有任何 mapper**。
+ * 免费订单 —— 没有自己的表，是 {@code ord_order WHERE free_reason IS NOT NULL}
+ * （[db-design §5.1]，索引 {@code idx_ord_free(tenant_id, free_reason, created_at)} 就是为它建的）。
  *
- * <p>免费订单没有自己的表：它是 {@code ord_order WHERE free_reason IS NOT NULL}
- * （[db-design §5.1] 定稿，索引 {@code idx_ord_free(tenant_id, free_reason, created_at)} 就是为它建的）。
- * 而 {@code ord_order} 的实体/mapper 归 {@code trade.entity}/{@code trade.mapper}，
- * 本分片没有写入权 —— 强行在这里新建一个 {@code OrdOrder} 副本会造成两份实体定义，
- * 后续加列时必然漏改一处。
+ * <p><b>此前这里返回的是写死的空结果与零统计</b>，注释说在等 {@code ord_order} 补上
+ * {@code free_reason / waived_amount / coupon_no / location_name} 等 v2 新列。
+ * 那些列早就补齐了（V8 + 实体映射），但没人回来接线 ——
+ * 于是「免费订单」这一页永远是空的、页头永远是 0，
+ * 而它看起来和「这个月确实没人用免单」一模一样。
  *
- * <p>所以骨架阶段只把接口与端点立起来，返回空结果集与零统计；接线见下方 TODO。
+ * <p>（在同一批改动里，{@code ord_order.free_reason} 才第一次真的有人写 ——
+ * 见 {@code RentOrderServiceImpl.rent} 里的白名单命中。）
  */
 @Service
 public class FreeOrderServiceImpl implements FreeOrderService {
@@ -26,26 +39,81 @@ public class FreeOrderServiceImpl implements FreeOrderService {
     /** 页头统计的默认币种（单市场 AED；多币种后应按 ord_order.currency 分组）。 */
     private static final String DEFAULT_CURRENCY = "AED";
 
-    @Override
-    public PageResult<FreeOrder> page(Integer page, Integer size, String keyword, String whitelistReason) {
-        // TODO(依赖 ord_order)：需要 trade.mapper.OrdMapper + OrdOrder 实体补上 v2 新列
-        //  （free_reason / waived_amount / coupon_no / location_no / location_name / buyout，
-        //   见 ddl/pb_core-v2-alter.sql §2）。补齐后本方法为：
-        //    LambdaQueryWrapper<OrdOrder> w = new LambdaQueryWrapper<>();
-        //    w.isNotNull(OrdOrder::getFreeReason);
-        //    if (has(whitelistReason)) w.eq(OrdOrder::getFreeReason, whitelistReason);
-        //    if (has(keyword)) w.and(q -> q.like(OrdOrder::getOrderNo, kw).or().like(OrdOrder::getCUserNo, kw));
-        //    w.orderByDesc(OrdOrder::getId);  → selectPage → toVO
-        //  nickname 需要联 usr_user（或由 user 域提供批量取昵称的接口），不在 ord_order 里。
-        return new PageResult<>(List.of(), 0L);
+    private final OrdMapper mapper;
+    private final NicknameQueryPort nicknames;
+    /** 站点名在 platform；跨服务只读面（ADR-017 §5.2）。缺席时退回订单上的点位名。 */
+    private final ObjectProvider<SiteQueryPort> siteQuery;
+
+    public FreeOrderServiceImpl(OrdMapper mapper, NicknameQueryPort nicknames,
+                                ObjectProvider<SiteQueryPort> siteQuery) {
+        this.mapper = mapper;
+        this.nicknames = nicknames;
+        this.siteQuery = siteQuery;
     }
 
     @Override
+    public PageResult<FreeOrder> page(Integer page, Integer size, String keyword, String whitelistReason) {
+        int p = (page == null || page < 1) ? 1 : page;
+        int s = (size == null || size < 1) ? 10 : Math.min(size, 200);
+
+        LambdaQueryWrapper<OrdOrder> w = new LambdaQueryWrapper<OrdOrder>()
+                .isNotNull(OrdOrder::getFreeReason)
+                .ne(OrdOrder::getFreeReason, "")
+                .eq(has(whitelistReason), OrdOrder::getFreeReason, whitelistReason);
+        if (has(keyword)) {
+            w.and(q -> q.like(OrdOrder::getOrderNo, keyword).or().like(OrdOrder::getCUserNo, keyword));
+        }
+        w.orderByDesc(OrdOrder::getId);
+
+        Page<OrdOrder> r = mapper.selectPage(new Page<>(p, s), w);
+        List<OrdOrder> rows = r.getRecords();
+        // 昵称与站点名各批查一次 —— 逐行查就是 N+1，而这正是最长的那种列表
+        Map<String, String> nicks = nicknames.byUserNos(rows.stream().map(OrdOrder::getCUserNo).toList());
+        Map<String, String> siteNames = siteNames(rows);
+        return new PageResult<>(rows.stream().map(e -> toVO(e, nicks, siteNames)).toList(), r.getTotal());
+    }
+
+    /**
+     * 页头统计走 SQL 聚合，**不在 Java 侧对分页结果求和** —— 后者翻一页数字就变了。
+     *
+     * <p>两个数口径不同，刻意分开算：单数只看本月（这个月花了多少），
+     * 减免额是累计（这条白名单一共让利多少）。
+     */
+    @Override
     public FreeOrderStats stats() {
-        // TODO(依赖 ord_order)：**全量口径**，不是当前页合计 ——
-        //  monthCount  = count(ord_order where free_reason is not null and created_at >= 本月 1 号)
-        //  waivedTotal = sum(waived_amount) where free_reason is not null（累计减免额）
-        //  两个数都要走 SQL 聚合，不能在 Java 侧对分页结果求和（翻页就变了）。
-        return new FreeOrderStats(0L, BigDecimal.ZERO, DEFAULT_CURRENCY);
+        java.time.LocalDateTime monthStart = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+        Long monthCount = mapper.selectCount(new LambdaQueryWrapper<OrdOrder>()
+                .isNotNull(OrdOrder::getFreeReason).ne(OrdOrder::getFreeReason, "")
+                .ge(OrdOrder::getCreatedAt, monthStart));
+
+        Map<String, Object> sum = mapper.selectMaps(new QueryWrapper<OrdOrder>()
+                .select("COALESCE(SUM(waived_amount), 0) AS waived_total")
+                .isNotNull("free_reason").ne("free_reason", "")).stream().findFirst().orElse(Map.of());
+        Object total = sum.get("waived_total");
+        return new FreeOrderStats(monthCount == null ? 0L : monthCount,
+                total == null ? BigDecimal.ZERO : new BigDecimal(total.toString()), DEFAULT_CURRENCY);
+    }
+
+    private Map<String, String> siteNames(List<OrdOrder> rows) {
+        SiteQueryPort sites = siteQuery.getIfAvailable();
+        if (sites == null) return Map.of();
+        List<String> nos = rows.stream().map(OrdOrder::getSiteNo).filter(n -> n != null && !n.isBlank()).distinct().toList();
+        if (nos.isEmpty()) return Map.of();
+        return sites.briefsByNos(nos).stream()
+                .filter(b -> b.name() != null)
+                .collect(java.util.stream.Collectors.toMap(SiteBrief::siteNo, SiteBrief::name, (a, b) -> a));
+    }
+
+    private static FreeOrder toVO(OrdOrder e, Map<String, String> nicks, Map<String, String> siteNames) {
+        // 站点名取不到时退回订单上的点位名：宁可显示得粗一点，也好过空白一列
+        String siteName = siteNames.getOrDefault(e.getSiteNo(), e.getLocationName());
+        return new FreeOrder(e.getOrderNo(), e.getCUserNo(), nicks.get(e.getCUserNo()), e.getFreeReason(),
+                e.getWaivedAmount() == null ? BigDecimal.ZERO : e.getWaivedAmount(),
+                e.getCurrency() == null ? DEFAULT_CURRENCY : e.getCurrency(),
+                siteName, e.getCabinetNo(), e.getRentStartAt(), e.getRentEndAt(), e.getDurationMin());
+    }
+
+    private static boolean has(String s) {
+        return s != null && !s.isBlank();
     }
 }
