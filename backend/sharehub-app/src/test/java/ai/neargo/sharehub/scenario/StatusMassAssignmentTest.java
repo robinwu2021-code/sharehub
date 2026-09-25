@@ -56,7 +56,7 @@ class StatusMassAssignmentTest extends ApiTestSupport {
 
         Map<String, Object> create = new HashMap<>();
         create.put("name", uniq("批量赋值探针-活动-"));
-        create.put("kind", "DISCOUNT");
+        create.put("kind", "COUPON_PUSH");
         String no = post("/api/user/campaigns", create, admin).okData().path("campaignNo").asText();
         assertThat(statusOfCampaign(admin, no)).as("建单落 DRAFT").isEqualTo("DRAFT");
 
@@ -77,7 +77,7 @@ class StatusMassAssignmentTest extends ApiTestSupport {
         String admin = login("ADMIN");
         Map<String, Object> create = new HashMap<>();
         create.put("name", uniq("批量赋值探针-活动B-"));
-        create.put("kind", "DISCOUNT");
+        create.put("kind", "COUPON_PUSH");
         String no = post("/api/user/campaigns", create, admin).okData().path("campaignNo").asText();
 
         String newName = uniq("改过的名字-");
@@ -96,7 +96,7 @@ class StatusMassAssignmentTest extends ApiTestSupport {
         String admin = login("ADMIN");
         Map<String, Object> create = new HashMap<>();
         create.put("name", uniq("批量赋值探针-活动C-"));
-        create.put("kind", "DISCOUNT");
+        create.put("kind", "COUPON_PUSH");
         create.put("endAt", "2099-12-31 23:59:59");
         String no = post("/api/user/campaigns", create, admin).okData().path("campaignNo").asText();
 
@@ -180,7 +180,7 @@ class StatusMassAssignmentTest extends ApiTestSupport {
         String admin = login("ADMIN");
         Map<String, Object> create = new HashMap<>();
         create.put("name", uniq("白名单探针-"));
-        create.put("kind", "DISCOUNT");
+        create.put("kind", "COUPON_PUSH");
         create.put("status", "RUNNING");          // 建单时就想跳过 DRAFT
         String no = post("/api/user/campaigns", create, admin).okData().path("campaignNo").asText();
 
@@ -206,7 +206,7 @@ class StatusMassAssignmentTest extends ApiTestSupport {
                 .isEqualTo(400);
 
         Map<String, Object> noName = new HashMap<>();
-        noName.put("kind", "DISCOUNT");
+        noName.put("kind", "COUPON_PUSH");
         assertThat(post("/api/user/campaigns", noName, admin).status)
                 .as("活动名必填")
                 .isEqualTo(400);

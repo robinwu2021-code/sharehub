@@ -126,8 +126,8 @@ class MissingWriteEndpointsTest extends ApiTestSupport {
         String maskedTarget = b.path("target").asText();
 
         JsonNode edited = post("/api/platform/notify-blacklist/" + no,
-                Map.of("reason", "COMPLAINT", "target", "+971509999999"), admin).okData();
-        assertThat(edited.path("reason").asText()).as("原因可改").isEqualTo("COMPLAINT");
+                Map.of("reason", "ABUSE", "target", "+971509999999"), admin).okData();
+        assertThat(edited.path("reason").asText()).as("原因可改").isEqualTo("ABUSE");
         // target 是脱敏存的：改掉等于换了一个人被拉黑，而从掩码上根本看不出换没换
         assertThat(edited.path("target").asText()).as("拉黑对象冻结").isEqualTo(maskedTarget);
     }
