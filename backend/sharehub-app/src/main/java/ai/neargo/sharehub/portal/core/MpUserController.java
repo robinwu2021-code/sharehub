@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.portal.core;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.auth.ConsumerContext;
 import ai.neargo.sharehub.user.asset.dto.UserAssetDtos.RechargePackageRow;
@@ -230,7 +231,7 @@ public class MpUserController {
 
     private java.util.Map<String, Object> profileOf(String me) {
         CUserRow u = userQuery.get(me);
-        if (u == null) throw new IllegalArgumentException("用户不存在: " + me);
+        if (u == null) throw BizException.notFound(me);
         var member = memberships.get(me);
         java.util.Map<String, Object> out = new java.util.LinkedHashMap<>();
         out.put("cUserNo", u.cUserNo());

@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.user.ad.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.common.crud.AbstractCrudService;
 import ai.neargo.sharehub.user.ad.dto.AdDtos.AdCampaignVO;
@@ -83,7 +84,7 @@ public class AdCampaignServiceImpl extends AbstractCrudService<AdCampaign, AdCam
     @org.springframework.transaction.annotation.Transactional
     public Object transition(String adNo, String action) {
         AdCampaign e = selectByKey(adNo);
-        if (e == null) throw new IllegalArgumentException("广告投放不存在: " + adNo);
+        if (e == null) throw BizException.notFound(adNo);
         e.setStatus(ai.neargo.sharehub.user.marketing.CampaignStateMachine.next(e.getStatus(), action));
         mapper.updateById(e);
         return toVO(selectByKey(adNo));

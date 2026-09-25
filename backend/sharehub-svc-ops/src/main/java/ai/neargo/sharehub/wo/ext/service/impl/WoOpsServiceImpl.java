@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.wo.ext.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.IdGenerator;
 import ai.neargo.sharehub.api.core.dto.CabinetBrief;
 import ai.neargo.sharehub.api.core.port.CabinetQueryPort;
@@ -525,7 +526,7 @@ public class WoOpsServiceImpl implements WoOpsService {
         if (woNo == null || woNo.isBlank()) throw new IllegalArgumentException("woNo 必填");
         WoOrder e = woMapper.selectOne(new LambdaQueryWrapper<WoOrder>()
                 .eq(WoOrder::getWoNo, woNo).last("limit 1"));
-        if (e == null) throw new IllegalArgumentException("工单不存在: " + woNo);
+        if (e == null) throw BizException.notFound(woNo);
         return e;
     }
 

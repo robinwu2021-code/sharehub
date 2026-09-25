@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.gw.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.gw.VendorStatus;
 
 import ai.neargo.sharehub.gw.driver.DriverRegistry;
@@ -75,7 +76,7 @@ public class VendorServiceImpl implements VendorService {
     @Override
     public VendorProbeResult probe(String vendorCode) {
         GwVendor v = byCode(vendorCode);
-        if (v == null) throw new IllegalArgumentException("供应商不存在: " + vendorCode);
+        if (v == null) throw BizException.notFound(vendorCode);
         String endpoint = v.getApiBase() == null || v.getApiBase().isBlank()
                 ? "gateway://" + vendorCode : v.getApiBase();
         boolean hasDriver = drivers.manifests().stream()

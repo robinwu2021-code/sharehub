@@ -44,8 +44,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ServerException.class)
     public ResponseEntity<Result<Void>> onServer(ServerException e) {
         // message 约定为 i18n key（非 key 的成品串经 Messages 原样返回，兼容旧代码）
+        // BizException 额外带 i18n 占位参数 —— 真实文案大多带值
+        // （「仅 FROZEN 可请款，当前：RELEASED」），不传 args 的话 {0} 会原样留在界面上
+        Object[] args = e instanceof BizException b ? b.args() : new Object[0];
         return ResponseEntity.status(statusOf(e.getCode()))
-                .body(Result.error(e.getCode(), Messages.msg(e.getMessage())));
+                .body(Result.error(e.getCode(), Messages.msg(e.getMessage(), args)));
     }
 
     /** 业务码 → HTTP 状态；只认 4xx/5xx，其余回 200（见 {@link #onServer} 注释）。 */

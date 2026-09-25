@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.portal.platform;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.platform.org.dto.OrgDtos.AuditDetail;
 import ai.neargo.sharehub.platform.org.dto.OrgDtos.AuditLogEntry;
@@ -93,7 +94,7 @@ public class PlatformController {
     @PreAuthorize("@perm.can('org:audit:read')")
     public AuditDetail auditLogDetail(@PathVariable String id) {
         AuditDetail d = auditLogService.detail(id);
-        if (d == null) throw new IllegalArgumentException("审计记录不存在: " + id);
+        if (d == null) throw BizException.notFound(id);
         return d;
     }
 }

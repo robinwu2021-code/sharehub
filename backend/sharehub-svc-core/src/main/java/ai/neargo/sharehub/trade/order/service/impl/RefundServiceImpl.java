@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.trade.order.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.ServerException;
 import ai.neargo.common.core.ErrorCode;
 import ai.neargo.common.core.PageResult;
@@ -116,7 +117,7 @@ public class RefundServiceImpl implements RefundService {
     @Override
     public RefundRecord audit(String refundNo, RefundAuditReq req) {
         OrdRefund e = selectByNo(refundNo);
-        if (e == null) throw new IllegalArgumentException("退款单不存在: " + refundNo);
+        if (e == null) throw BizException.notFound(refundNo);
         if (req == null || req.approved() == null) {
             throw new IllegalArgumentException("approved 必填");
         }

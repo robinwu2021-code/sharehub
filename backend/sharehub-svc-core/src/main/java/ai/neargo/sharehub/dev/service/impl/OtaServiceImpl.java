@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.dev.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.dev.OtaReleaseStatus;
 import ai.neargo.sharehub.dev.OtaRolloutStatus;
 
@@ -143,7 +144,7 @@ public class OtaServiceImpl implements OtaService {
         }
 
         DevOtaRollout cur = selectRollout(no);
-        if (cur == null) throw new IllegalArgumentException("OTA 投放不存在: " + no);
+        if (cur == null) throw BizException.notFound(no);
         if (body.getStatus() != null && !body.getStatus().isBlank() && !body.getStatus().equals(cur.getStatus())) {
             checkRolloutTransition(cur.getStatus(), body.getStatus());
             cur.setStatus(body.getStatus());

@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.operation.service;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.finance.entity.ShareRule;
 import ai.neargo.sharehub.finance.mapper.ShareRuleMapper;
 import ai.neargo.sharehub.loc.entity.LocContract;
@@ -212,7 +213,7 @@ public class OperationOverviewService {
     public SiteStats siteStats(String siteNo, String from, String to) {
         Map<String, Object> site = sites.sites().stream()
                 .filter(r -> siteNo.equals(s(r.get("siteNo")))).findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("站点不存在：" + siteNo));
+                .orElseThrow(() -> BizException.notFound(siteNo));
 
         String toDate = dateOf(to, LocalDate.now());
         String fromDate = dateOf(from, LocalDate.parse(toDate).minusDays(DEFAULT_DAYS - 1L));

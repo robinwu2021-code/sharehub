@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.trade.price.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.trade.price.PricePlanStatus;
 
 import ai.neargo.sharehub.common.crud.AbstractCrudService;
@@ -110,7 +111,7 @@ public class PricePlanServiceImpl extends AbstractCrudService<PricePlan, PricePl
         }
 
         PricePlanScope e = in.id() == null ? new PricePlanScope() : scopeMapper.selectById(in.id());
-        if (e == null) throw new IllegalArgumentException("适用范围不存在: " + in.id());
+        if (e == null) throw BizException.notFound(in.id());
         e.setPlanNo(in.planNo());
         e.setScopeType(level.name());
         e.setScopeRef(ref);
@@ -149,7 +150,7 @@ public class PricePlanServiceImpl extends AbstractCrudService<PricePlan, PricePl
         PricePlanScope e = scopeMapper.selectById(id);
         // 路径上的 planNo 为准：不校验的话，拿到任意 id 就能删别的方案的范围
         if (e == null || !e.getPlanNo().equals(planNo)) {
-            throw new IllegalArgumentException("适用范围不存在或不属于该方案: " + id);
+            throw BizException.notFound(id);
         }
         scopeMapper.deleteById(id);
     }

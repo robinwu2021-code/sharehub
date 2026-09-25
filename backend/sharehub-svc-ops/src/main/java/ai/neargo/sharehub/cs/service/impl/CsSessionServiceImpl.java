@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.cs.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.ServerException;
 import ai.neargo.common.core.ErrorCode;
 import ai.neargo.sharehub.cs.CsSenderType;
@@ -74,7 +75,7 @@ public class CsSessionServiceImpl implements CsSessionService {
     public CsMessageVO reply(String sessionNo, String senderNo, String content, String attach) {
         CsSession session = mapper.selectOne(new LambdaQueryWrapper<CsSession>()
                 .eq(CsSession::getSessionNo, sessionNo).last("limit 1"));
-        if (session == null) throw new IllegalArgumentException("会话不存在: " + sessionNo);
+        if (session == null) throw BizException.notFound(sessionNo);
         if (CsSessionStatus.CLOSED.name().equals(session.getStatus())) {
             throw ServerException.of(ErrorCode.CONFLICT, "会话已关闭，不能回复: " + sessionNo);
         }

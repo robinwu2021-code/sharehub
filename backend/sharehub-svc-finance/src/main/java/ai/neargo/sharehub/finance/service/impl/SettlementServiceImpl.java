@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.finance.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.finance.SettlementRefType;
 import ai.neargo.sharehub.finance.SettlementStatus;
 import ai.neargo.sharehub.finance.ShareRecordStatus;
@@ -179,7 +180,7 @@ public class SettlementServiceImpl implements SettlementService {
     private StlSettlement require(String settleNo) {
         StlSettlement e = mapper.selectOne(new LambdaQueryWrapper<StlSettlement>()
                 .eq(StlSettlement::getSettleNo, settleNo).last("limit 1"));
-        if (e == null) throw new IllegalArgumentException("结算单不存在: " + settleNo);
+        if (e == null) throw BizException.notFound(settleNo);
         return e;
     }
 

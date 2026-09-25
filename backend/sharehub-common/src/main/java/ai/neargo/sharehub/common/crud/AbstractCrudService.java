@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.common.crud;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.common.BaseEntity;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -185,7 +186,7 @@ public abstract class AbstractCrudService<E extends BaseEntity, V> implements Cr
     private V setArchived(String no, LocalDateTime at) {
         E e = selectByKey(no);
         if (e == null) {
-            throw new IllegalArgumentException("记录不存在: " + no);
+            throw BizException.notFound(no);
         }
         if (!(e instanceof Archivable a)) {
             throw new UnsupportedOperationException(

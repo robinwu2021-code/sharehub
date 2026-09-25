@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.trade.order.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.ServerException;
 import ai.neargo.common.core.ErrorCode;
 import ai.neargo.common.core.PageResult;
@@ -55,7 +56,7 @@ public class ReservationServiceImpl implements ReservationService {
     @Override
     public OkResult cancel(String reservationNo) {
         OrdReservation e = selectByNo(reservationNo);
-        if (e == null) throw new IllegalArgumentException("预约不存在: " + reservationNo);
+        if (e == null) throw BizException.notFound(reservationNo);
         if (!STATUS_PENDING.equals(e.getStatus())) {
             // 服务端复校（[api/README §4.1] 明确要求）：只有 PENDING 可取消
             throw ServerException.of(ErrorCode.CONFLICT, "仅 PENDING 预约可取消: " + reservationNo + " → " + e.getStatus());

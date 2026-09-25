@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.finance.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.finance.dto.FinDtos.PayoutAccount;
 import ai.neargo.sharehub.finance.dto.FinDtos.PayoutAccountReq;
@@ -169,7 +170,7 @@ public class PayoutAccountServiceImpl implements PayoutAccountService {
     private StlPayoutAccount require(String accountNo) {
         StlPayoutAccount e = mapper.selectOne(new LambdaQueryWrapper<StlPayoutAccount>()
                 .eq(StlPayoutAccount::getAccountNo, accountNo).last("limit 1"));
-        if (e == null) throw new IllegalArgumentException("收款账户不存在: " + accountNo);
+        if (e == null) throw BizException.notFound(accountNo);
         return e;
     }
 

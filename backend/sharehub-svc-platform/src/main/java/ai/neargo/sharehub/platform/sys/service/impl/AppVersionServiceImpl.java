@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.platform.sys.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.common.crud.AbstractCrudService;
 import ai.neargo.sharehub.platform.sys.SysCtx;
 import ai.neargo.sharehub.platform.sys.dto.SysDtos.AppVersion;
@@ -104,7 +105,7 @@ public class AppVersionServiceImpl extends AbstractCrudService<SysAppVersion, Ap
     @Override
     public AppVersion rollback(String versionId) {
         SysAppVersion e = selectByKey(versionId);
-        if (e == null) throw new IllegalArgumentException("版本不存在: " + versionId);
+        if (e == null) throw BizException.notFound(versionId);
 
         // 软回滚：改状态 + 灰度归零，记录保留（全站零 DELETE）
         e.setStatus("ROLLBACK");

@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.wo.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.common.OkResult;
 import ai.neargo.sharehub.wo.dto.WoDtos.WorkOrder;
@@ -44,7 +45,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
     @Override
     public OkResult dispatch(String woNo, String assignee) {
         WoOrder e = mapper.selectOne(new LambdaQueryWrapper<WoOrder>().eq(WoOrder::getWoNo, woNo));
-        if (e == null) throw new IllegalArgumentException("工单不存在: " + woNo);
+        if (e == null) throw BizException.notFound(woNo);
         e.setStatus(stateMachine.next(e.getStatus(), "DISPATCH")); // 非法迁移由状态机拒
         e.setAssigneeName(assignee);
         mapper.updateById(e);

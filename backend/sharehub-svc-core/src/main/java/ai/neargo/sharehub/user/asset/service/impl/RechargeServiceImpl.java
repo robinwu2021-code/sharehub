@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.user.asset.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.IdGenerator;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.trade.pay.dto.PayDtos.PayOrderEntry;
@@ -55,7 +56,7 @@ public class RechargeServiceImpl implements RechargeService {
         if (packageNo == null || packageNo.isBlank()) throw new IllegalArgumentException("请选择充值套餐");
         UsrRechargePkg pkg = packages.selectOne(new LambdaQueryWrapper<UsrRechargePkg>()
                 .eq(UsrRechargePkg::getPackageNo, packageNo).last("limit 1"));
-        if (pkg == null) throw new IllegalArgumentException("充值套餐不存在: " + packageNo);
+        if (pkg == null) throw BizException.notFound(packageNo);
         if (!PKG_ENABLED.equals(pkg.getStatus())) throw new IllegalArgumentException("充值套餐已停用: " + packageNo);
 
         BigDecimal pay = nz(pkg.getPayAmount());

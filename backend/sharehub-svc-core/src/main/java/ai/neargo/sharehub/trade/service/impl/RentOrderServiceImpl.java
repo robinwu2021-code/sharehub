@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.trade.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.IdGenerator;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.common.data.scope.DataScopeContext;
@@ -531,7 +532,7 @@ public class RentOrderServiceImpl implements RentOrderService {
 
     private OrdOrder require(String orderNo) {
         OrdOrder e = mapper.selectOne(new LambdaQueryWrapper<OrdOrder>().eq(OrdOrder::getOrderNo, orderNo));
-        if (e == null) throw new IllegalArgumentException("订单不存在: " + orderNo);
+        if (e == null) throw BizException.notFound(orderNo);
         return e;
     }
 

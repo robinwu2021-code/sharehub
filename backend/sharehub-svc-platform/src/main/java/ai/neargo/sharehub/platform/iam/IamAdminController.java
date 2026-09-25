@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.platform.iam;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.data.scope.DataScopeSpec;
 import ai.neargo.sharehub.auth.Realm;
 import ai.neargo.sharehub.auth.LoginUser;
@@ -79,7 +80,7 @@ public class IamAdminController {
     @PreAuthorize("@perm.can('org:role:read')")
     public List<String> rolePermissions(@PathVariable String roleNo) {
         if (roleMapper.selectOne(new LambdaQueryWrapper<IamRole>().eq(IamRole::getRoleNo, roleNo)) == null) {
-            throw new IllegalArgumentException("角色不存在: " + roleNo);
+            throw BizException.notFound(roleNo);
         }
         return rolePermMapper.selectList(new LambdaQueryWrapper<IamRolePerm>()
                         .eq(IamRolePerm::getRoleNo, roleNo)
@@ -97,7 +98,7 @@ public class IamAdminController {
     public Map<String, Object> setRolePermissions(@PathVariable String roleNo, @RequestBody Map<String, List<String>> body) {
         IamRole role = roleMapper.selectOne(new LambdaQueryWrapper<IamRole>().eq(IamRole::getRoleNo, roleNo));
         if (role == null) {
-            throw new IllegalArgumentException("角色不存在: " + roleNo);
+            throw BizException.notFound(roleNo);
         }
         if (Integer.valueOf(1).equals(role.getBuiltin())) {
             throw new IllegalArgumentException("内置角色只读，不可改权限: " + roleNo);
@@ -159,7 +160,7 @@ public class IamAdminController {
         IamMenu cur = menuMapper.selectOne(new LambdaQueryWrapper<IamMenu>()
                 .eq(IamMenu::getMenuNo, menuNo));
         if (cur == null) {
-            throw new IllegalArgumentException("菜单不存在: " + menuNo);
+            throw BizException.notFound(menuNo);
         }
         if (body.perm() != null && !body.perm().isBlank()
                 && permissionMapper.selectCount(new LambdaQueryWrapper<IamPermission>()

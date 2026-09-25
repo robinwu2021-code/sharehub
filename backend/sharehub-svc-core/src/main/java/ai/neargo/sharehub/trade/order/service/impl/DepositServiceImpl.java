@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.trade.order.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.ServerException;
 import ai.neargo.common.core.ErrorCode;
 import ai.neargo.sharehub.trade.order.DepositStatus;
@@ -57,7 +58,7 @@ public class DepositServiceImpl implements DepositService {
     @Override
     public OkResult release(String depositNo) {
         OrdDeposit e = selectByNo(depositNo);
-        if (e == null) throw new IllegalArgumentException("押金记录不存在: " + depositNo);
+        if (e == null) throw BizException.notFound(depositNo);
         if (!DepositStatus.HELD.is(e.getStatus())) {
             throw ServerException.of(ErrorCode.CONFLICT, "仅 HELD 押金可解冻: " + depositNo + " → " + e.getStatus());
         }
@@ -128,7 +129,7 @@ public class DepositServiceImpl implements DepositService {
         OrdDeposit e = mapper.selectOne(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OrdDeposit>()
                         .eq(OrdDeposit::getDepositNo, depositNo).last("limit 1"));
-        if (e == null) throw new IllegalArgumentException("押金记录不存在: " + depositNo);
+        if (e == null) throw BizException.notFound(depositNo);
         return e;
     }
 }

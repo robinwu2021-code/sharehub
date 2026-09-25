@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.platform.notify.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.platform.notify.NotifyTemplateStatus;
 import ai.neargo.sharehub.platform.notify.NotifyLogStatus;
 import ai.neargo.sharehub.common.BizKey;
@@ -86,7 +87,7 @@ public class NotifyTemplateServiceImpl extends AbstractCrudService<NotifyTemplat
     @Override
     public NotifyDtos.NotifyTemplatePreviewVO preview(String templateNo, java.util.Map<String, String> vars) {
         NotifyTemplate t = selectByKey(templateNo);
-        if (t == null) throw new IllegalArgumentException("模板不存在: " + templateNo);
+        if (t == null) throw BizException.notFound(templateNo);
         java.util.Map<String, String> v = vars == null ? java.util.Map.of() : vars;
 
         java.util.List<String> missing = new java.util.ArrayList<>();

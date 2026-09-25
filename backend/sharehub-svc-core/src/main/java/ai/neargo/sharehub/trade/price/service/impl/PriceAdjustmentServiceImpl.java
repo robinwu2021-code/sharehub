@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.trade.price.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.trade.price.PriceAdjustmentStatus;
 import ai.neargo.sharehub.trade.price.PricePlanStatus;
 
@@ -86,7 +87,7 @@ public class PriceAdjustmentServiceImpl implements PriceAdjustmentService {
         String planNo = str(in.get("planNo"));
         if (planNo == null || planNo.isBlank()) throw new IllegalArgumentException("请选择收费方案");
         PricePlan plan = planOf(planNo);
-        if (plan == null) throw new IllegalArgumentException("收费方案不存在：" + planNo);
+        if (plan == null) throw BizException.notFound(planNo);
 
         Map<String, Object> patch = patchOf(in.get("patch"));
         if (patch.isEmpty()) throw new IllegalArgumentException("至少要改一个字段，否则这张调价单什么也不会做");
@@ -291,7 +292,7 @@ public class PriceAdjustmentServiceImpl implements PriceAdjustmentService {
 
     private PriceAdjustment require(String no) {
         PriceAdjustment e = find(no);
-        if (e == null) throw new IllegalArgumentException("调价单不存在：" + no);
+        if (e == null) throw BizException.notFound(no);
         return e;
     }
 

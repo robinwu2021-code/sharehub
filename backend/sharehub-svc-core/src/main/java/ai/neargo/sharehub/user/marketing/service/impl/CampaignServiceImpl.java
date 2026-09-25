@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.user.marketing.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.common.crud.AbstractCrudService;
 import ai.neargo.sharehub.user.marketing.dto.MarketingDtos.CampaignVO;
@@ -78,7 +79,7 @@ public class CampaignServiceImpl extends AbstractCrudService<MktCampaign, Campai
     @org.springframework.transaction.annotation.Transactional
     public Object transition(String campaignNo, String action) {
         MktCampaign e = selectByKey(campaignNo);
-        if (e == null) throw new IllegalArgumentException("活动不存在: " + campaignNo);
+        if (e == null) throw BizException.notFound(campaignNo);
         // 状态机与前端 CAMPAIGN_TRANSITIONS 同源：页面藏按钮不等于服务端会拒绝。
         e.setStatus(ai.neargo.sharehub.user.marketing.CampaignStateMachine.next(e.getStatus(), action));
         mapper.updateById(e);

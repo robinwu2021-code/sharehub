@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.agent.ext;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.api.core.port.DeviceOwnershipPort;
 import ai.neargo.sharehub.api.platform.event.AssetAssignedEvent;
 import ai.neargo.sharehub.common.event.DomainEventBus;
@@ -112,7 +113,7 @@ public class AgentOwnershipSync {
             case "CABINET" -> deviceOwnership.existsInScope(targetNo);
             default -> throw new IllegalArgumentException("划拨对象类型非法: " + targetType);
         };
-        if (!ok) throw new IllegalArgumentException("划拨对象不存在或无权操作: " + targetType + " " + targetNo);
+        if (!ok) throw BizException.notFound(targetType + " " + targetNo);
     }
 
     private int applySite(String siteNo, String agentNo) {

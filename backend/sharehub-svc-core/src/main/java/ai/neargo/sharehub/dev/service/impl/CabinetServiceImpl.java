@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.dev.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.dev.CabinetStatus;
 import ai.neargo.sharehub.dev.DeviceKind;
 import ai.neargo.sharehub.dev.OnlineStatus;
@@ -49,7 +50,7 @@ public class CabinetServiceImpl implements CabinetService {
             if (cabinetNo != null && !cabinetNo.isBlank()) {
                 // 走 /cabinets/{no} 却查不到：是编辑一个不存在的柜子，而不是「顺手新建」。
                 // 静默新建会把打错的编号变成一台真实设备。
-                throw new IllegalArgumentException("机柜不存在: " + no);
+                throw BizException.notFound(no);
             }
             e = new DevCabinet();
             e.setCabinetNo(no);
@@ -84,7 +85,7 @@ public class CabinetServiceImpl implements CabinetService {
                 e.setLocationNo(null); e.setLocationName(null); e.setSiteNo(null); e.setAgentNo(null);
             } else {
                 var own = locationQuery.ownershipOf(locNo);
-                if (own == null) throw new IllegalArgumentException("点位不存在: " + locNo);
+                if (own == null) throw BizException.notFound(locNo);
                 e.setLocationNo(own.locationNo());
                 e.setLocationName(own.locationName());
                 e.setSiteNo(own.siteNo());
@@ -148,7 +149,7 @@ public class CabinetServiceImpl implements CabinetService {
     @Override
     public CabinetDetail detail(String cabinetNo) {
         DevCabinet e = mapper.selectOne(new LambdaQueryWrapper<DevCabinet>().eq(DevCabinet::getCabinetNo, cabinetNo));
-        if (e == null) throw new IllegalArgumentException("柜机不存在: " + cabinetNo);
+        if (e == null) throw BizException.notFound(cabinetNo);
         return new CabinetDetail(toVO(e), slotsOf(e));
     }
 
@@ -201,7 +202,7 @@ public class CabinetServiceImpl implements CabinetService {
     private Cabinet setArchived(String no, java.time.LocalDateTime at) {
         DevCabinet e = mapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<DevCabinet>()
                 .eq(DevCabinet::getCabinetNo, no).last("limit 1"));
-        if (e == null) throw new IllegalArgumentException("机柜不存在: " + no);
+        if (e == null) throw BizException.notFound(no);
         e.setArchivedAt(at);
         mapper.updateById(e);
         return toVO(e);

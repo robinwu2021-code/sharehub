@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.user.core.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.user.core.dto.UserCoreDtos;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.common.BizKey;
@@ -121,7 +122,7 @@ public class UserInvoiceServiceImpl implements UserInvoiceService {
                 .eq(UsrInvoiceTitle::getTitleNo, body.getTitleNo())
                 .eq(UsrInvoiceTitle::getCUserNo, cUserNo)
                 .last("limit 1"));
-        if (title == null) throw new IllegalArgumentException("抬头不存在或不属于当前用户: " + body.getTitleNo());
+        if (title == null) throw BizException.notFound(body.getTitleNo());
 
         body.setInvoiceNo(BizNoAllocator.next(invoices, "invoice_no", BizKey.INVOICE_USER, UsrInvoice::getInvoiceNo));
         body.setTenantId(TENANT_MAIN);
@@ -208,7 +209,7 @@ public class UserInvoiceServiceImpl implements UserInvoiceService {
     private UsrInvoice requireApplied(String invoiceNo) {
         UsrInvoice e = invoices.selectOne(new LambdaQueryWrapper<UsrInvoice>()
                 .eq(UsrInvoice::getInvoiceNo, invoiceNo).last("limit 1"));
-        if (e == null) throw new IllegalArgumentException("开票申请不存在: " + invoiceNo);
+        if (e == null) throw BizException.notFound(invoiceNo);
         if (!APPLIED.equals(e.getStatus())) {
             throw ai.neargo.common.core.ServerException.of(ai.neargo.common.core.ErrorCode.CONFLICT,
                     "该开票申请已处理过，当前状态: " + e.getStatus());

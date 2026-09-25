@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.dev.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.PageResult;
 import org.springframework.transaction.annotation.Transactional;
 import ai.neargo.sharehub.common.BizKey;
@@ -85,7 +86,7 @@ public class PowerbankServiceImpl implements PowerbankService {
     @Override
     public PowerbankRow update(String powerbankNo, PowerbankCmd cmd) {
         DevPowerbank e = selectByNo(powerbankNo);
-        if (e == null) throw new IllegalArgumentException("充电宝不存在: " + powerbankNo);
+        if (e == null) throw BizException.notFound(powerbankNo);
 
         // —— 状态变更：event 优先，其次按目标 status 反查事件；两者都空表示只改属性 ——
         String event = cmd.event();
@@ -175,7 +176,7 @@ public class PowerbankServiceImpl implements PowerbankService {
     private PowerbankRow setArchived(String no, java.time.LocalDateTime at) {
         DevPowerbank e = mapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<DevPowerbank>()
                 .eq(DevPowerbank::getPowerbankNo, no).last("limit 1"));
-        if (e == null) throw new IllegalArgumentException("充电宝不存在: " + no);
+        if (e == null) throw BizException.notFound(no);
         e.setArchivedAt(at);
         mapper.updateById(e);
         return toVO(e);

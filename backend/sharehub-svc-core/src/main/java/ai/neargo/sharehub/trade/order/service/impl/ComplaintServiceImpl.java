@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.trade.order.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.ServerException;
 import ai.neargo.common.core.ErrorCode;
 import ai.neargo.common.core.PageResult;
@@ -148,7 +149,7 @@ public class ComplaintServiceImpl implements ComplaintService {
 
     private OrdComplaint require(String complaintNo) {
         OrdComplaint e = selectByNo(complaintNo);
-        if (e == null) throw new IllegalArgumentException("投诉不存在: " + complaintNo);
+        if (e == null) throw BizException.notFound(complaintNo);
         return e;
     }
 

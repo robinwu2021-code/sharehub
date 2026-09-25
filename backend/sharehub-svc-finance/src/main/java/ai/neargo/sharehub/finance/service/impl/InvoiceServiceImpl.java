@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.finance.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.ServerException;
 import ai.neargo.common.core.ErrorCode;
 import ai.neargo.sharehub.finance.InvoiceStatus;
@@ -135,7 +136,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     private FinInvoice require(String invoiceNo) {
         FinInvoice e = mapper.selectOne(new LambdaQueryWrapper<FinInvoice>()
                 .eq(FinInvoice::getInvoiceNo, invoiceNo).last("limit 1"));
-        if (e == null) throw new IllegalArgumentException("发票不存在: " + invoiceNo);
+        if (e == null) throw BizException.notFound(invoiceNo);
         return e;
     }
 

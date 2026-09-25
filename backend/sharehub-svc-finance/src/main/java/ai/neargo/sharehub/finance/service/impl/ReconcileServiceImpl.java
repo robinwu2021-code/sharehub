@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.finance.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.finance.ReconTaskStatus;
 
 import ai.neargo.common.core.PageResult;
@@ -122,7 +123,7 @@ public class ReconcileServiceImpl implements ReconcileService {
     private ReconTask requireTask(String batchNo) {
         ReconTask t = taskMapper.selectOne(new LambdaQueryWrapper<ReconTask>()
                 .eq(ReconTask::getBatchNo, batchNo).last("limit 1"));
-        if (t == null) throw new IllegalArgumentException("对账批次不存在: " + batchNo);
+        if (t == null) throw BizException.notFound(batchNo);
         return t;
     }
 

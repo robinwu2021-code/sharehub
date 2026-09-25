@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.user.marketing.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.ServerException;
 import ai.neargo.common.core.ErrorCode;
 import ai.neargo.common.core.PageResult;
@@ -140,7 +141,7 @@ public class UserCouponServiceImpl implements UserCouponService {
     private CouponTpl requireActiveTpl(String tplNo) {
         CouponTpl tpl = tplMapper.selectOne(new LambdaQueryWrapper<CouponTpl>()
                 .eq(CouponTpl::getTplNo, tplNo).last("limit 1"));
-        if (tpl == null) throw new IllegalArgumentException("券模板不存在: " + tplNo);
+        if (tpl == null) throw BizException.notFound(tplNo);
         if (!"ACTIVE".equals(tpl.getStatus())) throw ServerException.of(ErrorCode.CONFLICT, "券模板已停用: " + tplNo);
         return tpl;
     }

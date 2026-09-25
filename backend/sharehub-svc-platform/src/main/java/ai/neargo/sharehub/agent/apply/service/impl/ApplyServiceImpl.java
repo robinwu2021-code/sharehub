@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.agent.apply.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.agent.apply.dto.ApplyDtos.ApplyResult;
 import ai.neargo.sharehub.agent.apply.dto.ApplyDtos.ApplyView;
@@ -313,7 +314,7 @@ public class ApplyServiceImpl implements ApplyService {
     private AgtApply mustFind(String applyNo) {
         AgtApply e = applyMapper.selectOne(new QueryWrapper<AgtApply>()
                 .eq("apply_no", applyNo).eq("deleted", 0).last("limit 1"));
-        if (e == null) throw new IllegalArgumentException("申请单不存在: " + applyNo);
+        if (e == null) throw BizException.notFound(applyNo);
         return e;
     }
 

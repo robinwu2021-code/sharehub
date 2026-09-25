@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.loc.ext.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.loc.ext.dto.LocExtDtos.OnboardingReviewReq;
 import ai.neargo.sharehub.loc.ext.dto.LocExtDtos.VenueOnboarding;
@@ -94,7 +95,7 @@ public class VenueOnboardingServiceImpl implements VenueOnboardingService {
     @Transactional
     public VenueOnboarding review(String onboardingNo, OnboardingReviewReq req) {
         LocVenueOnboarding e = byNo(onboardingNo);
-        if (e == null) throw new IllegalArgumentException("进件不存在: " + onboardingNo);
+        if (e == null) throw BizException.notFound(onboardingNo);
         if (!PENDING.equals(e.getStatus())) {
             throw new IllegalArgumentException("进件已审核，不可重复审核: " + onboardingNo + " status=" + e.getStatus());
         }

@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.finance.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.finance.WithdrawalStatus;
 
 import ai.neargo.sharehub.auth.LoginUser;
@@ -227,7 +228,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
     private StlWithdrawal require(String withdrawNo) {
         StlWithdrawal e = mapper.selectOne(new LambdaQueryWrapper<StlWithdrawal>()
                 .eq(StlWithdrawal::getWithdrawNo, withdrawNo).last("limit 1"));
-        if (e == null) throw new IllegalArgumentException("提现单不存在: " + withdrawNo);
+        if (e == null) throw BizException.notFound(withdrawNo);
         return e;
     }
 

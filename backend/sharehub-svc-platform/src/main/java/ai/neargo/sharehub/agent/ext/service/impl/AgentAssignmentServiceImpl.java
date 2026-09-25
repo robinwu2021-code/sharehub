@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.agent.ext.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.IdGenerator;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.agent.entity.AgtAgent;
@@ -98,7 +99,7 @@ public class AgentAssignmentServiceImpl implements AgentAssignmentService {
         // 冗余列写进去了，但没有任何账号的数据范围能匹配到它，资产从两边都消失。
         AgtAgent agent = agentMapper.selectOne(new LambdaQueryWrapper<AgtAgent>()
                 .eq(AgtAgent::getAgentNo, req.agentNo()).last("limit 1"));
-        if (agent == null) throw new IllegalArgumentException("代理商不存在: " + req.agentNo());
+        if (agent == null) throw BizException.notFound(req.agentNo());
         if ("ASSIGN".equals(req.action()) && !"ENABLED".equals(agent.getStatus())) {
             throw new IllegalArgumentException("代理商已停用，不可划入资产: " + req.agentNo());
         }
@@ -178,7 +179,7 @@ public class AgentAssignmentServiceImpl implements AgentAssignmentService {
         java.util.Map<String, String> owners = new java.util.HashMap<>();
         for (CabinetBrief c : cabinetQuery.briefsByNos(cabinetNos)) owners.put(c.cabinetNo(), c.agentNo());
         for (String no : cabinetNos) {
-            if (!owners.containsKey(no)) throw new IllegalArgumentException("机柜不存在或无权操作: " + no);
+            if (!owners.containsKey(no)) throw BizException.notFound(no);
             String owner = owners.get(no);
             if (owner == null || owner.isBlank()) continue;   // 已是直营，重试友好
             logs.add(assign(new AssignReq(owner, "CABINET", no, "REVOKE", req.operatorName())));
@@ -187,7 +188,7 @@ public class AgentAssignmentServiceImpl implements AgentAssignmentService {
         for (String no : siteNos) {
             LocSite s = siteMapper.selectOne(new LambdaQueryWrapper<LocSite>()
                     .eq(LocSite::getSiteNo, no).last("limit 1"));
-            if (s == null) throw new IllegalArgumentException("站点不存在或无权操作: " + no);
+            if (s == null) throw BizException.notFound(no);
             if (s.getAgentNo() == null || s.getAgentNo().isBlank()) continue;
             logs.add(assign(new AssignReq(s.getAgentNo(), "SITE", no, "REVOKE", req.operatorName())));
         }

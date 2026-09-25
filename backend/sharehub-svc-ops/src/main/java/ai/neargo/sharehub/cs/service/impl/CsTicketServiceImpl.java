@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.cs.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.ServerException;
 import ai.neargo.common.core.ErrorCode;
 import ai.neargo.sharehub.cs.CsTicketStatus;
@@ -256,7 +257,7 @@ public class CsTicketServiceImpl implements CsTicketService {
 
     private CsTicket require(String ticketNo) {
         CsTicket e = find(ticketNo);
-        if (e == null) throw new IllegalArgumentException("报障单不存在: " + ticketNo);
+        if (e == null) throw BizException.notFound(ticketNo);
         return e;
     }
 

@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.trade.pay.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.ServerException;
 import ai.neargo.common.core.ErrorCode;
 import ai.neargo.sharehub.trade.pay.PayAuthStatus;
@@ -144,7 +145,7 @@ public class PaymentServiceImpl implements PaymentService {
         require(ordRefundNo, "ordRefundNo（须先有已审批的 ord_refund）");
         PayOrder pay = payMapper.selectOne(new LambdaQueryWrapper<PayOrder>()
                 .eq(PayOrder::getPayNo, payNo).last("limit 1"));
-        if (pay == null) throw new IllegalArgumentException("支付单不存在: " + payNo);
+        if (pay == null) throw BizException.notFound(payNo);
         if (!PayOrderStatus.PAID.is(pay.getStatus())) {
             throw ServerException.of(ErrorCode.CONFLICT, "仅 PAID 的支付单可退款，当前：" + pay.getStatus());
         }
@@ -205,7 +206,7 @@ public class PaymentServiceImpl implements PaymentService {
     private PayAuth mustAuth(String authNo) {
         PayAuth e = authMapper.selectOne(new LambdaQueryWrapper<PayAuth>()
                 .eq(PayAuth::getAuthNo, authNo).last("limit 1"));
-        if (e == null) throw new IllegalArgumentException("预授权单不存在: " + authNo);
+        if (e == null) throw BizException.notFound(authNo);
         return e;
     }
 

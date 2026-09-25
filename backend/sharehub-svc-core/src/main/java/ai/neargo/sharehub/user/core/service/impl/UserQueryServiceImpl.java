@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.user.core.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.user.core.dto.UserCoreDtos.CUserRow;
 import ai.neargo.sharehub.user.core.entity.UsrBlacklist;
@@ -62,7 +63,7 @@ public class UserQueryServiceImpl implements UserQueryService {
     public CUserRow updateProfile(String cUserNo, String nickname, String avatar) {
         UsrUser u = users.selectOne(new LambdaQueryWrapper<UsrUser>()
                 .eq(UsrUser::getCUserNo, cUserNo).last("limit 1"));
-        if (u == null) throw new IllegalArgumentException("用户不存在: " + cUserNo);
+        if (u == null) throw BizException.notFound(cUserNo);
         if (nickname != null && !nickname.isBlank()) u.setNickname(nickname.trim());
         if (avatar != null && !avatar.isBlank()) u.setAvatar(avatar.trim());
         users.updateById(u);

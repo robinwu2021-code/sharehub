@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.loc.ext.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.audit.AuditChanges;
 import ai.neargo.sharehub.api.platform.dto.AgentBrief;
 import ai.neargo.sharehub.api.platform.port.AgentDirectoryPort;
@@ -73,7 +74,7 @@ public class SiteAgentServiceImpl implements SiteAgentService {
 
         AgentBrief agent = agents.briefOf(in.agentNo());
         // 悬空的 agent_no 会让分润按一个不存在的受益方生成记录，而且不报错
-        if (agent == null) throw new IllegalArgumentException("合作伙伴不存在: " + in.agentNo());
+        if (agent == null) throw BizException.notFound(in.agentNo());
 
         List<LocSiteAgent> exist = mapper.selectList(new LambdaQueryWrapper<LocSiteAgent>()
                 .eq(LocSiteAgent::getSiteNo, siteNo)
@@ -107,7 +108,7 @@ public class SiteAgentServiceImpl implements SiteAgentService {
         }
 
         LocSiteAgent e = revivedId == null ? new LocSiteAgent() : mapper.selectById(revivedId);
-        if (e == null) throw new IllegalArgumentException("责任行不存在: " + in.id());
+        if (e == null) throw BizException.notFound(in.id());
         if (e.getId() != null) {
             // 先记后改（就地 set）。这一行决定「这个站点的钱分给谁、按哪条规则分」——
             // 结算争议时要问的正是它什么时候变成现在这样的。
@@ -142,7 +143,7 @@ public class SiteAgentServiceImpl implements SiteAgentService {
         LocSiteAgent e = mapper.selectById(id);
         // 路径上的 siteNo 为准：不校验的话，拿到任意 id 就能撤销别的站点的责任
         if (e == null || !e.getSiteNo().equals(siteNo)) {
-            throw new IllegalArgumentException("责任行不存在或不属于该站点: " + id);
+            throw BizException.notFound(id);
         }
         mapper.deleteById(id);
     }

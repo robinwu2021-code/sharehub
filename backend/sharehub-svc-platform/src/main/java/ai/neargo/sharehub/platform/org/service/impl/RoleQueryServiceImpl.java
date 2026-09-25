@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.platform.org.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.platform.iam.entity.IamEntities.IamRole;
 import ai.neargo.sharehub.platform.iam.entity.IamEntities.IamRolePerm;
 import ai.neargo.sharehub.platform.iam.mapper.IamMappers.RoleMapper;
@@ -104,7 +105,7 @@ public class RoleQueryServiceImpl implements RoleQueryService {
     private IamRole require(String roleNo) {
         IamRole r = roles.selectOne(new LambdaQueryWrapper<IamRole>()
                 .eq(IamRole::getRoleNo, roleNo).last("limit 1"));
-        if (r == null) throw new IllegalArgumentException("角色不存在: " + roleNo);
+        if (r == null) throw BizException.notFound(roleNo);
         return r;
     }
 

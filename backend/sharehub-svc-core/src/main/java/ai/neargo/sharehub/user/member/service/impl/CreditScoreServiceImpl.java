@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.user.member.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.auth.LoginUser;
 import ai.neargo.sharehub.auth.SecurityUtils;
@@ -54,7 +55,7 @@ public class CreditScoreServiceImpl implements CreditScoreService {
         UsrCredit c = creditMapper.selectOne(new LambdaQueryWrapper<UsrCredit>()
                 .eq(UsrCredit::getCUserNo, cUserNo).last("limit 1"));
         if (c == null) {
-            throw new IllegalArgumentException("用户风控档案不存在: " + cUserNo);
+            throw BizException.notFound(cUserNo);
         }
         int before = c.getScore() == null ? 0 : c.getScore();
         int after = before + req.delta();

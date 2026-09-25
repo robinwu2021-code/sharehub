@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.user.asset.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.user.asset.RechargeOrderStatus;
 
 import ai.neargo.common.core.PageResult;
@@ -149,7 +150,7 @@ public class WalletServiceImpl implements WalletService {
         boolean userExists = users.selectCount(
                 new LambdaQueryWrapper<ai.neargo.sharehub.user.entity.UsrUser>()
                         .eq(ai.neargo.sharehub.user.entity.UsrUser::getCUserNo, cUserNo)) > 0;
-        if (!userExists) throw new IllegalArgumentException("用户不存在: " + cUserNo);
+        if (!userExists) throw BizException.notFound(cUserNo);
 
         UsrWallet w = openIfAbsent(cUserNo, in.currency());
 

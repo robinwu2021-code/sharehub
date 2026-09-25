@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.user.core.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.user.core.dto.UserCoreDtos.MessageItem;
 import ai.neargo.sharehub.user.core.entity.UsrMessage;
@@ -52,7 +53,7 @@ public class UserMessageServiceImpl implements UserMessageService {
     public MessageItem markRead(String cUserNo, String messageNo) {
         UsrMessage e = mapper.selectOne(new LambdaQueryWrapper<UsrMessage>()
                 .eq(UsrMessage::getMessageNo, messageNo).last("limit 1"));
-        if (e == null) throw new IllegalArgumentException("消息不存在: " + messageNo);
+        if (e == null) throw BizException.notFound(messageNo);
         if (!cUserNo.equals(e.getCUserNo())) {
             throw new AccessDeniedException("无权访问他人消息"); // 不泄露「存在但不属于你」之外的信息
         }

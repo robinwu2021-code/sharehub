@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.portal.shared;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.auth.StaffContext;
 import ai.neargo.sharehub.common.OkResult;
@@ -87,7 +88,7 @@ public class UserController {
     @PreAuthorize("@perm.can('user:cuser:read')")
     public UserProfileVO profile(@PathVariable String cUserNo) {
         CUserRow base = userQuery.get(cUserNo);
-        if (base == null) throw new IllegalArgumentException("用户不存在: " + cUserNo);
+        if (base == null) throw BizException.notFound(cUserNo);
         CUserRow user = withOrderCounts(List.of(base)).get(0);
 
         // 各切片服务的 page 只支持 keyword LIKE，此处按业务键**精确二次过滤**，防子串误命中

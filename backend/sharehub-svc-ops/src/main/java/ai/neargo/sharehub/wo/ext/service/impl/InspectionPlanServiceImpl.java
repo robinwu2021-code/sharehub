@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.wo.ext.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.api.core.dto.CabinetBrief;
 import ai.neargo.sharehub.api.core.port.CabinetQueryPort;
 import ai.neargo.sharehub.common.BizKey;
@@ -116,7 +117,7 @@ public class InspectionPlanServiceImpl extends AbstractCrudService<WoInspectionP
     @org.springframework.transaction.annotation.Transactional
     public Object run(String planNo) {
         WoInspectionPlan e = selectByKey(planNo);
-        if (e == null) throw new IllegalArgumentException("巡检计划不存在: " + planNo);
+        if (e == null) throw BizException.notFound(planNo);
         if (e.getActive() == null || e.getActive() != 1) {
             throw new IllegalArgumentException("计划已停用，启用后才能执行: " + planNo);
         }

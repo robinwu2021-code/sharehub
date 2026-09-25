@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.inv.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.inv.InvTransferStateMachine;
@@ -91,7 +92,7 @@ public class InventoryTransferServiceImpl implements InventoryTransferService {
 
         // —— 更新 ——
         InvTransfer current = selectByNo(no);
-        if (current == null) throw new IllegalArgumentException("调拨单不存在: " + no);
+        if (current == null) throw BizException.notFound(no);
         if (stateMachine.isTerminal(current.getStatus())) {
             throw new IllegalArgumentException("调拨单已完成，不可再修改: " + no
                     + "（如需退回请开一张反向调拨单，保留两条痕）");

@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.platform.notify.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.ServerException;
 import ai.neargo.common.core.ErrorCode;
 import ai.neargo.sharehub.platform.notify.NotifyLogStatus;
@@ -149,7 +150,7 @@ public class NotifyLogServiceImpl implements NotifyLogService {
         NotifyLog src = mapper.selectOne(new QueryWrapper<NotifyLog>()
                 .eq("log_no", logNo).last("limit 1"));
         if (src == null) {
-            throw new IllegalArgumentException("发送记录不存在: " + logNo);
+            throw BizException.notFound(logNo);
         }
 
         NotifyLog e = new NotifyLog();

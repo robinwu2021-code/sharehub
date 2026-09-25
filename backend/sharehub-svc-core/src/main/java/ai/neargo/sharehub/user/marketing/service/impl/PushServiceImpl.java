@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.user.marketing.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.user.marketing.AudienceType;
 import ai.neargo.sharehub.user.marketing.PushStatus;
 import ai.neargo.sharehub.common.BizKey;
@@ -148,7 +149,7 @@ public class PushServiceImpl extends AbstractCrudService<MktPush, PushMessageVO>
             throw new IllegalArgumentException("排期时间必填");
         }
         MktPush e = selectByKey(pushNo);
-        if (e == null) throw new IllegalArgumentException("推送不存在: " + pushNo);
+        if (e == null) throw BizException.notFound(pushNo);
         requireStatus(e, "排期", PushStatus.DRAFT.name());
         e.setStatus(PushStatus.SCHEDULED.name());
         e.setScheduledAt(scheduledAt);
@@ -166,7 +167,7 @@ public class PushServiceImpl extends AbstractCrudService<MktPush, PushMessageVO>
             throw new IllegalArgumentException("发送推送必须携带 idempotencyKey");
         }
         MktPush e = selectByKey(pushNo);
-        if (e == null) throw new IllegalArgumentException("推送不存在: " + pushNo);
+        if (e == null) throw BizException.notFound(pushNo);
 
         /*
          * **幂等按键判，不按状态判。**
@@ -189,7 +190,7 @@ public class PushServiceImpl extends AbstractCrudService<MktPush, PushMessageVO>
     @org.springframework.transaction.annotation.Transactional
     public Object finish(String pushNo, Integer targetCount, Integer successCount) {
         MktPush e = selectByKey(pushNo);
-        if (e == null) throw new IllegalArgumentException("推送不存在: " + pushNo);
+        if (e == null) throw BizException.notFound(pushNo);
         if (PushStatus.SENT.is(e.getStatus())) return toVO(e);   // 重复收尾按幂等处理
         requireStatus(e, "收尾", PushStatus.SENDING.name());
         int t = targetCount == null ? 0 : targetCount;

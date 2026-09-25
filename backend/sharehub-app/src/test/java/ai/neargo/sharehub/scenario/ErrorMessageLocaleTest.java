@@ -104,4 +104,38 @@ class ErrorMessageLocaleTest extends ApiTestSupport {
             throw new IllegalStateException("请求失败", e);
         }
     }
+
+    @Test
+    @DisplayName("★★ 「找不到指定记录」也跟语言走，并带上调用方自己传的那个键")
+    void not_found_message_is_localized_and_keeps_the_key() {
+        String admin = login("ADMIN");
+        String bogus = "PB-NOPE-" + System.nanoTime();
+
+        // 87 处「xxx不存在: 键」收口成了一条参数化 key —— 这里验它真的带上了参数、
+        // 而不是把 {0} 原样留在界面上（不传 args 时就会那样）。
+        String zh = notFoundMessage(admin, bogus, "zh-CN");
+        String en = notFoundMessage(admin, bogus, "en-AE");
+
+        assertThat(zh).as("中文文案").contains(bogus);
+        assertThat(zh).as("占位符必须被替换掉").doesNotContain("{0}");
+        assertThat(en).as("英文文案应当与中文不同").isNotEqualTo(zh);
+        assertThat(en).as("英文文案同样要带上那个键").contains(bogus);
+    }
+
+    /** 拿一个不存在的充电宝号去归档，取回那条「找不到」文案。 */
+    private String notFoundMessage(String token, String bizNo, String acceptLanguage) {
+        try {
+            HttpRequest req = HttpRequest.newBuilder(
+                            URI.create("http://localhost:" + port + "/api/ops/powerbanks/" + bizNo + "/archive"))
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + token)
+                    .header("Accept-Language", acceptLanguage)
+                    .POST(HttpRequest.BodyPublishers.ofString("{}")).build();
+            HttpResponse<String> r = raw.send(req, HttpResponse.BodyHandlers.ofString());
+            return json.readTree(r.body() == null || r.body().isBlank() ? "{}" : r.body())
+                    .path("message").asText("");
+        } catch (Exception e) {
+            throw new IllegalStateException("请求失败", e);
+        }
+    }
 }

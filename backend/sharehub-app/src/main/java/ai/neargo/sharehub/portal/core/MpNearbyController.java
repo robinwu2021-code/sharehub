@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.portal.core;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.data.scope.DataScopeContext;
 import ai.neargo.sharehub.auth.ConsumerContext;
 import ai.neargo.sharehub.dev.dto.DevLegacyDtos.Cabinet;
@@ -154,7 +155,7 @@ public class MpNearbyController {
         return DataScopeContext.executeWithoutScope(() -> {
             Site s = loc.pageSites(1, 200, null, false).getList().stream()
                     .filter(x -> siteNo.equals(x.siteNo())).findFirst()
-                    .orElseThrow(() -> new IllegalArgumentException("站点不存在: " + siteNo));
+                    .orElseThrow(() -> BizException.notFound(siteNo));
             List<Cabinet> cs = cabinets.bySite(siteNo);
             int borrow = cs.stream().mapToInt(Cabinet::availableCount).sum();
             int ret = cs.stream().mapToInt(c -> Math.max(0, c.slotTotal() - c.availableCount())).sum();

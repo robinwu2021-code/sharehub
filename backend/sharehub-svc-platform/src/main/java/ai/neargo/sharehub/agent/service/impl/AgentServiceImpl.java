@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.agent.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.api.platform.dto.AgentType;
 import ai.neargo.sharehub.agent.entity.AgtAgent;
 import org.springframework.transaction.annotation.Transactional;
@@ -107,7 +108,7 @@ public class AgentServiceImpl implements AgentService {
     private Agent setArchived(String no, java.time.LocalDateTime at) {
         AgtAgent e = mapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<AgtAgent>()
                 .eq(AgtAgent::getAgentNo, no).last("limit 1"));
-        if (e == null) throw new IllegalArgumentException("代理商不存在: " + no);
+        if (e == null) throw BizException.notFound(no);
         e.setArchivedAt(at);
         mapper.updateById(e);
         return toVO(e);

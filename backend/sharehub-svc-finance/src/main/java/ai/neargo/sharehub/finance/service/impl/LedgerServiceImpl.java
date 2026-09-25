@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.finance.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.auth.SecurityUtils;
 import ai.neargo.sharehub.common.BizKey;
@@ -168,7 +169,7 @@ public class LedgerServiceImpl implements LedgerService {
                         ai.neargo.sharehub.finance.entity.AcctAccount>()
                         .eq(ai.neargo.sharehub.finance.entity.AcctAccount::getAccountNo, accountNo)
                         .last("limit 1"));
-        if (acc == null) throw new IllegalArgumentException("账户不存在: " + accountNo);
+        if (acc == null) throw BizException.notFound(accountNo);
 
         java.math.BigDecimal debit = java.math.BigDecimal.ZERO;
         java.math.BigDecimal credit = java.math.BigDecimal.ZERO;

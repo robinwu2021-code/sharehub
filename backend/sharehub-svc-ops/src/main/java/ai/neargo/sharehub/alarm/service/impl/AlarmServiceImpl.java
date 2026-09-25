@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.alarm.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.auth.StaffContext;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.alarm.AlarmCloseReason;
@@ -133,7 +134,7 @@ public class AlarmServiceImpl implements AlarmService {
     private DevAlarm selectByNo(String alarmNo) {
         DevAlarm e = mapper.selectOne(new LambdaQueryWrapper<DevAlarm>()
                 .eq(DevAlarm::getAlarmNo, alarmNo).last("limit 1"));
-        if (e == null) throw new IllegalArgumentException("告警不存在: " + alarmNo);
+        if (e == null) throw BizException.notFound(alarmNo);
         return e;
     }
 
@@ -207,7 +208,7 @@ public class AlarmServiceImpl implements AlarmService {
         DevAlarmNotice src = noticeMapper.selectOne(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<DevAlarmNotice>()
                         .eq(DevAlarmNotice::getNoticeNo, noticeNo).last("limit 1"));
-        if (src == null) throw new IllegalArgumentException("告警通知不存在: " + noticeNo);
+        if (src == null) throw BizException.notFound(noticeNo);
 
         // 重发 = 新行指回源行（resend_of），不改写源行 —— 发送历史是审计事实
         DevAlarmNotice e = new DevAlarmNotice();

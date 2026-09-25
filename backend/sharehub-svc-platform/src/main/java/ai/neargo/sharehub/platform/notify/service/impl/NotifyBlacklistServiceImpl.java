@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.platform.notify.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.auth.StaffContext;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.common.BizKey;
@@ -84,7 +85,7 @@ public class NotifyBlacklistServiceImpl implements NotifyBlacklistService {
     @Override
     public NotifyBlacklistVO update(String blockNo, NotifyBlacklist body) {
         NotifyBlacklist e = selectByNo(blockNo);
-        if (e == null) throw new IllegalArgumentException("拉黑记录不存在: " + blockNo);
+        if (e == null) throw BizException.notFound(blockNo);
         if (RELEASED.equals(e.getStatus())) {
             // 已解除的是历史记录：解除动作是对当时那份内容做的，事后改内容就对不上了
             throw new IllegalArgumentException("已解除的拉黑记录不可修改: " + blockNo);
@@ -100,7 +101,7 @@ public class NotifyBlacklistServiceImpl implements NotifyBlacklistService {
     @Override
     public NotifyBlacklistVO release(String blockNo, String operator) {
         NotifyBlacklist e = selectByNo(blockNo);
-        if (e == null) throw new IllegalArgumentException("拉黑记录不存在: " + blockNo);
+        if (e == null) throw BizException.notFound(blockNo);
         if (RELEASED.equals(e.getStatus())) {
             throw new IllegalArgumentException("已解除，不能重复解除: " + blockNo); // 非法流转
         }

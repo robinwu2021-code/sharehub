@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.platform.sys.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.common.crud.AbstractCrudService;
 import ai.neargo.sharehub.platform.sys.SysCtx;
@@ -97,7 +98,7 @@ public class OpenApiAppServiceImpl extends AbstractCrudService<OpenapiApp, OpenA
     public OpenApiApp resetSecret(String appNo) {
         OpenapiApp e = mapper.selectOne(new LambdaQueryWrapper<OpenapiApp>()
                 .eq(OpenapiApp::getAppNo, appNo).last("limit 1"));
-        if (e == null) throw new IllegalArgumentException("应用不存在: " + appNo);
+        if (e == null) throw BizException.notFound(appNo);
         // 明文只在本方法栈内存在，随即被哈希取代；不记日志、不回参。
         String plain = UUID.randomUUID().toString().replace("-", "")
                 + UUID.randomUUID().toString().replace("-", "");

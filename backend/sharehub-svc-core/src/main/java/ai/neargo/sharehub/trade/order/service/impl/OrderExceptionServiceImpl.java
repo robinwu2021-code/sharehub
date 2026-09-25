@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.trade.order.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.ServerException;
 import ai.neargo.common.core.ErrorCode;
 import ai.neargo.common.core.PageResult;
@@ -65,7 +66,7 @@ public class OrderExceptionServiceImpl implements OrderExceptionService {
     @Override
     public OkResult handle(String exceptionNo, ExceptionHandleReq req) {
         OrdException e = selectByNo(exceptionNo);
-        if (e == null) throw new IllegalArgumentException("异常订单不存在: " + exceptionNo);
+        if (e == null) throw BizException.notFound(exceptionNo);
         if (!STATUS_OPEN.equals(e.getStatus())) {
             // 不静默返回成功：第二个处置人必须知道自己扑了个空，否则会以为处置生效了
             throw ServerException.of(ErrorCode.CONFLICT, "异常订单非 OPEN 状态，不可处置: " + exceptionNo + " → " + e.getStatus());
