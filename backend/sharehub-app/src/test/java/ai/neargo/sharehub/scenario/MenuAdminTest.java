@@ -77,8 +77,18 @@ class MenuAdminTest extends ApiTestSupport {
          * 连「进来改回去」的入口都没有了 —— 只能改库。所以必须在事务里拦住并回滚。
          */
         String admin = login("ADMIN");
-        assertThat(put(MENUS + "/M_org", patch("visible", 0), admin).status)
-                .as("藏掉自己那一支必须被拒").isEqualTo(500);
+        var resp = put(MENUS + "/M_org", patch("visible", 0), admin);
+        assertThat(resp.status).as("藏掉自己那一支必须被拒").isEqualTo(400);
+
+        /*
+         * **拦住还不够，得让人知道为什么。** 这一条原来断言 500 ——
+         * 闸确实在拦，但 IllegalStateException 落到兜底 handler，
+         * 消息被抹成「服务器错误」，操作者看到的是「系统坏了」而不是「这么改会把你锁在门外」。
+         * 断言消息真的送达，而不只断言它被拒了。
+         */
+        assertThat(resp.msg())
+                .as("拒绝的理由要送到调用方，否则界面上只剩一个没头没脑的 500")
+                .contains("谁都进不来");
 
         assertThat(node(admin, "M_org")).as("而且要回滚——它还得在").isNotNull();
         assertThat(get("/api/auth/menus", admin).okData().toString())

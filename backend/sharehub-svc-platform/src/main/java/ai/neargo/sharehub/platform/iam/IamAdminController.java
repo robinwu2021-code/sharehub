@@ -198,6 +198,12 @@ public class IamAdminController {
      *
      * <p>用超管视角（{@code *}）而不是当前操作者：当前操作者可能本来就看不到某些菜单，
      * 拿他判会把「他看不到」误判成「被锁死了」。
+     *
+     * <p><b>抛 {@link IllegalArgumentException} 而不是 {@code IllegalStateException}</b>：
+     * 只有前者被 {@code GlobalExceptionHandler} 映射成 400 并**把消息带给调用方**，
+     * 后者落到兜底 handler、被抹成「服务器错误」。下面这段话正是操作者唯一能知道
+     * 「为什么不让我改」的地方 —— 抹掉之后闸还在拦，但界面上只剩一个 500，
+     * 于是看起来像系统坏了而不是像被拦了。实跑对着真后端验出来的（首次前后端联跑）。
      */
     private void assertAdminCanStillGetBackIn() {
         LoginUser su = new LoginUser(Realm.STAFF, "__guard__", "__guard__", "ADMIN",
@@ -205,7 +211,7 @@ public class IamAdminController {
         boolean reachable = menuService.visibleFor(su).stream()
                 .anyMatch(n -> ADMIN_SECTION.equals(n.menuNo()));
         if (!reachable) {
-            throw new IllegalStateException(
+            throw new IllegalArgumentException(
                     "这一改之后「" + ADMIN_SECTION + "」对超管也不可见了——菜单是运营端唯一的入口，"
                             + "改成这样之后谁都进不来把它改回去。已回滚。");
         }
