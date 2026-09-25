@@ -205,6 +205,56 @@ def scan_types():
     return records, enums
 
 
+# ─────────────────────────── 实体请求体 ───────────────────────────
+
+def scan_entities():
+    """实体（@TableName 标注的 Lombok @Data 类）的字段表。
+
+    record 已经由 scan_types 抽了，但**实体也能当请求体** ——
+    known-entity-request-bodies.txt 里现在还有 57 个。对这些端点，
+    requestShape 原来是 null，于是任何按「后端接不接得住这个字段」做的核对
+    都只能得到「不知道」。而 null 与「没有请求体」在下游是同一个值，
+    check-form-fields.py 第一版就把它读成了「后端什么都不认」，诬告了一片。
+
+    继承自 BaseEntity 的 id/tenantId/createdAt/... 一并算进去：
+    MyBatis-Plus 的 updateById 只写非 null 字段，这些**确实**接得住
+    （能不能改得动是加固的事，与「接不接得住」是两个问题）。
+
+    只喂 requestShape，不动 responseShape —— 后者一旦跟着变，
+    依赖它的几个检查器的基线会一起漂，那是另一件事。
+    """
+    base = ['id', 'tenantId', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy',
+            'version', 'deleted']
+    out = {}
+    for _root in SRC_ROOTS:
+      for b, _, files in os.walk(_root):
+        for f in files:
+            if not f.endswith('.java'):
+                continue
+            src = strip_comments(io.open(os.path.join(b, f), encoding='utf-8').read())
+            # @TableName 带具名参数是常态（全局表用 excludeProperty 排掉 tenantId），
+            # 只认 @TableName("x") 会把 md_* 那一批整批漏掉 —— 第一版就漏了。
+            m = re.search(r'@TableName\s*\(([^)]*)\)[\s\S]{0,400}?\bclass\s+(\w+)([^{]*)\{', src)
+            if not m:
+                continue
+            args, name, ext = m.group(1), m.group(2), m.group(3)
+            excluded = set(re.findall(r'"(\w+)"', args.split('excludeProperty', 1)[1])) \
+                if 'excludeProperty' in args else set()
+            fields = [{'name': fm.group(2), 'type': fm.group(1)} for fm in
+                      re.finditer(r'\bprivate\s+([\w.<>\[\], ]+?)\s+(\w+)\s*;', src)]
+            if 'BaseEntity' in ext:
+                fields += [{'name': x, 'type': '?'} for x in base]
+            # excludeProperty 的属性根本不会进 SQL，算进「接得住」是假的
+            fields = [f for f in fields if f['name'] not in excluded]
+            seen, uniq = set(), []
+            for fd in fields:
+                if fd['name'] not in seen:
+                    seen.add(fd['name'])
+                    uniq.append(fd)
+            out[name] = uniq
+    return out
+
+
 # ─────────────────────────── 控制器解析 ───────────────────────────
 
 def parse_controller(path, records):
@@ -351,10 +401,20 @@ def shape_of(t, records, depth=0):
     return out
 
 
+def entity_shape(t, entities):
+    """实体请求体的字段表；不是实体就返回 None，交由上游保持原样。"""
+    if not t:
+        return None
+    elem = re.sub(r'^\w+<|>$', '', t).split('.')[-1].strip()
+    fields = entities.get(elem)
+    return [{'name': f['name'], 'type': f['type']} for f in fields] if fields else None
+
+
 # ─────────────────────────── 主流程 ───────────────────────────
 
 def main():
     records, enums = scan_types()
+    entities = scan_entities()
     all_eps = []
     for _root in SRC_ROOTS:
       for base, _, files in os.walk(_root):
@@ -367,7 +427,8 @@ def main():
         e['returnContainer'] = container
         e['returnElement'] = elem
         e['responseShape'] = shape_of(e['returnType'], records)
-        e['requestShape'] = shape_of(e['bodyType'], records) if e['bodyType'] else None
+        e['requestShape'] = (shape_of(e['bodyType'], records)
+                             or entity_shape(e['bodyType'], entities)) if e['bodyType'] else None
 
     all_eps.sort(key=lambda x: (x['path'], x['verb']))
 
@@ -377,6 +438,7 @@ def main():
     conflicts = {'%s %s' % k: v for k, v in dup.items() if len(v) > 1}
 
     out = {'endpoints': all_eps, 'enums': enums, 'conflicts': conflicts,
+           'features': ['entityRequestShape'],
            'stats': {'endpoints': len(all_eps), 'records': len(set(records)) // 2,
                      'withPerm': sum(1 for e in all_eps if e['perm']),
                      'withBody': sum(1 for e in all_eps if e['bodyType']),

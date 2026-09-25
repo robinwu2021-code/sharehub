@@ -62,6 +62,10 @@ const DEFAULT_TAB = "coupons";
 
 // 邀请奖励规则表单。`rewardTo` 用单选而不是两个勾选：BOTH 是「一次事件出两笔奖励」，
 // 与「二选一」在结算上完全不同，枚举把歧义堵死（见 types/marketing.ts 的注释）。
+/**
+ * @form POST /api/user/referral-rules
+ * @form POST /api/user/referral-rules/{ruleNo}
+ */
 const REFERRAL_RULE_FIELDS: FieldDef[] = [
   { key: "name", label: "规则名称", required: true, placeholder: "首单奖励", section: "基本" },
   { key: "rewardTo", label: "奖励对象", type: "select", required: true, section: "基本",
@@ -89,6 +93,10 @@ const REFERRAL_RULE_FIELDS: FieldDef[] = [
     help: "同一时间窗内只允许一条生效规则——重叠会导致一次邀请发多笔" },
 ];
 
+/**
+ * @form POST /api/user/coupons
+ * @form POST /api/user/coupons/{couponNo}
+ */
 const COUPON_FIELDS: FieldDef[] = [
   { key: "name", label: "名称", required: true, maxLength: 20, placeholder: "新人立减" },
   { key: "type", label: "类型", type: "select", options: [{ value: "CUT", label: "立减" }, { value: "DISCOUNT", label: "折扣" }] },
@@ -151,6 +159,10 @@ const CAMPAIGN_STATUS: StatusMap<Campaign["status"]> = {
  * 活动表单。**没有「状态」字段**——状态只能由启停动作的状态机推进
  * （草稿 → 进行中 ⇄ 已暂停 → 已结束），表单能改就等于能复活已结束的活动。
  */
+/**
+ * @form POST /api/user/campaigns
+ * @form POST /api/user/campaigns/{campaignNo}
+ */
 const CAMPAIGN_FIELDS: FieldDef[] = [
   { key: "name", label: "活动名称", required: true, maxLength: 20, placeholder: "夏日充电狂欢" },
   { key: "kind", label: "类型", placeholder: "满减 / 拉新 / 签到" },
@@ -162,6 +174,11 @@ const CAMPAIGN_FIELDS: FieldDef[] = [
  * 推送草稿表单。**没有「状态」字段**——状态只能由发送动作的状态机推进
  * （DRAFT →（定时）SCHEDULED → SENDING → SENT），表单能改就等于能伪造「已发送」。
  * 目标人群做成一个扁平下拉（`audienceKey` = `类型:值`），提交时拆回 audienceType/audienceValue。
+ */
+/**
+ * @form POST /api/user/push-messages
+ * @form POST /api/user/push-messages/{pushNo}
+ * @form-synthetic audienceKey 目标人群下拉的合成值 `类型:值`，提交时由 splitAudKey 拆回 audienceType/audienceValue
  */
 const pushFields = (segments: { segmentNo: string; segment: string; userCount: number }[]): FieldDef[] => [
   { key: "title", label: "标题", required: true, maxLength: 30, section: "内容", placeholder: "您有一张新券待领取" },
@@ -186,12 +203,20 @@ const parseAudKey = (k: string) => {
   const i = k.indexOf(":");
   return { audienceType: k.slice(0, i) as AudienceType, audienceValue: k.slice(i + 1) };
 };
+/**
+ * @form POST /api/ops/ad-slots
+ * @form POST /api/ops/ad-slots/{slotNo}
+ */
 const SLOT_FIELDS: FieldDef[] = [
   { key: "cabinetNo", label: "机柜号", placeholder: "CAB-0001" },
   { key: "position", label: "位置", type: "select", options: [{ value: "SCREEN", label: "屏幕" }, { value: "BODY", label: "机身" }] },
   { key: "size", label: "尺寸", placeholder: "1080x1920" },
   { key: "status", label: "状态", type: "select", options: [{ value: "IDLE", label: "空闲" }, { value: "OCCUPIED", label: "已占用" }] },
 ];
+/**
+ * @form POST /api/user/ad-campaigns
+ * @form POST /api/user/ad-campaigns/{adNo}
+ */
 const AD_FIELDS: FieldDef[] = [
   { key: "advertiser", label: "广告主", placeholder: "某品牌" },
   { key: "creative", label: "创意", placeholder: "创意素材描述" },

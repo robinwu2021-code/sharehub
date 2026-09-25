@@ -46,6 +46,10 @@ const COUNTRY_LABEL: Record<string, string> = {
 const COUNTRY_OPTIONS = Object.entries(COUNTRY_LABEL).map(([value, label]) => ({ value, label: `${label} ${value}` }));
 const CURRENCY_OPTIONS = ["AED", "SAR", "QAR", "KWD", "BHD", "OMR", "JOD", "EGP"].map((c) => ({ value: c, label: c }));
 
+/**
+ * @form POST /api/platform/banks
+ * @form POST /api/platform/banks/{bankCode}
+ */
 const FIELDS: FieldDef[] = [
   { key: "bankCode", label: "银行代码", required: true, readOnlyOnEdit: true, maxLength: 12, section: "基本信息", placeholder: "ENBD", help: "2～12 位大写字母或数字，保存时自动转大写；创建后不能修改" },
   { key: "bankName", label: "名称（中文）", required: true, maxLength: 40, section: "基本信息", placeholder: "阿联酋国民银行" },

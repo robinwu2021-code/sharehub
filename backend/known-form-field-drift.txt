@@ -1,0 +1,20 @@
+# 表单字段发出去但后端请求体接不住的 —— **只准变短，不准变长**。
+#
+# 症状是「填了不报错，就是存不进去」：@RequestBody 静默忽略不认识的字段，
+# 前端拿回 200。所以这类缺口不会有人报 bug，只会在某天有人问
+# 「这一栏为什么一直是空的」。守卫见 ops-web/scripts/check-form-fields.py。
+#
+# 格式：<文件>::<表单名> <字段键>
+# 合成字段（只活在表单里、提交前已拆）不登记在这里，用源码上的
+# `@form-synthetic <key> <理由>` 注解表达。
+
+# 券的「有效期止」在运营端完全不通：后端请求体只认 validRule，
+# 且 Coupon 的响应里**也没有** expireAt —— 写进不去、读也读不回，
+# 列表那一列对真后端恒空。修法要先定 validRule 与到期日的关系（待裁决）。
+ops-web/app/marketing/page.tsx::COUPON_FIELDS expireAt
+
+# 广告投放的「状态」下拉在 2026-09-25 之后失效：AdCampaignReq 按状态机
+# 有意不收 status（此前收，那正是状态机可被 save 绕过的那个洞）。
+# 正解是换成迁移动作按钮 —— POST /api/user/ad-campaigns/{adNo}/{action}
+# 已经在了，Campaign 那张表就是这么做的（transitionCampaign）。
+ops-web/app/marketing/page.tsx::AD_FIELDS status

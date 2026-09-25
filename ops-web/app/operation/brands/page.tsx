@@ -38,6 +38,10 @@ const BRAND_STATUS: StatusMap<Brand["status"]> = {
   DISABLED: { label: "停用", tone: "muted" },
 };
 
+/**
+ * @form POST /api/platform/brands
+ * @form POST /api/platform/brands/{brandNo}
+ */
 const FIELDS: FieldDef[] = [
   { key: "name", label: "品牌名称", required: true, maxLength: 64, section: "基本信息", placeholder: "ShareHub",
     help: "C 端 App 上显示的名字；同名品牌会让站点表单的下拉出现两个一样的选项，故不允许重名" },

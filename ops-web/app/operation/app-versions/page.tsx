@@ -44,6 +44,10 @@ const STATUS: StatusMap<AppVersion["status"]> = {
   ROLLBACK: { label: "已回滚", tone: "danger" },
 };
 
+/**
+ * @form POST /api/platform/app-versions
+ * @form POST /api/platform/app-versions/{versionId}
+ */
 const FIELDS: FieldDef[] = [
   { key: "platform", label: "平台", type: "select", required: true, readOnlyOnEdit: true, section: "基本信息",
     options: PLATFORMS.map((p) => ({ value: p.key, label: p.label })) },
@@ -61,6 +65,7 @@ const FIELDS: FieldDef[] = [
   { key: "downloadUrl", label: "下载地址", maxLength: 300, section: "发布控制", placeholder: "https://apps.apple.com/app/id…",
     help: "iOS 填 App Store 链接，Android 填 APK 地址；H5 不需要" },
 ];
+/** @form POST /api/platform/app-versions/{versionId} */
 const ROLLOUT_FIELDS: FieldDef[] = [
   { key: "rolloutPercent", label: "灰度比例（%）", type: "number", required: true, min: 1, max: 100, help: "调到 100 即全量；要停止下发请用「回滚」" },
 ];

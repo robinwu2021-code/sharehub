@@ -52,6 +52,10 @@ const PROBLEM_STATUS: StatusMap<ProblemEntry["status"]> = {
   DISABLED: { label: "停用", tone: "muted" },
 };
 
+/**
+ * @form POST /api/platform/problems
+ * @form POST /api/platform/problems/{problemNo}
+ */
 const FIELDS: FieldDef[] = [
   { key: "category", label: "分类", type: "select", required: true, section: "基本信息", options: CATEGORY_OPTIONS, help: "C 端按分类分组展示" },
   { key: "suggestedAction", label: "建议处置", type: "select", required: true, section: "基本信息",

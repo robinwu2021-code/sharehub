@@ -60,6 +60,10 @@ const VIEW_TABS: { key: string; label: string; views: NoticeView[] }[] = [
 
 const zone = formatOffset(tzOffsetMinutes(new Date(), MARKET_TZ));
 
+/**
+ * @form POST /api/ops/marketing/notices
+ * @form POST /api/ops/marketing/notices/{noticeNo}
+ */
 const FIELDS: FieldDef[] = [
   { key: "type", label: "类型", type: "select", required: true, section: "基本信息",
     options: (Object.keys(TYPE) as Notice["type"][]).map((k) => ({ value: k, label: TYPE[k].label })),

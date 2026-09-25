@@ -1,0 +1,61 @@
+# 还没挂端点的表单 —— **只准变短，不准变长**。
+#
+# 表单上方写一行 `@form POST /api/...` 就算挂上了（建单与更新是两个端点就写两行）。
+# 挂上之后，check-form-fields.py 才能核对「这张表单发出去的键后端接不接得住」。
+#
+# 为什么不自动推断：试过按文件里的 api.saveXxx 调用反查，一个页面里有七张表单时
+# 根本对不准。而一条对错了的告警比没有告警更糟——它会让人开始忽略整个检查器。
+#
+# 新表单必须一开始就写注解；存量慢慢补，补一张从这里删一行。
+ops-web/app/agents/page.tsx::APPLY_FIELDS
+ops-web/app/agents/page.tsx::accountFieldsFor
+ops-web/app/agents/page.tsx::commissionFieldsFor
+ops-web/app/alarms/page.tsx::CODE_FIELDS
+ops-web/app/alarms/page.tsx::RULE_FIELDS
+ops-web/app/cs/page.tsx::TICKET_FIELDS
+ops-web/app/dev/ui/composites.tsx::DEMO_FIELDS
+ops-web/app/devices/page.tsx::CODE_FIELDS
+ops-web/app/devices/page.tsx::OTA_FIELDS
+ops-web/app/devices/page.tsx::PB_FIELDS
+ops-web/app/devices/page.tsx::RELEASE_FIELDS
+ops-web/app/devices/page.tsx::cabinetFields
+ops-web/app/devices/page.tsx::commandFields
+ops-web/app/devices/page.tsx::invFields
+ops-web/app/employees/page.tsx::ROLE_FIELDS
+ops-web/app/employees/page.tsx::empFields
+ops-web/app/finance/page.tsx::INVOICE_FIELDS_BASE
+ops-web/app/finance/page.tsx::PAYOUT_FIELDS
+ops-web/app/finance/page.tsx::ruleFieldsFor
+ops-web/app/operation/fee-plans/page.tsx::PLAN_FIELDS
+ops-web/app/operation/fee-plans/page.tsx::SCHEDULE_FIELDS
+ops-web/app/operation/sites/page.tsx::PAUSE_FIELDS
+ops-web/app/operation/sites/page.tsx::fieldsFor
+ops-web/app/system/page.tsx::BLACKLIST_FIELDS
+ops-web/app/system/page.tsx::DICT_FIELDS
+ops-web/app/system/page.tsx::LOGIN_FIELDS
+ops-web/app/system/page.tsx::MARKET_FIELDS
+ops-web/app/system/page.tsx::NOTIFY_FIELDS
+ops-web/app/system/page.tsx::OPENAPI_FIELDS
+ops-web/app/system/page.tsx::PARAM_FIELDS
+ops-web/app/system/page.tsx::PAYMENT_FIELDS
+ops-web/app/system/page.tsx::TAX_FIELDS
+ops-web/app/system/page.tsx::regionFields
+ops-web/app/users/page.tsx::BENEFIT_FIELDS
+ops-web/app/users/page.tsx::CARD_FIELDS
+ops-web/app/users/page.tsx::ISSUE_FIELDS
+ops-web/app/users/page.tsx::MEMBER_FIELDS
+ops-web/app/users/page.tsx::RECHARGE_FIELDS
+ops-web/app/users/page.tsx::REJECT_FIELDS
+ops-web/app/users/page.tsx::WALLET_FIELDS
+ops-web/app/users/page.tsx::WHITELIST_FIELDS
+ops-web/app/venues/page.tsx::LEAD_FIELDS
+ops-web/app/venues/page.tsx::ONBOARDING_FIELDS
+ops-web/app/venues/page.tsx::REJECT_FIELDS
+ops-web/app/venues/page.tsx::VENUE_FIELDS
+ops-web/app/venues/page.tsx::contractFieldsFor
+ops-web/app/venues/page.tsx::leadFieldsFor
+ops-web/app/work-orders/page.tsx::INSPECTION_FIELDS
+ops-web/app/work-orders/page.tsx::SLA_FIELDS
+ops-web/components/operation/plan-scope-drawer.tsx::fields
+ops-web/components/operation/site-detail.tsx::POINT_FIELDS
+ops-web/components/operation/site-detail.tsx::fields
