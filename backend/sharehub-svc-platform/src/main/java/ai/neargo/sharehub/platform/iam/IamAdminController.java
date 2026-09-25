@@ -1,5 +1,9 @@
 package ai.neargo.sharehub.platform.iam;
 
+import ai.neargo.common.data.scope.DataScopeSpec;
+import ai.neargo.sharehub.auth.Realm;
+import ai.neargo.sharehub.auth.LoginUser;
+import ai.neargo.sharehub.audit.AuditChanges;
 import ai.neargo.sharehub.auth.PermVersion;
 import ai.neargo.sharehub.platform.iam.entity.IamEntities.IamMenu;
 import ai.neargo.sharehub.platform.iam.entity.IamEntities.IamPermission;
@@ -129,6 +133,93 @@ public class IamAdminController {
      * 这个是**全部**（管理用）。此前本方法直接返回实体 {@code IamMenu} ——
      * 与仓库「不拿实体当出参」的方向相反，且少了 children 结构，改成同一个 MenuNode。
      */
+    /** 菜单可改的字段。**不含 path / parentNo / type** —— 理由见 {@link #updateMenu}。 */
+    public record MenuPatch(String name, String nameEn, String nameAr, String groupName,
+                            Integer sort, Integer visible, String perm) {
+    }
+
+    /**
+     * 改一个菜单项。**只改「怎么显示、谁看得到」，不改「指向哪」。**
+     *
+     * <h2>为什么不让改 path / 新增 / 物理删除</h2>
+     * 菜单项的 {@code path} 必须指向一个**真实存在的前端路由** ——
+     * 在界面上填一个 {@code /foo} 得到的是一个点进去白屏的入口，而不报错。
+     * 新增菜单同理：页面本来就要发版才有。所以这里只给运营真正用得上的那几样：
+     * 改名（中/英/阿）· 分组标题 · 排序 · 显隐 · 挂哪个权限码。
+     *
+     * <p><b>没有物理删除</b>，只有 {@code visible=0}：删了就没了，停用可逆
+     * （与仓库「契约禁止 delete*」同一条纪律）。
+     *
+     * <h2>两道护栏</h2>
+     * <ol>
+     *   <li><b>perm 必须在目录里</b>。挂一个没人强制的码，等于这个菜单对谁都不可见
+     *       （除超管），而**不报错** —— 配的人以为配好了，用的人以为功能没做。</li>
+     *   <li><b>不能把自己锁在外面</b>。菜单改坏了，运营连「进来改回去」的入口都没有。
+     *       所以改完立刻用超管视角重算一遍：菜单管理自己那一支要是没了，直接回滚。</li>
+     * </ol>
+     */
+    @PutMapping("/menus/{menuNo}")
+    @PreAuthorize("@perm.can('org:role:update')")
+    @Transactional
+    public MenuService.MenuNode updateMenu(@PathVariable String menuNo, @RequestBody MenuPatch body) {
+        IamMenu cur = menuMapper.selectOne(new LambdaQueryWrapper<IamMenu>()
+                .eq(IamMenu::getMenuNo, menuNo));
+        if (cur == null) {
+            throw new IllegalArgumentException("菜单不存在: " + menuNo);
+        }
+        if (body.perm() != null && !body.perm().isBlank()
+                && permissionMapper.selectCount(new LambdaQueryWrapper<IamPermission>()
+                        .eq(IamPermission::getCode, body.perm())) == 0) {
+            throw new IllegalArgumentException(
+                    "权限码不在目录里：" + body.perm() + "。挂上去这个菜单对谁都不可见（除超管），"
+                            + "而且不会报错——先把它登记进 iam_permission。");
+        }
+
+        // 改前改后都记：菜单可见性出了问题时，「谁在什么时候把它藏了」是第一个要答的
+        AuditChanges.record("菜单名", cur.getName(), body.name());
+        AuditChanges.record("权限码", cur.getPerm(), body.perm());
+        AuditChanges.record("是否可见", cur.getVisible(), body.visible());
+        AuditChanges.record("排序", cur.getSort(), body.sort());
+
+        if (body.name() != null && !body.name().isBlank()) cur.setName(body.name());
+        if (body.nameEn() != null) cur.setNameEn(body.nameEn());
+        if (body.nameAr() != null) cur.setNameAr(body.nameAr());
+        if (body.groupName() != null) cur.setGroupName(body.groupName());
+        if (body.sort() != null) cur.setSort(body.sort());
+        if (body.visible() != null) cur.setVisible(body.visible());
+        if (body.perm() != null) cur.setPerm(body.perm().isBlank() ? null : body.perm());
+        menuMapper.updateById(cur);
+
+        assertAdminCanStillGetBackIn();
+        return menuService.tree().stream()
+                .flatMap(n -> java.util.stream.Stream.concat(java.util.stream.Stream.of(n), n.children().stream()))
+                .filter(n -> n.menuNo().equals(menuNo)).findFirst().orElseThrow();
+    }
+
+    /**
+     * 改完之后，超管还进得来吗？
+     *
+     * <p>菜单是运营端**唯一**的入口。把「员工与权限」那一支藏了之后，
+     * 谁都没法再进来把它改回去 —— 只能改库。所以这道闸拦在事务里，不过就回滚。
+     *
+     * <p>用超管视角（{@code *}）而不是当前操作者：当前操作者可能本来就看不到某些菜单，
+     * 拿他判会把「他看不到」误判成「被锁死了」。
+     */
+    private void assertAdminCanStillGetBackIn() {
+        LoginUser su = new LoginUser(Realm.STAFF, "__guard__", "__guard__", "ADMIN",
+                List.of("*"), "MAIN", "", DataScopeSpec.ALL);
+        boolean reachable = menuService.visibleFor(su).stream()
+                .anyMatch(n -> ADMIN_SECTION.equals(n.menuNo()));
+        if (!reachable) {
+            throw new IllegalStateException(
+                    "这一改之后「" + ADMIN_SECTION + "」对超管也不可见了——菜单是运营端唯一的入口，"
+                            + "改成这样之后谁都进不来把它改回去。已回滚。");
+        }
+    }
+
+    /** 回得来的那扇门：菜单管理自己就在这一支下面。 */
+    private static final String ADMIN_SECTION = "M_org";
+
     @GetMapping("/menus")
     @PreAuthorize("@perm.can('org:role:read')")
     public List<MenuService.MenuNode> menus() {

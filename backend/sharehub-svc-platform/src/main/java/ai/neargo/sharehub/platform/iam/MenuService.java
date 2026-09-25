@@ -70,14 +70,20 @@ public class MenuService {
                            List<MenuNode> children) {
     }
 
-    /** 完整菜单树，不过滤。给「菜单管理」这类要看全量的场景用。 */
+    /**
+     * 完整菜单树，**连隐藏的也在**。给菜单管理用。
+     *
+     * <p>为什么不过滤 {@code visible}：管理界面要是也照 visible 过滤，
+     * **把一个菜单藏了之后它就从管理界面消失，再也改不回来** ——
+     * 只能去改库。这条是写用例时当场撞出来的（藏完返回 500，因为结果里找不到它）。
+     */
     public List<MenuNode> tree() {
-        return build(all(), null);
+        return build(rows(false), null);
     }
 
-    /** 当前登录人可见的菜单树（规则见类注释）。 */
+    /** 当前登录人可见的菜单树（规则见类注释）。隐藏的一律不下发。 */
     public List<MenuNode> visibleFor(LoginUser u) {
-        List<IamMenu> rows = all();
+        List<IamMenu> rows = rows(true);
         String role = u.role() == null ? "" : u.role();
         // 这个人是不是某个专属门户的主人 —— 决定他看门户还是看通用运营项
         boolean portalUser = rows.stream()
@@ -118,10 +124,15 @@ public class MenuService {
         return m.getPerm() == null || m.getPerm().isBlank() || u.hasPerm(m.getPerm());
     }
 
-    private List<IamMenu> all() {
-        return menuMapper.selectList(new LambdaQueryWrapper<IamMenu>()
-                .eq(IamMenu::getVisible, 1).eq(IamMenu::getStatus, "ACTIVE")
-                .orderByAsc(IamMenu::getSort));
+    /**
+     * @param onlyVisible true = 只要 {@code visible=1} 的（下发给用户）；
+     *                    false = 全部（管理界面，藏了的也要看得到、改得回来）
+     */
+    private List<IamMenu> rows(boolean onlyVisible) {
+        LambdaQueryWrapper<IamMenu> w = new LambdaQueryWrapper<IamMenu>()
+                .eq(IamMenu::getStatus, "ACTIVE").orderByAsc(IamMenu::getSort);
+        if (onlyVisible) w.eq(IamMenu::getVisible, 1);
+        return menuMapper.selectList(w);
     }
 
     private List<MenuNode> build(List<IamMenu> all, String parentNo) {
