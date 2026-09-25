@@ -46,6 +46,12 @@
 声明未强制 org:employee:delete
 声明未强制 org:role:assign
 声明未强制 pricing:plan:delete
+# 2026-09-25 修展开器（认中段通配）之后**新显形**的一条：
+# 真源表第 237 行声明「报表 导出」给了 OPS/FIN/BD/VIEW 四个角色，
+# 而后端**一个导出端点都没有** —— 不是漏加闸，是这个能力压根没实现。
+# 在此之前它被 report:*:read 的假报盖住了（4 条假报刚删）。
+# 处置：确认导出到底做不做；不做就删表里那一行（表在说谎），做就补端点。
+声明未强制 report:*:export
 声明未强制 system:openapi:config
 声明未强制 tenant:billing:read
 强制未声明 cs:session:reply
@@ -59,10 +65,6 @@
 强制未声明 marketing:push:update
 强制未声明 marketing:recharge:update
 强制未声明 order:deposit:update
-强制未声明 report:consumer:read
-强制未声明 report:device:read
-强制未声明 report:finance:read
-强制未声明 report:location:read
 强制未声明 system:biz_rule:read
 强制未声明 system:login_setting:read
 强制未声明 system:notify_log:update

@@ -47,11 +47,25 @@ DOC = os.path.join(ROOT, 'docs/requirements/功能权限清单.md')
 CONTRACT = os.path.join(ROOT, 'docs/api/contract.json')
 BASELINE = os.path.join(ROOT, 'backend/known-perm-ssot-gaps.txt')
 
-FULL = r'[a-z_]+(?::[a-z_]+){2}'
+# 完整码；中段允许 `*`（真源表写 `report:*:read` 覆盖一族资源）
+FULL = r'[a-z_]+:(?:[a-z_]+|\*):[a-z_]+'
 
 
 def declared_codes():
-    """读真源表，展开承前省略的简写。"""
+    """
+    读真源表，展开两种简写。
+
+    ① **承前省略**：`` `a:b:read` / `:create` `` —— `:create` 指 `a:b:create`，
+       前缀取同一行前一个完整码的前两段。不展开会把一堆码误判成「表里没有」。
+
+    ② **中段通配**：`` `report:*:read` `` —— 一行覆盖一族资源。
+       2026-09-25 补：不认它的话，后端逐个强制的 report:device:read /
+       report:finance:read / report:location:read / report:consumer:read
+       会全被报成「强制未声明」，而真源表明明写了。
+       这是本展开器的第二个解析盲区（第一个是 ①）。
+       **通配保留原样返回**，由 `matches()` 在比对时做匹配 ——
+       在这里展开成具体码做不到：真源表不知道 report 下有哪几个资源。
+    """
     out = set()
     for line in io.open(DOC, encoding='utf-8'):
         prefix = None
@@ -65,6 +79,14 @@ def declared_codes():
     return out
 
 
+def matches(declared, code):
+    """声明码是否覆盖某个实际强制的码。支持中段通配 `a:*:c`。"""
+    if declared == code:
+        return True
+    d, c = declared.split(':'), code.split(':')
+    return len(d) == len(c) == 3 and d[0] == c[0] and d[2] == c[2] and d[1] == '*'
+
+
 def enforced_codes():
     eps = json.loads(io.open(CONTRACT, encoding='utf-8').read())['endpoints']
     # 一个端点可能挂多个码（`can('a') or can('b')`），**逐个都算强制** ——
@@ -74,11 +96,21 @@ def enforced_codes():
 
 
 def keys(declared, enforced):
+    """
+    两向比对。**不能用纯集合差** —— 声明侧可能带中段通配（`report:*:read`），
+    它与任何 `report:<资源>:read` 都算对上，而集合差看不出这层关系。
+    """
     out = set()
-    for c in declared - enforced:
-        out.add('声明未强制 %s' % c)
-    for c in enforced - declared:
-        out.add('强制未声明 %s' % c)
+    for c in declared:
+        if '*' in c:
+            # 通配：只要覆盖到至少一个实际强制的码，就算"已强制"
+            if not any(matches(c, e) for e in enforced):
+                out.add('声明未强制 %s' % c)
+        elif c not in enforced:
+            out.add('声明未强制 %s' % c)
+    for c in enforced:
+        if not any(matches(d, c) for d in declared):
+            out.add('强制未声明 %s' % c)
     return out
 
 
@@ -118,8 +150,13 @@ def write_baseline(declared, enforced):
 
 def main():
     declared, enforced = declared_codes(), enforced_codes()
-    only_doc = sorted(declared - enforced)
-    only_be = sorted(enforced - declared)
+    # 与 keys() 同一套判据 —— **不能在这里另写一套集合差**：
+    # 2026-09-25 就是这么出的 bug，keys() 改成认中段通配之后，
+    # 这两行还是纯差集，于是报告里照旧列着 report:*:read 那一族，
+    # 而台账比对已经不认为它们是缺口了。两处口径不一致，看报告的人永远对不上账。
+    gaps = keys(declared, enforced)
+    only_doc = sorted(c.split(' ', 1)[1] for c in gaps if c.startswith('声明未强制'))
+    only_be = sorted(c.split(' ', 1)[1] for c in gaps if c.startswith('强制未声明'))
 
     print('真源表声明 %d · 后端端点强制 %d' % (len(declared), len(enforced)))
     print('\n① 真源表声明、后端从不强制   %d' % len(only_doc))
