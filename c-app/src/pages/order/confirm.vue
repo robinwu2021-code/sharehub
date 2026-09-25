@@ -1,15 +1,18 @@
 <script setup lang="ts">
 // 借出确认 → 下单 → 等弹出(dispensing) → 借出成功。免押/押金二选一（端侧 PaymentPort，MVP Stub）。
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import { api } from "@/api";
 import { t } from "@/i18n";
-import type { CabinetAvailability } from "@/types";
+import type { CabinetAvailability, UserCoupon } from "@/types";
 import { payment } from "@/ports/payment";
 
 const avail = ref<CabinetAvailability | null>(null);
 const agree = ref(true);
 const useFree = ref(true);
+const coupons = ref<UserCoupon[]>([]);
+const picked = ref<string | null>(null);
+const pickerOpen = ref(false);
 const stage = ref<"confirm" | "dispensing" | "success">("confirm");
 const orderNo = ref("");
 let cabinetNo = "";
@@ -20,6 +23,50 @@ onLoad((q) => {
 });
 async function load() {
   avail.value = await api.cabinetAvailability(cabinetNo);
+  // 券包与本页是两个接口，券拉失败不该把整个借出流程堵死 —— 顶多这次借不成用券
+  try {
+    coupons.value = await api.listCoupons();
+  } catch {
+    coupons.value = [];
+  }
+}
+
+/**
+ * 这里的筛选条件要和后端 `CouponUsePort.offerOf` 逐条对齐（属主/未使用/未过期/币种）。
+ * 列出来一张后端会拒的券，用户点了就是一次失败的下单，而他看不出哪里错了。
+ */
+const usable = computed(() =>
+  coupons.value.filter(
+    (c) =>
+      c.status === "UNUSED" &&
+      !isExpired(c.expireAt) &&
+      (!avail.value?.currency || !c.currency || c.currency === avail.value.currency),
+  ),
+);
+
+function isExpired(expireAt: string) {
+  if (!expireAt) return false; // 空 = 不限期，与后端同一口径
+  const d = new Date(expireAt.replace(" ", "T"));
+  return !Number.isNaN(d.getTime()) && d.getTime() < Date.now();
+}
+
+/** 「减 5 AED」/「省 20%」。折扣率是**付几成**，所以省的是 1-value。 */
+function offerText(c: UserCoupon) {
+  const main =
+    c.tplType === "DISCOUNT"
+      ? t("borrow.couponOff", { v: Math.round((1 - c.value) * 100) })
+      : t("borrow.couponCut", { v: `${c.value} ${c.currency}` });
+  return c.threshold > 0 ? `${main} · ${t("borrow.couponThreshold", { v: `${c.threshold} ${c.currency}` })}` : main;
+}
+
+const pickedLabel = computed(() => {
+  const c = usable.value.find((x) => x.couponNo === picked.value);
+  return c ? offerText(c) : t("borrow.couponNone");
+});
+
+function choose(couponNo: string | null) {
+  picked.value = couponNo;
+  pickerOpen.value = false;
 }
 
 async function submit() {
@@ -30,7 +77,12 @@ async function submit() {
   stage.value = "dispensing";
   try {
     if (useFree.value) await payment.preAuthFreeDeposit(cabinetNo);
-    const order = await api.rentOrder({ cabinetNo, useFreeDeposit: useFree.value });
+    const order = await api.rentOrder({
+      cabinetNo,
+      useFreeDeposit: useFree.value,
+      // 只在真选了券时才带上 —— 传 null 与不传在后端是一个意思，但带着空值更容易被误读成「用券失败」
+      ...(picked.value ? { couponNo: picked.value } : {}),
+    });
     orderNo.value = order.orderNo;
     setTimeout(() => (stage.value = "success"), 1000);
   } catch (e) {
@@ -80,6 +132,36 @@ function viewOrder() {
           <view class="flex items-center gap-[16rpx]">
             <pb-amount v-if="avail" :value="avail.depositAmount" size="sm" />
             <view class="pb-radio" :class="{ 'is-on': !useFree }" />
+          </view>
+        </view>
+      </view>
+
+      <!-- 优惠券。此前这里什么都没有：券领得到、看得见，就是花不掉 -->
+      <view class="mt-[24rpx]">
+        <view class="pb-opt" @tap="pickerOpen = !pickerOpen">
+          <text class="flex-1 text-[28rpx] font-bold text-ink">{{ $t("borrow.coupon") }}</text>
+          <text class="text-[24rpx]" :class="picked ? 'text-primary' : 'text-sub'">{{ pickedLabel }}</text>
+        </view>
+        <view v-if="pickerOpen" class="mt-[12rpx] flex flex-col gap-[12rpx]">
+          <view class="pb-opt" :class="{ 'is-on': !picked }" @tap="choose(null)">
+            <text class="flex-1 text-[26rpx] text-ink">{{ $t("borrow.couponNone") }}</text>
+            <view class="pb-radio" :class="{ 'is-on': !picked }" />
+          </view>
+          <view
+            v-for="c in usable"
+            :key="c.couponNo"
+            class="pb-opt"
+            :class="{ 'is-on': picked === c.couponNo }"
+            @tap="choose(c.couponNo)"
+          >
+            <view class="flex-1">
+              <text class="text-[26rpx] font-bold text-ink">{{ c.tplName }}</text>
+              <view class="mt-[4rpx] text-[22rpx] text-sub">{{ offerText(c) }}</view>
+            </view>
+            <view class="pb-radio" :class="{ 'is-on': picked === c.couponNo }" />
+          </view>
+          <view v-if="!usable.length" class="px-[28rpx] py-[20rpx] text-[24rpx] text-sub">
+            {{ $t("borrow.couponEmpty") }}
           </view>
         </view>
       </view>

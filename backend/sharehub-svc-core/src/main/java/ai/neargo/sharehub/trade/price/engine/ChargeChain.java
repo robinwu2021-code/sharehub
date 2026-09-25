@@ -32,11 +32,12 @@ public class ChargeChain {
     /**
      * @param gross      {@link PriceEngine} 算出的应收（已含单项封顶）
      * @param multiplier 分时/节假日倍率；null 或 ≤0 视为 1
-     * @param couponOff  券面额（DEDUCT 类型的抵扣金额）；null 表示无券
+     * @param coupon     券的抵扣规格；null 表示无券。**传规格而不是算好的金额** ——
+     *                   门槛与折扣率都要按「封顶后的应收」算，而那个数只有本方法知道
      * @param capTotal   总封顶；null 表示不封顶。**在倍率之后、券之前应用**
      * @param freeReason 免单原因；非空即免单
      */
-    public Charged charge(BigDecimal gross, BigDecimal multiplier, BigDecimal couponOff,
+    public Charged charge(BigDecimal gross, BigDecimal multiplier, Coupon coupon,
                           BigDecimal capTotal, String freeReason) {
         BigDecimal amount = nz(gross);
 
@@ -57,9 +58,12 @@ public class ChargeChain {
 
         // ④ 券抵扣（封顶之后）。抵扣不产生负数应收 —— 券面额大于应收时按应收抵。
         BigDecimal couponUsed = BigDecimal.ZERO;
-        if (couponOff != null && couponOff.signum() > 0) {
-            couponUsed = couponOff.min(amount);
-            amount = amount.subtract(couponUsed);
+        if (coupon != null) {
+            BigDecimal off = coupon.offAgainst(amount);
+            if (off.signum() > 0) {
+                couponUsed = off.min(amount);
+                amount = amount.subtract(couponUsed);
+            }
         }
 
         // 免单：先算后减免
@@ -82,6 +86,38 @@ public class ChargeChain {
      */
     public record Charged(BigDecimal beforeDiscount, BigDecimal couponUsed,
                           BigDecimal waivedAmount, BigDecimal payable, boolean buyout) {
+    }
+
+    /**
+     * 券的抵扣规格（纯数据，不含券号与属主 —— 那些是调用方校验完才轮到这里）。
+     *
+     * @param type      CUT（满减）/ DISCOUNT（折扣）；其它值一律按不抵扣处理
+     * @param value     CUT=减免金额；DISCOUNT=折扣率（0..1）
+     * @param threshold 使用门槛；null/0 表示无门槛
+     */
+    public record Coupon(String type, BigDecimal value, BigDecimal threshold) {
+
+        /**
+         * 按基数算抵扣额。{@code base} 是**封顶后、抵扣前**的应收。
+         *
+         * <p>门槛用同一个基数判：用倍率前的原价判门槛，会让高峰期一张「满 10 减 3」
+         * 在应收 12 时用不了；用抵扣后的余额判，则门槛永远差那一点。两种都不报错。
+         *
+         * <p>{@code DISCOUNT} 的 {@code value} 是**折扣率**（0.8 = 八折 = 付 80%），
+         * 所以抵扣额是 {@code base × (1 - value)}，不是 {@code base × value} ——
+         * 写反了是「八折变两折」，金额照样算得出来，只是少收了 60%。
+         */
+        BigDecimal offAgainst(BigDecimal base) {
+            if (value == null || value.signum() <= 0) return BigDecimal.ZERO;
+            if (threshold != null && base.compareTo(threshold) < 0) return BigDecimal.ZERO;
+            if ("CUT".equals(type)) return value;
+            if ("DISCOUNT".equals(type)) {
+                if (value.compareTo(BigDecimal.ONE) >= 0) return BigDecimal.ZERO;   // 一折不打，不是倒贴
+                return base.multiply(BigDecimal.ONE.subtract(value))
+                        .setScale(MONEY_SCALE, RoundingMode.HALF_UP);
+            }
+            return BigDecimal.ZERO;
+        }
     }
 
     private static BigDecimal nz(BigDecimal v) {

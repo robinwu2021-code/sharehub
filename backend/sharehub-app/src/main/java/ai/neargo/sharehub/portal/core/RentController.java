@@ -44,10 +44,28 @@ public class RentController {
         this.bizRules = bizRules;
     }
 
-    /** 扫码借出：{@code {cabinetNo}} → 创单（免押/弹仓骨架），返回订单号 + 充电宝 + 指令号。 */
+    /**
+     * 扫码借出：{@code {cabinetNo, useFreeDeposit, couponNo}} → 创单，返回订单号 + 充电宝 + 指令号。
+     *
+     * <p><b>{@code useFreeDeposit} 此前被丢掉了</b>：这里只读 {@code cabinetNo}，
+     * 于是确认页上那个「免押金 / 支付押金」的单选**点哪个都一样** ——
+     * 选免押的人已经被冻结了一笔预授权，订单上又记一笔 50 押金，
+     * 同一笔钱在他眼里出现两次。不报错，只是账看起来不对。
+     *
+     * <p>缺省 {@code true}：确认页默认就是免押（{@code useFree = ref(true)}），
+     * 老客户端不传这个字段时按它当时的界面语义走。
+     */
     @PostMapping("/orders/rent")
-    public RentResult rent(@RequestBody Map<String, String> body) {
-        return orders.rent(ConsumerContext.userNo(), body == null ? null : body.get("cabinetNo"));
+    public RentResult rent(@RequestBody Map<String, Object> body) {
+        // 逐个取值不能图省事写 String.valueOf(get(...))：键缺席时它给的是字符串 "null"，
+        // 于是「没扫码」会被当成「有个叫 null 的柜子」，报成「该设备暂不可借」
+        Object cabinet = body == null ? null : body.get("cabinetNo");
+        String cabinetNo = cabinet == null ? null : String.valueOf(cabinet);
+        Object free = body == null ? null : body.get("useFreeDeposit");
+        Object coupon = body == null ? null : body.get("couponNo");
+        return orders.rent(ConsumerContext.userNo(), cabinetNo,
+                free == null || Boolean.parseBoolean(String.valueOf(free)),
+                coupon == null ? null : String.valueOf(coupon));
     }
 
     /**

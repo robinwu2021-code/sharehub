@@ -17,6 +17,11 @@ class ChargeChainTest {
 
     private final ChargeChain chain = new ChargeChain();
 
+    /** 无门槛满减券。测试里绝大多数场景只关心「抵多少」，券的类型不是重点。 */
+    private static ChargeChain.Coupon cut(String value) {
+        return new ChargeChain.Coupon("CUT", new BigDecimal(value), null);
+    }
+
     // ─────────── 约束一：券在封顶之后 ───────────
 
     /**
@@ -28,7 +33,7 @@ class ChargeChainTest {
     @Test
     void coupon_applies_after_cap_not_before() {
         ChargeChain.Charged c = chain.charge(new BigDecimal("40"), null,
-                new BigDecimal("10"), new BigDecimal("30"), null);
+                cut("10"), new BigDecimal("30"), null);
 
         assertThat(c.beforeDiscount()).as("封顶后、抵扣前").isEqualByComparingTo("30.00");
         assertThat(c.couponUsed()).isEqualByComparingTo("10");
@@ -39,10 +44,74 @@ class ChargeChainTest {
     @Test
     void coupon_never_produces_negative_payable() {
         ChargeChain.Charged c = chain.charge(new BigDecimal("8"), null,
-                new BigDecimal("20"), null, null);
+                cut("20"), null, null);
 
         assertThat(c.couponUsed()).as("只抵掉实际应收").isEqualByComparingTo("8.00");
         assertThat(c.payable()).isEqualByComparingTo("0.00");
+    }
+
+    /**
+     * 门槛按**封顶后的应收**判，与抵扣同一个基数。
+     *
+     * <p>差一分钱不到门槛就不该抵 —— 而「抵了」和「没抵」都不会报错，
+     * 只是账单上少了或多了那几块。
+     */
+    @Test
+    void threshold_is_measured_against_the_same_base_as_the_deduction() {
+        ChargeChain.Coupon over10 = new ChargeChain.Coupon("CUT", new BigDecimal("3"), new BigDecimal("10"));
+
+        assertThat(chain.charge(new BigDecimal("9.99"), null, over10, null, null).couponUsed())
+                .as("9.99 不到 10，券不该生效").isEqualByComparingTo("0");
+        assertThat(chain.charge(new BigDecimal("10"), null, over10, null, null).couponUsed())
+                .as("刚好到门槛，生效").isEqualByComparingTo("3");
+    }
+
+    /**
+     * 门槛用**倍率之后**的数判 —— 平峰 6 块、高峰 ×2 变 12，这时「满 10 减 3」是该生效的。
+     *
+     * <p>若拿倍率前的原价判门槛，用户在高峰期实付 12 块却被告知「没满 10」。
+     */
+    @Test
+    void threshold_sees_the_multiplier() {
+        ChargeChain.Coupon over10 = new ChargeChain.Coupon("CUT", new BigDecimal("3"), new BigDecimal("10"));
+        ChargeChain.Charged c = chain.charge(new BigDecimal("6"), new BigDecimal("2"), over10, null, null);
+
+        assertThat(c.beforeDiscount()).isEqualByComparingTo("12.00");
+        assertThat(c.couponUsed()).as("6×2=12 已过门槛").isEqualByComparingTo("3");
+        assertThat(c.payable()).isEqualByComparingTo("9.00");
+    }
+
+    /**
+     * 折扣率是「付几成」不是「减几成」：0.8 = 八折 = 付 80%，抵扣 20%。
+     *
+     * <p>写反了照样算得出金额、照样不报错，只是每一单都少收 60% —— 对账时才看得出来。
+     */
+    @Test
+    void discount_rate_is_what_you_pay_not_what_you_save() {
+        ChargeChain.Coupon eighty = new ChargeChain.Coupon("DISCOUNT", new BigDecimal("0.8"), null);
+        ChargeChain.Charged c = chain.charge(new BigDecimal("50"), null, eighty, null, null);
+
+        assertThat(c.couponUsed()).as("八折 = 抵掉 20%").isEqualByComparingTo("10.00");
+        assertThat(c.payable()).as("付 80%").isEqualByComparingTo("40.00");
+    }
+
+    /** 折扣券也在封顶之后算 —— 否则折扣会被封顶吃掉，与满减券同一条约束。 */
+    @Test
+    void discount_applies_after_cap_too() {
+        ChargeChain.Coupon half = new ChargeChain.Coupon("DISCOUNT", new BigDecimal("0.5"), null);
+        ChargeChain.Charged c = chain.charge(new BigDecimal("80"), null, half, new BigDecimal("30"), null);
+
+        assertThat(c.beforeDiscount()).isEqualByComparingTo("30.00");
+        assertThat(c.payable()).as("先封顶到 30，再打五折").isEqualByComparingTo("15.00");
+    }
+
+    /** 不认识的券类型按**不抵扣**处理，不是按面额抵 —— 猜错的方向应该是少给优惠，不是白送钱。 */
+    @Test
+    void unknown_coupon_type_deducts_nothing() {
+        ChargeChain.Coupon weird = new ChargeChain.Coupon("GIFT", new BigDecimal("10"), null);
+
+        assertThat(chain.charge(new BigDecimal("20"), null, weird, null, null).couponUsed())
+                .isEqualByComparingTo("0");
     }
 
     // ─────────── 约束二：免单先算后减 ───────────
@@ -68,7 +137,7 @@ class ChargeChainTest {
     @Test
     void waived_amount_excludes_what_the_coupon_already_covered() {
         ChargeChain.Charged c = chain.charge(new BigDecimal("30"), null,
-                new BigDecimal("10"), null, "BD_DEMO");
+                cut("10"), null, "BD_DEMO");
 
         assertThat(c.couponUsed()).isEqualByComparingTo("10");
         assertThat(c.waivedAmount())

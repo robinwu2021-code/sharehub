@@ -38,10 +38,36 @@ public interface RentOrderService {
     RentOrder detailForConsumer(String orderNo);
 
     /** C 端借出：创单→免押预授权（骨架）→弹仓（骨架）；订单置 IN_USE。 */
-    RentResult rent(String cUserNo, String cabinetNo);
+    /**
+     * 扫码借出。
+     *
+     * @param useFreeDeposit 用户在确认页选的那一项。<b>此前这个选择根本没传到后端</b> ——
+     *                       控制器只读 {@code cabinetNo}，于是无论选哪个，订单都记 50 押金。
+     *                       选「免押金」的人先被冻结了一笔预授权（{@code pay_auth}），
+     *                       订单上**又**记一笔押金，同一笔钱在他眼里出现两次。
+     * @param couponNo       用券；null/空 表示不用券。传了一张用不了的券会**拒单**，
+     *                       不是静默按原价 —— 后者要等到结算扣款时用户才发现。
+     */
+    RentResult rent(String cUserNo, String cabinetNo, boolean useFreeDeposit, String couponNo);
 
     /** 归还结单（设备归还事件驱动）：IN_USE→RETURNED→计费 SETTLE→SETTLED。 */
     OkResult returnOrder(String orderNo, String returnCabinetNo);
+
+    /**
+     * 按指定时刻结单（业务告警自愈 RETURN_NOT_RECOGNIZED：宝已在柜中被识别，但归还事件丢了）。
+     * 计费截止到宝首次在柜中出现的时刻，而不是发现问题的时刻 —— 用户不为系统的延迟付钱。
+     *
+     * @param endUtc 计费截止（UTC）；null = 现在
+     */
+    OkResult returnOrderAt(String orderNo, String returnCabinetNo, java.time.LocalDateTime endUtc);
+
+    /**
+     * 撤销出宝失败的订单（DISPENSING → CLOSED，不收费）。订单已不在出宝中时返回 false（幂等：别人已处理）。
+     */
+    boolean cancelUndelivered(String orderNo, String reason);
+
+    /** 逾期达封顶自动买断：触顶则以封顶价买断并返回 true（执行清单 A1 · E17）。 */
+    boolean buyoutIfCapped(String orderNo);
 
     /**
      * 客服干预：按 {@link InterventionDtos#RULES} 迁移状态，并**同事务写审计留痕**。

@@ -73,6 +73,15 @@ public class RentOrderServiceImpl implements RentOrderService {
     /** 停借保还（TDD-运营核心流程/04 §4.4）：只拦借，归还路径不调用。 */
     private final ai.neargo.sharehub.trade.RentabilityGuard rentability;
 
+    /** 借还驱动充电宝状态（执行清单 A2）：借出挑宝 → RENTED，归还 → IN_CABINET，买断 → SOLD。 */
+    private final ai.neargo.sharehub.dev.port.PowerbankTracker powerbankTracker;
+
+    /**
+     * 用券。走端口不走 {@code UserCouponService}：{@code user} 已经依赖 {@code trade}
+     * （钱包读订单），反向直连即成包循环，{@code ArchitectureTest} 的硬规则会红。
+     */
+    private final ai.neargo.sharehub.api.core.port.CouponUsePort coupons;
+
     public RentOrderServiceImpl(OrdMapper mapper, OrdStateMachine stateMachine,
                                 OrdRentExtMapper rentExtMapper, InterventionMapper interventionMapper,
                                 PriceResolver priceResolver, PriceEngine priceEngine,
@@ -80,7 +89,11 @@ public class RentOrderServiceImpl implements RentOrderService {
                                 DomainEventBus eventBus, PriceMultiplierResolver multipliers,
                                 ObjectProvider<SiteQueryPort> siteQuery,
                                 ai.neargo.sharehub.trade.order.service.OrderEventLogService eventLog,
-                                ai.neargo.sharehub.trade.RentabilityGuard rentability) {
+                                ai.neargo.sharehub.trade.RentabilityGuard rentability,
+                                ai.neargo.sharehub.dev.port.PowerbankTracker powerbankTracker,
+                                ai.neargo.sharehub.api.core.port.CouponUsePort coupons) {
+        this.coupons = coupons;
+        this.powerbankTracker = powerbankTracker;
         this.rentability = rentability;
         this.eventLog = eventLog;
         this.multipliers = multipliers;
@@ -192,6 +205,7 @@ public class RentOrderServiceImpl implements RentOrderService {
             // 买断是两跳一次做完，只记一条 BUYOUT —— 记成 RETURN+SETTLE 会让时间线
             // 看起来像「他还了柜子然后结算」，而事实是他没还
             appendEvent(orderNo, beforeBuyout, e.getStatus(), "BUYOUT", e.getCUserNo());
+            powerbankTracker.sold(e.getPowerbankNo());
             return toVO(e);
         });
     }
@@ -200,7 +214,7 @@ public class RentOrderServiceImpl implements RentOrderService {
     private static final String DEVICE_TYPE_POWERBANK = "POWERBANK";
 
     @Override
-    public RentResult rent(String cUserNo, String cabinetNo) {
+    public RentResult rent(String cUserNo, String cabinetNo, boolean useFreeDeposit, String couponNo) {
         if (cabinetNo == null || cabinetNo.isBlank()) throw BizException.badRequest("error.rent.cabinet_required");
         OrdOrder e = new OrdOrder();
         e.setOrderNo(IdGenerator.next("ORD"));
@@ -213,7 +227,9 @@ public class RentOrderServiceImpl implements RentOrderService {
         // Data truncation: Incorrect datetime value → 500，即扫码借出**从未成功落库**。
         // 与 OrderSupport.now() 同一处理：只去掉 DB 不认的 Z，时钟仍取 UTC。
         e.setRentStartAt(nowUtc());
-        e.setDepositAmount(DEPOSIT);
+        // 免押：额度冻结在 pay_auth 上，订单**不记押金** —— 记了就是同一笔钱说两遍，
+        // 而用户看到的是「我明明选了免押，怎么还有 50 押金」。
+        e.setDepositAmount(useFreeDeposit ? 0.0 : DEPOSIT);
         e.setFeeAmount(0.0);
         e.setCurrency(CURRENCY);
         e.setTenantId("MAIN");
@@ -253,6 +269,15 @@ public class RentOrderServiceImpl implements RentOrderService {
                 cabinetMapper.selectOne(new LambdaQueryWrapper<DevCabinet>()
                         .eq(DevCabinet::getCabinetNo, cabinetNo).last("limit 1")));
         rentability.checkRent(cab);
+        // 从柜内在库的宝里挑一颗；柜子有宝台账却挑不出能借的 → 拒借（没有台账的柜按旧行为放行）
+        ai.neargo.sharehub.dev.port.PowerbankTracker.Pick pick = powerbankTracker.pickForRent(cabinetNo);
+        if (pick.tracked() && pick.powerbankNo() == null) {
+            throw ai.neargo.sharehub.common.BizException.conflict("error.rent.no_stock");
+        }
+        if (pick.powerbankNo() != null) {
+            e.setPowerbankNo(pick.powerbankNo());
+            e.setSlotIndex(pick.slotIndex());
+        }
 
         /*
          * 数据范围锚点：这三列决定**这一单归谁看**（DataScopeRegistration 里
@@ -275,11 +300,26 @@ public class RentOrderServiceImpl implements RentOrderService {
         e.setPriceSnapshot(priced.toSnapshot());
         e.setCurrency(priced.currency() == null ? CURRENCY : priced.currency());
 
+        /*
+         * 用券：**下单时只绑定，不核销** —— 核销在结算时按实际应收做（见 settle 里的
+         * consume）。这里做的是可用性校验，传了一张用不了的券要当场拒单。
+         *
+         * 静默忽略是更省事的写法，也是更坏的写法：用户在确认页选了券、下单成功、
+         * 结算时却按原价扣款，中间没有任何一处报错，他只能事后来投诉。
+         */
+        if (couponNo != null && !couponNo.isBlank()) {
+            if (coupons.offerOf(cUserNo, couponNo, e.getCurrency()) == null) {
+                throw BizException.badRequest("error.rent.coupon_unusable", couponNo);
+            }
+            e.setCouponNo(couponNo);
+        }
+
         mapper.insert(e);
         // 生命周期要留痕。此前 ord_event_log **只有运营干预在写**（退款/投诉/异常），
         // 正常的「借出→归还→结算」一条都没有 —— 于是 C 端「状态时间线」和运营端事件页
         // 都只看得到干预记录，看不到这单本身是怎么走过来的。
         appendEvent(e.getOrderNo(), null, e.getStatus(), "RENT", e.getCUserNo());
+        if (pick.powerbankNo() != null) powerbankTracker.rented(pick.powerbankNo(), e.getOrderNo());
 
         // 双写扩展表。过渡期主表同名列暂留（删列不可回退），两处必须一致 ——
         // 等所有读路径切到扩展表、验证一个版本周期后再 DROP 主表冗余列。
@@ -348,11 +388,28 @@ public class RentOrderServiceImpl implements RentOrderService {
          *
          * 原先这里倍率位写死 null —— 「活动/时段价」菜单能存能改，订单一分钱都不多收。
          */
-        ChargeChain.Charged charged = chargeChain.charge(
-                gross, PriceResolver.multiplierFromSnapshot(e.getPriceSnapshot()),
-                couponOffOf(e), null, e.getFreeReason());
+        java.math.BigDecimal capTotal = PriceResolver.capTotalFromSnapshot(e.getPriceSnapshot());
+        java.math.BigDecimal multiplier = PriceResolver.multiplierFromSnapshot(e.getPriceSnapshot());
+        ChargeChain.Charged charged = chargeChain.charge(gross, multiplier, couponOf(e), capTotal, e.getFreeReason());
+
+        /*
+         * 先算后核销，且**核销失败就重算** ——
+         *
+         * 顺序不能反：门槛达没达要拿「封顶后的应收」判，而那个数只有 charge() 算得出。
+         * 先核销再算的话，一张「满 10 减 3」用在 6 块钱的单上会被白白烧掉。
+         *
+         * 而核销是带条件的原子更新，它的返回值就是并发裁决：两单同时用一张券，
+         * 只有一单会拿到 true。抢输的那单必须按无券重算 ——
+         * 不重算就是「券被别人用了，钱却从我这里少收」。
+         */
+        if (charged.couponUsed().signum() > 0 && !coupons.consume(e.getCouponNo(), orderNo)) {
+            log.warn("券已被其它订单核销，本单按无券结算 orderNo={} couponNo={}", orderNo, e.getCouponNo());
+            e.setCouponNo(null);
+            charged = chargeChain.charge(gross, multiplier, null, capTotal, e.getFreeReason());
+        }
 
         e.setAmount(charged.payable());
+        e.setCouponAmount(charged.couponUsed());
         e.setWaivedAmount(charged.waivedAmount());
         e.setBuyout(charged.buyout() ? 1 : 0);
         e.setFeeAmount(charged.payable().doubleValue());   // 过渡期双写，待前端与报表切到 amount 后移除
@@ -362,7 +419,33 @@ public class RentOrderServiceImpl implements RentOrderService {
         appendEvent(orderNo, beforeSettle, e.getStatus(), "SETTLE", OPERATOR_SYSTEM);
 
         publishSettled(e);
+        powerbankTracker.returned(e.getPowerbankNo(), returnCabinetNo, null);   // 仓位由设备的识别回执补齐
         return new OkResult(true);
+    }
+
+    /**
+     * 逾期达封顶自动买断（执行清单 A1 · 联动 E17）。按当前时长试算：触及方案总封顶（买断价）即以封顶价买断结单，
+     * 宝 → SOLD，照常发结算事件走分润。未触顶 / 快照没有总封顶 / 已不在进行中 → 返回 false。
+     */
+    @Override
+    public boolean buyoutIfCapped(String orderNo) {
+        return Boolean.TRUE.equals(DataScopeContext.executeWithoutScope(() -> {
+            OrdOrder e = mapper.selectOne(new LambdaQueryWrapper<OrdOrder>().eq(OrdOrder::getOrderNo, orderNo).last("limit 1"));
+            if (e == null || !OrderStatus.IN_USE.name().equals(e.getStatus())) return false;
+            java.math.BigDecimal cap = PriceResolver.capTotalFromSnapshot(e.getPriceSnapshot());
+            if (cap == null) return false;
+            long min = durationMinutes(e.getRentStartAt(), nowUtc());
+            java.math.BigDecimal gross = priceEngine.price(PriceResolver.fromSnapshot(e.getPriceSnapshot()),
+                    java.util.Map.of("MINUTE", java.math.BigDecimal.valueOf(min)), e.getCurrency()).total();
+            ChargeChain.Charged charged = chargeChain.charge(gross, PriceResolver.multiplierFromSnapshot(e.getPriceSnapshot()),
+                    null, cap, null);
+            if (!charged.buyout()) return false;
+            buyout(orderNo, cap);
+            OrdOrder done = mapper.selectOne(new LambdaQueryWrapper<OrdOrder>().eq(OrdOrder::getOrderNo, orderNo).last("limit 1"));
+            publishSettled(done);   // 买断也是收入，分润照常
+            log.info("逾期达封顶自动买断 orderNo={} minutes={} cap={}", orderNo, min, cap);
+            return true;
+        }));
     }
 
     /**
@@ -433,14 +516,22 @@ public class RentOrderServiceImpl implements RentOrderService {
     }
 
     /**
-     * 订单上挂的券的抵扣额。
+     * 订单上挂的券的抵扣规格；无券或券已失效返回 null。
      *
-     * <p>当前返回 null（无券）—— 券的发放与核销尚未接线（`usr_coupon` 有表有实体，
-     * 但没有「下单时选券」的入口）。**此处显式留空并注明，而不是悄悄不调 ChargeChain** ——
-     * 后者会让「券抵扣没实现」这件事从代码里看不出来。
+     * <p>返回**规格而不是金额**：门槛与折扣率都要按「封顶后的应收」算，
+     * 那个基数只有 {@link ChargeChain#charge} 知道（见 {@link ChargeChain.Coupon#offAgainst}）。
+     *
+     * <p>这里**重新校验一次可用性**，尽管下单时已经校验过：借出到归还之间可能过了有效期，
+     * 也可能被别处用掉。过期的券静静地抵扣下去，账面上谁也看不出不对。
      */
-    private java.math.BigDecimal couponOffOf(OrdOrder e) {
-        return null;
+    private ChargeChain.Coupon couponOf(OrdOrder e) {
+        if (e.getCouponNo() == null || e.getCouponNo().isBlank()) return null;
+        var offer = coupons.offerOf(e.getCUserNo(), e.getCouponNo(), e.getCurrency());
+        if (offer == null) {
+            log.warn("结算时券已不可用，本单按无券计价 orderNo={} couponNo={}", e.getOrderNo(), e.getCouponNo());
+            return null;
+        }
+        return new ChargeChain.Coupon(offer.type(), offer.value(), offer.threshold());
     }
 
     @Override

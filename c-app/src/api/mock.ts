@@ -2,6 +2,7 @@
 import * as db from "@/mock/db";
 import type { McpApi, LoginParams, RentParams, PayParams, OrderQ, NearbyQ } from "./contract";
 import type { ConsumerOrder, LogoffItem, UserCoupon, RechargeResult, CsTicket, ReportResult } from "@/types";
+import { t } from "@/i18n";
 
 /** 注销申请的 mock 状态。模块级而非 db 里：它是会话内的一次性流程，不是种子数据。 */
 let mockLogoff: LogoffItem | null = null;
@@ -101,8 +102,17 @@ export const mockApi: McpApi = {
   rentOrder: (p: RentParams) => {
     const cab = db.cabinets.find((c) => c.cabinetNo === p.cabinetNo) ?? db.cabinets[0];
     const now = fmtNow();
+    const orderNo = `R${Math.floor(performance.now() * 1000)}`;
+    // 用券在 mock 层也要**真的改 db**：不改的话重开一次券还在，而线上那张已经核销了。
+    // 校验口径照后端 CouponUsePort.offerOf —— mock 放行、线上拒单是最难查的一类不一致。
+    if (p.couponNo) {
+      const c = db.coupons.find((x) => x.couponNo === p.couponNo);
+      if (!c || c.status !== "UNUSED") throw new Error(t("borrow.couponUnusable"));
+      c.status = "USED";
+      c.usedOrderNo = orderNo;
+    }
     const order: ConsumerOrder = {
-      orderNo: `R${Math.floor(performance.now() * 1000)}`,
+      orderNo,
       cUserNo: "CU-0001",
       status: "IN_USE",
       cabinetNo: cab.cabinetNo,

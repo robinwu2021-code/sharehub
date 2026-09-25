@@ -84,6 +84,14 @@ public class OrdOrder extends BaseEntity {
     /** 使用的券号（逻辑引用 usr_coupon）。 */
     private String couponNo;
 
+    /**
+     * 券实际抵扣金额。
+     *
+     * <p>与 {@link #couponNo} 分开存：券号答「用了哪张」，这一列答「抵了多少」。
+     * 后者事后推不出来 —— 模板面额会改，折扣券的抵扣额还取决于当时的应收。
+     */
+    private java.math.BigDecimal couponAmount;
+
     /** 免单原因（非空即免单）：INTERNAL_TEST/VIP/BD_DEMO/MERCHANT_SELF。 */
     private String freeReason;
 
