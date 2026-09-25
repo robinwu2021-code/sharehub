@@ -2,6 +2,7 @@
 // 说明：状态机与必填校验一律落在 db 层（lib/mock/db/workorder.ts），本文件只做「延迟 + 透传」，
 // 且各动作方法**声明为 async**，让 db 抛的 WorkOrderTransitionError 变成 rejected promise，
 // 由页面 MutationCache.onError 统一弹错——不能默默吞掉非法迁移。
+import * as we from "../../mock/db/workorder-ext";
 import * as db from "../../mock/db";
 import * as wo from "../../mock/db/workorder";
 import type { WorkOrderApi } from "../contracts/workorder";
@@ -27,4 +28,11 @@ export const workOrderMock: WorkOrderApi = {
   // 立即执行一次：db 层抛 InspectionRunError（停用/本周期已执行/站点无机柜），
   // 声明 async 让它变成 rejected promise 交给全局 onError，不能默默吞掉
   runInspectionPlan: async (no) => wait(wo.runInspectionPlanNow(no), 500),
+
+  // —— 工单增强 ——
+  woSummary: () => wait(we.woSummary()),
+  getWorkOrderDetail: (no) => wait(we.getWorkOrderDetail(no)),
+  assigneeCandidates: (siteNo) => wait(we.assigneeCandidates(siteNo)),
+  deriveWorkOrder: async (no, req) => wait(we.deriveWorkOrder(no, req), 350),
+  takeoverWorkOrder: async (no, req) => wait(we.takeoverWorkOrder(no, req), 350),
 };

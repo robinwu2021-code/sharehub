@@ -14,6 +14,7 @@ import type { PageQ, WoQ } from "../query";
 import type {
   PageResult, WorkOrder, WorkOrderDraft, WorkOrderHandlePayload, WorkOrderClosePayload,
   SlaRule, InspectionPlan, InspectionRunResult,
+  WoSummary, WorkOrderDetail, AssigneeCandidate, WoDeriveReq, WoTakeoverReq,
 } from "../../types";
 
 export interface WorkOrderApi {
@@ -47,4 +48,22 @@ export interface WorkOrderApi {
    * ⚠️ 后端缺口：`WoExtController` 目前没有这个端点（详见 https/workorder.ts）。
    */
   runInspectionPlan(planNo: string): Promise<InspectionRunResult>;
+
+  // ——— 工单增强（2026-09-25）———
+
+  /** 摘要条：待派单 / 即将超时 / 已超时 / 验收不通过。四个都是要人动手的事。 */
+  woSummary(): Promise<WoSummary>;
+  /** 详情：工单 + 时间线 + 现场照片 + **关联告警**。 */
+  getWorkOrderDetail(woNo: string): Promise<WorkOrderDetail>;
+  /**
+   * 派单候选人。`siteNo` 给了就把该站的运维责任人排前面。
+   * 此前派单抽屉用的是写死的 STAFF 常量 —— 运营得自己记「哪个站归谁」，
+   * 记错了单子就派到另一个城市。
+   */
+  assigneeCandidates(siteNo?: string): Promise<AssigneeCandidate[]>;
+
+  /** 派生子单：现场发现的新问题另开一张，而不是塞进当前单的备注里。 */
+  deriveWorkOrder(woNo: string, req: WoDeriveReq): Promise<WorkOrder>;
+  /** 接管：转给另一个人。原因必填——被接管的人要看得到为什么。 */
+  takeoverWorkOrder(woNo: string, req: WoTakeoverReq): Promise<WorkOrder>;
 }

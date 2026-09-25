@@ -26,3 +26,4 @@ export * from "./file";
 // ⚠️ 临时落点：types/device.ts 被并发会话占用期间，设备运维类型先放这里（见该文件头部）
 export * from "./device-ops";
 export * from "./alarm-biz";
+export * from "./workorder-ext";

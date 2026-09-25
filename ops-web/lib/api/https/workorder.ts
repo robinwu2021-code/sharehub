@@ -30,4 +30,11 @@ export const workOrderHttp: WorkOrderApi = {
   // 端点名按现有 `/{no}/{action}` 约定先占位；后端补齐时必须同时实现幂等：
   // 同 planNo + 同周期键的第二次请求要拒绝（幂等键由服务端按 frequency 算，不能信前端传）。
   runInspectionPlan: (no) => client.post(`/api/ops/inspection-plans/${no}/run`),
+
+  // —— 工单增强 ——
+  woSummary: () => client.get("/api/ops/work-orders/summary"),
+  getWorkOrderDetail: (no) => client.get(`/api/ops/work-orders/${no}`),
+  assigneeCandidates: (siteNo) => client.get("/api/ops/work-orders/assignee-candidates", { siteNo }),
+  deriveWorkOrder: (no, req) => client.post(`/api/ops/work-orders/${no}/derive`, req),
+  takeoverWorkOrder: (no, req) => client.post(`/api/ops/work-orders/${no}/takeover`, req),
 };
