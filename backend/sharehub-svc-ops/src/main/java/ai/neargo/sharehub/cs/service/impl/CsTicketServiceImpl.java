@@ -110,7 +110,7 @@ public class CsTicketServiceImpl implements CsTicketService {
     public CsTicketVO create(TicketCreateReq req) {
         if (req == null || req.issue() == null || req.issue().isBlank()) {
             // 没有问题描述的工单是一行空记录 —— 它会进列表、占 SLA，却谁也不知道要做什么
-            throw new IllegalArgumentException("问题描述必填");
+            throw BizException.badRequest("error.report.issue_required");
         }
         CsTicket e = new CsTicket();
         e.setTicketNo(req.ticketNo() == null || req.ticketNo().isBlank() ? nextTicketNo() : req.ticketNo().trim());

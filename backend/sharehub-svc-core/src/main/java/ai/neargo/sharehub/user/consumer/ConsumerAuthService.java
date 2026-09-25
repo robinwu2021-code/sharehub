@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.user.consumer;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.data.scope.DataScopeContext;
 import ai.neargo.common.data.scope.DataScopeSpec;
 import ai.neargo.sharehub.auth.LoginUser;
@@ -48,7 +49,7 @@ public class ConsumerAuthService {
     public ConsumerLoginVO login(ConsumerLoginReq req) {
         ConsumerLoginStrategy strategy = strategies.get(req.grantType());
         if (strategy == null) {
-            throw new IllegalArgumentException("不支持的登录方式: " + req.grantType());
+            throw BizException.badRequest("error.auth.grant_type_unsupported", req.grantType());
         }
         ResolvedIdentity id = strategy.authenticate(req);              // ← 端差异全在此
         String tenant = (req.tenantNo() == null || req.tenantNo().isBlank()) ? "MAIN" : req.tenantNo();

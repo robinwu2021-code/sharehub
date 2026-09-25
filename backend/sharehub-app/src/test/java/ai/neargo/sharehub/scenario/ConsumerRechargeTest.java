@@ -124,8 +124,10 @@ class ConsumerRechargeTest extends ApiTestSupport {
                 .as("没选套餐").isEqualTo(400);
 
         String disabled = freshPackage(admin, "DISABLED", 30, 0);
+        // 409 而不是 400：请求本身没毛病，是**套餐的状态**不允许 —— 与「套餐不存在」
+        // （那才是入参错）分开。2026-09-25 随 i18n 那批一起改，此前只有 400 可用。
         assertThat(post("/mp/user/recharge", Map.of("packageNo", disabled), token).status)
-                .as("已停用的套餐不该还能充 —— 停用就是为了停止售卖").isEqualTo(400);
+                .as("已停用的套餐不该还能充 —— 停用就是为了停止售卖").isEqualTo(409);
         assertThat(get("/mp/user/wallet", token).okData().path("balance").asDouble())
                 .as("被拒之后余额不该动").isEqualTo(0.0);
     }

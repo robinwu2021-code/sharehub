@@ -22,7 +22,7 @@
 #   · 「<字段名> 必填」→ BizException.badRequest("error.common.missing_parameter", 字段名)（已收口 22 处）
 #   · 真正给人看的表单校验 → 自己的 key + 三语，见 messages*.properties
 #
-TOTAL 336
+TOTAL 318
 
 AccountStatus
 AdDtos
@@ -56,13 +56,11 @@ CampaignStatus
 CodeBatchStatus
 ComplaintServiceImpl
 ConsumerAuthController
-ConsumerAuthService
 ContractServiceImpl
 ContractStateMachine
 CreditScoreServiceImpl
 CsSenderType
 CsSessionStatus
-CsTicketServiceImpl
 CsTicketStatus
 DataScopeServiceImpl
 DepartmentServiceImpl
@@ -104,7 +102,6 @@ OrderStatus
 OtaReleaseStatus
 OtaRolloutStatus
 OtaServiceImpl
-OtpService
 OutboxStatus
 PaymentServiceImpl
 PayoutAccountServiceImpl
@@ -117,7 +114,6 @@ PricePlanServiceImpl
 PricingScheduleServiceImpl
 ProtectionServiceImpl
 PushServiceImpl
-RechargeServiceImpl
 ReconTaskStatus
 ReconcileServiceImpl
 ReferralServiceImpl
@@ -139,7 +135,6 @@ SlaRuleServiceImpl
 TrialRentStateMachine
 UserAssetDtos
 UserInvoiceServiceImpl
-UserLogoffServiceImpl
 VendorStatus
 VenueOnboardingServiceImpl
 WalletServiceImpl

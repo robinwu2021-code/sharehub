@@ -53,15 +53,15 @@ public class RechargeServiceImpl implements RechargeService {
     @Override
     @Transactional
     public RechargeResultVO recharge(String cUserNo, String packageNo) {
-        if (packageNo == null || packageNo.isBlank()) throw new IllegalArgumentException("请选择充值套餐");
+        if (packageNo == null || packageNo.isBlank()) throw BizException.badRequest("error.recharge.package_required");
         UsrRechargePkg pkg = packages.selectOne(new LambdaQueryWrapper<UsrRechargePkg>()
                 .eq(UsrRechargePkg::getPackageNo, packageNo).last("limit 1"));
         if (pkg == null) throw BizException.notFound(packageNo);
-        if (!PKG_ENABLED.equals(pkg.getStatus())) throw new IllegalArgumentException("充值套餐已停用: " + packageNo);
+        if (!PKG_ENABLED.equals(pkg.getStatus())) throw BizException.conflict("error.recharge.package_disabled");
 
         BigDecimal pay = nz(pkg.getPayAmount());
         BigDecimal gift = nz(pkg.getGiftAmount());
-        if (pay.signum() <= 0) throw new IllegalArgumentException("充值套餐金额异常: " + packageNo);
+        if (pay.signum() <= 0) throw BizException.conflict("error.recharge.package_amount_invalid");
         String currency = pkg.getCurrency() == null || pkg.getCurrency().isBlank() ? "AED" : pkg.getCurrency();
 
         UsrRechargeOrder o = new UsrRechargeOrder();

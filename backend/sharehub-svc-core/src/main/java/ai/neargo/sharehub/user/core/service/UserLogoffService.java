@@ -37,8 +37,10 @@ public interface UserLogoffService {
     /**
      * 冷静期内撤销注销。
      *
-     * @throws IllegalArgumentException 无 PENDING 申请，或冷静期已过（此时数据可能已开始清除）——
-     *         用前者不用 IllegalStateException：这是调用方的问题，本仓只把前者映射成 400
+     * @throws ai.neargo.sharehub.common.BizException 无 PENDING 申请 → 400（调用方的问题）；
+     *         冷静期已过 → <b>409</b>（请求没毛病，是申请的状态不允许，此时数据可能已开始清除）。
+     *         原注释写「只能用 IllegalArgumentException，因为本仓只把它映射成 400」——
+     *         那条限制 2026-09-25 已经没有了（ServerException 现在按业务码推导状态）
      */
     LogoffItem cancel(String cUserNo);
 }

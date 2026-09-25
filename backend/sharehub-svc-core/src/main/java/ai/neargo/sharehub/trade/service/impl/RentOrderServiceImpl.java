@@ -70,13 +70,18 @@ public class RentOrderServiceImpl implements RentOrderService {
     /** 站点的场地方 / 场景 / 区域在 platform；跨服务只读面（ADR-017 §5.2）。可缺席 —— 见 {@link #queryOf}。 */
     private final ObjectProvider<SiteQueryPort> siteQuery;
 
+    /** 停借保还（TDD-运营核心流程/04 §4.4）：只拦借，归还路径不调用。 */
+    private final ai.neargo.sharehub.trade.RentabilityGuard rentability;
+
     public RentOrderServiceImpl(OrdMapper mapper, OrdStateMachine stateMachine,
                                 OrdRentExtMapper rentExtMapper, InterventionMapper interventionMapper,
                                 PriceResolver priceResolver, PriceEngine priceEngine,
                                 ChargeChain chargeChain, CabinetMapper cabinetMapper,
                                 DomainEventBus eventBus, PriceMultiplierResolver multipliers,
                                 ObjectProvider<SiteQueryPort> siteQuery,
-                                ai.neargo.sharehub.trade.order.service.OrderEventLogService eventLog) {
+                                ai.neargo.sharehub.trade.order.service.OrderEventLogService eventLog,
+                                ai.neargo.sharehub.trade.RentabilityGuard rentability) {
+        this.rentability = rentability;
         this.eventLog = eventLog;
         this.multipliers = multipliers;
         this.siteQuery = siteQuery;
@@ -172,7 +177,7 @@ public class RentOrderServiceImpl implements RentOrderService {
         return DataScopeContext.executeWithoutScope(() -> {
             OrdOrder e = require(orderNo);
             if (!"IN_USE".equals(e.getStatus())) {
-                throw new IllegalArgumentException("仅使用中的订单可买断，当前状态: " + e.getStatus());
+                throw BizException.conflict("error.order.buyout_only_in_use", e.getStatus());
             }
             java.math.BigDecimal price = buyoutPrice == null ? java.math.BigDecimal.ZERO : buyoutPrice;
             e.setRentEndAt(nowUtc());
@@ -196,7 +201,7 @@ public class RentOrderServiceImpl implements RentOrderService {
 
     @Override
     public RentResult rent(String cUserNo, String cabinetNo) {
-        if (cabinetNo == null || cabinetNo.isBlank()) throw new IllegalArgumentException("柜机号为空");
+        if (cabinetNo == null || cabinetNo.isBlank()) throw BizException.badRequest("error.rent.cabinet_required");
         OrdOrder e = new OrdOrder();
         e.setOrderNo(IdGenerator.next("ORD"));
         e.setCUserNo(cUserNo);
@@ -247,6 +252,7 @@ public class RentOrderServiceImpl implements RentOrderService {
         DevCabinet cab = DataScopeContext.executeWithoutScope(() ->
                 cabinetMapper.selectOne(new LambdaQueryWrapper<DevCabinet>()
                         .eq(DevCabinet::getCabinetNo, cabinetNo).last("limit 1")));
+        rentability.checkRent(cab);
 
         /*
          * 数据范围锚点：这三列决定**这一单归谁看**（DataScopeRegistration 里
@@ -287,12 +293,40 @@ public class RentOrderServiceImpl implements RentOrderService {
 
     @Override
     public OkResult returnOrder(String orderNo, String returnCabinetNo) {
+        return returnOrderAt(orderNo, returnCabinetNo, null);
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public boolean cancelUndelivered(String orderNo, String reason) {
+        return Boolean.TRUE.equals(DataScopeContext.executeWithoutScope(() -> {
+            OrdOrder e = DataScopeContext.executeWithoutScope(() -> mapper.selectOne(
+                    new LambdaQueryWrapper<OrdOrder>().eq(OrdOrder::getOrderNo, orderNo).last("limit 1")));
+            if (e == null || !OrderStatus.DISPENSING.name().equals(e.getStatus())) return false;
+            String before = e.getStatus();
+            String to = stateMachine.next(before, "CANCEL");
+            int n = DataScopeContext.executeWithoutScope(() -> mapper.update(null,
+                    new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<OrdOrder>()
+                            .eq(OrdOrder::getOrderNo, orderNo).eq(OrdOrder::getStatus, before)
+                            .set(OrdOrder::getStatus, to).set(OrdOrder::getAmount, java.math.BigDecimal.ZERO)
+                            .set(OrdOrder::getFeeAmount, 0d)   // free_reason 回指免费白名单，不写自由文本
+                            .set(OrdOrder::getEndedAt, java.time.LocalDateTime.now())));
+            if (n == 0) return false;
+            appendEvent(orderNo, before, to, "CANCEL", OPERATOR_SYSTEM);
+            log.info("撤销未出宝订单 orderNo={} reason={}", orderNo, reason);
+            // 预授权释放 / 退款经支付接入（pay-svc）确认，接入前这里只撤单不动钱
+            return true;
+        }));
+    }
+
+    @Override
+    public OkResult returnOrderAt(String orderNo, String returnCabinetNo, java.time.LocalDateTime endUtc) {
         OrdOrder e = require(orderNo);
         String beforeReturn = e.getStatus();
         e.setStatus(stateMachine.next(e.getStatus(), "RETURN"));   // IN_USE→RETURNED，非法迁移拒
         appendEvent(orderNo, beforeReturn, e.getStatus(), "RETURN", OPERATOR_SYSTEM);
         e.setReturnCabinetNo(returnCabinetNo);
-        String endAt = nowUtc();   // 同 rent()：DATETIME(3) 不接受带 Z 的字面量
+        String endAt = endUtc == null ? nowUtc() : endUtc.toString();   // 同 rent()：DATETIME(3) 不接受带 Z 的字面量
         e.setRentEndAt(endAt);
         long min = durationMinutes(e.getRentStartAt(), endAt);
         e.setDurationMin((int) min);

@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.user.core.service.impl;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.ServerException;
 import ai.neargo.common.core.ErrorCode;
 import ai.neargo.sharehub.user.core.dto.UserCoreDtos.LogoffItem;
@@ -63,13 +64,13 @@ public class UserLogoffServiceImpl implements UserLogoffService {
         // 而日志规范要求每条 ERROR 都能回答「谁该做什么」。状态机（Wo/Ord/Settlement）一律用前者，
         // 正是为了实现状态总表里那句「非法迁移一律 400」。
         if (e == null || !PENDING.equals(e.getStatus())) {
-            throw new IllegalArgumentException("没有进行中的注销申请，无法撤销");
+            throw BizException.badRequest("error.logoff.no_pending");
         }
         // 冷静期过了就不许撤销。接口 javadoc 一直这么写着，而实现没有判 ——
         // 清除作业还没接，状态会一直停在 PENDING，于是「过期不可撤销」这条保护形同虚设。
         // 等作业接上之后，到期那一刻数据可能已经在删，那时候回一句「撤销成功」是假话。
         if (expired(e)) {
-            throw new IllegalArgumentException("冷静期已过（" + e.getCoolingUntil() + "），不可撤销");
+            throw BizException.conflict("error.logoff.cooling_over", e.getCoolingUntil());
         }
         e.setStatus(CANCELLED);
         mapper.updateById(e);

@@ -90,8 +90,11 @@ class ConsumerLogoffTest extends ApiTestSupport {
                 "2000-01-01 00:00:00", me);
         assertThat(updated).as("前置：应当改到那条 PENDING 申请").isEqualTo(1);
 
+        // 409：请求没毛病，是**申请的状态**（冷静期已结束）不允许撤销。
+        // 此前是 400，因为当时本仓只把 IllegalArgumentException 映射成 400 ——
+        // 那条限制 2026-09-25 已经没有了（见 UserLogoffService#cancel 的注释）。
         assertThat(post("/mp/user/logoff/cancel", Map.of(), token).status)
                 .as("冷静期已过还能撤销，等于对用户说了假话：数据可能已经开始清除")
-                .isEqualTo(400);
+                .isEqualTo(409);
     }
 }

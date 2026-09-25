@@ -222,12 +222,12 @@ public class WalletServiceImpl implements WalletService {
     @org.springframework.transaction.annotation.Transactional
     public WalletOverview credit(String cUserNo, BigDecimal payAmount, BigDecimal giftAmount,
                                  String currency, String bizType, String bizNo, String title) {
-        if (cUserNo == null || cUserNo.isBlank()) throw new IllegalArgumentException("入账必须指定用户");
+        if (cUserNo == null || cUserNo.isBlank()) throw BizException.badRequest("error.wallet.credit_user_required");
         BigDecimal pay = nz(payAmount);
         BigDecimal gift = nz(giftAmount);
-        if (pay.signum() < 0 || gift.signum() < 0) throw new IllegalArgumentException("入账金额不能为负");
+        if (pay.signum() < 0 || gift.signum() < 0) throw BizException.badRequest("error.wallet.credit_amount_invalid");
         // 0 元入账不记账：一条 0 元流水只会污染对账，和 adjust 里同样的道理
-        if (pay.signum() == 0 && gift.signum() == 0) throw new IllegalArgumentException("入账金额为 0");
+        if (pay.signum() == 0 && gift.signum() == 0) throw BizException.badRequest("error.wallet.credit_amount_invalid");
 
         UsrWallet w = openIfAbsent(cUserNo, currency);
         w.setBalance(nz(w.getBalance()).add(pay));

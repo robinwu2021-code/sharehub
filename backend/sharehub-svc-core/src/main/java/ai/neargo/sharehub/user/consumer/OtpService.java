@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.user.consumer;
 
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.auth.DevMode;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -84,7 +85,7 @@ public class OtpService {
      */
     public void verify(String phone, String otp) {
         if (otp == null || otp.isBlank()) {
-            throw new IllegalArgumentException("验证码为空");
+            throw BizException.badRequest("error.otp.required");
         }
         // 固定码：仅 dev-mode。放在最前面是为了本机联调不依赖「先发码」这一步。
         if (devMode.isEnabled() && DEV_MASTER.equals(otp)) {
@@ -93,19 +94,19 @@ public class OtpService {
         }
         Entry e = codes.get(phone);
         if (e == null) {
-            throw new IllegalArgumentException("验证码错误或已过期");
+            throw BizException.badRequest("error.otp.invalid");
         }
         if (Instant.now().isAfter(e.issuedAt.plus(ttl))) {
             codes.remove(phone);
-            throw new IllegalArgumentException("验证码错误或已过期");
+            throw BizException.badRequest("error.otp.invalid");
         }
         // 先累加再判断：第 maxAttempts 次失败后作废，避免「最后一次」还能再试
         if (++e.attempts > maxAttempts) {
             codes.remove(phone);
-            throw new IllegalArgumentException("验证码错误次数过多，请重新获取");
+            throw BizException.badRequest("error.otp.too_many");
         }
         if (!e.code.equals(otp)) {
-            throw new IllegalArgumentException("验证码错误或已过期");
+            throw BizException.badRequest("error.otp.invalid");
         }
         codes.remove(phone);
     }

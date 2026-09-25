@@ -62,7 +62,7 @@ public class UserInvoiceServiceImpl implements UserInvoiceService {
     @Transactional
     public InvoiceTitleItem saveTitle(String cUserNo, UsrInvoiceTitle body) {
         if ("COMPANY".equals(body.getType()) && (body.getVatTrn() == null || body.getVatTrn().isBlank())) {
-            throw new IllegalArgumentException("企业抬头必须填写税号 vatTrn");
+            throw BizException.badRequest("error.invoice.vat_required");
         }
         body.setCUserNo(cUserNo); // 属主以会话为准，不信 body
 
