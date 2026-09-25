@@ -10,9 +10,9 @@ const fmt = (d: Date) => d.toISOString().slice(0, 19).replace("T", " ");
 
 export const mockApi: McpApi = {
   login: (p: LoginParams) =>
-    db.delay({ token: `mock-c-${p.grantType}`, cUserNo: "CU-0001", nickname: db.profile.nickname, isNew: false }),
+    db.delay({ token: `mock-c-${p.grantType}`, cUserNo: "CU-0001", isNew: false, tenantNo: "MAIN" }),
   sendOtp: () => db.delay({ cooldown: 60 }, 300),
-  register: (p) => db.delay({ token: "mock-c-register", cUserNo: "CU-0001", nickname: p.nickname, isNew: true }, 500),
+  register: () => db.delay({ token: "mock-c-register", cUserNo: "CU-0001", isNew: true, tenantNo: "MAIN" }, 500),
   resetPassword: () => db.delay({ ok: true as const }, 400),
   // mock 没有服务端会话可吊销，但必须存在：缺这个方法，mock 模式点登出会直接 TypeError
   logout: () => db.delay(undefined as void, 100),
@@ -170,7 +170,7 @@ export const mockApi: McpApi = {
     // 真改 db：余额与流水一起动，重开页面能读回。只改余额不记流水的话，
     // 「流水合计 === 余额」当场被破坏，而这正是真后端里最不该出的那类错。
     db.wallet.balance += pkg.payAmount;
-    db.wallet.bonus += pkg.giftAmount;
+    db.wallet.giftBalance += pkg.giftAmount;
     const rechargeNo = "RCH" + String(db.walletTxns.length + 100).padStart(6, "0");
     const at = new Date().toISOString().slice(0, 19).replace("T", " ");
     db.walletTxns.unshift({
@@ -206,7 +206,7 @@ export const mockApi: McpApi = {
       currency: pkg.currency,
       status: "PAID",
       balance: db.wallet.balance,
-      bonus: db.wallet.bonus,
+      bonus: db.wallet.giftBalance,
     };
     return db.delay(r, 500);
   },

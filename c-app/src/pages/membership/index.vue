@@ -2,9 +2,9 @@
 import { ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "@/api";
-import type { Membership } from "@/types";
+import type { MembershipPlan } from "@/types";
 
-const list = ref<Membership[]>([]);
+const list = ref<MembershipPlan[]>([]);
 const loading = ref(true);
 
 async function load() {
@@ -17,7 +17,7 @@ async function load() {
 }
 onShow(load);
 
-function buy(m: Membership) {
+function buy(m: MembershipPlan) {
   uni.showToast({ title: m.name, icon: "none" });
 }
 </script>

@@ -4,11 +4,11 @@ import { onShow } from "@dcloudio/uni-app";
 import { storeToRefs } from "pinia";
 import { useUserStore } from "@/stores/user";
 import { api } from "@/api";
-import type { Wallet } from "@/types";
+import type { WalletOverview } from "@/types";
 
 const userStore = useUserStore();
 const { profile, isLoggedIn } = storeToRefs(userStore);
-const wallet = ref<Wallet | null>(null);
+const wallet = ref<WalletOverview | null>(null);
 const sheet = ref(false);
 
 async function load() {
@@ -67,7 +67,7 @@ async function logout() {
         <pb-card @tap="go('/pages/wallet/index')">
           <view class="flex">
             <pb-stat :label="$t('me.wallet')"><pb-amount :value="wallet.balance" size="md" /></pb-stat>
-            <pb-stat :label="$t('me.freeDeposit')"><pb-amount :value="wallet.frozen" size="md" /></pb-stat>
+            <pb-stat :label="$t('me.freeDeposit')"><pb-amount :value="wallet.frozenAmount" size="md" /></pb-stat>
             <pb-stat :label="$t('me.credit')">
               <text v-if="profile" class="text-primary">{{ profile.creditScore }}</text>
             </pb-stat>

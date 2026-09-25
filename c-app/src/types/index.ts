@@ -100,11 +100,20 @@ export interface UserProfile {
   memberLevel?: string;
 }
 
-export interface Wallet {
+/**
+ * 我的钱包总览（镜像后端 `WalletOverview`）。
+ *
+ * ⚠️ 字段名是后端那一套：`giftBalance`/`depositAmount`/`frozenAmount`，
+ * 不是 `bonus`/`deposit`/`frozen`。写成后者的时候「赠金 / 押金 / 免押冻结」
+ * 三个数字全是 undefined —— 卡片照样渲染，只是那三格空着，不报错。
+ * 类型名也必须叫 `WalletOverview`（与后端 DTO 同名），否则对齐脚本配不上对，
+ * 字段再怎么漂移都拦不住。
+ */
+export interface WalletOverview {
   balance: number;
-  bonus: number; // 赠金
-  deposit: number; // 押金
-  frozen: number; // 免押冻结
+  giftBalance: number; // 赠金
+  depositAmount: number; // 押金
+  frozenAmount: number; // 免押冻结
   currency: string;
 }
 
@@ -192,7 +201,8 @@ export interface ClaimableCoupon {
   claimed: boolean;
 }
 
-export interface Membership {
+/** 会员方案（镜像后端 `MembershipPlanVO`）。名字要带 `Plan`，否则对齐脚本配不上对。 */
+export interface MembershipPlan {
   planNo: string;
   name: string;
   price: number;
@@ -257,11 +267,18 @@ export interface FaqItem {
   sortNo: number;
 }
 
-export interface LoginResult {
+/**
+ * 登录结果（镜像后端 `ConsumerLoginVO`）。
+ *
+ * ⚠️ **没有 `nickname`** —— 后端登录只回 token / 用户号 / 是否新用户 / 租户号，
+ * 昵称走 `GET /mp/user/profile`。类型里挂着 `nickname` 的时候它恒为 undefined，
+ * 谁照着它写欢迎语就会得到一句「欢迎，undefined」。
+ */
+export interface ConsumerLogin {
   token: string;
   cUserNo: string;
-  nickname: string;
   isNew: boolean;
+  tenantNo: string;
 }
 
 // 国家区号（全球版）

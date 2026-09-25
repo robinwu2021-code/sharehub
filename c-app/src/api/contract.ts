@@ -6,17 +6,17 @@ import type {
   CabinetAvailability,
   RentOrder,
   UserProfile,
-  Wallet,
+  WalletOverview,
   UserCoupon,
   RechargePackage,
   RechargeResult,
   ClaimableCoupon,
-  Membership,
+  MembershipPlan,
   ReportInput,
   ReportResult,
   CsTicket,
   FaqItem,
-  LoginResult,
+  ConsumerLogin,
   Notice,
   MessageItem,
   AppVersionCheck,
@@ -84,9 +84,9 @@ export interface PayResult {
 
 export interface McpApi {
   // 认证（换 C 池 Bearer，之后属主鉴权）
-  login(p: LoginParams): Promise<LoginResult>;
+  login(p: LoginParams): Promise<ConsumerLogin>;
   sendOtp(p: OtpParams): Promise<{ cooldown: number }>;
-  register(p: RegisterParams): Promise<LoginResult>;
+  register(p: RegisterParams): Promise<ConsumerLogin>;
   resetPassword(p: ResetPwdParams): Promise<{ ok: true }>;
   // 登出：**让后端真正吊销 token**。只清本地 storage 等于没登出 ——
   // 令牌在服务端一直有效到过期（`POST /mp/auth/logout` 早就实现了吊销，前端从没调过）。
@@ -127,7 +127,7 @@ export interface McpApi {
   listReports(q?: PageQ & { status?: string }): Promise<PageResult<CsTicket>>;
   getReport(reportNo: string): Promise<CsTicket | null>;
   // 钱包 / 营销
-  getWallet(): Promise<Wallet>;
+  getWallet(): Promise<WalletOverview>;
   // 充值：**只传套餐号**。金额由服务端按套餐算 —— 端上传金额等于把定价权交给端。
   listRechargePackages(): Promise<RechargePackage[]>;
   recharge(packageNo: string): Promise<RechargeResult>;
@@ -137,5 +137,5 @@ export interface McpApi {
   listCoupons(): Promise<UserCoupon[]>;
   listClaimableCoupons(): Promise<ClaimableCoupon[]>;
   claimCoupon(tplNo: string): Promise<UserCoupon>;
-  listMemberships(): Promise<Membership[]>;
+  listMemberships(): Promise<MembershipPlan[]>;
 }

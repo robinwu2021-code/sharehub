@@ -12,11 +12,11 @@ import { ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { useI18n } from "vue-i18n";
 import { api } from "@/api";
-import type { Wallet, WalletTxn, RechargePackage } from "@/types";
+import type { WalletOverview, WalletTxn, RechargePackage } from "@/types";
 import { money, dateTimeOf } from "@/shared/format";
 
 const { t } = useI18n();
-const wallet = ref<Wallet | null>(null);
+const wallet = ref<WalletOverview | null>(null);
 const txns = ref<WalletTxn[]>([]);
 const packages = ref<RechargePackage[]>([]);
 const loading = ref(true);
@@ -86,9 +86,9 @@ async function recharge(p: RechargePackage) {
           <pb-button size="sm" @click="openSheet">{{ $t("wallet.recharge") }}</pb-button>
         </view>
         <view class="mt-[28rpx] flex">
-          <pb-stat :label="$t('wallet.bonus')"><pb-amount :value="wallet.bonus" size="md" /></pb-stat>
-          <pb-stat :label="$t('wallet.deposit')"><pb-amount :value="wallet.deposit" size="md" /></pb-stat>
-          <pb-stat :label="$t('wallet.frozen')"><pb-amount :value="wallet.frozen" size="md" /></pb-stat>
+          <pb-stat :label="$t('wallet.bonus')"><pb-amount :value="wallet.giftBalance" size="md" /></pb-stat>
+          <pb-stat :label="$t('wallet.deposit')"><pb-amount :value="wallet.depositAmount" size="md" /></pb-stat>
+          <pb-stat :label="$t('wallet.frozen')"><pb-amount :value="wallet.frozenAmount" size="md" /></pb-stat>
         </view>
       </pb-card>
 

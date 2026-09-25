@@ -79,21 +79,23 @@ D AssignmentLog POST /api/agent/assignments
 D AuditLogEntry GET /api/platform/audit-logs
 D CodeBatchRow GET /api/ops/device-code-batches
 D CommandResult POST /api/ops/cabinets/{cabinetNo}/commands
-D ConsumerLoginVO POST /mp/auth/login
 D CouponTplVO GET /api/user/coupons
+# ⚠️ 收藏页比「类型没对上」更严重：后端 FavoriteItem 只有 {siteNo,siteName,createdAt}，
+#   而页面渲染的是门店卡片（cabinetNo/address/distanceM/availableBorrow/availableReturn）。
+#   切到真后端时整列表只剩店名，key 用的 cabinetNo 还会全撞在 undefined 上，
+#   点进去是 confirm?cabinetNo=undefined。要么后端把收藏出参补成门店卡片所需，
+#   要么前端拿 siteNo 逐个查门店详情 —— 是个接口口径决策，单独排。
 D FavoriteItem GET /mp/user/favorites
 D InvoiceItem GET /mp/user/invoices
 D InvoiceTitleItem GET /mp/user/invoice-titles
 D Location GET /api/ops/locations
 D LoginResp POST /api/auth/login
-D MembershipPlanVO GET /mp/user/membership
 D MenuNode GET /api/auth/menus
 D OkResult POST /api/ops/sites/{siteNo}/agents/{id}/remove
 D OperatorMembership GET /api/auth/operators
 D RentResult POST /mp/trade/orders/rent
 D SharingStats GET /api/trade/site-sharing/stats
 D UserCouponVO POST /api/user/coupons/{tplNo}/issue
-D WalletOverview GET /mp/user/wallet
 D WorkOrderRef POST /api/ops/alarms/records/{alarmNo}/work-order
 # ⚠️ 下面这条是**临时入口**，不是遗漏：
 #   本该由共用调度器按 cron 回调（v4/07 的 JobHandler），但那要等 ai-shop 的任务服务

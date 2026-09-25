@@ -8,17 +8,17 @@ import type {
   CabinetAvailability,
   RentOrder,
   UserProfile,
-  Wallet,
+  WalletOverview,
   UserCoupon,
   RechargePackage,
   RechargeResult,
   ClaimableCoupon,
-  Membership,
+  MembershipPlan,
   ReportInput,
   ReportResult,
   CsTicket,
   FaqItem,
-  LoginResult,
+  ConsumerLogin,
   Notice,
   MessageItem,
   AppVersionCheck,
@@ -28,9 +28,9 @@ import type {
 } from "@/types";
 
 export const httpApi: McpApi = {
-  login: (p: LoginParams) => client.post<LoginResult>("/mp/auth/login", p),
+  login: (p: LoginParams) => client.post<ConsumerLogin>("/mp/auth/login", p),
   sendOtp: (p) => client.post<{ cooldown: number }>("/mp/auth/otp", p),
-  register: (p) => client.post<LoginResult>("/mp/auth/register", p),
+  register: (p) => client.post<ConsumerLogin>("/mp/auth/register", p),
   resetPassword: (p) => client.post<{ ok: true }>("/mp/auth/password/reset", p),
   logout: () => client.post<void>("/mp/auth/logout"),
   getProfile: () => client.get<UserProfile>("/mp/user/profile"),
@@ -67,7 +67,7 @@ export const httpApi: McpApi = {
   listReports: (q?: PageQ & { status?: string }) => client.get<PageResult<CsTicket>>("/mp/user/reports", q),
   getReport: (reportNo: string) => client.get<CsTicket | null>(`/mp/user/reports/${reportNo}`),
 
-  getWallet: () => client.get<Wallet>("/mp/user/wallet"),
+  getWallet: () => client.get<WalletOverview>("/mp/user/wallet"),
   listRechargePackages: () => client.get<RechargePackage[]>("/mp/user/recharge-packages"),
   recharge: (packageNo: string) => client.post<RechargeResult>("/mp/user/recharge", { packageNo }),
   walletTxns: (q?: PageQ) => client.get<PageResult<WalletTxn>>("/mp/user/wallet/txns", q), // 待定
@@ -76,5 +76,5 @@ export const httpApi: McpApi = {
   listCoupons: () => client.get<PageResult<UserCoupon>>("/mp/user/coupons", { size: 200 }).then((r) => r.list),
   listClaimableCoupons: () => client.get<ClaimableCoupon[]>("/mp/user/coupons/claimable"),
   claimCoupon: (tplNo: string) => client.post<UserCoupon>(`/mp/user/coupons/${tplNo}/claim`),
-  listMemberships: () => client.get<Membership[]>("/mp/user/membership"),
+  listMemberships: () => client.get<MembershipPlan[]>("/mp/user/membership"),
 };

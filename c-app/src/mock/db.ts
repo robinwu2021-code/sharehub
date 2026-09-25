@@ -4,10 +4,10 @@ import type {
   CabinetAvailability,
   RentOrder,
   UserProfile,
-  Wallet,
+  WalletOverview,
   UserCoupon,
   ClaimableCoupon,
-  Membership,
+  MembershipPlan,
   Notice,
   StoreDetail,
   WalletTxn,
@@ -116,7 +116,7 @@ export const profile: UserProfile = {
   memberLevel: "Plus",
 };
 
-export const wallet: Wallet = { balance: 24, bonus: 10, deposit: 0, frozen: 100, currency: CURRENCY };
+export const wallet: WalletOverview = { balance: 24, giftBalance: 10, depositAmount: 0, frozenAmount: 100, currency: CURRENCY };
 
 // 收藏门店（siteNo 集合，可变）
 export const favorites = new Set<string>(["ST-DXBM"]);
@@ -124,7 +124,7 @@ export const favorites = new Set<string>(["ST-DXBM"]);
 // 字段照 WalletTxnRow（createdAt 不是 at；bizType/bizNo 是来源单号）
 export const walletTxns: WalletTxn[] = [
   { txnNo: "TX-06", type: "SPEND", direction: "OUT", title: "The Dubai Mall · rental", amount: -6, currency: CURRENCY, bizType: "ORDER", bizNo: "ORD000031", createdAt: "2026-07-12 11:00:00" },
-  { txnNo: "TX-05", type: "BONUS", direction: "IN", title: "Membership bonus", amount: 10, currency: CURRENCY, bizType: "MEMBERSHIP", bizNo: "MB000002", createdAt: "2026-07-10 08:00:00" },
+  { txnNo: "TX-05", type: "BONUS", direction: "IN", title: "MembershipPlan bonus", amount: 10, currency: CURRENCY, bizType: "MEMBERSHIP", bizNo: "MB000002", createdAt: "2026-07-10 08:00:00" },
   { txnNo: "TX-04", type: "RECHARGE", direction: "IN", title: "Top-up", amount: 20, currency: CURRENCY, bizType: "RECHARGE", bizNo: "RCH000004", createdAt: "2026-07-09 19:20:00" },
   { txnNo: "TX-03", type: "REFUND", direction: "IN", title: "JBR The Walk · refund", amount: 4, currency: CURRENCY, bizType: "REFUND", bizNo: "RF000003", createdAt: "2026-07-06 14:05:00" },
   { txnNo: "TX-02", type: "SPEND", direction: "OUT", title: "Mall of the Emirates · rental", amount: -8, currency: CURRENCY, bizType: "ORDER", bizNo: "ORD000021", createdAt: "2026-07-04 17:40:00" },
@@ -170,7 +170,7 @@ export const tickets: CsTicket[] = [
   { ticketNo: "TK000001", userNo: "CU-0001", orderNo: "ORD000021", cabinetNo: "CAB1002", problemNo: "ISS000001", issue: "扫码后没弹出充电宝", channel: "APP", status: "CLOSED", handlerNo: "EMP0007", woNo: "WO000011", refundNo: null, createdAt: "2026-09-12 19:40:00" },
 ];
 
-export const memberships: Membership[] = [
+export const memberships: MembershipPlan[] = [
   { planNo: "MB-MONTH", name: "Monthly Pass", price: 29, benefits: ["First 2h free daily", "10% off", "Higher free-deposit"], active: true, expireAt: "2026-08-12" },
   { planNo: "MB-10", name: "10-Rides Card", price: 40, benefits: ["10 rides, 2h each"], active: false },
 ];
