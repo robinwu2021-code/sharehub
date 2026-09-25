@@ -171,6 +171,9 @@ user:logoff:revoke	注销申请 代为撤销	user	1
 user:invoice:read	C端开票申请 查看	user	1
 user:invoice:handle	C端开票申请 处理	user	1
 workorder:*	工单 全部	workorder	0
+workorder:alarm:read	告警 查	workorder	1
+workorder:alarm:ack	告警 受理	workorder	1
+workorder:alarm:close	告警 关闭	workorder	1
 workorder:alarm:config	告警代码/通知规则 配置	workorder	1
 workorder:alarm:update	告警规则 维护	workorder	1
 workorder:inspection:update	巡检计划 配置	workorder	1

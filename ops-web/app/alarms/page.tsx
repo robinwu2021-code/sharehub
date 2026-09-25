@@ -29,7 +29,8 @@ import {
   archiveConfirm, unarchiveConfirm,
 } from "@/components/archive";
 import type { AlarmRecord, AlarmNotice, AlarmCode, AlarmRule, AlarmLevel, PageResult } from "@/lib/types";
-import { canAlarmAction } from "@/lib/types";
+import { canAlarmAction, ALARM_CLOSE_REASONS } from "@/lib/types";
+import type { AlarmCloseReason } from "@/lib/types";
 
 // tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）
 const TAB_KEYS = ["records", "notices", "codes", "rules"] as const;
@@ -109,7 +110,10 @@ function AlarmsInner() {
   // 转工单：告警→工单闭环（我们比竞品多的一环，竞品到通知就断了）
   const canRaise = allow("workorder:wo:create");
   // 确认告警只是认领处置责任、不建单，故与列表同权（后端 ack 也是 wo:read）
-  const canAck = allow("workorder:wo:read");
+  // 2026-09-25：此前受理借的是 workorder:wo:read —— 一个**工单只读码**在管一个写动作，
+  // 而它的持有者含 VIEWER，于是只读角色能受理告警。现在各归各的码。
+  const canAck = allow("workorder:alarm:ack");
+  const canClose = allow("workorder:alarm:close");
   const canConfig = allow("workorder:alarm:config");
   // 重发通知会**真的再发一条**短信/邮件（重复触达 + 重复计费），故与只读/配置分开发码
   const canResendNotice = allow("workorder:alarm:notice_resend");
@@ -117,6 +121,9 @@ function AlarmsInner() {
   // 待确认的告警 + 处置备注：备注选填，故用抽屉而非 confirm（confirm 只能要求「输入指定文本」）
   const [acking, setAcking] = useState<AlarmRecord | null>(null);
   const [ackRemark, setAckRemark] = useState("");
+  const [closing, setClosing] = useState<AlarmRecord | null>(null);
+  const [closeReason, setCloseReason] = useState<AlarmCloseReason | "">("");
+  const [closeNote, setCloseNote] = useState("");
 
   const [codeForm, setCodeForm] = useState<Partial<AlarmCode> | null>(null);
   const [ruleForm, setRuleForm] = useState<Partial<AlarmRule> | null>(null);
@@ -150,6 +157,16 @@ function AlarmsInner() {
       notify.success(`告警 ${r.alarmNo} 已确认（${REC_STATUS[r.status].label}）`);
       qc.invalidateQueries({ queryKey: ["alarm"] });
       setAcking(null);
+    },
+  });
+  // 关闭告警：把它从「未处理」里抹掉，所以原因必填 —— 见 ALARM_CLOSE_REASONS 的说明。
+  const closeAlarm = useMutation({
+    mutationFn: (v: { alarmNo: string; reason: AlarmCloseReason; note: string }) =>
+      api.closeAlarm(v.alarmNo, v.reason, v.note.trim() || undefined),
+    onSuccess: (r) => {
+      notify.success(`告警 ${r.alarmNo} 已关闭`);
+      qc.invalidateQueries({ queryKey: ["alarm"] });
+      setClosing(null);
     },
   });
   // 重发通知（拍板 #6）：服务端新增一条流水、原记录不动，故必须 invalidate 才看得到补发那条。
@@ -246,6 +263,10 @@ function AlarmsInner() {
           canAck && canAlarmAction(a.status, "ack") && (
             <Button key="ack" size="sm" variant="outline" disabled={ack.isPending}
               onClick={() => { setAcking(a); setAckRemark(a.remark ?? ""); }}>确认</Button>
+          ),
+          canClose && canAlarmAction(a.status, "close") && (
+            <Button key="close" size="sm" variant="outline" disabled={closeAlarm.isPending}
+              onClick={() => { setClosing(a); setCloseReason(""); setCloseNote(""); }}>关闭</Button>
           ),
           canRaise && !a.workOrderNo && (
             <Button key="raise" size="sm" variant="outline" disabled={raise.isPending}
@@ -441,6 +462,54 @@ function AlarmsInner() {
             <Field label="柜机 / 站点">{acking.cabinetNo} · {acking.siteName}</Field>
             <Field label="处置备注（选填）">
               <Input value={ackRemark} placeholder="留空则保留原上报说明" onChange={(e) => setAckRemark(e.target.value)} />
+            </Field>
+          </>
+        )}
+      </Drawer>
+
+      {/* 关闭告警：原因必选，否则提交禁用 —— 「误报率」那个数就靠这一栏 */}
+      <Drawer
+        open={!!closing}
+        onOpenChange={(o) => !o && setClosing(null)}
+        title={`关闭告警 ${closing?.alarmNo ?? ""}`}
+        desc="关闭表示这条告警到此为止，不再计入「未处理」；需要现场处理请改用「转工单」"
+        footer={
+          closing && (
+            <>
+              <Button variant="outline" onClick={() => setClosing(null)}>取消</Button>
+              <Button
+                disabled={!closeReason || closeAlarm.isPending}
+                onClick={() => closeReason && closeAlarm.mutate({
+                  alarmNo: closing.alarmNo, reason: closeReason, note: closeNote,
+                })}
+              >确认关闭</Button>
+            </>
+          )
+        }
+      >
+        {closing && (
+          <>
+            <Field label="告警">{closing.alarmCode} · {LEVEL[closing.level].label}（{closing.vendorCode} {closing.vendorErrorCode}）</Field>
+            <Field label="柜机 / 站点">{closing.cabinetNo} · {closing.siteName}</Field>
+            <Field label="关闭原因（必选）">
+              <div className="flex flex-col gap-2">
+                {ALARM_CLOSE_REASONS.map((r) => (
+                  <label key={r.value} className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="radio" name="close-reason" className="mt-1"
+                      checked={closeReason === r.value}
+                      onChange={() => setCloseReason(r.value)}
+                    />
+                    <span>
+                      <span className="txt-body">{r.label}</span>
+                      <span className="block txt-caption text-muted-foreground">{r.hint}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </Field>
+            <Field label="备注（选填）">
+              <Input value={closeNote} placeholder="原因之外的补充" onChange={(e) => setCloseNote(e.target.value)} />
             </Field>
           </>
         )}

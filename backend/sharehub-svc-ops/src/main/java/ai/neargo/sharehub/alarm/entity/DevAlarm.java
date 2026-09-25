@@ -68,4 +68,16 @@ public class DevAlarm extends BaseEntity {
 
     /** 合并次数。 */
     private Integer count;
+
+    /** 关闭原因（{@link ai.neargo.sharehub.alarm.AlarmCloseReason}）；关闭时必填。 */
+    private String closeReason;
+
+    /** 关闭备注：原因之外的补充，可空。 */
+    private String closeNote;
+
+    /** 关闭人（员工号），服务端按当前登录人回填。 */
+    private String closedBy;
+
+    /** 关闭时间。 */
+    private java.time.LocalDateTime closedAt;
 }

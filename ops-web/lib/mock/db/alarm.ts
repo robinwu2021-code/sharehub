@@ -5,8 +5,8 @@ import type {
   AlarmCode, AlarmRecord, AlarmNotice, AlarmRule, AlarmAckResult, AlarmWorkOrderRef,
   AlarmNoticeResendPayload, PageQuery,
 
-  AutoWorkOrderResult,} from "../../types";
-import { ALARM_TRANSITIONS, canAlarmAction } from "../../types";
+  AutoWorkOrderResult, AlarmCloseReason,} from "../../types";
+import { ALARM_TRANSITIONS, canAlarmAction, ALARM_CLOSE_REASONS } from "../../types";
 import { LOCS, OPERATORS, p, iso, phone } from "./internal";
 import { notFound, fail } from "@/lib/biz-error";
 import { paginate, kwHit, upsert, nextNo, liveHit, archiveRow, unarchiveRow } from "./helpers";
@@ -58,6 +58,12 @@ export const alarmRecords: AlarmRecord[] = Array.from({ length: 14 }, (_, i) => 
     // 否则「按次数排优先级」这件事在页面上看不出来。
     count: i % 5 === 0 ? 8 + (i % 40) : 1,
     remark: p(["心跳超时 10 分钟未恢复", "用户反馈取宝失败", "巡检现场发现", "厂商云回调上报", "监控脚本自动触发"], i),
+    // 已关闭的种子行带上关闭信息 —— 否则「关闭了但看不出原因」在 mock 下复现不了，
+    // 而这正是 2026-09-25 补关闭动作时要守住的那一点。
+    closeReason: st === "CLOSED" ? p(["RESOLVED", "FALSE_ALARM", "SELF_HEALED"] as const, i) : null,
+    closeNote: st === "CLOSED" ? "现场确认后关闭" : null,
+    closedBy: st === "CLOSED" ? "admin" : null,
+    closedAt: st === "CLOSED" ? iso(-2 - (i % 5)) : null,
   };
 });
 
@@ -167,6 +173,34 @@ export function ackAlarm(alarmNo: string, remark?: string): AlarmAckResult {
   if (remark?.trim()) a.remark = remark.trim(); // 备注为空则保留原上报说明，不要抹掉
   return { alarmNo: a.alarmNo, status: a.status };
 }
+
+/**
+ * 关闭告警：OPEN / ACKED → CLOSED，**原因必填**。
+ *
+ * 与真后端 `AlarmServiceImpl.close` 同一套判据：状态机先拒非法迁移，
+ * 原因先解析再落库 —— 值不合法时报「关闭原因非法」，而不是一路走到落库炸成别的话。
+ */
+export function closeAlarm(alarmNo: string, reason: AlarmCloseReason, note?: string): AlarmAckResult {
+  const a = alarmRecords.find((x) => x.alarmNo === alarmNo);
+  if (!a) throw notFound("告警", "Alarm", alarmNo);
+  if (!canAlarmAction(a.status, "close")) {
+    throw fail(`告警 ${alarmNo} 当前是「${a.status}」，不可关闭`,
+      `Alarm ${alarmNo} is ${a.status} and cannot be closed`,
+      `الإنذار ${alarmNo} في حالة ${a.status} ولا يمكن إغلاقه`);
+  }
+  if (!ALARM_CLOSE_REASONS.some((r) => r.value === reason)) {
+    throw fail("关闭原因必填（已解决 / 误报 / 已自愈）",
+      "A close reason is required (RESOLVED / FALSE_ALARM / SELF_HEALED)",
+      "سبب الإغلاق مطلوب");
+  }
+  a.status = ALARM_TRANSITIONS.close.to;
+  a.closeReason = reason;
+  if (note?.trim()) a.closeNote = note.trim();
+  a.closedBy = "admin";
+  a.closedAt = new Date().toISOString();
+  return { alarmNo: a.alarmNo, status: a.status };
+}
+
 
 // ============================================================================
 // 告警通知重发（拍板 #6）

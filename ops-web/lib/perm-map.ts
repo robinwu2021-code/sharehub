@@ -262,6 +262,11 @@ export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   "user:invoice:read": "user:invoice:read",
   "user:invoice:handle": "user:invoice:handle",
   // ——— workorder ———
+  // 告警自己的三个码（2026-09-25）。此前告警域整体借 workorder:wo:read ——
+  // 一个工单只读码既管三个菜单叶、又管受理这个写动作，而它的持有者含 VIEWER。
+  "workorder:alarm:read": "workorder:alarm:read",
+  "workorder:alarm:ack": "workorder:alarm:ack",
+  "workorder:alarm:close": "workorder:alarm:close",
   "workorder:alarm:config": "workorder:alarm:config",
   "workorder:alarm:notice_resend": "workorder:alarm:update",   // 翻译：界面功能无独立端点 → POST /api/ops/alarms/notices/{noticeNo}/resend
   "workorder:alarm:update": "workorder:alarm:update",

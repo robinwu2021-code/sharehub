@@ -49,7 +49,7 @@ public class AlarmController {
     // —— 告警记录（菜单叶：告警管理 › 告警记录）——
 
     @GetMapping("/records")
-    @PreAuthorize("@perm.can('workorder:wo:read')")
+    @PreAuthorize("@perm.can('workorder:alarm:read')")
     public PageResult<AlarmRecord> records(@RequestParam(required = false) Integer page,
                                            @RequestParam(required = false) Integer size,
                                            @RequestParam(required = false) String keyword,
@@ -61,11 +61,31 @@ public class AlarmController {
 
     /** 确认告警（OPEN → ACKED）。可带处置备注。 */
     @PostMapping("/records/{alarmNo}/ack")
-    @PreAuthorize("@perm.can('workorder:wo:read')")
+    @PreAuthorize("@perm.can('workorder:alarm:ack')")
     public AckResult ack(@PathVariable String alarmNo,
                          @RequestBody(required = false) Map<String, Object> body) {
         Object remark = body == null ? null : body.get("remark");
         return alarmService.ack(alarmNo, remark == null ? null : String.valueOf(remark));
+    }
+
+    /**
+     * 关闭告警。{@code OPEN / ACKED → CLOSED}。
+     *
+     * <p><b>关闭原因必填</b>（RESOLVED / FALSE_ALARM / SELF_HEALED）——
+     * 与「验收关单必须给结论」同一口径。实际理由是「误报率」这个数
+     * 只有在关闭时记了原因才算得出来：不记就只知道关了多少条，
+     * 不知道其中多少是规则太敏感，规则调不动告警就会一直吵。
+     *
+     * <p>权限码与受理**分开**：受理是「我看到了、在处理」，
+     * 关闭会把它从「未处理」里抹掉，直接影响运营看的那个数。
+     */
+    @PostMapping("/records/{alarmNo}/close")
+    @PreAuthorize("@perm.can('workorder:alarm:close')")
+    public AckResult closeAlarm(@PathVariable String alarmNo,
+                                @RequestBody(required = false) java.util.Map<String, Object> body) {
+        String reason = body == null ? null : str(body.get("reason"));
+        String note = body == null ? null : str(body.get("note"));
+        return alarmService.close(alarmNo, reason, note);
     }
 
     /**
@@ -83,7 +103,7 @@ public class AlarmController {
     // —— 告警通知流水（菜单叶：告警通知）。append 表，只读，无写端点。——
 
     @GetMapping("/notices")
-    @PreAuthorize("@perm.can('workorder:wo:read')")
+    @PreAuthorize("@perm.can('workorder:alarm:read')")
     public PageResult<AlarmNotice> notices(@RequestParam(required = false) Integer page,
                                            @RequestParam(required = false) Integer size,
                                            @RequestParam(required = false) String keyword,
@@ -96,7 +116,7 @@ public class AlarmController {
     // —— 告警代码字典（菜单叶：告警代码）——
 
     @GetMapping("/codes")
-    @PreAuthorize("@perm.can('workorder:wo:read')")
+    @PreAuthorize("@perm.can('workorder:alarm:read')")
     public PageResult<AlarmCode> codes(@RequestParam(required = false) Integer page,
                                        @RequestParam(required = false) Integer size,
                                        @RequestParam(required = false) String keyword,
@@ -124,7 +144,7 @@ public class AlarmController {
     // —— 通知规则（菜单叶：通知规则）——
 
     @GetMapping("/rules")
-    @PreAuthorize("@perm.can('workorder:wo:read')")
+    @PreAuthorize("@perm.can('workorder:alarm:read')")
     public PageResult<AlarmRule> rules(@RequestParam(required = false) Integer page,
                                        @RequestParam(required = false) Integer size,
                                        @RequestParam(required = false) String keyword,
@@ -211,5 +231,9 @@ public class AlarmController {
                                     @RequestBody(required = false) java.util.Map<String, Object> body) {
         Object k = body == null ? null : body.get("idempotencyKey");
         return alarmService.resendNotice(noticeNo, k == null ? null : String.valueOf(k));
+    }
+
+    private static String str(Object v) {
+        return v == null ? null : String.valueOf(v);
     }
 }

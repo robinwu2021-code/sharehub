@@ -2375,9 +2375,9 @@
   {
    "verb": "GET",
    "path": "/api/ops/alarms/codes",
-   "perm": "workorder:wo:read",
+   "perm": "workorder:alarm:read",
    "perms": [
-    "workorder:wo:read"
+    "workorder:alarm:read"
    ],
    "handler": "AlarmController#codes",
    "summary": "",
@@ -2611,9 +2611,9 @@
   {
    "verb": "GET",
    "path": "/api/ops/alarms/notices",
-   "perm": "workorder:wo:read",
+   "perm": "workorder:alarm:read",
    "perms": [
-    "workorder:wo:read"
+    "workorder:alarm:read"
    ],
    "handler": "AlarmController#notices",
    "summary": "",
@@ -2726,9 +2726,9 @@
   {
    "verb": "GET",
    "path": "/api/ops/alarms/records",
-   "perm": "workorder:wo:read",
+   "perm": "workorder:alarm:read",
    "perms": [
-    "workorder:wo:read"
+    "workorder:alarm:read"
    ],
    "handler": "AlarmController#records",
    "summary": "",
@@ -2838,6 +2838,22 @@
     {
      "name": "count",
      "type": "Integer"
+    },
+    {
+     "name": "closeReason",
+     "type": "String"
+    },
+    {
+     "name": "closeNote",
+     "type": "String"
+    },
+    {
+     "name": "closedBy",
+     "type": "String"
+    },
+    {
+     "name": "closedAt",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -2845,9 +2861,9 @@
   {
    "verb": "POST",
    "path": "/api/ops/alarms/records/{alarmNo}/ack",
-   "perm": "workorder:wo:read",
+   "perm": "workorder:alarm:ack",
    "perms": [
-    "workorder:wo:read"
+    "workorder:alarm:ack"
    ],
    "handler": "AlarmController#ack",
    "summary": "确认告警（OPEN → ACKED）。",
@@ -2860,6 +2876,39 @@
     }
    ],
    "bodyType": "Map<String, Object>",
+   "returnType": "AckResult",
+   "returnContainer": null,
+   "returnElement": "AckResult",
+   "responseShape": [
+    {
+     "name": "alarmNo",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/alarms/records/{alarmNo}/close",
+   "perm": "workorder:alarm:close",
+   "perms": [
+    "workorder:alarm:close"
+   ],
+   "handler": "AlarmController#closeAlarm",
+   "summary": "关闭告警。",
+   "params": [
+    {
+     "in": "path",
+     "name": "alarmNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "java.util.Map<String, Object>",
    "returnType": "AckResult",
    "returnContainer": null,
    "returnElement": "AckResult",
@@ -2915,9 +2964,9 @@
   {
    "verb": "GET",
    "path": "/api/ops/alarms/rules",
-   "perm": "workorder:wo:read",
+   "perm": "workorder:alarm:read",
    "perms": [
-    "workorder:wo:read"
+    "workorder:alarm:read"
    ],
    "handler": "AlarmController#rules",
    "summary": "",
@@ -30047,6 +30096,10 @@
    "OPEN",
    "ACKED"
   ],
+  "AlarmCloseReason": [
+   "RESOLVED",
+   "FALSE_ALARM"
+  ],
   "AlarmNoticeStatus": [
    "SENT"
   ],
@@ -30124,10 +30177,10 @@
  },
  "conflicts": {},
  "stats": {
-  "endpoints": 430,
+  "endpoints": 431,
   "records": 315,
-  "withPerm": 367,
-  "withBody": 187,
-  "shapedResponses": 330
+  "withPerm": 368,
+  "withBody": 188,
+  "shapedResponses": 331
  }
 }

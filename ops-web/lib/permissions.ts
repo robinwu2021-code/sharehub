@@ -41,6 +41,8 @@ export const BACKEND_ROLE_PERMS: Record<Role, string[]> = {
     // 注销队列与代为撤销（2026-09-25）：用户打电话说「我点错了」的入口就在客服
     "user:logoff:read", "user:logoff:revoke", "user:invoice:read",
     "workorder:wo:read", "workorder:wo:create", "cs:*", "marketing:coupon:read",
+    // 告警查与受理（2026-09-25）：此前借 workorder:wo:read（只读码管写动作）。关闭不给 CS。
+    "workorder:alarm:read", "workorder:alarm:ack",
     "marketing:coupon:issue", "marketing:push:send", "marketing:notice:read",
     "system:notify_log:read", "system:notify_blacklist:read", "system:notify_blacklist:update",
     "system:problem:read", "system:problem:update",

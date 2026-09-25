@@ -45,6 +45,10 @@ public final class RolePerms {
                     // 注销队列与代为撤销（2026-09-25）：用户打电话说「我点错了」的入口就在客服
                     "user:logoff:read", "user:logoff:revoke", "user:invoice:read",
                     "workorder:wo:read", "workorder:wo:create", "cs:*",
+                    // 告警查与受理（2026-09-25）：此前借 workorder:wo:read，
+                    // 那是个**只读码在管写动作**，且持有者含 VIEWER。关闭不给 CS ——
+                    // 设备侧的「这事结了」由运维判定。
+                    "workorder:alarm:read", "workorder:alarm:ack",
                     "marketing:coupon:read", "marketing:coupon:issue", "marketing:push:send",
                     // —— D6d 权限对账补配（2026-09-23）——
                     // 判据：功能权限清单（RBAC SSOT）明确给了本角色 + 端点确实存在，

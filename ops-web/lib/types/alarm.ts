@@ -21,16 +21,30 @@ export type AlarmSource = "DEVICE" | "OTA" | "RENT";
  * `export type`，于是整个告警域的词表两端从未被比对过。
  * 与后端同名同值，改一边另一边会红。
  *
- * ⚠️ `CLOSED` 目前**谁也走不到**：后端 `AlarmStateMachine` 有 CLOSE 边，
- * 但主源码里没有任何一处发这个事件（`AlarmService` 六个方法里也没有 close）。
- * 告警只能 OPEN→ACKED 然后停住，ACKED 行只增不减。
- * 补关闭动作缺权限码（真源表里告警只有 `workorder:alarm:config`），
- * 见 `docs/technical/待办-状态机与领域缺口-执行计划.md` A3-2 第二步。
+ * `CLOSED` 由 2026-09-25 新增的关闭动作走到（`POST /records/{alarmNo}/close`，
+ * 权限码 `workorder:alarm:close`，必填关闭原因）。
+ * 在那之前它**谁也走不到** —— 后端两条 CLOSE 边有定义、没人发事件。
  */
 export type AlarmStatus = "OPEN" | "ACKED" | "CLOSED";
 
 /** 告警上的运营动作。见 {@link ALARM_TRANSITIONS}。 */
-export type AlarmAction = "ack";
+export type AlarmAction = "ack" | "close";
+
+/**
+ * 关闭原因。与后端 `AlarmCloseReason` 一字不差。
+ *
+ * **关闭必填原因**，与「验收关单必须给结论」同一口径。实际理由：
+ * 「误报率」这个数只有在关闭时记了原因才算得出来 —— 不记就只知道
+ * 「这个月关了 300 条」，不知道其中多少是设备真故障、多少是规则太敏感。
+ * 规则调不动，告警就会一直吵，吵到没人看。
+ */
+export type AlarmCloseReason = "RESOLVED" | "FALSE_ALARM" | "SELF_HEALED";
+
+export const ALARM_CLOSE_REASONS: { value: AlarmCloseReason; label: string; hint: string }[] = [
+  { value: "RESOLVED", label: "已解决", hint: "设备侧问题已处理，通常伴随一张完工的工单" },
+  { value: "FALSE_ALARM", label: "误报", hint: "设备其实没问题，是规则或阈值太敏感——这一档是调规则的依据" },
+  { value: "SELF_HEALED", label: "已自愈", hint: "再次上报时已恢复，无需人工处理" },
+];
 
 /**
  * 告警状态机（SSOT）：页面按钮可用性与 mock 校验共用同一份，
@@ -43,10 +57,18 @@ export type AlarmAction = "ack";
 export const ALARM_TRANSITIONS: Record<AlarmAction,
   { from: readonly AlarmStatus[]; to: AlarmStatus; label: string }> = {
   ack: { from: ["OPEN"], to: "ACKED", label: "确认" },
+  // 2026-09-25 补：此前这张表只有 ack，因为**后端也走不到 CLOSED** ——
+  // AlarmStateMachine 两条 CLOSE 边俱全，而没有一处发这个事件。
+  // 告警于是只能 OPEN→ACKED 然后停住，ACKED 行只增不减。
+  close: { from: ["OPEN", "ACKED"], to: "CLOSED", label: "关闭" },
 };
 
 export const canAlarmAction = (status: AlarmStatus, action: AlarmAction) =>
   ALARM_TRANSITIONS[action].from.includes(status);
+
+/** 当前状态下可执行的告警动作（列表操作列据此生成）。 */
+export const alarmActions = (status: AlarmStatus): AlarmAction[] =>
+  (Object.keys(ALARM_TRANSITIONS) as AlarmAction[]).filter((a) => canAlarmAction(status, a));
 
 export interface AlarmRecord {
   alarmNo: string;
@@ -82,6 +104,12 @@ export interface AlarmRecord {
    */
   count: number;
   remark: string;
+  /** 关闭原因；未关闭为 null。关闭时必填，见 {@link ALARM_CLOSE_REASONS}。 */
+  closeReason: AlarmCloseReason | null;
+  /** 关闭备注：原因之外的补充。 */
+  closeNote: string | null;
+  closedBy: string | null;
+  closedAt: string | null;
 }
 
 // 确认告警结果：回带落库后的状态，前端不自己猜 —— 状态迁移由后端状态机裁决（OPEN → ACKED）

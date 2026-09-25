@@ -25,6 +25,18 @@ public interface AlarmService {
     AckResult ack(String alarmNo, String remark);
 
     /**
+     * 关闭告警：{@code OPEN / ACKED → CLOSED}，非法迁移抛异常。
+     *
+     * <p><b>这条边此前有定义、没人走</b>：{@code AlarmStateMachine} 里两条 CLOSE 边俱全，
+     * 而主源码中没有任何一处发这个事件 —— 告警只能 {@code OPEN → ACKED} 然后停住，
+     * {@code dev_alarm} 的 ACKED 行只增不减，「还有多少没处理」这个数从此说不清。
+     *
+     * @param reason 关闭原因，**必填**（见 {@link ai.neargo.sharehub.alarm.AlarmCloseReason}）
+     * @param note   备注，可空
+     */
+    AckResult close(String alarmNo, String reason, String note);
+
+    /**
      * 一键转工单，**以 {@code alarmNo} 为幂等键**。
      *
      * <p>重复调用返回首次生成的 {@code woNo}，不产生第二张单

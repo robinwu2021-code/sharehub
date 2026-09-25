@@ -11,7 +11,8 @@ import {
   alarmCodes, autoRaiseWorkOrders,
 } from "./alarm";
 import { notifyBlacklist, maskTarget } from "./system";
-import { ALARM_TRANSITIONS, canAlarmAction } from "../../types";
+import { closeAlarm } from "./alarm";
+import { ALARM_TRANSITIONS, canAlarmAction, ALARM_CLOSE_REASONS } from "../../types";
 
 /** 取一条 OPEN 告警；用例会改状态，故每次现取一条未被改过的。 */
 const anyOpen = () => alarmRecords.find((x) => x.status === "OPEN")!;
@@ -206,9 +207,10 @@ describe("故障自动开工单", () => {
 });
 
 describe("告警状态机表（A3-2 第一步）", () => {
-  it("只有一条边：OPEN --ack--> ACKED", () => {
-    expect(Object.keys(ALARM_TRANSITIONS)).toEqual(["ack"]);
+  it("两条边：OPEN --ack--> ACKED，OPEN/ACKED --close--> CLOSED", () => {
+    expect(Object.keys(ALARM_TRANSITIONS).sort()).toEqual(["ack", "close"]);
     expect(ALARM_TRANSITIONS.ack).toMatchObject({ from: ["OPEN"], to: "ACKED" });
+    expect(ALARM_TRANSITIONS.close).toMatchObject({ from: ["OPEN", "ACKED"], to: "CLOSED" });
   });
 
   it("canAlarmAction 是页面按钮与 mock 守卫共用的那一份判据", () => {
@@ -217,12 +219,61 @@ describe("告警状态机表（A3-2 第一步）", () => {
     expect(canAlarmAction("CLOSED", "ack")).toBe(false);
   });
 
-  it("⚠️ 表里没有任何边通往 CLOSED —— 这不是漏写，是后端也走不到", () => {
-    // 后端 AlarmStateMachine 有 CLOSE 边，但主源码里没有一处发这个事件
-    // （AlarmService 六个方法里没有 close）。告警只能 OPEN→ACKED 然后停住。
-    // 这条断言是**故意钉住现状**的：补上关闭动作时它会红，提醒同时更新本表与台账。
-    // 补关闭动作缺权限码，见执行计划 A3-2 第二步。
-    const tos = Object.values(ALARM_TRANSITIONS).map((t) => t.to);
-    expect(tos).not.toContain("CLOSED");
+  it("CLOSED 现在走得到了——2026-09-25 补的关闭动作", () => {
+    /*
+     * 这条原先是**故意钉住现状**的反向断言（「表里没有任何边通往 CLOSED」），
+     * 因为那时后端 AlarmStateMachine 两条 CLOSE 边有定义、没人发事件，
+     * 告警只能 OPEN→ACKED 然后停住、ACKED 行只增不减。
+     * 补上关闭动作时它如期红了——**钉子起了作用**，所以连同本注释一起翻面留着，
+     * 而不是删掉：下一个人能看出这里曾经是断的，以及是怎么接上的。
+     */
+    expect(Object.values(ALARM_TRANSITIONS).map((t) => t.to)).toContain("CLOSED");
+    expect(canAlarmAction("OPEN", "close")).toBe(true);
+    expect(canAlarmAction("ACKED", "close")).toBe(true);
+    expect(canAlarmAction("CLOSED", "close")).toBe(false);   // 终态，不可重复关闭
+  });
+});
+
+describe("关闭告警（2026-09-25）", () => {
+  const mk = (status: "OPEN" | "ACKED" | "CLOSED") => {
+    const a = alarmRecords.find((x) => x.status === status);
+    return a;
+  };
+
+  it("OPEN 与 ACKED 都能关闭，落原因 / 关闭人 / 关闭时间", () => {
+    for (const from of ["OPEN", "ACKED"] as const) {
+      const a = mk(from);
+      if (!a) continue;                       // 种子里没有就跳过，不制造假绿
+      const r = closeAlarm(a.alarmNo, "RESOLVED", "现场已处理");
+      expect(r.status).toBe("CLOSED");
+      expect(a.closeReason).toBe("RESOLVED");
+      expect(a.closeNote).toBe("现场已处理");
+      expect(a.closedBy).toBeTruthy();
+      expect(a.closedAt).toBeTruthy();
+    }
+  });
+
+  it("已关闭的不能再关——CLOSED 是终态", () => {
+    const a = mk("CLOSED");
+    if (!a) return;
+    expect(() => closeAlarm(a.alarmNo, "RESOLVED")).toThrow();
+  });
+
+  it("**原因必填**：空或非法一律拒", () => {
+    const a = alarmRecords.find((x) => x.status !== "CLOSED");
+    if (!a) return;
+    const before = a.status;
+    // @ts-expect-error 故意传非法值，验证 mock 与真后端一样拒
+    expect(() => closeAlarm(a.alarmNo, "")).toThrow();
+    // @ts-expect-error 同上
+    expect(() => closeAlarm(a.alarmNo, "WHATEVER")).toThrow();
+    expect(a.status).toBe(before);           // 被拒的那条毫发无伤
+  });
+
+  it("三个原因档位与后端 AlarmCloseReason 一一对应", () => {
+    expect(ALARM_CLOSE_REASONS.map((r) => r.value))
+      .toEqual(["RESOLVED", "FALSE_ALARM", "SELF_HEALED"]);
+    // 每一档都要有说明——「误报」那一档是调规则的依据，没有说明没人会选对
+    for (const r of ALARM_CLOSE_REASONS) expect(r.hint).not.toBe("");
   });
 });

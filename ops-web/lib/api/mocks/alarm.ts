@@ -16,6 +16,7 @@ export const alarmMock: AlarmApi = {
   raiseAlarmWorkOrder: (no) => wait(db.raiseAlarmWorkOrder(no), 400),
   autoRaiseWorkOrders: () => wait(db.autoRaiseWorkOrders(), 500),
   ackAlarm: (no, remark) => wait(db.ackAlarm(no, remark), 350),
+  closeAlarm: (alarmNo, reason, note) => wait(db.closeAlarm(alarmNo, reason, note)),
   resendAlarmNotice: (no, x) => wait(resendAlarmNotice(no, x), 400),
 
   // G1 软删除：归档 / 恢复（禁止物理删除）

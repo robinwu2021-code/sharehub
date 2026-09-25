@@ -1,6 +1,8 @@
 package ai.neargo.sharehub.alarm.service.impl;
 
+import ai.neargo.sharehub.auth.StaffContext;
 import ai.neargo.common.core.PageResult;
+import ai.neargo.sharehub.alarm.AlarmCloseReason;
 import ai.neargo.sharehub.alarm.AlarmNoticeStatus;
 import ai.neargo.sharehub.alarm.AlarmStateMachine;
 import ai.neargo.sharehub.alarm.AlarmStatus;
@@ -88,6 +90,21 @@ public class AlarmServiceImpl implements AlarmService {
     }
 
     @Override
+    public AckResult close(String alarmNo, String reason, String note) {
+        DevAlarm e = selectByNo(alarmNo);
+        // 原因先解析再迁移：值不合法时报「关闭原因非法」，
+        // 而不是让它一路走到落库才炸成别的话。
+        AlarmCloseReason r = AlarmCloseReason.of(reason);
+        e.setStatus(stateMachine.next(e.getStatus(), "CLOSE"));   // 非法迁移由状态机拒
+        e.setCloseReason(r.name());
+        if (notBlank(note)) e.setCloseNote(note.trim());
+        e.setClosedBy(StaffContext.require().userNo());           // 关闭人不接受客户端传
+        e.setClosedAt(java.time.LocalDateTime.now());
+        mapper.updateById(e);
+        return new AckResult(e.getAlarmNo(), e.getStatus());
+    }
+
+    @Override
     public WorkOrderRef toWorkOrder(String alarmNo) {
         DevAlarm e = selectByNo(alarmNo);
 
@@ -125,7 +142,9 @@ public class AlarmServiceImpl implements AlarmService {
         return new AlarmRecord(e.getAlarmNo(), e.getCabinetNo(), e.getSiteNo(), null,
                 e.getAgentNo(), e.getVendorCode(), e.getAlarmCode(), e.getVendorErrorCode(),
                 e.getLevel(), e.getSource(), e.getOccurredAt(), e.getStatus(),
-                e.getWoNo(), e.getRemark(), e.getDedupKey(), e.getCount());
+                e.getWoNo(), e.getRemark(), e.getDedupKey(), e.getCount(),
+                e.getCloseReason(), e.getCloseNote(), e.getClosedBy(),
+                e.getClosedAt() == null ? null : e.getClosedAt().toString());
     }
 
     private static AlarmNotice toNoticeVO(DevAlarmNotice e) {

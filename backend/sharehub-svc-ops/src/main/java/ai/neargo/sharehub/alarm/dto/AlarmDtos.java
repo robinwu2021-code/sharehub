@@ -24,7 +24,11 @@ public final class AlarmDtos {
     public record AlarmRecord(String alarmNo, String cabinetNo, String siteNo, String siteName,
                               String agentNo, String vendorCode, String alarmCode, String vendorErrorCode,
                               String level, String source, String occurredAt, String status,
-                              String workOrderNo, String remark, String dedupKey, Integer count) {
+                              String workOrderNo, String remark, String dedupKey, Integer count,
+                              // 关闭信息（2026-09-25）。**必须回传** —— 落了库却不出参，
+                              // 症状就是「关了，但列表上看不出为什么关的」，
+                              // 而「误报率」正是靠 closeReason 算出来的。
+                              String closeReason, String closeNote, String closedBy, String closedAt) {
     }
 
     /** 告警通知流水行，镜像前端 {@code AlarmNotice}。 */

@@ -61,17 +61,6 @@ PowerbankStatus: IN_CABINET->SCRAP
 # 这三组是**债**，逐条见执行计划 A3。修法：在 ops-web/lib/types 里补对应的
 # `*_TRANSITIONS`，页面改读 canXxxAction()，然后从本台账删掉对应行。
 
-# 告警的两条 CLOSE 边：**后端自己也走不到** —— AlarmStateMachine 有这两条边，
-# 但主源码里没有任何一处发 "CLOSE" 事件（只有测试里有），AlarmService 六个方法
-# （page/pageNotices/ack/toWorkOrder/autoRaiseWorkOrders/resendNotice）里没有 close。
-# ⇒ 告警只能 OPEN→ACKED 然后停住，dev_alarm 的 ACKED 行只增不减，
-#   「还有多少没处理」这个数从此说不清。
-#
-# 这不是"前端缺一张表"，补它要先有后端动作 + 一个权限码 —— 真源表里告警只有
-# workorder:alarm:config（管告警代码/通知规则配置），没有受理/关闭的码
-# （前端 canAck 现在借的是 workorder:wo:read，本身就是将就）。
-# 关闭是有后果的动作（关掉就不再计入未处理），该有自己的码 → 先找产品裁决。
-# 见执行计划 A3-2 第二步。ack 那条已于 2026-09-25 由 ALARM_TRANSITIONS 接管。
-AlarmStatus: OPEN->CLOSED
-AlarmStatus: ACKED->CLOSED
+# 告警的两条 CLOSE 边已于 2026-09-25 接通（AlarmService.close + workorder:alarm:close
+# + 运营端 ALARM_TRANSITIONS.close），从本台账删除。
 

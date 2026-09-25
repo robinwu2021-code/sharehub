@@ -17,6 +17,7 @@ export const alarmHttp: AlarmApi = {
   //    必须沿用 alarmNo 幂等键，且应由规则引擎在告警产生时触发，而非依赖运营手点。
   autoRaiseWorkOrders: () => client.post("/api/ops/alarms/auto-work-orders"),
   ackAlarm: (no, remark) => client.post(`/api/ops/alarms/records/${no}/ack`, remark ? { remark } : {}),
+  closeAlarm: (alarmNo, reason, note) => client.post(`/api/ops/alarms/records/${alarmNo}/close`, { reason, note }),
   // ⚠️ 后端缺口：AlarmController 的 /notices 是 append 表、只读，**没有任何写端点**（无 /resend）。
   // 落地时后端**必须自己按 idempotencyKey 去重**：前端这把键只是礼貌，挡不住刷新重放、双标签页与
   // 网关重试 —— 真发短信/邮件的动作，去重责任在服务端。键走 body 而非 Idempotency-Key 头：
