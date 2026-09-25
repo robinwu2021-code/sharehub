@@ -48,7 +48,7 @@ export const httpApi: McpApi = {
   nearbyCabinets: (q?: NearbyQ) => client.get<NearbyCabinet[]>("/mp/nearby/cabinets", q),
   cabinetAvailability: (cabinetNo: string) =>
     client.get<CabinetAvailability>(`/mp/nearby/cabinets/${cabinetNo}/availability`), // 待定
-  storeDetail: (siteNo: string) => client.get<StoreDetail>(`/mp/sites/${siteNo}`),
+  storeDetail: (siteNo: string, at) => client.get<StoreDetail>(`/mp/sites/${siteNo}`, at),
 
   listFavorites: (at) => client.get<NearbyCabinet[]>("/mp/user/favorites", at),
   toggleFavorite: (siteNo: string) => client.post<{ favorite: boolean }>(`/mp/user/favorites/${siteNo}`), // 待定

@@ -3,6 +3,7 @@
 // Capacitor WebView = H5，Maps JS API 在 WebView 中完全可用，无需 renderjs。
 import { onMounted, onUnmounted, watch } from "vue";
 import type { NearbyCabinet } from "@/types";
+import { getUserLocation } from "@/ports/location";
 
 const props = defineProps<{ points: NearbyCabinet[] }>();
 const emit = defineEmits<{ (e: "select", p: NearbyCabinet): void }>();
@@ -37,17 +38,6 @@ function loadScript(): Promise<void> {
   });
 }
 
-async function getUserLocation(): Promise<{ lat: number; lng: number }> {
-  const DUBAI = { lat: 25.2048, lng: 55.2708 };
-  if (!navigator.geolocation) return DUBAI;
-  return new Promise((resolve) => {
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => resolve(DUBAI),
-      { timeout: 5000, maximumAge: 60_000 },
-    );
-  });
-}
 
 function buildMarkerIcon(available: boolean): google.maps.Symbol {
   return {
@@ -125,12 +115,13 @@ async function initGMap() {
       { featureType: "transit", elementType: "labels", stylers: [{ visibility: "off" }] },
     ],
   });
-  setUserMarker(DUBAI);
   placeMarkers();
 
-  // 地理定位异步回来后 recenter
+  // 地图**居中**在迪拜是合理的默认视野（总得从某处开始看）；
+  // 但「我在这儿」那个蓝点**只有真拿到位置才画** —— 原来它先画在迪拜市中心，
+  // 于是人在阿布扎比时，地图上明确告诉他「你在迪拜」。
   getUserLocation().then((center) => {
-    if (!gmap) return;
+    if (!gmap || !center) return;
     setUserMarker(center);
     gmap.setCenter(center);
     gmap.setZoom(14);

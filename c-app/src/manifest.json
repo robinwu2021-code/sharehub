@@ -23,6 +23,8 @@
             /* android打包配置 */
             "android" : {
                 "permissions" : [
+                    "<uses-permission android:name=\"android.permission.ACCESS_COARSE_LOCATION\"/>",
+                    "<uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\"/>",
                     "<uses-permission android:name=\"android.permission.CHANGE_NETWORK_STATE\"/>",
                     "<uses-permission android:name=\"android.permission.MOUNT_UNMOUNT_FILESYSTEMS\"/>",
                     "<uses-permission android:name=\"android.permission.VIBRATE\"/>",
@@ -41,7 +43,13 @@
                 ]
             },
             /* ios打包配置 */
-            "ios" : {},
+            "ios" : {
+                /* 缺这条 iOS 不会弹授权（审核也会打回）。文案要说清"为什么要"，
+                   只写"需要定位权限"等于没说 */
+                "privacyDescription" : {
+                    "NSLocationWhenInUseUsageDescription" : "用于按距离排序附近的充电宝网点"
+                }
+            },
             /* SDK配置 */
             "sdkConfigs" : {}
         }
@@ -54,7 +62,15 @@
         "setting" : {
             "urlCheck" : false
         },
-        "usingComponents" : true
+        "usingComponents" : true,
+        /* getLocation 自 2022-04 起是隐私接口：不进 requiredPrivateInfos 就直接调不通，
+           而失败长得像"用户拒绝了授权"，很容易查错方向 */
+        "requiredPrivateInfos" : [ "getLocation" ],
+        "permission" : {
+            "scope.userLocation" : {
+                "desc" : "用于按距离排序附近的充电宝网点"
+            }
+        }
     },
     "mp-alipay" : {
         "usingComponents" : true

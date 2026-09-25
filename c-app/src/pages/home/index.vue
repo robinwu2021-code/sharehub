@@ -7,6 +7,7 @@ import type { NearbyCabinet, Notice, RentOrder, StoreDetail } from "@/types";
 import { distance } from "@/shared/format";
 import { scanCabinet } from "@/ports/scan";
 import { openNavigation } from "@/ports/map";
+import { getUserLocation } from "@/ports/location";
 
 const { t } = useI18n();
 const list = ref<NearbyCabinet[]>([]);
@@ -26,8 +27,11 @@ const views = computed(() => [
 async function load() {
   loading.value = true;
   try {
+    // 定位先取：后端按 lat/lng 算距离并排序，不给就只能按建站顺序给第一屏。
+    // 取不到返回 null —— 那时列表不带距离，而不是带一个编出来的距离。
+    const at = await getUserLocation();
     const [cabs, notices, ong] = await Promise.all([
-      api.nearbyCabinets({ keyword: keyword.value }),
+      api.nearbyCabinets({ keyword: keyword.value, lat: at?.lat, lng: at?.lng }),
       api.listNotices(),
       api.ongoingOrder(),
     ]);
@@ -41,7 +45,8 @@ async function load() {
 onShow(load);
 
 async function openStore(c: NearbyCabinet) {
-  store.value = await api.storeDetail(c.siteNo);
+  const at = await getUserLocation();
+  store.value = await api.storeDetail(c.siteNo, { lat: at?.lat, lng: at?.lng });
   showStore.value = true;
 }
 function borrow(c: { cabinetNo?: string; siteNo?: string }) {

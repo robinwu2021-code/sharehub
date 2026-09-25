@@ -65,7 +65,7 @@ export const mockApi: McpApi = {
   checkVersion: () => db.delay(db.appVersion, 300),
   storeDetail: (siteNo: string) => db.delay(db.storeOf(siteNo)),
 
-  listFavorites: () => db.delay(db.cabinets.filter((c) => db.favorites.has(c.siteNo))),
+  listFavorites: () => db.delay(db.cabinets.filter((c) => db.favorites.has(c.siteNo))),  // 形状同找柜：门店卡片
   toggleFavorite: (siteNo: string) => {
     if (db.favorites.has(siteNo)) db.favorites.delete(siteNo);
     else db.favorites.add(siteNo);

@@ -6,6 +6,7 @@ import { useI18n } from "vue-i18n";
 import { api } from "@/api";
 import type { NearbyCabinet } from "@/types";
 import { distance } from "@/shared/format";
+import { getUserLocation } from "@/ports/location";
 
 const { t } = useI18n();
 const list = ref<NearbyCabinet[]>([]);
@@ -14,7 +15,8 @@ const loading = ref(true);
 async function load() {
   loading.value = true;
   try {
-    list.value = await api.listFavorites();
+    const at = await getUserLocation();
+    list.value = await api.listFavorites({ lat: at?.lat, lng: at?.lng });
   } finally {
     loading.value = false;
   }
