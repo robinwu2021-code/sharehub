@@ -22791,7 +22791,7 @@
    "handler": "MarketingController#createAdCampaign",
    "summary": "",
    "params": [],
-   "bodyType": "AdCampaign",
+   "bodyType": "AdDtos.AdCampaignReq",
    "returnType": "AdCampaignVO",
    "returnContainer": null,
    "returnElement": "AdCampaignVO",
@@ -22837,7 +22837,44 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "adNo",
+     "type": "String"
+    },
+    {
+     "name": "advertiserNo",
+     "type": "String"
+    },
+    {
+     "name": "advertiser",
+     "type": "String"
+    },
+    {
+     "name": "creative",
+     "type": "String"
+    },
+    {
+     "name": "budget",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "targeting",
+     "type": "String"
+    },
+    {
+     "name": "startAt",
+     "type": "String"
+    },
+    {
+     "name": "endAt",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -22856,7 +22893,7 @@
      "required": true
     }
    ],
-   "bodyType": "AdCampaign",
+   "bodyType": "AdDtos.AdCampaignReq",
    "returnType": "AdCampaignVO",
    "returnContainer": null,
    "returnElement": "AdCampaignVO",
@@ -22902,7 +22939,44 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "adNo",
+     "type": "String"
+    },
+    {
+     "name": "advertiserNo",
+     "type": "String"
+    },
+    {
+     "name": "advertiser",
+     "type": "String"
+    },
+    {
+     "name": "creative",
+     "type": "String"
+    },
+    {
+     "name": "budget",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "targeting",
+     "type": "String"
+    },
+    {
+     "name": "startAt",
+     "type": "String"
+    },
+    {
+     "name": "endAt",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -23187,7 +23261,7 @@
    "handler": "MarketingController#createCampaign",
    "summary": "",
    "params": [],
-   "bodyType": "MktCampaign",
+   "bodyType": "MarketingDtos.CampaignReq",
    "returnType": "CampaignVO",
    "returnContainer": null,
    "returnElement": "CampaignVO",
@@ -23221,7 +23295,32 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "campaignNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "kind",
+     "type": "String"
+    },
+    {
+     "name": "rule",
+     "type": "String"
+    },
+    {
+     "name": "startAt",
+     "type": "String"
+    },
+    {
+     "name": "endAt",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -23240,7 +23339,7 @@
      "required": true
     }
    ],
-   "bodyType": "MktCampaign",
+   "bodyType": "MarketingDtos.CampaignReq",
    "returnType": "CampaignVO",
    "returnContainer": null,
    "returnElement": "CampaignVO",
@@ -23274,7 +23373,32 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "campaignNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "kind",
+     "type": "String"
+    },
+    {
+     "name": "rule",
+     "type": "String"
+    },
+    {
+     "name": "startAt",
+     "type": "String"
+    },
+    {
+     "name": "endAt",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -24557,7 +24681,7 @@
    "handler": "MarketingController#createPush",
    "summary": "",
    "params": [],
-   "bodyType": "MktPush",
+   "bodyType": "MarketingDtos.PushReq",
    "returnType": "PushMessageVO",
    "returnContainer": null,
    "returnElement": "PushMessageVO",
@@ -24623,7 +24747,40 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "pushNo",
+     "type": "String"
+    },
+    {
+     "name": "title",
+     "type": "String"
+    },
+    {
+     "name": "content",
+     "type": "String"
+    },
+    {
+     "name": "channel",
+     "type": "String"
+    },
+    {
+     "name": "audience",
+     "type": "String"
+    },
+    {
+     "name": "audienceType",
+     "type": "String"
+    },
+    {
+     "name": "audienceValue",
+     "type": "String"
+    },
+    {
+     "name": "scheduledAt",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -24659,7 +24816,7 @@
      "required": true
     }
    ],
-   "bodyType": "MktPush",
+   "bodyType": "MarketingDtos.PushReq",
    "returnType": "PushMessageVO",
    "returnContainer": null,
    "returnElement": "PushMessageVO",
@@ -24725,7 +24882,40 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "pushNo",
+     "type": "String"
+    },
+    {
+     "name": "title",
+     "type": "String"
+    },
+    {
+     "name": "content",
+     "type": "String"
+    },
+    {
+     "name": "channel",
+     "type": "String"
+    },
+    {
+     "name": "audience",
+     "type": "String"
+    },
+    {
+     "name": "audienceType",
+     "type": "String"
+    },
+    {
+     "name": "audienceValue",
+     "type": "String"
+    },
+    {
+     "name": "scheduledAt",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -29302,7 +29492,7 @@
  "conflicts": {},
  "stats": {
   "endpoints": 425,
-  "records": 304,
+  "records": 307,
   "withPerm": 362,
   "withBody": 185,
   "shapedResponses": 325
