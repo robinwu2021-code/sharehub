@@ -81,6 +81,45 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * **请求本身不合法** → 400 / 405，不是 500。
+     *
+     * <p>2026-09-25 上线实测撞到：`GET /api/ops/qc-records` 少传必填的 `itemNo`，
+     * 返回的是 **500「服务器错误」**，日志里一条带堆栈的 ERROR。
+     * 于是「前端漏传一个参数」长得和「后端挂了」一模一样 —— 运维会去查后端、翻日志、
+     * 怀疑刚上线的版本，而真正要改的是调用方。ERROR 级别也因此贬值（这类根本不需要人介入）。
+     *
+     * <p>覆盖 Spring MVC 的请求绑定异常族：缺参数 / 类型不符 / 请求体读不出 / @Valid 不过 → 400；
+     * 方法不支持 → 405。**它们都是 4xx 语义**，此前无一被处理，全落进下面的兜底。
+     * 这与类注释里那条「ResponseStatusException 被抹成 500」是同一类问题，当时只修了一半。
+     *
+     * <p>日志记 WARN 不记 ERROR，且**不带堆栈**：调用方传错参数不是故障，
+     * 堆栈对定位毫无帮助（栈顶永远是 Spring 的绑定代码），只会淹掉真告警。
+     * 但要带上方法、路径与原因 —— 不然无从知道是谁在传错。
+     */
+    @ExceptionHandler({
+            org.springframework.web.bind.MissingServletRequestParameterException.class,
+            org.springframework.web.bind.MissingRequestHeaderException.class,
+            org.springframework.web.bind.MethodArgumentNotValidException.class,
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,
+            org.springframework.http.converter.HttpMessageNotReadableException.class,
+            org.springframework.web.bind.ServletRequestBindingException.class,
+    })
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Result<Void> onBadRequestBinding(Exception e, jakarta.servlet.http.HttpServletRequest req) {
+        log.warn("请求参数不合法 → 400: {} {} — {}", req.getMethod(), req.getRequestURI(), e.getMessage());
+        return Result.error(ErrorCode.BAD_REQUEST.getCode(), Messages.msg("error.bad_request"));
+    }
+
+    /** 方法不支持 → 405。同上：这是调用方的问题，不该记成服务端故障。 */
+    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+    @ResponseStatus(HttpStatus.METHOD_NOT_ALLOWED)
+    public Result<Void> onMethodNotAllowed(org.springframework.web.HttpRequestMethodNotSupportedException e,
+                                           jakarta.servlet.http.HttpServletRequest req) {
+        log.warn("方法不支持 → 405: {} {}", req.getMethod(), req.getRequestURI());
+        return Result.error(HttpStatus.METHOD_NOT_ALLOWED.value(), Messages.msg("error.bad_request"));
+    }
+
+    /**
      * 兜底：未预期异常 → 500。
      *
      * <p><b>必须打日志带堆栈</b>。原实现直接返回「服务器错误」而不记录任何东西 ——

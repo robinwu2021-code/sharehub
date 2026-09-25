@@ -185,6 +185,14 @@ public abstract class ApiTestSupport {
         return b;
     }
 
+    /** 原样发这段请求体（**不序列化**）：用来构造坏 JSON 等「请求本身不合法」的场景。 */
+    protected Resp postRaw(String path, String rawBody, String token) {
+        return send(reqBuilder(path, token)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(rawBody))
+                .build());
+    }
+
     /** 自定义请求（multipart 上传等）走同一套响应解析。 */
     protected Resp sendRequest(HttpRequest req) {
         return send(req);
