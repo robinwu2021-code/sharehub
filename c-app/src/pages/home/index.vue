@@ -3,7 +3,7 @@ import { ref, computed } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api, IS_MOCK } from "@/api";
 import { useI18n } from "vue-i18n";
-import type { NearbyCabinet, Notice, RentOrder, StoreDetail } from "@/types";
+import type { NearbyCabinet, Notice, ConsumerOrder, StoreDetail } from "@/types";
 import { distance } from "@/shared/format";
 import { scanCabinet } from "@/ports/scan";
 import { openNavigation } from "@/ports/map";
@@ -12,7 +12,7 @@ import { getUserLocation } from "@/ports/location";
 const { t } = useI18n();
 const list = ref<NearbyCabinet[]>([]);
 const notice = ref<Notice | null>(null);
-const ongoing = ref<RentOrder | null>(null);
+const ongoing = ref<ConsumerOrder | null>(null);
 const loading = ref(true);
 const keyword = ref("");
 const view = ref("map"); // map | list

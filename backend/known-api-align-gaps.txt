@@ -109,35 +109,12 @@ C POST /api/user/push-messages/sweep-due
 # NoticeVO / RentOrder / CsTicketVO。改成按 (受众, 类型名) 去重后它们才露出来。
 # （CsTicketVO 那条已当场接上，所以下面实际剩 38 条。）
 #
-# ── RentOrder（22 条）：C 端订单页**每一个字段**都对不上 ──
-#   前端读 amount/startAt/endAt/powerBankNo（大写 B）/siteNameBorrow/fees/timeline…，
-#   后端返 feeAmount/rentStartAt/rentEndAt/powerbankNo/locationName/…。
-#   切到真后端时订单列表与详情页**整页空白且不报错**。
-#   修法不是改字段名了事：fees / timeline 后端根本没有（费用明细与状态时间线要新建投影），
-#   siteNameBorrow/Return 也要后端补 join。属于一整块活，单独排。
+# ── RentOrder：已在 2026-09-25 修完 ──
+#   改法是给 C 端另立投影 `ConsumerOrderVO`（原 record 一个 DTO 两个受众，两边都不合身）：
+#   补 fees（由订单已有列派生，给类型码不给中文文案）与 timeline（读 ord_event_log，
+#   刻意不带 operator），并顺手止住一处泄漏 —— detailForConsumer 走 enrich()，
+#   把运营干预统计（waived/compensate/eject）一直返给了消费者。
 #
 # ── NoticeVO：已在同一批里改对（公告三语取列 + 已读态归还给站内信），本块不再有它 ──
 #
 # ── CsTicketVO：已在同一批的「报障进度」里接上，本块不再有它 ──
-B GET /mp/trade/orders RentOrder 前端有后端无:amount
-B GET /mp/trade/orders RentOrder 前端有后端无:cabinetNoBorrow
-B GET /mp/trade/orders RentOrder 前端有后端无:cabinetNoReturn
-B GET /mp/trade/orders RentOrder 前端有后端无:endAt
-B GET /mp/trade/orders RentOrder 前端有后端无:fees
-B GET /mp/trade/orders RentOrder 前端有后端无:freeFrozen
-B GET /mp/trade/orders RentOrder 前端有后端无:powerBankNo
-B GET /mp/trade/orders RentOrder 前端有后端无:siteNameBorrow
-B GET /mp/trade/orders RentOrder 前端有后端无:siteNameReturn
-B GET /mp/trade/orders RentOrder 前端有后端无:startAt
-B GET /mp/trade/orders RentOrder 前端有后端无:timeline
-B GET /mp/trade/orders RentOrder 后端有前端无:cabinetNo
-B GET /mp/trade/orders RentOrder 后端有前端无:compensateAmount
-B GET /mp/trade/orders RentOrder 后端有前端无:ejectCount
-B GET /mp/trade/orders RentOrder 后端有前端无:feeAmount
-B GET /mp/trade/orders RentOrder 后端有前端无:lastEjectAt
-B GET /mp/trade/orders RentOrder 后端有前端无:locationName
-B GET /mp/trade/orders RentOrder 后端有前端无:powerbankNo
-B GET /mp/trade/orders RentOrder 后端有前端无:rentEndAt
-B GET /mp/trade/orders RentOrder 后端有前端无:rentStartAt
-B GET /mp/trade/orders RentOrder 后端有前端无:returnCabinetNo
-B GET /mp/trade/orders RentOrder 后端有前端无:waivedAmount

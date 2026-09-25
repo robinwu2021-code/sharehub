@@ -240,6 +240,12 @@ export default {
     benefits: "المزايا",
     none: "لا توجد باقات",
   },
+  fee: {
+    RENT: "أجرة الاستئجار",
+    WAIVE: "خصم",
+    COMPENSATE: "تعويض",
+    DEPOSIT: "مبلغ التأمين",
+  },
   status: {
     CREATED: "تم الإنشاء",
     DISPENSING: "جارٍ الإخراج",

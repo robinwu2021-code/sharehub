@@ -3,10 +3,10 @@ import { ref, computed } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { useI18n } from "vue-i18n";
 import { api } from "@/api";
-import type { RentOrder, OrderStatus } from "@/types";
+import type { ConsumerOrder, OrderStatus } from "@/types";
 
 const { t } = useI18n();
-const all = ref<RentOrder[]>([]);
+const all = ref<ConsumerOrder[]>([]);
 const loading = ref(true);
 const filter = ref("all");
 
@@ -40,7 +40,7 @@ async function load() {
 }
 onShow(load);
 
-function detail(o: RentOrder) {
+function detail(o: ConsumerOrder) {
   uni.navigateTo({ url: `/pages/order/detail?orderNo=${o.orderNo}` });
 }
 </script>
@@ -62,13 +62,13 @@ function detail(o: RentOrder) {
         >
           <pb-card>
             <view class="flex items-center justify-between">
-              <text class="text-[30rpx] font-bold text-ink">{{ o.siteNameBorrow }}</text>
+              <text class="text-[30rpx] font-bold text-ink">{{ o.siteName ?? o.locationName ?? o.cabinetNo }}</text>
               <pb-tag :type="tagType[o.status]">{{ $t("status." + o.status) }}</pb-tag>
             </view>
             <view class="mt-[8rpx] text-[24rpx] text-sub">{{ o.orderNo }}</view>
             <view class="mt-[18rpx] flex items-center justify-between">
               <text class="text-[24rpx] text-sub">{{ $t("orders.duration") }} · {{ o.durationMin }} {{ $t("common.min") }}</text>
-              <pb-amount :value="o.amount" size="sm" />
+              <pb-amount :value="o.feeAmount" size="sm" />
             </view>
           </pb-card>
         </view>

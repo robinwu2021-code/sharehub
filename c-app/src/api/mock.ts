@@ -1,12 +1,15 @@
 // Mock 实现（McpApi）。全部走 mock/db 内存数据 + 模拟延迟。后端未就绪即可跑通全部 UI。
 import * as db from "@/mock/db";
 import type { McpApi, LoginParams, RentParams, PayParams, OrderQ, NearbyQ } from "./contract";
-import type { RentOrder, LogoffItem, UserCoupon, RechargeResult, CsTicket, ReportResult } from "@/types";
+import type { ConsumerOrder, LogoffItem, UserCoupon, RechargeResult, CsTicket, ReportResult } from "@/types";
 
 /** 注销申请的 mock 状态。模块级而非 db 里：它是会话内的一次性流程，不是种子数据。 */
 let mockLogoff: LogoffItem | null = null;
 /** 后端存的是 `yyyy-MM-dd HH:mm:ss` 文本，mock 跟着它走，免得页面按两套格式解析。 */
 const fmt = (d: Date) => d.toISOString().slice(0, 19).replace("T", " ");
+
+/** 与后端一致的时间格式（yyyy-MM-dd HH:mm:ss）。mock 出 ISO 会让格式化函数在两种源下表现不同。 */
+const fmtNow = () => new Date().toISOString().slice(0, 19).replace("T", " ");
 
 export const mockApi: McpApi = {
   login: (p: LoginParams) =>
@@ -75,12 +78,13 @@ export const mockApi: McpApi = {
   buyout: (orderNo: string) => {
     const o = db.orders.find((x) => x.orderNo === orderNo);
     if (o) {
-      const now = new Date().toISOString();
+      const now = fmtNow();
       o.status = "SETTLED";
-      o.amount = 99;
-      o.fees = [{ label: "buyout", amount: 99 }];
-      o.endAt = now;
-      o.timeline.push({ status: "SETTLED", at: now });
+      o.feeAmount = 99;
+      o.fees = [{ type: "RENT", amount: 99 }];
+      o.rentEndAt = now;
+      // 列表投影不带 timeline（为 null），买断返的是详情投影，所以这里要把它补起来
+      o.timeline = [...(o.timeline ?? []), { status: "SETTLED", at: now }];
     }
     return db.delay(o ?? db.orders[0], 450);
   },
@@ -96,21 +100,24 @@ export const mockApi: McpApi = {
 
   rentOrder: (p: RentParams) => {
     const cab = db.cabinets.find((c) => c.cabinetNo === p.cabinetNo) ?? db.cabinets[0];
-    const now = new Date().toISOString();
-    const order: RentOrder = {
+    const now = fmtNow();
+    const order: ConsumerOrder = {
       orderNo: `R${Math.floor(performance.now() * 1000)}`,
       cUserNo: "CU-0001",
       status: "IN_USE",
-      cabinetNoBorrow: cab.cabinetNo,
-      siteNameBorrow: cab.siteName,
-      powerBankNo: "PB-90001",
-      startAt: now,
+      cabinetNo: cab.cabinetNo,
+      siteName: cab.siteName,
+      returnCabinetNo: null,
+      returnSiteName: null,
+      powerbankNo: "PB-90001",
+      locationName: cab.address,
+      rentStartAt: now,
+      rentEndAt: null,
       durationMin: 0,
-      amount: 0,
+      feeAmount: 0,
       currency: cab.currency,
       depositAmount: p.useFreeDeposit ? 0 : db.availability[cab.cabinetNo]?.depositAmount ?? 50,
-      freeFrozen: p.useFreeDeposit ? db.availability[cab.cabinetNo]?.freeQuota ?? 100 : 0,
-      fees: [{ label: "rental", amount: 0 }],
+      fees: [],
       timeline: [
         { status: "CREATED", at: now },
         { status: "DISPENSING", at: now },
@@ -122,7 +129,7 @@ export const mockApi: McpApi = {
   },
   getOrder: (orderNo: string) => db.delay(db.orders.find((o) => o.orderNo === orderNo) ?? db.orders[0]),
   listOrders: (q: OrderQ = {}) =>
-    db.delay(db.paginate(db.orders, q.page, q.size, (o) => db.kwHit(q.keyword, o.orderNo, o.siteNameBorrow) && (!q.status || o.status === q.status))),
+    db.delay(db.paginate(db.orders, q.page, q.size, (o) => db.kwHit(q.keyword, o.orderNo, o.siteName) && (!q.status || o.status === q.status))),
 
   depositFree: (_cabinetNo: string) => db.delay({ authNo: `AUTH${Math.floor(performance.now())}`, frozen: 100 }, 420),
   pay: (p: PayParams) => db.delay({ payNo: `PAY${Math.floor(performance.now())}`, status: "SUCCESS" as const, cashierParams: { scene: p.scene } }, 480),

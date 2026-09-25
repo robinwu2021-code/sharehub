@@ -240,6 +240,12 @@ export default {
     benefits: "Benefits",
     none: "No plans",
   },
+  fee: {
+    RENT: "Rental",
+    WAIVE: "Discount",
+    COMPENSATE: "Compensation",
+    DEPOSIT: "Deposit",
+  },
   status: {
     CREATED: "Created",
     DISPENSING: "Dispensing",

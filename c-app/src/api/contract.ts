@@ -4,7 +4,7 @@ import type {
   PageResult,
   NearbyCabinet,
   CabinetAvailability,
-  RentOrder,
+  ConsumerOrder,
   UserProfile,
   WalletOverview,
   UserCoupon,
@@ -113,11 +113,11 @@ export interface McpApi {
   listFavorites(at?: { lat?: number; lng?: number }): Promise<NearbyCabinet[]>;
   toggleFavorite(siteNo: string): Promise<{ favorite: boolean }>;
   // 借还
-  rentOrder(p: RentParams): Promise<RentOrder>;
-  getOrder(orderNo: string): Promise<RentOrder>;
-  listOrders(q?: OrderQ): Promise<PageResult<RentOrder>>;
-  ongoingOrder(): Promise<RentOrder | null>;
-  buyout(orderNo: string): Promise<RentOrder>;
+  rentOrder(p: RentParams): Promise<ConsumerOrder>;
+  getOrder(orderNo: string): Promise<ConsumerOrder>;
+  listOrders(q?: OrderQ): Promise<PageResult<ConsumerOrder>>;
+  ongoingOrder(): Promise<ConsumerOrder | null>;
+  buyout(orderNo: string): Promise<ConsumerOrder>;
   // 支付 / 免押（经 PaymentPort→nearpay，MVP Stub）
   depositFree(cabinetNo: string): Promise<{ authNo: string; frozen: number }>;
   pay(p: PayParams): Promise<PayResult>;

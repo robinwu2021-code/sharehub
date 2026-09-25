@@ -2,7 +2,7 @@
 import type {
   NearbyCabinet,
   CabinetAvailability,
-  RentOrder,
+  ConsumerOrder,
   UserProfile,
   WalletOverview,
   UserCoupon,
@@ -22,7 +22,7 @@ import { CURRENCY, MOCK_DELAY_MS } from "@/shared/constants";
 export const delay = <T>(v: T, ms = MOCK_DELAY_MS): Promise<T> =>
   new Promise((r) => setTimeout(() => r(v), ms));
 
-export const kwHit = (kw: string | undefined, ...fields: (string | undefined)[]): boolean =>
+export const kwHit = (kw: string | undefined, ...fields: (string | undefined | null)[]): boolean =>
   !kw || fields.some((f) => (f ?? "").toLowerCase().includes(kw.toLowerCase()));
 
 export function paginate<T>(all: T[], page = 1, size = 10, pred?: (x: T) => boolean) {
@@ -57,50 +57,53 @@ export const availability: Record<string, CabinetAvailability> = Object.fromEntr
   ]),
 );
 
-export const orders: RentOrder[] = [
+export const orders: ConsumerOrder[] = [
   {
     orderNo: "R2026071200001",
     cUserNo: "CU-0001",
     status: "IN_USE",
-    cabinetNoBorrow: "CAB-DXBM-01",
-    siteNameBorrow: "The Dubai Mall",
-    powerBankNo: "PB-88213",
-    startAt: "2026-07-12T09:40:00Z",
+    cabinetNo: "CAB-DXBM-01",
+    siteName: "The Dubai Mall",
+    returnCabinetNo: null,
+    returnSiteName: null,
+    powerbankNo: "PB-88213",
+    locationName: "Downtown Dubai · 1F",
+    rentStartAt: "2026-07-12 09:40:00",
+    rentEndAt: null,
     durationMin: 72,
-    amount: 6,
+    feeAmount: 6,
     currency: CURRENCY,
     depositAmount: 0,
-    freeFrozen: 100,
-    fees: [{ label: "rental", amount: 6 }],
+    fees: [{ type: "RENT", amount: 6 }],
     timeline: [
-      { status: "CREATED", at: "2026-07-12T09:39:40Z" },
-      { status: "DISPENSING", at: "2026-07-12T09:39:45Z" },
-      { status: "IN_USE", at: "2026-07-12T09:40:00Z" },
+      { status: "CREATED", at: "2026-07-12 09:39:40" },
+      { status: "DISPENSING", at: "2026-07-12 09:39:45" },
+      { status: "IN_USE", at: "2026-07-12 09:40:00" },
     ],
   },
   {
     orderNo: "R2026071100042",
     cUserNo: "CU-0001",
     status: "SETTLED",
-    cabinetNoBorrow: "CAB-MOE-03",
-    siteNameBorrow: "Mall of the Emirates",
-    cabinetNoReturn: "CAB-JBR-07",
-    siteNameReturn: "JBR The Walk",
-    powerBankNo: "PB-12007",
-    startAt: "2026-07-11T14:10:00Z",
-    endAt: "2026-07-11T16:25:00Z",
+    cabinetNo: "CAB-MOE-03",
+    siteName: "Mall of the Emirates",
+    returnCabinetNo: "CAB-JBR-07",
+    returnSiteName: "JBR The Walk",
+    powerbankNo: "PB-12007",
+    locationName: "Al Barsha · G 层",
+    rentStartAt: "2026-07-11 14:10:00",
+    rentEndAt: "2026-07-11 16:25:00",
     durationMin: 135,
-    amount: 15,
+    feeAmount: 15,
     currency: CURRENCY,
     depositAmount: 0,
-    freeFrozen: 0,
     fees: [
-      { label: "rental", amount: 18 },
-      { label: "coupon", amount: -3 },
+      { type: "RENT", amount: 18 },
+      { type: "WAIVE", amount: -3 },
     ],
     timeline: [
-      { status: "IN_USE", at: "2026-07-11T14:10:00Z" },
-      { status: "RETURNED", at: "2026-07-11T16:25:00Z" },
+      { status: "IN_USE", at: "2026-07-11 14:10:00" },
+      { status: "RETURNED", at: "2026-07-11 16:25:00" },
       { status: "SETTLED", at: "2026-07-11T16:25:10Z" },
     ],
   },

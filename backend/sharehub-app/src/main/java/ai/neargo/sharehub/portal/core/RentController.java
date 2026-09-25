@@ -2,6 +2,7 @@ package ai.neargo.sharehub.portal.core;
 
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.auth.ConsumerContext;
+import ai.neargo.sharehub.portal.core.dto.MpTradeDtos.ConsumerOrderVO;
 import ai.neargo.sharehub.platform.sys.service.BizRuleService;
 import ai.neargo.sharehub.trade.dto.TradeLegacyDtos.RentOrder;
 import ai.neargo.sharehub.trade.dto.TradeLegacyDtos.RentResult;
@@ -31,10 +32,13 @@ public class RentController {
     private static final java.math.BigDecimal DEPOSIT_FREEZE = java.math.BigDecimal.valueOf(50);
 
     private final RentOrderService orders;
+    private final ConsumerOrderAssembler cards;
     private final PaymentService payments;
     private final BizRuleService bizRules;
 
-    public RentController(RentOrderService orders, PaymentService payments, BizRuleService bizRules) {
+    public RentController(RentOrderService orders, PaymentService payments, BizRuleService bizRules,
+                          ConsumerOrderAssembler cards) {
+        this.cards = cards;
         this.orders = orders;
         this.payments = payments;
         this.bizRules = bizRules;
@@ -46,36 +50,43 @@ public class RentController {
         return orders.rent(ConsumerContext.userNo(), body == null ? null : body.get("cabinetNo"));
     }
 
-    /** 我的订单（属主过滤，只见自己）。 */
+    /**
+     * 我的订单（属主过滤，只见自己）。
+     *
+     * <p>出参是 C 端投影 {@link ConsumerOrderVO}，不是运营端那个 {@code RentOrder} ——
+     * 后者缺借还两端的门店名、也把运营干预统计带给了消费者，见 {@code MpTradeDtos} 类注释。
+     * 列表不带 fees/timeline（时间线要逐单查事件表，挂列表上就是 N+1）。
+     */
     @GetMapping("/orders")
-    public PageResult<RentOrder> myOrders(@RequestParam(required = false) Integer page,
-                                          @RequestParam(required = false) Integer size) {
-        return orders.pageByOwner(ConsumerContext.userNo(), page, size);
+    public PageResult<ConsumerOrderVO> myOrders(@RequestParam(required = false) Integer page,
+                                                @RequestParam(required = false) Integer size) {
+        PageResult<RentOrder> r = orders.pageByOwner(ConsumerContext.userNo(), page, size);
+        return new PageResult<>(cards.list(r.getList()), r.getTotal());
     }
 
     /** 进行中订单（首页快捷入口）：无则 200 + null data，端上按无单渲染。 */
     @GetMapping("/orders/ongoing")
-    public RentOrder ongoing() {
-        return orders.ongoingOf(ConsumerContext.userNo());
+    public ConsumerOrderVO ongoing() {
+        return cards.one(orders.ongoingOf(ConsumerContext.userNo()));
     }
 
     /** 订单详情：属主鉴权，非本人 → 403（防横向越权 IDOR）。 */
     @GetMapping("/orders/{orderNo}")
-    public RentOrder detail(@PathVariable String orderNo) {
+    public ConsumerOrderVO detail(@PathVariable String orderNo) {
         // 走豁免数据范围的取数：否则非属主查询在 SQL 层就被过滤成空，
         // 守卫拿不到行、无从判定，403「无权」会退化成 400「不存在」
         RentOrder o = orders.detailForConsumer(orderNo);
         ConsumerContext.assertOwner(o.cUserNo());
-        return o;
+        return cards.detail(o);
     }
 
     /** 买断：不还了，按 {@code sys_biz_rule} 计费兜底分区的买断价结单（属主鉴权）。 */
     @PostMapping("/orders/{orderNo}/buyout")
-    public RentOrder buyout(@PathVariable String orderNo) {
+    public ConsumerOrderVO buyout(@PathVariable String orderNo) {
         RentOrder o = orders.detailForConsumer(orderNo);
         ConsumerContext.assertOwner(o.cUserNo());
         var billing = bizRules.get() == null ? null : bizRules.get().billing();
-        return orders.buyout(orderNo, billing == null ? null : billing.buyoutPrice());
+        return cards.detail(orders.buyout(orderNo, billing == null ? null : billing.buyoutPrice()));
     }
 
     /**

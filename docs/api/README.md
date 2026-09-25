@@ -583,9 +583,9 @@ SELF_SERVICE  TO_WORKORDER    TO_REFUND         TO_CS      （争议类问题额
 | Method Path | 用途 | 编号 | 状态 |
 |---|---|---|---|
 | `POST /mp/trade/orders/rent` | 扫码借出（`cabinetNo/useFreeDeposit/couponNo`；幂等） | C-RT-03 | ✅ |
-| `GET /mp/trade/orders` | 我的订单（`status/keyword` 分页，属主过滤） | C-BL-01/05 | ✅ |
+| `GET /mp/trade/orders` | 我的订单（分页，属主过滤）。出参 `ConsumerOrderVO` —— C 端专用投影，**不带运营干预统计**；列表不带 `fees`/`timeline` | C-BL-01/05 | ✅ |
 | `GET /mp/trade/orders/ongoing` | **进行中订单**（首页悬浮入口） | C-US-04 | ✅ |
-| `GET /mp/trade/orders/{orderNo}` | 订单详情（实时计费 + `fees[]` + `timeline[]`） | C-BL-02/03 · C-US-01 | ✅ |
+| `GET /mp/trade/orders/{orderNo}` | 订单详情（`fees[]` 给类型码不给文案 + `timeline[]` 读 `ord_event_log`，不带 operator） | C-BL-02/03 · C-US-01 | ✅ |
 | `POST /mp/trade/orders/{orderNo}/buyout` | 买断充电宝 | C-US-02 | ✅ |
 | `POST /mp/trade/deposit/free` | 免押授权（卡预授权冻结 → `{authNo, frozen}`） | C-DF-01 | ✅ |
 | `POST /mp/trade/pay` | 收银台（`scene` = `rent\|deposit\|recharge\|membership`） | C-PAY-01 · C-DF-03 | ✅ |

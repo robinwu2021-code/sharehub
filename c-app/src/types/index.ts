@@ -71,29 +71,53 @@ export interface CabinetAvailability {
   currency: string;
 }
 
+/**
+ * 费用明细的一项（镜像后端 `FeeItemVO`）。
+ *
+ * ⚠️ 后端给的是**类型码**不是文案。原来这里是 `label: string`，
+ * 而文案要跟着界面语言走（中/英/阿）—— 后端返一句中文，阿语界面上就是一句中文。
+ */
 export interface FeeItem {
-  label: string;
-  amount: number;
+  type: "RENT" | "WAIVE" | "COMPENSATE" | "DEPOSIT";
+  amount: number; // WAIVE 是负数：逐项相加要等于实付，否则这张表看着就不像账
 }
 
-export interface RentOrder {
+/** 状态时间线的一步（镜像后端 `OrderStepVO`）。后端刻意不带 operator（内部员工号）。 */
+export interface OrderStep {
+  status: OrderStatus;
+  at: string;
+}
+
+/**
+ * C 端订单（镜像后端 `ConsumerOrderVO`）。
+ *
+ * ⚠️ 这个类型此前叫 `RentOrder`，字段名与后端**几乎无一相同**：
+ * 前端读 `startAt`/`endAt`/`amount`/`powerBankNo`（大写 B）/`cabinetNoBorrow`/`siteNameBorrow`，
+ * 后端返 `rentStartAt`/`rentEndAt`/`feeAmount`/`powerbankNo`/`cabinetNo`/…
+ * ⇒ 切到真后端时**订单列表与详情整页空白且不报错**。
+ * 现在改名 `ConsumerOrder` 并逐字段对齐后端投影，此后漂移由对齐脚本拦。
+ *
+ * `fees`/`timeline` **只有详情才有**（列表为 null，避免逐单查事件表的 N+1）——
+ * null 表示「这个投影没带」，与「确实一步都没有」是两回事。
+ */
+export interface ConsumerOrder {
   orderNo: string;
   cUserNo: string;
   status: OrderStatus;
-  cabinetNoBorrow: string;
-  siteNameBorrow: string;
-  cabinetNoReturn?: string;
-  siteNameReturn?: string;
-  powerBankNo?: string;
-  startAt: string;
-  endAt?: string;
+  cabinetNo: string;
+  siteName: string | null;
+  returnCabinetNo: string | null;
+  returnSiteName: string | null;
+  powerbankNo: string | null;
+  locationName: string | null;
+  rentStartAt: string;
+  rentEndAt: string | null;
   durationMin: number;
-  amount: number; // 当前/最终费用
-  currency: string;
+  feeAmount: number;
   depositAmount: number;
-  freeFrozen: number; // 免押冻结额
-  fees: FeeItem[]; // 费用明细拆解
-  timeline: { status: OrderStatus; at: string }[];
+  currency: string;
+  fees: FeeItem[] | null;
+  timeline: OrderStep[] | null;
 }
 
 export interface UserProfile {

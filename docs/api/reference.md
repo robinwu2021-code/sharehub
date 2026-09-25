@@ -27,7 +27,7 @@
 | 端点 | **425** |
 | 带功能权限码 | 362 |
 | 有请求体 | 185 |
-| 数据结构 | 230 个（文末统一定义） |
+| 数据结构 | 237 个（文末统一定义） |
 
 ### ⚠️ 3 个 `/api/**` 端点没有功能权限码
 
@@ -2929,7 +2929,7 @@
 
 权限码 `marketing:ad:update` · `MarketingController#createAdCampaign`
 
-**请求体** `AdCampaign`
+**请求体** [`AdCampaignReq`](#adcampaignreq)
 
 **出参** [`AdCampaignVO`](#adcampaignvo)
 
@@ -2943,7 +2943,7 @@
 |---|---|---|---|
 | 路径 | `adNo` | `String` | 是 |
 
-**请求体** `AdCampaign`
+**请求体** [`AdCampaignReq`](#adcampaignreq)
 
 **出参** [`AdCampaignVO`](#adcampaignvo)
 
@@ -3016,7 +3016,7 @@
 
 权限码 `marketing:campaign:update` · `MarketingController#createCampaign`
 
-**请求体** `MktCampaign`
+**请求体** [`CampaignReq`](#campaignreq)
 
 **出参** [`CampaignVO`](#campaignvo)
 
@@ -3030,7 +3030,7 @@
 |---|---|---|---|
 | 路径 | `campaignNo` | `String` | 是 |
 
-**请求体** `MktCampaign`
+**请求体** [`CampaignReq`](#campaignreq)
 
 **出参** [`CampaignVO`](#campaignvo)
 
@@ -3321,7 +3321,7 @@
 
 权限码 `marketing:push:send` · `MarketingController#createPush`
 
-**请求体** `MktPush`
+**请求体** [`PushReq`](#pushreq)
 
 **出参** [`PushMessageVO`](#pushmessagevo)
 
@@ -3345,7 +3345,7 @@
 |---|---|---|---|
 | 路径 | `pushNo` | `String` | 是 |
 
-**请求体** `MktPush`
+**请求体** [`PushReq`](#pushreq)
 
 **出参** [`PushMessageVO`](#pushmessagevo)
 
@@ -3655,7 +3655,7 @@
 
 权限码 `agent:account:manage` · `AgentExtController#createAccount`
 
-**请求体** `AgtAccount`
+**请求体** [`AgentAccountReq`](#agentaccountreq)
 
 **出参** [`AgentAccount`](#agentaccount)
 
@@ -3681,7 +3681,7 @@
 |---|---|---|---|
 | 路径 | `accountNo` | `String` | 是 |
 
-**请求体** `AgtAccount`
+**请求体** [`AgentAccountReq`](#agentaccountreq)
 
 **出参** [`AgentAccount`](#agentaccount)
 
@@ -5187,7 +5187,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | 查询 | `page` | `Integer` | 否 |
 | 查询 | `size` | `Integer` | 否 |
 
-**出参** 分页<[`RentOrder`](#rentorder)>
+**出参** 分页<[`ConsumerOrderVO`](#consumerordervo)>
 
 ### `GET /mp/trade/orders/ongoing`
 
@@ -5195,7 +5195,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 **无权限码** · `RentController#ongoing`
 
-**出参** [`RentOrder`](#rentorder)
+**出参** [`ConsumerOrderVO`](#consumerordervo)
 
 ### `POST /mp/trade/orders/rent`
 
@@ -5219,7 +5219,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 |---|---|---|---|
 | 路径 | `orderNo` | `String` | 是 |
 
-**出参** [`RentOrder`](#rentorder)
+**出参** [`ConsumerOrderVO`](#consumerordervo)
 
 ### `POST /mp/trade/orders/{orderNo}/buyout`
 
@@ -5233,7 +5233,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 |---|---|---|---|
 | 路径 | `orderNo` | `String` | 是 |
 
-**出参** [`RentOrder`](#rentorder)
+**出参** [`ConsumerOrderVO`](#consumerordervo)
 
 ### `POST /mp/trade/pay`
 
@@ -5693,7 +5693,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 ## 数据结构
 
-共 230 个。同一结构常被多个端点复用，故在此定义一次、上文引用。
+共 237 个。同一结构常被多个端点复用，故在此定义一次、上文引用。
 
 ### AcceptReq
 
@@ -5707,6 +5707,20 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 |---|---|
 | `alarmNo` | `String` |
 | `status` | `String` |
+
+### AdCampaignReq
+
+| 字段 | 类型 |
+|---|---|
+| `adNo` | `String` |
+| `advertiserNo` | `String` |
+| `advertiser` | `String` |
+| `creative` | `String` |
+| `budget` | `BigDecimal` |
+| `currency` | `String` |
+| `targeting` | `String` |
+| `startAt` | `String` |
+| `endAt` | `String` |
 
 ### AdCampaignVO
 
@@ -5772,6 +5786,17 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `status` | `String` |
 | `dataScope` | `String` |
 | `createdAt` | `String` |
+
+### AgentAccountReq
+
+| 字段 | 类型 |
+|---|---|
+| `accountNo` | `String` |
+| `agentNo` | `String` |
+| `username` | `String` |
+| `displayName` | `String` |
+| `loginPhone` | `String` |
+| `status` | `String` |
 
 ### AgentCommission
 
@@ -6115,6 +6140,17 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `temp` | `Integer` |
 | `faultCount` | `Integer` |
 
+### CampaignReq
+
+| 字段 | 类型 |
+|---|---|
+| `campaignNo` | `String` |
+| `name` | `String` |
+| `kind` | `String` |
+| `rule` | `String` |
+| `startAt` | `String` |
+| `endAt` | `String` |
+
 ### CampaignVO
 
 | 字段 | 类型 |
@@ -6245,6 +6281,28 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `cUserNo` | `String` |
 | `isNew` | `boolean` |
 | `tenantNo` | `String` |
+
+### ConsumerOrderVO
+
+| 字段 | 类型 |
+|---|---|
+| `orderNo` | `String` |
+| `cUserNo` | `String` |
+| `status` | `String` |
+| `cabinetNo` | `String` |
+| `siteName` | `String` |
+| `returnCabinetNo` | `String` |
+| `returnSiteName` | `String` |
+| `powerbankNo` | `String` |
+| `locationName` | `String` |
+| `rentStartAt` | `String` |
+| `rentEndAt` | `String` |
+| `durationMin` | `Integer` |
+| `feeAmount` | `BigDecimal` |
+| `depositAmount` | `BigDecimal` |
+| `currency` | `String` |
+| `fees` | 数组<[`FeeItemVO`](#feeitemvo)> |
+| `timeline` | 数组<[`OrderStepVO`](#orderstepvo)> |
 
 ### ConsumerProfileSlice
 
@@ -6545,6 +6603,13 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `answer` | `String` |
 | `suggestedAction` | `String` |
 | `sortNo` | `Integer` |
+
+### FeeItemVO
+
+| 字段 | 类型 |
+|---|---|
+| `type` | `String` |
+| `amount` | `BigDecimal` |
 
 ### FreeOrder
 
@@ -7240,6 +7305,13 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `amount` | `BigDecimal` |
 | `currency` | `String` |
 
+### OrderStepVO
+
+| 字段 | 类型 |
+|---|---|
+| `status` | `String` |
+| `at` | `String` |
+
 ### OtaReleaseRow
 
 | 字段 | 类型 |
@@ -7537,6 +7609,19 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `sentAt` | `String` |
 | `operatorName` | `String` |
 | `idempotencyKey` | `String` |
+
+### PushReq
+
+| 字段 | 类型 |
+|---|---|
+| `pushNo` | `String` |
+| `title` | `String` |
+| `content` | `String` |
+| `channel` | `String` |
+| `audience` | `String` |
+| `audienceType` | `String` |
+| `audienceValue` | `String` |
+| `scheduledAt` | `String` |
 
 ### RechargeOrderRow
 

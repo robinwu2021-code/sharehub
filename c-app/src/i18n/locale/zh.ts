@@ -240,6 +240,12 @@ export default {
     benefits: "权益",
     none: "暂无套餐",
   },
+  fee: {
+    RENT: "租借费",
+    WAIVE: "优惠减免",
+    COMPENSATE: "赔偿",
+    DEPOSIT: "押金",
+  },
   status: {
     CREATED: "已下单",
     DISPENSING: "弹出中",

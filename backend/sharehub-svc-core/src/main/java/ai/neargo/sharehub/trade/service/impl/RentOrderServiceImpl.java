@@ -48,6 +48,14 @@ public class RentOrderServiceImpl implements RentOrderService {
     private static final double DEPOSIT = 50.0;      // 免押额度（AED），骨架
     private static final String CURRENCY = "AED";
 
+    private static final org.slf4j.Logger log =
+            org.slf4j.LoggerFactory.getLogger(RentOrderServiceImpl.class);
+
+    /** 归还/结算由设备事件与系统驱动，不是某个人在操作。 */
+    private static final String OPERATOR_SYSTEM = "SYSTEM";
+
+    /** 订单主状态机的流水。此前 ord_event_log 只有运营干预在写，正常生命周期一条都没有。 */
+    private final ai.neargo.sharehub.trade.order.service.OrderEventLogService eventLog;
     private final OrdMapper mapper;
     private final OrdStateMachine stateMachine;
     private final OrdRentExtMapper rentExtMapper;
@@ -66,7 +74,9 @@ public class RentOrderServiceImpl implements RentOrderService {
                                 PriceResolver priceResolver, PriceEngine priceEngine,
                                 ChargeChain chargeChain, CabinetMapper cabinetMapper,
                                 DomainEventBus eventBus, PriceMultiplierResolver multipliers,
-                                ObjectProvider<SiteQueryPort> siteQuery) {
+                                ObjectProvider<SiteQueryPort> siteQuery,
+                                ai.neargo.sharehub.trade.order.service.OrderEventLogService eventLog) {
+        this.eventLog = eventLog;
         this.multipliers = multipliers;
         this.siteQuery = siteQuery;
         this.cabinetMapper = cabinetMapper;
@@ -169,9 +179,13 @@ public class RentOrderServiceImpl implements RentOrderService {
             e.setFeeAmount(price.doubleValue());   // 过渡期双写，同 returnOrder
             e.setBuyout(1);
             // 买断即终局：RETURN→SETTLE 两跳走状态机，保持非法迁移仍会被拒
+            String beforeBuyout = e.getStatus();
             e.setStatus(stateMachine.next(e.getStatus(), "RETURN"));
             e.setStatus(stateMachine.next(e.getStatus(), "SETTLE"));
             mapper.updateById(e);
+            // 买断是两跳一次做完，只记一条 BUYOUT —— 记成 RETURN+SETTLE 会让时间线
+            // 看起来像「他还了柜子然后结算」，而事实是他没还
+            appendEvent(orderNo, beforeBuyout, e.getStatus(), "BUYOUT", e.getCUserNo());
             return toVO(e);
         });
     }
@@ -255,6 +269,10 @@ public class RentOrderServiceImpl implements RentOrderService {
         e.setCurrency(priced.currency() == null ? CURRENCY : priced.currency());
 
         mapper.insert(e);
+        // 生命周期要留痕。此前 ord_event_log **只有运营干预在写**（退款/投诉/异常），
+        // 正常的「借出→归还→结算」一条都没有 —— 于是 C 端「状态时间线」和运营端事件页
+        // 都只看得到干预记录，看不到这单本身是怎么走过来的。
+        appendEvent(e.getOrderNo(), null, e.getStatus(), "RENT", e.getCUserNo());
 
         // 双写扩展表。过渡期主表同名列暂留（删列不可回退），两处必须一致 ——
         // 等所有读路径切到扩展表、验证一个版本周期后再 DROP 主表冗余列。
@@ -269,7 +287,9 @@ public class RentOrderServiceImpl implements RentOrderService {
     @Override
     public OkResult returnOrder(String orderNo, String returnCabinetNo) {
         OrdOrder e = require(orderNo);
+        String beforeReturn = e.getStatus();
         e.setStatus(stateMachine.next(e.getStatus(), "RETURN"));   // IN_USE→RETURNED，非法迁移拒
+        appendEvent(orderNo, beforeReturn, e.getStatus(), "RETURN", OPERATOR_SYSTEM);
         e.setReturnCabinetNo(returnCabinetNo);
         String endAt = nowUtc();   // 同 rent()：DATETIME(3) 不接受带 Z 的字面量
         e.setRentEndAt(endAt);
@@ -301,8 +321,10 @@ public class RentOrderServiceImpl implements RentOrderService {
         e.setWaivedAmount(charged.waivedAmount());
         e.setBuyout(charged.buyout() ? 1 : 0);
         e.setFeeAmount(charged.payable().doubleValue());   // 过渡期双写，待前端与报表切到 amount 后移除
+        String beforeSettle = e.getStatus();
         e.setStatus(stateMachine.next(e.getStatus(), "SETTLE"));   // RETURNED→SETTLED（支付为骨架）
         mapper.updateById(e);
+        appendEvent(orderNo, beforeSettle, e.getStatus(), "SETTLE", OPERATOR_SYSTEM);
 
         publishSettled(e);
         return new OkResult(true);
@@ -525,6 +547,26 @@ public class RentOrderServiceImpl implements RentOrderService {
 
     /** 统一时间戳：ISO-8601 本地日期时间（UTC 时钟，**无 Z 后缀**）——
      *  ord_order 的时间列是 DATETIME(3)，带时区标记的字面量会被 MariaDB 拒收。 */
+    /**
+     * 追加订单流水。
+     *
+     * <p><b>吞掉异常并只记 WARN</b>：留痕失败不该把借出/归还本身带下去 ——
+     * 用户手里的充电宝已经弹出来了，这时候因为少一条流水而回滚订单，糟得多。
+     * 但日志必须带业务键，否则「少了一条流水」事后无从复现（见 CLAUDE.md 日志规范）。
+     *
+     * @param operator 谁做的。借出/买断是消费者本人（{@code cUserNo}），
+     *                 归还/结算由设备事件与系统驱动，记 {@code SYSTEM} ——
+     *                 这里**不取当前登录人**：归还走的是内部端点，
+     *                 那个「登录人」是网关的服务身份，写进去会让人以为是客服帮他还的。
+     */
+    private void appendEvent(String orderNo, String from, String to, String event, String operator) {
+        try {
+            eventLog.append(orderNo, from, to, event, operator);
+        } catch (RuntimeException ex) {
+            log.warn("订单流水写入失败，主流程继续 orderNo={} event={} {}→{}", orderNo, event, from, to, ex);
+        }
+    }
+
     private static String nowUtc() {
         return LocalDateTime.now(ZoneOffset.UTC).toString();
     }

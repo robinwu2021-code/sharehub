@@ -3,10 +3,10 @@
 import { ref, computed } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import { api } from "@/api";
-import type { RentOrder, OrderStatus } from "@/types";
+import type { ConsumerOrder, OrderStatus } from "@/types";
 import { timeOf } from "@/shared/format";
 
-const order = ref<RentOrder | null>(null);
+const order = ref<ConsumerOrder | null>(null);
 const buying = ref(false);
 const isInUse = computed(() => order.value?.status === "IN_USE" || order.value?.status === "DISPENSING");
 const tagType: Record<OrderStatus, "primary" | "success" | "warning" | "danger" | "neutral"> = {
@@ -44,7 +44,7 @@ async function buyout() {
       <pb-card tint="primary">
         <view class="flex items-center justify-between">
           <pb-tag :type="tagType[order.status]">{{ $t("status." + order.status) }}</pb-tag>
-          <pb-amount :value="order.amount" size="lg" />
+          <pb-amount :value="order.feeAmount" size="lg" />
         </view>
         <view class="mt-[10rpx] text-[24rpx] text-sub">{{ order.orderNo }}</view>
         <view v-if="isInUse" class="mt-[16rpx] flex items-center gap-[8rpx] text-[22rpx] text-sub">
@@ -61,8 +61,8 @@ async function buyout() {
       <view class="mt-[20rpx]">
         <pb-card :pad="false">
           <view class="px-[28rpx]">
-            <pb-cell icon="battery" :title="$t('orders.borrowAt')" :value="order.siteNameBorrow" />
-            <pb-cell v-if="order.siteNameReturn" icon="pin" :title="$t('orders.returnAt')" :value="order.siteNameReturn" />
+            <pb-cell icon="battery" :title="$t('orders.borrowAt')" :value="order.siteName ?? order.locationName ?? order.cabinetNo" />
+            <pb-cell v-if="order.returnCabinetNo" icon="pin" :title="$t('orders.returnAt')" :value="order.returnSiteName ?? order.returnCabinetNo" />
             <pb-cell icon="clock" :title="$t('orders.duration')" :value="`${order.durationMin} ${$t('common.min')}`" />
           </view>
         </pb-card>
@@ -74,12 +74,12 @@ async function buyout() {
         <pb-card>
           <view class="flex flex-col gap-[16rpx]">
             <view v-for="(f, i) in order.fees" :key="i" class="flex items-center justify-between">
-              <text class="text-[26rpx] text-sub">{{ f.label }}</text>
+              <text class="text-[26rpx] text-sub">{{ $t("fee." + f.type) }}</text>
               <pb-amount :value="f.amount" size="sm" />
             </view>
             <view class="mt-[8rpx] flex items-center justify-between border-t-0">
               <text class="text-[28rpx] font-semibold text-ink">{{ $t("orders.total") }}</text>
-              <pb-amount :value="order.amount" size="md" />
+              <pb-amount :value="order.feeAmount" size="md" />
             </view>
           </view>
         </pb-card>

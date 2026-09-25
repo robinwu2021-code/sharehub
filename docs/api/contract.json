@@ -91,7 +91,7 @@
    "handler": "AgentExtController#createAccount",
    "summary": "",
    "params": [],
-   "bodyType": "AgtAccount",
+   "bodyType": "AgentExtDtos.AgentAccountReq",
    "returnType": "AgentAccount",
    "returnContainer": null,
    "returnElement": "AgentAccount",
@@ -129,7 +129,32 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "accountNo",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "username",
+     "type": "String"
+    },
+    {
+     "name": "displayName",
+     "type": "String"
+    },
+    {
+     "name": "loginPhone",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "GET",
@@ -205,7 +230,7 @@
      "required": true
     }
    ],
-   "bodyType": "AgtAccount",
+   "bodyType": "AgentExtDtos.AgentAccountReq",
    "returnType": "AgentAccount",
    "returnContainer": null,
    "returnElement": "AgentAccount",
@@ -243,7 +268,32 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "accountNo",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "username",
+     "type": "String"
+    },
+    {
+     "name": "displayName",
+     "type": "String"
+    },
+    {
+     "name": "loginPhone",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "GET",
@@ -27580,9 +27630,9 @@
     }
    ],
    "bodyType": null,
-   "returnType": "PageResult<RentOrder>",
+   "returnType": "PageResult<ConsumerOrderVO>",
    "returnContainer": "PageResult",
-   "returnElement": "RentOrder",
+   "returnElement": "ConsumerOrderVO",
    "responseShape": [
     {
      "name": "orderNo",
@@ -27593,11 +27643,23 @@
      "type": "String"
     },
     {
+     "name": "status",
+     "type": "String"
+    },
+    {
      "name": "cabinetNo",
      "type": "String"
     },
     {
+     "name": "siteName",
+     "type": "String"
+    },
+    {
      "name": "returnCabinetNo",
+     "type": "String"
+    },
+    {
+     "name": "returnSiteName",
      "type": "String"
     },
     {
@@ -27606,10 +27668,6 @@
     },
     {
      "name": "locationName",
-     "type": "String"
-    },
-    {
-     "name": "status",
      "type": "String"
     },
     {
@@ -27626,31 +27684,43 @@
     },
     {
      "name": "feeAmount",
-     "type": "double"
+     "type": "BigDecimal"
     },
     {
      "name": "depositAmount",
-     "type": "double"
+     "type": "BigDecimal"
     },
     {
      "name": "currency",
      "type": "String"
     },
     {
-     "name": "waivedAmount",
-     "type": "java.math.BigDecimal"
+     "name": "fees",
+     "type": "List<FeeItemVO>",
+     "fields": [
+      {
+       "name": "type",
+       "type": "String"
+      },
+      {
+       "name": "amount",
+       "type": "BigDecimal"
+      }
+     ]
     },
     {
-     "name": "compensateAmount",
-     "type": "java.math.BigDecimal"
-    },
-    {
-     "name": "ejectCount",
-     "type": "Integer"
-    },
-    {
-     "name": "lastEjectAt",
-     "type": "String"
+     "name": "timeline",
+     "type": "List<OrderStepVO>",
+     "fields": [
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "at",
+       "type": "String"
+      }
+     ]
     }
    ],
    "requestShape": null
@@ -27664,9 +27734,9 @@
    "summary": "进行中订单（首页快捷入口）：无则 200 + null data，端上按无单渲染。",
    "params": [],
    "bodyType": null,
-   "returnType": "RentOrder",
+   "returnType": "ConsumerOrderVO",
    "returnContainer": null,
-   "returnElement": "RentOrder",
+   "returnElement": "ConsumerOrderVO",
    "responseShape": [
     {
      "name": "orderNo",
@@ -27677,11 +27747,23 @@
      "type": "String"
     },
     {
+     "name": "status",
+     "type": "String"
+    },
+    {
      "name": "cabinetNo",
      "type": "String"
     },
     {
+     "name": "siteName",
+     "type": "String"
+    },
+    {
      "name": "returnCabinetNo",
+     "type": "String"
+    },
+    {
+     "name": "returnSiteName",
      "type": "String"
     },
     {
@@ -27690,10 +27772,6 @@
     },
     {
      "name": "locationName",
-     "type": "String"
-    },
-    {
-     "name": "status",
      "type": "String"
     },
     {
@@ -27710,31 +27788,43 @@
     },
     {
      "name": "feeAmount",
-     "type": "double"
+     "type": "BigDecimal"
     },
     {
      "name": "depositAmount",
-     "type": "double"
+     "type": "BigDecimal"
     },
     {
      "name": "currency",
      "type": "String"
     },
     {
-     "name": "waivedAmount",
-     "type": "java.math.BigDecimal"
+     "name": "fees",
+     "type": "List<FeeItemVO>",
+     "fields": [
+      {
+       "name": "type",
+       "type": "String"
+      },
+      {
+       "name": "amount",
+       "type": "BigDecimal"
+      }
+     ]
     },
     {
-     "name": "compensateAmount",
-     "type": "java.math.BigDecimal"
-    },
-    {
-     "name": "ejectCount",
-     "type": "Integer"
-    },
-    {
-     "name": "lastEjectAt",
-     "type": "String"
+     "name": "timeline",
+     "type": "List<OrderStepVO>",
+     "fields": [
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "at",
+       "type": "String"
+      }
+     ]
     }
    ],
    "requestShape": null
@@ -27783,9 +27873,9 @@
     }
    ],
    "bodyType": null,
-   "returnType": "RentOrder",
+   "returnType": "ConsumerOrderVO",
    "returnContainer": null,
-   "returnElement": "RentOrder",
+   "returnElement": "ConsumerOrderVO",
    "responseShape": [
     {
      "name": "orderNo",
@@ -27796,11 +27886,23 @@
      "type": "String"
     },
     {
+     "name": "status",
+     "type": "String"
+    },
+    {
      "name": "cabinetNo",
      "type": "String"
     },
     {
+     "name": "siteName",
+     "type": "String"
+    },
+    {
      "name": "returnCabinetNo",
+     "type": "String"
+    },
+    {
+     "name": "returnSiteName",
      "type": "String"
     },
     {
@@ -27809,10 +27911,6 @@
     },
     {
      "name": "locationName",
-     "type": "String"
-    },
-    {
-     "name": "status",
      "type": "String"
     },
     {
@@ -27829,31 +27927,43 @@
     },
     {
      "name": "feeAmount",
-     "type": "double"
+     "type": "BigDecimal"
     },
     {
      "name": "depositAmount",
-     "type": "double"
+     "type": "BigDecimal"
     },
     {
      "name": "currency",
      "type": "String"
     },
     {
-     "name": "waivedAmount",
-     "type": "java.math.BigDecimal"
+     "name": "fees",
+     "type": "List<FeeItemVO>",
+     "fields": [
+      {
+       "name": "type",
+       "type": "String"
+      },
+      {
+       "name": "amount",
+       "type": "BigDecimal"
+      }
+     ]
     },
     {
-     "name": "compensateAmount",
-     "type": "java.math.BigDecimal"
-    },
-    {
-     "name": "ejectCount",
-     "type": "Integer"
-    },
-    {
-     "name": "lastEjectAt",
-     "type": "String"
+     "name": "timeline",
+     "type": "List<OrderStepVO>",
+     "fields": [
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "at",
+       "type": "String"
+      }
+     ]
     }
    ],
    "requestShape": null
@@ -27874,9 +27984,9 @@
     }
    ],
    "bodyType": null,
-   "returnType": "RentOrder",
+   "returnType": "ConsumerOrderVO",
    "returnContainer": null,
-   "returnElement": "RentOrder",
+   "returnElement": "ConsumerOrderVO",
    "responseShape": [
     {
      "name": "orderNo",
@@ -27887,11 +27997,23 @@
      "type": "String"
     },
     {
+     "name": "status",
+     "type": "String"
+    },
+    {
      "name": "cabinetNo",
      "type": "String"
     },
     {
+     "name": "siteName",
+     "type": "String"
+    },
+    {
      "name": "returnCabinetNo",
+     "type": "String"
+    },
+    {
+     "name": "returnSiteName",
      "type": "String"
     },
     {
@@ -27900,10 +28022,6 @@
     },
     {
      "name": "locationName",
-     "type": "String"
-    },
-    {
-     "name": "status",
      "type": "String"
     },
     {
@@ -27920,31 +28038,43 @@
     },
     {
      "name": "feeAmount",
-     "type": "double"
+     "type": "BigDecimal"
     },
     {
      "name": "depositAmount",
-     "type": "double"
+     "type": "BigDecimal"
     },
     {
      "name": "currency",
      "type": "String"
     },
     {
-     "name": "waivedAmount",
-     "type": "java.math.BigDecimal"
+     "name": "fees",
+     "type": "List<FeeItemVO>",
+     "fields": [
+      {
+       "name": "type",
+       "type": "String"
+      },
+      {
+       "name": "amount",
+       "type": "BigDecimal"
+      }
+     ]
     },
     {
-     "name": "compensateAmount",
-     "type": "java.math.BigDecimal"
-    },
-    {
-     "name": "ejectCount",
-     "type": "Integer"
-    },
-    {
-     "name": "lastEjectAt",
-     "type": "String"
+     "name": "timeline",
+     "type": "List<OrderStepVO>",
+     "fields": [
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "at",
+       "type": "String"
+      }
+     ]
     }
    ],
    "requestShape": null
@@ -29492,7 +29622,7 @@
  "conflicts": {},
  "stats": {
   "endpoints": 425,
-  "records": 307,
+  "records": 312,
   "withPerm": 362,
   "withBody": 185,
   "shapedResponses": 325
