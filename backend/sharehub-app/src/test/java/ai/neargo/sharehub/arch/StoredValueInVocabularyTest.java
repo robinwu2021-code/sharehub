@@ -26,6 +26,22 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 注释是这一列声明的取值，数据是这一列实际存的值，对不上就是错。
  * 于是它一口气覆盖 80 多列，不用维护任何对应关系。
  *
+ * <h2>⚠️ 范围是一份**写死的列名清单**，不是「所有列」</h2>
+ * 下面那句 {@code column_name IN (...)} 才是真实范围。上一段说「不用维护任何
+ * 对应关系」——而那份清单正是一份要维护的对应关系。说法与实际不符，
+ * 于是没人想到去看它漏了谁。
+ *
+ * <p>漏掉的代价已经发生过一次：{@code dev_alarm.level} 与
+ * {@code dev_alarm_code.level} 100% 存着 LOW/MEDIUM/HIGH/URGENT
+ * （**工单优先级**的词表），而列注释声明的是 INFO/WARN/CRITICAL。
+ * 这两列叫 {@code level}，不在当时那四个名字里，**一次都没被扫到**，
+ * 本条却一直是绿的 —— 看起来像"全库都核对过了"。V82 归一，并把 level 收进清单。
+ *
+ * <p>范围外还有 100+ 列在注释里声明了词表（{@code channel} / {@code source} /
+ * {@code direction} / {@code action} / {@code category} …），**目前不在覆盖内**。
+ * 要扩清单就得同时准备好修它炸出来的存量数据 —— 只加名字不修数据，
+ * 会逼下一个人把名字删回去。
+ *
  * <h2>抓到过什么</h2>
  * {@code share_rule.mode} 有 9 行、{@code share_record.mode} 有 8 行是 {@code RATE}，
  * 而词表是 {@code CHANNEL_SPLIT/LEDGER}（V66 已归一）。
@@ -71,7 +87,7 @@ class StoredValueInVocabularyTest extends ApiTestSupport {
                 SELECT table_name AS t, column_name AS c, column_comment AS cmt
                   FROM information_schema.columns
                  WHERE table_schema = DATABASE()
-                   AND column_name IN ('status', 'state', 'type', 'mode')
+                   AND column_name IN ('status', 'state', 'type', 'mode', 'level')
                    AND data_type = 'varchar'
                    AND column_comment <> ''
                    AND table_name NOT LIKE 'flyway%'""");

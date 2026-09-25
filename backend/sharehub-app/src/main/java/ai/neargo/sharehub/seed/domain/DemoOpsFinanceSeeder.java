@@ -113,15 +113,18 @@ public class DemoOpsFinanceSeeder implements CommandLineRunner {
 
     private void seedAlarms() {
         if (alarmCodes.selectCount(null) == 0) {
-            insertCode("E001", "仓位卡宝", "Slot jammed", "فتحة معطلة", "HIGH", "远程弹仓一次，仍卡则派工单换锁扣", 1);
-            insertCode("E002", "离线超时", "Device offline", "الجهاز غير متصل", "HIGH", "查网络/电源，30 分钟未恢复自动开单", 1);
-            insertCode("E003", "电量异常", "Abnormal battery", "بطارية غير طبيعية", "MEDIUM", "标记该宝待检，下次巡检带走", 0);
-            insertCode("E004", "温度过高", "Over temperature", "درجة حرارة مرتفعة", "URGENT", "立即断电并现场处置", 1);
+            insertCode("E001", "仓位卡宝", "Slot jammed", "فتحة معطلة", "WARN", "远程弹仓一次，仍卡则派工单换锁扣", 1);
+            insertCode("E002", "离线超时", "Device offline", "الجهاز غير متصل", "WARN", "查网络/电源，30 分钟未恢复自动开单", 1);
+            insertCode("E003", "电量异常", "Abnormal battery", "بطارية غير طبيعية", "INFO", "标记该宝待检，下次巡检带走", 0);
+            insertCode("E004", "温度过高", "Over temperature", "درجة حرارة مرتفعة", "CRITICAL", "立即断电并现场处置", 1);
         }
         if (alarms.selectCount(null) == 0) {
             List<DevCabinet> cabs = cabinets.selectList(new LambdaQueryWrapper<DevCabinet>().last("limit 6"));
             String[] codes = {"E001", "E002", "E003", "E004", "E001", "E002"};
-            String[] levels = {"HIGH", "HIGH", "MEDIUM", "URGENT", "HIGH", "HIGH"};
+            // 告警等级词表是 INFO/WARN/CRITICAL（AlarmLevel / dev_alarm.level 列注释）。
+            // 此处原先写的是**工单优先级**词表 LOW/MEDIUM/HIGH/URGENT —— 两个概念串了，
+            // 而种子走裸写入、绕过 AlarmLevel.of() 的校验，于是库里存着本枚举自己会拒绝的值。
+            String[] levels = {"WARN", "WARN", "INFO", "CRITICAL", "WARN", "WARN"};
             String[] states = {"OPEN", "OPEN", "ACKED", "OPEN", "CLOSED", "OPEN"};
             for (int i = 0; i < cabs.size(); i++) {
                 DevCabinet c = cabs.get(i);
