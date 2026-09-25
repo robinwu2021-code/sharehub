@@ -24,10 +24,34 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    /**
+     * 业务异常 → {@link Result} 错误包，**HTTP 状态由业务码推导**。
+     *
+     * <p>业务拒绝（「券已领完」「仅 HELD 押金可解冻」）此前一律是裸的
+     * {@link IllegalStateException}，落到下面的兜底 ⇒ 500 +「服务器错误」+ 一行带栈的 ERROR。
+     * 调用方拿不到真原因，而 ERROR 级别也因此失去意义（券领完不需要任何人介入）。
+     * 现在这类改抛 {@code ServerException.of(ErrorCode.CONFLICT, …)} 走这里。
+     *
+     * <p><b>为什么不恒回 200</b>：neargo 的 {@code Result} 约定把错误放在包里，
+     * 但状态码恒 200 会让业务失败在 HTTP 层完全不可见 —— 代理日志、监控、
+     * 任何只看状态码的东西都以为一切正常。本仓库已有的 400/403 映射就是这个用意
+     * （见类注释「维持 RBAC/状态机语义」），这里保持一致。
+     *
+     * <p><b>为什么不无脑 {@code HttpStatus.resolve}</b>：{@code Result} 的码域允许业务自定义
+     * （不一定是 HTTP 码）。解析不出来、或解析出来不是 4xx/5xx 的，**仍回 200** ——
+     * 那是旧行为，别把别人的码域当状态码用。
+     */
     @ExceptionHandler(ServerException.class)
-    public Result<Void> onServer(ServerException e) {
+    public ResponseEntity<Result<Void>> onServer(ServerException e) {
         // message 约定为 i18n key（非 key 的成品串经 Messages 原样返回，兼容旧代码）
-        return Result.error(e.getCode(), Messages.msg(e.getMessage()));
+        return ResponseEntity.status(statusOf(e.getCode()))
+                .body(Result.error(e.getCode(), Messages.msg(e.getMessage())));
+    }
+
+    /** 业务码 → HTTP 状态；只认 4xx/5xx，其余回 200（见 {@link #onServer} 注释）。 */
+    static HttpStatus statusOf(int code) {
+        HttpStatus s = HttpStatus.resolve(code);
+        return s != null && (s.is4xxClientError() || s.is5xxServerError()) ? s : HttpStatus.OK;
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
