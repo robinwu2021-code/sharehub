@@ -1,5 +1,6 @@
 // 覆盖范围：场所域 —— 站点 / 点位 / 场地方 / 合同 / 商机线索 / 选址分析 /
 // 门店 Onboarding / 站点生命周期。
+import * as ss from "../../mock/db/site-status";
 import * as ca from "../../mock/db/contract-approval";
 import * as db from "../../mock/db";
 // 阶段流转走子模块直取（同 mocks/workorder.ts 的 `wo`）：校验与留痕都在 db 层，本文件只延迟透传。
@@ -142,4 +143,13 @@ export const locationMock: LocationApi = {
   auditContractTermination: async (no, result, reason) => wait(ca.auditContractTermination(no, result, reason), 350),
   renewContract: async (no) => wait(ca.renewContract(no), 350),
   supplementContract: async (no, startAt) => wait(ca.supplementContract(no, startAt), 350),
+
+  // —— 站点状态机与门禁（暂停/恢复在 mocks/operation.ts，同一对端点不重复实现）——
+  getSite: (no) => wait(ss.getSite(no)),
+  siteSummary: () => wait(ss.siteSummary()),
+  listSiteStatusLogs: (no) => wait(ss.listSiteStatusLogs(no)),
+  siteOpeningChecklist: (no) => wait(ss.siteOpeningChecklist(no)),
+  siteCloseGate: (no) => wait(ss.siteCloseGate(no)),
+  withdrawSite: async (no, reason, plannedAt) => wait(ss.withdrawSite(no, reason, plannedAt), 350),
+  closeSite: async (no, note) => wait(ss.closeSite(no, note), 350),
 };

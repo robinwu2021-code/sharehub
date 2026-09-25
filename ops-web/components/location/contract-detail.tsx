@@ -7,7 +7,7 @@
 // 塞回列表页会让那个文件再长 200 行，且这三者的关系只有读代码才看得出来。
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { Contract, ContractStatus, ContractLogItem } from "@/lib/types";
+import type { Contract, ContractStatus, ContractLogItem, ContractTerminationStatus } from "@/lib/types";
 import { Drawer, Field } from "@/components/ui/drawer";
 
 import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
@@ -37,6 +37,13 @@ const SHARE_MODE: Record<string, string> = {
 const SHARE_BASE: Record<string, string> = { NET: "净额", GROSS: "毛额" };
 const SETTLE_PERIOD: Record<string, string> = { MONTH: "按月", QUARTER: "按季" };
 const AUDIT_STAGE: Record<string, string> = { OPS: "运营审条款", FINANCE: "财务会签" };
+
+/** 终止申请三态。走 StatusMap 而不是内联三元——与页面层的棘轮口径一致。 */
+const TERMINATION_STATUS: StatusMap<ContractTerminationStatus> = {
+  PENDING: { label: "待审批", tone: "warning" },
+  APPROVED: { label: "已获批", tone: "danger" },
+  REJECTED: { label: "已驳回", tone: "muted" },
+};
 
 /** 留痕事件 → 人读文案。缺映射时**原样显示事件名**，不吞掉。 */
 const EVENT_LABEL: Record<string, string> = {
@@ -110,9 +117,7 @@ export function ContractDetailDrawer({
           {/* —— 终止申请：有就必须显眼，它决定这份合同还能活多久 —— */}
           {f?.termination && (
             <Field label="终止申请">
-              <Badge tone={f.termination.status === "PENDING" ? "warning" : f.termination.status === "APPROVED" ? "danger" : "muted"}>
-                {f.termination.status === "PENDING" ? "待审批" : f.termination.status === "APPROVED" ? "已获批" : "已驳回"}
-              </Badge>
+              <StatusBadge map={TERMINATION_STATUS} value={f.termination.status} />
               <span className="ms-2">{f.termination.reason}</span>
               {f.termination.effectiveAt && (
                 <div className="mt-1 txt-caption text-muted-foreground">

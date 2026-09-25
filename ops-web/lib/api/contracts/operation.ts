@@ -25,7 +25,8 @@ export interface OperationApi {
   /** 单站统计（站点详情「统计」页签）。 */
   getSiteStats(siteNo: string, q?: SiteStatsQ): Promise<SiteStats>;
   /** 暂停营业：C 端隐藏该站点、站内机柜不允许新借，**已借出的仍可归还**。 */
-  pauseSite(siteNo: string, reason: string): Promise<Site>;
+  /** 暂停营业。`pauseUntil` 留空 = 无限期；填了到那天由定时任务自动恢复。 */
+  pauseSite(siteNo: string, reason: string, pauseUntil?: string): Promise<Site>;
   /** 恢复营业。 */
   resumeSite(siteNo: string): Promise<Site>;
 

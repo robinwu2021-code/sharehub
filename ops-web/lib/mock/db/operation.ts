@@ -2,6 +2,8 @@
 //
 // 聚合口径全部走 lib/operation-overview 的纯函数——与后端将来实现的是同一份规则，
 // 单测钉在那边；这里只负责把 db 的各张表喂进去，以及站点状态的写入。
+import { SITE_TRANSITIONS } from "../../types";
+import { siteStatusLog } from "./site-status";
 import type { OperationOverview, SiteStats } from "../../types/operation";
 import { notFound, fail } from "@/lib/biz-error";
 import type { Site } from "../../types/location";
@@ -68,14 +70,30 @@ export function getSiteStats(siteNo: string, q: { from?: string; to?: string } =
   return buildSiteStats(siteNo, inputOf(q.from, q.to));
 }
 
-/** 暂停营业。已归档的站点不允许改营业状态（先恢复归档再操作）。 */
-export function pauseSite(siteNo: string, reason: string): Site {
+/**
+ * 暂停营业。已归档的站点不允许改营业状态（先恢复归档再操作）。
+ *
+ * <p>2026-09-25 站点五态之后，**可用性以 SITE_TRANSITIONS 为准**：
+ * 原先只排「已经是 PAUSED」，于是筹备中 / 撤场中 / 已关闭的站点都能被暂停 ——
+ * 一个还没开业的站点显示「暂停营业」，谁也说不清它到底是什么状态。
+ *
+ * @param pauseUntil 留空 = 无限期；填了到那天由定时任务自动恢复。
+ */
+export function pauseSite(siteNo: string, reason: string, pauseUntil?: string): Site {
   const s = sites.find((x) => x.siteNo === siteNo);
   if (!s) throw notFound("站点", "Site", siteNo);
   if (s.archivedAt) throw fail("已归档的站点不能暂停营业", "An archived site cannot be suspended", "لا يمكن تعليق موقع مؤرشف");
-  if (s.status === "PAUSED") throw fail("站点已处于暂停营业状态", "This site is already suspended", "هذا الموقع معلّق بالفعل");
+  if (!SITE_TRANSITIONS.pause.from.includes(s.status)) {
+    throw fail(
+      `「${s.status}」的站点不能暂停营业（只有营业中可以）`,
+      `A site in ${s.status} cannot be suspended`,
+      `لا يمكن تعليق موقع في حالة ${s.status}`,
+    );
+  }
   if (!reason.trim()) throw fail("请填写暂停原因", "A reason is required to suspend", "سبب التعليق مطلوب");
-  s.status = "PAUSED";
+  s.status = SITE_TRANSITIONS.pause.to;
+  siteStatusLog(s, "PAUSE", "ACTIVE", s.status, reason);
+  if (s.ops) { s.ops.pauseReason = reason; s.ops.pauseUntil = pauseUntil ?? null; }
   return s;
 }
 
@@ -83,7 +101,15 @@ export function resumeSite(siteNo: string): Site {
   const s = sites.find((x) => x.siteNo === siteNo);
   if (!s) throw notFound("站点", "Site", siteNo);
   if (s.archivedAt) throw fail("已归档的站点不能恢复营业", "An archived site cannot be reopened", "لا يمكن إعادة فتح موقع مؤرشف");
-  if (s.status === "ACTIVE") throw fail("站点已在营业中", "This site is already open", "هذا الموقع مفتوح بالفعل");
-  s.status = "ACTIVE";
+  if (!SITE_TRANSITIONS.resume.from.includes(s.status)) {
+    throw fail(
+      `「${s.status}」的站点不能恢复营业（只有暂停中可以）`,
+      `A site in ${s.status} cannot be reopened`,
+      `لا يمكن إعادة فتح موقع في حالة ${s.status}`,
+    );
+  }
+  s.status = SITE_TRANSITIONS.resume.to;
+  siteStatusLog(s, "RESUME", "PAUSED", s.status);
+  if (s.ops) { s.ops.pauseReason = null; s.ops.pauseUntil = null; }
   return s;
 }

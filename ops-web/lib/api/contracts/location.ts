@@ -5,6 +5,7 @@ import type {
   PageResult, Site, SitePoint, Venue, Contract, ContractAttachmentReq,
   Lead, LeadFollowUp, LeadFollowUpReq, SiteAnalysis,
   VenueOnboarding, LifecycleRow, FunnelStage, SiteAgent, ContractSummary, ContractLogItem,
+  SiteSummary, SiteStatusLogItem, Checklist,
 } from "../../types";
 
 export interface LocationApi {
@@ -94,6 +95,33 @@ export interface LocationApi {
   listSiteLifecycles(q?: PageQ & { phase?: string }): Promise<PageResult<LifecycleRow>>;
   /** 漏斗每一档的计数。 */
   siteLifecycleFunnel(): Promise<FunnelStage[]>;
+
+  // ——— 站点状态机与门禁（2026-09-25）———
+  // 状态机见 SITE_TRANSITIONS。**没有 goLive** —— 首台设备上线由后端推进（系统边）。
+
+  /** 站点详情（含 ops 子对象，列表不返回）。 */
+  getSite(siteNo: string): Promise<Site>;
+  /** 摘要条：五个状态计数 + 缺运维责任人 / 缺营业时间两项待办。 */
+  siteSummary(): Promise<SiteSummary>;
+  /** 状态流转留痕。 */
+  listSiteStatusLogs(siteNo: string): Promise<SiteStatusLogItem[]>;
+
+  /**
+   * 开业清单：筹备中的站点还差什么才能营业。
+   * 它是**向导不是拦路虎** —— 每条未通过都带 fixHref 指向能解决它的页面。
+   */
+  siteOpeningChecklist(siteNo: string): Promise<Checklist>;
+  /** 关闭门禁：撤场中的站点还有什么没了结（在用设备、未结账款…）。 */
+  siteCloseGate(siteNo: string): Promise<Checklist>;
+
+  // 暂停 / 恢复**不在这里**：OperationApi 早就有 pauseSite / resumeSite，打的是同一对端点。
+  // 在两个切片各定义一份，`Api` 组合根会直接编译不过（属性签名不一致），
+  // 而就算签名碰巧一致，页面也会不知道该调哪个。pauseUntil 加在 OperationApi 那一份上。
+
+  /** 撤场：进入 WITHDRAWING，设备要撤、账要结，完了再 close。 */
+  withdrawSite(siteNo: string, reason: string, plannedAt?: string): Promise<Site>;
+  /** 关闭：**不可逆**。关了要重开只能另建站点，否则同一站点号跨两段经营期，报表对不上。 */
+  closeSite(siteNo: string, note?: string): Promise<Site>;
 
   // === G1 软删除（TDD §10.1）：归档而非删除，**契约里禁止出现 deleteXxx** ===
   archiveSite(siteNo: string): Promise<Site>;

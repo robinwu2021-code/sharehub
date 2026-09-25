@@ -59,4 +59,13 @@ export const locationHttp: LocationApi = {
     client.post(`/api/ops/contracts/${no}/termination/audit`, { result, reason }),
   renewContract: (no) => client.post(`/api/ops/contracts/${no}/renew`, {}),
   supplementContract: (no, startAt) => client.post(`/api/ops/contracts/${no}/supplement`, { startAt }),
+
+  // —— 站点状态机与门禁 ——
+  getSite: (no) => client.get(`/api/ops/sites/${no}`),
+  siteSummary: () => client.get("/api/ops/sites/summary"),
+  listSiteStatusLogs: (no) => client.get(`/api/ops/sites/${no}/status-logs`),
+  siteOpeningChecklist: (no) => client.get(`/api/ops/sites/${no}/opening-checklist`),
+  siteCloseGate: (no) => client.get(`/api/ops/sites/${no}/close-gate`),
+  withdrawSite: (no, reason, plannedAt) => client.post(`/api/ops/sites/${no}/withdraw`, { reason, plannedAt }),
+  closeSite: (no, note) => client.post(`/api/ops/sites/${no}/close`, { note }),
 };

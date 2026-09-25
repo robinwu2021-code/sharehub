@@ -7,7 +7,7 @@ import { client } from "../http-client";
 export const operationHttp: OperationApi = {
   getOperationOverview: (q) => client.get("/api/ops/operation/overview", q),
   getSiteStats: (siteNo, q) => client.get(`/api/ops/sites/${siteNo}/stats`, q),
-  pauseSite: (siteNo, reason) => client.post(`/api/ops/sites/${siteNo}/pause`, { reason }),
+  pauseSite: (siteNo, reason, pauseUntil) => client.post(`/api/ops/sites/${siteNo}/pause`, { reason, pauseUntil }),
   resumeSite: (siteNo) => client.post(`/api/ops/sites/${siteNo}/resume`, {}),
 
   listPriceAdjustments: (q) => client.get("/api/trade/price-adjustments", q),

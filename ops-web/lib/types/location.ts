@@ -30,6 +30,66 @@ export const SITE_TRANSITIONS = {
   close: { from: ["WITHDRAWING"] as SiteStatus[], to: "CLOSED" as SiteStatus },
 } as const;
 
+/**
+ * 开业清单 / 关闭门禁的一条（后端 `Checklist.Item`）。
+ *
+ * <p>**未通过时必须给去处**：`fixHref` 指向能解决它的那个页面。
+ * 只说「合同未生效」而不给链接，运营得自己猜去哪儿办 —— 门禁就成了拦路虎而非向导。
+ */
+export interface ChecklistItem {
+  key: string;
+  label: string;
+  passed: boolean;
+  detail: string | null;
+  fixHref: string | null;
+}
+
+/** 门禁结果。`allPassed` 由服务端算，前端不要自己 every() —— 两处算法迟早不一致。 */
+export interface Checklist {
+  allPassed: boolean;
+  items: ChecklistItem[];
+}
+
+/** 站点运营信息（后端 `SiteOps`）。列表不返回，详情才给。 */
+export interface SiteOps {
+  opsEmployeeNo: string | null;
+  /** 运维代理（`loc_site_agent.role=OPERATE`）。与 opsEmployeeNo 是「二选一」：平台自营填前者。 */
+  operateAgentNo: string | null;
+  firstLiveAt: string | null;
+  pauseReason: string | null;
+  pauseUntil: string | null;
+  withdrawReason: string | null;
+  withdrawPlannedAt: string | null;
+  closedAt: string | null;
+  activeContractNo: string | null;
+}
+
+/** 站点状态流转留痕的一行。 */
+export interface SiteStatusLogItem {
+  event: string;
+  fromStatus: SiteStatus | null;
+  toStatus: SiteStatus | null;
+  operator: string | null;
+  reason: string | null;
+  at: string;
+}
+
+/**
+ * 站点摘要条（后端 `SiteSummary`）。
+ *
+ * <p>前五个是各状态计数，后两个是**要人动手的事**：缺运维责任人、缺营业时间。
+ * 这两样缺了站点照常营业，所以没人会主动发现 —— 出事时才知道找不到人、也不知道几点开门。
+ */
+export interface SiteSummary {
+  preparing: number;
+  active: number;
+  paused: number;
+  withdrawing: number;
+  closed: number;
+  missingOwner: number;
+  missingOpenHours: number;
+}
+
 export interface Site extends Archivable {
   siteNo: string;
   name: string;
@@ -65,6 +125,8 @@ export interface Site extends Archivable {
   status: SiteStatus;
   /** 运维责任人（平台自营时的员工号）。代理运维走 `loc_site_agent.role=OPERATE`，不占本列。 */
   opsEmployeeNo?: string | null;
+  /** 运营信息。列表不返回（只详情给），故可空。 */
+  ops?: SiteOps | null;
 }
 
 /**

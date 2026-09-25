@@ -11,10 +11,12 @@
 // 而不是点了再报错。
 import { Suspense, useMemo, useState } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import Link from "next/link";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { BarChart3, Pause, Pencil, Play } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Site } from "@/lib/types";
+import { SITE_TRANSITIONS } from "@/lib/types";
 import { SITE_COORD_BOUNDS } from "@/lib/types/location";
 import { useCan } from "@/lib/hooks/use-can";
 import { useI18n } from "@/lib/i18n";
@@ -36,6 +38,10 @@ import {
   ShowArchivedToggle, archivedRowClass, ArchiveActions, archiveConfirm, unarchiveConfirm,
 } from "@/components/archive";
 import { SiteDetailDrawer, SITE_STATUS } from "@/components/operation/site-detail";
+import { SummaryCard } from "@/components/ui/summary-card";
+import { Drawer, Field } from "@/components/ui/drawer";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 
 
 const SCENES = ["商场", "机场", "餐饮", "地铁", "写字楼", "酒店", "医院", "其他"];
@@ -189,18 +195,57 @@ function SitesInner() {
   const archive = useMutation({ mutationFn: (no: string) => api.archiveSite(no), onSuccess: () => { refresh(); notify.success("已归档"); } });
   const unarchive = useMutation({ mutationFn: (no: string) => api.unarchiveSite(no), onSuccess: () => { refresh(); notify.success("已恢复"); } });
   const pause = useMutation({
-    mutationFn: (v: { siteNo: string; reason: string }) => api.pauseSite(v.siteNo, v.reason),
+    mutationFn: (v: { siteNo: string; reason: string; pauseUntil?: string }) =>
+      api.pauseSite(v.siteNo, v.reason, v.pauseUntil),
     onSuccess: () => { refresh(); notify.success("已暂停营业"); setPauseTarget(null); },
+  });
+  /** 撤场 / 关闭。合成一个：成功后处理完全一样，分两个会把这段抄两遍。 */
+  const exitFlow = useMutation({
+    mutationFn: (v: { kind: "withdraw"; siteNo: string; reason: string; plannedAt?: string }
+      | { kind: "close"; siteNo: string; note?: string }) =>
+      v.kind === "withdraw"
+        ? api.withdrawSite(v.siteNo, v.reason, v.plannedAt)
+        : api.closeSite(v.siteNo, v.note),
+    onSuccess: (_d, v) => {
+      refresh();
+      qc.invalidateQueries({ queryKey: ["site-summary"] });
+      notify.success(v.kind === "withdraw" ? "已进入撤场" : "站点已关闭");
+      setExitTarget(null); setExitReason(""); setExitPlannedAt("");
+    },
   });
   const resume = useMutation({
     mutationFn: (siteNo: string) => api.resumeSite(siteNo),
     onSuccess: () => { refresh(); notify.success("已恢复营业"); },
   });
 
+  /** 摘要条：五态计数 + 两项待办。 */
+  const summary = useQuery({ queryKey: ["site-summary"], queryFn: () => api.siteSummary() });
+
+  /**
+   * 门禁抽屉。开业清单（筹备中）与关闭门禁（撤场中）共用一个 ——
+   * 两者的形状完全一样（一串「通过/未通过 + 为什么 + 去哪办」），
+   * 分两个组件只会把同一段渲染抄两遍。
+   */
+  const [gateTarget, setGateTarget] = useState<Site | null>(null);
+  const gate = useQuery({
+    queryKey: ["site-gate", gateTarget?.siteNo, gateTarget?.status],
+    queryFn: () => gateTarget!.status === "WITHDRAWING"
+      ? api.siteCloseGate(gateTarget!.siteNo)
+      : api.siteOpeningChecklist(gateTarget!.siteNo),
+    enabled: !!gateTarget,
+  });
+
+  /** 撤场 / 关闭抽屉。 */
+  const [exitTarget, setExitTarget] = useState<{ site: Site; kind: "withdraw" | "close" } | null>(null);
+  const [exitReason, setExitReason] = useState("");
+  const [exitPlannedAt, setExitPlannedAt] = useState("");
+
   // 只有一个品牌时直接预选：让人在唯一选项上点一下，是没有意义的一步
   const openNew = () => {
     setEditing(undefined);
-    setForm({ sceneType: "商场", status: "ACTIVE", brandNo: brandOpts.length === 1 ? brandOpts[0].value : undefined });
+    // 不预置 status：五态之后新建一律 PREPARING，由后端定。
+    // 手填 ACTIVE 等于跳过开业清单——那张清单存在的意义就是不让人跳过它
+    setForm({ sceneType: "商场", brandNo: brandOpts.length === 1 ? brandOpts[0].value : undefined });
   };
   const openEdit = (s: Site) => { setEditing(s); setForm({ ...s }); };
   const submit = () => {
@@ -230,7 +275,8 @@ function SitesInner() {
     if (!pauseTarget) return;
     const reason = String(pauseForm.reason ?? "").trim();
     if (!reason) { notify.error("请填写暂停原因"); return; }
-    pause.mutate({ siteNo: pauseTarget.siteNo, reason });
+    // pauseUntil 可空：留空 = 无限期，填了到那天由定时任务自动恢复
+    pause.mutate({ siteNo: pauseTarget.siteNo, reason, pauseUntil: String(pauseForm.pauseUntil ?? "") || undefined });
   };
 
   const cols: Column<Site>[] = [
@@ -270,9 +316,25 @@ function SitesInner() {
             actions={
               <>
                 <Button size="sm" variant="outline" onClick={() => openEdit(s)}><Pencil className="size-4" /> 编辑</Button>
-                {canPause && (s.status === "ACTIVE"
-                  ? <Button size="sm" variant="outline" onClick={() => { setPauseTarget(s); setPauseForm({}); }}><Pause className="size-4" /> 暂停营业</Button>
-                  : <Button size="sm" variant="outline" onClick={() => resume.mutate(s.siteNo)}><Play className="size-4" /> 恢复营业</Button>)}
+                {/* 开业清单 / 关闭门禁：只在对应状态出现，其余状态点开是一张空清单 */}
+                {(s.status === "PREPARING" || s.status === "WITHDRAWING") && (
+                  <Button size="sm" variant="outline" onClick={() => setGateTarget(s)}>
+                    {s.status === "PREPARING" ? "开业清单" : "关闭门禁"}
+                  </Button>
+                )}
+                {/* 可用性一律问 SITE_TRANSITIONS，页面不另写一套 */}
+                {canPause && SITE_TRANSITIONS.pause.from.includes(s.status) && (
+                  <Button size="sm" variant="outline" onClick={() => { setPauseTarget(s); setPauseForm({}); }}><Pause className="size-4" /> 暂停营业</Button>
+                )}
+                {canPause && SITE_TRANSITIONS.resume.from.includes(s.status) && (
+                  <Button size="sm" variant="outline" onClick={() => resume.mutate(s.siteNo)}><Play className="size-4" /> 恢复营业</Button>
+                )}
+                {canWrite && SITE_TRANSITIONS.withdraw.from.includes(s.status) && (
+                  <Button size="sm" variant="outline" onClick={() => { setExitTarget({ site: s, kind: "withdraw" }); setExitReason(""); setExitPlannedAt(""); }}>撤场</Button>
+                )}
+                {canWrite && SITE_TRANSITIONS.close.from.includes(s.status) && (
+                  <Button size="sm" variant="outline" onClick={() => { setExitTarget({ site: s, kind: "close" }); setExitReason(""); }}>关闭站点</Button>
+                )}
               </>
             }
           />
@@ -287,6 +349,19 @@ function SitesInner() {
     <div>
       <PageTitle title={tNav("站点管理")} desc="站点的新增、编辑与营业状态；点位在站点详情里维护" />
       {!canWrite && <ReadOnlyNotice what="站点维护" perm="location:poi:create / location:poi:update" note="不能新增、编辑、暂停营业或归档" className="mb-3" />}
+      {summary.data && (
+        /* 前五个是状态计数（一眼看出盘子的形状），后两个是**要人动手的事** ——
+           缺运维责任人 / 缺营业时间，缺了站点照常营业，所以没人会主动发现 */
+        <div className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-7">
+          <SummaryCard label="筹备中" value={summary.data.preparing} />
+          <SummaryCard label="营业中" value={summary.data.active} />
+          <SummaryCard label="暂停营业" value={summary.data.paused} />
+          <SummaryCard label="撤场中" value={summary.data.withdrawing} />
+          <SummaryCard label="已关闭" value={summary.data.closed} />
+          <SummaryCard label="缺责任人" value={summary.data.missingOwner} />
+          <SummaryCard label="缺营业时间" value={summary.data.missingOpenHours} />
+        </div>
+      )}
       <Toolbar
         search={keyword}
         onSearch={(v) => { setKeyword(v); paging.reset(); }}
@@ -336,6 +411,80 @@ function SitesInner() {
         onSubmit={submitPause}
         submitting={pause.isPending}
       />
+
+      {/* 开业清单 / 关闭门禁：同一个抽屉，两者形状完全一样 */}
+      <Drawer
+        open={!!gateTarget}
+        onOpenChange={(o) => !o && setGateTarget(null)}
+        title={gateTarget?.status === "WITHDRAWING" ? `关闭门禁 ${gateTarget?.name ?? ""}` : `开业清单 ${gateTarget?.name ?? ""}`}
+        desc={gateTarget?.status === "WITHDRAWING"
+          ? "全部了结才能关闭站点。未通过的每条都带「去处理」——不必自己猜去哪儿办"
+          : "首台设备上线时站点自动转营业。这张清单列的是在那之前还差什么"}
+        width="w-[560px]"
+      >
+        {gate.isLoading && <span className="text-muted-foreground">加载中…</span>}
+        {gate.data && (
+          <ol className="space-y-3">
+            {gate.data.items.map((it) => (
+              <li key={it.key} className="flex items-start gap-2">
+                {/* 两个静态 Badge 而不是 tone={三元}：这里是布尔不是枚举，
+                    而棘轮拦的正是「状态→色调」的内联映射（它该走 StatusMap） */}
+                {it.passed ? <Badge tone="success">已满足</Badge> : <Badge tone="warning">待处理</Badge>}
+                <div className="min-w-0">
+                  <div className="txt-strong">{it.label}</div>
+                  {it.detail && <div className="txt-caption text-muted-foreground">{it.detail}</div>}
+                  {/* 未通过必须给去处：只说缺什么而不给链接，门禁就成了拦路虎 */}
+                  {!it.passed && it.fixHref && (
+                    <Link href={it.fixHref} className="txt-caption underline">去处理</Link>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
+      </Drawer>
+
+      {/* 撤场 / 关闭 */}
+      <Drawer
+        open={!!exitTarget}
+        onOpenChange={(o) => !o && setExitTarget(null)}
+        title={exitTarget?.kind === "withdraw" ? `撤场 ${exitTarget?.site.name ?? ""}` : `关闭站点 ${exitTarget?.site.name ?? ""}`}
+        desc={exitTarget?.kind === "withdraw"
+          ? "进入撤场后站点停止接单，设备要撤、账要结；全部了结后再「关闭站点」"
+          : "关闭**不可逆**。关了要重开只能另建站点——同一站点号跨两段经营期，报表再也对不上"}
+        width="w-[520px]"
+        footer={exitTarget && (
+          <>
+            <Button variant="outline" onClick={() => setExitTarget(null)}>取消</Button>
+            <Button
+              disabled={exitFlow.isPending || (exitTarget.kind === "withdraw" && !exitReason.trim())}
+              onClick={() => exitTarget.kind === "withdraw"
+                ? exitFlow.mutate({ kind: "withdraw", siteNo: exitTarget.site.siteNo, reason: exitReason, plannedAt: exitPlannedAt || undefined })
+                : exitFlow.mutate({ kind: "close", siteNo: exitTarget.site.siteNo, note: exitReason || undefined })}
+            >确认</Button>
+          </>
+        )}
+      >
+        {exitTarget && (
+          <>
+            <Field label={exitTarget.kind === "withdraw" ? "撤场原因" : "备注"}>
+              <Input className="w-full" value={exitReason}
+                placeholder={exitTarget.kind === "withdraw" ? "如：场地方收回场地" : "可留空"}
+                onChange={(e) => setExitReason(e.target.value)} />
+            </Field>
+            {exitTarget.kind === "withdraw" && (
+              <Field label="计划撤场日">
+                <Input type="date" className="w-full" value={exitPlannedAt} onChange={(e) => setExitPlannedAt(e.target.value)} />
+              </Field>
+            )}
+            {exitTarget.kind === "close" && (
+              <Field label="提醒">
+                <span className="text-muted-foreground">关闭前请先看「关闭门禁」——设备没撤完或合同还生效时会被拒</span>
+              </Field>
+            )}
+          </>
+        )}
+      </Drawer>
 
       <SiteDetailDrawer
         siteNo={detailNo}

@@ -16,7 +16,7 @@ const API_METHODS: Record<string, readonly string[]> = {
   device: ["listCabinets", "getCabinet", "saveCabinet", "sendCommand", "listPowerbanks", "listCabinetMonitor", "listCommandRecords", "listInventoryTransfers", "getInventoryTransfer", "listOtaRollouts", "savePowerbank", "saveInventoryTransfer", "saveOtaRollout", "listOtaReleases", "saveOtaRelease", "listOtaTasks", "listDeviceLogs", "listDeviceCodeBatches", "saveDeviceCodeBatch", "archiveCabinet", "unarchiveCabinet", "archivePowerbank", "unarchivePowerbank", "importCabinets"],
   alarm: ["listAlarmRecords", "listAlarmNotices", "listAlarmCodes", "listAlarmRules", "saveAlarmCode", "saveAlarmRule", "raiseAlarmWorkOrder", "ackAlarm", "closeAlarm", "autoRaiseWorkOrders", "resendAlarmNotice", "archiveAlarmCode", "unarchiveAlarmCode", "archiveAlarmRule", "unarchiveAlarmRule"],
   workorder: ["listWorkOrders", "createWorkOrder", "dispatchWorkOrder", "acceptWorkOrder", "processWorkOrder", "completeWorkOrder", "closeWorkOrder", "rejectWorkOrder", "reworkWorkOrder", "listSlaRules", "listInspectionPlans", "saveSlaRule", "saveInspectionPlan", "runInspectionPlan"],
-  location: ["listSiteAgents", "saveSiteAgent", "removeSiteAgent", "listSites", "saveSite", "listLocations", "savePoint", "listVenues", "listContracts", "listLeads", "listSiteAnalysis", "saveLead", "saveVenue", "saveContract", "listLeadFollowUps", "addLeadFollowUp", "addContractAttachment", "removeContractAttachment", "listVenueOnboardings", "saveVenueOnboarding", "reviewVenueOnboarding", "listSiteLifecycles", "siteLifecycleFunnel", "getContract", "contractSummary", "listContractLogs", "submitContract", "withdrawContract", "auditContract", "cosignContract", "signContract", "terminateContract", "auditContractTermination", "renewContract", "supplementContract", "archiveSite", "unarchiveSite", "archivePoint", "unarchivePoint", "archiveVenue", "unarchiveVenue"],
+  location: ["listSiteAgents", "saveSiteAgent", "removeSiteAgent", "listSites", "saveSite", "listLocations", "savePoint", "listVenues", "listContracts", "listLeads", "listSiteAnalysis", "saveLead", "saveVenue", "saveContract", "listLeadFollowUps", "addLeadFollowUp", "addContractAttachment", "removeContractAttachment", "listVenueOnboardings", "saveVenueOnboarding", "reviewVenueOnboarding", "listSiteLifecycles", "siteLifecycleFunnel", "getContract", "contractSummary", "listContractLogs", "submitContract", "withdrawContract", "auditContract", "cosignContract", "signContract", "terminateContract", "auditContractTermination", "renewContract", "supplementContract", "getSite", "siteSummary", "listSiteStatusLogs", "siteOpeningChecklist", "siteCloseGate", "withdrawSite", "closeSite", "archiveSite", "unarchiveSite", "archivePoint", "unarchivePoint", "archiveVenue", "unarchiveVenue"],
   agent: ["listAgents", "saveAgent", "listAgentAssignments", "listAgentPerformance", "listAgentAccounts", "saveAgentAccount", "listAgentApplies", "acceptAgentApply", "auditAgentApply", "createAgentApply", "sendApplyOtp", "selfServiceApply", "myApply", "listAssignableAssets", "assignAgentAssets", "reclaimAgentAssets", "listAgentAssignmentRecords", "listAgentCommissions", "saveAgentCommission", "archiveAgent", "unarchiveAgent"],
   order: ["listOrders", "getOrder", "interveneOrder", "listOrderInterventions", "listOrderEvents", "listOrderExceptions", "handleOrderException", "listDepositRecords", "releaseDeposit", "buyoutDeposit", "dunArrears", "listOrderComplaints", "createOrderComplaint", "handleOrderComplaint", "raiseComplaintWorkOrder", "listRefundRecords", "createRefund", "auditRefund", "listReservations", "cancelReservation", "listFreeOrders", "getFreeOrderStats"],
   pricing: ["listPricePlans", "listPricingSchedules", "savePricePlan", "savePricingSchedule", "listPlanScopes", "savePlanScope", "removePlanScope", "archivePricePlan", "unarchivePricePlan"],
@@ -81,7 +81,7 @@ describe("域切片划分", () => {
     expect(sorted(keysOf((HTTP_SLICES as Record<string, object>)[domain]))).toEqual(expected);
   });
 
-  it("方法总数仍为 333（新增/删除 API 时须自觉更新此数）", () => {
+  it("方法总数仍为 340（新增/删除 API 时须自觉更新此数）", () => {
     // 2026-09-23：差异化定价 2 个退役，适用范围 3 个新增（ADR-028 / V49），净 +1。
     // 2026-09-23 B1：品牌四个端点（list/save/archive/unarchive）。
         // 2026-09-23 A2-1：站点伙伴责任三个端点。
@@ -94,6 +94,9 @@ describe("域切片划分", () => {
     // 2026-09-25 运营流程批次2：文件上传 uploadFile / fileUrl 两个（+2）。
     // 2026-09-25 运营流程批次3：合同审批链 12 个（详情/摘要/留痕 + 提交/撤回/审批/会签/签署
     //   + 终止申请与其审批 + 续签/补充协议）。
-    expect(ALL_METHODS.length).toBe(333);
+    // 2026-09-25 运营流程批次4：站点状态机与门禁 9 个（详情/摘要/留痕 + 开业清单/关闭门禁
+    //   + 撤场/关闭）。暂停/恢复早在 OperationApi 里（同一对端点），不重复定义；
+    //   goLive 也不在其列——首台设备上线由后端推进，是系统边。
+    expect(ALL_METHODS.length).toBe(340);
   });
 });
