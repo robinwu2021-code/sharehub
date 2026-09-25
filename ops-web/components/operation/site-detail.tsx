@@ -28,6 +28,21 @@ import { EmptyState, Skeleton } from "@/components/ui/misc";
 import { SummaryCard } from "@/components/ui/summary-card";
 import { SiteStatsPanel } from "@/components/operation/site-stats";
 
+/**
+ * 站点五态（2026-09-25 起，与「门店生命周期」合并后的唯一一套）。
+ *
+ * <p>色调按**要不要人管**分：筹备中与撤场中是在途、需要推进（default/warning），
+ * 暂停营业是异常但可自恢复，已关闭是终态（muted，不再吸引注意力）。
+ */
+export const SITE_STATUS: StatusMap<Site["status"]> = {
+  PREPARING: { label: "筹备中", tone: "default" },
+  ACTIVE: { label: "营业中", tone: "success" },
+  PAUSED: { label: "暂停营业", tone: "warning" },
+  WITHDRAWING: { label: "撤场中", tone: "warning" },
+  CLOSED: { label: "已关闭", tone: "muted" },
+};
+
+
 const TABS = [
   { key: "basic", label: "基本信息" },
   { key: "points", label: "点位" },
@@ -243,7 +258,7 @@ export function SiteDetailDrawer({
               ? <>{site.agentNo}<span className="ms-2 txt-caption text-muted-foreground">改归属请走「代理商管理 › 资产划拨」，那里会连同点位与机柜一起变更并留流水</span></>
               : <>平台直营<span className="ms-2 txt-caption text-muted-foreground">如需划给代理，请走「代理商管理 › 资产划拨」</span></>}
           </Field>
-          <Field label="状态"><StatusBadge map={{ ACTIVE: { label: "营业中", tone: "success" }, PAUSED: { label: "暂停营业", tone: "warning" } }} value={site.status} /></Field>
+          <Field label="状态"><StatusBadge map={SITE_STATUS} value={site.status} /></Field>
         </div>
       )}
 

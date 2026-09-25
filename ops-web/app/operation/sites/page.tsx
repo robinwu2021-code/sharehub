@@ -35,13 +35,9 @@ import { ReadOnlyNotice } from "@/components/read-only-notice";
 import {
   ShowArchivedToggle, archivedRowClass, ArchiveActions, archiveConfirm, unarchiveConfirm,
 } from "@/components/archive";
-import { SiteDetailDrawer } from "@/components/operation/site-detail";
+import { SiteDetailDrawer, SITE_STATUS } from "@/components/operation/site-detail";
 
 
-const SITE_STATUS: StatusMap<Site["status"]> = {
-  ACTIVE: { label: "营业中", tone: "success" },
-  PAUSED: { label: "暂停营业", tone: "warning" },
-};
 const SCENES = ["商场", "机场", "餐饮", "地铁", "写字楼", "酒店", "医院", "其他"];
 
 const PAUSE_FIELDS: FieldDef[] = [

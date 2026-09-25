@@ -103,8 +103,9 @@ const REFS: Ref[] = [
   ref("contracts", db.contracts, "venueName", "venues.name", venueNames),
   ref("siteAnalyses", db.siteAnalyses, "siteNo", "sites.siteNo", siteNos),
   ref("siteAnalyses", db.siteAnalyses, "siteName", "sites.name", siteNames),
-  ref("siteLifecycles", db.siteLifecycles, "siteNo", "sites.siteNo", siteNos),
-  ref("siteLifecycles", db.siteLifecycles, "siteName", "sites.name", siteNames),
+  // siteLifecycles 的两条引用检查已删除（2026-09-25）：生命周期不再是独立种子表，
+  // 而是由 leads + sites **派生**（见 location.ts 的 lifecycleRows），
+  // 引用完整性由构造方式保证 —— 再检一遍等于检「自己等于自己」。
   ref("venueOnboardings", db.venueOnboardings, "venueName", "venues.name", venueNames, {
     allow: {
       "Al Barsha Mall": "入驻审核里的申请方按定义尚未成为场地方，审核通过后才会进 venues",

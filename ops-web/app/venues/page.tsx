@@ -32,8 +32,8 @@ import { useCan } from "@/lib/hooks/use-can";
 import { notify } from "@/lib/notify";
 import { useAuth } from "@/lib/auth";
 import { ReadOnlyNotice } from "@/components/read-only-notice";
-import { nextSiteStages, LEAD_FOLLOW_CHANNELS, ATTACH_EXTS, ATTACH_MAX_SIZE } from "@/lib/types";
-import type { Venue, Contract, Lead, LeadStage, LeadFollowChannel, VenueOnboarding, SiteLifecycle, SiteStage, PageResult } from "@/lib/types";
+import { LEAD_FOLLOW_CHANNELS, ATTACH_EXTS, ATTACH_MAX_SIZE } from "@/lib/types";
+import type { Venue, Contract, Lead, LeadStage, LeadFollowChannel, VenueOnboarding, LifecycleRow, SiteStatus, PageResult } from "@/lib/types";
 
 // tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）。
 // 「站点/点位/合同」在菜单里叫「站点管理 / 点位管理 / 进场合同」——以菜单为准。
@@ -63,16 +63,23 @@ const OB_STATUS: StatusMap<VenueOnboarding["status"]> = {
   REJECTED: { label: "已驳回", tone: "danger" },
 };
 /**
- * 门店生命周期阶段。键序 = 正常推进顺序（潜在 → 签约 → 上线 → 运营 → 流失/关闭），
- * **不是状态机**：可进可退由 `nextSiteStages` 说了算，这里只管「叫什么、什么色」。
+ * 漏斗档位 = **商机阶段 ∪ 站点状态**（2026-09-25 合并后的唯一一套）。
+ *
+ * <p>键序 = 从线索到闭店的真实先后。原先这里是一套独立的六阶段
+ * （PROSPECTING/SIGNED/LIVE/CHURNED…），与站点真实状态各说各话 ——
+ * 同一个站点在「阶段」里是 LIVE、在「站点管理」里是 ACTIVE，谁也说不清它在哪。
  */
-const LC_STAGE: StatusMap<SiteStage> = {
-  PROSPECTING: { label: "潜在", tone: "muted" },
+const LC_PHASE: StatusMap<LeadStage | SiteStatus> = {
+  NEW: { label: "新线索", tone: "muted" },
+  CONTACTED: { label: "已接触", tone: "outline" },
+  NEGOTIATING: { label: "洽谈中", tone: "warning" },
   SIGNED: { label: "已签约", tone: "outline" },
-  LIVE: { label: "上线", tone: "warning" },
-  ACTIVE: { label: "运营中", tone: "success" },
-  CHURNED: { label: "流失", tone: "danger" },
-  CLOSED: { label: "关闭", tone: "muted" },
+  LOST: { label: "已流失", tone: "danger" },
+  PREPARING: { label: "筹备中", tone: "default" },
+  ACTIVE: { label: "营业中", tone: "success" },
+  PAUSED: { label: "暂停营业", tone: "warning" },
+  WITHDRAWING: { label: "撤场中", tone: "warning" },
+  CLOSED: { label: "已关闭", tone: "muted" },
 };
 // 下拉选项由徽标映射表派生：原先是手抄的第二份，改文案会漏一处
 const LEAD_STAGE_OPTIONS = statusOptions(LEAD_STAGE);
@@ -218,10 +225,6 @@ function VenuesInner() {
   // 驳回单独一个抽屉：confirm 对话框只支持「照抄指定文本」，收不了自由文本，
   // 而驳回原因是必须写清楚的（申请人会看到它）
   const [rejectForm, setRejectForm] = useState<{ onboardingNo: string; note: string } | null>(null);
-  // 阶段流转抽屉：目标阶段与备注独立于行数据，开抽屉时按「第一个合法目标」初始化
-  const [stageRow, setStageRow] = useState<SiteLifecycle | null>(null);
-  const [stageTo, setStageTo] = useState<SiteStage>("SIGNED");
-  const [stageReason, setStageReason] = useState("");
   // 线索详情抽屉：与「编辑」分开——编辑改的是档案字段，详情看的是跟进流水，混在一个抽屉里会让
   // 「改了字段但没记跟进」变成常态（阶段悄悄变了没人知道为什么，正是本次要补的窟窿）
   const [leadDetail, setLeadDetail] = useState<Lead | null>(null);
@@ -272,7 +275,7 @@ function VenuesInner() {
     () => leadFieldsFor(String(leadForm?.ownerType ?? "STAFF"), employeeOpts, agentOpts, siteOpts),
     [leadForm?.ownerType, employeeOpts, agentOpts, siteOpts],
   );
-  const q = useQuery<PageResult<Venue | Contract | Lead | VenueOnboarding | SiteLifecycle>>({
+  const q = useQuery<PageResult<Venue | Contract | Lead | VenueOnboarding | LifecycleRow>>({
     // showArchived 必须进 queryKey，否则切开关不重新拉数据
     queryKey: ["venue-bd", tab, paging.page, paging.size, keyword, showArchived],
     queryFn: () =>
@@ -363,24 +366,12 @@ function VenuesInner() {
     onSuccess: (c) => { refreshAttachRow(c); notify.success("附件已移除"); },
   });
 
-  const changeStage = useMutation({
-    mutationFn: (v: { siteNo: string; stage: SiteStage; reason: string }) =>
-      // gmvLtm 不传：它是阶段决策快照，由服务端沿用上一次的值，手填只会污染快照
-      api.changeSiteStage(v.siteNo, { stage: v.stage, reason: v.reason, operator: username || undefined }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["venue-bd", "lifecycle"] }); notify.success("阶段已推进"); setStageRow(null); },
-  });
   /** 开线索详情：清掉上一条线索残留的跟进草稿，避免把 A 的跟进内容记到 B 头上。 */
   const openLeadDetail = (l: Lead) => {
     setFuContent(""); setFuChannel("CALL"); setFuStage(""); setFuNextAt("");
     setLeadDetail(l);
   };
 
-  /** 开流转抽屉：目标阶段预置成第一个合法值，避免默认值恰好等于当前阶段（后端会拒绝空转）。 */
-  const openStage = (l: SiteLifecycle) => {
-    setStageTo(nextSiteStages(l.stage)[0]);
-    setStageReason("");
-    setStageRow(l);
-  };
 
   // 归档 / 恢复（G1 软删除）。错误由全局 MutationCache 接管，页面不重复 catch。
   const invalidatePlace = () => qc.invalidateQueries({ queryKey: ["venue-bd"] });
@@ -533,20 +524,26 @@ function VenuesInner() {
       },
     },
   ];
-  const lifecycleCols: Column<SiteLifecycle>[] = [
-    { header: "站点号", cell: (l) => <span className="txt-strong tabular-nums">{l.siteNo}</span> },
-    { header: "站点名称", cell: (l) => l.siteName },
-    { header: "阶段", cell: (l) => <StatusBadge map={LC_STAGE} value={l.stage} /> },
-    { header: "阶段更新", cell: (l) => <span className="text-muted-foreground tabular-nums">{l.stageAt}</span> },
-    { header: "负责人", cell: (l) => l.owner },
-    { header: "GMV (LTM)", className: "text-right", cell: (l) => <span className="tabular-nums">{money(l.gmvLtm, l.currency)}</span> },
+  /**
+   * 漏斗明细**只读**：没有「操作」列。
+   *
+   * <p>推商机走「BD 拓展 CRM」的跟进，推站点走「站点管理」的暂停/恢复/撤场/关闭。
+   * 这里再放一个推进按钮，就又是第二套事实 —— 点它不会改站点真实状态。
+   */
+  const lifecycleCols: Column<LifecycleRow>[] = [
+    { header: "类型", cell: (l) => <Badge tone="outline">{l.kind === "LEAD" ? "商机" : "站点"}</Badge> },
+    { header: "编号", cell: (l) => <span className="txt-strong tabular-nums">{l.no}</span> },
+    { header: "名称", cell: (l) => l.name },
+    { header: "当前阶段", cell: (l) => <StatusBadge map={LC_PHASE} value={l.phase} /> },
     {
-      header: "操作",
-      // 无合法目标阶段（终态）就不给按钮——可用性判定只认 nextSiteStages，页面不另写一套阶段规则
-      cell: (l) => canVenue && nextSiteStages(l.stage).length > 0
-        ? <Button size="sm" variant="outline" onClick={() => openStage(l)}>推进阶段</Button>
-        : <span className="text-muted-foreground">-</span>,
+      header: "停留",
+      className: "text-right",
+      // 停留天数是这张表唯一的「该催了」信号：久居一档说明卡住了
+      cell: (l) => l.daysInPhase == null
+        ? <span className="text-muted-foreground">-</span>
+        : <span className="tabular-nums">{l.daysInPhase} 天</span>,
     },
+    { header: "负责人", cell: (l) => l.owner || <span className="text-muted-foreground">-</span> },
   ];
 
   const onSearch = (v: string) => { setKeyword(v); paging.reset(); };
@@ -598,14 +595,14 @@ function VenuesInner() {
         { header: "备注", value: (o) => o.reviewNote ?? "" },
       ], pageRows<VenueOnboarding>());
     } else if (tab === "lifecycle") {
-      exportCsv<SiteLifecycle>("门店生命周期", [
-        { header: "站点号", value: (l) => l.siteNo },
-        { header: "站点名称", value: (l) => l.siteName },
-        { header: "阶段", value: (l) => LC_STAGE[l.stage].label },
-        { header: "阶段更新", value: (l) => l.stageAt },
-        { header: "负责人", value: (l) => l.owner },
-        { header: "GMV (LTM)", value: (l) => money(l.gmvLtm, l.currency) },
-      ], pageRows<SiteLifecycle>());
+      exportCsv<LifecycleRow>("门店生命周期", [
+        { header: "类型", value: (l) => (l.kind === "LEAD" ? "商机" : "站点") },
+        { header: "编号", value: (l) => l.no },
+        { header: "名称", value: (l) => l.name },
+        { header: "当前阶段", value: (l) => LC_PHASE[l.phase].label },
+        { header: "停留天数", value: (l) => (l.daysInPhase == null ? "" : String(l.daysInPhase)) },
+        { header: "负责人", value: (l) => l.owner ?? "" },
+      ], pageRows<LifecycleRow>());
     }
   }
   // 无数据时不给导出按钮：导出一个空 CSV 只会让人以为功能坏了
@@ -644,8 +641,8 @@ function VenuesInner() {
         empty="暂无线索——BD 拓展的场地线索会出现在这里，可点「新增线索」手工录入" />}
       {tab === "onboarding" && <DataTable rowKey={(o: VenueOnboarding) => o.onboardingNo} columns={onboardingCols} rows={q.data?.list as VenueOnboarding[]} loading={q.isLoading} error={q.error} onRetry={q.refetch}
         empty="暂无入驻申请——门店自助提交的申请会进入此列表待审核，也可点「新增申请」代录" />}
-      {tab === "lifecycle" && <DataTable rowKey={(l: SiteLifecycle) => l.siteNo} columns={lifecycleCols} rows={q.data?.list as SiteLifecycle[]} loading={q.isLoading} error={q.error} onRetry={q.refetch}
-        empty="暂无生命周期记录——站点签约后自动进入跟踪，尚无签约站点时此处为空" />}
+      {tab === "lifecycle" && <DataTable rowKey={(l: LifecycleRow) => `${l.kind}:${l.no}`} columns={lifecycleCols} rows={q.data?.list as LifecycleRow[]} loading={q.isLoading} error={q.error} onRetry={q.refetch}
+        empty="暂无商机与站点——漏斗由「BD 拓展 CRM」的线索和「站点管理」的站点拼成，两者都为空时此处为空" />}
       {q.data && <Pagination page={paging.page} size={paging.size} total={q.data.total} onPage={paging.setPage} onSize={paging.setSize} />}
 
       {/* 进件驳回：只收一个原因 */}
@@ -707,50 +704,6 @@ function VenuesInner() {
         onSubmit={() => onboardingForm && saveOnboarding.mutate(onboardingForm)}
         submitting={saveOnboarding.isPending}
       />
-
-      {/* 门店生命周期 阶段流转：目标阶段由 SSOT 过滤（排掉当前阶段），操作人与原因随流转留痕 */}
-      <Drawer
-        open={!!stageRow}
-        onOpenChange={(o) => !o && setStageRow(null)}
-        title={`推进阶段 ${stageRow?.siteNo ?? ""}`}
-        desc="阶段是场地经营的对外口径：每次流转都会留痕（谁、何时、从哪到哪、为什么），不可撤回"
-        width="w-[520px]"
-        footer={stageRow && canVenue && (
-          <>
-            <Button variant="outline" onClick={() => setStageRow(null)}>取消</Button>
-            <Button disabled={changeStage.isPending}
-              onClick={() => changeStage.mutate({ siteNo: stageRow.siteNo, stage: stageTo, reason: stageReason })}
-            >确认推进</Button>
-          </>
-        )}
-      >
-        {stageRow && (<>
-          <Field label="站点">{stageRow.siteName}（{stageRow.siteNo}）</Field>
-          <Field label="当前阶段">
-            <StatusBadge map={LC_STAGE} value={stageRow.stage} />
-            <span className="ml-2 text-muted-foreground">自 {stageRow.stageAt}</span>
-          </Field>
-          <Field label="目标阶段">
-            <Select className="w-full" value={stageTo} onChange={(e) => setStageTo(e.target.value as SiteStage)}>
-              {nextSiteStages(stageRow.stage).map((s) => <option key={s} value={s}>{LC_STAGE[s].label}</option>)}
-            </Select>
-            {/* 说明「为什么能往回走」：生命周期没有单向状态机，流失/关闭的店重签回来是正常业务 */}
-            <div className="mt-1 text-xs text-muted-foreground">
-              阶段可进可退（流失/关闭的店重新签回来属正常业务），约束靠留痕而非锁死路径
-            </div>
-          </Field>
-          <Field label="操作人">{username || "admin"}</Field>
-          <Field label="流转原因">
-            <Input className="w-full" value={stageReason} placeholder="如：合同已签回，2026-08-01 进场施工"
-              onChange={(e) => setStageReason(e.target.value)} />
-          </Field>
-          <Field label="GMV (LTM)">
-            <span className="tabular-nums">{money(stageRow.gmvLtm, stageRow.currency)}</span>
-            {/* 提前挡住「这里为什么不能改 GMV」的疑问：它是快照，实时值在坪效页 */}
-            <span className="ml-2 text-muted-foreground">阶段决策快照，沿用上次值；实时口径见「站点坪效」</span>
-          </Field>
-        </>)}
-      </Drawer>
 
       {/* BD 线索 新增/编辑 */}
       <FormDrawer

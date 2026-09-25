@@ -3,6 +3,33 @@
 
 import type { Archivable } from "./common";
 
+/**
+ * 站点状态（SSOT）。与后端 `loc.SiteStatus`、`loc_site.status` 列注释三方同名同值。
+ *
+ * <p>2026-09-25 裁决：**站点状态与「门店生命周期」合并为一套**，
+ * `loc_site_lifecycle` 降为变更日志。原先那套 `SITE_STAGES`
+ * （PROSPECTING/SIGNED/LIVE/ACTIVE/CHURNED/CLOSED）**已删除** ——
+ * 它与本状态只有 ACTIVE/CLOSED 偶然重名，两套并存过一段时间，
+ * 界面上「阶段」与「状态」各说各话，没人说得清一个站点到底在哪。
+ */
+export type SiteStatus = "PREPARING" | "ACTIVE" | "PAUSED" | "WITHDRAWING" | "CLOSED";
+
+/**
+ * 站点状态机（SSOT）：页面按钮可用性与 mock 校验共用一份。
+ *
+ * <p>与合同不同，这**是**一张单向图：`PREPARING → ACTIVE` 由**首台设备上线**触发
+ * （系统边，没有按钮）；撤场与关闭不可逆 —— 关了要重开就另建站点，
+ * 否则同一个站点号的经营数据会跨两段互不相干的经营期，报表再也对不上。
+ */
+export const SITE_TRANSITIONS = {
+  /** 系统边：首台设备上线时由后端推进，运营端不提供按钮。 */
+  goLive: { from: ["PREPARING"] as SiteStatus[], to: "ACTIVE" as SiteStatus },
+  pause: { from: ["ACTIVE"] as SiteStatus[], to: "PAUSED" as SiteStatus },
+  resume: { from: ["PAUSED"] as SiteStatus[], to: "ACTIVE" as SiteStatus },
+  withdraw: { from: ["ACTIVE", "PAUSED"] as SiteStatus[], to: "WITHDRAWING" as SiteStatus },
+  close: { from: ["WITHDRAWING"] as SiteStatus[], to: "CLOSED" as SiteStatus },
+} as const;
+
 export interface Site extends Archivable {
   siteNo: string;
   name: string;
@@ -35,7 +62,9 @@ export interface Site extends Archivable {
   openHours?: string;
   pointCount: number;
   cabinetCount: number;
-  status: "ACTIVE" | "PAUSED";
+  status: SiteStatus;
+  /** 运维责任人（平台自营时的员工号）。代理运维走 `loc_site_agent.role=OPERATE`，不占本列。 */
+  opsEmployeeNo?: string | null;
 }
 
 /**
@@ -71,6 +100,34 @@ export interface Venue extends Archivable {
   industry: string;
   locationCount: number;
 }
+/**
+ * 进场合同状态（SSOT）。与后端 `loc.ContractStatus`、`loc_contract.status` 列注释三方同名同值。
+ *
+ * <p>2026-09-25 裁决：合同**走审批**。此前前端只有 `ACTIVE | EXPIRED` 两态，
+ * 而后端六态 —— 差的那四个（DRAFT/PENDING/SIGNED/TERMINATED）在界面上会直接显示英文原值，
+ * 按状态也筛不出来。跨端词表卡口没抓到它，是因为原先那是**内联联合**、配不上对
+ * （见 `lib/types/inline-status-union.test.ts`）。
+ */
+export type ContractStatus = "DRAFT" | "PENDING" | "SIGNED" | "ACTIVE" | "EXPIRED" | "TERMINATED";
+
+/**
+ * 合同状态机（SSOT）：页面按钮可用性与 mock 校验共用一份。
+ *
+ * <p>`SIGNED → ACTIVE` 与 `ACTIVE → EXPIRED` 是**系统边**（按生效日 / 到期日由定时任务推进），
+ * 没有按钮 —— 手工点「生效」会让合同的生效日与实际计费口径对不上。
+ */
+export const CONTRACT_TRANSITIONS = {
+  submit: { from: ["DRAFT"] as ContractStatus[], to: "PENDING" as ContractStatus },
+  withdraw: { from: ["PENDING"] as ContractStatus[], to: "DRAFT" as ContractStatus },
+  approve: { from: ["PENDING"] as ContractStatus[], to: "SIGNED" as ContractStatus },
+  reject: { from: ["PENDING"] as ContractStatus[], to: "DRAFT" as ContractStatus },
+  /** 系统边：到生效日由 `contract-tick` 推进。 */
+  activate: { from: ["SIGNED"] as ContractStatus[], to: "ACTIVE" as ContractStatus },
+  /** 系统边：到期日由 `contract-tick` 推进。 */
+  expire: { from: ["ACTIVE"] as ContractStatus[], to: "EXPIRED" as ContractStatus },
+  terminate: { from: ["ACTIVE"] as ContractStatus[], to: "TERMINATED" as ContractStatus },
+} as const;
+
 export interface Contract {
   contractNo: string;
   /**
@@ -86,7 +143,7 @@ export interface Contract {
   entryFee: number;
   startAt: string;
   endAt: string;
-  status: "ACTIVE" | "EXPIRED";
+  status: ContractStatus;
   /** 合同扫描件。内嵌而非另开列表接口：一份合同的附件个数是个位数，单独分页没有意义。 */
   attachments: ContractAttachment[];
 }
@@ -262,45 +319,34 @@ export interface VenueOnboarding {
   reviewNote: string | null;
 }
 
-// —— 站点生命周期管理（场地域 · P3）——
-
-/** 阶段取值域（SSOT）：与后端 `SiteLifecycleServiceImpl.STAGES`、[db-design §3.4] 逐字一致。 */
-export const SITE_STAGES = ["PROSPECTING", "SIGNED", "LIVE", "ACTIVE", "CHURNED", "CLOSED"] as const;
-export type SiteStage = (typeof SITE_STAGES)[number];
-
-export interface SiteLifecycle {
-  siteNo: string;
-  siteName: string;
-  stage: SiteStage;
-  stageAt: string;
-  owner: string;
-  currency: string;
-  gmvLtm: number; // 近 12 月 GMV
-}
+// —— 门店生命周期（只读漏斗 · 2026-09-25 起降为「变更日志 + 视图」）——
 
 /**
- * 阶段流转入参，镜像后端 `StageChangeReq`。
+ * 漏斗一行：**签约前是商机，签约后是站点**。
  *
- * `gmvLtm` 是**阶段决策快照**（进入该阶段那一刻的近 12 月 GMV），服务端只落库、不定时回刷；
- * 留空即沿用上一次的值。页面不传——运营手填一个 GMV 只会污染快照，实时值请看「站点坪效」。
+ * <p>原先这里是一套独立的 `SITE_STAGES` 六阶段，可任意互相推进（含 CHURNED→ACTIVE）。
+ * 2026-09-25 裁决把它与站点状态合并：站点的「阶段」就是它的 {@link SiteStatus}，
+ * 商机的阶段是 {@link LeadStage}，两段拼成一条从线索到闭店的漏斗。
+ *
+ * <p>**没有「推进阶段」这个动作了** —— 推进商机走 CRM 的跟进，推进站点走站点状态机
+ * （暂停/恢复/撤场/关闭）。此前那个可进可退的阶段抽屉是第二套事实，
+ * 改了它不影响站点真实状态，于是漏斗好看而数据不准。
  */
-export interface SiteStageChangeReq {
-  stage: SiteStage;
-  reason?: string;
-  operator?: string;
-  gmvLtm?: number;
-  currency?: string;
+export interface LifecycleRow {
+  /** `LEAD` = 商机（phase 是 {@link LeadStage}）· `SITE` = 站点（phase 是 {@link SiteStatus}）。 */
+  kind: "LEAD" | "SITE";
+  no: string;
+  name: string;
+  phase: LeadStage | SiteStatus;
+  phaseSince: string | null;
+  /** 在当前阶段停留天数。空 = 算不出（缺进入时刻）。 */
+  daysInPhase: number | null;
+  owner: string | null;
 }
 
-/**
- * 阶段流转合法性（SSOT）：页面按钮可用性与 mock 校验共用同一份，
- * 与结算单 `STL_TRANSITIONS`、工单 `WO_TRANSITIONS` 同一个位置、同一套用法。
- *
- * 但**故意不是一张单向状态机图**：后端 `SiteLifecycleServiceImpl.changeStage` 写明
- * [db-design §9A] 只给 `ord_rent`/`wo_order`/`dev_*` 三处定稿了状态机，门店生命周期不在其列；
- * 现实里「CHURNED 的店重新签回来」「CLOSED 复开」都是正常业务，硬编一条链会当场挡住合法操作。
- * 前端若自己加严，就会出现「接口能做、按钮不给点」的假约束——比放开更难查。
- * 因此这里与后端保持完全一致：只排掉「目标 = 当前」这一种非法，其余交给留痕（每次流转必写 log）。
- */
-export const nextSiteStages = (from: SiteStage): SiteStage[] => SITE_STAGES.filter((s) => s !== from);
-export const canSiteStageTransition = (from: SiteStage, to: SiteStage) => nextSiteStages(from).includes(to);
+/** 漏斗每一档的计数。`phase` 取值域同 {@link LifecycleRow.phase}。 */
+export interface FunnelStage {
+  phase: string;
+  label: string;
+  count: number;
+}

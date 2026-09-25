@@ -3,10 +3,10 @@
 import type {
   Site, SitePoint, Venue, Contract, ContractAttachment, ContractAttachmentReq,
   Lead, LeadStage, LeadFollowUp, LeadFollowUpReq,
-  VenueOnboarding, SiteLifecycle, SiteStage, SiteStageChangeReq, PageQuery,
+  VenueOnboarding, LifecycleRow, FunnelStage, SiteStatus, PageQuery,
 } from "../../types";
 import {
-  SITE_STAGES, canSiteStageTransition, SITE_COORD_BOUNDS,
+  SITE_COORD_BOUNDS,
   LEAD_STAGES, LEAD_FOLLOW_CHANNELS, ATTACH_EXTS, ATTACH_MAX_SIZE,
 } from "../../types";
 import { LOCS, VENUE_NAMES, OPERATORS, p, iso, phone } from "./internal";
@@ -139,20 +139,84 @@ export const venueOnboardings: VenueOnboarding[] = [
 // 生命周期挂在**真实存在的站点**上（台账 M5：原先是 SITE001–005 / DIFC Gate 等，
 // 既不在 sites 的 ST3xx 号段里，站点名也不在 LOCS 里，点进去查无此站点）。
 // siteName 一律由 sites 反查，不再手写。
-const SITE_LIFECYCLE_SEED: Omit<SiteLifecycle, "siteName">[] = [
-  { siteNo: "ST300", stage: "ACTIVE", stageAt: "2026-01-10", owner: "Ali Hassan", currency: "AED", gmvLtm: 28400 },
-  { siteNo: "ST301", stage: "LIVE", stageAt: "2026-06-01", owner: "Ali Hassan", currency: "AED", gmvLtm: 3200 },
-  { siteNo: "ST302", stage: "SIGNED", stageAt: "2026-07-01", owner: "Sara Ops", currency: "AED", gmvLtm: 0 },
-  { siteNo: "ST303", stage: "CHURNED", stageAt: "2026-05-15", owner: "BD Team", currency: "AED", gmvLtm: 410 },
-  { siteNo: "ST304", stage: "PROSPECTING", stageAt: "2026-07-10", owner: "BD Team", currency: "AED", gmvLtm: 0 },
+/**
+ * 门店生命周期**不再有自己的表** —— 2026-09-25 裁决把它与站点状态合并，
+ * `loc_site_lifecycle` 降为变更日志。所以这里也不再有种子数组：
+ * 漏斗由 `leads` + `sites` **派生**，与后端 `SiteServiceImpl.lifecycleRows()` 同一口径。
+ *
+ * <p>留一份独立种子的代价上次已经付过：它与 `sites.status` 各说各话，
+ * 界面上同一个站点在「阶段」里是 LIVE、在「站点管理」里是 ACTIVE，谁也说不清它到底在哪。
+ */
+const LEAD_PHASE_LABEL: Record<string, string> = {
+  NEW: "新线索", CONTACTED: "已接触", NEGOTIATING: "洽谈中", SIGNED: "已签约", LOST: "已流失",
+};
+const SITE_PHASE_LABEL: Record<SiteStatus, string> = {
+  PREPARING: "筹备中", ACTIVE: "营业中", PAUSED: "暂停营业", WITHDRAWING: "撤场中", CLOSED: "已关闭",
+};
+
+/** 漏斗档位顺序 = 从线索到闭店的真实先后，页面按它排版。 */
+const FUNNEL_ORDER: string[] = [
+  "NEW", "CONTACTED", "NEGOTIATING", "SIGNED", "LOST",
+  "PREPARING", "ACTIVE", "PAUSED", "WITHDRAWING", "CLOSED",
 ];
-export const siteLifecycles: SiteLifecycle[] = SITE_LIFECYCLE_SEED.map((s) => ({
-  ...s, siteName: sites.find((x) => x.siteNo === s.siteNo)!.name,
-}));
+
+/**
+ * mock 里的「进入当前阶段时刻」。
+ *
+ * <p>`Lead` 与 `Site` 的前端类型都没有时间戳字段（后端有 `created_at` / 状态日志），
+ * 所以这里**按序号派生一个确定性的日期** —— 每次加载都一样，
+ * 不用 `Math.random()`：随机值会让「停留 3 天」这种列每次刷新都变，
+ * 看着像数据在跳，实际只是 mock 在抖。真后端下这两个字段由服务端给。
+ */
+const mockPhaseSince = (i: number): string =>
+  new Date(Date.now() - (i * 3 + 5) * 86_400_000).toISOString();
+
+const daysSince = (iso: string | null): number | null => {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  return Number.isNaN(t) ? null : Math.max(0, Math.floor((Date.now() - t) / 86_400_000));
+};
+
+/** 签约前是商机、签约后是站点，拼成一条漏斗。已签约且已落站点的商机由站点接续，不重复计。 */
+function lifecycleRows(): LifecycleRow[] {
+  const out: LifecycleRow[] = [];
+  leads.forEach((l, i) => {
+    if (l.stage === "SIGNED" && l.siteNo) return;   // 已落站点 → 由站点那一行接续
+    const since = mockPhaseSince(i);
+    out.push({
+      kind: "LEAD", no: l.leadNo, name: l.venueName, phase: l.stage,
+      phaseSince: since, daysInPhase: daysSince(since), owner: l.owner ?? null,
+    });
+  });
+  sites.forEach((st, i) => {
+    if (st.archivedAt) return;
+    const since = mockPhaseSince(i + leads.length);
+    out.push({
+      kind: "SITE", no: st.siteNo, name: st.name, phase: st.status,
+      phaseSince: since, daysInPhase: daysSince(since), owner: st.opsEmployeeNo ?? null,
+    });
+  });
+  return out;
+}
 
 export const listLeads = (q: PageQuery = {}) => paginate(leads, q.page, q.size, (x) => kwHit(q.keyword, x.leadNo, x.venueName, x.owner));
 export const listVenueOnboardings = (q: PageQuery = {}) => paginate(venueOnboardings, q.page, q.size, (x) => kwHit(q.keyword, x.onboardingNo, x.venueName, x.contact));
-export const listSiteLifecycles = (q: PageQuery = {}) => paginate(siteLifecycles, q.page, q.size, (x) => kwHit(q.keyword, x.siteNo, x.siteName, x.owner));
+export const listSiteLifecycles = (q: PageQuery & { phase?: string } = {}) =>
+  paginate(
+    lifecycleRows().filter((x) => !q.phase || x.phase === q.phase),
+    q.page, q.size,
+    (x) => kwHit(q.keyword, x.no, x.name, x.owner ?? ""),
+  );
+
+/** 漏斗计数。**零的档位也要返回** —— 缺档会让漏斗看起来「跳过了一步」。 */
+export const siteLifecycleFunnel = (): FunnelStage[] => {
+  const rows = lifecycleRows();
+  return FUNNEL_ORDER.map((phase) => ({
+    phase,
+    label: LEAD_PHASE_LABEL[phase] ?? SITE_PHASE_LABEL[phase as SiteStatus] ?? phase,
+    count: rows.filter((r) => r.phase === phase).length,
+  }));
+};
 
 /**
  * 商机保存。
@@ -350,69 +414,15 @@ export function addLeadFollowUp(leadNo: string, req: LeadFollowUpReq): LeadFollo
 // mock 比后端松一格，页面就会学到一个线上不存在的操作；紧一格，又会藏掉线上合法的操作。
 // ————————————————————————————————————————————————————————————————
 
-/** 阶段流转违规（阶段取值非法 / 空转）。 */
-export class SiteLifecycleError extends Error {
-  constructor(msg: string) { super(msg); this.name = "SiteLifecycleError"; }
-}
-
-const STAGE_LABEL: Record<SiteStage, string> = {
-  PROSPECTING: "潜在", SIGNED: "已签约", LIVE: "上线", ACTIVE: "运营中", CHURNED: "流失", CLOSED: "关闭",
-};
-
-/** 流转留痕，对应后端 append 表 `loc_site_lifecycle_log`：主表只留「当前阶段」，历史全在这里。 */
-export interface SiteLifecycleLog {
-  siteNo: string;
-  fromStage: SiteStage | null; // 首次建档没有来源阶段
-  toStage: SiteStage;
-  operator: string;
-  reason: string;
-  createdAt: string;
-}
-export const siteLifecycleLogs: SiteLifecycleLog[] = [];
-
-/**
- * 阶段流转。三道闸门 + 一次留痕：
- *  ① 目标阶段必填且在取值域内；② 状态机允许（当前只排空转，见 types 里的 SSOT 注释）；
- *  ③ 站点没有生命周期行时**建档**而非报错——与后端 insert 分支一致，fromStage 记 null。
- * 留痕与主表更新同一个动作里完成：不留痕即不算流转。
+/*
+ * 「推进阶段」已删除（2026-09-25）。
+ *
+ * 原先这里有 changeSiteStage + SiteLifecycleError + siteLifecycleLogs 一整套，
+ * 且状态机**故意只排空转**（CHURNED→ACTIVE 也放行）。合并之后它是第二套事实：
+ * 改它不影响 `sites.status`，于是漏斗好看而站点真实状态没动。
+ * 推商机走 CRM 跟进（saveLead / addLeadFollowUp），推站点走站点状态机
+ * （pauseSite / resumeSite / withdrawSite / closeSite）。
  */
-export function changeSiteStage(siteNo: string, req: SiteStageChangeReq): SiteLifecycle {
-  if (!siteNo?.trim()) throw new SiteLifecycleError("siteNo 必填");
-  const to = req?.stage;
-  if (!to) throw new SiteLifecycleError("目标阶段必填");
-  if (!SITE_STAGES.includes(to)) throw new SiteLifecycleError(`门店生命周期阶段非法: ${to}`);
-
-  const cur = siteLifecycles.find((x) => x.siteNo === siteNo) ?? null;
-  const from = cur?.stage ?? null;
-  if (from && !canSiteStageTransition(from, to)) {
-    throw new SiteLifecycleError(
-      from === to
-        ? `站点 ${siteNo} 已处于「${STAGE_LABEL[to]}」阶段，无需重复推进`
-        : `站点 ${siteNo} 不允许从「${STAGE_LABEL[from]}」推进到「${STAGE_LABEL[to]}」`,
-    );
-  }
-
-  const row: SiteLifecycle = cur ?? {
-    siteNo, siteName: sites.find((x) => x.siteNo === siteNo)?.name ?? siteNo,
-    stage: to, stageAt: "", owner: "", currency: "AED", gmvLtm: 0,
-  };
-  Object.assign(row, {
-    stage: to,
-    stageAt: new Date().toISOString().slice(0, 10), // 后端列是 DATE，只有日期语义
-    owner: req.operator?.trim() || row.owner,
-    // gmvLtm / currency 是阶段决策快照：只在调用方明确传了才覆盖，否则沿用上一次的值
-    ...(req.gmvLtm === undefined ? {} : { gmvLtm: req.gmvLtm }),
-    ...(req.currency ? { currency: req.currency } : {}),
-  });
-  if (!cur) siteLifecycles.unshift(row);
-
-  siteLifecycleLogs.unshift({
-    siteNo, fromStage: from, toStage: to,
-    operator: req.operator?.trim() || "admin", reason: req.reason?.trim() ?? "",
-    createdAt: new Date().toISOString(),
-  });
-  return row;
-}
 
 // —— G1 软删除：站点 / 点位 / 场地方 ——
 export const archiveSite = (no: string) => archiveRow(sites, "siteNo", no);

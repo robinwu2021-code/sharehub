@@ -34,8 +34,8 @@ export const locationHttp: LocationApi = {
   saveVenueOnboarding: (x) => client.post(x.onboardingNo ? `/api/ops/venue-onboardings/${x.onboardingNo}` : "/api/ops/venue-onboardings", x),
   reviewVenueOnboarding: (onboardingNo, approve, note) =>
     client.post(`/api/ops/venue-onboardings/${onboardingNo}/review`, { approve, note }),
-  listSiteLifecycles: (q?: PageQ) => client.get("/api/ops/site-lifecycles", q),
-  changeSiteStage: (siteNo, req) => client.post(`/api/ops/site-lifecycles/${siteNo}/stage`, req),
+  listSiteLifecycles: (q?: PageQ & { phase?: string }) => client.get("/api/ops/site-lifecycles", q),
+  siteLifecycleFunnel: () => client.get("/api/ops/site-lifecycles/funnel"),
 
   // G1 软删除：归档 / 恢复。REST 上是「状态迁移」而非 DELETE —— 后端不得实现物理删除。
   archiveSite: (no) => client.post(`/api/ops/sites/${no}/archive`, {}),

@@ -4,7 +4,7 @@ import type { PageQ, ArchiveQ , ReportQ } from "../query";
 import type {
   PageResult, Site, SitePoint, Venue, Contract, ContractAttachmentReq,
   Lead, LeadFollowUp, LeadFollowUpReq, SiteAnalysis,
-  VenueOnboarding, SiteLifecycle, SiteStageChangeReq, SiteAgent,
+  VenueOnboarding, LifecycleRow, FunnelStage, SiteAgent,
 } from "../../types";
 
 export interface LocationApi {
@@ -55,9 +55,13 @@ export interface LocationApi {
 
   listVenueOnboardings(q?: PageQ): Promise<PageResult<VenueOnboarding>>;
   saveVenueOnboarding(x: Partial<VenueOnboarding> & { onboardingNo?: string }): Promise<VenueOnboarding>;
-  listSiteLifecycles(q?: PageQ): Promise<PageResult<SiteLifecycle>>;
-  /** 阶段流转（每次都留痕到 loc_site_lifecycle_log）。站点首次流转即建档，故 siteNo 可以还没有生命周期行。 */
-  changeSiteStage(siteNo: string, req: SiteStageChangeReq): Promise<SiteLifecycle>;
+  /**
+   * 门店生命周期漏斗的明细行（商机 + 站点拼成一条）。**只读** ——
+   * 2026-09-25 起没有「推进阶段」这个动作：推商机走 CRM 跟进，推站点走站点状态机。
+   */
+  listSiteLifecycles(q?: PageQ & { phase?: string }): Promise<PageResult<LifecycleRow>>;
+  /** 漏斗每一档的计数。 */
+  siteLifecycleFunnel(): Promise<FunnelStage[]>;
 
   // === G1 软删除（TDD §10.1）：归档而非删除，**契约里禁止出现 deleteXxx** ===
   archiveSite(siteNo: string): Promise<Site>;
