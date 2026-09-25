@@ -132,6 +132,7 @@ public abstract class AbstractCrudService<E extends BaseEntity, V> implements Cr
             }
             setKey(body, nextNo(prefix));
             body.setTenantId(TENANT_MAIN);
+            clearServerOwnedOnCreate(body);
             beforeCreate(body);
             mapper.insert(body);
             return toVO(selectByKey(keyOf(body)));
@@ -139,7 +140,11 @@ public abstract class AbstractCrudService<E extends BaseEntity, V> implements Cr
 
         E current = selectByKey(no);
         if (current == null) {
-            if (body.getTenantId() == null) body.setTenantId(TENANT_MAIN);
+            // 隔离键**无条件**由服务端定。原先写的是「客户端没传才取默认」——
+            // 那正是 2026-09-23 加固在更新分支上点名修掉的形状（「传了就能搬到别的租户」），
+            // 当时只改了更新那一支，这一行原样留着，于是建单时传 tenantId 就建到别人租户里。
+            body.setTenantId(TENANT_MAIN);
+            clearServerOwnedOnCreate(body);
             beforeCreate(body);
             mapper.insert(body);
         } else {
@@ -174,6 +179,39 @@ public abstract class AbstractCrudService<E extends BaseEntity, V> implements Cr
             mapper.updateById(body);
         }
         return toVO(selectByKey(no));
+    }
+
+    /**
+     * 建单时抹掉<b>服务端自有</b>的字段，不看客户端传了什么。
+     *
+     * <p>更新分支上这几样早就锁死了（从 {@code current} 回填），建单分支一直没有 ——
+     * 因为「建单时库里还没有那一行，没东西可回填」，于是看起来没什么可锁的。
+     * 但{@code null} 就是要的值：清空之后，它们各自的生成器才会接手。
+     *
+     * <ul>
+     *   <li>{@code id} —— {@code IdType.AUTO} 只在 id 为 null 时让库自增；
+     *       传了非 null 就会原样进 INSERT，等于客户端自选主键；</li>
+     *   <li>{@code deleted} —— 传 1 就建出一条**查不到却占着唯一键**的行：
+     *       保存成功、列表里没有、再建一次报重复，运营端看不出任何原因；</li>
+     *   <li>{@code createdAt / createdBy / updatedAt / updatedBy} —— insert 侧的
+     *       {@code strictInsertFill} 是「**只填空值**」（那是有意给数据迁移脚本留的口子，
+     *       见 {@code AuditMetaObjectHandler} 末段），所以客户端传了就算数，创建人能署成别人。
+     *       在这里清掉，口子只留给不经本方法的迁移代码；</li>
+     *   <li>{@code version} —— 乐观锁的起点由服务端定；</li>
+     *   <li>{@code archivedAt} —— 建出来就已归档等于「建完即消失」，与更新分支同口径。</li>
+     * </ul>
+     *
+     * <p>{@code tenantId} 不在这里：它要的不是 null 而是 {@code MAIN}，两个调用点各自设好了。
+     */
+    private void clearServerOwnedOnCreate(E body) {
+        body.setId(null);
+        body.setVersion(null);
+        body.setDeleted(null);
+        body.setCreatedAt(null);
+        body.setCreatedBy(null);
+        body.setUpdatedAt(null);
+        body.setUpdatedBy(null);
+        if (body instanceof Archivable a) a.setArchivedAt(null);
     }
 
     /**

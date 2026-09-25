@@ -41,6 +41,8 @@ class MassAssignmentHardeningTest {
 
     private static final String KEY = "zztest.mass.assignment";
     private static final String OTHER_TENANT = "EVIL-TENANT";
+    /** 只用于「建单」用例 —— 与 KEY 分开，免得 seed() 的存在把创建路径变成更新路径。 */
+    private static final String NEW_KEY = "zztest.mass.assignment.create";
 
     @Autowired
     SysParamService params;
@@ -69,6 +71,7 @@ class MassAssignmentHardeningTest {
     void hardDelete() {
         jdbc.update("DELETE FROM sys_param WHERE param_key = ?", KEY);
         jdbc.update("DELETE FROM md_problem WHERE problem_no = ?", P_KEY);
+        jdbc.update("DELETE FROM sys_param WHERE param_key = ?", NEW_KEY);
     }
 
     private SysParam seed() {
@@ -225,5 +228,92 @@ class MassAssignmentHardeningTest {
 
         problems.unarchive(P_KEY);
         assertThat(reloadProblem().getArchivedAt()).as("也该取消得掉").isNull();
+    }
+
+    // ——————————————————— 创建路径 ———————————————————
+    //
+    // 上面所有用例走的都是**更新**分支。2026-09-23 的加固也只改了那一支：
+    //
+    //   建单（自然键）： if (body.getTenantId() == null) body.setTenantId(TENANT_MAIN);
+    //   更新：           body.setTenantId(current.getTenantId());   // 越租户搬数据
+    //
+    // 上面那一行，正是加固注释里点名说「此前写成『客户端没传才取库里的』，于是传了就能
+    // 把这行数据搬到别的租户」的**同一个形状** —— 它在创建分支上原样留着。
+    // 建单时传 tenantId，这条记录就直接建到别人的租户里。
+    //
+    // 同一支上还有两个：
+    //   · deleted=1 —— 行插进去了却查不到（@TableLogic 过滤），可唯一键被占着，
+    //     于是「保存成功 → 列表里没有 → 再建一次报重复」，运营端看不出任何原因；
+    //   · createdBy / createdAt —— insert 侧是 strictInsertFill（**只填空值**，
+    //     见 AuditMetaObjectHandler 末段：那是给迁移脚本留的口子），
+    //     所以客户端传了就算数，创建人可以署成别人。
+    //
+    // 读库一律走 jdbc 而不是 mapper：deleted 带 @TableLogic，用 mapper 查「有没有被软删」
+    // 会因为查不到而误判成「没建成」——那是把夹具错误读成结论。
+
+    private java.util.Map<String, Object> rawNew() {
+        var rows = jdbc.queryForList("SELECT * FROM sys_param WHERE param_key = ?", NEW_KEY);
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    /** 一次「带恶意字段的建单」：只有 value 是正当的。 */
+    private void createWithMaliciousFields() {
+        SysParam evil = new SysParam();
+        evil.setParamKey(NEW_KEY);
+        evil.setValue("新建的值");                                  // 正当
+        evil.setTenantId(OTHER_TENANT);                            // 建到别人的租户
+        evil.setDeleted(1);                                        // 建出一条查不到却占着键的行
+        evil.setCreatedBy("EMP_SOMEONE_ELSE");                     // 伪造创建人
+        evil.setCreatedAt(LocalDateTime.of(2000, 1, 1, 0, 0));     // 伪造创建时间
+        params.save(evil);
+    }
+
+    @Test
+    @DisplayName("★★ 建单不能指定租户——加固只改了更新分支，创建分支同一行还在")
+    void tenantCannotBeChosenOnCreate() {
+        assertThat(rawNew()).as("前置条件：这个键还不存在，走的确实是创建分支").isNull();
+
+        createWithMaliciousFields();
+
+        var row = rawNew();
+        assertThat(row).as("前置条件：记录得真的建出来了").isNotNull();
+        assertThat(row.get("tenant_id"))
+                .as("建单的隔离键由服务端定，传什么都不算")
+                .isNotEqualTo(OTHER_TENANT);
+    }
+
+    @Test
+    @DisplayName("★★ 建单不能直接建成已软删的——那会占着唯一键却查不到")
+    void deletedCannotBeSetOnCreate() {
+        createWithMaliciousFields();
+
+        var row = rawNew();
+        assertThat(row).isNotNull();
+        assertThat(String.valueOf(row.get("deleted")))
+                .as("建出来就该是可见的 —— 否则运营会看到「保存成功但列表里没有，再建报重复」")
+                .isEqualTo("0");
+    }
+
+    @Test
+    @DisplayName("★★ 建单不能伪造创建人")
+    void createdByCannotBeForgedOnCreate() {
+        createWithMaliciousFields();
+
+        var row = rawNew();
+        assertThat(row).isNotNull();
+        assertThat(row.get("created_by"))
+                .as("insert 侧是「只填空值」的 strict 策略，所以必须在 service 里先清掉客户端传的")
+                .isNotEqualTo("EMP_SOMEONE_ELSE");
+        assertThat(row.get("created_by")).as("清掉之后要由填充器补上，不能留 NULL").isNotNull();
+    }
+
+    @Test
+    @DisplayName("创建路径的加固同样不能把正常建单堵死")
+    void legitimateCreateStillWorks() {
+        createWithMaliciousFields();
+
+        var row = rawNew();
+        assertThat(row).isNotNull();
+        assertThat(row.get("value")).as("正当字段必须照常写入").isEqualTo("新建的值");
     }
 }
