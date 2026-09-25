@@ -55,6 +55,43 @@ public final class UserAssetDtos {
      * 充值套餐行，镜像前端 {@code RechargePackage}。
      * {@code markets} 是 CSV（如 {@code "AE,SA"}），由 {@code usr_recharge_pkg_market} 拼回 —— 存的是关联表。
      */
+    /**
+     * 充值套餐**写入参**（白名单）。
+     *
+     * <p><b>比实体少 {@code archivedAt}</b> —— 归档走
+     * {@code /recharge-packages/{no}/archive|unarchive}，盖的是时间戳。
+     * 让保存端点也能写它，等于给归档开了第二条不走审计的路。
+     *
+     * <p>{@code status}（ENABLED/DISABLED）留在入参里：它是套餐的**上下架开关**，
+     * 没有专门端点，编辑就是它的正当入口 —— 与「归档」不是一回事。
+     *
+     * @param payAmount 支付金额，必填且须大于 0 —— 不校验的话能建出一个 0 元充 20 元的套餐
+     */
+    public record RechargePackageReq(String packageNo, String regionId, String name,
+                                     BigDecimal payAmount, BigDecimal giftAmount, String currency,
+                                     Integer validDays, Integer sortNo, String status) {
+        /** 映射到实体。**archivedAt 有意不设**（见类注释）。 */
+        public ai.neargo.sharehub.user.asset.entity.UsrRechargePkg toEntity() {
+            if (payAmount == null || payAmount.signum() <= 0) {
+                throw new IllegalArgumentException("支付金额必填且须大于 0");
+            }
+            if (giftAmount != null && giftAmount.signum() < 0) {
+                throw new IllegalArgumentException("赠送金额不能为负");
+            }
+            var e = new ai.neargo.sharehub.user.asset.entity.UsrRechargePkg();
+            e.setPackageNo(packageNo);
+            e.setRegionId(regionId);
+            e.setName(name);
+            e.setPayAmount(payAmount);
+            e.setGiftAmount(giftAmount);
+            e.setCurrency(currency);
+            e.setValidDays(validDays);
+            e.setSortNo(sortNo);
+            e.setStatus(status);
+            return e;
+        }
+    }
+
     public record RechargePackageRow(String packageNo, String name, BigDecimal payAmount,
                                      BigDecimal giftAmount, String currency, String markets,
                                      Integer validDays, Integer sortNo, String status,

@@ -37,7 +37,6 @@
 #
 # 格式：一行一个实体类型名
 AdSlot
-AgtCommission
 DevAlarmCode
 DevAlarmRule
 DevCodeBatch

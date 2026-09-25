@@ -20,16 +20,6 @@ AdSlot.position
 AdSlot.size
 AdSlot.slotNo
 AdSlot.status
-AgtCommission.agentName
-AgtCommission.agentNo
-AgtCommission.currency
-AgtCommission.dimension
-AgtCommission.effectiveAt
-AgtCommission.fixedAmount
-AgtCommission.mode
-AgtCommission.rate
-AgtCommission.ruleNo
-AgtCommission.status
 DevAlarmCode.archivedAt
 DevAlarmCode.autoWorkOrder
 DevAlarmCode.code

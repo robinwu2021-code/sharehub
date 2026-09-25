@@ -92,9 +92,12 @@ public class RechargePackageServiceImpl extends AbstractCrudService<UsrRechargeP
     protected RechargePackageRow toVO(UsrRechargePkg e) {
         return new RechargePackageRow(e.getPackageNo(), e.getName(), e.getPayAmount(), e.getGiftAmount(),
                 e.getCurrency(), marketsCsv(e.getPackageNo()), e.getValidDays(), e.getSortNo(), e.getStatus(),
-                // archivedAt：前端 RechargePackage extends Archivable，但 DDL 无 archived_at 列。
-                // 见交付报告「规格矛盾」——补列前恒为 null，不假造值。
-                null);
+                // 2026-09-25：这里原先硬编一个 null，配一句「DDL 无 archived_at 列」。
+                // 那句在写下时是对的，**列后来补上了，注释没跟着改** —— 于是运营点完「归档」，
+                // 列表刷新回来这一行看上去毫无变化（前端 RechargePackage extends Archivable，
+                // 它等着这个字段）。功能是好的，只有「看不看得见」坏了，所以不报错。
+                // 券模板 CouponTplServiceImpl.toVO 栽过一模一样的一次。
+                e.getArchivedAt() == null ? null : e.getArchivedAt().toString());
     }
 
     /** 关联表 → CSV，还原前端 {@code RechargePackage.markets} 的形状（如 {@code "AE,SA"}）。 */

@@ -117,6 +117,41 @@ public final class AgentExtDtos {
      * <p>前端字段名是 {@code basis}，库列名是 {@code dimension} —— 此处按前端命名出参，
      * 转换只在这一层，库列名不动（[db-design §3.5]）。
      */
+    /**
+     * 分润规则**写入参**（白名单）。
+     *
+     * <p>比实体少两个：
+     * <ul>
+     *   <li>{@code agentName} —— 归属主体的名字快照，随 {@code agentNo} 走，不该由客户端给
+     *       （给了就能让「列表显示 A、钱却算给 B」）；</li>
+     *   <li>{@code status} —— 启用/停用该走专门动作，不随费率编辑一起改。</li>
+     * </ul>
+     *
+     * <p>{@code agentNo} 留在入参里是因为**建规则时必须指定算给谁**；
+     * 编辑时 service 的 {@code beforeUpdate} 会回填原值 ——
+     * 归属决定这条规则的钱算到谁账上，变更有专门入口（代理划拨 /assignments）。
+     *
+     * @param rate        比例（LEDGER 模式用）
+     * @param fixedAmount 固定额（与 dimension 的自洽由 service 的 checkDimension 校验）
+     */
+    public record AgentCommissionReq(String ruleNo, String agentNo, String dimension,
+                                     java.math.BigDecimal rate, java.math.BigDecimal fixedAmount,
+                                     String currency, String mode, String effectiveAt) {
+        /** 映射到实体。**agentName / status 有意不设**（见类注释）。 */
+        public ai.neargo.sharehub.agent.ext.entity.AgtCommission toEntity() {
+            var e = new ai.neargo.sharehub.agent.ext.entity.AgtCommission();
+            e.setRuleNo(ruleNo);
+            e.setAgentNo(agentNo);
+            e.setDimension(dimension);
+            e.setRate(rate);
+            e.setFixedAmount(fixedAmount);
+            e.setCurrency(currency);
+            e.setMode(mode);
+            e.setEffectiveAt(effectiveAt);
+            return e;
+        }
+    }
+
     public record AgentCommission(String ruleNo, String agentNo, String agentName, String basis,
                                   BigDecimal rate, BigDecimal fixedAmount, String currency,
                                   String mode, String effectiveAt, String status) {

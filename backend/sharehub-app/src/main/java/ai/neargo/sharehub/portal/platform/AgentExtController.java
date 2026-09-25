@@ -176,15 +176,17 @@ public class AgentExtController {
 
     @PostMapping("/commissions")
     @PreAuthorize("@perm.can('agent:share:config')")
-    public AgentCommission createCommission(@RequestBody AgtCommission body) {
-        return commissionService.save(body);
+    public AgentCommission createCommission(@RequestBody AgentExtDtos.AgentCommissionReq body) {
+        return commissionService.save(body.toEntity());
     }
 
     @PostMapping("/commissions/{ruleNo}")
     @PreAuthorize("@perm.can('agent:share:config')")
-    public AgentCommission updateCommission(@PathVariable String ruleNo, @RequestBody AgtCommission body) {
-        body.setRuleNo(ruleNo);
-        return commissionService.save(body);
+    public AgentCommission updateCommission(@PathVariable String ruleNo,
+                                            @RequestBody AgentExtDtos.AgentCommissionReq body) {
+        AgtCommission e = body.toEntity();
+        e.setRuleNo(ruleNo);
+        return commissionService.save(e);
     }
 
     // —— 代理绩效（菜单叶：代理商管理 › 代理绩效）——
