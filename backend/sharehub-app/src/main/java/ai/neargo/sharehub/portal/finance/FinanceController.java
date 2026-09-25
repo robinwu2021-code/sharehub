@@ -453,7 +453,10 @@ public class FinanceController {
 
     /** 押金转买断：用户不还了，押金抵购机款，充电宝转 SOLD。**与丢失(LOST)财务方向相反**。 */
     @PostMapping("/api/trade/deposits/{depositNo}/buyout")
-    @PreAuthorize("@perm.can('order:deposit:update')")
+    // 买断是**没收用户押金**，归财务。真源表 §4：`order:deposit:manage` 仅 FIN。
+    // 此前与催缴同用 order:deposit:update（一个真源表里根本没有的码），
+    // 正好破坏了那条注释要防的事：给客服催缴权就等于给了买断权。
+    @PreAuthorize("@perm.can('order:deposit:manage')")
     public Object buyoutDeposit(@PathVariable String depositNo,
                                 @RequestBody(required = false) java.util.Map<String, Object> body) {
         Object n = body == null ? null : body.get("note");
@@ -462,7 +465,8 @@ public class FinanceController {
 
     /** 欠款催缴：**只留痕不改状态** —— 催缴不改变欠款事实，改状态会让「已催缴」被误读成「已解决」。 */
     @PostMapping("/api/trade/deposits/{depositNo}/dun")
-    @PreAuthorize("@perm.can('order:deposit:update')")
+    // 催缴**只留痕不改钱**，是客服日常。真源表 §4：`order:arrears:dun` 给 CS 与 FIN。
+    @PreAuthorize("@perm.can('order:arrears:dun')")
     public Object dunDeposit(@PathVariable String depositNo,
                              @RequestBody java.util.Map<String, Object> body) {
         Object c = body == null ? null : body.get("channel");

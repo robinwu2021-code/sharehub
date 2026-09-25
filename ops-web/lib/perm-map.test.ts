@@ -143,8 +143,24 @@ describe("can() 的语义", () => {
   });
 
   it("★★ 翻译条目按**后端真实的码**判，不按 UI 码", () => {
-    // order:deposit:manage 在后端没有端点，它映到 order:deposit:update
-    expect(can(["order:deposit:update"], "order:deposit:manage")).toBe(true);
-    expect(can(["order:deposit:manage"], "order:deposit:manage")).toBe(false);
+    /*
+     * 这条原先拿押金举例，断言 order:deposit:manage **在后端没有端点**、
+     * 要映到 order:deposit:update 才判得过。
+     *
+     * 2026-09-25 那个前提被修掉了：押金三个端点已换回真源表的码
+     * （解冻/买断 → order:deposit:manage 仅 FIN，催缴 → order:arrears:dun 给 CS+FIN）。
+     * 此前它们用的是 order:deposit:update（真源表里没有、也没有角色持有）
+     * 与 order:intervene:execute（客服的码）—— 实测后果正好反了：
+     * **财务不能催缴也不能买断，而客服能解冻押金**。
+     *
+     * 所以这条改用仍然存在的翻译（system:notify_log:resend → :update）来守同一个语义，
+     * 而押金那两行翻译已从 UI_PERM_MAP 撤掉 —— 撤掉本身由上一条用例（镜像一致）守着。
+     */
+    expect(can(["system:notify_log:update"], "system:notify_log:resend")).toBe(true);
+    expect(can(["system:notify_log:resend"], "system:notify_log:resend")).toBe(false);
+
+    // 押金现在是直通的：后端判什么码，界面就用什么码
+    expect(can(["order:deposit:manage"], "order:deposit:manage")).toBe(true);
+    expect(can(["order:deposit:update"], "order:deposit:manage")).toBe(false);
   });
 });

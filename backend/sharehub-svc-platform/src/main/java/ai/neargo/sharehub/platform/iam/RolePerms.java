@@ -41,6 +41,9 @@ public final class RolePerms {
                     "device:cabinet:read", "device:slot:read", "device:command:send",
                     "order:order:read", "order:order:export", "order:exception:read", "order:exception:handle",
                     "order:intervene:execute", "order:refund:apply",
+                    // 催缴只留痕不改钱，是客服日常（真源表 §4）。
+                    // **解冻/买断不给** —— 那是动用户的钱，归财务。
+                    "order:arrears:dun",
                     "user:cuser:read", "user:risk:update", "user:member:read", "user:wallet:read",
                     // 注销队列与代为撤销（2026-09-25）：用户打电话说「我点错了」的入口就在客服
                     "user:logoff:read", "user:logoff:revoke", "user:invoice:read",
@@ -59,9 +62,16 @@ public final class RolePerms {
             "FINANCE", List.of(
                     "dashboard:overview:read", "dashboard:todo:read",
                     "order:order:read", "order:order:export", "order:refund:audit",
+                    // 押金解冻/买断与欠费催缴（真源表 §4）：动钱的归财务，
+                    // 催缴财务也有（客服另给）。此前三个端点用的是 order:deposit:update
+                    // 与 order:intervene:execute，前者没有任何角色持有、后者是客服的码 ——
+                    // 于是**财务不能催缴也不能买断，而客服能解冻**，正好反了。
+                    "order:deposit:manage", "order:arrears:dun",
                     "pricing:*", "finance:*",
                     "agent:agent:read", "agent:share:config", "agent:settlement:read", "agent:performance:read",
                     "location:venue:read", "location:contract:read", "location:analysis:read",
+                    // 合同条件加签（2026-09-25，运营核心流程 B3）：超阈值的合同运营通过后由财务会签
+                    "location:contract:cosign",
 // D6d：站点概览改判专属码（见 OperationController 的注释）。
                     // 清单第 67 行把 location:overview:read 给了 OPS/FIN/BD/VIEW，
                     // 而后端此前没有任何端点用它 —— 前端拿它渲染入口、后端拿更宽的 poi:read 判访问。

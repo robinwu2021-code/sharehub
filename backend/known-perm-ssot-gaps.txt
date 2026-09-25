@@ -27,15 +27,12 @@
 声明未强制 device:slot:read
 声明未强制 finance:share_rule:update
 声明未强制 marketing:campaign:create
-声明未强制 order:arrears:dun
-声明未强制 order:deposit:manage
 声明未强制 order:order:export
 声明未强制 order:reservation:cancel
 声明未强制 org:dept:update
 声明未强制 org:role:assign
-# 2026-09-25 修展开器（认中段通配）后**新显形**：真源表把「报表 导出」给了
-# OPS/FIN/BD/VIEW 四个角色，而 13 个报表端点**全是 read**，一个导出都没有。
-# 不是漏加闸，是这个功能压根没做。做不做由产品定。
+# 修展开器后新显形：真源表把「报表 导出」给了四个角色，而 13 个报表端点全是 read。
+# 导出是纯前端（lib/export-csv.ts），架构上不需要后端端点 —— 见待裁决清单 ④-1。
 声明未强制 report:*:export
 声明未强制 system:openapi:config
 强制未声明 cs:session:reply
@@ -48,7 +45,6 @@
 强制未声明 marketing:ad:update
 强制未声明 marketing:push:update
 强制未声明 marketing:recharge:update
-强制未声明 order:deposit:update
 强制未声明 system:biz_rule:read
 强制未声明 system:login_setting:read
 强制未声明 system:notify_log:update

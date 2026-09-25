@@ -37,6 +37,8 @@ export const BACKEND_ROLE_PERMS: Record<Role, string[]> = {
     "dashboard:overview:read", "dashboard:todo:read", "device:cabinet:read", "device:slot:read",
     "device:command:send", "order:order:read", "order:order:export", "order:exception:read",
     "order:exception:handle", "order:intervene:execute", "order:refund:apply",
+    // 催缴只留痕不改钱，是客服日常（真源表 §4）。**解冻/买断不给** —— 那是动用户的钱。
+    "order:arrears:dun",
     "user:cuser:read", "user:risk:update", "user:member:read", "user:wallet:read",
     // 注销队列与代为撤销（2026-09-25）：用户打电话说「我点错了」的入口就在客服
     "user:logoff:read", "user:logoff:revoke", "user:invoice:read",
@@ -49,6 +51,10 @@ export const BACKEND_ROLE_PERMS: Record<Role, string[]> = {
   ],
   // 财务：计价、分润、结算、提现、银行字典、税率、支付渠道。
   FINANCE: [
+    // 押金解冻/买断与欠费催缴（真源表 §4）：动钱的归财务。
+    // 后端三个端点此前用的是 order:deposit:update 与 order:intervene:execute，
+    // 前者无人持有、后者是客服的码 —— 财务反而做不了，而客服能解冻。2026-09-25 已修。
+    "order:deposit:manage", "order:arrears:dun",
     "dashboard:overview:read", "dashboard:todo:read", "order:order:read", "order:order:export",
     "order:refund:audit", "pricing:*", "finance:*", "agent:agent:read", "agent:share:config",
     "agent:settlement:read", "agent:performance:read", "location:venue:read",

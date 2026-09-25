@@ -65,6 +65,10 @@ location:analysis:read	坪效分析 查看	location	1
 location:contract:create	合同 新增	location	1
 location:contract:read	合同 查看	location	1
 location:contract:update	合同 编辑	location	1
+location:contract:submit	合同 提交审批 / 撤回	location	1
+location:contract:audit	合同 审批（通过 / 驳回）	location	1
+location:contract:terminate	合同 提前终止（申请）	location	1
+location:contract:cosign	合同 财务会签（超阈值加签）	location	1
 location:crm:read	BD CRM 查看	location	1
 location:crm:update	BD CRM 跟进	location	1
 location:lead:read	BD 线索 查看	location	1
@@ -93,6 +97,8 @@ marketing:push:update	推送任务 维护	marketing	1
 marketing:recharge:update	充值活动 维护	marketing	1
 marketing:referral:read	邀请裂变 查看	marketing	1
 marketing:referral:update	邀请裂变 维护	marketing	1
+order:deposit:manage	押金 解冻/买断	order	1
+order:arrears:dun	欠费 催缴	order	1
 order:deposit:update	押金/欠费 处置	order	1
 order:exception:handle	异常订单 处置	order	1
 order:exception:read	异常订单 查看	order	1

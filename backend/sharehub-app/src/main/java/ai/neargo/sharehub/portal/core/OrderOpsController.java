@@ -179,7 +179,9 @@ public class OrderOpsController {
     }
 
     @PostMapping("/deposits/{no}/release")
-    @PreAuthorize("@perm.can('order:intervene:execute')")
+    // 解冻是**放弃用户押金**，与买断同级，归财务（真源表 §4「押金 解冻/买断」同一个码）。
+    // 此前用 order:intervene:execute —— 那是客服持有的码，于是**客服能解冻押金**。
+    @PreAuthorize("@perm.can('order:deposit:manage')")
     public OkResult releaseDeposit(@PathVariable String no) {
         return depositService.release(no);
     }

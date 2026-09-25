@@ -21,7 +21,6 @@
  *    | UI 码 | 实际端点判的码 |
  *    |---|---|
  *    | `location:overview:read` | `location:poi:read` |
- *    | `order:arrears:dun` · `order:deposit:manage` | `order:deposit:update` |
  *    | `order:reservation:cancel` | `order:order:update` |
  *    | `system:notify_log:resend` | `system:notify_log:update` |
  *    | `device:ota:publish` | `device:ota:manage` |
@@ -157,8 +156,12 @@ export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   "marketing:recharge:update": "marketing:recharge:update",
   "marketing:referral:read": "marketing:referral:read",
   // ——— order ———
-  "order:arrears:dun": "order:deposit:update",   // 翻译：界面功能无独立端点 → POST /api/trade/deposits/{no}/dun   // ⚠️ D6d：后端无角色持有 → 除 ADMIN 外必 403
-  "order:deposit:manage": "order:deposit:update",   // 翻译：界面功能无独立端点 → POST /api/trade/deposits/{no}/buyout · /dun   // ⚠️ D6d：后端无角色持有 → 除 ADMIN 外必 403
+  // 2026-09-25 撤销翻译：后端三个端点已换回真源表的码。
+  // 此前这两条翻译成 order:deposit:update，注释里还记着「后端无角色持有 → 除 ADMIN 外必 403」
+  // —— 当时的人**知道对不上，用翻译绕过去了**，而翻译目标同样没有角色持有，
+  // 于是绕了一圈还是 403，只是从「码不存在」变成了「码没人有」。
+  "order:arrears:dun": "order:arrears:dun",
+  "order:deposit:manage": "order:deposit:manage",
   "order:deposit:update": "order:deposit:update",
   "order:exception:handle": "order:exception:handle",
   "order:exception:read": "order:exception:read",
