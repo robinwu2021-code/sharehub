@@ -2071,21 +2071,6 @@
   },
   {
    "verb": "GET",
-   "path": "/api/auth/permissions",
-   "perm": null,
-   "perms": [],
-   "handler": "AuthController#permissions",
-   "summary": "当前登录人权限码集合（前端 can() 用）。",
-   "params": [],
-   "bodyType": null,
-   "returnType": "List<String>",
-   "returnContainer": "List",
-   "returnElement": "String",
-   "responseShape": null,
-   "requestShape": null
-  },
-  {
-   "verb": "GET",
    "path": "/api/ops/ad-slots",
    "perm": "marketing:ad:read",
    "perms": [
@@ -14229,23 +14214,6 @@
    "returnType": "List<IamPermission>",
    "returnContainer": "List",
    "returnElement": "IamPermission",
-   "responseShape": null,
-   "requestShape": null
-  },
-  {
-   "verb": "GET",
-   "path": "/api/platform/iam/roles",
-   "perm": "org:role:read",
-   "perms": [
-    "org:role:read"
-   ],
-   "handler": "IamAdminController#roles",
-   "summary": "角色列表。",
-   "params": [],
-   "bodyType": null,
-   "returnType": "List<IamRole>",
-   "returnContainer": "List",
-   "returnElement": "IamRole",
    "responseShape": null,
    "requestShape": null
   },
@@ -28127,12 +28095,84 @@
    ]
   },
   {
+   "verb": "GET",
+   "path": "/mp/user/logoff",
+   "perm": null,
+   "perms": [],
+   "handler": "MpUserController#currentLogoff",
+   "summary": "当前注销申请；没有则返回 `null`。",
+   "params": [],
+   "bodyType": null,
+   "returnType": "LogoffItem",
+   "returnContainer": null,
+   "returnElement": "LogoffItem",
+   "responseShape": [
+    {
+     "name": "cUserNo",
+     "type": "String"
+    },
+    {
+     "name": "requestedAt",
+     "type": "String"
+    },
+    {
+     "name": "coolingUntil",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "purgedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
    "verb": "POST",
    "path": "/mp/user/logoff",
    "perm": null,
    "perms": [],
    "handler": "MpUserController#applyLogoff",
    "summary": "提交注销申请；返回冷静期截止时间，期内可撤销。",
+   "params": [],
+   "bodyType": null,
+   "returnType": "LogoffItem",
+   "returnContainer": null,
+   "returnElement": "LogoffItem",
+   "responseShape": [
+    {
+     "name": "cUserNo",
+     "type": "String"
+    },
+    {
+     "name": "requestedAt",
+     "type": "String"
+    },
+    {
+     "name": "coolingUntil",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "purgedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/mp/user/logoff/cancel",
+   "perm": null,
+   "perms": [],
+   "handler": "MpUserController#cancelLogoff",
+   "summary": "冷静期内撤销注销。",
    "params": [],
    "bodyType": null,
    "returnType": "LogoffItem",
@@ -29017,8 +29057,8 @@
  "stats": {
   "endpoints": 422,
   "records": 301,
-  "withPerm": 362,
+  "withPerm": 361,
   "withBody": 184,
-  "shapedResponses": 319
+  "shapedResponses": 321
  }
 }

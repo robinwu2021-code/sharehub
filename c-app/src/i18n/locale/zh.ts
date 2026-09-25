@@ -96,6 +96,12 @@ export default {
     save: "保存",
     deleteWarn: "注销将在冷静期后永久删除你的账户与数据，且不可恢复。",
     deleteConfirm: "注销账户",
+    deletePending: "已提交注销申请",
+    deleteCoolingUntil: "冷静期至 {until}，在此之前可以撤销",
+    deleteRevoke: "撤销注销",
+    deleteRevoked: "已撤销，账户恢复正常",
+    deleteApplied: "已提交。冷静期内随时可以撤销",
+    deleteFailed: "操作失败，请稍后重试",
     version: "版本",
   },
   me: {

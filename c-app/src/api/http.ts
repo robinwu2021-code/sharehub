@@ -17,6 +17,7 @@ import type {
   Notice,
   StoreDetail,
   WalletTxn,
+  LogoffItem,
 } from "@/types";
 
 export const httpApi: McpApi = {
@@ -27,6 +28,9 @@ export const httpApi: McpApi = {
   logout: () => client.post<void>("/mp/auth/logout"),
   getProfile: () => client.get<UserProfile>("/mp/user/profile"),
   updateProfile: (p: ProfilePatch) => client.post<UserProfile>("/mp/user/profile", p), // 待定
+  currentLogoff: () => client.get<LogoffItem | null>("/mp/user/logoff"),
+  applyLogoff: () => client.post<LogoffItem>("/mp/user/logoff"),
+  cancelLogoff: () => client.post<LogoffItem>("/mp/user/logoff/cancel"),
 
   listNotices: () => client.get<Notice[]>("/mp/notice"),
 

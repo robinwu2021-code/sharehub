@@ -96,6 +96,12 @@ export default {
     save: "حفظ",
     deleteWarn: "سيؤدي هذا إلى حذف حسابك وبياناتك نهائيًا بعد فترة تهدئة، ولا يمكن التراجع.",
     deleteConfirm: "حذف الحساب",
+    deletePending: "تم تقديم طلب الحذف",
+    deleteCoolingUntil: "فترة التهدئة حتى {until}. يمكنك الإلغاء قبل ذلك.",
+    deleteRevoke: "إلغاء الحذف",
+    deleteRevoked: "تم الإلغاء. حسابك نشط مرة أخرى.",
+    deleteApplied: "تم الإرسال. يمكنك الإلغاء في أي وقت خلال فترة التهدئة.",
+    deleteFailed: "حدث خطأ ما. يرجى المحاولة مرة أخرى.",
     version: "الإصدار",
   },
   me: {

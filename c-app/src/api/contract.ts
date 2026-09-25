@@ -15,6 +15,7 @@ import type {
   Notice,
   StoreDetail,
   WalletTxn,
+  LogoffItem,
 } from "@/types";
 
 export interface PageQ {
@@ -85,6 +86,11 @@ export interface McpApi {
   logout(): Promise<void>;
   getProfile(): Promise<UserProfile>;
   updateProfile(p: ProfilePatch): Promise<UserProfile>;
+  // 注销（PDPL 冷静期）。三个都要：只有 apply 的话，用户点完看不到生效日期、也撤销不了 ——
+  // 那是一扇单向门。后端 UserLogoffService 一直实现着 current/cancel。
+  currentLogoff(): Promise<LogoffItem | null>;
+  applyLogoff(): Promise<LogoffItem>;
+  cancelLogoff(): Promise<LogoffItem>;
   // 公告
   listNotices(): Promise<Notice[]>;
   // 找柜与地图

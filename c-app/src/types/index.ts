@@ -163,6 +163,22 @@ export interface Country {
 }
 
 // 运营公告
+/**
+ * 注销申请（PDPL 冷静期，后端 usr_logoff）。
+ *
+ * **注销不是立刻删数据**：先落 PENDING 并给出 coolingUntil，期内可撤销；
+ * 到期后由清除作业执行。所以界面必须能显示「几号生效」与「撤销」——
+ * 少了这两样，用户点完就再也回不了头，而他并不知道。
+ */
+export interface LogoffItem {
+  cUserNo: string;
+  requestedAt: string;
+  /** 冷静期截止（yyyy-MM-dd HH:mm:ss）。此刻之前都可撤销。 */
+  coolingUntil: string;
+  status: "PENDING" | "CANCELLED" | "DONE";
+  purgedAt: string | null;
+}
+
 export interface Notice {
   noticeNo: string;
   title: string;

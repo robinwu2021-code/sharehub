@@ -1,7 +1,12 @@
 // Mock 实现（McpApi）。全部走 mock/db 内存数据 + 模拟延迟。后端未就绪即可跑通全部 UI。
 import * as db from "@/mock/db";
 import type { McpApi, LoginParams, RentParams, PayParams, OrderQ, NearbyQ } from "./contract";
-import type { RentOrder } from "@/types";
+import type { RentOrder, LogoffItem } from "@/types";
+
+/** 注销申请的 mock 状态。模块级而非 db 里：它是会话内的一次性流程，不是种子数据。 */
+let mockLogoff: LogoffItem | null = null;
+/** 后端存的是 `yyyy-MM-dd HH:mm:ss` 文本，mock 跟着它走，免得页面按两套格式解析。 */
+const fmt = (d: Date) => d.toISOString().slice(0, 19).replace("T", " ");
 
 export const mockApi: McpApi = {
   login: (p: LoginParams) =>
@@ -12,6 +17,34 @@ export const mockApi: McpApi = {
   // mock 没有服务端会话可吊销，但必须存在：缺这个方法，mock 模式点登出会直接 TypeError
   logout: () => db.delay(undefined as void, 100),
   getProfile: () => db.delay(db.profile),
+
+  /*
+   * 注销：mock 也要**有状态**，否则「申请 → 看到冷静期 → 撤销」这条路在 mock 下走不通，
+   * 而这正是这个页面唯一值得点的东西。冷静期与后端默认一致（15 天）。
+   */
+  currentLogoff: () => db.delay(mockLogoff),
+  applyLogoff: () => {
+    if (mockLogoff && mockLogoff.status === "PENDING") {
+      return Promise.reject(new Error("已有进行中的注销申请"));
+    }
+    const now = new Date();
+    const until = new Date(now.getTime() + 15 * 86400_000);
+    mockLogoff = {
+      cUserNo: "CU-0001",
+      requestedAt: fmt(now),
+      coolingUntil: fmt(until),
+      status: "PENDING",
+      purgedAt: null,
+    };
+    return db.delay(mockLogoff, 420);
+  },
+  cancelLogoff: () => {
+    if (!mockLogoff || mockLogoff.status !== "PENDING") {
+      return Promise.reject(new Error("没有进行中的注销申请，无法撤销"));
+    }
+    mockLogoff = { ...mockLogoff, status: "CANCELLED" };
+    return db.delay(mockLogoff, 380);
+  },
   updateProfile: (p) => {
     Object.assign(db.profile, p);
     return db.delay(db.profile, 400);

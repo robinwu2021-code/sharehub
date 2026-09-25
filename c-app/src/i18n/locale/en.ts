@@ -96,6 +96,12 @@ export default {
     save: "Save",
     deleteWarn: "This permanently deletes your account and data after a cooling-off period. This cannot be undone.",
     deleteConfirm: "Delete account",
+    deletePending: "Deletion requested",
+    deleteCoolingUntil: "Cooling-off until {until}. You can cancel before then.",
+    deleteRevoke: "Cancel deletion",
+    deleteRevoked: "Cancelled. Your account is active again.",
+    deleteApplied: "Submitted. You can cancel any time during the cooling-off period.",
+    deleteFailed: "Something went wrong. Please try again.",
     version: "Version",
   },
   me: {
