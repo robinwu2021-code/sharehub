@@ -5,6 +5,8 @@ import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.inv.InvTransferStateMachine;
 import ai.neargo.sharehub.inv.InvTransferStatus;
+import ai.neargo.sharehub.auth.StaffContext;
+import ai.neargo.sharehub.inv.dto.InvDtos.InvTransferReq;
 import ai.neargo.sharehub.inv.dto.InvDtos.InventoryTransfer;
 import ai.neargo.sharehub.inv.dto.InvDtos.InventoryTransferDetail;
 import ai.neargo.sharehub.inv.dto.InvDtos.TransferItem;
@@ -76,18 +78,28 @@ public class InventoryTransferServiceImpl implements InventoryTransferService {
     }
 
     @Override
-    public InventoryTransfer save(String transferNo, InvTransfer body) {
-        String no = notBlank(transferNo) ? transferNo : body.getTransferNo();
+    public InventoryTransfer save(String transferNo, InvTransferReq body) {
+        String no = transferNo;
 
         // —— 建单 ——
         if (!notBlank(no)) {
-            validateEndpoints(body);
-            body.setTransferNo(nextTransferNo());
-            body.setTenantId(TENANT_MAIN);
-            body.setStatus(InvTransferStatus.DRAFT.name()); // 建单一律 DRAFT，不接受调用方直接开在途单
-            if (body.getPowerbankCount() == null) body.setPowerbankCount(0);
-            mapper.insert(body);
-            return toVO(selectByNo(body.getTransferNo()));
+            InvTransfer e = new InvTransfer();
+            e.setFromType(body.fromType());
+            e.setFromRef(body.fromRef());
+            e.setFromName(body.fromName());
+            e.setToType(body.toType());
+            e.setToRef(body.toRef());
+            e.setToName(body.toName());
+            e.setItemType(body.itemType());
+            e.setPowerbankCount(body.powerbankCount() == null ? 0 : body.powerbankCount());
+            validateEndpoints(e);
+            e.setTransferNo(nextTransferNo());
+            e.setTenantId(TENANT_MAIN);
+            e.setStatus(InvTransferStatus.DRAFT.name()); // 建单一律 DRAFT，不接受调用方直接开在途单
+            // 经办人按当前登录人落，不收请求体里的值 —— 搬设备的人要能对上号
+            e.setOperatorNo(StaffContext.require().userNo());
+            mapper.insert(e);
+            return toVO(selectByNo(e.getTransferNo()));
         }
 
         // —— 更新 ——
@@ -98,7 +110,7 @@ public class InventoryTransferServiceImpl implements InventoryTransferService {
                     + "（如需退回请开一张反向调拨单，保留两条痕）");
         }
 
-        String target = body.getStatus();
+        String target = body.status();
         if (notBlank(target) && !target.equals(current.getStatus())) {
             // 目标状态 → 事件，交状态机裁决；未定义的跃迁（如 DRAFT 直接到 DONE）在这里被拒
             // switch 改切在枚举上：非法字符串在 of() 就被挡住并说清楚哪个值不合法，
@@ -115,17 +127,17 @@ public class InventoryTransferServiceImpl implements InventoryTransferService {
 
         // 单头可改字段：只有 DRAFT 期允许改两端与数量，在途单改数量等于事后编账
         if (InvTransferStatus.DRAFT.name().equals(current.getStatus())) {
-            if (notBlank(body.getFromType())) current.setFromType(body.getFromType());
-            if (notBlank(body.getFromRef())) current.setFromRef(body.getFromRef());
-            if (notBlank(body.getFromName())) current.setFromName(body.getFromName());
-            if (notBlank(body.getToType())) current.setToType(body.getToType());
-            if (notBlank(body.getToRef())) current.setToRef(body.getToRef());
-            if (notBlank(body.getToName())) current.setToName(body.getToName());
-            if (notBlank(body.getItemType())) current.setItemType(body.getItemType());
-            if (body.getPowerbankCount() != null) current.setPowerbankCount(body.getPowerbankCount());
+            if (notBlank(body.fromType())) current.setFromType(body.fromType());
+            if (notBlank(body.fromRef())) current.setFromRef(body.fromRef());
+            if (notBlank(body.fromName())) current.setFromName(body.fromName());
+            if (notBlank(body.toType())) current.setToType(body.toType());
+            if (notBlank(body.toRef())) current.setToRef(body.toRef());
+            if (notBlank(body.toName())) current.setToName(body.toName());
+            if (notBlank(body.itemType())) current.setItemType(body.itemType());
+            if (body.powerbankCount() != null) current.setPowerbankCount(body.powerbankCount());
             validateEndpoints(current);
         }
-        if (notBlank(body.getOperatorNo())) current.setOperatorNo(body.getOperatorNo());
+        // 经办人不在写入面里：建单时落的那个人就是经办人，换人经办得换个人来操作
 
         mapper.updateById(current);
 

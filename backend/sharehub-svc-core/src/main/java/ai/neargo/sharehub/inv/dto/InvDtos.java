@@ -27,6 +27,22 @@ public final class InvDtos {
                                     String status, String operator, String createdAt) {
     }
 
+    /**
+     * 调拨单写入面（建单 / 更新共用）。
+     *
+     * <p><b>不含 {@code operatorNo}</b> —— 经办人由服务端按当前登录人回填。调拨是真的把设备
+     * 从一个地方搬走，「谁经的手」是少了一台时唯一的追责线索，不能由请求体自称。
+     * 同样不含 {@code transferNo}：建单时服务端取号，更新时以路径为准。
+     *
+     * <p>{@code status} 留在写入面里是有意的：它不是直接赋值，而是**目标状态**，
+     * 由 {@code InvTransferStateMachine} 反查事件（SHIP / RECEIVE）后裁决，
+     * 非法跃迁（如 DRAFT 直接 DONE）在那里被拒。
+     */
+    public record InvTransferReq(String fromType, String fromRef, String fromName,
+                                 String toType, String toRef, String toName,
+                                 String itemType, Integer powerbankCount, String status) {
+    }
+
     /** 调拨单详情 = 单头 + 明细（收货核对逐件勾选用）。 */
     public record InventoryTransferDetail(InventoryTransfer transfer, List<TransferItem> items) {
     }

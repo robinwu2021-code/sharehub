@@ -5,7 +5,7 @@ import ai.neargo.sharehub.gw.dto.GwDtos.CommandRecord;
 import ai.neargo.sharehub.gw.service.CommandLogService;
 import ai.neargo.sharehub.inv.dto.InvDtos.InventoryTransfer;
 import ai.neargo.sharehub.inv.dto.InvDtos.InventoryTransferDetail;
-import ai.neargo.sharehub.inv.entity.InvTransfer;
+import ai.neargo.sharehub.inv.dto.InvDtos.InvTransferReq;
 import ai.neargo.sharehub.inv.service.InventoryTransferService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -55,7 +55,7 @@ public class InventoryController {
     /** 建调拨单（落 DRAFT）。 */
     @PostMapping("/inventory-transfers")
     @PreAuthorize("@perm.can('device:inventory:transfer')")
-    public InventoryTransfer createTransfer(@RequestBody InvTransfer body) {
+    public InventoryTransfer createTransfer(@RequestBody InvTransferReq body) {
         return transferService.save(null, body);
     }
 
@@ -63,8 +63,8 @@ public class InventoryController {
     @PostMapping("/inventory-transfers/{transferNo}")
     @PreAuthorize("@perm.can('device:inventory:transfer')")
     public InventoryTransfer updateTransfer(@PathVariable String transferNo,
-                                            @RequestBody InvTransfer body) {
-        return transferService.save(transferNo, body); // 路径为准，忽略 body 里的单号
+                                            @RequestBody InvTransferReq body) {
+        return transferService.save(transferNo, body); // 单号只认路径：写入面里没有 transferNo
     }
 
     // —— 远程控制 · 指令记录（菜单叶：设备管理 › 远程控制·指令记录）——

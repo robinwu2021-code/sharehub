@@ -73,17 +73,6 @@ IamEmployee.phone
 IamEmployee.roleNo
 IamEmployee.status
 IamEmployee.userId
-InvTransfer.fromName
-InvTransfer.fromRef
-InvTransfer.fromType
-InvTransfer.itemType
-InvTransfer.operatorNo
-InvTransfer.powerbankCount
-InvTransfer.status
-InvTransfer.toName
-InvTransfer.toRef
-InvTransfer.toType
-InvTransfer.transferNo
 LocLead.contact
 LocLead.expectSites
 LocLead.leadNo

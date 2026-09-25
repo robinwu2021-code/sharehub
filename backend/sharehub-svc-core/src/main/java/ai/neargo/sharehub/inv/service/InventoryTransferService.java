@@ -1,9 +1,9 @@
 package ai.neargo.sharehub.inv.service;
 
 import ai.neargo.common.core.PageResult;
+import ai.neargo.sharehub.inv.dto.InvDtos.InvTransferReq;
 import ai.neargo.sharehub.inv.dto.InvDtos.InventoryTransfer;
 import ai.neargo.sharehub.inv.dto.InvDtos.InventoryTransferDetail;
-import ai.neargo.sharehub.inv.entity.InvTransfer;
 
 /**
  * 库存调拨业务（[api/README §3.2]）。
@@ -26,5 +26,5 @@ public interface InventoryTransferService {
      * <p>{@code transferNo} 为空 → 建单（取号 TR*，落 {@code DRAFT}）；
      * 非空 → 按状态机流转 + 更新可改字段。终态 {@code DONE} 拒绝再改。
      */
-    InventoryTransfer save(String transferNo, InvTransfer body);
+    InventoryTransfer save(String transferNo, InvTransferReq body);
 }
