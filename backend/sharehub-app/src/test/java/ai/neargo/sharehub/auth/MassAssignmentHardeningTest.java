@@ -1,5 +1,8 @@
 package ai.neargo.sharehub.auth;
 
+import ai.neargo.sharehub.platform.md.entity.MdProblem;
+import ai.neargo.sharehub.platform.md.mapper.MdProblemMapper;
+import ai.neargo.sharehub.platform.md.service.ProblemService;
 import ai.neargo.sharehub.platform.sys.entity.SysParam;
 import ai.neargo.sharehub.platform.sys.mapper.SysParamMapper;
 import ai.neargo.sharehub.platform.sys.service.SysParamService;
@@ -48,6 +51,12 @@ class MassAssignmentHardeningTest {
     @Autowired
     JdbcTemplate jdbc;
 
+    @Autowired
+    ProblemService problems;
+
+    @Autowired
+    MdProblemMapper problemMapper;
+
     /**
      * **物理**删除，不能用 {@code mapper.delete}。
      *
@@ -59,6 +68,7 @@ class MassAssignmentHardeningTest {
     @AfterEach
     void hardDelete() {
         jdbc.update("DELETE FROM sys_param WHERE param_key = ?", KEY);
+        jdbc.update("DELETE FROM md_problem WHERE problem_no = ?", P_KEY);
     }
 
     private SysParam seed() {
@@ -151,5 +161,69 @@ class MassAssignmentHardeningTest {
         SysParam after = reload();
         assertThat(after.getId()).isEqualTo(before.getId());
         assertThat(after.getVersion()).as("版本由乐观锁推进，不由客户端指定").isNotEqualTo(4242L);
+    }
+
+    // ——————————————————— 归档时间戳 ———————————————————
+    //
+    // 上面四条锁的是 tenantId / deleted / createdAt / id+version，**独独漏了 archivedAt**。
+    // 基类注释里那句「归档走 archive/unarchive」说的是 deleted，而 archivedAt 才是
+    // 运营端真正看得见的归档位（Archivable 的契约：null = 在用，非空 = 已归档）。
+    //
+    // 16 个 Archivable 实体里只有 LocService 与 NoticeServiceImpl 在自己的 beforeUpdate
+    // 里补了一句 setArchivedAt(current.getArchivedAt())，其余 14 个没有 ——
+    // **那是黑名单：得有人记得写**。这里把它挪到基类，改成白名单。
+    //
+    // 可利用的方向只有一个：updateById 是 NOT_NULL 策略，传 null 不会进 UPDATE SET，
+    // 所以经 save **取消不了**归档；能做的是反向 —— 把任意记录设成已归档、并伪造归档时间。
+    // 归档的记录从默认列表消失，于是「运营点了保存，这条就不见了」，且没有任何报错。
+
+    private static final String P_KEY = "zztest-archive-guard";
+
+    private MdProblem seedProblem() {
+        MdProblem e = new MdProblem();
+        e.setProblemNo(P_KEY);
+        e.setCategory("OTHER");
+        e.setTitle("归档加固探针");
+        problems.save(e);
+        return reloadProblem();
+    }
+
+    private MdProblem reloadProblem() {
+        return problemMapper.selectOne(Wrappers.<MdProblem>lambdaQuery()
+                .eq(MdProblem::getProblemNo, P_KEY).last("limit 1"));
+    }
+
+    @Test
+    @DisplayName("★★ 更新不能顺手把记录归档掉——归档有专门入口")
+    void archivedAtCannotBeSetThroughSave() {
+        MdProblem before = seedProblem();
+        assertThat(before).as("前置条件：探针记录建起来了").isNotNull();
+        assertThat(before.getArchivedAt()).as("前置条件：刚建的未归档").isNull();
+
+        MdProblem evil = new MdProblem();
+        evil.setProblemNo(P_KEY);
+        evil.setTitle("改个标题而已");
+        evil.setArchivedAt(LocalDateTime.of(2020, 1, 1, 0, 0));
+        problems.save(evil);
+
+        MdProblem after = reloadProblem();
+        assertThat(after.getArchivedAt())
+                .as("归档位只认 archive 入口，保存端点传什么都不算")
+                .isNull();
+        assertThat(after.getTitle())
+                .as("正当字段照常写入 —— 只验「改不了」会把功能堵死还以为修好了")
+                .isEqualTo("改个标题而已");
+    }
+
+    @Test
+    @DisplayName("加固之后 archive / unarchive 本身仍要好使")
+    void archiveEndpointStillWorks() {
+        seedProblem();
+
+        problems.archive(P_KEY);
+        assertThat(reloadProblem().getArchivedAt()).as("专用入口该归档得上").isNotNull();
+
+        problems.unarchive(P_KEY);
+        assertThat(reloadProblem().getArchivedAt()).as("也该取消得掉").isNull();
     }
 }

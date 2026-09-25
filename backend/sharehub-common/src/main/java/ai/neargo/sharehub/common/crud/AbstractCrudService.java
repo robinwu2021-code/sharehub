@@ -155,6 +155,17 @@ public abstract class AbstractCrudService<E extends BaseEntity, V> implements Cr
             body.setDeleted(current.getDeleted());        // 绕过归档语义软删/反删（归档走 archive/unarchive）
             body.setCreatedAt(current.getCreatedAt());    // 伪造审计痕迹：createdAt/By 是 fill = INSERT，
             body.setCreatedBy(current.getCreatedBy());    // 更新时不会被 AuditMetaObjectHandler 覆盖
+            // archivedAt 同理，且**比 deleted 更要紧** —— 它才是运营端看得见的归档位
+            // （Archivable：null = 在用，非空 = 已归档），归档的记录从默认列表消失。
+            // 加固第一版漏了它，于是 16 个 Archivable 里只有 LocService 与 NoticeServiceImpl
+            // 各自在 beforeUpdate 里补了一句——那是黑名单，得有人记得写。挪到这里变白名单。
+            //
+            // 只有一个方向可利用：updateById 是 NOT_NULL 策略，传 null 不进 UPDATE SET，
+            // 所以经 save 取消不了归档；能做的是反向——把任意记录设成已归档并伪造归档时间。
+            // 后果是「运营点了保存，这条记录就不见了」，而且不报错。
+            if (body instanceof Archivable ab && current instanceof Archivable cur) {
+                ab.setArchivedAt(cur.getArchivedAt());
+            }
             // updatedAt / updatedBy 不用管：fill = INSERT_UPDATE，strictUpdateFill 会盖掉客户端传的值。
             //
             // **域字段**（agentNo 等归属、status 等状态、金额）不能在这里一刀切 ——
