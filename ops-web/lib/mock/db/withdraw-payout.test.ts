@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { withdrawals, payWithdrawal, auditWithdrawal, applyWithdrawal, WithdrawalError } from "./finance";
 import { bizRules } from "./system";
-import { canPayWithdrawal, payReceiptError } from "../../types";
+import { canPayWithdrawal, canAuditWithdrawal, canWithdrawAction, WITHDRAW_TRANSITIONS, payReceiptError } from "../../types";
 import type { Withdrawal } from "../../types";
 
 /**
@@ -203,5 +203,50 @@ describe("代理自助申请提现", () => {
     const paid = payWithdrawal(w.withdrawNo, { success: true, channel: "MANUAL", payRef: `E2E-${Date.now()}` });
     expect(paid.status).toBe("PAID");
     withdrawals.splice(withdrawals.indexOf(paid), 1);
+  });
+});
+
+describe("审批也走同一张状态机表（A3-1）", () => {
+  it("已打款的单不能再审批——此前 mock 这里一道守卫都没有，能把 PAID 改回 PAYING", () => {
+    const w = mk("WD-AUD-1", "PAID");
+    expect(() => auditWithdrawal(w.withdrawNo, true)).toThrow(WithdrawalError);
+    expect(() => auditWithdrawal(w.withdrawNo, false, "不行")).toThrow(WithdrawalError);
+    expect(w.status).toBe("PAID");           // 被拒的那张毫发无伤
+  });
+
+  it("APPLY 与 AUDIT 都能审批（后端 APPROVE 边的 from 是这两个）", () => {
+    for (const from of ["APPLY", "AUDIT"] as const) {
+      const w = mk(`WD-AUD-ok-${from}`, from);
+      expect(auditWithdrawal(w.withdrawNo, true).status).toBe("PAYING");
+    }
+  });
+
+  it("目标状态取自表，不是各写一个字面量", () => {
+    const w = mk("WD-AUD-2", "APPLY");
+    expect(auditWithdrawal(w.withdrawNo, false, "资料不全").status)
+      .toBe(WITHDRAW_TRANSITIONS.reject.to);
+  });
+
+  it("canAuditWithdrawal 就是 approve|reject 两条边的并——页面与 mock 同一份判据", () => {
+    expect(canAuditWithdrawal("APPLY")).toBe(true);
+    expect(canAuditWithdrawal("AUDIT")).toBe(true);
+    expect(canAuditWithdrawal("PAYING")).toBe(false);
+    expect(canAuditWithdrawal("PAID")).toBe(false);
+    expect(canAuditWithdrawal("FAILED")).toBe(false);
+  });
+
+  it("一个动作一条边：打款成功与失败是两条，不是一个动作两个 to", () => {
+    // 这正是表不能写成 `to: Status[]` 的原因 —— 否则「这一步走到哪」答不出来
+    expect(WITHDRAW_TRANSITIONS.pay.to).toBe("PAID");
+    expect(WITHDRAW_TRANSITIONS.payFail.to).toBe("FAILED");
+    expect(canWithdrawAction("PAYING", "pay")).toBe(true);
+    expect(canWithdrawAction("PAYING", "payFail")).toBe(true);
+    // canPayWithdrawal 是这两条的并
+    expect(canPayWithdrawal("PAYING")).toBe(true);
+  });
+
+  it("APPLY→AUDIT 刻意不在表里：那是代理侧提交，运营端没有这个动作", () => {
+    const tos = Object.values(WITHDRAW_TRANSITIONS).map((t) => t.to);
+    expect(tos).not.toContain("AUDIT");
   });
 });

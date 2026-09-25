@@ -15,6 +15,12 @@ import type { AuditTrail } from "./common";
 export type WithdrawalStatus = "APPLY" | "AUDIT" | "PAYING" | "PAID" | "FAILED";
 
 /**
+ * 提现单上的运营动作。见 {@link WITHDRAW_TRANSITIONS}：
+ * `approve`/`reject` 共用审批端点，`pay`/`payFail` 共用回执端点。
+ */
+export type WithdrawAction = "approve" | "reject" | "pay" | "payFail";
+
+/**
  * 钱包充值单状态。与后端 `RechargeOrderStatus` 必须一字不差。
  *
  * ⚠️ 与支付单（`pay_order`）不是同一套：那边初始态是 `INIT`、还有 `PAYING`/`CLOSED`。
@@ -192,8 +198,47 @@ export interface PayReceiptPayload {
   failReason?: string;
 }
 
-/** 只有「出款在途」的单子能登记回执：APPLY/AUDIT 还没批，PAID/FAILED 已是终态。 */
-export const canPayWithdrawal = (status: Withdrawal["status"]) => status === "PAYING";
+/**
+ * 提现单状态机（SSOT）：页面按钮可用性与 mock/后端校验共用同一份，
+ * 与工单 `WO_TRANSITIONS`、结算 `STL_TRANSITIONS` 同一套写法。
+ *
+ * **一个动作一条边，即使两个动作共用一个端点** —— 打款端点后端是
+ * `stateMachine.next(status, ok ? "PAY" : "FAIL")`：登记回执时填成功就
+ * `PAYING→PAID`、填失败就 `PAYING→FAILED`。审批端点同理（approve/reject）。
+ * 若按端点建表就得写成 `to: Status[]`，那样「这一步走到哪」在表里就答不出来了，
+ * 而这正是状态机该回答的唯一问题。
+ * **动作是 UI 概念、端点是传输概念，不必一一对应。**
+ *
+ * `APPLY→AUDIT`（后端 SUBMIT 边）**不在此表**：那是代理侧提交申请，
+ * 运营端没有、也不该有这个动作。
+ */
+export const WITHDRAW_TRANSITIONS: Record<WithdrawAction,
+  { from: readonly WithdrawalStatus[]; to: WithdrawalStatus; label: string }> = {
+  approve: { from: ["APPLY", "AUDIT"], to: "PAYING", label: "审核通过" },
+  reject: { from: ["APPLY", "AUDIT"], to: "FAILED", label: "驳回" },
+  pay: { from: ["PAYING"], to: "PAID", label: "登记打款成功" },
+  payFail: { from: ["PAYING"], to: "FAILED", label: "登记打款失败" },
+};
+
+export const canWithdrawAction = (status: WithdrawalStatus, action: WithdrawAction) =>
+  WITHDRAW_TRANSITIONS[action].from.includes(status);
+
+/**
+ * 审批入口是否可用（通过/驳回共用一个端点与一个弹窗，弹窗里再选）。
+ *
+ * 此前页面手写 `(w.status === "AUDIT" || w.status === "APPLY")` —— 正是
+ * `WithdrawalStateMachine` 的 APPROVE from 集抄了一份。抄一份不是风格问题：
+ * 后端加一条边时，手抄处没有任何东西会提醒。
+ */
+export const canAuditWithdrawal = (status: WithdrawalStatus) =>
+  canWithdrawAction(status, "approve") || canWithdrawAction(status, "reject");
+
+/**
+ * 只有「出款在途」的单子能登记回执：APPLY/AUDIT 还没批，PAID/FAILED 已是终态。
+ * 结论与此前手写的 `status === "PAYING"` 相同，但现在它是**从表里读出来的**。
+ */
+export const canPayWithdrawal = (status: Withdrawal["status"]) =>
+  canWithdrawAction(status, "pay") || canWithdrawAction(status, "payFail");
 
 /**
  * 回执入参校验，返回错误文案；通过返回 null。

@@ -6,6 +6,7 @@ import type {
   AlarmNoticeResendPayload, PageQuery,
 
   AutoWorkOrderResult,} from "../../types";
+import { ALARM_TRANSITIONS, canAlarmAction } from "../../types";
 import { LOCS, OPERATORS, p, iso, phone } from "./internal";
 import { notFound, fail } from "@/lib/biz-error";
 import { paginate, kwHit, upsert, nextNo, liveHit, archiveRow, unarchiveRow } from "./helpers";
@@ -159,8 +160,10 @@ export function autoRaiseWorkOrders(): AutoWorkOrderResult {
 export function ackAlarm(alarmNo: string, remark?: string): AlarmAckResult {
   const a = alarmRecords.find((x) => x.alarmNo === alarmNo);
   if (!a) throw notFound("告警", "Alarm", alarmNo);
-  if (a.status !== "OPEN") throw fail("仅待处理（OPEN）的告警可确认", "Only an OPEN alarm can be acknowledged", "يمكن الإقرار فقط بإنذار مفتوح (OPEN)");
-  a.status = "ACKED";
+  // 判据与目标状态都从 ALARM_TRANSITIONS 读 —— 此前两处各写一个字面量，
+  // 后端改边时这里不会有任何提示。
+  if (!canAlarmAction(a.status, "ack")) throw fail("仅待处理（OPEN）的告警可确认", "Only an OPEN alarm can be acknowledged", "يمكن الإقرار فقط بإنذار مفتوح (OPEN)");
+  a.status = ALARM_TRANSITIONS.ack.to;
   if (remark?.trim()) a.remark = remark.trim(); // 备注为空则保留原上报说明，不要抹掉
   return { alarmNo: a.alarmNo, status: a.status };
 }

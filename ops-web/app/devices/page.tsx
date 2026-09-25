@@ -35,10 +35,10 @@ import { parseImport, templateCsv, type ImportColumn, type RowError } from "@/li
 import { SiteMap, type MapPoint } from "@/components/ui/site-map";
 import { ReadOnlyNotice } from "@/components/read-only-notice";
 // 值导入：指令的「必须指定仓位」规则与 mock 落库校验同源，不在页面里另写一份
-import { SLOT_REQUIRED_COMMANDS } from "@/lib/types";
+import { SLOT_REQUIRED_COMMANDS, nextTransferStatuses } from "@/lib/types";
 import type {
   Cabinet, Powerbank, CabinetMonitor, CommandRecord, CommandType, InventoryTransfer,
-  InventoryTransferDetail, TransferItem, OtaRollout, PageResult,
+  InventoryTransferDetail, TransferItem, OtaRollout, PageResult, InvTransferStatus,
   OtaRelease, OtaTask, DeviceLog, DeviceCodeBatch,
 } from "@/lib/types";
 
@@ -959,14 +959,27 @@ const PB_FIELDS: FieldDef[] = [
   ] },
   { key: "cycles", label: "循环次数", type: "number" },
 ];
-const INV_FIELDS: FieldDef[] = [
+/**
+ * 调拨单表单。**状态下拉按状态机现算**，不是写死的三选 ——
+ * 写死的话一张 DRAFT 的单也能选「已完成」，点下去后端按非法迁移拒
+ * （界面给得出的选项，后端就该收得下）。
+ *
+ * 新建时后端强制置 DRAFT（`body.setStatus(InvTransferStatus.DRAFT)`，不接受调用方
+ * 直接开在途单），所以没有 `status` 时按 DRAFT 算。
+ */
+const invFields = (status?: InvTransferStatus | null): FieldDef[] => [
   { key: "transferNo", label: "调拨单号", readOnlyOnEdit: true, placeholder: "系统生成" },
   { key: "fromLocation", label: "调出点位" },
   { key: "toLocation", label: "调入点位" },
   { key: "powerbankCount", label: "充电宝数", type: "number" },
-  { key: "status", label: "状态", type: "select", options: [
-    { value: "DRAFT", label: "草稿" }, { value: "IN_TRANSIT", label: "在途" }, { value: "DONE", label: "已完成" },
-  ] },
+  {
+    key: "status", label: "状态", type: "select",
+    options: nextTransferStatuses(status ?? "DRAFT")
+      .map((v) => ({ value: v, label: TRANSFER_STATUS[v].label })),
+    // requireAllChecked 是**前置条件不是状态机的边**（见 TRANSFER_TRANSITIONS 注释），
+    // 所以在这里单独说一句 —— 否则被拒时用户分不清是「这一步不让走」还是「还没核对完」。
+    help: status === "IN_TRANSIT" ? "确认收货前，明细必须全部核对过" : undefined,
+  },
   { key: "operator", label: "操作人" },
 ];
 const OTA_FIELDS: FieldDef[] = [
@@ -1681,7 +1694,7 @@ function DevicesInner() {
         titleNew="新增调拨单"
         titleEdit={`编辑调拨单 ${invForm?.transferNo ?? ""}`}
         isEdit={!!invForm?.transferNo}
-        fields={INV_FIELDS}
+        fields={invFields(invForm?.status)}
         value={(invForm ?? {}) as Record<string, unknown>}
         onChange={(v) => setInvForm(v as Partial<InventoryTransfer>)}
         onSubmit={() => invForm && saveInv.mutate(invForm)}

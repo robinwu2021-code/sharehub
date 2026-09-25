@@ -159,6 +159,43 @@ export interface CommandRecord {
  */
 export type InvTransferStatus = "DRAFT" | "IN_TRANSIT" | "DONE";
 
+/** 调拨单上的动作。见 {@link TRANSFER_TRANSITIONS}。 */
+export type TransferAction = "ship" | "receive";
+
+/**
+ * 调拨单状态机（SSOT）：页面可选项与 mock 校验共用同一份，
+ * 与工单 `WO_TRANSITIONS`、提现 `WITHDRAW_TRANSITIONS` 同一套写法。
+ * 对齐后端 `InvTransferStateMachine`（SHIP / RECEIVE 两条边，DONE 是终态）。
+ *
+ * 「已收货的单能不能退回在途」的答案是**不能**：要退货应开一张反向调拨单，
+ * 留两条痕，而不是把一条痕改回去。
+ *
+ * ⚠️ `receive` 后端还有一道 `requireAllChecked` —— 明细必须全部核对过。
+ * **那是前置条件，不是状态机的边**，所以不在本表里：塞进来会让
+ * 「这一步不让走」和「你还没核对完」变成同一句话，而用户需要知道是哪一种。
+ */
+export const TRANSFER_TRANSITIONS: Record<TransferAction,
+  { from: readonly InvTransferStatus[]; to: InvTransferStatus; label: string }> = {
+  ship: { from: ["DRAFT"], to: "IN_TRANSIT", label: "发出" },
+  receive: { from: ["IN_TRANSIT"], to: "DONE", label: "确认收货" },
+};
+
+export const canTransferAction = (status: InvTransferStatus, action: TransferAction) =>
+  TRANSFER_TRANSITIONS[action].from.includes(status);
+
+/**
+ * 当前状态下，状态下拉该给哪几个选项 = **保持当前** + 合法的下一步。
+ *
+ * 此前这个下拉是写死的三选（草稿/在途/已完成），于是一张 DRAFT 的单也能选「已完成」
+ * —— 点下去后端按非法迁移拒。界面给得出的选项，后端就该收得下。
+ */
+export const nextTransferStatuses = (from: InvTransferStatus): InvTransferStatus[] => [
+  from,
+  ...(Object.keys(TRANSFER_TRANSITIONS) as TransferAction[])
+    .filter((a) => canTransferAction(from, a))
+    .map((a) => TRANSFER_TRANSITIONS[a].to),
+];
+
 export interface InventoryTransfer {
   transferNo: string;
   /**

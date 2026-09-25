@@ -13,6 +13,41 @@ export type AlarmLevel = "INFO" | "WARN" | "CRITICAL";
  */
 export type AlarmSource = "DEVICE" | "OTA" | "RENT";
 
+/**
+ * 告警状态。
+ *
+ * **此前是内联在 interface 里的联合**（`status: "OPEN" | …`）——
+ * 后端有 `AlarmStatus` 枚举，而 `StatusVocabularyAcrossEndsTest` 只认具名
+ * `export type`，于是整个告警域的词表两端从未被比对过。
+ * 与后端同名同值，改一边另一边会红。
+ *
+ * ⚠️ `CLOSED` 目前**谁也走不到**：后端 `AlarmStateMachine` 有 CLOSE 边，
+ * 但主源码里没有任何一处发这个事件（`AlarmService` 六个方法里也没有 close）。
+ * 告警只能 OPEN→ACKED 然后停住，ACKED 行只增不减。
+ * 补关闭动作缺权限码（真源表里告警只有 `workorder:alarm:config`），
+ * 见 `docs/technical/待办-状态机与领域缺口-执行计划.md` A3-2 第二步。
+ */
+export type AlarmStatus = "OPEN" | "ACKED" | "CLOSED";
+
+/** 告警上的运营动作。见 {@link ALARM_TRANSITIONS}。 */
+export type AlarmAction = "ack";
+
+/**
+ * 告警状态机（SSOT）：页面按钮可用性与 mock 校验共用同一份，
+ * 与工单 `WO_TRANSITIONS`、提现 `WITHDRAW_TRANSITIONS` 同一套写法。
+ *
+ * **只有一条边**，因为后端目前只有一个可走的动作（见 `AlarmStatus` 的 ⚠️）。
+ * 一条边也值得建表：此前 `alarms/page.tsx` 手写 `a.status === "OPEN"`，
+ * 后端加边时没有任何东西会提醒那一处。
+ */
+export const ALARM_TRANSITIONS: Record<AlarmAction,
+  { from: readonly AlarmStatus[]; to: AlarmStatus; label: string }> = {
+  ack: { from: ["OPEN"], to: "ACKED", label: "确认" },
+};
+
+export const canAlarmAction = (status: AlarmStatus, action: AlarmAction) =>
+  ALARM_TRANSITIONS[action].from.includes(status);
+
 export interface AlarmRecord {
   alarmNo: string;
   cabinetNo: string;
@@ -37,7 +72,7 @@ export interface AlarmRecord {
   vendorErrorCode: string; // 厂商原始错误码，各家风格不同（E203 / ERR-17 / 0x1F04）
   level: AlarmLevel;
   occurredAt: string;
-  status: "OPEN" | "ACKED" | "CLOSED"; // 待处理 / 已受理 / 已关闭
+  status: AlarmStatus;
   workOrderNo: string | null; // 关联工单号（转工单后回填）
   /**
    * 同源重复告警的合并次数（后端按 dedupKey 合并计数）。

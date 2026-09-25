@@ -2,11 +2,11 @@
 // cabinets 是全库的“机柜号来源”，其他域（订单/告警/客服/营销广告位…）一律通过 cabNo() 引用，不复制数据。
 import type {
   Cabinet, CabinetStatus, Slot, Vendor, Powerbank, CabinetMonitor, CommandRecord, CommandType,
-  InventoryTransfer, InventoryTransferDetail, TransferItem,
+  InventoryTransfer, InventoryTransferDetail, TransferItem, InvTransferStatus, TransferAction,
   OtaRollout, OtaRelease, OtaTask, DeviceLog, DeviceCodeBatch, PageQuery,
 } from "../../types";
 // 指令词表是 types 层 SSOT：抽屉里的选项、这里的落库校验同源，避免「界面能选、落库不认」
-import { COMMAND_TYPES, SLOT_REQUIRED_COMMANDS } from "../../types";
+import { COMMAND_TYPES, SLOT_REQUIRED_COMMANDS, TRANSFER_TRANSITIONS, canTransferAction } from "../../types";
 import { VENDORS, LOCS, OPERATORS, p, iso } from "./internal";
 import { paginate, kwHit, upsert, nextNo, liveHit, archiveRow, unarchiveRow } from "./helpers";
 import { notFound } from "@/lib/biz-error";
@@ -341,7 +341,53 @@ export const listInventoryTransfers = (q: PageQuery = {}) => paginate(inventoryT
 export const listOtaRollouts = (q: PageQuery = {}) => paginate(otaRollouts, q.page, q.size, (x) => kwHit(q.keyword, x.rolloutNo, x.fwVersion, x.vendorCode));
 
 export const savePowerbank = (x: Partial<Powerbank>) => upsert(powerbanks, x, "powerbankNo", () => nextNo("PB", powerbanks));
-export const saveInventoryTransfer = (x: Partial<InventoryTransfer>) => upsert(inventoryTransfers, x, "transferNo", () => nextNo("TR", inventoryTransfers));
+/**
+ * 新增 / 编辑调拨单。
+ *
+ * 此前是裸 `upsert`，于是 mock 下有两件真后端不允许的事：
+ * ① 新建时可以直接开一张「在途」甚至「已完成」的单（后端 `body.setStatus(DRAFT)` 强制）；
+ * ② 状态可以 DRAFT 直接跳 DONE（后端 `InvTransferStateMachine` 按非法迁移拒）。
+ * 两边行为不一致正是 mock 该消除的分叉 —— 页面在 mock 下看着是通的，切后端当场崩。
+ *
+ * `requireAllChecked`（收货前明细必须全核对）**不在这里** —— 那是前置条件不是状态机的边，
+ * 且 mock 的明细核对状态由另一条路径维护，硬塞会让两个概念混在一句报错里。
+ */
+export function saveInventoryTransfer(x: Partial<InventoryTransfer>): InventoryTransfer {
+  const existing = x.transferNo
+    ? inventoryTransfers.find((t) => t.transferNo === x.transferNo)
+    : undefined;
+
+  if (!existing) {
+    // 建单一律 DRAFT，不接受调用方直接开在途单（同后端）
+    return upsert(inventoryTransfers, { ...x, status: "DRAFT" }, "transferNo",
+      () => nextNo("TR", inventoryTransfers));
+  }
+
+  const target = x.status;
+  if (target && target !== existing.status) {
+    const action = (Object.keys(TRANSFER_TRANSITIONS) as TransferAction[])
+      .find((a) => TRANSFER_TRANSITIONS[a].to === target);
+    if (!action) {
+      throw new TransferError(`不支持的目标状态: ${target}`);
+    }
+    if (!canTransferAction(existing.status, action)) {
+      throw new TransferError(
+        `调拨单 ${existing.transferNo} 当前是「${TRANSFER_STATUS_LABEL[existing.status]}」，`
+        + `不允许执行「${TRANSFER_TRANSITIONS[action].label}」`
+        + `（允许自：${TRANSFER_TRANSITIONS[action].from.join(" / ")}）`);
+    }
+  }
+  return upsert(inventoryTransfers, x, "transferNo", () => nextNo("TR", inventoryTransfers));
+}
+
+/** 报错里用中文说状态，与页面徽标同一套说法。 */
+const TRANSFER_STATUS_LABEL: Record<InvTransferStatus, string> = {
+  DRAFT: "草稿", IN_TRANSIT: "在途", DONE: "已完成",
+};
+
+export class TransferError extends Error {
+  constructor(msg: string) { super(msg); this.name = "TransferError"; }
+}
 export const saveOtaRollout = (x: Partial<OtaRollout>) => upsert(otaRollouts, x, "rolloutNo", () => nextNo("OTA", otaRollouts));
 
 /** 版本库查询：关键词(版本号/发布单号/说明) + 固件类型 / 供应商 / 发布状态三筛。 */

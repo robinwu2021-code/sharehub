@@ -13,6 +13,7 @@ import {
   RECON_TRANSITIONS, canReconTransition, RECON_TERMINAL,
   INV_TRANSITIONS, canInvoiceTransition, canEditInvoiceFields,
   computeWithdrawFee, canPayWithdrawal, payReceiptError, withdrawApplyError,
+  canWithdrawAction, WITHDRAW_TRANSITIONS,
 } from "../../types";
 import { VENUE_NAMES, p, iso } from "./internal";
 import { fail, notFound } from "@/lib/biz-error";
@@ -633,18 +634,27 @@ export function voidInvoice(invoiceNo: string, voidReason?: string, operatorName
   });
 }
 
-/** 提现审批（mock）：通过→PAYING，驳回→FAILED 并记原因；两者都落审批人/审批时间。 */
+/**
+ * 提现审批（mock）：通过→PAYING，驳回→FAILED 并记原因；两者都落审批人/审批时间。
+ *
+ * 状态机由 `WITHDRAW_TRANSITIONS` 的 approve/reject 裁决 —— 此前这里**一道守卫都没有**，
+ * 于是 mock 下能审批一张已经打款（PAID）的单子，把它改回 PAYING 或 FAILED。
+ * 真后端由 `WithdrawalStateMachine` 拒，两边行为不一致正是 mock 该消除的分叉。
+ */
 export function auditWithdrawal(withdrawNo: string, approve: boolean, rejectReason?: string, auditorName?: string): Withdrawal {
-  const w = withdrawals.find((x) => x.withdrawNo === withdrawNo)!;
+  const w = withdrawals.find((x) => x.withdrawNo === withdrawNo);
+  if (!w) throw new WithdrawalError(`提现单 ${withdrawNo} 不存在`);
+  const action = approve ? "approve" : "reject";
+  if (!canWithdrawAction(w.status, action)) {
+    throw new WithdrawalError(
+      `提现单 ${withdrawNo} 当前是「${w.status}」，不允许执行「${WITHDRAW_TRANSITIONS[action].label}」`
+      + `（允许自：${WITHDRAW_TRANSITIONS[action].from.join(" / ")}）`);
+  }
   w.auditorName = auditorName || "admin";
   w.auditedAt = new Date().toISOString();
-  if (approve) {
-    w.status = "PAYING";
-    w.rejectReason = null;
-  } else {
-    w.status = "FAILED";
-    w.rejectReason = rejectReason ?? "";
-  }
+  // 目标状态从表里取，不再各写一个字面量
+  w.status = WITHDRAW_TRANSITIONS[action].to;
+  w.rejectReason = approve ? null : (rejectReason ?? "");
   return w;
 }
 

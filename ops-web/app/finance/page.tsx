@@ -42,7 +42,7 @@ import {
   RECON_TRANSITIONS, RECON_TERMINAL, canReconTransition, canEditInvoiceFields, parseReconDiffDetail,
   canSettlementTransition,
   withdrawFeeOf, withdrawNetOf, WITHDRAW_FEE_PENDING,
-  canPayWithdrawal, payReceiptError, PAY_CHANNELS, withdrawApplyError, computeWithdrawFee,
+  canPayWithdrawal, canAuditWithdrawal, payReceiptError, PAY_CHANNELS, withdrawApplyError, computeWithdrawFee,
   // 记账期间复用报表域枚举：与站点坪效/代理绩效/绩效报表同一套周期口径
   REPORT_PERIODS, REPORT_PERIOD_DEFAULT, type ReportPeriod,
 } from "@/lib/types";
@@ -312,7 +312,10 @@ function FinanceInner() {
     placeholderData: keepWithinTab(tab),
   });
 
-  const canAuditWithdrawal = allow("finance:withdrawal:audit");
+  // 尾下划线 = **权限**标志，与类型层同名的**状态**判定（canAuditWithdrawal /
+  // canPayWithdrawal，读 WITHDRAW_TRANSITIONS）区分开。两件事都要成立才出按钮：
+  // 状态允许这一步、且这个人有这个码。
+  const canAuditWithdrawal_ = allow("finance:withdrawal:audit");
   // 独立权限码：审批「同意打出去」与回执「确实出去了」分开，便于将来做双人复核
   const canPayWithdrawal_ = allow("finance:withdrawal:pay");
   // —— 收款账户（B3）：读写分开发码，能看账户不等于能改账户 ——
@@ -782,7 +785,10 @@ function FinanceInner() {
     {
       header: t("common.actions"),
       cell: (w) => {
-        if ((w.status === "AUDIT" || w.status === "APPLY") && canAuditWithdrawal) {
+        // 能不能审批由状态机说了算（WITHDRAW_TRANSITIONS 的 approve/reject from 集）。
+        // 此前这里手写 `(w.status === "AUDIT" || w.status === "APPLY")` —— 抄了后端
+        // WithdrawalStateMachine 的 APPROVE from 集一份，后端加边时没人会想起改这里。
+        if (canAuditWithdrawal(w.status) && canAuditWithdrawal_) {
           return <Button size="sm" variant="outline" onClick={() => { setWdAudit(w); setWdApprove("1"); setWdReject(""); }}>审批</Button>;
         }
         // 出款在途的单子此前**没有任何后续动作** —— 它会永远停在这个状态
@@ -1432,7 +1438,7 @@ function FinanceInner() {
         <ReadOnlyNotice what="结算单生成/确认" perm={["finance:settlement:generate", ":confirm"]} />
       )}
       {tab === "settlements" && <DataTable rowKey={(s: Settlement) => s.settleNo} columns={stlCols} rows={q.data?.list as Settlement[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无结算单——点右上「生成结算单」按周期出账（金额取该周期分润明细汇总），或放宽筛选条件" />}
-      {tab === "withdrawals" && !canAuditWithdrawal && <ReadOnlyNotice what="提现审批" perm="finance:withdrawal:audit" />}
+      {tab === "withdrawals" && !canAuditWithdrawal_ && <ReadOnlyNotice what="提现审批" perm="finance:withdrawal:audit" />}
       {/* 手续费口径必须写明出处：审批人看到的数从哪来、改哪里能改，否则「唯一来源」只是一句话 */}
       {/*
         * 「你还不能收款」。放在提现页最上面 —— 代理商是在这一页发现自己提不了现的，
@@ -1520,7 +1526,7 @@ function FinanceInner() {
         title={`提现审批 ${wdAudit?.withdrawNo ?? ""}`}
         desc="资金操作：通过后进入打款队列，审批人/时间将留痕不可改"
         footer={
-          wdAudit && canAuditWithdrawal && (
+          wdAudit && canAuditWithdrawal_ && (
             <Button
               disabled={audit.isPending || (wdApprove === "0" && !wdReject.trim())}
               variant={wdApprove === "0" ? "destructive" : "default"}

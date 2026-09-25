@@ -29,6 +29,7 @@ import {
   archiveConfirm, unarchiveConfirm,
 } from "@/components/archive";
 import type { AlarmRecord, AlarmNotice, AlarmCode, AlarmRule, AlarmLevel, PageResult } from "@/lib/types";
+import { canAlarmAction } from "@/lib/types";
 
 // tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）
 const TAB_KEYS = ["records", "notices", "codes", "rules"] as const;
@@ -238,10 +239,11 @@ function AlarmsInner() {
     { header: "备注", cell: (a) => <span className="text-muted-foreground">{a.remark}</span> },
     {
       header: t("common.actions"),
-      // 「确认」只对 OPEN 出：状态机只认 OPEN --ACK--> ACKED，已受理/已关闭再点必被后端拒
+      // 能不能确认由状态机说了算（ALARM_TRANSITIONS.ack.from = ["OPEN"]）。
+      // 此前这里手写 `a.status === "OPEN"` —— 抄了后端 AlarmStateMachine 的 ACK 边一份。
       cell: (a) => {
         const acts = [
-          canAck && a.status === "OPEN" && (
+          canAck && canAlarmAction(a.status, "ack") && (
             <Button key="ack" size="sm" variant="outline" disabled={ack.isPending}
               onClick={() => { setAcking(a); setAckRemark(a.remark ?? ""); }}>确认</Button>
           ),

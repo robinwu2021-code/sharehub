@@ -11,6 +11,7 @@ import {
   alarmCodes, autoRaiseWorkOrders,
 } from "./alarm";
 import { notifyBlacklist, maskTarget } from "./system";
+import { ALARM_TRANSITIONS, canAlarmAction } from "../../types";
 
 /** 取一条 OPEN 告警；用例会改状态，故每次现取一条未被改过的。 */
 const anyOpen = () => alarmRecords.find((x) => x.status === "OPEN")!;
@@ -201,5 +202,27 @@ describe("故障自动开工单", () => {
     for (const c of closedBefore) {
       expect(alarmRecords.find((a) => a.alarmNo === c.no)!.workOrderNo).toBe(c.wo);
     }
+  });
+});
+
+describe("告警状态机表（A3-2 第一步）", () => {
+  it("只有一条边：OPEN --ack--> ACKED", () => {
+    expect(Object.keys(ALARM_TRANSITIONS)).toEqual(["ack"]);
+    expect(ALARM_TRANSITIONS.ack).toMatchObject({ from: ["OPEN"], to: "ACKED" });
+  });
+
+  it("canAlarmAction 是页面按钮与 mock 守卫共用的那一份判据", () => {
+    expect(canAlarmAction("OPEN", "ack")).toBe(true);
+    expect(canAlarmAction("ACKED", "ack")).toBe(false);
+    expect(canAlarmAction("CLOSED", "ack")).toBe(false);
+  });
+
+  it("⚠️ 表里没有任何边通往 CLOSED —— 这不是漏写，是后端也走不到", () => {
+    // 后端 AlarmStateMachine 有 CLOSE 边，但主源码里没有一处发这个事件
+    // （AlarmService 六个方法里没有 close）。告警只能 OPEN→ACKED 然后停住。
+    // 这条断言是**故意钉住现状**的：补上关闭动作时它会红，提醒同时更新本表与台账。
+    // 补关闭动作缺权限码，见执行计划 A3-2 第二步。
+    const tos = Object.values(ALARM_TRANSITIONS).map((t) => t.to);
+    expect(tos).not.toContain("CLOSED");
   });
 });
