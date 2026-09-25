@@ -48,7 +48,6 @@ MdBank
 MdMarketCountry
 MdProblem
 MdRegion
-MktNotice
 NotifyBlacklist
 NotifyTemplate
 SysLoginSetting

@@ -153,6 +153,46 @@ public final class MarketingDtos {
     }
 
     /** 公告行，镜像前端 {@code Notice}。三语三列全出，前端按当前语种取值。 */
+    /**
+     * 公告**写入参**（白名单）。公告是推给 C 端全体用户的东西。
+     *
+     * <p>比实体少三个：
+     * <ul>
+     *   <li>{@code publishedBy} —— 谁发的。服务端按当前登录人回填；
+     *       实体当请求体时请求里塞一个别人的工号就能冒名，而且<b>不报错</b>；</li>
+     *   <li>{@code archivedAt} —— 归档走 {@code /notices/{no}/archive|unarchive}，
+     *       盖的是时间戳。保存端点也能写它 = 给归档开了第二条不走审计的路；</li>
+     *   <li>{@code status} —— 草稿 / 发布 / 下线由发布流程迁移。</li>
+     * </ul>
+     *
+     * <p>{@code pinned} 是置顶位，实体里是 {@code Integer}(0/1) 而出参 VO 回的是布尔 ——
+     * 这里声明成 {@code Boolean} 并在 {@code toEntity} 转，
+     * 否则前端把读到的原样回传会 500（同 {@code AppVersionReq.forceUpdate} 那次）。
+     */
+    public record NoticeReq(String noticeNo, String title, String titleEn, String titleAr,
+                            String content, String contentEn, String contentAr,
+                            String type, Boolean pinned, String startAt, String endAt) {
+        /** 映射到实体。**publishedBy / archivedAt / status 有意不设**；pinned 布尔转 0/1。 */
+        public ai.neargo.sharehub.user.marketing.entity.MktNotice toEntity() {
+            if (title == null || title.isBlank()) {
+                throw new IllegalArgumentException("公告标题必填");
+            }
+            var e = new ai.neargo.sharehub.user.marketing.entity.MktNotice();
+            e.setNoticeNo(noticeNo);
+            e.setTitle(title);
+            e.setTitleEn(titleEn);
+            e.setTitleAr(titleAr);
+            e.setContent(content);
+            e.setContentEn(contentEn);
+            e.setContentAr(contentAr);
+            e.setType(type);
+            e.setPinned(pinned == null ? null : (pinned ? 1 : 0));
+            e.setStartAt(startAt);
+            e.setEndAt(endAt);
+            return e;
+        }
+    }
+
     public record NoticeVO(String noticeNo,
                            String title, String titleEn, String titleAr,
                            String content, String contentEn, String contentAr,

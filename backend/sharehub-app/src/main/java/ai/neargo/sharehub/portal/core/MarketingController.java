@@ -259,15 +259,17 @@ public class MarketingController {
 
     @PostMapping("/api/ops/marketing/notices")
     @PreAuthorize("@perm.can('marketing:notice:update')")
-    public NoticeVO createNotice(@RequestBody MktNotice body) {
-        return noticeService.save(body);
+    public NoticeVO createNotice(@RequestBody MarketingDtos.NoticeReq body) {
+        return noticeService.save(body.toEntity());
     }
 
     @PostMapping("/api/ops/marketing/notices/{noticeNo}")
     @PreAuthorize("@perm.can('marketing:notice:update')")
-    public NoticeVO updateNotice(@PathVariable String noticeNo, @RequestBody MktNotice body) {
-        body.setNoticeNo(noticeNo);
-        return noticeService.save(body);
+    public NoticeVO updateNotice(@PathVariable String noticeNo,
+                                 @RequestBody MarketingDtos.NoticeReq body) {
+        MktNotice e = body.toEntity();
+        e.setNoticeNo(noticeNo);
+        return noticeService.save(e);
     }
 
     /** {@code Map.of} 不接受 null，统一转空串；空串在 CRUD 基类里等价于「不过滤」。 */

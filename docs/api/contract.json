@@ -6468,7 +6468,7 @@
    "handler": "MarketingController#createNotice",
    "summary": "",
    "params": [],
-   "bodyType": "MktNotice",
+   "bodyType": "MarketingDtos.NoticeReq",
    "returnType": "NoticeVO",
    "returnContainer": null,
    "returnElement": "NoticeVO",
@@ -6534,7 +6534,52 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "noticeNo",
+     "type": "String"
+    },
+    {
+     "name": "title",
+     "type": "String"
+    },
+    {
+     "name": "titleEn",
+     "type": "String"
+    },
+    {
+     "name": "titleAr",
+     "type": "String"
+    },
+    {
+     "name": "content",
+     "type": "String"
+    },
+    {
+     "name": "contentEn",
+     "type": "String"
+    },
+    {
+     "name": "contentAr",
+     "type": "String"
+    },
+    {
+     "name": "type",
+     "type": "String"
+    },
+    {
+     "name": "pinned",
+     "type": "Boolean"
+    },
+    {
+     "name": "startAt",
+     "type": "String"
+    },
+    {
+     "name": "endAt",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -6553,7 +6598,7 @@
      "required": true
     }
    ],
-   "bodyType": "MktNotice",
+   "bodyType": "MarketingDtos.NoticeReq",
    "returnType": "NoticeVO",
    "returnContainer": null,
    "returnElement": "NoticeVO",
@@ -6619,7 +6664,52 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "noticeNo",
+     "type": "String"
+    },
+    {
+     "name": "title",
+     "type": "String"
+    },
+    {
+     "name": "titleEn",
+     "type": "String"
+    },
+    {
+     "name": "titleAr",
+     "type": "String"
+    },
+    {
+     "name": "content",
+     "type": "String"
+    },
+    {
+     "name": "contentEn",
+     "type": "String"
+    },
+    {
+     "name": "contentAr",
+     "type": "String"
+    },
+    {
+     "name": "type",
+     "type": "String"
+    },
+    {
+     "name": "pinned",
+     "type": "Boolean"
+    },
+    {
+     "name": "startAt",
+     "type": "String"
+    },
+    {
+     "name": "endAt",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -30285,7 +30375,7 @@
  "conflicts": {},
  "stats": {
   "endpoints": 431,
-  "records": 319,
+  "records": 320,
   "withPerm": 368,
   "withBody": 188,
   "shapedResponses": 331

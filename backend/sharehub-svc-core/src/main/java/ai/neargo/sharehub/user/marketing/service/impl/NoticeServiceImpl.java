@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.user.marketing.service.impl;
 
+import ai.neargo.sharehub.auth.StaffContext;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.common.crud.AbstractCrudService;
 import ai.neargo.sharehub.user.marketing.dto.MarketingDtos.NoticeVO;
@@ -56,6 +57,9 @@ public class NoticeServiceImpl extends AbstractCrudService<MktNotice, NoticeVO> 
     @Override
     protected void beforeCreate(MktNotice e) {
         if (e.getStatus() == null || e.getStatus().isBlank()) e.setStatus("DRAFT");
+        // 发布人按当前登录人回填，不接受客户端传 —— 公告是推给 C 端全体用户的，
+        // 署名冒名了不报错也看不出来。
+        e.setPublishedBy(StaffContext.require().userNo());
         if (e.getType() == null || e.getType().isBlank()) e.setType("SYSTEM");
         if (e.getPinned() == null) e.setPinned(0);
     }
@@ -77,6 +81,15 @@ public class NoticeServiceImpl extends AbstractCrudService<MktNotice, NoticeVO> 
         return mapper.selectList(w).stream().map(this::toVO).toList();
     }
 
+    /** 发布人是首次发布时的审计事实，编辑不改它（同 {@code FreeWhitelistServiceImpl.grantedBy}）。 */
+    @Override
+    protected void beforeUpdate(MktNotice e, MktNotice current) {
+        e.setPublishedBy(current.getPublishedBy());
+        // 归档走 /notices/{no}/archive|unarchive，盖的是时间戳。
+        // 保存端点也能写它 = 给归档开了第二条不走审计的路。
+        e.setArchivedAt(current.getArchivedAt());
+    }
+
     @Override
     protected NoticeVO toVO(MktNotice e) {
         return new NoticeVO(e.getNoticeNo(),
@@ -86,6 +99,11 @@ public class NoticeServiceImpl extends AbstractCrudService<MktNotice, NoticeVO> 
                 e.getStartAt(), e.getEndAt(),
                 e.getStatus(), e.getPublishedBy(),
                 e.getCreatedAt() == null ? null : e.getCreatedAt().format(TS),
-                null); // archivedAt：前端 Archivable 字段，本表无归档列，恒 null
+                // 2026-09-25：这里原先硬编一个 null，配一句「本表无归档列」。
+                // 那句在写下时是对的，**列后来补上了，注释没跟着改** —— 于是运营点完「归档」，
+                // 列表刷新回来这一行看上去毫无变化（前端 Notice extends Archivable）。
+                // **这是第三次撞见同一形状**：券模板 9-24、充值套餐 9-25、本条。
+                // 补列的人只改 DDL 不看读侧，而读侧那句注释长得像结论。
+                e.getArchivedAt() == null ? null : e.getArchivedAt().toString());
     }
 }
