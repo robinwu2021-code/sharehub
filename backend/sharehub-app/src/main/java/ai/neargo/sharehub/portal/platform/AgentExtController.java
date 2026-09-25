@@ -1,6 +1,7 @@
 package ai.neargo.sharehub.portal.platform;
 
 import ai.neargo.common.core.PageResult;
+import ai.neargo.sharehub.agent.ext.dto.AgentExtDtos;
 import ai.neargo.sharehub.agent.ext.dto.AgentExtDtos.AgentAccount;
 import ai.neargo.sharehub.agent.ext.dto.AgentExtDtos.AgentAssignment;
 import ai.neargo.sharehub.agent.ext.dto.AgentExtDtos.AgentCommission;
@@ -75,15 +76,17 @@ public class AgentExtController {
 
     @PostMapping("/accounts")
     @PreAuthorize("@perm.can('agent:account:manage')")
-    public AgentAccount createAccount(@RequestBody AgtAccount body) {
-        return accountService.save(body);
+    public AgentAccount createAccount(@RequestBody AgentExtDtos.AgentAccountReq body) {
+        return accountService.save(body.toEntity());
     }
 
     @PostMapping("/accounts/{accountNo}")
     @PreAuthorize("@perm.can('agent:account:manage')")
-    public AgentAccount updateAccount(@PathVariable String accountNo, @RequestBody AgtAccount body) {
-        body.setAccountNo(accountNo); // 路径为准，忽略 body 里的键，防越权改他人账号
-        return accountService.save(body);
+    public AgentAccount updateAccount(@PathVariable String accountNo,
+                                      @RequestBody AgentExtDtos.AgentAccountReq body) {
+        AgtAccount e = body.toEntity();
+        e.setAccountNo(accountNo); // 路径为准，忽略 body 里的键，防越权改他人账号
+        return accountService.save(e);
     }
 
     // —— 设备/点位划拨（菜单叶：代理商管理 › 设备/点位划拨）——

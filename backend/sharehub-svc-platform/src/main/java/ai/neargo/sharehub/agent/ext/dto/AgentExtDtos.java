@@ -20,6 +20,48 @@ public final class AgentExtDtos {
      * 的 {@code scope_type}（[db-design §1.7]）。iam 域的 mapper 不在本分片边界内，
      * 当前恒为 {@code null}，见 {@code AgentAccountServiceImpl} 的 TODO。
      */
+    /**
+     * 代理账号**写入参**（白名单）。
+     *
+     * <p><b>比实体少五个，其中 {@code isOwner} 是提权面</b>：
+     * {@code agt_account.is_owner} 按 [ADR-030 §5.1] 是主体属主 ——
+     * {@code AgentIdentityPort} 的注释写明「<b>全站点全权限、不进授权表</b>」，
+     * 而 {@code AgentLoginServiceImpl} 确实把它喂进身份链路。
+     * 实体当请求体时，一次普通的「编辑账号」传 {@code {"isOwner":1}} 就能把账号提成属主
+     * —— 2026-09-25 实测建号与编辑<b>两条路都能设</b>。
+     * 而出参 VO 不回传这一位，从接口响应上<b>看不出有没有被改</b>。
+     *
+     * <p>其余四个：
+     * <ul>
+     *   <li>{@code principalNo} —— 这账号属于哪个自然人，改了等于把账号转给别人；
+     *       由入驻审核的那个事务派生（ADR-030 §三）；</li>
+     *   <li>{@code isPrimary} —— 默认主体，该由专门动作切，不随编辑走；</li>
+     *   <li>{@code credRef} —— 凭据引用由 pb_auth 侧维护（service 里本来就锁着，
+     *       这里不声明是第二道：锁是黑名单得有人记得写，白名单照抄也漏不掉）；</li>
+     *   <li>{@code agentName} —— 归属主体的名字快照，随 {@code agentNo} 走，不该由客户端给。</li>
+     * </ul>
+     *
+     * <p>运营端类型 {@code AgentAccount} 里本来就<b>没有</b>这五个字段 —— 界面从来不传它们，
+     * 白名单排掉不影响任何既有功能。
+     *
+     * @param agentNo 归属代理商，建号必填；<b>编辑时忽略</b>（service 的 beforeUpdate
+     *                会回填原值：改归属会绕开划拨审批）
+     */
+    public record AgentAccountReq(String accountNo, String agentNo, String username,
+                                  String displayName, String loginPhone, String status) {
+        /** 映射到实体。**isOwner / isPrimary / principalNo / credRef / agentName 有意不设。** */
+        public ai.neargo.sharehub.agent.ext.entity.AgtAccount toEntity() {
+            var e = new ai.neargo.sharehub.agent.ext.entity.AgtAccount();
+            e.setAccountNo(accountNo);
+            e.setAgentNo(agentNo);
+            e.setUsername(username);
+            e.setDisplayName(displayName);
+            e.setLoginPhone(loginPhone);
+            e.setStatus(status);
+            return e;
+        }
+    }
+
     public record AgentAccount(String accountNo, String agentNo, String agentName,
                                String username, String loginPhone, String status,
                                String dataScope, String createdAt) {

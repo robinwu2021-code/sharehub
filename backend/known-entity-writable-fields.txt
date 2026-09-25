@@ -20,17 +20,6 @@ AdSlot.position
 AdSlot.size
 AdSlot.slotNo
 AdSlot.status
-AgtAccount.accountNo
-AgtAccount.agentName
-AgtAccount.agentNo
-AgtAccount.credRef
-AgtAccount.displayName
-AgtAccount.isOwner
-AgtAccount.isPrimary
-AgtAccount.loginPhone
-AgtAccount.principalNo
-AgtAccount.status
-AgtAccount.username
 AgtCommission.agentName
 AgtCommission.agentNo
 AgtCommission.currency
