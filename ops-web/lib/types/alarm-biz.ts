@@ -39,11 +39,18 @@ export type AlarmCause =
 /**
  * 处置方式（与后端 `AlarmDisposition` 同名同值）。
  *
- * <p>**告警不是终点，处置才是**。一条告警最终要落到四者之一：
- * 自愈、开工单、转客服、仅通知。没有处置的告警只会堆着，
+ * <p>**告警不是终点，处置才是**。一条告警最终要落到五者之一：
+ * 自愈、开工单、转客服、只挂待办、仅通知。没有处置的告警只会堆着，
  * 堆到没人看 —— 而那时真正要紧的那条也一起被埋了。
+ *
+ * <p>`TODO` 与 `NOTIFY` 的差别：前者**要人办**（进待办、有人认领、能查办结率），
+ * 后者只是告知（不产生任何人的工作）。把该办的事发成通知，就等于没人负责。
+ *
+ * <p>⚠️ 这个 `TODO` 差点漏掉：提取后端枚举时我用 `grep -v "^TODO$"` 滤注释噪音，
+ * **把一个真常量一起滤掉了**，跨端词表卡口当场报「后端独有=[TODO]」。
+ * 滤噪音的规则会连真值一起吃，这类漏配只有卡口抓得到。
  */
-export type AlarmDisposition = "AUTO_FIX" | "WORK_ORDER" | "CS_CASE" | "NOTIFY";
+export type AlarmDisposition = "AUTO_FIX" | "WORK_ORDER" | "CS_CASE" | "TODO" | "NOTIFY";
 
 /** 影响面（与后端 `ImpactScope` 同名同值）：优先级按它与时段算。 */
 export type ImpactScope = "SITE" | "CABINET" | "SLOT" | "ORDER" | "ENTITY";

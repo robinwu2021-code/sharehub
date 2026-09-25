@@ -100,7 +100,9 @@ export function disposeAlarm(alarmNo: string): Record<string, unknown> {
       out.workOrderNo = woNo;
     }
   }
-  if (p.type === "CS_CASE" || p.type === "WORK_ORDER" || p.type === "NOTIFY") {
+  // TODO = 只挂待办（要人办），NOTIFY = 只告知。两者都产出待办行，
+  // 但 NOTIFY 那条不该被当成"有人负责"——真实环境里它由后端决定，这里照单接收
+  if (["CS_CASE", "WORK_ORDER", "TODO", "NOTIFY"].includes(p.type ?? "")) {
     const t: AlarmTodo = {
       todoNo: `TD${tSeq++}`, alarmNo, alarmCode: a.alarmCode, roleCode: p.todoRole,
       assigneeNo: null, title: `${a.alarmCode} · ${a.cabinetNo ?? ""}`.trim(),
