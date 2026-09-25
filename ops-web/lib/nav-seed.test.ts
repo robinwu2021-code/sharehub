@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { NAV } from "./nav";
+import { tNav } from "./i18n/nav-labels";
 
 /**
  * 菜单真源从 `nav.ts` 迁到 `iam_menu`（V67 建表灌数，V71 补 section 码，V74 补叶子码）——**切换那一刻两边必须逐节点相等**。
@@ -25,12 +26,12 @@ import { NAV } from "./nav";
  */
 
 // 相对**仓库根**，不是相对本文件 —— vitest 的 cwd 是 ops-web/
-const MIGRATION = "../backend/sharehub-app/src/main/resources/db/migration/V74__menu_leaf_perms.sql";
+const MIGRATION = "../backend/sharehub-app/src/main/resources/db/migration/V81__menu_admin_leaf_and_i18n.sql";
 
 type Row = Record<string, string>;
 
 const COLS = [
-  "menu_no", "parent_no", "name", "type", "path", "icon", "group_name", "sort",
+  "menu_no", "parent_no", "name", "name_en", "name_ar", "type", "path", "icon", "group_name", "sort",
   "perm", "phase", "ready", "module", "modules", "match_paths", "pin_bottom", "portal_for",
 ];
 
@@ -77,6 +78,7 @@ function rowsFromNav(): Row[] {
   NAV.forEach((s, si) => {
     out.push({
       menu_no: `M_${s.key}`, parent_no: "NULL", name: s.label,
+      name_en: tNav(s.label, "en"), name_ar: tNav(s.label, "ar"),
       // DIR=目录、MENU=可点页面，对齐冻结契约；没有叶子的 section 自己就是一页
       // 两档：MENU（分组）/ ITEM（叶子），词表由 V68 钉在列注释上
       type: "MENU",
@@ -87,7 +89,8 @@ function rowsFromNav(): Row[] {
     });
     (s.children ?? []).forEach((c, li) => {
       out.push({
-        menu_no: `M_${s.key}__${li + 1}`, parent_no: `M_${s.key}`, name: c.label, type: "ITEM",
+        menu_no: `M_${s.key}__${li + 1}`, parent_no: `M_${s.key}`, name: c.label,
+        name_en: tNav(c.label, "en"), name_ar: tNav(c.label, "ar"), type: "ITEM",
         path: c.href, icon: "NULL", group_name: c.group ?? "NULL", sort: String(li + 1),
         perm: c.perm ?? "NULL", phase: String(c.phase ?? 1), ready: c.ready ? "1" : "0",
         module: "NULL", modules: "NULL", match_paths: "NULL",

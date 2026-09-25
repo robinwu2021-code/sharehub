@@ -149,6 +149,7 @@ const LEAF_TUPLES = [
   "/employees?tab=employees|员工|org:employee:read||人与组织",
   "/employees?tab=org|组织架构|org:employee:read|2|人与组织",
   "/employees?tab=roles|角色权限|org:role:read||授权",
+  "/employees?tab=menus|菜单管理|org:role:read||授权",
   "/employees?tab=audit|操作审计|org:audit:read|1|留痕与考核",
   "/employees?tab=performance|绩效报表|org:employee:read|3|留痕与考核",
   "/system?tab=vendors|供应商接入|device:vendor:read||接入与支付",

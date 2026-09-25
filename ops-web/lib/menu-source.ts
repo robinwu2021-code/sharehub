@@ -80,6 +80,8 @@ export function toNavSections(nodes: MenuNode[]): NavSection[] {
         ...(c.phase && c.phase > 1 ? { phase: c.phase as NavLeaf["phase"] } : {}),
         ...(c.group ? { group: c.group } : {}),
         ...(c.ready ? { ready: true } : {}),
+        ...(c.nameEn ? { labelEn: c.nameEn } : {}),
+        ...(c.nameAr ? { labelAr: c.nameAr } : {}),
       };
       // /operation/<page> 的叶子：后端就绪度是构建期常量，服务端不知道
       const m = /^\/operation\/([\w-]+)/.exec(leaf.href);
@@ -98,6 +100,8 @@ export function toNavSections(nodes: MenuNode[]): NavSection[] {
       ...(n.phase && n.phase > 1 ? { phase: n.phase as NavSection["phase"] } : {}),
       ...(n.pinBottom ? { pinBottom: true } : {}),
       ...(n.portalFor?.length ? { portalFor: n.portalFor as NavSection["portalFor"] } : {}),
+      ...(n.nameEn ? { labelEn: n.nameEn } : {}),
+      ...(n.nameAr ? { labelAr: n.nameAr } : {}),
       children,
     };
   });

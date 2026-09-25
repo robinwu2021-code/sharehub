@@ -166,6 +166,7 @@ const NAV: Record<string, Pair> = {
   "消费者分析": { en: "Consumer Analytics", ar: "تحليلات المستهلك" },
   "员工": { en: "Employees", ar: "الموظفون" },
   "角色权限": { en: "Roles", ar: "الأدوار" },
+  "菜单管理": { en: "Menu Settings", ar: "إعدادات القائمة" },
   "操作审计": { en: "Audit Log", ar: "سجل التدقيق" },
   "组织架构": { en: "Org Chart", ar: "الهيكل التنظيمي" },
   "绩效报表": { en: "Performance", ar: "الأداء" },
@@ -196,4 +197,23 @@ export function hasNavLabel(label: string): boolean {
 export function tNav(label: string, locale: Locale): string {
   if (locale === "zh") return label;
   return NAV[label]?.[locale] ?? label;
+}
+
+/**
+ * 菜单节点的译名：**节点自带的优先**，没有才回落这份 overlay。
+ *
+ * <h3>为什么要这个优先级</h3>
+ * 这份 overlay 以**中文标签做 key**。菜单真源迁进库（V67）之后，
+ * 在菜单管理里改个名字，key 就对不上了 —— en/ar 静默回落成中文，而不报错。
+ * 所以 `iam_menu.name_en/name_ar` 定为真源（V81 已回填这 128 行），
+ * 翻译跟着菜单走；这份 overlay 退居兜底，供静态菜单（开关关闭）时使用，
+ * 到 P5 删掉 nav.ts 的硬编码数据时一并退役。
+ */
+export function tNavNode(
+  node: { label: string; labelEn?: string; labelAr?: string },
+  locale: Locale,
+): string {
+  if (locale === "zh") return node.label;
+  const own = locale === "ar" ? node.labelAr : node.labelEn;
+  return own || tNav(node.label, locale);
 }

@@ -69,6 +69,15 @@ export interface NavLeaf {
    *      我们不拆 section（一页一 section 的解析约束），改用分组达到同样的「一眼看清是谁的账」。
    */
   group?: string;
+  /**
+   * 服务端带来的译名（`iam_menu.name_en/name_ar`）。**有就优先于 nav-labels**。
+   *
+   * 为什么要有：nav-labels 以**中文标签做 key**，在菜单管理里改个名字，
+   * 它的翻译就静默失效 —— en/ar 回落成中文，而不报错。
+   * 翻译跟着菜单走之后，改名时在同一个抽屉里改三语。
+   */
+  labelEn?: string;
+  labelAr?: string;
 }
 
 /**
@@ -113,6 +122,9 @@ export interface NavSection {
    * 与 §三·B G5「代理端缺位」是同一问题的两面：既没有自己的门户，又看到了不该看的。
    */
   portalFor?: Role[];
+  /** 服务端带来的译名，理由同 {@link NavLeaf.labelEn}。 */
+  labelEn?: string;
+  labelAr?: string;
   children?: NavLeaf[];
 }
 
@@ -385,6 +397,9 @@ export const NAV: NavSection[] = [
       // 此前菜单没写 perm 而页面写了，两边不一致时以更严的那边为准
       { href: "/employees?tab=org", label: "组织架构", perm: "org:employee:read", phase: 2, group: "人与组织" },
       { href: "/employees?tab=roles", label: "角色权限", perm: "org:role:read", group: "授权" },
+      // 菜单本身也在库里（V67 起），所以它的维护入口也是一条菜单 ——
+      // 加这一条要写迁移，这就是「菜单真源迁进库」的代价（方案 §8）
+      { href: "/employees?tab=menus", label: "菜单管理", perm: "org:role:read", group: "授权" },
       { href: "/employees?tab=audit", label: "操作审计", perm: "org:audit:read", phase: 1, group: "留痕与考核" },
       { href: "/employees?tab=performance", label: "绩效报表", perm: "org:employee:read", phase: 3, group: "留痕与考核" },
     ],

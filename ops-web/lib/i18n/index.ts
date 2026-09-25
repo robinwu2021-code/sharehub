@@ -5,11 +5,11 @@
 import { zh, type Messages } from "./messages/zh";
 import { en } from "./messages/en";
 import { ar } from "./messages/ar";
-import { tNav } from "./nav-labels";
+import { tNav, tNavNode } from "./nav-labels";
 import { useLocaleStore, type Locale } from "@/lib/stores/locale";
 
 export type { Locale } from "@/lib/stores/locale";
-export { tNav } from "./nav-labels";
+export { tNav, tNavNode } from "./nav-labels";
 export const LOCALES = ["zh", "en", "ar"] as const;
 export const DIR: Record<Locale, "ltr" | "rtl"> = { zh: "ltr", en: "ltr", ar: "rtl" };
 export const LOCALE_TAG: Record<Locale, string> = { zh: "zh-CN", en: "en-AE", ar: "ar-AE" };
@@ -40,6 +40,8 @@ export interface I18n {
   localeTag: string;
   t: TFn;
   tNav: (label: string) => string;
+  /** 菜单节点的译名：节点自带的优先（库里那两列），没有才回落 overlay。 */
+  tNavNode: (node: { label: string; labelEn?: string; labelAr?: string }) => string;
 }
 
 /** React hook：订阅当前 locale，返回 t/tNav/dir/localeTag。 */
@@ -51,6 +53,7 @@ export function useI18n(): I18n {
     localeTag: LOCALE_TAG[locale],
     t: (key, params) => translate(locale, key, params),
     tNav: (label) => tNav(label, locale),
+    tNavNode: (node) => tNavNode(node, locale),
   };
 }
 

@@ -33,7 +33,8 @@ def main(path):
         rows.append(dict(
             # type 两档：MENU（分组）/ ITEM（叶子）。词表由 V68 钉死在列注释上，
             # 并有 StoredValueInVocabularyTest 守着 —— 别再引入第三套命名。
-            menu_no=no, parent_no=None, name=s["label"], type="MENU",
+            menu_no=no, parent_no=None, name=s["label"],
+            name_en=s.get("nameEn"), name_ar=s.get("nameAr"), type="MENU",
             path=s.get("href"), icon=s.get("icon"), group_name=None, sort=si,
             # ready 是叶子级的解锁标记，对 section 无意义；列是 NOT NULL，发 0 不发 NULL
             perm=s.get("perm"), phase=s.get("phase", 1), ready=0,
@@ -43,14 +44,19 @@ def main(path):
         ))
         for li, c in enumerate(s.get("children", []), 1):
             rows.append(dict(
-                menu_no=f"{no}__{li}", parent_no=no, name=c["label"], type="ITEM",
+                menu_no=f"{no}__{li}", parent_no=no, name=c["label"],
+                name_en=c.get("nameEn"), name_ar=c.get("nameAr"), type="ITEM",
                 path=c.get("href"), icon=None, group_name=c.get("group"), sort=li,
                 perm=c.get("perm"), phase=c.get("phase", 1),
                 ready=1 if c.get("ready") else 0,
                 module=None, modules=None, match_paths=None, pin_bottom=0,
                 portal_for=None,
             ))
-    cols = ["menu_no","parent_no","name","type","path","icon","group_name","sort",
+    # name_en / name_ar 也进来（2026-09-25）：菜单的多语言此前另有一份
+    # ops-web/lib/i18n/nav-labels.ts（172 条，**以中文标签做 key**）——
+    # 于是在菜单管理里改个名字，它的翻译就静默失效、en/ar 回落成中文，而不报错。
+    # 库里这两列定为真源，翻译跟着菜单走。
+    cols = ["menu_no","parent_no","name","name_en","name_ar","type","path","icon","group_name","sort",
             "perm","phase","ready","module","modules","match_paths","pin_bottom","portal_for"]
     print("-- 本段由 backend/scripts/gen-menu-seed.py 从 ops-web/lib/nav.ts 生成，请勿手改。")
     print(f"-- 共 {len(rows)} 行（{len(nav)} 个 section + {len(rows)-len(nav)} 个叶子）。")

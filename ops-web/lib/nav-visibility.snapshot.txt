@@ -1,7 +1,7 @@
 # 每个角色看得到的菜单（lib/nav-visibility.test.ts 生成，勿手改）
 # 改动菜单可见性时这份文件会变 —— diff 就是评审物，确认是有意的再提交。
 
-## ADMIN（102 项）
+## ADMIN（103 项）
 operation›站点概览
 operation›站点管理
 operation›点位管理
@@ -89,6 +89,7 @@ report›消费者分析
 org›员工
 org›组织架构
 org›角色权限
+org›菜单管理
 org›操作审计
 org›绩效报表
 system›供应商接入

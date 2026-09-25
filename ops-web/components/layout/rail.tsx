@@ -25,8 +25,9 @@ function RailItem({
   section, active, soon, href, expanded,
 }: { section: NavSection; active: boolean; soon: boolean; href?: string; expanded: boolean }) {
   const Icon = iconOf(section.icon);
-  const { t, tNav } = useI18n();
-  const label = tNav(section.label);
+  const { t, tNavNode } = useI18n();
+  // 节点自带的译名优先——菜单改名后 overlay 的 key 就对不上了
+  const label = tNavNode(section);
   const inner = (
     <>
       {active && <span className="absolute top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-e-full bg-primary" style={{ insetInlineStart: 0 }} />}

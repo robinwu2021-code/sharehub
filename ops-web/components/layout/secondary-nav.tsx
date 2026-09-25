@@ -32,7 +32,7 @@ function PhaseBadge({ phase }: { phase: Phase }) {
 }
 
 function LeafRow({ leaf, active }: { leaf: NavLeaf; active: boolean }) {
-  const { t, tNav } = useI18n();
+  const { t, tNavNode } = useI18n();
   const locked = isLeafLocked(leaf);
   if (leaf.soon || locked) {
     return (
@@ -40,7 +40,7 @@ function LeafRow({ leaf, active }: { leaf: NavLeaf; active: boolean }) {
         className="flex items-center rounded-field px-2.5 py-1.5 text-[13px] text-muted-foreground/50"
         title={locked ? `${PHASE_LABEL[leaf.phase!]} ${t("phase.suffix")}` : t("common.soon")}
       >
-        <span className="truncate">{tNav(leaf.label)}</span>
+        <span className="truncate">{tNavNode(leaf)}</span>
         {locked ? <PhaseBadge phase={leaf.phase!} /> : <SoonBadge />}
       </span>
     );
@@ -53,7 +53,7 @@ function LeafRow({ leaf, active }: { leaf: NavLeaf; active: boolean }) {
         active ? "bg-accent font-medium text-[var(--primary)]" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
       )}
     >
-      <span className="truncate">{tNav(leaf.label)}</span>
+      <span className="truncate">{tNavNode(leaf)}</span>
       {/* 已就绪但排期在后的叶子（ready + phase>当前）：可点，但保留分期徽章 ——
           否则「P2 功能已提前可用」这个信息在界面上完全消失，运营看不出自己在用超前功能。 */}
       {leaf.phase && isPhaseLocked(leaf.phase) && <PhaseBadge phase={leaf.phase} />}
@@ -70,7 +70,7 @@ export function SecondaryNav() {
   const tab = sp.get("tab");
   const view = sp.get("view");
   const viewer = useViewer();
-  const { tNav } = useI18n();
+  const { tNav, tNavNode } = useI18n();
 
   const section = findActiveSection(pathname, viewer);
   const leaves = section ? visibleLeaves(section, viewer) : [];
@@ -86,7 +86,7 @@ export function SecondaryNav() {
   return (
     <aside className="hidden shrink-0 flex-col bg-sidebar/60 md:flex" style={{ width: PANEL_WIDTH }}>
       <div className="flex h-14 shrink-0 items-center px-3">
-        <span className="truncate txt-strong">{tNav(section.label)}</span>
+        <span className="truncate txt-strong">{tNavNode(section)}</span>
       </div>
       <nav className="flex-1 overflow-y-auto px-2 py-2">
         {segments.map((seg, si) => (
