@@ -8,6 +8,8 @@ import type {
   UserProfile,
   Wallet,
   UserCoupon,
+  RechargePackage,
+  RechargeResult,
   ClaimableCoupon,
   Membership,
   ReportInput,
@@ -114,6 +116,9 @@ export interface McpApi {
   report(p: ReportInput): Promise<ReportResult>;
   // 钱包 / 营销
   getWallet(): Promise<Wallet>;
+  // 充值：**只传套餐号**。金额由服务端按套餐算 —— 端上传金额等于把定价权交给端。
+  listRechargePackages(): Promise<RechargePackage[]>;
+  recharge(packageNo: string): Promise<RechargeResult>;
   walletTxns(q?: PageQ): Promise<PageResult<WalletTxn>>;
   // 券包与领券中心是**两份不同的东西**：前者是已领到手的券实例（键 couponNo，CP…），
   // 后者是可领的券模板（键 tplNo）。claim 要传的是 tplNo —— 传券实例号会 400「券模板不存在」。

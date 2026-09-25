@@ -598,7 +598,8 @@ SELF_SERVICE  TO_WORKORDER    TO_REFUND         TO_CS      （争议类问题额
 |---|---|---|---|
 | `GET /mp/user/wallet` | 钱包总览（余额/赠金/押金/冻结） | C-WA-01 · C-DF-04 | ✅ |
 | `GET /mp/user/wallet/txns` | 钱包流水（分页） | C-WA-05 | ✅ |
-| `GET /mp/user/recharge-packages` | 充值套餐（按用户所在市场过滤） | C-WA-02 | 🆕 |
+| `GET /mp/user/recharge-packages` | 充值套餐（按用户所在市场过滤） | C-WA-02 | ✅ |
+| `POST /mp/user/recharge` | 按套餐充值并即时结算。**只收 packageNo，金额由服务端按套餐算** | C-WA-02 | ✅ |
 | `POST /mp/user/deposit/refund` | 退押金申请（无进行中订单/无欠费才可退） | C-WA-04 | 🆕 |
 
 ### 8.5 会员 · 券 · 营销（C-MB / C-CP / C-SH，模块 10/11/15）

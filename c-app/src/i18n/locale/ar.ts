@@ -137,6 +137,11 @@ export default {
     removed: "تمت الإزالة من المفضلة",
   },
   wallet: {
+    rechargeOk: "تمت التعبئة — تمت إضافة {n}",
+    rechargePending: "جارٍ معالجة الدفع؛ سيتحدّث رصيدك عند وصوله",
+    rechargeFailed: "تعذّرت التعبئة، حاول مرة أخرى",
+    rechargeGift: "‏+{n} هدية",
+    noPackages: "لا توجد باقات تعبئة متاحة",
     title: "المحفظة",
     balance: "الرصيد",
     bonus: "مكافأة",

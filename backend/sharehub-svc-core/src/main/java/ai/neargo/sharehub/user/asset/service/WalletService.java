@@ -24,13 +24,28 @@ public interface WalletService {
     WalletOverview overviewOf(String cUserNo);
 
     /**
+     * 入账（充值到账 / 赠额）—— 余额与流水在同一事务里写。
+     *
+     * <p>与 {@link #adjust} 的区别是**流水的业务类型**：这里是用户真实充值（{@code RECHARGE}/{@code BONUS}），
+     * 那里是运营补款（记 {@code REFUND}）。混为一谈会让「充值次数 / 充值金额」这两个经营指标凭空变大。
+     *
+     * <p>钱包行不存在则开户。此前全后端只有 {@link #adjust} 会建钱包行，
+     * 于是一个从没被运营调过账的用户，充值时无处可入账。
+     *
+     * @param bizNo 入账来源单号（充值单号）。对账时要能从流水反查到那一单，
+     *              留空的流水在差额排查里等于线索断了
+     */
+    WalletOverview credit(String cUserNo, java.math.BigDecimal payAmount, java.math.BigDecimal giftAmount,
+                          String currency, String bizType, String bizNo, String title);
+
+    /**
      * 运营手工调整余额 / 赠额。
      *
      * <p><b>改完必须补一条流水</b>，否则「流水合计 === 余额」当场被破坏 ——
      * 钱包详情会跟它打开来源的那张列表自相矛盾，而对账时没人说得清这笔差额从哪来。
      *
-     * <p><b>用户必须存在；钱包不存在则开户</b>。目前全后端没有任何地方建钱包行
-     * （充值、注册都不建），不在这里开的话这个端点永远无事可做。
+     * <p><b>用户必须存在；钱包不存在则开户</b>（与 {@link #credit} 共用同一处开户逻辑）。
+     * 注册链路仍然不建钱包行，所以一个既没充值过、也没被调账过的用户是没有钱包行的。
      * 但给一个**不存在的用户**开钱包不行 —— 那笔钱永远没人认领，却会进所有统计。
      *
      * @param operator 操作人（取自会话，不信前端传值）—— 手工调账必须回答「谁改的」

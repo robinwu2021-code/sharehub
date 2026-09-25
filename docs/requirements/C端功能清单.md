@@ -132,7 +132,7 @@
 | 编号 | 子功能 | 说明与交互 | 优先级 | App | 小程序 | 规则/边界 | 依赖端点 |
 |------|--------|-----------|:---:|:---:|:---:|----------|---------|
 | C-WA-01 | 钱包总览 | 余额/赠金/押金/冻结 概览 | P1 | ✓ | ✓ | 钱包记账入 acct 域 | `GET /mp/user/wallet` |
-| C-WA-02 | 充值 | 余额充值（含赠送规则） | P1 | ✓ | ✓ | 经 nearpay；赠金不可提现 | `POST /mp/trade/pay`（充值） |
+| C-WA-02 | 充值 | 余额充值（含赠送规则） | P1 | ✓ | ✓ | 经 nearpay；赠金不可提现；**金额只认套餐，不收端上传的金额** | `GET /mp/user/recharge-packages` + `POST /mp/user/recharge` |
 | C-WA-03 | 押金冻结/明细 | 押金冻结记录与状态 | P1 | ✓ | ✓ | 免押模式无押金 | `GET /mp/user/wallet` |
 | C-WA-04 | 退押金申请 | 无进行中订单可退押 | P1 | ✓ | ✓ | 有欠费/进行中订单不可退 | `POST /mp/user/deposit/refund` |
 | C-WA-05 | 钱包流水 | 充值/消费/退款/赠送 流水 | P1 | ✓ | ✓ | — | `GET /mp/user/wallet/transactions` |

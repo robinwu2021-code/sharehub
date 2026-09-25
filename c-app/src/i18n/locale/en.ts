@@ -137,6 +137,11 @@ export default {
     removed: "Removed from favorites",
   },
   wallet: {
+    rechargeOk: "Topped up — {n} credited",
+    rechargePending: "Payment is processing; your balance will update once it lands",
+    rechargeFailed: "Top-up failed, please try again",
+    rechargeGift: "+{n} bonus",
+    noPackages: "No top-up packages available",
     title: "Wallet",
     balance: "Balance",
     bonus: "Bonus",

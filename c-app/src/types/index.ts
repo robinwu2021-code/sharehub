@@ -108,14 +108,54 @@ export interface Wallet {
   currency: string;
 }
 
-// 钱包流水（充值/消费/退款/赠金）
+/**
+ * 钱包流水（镜像后端 `WalletTxnRow`）。
+ *
+ * ⚠️ 时间字段是 `createdAt` 不是 `at` —— 写成 `at` 的时候每一行的时间都是 undefined，
+ * 页面上那一列只剩「充值 · 」半句话，不报错。
+ * `bizType`/`bizNo` 是这笔流水的来源单号，对账时靠它反查。
+ */
 export interface WalletTxn {
   txnNo: string;
   type: "RECHARGE" | "SPEND" | "REFUND" | "BONUS";
+  direction: "IN" | "OUT";
   title: string;
   amount: number; // 正=入账，负=出账
   currency: string;
-  at: string;
+  bizType: string;
+  bizNo: string;
+  createdAt: string;
+}
+
+/** 可购充值套餐（镜像后端 `RechargePackageRow`）。`markets` 是 CSV，如 "AE,SA"。 */
+export interface RechargePackage {
+  packageNo: string;
+  name: string;
+  payAmount: number;
+  giftAmount: number;
+  currency: string;
+  markets: string;
+  validDays: number | null;
+  sortNo: number;
+  status: "ENABLED" | "DISABLED";
+  archivedAt: string | null;
+}
+
+/**
+ * 充值结果（镜像后端 `RechargeResultVO`）。
+ * 带回充值后的钱包：分两次请求的话，中间那一瞬显示的是旧余额，用户会以为钱没到账。
+ * 通道未即时成功时 `status` 仍是 `PENDING`，此时 `balance`/`bonus` 为 null（钱包没动）。
+ */
+export interface RechargeResult {
+  rechargeNo: string;
+  packageNo: string;
+  payAmount: number;
+  giftAmount: number;
+  creditAmount: number;
+  currency: string;
+  status: "PENDING" | "PAID" | "FAILED" | "REFUNDED";
+  balance: number | null;
+  bonus: number | null;
 }
 
 /**
@@ -128,6 +168,7 @@ export interface WalletTxn {
  */
 export interface UserCoupon {
   couponNo: string; // 券实例号（CP…），不是模板号
+  cUserNo: string;
   tplNo: string;
   tplName: string;
   tplType: "CUT" | "DISCOUNT";

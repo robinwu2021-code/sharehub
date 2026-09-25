@@ -1,4 +1,4 @@
-# 接口参考（全量 424 个端点）
+# 接口参考（全量 425 个端点）
 
 > **本文件由脚本生成，不要手改**：
 >
@@ -24,10 +24,10 @@
 
 | | |
 |---|---|
-| 端点 | **424** |
+| 端点 | **425** |
 | 带功能权限码 | 362 |
-| 有请求体 | 184 |
-| 数据结构 | 229 个（文末统一定义） |
+| 有请求体 | 185 |
+| 数据结构 | 230 个（文末统一定义） |
 
 ### ⚠️ 3 个 `/api/**` 端点没有功能权限码
 
@@ -5019,7 +5019,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 ## C 端（`/mp`，消费者会话）
 
-41 个端点。
+42 个端点。
 
 ### `GET /mp/app/version`
 
@@ -5428,6 +5428,16 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 **出参** `对象（自由键）`
 
+### `POST /mp/user/recharge`
+
+按套餐充值（C-WA-02）。
+
+**无权限码** · `MpUserController#recharge`
+
+**请求体** `对象（字符串值）`
+
+**出参** [`RechargeResultVO`](#rechargeresultvo)
+
 ### `GET /mp/user/recharge-packages`
 
 可购充值套餐，按用户所在市场过滤。
@@ -5679,7 +5689,7 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 
 ## 数据结构
 
-共 229 个。同一结构常被多个端点复用，故在此定义一次、上文引用。
+共 230 个。同一结构常被多个端点复用，故在此定义一次、上文引用。
 
 ### AcceptReq
 
@@ -7547,6 +7557,20 @@ agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +
 | `sortNo` | `Integer` |
 | `status` | `String` |
 | `archivedAt` | `String` |
+
+### RechargeResultVO
+
+| 字段 | 类型 |
+|---|---|
+| `rechargeNo` | `String` |
+| `packageNo` | `String` |
+| `payAmount` | `BigDecimal` |
+| `giftAmount` | `BigDecimal` |
+| `creditAmount` | `BigDecimal` |
+| `currency` | `String` |
+| `status` | `String` |
+| `balance` | `BigDecimal` |
+| `bonus` | `BigDecimal` |
 
 ### ReclaimReq
 

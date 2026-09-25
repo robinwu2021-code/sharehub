@@ -62,6 +62,21 @@ public final class UserAssetDtos {
     }
 
     /**
+     * C 端充值结果（{@code POST /mp/user/recharge}）。
+     *
+     * <p>把**充值后的钱包**一并带回：客户端刚充完就要显示新余额，
+     * 分成两次请求的话中间那一瞬显示的是旧数字 —— 用户会以为钱没到账。
+     *
+     * <p>金额三项都由服务端按套餐算出：{@code creditAmount = payAmount + giftAmount}。
+     * <b>前端传的金额一概不采信</b> —— 采信等于把定价权交给调用方。
+     */
+    public record RechargeResultVO(String rechargeNo, String packageNo,
+                                   BigDecimal payAmount, BigDecimal giftAmount, BigDecimal creditAmount,
+                                   String currency, String status,
+                                   BigDecimal balance, BigDecimal bonus) {
+    }
+
+    /**
      * 充值订单行，镜像前端 {@code RechargeOrder}。
      * <b>{@code pspTxnNo}</b>：前端的 {@code psgTxnNo} 是笔误，全库统一 {@code psp_}（[db-design §6.2]）。
      */

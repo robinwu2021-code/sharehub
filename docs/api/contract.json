@@ -28490,6 +28490,58 @@
    "requestShape": null
   },
   {
+   "verb": "POST",
+   "path": "/mp/user/recharge",
+   "perm": null,
+   "perms": [],
+   "handler": "MpUserController#recharge",
+   "summary": "按套餐充值（C-WA-02）。",
+   "params": [],
+   "bodyType": "Map<String, String>",
+   "returnType": "RechargeResultVO",
+   "returnContainer": null,
+   "returnElement": "RechargeResultVO",
+   "responseShape": [
+    {
+     "name": "rechargeNo",
+     "type": "String"
+    },
+    {
+     "name": "packageNo",
+     "type": "String"
+    },
+    {
+     "name": "payAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "giftAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "creditAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "balance",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "bonus",
+     "type": "BigDecimal"
+    }
+   ],
+   "requestShape": null
+  },
+  {
    "verb": "GET",
    "path": "/mp/user/recharge-packages",
    "perm": null,
@@ -29152,10 +29204,10 @@
  },
  "conflicts": {},
  "stats": {
-  "endpoints": 424,
-  "records": 302,
+  "endpoints": 425,
+  "records": 303,
   "withPerm": 362,
-  "withBody": 184,
-  "shapedResponses": 323
+  "withBody": 185,
+  "shapedResponses": 324
  }
 }

@@ -52,6 +52,9 @@ public class WalletServiceImpl implements WalletService {
     private final NicknameLookup nicknames;
     /** 手工调账流水的业务类型：审计时要能把「人改的」单独筛出来。 */
     private static final String BIZ_MANUAL_ADJUST = "MANUAL_ADJUST";
+    /** 流水类型（usr_wallet_txn.type 词表）。 */
+    private static final String TXN_RECHARGE = "RECHARGE";
+    private static final String TXN_BONUS = "BONUS";
 
     /** 手工调账要先确认用户真实存在 —— 给一个不存在的用户开钱包，那笔钱永远没人认领。 */
     private final ai.neargo.sharehub.user.mapper.UserMappers.UsrUserMapper users;
@@ -148,22 +151,7 @@ public class WalletServiceImpl implements WalletService {
                         .eq(ai.neargo.sharehub.user.entity.UsrUser::getCUserNo, cUserNo)) > 0;
         if (!userExists) throw new IllegalArgumentException("用户不存在: " + cUserNo);
 
-        UsrWallet w = wallets.selectOne(new LambdaQueryWrapper<UsrWallet>()
-                .eq(UsrWallet::getCUserNo, cUserNo).last("limit 1"));
-        if (w == null) {
-            // 用户存在但还没有钱包行：这里开户。**目前全后端没有任何地方建钱包**
-            // （充值、注册都不建），不在这里开的话这个端点永远无事可做。
-            w = new UsrWallet();
-            w.setWalletNo(ai.neargo.common.core.IdGenerator.next("WA"));
-            w.setTenantId("MAIN");
-            w.setCUserNo(cUserNo);
-            w.setBalance(BigDecimal.ZERO);
-            w.setGiftBalance(BigDecimal.ZERO);
-            w.setDepositAmount(BigDecimal.ZERO);
-            w.setFrozenAmount(BigDecimal.ZERO);
-            w.setCurrency(in.currency() == null || in.currency().isBlank() ? "AED" : in.currency());
-            wallets.insert(w);
-        }
+        UsrWallet w = openIfAbsent(cUserNo, in.currency());
 
         BigDecimal beforeBalance = nz(w.getBalance());
         BigDecimal beforeBonus = nz(w.getGiftBalance());
@@ -202,6 +190,60 @@ public class WalletServiceImpl implements WalletService {
      * 只改余额不记流水，「流水合计 === 余额」当场被破坏，而对账时没人说得清差额从哪来。
      */
     private void writeTxn(UsrWallet w, String type, String title, BigDecimal amount) {
+        writeTxn(w, type, title, amount, BIZ_MANUAL_ADJUST, "");
+    }
+
+    /**
+     * 开钱包（没有就建）。
+     *
+     * <p>抽出来是因为**建钱包的地方必须只有一处**：充值要入账、手工调账要入账，
+     * 两处各建一次的话，字段默认值早晚会分叉（币种、押金、冻结各差一点），
+     * 而差异只会在对账时以「这个用户的钱包怎么跟别人不一样」的形式冒出来。
+     */
+    private UsrWallet openIfAbsent(String cUserNo, String currency) {
+        UsrWallet w = wallets.selectOne(new LambdaQueryWrapper<UsrWallet>()
+                .eq(UsrWallet::getCUserNo, cUserNo).last("limit 1"));
+        if (w != null) return w;
+        w = new UsrWallet();
+        w.setWalletNo(ai.neargo.common.core.IdGenerator.next("WA"));
+        w.setTenantId("MAIN");
+        w.setCUserNo(cUserNo);
+        w.setBalance(BigDecimal.ZERO);
+        w.setGiftBalance(BigDecimal.ZERO);
+        w.setDepositAmount(BigDecimal.ZERO);
+        w.setFrozenAmount(BigDecimal.ZERO);
+        w.setCurrency(currency == null || currency.isBlank() ? "AED" : currency);
+        wallets.insert(w);
+        return w;
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public WalletOverview credit(String cUserNo, BigDecimal payAmount, BigDecimal giftAmount,
+                                 String currency, String bizType, String bizNo, String title) {
+        if (cUserNo == null || cUserNo.isBlank()) throw new IllegalArgumentException("入账必须指定用户");
+        BigDecimal pay = nz(payAmount);
+        BigDecimal gift = nz(giftAmount);
+        if (pay.signum() < 0 || gift.signum() < 0) throw new IllegalArgumentException("入账金额不能为负");
+        // 0 元入账不记账：一条 0 元流水只会污染对账，和 adjust 里同样的道理
+        if (pay.signum() == 0 && gift.signum() == 0) throw new IllegalArgumentException("入账金额为 0");
+
+        UsrWallet w = openIfAbsent(cUserNo, currency);
+        w.setBalance(nz(w.getBalance()).add(pay));
+        w.setGiftBalance(nz(w.getGiftBalance()).add(gift));
+        wallets.updateById(w);
+
+        // 本金与赠额分两条流水：合成一条就再也分不清「充了多少」与「送了多少」，
+        // 而赠额在财务上不是收入，报表要按这个拆
+        if (pay.signum() > 0) writeTxn(w, TXN_RECHARGE, title, pay, bizType, bizNo);
+        if (gift.signum() > 0) writeTxn(w, TXN_BONUS, title, gift, bizType, bizNo);
+
+        return new WalletOverview(w.getBalance(), w.getGiftBalance(),
+                nz(w.getDepositAmount()), nz(w.getFrozenAmount()), w.getCurrency());
+    }
+
+    private void writeTxn(UsrWallet w, String type, String title, BigDecimal amount,
+                          String bizType, String bizNo) {
         UsrWalletTxn t = new UsrWalletTxn();
         t.setTxnNo(ai.neargo.common.core.IdGenerator.next(ai.neargo.sharehub.common.BizKey.WALLET_TXN));
         t.setWalletNo(w.getWalletNo());
@@ -211,8 +253,8 @@ public class WalletServiceImpl implements WalletService {
         t.setTitle(title);
         t.setAmount(amount);
         t.setCurrency(w.getCurrency());
-        t.setBizType(BIZ_MANUAL_ADJUST);   // 手工调账要能被单独筛出来审计
-        t.setBizNo("");
+        t.setBizType(bizType);   // 手工调账要能被单独筛出来审计；充值要能反查到充值单
+        t.setBizNo(bizNo == null ? "" : bizNo);
         t.setCreatedAt(java.time.LocalDateTime.now().toString());
         txns.insert(t);
     }

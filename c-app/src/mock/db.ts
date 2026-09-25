@@ -11,6 +11,7 @@ import type {
   Notice,
   StoreDetail,
   WalletTxn,
+  RechargePackage,
 } from "@/types";
 import { CURRENCY, MOCK_DELAY_MS } from "@/shared/constants";
 
@@ -116,21 +117,30 @@ export const wallet: Wallet = { balance: 24, bonus: 10, deposit: 0, frozen: 100,
 // 收藏门店（siteNo 集合，可变）
 export const favorites = new Set<string>(["ST-DXBM"]);
 
+// 字段照 WalletTxnRow（createdAt 不是 at；bizType/bizNo 是来源单号）
 export const walletTxns: WalletTxn[] = [
-  { txnNo: "TX-06", type: "SPEND", title: "The Dubai Mall · rental", amount: -6, currency: CURRENCY, at: "2026-07-12T11:00:00Z" },
-  { txnNo: "TX-05", type: "BONUS", title: "Membership bonus", amount: 10, currency: CURRENCY, at: "2026-07-10T08:00:00Z" },
-  { txnNo: "TX-04", type: "RECHARGE", title: "Top-up", amount: 20, currency: CURRENCY, at: "2026-07-09T19:20:00Z" },
-  { txnNo: "TX-03", type: "REFUND", title: "JBR The Walk · refund", amount: 4, currency: CURRENCY, at: "2026-07-06T14:05:00Z" },
-  { txnNo: "TX-02", type: "SPEND", title: "Mall of the Emirates · rental", amount: -8, currency: CURRENCY, at: "2026-07-04T17:40:00Z" },
-  { txnNo: "TX-01", type: "RECHARGE", title: "Top-up", amount: 10, currency: CURRENCY, at: "2026-07-01T09:00:00Z" },
+  { txnNo: "TX-06", type: "SPEND", direction: "OUT", title: "The Dubai Mall · rental", amount: -6, currency: CURRENCY, bizType: "ORDER", bizNo: "ORD000031", createdAt: "2026-07-12 11:00:00" },
+  { txnNo: "TX-05", type: "BONUS", direction: "IN", title: "Membership bonus", amount: 10, currency: CURRENCY, bizType: "MEMBERSHIP", bizNo: "MB000002", createdAt: "2026-07-10 08:00:00" },
+  { txnNo: "TX-04", type: "RECHARGE", direction: "IN", title: "Top-up", amount: 20, currency: CURRENCY, bizType: "RECHARGE", bizNo: "RCH000004", createdAt: "2026-07-09 19:20:00" },
+  { txnNo: "TX-03", type: "REFUND", direction: "IN", title: "JBR The Walk · refund", amount: 4, currency: CURRENCY, bizType: "REFUND", bizNo: "RF000003", createdAt: "2026-07-06 14:05:00" },
+  { txnNo: "TX-02", type: "SPEND", direction: "OUT", title: "Mall of the Emirates · rental", amount: -8, currency: CURRENCY, bizType: "ORDER", bizNo: "ORD000021", createdAt: "2026-07-04 17:40:00" },
+  { txnNo: "TX-01", type: "RECHARGE", direction: "IN", title: "Top-up", amount: 10, currency: CURRENCY, bizType: "RECHARGE", bizNo: "RCH000001", createdAt: "2026-07-01 09:00:00" },
+];
+
+// 可购充值套餐。金额只在这里定义一份 —— mock 也不让端上传金额，
+// 否则 mock 下能「充 1 到账 100」，切到真后端才发现被拒。
+export const rechargePackages: RechargePackage[] = [
+  { packageNo: "RP000001", name: "AED 20", payAmount: 20, giftAmount: 0, currency: CURRENCY, markets: "AE", validDays: null, sortNo: 1, status: "ENABLED", archivedAt: null },
+  { packageNo: "RP000002", name: "AED 50 + 5", payAmount: 50, giftAmount: 5, currency: CURRENCY, markets: "AE", validDays: null, sortNo: 2, status: "ENABLED", archivedAt: null },
+  { packageNo: "RP000003", name: "AED 100 + 15", payAmount: 100, giftAmount: 15, currency: CURRENCY, markets: "AE", validDays: 365, sortNo: 3, status: "ENABLED", archivedAt: null },
 ];
 
 // 我的券包（已领到手的券实例）。字段照 UserCouponVO —— mock 与真后端同形，
 // 否则切到真后端才发现页面读的是不存在的字段。
 export const coupons: UserCoupon[] = [
-  { couponNo: "CP000001", tplNo: "CTPL-NEW", tplName: "New user AED 5 off", tplType: "CUT", value: 5, threshold: 0, currency: CURRENCY, status: "UNUSED", expireAt: "2026-08-01" },
-  { couponNo: "CP000002", tplNo: "CTPL-OVER10", tplName: "AED 3 off over 10", tplType: "CUT", value: 3, threshold: 10, currency: CURRENCY, status: "UNUSED", expireAt: "2026-07-20" },
-  { couponNo: "CP000003", tplNo: "CTPL-WEEKEND", tplName: "Weekend AED 2", tplType: "CUT", value: 2, threshold: 0, currency: CURRENCY, status: "USED", usedOrderNo: "ORD000031", expireAt: "2026-07-06" },
+  { couponNo: "CP000001", cUserNo: "CU-0001", tplNo: "CTPL-NEW", tplName: "New user AED 5 off", tplType: "CUT", value: 5, threshold: 0, currency: CURRENCY, status: "UNUSED", expireAt: "2026-08-01" },
+  { couponNo: "CP000002", cUserNo: "CU-0001", tplNo: "CTPL-OVER10", tplName: "AED 3 off over 10", tplType: "CUT", value: 3, threshold: 10, currency: CURRENCY, status: "UNUSED", expireAt: "2026-07-20" },
+  { couponNo: "CP000003", cUserNo: "CU-0001", tplNo: "CTPL-WEEKEND", tplName: "Weekend AED 2", tplType: "CUT", value: 2, threshold: 0, currency: CURRENCY, status: "USED", usedOrderNo: "ORD000031", expireAt: "2026-07-06" },
 ];
 
 // 领券中心（可领的券模板）。前两个已在券包里 → claimed 由 mock 按 coupons 现算，不写死。

@@ -193,29 +193,14 @@ def scan_frontend_types(root=None, sub='lib/types'):
 
 # ─────────────────────────── 比对 ───────────────────────────
 
-def main():
-    contract = json.load(io.open(os.path.join(ROOT, 'docs/api/contract.json'), encoding='utf-8'))
-    eps = contract['endpoints']
-    be = {(e['verb'], normalize(e['path'])): e for e in eps}
-    calls = scan_frontend_calls()
-    ftypes = scan_frontend_types()                      # 运营端
-    ctypes = scan_frontend_types(CAPP, 'src/types')     # C 端
+def compare_shapes(eps, ftypes, ctypes):
+    """B/D 比对：出参形状 vs 前端类型。
 
-    # A. 前端在调、后端没有
-    missing = [c for c in calls if (c['verb'], c['path']) not in be]
-    # C. 后端有、前端没调
-    #
-    # **先按受众分三类再数**，否则这个数字永远不可信：
-    #   · /internal/* 是服务间调用（定时任务、网关、跨服务），**设计上就没有前端调用者** ——
-    #     把它们算成「前端未接线」是拿错了比对对象，而且永远清不掉；
-    #   · /mp/*  是 C 端端点，调用方是 c-app，不是 ops-web；
-    #   · /api/* 才是运营端，未调用才真的可能是待办或废端点。
-    # 混在一起数出来的 42，实际只有 16 条值得看。
-    called = {(c['verb'], c['path']) for c in calls}
-    unused_all = [e for k, e in be.items() if k not in called]
-    unused = [e for e in unused_all if not e['path'].startswith('/internal/')]
-    internal_unused = [e for e in unused_all if e['path'].startswith('/internal/')]
+    单独成函数是为了**能被自测直接调用**。这段逻辑踩过一个只在真实数据上才显形的坑
+    （见下面 `checked` 的注释），而那种坑正是最需要一条固定用例钉住的。
 
+    → (shape_issues, no_type, other_projection, internal_types)
+    """
     # B/D. 出参形状 vs 前端类型
     #
     # **按名字直接相等匹配会数出一堆假的**，实测 83 条里只有 16 条是真的。三件事要先做：
@@ -245,18 +230,21 @@ def main():
     for e in eps:
         shape = e.get('responseShape')
         elem = (e.get('returnElement') or '').split('.')[-1]
-        if not shape or not elem or elem in checked:
-            continue
-        checked.add(elem)
         path = e['path']
+        # 去重要**按受众分开**。同一个 VO 常常两端都用（WalletTxnRow 既出 /api 也出 /mp），
+        # 全局去重的话先出现的那条把名字占掉，另一端就再也不比了 ——
+        # 于是 c-app 的 `WalletTxn.at` 对着后端的 `createdAt`，卡口一路绿灯。
+        aud = 'c-app' if path.startswith('/mp/') else ('internal' if path.startswith('/internal/') else 'ops-web')
+        if not shape or not elem or (aud, elem) in checked:
+            continue
+        checked.add((aud, elem))
         if path.startswith('/internal/'):
             internal_types.append({'type': elem, 'endpoint': '%s %s' % (e['verb'], path)})
             continue
         pool = ctypes if path.startswith('/mp/') else ftypes
         ft, how = resolve(elem, pool)
         if ft is None:
-            rec = {'type': elem, 'endpoint': '%s %s' % (e['verb'], path),
-                   'audience': 'c-app' if path.startswith('/mp/') else 'ops-web'}
+            rec = {'type': elem, 'endpoint': '%s %s' % (e['verb'], path), 'audience': aud}
             (other_projection if how.startswith('shape:') else no_type).append(rec)
             continue
         bf = {f['name'] for f in shape}
@@ -266,6 +254,33 @@ def main():
             shape_issues.append({'type': elem, 'file': ft['file'],
                                  'endpoint': '%s %s' % (e['verb'], e['path']),
                                  'backendOnly': only_be, 'frontendOnly': only_fe})
+    return shape_issues, no_type, other_projection, internal_types
+
+
+def main():
+    contract = json.load(io.open(os.path.join(ROOT, 'docs/api/contract.json'), encoding='utf-8'))
+    eps = contract['endpoints']
+    be = {(e['verb'], normalize(e['path'])): e for e in eps}
+    calls = scan_frontend_calls()
+    ftypes = scan_frontend_types()                      # 运营端
+    ctypes = scan_frontend_types(CAPP, 'src/types')     # C 端
+
+    # A. 前端在调、后端没有
+    missing = [c for c in calls if (c['verb'], c['path']) not in be]
+    # C. 后端有、前端没调
+    #
+    # **先按受众分三类再数**，否则这个数字永远不可信：
+    #   · /internal/* 是服务间调用（定时任务、网关、跨服务），**设计上就没有前端调用者** ——
+    #     把它们算成「前端未接线」是拿错了比对对象，而且永远清不掉；
+    #   · /mp/*  是 C 端端点，调用方是 c-app，不是 ops-web；
+    #   · /api/* 才是运营端，未调用才真的可能是待办或废端点。
+    # 混在一起数出来的 42，实际只有 16 条值得看。
+    called = {(c['verb'], c['path']) for c in calls}
+    unused_all = [e for k, e in be.items() if k not in called]
+    unused = [e for e in unused_all if not e['path'].startswith('/internal/')]
+    internal_unused = [e for e in unused_all if e['path'].startswith('/internal/')]
+
+    shape_issues, no_type, other_projection, internal_types = compare_shapes(eps, ftypes, ctypes)
 
     out = {'missingInBackend': missing, 'notCalledByFrontend': unused,
            'shapeMismatch': shape_issues, 'noFrontendType': no_type}

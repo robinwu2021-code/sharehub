@@ -155,6 +155,42 @@ def test_align_extends(tmpdir):
           '取到 %s（字段 %s）' % (sorted(types), sorted(fields)))
 
 
+# ───────────── ⑤ align：同名 VO 两端都用时，**两端都要比** ─────────────
+#
+# 去重集合原本是全局的：先扫到的那个端点把类型名占掉，另一端就再也不比了。
+# 现实里 WalletTxnRow / NoticeVO / RentOrder / CsTicketVO 都是两端共用，
+# 而 `/api/*` 排在前面 —— 于是 c-app 那一半**从来没有被比过**，卡口一路绿灯，
+# 实际上 c-app 的 `WalletTxn.at` 对着后端的 `createdAt`，页面上时间列全是 undefined。
+# 这条用例就钉这一点：同一个 VO，两个受众，两边各自的错都要报出来。
+
+EPS_SHARED_VO = [
+    {'verb': 'GET', 'path': '/api/user/wallets/{userNo}/txns',
+     'returnElement': 'WalletTxnRow',
+     'responseShape': [{'name': 'txnNo'}, {'name': 'createdAt'}]},
+    {'verb': 'GET', 'path': '/mp/user/wallet/txns',
+     'returnElement': 'WalletTxnRow',
+     'responseShape': [{'name': 'txnNo'}, {'name': 'createdAt'}]},
+]
+
+
+def test_align_audience_dedupe():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('apialign5', os.path.join(HERE, 'api-align.py'))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    # 运营端类型是对的；C 端把 createdAt 写成了 at
+    ops = {'WalletTxn': {'file': 'lib/types/user.ts',
+                         'fields': [{'name': 'txnNo'}, {'name': 'createdAt'}]}}
+    capp = {'WalletTxn': {'file': 'src/types/index.ts',
+                          'fields': [{'name': 'txnNo'}, {'name': 'at'}]}}
+    issues, _, _, _ = mod.compare_shapes(EPS_SHARED_VO, ops, capp)
+    hit = [i for i in issues if '/mp/' in i['endpoint']]
+    check('⑤ align 同名 VO 两端各比各的（全局去重会漏掉后出现的那一端）',
+          len(hit) == 1 and hit[0]['frontendOnly'] == ['at'] and hit[0]['backendOnly'] == ['createdAt'],
+          '报出 %s' % issues)
+
+
 if __name__ == '__main__':
     import tempfile
     print('对齐工具链自测（量尺自己的卡口）')
@@ -163,8 +199,9 @@ if __name__ == '__main__':
     test_align_nested()
     with tempfile.TemporaryDirectory() as td:
         test_align_extends(td)
+    test_align_audience_dedupe()
     print()
     if fails:
         print('❌ %d 条未通过 —— 量尺坏了，此时它给出的任何数字都不能用来排期' % len(fails))
         sys.exit(1)
-    print('✅ 四条全过')
+    print('✅ 五条全过')

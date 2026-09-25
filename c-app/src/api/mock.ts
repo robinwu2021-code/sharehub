@@ -1,7 +1,7 @@
 // Mock 实现（McpApi）。全部走 mock/db 内存数据 + 模拟延迟。后端未就绪即可跑通全部 UI。
 import * as db from "@/mock/db";
 import type { McpApi, LoginParams, RentParams, PayParams, OrderQ, NearbyQ } from "./contract";
-import type { RentOrder, LogoffItem, UserCoupon } from "@/types";
+import type { RentOrder, LogoffItem, UserCoupon, RechargeResult } from "@/types";
 
 /** 注销申请的 mock 状态。模块级而非 db 里：它是会话内的一次性流程，不是种子数据。 */
 let mockLogoff: LogoffItem | null = null;
@@ -117,6 +117,53 @@ export const mockApi: McpApi = {
   report: (_p) => db.delay({ reportNo: `RP${Math.floor(performance.now())}`, woNo: `WO${Math.floor(performance.now())}`, status: "OPEN" }, 400),
 
   getWallet: () => db.delay(db.wallet),
+  listRechargePackages: () => db.delay(db.rechargePackages.filter((p) => p.status === "ENABLED")),
+  recharge: (packageNo: string) => {
+    const pkg = db.rechargePackages.find((p) => p.packageNo === packageNo && p.status === "ENABLED");
+    if (!pkg) return Promise.reject(new Error("充值套餐不存在或已停用"));
+    // 真改 db：余额与流水一起动，重开页面能读回。只改余额不记流水的话，
+    // 「流水合计 === 余额」当场被破坏，而这正是真后端里最不该出的那类错。
+    db.wallet.balance += pkg.payAmount;
+    db.wallet.bonus += pkg.giftAmount;
+    const rechargeNo = "RCH" + String(db.walletTxns.length + 100).padStart(6, "0");
+    const at = new Date().toISOString().slice(0, 19).replace("T", " ");
+    db.walletTxns.unshift({
+      txnNo: "TX-" + (db.walletTxns.length + 1),
+      type: "RECHARGE",
+      direction: "IN",
+      title: "钱包充值 " + pkg.name,
+      amount: pkg.payAmount,
+      currency: pkg.currency,
+      bizType: "RECHARGE",
+      bizNo: rechargeNo,
+      createdAt: at,
+    });
+    if (pkg.giftAmount > 0) {
+      db.walletTxns.unshift({
+        txnNo: "TX-" + (db.walletTxns.length + 1),
+        type: "BONUS",
+        direction: "IN",
+        title: "钱包充值 " + pkg.name,
+        amount: pkg.giftAmount,
+        currency: pkg.currency,
+        bizType: "RECHARGE",
+        bizNo: rechargeNo,
+        createdAt: at,
+      });
+    }
+    const r: RechargeResult = {
+      rechargeNo,
+      packageNo,
+      payAmount: pkg.payAmount,
+      giftAmount: pkg.giftAmount,
+      creditAmount: pkg.payAmount + pkg.giftAmount,
+      currency: pkg.currency,
+      status: "PAID",
+      balance: db.wallet.balance,
+      bonus: db.wallet.bonus,
+    };
+    return db.delay(r, 500);
+  },
   walletTxns: (q = {}) => db.delay(db.paginate(db.walletTxns, q.page, q.size)),
   listCoupons: () => db.delay(db.coupons),
   // claimed 现算而不是写死：领完之后再进页面，那一行必须已经是「已领取」。
@@ -136,6 +183,7 @@ export const mockApi: McpApi = {
     if (tpl.remaining !== null && tpl.remaining <= 0) return Promise.reject(new Error("券已领完"));
     const got: UserCoupon = {
       couponNo: "CP" + String(db.coupons.length + 1).padStart(6, "0"),
+      cUserNo: db.profile.cUserNo,
       tplNo: tpl.tplNo,
       tplName: tpl.name,
       tplType: tpl.type,

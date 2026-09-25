@@ -137,6 +137,11 @@ export default {
     removed: "已取消收藏",
   },
   wallet: {
+    rechargeOk: "充值成功，到账 {n}",
+    rechargePending: "支付处理中，到账后余额会更新",
+    rechargeFailed: "充值失败，请稍后再试",
+    rechargeGift: "赠 {n}",
+    noPackages: "暂无可用的充值套餐",
     title: "钱包",
     balance: "余额",
     bonus: "赠金",

@@ -3,11 +3,13 @@ package ai.neargo.sharehub.portal.core;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.auth.ConsumerContext;
 import ai.neargo.sharehub.user.asset.dto.UserAssetDtos.RechargePackageRow;
+import ai.neargo.sharehub.user.asset.dto.UserAssetDtos.RechargeResultVO;
 import ai.neargo.sharehub.user.asset.dto.UserAssetDtos.WalletOverview;
 import ai.neargo.sharehub.user.asset.dto.UserAssetDtos.WalletTxnRow;
 import ai.neargo.sharehub.user.asset.dto.UserAssetDtos.MembershipPlanVO;
 import ai.neargo.sharehub.user.asset.service.MembershipService;
 import ai.neargo.sharehub.user.asset.service.RechargePackageService;
+import ai.neargo.sharehub.user.asset.service.RechargeService;
 import ai.neargo.sharehub.user.asset.service.WalletService;
 import ai.neargo.sharehub.user.core.dto.UserCoreDtos.FavoriteItem;
 import ai.neargo.sharehub.user.core.dto.UserCoreDtos.InvoiceApplyReq;
@@ -32,6 +34,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * C 端用户资产与个人中心（{@code /mp/user/**}，[api/README §8.4 / §8.7 / §8.8]）。
@@ -49,6 +52,7 @@ public class MpUserController {
 
     private final WalletService wallets;
     private final RechargePackageService packages;
+    private final RechargeService recharges;
     private final UserFavoriteService favorites;
     private final UserMessageService messages;
     private final UserInvoiceService invoices;
@@ -57,11 +61,13 @@ public class MpUserController {
     private final MembershipService memberships;
 
     public MpUserController(WalletService wallets, RechargePackageService packages,
+                            RechargeService recharges,
                             UserFavoriteService favorites, UserMessageService messages,
                             UserInvoiceService invoices, UserLogoffService logoff,
                             UserQueryService userQuery, MembershipService memberships) {
         this.wallets = wallets;
         this.packages = packages;
+        this.recharges = recharges;
         this.favorites = favorites;
         this.messages = messages;
         this.invoices = invoices;
@@ -94,6 +100,22 @@ public class MpUserController {
     @GetMapping("/recharge-packages")
     public List<RechargePackageRow> rechargePackages(@RequestParam(required = false) String country) {
         return packages.listForMarket(country);
+    }
+
+    /**
+     * 按套餐充值（C-WA-02）。
+     *
+     * <p><b>只收 {@code packageNo}，不收金额</b> —— 金额由服务端按套餐算。
+     * 收前端传的金额，「充 1 元到账 100」就是一次普通的改参数请求。
+     *
+     * <p>此前这条路是断的：c-app 的「充值」按钮打的是 {@code POST /mp/trade/pay}，
+     * 而那个口在没有 orderNo 时直接抛「充值等无单支付待充值单流程接入」。
+     * 前端又没有 catch，于是点下去**什么都不发生** —— 没提示，也没报错。
+     */
+    @PostMapping("/recharge")
+    public RechargeResultVO recharge(@RequestBody Map<String, String> body) {
+        String packageNo = body == null ? null : body.get("packageNo");
+        return recharges.recharge(ConsumerContext.userNo(), packageNo);
     }
 
     // —— 收藏门店 ——
