@@ -48,6 +48,9 @@ import java.util.Set;
 @Service
 public class WoOpsServiceImpl implements WoOpsService {
 
+    private static final org.slf4j.Logger log =
+            org.slf4j.LoggerFactory.getLogger(WoOpsServiceImpl.class);
+
     /** [db-design §9A.4] 关单原因取值域。 */
     private static final Set<String> CLOSE_REASONS =
             Set.of("RESOLVED", "INVALID", "DUPLICATE", "WITHDRAWN");
@@ -524,6 +527,57 @@ public class WoOpsServiceImpl implements WoOpsService {
                 .eq(WoOrder::getWoNo, woNo).last("limit 1"));
         if (e == null) throw new IllegalArgumentException("工单不存在: " + woNo);
         return e;
+    }
+
+    @Override
+    @Transactional
+    public int sweepSlaBreaches() {
+        LocalDateTime now = LocalDateTime.now();
+        // 响应：过了 due 还停在「尚未接单」的两个态；解决：过了 due 还没到 DONE
+        return markOverdue(now, true,
+                       List.of(WorkOrderStatus.CREATED.name(), WorkOrderStatus.DISPATCHED.name()))
+                + markOverdue(now, false,
+                       List.of(WorkOrderStatus.CREATED.name(), WorkOrderStatus.DISPATCHED.name(),
+                               WorkOrderStatus.ACCEPTED.name(), WorkOrderStatus.PROCESSING.name()));
+    }
+
+    /**
+     * 把「due 已过、标记还是 0、且工单仍停在 {@code pendingStatuses} 里」的那些标成超时。
+     *
+     * <p>时间比较**下推到 SQL**：`respond_due_at` 是 DATETIME 列而实体按 String 映射
+     * （见 {@link #parseDue} 的说明），在 Java 侧比就得把整表捞回来再逐行 parse。
+     * 绑 {@link LocalDateTime} 参数由驱动按时间戳比较，两种字面量格式都不受影响。
+     */
+    private int markOverdue(LocalDateTime now, boolean respond, List<String> pendingStatuses) {
+        String dueCol = respond ? "respond_due_at" : "resolve_due_at";
+        String flagCol = respond ? "respond_breached" : "resolve_breached";
+        List<WoSla> due = slaMapper.selectList(new QueryWrapper<WoSla>()
+                .eq(flagCol, 0)
+                .isNotNull(dueCol)
+                .apply(dueCol + " < {0}", now));
+        if (due.isEmpty()) return 0;
+
+        // 一次取回这批单的状态，别逐行查库（超时积压时这批可能不小）
+        List<String> woNos = due.stream().map(WoSla::getWoNo).toList();
+        java.util.Map<String, String> statusByNo = woMapper.selectList(new LambdaQueryWrapper<WoOrder>()
+                        .in(WoOrder::getWoNo, woNos))
+                .stream().collect(java.util.stream.Collectors.toMap(WoOrder::getWoNo, WoOrder::getStatus,
+                        (a, b) -> a));
+
+        int n = 0;
+        for (WoSla sla : due) {
+            String status = statusByNo.get(sla.getWoNo());
+            // 查不到工单：数据不一致，**跳过而不是当成超时** —— 标错比不标更难查
+            if (status == null || !pendingStatuses.contains(status)) continue;
+            if (respond) sla.setRespondBreached(1); else sla.setResolveBreached(1);
+            slaMapper.updateById(sla);
+            n++;
+        }
+        if (n > 0) {
+            log.warn("SLA 超时扫描标记 {} 单 kind={} —— 这些单已过期限且仍未{}，需要派单/催办",
+                    n, respond ? "respond" : "resolve", respond ? "接单" : "完工");
+        }
+        return n;
     }
 
     /** 取该工单类型当前启用的 SLA 规则；没有配置则不计时（due 为空，永不超时）。 */

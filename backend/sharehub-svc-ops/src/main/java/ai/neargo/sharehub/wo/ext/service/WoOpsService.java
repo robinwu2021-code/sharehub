@@ -67,4 +67,24 @@ public interface WoOpsService {
      * （{@code wo:close} 验收人 vs {@code wo:dispatch} 派单人）四项全不同。
      */
     WorkOrder rework(String woNo, RejectReq req);
+
+    /**
+     * 扫出**已经超时却还没被标记**的工单，落超时标记。定时任务 {@code wo-sla-breach-scan} 调这个。
+     *
+     * <h3>为什么事件驱动的那一半不够</h3>
+     * {@code markBreached} 在**接单那一刻**判响应超时、**关单那一刻**判解决超时。
+     * 于是已经接了 / 关了的单能被正确标记（哪怕晚了），而
+     * <b>一张彻底躺着没人管的单，因为永远不会发生那两个事件，`respond_breached` 就永远是 0</b>。
+     * ⇒ 超时最严重的那些，恰恰是唯一不会被判定的。「还有多少单超时了」这个数因此说不清。
+     *
+     * <h3>判据</h3>
+     * 响应：过了 {@code respond_due_at} 还停在 CREATED/DISPATCHED（尚未接单）；
+     * 解决：过了 {@code resolve_due_at} 还没到 DONE（尚未完工）。
+     * 无 SLA 规则配置的单 due 为空，**不考核**（与 {@code markBreached} 同口径）。
+     *
+     * <p><b>只把 0 翻成 1，不会翻回去</b>：超时是既成事实，事后补做了也不改写历史。
+     *
+     * @return 本次新标记的条数（响应 + 解决）
+     */
+    int sweepSlaBreaches();
 }

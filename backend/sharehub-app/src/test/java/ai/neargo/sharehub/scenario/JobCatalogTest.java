@@ -67,7 +67,11 @@ class JobCatalogTest extends ApiTestSupport {
          * 而且**每天跑每天造** —— test_sharehub 是累积型共享资产（见 CLAUDE.md），
          * 一条用例天天往里塞单据，下一个查「这些工单哪来的」的人会查很久。
          */
-        for (String name : A_CLASS) {
+        /*
+         * 遍历**注册表**而不是 A_CLASS 那张写死的表：以后每新增一个任务都自动被冒烟，
+         * 不必记得回来改这条用例 —— 「要记得改的卡口」迟早有一次没人改。
+         */
+        for (String name : registry.declarations().stream().map(JobDeclaration::name).toList()) {
             JobResult r = registry.trigger(name);
             assertThat(r.status())
                     .as("任务 %s 触发失败：%s", name, r.error())
