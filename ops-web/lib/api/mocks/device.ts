@@ -1,4 +1,5 @@
 // 覆盖范围：机柜与仓位、下发指令、充电宝、实时监控、指令记录、调拨、OTA、设备日志、设备编码批次。
+import * as dg from "../../mock/db/device-gate";
 import * as db from "../../mock/db";
 import type { DeviceApi } from "../contracts/device";
 import type { PageQ, CabinetQ, DeviceLogQ, ArchiveQ, OtaReleaseQ } from "../query";
@@ -49,4 +50,18 @@ export const deviceMock: DeviceApi = {
 
   // G2 导入：整批校验通过后一次性落库
   importCabinets: async (rows) => wait(db.importCabinets(rows), 600),
+
+  // —— 设备运维：上线门禁 / 试借还 / 保护 ——
+  goLiveGate: (no) => wait(dg.goLiveGate(no)),
+  goLive: async (no) => wait(dg.goLive(no), 350),
+  markDeviceFault: async (no, reason) => wait(dg.markDeviceFault(no, reason), 350),
+  repairDevice: async (no) => wait(dg.repairDevice(no), 350),
+  undeployDevice: async (no, reason) => wait(dg.undeployDevice(no, reason), 350),
+  retireDevice: async (no, reason) => wait(dg.retireDevice(no, reason), 350),
+  listTrialRents: (no) => wait(dg.listTrialRents(no)),
+  startTrialRent: async (no) => wait(dg.startTrialRent(no), 400),
+  listProtections: (no, activeOnly) => wait(dg.listProtections(no, activeOnly)),
+  applyProtection: async (no, req) => wait(dg.applyProtection(no, req), 350),
+  releaseProtection: async (pno, reason) => wait(dg.releaseProtection(pno, reason), 350),
+  listSignalCodes: () => wait(dg.listSignalCodes()),
 };

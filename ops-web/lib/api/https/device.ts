@@ -44,4 +44,18 @@ export const deviceHttp: DeviceApi = {
 
   // G2 导入：服务端整批校验后一次性落库（部分成功不允许）
   importCabinets: (rows) => client.post("/api/ops/cabinets/import", { rows }),
+
+  // —— 设备运维 ——
+  goLiveGate: (no) => client.get(`/api/ops/devices/${no}/go-live-gate`),
+  goLive: (no) => client.post(`/api/ops/devices/${no}/go-live`, {}),
+  markDeviceFault: (no, reason) => client.post(`/api/ops/devices/${no}/mark-fault`, { reason }),
+  repairDevice: (no) => client.post(`/api/ops/devices/${no}/repair`, {}),
+  undeployDevice: (no, reason) => client.post(`/api/ops/devices/${no}/undeploy`, { reason }),
+  retireDevice: (no, reason) => client.post(`/api/ops/devices/${no}/retire`, { reason }),
+  listTrialRents: (no) => client.get(`/api/ops/devices/${no}/trial-rents`),
+  startTrialRent: (no) => client.post(`/api/ops/devices/${no}/trial-rents`, {}),
+  listProtections: (no, activeOnly) => client.get(`/api/ops/devices/${no}/protections`, { activeOnly }),
+  applyProtection: (no, req) => client.post(`/api/ops/devices/${no}/protections`, req),
+  releaseProtection: (pno, reason) => client.post(`/api/ops/devices/protections/${pno}/release`, { reason }),
+  listSignalCodes: () => client.get("/api/ops/device-signals"),
 };

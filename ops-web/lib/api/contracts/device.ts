@@ -3,6 +3,7 @@ import type { PageQ, CabinetQ, DeviceLogQ, ArchiveQ, OtaReleaseQ } from "../quer
 import type {
   PageResult, Cabinet, Slot, Powerbank, CabinetMonitor, CommandRecord,
   InventoryTransfer, InventoryTransferDetail, OtaRollout, OtaRelease, OtaTask, DeviceLog, DeviceCodeBatch,
+  Checklist, TrialRent, Protection, ProtectionReq, SignalCode,
 } from "../../types";
 
 export interface DeviceApi {
@@ -50,4 +51,40 @@ export interface DeviceApi {
    * **调用方必须先整批校验通过再调**——服务端亦全量校验后再落库，不允许「导一半失败」。
    */
   importCabinets(rows: Partial<Cabinet>[]): Promise<{ imported: number; updated: number }>;
+
+  // ——— 设备运维：上线门禁 · 试借还 · 保护（2026-09-25）———
+
+  /**
+   * 上线门禁：这台柜子还差什么才能接客。
+   * 与站点开业清单同形（`Checklist`），每条未通过都带 fixHref。
+   */
+  goLiveGate(deviceNo: string): Promise<Checklist>;
+  /** 上线。**门禁不过会被拒** —— 按钮禁用只是提示，真正的闸在服务端。 */
+  goLive(deviceNo: string): Promise<Cabinet>;
+  /** 标记故障。 */
+  markDeviceFault(deviceNo: string, reason?: string): Promise<Cabinet>;
+  /** 修复完成，回到可用。 */
+  repairDevice(deviceNo: string): Promise<Cabinet>;
+  /** 撤机：从站点撤下，回库存。 */
+  undeployDevice(deviceNo: string, reason?: string): Promise<Cabinet>;
+  /** 报废：**不可逆**。 */
+  retireDevice(deviceNo: string, reason?: string): Promise<Cabinet>;
+
+  /** 该柜的试借还记录。 */
+  listTrialRents(deviceNo: string): Promise<TrialRent[]>;
+  /** 发起一次试借还：真弹一个宝出来，等它还回去。 */
+  startTrialRent(deviceNo: string): Promise<TrialRent>;
+
+  /** 该柜当前的保护。`activeOnly=false` 可看历史。 */
+  listProtections(deviceNo: string, activeOnly?: boolean): Promise<Protection[]>;
+  /** 人工挂一条保护。 */
+  applyProtection(deviceNo: string, req: ProtectionReq): Promise<Protection>;
+  /**
+   * 解除保护。**只能解人工挂的那些** ——
+   * 信号/告警挂的由系统在条件恢复时自己撤，手工撤会让设备在故障未恢复时重新接客。
+   */
+  releaseProtection(protectionNo: string, reason?: string): Promise<Protection>;
+
+  /** 设备信号码字典。信号**不是**告警——业务告警才是人要看的那层。 */
+  listSignalCodes(): Promise<SignalCode[]>;
 }
