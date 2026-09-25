@@ -289,12 +289,58 @@ export interface LogoffItem {
   purgedAt: string | null;
 }
 
+/**
+ * 运营公告（镜像后端 `NoticeVO`）—— **广播，没有「已读」这回事**。
+ *
+ * 此前这个类型写成 `{title, body, date, read}`，四个字段后端一个都不返：
+ * 后端三语三列全量下发（`title/titleEn/titleAr` + `content/contentEn/contentAr`），
+ * 由端按当前语种取；`read` 属于**站内信**（`MessageItem`，每人一份），公告没有。
+ * 结果是公告页整页空白，而且那个红点永远亮着 —— 因为 `read` 恒为 undefined。
+ */
 export interface Notice {
   noticeNo: string;
   title: string;
+  titleEn: string;
+  titleAr: string;
+  content: string;
+  contentEn: string;
+  contentAr: string;
+  type: string;
+  pinned: boolean;
+  startAt: string | null;
+  endAt: string | null;
+  status: string;
+  publishedBy: string | null;
+  createdAt: string;
+  archivedAt: string | null;
+}
+
+/**
+ * 站内信（镜像后端 `MessageItem`）—— 每人一份，有已读态。
+ *
+ * ⚠️ 类型名必须叫 `MessageItem`，不能简写成 `Message`：对齐脚本把 `Item` 当作
+ * **形状后缀**，看到前端有个 `Message` 就判定「那是另一个投影」，于是既不报缺失、
+ * 也不逐字段比 —— 字段对不上再也没人拦。
+ */
+export interface MessageItem {
+  messageNo: string;
+  type: string;
+  title: string;
   body: string;
-  date: string;
   read: boolean;
+  readAt: string | null;
+  createdAt: string;
+}
+
+/** 版本检查结果（镜像后端 `AppVersionCheck`）。无在架版本时 `hasUpdate=false`，其余字段可空。 */
+export interface AppVersionCheck {
+  hasUpdate: boolean;
+  versionNo: string | null;
+  buildNo: number | null;
+  forceUpdate: boolean | null;
+  minSupported: string | null;
+  releaseNote: string | null;
+  downloadUrl: string | null;
 }
 
 // 门店详情（附近门店点选）

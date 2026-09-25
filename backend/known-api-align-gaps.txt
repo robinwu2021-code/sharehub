@@ -60,8 +60,6 @@ C GET /api/trade/settlements/{}
 #
 # ── A 组：已上线功能的闭环缺一半（后端已实现 + c-app 页面已存在，差接线）──
 # 用户现在就会撞上，不是「功能没做」，是「功能做了半截」。
-C GET /mp/user/messages            # 站内信：只接了 /mp/notice（公告）→ 有广播没私信（页面 notice）
-C POST /mp/user/messages/{}/read   # 同上，已读回执
 #
 # ── B 组：整块没做（c-app 连页面都没有）──
 #                                    都要求提供账号删除入口），后端 logoff.apply 已就绪，不做上不了架
@@ -69,14 +67,12 @@ C GET /mp/user/invoices            # 开票（4 条一组）：to-B 需求，取
 C POST /mp/user/invoices           #   同上
 C GET /mp/user/invoice-titles      #   同上，抬头管理
 C POST /mp/user/invoice-titles     #   同上
-C GET /mp/app/version              # 版本检查，小件（配合强更策略）
 #
 # 每接一条的完成定义：接 c-app/src/api 的 http 切片 → 去掉 mock 分支 →
 # contract 测试覆盖 → **从本文件删掉对应行**（卡口对「修好了还留着」同样报红）。
 # ══════════════════════════════════════════════════════════════════════
 
 D AckResult POST /api/ops/alarms/records/{alarmNo}/ack
-D AppVersionCheck GET /mp/app/version
 D ApplyResult POST /api/agent/applies
 D ApplyView GET /api/agent/applies
 D AssignmentLog POST /api/agent/assignments
@@ -92,7 +88,6 @@ D Location GET /api/ops/locations
 D LoginResp POST /api/auth/login
 D MembershipPlanVO GET /mp/user/membership
 D MenuNode GET /api/auth/menus
-D MessageItem GET /mp/user/messages
 D OkResult POST /api/ops/sites/{siteNo}/agents/{id}/remove
 D OperatorMembership GET /api/auth/operators
 D RentResult POST /mp/trade/orders/rent
@@ -125,28 +120,9 @@ C POST /api/user/push-messages/sweep-due
 #   修法不是改字段名了事：fees / timeline 后端根本没有（费用明细与状态时间线要新建投影），
 #   siteNameBorrow/Return 也要后端补 join。属于一整块活，单独排。
 #
-# ── NoticeVO（16 条）：公告三语三列全量下发，前端类型还停在 title/body/date/read ──
-#   后端一次给 title/titleEn/titleAr + content/contentEn/contentAr，由客户端按语种取。
-#   前端的 `read`（已读标记）后端没有 —— 公告已读态要么落 usr_message，要么端上本地存，
-#   先定下来再改，别急着加列。
+# ── NoticeVO：已在同一批里改对（公告三语取列 + 已读态归还给站内信），本块不再有它 ──
 #
 # ── CsTicketVO：已在同一批的「报障进度」里接上，本块不再有它 ──
-B GET /mp/notice NoticeVO 前端有后端无:body
-B GET /mp/notice NoticeVO 前端有后端无:date
-B GET /mp/notice NoticeVO 前端有后端无:read
-B GET /mp/notice NoticeVO 后端有前端无:archivedAt
-B GET /mp/notice NoticeVO 后端有前端无:content
-B GET /mp/notice NoticeVO 后端有前端无:contentAr
-B GET /mp/notice NoticeVO 后端有前端无:contentEn
-B GET /mp/notice NoticeVO 后端有前端无:createdAt
-B GET /mp/notice NoticeVO 后端有前端无:endAt
-B GET /mp/notice NoticeVO 后端有前端无:pinned
-B GET /mp/notice NoticeVO 后端有前端无:publishedBy
-B GET /mp/notice NoticeVO 后端有前端无:startAt
-B GET /mp/notice NoticeVO 后端有前端无:status
-B GET /mp/notice NoticeVO 后端有前端无:titleAr
-B GET /mp/notice NoticeVO 后端有前端无:titleEn
-B GET /mp/notice NoticeVO 后端有前端无:type
 B GET /mp/trade/orders RentOrder 前端有后端无:amount
 B GET /mp/trade/orders RentOrder 前端有后端无:cabinetNoBorrow
 B GET /mp/trade/orders RentOrder 前端有后端无:cabinetNoReturn

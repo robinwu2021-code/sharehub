@@ -190,6 +190,18 @@ export default {
     otpSent: "Code sent",
     createDone: "Create account",
   },
+  notice: {
+    title: "Messages",
+    messages: "Inbox",
+    notices: "Announcements",
+    unread: "{n} unread",
+    pinned: "Pinned",
+    noMessages: "No messages yet",
+    noNotices: "No announcements",
+    update: "Version {v} is available",
+    updateNow: "Update now",
+    latest: "You are on the latest version",
+  },
   reports: {
     title: "My reports",
     none: "You have not submitted any reports",

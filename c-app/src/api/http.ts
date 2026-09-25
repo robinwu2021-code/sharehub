@@ -20,6 +20,8 @@ import type {
   FaqItem,
   LoginResult,
   Notice,
+  MessageItem,
+  AppVersionCheck,
   StoreDetail,
   WalletTxn,
   LogoffItem,
@@ -38,6 +40,10 @@ export const httpApi: McpApi = {
   cancelLogoff: () => client.post<LogoffItem>("/mp/user/logoff/cancel"),
 
   listNotices: () => client.get<Notice[]>("/mp/notice"),
+  listMessages: (q) => client.get<PageResult<MessageItem>>("/mp/user/messages", q),
+  markMessageRead: (messageNo: string) => client.post<MessageItem>(`/mp/user/messages/${messageNo}/read`),
+  checkVersion: (platform: string, lang?: string) =>
+    client.get<AppVersionCheck>("/mp/app/version", { platform, lang }),
 
   nearbyCabinets: (q?: NearbyQ) => client.get<NearbyCabinet[]>("/mp/nearby/cabinets", q),
   cabinetAvailability: (cabinetNo: string) =>

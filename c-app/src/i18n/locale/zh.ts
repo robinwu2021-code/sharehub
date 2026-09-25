@@ -190,6 +190,18 @@ export default {
     otpSent: "验证码已发送",
     createDone: "注册",
   },
+  notice: {
+    title: "消息",
+    messages: "站内信",
+    notices: "公告",
+    unread: "{n} 条未读",
+    pinned: "置顶",
+    noMessages: "暂无消息",
+    noNotices: "暂无公告",
+    update: "发现新版本 {v}",
+    updateNow: "立即更新",
+    latest: "已是最新版本",
+  },
   reports: {
     title: "我的报障",
     none: "还没有提交过报障",

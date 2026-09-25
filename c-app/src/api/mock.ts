@@ -50,6 +50,19 @@ export const mockApi: McpApi = {
     return db.delay(db.profile, 400);
   },
   listNotices: () => db.delay(db.notices),
+  listMessages: (q = {}) =>
+    db.delay(db.paginate(
+      db.messages.filter((m) => (!q.type || m.type === q.type) && (q.read === undefined || m.read === q.read)),
+      q.page, q.size)),
+  markMessageRead: (messageNo: string) => {
+    const m = db.messages.find((x) => x.messageNo === messageNo);
+    if (!m) return Promise.reject(new Error("消息不存在"));
+    // 真改 db：退出去再进来，红点不该又亮回来
+    m.read = true;
+    m.readAt = m.readAt ?? new Date().toISOString().slice(0, 19).replace("T", " ");
+    return db.delay(m, 200);
+  },
+  checkVersion: () => db.delay(db.appVersion, 300),
   storeDetail: (siteNo: string) => db.delay(db.storeOf(siteNo)),
 
   listFavorites: () => db.delay(db.cabinets.filter((c) => db.favorites.has(c.siteNo))),

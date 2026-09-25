@@ -18,6 +18,8 @@ import type {
   FaqItem,
   LoginResult,
   Notice,
+  MessageItem,
+  AppVersionCheck,
   StoreDetail,
   WalletTxn,
   LogoffItem,
@@ -96,8 +98,12 @@ export interface McpApi {
   currentLogoff(): Promise<LogoffItem | null>;
   applyLogoff(): Promise<LogoffItem>;
   cancelLogoff(): Promise<LogoffItem>;
-  // 公告
+  // 公告（广播，无已读）与站内信（每人一份，有已读）。两者不是一回事，别合并。
   listNotices(): Promise<Notice[]>;
+  listMessages(q?: PageQ & { type?: string; read?: boolean }): Promise<PageResult<MessageItem>>;
+  markMessageRead(messageNo: string): Promise<MessageItem>;
+  // 版本检查：platform 由端决定（app/mp-weixin/h5），lang 用于取对应语种的更新说明
+  checkVersion(platform: string, lang?: string): Promise<AppVersionCheck>;
   // 找柜与地图
   nearbyCabinets(q?: NearbyQ): Promise<NearbyCabinet[]>;
   cabinetAvailability(cabinetNo: string): Promise<CabinetAvailability>;

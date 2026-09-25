@@ -14,6 +14,8 @@ import type {
   RechargePackage,
   FaqItem,
   CsTicket,
+  MessageItem,
+  AppVersionCheck,
 } from "@/types";
 import { CURRENCY, MOCK_DELAY_MS } from "@/shared/constants";
 
@@ -173,10 +175,39 @@ export const memberships: Membership[] = [
   { planNo: "MB-10", name: "10-Rides Card", price: 40, benefits: ["10 rides, 2h each"], active: false },
 ];
 
+// 公告：三语三列全量下发，由端按当前语种取（与后端 NoticeVO 同形）
 export const notices: Notice[] = [
-  { noticeNo: "N-01", title: "Ramadan hours updated", body: "Selected mall stations now operate 10:00–02:00 during Ramadan.", date: "2026-07-12", read: false },
-  { noticeNo: "N-02", title: "New stations at DXB T3", body: "9 new cabinets are now live at Dubai Airport Terminal 3.", date: "2026-07-08", read: true },
+  {
+    noticeNo: "N-01", type: "OPERATION", pinned: true, status: "PUBLISHED",
+    title: "斋月营业时间调整", titleEn: "Ramadan hours updated", titleAr: "تعديل ساعات العمل في رمضان",
+    content: "部分商场点位斋月期间营业时间调整为 10:00–02:00。",
+    contentEn: "Selected mall stations now operate 10:00–02:00 during Ramadan.",
+    contentAr: "تعمل بعض المحطات في المراكز التجارية من 10:00 إلى 02:00 خلال رمضان.",
+    startAt: "2026-07-01 00:00:00", endAt: null, publishedBy: "EMP0001",
+    createdAt: "2026-07-12 09:00:00", archivedAt: null,
+  },
+  {
+    noticeNo: "N-02", type: "OPERATION", pinned: false, status: "PUBLISHED",
+    title: "迪拜机场 T3 新增点位", titleEn: "New stations at DXB T3", titleAr: "محطات جديدة في مطار دبي T3",
+    content: "迪拜机场 T3 新增 9 台机柜，已可借可还。",
+    contentEn: "9 new cabinets are now live at Dubai Airport Terminal 3.",
+    contentAr: "‏9 خزائن جديدة متاحة الآن في المبنى 3 بمطار دبي.",
+    startAt: "2026-07-08 00:00:00", endAt: null, publishedBy: "EMP0001",
+    createdAt: "2026-07-08 12:00:00", archivedAt: null,
+  },
 ];
+
+// 站内信：每人一份、有已读态（公告没有这回事）
+export const messages: MessageItem[] = [
+  { messageNo: "MSG000003", type: "ORDER", title: "订单已结算", body: "订单 ORD000031 已结算，费用 AED 6.00。", read: false, readAt: null, createdAt: "2026-09-21 08:30:00" },
+  { messageNo: "MSG000002", type: "REFUND", title: "退款已到账", body: "退款单 RF000003 已原路退回 AED 4.00，到账时间以发卡行为准。", read: false, readAt: null, createdAt: "2026-09-20 15:10:00" },
+  { messageNo: "MSG000001", type: "MARKETING", title: "新人礼包已发放", body: "AED 5 无门槛券已放入你的券包，7 天内有效。", read: true, readAt: "2026-09-10 09:02:00", createdAt: "2026-09-10 09:00:00" },
+];
+
+export const appVersion: AppVersionCheck = {
+  hasUpdate: true, versionNo: "1.1.0", buildNo: 110, forceUpdate: false,
+  minSupported: "1.0.0", releaseNote: "修复归还偶发失败；地图加载更快。", downloadUrl: "https://example.com/app",
+};
 
 export function storeOf(siteNo: string): StoreDetail {
   const c = cabinets.find((x) => x.siteNo === siteNo) ?? cabinets[0];

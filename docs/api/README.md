@@ -611,7 +611,7 @@ SELF_SERVICE  TO_WORKORDER    TO_REFUND         TO_CS      （争议类问题额
 | `GET /mp/user/coupons` | 我的券包（**已领到手的券实例**，PageResult） | C-CP-02 | ✅ |
 | `GET /mp/user/coupons/claimable` | 领券中心（可领的**券模板**，带 `claimed`/剩余量） | C-CP-01 | ✅ |
 | `POST /mp/user/coupons/{couponNo}/claim` | 领券（幂等 + 库存校验）。路径上传的是**模板号** `tplNo`，不是券包里的 `couponNo` | C-CP-01 | ✅ |
-| `GET /mp/notice` | 运营公告（首页公告条 + 公告页） | C-CP-04 | ✅ |
+| `GET /mp/notice` | 运营公告（广播，三语三列由端取；**无已读态**，已读属站内信） | C-CP-04 | ✅ |
 | `GET /mp/user/invite` | 邀请码/邀请链接 | C-SH-01 | 🆕 |
 | `POST /mp/user/invite/bind` | 新用户绑定邀请人（归因/反作弊） | C-SH-03 | 🆕 |
 
@@ -637,10 +637,10 @@ SELF_SERVICE  TO_WORKORDER    TO_REFUND         TO_CS      （争议类问题额
 | Method Path | 用途 | 编号 | 状态 |
 |---|---|---|---|
 | `POST /mp/user/push-token` | 注册 Push token（APNs/FCM/UniPush） | C-MS-01 | 🆕 |
-| `GET /mp/user/messages` | 站内消息中心（历史/已读未读） | C-MS-03 | 🆕 |
-| `POST /mp/user/messages/{messageNo}/read` | 标记已读 | C-MS-03 | 🆕 |
+| `GET /mp/user/messages` | 站内消息中心（历史/已读未读） | C-MS-03 | ✅ |
+| `POST /mp/user/messages/{messageNo}/read` | 标记已读 | C-MS-03 | ✅ |
 | `GET/PUT /mp/user/notify-prefs` | 通知偏好（分类开关/免打扰时段/语言） | C-MS-04 | 🆕 |
-| `GET /mp/app/version` | 版本检查（读 `sys_app_version`，按平台 + 灰度） | C-ME-06 | 🆕 |
+| `GET /mp/app/version` | 版本检查（读 `sys_app_version`，按平台 + 灰度） | C-ME-06 | ✅ |
 
 ---
 

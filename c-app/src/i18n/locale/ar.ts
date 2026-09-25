@@ -190,6 +190,18 @@ export default {
     otpSent: "تم إرسال الرمز",
     createDone: "تسجيل",
   },
+  notice: {
+    title: "الرسائل",
+    messages: "صندوق الوارد",
+    notices: "الإعلانات",
+    unread: "‏{n} غير مقروءة",
+    pinned: "مثبّت",
+    noMessages: "لا توجد رسائل",
+    noNotices: "لا توجد إعلانات",
+    update: "‏الإصدار {v} متاح",
+    updateNow: "التحديث الآن",
+    latest: "أنت على أحدث إصدار",
+  },
   reports: {
     title: "تقاريري",
     none: "لم تُرسل أي تقرير بعد",
