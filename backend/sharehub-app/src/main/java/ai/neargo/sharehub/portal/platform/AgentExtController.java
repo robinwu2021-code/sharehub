@@ -127,15 +127,23 @@ public class AgentExtController {
      * <p>带**当前归属**返回，前端在选项上标注「已属某代理」—— 划拨是覆盖式写入，
      * 不标出来就会把别人名下的柜子误划走，而原代理只会发现资产凭空消失。
      *
-     * <p>{@code agentNo} 传 {@code __NONE__} 只看平台直营。
+     * <p>{@code agentNo} 传 {@code __NONE__} 只看平台直营；{@code excludeAgentNo} 排除已属于该代理的
+     * （「换个代理」时用 —— 划给自己是空操作却会留一行流水）。
+     *
+     * <p><b>2026-09-26 起返回 {@code PageResult}</b>（§5.8 #4）：此前是裸数组 + {@code limit}，
+     * 全站其余列表都是 {@code {list,total}} + {@code page/size}，前端为它单独写了一层适配。
+     * {@code total} 的口径见 service 的 javadoc —— 它是候选池（前 500 条）里的条数，
+     * 与能翻到的页数一致，不是全表 count。
      */
     @GetMapping("/assignable-assets")
     @PreAuthorize("@perm.can('agent:scope:assign')")
-    public java.util.List<AssignableAsset> assignableAssets(@RequestParam(required = false) String keyword,
-                                                            @RequestParam(required = false) String agentNo,
-                                                            @RequestParam(required = false) String assetType,
-                                                            @RequestParam(required = false) Integer limit) {
-        return assignmentService.assignable(keyword, agentNo, assetType, limit);
+    public PageResult<AssignableAsset> assignableAssets(@RequestParam(required = false) String keyword,
+                                                        @RequestParam(required = false) String agentNo,
+                                                        @RequestParam(required = false) String assetType,
+                                                        @RequestParam(required = false) Integer page,
+                                                        @RequestParam(required = false) Integer size,
+                                                        @RequestParam(required = false) String excludeAgentNo) {
+        return assignmentService.assignable(keyword, agentNo, assetType, page, size, excludeAgentNo);
     }
 
     /**

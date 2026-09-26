@@ -62,15 +62,12 @@ export const agentHttp: AgentApi = {
   // 代建走复数端点（判 agent:apply:create）；单数 /apply 是免鉴权的自助入口
   createAgentApply: (x) => client.post("/api/agent/applies", x),
 
-  // 后端出参是**裸数组**（List<AssignableAsset>）、条数参数叫 limit、不认 excludeAgentNo ——
-  // 此前原样透传，真后端下 `.list` 是 undefined，划拨 / 回收抽屉的候选一条都没有。
-  // 这里包成 PageResult，并在前端做「排除目标代理已有的」（候选池有界：limit 封顶）。
-  listAssignableAssets: async (q?: AssignableAssetQ) => {
-    const { excludeAgentNo, size, page: _page, ...rest } = q ?? {};
-    const rows = await client.get<AssignableAsset[]>("/api/agent/assignable-assets", { ...rest, limit: size });
-    const list = (rows ?? []).filter((a) => !excludeAgentNo || a.currentAgentNo !== excludeAgentNo);
-    return { list, total: list.length };
-  },
+  // 2026-09-26 起后端返回统一的 PageResult 并自己认 excludeAgentNo（§5.8 #4），
+  // 所以这里直接透传 —— 此前那层「裸数组包成 PageResult + 前端过滤 excludeAgentNo」已撤掉。
+  // ⚠️ total 是**候选池（前 500 条）里的条数**，不是全表 count：候选池是选项源，
+  // 翻到底就是底，不会出现「总数 800 却翻到第 6 页就空了」。
+  listAssignableAssets: (q?: AssignableAssetQ) =>
+    client.get<PageResult<AssignableAsset>>("/api/agent/assignable-assets", q),
 
   // T0-5：后端是**单资产**端点 POST /api/agent/assignments（AssignReq{agentNo,targetType,
   // targetNo,action,operator} → AssignmentLog），前端契约是**批量**。此处做扇出适配。

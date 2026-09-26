@@ -118,6 +118,61 @@ class OpsFlowGaps2Test extends ApiTestSupport {
         assertThat(get("/api/ops/settlement-adjustments?page=1&size=1&kind=NOPE", admin).status).isEqualTo(400);
     }
 
+    @Test
+    @DisplayName("#5 代理名下资产汇总不再恒空——此前端点、权限、前端调用都齐备，方法却什么也没查")
+    void agent_assignments_are_no_longer_empty() {
+        JsonNode r = get("/api/agent/assignments?page=1&size=5", admin).okData();
+        assertThat(r.path("total").asLong()).as("库里有代理，汇总不该是 0 条").isPositive();
+
+        JsonNode row = r.path("list").get(0);
+        assertThat(row.has("cabinetCount") && row.has("siteCount")).as("%s", row).isTrue();
+
+        /*
+         * 与库直接对一遍：只断言「不为空」的话，哪天口径写错（比如把归档的也算进来）仍然是绿的。
+         * 口径 = agent_no 直接挂在站点 / 机柜上，且未归档未软删。
+         */
+        String ag = row.path("agentNo").asText();
+        Integer cabs = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM dev_cabinet WHERE agent_no=? AND deleted=0 AND archived_at IS NULL", Integer.class, ag);
+        Integer sites = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM loc_site WHERE agent_no=? AND deleted=0", Integer.class, ag);
+        assertThat(row.path("cabinetCount").asInt()).as("代理 %s 的机柜数", ag).isEqualTo(cabs);
+        assertThat(row.path("siteCount").asInt()).as("代理 %s 的站点数", ag).isEqualTo(sites);
+    }
+
+    @Test
+    @DisplayName("#4 划拨候选统一成 PageResult + page/size，并认 excludeAgentNo")
+    void assignable_assets_use_the_standard_page_shape() {
+        Resp r = get("/api/agent/assignable-assets?page=1&size=3", admin);
+        assertThat(r.status).isEqualTo(200);
+        JsonNode d = r.okData();
+        assertThat(d.has("list") && d.has("total")).as("全站统一形状：%s", d).isTrue();
+        assertThat(d.path("list").size()).as("size=3 应当最多回 3 条").isLessThanOrEqualTo(3);
+
+        long total = d.path("total").asLong();
+        if (total == 0) return;   // 库里没有可划拨资产时后面几条无从验起
+
+        /*
+         * total 必须与**实际能翻到的**一致：候选池是选项源（上限 500 条），
+         * 返回全表 count 会出现「总数 800 却翻到第 6 页就空了」—— 那种 total 是在骗人。
+         */
+        long lastPage = (total + 2) / 3;
+        assertThat(get("/api/agent/assignable-assets?page=" + lastPage + "&size=3", admin).okData().path("list").size())
+                .as("最后一页不该是空的（total=%s）", total).isPositive();
+
+        // excludeAgentNo：后端自己认，不再靠前端过滤
+        JsonNode owned = null;
+        for (JsonNode x : get("/api/agent/assignable-assets?page=1&size=200", admin).okData().path("list")) {
+            if (!x.path("currentAgentNo").isNull() && !x.path("currentAgentNo").asText().isBlank()) { owned = x; break; }
+        }
+        if (owned != null) {
+            String ag = owned.path("currentAgentNo").asText();
+            for (JsonNode x : get("/api/agent/assignable-assets?page=1&size=200&excludeAgentNo=" + ag, admin).okData().path("list")) {
+                assertThat(x.path("currentAgentNo").asText("")).as("排除了 %s 就不该再出现它的资产", ag).isNotEqualTo(ag);
+            }
+        }
+    }
+
     private long total(String path) {
         return get(path, admin).okData().path("total").asLong();
     }

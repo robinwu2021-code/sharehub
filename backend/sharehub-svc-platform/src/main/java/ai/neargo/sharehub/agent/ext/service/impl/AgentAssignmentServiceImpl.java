@@ -125,8 +125,11 @@ public class AgentAssignmentServiceImpl implements AgentAssignmentService {
 
     /** 可划拨资产候选池：机柜经 Port 取（core 的表），站点读 platform 自己的 {@code loc_site}。 */
     @Override
-    public List<AssignableAsset> assignable(String keyword, String agentNo, String assetType, Integer limit) {
-        int n = (limit == null || limit < 1) ? 100 : Math.min(limit, 500);
+    public PageResult<AssignableAsset> assignable(String keyword, String agentNo, String assetType,
+                                                  Integer page, Integer size, String excludeAgentNo) {
+        int p = (page == null || page < 1) ? 1 : page;
+        int s = (size == null || size < 1) ? 20 : Math.min(size, 200);
+        int n = CANDIDATE_CAP;
         List<AssignableAsset> out = new java.util.ArrayList<>();
 
         if (assetType == null || "CABINET".equals(assetType)) {
@@ -145,13 +148,31 @@ public class AgentAssignmentServiceImpl implements AgentAssignmentService {
                 else w.eq(LocSite::getAgentNo, agentNo);
             }
             w.orderByAsc(LocSite::getSiteNo).last("limit " + n);
-            for (LocSite s : siteMapper.selectList(w)) {
-                out.add(new AssignableAsset("SITE", s.getSiteNo(), s.getName(),
-                        s.getAgentNo(), agentName(s.getAgentNo())));
+            for (LocSite site : siteMapper.selectList(w)) {
+                out.add(new AssignableAsset("SITE", site.getSiteNo(), site.getName(),
+                        site.getAgentNo(), agentName(site.getAgentNo())));
             }
         }
-        return out;
+        /*
+         * 排除已属于该代理的：划拨抽屉「换个代理」时，把当前代理自己的选项去掉 ——
+         * 划给自己是一次空操作，却会留下一行看不懂的流水。
+         */
+        if (excludeAgentNo != null && !excludeAgentNo.isBlank()) {
+            String ex = excludeAgentNo.trim();
+            out.removeIf(a -> ex.equals(a.currentAgentNo()));
+        }
+        /*
+         * 内存分页：候选池是**选项源**，上限 CANDIDATE_CAP 条，不是无限台账。
+         * total 取切片前的条数 —— 与实际能翻到的页数严格一致（见接口 javadoc 里
+         * 「返回真实全表 count 会骗人」那一段）。
+         */
+        int from = Math.min((p - 1) * s, out.size());
+        int to = Math.min(from + s, out.size());
+        return new PageResult<>(List.copyOf(out.subList(from, to)), (long) out.size());
     }
+
+    /** 候选池上限：它是选项源，不是台账。超过这个数说明筛选条件太宽，该让人先搜一下。 */
+    static final int CANDIDATE_CAP = 500;
 
     /**
      * 批量回收到平台直营。
