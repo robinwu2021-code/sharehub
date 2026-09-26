@@ -191,6 +191,7 @@ export function AddressPicker({
     m.setCenter({ lat, lng });
     m.setZoom(16);
     markerRef.current?.setPosition({ lat, lng });
+    markerRef.current?.setMap(m);
   }
 
   /** 坐标 → 地址。查不到就只写坐标，**不清空**用户已填的地址。 */
@@ -215,10 +216,16 @@ export function AddressPicker({
         center, zoom: has ? 16 : 11,
         mapTypeControl: false, streetViewControl: false, fullscreenControl: false,
       });
-      const marker = new google.maps.Marker({ position: center, draggable: true, map });
+      /*
+       * 主标记（选中的那个）**没坐标时不显示**。
+       * 一直显示的话，它会杵在默认视野中心 —— 看着像「已经选好了」，
+       * 而那个位置是迪拜市中心，不是用户选的任何地方。
+       */
+      const marker = new google.maps.Marker({ position: center, draggable: true, map: has ? map : null });
       map.addListener("click", (e: google.maps.MapMouseEvent) => {
         if (!e.latLng) return;
         marker.setPosition(e.latLng);
+        marker.setMap(map);   // 第一次点图时它才出现
         void writeBack(e.latLng.lat(), e.latLng.lng());
       });
       marker.addListener("dragend", () => {
