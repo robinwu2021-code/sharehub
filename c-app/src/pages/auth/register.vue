@@ -33,6 +33,7 @@ async function submit() {
   try {
     const r = await api.register({
       countryCode: country.value.dial,
+      country: country.value.iso,   // 判密码登录开关用（留空口令则不设，开关不参与）
       phone: phone.value,
       otp: otp.value,
       nickname: nickname.value,

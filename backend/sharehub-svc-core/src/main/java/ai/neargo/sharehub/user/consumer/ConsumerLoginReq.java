@@ -14,6 +14,7 @@ public record ConsumerLoginReq(
         String tenantNo,
         String phone,         // phone_otp
         String otp,
+        String password,      // grantType=password
         String country,       // ISO alpha-2，选登录方式开关用（原 regionCode 是死字段，无人读也无人发）
         String jsCode,        // wechat_miniapp
         String code,          // wechat_oauth

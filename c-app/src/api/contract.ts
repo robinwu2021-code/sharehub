@@ -75,17 +75,27 @@ export interface OtpParams {
 }
 export interface RegisterParams {
   countryCode: string;
+  /** ISO alpha-2，判密码登录开关用（与 countryCode 的拨号码不是一回事）。 */
+  country?: string;
   phone: string;
   otp: string;
   nickname: string;
   email?: string;
+  /** 留空则不设口令 —— 注册不强制设密码，OTP 登录本身就是完整的登录方式。 */
   password?: string;
 }
 export interface ResetPwdParams {
   countryCode: string;
+  country?: string;
   phone: string;
   otp: string;
   password: string;
+}
+/** 改密（已登录）。**没有 cUserNo** —— 后端取自会话。 */
+export interface ChangePwdParams {
+  country?: string;
+  oldPassword: string;
+  newPassword: string;
 }
 
 export interface RentParams {
@@ -127,6 +137,8 @@ export interface McpApi {
   sendOtp(p: OtpParams): Promise<{ cooldown: number }>;
   register(p: RegisterParams): Promise<ConsumerLogin>;
   resetPassword(p: ResetPwdParams): Promise<{ ok: true }>;
+  /** 改密（已登录）。走 `/mp/user/password` 而不是 `/mp/auth/*` —— 后者整段是 permitAll。 */
+  changePassword(p: ChangePwdParams): Promise<{ ok: true }>;
   // 登出：**让后端真正吊销 token**。只清本地 storage 等于没登出 ——
   // 令牌在服务端一直有效到过期（`POST /mp/auth/logout` 早就实现了吊销，前端从没调过）。
   logout(): Promise<void>;

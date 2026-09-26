@@ -53,6 +53,7 @@ public class MpUserController {
     private final WalletService wallets;
     private final RechargePackageService packages;
     private final RechargeService recharges;
+    private final ai.neargo.sharehub.user.consumer.ConsumerPasswordService passwords;
     private final UserFavoriteService favorites;
     private final UserMessageService messages;
     private final UserInvoiceService invoices;
@@ -62,12 +63,14 @@ public class MpUserController {
 
     public MpUserController(WalletService wallets, RechargePackageService packages,
                             RechargeService recharges,
+                            ai.neargo.sharehub.user.consumer.ConsumerPasswordService passwords,
                             UserFavoriteService favorites, UserMessageService messages,
                             UserInvoiceService invoices, UserLogoffService logoff,
                             UserQueryService userQuery, MembershipService memberships) {
         this.wallets = wallets;
         this.packages = packages;
         this.recharges = recharges;
+        this.passwords = passwords;
         this.favorites = favorites;
         this.messages = messages;
         this.invoices = invoices;
@@ -244,5 +247,26 @@ public class MpUserController {
         out.put("freeDeposit", false);        // 免押开通态待 nearpay 预授权接入（ADR-005），不伪造
         out.put("memberLevel", member == null ? null : member.level());
         return out;
+    }
+
+    // —— 修改密码 ——
+    //
+    // 放在 /mp/user/** 而不是 /mp/auth/**：后者整段是 permitAll（登录前的接口），
+    // 改密要求已登录。放那边就得在 SecurityConfig 里开一条与周围相反的例外，
+    // 而那种例外是最容易被读漏的。
+
+    /**
+     * 本人改密。{@code cUserNo} **取自会话**，请求体里没有用户号 ——
+     * 有的话任何登录用户都能改别人的口令，而那种参数一旦存在，早晚有人会读它。
+     *
+     * <p>c-app 的改密页此前是 {@code setTimeout} 假装成功（注释写着「端侧校验 + mock 成功」）：
+     * 它根本没调后端，却弹一个 OK。所以「旧口令错」这种情况从来没被拒过。
+     */
+    @PostMapping("/password")
+    public Map<String, Object> changePassword(
+            @RequestBody ai.neargo.sharehub.user.consumer.ConsumerAuthReqs.ChangePwdReq body) {
+        if (body == null) throw ai.neargo.sharehub.common.BizException.badRequest("error.common.body_required");
+        passwords.change(ConsumerContext.userNo(), body.oldPassword(), body.newPassword(), body.country());
+        return Map.of("ok", true);
     }
 }

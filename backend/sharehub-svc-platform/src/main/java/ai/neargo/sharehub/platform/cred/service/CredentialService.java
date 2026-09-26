@@ -32,4 +32,21 @@ public interface CredentialService {
 
     /** 本人改密。校验旧口令，通过后换新并清掉 {@code mustChange}。 */
     void changePassword(String realm, String subjectNo, String oldPassword, String newPassword);
+
+    /**
+     * 由**用户自己**定口令（注册时设、或忘记密码经 OTP 验证后重设）。没有则建，有则覆盖。
+     *
+     * <p><b>为什么不复用 {@link #resetPassword}</b>：那个方法是**服务端生成**一次性口令
+     * 并置 {@code mustChange=1} —— 对「管理员给员工开号」是对的（它的注释写着
+     * 「让调用方定初始口令，它多半会定成 123456」）。而消费者忘记密码的场景里，
+     * 没有管理员可以转述那串临时口令，用户必须当场自设。
+     * 所以这是**另一个动作**，不是同一个动作的参数变体。
+     *
+     * <p><b>调用方的义务</b>：本方法<b>不验证调用者有权改这个主体的口令</b> ——
+     * 它只管存。「验过 OTP 了吗」「是本人吗」必须在调用之前答完。
+     *
+     * <p>覆盖时同样清零失败计数与锁：忘记密码本身就是「我进不来」的出口，
+     * 重设完还锁着就等于没出口。
+     */
+    void setPassword(String realm, String subjectNo, String newPassword);
 }

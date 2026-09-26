@@ -50,7 +50,16 @@ public class UserLogoffServiceImpl implements UserLogoffService {
         e.setCoolingUntil(now.plusDays(COOLING_DAYS).format(TS));
         e.setStatus(PENDING);
         mapper.insert(e);
-        // TODO(清除作业)：到期扫描 status=PENDING AND cooling_until <= now → 执行清除/匿名化 → DONE + purged_at。
+        /*
+         * TODO(清除作业)：到期扫描 status=PENDING AND cooling_until <= now → 执行清除/匿名化 → DONE + purged_at。
+         *
+         * ⚠️ 清除时**必须一并删掉登录凭据**（`cred_credential` 的 realm=CONSUMER，
+         * 2026-09-26 起 C 端可设口令）。账号清了而口令还在，就是一条没有主人的登录凭证。
+         *
+         * 也正因为如此，**申请注销时不能删凭据** —— 冷静期内用户可以撤销，
+         * 那时候口令已经没了的话，他就被锁在自己的冷静期里、连撤销都登不进来。
+         * 删除属于清除作业这一刻，不属于申请这一刻。
+         */
         //  清除范围（哪些表物理删、哪些匿名化保留财务留痕）待法务确认后写入 PDPL 专篇。
         return toVO(e);
     }

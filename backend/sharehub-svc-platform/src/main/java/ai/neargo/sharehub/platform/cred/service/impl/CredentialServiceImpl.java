@@ -36,6 +36,8 @@ public class CredentialServiceImpl implements CredentialService {
     private static final int MAX_FAILED = 5;
     /** 锁多久。短到不至于变成拒绝服务，长到让爆破无利可图。 */
     private static final int LOCK_MINUTES = 15;
+    /** 口令最短长度。{@code changePassword} 与 {@code setPassword} 必须同一个数 —— 两处各写一遍一定会分叉。 */
+    private static final int MIN_LEN = 8;
     /** 一次性口令长度。 */
     private static final int TEMP_LEN = 12;
     /** 去掉了 0/O/1/l/I —— 一次性口令要靠人转述，形近字符会变成「登不进去」的投诉。 */
@@ -50,8 +52,21 @@ public class CredentialServiceImpl implements CredentialService {
         this.encoder = encoder;
     }
 
+    /**
+     * ⚠️ {@code REQUIRES_NEW} 不是随手加的：**失败计数必须独立于调用方的事务提交**。
+     *
+     * <p>2026-09-26 实测：C 端口令登录连错 5 次之后，正确口令照样登得进去 —— 因为
+     * {@code ConsumerAuthService.login} 是 {@code @Transactional}，口令错时它往外抛
+     * {@code BizException}，把本方法刚累加的 {@code failed_count} <b>一起回滚了</b>。
+     * 库里查出来永远是 0，于是锁永远上不了，而代码、测试、注释看起来都没问题
+     * （员工侧那条路没有外层事务，所以在那边是好的）。
+     *
+     * <p>这类缺陷的失败形态是「保护看起来在，实际不在」—— 所以它有一条专门的用例
+     * （{@code ConsumerPasswordLoginTest#lockoutRejectsEvenCorrectPassword}），
+     * 而那条用例最初就是红的。
+     */
     @Override
-    @Transactional
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public Check verify(String realm, String subjectNo, String rawPassword) {
         CredCredential c = find(realm, subjectNo);
         if (c == null) return null;   // 没有凭据 → 调用方回落到共享口令闸
@@ -118,9 +133,7 @@ public class CredentialServiceImpl implements CredentialService {
     @Override
     @Transactional
     public void changePassword(String realm, String subjectNo, String oldPassword, String newPassword) {
-        if (newPassword == null || newPassword.trim().length() < 8) {
-            throw BizException.badRequest("error.cred.password_too_short");
-        }
+        requireStrongEnough(newPassword);
         CredCredential c = find(realm, subjectNo);
         if (c == null) throw BizException.badRequest("error.cred.not_found");
         if (oldPassword == null || !encoder.matches(oldPassword, c.getHash())) {
@@ -136,6 +149,49 @@ public class CredentialServiceImpl implements CredentialService {
                 .set(CredCredential::getLockedUntil, null)
                 .set(CredCredential::getPwdChangedAt, LocalDateTime.now()));
         log.info("已改密 realm={} subject={}", realm, subjectNo);
+    }
+
+    @Override
+    @Transactional
+    public void setPassword(String realm, String subjectNo, String newPassword) {
+        requireStrongEnough(newPassword);
+        if (subjectNo == null || subjectNo.isBlank()) {
+            throw BizException.badRequest("error.cred.subject_required");
+        }
+        String hash = encoder.encode(newPassword.trim());
+        LocalDateTime now = LocalDateTime.now();
+        CredCredential c = find(realm, subjectNo);
+        if (c == null) {
+            c = new CredCredential();
+            c.setCredNo(BizKey.CREDENTIAL + java.util.UUID.randomUUID().toString()
+                    .replace("-", "").substring(0, 16).toUpperCase());
+            c.setTenantId("MAIN");
+            c.setRealm(realm);
+            c.setSubjectNo(subjectNo.trim());
+            c.setAlgo("BCRYPT");
+            c.setHash(hash);
+            c.setMustChange(0);          // 用户自己定的，没有「下次必须改」
+            c.setFailedCount(0);
+            c.setStatus(CredentialStatus.ACTIVE.name());
+            c.setPwdChangedAt(now);
+            creds.insert(c);
+        } else {
+            creds.update(null, new LambdaUpdateWrapper<CredCredential>().eq(CredCredential::getId, c.getId())
+                    .set(CredCredential::getHash, hash)
+                    .set(CredCredential::getMustChange, 0)
+                    .set(CredCredential::getFailedCount, 0)
+                    .set(CredCredential::getLockedUntil, null)
+                    .set(CredCredential::getStatus, CredentialStatus.ACTIVE.name())
+                    .set(CredCredential::getPwdChangedAt, now));
+        }
+        // 只记"谁设了口令"，**不记口令本身**（日志的读者远多于接口的调用者）
+        log.info("用户自设登录口令 realm={} subject={}", realm, subjectNo);
+    }
+
+    private static void requireStrongEnough(String raw) {
+        if (raw == null || raw.trim().length() < MIN_LEN) {
+            throw BizException.badRequest("error.cred.password_too_short");
+        }
     }
 
     private CredCredential find(String realm, String subjectNo) {

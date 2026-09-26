@@ -1,6 +1,6 @@
 # TDD-C端密码登录与凭据
 
-状态：**阶段 1 已实现 · 阶段 2 进行中**
+状态：**已实现**（阶段 1 + 阶段 2，2026-09-26）
 关联需求：[`功能清单-分级矩阵.md`](../requirements/功能清单-分级矩阵.md) **OPS-SYS-07 登录设置**（L1，「OTP / 密码 / Apple / Google 开关，按国家可配，下发 `/mp/auth/methods`」）
        · [`C端功能清单.md`](../requirements/C端功能清单.md) §1 C-AC-01 登录授权
 关联现状：[`C端对齐现状-17模块.md`](C端对齐现状-17模块.md) §一 模块 1
@@ -174,13 +174,28 @@ public interface ConsumerCredentialGate {
 > （c-app 发的是 `countryCode`，那个名字在 record 里不存在，被静默丢弃）。
 > 顶掉它换成 `country`(ISO)，而不是并排再加一个 —— 两个都像「国家」的字段一定有人填错。
 
-**阶段 2**
-- [ ] `CredentialService.setPassword(realm, subjectNo, raw)`（新增，不改 `resetPassword`）
-- [ ] `ConsumerCredentialGate` + `ConsumerCredentialGateConfig`（照 `OtpGate` 的理由与形状）
-- [ ] `PasswordStrategy`（`grantType="password"`）
-- [ ] `RegisterReq.password` 受理；`password/reset` 改为验 OTP + 自设；新增 `password/change`
-- [ ] 注销流程补「删凭据」
-- [ ] 测试 + 负对照；文案与耗时的探测防护；台账与 17 模块表回填
+**阶段 2（已实现，2026-09-26）**
+- [x] `CredentialService.setPassword(realm, subjectNo, raw)`（新增，`resetPassword` 未动）
+- [x] `ConsumerCredentialGate` + `ConsumerCredentialGateConfig`（照 `OtpGate` 的理由与形状）
+- [x] `PasswordStrategy`（`grantType="password"`），**不建户**：查不到身份就拒
+- [x] `RegisterReq.password` 受理（`passwordStored` 如实回）；`password/reset` = 验 OTP + 自设；
+      改密落在 `POST /mp/user/password`（**不是** `/mp/auth/*`，那整段 permitAll）
+- [x] 迁移 `V128`：`cred_realm` 词表补 `CONSUMER`（列注释是本仓判定合法值的裁定依据）
+- [x] 测试 10 条 + 负对照 3 条；全量 675 用例 BUILD SUCCESS；六个检查器全绿
+- [x] 探测防护：三种失败同一句文案 + 无凭据时烧一次 BCrypt 对齐耗时
+
+> **注销「删凭据」没有做，是有意的**：清除作业本身还不存在（`UserLogoffServiceImpl`
+> 的 `TODO(清除作业)`），而冷静期内用户可以撤销 —— 申请时就删口令会把人锁在自己的
+> 冷静期里、连撤销都登不进来。义务已写进那个 TODO 的注释，等清除作业落地时一并做。
+> 没有在端口上留一个没人调的 `remove()`：那正是这轮一直在清的「看起来做了」。
+
+### ⚠️ 实现时撞出的一个真缺陷（本方案之外）
+
+`CredentialServiceImpl.verify` 原本是 `@Transactional`。C 端口令连错 5 次后**正确口令照样登得进去** ——
+因为 `ConsumerAuthService.login` 也是 `@Transactional`，口令错时它往外抛 `BizException`，
+把 `verify` 刚累加的 `failed_count` **一起回滚了**，库里查出来永远是 0，锁永远上不了。
+代码、注释、员工侧的测试看起来都没问题（员工侧那条路没有外层事务）。
+改成 `REQUIRES_NEW`，失败计数独立提交。**那条用例最初就是红的**，不是补上去凑数的。
 
 ---
 确认记录：2026-09-26 用户确认（含 §5 的两处 P6 确认）

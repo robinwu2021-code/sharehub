@@ -34,6 +34,7 @@ export const httpApi: McpApi = {
   sendOtp: (p) => client.post<{ cooldown: number }>("/mp/auth/otp", p),
   register: (p) => client.post<ConsumerLogin>("/mp/auth/register", p),
   resetPassword: (p) => client.post<{ ok: true }>("/mp/auth/password/reset", p),
+  changePassword: (p) => client.post<{ ok: true }>("/mp/user/password", p),
   logout: () => client.post<void>("/mp/auth/logout"),
   getProfile: () => client.get<UserProfile>("/mp/user/profile"),
   updateProfile: (p: ProfilePatch) => client.post<UserProfile>("/mp/user/profile", p), // 待定

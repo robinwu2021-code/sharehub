@@ -27,7 +27,13 @@ async function sendOtp() {
 async function submit() {
   loading.value = true;
   try {
-    await api.resetPassword({ countryCode: country.value.dial, phone: phone.value, otp: otp.value, password: pwd.value });
+    await api.resetPassword({
+      countryCode: country.value.dial,
+      country: country.value.iso,   // 判密码登录开关用
+      phone: phone.value,
+      otp: otp.value,
+      password: pwd.value,
+    });
     uni.showToast({ title: "OK", icon: "success" });
     setTimeout(() => uni.navigateBack(), 500);
   } catch (e) {

@@ -23,17 +23,20 @@ public class ConsumerAuthController {
     private final DevMode devMode;
     private final ai.neargo.sharehub.identity.IdentifierNormalizer normalizer;
     private final ai.neargo.sharehub.platform.sys.service.LoginSettingService loginSettings;
+    private final ai.neargo.sharehub.user.consumer.ConsumerPasswordService passwords;
 
     public ConsumerAuthController(ConsumerAuthService authService, OtpService otpService,
                                   TokenStore tokenStore, DevMode devMode,
                                   ai.neargo.sharehub.identity.IdentifierNormalizer normalizer,
-                                  ai.neargo.sharehub.platform.sys.service.LoginSettingService loginSettings) {
+                                  ai.neargo.sharehub.platform.sys.service.LoginSettingService loginSettings,
+                                  ai.neargo.sharehub.user.consumer.ConsumerPasswordService passwords) {
         this.authService = authService;
         this.otpService = otpService;
         this.tokenStore = tokenStore;
         this.devMode = devMode;
         this.normalizer = normalizer;
         this.loginSettings = loginSettings;
+        this.passwords = passwords;
     }
 
     /**
@@ -115,20 +118,49 @@ public class ConsumerAuthController {
         // 两者不是一回事，塞进去只会让门禁按一个不存在的 ISO 去查、白白回落默认行。
         // 注册走的是 phone_otp，默认行 otp_enabled=1，门禁按默认行判即正确。
         ConsumerLoginReq req = new ConsumerLoginReq("phone_otp", null, phone, otp.trim(),
-                null, null, null, null, null, null,
+                null, null, null, null, null, null, null,
                 body.nickname(), null);
         ConsumerLoginVO vo = authService.login(req);
+        /*
+         * 口令现在**受理**了（realm=CONSUMER 的凭据，见 TDD-C端密码登录与凭据）。
+         * 空着就不设 —— 注册不强制设口令：OTP 登录本身就是完整的登录方式，
+         * 逼用户当场想一个只会让他想一个弱的。
+         * 密码登录开关关着时 setOnRegister 会抛，于是「注册成功但口令没存」不会静默发生。
+         */
+        boolean stored = false;
+        if (body.password() != null && !body.password().isBlank()) {
+            passwords.setOnRegister(vo.cUserNo(), body.password(), body.country());
+            stored = true;
+        }
         return Map.of("token", vo.token(), "cUserNo", vo.cUserNo(),
                 "nickname", body.nickname() == null ? "" : body.nickname(),
-                "isNew", vo.isNew(), "passwordStored", false);
+                "isNew", vo.isNew(), "passwordStored", stored);
     }
 
-    /** 密码重置：**能力未开通**（凭据库 pb_auth 未建，[未完成清单 B6]）——如实 400，不假 ok。 */
+    /**
+     * 忘记密码：**验 OTP → 用户自设新口令**。
+     *
+     * <p>此前这里如实 400（「凭据库 pb_auth 未建」）。那个理由 2026-09-26 起不再成立 ——
+     * {@code cred_credential} 早已存在且按 realm 参数化，本能力只是多一个 {@code CONSUMER}
+     * realm，不需要等 {@code pb_auth} 分库（那是架构级 D4，与此解耦）。
+     *
+     * <p>不回 token：重设完让用户**用新口令登一次**。直接发 token 会让「改完密码顺手登进去」
+     * 掩盖掉新口令其实没存成的情况。
+     */
     @PostMapping("/password/reset")
     public Map<String, Object> resetPassword(
-            @RequestBody(required = false) ai.neargo.sharehub.user.consumer.ConsumerAuthReqs.ResetPwdReq body) {
-        throw new IllegalArgumentException("密码能力未开通：消费者凭据库(pb_auth)未建，请使用手机验证码登录");
+            @RequestBody ai.neargo.sharehub.user.consumer.ConsumerAuthReqs.ResetPwdReq body) {
+        if (body == null || body.phone() == null || body.phone().isBlank()) {
+            throw new IllegalArgumentException("手机号为空");
+        }
+        passwords.resetByOtp(body.phone(), body.otp(), body.password(), body.country());
+        return Map.of("ok", true);
     }
+
+    // 改密**不在这里**：本控制器挂在 /mp/auth/**，而那整段是 permitAll（登录前的接口）。
+    // 改密要求已登录，所以它在 MpUserController 的 POST /mp/user/password ——
+    // 放这里就得在 SecurityConfig 里给 /mp/auth/** 开一个 authenticated 例外，
+    // 而一条与周围规则相反的例外，是下一个人最容易读漏的东西。
 
     @PostMapping("/logout")
     public Map<String, Object> logout(@RequestHeader(value = "Authorization", required = false) String auth) {

@@ -34,6 +34,11 @@ export const mockApi: McpApi = {
   sendOtp: () => db.delay({ cooldown: 60 }, 300),
   register: () => db.delay({ token: "mock-c-register", cUserNo: "CU-0001", isNew: true, tenantNo: "MAIN" }, 500),
   resetPassword: () => db.delay({ ok: true as const }, 400),
+  // mock 也校验旧口令非空：mock 一律成功的话，「旧口令错该被拒」这条永远测不到
+  changePassword: (p) => {
+    if (!p.oldPassword) return Promise.reject(new Error("old password required"));
+    return db.delay({ ok: true as const }, 400);
+  },
   // mock 没有服务端会话可吊销，但必须存在：缺这个方法，mock 模式点登出会直接 TypeError
   logout: () => db.delay(undefined as void, 100),
   getProfile: () => db.delay(db.profile),

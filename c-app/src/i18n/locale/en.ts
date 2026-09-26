@@ -106,6 +106,8 @@ export default {
     privacy: "Privacy policy",
     oldPwd: "Current password",
     newPwd: "New password",
+    pwdTooShort: "Password must be at least {n} characters",
+    pwdChanged: "Password changed",
     save: "Save",
     deleteWarn: "This permanently deletes your account and data after a cooling-off period. This cannot be undone.",
     deleteConfirm: "Delete account",

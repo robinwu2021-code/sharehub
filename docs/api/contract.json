@@ -836,6 +836,18 @@
      "type": "String"
     },
     {
+     "name": "contactName",
+     "type": "String"
+    },
+    {
+     "name": "contactPhone",
+     "type": "String"
+    },
+    {
+     "name": "contactEmail",
+     "type": "String"
+    },
+    {
      "name": "regionScope",
      "type": "String"
     },
@@ -933,6 +945,10 @@
     },
     {
      "name": "operatorType",
+     "type": "String"
+    },
+    {
+     "name": "contactName",
      "type": "String"
     },
     {
@@ -1085,6 +1101,10 @@
     },
     {
      "name": "operatorType",
+     "type": "String"
+    },
+    {
+     "name": "contactName",
      "type": "String"
     },
     {
@@ -42788,6 +42808,10 @@
      "type": "String"
     },
     {
+     "name": "password",
+     "type": "String"
+    },
+    {
      "name": "country",
      "type": "String"
     },
@@ -42899,7 +42923,7 @@
    "perm": null,
    "perms": [],
    "handler": "ConsumerAuthController#resetPassword",
-   "summary": "密码重置：**能力未开通**（凭据库 pb_auth 未建，[未完成清单 B6]）——如实 400，不假 ok。",
+   "summary": "忘记密码：**验 OTP → 用户自设新口令**。",
    "params": [],
    "bodyType": "ai.neargo.sharehub.user.consumer.ConsumerAuthReqs.ResetPwdReq",
    "returnType": "Map<String, Object>",
@@ -42909,6 +42933,10 @@
    "requestShape": [
     {
      "name": "countryCode",
+     "type": "String"
+    },
+    {
+     "name": "country",
      "type": "String"
     },
     {
@@ -42941,6 +42969,10 @@
    "requestShape": [
     {
      "name": "countryCode",
+     "type": "String"
+    },
+    {
+     "name": "country",
      "type": "String"
     },
     {
@@ -44610,6 +44642,34 @@
    "requestShape": null
   },
   {
+   "verb": "POST",
+   "path": "/mp/user/password",
+   "perm": null,
+   "perms": [],
+   "handler": "MpUserController#changePassword",
+   "summary": "本人改密。",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.user.consumer.ConsumerAuthReqs.ChangePwdReq",
+   "returnType": "Map<String, Object>",
+   "returnContainer": null,
+   "returnElement": "Map<String, Object>",
+   "responseShape": null,
+   "requestShape": [
+    {
+     "name": "country",
+     "type": "String"
+    },
+    {
+     "name": "oldPassword",
+     "type": "String"
+    },
+    {
+     "name": "newPassword",
+     "type": "String"
+    }
+   ]
+  },
+  {
    "verb": "GET",
    "path": "/mp/user/profile",
    "perm": null,
@@ -45643,10 +45703,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 516,
-  "records": 467,
+  "endpoints": 517,
+  "records": 468,
   "withPerm": 444,
-  "withBody": 219,
+  "withBody": 220,
   "shapedResponses": 406
  }
 }

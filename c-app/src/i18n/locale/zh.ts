@@ -106,6 +106,8 @@ export default {
     privacy: "隐私政策",
     oldPwd: "当前密码",
     newPwd: "新密码",
+    pwdTooShort: "密码至少 {n} 位",
+    pwdChanged: "密码已修改",
     save: "保存",
     deleteWarn: "注销将在冷静期后永久删除你的账户与数据，且不可恢复。",
     deleteConfirm: "注销账户",

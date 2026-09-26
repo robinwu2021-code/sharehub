@@ -38,12 +38,37 @@ public final class ConsumerAuthReqs {
     public record OtpReq(String countryCode, String phone, String scene) {
     }
 
-    /** 注册入参。{@code password} **不受理**（凭据库 pb_auth 未建），出参 {@code passwordStored=false} 如实声明。 */
-    public record RegisterReq(String countryCode, String phone, String otp,
+    /**
+     * 注册入参。
+     *
+     * <p><b>{@code password} 2026-09-26 起受理</b>（{@code cred_credential} 的
+     * {@code realm=CONSUMER}）。空着就不设 —— 注册不强制设口令。
+     * 出参 {@code passwordStored} 如实回「这次到底存了没有」。
+     *
+     * @param country ISO alpha-2（AE/SA…），判**密码登录开关**用；与 {@code countryCode}
+     *                （拨号码 +971）不是一回事
+     */
+    public record RegisterReq(String countryCode, String country, String phone, String otp,
                               String nickname, String password) {
     }
 
-    /** 密码重置入参 —— 能力未开通，端点如实 400。字段照 c-app 的 {@code ResetPwdParams} 收全，便于开通时不改契约。 */
-    public record ResetPwdReq(String countryCode, String phone, String otp, String password) {
+    /**
+     * 忘记密码入参：验 {@code otp} 通过后把 {@code password} 设为新口令。
+     *
+     * <p>原注释写着「能力未开通，端点如实 400」—— 那个状态 2026-09-26 结束了。
+     *
+     * @param country ISO alpha-2，判开关用
+     */
+    public record ResetPwdReq(String countryCode, String country, String phone,
+                              String otp, String password) {
+    }
+
+    /**
+     * 改密入参（已登录）。**故意不收 cUserNo** —— 它取自会话；
+     * 收了就意味着任何登录用户都能改别人的口令，而那种参数一旦存在，早晚有人会读它。
+     *
+     * @param country ISO alpha-2，判开关用
+     */
+    public record ChangePwdReq(String country, String oldPassword, String newPassword) {
     }
 }

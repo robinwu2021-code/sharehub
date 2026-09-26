@@ -46,9 +46,11 @@ B GET /api/trade/withdrawals Withdrawal 后端有前端无:netAmount
 #
 # ⚠️ 顺便记清这个卡口的边界，免得「C 类只剩 4 条」被读成「C 端对齐做完了」：
 # 本脚本只比**路径在不在、出参字段名对不对、类型有没有声明**。它不比
-#   · 请求体里的**枚举值** —— c-app 登录页发 grantType:"password"，后端没有这个策略
-#     （只有 phone_otp/apple/google/wechat_*），路径与形状都对，卡口全绿、用户吃 400；
-#   · **能力开关** —— 密码重置/改密/改邮箱后端如实 400，而 c-app 三个入口都齐；
+#   · 请求体里的**枚举值** —— 曾经的例子：c-app 发 grantType:"password" 而后端没有这个策略，
+#     路径与形状都对、卡口全绿、用户吃 400。**该例 2026-09-26 已修**（PasswordStrategy +
+#     GET /mp/auth/methods 下发开关），但盲区照旧：本脚本不比取值域；
+#   · **能力开关** —— 2026-09-26 已收口：开关由 sys_login_setting 按国家下发、服务端强制。
+#     剩「改邮箱」仍如实 400（pb_pii 未建）；
 #   · **依赖的桩** —— PaymentPort 只有 StubPaymentPort，一律模拟成功，形状完全正确。
 # 这三类的现状与处置见 docs/technical/C端对齐现状-17模块.md。
 C GET /mp/user/invoices            # 开票（4 条一组）：to-B 需求，取决于目标市场口径
