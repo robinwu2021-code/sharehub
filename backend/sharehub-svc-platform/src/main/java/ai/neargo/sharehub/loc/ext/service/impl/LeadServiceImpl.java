@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * BD 商机实现：属性保存走 {@link AbstractCrudService}；阶段迁移、丢单原因、查重、服务端字段锁在钩子里。
@@ -42,8 +43,8 @@ public class LeadServiceImpl extends AbstractCrudService<LocLead, Lead> implemen
     private final LeadStateMachine sm;
     private final SysParamPort params;
 
-    public LeadServiceImpl(LocLeadMapper mapper, SiteAgentService siteAgents, LeadStateMachine sm, SysParamPort params) {
-        super(mapper);
+    public LeadServiceImpl(LocLeadMapper mapper, JdbcTemplate jdbc, SiteAgentService siteAgents, LeadStateMachine sm, SysParamPort params) {
+        super(mapper, jdbc);
         this.siteAgents = siteAgents;
         this.leads = mapper;
         this.sm = sm;

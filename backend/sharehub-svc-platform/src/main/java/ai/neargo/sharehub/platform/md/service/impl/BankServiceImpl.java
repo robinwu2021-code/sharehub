@@ -6,6 +6,7 @@ import ai.neargo.sharehub.platform.md.entity.MdBank;
 import ai.neargo.sharehub.platform.md.mapper.MdBankMapper;
 import ai.neargo.sharehub.platform.md.service.BankService;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * 银行字典实现 —— **字典类实体的金标准样板**。
@@ -14,8 +15,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class BankServiceImpl extends AbstractCrudService<MdBank, BankEntry> implements BankService {
 
-    public BankServiceImpl(MdBankMapper mapper) {
-        super(mapper);
+    public BankServiceImpl(MdBankMapper mapper, JdbcTemplate jdbc) {
+        super(mapper, jdbc);
     }
 
     @Override

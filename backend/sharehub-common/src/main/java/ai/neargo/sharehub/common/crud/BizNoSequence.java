@@ -36,8 +36,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * <h2>已知取舍：并发下会撞唯一键</h2>
  * 两个人同一瞬间建档，{@code MAX+1} 会算出同一个号，其中一个撞业务键唯一索引失败。
  * 场地方 / 代理商一天建几个，这个代价可以接受；要绝对安全得上号段表，不值得。
- * {@link AbstractCrudService#nextNo} 走的也是这条路，行为一致。
- * ⚠️ 但它**也有上面那个逻辑删除的洞** —— 那条路归档过的实体同样会撞，尚未修。
+ * {@link AbstractCrudService#nextNo} 直接委托到这里，两条路行为一致 ——
+ * 它此前有同样的逻辑删除的洞（而基类的 remove() 正是软删），2026-09-26 一并收掉。
  */
 public final class BizNoSequence {
 

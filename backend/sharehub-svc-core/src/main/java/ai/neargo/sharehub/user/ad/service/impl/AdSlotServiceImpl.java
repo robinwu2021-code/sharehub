@@ -10,6 +10,7 @@ import ai.neargo.sharehub.user.ad.service.AdSlotService;
 import org.springframework.stereotype.Service;
 
 import java.time.format.DateTimeFormatter;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /** 广告位实现。 */
 @Service
@@ -17,8 +18,8 @@ public class AdSlotServiceImpl extends AbstractCrudService<AdSlot, AdSlotVO> imp
 
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    public AdSlotServiceImpl(AdSlotMapper mapper) {
-        super(mapper);
+    public AdSlotServiceImpl(AdSlotMapper mapper, JdbcTemplate jdbc) {
+        super(mapper, jdbc);
     }
 
     @Override

@@ -12,6 +12,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * 应用版本实现。
@@ -30,8 +31,8 @@ public class AppVersionServiceImpl extends AbstractCrudService<SysAppVersion, Ap
 
     private final SysAppVersionMapper versionMapper;
 
-    public AppVersionServiceImpl(SysAppVersionMapper mapper) {
-        super(mapper);
+    public AppVersionServiceImpl(SysAppVersionMapper mapper, JdbcTemplate jdbc) {
+        super(mapper, jdbc);
         this.versionMapper = mapper;
     }
 

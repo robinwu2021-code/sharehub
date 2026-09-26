@@ -13,6 +13,7 @@ import ai.neargo.sharehub.platform.notify.entity.NotifyTemplate;
 import ai.neargo.sharehub.platform.notify.mapper.NotifyTemplateMapper;
 import ai.neargo.sharehub.platform.notify.service.NotifyTemplateService;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /** 通知模板实现 —— 字典/配置类，行为全部来自 {@link AbstractCrudService}。 */
 @Service
@@ -21,8 +22,8 @@ public class NotifyTemplateServiceImpl extends AbstractCrudService<NotifyTemplat
 
     private final NotifyLogService notifyLogService;
 
-    public NotifyTemplateServiceImpl(NotifyTemplateMapper mapper, NotifyLogService notifyLogService) {
-        super(mapper);
+    public NotifyTemplateServiceImpl(NotifyTemplateMapper mapper, JdbcTemplate jdbc, NotifyLogService notifyLogService) {
+        super(mapper, jdbc);
         this.notifyLogService = notifyLogService;
     }
 

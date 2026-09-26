@@ -21,6 +21,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class MissingWriteEndpointsTest extends ApiTestSupport {
 
+    @org.springframework.beans.factory.annotation.Autowired
+    org.springframework.jdbc.core.JdbcTemplate jdbc;
+
     // ——— 裂变规则 ———
 
     private Map<String, Object> rule(String name, String status) {
@@ -68,16 +71,37 @@ class MissingWriteEndpointsTest extends ApiTestSupport {
     void role_can_be_created_and_renamed() {
         String admin = login("ADMIN");
         Map<String, Object> body = new HashMap<>();
-        body.put("code", "TESTROLE" + System.nanoTime() % 100000);
+        /*
+         * 编码用 UUID，**不用 `System.nanoTime() % 100000`**。
+         *
+         * 那个写法看起来有 10 万个值，实测只有约 2400 个：macOS 的 nanoTime 量化到
+         * ~41.67ns 一步，取后五位只落在 41 的倍数上。而本用例建的角色从不清理，
+         * 共享测试库里已经攒了 89 行 TESTROLE —— 撞上的概率约 89/2400≈3.7%，
+         * **且每跑一次就涨一点**。症状是「绿了很久忽然开始红」，
+         * 而红的是 400「角色编码已存在」，看起来像接口坏了。
+         *
+         * 取号不撞只是一半，更要紧的是**跑完自己收拾**（见下面的 finally）：
+         * 不收拾的话库继续长，抖动必然复发。
+         */
+        String code = "TESTROLE" + java.util.UUID.randomUUID().toString().substring(0, 8);
+        body.put("code", code);
         body.put("name", "测试角色");
-        JsonNode r = post("/api/platform/roles", body, admin).okData();
-        String roleNo = r.path("roleNo").asText();
-        assertThat(roleNo).isNotBlank();
+        String roleNo = null;
+        try {
+            JsonNode r = post("/api/platform/roles", body, admin).okData();
+            roleNo = r.path("roleNo").asText();
+            assertThat(roleNo).isNotBlank();
 
-        Map<String, Object> rename = new HashMap<>();
-        rename.put("name", "测试角色改名");
-        assertThat(post("/api/platform/roles/" + roleNo, rename, admin).okData().path("name").asText())
-                .isEqualTo("测试角色改名");
+            Map<String, Object> rename = new HashMap<>();
+            rename.put("name", "测试角色改名");
+            assertThat(post("/api/platform/roles/" + roleNo, rename, admin).okData().path("name").asText())
+                    .isEqualTo("测试角色改名");
+        } finally {
+            if (roleNo != null) {
+                jdbc.update("DELETE FROM iam_role_perm WHERE role_no=?", roleNo);
+                jdbc.update("DELETE FROM iam_role WHERE role_no=?", roleNo);
+            }
+        }
     }
 
     @Test

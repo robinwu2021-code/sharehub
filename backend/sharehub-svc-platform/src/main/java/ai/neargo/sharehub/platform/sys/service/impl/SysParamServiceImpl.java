@@ -8,6 +8,7 @@ import ai.neargo.sharehub.platform.sys.mapper.SysParamMapper;
 import ai.neargo.sharehub.platform.sys.service.SysParamService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * 系统参数实现。
@@ -18,8 +19,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class SysParamServiceImpl extends AbstractCrudService<SysParam, SysParamEntry> implements SysParamService {
 
-    public SysParamServiceImpl(SysParamMapper mapper) {
-        super(mapper);
+    public SysParamServiceImpl(SysParamMapper mapper, JdbcTemplate jdbc) {
+        super(mapper, jdbc);
     }
 
     @Override

@@ -12,6 +12,7 @@ import ai.neargo.sharehub.wo.ext.entity.WoInspectionPlan;
 import ai.neargo.sharehub.wo.ext.mapper.WoInspectionPlanMapper;
 import ai.neargo.sharehub.wo.ext.service.InspectionPlanService;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * 巡检计划实现。{@code run} 的机柜定位走 {@link CabinetQueryPort}（api 契约层）——
@@ -28,9 +29,9 @@ public class InspectionPlanServiceImpl extends AbstractCrudService<WoInspectionP
     private final WoOpsService woOps;
     private final CabinetQueryPort cabinetQuery;
 
-    public InspectionPlanServiceImpl(WoInspectionPlanMapper mapper, WoOpsService woOps,
+    public InspectionPlanServiceImpl(WoInspectionPlanMapper mapper, JdbcTemplate jdbc, WoOpsService woOps,
                                      CabinetQueryPort cabinetQuery) {
-        super(mapper);
+        super(mapper, jdbc);
         this.planMapper = mapper;
         this.woOps = woOps;
         this.cabinetQuery = cabinetQuery;

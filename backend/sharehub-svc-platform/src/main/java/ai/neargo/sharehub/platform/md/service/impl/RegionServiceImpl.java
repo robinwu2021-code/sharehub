@@ -6,6 +6,7 @@ import ai.neargo.sharehub.platform.md.entity.MdRegion;
 import ai.neargo.sharehub.platform.md.mapper.MdRegionMapper;
 import ai.neargo.sharehub.platform.md.service.RegionService;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * 地区库实现。{@code region_id} 是自然键（{@code AE}/{@code AE-DU}/{@code DU-MAR}）——
@@ -14,8 +15,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class RegionServiceImpl extends AbstractCrudService<MdRegion, Region> implements RegionService {
 
-    public RegionServiceImpl(MdRegionMapper mapper) {
-        super(mapper);
+    public RegionServiceImpl(MdRegionMapper mapper, JdbcTemplate jdbc) {
+        super(mapper, jdbc);
     }
 
     @Override

@@ -12,6 +12,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * 充值套餐实现 —— 字典类样板 + 一处域特有逻辑（适用市场关联表）。
@@ -25,8 +26,8 @@ public class RechargePackageServiceImpl extends AbstractCrudService<UsrRechargeP
 
     private final UsrRechargePkgMarketMapper markets;
 
-    public RechargePackageServiceImpl(UsrRechargePkgMapper mapper, UsrRechargePkgMarketMapper markets) {
-        super(mapper);
+    public RechargePackageServiceImpl(UsrRechargePkgMapper mapper, JdbcTemplate jdbc, UsrRechargePkgMarketMapper markets) {
+        super(mapper, jdbc);
         this.markets = markets;
     }
 

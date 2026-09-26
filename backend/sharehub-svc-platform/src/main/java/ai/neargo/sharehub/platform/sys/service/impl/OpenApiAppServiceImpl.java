@@ -14,6 +14,7 @@ import ai.neargo.sharehub.platform.sys.entity.OpenapiApp;
 import ai.neargo.sharehub.platform.sys.mapper.OpenapiAppMapper;
 import ai.neargo.sharehub.platform.sys.service.OpenApiAppService;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * 开放平台应用实现。
@@ -25,8 +26,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class OpenApiAppServiceImpl extends AbstractCrudService<OpenapiApp, OpenApiApp> implements OpenApiAppService {
 
-    public OpenApiAppServiceImpl(OpenapiAppMapper mapper) {
-        super(mapper);
+    public OpenApiAppServiceImpl(OpenapiAppMapper mapper, JdbcTemplate jdbc) {
+        super(mapper, jdbc);
     }
 
     @Override

@@ -8,6 +8,7 @@ import ai.neargo.sharehub.platform.sys.mapper.SysLoginSettingMapper;
 import ai.neargo.sharehub.platform.sys.service.LoginSettingService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * 登录设置实现。
@@ -27,8 +28,8 @@ public class LoginSettingServiceImpl extends AbstractCrudService<SysLoginSetting
     /** 默认行：端上查不到本国配置时回落它。 */
     private static final String DEFAULT_COUNTRY = "*";
 
-    public LoginSettingServiceImpl(SysLoginSettingMapper mapper) {
-        super(mapper);
+    public LoginSettingServiceImpl(SysLoginSettingMapper mapper, JdbcTemplate jdbc) {
+        super(mapper, jdbc);
     }
 
     @Override

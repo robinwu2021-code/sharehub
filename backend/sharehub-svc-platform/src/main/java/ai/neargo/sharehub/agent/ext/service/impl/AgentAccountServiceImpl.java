@@ -7,6 +7,7 @@ import ai.neargo.sharehub.agent.ext.service.AgentAccountService;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.common.crud.AbstractCrudService;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * 代理账号实现。
@@ -18,8 +19,8 @@ import org.springframework.stereotype.Service;
 public class AgentAccountServiceImpl extends AbstractCrudService<AgtAccount, AgentAccount>
         implements AgentAccountService {
 
-    public AgentAccountServiceImpl(AgtAccountMapper mapper) {
-        super(mapper);
+    public AgentAccountServiceImpl(AgtAccountMapper mapper, JdbcTemplate jdbc) {
+        super(mapper, jdbc);
     }
 
     @Override

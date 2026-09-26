@@ -8,13 +8,14 @@ import ai.neargo.sharehub.user.marketing.entity.MktCampaign;
 import ai.neargo.sharehub.user.marketing.mapper.MktCampaignMapper;
 import ai.neargo.sharehub.user.marketing.service.CampaignService;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /** 营销活动实现。 */
 @Service
 public class CampaignServiceImpl extends AbstractCrudService<MktCampaign, CampaignVO> implements CampaignService {
 
-    public CampaignServiceImpl(MktCampaignMapper mapper) {
-        super(mapper);
+    public CampaignServiceImpl(MktCampaignMapper mapper, JdbcTemplate jdbc) {
+        super(mapper, jdbc);
     }
 
     @Override

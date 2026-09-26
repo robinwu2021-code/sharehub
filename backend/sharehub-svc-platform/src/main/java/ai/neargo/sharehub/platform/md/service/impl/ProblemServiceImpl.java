@@ -11,6 +11,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * 问题字典实现。运营侧走通用 CRUD；{@link #faq} 是 C 端只读投影
@@ -21,8 +22,8 @@ public class ProblemServiceImpl extends AbstractCrudService<MdProblem, ProblemEn
 
     private final MdProblemMapper problemMapper;
 
-    public ProblemServiceImpl(MdProblemMapper mapper) {
-        super(mapper);
+    public ProblemServiceImpl(MdProblemMapper mapper, JdbcTemplate jdbc) {
+        super(mapper, jdbc);
         this.problemMapper = mapper;
     }
 

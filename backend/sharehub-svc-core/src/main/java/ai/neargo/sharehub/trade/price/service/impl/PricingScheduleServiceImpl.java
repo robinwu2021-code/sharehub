@@ -9,6 +9,7 @@ import ai.neargo.sharehub.trade.price.service.PricingScheduleService;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * 活动/时段价实现。
@@ -23,8 +24,8 @@ public class PricingScheduleServiceImpl extends AbstractCrudService<PriceSchedul
     /** 倍率上限：纯防呆（防止手滑多敲一位），非业务规则。 */
     private static final BigDecimal MULTIPLIER_MAX = new BigDecimal("99.9999");
 
-    public PricingScheduleServiceImpl(PriceScheduleMapper mapper) {
-        super(mapper);
+    public PricingScheduleServiceImpl(PriceScheduleMapper mapper, JdbcTemplate jdbc) {
+        super(mapper, jdbc);
     }
 
     @Override

@@ -10,14 +10,15 @@ import ai.neargo.sharehub.dev.entity.DevCodeBatch;
 import ai.neargo.sharehub.dev.mapper.CodeBatchMapper;
 import ai.neargo.sharehub.dev.service.CodeBatchService;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /** 设备编码批次实现：行为全部来自 {@link AbstractCrudService}，本类只声明键/搜索/筛选/转 VO。 */
 @Service
 public class CodeBatchServiceImpl extends AbstractCrudService<DevCodeBatch, CodeBatchRow>
         implements CodeBatchService {
 
-    public CodeBatchServiceImpl(CodeBatchMapper mapper) {
-        super(mapper);
+    public CodeBatchServiceImpl(CodeBatchMapper mapper, JdbcTemplate jdbc) {
+        super(mapper, jdbc);
     }
 
     @Override

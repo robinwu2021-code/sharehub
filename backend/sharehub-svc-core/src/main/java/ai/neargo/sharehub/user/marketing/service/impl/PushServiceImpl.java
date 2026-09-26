@@ -10,13 +10,14 @@ import ai.neargo.sharehub.user.marketing.entity.MktPush;
 import ai.neargo.sharehub.user.marketing.mapper.MktPushMapper;
 import ai.neargo.sharehub.user.marketing.service.PushService;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /** 推送触达实现。 */
 @Service
 public class PushServiceImpl extends AbstractCrudService<MktPush, PushMessageVO> implements PushService {
 
-    public PushServiceImpl(MktPushMapper mapper) {
-        super(mapper);
+    public PushServiceImpl(MktPushMapper mapper, JdbcTemplate jdbc) {
+        super(mapper, jdbc);
     }
 
     @Override

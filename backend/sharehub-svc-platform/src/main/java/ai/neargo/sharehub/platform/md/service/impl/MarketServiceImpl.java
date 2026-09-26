@@ -9,6 +9,7 @@ import ai.neargo.sharehub.platform.md.mapper.MdRegionMapper;
 import ai.neargo.sharehub.platform.md.service.MarketService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * 多国家市场实现。
@@ -23,8 +24,8 @@ public class MarketServiceImpl extends AbstractCrudService<MdMarketCountry, Mark
 
     private final MdRegionMapper regionMapper;
 
-    public MarketServiceImpl(MdMarketCountryMapper mapper, MdRegionMapper regionMapper) {
-        super(mapper);
+    public MarketServiceImpl(MdMarketCountryMapper mapper, JdbcTemplate jdbc, MdRegionMapper regionMapper) {
+        super(mapper, jdbc);
         this.regionMapper = regionMapper;
     }
 

@@ -9,13 +9,14 @@ import ai.neargo.sharehub.user.marketing.service.CouponTplService;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /** 券模板实现。 */
 @Service
 public class CouponTplServiceImpl extends AbstractCrudService<CouponTpl, CouponTplVO> implements CouponTplService {
 
-    public CouponTplServiceImpl(CouponTplMapper mapper) {
-        super(mapper);
+    public CouponTplServiceImpl(CouponTplMapper mapper, JdbcTemplate jdbc) {
+        super(mapper, jdbc);
     }
 
     @Override

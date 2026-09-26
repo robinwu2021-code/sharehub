@@ -156,15 +156,72 @@ class AgentCreateTest extends ApiTestSupport {
         }
     }
 
+    @Test
+    @DisplayName("★ 审核通过后代理商档案上有联系方式 —— 明文只在申请单的 contact* 三列里活着")
+    void approved_agent_carries_business_contact() {
+        /*
+         * 2026-09-26 生产验证时发现：审核建出来的代理商 contact_name/phone/email
+         * **全是 NULL**，运营台列表显示 `-`，「开通登录」还提示「缺联系手机/邮箱」。
+         * 链路通着，值是空的。
+         *
+         * 根因是明文在提交那一刻就丢了 —— submit() 只写 hash/mask，
+         * 而 phone_enc / email_enc 两列**全仓没有任何一处写入**。
+         * V127 起明文存进申请单的 contact* 三列（业务联系方式，与登录标识分开），
+         * 审核通过时回填到 agt_agent。
+         *
+         * 断言**具体的值相等**而不是「非空」：回填成掩码（曾经的 mock 就是这么写的）
+         * 同样非空，但掩码打不了电话。
+         */
+        String name = "【测试】联系方式落地";
+        String phone = storedPhone(name);
+        String email = expectedEmail(name);
+        String applyNo = recordApply(name);
+
+        String other = "TMPAPV3";
+        jdbc.update("DELETE FROM iam_role_perm WHERE role_no=?", other);
+        jdbc.update("INSERT INTO iam_role_perm (role_no, perm_code) VALUES (?, 'agent:apply:read'), (?, 'agent:apply:approve')",
+                other, other);
+        try {
+            Resp r = post("/api/agent/applies/" + applyNo + "/audit", Map.of("approve", true), login(other));
+            assertThat(r.status).as("%s", r.body).isEqualTo(200);
+
+            Map<String, Object> row = jdbc.queryForMap(
+                    "SELECT contact_name, phone, email FROM agt_agent WHERE name=?", name);
+            assertThat(row.get("phone")).as("档案上的联系电话 —— 空的话运营台显示 `-`、开通登录会拦")
+                    .isEqualTo(phone);
+            assertThat(row.get("email")).as("档案上的联系邮箱").isEqualTo(email);
+        } finally {
+            jdbc.update("DELETE FROM iam_role_perm WHERE role_no=?", other);
+        }
+    }
+
     /** 以 admin 的身份代建录入一张申请单，返回单号。 */
     private String recordApply(String name) {
         Map<String, Object> m = new HashMap<>();
         m.put("operatorName", name);
         m.put("operatorType", "AGENT");
         // 手机号与邮箱都必填 —— 自然人的两个登录标识，缺一个审核通过时建不出来
-        m.put("phone", "+9715000" + String.format("%05d", Math.abs(name.hashCode()) % 100000));
-        m.put("email", "a" + Math.abs(name.hashCode()) + "@selfaudit.test");
+        m.put("phone", expectedPhone(name));
+        m.put("email", expectedEmail(name));
         JsonNode r = post("/api/agent/applies", m, admin).okData();
         return r.path("applyNo").asText();
+    }
+
+    /** 与 {@link #recordApply} 用同一个算法 —— 断言要比的是「存进去的就是填进去的那个」。 */
+    private static String expectedPhone(String name) {
+        return "+9715000" + String.format("%05d", Math.abs(name.hashCode()) % 100000);
+    }
+
+    /**
+     * 落库的形态：{@code IdentifierNormalizer.phone} 会**去掉前导 `+`**，
+     * 存的是 E.164 的纯数字串。拿填进去的原样去断言会红在一个 `+` 上，
+     * 而那个红看起来像「联系方式没落下来」—— 与真缺陷完全同形，所以这里说清楚。
+     */
+    private static String storedPhone(String name) {
+        return expectedPhone(name).substring(1);
+    }
+
+    private static String expectedEmail(String name) {
+        return "a" + Math.abs(name.hashCode()) + "@selfaudit.test";
     }
 }

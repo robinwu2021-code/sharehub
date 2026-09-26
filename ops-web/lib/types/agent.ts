@@ -81,13 +81,28 @@ export interface AgentApply {
   operatorName: string;
   operatorType: OperatorType;
   /**
-   * 手机号与邮箱一律**只给掩码**。
+   * **登录标识**的掩码。掩码不可逆也会碰撞（`13800138000` 与 `13811138000`
+   * 掩码相同），拿它做任何等值判断都是错的 —— 登录键是 HMAC。
    *
-   * 明文在服务端（可逆加密），登录键是 HMAC —— 掩码不可逆也会碰撞
-   * （`13800138000` 与 `13811138000` 掩码相同），拿它做任何等值判断都是错的。
+   * ⚠️ 这里此前写着「明文在服务端（可逆加密）」，**那是不成立的**：
+   * `phone_enc` / `email_enc` 两列全仓没有任何一处写入，生产上恒为 NULL。
+   * 要联系方式看下面的 `contact*` 三列。
    */
   phoneMask: string;
   emailMask: string;
+  /**
+   * ——— 业务联系方式（明文，V127）———
+   *
+   * 与上面的掩码**语义不同，不要混用**：掩码只用于显示，这三列是运营要拨打、
+   * 要发件的东西，审核通过时回填到代理商档案。联系人完全可能不是那个
+   * 登录的自然人（换对接人是常事）。
+   *
+   * 电话/邮箱默认取提交时填的那个，不让人填两遍；姓名可选。
+   * 历史申请单的明文已经丢了，补不回来 —— 那些行这三列是 null。
+   */
+  contactName: string | null;
+  contactPhone: string | null;
+  contactEmail: string | null;
   regionScope: string | null;
   shareRate: number | null;
   /** 资质材料。敏感件只存 pii 引用，不落明文（PDPL）。 */

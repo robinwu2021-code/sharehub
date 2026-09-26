@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.LinkedHashSet;
 import java.util.List;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * 员工实现。
@@ -40,9 +41,9 @@ public class EmployeeServiceImpl extends AbstractCrudService<IamEmployee, Employ
     private final RoleMapper roleMapper;
     private final PermVersion permVersion;
 
-    public EmployeeServiceImpl(IamEmployeeMapper mapper, IamEmployeeRoleMapper employeeRoleMapper,
+    public EmployeeServiceImpl(IamEmployeeMapper mapper, JdbcTemplate jdbc, IamEmployeeRoleMapper employeeRoleMapper,
                                IamDeptMapper deptMapper, RoleMapper roleMapper, PermVersion permVersion) {
-        super(mapper);
+        super(mapper, jdbc);
         this.employeeRoleMapper = employeeRoleMapper;
         this.deptMapper = deptMapper;
         this.roleMapper = roleMapper;

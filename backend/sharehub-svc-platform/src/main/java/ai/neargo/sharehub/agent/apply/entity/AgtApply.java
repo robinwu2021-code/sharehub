@@ -32,6 +32,12 @@ public class AgtApply extends BaseEntity {
      */
     private String source;
 
+    /*
+     * ⚠️ phoneEnc / emailEnc 两列**全仓没有任何一处写入**，生产上恒为 NULL。
+     * 设计上它们是「需要还原时（发短信/邮件）」与「pepper 轮换时重算 hash 的依据」，
+     * 两个用途都没有落过地。要联系方式请看下面的 contact* 三列 ——
+     * 那才是运营真正要看见、要拨打的东西（V127）。
+     */
     private String phoneHash;
     private String phoneMask;
     private byte[] phoneEnc;
@@ -47,6 +53,21 @@ public class AgtApply extends BaseEntity {
 
     /** AGENT / CITY_PARTNER。**决定必填项**。 */
     private String operatorType;
+
+    /*
+     * ——— 业务联系方式（明文，V127）———
+     *
+     * 与上面的身份三列**语义不同，不要混用**：
+     *   · phoneHash/Mask 是**登录标识** —— 要能查找、要唯一、不可逆；
+     *   · 这三列是**运营要拨打、要发件的联系方式** —— 本就该是明文，
+     *     而且联系人完全可能不是那个登录的自然人（换对接人是常事）。
+     *
+     * contactPhone/Email 默认取提交时填的那个号（归一化后），不让人填两遍；
+     * 审核通过时回填到 agt_agent 的同名列，运营可在档案里单独改。
+     */
+    private String contactName;
+    private String contactPhone;
+    private String contactEmail;
 
     private String regionScope;
 

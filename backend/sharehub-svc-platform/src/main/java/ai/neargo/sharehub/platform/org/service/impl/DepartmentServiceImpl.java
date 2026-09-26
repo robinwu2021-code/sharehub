@@ -10,6 +10,7 @@ import ai.neargo.sharehub.platform.org.mapper.IamEmployeeMapper;
 import ai.neargo.sharehub.platform.org.service.DepartmentService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * 组织架构实现。CRUD 之外只有两条规则，都是为了「树」这件事：
@@ -28,8 +29,8 @@ public class DepartmentServiceImpl extends AbstractCrudService<IamDept, Departme
 
     private final IamEmployeeMapper employeeMapper;
 
-    public DepartmentServiceImpl(IamDeptMapper mapper, IamEmployeeMapper employeeMapper) {
-        super(mapper);
+    public DepartmentServiceImpl(IamDeptMapper mapper, JdbcTemplate jdbc, IamEmployeeMapper employeeMapper) {
+        super(mapper, jdbc);
         this.employeeMapper = employeeMapper;
     }
 

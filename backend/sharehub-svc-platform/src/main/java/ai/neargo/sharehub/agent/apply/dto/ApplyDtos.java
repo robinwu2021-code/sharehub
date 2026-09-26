@@ -17,8 +17,14 @@ public final class ApplyDtos {
      *
      * @param otp 自助提交必填（证明持有该手机号）；代建由经办员工的令牌背书，可不传
      */
+    /**
+     * @param contactName 业务联系人姓名，**可选** —— 自助注册时申请人未必填。
+     *                    联系电话/邮箱不单独收：默认就是上面 {@code phone}/{@code email}
+     *                    的明文，不让人把同一个号填两遍（运营可在代理商档案里单独改）。
+     */
     public record SubmitReq(String phone, String email, String otp,
                             String operatorName, String operatorType,
+                            String contactName,
                             String regionScope, BigDecimal shareRate, String payload) {
     }
 
@@ -32,6 +38,7 @@ public final class ApplyDtos {
     public record ApplyView(String applyNo, String source, String status,
                             String operatorName, String operatorType,
                             String phoneMask, String emailMask,
+                            String contactName, String contactPhone, String contactEmail,
                             String regionScope, BigDecimal shareRate, String payload,
                             String principalNo, String rejectReason,
                             String submittedBy, LocalDateTime submittedAt,

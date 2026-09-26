@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
 import java.util.List;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /** 计费模板实现：CRUD 走基类，{@code price_plan_scope} 多值拆表手写。 */
 @Service
@@ -29,8 +30,8 @@ public class PricePlanServiceImpl extends AbstractCrudService<PricePlan, PricePl
 
     private final PricePlanScopeMapper scopeMapper;
 
-    public PricePlanServiceImpl(PricePlanMapper mapper, PricePlanScopeMapper scopeMapper) {
-        super(mapper);
+    public PricePlanServiceImpl(PricePlanMapper mapper, JdbcTemplate jdbc, PricePlanScopeMapper scopeMapper) {
+        super(mapper, jdbc);
         this.scopeMapper = scopeMapper;
     }
 

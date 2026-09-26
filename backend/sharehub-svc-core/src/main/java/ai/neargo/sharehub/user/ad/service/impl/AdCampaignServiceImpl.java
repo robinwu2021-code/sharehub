@@ -10,13 +10,14 @@ import ai.neargo.sharehub.user.ad.service.AdCampaignService;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /** 广告活动实现。 */
 @Service
 public class AdCampaignServiceImpl extends AbstractCrudService<AdCampaign, AdCampaignVO> implements AdCampaignService {
 
-    public AdCampaignServiceImpl(AdCampaignMapper mapper) {
-        super(mapper);
+    public AdCampaignServiceImpl(AdCampaignMapper mapper, JdbcTemplate jdbc) {
+        super(mapper, jdbc);
     }
 
     @Override

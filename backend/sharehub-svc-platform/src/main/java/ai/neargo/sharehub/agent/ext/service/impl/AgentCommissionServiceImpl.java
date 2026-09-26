@@ -9,6 +9,7 @@ import ai.neargo.sharehub.common.crud.AbstractCrudService;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * 代理分润配置实现。
@@ -22,8 +23,8 @@ public class AgentCommissionServiceImpl extends AbstractCrudService<AgtCommissio
     private static final String DIM_GMV = "GMV";
     private static final String DIM_ORDER_COUNT = "ORDER_COUNT";
 
-    public AgentCommissionServiceImpl(AgtCommissionMapper mapper) {
-        super(mapper);
+    public AgentCommissionServiceImpl(AgtCommissionMapper mapper, JdbcTemplate jdbc) {
+        super(mapper, jdbc);
     }
 
     @Override

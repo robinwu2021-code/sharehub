@@ -7,6 +7,7 @@ import ai.neargo.sharehub.alarm.entity.DevAlarmCode;
 import ai.neargo.sharehub.alarm.mapper.DevAlarmCodeMapper;
 import ai.neargo.sharehub.alarm.service.AlarmCodeService;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * 告警代码字典实现。行为全部来自 {@link AbstractCrudService}，本类只声明键/搜/筛/转 VO。
@@ -18,8 +19,8 @@ import org.springframework.stereotype.Service;
 public class AlarmCodeServiceImpl extends AbstractCrudService<DevAlarmCode, AlarmCode>
         implements AlarmCodeService {
 
-    public AlarmCodeServiceImpl(DevAlarmCodeMapper mapper) {
-        super(mapper);
+    public AlarmCodeServiceImpl(DevAlarmCodeMapper mapper, JdbcTemplate jdbc) {
+        super(mapper, jdbc);
     }
 
     @Override

@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /** 公告实现：CRUD 走基类，C 端可见性（发布态 + 生效期 + 置顶排序）手写。 */
 @Service
@@ -20,8 +21,8 @@ public class NoticeServiceImpl extends AbstractCrudService<MktNotice, NoticeVO> 
 
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    public NoticeServiceImpl(MktNoticeMapper mapper) {
-        super(mapper);
+    public NoticeServiceImpl(MktNoticeMapper mapper, JdbcTemplate jdbc) {
+        super(mapper, jdbc);
     }
 
     @Override

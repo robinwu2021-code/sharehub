@@ -101,6 +101,12 @@ const APPLY_FIELDS: FieldDef[] = [
     pattern: { re: "^\\+?[0-9 -]{6,20}$", msg: "手机号格式不对（可带国际区号）" } },
   { key: "email", label: "邮箱", required: true,
     pattern: { re: "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", msg: "邮箱格式不对" } },
+  /*
+   * 业务联系人**只收姓名**（V127）：联系电话与邮箱就是上面那两个，
+   * 不让人把同一个号填两遍。审核通过时三样一起落到代理商档案上。
+   * 可选 —— 商家自助那一侧申请人未必填，代建时运营多半知道对接人是谁。
+   */
+  { key: "contactName", label: "业务联系人", placeholder: "对接人姓名，可与登录人不同" },
   { key: "regionScope", label: "辖域", placeholder: "如：迪拜 · 商业湾" },
   { key: "shareRate", label: "拟定分润比例（0~1）", type: "number", min: 0, max: 1 },
   { key: "payload", label: "资质材料说明", placeholder: "线下已签约 / 材料清单" },

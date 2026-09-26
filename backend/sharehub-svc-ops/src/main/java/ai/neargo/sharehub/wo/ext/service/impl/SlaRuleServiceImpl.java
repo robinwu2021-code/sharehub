@@ -8,13 +8,14 @@ import ai.neargo.sharehub.wo.ext.entity.WoSlaRule;
 import ai.neargo.sharehub.wo.ext.mapper.WoSlaRuleMapper;
 import ai.neargo.sharehub.wo.ext.service.SlaRuleService;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /** SLA 规则配置实现。 */
 @Service
 public class SlaRuleServiceImpl extends AbstractCrudService<WoSlaRule, SlaRule> implements SlaRuleService {
 
-    public SlaRuleServiceImpl(WoSlaRuleMapper mapper) {
-        super(mapper);
+    public SlaRuleServiceImpl(WoSlaRuleMapper mapper, JdbcTemplate jdbc) {
+        super(mapper, jdbc);
     }
 
     @Override

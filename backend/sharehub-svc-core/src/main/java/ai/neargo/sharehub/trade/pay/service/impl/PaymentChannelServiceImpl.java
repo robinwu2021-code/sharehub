@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * 支付渠道实现。CRUD 走基类；国家/币种/能力的多值拆表手写。
@@ -33,8 +34,8 @@ public class PaymentChannelServiceImpl extends AbstractCrudService<PayChannel, P
 
     private final PayChannelScopeMapper scopeMapper;
 
-    public PaymentChannelServiceImpl(PayChannelMapper mapper, PayChannelScopeMapper scopeMapper) {
-        super(mapper);
+    public PaymentChannelServiceImpl(PayChannelMapper mapper, JdbcTemplate jdbc, PayChannelScopeMapper scopeMapper) {
+        super(mapper, jdbc);
         this.scopeMapper = scopeMapper;
     }
 

@@ -8,6 +8,7 @@ import ai.neargo.sharehub.alarm.entity.DevAlarmRule;
 import ai.neargo.sharehub.alarm.mapper.DevAlarmRuleMapper;
 import ai.neargo.sharehub.alarm.service.AlarmRuleService;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * 告警通知规则实现。CRUD 走基类；本类额外承担静默窗口的**校验**与**判定**。
@@ -16,8 +17,8 @@ import org.springframework.stereotype.Service;
 public class AlarmRuleServiceImpl extends AbstractCrudService<DevAlarmRule, AlarmRule>
         implements AlarmRuleService {
 
-    public AlarmRuleServiceImpl(DevAlarmRuleMapper mapper) {
-        super(mapper);
+    public AlarmRuleServiceImpl(DevAlarmRuleMapper mapper, JdbcTemplate jdbc) {
+        super(mapper, jdbc);
     }
 
     @Override

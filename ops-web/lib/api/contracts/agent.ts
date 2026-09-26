@@ -61,6 +61,11 @@ export interface AgentApi {
    */
   createAgentApply(x: {
     phone: string; email: string; operatorName: string; operatorType: OperatorType;
+    /**
+     * 业务联系人姓名，可选。**联系电话/邮箱不单独收** —— 默认就是上面
+     * `phone`/`email` 的明文，不让人把同一个号填两遍（运营可在代理商档案里改）。
+     */
+    contactName?: string;
     regionScope?: string; shareRate?: number; payload?: string;
   }): Promise<AgentApply>;
 
@@ -75,7 +80,7 @@ export interface AgentApi {
   /** 自助提交。落的是 `source=SELF_SERVICE`（由路由决定，不从这里传）。 */
   selfServiceApply(x: {
     phone: string; otp: string; email: string;
-    operatorName: string; operatorType: OperatorType;
+    operatorName: string; operatorType: OperatorType; contactName?: string;
     regionScope?: string; payload?: string;
   }): Promise<{ applyNo: string; status: ApplyStatus }>;
   /** 申请人查自己的进度与驳回原因（凭手机号 + OTP）。 */

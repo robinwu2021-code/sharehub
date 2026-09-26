@@ -7,13 +7,14 @@ import ai.neargo.sharehub.platform.md.entity.DictItem;
 import ai.neargo.sharehub.platform.md.mapper.DictItemMapper;
 import ai.neargo.sharehub.platform.md.service.DictEntryService;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /** 参数字典实现：全部行为来自 {@link AbstractCrudService}，本类只声明键/搜索/筛选/转 VO。 */
 @Service
 public class DictEntryServiceImpl extends AbstractCrudService<DictItem, DictEntry> implements DictEntryService {
 
-    public DictEntryServiceImpl(DictItemMapper mapper) {
-        super(mapper);
+    public DictEntryServiceImpl(DictItemMapper mapper, JdbcTemplate jdbc) {
+        super(mapper, jdbc);
     }
 
     @Override

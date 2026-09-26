@@ -6,13 +6,14 @@ import ai.neargo.sharehub.platform.md.entity.MdBrand;
 import ai.neargo.sharehub.platform.md.mapper.MdBrandMapper;
 import ai.neargo.sharehub.platform.md.service.BrandService;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /** 品牌字典实现。行为全部来自 {@link AbstractCrudService}，本类只声明键/搜索/筛选/转 VO。 */
 @Service
 public class BrandServiceImpl extends AbstractCrudService<MdBrand, BrandEntry> implements BrandService {
 
-    public BrandServiceImpl(MdBrandMapper mapper) {
-        super(mapper);
+    public BrandServiceImpl(MdBrandMapper mapper, JdbcTemplate jdbc) {
+        super(mapper, jdbc);
     }
 
     @Override

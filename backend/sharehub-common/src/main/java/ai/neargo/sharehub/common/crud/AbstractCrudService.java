@@ -5,7 +5,11 @@ import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.common.BaseEntity;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.core.metadata.TableInfo;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import com.baomidou.mybatisplus.core.toolkit.ReflectionKit;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -35,8 +39,21 @@ public abstract class AbstractCrudService<E extends BaseEntity, V> implements Cr
 
     protected final BaseMapper<E> mapper;
 
-    protected AbstractCrudService(BaseMapper<E> mapper) {
+    /**
+     * 取号专用 —— **刻意绕开 mapper**，见 {@link #nextNo}。
+     *
+     * <p>走构造器而不是 {@code @Autowired} 字段：本仓全是构造器注入
+     * （{@code ArchitectureTest.noFieldInjection} 会拦），依赖要在签名上显形，
+     * 类也才能脱离 Spring 直接 new 出来测。32 个子类各加一个参数，值这个钱。
+     */
+    protected final JdbcTemplate jdbc;
+
+    /** {@link #tableName()} 的缓存 —— 反射拿泛型 + 查 TableInfo 不必每次做。 */
+    private volatile String tableNameCache;
+
+    protected AbstractCrudService(BaseMapper<E> mapper, JdbcTemplate jdbc) {
         this.mapper = mapper;
+        this.jdbc = jdbc;
     }
 
     // ——————————————————————— 子类必须给出 ———————————————————————
@@ -279,25 +296,41 @@ public abstract class AbstractCrudService<E extends BaseEntity, V> implements Cr
         return mapper.selectOne(new QueryWrapper<E>().eq(keyColumn(), no).last("limit 1"));
     }
 
-    /** 扫描同前缀最大号 + 1。见类注释关于并发的说明。 */
+    /**
+     * 扫描同前缀最大号 + 1。见类注释关于并发的说明。
+     *
+     * <h3>⚠️ 必须把软删的行算进去</h3>
+     * 2026-09-26 在代理商那条路上实测炸出来过（`Duplicate entry 'AG010'`）：
+     * 业务键的唯一索引**不含 {@code deleted} 列** —— 这是对的，软删/归档掉的编号
+     * 被合同、结算、引用记录挂着，不能被重新发出去；而用 {@link QueryWrapper} 取 MAX 时
+     * {@code @TableLogic} 会自动补上 {@code deleted = 0}，**取号看不见那些行**。
+     *
+     * <p>而本类的 {@link #remove} 正是软删。于是**删掉一个员工，下一次新建员工就撞唯一键**——
+     * 报 500，列表却一切正常（那行被逻辑删除藏起来了）。
+     * 所以这里与 {@link BizNoSequence} 一样走原生 SQL，不经 mapper。
+     */
     protected String nextNo(String prefix) {
-        // 数字序取最大 —— **不能用字典序**：位宽不一致时会取错。
-        // 实测（提现单）：库里同时有 WD9002(4位) 与 WD009003(6位)，字典序下 'WD9002' > 'WD009003'，
-        // 取到 9002 → 下一个算成 WD009003 → 撞已存在行报 Duplicate entry。
-        List<Object> top = mapper.selectObjs(new QueryWrapper<E>()
-                .select("MAX(CAST(SUBSTRING(" + keyColumn() + ", " + (prefix.length() + 1)
-                        + ") AS UNSIGNED)) AS mx")
-                .likeRight(keyColumn(), prefix));
+        return BizNoSequence.next(jdbc, tableName(), keyColumn(), prefix, keyWidth());
+    }
 
-        long n = 0L;
-        if (top != null && !top.isEmpty() && top.get(0) != null) {
-            try {
-                n = Long.parseLong(String.valueOf(top.get(0)));
-            } catch (NumberFormatException ignore) {
-                // 全是脏号时从 0 起，由业务键 UNIQUE 兜底
-            }
+    /**
+     * 实体对应的表名。
+     *
+     * <p>反射拿泛型 {@code E} 再查 MyBatis-Plus 的 {@link TableInfo} ——
+     * 这样 32 个子类一个都不用改。子类若不是直接继承本类（中间还有一层抽象），
+     * 反射拿不到泛型，此时**覆盖本方法显式给表名**。
+     */
+    protected String tableName() {
+        String cached = tableNameCache;
+        if (cached != null) return cached;
+        Class<?> entity = ReflectionKit.getSuperClassGenericType(getClass(), AbstractCrudService.class, 0);
+        TableInfo info = entity == null ? null : TableInfoHelper.getTableInfo(entity);
+        if (info == null || info.getTableName() == null) {
+            // 说清楚怎么办 —— 否则这个 NPE 出现在取号时，现场只看得见「新建失败」
+            throw new IllegalStateException(getClass().getSimpleName()
+                    + " 取不到表名（泛型或 @TableName 拿不到），请覆盖 tableName()");
         }
-        return prefix + String.format("%0" + keyWidth() + "d", n + 1);
+        return tableNameCache = info.getTableName();
     }
 
     /**

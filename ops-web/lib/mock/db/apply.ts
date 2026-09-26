@@ -38,6 +38,7 @@ export const applies: ApplyRow[] = [
     applyNo: "AP001", source: "SELF_SERVICE", status: "SUBMITTED",
     operatorName: "迪拜湾畔科技", operatorType: "AGENT",
     phoneMask: "971****4567", emailMask: "m***@bayside.ae",
+    contactName: "Mansour Al Bayside", contactPhone: "+971501234567", contactEmail: "mansour@bayside.ae",
     regionScope: "迪拜 · 商业湾", shareRate: 0.3, payload: "营业执照 · 法人身份证",
     principalNo: null, rejectReason: null,
     submittedBy: "971501234567", submittedAt: "2026-09-21T09:12:00Z",
@@ -50,6 +51,7 @@ export const applies: ApplyRow[] = [
     applyNo: "AP002", source: "SELF_SERVICE", status: "SUBMITTED",
     operatorName: "阿布扎比港务合伙", operatorType: "CITY_PARTNER",
     phoneMask: "971****8899", emailMask: "l***@ad-port.ae",
+    contactName: "Latifa Al Nuaimi", contactPhone: "+971509998899", contactEmail: "latifa@ad-port.ae",
     regionScope: "阿布扎比", shareRate: 0.25, payload: "营业执照",
     principalNo: "PR001", rejectReason: null,
     submittedBy: "971509998899", submittedAt: "2026-09-22T03:40:00Z",
@@ -61,6 +63,7 @@ export const applies: ApplyRow[] = [
     applyNo: "AP003", source: "OPS_CREATED", status: "REVIEWING",
     operatorName: "沙迦仓储服务", operatorType: "AGENT",
     phoneMask: "971****1122", emailMask: "w***@shj-store.ae",
+    contactName: "Wang Lei", contactPhone: "+971501111122", contactEmail: "wang@shj-store.ae",
     regionScope: "沙迦", shareRate: 0.28, payload: "线下已签约，材料补齐中",
     principalNo: null, rejectReason: null,
     submittedBy: "E1001", submittedAt: "2026-09-22T07:05:00Z",
@@ -72,6 +75,9 @@ export const applies: ApplyRow[] = [
     applyNo: "AP004", source: "SELF_SERVICE", status: "REJECTED",
     operatorName: "测试商户甲", operatorType: "AGENT",
     phoneMask: "971****0000", emailMask: "t***@example.com",
+    // 历史行：V127 之前提交的申请单，明文已经丢了补不回来。
+    // 留一张 null 的在种子里，否则前端永远见不到这个形态、也就测不到它的渲染
+    contactName: null, contactPhone: null, contactEmail: null,
     regionScope: null, shareRate: null, payload: null,
     principalNo: null, rejectReason: "营业执照与主体名称不一致，请补正后重新提交",
     submittedBy: "971500000000", submittedAt: "2026-09-20T11:00:00Z",
@@ -83,6 +89,7 @@ export const applies: ApplyRow[] = [
     applyNo: "AP005", source: "OPS_CREATED", status: "APPROVED",
     operatorName: "示例代理商甲", operatorType: "AGENT",
     phoneMask: "971****1234", emailMask: "a***@agent-one.ae",
+    contactName: "Ahmed Rashid", contactPhone: "+971509991234", contactEmail: "ahmed@agent-one.ae",
     regionScope: "迪拜", shareRate: 0.3, payload: null,
     principalNo: "PR001", rejectReason: null,
     submittedBy: "E1001", submittedAt: "2026-09-18T02:00:00Z",
@@ -160,7 +167,13 @@ export function auditAgentApply(x: {
    */
   const agentNo = `AG${String(agents.length + 1).padStart(3, "0")}`;
   agents.push({
-    agentNo, name: r.operatorName, contact: r.phoneMask,
+    agentNo, name: r.operatorName,
+    /*
+     * 联系方式带**明文**过去（V127）。此前这里写的是 `contact: r.phoneMask` ——
+     * 掩码打不了电话，而运营台列表与「开通登录」都指望这几个值。
+     * 服务端同样在 activate() 里从申请单的 contact* 三列回填。
+     */
+    contactName: r.contactName, phone: r.contactPhone, email: r.contactEmail,
     regionScope: x.regionScope ?? r.regionScope ?? "",
     // A1：受理入驻建出来的默认是代理商；城市合伙人由运营在档案页改（ADR-027）
     agentType: "AGENT",
@@ -194,7 +207,7 @@ function checkOtp(otp: string) {
 /** 自助提交。与代建**落同一个 createAgentApply**，只是 source 不同。 */
 export function selfServiceApply(x: {
   phone: string; otp: string; email: string;
-  operatorName: string; operatorType: OperatorType;
+  operatorName: string; operatorType: OperatorType; contactName?: string;
   regionScope?: string; payload?: string;
 }): { applyNo: string; status: ApplyStatus } {
   checkOtp(x.otp);
@@ -223,6 +236,7 @@ export function myApply(phone: string, otp: string) {
 
 export function createAgentApply(x: {
   phone: string; email: string; operatorName: string; operatorType: OperatorType;
+  contactName?: string;
   regionScope?: string; shareRate?: number; payload?: string;
 }): AgentApply {
   if (!x.operatorName?.trim()) fail("主体名称必填", "Operator name is required");
@@ -244,6 +258,13 @@ export function createAgentApply(x: {
     status: "SUBMITTED",
     operatorName: x.operatorName.trim(), operatorType: x.operatorType,
     phoneMask: maskPhone(x.phone), emailMask: maskEmail(x.email),
+    /*
+     * 业务联系方式是**明文**，与上面的掩码语义不同：掩码只用于显示，
+     * 这三列是运营要拨打、要发件的东西，审核通过时回填到代理商档案。
+     * 电话/邮箱默认取提交时填的那个，不让人填两遍。
+     */
+    contactName: x.contactName?.trim() || null,
+    contactPhone: x.phone.trim(), contactEmail: x.email.trim(),
     regionScope: x.regionScope ?? null,
     shareRate: x.shareRate ?? null,
     payload: x.payload ?? null,

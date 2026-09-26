@@ -10,6 +10,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * 税率与发票设置实现。
@@ -20,8 +21,8 @@ import java.math.BigDecimal;
 @Service
 public class TaxSettingServiceImpl extends AbstractCrudService<SysTaxSetting, TaxSetting> implements TaxSettingService {
 
-    public TaxSettingServiceImpl(SysTaxSettingMapper mapper) {
-        super(mapper);
+    public TaxSettingServiceImpl(SysTaxSettingMapper mapper, JdbcTemplate jdbc) {
+        super(mapper, jdbc);
     }
 
     @Override

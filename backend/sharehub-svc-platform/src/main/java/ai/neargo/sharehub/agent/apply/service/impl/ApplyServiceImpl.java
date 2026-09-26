@@ -145,6 +145,17 @@ public class ApplyServiceImpl implements ApplyService {
         e.setPrincipalNo(known == null ? null : known.getPrincipalNo());
         e.setOperatorName(req.operatorName().trim());
         e.setOperatorType(req.operatorType());
+        /*
+         * 业务联系方式（V127）：**这里是明文唯一活下来的地方**。
+         * 上面的 hash/mask 是登录标识，掩码打不了电话；而 phone_enc / email_enc
+         * 两列全仓没有任何一处写入，指望不上。不存这一份，审核建档时
+         * agt_agent 的联系方式就只能是空 —— 生产上已经这样发生过一次。
+         * 电话/邮箱默认取提交时填的那个（已归一化），不让人填两遍。
+         */
+        e.setContactName(req.contactName() == null || req.contactName().isBlank()
+                ? null : req.contactName().trim());
+        e.setContactPhone(phone);
+        e.setContactEmail(email);
         // region_scope 是 JSON 列（两张表都是）—— 直接写自然语言会触发 json_valid 约束、返回 500
         e.setRegionScope(RegionScopeJson.toJson(req.regionScope()));
         e.setShareRate(req.shareRate());
@@ -265,6 +276,10 @@ public class ApplyServiceImpl implements ApplyService {
         AgtAgent agent = new AgtAgent();
         agent.setAgentNo(nextNo("agt_agent", "agent_no", "AG"));
         agent.setName(e.getOperatorName());
+        // 联系方式带过去 —— 不带的话运营台列表显示 `-`，「开通登录」还会提示缺手机/邮箱
+        agent.setContactName(e.getContactName());
+        agent.setPhone(e.getContactPhone());
+        agent.setEmail(e.getContactEmail());
         agent.setRegionScope(RegionScopeJson.toJson(
                 req.regionScope() != null ? req.regionScope() : e.getRegionScope()));
         java.math.BigDecimal rate = req.shareRate() != null ? req.shareRate() : e.getShareRate();
@@ -358,6 +373,7 @@ public class ApplyServiceImpl implements ApplyService {
         String knownEmail = p != null && !p.getEmailHash().equals(e.getEmailHash()) ? p.getEmailMask() : null;
         return new ApplyView(e.getApplyNo(), e.getSource(), e.getStatus(),
                 e.getOperatorName(), e.getOperatorType(), e.getPhoneMask(), e.getEmailMask(),
+                e.getContactName(), e.getContactPhone(), e.getContactEmail(),
                 RegionScopeJson.toPlain(e.getRegionScope()), e.getShareRate(), e.getPayload(), e.getPrincipalNo(),
                 e.getRejectReason(), e.getSubmittedBy(), e.getSubmittedAt(),
                 e.getReviewedBy(), e.getReviewedAt(), e.getOperatorNo(),
