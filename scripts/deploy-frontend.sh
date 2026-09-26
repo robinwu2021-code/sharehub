@@ -68,6 +68,25 @@ ok "已拿到 $APP 部署锁"
 WT="$(mktemp -d)/deploy-$APP"
 git worktree add -q --detach "$WT" HEAD
 
+# ── 把**不进 git 的**构建期环境变量带进干净副本
+#
+# 为什么需要这一步：worktree 是从 HEAD 检出的，`.env.local` 在 .gitignore 里，
+# 所以它不在副本里。而 Next.js 静态导出把 NEXT_PUBLIC_* **烘进包**里 ——
+# 缺了它构建照常成功、站点照常起来，只是地图一片空白，
+# 而这件事**只有真去点「地图选点」才会发现**（AddressPicker 会降级成手填经纬度）。
+#
+# 为什么不提交进 git：本仓库是**公开仓库**。高德的 key 与安全密钥最终确实会随页面
+# 下发到浏览器，但那和「放进公开仓库被爬虫索引、且永久留在 history 里」不是一回事。
+#
+# 缺了不中断部署（不是每个人都需要地图），但**必须说出来** ——
+# 静默跳过的话，下一个人会在界面上找一个不存在的地图。
+if [ -f "$ROOT/$APP/.env.local" ]; then
+    cp "$ROOT/$APP/.env.local" "$WT/$APP/.env.local"
+    ok "已带上 $APP/.env.local（$(grep -c '^NEXT_PUBLIC_' "$ROOT/$APP/.env.local" 2>/dev/null || echo 0) 个 NEXT_PUBLIC_ 变量）"
+else
+    say "⚠️ 没有 $APP/.env.local —— 构建期变量（如高德地图密钥）不会进包，地图会降级成手填经纬度"
+fi
+
 say "构建（干净副本，$APP）"
 (
     cd "$WT/$APP"

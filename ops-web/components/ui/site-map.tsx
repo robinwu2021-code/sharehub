@@ -13,6 +13,7 @@ import * as React from "react";
 import { Card } from "./card";
 import { EmptyState } from "./misc";
 import { Badge } from "./badge";
+import { loadGoogleMaps as sharedLoad, gmapsConfigured } from "@/lib/gmaps";
 
 export interface MapPoint {
   id: string;
@@ -27,34 +28,14 @@ export interface MapPoint {
   alert?: boolean;
 }
 
-const KEY = process.env.NEXT_PUBLIC_GMAPS_KEY;
+const KEY = gmapsConfigured;
 /** 迪拜市中心（无点位时的默认视野中心） */
 const FALLBACK_CENTER = { lat: 25.2048, lng: 55.2708 };
 
-declare global {
-  interface Window { google?: typeof globalThis.google }
-}
-
-let loading: Promise<void> | null = null;
-/** 全局只加载一次脚本；失败时 resolve（静默降级），不让地图挂掉整个页面。 */
-function loadGoogleMaps(): Promise<void> {
-  if (typeof window === "undefined" || !KEY) return Promise.resolve();
-  if (window.google?.maps) return Promise.resolve();
-  if (loading) return loading;
-  loading = new Promise<void>((resolve) => {
-    const cb = "__pb_ops_gmaps_ready";
-    (window as unknown as Record<string, unknown>)[cb] = () => {
-      delete (window as unknown as Record<string, unknown>)[cb];
-      resolve();
-    };
-    const s = document.createElement("script");
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${KEY}&callback=${cb}&language=zh-CN&loading=async`;
-    s.async = true;
-    s.onerror = () => resolve(); // key 无效/网络不通 → 降级占位
-    document.head.appendChild(s);
-  });
-  return loading;
-}
+// 加载器已提到 lib/gmaps.ts 共用 —— 本文件与 AddressPicker 会出现在同一个页面上，
+// 各自注入一次 Maps JS 会互相打架（第二次注入被 Google 判为重复加载并告警，
+// 且两个 callback 只有一个会被调到）。
+const loadGoogleMaps = () => sharedLoad().then(() => undefined);
 
 export function SiteMap({
   points, height = 460, onSelect,
