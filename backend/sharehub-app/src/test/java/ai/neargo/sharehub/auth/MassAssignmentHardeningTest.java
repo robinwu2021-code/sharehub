@@ -289,9 +289,13 @@ class MassAssignmentHardeningTest {
 
         var row = rawNew();
         assertThat(row).isNotNull();
+        // JDBC 把 tinyint(1) 回成 Boolean，不是 "0" —— 第一版断言写死了 "0"，
+        // 实测报 expected "0" but was "false"。**那是断言错了不是加固错了**，
+        // 而两者长得一模一样：都是一条红。所以这里按语义判「未被软删」，
+        // 把 0 / false / "0" 都算上，不押注 JDBC 的表示形式。
         assertThat(String.valueOf(row.get("deleted")))
                 .as("建出来就该是可见的 —— 否则运营会看到「保存成功但列表里没有，再建报重复」")
-                .isEqualTo("0");
+                .isIn("0", "false");
     }
 
     @Test
