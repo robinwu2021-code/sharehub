@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.platform.notify.service.impl;
 
+import ai.neargo.sharehub.platform.notify.NotifyBlacklistReason;
 import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.auth.StaffContext;
 import ai.neargo.common.core.PageResult;
@@ -68,6 +69,12 @@ public class NotifyBlacklistServiceImpl implements NotifyBlacklistService {
         body.setTarget(NotifyTargets.maskTarget(body.getTarget())); // 脱敏存储，与 notify_log 同口径
         if (body.getChannel() == null || body.getChannel().isBlank()) body.setChannel(CHANNEL_ALL);
         if (body.getReason() == null || body.getReason().isBlank()) body.setReason("MANUAL");
+        /*
+         * 原因是合规凭据，不是标签：USER_OPT_OUT / HARD_BOUNCE 的拉黑不能被运营随手解除。
+         * 写错等于把「用户明确退订」降级成「手工拉黑」，然后合法地再给他发 —— 不报错。
+         * 这个入口直接收实体当请求体，所以闸只能落在这里。
+         */
+        body.setReason(NotifyBlacklistReason.of(body.getReason()).name());
         if (body.getBlockedAt() == null || body.getBlockedAt().isBlank()) body.setBlockedAt(now());
         body.setStatus(ACTIVE);
         // 谁拉的黑：按当前登录人回填，不接受客户端传。
@@ -93,7 +100,9 @@ public class NotifyBlacklistServiceImpl implements NotifyBlacklistService {
         // target 不受理：它是脱敏存的，改掉等于换了一个人被拉黑，而从掩码上看不出换没换。
         // 拉黑别人请新建一条 —— 那样才留得下「谁在什么时候被拉黑」这条痕。
         if (body.getChannel() != null && !body.getChannel().isBlank()) e.setChannel(body.getChannel());
-        if (body.getReason() != null && !body.getReason().isBlank()) e.setReason(body.getReason());
+        if (body.getReason() != null && !body.getReason().isBlank()) {
+            e.setReason(NotifyBlacklistReason.of(body.getReason()).name());
+        }
         mapper.updateById(e);
         return toVO(e);
     }

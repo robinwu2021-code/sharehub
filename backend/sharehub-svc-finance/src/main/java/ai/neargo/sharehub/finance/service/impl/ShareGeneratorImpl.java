@@ -1,6 +1,6 @@
 package ai.neargo.sharehub.finance.service.impl;
 
-import ai.neargo.sharehub.finance.ShareMode;
+import ai.neargo.sharehub.api.common.ShareMode;
 import ai.neargo.sharehub.finance.ShareRecordStatus;
 
 import ai.neargo.sharehub.api.core.event.OrderSettledEvent;

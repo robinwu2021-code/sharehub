@@ -5,6 +5,9 @@ import ai.neargo.sharehub.audit.AuditChanges;
 import ai.neargo.sharehub.auth.SecurityUtils;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.finance.FinNos;
+import ai.neargo.sharehub.finance.ShareBasis;
+import ai.neargo.sharehub.finance.ShareDimension;
+import ai.neargo.sharehub.api.common.ShareMode;
 import ai.neargo.sharehub.finance.dto.FinDtos;
 import ai.neargo.sharehub.finance.entity.ShareRecord;
 import ai.neargo.sharehub.finance.entity.ShareRule;
@@ -148,11 +151,24 @@ public class ShareServiceImpl implements ShareService {
          */
         ShareRule body = new ShareRule();
         body.setRuleNo(req.ruleNo());
-        body.setDimension(req.dimension());
+        /*
+         * 词表三列一律经 of() 归一后再落库。**这条路就是当年把 17 行 RATE 写进
+         * share_rule.mode / share_record.mode 的那一条**（V66 归一）：
+         * ShareMode.of 一直存在，只是这里没调 —— 于是词表有定义、校验有实现、
+         * 中间那一步没接上，而三者都不报错。
+         *
+         * 当时没立刻炸，是因为读侧也没人解析这一列；等哪天开始解析，
+         * 炸的是这些历史行而不是写它们的代码，排障会从错的地方开始查。
+         *
+         * basis 用 ofNullable：空串是合法值（通用规则），按「必填」写会拒掉
+         * 188 行对的写入 —— 见 ShareBasis 类注释。
+         */
+        body.setDimension(ShareDimension.of(req.dimension()).name());
         body.setPayeeNo(req.payeeNo());
         body.setPayeeName(req.payeeName());
-        body.setBasis(req.basis());
-        body.setMode(req.mode());
+        ShareBasis basis = ShareBasis.ofNullable(req.basis());
+        body.setBasis(basis == null ? "" : basis.name());
+        body.setMode(ShareMode.of(req.mode()).name());
         body.setRate(req.rate());
         body.setFormula(req.formula());
         body.setPriority(req.priority());

@@ -152,7 +152,9 @@ public final class AgentExtDtos {
             e.setRate(rate);
             e.setFixedAmount(fixedAmount);
             e.setCurrency(currency);
-            e.setMode(mode);
+            // agt_commission.mode 与 share_rule.mode 是**同一套词表**，复用 ShareMode，
+            // 不另建一个 —— 两个枚举描述同一列取值，迟早只改一边而那件事没有症状
+            e.setMode(ai.neargo.sharehub.api.common.ShareMode.of(mode).name());
             e.setEffectiveAt(effectiveAt);
             return e;
         }

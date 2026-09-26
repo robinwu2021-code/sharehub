@@ -30,7 +30,6 @@ public class ShareRule extends BaseEntity {
 
     private String payeeName;
 
-    /** CHANNEL_SPLIT（渠道直分）/ LEDGER（账务记账后结算）。 */
     /**
      * 分成依据（V53 / ADR-027）：INVEST / DEVELOP / OPERATE / REFER；VENUE 维度留空串。
      *
@@ -39,6 +38,13 @@ public class ShareRule extends BaseEntity {
      */
     private String basis;
 
+    /**
+     * CHANNEL_SPLIT（渠道直分）/ LEDGER（账务记账后结算），取值域 {@link ai.neargo.sharehub.api.common.ShareMode}。
+     *
+     * <p>⚠️ 这行注释此前**在 {@code basis} 上面**，被后加的 basis javadoc 挤成了孤儿 ——
+     * 两个连续 javadoc 只有后一个生效，于是 {@code mode} 变成了「没有声明词表的列」，
+     * 而它恰好就是当年落了 17 行 {@code RATE} 的那一列（V66 归一）。
+     */
     private String mode;
 
     /** 分成比率，0..1。 */

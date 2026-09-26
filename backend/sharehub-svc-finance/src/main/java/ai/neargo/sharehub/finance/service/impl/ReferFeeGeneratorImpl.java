@@ -5,7 +5,7 @@ import ai.neargo.sharehub.api.platform.event.ContractSignedEvent;
 import ai.neargo.sharehub.api.platform.port.SiteAgentQueryPort;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.finance.FinNos;
-import ai.neargo.sharehub.finance.ShareMode;
+import ai.neargo.sharehub.api.common.ShareMode;
 import ai.neargo.sharehub.finance.ShareRecordStatus;
 import ai.neargo.sharehub.finance.entity.ShareRecord;
 import ai.neargo.sharehub.finance.mapper.ShareRecordMapper;

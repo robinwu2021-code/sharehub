@@ -1,6 +1,6 @@
 package ai.neargo.sharehub.seed.domain;
 
-import ai.neargo.sharehub.finance.ShareMode;
+import ai.neargo.sharehub.api.common.ShareMode;
 import ai.neargo.sharehub.alarm.entity.DevAlarm;
 import ai.neargo.sharehub.agent.entity.AgtAgent;
 import ai.neargo.sharehub.agent.mapper.AgentMapper;

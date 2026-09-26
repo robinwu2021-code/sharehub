@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.portal.core;
 
+import ai.neargo.sharehub.trade.pay.PayChannelMode;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.trade.pay.dto.PayDtos.PaymentChannelEntry;
 import ai.neargo.sharehub.trade.pay.entity.PayChannel;
@@ -98,7 +99,8 @@ public class PaymentChannelController {
             e.setChannelName(channelName);
             e.setChannelNameEn(channelNameEn);
             e.setChannelNameAr(channelNameAr);
-            e.setMode(mode);
+            // pay_channel 当前 0 行，这道校验是纯预防：第一条数据进来之前装闸最便宜
+            e.setMode(PayChannelMode.of(mode).name());
             e.setStatus(status);
             e.setApiBase(apiBase);
             e.setMerchantId(merchantId);

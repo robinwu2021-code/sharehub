@@ -21,13 +21,18 @@ public class MktCampaign extends BaseEntity {
 
     private String name;
 
-    /** NEW_USER / RECHARGE_GIFT / COUPON_PUSH / REFERRAL / FESTIVAL。 */
+    /** NEW_USER / RECHARGE_GIFT / COUPON_PUSH / REFERRAL / FESTIVAL，取值域 {@link ai.neargo.sharehub.user.marketing.CampaignKind}。 */
     private String kind;
 
     /** 活动规则 JSON（门槛 / 奖励 / 频次）。 */
     private String rule;
 
-    /** DRAFT / RUNNING / ENDED。 */
+    /**
+     * DRAFT / RUNNING / PAUSED / ENDED，取值域 {@link ai.neargo.sharehub.user.marketing.CampaignStatus}。
+     *
+     * <p>⚠️ 这里此前漏了 {@code PAUSED} —— V80 补正的是 DDL 列注释，这行没跟上。
+     * 不影响运行（校验走枚举），但它是给下一个人看的，照它推会得出错结论。
+     */
     private String status;
 
     private String startAt;

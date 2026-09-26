@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.user.marketing.dto;
 
+import ai.neargo.sharehub.user.marketing.CampaignKind;
+
 import java.math.BigDecimal;
 
 /**
@@ -56,7 +58,8 @@ public final class MarketingDtos {
             var e = new ai.neargo.sharehub.user.marketing.entity.MktCampaign();
             e.setCampaignNo(campaignNo);
             e.setName(name);
-            e.setKind(kind);
+            // 词表两列经 of() 归一：此前原样落库，POST {"kind":"WHATEVER"} 也能成功
+            e.setKind(CampaignKind.of(kind).name());
             e.setRule(rule);
             e.setStartAt(startAt);
             e.setEndAt(endAt);

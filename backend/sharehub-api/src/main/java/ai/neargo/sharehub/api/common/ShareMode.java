@@ -1,7 +1,16 @@
-package ai.neargo.sharehub.finance;
+package ai.neargo.sharehub.api.common;
 
 /**
  * 分润执行方式（{@code share_rule.mode}）。
+ *
+ * <h2>为什么住在 {@code sharehub-api} 而不是 {@code finance}</h2>
+ * 这一套词表有**两列**在用：{@code share_rule.mode}（finance）与
+ * {@code agt_commission.mode}（platform）。原先它在 finance 里，而 platform 不依赖 finance ——
+ * 于是 platform 那一列**只能裸 String 落库**，或者另建一个同义枚举。
+ * 后者更糟：两个枚举描述同一列取值，迟早只改一边，而「另一边没改」这件事没有任何症状。
+ *
+ * <p>⚠️ 不要和 {@code loc.ContractShareMode}（SHARE/ENTRY_FEE/GUARANTEE/FREE）搞混 ——
+ * 名字像，是**合同的商业模式**，与结算路径无关。
  *
  * <p>这不是状态而是**结算路径的选择**，两者的资金流完全不同：
  * {@link #LEDGER} 先全额收款再记账分账（平台先拿钱），
