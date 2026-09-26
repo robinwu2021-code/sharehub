@@ -11,6 +11,7 @@ export const dashboardHttp: DashboardApi = {
       ? { realm, phone: identifier, otp }
       : { realm, identifier, username: identifier, password }),
   sendLoginOtp: (phone) => client.post("/api/auth/otp", { phone }),
+  changePassword: (oldPassword, newPassword) => client.post("/api/auth/password", { oldPassword, newPassword }),
   listOperators: () => client.get("/api/auth/operators"),
   switchOperator: (agentNo) => client.post(`/api/auth/operators/${agentNo}/switch`, {}),
   me: () => client.get("/api/auth/me"),

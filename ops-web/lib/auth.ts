@@ -81,11 +81,22 @@ export interface AuthState {
 
   token: string;
 
+  /**
+   * 建号发的一次性口令还没改过 —— 外壳据此**挡住整个应用**，只留改密表单。
+   *
+   * 为什么不是「登录页上改完再放进来」：一次性口令是管理员口头或邮件转述的，
+   * 会话一旦建立，刷新一次就绕过了登录页那道提示。放在外壳上，
+   * 任何路径、任何刷新都还是同一道门。
+   */
+  mustChange: boolean;
+
   login: (v: {
     realm: Realm; subjectNo: string; username: string; role: Role | "";
     token: string; perms: string[];
-    memberships?: Membership[]; currentOperatorNo?: string;
+    memberships?: Membership[]; currentOperatorNo?: string; mustChange?: boolean;
   }) => void;
+  /** 改密成功后放行。**只由改密成功的回调调用** —— 别在任何别的地方清它。 */
+  passwordChanged: () => void;
   /** 切主体。**只改 store**；重拉身份、清缓存、路由兜底由调用方做（D6b）。 */
   /**
    * 切换当前运营主体。`session` 是**服务端换发的新会话** —— 见实现里的注释：
@@ -110,7 +121,7 @@ export interface AuthState {
 const EMPTY = {
   realm: "" as Realm, subjectNo: "", username: "", role: "" as Role | "",
   perms: [] as string[], memberships: [] as Membership[],
-  currentOperatorNo: "", token: "",
+  currentOperatorNo: "", token: "", mustChange: false,
 };
 
 export const useAuth = create<AuthState>()(
@@ -118,8 +129,10 @@ export const useAuth = create<AuthState>()(
     (set, get) => ({
       ...EMPTY,
       operatorGen: 0,
+      passwordChanged: () => set({ mustChange: false }),
       login: (v) => set({
         ...EMPTY, ...v,
+        mustChange: v.mustChange === true,
         memberships: v.memberships ?? [],
         currentOperatorNo: v.currentOperatorNo
           ?? v.memberships?.find((m) => m.isPrimary)?.operatorNo ?? "",

@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
+import { MustChangePasswordGate } from "@/components/auth/change-password";
 import { usePermsSync } from "@/lib/perms-sync";
 import { useMenuTree } from "@/lib/use-menu-tree";
 import { useMenuStore } from "@/lib/menu-source";
@@ -28,6 +29,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const loggedIn = useAuth((s) => s.loggedIn());
+  const mustChange = useAuth((s) => s.mustChange);
   const [ready, setReady] = useState(false);
   // 权限码与服务端对齐（进应用 + 标签页重新可见）。挂在这里而不是各页面：
   // 判权入口散在全站，任何一页少挂一次就是「那一页还按旧权限渲染」。
@@ -52,6 +54,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   if (isPublic) return <>{children}</>;
   if (!ready || !loggedIn) return null;
+  /*
+   * 一次性口令还没改 → **整个应用都不给进**，只留改密表单。
+   * 挡在这里而不是登录页：会话建立之后刷新一次就绕过登录页的提示了。
+   */
+  if (mustChange) return <MustChangePasswordGate />;
   /*
    * 菜单在途时先不渲染导航。渲染的话会先闪一份**本地**菜单、再跳成服务端那份 ——
    * 两者不一致时那一下看着像「菜单自己少了几项」。

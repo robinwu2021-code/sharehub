@@ -15,6 +15,13 @@ export interface LoginResp {
   operators?: OperatorRef[];
   /** 默认进哪个主体（取 isPrimary 那一行）。 */
   currentOperatorNo?: string;
+  /**
+   * 建号发的一次性口令还没改过 —— **必须先改密才能建立会话**。
+   *
+   * 不是「登录后提示一下」：那样点掉提示就能带着一次性口令一直用下去，
+   * 而那个口令是管理员口头/邮件转述给本人的，转述路径上的人都知道它。
+   */
+  mustChange?: boolean;
 }
 
 /**
@@ -90,6 +97,11 @@ export interface DashboardApi {
    * @returns dev-mode 下回显验证码供联调；生产走短信通道，接口不回传
    */
   sendLoginOtp(phone: string): Promise<{ ok: boolean; code?: string }>;
+  /**
+   * 本人改密。**不传「给谁改」** —— 主体由后端从 token 取。
+   * 让前端传 subjectNo 等于把改密做成越权接口。
+   */
+  changePassword(oldPassword: string, newPassword: string): Promise<void>;
   /** 我的运营主体列表（ADR-030）。STAFF 会话返回空表 —— 运营端没有「我的主体」这个概念。 */
   listOperators(): Promise<OperatorRef[]>;
   /**

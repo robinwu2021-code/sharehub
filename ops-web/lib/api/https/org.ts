@@ -18,6 +18,7 @@ export const orgHttp: OrgApi = {
   saveDepartment: (x) => client.post(x.deptNo ? `/api/platform/departments/${x.deptNo}` : "/api/platform/departments", x),
   saveRoleRow: (x) => client.post(x.roleNo ? `/api/platform/roles/${x.roleNo}` : "/api/platform/roles", x),
   saveEmployee: (x) => client.post(x.employeeNo ? `/api/platform/employees/${x.employeeNo}` : "/api/platform/employees", x),
+  resetEmployeeCredential: (no) => client.post(`/api/platform/employees/${no}/credential`, {}),
   // 覆盖写（PUT），对齐《权限体系设计》§9「数据范围配置」。
   // T0-4：真实端点是 OrgController 的 PUT /api/platform/data-scopes/{subjectType}/{subjectNo}
   // （不是 iam/roles/{code}/data-scope —— IamAdminController 只管 roles/{no}/permissions）。

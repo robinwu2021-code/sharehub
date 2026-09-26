@@ -33,6 +33,14 @@ export interface OrgApi {
   saveDepartment(x: Partial<Department> & { deptNo?: string }): Promise<Department>;
   saveRoleRow(x: Partial<RoleRow> & { roleNo?: string }): Promise<RoleRow>;
   saveEmployee(x: Partial<Employee> & { employeeNo?: string }): Promise<Employee>;
+  /**
+   * 给员工建登录号 / 重置口令，返回**一次性初始口令**（`org:employee:update`）。
+   *
+   * 口令只在这一次响应里出现：**没有第二个能查出它的接口**，也不落日志 ——
+   * 能再查出来的初始口令等于没有初始口令。所以前端必须把它当场显示给操作人，
+   * 关掉弹窗就再也拿不到，只能重置一次。
+   */
+  resetEmployeeCredential(employeeNo: string): Promise<{ employeeNo: string; password: string }>;
 
   /**
    * 角色数据权限（G7）：覆盖写该角色的数据范围。

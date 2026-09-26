@@ -155,6 +155,8 @@ export {
   listRoles, archiveRole, unarchiveRole,
   // S6 功能权限勾选树 + 审计详情
   permissions, listRolePermissions, saveRolePermissions, getAuditDetail,
+  // P3b·B2 登录凭据（mock 只存「有没有改过密」，不存口令）
+  resetEmployeeCredential, mustChangePassword, changeOwnPassword,
 } from "./org";
 
 export {

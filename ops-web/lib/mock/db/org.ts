@@ -559,3 +559,47 @@ export const unarchiveRole = (no: string) => unarchiveRow(roles, "roleNo", no);
 
 /** 角色列表：角色数量少，不分页；默认过滤已归档（`showArchived` 打开才带出）。 */
 export const listRoles = (q: PageQuery = {}) => roles.filter((r) => liveHit(r, q.showArchived));
+
+// ── 登录凭据（P3b·B2）─────────────────────────────────────────────
+//
+// mock 只存「有没有改过密」这一件事，**不存口令** ——
+// 离线开发需要验的是「一次性口令必须先改密」这条流程分支，
+// 而不是散列算法；存明文口令的 mock 迟早会被人复制进真实代码。
+const credentials = new Map<string, { mustChange: boolean; changedAt?: string }>();
+
+/** 管理员建号 / 重置：回一次性口令。与后端同形 —— 口令由"服务端"生成，调用方不能指定。 */
+export function resetEmployeeCredential(employeeNo: string) {
+  const e = employees.find((x) => x.employeeNo === employeeNo);
+  if (!e) throw notFound("员工", "Employee", employeeNo);
+  // 离职不给建号：既然离职要停用凭据，就不该有一条路把它激活回来（后端同闸）
+  if (e.status !== "ACTIVE") {
+    throw fail(`员工 ${employeeNo} 不在职，不能建登录号`,
+      `Employee ${employeeNo} is not active; a login cannot be created`,
+      `الموظف ${employeeNo} غير نشط، لا يمكن إنشاء حساب دخول له`);
+  }
+  credentials.set(employeeNo, { mustChange: true });
+  // 形状与后端一致：12 位、去掉形近字符
+  const alphabet = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let pwd = "";
+  for (let i = 0; i < 12; i++) pwd += alphabet[Math.floor(Math.random() * alphabet.length)];
+  return { employeeNo, password: pwd };
+}
+
+/** 这个人现在是否被要求改密。查不到凭据 = 走的是共享口令那条路，不强制。 */
+export const mustChangePassword = (subjectNo: string) => credentials.get(subjectNo)?.mustChange === true;
+
+/** 本人改密。口令长度这道闸 mock 层也要有 —— 否则联调时前端以为过了，切后端才 400。 */
+export function changeOwnPassword(subjectNo: string, oldPassword: string, newPassword: string) {
+  if (!oldPassword?.trim()) {
+    throw fail("原密码不正确", "Current password is incorrect", "كلمة المرور الحالية غير صحيحة");
+  }
+  if (!newPassword || newPassword.trim().length < 8) {
+    throw fail("新密码至少 8 位", "New password must be at least 8 characters",
+      "يجب أن تكون كلمة المرور الجديدة 8 أحرف على الأقل");
+  }
+  if (oldPassword === newPassword) {
+    throw fail("新密码不能与原密码相同", "New password must differ from the current one",
+      "يجب أن تختلف كلمة المرور الجديدة عن الحالية");
+  }
+  credentials.set(subjectNo, { mustChange: false, changedAt: new Date().toISOString() });
+}

@@ -16,6 +16,7 @@ export const orgMock: OrgApi = {
   saveDepartment: (x) => wait(db.saveDepartment(x), 350),
   saveRoleRow: (x) => wait(db.saveRoleRow(x), 350),
   saveEmployee: (x) => wait(db.saveEmployee(x), 350),
+  resetEmployeeCredential: (no) => wait(db.resetEmployeeCredential(no), 350),
   getDataScope: (subjectType, subjectNo) => wait(db.getDataScope(subjectType, subjectNo)),
   saveDataScope: (subjectType, subjectNo, scope, values) =>
     wait(db.saveDataScope(subjectType, subjectNo, scope, values), 350),

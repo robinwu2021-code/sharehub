@@ -12,7 +12,7 @@ import { httpApi, HTTP_SLICES } from "./http";
 
 /** Api interface 的运行时锚：按域分组，顺序与 contracts/*.ts 一致。 */
 const API_METHODS: Record<string, readonly string[]> = {
-  dashboard: ["login", "logout", "me", "getMenus", "getDashboard", "getOpsFlowMetrics", "sendLoginOtp", "listOperators", "switchOperator"],
+  dashboard: ["login", "logout", "me", "getMenus", "getDashboard", "getOpsFlowMetrics", "sendLoginOtp", "listOperators", "switchOperator", "changePassword"],
   device: ["goLiveGate", "goLive", "markDeviceFault", "repairDevice", "undeployDevice", "retireDevice", "listTrialRents", "startTrialRent", "listProtections", "applyProtection", "releaseProtection", "listSignalCodes", "listCabinets", "getCabinet", "saveCabinet", "sendCommand", "listPowerbanks", "listCabinetMonitor", "listCommandRecords", "listInventoryTransfers", "getInventoryTransfer", "listOtaRollouts", "savePowerbank", "saveInventoryTransfer", "saveOtaRollout", "listOtaReleases", "saveOtaRelease", "listOtaTasks", "listDeviceLogs", "listDeviceCodeBatches", "saveDeviceCodeBatch", "archiveCabinet", "unarchiveCabinet", "archivePowerbank", "unarchivePowerbank", "importCabinets", "transitPowerbank", "inspectCabinet", "inspectPowerbank",
   // 疑似丢失核实（后端 V113）：失联满 7 天打标记，由人确认丢失或找回
   "confirmPowerbankLost", "dismissPowerbankLost", "listQcRecords", "setTransferItems", "shipTransfer", "receiveTransfer", "listAssetDiffs", "resolveAssetDiff"],
@@ -27,7 +27,7 @@ const API_METHODS: Record<string, readonly string[]> = {
   marketing: ["listCoupons", "saveCoupon", "issueCoupon", "listCouponIssueRecords", "listCampaigns", "listPushMessages", "listReferrals", "listAdSlots", "listAdCampaigns", "listAdDeliveries", "transitionAdCampaign", "listReferralRules", "saveReferralRule", "saveCampaign", "transitionCampaign", "savePushMessage", "sendPushMessage", "finishPushMessage", "saveAdSlot", "saveAdCampaign", "listNotices", "saveNotice", "archiveCoupon", "unarchiveCoupon", "archiveNotice", "unarchiveNotice"],
   cs: ["listCsTickets", "listCsSessions", "saveCsTicket", "refundCsTicket", "woCsTicket", "listCsMessages", "replyCsSession"],
   report: ["listReportDevice", "listReportLocation", "listReportFinance", "listReportScreen", "listReportCustom", "getReportTrend", "getScreenBoard", "listReportMetrics", "getConsumerInsight"],
-  org: ["listEmployees", "listRoles", "listAudits", "listDepartments", "listStaffPerformance", "saveDepartment", "saveRoleRow", "saveEmployee", "getDataScope", "saveDataScope", "listAllMenus", "updateMenu", "listPermissions", "listRolePermissions", "saveRolePermissions", "getAuditDetail", "archiveRole", "unarchiveRole"],
+  org: ["listEmployees", "listRoles", "listAudits", "listDepartments", "listStaffPerformance", "saveDepartment", "saveRoleRow", "saveEmployee", "resetEmployeeCredential", "getDataScope", "saveDataScope", "listAllMenus", "updateMenu", "listPermissions", "listRolePermissions", "saveRolePermissions", "getAuditDetail", "archiveRole", "unarchiveRole"],
   system: ["uploadFile", "fileUrl", "listBrands", "saveBrand", "archiveBrand", "unarchiveBrand", "listVendors", "saveVendor", "testVendorConnectivity", "listNotifyTemplates", "listDictEntries", "listRegions", "listSysParams", "listOpenApiApps", "listMarketCountries", "saveNotifyTemplate", "saveDictEntry", "saveRegion", "saveSysParam", "saveOpenApiApp", "saveMarketCountry", "listRegionTree", "previewNotifyTemplate", "testSendNotifyTemplate", "resetOpenApiAppSecret", "listPaymentChannels", "savePaymentChannel", "listNotifyLogs", "getNotifyLogStats", "resendNotifyLog", "listNotifyBlacklist", "saveNotifyBlacklist", "releaseNotifyBlacklist", "getBizRules", "saveBizRules", "listLoginSettings", "saveLoginSetting", "listAppVersions", "saveAppVersion", "rollbackAppVersion", "listBanks", "saveBank", "listProblems", "saveProblem", "listTaxSettings", "saveTaxSetting", "archiveBank", "unarchiveBank", "archiveProblem", "unarchiveProblem"],
   operation: ["getOperationOverview", "getSiteStats", "pauseSite", "resumeSite", "listPriceAdjustments", "savePriceAdjustment", "cancelPriceAdjustment", "revertPriceAdjustment", "retryPriceAdjustment", "listSiteSharing", "getSiteSharingStats", "listPayeeSharing"],
 };
@@ -108,6 +108,7 @@ describe("域切片划分", () => {
     // 2026-09-25 运营流程批次6b：+1 运营核心流程指标（getOpsFlowMetrics）；
     //   getAlarmRecord 更名 getAlarmDetail（后端回的是 AlarmDetail，不是整行记录），不改总数。
     // 2026-09-25 场所域前端补全：商机详情 / 认领 / 签约转化 + 进件详情 + 站点勘测读写（+6）。
-    expect(ALL_METHODS.length).toBe(404);
+    // 2026-09-26 员工凭据登录（P3b·B2）：本人改密 + 管理员建号/重置（+2）。
+    expect(ALL_METHODS.length).toBe(406);
   });
 });

@@ -42,7 +42,14 @@ export const dashboardMock: DashboardApi = {
       token: `mock-${role}`, subjectNo: identifier, username: identifier, role,
       perms: permsOf(role as Role),
       operators, currentOperatorNo: operators?.[0].operatorNo,
+      // 建过号且还没改密 → 强制改密。mock 里「建号」发生在员工页点重置的那一刻
+      mustChange: realm === "STAFF" && db.mustChangePassword(identifier),
     });
+  },
+  changePassword: async (oldPassword, newPassword) => {
+    // 改的是**当前会话**这个人 —— 与后端一致：不接受「给谁改」入参
+    const who = currentAuth()?.username ?? "";
+    return wait(db.changeOwnPassword(who, oldPassword, newPassword), 350);
   },
   // 查无此号也返回 ok：见契约注释（否则是一台手机号枚举器）。mock 一律回显固定码
   sendLoginOtp: (_phone) => wait({ ok: true, code: DEV_OTP }),

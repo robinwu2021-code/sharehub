@@ -63,6 +63,8 @@ export default function LoginPage() {
         perms: r.perms ?? [],
         memberships: r.operators ?? [],
         currentOperatorNo: r.currentOperatorNo,
+        // 一次性口令未改 → 外壳会挡住整个应用，只留改密表单（见 MustChangePasswordGate）
+        mustChange: r.mustChange,
       });
       router.replace("/");
     } catch (e) {
