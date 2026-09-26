@@ -1,0 +1,15 @@
+# powerbank · 演示环境心跳模拟器
+#
+# ⚠️ **仅供演示环境。接入真实设备前删掉本文件与 deploy/tencent/demo/heartbeat.sh。**
+# 理由、为什么不调大在线判定窗口、为什么只刷 CAB1 号段，都写在那个脚本的头部。
+#
+# 刻意不放进 powerbank-jobs：那份清单由 JobCronCoverageTest 按**任务声明**生成，
+# 塞一个不存在的任务名进去会让卡口红 —— 而这个模拟器根本不是一个 JobHandler。
+#
+# 安装：sudo install -o root -g root -m 644 deploy/tencent/cron/powerbank-demo-heartbeat /etc/cron.d/
+#       sudo install -o root -g root -m 755 deploy/tencent/demo/heartbeat.sh /usr/local/bin/powerbank-demo-heartbeat
+# 卸载：sudo rm /etc/cron.d/powerbank-demo-heartbeat /usr/local/bin/powerbank-demo-heartbeat
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+* * * * * root flock -n /run/lock/powerbank-demo-heartbeat.lock /usr/local/bin/powerbank-demo-heartbeat >/dev/null 2>&1
