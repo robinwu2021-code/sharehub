@@ -93,6 +93,8 @@ export const powerbanks: Powerbank[] = Array.from({ length: 30 }, (_, i) => {
     slotIndex: st === "RENTED" ? null : (i % 8) + 1,
     battery: st === "RENTED" ? 20 + (i * 7) % 60 : 60 + (i * 11) % 40,
     status: st, health: st === "FAULT" ? "FAULT" : "OK", cycles: 40 + (i * 37) % 900,
+    // 借出中的宝里挑两个当「疑似丢失」样本（后端是失联满 7 天由定时任务打的标记）
+    suspectedLostAt: st === "RENTED" && i % 6 === 2 ? "2026-09-18 03:30:00" : null,
     archivedAt: null,
   };
 });

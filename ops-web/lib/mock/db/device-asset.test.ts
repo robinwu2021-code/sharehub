@@ -201,3 +201,34 @@ describe("充电宝建档（与后端 PowerbankServiceImpl 对齐）", () => {
     expect(e).toMatchObject({ status: "IN_STOCK", cycles: 3 });
   });
 });
+
+describe("疑似丢失核实（后端 V113）", () => {
+  // 「标记不是状态」：宝在被怀疑期间仍然是 RENTED，订单 / 分润 / 告警口径都不变
+  const suspected = () => powerbanks.find((p) => p.suspectedLostAt && p.status === "RENTED")!;
+
+  it("种子里有疑似丢失的样本（没有的话下面几条测的是空气）", () => {
+    expect(suspected()).toBeTruthy();
+    expect(suspected().status).toBe("RENTED");
+  });
+
+  it("确认丢失 → 转 LOST、摘掉柜位、清标记", () => {
+    const p = suspected();
+    const r = da.confirmPowerbankLost(p.powerbankNo);
+    expect(r.status).toBe("LOST");
+    expect(r.cabinetNo).toBeNull();
+    expect(r.suspectedLostAt).toBeNull();
+  });
+
+  it("没被怀疑过的宝不能确认丢失——判断依据不在系统里就该先查清", () => {
+    const normal = powerbanks.find((p) => !p.suspectedLostAt)!;
+    expect(() => da.confirmPowerbankLost(normal.powerbankNo)).toThrow();
+  });
+
+  it("已找回：说明必填，且清标记后状态不变（仍是借出中）", () => {
+    const p = suspected();
+    expect(() => da.dismissPowerbankLost(p.powerbankNo, "  ")).toThrow();
+    const r = da.dismissPowerbankLost(p.powerbankNo, "在仓库角落找到");
+    expect(r.suspectedLostAt).toBeNull();
+    expect(r.status).toBe("RENTED");
+  });
+});

@@ -74,6 +74,39 @@ export function inspectCabinet(cabinetNo: string, req: QcReq): QcRecord {
 export const QC_MIN_BATTERY = 60;
 export const QC_MAX_CYCLES = 500;
 
+/**
+ * 疑似丢失经核实：确认丢失。**只对打了疑似标记的宝开放** —— 与后端同一条闸：
+ * 没被系统怀疑过就要标丢失，说明判断依据不在系统里。
+ */
+export function confirmPowerbankLost(powerbankNo: string, note?: string): Powerbank {
+  const p = powerbanks.find((x) => x.powerbankNo === powerbankNo);
+  if (!p) notFound("充电宝", "Powerbank", powerbankNo);
+  if (!p!.suspectedLostAt) {
+    fail(`${powerbankNo} 未被标记为疑似丢失，不能在此确认丢失`,
+         "Not marked as suspected lost", "غير مُعلَّم كمفقود محتمل");
+  }
+  p!.status = "LOST";
+  p!.cabinetNo = null;
+  p!.slotIndex = null;
+  p!.suspectedLostAt = null;
+  void note;
+  return { ...p! };
+}
+
+/** 疑似丢失经核实：已找回 / 误判。说明必填 —— 事后要能看出当时凭什么解除。 */
+export function dismissPowerbankLost(powerbankNo: string, note: string): Powerbank {
+  const p = powerbanks.find((x) => x.powerbankNo === powerbankNo);
+  if (!p) notFound("充电宝", "Powerbank", powerbankNo);
+  if (!p!.suspectedLostAt) {
+    fail(`${powerbankNo} 未被标记为疑似丢失`, "Not marked as suspected lost", "غير مُعلَّم كمفقود محتمل");
+  }
+  if (!note || !note.trim()) {
+    fail("请填写说明：在哪里找回，或为什么是误判", "Note required", "الملاحظة مطلوبة");
+  }
+  p!.suspectedLostAt = null;
+  return { ...p! };
+}
+
 /** 充电宝入库质检。电量 ≥ 60 且循环 ≤ 500 才算检查项通过；质检时顺带回写电量与循环次数。 */
 export function inspectPowerbank(powerbankNo: string, req: QcReq): QcRecord {
   const p = powerbanks.find((x) => x.powerbankNo === powerbankNo);

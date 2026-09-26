@@ -107,6 +107,15 @@ export interface Powerbank extends Archivable {
   status: PowerbankStatus;
   health: PowerbankHealth;
   cycles: number;
+  /**
+   * 疑似丢失的标记时间；null = 未被怀疑（后端 V113）。
+   *
+   * <p>**它是标记不是状态**：宝仍然是 `RENTED`，订单 / 分润 / 告警的口径都不变。
+   * 失联满 N 天（默认 7）由定时任务打上，运维核实后「确认丢失」或「已找回」。
+   * 之所以不自动转 `LOST`：那一步带资产与钱的后果（核销、可能向最后借用人追偿），
+   * 而失联多半只是上报缺失（柜子离线、归还未识别）。
+   */
+  suspectedLostAt: string | null;
 }
 export interface CabinetMonitor {
   cabinetNo: string;

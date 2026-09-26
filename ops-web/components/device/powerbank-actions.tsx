@@ -21,7 +21,14 @@ const CONFIRM_DESC: Record<PowerbankAction, string> = {
   scrap: "报废不可逆：这块宝从此不能再借出、调拨或维修。输入充电宝号确认。",
 };
 
-export function PowerbankActions({ pb, onQc }: { pb: Powerbank; onQc: (pb: Powerbank) => void }) {
+export function PowerbankActions({
+  pb, onQc, onDismissLost,
+}: {
+  pb: Powerbank;
+  onQc: (pb: Powerbank) => void;
+  /** 「已找回」要填说明，交给页面开抽屉收（这里只负责判定动作出不出现）。 */
+  onDismissLost: (pb: Powerbank) => void;
+}) {
   const qc = useQueryClient();
   const run = useMutation({
     mutationFn: (a: PowerbankAction) => api.transitPowerbank(pb.powerbankNo, a),
@@ -31,6 +38,13 @@ export function PowerbankActions({ pb, onQc }: { pb: Powerbank; onQc: (pb: Power
     },
   });
   const archived = pb.archivedAt ? "已归档的充电宝只读：先恢复" : null;
+  const confirmLost = useMutation({
+    mutationFn: () => api.confirmPowerbankLost(pb.powerbankNo),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ["devices"] });
+      notify.success(`${r.powerbankNo} 已确认丢失`);
+    },
+  });
 
   const actions: ActionSpec[] = (Object.keys(POWERBANK_TRANSITIONS) as PowerbankAction[]).map((a) => ({
     key: a,
@@ -47,6 +61,29 @@ export function PowerbankActions({ pb, onQc }: { pb: Powerbank; onQc: (pb: Power
     },
     onRun: () => run.mutateAsync(a).catch(() => undefined),
   }));
+  /*
+   * 疑似丢失的两个核实动作（后端 V113）。**只在打了标记时出现** —— 与后端同一条闸：
+   * 没被系统怀疑过的宝要标丢失，说明判断依据不在系统里，应先查清再说。
+   * 确认丢失是不可逆的资产动作（核销、可能向最后借用人追偿），所以要求手输充电宝号。
+   */
+  if (pb.suspectedLostAt) {
+    actions.unshift(
+      {
+        key: "confirmLost", label: "确认丢失", perm: PERM, danger: true, blockedReason: archived,
+        confirm: {
+          title: `确认丢失 ${pb.powerbankNo}`,
+          desc: "这块宝将转为「丢失」并从柜位上摘除。丢失会进入资产核销、并可能向最后借用人追偿——"
+            + "确认前请先核对最后订单与现场。输入充电宝号确认。",
+          confirmText: "确认丢失", requireText: pb.powerbankNo,
+        },
+        onRun: () => confirmLost.mutateAsync().catch(() => undefined),
+      },
+      {
+        key: "dismissLost", label: "已找回 / 误判", perm: PERM, blockedReason: archived,
+        onRun: () => onDismissLost(pb),
+      },
+    );
+  }
   actions.unshift({
     key: "qc", label: "入库质检", perm: PERM,
     // 只在在库时质检：在仓 / 借出的宝出问题走「标记故障」

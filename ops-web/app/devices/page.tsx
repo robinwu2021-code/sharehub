@@ -41,9 +41,10 @@ import type {
   OtaRollout, PageResult, OtaRelease, OtaTask, DeviceLog, DeviceCodeBatch,
 } from "@/lib/types";
 import { RefLink } from "@/components/ref-link";
-import { CAB_STATUS, PB_STATUS, PB_HEALTH, TRANSFER_STATUS } from "@/components/device/device-maps";
+import { CAB_STATUS, PB_STATUS, PB_HEALTH, TRANSFER_STATUS, daysSince } from "@/components/device/device-maps";
 import { TransferForm, TransferDetailDrawer, AssetDiffsTable } from "@/components/device/transfer";
 import { PowerbankActions } from "@/components/device/powerbank-actions";
+import { ReasonDrawer, type ReasonRequest } from "@/components/device/reason-drawer";
 import { QcDrawer, type QcTarget } from "@/components/device/qc";
 import { CabinetSummaryStrip } from "@/components/device/cabinet-summary";
 
@@ -798,7 +799,19 @@ const pbColsOf = (vendorName: (code: string | null) => string): Column<Powerbank
     ),
   },
   { header: "电量", cell: (r) => <span className="tabular-nums">{Math.round(r.battery)}%</span> },
-  { header: "状态", cell: (r) => <StatusBadge map={PB_STATUS} value={r.status} /> },
+  {
+    header: "状态",
+    cell: (r) => (
+      <div className="space-y-0.5">
+        <StatusBadge map={PB_STATUS} value={r.status} />
+        {/* 疑似丢失是**标记不是状态**（宝仍是借出中），所以挂在状态下面而不是替换它。
+            显示「第几天」而不是时间戳：运维要判断的是「拖了多久还没核实」 */}
+        {r.suspectedLostAt && (
+          <div className="txt-caption text-warning-ink">疑似丢失 · 第 {daysSince(r.suspectedLostAt)} 天</div>
+        )}
+      </div>
+    ),
+  },
   { header: "健康", cell: (r) => <StatusBadge map={PB_HEALTH} value={r.health} /> },
   {
     header: "循环次数",
@@ -1382,6 +1395,8 @@ function DevicesInner() {
   // 库存调拨 tab 的两个视图：调拨单 / 资产差异（签收差异、撤机清点差异逐条查清）
   const [invView, setInvView] = useState<"transfers" | "diffs">("transfers");
   const [qcTarget, setQcTarget] = useState<QcTarget | null>(null);
+  // 「已找回 / 误判」要填说明（后端必填）：复用写原因抽屉，打开它本身无副作用
+  const [lostDismiss, setLostDismiss] = useState<ReasonRequest | null>(null);
   const [otaForm, setOtaForm] = useState<Partial<OtaRollout> | null>(null);
   // 指令记录 tab 的下发抽屉：null = 关，对象 = 打开并按内容预填（「重新下发」带着原记录进来）
   const [cmdDraft, setCmdDraft] = useState<CmdDraft | null>(null);
@@ -1524,7 +1539,17 @@ function DevicesInner() {
             <>
               <Button size="sm" variant="outline" onClick={() => setPbForm(r)}>编辑</Button>
               {/* 状态动作（报故障 / 维修 / 丢失 / 找回 / 报废）与入库质检：由迁移表决定出现哪几个 */}
-              <PowerbankActions pb={r} onQc={(pb) => setQcTarget({ itemType: "POWERBANK", itemNo: pb.powerbankNo })} />
+              <PowerbankActions
+                pb={r}
+                onQc={(pb) => setQcTarget({ itemType: "POWERBANK", itemNo: pb.powerbankNo })}
+                onDismissLost={(pb) => setLostDismiss({
+                  title: `解除疑似丢失 ${pb.powerbankNo}`,
+                  help: "写清在哪里找回、或为什么判定是误判——三个月后有人问起，能回答的只有这一句。"
+                    + "解除后失联计时从现在重新开始。",
+                  onSubmit: (note) => api.dismissPowerbankLost(pb.powerbankNo, note)
+                    .then(() => { qc.invalidateQueries({ queryKey: ["devices"] }); notify.success(`${pb.powerbankNo} 已解除疑似丢失`); }),
+                })}
+              />
             </>
           }
         />
@@ -1698,6 +1723,7 @@ function DevicesInner() {
       />
       <TransferDetailDrawer transferNo={invDetail} onClose={() => setInvDetail(null)} onEdit={(t) => setInvForm(t)} />
       <QcDrawer target={qcTarget} onClose={() => setQcTarget(null)} />
+      <ReasonDrawer req={lostDismiss} onClose={() => setLostDismiss(null)} />
       <OtaTasksDrawer rollout={taskRollout} onOpenChange={(o) => !o && setTaskRollout(null)} />
       <SendCommandDrawer draft={cmdDraft} onOpenChange={(o) => !o && setCmdDraft(null)} />
     </div>

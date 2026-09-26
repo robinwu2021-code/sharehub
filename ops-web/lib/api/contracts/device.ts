@@ -105,6 +105,14 @@ export interface DeviceApi {
   inspectCabinet(cabinetNo: string, req: QcReq): Promise<QcRecord>;
   /** 充电宝入库质检（看电量与循环次数，阈值在系统参数里）。 */
   inspectPowerbank(powerbankNo: string, req: QcReq): Promise<QcRecord>;
+
+  /**
+   * 疑似丢失经核实：**确认丢失**（`RENTED → LOST`）。只对打了疑似标记的宝开放 ——
+   * 没被系统怀疑过就要标丢失，说明判断依据不在系统里，应先查清。
+   */
+  confirmPowerbankLost(powerbankNo: string, note?: string): Promise<Powerbank>;
+  /** 疑似丢失经核实：**已找回 / 误判**。说明必填（在哪找回、为什么误判），并重置失联计时。 */
+  dismissPowerbankLost(powerbankNo: string, note: string): Promise<Powerbank>;
   /** 某台设备（机柜号或充电宝号）的质检记录，新的在前。 */
   listQcRecords(itemNo: string): Promise<QcRecord[]>;
 

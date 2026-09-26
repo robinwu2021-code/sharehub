@@ -92,3 +92,15 @@ export const ENDPOINT_TYPE_LABEL: Record<TransferEndpointType, string> = {
 export const ITEM_TYPE_LABEL: Record<TransferItemType, string> = {
   CABINET: "机柜", POWERBANK: "充电宝",
 };
+
+/**
+ * 从某个时间点到现在过了几天（至少 1 天）。
+ *
+ * <p>疑似丢失要回答的是「拖了多久还没人核实」，时间戳回答不了这个 ——
+ * 看到「2026-09-18 03:30」还得自己心算。
+ */
+export function daysSince(at: string): number {
+  const t = new Date(at.replace(" ", "T")).getTime();
+  if (Number.isNaN(t)) return 1;
+  return Math.max(1, Math.floor((Date.now() - t) / 86400000) + 1);
+}

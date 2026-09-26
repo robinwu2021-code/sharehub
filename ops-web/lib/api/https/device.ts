@@ -107,6 +107,8 @@ export const deviceHttp: DeviceApi = {
     client.post(`/api/ops/powerbanks/${no}`, { event: POWERBANK_TRANSITIONS[action].event }),
   inspectCabinet: (no, req) => client.post(`/api/ops/devices/${no}/qc`, req),
   inspectPowerbank: (no, req) => client.post(`/api/ops/powerbanks/${no}/qc`, req),
+  confirmPowerbankLost: (no, note) => client.post(`/api/ops/powerbanks/${no}/confirm-lost`, { note }),
+  dismissPowerbankLost: (no, note) => client.post(`/api/ops/powerbanks/${no}/dismiss-lost`, { note }),
   listQcRecords: (itemNo) => client.get("/api/ops/qc-records", { itemNo }),
   setTransferItems: (no, itemNos) => client.post(`/api/ops/inventory-transfers/${no}/items`, { itemNos }),
   shipTransfer: (no) => client.post(`/api/ops/inventory-transfers/${no}/ship`, {}),
