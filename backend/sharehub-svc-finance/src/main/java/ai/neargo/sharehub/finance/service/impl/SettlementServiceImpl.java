@@ -253,7 +253,29 @@ public class SettlementServiceImpl implements SettlementService {
      * 累加会把中间态叠上去；重算的结果只取决于当前明细，跑几次都一样。
      */
     private void mergeInto(StlSettlement existing, List<ShareRecord> group, List<StlAdjustment> adjs, String tenantId) {
+        /*
+         * **先读这张单已有的明细键**，跳过已经在里面的。
+         *
+         * <p>`stl_settlement_detail` 上有唯一键 `(settle_no, ref_type, ref_no)`，
+         * 而历史数据里存在「明细已经指向某条分润、那条分润的 status 却还是 PENDING」的不一致
+         * （2026-09-26 生产实测：SR10000 被两张单引用，自己却是 PENDING、settle_no 为空）。
+         * 不跳过的话插入撞唯一键 ⇒ **整批出账事务回滚**，一条脏数据会把同批其余正常分润一起拖住 ——
+         * 实测就是这样：7 条干净的分润跟着一条脏的一起出不去。
+         */
+        java.util.Set<String> already = detailMapper.selectList(new LambdaQueryWrapper<StlSettlementDetail>()
+                        .eq(StlSettlementDetail::getSettleNo, existing.getSettleNo())).stream()
+                .map(d -> d.getRefType() + ":" + d.getRefNo()).collect(java.util.stream.Collectors.toSet());
+
         for (ShareRecord r : group) {
+            if (!already.add(SettlementRefType.SHARE.name() + ":" + r.getRecordNo())) {
+                // 明细早就有它了：把分润的状态补齐到与明细一致，别让它继续挂在待出账里反复被捞
+                log.warn("分润 {} 已在结算单 {} 的明细里，但状态仍是 {} —— 本次只补状态，不重复插明细",
+                        r.getRecordNo(), existing.getSettleNo(), r.getStatus());
+                r.setSettleNo(existing.getSettleNo());
+                r.setStatus(ShareRecordStatus.DONE.name());
+                recordMapper.updateById(r);
+                continue;
+            }
             StlSettlementDetail d = new StlSettlementDetail();
             d.setTenantId(tenantId);
             d.setSettleNo(existing.getSettleNo());
@@ -266,6 +288,7 @@ public class SettlementServiceImpl implements SettlementService {
             recordMapper.updateById(r);
         }
         for (StlAdjustment a : adjs) {
+            if (!already.add(SettlementRefType.ADJUST.name() + ":" + a.getAdjNo())) continue;
             StlSettlementDetail d = new StlSettlementDetail();
             d.setTenantId(tenantId);
             d.setSettleNo(existing.getSettleNo());

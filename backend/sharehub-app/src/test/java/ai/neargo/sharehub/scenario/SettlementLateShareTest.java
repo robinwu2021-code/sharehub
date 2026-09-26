@@ -103,6 +103,35 @@ class SettlementLateShareTest extends ApiTestSupport {
         assertThat(pending()).as("那条分润仍留在待出账，等人工处理 —— 而不是被悄悄标成已结").isEqualTo(1);
     }
 
+    @Test
+    @DisplayName("★ 一条脏数据不能把整批出账拖住（明细已指向它、状态却还是 PENDING）")
+    void dirty_detail_does_not_block_the_whole_batch() {
+        /*
+         * 2026-09-26 生产实测：SR10000 已被两张结算单的明细引用，自己却是 PENDING、settle_no 为空。
+         * 并入时插明细撞 `uk_stl_detail` ⇒ **整批事务回滚**，同批 7 条干净的分润跟着一起出不去。
+         */
+        share("6.00");
+        String settleNo = settlements.generate(period, null).get(0);
+
+        // 造脏：明细里塞一条指向新分润的记录，但那条分润仍是 PENDING
+        share("1.00");
+        String dirty = jdbc.queryForObject(
+                "SELECT record_no FROM share_record WHERE period=? AND status='PENDING' LIMIT 1", String.class, period);
+        jdbc.update("INSERT INTO stl_settlement_detail (settle_no, ref_type, ref_no, amount, tenant_id) VALUES (?,?,?,?,'MAIN')",
+                settleNo, "SHARE", dirty, new BigDecimal("1.00"));
+        // 再来两条干净的
+        share("2.00");
+        share("3.00");
+
+        settlements.generate(period, null);
+
+        assertThat(pending()).as("干净的那两条不该被脏数据拖住").isZero();
+        assertThat(jdbc.queryForObject("SELECT status FROM share_record WHERE record_no=?", String.class, dirty))
+                .as("脏的那条把状态补齐到与明细一致").isEqualTo("DONE");
+        assertThat(count(settleNo)).as("明细不重复插：6.00 + 脏的 1.00 + 新的两条").isEqualTo(4);
+        assertThat(total(settleNo)).isEqualByComparingTo("12.00");
+    }
+
     // ───────────────────────── 夹具 ─────────────────────────
 
     private void share(String amount) {
