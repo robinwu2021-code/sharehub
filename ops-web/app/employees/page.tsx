@@ -284,6 +284,12 @@ function EmployeesInner() {
   const [roleForm, setRoleForm] = useState<Partial<RoleRow> | null>(null);
   const [deptForm, setDeptForm] = useState<Partial<Department> | null>(null);
   const [empForm, setEmpForm] = useState<Partial<Employee> | null>(null);
+  /**
+   * 刚建出来的一次性登录口令。**只在这里出现这一次** ——
+   * 后端不落日志、也没有第二个接口能查出它（能再查出来的初始口令等于没有初始口令）。
+   * 所以关掉这个面板就只能重置一次，面板上把这件事写明。
+   */
+  const [newCred, setNewCred] = useState<{ employeeNo: string; password: string } | null>(null);
   // 功能权限勾选树。permDraft = 「用户动过手的草稿」，null 表示还没动过 → 显示服务端现值。
   // 不用「打开时 setState 灌一次」那套：react-query 命中缓存时 data 的引用不变，
   // 重开同一个角色的 effect 不会再跑，抽屉里就会出现「一项都没勾」的假象。
@@ -449,6 +455,15 @@ function EmployeesInner() {
     mutationFn: (v: Partial<Employee>) => api.saveEmployee(v),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["employees"] }); notify.success("保存成功"); setEmpForm(null); },
   });
+  /**
+   * 建登录号 / 重置口令。口令由服务端生成（不接受调用方指定，否则多半会被定成全员同一个），
+   * 回来的明文直接进 {@link newCred} 面板 —— **不写进任何 query 缓存**，
+   * 免得它跟着 devtools / 缓存持久化跑到别处去。
+   */
+  const resetCred = useMutation({
+    mutationFn: (employeeNo: string) => api.resetEmployeeCredential(employeeNo),
+    onSuccess: (r) => setNewCred(r),
+  });
   const saveRole = useMutation({
     mutationFn: (v: Partial<RoleRow>) => api.saveRoleRow(v),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["roles"] }); notify.success("保存成功"); setRoleForm(null); },
@@ -539,6 +554,30 @@ function EmployeesInner() {
               数据范围管「同一个按钮下看得见哪些行」。挂在员工行上，
               因为要调的恰恰是「这个人」比他的角色多看或少看。 */}
           <Button size="sm" variant="outline" onClick={() => { setScopeForm(EMPTY_SCOPE_FORM); setScopeEmp(e); }}>数据范围</Button>
+          {/*
+            建号 / 重置口令。**只对在职的人出现** —— 离职要停用凭据，
+            不该有一条路把它重新激活（后端同闸，返回 400）。
+            按钮上不写「重置」还是「新建」：前端不知道这个人有没有凭据
+            （**故意没有那个查询接口**，有的话就多了一处能判断账号存不存在的地方）。
+          */}
+          {e.status === "ACTIVE" && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={resetCred.isPending}
+              onClick={async () => {
+                const ok = await confirm({
+                  title: `为 ${e.name}（${e.employeeNo}）生成登录口令`,
+                  desc: "会生成一个新的一次性口令，本人下次登录必须改密。"
+                    + "如果他已经有口令，**原口令立刻失效**。新口令只显示这一次。",
+                  confirmText: "生成",
+                });
+                if (ok) resetCred.mutate(e.employeeNo);
+              }}
+            >
+              登录口令
+            </Button>
+          )}
         </div>
       ) : <span className="text-muted-foreground">-</span>,
     },
@@ -886,6 +925,51 @@ function EmployeesInner() {
         onSubmit={() => empForm && saveEmp.mutate(empForm)}
         submitting={saveEmp.isPending}
       />
+
+      {/*
+        一次性口令面板。**没有「再看一次」** —— 后端不落日志、没有第二个能查出它的接口。
+        所以这里把「关掉就拿不到了」写在明面上，而不是让人事后才发现。
+      */}
+      <Drawer
+        open={!!newCred}
+        onOpenChange={(o) => !o && setNewCred(null)}
+        title={`${newCred?.employeeNo ?? ""} 的一次性登录口令`}
+        desc="只显示这一次。关掉之后查不回来，只能重新生成一个。"
+        footer={<Button onClick={() => setNewCred(null)}>我已记下，关闭</Button>}
+      >
+        <div className="space-y-3">
+          <Field label="登录名（工号）">
+            <span className="txt-strong tabular-nums">{newCred?.employeeNo}</span>
+          </Field>
+          <Field label="一次性口令">
+            <div className="flex items-center gap-2">
+              {/* 等宽 + 可选中：这串要靠人转述或复制，形近字符已在服务端的字母表里去掉了 */}
+              <code className="flex-1 select-all rounded-field bg-muted px-3 py-2 font-mono text-sm tabular-nums">
+                {newCred?.password}
+              </code>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={async () => {
+                  if (!newCred) return;
+                  try {
+                    await navigator.clipboard.writeText(newCred.password);
+                    notify.success("已复制");
+                  } catch {
+                    // 非 https / 无剪贴板权限时会抛 —— 口令本身就在屏幕上，手动选也行
+                    notify.error("复制失败，请手动选中");
+                  }
+                }}
+              >
+                复制
+              </Button>
+            </div>
+          </Field>
+          <Notice className="mb-0 text-warning">
+            本人首次登录会被强制改密，改完才能进入系统。请通过可信渠道转述，别发在群里。
+          </Notice>
+        </div>
+      </Drawer>
 
       <FormDrawer
         open={!!deptForm}
