@@ -32,11 +32,26 @@ import { Input } from "./input";
 import { Button } from "./button";
 import { cn } from "@/lib/utils";
 import {
-  loadGoogleMaps, gmapsReasonText, gmapsConfigured, searchPlaces, placeDetail, reverseGeocode,
-  newSessionToken, useDebounced, FALLBACK_CENTER, type PlaceHit,
+  loadGoogleMaps, gmapsReasonText, gmapsConfigured, searchPlaces, reverseGeocode,
+  useDebounced, FALLBACK_CENTER, PLACE_TYPES, type PlaceHit,
 } from "@/lib/gmaps";
 
 export type AddressValue = { address: string; lat: number | ""; lng: number | "" };
+
+/**
+ * 读一个 CSS 变量的计算值。
+ *
+ * Google Maps 的 Marker 图标只收颜色**字符串**，塞不进 `var(--x)`，
+ * 所以把 token 读出来再给它 —— 换肤时图上这个点会跟着变。
+ *
+ * **取不到就回空串**，调用方据此不传自定义图标、用 Google 默认针。
+ * 不在这里写一个兜底色：那既违反「组件层不写死颜色」，
+ * 也是在为一个几乎不可能发生的情况（globals.css 一定定义了这些 token）发明配色。
+ */
+function cssVar(name: string): string {
+  if (typeof window === "undefined") return "";
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
 
 export function AddressPicker({
   value, onChange, disabled, invalid, onBlur, placeholder,
@@ -53,12 +68,16 @@ export function AddressPicker({
   const [hits, setHits] = React.useState<PlaceHit[]>([]);
   const [searching, setSearching] = React.useState(false);
   const [listOpen, setListOpen] = React.useState(false);
+  /** 按地点类型筛（购物中心 / 机场 / 酒店…）。空 = 不限。 */
+  const [type, setType] = React.useState("");
+  /** 只搜当前地图范围 —— 「这一片有哪些商场」比「全城叫 mall 的」有用得多。 */
+  const [inView, setInView] = React.useState(false);
 
   const boxRef = React.useRef<HTMLDivElement | null>(null);
   const mapRef = React.useRef<google.maps.Map | null>(null);
   const markerRef = React.useRef<google.maps.Marker | null>(null);
-  /** 一次搜索会话：多次补全 + 一次详情按一次计费。选中后换新的。 */
-  const session = React.useRef(newSessionToken());
+  /** 候选在地图上的标记（与选中的那个主标记分开管）。 */
+  const hitMarkersRef = React.useRef<google.maps.Marker[]>([]);
   /**
    * 刚选中/刚回填过，这一轮不要再搜。
    * 没有它的话：选中 → 地址被写成完整地址 → 防抖触发 → 又弹一次列表，
@@ -85,35 +104,80 @@ export function AddressPicker({
   React.useEffect(() => {
     if (skipSearch.current) { skipSearch.current = false; return; }
     const q = debounced.trim();
-    if (!gmapsConfigured || q.length < 2) { setHits([]); setListOpen(false); return; }
+    // 选了类型但没打字 → 按这个类型浏览（用它自带的英文关键词当查询词）
+    const typeKeyword = PLACE_TYPES.find((t) => t.value === type)?.keyword ?? "";
+    const text = q.length >= 2 ? q : (type ? typeKeyword : "");
+    if (!gmapsConfigured || !text) { setHits([]); setListOpen(false); clearHitMarkers(); return; }
     let dead = false;
     setSearching(true);
-    // 已有坐标就以它为中心偏置，否则用首批市场的中心 ——
-    // 不偏置的话「Marina」会优先命中别的国家
     const bias = hasCoords
       ? { lat: Number(latest.current.value.lat), lng: Number(latest.current.value.lng) }
       : FALLBACK_CENTER;
-    searchPlaces(q, session.current, bias).then((r) => {
+    const b = inView ? viewBounds() : null;
+    searchPlaces(text, { type: type || undefined, bias, bounds: b }).then((r) => {
       if (dead) return;
       setHits(r);
       setSearching(false);
       setListOpen(r.length > 0);
+      drawHitMarkers(r);
     });
     return () => { dead = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debounced]);
+  }, [debounced, type, inView]);
 
-  /** 选中一条：地址 / 坐标 / 地图落点一起写。 */
-  async function pick(hit: PlaceHit) {
+  /** 当前地图视野的矩形范围；地图没开就没有范围可用。 */
+  function viewBounds() {
+    const b = mapRef.current?.getBounds();
+    if (!b) return null;
+    const ne = b.getNorthEast(), sw = b.getSouthWest();
+    return { south: sw.lat(), west: sw.lng(), north: ne.lat(), east: ne.lng() };
+  }
+
+  function clearHitMarkers() {
+    hitMarkersRef.current.forEach((m) => m.setMap(null));
+    hitMarkersRef.current = [];
+  }
+
+  /**
+   * 把候选撒到地图上，点标记等于点列表里那一条。
+   * 候选用小圆点、选中的用默认大头针 —— 两者必须一眼分得开，
+   * 否则人不知道「我到底选中了哪个」。
+   */
+  function drawHitMarkers(list: PlaceHit[]) {
+    const map = mapRef.current;
+    clearHitMarkers();
+    if (!map || list.length === 0) return;
+    hitMarkersRef.current = list.map((h) => {
+      const fill = cssVar("--primary");
+      const stroke = cssVar("--surface");
+      const m = new google.maps.Marker({
+        position: { lat: h.lat, lng: h.lng }, map, title: h.name,
+        // 候选是小圆点、选中的是默认大头针 —— 两者必须一眼分得开。
+        // token 读不到时不传 icon，退成默认针（形状仍与选中的一样，但这只是兜底路径）。
+        ...(fill && stroke ? {
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE, scale: 6,
+            fillColor: fill, fillOpacity: 0.9, strokeColor: stroke, strokeWeight: 2,
+          },
+        } : {}),
+      });
+      m.addListener("click", () => pick(h));
+      return m;
+    });
+  }
+
+  /**
+   * 选中一条：地址 / 坐标 / 地图落点一起写。
+   * **不再需要二次请求** —— searchText 已经把坐标带回来了。
+   */
+  function pick(hit: PlaceHit) {
     setListOpen(false);
-    const d = await placeDetail(hit.placeId, session.current);
-    session.current = newSessionToken();   // 一次会话结束
-    if (!d) { setFail("这条地点取不到坐标，可在地图上直接点选"); return; }
+    clearHitMarkers();
     setFail(null);
     skipSearch.current = true;
-    set({ address: d.address, lat: d.lat, lng: d.lng });
+    set({ address: hit.address || hit.name, lat: hit.lat, lng: hit.lng });
     setMapOpen(true);     // 让人当场看见落在哪儿
-    focusMap(d.lat, d.lng);
+    focusMap(hit.lat, hit.lng);
   }
 
   function focusMap(lat: number, lng: number) {
@@ -158,6 +222,8 @@ export function AddressPicker({
       });
       mapRef.current = map;
       markerRef.current = marker;
+      // 先搜后开图时，候选还没撒上去 —— 这里补一次
+      if (hits.length) drawHitMarkers(hits);
     });
     return () => { dead = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -165,7 +231,12 @@ export function AddressPicker({
 
   // 收起地图时丢掉实例，下次展开重建 —— 否则容器卸载后地图挂在一个已消失的节点上
   React.useEffect(() => {
-    if (!mapOpen) { mapRef.current = null; markerRef.current = null; }
+    if (!mapOpen) {
+      // 候选标记也要丢：它们挂在一个已经卸载的地图上，留着下次会当作"还在图上"
+      hitMarkersRef.current = [];
+      mapRef.current = null;
+      markerRef.current = null;
+    }
   }, [mapOpen]);
 
   const num = (s: string) => (s === "" ? "" : Number(s));
@@ -201,8 +272,33 @@ export function AddressPicker({
         </Button>
       </div>
 
+      {/* 换个方式搜：按类型（选了类型不打字也能按类型浏览）、只搜当前地图范围 */}
+      {gmapsConfigured && !disabled && (
+        <div className="flex flex-wrap items-center gap-2 txt-caption text-muted-foreground">
+          <select
+            className="h-7 rounded-control border border-border bg-card px-2 txt-caption"
+            value={type}
+            onChange={(e) => setType(e.target.value)}
+            aria-label="按地点类型筛选"
+          >
+            <option value="">不限类型</option>
+            {PLACE_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+          </select>
+          {mapOpen && (
+            <label className="flex items-center gap-1.5">
+              <input
+                type="checkbox" className="size-3.5 accent-primary"
+                checked={inView} onChange={(e) => setInView(e.target.checked)}
+              />
+              只搜当前地图范围
+            </label>
+          )}
+          {type && !(value.address ?? "").trim() && <span>已按「{PLACE_TYPES.find((t) => t.value === type)?.label}」列出附近的</span>}
+        </div>
+      )}
+
       {/*
-        联想列表走**文档流**：它一出现就把地图推下去，而不是盖在地图上。
+        候选列表走**文档流**：它一出现就把地图推下去，而不是盖在地图上。
         这两样恰恰要一起看 ——「我选的这条是不是落在我想的位置」。
       */}
       {listOpen && hits.length > 0 && (
@@ -212,10 +308,13 @@ export function AddressPicker({
               <button
                 type="button" role="option" aria-selected={false}
                 className="w-full px-3 py-2 text-start hover:bg-muted"
-                onClick={() => void pick(h)}
+                onClick={() => pick(h)}
               >
-                <div className="txt-body text-foreground">{h.main}</div>
-                {h.secondary && <div className="txt-caption text-muted-foreground">{h.secondary}</div>}
+                <div className="flex items-baseline gap-2">
+                  <span className="txt-body text-foreground">{h.name}</span>
+                  {h.typeLabel && <span className="txt-caption text-muted-foreground/70">{h.typeLabel}</span>}
+                </div>
+                {h.address && <div className="txt-caption text-muted-foreground">{h.address}</div>}
               </button>
             </li>
           ))}

@@ -140,7 +140,15 @@ public class LocService {
         LambdaQueryWrapper<LocVenue> w = new LambdaQueryWrapper<>();
         if (!Boolean.TRUE.equals(showArchived)) w.isNull(LocVenue::getArchivedAt);
         if (kw(keyword)) w.like(LocVenue::getName, keyword);
-        w.orderByAsc(LocVenue::getId);
+        /*
+         * **新建的排最上**（倒序）。此前是 `orderByAsc` —— 建完一个场地方回到列表，
+         * 它在最后一页，而运营的下一步通常就是接着操作这一条。
+         *
+         * 顺带把一处 mock 与真后端的分叉抹平：mock 的 `upsert` 用的是 `arr.unshift`，
+         * 也就是**新建的本来就在最上**。离线开发时看到的顺序与线上相反，
+         * 而这种差异不会报错，只会让人在线上觉得「刚建的没保存成功」。
+         */
+        w.orderByDesc(LocVenue::getId);
         Page<LocVenue> r = venueMapper.selectPage(p, w);
         Map<String, Integer> counts = venueSiteCounts(r.getRecords().stream().map(LocVenue::getVenueNo).toList());
         List<Venue> rows = r.getRecords().stream()

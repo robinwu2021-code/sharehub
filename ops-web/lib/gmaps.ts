@@ -75,77 +75,97 @@ export function gmapsReasonText(reason: "no-key" | "script-failed"): string {
 
 export interface PlaceHit {
   placeId: string;
-  /** 主标题，如「Mall of the Emirates」 */
-  main: string;
-  /** 次要说明，如「Sheikh Zayed Rd - Al Barsha - Dubai」 */
-  secondary: string;
-}
-
-export interface PlaceDetail {
+  /** 地点名，如「The Dubai Mall」 */
+  name: string;
+  /** 完整地址 —— 存进库的是这个（名字派不了单，地址才能让人找到路）。 */
   address: string;
+  /** Google 给的类型中文名，如「购物中心」。可能为空。 */
+  typeLabel: string;
   lat: number;
   lng: number;
 }
 
-/** 一次搜索会话的令牌：多次补全 + 一次详情按一次计费。 */
-export function newSessionToken(): string {
-  return (crypto.randomUUID?.() ?? String(Math.random()).slice(2)) as string;
+/** 可按类型筛的地点类型（Places「Table A」primary type）。全部实测被接受。 */
+export const PLACE_TYPES: { value: string; label: string; keyword: string }[] = [
+  { value: "shopping_mall", label: "购物中心", keyword: "shopping mall" },
+  { value: "airport", label: "机场", keyword: "airport" },
+  { value: "transit_station", label: "交通枢纽", keyword: "metro station" },
+  { value: "hotel", label: "酒店", keyword: "hotel" },
+  { value: "restaurant", label: "餐饮", keyword: "restaurant" },
+  { value: "supermarket", label: "零售", keyword: "supermarket" },
+  { value: "corporate_office", label: "办公楼", keyword: "office tower" },
+  { value: "hospital", label: "医疗", keyword: "hospital" },
+  { value: "school", label: "学校", keyword: "school" },
+  { value: "tourist_attraction", label: "景区", keyword: "attraction" },
+];
+
+export interface SearchOpts {
+  /** Places primary type；空 = 不限。 */
+  type?: string;
+  /** 地理偏置中心：优先用已选坐标，否则首批市场中心。 */
+  bias?: { lat: number; lng: number };
+  /** 只搜这个矩形范围内的（「只搜当前地图范围」用）。给了就覆盖 bias。 */
+  bounds?: { south: number; west: number; north: number; east: number } | null;
 }
 
 /**
- * 地点搜索（自动补全）。
+ * 地点搜索。
  *
- * `bias` 给一个中心点做地理偏置 —— 不给的话「Marina」会优先命中别的国家。
+ * <h3>用 searchText 而不是 autocomplete</h3>
+ * 这两个 API 都能做「边打边找」，但 **searchText 一次就把坐标带回来**，
+ * autocomplete 只给 placeId、要为**每一条**再调一次详情。
+ * 而「把候选撒到地图上让人先看看再选」恰恰需要每条都有坐标 ——
+ * 走 autocomplete 的话那是 N 次详情调用（N 倍计费）。
+ * 换过来之后顺带没了 sessionToken 那套（searchText 不用它），选中也不再需要二次请求。
+ *
+ * <h3>为什么要偏置</h3>
+ * 不给中心点的话「Marina」会优先命中别的国家。
+ *
  * 任何失败都回空表而不是抛错：搜不到东西不该让输入框崩掉，手填那条路一直在。
  */
-export async function searchPlaces(
-  input: string, sessionToken: string, bias = FALLBACK_CENTER,
-): Promise<PlaceHit[]> {
-  if (!KEY || !input.trim()) return [];
+export async function searchPlaces(text: string, opts: SearchOpts = {}): Promise<PlaceHit[]> {
+  const q = text.trim();
+  if (!KEY || !q) return [];
+  const bias = opts.bias ?? FALLBACK_CENTER;
   try {
-    const r = await fetch("https://places.googleapis.com/v1/places:autocomplete", {
+    const r = await fetch("https://places.googleapis.com/v1/places:searchText", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Goog-Api-Key": KEY },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": KEY,
+        // FieldMask 必填，且**直接决定计费档位** —— 只要真正用得上的字段
+        "X-Goog-FieldMask":
+          "places.id,places.displayName,places.formattedAddress,places.location,places.primaryTypeDisplayName",
+      },
       body: JSON.stringify({
-        input: input.trim(),
-        sessionToken,
-        locationBias: { circle: { center: { latitude: bias.lat, longitude: bias.lng }, radius: 50000 } },
+        textQuery: q,
+        languageCode: "zh-CN",
+        ...(opts.type ? { includedType: opts.type } : {}),
+        ...(opts.bounds
+          ? {
+              locationRestriction: {
+                rectangle: {
+                  low: { latitude: opts.bounds.south, longitude: opts.bounds.west },
+                  high: { latitude: opts.bounds.north, longitude: opts.bounds.east },
+                },
+              },
+            }
+          : { locationBias: { circle: { center: { latitude: bias.lat, longitude: bias.lng }, radius: 50000 } } }),
       }),
     });
     const j = await r.json();
-    return (j.suggestions ?? [])
-      .map((s: Record<string, any>) => s.placePrediction)  // eslint-disable-line @typescript-eslint/no-explicit-any
-      .filter(Boolean)
-      .map((p: Record<string, any>) => ({                  // eslint-disable-line @typescript-eslint/no-explicit-any
-        placeId: p.placeId,
-        main: p.structuredFormat?.mainText?.text ?? p.text?.text ?? "",
-        secondary: p.structuredFormat?.secondaryText?.text ?? "",
-      }))
-      .filter((p: PlaceHit) => p.placeId && p.main);
+    return (j.places ?? [])
+      .filter((p: Record<string, any>) => p?.location)   // eslint-disable-line @typescript-eslint/no-explicit-any
+      .map((p: Record<string, any>) => ({                // eslint-disable-line @typescript-eslint/no-explicit-any
+        placeId: p.id,
+        name: p.displayName?.text ?? "",
+        address: p.formattedAddress ?? "",
+        typeLabel: p.primaryTypeDisplayName?.text ?? "",
+        lat: Number(p.location.latitude),
+        lng: Number(p.location.longitude),
+      }));
   } catch {
     return [];
-  }
-}
-
-/** 取地点详情（地址 + 坐标）。查不到回 null，调用方保留用户已填的值。 */
-export async function placeDetail(placeId: string, sessionToken: string): Promise<PlaceDetail | null> {
-  if (!KEY || !placeId) return null;
-  try {
-    const r = await fetch(
-      `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?sessionToken=${encodeURIComponent(sessionToken)}`,
-      { headers: { "X-Goog-Api-Key": KEY, "X-Goog-FieldMask": "formattedAddress,location,displayName" } },
-    );
-    const j = await r.json();
-    if (!j?.location) return null;
-    return {
-      // 用 formattedAddress 而不是 displayName：前者是完整地址（人照着能找到路），
-      // 后者只是名字（「Mall of the Emirates」这五个字派不了单）
-      address: j.formattedAddress ?? j.displayName?.text ?? "",
-      lat: Number(j.location.latitude),
-      lng: Number(j.location.longitude),
-    };
-  } catch {
-    return null;
   }
 }
 

@@ -115,8 +115,8 @@ const VENUE_FIELDS: FieldDef[] = [
   { key: "industry", label: "行业", type: "select", options: INDUSTRY_OPTIONS,
     help: "与站点的「场景类型」是两个轴：行业说这家公司做什么，场景说这个点位在什么地方" },
   { key: "address", label: "地址", type: "address", latKey: "lat", lngKey: "lng", maxLength: 256,
-    placeholder: "点「地图选点」或直接输入",
-    help: "地址与经纬度请保持一致：地址给人看，按距离排序看的是坐标" },
+    placeholder: "输入地点名或地址，边打边找",
+    help: "选中候选后坐标自动带上；也可按类型筛、或只搜当前地图范围" },
   // 「站点数」是**聚合值**（名下有几个站点），不是属性，手填必然与实际脱节 —— 表单不收。
 ];
 /**
@@ -158,8 +158,8 @@ const LEAD_FIELDS: FieldDef[] = [
   // 此前转化传的是 `SiteReq(..., address, null, null, ...)` —— 站点有地址没落点，
   // 地图上看不见、C 端「找附近」也排不到它，而这件事不报错。
   { key: "address", label: "地址", type: "address", latKey: "lat", lngKey: "lng",
-    maxLength: 256, placeholder: "点「地图选点」或直接输入", section: "场地",
-    help: "选点后坐标会一起存；签约转化时连同地址带进新建的站点" },
+    maxLength: 256, placeholder: "输入地点名或地址，边打边找", section: "场地",
+    help: "选中候选后坐标自动带上；签约转化时连同地址带进新建的站点" },
   { key: "contact", label: "联系人", placeholder: "姓名 / 电话", section: "场地" },
   { key: "expectSites", label: "预计站点数", type: "number", min: 0, section: "场地" },
   { key: "nextFollowAt", label: "下次跟进", type: "date", section: "场地", help: "「今天该打谁的电话」按它排" },
