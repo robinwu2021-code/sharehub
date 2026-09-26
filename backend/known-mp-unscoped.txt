@@ -15,7 +15,11 @@
 # 【下面这 9 条为什么可以不用】
 # 它们都不返回「某个人的」数据：
 #
-#   /mp/auth/*                 登录/注册/验证码/登出 —— 此时还没有当前登录人
+#   /mp/auth/*                 登录/注册/验证码/登出/可用方式 —— 此时还没有当前登录人。
+#                              /mp/auth/methods 尤其明确：它回的是**按国家的登录方式开关**
+#                              （sys_login_setting），登录页在登录**之前**就要拿它来决定
+#                              画哪些页签 —— 那一刻不存在「当前登录人」。同一个国家的
+#                              所有人拿到同一份，换谁登录都不变。
 #   /mp/app/version            客户端版本，全体一份
 #   /mp/faq                    帮助文案，全体一份
 #   /mp/notice                 公告，全体一份
@@ -31,6 +35,7 @@
 /mp/app/version
 /mp/auth/login
 /mp/auth/logout
+/mp/auth/methods
 /mp/auth/otp
 /mp/auth/password/reset
 /mp/auth/register

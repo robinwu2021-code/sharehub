@@ -13,6 +13,22 @@ const fmt = (d: Date) => d.toISOString().slice(0, 19).replace("T", " ");
 const fmtNow = () => new Date().toISOString().slice(0, 19).replace("T", " ");
 
 export const mockApi: McpApi = {
+  /**
+   * mock 的口径**照抄后端默认行**（V126：otp 开、其余三个关）。
+   *
+   * <p>不写成「全开」：mock 开着而真后端关着，就会出现「本地点得通、切真后端点不动」
+   * —— 那正是这批对齐要消掉的那类差异（口径写在 mock 里、真后端没照做）。
+   */
+  loginMethods: (country?: string) =>
+    db.delay({
+      country: country || "*",
+      otp: true,
+      password: false,
+      apple: false,
+      google: false,
+      forceRealName: false,
+      otpExpireSec: 300,
+    }),
   login: (p: LoginParams) =>
     db.delay({ token: `mock-c-${p.grantType}`, cUserNo: "CU-0001", isNew: false, tenantNo: "MAIN" }),
   sendOtp: () => db.delay({ cooldown: 60 }, 300),

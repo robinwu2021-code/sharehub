@@ -39,11 +39,34 @@ export type ProfilePatch = Partial<Pick<UserProfile, "nickname" | "avatar" | "em
 export type GrantType = "phone_otp" | "password" | "apple" | "google" | "wechat_miniapp";
 export interface LoginParams {
   grantType: GrantType;
-  countryCode?: string; // +971（全球版区号）
+  countryCode?: string; // +971（拨号码，拼手机号用）
+  /**
+   * ISO alpha-2（AE/SA…），选**登录方式开关**用（后端 sys_login_setting 按国家配）。
+   * 与 countryCode 不是一回事：那个是拨号码。后端此前第 5 个字段叫 regionCode
+   * 且无人读，c-app 发的 countryCode 在后端 record 里根本不存在、被静默丢弃。
+   */
+  country?: string;
   phone?: string;
   otp?: string;
   password?: string;
   code?: string; // 小程序 wx.login code / OAuth code
+}
+
+/**
+ * 后端下发的可用登录方式（`GET /mp/auth/methods`，需求 OPS-SYS-07）。
+ *
+ * <p>⚠️ 这是**建议**不是保护：后端 `ConsumerAuthService` 另有一道服务端门禁。
+ * 端上按它隐入口，是为了别让用户点一个必然失败的页签 ——
+ * 此前没有这个接口，密码页签无条件画着，而后端连 password 这个 grantType 都没有。
+ */
+export interface LoginMethods {
+  country: string;
+  otp: boolean;
+  password: boolean;
+  apple: boolean;
+  google: boolean;
+  forceRealName: boolean;
+  otpExpireSec: number;
 }
 export interface OtpParams {
   countryCode: string;
@@ -98,6 +121,8 @@ export interface PayResult {
 
 export interface McpApi {
   // 认证（换 C 池 Bearer，之后属主鉴权）
+  /** 可用登录方式：登录页据此渲染页签、隐掉没开的入口。 */
+  loginMethods(country?: string): Promise<LoginMethods>;
   login(p: LoginParams): Promise<ConsumerLogin>;
   sendOtp(p: OtpParams): Promise<{ cooldown: number }>;
   register(p: RegisterParams): Promise<ConsumerLogin>;

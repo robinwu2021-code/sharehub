@@ -1,7 +1,7 @@
 // 真实后端实现（McpApi）。端点对齐 docs/api/README §六/§七 的 /mp/**。
 // auth 路径由 ConsumerRentFlowTest 实测确认（/mp/auth/*），标「待定」者需服务端补齐。
 import { client } from "./http-client";
-import type { McpApi, LoginParams, RentParams, PayParams, PayResult, OrderQ, NearbyQ, PageQ, ProfilePatch } from "./contract";
+import type { McpApi, LoginParams, LoginMethods, RentParams, PayParams, PayResult, OrderQ, NearbyQ, PageQ, ProfilePatch } from "./contract";
 import type {
   PageResult,
   NearbyCabinet,
@@ -28,6 +28,8 @@ import type {
 } from "@/types";
 
 export const httpApi: McpApi = {
+  loginMethods: (country?: string) =>
+    client.get<LoginMethods>("/mp/auth/methods", country ? { country } : undefined),
   login: (p: LoginParams) => client.post<ConsumerLogin>("/mp/auth/login", p),
   sendOtp: (p) => client.post<{ cooldown: number }>("/mp/auth/otp", p),
   register: (p) => client.post<ConsumerLogin>("/mp/auth/register", p),

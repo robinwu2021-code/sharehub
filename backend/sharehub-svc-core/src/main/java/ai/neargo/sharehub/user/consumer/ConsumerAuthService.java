@@ -35,16 +35,19 @@ public class ConsumerAuthService {
     private final UsrIdentityMapper identityMapper;
     private final TokenStore tokenStore;
     private final PermVersion permVersion;
+    private final LoginMethodGate methodGate;
 
     public ConsumerAuthService(List<ConsumerLoginStrategy> strategyList,
                                UsrUserMapper userMapper, UsrIdentityMapper identityMapper,
-                               TokenStore tokenStore, PermVersion permVersion) {
+                               TokenStore tokenStore, PermVersion permVersion,
+                               LoginMethodGate methodGate) {
         this.strategies = strategyList.stream()
                 .collect(Collectors.toMap(ConsumerLoginStrategy::grantType, Function.identity()));
         this.userMapper = userMapper;
         this.identityMapper = identityMapper;
         this.tokenStore = tokenStore;
         this.permVersion = permVersion;
+        this.methodGate = methodGate;
     }
 
     @Transactional
@@ -52,6 +55,14 @@ public class ConsumerAuthService {
         ConsumerLoginStrategy strategy = strategies.get(req.grantType());
         if (strategy == null) {
             throw BizException.badRequest("error.auth.grant_type_unsupported", req.grantType());
+        }
+        /*
+         * 登录方式开关（OPS-SYS-07）**必须在服务端强制**，不能只靠端上隐入口 ——
+         * 入口隐了，客户端照样能直接把这个 grantType 发过来。
+         * 此前 sys_login_setting 四个开关列一个都没人读，运营台拨了等于没拨。
+         */
+        if (!methodGate.enabled(req.country(), req.grantType())) {
+            throw BizException.badRequest("error.auth.grant_type_disabled", req.grantType());
         }
         ResolvedIdentity id = strategy.authenticate(req);              // ← 端差异全在此
         String tenant = (req.tenantNo() == null || req.tenantNo().isBlank()) ? "MAIN" : req.tenantNo();

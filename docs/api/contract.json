@@ -42788,7 +42788,7 @@
      "type": "String"
     },
     {
-     "name": "regionCode",
+     "name": "country",
      "type": "String"
     },
     {
@@ -42832,6 +42832,28 @@
     {
      "in": "header",
      "name": "auth",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "Map<String, Object>",
+   "returnContainer": null,
+   "returnElement": "Map<String, Object>",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/mp/auth/methods",
+   "perm": null,
+   "perms": [],
+   "handler": "ConsumerAuthController#methods",
+   "summary": "可用登录方式（需求 OPS-SYS-07，`sys_login_setting`）。",
+   "params": [
+    {
+     "in": "query",
+     "name": "country",
      "type": "String",
      "required": false
     }
@@ -45621,7 +45643,7 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 515,
+  "endpoints": 516,
   "records": 467,
   "withPerm": 444,
   "withBody": 219,

@@ -22,15 +22,47 @@ public class ConsumerAuthController {
     private final TokenStore tokenStore;
     private final DevMode devMode;
     private final ai.neargo.sharehub.identity.IdentifierNormalizer normalizer;
+    private final ai.neargo.sharehub.platform.sys.service.LoginSettingService loginSettings;
 
     public ConsumerAuthController(ConsumerAuthService authService, OtpService otpService,
                                   TokenStore tokenStore, DevMode devMode,
-                                  ai.neargo.sharehub.identity.IdentifierNormalizer normalizer) {
+                                  ai.neargo.sharehub.identity.IdentifierNormalizer normalizer,
+                                  ai.neargo.sharehub.platform.sys.service.LoginSettingService loginSettings) {
         this.authService = authService;
         this.otpService = otpService;
         this.tokenStore = tokenStore;
         this.devMode = devMode;
         this.normalizer = normalizer;
+        this.loginSettings = loginSettings;
+    }
+
+    /**
+     * 可用登录方式（需求 OPS-SYS-07，{@code sys_login_setting}）。
+     *
+     * <p>端上据此渲染页签与入口。此前**没有这个端点**，所以 c-app 无条件画出「密码」页签 ——
+     * 而后端连 {@code password} 这个 grantType 都没有，用户点下去吃一个 400。
+     * 开关本身自 V5 就存在，四列一个都没人读：运营台拨了等于没拨。
+     *
+     * <p>⚠️ 出参是**建议**，不是保护：真正的闸在 {@code ConsumerAuthService.login}
+     * （见那里的注释）。端上按它隐入口，后端照样要拦。
+     *
+     * @param country ISO alpha-2；空或查不到则回落默认行 {@code '*'}
+     */
+    @GetMapping("/methods")
+    public Map<String, Object> methods(@RequestParam(required = false) String country) {
+        var s = loginSettings.effective(country);
+        if (s == null) {
+            // 与 LoginMethodGate 同一个取舍：不假装「全开」，也不假装「全关」
+            throw ai.neargo.sharehub.common.BizException.conflict("error.auth.login_setting_missing");
+        }
+        return Map.of(
+                "country", s.country() == null ? "*" : s.country(),
+                "otp", Boolean.TRUE.equals(s.otpEnabled()),
+                "password", Boolean.TRUE.equals(s.passwordEnabled()),
+                "apple", Boolean.TRUE.equals(s.appleEnabled()),
+                "google", Boolean.TRUE.equals(s.googleEnabled()),
+                "forceRealName", Boolean.TRUE.equals(s.forceRealName()),
+                "otpExpireSec", s.otpExpireSec() == null ? 300 : s.otpExpireSec());
     }
 
     /** 统一登录：grantType 分发（phone_otp/wechat_miniapp/wechat_oauth/apple/google）。 */
@@ -79,8 +111,11 @@ public class ConsumerAuthController {
         String otp = body == null ? null : body.otp();
         if (phone == null || phone.isBlank()) throw new IllegalArgumentException("手机号为空");
         if (otp == null || otp.isBlank()) throw new IllegalArgumentException("验证码为空");
+        // 第 5 位现在是 country(ISO)，而 RegisterReq 收的 countryCode 是拨号码（+971）——
+        // 两者不是一回事，塞进去只会让门禁按一个不存在的 ISO 去查、白白回落默认行。
+        // 注册走的是 phone_otp，默认行 otp_enabled=1，门禁按默认行判即正确。
         ConsumerLoginReq req = new ConsumerLoginReq("phone_otp", null, phone, otp.trim(),
-                body.countryCode(), null, null, null, null, null,
+                null, null, null, null, null, null,
                 body.nickname(), null);
         ConsumerLoginVO vo = authService.login(req);
         return Map.of("token", vo.token(), "cUserNo", vo.cUserNo(),
