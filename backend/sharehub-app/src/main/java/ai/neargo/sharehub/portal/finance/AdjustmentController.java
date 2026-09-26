@@ -32,8 +32,11 @@ public class AdjustmentController {
     @PreAuthorize("@perm.can('finance:settlement:read')")
     public PageResult<Adjustment> page(@RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size,
                                        @RequestParam(required = false) String status, @RequestParam(required = false) String payeeNo,
-                                       @RequestParam(required = false) String siteNo) {
-        return adjustments.page(page, size, status, payeeNo, siteNo);
+                                       @RequestParam(required = false) String siteNo,
+                                       @RequestParam(required = false) String kind,
+                                       @RequestParam(required = false) String source,
+                                       @RequestParam(required = false) String period) {
+        return adjustments.page(page, size, status, payeeNo, siteNo, kind, source, period);
     }
 
     @PostMapping("/{adjNo}/confirm")

@@ -60,9 +60,17 @@ public interface AlarmService {
     // ——————————— 2026-09-25 业务告警（TDD-运营核心流程/05 §九）———————————
 
     /** 列表筛选（在旧参数之上追加业务维度）。{@code topOnly} = 只看未被取代的（parent 为空）。 */
+    /**
+     * @param preset 摘要卡对应的预置子集：{@code DISPOSED_OPEN}（已处置未关闭）/ {@code HEALED_TODAY}（今日自愈）。
+     *               <p><b>为什么做成 preset 而不是让调用方拼条件</b>：这两个子集各有两三个条件
+     *               （前者「未关闭 + 有处置单」，后者「已关闭 + 关闭原因是自愈/自动修复 + 今天关的」）。
+     *               调用方自己拼的话，摘要卡的数字与点进去的列表条数迟早对不上 ——
+     *               而那比「卡片不可点」更糟：两个数都摆在界面上，人只会以为数据错了。
+     *               服务端用同一段条件同时算摘要与列表，见 {@code AlarmServiceImpl#applyPreset}。
+     */
     record AlarmQuery(Integer page, Integer size, String keyword, String level, String status, String cabinetNo,
                       String domain, String subjectType, String siteNo, String cause, String disposition,
-                      java.time.LocalDate from, java.time.LocalDate to, Boolean topOnly) {
+                      java.time.LocalDate from, java.time.LocalDate to, Boolean topOnly, String preset) {
     }
 
     PageResult<AlarmRecord> page(AlarmQuery q);

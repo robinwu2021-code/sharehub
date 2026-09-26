@@ -157,11 +157,20 @@ public class AdjustmentServiceImpl implements AdjustmentService {
     }
 
     @Override
-    public PageResult<Adjustment> page(Integer page, Integer size, String status, String payeeNo, String siteNo) {
+    public PageResult<Adjustment> page(Integer page, Integer size, String status, String payeeNo, String siteNo,
+                                       String kind, String source, String period) {
         LambdaQueryWrapper<StlAdjustment> w = new LambdaQueryWrapper<>();
         if (status != null && !status.isBlank()) w.eq(StlAdjustment::getStatus, AdjustmentStatus.valueOf(status.trim().toUpperCase()).name());
         if (payeeNo != null && !payeeNo.isBlank()) w.eq(StlAdjustment::getPayeeNo, payeeNo.trim());
         if (siteNo != null && !siteNo.isBlank()) w.eq(StlAdjustment::getSiteNo, siteNo.trim());
+        /*
+         * 类型 / 来源 / 账期三个筛：此前只有状态、受益方、站点，于是「这个月的保底补差」
+         * 只能整页拉回来在前端再过一遍 —— 页内过滤的结果是**总数会偏大**（分页总数按未过滤算），
+         * 翻页还会漏。枚举值走 valueOf 归一：拼错的值当场 400，而不是静默返回空列表。
+         */
+        if (kind != null && !kind.isBlank()) w.eq(StlAdjustment::getKind, AdjustmentKind.valueOf(kind.trim().toUpperCase()).name());
+        if (source != null && !source.isBlank()) w.eq(StlAdjustment::getSource, source.trim().toUpperCase());
+        if (period != null && !period.isBlank()) w.eq(StlAdjustment::getPeriod, period.trim());
         w.orderByDesc(StlAdjustment::getId);
         int p = page == null || page < 1 ? 1 : page;
         int s = size == null || size < 1 ? 20 : Math.min(size, 200);
@@ -216,6 +225,6 @@ public class AdjustmentServiceImpl implements AdjustmentService {
     private static Adjustment vo(StlAdjustment a) {
         return new Adjustment(a.getAdjNo(), a.getPayeeType(), a.getPayeeNo(), a.getPayeeName(), a.getKind(), a.getSiteNo(),
                 a.getContractNo(), a.getAmount(), a.getSuggestedAmount(), a.getCurrency(), a.getStatus(), a.getSettleNo(),
-                a.getSource(), a.getNote(), a.getConfirmedBy(), a.getConfirmedAt(), a.getCreatedAt());
+                a.getSource(), a.getNote(), a.getConfirmedBy(), a.getConfirmedAt(), a.getCreatedAt(), a.getPeriod());
     }
 }

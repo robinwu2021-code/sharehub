@@ -9,10 +9,15 @@ import java.time.LocalDateTime;
 /** 结算调整项（对齐清单 C9）：撤场关闭 → 按最后一份合同生成押金 / 进场费调整项，财务确认后并入下一次出账。 */
 public interface AdjustmentService {
 
+    /**
+     * @param period 按账期的调整（保底补差）填 {@code YYYY-MM}；一次性的（撤场结清）为空串。
+     *               **缺了它界面上看不出这笔补差属于哪个月** —— 同一个合同每月一笔，
+     *               金额还可能一样，不带账期就分不清是这个月的还是上个月的重复生成。
+     */
     record Adjustment(String adjNo, String payeeType, String payeeNo, String payeeName, String kind, String siteNo,
                       String contractNo, BigDecimal amount, BigDecimal suggestedAmount, String currency, String status,
                       String settleNo, String source, String note, String confirmedBy, LocalDateTime confirmedAt,
-                      LocalDateTime createdAt) {
+                      LocalDateTime createdAt, String period) {
     }
 
     record ConfirmReq(BigDecimal amount, String note) {
@@ -24,7 +29,13 @@ public interface AdjustmentService {
     /** 幂等：同一站点 × 合同 × 种类只生成一次（唯一键兜底）。返回生成条数。 */
     int onSiteClosed(SiteClosedEvent e);
 
-    PageResult<Adjustment> page(Integer page, Integer size, String status, String payeeNo, String siteNo);
+    /**
+     * @param kind   按类型筛（DEPOSIT_REFUND / ENTRY_FEE_SETTLE / GUARANTEE_TOPUP）
+     * @param source 按来源筛（SITE_CLOSED / GUARANTEE）
+     * @param period 按账期筛（{@code YYYY-MM}）
+     */
+    PageResult<Adjustment> page(Integer page, Integer size, String status, String payeeNo, String siteNo,
+                                String kind, String source, String period);
 
     /** 确认：可改金额（改了必须写说明），PENDING → CONFIRMED。 */
     Adjustment confirm(String adjNo, BigDecimal amount, String note);

@@ -18,7 +18,11 @@ public final class DevDtos {
                                Integer battery, Integer cycles, String health, String status,
                                String archivedAt,
                                /* 疑似丢失标记时间（V113）；null = 未被怀疑。宝仍是 RENTED，这只是「待人核实」 */
-                               String suspectedLostAt) {
+                               String suspectedLostAt,
+                               /* 入库质检结论（PENDING / PASSED / FAILED）；null = 存量免检 */
+                               String qcStatus,
+                               /* 所在仓；在库的宝才有。调拨按仓选宝要用它 */
+                               String warehouseNo) {
     }
 
     /**

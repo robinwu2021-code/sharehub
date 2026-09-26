@@ -157,7 +157,8 @@ public class PowerbankServiceImpl implements PowerbankService {
                 e.getCabinetNo(), e.getSlotIndex(), e.getBattery(), e.getCycles(),
                 e.getHealth(), e.getStatus(),
                 e.getArchivedAt() == null ? null : e.getArchivedAt().toString(),
-                e.getSuspectedLostAt() == null ? null : e.getSuspectedLostAt().toString());
+                e.getSuspectedLostAt() == null ? null : e.getSuspectedLostAt().toString(),
+                e.getQcStatus(), e.getWarehouseNo());
     }
 
     // ── 归档 / 取消归档（前端契约 Archivable）──

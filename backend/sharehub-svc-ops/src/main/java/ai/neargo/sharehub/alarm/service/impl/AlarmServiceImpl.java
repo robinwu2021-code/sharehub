@@ -257,9 +257,31 @@ public class AlarmServiceImpl implements AlarmService {
         if (q.from() != null) w.ge(DevAlarm::getOccurredAt, q.from().toString());
         if (q.to() != null) w.lt(DevAlarm::getOccurredAt, q.to().plusDays(1).toString());
         if (Boolean.TRUE.equals(q.topOnly())) w.isNull(DevAlarm::getParentAlarmNo);
+        applyPreset(w, q.preset());
         w.orderByDesc(DevAlarm::getOccurredAt).orderByDesc(DevAlarm::getId);
         Page<DevAlarm> r = mapper.selectPage(new Page<>(norm(q.page(), 1), normSize(q.size())), w);
         return new PageResult<>(r.getRecords().stream().map(AlarmServiceImpl::toVO).toList(), r.getTotal());
+    }
+
+    /** 摘要卡「已处置未关闭」。 */
+    public static final String PRESET_DISPOSED_OPEN = "DISPOSED_OPEN";
+    /** 摘要卡「今日自愈」。 */
+    public static final String PRESET_HEALED_TODAY = "HEALED_TODAY";
+
+    /**
+     * 摘要卡口径的唯一实现：**摘要与列表都调它**。
+     * 未知的 preset 原样忽略（不报错）—— 它来自 URL，拼错一个词不该让整页 500。
+     */
+    private static LambdaQueryWrapper<DevAlarm> applyPreset(LambdaQueryWrapper<DevAlarm> w, String preset) {
+        if (PRESET_DISPOSED_OPEN.equals(preset)) {
+            w.in(DevAlarm::getStatus, List.of(AlarmStatus.OPEN.name(), AlarmStatus.ACKED.name()))
+                    .isNotNull(DevAlarm::getDispositionRef);
+        } else if (PRESET_HEALED_TODAY.equals(preset)) {
+            w.eq(DevAlarm::getStatus, AlarmStatus.CLOSED.name())
+                    .in(DevAlarm::getCloseReason, List.of(AlarmCloseReason.SELF_HEALED.name(), AlarmCloseReason.AUTO_FIXED.name()))
+                    .ge(DevAlarm::getClosedAt, java.time.LocalDate.now().atStartOfDay());
+        }
+        return w;
     }
 
     @Override
@@ -299,11 +321,9 @@ public class AlarmServiceImpl implements AlarmService {
             if (ai.neargo.sharehub.alarm.AlarmLevel.CRITICAL.name().equals(a.getLevel())) v[1]++;
         }
         acc.forEach((k, v) -> byDomain.put(k, new ai.neargo.sharehub.alarm.dto.AlarmDtos.DomainCount(v[0], v[1])));
-        long disposedOpen = mapper.selectCount(new LambdaQueryWrapper<DevAlarm>()
-                .in(DevAlarm::getStatus, List.of(AlarmStatus.OPEN.name(), AlarmStatus.ACKED.name())).isNotNull(DevAlarm::getDispositionRef));
-        long healed = mapper.selectCount(new LambdaQueryWrapper<DevAlarm>().eq(DevAlarm::getStatus, AlarmStatus.CLOSED.name())
-                .in(DevAlarm::getCloseReason, List.of(AlarmCloseReason.SELF_HEALED.name(), AlarmCloseReason.AUTO_FIXED.name()))
-                .ge(DevAlarm::getClosedAt, java.time.LocalDate.now().atStartOfDay()));
+        // 摘要与列表走**同一段条件**：分开写的话，卡片上的数字与点进去的条数迟早对不上
+        long disposedOpen = mapper.selectCount(applyPreset(new LambdaQueryWrapper<>(), PRESET_DISPOSED_OPEN));
+        long healed = mapper.selectCount(applyPreset(new LambdaQueryWrapper<>(), PRESET_HEALED_TODAY));
         return new ai.neargo.sharehub.alarm.dto.AlarmDtos.AlarmSummary(byDomain, disposedOpen, healed);
     }
 

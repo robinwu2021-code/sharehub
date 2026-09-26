@@ -179,7 +179,8 @@ public class CabinetServiceImpl implements CabinetService {
                 e.getAvailableCount() == null ? 0 : e.getAvailableCount(),
                 e.getOnlineStatus(), e.getStatus(), e.getFwVersion(), e.getLastHeartbeatAt(),
                 e.getSiteNo(), e.getAgentNo(),
-                e.getArchivedAt() == null ? null : e.getArchivedAt().toString());
+                e.getArchivedAt() == null ? null : e.getArchivedAt().toString(),
+                e.getQcStatus(), e.getWarehouseNo());
     }
 
     // ── 归档 / 取消归档（前端契约 Archivable）──

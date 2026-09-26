@@ -17,18 +17,23 @@ public final class DevLegacyDtos {
     /**
      * @param agentNo    归属代理；`null` = 平台直营。前端列表按它显示归属，缺了就永远是「平台直营」
      * @param archivedAt 归档时间；`null` = 在用。运营端靠它把归档行置灰并显示归档时间
+     * @param qcStatus   入库质检结论（PENDING / PASSED / FAILED）；`null` = 存量免检。
+     *                   它是**上线门禁的第一项**，缺在出参里的话设备详情只能再去翻质检记录取最近一条 ——
+     *                   多一次往返不说，「最近一条质检记录」与「当前质检状态」在补检后并不是一回事
+     * @param warehouseNo 所在仓；在库设备才有。调拨要按仓选设备，缺了就只能手输仓库编号
      */
     public record Cabinet(String cabinetNo, String sn, String vendorCode, String model,
                           String locationNo, String locationName, int slotTotal, int availableCount,
                           String onlineStatus, String status, String fwVersion, String lastHeartbeatAt,
-                          String siteNo, String agentNo, String archivedAt) {
+                          String siteNo, String agentNo, String archivedAt,
+                          String qcStatus, String warehouseNo) {
 
         /** 兼容旧 12 参调用（种子/历史代码），siteNo / agentNo / archivedAt 缺省 null。 */
         public Cabinet(String cabinetNo, String sn, String vendorCode, String model,
                        String locationNo, String locationName, int slotTotal, int availableCount,
                        String onlineStatus, String status, String fwVersion, String lastHeartbeatAt) {
             this(cabinetNo, sn, vendorCode, model, locationNo, locationName, slotTotal, availableCount,
-                    onlineStatus, status, fwVersion, lastHeartbeatAt, null, null, null);
+                    onlineStatus, status, fwVersion, lastHeartbeatAt, null, null, null, null, null);
         }
 
         /** 兼容旧 13 参调用（带 siteNo）。 */
@@ -37,7 +42,7 @@ public final class DevLegacyDtos {
                        String onlineStatus, String status, String fwVersion, String lastHeartbeatAt,
                        String siteNo) {
             this(cabinetNo, sn, vendorCode, model, locationNo, locationName, slotTotal, availableCount,
-                    onlineStatus, status, fwVersion, lastHeartbeatAt, siteNo, null, null);
+                    onlineStatus, status, fwVersion, lastHeartbeatAt, siteNo, null, null, null, null);
         }
     }
 

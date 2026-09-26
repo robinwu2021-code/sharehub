@@ -66,9 +66,11 @@ public class AlarmController {
                                            @RequestParam(required = false) String disposition,
                                            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
                                            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to,
-                                           @RequestParam(required = false) Boolean topOnly) {
+                                           @RequestParam(required = false) Boolean topOnly,
+                                           /* 摘要卡的预置子集：DISPOSED_OPEN / HEALED_TODAY。与摘要同一段条件，见 AlarmQuery 的说明 */
+                                           @RequestParam(required = false) String preset) {
         return alarmService.page(new AlarmService.AlarmQuery(page, size, keyword, level, status, cabinetNo, domain, subjectType,
-                siteNo, cause, disposition, from, to, topOnly));
+                siteNo, cause, disposition, from, to, topOnly, preset));
     }
 
     /** 告警中心摘要条：按业务域的未关闭 / 严重数，已处置未关闭，今日自动恢复。 */
