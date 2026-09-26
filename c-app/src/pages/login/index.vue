@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from "vue";
+import { ref, computed, watch } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import { useI18n } from "vue-i18n";
 import { useUserStore } from "@/stores/user";
 import { useAppStore } from "@/stores/app";
@@ -50,7 +51,13 @@ async function loadMethods() {
     // 放开的后果是用户撞 400，而收着的后果只是少一个入口。
   }
 }
-onMounted(loadMethods);
+/*
+ * 用 onShow 而不是 onMounted：uni 的页面栈会**缓存页面实例**，从别的页返回登录页时
+ * onMounted 不会重跑（本地实测过：改了下发值、返回登录页，页签还是旧的）。
+ * 于是运营台拨了开关之后，还开着 App 的用户会看到一个后端必然拒绝的页签 ——
+ * 正是这次要消掉的那种死路。仓库里 home/me/notice 已经都是 onShow。
+ */
+onShow(loadMethods);
 // 换国家要重取：开关是按国家配的
 watch(() => country.value.iso, loadMethods);
 

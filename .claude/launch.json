@@ -4,21 +4,20 @@
     {
       "name": "ops-web-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 3000,
       "cwd": "ops-web"
     },
     {
-      "name": "cend-h5",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev:h5"],
-      "port": 5173,
-      "cwd": "cend"
-    },
-    {
       "name": "c-app-h5",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev:h5"],
+      "runtimeArgs": [
+        "run",
+        "dev:h5"
+      ],
       "port": 5174,
       "cwd": "c-app"
     }

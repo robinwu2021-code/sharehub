@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import { useUserStore } from "@/stores/user";
 import { api } from "@/api";
 const userStore = useUserStore();
@@ -10,7 +11,7 @@ const showLogout = ref(false);
  * 初值 false：拿到下发之前宁可不画，也不要先画出来再收回去。
  */
 const passwordOn = ref(false);
-onMounted(async () => {
+onShow(async () => {
   try {
     passwordOn.value = (await api.loginMethods()).password;
   } catch {
