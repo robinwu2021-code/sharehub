@@ -70,11 +70,25 @@ export interface RentParams {
   useFreeDeposit: boolean; // true=免押预授权，false=降级押金
   couponNo?: string;
 }
-export type PayScene = "rent" | "deposit" | "recharge" | "membership";
+/**
+ * 支付用途 —— 值按后端 `pay_order.type` 的词表（大写）。
+ *
+ * 此前是小写的 `rent | deposit | recharge | membership`，而后端那一列声明的是
+ * `DEPOSIT/RENT/BUYOUT`、缺省还写成 `"ORDER"` —— 三种写法混着落进同一列，
+ * 按用途筛支付单就一条都筛不出来。
+ * `recharge` 不在这里：充值走 `POST /mp/user/recharge`（只收 packageNo，不收金额）。
+ */
+export type PayScene = "RENT" | "DEPOSIT" | "BUYOUT";
 export interface PayParams {
   scene: PayScene;
   orderNo?: string;
-  amount: number;
+  /**
+   * **没有 amount**：金额由服务端从订单上取。
+   *
+   * 此前这里有，而后端「body 里有 amount 就用它」且从不与订单应付比对 ——
+   * `{orderNo, amount: 0.01}` 就能给应付 17 的单记一笔 0.01，
+   * 而幂等键是 `PAY-<orderNo>`，先到的那笔把这张单的支付金额锁死。
+   */
 }
 export interface PayResult {
   payNo: string;

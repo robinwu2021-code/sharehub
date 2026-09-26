@@ -33,9 +33,6 @@ OpsController#importCabinets
 OpsController#saveCabinet
 OwnershipInternalController#byLocations
 OwnershipInternalController#cabinet
-RentController#depositFree
-RentController#pay
-RentController#rent
 TradeInternalController#returnOrder
 UserController#blacklist
 VendorController#saveConfig

@@ -56,16 +56,13 @@ public class RentController {
      * 老客户端不传这个字段时按它当时的界面语义走。
      */
     @PostMapping("/orders/rent")
-    public RentResult rent(@RequestBody Map<String, Object> body) {
-        // 逐个取值不能图省事写 String.valueOf(get(...))：键缺席时它给的是字符串 "null"，
-        // 于是「没扫码」会被当成「有个叫 null 的柜子」，报成「该设备暂不可借」
-        Object cabinet = body == null ? null : body.get("cabinetNo");
-        String cabinetNo = cabinet == null ? null : String.valueOf(cabinet);
-        Object free = body == null ? null : body.get("useFreeDeposit");
-        Object coupon = body == null ? null : body.get("couponNo");
-        return orders.rent(ConsumerContext.userNo(), cabinetNo,
-                free == null || Boolean.parseBoolean(String.valueOf(free)),
-                coupon == null ? null : String.valueOf(coupon));
+    public RentResult rent(@RequestBody ai.neargo.sharehub.trade.dto.MpTradeReqs.RentReq body) {
+        // record 顺带解决了裸 Map 的一个坑：原先逐个取值时若写
+        // String.valueOf(get("cabinetNo"))，键缺席给的是字符串 "null" ——
+        // 「没扫码」会被当成「有个叫 null 的柜子」，报成「该设备暂不可借」。
+        return orders.rent(ConsumerContext.userNo(), body == null ? null : body.cabinetNo(),
+                body == null || body.freeDeposit(),
+                body == null ? null : body.couponNo());
     }
 
     /**
@@ -112,8 +109,9 @@ public class RentController {
      * 尚无订单号，pay_auth 先挂柜机号做业务引用，借出后由借出流程回填 —— 骨架阶段约定。
      */
     @PostMapping("/deposit/free")
-    public Map<String, Object> depositFree(@RequestBody Map<String, String> body) {
-        String cabinetNo = body == null ? null : body.get("cabinetNo");
+    public Map<String, Object> depositFree(
+            @RequestBody ai.neargo.sharehub.trade.dto.MpTradeReqs.DepositFreeReq body) {
+        String cabinetNo = body == null ? null : body.cabinetNo();
         if (cabinetNo == null || cabinetNo.isBlank()) throw new IllegalArgumentException("柜机号为空");
         PayAuthEntry auth = payments.preAuth(cabinetNo, ConsumerContext.userNo(),
                 DEPOSIT_FREEZE, "AED", null, "DEPFREE-" + cabinetNo + "-" + ConsumerContext.userNo());
@@ -125,18 +123,23 @@ public class RentController {
      * 真实收银台参数（cashierParams）待 nearpay 接入（ADR-005），当前恒 null。
      */
     @PostMapping("/pay")
-    public Map<String, Object> pay(@RequestBody Map<String, Object> body) {
-        String orderNo = body.get("orderNo") == null ? null : String.valueOf(body.get("orderNo"));
-        String scene = body.get("scene") == null ? "ORDER" : String.valueOf(body.get("scene"));
+    public Map<String, Object> pay(@RequestBody ai.neargo.sharehub.trade.dto.MpTradeReqs.PayReq body) {
+        String orderNo = body == null ? null : body.orderNo();
         if (orderNo == null || orderNo.isBlank()) {
             throw new IllegalArgumentException("充值等无单支付待充值单流程接入，当前仅支持按订单支付（orderNo 必填）");
         }
         RentOrder o = orders.detailForConsumer(orderNo);
         ConsumerContext.assertOwner(o.cUserNo());
-        java.math.BigDecimal amount = body.get("amount") == null
-                ? java.math.BigDecimal.valueOf(o.feeAmount())
-                : new java.math.BigDecimal(String.valueOf(body.get("amount")));
-        PayOrderEntry p = payments.pay(orderNo, ConsumerContext.userNo(), scene, amount,
+        /*
+         * 金额**只从订单上取，不收请求体**。此前是「body 里有 amount 就用它」，
+         * 而 PaymentServiceImpl.pay 只做 requirePositive、从不与订单应付比对 ——
+         * POST /mp/trade/pay {orderNo, amount: 0.01} 就能给应付 17 的单记一笔 0.01，
+         * 而幂等键是 "PAY-" + orderNo，先到的那笔把这张单的支付金额锁死。
+         * 隔壁 recharge 的注释早把这条规矩写清楚了：收前端传的金额，
+         * 「充 1 元到账 100」就是一次普通的改参数请求。
+         */
+        java.math.BigDecimal amount = java.math.BigDecimal.valueOf(o.feeAmount());
+        PayOrderEntry p = payments.pay(orderNo, ConsumerContext.userNo(), body.payType(), amount,
                 o.currency(), null, "PAY-" + orderNo);
         String status = "PAID".equals(p.status()) ? "SUCCESS"
                 : "FAILED".equals(p.status()) ? "FAILED" : "PENDING";
