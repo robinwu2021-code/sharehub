@@ -78,6 +78,15 @@ def declared_codes():
             cancelled = '~~' in line and '取消' in line
         if cancelled:
             continue
+        # **改名记录那一行也不是声明**（2026-09-26 补，本展开器第四个盲区）。
+        # 形如「命名对齐记录（2026-07-29）：原 `workorder:wo:process` / `:audit` …
+        # 从未被任何实现引用，现统一为 `:handle` / `:close`」——
+        # 它在小节**内部**，所以上面那个「已取消小节整段跳过」接不住；
+        # 而展开器照样把被淘汰的旧码读成声明。
+        # 2026-09-26 工单三个端点改判新码后，强制侧没了、误读的声明侧还在，
+        # 这两条旧码立刻变成「声明未强制」的假缺口 —— 一次修复把一个既有盲区顶了出来。
+        if '命名对齐记录' in line or ('原 `' in line and '现统一为' in line):
+            continue
         prefix = None
         for c in re.findall(r'`(%s|:[a-z_]+)`' % FULL, line):
             if c.startswith(':'):

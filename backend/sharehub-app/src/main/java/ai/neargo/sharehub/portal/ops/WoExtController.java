@@ -88,13 +88,16 @@ public class WoExtController {
     }
 
     @PostMapping("/work-orders/{woNo}/accept")
-    @PreAuthorize("@perm.can('workorder:wo:process')")
+    // 清单 §7「接单/处理/完成」的码是 workorder:wo:handle。此前挂 wo:process ——
+    // 那是 2026-07-29 就改过名的旧码，真源表里**不存在**，于是没有任何角色真正持有它；
+    // 线上没炸只因为 OPS 持 workorder:* 通配、ADMIN 持 *。访问面不变，语义归位。
+    @PreAuthorize("@perm.can('workorder:wo:handle')")
     public WorkOrder accept(@PathVariable String woNo, @RequestBody(required = false) AcceptReq body) {
         return woOpsService.accept(woNo, body);
     }
 
     @PostMapping("/work-orders/{woNo}/handle")
-    @PreAuthorize("@perm.can('workorder:wo:process')")
+    @PreAuthorize("@perm.can('workorder:wo:handle')")
     public WorkOrder handle(@PathVariable String woNo, @RequestBody(required = false) HandleReq body) {
         return woOpsService.handle(woNo, body);
     }
@@ -153,7 +156,8 @@ public class WoExtController {
 
     /** 完成 / 审核关单。{@code closeReason} 必填，空则 400。 */
     @PostMapping("/work-orders/{woNo}/close")
-    @PreAuthorize("@perm.can('workorder:wo:audit')")
+    // 清单 §7「验收关单」的码是 workorder:wo:close（wo:audit 与 wo:process 一样是已改名的旧码）。
+    @PreAuthorize("@perm.can('workorder:wo:close')")
     public WorkOrder close(@PathVariable String woNo, @RequestBody CloseReq body) {
         return woOpsService.close(woNo, body);
     }
@@ -172,11 +176,16 @@ public class WoExtController {
      * 验收不合格退回返工：{@code DONE → PROCESSING}，{@code reason} 必填，受理人不变。
      * 权限跟验收关单同属验收人的判定动作。
      *
-     * <p>用的是 {@code workorder:wo:close} 而不是上面 {@code close()} 那个 {@code :audit}：
-     * {@code :audit}/{@code :process} 是 [功能权限清单 §7] 已废弃的旧码
-     * （2026-07-29 统一为 {@code :handle}/{@code :close}），ops-web 的按钮也按新码渲染
-     * （{@code canClose = wo:close}）。新端点一律用新码；上面三个老端点的旧码是既存分歧，
-     * 见交付报告，此处不顺手改（会改变现有角色的可见范围，须单独放行）。
+     * <p>{@code :audit}/{@code :process} 是 [功能权限清单 §7] 已废弃的旧码
+     * （2026-07-29 统一为 {@code :handle}/{@code :close}），ops-web 的按钮一直按新码渲染
+     * （{@code canClose = wo:close}）。
+     *
+     * <p><b>2026-09-26：上面那三个老端点已一并改判新码。</b>此前这里写着「不顺手改
+     * （会改变现有角色的可见范围，须单独放行）」—— 那个担心现在有了可验证的答案：
+     * {@code WorkOrderPermRenameTest} 逐角色比对旧码与新码的可达性，**完全一致**。
+     * 原因是旧码在真源表里根本不存在、没有角色显式持有它，而能过旧码的 OPS/ADMIN
+     * 靠的是 {@code workorder:*} 与 {@code *} 通配，通配对新旧码一视同仁。
+     * 那条用例会在「将来有人给某个角色显式配上新码」时立刻红 —— 前提一旦不成立就报警。
      */
     @PostMapping("/work-orders/{woNo}/rework")
     @PreAuthorize("@perm.can('workorder:wo:close')")
@@ -236,13 +245,15 @@ public class WoExtController {
     }
 
     @PostMapping("/inspection-plans")
-    @PreAuthorize("@perm.can('workorder:wo:update')")
+    // 清单 §工单「巡检计划 配置」的码是 workorder:inspection:update，此前挂通用的 wo:update
+    // （真源表里没有那个码，台账 known-perm-ssot-gaps 记着「强制未声明」）。与 SLA 配置同一处理。
+    @PreAuthorize("@perm.can('workorder:inspection:update')")
     public InspectionPlan createInspectionPlan(@RequestBody WoInspectionPlan body) {
         return inspectionPlanService.save(body);
     }
 
     @PostMapping("/inspection-plans/{planNo}")
-    @PreAuthorize("@perm.can('workorder:wo:update')")
+    @PreAuthorize("@perm.can('workorder:inspection:update')")
     public InspectionPlan updateInspectionPlan(@PathVariable String planNo, @RequestBody WoInspectionPlan body) {
         body.setPlanNo(planNo);
         return inspectionPlanService.save(body);

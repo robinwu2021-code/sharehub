@@ -55,4 +55,3 @@
 强制未声明 system:tax:read
 强制未声明 user:risk:read
 强制未声明 workorder:alarm:update
-强制未声明 workorder:wo:update

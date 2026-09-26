@@ -271,14 +271,13 @@ export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   "workorder:alarm:config": "workorder:alarm:config",
   "workorder:alarm:notice_resend": "workorder:alarm:update",   // 翻译：界面功能无独立端点 → POST /api/ops/alarms/notices/{noticeNo}/resend
   "workorder:alarm:update": "workorder:alarm:update",
+  // wo:audit / wo:process / wo:update 三条已删（2026-09-26）：后端端点已改判真源表的
+  // :close / :handle / inspection:update，这三个码再没有任何端点判它们，留着就是「声明未强制」。
   "workorder:inspection:update": "workorder:inspection:update",
   "workorder:sla:update": "workorder:sla:update",
-  "workorder:wo:audit": "workorder:wo:audit",
   "workorder:wo:close": "workorder:wo:close",
   "workorder:wo:create": "workorder:wo:create",
   "workorder:wo:dispatch": "workorder:wo:dispatch",
   "workorder:wo:handle": "workorder:wo:handle",
-  "workorder:wo:process": "workorder:wo:process",
   "workorder:wo:read": "workorder:wo:read",
-  "workorder:wo:update": "workorder:wo:update",
 };
