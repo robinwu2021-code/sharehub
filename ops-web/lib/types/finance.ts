@@ -102,7 +102,9 @@ export interface SettlementDraft {
   payeeType: "VENUE" | "AGENT";
   payeeNos: string[];
   period: string; // `2026-07`
-  operatorName?: string;
+  // 没有 operatorName：后端 SettlementGenerateReq 只认 period/payeeType/payeeNos，
+  // 出账人由会话决定。payeeNos 从 2026-09-26 起才真的被后端读 ——
+  // 此前勾了三个场地方，出的是该类型全部收款方的账。
 }
 
 /**

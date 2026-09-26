@@ -122,16 +122,21 @@ public class SettlementServiceImpl implements SettlementService {
 
     @Override
     @Transactional
-    public List<String> generate(String period, String payeeType) {
+    public List<String> generate(String period, String payeeType, List<String> payeeNos) {
         if (period == null || period.isBlank()) {
             throw new IllegalArgumentException("出账账期 period 必填（YYYY-MM）");
         }
+        // 只给选中的收款方出账。**下推到查询而不是出完再筛** —— 分润记录会被 settle_no 回填并置 DONE，
+        // 先出完再筛等于把没选中的那些也消耗掉了，而它们下次就不再是 PENDING。
+        java.util.Set<String> only = payeeNos == null ? java.util.Set.of()
+                : payeeNos.stream().filter(n -> n != null && !n.isBlank()).collect(java.util.stream.Collectors.toSet());
 
         QueryWrapper<ShareRecord> w = new QueryWrapper<>();
         w.eq("status", ShareRecordStatus.PENDING.name());
         // 按归属账期列取（V34）：创建时刻不等于归属周期，且函数包列无法走索引
         w.eq("period", period);
         if (payeeType != null && !payeeType.isBlank()) w.eq("payee_type", payeeType);
+        if (!only.isEmpty()) w.in("payee_no", only);
         List<ShareRecord> pending = recordMapper.selectList(w);
 
         // 按收款方分组（LinkedHashMap 保出账顺序稳定，便于重跑比对）
@@ -148,6 +153,7 @@ public class SettlementServiceImpl implements SettlementService {
         LambdaQueryWrapper<StlAdjustment> aw = new LambdaQueryWrapper<StlAdjustment>()
                 .eq(StlAdjustment::getStatus, AdjustmentStatus.CONFIRMED.name()).isNull(StlAdjustment::getSettleNo);
         if (payeeType != null && !payeeType.isBlank()) aw.eq(StlAdjustment::getPayeeType, payeeType);
+        if (!only.isEmpty()) aw.in(StlAdjustment::getPayeeNo, only);
         Map<String, List<StlAdjustment>> adjByPayee = new LinkedHashMap<>();
         for (StlAdjustment a : adjustmentMapper.selectList(aw)) {
             adjByPayee.computeIfAbsent(a.getPayeeNo(), k -> new ArrayList<>()).add(a);

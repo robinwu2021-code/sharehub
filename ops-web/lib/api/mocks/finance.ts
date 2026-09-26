@@ -61,7 +61,7 @@ export const financeMock: FinanceApi = {
   handleRecon: (no, action, note, diffId) => wait(db.handleRecon(no, action, note, diffId), 400),
   getReconStats: () => wait(db.getReconStats()),
   issueInvoice: (no, operatorName) => wait(db.issueInvoice(no, operatorName), 400),
-  voidInvoice: (no, voidReason, operatorName) => wait(db.voidInvoice(no, voidReason, operatorName), 400),
+  voidInvoice: (no, voidReason) => wait(db.voidInvoice(no, voidReason), 400),
 
   // 财务 B5：分润统计（维度/周期/排序在 db 层处理）/ 充值订单
   listShareSummaries: (q: ShareSummaryQ = {}) => wait(db.listShareSummaries(q)),

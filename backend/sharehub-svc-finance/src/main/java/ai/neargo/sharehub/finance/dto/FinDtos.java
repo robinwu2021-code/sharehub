@@ -142,6 +142,31 @@ public final class FinDtos {
                                String handledBy, String handledAt) {
     }
 
+    /*
+     * ——————————————— 写入参（裸 Map → record，2026-09-26）———————————————
+     *
+     * 裸 `Map` 当请求体 = 这个端点没有契约：契约抽取抽不出 requestShape，
+     * 靠它的「表单字段 vs 后端写入面」卡口对这些端点全是盲的；拼错的键静默忽略。
+     * 见 backend/known-map-request-bodies.txt。
+     */
+
+    /**
+     * 周期出账入参。
+     *
+     * <p>{@code payeeNos} 是**此前整个丢掉的那个字段**：运营端出账抽屉有「选择要出账的对象」多选，
+     * 后端只读 period/payeeType —— 勾了三个场地方，出的是该类型全部收款方的账。
+     */
+    public record SettlementGenerateReq(String period, String payeeType, java.util.List<String> payeeNos) {
+    }
+
+    /** 对账差错处置入参。**不含操作人** —— 处置人是审计事实，服务端按会话回填。 */
+    public record ReconResolveReq(Long diffId, String action, String handleNote) {
+    }
+
+    /** 发票作废入参。{@code voidReason} 必填由 service 校验（作废等于账面凭空少一张票）。 */
+    public record InvoiceVoidReq(String voidReason) {
+    }
+
     // ——————————————————————— 发票 ———————————————————————
 
     /** 发票行，镜像前端 {@code Invoice}（finance.ts）：来源单据 + 税局票号 + 开具/作废留痕全量出参。 */

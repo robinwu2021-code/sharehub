@@ -57,14 +57,14 @@ class SettlementLateShareTest extends ApiTestSupport {
     @DisplayName("★ 出账后又来一条同账期分润 → 并入原单，不再静默跳过")
     void late_share_is_merged_into_the_existing_settlement() {
         share("10.00");
-        List<String> first = settlements.generate(period, null);
+        List<String> first = settlements.generate(period, null, null);
         assertThat(first).as("第一次出账应生成一张单").hasSize(1);
         String settleNo = first.get(0);
         assertThat(total(settleNo)).isEqualByComparingTo("10.00");
 
         // —— 出账之后才产生的那一条（延迟结算 / 补录 / 纠错重算都会这样）——
         share("2.50");
-        List<String> second = settlements.generate(period, null);
+        List<String> second = settlements.generate(period, null, null);
 
         assertThat(second).as("应当返回被并入的那张单，而不是空").containsExactly(settleNo);
         assertThat(count(settleNo)).as("明细应当是两条").isEqualTo(2);
@@ -76,13 +76,13 @@ class SettlementLateShareTest extends ApiTestSupport {
     @DisplayName("并入是幂等的：同一条分润不会被结两次")
     void merging_is_idempotent() {
         share("7.00");
-        String settleNo = settlements.generate(period, null).get(0);
+        String settleNo = settlements.generate(period, null, null).get(0);
         share("3.00");
-        settlements.generate(period, null);
+        settlements.generate(period, null, null);
         BigDecimal afterMerge = total(settleNo);
 
-        settlements.generate(period, null);   // 再跑两次
-        settlements.generate(period, null);
+        settlements.generate(period, null, null);   // 再跑两次
+        settlements.generate(period, null, null);
 
         assertThat(total(settleNo)).as("重跑不该把金额叠上去").isEqualByComparingTo(afterMerge);
         assertThat(count(settleNo)).as("明细数也不该增长").isEqualTo(2);
@@ -92,11 +92,11 @@ class SettlementLateShareTest extends ApiTestSupport {
     @DisplayName("已打款的单不能动——钱已经出去了，再加明细会让账实不符（跳过但记 WARN）")
     void paid_settlement_is_left_alone() {
         share("5.00");
-        String settleNo = settlements.generate(period, null).get(0);
+        String settleNo = settlements.generate(period, null, null).get(0);
         jdbc.update("UPDATE stl_settlement SET status='PAID' WHERE settle_no=?", settleNo);
 
         share("9.99");
-        settlements.generate(period, null);
+        settlements.generate(period, null, null);
 
         assertThat(total(settleNo)).as("已打款的单金额不许变").isEqualByComparingTo("5.00");
         assertThat(count(settleNo)).isEqualTo(1);
@@ -111,7 +111,7 @@ class SettlementLateShareTest extends ApiTestSupport {
          * 并入时插明细撞 `uk_stl_detail` ⇒ **整批事务回滚**，同批 7 条干净的分润跟着一起出不去。
          */
         share("6.00");
-        String settleNo = settlements.generate(period, null).get(0);
+        String settleNo = settlements.generate(period, null, null).get(0);
 
         // 造脏：明细里塞一条指向新分润的记录，但那条分润仍是 PENDING
         share("1.00");
@@ -123,7 +123,7 @@ class SettlementLateShareTest extends ApiTestSupport {
         share("2.00");
         share("3.00");
 
-        settlements.generate(period, null);
+        settlements.generate(period, null, null);
 
         assertThat(pending()).as("干净的那两条不该被脏数据拖住").isZero();
         assertThat(jdbc.queryForObject("SELECT status FROM share_record WHERE record_no=?", String.class, dirty))

@@ -300,7 +300,7 @@ class SiteAssetFlowTest extends ApiTestSupport {
         post("/api/ops/settlement-adjustments/" + dep + "/confirm", Map.of(), admin).okData();
 
         String venue = jdbc.queryForObject("SELECT venue_no FROM loc_site WHERE site_no=?", String.class, site);
-        List<String> created = settlements.generate("2099-12", "VENUE");
+        List<String> created = settlements.generate("2099-12", "VENUE", null);
         settleNos.addAll(created);
         String settle = jdbc.queryForObject("SELECT settle_no FROM stl_settlement WHERE payee_no=? AND period='2099-12'", String.class, venue);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM stl_settlement_detail WHERE settle_no=? AND ref_type='ADJUST'", Integer.class, settle))

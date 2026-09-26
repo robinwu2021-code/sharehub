@@ -69,6 +69,25 @@ public final class OrderDtos {
                             String cabinetNo, String startedAt, String endedAt, Integer duration) {
     }
 
+    /**
+     * 押金转买断入参（裸 Map → record，2026-09-26；见 known-map-request-bodies.txt）。
+     *
+     * <p><b>字段叫 {@code reason} 不叫 {@code note}</b>：前端 {@code DepositBuyoutPayload}
+     * 发的是 {@code reason}，而端点此前读 {@code note} —— <b>买断原因静默丢弃</b>，
+     * 而买断是没收用户押金，`ord_deposit.note` 是这笔钱唯一的说明。
+     *
+     * <p><b>刻意不含 {@code amount}</b>：买断金额 = 押金全额，由服务端定
+     * （{@code DepositServiceImpl}：「不得超过押金额 —— 押金抵购机款，抵不了更多」）。
+     * 前端原先有个 amount 输入框，填什么都不生效 —— 一个永远不生效的金额输入框
+     * 比没有更糟，它让人以为可以少收或多收。
+     */
+    public record DepositBuyoutReq(String reason) {
+    }
+
+    /** 欠款催缴入参。{@code channel} 必选、{@code note} 可空（镜像前端 {@code ArrearsDunPayload}）。 */
+    public record DepositDunReq(String channel, String note) {
+    }
+
     /** 免费订单页头统计（成本管控口径，**全量**非当前页），镜像前端 {@code FreeOrderStats}。 */
     public record FreeOrderStats(long monthCount, BigDecimal waivedTotal, String currency) {
     }

@@ -270,7 +270,14 @@ export const depositActions = (status: DepositStatus): DepositAction[] =>
 
 /** 买断入参：金额与原因都必填（金额类操作，二次确认另在页面侧）。 */
 export interface DepositBuyoutPayload {
-  amount: number;
+  /**
+   * 买断原因（必填）。
+   *
+   * **没有 amount**：买断金额由服务端定为押金全额
+   * （`DepositServiceImpl`：「不得超过押金额 —— 押金抵购机款，抵不了更多」）。
+   * 此前这里有个 amount，抽屉里也有输入框，而后端读的是 `note` 且根本不看金额 ——
+   * 金额与原因**两个都静默丢弃**，而买断是没收用户押金。
+   */
   reason: string;
 }
 /** 催缴入参：渠道必选，备注可空。 */

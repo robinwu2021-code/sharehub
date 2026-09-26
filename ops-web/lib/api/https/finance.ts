@@ -106,7 +106,8 @@ export const financeHttp: FinanceApi = {
   getReconStats: () => client.get("/api/trade/reconciles/stats"),
   // ⚠️ T1-D 后端缺口：开具/作废无动作端点（后端只有 POST /invoices 与 /invoices/{no} upsert）。
   issueInvoice: (no, operatorName) => client.post(`/api/trade/invoices/${no}/issue`, { operatorName }),
-  voidInvoice: (no, voidReason, operatorName) => client.post(`/api/trade/invoices/${no}/void`, { voidReason, operatorName }),
+  // operatorName 不再发：后端 InvoiceVoidReq 只有 voidReason，voidedBy 按会话回填
+  voidInvoice: (no, voidReason) => client.post(`/api/trade/invoices/${no}/void`, { voidReason }),
 
   // 财务 B5：分润统计（trade 域聚合）/ 充值订单（钱包同主体，归 user 域）
   listShareSummaries: (q?: ShareSummaryQ) => client.get("/api/trade/share-summaries", q),

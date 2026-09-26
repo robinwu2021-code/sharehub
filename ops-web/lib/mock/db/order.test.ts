@@ -193,11 +193,14 @@ describe("押金状态机", () => {
     expect(r.note).toBe("订单已结清");
   });
 
-  it("买断：HELD → BOUGHT_OUT，写买断金额", () => {
+  it("买断：HELD → BOUGHT_OUT，买断金额恒为押金全额（不收传参）", () => {
     const d = deposit("HELD", { amount: 199 });
-    const r = buyoutDeposit(d.depositNo, { amount: 150, reason: "超时未归还" });
+    const r = buyoutDeposit(d.depositNo, { reason: "超时未归还" });
     expect(r.status).toBe("BOUGHT_OUT");
-    expect(r.buyoutAmount).toBe(150);
+    // 真后端定为押金全额（DepositServiceImpl：「不得超过押金额 —— 押金抵购机款，抵不了更多」），
+    // 且**根本不看**传来的金额。此前这条用例传 150 并断言记 150 ——
+    // 那是 mock 独有的行为，线上填什么都不生效。
+    expect(r.buyoutAmount).toBe(199);
     expect(r.buyoutAt).toBeTruthy();
   });
 
@@ -225,12 +228,12 @@ describe("押金状态机", () => {
     expect(() => releaseDeposit(arrears.depositNo, "解冻")).toThrow(DepositTransitionError); // 欠着钱不能解冻
   });
 
-  it("必填校验：解冻原因 / 买断金额与原因 / 催缴渠道", () => {
+  it("必填校验：解冻原因 / 买断原因 / 催缴渠道", () => {
     const d1 = deposit("HELD", { amount: 99 });
     expect(() => releaseDeposit(d1.depositNo, "  ")).toThrow(/必须填写原因/);
-    expect(() => buyoutDeposit(d1.depositNo, { amount: 0, reason: "x" })).toThrow(/必须大于 0/);
-    expect(() => buyoutDeposit(d1.depositNo, { amount: 120, reason: "x" })).toThrow(/不得超过押金额/);
-    expect(() => buyoutDeposit(d1.depositNo, { amount: 50, reason: " " })).toThrow(/必须填写原因/);
+    // 买断金额的两条校验删了：金额已不是入参（服务端定为押金全额），
+    // 校验一个收不到的字段等于 mock 比真后端严 —— mock 下过不了的线上能过，反之亦然
+    expect(() => buyoutDeposit(d1.depositNo, { reason: " " })).toThrow(/必须填写原因/);
     expect(d1.status).toBe("HELD"); // 全部失败，状态没动
     const d2 = deposit("ARREARS");
     // 渠道必选：前端是 Select 不会漏，后端/mock 仍要兜住

@@ -371,12 +371,10 @@ function OrdersInner() {
   // 押金处置抽屉：解冻/买断/催缴共用（买断填金额、催缴选渠道，全都要填原因）
   const [depAct, setDepAct] = useState<{ row: DepositRecord; action: DepositAction } | null>(null);
   const [depReason, setDepReason] = useState("");
-  const [depAmount, setDepAmount] = useState("");
   const [dunChannel, setDunChannel] = useState<DunChannel>("SMS");
   const openDepAct = (row: DepositRecord, action: DepositAction) => {
     setDepAct({ row, action });
     setDepReason("");
-    setDepAmount(String(row.amount)); // 买断金额缺省为押金额（上限也是它）
     setDunChannel("SMS");
   };
   const onDepDone = (label: string) => {
@@ -389,7 +387,7 @@ function OrdersInner() {
     onSuccess: () => onDepDone("押金解冻"),
   });
   const buyoutDep = useMutation({
-    mutationFn: (v: { no: string; amount: number; reason: string }) => api.buyoutDeposit(v.no, { amount: v.amount, reason: v.reason }),
+    mutationFn: (v: { no: string; reason: string }) => api.buyoutDeposit(v.no, { reason: v.reason }),
     onSuccess: () => onDepDone("押金买断"),
   });
   const dunDep = useMutation({
@@ -409,7 +407,7 @@ function OrdersInner() {
       title: `${DEP_ACTION_LABEL[action]}押金 ${row.depositNo}`,
       desc: action === "release"
         ? `将解冻 ${money(row.amount, row.currency)} 并退回用户原支付方式，解冻后不可撤销。`
-        : `将按 ${money(Number(depAmount) || 0, row.currency)} 买断（押金额 ${money(row.amount, row.currency)}），买断后押金不再退还。`,
+        : `将按押金全额 ${money(row.amount, row.currency)} 买断，买断后押金不再退还。`,
       danger: true,
       confirmText: `确认${DEP_ACTION_LABEL[action]}`,
       cancelText: "再想想",
@@ -419,7 +417,7 @@ function OrdersInner() {
     });
     if (!ok) return;
     if (action === "release") releaseDep.mutate({ no: row.depositNo, reason: depReason });
-    else buyoutDep.mutate({ no: row.depositNo, amount: Number(depAmount), reason: depReason });
+    else buyoutDep.mutate({ no: row.depositNo, reason: depReason });
   };
 
   // —— 预约订单 tab（B4）——
@@ -1275,7 +1273,6 @@ function OrdersInner() {
               disabled={
                 depBusy
                 || (depAct.action !== "dun" && !depReason.trim())
-                || (depAct.action === "buyout" && !(Number(depAmount) > 0 && Number(depAmount) <= depAct.row.amount))
               }
               onClick={submitDepAct}
             >{depAct.action === "dun" ? "确认催缴" : `下一步：确认${DEP_ACTION_LABEL[depAct.action]}`}</Button>
@@ -1300,9 +1297,17 @@ function OrdersInner() {
             )}
             {depAct.action === "buyout" && (
               <>
-                <Field label="处置口径">买断后押金不再退还，状态转「已买断」；买断金额不得超过押金额</Field>
-                <Field label={`买断金额（${depAct.row.currency}，必填，≤ ${depAct.row.amount}）`}>
-                  <Input type="number" min="0" step="1" value={depAmount} onChange={(e) => setDepAmount(e.target.value)} />
+                <Field label="处置口径">买断后押金不再退还，状态转「已买断」</Field>
+                {/*
+                  买断金额**不是运营能填的**：服务端定为押金全额
+                  （DepositServiceImpl：「不得超过押金额 —— 押金抵购机款，抵不了更多」）。
+                  这里原先是个 number 输入框，填什么都不生效 ——
+                  一个永远不生效的金额输入框比没有更糟，它让人以为可以少收或多收。
+                  改成摆明「会没收多少」。
+                */}
+                <Field label="买断金额">
+                  <span className="tabular-nums">{money(depAct.row.amount, depAct.row.currency)}</span>
+                  <span className="ml-2 text-xs text-muted-foreground">= 押金全额，由服务端定，不可调</span>
                 </Field>
                 <Field label="买断原因（必填）">
                   <Input value={depReason} placeholder="如：超时未归还，按买断处理" onChange={(e) => setDepReason(e.target.value)} />

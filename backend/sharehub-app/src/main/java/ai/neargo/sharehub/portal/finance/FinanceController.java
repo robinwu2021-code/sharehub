@@ -175,10 +175,9 @@ public class FinanceController {
      * @return 本次新生成的结算单号；重跑已出账的账期返回空列表（幂等）
      */
     @PostMapping("/internal/trade/settlements/generate")
-    public List<String> generateSettlements(@RequestBody(required = false) Map<String, String> body) {
-        String period = body == null ? null : body.get("period");
-        String payeeType = body == null ? null : body.get("payeeType");
-        return settlementService.generate(period, payeeType);
+    public List<String> generateSettlements(@RequestBody(required = false) FinDtos.SettlementGenerateReq body) {
+        return body == null ? settlementService.generate(null, null, null)
+                : settlementService.generate(body.period(), body.payeeType(), body.payeeNos());
     }
 
     // ——————————————————————— 提现（菜单叶：提现审核 —— 申请入口在代理端）———————————————————————
@@ -311,11 +310,10 @@ public class FinanceController {
     // 清单 §对账 的码是 :handle（差错处理），此前后端自造了 :resolve。
     @PreAuthorize("@perm.can('finance:recon:handle')")
     public FinDtos.Reconcile resolveRecon(@PathVariable String batchNo,
-                                          @RequestBody(required = false) Map<String, Object> body) {
-        Object raw = body == null ? null : body.get("diffId");
-        Long diffId = raw == null ? null : Long.valueOf(String.valueOf(raw));
-        String action = body == null ? null : (String) body.get("action");
-        String note = body == null ? null : (String) body.get("handleNote");
+                                          @RequestBody(required = false) FinDtos.ReconResolveReq body) {
+        Long diffId = body == null ? null : body.diffId();
+        String action = body == null ? null : body.action();
+        String note = body == null ? null : body.handleNote();
         // operatorName **刻意不再从请求体读**：处置人是审计事实，服务端按会话回填。
         // 此前前端传什么就记什么，且服务里是「有传参就用传参、否则才看会话」——
         // 服务端明明知道是谁，却优先信调用方说的。对账差错的 handled_by 正是要审的那一列。
@@ -377,10 +375,9 @@ public class FinanceController {
      */
     @PostMapping("/api/trade/settlements/generate")
     @PreAuthorize("@perm.can('finance:settlement:generate')")
-    public List<String> generateSettlementsPublic(@RequestBody(required = false) Map<String, String> body) {
-        String period = body == null ? null : body.get("period");
-        String payeeType = body == null ? null : body.get("payeeType");
-        return settlementService.generate(period, payeeType);
+    public List<String> generateSettlementsPublic(@RequestBody(required = false) FinDtos.SettlementGenerateReq body) {
+        return body == null ? settlementService.generate(null, null, null)
+                : settlementService.generate(body.period(), body.payeeType(), body.payeeNos());
     }
 
     /** 账务分录列表（自 {@code TradeController} SeedData 骨架迁入，走 {@code acct_ledger} 表）。 */
@@ -449,9 +446,8 @@ public class FinanceController {
     // 此前挂 :update，清单定了但后端没实现。（FINANCE 持 finance:* 通配，访问面不变。）
     @PreAuthorize("@perm.can('finance:invoice:void')")
     public Object voidInvoice(@PathVariable String invoiceNo,
-                              @RequestBody java.util.Map<String, Object> body) {
-        Object r = body == null ? null : body.get("voidReason");
-        return invoiceService.voidInvoice(invoiceNo, r == null ? null : String.valueOf(r));
+                              @RequestBody(required = false) FinDtos.InvoiceVoidReq body) {
+        return invoiceService.voidInvoice(invoiceNo, body == null ? null : body.voidReason());
     }
 
     /** 押金转买断：用户不还了，押金抵购机款，充电宝转 SOLD。**与丢失(LOST)财务方向相反**。 */
@@ -460,21 +456,21 @@ public class FinanceController {
     // 此前与催缴同用 order:deposit:update（一个真源表里根本没有的码），
     // 正好破坏了那条注释要防的事：给客服催缴权就等于给了买断权。
     @PreAuthorize("@perm.can('order:deposit:manage')")
-    public Object buyoutDeposit(@PathVariable String depositNo,
-                                @RequestBody(required = false) java.util.Map<String, Object> body) {
-        Object n = body == null ? null : body.get("note");
-        return depositService.buyout(depositNo, n == null ? null : String.valueOf(n));
+    public Object buyoutDeposit(
+            @PathVariable String depositNo,
+            @RequestBody(required = false) ai.neargo.sharehub.trade.order.dto.OrderDtos.DepositBuyoutReq body) {
+        // 入参字段是 reason（前端发的就是这个名字）；此前这里读 note，于是买断原因静默丢弃
+        return depositService.buyout(depositNo, body == null ? null : body.reason());
     }
 
     /** 欠款催缴：**只留痕不改状态** —— 催缴不改变欠款事实，改状态会让「已催缴」被误读成「已解决」。 */
     @PostMapping("/api/trade/deposits/{depositNo}/dun")
     // 催缴**只留痕不改钱**，是客服日常。真源表 §4：`order:arrears:dun` 给 CS 与 FIN。
     @PreAuthorize("@perm.can('order:arrears:dun')")
-    public Object dunDeposit(@PathVariable String depositNo,
-                             @RequestBody java.util.Map<String, Object> body) {
-        Object c = body == null ? null : body.get("channel");
-        Object n = body == null ? null : body.get("note");
-        return depositService.dun(depositNo, c == null ? null : String.valueOf(c),
-                n == null ? null : String.valueOf(n));
+    public Object dunDeposit(
+            @PathVariable String depositNo,
+            @RequestBody(required = false) ai.neargo.sharehub.trade.order.dto.OrderDtos.DepositDunReq body) {
+        return depositService.dun(depositNo, body == null ? null : body.channel(),
+                body == null ? null : body.note());
     }
 }

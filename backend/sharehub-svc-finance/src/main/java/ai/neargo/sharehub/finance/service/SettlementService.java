@@ -30,7 +30,12 @@ public interface SettlementService {
      * <p><b>幂等</b>：同一 (payeeNo, period) 已出过账则跳过，不重复出单 —— 批处理重跑是常态。
      *
      * @param period 账期 {@code YYYY-MM}
+     * @param payeeNos 只给这几个收款方出账；null/空 = 该类型全部。
+     *                 <b>此前这个参数不存在</b>，而运营端出账抽屉有个「选择要出账的对象」多选
+     *                 （帮助文案还写着「该周期没有分润明细的对象会被拒绝」）——
+     *                 前端把选中的 payeeNos 发过来，后端整个忽略，于是**勾了三个场地方，
+     *                 出的是这个类型全部收款方的账**。结算单是钱，多出来的那些还要人去撤。
      * @return 本次新生成的结算单号
      */
-    List<String> generate(String period, String payeeType);
+    List<String> generate(String period, String payeeType, java.util.List<String> payeeNos);
 }

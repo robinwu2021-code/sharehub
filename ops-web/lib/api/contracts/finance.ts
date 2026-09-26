@@ -124,7 +124,8 @@ export interface FinanceApi {
   /** 开具：DRAFT → ISSUED，服务端生成发票代码/号码并留痕；金额与来源结算单对不上则拒绝。 */
   issueInvoice(invoiceNo: string, operatorName?: string): Promise<Invoice>;
   /** 作废：ISSUED → VOID，`voidReason` 必填（不可逆）。草稿不可作废——改错直接编辑。 */
-  voidInvoice(invoiceNo: string, voidReason: string, operatorName?: string): Promise<Invoice>;
+  /** 作废发票。**不传操作人** —— 后端 `InvoiceVoidReq` 只认 voidReason，voidedBy 按会话回填。 */
+  voidInvoice(invoiceNo: string, voidReason: string): Promise<Invoice>;
 
   // === 财务域 B5：分润统计 / 充值订单（规格 §5 §6，均为只读）===
   /** 分润统计：dimension 是维度切换器的参数——一张表两种主体，不是两个接口。 */

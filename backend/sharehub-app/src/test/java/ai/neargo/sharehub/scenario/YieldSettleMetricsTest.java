@@ -113,13 +113,13 @@ class YieldSettleMetricsTest extends ApiTestSupport {
         jdbc.update("INSERT INTO share_record (record_no, tenant_id, order_no, dimension, payee_type, payee_no, payee_name, amount, gross_amount, rate, currency, mode, status, period, source_no, basis)"
                 + " VALUES (?, 'MAIN', ?, 'VENUE', 'VENUE', ?, '测试场地方', 300, 1500, 0.2, 'AED', 'LEDGER', 'PENDING', ?, ?, '')", "SRY" + rnd(), "ORDY" + rnd(), venue, period, full);
 
-        settleNos.addAll(settlements.generate(period, "VENUE"));
+        settleNos.addAll(settlements.generate(period, "VENUE", null));
         Map<String, Object> topUp = jdbc.queryForMap("SELECT amount, status, settle_no FROM stl_adjustment WHERE contract_no=? AND kind='GUARANTEE_TOPUP' AND period=?", full, period);
         assertThat((BigDecimal) topUp.get("amount")).isEqualByComparingTo("700");
         assertThat(topUp).containsEntry("status", "SETTLED");
         assertThat(jdbc.queryForObject("SELECT amount FROM stl_adjustment WHERE contract_no=? AND kind='GUARANTEE_TOPUP'", BigDecimal.class, half))
                 .as("11-16 起生效：15 / 30 天").isEqualByComparingTo("500");
-        settleNos.addAll(settlements.generate(period, "VENUE"));
+        settleNos.addAll(settlements.generate(period, "VENUE", null));
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM stl_adjustment WHERE contract_no=? AND kind='GUARANTEE_TOPUP'", Integer.class, full))
                 .as("重跑出账不重复补差").isEqualTo(1);
 

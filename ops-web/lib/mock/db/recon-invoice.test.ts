@@ -290,10 +290,12 @@ describe("发票：开具 / 作废状态机", () => {
     expect(() => voidInvoice(draft.invoiceNo, "写错了")).toThrow(/草稿/);
 
     const issued = issueInvoice(draftInvoice().invoiceNo);
-    const done = voidInvoice(issued.invoiceNo, "抬头填错，需重开", "Sara Ahmed");
+    const done = voidInvoice(issued.invoiceNo, "抬头填错，需重开");
     expect(done.status).toBe("VOID");
     expect(done.voidReason).toBe("抬头填错，需重开");
-    expect(done.voidedBy).toBe("Sara Ahmed");
+    // 作废人按会话来（mock 的会话就是 admin）：后端 InvoiceVoidReq 只认 voidReason，
+    // voidedBy 由会话回填 —— 传什么就记什么等于审计链随手可伪造
+    expect(done.voidedBy).toBe("admin");
     expect(done.voidedAt).toBeTruthy();
     // 作废是终态：不能再作废一次
     expect(() => voidInvoice(done.invoiceNo, "再来一次")).toThrow(/不允许执行/);

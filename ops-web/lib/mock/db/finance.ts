@@ -634,13 +634,15 @@ export function issueInvoice(invoiceNo: string, operatorName?: string): Invoice 
 }
 
 /** 作废：ISSUED → VOID，**原因必填**（不可逆，页面另有二次确认）。 */
-export function voidInvoice(invoiceNo: string, voidReason?: string, operatorName?: string): Invoice {
+export function voidInvoice(invoiceNo: string, voidReason?: string): Invoice {
   const inv = findInvoice(invoiceNo);
   if (!canInvoiceTransition(inv.status, "void")) transitionInvoice(inv, "void", {});
   const reason = (voidReason ?? "").trim();
   if (!reason) throw new InvoiceError("作废原因必填——作废等于账面凭空少一张票，不留原因日后无从解释");
   return transitionInvoice(inv, "void", {
-    voidedAt: new Date().toISOString(), voidedBy: operatorName || "admin", voidReason: reason,
+    // voidedBy 按会话来，不是调用方说了算（mock 的会话就是 admin）——
+    // 后端 InvoiceVoidReq 也只认 voidReason
+    voidedAt: new Date().toISOString(), voidedBy: "admin", voidReason: reason,
   });
 }
 

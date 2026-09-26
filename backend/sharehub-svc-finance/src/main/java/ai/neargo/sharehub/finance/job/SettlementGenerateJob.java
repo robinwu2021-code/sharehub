@@ -46,7 +46,7 @@ public class SettlementGenerateJob implements JobHandler {
     @Override
     public JobResult run(JobInvocation invocation) {
         String period = invocation.bizDate().format(PERIOD);
-        List<String> created = settlements.generate(period, null);
+        List<String> created = settlements.generate(period, null, null);   // 批处理：全类型、全收款方
         return created.isEmpty()
                 ? JobResult.skipped("账期 " + period + " 没有待出账的分润（或已出过）")
                 : JobResult.success("period=" + period + " created=" + created.size() + " " + created);

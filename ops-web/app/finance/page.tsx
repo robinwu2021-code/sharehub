@@ -532,7 +532,9 @@ function FinanceInner() {
 
   const genSettlements = useMutation({
     mutationFn: (v: { payeeType: "VENUE" | "AGENT"; period: string; payeeNos: string[] }) =>
-      api.generateSettlements({ ...v, operatorName: username || undefined }),
+      // operatorName 不再发：后端 SettlementGenerateReq 只认 period/payeeType/payeeNos。
+      // payeeNos 是这次才真的被后端读的 —— 此前勾了三个场地方，出的是该类型全部收款方的账。
+      api.generateSettlements(v),
     onSuccess: (rows) => {
       qc.invalidateQueries({ queryKey: ["fin"] });
       notify.success(`已生成 ${rows.length} 张结算单（待确认），合计 ${money(rows.reduce((s, r) => s + r.totalAmount, 0), rows[0]?.currency ?? "AED")}`);
@@ -650,7 +652,7 @@ function FinanceInner() {
     },
   });
   const voidInvoice = useMutation({
-    mutationFn: (v: { no: string; reason: string }) => api.voidInvoice(v.no, v.reason, username || undefined),
+    mutationFn: (v: { no: string; reason: string }) => api.voidInvoice(v.no, v.reason),
     onSuccess: (inv) => {
       qc.invalidateQueries({ queryKey: ["fin"] });
       notify.success(`发票 ${inv.invoiceNo} 已作废`);

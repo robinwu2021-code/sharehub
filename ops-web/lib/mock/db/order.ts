@@ -363,15 +363,19 @@ export const releaseDeposit = (depositNo: string, reason: string): DepositRecord
   return transitionDeposit(depositNo, "release", { releasedAt: now(), operatorName: "admin", note: reason.trim() });
 };
 
-/** 买断：HELD → BOUGHT_OUT（金额与原因必填；买断金额不得超过押金额）。 */
+/**
+ * 买断：HELD → BOUGHT_OUT（原因必填）。
+ *
+ * **买断金额不收传参**：真后端定为押金全额（`DepositServiceImpl`：「不得超过押金额 ——
+ * 押金抵购机款，抵不了更多」），mock 跟着它走。原先这里校验「金额 > 0 且 ≤ 押金额」，
+ * 而真后端根本不看传来的金额 —— mock 比真后端严，于是 mock 下过不了的用例线上能过，
+ * 反过来运营在真环境填的金额又永远不生效。
+ */
 export const buyoutDeposit = (depositNo: string, x: DepositBuyoutPayload): DepositRecord => {
   const d = findDeposit(depositNo);
-  const amt = Number(x?.amount ?? 0);
-  if (!(amt > 0)) throw new DepositTransitionError(depositNo, "buyout", d?.status ?? null, "买断金额必须大于 0");
-  if (d && amt > d.amount) throw new DepositTransitionError(depositNo, "buyout", d.status, `买断金额不得超过押金额 ${d.amount}`);
   if (!x?.reason?.trim()) throw new DepositTransitionError(depositNo, "buyout", d?.status ?? null, "买断必须填写原因");
   return transitionDeposit(depositNo, "buyout", {
-    buyoutAmount: amt, buyoutAt: now(), operatorName: "admin", note: x.reason.trim(),
+    buyoutAmount: d?.amount ?? 0, buyoutAt: now(), operatorName: "admin", note: x.reason.trim(),
   });
 };
 
