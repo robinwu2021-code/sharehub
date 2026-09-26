@@ -113,9 +113,17 @@ public class EmployeeServiceImpl extends AbstractCrudService<IamEmployee, Employ
         body.setDeptNo(req.deptNo());
         body.setRoleNo(req.roleNo());
         body.setStatus(req.status());
+        boolean creating = req.employeeNo() == null || req.employeeNo().isBlank();
         Employee vo = super.save(body);
         IamEmployee saved = selectByKey(vo.employeeNo());
-        syncRoles(saved.getEmployeeNo(), saved.getRoleNo(), req.roleNos());
+        /*
+         * **建档时 roleNos 缺省不等于「不动角色」** —— 新人根本没有「原有角色」可保留。
+         * 照「不动」处理的话，`iam_employee.role_no` 写着 BD、而 `iam_employee_role` 一行都没有，
+         * 于是这个人登录后是 VIEWER：列表上他是拓展，实际什么都干不了。
+         * 2026-09-26 生产实测撞到 —— 为合同审批链建两个 BD 账号，两个都成了 VIEWER。
+         */
+        syncRoles(saved.getEmployeeNo(), saved.getRoleNo(), creating && req.roleNos() == null
+                ? List.of() : req.roleNos());
 
         // 在线生效：状态（离职）与角色（授权）变更都要让在线会话下一次请求重建。
         // **不分状态改了还是角色改了** —— 两者都影响授权，分开判就要维护一个
@@ -185,10 +193,20 @@ public class EmployeeServiceImpl extends AbstractCrudService<IamEmployee, Employ
         return d == null ? null : d.getName();
     }
 
+    /**
+     * 角色显示名。**按 role_no 或 code 两者之一匹配** —— 员工表里存的是哪一种，历史上两种都有：
+     * 生产 5 个种子员工的 {@code role_no} 是 {@code OPS/CS/FINANCE/ADMIN}（也就是 code），
+     * 而 {@code iam_role.role_no} 是 {@code R1..R7}。只按 role_no 查的话
+     * <b>每一个员工的 roleName 都是 null</b>，列表那一列长期空着，而这不报错。
+     */
     private String roleName(String roleNo) {
         if (roleNo == null || roleNo.isBlank()) return null;
         IamRole r = roleMapper.selectOne(new LambdaQueryWrapper<IamRole>()
                 .eq(IamRole::getRoleNo, roleNo).last("limit 1"));
+        if (r == null) {
+            r = roleMapper.selectOne(new LambdaQueryWrapper<IamRole>()
+                    .eq(IamRole::getCode, roleNo).last("limit 1"));
+        }
         return r == null ? null : r.getName();
     }
 
