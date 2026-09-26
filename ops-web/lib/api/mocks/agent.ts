@@ -14,10 +14,20 @@ export const agentMock: AgentApi = {
     return wait(db.paginate(db.agents, q.page, q.size, (a) => db.liveHit(a, q.showArchived) && db.kwHit(q.keyword, a.name, a.agentNo, a.regionScope)));
   },
   saveAgent: (a) => {
-    const idx = db.agents.findIndex((x) => x.agentNo === a.agentNo);
+    /*
+     * 编号为空 = 新建，**服务端取号**（与真后端同口径：请求体里的 agentNo 不作数）。
+     * 原先取的是 `AG${length + 1}` —— 那正是 helpers 里 nextNo 的注释点名的撞号写法：
+     * 种子从 AG001 起共 8 条，删一条再建就会撞已有号。
+     *
+     * mock 的号从 900 起（nextNo 的默认 base），**刻意与种子号段错开** ——
+     * 所以它长得不像真后端出的 AG009，这是设计如此，不是分叉。
+     */
+    const no = a.agentNo?.trim() || db.nextNo("AG", db.agents);
+    const idx = db.agents.findIndex((x) => x.agentNo === no);
     const before = idx >= 0 ? db.agents[idx].status : null;
-    const merged = { ...(db.agents[idx] ?? { name: "", contact: "", regionScope: "", shareRate: 0.3, cabinetCount: 0, status: "ENABLED", archivedAt: null, agentNo: `AG${db.agents.length + 1}` }), ...a } as Agent;
-    if (idx >= 0) db.agents[idx] = merged; else db.agents.push(merged);
+    const merged = { ...(db.agents[idx] ?? { name: "", contact: "", regionScope: "", shareRate: 0.3, cabinetCount: 0, status: "ENABLED", archivedAt: null }), ...a, agentNo: no } as Agent;
+    // 新建的排最上（与场地方同口径，也与真后端的倒序一致）
+    if (idx >= 0) db.agents[idx] = merged; else db.agents.unshift(merged);
     // 停用联动（F2）：名下未完结工单改派平台 —— 后端由 AgentStatusChangedEvent 的监听器做
     if (before && before !== "SUSPENDED" && merged.status === "SUSPENDED") ax.onAgentSuspended(merged.agentNo);
     return wait(merged, 350);

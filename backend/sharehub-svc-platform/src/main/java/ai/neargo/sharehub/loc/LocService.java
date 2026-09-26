@@ -219,38 +219,12 @@ public class LocService {
     }
 
     /**
-     * 下一个场地方编号：{@code VEN} + 三位顺序号（{@code VEN305}…）。
-     *
-     * <h3>为什么换掉 ULID</h3>
-     * 原先是 {@code IdGenerator.next("VEN")}，出来的是 {@code VENMUI4WT2QTD1RV17O}（19 位）。
-     * 场地方编号是**人要读、要念、要在合同和对账单上核对**的东西，
-     * 而这个仓库里员工、部门那些走 {@code AbstractCrudService} 的实体本来就是顺序号
-     * （今天生产建的是 E1006 / E1007）—— 同一套系统里两种编号形态，没有理由。
-     *
-     * <h3>取最大值而不是字典序</h3>
-     * 位宽不一致时字典序会取错：实测提现单里同时有 {@code WD9002}(4 位) 与 {@code WD009003}(6 位)，
-     * 字典序下 {@code 'WD9002' > 'WD009003'}，取到 9002 → 下一个算成 WD009003 → 撞已存在行。
-     * 所以按数字序取 {@code MAX}，与 {@link ai.neargo.sharehub.common.crud.AbstractCrudService#nextNo} 同法。
-     *
-     * <h3>已知取舍：并发下会撞唯一键</h3>
-     * 两个人同一瞬间建档，{@code MAX+1} 会算出同一个号，其中一个撞 {@code uk_venue_no} 失败。
-     * 场地方一天建几个，这个代价可以接受；要绝对安全得上号段表，不值得。
-     * 员工号走的也是这条路，行为一致。
+     * 下一个场地方编号：{@code VEN} + 三位顺序号（{@code VEN305}…），与种子 {@code VEN300~304} 同形。
+     * 取号规则与已知取舍见 {@link ai.neargo.sharehub.common.crud.BizNoSequence}。
      */
     private String nextVenueNo() {
-        String prefix = ai.neargo.sharehub.common.BizKey.VENUE;
-        List<Object> top = venueMapper.selectObjs(new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<LocVenue>()
-                .select("MAX(CAST(SUBSTRING(venue_no, " + (prefix.length() + 1) + ") AS UNSIGNED)) AS mx")
-                .likeRight("venue_no", prefix));
-        long n = 0L;
-        if (top != null && !top.isEmpty() && top.get(0) != null) {
-            try {
-                n = Long.parseLong(String.valueOf(top.get(0)));
-            } catch (NumberFormatException ignore) {
-                // 历史上有过 ULID 形态的号，取不出数字时从 0 起，由 uk_venue_no 兜底
-            }
-        }
-        return prefix + String.format("%03d", n + 1);
+        return ai.neargo.sharehub.common.crud.BizNoSequence.next(
+                venueMapper, "venue_no", ai.neargo.sharehub.common.BizKey.VENUE, 3);
     }
 
     // —— 合同 —— 已迁入 loc.service.ContractService（2026-09-25 合同走审批）

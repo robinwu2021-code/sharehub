@@ -372,6 +372,13 @@ function AgentsInner() {
   });
 
   const canEditAccount = allow("agent:agent:update");
+  /*
+   * 建档与改档**分开判码**（权限清单 §代理商「增/改」本来就是两个码）。
+   * 此前 `agent:agent:create` 在目录里列着、**没有任何端点认它** ——
+   * 管理员勾了「代理商 增」以为开了权限，实际配了等于没配
+   *（与 2026-09-26 收拾掉的三个工单码同一族，见 V116）。后端已同步改判。
+   */
+  const canCreateAgent = allow("agent:agent:create");
   const save = useMutation({
     mutationFn: (a: Partial<Agent>) => api.saveAgent(a),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["agents"] }); setEdit(null); },
@@ -779,6 +786,12 @@ function AgentsInner() {
             onSearch={(v) => { setKeyword(v); paging.reset(); }}
             searchPlaceholder="搜索代理名称 / 编号 / 辖域"
             onExport={exportIf(exportProfiles, profiles.data?.list?.length)}
+            onAdd={canCreateAgent ? () => {
+              // 编号留空 = 新建；服务端取号（与场地方同口径，前端不发明编号）
+              setEdit({ agentNo: "" } as Agent);
+              setForm({ agentType: "AGENT", shareRate: 0.1, status: "ENABLED" });
+            } : undefined}
+            addLabel="新增代理商"
           >
             <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); paging.reset(); }} />
           </Toolbar>
@@ -864,8 +877,10 @@ function AgentsInner() {
       <Drawer
         open={!!edit}
         onOpenChange={(o) => !o && setEdit(null)}
-        title={`代理商 ${edit?.agentNo ?? ""}`}
-        desc="档案与默认分润（分润执行/打款经 nearpay）"
+        title={edit?.agentNo ? `代理商 ${edit.agentNo}` : "新增代理商"}
+        desc={edit?.agentNo
+          ? "档案与默认分润（分润执行/打款经 nearpay）"
+          : "编号由服务端取，建完可在「代理账号」里给他开登录号"}
         footer={
           <>
             <Button variant="outline" onClick={() => setEdit(null)}>取消</Button>

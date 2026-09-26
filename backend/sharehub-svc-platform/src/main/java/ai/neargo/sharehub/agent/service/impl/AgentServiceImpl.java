@@ -53,9 +53,17 @@ public class AgentServiceImpl implements AgentService {
 
     @Override
     public Agent save(String agentNo, Agent in) {
+        /*
+         * **建档时一律服务端取号，不看客户端传了什么**。
+         * 原先这里是「路径没给就取 body 里的」—— 于是新建时在请求体里塞一个 agentNo
+         * 就能建出任意编号的代理商，而代理编号是分润、划拨、结算都认的业务键。
+         * 改档走路径上的编号（`POST /agents/{agentNo}`），那条路不受影响。
+         *
+         * 取号形态从 ULID（`AGMUI9X6VY1M3XM5DQ`，19 位）换成 `AG` + 三位顺序号，
+         * 与种子 `AG001~AG008` 同形 —— 代理编号是人要读、要念、要在对账单上核对的东西。
+         */
         String no = (agentNo != null && !agentNo.isBlank()) ? agentNo
-                : (in.agentNo() != null && !in.agentNo().isBlank()) ? in.agentNo()
-                : IdGenerator.next("AG");   // 业务键复用 neargo-common-core（物理主键仍库内自增 Long）
+                : ai.neargo.sharehub.common.crud.BizNoSequence.next(mapper, "agent_no", "AG", 3);
         AgtAgent e = mapper.selectOne(new LambdaQueryWrapper<AgtAgent>().eq(AgtAgent::getAgentNo, no));
         boolean insert = (e == null);
         if (insert) { e = new AgtAgent(); e.setAgentNo(no); e.setTenantId("MAIN"); }
@@ -72,7 +80,9 @@ public class AgentServiceImpl implements AgentService {
         e.setName(in.name());
         e.setContact(in.contact());
         e.setRegionScope(ai.neargo.sharehub.agent.RegionScopeJson.toJson(in.regionScope()));
-        e.setShareRate(in.shareRate());
+        // 不传 = 不改（新建时按 0，配规则之前本来就没有默认分润）
+        if (in.shareRate() != null) e.setShareRate(in.shareRate());
+        else if (insert) e.setShareRate(0d);
         // 类型只认两个值；归一规则与理由见 AgentType.of
         e.setAgentType(AgentType.of(in.agentType()).name());
         // 机柜数不回写：它是聚合值不是档案属性（实体与库里都已没有这一列）

@@ -30,9 +30,31 @@ public class AgentController {
         return service.page(page, size, keyword);
     }
 
-    @PostMapping({"", "/{agentNo}"})
+    /**
+     * 新建代理商。
+     *
+     * <p><b>判 {@code :create} 而不是 {@code :update}</b>：权限清单 §代理商「增/改」本来就是
+     * 两个码，而此前两条路合用一个映射、一律判 {@code :update} ——
+     * 于是 {@code agent:agent:create} <b>在目录里列着、没有任何端点认它</b>，
+     * 管理员勾了「代理商 增」以为开了权限，实际配了等于没配
+     *（与 2026-09-26 收拾掉的三个工单码同一族，见 V116；该码在
+     * {@code known-perm-ssot-gaps.txt} 里登记为「声明未强制」，本次销账）。
+     *
+     * <p>可达性核过：生产里持有写权限的只有 BD（{@code agent:*} 通配）与 ADMIN（{@code *}），
+     * 两者都覆盖新码，拆开不缩小任何人的访问面。
+     *
+     * <p>编号由服务端取，请求体里的 {@code agentNo} 不作数（见 {@code AgentServiceImpl.save}）。
+     */
+    @PostMapping
+    @PreAuthorize("@perm.can('agent:agent:create')")
+    public Agent create(@RequestBody Agent in) {
+        return service.save(null, in);
+    }
+
+    /** 修改代理商档案。编号以路径为准，防越权改别家。 */
+    @PostMapping("/{agentNo}")
     @PreAuthorize("@perm.can('agent:agent:update')")
-    public Agent save(@PathVariable(required = false) String agentNo, @RequestBody Agent in) {
+    public Agent update(@PathVariable String agentNo, @RequestBody Agent in) {
         return service.save(agentNo, in);
     }
 

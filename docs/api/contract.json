@@ -351,11 +351,11 @@
     },
     {
      "name": "shareRate",
-     "type": "double"
+     "type": "Double"
     },
     {
      "name": "cabinetCount",
-     "type": "int"
+     "type": "Integer"
     },
     {
      "name": "status",
@@ -371,20 +371,13 @@
   {
    "verb": "POST",
    "path": "/api/agent/agents",
-   "perm": "agent:agent:update",
+   "perm": "agent:agent:create",
    "perms": [
-    "agent:agent:update"
+    "agent:agent:create"
    ],
-   "handler": "AgentController#save",
-   "summary": "",
-   "params": [
-    {
-     "in": "path",
-     "name": "agentNo",
-     "type": "String",
-     "required": true
-    }
-   ],
+   "handler": "AgentController#create",
+   "summary": "新建代理商。",
+   "params": [],
    "bodyType": "Agent",
    "returnType": "Agent",
    "returnContainer": null,
@@ -412,11 +405,11 @@
     },
     {
      "name": "shareRate",
-     "type": "double"
+     "type": "Double"
     },
     {
      "name": "cabinetCount",
-     "type": "int"
+     "type": "Integer"
     },
     {
      "name": "status",
@@ -450,11 +443,11 @@
     },
     {
      "name": "shareRate",
-     "type": "double"
+     "type": "Double"
     },
     {
      "name": "cabinetCount",
-     "type": "int"
+     "type": "Integer"
     },
     {
      "name": "status",
@@ -473,8 +466,8 @@
    "perms": [
     "agent:agent:update"
    ],
-   "handler": "AgentController#save",
-   "summary": "",
+   "handler": "AgentController#update",
+   "summary": "修改代理商档案。",
    "params": [
     {
      "in": "path",
@@ -510,11 +503,11 @@
     },
     {
      "name": "shareRate",
-     "type": "double"
+     "type": "Double"
     },
     {
      "name": "cabinetCount",
-     "type": "int"
+     "type": "Integer"
     },
     {
      "name": "status",
@@ -548,11 +541,11 @@
     },
     {
      "name": "shareRate",
-     "type": "double"
+     "type": "Double"
     },
     {
      "name": "cabinetCount",
-     "type": "int"
+     "type": "Integer"
     },
     {
      "name": "status",
