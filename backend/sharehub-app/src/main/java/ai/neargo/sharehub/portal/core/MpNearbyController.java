@@ -43,6 +43,8 @@ import java.util.Map;
 @RestController
 public class MpNearbyController {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MpNearbyController.class);
+
     private static final BigDecimal DEPOSIT_AMOUNT = BigDecimal.valueOf(50);   // 同 RentController 骨架常量
 
     private final LocService loc;
@@ -77,7 +79,8 @@ public class MpNearbyController {
             List<NearbyCabinetVO> out = new ArrayList<>();
             for (Site s : loc.pageSites(1, 50, keyword, false).getList()) {
                 if (!consumerVisible(s)) continue;
-                Quote q = cards.quoteOf(s.siteNo(), s.sceneType());
+                Quote q = quoteOrSkip(s);
+                if (q == null) continue;                      // 见 quoteOrSkip：算不出价就不上榜
                 for (Cabinet c : cabinets.bySite(s.siteNo())) {
                     int ret = Math.max(0, c.slotTotal() - c.availableCount());
                     if (Boolean.TRUE.equals(returnable) && ret == 0) continue;
@@ -91,6 +94,37 @@ public class MpNearbyController {
             }
             return out;
         });
+    }
+
+    /**
+     * 列表用的报价：算不出就回 {@code null} 让调用方跳过这家店，**而不是让整张列表挂掉**。
+     *
+     * <p>2026-09-27 H5 对接实测：{@code /mp/nearby/cabinets} 恒返 409
+     * 「该点位暂不可借，请到附近其它网点试试」—— C 端首页的主数据源整条不通。
+     * 成因是 {@code StoreCardAssembler#quoteOf} 里的 {@code PriceResolver.resolve}
+     * 在站点匹配不到计价方案时抛 409，而这里在**循环里**调它、没有兜底：
+     * <b>13 家店里只要有一家没配价，另外 12 家也一起消失。</b>
+     *
+     * <p>那个 409 本身是对的 —— 对**站在柜机前准备借**的人，「这儿借不了，换一家」
+     * 正是他能行动的那句话。错的是把它用在列表上：列表的读者不在任何一家店门口，
+     * 他要的是「还有哪些店」。所以同一个失败，**单条查询保留 409，列表逐行降级**。
+     *
+     * <p><b>为什么是跳过而不是标成 PAUSED</b>：出参里确实有 {@code status} 这一位，
+     * 但 c-app 全仓**没有任何一处读它**（已 grep），标了没有任何视觉效果，
+     * 而价格会渲染成 {@code AED 0/h} —— 读起来是「免费」。
+     * 在 c-app 真按 status 渲染之前，不显示比显示成免费诚实。
+     *
+     * <p>WARN 带站点号：这是运维能直接行动的一条（给该站点配价，或配一条 ALL 层默认方案）。
+     */
+    private Quote quoteOrSkip(Site s) {
+        try {
+            return cards.quoteOf(s.siteNo(), s.sceneType());
+        } catch (BizException e) {
+            log.warn("站点算不出报价，已从列表中略过 siteNo={} sceneType={} reason={} —— "
+                            + "请为该站点配置计价方案，或配一条 ALL 层默认方案",
+                    s.siteNo(), s.sceneType(), e.getMessage());
+            return null;
+        }
     }
 
     /**
@@ -115,7 +149,8 @@ public class MpNearbyController {
             for (Site s : loc.pageSites(1, 200, null, false).getList()) {
                 if (!mine.contains(s.siteNo())) continue;
                 if (!consumerVisible(s)) continue;   // 收藏了一家后来关掉的店，不该还挂在列表上
-                Quote q = cards.quoteOf(s.siteNo(), s.sceneType());
+                Quote q = quoteOrSkip(s);
+                if (q == null) continue;                      // 同找柜列表：一家店算不出价不该让整个收藏夹空掉
                 for (Cabinet c : cabinets.bySite(s.siteNo())) {
                     out.add(cards.card(c, s, q, lat, lng));
                 }

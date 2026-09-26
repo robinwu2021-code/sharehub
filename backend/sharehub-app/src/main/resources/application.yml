@@ -98,7 +98,10 @@ sharehub:
   seed:
     enabled: false
   cors:
-    allowed-origins: http://localhost:3000
+    # 3000=运营端 ops-web，5174=C 端 c-app 的 H5（两个端口都在 .claude/launch.json 里）。
+    # 少了 5174 的后果是 C 端 H5 一切请求被浏览器拦在 CORS 上 —— 而那看起来像「后端挂了」。
+    # 生产由 SHAREHUB_CORS_ALLOWED_ORIGINS 覆盖，这里是开发默认值。
+    allowed-origins: ${SHAREHUB_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5174}
   # 跨进程地基（B7 · TDD-cross-process-foundation）
   services:
     # 服务凭证共享密钥。**空 = 内部调用与 /internal/** 端点一律拒绝**（fail-closed）。
