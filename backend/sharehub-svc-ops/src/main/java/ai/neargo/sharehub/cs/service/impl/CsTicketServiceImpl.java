@@ -115,7 +115,7 @@ public class CsTicketServiceImpl implements CsTicketService {
         CsTicket e = new CsTicket();
         e.setTicketNo(req.ticketNo() == null || req.ticketNo().isBlank() ? nextTicketNo() : req.ticketNo().trim());
         e.setTenantId(TENANT_MAIN);
-        e.setCUserNo(blank(req.cUserNo()));
+        e.setCUserNo(blank(req.userNo()));
         e.setOrderNo(blank(req.orderNo()));
         e.setCabinetNo(blank(req.cabinetNo()));
         e.setProblemNo(blank(req.problemNo()));

@@ -5,7 +5,8 @@
 export type CsTicketStatus = "OPEN" | "PROCESSING" | "CLOSED";
 export interface CsTicket {
   ticketNo: string;
-  userNo: string;
+  /** 手工登记时可以没有：来电的人未必报得出账号（后端 V119 起该列允许 NULL）。 */
+  userNo: string | null;
   /** 关联订单：转退款要拿它去资金域建退款单，没有订单号就退不了钱 */
   orderNo: string | null;
   cabinetNo: string;

@@ -45,10 +45,16 @@ public final class CsDtos {
      * 手工建单是客服接到来电后登记 —— 人已经在处理了，再被分流关掉是荒谬的。
      * 页面空态写的就是「用户来电/APP 报障后在此登记，也可点右上「新增工单」手工建单」。
      *
-     * <p>{@code cUserNo} 在这里**可空**：来电的人未必报得出账号，
-     * 而「登记不下来」比「记录里缺个账号」糟得多。
+     * <p>{@code userNo} 在这里**可空**：来电的人未必报得出账号，
+     * 而「登记不下来」比「记录里缺个账号」糟得多。（列直到 V119 才真的允许 NULL ——
+     * 在那之前这句注释是对的、库是错的，不带账号建单 500。）
+     *
+     * <p><b>叫 userNo 不叫 cUserNo</b>：本仓库的分层口径是 DTO / API 层用 {@code userNo}，
+     * 实体与库列用 {@code cUserNo}（{@code c_user_no}）。同域的 {@code ComplaintCreateReq}、
+     * {@code RefundApplyReq} 都是前者，出参 {@link CsTicketVO} 也是前者。
+     * 此前这里写成 cUserNo —— 把列名漏到了 API 上，于是运营端发的 userNo 被静默丢掉。
      */
-    public record TicketCreateReq(String ticketNo, String cUserNo, String orderNo, String cabinetNo,
+    public record TicketCreateReq(String ticketNo, String userNo, String orderNo, String cabinetNo,
                                   String problemNo, String issue, String channel, String status) {
     }
 

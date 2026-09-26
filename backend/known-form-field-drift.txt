@@ -41,8 +41,6 @@ ops-web/app/users/page.tsx::CARD_FIELDS validTo
 # 每条都核过两端，诊断写在下面。修法都在后端写入面（前端 key 必须与读出参一致，
 # 否则编辑抽屉预填不上），所以逐条单独提交、各自带用例，不在挂注解这一笔里混做。
 
-# 客服工单的「用户」存不进去：读出参 CsTicket.userNo，写入面要 cUserNo。
-ops-web/app/cs/page.tsx::TICKET_FIELDS userNo
 
 # 巡检计划的「负责人」存不进去：读出参 InspectionPlan.assignee，
 # 写入面收实体 WoInspectionPlan（字段 assigneeNo，@TableField("assignee_id")）。
