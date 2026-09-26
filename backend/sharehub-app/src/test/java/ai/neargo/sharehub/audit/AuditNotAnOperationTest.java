@@ -177,7 +177,7 @@ class AuditNotAnOperationTest extends AuditTestSupport {
         body.put("planNo", planNo);
         body.put("name", "[审计] 定时执行留痕");
         body.put("patch", Map.of("unitPrice", target));
-        body.put("effectiveAt", LocalDate.now().minusDays(1) + "T00:00:00Z");
+        body.put("effectiveAt", bizToday().minusDays(1) + "T00:00:00Z");
         body.put("reason", "自动化测试");
         String adjustNo = post("/api/trade/price-adjustments", body, admin).okData().path("adjustNo").asText();
         assertThat(adjustNo).as("前置：调价单应当创建成功").isNotBlank();

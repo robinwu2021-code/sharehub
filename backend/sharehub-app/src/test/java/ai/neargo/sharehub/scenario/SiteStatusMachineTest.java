@@ -98,7 +98,7 @@ class SiteStatusMachineTest extends ApiTestSupport {
         String no = create().path("siteNo").asText();
         sites.goLiveIfPreparing(no, LocalDateTime.now(), "test");
         assertThat(post("/api/ops/sites/" + no + "/pause", Map.of(), admin).status).isEqualTo(400);
-        assertThat(post("/api/ops/sites/" + no + "/pause", Map.of("reason", "装修", "pauseUntil", LocalDate.now().plusDays(3).toString()),
+        assertThat(post("/api/ops/sites/" + no + "/pause", Map.of("reason", "装修", "pauseUntil", bizToday().plusDays(3).toString()),
                 admin).okData().path("status").asText()).isEqualTo("PAUSED");
         assertThat(post("/api/ops/sites/" + no + "/resume", Map.of(), admin).status).isEqualTo(409);
         assertThat(status(no)).isEqualTo("PAUSED");
@@ -132,7 +132,7 @@ class SiteStatusMachineTest extends ApiTestSupport {
         cabinet(no, "DEPLOYED");
         cabinet(no, "DEPLOYED");
         sites.goLiveIfPreparing(no, LocalDateTime.now(), "test");
-        assertThat(post("/api/ops/sites/" + no + "/withdraw", Map.of("reason", "场地方不续约", "plannedAt", LocalDate.now().plusDays(7).toString()),
+        assertThat(post("/api/ops/sites/" + no + "/withdraw", Map.of("reason", "场地方不续约", "plannedAt", bizToday().plusDays(7).toString()),
                 admin).okData().path("status").asText()).isEqualTo("WITHDRAWING");
         assertThat(jdbc.queryForList("SELECT type FROM wo_order WHERE source_ref LIKE ?", String.class, "WD:" + no + ":%"))
                 .hasSize(2).containsOnly("REMOVE");

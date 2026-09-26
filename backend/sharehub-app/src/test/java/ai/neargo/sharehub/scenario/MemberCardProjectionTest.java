@@ -92,7 +92,7 @@ class MemberCardProjectionTest extends ApiTestSupport {
         jdbc.update("INSERT INTO usr_membership (mbr_no, tenant_id, c_user_no, plan_no, level, points,"
                         + " start_at, end_at, auto_renew, status)"
                         + " VALUES (?, 'MAIN', ?, 'MBRP-TEST', ?, 120, ?, ?, 1, 'ACTIVE')",
-                no, cUserNo, level, LocalDate.now().minusDays(1).toString(), LocalDate.now().plusMonths(1).toString());
+                no, cUserNo, level, bizToday().minusDays(1).toString(), bizToday().plusMonths(1).toString());
         return no;
     }
 

@@ -114,7 +114,7 @@ class OperationMenuTest extends ApiTestSupport {
         body.put("planNo", planNo);
         body.put("name", "测试调价");
         body.put("patch", Map.of("unitPrice", target));
-        body.put("effectiveAt", LocalDate.now().minusDays(1) + "T00:00:00Z");
+        body.put("effectiveAt", bizToday().minusDays(1) + "T00:00:00Z");
         body.put("reason", "自动化测试");
         String adjustNo = post("/api/trade/price-adjustments", body, admin).okData().path("adjustNo").asText();
 
@@ -149,7 +149,7 @@ class OperationMenuTest extends ApiTestSupport {
         body.put("planNo", planNo);
         body.put("name", "会被人工改掉的调价");
         body.put("patch", Map.of("unitPrice", before + 2));
-        body.put("effectiveAt", LocalDate.now().minusDays(1) + "T00:00:00Z");
+        body.put("effectiveAt", bizToday().minusDays(1) + "T00:00:00Z");
         String adjustNo = post("/api/trade/price-adjustments", body, admin).okData().path("adjustNo").asText();
         get("/api/trade/price-adjustments?page=1&size=50&keyword=" + adjustNo, admin);   // 触发生效
 

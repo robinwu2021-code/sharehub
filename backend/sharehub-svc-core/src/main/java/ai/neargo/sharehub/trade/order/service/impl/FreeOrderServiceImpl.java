@@ -19,6 +19,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import ai.neargo.sharehub.common.time.BizClock;
 
 /**
  * 免费订单 —— 没有自己的表，是 {@code ord_order WHERE free_reason IS NOT NULL}
@@ -44,8 +45,12 @@ public class FreeOrderServiceImpl implements FreeOrderService {
     /** 站点名在 platform；跨服务只读面（ADR-017 §5.2）。缺席时退回订单上的点位名。 */
     private final ObjectProvider<SiteQueryPort> siteQuery;
 
-    public FreeOrderServiceImpl(OrdMapper mapper, NicknameQueryPort nicknames,
+    /** 「本月」是**业务日历**上的自然月，不是服务器时区的。见 BizClock。 */
+    private final BizClock clock;
+
+    public FreeOrderServiceImpl(BizClock clock, OrdMapper mapper, NicknameQueryPort nicknames,
                                 ObjectProvider<SiteQueryPort> siteQuery) {
+        this.clock = clock;
         this.mapper = mapper;
         this.nicknames = nicknames;
         this.siteQuery = siteQuery;
@@ -81,7 +86,7 @@ public class FreeOrderServiceImpl implements FreeOrderService {
      */
     @Override
     public FreeOrderStats stats() {
-        java.time.LocalDateTime monthStart = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+        java.time.LocalDateTime monthStart = clock.today().withDayOfMonth(1).atStartOfDay();  // 自然月按业务时区切，见 BizClock
         Long monthCount = mapper.selectCount(new LambdaQueryWrapper<OrdOrder>()
                 .isNotNull(OrdOrder::getFreeReason).ne(OrdOrder::getFreeReason, "")
                 .ge(OrdOrder::getCreatedAt, monthStart));

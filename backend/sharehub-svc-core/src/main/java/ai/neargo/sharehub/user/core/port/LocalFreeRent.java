@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import ai.neargo.sharehub.common.time.BizClock;
 
 /** {@link FreeRentPort} 的本地实现（单体内同进程）。 */
 @Component
@@ -23,7 +24,11 @@ public class LocalFreeRent implements FreeRentPort {
 
     private final UsrFreeWhitelistMapper mapper;
 
-    public LocalFreeRent(UsrFreeWhitelistMapper mapper) {
+    /** 白名单的 validFrom/validTo 是**业务日历**上的日期。见 BizClock。 */
+    private final BizClock clock;
+
+    public LocalFreeRent(UsrFreeWhitelistMapper mapper, BizClock clock) {
+        this.clock = clock;
         this.mapper = mapper;
     }
 
@@ -88,7 +93,7 @@ public class LocalFreeRent implements FreeRentPort {
                 .eq(UsrFreeWhitelist::getStatus, ACTIVE)
                 .orderByDesc(UsrFreeWhitelist::getId).last("limit 1"));
         if (w == null) return null;
-        LocalDate today = LocalDate.now();
+        LocalDate today = clock.today();   // 业务日历的今天 —— 用服务器时区会让白名单提前 4 小时失效
         LocalDate from = date(w.getValidFrom());
         LocalDate to = date(w.getValidTo());
         if (from != null && today.isBefore(from)) return null;   // 还没开始

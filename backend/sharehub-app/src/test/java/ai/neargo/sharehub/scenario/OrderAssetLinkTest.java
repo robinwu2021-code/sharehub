@@ -125,7 +125,7 @@ class OrderAssetLinkTest extends ApiTestSupport {
         String site = site("R-TEST");
         jdbc.update("INSERT INTO loc_contract (contract_no, tenant_id, venue_no, site_no, share_rate, start_at, end_at, status)"
                         + " VALUES (?, 'MAIN', (SELECT venue_no FROM loc_site WHERE site_no=?), ?, 0.2, ?, ?, 'ACTIVE')",
-                "CTA2" + rnd(), site, site, LocalDate.now().minusDays(1).toString(), LocalDate.now().plusYears(1).toString());
+                "CTA2" + rnd(), site, site, bizToday().minusDays(1).toString(), bizToday().plusYears(1).toString());
         String cab = "CBO" + rnd();
         cabinets.add(cab);
         jdbc.update("INSERT INTO dev_cabinet (cabinet_no, tenant_id, sn, vendor_code, device_type, site_no, slot_total, available_count, status,"

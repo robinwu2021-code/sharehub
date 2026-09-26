@@ -112,7 +112,7 @@ class ConsumerCouponCheckoutTest extends ApiTestSupport {
         String hisCoupon = coupon(other, cut("3"), null);
         String usedCoupon = coupon(mine, cut("3"), null);
         jdbc.update("UPDATE usr_coupon SET status='USED' WHERE coupon_no=?", usedCoupon);
-        String staleCoupon = coupon(mine, cut("3"), LocalDate.now().minusDays(1));
+        String staleCoupon = coupon(mine, cut("3"), bizToday().minusDays(1));
 
         for (String bad : List.of(hisCoupon, usedCoupon, staleCoupon, "CP-NOT-EXIST")) {
             assertThatThrownBy(() -> rents.rent(mine, cab, true, bad))
@@ -275,7 +275,7 @@ class ConsumerCouponCheckoutTest extends ApiTestSupport {
         String site = site();
         jdbc.update("INSERT INTO loc_contract (contract_no, tenant_id, venue_no, site_no, share_rate, start_at, end_at, status)"
                         + " VALUES (?, 'MAIN', (SELECT venue_no FROM loc_site WHERE site_no=?), ?, 0.2, ?, ?, 'ACTIVE')",
-                "CTCP" + rnd(), site, site, LocalDate.now().minusDays(1).toString(), LocalDate.now().plusYears(1).toString());
+                "CTCP" + rnd(), site, site, bizToday().minusDays(1).toString(), bizToday().plusYears(1).toString());
         String cab = "CBCP" + rnd();
         cabinets.add(cab);
         jdbc.update("INSERT INTO dev_cabinet (cabinet_no, tenant_id, sn, vendor_code, device_type, site_no, slot_total, available_count,"

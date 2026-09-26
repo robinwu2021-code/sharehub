@@ -249,6 +249,17 @@ class SiteAssetFlowTest extends ApiTestSupport {
 
     private void withdrawCloseAndSettle(String w) {
         String site = site("ACTIVE");
+        /*
+         * ⚠️ 这里刻意仍用 LocalDate.now()（JVM 时区），**不要换成 bizToday()**。
+         *
+         * 进场费按剩余天数折算（下面断言 3650 × 265 / 366），而算它的
+         * AdjustmentServiceImpl#onSiteClosed 里 `closed` 来自事件的 closedAt 时间戳
+         * —— 那是服务器时区。只把测试的合同日期挪到业务时区，两边就差一天，钱差一笔。
+         *
+         * 也就是说这个用例与 AdjustmentServiceImpl **必须一起改**，而那一处要先定
+         * 「closedAt 这个字符串是哪个时区的」才谈得上改 —— 算钱的路径上不能猜。
+         * 见 backend/known-localdate-now.txt 里 AdjustmentServiceImpl 那条。
+         */
         LocalDate start = LocalDate.now().minusDays(100), end = LocalDate.now().plusDays(265);
         contract(site, start, end);
         String cab = "CBC" + rnd();

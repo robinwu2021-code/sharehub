@@ -204,7 +204,7 @@ class DeviceLifecycleTest extends ApiTestSupport {
     private void contract(String site) {
         String venue = jdbc.queryForObject("SELECT venue_no FROM loc_site WHERE site_no=?", String.class, site);
         jdbc.update("INSERT INTO loc_contract (contract_no, tenant_id, venue_no, site_no, share_rate, start_at, end_at, status) VALUES (?, 'MAIN', ?, ?, 0.2, ?, ?, 'ACTIVE')",
-                "CTD" + rnd(), venue, site, LocalDate.now().minusDays(1).toString(), LocalDate.now().plusYears(1).toString());
+                "CTD" + rnd(), venue, site, bizToday().minusDays(1).toString(), bizToday().plusYears(1).toString());
     }
 
     private void signal(String cabinet, String type, Integer slot, String powerbank, Map<String, String> attrs) {

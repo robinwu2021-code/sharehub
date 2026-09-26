@@ -44,7 +44,7 @@ class DispatchInspectionTest extends ApiTestSupport {
     final List<String> cabinets = new ArrayList<>();
     final List<String> regions = new ArrayList<>();
     /** 固定在正午：营业时间 00:00-23:59 内。 */
-    final LocalDateTime t0 = LocalDate.now().atTime(12, 0);
+    final LocalDateTime t0 = bizToday().atTime(12, 0);
 
     @BeforeAll
     void tokens() {

@@ -111,7 +111,7 @@ class ReadWriteFieldNameParityTest extends ApiTestSupport {
         // 否则维度会是空的、根本走不到这条校验
         m.put("fixedAmount", 0.5);
         m.put("currency", "AED");
-        m.put("effectiveAt", java.time.LocalDate.now().toString());
+        m.put("effectiveAt", bizToday().toString());
         JsonNode created = post("/api/agent/commissions", m, admin).okData();
 
         assertThat(created.path("basis").asText())

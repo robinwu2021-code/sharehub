@@ -115,7 +115,7 @@ class FreeWhitelistBillingTest extends ApiTestSupport {
     void expiredOrRevokedWhitelistDoesNotApply() {
         String cab = liveCabinet();
         String expired = user(), revoked = user();
-        grant(expired, "VIP", "UNLIMITED", "0", null, LocalDate.now().minusDays(1));
+        grant(expired, "VIP", "UNLIMITED", "0", null, bizToday().minusDays(1));
         String wl = grant(revoked, "VIP", "UNLIMITED", "0", null, null);
         jdbc.update("UPDATE usr_free_whitelist SET status='REVOKED' WHERE whitelist_no=?", wl);
 
@@ -241,7 +241,7 @@ class FreeWhitelistBillingTest extends ApiTestSupport {
         String site = site();
         jdbc.update("INSERT INTO loc_contract (contract_no, tenant_id, venue_no, site_no, share_rate, start_at, end_at, status)"
                         + " VALUES (?, 'MAIN', (SELECT venue_no FROM loc_site WHERE site_no=?), ?, 0.2, ?, ?, 'ACTIVE')",
-                "CTFW" + rnd(), site, site, LocalDate.now().minusDays(1).toString(), LocalDate.now().plusYears(1).toString());
+                "CTFW" + rnd(), site, site, bizToday().minusDays(1).toString(), bizToday().plusYears(1).toString());
         String cab = "CBFW" + rnd();
         cabinets.add(cab);
         jdbc.update("INSERT INTO dev_cabinet (cabinet_no, tenant_id, sn, vendor_code, device_type, site_no, slot_total,"

@@ -47,7 +47,7 @@ class BusinessAlarmTest extends ApiTestSupport {
         ai.neargo.sharehub.support.FixtureCleanup.dropCabinets(jdbc, cabinets);
     }
     /** 固定在正午：营业时间 00:00-23:59 内，且不受真实时刻影响。 */
-    final LocalDateTime t0 = LocalDate.now().atTime(12, 0);
+    final LocalDateTime t0 = bizToday().atTime(12, 0);
 
     @BeforeAll
     void tokens() {
@@ -253,7 +253,7 @@ class BusinessAlarmTest extends ApiTestSupport {
     private void contract(String site) {
         String venue = jdbc.queryForObject("SELECT venue_no FROM loc_site WHERE site_no=?", String.class, site);
         jdbc.update("INSERT INTO loc_contract (contract_no, tenant_id, venue_no, site_no, share_rate, start_at, end_at, status) VALUES (?, 'MAIN', ?, ?, 0.2, ?, ?, 'ACTIVE')",
-                "CTA" + rnd(), venue, site, LocalDate.now().minusDays(1).toString(), LocalDate.now().plusYears(1).toString());
+                "CTA" + rnd(), venue, site, bizToday().minusDays(1).toString(), bizToday().plusYears(1).toString());
     }
 
     /** 已布放机柜，8 仓、1 块可借宝；online=false 时心跳写成 1 小时前（离线）。 */

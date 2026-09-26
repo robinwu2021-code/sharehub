@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import ai.neargo.sharehub.common.time.BizClock;
 
 /** {@link ContractQueryPort} 的本地实现。系统判定用，豁免数据范围。 */
 @Service
@@ -26,7 +27,11 @@ public class LocalContractQuery implements ContractQueryPort {
     private final LocMappers.ContractMapper contracts;
     private final LocMappers.SiteMapper sites;
 
-    public LocalContractQuery(LocMappers.ContractMapper contracts, LocMappers.SiteMapper sites) {
+    /** 合同期限是**业务日期**，到期提醒的窗口要按业务时区切。见 BizClock。 */
+    private final BizClock clock;
+
+    public LocalContractQuery(LocMappers.ContractMapper contracts, LocMappers.SiteMapper sites, BizClock clock) {
+        this.clock = clock;
         this.contracts = contracts;
         this.sites = sites;
     }
@@ -46,7 +51,7 @@ public class LocalContractQuery implements ContractQueryPort {
      */
     @Override
     public List<ContractBrief> expiringWithin(int days, int limit) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = clock.today();
         List<LocContract> due = DataScopeContext.executeWithoutScope(() -> contracts.selectList(new LambdaQueryWrapper<LocContract>()
                 .eq(LocContract::getStatus, ContractStatus.ACTIVE.name())
                 .between(LocContract::getEndAt, today.toString(), today.plusDays(days).toString())

@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import ai.neargo.sharehub.common.time.BizClock;
 
 /** {@link CouponUsePort} 的本地实现（单体内同进程，拆服务时换成远调即可）。 */
 @Component
@@ -24,7 +25,11 @@ public class LocalCouponUse implements CouponUsePort {
     private final UsrCouponMapper mapper;
     private final CouponTplMapper tplMapper;
 
-    public LocalCouponUse(UsrCouponMapper mapper, CouponTplMapper tplMapper) {
+    /** 券的有效期是**业务日历**上的日期，不能用服务器时区判。见 BizClock。 */
+    private final BizClock clock;
+
+    public LocalCouponUse(UsrCouponMapper mapper, CouponTplMapper tplMapper, BizClock clock) {
+        this.clock = clock;
         this.mapper = mapper;
         this.tplMapper = tplMapper;
     }
@@ -71,7 +76,7 @@ public class LocalCouponUse implements CouponUsePort {
         if (expireAt == null || expireAt.isBlank()) return false;   // 空=不限期
         try {
             return LocalDate.parse(expireAt.substring(0, Math.min(10, expireAt.length())))
-                    .isBefore(LocalDate.now());
+                    .isBefore(clock.today());   // 业务日历的今天，见 BizClock
         } catch (DateTimeParseException | StringIndexOutOfBoundsException ex) {
             log.warn("券有效期字面量无法解析，按不过期处理 expireAt={}", expireAt);
             return false;

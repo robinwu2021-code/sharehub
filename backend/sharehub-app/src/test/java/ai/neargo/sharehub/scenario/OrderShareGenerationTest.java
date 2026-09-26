@@ -50,7 +50,7 @@ class OrderShareGenerationTest extends ApiTestSupport {
 
     private OrderSettledEvent event(String orderNo, BigDecimal gross) {
         return new OrderSettledEvent(orderNo, CABINET, SITE, AGENT, gross, "AED",
-                LocalDate.now().toString().substring(0, 7));
+                bizToday().toString().substring(0, 7));
     }
 
     private JsonNode sharesOf(String orderNo, String admin) {
@@ -107,7 +107,7 @@ class OrderShareGenerationTest extends ApiTestSupport {
         // 机柜没绑点位/站点时，「这笔钱本该分给谁」没人知道。跳过并留痕，不能抛异常
         // 把整条归还链路带崩 —— 用户已经把充电宝还回去了。
         OrderSettledEvent orphan = new OrderSettledEvent(orderNo("O"), CABINET, null, null,
-                new BigDecimal("50.00"), "AED", LocalDate.now().toString().substring(0, 7));
+                new BigDecimal("50.00"), "AED", bizToday().toString().substring(0, 7));
         assertThat(generator.generate(orphan)).isZero();
     }
 
@@ -125,7 +125,7 @@ class OrderShareGenerationTest extends ApiTestSupport {
 
     private OrderSettledEvent eventAt(String site, String orderNo, BigDecimal gross) {
         return new OrderSettledEvent(orderNo, CABINET, site, null, gross, "AED",
-                LocalDate.now().toString().substring(0, 7));
+                bizToday().toString().substring(0, 7));
     }
 
     /** 建一条带依据的分润规则，返回规则号。 */
@@ -237,7 +237,7 @@ class OrderShareGenerationTest extends ApiTestSupport {
         // ST303 没有 agent_no，故 V52 没给它回填责任行；事件自带 agentNo 走回落分支
         String no = orderNo("B");
         OrderSettledEvent e = new OrderSettledEvent(no, CABINET, "ST303", AGENT,
-                new BigDecimal("100.00"), "AED", LocalDate.now().toString().substring(0, 7));
+                new BigDecimal("100.00"), "AED", bizToday().toString().substring(0, 7));
         generator.generate(e);
 
         JsonNode agent = null;

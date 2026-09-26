@@ -1,0 +1,55 @@
+# 直调 LocalDate.now() 台账 —— 只准变短，且**每次变化都要改数字**（在 review 里显形）。
+#
+# 由 BizDateFromBizClockTest 卡住：格式 `类名 处数`，按类**精确相等**比对。
+# 精确相等而不是「不超过」：同一个类里删一处又加一处会互相抵消，那样棘轮就是摆设。
+#
+# ───────────────────────────────────────────────────────────────
+# 为什么直调是错的
+#
+# LocalDate.now() 取的是**服务器 JVM 时区**。生产实测跑在 Asia/Shanghai
+# (-Duser.timezone=Asia/Shanghai)，而业务在阿联酋（sharehub.biz-zone=Asia/Dubai）。
+# 于是每天有 4 小时 —— 迪拜 20:00 到午夜，正是租借高峰 —— 它比业务「今天」早一天。
+#
+# 已经造成过的后果（2026-09-27 查出）：
+#   · 有效期到 9-30 的券，迪拜 9-30 20:00 起判为过期 —— 用户看得见、又说不出所以然的损失
+#   · 合同签署撞上「日期不能晚于今天」，10 条用例同时红
+#
+# 这类缺陷**每天自己好一次**：过了那 4 小时再跑就全绿。于是它看起来像偶发抖动，
+# 最坏的情况是有人为了「修」它去放宽服务端校验 —— 那是把真约束拆掉，
+# 换来一个永远不会红的测试。
+#
+# 业务日期一律走 BizClock#today()。什么算业务日期：会被人在业务日历上核对的东西
+# （合同生效/终止日、券有效期、免费额度的自然月、结算归属期间）。
+# ───────────────────────────────────────────────────────────────
+
+# （报表不在台账里：ReportConfig / ReportServiceImpl 提到 LocalDate.now() 的地方
+#   **只在注释里** —— 真实代码早就注入 Clock.systemUTC() 了。本卡口扫描前会剥注释。）
+
+# —— 钱：口径要先定，不是改个时区就对 ——
+RentOrderServiceImpl 1      # 分润归属 period。注释写着「按**结算时刻**定格，不用『今天』」，
+                            # 而下一行就是 LocalDate.now() —— 两层错。改对要先定哪个时间戳权威：
+                            # ord_order.endedAt 是 LocalDateTime（服务器时区写入），
+                            # rentEndAt 是 UTC 字符串 —— **数据本身就是混的**。待拍板。
+ReferFeeGeneratorImpl 2     # 推荐费的 onDate 与 period。同上，跨月会记进错的月份。待拍板。
+AdjustmentServiceImpl 1     # 撤场结清时 `closed` 的兜底日 —— 进场费按**剩余天数**折算，差一天就差一笔钱。
+                            # 改对要先定「事件里的 closedAt 字符串是哪个时区的」：合同的 startAt/endAt
+                            # 是业务日期，而 closedAt 是时间戳 —— 只挪一边，两边就差一天。
+                            # ⚠️ 与 SiteAssetFlowTest#withdrawCloseAndSettle **绑在一起**：
+                            # 2026-09-27 只把那个用例的日期换成 bizToday()，断言的 3650×265/366 当场变成
+                            # 3650×264/366 而红。所以那个用例刻意仍用 LocalDate.now()，那里写了原因。
+                            # 两处必须同时改，且改之前先定 closedAt 的时区口径 —— 算钱的路径上不能猜。
+
+# —— 统计窗口：偏一天只影响显示，不影响钱 ——
+AlarmServiceImpl 3          # 今日已闭环数 / 近 7 天 / 近 N 天
+SharingQueryService 2       # 今日 + 近 30 天
+OperationOverviewService 2  # 概览的默认 to
+NotifyLogServiceImpl 1      # 今日发送量
+OpsFlowMetricsController 1  # 默认 to = 明天
+
+# —— 其它 ——
+InternalJobController 1     # bizDate 缺省取昨天 —— 任务口径，与调度器的时区约定一起定
+JobInvocation 1             # 手动触发任务时 bizDate 取昨天。与上一条是同一个口径问题：
+                            # 「昨天」相对哪个时区？手动跑与定时跑必须算同一个日子，
+                            # 否则对不上账（那个类的注释正是这么写的）。与调度器一起定。
+LeadOpsServiceImpl 1        # 商机转站点时的默认开始日
+DemoOpsFinanceSeeder 3      # 演示种子数据，不是生产路径

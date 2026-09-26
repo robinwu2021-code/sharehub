@@ -116,7 +116,7 @@ class ConsumerPayAmountTest extends ApiTestSupport {
                 + " VALUES (?, 'MAIN', ?, ?, 'ACTIVE', '00:00-23:59', 'R-TEST')", site, venue, "支付金额测试站点 " + site);
         jdbc.update("INSERT INTO loc_contract (contract_no, tenant_id, venue_no, site_no, share_rate, start_at, end_at, status)"
                         + " VALUES (?, 'MAIN', ?, ?, 0.2, ?, ?, 'ACTIVE')",
-                "CTPA" + rnd(), venue, site, LocalDate.now().minusDays(1).toString(), LocalDate.now().plusYears(1).toString());
+                "CTPA" + rnd(), venue, site, bizToday().minusDays(1).toString(), bizToday().plusYears(1).toString());
         String cab = "CBPA" + rnd();
         cabinets.add(cab);
         jdbc.update("INSERT INTO dev_cabinet (cabinet_no, tenant_id, sn, vendor_code, device_type, site_no, slot_total,"
