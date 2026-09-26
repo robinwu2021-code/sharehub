@@ -151,7 +151,19 @@ class StoredValueInVocabularyTest extends ApiTestSupport {
              * `share_record.agent_no` 同理，而编号本身恰好也是大写形，于是被误伤。
              * 实测全库覆盖 151 列里只有这两个 `_no`，排掉不丢任何真枚举列。
              */
-            boolean businessNumber = column.endsWith("_no");
+            /*
+             * `xxx_ref` 同理，而且更整齐：全库 14 个 `_ref` 列**一个都不是状态列**
+             * （cred_ref / disposition_ref / holder_ref / source_ref / pay_ref …
+             * 装的全是别的单据的业务键）。其中三个的注释提的是**配对那一列**的词表：
+             * `inv_transfer.from_ref` 写着「配合 from_type 解释（WAREHOUSE/SITE/LOCATION）」，
+             * `price_rule_deprecated_v1.match_ref` 与 `price_plan_scope.scope_ref` 也是 ——
+             * 于是里面装的 `WH0001` 这种业务键被判成「不在词表里」。
+             * 2026-09-26 实测撞到 from_ref 那一个；一并排掉另两个将来会撞的。
+             * **代价量过**：覆盖 213 → 212 列，少的那一列正是 `inv_transfer.from_ref`
+             * （另外 13 个 `_ref` 列本来就没被计入 —— 表是空的或值不是大写形）。
+             * 也就是说排掉它不丢任何真枚举列，只少了一个本来就在误报的。
+             */
+            boolean businessNumber = column.endsWith("_no") || column.endsWith("_ref");
             if (businessNumber) continue;
             if (!CLASSIC_NAMES.contains(column) && !looksLikeEnum) continue;
             checked++;

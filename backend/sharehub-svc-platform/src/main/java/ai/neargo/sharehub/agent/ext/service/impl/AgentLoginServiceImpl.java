@@ -1,6 +1,7 @@
 package ai.neargo.sharehub.agent.ext.service.impl;
 
 import ai.neargo.sharehub.agent.apply.service.OtpGate;
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.agent.ext.AccountStatus;
 import ai.neargo.sharehub.agent.ext.entity.AgtAccount;
 import ai.neargo.sharehub.agent.ext.entity.AgtPrincipal;
@@ -75,7 +76,17 @@ public class AgentLoginServiceImpl implements AgentIdentityPort {
         }
         try {
             otpGate.verify(phone, otp);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException | BizException e) {
+            /*
+             * **必须同时接 BizException**：2026-09-25 的 i18n 批次把 OtpService 的
+             * IllegalArgumentException 换成了 BizException，而这个 catch 只接前者 ——
+             * 于是「码不对」直接以 `error.otp.invalid`（「验证码错误或已过期」）冒出去，
+             * 而「号不存在」仍回 LOGIN_FAILED。**两句话不一样，账号枚举防护当场失效**。
+             *
+             * 这正是「改了被 catch 的异常类型，catch 静默失配」那一类：不报错、不编译失败，
+             * 只是那道防护没了。`AgentLoginFlowTest` 从那天起一直红着。
+             * 往后要改 OtpGate 的抛出类型，先看这里。
+             */
             throw new IllegalArgumentException(LOGIN_FAILED);
         }
         return p.getPrincipalNo();
