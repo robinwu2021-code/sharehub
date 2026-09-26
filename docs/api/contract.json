@@ -303,7 +303,7 @@
     "agent:agent:read"
    ],
    "handler": "AgentController#agents",
-   "summary": "agt 域运营端端点（ADR-012 代理商）：薄控制器——路由 +",
+   "summary": "",
    "params": [
     {
      "in": "query",
@@ -364,6 +364,18 @@
     {
      "name": "archivedAt",
      "type": "String"
+    },
+    {
+     "name": "contactName",
+     "type": "String"
+    },
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "email",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -418,6 +430,18 @@
     {
      "name": "archivedAt",
      "type": "String"
+    },
+    {
+     "name": "contactName",
+     "type": "String"
+    },
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "email",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -455,6 +479,18 @@
     },
     {
      "name": "archivedAt",
+     "type": "String"
+    },
+    {
+     "name": "contactName",
+     "type": "String"
+    },
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "email",
      "type": "String"
     }
    ]
@@ -516,6 +552,18 @@
     {
      "name": "archivedAt",
      "type": "String"
+    },
+    {
+     "name": "contactName",
+     "type": "String"
+    },
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "email",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -553,6 +601,18 @@
     },
     {
      "name": "archivedAt",
+     "type": "String"
+    },
+    {
+     "name": "contactName",
+     "type": "String"
+    },
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "email",
      "type": "String"
     }
    ]
@@ -693,6 +753,52 @@
    ]
   },
   {
+   "verb": "POST",
+   "path": "/api/agent/agents/{agentNo}/login-account",
+   "perm": "agent:account:manage",
+   "perms": [
+    "agent:account:manage"
+   ],
+   "handler": "AgentController#grantLogin",
+   "summary": "给代理商开通代理端登录。",
+   "params": [
+    {
+     "in": "path",
+     "name": "agentNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "ai.neargo.sharehub.agent.dto.AgentDtos.GrantLoginReq",
+   "returnType": "GrantLoginResult",
+   "returnContainer": null,
+   "returnElement": "GrantLoginResult",
+   "responseShape": [
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "accountNo",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "email",
+     "type": "String"
+    },
+    {
+     "name": "displayName",
+     "type": "String"
+    }
+   ]
+  },
+  {
    "verb": "GET",
    "path": "/api/agent/agents/{agentNo}/ops-assessments",
    "perm": "agent:performance:read",
@@ -724,7 +830,7 @@
     "agent:agent:update"
    ],
    "handler": "AgentController#archiveAgent",
-   "summary": "归档Agent。",
+   "summary": "开通结果：成员关系号（`agt_account.account_no`）。",
    "params": [
     {
      "in": "path",
@@ -45630,10 +45736,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 515,
-  "records": 465,
-  "withPerm": 444,
-  "withBody": 219,
-  "shapedResponses": 406
+  "endpoints": 516,
+  "records": 467,
+  "withPerm": 445,
+  "withBody": 220,
+  "shapedResponses": 407
  }
 }

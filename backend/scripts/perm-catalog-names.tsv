@@ -4,6 +4,7 @@
 agent:*	代理商 全部	agent	0
 agent:account:manage	代理账号 开通/停用	agent	1
 agent:agent:read	代理商 查看	agent	1
+agent:agent:create	代理商 新增	agent	1
 agent:agent:update	代理商 编辑	agent	1
 agent:apply:approve	代理入驻申请 审核	agent	1
 agent:apply:create	代理入驻申请 代录	agent	1

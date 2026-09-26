@@ -18,8 +18,12 @@ public class AgentController {
 
     private final AgentService service;
 
-    public AgentController(AgentService service) {
+    private final ai.neargo.sharehub.agent.ext.service.AgentMembershipService membership;
+
+    public AgentController(AgentService service,
+                           ai.neargo.sharehub.agent.ext.service.AgentMembershipService membership) {
         this.service = service;
+        this.membership = membership;
     }
 
     @GetMapping
@@ -56,6 +60,38 @@ public class AgentController {
     @PreAuthorize("@perm.can('agent:agent:update')")
     public Agent update(@PathVariable String agentNo, @RequestBody Agent in) {
         return service.save(agentNo, in);
+    }
+
+    /**
+     * 给代理商开通代理端登录。
+     *
+     * <p><b>为什么需要这个端点</b>：登录链是
+     * {@code 手机号 → agt_principal.phone_hash → agt_account.principal_no → agent_no}，
+     * 而运营端建出来的代理商**一个 principal 都没有** —— 建得出、划得了资产、配得了分润，
+     * 唯独那个代理商自己永远进不来，且不报错（见 docs/technical/梳理-代理商域.md §四）。
+     *
+     * <p>用档案上的联系手机开通（V123 拆出来的那个）。
+     * <b>档案手机 ≠ 登录方式</b>：这里是把前者灌进后者一次，此后两者各走各的 ——
+     * 改档案电话不会改登录方式（改登录要走换绑，另一条流程）。
+     *
+     * <p>判 {@code agent:account:manage} 而不是 {@code agent:agent:update}：
+     * 这件事的实质是「开一个能登录的账号」，与改档案是两种授权。
+     */
+    @PostMapping("/{agentNo}/login-account")
+    @PreAuthorize("@perm.can('agent:account:manage')")
+    public GrantLoginResult grantLogin(
+            @PathVariable String agentNo,
+            @RequestBody(required = false) ai.neargo.sharehub.agent.dto.AgentDtos.GrantLoginReq body) {
+        // 三项都可不传 —— 服务层回落到主体档案上的联系手机 / 邮箱 / 联系人
+        String accountNo = membership.grantOwner(agentNo,
+                body == null ? null : body.phone(),
+                body == null ? null : body.email(),
+                body == null ? null : body.displayName());
+        return new GrantLoginResult(agentNo, accountNo);
+    }
+
+    /** 开通结果：成员关系号（{@code agt_account.account_no}）。 */
+    public record GrantLoginResult(String agentNo, String accountNo) {
     }
 
     /**

@@ -12,7 +12,22 @@ import lombok.EqualsAndHashCode;
 public class AgtAgent extends BaseEntity implements ai.neargo.sharehub.common.crud.Archivable {
     private String agentNo;
     private String name;
+    /**
+     * retired（V123）：已拆成 {@link #contactName}/{@link #phone}/{@link #email}。
+     * 形状不明的存量留在这里待人工归位，**不要再读写它**。
+     */
     private String contact;
+
+    /** 联系人姓名。 */
+    private String contactName;
+    /**
+     * 联系手机 —— **业务联系方式，不是登录身份**。
+     * 谁能登录代理端看 {@code agt_principal.phone_hash}；开通登录时从这里灌一次过去，
+     * 此后两者各走各的（改这里不会改登录方式）。
+     */
+    private String phone;
+    /** 联系邮箱，同上。 */
+    private String email;
     private String regionScope;
 
     /**

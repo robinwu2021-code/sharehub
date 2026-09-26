@@ -248,7 +248,7 @@ class AgentOpsTest extends ApiTestSupport {
     // —— 夹具 ——
 
     private void setStatus(String ag, String status) {
-        agentService.save(ag, new Agent(ag, "测试代理 " + ag, "联系人", null, "AGENT", 0.1, 0, status, null));
+        agentService.save(ag, new Agent(ag, "测试代理 " + ag, null, null, "AGENT", 0.1, 0, status, null, "联系人", null, null));
     }
 
     private String agent() {

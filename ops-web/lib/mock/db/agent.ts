@@ -384,3 +384,34 @@ export const removeSiteAgent = (siteNo: string, id: number) => {
   siteAgents.splice(at, 1);
   return { ok: true };
 };
+
+/**
+ * 开通代理端登录（mock）。
+ *
+ * 真后端做两件事：建 `agt_principal`（自然人，按 phone_hash 查重、命中则复用）
+ * + 建 `agt_account`（成员关系，`is_owner=1`）。
+ *
+ * ⚠️ **mock 没有自然人表**，所以它只落得下成员关系这一半 ——
+ * 「同一个人服务多家主体时复用同一个自然人」这条规则在 mock 里验不了，
+ * 权威用例在后端 `AgentGrantLoginTest`。这里保证的是两件能验的事：
+ * 没有联系手机时**拒**，以及重复点**幂等**。
+ */
+export function grantAgentLogin(agentNo: string) {
+  const a = agents.find((x) => x.agentNo === agentNo);
+  if (!a) notFound("代理商", "Agent", agentNo);
+  if (!a!.phone?.trim()) {
+    fail(`代理商 ${agentNo} 档案里没有联系手机，先补上再开通登录`,
+      `Agent ${agentNo} has no contact phone on file; add one before granting login`);
+  }
+  // 幂等：重复点不该建出第二行（真后端靠 uk_agt_account_member，这里按归属 + 登录手机判）
+  const exist = agentAccounts.find((x) => x.agentNo === agentNo && x.loginPhone === a!.phone);
+  if (exist) return { agentNo, accountNo: exist.accountNo };
+  const acc = saveAgentAccount({
+    agentNo,
+    agentName: a!.name,
+    username: a!.contactName || a!.name,
+    loginPhone: a!.phone!,
+    status: "ACTIVE",
+  });
+  return { agentNo, accountNo: acc.accountNo };
+}

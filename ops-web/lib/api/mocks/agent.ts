@@ -33,6 +33,8 @@ export const agentMock: AgentApi = {
     return wait(merged, 350);
   },
 
+  grantAgentLogin: (no) => wait(db.grantAgentLogin(no), 350),
+
   // 代理商扩展
   listAgentAssignments: (q: PageQ = {}) => wait(db.listAgentAssignments(q)),
   listAgentPerformance: (q: ReportQ = {}) => wait(db.listAgentPerformance(q)),

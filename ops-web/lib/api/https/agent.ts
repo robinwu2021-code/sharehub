@@ -41,6 +41,7 @@ function toAssignmentRecord(r: AssignmentLogRaw): AgentAssignmentRecord {
 export const agentHttp: AgentApi = {
   listAgents: (q?: ArchiveQ) => client.get("/api/agent/agents", q),
   saveAgent: (a) => client.post(a.agentNo ? `/api/agent/agents/${a.agentNo}` : "/api/agent/agents", a),
+  grantAgentLogin: (no) => client.post(`/api/agent/agents/${no}/login-account`, {}),
 
   // 代理商扩展
   listAgentAssignments: (q?: PageQ) => client.get("/api/agent/assignments", q),

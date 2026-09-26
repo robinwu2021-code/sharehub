@@ -20,13 +20,39 @@ export type AgentStatus = "ENABLED" | "SUSPENDED";
 export interface Agent extends Archivable {
   agentNo: string;
   name: string;
-  contact: string;
+  /**
+   * retired（V123）：已拆成 contactName / phone / email。
+   * 形状不明的存量（如「Ali +971500001234」）还留在这里待人工归位，**不要再往它写**。
+   */
+  contact?: string | null;
+  /** 联系人姓名。 */
+  contactName?: string | null;
+  /**
+   * 联系手机 —— **业务联系方式，不是登录身份**。
+   * 谁能登录代理端看 `agt_principal.phone_hash`；「开通登录」时从这里灌一次过去，
+   * 此后两者各走各的（改这里不会改登录方式）。
+   */
+  phone?: string | null;
+  /** 联系邮箱，同上。 */
+  email?: string | null;
   regionScope: string;
   /** 登记类型；存量与缺省为 `AGENT`。 */
   agentType: AgentType;
   shareRate: number; // 默认分润比例 0..1
   cabinetCount: number;
   status: AgentStatus;
+}
+
+/**
+ * 开通代理端登录的结果。
+ *
+ * **具名而不是内联对象**：跨端对齐卡口按类型名配对，内联的配不上 ——
+ * 后端 `GrantLoginResult` 改了字段，前端这边不会有任何人提醒。
+ */
+export interface GrantLoginResult {
+  agentNo: string;
+  /** 成员关系号（`agt_account.account_no`）。 */
+  accountNo: string;
 }
 
 // —— 入驻申请（ADR-030 §三）——

@@ -72,13 +72,18 @@ public class AgentServiceImpl implements AgentService {
             // 前者直接决定分多少钱，后者决定这个代理还能不能开展业务 ——
             // 「他什么时候被停用的、谁停的」是争议里必问的。
             AuditChanges.record("名称", e.getName(), in.name());
-            AuditChanges.record("联系人", e.getContact(), in.contact());
+            AuditChanges.record("联系人", e.getContactName(), in.contactName());
+            AuditChanges.record("联系手机", e.getPhone(), in.phone());
+            AuditChanges.record("联系邮箱", e.getEmail(), in.email());
             AuditChanges.record("分成比例", e.getShareRate(), in.shareRate());
             AuditChanges.record("类型", e.getAgentType(), AgentType.of(in.agentType()).name());
             AuditChanges.record("状态", e.getStatus(), in.status() == null ? "ENABLED" : in.status());
         }
         e.setName(in.name());
-        e.setContact(in.contact());
+        // contact 已退役（V123）：不再从写入面接收，存量留在库里待人工归位
+        e.setContactName(in.contactName());
+        e.setPhone(in.phone());
+        e.setEmail(in.email());
         e.setRegionScope(ai.neargo.sharehub.agent.RegionScopeJson.toJson(in.regionScope()));
         // 不传 = 不改（新建时按 0，配规则之前本来就没有默认分润）
         if (in.shareRate() != null) e.setShareRate(in.shareRate());
@@ -121,7 +126,8 @@ public class AgentServiceImpl implements AgentService {
                  * 机柜数：platform 算不出（dev_cabinet 属于 core），**给 0 而不是假装有值**。
                  * 代理商的真实机柜数在「设备/点位划拨」页按关系现算。
                  */
-                0, e.getStatus(), e.getArchivedAt() == null ? null : e.getArchivedAt().toString());
+                0, e.getStatus(), e.getArchivedAt() == null ? null : e.getArchivedAt().toString(),
+                e.getContactName(), e.getPhone(), e.getEmail());
     }
 
     // ── 归档 / 取消归档（前端契约 Archivable）──

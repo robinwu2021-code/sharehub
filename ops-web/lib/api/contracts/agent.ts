@@ -1,7 +1,7 @@
 // 覆盖范围：代理商主档、区域分配、业绩、资金账户、分润规则。
 import type { PageQ, ArchiveQ, AssignmentRecordQ, AssignableAssetQ , ReportQ, ApplyQ } from "../query";
 import type {
-  PageResult, Agent, AgentAssignment, AgentPerformance, AgentAccount, AgentCommission,
+  PageResult, Agent, AgentAssignment, AgentPerformance, AgentAccount, AgentCommission, GrantLoginResult,
   AgentAssignmentRecord, AssignableAsset, AssignAssetsPayload, ReclaimAssetsPayload,
   AgentApply, ApplyStatus, OperatorType, MyApplyView,
   AgentExit, AgentOpsAssessment, Checklist,
@@ -10,6 +10,16 @@ import type {
 export interface AgentApi {
   listAgents(q?: ArchiveQ): Promise<PageResult<Agent>>;
   saveAgent(a: Partial<Agent> & { agentNo?: string }): Promise<Agent>;
+  /**
+   * 给代理商开通代理端登录（`agent:account:manage`）。
+   *
+   * 用档案上的联系手机建自然人 + 属主成员关系 —— 在此之前运营端建出来的代理商
+   * **一个 principal 都没有**，登录链断在那里，而且不报错。
+   * 幂等：已开通时返回既有的成员关系号。
+   *
+   * ⚠️ 档案手机 ≠ 登录方式：这里是把前者灌进后者一次，之后改档案电话不会改登录方式。
+   */
+  grantAgentLogin(agentNo: string): Promise<GrantLoginResult>;
 
   // === 代理商扩展 tab ===
   listAgentAssignments(q?: PageQ): Promise<PageResult<AgentAssignment>>;

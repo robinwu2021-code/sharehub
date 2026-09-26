@@ -30,8 +30,20 @@ public final class AgentDtos {
      *（名下有几台机柜，服务端现算、保存时不回写），要求调用方带上它等于
      * 让人填一个填了也不算数的数。
      */
+    /**
+     * 开通代理端登录的入参。**三项都可不传** —— 不传就用主体档案上的联系手机 / 邮箱 / 联系人，
+     * 那是常态；让调用方再抄一遍只会抄错。
+     *
+     * <p>用 record 而不是裸 {@code Map}：裸 Map 等于没有契约，
+     * 前端发错键名不报错、只是那一项静默为空（`MapRequestBodyRatchetTest` 盯这件事）。
+     */
+    public record GrantLoginReq(String phone, String email, String displayName) {
+    }
+
     public record Agent(String agentNo, String name, String contact, String regionScope,
                        String agentType, Double shareRate, Integer cabinetCount, String status,
-                       String archivedAt) {
+                       String archivedAt,
+                       /* V123：联系方式从自由文本 contact 拆出来。contact 已退役，仅带出待归位的存量 */
+                       String contactName, String phone, String email) {
     }
 }

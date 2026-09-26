@@ -9,6 +9,7 @@ import { PageTitle, Pagination } from "@/components/ui/misc";
 import { usePaging } from "@/lib/hooks/use-paging";
 import { useNavTabs, usePageTab } from "@/lib/hooks/use-page-tab";
 import { Input, Select } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { TabHeader } from "@/components/ui/tab-header";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Drawer, Field } from "@/components/ui/drawer";
@@ -383,6 +384,22 @@ function AgentsInner() {
     mutationFn: (a: Partial<Agent>) => api.saveAgent(a),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["agents"] }); setEdit(null); },
   });
+  /**
+   * 开通代理端登录。
+   *
+   * 在此之前运营端建出来的代理商**一个自然人都没有** —— 登录链
+   * `手机号 → agt_principal.phone_hash → agt_account.principal_no → agent_no`
+   * 断在第一环，而且建得出、划得了资产、配得了分润，唯独那个代理商自己进不来，
+   * 两处都不报错（见 docs/technical/梳理-代理商域.md §四）。
+   */
+  const grantLogin = useMutation({
+    mutationFn: (no: string) => api.grantAgentLogin(no),
+    onSuccess: (r) => {
+      notify.success(`已开通登录，成员关系 ${r.accountNo}`);
+      qc.invalidateQueries({ queryKey: ["agent-accounts"] });
+    },
+    onError: (e: Error) => notify.error(e.message),
+  });
   const saveAccount = useMutation({
     mutationFn: (a: Partial<AgentAccount>) => api.saveAgentAccount(a),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["agent-accounts"] }); notify.success("保存成功"); setAccountForm(null); },
@@ -499,7 +516,12 @@ function AgentsInner() {
     { header: "名称", cell: (a) => a.name },
     { header: "类型", className: "whitespace-nowrap", cell: (a) => <StatusBadge map={AGENT_TYPE} value={a.agentType ?? "AGENT"} /> },
     { header: "辖域", cell: (a) => <span className="text-muted-foreground">{a.regionScope}</span> },
-    { header: "联系方式", cell: (a) => <span className="text-muted-foreground">{a.contact}</span> },
+    { header: "联系方式", cell: (a) => (
+      <span className="text-muted-foreground">
+        {a.contactName && <span className="me-1.5">{a.contactName}</span>}
+        <span className="tabular-nums">{a.phone ?? a.contact ?? "-"}</span>
+      </span>
+    ) },
     { header: "分润比例", className: "text-right", cell: (a) => <span className="tabular-nums">{(a.shareRate * 100).toFixed(0)}%</span> },
     { header: "设备数", className: "text-right", cell: (a) => <span className="tabular-nums">{a.cabinetCount}</span> },
     // 状态只由详情里的动作改（停用 / 恢复 / 清退，规则 R1）；这里只显示
@@ -515,6 +537,29 @@ function AgentsInner() {
           actions={<>
             <Button size="sm" variant="outline" onClick={() => openAgent(a.agentNo)}>详情</Button>
             <Button size="sm" variant="outline" onClick={() => open(a)}>配置</Button>
+            {/*
+              手机号与邮箱**两个都要**：agt_principal 的 phone_hash 与 email_hash
+              都是 NOT NULL + UNIQUE，自然人有两个登录标识，缺一个这行建不出来
+              （与入驻申请一致，那边也是两者必填）。
+              缺了就禁用并在 title 里说清楚 —— 按钮能点却必被服务端拒，是最没用的那种反馈。
+            */}
+            {allow("agent:account:manage") && (() => {
+              const missing = [!a.phone && "联系手机", !a.email && "联系邮箱"].filter(Boolean);
+              return (
+                <Button
+                  size="sm" variant="outline" disabled={grantLogin.isPending || missing.length > 0}
+                  title={missing.length ? `先在「配置」里补上${missing.join("与")}` : ""}
+                  onClick={async () => {
+                    if (await confirm({
+                      title: `给 ${a.name} 开通代理端登录`,
+                      desc: `用档案上的 ${a.phone} 与 ${a.email} 建登录身份。已开通过则不会重复建。`
+                        + "注意：此后改档案里的手机或邮箱，不会改登录方式。",
+                      confirmText: "开通",
+                    })) grantLogin.mutate(a.agentNo);
+                  }}
+                >开通登录</Button>
+              );
+            })()}
           </>}
           // 代理商是主数据：要求手输代理编号确认
           onArchive={async () => { if (await confirm(archiveConfirm("代理商", a.agentNo, a.agentNo))) archiveAgent.mutate(a.agentNo); }}
@@ -755,16 +800,12 @@ function AgentsInner() {
                   .map((k) => ({ value: k, label: APPLY_STATUS[k].label })),
               ]}
             />
-            <Input
-              type="date" aria-label="提交起始日"
-              value={applyFrom}
-              onChange={(e) => { setApplyFrom(e.target.value); paging.reset(); }}
-            />
-            <Input
-              type="date" aria-label="提交截止日"
-              value={applyTo}
-              onChange={(e) => { setApplyTo(e.target.value); paging.reset(); }}
-            />
+            {/* 日期区间的全站写法：DateInput + w-40 + 中间一个 ~（见 finance / devices 两页） */}
+            <DateInput className="w-40" aria-label="提交起始日"
+              value={applyFrom} onChange={(e) => { setApplyFrom(e.target.value); paging.reset(); }} />
+            <span className="text-muted-foreground">~</span>
+            <DateInput className="w-40" aria-label="提交截止日"
+              value={applyTo} onChange={(e) => { setApplyTo(e.target.value); paging.reset(); }} />
           </Toolbar>
           <DataTable
             rows={appliesQ.data?.list ?? []}
@@ -899,7 +940,16 @@ function AgentsInner() {
           </Select>
         </Field>
         <Field label="辖域"><Input value={form.regionScope ?? ""} onChange={(e) => setForm({ ...form, regionScope: e.target.value })} /></Field>
-        <Field label="联系方式"><Input value={form.contact ?? ""} onChange={(e) => setForm({ ...form, contact: e.target.value })} /></Field>
+        {/*
+          联系方式拆成三格（V123）。原先是一个自由文本框，生产 9 条里**全是纯手机号** ——
+          联系人是谁、邮箱是什么无处可放，而「开通代理端登录」要的恰恰是**结构化的手机号**
+          （自由文本里可能是「Ali +971500001234」，取不出来）。
+        */}
+        <Field label="联系人"><Input value={form.contactName ?? ""} onChange={(e) => setForm({ ...form, contactName: e.target.value })} placeholder="姓名" /></Field>
+        <Field label="联系手机">
+          <Input value={form.phone ?? ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+9715xxxxxxx" />
+        </Field>
+        <Field label="联系邮箱"><Input value={form.email ?? ""} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="partner@example.ae" /></Field>
         <Field label="默认分润比例（%）">
           <Input type="number" value={form.shareRate != null ? Math.round(form.shareRate * 100) : ""} onChange={(e) => setForm({ ...form, shareRate: Number(e.target.value) / 100 })} />
         </Field>

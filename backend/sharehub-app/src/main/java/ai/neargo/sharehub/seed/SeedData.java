@@ -238,11 +238,15 @@ public class SeedData {
         for (int i = 0; i < 9; i++) {
             agents.add(new Agent("AG" + String.format("%03d", i + 1),
                     p(List.of("North Hub", "Marina Partner", "Deira Agent", "Airport Ops", "JBR Franchise"), i),
-                    "+9715" + first7(6000000 + i * 271), p(REGIONS, i),
+                    // contact 已退役（V123）：联系方式走下面的 contactName/phone/email
+                    null, p(REGIONS, i),
                     // 演示数据里两种类型都出现，页面上能看出区别（ADR-027）
                     i % 3 == 0 ? "CITY_PARTNER" : "AGENT",
                     p(agentRates, i), 4 + i * 3,
-                    i % 6 == 0 ? "SUSPENDED" : "ENABLED", null));
+                    i % 6 == 0 ? "SUSPENDED" : "ENABLED", null,
+                    p(List.of("Ali Hassan", "Omar Khan", "Sara Ahmed"), i),
+                    "+9715" + first7(6000000 + i * 271),
+                    "agent" + (i + 1) + "@partner.ae"));
         }
 
         // —— 员工（20）/ 角色（7）/ 审计（40）——

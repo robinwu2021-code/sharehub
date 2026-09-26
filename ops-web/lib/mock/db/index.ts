@@ -45,7 +45,7 @@ export {
   agents, siteAgents, listSiteAgents, saveSiteAgent, removeSiteAgent, agentAssignments, agentPerformances, agentAccounts, agentCommissions,
   listAgentAssignments, listAgentAccounts, listAgentCommissions,
   saveAgentAccount, saveAgentCommission,
-  archiveAgent, unarchiveAgent,
+  archiveAgent, unarchiveAgent, grantAgentLogin,
   // S1 设备/点位划拨
   agentAssignmentRecords, listAgentAssignmentRecords, listAssignableAssets,
   assignAgentAssets, reclaimAgentAssets, refreshAgentAssetCounts, AgentAssignError,
