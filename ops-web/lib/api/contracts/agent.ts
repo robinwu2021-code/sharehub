@@ -94,6 +94,13 @@ export interface AgentApi {
    */
   startAgentExit(agentNo: string, reason: string): Promise<AgentExit>;
   getAgentExit(exitNo: string): Promise<AgentExit>;
+  /**
+   * 该代理**当前在途的**清退单；没有在清退时返回 `null`（不是错误）。
+   *
+   * <p>此前清退单号只能从「发起」那一次的返回值里拿到 —— 刷新页面、换个人看就再也找不到，
+   * 详情页只好放一个「按单号查进度」的输入框让人手抄。
+   */
+  getAgentOpenExit(agentNo: string): Promise<AgentExit | null>;
   /** 当前这一步的门禁（逐项、带数量、带去处）。`allPassed` 以服务端为准。 */
   agentExitGate(exitNo: string): Promise<Checklist>;
   /** 门禁全过 → 推进一步；最后一步停用全部登录账号并归档代理（不可逆）。服务端会重算门禁。 */

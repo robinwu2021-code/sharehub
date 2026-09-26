@@ -26,7 +26,10 @@ function seed(): Adjustment[] {
     return {
       adjNo: `ADJ${9100 + rows.length}`,
       payeeType: "VENUE", payeeNo: v.venueNo, payeeName: v.name,
-      kind, siteNo: c.siteNo ?? null, contractNo: c.contractNo,
+      kind,
+      // 保底补差按账期生成，一次性的（撤场结清）为空串 —— 与后端 stl_adjustment.period 同义
+      period: kind === "GUARANTEE_TOPUP" ? "2026-09" : "",
+      siteNo: c.siteNo ?? null, contractNo: c.contractNo,
       amount, suggestedAmount: amount, currency: "AED", status,
       settleNo: status === "SETTLED" ? settlements.find((s) => s.payeeNo === v.venueNo)?.settleNo ?? null : null,
       source, note,
@@ -177,7 +180,7 @@ export function _pushAdjustment(x: Partial<Adjustment> = {}): Adjustment {
   const a: Adjustment = {
     adjNo: nextNo("ADJ", adjustments(), 9100, "adjNo"),
     payeeType: "VENUE", payeeNo: venues[0].venueNo, payeeName: venues[0].name,
-    kind: "DEPOSIT_REFUND", siteNo: null, contractNo: contracts[0].contractNo,
+    kind: "DEPOSIT_REFUND", period: "", siteNo: null, contractNo: contracts[0].contractNo,
     amount: -1000, suggestedAmount: -1000, currency: "AED", status: "PENDING",
     settleNo: null, source: "SITE_CLOSED", note: "撤场退还押金", confirmedBy: null, confirmedAt: null,
     createdAt: new Date().toISOString(), ...x,

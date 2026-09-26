@@ -115,6 +115,17 @@ export function AgentDetailDrawer({
     enabled: !!agentNo,
   });
   const agent = agentQ.data;
+  /*
+   * 在途清退单**按代理号直接查**（后端 2026-09-26 起提供）。
+   * 此前只能从 URL 上的 `?exit=` 拿单号 —— 那个号只在「发起」那一次的响应里出现过，
+   * 刷新页面、换个人看就再也找不到，于是「清退中不许恢复」这条闸在界面上时有时无。
+   */
+  const openExitQ = useQuery({
+    queryKey: ["agent-open-exit", agentNo],
+    queryFn: () => api.getAgentOpenExit(agentNo!),
+    enabled: !!agentNo,
+    retry: false,
+  });
   const exitQ = useQuery({
     queryKey: ["agent-exit", exitNo],
     queryFn: () => api.getAgentExit(exitNo!),
@@ -122,7 +133,8 @@ export function AgentDetailDrawer({
     retry: false,
   });
   // 只认属于本代理的清退单：URL 被手改成别人的单号时不能拿它来挡本代理的恢复
-  const exit = exitQ.data && exitQ.data.agentNo === agentNo ? exitQ.data : undefined;
+  const fromUrl = exitQ.data && exitQ.data.agentNo === agentNo ? exitQ.data : undefined;
+  const exit = fromUrl ?? openExitQ.data ?? undefined;
   const exitOpen = !!exit && exit.status !== "CLOSED";
   const impact = useSuspendImpact(agent, !!agentNo);
 

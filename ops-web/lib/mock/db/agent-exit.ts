@@ -70,6 +70,10 @@ export function startAgentExit(agentNo: string, reason: string, operator = "admi
 
 export const getAgentExit = (exitNo: string): AgentExit => requireExit(exitNo);
 
+/** 该代理当前在途的清退单；没有则 `null`（「没有在清退」是正常状态，不是错误）。 */
+export const getAgentOpenExit = (agentNo: string): AgentExit | null =>
+  agentExits.find((e) => e.agentNo === agentNo && OPEN_EXIT.includes(e.status)) ?? null;
+
 function item(key: string, label: string, n: number, what: string, href: string): ChecklistItem {
   return { key, label, passed: n === 0, detail: n === 0 ? "已完成" : `还有 ${n} ${what}`, fixHref: href };
 }

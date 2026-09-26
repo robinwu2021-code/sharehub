@@ -565,6 +565,71 @@
    ]
   },
   {
+   "verb": "GET",
+   "path": "/api/agent/agents/{agentNo}/exit",
+   "perm": "agent:agent:read",
+   "perms": [
+    "agent:agent:read"
+   ],
+   "handler": "AgentExitController#openExit",
+   "summary": "该代理**当前在途的**清退单；没有则返回 null（不是 404 —— 「没有在清退」是正常状态，不是错误）。",
+   "params": [
+    {
+     "in": "path",
+     "name": "agentNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "AgentExit",
+   "returnContainer": null,
+   "returnElement": "AgentExit",
+   "responseShape": [
+    {
+     "name": "exitNo",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "reason",
+     "type": "String"
+    },
+    {
+     "name": "startedBy",
+     "type": "String"
+    },
+    {
+     "name": "startedAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "reclaimedAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "settledAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "closedAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "closedBy",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
    "verb": "POST",
    "path": "/api/agent/agents/{agentNo}/exit",
    "perm": "agent:agent:update",
@@ -1154,16 +1219,49 @@
     },
     {
      "in": "query",
-     "name": "limit",
+     "name": "page",
      "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "excludeAgentNo",
+     "type": "String",
      "required": false
     }
    ],
    "bodyType": null,
-   "returnType": "java.util.List<AssignableAsset>",
-   "returnContainer": null,
-   "returnElement": "java.util.List<AssignableAsset>",
-   "responseShape": null,
+   "returnType": "PageResult<AssignableAsset>",
+   "returnContainer": "PageResult",
+   "returnElement": "AssignableAsset",
+   "responseShape": [
+    {
+     "name": "assetType",
+     "type": "String"
+    },
+    {
+     "name": "assetNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "currentAgentNo",
+     "type": "String"
+    },
+    {
+     "name": "currentAgentName",
+     "type": "String"
+    }
+   ],
    "requestShape": null
   },
   {
@@ -3959,6 +4057,12 @@
      "name": "topOnly",
      "type": "Boolean",
      "required": false
+    },
+    {
+     "in": "query",
+     "name": "preset",
+     "type": "String",
+     "required": false
     }
    ],
    "bodyType": null,
@@ -5327,6 +5431,14 @@
     {
      "name": "archivedAt",
      "type": "String"
+    },
+    {
+     "name": "qcStatus",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -5456,6 +5568,14 @@
       },
       {
        "name": "archivedAt",
+       "type": "String"
+      },
+      {
+       "name": "qcStatus",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
        "type": "String"
       }
      ]
@@ -11194,6 +11314,14 @@
     {
      "name": "archivedAt",
      "type": "String"
+    },
+    {
+     "name": "qcStatus",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -11333,6 +11461,14 @@
     },
     {
      "name": "archivedAt",
+     "type": "String"
+    },
+    {
+     "name": "qcStatus",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
      "type": "String"
     }
    ],
@@ -11581,6 +11717,14 @@
     {
      "name": "archivedAt",
      "type": "String"
+    },
+    {
+     "name": "qcStatus",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -11665,6 +11809,14 @@
     },
     {
      "name": "archivedAt",
+     "type": "String"
+    },
+    {
+     "name": "qcStatus",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
      "type": "String"
     }
    ],
@@ -11886,6 +12038,14 @@
     {
      "name": "archivedAt",
      "type": "String"
+    },
+    {
+     "name": "qcStatus",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -11981,9 +12141,9 @@
   {
    "verb": "POST",
    "path": "/api/ops/inspection-plans",
-   "perm": "workorder:wo:update",
+   "perm": "workorder:inspection:update",
    "perms": [
-    "workorder:wo:update"
+    "workorder:inspection:update"
    ],
    "handler": "WoExtController#createInspectionPlan",
    "summary": "",
@@ -12177,9 +12337,9 @@
   {
    "verb": "POST",
    "path": "/api/ops/inspection-plans/{planNo}",
-   "perm": "workorder:wo:update",
+   "perm": "workorder:inspection:update",
    "perms": [
-    "workorder:wo:update"
+    "workorder:inspection:update"
    ],
    "handler": "WoExtController#updateInspectionPlan",
    "summary": "",
@@ -15924,6 +16084,12 @@
      "name": "cabinetNo",
      "type": "String",
      "required": false
+    },
+    {
+     "in": "query",
+     "name": "suspectedLost",
+     "type": "Boolean",
+     "required": false
     }
    ],
    "bodyType": null,
@@ -15969,6 +16135,18 @@
     },
     {
      "name": "archivedAt",
+     "type": "String"
+    },
+    {
+     "name": "suspectedLostAt",
+     "type": "String"
+    },
+    {
+     "name": "qcStatus",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
      "type": "String"
     }
    ],
@@ -16027,6 +16205,18 @@
     },
     {
      "name": "archivedAt",
+     "type": "String"
+    },
+    {
+     "name": "suspectedLostAt",
+     "type": "String"
+    },
+    {
+     "name": "qcStatus",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
      "type": "String"
     }
    ],
@@ -16182,6 +16372,18 @@
     {
      "name": "archivedAt",
      "type": "String"
+    },
+    {
+     "name": "suspectedLostAt",
+     "type": "String"
+    },
+    {
+     "name": "qcStatus",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -16226,6 +16428,160 @@
      "type": "String"
     }
    ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/powerbanks/{powerbankNo}/confirm-lost",
+   "perm": "device:powerbank:update",
+   "perms": [
+    "device:powerbank:update"
+   ],
+   "handler": "DeviceController#confirmLost",
+   "summary": "疑似丢失经核实：确认丢失（RENTED → LOST，状态机 CONFIRM_LOST）。",
+   "params": [
+    {
+     "in": "path",
+     "name": "powerbankNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "Map<String, String>",
+   "returnType": "PowerbankRow",
+   "returnContainer": null,
+   "returnElement": "PowerbankRow",
+   "responseShape": [
+    {
+     "name": "powerbankNo",
+     "type": "String"
+    },
+    {
+     "name": "sn",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "cabinetNo",
+     "type": "String"
+    },
+    {
+     "name": "slotIndex",
+     "type": "Integer"
+    },
+    {
+     "name": "battery",
+     "type": "Integer"
+    },
+    {
+     "name": "cycles",
+     "type": "Integer"
+    },
+    {
+     "name": "health",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    },
+    {
+     "name": "suspectedLostAt",
+     "type": "String"
+    },
+    {
+     "name": "qcStatus",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/powerbanks/{powerbankNo}/dismiss-lost",
+   "perm": "device:powerbank:update",
+   "perms": [
+    "device:powerbank:update"
+   ],
+   "handler": "DeviceController#dismissLost",
+   "summary": "疑似丢失经核实：已找回 / 误判 —— 清标记并重置失联计时。",
+   "params": [
+    {
+     "in": "path",
+     "name": "powerbankNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "Map<String, String>",
+   "returnType": "PowerbankRow",
+   "returnContainer": null,
+   "returnElement": "PowerbankRow",
+   "responseShape": [
+    {
+     "name": "powerbankNo",
+     "type": "String"
+    },
+    {
+     "name": "sn",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "cabinetNo",
+     "type": "String"
+    },
+    {
+     "name": "slotIndex",
+     "type": "Integer"
+    },
+    {
+     "name": "battery",
+     "type": "Integer"
+    },
+    {
+     "name": "cycles",
+     "type": "Integer"
+    },
+    {
+     "name": "health",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    },
+    {
+     "name": "suspectedLostAt",
+     "type": "String"
+    },
+    {
+     "name": "qcStatus",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
   },
   {
    "verb": "POST",
@@ -17126,6 +17482,24 @@
      "name": "siteNo",
      "type": "String",
      "required": false
+    },
+    {
+     "in": "query",
+     "name": "kind",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "source",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "period",
+     "type": "String",
+     "required": false
     }
    ],
    "bodyType": null,
@@ -17200,6 +17574,10 @@
     {
      "name": "createdAt",
      "type": "LocalDateTime"
+    },
+    {
+     "name": "period",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -17293,6 +17671,10 @@
     {
      "name": "createdAt",
      "type": "LocalDateTime"
+    },
+    {
+     "name": "period",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -17395,6 +17777,10 @@
     {
      "name": "createdAt",
      "type": "LocalDateTime"
+    },
+    {
+     "name": "period",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -21894,9 +22280,9 @@
   {
    "verb": "POST",
    "path": "/api/ops/work-orders/{woNo}/accept",
-   "perm": "workorder:wo:process",
+   "perm": "workorder:wo:handle",
    "perms": [
-    "workorder:wo:process"
+    "workorder:wo:handle"
    ],
    "handler": "WoExtController#accept",
    "summary": "",
@@ -22070,9 +22456,9 @@
   {
    "verb": "POST",
    "path": "/api/ops/work-orders/{woNo}/close",
-   "perm": "workorder:wo:audit",
+   "perm": "workorder:wo:close",
    "perms": [
-    "workorder:wo:audit"
+    "workorder:wo:close"
    ],
    "handler": "WoExtController#close",
    "summary": "完成 / 审核关单。",
@@ -22992,9 +23378,9 @@
   {
    "verb": "POST",
    "path": "/api/ops/work-orders/{woNo}/handle",
-   "perm": "workorder:wo:process",
+   "perm": "workorder:wo:handle",
    "perms": [
-    "workorder:wo:process"
+    "workorder:wo:handle"
    ],
    "handler": "WoExtController#handle",
    "summary": "",
@@ -25867,7 +26253,7 @@
    "handler": "SysConfigController#createDictEntry",
    "summary": "",
    "params": [],
-   "bodyType": "DictItem",
+   "bodyType": "DictEntry",
    "returnType": "DictEntry",
    "returnContainer": null,
    "returnElement": "DictEntry",
@@ -25903,7 +26289,7 @@
      "type": "String"
     },
     {
-     "name": "groupCode",
+     "name": "group",
      "type": "String"
     },
     {
@@ -25915,48 +26301,12 @@
      "type": "String"
     },
     {
-     "name": "labelEn",
-     "type": "String"
-    },
-    {
-     "name": "labelAr",
-     "type": "String"
-    },
-    {
      "name": "sort",
      "type": "Integer"
     },
     {
      "name": "enabled",
-     "type": "Integer"
-    },
-    {
-     "name": "id",
-     "type": "?"
-    },
-    {
-     "name": "createdAt",
-     "type": "?"
-    },
-    {
-     "name": "createdBy",
-     "type": "?"
-    },
-    {
-     "name": "updatedAt",
-     "type": "?"
-    },
-    {
-     "name": "updatedBy",
-     "type": "?"
-    },
-    {
-     "name": "version",
-     "type": "?"
-    },
-    {
-     "name": "deleted",
-     "type": "?"
+     "type": "Boolean"
     }
    ]
   },
@@ -25977,7 +26327,7 @@
      "required": true
     }
    ],
-   "bodyType": "DictItem",
+   "bodyType": "DictEntry",
    "returnType": "DictEntry",
    "returnContainer": null,
    "returnElement": "DictEntry",
@@ -26013,7 +26363,7 @@
      "type": "String"
     },
     {
-     "name": "groupCode",
+     "name": "group",
      "type": "String"
     },
     {
@@ -26025,48 +26375,12 @@
      "type": "String"
     },
     {
-     "name": "labelEn",
-     "type": "String"
-    },
-    {
-     "name": "labelAr",
-     "type": "String"
-    },
-    {
      "name": "sort",
      "type": "Integer"
     },
     {
      "name": "enabled",
-     "type": "Integer"
-    },
-    {
-     "name": "id",
-     "type": "?"
-    },
-    {
-     "name": "createdAt",
-     "type": "?"
-    },
-    {
-     "name": "createdBy",
-     "type": "?"
-    },
-    {
-     "name": "updatedAt",
-     "type": "?"
-    },
-    {
-     "name": "updatedBy",
-     "type": "?"
-    },
-    {
-     "name": "version",
-     "type": "?"
-    },
-    {
-     "name": "deleted",
-     "type": "?"
+     "type": "Boolean"
     }
    ]
   },
@@ -29185,7 +29499,52 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "channelCode",
+     "type": "String"
+    },
+    {
+     "name": "channelName",
+     "type": "String"
+    },
+    {
+     "name": "channelNameEn",
+     "type": "String"
+    },
+    {
+     "name": "channelNameAr",
+     "type": "String"
+    },
+    {
+     "name": "mode",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "apiBase",
+     "type": "String"
+    },
+    {
+     "name": "merchantId",
+     "type": "String"
+    },
+    {
+     "name": "countries",
+     "type": "String"
+    },
+    {
+     "name": "currencies",
+     "type": "String"
+    },
+    {
+     "name": "capabilities",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -29266,7 +29625,52 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "channelCode",
+     "type": "String"
+    },
+    {
+     "name": "channelName",
+     "type": "String"
+    },
+    {
+     "name": "channelNameEn",
+     "type": "String"
+    },
+    {
+     "name": "channelNameAr",
+     "type": "String"
+    },
+    {
+     "name": "mode",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "apiBase",
+     "type": "String"
+    },
+    {
+     "name": "merchantId",
+     "type": "String"
+    },
+    {
+     "name": "countries",
+     "type": "String"
+    },
+    {
+     "name": "currencies",
+     "type": "String"
+    },
+    {
+     "name": "capabilities",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "GET",
@@ -34591,6 +34995,22 @@
     {
      "name": "resolved",
      "type": "Boolean"
+    },
+    {
+     "name": "handleResult",
+     "type": "String"
+    },
+    {
+     "name": "handleNote",
+     "type": "String"
+    },
+    {
+     "name": "handledBy",
+     "type": "String"
+    },
+    {
+     "name": "handledAt",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -36258,6 +36678,12 @@
     {
      "in": "query",
      "name": "status",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "payeeNo",
      "type": "String",
      "required": false
     }
@@ -39915,6 +40341,10 @@
     {
      "name": "status",
      "type": "String"
+    },
+    {
+     "name": "markets",
+     "type": "String"
     }
    ]
   },
@@ -40064,6 +40494,10 @@
     },
     {
      "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "markets",
      "type": "String"
     }
    ]
@@ -44818,10 +45252,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 510,
-  "records": 435,
-  "withPerm": 440,
-  "withBody": 216,
-  "shapedResponses": 402
+  "endpoints": 513,
+  "records": 438,
+  "withPerm": 443,
+  "withBody": 218,
+  "shapedResponses": 406
  }
 }

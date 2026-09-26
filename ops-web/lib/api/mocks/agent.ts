@@ -55,6 +55,7 @@ export const agentMock: AgentApi = {
   // 代理清退 / 运维考核：状态机与门禁在 db 层（agent-exit.ts）强制；async 让抛错变成 rejected promise
   startAgentExit: async (agentNo, reason) => wait(ax.startAgentExit(agentNo, reason), 400),
   getAgentExit: async (no) => wait(ax.getAgentExit(no)),
+  getAgentOpenExit: async (agentNo) => wait(ax.getAgentOpenExit(agentNo)),
   agentExitGate: async (no) => wait(ax.agentExitGate(no)),
   advanceAgentExit: async (no) => wait(ax.advanceAgentExit(no), 400),
   listAgentOpsAssessments: async (agentNo) => wait(ax.listAgentOpsAssessments(agentNo)),

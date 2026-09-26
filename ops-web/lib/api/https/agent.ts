@@ -115,6 +115,7 @@ export const agentHttp: AgentApi = {
   // 代理清退（AgentExitController）：发起挂在代理资源下，推进 / 门禁挂在清退单资源下
   startAgentExit: (agentNo, reason) => client.post(`/api/agent/agents/${agentNo}/exit`, { reason }),
   getAgentExit: (no) => client.get(`/api/agent/exits/${no}`),
+  getAgentOpenExit: (agentNo) => client.get(`/api/agent/agents/${agentNo}/exit`),
   agentExitGate: (no) => client.get(`/api/agent/exits/${no}/gate`),
   advanceAgentExit: (no) => client.post(`/api/agent/exits/${no}/advance`, {}),
   listAgentOpsAssessments: (agentNo) => client.get(`/api/agent/agents/${agentNo}/ops-assessments`),

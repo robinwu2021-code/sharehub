@@ -668,6 +668,13 @@ export interface Adjustment {
   payeeNo: string;
   payeeName: string | null;
   kind: AdjustmentKind;
+  /**
+   * 按账期的调整（保底补差）填 `YYYY-MM`；一次性的（撤场结清）为空串。
+   *
+   * <p>保底补差按月生成、同一合同每月一笔、金额还可能一样 ——
+   * 不带账期就分不清这笔是本月的还是上月重复生成的。
+   */
+  period: string;
   siteNo: string | null;
   contractNo: string | null;
   amount: number;

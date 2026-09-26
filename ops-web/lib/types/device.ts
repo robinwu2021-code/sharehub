@@ -47,6 +47,14 @@ export interface Cabinet extends Archivable {
   status: CabinetStatus;
   fwVersion: string;
   lastHeartbeatAt: string | null;
+  /**
+   * 入库质检结论；`null` = 存量免检。**它是上线门禁的第一项** ——
+   * 2026-09-26 前出参里没有它，详情页只好另查一次「最近一条质检记录」代替，
+   * 而补检之后这两者根本不是一回事。
+   */
+  qcStatus: QcStatus | null;
+  /** 所在仓；在库设备才有。调拨按仓选设备要用它。 */
+  warehouseNo: string | null;
 }
 
 export type SlotLock = "LOCKED" | "UNLOCKED";
@@ -116,6 +124,10 @@ export interface Powerbank extends Archivable {
    * 而失联多半只是上报缺失（柜子离线、归还未识别）。
    */
   suspectedLostAt: string | null;
+  /** 入库质检结论；`null` = 存量免检。与机柜同义，见 {@link Cabinet.qcStatus}。 */
+  qcStatus: QcStatus | null;
+  /** 所在仓；在库的宝才有。 */
+  warehouseNo: string | null;
 }
 export interface CabinetMonitor {
   cabinetNo: string;

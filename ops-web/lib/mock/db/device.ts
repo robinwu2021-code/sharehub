@@ -49,6 +49,8 @@ export const cabinets: Cabinet[] = Array.from({ length: 48 }, (_, i) => {
     locationName: p(LOCS, i), slotTotal: total, availableCount: (i * 7) % (total + 1),
     onlineStatus: online ? "ONLINE" : "OFFLINE", status: i % 13 === 0 ? "FAULT" : "DEPLOYED",
     fwVersion: p(["1.2.0", "1.3.1", "1.4.0"], i), lastHeartbeatAt: online ? iso(i * 60000) : null,
+    // 已布放的是存量免检（与后端 V107 口径一致）：质检是入库环节，这批柜子早在它之前就上线了
+    qcStatus: null, warehouseNo: null,
     archivedAt: null,
   };
 });
@@ -93,6 +95,8 @@ export const powerbanks: Powerbank[] = Array.from({ length: 30 }, (_, i) => {
     slotIndex: st === "RENTED" ? null : (i % 8) + 1,
     battery: st === "RENTED" ? 20 + (i * 7) % 60 : 60 + (i * 11) % 40,
     status: st, health: st === "FAULT" ? "FAULT" : "OK", cycles: 40 + (i * 37) % 900,
+    // 在库的宝才有质检与仓号；在柜 / 借出的是存量免检（与后端 V107 口径一致）
+    qcStatus: st === "IN_STOCK" ? "PASSED" : null, warehouseNo: st === "IN_STOCK" ? "WH001" : null,
     // 借出中的宝里挑两个当「疑似丢失」样本（后端是失联满 7 天由定时任务打的标记）
     suspectedLostAt: st === "RENTED" && i % 6 === 2 ? "2026-09-18 03:30:00" : null,
     archivedAt: null,
@@ -625,6 +629,8 @@ const DEFAULT_CABINET: Cabinet = {
   // 未上架的机柜没有点位、也就没有归属站点（siteNo 由点位反查，见 siteNoOfLocation）
   cabinetNo: "", sn: "", vendorCode: "cd-tech", model: "X6", locationNo: null, siteNo: null, locationName: null, agentNo: null,
   // 新建机柜默认在库（同后端 CabinetServiceImpl：还没上架就置在用会让它出现在 C 端可借列表里）
+  // 新到货待质检（同后端 CabinetServiceImpl：建档即 PENDING，过了才能调拨 / 上线）
+  qcStatus: "PENDING", warehouseNo: null,
   slotTotal: 8, availableCount: 0, onlineStatus: "OFFLINE", status: "IN_STOCK",
   fwVersion: "1.0.0", lastHeartbeatAt: null, archivedAt: null,
 };
