@@ -324,12 +324,15 @@ public class WoOpsServiceImpl implements WoOpsService {
         String dispatched = stateMachine.next(e.getStatus(), "DISPATCH");
         String accepted = stateMachine.next(dispatched, "ACCEPT");
         int n = woMapper.update(null, new UpdateWrapper<WoOrder>().eq("wo_no", woNo).eq("status", WorkOrderStatus.CREATED.name())
-                .set("status", accepted).set("assignee_name", me).set("assignee_type", "EMPLOYEE").set("dispatch_strategy", "GRAB"));
+                .set("status", accepted).set("assignee_name", me).set("assignee_type", "EMPLOYEE")
+                .set("assignee_id", me).set("dispatch_strategy", GRAB_STRATEGY));
         if (n == 0) throw BizException.conflict("error.wo.not_in_pool", woNo);
         e.setStatus(accepted);
         e.setAssigneeName(me);
-        appendDispatch(woNo, resolveAssignee(me, e), WoDispatchAction.DISPATCH.name());
-        appendDispatch(woNo, resolveAssignee(me, e), WoDispatchAction.ACCEPT.name());
+        // 策略传 GRAB：主表第 327 行已经写了 GRAB，时间轴却走默认的 MANUAL ——
+        // 同一件事在两处记成两个答案，而事后追「这单是派的还是抢的」多半看的是时间轴
+        appendDispatch(woNo, resolveAssignee(me, e), WoDispatchAction.DISPATCH.name(), GRAB_STRATEGY);
+        appendDispatch(woNo, resolveAssignee(me, e), WoDispatchAction.ACCEPT.name(), GRAB_STRATEGY);
         markBreached(woNo, true);   // 接单即响应，和 accept 同一个度量点
         log.info("抢单 woNo={} by={}", woNo, me);
         return toVO(e);
@@ -535,8 +538,48 @@ public class WoOpsServiceImpl implements WoOpsService {
         e.setStatus(stateMachine.next(e.getStatus(), "DISPATCH"));   // CREATED→DISPATCHED，非法迁移拒
         e.setAssigneeName(assignee);
         woMapper.updateById(e);
-        appendDispatch(woNo, resolveAssignee(assignee, e), WoDispatchAction.DISPATCH.name());
+        /*
+         * **受理人类型必须落库**（2026-09-26 补）。此前这条人工派单的路径只写了名字，
+         * 而自动派单的 {@link #dispatchAs} 三列都写 —— 于是同一张表里，
+         * 人工派的单 {@code assignee_type} 恒为空。两处读它的地方因此对人工派的单永远不成立：
+         *   · {@link #takeover}：判不出「这是代理承接的单」⇒ **超时了也接管不了**；
+         *   · {@link #recordCost}：判不出代理运维 ⇒ 成本记到站点，**代理的运维成本算不到它头上**。
+         * 两者都不报错，只是结果一直是错的那一边。
+         */
+        String type = assigneeTypeOf(assignee);
+        // 认不出类型时不写 assignee_id：那个值不是有效编号，而该列是 varchar(36)，
+        // 塞一个长姓名进去会直接 Data too long（此前 wo_dispatch 那一侧就是这么 500 的）
+        UpdateWrapper<WoOrder> u = new UpdateWrapper<WoOrder>().eq("wo_no", woNo)
+                .set("assignee_type", type).set("dispatch_strategy", MANUAL_STRATEGY);
+        if (type != null) u.set("assignee_id", assignee.trim());
+        woMapper.update(null, u);
+        appendDispatch(woNo, resolveAssignee(assignee, e), WoDispatchAction.DISPATCH.name(), MANUAL_STRATEGY);
         return toVO(e);
+    }
+
+    /** 派单策略留痕的取值（{@code wo_dispatch.strategy} / {@code wo_order.dispatch_strategy}）。 */
+    private static final String MANUAL_STRATEGY = "MANUAL";
+    /** 抢单。与 {@code wo_order.dispatch_strategy} 用同一套取值。 */
+    private static final String GRAB_STRATEGY = "GRAB";
+
+    /**
+     * 受理人是代理还是员工。**认不出就留空并告警**，不猜也不拒。
+     *
+     * <p>为什么不拒：这个端点的历史契约是**接受姓名**（{@code wo_order.assignee_name} 是 varchar(64)，
+     * 既有用例传的就是「Ahmed Field-Eng」这样的人名）。改成「必须是在册编号」会让这些派单一律 400 ——
+     * 实测打红 9 条既有用例。运营端现在传的是候选人的编号，所以能认出来；老用法继续按姓名走。
+     *
+     * <p>留空的代价要说清楚：{@code takeover} 判不出代理单 ⇒ 超时也接管不了；
+     * {@code recordCost} 判不出代理运维 ⇒ 成本记到站点。所以认不出时记 WARN，让它在日志里显形。
+     */
+    private String assigneeTypeOf(String no) {
+        if (!notBlank(no)) return null;
+        String key = no.trim();
+        if (agents.briefOf(key) != null) return "AGENT";
+        if (employees.briefsOf(List.of(key)).containsKey(key)) return "EMPLOYEE";
+        log.warn("派单受理人既不是在册代理也不是在职员工 assignee={} —— assignee_type 留空，"
+                + "该单无法被平台接管、成本也会记到站点；运营端应当从候选人列表里选（传编号）", key);
+        return null;
     }
 
     // ——————————————————————— 列表（富行装配）———————————————————————
@@ -717,6 +760,9 @@ public class WoOpsServiceImpl implements WoOpsService {
         woMapper.update(null, new UpdateWrapper<WoOrder>()
                 .eq("wo_no", woNo)
                 .set("reject_reason", reason)
+                // 受理人三列一起清：只清 assignee_name 的话，类型与编号仍留在库里，
+                // 于是「待派单」的单按受理人还筛得到，接管/成本也仍按那个已被退回的人算
+                .set("assignee_type", null).set("assignee_id", null).set("dispatch_strategy", null)
                 .setSql("reject_count = COALESCE(reject_count, 0) + 1"));
 
         // 与派单/接单共用 append 表：退回也是「转手」的一环，缺了它时间轴上会凭空断一截。
@@ -800,12 +846,29 @@ public class WoOpsServiceImpl implements WoOpsService {
         return h;
     }
 
-    /** 落一行 {@code wo_dispatch}（派单/接单/驳回共用同一根「转了几手」的时间轴）。 */
+    /** 落一行 {@code wo_dispatch}（派单/接单/驳回共用同一根「转了几手」的时间轴）。策略默认人工。 */
     private void appendDispatch(String woNo, String assigneeNo, String action) {
+        appendDispatch(woNo, assigneeNo, action, MANUAL_STRATEGY);
+    }
+
+    /**
+     * 同上，但由调用方指明**派单策略**。
+     *
+     * <p>原先这里把 {@code strategy} 写死成 {@code "MANUAL"}，于是抢单（{@link #grab}）
+     * 在时间轴上也记成「人工派单」—— 留痕看着完整，说的却不是事实：
+     * 事后追「这单当时是派下去的还是被抢的」，答案永远是前者。
+     */
+    private void appendDispatch(String woNo, String assigneeNo, String action, String strategy) {
         WoDispatch d = new WoDispatch();
         d.setWoNo(woNo);
-        d.setAssigneeNo(assigneeNo);
-        d.setStrategy("MANUAL");
+        /*
+         * `wo_dispatch.assignee_id` 是 varchar(36)，而派单入参可以是最长 64 的姓名 ——
+         * 直接写会 `Data too long` ⇒ **整个派单 500**（用例撞到过）。
+         * 截断而不是置空：时间轴要回答「这单从谁手里转出去的」，截断后的前 36 字符仍认得出是谁；
+         * 置空则等于这一环凭空断了。真正的编号都远短于 36，走不到这一步。
+         */
+        d.setAssigneeNo(assigneeNo != null && assigneeNo.length() > 36 ? assigneeNo.substring(0, 36) : assigneeNo);
+        d.setStrategy(strategy);
         d.setAction(action);
         d.setDispatchedAt(LocalDateTime.now().toString());
         dispatchMapper.insert(d);
