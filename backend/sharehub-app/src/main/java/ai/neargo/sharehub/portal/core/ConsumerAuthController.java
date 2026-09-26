@@ -44,11 +44,15 @@ public class ConsumerAuthController {
      * 生产只回 {@code {"sent": true}}，码由短信通道送达。
      */
     @PostMapping("/otp")
-    public Map<String, Object> otp(@RequestBody Map<String, String> body) {
-        String phone = body.get("phone");
+    public Map<String, Object> otp(
+            @RequestBody ai.neargo.sharehub.user.consumer.ConsumerAuthReqs.OtpReq body) {
+        String phone = body == null ? null : body.phone();
         if (phone == null || phone.isBlank()) {
             throw new IllegalArgumentException("手机号为空");
         }
+        // ⚠️ countryCode / scene 收进契约了但**仍未参与计算** —— 见 OtpReq 的注释：
+        // 码表与 uid 都只按 phone 派生，+971 与 +966 的同号是同一个账号、同一个码。
+        // 修它要改 uid 的组成（给存量账号改身份），属于要先拍板的迁移，不在本次。
         String code = otpService.issue(phone.trim());
         return devMode.isEnabled()
                 ? Map.of("sent", true, "devCode", code)
@@ -61,23 +65,25 @@ public class ConsumerAuthController {
      * 出参 {@code passwordStored=false} 如实声明，端上按 OTP 登录引导。
      */
     @PostMapping("/register")
-    public Map<String, Object> register(@RequestBody Map<String, String> body) {
-        String phone = body.get("phone");
-        String otp = body.get("otp");
+    public Map<String, Object> register(
+            @RequestBody ai.neargo.sharehub.user.consumer.ConsumerAuthReqs.RegisterReq body) {
+        String phone = body == null ? null : body.phone();
+        String otp = body == null ? null : body.otp();
         if (phone == null || phone.isBlank()) throw new IllegalArgumentException("手机号为空");
         if (otp == null || otp.isBlank()) throw new IllegalArgumentException("验证码为空");
         ConsumerLoginReq req = new ConsumerLoginReq("phone_otp", null, phone.trim(), otp.trim(),
-                body.get("countryCode"), null, null, null, null, null,
-                body.get("nickname"), null);
+                body.countryCode(), null, null, null, null, null,
+                body.nickname(), null);
         ConsumerLoginVO vo = authService.login(req);
         return Map.of("token", vo.token(), "cUserNo", vo.cUserNo(),
-                "nickname", body.get("nickname") == null ? "" : body.get("nickname"),
+                "nickname", body.nickname() == null ? "" : body.nickname(),
                 "isNew", vo.isNew(), "passwordStored", false);
     }
 
     /** 密码重置：**能力未开通**（凭据库 pb_auth 未建，[未完成清单 B6]）——如实 400，不假 ok。 */
     @PostMapping("/password/reset")
-    public Map<String, Object> resetPassword(@RequestBody(required = false) Map<String, String> body) {
+    public Map<String, Object> resetPassword(
+            @RequestBody(required = false) ai.neargo.sharehub.user.consumer.ConsumerAuthReqs.ResetPwdReq body) {
         throw new IllegalArgumentException("密码能力未开通：消费者凭据库(pb_auth)未建，请使用手机验证码登录");
     }
 

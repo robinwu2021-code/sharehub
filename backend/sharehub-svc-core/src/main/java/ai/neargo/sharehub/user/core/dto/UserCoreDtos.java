@@ -40,6 +40,15 @@ public final class UserCoreDtos {
                                     String validFrom, String validTo, String grantedBy, String status) {
     }
 
+    /**
+     * C 端资料编辑入参（裸 Map → record，2026-09-26）。
+     *
+     * <p>{@code email} 收进来只为了**能显式拒绝**：它无落列（PII 归 pb_pii 分库，未建），
+     * 静默丢弃会让端上以为存上了。契约里留着它，拒绝才说得通。
+     */
+    public record ProfilePatchReq(String nickname, String avatar, String email) {
+    }
+
     // ——————————————————————— C 端专属 ———————————————————————
 
     /** 站内消息。实体列是 {@code is_read}（MySQL 保留字规避），VO 里回到业务语义 {@code read}。 */

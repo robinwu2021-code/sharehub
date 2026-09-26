@@ -113,9 +113,9 @@ public class MpUserController {
      * 前端又没有 catch，于是点下去**什么都不发生** —— 没提示，也没报错。
      */
     @PostMapping("/recharge")
-    public RechargeResultVO recharge(@RequestBody Map<String, String> body) {
-        String packageNo = body == null ? null : body.get("packageNo");
-        return recharges.recharge(ConsumerContext.userNo(), packageNo);
+    public RechargeResultVO recharge(
+            @RequestBody ai.neargo.sharehub.user.asset.dto.UserAssetDtos.RechargeReq body) {
+        return recharges.recharge(ConsumerContext.userNo(), body == null ? null : body.packageNo());
     }
 
     // —— 收藏门店 ——
@@ -213,13 +213,14 @@ public class MpUserController {
      * 无落列（PII 归 pb_pii 分库，未建），静默丢弃会让端上以为存上了。
      */
     @PostMapping("/profile")
-    public java.util.Map<String, Object> updateProfile(@RequestBody java.util.Map<String, String> body) {
-        if (body != null && body.get("email") != null && !body.get("email").isBlank()) {
+    public java.util.Map<String, Object> updateProfile(
+            @RequestBody ai.neargo.sharehub.user.core.dto.UserCoreDtos.ProfilePatchReq body) {
+        if (body != null && body.email() != null && !body.email().isBlank()) {
             throw new IllegalArgumentException("email 暂不支持修改：PII 库(pb_pii)未建，请先只改昵称/头像");
         }
         String me = ConsumerContext.userNo();
-        userQuery.updateProfile(me, body == null ? null : body.get("nickname"),
-                body == null ? null : body.get("avatar"));
+        userQuery.updateProfile(me, body == null ? null : body.nickname(),
+                body == null ? null : body.avatar());
         return profileOf(me);
     }
 

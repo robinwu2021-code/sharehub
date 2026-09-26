@@ -67,6 +67,15 @@ public final class UserAssetDtos {
      *
      * @param payAmount 支付金额，必填且须大于 0 —— 不校验的话能建出一个 0 元充 20 元的套餐
      */
+    /**
+     * C 端按套餐充值入参（裸 Map → record，2026-09-26）。
+     *
+     * <p><b>只有 packageNo，刻意不收金额</b>：金额由服务端按套餐算。
+     * 收前端传的金额，「充 1 元到账 100」就是一次普通的改参数请求。
+     */
+    public record RechargeReq(String packageNo) {
+    }
+
     public record RechargePackageReq(String packageNo, String regionId, String name,
                                      BigDecimal payAmount, BigDecimal giftAmount, String currency,
                                      Integer validDays, Integer sortNo, String status,
