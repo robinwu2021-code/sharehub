@@ -197,7 +197,7 @@ export function AddressPicker({
         {listOpen && hits.length > 0 && (
           <ul
             role="listbox"
-            className="absolute inset-x-0 top-full z-[var(--z-popover)] mt-1 max-h-64 overflow-auto rounded-field border border-border bg-surface py-1 shadow-md"
+            className="absolute inset-x-0 top-full z-[var(--z-popover)] mt-1 max-h-64 overflow-auto rounded-field border border-border bg-card py-1 shadow-pop"
           >
             {hits.map((h) => (
               <li key={h.placeId}>
@@ -216,7 +216,7 @@ export function AddressPicker({
           </ul>
         )}
         {listOpen && !searching && debounced.trim().length >= 2 && hits.length === 0 && (
-          <div className="absolute inset-x-0 top-full z-[var(--z-popover)] mt-1 rounded-field border border-border bg-surface px-3 py-2 txt-caption text-muted-foreground">
+          <div className="absolute inset-x-0 top-full z-[var(--z-popover)] mt-1 rounded-field border border-border bg-card px-3 py-2 txt-caption text-muted-foreground">
             没搜到这个地点。换个关键词，或直接在地图上点选。
           </div>
         )}

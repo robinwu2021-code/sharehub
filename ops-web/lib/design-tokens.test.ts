@@ -30,7 +30,69 @@ const DEPRECATED_RADIUS = /\brounded-(sm|md|lg|xl|2xl|3xl|full)\b/g;
  */
 const RADIUS_EXEMPT = ["components/ui/tree.tsx", "components/quick-actions.tsx"];
 
+/**
+ * `@theme inline` 里注册过的颜色名 —— Tailwind 只为这些名字生成 `bg-*` / `text-*` / `border-*`。
+ * 没注册的名字**不会报错**，它只是不生成任何规则：类名在 DOM 上、算出来的背景是 rgba(0,0,0,0)。
+ */
+function themeColors(): Set<string> {
+  const css = readFileSync(join(ROOT, "app/globals.css"), "utf8");
+  const block = css.slice(css.indexOf("@theme inline"));
+  return new Set([...block.matchAll(/--color-([a-z0-9-]+):/g)].map((m) => m[1]));
+}
+
+/** 项目自有的颜色工具类（排除 Tailwind 自带的调色板与关键字）。 */
+const COLOR_UTIL = /\b(?:bg|text|border|ring|fill|stroke|from|via|to|divide|outline|shadow|accent|caret|decoration)-([a-z][a-z0-9-]*)\b/g;
+/** Tailwind 自带或 CSS 关键字，不受本项目 @theme 约束。 */
+const NOT_A_TOKEN = new Set([
+  "transparent", "current", "inherit", "black", "white", "none", "auto",
+  "slate", "gray", "zinc", "neutral", "stone", "red", "orange", "amber", "yellow",
+  "lime", "green", "emerald", "teal", "cyan", "sky", "blue", "indigo", "violet",
+  "purple", "fuchsia", "pink", "rose",
+  // 非颜色的同前缀工具类
+  "center", "left", "right", "start", "end", "justify", "wrap", "nowrap", "balance", "pretty",
+  "ellipsis", "clip", "xs", "sm", "base", "lg", "xl", "2xl", "3xl", "4xl", "5xl", "6xl",
+  "solid", "dashed", "dotted", "double", "hidden", "collapse", "separate", "y", "x",
+  "pop", "inner", "md", "opacity", "offset", "0", "1", "2", "4", "8",
+]);
+
 describe("设计 token 守卫", () => {
+  /*
+   * 2026-09-26 撞到的：`bg-surface` 在 DOM 上、`border-border` 正常生效，
+   * 而算出来的背景是 **rgba(0, 0, 0, 0)** —— `@theme inline` 里注册的是
+   * `--color-canvas`（值就是 `var(--surface)`），没有 `--color-surface`。
+   *
+   * 症状与 CLAUDE.md 记的「类型阶吃掉字重」同类：**类名在、规则不生成、不报错**。
+   * 当时那个搜索候选列表是透明的，底下的字透出来 —— 看着像 z-index 写错了。
+   * 全站两处：新写的这个下拉，和登录页那个「选中的账号池 tab」的白底
+   *（后者从写下那天起就没生效过，只是 shadow-sm 让它看着像凸起的）。
+   */
+  it("★ 颜色工具类用的名字必须在 @theme inline 里注册过（否则类名在、规则不生成）", () => {
+    const known = themeColors();
+    expect(known.size, "读不到 @theme inline 的颜色，本条会恒绿").toBeGreaterThan(10);
+
+    const offenders: string[] = [];
+    for (const dir of ["app", "components"]) {
+      for (const file of walk(join(ROOT, dir))) {
+        const rel = file.slice(ROOT.length).replace(/^\/+/, "");
+        if (rel.includes(".test.")) continue;
+        const src = readFileSync(file, "utf8");
+        for (const m of src.matchAll(COLOR_UTIL)) {
+          const name = m[1];
+          if (NOT_A_TOKEN.has(name) || known.has(name)) continue;
+          // 只盯「长得像本项目 token」的：含连字符或在 globals.css 里定义过同名变量
+          if (!/^--/.test(name) && !src.includes(`--${name}`) && !name.includes("-")) continue;
+          if (!new RegExp(`--${name}\\b`).test(readFileSync(join(ROOT, "app/globals.css"), "utf8"))) continue;
+          offenders.push(`${rel}: ${m[0]}`);
+        }
+      }
+    }
+    expect([...new Set(offenders)],
+      "这些颜色类引用了 globals.css 里有、但没注册进 @theme inline 的名字 ——\n"
+      + "Tailwind 不会为它们生成任何规则（类名在，颜色是透明的，且不报错）。\n"
+      + "要么在 @theme inline 里加 --color-xxx，要么改用已注册的别名。")
+      .toEqual([]);
+  });
+
   it("components/ 不再使用废弃的圆角类（豁免清单外）", () => {
     const offenders: string[] = [];
     for (const file of walk(join(ROOT, "components"))) {

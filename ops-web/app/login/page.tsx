@@ -114,7 +114,10 @@ export default function LoginPage() {
                 className={cn(
                   "flex-1 rounded-control px-3 py-1.5 text-sm transition-colors",
                   realm === x.realm
-                    ? "bg-surface text-foreground shadow-sm"
+                    // 用 canvas 这个名字：`--canvas` 的值就是 `var(--surface)`，
+                    // 而 @theme inline 里只注册了 --color-canvas，没有 --color-surface。
+                    // 写另一个名字的话类名在、规则不生成，背景是透明的且不报错（见 design-tokens.test.ts）。
+                    ? "bg-canvas text-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
