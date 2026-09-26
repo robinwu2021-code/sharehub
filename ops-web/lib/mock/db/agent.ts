@@ -55,7 +55,10 @@ export const agentAccounts: AgentAccount[] = Array.from({ length: 12 }, (_, i) =
   const a = p(agents, i);
   return {
     accountNo: `AA${7000 + i}`, username: `ag${1000 + i}`, agentNo: a.agentNo, agentName: a.name, loginPhone: phone(i, "+9714"),
-    status: i % 6 === 0 ? "DISABLED" : "ACTIVE", dataScope: p(["AGENT", "REGION", "SITE"] as const, i),
+    status: i % 6 === 0 ? "DISABLED" : "ACTIVE",
+    // 跟真后端一致地给 null。此前 mock 编了值，于是「这一格其实没实现」
+    // 只有生产才看得见 —— 本地一直是好的。见 types/agent.ts 上的说明。
+    dataScope: null,
     createdAt: iso(i * 86400_000),
   };
 });

@@ -47,11 +47,6 @@ ops-web/app/users/page.tsx::CARD_FIELDS validTo
 # 修法不是改名：deptName 是显示名，deptNo 是键，得换成选择器（部门下拉）。
 ops-web/app/employees/page.tsx::empFields deptName
 
-# 代理账号的「数据范围」选了不生效：读出参 AgentAccount.dataScope 有，
-# 写入面 AgentAccountReq 没有，也没有单独的范围端点（agent.ts 里 grep 不到）。
-# 与「数据范围 51 张表」那个待裁决项相关：范围到底落 iam_data_scope 还是账号上，
-# 先定口径再改，否则改完还得再改一次。
-ops-web/app/agents/page.tsx::accountFieldsFor dataScope
 
 # 分佣规则的「状态」：写入面有意不收（同 AD_FIELDS status 那条的理由——
 # 状态归状态机，save 收了它就等于开了第二条路）。正解是换成迁移动作按钮，

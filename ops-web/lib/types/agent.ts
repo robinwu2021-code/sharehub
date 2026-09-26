@@ -172,7 +172,13 @@ export interface AgentAccount {
   username: string | null;
   loginPhone: string;
   status: "ACTIVE" | "DISABLED";
-  dataScope: DataScope; // 台账 T5：原为 string，与 RoleRow.dataScope 统一
+  /**
+   * 授权范围。**真后端目前恒为 null** —— `agt_account` 有意没有这一列，落点本该是
+   * `iam_data_scope(subject_type='AGENT_ACCOUNT')`，而 `AGENT_ACCOUNT` 还不在后端的
+   * `DataScopeSubject` 词表里（只有 ROLE / EMPLOYEE）。整块没有实现，不是漏查。
+   * 「代理账号能不能看得比它所属代理更窄」是待裁决项，见 待裁决清单-9-25。
+   */
+  dataScope: DataScope | null; // 台账 T5：原为 string，与 RoleRow.dataScope 统一
   createdAt: string;
 }
 

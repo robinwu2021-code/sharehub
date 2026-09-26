@@ -46,7 +46,6 @@ const periodLabel = (p: string) => REPORT_PERIODS.find((x) => x.value === p)?.la
 // dev_cabinet / ord_order / wo_order 五张表），选中的也是站点。
 // 此前这里是 LOCATION —— 一个后端一张表都没登记的档位，选了就什么都看不见（见 DataScope 注释）。
 const SCOPE_LABEL: Record<DataScope, string> = { ALL: "全部数据", REGION: "按区域", SITE: "按站点", AGENT: "按代理(自己)", SELF: "仅自己经手" };
-const SCOPE_OPTIONS = (["ALL", "REGION", "SITE", "AGENT", "SELF"] as DataScope[]).map((s) => ({ value: s, label: SCOPE_LABEL[s] }));
 /**
  * 入驻申请状态。
  *
@@ -153,7 +152,11 @@ function accountFieldsFor(agents: { value: string; label: string }[]): FieldDef[
     { key: "loginPhone", label: "登录手机", required: true,
       pattern: { re: "^\\+?[0-9 -]{6,20}$", msg: "手机号格式不对（可带国际区号）" } },
     { key: "status", label: "状态", type: "select", options: [{ value: "ACTIVE", label: "启用" }, { value: "DISABLED", label: "停用" }] },
-    { key: "dataScope", label: "数据范围", type: "select", options: SCOPE_OPTIONS },
+    // 这里**没有**「数据范围」：账号保存端点不收它（新卡口 check-form-fields 报出来的），
+    // 选了只会得到一个成功提示。而且内联 select 填不了 scopeRefs，
+    // 选「区域」却不给范围值是 fail-closed —— 那个账号会什么都看不到，比不生效更糟。
+    // 角色与员工的数据权限走独立抽屉（app/employees 的 saveScope / saveEmpScope），
+    // 代理账号要做也照那个样式；前提是后端先把 AGENT_ACCOUNT 加进 DataScopeSubject 词表。
   ];
 }
 
@@ -569,7 +572,9 @@ function AgentsInner() {
     { header: "登录名", cell: (a) => a.username ? <span className="tabular-nums">{a.username}</span> : <span className="text-muted-foreground">—</span> },
     { header: "登录手机", cell: (a) => <span className="tabular-nums">{a.loginPhone}</span> },
     { header: "状态", cell: (a) => a.status === "ACTIVE" ? <Badge tone="success">启用</Badge> : <Badge tone="muted">停用</Badge> },
-    { header: "数据范围", cell: (a) => <Badge tone="outline">{SCOPE_LABEL[a.dataScope]}</Badge> },
+    // a.dataScope 为 null 时不能直接查表 —— SCOPE_LABEL[null] 是 undefined，
+    // 渲染出来是个空徽章，看着像「查询挂了」而不是「没设置过」。
+    { header: "数据范围", cell: (a) => <Badge tone="outline">{a.dataScope ? SCOPE_LABEL[a.dataScope] : "未设置"}</Badge> },
     { header: "创建时间", cell: (a) => <span className="text-muted-foreground">{fmtTime(a.createdAt)}</span> },
     { header: "操作", cell: (a) => canEditAccount ? <Button size="sm" variant="outline" onClick={() => setAccountForm(a)}>编辑</Button> : <span className="text-muted-foreground">-</span> },
   ];
@@ -635,7 +640,7 @@ function AgentsInner() {
     { header: "代理名称", value: (a) => a.agentName },
     { header: "登录手机", value: (a) => a.loginPhone },
     { header: "状态", value: (a) => (a.status === "ACTIVE" ? "启用" : "停用") },
-    { header: "数据范围", value: (a) => SCOPE_LABEL[a.dataScope] },
+    { header: "数据范围", value: (a) => (a.dataScope ? SCOPE_LABEL[a.dataScope] : "未设置") },
     { header: "创建时间", value: (a) => fmtTime(a.createdAt) },
   ], accounts.data?.list ?? []);
   // 无数据时不给导出按钮：导出一个空 CSV 只会让人以为功能坏了
@@ -846,7 +851,7 @@ function AgentsInner() {
             onSearch={(v) => { setKeyword(v); paging.reset(); }}
             searchPlaceholder="搜索账号编号 / 代理 / 登录手机"
             onExport={exportIf(exportAccounts, accounts.data?.list?.length)}
-            onAdd={canEditAccount ? () => setAccountForm({ status: "ACTIVE", dataScope: "AGENT" }) : undefined}
+            onAdd={canEditAccount ? () => setAccountForm({ status: "ACTIVE" }) : undefined}
             addLabel="新增代理账号"
           />
           <DataTable rowKey={(a: AgentAccount) => a.accountNo} columns={accountCols} rows={accounts.data?.list} loading={accounts.isLoading} error={accounts.error} onRetry={accounts.refetch}

@@ -12,7 +12,9 @@ import lombok.EqualsAndHashCode;
  * {@code pb_auth.cred}（{@code realm=AGENT}，[db-design §七]），本表只存 {@link #credRef} 引用，
  * <b>不存任何口令материал</b>。
  *
- * <p>⚠️ <b>没有 {@code data_scope} 列，且不要加</b>：前端 {@code AgentAccount.dataScope} 的落点是
+ * <p>⚠️ <b>没有 {@code data_scope} 列，且不要加</b>（但也别照下面这句去查 —— {@code AGENT_ACCOUNT}
+ * 还不在 {@code DataScopeSubject} 词表里，那张表里没有这个主体的行；详见
+ * {@code AgentAccountServiceImpl#toVO}）：前端 {@code AgentAccount.dataScope} 的落点是
  * {@code iam_data_scope}（{@code subject_type='AGENT_ACCOUNT'}, {@code subject_no=account_no}），
  * 见 [db-design §1.7] 多值列拆表。理由是数据范围本身是 {@code scope_type + scope_refs} 的组合值
  * （ALL/REGION/SITE/LOCATION/VENUE/AGENT/SELF ×  refs 列表），单列存不下；而且角色级/员工级/代理级

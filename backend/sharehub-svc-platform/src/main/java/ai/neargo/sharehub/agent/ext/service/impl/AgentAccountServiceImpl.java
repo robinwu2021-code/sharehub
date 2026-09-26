@@ -71,8 +71,18 @@ public class AgentAccountServiceImpl extends AbstractCrudService<AgtAccount, Age
 
     @Override
     protected AgentAccount toVO(AgtAccount e) {
-        // TODO(iam): dataScope 取自 iam_data_scope(subject_type='AGENT_ACCOUNT', subject_no=accountNo)
-        //   的 scope_type —— iam 域 mapper 不在本分片边界内，落地后在此注入查询，勿改回本表加列。
+        // dataScope 恒 null，**原因不是原先写的那个**。
+        //
+        // 原注释说「iam 域 mapper 不在本分片边界内」—— 不成立：DataScopeService 就在本模块
+        // （sharehub-svc-platform 的 platform.org），注进来即可，不需要 port。
+        //
+        // 真正的阻塞是词表：DataScopeSubject 只有 ROLE / EMPLOYEE，**没有 AGENT_ACCOUNT**，
+        // 所以 iam_data_scope 里根本不会有这个主体的行，save() 传它还会抛「非法 subjectType」。
+        // 也就是说这一块整体没有实现，不是这里漏了一次查询 —— 照原注释去补 port 会白做。
+        //
+        // 要不要实现取决于一个产品问题：代理账号能不能看得比它所属的代理更窄
+        // （代理会话本来就按 agentNo 收口）。见 docs/requirements/待裁决清单-9-25.md。
+        // 运营端已把那个选不动的「数据范围」表单项撤掉，列显示「未设置」。
         return new AgentAccount(e.getAccountNo(), e.getAgentNo(), e.getAgentName(),
                 e.getUsername(), e.getLoginPhone(), e.getStatus(), null,
                 e.getCreatedAt() == null ? null : e.getCreatedAt().toString());
