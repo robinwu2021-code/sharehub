@@ -6,6 +6,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import { StatCard, PageTitle, Skeleton } from "@/components/ui/misc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
 import { QuickActions } from "@/components/quick-actions";
 import { AlarmTodoPanel } from "@/components/dashboard/alarm-todo-panel";
@@ -140,26 +141,31 @@ export default function DashboardPage() {
           <Card className="mt-6">
             <CardHeader><CardTitle>今日站点 GMV 排名</CardTitle></CardHeader>
             <CardContent>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-muted-foreground text-left border-b border-border">
-                    <th className="pb-2 w-8">排名</th>
-                    <th className="pb-2">站点</th>
-                    <th className="pb-2 text-right tabular-nums">GMV</th>
-                    <th className="pb-2 text-right tabular-nums">订单数</th>
-                  </tr>
-                </thead>
-                <tbody>
+              {/*
+                走 Table 原语而不是手写 <table>：手写那版用的是「下划线表头」，
+                而全站的表是「色块表头 + 隔行斑马」（见 components/ui/table.tsx）——
+                同一个界面里两种表看着就不像一套东西，而这不报错。
+              */}
+              <Table>
+                <THead>
+                  <TR>
+                    <TH className="w-8">排名</TH>
+                    <TH>站点</TH>
+                    <TH className="text-right">GMV</TH>
+                    <TH className="text-right">订单数</TH>
+                  </TR>
+                </THead>
+                <TBody>
                   {data.rankings.map((r) => (
-                    <tr key={r.rank} className="border-b border-border/40 last:border-0">
-                      <td className="py-2 txt-strong tabular-nums text-muted-foreground">#{r.rank}</td>
-                      <td className="py-2">{r.siteName}</td>
-                      <td className="py-2 text-right tabular-nums">{money(r.gmv, r.currency)}</td>
-                      <td className="py-2 text-right tabular-nums">{r.orderCount}</td>
-                    </tr>
+                    <TR key={r.rank}>
+                      <TD className="txt-strong tabular-nums text-muted-foreground">#{r.rank}</TD>
+                      <TD>{r.siteName}</TD>
+                      <TD className="text-right tabular-nums">{money(r.gmv, r.currency)}</TD>
+                      <TD className="text-right tabular-nums">{r.orderCount}</TD>
+                    </TR>
                   ))}
-                </tbody>
-              </table>
+                </TBody>
+              </Table>
             </CardContent>
           </Card>
         </>

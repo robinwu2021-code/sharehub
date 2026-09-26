@@ -34,6 +34,7 @@ import { Drawer } from "@/components/ui/drawer";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { ReadOnlyNotice } from "@/components/read-only-notice";
 import { SummaryCard } from "@/components/ui/summary-card";
+import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 
 const zone = formatOffset(tzOffsetMinutes(new Date(), MARKET_TZ));
 
@@ -317,27 +318,28 @@ function AdjustmentsInner() {
                 <SummaryCard label={`生效时间（${zone}）`} value={formatMarketTime(detail.effectiveAt)} sub={detail.revertAt ? `恢复 ${formatMarketTime(detail.revertAt)}` : "不自动恢复"} />
               </div>
               <h3 className="mb-2 mt-4 txt-strong">变更对比</h3>
-              <table className="w-full txt-body">
-                <thead>
-                  <tr className="txt-caption text-muted-foreground">
-                    <th className="py-1 text-start">字段</th><th className="py-1 text-end">调价前</th><th className="py-1 text-end">调价后</th>
-                  </tr>
-                </thead>
-                <tbody>
+              {/* 走 Table 原语：手写那版是下划线表头，与全站的色块表头 + 隔行斑马不是一套 */}
+              <Table>
+                <THead>
+                  <TR>
+                    <TH>字段</TH><TH className="text-end">调价前</TH><TH className="text-end">调价后</TH>
+                  </TR>
+                </THead>
+                <TBody>
                   {ADJUSTABLE.filter((f) => detail.patch[f.key] != null).map((f) => {
                     const b = (before as PriceAdjustPatch)[f.key];
                     const a = detail.patch[f.key]!;
                     const fmt = (v?: number) => v == null ? "—" : f.money ? money(v, plan?.currency) : `${v}${f.unit ?? ""}`;
                     return (
-                      <tr key={f.key}>
-                        <td className="py-1.5">{f.label}</td>
-                        <td className="py-1.5 text-end tabular-nums text-muted-foreground">{fmt(b)}</td>
-                        <td className="py-1.5 text-end tabular-nums text-primary">{fmt(a)}</td>
-                      </tr>
+                      <TR key={f.key}>
+                        <TD>{f.label}</TD>
+                        <TD className="text-end tabular-nums text-muted-foreground">{fmt(b)}</TD>
+                        <TD className="text-end tabular-nums text-primary">{fmt(a)}</TD>
+                      </TR>
                     );
                   })}
-                </tbody>
-              </table>
+                </TBody>
+              </Table>
               <h3 className="mb-2 mt-4 txt-strong">执行记录</h3>
               <ul className="txt-caption text-muted-foreground">
                 <li>创建：{formatMarketTime(detail.createdAt)} · {detail.createdBy}</li>
