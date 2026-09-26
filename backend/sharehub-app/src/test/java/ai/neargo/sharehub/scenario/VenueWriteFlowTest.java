@@ -25,7 +25,7 @@ class VenueWriteFlowTest extends ApiTestSupport {
         Map<String, Object> m = new HashMap<>();
         m.put("name", name);
         m.put("contact", "+97140000000");
-        m.put("industry", "购物中心");
+        m.put("industry", "SHOPPING_MALL");
         return m;
     }
 
@@ -94,7 +94,7 @@ class VenueWriteFlowTest extends ApiTestSupport {
         Map<String, Object> m = new HashMap<>();
         m.put("venueName", name);
         m.put("contact", "+97141111111");
-        m.put("industry", "写字楼");
+        m.put("industry", "OFFICE");
         return m;
     }
 

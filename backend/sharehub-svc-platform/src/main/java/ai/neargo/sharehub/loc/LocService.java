@@ -145,7 +145,8 @@ public class LocService {
         Map<String, Integer> counts = venueSiteCounts(r.getRecords().stream().map(LocVenue::getVenueNo).toList());
         List<Venue> rows = r.getRecords().stream()
                 .map(v -> new Venue(v.getVenueNo(), v.getName(), v.getContact(), v.getIndustry(),
-                        counts.getOrDefault(v.getVenueNo(), 0), str(v.getArchivedAt())))
+                        counts.getOrDefault(v.getVenueNo(), 0), str(v.getArchivedAt()),
+                        v.getAddress(), v.getLng(), v.getLat()))
                 .toList();
         return new PageResult<>(rows, r.getTotal());
     }
@@ -168,6 +169,15 @@ public class LocService {
             throw new IllegalArgumentException("场地方名称必填");
         }
         body.setName(body.getName().trim());
+        /*
+         * 行业收成词表（V121）。**非法值当场拒**，不是默默存下去 ——
+         * 存下去的后果是运营端下拉选不中它（显示空白），一保存又被改成别的值。
+         * 空值放行：行业不是必填，「还没问清楚」是合法状态。
+         */
+        if (body.getIndustry() != null && !body.getIndustry().isBlank()
+                && VenueIndustry.of(body.getIndustry()).isEmpty()) {
+            throw BizException.badRequest("error.venue.industry_invalid", body.getIndustry());
+        }
 
         String no = body.getVenueNo();
         LocVenue current = (no == null || no.isBlank()) ? null
@@ -176,8 +186,7 @@ public class LocService {
 
         if (current == null) {
             if (no == null || no.isBlank()) {
-                body.setVenueNo(ai.neargo.common.core.IdGenerator.next(
-                        ai.neargo.sharehub.common.BizKey.VENUE));
+                body.setVenueNo(nextVenueNo());
             }
             if (body.getTenantId() == null) body.setTenantId("MAIN");
             venueMapper.insert(body);
@@ -197,7 +206,43 @@ public class LocService {
                 .eq(LocVenue::getVenueNo, body.getVenueNo()).last("limit 1"));
         return new Venue(saved.getVenueNo(), saved.getName(), saved.getContact(), saved.getIndustry(),
                 venueSiteCounts(java.util.List.of(saved.getVenueNo()))
-                        .getOrDefault(saved.getVenueNo(), 0), str(saved.getArchivedAt()));
+                        .getOrDefault(saved.getVenueNo(), 0), str(saved.getArchivedAt()),
+                saved.getAddress(), saved.getLng(), saved.getLat());
+    }
+
+    /**
+     * 下一个场地方编号：{@code VEN} + 三位顺序号（{@code VEN305}…）。
+     *
+     * <h3>为什么换掉 ULID</h3>
+     * 原先是 {@code IdGenerator.next("VEN")}，出来的是 {@code VENMUI4WT2QTD1RV17O}（19 位）。
+     * 场地方编号是**人要读、要念、要在合同和对账单上核对**的东西，
+     * 而这个仓库里员工、部门那些走 {@code AbstractCrudService} 的实体本来就是顺序号
+     * （今天生产建的是 E1006 / E1007）—— 同一套系统里两种编号形态，没有理由。
+     *
+     * <h3>取最大值而不是字典序</h3>
+     * 位宽不一致时字典序会取错：实测提现单里同时有 {@code WD9002}(4 位) 与 {@code WD009003}(6 位)，
+     * 字典序下 {@code 'WD9002' > 'WD009003'}，取到 9002 → 下一个算成 WD009003 → 撞已存在行。
+     * 所以按数字序取 {@code MAX}，与 {@link ai.neargo.sharehub.common.crud.AbstractCrudService#nextNo} 同法。
+     *
+     * <h3>已知取舍：并发下会撞唯一键</h3>
+     * 两个人同一瞬间建档，{@code MAX+1} 会算出同一个号，其中一个撞 {@code uk_venue_no} 失败。
+     * 场地方一天建几个，这个代价可以接受；要绝对安全得上号段表，不值得。
+     * 员工号走的也是这条路，行为一致。
+     */
+    private String nextVenueNo() {
+        String prefix = ai.neargo.sharehub.common.BizKey.VENUE;
+        List<Object> top = venueMapper.selectObjs(new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<LocVenue>()
+                .select("MAX(CAST(SUBSTRING(venue_no, " + (prefix.length() + 1) + ") AS UNSIGNED)) AS mx")
+                .likeRight("venue_no", prefix));
+        long n = 0L;
+        if (top != null && !top.isEmpty() && top.get(0) != null) {
+            try {
+                n = Long.parseLong(String.valueOf(top.get(0)));
+            } catch (NumberFormatException ignore) {
+                // 历史上有过 ULID 形态的号，取不出数字时从 0 起，由 uk_venue_no 兜底
+            }
+        }
+        return prefix + String.format("%03d", n + 1);
     }
 
     // —— 合同 —— 已迁入 loc.service.ContractService（2026-09-25 合同走审批）
@@ -293,6 +338,6 @@ public class LocService {
         venueMapper.updateById(e);
         return new Venue(e.getVenueNo(), e.getName(), e.getContact(), e.getIndustry(),
                 venueSiteCounts(List.of(e.getVenueNo())).getOrDefault(e.getVenueNo(), 0),
-                str(e.getArchivedAt()));
+                str(e.getArchivedAt()), e.getAddress(), e.getLng(), e.getLat());
     }
 }

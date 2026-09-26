@@ -86,6 +86,14 @@ public class VenueOnboardingServiceImpl implements VenueOnboardingService {
         }
         e.setVenueName(in.venueName().trim());
         e.setContact(in.contact());
+        /*
+         * 行业同 loc_venue 的词表（V121）：进件通过后会**原样建档成场地方**，
+         * 两边词表不同的话失配发生在审批通过那一刻 —— 那时申请人已经走了，回头改很贵。
+         */
+        if (in.industry() != null && !in.industry().isBlank()
+                && ai.neargo.sharehub.loc.VenueIndustry.of(in.industry()).isEmpty()) {
+            throw ai.neargo.sharehub.common.BizException.badRequest("error.venue.industry_invalid", in.industry());
+        }
         e.setIndustry(in.industry());
         if (create) mapper.insert(e); else mapper.updateById(e);
         return toVO(byNo(e.getOnboardingNo()));

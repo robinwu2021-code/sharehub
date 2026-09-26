@@ -20,6 +20,11 @@ public class LocVenue {
     private String name;
     private String contact;
     private String industry;
+
+    /** 场地方地址（V121）。与 {@link #lng}/{@link #lat} 由地图选点一起写，不单独手填。 */
+    private String address;
+    private java.math.BigDecimal lng;
+    private java.math.BigDecimal lat;
     /*
      * 这里**没有** locationCount：它是「这个场地方名下有几个站点」的聚合值，
      * 不是场地方的属性。存成列的后果见 V39 的说明（列表说有 3 个、点进去一个都没有），

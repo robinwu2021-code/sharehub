@@ -163,8 +163,11 @@ public class SeedData {
                     1 + (i % 3), i % 9 == 0 ? "PAUSED" : "ACTIVE"));
         }
         for (int i = 0; i < VENUE_NAMES.size(); i++) {
+            // 行业用词表码（V121），不再是自由文本。种子里这几个值原本是随机配的
+            // （DXB Airports 配到「地产」），归一时按字面映射没有替业务猜 —— 有了下拉，改它是一次点击。
             venues.add(new Venue("VEN" + (300 + i), VENUE_NAMES.get(i), "+9714" + first7(2000000 + i * 311),
-                    p(List.of("零售", "航空", "地产", "餐饮"), i), 3 + i * 2, null));
+                    p(List.of("RETAIL", "AIRPORT", "COMMERCIAL_RE", "F_AND_B"), i), 3 + i * 2, null,
+                    null, null, null));
         }
         List<Double> shareRates = List.of(0.15, 0.2, 0.25, 0.3);
         for (int i = 0; i < 18; i++) {

@@ -5673,7 +5673,7 @@
      "required": true
     }
    ],
-   "bodyType": "Map<String, Object>",
+   "bodyType": "CommandReq",
    "returnType": "CommandResult",
    "returnContainer": null,
    "returnElement": "CommandResult",
@@ -5683,7 +5683,16 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "type",
+     "type": "String"
+    },
+    {
+     "name": "params",
+     "type": "java.util.Map<String, Object>"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -13322,6 +13331,14 @@
        "type": "Boolean"
       }
      ]
+    },
+    {
+     "name": "lng",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "lat",
+     "type": "java.math.BigDecimal"
     }
    ],
    "requestShape": null
@@ -13454,6 +13471,14 @@
        "type": "Boolean"
       }
      ]
+    },
+    {
+     "name": "lng",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "lat",
+     "type": "java.math.BigDecimal"
     }
    ],
    "requestShape": [
@@ -13500,6 +13525,14 @@
     {
      "name": "address",
      "type": "String"
+    },
+    {
+     "name": "lng",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "lat",
+     "type": "java.math.BigDecimal"
     },
     {
      "name": "venueNo",
@@ -13742,6 +13775,14 @@
        "type": "Boolean"
       }
      ]
+    },
+    {
+     "name": "lng",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "lat",
+     "type": "java.math.BigDecimal"
     }
    ],
    "requestShape": null
@@ -13881,6 +13922,14 @@
        "type": "Boolean"
       }
      ]
+    },
+    {
+     "name": "lng",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "lat",
+     "type": "java.math.BigDecimal"
     }
    ],
    "requestShape": [
@@ -13927,6 +13976,14 @@
     {
      "name": "address",
      "type": "String"
+    },
+    {
+     "name": "lng",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "lat",
+     "type": "java.math.BigDecimal"
     },
     {
      "name": "venueNo",
@@ -14169,6 +14226,14 @@
        "type": "Boolean"
       }
      ]
+    },
+    {
+     "name": "lng",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "lat",
+     "type": "java.math.BigDecimal"
     }
    ],
    "requestShape": null
@@ -21003,6 +21068,18 @@
     {
      "name": "archivedAt",
      "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "lng",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "lat",
+     "type": "java.math.BigDecimal"
     }
    ],
    "requestShape": null
@@ -21045,6 +21122,18 @@
     {
      "name": "archivedAt",
      "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "lng",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "lat",
+     "type": "java.math.BigDecimal"
     }
    ],
    "requestShape": [
@@ -21071,6 +21160,18 @@
     {
      "name": "industry",
      "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "lng",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "lat",
+     "type": "java.math.BigDecimal"
     },
     {
      "name": "createdAt",
@@ -21187,6 +21288,18 @@
     {
      "name": "archivedAt",
      "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "lng",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "lat",
+     "type": "java.math.BigDecimal"
     }
    ],
    "requestShape": [
@@ -21213,6 +21326,18 @@
     {
      "name": "industry",
      "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "lng",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "lat",
+     "type": "java.math.BigDecimal"
     },
     {
      "name": "createdAt",
@@ -31874,12 +31999,17 @@
      "required": true
     }
    ],
-   "bodyType": "java.util.Map<String, Object>",
+   "bodyType": "ai.neargo.sharehub.trade.order.dto.OrderDtos.DepositBuyoutReq",
    "returnType": "Object",
    "returnContainer": null,
    "returnElement": "Object",
    "responseShape": null,
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "reason",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -31898,12 +32028,21 @@
      "required": true
     }
    ],
-   "bodyType": "java.util.Map<String, Object>",
+   "bodyType": "ai.neargo.sharehub.trade.order.dto.OrderDtos.DepositDunReq",
    "returnType": "Object",
    "returnContainer": null,
    "returnElement": "Object",
    "responseShape": null,
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "channel",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -32595,12 +32734,17 @@
      "required": true
     }
    ],
-   "bodyType": "java.util.Map<String, Object>",
+   "bodyType": "FinDtos.InvoiceVoidReq",
    "returnType": "Object",
    "returnContainer": null,
    "returnElement": "Object",
    "responseShape": null,
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "voidReason",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "GET",
@@ -35003,7 +35147,7 @@
      "required": true
     }
    ],
-   "bodyType": "Map<String, Object>",
+   "bodyType": "FinDtos.ReconResolveReq",
    "returnType": "FinDtos.Reconcile",
    "returnContainer": null,
    "returnElement": "FinDtos.Reconcile",
@@ -35069,7 +35213,20 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "diffId",
+     "type": "Long"
+    },
+    {
+     "name": "action",
+     "type": "String"
+    },
+    {
+     "name": "handleNote",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "GET",
@@ -35587,12 +35744,25 @@
    "handler": "FinanceController#generateSettlementsPublic",
    "summary": "周期出账（运营端手动触发入口）。",
    "params": [],
-   "bodyType": "Map<String, String>",
+   "bodyType": "FinDtos.SettlementGenerateReq",
    "returnType": "List<String>",
    "returnContainer": "List",
    "returnElement": "String",
    "responseShape": null,
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "period",
+     "type": "String"
+    },
+    {
+     "name": "payeeType",
+     "type": "String"
+    },
+    {
+     "name": "payeeNos",
+     "type": "java.util.List<String>"
+    }
+   ]
   },
   {
    "verb": "GET",
@@ -38239,57 +38409,110 @@
      "required": true
     }
    ],
-   "bodyType": "Map<String, Object>",
-   "returnType": "List<UserCouponVO>",
-   "returnContainer": "List",
-   "returnElement": "UserCouponVO",
+   "bodyType": "ai.neargo.sharehub.user.marketing.dto.MarketingDtos.CouponIssueReq",
+   "returnType": "ai.neargo.sharehub.user.marketing.dto.MarketingDtos.CouponIssueResultVO",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.user.marketing.dto.MarketingDtos.CouponIssueResultVO",
    "responseShape": [
     {
-     "name": "couponNo",
-     "type": "String"
+     "name": "coupon",
+     "type": "CouponTplVO",
+     "fields": [
+      {
+       "name": "couponNo",
+       "type": "String"
+      },
+      {
+       "name": "name",
+       "type": "String"
+      },
+      {
+       "name": "type",
+       "type": "String"
+      },
+      {
+       "name": "value",
+       "type": "BigDecimal"
+      },
+      {
+       "name": "threshold",
+       "type": "BigDecimal"
+      },
+      {
+       "name": "currency",
+       "type": "String"
+      },
+      {
+       "name": "stock",
+       "type": "Integer"
+      },
+      {
+       "name": "issued",
+       "type": "Integer"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "archivedAt",
+       "type": "String"
+      }
+     ]
     },
     {
-     "name": "cUserNo",
-     "type": "String"
-    },
-    {
-     "name": "tplNo",
-     "type": "String"
-    },
-    {
-     "name": "tplName",
-     "type": "String"
-    },
-    {
-     "name": "tplType",
-     "type": "String"
-    },
-    {
-     "name": "value",
-     "type": "BigDecimal"
-    },
-    {
-     "name": "threshold",
-     "type": "BigDecimal"
-    },
-    {
-     "name": "currency",
-     "type": "String"
-    },
-    {
-     "name": "status",
-     "type": "String"
-    },
-    {
-     "name": "usedOrderNo",
-     "type": "String"
-    },
-    {
-     "name": "expireAt",
-     "type": "String"
+     "name": "record",
+     "type": "ai.neargo.sharehub.user.member.dto.MemberDtos.CouponIssueRecord",
+     "fields": [
+      {
+       "name": "issueNo",
+       "type": "String"
+      },
+      {
+       "name": "couponNo",
+       "type": "String"
+      },
+      {
+       "name": "couponName",
+       "type": "String"
+      },
+      {
+       "name": "targetType",
+       "type": "String"
+      },
+      {
+       "name": "targetDesc",
+       "type": "String"
+      },
+      {
+       "name": "quantity",
+       "type": "Integer"
+      },
+      {
+       "name": "operatorName",
+       "type": "String"
+      },
+      {
+       "name": "createdAt",
+       "type": "String"
+      }
+     ]
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "targetType",
+     "type": "String"
+    },
+    {
+     "name": "targetValue",
+     "type": "String"
+    },
+    {
+     "name": "quantity",
+     "type": "Integer"
+    }
+   ]
   },
   {
    "verb": "GET",
@@ -38443,7 +38666,7 @@
      "required": true
     }
    ],
-   "bodyType": "Map<String, String>",
+   "bodyType": "InvoiceIssueReq",
    "returnType": "CUserInvoiceRow",
    "returnContainer": null,
    "returnElement": "CUserInvoiceRow",
@@ -38505,7 +38728,12 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "fileUrl",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -38524,7 +38752,7 @@
      "required": true
     }
    ],
-   "bodyType": "Map<String, String>",
+   "bodyType": "InvoiceRejectReq",
    "returnType": "CUserInvoiceRow",
    "returnContainer": null,
    "returnElement": "CUserInvoiceRow",
@@ -38586,7 +38814,12 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "reason",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "GET",
@@ -39857,12 +40090,17 @@
    "handler": "MarketingController#sweepDuePushMessages",
    "summary": "扫描到点的排期推送并发出。",
    "params": [],
-   "bodyType": "java.util.Map<String, Object>",
+   "bodyType": "ai.neargo.sharehub.user.marketing.dto.MarketingDtos.PushSweepReq",
    "returnType": "Object",
    "returnContainer": null,
    "returnElement": "Object",
    "responseShape": null,
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "now",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -39999,12 +40237,21 @@
      "required": true
     }
    ],
-   "bodyType": "java.util.Map<String, Object>",
+   "bodyType": "ai.neargo.sharehub.user.marketing.dto.MarketingDtos.PushFinishReq",
    "returnType": "Object",
    "returnContainer": null,
    "returnElement": "Object",
    "responseShape": null,
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "targetCount",
+     "type": "Integer"
+    },
+    {
+     "name": "successCount",
+     "type": "Integer"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -40023,12 +40270,21 @@
      "required": true
     }
    ],
-   "bodyType": "java.util.Map<String, Object>",
+   "bodyType": "ai.neargo.sharehub.user.marketing.dto.MarketingDtos.PushSendReq",
    "returnType": "Object",
    "returnContainer": null,
    "returnElement": "Object",
    "responseShape": null,
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "idempotencyKey",
+     "type": "String"
+    },
+    {
+     "name": "scheduledAt",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "GET",
@@ -42373,12 +42629,25 @@
    "handler": "FinanceController#generateSettlements",
    "summary": "周期出账（[api/README §4.3]）—— **批处理作业调用，非页面入口**，内网受信， 故不挂 `",
    "params": [],
-   "bodyType": "Map<String, String>",
+   "bodyType": "FinDtos.SettlementGenerateReq",
    "returnType": "List<String>",
    "returnContainer": "List",
    "returnElement": "String",
    "responseShape": null,
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "period",
+     "type": "String"
+    },
+    {
+     "name": "payeeType",
+     "type": "String"
+    },
+    {
+     "name": "payeeNos",
+     "type": "java.util.List<String>"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -42570,12 +42839,25 @@
    "handler": "ConsumerAuthController#otp",
    "summary": "发送 OTP。",
    "params": [],
-   "bodyType": "Map<String, String>",
+   "bodyType": "ai.neargo.sharehub.user.consumer.ConsumerAuthReqs.OtpReq",
    "returnType": "Map<String, Object>",
    "returnContainer": null,
    "returnElement": "Map<String, Object>",
    "responseShape": null,
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "countryCode",
+     "type": "String"
+    },
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "scene",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -42585,12 +42867,29 @@
    "handler": "ConsumerAuthController#resetPassword",
    "summary": "密码重置：**能力未开通**（凭据库 pb_auth 未建，[未完成清单 B6]）——如实 400，不假 ok。",
    "params": [],
-   "bodyType": "Map<String, String>",
+   "bodyType": "ai.neargo.sharehub.user.consumer.ConsumerAuthReqs.ResetPwdReq",
    "returnType": "Map<String, Object>",
    "returnContainer": null,
    "returnElement": "Map<String, Object>",
    "responseShape": null,
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "countryCode",
+     "type": "String"
+    },
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "otp",
+     "type": "String"
+    },
+    {
+     "name": "password",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -42600,12 +42899,33 @@
    "handler": "ConsumerAuthController#register",
    "summary": "注册 = OTP 验证 + 建户 + 直接发 token（复用 phone_otp 登录链路，带显式昵称）。",
    "params": [],
-   "bodyType": "Map<String, String>",
+   "bodyType": "ai.neargo.sharehub.user.consumer.ConsumerAuthReqs.RegisterReq",
    "returnType": "Map<String, Object>",
    "returnContainer": null,
    "returnElement": "Map<String, Object>",
    "responseShape": null,
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "countryCode",
+     "type": "String"
+    },
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "otp",
+     "type": "String"
+    },
+    {
+     "name": "nickname",
+     "type": "String"
+    },
+    {
+     "name": "password",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "GET",
@@ -42896,12 +43216,17 @@
    "handler": "RentController#depositFree",
    "summary": "免押预授权（借出前）：冻结额度走 `pay_auth`（StubPaymentPort，ADR-005 不真扣款）。",
    "params": [],
-   "bodyType": "Map<String, String>",
+   "bodyType": "ai.neargo.sharehub.trade.dto.MpTradeReqs.DepositFreeReq",
    "returnType": "Map<String, Object>",
    "returnContainer": null,
    "returnElement": "Map<String, Object>",
    "responseShape": null,
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "cabinetNo",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "GET",
@@ -43132,7 +43457,7 @@
    "handler": "RentController#rent",
    "summary": "扫码借出：`{cabinetNo, useFreeDeposit, couponNo`} → 创单，返回订单号 + 充电宝 + 指令号。",
    "params": [],
-   "bodyType": "Map<String, Object>",
+   "bodyType": "ai.neargo.sharehub.trade.dto.MpTradeReqs.RentReq",
    "returnType": "RentResult",
    "returnContainer": null,
    "returnElement": "RentResult",
@@ -43150,7 +43475,20 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "cabinetNo",
+     "type": "String"
+    },
+    {
+     "name": "useFreeDeposit",
+     "type": "Boolean"
+    },
+    {
+     "name": "couponNo",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "GET",
@@ -43382,12 +43720,21 @@
    "handler": "RentController#pay",
    "summary": "支付（`scene`=ORDER/…）。",
    "params": [],
-   "bodyType": "Map<String, Object>",
+   "bodyType": "ai.neargo.sharehub.trade.dto.MpTradeReqs.PayReq",
    "returnType": "Map<String, Object>",
    "returnContainer": null,
    "returnElement": "Map<String, Object>",
    "responseShape": null,
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "orderNo",
+     "type": "String"
+    },
+    {
+     "name": "scene",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "GET",
@@ -44251,12 +44598,25 @@
    "handler": "MpUserController#updateProfile",
    "summary": "资料编辑：仅 `nickname`/`avatar`。",
    "params": [],
-   "bodyType": "java.util.Map<String, String>",
+   "bodyType": "ai.neargo.sharehub.user.core.dto.UserCoreDtos.ProfilePatchReq",
    "returnType": "java.util.Map<String, Object>",
    "returnContainer": null,
    "returnElement": "java.util.Map<String, Object>",
    "responseShape": null,
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "nickname",
+     "type": "String"
+    },
+    {
+     "name": "avatar",
+     "type": "String"
+    },
+    {
+     "name": "email",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -44266,7 +44626,7 @@
    "handler": "MpUserController#recharge",
    "summary": "按套餐充值（C-WA-02）。",
    "params": [],
-   "bodyType": "Map<String, String>",
+   "bodyType": "ai.neargo.sharehub.user.asset.dto.UserAssetDtos.RechargeReq",
    "returnType": "RechargeResultVO",
    "returnContainer": null,
    "returnElement": "RechargeResultVO",
@@ -44308,7 +44668,12 @@
      "type": "BigDecimal"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "packageNo",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "GET",
@@ -45114,6 +45479,20 @@
    "GOOD",
    "WEAK"
   ],
+  "VenueIndustry": [
+   "SHOPPING_MALL",
+   "COMMERCIAL_RE",
+   "AIRPORT",
+   "TRANSPORT_HUB",
+   "F_AND_B",
+   "HOTEL",
+   "MEDICAL",
+   "EDUCATION",
+   "OFFICE",
+   "ENTERTAINMENT",
+   "RETAIL",
+   "SCENIC"
+  ],
   "LocationStatus": [
    "ACTIVE"
   ],
@@ -45227,7 +45606,7 @@
  ],
  "stats": {
   "endpoints": 515,
-  "records": 440,
+  "records": 461,
   "withPerm": 444,
   "withBody": 219,
   "shapedResponses": 406

@@ -40,9 +40,9 @@ import { FilterCard } from "@/components/location/filter-card";
 import { SummaryCard } from "@/components/ui/summary-card";
 import { FileLink } from "@/components/location/file-link";
 import { LEAD_STAGE, SHARE_MODE_LABEL, FOLLOW_DUE, followDue } from "@/components/location/lead-meta";
-import { FILE_CATEGORY_RULES, fileSize } from "@/lib/types";
+import { FILE_CATEGORY_RULES, fileSize, VENUE_INDUSTRIES, VENUE_INDUSTRY_LABEL } from "@/lib/types";
 import type {
-  Venue, Contract, Lead, LeadStage, LeadSaveReq, VenueOnboarding, LifecycleRow, SiteStatus, PageResult, FunnelStage,
+  Venue, VenueIndustry, Contract, Lead, LeadStage, LeadSaveReq, VenueOnboarding, LifecycleRow, SiteStatus, PageResult, FunnelStage,
 } from "@/lib/types";
 
 // tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）。
@@ -82,14 +82,41 @@ const SHARE_MODE_OPTS = (Object.keys(SHARE_MODE_LABEL) as (keyof typeof SHARE_MO
   .map((k) => ({ value: k, label: SHARE_MODE_LABEL[k] }));
 
 /**
+ * 行业码 → 中文名。**取不到就原样显示那个码**，不显示空白 ——
+ * 空白只说「这里没有」，原样显示能让「库里存着词表外的值」当场看得见。
+ */
+const industryLabel = (v?: string | null) =>
+  (v && VENUE_INDUSTRY_LABEL[v as VenueIndustry]) || v || "-";
+
+const INDUSTRY_OPTIONS = [
+  { value: "", label: "未确定" },
+  ...VENUE_INDUSTRIES.map((v) => ({ value: v, label: VENUE_INDUSTRY_LABEL[v] })),
+];
+
+/**
+ * 场地方表单。
+ *
+ * **没有编号字段**：编号一律服务端取号（`VEN` + 顺序号），后端在 `createVenue` 里
+ * 直接 `body.setVenueNo(null)`。此前这里有一个可编辑的「编号」框、占位写着「新增自动生成」——
+ * 运营打进去的值会被**静默丢弃**，是那种「看着能用其实不生效」的字段。
+ * 编辑时编号在抽屉标题里显示，够用了。
+ *
+ * **行业是下拉不是文本框**：自由文本的问题不是填错，是填错了没人拦也没人看得出来 ——
+ * 生产 5 行里有三行是错的（DXB Airports 填的是「地产」）。
+ *
+ * **地址走地图选点**：地址与经纬度必须一致，分开手填时两者对不上没人拦得住。
+ *
  * @form POST /api/ops/venues
  * @form POST /api/ops/venues/{venueNo}
  */
 const VENUE_FIELDS: FieldDef[] = [
-  { key: "venueNo", label: "编号", readOnlyOnEdit: true, placeholder: "新增自动生成" },
   { key: "name", label: "名称", required: true, maxLength: 128, placeholder: "Dubai Mall" },
   { key: "contact", label: "联系方式", placeholder: "姓名 / 电话" },
-  { key: "industry", label: "行业", placeholder: "购物中心" },
+  { key: "industry", label: "行业", type: "select", options: INDUSTRY_OPTIONS,
+    help: "与站点的「场景类型」是两个轴：行业说这家公司做什么，场景说这个点位在什么地方" },
+  { key: "address", label: "地址", type: "address", latKey: "lat", lngKey: "lng", maxLength: 256,
+    placeholder: "点「地图选点」或直接输入",
+    help: "地址与经纬度请保持一致：地址给人看，按距离排序看的是坐标" },
   // 「站点数」是**聚合值**（名下有几个站点），不是属性，手填必然与实际脱节 —— 表单不收。
 ];
 /**
@@ -127,7 +154,12 @@ const LEAD_FIELDS: FieldDef[] = [
   { key: "leadNo", label: "线索号", readOnlyOnEdit: true, placeholder: "新增自动生成", section: "场地" },
   { key: "venueName", label: "场地名称", required: true, maxLength: 128, placeholder: "某商场", section: "场地",
     help: "新建时按场地名或地址查重：90 天内别人在跟的场地不能重复建，会告诉你是谁在跟" },
-  { key: "address", label: "地址", maxLength: 256, placeholder: "楼宇 / 街道", section: "场地" },
+  // 地图选点而不是纯文本：**坐标要跟着一起存**，签约转化时随地址带进新建站点。
+  // 此前转化传的是 `SiteReq(..., address, null, null, ...)` —— 站点有地址没落点，
+  // 地图上看不见、C 端「找附近」也排不到它，而这件事不报错。
+  { key: "address", label: "地址", type: "address", latKey: "lat", lngKey: "lng",
+    maxLength: 256, placeholder: "点「地图选点」或直接输入", section: "场地",
+    help: "选点后坐标会一起存；签约转化时连同地址带进新建的站点" },
   { key: "contact", label: "联系人", placeholder: "姓名 / 电话", section: "场地" },
   { key: "expectSites", label: "预计站点数", type: "number", min: 0, section: "场地" },
   { key: "nextFollowAt", label: "下次跟进", type: "date", section: "场地", help: "「今天该打谁的电话」按它排" },
@@ -194,13 +226,17 @@ const ONBOARDING_FIELDS: FieldDef[] = [
   { key: "onboardingNo", label: "申请号", readOnlyOnEdit: true, placeholder: "新增自动生成" },
   { key: "venueName", label: "场地名称", placeholder: "Al Barsha Mall" },
   { key: "contact", label: "联系人", placeholder: "姓名 + 电话" },
-  { key: "industry", label: "行业", placeholder: "购物中心" },
+  // 与场地方同一套词表：进件通过后会原样建档成场地方，两边不同的话失配发生在审批通过那一刻
+  { key: "industry", label: "行业", type: "select", options: INDUSTRY_OPTIONS },
   // 「审核状态 / 审核备注」不放进表单：审核是一个有状态机的动作，不是可以随手改的字段。
 ];
 
 /** 出参 Lead（条款收在 terms 里）→ 编辑表单（条款平铺，与保存入参同形）。 */
 const leadToForm = (l: Lead): LeadSaveReq => ({
   leadNo: l.leadNo, venueName: l.venueName, address: l.address, contact: l.contact,
+  // **坐标必须回填**：不带的话编辑抽屉一打开坐标就是空的，运营点一下保存就把原来选好的点抹了
+  // —— 而抹掉之后没有任何症状，只是这个商机转化出来的站点又回到「地图上看不见」。
+  lng: l.lng ?? null, lat: l.lat ?? null,
   expectSites: l.expectSites, nextFollowAt: l.nextFollowAt?.slice(0, 10) ?? null,
   ownerType: l.ownerType, owner: l.owner, siteNo: l.siteNo,
   shareMode: l.terms?.shareMode ?? null, shareRate: l.terms?.shareRate ?? null, entryFee: l.terms?.entryFee ?? null,
@@ -440,7 +476,7 @@ function VenuesInner() {
     { header: "编号", cell: (v) => <span className="txt-strong tabular-nums">{v.venueNo}</span> },
     { header: "名称", cell: (v) => v.name },
     { header: "联系方式", cell: (v) => <span className="text-muted-foreground">{v.contact}</span> },
-    { header: "行业", cell: (v) => v.industry },
+    { header: "行业", cell: (v) => industryLabel(v.industry) },
     { header: "站点数", className: "text-right", cell: (v) => <span className="tabular-nums">{v.locationCount}</span> },
     ...(canReadPayout ? [{
       header: "收款账户",
@@ -624,7 +660,7 @@ function VenuesInner() {
     },
     { header: "场地名称", cell: (o) => o.venueName },
     { header: "联系人", cell: (o) => <span className="text-muted-foreground">{o.contact}</span> },
-    { header: "行业", cell: (o) => o.industry },
+    { header: "行业", cell: (o) => industryLabel(o.industry) },
     { header: "申请时间", cell: (o) => <span className="text-muted-foreground">{fmtTime(o.requestedAt)}</span> },
     { header: "审核状态", cell: (o) => <StatusBadge map={OB_STATUS} value={o.status} /> },
     {
@@ -672,7 +708,7 @@ function VenuesInner() {
         { header: "编号", value: (v) => v.venueNo },
         { header: "名称", value: (v) => v.name },
         { header: "联系方式", value: (v) => v.contact },
-        { header: "行业", value: (v) => v.industry },
+        { header: "行业", value: (v) => industryLabel(v.industry) },
         { header: "站点数", value: (v) => v.locationCount },
         ...archivedCsv<Venue>(),
       ], pageRows<Venue>());
@@ -705,7 +741,7 @@ function VenuesInner() {
         { header: "申请号", value: (o) => o.onboardingNo },
         { header: "场地名称", value: (o) => o.venueName },
         { header: "联系人", value: (o) => o.contact },
-        { header: "行业", value: (o) => o.industry },
+        { header: "行业", value: (o) => industryLabel(o.industry) },
         { header: "申请时间", value: (o) => fmtTime(o.requestedAt) },
         { header: "审核状态", value: (o) => OB_STATUS[o.status].label },
         { header: "备注", value: (o) => o.reviewNote ?? "" },
@@ -791,7 +827,7 @@ function VenuesInner() {
       )}
       {tab === "onboarding" && (
         <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索场地名称 / 联系人" onExport={onExport}
-          onAdd={allow("location:venue:create") ? () => setOnboardingForm({ status: "PENDING", industry: "购物中心" }) : undefined} addLabel="新增申请" />
+          onAdd={allow("location:venue:create") ? () => setOnboardingForm({ status: "PENDING", industry: "SHOPPING_MALL" }) : undefined} addLabel="新增申请" />
       )}
       {tab === "lifecycle" && funnel.data && (
         /* 连续漏斗：签约前是商机五阶段，签约后是站点五状态；点一格筛下方列表（R2） */

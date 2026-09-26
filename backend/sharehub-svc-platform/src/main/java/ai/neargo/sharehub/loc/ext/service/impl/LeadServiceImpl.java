@@ -259,6 +259,7 @@ public class LeadServiceImpl extends AbstractCrudService<LocLead, Lead> implemen
                 e.getInPool() != null && e.getInPool() == 1, e.getPrevOwner(), e.getCompetitorName(),
                 e.getCompetitorExclusiveUntil(), e.getReactivatedAt(),
                 new LeadTerms(e.getShareMode(), e.getShareRate(), e.getEntryFee(), e.getGuaranteeAmount(),
-                        e.getTermMonths(), e.getExclusiveFlag()));
+                        e.getTermMonths(), e.getExclusiveFlag()),
+                e.getLng(), e.getLat());
     }
 }

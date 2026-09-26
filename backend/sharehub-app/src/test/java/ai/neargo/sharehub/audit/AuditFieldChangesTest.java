@@ -90,7 +90,7 @@ class AuditFieldChangesTest extends AuditTestSupport {
         String tp = newTraceparent();
         Map<String, Object> venue = new HashMap<>();
         venue.put("name", "[改动泄漏测试] 场地方 " + System.nanoTime());
-        venue.put("industry", "购物中心");
+        venue.put("industry", "SHOPPING_MALL");
         postWithHeaders("/api/ops/venues", venue, admin, "traceparent", tp).okData();
 
         assertThat(changesOfDetail(auditOfThisRequest("admin.user", traceIdOf(tp))))

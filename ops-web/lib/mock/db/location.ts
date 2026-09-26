@@ -52,7 +52,8 @@ export const locations: SitePoint[] = Array.from({ length: 30 }, (_, i) => {
 });
 export const venues: Venue[] = VENUE_NAMES.map((name, i) => ({
   venueNo: `VEN${300 + i}`, name, contact: `+9714${String(2000000 + i * 311).slice(0, 7)}`,
-  industry: p(["零售", "航空", "地产", "餐饮"], i), locationCount: 3 + i * 2, archivedAt: null,
+  industry: p(["RETAIL", "AIRPORT", "COMMERCIAL_RE", "F_AND_B"] as const, i), locationCount: 3 + i * 2, archivedAt: null,
+  address: null, lng: null, lat: null,
 }));
 export const contracts: Contract[] = Array.from({ length: 18 }, (_, i) => ({
   contractNo: `CT${400 + i}`,
@@ -162,10 +163,10 @@ for (const i of [10, 12]) {
 // 后端出于同一理由把 SiteAnalysis 从 loc.ext 迁进了报表域（见 ReportDtos 的迁入注释）。
 
 export const venueOnboardings: VenueOnboarding[] = [
-  { onboardingNo: "OB0001", venueName: "Al Barsha Mall", contact: "Ahmed +971501110001", industry: "购物中心", requestedAt: "2026-07-10T10:00:00Z", status: "PENDING", reviewAt: null, reviewNote: null },
-  { onboardingNo: "OB0002", venueName: "Dragon Mart 2", contact: "Lin +971501110002", industry: "商贸城", requestedAt: "2026-07-08T09:00:00Z", status: "APPROVED", reviewAt: "2026-07-09T14:00:00Z", reviewNote: "资料齐全，已通过" },
-  { onboardingNo: "OB0003", venueName: "Dune Hotel", contact: "Sara +971501110003", industry: "酒店", requestedAt: "2026-07-05T11:00:00Z", status: "REJECTED", reviewAt: "2026-07-06T10:00:00Z", reviewNote: "流量不足，建议重新评估" },
-  { onboardingNo: "OB0004", venueName: "City Walk Shops", contact: "Omar +971501110004", industry: "零售街区", requestedAt: "2026-07-12T08:00:00Z", status: "PENDING", reviewAt: null, reviewNote: null },
+  { onboardingNo: "OB0001", venueName: "Al Barsha Mall", contact: "Ahmed +971501110001", industry: "SHOPPING_MALL", requestedAt: "2026-07-10T10:00:00Z", status: "PENDING", reviewAt: null, reviewNote: null },
+  { onboardingNo: "OB0002", venueName: "Dragon Mart 2", contact: "Lin +971501110002", industry: "RETAIL", requestedAt: "2026-07-08T09:00:00Z", status: "APPROVED", reviewAt: "2026-07-09T14:00:00Z", reviewNote: "资料齐全，已通过" },
+  { onboardingNo: "OB0003", venueName: "Dune Hotel", contact: "Sara +971501110003", industry: "HOTEL", requestedAt: "2026-07-05T11:00:00Z", status: "REJECTED", reviewAt: "2026-07-06T10:00:00Z", reviewNote: "流量不足，建议重新评估" },
+  { onboardingNo: "OB0004", venueName: "City Walk Shops", contact: "Omar +971501110004", industry: "RETAIL", requestedAt: "2026-07-12T08:00:00Z", status: "PENDING", reviewAt: null, reviewNote: null },
 ];
 
 // 生命周期挂在**真实存在的站点**上（台账 M5：原先是 SITE001–005 / DIFC Gate 等，
@@ -542,7 +543,9 @@ function createLead(x: LeadSaveReq): Lead {
     leadNo: nextNo("LD", leads),
     venueName: x.venueName?.trim() ?? "", contact: x.contact ?? null, stage, owner, ownerType,
     siteNo: x.siteNo || null, expectSites: Number(x.expectSites ?? 0) || 0, nextFollowAt: x.nextFollowAt || null,
-    updatedAt: at, address: x.address ?? null, venueNo: null,
+    updatedAt: at, address: x.address ?? null,
+    // 坐标与地址一起存：转化时要带进新建站点（此前站点有地址没落点）
+    lng: x.lng ?? null, lat: x.lat ?? null, venueNo: null,
     // 服务端字段一律不采信入参：新建请求里带 contractNo / inPool 只可能是伪造
     contractNo: null, inPool: false, prevOwner: null, lastFollowAt: at,
     lostReason: stage === "LOST" ? x.lostReason!.trim() : null, lostAt: stage === "LOST" ? at : null,
@@ -568,6 +571,10 @@ function updateLead(cur: Lead, x: LeadSaveReq): Lead {
     venueName: pick("venueName", cur.venueName),
     contact: pick("contact", cur.contact),
     address: pick("address", cur.address),
+    // 与 address 同口径：不传就沿用旧值。**漏了这两行的后果是**改个名字就把选好的点抹了，
+    // 而抹掉之后没有任何症状 —— 只是这条商机转化出来的站点又回到「地图上看不见」。
+    lng: pick("lng", cur.lng),
+    lat: pick("lat", cur.lat),
     expectSites: Number(pick("expectSites", cur.expectSites)) || 0,
     nextFollowAt: pick("nextFollowAt", cur.nextFollowAt) || null,
     siteNo: pick("siteNo", cur.siteNo) || null,
@@ -672,7 +679,14 @@ export function convertLead(leadNo: string, r: LeadConvertReq = {}): LeadConvers
     const st: Site = {
       siteNo: `ST${300 + sites.length}`, name: r.siteName?.trim() || lead.venueName, venueNo, venueName: venue.name,
       agentNo: null, regionId: region.id, regionName: region.name, address: r.address || lead.address || "",
-      lat: region.lat, lng: region.lng, sceneType: "商场", openHours: r.openHours || undefined,
+      /*
+       * **优先用商机上选好的坐标**（V121 起商机有坐标了）。
+       * 商机没选点时退到区域中心 —— 那是 mock 的既有行为，且与真后端不一致：
+       * 后端那一侧退的是 null。这个差异是既有的，不在本次改动范围内，
+       * 但它意味着「商机没填地址」这条路在 mock 里看不出问题、切后端才发现站点没落点。
+       */
+      lat: lead.lat ?? region.lat, lng: lead.lng ?? region.lng,
+      sceneType: "商场", openHours: r.openHours || undefined,
       pointCount: 0, cabinetCount: 0, status: "PREPARING", archivedAt: null,
     };
     sites.unshift(st);

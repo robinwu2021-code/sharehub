@@ -59,6 +59,14 @@ public class LocLead extends BaseEntity {
     // —— 批次 B（V104）——
     /** 场地地址：与场地名一起做 90 天查重。 */
     private String address;
+
+    /**
+     * 坐标（V121）。**签约转化时随 address 一起带进新建站点** ——
+     * 此前这两个值不存在，{@code convert()} 传的是 {@code SiteReq(..., address, null, null, ...)}，
+     * 于是转化出来的站点在地图上没有落点、C 端「找附近」也排不到它，且不报错。
+     */
+    private java.math.BigDecimal lng;
+    private java.math.BigDecimal lat;
     /** 签约转化生成 / 关联的场地方（也可在转化前手工关联已有场地方）。 */
     private String venueNo;
     /** 签约转化生成的合同草稿 —— 有值即已转化，不可重复转化。服务端写，编辑锁死。 */

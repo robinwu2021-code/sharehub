@@ -195,12 +195,51 @@ export interface SitePoint extends Archivable {
   cabinetCount: number;
   status: "ACTIVE" | "PAUSED";
 }
+/**
+ * 场地方行业（SSOT）。与后端 `loc.VenueIndustry`、`loc_venue.industry` 列注释三方同名同值。
+ *
+ * **与站点的「场景类型」是两个轴，别合并**：行业说的是这家公司做什么
+ * （Emaar 是商业地产），场景说的是这个点位在什么地方（它名下那个点位在商场里）。
+ * 取值高度重叠，但地产集团运营商场时二者恰恰不同。
+ *
+ * 收成词表之前这一列是自由文本框，生产 5 行里有三行填错了（DXB Airports 填的是「地产」），
+ * 而**自由文本的问题不是填错，是填错了没人拦也没人看得出来**。
+ */
+export type VenueIndustry =
+  | "SHOPPING_MALL" | "COMMERCIAL_RE" | "AIRPORT" | "TRANSPORT_HUB" | "F_AND_B"
+  | "HOTEL" | "MEDICAL" | "EDUCATION" | "OFFICE" | "ENTERTAINMENT"
+  | "RETAIL" | "SCENIC" | "OTHER";
+
+/** 行业中文名。下拉与列表共用一份 —— 两处各写一遍迟早对不上。 */
+export const VENUE_INDUSTRY_LABEL: Record<VenueIndustry, string> = {
+  SHOPPING_MALL: "购物中心",
+  COMMERCIAL_RE: "商业地产",
+  AIRPORT: "机场与航空",
+  TRANSPORT_HUB: "交通枢纽",
+  F_AND_B: "餐饮",
+  HOTEL: "酒店与住宿",
+  MEDICAL: "医疗",
+  EDUCATION: "教育",
+  OFFICE: "办公",
+  ENTERTAINMENT: "娱乐",
+  RETAIL: "零售",
+  SCENIC: "景区与文旅",
+  OTHER: "其它",
+};
+
+export const VENUE_INDUSTRIES = Object.keys(VENUE_INDUSTRY_LABEL) as VenueIndustry[];
+
 export interface Venue extends Archivable {
   venueNo: string;
   name: string;
   contact: string;
-  industry: string;
+  /** 见 {@link VenueIndustry}。空 = 还没问清楚，这是合法状态，不是必填。 */
+  industry: VenueIndustry | "" | null;
   locationCount: number;
+  /** 地址与坐标：由地图选点**一起**写。分开手填时两者对不上没人拦得住。 */
+  address?: string | null;
+  lng?: number | null;
+  lat?: number | null;
 }
 /**
  * 进场合同状态（SSOT）。与后端 `loc.ContractStatus`、`loc_contract.status` 列注释三方同名同值。
@@ -501,6 +540,12 @@ export interface Lead {
   updatedAt: string;
   /** 场地地址。查重按「场地名或地址」任一相同判（后端 `lead.dedup.days` 天内）。 */
   address?: string | null;
+  /**
+   * 地址对应的坐标。**签约转化时随 address 一起带进新建站点** ——
+   * 这两个值存在之前，转化出来的站点有地址没落点：地图上看不见、C 端「找附近」排不到，且不报错。
+   */
+  lng?: number | null;
+  lat?: number | null;
   /** 签约转化后回填：关联 / 新建的场地方。 */
   venueNo?: string | null;
   /** 签约转化后回填：生成的合同草稿。有值 = 已转化，不能再转。 */
@@ -538,6 +583,9 @@ export interface LeadSaveReq {
   venueName?: string;
   contact?: string | null;
   address?: string | null;
+  /** 与 address 由地图选点一起写，见 Lead.lng 的说明。 */
+  lng?: number | null;
+  lat?: number | null;
   regionId?: string | null;
   stage?: LeadStage;
   owner?: string | null;
@@ -695,7 +743,11 @@ export interface VenueOnboarding {
   venueNo?: string | null;
   venueName: string;
   contact: string;
-  industry: string;
+  /**
+   * 见 {@link VenueIndustry}。**与场地方同一套词表** ——
+   * 进件通过后会原样建档成场地方，两边词表不同的话失配发生在审批通过那一刻。
+   */
+  industry: VenueIndustry | "" | null;
   requestedAt: string;
   status: "PENDING" | "APPROVED" | "REJECTED";
   reviewAt: string | null;

@@ -28,7 +28,9 @@ public final class LocExtDtos {
                        String address, String venueNo, String contractNo, String lostReason,
                        java.time.LocalDateTime lostAt, java.time.LocalDateTime lastFollowAt, boolean inPool,
                        String prevOwner, String competitorName, java.time.LocalDate competitorExclusiveUntil,
-                       java.time.LocalDateTime reactivatedAt, LeadTerms terms) {
+                       java.time.LocalDateTime reactivatedAt, LeadTerms terms,
+                       /* 坐标（V121）：与 address 同时由地图选点写入，签约转化时一起带进站点 */
+                       java.math.BigDecimal lng, java.math.BigDecimal lat) {
     }
 
     /** 商机上的谈判条款：签约转化时带进合同草稿。 */

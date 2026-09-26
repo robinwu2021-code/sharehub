@@ -81,7 +81,10 @@ public final class LocDtos {
      * 而列表默认已按它过滤，所以平时看不出少了什么。
      */
     public record Venue(String venueNo, String name, String contact, String industry,
-                        int locationCount, String archivedAt) {
+                        int locationCount, String archivedAt,
+                        /* 地址与坐标（V121）。三者由地图选点一起写 —— 分开手填时对不上没人拦得住，
+                           而 C 端「找附近」按坐标排、地址只给人看。 */
+                        String address, java.math.BigDecimal lng, java.math.BigDecimal lat) {
     }
 
     /**

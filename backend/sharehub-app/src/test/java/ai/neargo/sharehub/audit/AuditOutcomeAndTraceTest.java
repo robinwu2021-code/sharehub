@@ -76,7 +76,7 @@ class AuditOutcomeAndTraceTest extends AuditTestSupport {
     private static Map<String, Object> venueBody() {
         Map<String, Object> m = new HashMap<>();
         m.put("name", "[审计结果测试] 场地方 " + System.nanoTime());
-        m.put("industry", "购物中心");
+        m.put("industry", "SHOPPING_MALL");
         return m;
     }
 }

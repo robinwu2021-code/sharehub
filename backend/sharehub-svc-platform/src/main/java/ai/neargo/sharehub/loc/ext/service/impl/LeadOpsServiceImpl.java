@@ -132,9 +132,14 @@ public class LeadOpsServiceImpl implements LeadOpsService {
                 throw BizException.badRequest("error.contract.site_venue_mismatch", sn, venueNo);
             }
         } else {
+            /*
+             * **坐标必须跟着 address 一起过去**（V121 起商机有坐标了）。
+             * 此前这两个位置写死 null，于是转化出来的站点有地址、没落点 ——
+             * 地图上看不见它，C 端「找附近」也排不到它，而这件事不报错。
+             */
             Site s = siteService.create(new SiteReq(firstNonBlank(r.siteName(), lead.getVenueName()), null, venueNo, null,
                     firstNonBlank(r.regionId(), lead.getRegionId()), firstNonBlank(r.address(), lead.getAddress()),
-                    null, null, null, r.openHours(), null));
+                    lead.getLng(), lead.getLat(), null, r.openHours(), null));
             siteNo = s.siteNo();
             siteCreated = true;
         }
