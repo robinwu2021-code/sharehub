@@ -7,18 +7,7 @@
 # 根本对不准。而一条对错了的告警比没有告警更糟——它会让人开始忽略整个检查器。
 #
 # 新表单必须一开始就写注解；存量慢慢补，补一张从这里删一行。
-ops-web/app/agents/page.tsx::APPLY_FIELDS
-ops-web/app/agents/page.tsx::accountFieldsFor
-ops-web/app/agents/page.tsx::commissionFieldsFor
-ops-web/app/cs/page.tsx::TICKET_FIELDS
 ops-web/app/dev/ui/composites.tsx::DEMO_FIELDS
-ops-web/app/devices/page.tsx::CODE_FIELDS
-ops-web/app/devices/page.tsx::OTA_FIELDS
-ops-web/app/devices/page.tsx::RELEASE_FIELDS
-ops-web/app/devices/page.tsx::cabinetFields
-ops-web/app/devices/page.tsx::commandFields
-ops-web/app/employees/page.tsx::ROLE_FIELDS
-ops-web/app/employees/page.tsx::empFields
 ops-web/app/finance/page.tsx::INVOICE_FIELDS_BASE
 ops-web/app/finance/page.tsx::PAYOUT_FIELDS
 ops-web/app/finance/page.tsx::ruleFieldsFor
@@ -26,14 +15,6 @@ ops-web/app/operation/fee-plans/page.tsx::PLAN_FIELDS
 ops-web/app/operation/fee-plans/page.tsx::SCHEDULE_FIELDS
 ops-web/app/operation/sites/page.tsx::PAUSE_FIELDS
 ops-web/app/operation/sites/page.tsx::fieldsFor
-ops-web/app/venues/page.tsx::LEAD_FIELDS
-ops-web/app/venues/page.tsx::ONBOARDING_FIELDS
-ops-web/app/venues/page.tsx::REJECT_FIELDS
-ops-web/app/venues/page.tsx::VENUE_FIELDS
-ops-web/app/venues/page.tsx::contractFieldsFor
-ops-web/app/venues/page.tsx::leadFieldsFor
-ops-web/app/work-orders/page.tsx::INSPECTION_FIELDS
-ops-web/app/work-orders/page.tsx::SLA_FIELDS
 ops-web/components/operation/plan-scope-drawer.tsx::fields
 ops-web/components/operation/site-detail.tsx::POINT_FIELDS
 ops-web/components/operation/site-detail.tsx::fields

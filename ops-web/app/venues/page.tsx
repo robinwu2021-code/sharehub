@@ -81,6 +81,10 @@ const LEAD_VIEW: StatusMap<"ACTIVE" | "POOL"> = {
 const SHARE_MODE_OPTS = (Object.keys(SHARE_MODE_LABEL) as (keyof typeof SHARE_MODE_LABEL)[])
   .map((k) => ({ value: k, label: SHARE_MODE_LABEL[k] }));
 
+/**
+ * @form POST /api/ops/venues
+ * @form POST /api/ops/venues/{venueNo}
+ */
 const VENUE_FIELDS: FieldDef[] = [
   { key: "venueNo", label: "编号", readOnlyOnEdit: true, placeholder: "新增自动生成" },
   { key: "name", label: "名称", required: true, maxLength: 128, placeholder: "Dubai Mall" },
@@ -91,6 +95,10 @@ const VENUE_FIELDS: FieldDef[] = [
 /**
  * 合同字段。场地方 / 站点必须**选**不能**打** —— 合同是场地方分成的唯一依据，按名字连必然连错。
  * **没有状态**（R1）：新建一律草稿，推进走提交 / 审批 / 签署等动作；只有草稿能编辑。
+ */
+/**
+ * @form POST /api/ops/contracts
+ * @form POST /api/ops/contracts/{contractNo}
  */
 function contractFieldsFor(
   venues: { value: string; label: string }[],
@@ -111,6 +119,10 @@ function contractFieldsFor(
   ];
 }
 /** 商机档案字段。**没有阶段**（R1）：阶段只经动作改（记跟进顺带推进 / 标记丢单 / 签约转化）。 */
+/**
+ * @form POST /api/ops/leads
+ * @form POST /api/ops/leads/{leadNo}
+ */
 const LEAD_FIELDS: FieldDef[] = [
   { key: "leadNo", label: "线索号", readOnlyOnEdit: true, placeholder: "新增自动生成", section: "场地" },
   { key: "venueName", label: "场地名称", required: true, maxLength: 128, placeholder: "某商场", section: "场地",
@@ -130,6 +142,10 @@ const LEAD_FIELDS: FieldDef[] = [
 /**
  * 负责人单独拼：`loc_lead.owner` 存的是**业务号**，它是员工号还是伙伴号由 `ownerType` 说了算。
  * 归属是伙伴时，商机签下并指定落成站点后会自动写一行「拓展」责任 —— 那是拓展佣金的依据。
+ */
+/**
+ * @form POST /api/ops/leads
+ * @form POST /api/ops/leads/{leadNo}
  */
 function leadFieldsFor(
   ownerType: string,
@@ -162,11 +178,18 @@ function leadFieldsFor(
   ];
 }
 /** 驳回原因：必填。不给原因的话，申请人只能反复猜着重提。 */
+/**
+ * @form POST /api/ops/venue-onboardings/{onboardingNo}/review
+ */
 const REJECT_FIELDS: FieldDef[] = [
   { key: "note", label: "驳回原因", required: true, maxLength: 200,
     placeholder: "如：营业执照照片不清晰，请重新上传",
     help: "申请人会原样看到这句话" },
 ];
+/**
+ * @form POST /api/ops/venue-onboardings
+ * @form POST /api/ops/venue-onboardings/{onboardingNo}
+ */
 const ONBOARDING_FIELDS: FieldDef[] = [
   { key: "onboardingNo", label: "申请号", readOnlyOnEdit: true, placeholder: "新增自动生成" },
   { key: "venueName", label: "场地名称", placeholder: "Al Barsha Mall" },

@@ -88,6 +88,9 @@ const AGENT_TYPE: StatusMap<AgentType> = {
   CITY_PARTNER: { label: "城市合伙人", tone: "default" },
 };
 
+/**
+ * @form POST /api/agent/applies
+ */
 const APPLY_FIELDS: FieldDef[] = [
   { key: "operatorName", label: "主体名称", required: true, placeholder: "营业执照上的名称" },
   { key: "operatorType", label: "主体类型", type: "select", required: true,
@@ -109,6 +112,10 @@ const TAB_KEYS = ["applies", "profiles", "commission", "assign", "performance", 
 /**
  * 分润规则字段。代理商**选**不**打** —— 原先是「代理编号 + 代理名称」两个文本框，
  * 要人手填两遍同一件事，填不一致时以哪个为准没人说得清。现在只选编号，名字提交时带出。
+ */
+/**
+ * @form POST /api/agent/commissions
+ * @form POST /api/agent/commissions/{commissionNo}
  */
 function commissionFieldsFor(agents: { value: string; label: string }[]): FieldDef[] {
   return [
@@ -134,6 +141,10 @@ const toOptions = (rows: AssignableAsset[] | undefined, type: AssignableAsset["a
 const ASSET_TYPE_LABEL: Record<AssignableAsset["assetType"], string> = { CABINET: "机柜", SITE: "站点" };
 
 /** 代理账号字段。同上：代理商选而不打。 */
+/**
+ * @form POST /api/agent/accounts
+ * @form POST /api/agent/accounts/{accountNo}
+ */
 function accountFieldsFor(agents: { value: string; label: string }[]): FieldDef[] {
   return [
     { key: "accountNo", label: "账号编号", readOnlyOnEdit: true, placeholder: "留空自动生成" },

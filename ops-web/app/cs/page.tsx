@@ -27,6 +27,10 @@ import type { CsTicket, CsSession, CsMessage, PageResult } from "@/lib/types";
 // tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）
 const TAB_KEYS = ["tickets", "sessions"] as const;
 
+/**
+ * @form POST /api/ops/cs/tickets
+ * @form POST /api/ops/cs/tickets/{ticketNo}
+ */
 const TICKET_FIELDS: FieldDef[] = [
   { key: "ticketNo", label: "工单号", readOnlyOnEdit: true, placeholder: "留空自动生成" },
   { key: "userNo", label: "用户", placeholder: "U-xxxx" },

@@ -289,6 +289,10 @@ const SLOT_COMMANDS = ["EJECT", "LOCK"];
 // 前三个是派生或另有唯一写入口（点位反查 / 代理划拨），后两个是设备上报的事实——
 // 表单里填「在线」不会让机器真的在线，只会让台账骗人。校验同在 mock 层（`saveCabinet`），
 // 抽屉这层只做即时提示，换个入口塞不进脏数据。
+/**
+ * @form POST /api/ops/cabinets
+ * @form POST /api/ops/cabinets/{cabinetNo}
+ */
 const cabinetFields = (
   vendorCodes: string[],
   points: { locationNo: string; name: string }[],
@@ -637,6 +641,10 @@ const CODE_STATUS: StatusMap<DeviceCodeBatch["status"]> = {
   BOUND: { label: "已绑完", tone: "success" },
   VOID: { label: "已作废", tone: "danger" },
 };
+/**
+ * @form POST /api/ops/device-code-batches
+ * @form POST /api/ops/device-code-batches/{batchNo}
+ */
 const CODE_FIELDS: FieldDef[] = [
   { key: "batchNo", label: "批次号", readOnlyOnEdit: true, placeholder: "留空自动生成", section: "批次信息" },
   { key: "vendorCode", label: "供应商", type: "select", required: true, section: "批次信息", options: [
@@ -979,6 +987,10 @@ const PB_FIELDS: FieldDef[] = [
   ], help: "老化一般由每日任务按循环次数自动标记，手工改只用于纠错" },
   { key: "cycles", label: "循环次数", type: "number", min: 0 },
 ];
+/**
+ * @form POST /api/ops/ota-rollouts
+ * @form POST /api/ops/ota-rollouts/{rolloutNo}
+ */
 const OTA_FIELDS: FieldDef[] = [
   { key: "rolloutNo", label: "发布单号", readOnlyOnEdit: true, placeholder: "系统生成" },
   { key: "fwVersion", label: "固件版本", placeholder: "v1.2.0" },
@@ -1109,6 +1121,9 @@ const TASK_STATUS: StatusMap<OtaTask["status"]> = {
 const VENDOR_OPTIONS = [
   { value: "cd-tech", label: "cd-tech" }, { value: "sd-power", label: "sd-power" }, { value: "chargenow", label: "chargenow" },
 ];
+/**
+ * @form POST /api/ops/ota-releases
+ */
 const RELEASE_FIELDS: FieldDef[] = [
   { key: "releaseNo", label: "版本单号", readOnlyOnEdit: true, placeholder: "留空自动生成", section: "固件信息" },
   { key: "fwType", label: "固件类型", type: "select", required: true, section: "固件信息", options: [
@@ -1295,6 +1310,9 @@ function OtaTasksDrawer({ rollout, onOpenChange }: { rollout: OtaRollout | null;
 // ============================================================================
 type CmdDraft = { cabinetNo?: string; type?: string; slotIndex?: number | string };
 
+/**
+ * @form POST /api/ops/cabinets/{cabinetNo}/commands
+ */
 const commandFields = (cabinets: Cabinet[], typeHint: string): FieldDef[] => [
   { key: "cabinetNo", label: "机柜", type: "select", required: true,
     options: [

@@ -68,6 +68,10 @@ const scopeValuesOf = (f: ScopeForm): string =>
   : f.dataScope === "AGENT" ? f.agentValues
   : ""; // ALL / SELF 无附加范围值
 const csvCount = (v?: string) => (v ?? "").split(",").filter((s) => s.trim()).length;
+/**
+ * @form POST /api/platform/roles
+ * @form POST /api/platform/roles/{roleNo}
+ */
 const ROLE_FIELDS: FieldDef[] = [
   { key: "code", label: "角色码", placeholder: "custom_ops" },
   { key: "name", label: "名称", placeholder: "自定义运营" },
@@ -81,6 +85,10 @@ const ROLE_FIELDS: FieldDef[] = [
  * 此前这里是一个自由文本框（key 为 `roleName`），而后端认的是 `roleNo`：
  * 填进去的名字不是任何一列，**被静默丢弃**，那个人的角色一直是空的，
  * 于是他登录后什么菜单都没有，而表单上明明写着「运维」。
+ */
+/**
+ * @form POST /api/platform/employees
+ * @form POST /api/platform/employees/{employeeNo}
  */
 function empFields(roles: RoleRow[]): FieldDef[] {
   const opts = roles.filter((r) => !r.archivedAt)

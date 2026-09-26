@@ -133,6 +133,10 @@ const PRIO_OPTIONS = statusOptions(PRIO);
 const WO_STATUS_OPTIONS = BOARD_COLS.map((c) => ({ value: c.key, label: c.label }));
 const SOURCE_OPTIONS = Object.entries(SOURCE_LABEL).map(([value, label]) => ({ value, label }));
 
+/**
+ * @form POST /api/ops/sla-rules
+ * @form POST /api/ops/sla-rules/{ruleNo}
+ */
 const SLA_FIELDS: FieldDef[] = [
   { key: "slaNo", label: "SLA 编号", readOnlyOnEdit: true, placeholder: "自动生成" },
   { key: "woType", label: "工单类型", type: "select", options: WO_TYPE_OPTIONS },
@@ -141,6 +145,10 @@ const SLA_FIELDS: FieldDef[] = [
   { key: "escalateTo", label: "升级至", placeholder: "运维主管" },
   { key: "active", label: "启用", type: "switch" },
 ];
+/**
+ * @form POST /api/ops/inspection-plans
+ * @form POST /api/ops/inspection-plans/{planNo}
+ */
 const INSPECTION_FIELDS: FieldDef[] = [
   { key: "planNo", label: "计划编号", readOnlyOnEdit: true, placeholder: "自动生成" },
   { key: "route", label: "巡检路线", placeholder: "市中心 A 线" },
