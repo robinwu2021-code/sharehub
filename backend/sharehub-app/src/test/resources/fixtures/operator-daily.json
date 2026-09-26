@@ -51,7 +51,7 @@
   },
 
   "expectedBaseline": {
-    "_comment": "种子基线（*Seeder 幂等灌入 MariaDB / 内存）。首跑后本测试的 upsert 键不改变这些基线计数。",
+    "_comment": "种子基线（*Seeder 幂等灌入 MariaDB / 内存）。⚠️ 这些数是**下限**不是等值：本测试的 upsert 键不改变它们，但 test_sharehub 是有状态的共享库，别的用例建的行会永久留下。断等值的代价见 OperatorDailyFlowTest#step03 的注释。",
     "currency": "AED",
     "cabinetsTotal": 48,
     "workOrdersTotal": 64,

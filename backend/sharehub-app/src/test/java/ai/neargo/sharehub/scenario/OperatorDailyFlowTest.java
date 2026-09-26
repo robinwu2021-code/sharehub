@@ -62,9 +62,24 @@ class OperatorDailyFlowTest extends ApiTestSupport {
     /** 步骤 3：设备巡检——分页列柜机、筛线下柜、查一台详情（含仓位）。 */
     @Test @Order(3)
     void step03_inspect_cabinets() {
+        int seedCabinets = fx.at("/expectedBaseline/cabinetsTotal").asInt();
         JsonNode page = get("/api/ops/cabinets?page=1&size=10", opsToken).okData();
-        assertThat(page.path("total").asInt()).isEqualTo(fx.at("/expectedBaseline/cabinetsTotal").asInt());
+        /*
+         * ⚠️ 基线是**下限**不是等值。fixture 里那句「本测试的 upsert 键不改变这些基线计数」
+         * 只管住了本测试自己 —— 而 test_sharehub 是有状态的共享库，别的用例（建站/调拨那几条）
+         * 建的柜机会永久留在表里。此前这里断等值，9-25 某次跑留下 13 台之后它就一直红着，
+         * 而那次跑自己是绿的：**制造噪音的人看不到噪音**，于是没人认领。
+         * 种子完好本身单独断（见下），那才是这条基线真正想守的东西。
+         */
+        assertThat(page.path("total").asInt())
+                .as("全表数至少是种子台数；多出来的是别的用例留在共享库里的")
+                .isGreaterThanOrEqualTo(seedCabinets);
         assertThat(page.path("list")).hasSize(10);
+        // keyword 只 like cabinet_no / location_name，CAB1 恰好圈住种子那批
+        assertThat(get("/api/ops/cabinets?keyword=CAB1&page=1&size=100", opsToken)
+                .okData().path("total").asInt())
+                .as("种子被删/被改才该红")
+                .isEqualTo(seedCabinets);
 
         // 关键词 + 状态过滤（曾被数据权限拦截器破坏，现已修复）
         JsonNode offline = get("/api/ops/cabinets?onlineStatus=OFFLINE&page=1&size=50", opsToken).okData();

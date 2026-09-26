@@ -65,13 +65,36 @@ class SmokeTest {
         assertThat(body.get("data").get("currency").asText()).isEqualTo("AED");
     }
 
+    /**
+     * 分页 + 种子完好。
+     *
+     * <p>⚠️ <b>total 不能断绝对数</b>：{@code test_sharehub} 是有状态的共享库
+     * （见 {@code application.properties} 的说明），别的用例建的柜机会永久留在表里。
+     * 此前这里写 {@code isEqualTo(48)}，9-25 某次跑留下 13 台随机号柜机之后
+     * 它就一直红着 —— <b>而那次跑自己是绿的</b>，红的是另外两条用例，一天没人认领。
+     * 对可变共享状态断绝对数量，等于给未来的每一次无关改动都埋一颗噪音。
+     *
+     * <p>所以改断两件本方法名下真正该断的事：分页算术（total 是全表数、单页给满 size 条）
+     * 与种子基线完好（{@code CAB1000}–{@code CAB1047} 共 48 台还在）。
+     */
     @Test
     void cabinetsArePagedWithRecords() throws Exception {
         JsonNode data = get("/api/ops/cabinets?page=1&size=10").get("data");
-        assertThat(data.get("total").asInt()).isEqualTo(48);
+        assertThat(data.get("total").asInt())
+                .as("全表数至少是 48 台种子；多出来的是别的用例留在共享库里的")
+                .isGreaterThanOrEqualTo(SEED_CABINETS);
         assertThat(data.get("list")).hasSize(10);
         assertThat(data.get("list").get(0).get("cabinetNo").asText()).isEqualTo("CAB1000");
+
+        // 种子基线：keyword 只 like cabinet_no / location_name，CAB1 恰好圈住那 48 台
+        JsonNode seed = get("/api/ops/cabinets?keyword=CAB1&page=1&size=100").get("data");
+        assertThat(seed.get("total").asInt())
+                .as("种子被删/被改就该红 —— 这才是这条断言原本想守的东西")
+                .isEqualTo(SEED_CABINETS);
     }
+
+    /** 种子柜机台数（CAB1000–CAB1047）。 */
+    private static final int SEED_CABINETS = 48;
 
     @Test
     void vendorsAreListedForGateway() throws Exception {
