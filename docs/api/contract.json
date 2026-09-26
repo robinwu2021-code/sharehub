@@ -382,121 +382,6 @@
   },
   {
    "verb": "POST",
-   "path": "/api/agent/agents",
-   "perm": "agent:agent:create",
-   "perms": [
-    "agent:agent:create"
-   ],
-   "handler": "AgentController#create",
-   "summary": "新建代理商。",
-   "params": [],
-   "bodyType": "Agent",
-   "returnType": "Agent",
-   "returnContainer": null,
-   "returnElement": "Agent",
-   "responseShape": [
-    {
-     "name": "agentNo",
-     "type": "String"
-    },
-    {
-     "name": "name",
-     "type": "String"
-    },
-    {
-     "name": "contact",
-     "type": "String"
-    },
-    {
-     "name": "regionScope",
-     "type": "String"
-    },
-    {
-     "name": "agentType",
-     "type": "String"
-    },
-    {
-     "name": "shareRate",
-     "type": "Double"
-    },
-    {
-     "name": "cabinetCount",
-     "type": "Integer"
-    },
-    {
-     "name": "status",
-     "type": "String"
-    },
-    {
-     "name": "archivedAt",
-     "type": "String"
-    },
-    {
-     "name": "contactName",
-     "type": "String"
-    },
-    {
-     "name": "phone",
-     "type": "String"
-    },
-    {
-     "name": "email",
-     "type": "String"
-    }
-   ],
-   "requestShape": [
-    {
-     "name": "agentNo",
-     "type": "String"
-    },
-    {
-     "name": "name",
-     "type": "String"
-    },
-    {
-     "name": "contact",
-     "type": "String"
-    },
-    {
-     "name": "regionScope",
-     "type": "String"
-    },
-    {
-     "name": "agentType",
-     "type": "String"
-    },
-    {
-     "name": "shareRate",
-     "type": "Double"
-    },
-    {
-     "name": "cabinetCount",
-     "type": "Integer"
-    },
-    {
-     "name": "status",
-     "type": "String"
-    },
-    {
-     "name": "archivedAt",
-     "type": "String"
-    },
-    {
-     "name": "contactName",
-     "type": "String"
-    },
-    {
-     "name": "phone",
-     "type": "String"
-    },
-    {
-     "name": "email",
-     "type": "String"
-    }
-   ]
-  },
-  {
-   "verb": "POST",
    "path": "/api/agent/agents/{agentNo}",
    "perm": "agent:agent:update",
    "perms": [
@@ -45736,10 +45621,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 516,
+  "endpoints": 515,
   "records": 467,
-  "withPerm": 445,
-  "withBody": 220,
-  "shapedResponses": 407
+  "withPerm": 444,
+  "withBody": 219,
+  "shapedResponses": 406
  }
 }

@@ -34,26 +34,22 @@ public class AgentController {
         return service.page(page, size, keyword);
     }
 
-    /**
-     * 新建代理商。
+    /*
+     * ⚠️ **没有「新建代理商」端点**（2026-09-26 收掉）。
      *
-     * <p><b>判 {@code :create} 而不是 {@code :update}</b>：权限清单 §代理商「增/改」本来就是
-     * 两个码，而此前两条路合用一个映射、一律判 {@code :update} ——
-     * 于是 {@code agent:agent:create} <b>在目录里列着、没有任何端点认它</b>，
-     * 管理员勾了「代理商 增」以为开了权限，实际配了等于没配
-     *（与 2026-09-26 收拾掉的三个工单码同一族，见 V116；该码在
-     * {@code known-perm-ssot-gaps.txt} 里登记为「声明未强制」，本次销账）。
+     * 代理商一律经入驻申请产生：自助提交或运营代建录入 → 受理 → 审核通过 →
+     * `ApplyServiceImpl.activate()` 在一个事务里派生主体 + 自然人 + 属主成员关系。
      *
-     * <p>可达性核过：生产里持有写权限的只有 BD（{@code agent:*} 通配）与 ADMIN（{@code *}），
-     * 两者都覆盖新码，拆开不缩小任何人的访问面。
+     * 此前这里有一条 `POST /api/agent/agents` 直连建档：建出来就是 ENABLED、
+     * 立刻能被划拨资产与配分润，**全程零审核**。而同一个仓库里入驻那条路
+     * 刻意把「录入」与「放行」分成两个码来立四眼 —— 两条路的治理强度差这么多，
+     * 不是设计，是这条路先存在、审核流后补，没人回头看过它们的关系。
      *
-     * <p>编号由服务端取，请求体里的 {@code agentNo} 不作数（见 {@code AgentServiceImpl.save}）。
+     * 「运营要能在后台加代理商」这个需求由**代建录入**满足
+     * （`POST /api/agent/applies`，`agent:apply:create`），它走完整审核。
+     *
+     * `agent:agent:create` 这个码随之退回「声明未强制」—— 见 V125 的说明。
      */
-    @PostMapping
-    @PreAuthorize("@perm.can('agent:agent:create')")
-    public Agent create(@RequestBody Agent in) {
-        return service.save(null, in);
-    }
 
     /** 修改代理商档案。编号以路径为准，防越权改别家。 */
     @PostMapping("/{agentNo}")

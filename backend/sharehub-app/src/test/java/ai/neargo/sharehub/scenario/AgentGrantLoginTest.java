@@ -150,11 +150,18 @@ class AgentGrantLoginTest extends ApiTestSupport {
     }
 
     private String createAgent(String name, String phone, String email) {
+        /*
+         * 用**改档那条路**建夹具（`POST /agents/{agentNo}` 打一个不存在的编号会 upsert）。
+         * 直连建档的端点 2026-09-26 已收掉 —— 代理商一律经入驻审核产生。
+         * 本类测的是「开通登录」，不是「怎么建出来的」，所以走这条捷径；
+         * 与既有夹具号（AG-RBAC-ADMIN / AG-E2E-GULF）同一手法。
+         */
         Map<String, Object> m = new HashMap<>();
         m.put("name", name);
         if (phone != null) m.put("phone", phone);
         if (email != null) m.put("email", email);
-        String no = post("/api/agent/agents", m, admin).okData().path("agentNo").asText();
+        String no = "AGT" + Math.abs((name + String.valueOf(phone)).hashCode() % 100000);
+        post("/api/agent/agents/" + no, m, admin).okData();
         agents.add(no);
         return no;
     }

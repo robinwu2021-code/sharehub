@@ -9,7 +9,12 @@ import type {
 
 export interface AgentApi {
   listAgents(q?: ArchiveQ): Promise<PageResult<Agent>>;
-  saveAgent(a: Partial<Agent> & { agentNo?: string }): Promise<Agent>;
+  /**
+   * **改档，不能新建**（2026-09-26）：代理商一律经入驻申请产生 ——
+   * 自助注册或运营代建录入，都要过受理 + 审核，且放行的人不能是录入的人。
+   * 直连建档的端点已收掉：它建出来就是启用态、立刻能划拨资产与配分润，全程零审核。
+   */
+  saveAgent(a: Partial<Agent> & { agentNo: string }): Promise<Agent>;
   /**
    * 给代理商开通代理端登录（`agent:account:manage`）。
    *

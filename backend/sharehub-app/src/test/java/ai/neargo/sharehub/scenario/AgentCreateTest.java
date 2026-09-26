@@ -3,14 +3,13 @@ package ai.neargo.sharehub.scenario;
 import ai.neargo.sharehub.support.ApiTestSupport;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,19 +17,20 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 代理商建档：编号服务端取 · {@code agent:agent:create} 真的被强制。
+ * 代理商**只能经审核产生**，运营端没有直连建档的路。
  *
- * <h3>这一条为什么存在</h3>
- * 运营端一直**没有「新增代理商」入口** —— 代理商只能靠入驻审核产生，
- * 而权限清单 §代理商「增/改」本来就写着两个码。补入口时发现两件事：
- * <ul>
- *   <li>{@code agent:agent:create} <b>在目录里列着、没有任何端点认它</b>
- *       —— 建档与改档合用一个映射、一律判 {@code :update}。
- *       管理员勾了「代理商 增」以为开了权限，实际配了等于没配
- *       （该码在 {@code known-perm-ssot-gaps.txt} 里登记为「声明未强制」）；</li>
- *   <li>建档时 <b>请求体里的 {@code agentNo} 会被采纳</b> ——
- *       塞一个就能建出任意编号的代理商，而代理编号是分润、划拨、结算都认的业务键。</li>
- * </ul>
+ * <h3>为什么收掉直连建档</h3>
+ * 此前有两条路：入驻申请（自助或代建录入 → 受理 → 审核）和
+ * {@code POST /api/agent/agents} 直连建档。后者建出来就是 {@code ENABLED}，
+ * 立刻能被划拨资产、配分润，**全程零审核**。
+ *
+ * <p>而同一个系统里，入驻那条路刻意把「录入」{@code agent:apply:create} 与
+ * 「放行」{@code agent:apply:approve} 分成两个码来立四眼。
+ * 两条路的治理强度差这么多**不是设计** —— 是直连那条先存在、审核流后补，
+ * 没人回头看过它们的关系。2026-09-26 裁决：不论代理商自助注册还是运营端代录，
+ * 都要过审核。
+ *
+ * <p>「运营要能在后台加代理商」这个需求由**代建录入**满足，它走完整审核。
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class AgentCreateTest extends ApiTestSupport {
@@ -39,91 +39,92 @@ class AgentCreateTest extends ApiTestSupport {
     JdbcTemplate jdbc;
 
     private String admin;
-    private final List<String> made = new ArrayList<>();
 
-    @BeforeAll
+    /*
+     * 每个用例重新登录，**不用 @BeforeAll 取一次** ——
+     * 本类里有用例会新增/删除角色权限行，那会 bump PermVersion 触发会话重建；
+     * 再加上令牌存储本身有容量上限，一次取来全类共用实测会拿到 401「登录已失效」，
+     * 而那个 401 会伪装成「端点还在/不在」，把断言引到完全错的方向。
+     */
+    @BeforeEach
     void setUp() {
         admin = login("ADMIN");
     }
 
     @AfterEach
     void clean() {
-        for (String no : made) jdbc.update("DELETE FROM agt_agent WHERE agent_no=?", no);
-        made.clear();
+        jdbc.update("DELETE FROM agt_account WHERE agent_no IN (SELECT agent_no FROM agt_agent WHERE name LIKE '【测试】%')");
         jdbc.update("DELETE FROM agt_agent WHERE name LIKE '【测试】%'");
+        jdbc.update("DELETE FROM agt_apply WHERE operator_name LIKE '【测试】%'");
+        jdbc.update("DELETE FROM agt_principal WHERE email_mask LIKE '%@selfaudit.test'");
     }
 
     @Test
-    @DisplayName("★ 编号是 AG + 顺序号，且请求体里塞的编号不作数")
-    void agent_no_is_server_assigned() {
-        JsonNode a = create(Map.of("name", "【测试】取号一"));
-        String first = a.path("agentNo").asText();
-        assertThat(first).as("形状应当是 AG + 数字，而不是 ULID：%s", first).matches("^AG\\d+$");
-
-        JsonNode b = create(Map.of("name", "【测试】取号二"));
-        assertThat(num(b.path("agentNo").asText()))
-                .as("第二个应当比第一个大 1（%s → %s）", first, b.path("agentNo").asText())
-                .isEqualTo(num(first) + 1);
-
-        // 塞一个编号进请求体：必须被忽略
-        JsonNode c = create(Map.of("name", "【测试】硬塞编号", "agentNo", "AG-I-TYPED-THIS"));
-        assertThat(c.path("agentNo").asText()).as("请求体里的编号被采纳了").matches("^AG\\d+$");
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM agt_agent WHERE agent_no=?",
-                Integer.class, "AG-I-TYPED-THIS")).isZero();
-    }
-
-    @Test
-    @DisplayName("★ 建档判的是 agent:agent:create —— 这个码此前没有任何端点认它")
-    void create_is_guarded_by_its_own_perm_code() {
+    @DisplayName("★ 没有直连建档这条路 —— POST /api/agent/agents 不再存在")
+    void there_is_no_direct_create_endpoint() {
+        Resp r = post("/api/agent/agents", Map.of("name", "【测试】想直连建"), admin);
         /*
-         * 判据不是「ADMIN 能建」（超管持 `*`，换成任何码它都能过，那样这条恒绿），
-         * 而是「**只有 :update、没有 :create** 的角色建不出来」。
-         * 用一个临时角色来问这个问题，免得依赖种子角色当下的配码。
+         * 只断言「不是 200」与「库里没长出东西」，**不断言具体状态码**。
+         * 实测未映射的 POST 会被转到 `/error` 再过一遍安全过滤链，
+         * 回来的是 **401** 而不是 404 —— 我第一版按 404/405 断言，红在
+         * 「直连建档的端点还在」上，而端点其实已经没了。
+         * 钉状态码等于钉 Spring 的路由细节，那不是这条用例要守的东西。
          */
-        String role = "TMPAGT";
-        jdbc.update("DELETE FROM iam_role_perm WHERE role_no=?", role);
-        jdbc.update("INSERT INTO iam_role_perm (role_no, perm_code) VALUES (?, 'agent:agent:read'), (?, 'agent:agent:update')", role, role);
+        assertThat(r.status).as("直连建档似乎还通着：%s", r.body).isNotEqualTo(200);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM agt_agent WHERE name=?",
+                Integer.class, "【测试】想直连建")).isZero();
+    }
+
+    @Test
+    @DisplayName("★ 代建录入的人不能自己放行 —— 四眼原则要有落脚点，不能只写在注释里")
+    void the_recorder_cannot_approve_their_own_application() {
+        /*
+         * 此前只是把录入码与放行码分开，控制器注释写着「四眼原则以后有落脚点」。
+         * 而生产里 BD 持的是 `agent:*` 通配，两个码它都有 —— **分码等于没分**。
+         */
+        String applyNo = recordApply("【测试】自批测试");
+
+        Resp self = post("/api/agent/applies/" + applyNo + "/audit",
+                Map.of("approve", true), admin);
+        assertThat(self.status).as("录入人自己把它批了：%s", self.body).isEqualTo(409);
+        assertThat(jdbc.queryForObject("SELECT status FROM agt_apply WHERE apply_no=?", String.class, applyNo))
+                .as("被拒了就不该留下状态变更").isNotEqualTo("APPROVED");
+    }
+
+    @Test
+    @DisplayName("换一个人放行就能过，且过了之后代理商才出现")
+    void another_person_can_approve_and_only_then_the_agent_exists() {
+        String applyNo = recordApply("【测试】他人放行");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM agt_agent WHERE name=?",
+                Integer.class, "【测试】他人放行"))
+                .as("审核通过之前不该有代理商 —— 那正是收掉直连建档要保证的").isZero();
+
+        // 换一个持 approve 码、但不是录入人的角色来批
+        String other = "TMPAPV";
+        jdbc.update("DELETE FROM iam_role_perm WHERE role_no=?", other);
+        jdbc.update("INSERT INTO iam_role_perm (role_no, perm_code) VALUES (?, 'agent:apply:read'), (?, 'agent:apply:approve')",
+                other, other);
         try {
-            String tk = login(role);
-            // 先证明这个角色确实是"能用的"：读得到列表
-            assertThat(get("/api/agent/agents?page=1&size=1", tk).status).as("前提：这个角色至少读得到").isEqualTo(200);
-            // 只有 :update 的人**建不出来**
-            assertThat(post("/api/agent/agents", Map.of("name", "【测试】只有update"), tk).status)
-                    .as("只有 :update 却建出来了 —— 说明建档判的还是 :update").isEqualTo(403);
-            // 改档这条路仍然走得通（拆码不该把改档也锁掉）
-            JsonNode mine = create(Map.of("name", "【测试】给它改"));
-            String no = mine.path("agentNo").asText();
-            assertThat(post("/api/agent/agents/" + no, Map.of("name", "【测试】给它改-已改"), tk).status)
-                    .as(":update 应当还能改档").isEqualTo(200);
+            Resp r = post("/api/agent/applies/" + applyNo + "/audit", Map.of("approve", true), login(other));
+            assertThat(r.status).as("%s", r.body).isEqualTo(200);
+            List<String> nos = jdbc.queryForList("SELECT agent_no FROM agt_agent WHERE name=?",
+                    String.class, "【测试】他人放行");
+            assertThat(nos).as("审核通过之后才建档").hasSize(1);
+            assertThat(nos.get(0)).as("编号形状").matches("^AG\\d+$");
         } finally {
-            jdbc.update("DELETE FROM iam_role_perm WHERE role_no=?", role);
+            jdbc.update("DELETE FROM iam_role_perm WHERE role_no=?", other);
         }
     }
 
-    @Test
-    @DisplayName("只填名称也能建 —— record 上的原始类型字段会让 Jackson 直接 400")
-    void a_minimal_body_is_accepted() {
-        /*
-         * `Agent` 的 shareRate / cabinetCount 原先是 **原始类型**，
-         * 而 record 上的原始类型在 Jackson 里不能缺 —— 缺了直接 400，
-         * 且错误信息说的是反序列化失败，看不出少了哪个字段。
-         * 「新增代理商」这种只填名称与联系方式的请求因此根本发不出去。
-         *
-         * cabinetCount 尤其没理由必填：它是只出不入的聚合值，保存时根本不回写。
-         */
-        JsonNode a = create(Map.of("name", "【测试】只填名称"));
-        assertThat(a.path("agentNo").asText()).matches("^AG\\d+$");
-        assertThat(a.path("cabinetCount").asInt()).as("聚合值由服务端算").isZero();
-    }
-
-    private JsonNode create(Map<String, ?> body) {
-        Map<String, Object> m = new HashMap<>(body);
-        JsonNode a = post("/api/agent/agents", m, admin).okData();
-        made.add(a.path("agentNo").asText());
-        return a;
-    }
-
-    private static long num(String agentNo) {
-        return Long.parseLong(agentNo.substring(2));
+    /** 以 admin 的身份代建录入一张申请单，返回单号。 */
+    private String recordApply(String name) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("operatorName", name);
+        m.put("operatorType", "AGENT");
+        // 手机号与邮箱都必填 —— 自然人的两个登录标识，缺一个审核通过时建不出来
+        m.put("phone", "+9715000" + String.format("%05d", Math.abs(name.hashCode()) % 100000));
+        m.put("email", "a" + Math.abs(name.hashCode()) + "@selfaudit.test");
+        JsonNode r = post("/api/agent/applies", m, admin).okData();
+        return r.path("applyNo").asText();
     }
 }

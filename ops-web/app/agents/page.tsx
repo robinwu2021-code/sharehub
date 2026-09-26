@@ -303,7 +303,11 @@ function AgentsInner() {
     }),
     onSuccess: (r) => {
       notify.success(`已录入 ${r.applyNo}，仍需审核放行`);
-      setApplyForm(null); afterApplyWrite();
+      setApplyForm(null);
+      afterApplyWrite();
+      // 从档案页录入时切到审核队列 —— 否则提交完还停在档案列表上，
+      // 而那张单**不会**出现在这里（它还不是代理商），看着像没保存成功
+      setTab("applies");
     },
     onError: (e: Error) => notify.error(e.message),
   });
@@ -373,15 +377,10 @@ function AgentsInner() {
   });
 
   const canEditAccount = allow("agent:agent:update");
-  /*
-   * 建档与改档**分开判码**（权限清单 §代理商「增/改」本来就是两个码）。
-   * 此前 `agent:agent:create` 在目录里列着、**没有任何端点认它** ——
-   * 管理员勾了「代理商 增」以为开了权限，实际配了等于没配
-   *（与 2026-09-26 收拾掉的三个工单码同一族，见 V116）。后端已同步改判。
-   */
-  const canCreateAgent = allow("agent:agent:create");
   const save = useMutation({
-    mutationFn: (a: Partial<Agent>) => api.saveAgent(a),
+    // 只改档 —— 新建走入驻申请（见 createApply）。类型上要求 agentNo 必有，
+    // 于是「从这里新建」在编译期就过不去，而不是运行时打一个已不存在的端点
+    mutationFn: (a: Partial<Agent> & { agentNo: string }) => api.saveAgent(a),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["agents"] }); setEdit(null); },
   });
   /**
@@ -832,11 +831,15 @@ function AgentsInner() {
             onSearch={(v) => { setKeyword(v); paging.reset(); }}
             searchPlaceholder="搜索代理名称 / 编号 / 辖域"
             onExport={exportIf(exportProfiles, profiles.data?.list?.length)}
-            onAdd={canCreateAgent ? () => {
-              // 编号留空 = 新建；服务端取号（与场地方同口径，前端不发明编号）
-              setEdit({ agentNo: "" } as Agent);
-              setForm({ agentType: "AGENT", shareRate: 0.1, status: "ENABLED" });
-            } : undefined}
+            /*
+              「新增」走的是**入驻申请**，不是直连建档（2026-09-26 裁决：
+              不论代理商自助注册还是运营端代录，都要过审核）。
+              点这里开的是代建录入抽屉，提交后进「入驻审核」队列等人放行 ——
+              而且**放行的人不能是录入的人**（服务端拦）。
+              直连建档的端点已经收掉：它建出来就是启用态、立刻能划拨资产与配分润，
+              全程零审核，与同一系统里入驻那条路的治理强度差得太远。
+            */
+            onAdd={canCreateApply ? () => setApplyForm({ operatorType: "AGENT" }) : undefined}
             addLabel="新增代理商"
           >
             <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); paging.reset(); }} />
@@ -930,7 +933,7 @@ function AgentsInner() {
         footer={
           <>
             <Button variant="outline" onClick={() => setEdit(null)}>取消</Button>
-            <Button onClick={() => save.mutate(form)} disabled={save.isPending}>保存</Button>
+            <Button onClick={() => edit?.agentNo && save.mutate({ ...form, agentNo: edit.agentNo })} disabled={save.isPending}>保存</Button>
           </>
         }
       >

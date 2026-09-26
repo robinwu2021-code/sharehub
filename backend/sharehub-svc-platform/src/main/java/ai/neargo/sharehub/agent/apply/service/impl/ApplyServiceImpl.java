@@ -217,6 +217,19 @@ public class ApplyServiceImpl implements ApplyService {
             throw new IllegalArgumentException(
                     "只有待审核或审核中的申请可以处理，当前状态: " + e.getStatus());
         }
+        /*
+         * **不能审核自己录入的**（四眼原则）。
+         *
+         * 此前只是把 `agent:apply:create`（录入）与 `:approve`（放行）分成两个码，
+         * 控制器注释写着「四眼原则以后有落脚点」—— 而生产里 BD 持的是 `agent:*` 通配，
+         * 两个码它都有，于是同一个人可以自己录单、自己批准，**分码等于没分**。
+         *
+         * 只拦代建（`submitted_by` 存的是录入员工号）；自助提交那一路
+         * `submitted_by` 存的是手机号哈希前缀，不会与任何员工号相等，天然不受影响。
+         */
+        if (staffNo != null && staffNo.equals(e.getSubmittedBy())) {
+            throw BizException.conflict("error.apply.self_audit", applyNo);
+        }
 
         if (!req.approve()) {
             requireText(req.rejectReason(), "驳回原因必填");

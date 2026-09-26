@@ -40,7 +40,15 @@ function toAssignmentRecord(r: AssignmentLogRaw): AgentAssignmentRecord {
 
 export const agentHttp: AgentApi = {
   listAgents: (q?: ArchiveQ) => client.get("/api/agent/agents", q),
-  saveAgent: (a) => client.post(a.agentNo ? `/api/agent/agents/${a.agentNo}` : "/api/agent/agents", a),
+  /*
+   * 只改档，**没有新建**：代理商一律经入驻申请产生（createAgentApply → 受理 → 审核）。
+   * 漏传 agentNo 就当场抛，而不是去打一个已经不存在的端点收一个 404 ——
+   * 404 会被 http-client 包成一句含糊的「请求失败」，查起来要绕一圈。
+   */
+  saveAgent: (a) => {
+    if (!a.agentNo) throw new Error("代理商只能经入驻申请新建，saveAgent 仅用于改档");
+    return client.post(`/api/agent/agents/${a.agentNo}`, a);
+  },
   grantAgentLogin: (no) => client.post(`/api/agent/agents/${no}/login-account`, {}),
 
   // 代理商扩展
