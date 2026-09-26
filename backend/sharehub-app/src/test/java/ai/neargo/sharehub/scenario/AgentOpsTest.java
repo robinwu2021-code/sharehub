@@ -27,6 +27,7 @@ import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -133,6 +134,43 @@ class AgentOpsTest extends ApiTestSupport {
                 .containsEntry("assignee_name", emp).containsEntry("taken_over_from", ag);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM wo_dispatch WHERE wo_no=? AND action='TAKEOVER'", Integer.class, wo)).isEqualTo(1);
         assertThat(post("/api/ops/work-orders/" + wo + "/takeover", Map.of(), admin).status).as("已经是员工的单").isEqualTo(409);
+    }
+
+    @Test
+    @DisplayName("★★ 清退中的代理不能被改回启用——资产还没收完，业务不能再开")
+    void exitingAgentCannotBeReEnabled() {
+        String ag = agent();
+        post("/api/agent/agents/" + ag + "/exit", Map.of("reason", "合作终止"), admin).okData();
+        assertThat(jdbc.queryForObject("SELECT status FROM agt_agent WHERE agent_no=?", String.class, ag))
+                .as("前提：开清退即停用").isEqualTo("SUSPENDED");
+
+        // 实测（2026-09-25 接入）：这一下真把他改回 ENABLED 了。
+        // AgentServiceImpl.save 只认 AgentStatus 词表，不看有没有在途清退单，
+        // 于是资产还在回收、结算还没清，代理已经能继续开展业务。
+        // 前端把按钮禁掉了，但**禁用按钮只是提示，闸得在服务端**。
+        // shareRate / cabinetCount 必须带上：Agent 是 record，这两个是 double / int，
+        // **缺字段就是 null→primitive**，Jackson 直接 400「请求有误」，连是哪个字段都不说。
+        // 探针第一版少了它们，红在这里，看着像闸没生效 —— 实际请求根本没进 service。
+        var resp = post("/api/agent/agents/" + ag,
+                agentBody("测试代理 " + ag, "ENABLED"), admin);
+        assertThat(resp.status).as("清退在途，启用要被拒（message=%s）", resp.msg()).isEqualTo(409);
+        assertThat(jdbc.queryForObject("SELECT status FROM agt_agent WHERE agent_no=?", String.class, ag))
+                .as("被拒之后状态不许动").isEqualTo("SUSPENDED");
+
+        // 反向：改别的字段不该被这道闸连坐 —— 清退期间照样要能改联系人。
+        assertThat(post("/api/agent/agents/" + ag, agentBody("改过的名字", "SUSPENDED"), admin).status)
+                .as("不动状态的编辑照常放过").isEqualTo(200);
+    }
+
+    /** 代理档案的完整载荷。见上面那段注释：少一个基本类型字段就 400。 */
+    private static Map<String, Object> agentBody(String name, String status) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("name", name);
+        m.put("agentType", "AGENT");
+        m.put("status", status);
+        m.put("shareRate", 0.1);
+        m.put("cabinetCount", 0);
+        return m;
     }
 
     @Test

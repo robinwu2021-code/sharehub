@@ -131,6 +131,43 @@ class SiteAssetFlowTest extends ApiTestSupport {
     }
 
     @Test
+    @DisplayName("★★ 一件明细都没有的调拨单不能发货——发出去等于凭空产生一次在途")
+    void emptyTransferCannotShip() {
+        // 实测（2026-09-25 接入）：空单真发出去了。ship() 里那一圈
+        // `for (item : list) checkShippable(...)` 对空列表直接空转，
+        // 状态照常推到 IN_TRANSIT，于是账上多一笔「运输中 0 件」，
+        // 签收时 expected 为空又一路放过 —— 从头到尾没有任何人说过这单里有什么。
+        //
+        // 前端拦住了，但闸在前端就只保护这一个客户端。
+        String w1 = warehouse(), w2 = warehouse();
+        Map<String, Object> head = new HashMap<>();
+        head.put("fromType", "WAREHOUSE");
+        head.put("fromRef", w1);
+        head.put("fromName", "一号仓");
+        head.put("toType", "WAREHOUSE");
+        head.put("toRef", w2);
+        head.put("toName", "二号仓");
+        head.put("itemType", "CABINET");
+        String no = post("/api/ops/inventory-transfers", head, admin).okData().path("transferNo").asText();
+        transferNos.add(no);
+
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM inv_transfer_item WHERE transfer_no=?", Integer.class, no))
+                .as("前提：这单确实一件明细都没有").isZero();
+
+        assertThat(post("/api/ops/inventory-transfers/" + no + "/ship", Map.of(), admin).status)
+                .as("专用发货端点要拒").isEqualTo(409);
+        assertThat(jdbc.queryForObject("SELECT status FROM inv_transfer WHERE transfer_no=?", String.class, no))
+                .as("被拒之后状态不许动").isEqualTo("DRAFT");
+
+        // **两条发货路径**：保存端点传目标状态也能发货，它走的是另一套代码。
+        // 只堵 /ship 等于没堵 —— 这正是「一个动作两个入口」最典型的漏法。
+        assertThat(post("/api/ops/inventory-transfers/" + no, Map.of("status", "IN_TRANSIT"), admin).status)
+                .as("保存端点这条路同样要拒").isEqualTo(409);
+        assertThat(jdbc.queryForObject("SELECT status FROM inv_transfer WHERE transfer_no=?", String.class, no))
+                .isEqualTo("DRAFT");
+    }
+
+    @Test
     @DisplayName("C4 调拨：质检未过不能进明细；发货 → 运输中；签收一件缺一件多一件 → 单子照常完成、缺件留在途、差异两条；差异处理一次")
     void transferReceiving() {
         String w1 = warehouse(), w2 = warehouse();
