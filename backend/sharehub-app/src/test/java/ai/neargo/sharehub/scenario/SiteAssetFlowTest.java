@@ -250,17 +250,19 @@ class SiteAssetFlowTest extends ApiTestSupport {
     private void withdrawCloseAndSettle(String w) {
         String site = site("ACTIVE");
         /*
-         * ⚠️ 这里刻意仍用 LocalDate.now()（JVM 时区），**不要换成 bizToday()**。
+         * 合同期限用**业务日期**（bizToday），与 AdjustmentServiceImpl 折算的口径一致。
          *
-         * 进场费按剩余天数折算（下面断言 3650 × 265 / 366），而算它的
-         * AdjustmentServiceImpl#onSiteClosed 里 `closed` 来自事件的 closedAt 时间戳
-         * —— 那是服务器时区。只把测试的合同日期挪到业务时区，两边就差一天，钱差一笔。
+         * 这两边曾经不一致过：AdjustmentServiceImpl 直接把事件的 closedAt 时间戳
+         * （服务器时区）当业务日用，于是退款按少一天算 —— 金额差一天的钱，
+         * 而那条调整项看起来完全正常（恰好在合同最后一个业务日撤场时更糟：压根不生成）。
+         * 现在那边显式折算成业务日，所以这里也一律用 bizToday，两边同一口径。
          *
-         * 也就是说这个用例与 AdjustmentServiceImpl **必须一起改**，而那一处要先定
-         * 「closedAt 这个字符串是哪个时区的」才谈得上改 —— 算钱的路径上不能猜。
-         * 见 backend/known-localdate-now.txt 里 AdjustmentServiceImpl 那条。
+         * ⚠️ **这条用例只在每天那 4 小时里能发现上面那个 bug**（服务器时区与业务时区
+         * 跨日的那段）。要与时刻无关地复现，给测试 JVM 指定一个与业务时区跨日的时区：
+         *   mvn test -Dtest=SiteAssetFlowTest -DargLine="-Duser.timezone=America/New_York"
+         * 负对照就是这么验的 —— 不加这个参数的话，白天跑这条用例**改坏了也是绿的**。
          */
-        LocalDate start = LocalDate.now().minusDays(100), end = LocalDate.now().plusDays(265);
+        LocalDate start = bizToday().minusDays(100), end = bizToday().plusDays(265);
         contract(site, start, end);
         String cab = "CBC" + rnd();
         cabinets.add(cab);
@@ -269,8 +271,8 @@ class SiteAssetFlowTest extends ApiTestSupport {
         for (int i = 0; i < 3; i++) powerbank(cab, "IN_CABINET");
 
         String url = "/api/ops/sites/" + site + "/withdraw";
-        assertThat(post(url, Map.of("reason", "不续约", "plannedAt", LocalDate.now().plusDays(3).toString()), admin).status).isEqualTo(400);
-        post(url, Map.of("reason", "不续约", "plannedAt", LocalDate.now().plusDays(10).toString()), admin).okData();
+        assertThat(post(url, Map.of("reason", "不续约", "plannedAt", bizToday().plusDays(3).toString()), admin).status).isEqualTo(400);
+        post(url, Map.of("reason", "不续约", "plannedAt", bizToday().plusDays(10).toString()), admin).okData();
         String wo = jdbc.queryForObject("SELECT wo_no FROM wo_order WHERE site_no=? AND cabinet_no=? AND type='REMOVE'", String.class, site, cab);
         jdbc.update("UPDATE wo_order SET status='PROCESSING' WHERE wo_no=?", wo);
 
@@ -332,8 +334,8 @@ class SiteAssetFlowTest extends ApiTestSupport {
     }
 
     private void contract(String site, LocalDate start, LocalDate end) {
-        LocalDate s = start == null ? LocalDate.now().minusDays(1) : start;
-        LocalDate e = end == null ? LocalDate.now().plusYears(1) : end;
+        LocalDate s = start == null ? bizToday().minusDays(1) : start;
+        LocalDate e = end == null ? bizToday().plusYears(1) : end;
         jdbc.update("INSERT INTO loc_contract (contract_no, tenant_id, venue_no, site_no, venue_name, share_rate, entry_fee, deposit_amount, start_at, end_at, status)"
                         + " VALUES (?, 'MAIN', (SELECT venue_no FROM loc_site WHERE site_no=?), ?, '测试场地方', 0.2, 3650, 500, ?, ?, 'ACTIVE')",
                 "CTC" + rnd(), site, site, s.toString(), e.toString());

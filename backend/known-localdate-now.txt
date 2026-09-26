@@ -31,13 +31,17 @@ RentOrderServiceImpl 1      # 分润归属 period。注释写着「按**结算�
                             # ord_order.endedAt 是 LocalDateTime（服务器时区写入），
                             # rentEndAt 是 UTC 字符串 —— **数据本身就是混的**。待拍板。
 ReferFeeGeneratorImpl 2     # 推荐费的 onDate 与 period。同上，跨月会记进错的月份。待拍板。
-AdjustmentServiceImpl 1     # 撤场结清时 `closed` 的兜底日 —— 进场费按**剩余天数**折算，差一天就差一笔钱。
-                            # 改对要先定「事件里的 closedAt 字符串是哪个时区的」：合同的 startAt/endAt
-                            # 是业务日期，而 closedAt 是时间戳 —— 只挪一边，两边就差一天。
-                            # ⚠️ 与 SiteAssetFlowTest#withdrawCloseAndSettle **绑在一起**：
-                            # 2026-09-27 只把那个用例的日期换成 bizToday()，断言的 3650×265/366 当场变成
-                            # 3650×264/366 而红。所以那个用例刻意仍用 LocalDate.now()，那里写了原因。
-                            # 两处必须同时改，且改之前先定 closedAt 的时区口径 —— 算钱的路径上不能猜。
+# （AdjustmentServiceImpl 已从台账移出：撤场结清的关闭时刻现在显式折算成业务日 ——
+#   按写入方时区解释那个时间戳，再换到业务时区取日期。查清了「closedAt 是哪个时区」
+#   之后就不用猜了：SiteServiceImpl 用 LocalDateTime.now() 写的，与 created_at 同口径。
+#   修之前的后果：站点在迪拜 9-30 21:00 关闭时服务器日期已是 10-01 →
+#   常见情形是退款**金额差一天的钱**（那条调整项看起来完全正常）；
+#   恰好在合同最后一个业务日撤场时 `closed.isBefore(endAt)` 成了 `10-01 < 09-30`
+#   = false → 那条退款压根不生成。都只在每天那 4 小时发生。
+#
+#   ⚠️ 验它需要给测试 JVM 指定与业务时区跨日的时区：
+#      -DargLine="-Duser.timezone=America/New_York"
+#   不加的话白天跑 SiteAssetFlowTest 改坏了也是绿的 —— 负对照就是这么栽过一次。）
 
 # —— 统计窗口：偏一天只影响显示，不影响钱 ——
 AlarmServiceImpl 3          # 今日已闭环数 / 近 7 天 / 近 N 天

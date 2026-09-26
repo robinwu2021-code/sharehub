@@ -26,6 +26,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import ai.neargo.sharehub.common.time.BizClock;
 
 /**
  * 结算调整项实现。
@@ -46,8 +47,13 @@ public class AdjustmentServiceImpl implements AdjustmentService {
     private final ContractQueryPort contracts;
     private final ai.neargo.sharehub.finance.mapper.ShareRecordMapper shares;
 
+    /** 撤场结清要把「关闭时刻」折成**业务日**才能和合同期限比。见 BizClock 与下面 onSiteClosed。 */
+    private final BizClock clock;
+
     public AdjustmentServiceImpl(StlAdjustmentMapper adjustments, ContractQueryPort contracts,
-                                 ai.neargo.sharehub.finance.mapper.ShareRecordMapper shares) {
+                                 ai.neargo.sharehub.finance.mapper.ShareRecordMapper shares,
+                                 BizClock clock) {
+        this.clock = clock;
         this.shares = shares;
         this.adjustments = adjustments;
         this.contracts = contracts;
@@ -58,7 +64,33 @@ public class AdjustmentServiceImpl implements AdjustmentService {
     public int onSiteClosed(SiteClosedEvent e) {
         ContractMoneyTerms c = contracts.lastMoneyTermsOfSite(e.siteNo());
         if (c == null) return 0;
-        LocalDate closed = e.closedAt() == null ? LocalDate.now() : LocalDateTime.parse(e.closedAt()).toLocalDate();
+        /*
+         * —— 关闭时刻要折成**业务日**，否则退款那条压根不会生成 ——
+         *
+         * 合同的 startAt / endAt 是**人填的业务日期**：写 2026-09-30 指的是迪拜的 9-30。
+         * 而 closedAt 是 SiteServiceImpl 用 LocalDateTime.now() 写的**服务器时区**时间戳
+         * （生产是 Asia/Shanghai，比业务时区 Asia/Dubai 早 4 小时）——
+         * 和 created_at / updated_at 同一口径，这是对的，不该改存储语义。
+         *
+         * 但直接 toLocalDate() 拿它当业务日就错了。站点在迪拜 9-30 21:00 关闭时
+         * 服务器日期已经是 10-01，于是：
+         *   · 常见情形（endAt 还早得很）：`remaining` 少算一天 ——
+         *     **退款金额差一天的钱**，而那条调整项看起来完全正常；
+         *   · 边界情形（恰好在合同最后一个业务日撤场）：`closed.isBefore(c.endAt())`
+         *     成了 `10-01 < 09-30` = false —— **那条退款压根不生成**。
+         * 两者都只在每天那 4 小时里发生，别的时候一切正常。
+         *
+         * 所以显式折算：按写入方的时区解释这个时间戳，再换到业务时区取日期。
+         * ⚠️ 这里假设事件的生产方与消费方在同一个 JVM 时区（当前是单体，成立）。
+         * 将来拆成独立进程且时区不同的话，事件该带偏移量（ISO-8601 with offset），
+         * 而不是靠这个假设 —— 那时这行注释就是改它的入口。
+         */
+        LocalDate closed = e.closedAt() == null
+                ? clock.today()
+                : LocalDateTime.parse(e.closedAt())
+                        .atZone(java.time.ZoneId.systemDefault())
+                        .withZoneSameInstant(clock.zone())
+                        .toLocalDate();
         int n = 0;
         if (positive(c.depositAmount())) {
             n += insert(c, AdjustmentKind.DEPOSIT_REFUND, c.depositAmount().negate(),
