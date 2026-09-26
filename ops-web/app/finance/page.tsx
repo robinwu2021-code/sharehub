@@ -1804,7 +1804,7 @@ function FinanceInner() {
         {entryDraft && (
           <>
             <Notice className="mb-4">
-              凭证一经记账**不可修改**——需要更正请再记一张反向凭证。直接改历史分录会让账实相符无从追溯。
+              凭证一经记账<b>不可修改</b>——需要更正请再记一张反向凭证。直接改历史分录会让账实相符无从追溯。
             </Notice>
             <Field label="凭证摘要（必填）">
               <Input

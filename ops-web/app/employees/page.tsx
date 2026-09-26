@@ -569,7 +569,8 @@ function EmployeesInner() {
                 const ok = await confirm({
                   title: `为 ${e.name}（${e.employeeNo}）生成登录口令`,
                   desc: "会生成一个新的一次性口令，本人下次登录必须改密。"
-                    + "如果他已经有口令，**原口令立刻失效**。新口令只显示这一次。",
+                    // ⚠️ 这是**纯文本**，不是 markdown —— 写 `**…**` 会原样显示成星号（实测撞到过）
+                    + "如果他已经有口令，原口令会立刻失效。新口令只显示这一次。",
                   confirmText: "生成",
                 });
                 if (ok) resetCred.mutate(e.employeeNo);

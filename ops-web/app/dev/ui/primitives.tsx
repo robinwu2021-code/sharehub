@@ -112,7 +112,7 @@ function ButtonSection() {
         当前两者数值相同所以看不出来，但改 <code>--r-chip</code> 时按钮不会跟着变。
       </Flaw>
       <Hint>
-        真正的 <code>:focus-visible</code> 无法用 CSS 从外部强制触发，上面第 6 列是**静态复刻**。
+        真正的 <code>:focus-visible</code> 无法用 CSS 从外部强制触发，上面第 6 列是<b>静态复刻</b>。
         要验真实效果：点一下这段文字，然后连按 Tab 走一遍。
       </Hint>
     </Section>
@@ -149,7 +149,7 @@ function BadgeSection() {
       </Row>
 
       <Hint>
-        Badge 没有 disabled / loading / error 态 —— 它是纯展示件，这是**对的**，不算缺陷。
+        Badge 没有 disabled / loading / error 态 —— 它是纯展示件，这是<b>对的</b>，不算缺陷。
         它的"状态"维度就是 tone。
       </Hint>
       <Flaw>
@@ -201,7 +201,7 @@ function InputSection() {
       </Flaw>
       <Flaw><b>高度 h-9 硬写</b>，密度开关无效。</Flaw>
       <Hint>
-        占位文字用 <code>--muted-foreground</code>（对白底 3.9:1）。它低于 4.5 是**已知取舍**：
+        占位文字用 <code>--muted-foreground</code>（对白底 3.9:1）。它低于 4.5 是<b>已知取舍</b>：
         占位符不是必读内容。但同一个色也用在表头/次要说明上，那些地方就需要复核。
       </Hint>
     </Section>
@@ -224,7 +224,7 @@ function SelectSection() {
         <Select className="max-w-64" defaultValue="a"><option value="a">迪拜 · 朱美拉海滩路 · 星巴克 JBR 店（3 号柜）</option></Select>
       </Row>
       <Flaw>
-        <b>无 disabled 视觉</b>：Input 有 <code>disabled:opacity-50</code>，Select 的 cva 里**没有**，
+        <b>无 disabled 视觉</b>：Input 有 <code>disabled:opacity-50</code>，Select 的 cva 里<b>没有</b>，
         禁用下拉和可用下拉长得一模一样（上面那格自己看）。这是真缺陷不是风格差异。
       </Flaw>
       <Flaw><b>圆角魔数 <code>rounded-[11px]</code> + 高度 h-9 硬写</b>（同 Input）。</Flaw>
@@ -320,7 +320,7 @@ function TableSection() {
       </Flaw>
       <Flaw>
         <b>表头文字对比度不足</b>：<code>--muted-foreground</code>（#8a8d97）压在 <code>--muted</code>（#f2f3f6）上，
-        实测见上（明色下约 3.6:1，低于 4.5）。表头是**必读**内容，不是占位符，这条要修。
+        实测见上（明色下约 3.6:1，低于 4.5）。表头是<b>必读</b>内容，不是占位符，这条要修。
       </Flaw>
     </Section>
   );
@@ -405,7 +405,7 @@ function NoticeSection() {
       </Flaw>
       <Flaw><b>圆角 <code>rounded-lg</code> 绕过四档</b>。</Flaw>
       <Flaw>
-        <b>灰字压灰底的对比度不足</b>（读数见上）。提示条的内容是**要读的**，不是装饰。
+        <b>灰字压灰底的对比度不足</b>（读数见上）。提示条的内容是<b>要读的</b>，不是装饰。
       </Flaw>
     </Section>
   );
@@ -505,7 +505,7 @@ function PaginationSection() {
       <Row label="只有一页" stack><Pagination page={1} size={20} total={3} onPage={() => {}} /></Row>
       <Row label="空列表（total=0）" stack><Pagination page={1} size={20} total={0} onPage={() => {}} /></Row>
       <Flaw><b>没用 Button 原语</b>：自己写了两个裸 <code>&lt;button&gt;</code>（<code>rounded-lg bg-secondary</code>），
-        既绕过四档圆角，也**没有 focus-visible 环** —— 键盘翻页看不到焦点在哪。</Flaw>
+        既绕过四档圆角，也<b>没有 focus-visible 环</b> —— 键盘翻页看不到焦点在哪。</Flaw>
       <Missing>无每页条数选择、无跳页输入。数据量大的页面（订单/流水）实际不够用。</Missing>
     </Section>
   );

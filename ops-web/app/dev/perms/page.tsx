@@ -73,7 +73,7 @@ export default function DevPermsPage() {
       <section className="space-y-3">
         <h2 className="txt-section">高危动作谁持有</h2>
         <p className="txt-caption text-muted-foreground">
-          动钱、授权、改登录方式。**每一行至少要有一个人**，否则那个功能没人做得了；
+          动钱、授权、改登录方式。<b>每一行至少要有一个人</b>，否则那个功能没人做得了；
           而多一个人就是一次越权。
         </p>
         <Table>

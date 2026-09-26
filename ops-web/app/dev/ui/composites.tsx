@@ -210,7 +210,7 @@ function FormDrawerSection() {
         读屏用户拿不到「这项必填」「错在哪」。
       </Flaw>
       <Hint>
-        「保存按钮不因校验错误而禁用」是**刻意设计**（注释里有理由），不是缺陷 —— 别在 P2 顺手改掉。
+        「保存按钮不因校验错误而禁用」是<b>刻意设计</b>（注释里有理由），不是缺陷 —— 别在 P2 顺手改掉。
       </Hint>
     </Section>
   );
@@ -261,7 +261,7 @@ function DrawerSection() {
       </Flaw>
       <Flaw>
         <b>抽屉是直角</b>：<code>--r-sheet</code>（20px）为「抽屉/弹层等大面」而设，Drawer 完全没用它。
-        四档圆角里目前**只有 sheet 一档没有任何调用点**。
+        四档圆角里目前<b>只有 sheet 一档没有任何调用点</b>。
       </Flaw>
       <Flaw><b>关闭按钮 <code>rounded-md</code> 且无 focus 环</b>。</Flaw>
     </Section>
@@ -321,7 +321,7 @@ function TabHeaderSection() {
       </Row>
       <Flaw>
         <b>标题区是 <code>&lt;div role=&quot;button&quot;&gt;</code> 而不是 <code>&lt;button&gt;</code></b>，
-        自己补了 tabIndex 与 Enter/Space 处理，但**没有 focus-visible 环** —— 键盘用户看不到自己站在哪。
+        自己补了 tabIndex 与 Enter/Space 处理，但<b>没有 focus-visible 环</b> —— 键盘用户看不到自己站在哪。
       </Flaw>
       <Flaw>
         <b>「悬停才出现」是可发现性缺陷</b>：不悬停就完全看不到还有别的 tab。
@@ -377,7 +377,7 @@ function MultiSelectSection() {
       <Row label="invalid（错误态）"><div className="w-64"><MultiSelect value={a} options={MS_OPTIONS} onChange={setA} invalid placeholder="必填" /></div></Row>
       <Row label="无可选项"><div className="w-64"><MultiSelect value={[]} options={[]} onChange={() => {}} placeholder="（无可选项）" /></div></Row>
       <Hint>
-        本区块只**读**这个组件不改它 —— 另有一路在改 multi-select.tsx。此处呈现的是本次快照下的现状。
+        本区块只<b>读</b>这个组件不改它 —— 另有一路在改 multi-select.tsx。此处呈现的是本次快照下的现状。
       </Hint>
     </Section>
   );

@@ -90,7 +90,7 @@ function fieldsFor(
       help: "分成按场地方结算；这里选的是档案里的场地方，不是手打名字" },
     { key: "brandNo", label: "品牌", type: "select", required: true, section: "基本信息",
       options: [{ value: "", label: "请选择品牌" }, ...brands],
-      help: "站点以哪个品牌对 C 端呈现。**一站一品牌**——分成与坪效都按站点统计，挂两个品牌会让「这笔钱算哪个品牌的」没有答案" },
+      help: "站点以哪个品牌对 C 端呈现。一站只能挂一个品牌 —— 分成与坪效都按站点统计，挂两个品牌会让「这笔钱算哪个品牌的」没有答案" },
     { key: "sceneType", label: "场景类型", type: "select", required: true, section: "基本信息", options: SCENES.map((s) => ({ value: s, label: s })) },
     { key: "regionId", label: "区域", type: "select", required: true, section: "位置",
       options: [{ value: "", label: "请选择区域" }, ...regions],

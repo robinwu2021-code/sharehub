@@ -142,9 +142,9 @@ export default function DevUiPage() {
           <section className="mb-5 rounded-card bg-card p-5 shadow-[var(--card-shadow)]">
             <h2 className="txt-heading">规范体检结果</h2>
             <p className="mt-1 txt-caption text-muted-foreground">
-              在**已渲染的 DOM** 上扫描，不是读源码 —— 组件改好了这份清单会自动变短，不需要有人回来维护手抄的问题列表。
+              在<b>已渲染的 DOM</b> 上扫描，不是读源码 —— 组件改好了这份清单会自动变短，不需要有人回来维护手抄的问题列表。
               局限：抽屉/弹窗关着时其内容不在 DOM 里（打开后重新体检）；class 字符串判断不了「这个尺寸是不是刻意的」，
-              所以结论是**线索不是判决**。
+              所以结论是<b>线索不是判决</b>。
             </p>
             {grouped.length === 0 ? (
               <div className="mt-3 rounded-field bg-success-tint px-3 py-2 txt-caption text-success-ink">
