@@ -45,6 +45,7 @@ const IN_FLIGHT_WD: WithdrawalStatus[] = ["APPLY", "AUDIT", "PAYING"];
  * 在途提现按名字取一页再按编号精确过滤，一页够看「有没有、大概几笔」—— 这是预览，不是对账。
  */
 const LOOKUP_SIZE = 50;
+/** 一个代理的在途提现不会有一百笔；状态得在前端筛（端点的 status 只收一个值）。 */
 const IMPACT_SCAN_SIZE = 100;
 
 /** 停用影响预览：各项独立取数，缺权限的那项说明看不到，而不是显示成 0 —— 0 是一个会被当真的数。 */
@@ -59,12 +60,14 @@ function useSuspendImpact(agent: Agent | undefined, enabled: boolean) {
     queryFn: () => api.listWorkOrders({ page: 1, size: 1, assigneeNo: no, status: OPEN_WO }),
     enabled: enabled && !!agent && canWo,
   });
-  // 后端提现列表没有 payeeNo 参数（只认 keyword = 单号 / 收款方名），按名字取一页再按编号精确过滤：
-  // 同名主体（种子里就有两个 North Hub）会被按名字捞进来，编号过滤把它们剔掉
+  // payeeNo 现在由后端精确筛（2026-09-26）。此前后端静默忽略这个参数，只好按
+  // keyword = 代理名取一页再在页内按编号剔——那会**丢行**：翻页是按名字翻的，
+  // 同名主体（种子里就有两个 North Hub）把页填满后，本代理落在页外的单子根本取不回来。
+  // 状态还得在这里筛：端点的 status 只收一个值，而「在途」是好几个状态。
   const wd = useQuery({
     queryKey: ["agent-impact-wd", no],
-    queryFn: () => api.listWithdrawals({ page: 1, size: IMPACT_SCAN_SIZE, keyword: agent!.name, payeeNo: no }),
-    select: (d) => d.list.filter((w) => w.payeeNo === no && IN_FLIGHT_WD.includes(w.status)).length,
+    queryFn: () => api.listWithdrawals({ page: 1, size: IMPACT_SCAN_SIZE, payeeNo: no }),
+    select: (d) => d.list.filter((w) => IN_FLIGHT_WD.includes(w.status)).length,
     enabled: enabled && !!agent && canWd,
   });
   // 名下资产从「可划拨资产池」按当前归属数（划拨汇总那个读模型后端还是空实现，会永远给 0）

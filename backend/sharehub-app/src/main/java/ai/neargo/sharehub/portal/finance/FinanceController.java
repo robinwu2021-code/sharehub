@@ -201,8 +201,9 @@ public class FinanceController {
     public PageResult<FinDtos.Withdrawal> withdrawals(@RequestParam(required = false) Integer page,
                                                      @RequestParam(required = false) Integer size,
                                                      @RequestParam(required = false) String keyword,
-                                                     @RequestParam(required = false) String status) {
-        return withdrawalService.page(page, size, keyword, status);
+                                                     @RequestParam(required = false) String status,
+                                                     @RequestParam(required = false) String payeeNo) {
+        return withdrawalService.page(page, size, keyword, status, payeeNo);
     }
 
     /**

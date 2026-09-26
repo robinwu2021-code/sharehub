@@ -107,7 +107,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
      * 前端却要 fee/auditorName/auditedAt/rejectReason —— 迁来落库版后契约才对得上。
      */
     @Override
-    public PageResult<Withdrawal> page(Integer page, Integer size, String keyword, String status) {
+    public PageResult<Withdrawal> page(Integer page, Integer size, String keyword, String status, String payeeNo) {
         int p = (page == null || page < 1) ? 1 : page;
         int sz = (size == null || size < 1) ? 10 : Math.min(size, 200);
         LambdaQueryWrapper<StlWithdrawal> w = new LambdaQueryWrapper<>();
@@ -116,6 +116,11 @@ public class WithdrawalServiceImpl implements WithdrawalService {
                     .or().like(StlWithdrawal::getPayeeName, keyword));
         }
         if (status != null && !status.isBlank()) w.eq(StlWithdrawal::getStatus, status);
+        // 按收款方**编号**精确筛。keyword 只匹配单号与 payeeName，而同名代理不罕见 ——
+        // 前端原先的兜底是「按名字取一页，再在页内按编号过滤」，那会丢行：
+        // 翻页按名字翻，落在当前页之外的同名记录根本取不回来，
+        // 于是「这个代理的提现」少了几笔，界面上看不出少了。total 同理是假的。
+        if (payeeNo != null && !payeeNo.isBlank()) w.eq(StlWithdrawal::getPayeeNo, payeeNo.trim());
         w.orderByDesc(StlWithdrawal::getId);
         Page<StlWithdrawal> r = mapper.selectPage(new Page<>(p, sz), w);
         return new PageResult<>(r.getRecords().stream().map(WithdrawalServiceImpl::toVO).toList(), r.getTotal());

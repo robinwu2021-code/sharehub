@@ -2,6 +2,7 @@ package ai.neargo.sharehub.scenario;
 
 import ai.neargo.sharehub.support.ApiTestSupport;
 import com.fasterxml.jackson.databind.JsonNode;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
@@ -53,6 +54,32 @@ class WithdrawalPayoutTest extends ApiTestSupport {
         assertThat(approved.path("status").asText())
                 .as("审批通过后应进入出款在途").isEqualTo("PAYING");
         return no;
+    }
+
+    @Test
+    @DisplayName("★★ 提现列表要能按收款方编号筛——按名字筛会丢行")
+    void withdrawalsCanBeFilteredByPayeeNo() {
+        String admin = login("ADMIN");
+        // 两个不同的收款方，**同一个名字** —— 现实里同名代理不罕见，
+        // 而 keyword 只匹配单号与 payeeName，于是这两笔在按名字筛时混在一起。
+        String a = randomPayee(), b = randomPayee();
+        String na = approvedWithdrawal(admin, a);
+        String nb = approvedWithdrawal(admin, b);
+
+        // 前端的兜底是「按名字取一页，再在页内按编号过滤」。那会丢行：
+        // 翻页是按名字翻的，落在当前页之外的同名记录根本不会被取回来，
+        // 于是「这个代理的提现」少了几笔，而界面上看不出少了。
+        JsonNode r = get("/api/trade/withdrawals?payeeNo=" + a + "&size=50", admin).okData();
+        var nos = new java.util.ArrayList<String>();
+        r.path("list").forEach(x -> nos.add(x.path("withdrawNo").asText()));
+        assertThat(nos).as("只该有 a 的那笔").contains(na).doesNotContain(nb);
+        assertThat(r.path("total").asInt()).as("total 也要按筛选口径算，否则分页是假的").isEqualTo(nos.size());
+
+        // 反向：不传这个参数时两笔都在 —— 只验「筛得掉」会把列表筛成空也算通过。
+        var all = new java.util.ArrayList<String>();
+        get("/api/trade/withdrawals?size=200", admin).okData().path("list")
+                .forEach(x -> all.add(x.path("withdrawNo").asText()));
+        assertThat(all).as("不筛的时候两笔都看得到").contains(na, nb);
     }
 
     private Map<String, Object> receipt(boolean success, String channel, String ref, String reason) {

@@ -22,7 +22,7 @@ public interface WithdrawalService {
      * </ol>
      */
     /** 提现审核队列（运营端列表）。原实现在 TradeController 读内存 SeedData，已迁来落库版。 */
-    PageResult<Withdrawal> page(Integer page, Integer size, String keyword, String status);
+    PageResult<Withdrawal> page(Integer page, Integer size, String keyword, String status, String payeeNo);
 
     Withdrawal apply(WithdrawApplyReq req);
 
