@@ -89,6 +89,9 @@ const PA_STATUS: StatusMap<PayoutAccount["status"]> = {
  * **账号填明文、只落掩码** —— 明文属于 PII，服务端不回传，所以编辑既有账户时
  * 这一栏是空的（不是「丢了」），留空即不改。
  */
+/**
+ * @form POST /api/trade/payout-accounts
+ */
 const PAYOUT_FIELDS: FieldDef[] = [
   { key: "payeeType", label: "受益方类型", type: "select", required: true,
     options: [{ value: "AGENT", label: "代理商" }, { value: "VENUE", label: "场地方" }] },
@@ -130,6 +133,10 @@ const csvArr = (v: unknown) => String(v ?? "").split(",").map((s) => s.trim()).f
  * 分成方必须是「选」出来的：取价按 `payeeNo` 精确匹配，手打名字存不出编号，
  * 规则在分账时**一条都命中不了** —— 界面上看着配好了，钱却分不出去，且不报错。
  * 候选集跟着「维度」切换：场地方选 venues、代理商选 agents，两个命名空间不能混。
+ */
+/**
+ * @form POST /api/trade/share-rules
+ * @form POST /api/trade/share-rules/{ruleNo}
  */
 function ruleFieldsFor(dimension: string, payees: { value: string; label: string }[]): FieldDef[] {
   return [
@@ -189,6 +196,10 @@ const INV_STATUS: StatusMap<InvoiceStatus> = {
   VOID: { label: "已作废", tone: "danger" },
 };
 // 状态不在表单里：开具/作废是显式动作（要生成票号、留痕、必填原因），不能靠改个下拉框糊过去。
+/**
+ * @form POST /api/trade/invoices
+ * @form POST /api/trade/invoices/{invoiceNo}
+ */
 const INVOICE_FIELDS_BASE: FieldDef[] = [
   { key: "invoiceNo", label: "发票号", readOnlyOnEdit: true, placeholder: "新增留空自动生成" },
   { key: "payeeName", label: "抬头", required: true, placeholder: "开票抬头" },

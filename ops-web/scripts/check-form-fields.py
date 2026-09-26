@@ -106,10 +106,11 @@ def forms():
             if not keys:
                 continue          # 不是表单定义（如 FieldDef[] 形参的类型标注）
             line = src[: max(0, m.start() - 600) + nm.start()].count("\n") + 1
-            eps, syn = annotations(lines, line - 1)
+            eps, syn, none = annotations(lines, line - 1)
             found.append({
                 "file": str(f.relative_to(REPO)), "line": line, "name": name,
                 "keys": sorted(set(keys)), "endpoints": eps, "synthetic": syn,
+                "nowhere": none,
             })
     return found
 
@@ -143,11 +144,16 @@ ANNOT = re.compile(r"@form\s+(GET|POST|PUT|PATCH|DELETE)\s+(\S+)")
 # 这类键后端本来就不该认，报出来是诬告。必须写理由——一个能随手加的豁免
 # 迟早会被用来消音真漂移。
 IGNORE = re.compile(r"@form-synthetic\s+(\w+)\s+(.+?)\s*(?:\*/)?$")
+# 整张表单不提交到任何端点（组件展示页的假表单：onSubmit 只弹个 toast）。
+# 这类表单挂 @form 是假的 —— 它没有「发到哪」这件事。
+# 同样必须写理由：一个能随手加的豁免迟早会被用来消音真漂移。
+NOWHERE = re.compile(r"@form-none\s+(.+?)\s*(?:\*/)?$")
 
 
 def annotations(lines, idx):
-    """声明上方连续的注释块里找 @form / @form-synthetic；空行即止，避免蹭到上一个声明的注释。"""
-    eps, syn, i = [], {}, idx - 1
+    """声明上方连续的注释块里找 @form / @form-synthetic / @form-none；
+    空行即止，避免蹭到上一个声明的注释。"""
+    eps, syn, none, i = [], {}, None, idx - 1
     while i >= 0:
         s = lines[i].strip()
         if not s:
@@ -158,8 +164,10 @@ def annotations(lines, idx):
             eps.append((verb, path))
         for key, why in IGNORE.findall(s):
             syn[key] = why.strip()
+        for why in NOWHERE.findall(s):
+            none = why.strip()
         i -= 1
-    return list(reversed(eps)), syn
+    return list(reversed(eps)), syn, none
 
 
 def main():
@@ -171,6 +179,10 @@ def main():
     drift, stale, unmapped, unverifiable, checked = [], [], [], [], 0
     for fm in forms():
         ident = "%s::%s" % (fm["file"], fm["name"])
+        if fm.get("nowhere"):
+            # 标了 @form-none：这张表单不提交到任何端点，没有「发到哪」这件事，
+            # 既不算未挂也无从核对（理由写在注解里，见 NOWHERE）
+            continue
         if not fm["endpoints"]:
             unmapped.append(ident)
             continue

@@ -89,6 +89,9 @@ export function PlanScopeDrawer({
   const src = REF_SOURCE[level];
   const refOptions = src === "none" ? [] : (opts.data?.[src] ?? []);
 
+  /**
+   * @form POST /api/trade/price-plans/{planNo}/scopes
+   */
   const fields: FieldDef[] = [
     {
       key: "deviceType", label: "设备类型", type: "select", required: true, section: "范围",

@@ -53,6 +53,9 @@ const earliestWithdraw = () => new Date(Date.now() + WITHDRAW_LEAD_DAYS * 86400_
 
 const SCENES = ["商场", "机场", "餐饮", "地铁", "写字楼", "酒店", "医院", "其他"];
 
+/**
+ * @form POST /api/ops/sites/{siteNo}/pause
+ */
 const PAUSE_FIELDS: FieldDef[] = [
   { key: "reason", label: "暂停原因", type: "textarea", rows: 2, required: true, maxLength: 100,
     placeholder: "如：商场装修，预计 10 月复业",
@@ -69,6 +72,10 @@ const OPEN_HOURS_RE = "^([01]\\d|2[0-4]):[0-5]\\d-([01]\\d|2[0-4]):[0-5]\\d(,([0
  *  - 场地方存名字不存编号 → 分成链在「站点→场地方」这一跳断掉，同名场地方会把钱分错家；
  *  - 区域存名字 → 数据权限按区域收敛，打错一个字**静默失效**（不报错，是看不到/看到不该看的）。
  * 所以现在一律「选出来」，存编号，名字只作展示冗余。
+ */
+/**
+ * @form POST /api/ops/sites
+ * @form POST /api/ops/sites/{siteNo}
  */
 function fieldsFor(
   venues: { value: string; label: string }[],

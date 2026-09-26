@@ -134,6 +134,10 @@ function DataTableSection() {
 }
 
 // ────────────────────────────────────────────────────────────── FormDrawer
+/**
+ * @form-none 组件展示页的假表单：onSubmit 只弹一个 toast，不提交到任何端点。
+ * 挂 @form 是假的 —— 它没有「发到哪」这件事，挂了反而会把展示字段当成真契约核。
+ */
 const DEMO_FIELDS: FieldDef[] = [
   { key: "code", label: "机柜编号", required: true, readOnlyOnEdit: true, placeholder: "CAB-000123", section: "基本信息",
     pattern: { re: "^CAB-\\d{6}$", msg: "格式应为 CAB- + 6 位数字" } },

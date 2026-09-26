@@ -95,6 +95,10 @@ const ONLINE: StatusMap<"ONLINE" | "OFFLINE"> = {
   ONLINE: { label: "在线", tone: "success" },
   OFFLINE: { label: "离线", tone: "danger" },
 };
+/**
+ * @form POST /api/ops/locations
+ * @form POST /api/ops/locations/{locationNo}
+ */
 const POINT_FIELDS: FieldDef[] = [
   { key: "name", label: "点位名称", required: true, maxLength: 128, placeholder: "L1 东门" },
   { key: "spotDesc", label: "位置描述", maxLength: 256, placeholder: "B1 层扶梯口左侧，靠近收银台" },
@@ -395,6 +399,9 @@ export function SiteDetailDrawer({
         const agentOpts = (agentOptsQ.data?.list ?? [])
           .filter((a) => !a.archivedAt)
           .map((a) => ({ value: a.agentNo, label: `${a.name}（${a.agentNo}）` }));
+        /**
+         * @form POST /api/ops/sites/{siteNo}/agents
+         */
         const fields: FieldDef[] = [
           { key: "agentNo", label: "合作伙伴", type: "select", required: true, section: "责任",
             options: [{ value: "", label: "请选择合作伙伴" }, ...agentOpts] },

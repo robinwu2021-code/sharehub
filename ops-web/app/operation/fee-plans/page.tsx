@@ -47,6 +47,10 @@ const PLAN_STATUS: StatusMap<PricePlan["status"]> = {
   DISABLED: { label: "停用", tone: "muted" },
 };
 
+/**
+ * @form POST /api/trade/price-plans
+ * @form POST /api/trade/price-plans/{planNo}
+ */
 const PLAN_FIELDS: FieldDef[] = [
   { key: "name", label: "方案名称", required: true, maxLength: 64, section: "基本信息", placeholder: "机场高价" },
   // `scope` 是一句**给人看的描述**，不参与取价。真正决定「这个方案对谁生效」的是
@@ -78,6 +82,10 @@ const WEEKDAYS = [
   { value: "7", label: "周日" },
 ];
 const HHMM = "^([01][0-9]|2[0-3]):[0-5][0-9]$";
+/**
+ * @form POST /api/trade/pricing-schedules
+ * @form POST /api/trade/pricing-schedules/{scheduleNo}
+ */
 const SCHEDULE_FIELDS: FieldDef[] = [
   { key: "name", label: "名称", required: true, maxLength: 40, placeholder: "晚高峰", section: "基本信息" },
   { key: "days", label: "星期", type: "multiselect", csv: true, options: WEEKDAYS, section: "时段",

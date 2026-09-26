@@ -38,7 +38,17 @@ public final class PriceDtos {
      */
     public record PricePlanReq(String planNo, String name, Integer freeMinutes, Integer unitMinutes,
                                java.math.BigDecimal unitPrice, java.math.BigDecimal capDaily,
-                               java.math.BigDecimal capTotal, String currency, String scope,
+                               // **叫 buyoutPrice 不叫 capTotal**：读出参 PricePlanEntry 用的是
+                               // buyoutPrice（实体注释原话「列名保留 DDL 的 cap_total，VO 层才换成
+                               // 前端的 buyoutPrice」），而写入面原先用 DB 名 —— 于是运营填的
+                               // 「买断价」发过来叫 buyoutPrice，后端读 capTotal，**永远存不进去**。
+                               //
+                               // 代价不止少一列：cap_total 为空 = 不封顶，于是
+                               //   · ChargeChain 拿到 capTotal=null → 长租**无上限计费**；
+                               //   · buyoutIfCapped 开头就 `if (cap == null) return false`
+                               //     → 「逾期达封顶自动买断」永不触发，宝也永不转 SOLD。
+                               // 读侧显示正常（VO 改过名），所以这一格看起来一直是对的。
+                               java.math.BigDecimal buyoutPrice, String currency, String scope,
                                String deviceType) {
         /** 映射到实体。**status / archivedAt 有意不设**（见类注释）。 */
         public ai.neargo.sharehub.trade.price.entity.PricePlan toEntity() {
@@ -49,7 +59,7 @@ public final class PriceDtos {
             e.setUnitMinutes(unitMinutes);
             e.setUnitPrice(unitPrice);
             e.setCapDaily(capDaily);
-            e.setCapTotal(capTotal);
+            e.setCapTotal(buyoutPrice);   // 列名 cap_total，入参名随读出参叫 buyoutPrice
             e.setCurrency(currency);
             e.setScope(scope);
             e.setDeviceType(deviceType);

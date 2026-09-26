@@ -7,14 +7,7 @@
 # 根本对不准。而一条对错了的告警比没有告警更糟——它会让人开始忽略整个检查器。
 #
 # 新表单必须一开始就写注解；存量慢慢补，补一张从这里删一行。
-ops-web/app/dev/ui/composites.tsx::DEMO_FIELDS
-ops-web/app/finance/page.tsx::INVOICE_FIELDS_BASE
-ops-web/app/finance/page.tsx::PAYOUT_FIELDS
-ops-web/app/finance/page.tsx::ruleFieldsFor
-ops-web/app/operation/fee-plans/page.tsx::PLAN_FIELDS
-ops-web/app/operation/fee-plans/page.tsx::SCHEDULE_FIELDS
-ops-web/app/operation/sites/page.tsx::PAUSE_FIELDS
-ops-web/app/operation/sites/page.tsx::fieldsFor
-ops-web/components/operation/plan-scope-drawer.tsx::fields
-ops-web/components/operation/site-detail.tsx::POINT_FIELDS
-ops-web/components/operation/site-detail.tsx::fields
+
+# 2026-09-26：**清零**。48 张存量表单全部挂上了 @form（其中 dev/ui 的 DEMO_FIELDS
+# 标的是 @form-none —— 组件展示页的假表单，onSubmit 只弹 toast，没有「发到哪」这件事）。
+# 从此新表单必须一开始就带注解：这张表为空不是"没人管"，是"一张都不欠"。
