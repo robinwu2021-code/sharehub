@@ -159,6 +159,37 @@ scripts/deploy-frontend.sh c-app         # C 端 H5
 > 最小号 ≤ 现网最高版本就**先别发**：要么等那批一起合并后整体部署，
 > 要么重新编号（改号只在**尚未部署到任何环境**时才安全 —— 已应用过的库里存着校验和）。
 
+> ⚠️ **发布前必查（2026-09-27 新增）· 定时任务 cron 装没装**：
+> **19 个任务在 `JobRegistry` 里注册着、手动触发也正常，但生产按 9-25 裁决没装
+> `/etc/cron.d/powerbank-jobs` ⇒ 它们一个都不会自己跑。**
+>
+> 症状是**什么都不发生**：不报错、不告警，界面上 SLA 列和合同到期天数都有数字
+> （那是建单/建约时算的），只是永远不推进 —— 合同不会自己到期、线索不会自己回收、
+> 告警不会自己判定、账不会自己出。
+>
+> `powerbank-jobs` 由 `JobCronCoverageTest` 按任务声明**生成**，所以仓库里的卡口能保证
+> 「每个声明都有一行、时间与声明一致」，**保证不了「这份清单躺在那台机器上」** ——
+> 这是卡口天然到不了的地方，只能上机看。
+>
+> ```bash
+> # 一、先确认心跳模拟器在跑。顺序反了会出事：alarm-rule-eval 第一次跑就会把
+> #     心跳过期的柜子判离线并挂停借（曾经 48 台里 41 台就是这么被挂的）
+> ssh soukmind-tx 'ls -l /etc/cron.d/powerbank-demo-heartbeat /usr/local/bin/powerbank-demo-heartbeat'
+> # 二、看任务 cron 装没装、与仓库里的是否一致
+> ssh soukmind-tx 'ls -l /etc/cron.d/powerbank-jobs'
+> ssh soukmind-tx 'cat /etc/cron.d/powerbank-jobs' | diff - deploy/tencent/cron/powerbank-jobs
+> # 三、在线核对注册表（应与 powerbank-jobs 里的行数一致）
+> ssh soukmind-tx 'curl -s http://127.0.0.1:8082/internal/job/declarations' | python3 -c 'import json,sys;print(len(json.load(sys.stdin)["data"]))'
+> ```
+>
+> **装它**（心跳确认在跑之后）：
+> ```bash
+> scp deploy/tencent/cron/powerbank-jobs soukmind-tx:/tmp/
+> ssh soukmind-tx 'sudo install -o root -g root -m 644 /tmp/powerbank-jobs /etc/cron.d/'
+> ```
+> ⚠️ **每次新增任务都要重发这个文件** —— 新任务没进清单时 `JobCronCoverageTest` 会在本地红，
+> 但**清单更新了而生产没重发**这件事没有任何东西会说。
+
 | 配置 | 仓库默认 | 生产必须 | 原因 |
 |---|---|---|---|
 | `SHAREHUB_IDENTITY_PEPPER` | 空 | **必须配，≥32 字符** | 登录标识（手机号/邮箱）哈希的 pepper。**为空即拒绝启动**。手机号取值空间小到可以穷举，裸哈希等于明文存储；给默认值等于所有部署共用一个 pepper。轮换见上方「发布前必查」 |
@@ -252,6 +283,11 @@ ssh soukmind-tx 'systemctl status powerbank'
 5. **`c-app` App/小程序打包**：与本次 Web 部署无关，H5 是当前唯一目标；App/微信小程序分发另开一份 release 流程。
 6. **迁移到 ShareHub 名字**：`ADR-014` 定名但迁移待放行。本方案的路径继续用 `powerbank/`（跟仓库名），改名时**一次性把 `/data/app/powerbank/` 软链到 `/data/app/sharehub/`**（同 ai-shop `/opt/ai-shop*` 兼容软链的做法），不做原地重命名。
 
+7. **装 `/etc/cron.d/powerbank-jobs`（待放行）**：生产现在 19 个任务一个都不会自己跑，
+   全靠手动 `POST /internal/job/<名>/trigger`。挡它的前提（演示环境没真实心跳）已由心跳模拟器解除，
+   **装的顺序是先心跳后任务**，命令见上方「发布前必查 · 定时任务 cron」。
+   放行前想清楚一件事：装上之后 `settlement-generate`（每月 1 号 02:00）会**真的出账**，
+   `contract-lifecycle` 会**真的把到期合同置 EXPIRED** —— 演示数据里那些日期是不是你想让它生效的。
 ## 12. 落地顺序（你放行后我做）
 
 1. 写 nginx site 文件（本目录 `nginx/powerbank.ichain.top`）
