@@ -26,6 +26,22 @@ public final class NotifyDtos {
     }
 
     /** 模板预览出参，镜像前端 {@code NotifyTemplatePreview}。 */
+    /**
+     * 模板预览入参（裸 {@code Map} → record，2026-09-26）。
+     *
+     * <p>原先是 {@code Map<String,Object>} 里 {@code getOrDefault("vars", Map.of())} 再
+     * <b>强转成 {@code Map<String,String>}</b>（带 {@code @SuppressWarnings("unchecked")}）——
+     * 客户端把 {@code vars} 发成字符串或数组时是 {@code ClassCastException} → <b>500</b>，
+     * 而那本该是 400。声明成字段之后由 Jackson 在入口拒。
+     */
+    public record NotifyTemplatePreviewReq(java.util.Map<String, String> vars) {
+
+        /** 缺省空表：不传变量就是「只看模板原样」，不是错误。 */
+        public java.util.Map<String, String> varsOrEmpty() {
+            return vars == null ? java.util.Map.of() : vars;
+        }
+    }
+
     public record NotifyTemplatePreviewVO(String templateNo, String channel, String rendered,
                                           java.util.List<String> missingVars) {
     }

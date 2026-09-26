@@ -131,13 +131,16 @@ public class UserController {
     /** 内部拉黑/解除。拉黑写新记录、解除单向（{@code ACTIVE → RELEASED}），语义在 service。 */
     @PostMapping("/internal/user/credit/blacklist")
     @PreAuthorize("@perm.can('user:risk:update')")
-    public OkResult blacklist(@RequestBody Map<String, Object> body) {
-        String cUserNo = String.valueOf(body.get("cUserNo"));
-        boolean blacklisted = Boolean.TRUE.equals(body.get("blacklisted"));
-        String reason = body.get("reason") == null ? "运营端拉黑" : String.valueOf(body.get("reason"));
+    public OkResult blacklist(
+            @RequestBody ai.neargo.sharehub.user.core.dto.UserCoreDtos.BlacklistReq body) {
+        // requireCUserNo 挡住的是一个很具体的老坑：原先写 String.valueOf(body.get("cUserNo"))，
+        // 键缺席或拼错（发成 userNo）时它给字符串 "null"，而 block() 不校验 ——
+        // 库里多一条 c_user_no='null' 的 ACTIVE 拉黑记录，调用方拿到 {ok:true}：
+        // 运营以为拉黑了某人，而没有任何人被拉黑。
+        String cUserNo = body.requireCUserNo();
         String operator = StaffContext.require().username();
-        if (blacklisted) {
-            userBlacklists.block(cUserNo, reason, operator);
+        if (body.block()) {
+            userBlacklists.block(cUserNo, body.reasonOr("运营端拉黑"), operator);
         } else {
             userBlacklists.release(cUserNo, operator);
         }

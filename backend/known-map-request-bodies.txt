@@ -22,10 +22,7 @@ AlarmController#closeAlarm
 AlarmController#resendAlarmNotice
 AuthController#changePassword
 AuthController#loginOtp
-DeviceController#confirmLost
-DeviceController#dismissLost
 IamAdminController#setRolePermissions
-NotifyController#previewTemplate
 OperationController#cancelAdjustment
 OperationController#saveAdjustment
 OpsController#dispatch
@@ -34,7 +31,6 @@ OpsController#saveCabinet
 OwnershipInternalController#byLocations
 OwnershipInternalController#cabinet
 TradeInternalController#returnOrder
-UserController#blacklist
 VendorController#saveConfig
 
 # ⚠️ 2026-09-26 换 record 时查明、**未修**（要先拍板）：C 端认证的 countryCode 从不参与身份派生。
@@ -45,3 +41,9 @@ VendorController#saveConfig
 # 修法是把 uid 改成按 E.164 派生，而 uid 就是账号身份 —— 等于给存量账号改身份，
 # 要先定迁移方式（惰性重键 / 双读回落 / 停机重算）。
 # 现状已由 ConsumerPhoneIdentityTest 钉住：身份改好之后那条会红，届时连本段一起删。
+
+# ✅ 2026-09-26 判定为**正当例外，不要转**：
+#   VendorController#saveConfig —— 服务里用 `body.containsKey("apiBase")` 区分
+#   「没传=不动」与「传了 null=清空」（VendorServiceImpl.saveConfig）。
+#   record 表达不了这个区别，照着直转是行为回退：原本「不动 apiBase」会变成「清空 apiBase」。
+#   要转得先设计 patch 语义（Optional / JsonNullable / 显式 patch 字段），那是独立一笔。

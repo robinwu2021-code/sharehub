@@ -54,6 +54,17 @@ public final class DevDtos {
                                String occurredAt, String result) {
     }
 
+    /**
+     * 疑似丢失的核实结论入参（裸 {@code Map} → record，2026-09-26；
+     * 见 backend/known-map-request-bodies.txt）。
+     *
+     * <p>确认丢失与解除误判共用：都只带一句说明。
+     * 解除时 {@code note} 必填由 service 拦（{@code error.powerbank.dismiss_note_required}）——
+     * 「找回在哪、为什么误判」不写下来，这条记录事后就没有意义。
+     */
+    public record LostVerdictReq(String note) {
+    }
+
     /** 设备编码批次行，镜像前端 {@code DeviceCodeBatch}。 */
     public record CodeBatchRow(String batchNo, String vendorCode, String codeType,
                                String rangeStart, String rangeEnd, Integer total, Integer bound,

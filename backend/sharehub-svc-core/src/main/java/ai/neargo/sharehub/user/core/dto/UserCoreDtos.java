@@ -41,6 +41,38 @@ public final class UserCoreDtos {
     }
 
     /**
+     * 拉黑 / 解除拉黑入参（裸 {@code Map} → record，2026-09-26）。
+     *
+     * <p><b>顺带挡住一个「字符串 null」</b>：此前控制器写
+     * {@code String.valueOf(body.get("cUserNo"))} —— 键缺席或拼错（比如发成 {@code userNo}）时
+     * 它给的是**字符串 {@code "null"}**，而 {@code UserBlacklistServiceImpl.block} 不校验，
+     * 于是库里多一条 {@code c_user_no = 'null'} 的 ACTIVE 拉黑记录、调用方拿到 {@code {ok:true}}。
+     * 运营以为拉黑了某人，而没有任何人被拉黑。
+     * record 让键缺席就是 {@code null}，配上下面这个判空，这条路就断了。
+     *
+     * @param blacklisted true=拉黑，false/缺省=解除
+     */
+    public record BlacklistReq(String cUserNo, Boolean blacklisted, String reason) {
+
+        /** 业务键必须真有值 —— 见类注释里那条「字符串 null」。 */
+        public String requireCUserNo() {
+            if (cUserNo == null || cUserNo.isBlank()) {
+                throw ai.neargo.sharehub.common.BizException.badRequest(
+                        "error.common.missing_parameter", "cUserNo");
+            }
+            return cUserNo.trim();
+        }
+
+        public boolean block() {
+            return Boolean.TRUE.equals(blacklisted);
+        }
+
+        public String reasonOr(String fallback) {
+            return reason == null || reason.isBlank() ? fallback : reason;
+        }
+    }
+
+    /**
      * C 端资料编辑入参（裸 Map → record，2026-09-26）。
      *
      * <p>{@code email} 收进来只为了**能显式拒绝**：它无落列（PII 归 pb_pii 分库，未建），

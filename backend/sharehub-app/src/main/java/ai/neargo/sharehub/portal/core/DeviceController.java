@@ -80,15 +80,19 @@ public class DeviceController {
      */
     @PostMapping("/powerbanks/{powerbankNo}/confirm-lost")
     @PreAuthorize("@perm.can('device:powerbank:update')")
-    public PowerbankRow confirmLost(@PathVariable String powerbankNo, @RequestBody(required = false) Map<String, String> body) {
-        return powerbankLoss.confirmLost(powerbankNo, body == null ? null : body.get("note"));
+    public PowerbankRow confirmLost(
+            @PathVariable String powerbankNo,
+            @RequestBody(required = false) ai.neargo.sharehub.dev.dto.DevDtos.LostVerdictReq body) {
+        return powerbankLoss.confirmLost(powerbankNo, body == null ? null : body.note());
     }
 
     /** 疑似丢失经核实：已找回 / 误判 —— 清标记并重置失联计时。说明必填（找回在哪、为什么误判）。 */
     @PostMapping("/powerbanks/{powerbankNo}/dismiss-lost")
     @PreAuthorize("@perm.can('device:powerbank:update')")
-    public PowerbankRow dismissLost(@PathVariable String powerbankNo, @RequestBody(required = false) Map<String, String> body) {
-        return powerbankLoss.dismiss(powerbankNo, body == null ? null : body.get("note"));
+    public PowerbankRow dismissLost(
+            @PathVariable String powerbankNo,
+            @RequestBody(required = false) ai.neargo.sharehub.dev.dto.DevDtos.LostVerdictReq body) {
+        return powerbankLoss.dismiss(powerbankNo, body == null ? null : body.note());
     }
 
     @PostMapping("/powerbanks")

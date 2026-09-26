@@ -156,11 +156,12 @@ public class NotifyController {
     /** 模板渲染预览。缺失的变量原样保留并单列，不静默替空串 —— 否则漏配上线才发现。 */
     @PostMapping("/api/platform/notify-templates/{no}/preview")
     @PreAuthorize("@perm.can('system:notify_template:read')")
-    public Object previewTemplate(@PathVariable String no, @RequestBody(required = false) java.util.Map<String, Object> body) {
-        @SuppressWarnings("unchecked")
-        java.util.Map<String, String> vars = body == null ? java.util.Map.of()
-                : (java.util.Map<String, String>) body.getOrDefault("vars", java.util.Map.of());
-        return templateService.preview(no, vars);
+    public Object previewTemplate(
+            @PathVariable String no,
+            @RequestBody(required = false) ai.neargo.sharehub.platform.notify.dto.NotifyDtos.NotifyTemplatePreviewReq body) {
+        // 原先是从裸 Map 里取出再 unchecked 强转成 Map<String,String>：
+        // vars 发成字符串或数组时是 ClassCastException → 500，而那本该是 400。
+        return templateService.preview(no, body == null ? java.util.Map.of() : body.varsOrEmpty());
     }
 
     /** 模板试发。**必带幂等键** —— 试发也是真发真扣钱，双击不该发两条。 */
