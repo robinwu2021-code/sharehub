@@ -31,9 +31,16 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class EntityRequestBodyRatchetTest {
 
-    /** `@RequestBody 类型名`（允许 final 修饰） */
+    /**
+     * `@RequestBody 类型名`（允许 final 修饰，**也允许注解带包名**）。
+     *
+     * <p>包名那一段是 2026-09-26 补的：本仓库有 17 个文件在用全限定 Spring 注解，
+     * 而 `@org.springframework.web.bind.annotation.RequestBody` 里没有 `@RequestBody`
+     * 这个子串 —— 只认后者等于对那种写法完全失明。今天还没有这种写法，
+     * 所以这一改不改变任何现有判定（同批加的 MapRequestBodyRatchetTest 是靠负对照撞出来的）。
+     */
     private static final Pattern REQUEST_BODY =
-            Pattern.compile("@RequestBody\\s+(?:final\\s+)?([A-Z][A-Za-z0-9_]*)");
+            Pattern.compile("@(?:[\\w.]*\\.)?RequestBody\\s+(?:final\\s+)?([A-Z][A-Za-z0-9_]*)");
 
     /** `class Xxx extends BaseEntity` */
     private static final Pattern ENTITY_DECL =

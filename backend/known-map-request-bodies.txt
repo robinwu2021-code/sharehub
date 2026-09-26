@@ -1,0 +1,59 @@
+# 请求体是裸 `Map<…>` 的处理器 —— **只准变少，不准变多**。
+#
+# 裸 Map 当请求体 = **这个端点没有契约**。没人能从签名上说出它认哪些键，
+# 于是三件事同时失去：
+#   · 契约抽取（api-extract）抽不出 requestShape，靠它的检查器一个都核不了 ——
+#     ops-web 的「表单字段 vs 后端写入面」卡口对这 41 个端点全是盲的，
+#     而它上线第一天就查出四处「运营填了存不进去」，其中一处是每次 500；
+#   · 拼错的键**静默忽略**。`body.get("userNo")` 与前端发的 `user_no` 差一个字，
+#     没有任何东西会响；
+#   · 前端类型无从生成，只能靠人两边对着抄。
+#
+# 换成 record DTO 就都解决了。**但不是所有都能机械换** ——
+# 少数端点用 `in.containsKey("x")` 区分「没传」与「传了空」（部分更新语义），
+# 那个区别 record 表达不了：`CabinetServiceImpl.save` 就靠它做到
+# 「locationNo 缺省=不动、传空=解绑」。这类要先设计（Optional / JsonNullable /
+# 显式 patch 字段），照 record 直转是**行为回退**。转之前先读一遍 service。
+#
+# 格式：<控制器类名>#<方法名>
+AgentApplyController#applyOtp
+AlarmController#ack
+AlarmController#closeAlarm
+AlarmController#resendAlarmNotice
+AuthController#changePassword
+AuthController#loginOtp
+ConsumerAuthController#otp
+ConsumerAuthController#register
+ConsumerAuthController#resetPassword
+DeviceController#confirmLost
+DeviceController#dismissLost
+FinanceController#buyoutDeposit
+FinanceController#dunDeposit
+FinanceController#generateSettlements
+FinanceController#generateSettlementsPublic
+FinanceController#resolveRecon
+FinanceController#voidInvoice
+IamAdminController#setRolePermissions
+MarketingController#finishPushMessage
+MarketingController#issueCoupon
+MarketingController#sendPushMessage
+MarketingController#sweepDuePushMessages
+MpUserController#recharge
+MpUserController#updateProfile
+NotifyController#previewTemplate
+OperationController#cancelAdjustment
+OperationController#saveAdjustment
+OpsController#dispatch
+OpsController#importCabinets
+OpsController#saveCabinet
+OpsController#sendCommand
+OwnershipInternalController#byLocations
+OwnershipInternalController#cabinet
+RentController#depositFree
+RentController#pay
+RentController#rent
+TradeInternalController#returnOrder
+UserController#blacklist
+UserOpsController#issueCUserInvoice
+UserOpsController#rejectCUserInvoice
+VendorController#saveConfig
