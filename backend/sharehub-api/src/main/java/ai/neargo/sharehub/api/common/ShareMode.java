@@ -33,4 +33,12 @@ public enum ShareMode {
             throw new IllegalArgumentException("分润方式非法: " + v + "（仅 CHANNEL_SPLIT/LEDGER）");
         }
     }
+    /**
+     * **传了才校验** —— 空/缺省返回 {@code null}，调用方沿用原语义（见
+     * {@code CampaignKind.ofNullable} 的注释：保存端点创建与编辑共用）。
+     */
+    public static ShareMode ofNullable(String v) {
+        return v == null || v.isBlank() ? null : of(v);
+    }
+
 }

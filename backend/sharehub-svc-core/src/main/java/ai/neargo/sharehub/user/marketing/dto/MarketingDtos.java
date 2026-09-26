@@ -58,8 +58,13 @@ public final class MarketingDtos {
             var e = new ai.neargo.sharehub.user.marketing.entity.MktCampaign();
             e.setCampaignNo(campaignNo);
             e.setName(name);
-            // 词表两列经 of() 归一：此前原样落库，POST {"kind":"WHATEVER"} 也能成功
-            e.setKind(CampaignKind.of(kind).name());
+            /*
+             * 词表经 ofNullable 归一：此前原样落库，POST {"kind":"WHATEVER"} 也能成功。
+             * 用 ofNullable 而不是 of —— 本方法创建与编辑共用，编辑只传要改的字段，
+             * kind 为 null 表示「不改」（MyBatis-Plus 更新忽略 null）。
+             */
+            CampaignKind k = CampaignKind.ofNullable(kind);
+            e.setKind(k == null ? null : k.name());
             e.setRule(rule);
             e.setStartAt(startAt);
             e.setEndAt(endAt);

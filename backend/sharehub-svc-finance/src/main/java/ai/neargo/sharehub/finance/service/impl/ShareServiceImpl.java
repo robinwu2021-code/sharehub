@@ -163,12 +163,14 @@ public class ShareServiceImpl implements ShareService {
          * basis 用 ofNullable：空串是合法值（通用规则），按「必填」写会拒掉
          * 188 行对的写入 —— 见 ShareBasis 类注释。
          */
-        body.setDimension(ShareDimension.of(req.dimension()).name());
+        ShareDimension dim = ShareDimension.ofNullable(req.dimension());
+        body.setDimension(dim == null ? null : dim.name());
         body.setPayeeNo(req.payeeNo());
         body.setPayeeName(req.payeeName());
         ShareBasis basis = ShareBasis.ofNullable(req.basis());
-        body.setBasis(basis == null ? "" : basis.name());
-        body.setMode(ShareMode.of(req.mode()).name());
+        body.setBasis(basis == null ? req.basis() : basis.name());   // 空/缺省原样带过，别把 null 改写成 ""
+        ShareMode md = ShareMode.ofNullable(req.mode());
+        body.setMode(md == null ? null : md.name());
         body.setRate(req.rate());
         body.setFormula(req.formula());
         body.setPriority(req.priority());

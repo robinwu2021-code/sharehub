@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.finance;
 
+import ai.neargo.sharehub.common.BizException;
+
 /**
  * 分润依据（{@code share_rule.basis}，V53 / ADR-027）—— 同一个代理凭哪一项责任分这笔钱。
  *
@@ -26,16 +28,18 @@ public enum ShareBasis {
     REFER;
 
     /**
-     * 宽松解析，**允许空**（空 = 通用规则，见类注释）。
-     * 非空且非法时抛 {@link IllegalArgumentException}（全局映射 400）。
+     * 宽松解析，**允许空**（空 = 通用规则，见类注释）。非空且非法时抛 400。
+     *
+     * <p>⚠️ 文案走 i18n key，不写中文字面量 —— 非 key 的字符串会被一字不改送到客户端，
+     * 界面切英文/阿语之后页面是英文、报错还是中文（{@code ChineseErrorLiteralRatchetTest}
+     * 卡着这件事，本类第一版就是那么写的）。
      */
     public static ShareBasis ofNullable(String v) {
         if (v == null || v.isBlank()) return null;
         try {
             return valueOf(v.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("分润依据非法: " + v
-                    + "（仅 INVEST/DEVELOP/OPERATE/REFER，或留空表示通用规则）");
+            throw BizException.badRequest("error.share.basis_invalid", v);
         }
     }
 }

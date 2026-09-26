@@ -99,8 +99,10 @@ public class PaymentChannelController {
             e.setChannelName(channelName);
             e.setChannelNameEn(channelNameEn);
             e.setChannelNameAr(channelNameAr);
-            // pay_channel 当前 0 行，这道校验是纯预防：第一条数据进来之前装闸最便宜
-            e.setMode(PayChannelMode.of(mode).name());
+            // pay_channel 当前 0 行，这道校验是纯预防：第一条数据进来之前装闸最便宜。
+            // ofNullable：本方法创建与编辑共用，没传表示「不改」
+            PayChannelMode m = PayChannelMode.ofNullable(mode);
+            e.setMode(m == null ? null : m.name());
             e.setStatus(status);
             e.setApiBase(apiBase);
             e.setMerchantId(merchantId);
