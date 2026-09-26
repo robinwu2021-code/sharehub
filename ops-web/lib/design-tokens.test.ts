@@ -158,6 +158,47 @@ describe("页面层规范一致性（只允许变好）", () => {
   const countAll = (re: RegExp) =>
     pageFiles().reduce((n, f) => n + (readFileSync(f, "utf8").match(re)?.length ?? 0), 0);
 
+  /**
+   * 控件一律走组件库 —— 裸 `<input>` / `<select>` 不许出现在页面里。
+   *
+   * 2026-09-26 实测撞到的三种形态：
+   *   · 入驻审核的日期区间用两个 `<Input type="date">`，而全站另外 19 处用的是 `<DateInput>`
+   *     —— 高矮、圆角、日历图标的 hover 都不一样，摆在同一条工具条上一眼就能看出来；
+   *   · 员工页的两个 `<select>` 自己拼了 `h-9 rounded-control border-[var(--border)]`，
+   *     与 `<Select>` 各走各的，改主题时只会变一边；
+   *   · 而这类不一致**不报错**，只是界面上参差 —— 没人会为此提单，于是它能活很久。
+   *
+   * `<input type="file">` 例外：组件库里没有对应件（`FileField` 是上传业务件，
+   * 不是文件选择器），设备页的 CSV 导入用的就是它。例外只此一个，写死在判据里。
+   */
+  it("★ 页面里不许有裸 <input> / <select> —— 控件一律走组件库", () => {
+    const offenders: string[] = [];
+    for (const f of pageFiles()) {
+      const rel = f.slice(ROOT.length).replace(/^\/+/, "");
+      const src = readFileSync(f, "utf8");
+      // ① 裸元素
+      for (const m of src.matchAll(/<(input|select)\b[^>]*/g)) {
+        if (m[1] === "input" && /type=["']file["']/.test(m[0])) continue;
+        const line = src.slice(0, m.index).split("\n").length;
+        offenders.push(`${rel}:${line} <${m[1]}>`);
+      }
+      /*
+       * ② 用对了组件、用错了**哪一个**：`<Input type="date">` 该是 `<DateInput>`。
+       *    ⚠️ 这一条是负对照逼出来的 —— 第一版判据只认小写裸元素，
+       *    而入驻审核那处原本写的正是 `<Input type="date">`（大写 I，是组件），
+       *    改回去卡口照样绿。**说明里写着能抓、实际抓不到**，比没有这条更糟。
+       */
+      for (const m of src.matchAll(/<Input\b[^>]*type=["']date["'][^>]*/g)) {
+        const line = src.slice(0, m.index).split("\n").length;
+        offenders.push(`${rel}:${line} <Input type="date"> → 应为 <DateInput>`);
+      }
+    }
+    expect(offenders,
+      "改用 components/ui 里的 <Input> / <Select> / <DateInput> / <FilterSelect>。\n"
+      + "裸控件与组件件的高矮、圆角、焦点环各走各的，而这**不会报错**，只是界面参差。")
+      .toEqual([]);
+  });
+
   it("手写「仅可查看」不增加 —— 应改用 <ReadOnlyNotice>（规范 §13）", () => {
     // 基线 1（原 17，2026-07-30 页面层清理）：句式统一 + 说清缺哪个权限码全靠组件保证。
     // 剩的 1 处在**注释里**（employees 说明「禁用态悬浮提示刻意不套这句」），

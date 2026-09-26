@@ -42,6 +42,7 @@ import { SummaryCard } from "@/components/ui/summary-card";
 import { Drawer, Field } from "@/components/ui/drawer";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 
 
 /**
@@ -501,7 +502,7 @@ function SitesInner() {
             </Field>
             {exitTarget.kind === "withdraw" && (
               <Field label="计划撤场日（必填）">
-                <Input type="date" className="w-full" min={earliestWithdraw()} value={exitPlannedAt} onChange={(e) => setExitPlannedAt(e.target.value)} />
+                <DateInput className="w-full" min={earliestWithdraw()} value={exitPlannedAt} onChange={(e) => setExitPlannedAt(e.target.value)} />
                 <div className="mt-1 txt-caption text-muted-foreground">
                   至少提前 {WITHDRAW_LEAD_DAYS} 天：给运维排撤机、给在借用户留归还时间（系统参数 site.withdraw.lead_days）
                 </div>

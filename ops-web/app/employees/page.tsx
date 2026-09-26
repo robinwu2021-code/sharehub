@@ -23,7 +23,7 @@ import { Tree, type TreeNode } from "@/components/ui/tree";
 import { Notice } from "@/components/ui/notice";
 import { Card } from "@/components/ui/card";
 import { ReadOnlyNotice } from "@/components/read-only-notice";
-import { Input } from "@/components/ui/input";
+import { Input, Select } from "@/components/ui/input";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
@@ -1123,15 +1123,15 @@ function EmployeesInner() {
                 onChange={(e) => setMenuForm({ ...menuForm, sort: Number(e.target.value) || 0 })} />
             </Field>
             <Field label="是否启用">
-              <select
-                className="h-9 w-full rounded-control border border-[var(--border)] bg-[var(--surface)] px-2"
+              <Select
+                className="w-full"
                 value={String(menuVisible)}
                 disabled={menuForm.menuNo === ADMIN_MENU}
                 onChange={(e) => setMenuVisible(Number(e.target.value))}
               >
                 <option value="1">启用</option>
                 <option value="0">停用（不显示，可恢复）</option>
-              </select>
+              </Select>
               {menuForm.menuNo === ADMIN_MENU && (
                 // 护栏在界面上先说清楚，而不是让人点了才吃一个 500
                 <div className="mt-1 txt-caption text-muted-foreground">
@@ -1141,8 +1141,8 @@ function EmployeesInner() {
             </Field>
             <Field label="权限码">
               {/* 只能从目录里选：自由输入的结果是「对谁都不可见且不报错」 */}
-              <select
-                className="h-9 w-full rounded-control border border-[var(--border)] bg-[var(--surface)] px-2"
+              <Select
+                className="w-full"
                 value={menuForm.perm ?? ""}
                 disabled={!menuForm.parentNo && (menuForm.children?.length ?? 0) > 0}
                 onChange={(e) => setMenuForm({ ...menuForm, perm: e.target.value || null })}
@@ -1151,7 +1151,7 @@ function EmployeesInner() {
                 {(permsQ.data ?? []).map((p) => (
                   <option key={p.code} value={p.code}>{p.name}（{p.code}）</option>
                 ))}
-              </select>
+              </Select>
               {!menuForm.parentNo && (menuForm.children?.length ?? 0) > 0 && (
                 // 有子项的 section 走「有没有可见子项」，它自己的码不参与判定
                 <div className="mt-1 txt-caption text-muted-foreground">
