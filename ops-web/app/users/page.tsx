@@ -109,21 +109,31 @@ const CUINV_STATUS: StatusMap<CUserInvoiceRow["status"]> = {
   REJECTED: { label: "已驳回", tone: "danger" },
 };
 
+/**
+ * @form POST /api/user/cuser-invoices/{invoiceNo}/issue
+ */
 const ISSUE_FIELDS: FieldDef[] = [
   { key: "fileUrl", label: "发票文件地址", required: true, placeholder: "https://…/invoice.pdf",
     help: "开具后消费者在 App 里点开的就是这个地址；留空等于告诉他「已开具」却拿不到票" },
 ];
 
+/**
+ * @form POST /api/user/cuser-invoices/{invoiceNo}/reject
+ */
 const REJECT_FIELDS: FieldDef[] = [
   { key: "reason", label: "驳回原因", required: true, maxLength: 200, type: "textarea",
     placeholder: "例如：抬头与实名信息不符，请修改抬头后重新提交",
     help: "必填。只说「已驳回」，用户无从改正后重提 —— 他会做的事是再提一次" },
 ];
 
+/**
+ * @form POST /api/user/free-whitelist
+ * @form POST /api/user/free-whitelist/{userNo}
+ */
 const WHITELIST_FIELDS: FieldDef[] = [
   { key: "userNo", label: "用户号", readOnlyOnEdit: true, required: true, section: "用户", placeholder: "U3001" },
-  { key: "nickname", label: "昵称", required: true, maxLength: 30, section: "用户", placeholder: "用户昵称" },
-  { key: "phone", label: "手机", section: "用户", placeholder: "+971501234567", pattern: { re: "^\\+?[0-9]{7,15}$", msg: "手机号格式不正确（示例 +971501234567）" } },
+  // 昵称/手机是**读出参里的展示值**（后端从 NicknameLookup 批量回填），不是这张表单能写的东西。
+  // 原先它们是输入框且昵称还 required —— 运营被逼着填一个会被丢掉的值，而抽屉标题里本来就有用户号。
   { key: "reason", label: "用途", type: "select", required: true, section: "额度", options: REASON_OPTIONS, help: "必填且为枚举：事后要按用途归集免费成本，自由文本归集不了" },
   { key: "quotaType", label: "额度类型", type: "select", required: true, section: "额度", options: [
     { value: "UNLIMITED", label: "不限额" }, { value: "TIMES", label: "限次数" }, { value: "AMOUNT", label: "限金额" },
@@ -155,6 +165,10 @@ const PKG_STATUS: StatusMap<RechargePackage["status"]> = {
   ENABLED: { label: "上架", tone: "success" },
   DISABLED: { label: "下架", tone: "muted" },
 };
+/**
+ * @form POST /api/user/recharge-packages
+ * @form POST /api/user/recharge-packages/{packageNo}
+ */
 const RECHARGE_FIELDS: FieldDef[] = [
   { key: "packageNo", label: "套餐号", readOnlyOnEdit: true, placeholder: "留空自动生成", section: "基本信息" },
   { key: "name", label: "套餐名称", required: true, maxLength: 20, section: "基本信息", placeholder: "常用包" },
@@ -186,9 +200,14 @@ const BENEFIT_STATUS: StatusMap<MemberBenefit["status"]> = {
 
 // 会员表单不含「次卡类型 / 到期时间」：这两列由**次卡发放**派生（服务端也会剥掉这两个字段），
 // 手改就能造出「名单说有月卡、次卡记录里一张都没有」的假象。要给卡走「发次卡」。
+/**
+ * @form POST /api/user/members
+ * @form POST /api/user/members/{userNo}
+ */
 const MEMBER_FIELDS: FieldDef[] = [
   { key: "userNo", label: "用户号", readOnlyOnEdit: true, required: true, placeholder: "U0001" },
-  { key: "nickname", label: "昵称", required: true, maxLength: 30, placeholder: "会员昵称" },
+  // 昵称/手机是**读出参里的展示值**（后端从 NicknameLookup 批量回填），不是这张表单能写的东西。
+  // 原先它们是输入框且昵称还 required —— 运营被逼着填一个会被丢掉的值，而抽屉标题里本来就有用户号。
   { key: "level", label: "等级", type: "select", required: true, options: [
     { value: "SILVER", label: "白银" },
     { value: "GOLD", label: "黄金" },
@@ -199,6 +218,9 @@ const MEMBER_FIELDS: FieldDef[] = [
 
 // —— 会员权益（S4：等级列背后此前没有任何口径）——
 // 「等级名」不在表单里：它同时是页面徽标文案，改了就和名单上的徽标对不上。
+/**
+ * @form POST /api/user/member-benefits/{level}
+ */
 const BENEFIT_FIELDS: FieldDef[] = [
   { key: "rentDiscount", label: "租金折扣", type: "number", required: true, min: 0.1, max: 1, section: "计费权益",
     help: "0.9 = 九折；1 = 不打折。必须随等级变好（高档折扣不得高于低档），否则服务端拒绝" },
@@ -221,6 +243,9 @@ const CARD_STATUS: StatusMap<MemberCard["status"]> = {
   EXPIRED: { label: "已过期", tone: "muted" },
   REVOKED: { label: "已撤销", tone: "danger" },
 };
+/**
+ * @form POST /api/user/member-cards
+ */
 const CARD_FIELDS: FieldDef[] = [
   { key: "userNo", label: "用户号", required: true, section: "发放对象", placeholder: "U3001",
     help: "必须是已注册用户；黑名单用户拒发（请先解除拉黑）" },
@@ -243,9 +268,14 @@ const TXN_TYPE: StatusMap<WalletTxn["type"]> = {
   BONUS: { label: "赠额", tone: "outline" },
 };
 
+/**
+ * @form POST /api/user/wallets
+ * @form POST /api/user/wallets/{userNo}
+ */
 const WALLET_FIELDS: FieldDef[] = [
   { key: "userNo", label: "用户号", readOnlyOnEdit: true, placeholder: "U0001" },
-  { key: "nickname", label: "昵称", placeholder: "用户昵称" },
+  // 昵称/手机是**读出参里的展示值**（后端从 NicknameLookup 批量回填），不是这张表单能写的东西。
+  // 原先它们是输入框且昵称还 required —— 运营被逼着填一个会被丢掉的值，而抽屉标题里本来就有用户号。
   { key: "balance", label: "余额", type: "number" },
   { key: "bonus", label: "赠额", type: "number" },
   { key: "currency", label: "币种", placeholder: "AED" },

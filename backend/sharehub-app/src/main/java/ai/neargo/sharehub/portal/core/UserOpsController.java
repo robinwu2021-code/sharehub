@@ -210,7 +210,9 @@ public class UserOpsController {
     @PostMapping("/recharge-packages")
     @PreAuthorize("@perm.can('user:wallet:update')")
     public RechargePackageRow createRechargePackage(@RequestBody UserAssetDtos.RechargePackageReq body) {
-        return packages.save(body.toEntity());
+        // 走 saveWithMarkets：适用市场在关联表上，基类的 save 只认实体 ——
+        // 此前调 save 等于把这一格静默丢掉，而没有市场的套餐 C 端对每个用户都不出现
+        return packages.saveWithMarkets(body.toEntity(), body.markets());
     }
 
     @PostMapping("/recharge-packages/{packageNo}")
@@ -219,7 +221,7 @@ public class UserOpsController {
                                                     @RequestBody UserAssetDtos.RechargePackageReq body) {
         UsrRechargePkg e = body.toEntity();
         e.setPackageNo(packageNo);
-        return packages.save(e);
+        return packages.saveWithMarkets(e, body.markets());
     }
 
     // —— 充值订单（只读；下单与回调走支付域）——

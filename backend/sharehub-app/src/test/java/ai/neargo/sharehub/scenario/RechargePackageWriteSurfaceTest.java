@@ -43,6 +43,41 @@ class RechargePackageWriteSurfaceTest extends ApiTestSupport {
         return post("/api/user/recharge-packages", m, admin).okData().path("packageNo").asText();
     }
 
+    /**
+     * 「适用市场」此前**存不进去**：读出参从 {@code usr_recharge_pkg_market} 关联表拼 CSV，
+     * 而写入 DTO {@code RechargePackageReq} 根本没有这个字段，端点调的是基类 {@code save(实体)}。
+     * 运营在必填的「适用市场」勾了国家、保存拿到 200，关联表一行都没写。
+     *
+     * <p>后果不是「少一列显示」：C 端按用户所在国家筛套餐，
+     * <b>没有市场的套餐对每个用户都不出现</b> —— 症状是「新建的套餐 C 端看不到」，
+     * 没人会想到是这一格。
+     */
+    @Test
+    @DisplayName("★★ 适用市场存得进去，且取消勾选真的取消（全量重写不是只增）")
+    void marketsAreSaved() {
+        String admin = login("ADMIN");
+        Map<String, Object> m = new HashMap<>();
+        m.put("packageNo", uniq());
+        m.put("name", "市场测试包");
+        m.put("payAmount", new BigDecimal("50.00"));
+        m.put("giftAmount", new BigDecimal("5.00"));
+        m.put("currency", "AED");
+        m.put("validDays", 180);
+        m.put("markets", "AE,SA");
+        String no = post("/api/user/recharge-packages", m, admin).okData().path("packageNo").asText();
+
+        assertThat(row(admin, no).path("markets").asText())
+                .as("建单就该带上市场 —— 此前这里是空的，而 HTTP 仍然 200")
+                .isEqualTo("AE,SA");
+
+        // 改成只留 AE：取消勾选必须真的取消，否则「已取消的市场仍买得到」
+        m.put("markets", "AE");
+        post("/api/user/recharge-packages/" + no, m, admin).okData();
+        assertThat(row(admin, no).path("markets").asText())
+                .as("全量重写：只增不删的话 SA 会留在关联表里")
+                .isEqualTo("AE");
+    }
+
     private JsonNode row(String admin, String no) {
         return findInPages("/api/user/recharge-packages?showArchived=true", "packageNo", no, admin);
     }

@@ -18,3 +18,18 @@ ops-web/app/marketing/page.tsx::COUPON_FIELDS expireAt
 # 正解是换成迁移动作按钮 —— POST /api/user/ad-campaigns/{adNo}/{action}
 # 已经在了，Campaign 那张表就是这么做的（transitionCampaign）。
 ops-web/app/marketing/page.tsx::AD_FIELDS status
+
+# 发卡表单整张对不上，而它提交的端点本身是个显式 stub：
+# MemberService.grantCard 直接 throw UnsupportedOperationException
+# （「发卡需与支付/权益生效链路一起设计（M5），当前仅开放权益配置」），
+# 入参 MemberCardGrantReq 只有 cUserNo/planNo/level/months。
+# 所以这里不是「改个字段名就对上」——把 userNo→cUserNo、cardType/totalTimes/
+# validFrom/validTo/note 塞进一个必然 500 的端点没有意义，只会让它看起来对齐了。
+# 正确顺序：先接会员权益计价（C-MB-02）→ 实现发卡 → 再按那时的入参定字段。
+# 期间这张表单提交必然失败（500），不是静默丢弃，运营看得见。
+ops-web/app/users/page.tsx::CARD_FIELDS cardType
+ops-web/app/users/page.tsx::CARD_FIELDS note
+ops-web/app/users/page.tsx::CARD_FIELDS totalTimes
+ops-web/app/users/page.tsx::CARD_FIELDS userNo
+ops-web/app/users/page.tsx::CARD_FIELDS validFrom
+ops-web/app/users/page.tsx::CARD_FIELDS validTo

@@ -69,7 +69,13 @@ public final class UserAssetDtos {
      */
     public record RechargePackageReq(String packageNo, String regionId, String name,
                                      BigDecimal payAmount, BigDecimal giftAmount, String currency,
-                                     Integer validDays, Integer sortNo, String status) {
+                                     Integer validDays, Integer sortNo, String status,
+                                     // 适用市场 CSV（如 "AE,SA"），与读出参 RechargePackageRow.markets 同形状。
+                                     // **此前写入面没有这个字段**：运营在「适用市场」勾了国家、保存拿到 200，
+                                     // 关联表一行都没写 —— 而 C 端是按用户所在国家筛套餐的，
+                                     // 没有市场的套餐对**每个用户都不出现**。必填字段却存不进去，
+                                     // 症状是「新建的套餐 C 端看不到」，没人会想到是这一格。
+                                     String markets) {
         /** 映射到实体。**archivedAt 有意不设**（见类注释）。 */
         public ai.neargo.sharehub.user.asset.entity.UsrRechargePkg toEntity() {
             if (payAmount == null || payAmount.signum() <= 0) {
