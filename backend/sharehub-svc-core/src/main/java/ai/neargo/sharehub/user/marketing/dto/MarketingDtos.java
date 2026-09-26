@@ -146,6 +146,57 @@ public final class MarketingDtos {
      * 用户手里的券（usr_coupon）。运营端按 {@code cUserNo} 查某人券包，C 端只能查自己的。
      * {@code tpl*} 是模板快照，免得 C 端券包列表逐行回查模板。
      */
+    /*
+     * ——————— 写入参（裸 Map → record，2026-09-26）———————
+     * 裸 Map 当请求体 = 这个端点没有契约；见 backend/known-map-request-bodies.txt。
+     */
+
+    /**
+     * 定向发券入参 —— **镜像前端 {@code CouponIssuePayload}**（targetType/targetValue/quantity）。
+     *
+     * <p>此前端点读的是 {@code cUserNos}，而前端<b>从来不发这个键</b>：
+     * 它发的是人群规格。于是 {@code issue(tplNo, null, null)} 走到
+     * 「{@code cUserNos == null → return List.of()}」—— <b>一张券都不发，HTTP 200</b>，
+     * 而前端 onSuccess 读 {@code r.record.quantity}（后端返的是列表，没有 record）
+     * 直接抛 TypeError。整条定向发券**只在 mock 下成立**。
+     */
+    public record CouponIssueReq(String targetType, String targetValue, Integer quantity) {
+    }
+
+    /**
+     * 定向发券**出参** —— 镜像前端 {@code CouponIssueResult}（{@code {coupon, record}}）。
+     *
+     * <p>此前端点返的是 {@code List<UserCouponVO>}，而前端 onSuccess 读
+     * {@code r.record.quantity} / {@code r.coupon} —— <b>形状完全不同，直接抛 TypeError</b>。
+     * 对齐卡口没抓到：它按类型名配对，{@code CouponIssueResult} 与 {@code UserCouponVO}
+     * 名字毫不相干，于是被判成「那是另一个投影」而跳过（与 MessageItem/Message 同一个盲区）。
+     *
+     * <p>选择让**后端产出前端已在读的形状**而不是改前端：{@code record} 对应
+     * {@code usr_coupon_issue} 一行，而那张表此前**只被读、从没被写** ——
+     * 运营端「发放记录」页因此永远是空的。补上写入，那一页也跟着活了。
+     */
+    public record CouponIssueResultVO(CouponTplVO coupon,
+                                      ai.neargo.sharehub.user.member.dto.MemberDtos.CouponIssueRecord record) {
+    }
+
+    /** 推送发送/排期入参。**不含操作人** —— 服务端按会话回填（审计事实不由调用方提供）。 */
+    public record PushSendReq(String idempotencyKey, String scheduledAt) {
+    }
+
+    /** 推送收尾入参：触达统计由运营/联调显式填（真实回执通道尚未接入）。 */
+    public record PushFinishReq(Integer targetCount, Integer successCount) {
+    }
+
+    /**
+     * 扫描到点排期推送的入参。
+     *
+     * <p>{@code now} <b>只在 dev-mode 下作数</b>：它是联调用的时钟注入口，
+     * 而生产里传一个未来时刻就等于**把所有排期推送提前发出去** ——
+     * 推送是真的推到用户手机上。生产一律用服务端时钟。
+     */
+    public record PushSweepReq(String now) {
+    }
+
     public record UserCouponVO(String couponNo, String cUserNo, String tplNo,
                                String tplName, String tplType,
                                BigDecimal value, BigDecimal threshold, String currency,

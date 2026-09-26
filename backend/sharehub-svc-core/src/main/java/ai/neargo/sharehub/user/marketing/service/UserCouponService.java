@@ -32,6 +32,25 @@ public interface UserCouponService {
     List<UserCouponVO> issue(String tplNo, List<String> cUserNos, String expireAt);
 
     /**
+     * 按人群定向发券（运营端「发放」按钮走的就是这条）。
+     *
+     * <p><b>此前这条路根本不通</b>：端点读 {@code cUserNos}，而前端发的是人群规格
+     * （{@code targetType}/{@code targetValue}/{@code quantity}）—— 键对不上，
+     * {@link #issue} 拿到 null 直接 {@code return List.of()}，
+     * <b>一张券都不发而 HTTP 200</b>。
+     *
+     * <p><b>只有 {@code USER_LIST} 能真发</b>：把逗号分隔的用户号解析出来即可。
+     * {@code ALL / MEMBER_LEVEL / SEGMENT} <b>显式拒绝</b>而不是发 0 张 ——
+     * 后端至今没有「人群 → 用户列表」的解析（推送侧也只拼了个人群**标签**，
+     * 从不落实到人；{@code mkt_segment} 表根本不存在）。
+     * 发 0 张 + 200 是最坏的选择：运营以为发出去了。
+     *
+     * @param quantity 发放上限；null/≤0 = 不限（仍受模板库存约束）
+     */
+    ai.neargo.sharehub.user.marketing.dto.MarketingDtos.CouponIssueResultVO issueToAudience(
+            String tplNo, String targetType, String targetValue, Integer quantity);
+
+    /**
      * 领券中心（{@code GET /mp/user/coupons/claimable}）—— 当前**可领**的券模板。
      *
      * <p>没有这个接口时 {@link #claim} 是**够不着的**：C 端另一个列表

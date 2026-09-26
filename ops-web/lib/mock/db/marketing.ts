@@ -429,12 +429,28 @@ export function issueCoupon(couponNo: string, x: CouponIssuePayload): CouponIssu
     );
   }
 
+  /*
+   * ⚠️ 与真后端的模型差异（2026-09-26 查明，登记在 known-api-align-gaps）：
+   *
+   * 本 mock 把发放建模成**纯记账**：`quantity` 是个自由数，只改 c.issued 并落一条流水，
+   * 不给任何用户真的发券。真后端的模型是「给这些人各发一张」——
+   * 逐个写 usr_coupon，quantity 只是对用户列表的上限。
+   *
+   * 于是真后端**只支持 USER_LIST**：ALL / MEMBER_LEVEL / SEGMENT 显式拒绝，
+   * 因为后端没有「人群 → 用户列表」的解析（推送侧也只拼了个人群标签，mkt_segment 表都不存在），
+   * 而且 `quantity` 对 ALL 的语义**产品上没定**：一万人发五百张，是抽签还是先到先得？
+   *
+   * 这里刻意**不**改成只收 USER_LIST：那会把本文件的库存/边界用例一起拆掉
+   * （它们靠 quantity 是自由数），而那些用例守的是另一件事。
+   * 两个模型的收敛要等 quantity 语义定下来。
+   */
   const aud = resolveAudience(x); // 人群非法在这里抛 AudienceError
   const record: CouponIssueRecord = {
     issueNo: nextNo("CIS", couponIssueRecords, 900, "issueNo"),
     couponNo: c.couponNo, couponName: c.name,
     targetType: aud.targetType, targetDesc: aud.targetDesc,
-    quantity: qty, operatorName: x.operatorName?.trim() || "admin", createdAt: now(),
+    // 发放人按会话来（mock 的会话就是 admin）：后端 CouponIssueReq 不收 operatorName
+    quantity: qty, operatorName: "admin", createdAt: now(),
   };
   c.issued += qty;
   couponIssueRecords.unshift(record);
@@ -512,7 +528,9 @@ export function sendPushMessage(pushNo: string, x: PushSendPayload): PushMessage
     throw new PushError(`推送 ${pushNo} 当前状态「${target.status}」不允许执行「发送」`);
   }
   const aud = resolveAudience({ targetType: target.audienceType, targetValue: target.audienceValue });
-  const operatorName = x.operatorName?.trim() || "admin";
+  // 发送人按会话来（mock 的会话就是 admin）：后端 PushSendReq 不收 operatorName，
+  // 且服务端会兜底成会话用户 —— 此前它「有传参就用传参」且**没有兜底**，不传就是空
+  const operatorName = "admin";
   usedPushKeys.add(key);
 
   const scheduledAt = x.scheduledAt?.trim() || null;

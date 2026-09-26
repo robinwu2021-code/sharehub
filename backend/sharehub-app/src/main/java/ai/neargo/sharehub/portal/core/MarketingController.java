@@ -65,6 +65,8 @@ public class MarketingController {
     private final AdSlotService adSlotService;
     private final AdCampaignService adCampaignService;
     private final AdDeliveryService adDeliveryService;
+    /** 只为 sweep-due 的 {@code now} 注入口把关：生产不接受客户端给的时钟。 */
+    private final ai.neargo.sharehub.auth.DevMode devMode;
 
     public MarketingController(CouponTplService couponTplService,
                                UserCouponService userCouponService,
@@ -74,7 +76,9 @@ public class MarketingController {
                                NoticeService noticeService,
                                AdSlotService adSlotService,
                                AdCampaignService adCampaignService,
-                               AdDeliveryService adDeliveryService) {
+                               AdDeliveryService adDeliveryService,
+                               ai.neargo.sharehub.auth.DevMode devMode) {
+        this.devMode = devMode;
         this.couponTplService = couponTplService;
         this.userCouponService = userCouponService;
         this.campaignService = campaignService;
@@ -105,11 +109,13 @@ public class MarketingController {
     /** 定向发券。{@code cUserNos} 是收券人列表，{@code expireAt} 可空（走模板 validRule）。 */
     @PostMapping("/api/user/coupons/{tplNo}/issue")
     @PreAuthorize("@perm.can('marketing:coupon:issue')")
-    public List<UserCouponVO> issueCoupon(@PathVariable String tplNo, @RequestBody Map<String, Object> body) {
-        @SuppressWarnings("unchecked")
-        List<String> cUserNos = (List<String>) body.get("cUserNos");
-        Object expireAt = body.get("expireAt");
-        return userCouponService.issue(tplNo, cUserNos, expireAt == null ? null : String.valueOf(expireAt));
+    public ai.neargo.sharehub.user.marketing.dto.MarketingDtos.CouponIssueResultVO issueCoupon(
+            @PathVariable String tplNo,
+            @RequestBody ai.neargo.sharehub.user.marketing.dto.MarketingDtos.CouponIssueReq body) {
+        // 入参按**前端真正发的那三个键**收（targetType/targetValue/quantity）。
+        // 此前这里读 cUserNos —— 一个前端从来不发的键，于是 issue(tplNo, null, null)
+        // 走到「cUserNos 为空就 return List.of()」：**一张券都不发而 HTTP 200**。
+        return userCouponService.issueToAudience(tplNo, body.targetType(), body.targetValue(), body.quantity());
     }
 
     // ——————————————— 活动（菜单叶：营销管理 › 活动）———————————————
@@ -346,14 +352,17 @@ public class MarketingController {
      */
     @PostMapping("/api/user/push-messages/{pushNo}/send")
     @PreAuthorize("@perm.can('marketing:push:update')")
-    public Object sendPushMessage(@PathVariable String pushNo,
-                                  @RequestBody(required = false) java.util.Map<String, Object> body) {
-        String key = str(body, "idempotencyKey");
-        String at = str(body, "scheduledAt");
-        String by = str(body, "operatorName");
+    public Object sendPushMessage(
+            @PathVariable String pushNo,
+            @RequestBody(required = false) ai.neargo.sharehub.user.marketing.dto.MarketingDtos.PushSendReq body) {
+        String key = body == null ? null : body.idempotencyKey();
+        String at = body == null ? null : body.scheduledAt();
+        // 操作人**不从请求体读**：传 null 让服务按会话回填。
+        // 此前读 body 里的 operatorName，而服务是「有传参就用传参」且无会话兜底 ——
+        // 谁发的这条推送由调用方随便写，不写就是空。
         return (at == null || at.isBlank())
-                ? pushService.send(pushNo, key, by)
-                : pushService.schedule(pushNo, at, by);
+                ? pushService.send(pushNo, key, null)
+                : pushService.schedule(pushNo, at, null);
     }
 
     /**
@@ -364,9 +373,11 @@ public class MarketingController {
      */
     @PostMapping("/api/user/push-messages/{pushNo}/finish")
     @PreAuthorize("@perm.can('marketing:push:update')")
-    public Object finishPushMessage(@PathVariable String pushNo,
-                                    @RequestBody(required = false) java.util.Map<String, Object> body) {
-        return pushService.finish(pushNo, intOf(body, "targetCount"), intOf(body, "successCount"));
+    public Object finishPushMessage(
+            @PathVariable String pushNo,
+            @RequestBody(required = false) ai.neargo.sharehub.user.marketing.dto.MarketingDtos.PushFinishReq body) {
+        return pushService.finish(pushNo, body == null ? null : body.targetCount(),
+                body == null ? null : body.successCount());
     }
 
     /**
@@ -379,8 +390,15 @@ public class MarketingController {
      */
     @PostMapping("/api/user/push-messages/sweep-due")
     @PreAuthorize("@perm.can('marketing:push:update')")
-    public Object sweepDuePushMessages(@RequestBody(required = false) java.util.Map<String, Object> body) {
-        return java.util.Map.of("handled", pushService.sweepDue(str(body, "now")));
+    public Object sweepDuePushMessages(
+            @RequestBody(required = false) ai.neargo.sharehub.user.marketing.dto.MarketingDtos.PushSweepReq body) {
+        /*
+         * `now` **只在 dev-mode 下作数**。它是联调用的时钟注入口，而生产里传一个未来时刻
+         * 就等于把**所有排期推送提前发出去** —— 推送是真推到用户手机上的，不可撤回。
+         * 生产一律用服务端时钟（传 null，服务里取 Instant.now()）。
+         */
+        String now = devMode.isEnabled() && body != null ? body.now() : null;
+        return java.util.Map.of("handled", pushService.sweepDue(now));
     }
 
     private static String str(java.util.Map<String, Object> body, String k) {

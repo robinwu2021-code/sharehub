@@ -153,7 +153,13 @@ public class PushServiceImpl extends AbstractCrudService<MktPush, PushMessageVO>
         requireStatus(e, "排期", PushStatus.DRAFT.name());
         e.setStatus(PushStatus.SCHEDULED.name());
         e.setScheduledAt(scheduledAt);
-        if (operatorName != null && !operatorName.isBlank()) e.setOperatorName(operatorName);
+        // 操作人：**传参只用于系统重放**（sweepDue 沿用排期时记下的那位），
+        // 用户动作一律传 null 由会话决定 —— 此前控制器从请求体读 operatorName，
+        // 而这里「有传参就用传参」，等于 push_message.operator_name 由调用方随便写；
+        // 更糟的是没有会话兜底，不传就是 null，事后连"谁发的"都答不上来。
+        e.setOperatorName(operatorName != null && !operatorName.isBlank() ? operatorName
+                : ai.neargo.sharehub.auth.SecurityUtils.currentUser()
+                        .map(ai.neargo.sharehub.auth.LoginUser::username).orElse("system"));
         mapper.updateById(e);
         return toVO(selectByKey(pushNo));
     }
@@ -180,7 +186,10 @@ public class PushServiceImpl extends AbstractCrudService<MktPush, PushMessageVO>
         requireStatus(e, "发送", PushStatus.DRAFT.name(), PushStatus.SCHEDULED.name());
         e.setStatus(PushStatus.SENDING.name());
         e.setIdempotencyKey(idempotencyKey);
-        if (operatorName != null && !operatorName.isBlank()) e.setOperatorName(operatorName);
+        // 同 schedule：传参只用于系统重放，用户动作走会话
+        e.setOperatorName(operatorName != null && !operatorName.isBlank() ? operatorName
+                : ai.neargo.sharehub.auth.SecurityUtils.currentUser()
+                        .map(ai.neargo.sharehub.auth.LoginUser::username).orElse("system"));
         e.setSentAt(java.time.Instant.now().toString());
         mapper.updateById(e);
         return toVO(selectByKey(pushNo));

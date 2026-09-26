@@ -73,7 +73,6 @@ D OkResult POST /api/ops/sites/{siteNo}/agents/{id}/remove
 D OperatorMembership GET /api/auth/operators
 D RentResult POST /mp/trade/orders/rent
 D SharingStats GET /api/trade/site-sharing/stats
-D UserCouponVO POST /api/user/coupons/{tplNo}/issue
 D WorkOrderRef POST /api/ops/alarms/records/{alarmNo}/work-order
 # ⚠️ 下面这条是**临时入口**，不是遗漏：
 #   本该由共用调度器按 cron 回调（v4/07 的 JobHandler），但那要等 ai-shop 的任务服务
@@ -123,3 +122,12 @@ D SignedUrl GET /api/platform/files/{fileNo}/url
 # 标签应由前端按 phase 词表三语翻译（后端不出中文标签），kind / avgDaysInPhase 待前端接 —— 前端那条线收口后删除
 
 # 2026-09-25 运营核心流程批次 G（运营指标 / 工单成本 / 场地方对账单）：后端先行，随报表与财务页接入后删除
+
+# 2026-09-26：定向发券的「人群」两端是两个模型，收敛要等产品定 quantity 语义。
+# 后端（本次改通）：给 targetValue 里的每个用户各发一张，quantity 是列表上限；
+#   ALL / MEMBER_LEVEL / SEGMENT **显式拒绝** —— 没有「人群 → 用户列表」的解析
+#   （推送侧只拼人群标签，mkt_segment 表根本不存在）。
+# 前端 mock：把发放当纯记账，quantity 是自由数，只改 issued 并落流水、不给任何人发券。
+# 卡住的不是工程而是口径：**一万人发五百张，是抽签还是先到先得？** 产品未定。
+# 定了之后：后端补人群解析 + 抽取规则，mock 收敛到同一模型，本条删掉。
+# （出参形状本次已对齐，不再是缺口；上面这段留着记裁决点。）

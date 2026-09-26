@@ -45,6 +45,88 @@ public class UserCouponServiceImpl implements UserCouponService {
     }
 
     @Override
+    @Transactional
+    public ai.neargo.sharehub.user.marketing.dto.MarketingDtos.CouponIssueResultVO issueToAudience(
+            String tplNo, String targetType, String targetValue, Integer quantity) {
+        String type = targetType == null || targetType.isBlank() ? "ALL" : targetType.trim().toUpperCase();
+        if (!"USER_LIST".equals(type)) {
+            // 显式拒绝，不发 0 张 —— 后端没有「人群 → 用户列表」的解析（连 mkt_segment 表都没有）。
+            // 发 0 张 + 200 是最坏的选择：运营以为发出去了，而券一张也没到用户手里。
+            throw BizException.badRequest("error.coupon.audience_unsupported", type);
+        }
+        if (targetValue == null || targetValue.isBlank()) {
+            throw BizException.badRequest("error.coupon.user_list_required");
+        }
+        List<String> users = java.util.Arrays.stream(targetValue.split(","))
+                .map(String::trim).filter(u -> !u.isEmpty()).distinct().toList();
+        if (users.isEmpty()) throw BizException.badRequest("error.coupon.user_list_required");
+        // quantity 是上限：勾了 10 个人但只发 3 张时，按列表顺序取前 3 个
+        if (quantity != null && quantity > 0 && users.size() > quantity) {
+            users = users.subList(0, quantity);
+        }
+        List<UserCouponVO> issued = issue(tplNo, users, null);
+
+        /*
+         * 落一条发放记录。`usr_coupon_issue` 此前**只被读、从没被写**（本类里
+         * couponIssueMapper 只出现在 pageIssueRecords），所以运营端「发放记录」页永远是空的 ——
+         * 而它是「谁在什么时候给谁发了多少张」的唯一凭证。
+         *
+         * quantity 记**实际发出的张数**而不是请求的张数：请求 10 张、库存只剩 3 张时
+         * 记 10 会让发放记录与券的 issued 对不上，而对账时先看的就是这两个数。
+         */
+        CouponTpl tpl = requireActiveTpl(tplNo);
+        ai.neargo.sharehub.user.member.entity.UsrCouponIssue rec =
+                new ai.neargo.sharehub.user.member.entity.UsrCouponIssue();
+        rec.setIssueNo(nextIssueNo());
+        rec.setTenantId(TENANT_MAIN);
+        rec.setCouponNo(tplNo);
+        rec.setCouponName(tpl.getName());
+        rec.setTargetType("USER_LIST");
+        rec.setTargetDesc("指定用户号（" + users.size() + " 人）");
+        rec.setQuantity(issued.size());
+        rec.setOperatorName(ai.neargo.sharehub.auth.SecurityUtils.currentUser()
+                .map(ai.neargo.sharehub.auth.LoginUser::username).orElse("system"));
+        rec.setCreatedAt(java.time.LocalDateTime.now());
+        couponIssueMapper.insert(rec);
+
+        return new ai.neargo.sharehub.user.marketing.dto.MarketingDtos.CouponIssueResultVO(
+                tplVO(requireActiveTpl(tplNo)),
+                new ai.neargo.sharehub.user.member.dto.MemberDtos.CouponIssueRecord(
+                        rec.getIssueNo(), rec.getCouponNo(), rec.getCouponName(), rec.getTargetType(),
+                        rec.getTargetDesc(), rec.getQuantity(), rec.getOperatorName(),
+                        rec.getCreatedAt().toString()));
+    }
+
+    /**
+     * 券模板 → 出参（与 {@code CouponTplServiceImpl.toVO} 同口径）。
+     *
+     * <p>{@code archivedAt} 必须带上：那一列是 V22 加的，硬写 null 曾让「券归档了界面看不出来」。
+     */
+    private static ai.neargo.sharehub.user.marketing.dto.MarketingDtos.CouponTplVO tplVO(CouponTpl e) {
+        return new ai.neargo.sharehub.user.marketing.dto.MarketingDtos.CouponTplVO(
+                e.getTplNo(), e.getName(), e.getType(), e.getValue(), e.getThreshold(), e.getCurrency(),
+                e.getStock(), e.getIssued(), e.getStatus(),
+                e.getArchivedAt() == null ? null : e.getArchivedAt().toString());
+    }
+
+    /** 发放记录单号。取号口径同本类其它业务键（扫同前缀最大号 +1，并发撞号靠唯一索引兜底）。 */
+    private String nextIssueNo() {
+        var last = couponIssueMapper.selectOne(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<
+                        ai.neargo.sharehub.user.member.entity.UsrCouponIssue>()
+                        .orderByDesc(ai.neargo.sharehub.user.member.entity.UsrCouponIssue::getId).last("limit 1"));
+        long next = 1;
+        if (last != null && last.getIssueNo() != null) {
+            try {
+                next = Long.parseLong(last.getIssueNo().replaceAll("\\D", "")) + 1;
+            } catch (NumberFormatException ignored) {
+                next = last.getId() + 1;
+            }
+        }
+        return "CIS" + String.format("%06d", next);
+    }
+
+    @Override
     public PageResult<UserCouponVO> page(Integer page, Integer size, String cUserNo, String status) {
         int p = (page == null || page < 1) ? 1 : page;
         int s = (size == null || size < 1) ? 10 : Math.min(size, 200);

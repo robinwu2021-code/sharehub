@@ -52,7 +52,12 @@ export interface CouponIssueRecord {
 }
 export interface CouponIssuePayload extends AudienceSpec {
   quantity: number;
-  operatorName?: string;
+  // 没有 operatorName：后端 CouponIssueReq 只认 targetType/targetValue/quantity，
+  // 发放人由会话回填（审计事实不由调用方提供）。
+  //
+  // ⚠️ 只有 USER_LIST 能真发：后端至今没有「人群 → 用户列表」的解析
+  //（推送侧也只拼了个人群标签，mkt_segment 表根本不存在），
+  // ALL / MEMBER_LEVEL / SEGMENT 会被显式拒绝 —— 而不是发 0 张让人以为发出去了。
 }
 /** 发放结果：回带发放后的券（已发/剩余已变）与本次流水，页面无需再拉一次。 */
 export interface CouponIssueResult {
@@ -158,7 +163,9 @@ export interface PushFinishPayload {
 export interface PushSendPayload {
   idempotencyKey: string;
   scheduledAt?: string | null;
-  operatorName?: string;
+  // 没有 operatorName：后端 PushSendReq 只认这两个，发送人由会话回填。
+  // 此前前端传什么后端就记什么，且**没有会话兜底** —— 不传就是空，
+  // 事后连「这条推送是谁发的」都答不上来。
 }
 export interface Referral {
   inviteNo: string;

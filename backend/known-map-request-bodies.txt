@@ -28,10 +28,6 @@ ConsumerAuthController#resetPassword
 DeviceController#confirmLost
 DeviceController#dismissLost
 IamAdminController#setRolePermissions
-MarketingController#finishPushMessage
-MarketingController#issueCoupon
-MarketingController#sendPushMessage
-MarketingController#sweepDuePushMessages
 MpUserController#recharge
 MpUserController#updateProfile
 NotifyController#previewTemplate

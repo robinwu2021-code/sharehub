@@ -14,9 +14,16 @@ import ai.neargo.sharehub.user.marketing.entity.MktPush;
 public interface PushService extends CrudService<MktPush, PushMessageVO> {
 
     /** 发送推送。**必带幂等键** —— 推送是真推到用户手机上，双击不该推两次。 */
+    /**
+     * @param operatorName **只给系统重放用**（{@link #sweepDue} 沿用排期时记下的那位）。
+     *                     用户动作一律传 {@code null} —— 操作人由服务端按会话回填。
+     *                     此前控制器从请求体读它，而实现里「有传参就用传参」且没有会话兜底：
+     *                     谁发的这条推送，由调用方随便写，不写就是空。
+     */
     Object send(String pushNo, String idempotencyKey, String operatorName);
 
     /** 排期：DRAFT → SCHEDULED。{@code scheduledAt} 为 ISO 时刻。 */
+    /** @param operatorName 同 {@link #send}：只给系统重放用，用户动作传 {@code null}。 */
     Object schedule(String pushNo, String scheduledAt, String operatorName);
 
     /** 收尾：SENDING → SENT，落触达统计。SENT 是终态，不可重发。 */
