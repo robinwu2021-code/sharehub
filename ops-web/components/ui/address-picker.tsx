@@ -147,6 +147,11 @@ export function AddressPicker({
     const map = mapRef.current;
     clearHitMarkers();
     if (!map || list.length === 0) return;
+    // 把视野框住全部候选 —— 否则中心还停在默认视野，一半是海，
+    // 「在图上看看再选」这件事就没发生
+    const bounds = new google.maps.LatLngBounds();
+    list.forEach((h) => bounds.extend({ lat: h.lat, lng: h.lng }));
+    map.fitBounds(bounds, 32);
     hitMarkersRef.current = list.map((h) => {
       const fill = cssVar("--primary");
       const stroke = cssVar("--surface");
@@ -358,7 +363,9 @@ export function AddressPicker({
           已定位 <span className="tabular-nums">{Number(value.lat).toFixed(6)}, {Number(value.lng).toFixed(6)}</span>
         </p>
       ) : (
-        <p className="txt-caption text-muted-foreground/70">从上面的联想里选一条，或点「地图」直接在图上选点，坐标会自动带上</p>
+        // 只说**状态**，不重复字段 help 里的说明 —— 两句话说同一件事，
+        // 人会以为它们讲的是两回事，然后两句都不看
+        <p className="txt-caption text-muted-foreground/70">尚未定位</p>
       )}
     </div>
   );
