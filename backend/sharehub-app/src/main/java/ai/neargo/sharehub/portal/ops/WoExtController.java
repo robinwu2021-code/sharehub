@@ -248,15 +248,19 @@ public class WoExtController {
     // 清单 §工单「巡检计划 配置」的码是 workorder:inspection:update，此前挂通用的 wo:update
     // （真源表里没有那个码，台账 known-perm-ssot-gaps 记着「强制未声明」）。与 SLA 配置同一处理。
     @PreAuthorize("@perm.can('workorder:inspection:update')")
-    public InspectionPlan createInspectionPlan(@RequestBody WoInspectionPlan body) {
-        return inspectionPlanService.save(body);
+    public InspectionPlan createInspectionPlan(
+            @RequestBody ai.neargo.sharehub.wo.ext.dto.WoExtDtos.InspectionPlanReq body) {
+        return inspectionPlanService.save(body.toEntity());
     }
 
     @PostMapping("/inspection-plans/{planNo}")
     @PreAuthorize("@perm.can('workorder:inspection:update')")
-    public InspectionPlan updateInspectionPlan(@PathVariable String planNo, @RequestBody WoInspectionPlan body) {
-        body.setPlanNo(planNo);
-        return inspectionPlanService.save(body);
+    public InspectionPlan updateInspectionPlan(
+            @PathVariable String planNo,
+            @RequestBody ai.neargo.sharehub.wo.ext.dto.WoExtDtos.InspectionPlanReq body) {
+        var e = body.toEntity();
+        e.setPlanNo(planNo);   // 路径为准，防越权改他行
+        return inspectionPlanService.save(e);
     }
 
     private static String nz(String s) {

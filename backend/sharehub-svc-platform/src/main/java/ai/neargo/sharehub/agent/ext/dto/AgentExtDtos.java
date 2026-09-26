@@ -134,7 +134,13 @@ public final class AgentExtDtos {
      * @param rate        比例（LEDGER 模式用）
      * @param fixedAmount 固定额（与 dimension 的自洽由 service 的 checkDimension 校验）
      */
-    public record AgentCommissionReq(String ruleNo, String agentNo, String dimension,
+    public record AgentCommissionReq(String ruleNo, String agentNo,
+                                     // **叫 basis 不叫 dimension**：读出参 AgentCommission 用的是 basis
+                                     // （GMV / ORDER_COUNT），而写入面原先用列名 dimension ——
+                                     // 于是运营选的「计费基准」发过来叫 basis，后端读 dimension，
+                                     // 永远存不进去，规则静默落到 dimension 的默认值上。
+                                     // 读侧显示正常（VO 改过名），所以这一格看起来一直是对的。
+                                     String basis,
                                      java.math.BigDecimal rate, java.math.BigDecimal fixedAmount,
                                      String currency, String mode, String effectiveAt) {
         /** 映射到实体。**agentName / status 有意不设**（见类注释）。 */
@@ -142,7 +148,7 @@ public final class AgentExtDtos {
             var e = new ai.neargo.sharehub.agent.ext.entity.AgtCommission();
             e.setRuleNo(ruleNo);
             e.setAgentNo(agentNo);
-            e.setDimension(dimension);
+            e.setDimension(basis);   // 列名 dimension，入参名随读出参叫 basis
             e.setRate(rate);
             e.setFixedAmount(fixedAmount);
             e.setCurrency(currency);

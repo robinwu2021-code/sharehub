@@ -42,10 +42,6 @@ ops-web/app/users/page.tsx::CARD_FIELDS validTo
 # 否则编辑抽屉预填不上），所以逐条单独提交、各自带用例，不在挂注解这一笔里混做。
 
 
-# 巡检计划的「负责人」存不进去：读出参 InspectionPlan.assignee，
-# 写入面收实体 WoInspectionPlan（字段 assigneeNo，@TableField("assignee_id")）。
-ops-web/app/work-orders/page.tsx::INSPECTION_FIELDS assignee
-
 # 员工的「部门」根本设不了：表单只有 deptName（读出参里的派生显示名），
 # 而写入面要 deptNo —— 表单里**没有** deptNo 这一格。
 # 修法不是改名：deptName 是显示名，deptNo 是键，得换成选择器（部门下拉）。
@@ -56,10 +52,6 @@ ops-web/app/employees/page.tsx::empFields deptName
 # 与「数据范围 51 张表」那个待裁决项相关：范围到底落 iam_data_scope 还是账号上，
 # 先定口径再改，否则改完还得再改一次。
 ops-web/app/agents/page.tsx::accountFieldsFor dataScope
-
-# 分佣规则的「计费基准」存不进去：读出参 AgentCommission.basis（GMV/ORDER_COUNT），
-# 写入面叫 dimension。两个名字指的是同一件事，但发过去的是 basis，落库的是 dimension 的默认值。
-ops-web/app/agents/page.tsx::commissionFieldsFor basis
 
 # 分佣规则的「状态」：写入面有意不收（同 AD_FIELDS status 那条的理由——
 # 状态归状态机，save 收了它就等于开了第二条路）。正解是换成迁移动作按钮，

@@ -23,6 +23,36 @@ public final class WoExtDtos {
                                  java.util.List<String> lastRunWoNos) {
     }
 
+    /**
+     * 巡检计划**写入参**（{@code POST /api/ops/inspection-plans[/{planNo}]}）。
+     *
+     * <p>此前写入面直接收实体 {@code WoInspectionPlan}，而实体的负责人字段叫
+     * {@code assigneeNo}（列 {@code assignee_id}），读出参 {@link InspectionPlan} 叫
+     * {@code assignee} —— 表单按读出参的名字发 {@code assignee} 过来，
+     * <b>负责人永远存不进去</b>，计划开出来的工单没人担。读侧显示正常，所以看不出来。
+     *
+     * <p>顺带这也是 B3 纪律要的那一步：实体当请求体等于把
+     * id/version/deleted/tenantId 以及 {@code lastRunAt/lastRunPeriod/lastRunWoNos}
+     * （执行留痕，只能由「立即执行一次」写）一起开放给客户端。
+     * 白名单里没有它们，就不需要谁记得去拦。
+     */
+    public record InspectionPlanReq(String planNo, String route, String frequency, String cron,
+                                    String nextAt, String assignee, Boolean active) {
+
+        /** 映射到实体。**执行留痕三列有意不设** —— 它们归 run 那条路。 */
+        public ai.neargo.sharehub.wo.ext.entity.WoInspectionPlan toEntity() {
+            var e = new ai.neargo.sharehub.wo.ext.entity.WoInspectionPlan();
+            e.setPlanNo(planNo);
+            e.setRoute(route);
+            e.setFrequency(frequency);
+            e.setCron(cron);
+            e.setNextAt(nextAt);
+            e.setAssigneeNo(assignee);   // 列 assignee_id，入参名随读出参叫 assignee
+            e.setActive(active == null ? null : (active ? 1 : 0));
+            return e;
+        }
+    }
+
     /** 手工开单入参，镜像前端 {@code WorkOrderDraft}（补 [api/README §6] 的 G6 缺口）。 */
     public record WorkOrderDraft(String type, String source, String sourceNo, String priority,
                                  String cabinetNo, String locationNo, String locationName,
