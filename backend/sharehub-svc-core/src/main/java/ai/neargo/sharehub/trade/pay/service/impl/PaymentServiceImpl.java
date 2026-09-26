@@ -258,4 +258,9 @@ public class PaymentServiceImpl implements PaymentService {
         return new PayRefundEntry(e.getRefundNo(), e.getPayNo(), e.getOrdRefundNo(), e.getAmount(),
                 e.getReason(), e.getStatus(), e.getNearpayRefundNo());
     }
+
+    @Override
+    public boolean simulated() {
+        return port.simulated();
+    }
 }

@@ -40,19 +40,43 @@ public class RechargeServiceImpl implements RechargeService {
     private final WalletService wallets;
     private final PaymentService payments;
     private final NicknameLookup nicknames;
+    private final ai.neargo.sharehub.auth.DevMode devMode;
 
     public RechargeServiceImpl(UsrRechargePkgMapper packages, UsrRechargeOrderMapper orders,
-                               WalletService wallets, PaymentService payments, NicknameLookup nicknames) {
+                               WalletService wallets, PaymentService payments, NicknameLookup nicknames,
+                               ai.neargo.sharehub.auth.DevMode devMode) {
         this.packages = packages;
         this.orders = orders;
         this.wallets = wallets;
         this.payments = payments;
         this.nicknames = nicknames;
+        this.devMode = devMode;
     }
 
     @Override
     @Transactional
     public RechargeResultVO recharge(String cUserNo, String packageNo) {
+        /*
+         * ⚠️ 桩支付 + 真加余额 = 免费充值。这道闸拦的就是这一条。
+         *
+         * 本方法下面的逻辑是对的：它检查 PAID 之后才 wallets.credit()。问题在
+         * StubPaymentPort 恒返 PAID（它的定义就是这样），于是「收到钱才记账」
+         * 在桩上等于「无条件记账」—— 而余额是能花出去的。
+         *
+         * 为什么不做成「桩缺配置就起不来」：桩现在是唯一的 PaymentPort 实现，
+         * 那等于所有环境都起不来。所以闸做在**会把钱变成余额的这一条路上**，
+         * 借还/押金/买断照旧（它们是「把应收记成已付」，平台少收钱，
+         * 不是给用户凭空发一笔能花的余额）。
+         *
+         * dev-mode 开着时放行：本机联调需要它，而 dev-mode 本身是 fail-closed 的
+         * （不配即全关，生产恒 false，见 DevMode 的类注释）。
+         */
+        if (payments.simulated() && !devMode.isEnabled()) {
+            log.error("拒绝充值：支付通道是桩实现而 dev-mode 关闭 cUserNo={} packageNo={}。"
+                    + "运维动作：接入真实支付通道（新增 NearpayPaymentPort 并 @Primary），"
+                    + "在此之前充值功能对用户不可用", cUserNo, packageNo);
+            throw BizException.conflict("error.recharge.channel_not_ready");
+        }
         if (packageNo == null || packageNo.isBlank()) throw BizException.badRequest("error.recharge.package_required");
         UsrRechargePkg pkg = packages.selectOne(new LambdaQueryWrapper<UsrRechargePkg>()
                 .eq(UsrRechargePkg::getPackageNo, packageNo).last("limit 1"));

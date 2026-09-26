@@ -58,4 +58,12 @@ public interface PaymentService {
     PayOrderEntry getPay(String payNo);
 
     PayAuthEntry getAuth(String authNo);
+
+    /**
+     * 底层通道是否只是模拟（转发 {@code PaymentPort#simulated}）。
+     *
+     * <p>放在编排层而不是让业务直接注入 {@code PaymentPort}：业务只该认识一个支付入口，
+     * 认识两个就会有人绕过编排（幂等键、pay_order 镜像都在编排里）。
+     */
+    boolean simulated();
 }
