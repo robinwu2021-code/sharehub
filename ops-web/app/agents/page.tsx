@@ -816,7 +816,12 @@ function AgentsInner() {
               : "当前没有待办 —— 商家自助提交与运营代建录入的申请都会出现在这里"}
             columns={applyColumns}
           />
-          <Pagination page={paging.page} size={paging.size} total={total ?? 0} onPage={paging.setPage} onSize={paging.setSize} />
+          {/*
+            分页条**不在这里** —— 本页所有 tab 共用下面那一条（它按 `total` 取当前 tab 的数）。
+            这里原先又写了一条，于是入驻审核底部并排出现两条一模一样的分页
+            （实测生产截图可见）。两条各自持有同一个 `paging`，点哪条都动、
+            看着像界面坏了。
+          */}
         </>
       )}
 
