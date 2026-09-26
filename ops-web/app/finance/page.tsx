@@ -12,6 +12,7 @@ import { useNavTabs, usePageTab, keepWithinTab } from "@/lib/hooks/use-page-tab"
 import { TabHeader } from "@/components/ui/tab-header";
 import { Toolbar } from "@/components/ui/toolbar";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
+import { PayoutAccountDrawer } from "@/components/finance/payout-account-drawer";
 import { DataTable, type Column, type SortDir } from "@/components/ui/data-table";
 import { Drawer, Field } from "@/components/ui/drawer";
 import { FilterSelect } from "@/components/ui/filter-select";
@@ -89,22 +90,6 @@ const PA_STATUS: StatusMap<PayoutAccount["status"]> = {
  * **账号填明文、只落掩码** —— 明文属于 PII，服务端不回传，所以编辑既有账户时
  * 这一栏是空的（不是「丢了」），留空即不改。
  */
-/**
- * @form POST /api/trade/payout-accounts
- */
-const PAYOUT_FIELDS: FieldDef[] = [
-  { key: "payeeType", label: "受益方类型", type: "select", required: true,
-    options: [{ value: "AGENT", label: "代理商" }, { value: "VENUE", label: "场地方" }] },
-  { key: "payeeNo", label: "受益方编号", required: true, placeholder: "如 AG001 / VN001" },
-  { key: "bankCode", label: "开户行", required: true, placeholder: "如 ENBD / ADCB / FAB" },
-  { key: "accountName", label: "户名", required: true,
-    placeholder: "须与主体法人名一致，否则银行会退回" },
-  { key: "accountMasked", label: "账号 / IBAN", required: true,
-    placeholder: "填完整账号；系统只保存后四位" },
-  { key: "currency", label: "币种", type: "select",
-    options: [{ value: "AED", label: "AED" }, { value: "SAR", label: "SAR" }] },
-];
-
 const WD_STATUS: StatusMap<Withdrawal["status"]> = {
   APPLY: { label: "待审批", tone: "warning" },
   AUDIT: { label: "审批中", tone: "warning" },
@@ -386,20 +371,6 @@ function FinanceInner() {
     // 提现审批读的是同一份账户 —— 账户变了，「能不能放行」也跟着变
     qc.invalidateQueries({ queryKey: ["fin", "withdrawals"] });
   };
-  const savePayout = useMutation({
-    mutationFn: (v: Record<string, unknown>) => api.savePayoutAccount({
-      accountNo: v.accountNo ? String(v.accountNo) : undefined,
-      payeeType: (v.payeeType as PayoutAccount["payeeType"]) ?? "AGENT",
-      payeeNo: String(v.payeeNo ?? ""),
-      bankCode: String(v.bankCode ?? ""),
-      accountName: String(v.accountName ?? ""),
-      accountMasked: String(v.accountMasked ?? ""),
-      currency: v.currency ? String(v.currency) : undefined,
-      makeDefault: v.makeDefault === true,
-    }),
-    onSuccess: () => { notify.success("收款账户已保存"); setPayoutForm(null); afterPayoutWrite(); },
-    onError: (e: Error) => notify.error(e.message),
-  });
   const setPayoutDefault = useMutation({
     mutationFn: (a: PayoutAccount) => api.savePayoutAccount({
       accountNo: a.accountNo, payeeType: a.payeeType, payeeNo: a.payeeNo,
@@ -1727,18 +1698,8 @@ function FinanceInner() {
 
       {/* 生成结算单：类型 + 周期 + 多选对象；金额不在这里填——由服务端按分润明细汇总 */}
       {/* 收款账户表单。账号填明文、只落掩码 —— 编辑时这一栏是空的（不是丢了），留空即不改 */}
-      <FormDrawer
-        open={!!payoutForm}
-        onOpenChange={(o) => !o && setPayoutForm(null)}
-        titleNew="新增收款账户"
-        titleEdit={`编辑收款账户 ${payoutForm?.accountNo ?? ""}`}
-        isEdit={!!payoutForm?.accountNo}
-        fields={PAYOUT_FIELDS}
-        value={payoutForm ?? {}}
-        onChange={(v) => setPayoutForm(v)}
-        onSubmit={() => payoutForm && savePayout.mutate(payoutForm)}
-        submitting={savePayout.isPending}
-      />
+      {/* 表单与写接口都在共享组件里 —— 场地方页那个「就地设置」用的是同一份实现 */}
+      <PayoutAccountDrawer value={payoutForm} onOpenChange={(o) => !o && setPayoutForm(null)} />
 
       <FormDrawer
         open={!!genForm}

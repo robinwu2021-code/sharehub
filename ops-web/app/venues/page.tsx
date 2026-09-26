@@ -1,7 +1,6 @@
 "use client";
 
 import { Suspense, useMemo, useState } from "react";
-import Link from "next/link";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { UNPAGED_SIZE } from "@/lib/constants";
@@ -12,6 +11,7 @@ import { useNavTabs, usePageTab, keepWithinTab } from "@/lib/hooks/use-page-tab"
 import { TabHeader } from "@/components/ui/tab-header";
 import { Toolbar } from "@/components/ui/toolbar";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
+import { PayoutAccountDrawer } from "@/components/finance/payout-account-drawer";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { Drawer, Field } from "@/components/ui/drawer";
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +43,7 @@ import { LEAD_STAGE, SHARE_MODE_LABEL, FOLLOW_DUE, followDue } from "@/component
 import { FILE_CATEGORY_RULES, fileSize, VENUE_INDUSTRIES, VENUE_INDUSTRY_LABEL } from "@/lib/types";
 import type {
   Venue, VenueIndustry, Contract, Lead, LeadStage, LeadSaveReq, VenueOnboarding, LifecycleRow, SiteStatus, PageResult, FunnelStage,
+  PayoutAccount,
 } from "@/lib/types";
 
 // tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）。
@@ -281,22 +282,33 @@ function VenuesInner() {
   };
 
   /*
-   * 场地方的收款账户（B3）。这一页**不做账户的增删改** —— 管理界面在 /finance?tab=payout-accounts。
-   * 这里只回答一个问题：**这个场地方现在能不能收到钱**。
+   * 场地方的收款账户（B3）。
+   *
+   * <b>就地设置，不跳页</b>（2026-09-26）：原先这一列是一个指向
+   * `/finance?tab=payout-accounts` 的链接。点过去之后人要在几百条账户里
+   * 自己找回刚才那个场地方、还要手打一遍它的编号 —— 而编号恰恰是**最容易打错**
+   * 又最看不出打错了的东西（打错了就是钱打给别人）。
+   * 现在在本页开抽屉，受益方类型与编号由这一行**带进去且不可改**。
    */
   const canReadPayout = allow("finance:payout_account:read");
+  const canEditPayout = allow("finance:payout_account:update");
   const payoutQ = useQuery({
     queryKey: ["venue-payout-accounts"],
     queryFn: () => api.listPayoutAccounts({ page: 1, size: UNPAGED_SIZE, payeeType: "VENUE" }),
     enabled: canReadPayout && tab === "venues",
   });
+  // 存整条而不只是掩码 —— 要改已有账户得带上 accountNo，否则保存会变成"再建一条"
   const payoutByVenue = useMemo(() => {
-    const m = new Map<string, string>();
+    const m = new Map<string, PayoutAccount>();
     for (const a of payoutQ.data?.list ?? []) {
-      if (a.status === "ACTIVE" && a.isDefault) m.set(a.payeeNo, a.accountMasked);
+      if (a.status === "ACTIVE" && a.isDefault) m.set(a.payeeNo, a);
     }
     return m;
   }, [payoutQ.data]);
+
+  /** 就地设置收款账户：抽屉本体是共享组件（见 components/finance/payout-account-drawer）。 */
+  const [payoutForm, setPayoutForm] = useState<Record<string, unknown> | null>(null);
+  const [payoutFor, setPayoutFor] = useState<{ venueNo: string; name: string } | null>(null);
 
   const [keyword, setKeyword] = useState("");
   const [showArchived, setShowArchived] = useState(false);
@@ -481,15 +493,30 @@ function VenuesInner() {
     ...(canReadPayout ? [{
       header: "收款账户",
       cell: (v: Venue) => {
-        const masked = payoutByVenue.get(v.venueNo);
-        return masked
-          ? <span className="font-mono txt-caption text-muted-foreground">{masked}</span>
-          : (
-            // 未设置就是「结算做完也打不出去」—— 标出来，别等审批被拒才发现
-            <Link href="/finance?tab=payout-accounts" className="txt-caption text-warning hover:underline">
-              未设置 · 去补录
-            </Link>
+        const acc = payoutByVenue.get(v.venueNo);
+        const open = () => {
+          setPayoutFor({ venueNo: v.venueNo, name: v.name });
+          setPayoutForm({
+            accountNo: acc?.accountNo,
+            bankCode: acc?.bankCode ?? "", accountName: acc?.accountName ?? "",
+            // 账号故意留空：库里存的是掩码，回填掩码会把掩码当成新账号存进去
+            accountMasked: "", currency: acc?.currency ?? "AED",
+          });
+        };
+        if (acc) {
+          return (
+            <span className="flex items-center gap-2">
+              <span className="font-mono txt-caption text-muted-foreground">{acc.accountMasked}</span>
+              {canEditPayout && (
+                <Button size="sm" variant="ghost" onClick={open}>更换</Button>
+              )}
+            </span>
           );
+        }
+        // 未设置就是「结算做完也打不出去」—— 标出来，别等审批被拒才发现
+        return canEditPayout
+          ? <Button size="sm" variant="ghost" className="text-warning" onClick={open}>未设置 · 去设置</Button>
+          : <span className="txt-caption text-warning">未设置</span>;
       },
     }] : []),
     ...archivedCols<Venue>(),
@@ -874,6 +901,14 @@ function VenuesInner() {
         }}
         submitting={reviewOnboarding.isPending}
       />
+
+      {payoutFor && (
+        <PayoutAccountDrawer
+          value={payoutForm}
+          onOpenChange={(o) => { if (!o) { setPayoutForm(null); setPayoutFor(null); } }}
+          boundTo={{ payeeType: "VENUE", payeeNo: payoutFor.venueNo, label: payoutFor.name }}
+        />
+      )}
 
       <FormDrawer
         open={!!venueForm}
