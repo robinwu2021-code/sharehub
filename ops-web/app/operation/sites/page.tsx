@@ -84,7 +84,10 @@ function fieldsFor(
 ): FieldDef[] {
   return [
     { key: "name", label: "站点名称", required: true, maxLength: 128, section: "基本信息" },
-    { key: "nameAr", label: "站点名称（العربية）", maxLength: 128, section: "基本信息", help: "不填时阿语界面显示中文名" },
+    // 这里**没有**阿语名那一格（2026-09-26 去掉）。`loc_site.name_ar` 有列、SiteReq 也收，
+    // 但 C 端 BFF（MpNearbyController）里没有任何 lang 处理、一次都没读过它 ——
+    // 运营填的阿语站名**没有任何地方会显示**，两个并排的「站点名称」只是让人犹豫填哪个。
+    // 要做阿语店名的话缺口在 C 端出参那一侧，不在这张表单；届时连同 nameEn 一起设计。
     { key: "venueNo", label: "场地方", type: "select", required: true, section: "基本信息",
       options: [{ value: "", label: "请选择场地方" }, ...venues],
       help: "分成按场地方结算；这里选的是档案里的场地方，不是手打名字" },
