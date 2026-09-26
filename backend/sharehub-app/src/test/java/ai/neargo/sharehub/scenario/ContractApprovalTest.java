@@ -49,14 +49,14 @@ class ContractApprovalTest extends ApiTestSupport {
     @DisplayName("★ 起草 → 提交 → 他人审批通过 → 签署（开始日已到）→ 生效；介绍费事件恰好一次")
     void happyPath() {
         String site = newSite();
-        String no = draft(site, LocalDate.now().minusDays(1), LocalDate.now().plusYears(1)).path("contractNo").asText();
+        String no = draft(site, bizToday().minusDays(1), bizToday().plusYears(1)).path("contractNo").asText();
         assertThat(post("/api/ops/contracts/" + no + "/submit", Map.of(), bd).okData().path("status").asText()).isEqualTo("PENDING");
         assertThat(post("/api/ops/contracts/" + no + "/audit", Map.of("result", "APPROVE"), admin).okData().path("status").asText())
                 .isEqualTo("SIGNED");
 
         String fileNo = upload("CONTRACT_SCAN", "scan.pdf", pdfBytes(), bd).path("fileNo").asText();
         JsonNode signed = post("/api/ops/contracts/" + no + "/sign",
-                Map.of("signedAt", LocalDate.now().toString(), "fileNos", List.of(fileNo)), bd).okData();
+                Map.of("signedAt", bizToday().toString(), "fileNos", List.of(fileNo)), bd).okData();
         assertThat(signed.path("status").asText()).isEqualTo("ACTIVE");
         assertThat(signed.path("attachments").get(0).path("fileNo").asText()).isEqualTo(fileNo);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM sys_outbox WHERE event_type='CONTRACT_SIGNED' AND aggregate_id=?",
@@ -74,7 +74,7 @@ class ContractApprovalTest extends ApiTestSupport {
     @DisplayName("不能审批自己提交的合同 → 409；驳回不填原因 → 400；驳回回到草稿")
     void auditRules() {
         String site = newSite();
-        String no = draft(site, LocalDate.now().plusDays(10), LocalDate.now().plusYears(1)).path("contractNo").asText();
+        String no = draft(site, bizToday().plusDays(10), bizToday().plusYears(1)).path("contractNo").asText();
         post("/api/ops/contracts/" + no + "/submit", Map.of(), admin).okData();
         assertThat(post("/api/ops/contracts/" + no + "/audit", Map.of("result", "APPROVE"), admin).status).isEqualTo(409);
         assertThat(post("/api/ops/contracts/" + no + "/audit", Map.of("result", "REJECT"), bd).status).isEqualTo(400);
@@ -86,11 +86,11 @@ class ContractApprovalTest extends ApiTestSupport {
     @DisplayName("只有草稿可改；期限与同站点待审合同重叠时提交 → 409")
     void draftOnlyAndOverlap() {
         String site = newSite();
-        String a = draft(site, LocalDate.now().plusDays(1), LocalDate.now().plusYears(1)).path("contractNo").asText();
+        String a = draft(site, bizToday().plusDays(1), bizToday().plusYears(1)).path("contractNo").asText();
         post("/api/ops/contracts/" + a + "/submit", Map.of(), bd).okData();
-        assertThat(post("/api/ops/contracts/" + a, body(site, LocalDate.now().plusDays(1), LocalDate.now().plusYears(1)), bd).status)
+        assertThat(post("/api/ops/contracts/" + a, body(site, bizToday().plusDays(1), bizToday().plusYears(1)), bd).status)
                 .isEqualTo(409);
-        String b = draft(site, LocalDate.now().plusMonths(3), LocalDate.now().plusYears(2)).path("contractNo").asText();
+        String b = draft(site, bizToday().plusMonths(3), bizToday().plusYears(2)).path("contractNo").asText();
         assertThat(post("/api/ops/contracts/" + b + "/submit", Map.of(), bd).status).isEqualTo(409);
     }
 
@@ -98,12 +98,12 @@ class ContractApprovalTest extends ApiTestSupport {
     @DisplayName("开始日在未来：签署后保持 SIGNED；推到开始日跑定时 → ACTIVE；再推过到期日 → EXPIRED；再跑一次无变化")
     void tickActivatesAndExpires() {
         String site = newSite();
-        LocalDate start = LocalDate.now().plusDays(5), end = LocalDate.now().plusDays(20);
+        LocalDate start = bizToday().plusDays(5), end = bizToday().plusDays(20);
         String no = draft(site, start, end).path("contractNo").asText();
         post("/api/ops/contracts/" + no + "/submit", Map.of(), bd).okData();
         post("/api/ops/contracts/" + no + "/audit", Map.of("result", "APPROVE"), admin).okData();
         String fileNo = upload("CONTRACT_SCAN", "scan.pdf", pdfBytes(), bd).path("fileNo").asText();
-        assertThat(post("/api/ops/contracts/" + no + "/sign", Map.of("signedAt", LocalDate.now().toString(), "fileNos", List.of(fileNo)), bd)
+        assertThat(post("/api/ops/contracts/" + no + "/sign", Map.of("signedAt", bizToday().toString(), "fileNos", List.of(fileNo)), bd)
                 .okData().path("status").asText()).isEqualTo("SIGNED");
 
         contracts.tick(start);
@@ -119,7 +119,7 @@ class ContractApprovalTest extends ApiTestSupport {
         assertThat(uploadResp("CONTRACT_SCAN", "fake.pdf", "#!/bin/sh\necho hi\n".getBytes(StandardCharsets.UTF_8), bd).status)
                 .isEqualTo(400);
         String site = newSite();
-        String no = draft(site, LocalDate.now().plusDays(1), LocalDate.now().plusYears(1)).path("contractNo").asText();
+        String no = draft(site, bizToday().plusDays(1), bizToday().plusYears(1)).path("contractNo").asText();
         String someoneElses = upload("CONTRACT_SCAN", "scan.pdf", pdfBytes(), admin).path("fileNo").asText();
         assertThat(post("/api/ops/contracts/" + no + "/attachments", Map.of("fileNos", List.of(someoneElses)), bd).status).isEqualTo(400);
     }

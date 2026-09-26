@@ -511,10 +511,17 @@ public class WoOpsServiceImpl implements WoOpsService {
         }
         woMapper.updateById(e);
 
-        // close_reason / 验收四件套不是 WoOrder 实体的字段（wo 主包边界），按列名补写。
-        // audited_by：入参显式指定优先，否则记当前登录人 —— 验收人是合规字段，不能为空。
-        String auditor = notBlank(req.auditorNo()) ? req.auditorNo()
-                : SecurityUtils.currentUser().map(LoginUser::username).orElse("system");
+        /*
+         * close_reason / 验收四件套不是 WoOrder 实体的字段（wo 主包边界），按列名补写。
+         *
+         * audited_by **只认会话**。此前这里是「入参显式指定优先」——
+         * 而验收人是合规字段，可伪造的话四眼原则就是摆设：谁都能声称是别人验收的。
+         * 提现那边 StlWithdrawal#auditorNo 上早就写死了同一条约定
+         * （「服务端按会话回填，不信前端传值」），这里违反的正是它。
+         * 入参里的 auditorNo 随之删掉 —— 留着等于「前端还传、后端静默忽略」，
+         * 那是另一种谎。前端本来也没传过。
+         */
+        String auditor = SecurityUtils.currentUser().map(LoginUser::username).orElse("system");
         UpdateWrapper<WoOrder> uw = new UpdateWrapper<WoOrder>()
                 .eq("wo_no", woNo)
                 .set("close_reason", closeReason)

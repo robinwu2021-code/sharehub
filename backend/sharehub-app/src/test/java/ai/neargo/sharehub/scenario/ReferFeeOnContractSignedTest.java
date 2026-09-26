@@ -60,7 +60,7 @@ class ReferFeeOnContractSignedTest extends ApiTestSupport {
         post("/api/ops/contracts/" + no + "/submit", Map.of(), bd).okData();
         post("/api/ops/contracts/" + no + "/audit", Map.of("result", "APPROVE"), admin).okData();
         String fileNo = uploadFile("CONTRACT_SCAN", "scan.pdf", minimalPdf(), bd).path("fileNo").asText();
-        post("/api/ops/contracts/" + no + "/sign", Map.of("signedAt", LocalDate.now().toString(), "fileNos", List.of(fileNo)), bd).okData();
+        post("/api/ops/contracts/" + no + "/sign", Map.of("signedAt", bizToday().toString(), "fileNos", List.of(fileNo)), bd).okData();
         return no;
     }
 
@@ -85,7 +85,7 @@ class ReferFeeOnContractSignedTest extends ApiTestSupport {
     void contract_write_endpoint_exists_and_persists() {
         // 合同是场地方分成的唯一依据 —— 建不了合同，场地方费率就只能靠改库。
         String admin = login("ADMIN");
-        JsonNode c = post("/api/ops/contracts", contract(newSite(admin), LocalDate.now(), LocalDate.now().plusYears(1)), admin).okData();
+        JsonNode c = post("/api/ops/contracts", contract(newSite(admin), bizToday(), bizToday().plusYears(1)), admin).okData();
         assertThat(c.path("contractNo").asText()).as("服务端取号").startsWith("CT");
         assertThat(c.path("shareRate").asDouble()).isEqualTo(0.2);
         assertThat(c.path("status").asText()).as("录入即草稿，状态只经审批动作改").isEqualTo("DRAFT");
@@ -95,7 +95,7 @@ class ReferFeeOnContractSignedTest extends ApiTestSupport {
     void contract_must_bind_a_site() {
         // 不绑站点的合同，场地方分成取价时找不到它，会静默回落到通用规则 ——
         // 而回落值与合同里白纸黑字写的比例往往不一样。
-        Map<String, Object> bad = contract("ignored", LocalDate.now(), LocalDate.now().plusYears(1));
+        Map<String, Object> bad = contract("ignored", bizToday(), bizToday().plusYears(1));
         bad.remove("siteNo");
         assertThat(post("/api/ops/contracts", bad, login("ADMIN")).status)
                 .as("合同不绑站点必须当场拒").isEqualTo(400);
@@ -104,7 +104,7 @@ class ReferFeeOnContractSignedTest extends ApiTestSupport {
     @Test
     void end_date_before_start_is_refused() {
         String admin = login("ADMIN");
-        Map<String, Object> bad = contract(newSite(admin), LocalDate.now(), LocalDate.now().minusYears(1));
+        Map<String, Object> bad = contract(newSite(admin), bizToday(), bizToday().minusYears(1));
         assertThat(post("/api/ops/contracts", bad, admin).status).isEqualTo(400);
     }
 
@@ -114,7 +114,7 @@ class ReferFeeOnContractSignedTest extends ApiTestSupport {
         String site = newSite(admin);
         long id = referrer(admin, site, 500);
         try {
-            String no = signedContract(site, LocalDate.now().minusDays(1));
+            String no = signedContract(site, bizToday().minusDays(1));
 
             JsonNode fees = referFees(admin, no);
             assertThat(fees).as("生效应结出牵线费").hasSize(1);
@@ -136,10 +136,10 @@ class ReferFeeOnContractSignedTest extends ApiTestSupport {
         String site = newSite(admin);
         long id = referrer(admin, site, 500);
         try {
-            String no = signedContract(site, LocalDate.now().minusDays(1));
-            contracts.tick(LocalDate.now());
-            contracts.tick(LocalDate.now());
-            assertThat(post("/api/ops/contracts/" + no + "/sign", Map.of("signedAt", LocalDate.now().toString()), login("BD")).status)
+            String no = signedContract(site, bizToday().minusDays(1));
+            contracts.tick(bizToday());
+            contracts.tick(bizToday());
+            assertThat(post("/api/ops/contracts/" + no + "/sign", Map.of("signedAt", bizToday().toString()), login("BD")).status)
                     .as("生效后不能再签署").isIn(400, 409);
             assertThat(referFees(admin, no)).as("重复处理不该重复付").hasSize(1);
         } finally {
@@ -162,7 +162,7 @@ class ReferFeeOnContractSignedTest extends ApiTestSupport {
             clear.put("oneOffAmount", null);
             post("/api/ops/sites/" + site + "/agents", clear, admin).okData();
 
-            String no = signedContract(site, LocalDate.now().minusDays(1));
+            String no = signedContract(site, bizToday().minusDays(1));
             assertThat(referFees(admin, no)).as("清空之后不该再付").isEmpty();
         } finally {
             drop(admin, site, id);
@@ -177,7 +177,7 @@ class ReferFeeOnContractSignedTest extends ApiTestSupport {
         String site = newSite(admin);
         long id = referrer(admin, site, null);
         try {
-            String no = signedContract(site, LocalDate.now().minusDays(1));
+            String no = signedContract(site, bizToday().minusDays(1));
             assertThat(referFees(admin, no)).as("没配金额时不落库，只告警").isEmpty();
         } finally {
             drop(admin, site, id);
@@ -188,7 +188,7 @@ class ReferFeeOnContractSignedTest extends ApiTestSupport {
     void site_without_referrer_pays_nothing() {
         // 绝大多数站点没有牵线人。多付给一个不存在的受益方是最贵的那种静默错账。
         String admin = login("ADMIN");
-        String no = signedContract(newSite(admin), LocalDate.now().minusDays(1));
+        String no = signedContract(newSite(admin), bizToday().minusDays(1));
         assertThat(referFees(admin, no)).isEmpty();
     }
 
@@ -199,7 +199,7 @@ class ReferFeeOnContractSignedTest extends ApiTestSupport {
         String site = newSite(admin);
         long id = referrer(admin, site, 500);
         try {
-            LocalDate start = LocalDate.now().plusDays(7);
+            LocalDate start = bizToday().plusDays(7);
             String no = signedContract(site, start);
             assertThat(referFees(admin, no)).as("SIGNED 未生效不付").isEmpty();
             contracts.tick(start);

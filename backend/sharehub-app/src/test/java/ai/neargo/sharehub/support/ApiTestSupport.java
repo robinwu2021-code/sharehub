@@ -40,6 +40,29 @@ public abstract class ApiTestSupport {
     protected final HttpClient http = HttpClient.newHttpClient();
     protected final ObjectMapper json = new ObjectMapper();
 
+    /**
+     * **业务时区的「今天」**。造业务日期（合同签署日、生效日、终止日…）一律用它，
+     * <b>不要用 {@code LocalDate.now()}</b>。
+     *
+     * <h3>为什么</h3>
+     * 服务端判业务日期用的是 {@code LocalDate.now(sharehub.biz-zone)}，默认
+     * {@code Asia/Dubai}（UTC+4）；而 {@code LocalDate.now()} 取的是 <b>JVM 所在时区</b>
+     * —— 开发机与生产机都是 {@code Asia/Shanghai}（UTC+8）。
+     *
+     * <p>于是每天在本地 00:00–04:00 这 4 小时里，{@code LocalDate.now()} 比业务「今天」
+     * <b>早一天</b>，合同签署便撞上「日期不能晚于今天」这条校验 ——
+     * 2026-09-27 01:15 实测 10 条用例同时红（合同签署 / 补充协议 / 终止审批 / 推荐费）。
+     *
+     * <p>这类红最费时间的地方是**它会自己好**：过了 04:00 再跑就全绿，
+     * 于是很容易被当成偶发抖动，甚至被「修」成放宽服务端校验 —— 那是把真约束拆掉。
+     */
+    protected static java.time.LocalDate bizToday() {
+        return java.time.LocalDate.now(BIZ_ZONE);
+    }
+
+    /** 与 {@code sharehub.biz-zone} 的默认值一致；配置改了这里也要改（测试里不读 Environment）。 */
+    protected static final java.time.ZoneId BIZ_ZONE = java.time.ZoneId.of("Asia/Dubai");
+
     /** 一次响应：HTTP 状态 + 解析后的包体（{@code {code,msg,data}}）。 */
     public final class Resp {
         public final int status;

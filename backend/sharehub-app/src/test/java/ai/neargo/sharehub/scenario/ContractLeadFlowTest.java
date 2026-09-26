@@ -97,8 +97,8 @@ class ContractLeadFlowTest extends ApiTestSupport {
     @DisplayName("B1 到期提醒：60 天内开一条（LOW，BD 待办）→ 跨进 30 天升 MEDIUM → 续签合同提交后恢复")
     void expiryReminder() {
         String site = newSite();
-        String no = activeContract(site, LocalDate.now().minusMonths(6), LocalDate.now().plusDays(50), 0.2);
-        LocalDateTime t0 = LocalDate.now().atTime(12, 0);
+        String no = activeContract(site, bizToday().minusMonths(6), bizToday().plusDays(50), 0.2);
+        LocalDateTime t0 = bizToday().atTime(12, 0);
 
         engine.tickSites(t0, List.of(site));
         Map<String, Object> a = jdbc.queryForMap("SELECT alarm_no, priority, status, site_no FROM dev_alarm WHERE subject_no=? AND alarm_code='CONTRACT_EXPIRING'", no);
@@ -107,7 +107,7 @@ class ContractLeadFlowTest extends ApiTestSupport {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dev_alarm_todo WHERE alarm_no=? AND status='OPEN'", Integer.class, alarmNo))
                 .as("BD 待办一张").isEqualTo(1);
 
-        jdbc.update("UPDATE loc_contract SET end_at=? WHERE contract_no=?", LocalDate.now().plusDays(20).toString(), no);
+        jdbc.update("UPDATE loc_contract SET end_at=? WHERE contract_no=?", bizToday().plusDays(20).toString(), no);
         engine.tickSites(t0.plusMinutes(1), List.of(site));
         assertThat(jdbc.queryForObject("SELECT priority FROM dev_alarm WHERE alarm_no=?", String.class, alarmNo)).isEqualTo("MEDIUM");
         assertThat(logEvents(alarmNo)).contains("IMPACT_UP");
@@ -126,7 +126,7 @@ class ContractLeadFlowTest extends ApiTestSupport {
     @DisplayName("B3 条件加签：分成 0.4 > 0.30 → 运营通过后仍 PENDING（FINANCE）；运营再审 409；同一审批人会签 409；财务会签 → SIGNED")
     void financeCosign() {
         String site = newSite();
-        Map<String, Object> body = body(site, LocalDate.now().plusDays(3), LocalDate.now().plusYears(1));
+        Map<String, Object> body = body(site, bizToday().plusDays(3), bizToday().plusYears(1));
         body.put("shareRate", 0.4);
         String no = post("/api/ops/contracts", body, bd).okData().path("contractNo").asText();
         contractNos.add(no);
@@ -152,8 +152,8 @@ class ContractLeadFlowTest extends ApiTestSupport {
     @DisplayName("B2 提前终止走审批：申请后仍 ACTIVE；重复申请 409；自审 409；他人批准 → 到终止日定时终止；当日终止批准即终止")
     void terminationApproval() {
         String site = newSite();
-        String no = activeContract(site, LocalDate.now().minusMonths(1), LocalDate.now().plusYears(1), 0.2);
-        LocalDate eff = LocalDate.now().plusDays(10);
+        String no = activeContract(site, bizToday().minusMonths(1), bizToday().plusYears(1), 0.2);
+        LocalDate eff = bizToday().plusDays(10);
         JsonNode c = post("/api/ops/contracts/" + no + "/terminate", Map.of("reason", "场地装修", "effectiveAt", eff.toString()), bd).okData();
         assertThat(c.path("status").asText()).as("审批中不影响营业").isEqualTo("ACTIVE");
         assertThat(c.path("flow").path("termination").path("status").asText()).isEqualTo("PENDING");
@@ -172,11 +172,11 @@ class ContractLeadFlowTest extends ApiTestSupport {
         });
 
         // 驳回留痕，驳回后可以重新申请；终止日为今天 → 批准即终止
-        String other = activeContract(newSite(), LocalDate.now().minusMonths(1), LocalDate.now().plusYears(1), 0.2);
-        post("/api/ops/contracts/" + other + "/terminate", Map.of("reason", "a", "effectiveAt", LocalDate.now().toString()), bd).okData();
+        String other = activeContract(newSite(), bizToday().minusMonths(1), bizToday().plusYears(1), 0.2);
+        post("/api/ops/contracts/" + other + "/terminate", Map.of("reason", "a", "effectiveAt", bizToday().toString()), bd).okData();
         assertThat(post("/api/ops/contracts/" + other + "/termination/audit", Map.of("result", "REJECT"), admin).status).isEqualTo(400);
         post("/api/ops/contracts/" + other + "/termination/audit", Map.of("result", "REJECT", "reason", "先谈续约"), admin).okData();
-        post("/api/ops/contracts/" + other + "/terminate", Map.of("reason", "谈崩了", "effectiveAt", LocalDate.now().toString()), bd).okData();
+        post("/api/ops/contracts/" + other + "/terminate", Map.of("reason", "谈崩了", "effectiveAt", bizToday().toString()), bd).okData();
         assertThat(post("/api/ops/contracts/" + other + "/termination/audit", Map.of("result", "APPROVE"), admin).okData()
                 .path("status").asText()).isEqualTo("TERMINATED");
         assertThat(logs(other)).containsSubsequence("TERM_REQUEST", "TERM_REJECT", "TERM_REQUEST", "TERM_APPROVE", "TERMINATE");
@@ -186,9 +186,9 @@ class ContractLeadFlowTest extends ApiTestSupport {
     @DisplayName("B4 补充协议：生成关联草稿（重复 409）→ 改条款 → 审批签署 → 生效日原合同 EXPIRED（被补充协议取代），不发签约事件")
     void supplement() {
         String site = newSite();
-        LocalDate end = LocalDate.now().plusYears(1);
-        String parent = activeContract(site, LocalDate.now().minusMonths(2), end, 0.2);
-        LocalDate start = LocalDate.now().plusDays(1);
+        LocalDate end = bizToday().plusYears(1);
+        String parent = activeContract(site, bizToday().minusMonths(2), end, 0.2);
+        LocalDate start = bizToday().plusDays(1);
         JsonNode s = post("/api/ops/contracts/" + parent + "/supplement", Map.of("startAt", start.toString()), bd).okData();
         String no = s.path("contractNo").asText();
         contractNos.add(no);
@@ -204,7 +204,7 @@ class ContractLeadFlowTest extends ApiTestSupport {
         post("/api/ops/contracts/" + no + "/submit", Map.of(), bd).okData();
         post("/api/ops/contracts/" + no + "/audit", Map.of("result", "APPROVE"), admin).okData();
         String fileNo = uploadFile("CONTRACT_SCAN", "supplement.pdf", minimalPdf(), bd).path("fileNo").asText();
-        assertThat(post("/api/ops/contracts/" + no + "/sign", Map.of("signedAt", LocalDate.now().toString(), "fileNos", List.of(fileNo)), bd)
+        assertThat(post("/api/ops/contracts/" + no + "/sign", Map.of("signedAt", bizToday().toString(), "fileNos", List.of(fileNo)), bd)
                 .okData().path("status").asText()).isEqualTo("SIGNED");
 
         inRollback(st -> {
@@ -228,7 +228,7 @@ class ContractLeadFlowTest extends ApiTestSupport {
         assertThat(get("/api/ops/leads/" + no, bd).okData().path("stage").asText()).isEqualTo("CONTACTED");
         assertThat(post("/api/ops/leads/" + no, Map.of("stage", "LOST"), bd).status).isEqualTo(400);
         JsonNode lost = post("/api/ops/leads/" + no, Map.of("stage", "LOST", "lostReason", "已签竞品",
-                "competitorName", "某竞品", "competitorExclusiveUntil", LocalDate.now().plusMonths(8).toString()), bd).okData();
+                "competitorName", "某竞品", "competitorExclusiveUntil", bizToday().plusMonths(8).toString()), bd).okData();
         assertThat(lost.path("stage").asText()).isEqualTo("LOST");
         assertThat(lost.path("lostAt").isNull()).isFalse();
         JsonNode back = post("/api/ops/leads/" + no, Map.of("stage", "NEW"), bd).okData();
@@ -292,7 +292,7 @@ class ContractLeadFlowTest extends ApiTestSupport {
         m.put("shareRate", 0.22);
         m.put("termMonths", 6);
         String no = lead(m, bd).path("leadNo").asText();
-        LocalDate start = LocalDate.now().plusDays(7);
+        LocalDate start = bizToday().plusDays(7);
         JsonNode r = post("/api/ops/leads/" + no + "/convert", Map.of("openHours", "10:00-22:00", "startAt", start.toString()), bd).okData();
         venueNos.add(r.path("venueNo").asText());
         siteNos.add(r.path("siteNo").asText());
@@ -319,7 +319,7 @@ class ContractLeadFlowTest extends ApiTestSupport {
     void competitorReactivation() {
         String no = lead(Map.of("venueName", uniq("竞品场地")), bd).path("leadNo").asText();
         jdbc.update("UPDATE loc_lead SET stage='LOST', lost_reason='已签竞品', lost_at=?, competitor_exclusive_until=? WHERE lead_no=?",
-                LocalDateTime.now().minusDays(100), LocalDate.now().plusDays(30), no);
+                LocalDateTime.now().minusDays(100), bizToday().plusDays(30), no);
         inRollback(st -> {
             assertThat(leadOps.tick(LocalDateTime.now()).reactivated()).isGreaterThanOrEqualTo(1);
             assertThat(jdbc.queryForMap("SELECT stage, reactivated_at IS NOT NULL AS r FROM loc_lead WHERE lead_no=?", no))

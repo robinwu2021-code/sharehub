@@ -88,6 +88,9 @@
 - **动作端点**用动词后缀：`/dispatch` `/intervene` `/audit` `/handle` `/cancel` `/revoke` `/release` `/rollback` `/work-order`。
 - **幂等**：写操作带 `Idempotency-Key`（或业务键 `*_no`）；重复返回**首次结果**（200 原样，非 409）。落点见 db-design §1.6。
 - **审批类强约束**：`/audit` 驳回时 `rejectReason` **必填**，且服务端必须回填 `auditorNo/auditorName/auditedAt`（不信前端传的审批人）。
+  **落脚点**：`ActorNotFromRequestBodyTest` —— 请求体 `*Req` 里出现审批人/验收人身份字段直接红。
+  这句约定此前写在三处（本节、`db-schema-reference` 的 `auditor_no` 列注、`TDD-核心业务逻辑-分模块.md`），而 2026-09-27 实测发现工单验收 `CloseReq` 有一个 `auditorNo`、服务端还写着「入参显式指定优先」—— **约定越写越多，落脚点一个都没有**。
+  模式刻意不含 `assigneeNo`/`handlerNo`/`employeeNo`：那些是**被操作的对象**（「指派谁去接管」），由调用方指定是对的。新字段若确实是对象，改名比加豁免好。
 - 版本：路径不带版本，破坏性变更走新端点；契约演进只增不改（对齐 neargo）。
 
 ### 1.6 脱敏约定（服务端出参即脱敏，不靠前端遮）

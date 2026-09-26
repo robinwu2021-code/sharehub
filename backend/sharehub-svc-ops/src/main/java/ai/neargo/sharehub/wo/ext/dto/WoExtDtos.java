@@ -166,6 +166,18 @@ public final class WoExtDtos {
      * 故 {@code closeReason} 可缺省：{@code PASS/PASS_WITH_ISSUE → RESOLVED} 服务端推导；
      * {@code FAIL} 不允许直接关单（走 {@code /rework}），两者都缺则 400。
      */
-    public record CloseReq(String closeReason, String auditResult, String auditNote, String auditorNo) {
+    /**
+     * ⚠️ **没有 auditorNo** —— 验收人一律由服务端按会话回填。
+     *
+     * <p>此前这里有一个 {@code auditorNo}，服务端还写着「入参显式指定优先」。
+     * 而 {@code audited_by} 是**合规字段**：谁都可以声称是别人验收的，
+     * 四眼原则就成了摆设 —— 与提现那边 {@code StlWithdrawal#auditorNo} 上
+     * 早就写死的约定（「服务端按会话回填，不信前端传值」）直接冲突。
+     *
+     * <p>前端从来没传过它（ops-web / c-app 全仓零命中），
+     * 所以它不是一个在用的功能，只是给伪造留的门。2026-09-27 收掉。
+     * 卡口见 {@code ActorNotFromRequestBodyTest}。
+     */
+    public record CloseReq(String closeReason, String auditResult, String auditNote) {
     }
 }
