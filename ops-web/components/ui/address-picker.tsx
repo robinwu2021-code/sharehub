@@ -1,27 +1,38 @@
 "use client";
 
-// 地址选点：地址**搜索框** + 地图 + 经纬度，三个值绑成一个控件。
+// 地址录入：**一个输入框**搞定地址 + 经纬度。
 //
-// 为什么不是三个独立字段：地址与经纬度**必须一致**，分开手填时两者对不上没人拦得住 ——
-// C 端「找附近」按经纬度排序、运营端撒点按经纬度落点，地址只是给人看的。
+// ── 为什么只有一个输入框 ──────────────────────────────────────────
+// 第一版摆了四个：搜索框、地址框、经度、纬度。运营看到的是「我该填哪个」——
+// 而这四个其实是**同一件事的四种表示**，而且必须彼此一致：
+// C 端「找附近」按坐标排、运营端撒点按坐标落点，地址只是给人看的。
+// 摆四个框等于把「保持一致」这件事交给填表的人，那是拦不住的。
 //
-// 三条写入路径，任何一条都同时写这三个值：
-//   ① 输入关键词 → 调 Places 搜索 → 选一条 → 地址、经纬度、地图落点一起写；
-//   ② 在地图上点 / 拖标记 → 逆地理编码回填地址；
-//   ③ 手填（没有地图密钥时这是唯一入口）。
+// 现在：输入框既是**搜索**也是**最终地址**。
+//   · 边打边联想（Places 自动补全，天然容错 —— 打错几个字母照样命中）；
+//   · 选中一条 → 地址、经纬度、地图落点**一起写**；
+//   · 地图上点 / 拖标记微调 → 逆地理编码回填地址；
+//   · 坐标是**只读展示**，不是输入框 —— 它由上面两条路产生，手填只会制造不一致。
 //
-// 降级：没配密钥或脚本加载不出来时**不白屏也不报错** —— 地址照样手填，
-// 经纬度露出两个小输入框。建站点这件事本身不被地图挡住。
+// ── 联想列表不压地图 ─────────────────────────────────────────────
+// 列表**走正常文档流**，不是绝对定位浮层。浮层版本实测正好盖在地图上，
+// 而这两样恰恰要一起看（「我选的这条是不是落在我想的位置」）。
+// 走文档流的代价是列表出现时下面的内容会被推下去 —— 在抽屉里这没问题，
+// 换来的是两者永远不重叠，也不必跟 z-index 打架。
+//
+// ── 降级 ────────────────────────────────────────────────────────
+// 没配密钥或脚本加载不出来时**不白屏也不报错**：地址照常手填，
+// 并且**这时才**露出两个坐标小输入框（那是唯一入口）。建站点不被地图挡住。
 //
 // 供应商：Google（见 lib/gmaps.ts 顶部那组瓦片对照 —— 高德在阿联酋没有数据，
 // 而且它不报错，只是底图一片空白）。
 import * as React from "react";
-import { MapPin, LocateFixed, Search, Loader2 } from "lucide-react";
+import { MapPin, Search, Loader2, Check } from "lucide-react";
 import { Input } from "./input";
 import { Button } from "./button";
 import { cn } from "@/lib/utils";
 import {
-  loadGoogleMaps, gmapsReasonText, searchPlaces, placeDetail, reverseGeocode,
+  loadGoogleMaps, gmapsReasonText, gmapsConfigured, searchPlaces, placeDetail, reverseGeocode,
   newSessionToken, useDebounced, FALLBACK_CENTER, type PlaceHit,
 } from "@/lib/gmaps";
 
@@ -37,9 +48,8 @@ export function AddressPicker({
   onBlur?: () => void;
   placeholder?: string;
 }) {
-  const [open, setOpen] = React.useState(false);
+  const [mapOpen, setMapOpen] = React.useState(false);
   const [fail, setFail] = React.useState<string | null>(null);
-  const [query, setQuery] = React.useState("");
   const [hits, setHits] = React.useState<PlaceHit[]>([]);
   const [searching, setSearching] = React.useState(false);
   const [listOpen, setListOpen] = React.useState(false);
@@ -47,9 +57,14 @@ export function AddressPicker({
   const boxRef = React.useRef<HTMLDivElement | null>(null);
   const mapRef = React.useRef<google.maps.Map | null>(null);
   const markerRef = React.useRef<google.maps.Marker | null>(null);
-  const wrapRef = React.useRef<HTMLDivElement | null>(null);
-  /** 一次搜索会话：多次补全 + 一次详情按一次计费。选中或放弃后换新的。 */
+  /** 一次搜索会话：多次补全 + 一次详情按一次计费。选中后换新的。 */
   const session = React.useRef(newSessionToken());
+  /**
+   * 刚选中/刚回填过，这一轮不要再搜。
+   * 没有它的话：选中 → 地址被写成完整地址 → 防抖触发 → 又弹一次列表，
+   * 而人已经在看地图了，列表又把它推下去。
+   */
+  const skipSearch = React.useRef(false);
 
   // onChange 会随每次输入变新，但地图事件只在初始化时绑一次 —— 用 ref 取最新的，
   // 否则地图里点一下写回的是「打开地图那一刻」的旧值（闭包陷阱，
@@ -62,40 +77,45 @@ export function AddressPicker({
     latest.current.onChange({ ...cur, ...patch });
   };
 
-  // ───────────────── 搜索 ─────────────────
+  const hasCoords = value.lat !== "" && value.lng !== "";
 
-  const debounced = useDebounced(query, 350);
+  // ───────────────── 联想 ─────────────────
+
+  const debounced = useDebounced(value.address ?? "", 350);
   React.useEffect(() => {
+    if (skipSearch.current) { skipSearch.current = false; return; }
     const q = debounced.trim();
-    if (q.length < 2) { setHits([]); return; }
+    if (!gmapsConfigured || q.length < 2) { setHits([]); setListOpen(false); return; }
     let dead = false;
     setSearching(true);
-    const bias = latest.current.value.lat !== "" && latest.current.value.lng !== ""
+    // 已有坐标就以它为中心偏置，否则用首批市场的中心 ——
+    // 不偏置的话「Marina」会优先命中别的国家
+    const bias = hasCoords
       ? { lat: Number(latest.current.value.lat), lng: Number(latest.current.value.lng) }
       : FALLBACK_CENTER;
     searchPlaces(q, session.current, bias).then((r) => {
       if (dead) return;
       setHits(r);
       setSearching(false);
-      setListOpen(true);
+      setListOpen(r.length > 0);
     });
     return () => { dead = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debounced]);
 
-  /** 选中一条候选：地址 / 坐标 / 地图落点一起写。 */
+  /** 选中一条：地址 / 坐标 / 地图落点一起写。 */
   async function pick(hit: PlaceHit) {
     setListOpen(false);
     const d = await placeDetail(hit.placeId, session.current);
     session.current = newSessionToken();   // 一次会话结束
     if (!d) { setFail("这条地点取不到坐标，可在地图上直接点选"); return; }
     setFail(null);
-    setQuery("");
+    skipSearch.current = true;
     set({ address: d.address, lat: d.lat, lng: d.lng });
+    setMapOpen(true);     // 让人当场看见落在哪儿
     focusMap(d.lat, d.lng);
-    setOpen(true);      // 选完直接把地图展开，让人看见落在哪儿
   }
 
-  /** 把地图与标记挪到某个坐标。地图还没初始化时只写值，等展开时会以它为中心。 */
   function focusMap(lat: number, lng: number) {
     const m = mapRef.current;
     if (!m) return;
@@ -108,22 +128,13 @@ export function AddressPicker({
   async function writeBack(lat: number, lng: number) {
     set({ lat, lng });
     const addr = await reverseGeocode(lat, lng);
-    if (addr) set({ address: addr });
-  }
-
-  /** 「按地址定位」：拿输入框里已有的地址去搜第一条。 */
-  async function locate() {
-    const addr = latest.current.value.address?.trim();
-    if (!addr) return;
-    const r = await searchPlaces(addr, session.current);
-    if (!r.length) { setFail("按这个地址没找到坐标，可在地图上直接点选"); return; }
-    await pick(r[0]);
+    if (addr) { skipSearch.current = true; set({ address: addr }); }
   }
 
   // ───────────────── 地图 ─────────────────
 
   React.useEffect(() => {
-    if (!open || mapRef.current) return;
+    if (!mapOpen || mapRef.current) return;
     let dead = false;
     loadGoogleMaps().then((r) => {
       if (dead || !boxRef.current) return;
@@ -150,121 +161,106 @@ export function AddressPicker({
     });
     return () => { dead = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [mapOpen]);
 
-  // 收起地图时丢掉实例，下次展开重建 —— 否则容器被卸载后地图挂在一个已消失的节点上
+  // 收起地图时丢掉实例，下次展开重建 —— 否则容器卸载后地图挂在一个已消失的节点上
   React.useEffect(() => {
-    if (!open) { mapRef.current = null; markerRef.current = null; }
-  }, [open]);
-
-  // 点到别处收起候选列表（列表是浮层，不收的话会盖住下面的字段）
-  React.useEffect(() => {
-    if (!listOpen) return;
-    const onDown = (e: MouseEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setListOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [listOpen]);
+    if (!mapOpen) { mapRef.current = null; markerRef.current = null; }
+  }, [mapOpen]);
 
   const num = (s: string) => (s === "" ? "" : Number(s));
+  /** 密钥没配 / 脚本没起来 —— 这时坐标只能手填，是唯一入口。 */
+  const degraded = !gmapsConfigured || Boolean(fail);
 
   return (
     <div className="space-y-2">
-      {/* 搜索框：输关键词找地点。选中后地址、坐标、地图一起写 */}
-      <div ref={wrapRef} className="relative">
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/60" />
-            <Input
-              className="ps-8"
-              value={query}
-              disabled={disabled}
-              placeholder="搜索地点，如 Mall of the Emirates"
-              onChange={(e) => { setQuery(e.target.value); setFail(null); }}
-              onFocus={() => hits.length && setListOpen(true)}
-            />
-            {searching && (
-              <Loader2 className="absolute end-2.5 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground/60" />
-            )}
-          </div>
-          <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={() => setOpen((o) => !o)}>
-            <MapPin className="size-4" />
-            {open ? "收起地图" : "地图选点"}
-          </Button>
-        </div>
-
-        {listOpen && hits.length > 0 && (
-          <ul
-            role="listbox"
-            className="absolute inset-x-0 top-full z-[var(--z-popover)] mt-1 max-h-64 overflow-auto rounded-field border border-border bg-card py-1 shadow-pop"
-          >
-            {hits.map((h) => (
-              <li key={h.placeId}>
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={false}
-                  className="w-full px-3 py-2 text-start hover:bg-muted"
-                  onClick={() => void pick(h)}
-                >
-                  <div className="txt-body text-foreground">{h.main}</div>
-                  {h.secondary && <div className="txt-caption text-muted-foreground">{h.secondary}</div>}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        {listOpen && !searching && debounced.trim().length >= 2 && hits.length === 0 && (
-          <div className="absolute inset-x-0 top-full z-[var(--z-popover)] mt-1 rounded-field border border-border bg-card px-3 py-2 txt-caption text-muted-foreground">
-            没搜到这个地点。换个关键词，或直接在地图上点选。
-          </div>
-        )}
-      </div>
-
-      {/* 选定的地址：搜索写入，也允许手改（地址是给人看的，运营常要补楼层门牌） */}
-      <Input
-        className={cn(invalid && "ring-2 ring-destructive")}
-        value={value.address ?? ""}
-        disabled={disabled}
-        placeholder={placeholder}
-        onBlur={onBlur}
-        onChange={(e) => set({ address: e.target.value })}
-      />
-
-      {open && (
-        <div className="space-y-2">
-          {fail ? (
-            <div className="rounded-field bg-secondary px-3 py-2 txt-caption text-muted-foreground">{fail}</div>
-          ) : (
-            <>
-              <div ref={boxRef} className="h-56 w-full overflow-hidden rounded-field bg-secondary" />
-              <div className="flex items-center justify-between txt-caption text-muted-foreground/70">
-                <span>在地图上点选或拖动标记，地址与经纬度一起写入</span>
-                <Button type="button" variant="ghost" size="sm" onClick={() => void locate()}>
-                  <LocateFixed className="size-4" />按地址定位
-                </Button>
-              </div>
-            </>
+      {/* 唯一的输入框：既是搜索也是最终地址 */}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/60" />
+          <Input
+            className={cn("ps-8", invalid && "ring-2 ring-destructive")}
+            value={value.address ?? ""}
+            disabled={disabled}
+            placeholder={placeholder ?? "输入地点名或地址，边打边找"}
+            onBlur={onBlur}
+            onChange={(e) => { setFail(null); set({ address: e.target.value }); }}
+            onFocus={() => hits.length > 0 && setListOpen(true)}
+          />
+          {searching && (
+            <Loader2 className="absolute end-2.5 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground/60" />
           )}
         </div>
+        <Button
+          type="button" variant="outline" size="sm"
+          disabled={disabled || !gmapsConfigured}
+          onClick={() => setMapOpen((o) => !o)}
+        >
+          <MapPin className="size-4" />
+          {mapOpen ? "收起地图" : "地图"}
+        </Button>
+      </div>
+
+      {/*
+        联想列表走**文档流**：它一出现就把地图推下去，而不是盖在地图上。
+        这两样恰恰要一起看 ——「我选的这条是不是落在我想的位置」。
+      */}
+      {listOpen && hits.length > 0 && (
+        <ul role="listbox" className="max-h-56 overflow-auto rounded-field border border-border bg-card py-1">
+          {hits.map((h) => (
+            <li key={h.placeId}>
+              <button
+                type="button" role="option" aria-selected={false}
+                className="w-full px-3 py-2 text-start hover:bg-muted"
+                onClick={() => void pick(h)}
+              >
+                <div className="txt-body text-foreground">{h.main}</div>
+                {h.secondary && <div className="txt-caption text-muted-foreground">{h.secondary}</div>}
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
 
-      {/* 经纬度：搜索/地图写入后在这里显示，也允许手填（没地图时这是唯一入口）。 */}
-      <div className="flex items-center gap-2">
-        <span className="txt-caption text-muted-foreground/70">经度</span>
-        <Input
-          type="number" className="h-8 w-28" disabled={disabled}
-          value={value.lng ?? ""} onBlur={onBlur}
-          onChange={(e) => set({ lng: num(e.target.value) })}
-        />
-        <span className="txt-caption text-muted-foreground/70">纬度</span>
-        <Input
-          type="number" className="h-8 w-28" disabled={disabled}
-          value={value.lat ?? ""} onBlur={onBlur}
-          onChange={(e) => set({ lat: num(e.target.value) })}
-        />
-      </div>
+      {fail && (
+        <div className="rounded-field bg-secondary px-3 py-2 txt-caption text-muted-foreground">{fail}</div>
+      )}
+
+      {mapOpen && !fail && (
+        <>
+          <div ref={boxRef} className="h-56 w-full overflow-hidden rounded-field bg-secondary" />
+          <p className="txt-caption text-muted-foreground/70">在地图上点选或拖动标记可微调，地址会跟着更新</p>
+        </>
+      )}
+
+      {/*
+        坐标：正常情况下**只读展示**。它由「选中联想」或「地图点选」产生 ——
+        手填只会制造地址与坐标不一致，而那种不一致没人拦得住、也看不出来。
+        只有在地图用不了时才退成两个输入框（那时它是唯一入口）。
+      */}
+      {degraded ? (
+        <div className="flex items-center gap-2">
+          <span className="txt-caption text-muted-foreground/70">经度</span>
+          <Input
+            type="number" className="h-8 w-28" disabled={disabled}
+            value={value.lng ?? ""} onBlur={onBlur}
+            onChange={(e) => set({ lng: num(e.target.value) })}
+          />
+          <span className="txt-caption text-muted-foreground/70">纬度</span>
+          <Input
+            type="number" className="h-8 w-28" disabled={disabled}
+            value={value.lat ?? ""} onBlur={onBlur}
+            onChange={(e) => set({ lat: num(e.target.value) })}
+          />
+        </div>
+      ) : hasCoords ? (
+        <p className="flex items-center gap-1.5 txt-caption text-muted-foreground">
+          <Check className="size-3.5 text-success" />
+          已定位 <span className="tabular-nums">{Number(value.lat).toFixed(6)}, {Number(value.lng).toFixed(6)}</span>
+        </p>
+      ) : (
+        <p className="txt-caption text-muted-foreground/70">从上面的联想里选一条，或点「地图」直接在图上选点，坐标会自动带上</p>
+      )}
     </div>
   );
 }
