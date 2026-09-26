@@ -461,17 +461,17 @@ public class SiteServiceImpl implements SiteService {
         return Checklist.of(List.of(
                 new Checklist.Item("SURVEY", "现场勘测", Boolean.TRUE.equals(surveyed),
                         surveyed == null ? "还没有勘测记录" : surveyed ? "最近一次勘测通过" : "最近一次勘测不通过",
-                        "/sites/" + no + "?tab=survey"),
+                        "/operation/sites?no=" + no + "&tab=survey"),
                 new Checklist.Item("CONTRACT", "生效合同", c != null,
                         c != null ? c.contractNo() : "站点没有生效中的合同", "/venues?tab=contracts&siteNo=" + no),
                 new Checklist.Item("LOCATION", "点位", nz(points) > 0,
-                        nz(points) > 0 ? points + " 个点位" : "还没有点位", "/sites/" + no + "?tab=locations"),
+                        nz(points) > 0 ? points + " 个点位" : "还没有点位", "/operation/sites?no=" + no + "&tab=points"),
                 new Checklist.Item("OPS_OWNER", "运维责任人", owner == null,
-                        owner == null ? "已指定" : owner, "/sites/" + no + "?tab=partners"),
+                        owner == null ? "已指定" : owner, "/operation/sites?no=" + no + "&tab=partners"),
                 new Checklist.Item("OPEN_HOURS", "营业时间", notBlank(e.getOpenHours()),
-                        notBlank(e.getOpenHours()) ? e.getOpenHours() : "未设置", "/sites/" + no + "?edit=1"),
+                        notBlank(e.getOpenHours()) ? e.getOpenHours() : "未设置", "/operation/sites?no=" + no + "&tab=basic"),
                 new Checklist.Item("DEVICE_LIVE", "设备上线", live > 0,
-                        live > 0 ? live + " 台已上线" : "还没有设备上线（首台上线后站点自动转营业）", "/devices?siteNo=" + no)));
+                        live > 0 ? live + " 台已上线" : "还没有设备上线（首台上线后站点自动转营业）", "/devices?tab=cabinets&siteNo=" + no)));
     }
 
     @Override
@@ -486,11 +486,11 @@ public class SiteServiceImpl implements SiteService {
         long inFlight = orders.inFlightCountBySites(List.of(no)).getOrDefault(no, 0L);
         return Checklist.of(List.of(
                 new Checklist.Item("NO_DEVICE", "设备已撤", devices == 0,
-                        devices == 0 ? "无设备" : "还有 " + devices + " 台设备", "/devices?siteNo=" + no),
+                        devices == 0 ? "无设备" : "还有 " + devices + " 台设备", "/devices?tab=cabinets&siteNo=" + no),
                 new Checklist.Item("NO_OPEN_WO", "工单已结", wos == 0,
-                        wos == 0 ? "无未结工单" : "还有 " + wos + " 张未结工单", "/work-orders?siteNo=" + no),
+                        wos == 0 ? "无未结工单" : "还有 " + wos + " 张未结工单", "/work-orders?view=list&siteNo=" + no),
                 new Checklist.Item("NO_IN_FLIGHT_ORDER", "订单已还", inFlight == 0,
-                        inFlight == 0 ? "无在借订单" : "还有 " + inFlight + " 笔在借订单", "/orders?siteNo=" + no)));
+                        inFlight == 0 ? "无在借订单" : "还有 " + inFlight + " 笔在借订单", "/orders?tab=list&siteNo=" + no)));
     }
 
     /** 运维责任人是否就位；就位返回 null，否则返回原因。 */

@@ -52,6 +52,10 @@ const LANG_LABEL: Record<NotifyTemplate["lang"], string> = { ar: "阿拉伯语",
 // 地区库定死三级：国家 → 城市/酋长国 → 商圈。层级名比数字 1/2/3 更能说明"这一层是什么"
 const REGION_LEVEL_LABEL: Record<number, string> = { 1: "国家", 2: "城市 / 酋长国", 3: "商圈" };
 
+/**
+ * @form POST /api/platform/notify-templates
+ * @form POST /api/platform/notify-templates/{templateNo}
+ */
 const NOTIFY_FIELDS: FieldDef[] = [
   { key: "templateNo", label: "模板号", readOnlyOnEdit: true, placeholder: "留空自动生成" },
   { key: "name", label: "名称", placeholder: "订单完成通知" },
@@ -64,6 +68,10 @@ const NOTIFY_FIELDS: FieldDef[] = [
   { key: "params", label: "变量名（逗号分隔）", placeholder: "userName,code", help: "预览/试发按此列出待填变量；漏声明的变量会被当成普通文字发出去" },
 ];
 
+/**
+ * @form POST /api/platform/dict-entries
+ * @form POST /api/platform/dict-entries/{dictNo}
+ */
 const DICT_FIELDS: FieldDef[] = [
   { key: "dictNo", label: "字典号", readOnlyOnEdit: true, placeholder: "留空自动生成" },
   { key: "group", label: "分组", placeholder: "order_status" },
@@ -77,6 +85,10 @@ const DICT_FIELDS: FieldDef[] = [
  * 地区库表单（S6）。**层级与上级名称都不给填**：选定上级后由 parentId 推出 level 与 parent，
  * 手填必然出现「level=3 但挂在国家下」这类自相矛盾的行，而树是靠这两个字段画出来的。
  */
+/**
+ * @form POST /api/platform/regions
+ * @form POST /api/platform/regions/{regionId}
+ */
 const regionFields = (options: { value: string; label: string }[]): FieldDef[] => [
   { key: "regionId", label: "区域 ID", readOnlyOnEdit: true, placeholder: "如 AE-RK（留空自动生成）" },
   { key: "name", label: "名称", required: true, maxLength: 40, placeholder: "哈伊马角" },
@@ -87,6 +99,10 @@ const regionFields = (options: { value: string; label: string }[]): FieldDef[] =
   { key: "cityCount", label: "城市数", type: "number", min: 0 },
 ];
 
+/**
+ * @form POST /api/platform/sys-params
+ * @form POST /api/platform/sys-params/{paramKey}
+ */
 const PARAM_FIELDS: FieldDef[] = [
   { key: "paramKey", label: "参数键", readOnlyOnEdit: true, placeholder: "order.timeout.minutes" },
   { key: "label", label: "说明", placeholder: "订单超时分钟数" },
@@ -95,6 +111,10 @@ const PARAM_FIELDS: FieldDef[] = [
 ];
 
 // 密钥类字段一律 password 型 + 掩码占位，前端永不承载真实密钥（真实值仅后端保管）
+/**
+ * @form POST /api/platform/payment-channels
+ * @form POST /api/platform/payment-channels/{channelCode}
+ */
 const PAYMENT_FIELDS: FieldDef[] = [
   { key: "channelCode", label: "渠道码", readOnlyOnEdit: true, placeholder: "NEARPAY / STRIPE / PAYPAL" },
   { key: "channelName", label: "渠道名称", placeholder: "NearPay（聚合收单）" },
@@ -108,24 +128,35 @@ const PAYMENT_FIELDS: FieldDef[] = [
   { key: "currencies", label: "币种", placeholder: "AED,SAR" },
   { key: "capabilities", label: "能力", placeholder: "支付,退款,预授权,分账" },
   { key: "apiBase", label: "API 基址", placeholder: "https://api.nearpay.example" },
-  { key: "merchantId", label: "商户号", placeholder: "MID-AE-100286" },
-  { key: "apiKeyMasked", label: "API 密钥（掩码）", type: "password", placeholder: "sk_test_****" },
-  // 多数支付网关是 key + secret 成对使用的，此前表单只有 key ——
-  // **渠道的 secret 从界面上根本配不了**，也看不出配没配。
-  { key: "apiSecretMasked", label: "API Secret（掩码）", type: "password", placeholder: "whsec_****" },
+  {
+    key: "merchantId", label: "商户号", placeholder: "MID-AE-100286",
+    help: "密钥不在这里配：明文走 KMS/vault 轮换（ADR-005），库里只存掩码供核对末四位，列表「密钥」列可读",
+  },
+  // 这里原本有 apiKeyMasked / apiSecretMasked 两个 password 输入框。
+  // **后端刻意不收**（PaymentChannelController 类注释：「入参即使带了明文密钥字段也无处可落
+  // —— 实体压根没有那个字段」，ChannelBody 里确实没有这两项）。
+  // 于是运营填进去、拿到 200、什么都没存，而列表里的掩码还是原来那个。
+  // 掩码是**出参**，不是入参：可读不可填，读的地方挪到列表那一列。
 ];
 
 // 国家码是业务主键（ISO alpha-2），新增必填、编辑只读
+/**
+ * @form POST /api/platform/markets
+ * @form POST /api/platform/markets/{countryCode}
+ */
 const MARKET_FIELDS: FieldDef[] = [
   { key: "countryCode", label: "国家码（ISO alpha-2）", readOnlyOnEdit: true, placeholder: "AE" },
   { key: "name", label: "国家名称", placeholder: "阿联酋" },
   { key: "currency", label: "币种", placeholder: "AED" },
   { key: "timezone", label: "时区", placeholder: "Asia/Dubai" },
   { key: "compliance", label: "合规主体", placeholder: "Neargo FZ-LLC / 筹备中 / 规划" },
-  { key: "cityCount", label: "开城数", type: "number" },
   { key: "status", label: "状态", type: "select", options: [{ value: "LIVE", label: "已开城" }, { value: "PILOT", label: "试点" }, { value: "PLANNED", label: "规划" }] },
 ];
 
+/**
+ * @form POST /api/platform/openapi-apps
+ * @form POST /api/platform/openapi-apps/{appNo}
+ */
 const OPENAPI_FIELDS: FieldDef[] = [
   { key: "appNo", label: "应用号", readOnlyOnEdit: true, placeholder: "留空自动生成" },
   { key: "name", label: "名称", placeholder: "合作方对接" },
@@ -176,6 +207,10 @@ const BL_CHANNEL_OPTIONS = [
   { value: "SMS", label: "短信" }, { value: "EMAIL", label: "邮件" }, { value: "PUSH", label: "Push" },
   { value: "WHATSAPP", label: "WhatsApp" }, { value: "ALL", label: "全渠道" },
 ];
+/**
+ * @form POST /api/platform/notify-blacklist
+ * @form POST /api/platform/notify-blacklist/{blockNo}
+ */
 const BLACKLIST_FIELDS: FieldDef[] = [
   { key: "blockNo", label: "拉黑号", readOnlyOnEdit: true, placeholder: "留空自动生成", section: "拉黑对象" },
   {
@@ -197,6 +232,10 @@ const BLACKLIST_FIELDS: FieldDef[] = [
 ];
 
 // —— §12 登录设置 ——
+/**
+ * @form POST /api/platform/login-settings
+ * @form POST /api/platform/login-settings/{country}
+ */
 const LOGIN_FIELDS: FieldDef[] = [
   {
     key: "country", label: "国家码", readOnlyOnEdit: true, required: true, section: "适用范围",
@@ -216,6 +255,10 @@ const LOGIN_FIELDS: FieldDef[] = [
 ];
 
 // —— §16 税率与发票 ——
+/**
+ * @form POST /api/platform/tax-settings
+ * @form POST /api/platform/tax-settings/{country}
+ */
 const TAX_FIELDS: FieldDef[] = [
   {
     key: "country", label: "国家码", required: true, readOnlyOnEdit: true, section: "适用范围", placeholder: "AE",
@@ -597,7 +640,12 @@ function SystemInner() {
     // 能力矩阵：决定能否走预授权（免押）与分账（场地方/代理商）
     { header: "能力", cell: (c) => <span className="text-muted-foreground">{c.capabilities}</span> },
     { header: "商户号", cell: (c) => <span className="text-muted-foreground tabular-nums">{c.merchantId}</span> },
-    { header: "密钥", cell: () => <span className="text-muted-foreground tabular-nums">****</span> },
+    {
+      // 此前这一列写死 `****`，与上面那个「密钥」徽标列同名且不带任何信息。
+      // 掩码本来就是为了给人核对末四位的（明文永不落前端），所以这里出真值。
+      header: "密钥掩码",
+      cell: (c) => <span className="text-muted-foreground tabular-nums">{c.apiKeyMasked || "—"}{c.apiSecretMasked ? ` / ${c.apiSecretMasked}` : ""}</span>,
+    },
     { header: "状态", cell: (c) => <EnabledBadge on={c.status === "ENABLED"} /> },
     { header: "更新时间", cell: (c) => <span className="text-muted-foreground">{fmtTime(c.updatedAt)}</span> },
     { header: "操作", cell: (c) => canPayment ? <Button size="sm" variant="outline" onClick={() => setPaymentForm(c)}>配置</Button> : <span className="text-muted-foreground">-</span> },
@@ -904,7 +952,7 @@ function SystemInner() {
             { header: "状态", value: (c) => (c.status === "ENABLED" ? "启用" : "停用") },
             { header: "更新时间", value: (c) => fmtTime(c.updatedAt) },
           ], (q.data?.list ?? []) as PaymentChannel[])}
-          onAdd={canPayment ? () => setPaymentForm({ mode: "DIRECT", status: "DISABLED", countries: "AE", currencies: "AED", capabilities: "支付,退款", apiBase: "", merchantId: "", apiKeyMasked: "sk_test_****" }) : undefined} addLabel="新增支付渠道" />
+          onAdd={canPayment ? () => setPaymentForm({ mode: "DIRECT", status: "DISABLED", countries: "AE", currencies: "AED", capabilities: "支付,退款", apiBase: "", merchantId: "" }) : undefined} addLabel="新增支付渠道" />
       )}
       {tab === "notify" && (
         <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); paging.reset(); }} searchPlaceholder="搜索模板号 / 名称"
@@ -975,7 +1023,7 @@ function SystemInner() {
             { header: "开城数", value: (m) => m.cityCount },
             { header: "状态", value: (m) => MARKET_STATUS[m.status].label },
           ], (q.data?.list ?? []) as MarketCountry[])}
-          onAdd={canMarket ? () => setMarketForm({ countryCode: "", name: "", currency: "AED", timezone: "Asia/Dubai", compliance: "规划", cityCount: 0, status: "PLANNED" }) : undefined} addLabel="新增国家市场" />
+          onAdd={canMarket ? () => setMarketForm({ countryCode: "", name: "", currency: "AED", timezone: "Asia/Dubai", compliance: "规划", status: "PLANNED" }) : undefined} addLabel="新增国家市场" />
       )}
 
       {tab === "notify-log" && (

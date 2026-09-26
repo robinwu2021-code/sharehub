@@ -101,7 +101,7 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
         boolean trial = c.getTrialPassedAt() != null && (c.getBoundAt() == null || !c.getTrialPassedAt().isBefore(c.getBoundAt()));
         String plan = pricing.planFor(c.getDeviceType() == null ? DeviceKind.POWERBANK.name() : c.getDeviceType(), no,
                 c.getLocationNo(), c.getSiteNo(), c.getAgentNo(), c.getVendorCode(), c.getModel());
-        String siteHref = c.getSiteNo() == null ? "/sites" : "/sites/" + c.getSiteNo();
+        String siteHref = c.getSiteNo() == null ? "/operation/sites" : "/operation/sites?no=" + c.getSiteNo();
         boolean qc = QcStatus.cleared(c.getQcStatus());
         // 勘测只卡「首台上线」：站点已在营业说明现场早验过了，存量站点不补勘测也能加柜
         boolean firstLive = site != null && "PREPARING".equals(site.status());
@@ -110,25 +110,25 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
         Load load = load(c);
         return Checklist.of(List.of(
                 new Checklist.Item("QC", "入库质检", qc, qc ? (c.getQcStatus() == null ? "存量设备免检" : "质检通过")
-                        : QcStatus.FAILED.name().equals(c.getQcStatus()) ? "质检不通过" : "未做入库质检", "/devices/" + no + "?tab=qc"),
+                        : QcStatus.FAILED.name().equals(c.getQcStatus()) ? "质检不通过" : "未做入库质检", "/devices/detail?no=" + no + "&tab=qc"),
                 new Checklist.Item("SURVEY", "现场勘测", survey,
                         !firstLive ? "站点已营业，免勘测" : site.surveyPassed() == null ? "站点首台上线须先做现场勘测" : survey ? "勘测通过" : "最近一次勘测不通过",
                         siteHref + "?tab=survey"),
                 new Checklist.Item("INSTALL_WO", "装机工单", installed, installed ? "装机工单已完工" : "没有已完工的装机工单",
-                        "/work-orders?type=INSTALL&cabinetNo=" + no),
-                new Checklist.Item("LOAD", "装宝比例", load.ok(), load.detail(), "/devices/" + no + "?tab=slots"),
+                        "/work-orders?view=list&type=INSTALL&cabinetNo=" + no),
+                new Checklist.Item("LOAD", "装宝比例", load.ok(), load.detail(), "/devices/detail?no=" + no + "&tab=slots"),
                 new Checklist.Item("LOCATION", "绑定点位", bound, bound ? c.getLocationName() : "未绑定点位或点位已归档",
-                        "/devices/" + no + "?edit=1"),
+                        "/devices/detail?no=" + no + "&tab=overview"),
                 new Checklist.Item("SITE_OPEN", "站点开放", siteOpen,
                         site == null ? "点位所属站点不存在" : siteOpen ? site.status() : "站点状态为 " + site.status() + "，不能上线新设备", siteHref),
                 new Checklist.Item("CONTRACT", "生效合同", contract != null,
                         contract != null ? contract.contractNo() : "站点没有生效中的合同", "/venues?tab=contracts&siteNo=" + c.getSiteNo()),
                 new Checklist.Item("ONLINE", "设备在线", online,
                         online ? "最近心跳 " + c.getLastHeartbeatAt() : hb == null ? "从未收到心跳" : "最近心跳 " + c.getLastHeartbeatAt() + "，已超过 "
-                                + ONLINE_WINDOW_MIN + " 分钟", "/devices/" + no),
+                                + ONLINE_WINDOW_MIN + " 分钟", "/devices/detail?no=" + no),
                 new Checklist.Item("TRIAL", "试借还", trial,
                         trial ? "通过于 " + c.getTrialPassedAt() : c.getTrialPassedAt() == null ? "未做试借还" : "换点位后需重做试借还",
-                        "/devices/" + no + "?tab=trial"),
+                        "/devices/detail?no=" + no + "&tab=trial"),
                 new Checklist.Item("PRICE", "计费方案", plan != null, plan != null ? plan : "该设备在此站点匹配不到生效的收费方案",
                         "/pricing")));
     }

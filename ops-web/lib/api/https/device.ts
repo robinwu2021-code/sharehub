@@ -7,12 +7,14 @@ import type { Checklist } from "../../types";
 import { POWERBANK_TRANSITIONS } from "../../types";
 
 /**
- * 后端门禁清单里的 `fixHref` 是**路径式**（`/devices/CAB1000?tab=qc`、`/sites/ST300?tab=survey`），
- * 而运营端是静态导出、详情一律 query 式（`/devices/detail?no=`、`/operation/sites?no=`）——
- * 原样渲染的话「去处理」全是 404，而门禁的意义恰恰是「告诉你去哪处理」。
+ * 门禁清单 `fixHref` 的兜底改写。
  *
- * 这里只做**已知形状的翻译**，认不出的原样返回（比吞掉链接好：至少看得见它指向哪）。
- * 根治应在后端按运营端路由出链接，见批次 5b 回报。
+ * <p>**2026-09-26 起后端已按运营端路由出链接**（`FixHrefRoutesTest` 逐条钉住页面与页签），
+ * 所以正常情况下这里什么都不做 —— 已是运营端路由的原样返回。
+ *
+ * <p>留着它是因为：后端一旦又写回路径式（`/devices/CAB1000?tab=qc`），界面上的表现是
+ * 「去处理」404，而那是点下去才知道的。这层把已知的旧形状继续翻译过来，
+ * 让那种回退**不至于直接砸到用户脸上** —— 但它不再是真源，真源在后端。
  */
 export function toOpsHref(href: string | null): string | null {
   if (!href) return href;

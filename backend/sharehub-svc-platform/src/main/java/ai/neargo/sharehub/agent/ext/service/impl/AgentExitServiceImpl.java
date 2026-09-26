@@ -116,19 +116,19 @@ public class AgentExitServiceImpl implements AgentExitService {
                 long wos = count("SELECT COUNT(*) FROM wo_order WHERE assignee_type = 'AGENT' AND assignee_name = ?"
                         + " AND status IN ('CREATED','DISPATCHED','ACCEPTED','PROCESSING')", ag);
                 yield Checklist.of(List.of(
-                        item("SITES", "站点已收回", sites, "个站点仍归属该代理", "/agents/" + ag + "?tab=assign"),
-                        item("SITE_ROLES", "站点责任已解除", roles, "条站点责任（运维 / 拓展）仍生效", "/agents/" + ag + "?tab=sites"),
-                        item("CABINETS", "设备已收回", cabs, "台机柜仍归属该代理", "/agents/" + ag + "?tab=assign"),
-                        item("WORK_ORDERS", "工单已转出", wos, "张未完结工单仍在它手上", "/work-orders?assignee=" + ag)));
+                        item("SITES", "站点已收回", sites, "个站点仍归属该代理", "/agents?tab=assign&no=" + ag),
+                        item("SITE_ROLES", "站点责任已解除", roles, "条站点责任（运维 / 拓展）仍生效", "/operation/sites?agentNo=" + ag),
+                        item("CABINETS", "设备已收回", cabs, "台机柜仍归属该代理", "/agents?tab=assign&no=" + ag),
+                        item("WORK_ORDERS", "工单已转出", wos, "张未完结工单仍在它手上", "/work-orders?view=list&assignee=" + ag)));
             }
             case SETTLING -> {
                 long shares = count("SELECT COUNT(*) FROM share_record WHERE deleted = 0 AND payee_type = 'AGENT' AND payee_no = ? AND status = 'PENDING'", ag);
                 long settles = count("SELECT COUNT(*) FROM stl_settlement WHERE deleted = 0 AND payee_no = ? AND status <> 'PAID'", ag);
                 long wds = count("SELECT COUNT(*) FROM stl_withdrawal WHERE payee_no = ? AND status IN ('APPLY','AUDIT','PAYING')", ag);
                 yield Checklist.of(List.of(
-                        item("SHARES", "分润已出账", shares, "条分润还没进结算单", "/finance/shares?payeeNo=" + ag),
-                        item("SETTLEMENTS", "结算单已付清", settles, "张结算单未付清", "/finance/settlements?payeeNo=" + ag),
-                        item("WITHDRAWALS", "提现已办结", wds, "笔提现在途", "/finance/withdrawals?payeeNo=" + ag)));
+                        item("SHARES", "分润已出账", shares, "条分润还没进结算单", "/finance?tab=records&payee=" + ag),
+                        item("SETTLEMENTS", "结算单已付清", settles, "张结算单未付清", "/finance?tab=settlements&payee=" + ag),
+                        item("WITHDRAWALS", "提现已办结", wds, "笔提现在途", "/finance?tab=withdrawals&payee=" + ag)));
             }
             case CLOSING -> Checklist.of(List.of(new Checklist.Item("READY", "可以关闭", true, "关闭将停用全部登录账号并归档代理", null)));
             case CLOSED -> Checklist.of(List.of(new Checklist.Item("CLOSED", "已清退", true, "清退完成于 " + e.getClosedAt(), null)));

@@ -62,7 +62,22 @@ class OrphanNotNullColumnTest {
     private DataSource dataSource;
 
     /** 实体字段 → 列名：驼峰转下划线；{@code @TableField("x")} 显式命名优先。 */
-    private static final Pattern TABLE_NAME = Pattern.compile("@TableName\\(\\s*\"(\\w+)\"");
+    /**
+     * {@code @TableName} 有三种写法，三种都要认：
+     * <pre>
+     *   @TableName("dict_item")                                    直接字符串
+     *   @TableName(value = "dict_item", excludeProperty = "...")   带 value =
+     *   @TableName(excludeProperty = "tenantId")                   连表名都没有（按类名推）
+     * </pre>
+     * <b>此前只认第一种。</b>同一个文件里的 {@code TABLE_FIELD} 是写了 {@code (?:value\s*=\s*)?} 的
+     * —— 作者为 {@code @TableField} 想到了这一层，{@code @TableName} 漏了。
+     * 后果是：用后两种写法的实体**整个被跳过**，它们的表被当成「没有实体的表」豁免，
+     * 于是本卡口对它们从来没生效过。实测漏掉 7 张（dict_item / md_region / md_bank /
+     * md_brand / md_market_country / dev_alarm_code / gw_vendor），
+     * 其中 dict_item 的「新建」一直是 500（dict_type 是 V13 改名留下的旧列，NOT NULL 无默认）。
+     */
+    private static final Pattern TABLE_NAME_ANNOTATION = Pattern.compile("@TableName\\(([^)]*)\\)");
+    private static final Pattern TABLE_NAME_VALUE = Pattern.compile("\"(\\w+)\"");
     private static final Pattern TABLE_FIELD = Pattern.compile("@TableField\\(\\s*(?:value\\s*=\\s*)?\"(\\w+)\"");
     private static final Pattern FIELD = Pattern.compile("private\\s+[\\w<>.\\[\\]]+\\s+(\\w+)\\s*;");
 
@@ -71,6 +86,26 @@ class OrphanNotNullColumnTest {
     void every_mandatory_column_is_mapped_by_its_entity() throws IOException, SQLException {
         Map<String, Set<String>> mapped = entityColumns();
         assertThat(mapped).as("应当扫描到实体；一个都没有说明扫描坏了").isNotEmpty();
+
+        /*
+         * 扫描面自测 —— 「非空」这一条太弱了：它在漏掉 7 个实体的情况下也是绿的。
+         *
+         * 实测代价：@TableName 的正则只认 `@TableName("x")`，于是写成
+         * `@TableName(value = "x", excludeProperty = ...)` 的实体**整个被跳过**，
+         * 它们的表被当成「没有实体的表」豁免。dict_item 就这么躲过去了 ——
+         * 它的 dict_type 是 V13 改名留下的 NOT NULL 旧列，「新建字典项」一直 500。
+         *
+         * 所以这里按三种写法各钉一张表。少了哪个，说明正则又收窄了：
+         *   ord_order        @TableName("ord_order")                        直接字符串
+         *   dict_item        @TableName(value = "dict_item", exclude...)    带 value =
+         *   md_bank          @TableName(excludeProperty = "tenantId")       无表名，按类名推
+         *
+         * **这一条也是上面那条主断言唯一能被负对照验到的地方**：V117 之后库里已无孤儿列，
+         * 把正则改回去主断言照样绿，只有这里会红。
+         */
+        assertThat(mapped.keySet())
+                .as("三种 @TableName 写法都要能扫到；漏掉哪种，那些表就被静默豁免了")
+                .contains("ord_order", "dict_item", "md_bank");
 
         Map<String, Set<String>> orphans = new TreeMap<>();
         try (Connection c = dataSource.getConnection();
@@ -112,9 +147,11 @@ class OrphanNotNullColumnTest {
                     .filter(f -> f.toString().contains("/src/main/java/"))
                     .filter(f -> !f.toString().contains("/target/")).toList()) {
                 String src = Files.readString(p, StandardCharsets.UTF_8);
-                Matcher t = TABLE_NAME.matcher(src);
+                Matcher t = TABLE_NAME_ANNOTATION.matcher(src);
                 if (!t.find()) continue;
-                Set<String> cols = out.computeIfAbsent(t.group(1), k -> new LinkedHashSet<>());
+                String table = tableNameOf(t.group(1), p);
+                if (table == null) continue;
+                Set<String> cols = out.computeIfAbsent(table, k -> new LinkedHashSet<>());
                 for (Matcher m = TABLE_FIELD.matcher(src); m.find(); ) cols.add(m.group(1));
                 for (Matcher m = FIELD.matcher(src); m.find(); ) cols.add(snake(m.group(1)));
                 // BaseEntity 的公共列由基类声明，子类文件里看不到
@@ -123,6 +160,26 @@ class OrphanNotNullColumnTest {
             }
         }
         return out;
+    }
+
+    /**
+     * 从 {@code @TableName(...)} 的参数里取表名。
+     *
+     * <p>参数里第一个字符串字面量就是表名 —— 唯一的例外是只写了
+     * {@code excludeProperty}（那个值是**属性名**不是表名），此时 MyBatis-Plus
+     * 按类名推表名，这里照同一规则推（{@code MdBank → md_bank}）。
+     */
+    private static String tableNameOf(String args, Path file) {
+        if (!args.contains("excludeProperty") || args.contains("value")) {
+            Matcher v = TABLE_NAME_VALUE.matcher(args);
+            if (v.find()) return v.group(1);
+        }
+        // args 里只有 excludeProperty：按类名推
+        if (args.contains("excludeProperty")) {
+            String cls = file.getFileName().toString().replace(".java", "");
+            return snake(cls);
+        }
+        return null;
     }
 
     private static String snake(String camel) {

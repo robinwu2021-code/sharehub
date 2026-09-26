@@ -170,6 +170,24 @@ def first_sentence(javadoc):
 
 # ─────────────────────────── 类型字典：record / enum ───────────────────────────
 
+def brace_body(src, open_idx):
+    """取 `{` 起的配对块内容（不含两端花括号）；不配对返回 None。
+
+    正则数不了嵌套，而类体里一定有方法体 —— 所以这一步必须真的配对计数。
+    """
+    if open_idx >= len(src) or src[open_idx] != '{':
+        return None
+    depth = 0
+    for i in range(open_idx, len(src)):
+        if src[i] == '{':
+            depth += 1
+        elif src[i] == '}':
+            depth -= 1
+            if depth == 0:
+                return src[open_idx + 1:i]
+    return None
+
+
 def scan_types():
     """全仓扫 record 与 enum，供出入参形状展开。
 
@@ -198,6 +216,25 @@ def scan_types():
                         fields.append({'name': bits[1].strip(), 'type': bits[0].strip()})
                 records[name] = fields
                 records['%s.%s' % (outer, name)] = fields
+
+            # 请求体也可以是**普通类**而不是 record（`ChannelBody` 这种
+            # `public static class` + 一堆公开字段）。只认 record 的话，
+            # 它的 requestShape 抽不出来，check-form-fields 就只能报「核不了」——
+            # 那张表单等于没人核对过。规则：类体里的公开字段就是它的形状；
+            # 方法忽略。**不覆盖同名 record**（record 是更准的那一份）。
+            for m in re.finditer(r'\bclass\s+(\w+)\b[^{;]*\{', src):
+                name = m.group(1)
+                body = brace_body(src, m.end() - 1)
+                if body is None:
+                    continue
+                fields = [{'name': fm.group(2), 'type': fm.group(1).strip()}
+                          for fm in re.finditer(
+                              r'public\s+(?!static\b|final\s+static\b)(?:final\s+)?'
+                              r'([\w.]+(?:<[^;>]*>)?(?:\[\])?)\s+(\w+)\s*(?:=[^;]*)?;', body)]
+                if not fields:
+                    continue
+                records.setdefault(name, fields)
+                records.setdefault('%s.%s' % (outer, name), fields)
 
             for m in re.finditer(r'\benum\s+(\w+)\s*\{([^}]*)\}', src, re.S):
                 vals = [v.strip().split('(')[0] for v in m.group(2).split(',')]

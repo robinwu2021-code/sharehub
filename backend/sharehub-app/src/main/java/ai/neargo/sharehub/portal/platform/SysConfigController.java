@@ -61,17 +61,42 @@ public class SysConfigController {
                 Map.of("groupCode", nz(groupCode), "enabled", nz(enabled)));
     }
 
+    /*
+     * 写操作收 **DTO 而不是实体**（B3 纪律，EntityRequestBodyRatchetTest 守着）。
+     *
+     * 这里还顺带修掉一个静默丢弃：读出参把 group_code 改名成 {@code group}
+     * （{@code DictItem} 的字段注释写着「前端 VO 里叫 group」），而写入面直接收实体、
+     * 要的是 {@code groupCode} —— 于是运营在「分组」那一格填什么都存不进去，
+     * 新建的字典项 group_code 为 null，列表里那一列空着，全程 200。
+     * 读写用同一个 DTO，这种改名就不可能只改一头。
+     */
     @PostMapping("/dict-entries")
     @PreAuthorize("@perm.can('system:dict:update')")
-    public DictEntry createDictEntry(@RequestBody DictItem body) {
-        return dictEntries.save(body);
+    public DictEntry createDictEntry(@RequestBody DictEntry body) {
+        return dictEntries.save(toEntity(body, body.dictNo()));
     }
 
     @PostMapping("/dict-entries/{dictNo}")
     @PreAuthorize("@perm.can('system:dict:update')")
-    public DictEntry updateDictEntry(@PathVariable String dictNo, @RequestBody DictItem body) {
-        body.setDictNo(dictNo);
-        return dictEntries.save(body);
+    public DictEntry updateDictEntry(@PathVariable String dictNo, @RequestBody DictEntry body) {
+        return dictEntries.save(toEntity(body, dictNo));   // 路径为准，防越权改他行
+    }
+
+    /**
+     * DTO → 实体。**只搬业务字段**：id/version/deleted/tenantId 一律由服务端掌握。
+     *
+     * <p>{@code group → groupCode} 就是这一层存在的理由。
+     * 三语标签（labelEn/labelAr）暂不在前端表单里，故不搬 —— 搬了会把已有值冲成 null。
+     */
+    private static DictItem toEntity(DictEntry in, String dictNo) {
+        DictItem e = new DictItem();
+        e.setDictNo(dictNo);
+        e.setGroupCode(in.group());
+        e.setCode(in.code());
+        e.setLabel(in.label());
+        e.setSort(in.sort());
+        e.setEnabled(in.enabled() == null ? null : (in.enabled() ? 1 : 0));
+        return e;
     }
 
     // —— 地区库（菜单叶：系统设置 › 基础字典 › 地区库）——

@@ -26,16 +26,6 @@ ops-web/app/operation/fee-plans/page.tsx::PLAN_FIELDS
 ops-web/app/operation/fee-plans/page.tsx::SCHEDULE_FIELDS
 ops-web/app/operation/sites/page.tsx::PAUSE_FIELDS
 ops-web/app/operation/sites/page.tsx::fieldsFor
-ops-web/app/system/page.tsx::BLACKLIST_FIELDS
-ops-web/app/system/page.tsx::DICT_FIELDS
-ops-web/app/system/page.tsx::LOGIN_FIELDS
-ops-web/app/system/page.tsx::MARKET_FIELDS
-ops-web/app/system/page.tsx::NOTIFY_FIELDS
-ops-web/app/system/page.tsx::OPENAPI_FIELDS
-ops-web/app/system/page.tsx::PARAM_FIELDS
-ops-web/app/system/page.tsx::PAYMENT_FIELDS
-ops-web/app/system/page.tsx::TAX_FIELDS
-ops-web/app/system/page.tsx::regionFields
 ops-web/app/users/page.tsx::BENEFIT_FIELDS
 ops-web/app/users/page.tsx::CARD_FIELDS
 ops-web/app/users/page.tsx::ISSUE_FIELDS
