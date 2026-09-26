@@ -1312,6 +1312,7 @@ type CmdDraft = { cabinetNo?: string; type?: string; slotIndex?: number | string
 
 /**
  * @form POST /api/ops/cabinets/{cabinetNo}/commands
+ * @form-synthetic slotIndex 表单级字段，提交时打包进 params 下发给设备网关（见 submitCommand），不是顶层键
  */
 const commandFields = (cabinets: Cabinet[], typeHint: string): FieldDef[] => [
   { key: "cabinetNo", label: "机柜", type: "select", required: true,

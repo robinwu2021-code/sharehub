@@ -52,6 +52,17 @@ public final class DevLegacyDtos {
     public record Slot(int slotIndex, String powerbankNo, Integer battery, String lockStatus, String health) {
     }
 
+    /**
+     * 单柜指令下发入参。
+     *
+     * <p>{@code params} 有意仍是 Map：它**原样转发给设备网关**，每种指令要的参数不同
+     * （弹仓要 {@code slotIndex}、其它指令不要），在这里逐指令建类型等于把网关协议抄一遍。
+     * 但**请求体本身必须有类型** —— 原先整个 body 是裸 Map，连 {@code type} 都说不出来，
+     * 于是契约抽取拿不到 requestShape，卡口全盲。见 {@code known-map-request-bodies.txt}。
+     */
+    public record CommandReq(String type, java.util.Map<String, Object> params) {
+    }
+
     public record CommandResult(String commandId) {
     }
 

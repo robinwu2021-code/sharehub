@@ -89,6 +89,18 @@ public final class UserCoreDtos {
      * 运营端拿它做列表，第一列「是谁申请的」就填不出来。
      * 同一个 DTO 服务两个受众的代价已经在订单那边付过一次（见 {@code MpTradeDtos} 类注释）。
      */
+    /**
+     * 开票入参。原先是裸 {@code Map<String, String>} —— 那种签名说不出它认哪些键，
+     * 抽不出 requestShape，靠它核对「表单发的键后端接不接得住」的卡口就是全盲的。
+     * 见 {@code known-map-request-bodies.txt}。
+     */
+    public record InvoiceIssueReq(String fileUrl) {
+    }
+
+    /** 驳回入参。{@code reason} 必填由 service 校验 —— 只说「已驳回」等于让用户无从改正后重提。 */
+    public record InvoiceRejectReq(String reason) {
+    }
+
     public record CUserInvoiceRow(String invoiceNo, String cUserNo, String nickname,
                                   String titleNo, String title, BigDecimal amount, String currency,
                                   String status, String fileUrl, String rejectReason,

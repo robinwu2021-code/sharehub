@@ -5,6 +5,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import ai.neargo.sharehub.dev.service.CabinetService;
 import ai.neargo.sharehub.wo.dto.WoDtos.WorkOrder;
 import ai.neargo.sharehub.dev.dto.DevLegacyDtos.Cabinet;
+import ai.neargo.sharehub.dev.dto.DevLegacyDtos.CommandReq;
 import ai.neargo.sharehub.dev.dto.DevLegacyDtos.CabinetDetail;
 import ai.neargo.sharehub.dev.dto.DevLegacyDtos.CommandResult;
 import ai.neargo.sharehub.loc.dto.LocDtos.Site;
@@ -89,9 +90,12 @@ public class OpsController {
 
     @PostMapping("/cabinets/{cabinetNo}/commands")
     @PreAuthorize("@perm.can('device:command:send')")
-    public CommandResult sendCommand(@PathVariable String cabinetNo, @RequestBody(required = false) Map<String, Object> body) {
-        String type = body == null ? null : String.valueOf(body.get("type"));
-        return cabinetService.sendCommand(cabinetNo, type, body);
+    public CommandResult sendCommand(@PathVariable String cabinetNo,
+                                     @RequestBody(required = false) CommandReq body) {
+        // 原先传的是整个 body（含 type 那一层）。params 才是给网关的载荷，
+        // 把外层信封一起转发是顺手而不是有意 —— 骨架实现忽略它，所以一直没人发现。
+        return cabinetService.sendCommand(cabinetNo, body == null ? null : body.type(),
+                body == null ? null : body.params());
     }
 
     // —— 工单（MariaDB 持久化，经 WorkOrderService）——

@@ -27,12 +27,6 @@ ConsumerAuthController#register
 ConsumerAuthController#resetPassword
 DeviceController#confirmLost
 DeviceController#dismissLost
-FinanceController#buyoutDeposit
-FinanceController#dunDeposit
-FinanceController#generateSettlements
-FinanceController#generateSettlementsPublic
-FinanceController#resolveRecon
-FinanceController#voidInvoice
 IamAdminController#setRolePermissions
 MarketingController#finishPushMessage
 MarketingController#issueCoupon
@@ -46,7 +40,6 @@ OperationController#saveAdjustment
 OpsController#dispatch
 OpsController#importCabinets
 OpsController#saveCabinet
-OpsController#sendCommand
 OwnershipInternalController#byLocations
 OwnershipInternalController#cabinet
 RentController#depositFree
@@ -54,6 +47,4 @@ RentController#pay
 RentController#rent
 TradeInternalController#returnOrder
 UserController#blacklist
-UserOpsController#issueCUserInvoice
-UserOpsController#rejectCUserInvoice
 VendorController#saveConfig

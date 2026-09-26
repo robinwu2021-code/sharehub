@@ -15,6 +15,8 @@ import ai.neargo.sharehub.user.asset.service.RechargeOrderService;
 import ai.neargo.sharehub.user.asset.service.RechargePackageService;
 import ai.neargo.sharehub.user.asset.service.WalletService;
 import ai.neargo.sharehub.user.core.dto.UserCoreDtos.CUserInvoiceRow;
+import ai.neargo.sharehub.user.core.dto.UserCoreDtos.InvoiceIssueReq;
+import ai.neargo.sharehub.user.core.dto.UserCoreDtos.InvoiceRejectReq;
 import ai.neargo.sharehub.user.core.dto.UserCoreDtos.FreeUserWhitelist;
 import ai.neargo.sharehub.user.core.dto.UserCoreDtos.LogoffItem;
 import ai.neargo.sharehub.user.core.dto.UserCoreDtos.UserBlacklist;
@@ -374,17 +376,17 @@ public class UserOpsController {
     @PostMapping("/cuser-invoices/{invoiceNo}/issue")
     @PreAuthorize("@perm.can('user:invoice:handle')")
     public CUserInvoiceRow issueCUserInvoice(@PathVariable String invoiceNo,
-                                             @RequestBody(required = false) Map<String, String> body) {
-        String fileUrl = body == null ? null : body.get("fileUrl");
-        return cuserInvoices.issue(invoiceNo, fileUrl, StaffContext.require().userNo());
+                                             @RequestBody(required = false) InvoiceIssueReq body) {
+        return cuserInvoices.issue(invoiceNo, body == null ? null : body.fileUrl(),
+                StaffContext.require().userNo());
     }
 
     /** 驳回：原因必填 —— 只说「已驳回」等于让用户无从改正后重提。 */
     @PostMapping("/cuser-invoices/{invoiceNo}/reject")
     @PreAuthorize("@perm.can('user:invoice:handle')")
     public CUserInvoiceRow rejectCUserInvoice(@PathVariable String invoiceNo,
-                                              @RequestBody(required = false) Map<String, String> body) {
-        String reason = body == null ? null : body.get("reason");
-        return cuserInvoices.reject(invoiceNo, reason, StaffContext.require().userNo());
+                                              @RequestBody(required = false) InvoiceRejectReq body) {
+        return cuserInvoices.reject(invoiceNo, body == null ? null : body.reason(),
+                StaffContext.require().userNo());
     }
 }
