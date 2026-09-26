@@ -33,14 +33,26 @@ OwnershipInternalController#cabinet
 TradeInternalController#returnOrder
 VendorController#saveConfig
 
-# ⚠️ 2026-09-26 换 record 时查明、**未修**（要先拍板）：C 端认证的 countryCode 从不参与身份派生。
-# c-app 每次都发 {countryCode: "+971", phone: "501234567"} 两个字段，而后端只拿 phone 当键：
-# OtpService 的码表按它索引，PhoneOtpStrategy 的 uid = sha256(phone) 也按它派生 ——
-# 于是 **+971 501234567 与 +966 501234567 是同一个 OTP、同一个账号**（钱包/订单/券/押金共用）。
-# PhoneOtpStrategy 里那句「// 生产：E.164 归一」是没有实现的意图，实际只有 .trim()。
-# 修法是把 uid 改成按 E.164 派生，而 uid 就是账号身份 —— 等于给存量账号改身份，
-# 要先定迁移方式（惰性重键 / 双读回落 / 停机重算）。
-# 现状已由 ConsumerPhoneIdentityTest 钉住：身份改好之后那条会红，届时连本段一起删。
+# 2026-09-26 换 record 时查明的 C 端手机号身份问题，**已修掉两件、剩一件要拍板**：
+#
+# ✅ 已修（同日）：PhoneOtpStrategy 自带的那套 sha256(phone.trim()) 换成公共的
+#    IdentifierNormalizer + IdentifierHasher —— 与员工侧同一个方法（ADR-030 §4.1）。
+#    它此前同时犯了那两个类 javadoc 明确写着要避免的两件事：
+#      · 不归一 → 0501234567 / +971501234567 / 00971501234567 是三个账号，
+#        失败形态是「注册能成、登录查不到」，不报任何错；
+#      · 裸哈希 → 手机号取值空间穷举得完，无 pepper 等于明文存库（而 pepper 是强制配置项）。
+#    存量账号靠**惰性重键**认领（旧 uid 查到就地改写），不需要停机也不需要迁移脚本 ——
+#    旧 uid 是 hash(原始输入)，而原始输入没存下来，只有用户本人再登录时才同时拿到两者。
+#    见 ConsumerPhoneNormalizationTest（3 条，含负对照）。
+#
+# ⚠️ 未修（要先拍板）：countryCode 仍不参与派生。区号来自 phone 自带（+971…）或
+#    default-calling-code 补全，所以 +971 501234567 与 +966 501234567 仍是同一个账号
+#    （钱包/订单/券/押金共用），而 md_market_country 与充值套餐的「适用市场」都是为多市场建的。
+#    为什么不顺手改：让 countryCode 参与派生会**破掉惰性重键的唯一性** ——
+#    两个区号的旧 uid 是同一个 sha256("501234567")，两个人会争抢同一条历史行、
+#    把账号在彼此之间来回搬，比现在的共用更糟。所以它需要先回答：
+#    **存量里真有跨市场撞号的账号时，那条历史行归谁？**
+#    现状由 ConsumerPhoneIdentityTest 钉住：区号参与派生之后那条会红，届时连本段一起删。
 
 # ✅ 2026-09-26 判定为**正当例外，不要转**：
 #   VendorController#saveConfig —— 服务里用 `body.containsKey("apiBase")` 区分

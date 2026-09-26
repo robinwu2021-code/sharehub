@@ -22,6 +22,23 @@ public class LocalNotifyPort implements NotifyPort {
     }
 
     @Override
+    public Delivery sendToTarget(String target, String channel, String scene, String content) {
+        if (target == null || target.isBlank()) return new Delivery(false, "NO_TARGET");
+        String ch = channel == null ? "SMS" : channel.trim().toUpperCase();
+        if (!"SMS".equals(ch) && !"EMAIL".equals(ch)) return new Delivery(false, "UNSUPPORTED_CHANNEL");
+        // 掩码当号码发是发不出去的，且会在流水里留下一条看似成功的记录（同 send 的理由）
+        if (target.contains("*")) return new Delivery(false, "MASKED_ONLY");
+        try {
+            var r = sender.send(new SendReq(ch, null, target, scene, content, null, null));
+            return r.blocked() ? new Delivery(false, "BLACKLISTED") : new Delivery(true, null);
+        } catch (RuntimeException ex) {
+            // 不打 target：手机号属敏感信息（CLAUDE.md 日志规范），scene 足以定位
+            log.warn("按联系方式投递失败 channel={} scene={}，业务已生效、仅通知缺失", ch, scene, ex);
+            return new Delivery(false, "SEND_ERROR");
+        }
+    }
+
+    @Override
     public Delivery send(String targetNo, String channel, String scene, String content) {
         if (targetNo == null || targetNo.isBlank()) return new Delivery(false, "NO_TARGET");
         String ch = channel == null ? "PUSH" : channel.trim().toUpperCase();

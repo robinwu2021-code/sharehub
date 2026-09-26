@@ -49,7 +49,8 @@ public class UserCouponServiceImpl implements UserCouponService {
     public ai.neargo.sharehub.user.marketing.dto.MarketingDtos.CouponIssueResultVO issueToAudience(
             String tplNo, String targetType, String targetValue, Integer quantity) {
         String type = targetType == null || targetType.isBlank() ? "ALL" : targetType.trim().toUpperCase();
-        if (!"USER_LIST".equals(type)) {
+        if (ai.neargo.sharehub.user.marketing.CouponAudience.parse(type)
+                != ai.neargo.sharehub.user.marketing.CouponAudience.USER_LIST) {
             // 显式拒绝，不发 0 张 —— 后端没有「人群 → 用户列表」的解析（连 mkt_segment 表都没有）。
             // 发 0 张 + 200 是最坏的选择：运营以为发出去了，而券一张也没到用户手里。
             throw BizException.badRequest("error.coupon.audience_unsupported", type);
@@ -81,7 +82,7 @@ public class UserCouponServiceImpl implements UserCouponService {
         rec.setTenantId(TENANT_MAIN);
         rec.setCouponNo(tplNo);
         rec.setCouponName(tpl.getName());
-        rec.setTargetType("USER_LIST");
+        rec.setTargetType(ai.neargo.sharehub.user.marketing.CouponAudience.USER_LIST.name());
         rec.setTargetDesc("指定用户号（" + users.size() + " 人）");
         rec.setQuantity(issued.size());
         rec.setOperatorName(ai.neargo.sharehub.auth.SecurityUtils.currentUser()

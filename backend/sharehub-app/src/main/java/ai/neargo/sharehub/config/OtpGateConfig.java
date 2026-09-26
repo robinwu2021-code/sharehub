@@ -21,7 +21,11 @@ public class OtpGateConfig {
     @Bean
     public OtpGate otpGate(OtpService otpService) {
         return new OtpGate() {
-            @Override public String issue(String normalizedPhone) { return otpService.issue(normalizedPhone); }
+            // scene=login：代理侧这个端口目前只用于登录（入驻申请也是「验本人手机号」）。
+            // 两处都传归一后的值，OtpService 不会再归一一次（那个方法不幂等，见其 @param phone）。
+            @Override public String issue(String normalizedPhone) {
+                return otpService.issue(normalizedPhone, "login").code();
+            }
             @Override public void verify(String normalizedPhone, String otp) { otpService.verify(normalizedPhone, otp); }
         };
     }

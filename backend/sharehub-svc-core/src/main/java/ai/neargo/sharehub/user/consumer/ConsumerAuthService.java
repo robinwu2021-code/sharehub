@@ -28,6 +28,8 @@ import java.util.stream.Collectors;
 @Service
 public class ConsumerAuthService {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ConsumerAuthService.class);
+
     private final Map<String, ConsumerLoginStrategy> strategies;
     private final UsrUserMapper userMapper;
     private final UsrIdentityMapper identityMapper;
@@ -75,6 +77,15 @@ public class ConsumerAuthService {
             if (existing != null) {
                 return new Upsert(byNo(existing.getCUserNo()), false);   // 1) 同渠道同 uid
             }
+            UsrIdentity legacy = byLegacyUid(tenant, id);
+            if (legacy != null) {
+                // 1b) 旧算法命中 → 就地重键。不新建、不归并：这本来就是同一个人。
+                legacy.setProviderUid(id.providerUid());
+                legacy.setUnionKey(id.unionKey());
+                identityMapper.updateById(legacy);
+                log.info("登录标识重键 provider={} cUserNo={}", id.provider(), legacy.getCUserNo());
+                return new Upsert(byNo(legacy.getCUserNo()), false);
+            }
             UsrIdentity merged = identityMapper.selectOne(new LambdaQueryWrapper<UsrIdentity>()
                     .eq(UsrIdentity::getTenantId, tenant)
                     .eq(UsrIdentity::getUnionKey, id.unionKey()).last("limit 1"));
@@ -98,13 +109,39 @@ public class ConsumerAuthService {
         });
     }
 
+    /**
+     * 按**旧算法**的 uid 找那条历史行（惰性重键的唯一入口）。
+     *
+     * <p>为什么不写迁移脚本：旧 uid 是 {@code hash(原始输入)}，而原始输入没有存下来 ——
+     * 库里只有 hash，离线算不出「这一行对应哪个归一后的号码」。只有用户本人再登录一次时
+     * 才同时拿到两者，所以重键只能发生在这一刻。
+     *
+     * <p>{@code legacyUid == null}（其余渠道，算法从未变过）直接跳过。
+     */
+    private UsrIdentity byLegacyUid(String tenant, ResolvedIdentity id) {
+        if (id.legacyUid() == null || id.legacyUid().isBlank()) {
+            return null;
+        }
+        return identityMapper.selectOne(new LambdaQueryWrapper<UsrIdentity>()
+                .eq(UsrIdentity::getTenantId, tenant)
+                .eq(UsrIdentity::getProvider, id.provider().name())
+                .eq(UsrIdentity::getProviderUid, id.legacyUid()).last("limit 1"));
+    }
+
     private String createUser(String tenant, ResolvedIdentity id) {
         UsrUser u = new UsrUser();
         u.setCUserNo("CU" + UUID.randomUUID().toString().replace("-", "").substring(0, 14));
         u.setTenantId(tenant);
         boolean wechat = id.provider() == Provider.WECHAT_MP || id.provider() == Provider.WECHAT_OA;
         u.setOpenid(wechat ? id.providerUid() : null);
-        u.setUnionid(id.unionKey());
+        /*
+         * unionid 与 openid 同样**只对微信渠道有意义**（V4 的列注释：「唯一性移交 usr_identity；
+         * openid/unionid 仅主渠道冗余展示」）。此前无条件写 unionKey，于是手机号渠道往这列塞
+         * 'PHONE:<hash>' —— 一个没有任何代码会读的合成值，而 uid 变长到 64 位后
+         * 它就是 70 字符、超过 VARCHAR(64)，登录直接 500。归并靠的是 usr_identity.union_key，
+         * 不是这列。
+         */
+        u.setUnionid(wechat ? id.unionKey() : null);
         u.setNickname(id.nickname());
         u.setAvatar(id.avatar());
         u.setCreditScore(600);

@@ -1,7 +1,9 @@
 package ai.neargo.sharehub.user.consumer;
 
+import ai.neargo.sharehub.api.platform.port.NotifyPort;
 import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.auth.DevMode;
+import ai.neargo.sharehub.identity.IdentifierNormalizer;   // javadoc 引用
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -19,6 +21,18 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>四条约束（都可配，见 {@code sharehub.auth.otp.*}）：有效期、重发间隔、单码最多校验次数、
  * 校验成功即失效。内存实现的已知边界：进程重启丢失、多实例不共享 —— 止血够用，落库属 A3。
+ *
+ * <p><b>2026-09-26 投递</b>：此前本类**只生成码、从不投递** —— 生产不回传码（对的），
+ * 又没有任何一处把码交给短信通道，于是 C 端登录在线上是彻底走不通的死路（而不是「差个渠道商」）。
+ * 现在发码即经 {@link NotifyPort#sendToTarget} 走通知唯一正门（黑名单在那里统一拦）。
+ *
+ * <p>⚠️ 边界：通道商尚未对接（{@code NotifySendServiceImpl} 的 {@code TODO(接入层)} 之后
+ * 无条件置 {@code SENT}），所以 {@code delivered=true} 目前只表示「已交给正门且未被黑名单拦」，
+ * <b>不表示用户真收到了</b>。这条边界在接入层落地后自动消失，不需要改这里。
+ *
+ * <p>码表的键是**归一后**的手机号（{@link IdentifierNormalizer#phone}），与
+ * {@link PhoneOtpStrategy} 算 uid 用的是同一个方法 —— 否则「按 0501… 发码、按 +971501… 登录」
+ * 会撞出一句无从解释的「验证码错误」。
  */
 @Service
 public class OtpService {
@@ -30,10 +44,25 @@ public class OtpService {
     private static final int CODE_BOUND = 1_000_000;          // 6 位十进制的上界
     private static final SecureRandom RANDOM = new SecureRandom();
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(OtpService.class);
+
     private final DevMode devMode;
+    private final NotifyPort notify;
     private final Duration ttl;
     private final Duration resendInterval;
     private final int maxAttempts;
+    private final String smsTemplate;
+
+    /**
+     * 一次发码的结果。
+     *
+     * @param phone     归一后的手机号（调用方要再用它时别用原始输入）
+     * @param code      码本身；**只允许 dev-mode 回传给端上**，见 {@code ConsumerAuthController}
+     * @param delivered 是否已交给通知正门（见类注释的 ⚠️ 边界）
+     * @param reason    未投递的原因（{@code UNSUPPORTED_CHANNEL}/{@code BLACKLISTED}/…），已投递则 null
+     */
+    public record Issued(String phone, String code, boolean delivered, String reason) {
+    }
 
     private final ConcurrentHashMap<String, Entry> codes = new ConcurrentHashMap<>();
 
@@ -49,25 +78,37 @@ public class OtpService {
         }
     }
 
-    public OtpService(DevMode devMode,
+    public OtpService(DevMode devMode, NotifyPort notify,
                       @Value("${sharehub.auth.otp.ttl:5m}") Duration ttl,
                       @Value("${sharehub.auth.otp.resend-interval:60s}") Duration resendInterval,
-                      @Value("${sharehub.auth.otp.max-attempts:5}") int maxAttempts) {
+                      @Value("${sharehub.auth.otp.max-attempts:5}") int maxAttempts,
+                      @Value("${sharehub.auth.otp.sms-template:Your ShareHub verification code is {code}. It expires in 5 minutes.}")
+                      String smsTemplate) {
         this.devMode = devMode;
+        this.notify = notify;
+        this.smsTemplate = smsTemplate;
         this.ttl = ttl;
         this.resendInterval = resendInterval;
         this.maxAttempts = maxAttempts;
     }
 
     /**
-     * 发码。dev-mode 下发固定码便于联调，否则发真随机码。
+     * 发码并投递。dev-mode 下发固定码便于联调，否则发真随机码。
      *
-     * <p>返回值只供**调用方决定是否展示**（见 {@code ConsumerAuthController}：仅 dev-mode 回传）；
-     * 生产应由短信通道送达，接口不回传。
+     * <p><b>投递失败会把刚存的码删掉</b>，这一步不是"顺手清理"而是必需的：码留在表里，
+     * {@code resend-interval} 就会把用户锁在「重发太频繁」上 60 秒，去等一条永远不会到的短信 ——
+     * 一个既收不到码、又不让重试的死局。删掉之后用户可以立刻重试。
      *
+     * @param phone <b>必须是 {@link IdentifierNormalizer#phone} 的输出</b>，与 {@link #verify}
+     *              和 {@code PhoneOtpStrategy} 算 uid 用的是同一个值。
+     *              ⚠️ 本方法<b>不能</b>顺手再归一一次 —— {@code phone()} 不是幂等的：
+     *              它的输出（{@code 971501234567}，不带 {@code +}）再喂回去会被当成本地号
+     *              二次补区号成 {@code 971971501234567}，长度 15 仍在 E.164 上限内、
+     *              <b>不报任何错</b>。代理侧（{@code OtpGate}）传进来的本来就是归一后的值。
+     * @param scene login / register / reset，进模板号 {@code OTP_<scene>}，落 notify_log 便于分场景统计
      * @throws IllegalStateException 距上次发码不足 {@code resend-interval}
      */
-    public String issue(String phone) {
+    public Issued issue(String phone, String scene) {
         Instant now = Instant.now();
         Entry prev = codes.get(phone);
         if (prev != null && now.isBefore(prev.issuedAt.plus(resendInterval))) {
@@ -75,7 +116,17 @@ public class OtpService {
         }
         String code = devMode.isEnabled() ? DEV_MASTER : randomCode();
         codes.put(phone, new Entry(code, now));
-        return code;
+
+        String sc = (scene == null || scene.isBlank()) ? "login" : scene.trim().toLowerCase();
+        NotifyPort.Delivery d = notify.sendToTarget(
+                phone, "SMS", "OTP_" + sc, smsTemplate.replace("{code}", code));
+        if (!d.sent()) {
+            codes.remove(phone);   // 见上：不删就是「收不到又不让重试」
+            // 不打 phone/code：手机号与令牌都属敏感信息（CLAUDE.md 日志规范）。
+            // 运维动作：查 notify_log 的 OTP_* 场景与渠道商状态 —— 该场景全量失败则 C 端登录已中断。
+            log.error("OTP 投递失败 scene={} reason={}，该手机号本次无法登录", sc, d.reason());
+        }
+        return new Issued(phone, code, d.sent(), d.reason());
     }
 
     /**

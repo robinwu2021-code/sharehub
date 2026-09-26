@@ -21,13 +21,16 @@ public class ConsumerAuthController {
     private final OtpService otpService;
     private final TokenStore tokenStore;
     private final DevMode devMode;
+    private final ai.neargo.sharehub.identity.IdentifierNormalizer normalizer;
 
     public ConsumerAuthController(ConsumerAuthService authService, OtpService otpService,
-                                  TokenStore tokenStore, DevMode devMode) {
+                                  TokenStore tokenStore, DevMode devMode,
+                                  ai.neargo.sharehub.identity.IdentifierNormalizer normalizer) {
         this.authService = authService;
         this.otpService = otpService;
         this.tokenStore = tokenStore;
         this.devMode = devMode;
+        this.normalizer = normalizer;
     }
 
     /** 统一登录：grantType 分发（phone_otp/wechat_miniapp/wechat_oauth/apple/google）。 */
@@ -50,13 +53,18 @@ public class ConsumerAuthController {
         if (phone == null || phone.isBlank()) {
             throw new IllegalArgumentException("手机号为空");
         }
-        // ⚠️ countryCode / scene 收进契约了但**仍未参与计算** —— 见 OtpReq 的注释：
-        // 码表与 uid 都只按 phone 派生，+971 与 +966 的同号是同一个账号、同一个码。
-        // 修它要改 uid 的组成（给存量账号改身份），属于要先拍板的迁移，不在本次。
-        String code = otpService.issue(phone.trim());
+        // 归一在这里做（与代理侧 AgentLoginServiceImpl / ApplyServiceImpl 同一个方法），
+        // 之后整条链路（码表键、uid）用的都是它的输出 —— ADR-030 §4.1。
+        // countryCode 仍不参与计算：区号已经由 phone 自带（+971…）或由 default-calling-code 补全，
+        // 再引入一个来源就会出现「两个都填且不一致」这种没有正确答案的输入。
+        String normalized = normalizer.phone(phone);
+        OtpService.Issued issued = otpService.issue(normalized, body.scene());
+        // sent 如实回传投递结果：投递失败时码已作废，端上该提示重试而不是等短信。
         return devMode.isEnabled()
-                ? Map.of("sent", true, "devCode", code)
-                : Map.of("sent", true);
+                ? Map.of("sent", issued.delivered(), "reason", issued.reason() == null ? "" : issued.reason(),
+                         "devCode", issued.code())
+                : (issued.delivered() ? Map.of("sent", true)
+                                      : Map.of("sent", false, "reason", issued.reason()));
     }
 
     /**
@@ -71,7 +79,7 @@ public class ConsumerAuthController {
         String otp = body == null ? null : body.otp();
         if (phone == null || phone.isBlank()) throw new IllegalArgumentException("手机号为空");
         if (otp == null || otp.isBlank()) throw new IllegalArgumentException("验证码为空");
-        ConsumerLoginReq req = new ConsumerLoginReq("phone_otp", null, phone.trim(), otp.trim(),
+        ConsumerLoginReq req = new ConsumerLoginReq("phone_otp", null, phone, otp.trim(),
                 body.countryCode(), null, null, null, null, null,
                 body.nickname(), null);
         ConsumerLoginVO vo = authService.login(req);

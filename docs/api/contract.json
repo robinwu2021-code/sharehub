@@ -16446,7 +16446,7 @@
      "required": true
     }
    ],
-   "bodyType": "Map<String, String>",
+   "bodyType": "ai.neargo.sharehub.dev.dto.DevDtos.LostVerdictReq",
    "returnType": "PowerbankRow",
    "returnContainer": null,
    "returnElement": "PowerbankRow",
@@ -16504,7 +16504,12 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "note",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -16523,7 +16528,7 @@
      "required": true
     }
    ],
-   "bodyType": "Map<String, String>",
+   "bodyType": "ai.neargo.sharehub.dev.dto.DevDtos.LostVerdictReq",
    "returnType": "PowerbankRow",
    "returnContainer": null,
    "returnElement": "PowerbankRow",
@@ -16581,7 +16586,12 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "note",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -28963,12 +28973,17 @@
      "required": true
     }
    ],
-   "bodyType": "java.util.Map<String, Object>",
+   "bodyType": "ai.neargo.sharehub.platform.notify.dto.NotifyDtos.NotifyTemplatePreviewReq",
    "returnType": "Object",
    "returnContainer": null,
    "returnElement": "Object",
    "responseShape": null,
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "vars",
+     "type": "java.util.Map<String, String>"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -42659,7 +42674,7 @@
    "handler": "UserController#blacklist",
    "summary": "内部拉黑/解除。",
    "params": [],
-   "bodyType": "Map<String, Object>",
+   "bodyType": "ai.neargo.sharehub.user.core.dto.UserCoreDtos.BlacklistReq",
    "returnType": "OkResult",
    "returnContainer": null,
    "returnElement": "OkResult",
@@ -42669,7 +42684,20 @@
      "type": "boolean"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "cUserNo",
+     "type": "String"
+    },
+    {
+     "name": "blacklisted",
+     "type": "Boolean"
+    },
+    {
+     "name": "reason",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "GET",
@@ -45188,6 +45216,10 @@
    "RUNNING",
    "PAUSED"
   ],
+  "CouponAudience": [
+   "ALL",
+   "SEGMENT"
+  ],
   "AudienceType": [
    "ALL",
    "MEMBER_LEVEL",
@@ -45606,7 +45638,7 @@
  ],
  "stats": {
   "endpoints": 515,
-  "records": 461,
+  "records": 465,
   "withPerm": 444,
   "withBody": 219,
   "shapedResponses": 406

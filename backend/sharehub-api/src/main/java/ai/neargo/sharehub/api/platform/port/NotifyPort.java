@@ -20,6 +20,20 @@ public interface NotifyPort {
      */
     Delivery send(String targetNo, String channel, String scene, String content);
 
+    /**
+     * 直接发给一个**联系方式**（不是业务号）—— C 端验证码这类「收件人还不是系统里的人」的场景。
+     *
+     * <p>{@link #send} 解决不了这个：它按 {@code targetNo} 去 {@code iam_employee} 查联系方式，
+     * 非员工返回 {@code NOT_EMPLOYEE}。而 OTP 的收件人是一个**尚未注册**的手机号。
+     *
+     * <p>仍然走 {@code NotifySendService} 这道唯一正门 —— 黑名单校验、{@code notify_log} 留痕、
+     * 目标脱敏入库都在那里。<b>绕过它就等于绕过退订</b>，而向已退订号码发送在短信合规里是处罚项。
+     *
+     * @param target  明文联系方式（手机号 / 邮箱）；入库前由发送侧脱敏
+     * @param channel SMS / EMAIL / PUSH
+     */
+    Delivery sendToTarget(String target, String channel, String scene, String content);
+
     record Delivery(boolean sent, String reason) {
     }
 }

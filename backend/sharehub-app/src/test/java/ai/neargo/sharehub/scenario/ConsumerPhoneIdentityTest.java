@@ -12,28 +12,27 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 手机号身份：{@code countryCode} 一直在发，一直没被用。
+ * 手机号身份：{@code countryCode} 一直在发，一直没被用（**本类钉住的是这个现状，不是期望**）。
  *
- * <h3>现状（本类钉住的就是这个现状，不是期望）</h3>
- * c-app 的每一次认证调用都是 {@code {countryCode: "+971", phone: "501234567"}} 两个字段分开发，
- * 而后端只拿 {@code phone} 当键：
- * <ul>
- *   <li>{@code OtpService} 的码表按 {@code phone} 索引；</li>
- *   <li>{@code PhoneOtpStrategy} 的 {@code uid = sha256(phone)} 也按它派生。</li>
- * </ul>
- * 于是 <b>+971 501234567 与 +966 501234567 是同一个 OTP、同一个账号</b> ——
+ * <h3>已经修掉的部分（2026-09-26，见 {@link ConsumerPhoneNormalizationTest}）</h3>
+ * {@code PhoneOtpStrategy} 此前那句 {@code // 生产：E.164 归一} 是没有实现的意图
+ * （实际只有 {@code .trim()}），且 uid 是裸 {@code sha256}。现已改用公共的
+ * {@code IdentifierNormalizer} + {@code IdentifierHasher}，与员工侧同一个方法（ADR-030 §4.1）——
+ * 同一个号的不同写法不再是不同账号，uid 也不再是可离线穷举的裸哈希。存量账号靠惰性重键认领。
+ *
+ * <h3>还剩下的就是本类这一条</h3>
+ * 区号由 {@code phone} 自带或由 {@code default-calling-code} 补全，端上那个 {@code countryCode}
+ * 依然没人读。于是 <b>+971 501234567 与 +966 501234567 仍是同一个账号</b> ——
  * 钱包、订单、券、押金全部共用。而这个产品的 {@code md_market_country} 表和充值套餐的
  * 「适用市场」CSV 都是为多市场（AE/SA）建的。
  *
- * <p>{@code PhoneOtpStrategy} 里那句 {@code // 生产：E.164 归一} 是<b>没有实现的意图</b>
- * —— 实际只有 {@code .trim()}。
+ * <h3>为什么这一条没跟着一起修</h3>
+ * 让 {@code countryCode} 参与派生就<b>破掉了惰性重键的唯一性</b>：两个区号的旧 uid 是同一个
+ * {@code sha256("501234567")}，两个人会争抢同一条历史行，把账号在彼此之间来回搬 ——
+ * 比现在的共用更糟。所以它需要先回答一个只有业务能答的问题：
+ * <b>存量里真有跨市场撞号的账号时，那条历史行归谁？</b>
  *
- * <h3>为什么这里只钉住现状而不修</h3>
- * 修法是把 {@code uid} 改成按 E.164 派生，而 {@code uid} 就是账号身份 ——
- * 改它等于给**存量账号改身份**（老 uid 的行从此查不到）。这是要先拍板的迁移
- * （惰性重键？双读回落？停机重算？），不是一次重构能顺手做掉的。
- *
- * <p><b>本类的作用是让这件事改不动就一直显形</b>：等身份改成按 E.164 派生之后，
+ * <p><b>本类的作用是让这件事改不动就一直显形</b>：等区号参与派生之后，
  * 下面这条会红，而那正是提醒「该来更新这个用例、并把台账里那一条删掉」的时刻。
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -53,9 +52,10 @@ class ConsumerPhoneIdentityTest extends ApiTestSupport {
         assertThat(sa)
                 .as("""
                         两个区号登录出的是同一个 c_user_no —— countryCode 没参与身份派生。
-                        这不是期望行为，是被钉住的现状：uid = sha256(phone)，而 phone 不含区号。
-                        修它要给存量账号改身份，属于待拍板的迁移（见 known-map-request-bodies.txt）。
-                        **本条变红 = 身份已改好**，请连同台账那一条一起更新。""")
+                        这不是期望行为，是被钉住的现状：区号来自 default-calling-code，不是端上那个字段。
+                        （归一与 pepper 已于 9-26 修好，见 ConsumerPhoneNormalizationTest；剩下的就是这一条。）
+                        让它参与派生会破掉惰性重键的唯一性，需要先拍板「撞号的历史行归谁」。
+                        **本条变红 = 区号已参与身份**，请连同台账那一条一起更新。""")
                 .isEqualTo(ae);
     }
 
