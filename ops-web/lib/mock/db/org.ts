@@ -27,9 +27,27 @@ export const tenantConfigs: TenantConfig[] = tenants.map((t) => ({
 }));
 
 // —— 员工 / 角色 / 审计 ——
+
+/**
+ * 部门编号 → {deptNo, deptName}。名字必须与下方 `departments` 一致
+ * （`employee-dept.test.ts` 断言这一点），这里不能另编一套 —— 两套名字迟早对不上。
+ *
+ * 不直接引用 `departments`：它声明在本文件更下方，模块初始化时员工种子先跑，
+ * 引用到的会是 undefined。
+ */
+const DEPT_NAMES: Record<string, string> = {
+  D1: "运营中心", D2: "运维部", D3: "客服部", D4: "财务部", D5: "市场拓展部",
+};
+const deptOf = (deptNo: string) => ({ deptNo, deptName: DEPT_NAMES[deptNo] ?? null });
+
 export const employees: Employee[] = Array.from({ length: 20 }, (_, i) => ({
   employeeNo: `E${100 + i}`, name: p(["Ali Hassan", "Omar Khan", "Sara Ahmed", "Wang Lei", "Fatima N."], i),
-  phone: `+9715${String(1000000 + i * 137).slice(0, 7)}`, deptName: p(["运营", "运维", "客服", "财务"], i),
+  phone: `+9715${String(1000000 + i * 137).slice(0, 7)}`,
+  // 存**编号**、名字由编号派生 —— 与后端同口径（deptName 是 deptNo 查 iam_dept 得来的）。
+  // 此前这里直接编了「运营 / 运维 / 客服 / 财务」四个自由字符串，
+  // 和下面 departments 里的 D1–D5（运营中心 / 运维部 / …）**对不上**，
+  // 于是按部门筛在 mock 下也筛不出东西，而看着像有数据。
+  ...deptOf(p(["D2", "D3", "D4", "D5"], i)),
   email: `${p(["ali", "omar", "sara", "wang", "fatima"], i)}.${100 + i}@sharehub.ae`,
   roleNo: p(["OPS", "CS", "FINANCE", "ADMIN"], i),
   roleName: p(["运维", "客服", "财务", "租户管理员"], i),
@@ -515,8 +533,13 @@ export const saveEmployee = (x: Partial<Employee>) => {
   const roleNos = x.roleNos === undefined
     ? (prev?.roleNos ?? (roleNo ? [roleNo] : []))
     : [...new Set([...(roleNo ? [roleNo] : []), ...x.roleNos])];
-  return upsert(employees, { ...x, roleNo, roleNos, roleName: roleLabel(roleNo) },
-    "employeeNo", () => nextNo("E", employees, 100));
+  // deptName 与 roleName 同理：由编号派生，不收调用方传的名字。
+  // 真后端就是这么做的（按 deptNo 查 iam_dept），mock 跟着才测得出前端发错键。
+  const deptNo = x.deptNo ?? prev?.deptNo ?? null;
+  return upsert(employees, {
+    ...x, roleNo, roleNos, roleName: roleLabel(roleNo),
+    deptNo, deptName: deptNo ? (DEPT_NAMES[deptNo] ?? null) : null,
+  }, "employeeNo", () => nextNo("E", employees, 100));
 };
 
 /** 角色编号 → 中文名。取自角色表，不另编一套 —— 两套名字迟早对不上。 */

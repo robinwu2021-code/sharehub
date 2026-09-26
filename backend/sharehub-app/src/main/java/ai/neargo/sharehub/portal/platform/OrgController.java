@@ -1,6 +1,7 @@
 package ai.neargo.sharehub.portal.platform;
 
 import ai.neargo.common.core.PageResult;
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.platform.org.dto.OrgDtos.DataScopeEntry;
 import ai.neargo.sharehub.platform.org.dto.OrgDtos.DataScopeReq;
 import ai.neargo.sharehub.platform.org.dto.OrgDtos.Department;
@@ -12,6 +13,7 @@ import ai.neargo.sharehub.platform.org.entity.IamEmployee;
 import ai.neargo.sharehub.platform.org.service.DataScopeService;
 import ai.neargo.sharehub.platform.org.service.DepartmentService;
 import ai.neargo.sharehub.platform.org.service.EmployeeService;
+import ai.neargo.sharehub.platform.cred.service.CredentialService;
 import ai.neargo.sharehub.platform.org.service.StaffPerformanceService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -37,9 +39,12 @@ public class OrgController {
     private final DepartmentService departmentService;
     private final DataScopeService dataScopeService;
     private final StaffPerformanceService staffPerformanceService;
+    private final CredentialService credentials;
 
     public OrgController(EmployeeService employeeService, DepartmentService departmentService,
-                         DataScopeService dataScopeService, StaffPerformanceService staffPerformanceService) {
+                         DataScopeService dataScopeService, StaffPerformanceService staffPerformanceService,
+                         CredentialService credentials) {
+        this.credentials = credentials;
         this.employeeService = employeeService;
         this.departmentService = departmentService;
         this.dataScopeService = dataScopeService;
@@ -64,6 +69,25 @@ public class OrgController {
         // 路径为准，忽略 body 里的键，防越权改他人。record 无 setter，重建一个。
         return employeeService.save(new EmployeeSaveReq(employeeNo, body.name(), body.phone(),
                 body.email(), body.deptNo(), body.roleNo(), body.roleNos(), body.status()));
+    }
+
+    /**
+     * 给员工建登录号 / 重置口令，返回**一次性初始口令**。
+     *
+     * <p>口令由服务端生成（不接受调用方指定，否则多半会被定成全员同一个），
+     * 只在这一次响应里出现：不落日志、没有第二个能查出它的接口 ——
+     * 能再查出来的初始口令等于没有初始口令。同时置 {@code mustChange}，首次登录必须改。
+     *
+     * <p><b>离职的人不给建号</b>：{@code status != ACTIVE} 直接 400。
+     * 既然离职后凭据要停用，就不该有一条路把它重新激活。
+     */
+    @PostMapping("/employees/{employeeNo}/credential")
+    @PreAuthorize("@perm.can('org:employee:update')")
+    public Map<String, Object> resetEmployeeCredential(@PathVariable String employeeNo) {
+        Employee e = employeeService.get(employeeNo);
+        if (e == null) throw BizException.notFound(employeeNo);
+        if (!ai.neargo.sharehub.platform.iam.EmployeeStatus.ACTIVE.is(e.status())) throw BizException.badRequest("error.employee.not_active");
+        return Map.of("employeeNo", employeeNo, "password", credentials.resetPassword(ai.neargo.sharehub.auth.Realm.STAFF.name(), employeeNo));
     }
 
     // —— 组织架构（菜单叶：员工与权限 › 组织架构）——

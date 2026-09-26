@@ -145,6 +145,9 @@ public final class BizKey {
     /** 文件 sys_file.file_no。 */
     public static final String FILE = "FL";
 
+    /** 登录凭据 cred_credential.cred_no（P3b·B2）。 */
+    public static final String CREDENTIAL = "CR";
+
     // —— 运营核心流程（2026-09-25）——
     /** 设备保护动作 dev_protection.protection_no。 */
     public static final String PROTECTION = "PRT";

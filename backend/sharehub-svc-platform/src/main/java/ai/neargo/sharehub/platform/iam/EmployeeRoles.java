@@ -39,6 +39,20 @@ public class EmployeeRoles {
     }
 
     /**
+     * 这个登录名**是员工档案里的人、但已经不在职**。
+     *
+     * <p>{@link #rolesOf} 对「不是员工」与「已离职」都回空表 —— 授权口径上两者等价，
+     * 认证口径上不等价：前者今天是 {@code admin} 这种不在档案里的运维账号（必须放行），
+     * 后者是离职的人拿着还没停用的凭据（必须拒）。<b>不区分就会让离职的人登进来</b>。
+     */
+    public boolean isLeftEmployee(String loginName) {
+        if (loginName == null || loginName.isBlank()) return false;
+        IamEmployee e = employeeMapper.selectOne(new LambdaQueryWrapper<IamEmployee>()
+                .eq(IamEmployee::getEmployeeNo, loginName).last("limit 1"));
+        return e != null && !EmployeeStatus.ACTIVE.is(e.getStatus());
+    }
+
+    /**
      * 这个登录名对应员工的全部角色；不是员工、或已离职、或没配角色 → 空表。
      *
      * <p><b>离职即失去全部角色</b>，不是降级成某个默认角色：

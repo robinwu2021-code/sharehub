@@ -1582,7 +1582,7 @@
      "type": "String"
     },
     {
-     "name": "dimension",
+     "name": "basis",
      "type": "String"
     },
     {
@@ -1745,7 +1745,7 @@
      "type": "String"
     },
     {
-     "name": "dimension",
+     "name": "basis",
      "type": "String"
     },
     {
@@ -2038,7 +2038,7 @@
    "perm": null,
    "perms": [],
    "handler": "AuthController#login",
-   "summary": "登录出参。",
+   "summary": "",
    "params": [],
    "bodyType": "LoginReq",
    "returnType": "LoginResp",
@@ -2102,6 +2102,10 @@
        "type": "String"
       }
      ]
+    },
+    {
+     "name": "mustChange",
+     "type": "boolean"
     }
    ],
    "requestShape": [
@@ -2543,6 +2547,10 @@
        "type": "String"
       }
      ]
+    },
+    {
+     "name": "mustChange",
+     "type": "boolean"
     }
    ],
    "requestShape": null
@@ -2553,6 +2561,21 @@
    "perm": null,
    "perms": [],
    "handler": "AuthController#loginOtp",
+   "summary": "",
+   "params": [],
+   "bodyType": "Map<String, String>",
+   "returnType": "Map<String, Object>",
+   "returnContainer": null,
+   "returnElement": "Map<String, Object>",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/auth/password",
+   "perm": null,
+   "perms": [],
+   "handler": "AuthController#changePassword",
    "summary": "发送代理端登录验证码（匿名）。",
    "params": [],
    "bodyType": "Map<String, String>",
@@ -10189,7 +10212,7 @@
      "type": "String"
     },
     {
-     "name": "cUserNo",
+     "name": "userNo",
      "type": "String"
     },
     {
@@ -12148,7 +12171,7 @@
    "handler": "WoExtController#createInspectionPlan",
    "summary": "",
    "params": [],
-   "bodyType": "WoInspectionPlan",
+   "bodyType": "ai.neargo.sharehub.wo.ext.dto.WoExtDtos.InspectionPlanReq",
    "returnType": "InspectionPlan",
    "returnContainer": null,
    "returnElement": "InspectionPlan",
@@ -12216,56 +12239,12 @@
      "type": "String"
     },
     {
-     "name": "assigneeNo",
+     "name": "assignee",
      "type": "String"
     },
     {
      "name": "active",
-     "type": "Integer"
-    },
-    {
-     "name": "lastRunAt",
-     "type": "java.time.LocalDateTime"
-    },
-    {
-     "name": "lastRunPeriod",
-     "type": "String"
-    },
-    {
-     "name": "lastRunWoNos",
-     "type": "String"
-    },
-    {
-     "name": "id",
-     "type": "?"
-    },
-    {
-     "name": "tenantId",
-     "type": "?"
-    },
-    {
-     "name": "createdAt",
-     "type": "?"
-    },
-    {
-     "name": "createdBy",
-     "type": "?"
-    },
-    {
-     "name": "updatedAt",
-     "type": "?"
-    },
-    {
-     "name": "updatedBy",
-     "type": "?"
-    },
-    {
-     "name": "version",
-     "type": "?"
-    },
-    {
-     "name": "deleted",
-     "type": "?"
+     "type": "Boolean"
     }
    ]
   },
@@ -12351,7 +12330,7 @@
      "required": true
     }
    ],
-   "bodyType": "WoInspectionPlan",
+   "bodyType": "ai.neargo.sharehub.wo.ext.dto.WoExtDtos.InspectionPlanReq",
    "returnType": "InspectionPlan",
    "returnContainer": null,
    "returnElement": "InspectionPlan",
@@ -12419,56 +12398,12 @@
      "type": "String"
     },
     {
-     "name": "assigneeNo",
+     "name": "assignee",
      "type": "String"
     },
     {
      "name": "active",
-     "type": "Integer"
-    },
-    {
-     "name": "lastRunAt",
-     "type": "java.time.LocalDateTime"
-    },
-    {
-     "name": "lastRunPeriod",
-     "type": "String"
-    },
-    {
-     "name": "lastRunWoNos",
-     "type": "String"
-    },
-    {
-     "name": "id",
-     "type": "?"
-    },
-    {
-     "name": "tenantId",
-     "type": "?"
-    },
-    {
-     "name": "createdAt",
-     "type": "?"
-    },
-    {
-     "name": "createdBy",
-     "type": "?"
-    },
-    {
-     "name": "updatedAt",
-     "type": "?"
-    },
-    {
-     "name": "updatedBy",
-     "type": "?"
-    },
-    {
-     "name": "version",
-     "type": "?"
-    },
-    {
-     "name": "deleted",
-     "type": "?"
+     "type": "Boolean"
     }
    ]
   },
@@ -26435,6 +26370,10 @@
      "type": "String"
     },
     {
+     "name": "deptNo",
+     "type": "String"
+    },
+    {
      "name": "deptName",
      "type": "String"
     },
@@ -26486,6 +26425,10 @@
     },
     {
      "name": "email",
+     "type": "String"
+    },
+    {
+     "name": "deptNo",
      "type": "String"
     },
     {
@@ -26583,6 +26526,10 @@
      "type": "String"
     },
     {
+     "name": "deptNo",
+     "type": "String"
+    },
+    {
      "name": "deptName",
      "type": "String"
     },
@@ -26637,6 +26584,30 @@
      "type": "String"
     }
    ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/platform/employees/{employeeNo}/credential",
+   "perm": "org:employee:update",
+   "perms": [
+    "org:employee:update"
+   ],
+   "handler": "OrgController#resetEmployeeCredential",
+   "summary": "给员工建登录号 / 重置口令，返回**一次性初始口令**。",
+   "params": [
+    {
+     "in": "path",
+     "name": "employeeNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "Map<String, Object>",
+   "returnContainer": null,
+   "returnElement": "Map<String, Object>",
+   "responseShape": null,
+   "requestShape": null
   },
   {
    "verb": "POST",
@@ -34148,7 +34119,7 @@
      "type": "java.math.BigDecimal"
     },
     {
-     "name": "capTotal",
+     "name": "buyoutPrice",
      "type": "java.math.BigDecimal"
     },
     {
@@ -34306,7 +34277,7 @@
      "type": "java.math.BigDecimal"
     },
     {
-     "name": "capTotal",
+     "name": "buyoutPrice",
      "type": "java.math.BigDecimal"
     },
     {
@@ -45252,10 +45223,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 513,
-  "records": 438,
-  "withPerm": 443,
-  "withBody": 218,
+  "endpoints": 515,
+  "records": 440,
+  "withPerm": 444,
+  "withBody": 219,
   "shapedResponses": 406
  }
 }

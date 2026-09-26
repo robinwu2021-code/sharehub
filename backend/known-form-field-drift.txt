@@ -42,10 +42,6 @@ ops-web/app/users/page.tsx::CARD_FIELDS validTo
 # 否则编辑抽屉预填不上），所以逐条单独提交、各自带用例，不在挂注解这一笔里混做。
 
 
-# 员工的「部门」根本设不了：表单只有 deptName（读出参里的派生显示名），
-# 而写入面要 deptNo —— 表单里**没有** deptNo 这一格。
-# 修法不是改名：deptName 是显示名，deptNo 是键，得换成选择器（部门下拉）。
-ops-web/app/employees/page.tsx::empFields deptName
 
 
 # 分佣规则的「状态」：写入面有意不收（同 AD_FIELDS status 那条的理由——

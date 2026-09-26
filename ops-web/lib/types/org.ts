@@ -10,6 +10,9 @@ export interface Employee {
   name: string;
   phone: string;
   email: string; // 登录/通知邮箱
+  /** 部门**编号**：编辑抽屉的下拉用它预选，提交也发它。后端写入面只认编号。 */
+  deptNo: string | null;
+  /** 部门显示名：列表那一列用它。由后端按 deptNo 查 iam_dept 得来，不可提交。 */
   deptName: string | null;
   /** 主角色编号。列表显示用 roleName，**提交必须用它** —— 后端认的是编号。 */
   roleNo: string;

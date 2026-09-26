@@ -10,6 +10,7 @@ import ai.neargo.sharehub.auth.PermVersion;
 import ai.neargo.sharehub.auth.Realm;
 import ai.neargo.sharehub.auth.SecurityUtils;
 import ai.neargo.sharehub.auth.TokenStore;
+import ai.neargo.sharehub.platform.cred.service.CredentialService;
 import ai.neargo.sharehub.platform.iam.MenuService.MenuNode;
 import ai.neargo.sharehub.platform.iam.port.AgentIdentityPort;
 import ai.neargo.sharehub.platform.iam.port.AgentIdentityPort.OperatorMembership;
@@ -31,6 +32,8 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AuthController.class);
 
     private final TokenStore tokenStore;
     private final PermissionResolver permissionResolver;   // SPI（由 PermissionService 实现）
@@ -59,10 +62,15 @@ public class AuthController {
 
     private final EmployeeRoles employeeRoles;
 
+    /** 登录凭据（P3b·B2）。查不到时回落到共享口令闸 —— 见 login() 里那段注释。 */
+    private final ai.neargo.sharehub.platform.cred.service.CredentialService credentials;
+
     public AuthController(TokenStore tokenStore, PermissionResolver permissionResolver,
                           EmployeeRoles employeeRoles,
                           DataScopeResolver dataScopeResolver, MenuService menuService,
-                          PermVersion permVersion, DevMode devMode, AgentIdentityPort agentLogin) {
+                          PermVersion permVersion, DevMode devMode, AgentIdentityPort agentLogin,
+                          ai.neargo.sharehub.platform.cred.service.CredentialService credentials) {
+        this.credentials = credentials;
         this.agentLogin = agentLogin;
         this.devMode = devMode;
         this.tokenStore = tokenStore;
@@ -88,7 +96,15 @@ public class AuthController {
      * 运营端（STAFF）登录时这两个字段为 null / 空表。
      */
     public record LoginResp(String token, String username, String role, String agentNo, List<String> perms,
-                            String principalNo, List<OperatorMembership> operators) {
+                            String principalNo, List<OperatorMembership> operators,
+                            /* 建号发的一次性口令还没改过 —— 前端据此强制跳改密页。false 时前端不必处理 */
+                            boolean mustChange) {
+
+        /** 兼容既有构造点（不强制改密）。 */
+        public LoginResp(String token, String username, String role, String agentNo, List<String> perms,
+                         String principalNo, List<OperatorMembership> operators) {
+            this(token, username, role, agentNo, perms, principalNo, operators, false);
+        }
     }
 
     @PostMapping("/login")
@@ -106,9 +122,36 @@ public class AuthController {
         }
         String username = (in.username() == null || in.username().isBlank()) ? "user" : in.username();
         String role;
-        boolean gateConfigured = adminPassword != null && !adminPassword.isBlank();
-        if (gateConfigured) {
-            // 正常路径：账号 + 口令都对才放行；**角色只由账号决定**，前端传的 role 一概不认
+        /*
+         * **先查凭据表（P3b·B2）**：这是「一人一号」的正路。
+         *
+         * <p>查不到凭据时**回落到下面的共享口令闸** —— 这个回落不是过渡期的将就，
+         * 它是上线安全网：凭据表为空时系统行为必须与接这段代码之前**完全一致**，
+         * 否则上线那一刻所有人都进不来，而这类故障只能靠改库自救。
+         * 等所有人都建了号，再单独一批把共享口令摘掉。
+         */
+        boolean mustChange = false;
+        CredentialService.Check check = credentials.verify(Realm.STAFF.name(), username, in.password());
+        if (check != null) {
+            if (!check.ok()) {
+                // 锁定与口令错都回同一句话：区分开等于告诉爆破者「这个账号存在」
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "error.auth.bad_credentials");
+            }
+            if (employeeRoles.isLeftEmployee(username)) {
+                // 离职的人凭据还没停用 —— 拒，并且回同一句话（不透露账号存不存在）
+                log.warn("离职员工尝试登录 subject={} —— 建号时漏了停用凭据，需要人工清理", username);
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "error.auth.bad_credentials");
+            }
+            mustChange = check.mustChange();
+            /*
+             * **凭据路径的角色默认 VIEWER，不是 adminRole**。
+             * 写成 adminRole 的话，一个建了号但还没配角色的员工登进来就是 ADMIN ——
+             * 下面 perms 解析出空表时那段兜底只对非 ADMIN 生效，于是这个洞不会被兜住。
+             * 真实角色由下面的员工档案覆盖；档案里没配角色 = 看得见但什么都动不了，这是安全的方向。
+             */
+            role = "admin".equals(username) ? adminRole : "VIEWER";
+        } else if (adminPassword != null && !adminPassword.isBlank()) {
+            // 共享口令闸（回落路径）：账号 + 口令都对才放行；**角色只由账号决定**，前端传的 role 一概不认
             // （此前闸门关闭时前端可自选 ADMIN —— v4/06 §〇 第 1 条）。
             if (!"admin".equals(username) || !adminPassword.equals(in.password())) {
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "error.auth.bad_credentials");
@@ -154,7 +197,7 @@ public class AuthController {
         DataScopeSpec scope = dataScopeResolver.resolveDataScope(subject);
         LoginUser user = new LoginUser(realm, username, username, role, perms, "MAIN", agentNo, scope);
         String token = tokenStore.issue(new TokenStore.SessionData(user, roleNos, permVersion.get()));
-        return new LoginResp(token, username, role, agentNo, perms, null, List.of());
+        return new LoginResp(token, username, role, agentNo, perms, null, List.of(), mustChange);
     }
 
     /**
@@ -164,6 +207,21 @@ public class AuthController {
      * 一旦「存在」与「不存在」返回不同，这个接口就成了代理商手机号枚举器。
      * 验证码只在 dev-mode 回显，生产走短信通道。
      */
+    /**
+     * 本人改密（登录态，任何角色都能改自己的）。
+     *
+     * <p>不接受 {@code subjectNo} 入参 —— 主体一律取自 token。
+     * 让调用方传「给谁改密」等于把改密做成了越权接口。
+     */
+    @PostMapping("/password")
+    public Map<String, Object> changePassword(@RequestBody Map<String, String> body) {
+        String subject = SecurityUtils.requireUser().userNo();
+        credentials.changePassword(Realm.STAFF.name(), subject,
+                body == null ? null : body.get("oldPassword"),
+                body == null ? null : body.get("newPassword"));
+        return Map.of("ok", true);
+    }
+
     @PostMapping("/otp")
     public Map<String, Object> loginOtp(@RequestBody Map<String, String> body) {
         String phone = body == null ? null : body.get("phone");

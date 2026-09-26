@@ -21,7 +21,13 @@ public final class OrgDtos {
      * {@code phone} 出参即掩码（[api/README §1.6]）。
      */
     public record Employee(String employeeNo, String name, String phone, String email,
-                           String deptName, String roleNo, String roleName,
+                           /**
+                            * 部门**编号**与**显示名**两个都给，口径同 roleNo / roleName：
+                            * 列表显示用后者，编辑抽屉的下拉要用前者预选。
+                            * 此前只给 deptName，于是运营端的「部门」只能做成自由文本框，
+                            * 填进去的名字后端不认（写入面要 deptNo），被静默丢弃。
+                            */
+                           String deptNo, String deptName, String roleNo, String roleName,
                            /** 该员工的全部角色（iam_employee_role）。主角色 roleNo 只是其中显示用的那个。 */
                            java.util.List<String> roleNos,
                            String status) {

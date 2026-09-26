@@ -165,7 +165,7 @@ public class EmployeeServiceImpl extends AbstractCrudService<IamEmployee, Employ
     @Override
     protected Employee toVO(IamEmployee e) {
         return new Employee(e.getEmployeeNo(), e.getName(), maskPhone(e.getPhone()), e.getEmail(),
-                deptName(e.getDeptNo()), e.getRoleNo(), roleName(e.getRoleNo()),
+                e.getDeptNo(), deptName(e.getDeptNo()), e.getRoleNo(), roleName(e.getRoleNo()),
                 rolesOf(e.getEmployeeNo()), e.getStatus());
     }
 

@@ -90,15 +90,21 @@ const ROLE_FIELDS: FieldDef[] = [
  * @form POST /api/platform/employees
  * @form POST /api/platform/employees/{employeeNo}
  */
-function empFields(roles: RoleRow[]): FieldDef[] {
+function empFields(roles: RoleRow[], depts: Department[]): FieldDef[] {
   const opts = roles.filter((r) => !r.archivedAt)
     .map((r) => ({ value: r.roleNo, label: `${r.name}（${r.code}）` }));
+  const deptOpts = [{ value: "", label: "不设部门" },
+    ...depts.map((d) => ({ value: d.deptNo, label: d.name }))];
   return [
     { key: "employeeNo", label: "工号", readOnlyOnEdit: true, placeholder: "留空自动生成" },
     { key: "name", label: "姓名", placeholder: "Ali Hassan" },
     { key: "phone", label: "手机", placeholder: "+9715xxxxxxx" },
     { key: "email", label: "邮箱", placeholder: "ali.hassan@sharehub.ae" },
-    { key: "deptName", label: "部门", placeholder: "运维" },
+    // 发 deptNo 不发 deptName —— 与上面那段注释说的 roleName → roleNo 是同一个坑，
+    // 当时只改了角色那一行。写入面认编号，自由文本框填的名字被静默丢弃：
+    // 部门不像角色那样决定权限，所以没有「登录后没菜单」这种响亮症状，
+    // 只是按部门筛人 / 派单 / 统计永远筛不出东西。
+    { key: "deptNo", label: "部门", type: "select", options: deptOpts },
     {
       key: "roleNo", label: "主角色", type: "select", options: opts, required: true,
       help: "列表显示的就是它；权限取下面「全部角色」的并集，主角色总在其中",
@@ -315,6 +321,12 @@ function EmployeesInner() {
   const roleOptsQ = useQuery({
     queryKey: ["role-options"],
     queryFn: () => api.listRoles({}),
+    enabled: !!empForm,
+  });
+  /* 部门下拉同理：上面那个 org 树只在「组织架构」tab 拉（enabled: tab === "org"）。 */
+  const deptOptsQ = useQuery({
+    queryKey: ["dept-options"],
+    queryFn: () => api.listDepartments({ page: 1, size: TREE_SIZE }),
     enabled: !!empForm,
   });
   const audit = useQuery({
@@ -868,7 +880,7 @@ function EmployeesInner() {
         titleNew="新增员工"
         titleEdit={`编辑员工 ${empForm?.employeeNo ?? ""}`}
         isEdit={!!empForm?.employeeNo}
-        fields={empFields(roleOptsQ.data ?? [])}
+        fields={empFields(roleOptsQ.data ?? [], deptOptsQ.data?.list ?? [])}
         value={(empForm ?? {}) as Record<string, unknown>}
         onChange={(v) => setEmpForm(v as Partial<Employee>)}
         onSubmit={() => empForm && saveEmp.mutate(empForm)}
