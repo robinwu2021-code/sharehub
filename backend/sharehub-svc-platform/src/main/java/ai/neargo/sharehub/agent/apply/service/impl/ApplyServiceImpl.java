@@ -51,6 +51,9 @@ public class ApplyServiceImpl implements ApplyService {
     private final AgtPrincipalMapper principalMapper;
     private final AgtAccountMapper accountMapper;
     private final AgentMapper agentMapper;
+    /** 取号要绕开逻辑删除过滤，只能走原生 SQL —— 见 BizNoSequence 的类注释。 */
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+
     private final IdentifierNormalizer normalizer;
     private final IdentifierHasher hasher;
     private final OtpGate otpGate;
@@ -58,7 +61,9 @@ public class ApplyServiceImpl implements ApplyService {
     public ApplyServiceImpl(AgtApplyMapper applyMapper, AgtPrincipalMapper principalMapper,
                             AgtAccountMapper accountMapper, AgentMapper agentMapper,
                             IdentifierNormalizer normalizer, IdentifierHasher hasher,
-                            OtpGate otpGate) {
+                            OtpGate otpGate,
+                            org.springframework.jdbc.core.JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
         this.applyMapper = applyMapper;
         this.principalMapper = principalMapper;
         this.accountMapper = accountMapper;
@@ -258,7 +263,7 @@ public class ApplyServiceImpl implements ApplyService {
     private String activate(AgtApply e, AuditReq req, String staffNo) {
         // ① 运营主体
         AgtAgent agent = new AgtAgent();
-        agent.setAgentNo(nextNo(agentMapper, AgtAgent.class, "agent_no", "AG"));
+        agent.setAgentNo(nextNo("agt_agent", "agent_no", "AG"));
         agent.setName(e.getOperatorName());
         agent.setRegionScope(RegionScopeJson.toJson(
                 req.regionScope() != null ? req.regionScope() : e.getRegionScope()));
@@ -276,7 +281,7 @@ public class ApplyServiceImpl implements ApplyService {
         boolean firstOperatorOfThisPerson = principal == null;
         if (principal == null) {
             principal = new AgtPrincipal();
-            principal.setPrincipalNo(nextNo(principalMapper, AgtPrincipal.class, "principal_no", "PR"));
+            principal.setPrincipalNo(nextNo("agt_principal", "principal_no", "PR"));
             principal.setPhoneHash(e.getPhoneHash());
             principal.setPhoneMask(e.getPhoneMask());
             principal.setEmailHash(e.getEmailHash());
@@ -293,7 +298,7 @@ public class ApplyServiceImpl implements ApplyService {
          *    （ADR-030 §2.5 约束 2），否则登录进哪个主体不确定。
          */
         AgtAccount acc = new AgtAccount();
-        acc.setAccountNo(nextNo(accountMapper, AgtAccount.class, "account_no", "AA"));
+        acc.setAccountNo(nextNo("agt_account", "account_no", "AA"));
         acc.setAgentNo(agent.getAgentNo());
         acc.setAgentName(agent.getName());
         acc.setUsername(principal.getPrincipalNo());   // username 已不是唯一键，留兼容（ADR-030 §七 3）
@@ -360,7 +365,7 @@ public class ApplyServiceImpl implements ApplyService {
     }
 
     private String nextApplyNo() {
-        return nextNo(applyMapper, AgtApply.class, "apply_no", "AP");
+        return nextNo("agt_apply", "apply_no", "AP");
     }
 
     /**
@@ -372,20 +377,16 @@ public class ApplyServiceImpl implements ApplyService {
      *
      * <p>并发下仍可能撞号，兜底是各表的 {@code uk_*_no} 唯一键 —— 撞了会报错，不会静默写脏。
      */
-    private static <T> String nextNo(com.baomidou.mybatisplus.core.mapper.BaseMapper<T> mapper,
-                                     Class<T> ignored, String column, String prefix) {
-        List<Object> top = mapper.selectObjs(new QueryWrapper<T>()
-                .select("MAX(CAST(SUBSTRING(" + column + ", " + (prefix.length() + 1) + ") AS UNSIGNED)) AS mx")
-                .likeRight(column, prefix));
-        long n = 0L;
-        if (top != null && !top.isEmpty() && top.get(0) != null) {
-            try {
-                n = Long.parseLong(String.valueOf(top.get(0)));
-            } catch (NumberFormatException ignore) {
-                n = 0L;
-            }
-        }
-        return prefix + String.format("%03d", n + 1);
+    /**
+     * 取号统一走 {@link ai.neargo.sharehub.common.crud.BizNoSequence}。
+     *
+     * ⚠️ 本类原先有一份自己的实现，用 MyBatis-Plus 的 QueryWrapper 取 MAX ——
+     * 而 {@code @TableLogic} 会给它补上 {@code deleted = 0}，**看不见软删/归档掉的号**，
+     * 那些号却仍占着唯一索引。2026-09-26 生产实测：审核通过时
+     * {@code Duplicate entry 'AG010' for key 'uk_agent_no'}，而列表里完全看不到 AG010。
+     */
+    private String nextNo(String table, String column, String prefix) {
+        return ai.neargo.sharehub.common.crud.BizNoSequence.next(jdbc, table, column, prefix, 3);
     }
 
     private static void requireText(String v, String msg) {

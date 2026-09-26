@@ -23,6 +23,9 @@ import java.util.List;
 @Service
 public class AgentServiceImpl implements AgentService {
 
+    /** 取号要绕开逻辑删除过滤，只能走原生 SQL —— 见 BizNoSequence 的类注释。 */
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+
     private final AgentMapper mapper;
     /** 只用来判「这个代理正在清退中」—— 见 save 里那条闸。 */
     private final ai.neargo.sharehub.agent.ext.service.AgentExitService exits;
@@ -30,7 +33,9 @@ public class AgentServiceImpl implements AgentService {
     private final ai.neargo.sharehub.common.event.DomainEventBus events;
 
     public AgentServiceImpl(AgentMapper mapper, ai.neargo.sharehub.common.event.DomainEventBus events,
-                            ai.neargo.sharehub.agent.ext.service.AgentExitService exits) {
+                            ai.neargo.sharehub.agent.ext.service.AgentExitService exits,
+                            org.springframework.jdbc.core.JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
         this.exits = exits;
         this.events = events;
         this.mapper = mapper;
@@ -63,7 +68,7 @@ public class AgentServiceImpl implements AgentService {
          * 与种子 `AG001~AG008` 同形 —— 代理编号是人要读、要念、要在对账单上核对的东西。
          */
         String no = (agentNo != null && !agentNo.isBlank()) ? agentNo
-                : ai.neargo.sharehub.common.crud.BizNoSequence.next(mapper, "agent_no", "AG", 3);
+                : ai.neargo.sharehub.common.crud.BizNoSequence.next(jdbc, "agt_agent", "agent_no", "AG", 3);
         AgtAgent e = mapper.selectOne(new LambdaQueryWrapper<AgtAgent>().eq(AgtAgent::getAgentNo, no));
         boolean insert = (e == null);
         if (insert) { e = new AgtAgent(); e.setAgentNo(no); e.setTenantId("MAIN"); }

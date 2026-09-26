@@ -24,6 +24,9 @@ public class AgentMembershipServiceImpl implements AgentMembershipService {
 
     private static final Logger log = LoggerFactory.getLogger(AgentMembershipServiceImpl.class);
 
+    /** 取号要绕开逻辑删除过滤，只能走原生 SQL —— 见 BizNoSequence 的类注释。 */
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+
     private final AgentMapper agents;
     private final AgtPrincipalMapper principals;
     private final AgtAccountMapper accounts;
@@ -32,7 +35,8 @@ public class AgentMembershipServiceImpl implements AgentMembershipService {
 
     public AgentMembershipServiceImpl(AgentMapper agents, AgtPrincipalMapper principals,
                                       AgtAccountMapper accounts, IdentifierNormalizer normalizer,
-                                      IdentifierHasher hasher) {
+                                      IdentifierHasher hasher, org.springframework.jdbc.core.JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
         this.agents = agents;
         this.principals = principals;
         this.accounts = accounts;
@@ -80,7 +84,7 @@ public class AgentMembershipServiceImpl implements AgentMembershipService {
         boolean firstOperatorOfThisPerson = principal == null;
         if (principal == null) {
             principal = new AgtPrincipal();
-            principal.setPrincipalNo(BizNoSequence.next(principals, "principal_no", "PR", 4));
+            principal.setPrincipalNo(BizNoSequence.next(jdbc, "agt_principal", "principal_no", "PR", 4));
             principal.setPhoneHash(phoneHash);
             principal.setPhoneMask(IdentifierNormalizer.mask(phone));
             principal.setEmailHash(hasher.hash(email));
@@ -105,7 +109,7 @@ public class AgentMembershipServiceImpl implements AgentMembershipService {
         }
 
         AgtAccount acc = new AgtAccount();
-        acc.setAccountNo(BizNoSequence.next(accounts, "account_no", "AA", 4));
+        acc.setAccountNo(BizNoSequence.next(jdbc, "agt_account", "account_no", "AA", 4));
         acc.setAgentNo(agentNo);
         acc.setAgentName(agent.getName());
         acc.setUsername(principal.getPrincipalNo());   // username 已不是唯一键，留兼容（ADR-030 §七 3）

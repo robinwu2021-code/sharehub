@@ -26,12 +26,17 @@ public class LocService {
 
     private final SiteMapper siteMapper;
     private final LocationMapper locationMapper;
+    /** 取号要绕开逻辑删除过滤，只能走原生 SQL —— 见 BizNoSequence 的类注释。 */
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+
     private final VenueMapper venueMapper;
     private final ai.neargo.sharehub.platform.md.mapper.MdRegionMapper regions;
 
     public LocService(SiteMapper siteMapper, LocationMapper locationMapper,
                       VenueMapper venueMapper,
-                      ai.neargo.sharehub.platform.md.mapper.MdRegionMapper regions) {
+                      ai.neargo.sharehub.platform.md.mapper.MdRegionMapper regions,
+                      org.springframework.jdbc.core.JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
         this.regions = regions;
         this.siteMapper = siteMapper;
         this.locationMapper = locationMapper;
@@ -224,7 +229,7 @@ public class LocService {
      */
     private String nextVenueNo() {
         return ai.neargo.sharehub.common.crud.BizNoSequence.next(
-                venueMapper, "venue_no", ai.neargo.sharehub.common.BizKey.VENUE, 3);
+                jdbc, "loc_venue", "venue_no", ai.neargo.sharehub.common.BizKey.VENUE, 3);
     }
 
     // —— 合同 —— 已迁入 loc.service.ContractService（2026-09-25 合同走审批）

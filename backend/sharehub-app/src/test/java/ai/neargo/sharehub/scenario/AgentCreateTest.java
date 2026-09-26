@@ -116,6 +116,46 @@ class AgentCreateTest extends ApiTestSupport {
         }
     }
 
+    @Test
+    @DisplayName("★ 归档/软删掉的编号仍占着唯一键 —— 取号必须把它们算进去")
+    void soft_deleted_numbers_still_occupy_the_unique_key() {
+        /*
+         * 2026-09-26 生产实测炸出来的：审核通过时
+         * `Duplicate entry 'AG010' for key 'uk_agent_no'`，而列表里**完全看不到 AG010**
+         * （它被软删藏起来了）。两件事撞在一起：
+         *   · `uk_agent_no` 不含 deleted 列 —— 这是对的，软删的号被合同/结算/划拨引用着，
+         *     不能重新发出去；
+         *   · 而取号走 MyBatis-Plus 的 QueryWrapper 时 @TableLogic 会补上 deleted = 0，
+         *     **取号看不见那些行**。
+         * 于是只要有一个代理被归档，它的号就成了一个洞，下一次取号必然走进去。
+         */
+        Long maxNow = jdbc.queryForObject(
+                "SELECT MAX(CAST(SUBSTRING(agent_no, 3) AS UNSIGNED)) FROM agt_agent WHERE agent_no LIKE 'AG%'",
+                Long.class);
+        String hole = "AG" + String.format("%03d", (maxNow == null ? 0 : maxNow) + 1);
+        // 造一个「软删掉的下一个号」——它就是那个洞
+        jdbc.update("INSERT INTO agt_agent (agent_no, tenant_id, name, status, deleted) VALUES (?, 'MAIN', ?, 'ENABLED', 1)",
+                hole, "【测试】软删占位");
+        try {
+            String applyNo = recordApply("【测试】跨过那个洞");
+            String other = "TMPAPV2";
+            jdbc.update("DELETE FROM iam_role_perm WHERE role_no=?", other);
+            jdbc.update("INSERT INTO iam_role_perm (role_no, perm_code) VALUES (?, 'agent:apply:read'), (?, 'agent:apply:approve')",
+                    other, other);
+            try {
+                Resp r = post("/api/agent/applies/" + applyNo + "/audit", Map.of("approve", true), login(other));
+                assertThat(r.status).as("撞上软删的号了：%s", r.body).isEqualTo(200);
+                String got = jdbc.queryForObject("SELECT agent_no FROM agt_agent WHERE name=?",
+                        String.class, "【测试】跨过那个洞");
+                assertThat(got).as("取号应当跳过被软删占着的 %s", hole).isNotEqualTo(hole);
+            } finally {
+                jdbc.update("DELETE FROM iam_role_perm WHERE role_no=?", other);
+            }
+        } finally {
+            jdbc.update("DELETE FROM agt_agent WHERE agent_no=?", hole);
+        }
+    }
+
     /** 以 admin 的身份代建录入一张申请单，返回单号。 */
     private String recordApply(String name) {
         Map<String, Object> m = new HashMap<>();
