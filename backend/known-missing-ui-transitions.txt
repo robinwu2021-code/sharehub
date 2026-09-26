@@ -94,16 +94,7 @@ SiteStatus: PAUSED->WITHDRAWING
 SiteStatus: WITHDRAWING->CLOSED
 SiteStatus: PREPARING->CLOSED
 
-# 商机阶段机（2026-09-25，运营核心流程批次 B5）：后端 LeadStateMachine 定了顺序推进 / LOST 必填原因 / 重新激活，
-# 运营端 BD CRM 页仍是「阶段下拉随便选」（LEAD_STAGES 只是取值表，没有迁移表）—— 这是**分叉**：
-# 界面能选出后端会 400 的跳阶（如 NEW→NEGOTIATING）。修法：ops-web/lib/types/location.ts 补 LEAD_TRANSITIONS，
-# 下拉只列可达阶段、选 LOST 时要求填原因，然后删掉以下各行。
-LeadStatus: NEW->CONTACTED
-LeadStatus: CONTACTED->NEGOTIATING
-LeadStatus: NEGOTIATING->CONTACTED
-LeadStatus: NEGOTIATING->SIGNED
-LeadStatus: NEW->LOST
-LeadStatus: CONTACTED->LOST
-LeadStatus: NEGOTIATING->LOST
-LeadStatus: LOST->NEW
+# 商机阶段机（2026-09-25 登记 → 2026-09-26 已还）：当时运营端 BD CRM 页是「阶段下拉随便选」，
+# 界面能选出后端会 400 的跳阶。现在 ops-web/lib/types/location.ts 有 LEAD_TRANSITIONS，
+# 下拉走 leadNextStages()、mock 走 leadStageMoveOk()，8 条边全部有对应动作，故整段删除。
 

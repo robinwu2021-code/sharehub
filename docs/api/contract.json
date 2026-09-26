@@ -45195,6 +45195,9 @@
   "DataScopeSubject": [
    "ROLE"
   ],
+  "CredentialStatus": [
+   "ACTIVE"
+  ],
   "EmployeeStatus": [
    "ACTIVE"
   ],
