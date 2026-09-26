@@ -18,6 +18,15 @@ public interface AgentExitService {
 
     AgentExit get(String exitNo);
 
+    /**
+     * 该代理**当前在途的**清退单；没有则 {@code null}。
+     *
+     * <p>清退单号此前只能从「发起」的返回值里拿到 —— 刷新页面、换个人看，就再也找不到它了
+     * （运营端只好加一个「按单号查进度」的输入框）。更要紧的是保存代理档案那条路径
+     * 需要它来判断「这个代理正在清退中」，见 {@code AgentService#save}。
+     */
+    AgentExit openOf(String agentNo);
+
     /** 当前这一步的门禁（逐项、带数量）。 */
     Checklist gate(String exitNo);
 

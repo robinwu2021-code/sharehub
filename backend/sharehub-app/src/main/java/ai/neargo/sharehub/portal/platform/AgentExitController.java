@@ -41,6 +41,18 @@ public class AgentExitController {
         return exits.start(agentNo, r == null ? null : r.reason());
     }
 
+    /**
+     * 该代理**当前在途的**清退单；没有则返回 null（不是 404 —— 「没有在清退」是正常状态，不是错误）。
+     *
+     * <p>此前清退单号只能从「发起」那一次的返回值里拿到：刷新页面、换个人看就再也找不到，
+     * 运营端只好加一个「按单号查进度」的输入框让人手抄。
+     */
+    @GetMapping("/api/agent/agents/{agentNo}/exit")
+    @PreAuthorize("@perm.can('agent:agent:read')")
+    public AgentExit openExit(@PathVariable String agentNo) {
+        return exits.openOf(agentNo);
+    }
+
     @GetMapping("/api/agent/exits/{exitNo}")
     @PreAuthorize("@perm.can('agent:agent:read')")
     public AgentExit get(@PathVariable String exitNo) {

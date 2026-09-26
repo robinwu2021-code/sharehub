@@ -24,10 +24,14 @@ import java.util.List;
 public class AgentServiceImpl implements AgentService {
 
     private final AgentMapper mapper;
+    /** 只用来判「这个代理正在清退中」—— 见 save 里那条闸。 */
+    private final ai.neargo.sharehub.agent.ext.service.AgentExitService exits;
 
     private final ai.neargo.sharehub.common.event.DomainEventBus events;
 
-    public AgentServiceImpl(AgentMapper mapper, ai.neargo.sharehub.common.event.DomainEventBus events) {
+    public AgentServiceImpl(AgentMapper mapper, ai.neargo.sharehub.common.event.DomainEventBus events,
+                            ai.neargo.sharehub.agent.ext.service.AgentExitService exits) {
+        this.exits = exits;
         this.events = events;
         this.mapper = mapper;
     }
@@ -73,7 +77,19 @@ public class AgentServiceImpl implements AgentService {
         e.setAgentType(AgentType.of(in.agentType()).name());
         // 机柜数不回写：它是聚合值不是档案属性（实体与库里都已没有这一列）
         String before = insert ? null : e.getStatus();
-        e.setStatus(ai.neargo.sharehub.agent.AgentStatus.of(in.status() == null ? ai.neargo.sharehub.agent.AgentStatus.ENABLED.name() : in.status()).name());
+        String want = ai.neargo.sharehub.agent.AgentStatus
+                .of(in.status() == null ? ai.neargo.sharehub.agent.AgentStatus.ENABLED.name() : in.status()).name();
+        /*
+         * **清退中不许改回启用**。清退单一发起就停用代理（冻结提现、名下工单改派），
+         * 而这条保存路径此前直接写 status —— 于是在「档案编辑」里把状态改回启用，
+         * 就绕过了整个清退流程：提现解冻、又开始派新单，而清退单还停在原处等着推进。
+         * 运营端已经禁用了那个按钮，但**按钮禁用只是体验层**，闸必须在服务端。
+         */
+        if (!insert && ai.neargo.sharehub.agent.AgentStatus.ENABLED.name().equals(want)
+                && !java.util.Objects.equals(before, want) && exits.openOf(no) != null) {
+            throw BizException.conflict("error.agent.enable_while_exiting", no);
+        }
+        e.setStatus(want);
         if (insert) mapper.insert(e); else mapper.updateById(e);
         if (!insert && !java.util.Objects.equals(before, e.getStatus())) {
             // 停用 → 工单侧改派名下未完结工单（F2）；提现侧在服务层按实时状态拦，不靠事件

@@ -133,6 +133,13 @@ public class TransferOpsServiceImpl implements TransferOpsService {
         InvTransfer t = require(transferNo);
         String to = sm.next(t.getStatus(), "SHIP");
         List<InvTransferItem> list = itemsOf(transferNo);
+        /*
+         * **空单不许发货**。此前零明细的单也能一路走到 IN_TRANSIT（上线实测把一张空单发出去了）：
+         * 接收方等着收货，而车上什么都没有；对账时这张单既不算差异也不算正常，
+         * 因为「应收 0 件、实收 0 件」处处自洽 —— 错的是它根本不该存在。
+         * 明细是发货的前提，不是可选项。
+         */
+        if (list.isEmpty()) throw BizException.conflict("error.inv_transfer.no_items", transferNo);
         // 发货这一刻再核一遍：建明细之后到装车之间，柜子可能被别的单调走或质检被判不过
         for (InvTransferItem i : list) checkShippable(t.getItemType(), itemNo(i));
         int n = transfers.update(null, new LambdaUpdateWrapper<InvTransfer>().eq(InvTransfer::getTransferNo, transferNo)

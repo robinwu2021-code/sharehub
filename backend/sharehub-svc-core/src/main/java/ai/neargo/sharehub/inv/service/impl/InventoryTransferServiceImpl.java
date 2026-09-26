@@ -121,6 +121,13 @@ public class InventoryTransferServiceImpl implements InventoryTransferService {
                 case DONE -> "RECEIVE";
                 default -> throw new IllegalArgumentException("不支持的目标状态: " + target);
             };
+            /*
+             * **发货有两个入口**：专用的 `POST …/{no}/ship` 与这里的「保存时传目标状态」。
+             * 空单校验此前只加在前者，于是这条路照样能把零明细的单推成在途 ——
+             * 「一个动作两个入口，只堵一个」是最典型的漏法，而账面上完全自洽
+             * （应收 0 件、实收 0 件），对账查不出来。
+             */
+            if ("SHIP".equals(event)) requireHasItems(no);
             if ("RECEIVE".equals(event)) requireAllChecked(no);
             current.setStatus(stateMachine.next(current.getStatus(), event));
         }
@@ -161,6 +168,13 @@ public class InventoryTransferServiceImpl implements InventoryTransferService {
         return itemMapper.selectList(new LambdaQueryWrapper<InvTransferItem>()
                 .eq(InvTransferItem::getTransferNo, transferNo)
                 .orderByAsc(InvTransferItem::getId));
+    }
+
+    /** 发货前必须有明细：接收方等着收货，而车上什么都没有。与 {@code TransferOpsServiceImpl#ship} 同一条闸。 */
+    private void requireHasItems(String transferNo) {
+        if (selectItems(transferNo).isEmpty()) {
+            throw BizException.conflict("error.inv_transfer.no_items", transferNo);
+        }
     }
 
     /** 收货前逐件核对：有一件没勾就不许结单 —— 这正是「少了一台」当场被发现的地方。 */

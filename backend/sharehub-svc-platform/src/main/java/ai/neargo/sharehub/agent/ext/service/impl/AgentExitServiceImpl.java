@@ -59,6 +59,15 @@ public class AgentExitServiceImpl implements AgentExitService {
 
     @Override
     @Transactional
+    public AgentExit openOf(String agentNo) {
+        if (agentNo == null || agentNo.isBlank()) return null;
+        AgtExit e = exits.selectOne(new LambdaQueryWrapper<AgtExit>()
+                .eq(AgtExit::getAgentNo, agentNo).in(AgtExit::getStatus, OPEN)
+                .orderByDesc(AgtExit::getId).last("limit 1"));
+        return e == null ? null : vo(e);
+    }
+
+    @Override
     public AgentExit start(String agentNo, String reason) {
         if (reason == null || reason.isBlank()) throw BizException.badRequest("error.common.reason_required");
         AgtAgent a = agents.selectOne(new LambdaQueryWrapper<AgtAgent>().eq(AgtAgent::getAgentNo, agentNo).last("limit 1"));
