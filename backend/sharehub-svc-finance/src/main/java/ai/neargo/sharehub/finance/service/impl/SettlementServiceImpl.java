@@ -42,6 +42,9 @@ import java.util.Map;
 @Service
 public class SettlementServiceImpl implements SettlementService {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SettlementServiceImpl.class);
+
+
     private final StlSettlementMapper mapper;
     private final StlSettlementDetailMapper detailMapper;
     private final ShareRecordMapper recordMapper;
@@ -159,11 +162,38 @@ public class SettlementServiceImpl implements SettlementService {
             List<ShareRecord> group = en.getValue();
             List<StlAdjustment> adjs = adjByPayee.getOrDefault(payeeNo, List.of());
 
-            // 幂等：同一 (payeeNo, period) 已出过账则跳过，批处理重跑不会出重单
-            Long exists = mapper.selectCount(new LambdaQueryWrapper<StlSettlement>()
-                    .eq(StlSettlement::getPayeeNo, payeeNo)
-                    .eq(StlSettlement::getPeriod, period));
-            if (exists != null && exists > 0) continue;
+            /*
+             * 同一 (payeeNo, period) 已有结算单时**并入**，不再静默跳过。
+             *
+             * <p>防重复结算靠的是下面那道闸（分润出账后置 DONE，下次捞不到它），
+             * 这里原先的「已出过账就 continue」是第二把锁 —— 而它锁错了对象：
+             * 挡住的不是重复的分润，是**出账之后才产生的该账期分润**
+             * （订单延迟结算、补录、纠错重算都会产生）。
+             * 2026-09-26 生产实测：账期 2026-09 已出过两张单，同账期还躺着 8 条 PENDING，
+             * 再怎么触发都是「没有待出账的分润（或已出过）」—— 钱算出来了却永远进不了任何单，
+             * 而且没有任何日志说它被跳过了。
+             *
+             * <p>为什么是并入而不是开补充单：库上有唯一键 {@code (payee_type, payee_no, period)}，
+             * 一个收款方一个账期只能一张单 —— 那是财务口径，不该为了绕开它而改表。
+             *
+             * <p>**已打款的单不能改**：钱已经出去了，再往里加明细会让账实不符。
+             * 这种情况记 WARN 并跳过，但要说清跳过了什么 —— 让它在日志里显形，而不是静静消失。
+             */
+            StlSettlement existing = mapper.selectOne(new LambdaQueryWrapper<StlSettlement>()
+                    .eq(StlSettlement::getPayeeNo, payeeNo).eq(StlSettlement::getPeriod, period).last("limit 1"));
+            if (existing != null) {
+                if (SettlementStatus.PAID.name().equals(existing.getStatus())) {
+                    BigDecimal skipped = group.stream().map(r -> r.getAmount() == null ? BigDecimal.ZERO : r.getAmount())
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                    log.warn("结算单 {} 已打款，本次 {} 条分润（合计 {}）无法并入 payee={} period={} —— "
+                                    + "请人工处理：要么下期补，要么冲正后重出",
+                            existing.getSettleNo(), group.size(), skipped, payeeNo, period);
+                    continue;
+                }
+                mergeInto(existing, group, adjs, tenantId);
+                created.add(existing.getSettleNo());
+                continue;
+            }
 
             BigDecimal total = group.stream()
                     .map(r -> r.getAmount() == null ? BigDecimal.ZERO : r.getAmount())
@@ -214,6 +244,46 @@ public class SettlementServiceImpl implements SettlementService {
             created.add(s.getSettleNo());
         }
         return created;
+    }
+
+    /**
+     * 把后来才产生的分润 / 调整项并进已有的那张单（未打款时）。
+     *
+     * <p>金额**按明细重算**而不是 {@code total += delta}：并入可能与别的写入并发，
+     * 累加会把中间态叠上去；重算的结果只取决于当前明细，跑几次都一样。
+     */
+    private void mergeInto(StlSettlement existing, List<ShareRecord> group, List<StlAdjustment> adjs, String tenantId) {
+        for (ShareRecord r : group) {
+            StlSettlementDetail d = new StlSettlementDetail();
+            d.setTenantId(tenantId);
+            d.setSettleNo(existing.getSettleNo());
+            d.setRefType(SettlementRefType.SHARE.name());
+            d.setRefNo(r.getRecordNo());
+            d.setAmount(r.getAmount());
+            detailMapper.insert(d);
+            r.setSettleNo(existing.getSettleNo());
+            r.setStatus(ShareRecordStatus.DONE.name());
+            recordMapper.updateById(r);
+        }
+        for (StlAdjustment a : adjs) {
+            StlSettlementDetail d = new StlSettlementDetail();
+            d.setTenantId(tenantId);
+            d.setSettleNo(existing.getSettleNo());
+            d.setRefType(SettlementRefType.ADJUST.name());
+            d.setRefNo(a.getAdjNo());
+            d.setAmount(a.getAmount());
+            detailMapper.insert(d);
+            adjustmentMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<StlAdjustment>()
+                    .eq(StlAdjustment::getAdjNo, a.getAdjNo()).set(StlAdjustment::getSettleNo, existing.getSettleNo()));
+        }
+        BigDecimal total = detailMapper.selectList(new LambdaQueryWrapper<StlSettlementDetail>()
+                        .eq(StlSettlementDetail::getSettleNo, existing.getSettleNo())).stream()
+                .map(d -> d.getAmount() == null ? BigDecimal.ZERO : d.getAmount())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        mapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<StlSettlement>()
+                .eq(StlSettlement::getSettleNo, existing.getSettleNo()).set(StlSettlement::getTotalAmount, total));
+        log.info("并入已有结算单 settleNo={} payee={} period={} 新增分润={} 调整项={} 合计={}",
+                existing.getSettleNo(), existing.getPayeeNo(), existing.getPeriod(), group.size(), adjs.size(), total);
     }
 
     private StlSettlement require(String settleNo) {

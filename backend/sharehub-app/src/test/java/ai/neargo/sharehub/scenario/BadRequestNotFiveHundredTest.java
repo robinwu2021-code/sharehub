@@ -33,6 +33,26 @@ class BadRequestNotFiveHundredTest extends ApiTestSupport {
 
     private String admin;
 
+    /** 直接发 multipart，绕开 {@code uploadFile} 对成功响应的解析（这里要的就是失败响应）。 */
+    private Resp uploadRaw(String category, String name, byte[] bytes, String token) {
+        String boundary = "----vt" + java.util.UUID.randomUUID();
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        try {
+            out.write(("--" + boundary + "\r\nContent-Disposition: form-data; name=\"category\"\r\n\r\n" + category + "\r\n"
+                    + "--" + boundary + "\r\nContent-Disposition: form-data; name=\"file\"; filename=\"" + name + "\"\r\n"
+                    + "Content-Type: image/jpeg\r\n\r\n").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            out.write(bytes);
+            out.write(("\r\n--" + boundary + "--\r\n").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException(e);
+        }
+        return sendRequest(java.net.http.HttpRequest.newBuilder(java.net.URI.create("http://localhost:" + port + "/api/platform/files"))
+                .header("Authorization", "Bearer " + token)
+                .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+                .POST(java.net.http.HttpRequest.BodyPublishers.ofByteArray(out.toByteArray()))
+                .build());
+    }
+
     @BeforeAll
     void setUp() {
         admin = login("ADMIN");
@@ -73,6 +93,19 @@ class BadRequestNotFiveHundredTest extends ApiTestSupport {
          * 本条守住的是底线：**调用方的问题不该被记成服务端故障**。
          */
         assertThat(r.status).as("方法不符不该是 500").isNotEqualTo(500);
+    }
+
+    @Test
+    @DisplayName("⑥ 坏图上传 → 400 而不是 500（ImageIO 抛 IOException 那条路此前没接住）")
+    void broken_image_upload_is_400() {
+        /*
+         * 2026-09-26 生产实测撞到：传一个「文件头像 JPEG、内容是垃圾」的文件，
+         * `ImageIO.read` 抛 IOException（不是返回 null），一路冒到外层包成
+         * UncheckedIOException ⇒ 500「服务器错误」。而这明明是调用方给了坏数据。
+         */
+        byte[] fake = new byte[]{(byte) 0xff, (byte) 0xd8, (byte) 0xff, (byte) 0xe0, 0x00, 0x10, 'J', 'F', 'I', 'F', 0x00};
+        Resp r = uploadRaw("WO_PHOTO", "broken.jpg", fake, admin);
+        assertThat(r.status).as("坏图应当是 400：%s", r.body).isEqualTo(400);
     }
 
     @Test

@@ -105,7 +105,21 @@ public class FileServiceImpl implements FileService {
             Integer width = null, height = null;
             processed = tmp;
             if (kind.image && kind != MediaKind.WEBP) {
-                BufferedImage img = ImageIO.read(tmp.toFile());
+                /*
+                 * **坏图是调用方的问题，不是服务端故障**。
+                 * `ImageIO.read` 对读不出的图有两种表现：返回 null（本来就判了），
+                 * 或**抛 IOException**（文件头像图片但内容截断 / 损坏时走这条）。
+                 * 后者此前没接住，一路冒到外层的 catch(IOException) 包成 UncheckedIOException ⇒ **500**。
+                 * 2026-09-26 生产实测：传一个只有魔数字节的假 JPEG 即可复现。
+                 * 两条路都归成 400，说的是同一件事：这张图读不出来。
+                 */
+                BufferedImage img;
+                try {
+                    img = ImageIO.read(tmp.toFile());
+                } catch (IOException bad) {
+                    log.warn("图片读不出来 category={} name={} —— {}", c, cmd.originalName(), bad.toString());
+                    throw ai.neargo.sharehub.common.BizException.badRequest("error.file.image_unreadable");
+                }
                 if (img == null) throw ai.neargo.sharehub.common.BizException.badRequest("error.file.image_unreadable");
                 width = img.getWidth();
                 height = img.getHeight();
