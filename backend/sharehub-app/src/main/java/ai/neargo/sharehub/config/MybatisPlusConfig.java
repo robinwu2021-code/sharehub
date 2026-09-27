@@ -34,7 +34,9 @@ public class MybatisPlusConfig {
     public com.baomidou.mybatisplus.autoconfigure.MybatisPlusPropertiesCustomizer bizZoneSqlVariables(
             @org.springframework.beans.factory.annotation.Value("${sharehub.biz-zone:Asia/Dubai}") String bizZone) {
         java.time.ZoneId biz = java.time.ZoneId.of(bizZone);
-        if (!biz.getRules().isFixedOffset() && !biz.getRules().getTransitions().isEmpty()) {
+        // 看**将来**还会不会切换，不看有没有切换历史：Asia/Dubai 1920 年有过一次 LMT→+04，
+        // 按「有历史」判会在每次启动时误报一条夏令时 WARN（2026-09-28 生产首启撞到）
+        if (biz.getRules().nextTransition(java.time.Instant.now()) != null) {
             org.slf4j.LoggerFactory.getLogger(MybatisPlusConfig.class).warn(
                     "业务时区 {} 有夏令时，报表切日的偏移在启动时定格为 {} —— 跨越切换日后需重启，或改报表查询按时刻换算", bizZone, offsetOf(biz));
         }
