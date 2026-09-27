@@ -34,6 +34,7 @@ export default {
     nearby: "Nearby stations",
     map: "Map",
     list: "List",
+    returnableOnly: "Showing stations with free slots only",
   },
   borrow: {
     confirm: "Confirm borrow",
@@ -60,6 +61,10 @@ export default {
     couponThreshold: "Spend {v} or more",
     couponCut: "{v} off",
     couponOff: "{v}% off",
+    failed: "Not dispensed",
+    failedTip: "The cabinet did not confirm in time. This order has not started billing; if a deposit-free hold was placed, it is released after our check. Try another cabinet, or tell us what happened.",
+    tryAnother: "Try another cabinet",
+    reportIt: "Report the problem",
   },
   orders: {
     title: "My orders",
@@ -74,9 +79,12 @@ export default {
     timeline: "Status timeline",
     feeDetail: "Fee breakdown",
     total: "Total",
+    depositRefundable: "Deposit (refundable)",
     report: "Report an issue",
     buyout: "Buy out",
     capNote: "No charge after the daily cap",
+    findReturn: "Find a return station",
+    feeAtReturn: "The fee is calculated on return",
   },
   feedback: {
     pickType: "Pick a problem type first",

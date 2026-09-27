@@ -34,6 +34,7 @@ export default {
     nearby: "附近门店",
     map: "地图",
     list: "列表",
+    returnableOnly: "只显示有空仓的网点（可归还）",
   },
   borrow: {
     confirm: "确认借出",
@@ -60,6 +61,10 @@ export default {
     couponThreshold: "满 {v} 可用",
     couponCut: "减 {v}",
     couponOff: "省 {v}%",
+    failed: "没有弹出",
+    failedTip: "柜机没有在预期时间内回执。这一单还没有开始计费；若刚才冻结了免押额度，解冻由后台核对后处理。可以换个柜机再试，或把这次情况反馈给我们。",
+    tryAnother: "换个柜机",
+    reportIt: "反馈问题",
   },
   orders: {
     title: "我的订单",
@@ -74,9 +79,12 @@ export default {
     timeline: "状态时间线",
     feeDetail: "费用明细",
     total: "合计",
+    depositRefundable: "押金（可退）",
     report: "问题反馈",
     buyout: "买断",
     capNote: "达每日封顶后不再计费",
+    findReturn: "找可还网点",
+    feeAtReturn: "费用在归还时按结算规则计算",
   },
   feedback: {
     pickType: "请先选择问题类型",

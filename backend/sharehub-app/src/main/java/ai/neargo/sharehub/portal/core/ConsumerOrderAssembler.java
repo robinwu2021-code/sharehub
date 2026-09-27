@@ -35,7 +35,6 @@ public class ConsumerOrderAssembler {
     private static final String FEE_COUPON = "COUPON";
     private static final String FEE_WAIVE = "WAIVE";
     private static final String FEE_COMPENSATE = "COMPENSATE";
-    private static final String FEE_DEPOSIT = "DEPOSIT";
 
     private final CabinetService cabinets;
     private final LocService loc;
@@ -112,7 +111,22 @@ public class ConsumerOrderAssembler {
         add(out, FEE_COUPON, coupon.negate());
         add(out, FEE_WAIVE, waived.negate());
         add(out, FEE_COMPENSATE, o.compensateAmount());
-        add(out, FEE_DEPOSIT, BigDecimal.valueOf(o.depositAmount()));
+        /*
+         * **押金不进这张表**（2026-09-27 H5 对接实测）。
+         *
+         * 它此前是这里的最后一行，于是订单详情页上是这样的：
+         *     租借费   3.00
+         *     押金    50.00
+         *     ────────────
+         *     合计     3.00
+         * —— 端上合计取的是 feeAmount（实付），而明细里多一笔 50。
+         * **账在屏幕上加不起来**，正是上面那段注释说要避免的「看着就不像账」。
+         *
+         * 押金不是费用：它可退，也不构成本单应付。而它本来就有自己的出参字段
+         * {@code depositAmount}，端上应当在合计之下单独列一行「押金（可退）」。
+         * 放进 fees 等于让同一笔钱在契约里出现两次，而其中一次还会破坏
+         * 「逐项相加 = 实付」这条本表唯一的不变量。
+         */
         return out;
     }
 

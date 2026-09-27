@@ -34,6 +34,7 @@ export default {
     nearby: "المحطات القريبة",
     map: "خريطة",
     list: "قائمة",
+    returnableOnly: "عرض المحطات التي بها منافذ فارغة فقط",
   },
   borrow: {
     confirm: "تأكيد الاستعارة",
@@ -60,6 +61,10 @@ export default {
     couponThreshold: "عند الإنفاق {v} أو أكثر",
     couponCut: "خصم {v}",
     couponOff: "خصم {v}%",
+    failed: "لم يخرج الشاحن",
+    failedTip: "لم تؤكد المحطة العملية في الوقت المتوقع. لم تبدأ محاسبة هذا الطلب بعد؛ وإذا تم حجز مبلغ للضمان فسيُحرَّر بعد المراجعة. جرّب محطة أخرى أو أبلغنا بما حدث.",
+    tryAnother: "جرّب محطة أخرى",
+    reportIt: "الإبلاغ عن مشكلة",
   },
   orders: {
     title: "طلباتي",
@@ -74,9 +79,12 @@ export default {
     timeline: "مسار الحالة",
     feeDetail: "تفاصيل الرسوم",
     total: "الإجمالي",
+    depositRefundable: "وديعة (قابلة للاسترداد)",
     report: "الإبلاغ عن مشكلة",
     buyout: "شراء",
     capNote: "لا رسوم بعد الحد اليومي",
+    findReturn: "ابحث عن محطة للإرجاع",
+    feeAtReturn: "تُحتسب الرسوم عند الإرجاع",
   },
   feedback: {
     pickType: "اختر نوع المشكلة أولاً",
