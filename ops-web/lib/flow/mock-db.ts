@@ -178,16 +178,17 @@ function slaOf(r: TicketRec, now: number): SlaSummary {
   };
 }
 
-const act = (code: string, name: string, toCategory?: StatusCategory): TicketAction =>
+const act = (code: string, name: string, toCategory: StatusCategory): TicketAction =>
   ({ code, name, requires: { fields: [], comment: false }, toCategory });
 
 /** 服务端算动作：状态 × SLA × 受理方。页面只渲染这里给的 */
 function actionsOf(r: TicketRec, state: SlaState): TicketAction[] {
   if (!OPEN.includes(r.status)) return [];
   const out: TicketAction[] = [];
-  if (state === "BREACHED" && r.assignee && r.assignee.ref !== ME.ref) out.push(act("TAKEOVER", "接管"));
-  if (r.status === "PENDING_ACCEPT" && !r.pooled) out.push(act("NUDGE", "催办"));
-  if (r.status === "PROCESSING" && !r.escalated) out.push(act("ESCALATE", "升级"));
+  const cat = STATUS[r.status].category;
+  if (state === "BREACHED" && r.assignee && r.assignee.ref !== ME.ref) out.push(act("TAKEOVER", "接管", cat));
+  if (r.status === "PENDING_ACCEPT" && !r.pooled) out.push(act("NUDGE", "催办", cat));
+  if (r.status === "PROCESSING" && !r.escalated) out.push(act("ESCALATE", "升级", cat));
   if (r.status === "PENDING_REVIEW") out.push(act("REVIEW", "复核", "DONE"));
   return out;
 }

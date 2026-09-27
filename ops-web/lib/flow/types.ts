@@ -9,8 +9,8 @@
 // 名称类字段一律用服务给的 `name`（已按 Accept-Language 选好），前端不查字典、不内置业务词：
 //   办理人类型（代理/员工/客服）来自成员属性 assignee.attrs；工单来源来自类型字段 fields.source。
 //
-// 标 ⏳ 的字段是**前端已向后端提出、待确认**的补充（见 22-前端方案 README §二）；
-// 后端确认前，页面对它们一律做缺省处理（没有就不画 / 不显示），不会因为缺字段而报错。
+// 2026-09-27 前端提出的 4 项补充（行内 actions、行内 sla、动作 toCategory、按成员属性筛选）
+// 后端已全部接受并写进 21/06 §七。
 
 export type TodoOrigin = "PROCESS" | "TICKET";
 export type TodoKind = "WORK" | "APPROVAL";
@@ -35,7 +35,10 @@ export interface SlaSummary {
   pausedMs: number;
 }
 
-/** 成员属性里的一项（租户自定义，如 partyType）。⏳ 形状待后端确认：是否同时给显示名 */
+/**
+ * 成员属性里的一项（租户自定义，如 partyType）。name 来自空间的「成员属性定义」（后端 21/07 O1-12，
+ * 未实现前只给 value）—— **没有 name 就显示原值**，前端不内置「代理 / 员工」这类词。
+ */
 export interface MemberAttr { value: string; name?: string }
 
 export interface Member {
@@ -44,7 +47,11 @@ export interface Member {
   attrs?: Record<string, MemberAttr>;
 }
 
-/** 类型字段的值（选项集字段带显示名） */
+/**
+ * 类型字段的值：选项 / 成员 / 组带 name；文本、数字只有 value；日期时间的 value 是毫秒；
+ * 外部引用的 value 是 {type, ref, display}。字段代号由租户在工单类型里定义 —— 通用渲染要按类型的
+ * 字段配置来，不要假定代号（ShareHub 的类型定义了 source 与 sourceRef，工作台的「来源」列用的就是它们）。
+ */
 export interface FieldValue { value: unknown; name?: string }
 
 // ── 待办 ────────────────────────────────────────────────────────────────
@@ -87,8 +94,8 @@ export interface TicketAction {
   code: string;
   name: string;
   requires: { fields: string[]; comment: boolean };
-  /** ⏳ 迁移后的状态大类：前端据此把「推进到 DONE」的动作画成主按钮 */
-  toCategory?: StatusCategory;
+  /** 迁移后的状态大类（由流程定义推出）：前端据此把「推进到 DONE」的动作画成主按钮 */
+  toCategory: StatusCategory;
 }
 
 export interface TicketRow {
@@ -108,10 +115,10 @@ export interface TicketRow {
   updatedAtMs: number;
   /** 列表配置里要显示的可筛选字段（如 source 来源、sourceRef 来源单号） */
   fields: Record<string, FieldValue>;
-  /** ⏳ 与 TodoItem 同形的 SLA 摘要：画「剩余比例」色条要用；没有就只显示文字 */
+  /** 与 TodoItem 同形的 SLA 摘要（到期最近的运行中指标）；没有运行中指标时不给，只显示文字 */
   sla?: SlaSummary;
-  /** ⏳ 行内快捷动作（原型工作台每行都有）；没有就不出按钮，进详情办理 */
-  actions?: TicketAction[];
+  /** 行内快捷动作：与详情同形、全量（只含当前操作人可走的迁移） */
+  actions: TicketAction[];
 }
 
 /** 工单查询（21/06 tickets/query 中界面上有筛选控件的那部分） */
@@ -119,7 +126,10 @@ export interface TicketQuery {
   typeCode?: string[];
   statusCategory?: StatusCategory[];
   slaState?: SlaState[];
-  /** ⏳ 按成员属性筛受理方（如 partyType=AGENT）；原型「受理方：全部」 */
+  /**
+   * 按成员属性筛受理方（如 partyType=AGENT）。服务先取匹配成员再 IN 过滤；
+   * 匹配超过 5000 人返回 422 opskit.ticket.filter_too_broad —— 提示改用组筛选。
+   */
   assigneeAttr?: { key: string; values: string[] };
   keyword?: string;
   /** 关闭时间下界（「今日关闭」统计卡的口径） */

@@ -23,8 +23,11 @@ import { PriorityBadge, TicketStatusBadge } from "@/components/flow/badges";
 // 筛选项都来自服务（工单类型 / 成员属性定义），不在前端内置业务词（21/06 §七）
 const TYPE_OPTIONS = flow.ticketTypes().map((t) => ({ value: t.code, label: t.name }));
 const PARTY_OPTIONS = flow.partyOptions().map((p) => ({ value: p.code, label: p.name }));
-/** 受理方显示：成员属性 partyType 的显示名 + 成员名 */
-const memberLabel = (m: Member) => [m.attrs?.partyType?.name, m.displayName].filter(Boolean).join(" · ");
+/** 受理方显示：成员属性 partyType 的显示名（未定义显示名时用原值）+ 成员名 */
+const memberLabel = (m: Member) => {
+  const party = m.attrs?.partyType;
+  return [party?.name ?? party?.value, m.displayName].filter(Boolean).join(" · ");
+};
 
 /**
  * @form-none 批量改派提交到 OpsKit（opskit-svc 的 POST /workspaces/{ws}/tickets/reassign，21/06），
@@ -104,7 +107,7 @@ export default function FlowTicketsPage() {
       className: "text-end",
       cell: (t) => (
         <span className="inline-flex justify-end gap-2">
-          {(t.actions ?? []).map((a) => (
+          {t.actions.map((a) => (
             <Button
               key={a.code}
               size="sm"

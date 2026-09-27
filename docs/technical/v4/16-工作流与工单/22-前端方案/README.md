@@ -45,10 +45,12 @@
 | R6 | 出 `openapi.yaml` 入库，前端类型从它生成 | 21/06 头注（`openapi/{platform,process,ticket}.yaml`） | 待后端 M2/M3 |
 | R7 | 宿主登出后下一次请求即 401 | 内省结果缓存上限 5 分钟 | ⚠️ 最长 5 分钟延迟，需产品确认可接受 |
 | R8 | 列表出参字段（TodoItem / TicketRow） | 21/06 §七 | ✅ 定稿，前端已同形 |
-| R9 | ⏳ TicketRow 带 `actions[]`（工作台行内快捷按钮，否则 N+1） | —— | 已提请后端，待答复 |
-| R10 | ⏳ TicketRow 带 `sla{state,startedAtMs,dueAtMs,pausedMs}`（剩余比例色条） | —— | 已提请，前端没有时只显示文字 |
-| R11 | ⏳ actions 每项带 `toCategory`（推进到 DONE 的画主按钮） | —— | 已提请 |
-| R12 | ⏳ tickets/query 支持 `assigneeAttr{key, values}`（「受理方」筛选） | —— | 已提请 |
+| R9 | TicketRow 带 `actions[]`（工作台行内快捷按钮，否则 N+1） | 21/06 §七 | ✅ 后端已接受（全量，与详情同形） |
+| R10 | TicketRow 带 `sla{state,startedAtMs,dueAtMs,pausedMs}`（剩余比例色条） | 21/06 §七 | ✅ 后端已接受（到期最近的运行中指标） |
+| R11 | actions 每项带 `toCategory`（推进到 DONE 的画主按钮） | 21/06 §七 | ✅ 后端已接受 |
+| R12 | tickets/query 支持 `assigneeAttr{key, values}`（「受理方」筛选） | 21/06 §七 | ✅ 后端已接受；匹配成员 > 5000 返回 422 `filter_too_broad` |
+
+**成员属性显示名**（后端 21/07 O1-12）未实现前只给原值，前端没有 name 就显示原值。
 
 **不写死业务词**（后端要求，前端已照做）：办理人类型取 `assignee.attrs.partyType`、来源取 `fields.source`、
 优先级色调按 `priority.ordinal`、类型与状态名用服务给的 `name`。
