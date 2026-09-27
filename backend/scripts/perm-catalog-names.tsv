@@ -192,3 +192,14 @@ workorder:wo:handle	工单 接单/处理/完成	workorder	1
 workorder:wo:process	工单 处理	workorder	1
 workorder:wo:read	工单 查看/看板	workorder	1
 workorder:wo:update	工单 编辑	workorder	1
+# 流程与工单 flow：强制方 OpsKit（功能权限清单 §16），ShareHub 不强制 → 第四列 0
+flow:todo:read	流程与工单 · 待办中心	flow	0
+flow:approval:read	流程与工单 · 审批 查看	flow	0
+flow:approval:decide	流程与工单 · 审批 通过/驳回	flow	0
+flow:queue:claim	流程与工单 · 审核队列 领取/决定	flow	0
+flow:ticket:read	流程与工单 · 工单 查看	flow	0
+flow:ticket:handle	流程与工单 · 工单 办理/抢单	flow	0
+flow:ticket:dispatch	流程与工单 · 工单 派单/改派/升级	flow	0
+flow:process:manage	流程与工单 · 流程配置	flow	0
+flow:config:manage	流程与工单 · 运营配置（SLA/日历/队列）	flow	0
+flow:access:manage	流程与工单 · 接入管理（应用/凭证/投递）	flow	0

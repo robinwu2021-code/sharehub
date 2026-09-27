@@ -23,6 +23,12 @@ ADMIN 有 `*`、各角色有模块通配（`workorder:*`），所以窄授权之
 """
 import re, sys, pathlib, collections
 
+# 外部强制模块：前端用这些码做门禁，但强制方不是 ShareHub 后端（contract / @perm.can 里不会出现）。
+# 口径与 backend/scripts/perm-ssot-align.py 的 EXTERNAL_MODULES **必须一致** —— 改一处就要改另一处。
+EXTERNAL_MODULES = {
+    'flow': 'OpsKit（opskit-svc）—— 按 21/07 P3「权限码 → OpsKit 角色映射」判权；真源表 §16',
+}
+
 REPO = pathlib.Path(__file__).resolve().parents[2]
 OPS = REPO / "ops-web"
 
@@ -93,6 +99,8 @@ ghost = {}
 for _c, _v in fe.items():
     _t = umap.get(_c, _c)          # 未登记 → 按字面码算（perm-map.test.ts 另有守卫）
     if _t is None:                 # UNIMPLEMENTED
+        continue
+    if _t.split(":", 1)[0] in EXTERNAL_MODULES:  # 强制方不是 ShareHub，见 EXTERNAL_MODULES
         continue
     if _t not in be:
         ghost[_c] = _v

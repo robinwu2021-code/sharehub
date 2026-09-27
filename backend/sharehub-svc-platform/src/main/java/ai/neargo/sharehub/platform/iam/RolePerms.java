@@ -18,6 +18,8 @@ public final class RolePerms {
     public static final Map<String, List<String>> MAP = Map.of(
             "ADMIN", List.of("*"),
             "OPS", List.of(
+                    // 流程与工单（强制方 OpsKit，功能权限清单 §16）
+                    "flow:todo:read", "flow:approval:read", "flow:approval:decide", "flow:queue:claim", "flow:ticket:read", "flow:ticket:handle", "flow:ticket:dispatch", "flow:config:manage",
                     "dashboard:overview:read", "dashboard:todo:read",
                     "device:cabinet:*", "device:slot:read", "device:powerbank:*",
                     "device:command:*", "device:inventory:*", "device:ota:*", "device:vendor:read",
@@ -37,6 +39,8 @@ public final class RolePerms {
                     // 暂按前端既有配置保留（删了会让运维看不到系统参数），确认后补进清单或改码。
                     "system:market:read", "system:param:read"),
             "CS", List.of(
+                    // 流程与工单（强制方 OpsKit，功能权限清单 §16）
+                    "flow:todo:read", "flow:approval:read", "flow:approval:decide", "flow:queue:claim", "flow:ticket:read", "flow:ticket:handle",
                     "dashboard:overview:read", "dashboard:todo:read",
                     "device:cabinet:read", "device:slot:read", "device:command:send",
                     "order:order:read", "order:order:export", "order:exception:read", "order:exception:handle",
@@ -60,6 +64,8 @@ public final class RolePerms {
                     "system:notify_log:read", "system:notify_blacklist:read", "system:notify_blacklist:update",
                     "system:problem:read", "system:problem:update"),
             "FINANCE", List.of(
+                    // 流程与工单（强制方 OpsKit，功能权限清单 §16）
+                    "flow:todo:read", "flow:approval:read", "flow:approval:decide",
                     "dashboard:overview:read", "dashboard:todo:read",
                     "order:order:read", "order:order:export", "order:refund:audit",
                     // 押金解冻/买断与欠费催缴（真源表 §4）：动钱的归财务，
@@ -86,16 +92,22 @@ public final class RolePerms {
                     "system:bank:read", "system:bank:update", "system:tax:update",
                     "system:biz_rule:update", "system:payment_channel:read"),
             "BD", List.of(
+                    // 流程与工单（强制方 OpsKit，功能权限清单 §16）
+                    "flow:todo:read", "flow:approval:read",
                     "dashboard:overview:read", "location:*", "pricing:rule:read", "pricing:rule:update",
                     "marketing:*", "agent:*",
                     "finance:share_rule:read", "finance:share_record:read", "report:*"),
             "VIEWER", List.of(
+                    // 流程与工单（强制方 OpsKit，功能权限清单 §16）
+                    "flow:approval:read", "flow:ticket:read",
                     "dashboard:overview:read", "dashboard:todo:read",
                     "device:cabinet:read", "device:slot:read", "order:order:read",
                     "location:poi:read", "location:venue:read", "location:analysis:read", "location:overview:read",
                     "finance:share_rule:read", "finance:share_record:read", "finance:settlement:read",
                     "finance:withdrawal:read", "agent:agent:read", "report:*"),
             "AGENT", List.of(
+                    // 流程与工单（强制方 OpsKit，功能权限清单 §16）
+                    "flow:todo:read", "flow:ticket:read", "flow:ticket:handle",
                     "dashboard:overview:read", "device:cabinet:read", "device:slot:read",
                     // ⚠️ workorder:wo:read：功能权限清单 §7 未给 AGENT（D6d 待确认）。
                     // **保留**的理由：代理门户有「设备报修」（wo:create），能提报却看不到自己提的工单

@@ -50,9 +50,29 @@
 // 全站零 DELETE —— **归档走的是 `:update`**（/api/ops/cabinets/{no}/archive
 // 用 device:cabinet:update），`:delete` 这一档从头到尾没有对应能力。
 // 留着它们的后果是角色勾选树上多一个勾不出任何东西的「删」。
+/**
+ * 外部强制模块：前端用这些码做门禁，**强制方不是 ShareHub 后端**，所以它们在 contract.json 里本就不会出现。
+ * 与两个 Python 卡口的同名常量口径一致（backend/scripts/perm-ssot-align.py、ops-web/scripts/check-perm-parity.py），
+ * 改一处就要改另外两处；真源表对应一节写明强制方。
+ */
+export const EXTERNAL_PERM_MODULES: Record<string, string> = {
+  flow: "OpsKit（opskit-svc）—— 按 21/07 P3「权限码 → OpsKit 角色映射」判权；真源表 §16",
+};
+
 export const UNIMPLEMENTED = Symbol("backend-unimplemented");
 
 export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
+  // 流程与工单（强制方 OpsKit，见 EXTERNAL_PERM_MODULES）：界面码即 OpsKit 映射用的码，恒等
+  "flow:access:manage": "flow:access:manage",
+  "flow:approval:decide": "flow:approval:decide",
+  "flow:approval:read": "flow:approval:read",
+  "flow:config:manage": "flow:config:manage",
+  "flow:process:manage": "flow:process:manage",
+  "flow:queue:claim": "flow:queue:claim",
+  "flow:ticket:dispatch": "flow:ticket:dispatch",
+  "flow:ticket:handle": "flow:ticket:handle",
+  "flow:ticket:read": "flow:ticket:read",
+  "flow:todo:read": "flow:todo:read",
   // ——— agent ———
   "agent:account:manage": "agent:account:manage",
   "agent:agent:create": "agent:agent:create",

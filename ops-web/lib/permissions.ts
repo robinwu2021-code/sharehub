@@ -24,6 +24,8 @@ export const BACKEND_ROLE_PERMS: Record<Role, string[]> = {
   ],
   // 运维：设备、工单、巡检、OTA、系统参数。
   OPS: [
+    // 流程与工单（强制方 OpsKit，功能权限清单 §16）
+    "flow:todo:read", "flow:approval:read", "flow:approval:decide", "flow:queue:claim", "flow:ticket:read", "flow:ticket:handle", "flow:ticket:dispatch", "flow:config:manage",
     "dashboard:overview:read", "dashboard:todo:read", "device:cabinet:*", "device:slot:read",
     "device:powerbank:*", "device:command:*", "device:inventory:*", "device:ota:*",
     "device:vendor:read", "location:poi:read", "location:venue:read", "location:overview:read",
@@ -34,6 +36,8 @@ export const BACKEND_ROLE_PERMS: Record<Role, string[]> = {
   ],
   // 客服：订单干预、用户、会话、通知、问题字典。**不碰钱**。
   CS: [
+    // 流程与工单（强制方 OpsKit，功能权限清单 §16）
+    "flow:todo:read", "flow:approval:read", "flow:approval:decide", "flow:queue:claim", "flow:ticket:read", "flow:ticket:handle",
     "dashboard:overview:read", "dashboard:todo:read", "device:cabinet:read", "device:slot:read",
     "device:command:send", "order:order:read", "order:order:export", "order:exception:read",
     "order:exception:handle", "order:intervene:execute", "order:refund:apply",
@@ -51,6 +55,8 @@ export const BACKEND_ROLE_PERMS: Record<Role, string[]> = {
   ],
   // 财务：计价、分润、结算、提现、银行字典、税率、支付渠道。
   FINANCE: [
+    // 流程与工单（强制方 OpsKit，功能权限清单 §16）
+    "flow:todo:read", "flow:approval:read", "flow:approval:decide",
     // 押金解冻/买断与欠费催缴（真源表 §4）：动钱的归财务。
     // 后端三个端点此前用的是 order:deposit:update 与 order:intervene:execute，
     // 前者无人持有、后者是客服的码 —— 财务反而做不了，而客服能解冻。2026-09-25 已修。
@@ -70,12 +76,16 @@ export const BACKEND_ROLE_PERMS: Record<Role, string[]> = {
   ],
   // 拓展：场地方、代理商、营销、报表。
   BD: [
+    // 流程与工单（强制方 OpsKit，功能权限清单 §16）
+    "flow:todo:read", "flow:approval:read",
     "dashboard:overview:read", "location:*", "pricing:rule:read", "pricing:rule:update",
     "marketing:*", "agent:*", "finance:share_rule:read", "finance:share_record:read",
     "report:*",
   ],
   // 只读。
   VIEWER: [
+    // 流程与工单（强制方 OpsKit，功能权限清单 §16）
+    "flow:approval:read", "flow:ticket:read",
     "dashboard:overview:read", "dashboard:todo:read", "device:cabinet:read", "device:slot:read",
     "order:order:read", "location:poi:read", "location:venue:read", "location:analysis:read",
     "location:overview:read", "finance:share_rule:read", "finance:share_record:read",
@@ -83,6 +93,8 @@ export const BACKEND_ROLE_PERMS: Record<Role, string[]> = {
   ],
   // 代理商：**强制数据范围 = 自己的主体**，看到什么由数据范围再收一道。
   AGENT: [
+    // 流程与工单（强制方 OpsKit，功能权限清单 §16）
+    "flow:todo:read", "flow:ticket:read", "flow:ticket:handle",
     "dashboard:overview:read", "device:cabinet:read", "device:slot:read", "workorder:wo:create",
     "workorder:wo:read", "order:order:read", "finance:share_record:read",
     "finance:withdrawal:apply", "agent:settlement:read", "location:poi:read", "finance:payout_account:read",
