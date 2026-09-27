@@ -403,9 +403,16 @@ export interface Notice {
  */
 export interface MessageItem {
   messageNo: string;
+  /** ORDER / WALLET / COUPON / SYSTEM / ACTIVITY / CS */
   type: string;
+  // 三语三列全量下发、由端按当前语种取（[db-design §1.5]，同 Notice）——
+  // 后端挑语言要先知道「这个用户此刻把界面切到了哪一种」，而那只有端上知道
   title: string;
+  titleEn: string;
+  titleAr: string;
   body: string;
+  bodyEn: string;
+  bodyAr: string;
   read: boolean;
   readAt: string | null;
   createdAt: string;

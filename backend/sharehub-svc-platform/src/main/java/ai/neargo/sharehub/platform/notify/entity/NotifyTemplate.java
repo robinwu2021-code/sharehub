@@ -19,7 +19,14 @@ import lombok.EqualsAndHashCode;
 public class NotifyTemplate extends BaseEntity {
     private String templateNo;
     private String name;
-    /** SMS / EMAIL / PUSH / WHATSAPP */
+    /**
+     * INAPP / PUSH / SMS / SUBSCRIBE —— 写入时由 {@code NotifyTemplateChannel} 校验。
+     *
+     * <p>此处原本注着 {@code SMS / EMAIL / PUSH / WHATSAPP}，那是 {@code notify_blacklist}
+     * 与 {@code notify_log} 的词表（本仓库有四套 channel 词表，两两不同，
+     * 见 {@code NotifyTemplateChannel} 类注释里的对照表）。**注释与写入时校验对不上**，
+     * 照它配 {@code EMAIL} 会被 400 拒 —— 而看注释的人不会知道为什么。
+     */
     private String channel;
     /** ar / en / zh */
     private String lang;

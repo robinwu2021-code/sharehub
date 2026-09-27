@@ -434,7 +434,7 @@ InnoDB · `utf8mb4_0900_ai_ci` · 金额 `DECIMAL(18,2)` + `currency VARCHAR(8) 
 | 表 | 说明 | 关键列 | C端编号 |
 |----|------|-------|---|
 | `usr_favorite` `NEW` | 收藏门店 | c_user_no, site_no, created_at；UK(c_user_no,site_no) | c-app `/mp/user/favorites` |
-| `usr_message` `NEW` | 站内消息中心 | `message_no` UK, tenant_id, c_user_no, type, title, body, **is_read**（`read` 是 MySQL 保留字）, read_at, created_at | C-MS-03 |
+| `usr_message` `NEW` | 站内消息中心 | `message_no` UK, tenant_id, c_user_no, type(ORDER/WALLET/COUPON/SYSTEM/ACTIVITY/CS), **title, title_en, title_ar**, **body, body_en, body_ar**（§1.5 三语三列，V133 补 —— 本行此前只写 title/body，是**规范自己违反了自己的 §1.5**，实现照抄了它）, **is_read**（`read` 是 MySQL 保留字）, read_at, created_at | C-MS-03 |
 | `usr_push_token` `NEW` | Push token 注册 | c_user_no, platform(APNS/FCM/UNIPUSH), token, device_id, active；UK(platform,token) | C-MS-01 |
 | `usr_notify_pref` `NEW` | 通知偏好 | c_user_no, category, enabled, quiet_start, quiet_end, lang；UK(c_user_no,category) | C-MS-04 |
 | `usr_invoice_title` `NEW` | 发票抬头 | `title_no` UK, c_user_no, type(PERSONAL/COMPANY), title, **vat_trn**, is_default | C-IV-02 |

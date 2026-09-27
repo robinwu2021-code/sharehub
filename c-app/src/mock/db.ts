@@ -207,11 +207,15 @@ export const notices: Notice[] = [
   },
 ];
 
-// 站内信：每人一份、有已读态（公告没有这回事）
+// 站内信：每人一份、有已读态（公告没有这回事）。三语三列，同 Notice（[db-design §1.5]）
+//
+// ⚠️ type 只能取后端词表里的值：ORDER / WALLET / COUPON / SYSTEM / ACTIVITY / CS。
+// 此前这里写着 REFUND 与 MARKETING —— 后端产不出这两个值，于是 mock 下按 type 做的
+// 任何筛选/图标映射在真后端下都会落空，而两边各自都跑得通。
 export const messages: MessageItem[] = [
-  { messageNo: "MSG000003", type: "ORDER", title: "订单已结算", body: "订单 ORD000031 已结算，费用 AED 6.00。", read: false, readAt: null, createdAt: "2026-09-21 08:30:00" },
-  { messageNo: "MSG000002", type: "REFUND", title: "退款已到账", body: "退款单 RF000003 已原路退回 AED 4.00，到账时间以发卡行为准。", read: false, readAt: null, createdAt: "2026-09-20 15:10:00" },
-  { messageNo: "MSG000001", type: "MARKETING", title: "新人礼包已发放", body: "AED 5 无门槛券已放入你的券包，7 天内有效。", read: true, readAt: "2026-09-10 09:02:00", createdAt: "2026-09-10 09:00:00" },
+  { messageNo: "MSG00000003", type: "ORDER", title: "订单已结算", titleEn: "Order settled", titleAr: "تمت تسوية الطلب", body: "订单 ORD000031 已结算，实付 6.00 AED。", bodyEn: "Order ORD000031 settled. You paid 6.00 AED.", bodyAr: "تمت تسوية الطلب ORD000031. المبلغ المدفوع 6.00 AED.", read: false, readAt: null, createdAt: "2026-09-21 08:30:00" },
+  { messageNo: "MSG00000002", type: "WALLET", title: "退款已到账", titleEn: "Refund completed", titleAr: "تم استرداد المبلغ", body: "退款单 RF000003 已原路退回 4.00 AED，到账时间以发卡行为准。", bodyEn: "Refund RF000003 of 4.00 AED has been returned to the original payment method; posting time depends on your bank.", bodyAr: "تم إرجاع مبلغ 4.00 AED للطلب RF000003 إلى وسيلة الدفع الأصلية؛ يعتمد وقت الإيداع على البنك.", read: false, readAt: null, createdAt: "2026-09-20 15:10:00" },
+  { messageNo: "MSG00000001", type: "COUPON", title: "新人礼包已发放", titleEn: "Welcome coupon issued", titleAr: "تم إصدار قسيمة الترحيب", body: "5.00 AED 无门槛券已放入你的券包，7 天内有效。", bodyEn: "A 5.00 AED no-minimum coupon has been added to your wallet, valid for 7 days.", bodyAr: "تمت إضافة قسيمة بقيمة 5.00 AED بدون حد أدنى إلى محفظتك، صالحة لمدة 7 أيام.", read: true, readAt: "2026-09-10 09:02:00", createdAt: "2026-09-10 09:00:00" },
 ];
 
 export const appVersion: AppVersionCheck = {

@@ -84,7 +84,16 @@ public final class UserCoreDtos {
     // ——————————————————————— C 端专属 ———————————————————————
 
     /** 站内消息。实体列是 {@code is_read}（MySQL 保留字规避），VO 里回到业务语义 {@code read}。 */
-    public record MessageItem(String messageNo, String type, String title, String body,
+    /**
+     * 站内消息。
+     *
+     * <p><b>三语全量下发、由端按当前语种取</b>（[db-design §1.5]，同 {@code Notice}）——
+     * 后端挑语言要先知道「这个用户此刻把界面切到了哪一种」，而那只有端上知道。
+     * 返单语的后果是阿语界面上出现一句中文，且不报错。
+     */
+    public record MessageItem(String messageNo, String type,
+                              String title, String titleEn, String titleAr,
+                              String body, String bodyEn, String bodyAr,
                               boolean read, String readAt, String createdAt) {
     }
 

@@ -44998,7 +44998,23 @@
      "type": "String"
     },
     {
+     "name": "titleEn",
+     "type": "String"
+    },
+    {
+     "name": "titleAr",
+     "type": "String"
+    },
+    {
      "name": "body",
+     "type": "String"
+    },
+    {
+     "name": "bodyEn",
+     "type": "String"
+    },
+    {
+     "name": "bodyAr",
      "type": "String"
     },
     {
@@ -45049,7 +45065,23 @@
      "type": "String"
     },
     {
+     "name": "titleEn",
+     "type": "String"
+    },
+    {
+     "name": "titleAr",
+     "type": "String"
+    },
+    {
      "name": "body",
+     "type": "String"
+    },
+    {
+     "name": "bodyEn",
+     "type": "String"
+    },
+    {
+     "name": "bodyAr",
      "type": "String"
     },
     {
@@ -46202,7 +46234,7 @@
  ],
  "stats": {
   "endpoints": 523,
-  "records": 473,
+  "records": 474,
   "withPerm": 450,
   "withBody": 221,
   "shapedResponses": 408

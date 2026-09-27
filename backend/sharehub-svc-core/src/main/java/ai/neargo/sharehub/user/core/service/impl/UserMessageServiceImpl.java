@@ -66,7 +66,9 @@ public class UserMessageServiceImpl implements UserMessageService {
     }
 
     private static MessageItem toVO(UsrMessage e) {
-        return new MessageItem(e.getMessageNo(), e.getType(), e.getTitle(), e.getBody(),
+        return new MessageItem(e.getMessageNo(), e.getType(),
+                e.getTitle(), e.getTitleEn(), e.getTitleAr(),
+                e.getBody(), e.getBodyEn(), e.getBodyAr(),
                 Integer.valueOf(1).equals(e.getIsRead()), e.getReadAt(),
                 e.getCreatedAt() == null ? null : e.getCreatedAt().toString());
     }

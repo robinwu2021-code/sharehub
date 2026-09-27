@@ -12,7 +12,12 @@
 import { ref, computed } from "vue";
 import { onShow, onLoad } from "@dcloudio/uni-app";
 import { useUserStore } from "@/stores/user";
-import { noticeTitle as noticeTitleOf, noticeBody as noticeBodyOf } from "@/shared/notice";
+import {
+  noticeTitle as noticeTitleOf,
+  noticeBody as noticeBodyOf,
+  messageTitle as messageTitleOf,
+  messageBody as messageBodyOf,
+} from "@/shared/notice";
 import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
 import { api } from "@/api";
@@ -43,6 +48,10 @@ const options = computed(() => [
 // 挑语言的规则与首页公告条共用一份（shared/notice.ts）
 const noticeTitle = (n: Notice) => noticeTitleOf(n, app.lang);
 const noticeBody = (n: Notice) => noticeBodyOf(n, app.lang);
+
+// 站内信也是三语三列（V133），规则与公告共用同一份 pick，否则两处迟早分叉
+const messageTitle = (m: MessageItem) => messageTitleOf(m, app.lang);
+const messageBody = (m: MessageItem) => messageBodyOf(m, app.lang);
 
 const unread = computed(() => messages.value.filter((m) => !m.read).length);
 
@@ -96,10 +105,10 @@ async function open(m: MessageItem) {
         @tap="open(m)"
       >
         <view class="flex items-center justify-between">
-          <text class="text-[30rpx] font-bold text-ink">{{ m.title }}</text>
+          <text class="text-[30rpx] font-bold text-ink">{{ messageTitle(m) }}</text>
           <view v-if="!m.read" class="pb-dot-red" />
         </view>
-        <text class="mt-[12rpx] block text-[26rpx] text-sub" style="line-height: 1.6">{{ m.body }}</text>
+        <text class="mt-[12rpx] block text-[26rpx] text-sub" style="line-height: 1.6">{{ messageBody(m) }}</text>
         <text class="mt-[14rpx] block text-[22rpx] text-sub">{{ m.createdAt }}</text>
       </pb-card>
       <pb-empty v-if="!loading && !messages.length" icon="bell" :text="$t('notice.noMessages')" />
