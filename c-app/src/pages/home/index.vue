@@ -107,20 +107,23 @@ function goConfirm(cabinetNo: string) {
   if (ensureLoggedIn(url)) uni.navigateTo({ url });
 }
 
-async function onScan() {
+function openManual() {
+  manualNo.value = "";
+  showManual.value = true;
+}
+
+/** 主按钮：能扫码的端去扫，扫不了的端直接手输。 */
+async function onPrimary() {
   if (!canScan) {
-    manualNo.value = "";
-    showManual.value = true;
+    openManual();
     return;
   }
   try {
     goConfirm(await scanCabinet());
   } catch (e) {
-    // 用户主动取消不该弹错误提示；其余失败给一句「扫不出来就手输」的出口
-    const msg = (e as Error).message || "";
-    if (/cancel/i.test(msg)) return;
-    manualNo.value = "";
-    showManual.value = true;
+    // 用户主动取消不该弹错误提示；其余失败（没授权/相机被占用）回落到手输
+    if (/cancel/i.test((e as Error).message || "")) return;
+    openManual();
   }
 }
 </script>
@@ -162,7 +165,7 @@ async function onScan() {
 
       <!-- 列表（填满剩余高度，可滚动） -->
       <scroll-view v-show="view === 'list'" scroll-y class="pb-home__fill pb-home__list">
-        <view class="flex flex-col gap-[24rpx] pb-[220rpx]">
+        <view class="flex flex-col gap-[24rpx] pb-[360rpx]">
           <view v-for="(c, i) in list" :key="c.cabinetNo" class="pb-rise" :style="{ animationDelay: i * 50 + 'ms' }" @tap="openStore(c)">
             <pb-card>
               <view class="flex items-center">
@@ -195,10 +198,23 @@ async function onScan() {
       </scroll-view>
     </view>
 
-    <!-- 图标此前是 zap（闪电），读起来是「快充」不是「扫一扫」；文案与能力也要一致 -->
-    <view class="pb-fab" hover-class="pb-fab--press" :hover-stay-time="40" @tap="onScan">
+    <!--
+      借出的两个入口：扫码是主，输入编号是辅。
+      图标此前是 zap（闪电），读起来是「快充」不是「扫一扫」；文案与能力也要一致。
+    -->
+    <view class="pb-fab" hover-class="pb-fab--press" :hover-stay-time="40" @tap="onPrimary">
       <pb-icon :name="canScan ? 'scan' : 'keyboard'" :size="36" />
       <text>{{ canScan ? $t("home.scan") : $t("home.enterCabinet") }}</text>
+    </view>
+
+    <!--
+      次要入口只在**能扫码的端**出现：那里两种方式并存，扫码为主、手输为辅。
+      H5 本来就扫不了（uni.scanCode 是 App/小程序能力），主按钮已经是手输，
+      再挂一个同样的次要入口只是重复。
+    -->
+    <view v-if="canScan" class="pb-fab-alt" @tap="openManual">
+      <pb-icon name="keyboard" :size="26" />
+      <text>{{ $t("home.enterCabinet") }}</text>
     </view>
 
     <!-- 无扫码能力时的兜底：照着柜机上印的编号输 -->
@@ -229,7 +245,12 @@ async function onScan() {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: 196rpx;
+  /*
+   * 计入安全区：底栏自己加了 env(safe-area-inset-bottom)，会在刘海屏上变高，
+   * 而这两个浮层原本写的是固定 rpx —— 在那些机型上会被底栏顶掉。
+   */
+  bottom: calc(230rpx + constant(safe-area-inset-bottom));
+  bottom: calc(230rpx + env(safe-area-inset-bottom));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -253,4 +274,23 @@ async function onScan() {
   transition: transform 0.12s ease;
 }
 .pb-fab--press { transform: translateX(-50%) scale(0.96); }
+/*
+ * 次要入口：压在主按钮与底栏之间那道空档里（实测 400×800 下 FAB 底 695、底栏顶 739，
+ * 中间 44px）。刻意做得轻——它是「扫不出来时」的出口，不该跟主按钮抢注意力。
+ */
+.pb-fab-alt {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(150rpx + constant(safe-area-inset-bottom));
+  bottom: calc(150rpx + env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 8rpx 24rpx;
+  border-radius: 9999px;
+  color: var(--pb-sub);
+  font-size: 24rpx;
+  white-space: nowrap;
+}
 </style>
