@@ -4,7 +4,9 @@ android {
     namespace "ai.neargo.powerbank"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "ai.neargo.powerbank"
+        // 预览壳专用包名（真包是 ai.neargo.powerbank，走 DCloud 离线打包）。
+        // 同包名会互相顶掉，而拿错包时界面几乎一样、零报错 —— 见 capacitor.config.ts 注释。
+        applicationId "ai.neargo.powerbank.preview"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

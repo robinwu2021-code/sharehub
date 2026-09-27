@@ -20,6 +20,17 @@
       ],
       "port": 5174,
       "cwd": "c-app"
+    },
+    {
+      "name": "c-app-h5-mock",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev:h5:mock"
+      ],
+      "port": 5175,
+      "autoPort": true,
+      "cwd": "c-app"
     }
   ]
 }

@@ -1,0 +1,141 @@
+/*
+ * 离线打包的**构建期闸门**（两条，都在打包那一刻校验包里的东西，而不是事后体检）：
+ *
+ *   1. APK 的 versionCode 与包内 `www/manifest.json` 的 version.code 一致；
+ *   2. 包内 `www/pb-build-info.json` 说这份 www 不是 mock 构建、后端源不是本地地址。
+ *
+ * **为什么必须在构建期，而不是只靠 offline/verify-apk.sh：**
+ * 体检脚本只在有人记得跑的时候才存在。ai-shop 那边同样的两处 versionCode，
+ * 仓库里明明有体检脚本、脚本里明明有那一节，仍然发出过一个 APK=159/www=158 的包，
+ * 在测试机上跑了两个多小时 —— 因为那一节只打印不比对，而且没有任何流程调用它。
+ * **一个只能靠人记得跑的守卫，等于没有守卫。**
+ *
+ * ---
+ *
+ * 两处版本号是**两个来源**，各有各的消费者：
+ *
+ *   APK manifest 的 versionCode         ← 离线工程 build.gradle
+ *       消费者是 Android 系统：判断能不能覆盖安装、设置里显示成什么
+ *
+ *   包内 www/manifest.json 的 version.code ← c-app/src/manifest.json 经 build:app 产出
+ *       消费者是 DCloud 运行时：判断手机上已解压的 www 要不要替换
+ *
+ * 只抬前者 → **静默坏包**：装得上、系统里版本号是新的、零报错，
+ * 而运行时沿用旧 www。症状极难认：**页面代码走新、页面注册表走旧** ——
+ * 老页面的新内容都对，新增页面 navigateTo 静默不跳，logcat 一个字都没有。
+ *
+ * 第 2 条是 powerbank 特有的：`src/api/index.ts` 的判定是
+ * `VITE_USE_MOCK !== "0"`，也就是**不写就是 mock**。mock 构建打出来的包
+ * 界面全对（迪拜四个假门店、登录随便填都进、充值立刻到账），
+ * 而它一个后端请求都不发 —— 要点到下单那一步才可能起疑。
+ *
+ * 逻辑留在仓库里、离线工程只写一行 `apply from:`，是因为离线工程在仓库外
+ * （DCloud 网盘分发、不受版本控制），重解压一次 SDK 就把工程里的改动覆盖没了。
+ * **一行的接线丢了一眼看得出，几十行的逻辑丢了看不出。**
+ */
+
+import groovy.json.JsonSlurper
+
+/** 允许的后端源。给 `-PpbApiBase=...` 可覆盖（灰度/预发）。 */
+def expectedApiBase = project.hasProperty('pbApiBase') ? project.property('pbApiBase') : 'https://powerbank.ichain.top'
+
+tasks.register('checkAppBundleGates') {
+    group = 'verification'
+    description = '校验 versionCode 两处一致，且包内 www 不是 mock 构建'
+
+    doLast {
+        def apkVersionCode = android.defaultConfig.versionCode
+        if (apkVersionCode == null) {
+            throw new GradleException("build.gradle 里没有 versionCode，拒绝打包。")
+        }
+
+        def assetsRoot = new File(project.projectDir, 'src/main/assets/apps')
+        if (!assetsRoot.isDirectory()) {
+            throw new GradleException(
+                "找不到 ${assetsRoot} —— App 资源没拷进来？\n" +
+                "  正常流程是 c-app/offline/build-apk.sh 一条命令走完；\n" +
+                "  手工做的话：npm run build:app，再把 dist/build/app 拷进 assets/apps/<appid>/www/")
+        }
+
+        def checked = 0
+        assetsRoot.eachDir { appDir ->
+            def mf = new File(appDir, 'www/manifest.json')
+            if (!mf.exists()) {
+                throw new GradleException(
+                    "${appDir.name} 下没有 www/manifest.json —— 这个包里没有页面代码。\n  文件：${mf}")
+            }
+            def wwwCode = new JsonSlurper().parse(mf, 'UTF-8')?.version?.code
+            if (wwwCode == null || wwwCode.toString().trim().isEmpty()) {
+                throw new GradleException(
+                    "${mf} 里读不到 version.code。\n" +
+                    "  它来自 c-app/src/manifest.json 的 versionCode，那里也要有值。")
+            }
+            if (wwwCode.toString().trim() != apkVersionCode.toString()) {
+                throw new GradleException(
+                    "versionCode 两处不一致，拒绝打包。\n" +
+                    "  APK manifest（build.gradle）：${apkVersionCode}\n" +
+                    "  包内 www/manifest.json     ：${wwwCode}   ← ${mf}\n\n" +
+                    "  照这样打出来的包：系统显示 ${apkVersionCode}，实际跑的是 ${wwwCode} 那一版的页面代码，\n" +
+                    "  装得上、零报错、界面一模一样 —— 只有新页面点不开。\n\n" +
+                    "  正常流程不该撞到这条：build-apk.sh 以 c-app/src/manifest.json 为单一真源，\n" +
+                    "  自动同步到这里的 gradle。撞到了说明有人手改了其中一处。")
+            }
+
+            // ── powerbank 特有：这份 www 连的是谁 ──
+            def bi = new File(appDir, 'www/pb-build-info.json')
+            if (!bi.exists()) {
+                throw new GradleException(
+                    "${appDir.name} 下没有 www/pb-build-info.json —— 这份 www 是老版本工具链出的。\n" +
+                    "  它由 c-app/vite.config.mts 的 pbBuildInfo 插件产出，重跑 npm run build:app 即可。\n" +
+                    "  没有它就**无法判断这个包连的是 mock 还是真后端** —— 产物是压缩过的，事后看不出来。")
+            }
+            def info = new JsonSlurper().parse(bi, 'UTF-8')
+            if (info.useMock) {
+                throw new GradleException(
+                    "这份 www 是 **mock 构建**，拒绝打包。\n" +
+                    "  ${bi}\n\n" +
+                    "  mock 包的样子：界面全对、门店是迪拜那四个假点、登录随便填都能进、\n" +
+                    "  充值立刻到账 —— 而它一个后端请求都不发，线上挂没挂都看不出来。\n" +
+                    "  修法：带上生产环境重打 —— npm run build:app（c-app/.env.production 已置 VITE_USE_MOCK=0），\n" +
+                    "  确认产物里的 pb-build-info.json 写着 \"useMock\": false 再拷 www。")
+            }
+            def base = (info.apiBase ?: '').toString()
+            if (base.isEmpty()) {
+                throw new GradleException(
+                    "这份 www 没有后端源（apiBase 为空），拒绝打包。\n" +
+                    "  离线包里没有同源反代这回事，base 为空 = 每个请求都打到 file:// 上。\n" +
+                    "  文件：${bi}")
+            }
+            if (base ==~ /(?i).*(localhost|127\.0\.0\.1|10\.0\.2\.2|0\.0\.0\.0).*/) {
+                throw new GradleException(
+                    "后端源是本地地址：${base} —— 这种包在模拟器上一切正常，\n" +
+                    "  到真机上每个列表都是「网络异常」，而产物里看不出哪里错。\n" +
+                    "  文件：${bi}")
+            }
+            if (base != expectedApiBase) {
+                throw new GradleException(
+                    "后端源不是预期的那个，拒绝打包。\n" +
+                    "  包里：${base}\n  预期：${expectedApiBase}\n" +
+                    "  确实要发到别处，给 -PpbApiBase=${base} 明示（会留在构建记录里）。")
+            }
+            if (!info.hasGmapsKey) {
+                throw new GradleException(
+                    "这份 www 没有 Google Maps key —— 首页地图会降级成占位块，\n" +
+                    "  而它不报错，看起来像「地图坏了」。key 放 c-app/.env.local 的 VITE_GMAPS_KEY，\n" +
+                    "  加完重跑 npm run build:app。文件：${bi}")
+            }
+
+            println "[gates] ${appDir.name}: versionCode=${apkVersionCode} · api=${base} · mock=false · maps=on"
+            checked++
+        }
+
+        if (checked == 0) {
+            throw new GradleException("${assetsRoot} 下一个 app 目录都没有 —— 资源没拷进来。")
+        }
+    }
+}
+
+// 挂在 preBuild 上：assemble / bundle 的任何一条路都会经过它，漏不掉
+tasks.matching { it.name == 'preBuild' }.configureEach {
+    dependsOn 'checkAppBundleGates'
+}
