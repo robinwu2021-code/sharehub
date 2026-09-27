@@ -1,7 +1,7 @@
 // 真实后端实现（McpApi）。端点对齐 docs/api/README §六/§七 的 /mp/**。
 // auth 路径由 ConsumerRentFlowTest 实测确认（/mp/auth/*），标「待定」者需服务端补齐。
 import { client } from "./http-client";
-import type { McpApi, LoginParams, LoginMethods, RentParams, PayParams, PayResult, OrderQ, NearbyQ, PageQ, ProfilePatch } from "./contract";
+import type { McpApi, LoginParams, LoginMethods, RentParams, RentReceipt, PayParams, PayResult, OrderQ, NearbyQ, PageQ, ProfilePatch } from "./contract";
 import type {
   PageResult,
   NearbyCabinet,
@@ -56,7 +56,7 @@ export const httpApi: McpApi = {
   listFavorites: (at) => client.get<NearbyCabinet[]>("/mp/user/favorites", at),
   toggleFavorite: (siteNo: string) => client.post<{ favorite: boolean }>(`/mp/user/favorites/${siteNo}`), // 待定
 
-  rentOrder: (p: RentParams) => client.post<ConsumerOrder>("/mp/trade/orders/rent", p),
+  rentOrder: (p: RentParams) => client.post<RentReceipt>("/mp/trade/orders/rent", p),
   getOrder: (orderNo: string) => client.get<ConsumerOrder>(`/mp/trade/orders/${orderNo}`),
   listOrders: (q?: OrderQ) => client.get<PageResult<ConsumerOrder>>("/mp/trade/orders", q),
   ongoingOrder: () => client.get<ConsumerOrder | null>("/mp/trade/orders/ongoing"),

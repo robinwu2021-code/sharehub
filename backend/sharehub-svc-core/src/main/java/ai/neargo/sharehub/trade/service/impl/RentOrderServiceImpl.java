@@ -59,6 +59,8 @@ public class RentOrderServiceImpl implements RentOrderService {
     private final ai.neargo.sharehub.trade.order.service.OrderEventLogService eventLog;
     private final OrdMapper mapper;
     private final OrdStateMachine stateMachine;
+    private final ai.neargo.sharehub.dev.port.CabinetCommandPort cabinetCommands;
+    private final ai.neargo.sharehub.trade.EjectSimulation ejectSimulation;
     private final OrdRentExtMapper rentExtMapper;
     private final InterventionMapper interventionMapper;
     private final PriceResolver priceResolver;
@@ -99,7 +101,11 @@ public class RentOrderServiceImpl implements RentOrderService {
                                 ai.neargo.sharehub.dev.port.PowerbankTracker powerbankTracker,
                                 ai.neargo.sharehub.api.core.port.CouponUsePort coupons,
                                 ai.neargo.sharehub.api.core.port.FreeRentPort freeRents,
-                                ai.neargo.sharehub.common.time.BizClock clock) {
+                                ai.neargo.sharehub.common.time.BizClock clock,
+                                ai.neargo.sharehub.dev.port.CabinetCommandPort cabinetCommands,
+                                ai.neargo.sharehub.trade.EjectSimulation ejectSimulation) {
+        this.cabinetCommands = cabinetCommands;
+        this.ejectSimulation = ejectSimulation;
         this.clock = clock;
         this.freeRents = freeRents;
         this.coupons = coupons;
@@ -231,7 +237,18 @@ public class RentOrderServiceImpl implements RentOrderService {
         e.setCUserNo(cUserNo);
         e.setCabinetNo(cabinetNo);
         e.setPowerbankNo(IdGenerator.next("PB"));
-        e.setStatus("IN_USE");                       // 免押预授权 + 弹仓为骨架，直接置借用中
+        /*
+         * 落单为**出宝中**，不是直接 IN_USE。
+         *
+         * 2026-09-27 之前这里写的是 `setStatus("IN_USE")`，注释说「弹仓为骨架」——
+         * 而代价不只是「暂时不发指令」：订单从不经过 DISPENSING，于是
+         *   · C 端的「等弹出」无论怎么轮询都第一轮就成功（等于没在等）；
+         *   · 出宝失败的自愈告警 RENT_NOT_DELIVERED（阈值 5 分钟、自动撤单、
+         *     转客服兜底）配得好好的，**永远不会触发** —— 没有单会停在出宝中；
+         *   · 状态机里 DISPENSING→CLOSED 那条边同样走不到。
+         * 宝没弹出来而订单照常计费，系统里一处异常都没有。
+         */
+        e.setStatus(OrderStatus.DISPENSING.name());
         // ⚠️ 必须是 LocalDateTime 而非 Instant：ord_order.rent_start_at 是 DATETIME(3)，
         // MariaDB 不接受 Instant.toString() 产出的带 Z 字面量，写入直接
         // Data truncation: Incorrect datetime value → 500，即扫码借出**从未成功落库**。
@@ -354,12 +371,81 @@ public class RentOrderServiceImpl implements RentOrderService {
         ext.setPowerbankNo(e.getPowerbankNo());
         rentExtMapper.insert(ext);
 
-        return new RentResult(e.getOrderNo(), e.getPowerbankNo(), "CMD" + System.nanoTime());
+        /*
+         * 真的向柜机发一条弹仓指令。此前这里返回的是 `"CMD" + System.nanoTime()` ——
+         * 一个现造的字符串，扫码借出从不向柜机发送任何东西。
+         *
+         * 指令幂等键是 `<orderNo>:EJECT`（见 CabinetCommandPort），同一单重发不会弹两块宝。
+         */
+        String commandNo = cabinetCommands.eject(cabinetNo, e.getSlotIndex(), e.getOrderNo());
+        log.info("借出发起 orderNo={} cabinetNo={} slot={} command={}",
+                e.getOrderNo(), cabinetNo, e.getSlotIndex(), commandNo);
+
+        /*
+         * 没有真机的环境（演示/测试）：立刻自己补一次回执，走的是与设备回执**同一个方法**。
+         * 开关与横幅见 {@link EjectSimulation} —— 接上真驱动那天把它置 false，这里一行不改。
+         */
+        if (ejectSimulation.enabled()) {
+            confirmDelivered(e.getOrderNo(), "SIMULATED");
+        }
+        return new RentResult(e.getOrderNo(), e.getPowerbankNo(), commandNo);
     }
 
     @Override
     public OkResult returnOrder(String orderNo, String returnCabinetNo) {
         return returnOrderAt(orderNo, returnCabinetNo, null);
+    }
+
+    /**
+     * 出宝回执：DISPENSING → IN_USE。
+     *
+     * <p><b>条件更新 + 幂等</b>：回执可能重复投递（网关重试），也可能与「超时撤单」赛跑。
+     * 以 {@code status=DISPENSING} 为更新条件，谁先到谁赢，输的那一边返回 false 而不是抛错 ——
+     * 一条迟到的回执不该把已经撤掉的单再拉回使用中。
+     *
+     * <p>计费起点仍是 {@code rent_start_at}（下单时刻）。出宝通常在数秒内完成，
+     * 把起点挪到回执会让「下单到出宝」这段时间不计费，那是另一个口径问题，
+     * 要改得和运营侧一起改。
+     */
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public boolean confirmDelivered(String orderNo, String reason) {
+        return Boolean.TRUE.equals(DataScopeContext.executeWithoutScope(() -> {
+            OrdOrder e = mapper.selectOne(new LambdaQueryWrapper<OrdOrder>()
+                    .eq(OrdOrder::getOrderNo, orderNo).last("limit 1"));
+            if (e == null || !OrderStatus.DISPENSING.name().equals(e.getStatus())) return false;
+            String before = e.getStatus();
+            String to = stateMachine.next(before, "DELIVER");
+            int n = mapper.update(null,
+                    new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<OrdOrder>()
+                            .eq(OrdOrder::getOrderNo, orderNo).eq(OrdOrder::getStatus, before)
+                            .set(OrdOrder::getStatus, to));
+            if (n == 0) return false;
+            appendEvent(orderNo, before, to, "DELIVER", OPERATOR_SYSTEM);
+            log.info("出宝回执 orderNo={} {}→{} reason={}", orderNo, before, to, reason);
+            return true;
+        }));
+    }
+
+    /**
+     * 设备回执只带柜机（可能带仓位），不带订单号 —— 按柜机/仓位反查正在等出宝的那一单。
+     *
+     * <p>取**最近的一单**：同一台柜机上同时有两单在等出宝是极少数情况（指令是串行下发的），
+     * 真撞上了也只能按时间就近归属；归错的后果是两单互换了回执，而两单都会 IN_USE，
+     * 比「都超时撤单」好。
+     */
+    @Override
+    public String pendingDeliveryOrder(String cabinetNo, Integer slotIndex) {
+        if (cabinetNo == null || cabinetNo.isBlank()) return null;
+        OrdOrder e = DataScopeContext.executeWithoutScope(() -> mapper.selectOne(
+                new LambdaQueryWrapper<OrdOrder>()
+                        .eq(OrdOrder::getCabinetNo, cabinetNo)
+                        .eq(OrdOrder::getStatus, OrderStatus.DISPENSING.name())
+                        // 仓位给了才按它筛：仓位级上报没接入的柜子回执里没有这一项，
+                        // 按 null 去比会一单都匹配不到（而那等于回执全丢）
+                        .eq(slotIndex != null, OrdOrder::getSlotIndex, slotIndex)
+                        .orderByDesc(OrdOrder::getId).last("limit 1")));
+        return e == null ? null : e.getOrderNo();
     }
 
     @Override

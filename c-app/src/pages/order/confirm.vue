@@ -100,17 +100,15 @@ async function submit() {
   stage.value = "dispensing";
   try {
     if (useFree.value) await payment.preAuthFreeDeposit(cabinetNo);
-    const order = await api.rentOrder({
+    const receipt = await api.rentOrder({
       cabinetNo,
       useFreeDeposit: useFree.value,
       // 只在真选了券时才带上 —— 传 null 与不传在后端是一个意思，但带着空值更容易被误读成「用券失败」
       ...(picked.value ? { couponNo: picked.value } : {}),
     });
-    orderNo.value = order.orderNo;
-    if (order.status === "IN_USE") {
-      stage.value = "success";   // 已经出宝了就别再演一遍等待动画
-      return;
-    }
+    orderNo.value = receipt.orderNo;
+    // 下单只是把弹仓指令发出去 —— 回执里没有「出没出宝」这件事（`RentReceipt` 无 status），
+    // 成不成功一律去查订单。模拟回执开着时第一轮就会读到 IN_USE，那也是**读来的**，不是猜的
     waitForDispense();
   } catch (e) {
     stage.value = "confirm";

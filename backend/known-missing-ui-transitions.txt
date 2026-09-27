@@ -98,3 +98,10 @@ SiteStatus: PREPARING->CLOSED
 # 界面能选出后端会 400 的跳阶。现在 ops-web/lib/types/location.ts 有 LEAD_TRANSITIONS，
 # 下拉走 leadNextStages()、mock 走 leadStageMoveOk()，8 条边全部有对应动作，故整段删除。
 
+
+# 出宝回执（2026-09-27）：DISPENSING->IN_USE 由**设备回执**推进（SLOT_EJECT_OK /
+# COMMAND_RESULT=OK），没有、也不该有运营端按钮 —— 人替柜机宣布「宝已经出来了」，
+# 就等于人替用户开始计费。运营侧要干预这一单只有两条路：出宝失败自愈撤单
+# （RENT_NOT_DELIVERED，已是自动的），或客服干预（intervene）。
+# 与本台账其余各行不同，**这一条不会被「补个前端入口」还掉**。
+OrderStatus: DISPENSING->IN_USE

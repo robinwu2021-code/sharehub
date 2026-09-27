@@ -62,6 +62,22 @@ public interface RentOrderService {
     OkResult returnOrderAt(String orderNo, String returnCabinetNo, java.time.LocalDateTime endUtc);
 
     /**
+     * 出宝回执：DISPENSING → IN_USE，**计费从这一刻才有意义**。
+     *
+     * <p>由设备信号推进（{@code EJECT_OK} / {@code COMMAND_RESULT=OK}），
+     * 或在没有真机的环境里由 {@code EjectSimulation} 立刻补一次。
+     * 订单已不在出宝中时返回 false（幂等：回执重复、或已被超时撤单抢先）。
+     */
+    boolean confirmDelivered(String orderNo, String reason);
+
+    /**
+     * 找这台柜机上**正在等出宝**的那一单（最近的一单）。设备回执只带柜机/仓位，不带订单号。
+     *
+     * @param slotIndex 给了就按仓位精确匹配；null = 只按柜机（仓位级上报未接入的柜）
+     */
+    String pendingDeliveryOrder(String cabinetNo, Integer slotIndex);
+
+    /**
      * 撤销出宝失败的订单（DISPENSING → CLOSED，不收费）。订单已不在出宝中时返回 false（幂等：别人已处理）。
      */
     boolean cancelUndelivered(String orderNo, String reason);

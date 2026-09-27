@@ -98,6 +98,23 @@ export interface ChangePwdParams {
   newPassword: string;
 }
 
+/**
+ * 借出回执。**不是订单本身** —— 后端 `POST /mp/trade/orders/rent` 返的是
+ * `RentResult{orderNo, powerbankNo, commandId}`，没有 status、没有金额。
+ *
+ * 此前这里声明成 `ConsumerOrder`，于是端上读 `order.status` 拿到的是 undefined。
+ * 那段代码没报错（undefined 不等于 "IN_USE"，正好落进等待分支），但类型是假的 ——
+ * 下一个人照着它写 `order.feeAmount` 就会拿到 undefined 再渲染成 NaN。
+ *
+ * 出宝成不成功要**另外查订单**（`getOrder` 轮询），这也正是它该有的样子：
+ * 下单只是把指令发出去，柜机弹没弹是后面的事。
+ */
+export interface RentReceipt {
+  orderNo: string;
+  powerbankNo: string | null;
+  commandId: string | null;
+}
+
 export interface RentParams {
   cabinetNo: string;
   useFreeDeposit: boolean; // true=免押预授权，false=降级押金
@@ -164,7 +181,7 @@ export interface McpApi {
   listFavorites(at?: { lat?: number; lng?: number }): Promise<NearbyCabinet[]>;
   toggleFavorite(siteNo: string): Promise<{ favorite: boolean }>;
   // 借还
-  rentOrder(p: RentParams): Promise<ConsumerOrder>;
+  rentOrder(p: RentParams): Promise<RentReceipt>;
   getOrder(orderNo: string): Promise<ConsumerOrder>;
   listOrders(q?: OrderQ): Promise<PageResult<ConsumerOrder>>;
   ongoingOrder(): Promise<ConsumerOrder | null>;

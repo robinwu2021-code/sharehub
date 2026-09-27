@@ -86,6 +86,14 @@ sharehub:
     # 本地号补哪个国际区号。**与 pepper 同级：上线后不可改**，改了等于所有本地号
     # 算出另一个 hash（注册能成、登录查不到）。971=AE
     default-calling-code: ${SHAREHUB_DEFAULT_CALLING_CODE:971}
+  # 借出的出宝回执：没有真实柜机驱动时，下单后立刻自补一次（DISPENSING→IN_USE）。
+  # **接入真机后置 false**，改由设备信号（SLOT_EJECT_OK / COMMAND_RESULT=OK）推进。
+  # 默认 true 保持既有行为：当前唯一的驱动 DemoPowerbankDriver 的 send 只打日志、不回事件，
+  # 置 false 会让每一单都停在「出宝中」，五分钟后被 RENT_NOT_DELIVERED 自愈撤单。
+  # 开启时启动日志打 WARN 横幅（同桩支付的做法）。
+  trade:
+    simulate-eject:
+      enabled: ${SHAREHUB_SIMULATE_EJECT:true}
   # 开发便利总开关：固定验证码 000000 + OTP 明文回传 + 免密登录运营端。
   # **默认关，生产绝不可开**（开启时启动日志会打 WARN 横幅）。
   # 2026-09-23 之前这三件事在所有环境无条件生效 —— 线上任何人可登录任意手机号。

@@ -204,7 +204,9 @@ export const mockApi: McpApi = {
         }
       }, 2000);
     }
-    return db.delay(order, 480);
+    // 返回**回执**而不是订单：后端 RentResult{orderNo, powerbankNo, commandId}，
+    // 出宝成没成功要另外轮询订单（端上就是这么做的）
+    return db.delay({ orderNo, powerbankNo: order.powerbankNo, commandId: "CMD-" + orderNo }, 480);
   },
   // 详情与进行中卡带试算，列表不带 —— 与后端投影同一约定（列表逐单跑计价链是 N+1）
   getOrder: (orderNo: string) =>
