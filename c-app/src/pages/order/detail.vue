@@ -4,7 +4,7 @@ import { ref, computed, onUnmounted } from "vue";
 import { onLoad, onHide, onShow } from "@dcloudio/uni-app";
 import { api } from "@/api";
 import type { ConsumerOrder, OrderStatus } from "@/types";
-import { timeOf, elapsedMin, durationText } from "@/shared/format";
+import { utcTimeOf, elapsedMin, durationText } from "@/shared/format";
 import { ORDER_REFRESH_MS } from "@/shared/constants";
 
 const order = ref<ConsumerOrder | null>(null);
@@ -182,7 +182,7 @@ async function buyout() {
             <view v-for="(step, i) in order.timeline" :key="i" class="flex items-center gap-[16rpx]">
               <view class="pb-dot" />
               <text class="flex-1 text-[26rpx] text-ink">{{ $t("status." + step.status) }}</text>
-              <text class="text-[24rpx] text-sub">{{ timeOf(step.at) }}</text>
+              <text class="text-[24rpx] text-sub">{{ utcTimeOf(step.at) }}</text>
             </view>
           </view>
         </pb-card>

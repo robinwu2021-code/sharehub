@@ -35,11 +35,13 @@ export function dateTimeOf(iso: string): string {
  * 于是在迪拜（+4）算出来的已用时长比真实少 4 小时、在上海（+8）少 8 小时，
  * 刚借出的单会显示成负数。mock 的 `fmtNow()` 走 `toISOString()`，同样是 UTC，口径一致。
  *
- * ⚠️ 这个函数**只适用于确定是 UTC 的字段**（目前：`rentStartAt` / `rentEndAt`）。
- * 状态时间线的 `at` 来自 `ord_event_log.created_at`，那是数据库生成的、跟着服务器时区走
- * （生产是 Asia/Shanghai），与本字段**不是同一个时区** —— 同一个响应里两种口径。
- * 所以别把这个解析器顺手套到 `timeline[].at` 上：那只是把一种错换成另一种错。
- * 统一口径要在后端做（见「三个时区」那批待办）。
+ * 适用字段（都经 `OrderSupport.now()` = `LocalDateTime.now(ZoneOffset.UTC)` 写入）：
+ * `rentStartAt` / `rentEndAt` / 状态时间线 `timeline[].at`。
+ * （09-27 更正：此前这里写着「时间线的 at 跟着服务器时区走、与 rentStartAt 不是一个口径」——
+ *  查实是错的，两者同源同为 UTC。时间线差 8 小时的真因是端上 `new Date()` 按本地解。）
+ *
+ * ⚠️ **不**适用：钱包流水等走 `AuditMetaObjectHandler` 的 `createdAt` ——
+ * 那是 `LocalDateTime.now()`，跟着 JVM 时区（生产 Asia/Shanghai），是另一种口径（归「三个时区」）。
  */
 export function parseUtc(s: string | null): Date | null {
   if (!s) return null;
@@ -68,4 +70,17 @@ export function elapsedMin(startAt: string | null): number | null {
 export function durationText(min: number): string {
   const h = Math.floor(min / 60);
   return h > 0 ? `${h}h ${min % 60}m` : `${min}m`;
+}
+
+/**
+ * 服务端 UTC 时间 → 设备本地的 HH:mm（状态时间线用）。
+ *
+ * 此前时间线用的是 `timeOf(iso)` → `new Date(iso)`：无偏移量的 ISO 串被 JS 当本地时间，
+ * 于是上海设备上时间线比实际早 8 小时、迪拜早 4 小时（Android 模拟器实测：借出在 10:55，时间线写 02:55）。
+ */
+export function utcTimeOf(s: string | null): string {
+  const d = parseUtc(s);
+  if (!d) return "";
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getHours())}:${p(d.getMinutes())}`;
 }

@@ -8,6 +8,8 @@ export function openNavigation(c: NearbyCabinet) {
     uni.showToast({ title: "no location for this store", icon: "none" });
     return;
   }
+  // #ifdef MP
+  // 小程序：微信内置地图页本身就有「导航」按钮，体验是好的
   uni.openLocation({
     latitude: c.lat,
     longitude: c.lng,
@@ -15,4 +17,22 @@ export function openNavigation(c: NearbyCabinet) {
     address: c.address,
     fail: (e) => uni.showToast({ title: e.errMsg || "map unavailable", icon: "none" }),
   });
+  // #endif
+  // #ifndef MP
+  /*
+   * App / H5：**直接唤起 Google Maps 导航**，不走 uni.openLocation。
+   *
+   * App 里 openLocation 会先打开一个 uni 内置的位置页，那一页的预览地图要地图模块才画得出来
+   * （离线包没集成），于是用户看到一整页空白，要再点右下角的按钮才进 Google Maps。
+   * Android 模拟器实测如此。Google 的 Maps URL 在装了 Google Maps 的手机上直接进导航，
+   * 没装就开网页版 —— 两种都比空白页强。
+   */
+  const url = `https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lng}`;
+  // #ifdef APP-PLUS
+  plus.runtime.openURL(url, () => uni.showToast({ title: "map unavailable", icon: "none" }));
+  // #endif
+  // #ifdef H5
+  window.open(url, "_blank");
+  // #endif
+  // #endif
 }

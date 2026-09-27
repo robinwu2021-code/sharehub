@@ -25,6 +25,7 @@ const showScanner = ref(false);
 import { openNavigation } from "@/ports/map";
 import { getUserLocation } from "@/ports/location";
 import { ensureLoggedIn } from "@/shared/auth-gate";
+import { useUserStore } from "@/stores/user";
 
 const { t } = useI18n();
 const list = ref<NearbyCabinet[]>([]);
@@ -48,27 +49,57 @@ const views = computed(() => [
   { label: t("home.list"), value: "list" },
 ]);
 
+/**
+ * 搜索键：**以事件里的值为准**，不读 v-model。
+ *
+ * 安卓输入法（Gboard）打拉丁字母时文字处于「组字」状态，Vue 的 v-model 在组字期间不更新；
+ * 用户点键盘上的搜索键时，confirm 比组字结束的那次更新先到 —— 读 keyword 拿到的是半截
+ * （模拟器实测：输入 Yas，请求里是 keyword=Y）。e.detail.value 是输入框此刻的完整值。
+ */
+function onSearch(e: { detail?: { value?: string } }) {
+  if (typeof e?.detail?.value === "string") keyword.value = e.detail.value;
+  load();
+}
+
+/** 每次 load 的序号：只认最后一次发起的结果（见下）。 */
+let loadSeq = 0;
+
 async function load() {
+  const seq = ++loadSeq;
   loading.value = true;
   try {
-    // 定位先取：后端按 lat/lng 算距离并排序，不给就只能按建站顺序给第一屏。
-    // 取不到返回 null —— 那时列表不带距离，而不是带一个编出来的距离。
-    const at = await getUserLocation();
-    const [cabs, notices, ong] = await Promise.all([
-      api.nearbyCabinets({
-        keyword: keyword.value,
-        lat: at?.lat,
-        lng: at?.lng,
-        ...(returnable.value ? { returnable: true } : {}),
-      }),
+    /*
+     * 公告与进行中订单**不等定位**，先发。此前三者都排在 `await getUserLocation()` 后面：
+     * 定位慢（App 端十几秒）或挂住时，首页整页空白 —— 连与位置无关的两块都出不来。
+     */
+    const side = Promise.all([
       api.listNotices(),
-      api.ongoingOrder(),
-    ]);
-    list.value = cabs;
-    notice.value = notices[0] ?? null;
-    ongoing.value = ong;
+      // 游客没有进行中订单可言，也不该去调 —— 那个口要登录，游客调了吃 401，
+      // 会话守卫再把人送去登录页：「打开 App 就被要求登录」（Android 模拟器实测撞到）。
+      useUserStore().isLoggedIn ? api.ongoingOrder() : Promise.resolve(null),
+    ]).then(([notices, ong]) => {
+      if (seq !== loadSeq) return;
+      notice.value = notices[0] ?? null;
+      ongoing.value = ong;
+    });
+
+    // 网点列表要定位：后端按 lat/lng 算距离并排序，不给就只能按建站顺序给第一屏。
+    // 取不到（含超时）返回 null —— 那时列表不带距离，而不是带一个编出来的距离。
+    const at = await getUserLocation();
+    const cabs = await api.nearbyCabinets({
+      keyword: keyword.value,
+      lat: at?.lat,
+      lng: at?.lng,
+      ...(returnable.value ? { returnable: true } : {}),
+    });
+    /*
+     * **只认最后一次**。连着搜两次（先「Emirates」再「Yas」）时，先发的请求可能后回来，
+     * 把新结果盖掉 —— 模拟器上见过：搜索框写着 Yas，列表是 Emirates 的店。
+     */
+    if (seq === loadSeq) list.value = cabs;
+    await side;
   } finally {
-    loading.value = false;
+    if (seq === loadSeq) loading.value = false;
   }
 }
 onLoad((q) => {
@@ -82,7 +113,11 @@ async function openStore(c: NearbyCabinet) {
   showStore.value = true;
 }
 function borrow(c: { cabinetNo?: string; siteNo?: string }) {
-  const cabinetNo = c.cabinetNo ?? list.value.find((x) => x.siteNo === c.siteNo)?.cabinetNo;
+  // 从门店卡来的只有 siteNo：挑这家店里**真能借的**那台柜（status=ACTIVE 且有宝）。
+  // 此前取的是这家店在列表里的第一台，不管能不能借 —— 模拟器实测点进去的是一台「不可用」的柜。
+  const cabinetNo =
+    c.cabinetNo ??
+    list.value.find((x) => x.siteNo === c.siteNo && x.status !== "PAUSED" && x.availableBorrow > 0)?.cabinetNo;
   if (!cabinetNo) return;
   const url = `/pages/order/confirm?cabinetNo=${cabinetNo}`;
   // 门禁前置：未登录先登录，登录完直接回到这一页（带着柜机号）。
@@ -161,7 +196,7 @@ async function onPrimary() {
         <!-- 搜索 -->
         <view class="mt-[24rpx] flex items-center rounded-full bg-faint px-[30rpx] py-[20rpx]">
           <pb-icon name="search" :size="34" class="text-sub" />
-          <input v-model="keyword" class="ms-[16rpx] flex-1 text-[28rpx] text-ink" :placeholder="$t('home.searchPlaceholder')" confirm-type="search" @confirm="load" />
+          <input v-model="keyword" class="ms-[16rpx] flex-1 text-[28rpx] text-ink" :placeholder="$t('home.searchPlaceholder')" confirm-type="search" @confirm="onSearch" />
         </view>
 
         <!-- 附近门店 -->

@@ -69,7 +69,16 @@ export const useUserStore = defineStore("user", {
      */
     installSessionGuard() {
       setUnauthorizedHandler(() => {
+        /*
+         * **只有「本来登录着、会话失效了」才送去登录页。**
+         *
+         * 游客本来就没有 token —— 他撞到一个要登录的口，是那个调用不该发（或该先引导登录），
+         * 不是「登录失效」。此前这里不分这两种：游客打开首页、任何一个口回 401，
+         * 就被 reLaunch 到登录页，看起来像「这个 App 不登录不给用」—— 而需求是游客可浏览。
+         */
+        const hadSession = !!this.token;
         this.clearSession();
+        if (!hadSession) return;
         const stack = getCurrentPages();
         const cur = stack.length ? `/${stack[stack.length - 1].route ?? ""}` : "";
         if (cur === LOGIN_PAGE) return;

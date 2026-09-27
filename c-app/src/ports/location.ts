@@ -16,6 +16,8 @@ export interface Coords {
 
 /** 缓存一分钟：首页与收藏页各拉一次列表，不该弹两次授权。 */
 const TTL_MS = 60_000;
+/** 定位最多等这么久（与 H5 分支的 timeout 同口径）。拿不到位置不该让整页等着。 */
+const LOCATE_TIMEOUT_MS = 5000;
 let cached: { at: number; value: Coords | null } | null = null;
 let inflight: Promise<Coords | null> | null = null;
 
@@ -52,10 +54,24 @@ function locate(): Promise<Coords | null> {
   // #endif
   // #ifndef H5
   return new Promise((resolve) => {
+    /*
+     * **必须有超时。** uni.getLocation 在 App 端可能既不 success 也不 fail —— 模拟器只推过一次坐标、
+     * 真机在室内弱 GPS 下都会这样。而上面的 inflight 是全局共享的：这一次挂住，
+     * **之后所有取定位的调用都跟着永远挂住**，首页 load() 永不返回（整页空白）、
+     * 搜索永不生效（请求根本没发出去）。Android 模拟器实测：一次搜索等了一分多钟请求都没发。
+     * 超时就按「不知道位置」处理（null），与拒绝授权同一条路 —— 列表照出，只是不带距离。
+     */
+    let settled = false;
+    const done = (v: Coords | null) => {
+      if (settled) return;
+      settled = true;
+      resolve(v);
+    };
+    setTimeout(() => done(null), LOCATE_TIMEOUT_MS);
     uni.getLocation({
       type: "wgs84",
-      success: (r) => resolve({ lat: r.latitude, lng: r.longitude }),
-      fail: () => resolve(null),
+      success: (r) => done({ lat: r.latitude, lng: r.longitude }),
+      fail: () => done(null),
     });
   });
   // #endif

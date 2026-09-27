@@ -129,8 +129,10 @@ mock 层给了 `CAB-TIMEOUT` 这个**永不回执的柜机号**做负对照，�
 
 ⚠️ `rentStartAt` 是**不带 Z 的 UTC**（`LocalDateTime.now(ZoneOffset.UTC).toString()`），
 按本地时区解会少算 4（迪拜）/ 8（上海）小时，刚借的单显示成负数 —— `parseUtc` 显式按 UTC 解。
-顺带发现：同一个响应里 `timeline[].at` 来自 `ord_event_log.created_at`，**跟着服务器时区走**，
-与 `rentStartAt` 不是一个口径（归「三个时区」那批待办）。
+（2026-09-27 更正：此前这里写「`timeline[].at` 跟着服务器时区走、与 `rentStartAt` 不是一个口径」——
+查实是错的：两者同经 `OrderSupport.now()` = `LocalDateTime.now(ZoneOffset.UTC)` 写入，同为不带 Z 的 UTC。
+时间线差 8 小时的真因是端上按本地时区解析，已改为 `utcTimeOf`。另一种口径确实存在，但在钱包流水等
+走 `AuditMetaObjectHandler` 的 `createdAt`：那是 `LocalDateTime.now()`，跟着 JVM 时区。）
 
 **3. 支付只有下单那一刀 —— 无收银台、无重试、无欠费补缴（C-PAY-01/05 · C-BL-04）**
 
