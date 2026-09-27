@@ -38,6 +38,14 @@ export interface RentOrder {
    * 而这个数事后推不回来（模板面额会改、折扣额还取决于当时应收）。
    */
   couponAmount?: number;
+  /**
+   * 会员折扣额（结算时落列，[TDD-会员套餐 §2]）。
+   *
+   * 与 `couponAmount` 同一个理由：`feeAmount` 是折后应付，答不出「会员折了多少」，
+   * 而权益配置会改、折扣额还取决于当时应收 —— 事后推不回来。
+   * 买断单恒为 0（买断收的是硬件钱，不是租金）。
+   */
+  memberDiscountAmount?: number;
 }
 
 // —— 订单人工干预（S1：修 F0 伪实现）——

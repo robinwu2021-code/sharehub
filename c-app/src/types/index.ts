@@ -78,8 +78,9 @@ export interface CabinetAvailability {
  * 而文案要跟着界面语言走（中/英/阿）—— 后端返一句中文，阿语界面上就是一句中文。
  */
 export interface FeeItem {
-  type: "RENT" | "COUPON" | "WAIVE" | "COMPENSATE" | "DEPOSIT";
-  // COUPON / WAIVE 是负数，RENT 是**折扣前**应收：RENT + COUPON + WAIVE = 实付。
+  type: "RENT" | "MEMBER" | "COUPON" | "WAIVE" | "COMPENSATE" | "DEPOSIT";
+  // MEMBER / COUPON / WAIVE 是负数，RENT 是**折扣前**应收：
+  // RENT + MEMBER + COUPON + WAIVE = 实付。新增一种折扣必须同时进这个和式
   // 押金单列（要退回的，不是支出），赔偿单列（订单之外的追加）
   amount: number;
 }
@@ -244,12 +245,30 @@ export interface ClaimableCoupon {
   claimed: boolean;
 }
 
+/**
+ * 会员方案权益（镜像后端 `PlanRightsVO`）。
+ *
+ * ⚠️ **结构化而不是文案**。此前后端透出的是 `benefits: string[]`，
+ * 直接把 `mbr_plan.rights` 的自由文案给端上，两个后果：文案跟不上界面语言
+ * （后端存一句中文，阿语界面上就是一句中文，同 `FeeItem` 那边改过的错），
+ * 而且自由文本里解析不出折扣率，于是页面写着「租金九折」而账单照收原价。
+ */
+export interface PlanRights {
+  /** 折扣率，0.9 = 九折；缺省 = 不打折。**不是「几折」那个整数** */
+  rentDiscount?: number;
+  freeMinutes?: number;
+  depositFree?: boolean;
+}
+
 /** 会员方案（镜像后端 `MembershipPlanVO`）。名字要带 `Plan`，否则对齐脚本配不上对。 */
 export interface MembershipPlan {
   planNo: string;
   name: string;
   price: number;
-  benefits: string[];
+  currency?: string;
+  /** MONTHLY(包月) / TIMES(次卡) / RIGHTS(权益卡) */
+  cardType?: string;
+  rights?: PlanRights | null;
   active: boolean;
   expireAt?: string;
 }

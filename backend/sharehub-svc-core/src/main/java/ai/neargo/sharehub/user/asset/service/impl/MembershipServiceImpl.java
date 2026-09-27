@@ -120,16 +120,29 @@ public class MembershipServiceImpl implements MembershipService {
                     boolean active = mine != null && p.getPlanNo().equals(mine.getPlanNo())
                             && "ACTIVE".equals(mine.getStatus());
                     return new ai.neargo.sharehub.user.asset.dto.UserAssetDtos.MembershipPlanVO(
-                            p.getPlanNo(), p.getName(), p.getPrice(), benefitsOf(p.getRights()),
-                            active, active ? mine.getEndAt() : null);
+                            p.getPlanNo(), p.getName(), p.getPrice(), p.getCurrency(), p.getCardType(),
+                            rightsOf(p.getRights()), active, active ? mine.getEndAt() : null);
                 }).toList();
     }
 
-    /** {@code mbr_plan.rights} 是 JSON 数组文本；解析失败按单条文案兜底，不因脏值整页失败。 */
-    private static List<String> benefitsOf(String rights) {
-        if (rights == null || rights.isBlank()) return List.of();
-        List<?> arr = ai.neargo.sharehub.common.Json.read(rights, List.class, null);
-        if (arr == null) return List.of(rights);
-        return arr.stream().map(String::valueOf).toList();
+    /**
+     * {@code mbr_plan.rights} 是**结构化 JSON**
+     * （{@code {"rentDiscount":0.9,"freeMinutes":30,"depositFree":true}}，[TDD-会员套餐 §2]）。
+     *
+     * <p>解析不了返回 {@code null}（页面不显示权益行），**不兜底成一条文案** ——
+     * 此前这里把整个脏值当成一条权益文本透出去，于是屏幕上会出现一段 JSON，
+     * 或者更糟：一句「每日首小时免费」而计价链读不到任何折扣。
+     * 权益读不出来就该是空的，让人看见缺失，而不是看见一句无人兑现的承诺。
+     */
+    private static ai.neargo.sharehub.user.asset.dto.UserAssetDtos.PlanRightsVO rightsOf(String rights) {
+        if (rights == null || rights.isBlank()) return null;
+        java.util.Map<?, ?> r = ai.neargo.sharehub.common.Json.read(rights, java.util.Map.class, null);
+        if (r == null) return null;
+        Object d = r.get("rentDiscount");
+        Object f = r.get("freeMinutes");
+        return new ai.neargo.sharehub.user.asset.dto.UserAssetDtos.PlanRightsVO(
+                d instanceof Number n ? new java.math.BigDecimal(n.toString()) : null,
+                f instanceof Number n ? n.intValue() : 0,
+                Boolean.TRUE.equals(r.get("depositFree")));
     }
 }

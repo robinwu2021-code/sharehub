@@ -39,13 +39,13 @@ import {
 import type {
   CUser, Member, Wallet, WalletTxn, UserRisk, UserBlacklist,
   FreeUserWhitelist, RechargePackage, WhitelistReason,
-  MemberBenefit, MemberCard, MemberCardType, RentOrder, UserProfile,
+  MemberBenefit, MemberPlan, MemberCard, MemberCardType, RentOrder, UserProfile,
   LogoffItem, CUserInvoiceRow,
 } from "@/lib/types";
 
 // tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）。
 // 「用户」在菜单里叫「用户列表」——以菜单为准。
-const TAB_KEYS = ["list", "risk", "blacklist", "whitelist", "members", "wallets", "recharge", "logoffs", "invoices"] as const;
+const TAB_KEYS = ["list", "risk", "blacklist", "whitelist", "members", "plans", "wallets", "recharge", "logoffs", "invoices"] as const;
 
 // —— 账号 / 风控 / 黑名单三张表的状态映射 ——
 // 拉黑与否不是后端枚举，但同一对徽标在列表页和详情抽屉各出现一次，
@@ -221,6 +221,79 @@ const MEMBER_FIELDS: FieldDef[] = [
 /**
  * @form POST /api/user/member-benefits/{level}
  */
+/** 方案两态。上下架走动作端点，故这里只是展示映射。 */
+const PLAN_STATUS: StatusMap<MemberPlan["status"]> = {
+  ENABLED: { label: "在售", tone: "success" },
+  DISABLED: { label: "已下架", tone: "muted" },
+};
+const PLAN_CARD_TYPE: StatusMap<MemberPlan["cardType"]> = {
+  MONTHLY: { label: "包月", tone: "info" },
+  TIMES: { label: "次卡", tone: "info" },
+  RIGHTS: { label: "权益卡", tone: "info" },
+};
+
+/**
+ * 会员方案表单。
+ *
+ * @form POST /api/user/member-plans
+ * @form-synthetic rentDiscount 权益在契约里是嵌套的 rights，表单字段是平的；提交时由 planPayloadOf 收回 rights
+ * @form-synthetic freeMinutes 同 rentDiscount
+ * @form-synthetic depositFree 同 rentDiscount
+ *
+ * **没有 status 字段** —— 上下架是动作端点（在售/下架按钮）。混进保存字段里，
+ * 「下架一个方案」和「改个名字」就成了同一个动作，而其中一个会影响正在卖的东西。
+ *
+ * 权益三项在契约里是嵌套的 `rights`，但表单字段是平的 —— 在读写两端各拍一次扁，
+ * 见 `planFormOf` / `planPayloadOf`。
+ */
+const PLAN_FIELDS: FieldDef[] = [
+  { key: "name", label: "方案名", required: true, section: "基本" },
+  { key: "nameEn", label: "英文名", section: "基本" },
+  { key: "nameAr", label: "阿语名", section: "基本" },
+  { key: "cardType", label: "卡型", type: "select", required: true, section: "基本", options: [
+    { value: "MONTHLY", label: "包月" }, { value: "TIMES", label: "次卡" }, { value: "RIGHTS", label: "权益卡" },
+  ] },
+  { key: "price", label: "价格", type: "number", required: true, min: 0, section: "售价" },
+  { key: "currency", label: "币种", section: "售价" },
+  { key: "periodDays", label: "有效期（天）", type: "number", min: 0, section: "售价", help: "包月 / 权益卡用" },
+  { key: "timesTotal", label: "总次数", type: "number", min: 0, section: "售价", help: "次卡用" },
+  { key: "rentDiscount", label: "租金折扣", type: "number", min: 0.01, max: 1, section: "权益",
+    help: "0.9 = 九折；留空 = 不打折。填的是折扣率，不是「几折」—— 填 9 会被服务端拒" },
+  { key: "freeMinutes", label: "每单免费时长（分钟）", type: "number", min: 0, section: "权益" },
+  { key: "depositFree", label: "免押金", type: "switch", section: "权益" },
+  { key: "autoRenew", label: "支持自动续费", type: "switch", section: "其它" },
+  { key: "sortNo", label: "排序", type: "number", min: 0, section: "其它" },
+];
+
+/** 方案行 → 平表单（权益三项从 rights 里提出来）。 */
+const planFormOf = (p: MemberPlan): Record<string, unknown> => ({
+  ...p, rentDiscount: p.rights?.rentDiscount, freeMinutes: p.rights?.freeMinutes, depositFree: p.rights?.depositFree,
+});
+
+/**
+ * 平表单 → 保存入参（权益三项收回 rights）。
+ *
+ * 三项全空时 `rights` 传 null 而不是 `{}` —— 空对象与「没配权益」在读侧要是同一件事，
+ * 否则「有 rights 但全是空」会被当成配过权益，而它上架后什么也不会发生。
+ */
+function planPayloadOf(f: Record<string, unknown>): Partial<MemberPlan> & { planNo?: string } {
+  const { rentDiscount, freeMinutes, depositFree, status: _status, ...rest } = f as Record<string, unknown>;
+  const rights: MemberPlan["rights"] = {
+    ...(rentDiscount != null && rentDiscount !== "" ? { rentDiscount: Number(rentDiscount) } : {}),
+    ...(freeMinutes != null && freeMinutes !== "" ? { freeMinutes: Number(freeMinutes) } : {}),
+    ...(depositFree ? { depositFree: true } : {}),
+  };
+  return { ...(rest as Partial<MemberPlan>), rights: Object.keys(rights).length ? rights : null };
+}
+
+/**
+ * 会员权益表单（「等级给什么」）。
+ *
+ * 2026-09-27 补 @form 注解 —— 此前它一直挂在「新增未挂端点的表单」名单里，
+ * 而端点其实早就有了。表单与写入面对不上时，检查器要能指出来。
+ *
+ * @form POST /api/user/member-benefits/{level}
+ */
 const BENEFIT_FIELDS: FieldDef[] = [
   { key: "rentDiscount", label: "租金折扣", type: "number", required: true, min: 0.1, max: 1, section: "计费权益",
     help: "0.9 = 九折；1 = 不打折。必须随等级变好（高档折扣不得高于低档），否则服务端拒绝" },
@@ -332,6 +405,31 @@ function UsersInner() {
   });
 
   // —— 会员权益（S4）：固定三档，只改不增 ——
+  // —— 会员方案（「卖什么」）。此前 mbr_plan 没有任何写入方，C 端会员页因此永远是空列表 ——
+  const [planForm, setPlanForm] = useState<Record<string, unknown> | null>(null);
+  const plans = useQuery({
+    queryKey: ["member-plans"],
+    queryFn: () => api.listMemberPlans({ size: UNPAGED_SIZE }),
+    enabled: tab === "plans",
+  });
+  const savePlan = useMutation({
+    mutationFn: (v: Record<string, unknown>) => api.saveMemberPlan(planPayloadOf(v)),
+    onSuccess: (p) => {
+      qc.invalidateQueries({ queryKey: ["member-plans"] });
+      // 新建默认下架 —— 说清楚，否则运营会以为建完就在卖了
+      notify.success(p.status === "ENABLED" ? `${p.name} 已保存` : `${p.name} 已保存（未上架）`);
+      setPlanForm(null);
+    },
+  });
+  const togglePlan = useMutation({
+    mutationFn: (v: { planNo: string; enable: boolean }) =>
+      v.enable ? api.enableMemberPlan(v.planNo) : api.disableMemberPlan(v.planNo),
+    onSuccess: (p) => {
+      qc.invalidateQueries({ queryKey: ["member-plans"] });
+      notify.success(p.status === "ENABLED" ? `${p.name} 已上架` : `${p.name} 已下架`);
+    },
+  });
+
   const [benefitForm, setBenefitForm] = useState<Partial<MemberBenefit> | null>(null);
   const benefits = useQuery({
     queryKey: ["member-benefits"],
@@ -630,6 +728,52 @@ function UsersInner() {
     },
   ];
 
+  const planCols: Column<MemberPlan>[] = [
+    { header: "方案号", cell: (p) => <span className="txt-strong tabular-nums">{p.planNo}</span> },
+    { header: "名称", cell: (p) => p.name },
+    { header: "卡型", cell: (p) => <StatusBadge map={PLAN_CARD_TYPE} value={p.cardType} /> },
+    { header: "价格", className: "text-right", cell: (p) => <span className="tabular-nums">{p.price} {p.currency ?? ""}</span> },
+    {
+      header: "期限",
+      className: "text-right",
+      // 包月看天数、次卡看次数 —— 两列各自大半是空的，合成一列读起来才连贯
+      cell: (p) => <span className="tabular-nums">{p.cardType === "TIMES" ? (p.timesTotal ? `${p.timesTotal} 次` : "-") : (p.periodDays ? `${p.periodDays} 天` : "-")}</span>,
+    },
+    {
+      header: "权益",
+      // 折扣按「几折」念（运营就是这么说话的），与会员权益那张表同一口径
+      cell: (p) => {
+        const r = p.rights;
+        const parts = [
+          r?.rentDiscount != null && r.rentDiscount < 1 ? `${(r.rentDiscount * 10).toFixed(1)} 折` : null,
+          r?.freeMinutes ? `免费 ${r.freeMinutes} 分钟` : null,
+          r?.depositFree ? "免押" : null,
+        ].filter(Boolean);
+        // 空权益必须看得见地写出来 —— 它是「不能上架」的原因，写「-」运营会以为是没配满
+        return parts.length ? <span>{parts.join(" · ")}</span>
+          : <span className="text-muted-foreground">未配权益（不能上架）</span>;
+      },
+    },
+    { header: "自动续费", cell: (p) => p.autoRenew ? <Badge tone="info">支持</Badge> : <span className="text-muted-foreground">否</span> },
+    { header: "状态", cell: (p) => <StatusBadge map={PLAN_STATUS} value={p.status} /> },
+    {
+      header: t("common.actions"),
+      cell: (p) => !canEditMember ? <span className="text-muted-foreground">-</span> : (
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setPlanForm(planFormOf(p))}>{t("common.edit")}</Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={togglePlan.isPending}
+            onClick={() => togglePlan.mutate({ planNo: p.planNo, enable: p.status !== "ENABLED" })}
+          >
+            {p.status === "ENABLED" ? "下架" : "上架"}
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   const riskCols: Column<UserRisk>[] = [
     { header: "风控号", cell: (r) => <span className="txt-strong tabular-nums">{r.riskNo}</span> },
     { header: "用户号", cell: (r) => <span className="tabular-nums">{r.userNo}</span> },
@@ -915,6 +1059,7 @@ function UsersInner() {
 
   const active = tab === "list" ? users
     : tab === "members" ? members
+    : tab === "plans" ? plans
     : tab === "wallets" ? wallets
     : tab === "risk" ? risks
     : tab === "whitelist" ? whitelist
@@ -959,6 +1104,34 @@ function UsersInner() {
             selectedKeys={selectedUsers}
             onSelectedChange={setSelectedUsers}
             empty="没有符合条件的用户——可能是搜索词太窄，或 C 端尚无用户注册；清空搜索再看一次"
+          />
+        </>
+      )}
+      {tab === "plans" && (
+        <>
+          {!canEditMember && <ReadOnlyNotice what="会员套餐维护" perm="user:member:update" note="不能增改方案，也不能上下架" />}
+          {/*
+            方案（「卖什么」）与会员权益（「等级给什么」）是**两件正交的事**：
+            等级来自积分成长，卡型来自买了哪个方案。两者的权益由后端逐项取更优，
+            不是相互覆盖 —— 白银用户买了次卡，不该因此丢掉等级折扣。
+          */}
+          <div className="mb-2 flex items-baseline gap-2">
+            <h2 className="text-sm font-medium">会员套餐</h2>
+            <span className="text-xs text-muted-foreground">
+              新建默认下架；未配权益的方案不能上架 —— 上架后 C 端看到「有价格、没权益」的卡片，买了什么也不会发生
+            </span>
+          </div>
+          <Toolbar
+            onAdd={canEditMember ? () => setPlanForm({ cardType: "MONTHLY", price: 0, currency: "AED", sortNo: 0 }) : undefined}
+            addLabel="新增套餐"
+          />
+          <DataTable
+            rowKey={(p: MemberPlan) => p.planNo}
+            columns={planCols}
+            rows={plans.data?.list}
+            loading={plans.isLoading} error={plans.error} onRetry={plans.refetch}
+            rowClassName={(p: MemberPlan) => (p.status === "ENABLED" ? undefined : "opacity-60")}
+            empty="还没有会员套餐——C 端会员页会是空的，先在这里建一个并上架"
           />
         </>
       )}
@@ -1277,6 +1450,19 @@ function UsersInner() {
         onChange={(v) => setMemberForm(v as Partial<Member>)}
         onSubmit={() => memberForm && saveMember.mutate(memberForm)}
         submitting={saveMember.isPending}
+      />
+
+      <FormDrawer
+        open={!!planForm}
+        onOpenChange={(o) => !o && setPlanForm(null)}
+        titleNew="新增会员套餐"
+        titleEdit={`编辑套餐 · ${String(planForm?.name ?? "")}`}
+        isEdit={!!planForm?.planNo}
+        fields={PLAN_FIELDS}
+        value={planForm ?? {}}
+        onChange={(v) => setPlanForm(v as Record<string, unknown>)}
+        onSubmit={() => planForm && savePlan.mutate(planForm)}
+        submitting={savePlan.isPending}
       />
 
       <FormDrawer

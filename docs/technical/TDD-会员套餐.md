@@ -1,6 +1,6 @@
 # TDD-会员套餐
 
-状态：**待确认**（本文只给方案，未动代码）
+状态：**P0 已落地**（P1 阻塞在「收款动作」口径）
 关联需求：[`C端功能清单.md`](../requirements/C端功能清单.md) §10 会员与权益（C-MB，P1）
 关联现状：[`C端对齐现状-17模块.md`](C端对齐现状-17模块.md) 模块 10
 创建日期：2026-09-27
@@ -131,4 +131,36 @@ gross → ③倍率 → 总封顶(买断判定) → ④会员折扣 → ⑤券 �
 - `usr_membership` 的写入参是整实体（台账项），P1 动到它时要一并转 DTO。
 
 ---
-确认记录：待确认
+
+## 6. 落地记录（2026-09-27）
+
+**P0 全部落地**，两处与初稿不同（初稿被事实推翻，已在正文改正）：
+
+1. 权益**不是二选一合并**：`mbr_benefit`（等级，来自积分）与 `mbr_plan.rights`（卡，花钱买的）
+   本就正交（`MbrPlan` 里没有 `level` 列）。做法改成两者都结构化 + 逐项取更优。
+2. 会员权益**不进 `price_snapshot`**：`ChargeChain` 的类注释早定了口径
+   「券与会员权益本来就是结算时才确定的」。可复原性靠回写
+   `ord_order.member_level` + `member_discount_amount`。
+
+| 项 | 落点 |
+|---|---|
+| 端口 | `MemberRightsPort`（sharehub-api）+ `LocalMemberRights` |
+| 计价 | `ChargeChain` 6 参重载（封顶后、券前、买断跳过）；`RentOrderServiceImpl` 4 处调用点 |
+| 落列 | `V129__ord_order_member_discount.sql` |
+| 账单 | `ConsumerOrderAssembler.fees` 的和式 + `MEMBER` 行；c-app 三语文案 |
+| 方案 CRUD | `MemberPlanService` + `/api/user/member-plans`（+ `enable`/`disable`）；Req DTO 非实体 |
+| C 端展示 | `MembershipPlanVO.rights` 结构化，文案由端上生成（中英「折扣」是互补的两个数） |
+| 运营端 | 用户管理 › 会员套餐（`V132__menu_member_plan_leaf.sql`，INSERT 一行不整表重灌） |
+
+**卡口**：`ChargeChainTest` +7 · `MemberRightsReachBillingTest` 3（真实借还闭环）
+· `MemberPlanLifecycleTest` 3。负对照：拆折扣层 → 4 红；`LocalMemberRights` 恒返 null → 3 红；
+拆方案两个 guard → 2 红。**全部是 Failure 不是 Error**。
+
+**顺带发现（未改，只记）**：`MembershipServiceImpl.get` 的注释写「planNo 可能为 null」，
+而 `usr_membership.plan_no` 在 DDL 里是 NOT NULL；c-app 会员页此前按
+`planNo.includes("MONTH")` 判包月，新取号是 `MP0001`，永远判不中（已改成按 `cardType`）。
+
+---
+确认记录：2026-09-27 用户「确认」；两个待拍板项按推荐默认执行并记录在案
+（权益真源 = 结构化双源逐项取更优 · 顺序 = 先会员折扣再券，`ord_order` 加
+`member_discount_amount` 列）。

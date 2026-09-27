@@ -90,6 +90,8 @@ export type FreeOrderQ = PageQ & { reason?: string };
 export type PackageQ = PageQ & { status?: string; showArchived?: boolean };
 /** 钱包流水：按流水类型筛（RECHARGE/SPEND/REFUND/BONUS）；用户号走路径参数，不进 q。 */
 export type WalletTxnQ = PageQ & { type?: string };
+/** 会员方案：按上下架状态筛（默认全部 —— 下架的方案仍要能在运营端看见并改回来）。 */
+export type MemberPlanQ = PageQ & { status?: string };
 /** 次卡：按用户 / 卡类型 / 状态筛（用户详情抽屉按 userNo 精确取该用户的卡）。 */
 export type MemberCardQ = PageQ & { userNo?: string; cardType?: string; status?: string };
 /** 免费白名单：状态（含 REVOKED 软撤销）+ 原因。 */

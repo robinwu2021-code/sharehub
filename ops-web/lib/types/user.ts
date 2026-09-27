@@ -141,6 +141,50 @@ export interface Member {
  * 一个等级的权益。等级本身是**固定三档**（SILVER/GOLD/PLATINUM，与 Member.level 同源），
  * 所以权益只有「改」没有「增删」—— 凭空多一档权益却没有会员能落到该档，是假功能。
  */
+/**
+ * 会员方案权益（镜像后端 `PlanRightsVO`）。
+ *
+ * ⚠️ **结构化而不是文案**。`mbr_plan.rights` 此前存的是展示文案数组，
+ * 于是「租金九折」这句话在库里是一段文本 —— 计价链无从解析，账单照收原价。
+ * 现在它与 {@link MemberBenefit} 的三项是同一份形状，由 `MemberRightsPort` 逐项取更优后进计价。
+ */
+export interface MemberPlanRights {
+  /** 租金折扣率，`0.9` = 九折。**不是「几折」那个整数** —— 填 `9` 会被服务端拒 */
+  rentDiscount?: number;
+  /** 每单免费时长（分钟） */
+  freeMinutes?: number;
+  depositFree?: boolean;
+}
+
+/**
+ * 会员方案（镜像后端 `MemberPlanRow`）—— 「卖什么」。
+ *
+ * <p>与 {@link MemberBenefit}（「等级给什么」）**正交**：等级来自积分成长，
+ * 卡型来自买了哪个方案。两者的权益由后端逐项取更优，不是相互覆盖 ——
+ * 白银用户买了次卡，不该因此丢掉等级折扣。
+ *
+ * <p>`status` **不在保存入参里**：上下架走 enable/disable 动作端点。
+ * 让状态混在保存字段里，「下架一个方案」和「改个名字」就成了同一个动作。
+ */
+export interface MemberPlan {
+  planNo: string;
+  name: string;
+  nameEn?: string;
+  nameAr?: string;
+  /** MONTHLY(包月) / TIMES(次卡) / RIGHTS(权益卡) */
+  cardType: "MONTHLY" | "TIMES" | "RIGHTS";
+  price: number;
+  currency?: string;
+  /** 有效期天数（MONTHLY/RIGHTS） */
+  periodDays?: number;
+  /** 总次数（TIMES 卡） */
+  timesTotal?: number;
+  rights?: MemberPlanRights | null;
+  autoRenew: boolean;
+  sortNo?: number;
+  status: "ENABLED" | "DISABLED";
+}
+
 export interface MemberBenefit {
   level: Member["level"];
   /** 等级展示名（白银/黄金/铂金），与页面徽标共用一份文案。 */

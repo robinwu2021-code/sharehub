@@ -33522,6 +33522,10 @@
     {
      "name": "couponAmount",
      "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "memberDiscountAmount",
+     "type": "java.math.BigDecimal"
     }
    ],
    "requestShape": null
@@ -33618,6 +33622,10 @@
     },
     {
      "name": "couponAmount",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "memberDiscountAmount",
      "type": "java.math.BigDecimal"
     }
    ],
@@ -33719,6 +33727,10 @@
       },
       {
        "name": "couponAmount",
+       "type": "java.math.BigDecimal"
+      },
+      {
+       "name": "memberDiscountAmount",
        "type": "java.math.BigDecimal"
       }
      ]
@@ -39763,6 +39775,176 @@
   },
   {
    "verb": "GET",
+   "path": "/api/user/member-plans",
+   "perm": "user:member:read",
+   "perms": [
+    "user:member:read"
+   ],
+   "handler": "UserOpsController#memberPlans",
+   "summary": "会员方案列表（`mbr_plan`）。",
+   "params": [
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "keyword",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "status",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "Object",
+   "returnContainer": null,
+   "returnElement": "Object",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/user/member-plans",
+   "perm": "user:member:update",
+   "perms": [
+    "user:member:update"
+   ],
+   "handler": "UserOpsController#saveMemberPlan",
+   "summary": "新建 / 修改会员方案。",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.user.asset.dto.UserAssetDtos.MemberPlanReq",
+   "returnType": "Object",
+   "returnContainer": null,
+   "returnElement": "Object",
+   "responseShape": null,
+   "requestShape": [
+    {
+     "name": "planNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "nameEn",
+     "type": "String"
+    },
+    {
+     "name": "nameAr",
+     "type": "String"
+    },
+    {
+     "name": "cardType",
+     "type": "String"
+    },
+    {
+     "name": "price",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "periodDays",
+     "type": "Integer"
+    },
+    {
+     "name": "timesTotal",
+     "type": "Integer"
+    },
+    {
+     "name": "rights",
+     "type": "PlanRightsVO",
+     "fields": [
+      {
+       "name": "rentDiscount",
+       "type": "BigDecimal"
+      },
+      {
+       "name": "freeMinutes",
+       "type": "Integer"
+      },
+      {
+       "name": "depositFree",
+       "type": "Boolean"
+      }
+     ]
+    },
+    {
+     "name": "autoRenew",
+     "type": "Boolean"
+    },
+    {
+     "name": "sortNo",
+     "type": "Integer"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/user/member-plans/{no}/disable",
+   "perm": "user:member:update",
+   "perms": [
+    "user:member:update"
+   ],
+   "handler": "UserOpsController#disableMemberPlan",
+   "summary": "下架。",
+   "params": [
+    {
+     "in": "path",
+     "name": "no",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "Object",
+   "returnContainer": null,
+   "returnElement": "Object",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/user/member-plans/{no}/enable",
+   "perm": "user:member:update",
+   "perms": [
+    "user:member:update"
+   ],
+   "handler": "UserOpsController#enableMemberPlan",
+   "summary": "上架：对 C 端可见可买。",
+   "params": [
+    {
+     "in": "path",
+     "name": "no",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "Object",
+   "returnContainer": null,
+   "returnElement": "Object",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
    "path": "/api/user/members",
    "perm": "user:member:read",
    "perms": [
@@ -41807,6 +41989,10 @@
       },
       {
        "name": "couponAmount",
+       "type": "java.math.BigDecimal"
+      },
+      {
+       "name": "memberDiscountAmount",
        "type": "java.math.BigDecimal"
       }
      ]
@@ -44725,8 +44911,30 @@
      "type": "java.math.BigDecimal"
     },
     {
-     "name": "benefits",
-     "type": "java.util.List<String>"
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "cardType",
+     "type": "String"
+    },
+    {
+     "name": "rights",
+     "type": "PlanRightsVO",
+     "fields": [
+      {
+       "name": "rentDiscount",
+       "type": "BigDecimal"
+      },
+      {
+       "name": "freeMinutes",
+       "type": "Integer"
+      },
+      {
+       "name": "depositFree",
+       "type": "Boolean"
+      }
+     ]
     },
     {
      "name": "active",
@@ -45993,10 +46201,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 519,
-  "records": 469,
-  "withPerm": 446,
-  "withBody": 220,
+  "endpoints": 523,
+  "records": 473,
+  "withPerm": 450,
+  "withBody": 221,
   "shapedResponses": 408
  }
 }

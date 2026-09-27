@@ -1,11 +1,11 @@
 // 覆盖范围：C 端用户主档与拉黑、会员、钱包、风控与黑名单、消费者分群、
 // 免费用户白名单、充值套餐。
-import type { PageQ, WhitelistQ, PackageQ, WalletTxnQ, MemberCardQ } from "../query";
+import type { PageQ, WhitelistQ, PackageQ, WalletTxnQ, MemberCardQ, MemberPlanQ } from "../query";
 import type {
   PageResult, CUser, Member, Wallet, WalletTxn, UserRisk, UserBlacklist,
   ConsumerSegment, FreeUserWhitelist, RechargePackage, LogoffItem, CUserInvoiceRow,
   CreditScoreChange, CreditScoreAdjustPayload, CreditScoreAdjustResult,
-  MemberBenefit, MemberCard, MemberCardGrantPayload, MemberCardGrantResult, UserProfile,
+  MemberBenefit, MemberPlan, MemberCard, MemberCardGrantPayload, MemberCardGrantResult, UserProfile,
 } from "../../types";
 
 export interface UserApi {
@@ -31,25 +31,40 @@ export interface UserApi {
   /** 会员增改。`cardType`/`expireAt` 由次卡派生，**服务端会剥掉**这两个字段（见 mock/db/user.ts）。 */
   saveMember(x: Partial<Member> & { userNo?: string }): Promise<Member>;
   /**
+   * 会员方案（`user:member:read`）—— 「卖什么」，与会员权益（「等级给什么」）正交。
+   *
+   * ⚠️ 此前 `mbr_plan` **没有任何写入方**：有表、有实体、C 端有页面读它，
+   * 但全仓没有一个端点能建或改它，表里 0 行 —— 于是 C 端会员页永远是空列表，
+   * 看起来像「本平台暂无会员方案」。
+   */
+  listMemberPlans(q?: MemberPlanQ): Promise<PageResult<MemberPlan>>;
+  /**
+   * 增改会员方案（`user:member:update`）。`planNo` 为空则新建（后端取号 `MP`）。
+   *
+   * **`status` 不在入参里** —— 上下架走下面两个动作端点。混在保存字段里，
+   * 「下架一个方案」和「改个名字」就成了同一个动作，而其中一个会影响正在卖的东西。
+   */
+  saveMemberPlan(x: Partial<MemberPlan> & { planNo?: string }): Promise<MemberPlan>;
+  /** 上架：对 C 端可见。**权益为空的方案会被服务端拒绝上架**（否则买了什么也不会发生）。 */
+  enableMemberPlan(planNo: string): Promise<MemberPlan>;
+  /** 下架。已开通的会员不受影响（权益按 usr_membership 走，不回读方案状态）。 */
+  disableMemberPlan(planNo: string): Promise<MemberPlan>;
+  /**
    * 会员权益（`user:member:read`）：固定三档，一页三条。
-   * ⚠️ 后端缺口：`GET /api/user/member-benefits` 尚未实现。
    */
   listMemberBenefits(q?: PageQ): Promise<PageResult<MemberBenefit>>;
   /**
    * 改会员权益（`user:member:update`）：**只改不增**（等级固定三档），
    * 且权益必须随等级单调变好（不满足服务端整表回滚并报错）。
-   * ⚠️ 后端缺口：`POST /api/user/member-benefits/{level}` 尚未实现。
    */
   saveMemberBenefit(x: Partial<MemberBenefit> & { level: MemberBenefit["level"] }): Promise<MemberBenefit>;
   /**
    * 次卡（`user:member:read`）：`userNo` 精确筛该用户的卡（用户详情抽屉用）。
-   * ⚠️ 后端缺口：`GET /api/user/member-cards` 尚未实现。
    */
   listMemberCards(q?: MemberCardQ): Promise<PageResult<MemberCard>>;
   /**
    * 发放次卡（`user:member:update`）：事由必填、黑名单用户拒发、失效日期必须晚于生效日期；
    * 落卡后**同步会员行的次卡/到期两列**，故返回值把同步后的会员行一起带回。
-   * ⚠️ 后端缺口：`POST /api/user/member-cards` 尚未实现。
    */
   grantMemberCard(payload: MemberCardGrantPayload): Promise<MemberCardGrantResult>;
   saveWallet(x: Partial<Wallet> & { userNo?: string }): Promise<Wallet>;

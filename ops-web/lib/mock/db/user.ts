@@ -6,7 +6,7 @@ import type {
   CUser, UserRisk, UserBlacklist, Member, Wallet, WalletTxn,
   FreeUserWhitelist, ConsumerSegment, PageQuery,
   CreditScoreChange, CreditScoreAdjustPayload, CreditScoreAdjustResult,
-  MemberBenefit, MemberCard, MemberCardType, MemberCardGrantPayload, MemberCardGrantResult,
+  MemberBenefit, MemberPlan, MemberCard, MemberCardType, MemberCardGrantPayload, MemberCardGrantResult,
   UserProfile,
   LogoffItem, CUserInvoiceRow,
 } from "../../types";
@@ -381,6 +381,85 @@ export const memberBenefits: MemberBenefit[] = [
   { level: "GOLD", name: "黄金", rentDiscount: 0.9, freeMinutes: 10, depositFree: false, monthlyCoupons: 2, pointsRate: 1.5, upgradePoints: 1000, status: "ENABLED", updatedBy: "admin", updatedAt: iso(30 * 86400_000) },
   { level: "PLATINUM", name: "铂金", rentDiscount: 0.8, freeMinutes: 30, depositFree: true, monthlyCoupons: 5, pointsRate: 2, upgradePoints: 5000, status: "ENABLED", updatedBy: "admin", updatedAt: iso(30 * 86400_000) },
 ];
+
+// ————————————————————————————————————————————————————————————————
+// 会员方案（「卖什么」）—— 与会员权益（「等级给什么」）正交，见 types/user.ts
+//
+// ⚠️ mbr_plan 此前**没有任何写入方**：有表、有实体、C 端有页面读它，
+// 但全仓没有一个端点能建或改它，表里 0 行 —— C 端会员页永远是空列表。
+
+export const memberPlans: MemberPlan[] = [
+  { planNo: "MP0001", name: "月卡", nameEn: "Monthly Pass", cardType: "MONTHLY", price: 29, currency: "AED", periodDays: 30, rights: { rentDiscount: 0.9, freeMinutes: 120, depositFree: true }, autoRenew: true, sortNo: 1, status: "ENABLED" },
+  { planNo: "MP0002", name: "十次卡", nameEn: "10-Rides Card", cardType: "TIMES", price: 40, currency: "AED", timesTotal: 10, rights: { freeMinutes: 120 }, autoRenew: false, sortNo: 2, status: "ENABLED" },
+  // 下架的方案仍要在运营端看得见并改回来，所以 mock 里就留一条
+  { planNo: "MP0003", name: "体验卡", nameEn: "Trial Card", cardType: "RIGHTS", price: 9, currency: "AED", periodDays: 7, rights: { rentDiscount: 0.95 }, autoRenew: false, sortNo: 3, status: "DISABLED" },
+];
+
+export class MemberPlanError extends Error {
+  constructor(readonly planNo: string, msg: string) {
+    super(msg);
+    this.name = "MemberPlanError";
+  }
+}
+
+export const listMemberPlans = (q: PageQuery & { status?: string } = {}) =>
+  paginate(
+    [...memberPlans].sort((a, b) => (a.sortNo ?? 0) - (b.sortNo ?? 0)),
+    q.page, q.size,
+    (x) => kwHit(q.keyword, x.planNo, x.name, x.nameEn ?? "") && (!q.status || x.status === q.status),
+  );
+
+/**
+ * 增改方案。`status` **刻意不接受** —— 上下架走 {@link setMemberPlanEnabled}。
+ *
+ * 折扣率越界要拒：「九折」填成 `9` 是最容易犯的那一种，不拦的话应收会乘成九倍，
+ * 而金额照样算得出来、接口一路成功 —— 只有用户会发现，且发现时钱已经扣了。
+ */
+export function saveMemberPlan(x: Partial<MemberPlan> & { planNo?: string }): MemberPlan {
+  if (!x.name?.trim()) throw new MemberPlanError(String(x.planNo), "方案名必填");
+  const cardType = x.cardType;
+  if (!cardType || !["MONTHLY", "TIMES", "RIGHTS"].includes(cardType)) {
+    throw new MemberPlanError(String(x.planNo), `卡型非法：${cardType}`);
+  }
+  const d = x.rights?.rentDiscount;
+  if (d != null && !(d > 0 && d <= 1)) {
+    throw new MemberPlanError(String(x.planNo), `租金折扣率必须在 0 与 1 之间（0.9 即九折），当前：${d}`);
+  }
+  if (x.rights?.freeMinutes != null && x.rights.freeMinutes < 0) {
+    throw new MemberPlanError(String(x.planNo), `免费时长不能为负：${x.rights.freeMinutes}`);
+  }
+
+  const i = x.planNo ? memberPlans.findIndex((p) => p.planNo === x.planNo) : -1;
+  if (i >= 0) {
+    // status 从库里取，不看入参 —— 保存不该顺手改上下架
+    const next = { ...memberPlans[i], ...x, status: memberPlans[i].status };
+    memberPlans[i] = next;
+    return next;
+  }
+  // 取号按「扫同前缀取 max+1」，不是「前缀 + 数组长度」（后者在本 mock 里撞过两次主键）
+  const max = memberPlans.reduce((m, p) => Math.max(m, Number(p.planNo.slice(2)) || 0), 0);
+  // 新建默认下架：建好就开卖会让一个还没填完权益的方案直接对 C 端可见
+  const created: MemberPlan = {
+    planNo: `MP${String(max + 1).padStart(4, "0")}`,
+    name: x.name, nameEn: x.nameEn, nameAr: x.nameAr, cardType,
+    price: x.price ?? 0, currency: x.currency ?? "AED",
+    periodDays: x.periodDays, timesTotal: x.timesTotal, rights: x.rights ?? null,
+    autoRenew: !!x.autoRenew, sortNo: x.sortNo ?? 0, status: "DISABLED",
+  };
+  memberPlans.push(created);
+  return created;
+}
+
+/** 上下架。**权益为空的方案拒绝上架** —— 上架后 C 端看到「有价格、没权益」的卡片，买了什么也不会发生。 */
+export function setMemberPlanEnabled(planNo: string, enable: boolean): MemberPlan {
+  const i = memberPlans.findIndex((p) => p.planNo === planNo);
+  if (i < 0) throw new MemberPlanError(planNo, `会员方案 ${planNo} 不存在`);
+  const r = memberPlans[i].rights;
+  const empty = !r || (r.rentDiscount == null && !r.freeMinutes && !r.depositFree);
+  if (enable && empty) throw new MemberPlanError(planNo, "该方案还没配权益，不能上架");
+  memberPlans[i] = { ...memberPlans[i], status: enable ? "ENABLED" : "DISABLED" };
+  return memberPlans[i];
+}
 
 export class MemberBenefitError extends Error {
   constructor(readonly level: string, msg: string) {

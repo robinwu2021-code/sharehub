@@ -1,7 +1,7 @@
 # 每个角色看得到的菜单（lib/nav-visibility.test.ts 生成，勿手改）
 # 改动菜单可见性时这份文件会变 —— diff 就是评审物，确认是有意的再提交。
 
-## ADMIN（105 项）
+## ADMIN（106 项）
 operation›站点概览
 operation›站点管理
 operation›点位管理
@@ -71,6 +71,7 @@ user›会员/次卡
 user›钱包
 user›充值套餐
 user›开票申请
+user›会员套餐
 marketing›优惠券
 marketing›活动
 marketing›推送触达
@@ -155,7 +156,7 @@ report›实时大屏
 report›自定义报表
 report›消费者分析
 
-## CS（39 项）
+## CS（40 项）
 operation›问题管理
 operation›公告管理
 device›设备台账
@@ -187,6 +188,7 @@ user›会员/次卡
 user›钱包
 user›充值套餐
 user›开票申请
+user›会员套餐
 marketing›优惠券
 marketing›推送触达
 cs›报障受理
@@ -196,7 +198,7 @@ cs›黑名单处理
 system›发送记录
 system›触达拉黑
 
-## FINANCE（47 项）
+## FINANCE（48 项）
 operation›站点概览
 operation›站点坪效
 operation›收费方案
@@ -234,6 +236,7 @@ user›会员/次卡
 user›钱包
 user›充值套餐
 user›开票申请
+user›会员套餐
 report›设备运营分析
 report›点位坪效
 report›财务报表

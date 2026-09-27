@@ -179,9 +179,10 @@ export const tickets: CsTicket[] = [
   { ticketNo: "TK000001", userNo: "CU-0001", orderNo: "ORD000021", cabinetNo: "CAB1002", problemNo: "ISS000001", issue: "扫码后没弹出充电宝", channel: "APP", status: "CLOSED", handlerNo: "EMP0007", woNo: "WO000011", refundNo: null, createdAt: "2026-09-12 19:40:00" },
 ];
 
+// 权益是**结构化**的（rights），不是文案数组 —— 见 types/index.ts 的 PlanRights
 export const memberships: MembershipPlan[] = [
-  { planNo: "MB-MONTH", name: "Monthly Pass", price: 29, benefits: ["First 2h free daily", "10% off", "Higher free-deposit"], active: true, expireAt: "2026-08-12" },
-  { planNo: "MB-10", name: "10-Rides Card", price: 40, benefits: ["10 rides, 2h each"], active: false },
+  { planNo: "MP0001", name: "Monthly Pass", price: 29, currency: "AED", cardType: "MONTHLY", rights: { rentDiscount: 0.9, freeMinutes: 120, depositFree: true }, active: true, expireAt: "2026-08-12" },
+  { planNo: "MP0002", name: "10-Rides Card", price: 40, currency: "AED", cardType: "TIMES", rights: { freeMinutes: 120 }, active: false },
 ];
 
 // 公告：三语三列全量下发，由端按当前语种取（与后端 NoticeVO 同形）

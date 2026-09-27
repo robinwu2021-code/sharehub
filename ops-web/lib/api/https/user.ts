@@ -3,7 +3,7 @@
 // 端点前缀：/api/user/**（拉黑写操作走 /internal/user/**，消费者分群走 /api/ops/reports/**，沿用现状）。
 import { client } from "../http-client";
 import type { UserApi } from "../contracts/user";
-import type { PageQ, PackageQ, WhitelistQ, WalletTxnQ, MemberCardQ } from "../query";
+import type { PageQ, PackageQ, WhitelistQ, WalletTxnQ, MemberCardQ, MemberPlanQ } from "../query";
 
 export const userHttp: UserApi = {
   listUsers: (q?: PageQ) => client.get("/api/user/users", q),
@@ -13,7 +13,12 @@ export const userHttp: UserApi = {
 
   // 用户扩展
   listMembers: (q?: PageQ) => client.get("/api/user/members", q),
-  // 会员权益与次卡都挂在 user 域（与 /members 同级）。⚠️ 后端缺口：四个端点都还没有
+  // 会员权益与次卡都挂在 user 域（与 /members 同级）。四个端点后端均已落地（2026-09-27 核对）
+  // 会员方案（「卖什么」）。上下架是**动作端点**，不是 status 保存字段
+  listMemberPlans: (q?: MemberPlanQ) => client.get("/api/user/member-plans", q),
+  saveMemberPlan: (x) => client.post("/api/user/member-plans", x),
+  enableMemberPlan: (no) => client.post(`/api/user/member-plans/${no}/enable`, {}),
+  disableMemberPlan: (no) => client.post(`/api/user/member-plans/${no}/disable`, {}),
   listMemberBenefits: (q?: PageQ) => client.get("/api/user/member-benefits", q),
   // 等级是主键：只有更新语义，故路径必带 {level}（没有「新增一档」的入口）
   saveMemberBenefit: (x) => client.post(`/api/user/member-benefits/${x.level}`, x),

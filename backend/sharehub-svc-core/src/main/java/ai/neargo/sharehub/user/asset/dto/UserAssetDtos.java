@@ -145,13 +145,57 @@ public final class UserAssetDtos {
 
     /** C 端会员方案行，镜像 c-app {@code Membership}：全部在售方案 + 当前用户是否已开通。 */
     public record MembershipPlanVO(String planNo, String name, java.math.BigDecimal price,
-                                   java.util.List<String> benefits, Boolean active, String expireAt) {
+                                   String currency, String cardType, PlanRightsVO rights,
+                                   Boolean active, String expireAt) {
     }
 
-    /** 会员方案（C-MB-01 选购页 / 运营端方案维护）。 */
+    /**
+     * 方案权益，**结构化而非文案**（[TDD-会员套餐 §2]）。
+     *
+     * <p>此前这里是 {@code List<String> benefits}，直接把 {@code mbr_plan.rights}
+     * 的自由文案透出去。两个后果：
+     * <ul>
+     *   <li><b>文案跟不上界面语言</b> —— 后端存一句中文，阿语界面上就是一句中文。
+     *       {@code FeeItem} 那边已经为同一个错改过一轮（见 c-app {@code types/index.ts}）；</li>
+     *   <li><b>权益不可能参与计价</b> —— 自由文本里解析不出折扣率，
+     *       于是页面写着「租金九折」而账单照收原价。</li>
+     * </ul>
+     *
+     * @param rentDiscount 折扣率，0.9 = 九折；null = 不打折
+     * @param freeMinutes  每单免费分钟数；0 = 无
+     * @param depositFree  是否免押
+     */
+    public record PlanRightsVO(BigDecimal rentDiscount, Integer freeMinutes, Boolean depositFree) {
+    }
+
+    /**
+     * 会员方案行（运营端方案维护）。
+     *
+     * <p>{@code rights} 是**结构化对象**而不是 JSON 字符串 ——
+     * 透出字符串等于让页面自己解析，而它解析出来的形状与计价链读的形状**没有任何东西保证一致**。
+     */
     public record MemberPlanRow(String planNo, String name, String nameEn, String nameAr,
                                 String cardType, BigDecimal price, String currency,
-                                Integer periodDays, Integer timesTotal, String rights,
+                                Integer periodDays, Integer timesTotal, PlanRightsVO rights,
                                 boolean autoRenew, Integer sortNo, String status) {
+    }
+
+    /**
+     * 会员方案保存入参。
+     *
+     * <p><b>不用实体当请求体</b>（{@code known-entity-request-bodies} 台账：
+     * 「新端点不许再用实体当请求体」）—— 实体当请求体时客户端传哪些字段就能改哪些字段，
+     * 而那份台账是黑名单，以后给实体加个字段它默认就可写。
+     *
+     * <p><b>{@code status} 不在入参里</b>：启停走 {@code /enable}|{@code /disable} 动作端点。
+     * 让状态混在保存字段里，「停用一个方案」和「改个名字」就成了同一个动作，
+     * 而其中一个会影响正在卖的东西 —— 公告那条链刚为同样的错修过一轮。
+     *
+     * @param planNo 为空则新建（取号 MP），否则按业务键更新
+     */
+    public record MemberPlanReq(String planNo, String name, String nameEn, String nameAr,
+                                String cardType, BigDecimal price, String currency,
+                                Integer periodDays, Integer timesTotal, PlanRightsVO rights,
+                                Boolean autoRenew, Integer sortNo) {
     }
 }

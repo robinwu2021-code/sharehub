@@ -131,6 +131,9 @@ const LEAF_TUPLES = [
   "/users?tab=wallets|钱包|user:wallet:read|2|用户资产",
   "/users?tab=recharge|充值套餐|user:wallet:read|2|用户资产",
   "/users?tab=invoices|开票申请|user:invoice:read|2|用户资产",
+  // 会员套餐（2026-09-27）：mbr_plan 此前没有任何写入方，C 端会员页因此永远是空列表。
+  // 在本菜单末尾而非紧挨「会员/次卡」—— 菜单真源在库里，往组中间插要整表重灌种子
+  "/users?tab=plans|会员套餐|user:member:read|2|用户资产",
   "/marketing|优惠券|marketing:coupon:read|2|促销玩法",
   "/marketing?tab=campaigns|活动|marketing:campaign:read|2|促销玩法",
   "/marketing?tab=push|推送触达|marketing:push:send|3|促销玩法",

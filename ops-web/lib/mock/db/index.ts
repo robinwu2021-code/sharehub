@@ -112,6 +112,7 @@ export {
   // S4 用户详情 + 会员权益/次卡发放
   getUserProfileBase,
   memberBenefits, listMemberBenefits, saveMemberBenefit, MemberBenefitError,
+  memberPlans, listMemberPlans, saveMemberPlan, setMemberPlanEnabled, MemberPlanError,
   memberCards, listMemberCards, grantMemberCard, MemberCardError,
 } from "./user";
 

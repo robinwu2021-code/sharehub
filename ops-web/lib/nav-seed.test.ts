@@ -38,6 +38,22 @@ type Row = Record<string, string>;
 const MIGRATION_DIR = "../backend/sharehub-app/src/main/resources/db/migration/";
 const PATCHES: { file: string; mustContain: string; apply: (rows: Row[]) => void }[] = [
   {
+    // 用户管理 › 会员套餐（mbr_plan 此前没有任何写入方，C 端会员页因此永远是空列表）。
+    // 是 INSERT 而不是整表重灌 —— 故这条叶子在 nav.ts 里刻意放在本菜单末尾，
+    // 往组中间插会让同组后面所有叶子的 sort 都要挪。
+    file: "V132__menu_member_plan_leaf.sql",
+    mustContain: "'M_user__10', 'M_user', '会员套餐'",
+    apply: (rows) => {
+      rows.push({
+        menu_no: "M_user__10", parent_no: "M_user", name: "会员套餐",
+        name_en: "Membership Plans", name_ar: "خطط العضوية", type: "ITEM",
+        path: "/users?tab=plans", icon: "NULL", group_name: "用户资产", sort: "10",
+        perm: "user:member:read", phase: "2", ready: "0",
+        module: "NULL", modules: "NULL", match_paths: "NULL", pin_bottom: "0", portal_for: "NULL",
+      });
+    },
+  },
+  {
     // 告警四个菜单叶：workorder:wo:read → workorder:alarm:read
     file: "V92__menu_alarm_perm.sql",
     mustContain: "UPDATE iam_menu SET perm = 'workorder:alarm:read'",

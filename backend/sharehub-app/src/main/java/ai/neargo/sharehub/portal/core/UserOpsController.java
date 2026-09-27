@@ -56,6 +56,7 @@ public class UserOpsController {
     private final FreeWhitelistService whitelist;
     private final MembershipService members;
     private final ai.neargo.sharehub.user.member.service.MemberService memberService;
+    private final ai.neargo.sharehub.user.asset.service.MemberPlanService memberPlanService;
     private final ai.neargo.sharehub.user.member.service.CreditScoreService creditScoreService;
     private final WalletService wallets;
     private final RechargePackageService packages;
@@ -66,11 +67,13 @@ public class UserOpsController {
                              WalletService wallets, RechargePackageService packages,
                              RechargeOrderService rechargeOrders,
                              ai.neargo.sharehub.user.member.service.MemberService memberService,
+                             ai.neargo.sharehub.user.asset.service.MemberPlanService memberPlanService,
                              ai.neargo.sharehub.user.member.service.CreditScoreService creditScoreService,
                               UserLogoffService logoffs, UserInvoiceService cuserInvoices) {
         this.logoffs = logoffs;
         this.cuserInvoices = cuserInvoices;
         this.memberService = memberService;
+        this.memberPlanService = memberPlanService;
         this.creditScoreService = creditScoreService;
         this.risks = risks;
         this.blacklist = blacklist;
@@ -263,7 +266,50 @@ public class UserOpsController {
         return packages.unarchive(no);
     }
 
-    // ───────────────── 会员权益 / 会员卡 / 信用分 ─────────────────
+    // ───────────────── 会员方案 / 会员权益 / 会员卡 / 信用分 ─────────────────
+
+    /**
+     * 会员方案列表（{@code mbr_plan}）。
+     *
+     * <p>此前这张表**没有任何写入方** —— 有表、有实体、有 mapper、C 端有页面读它，
+     * 出参 DTO 还注明「运营端方案维护」，但全仓没有一个端点能建或改它，表里 0 行。
+     * 于是 C 端会员页永远是空列表，看起来像「本平台暂无会员方案」。
+     */
+    @GetMapping("/member-plans")
+    @PreAuthorize("@perm.can('user:member:read')")
+    public Object memberPlans(@RequestParam(required = false) Integer page,
+                              @RequestParam(required = false) Integer size,
+                              @RequestParam(required = false) String keyword,
+                              @RequestParam(required = false) String status) {
+        return memberPlanService.page(page, size, keyword, status);
+    }
+
+    /**
+     * 新建 / 修改会员方案。**入参是 Req DTO 不是实体**
+     * （{@code known-entity-request-bodies}：新端点不许再用实体当请求体）。
+     *
+     * <p>{@code status} 不收 —— 上下架走下面两个动作端点。
+     */
+    @PostMapping("/member-plans")
+    @PreAuthorize("@perm.can('user:member:update')")
+    public Object saveMemberPlan(
+            @RequestBody ai.neargo.sharehub.user.asset.dto.UserAssetDtos.MemberPlanReq req) {
+        return memberPlanService.save(req);
+    }
+
+    /** 上架：对 C 端可见可买。**权益读不出来的方案拒绝上架** —— 见 service。 */
+    @PostMapping("/member-plans/{no}/enable")
+    @PreAuthorize("@perm.can('user:member:update')")
+    public Object enableMemberPlan(@PathVariable String no) {
+        return memberPlanService.setEnabled(no, true);
+    }
+
+    /** 下架。已开通的会员不受影响（权益按 usr_membership 走，不回读方案状态）。 */
+    @PostMapping("/member-plans/{no}/disable")
+    @PreAuthorize("@perm.can('user:member:update')")
+    public Object disableMemberPlan(@PathVariable String no) {
+        return memberPlanService.setEnabled(no, false);
+    }
 
     /** 会员等级权益，**按等级由低到高**返回（页面排序与单调性校验共用同一顺序）。 */
     @GetMapping("/member-benefits")

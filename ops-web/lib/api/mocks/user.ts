@@ -2,7 +2,7 @@
 // 免费用户白名单、充值套餐。
 import * as db from "../../mock/db";
 import type { UserApi } from "../contracts/user";
-import type { PageQ, WhitelistQ, PackageQ, WalletTxnQ, MemberCardQ } from "../query";
+import type { PageQ, WhitelistQ, PackageQ, WalletTxnQ, MemberCardQ, MemberPlanQ } from "../query";
 import { wait } from "./_wait";
 
 export const userMock: UserApi = {
@@ -35,6 +35,10 @@ export const userMock: UserApi = {
 
   // 用户扩展
   listMembers: (q: PageQ = {}) => wait(db.listMembers(q)),
+  listMemberPlans: (q: MemberPlanQ = {}) => wait(db.listMemberPlans(q)),
+  saveMemberPlan: (x) => wait(db.saveMemberPlan(x), 350),
+  enableMemberPlan: (no) => wait(db.setMemberPlanEnabled(no, true), 300),
+  disableMemberPlan: (no) => wait(db.setMemberPlanEnabled(no, false), 300),
   listMemberBenefits: (q: PageQ = {}) => wait(db.listMemberBenefits(q)),
   // 权益写入在 db 层校验范围与「随等级单调变好」，不过就整表回滚并抛错
   saveMemberBenefit: (x) => wait(db.saveMemberBenefit(x), 350),

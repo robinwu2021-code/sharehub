@@ -353,6 +353,11 @@ export const NAV: NavSection[] = [
       // 不报错、不红、用户也不会投诉，因为他们不知道本该有。
       // 同名 group 的叶子必须相邻：「注销申请」在用户主体组里，「开票申请」跟在用户资产组末尾。
       { href: "/users?tab=invoices", label: "开票申请", perm: "user:invoice:read", phase: 2, group: "用户资产" },
+      // 2026-09-27：mbr_plan 此前没有任何写入方 —— C 端会员页因此永远是空列表。
+      // 放在本菜单**末尾**而不是紧挨「会员/次卡」：菜单真源在库里，往中间插一条
+      // 会让同组后面所有叶子的 sort 都要挪，而那就得整表重灌 ——
+      // 整表重灌会冲掉「菜单管理」里的线上改动（见 nav-seed.test.ts）。
+      { href: "/users?tab=plans", label: "会员套餐", perm: "user:member:read", phase: 2, group: "用户资产" },
     ],
   },
   {

@@ -37,7 +37,8 @@ class MenuTreeTest extends ApiTestSupport {
         int leaves = 0;
         for (JsonNode s : t) leaves += s.path("children").size();
         // 2026-09-25 +2：用户管理 › 注销申请 / 开票申请（C 端一直在产生这两类待办，运营端此前没有入口）
-        assertThat(leaves).as("ADMIN 看得到的叶子数").isEqualTo(105);
+        // 2026-09-27 +1：用户管理 › 会员套餐（mbr_plan 此前没有任何写入方，C 端会员页因此永远是空列表）
+        assertThat(leaves).as("ADMIN 看得到的叶子数").isEqualTo(106);
     }
 
     @Test

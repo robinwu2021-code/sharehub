@@ -147,6 +147,7 @@ const NAV: Record<string, Pair> = {
   "风控用户": { en: "Risk Users", ar: "المستخدمون المحفوفون بالمخاطر" },
   "黑名单": { en: "Blacklist", ar: "القائمة السوداء" },
   "会员/次卡": { en: "Members", ar: "الأعضاء" },
+  "会员套餐": { en: "Membership Plans", ar: "خطط العضوية" },
   "钱包": { en: "Wallets", ar: "المحافظ" },
   "用户钱包": { en: "User Wallets", ar: "محافظ المستخدمين" },
   "优惠券": { en: "Coupons", ar: "القسائم" },

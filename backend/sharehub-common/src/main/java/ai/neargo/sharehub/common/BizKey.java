@@ -155,4 +155,8 @@ public final class BizKey {
     public static final String TRIAL_RENT = "TRL";
     /** 告警待办 dev_alarm_todo.todo_no。不用 TD：与租户前缀 T 起首相同，按号查易混。 */
     public static final String ALARM_TODO = "ATD";
+
+    // —— 会员套餐（2026-09-27）——
+    /** 会员方案 mbr_plan.plan_no。不用 PP：那是计价方案（{@link #PRICE_PLAN}），按号查会混。 */
+    public static final String MEMBER_PLAN = "MP";
 }
