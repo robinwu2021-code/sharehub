@@ -100,8 +100,24 @@ public class JobRegistry {
         }
     }
 
-    /** 便捷重载：手动触发，入参用 {@link JobInvocation#manual()}。 */
+    /** 业务日历；脱离 Spring 构造（单元测试）时为空，见 {@link #bizToday()}。 */
+    private ai.neargo.sharehub.common.time.BizClock bizClock;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setBizClock(ai.neargo.sharehub.common.time.BizClock bizClock) {
+        this.bizClock = bizClock;
+    }
+
+    /**
+     * 业务日的今天。容器里一定有 {@code BizClock}；没有的只有直接 new 出来的单元测试，
+     * 那时<b>显式</b>回落 UTC —— 不回落服务器时区（那正是要消灭的隐式口径）。
+     */
+    private java.time.LocalDate bizToday() {
+        return bizClock != null ? bizClock.today() : java.time.LocalDate.now(java.time.ZoneOffset.UTC);
+    }
+
+    /** 便捷重载：手动触发，入参用 {@link JobInvocation#manual(java.time.LocalDate)}（业务日的昨天）。 */
     public JobResult trigger(String name) {
-        return trigger(name, JobInvocation.manual());
+        return trigger(name, JobInvocation.manual(bizToday()));
     }
 }

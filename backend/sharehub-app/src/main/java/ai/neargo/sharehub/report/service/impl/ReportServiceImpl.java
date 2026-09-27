@@ -121,6 +121,8 @@ public class ReportServiceImpl implements ReportService {
     private final ReportMappers.WithdrawFactMapper withdrawFacts;
     private final ReportMappers.AlarmFactMapper alarmFacts;
     private final Clock clock;
+    /** 报表切日按业务时区（2026-09-28 拍板；此前按 UTC）。取自 BizClock，时区只在 sharehub.biz-zone 一处配。 */
+    private final java.time.ZoneId bizZone;
 
     /**
      * {@code Clock} 注入而非 {@code LocalDate.now()} 直调：报表的全部口径都挂在「今日」上，
@@ -135,7 +137,9 @@ public class ReportServiceImpl implements ReportService {
                             ReportMappers.RefundFactMapper refundFacts,
                             ReportMappers.WithdrawFactMapper withdrawFacts,
                             ReportMappers.AlarmFactMapper alarmFacts,
-                            Clock clock) {
+                            Clock clock,
+                            ai.neargo.sharehub.common.time.BizClock bizClock) {
+        this.bizZone = bizClock.zone();
         this.orderFacts = orderFacts;
         this.cabinetFacts = cabinetFacts;
         this.contractRates = contractRates;
@@ -276,7 +280,7 @@ public class ReportServiceImpl implements ReportService {
     }
 
     private LocalDate today() {
-        return LocalDate.now(clock.withZone(ZoneOffset.UTC));
+        return LocalDate.now(clock.withZone(bizZone));
     }
 
     /** 周期窗口：{@code [today − days, today − 1]}，即**统计到昨日**（T+1）。 */
@@ -492,7 +496,7 @@ public class ReportServiceImpl implements ReportService {
     public ScreenBoard screenBoard() {
         LocalDate today = today();
         LocalDate yesterday = today.minusDays(1);
-        int nowHour = clock.instant().atZone(ZoneOffset.UTC).getHour();
+        int nowHour = clock.instant().atZone(bizZone).getHour();
         Facts f = new Facts(yesterday, today);
         Set<String> all = f.siteNames();
 

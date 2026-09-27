@@ -103,12 +103,12 @@ class JobRegistryTest {
     }
 
     @Test
-    @DisplayName("手动触发的 bizDate 取昨天——与调度器口径一致，否则手动跑和定时跑算的不是同一天")
+    @DisplayName("手动触发的 bizDate 取业务日的昨天——与调度器口径一致，否则手动跑和定时跑算的不是同一天")
     void manual_invocation_uses_yesterday() {
-        assertThat(JobInvocation.manual().bizDate())
-                .isEqualTo(java.time.LocalDate.now().minusDays(1));
-        assertThat(JobInvocation.manual().type()).isEqualTo(JobInvocation.Type.MANUAL);
-        assertThat(JobInvocation.manual().params()).isEmpty();
+        java.time.LocalDate bizToday = java.time.LocalDate.of(2026, 10, 1);
+        assertThat(JobInvocation.manual(bizToday).bizDate()).isEqualTo(java.time.LocalDate.of(2026, 9, 30));
+        assertThat(JobInvocation.manual(bizToday).type()).isEqualTo(JobInvocation.Type.MANUAL);
+        assertThat(JobInvocation.manual(bizToday).params()).isEmpty();
     }
 
     // ——— 声明的自检 ———

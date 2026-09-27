@@ -17,7 +17,8 @@ import java.time.Clock;
  * 全局 {@code Clock} bean 冲突（重复定义会让整个上下文启动失败）。
  *
  * <p>时区固定 <b>UTC</b>：{@code ord_order.rent_start_at} 存的是 UTC ISO-8601 字符串，
- * 报表按 UTC 切业务日。混用本地时区会让跨零点的订单在不同报表里落到不同天。
+ * 报表的「现在」由这个 Clock 给（测试可钉住）。<b>切日</b>按业务时区（2026-09-28 起，此前按 UTC）：
+ * 服务层用 BizClock 的时区取「今天」，SQL 用 ${bizOffset} 把 UTC 时间换算成业务日（见 MybatisPlusConfig）。
  */
 @Configuration
 public class ReportConfig {

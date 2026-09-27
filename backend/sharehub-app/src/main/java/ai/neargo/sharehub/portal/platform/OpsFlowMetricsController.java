@@ -15,8 +15,10 @@ import java.time.LocalDate;
 public class OpsFlowMetricsController {
 
     private final OpsFlowMetricsService metrics;
+    private final ai.neargo.sharehub.common.time.BizClock clock;
 
-    public OpsFlowMetricsController(OpsFlowMetricsService metrics) {
+    public OpsFlowMetricsController(OpsFlowMetricsService metrics, ai.neargo.sharehub.common.time.BizClock clock) {
+        this.clock = clock;
         this.metrics = metrics;
     }
 
@@ -24,7 +26,7 @@ public class OpsFlowMetricsController {
     @PreAuthorize("@perm.can('dashboard:overview:read')")
     public OpsFlowMetrics metrics(@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
                                   @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        LocalDate t = to == null ? LocalDate.now().plusDays(1) : to;
+        LocalDate t = to == null ? clock.today().plusDays(1)   /* 业务日历（2026-09-28 拍板） */ : to;
         LocalDate f = from == null ? t.minusDays(30) : from;
         return metrics.metrics(f, t);
     }

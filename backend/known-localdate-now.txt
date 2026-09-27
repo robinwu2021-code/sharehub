@@ -62,19 +62,13 @@
 # （AdjustmentServiceImpl 那个折算的反方向）。字符串列用 startOfDayAsStoredText。
 # 2026-09-27 已按此改完 AlarmServiceImpl / NotifyLogServiceImpl / SharingQueryService。
 
-# —— 报表口径的日期范围：要先定 UTC 还是业务时区 ——
-OperationOverviewService 2  # 概览的默认 to（两处）。它产出的是日期范围，下游查的是
-                            # ord_order 那批 —— 而 rent_start_at 存的是 **UTC 字符串**，
-                            # ReportConfig 正是为此刻意用 Clock.systemUTC()。
-                            # 所以这两处该跟报表走 UTC 还是跟业务日历走，是同一个待定口径，
-                            # 不能单独改。改错的代价是「概览与报表对同一天给出不同数字」。
-OpsFlowMetricsController 1  # 默认 to = 明天。同上，是同一批日期范围参数。
+# （报表口径的日期范围 + 任务 bizDate 已移出，2026-09-28 拍板：统一按业务时区。
+#   OperationOverviewService / OpsFlowMetricsController 的默认范围走 BizClock，
+#   且下游查询同步改为按业务日切日（OperationMappers / ReportMappers 用 ${bizOffset}，见 MybatisPlusConfig）——
+#   只改默认日期不改下游，概览与报表会对同一天给出不同数字。
+#   InternalJobController / JobInvocation 的「昨天」改为业务日的昨天：手动跑与定时跑算同一天。）
 
 # —— 其它 ——
-InternalJobController 1     # bizDate 缺省取昨天 —— 任务口径，与调度器的时区约定一起定
-JobInvocation 1             # 手动触发任务时 bizDate 取昨天。与上一条是同一个口径问题：
-                            # 「昨天」相对哪个时区？手动跑与定时跑必须算同一个日子，
-                            # 否则对不上账（那个类的注释正是这么写的）。与调度器一起定。
 # （LeadOpsServiceImpl 已移出：商机转站点生成合同草稿时的默认开始日改用
 #   contractService.today() —— 合同的日期校验走的就是它。取两个不同的「今天」，
 #   会出现草稿刚生成就被自己的校验拒掉的那 4 小时。

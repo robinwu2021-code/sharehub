@@ -49,11 +49,19 @@ public class OperationOverviewService {
     private final ContractMapper contracts;
     private final ShareRuleMapper shareRules;
     private final ai.neargo.sharehub.loc.mapper.LocMappers.LocationMapper locations;
+    /**
+     * 默认日期范围按业务日历（2026-09-28 拍板：统一按业务时区）。
+     * 下游查询也按业务日切日（OperationMappers 的 ${bizOffset}），两边同一个口径 ——
+     * 只改一边的话，概览与报表会对同一天给出不同数字。
+     */
+    private final ai.neargo.sharehub.common.time.BizClock clock;
 
     public OperationOverviewService(SiteScaleMapper sites, CabinetStatMapper cabinets,
                                     OrderStatMapper orders, ContractMapper contracts,
                                     ShareRuleMapper shareRules,
-                                    ai.neargo.sharehub.loc.mapper.LocMappers.LocationMapper locations) {
+                                    ai.neargo.sharehub.loc.mapper.LocMappers.LocationMapper locations,
+                                    ai.neargo.sharehub.common.time.BizClock clock) {
+        this.clock = clock;
         this.locations = locations;
         this.sites = sites;
         this.cabinets = cabinets;
@@ -65,7 +73,7 @@ public class OperationOverviewService {
     // ——————————————————————— 概览 ———————————————————————
 
     public OperationOverview overview(String from, String to) {
-        String toDate = dateOf(to, LocalDate.now());
+        String toDate = dateOf(to, clock.today());
         String fromDate = dateOf(from, LocalDate.parse(toDate).minusDays(DEFAULT_DAYS - 1L));
         long days = Math.max(1, ChronoUnit.DAYS.between(LocalDate.parse(fromDate), LocalDate.parse(toDate)) + 1);
 
@@ -216,7 +224,7 @@ public class OperationOverviewService {
                 .filter(r -> siteNo.equals(s(r.get("siteNo")))).findFirst()
                 .orElseThrow(() -> BizException.notFound(siteNo));
 
-        String toDate = dateOf(to, LocalDate.now());
+        String toDate = dateOf(to, clock.today());
         String fromDate = dateOf(from, LocalDate.parse(toDate).minusDays(DEFAULT_DAYS - 1L));
         long days = Math.max(1, ChronoUnit.DAYS.between(LocalDate.parse(fromDate), LocalDate.parse(toDate)) + 1);
 

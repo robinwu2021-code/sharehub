@@ -40,7 +40,7 @@ class ReportReadModelTest extends ApiTestSupport {
 
     @Test
     void period_report_stops_at_yesterday_not_today() {
-        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        LocalDate today = bizToday();   // 报表按业务日切日（2026-09-28 起，此前 UTC）
         JsonNode rows = admin("/api/ops/reports/finance?period=LAST_7D&" + ALL).path("list");
 
         assertThat(rows).as("LAST_7D 应切成 7 个日桶（天数取桶宽整数倍，无残桶）").hasSize(7);
@@ -57,8 +57,9 @@ class ReportReadModelTest extends ApiTestSupport {
 
     @Test
     void screen_board_covers_today_up_to_current_hour() {
-        LocalDate today = LocalDate.now(ZoneOffset.UTC);
-        int nowHour = java.time.Instant.now().atZone(ZoneOffset.UTC).getHour();
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);   // updatedAt 是 UTC 时间戳，按 UTC 日期比
+        // 分时序列按业务时区的「今日 00:00 到当前小时」（2026-09-28 起，此前 UTC）
+        int nowHour = java.time.Instant.now().atZone(BIZ_ZONE).getHour();
         JsonNode board = admin("/api/ops/reports/screen-board");
 
         assertThat(board.path("updatedAt").asText()).as("大屏时间戳是「现在」，不是昨日")

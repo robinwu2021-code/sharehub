@@ -44,9 +44,11 @@ public class InternalJobController {
     private static final Logger log = LoggerFactory.getLogger(InternalJobController.class);
 
     private final JobRegistry registry;
+    private final ai.neargo.sharehub.common.time.BizClock clock;
 
-    public InternalJobController(JobRegistry registry) {
+    public InternalJobController(JobRegistry registry, ai.neargo.sharehub.common.time.BizClock clock) {
         this.registry = registry;
+        this.clock = clock;
     }
 
     /** 全部任务声明（调度器接入后由它拉取；现在供运维核对 cron 清单）。 */
@@ -70,7 +72,8 @@ public class InternalJobController {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "没有这个任务：" + name);
         }
         JobInvocation inv = new JobInvocation(UUID.randomUUID().toString(), type,
-                bizDate != null ? bizDate : LocalDate.now().minusDays(1), Map.of());
+                // 缺省 = 业务日的昨天（与 JobInvocation#manual 同一口径；2026-09-28 拍板统一按业务时区）
+                bizDate != null ? bizDate : clock.today().minusDays(1), Map.of());
         JobResult r = registry.trigger(name, inv);
         // 失败在 JobRegistry 里已带 runId 记过 ERROR；这里只记状态变更，便于按 runId 串起一次执行
         log.info("任务已执行 job={} runId={} type={} status={} detail={}",

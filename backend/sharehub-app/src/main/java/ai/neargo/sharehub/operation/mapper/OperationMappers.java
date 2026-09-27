@@ -110,31 +110,31 @@ public final class OperationMappers {
                   FROM ord_order o
                   JOIN dev_cabinet c ON c.cabinet_no = o.cabinet_no AND c.deleted = 0
                  WHERE o.deleted = 0 AND o.rent_end_at IS NOT NULL AND o.amount > 0
-                   AND LEFT(o.rent_end_at, 10) BETWEEN #{fromDate} AND #{toDate}
+                   AND DATE_FORMAT(CONVERT_TZ(REPLACE(LEFT(o.rent_end_at, 19), 'T', ' '), '+00:00', '${bizOffset}'), '%Y-%m-%d') BETWEEN #{fromDate} AND #{toDate}
                  GROUP BY c.site_no
                 """)
         List<Map<String, Object>> bySite(@Param("fromDate") String fromDate, @Param("toDate") String toDate);
 
         /** 区间内逐日趋势（全局）。 */
         @Select("""
-                SELECT LEFT(o.rent_end_at, 10) AS day, COUNT(*) AS orders, COALESCE(SUM(o.amount), 0) AS gmv
+                SELECT DATE_FORMAT(CONVERT_TZ(REPLACE(LEFT(o.rent_end_at, 19), 'T', ' '), '+00:00', '${bizOffset}'), '%Y-%m-%d') AS day, COUNT(*) AS orders, COALESCE(SUM(o.amount), 0) AS gmv
                   FROM ord_order o
                  WHERE o.deleted = 0 AND o.rent_end_at IS NOT NULL AND o.amount > 0
-                   AND LEFT(o.rent_end_at, 10) BETWEEN #{fromDate} AND #{toDate}
-                 GROUP BY LEFT(o.rent_end_at, 10)
+                   AND DATE_FORMAT(CONVERT_TZ(REPLACE(LEFT(o.rent_end_at, 19), 'T', ' '), '+00:00', '${bizOffset}'), '%Y-%m-%d') BETWEEN #{fromDate} AND #{toDate}
+                 GROUP BY DATE_FORMAT(CONVERT_TZ(REPLACE(LEFT(o.rent_end_at, 19), 'T', ' '), '+00:00', '${bizOffset}'), '%Y-%m-%d')
                  ORDER BY day
                 """)
         List<Map<String, Object>> trend(@Param("fromDate") String fromDate, @Param("toDate") String toDate);
 
         /** 某站点区间内逐日趋势。 */
         @Select("""
-                SELECT LEFT(o.rent_end_at, 10) AS day, COUNT(*) AS orders, COALESCE(SUM(o.amount), 0) AS gmv
+                SELECT DATE_FORMAT(CONVERT_TZ(REPLACE(LEFT(o.rent_end_at, 19), 'T', ' '), '+00:00', '${bizOffset}'), '%Y-%m-%d') AS day, COUNT(*) AS orders, COALESCE(SUM(o.amount), 0) AS gmv
                   FROM ord_order o
                   JOIN dev_cabinet c ON c.cabinet_no = o.cabinet_no AND c.deleted = 0
                  WHERE o.deleted = 0 AND o.rent_end_at IS NOT NULL AND o.amount > 0
                    AND c.site_no = #{siteNo}
-                   AND LEFT(o.rent_end_at, 10) BETWEEN #{fromDate} AND #{toDate}
-                 GROUP BY LEFT(o.rent_end_at, 10)
+                   AND DATE_FORMAT(CONVERT_TZ(REPLACE(LEFT(o.rent_end_at, 19), 'T', ' '), '+00:00', '${bizOffset}'), '%Y-%m-%d') BETWEEN #{fromDate} AND #{toDate}
+                 GROUP BY DATE_FORMAT(CONVERT_TZ(REPLACE(LEFT(o.rent_end_at, 19), 'T', ' '), '+00:00', '${bizOffset}'), '%Y-%m-%d')
                  ORDER BY day
                 """)
         List<Map<String, Object>> trendOfSite(@Param("siteNo") String siteNo,
@@ -149,7 +149,7 @@ public final class OperationMappers {
                   JOIN dev_cabinet c ON c.cabinet_no = o.cabinet_no AND c.deleted = 0
                  WHERE o.deleted = 0 AND o.rent_end_at IS NOT NULL AND o.amount > 0
                    AND c.site_no = #{siteNo}
-                   AND LEFT(o.rent_end_at, 10) BETWEEN #{fromDate} AND #{toDate}
+                   AND DATE_FORMAT(CONVERT_TZ(REPLACE(LEFT(o.rent_end_at, 19), 'T', ' '), '+00:00', '${bizOffset}'), '%Y-%m-%d') BETWEEN #{fromDate} AND #{toDate}
                  GROUP BY c.location_no
                 """)
         List<Map<String, Object>> byPointOfSite(@Param("siteNo") String siteNo,
@@ -164,7 +164,7 @@ public final class OperationMappers {
                   JOIN dev_cabinet c ON c.cabinet_no = o.cabinet_no AND c.deleted = 0
                  WHERE o.deleted = 0 AND o.rent_end_at IS NOT NULL AND o.amount > 0
                    AND c.site_no = #{siteNo}
-                   AND LEFT(o.rent_end_at, 10) BETWEEN #{fromDate} AND #{toDate}
+                   AND DATE_FORMAT(CONVERT_TZ(REPLACE(LEFT(o.rent_end_at, 19), 'T', ' '), '+00:00', '${bizOffset}'), '%Y-%m-%d') BETWEEN #{fromDate} AND #{toDate}
                 """)
         Map<String, Object> summaryOfSite(@Param("siteNo") String siteNo,
                                           @Param("fromDate") String fromDate,
@@ -175,7 +175,7 @@ public final class OperationMappers {
                 SELECT COUNT(*) AS orders, COALESCE(SUM(o.amount), 0) AS gmv
                   FROM ord_order o
                  WHERE o.deleted = 0 AND o.rent_end_at IS NOT NULL AND o.amount > 0
-                   AND LEFT(o.rent_end_at, 10) BETWEEN #{fromDate} AND #{toDate}
+                   AND DATE_FORMAT(CONVERT_TZ(REPLACE(LEFT(o.rent_end_at, 19), 'T', ' '), '+00:00', '${bizOffset}'), '%Y-%m-%d') BETWEEN #{fromDate} AND #{toDate}
                 """)
         Map<String, Object> summary(@Param("fromDate") String fromDate, @Param("toDate") String toDate);
 
@@ -185,7 +185,7 @@ public final class OperationMappers {
                   FROM ord_order o
                   JOIN dev_cabinet c ON c.cabinet_no = o.cabinet_no AND c.deleted = 0
                  WHERE o.deleted = 0 AND o.rent_end_at IS NOT NULL AND o.amount > 0
-                   AND LEFT(o.rent_end_at, 10) >= #{sinceDate}
+                   AND DATE_FORMAT(CONVERT_TZ(REPLACE(LEFT(o.rent_end_at, 19), 'T', ' '), '+00:00', '${bizOffset}'), '%Y-%m-%d') >= #{sinceDate}
                 """)
         List<String> siteNosWithOrdersSince(@Param("sinceDate") String sinceDate);
     }

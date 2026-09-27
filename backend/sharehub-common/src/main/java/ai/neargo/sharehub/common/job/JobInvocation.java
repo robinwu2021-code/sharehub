@@ -32,11 +32,15 @@ public record JobInvocation(String runId, Type type, LocalDate bizDate, Map<Stri
     }
 
     /**
-     * 进程内 / 手动触发用。{@code bizDate} 取昨天，与调度器口径一致 ——
+     * 进程内 / 手动触发用。{@code bizDate} 取<b>业务日历的</b>昨天，与调度器口径一致 ——
      * 取今天的话，手动跑一遍和定时跑一遍算的是不同的日子，对不上账。
+     *
+     * <p>「今天」由调用方给（{@code BizClock#today()}）。此前这里是 {@code LocalDate.now()}，
+     * 即服务器时区（生产 Asia/Shanghai）的昨天 —— 迪拜 20:00 起它比业务日早一天，
+     * 手动补跑会算错日子（2026-09-28 拍板：统一按业务时区）。
      */
-    public static JobInvocation manual() {
+    public static JobInvocation manual(LocalDate bizToday) {
         return new JobInvocation(UUID.randomUUID().toString(), Type.MANUAL,
-                LocalDate.now().minusDays(1), Map.of());
+                bizToday.minusDays(1), Map.of());
     }
 }

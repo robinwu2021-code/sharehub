@@ -57,8 +57,8 @@ public final class ReportMappers {
          * @param toDate   {@code yyyy-MM-dd} 含
          */
         @Select("""
-                SELECT LEFT(o.rent_start_at, 10)                                        AS bizDate,
-                       CAST(SUBSTRING(o.rent_start_at, 12, 2) AS UNSIGNED)              AS bizHour,
+                SELECT DATE_FORMAT(CONVERT_TZ(REPLACE(LEFT(o.rent_start_at, 19), 'T', ' '), '+00:00', '${bizOffset}'), '%Y-%m-%d')                                        AS bizDate,
+                       HOUR(CONVERT_TZ(REPLACE(LEFT(o.rent_start_at, 19), 'T', ' '), '+00:00', '${bizOffset}')) AS bizHour,
                        COALESCE(NULLIF(s.name, ''), NULLIF(o.location_name, ''), '未归属') AS siteName,
                        COUNT(*)                                                         AS orders,
                        COALESCE(SUM(o.fee_amount), 0)                                   AS gmv,
@@ -67,7 +67,7 @@ public final class ReportMappers {
                   LEFT JOIN loc_site s ON s.site_no = o.site_no AND s.deleted = 0
                  WHERE o.deleted = 0
                    AND o.rent_start_at IS NOT NULL
-                   AND LEFT(o.rent_start_at, 10) BETWEEN #{fromDate} AND #{toDate}
+                   AND DATE_FORMAT(CONVERT_TZ(REPLACE(LEFT(o.rent_start_at, 19), 'T', ' '), '+00:00', '${bizOffset}'), '%Y-%m-%d') BETWEEN #{fromDate} AND #{toDate}
                  GROUP BY bizDate, bizHour, siteName
                 """)
         java.util.List<java.util.Map<String, Object>> facts(@Param("fromDate") String fromDate,
@@ -81,7 +81,7 @@ public final class ReportMappers {
         @Select("""
                 SELECT COUNT(DISTINCT c_user_no) FROM ord_order
                  WHERE deleted = 0 AND rent_start_at IS NOT NULL
-                   AND LEFT(rent_start_at, 10) BETWEEN #{fromDate} AND #{toDate}
+                   AND DATE_FORMAT(CONVERT_TZ(REPLACE(LEFT(rent_start_at, 19), 'T', ' '), '+00:00', '${bizOffset}'), '%Y-%m-%d') BETWEEN #{fromDate} AND #{toDate}
                 """)
         long activeUsers(@Param("fromDate") String fromDate, @Param("toDate") String toDate);
 
@@ -97,8 +97,8 @@ public final class ReportMappers {
                        COUNT(*)                                          AS orders,
                        COALESCE(SUM(o.fee_amount), 0)                    AS gmv,
                        MIN(o.currency)                                   AS currency,
-                       MAX(LEFT(o.rent_start_at, 10))                    AS lastDate,
-                       CAST(SUBSTRING(MIN(o.rent_start_at), 12, 2) AS UNSIGNED) AS firstHour
+                       MAX(DATE_FORMAT(CONVERT_TZ(REPLACE(LEFT(o.rent_start_at, 19), 'T', ' '), '+00:00', '${bizOffset}'), '%Y-%m-%d'))                    AS lastDate,
+                       HOUR(CONVERT_TZ(REPLACE(LEFT(MIN(o.rent_start_at), 19), 'T', ' '), '+00:00', '${bizOffset}')) AS firstHour
                   FROM ord_order o
                  WHERE o.deleted = 0
                    AND o.rent_start_at IS NOT NULL
@@ -182,10 +182,10 @@ public final class ReportMappers {
          * 内置方法的分润查询都会报同样的错。修法是补列（DDL），不是在这里绕过，故留注不留 TODO 在别处。
          */
         @Select("""
-                SELECT DATE(r.created_at)                                                 AS bizDate,
+                SELECT DATE_FORMAT(CONVERT_TZ(r.created_at, '${storedOffset}', '${bizOffset}'), '%Y-%m-%d')                                                 AS bizDate,
                        COALESCE(SUM(CASE WHEN r.status = 'DONE' THEN r.amount ELSE 0 END), 0) AS settle
                   FROM share_record r
-                 WHERE DATE(r.created_at) BETWEEN #{fromDate} AND #{toDate}
+                 WHERE DATE_FORMAT(CONVERT_TZ(r.created_at, '${storedOffset}', '${bizOffset}'), '%Y-%m-%d') BETWEEN #{fromDate} AND #{toDate}
                  GROUP BY bizDate
                 """)
         java.util.List<java.util.Map<String, Object>> settledByDay(@Param("fromDate") String fromDate,

@@ -43,15 +43,19 @@ public class SiteAnalysisServiceImpl implements SiteAnalysisService {
 
     private final ReportService reportService;
     private final Clock clock;
+    /** 报表切日按业务时区（2026-09-28 拍板；此前按 UTC）。取自 BizClock，时区只在 sharehub.biz-zone 一处配。 */
+    private final java.time.ZoneId bizZone;
 
-    public SiteAnalysisServiceImpl(ReportService reportService, Clock clock) {
+    public SiteAnalysisServiceImpl(ReportService reportService, Clock clock,
+                            ai.neargo.sharehub.common.time.BizClock bizClock) {
+        this.bizZone = bizClock.zone();
         this.reportService = reportService;
         this.clock = clock;
     }
 
     @Override
     public PageResult<SiteAnalysis> page(Integer page, Integer size, String keyword, String from, String to) {
-        LocalDate today = LocalDate.now(clock.withZone(ZoneOffset.UTC));
+        LocalDate today = LocalDate.now(clock.withZone(bizZone));
         // from/to 是「含端点的 UTC 业务日」，与报表域周期同口径。
         // 缺省 to 取**昨日**而非今日：今日是残日，与昨天并排看会莫名矮一截，被当成掉量。
         LocalDate end = parse(to, today.minusDays(1));
