@@ -43,7 +43,7 @@ class MenuAdminTest extends ApiTestSupport {
         // 与 /api/auth/menus 的分工：那个是「我看得到的」，这个是「全部」——
         // 菜单管理要能看到、也能改管理员自己都看不到的项
         String admin = login("ADMIN");
-        assertThat(get(MENUS, admin).okData().size()).as("全量 section 数（含代理门户）").isEqualTo(18);
+        assertThat(get(MENUS, admin).okData().size()).as("全量 section 数（含代理门户；V136 起含「流程与工单」）").isEqualTo(19);
     }
 
     @Test

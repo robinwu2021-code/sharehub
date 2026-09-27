@@ -64,15 +64,32 @@ class MenuPermIsEnforcedTest extends ApiTestSupport {
         return false;
     }
 
+    /**
+     * backend/external-perm-modules.txt 登记的外部强制模块（格式：模块&lt;TAB&gt;强制方）。
+     * 本类是那张表的第六个读取方 —— 与另外五处同一口径：强制方不是 ShareHub 的码，
+     * 在 @perm.can 里本就不会出现，不算「没人强制」。
+     */
+    private static Set<String> externalPermModules() throws IOException {
+        Path p = Path.of("").toAbsolutePath();
+        while (p != null && !Files.isRegularFile(p.resolve("external-perm-modules.txt"))) p = p.getParent();
+        if (p == null) throw new IllegalStateException("找不到 backend/external-perm-modules.txt");
+        Set<String> out = new TreeSet<>();
+        for (String line : Files.readAllLines(p.resolve("external-perm-modules.txt"), StandardCharsets.UTF_8)) {
+            if (!line.isBlank() && !line.startsWith("#")) out.add(line.split("\t", 2)[0].trim());
+        }
+        return out;
+    }
+
     @Test
     void every_menu_perm_is_actually_enforced_somewhere() throws IOException {
         Set<String> enforced = enforced();
         assertThat(enforced).as("前提：扫得到 @perm.can").isNotEmpty();
+        Set<String> external = externalPermModules();
 
         List<String> dangling = new ArrayList<>();
         for (JsonNode s : get("/api/platform/iam/menus", login("ADMIN")).okData()) {
-            check(enforced, dangling, s);
-            for (JsonNode c : s.path("children")) check(enforced, dangling, c);
+            check(enforced, external, dangling, s);
+            for (JsonNode c : s.path("children")) check(enforced, external, dangling, c);
         }
         assertThat(dangling).as("""
                 这些菜单挂的码**没有任何端点在强制**。后果是只有超管看得到它们，
@@ -84,9 +101,9 @@ class MenuPermIsEnforcedTest extends ApiTestSupport {
                 .isEmpty();
     }
 
-    private static void check(Set<String> enforced, List<String> out, JsonNode n) {
+    private static void check(Set<String> enforced, Set<String> external, List<String> out, JsonNode n) {
         String perm = n.path("perm").asText("");
-        if (!perm.isBlank() && !covered(enforced, perm)) {
+        if (!perm.isBlank() && !covered(enforced, perm) && !external.contains(perm.split(":")[0])) {
             out.add(n.path("menuNo").asText() + "（" + n.path("name").asText() + "）→ " + perm);
         }
     }

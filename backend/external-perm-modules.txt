@@ -3,12 +3,14 @@
 # 这类码在 ShareHub 的 contract.json / @perm.can 里本就不会出现，
 # 于是所有「这个码后端有没有端点在判」的对齐检查都会误报。那不是缺口，是强制方不同。
 #
-# 【读取方（五处，口径必须一致 —— 这正是它是一个文件而不是五个常量的原因）】
+# 【读取方（六处，口径必须一致 —— 这正是它是一个文件而不是五个常量的原因）】
 #   backend/scripts/perm-ssot-align.py          真源表 × 后端强制：不判「声明未强制」
 #   backend/scripts/feature-align.py            菜单码 × 后端码：不判「菜单权限码在后端无人使用」
 #   ops-web/scripts/check-perm-parity.py        前端门禁码 × 后端码：不判「前端在用、后端不存在」
 #   ops-web/lib/perm-map.test.ts                UI_PERM_MAP 映射目标：不算「悬空码」
 #   backend/.../arch/MenuPermissionContractTest 菜单码 × 契约码：不算孤儿
+#   backend/.../scenario/MenuPermIsEnforcedTest 菜单码 × @perm.can：不算「没有端点在强制」
+#     （2026-09-28 补：V136 插流程菜单时它不读这张表，7 个 flow 叶子被判悬空）
 #
 # 【登记门槛】只登记**确有外部强制方**的模块，写明是谁、依据在哪；
 # 同时在功能权限清单对应一节写明「强制方」。不是用来给「后端漏了闸」开后门的。
