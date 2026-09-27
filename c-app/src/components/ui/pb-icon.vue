@@ -1,11 +1,14 @@
 <script setup lang="ts">
 // 描边线性图标（currentColor 跟随文字色，随皮肤/明暗变化）。替代 emoji，统一精致度。
-// H5/App(WebView) 用 v-html 注入 SVG；小程序端 SVG 受限（后续可换 base64/字体图标）。
+// H5/App(WebView) 用 v-html 注入 SVG。
+// 小程序不支持 v-html —— 此前小程序里**所有图标都不显示**（微信开发者工具实测）。
+// 小程序端改成 CSS 背景图（data URI）；背景图里拿不到 currentColor，颜色用 color（默认墨色）。
 import { computed } from "vue";
 
-const props = withDefaults(defineProps<{ name: string; size?: number; stroke?: number }>(), {
+const props = withDefaults(defineProps<{ name: string; size?: number; stroke?: number; color?: string }>(), {
   size: 40,
   stroke: 2,
+  color: "#16171d", // = MP_ICON.ink（design/tokens.ts）
 });
 
 // Lucide 风格 24x24 路径
@@ -53,10 +56,29 @@ const svg = computed(
     `<svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="${props.stroke}" stroke-linecap="round" stroke-linejoin="round">${P[props.name] || ""}</svg>`,
 );
 const px = computed(() => `${props.size}rpx`);
+
+/**
+ * 小程序：同一段 SVG 换成显式颜色，作为 CSS 背景图（URL 编码的 data URI）。
+ * 作为独立图片加载的 SVG **必须带 xmlns** —— 内联进 HTML 时可省，data URI 里省了就整张不画、也不报错
+ * （开发者工具对照实验：同一段 SVG，带 xmlns 画得出、不带画不出）。宽高不用百分比，与 viewBox 同值。
+ */
+const mpStyle = computed(() => {
+  const raw = svg.value
+    .replace("<svg ", '<svg xmlns="http://www.w3.org/2000/svg" ')
+    .replace('width="100%" height="100%"', 'width="24" height="24"')
+    .replace('stroke="currentColor"', `stroke="${props.color}"`);
+  const uri = "data:image/svg+xml," + encodeURIComponent(raw);
+  return `width:${px.value};height:${px.value};background:url("${uri}") center/contain no-repeat;`;
+});
 </script>
 
 <template>
+  <!-- #ifdef MP -->
+  <view class="pb-icon pb-icon--mp" :style="mpStyle" />
+  <!-- #endif -->
+  <!-- #ifndef MP -->
   <view class="pb-icon" :style="{ width: px, height: px }" v-html="svg" />
+  <!-- #endif -->
 </template>
 
 <style scoped>

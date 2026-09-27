@@ -2,6 +2,7 @@
 // 门店详情底部弹层（地图点选后）。地址/营业/可借可还/价格/导航/借出/收藏。
 import type { StoreDetail } from "@/types";
 import { distance } from "@/shared/format";
+import { MP_ICON } from "@/design/tokens";
 defineProps<{ visible: boolean; store: StoreDetail | null }>();
 const emit = defineEmits<{
   (e: "update:visible", v: boolean): void;
@@ -22,7 +23,7 @@ function close() {
       <view class="flex items-start justify-between">
         <text class="pb-h2 flex-1">{{ store.siteName }}</text>
         <view class="pb-fav" :class="{ 'is-on': store.favorite }" @tap="emit('favorite', store)">
-          <pb-icon name="heart" :size="34" />
+          <pb-icon name="heart" :size="34" :color="store.favorite ? MP_ICON.danger : MP_ICON.sub" />
         </view>
       </view>
       <view class="mt-[12rpx] flex items-center gap-[10rpx] text-[24rpx] text-sub">

@@ -28,6 +28,7 @@ import { ensureLoggedIn } from "@/shared/auth-gate";
 import { useUserStore } from "@/stores/user";
 import { useAppStore } from "@/stores/app";
 import { noticeTitle } from "@/shared/notice";
+import { MP_ICON } from "@/design/tokens";
 
 const { t } = useI18n();
 const appStore = useAppStore();
@@ -283,7 +284,7 @@ async function onPrimary() {
       图标此前是 zap（闪电），读起来是「快充」不是「扫一扫」；文案与能力也要一致。
     -->
     <view class="pb-fab" hover-class="pb-fab--press" :hover-stay-time="40" @tap="onPrimary">
-      <pb-icon :name="canScan ? 'scan' : 'keyboard'" :size="36" />
+      <pb-icon :name="canScan ? 'scan' : 'keyboard'" :size="36" :color="MP_ICON.onPrimary" />
       <text>{{ canScan ? $t("home.scan") : $t("home.enterCabinet") }}</text>
     </view>
 

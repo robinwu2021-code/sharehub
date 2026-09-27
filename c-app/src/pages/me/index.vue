@@ -50,9 +50,12 @@ async function logout() {
     <view class="px-[32rpx] pt-[36rpx]">
       <view class="flex items-center justify-between">
         <text class="pb-h1">{{ $t("me.title") }}</text>
+        <!-- 小程序右上角是微信胶囊按钮，这个按钮会被盖住；同一入口在下面列表里（Appearance），那端就不出 -->
+        <!-- #ifndef MP -->
         <view class="pb-icon-btn" hover-class="pb-icon-btn--press" :hover-stay-time="40" @tap="sheet = true">
           <pb-icon name="sparkles" :size="38" />
         </view>
+        <!-- #endif -->
       </view>
 
       <!-- 资料 / 游客 -->

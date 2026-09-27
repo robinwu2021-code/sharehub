@@ -7,6 +7,7 @@ import { api } from "@/api";
 import type { NearbyCabinet } from "@/types";
 import { distance } from "@/shared/format";
 import { getUserLocation } from "@/ports/location";
+import { MP_ICON } from "@/design/tokens";
 
 const { t } = useI18n();
 const list = ref<NearbyCabinet[]>([]);
@@ -58,7 +59,7 @@ function borrow(c: NearbyCabinet) {
               </view>
             </view>
             <view class="pb-fav-btn" hover-class="pb-fav-btn--press" :hover-stay-time="40" @tap.stop="remove(c)">
-              <pb-icon name="heart" :size="38" />
+              <pb-icon name="heart" :size="38" :color="MP_ICON.danger" />
             </view>
           </view>
         </pb-card>

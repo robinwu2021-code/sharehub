@@ -32,3 +32,16 @@ export const DEFAULT_MODE: ModeId = "light";
 
 // 圆角/间距（rpx），扁平风偏大圆角
 export const radius = { sm: "12rpx", md: "20rpx", lg: "28rpx", full: "9999px" } as const;
+
+/**
+ * 小程序图标色（pb-icon 的 color）。小程序的图标是 CSS 背景图，拿不到 currentColor，
+ * 靠父元素 class 变色（收藏变红、深底反白）在那里一律失效 —— 颜色要显式传。
+ * 取值 = App.vue 默认皮肤（mono · 浅色）的 --pb-ink / --pb-sub / --pb-danger / --pb-on-primary，改那边要同步。
+ * App / H5 不读这个值（仍跟 currentColor 走，随皮肤明暗变化）。
+ */
+export const MP_ICON = {
+  ink: "#16171d",
+  sub: "#8a8d97",
+  danger: "#f04438",
+  onPrimary: "#ffffff",
+} as const;
