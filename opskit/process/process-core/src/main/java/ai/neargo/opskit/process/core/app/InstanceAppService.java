@@ -28,7 +28,9 @@ import ai.neargo.opskit.process.store.dao.InstanceScopeDao;
 import ai.neargo.opskit.process.store.dao.ParticipantDao;
 import ai.neargo.opskit.process.store.dao.TransitionLogDao;
 import java.time.Clock;
+import java.util.ArrayDeque;
 import java.util.Collection;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -101,9 +103,9 @@ public class InstanceAppService {
             scopes.replace(t.workspaceId(), no, req.scopes());
             log(t, no, subj, "created", null, initial.code(), 1, actor, null, now);
             HookContext ctx = new HookContext(t, no, p, fields, Optional.of(actor), 1, 1);
-            hooks.forEach(h -> h.onEnter(ctx, initial));
             events.publish(new InstanceTransitioned(t, no, p.definition().code(), subj, "created", null, initial.code(), initial.category(),
                     !initial.category().isTerminal(), 1, who(actor), clock.instant()));
+            runTopLevel(() -> hooks.forEach(h -> h.onEnter(ctx, initial)));
             return view(actor, no);
         });
     }
@@ -111,18 +113,56 @@ public class InstanceAppService {
     @SystemAction("授权由流程定义的 who 判定")
     public InstanceView transition(Actor actor, String instanceNo, String code, TransitionRequest req) {
         return tx.execute(() -> {
-            fire(actor.tenant(), instanceNo, code, false, Optional.of(actor), req.fields(), req.comment(), null);
+            runTopLevel(() -> fire(actor.tenant(), instanceNo, code, false, Optional.of(actor), req.fields(), req.comment(), null));
             return view(actor, instanceNo);
         });
     }
 
-    /** 门触发的系统迁移（审批结果、外部确认回复、定时到点）。须在调用方的事务里调用。 */
+    /**
+     * 门触发的系统迁移（审批结果、外部确认回复、定时到点）。
+     *
+     * <p>若此刻正处在另一次迁移的钩子里（如进入审批门时所有步骤都被条件跳过、审批当场通过），不立刻执行，
+     * 而是排到当前迁移**完整走完之后**、在同一事务里依次执行 —— 否则外层迁移剩下的钩子（SLA 起算等）
+     * 会在实例已经离开该状态之后才跑，对着过时的状态动手。
+     */
     @SystemAction("门触发，内部调用")
     public void fireSystem(TenantContext t, String instanceNo, String code, String by, String reason) {
+        Deque<Runnable> pending = DEFERRED.get();
+        Runnable job = () -> fire(t, instanceNo, code, true, Optional.empty(), Map.of(), reason, by);
+        if (pending != null) {
+            pending.addLast(job);
+            return;
+        }
         tx.execute(() -> {
-            fire(t, instanceNo, code, true, Optional.empty(), Map.of(), reason, by);
+            runTopLevel(job);
             return null;
         });
+    }
+
+    /** 当前线程正在执行的迁移链；非空 = 处于某次迁移（含其钩子）之中。 */
+    private static final ThreadLocal<Deque<Runnable>> DEFERRED = new ThreadLocal<>();
+
+    /** 执行一次迁移，并把它的钩子排下的系统迁移依次跑完（同一事务、先进先出）。 */
+    private void runTopLevel(Runnable first) {
+        if (DEFERRED.get() != null) {
+            first.run();
+            return;
+        }
+        Deque<Runnable> pending = new ArrayDeque<>();
+        DEFERRED.set(pending);
+        try {
+            first.run();
+            Runnable next;
+            int guard = 0;
+            while ((next = pending.pollFirst()) != null) {
+                if (++guard > 50) {
+                    throw new IllegalStateException("system transitions keep chaining (> 50): the process definition loops through gates");
+                }
+                next.run();
+            }
+        } finally {
+            DEFERRED.remove();
+        }
     }
 
     @SystemAction("参与者与应用自身可读；完整可见性规则见 O2-9")
@@ -213,12 +253,12 @@ public class InstanceAppService {
                         .assign(ctx, as.candidates());
             }
         }
+        events.publish(new InstanceTransitioned(t, instanceNo, row.processCode(), subject(row), code, from.code(), to.code(), to.category(),
+                open, seq, by, clock.instant()));
         hooks.forEach(h -> h.onEnter(ctx, to));
         if (!open) {
             hooks.forEach(h -> h.onClosed(ctx));
         }
-        events.publish(new InstanceTransitioned(t, instanceNo, row.processCode(), subject(row), code, from.code(), to.code(), to.category(),
-                open, seq, by, clock.instant()));
     }
 
     private InstanceView view(Actor actor, String instanceNo) {

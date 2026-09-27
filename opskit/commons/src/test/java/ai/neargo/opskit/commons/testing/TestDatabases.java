@@ -66,6 +66,8 @@ public final class TestDatabases {
                 default -> throw new IllegalArgumentException(n);
             };
             c.start();
+            // JVM 退出时主动停掉：本机实测 Ryuk 看守容器会消失，遗留的整套数据库把 2GiB 的容器虚拟机挤爆（MySQL 被 OOM 杀掉）
+            Runtime.getRuntime().addShutdownHook(new Thread(c::stop, "stop-" + n));
             return c;
         });
     }

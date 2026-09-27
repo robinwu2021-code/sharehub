@@ -11,6 +11,12 @@ public final class ProcessErrors {
     public static final ErrorKey REQUIRED_MISSING = new ErrorKey("opskit.process.required_missing", 422);
     public static final ErrorKey DEFINITION_DISABLED = new ErrorKey("opskit.definition.disabled", 422);
     public static final ErrorKey INSTANCE_CLOSED = new ErrorKey("opskit.process.instance_closed", 422);
+    public static final ErrorKey SELF_REVIEW = new ErrorKey("opskit.approval.self_review", 403);
+    public static final ErrorKey CROSS_STEP = new ErrorKey("opskit.approval.cross_step", 403);
+    public static final ErrorKey WITHDRAW_FORBIDDEN = new ErrorKey("opskit.approval.withdraw_forbidden", 403);
+    public static final ErrorKey REASON_REQUIRED = new ErrorKey("opskit.approval.reason_required", 422);
+    public static final ErrorKey NOT_CANDIDATE = new ErrorKey("opskit.task.not_candidate", 403);
+    public static final ErrorKey NO_APPROVER = new ErrorKey("opskit.approval.no_approver", 422);
 
     private ProcessErrors() {
     }
