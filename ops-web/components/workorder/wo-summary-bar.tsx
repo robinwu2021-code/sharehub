@@ -36,6 +36,8 @@ export function WoSummaryBar({
           <button
             key={c.key}
             type="button"
+            data-surface="stat"
+            data-tone={hot ? c.tone : undefined}
             aria-pressed={on}
             onClick={() => onPick(on ? null : c.key)}
             className={cn(
@@ -47,6 +49,7 @@ export function WoSummaryBar({
             {on && <span className="absolute end-3 top-3 txt-caption text-primary">✓ 已筛选</span>}
             <div className="txt-body text-muted-foreground">{c.label}</div>
             <div
+              data-slot="value"
               className={cn(
                 "mt-1 txt-display tabular-nums",
                 hot && c.tone === "warning" && "text-warning-ink",

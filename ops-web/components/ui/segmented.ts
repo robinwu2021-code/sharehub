@@ -10,18 +10,21 @@
 // 焦点环、过渡时长走统一 token。
 import { cn } from "@/lib/utils";
 
+// ui-seg / ui-seg-item / ui-seg-on 是**样式钩子**（没有自身样式），供 globals.css 里的
+// ink 风格把分段控件渲染成下划线 tab。这里只返回 className、没法挂 data-* 属性，所以用类名当钩子。
+
 /** 分段控件的灰槽容器。 */
 export function segmentedTrackClass(className?: string) {
-  return cn("inline-flex gap-1 rounded-field bg-secondary p-1", className);
+  return cn("ui-seg inline-flex gap-1 rounded-field bg-secondary p-1", className);
 }
 
 /** 分段控件里的单个选项按钮；`active` 决定是否渲染成白色凸起块。 */
 export function segmentedItemClass(active: boolean, className?: string) {
   return cn(
-    "rounded-control whitespace-nowrap transition-colors duration-[var(--dur)] ease-[var(--ease)]",
+    "ui-seg-item rounded-control whitespace-nowrap transition-colors duration-[var(--dur)] ease-[var(--ease)]",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[--ring-offset-bg]",
     active
-      ? "bg-card font-semibold text-foreground shadow-[var(--card-shadow)]"
+      ? "ui-seg-on bg-card font-semibold text-foreground shadow-[var(--card-shadow)]"
       : "text-muted-foreground hover:text-foreground",
     className,
   );

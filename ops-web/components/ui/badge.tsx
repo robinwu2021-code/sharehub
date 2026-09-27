@@ -39,5 +39,5 @@ export type BadgeTone = NonNullable<VariantProps<typeof badgeVariants>["tone"]>;
 export function Badge({
   className, tone, ...props
 }: React.HTMLAttributes<HTMLSpanElement> & VariantProps<typeof badgeVariants>) {
-  return <span className={cn(badgeVariants({ tone }), className)} {...props} />;
+  return <span data-slot="badge" className={cn(badgeVariants({ tone }), className)} {...props} />;
 }

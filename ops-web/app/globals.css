@@ -374,3 +374,71 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .animate-in { animation: none !important; }
 }
+
+/* ═══ ink 风格的组件形态（2026-09-27）════════════════════════════════════════
+   风格不只换色阶，也换标志性组件的形态，对齐流程与工单原型（v4/16/13）：
+   表格 = 白表头 + 行线（取代表头色带 + 斑马纹）；tab = 下划线（取代灰槽分段）；
+   徽章 = 小方角常规字重（取代药丸加粗）；卡片与统计卡 = 细描边无阴影；次按钮 = 白底描边。
+   ⚠️ 选择器一律以 [data-style="ink"] 开头：经典风格下完全不生效，切回即原样。
+   ⚠️ 钩子是组件上的 data-slot / data-surface / data-variant / data-tone，以及
+      segmented.ts 的三个 ui-seg 钩子类 —— 改组件时别删。
+   ⚠️ **不放进任何 @layer**：上方有一条非 layer 的全局规则给所有元素设 border-color，
+      layer 里的规则永远压不过它（实测：下划线与统计卡的彩色边框被吃成灰色）。
+      代价是页面上单独传的工具类也压不过这里 —— 所以这里只写形态，范围限定在 ink。
+   颜色只用 token，不写值。 */
+  /* ── 表格 ── */
+  [data-style="ink"] [data-slot="thead"] { background: var(--card); }
+  [data-style="ink"] [data-slot="thead"] th {
+    height: 36px; padding: 0 10px;
+    font-size: 12px; font-weight: 600; color: var(--muted-foreground);
+    border-bottom: 1px solid var(--border);
+  }
+  [data-style="ink"] [data-slot="tbody"] > tr:nth-child(even) { background: transparent; }
+  [data-style="ink"] [data-slot="tbody"] > tr:hover { background: color-mix(in srgb, var(--muted) 70%, transparent); }
+  [data-style="ink"] [data-slot="tbody"] td { padding: 9px 10px; border-bottom: 1px solid var(--border); }
+  [data-style="ink"] [data-slot="tbody"] > tr:last-child > td { border-bottom: 0; }
+
+  /* ── 卡片、表格容器与统计卡：细描边，不用阴影 ── */
+  [data-style="ink"] [data-surface="card"]:not([class*="-tint"]),
+  [data-style="ink"] [data-surface="stat"] {
+    box-shadow: none;
+    border: 1px solid var(--border);
+  }
+  [data-style="ink"] [data-surface="stat"] { display: flex; flex-direction: column; }
+  [data-style="ink"] [data-surface="stat"] > [data-slot="value"] { order: -1; margin: 0 0 2px; }
+  [data-style="ink"] [data-surface="stat"][data-tone="warning"] { border-color: color-mix(in srgb, var(--warning) 45%, var(--card)); }
+  [data-style="ink"] [data-surface="stat"][data-tone="danger"]  { border-color: color-mix(in srgb, var(--destructive) 40%, var(--card)); }
+  [data-style="ink"] button[data-surface="stat"]:hover { background: var(--card); border-color: var(--primary); }
+
+  /* ── tab：分段控件渲染为下划线 tab ── */
+  [data-style="ink"] .ui-seg {
+    gap: 0; padding: 0; border-radius: 0; background: transparent;
+    border-bottom: 1px solid var(--border);
+  }
+  [data-style="ink"] .ui-seg-block { display: flex; width: 100%; }
+  [data-style="ink"] .ui-seg-item {
+    padding: 7px 16px; margin-bottom: -1px; border-radius: 0;
+    background: transparent; box-shadow: none;
+    border-bottom: 2px solid transparent;
+    color: var(--muted-foreground); font-weight: 500;
+  }
+  [data-style="ink"] .ui-seg-item:hover { color: var(--foreground); }
+  [data-style="ink"] .ui-seg-on { color: var(--primary); border-bottom-color: var(--primary); }
+
+  /* ── 徽章：小方角 + 常规字重 ── */
+  [data-style="ink"] [data-slot="badge"] {
+    border-radius: var(--r-field); padding: 1px 8px; font-weight: 400;  /* 原型 5px，取最近的一档 */
+  }
+
+  /* ── 按钮：次按钮白底描边，悬停转主色；主按钮去阴影 ── */
+  [data-style="ink"] [data-variant="outline"],
+  [data-style="ink"] [data-variant="secondary"] {
+    background: var(--card); color: var(--foreground);
+    box-shadow: inset 0 0 0 1px var(--border-strong);
+  }
+  [data-style="ink"] [data-variant="outline"]:hover,
+  [data-style="ink"] [data-variant="secondary"]:hover {
+    background: var(--card); color: var(--primary);
+    box-shadow: inset 0 0 0 1px var(--primary);
+  }
+  [data-style="ink"] [data-variant="default"] { box-shadow: none; }

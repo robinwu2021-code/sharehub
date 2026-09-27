@@ -13,7 +13,7 @@ export function StatCard({
   return (
     <div data-surface="stat" className="rounded-card bg-card p-5 shadow-[var(--card-shadow)]">
       <div data-slot="label" className="txt-body text-muted-foreground">{label}</div>
-      <div className="mt-2 txt-display tabular-nums">{value}</div>
+      <div data-slot="value" className="mt-2 txt-display tabular-nums">{value}</div>
       {sub && (
         <div className={cn("mt-1 text-xs", tone === "down" ? "text-[var(--destructive)]" : "text-[var(--success)]")}>
           {sub}

@@ -10,7 +10,7 @@ export function SummaryCard({ label, value, sub }: { label: string; value: React
   return (
     <div data-surface="stat" className="rounded-card bg-card p-5 shadow-[var(--card-shadow)]">
       <div className="txt-body text-muted-foreground">{label}</div>
-      <div className="mt-2 txt-display tabular-nums">{value}</div>
+      <div data-slot="value" className="mt-2 txt-display tabular-nums">{value}</div>
       {sub && <div className="mt-1 txt-caption text-muted-foreground">{sub}</div>}
     </div>
   );

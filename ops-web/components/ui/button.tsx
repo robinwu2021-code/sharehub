@@ -68,6 +68,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       return (
         <Comp
           ref={ref}
+          data-variant={variant ?? "default"}
           className={cn(buttonVariants({ variant, size, className }))}
           disabled={asChild ? undefined : disabled}
           {...props}
@@ -79,6 +80,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <button
         ref={ref}
+        data-variant={variant ?? "default"}
         // relative：给绝对定位的 spinner 做定位上下文。
         className={cn(buttonVariants({ variant, size, className }), "relative")}
         disabled

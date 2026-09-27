@@ -9,7 +9,7 @@ export function Tabs({
   tabs, value, onChange,
 }: { tabs: { key: string; label: string }[]; value: string; onChange: (k: string) => void }) {
   return (
-    <div className={segmentedTrackClass("mb-5 max-w-full flex-wrap")}>
+    <div className={segmentedTrackClass("ui-seg-block mb-5 max-w-full flex-wrap")}>
       {tabs.map((t) => (
         <button
           key={t.key}
