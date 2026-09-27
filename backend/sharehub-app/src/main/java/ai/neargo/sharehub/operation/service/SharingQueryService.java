@@ -37,8 +37,13 @@ public class SharingQueryService {
     private final ShareRecordMapper records;
     private final SiteSharingQueryPort siteSharing;
 
+    /** 业务日期（责任行生效判定）与统计日界都要按业务日历。见 BizClock。 */
+    private final ai.neargo.sharehub.common.time.BizClock clock;
+
     public SharingQueryService(SiteMapper sites, ShareRuleMapper rules, ShareRecordMapper records,
-                               SiteSharingQueryPort siteSharing) {
+                               SiteSharingQueryPort siteSharing,
+                               ai.neargo.sharehub.common.time.BizClock clock) {
+        this.clock = clock;
         this.sites = sites;
         this.rules = rules;
         this.records = records;
@@ -68,7 +73,8 @@ public class SharingQueryService {
     public PageResult<PayeeSharingRow> pagePayees(Integer page, Integer size, String keyword, String payeeType) {
         // 近 30 日分成金额：按分成方汇总真实分润明细
         Map<String, BigDecimal> amount = new HashMap<>();
-        String since = LocalDate.now().minusDays(30).toString();
+        // created_at 是审计列（服务器时区）—— 业务日的零点要换算到存储时区再比
+        java.time.LocalDateTime since = clock.startOfDayAsStored(clock.today().minusDays(30));
         for (ShareRecord r : records.selectList(new LambdaQueryWrapper<ShareRecord>()
                 .ge(ShareRecord::getCreatedAt, since))) {
             if (r.getPayeeNo() == null) continue;
@@ -109,7 +115,8 @@ public class SharingQueryService {
 
     /** 逐站算出分成方与配置状态。站点是百级规模，逐站一次 Port 调用可接受。 */
     private List<SiteSharingRow> rows() {
-        String today = LocalDate.now().toString();
+        // 责任行按「这天生效」筛 —— 业务日期，与牵线费的 onDate 同一口径
+        String today = clock.today().toString();
         List<SiteSharingRow> out = new ArrayList<>();
         for (LocSite s : sites.selectList(new LambdaQueryWrapper<LocSite>().isNull(LocSite::getArchivedAt))) {
             SiteSharingBrief brief = siteSharing.sharingOf(s.getSiteNo(), today);

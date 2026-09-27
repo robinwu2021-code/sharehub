@@ -40,8 +40,12 @@ public class NotifyLogServiceImpl implements NotifyLogService {
 
     private final NotifyLogMapper mapper;
 
-    public NotifyLogServiceImpl(NotifyLogMapper mapper) {
+    /** 「今日」的日界按**业务日历**切，且要换算到存储时区（created_at 是服务器时区）。 */
+    private final ai.neargo.sharehub.common.time.BizClock clock;
+
+    public NotifyLogServiceImpl(NotifyLogMapper mapper, ai.neargo.sharehub.common.time.BizClock clock) {
         this.mapper = mapper;
+        this.clock = clock;
     }
 
     @Override
@@ -77,7 +81,8 @@ public class NotifyLogServiceImpl implements NotifyLogService {
 
     @Override
     public NotifyLogStats stats() {
-        LocalDateTime dayStart = LocalDate.now().atStartOfDay();
+        // created_at 是审计列（服务器时区），所以业务日的零点要换算到存储时区再比
+        LocalDateTime dayStart = clock.startOfTodayAsStored();
 
         long sent = mapper.selectCount(new QueryWrapper<NotifyLog>()
                 .ge("created_at", dayStart).eq("status", NotifyLogStatus.SENT.name()));

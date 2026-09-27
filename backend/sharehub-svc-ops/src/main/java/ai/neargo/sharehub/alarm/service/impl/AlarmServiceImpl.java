@@ -39,13 +39,17 @@ public class AlarmServiceImpl implements AlarmService {
     private final ai.neargo.sharehub.alarm.mapper.AlarmEngineMappers.RouteMapper routeMapper;
     private final ai.neargo.sharehub.wo.ext.service.WoOpsService workOrders;
 
-    public AlarmServiceImpl(DevAlarmMapper mapper, DevAlarmNoticeMapper noticeMapper,
+    /** 统计窗口的日界按**业务日历**切，且要换算到存储时区。见 BizClock#startOfDayAsStored。 */
+    private final ai.neargo.sharehub.common.time.BizClock clock;
+
+    public AlarmServiceImpl(ai.neargo.sharehub.common.time.BizClock clock, DevAlarmMapper mapper, DevAlarmNoticeMapper noticeMapper,
                             AlarmStateMachine stateMachine,
                             ai.neargo.sharehub.alarm.engine.AlarmEngine engine,
                             ai.neargo.sharehub.alarm.mapper.DevAlarmCodeMapper codeMapper,
                             ai.neargo.sharehub.alarm.mapper.AlarmEngineMappers.AlarmLogMapper logMapper,
                             ai.neargo.sharehub.alarm.mapper.AlarmEngineMappers.RouteMapper routeMapper,
                             ai.neargo.sharehub.wo.ext.service.WoOpsService workOrders) {
+        this.clock = clock;
         this.workOrders = workOrders;
         this.engine = engine;
         this.codeMapper = codeMapper;
@@ -272,14 +276,17 @@ public class AlarmServiceImpl implements AlarmService {
      * 摘要卡口径的唯一实现：**摘要与列表都调它**。
      * 未知的 preset 原样忽略（不报错）—— 它来自 URL，拼错一个词不该让整页 500。
      */
-    private static LambdaQueryWrapper<DevAlarm> applyPreset(LambdaQueryWrapper<DevAlarm> w, String preset) {
+    // 去掉 static：HEALED_TODAY 的日界要问 BizClock 要（业务日 + 换算到存储时区）。
+    // 两个调用方都是实例方法，「摘要与列表同一段条件」这个性质不受影响。
+    private LambdaQueryWrapper<DevAlarm> applyPreset(LambdaQueryWrapper<DevAlarm> w, String preset) {
         if (PRESET_DISPOSED_OPEN.equals(preset)) {
             w.in(DevAlarm::getStatus, List.of(AlarmStatus.OPEN.name(), AlarmStatus.ACKED.name()))
                     .isNotNull(DevAlarm::getDispositionRef);
         } else if (PRESET_HEALED_TODAY.equals(preset)) {
             w.eq(DevAlarm::getStatus, AlarmStatus.CLOSED.name())
                     .in(DevAlarm::getCloseReason, List.of(AlarmCloseReason.SELF_HEALED.name(), AlarmCloseReason.AUTO_FIXED.name()))
-                    .ge(DevAlarm::getClosedAt, java.time.LocalDate.now().atStartOfDay());
+                    // closed_at 是 LocalDateTime.now() 写的（服务器时区），所以日界要换算过去
+                    .ge(DevAlarm::getClosedAt, clock.startOfTodayAsStored());
         }
         return w;
     }
@@ -301,7 +308,8 @@ public class AlarmServiceImpl implements AlarmService {
             recent = mapper.selectList(new LambdaQueryWrapper<DevAlarm>()
                             .and(x -> x.eq(DevAlarm::getSubjectNo, subject).or().eq(DevAlarm::getCabinetNo, subject))
                             .ne(DevAlarm::getAlarmNo, alarmNo)
-                            .ge(DevAlarm::getOccurredAt, java.time.LocalDate.now().minusDays(7).toString())
+                            // occurred_at 是**字符串**列，按字典序比；定宽格式下与时间序一致
+                            .ge(DevAlarm::getOccurredAt, clock.startOfDayAsStoredText(clock.today().minusDays(7)))
                             .orderByDesc(DevAlarm::getId).last("limit 20"))
                     .stream().map(AlarmServiceImpl::toVO).toList();
         }
@@ -375,7 +383,8 @@ public class AlarmServiceImpl implements AlarmService {
         java.util.Map<String, long[]> acc = new java.util.TreeMap<>();
         List<DevAlarm> rows = mapper.selectList(new LambdaQueryWrapper<DevAlarm>()
                 .select(DevAlarm::getAlarmCode, DevAlarm::getCloseReason, DevAlarm::getDispositionType, DevAlarm::getDispositionRef)
-                .ge(DevAlarm::getOccurredAt, java.time.LocalDate.now().minusDays(Math.max(1, Math.min(days, 365))).toString()));
+                .ge(DevAlarm::getOccurredAt,
+                        clock.startOfDayAsStoredText(clock.today().minusDays(Math.max(1, Math.min(days, 365))))));
         // 撤单率 = 开了工单、工单后来因告警自动恢复被撤（WITHDRAWN）的占比 —— 高了说明开单延迟太短，白跑了人
         java.util.Map<String, String> woClose = workOrders.closeReasons(rows.stream()
                 .filter(a -> ai.neargo.sharehub.alarm.AlarmDisposition.WORK_ORDER.name().equals(a.getDispositionType()) && a.getDispositionRef() != null)

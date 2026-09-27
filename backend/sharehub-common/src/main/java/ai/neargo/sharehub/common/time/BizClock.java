@@ -84,4 +84,48 @@ public class BizClock {
     public ZoneId zone() {
         return zone;
     }
+
+    /**
+     * **业务日的起点，换算成「存储时区」的 {@link LocalDateTime}** ——
+     * 用来和 {@code created_at} / {@code closed_at} 这类列比大小。
+     *
+     * <h3>为什么不能直接用 {@code today().atStartOfDay()}</h3>
+     * 那些列是 {@code LocalDateTime.now()} 写的，**服务器 JVM 时区**
+     * （与 {@code created_at}/{@code updated_at} 同一口径，这是对的，不该改存储语义）。
+     * 拿「业务日的零点」去比「服务器时区的时间戳」，会得到一个**不自洽**的窗口：
+     * 迪拜 9-25 22:00 关闭的告警（业务日 9-25）会被算进「9-26 今日」，
+     * 因为它的服务器时间戳是 {@code 9-26T02:00 ≥ 9-26T00:00}。
+     *
+     * <p>换句话说：直接替换比不替换**更错** —— 原来至少是「服务器日」这个自洽的口径，
+     * 只是那个日不是业务日。所以必须把日界**换算到存储时区**再比。
+     *
+     * <p>这是 {@code AdjustmentServiceImpl} 那个折算的**反方向**：
+     * 那边把存储时间戳折成业务日，这边把业务日界折成存储时间戳。
+     *
+     * <p>⚠️ 依赖「写入方与本进程同 JVM 时区」（当前是单体，成立）。
+     * 拆成独立进程且时区不同时，这些列该带偏移量存，而不是靠这个假设。
+     */
+    public LocalDateTime startOfDayAsStored(LocalDate bizDay) {
+        return bizDay.atStartOfDay(zone).withZoneSameInstant(ZoneId.systemDefault()).toLocalDateTime();
+    }
+
+    /** {@link #startOfDayAsStored} 的今天。 */
+    public LocalDateTime startOfTodayAsStored() {
+        return startOfDayAsStored(today());
+    }
+
+    /**
+     * 同上，但格式化成 {@code yyyy-MM-dd HH:mm:ss} —— 给**字符串列**用
+     * （如 {@code dev_alarm.occurred_at}，它是 {@code String} 不是 DATETIME）。
+     *
+     * <p>字符串列按**字典序**比大小，而这个格式定宽、同前缀，所以字典序与时间序一致。
+     * 原先传的是 10 位的 {@code yyyy-MM-dd}，靠「同前缀更短者排前」也能当日界用；
+     * 换成定宽全量后语义更明确，且把时区折算带了进去。
+     */
+    public String startOfDayAsStoredText(LocalDate bizDay) {
+        return startOfDayAsStored(bizDay).format(STORED_TS);
+    }
+
+    private static final java.time.format.DateTimeFormatter STORED_TS =
+            java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 }
