@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { onShow, onLoad } from "@dcloudio/uni-app";
+import { onShow, onLoad, onUnload } from "@dcloudio/uni-app";
 import { api, IS_MOCK } from "@/api";
 import { useI18n } from "vue-i18n";
 import type { NearbyCabinet, Notice, ConsumerOrder, StoreDetail } from "@/types";
@@ -23,7 +23,7 @@ const useWebScanner = (() => {
 })();
 const showScanner = ref(false);
 import { openNavigation } from "@/ports/map";
-import { getUserLocation } from "@/ports/location";
+import { getUserLocation, onUserLocation } from "@/ports/location";
 import { ensureLoggedIn } from "@/shared/auth-gate";
 import { useUserStore } from "@/stores/user";
 import { useAppStore } from "@/stores/app";
@@ -66,6 +66,8 @@ function onSearch(e: { detail?: { value?: string } }) {
 
 /** 每次 load 的序号：只认最后一次发起的结果（见下）。 */
 let loadSeq = 0;
+/** 当前列表是不是在「不知道位置」时取的 —— 是的话，位置一到就重取一次（带上距离与排序）。 */
+let listWithoutLoc = false;
 
 async function load() {
   const seq = ++loadSeq;
@@ -99,7 +101,10 @@ async function load() {
      * **只认最后一次**。连着搜两次（先「Emirates」再「Yas」）时，先发的请求可能后回来，
      * 把新结果盖掉 —— 模拟器上见过：搜索框写着 Yas，列表是 Emirates 的店。
      */
-    if (seq === loadSeq) list.value = cabs;
+    if (seq === loadSeq) {
+      list.value = cabs;
+      listWithoutLoc = !at;
+    }
     await side;
   } finally {
     if (seq === loadSeq) loading.value = false;
@@ -109,6 +114,14 @@ onLoad((q) => {
   returnable.value = q?.returnable === "1";
 });
 onShow(load);
+/*
+ * 冷启动时定位常常超时（首页先按「不知道位置」出了列表：没有距离、按建站顺序），
+ * 坐标几秒后才到。此前要等用户自己切页回来才会带上距离 —— 位置一到就重取一次。
+ */
+const offLoc = onUserLocation(() => {
+  if (listWithoutLoc) void load();
+});
+onUnload(offLoc);
 
 /**
  * 门店卡上的收藏（心形）。

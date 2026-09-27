@@ -16,7 +16,7 @@
  */
 import { defineComponent, type PropType } from "vue";
 import type { NearbyCabinet } from "@/types";
-import { getUserLocation } from "@/ports/location";
+import { getUserLocation, onUserLocation } from "@/ports/location";
 
 const KEY = (import.meta.env.VITE_GMAPS_KEY as string | undefined) || "";
 
@@ -44,6 +44,7 @@ export default defineComponent({
       real: RENDERJS && !!KEY,
       failed: false,
       me: null as { lat: number; lng: number } | null,
+      offLoc: null as null | (() => void),
     };
   },
   computed: {
@@ -63,9 +64,14 @@ export default defineComponent({
     if (!KEY) console.warn("[pb-map] 未配置 VITE_GMAPS_KEY，地图显示为占位");
     // 定位在逻辑层取（App 走 uni.getLocation 的原生定位），拿到了再交给视图层画蓝点。
     // 「我在这儿」**只有真拿到位置才画**：先画在迪拜市中心的话，人在阿布扎比时地图会告诉他「你在迪拜」。
-    getUserLocation().then((c) => {
+    // 订阅而不是只问一次：冷启动时第一次常常超时，坐标是之后才到的
+    this.offLoc = onUserLocation((c) => {
       this.me = c;
     });
+    void getUserLocation();
+  },
+  beforeUnmount() {
+    this.offLoc?.();
   },
   methods: {
     /** 视图层回调：点了某个网点。 */
@@ -88,6 +94,8 @@ let gmap = null;
 let markers = [];
 let meMarker = null;
 let loading = null;
+/** 在后台时做的居中：容器没有尺寸，居中会落歪。回到前台再补一次。 */
+let pendingCenter = null;
 const DUBAI = { lat: 25.2048, lng: 55.2708 };
 
 function loadScript(key) {
@@ -120,12 +128,17 @@ function loadScript(key) {
  *
  * 8 秒是权衡：慢网下首帧可能要几秒，太短会把能用的地图误判掉；
  * 而超过 8 秒还是空白的话，用户早就去点别处了。
+ *
+ * **只在页面可见时计时。** WebView 在后台本来就不绘制 —— 此前 App 一启动就被切走
+ * （来电、通知、系统更新页盖上来），8 秒后看门狗把「在后台」判成「画不出来」，
+ * 地图**整个会话都退回占位**，回到前台也不恢复（Android 模拟器复现）。
  */
 function watchPainted(el, owner) {
   const deadline = 8000;
-  const t0 = Date.now();
+  let t0 = Date.now();
   const timer = setInterval(function () {
     if (el.querySelector(".gm-style")) { clearInterval(timer); return; }
+    if (document.hidden) { t0 = Date.now(); return; }   // 后台不算时间
     if (Date.now() - t0 > deadline) {
       clearInterval(timer);
       // 留一句给排障的人：区分「没加载出来」和「加载了但没画」
@@ -192,6 +205,15 @@ export default {
             });
             gmap.setCenter(p.me);
             gmap.setZoom(14);
+            if (document.hidden) {
+              pendingCenter = p.me;
+              document.addEventListener("visibilitychange", function once() {
+                if (document.hidden || !pendingCenter) return;
+                document.removeEventListener("visibilitychange", once);
+                gmap.setCenter(pendingCenter);
+                pendingCenter = null;
+              });
+            }
           }
           meMarker.setPosition(p.me);
         }
