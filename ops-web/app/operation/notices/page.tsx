@@ -126,7 +126,15 @@ export default function NoticesPage() {
     onSuccess: () => { refresh(); notify.success("已保存"); setForm(null); },
   });
   const transit = useMutation({
-    mutationFn: (v: { noticeNo: string; status: Notice["status"] }) => api.saveNotice(v),
+    /*
+     * 发布 / 下线走**动作端点**，不是 saveNotice。
+     * 此前这里发的是 saveNotice({noticeNo, status}) —— 而后端保存端点的入参里没有 status
+     * （转 DTO 那批去掉的）。2026-09-27 实测：那个请求得到 400「公告标题必填」
+     * （运营根本没碰标题）；就算补齐全量字段，也是 200 而库里仍是 DRAFT。
+     * 结果是公告发不出去，C 端公告永远为空（C 端只读 PUBLISHED）。
+     */
+    mutationFn: (v: { noticeNo: string; status: Notice["status"] }) =>
+      api.transitionNotice(v.noticeNo, v.status === "PUBLISHED" ? "publish" : "offline"),
     onSuccess: (_r, v) => { refresh(); notify.success(v.status === "PUBLISHED" ? "已发布" : "已下线"); },
   });
   const archive = useMutation({ mutationFn: (no: string) => api.archiveNotice(no), onSuccess: () => { refresh(); notify.success("已归档"); } });

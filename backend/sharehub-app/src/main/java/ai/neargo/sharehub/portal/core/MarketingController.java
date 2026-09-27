@@ -278,6 +278,28 @@ public class MarketingController {
         return noticeService.save(e);
     }
 
+    /**
+     * 发布 / 下线公告。**动作端点，不是保存字段。**
+     *
+     * <p>2026-09-27 实测：运营台的「发布」按钮发的是 {@code {noticeNo, status}} 到保存端点，
+     * 而保存端点的入参 DTO 里**没有 status**（转 DTO 那批去掉的，对的）。于是
+     * 只发那两个字段 → 400「公告标题必填」（运营根本没碰标题）；带全量字段再加 status
+     * → 200 而库里仍是 DRAFT。两种都不说真正的原因，结果是**公告发不出去、C 端永远空**。
+     *
+     * <p>形状照 {@code archive/unarchive}：状态只从这里改，保存端点碰不到它。
+     */
+    @PostMapping("/api/ops/marketing/notices/{no}/publish")
+    @PreAuthorize("@perm.can('marketing:notice:update')")
+    public NoticeVO publishNotice(@PathVariable String no) {
+        return noticeService.setPublished(no, true);
+    }
+
+    @PostMapping("/api/ops/marketing/notices/{no}/offline")
+    @PreAuthorize("@perm.can('marketing:notice:update')")
+    public NoticeVO offlineNotice(@PathVariable String no) {
+        return noticeService.setPublished(no, false);
+    }
+
     /** {@code Map.of} 不接受 null，统一转空串；空串在 CRUD 基类里等价于「不过滤」。 */
     private static String nz(String s) {
         return s == null ? "" : s;

@@ -62,6 +62,12 @@ export interface MarketingApi {
   // === 公告管理（P1，补齐清单 E1）===
   listNotices(q?: ArchiveQ): Promise<PageResult<Notice>>;
   saveNotice(x: Partial<Notice> & { noticeNo?: string }): Promise<Notice>;
+  /**
+   * 发布 / 下线公告。**状态不走 saveNotice** —— 保存端点的入参里没有 status
+   * （转 DTO 那批去掉的），往那儿发只会 400「公告标题必填」或 200 而库里不变，
+   * 两种都不说真正的原因，结果是公告发不出去、C 端永远空（2026-09-27 实测）。
+   */
+  transitionNotice(noticeNo: string, action: "publish" | "offline"): Promise<Notice>;
 
   // === G1 软删除（TDD §10.1）：归档而非删除，**契约里禁止出现 deleteXxx** ===
   archiveCoupon(couponNo: string): Promise<Coupon>;

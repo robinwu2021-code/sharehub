@@ -42,6 +42,17 @@ export const marketingHttp: MarketingApi = {
   // 公告管理
   listNotices: (q?: ArchiveQ) => client.get("/api/ops/marketing/notices", q),
   saveNotice: (x) => client.post(x.noticeNo ? `/api/ops/marketing/notices/${x.noticeNo}` : "/api/ops/marketing/notices", x),
+  /*
+   * 两条路径写成字面量，不拼 `${action}`：对齐脚本把 `${...}` 一律归一成 `{}`，
+   * 拼出来的 `/notices/{}/{}` 匹配不上后端的 `/notices/{no}/publish`，
+   * 会被报成「前端在调、后端没有」（A 类，零容忍）。
+   * 后端也刻意是两个字面量端点而不是 `/{no}/{action}` —— 后者等于又开一条
+   * 「动作随便传」的路，而这次修的正是「状态随便写」。
+   */
+  transitionNotice: (no, action) =>
+    action === "publish"
+      ? client.post(`/api/ops/marketing/notices/${no}/publish`, {})
+      : client.post(`/api/ops/marketing/notices/${no}/offline`, {}),
 
   // G1 软删除：归档 / 恢复。REST 上是「状态迁移」而非 DELETE —— 后端不得实现物理删除。
   archiveCoupon: (no) => client.post(`/api/user/coupons/${no}/archive`, {}),

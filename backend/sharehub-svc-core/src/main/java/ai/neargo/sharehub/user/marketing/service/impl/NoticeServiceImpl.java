@@ -20,6 +20,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 public class NoticeServiceImpl extends AbstractCrudService<MktNotice, NoticeVO> implements NoticeService {
 
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    /** C 端只读 PUBLISHED（见 visibleNotices）；下线回 OFFLINE 而不是 DRAFT —— 草稿与「下过线」不是一回事。 */
+    private static final String PUBLISHED = "PUBLISHED";
+    private static final String OFFLINE = "OFFLINE";
 
     public NoticeServiceImpl(MktNoticeMapper mapper, JdbcTemplate jdbc) {
         super(mapper, jdbc);
@@ -80,6 +83,28 @@ public class NoticeServiceImpl extends AbstractCrudService<MktNotice, NoticeVO> 
                 .last("limit " + n);
 
         return mapper.selectList(w).stream().map(this::toVO).toList();
+    }
+
+    @Override
+    public NoticeVO setPublished(String noticeNo, boolean publish) {
+        MktNotice e = mapper.selectOne(new LambdaQueryWrapper<MktNotice>()
+                .eq(MktNotice::getNoticeNo, noticeNo).last("limit 1"));
+        if (e == null) throw ai.neargo.sharehub.common.BizException.notFound(noticeNo);
+
+        e.setStatus(publish ? PUBLISHED : OFFLINE);
+        /*
+         * 发布人取自会话，**不接受调用方提供** —— 审计事实由客户端给等于没有审计。
+         *
+         * ⚠️ 这一列此前在 beforeCreate 就填上了，也就是说它记的其实是**创建人**，
+         * 而列名与 beforeUpdate 的注释都说它是「发布人」。真正按下发布的可以是另一个人。
+         * 这里在发布这一刻如实覆盖成真发布人；beforeCreate 那行没动（改它要决定
+         * 存量行怎么算），但两处口径对不上这件事值得有人回来定。
+         */
+        if (publish) {
+            e.setPublishedBy(StaffContext.require().userNo());
+        }
+        mapper.updateById(e);
+        return toVO(e);
     }
 
     /** 发布人是首次发布时的审计事实，编辑不改它（同 {@code FreeWhitelistServiceImpl.grantedBy}）。 */

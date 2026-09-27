@@ -38,6 +38,7 @@ export const marketingMock: MarketingApi = {
   // 公告管理
   listNotices: (q: ArchiveQ = {}) => wait(db.listNotices(q)),
   saveNotice: (x) => wait(db.saveNotice(x), 350),
+  transitionNotice: (no, action) => wait(db.transitionNotice(no, action === "publish"), 350),
 
   // G1 软删除：归档 / 恢复（禁止物理删除）
   archiveCoupon: async (no) => wait(db.archiveCoupon(no), 350),

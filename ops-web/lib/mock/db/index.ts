@@ -120,7 +120,7 @@ export {
   adSlots, adCampaigns, adDeliveries,
   listCampaigns, listPushMessages, listReferrals, listAdSlots, listAdCampaigns, listAdDeliveries,
   saveCampaign, savePushMessage, saveAdSlot, saveAdCampaign,
-  notices, listNotices, saveNotice,
+  notices, listNotices, saveNotice, transitionNotice,
   archiveCoupon, unarchiveCoupon, archiveNotice, unarchiveNotice,
   // S2：优惠券发放 / 推送发送
   couponIssueRecords, listCouponIssueRecords, issueCoupon,

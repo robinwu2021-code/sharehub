@@ -373,6 +373,20 @@ export const saveNotice = (x: Partial<Notice>) => {
   return upsert(notices, x, "noticeNo", () => nextNo("NTC", notices));
 };
 
+/**
+ * 发布 / 下线。**状态只从这里改**，saveNotice 碰不到它 —— 与后端一致
+ * （后端保存端点的入参 DTO 里没有 status，状态走 /publish、/offline 动作端点）。
+ * mock 也照这个口径，否则「mock 里点得通、切真后端点不动」。
+ */
+export const transitionNotice = (noticeNo: string, publish: boolean) => {
+  const n = notices.find((x) => x.noticeNo === noticeNo);
+  if (!n) throw new ApiError(404, `公告不存在：${noticeNo}`);
+  const errors = validateNotice({ ...n, status: publish ? "PUBLISHED" : "OFFLINE" }, n, notices);
+  if (errors.length) throw new ApiError(400, errors[0]);
+  n.status = publish ? "PUBLISHED" : "OFFLINE";
+  return n;
+};
+
 // ============================================================================
 // S2 · 优惠券发放（权限码 marketing:coupon:issue）
 // ----------------------------------------------------------------------------

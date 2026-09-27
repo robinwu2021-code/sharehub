@@ -15092,6 +15092,176 @@
   },
   {
    "verb": "POST",
+   "path": "/api/ops/marketing/notices/{no}/offline",
+   "perm": "marketing:notice:update",
+   "perms": [
+    "marketing:notice:update"
+   ],
+   "handler": "MarketingController#offlineNotice",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "no",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "NoticeVO",
+   "returnContainer": null,
+   "returnElement": "NoticeVO",
+   "responseShape": [
+    {
+     "name": "noticeNo",
+     "type": "String"
+    },
+    {
+     "name": "title",
+     "type": "String"
+    },
+    {
+     "name": "titleEn",
+     "type": "String"
+    },
+    {
+     "name": "titleAr",
+     "type": "String"
+    },
+    {
+     "name": "content",
+     "type": "String"
+    },
+    {
+     "name": "contentEn",
+     "type": "String"
+    },
+    {
+     "name": "contentAr",
+     "type": "String"
+    },
+    {
+     "name": "type",
+     "type": "String"
+    },
+    {
+     "name": "pinned",
+     "type": "boolean"
+    },
+    {
+     "name": "startAt",
+     "type": "String"
+    },
+    {
+     "name": "endAt",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "publishedBy",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/marketing/notices/{no}/publish",
+   "perm": "marketing:notice:update",
+   "perms": [
+    "marketing:notice:update"
+   ],
+   "handler": "MarketingController#publishNotice",
+   "summary": "发布 / 下线公告。",
+   "params": [
+    {
+     "in": "path",
+     "name": "no",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "NoticeVO",
+   "returnContainer": null,
+   "returnElement": "NoticeVO",
+   "responseShape": [
+    {
+     "name": "noticeNo",
+     "type": "String"
+    },
+    {
+     "name": "title",
+     "type": "String"
+    },
+    {
+     "name": "titleEn",
+     "type": "String"
+    },
+    {
+     "name": "titleAr",
+     "type": "String"
+    },
+    {
+     "name": "content",
+     "type": "String"
+    },
+    {
+     "name": "contentEn",
+     "type": "String"
+    },
+    {
+     "name": "contentAr",
+     "type": "String"
+    },
+    {
+     "name": "type",
+     "type": "String"
+    },
+    {
+     "name": "pinned",
+     "type": "boolean"
+    },
+    {
+     "name": "startAt",
+     "type": "String"
+    },
+    {
+     "name": "endAt",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "publishedBy",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
    "path": "/api/ops/marketing/notices/{no}/unarchive",
    "perm": "marketing:notice:update",
    "perms": [
@@ -43407,6 +43577,18 @@
        "type": "String"
       }
      ]
+    },
+    {
+     "name": "estimatedFee",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "estimatedDurationMin",
+     "type": "Integer"
+    },
+    {
+     "name": "capped",
+     "type": "Boolean"
     }
    ],
    "requestShape": null
@@ -43511,6 +43693,18 @@
        "type": "String"
       }
      ]
+    },
+    {
+     "name": "estimatedFee",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "estimatedDurationMin",
+     "type": "Integer"
+    },
+    {
+     "name": "capped",
+     "type": "Boolean"
     }
    ],
    "requestShape": null
@@ -43663,6 +43857,18 @@
        "type": "String"
       }
      ]
+    },
+    {
+     "name": "estimatedFee",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "estimatedDurationMin",
+     "type": "Integer"
+    },
+    {
+     "name": "capped",
+     "type": "Boolean"
     }
    ],
    "requestShape": null
@@ -43774,6 +43980,18 @@
        "type": "String"
       }
      ]
+    },
+    {
+     "name": "estimatedFee",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "estimatedDurationMin",
+     "type": "Integer"
+    },
+    {
+     "name": "capped",
+     "type": "Boolean"
     }
    ],
    "requestShape": null
@@ -45167,6 +45385,9 @@
    "CABINET",
    "LOCATION"
   ],
+  "ShareMode": [
+   "CHANNEL_SPLIT"
+  ],
   "Period": [
    "LAST_7D",
    "LAST_30D",
@@ -45237,6 +45458,9 @@
    "RELEASED",
    "BOUGHT_OUT"
   ],
+  "PayChannelMode": [
+   "DELEGATED"
+  ],
   "PayAuthStatus": [
    "FROZEN",
    "CAPTURED"
@@ -45277,6 +45501,15 @@
    "PAID",
    "FAILED"
   ],
+  "CouponType": [
+   "CUT"
+  ],
+  "PushChannel": [
+   "APP_PUSH"
+  ],
+  "CouponTplStatus": [
+   "ACTIVE"
+  ],
   "CampaignStatus": [
    "DRAFT",
    "RUNNING",
@@ -45295,6 +45528,12 @@
    "DRAFT",
    "SCHEDULED",
    "SENDING"
+  ],
+  "CampaignKind": [
+   "NEW_USER",
+   "RECHARGE_GIFT",
+   "COUPON_PUSH",
+   "REFERRAL"
   ],
   "Provider": [
    "WECHAT_MP",
@@ -45379,8 +45618,8 @@
   "ReconTaskStatus": [
    "MATCHED"
   ],
-  "ShareMode": [
-   "CHANNEL_SPLIT"
+  "ShareDimension": [
+   "VENUE"
   ],
   "SettlementRefType": [
    "ORDER",
@@ -45389,6 +45628,11 @@
   "InvoiceStatus": [
    "DRAFT",
    "ISSUED"
+  ],
+  "ShareBasis": [
+   "INVEST",
+   "DEVELOP",
+   "OPERATE"
   ],
   "AdjustmentStatus": [
    "PENDING",
@@ -45459,6 +45703,11 @@
    "SN_SEEN",
    "HAZARD"
   ],
+  "AlarmNotifyChannel": [
+   "EMAIL",
+   "PUSH",
+   "SMS"
+  ],
   "AlarmTodoStatus": [
    "OPEN",
    "DONE"
@@ -45488,6 +45737,9 @@
   ],
   "AlarmRuleStatus": [
    "ACTIVE"
+  ],
+  "AlarmNotifyMethod": [
+   "INSTANT"
   ],
   "MergeScope": [
    "DEVICE",
@@ -45625,8 +45877,24 @@
   "LeadOwnerType": [
    "STAFF"
   ],
+  "NotifyTemplateChannel": [
+   "INAPP",
+   "PUSH",
+   "SMS"
+  ],
+  "NotifyBlacklistChannel": [
+   "ALL",
+   "EMAIL",
+   "PUSH",
+   "SMS"
+  ],
   "NotifyTemplateStatus": [
    "ENABLED"
+  ],
+  "NotifyBlacklistReason": [
+   "USER_OPT_OUT",
+   "HARD_BOUNCE",
+   "ABUSE"
   ],
   "NotifyLogStatus": [
    "SENT"
@@ -45675,8 +45943,30 @@
   "CredentialStatus": [
    "ACTIVE"
   ],
+  "AppPlatform": [
+   "IOS",
+   "ANDROID"
+  ],
   "EmployeeStatus": [
    "ACTIVE"
+  ],
+  "ProblemSuggestedAction": [
+   "SELF_SERVICE",
+   "TO_CS",
+   "TO_REFUND"
+  ],
+  "ProblemCategory": [
+   "ACCOUNT",
+   "BILLING",
+   "DEVICE",
+   "RENT",
+   "RETURN"
+  ],
+  "AgentAccountStatus": [
+   "ACTIVE"
+  ],
+  "CommissionDimension": [
+   "GMV"
   ],
   "AgentStatus": [
    "ENABLED"
@@ -45703,10 +45993,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 517,
-  "records": 468,
-  "withPerm": 444,
+  "endpoints": 519,
+  "records": 469,
+  "withPerm": 446,
   "withBody": 220,
-  "shapedResponses": 406
+  "shapedResponses": 408
  }
 }
