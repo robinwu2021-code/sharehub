@@ -1,18 +1,14 @@
 package ai.neargo.sharehub.scenario;
 
 import ai.neargo.sharehub.api.core.port.CouponUsePort;
+import ai.neargo.sharehub.support.FixedBizClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-import java.time.Clock;
 import java.time.Instant;
-import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -41,37 +37,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 // 不标 @SpringBootTest —— 父类已经标了（含 RANDOM_PORT）。在子类上再标一次会**覆盖**它，
 // 退回默认的 MOCK 环境，于是父类的 @LocalServerPort 解析不了，报的是
 // 「Could not resolve placeholder 'local.server.port'」—— 看不出与这个注解有关。
+@org.springframework.context.annotation.Import(ai.neargo.sharehub.support.FixedBizClock.class)
 class CouponExpiryOnBizCalendarTest extends ai.neargo.sharehub.support.ApiTestSupport {
-
-    /** 业务时区（+4）刚跨入 10-01 的那一瞬。UTC 20:30 → 迪拜 2026-10-01 00:30。 */
-    private static final Instant JUST_AFTER_BIZ_MIDNIGHT = Instant.parse("2026-09-30T20:30:00Z");
-
-    /** 业务时区仍在 09-30 的最后半小时。UTC 19:30 → 迪拜 2026-09-30 23:30。 */
-    private static final Instant JUST_BEFORE_BIZ_MIDNIGHT = Instant.parse("2026-09-30T19:30:00Z");
-
-    /**
-     * 可变的固定时钟 —— 一个上下文里要验两个时刻，不想为此起两个 Spring 上下文。
-     *
-     * <p>{@code @Primary}：{@code ReportConfig} 那个 {@code Clock} bean 是
-     * {@code @ConditionalOnMissingBean}，本来就会让位；标上它是为了**即使将来
-     * 有人加了别的 Clock bean，这条用例也仍然钉得住**，而不是悄悄变成测真时钟。
-     */
-    static final class MutableClock extends Clock {
-        volatile Instant at = JUST_AFTER_BIZ_MIDNIGHT;
-
-        @Override public java.time.ZoneId getZone() { return ZoneOffset.UTC; }
-        @Override public Clock withZone(java.time.ZoneId z) { return this; }
-        @Override public Instant instant() { return at; }
-    }
-
-    @TestConfiguration
-    static class FixedClockConfig {
-        @Bean
-        @Primary
-        MutableClock mutableClock() {
-            return new MutableClock();
-        }
-    }
 
     @Autowired
     JdbcTemplate jdbc;
@@ -80,7 +47,7 @@ class CouponExpiryOnBizCalendarTest extends ai.neargo.sharehub.support.ApiTestSu
     CouponUsePort coupons;
 
     @Autowired
-    MutableClock clock;
+    FixedBizClock.MutableClock clock;
 
     @AfterEach
     void clean() {
@@ -90,7 +57,7 @@ class CouponExpiryOnBizCalendarTest extends ai.neargo.sharehub.support.ApiTestSu
     @Test
     @DisplayName("★ 业务日历已翻篇 → 有效期到前一天的券过期")
     void expired_when_the_business_calendar_has_moved_on() {
-        clock.at = JUST_AFTER_BIZ_MIDNIGHT;                 // 迪拜 2026-10-01 00:30
+        clock.at = FixedBizClock.JUST_AFTER_BIZ_MIDNIGHT;                 // 迪拜 2026-10-01 00:30
         String no = seedCoupon("CP-TZ-A", "2026-09-30");
         assertThat(coupons.offerOf(USER, no, "AED"))
                 .as("业务日已是 10-01，有效期到 09-30 的券应当已过期")
@@ -105,7 +72,7 @@ class CouponExpiryOnBizCalendarTest extends ai.neargo.sharehub.support.ApiTestSu
          * 于是这张券当场作废 —— 而在业务日历上它还有 4 个小时。
          * 用户看得见、又说不出所以然的损失，那段代码的注释正是这么写的。
          */
-        clock.at = JUST_BEFORE_BIZ_MIDNIGHT;                // 迪拜 2026-09-30 23:30
+        clock.at = FixedBizClock.JUST_BEFORE_BIZ_MIDNIGHT;                // 迪拜 2026-09-30 23:30
         String no = seedCoupon("CP-TZ-B", "2026-09-30");
         assertThat(coupons.offerOf(USER, no, "AED"))
                 .as("业务日仍是 09-30，有效期到 09-30 的券不该被判过期")

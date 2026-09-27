@@ -32,7 +32,12 @@
 #   修之前是两层错：用「今天」（与它上面那句注释正好相反，跨月补算会记错月份），
 #   而且是服务器时区的今天（迪拜 9-30 20:00 之后结算的单 period 直接变成 2026-10，
 #   每月有 4 小时的单记错月份，结算单上看不出任何异常）。）
-ReferFeeGeneratorImpl 2     # 推荐费的 onDate 与 period。同上，跨月会记进错的月份。待拍板。
+# （ReferFeeGeneratorImpl 已移出：onDate 与 period 都改走 clock.today()。
+#   事件里没有时间戳，所以只能用「现在」—— 但要用**业务日历的**现在。
+#   修之前：period 用服务器月份，迪拜 9-30 20:00 之后签的合同记进 10 月；
+#   onDate 用来筛「这天生效的责任行」，错一天会把有效期到 9-30 的牵线人漏掉 ——
+#   **那笔牵线费谁也拿不到，而日志只会说「没配对价」**。
+#   钉住时钟的用例 ReferFeePeriodOnBizCalendarTest 守着 period，负对照精确命中。）
 # （AdjustmentServiceImpl 已从台账移出：撤场结清的关闭时刻现在显式折算成业务日 ——
 #   按写入方时区解释那个时间戳，再换到业务时区取日期。查清了「closedAt 是哪个时区」
 #   之后就不用猜了：SiteServiceImpl 用 LocalDateTime.now() 写的，与 created_at 同口径。

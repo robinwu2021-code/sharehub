@@ -49,9 +49,14 @@ public class ReferFeeGeneratorImpl implements ReferFeeGenerator {
     private final ShareRecordMapper records;
     private final SiteAgentQueryPort siteAgents;
 
-    public ReferFeeGeneratorImpl(ShareRecordMapper records, SiteAgentQueryPort siteAgents) {
+    /** 牵线费的生效日与归属月都是**业务日历**上的日期。见 BizClock。 */
+    private final ai.neargo.sharehub.common.time.BizClock clock;
+
+    public ReferFeeGeneratorImpl(ShareRecordMapper records, SiteAgentQueryPort siteAgents,
+                                 ai.neargo.sharehub.common.time.BizClock clock) {
         this.records = records;
         this.siteAgents = siteAgents;
+        this.clock = clock;
     }
 
     @Override
@@ -62,7 +67,13 @@ public class ReferFeeGeneratorImpl implements ReferFeeGenerator {
             log.warn("合同 {} 没有绑定站点，跳过牵线费结算", e.contractNo());
             return 0;
         }
-        String onDate = LocalDate.now().toString();
+        /*
+         * 责任行的生效判定按**业务日历**。合同上的 valid_from / valid_to 是人填的业务日期，
+         * 而 LocalDate.now() 是服务器时区（生产 Asia/Shanghai，业务 Asia/Dubai）——
+         * 迪拜 9-30 20:00 之后签的合同，这里会拿 10-01 去筛责任行：
+         * **有效期到 9-30 的牵线人被漏掉，那笔牵线费谁也拿不到**，而日志只会说「没配对价」。
+         */
+        String onDate = clock.today().toString();
         int n = 0;
         for (SiteAgentBrief r : siteAgents.agentsOf(e.siteNo(), onDate)) {
             if (!REFER.equalsIgnoreCase(r.role())) continue;
@@ -92,7 +103,8 @@ public class ReferFeeGeneratorImpl implements ReferFeeGenerator {
         rec.setCurrency(e.currency());
         rec.setMode(ShareMode.LEDGER.name());
         rec.setStatus(ShareRecordStatus.PENDING.name());
-        rec.setPeriod(LocalDate.now().toString().substring(0, 7));
+        // 归属月同样按业务日历 —— 迪拜 9-30 20:00 之后签的合同不该记进 10 月
+        rec.setPeriod(clock.today().toString().substring(0, 7));
         rec.setSourceNo(e.contractNo());
         try {
             records.insert(rec);
