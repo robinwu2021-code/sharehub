@@ -74,7 +74,12 @@ public class MpNearbyController {
                                         @RequestParam(required = false) Boolean returnable,
                                         @RequestParam(required = false) Double lat,
                                         @RequestParam(required = false) Double lng) {
-        ConsumerContext.require();
+        // **游客可看**（C 端功能清单 §一：游客「可浏览附近网点/价格；扫码借出前强制登录」）。
+        // 此前这里强制要求登录（ConsumerContext#require），与 SecurityConfig 对 /mp/nearby/** 的放行打架：
+        // （⚠️ 注释里别写出「ConsumerContext」加点号的字样：MpOwnershipContractTest 按文本扫方法体，
+        //   一句注释就能让它以为这个口经过了收口 —— 09-27 实测撞到过。）
+        // 安全链放进来了，控制器又拒回去 —— 游客开 App 首页直接 403，会话守卫把他送去登录页。
+        // 借出本身仍然要登录（/mp/trade/** 不放行），这里只是看。
         return DataScopeContext.executeWithoutScope(() -> {
             List<NearbyCabinetVO> out = new ArrayList<>();
             for (Site s : loc.pageSites(1, 50, keyword, false).getList()) {
@@ -162,6 +167,10 @@ public class MpNearbyController {
     /** 借出可用性校验（借出确认页，镜像 c-app {@code CabinetAvailability}）。 */
     @GetMapping("/mp/nearby/cabinets/{cabinetNo}/availability")
     public Map<String, Object> availability(@PathVariable String cabinetNo) {
+        // 这一口**仍要登录**（与上面的找柜不同）：它只服务借出确认页，而进确认页之前
+        // 端上已有登录门禁；价格游客在找柜列表与门店卡上就看得到。
+        // 路径里带标识的 /mp 接口一律经 ConsumerContext（MpOwnershipContractTest，无例外）——
+        // 为一个游客用不到的口子给那道卡口开例外，不划算。
         ConsumerContext.require();
         return DataScopeContext.executeWithoutScope(() -> {
             Cabinet c = cabinets.detail(cabinetNo).cabinet();
@@ -190,16 +199,25 @@ public class MpNearbyController {
     public Map<String, Object> site(@PathVariable String siteNo,
                                     @RequestParam(required = false) Double lat,
                                     @RequestParam(required = false) Double lng) {
-        String me = ConsumerContext.userNo();
+        // 游客也能看门店卡（点地图上的点就弹这个）；登录了才有「已收藏」这一位
+        String me = ConsumerContext.optionalUserNo();
         return DataScopeContext.executeWithoutScope(() -> {
             Site s = loc.pageSites(1, 200, null, false).getList().stream()
                     .filter(x -> siteNo.equals(x.siteNo())).findFirst()
                     .orElseThrow(() -> BizException.notFound(siteNo));
             List<Cabinet> cs = cabinets.bySite(siteNo);
-            int borrow = cs.stream().mapToInt(Cabinet::availableCount).sum();
+            /*
+             * 可借数只算**真能借的柜**（与找柜列表、借出可用性同一个判法 StoreCardAssembler#borrowable）。
+             *
+             * 此前是所有柜的 availableCount 直接相加 —— 离线 / 故障 / 停用的柜里的宝也算进去。
+             * 模拟器实测：门店卡写「可借 29」，列表里这家店的每台柜都是「不可用」；
+             * 用户照着门店卡点「借」，进的是一台借不了的柜。这是「同一个事实两个来源」的第三处
+             * （前两处 1f690b2 已统一：列表与借出确认页），当时漏了门店卡。
+             */
+            int borrow = cs.stream().filter(cards::borrowable).mapToInt(Cabinet::availableCount).sum();
             int ret = cs.stream().mapToInt(c -> Math.max(0, c.slotTotal() - c.availableCount())).sum();
             Quote q = cards.quoteOf(siteNo, s.sceneType());
-            boolean fav = favorites.pageByOwner(me, 1, 200).getList().stream()
+            boolean fav = me != null && favorites.pageByOwner(me, 1, 200).getList().stream()
                     .anyMatch(f -> siteNo.equals(f.siteNo()));
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("siteNo", s.siteNo());

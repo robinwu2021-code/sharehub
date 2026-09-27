@@ -20,6 +20,17 @@ public final class ConsumerContext {
         return u;
     }
 
+    /**
+     * 当前消费者业务号；**游客（未登录）返回 null**，不抛。
+     *
+     * <p>只给「游客也能看、登录了多显示一点」的读接口用（例：门店详情里的「已收藏」）。
+     * 需要属主的地方一律用 {@link #userNo()} —— 那个拿不到就拒绝，这个拿不到就当没有。
+     */
+    public static String optionalUserNo() {
+        LoginUser u = SecurityUtils.currentUser().orElse(null);
+        return u != null && u.realm() == Realm.CONSUMER ? u.userNo() : null;
+    }
+
     /** 当前消费者业务号（c_user_no）——服务端查询/过滤的唯一可信来源，不信前端传参。 */
     public static String userNo() {
         return require().userNo();

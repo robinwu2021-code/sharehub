@@ -51,7 +51,10 @@ public class SecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(reg -> reg
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/mp/auth/**", "/mp/nearby/**", "/mp/public/**").permitAll()
+                        // 游客可看：找柜、门店卡、公告（C 端功能清单 §一「游客可浏览附近网点/价格」）。
+                        // 放行只是「不要求登录」，控制器里**不许**再 ConsumerContext.require() ——
+                        // 两处意图打架时游客吃 403，而安全配置读起来是对的（09-27 实测撞到过）。
+                        .requestMatchers("/mp/auth/**", "/mp/nearby/**", "/mp/sites/**", "/mp/notice", "/mp/public/**").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(consumerFilter, UsernamePasswordAuthenticationFilter.class)
                 .exceptionHandling(ex -> ex

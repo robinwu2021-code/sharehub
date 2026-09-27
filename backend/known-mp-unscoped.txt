@@ -12,7 +12,7 @@
 # 所以规则是：`/mp/**` 的处理方法必须出现 ConsumerContext。
 # 出现它不等于用对了（还得真下推到查询里），但**不出现它一定是漏了**。
 #
-# 【下面这 9 条为什么可以不用】
+# 【下面这 10 条为什么可以不用】
 # 它们都不返回「某个人的」数据：
 #
 #   /mp/auth/*                 登录/注册/验证码/登出/可用方式 —— 此时还没有当前登录人。
@@ -23,6 +23,10 @@
 #   /mp/app/version            客户端版本，全体一份
 #   /mp/faq                    帮助文案，全体一份
 #   /mp/notice                 公告，全体一份
+#   /mp/nearby/cabinets        找柜列表（2026-09-27 加）：网点、库存、价格、距离 —— 距离随**传入的坐标**变，
+#                              不随登录人变；游客与任何登录用户拿到同一份。需求原文「游客可浏览附近网点/价格」。
+#                              此前这里有 ConsumerContext.require()，与 SecurityConfig 的放行打架，
+#                              游客打开 App 首页直接 403（Android 模拟器实测）。
 #   /mp/user/recharge-packages 充值套餐目录，全体一份（挂在 /user 下只是路径归类，
 #                              它返回的是**商品**不是**我的**——别被路径骗了）
 #
@@ -40,5 +44,6 @@
 /mp/auth/password/reset
 /mp/auth/register
 /mp/faq
+/mp/nearby/cabinets
 /mp/notice
 /mp/user/recharge-packages
