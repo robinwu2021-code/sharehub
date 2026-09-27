@@ -108,13 +108,19 @@ public class UserController {
         List<MemberCard> cards = members.pageCards(1, 50, cUserNo, null).getList().stream()
                 .filter(c -> cUserNo.equals(c.cUserNo())).toList();
 
-        PageResult<RentOrder> orderPage = rentOrders.pageByOwner(cUserNo, 1, 200);
-        List<RentOrder> orders = orderPage.getList();
-        BigDecimal amount = orders.stream()
-                .map(o -> BigDecimal.valueOf(o.feeAmount()))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        String currency = orders.isEmpty() ? "AED" : orders.get(0).currency();
-        OrderStats orderStats = new OrderStats(orderPage.getTotal(), amount, currency);
+        /*
+         * 累计消费走**聚合查询**，单数与金额出自同一次查询。
+         *
+         * 此前是 pageByOwner(cUserNo, 1, 200) 之后累加那一页的 feeAmount，
+         * 而单数取的是 getTotal()（全量）—— 运营端把两者并排渲染成
+         * 「{count} 单 · {amount}」，于是 200 单之后**单数对、金额不再增长**，
+         * 且不报错。少的那部分钱只有拿它去核对的人才会发现。
+         */
+        var spend = rentOrders.spendOf(cUserNo);
+        OrderStats orderStats = new OrderStats(spend.count(), spend.amount(),
+                spend.currency() == null ? "AED" : spend.currency());
+        // 档案里那一小列近期订单仍然只要一页（它就是「最近几单」，不是统计口径）
+        List<RentOrder> orders = rentOrders.pageByOwner(cUserNo, 1, 200).getList();
 
         return new UserProfileVO(user, risk, blacklist, whitelist, creditChanges,
                 wallet, walletTxns, member, cards, orders, orderStats);

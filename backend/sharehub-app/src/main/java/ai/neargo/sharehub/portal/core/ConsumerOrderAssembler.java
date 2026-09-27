@@ -197,13 +197,26 @@ public class ConsumerOrderAssembler {
         return DataScopeContext.executeWithoutScope(() -> {
             // C 端会话的 spec 是 SELF，而 dev_cabinet / loc_site 没有 c_user_no 锚点 ——
             // 与 MpNearbyController 同一处理：显式豁免，不给运营表编假 SELF 锚点。
+            /*
+             * **按键批查本页需要的那些**，不是「拉一页全量再建映射」。
+             *
+             * 此前是 cabinets.page(1, 500) + loc.pageSites(1, 200) —— 两个数都是分页
+             * 默认值、不是业务上限。机柜过 500 台或站点过 200 个，靠后那些的订单在
+             * 订单列表上**站点名就是空的**，而接口一路 200、页面照常渲染。
+             * 原注释写着「按当前规模（百级机柜）一次拉全量即可」——
+             * 实测测试库已有 1600+ 站点，那句话早就不成立了，而它不会自己报错。
+             */
+            java.util.Set<String> cabinetNos = new java.util.HashSet<>();
+            for (var o : orders) {
+                if (o.cabinetNo() != null) cabinetNos.add(o.cabinetNo());
+                if (o.returnCabinetNo() != null) cabinetNos.add(o.returnCabinetNo());
+            }
             Map<String, String> cabinetToSite = new HashMap<>();
-            // 注：按当前规模（百级机柜）一次拉全量即可；真长起来要换成按 cabinetNo 批量查
-            for (Cabinet c : cabinets.page(1, 500, null, null, null).getList()) {
+            for (Cabinet c : cabinets.byNos(cabinetNos)) {
                 if (c.cabinetNo() != null) cabinetToSite.put(c.cabinetNo(), c.siteNo());
             }
             Map<String, String> siteToName = new HashMap<>();
-            for (Site s : loc.pageSites(1, 200, null, false).getList()) {
+            for (Site s : loc.sitesByNos(cabinetToSite.values())) {
                 siteToName.put(s.siteNo(), s.name());
             }
             return new Names(cabinetToSite, siteToName);

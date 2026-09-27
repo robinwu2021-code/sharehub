@@ -21,6 +21,25 @@ public interface RentOrderService {
     /** C 端：我的订单（按属主 c_user_no 过滤）。 */
     PageResult<RentOrder> pageByOwner(String cUserNo, Integer page, Integer size);
 
+    /**
+     * 某用户的累计消费。**一次聚合查询**，不是「取一页再累加」。
+     *
+     * <p>用户 360 档案此前是 {@code pageByOwner(cUserNo, 1, 200)} 之后把那一页的
+     * {@code feeAmount} 相加，而单数取的是 {@code getTotal()}（全量）。于是运营端并排
+     * 渲染的「{@code {count} 单 · {amount}}」里，<b>单数对、金额在 200 单之后就不再增长</b>，
+     * 且没有任何地方会提示 —— 只有拿它去核对的人才会发现。
+     *
+     * @param count    订单总数（与 {@code amount} 出自同一次查询，两个数不可能对不上）
+     * @param amount   累计金额。⚠️ <b>跨币种相加是无意义的</b> —— 今天单市场（AED）成立，
+     *                 将来多币种时这个口径要改成按币种分组（沿用此前语义，本次只修截断）
+     * @param currency 最近一单的币种；无单时为 {@code null}，由调用方兜底
+     */
+    record OwnerSpend(long count, java.math.BigDecimal amount, String currency) {
+    }
+
+    /** 见 {@link OwnerSpend}。无单时返回 {@code count=0 / amount=0 / currency=null}。 */
+    OwnerSpend spendOf(String cUserNo);
+
     /** 订单详情（**受数据范围约束**：运营端 AGENT 只能取到自己归属的单）。 */
     RentOrder detail(String orderNo);
 

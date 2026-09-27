@@ -160,6 +160,18 @@ public class CabinetServiceImpl implements CabinetService {
     }
 
     @Override
+    public List<Cabinet> byNos(java.util.Collection<String> cabinetNos) {
+        if (cabinetNos == null || cabinetNos.isEmpty()) return List.of();
+        List<String> keys = cabinetNos.stream().filter(x -> x != null && !x.isBlank()).distinct().toList();
+        if (keys.isEmpty()) return List.of();
+        return mapper.selectList(new LambdaQueryWrapper<DevCabinet>()
+                        .in(DevCabinet::getCabinetNo, keys)
+                        .isNull(DevCabinet::getArchivedAt)
+                        .orderByAsc(DevCabinet::getId))
+                .stream().map(CabinetServiceImpl::toVO).toList();
+    }
+
+    @Override
     public CabinetDetail detail(String cabinetNo) {
         DevCabinet e = mapper.selectOne(new LambdaQueryWrapper<DevCabinet>().eq(DevCabinet::getCabinetNo, cabinetNo));
         if (e == null) throw BizException.notFound(cabinetNo);

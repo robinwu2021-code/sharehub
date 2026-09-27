@@ -26,6 +26,7 @@ import ai.neargo.sharehub.trade.price.engine.PriceMultiplierResolver;
 import ai.neargo.sharehub.trade.price.engine.PriceQuery;
 import ai.neargo.sharehub.trade.mapper.OrdMapper;
 import ai.neargo.sharehub.trade.service.RentOrderService;
+import ai.neargo.sharehub.trade.service.RentOrderService.OwnerSpend;
 import ai.neargo.sharehub.api.core.event.OrderSettledEvent;
 import ai.neargo.sharehub.common.event.DomainEventBus;
 import ai.neargo.sharehub.dev.entity.DevCabinet;
@@ -150,6 +151,30 @@ public class RentOrderServiceImpl implements RentOrderService {
                 .eq(OrdOrder::getCUserNo, cUserNo).orderByDesc(OrdOrder::getId);
         Page<OrdOrder> r = mapper.selectPage(new Page<>(p, s), w);
         return new PageResult<>(r.getRecords().stream().map(RentOrderServiceImpl::toVO).toList(), r.getTotal());
+    }
+
+    @Override
+    public OwnerSpend spendOf(String cUserNo) {
+        /*
+         * COUNT 与 SUM 出自同一次查询 —— 两个数并排显示时，它们必须不可能对不上。
+         * 此前单数取全量 total、金额只累加第一页 200 行（见 OwnerSpend 的注释）。
+         *
+         * 用 QueryWrapper（字符串列名）而不是 LambdaQueryWrapper：聚合函数没有 lambda 形式。
+         * @TableLogic 仍会补 deleted=0。
+         */
+        var w = new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<OrdOrder>()
+                .select("COUNT(*) AS cnt", "COALESCE(SUM(amount), 0) AS amt")
+                .eq("c_user_no", cUserNo);
+        java.util.Map<String, Object> agg = mapper.selectMaps(w).stream().findFirst().orElse(java.util.Map.of());
+        long count = agg.get("cnt") == null ? 0L : ((Number) agg.get("cnt")).longValue();
+        java.math.BigDecimal amount = agg.get("amt") == null
+                ? java.math.BigDecimal.ZERO : new java.math.BigDecimal(agg.get("amt").toString());
+
+        // 币种取最近一单（沿用此前「orders.get(0).currency()」的语义，那一页也是 id 倒序）
+        String currency = count == 0 ? null : mapper.selectOne(new LambdaQueryWrapper<OrdOrder>()
+                .select(OrdOrder::getCurrency).eq(OrdOrder::getCUserNo, cUserNo)
+                .orderByDesc(OrdOrder::getId).last("limit 1")).getCurrency();
+        return new OwnerSpend(count, amount, currency);
     }
 
     @Override

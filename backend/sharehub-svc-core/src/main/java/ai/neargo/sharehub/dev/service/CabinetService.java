@@ -14,6 +14,16 @@ public interface CabinetService {
 
     /** 某站点下全部在用机柜（C 端找柜/门店详情）。 */
     java.util.List<Cabinet> bySite(String siteNo);
+
+    /**
+     * 按机柜号批查（未归档）。
+     *
+     * <p><b>为什么要有它</b>：调用方此前的做法是 {@code page(1, 500, …)} 再在内存里建
+     * {@code cabinetNo → siteNo} 的映射 —— 那把**分页默认值当成了业务上限**。
+     * 机柜一过 500 台，靠后那些机柜的订单在 C 端订单列表上<b>站点名是空的</b>，
+     * 而接口一路 200、页面照常渲染。
+     */
+    java.util.List<Cabinet> byNos(java.util.Collection<String> cabinetNos);
     CommandResult sendCommand(String cabinetNo, String type, Map<String, Object> params);
 
     /**

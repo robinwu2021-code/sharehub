@@ -26,6 +26,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   <li>收藏列表同样从 {@code pageSites(1, 200)} 里挑，收藏了靠后的店就是不出现；</li>
  *   <li>「我收藏了吗」用 {@code favorites.pageByOwner(me, 1, 200)} 再 contains ——
  *       收藏超过 200 家后，心形永远不亮；</li>
+ *   <li>C 端订单列表拼站点名时拉 {@code page(1, 500)} + {@code pageSites(1, 200)} 建映射 ——
+ *       靠后的机柜/站点的订单，<b>站点名就是空的</b>；</li>
  *   <li><b>后果最重的一处</b>：借出确认页按机柜反查站点，也是从那一页里挑。
  *       站点落在第一页之外就返 {@code null}，报价退回兜底值 ——
  *       <b>确认页给出的是错的价格</b>，而用户点下去就按那个价借了。</li>
@@ -46,6 +48,8 @@ class SiteLookupBeyondFirstPageTest extends ApiTestSupport {
 
     @Autowired
     JdbcTemplate jdbc;
+    @Autowired
+    ai.neargo.sharehub.trade.service.RentOrderService rents;
 
     final List<String> sites = new ArrayList<>();
     final List<String> cabinets = new ArrayList<>();
@@ -155,6 +159,63 @@ class SiteLookupBeyondFirstPageTest extends ApiTestSupport {
         JsonNode a = get("/mp/nearby/cabinets/" + cab + "/availability", token).okData();
         assertThat(a.path("siteName").asText())
                 .as("站点没查到时这里会退回机柜的 locationName，同时报价悄悄变成兜底值")
+                .isEqualTo(siteName);
+    }
+
+    /**
+     * C 端订单列表的站点名，也是从「一页全量」里查的。
+     *
+     * <p>站点名为空不报错，只是订单卡上少一行字 —— 而用户看不出那是缺陷，
+     * 只会觉得「这单不知道在哪借的」。
+     *
+     * <p>⚠️ <b>本例只钉住「站点」那一半</b>（{@code pageSites(1, 200)}，测试库已有 1600+ 站点）。
+     * 「机柜」那一半（{@code page(1, 500)}）同样已改成按键批查，但<b>钉不住</b>：
+     * 测试库的机柜数还没到 500，把负对照退回分页写法它照样绿。
+     * 要钉住得往共享测试库灌 500 台机柜，而那张库是**有状态的共享资产**，
+     * 凭空多 500 台在线机柜会影响别的用例 —— 代价大于收益。
+     * 两半走的是同一条代码路径（{@code byNos} / {@code sitesByNos}），机制一致；
+     * 这里如实记下覆盖边界，不假装它被钉住了。
+     */
+    @Test
+    @DisplayName("订单列表的站点名：机柜/站点在第一页之外也要拼得出来")
+    void orderListResolvesSiteNameBeyondFirstPage() {
+        String venue = jdbc.queryForObject(
+                "SELECT venue_no FROM loc_venue WHERE deleted=0 ORDER BY id LIMIT 1", String.class);
+        String site = "STPG" + rnd();
+        String siteName = "订单列表站点名测试 " + site;
+        jdbc.update("INSERT INTO loc_site (site_no, tenant_id, venue_no, name, status, open_hours, region_id)"
+                + " VALUES (?, 'MAIN', ?, ?, 'ACTIVE', '00:00-23:59', 'R-TEST')", site, venue, siteName);
+        jdbc.update("INSERT INTO loc_contract (contract_no, tenant_id, venue_no, site_no, share_rate, start_at, end_at, status)"
+                        + " VALUES (?, 'MAIN', ?, ?, 0.2, ?, ?, 'ACTIVE')",
+                "CTPG" + rnd(), venue, site, bizToday().minusDays(1).toString(), bizToday().plusYears(1).toString());
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM loc_site WHERE archived_at IS NULL", Integer.class))
+                .as("本例要求站点总数超过 200").isGreaterThan(200);
+
+        String cab = "CBPG" + rnd();
+        cabinets.add(cab);
+        jdbc.update("INSERT INTO dev_cabinet (cabinet_no, tenant_id, sn, vendor_code, device_type, site_no, slot_total,"
+                        + " available_count, status, online_status, last_heartbeat_at)"
+                        + " VALUES (?, 'MAIN', ?, 'TEST', 'POWERBANK', ?, 8, 3, 'DEPLOYED', 'ONLINE', NOW(3))",
+                cab, cab, site);
+
+        String phone = "+9715" + (10000000 + new java.util.Random().nextInt(89999999));
+        String otp = post("/mp/auth/otp", Map.of("phone", phone), null).okData().path("devCode").asText();
+        JsonNode login = post("/mp/auth/login",
+                Map.of("grantType", "phone_otp", "phone", phone, "otp", otp), null).okData();
+        String token = login.path("token").asText();
+        users.add(login.path("cUserNo").asText());
+
+        String orderNo = post("/mp/trade/orders/rent",
+                Map.of("cabinetNo", cab, "useFreeDeposit", true), token).okData().path("orderNo").asText();
+        rents.returnOrderAt(orderNo, cab, java.time.LocalDateTime.now(java.time.ZoneOffset.UTC).plusHours(1));
+
+        JsonNode row = null;
+        for (JsonNode o : get("/mp/trade/orders", token).okData().path("list")) {
+            if (orderNo.equals(o.path("orderNo").asText())) row = o;
+        }
+        assertThat(row).as("刚下的单要出现在我的订单里").isNotNull();
+        assertThat(row.path("siteName").asText(""))
+                .as("站点名要拼得出来 —— 从 page(1,500)/pageSites(1,200) 建映射的话这里是空的")
                 .isEqualTo(siteName);
     }
 
