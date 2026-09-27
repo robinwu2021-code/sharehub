@@ -95,11 +95,15 @@ public class ConsumerAuthController {
         String normalized = normalizer.phone(phone, body.countryCode());
         OtpService.Issued issued = otpService.issue(normalized, body.scene());
         // sent 如实回传投递结果：投递失败时码已作废，端上该提示重试而不是等短信。
+        // cooldown：端上倒计时的秒数，与服务端「重发太频繁」同一个数。此前不回 —— c-app 契约写着有、
+        // 实际拿到 undefined：按钮不倒计时，而那个每秒 -1 的定时器算成 NaN 永不停（真机实测）。
+        // 投递失败回 0：码已作废，不该把人锁 60 秒去等一条不会到的短信（同 OtpService 的约定）。
+        long cooldown = issued.delivered() ? otpService.resendIntervalSeconds() : 0L;
         return devMode.isEnabled()
                 ? Map.of("sent", issued.delivered(), "reason", issued.reason() == null ? "" : issued.reason(),
-                         "devCode", issued.code())
-                : (issued.delivered() ? Map.of("sent", true)
-                                      : Map.of("sent", false, "reason", issued.reason()));
+                         "devCode", issued.code(), "cooldown", cooldown)
+                : (issued.delivered() ? Map.of("sent", true, "cooldown", cooldown)
+                                      : Map.of("sent", false, "reason", issued.reason(), "cooldown", cooldown));
     }
 
     /**

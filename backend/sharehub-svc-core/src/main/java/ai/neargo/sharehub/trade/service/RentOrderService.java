@@ -146,4 +146,10 @@ public interface RentOrderService {
      * 金额取订单应付。成功后订单转已收并发结算事件（分润随之生成）。
      */
     ai.neargo.sharehub.trade.pay.dto.PayDtos.PayOrderEntry repay(String orderNo, String payType);
+
+    /**
+     * 有欠费单就抛 409 {@code error.rent.arrears}（带 {@code data:{orderNo, amount}}）。
+     * 借出前与免押预授权前都要查：欠费的人借不了，就不该先在他卡上冻一笔押金。
+     */
+    void requireNoArrears(String cUserNo);
 }

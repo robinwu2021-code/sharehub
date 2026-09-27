@@ -802,14 +802,18 @@ public class RentOrderServiceImpl implements RentOrderService {
      * 欠费拦下次借出（C-BL-04 规则）。放这里而不是 {@code RentabilityGuard}：
      * 那是<b>设备</b>能不能借（也给列表显示「可借」用），欠费是<b>人</b>能不能借。
      */
-    private void requireNoArrears(String cUserNo) {
+    @Override
+    public void requireNoArrears(String cUserNo) {
         OrdOrder owed = DataScopeContext.executeWithoutScope(() -> mapper.selectOne(new LambdaQueryWrapper<OrdOrder>()
                 .eq(OrdOrder::getCUserNo, cUserNo)
                 .eq(OrdOrder::getPayStatus, PAY_UNPAID)
                 .orderByAsc(OrdOrder::getId).last("limit 1")));
         if (owed != null) {
             // 带上单号：端上据此直接打开那张欠费单去补缴，而不是让用户自己去订单列表里找
-            throw BizException.conflict("error.rent.arrears", owed.getAmount(), owed.getOrderNo())
+            // 金额按两位小数传：交给 MessageFormat 的是数字的话，18.00 会被念成「18」（真机弹窗实测）
+            String amt = (owed.getAmount() == null ? java.math.BigDecimal.ZERO : owed.getAmount())
+                    .setScale(2, java.math.RoundingMode.HALF_UP).toPlainString();
+            throw BizException.conflict("error.rent.arrears", amt, owed.getOrderNo())
                     .withData(java.util.Map.of("orderNo", owed.getOrderNo(),
                             "amount", owed.getAmount() == null ? java.math.BigDecimal.ZERO : owed.getAmount()));
         }

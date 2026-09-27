@@ -93,6 +93,16 @@ class ConsumerArrearsTest extends ApiTestSupport {
         assertThat(blocked.status).as("欠费拦下次借出（响应：%s）", blocked.msg()).isEqualTo(409);
         assertThat(blocked.body.path("data").path("orderNo").asText())
                 .as("拦截要带上欠费单号 —— 端上据此直接打开那张单去补缴").isEqualTo(orderNo);
+        assertThat(blocked.msg()).as("金额按两位小数念 —— 交给 MessageFormat 的是数字的话 18.00 会变成「18」")
+                .containsPattern("\\d+\\.\\d{2}");
+
+        int authBefore = jdbc.queryForObject("SELECT COUNT(*) FROM pay_auth WHERE c_user_no=?", Integer.class, user);
+        var freeze = post("/mp/trade/deposit/free", Map.of("cabinetNo", cab), token);
+        assertThat(freeze.status).as("欠费的人借不了，就不该先在他卡上冻一笔押金（真机实测：冻上了、宝没借到）")
+                .isEqualTo(409);
+        assertThat(freeze.body.path("data").path("orderNo").asText()).isEqualTo(orderNo);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pay_auth WHERE c_user_no=?", Integer.class, user))
+                .as("没有新增冻结").isEqualTo(authBefore);
 
         post("/mp/trade/pay", Map.of("orderNo", orderNo, "scene", "RENT"), token).okData();
         assertThat(payStatus(orderNo)).as("补缴成功 → 已收").isEqualTo("PAID");

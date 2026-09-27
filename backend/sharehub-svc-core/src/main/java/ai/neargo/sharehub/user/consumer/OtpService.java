@@ -108,6 +108,11 @@ public class OtpService {
      * @param scene login / register / reset，进模板号 {@code OTP_<scene>}，落 notify_log 便于分场景统计
      * @throws IllegalStateException 距上次发码不足 {@code resend-interval}
      */
+    /** 重发间隔（秒）—— 端上的倒计时按它走，与服务端的「重发太频繁」同一个数。 */
+    public long resendIntervalSeconds() {
+        return resendInterval.toSeconds();
+    }
+
     public Issued issue(String phone, String scene) {
         Instant now = Instant.now();
         Entry prev = codes.get(phone);

@@ -111,6 +111,9 @@ public class RentController {
     @PostMapping("/deposit/free")
     public Map<String, Object> depositFree(
             @RequestBody ai.neargo.sharehub.trade.dto.MpTradeReqs.DepositFreeReq body) {
+        // 先查欠费再冻结：此前欠费用户点「立即借」，免押预授权照样冻上，下一步借出才被 409 拦下 ——
+        // 钱冻了、宝没借到（真机实测：deposit/free 200 → rent 409）。接真通道后那是真实的卡上冻结
+        orders.requireNoArrears(ConsumerContext.userNo());
         String cabinetNo = body == null ? null : body.cabinetNo();
         if (cabinetNo == null || cabinetNo.isBlank()) throw new IllegalArgumentException("柜机号为空");
         PayAuthEntry auth = payments.preAuth(cabinetNo, ConsumerContext.userNo(),
