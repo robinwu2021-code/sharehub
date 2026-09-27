@@ -60,7 +60,7 @@ export const en: Messages = {
     VIEWER: "Viewer",
     AGENT: "Agent",
   },
-  theme: { label: "Theme" },
+  theme: { label: "Theme", style: "Style", styleInk: "Ink", styleClassic: "Classic" },
   lang: { label: "Language", zh: "中文", en: "English", ar: "العربية" },
   online: { ONLINE: "Online", OFFLINE: "Offline" },
   orderStatus: {

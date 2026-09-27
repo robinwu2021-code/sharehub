@@ -26,20 +26,20 @@ import { PreviewVersionCtx } from "./probe";
 import { audit, groupFindings, type AuditResult } from "./audit";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { THEMES, DEFAULT_THEME } from "@/lib/stores/theme";
+import { STYLES, DEFAULT_STYLE } from "@/lib/stores/style";
 
-// 与 lib/stores/theme.ts 的 THEMES 一一对应（四套）。
-// 曾经漏了简电青 —— 总览页少一套皮肤，等于那套皮肤的问题永远不会在这里被发现。
-const SKINS = [
-  { key: "mono", label: "黑白灰" },
-  { key: "brand", label: "简电青" },
-  { key: "blue", label: "时尚蓝" },
-  { key: "purple", label: "科幻紫" },
-] as const;
+// 皮肤与风格直接取 store 的清单，不在本页另抄一份。
+// 此前这里手抄了一份皮肤表，漏过简电青 —— 总览页少一套皮肤，等于那套皮肤的问题
+// 永远不会在这里被发现。新增 teal 时若仍是手抄，会第二次漏。
+const SKINS = THEMES;
+const STYLE_LABEL: Record<string, string> = { ink: "墨青风格", classic: "经典风格" };
 
 /** 顶部开关：直接改 <html>，离开本页还原。 */
 function useRootToggles() {
   const [dark, setDark] = React.useState(false);
-  const [skin, setSkin] = React.useState<string>("mono");
+  const [skin, setSkin] = React.useState<string>(DEFAULT_THEME);
+  const [style, setStyle] = React.useState<string>(DEFAULT_STYLE);
   const [rtl, setRtl] = React.useState(false);
   const [dense, setDense] = React.useState(false);
 
@@ -49,12 +49,14 @@ function useRootToggles() {
     const prev = {
       dark: el.classList.contains("dark"),
       theme: el.dataset.theme,
+      style: el.dataset.style,
       dir: el.dir,
       density: el.dataset.density,
     };
     return () => {
       el.classList.toggle("dark", prev.dark);
       if (prev.theme) el.dataset.theme = prev.theme; else delete el.dataset.theme;
+      if (prev.style) el.dataset.style = prev.style; else delete el.dataset.style;
       el.dir = prev.dir || "ltr";
       if (prev.density) el.dataset.density = prev.density; else delete el.dataset.density;
     };
@@ -62,13 +64,14 @@ function useRootToggles() {
 
   React.useEffect(() => { document.documentElement.classList.toggle("dark", dark); }, [dark]);
   React.useEffect(() => { document.documentElement.dataset.theme = skin; }, [skin]);
+  React.useEffect(() => { document.documentElement.dataset.style = style; }, [style]);
   React.useEffect(() => { document.documentElement.dir = rtl ? "rtl" : "ltr"; }, [rtl]);
   React.useEffect(() => {
     const el = document.documentElement;
     if (dense) el.dataset.density = "dense"; else delete el.dataset.density;
   }, [dense]);
 
-  return { dark, setDark, skin, setSkin, rtl, setRtl, dense, setDense };
+  return { dark, setDark, skin, setSkin, style, setStyle, rtl, setRtl, dense, setDense };
 }
 
 function Toggle({
@@ -101,7 +104,7 @@ export default function DevUiPage() {
     // 等这一帧的样式生效再量，否则量到的是切换前的值
     const id = requestAnimationFrame(() => setVersion((v) => v + 1));
     return () => cancelAnimationFrame(id);
-  }, [t.dark, t.skin, t.rtl, t.dense]);
+  }, [t.dark, t.skin, t.style, t.rtl, t.dense]);
 
   const runAudit = React.useCallback(() => {
     if (rootRef.current) setResult(audit(rootRef.current));
@@ -115,12 +118,16 @@ export default function DevUiPage() {
         <header className="mb-4">
           <h1 className="txt-display">组件总览 · 全状态矩阵</h1>
           <p className="mt-1 txt-caption text-muted-foreground">
-            dev-only 工具页，不在菜单里。四个开关作用于 <code>&lt;html&gt;</code>，离开本页自动还原，不写 localStorage。
+            dev-only 工具页，不在菜单里。五组开关作用于 <code>&lt;html&gt;</code>，离开本页自动还原，不写 localStorage。
           </p>
         </header>
 
         <div className="sticky top-0 z-[var(--z-sticky)] mb-5 flex flex-wrap items-center gap-2 rounded-card bg-card/95 p-3 shadow-[var(--card-shadow)] backdrop-blur">
           <Toggle on={t.dark} onClick={() => t.setDark(!t.dark)}>{t.dark ? "暗色" : "浅色"}</Toggle>
+          <span className="mx-1 h-4 w-px bg-border" />
+          {STYLES.map((s) => (
+            <Toggle key={s.key} on={t.style === s.key} onClick={() => t.setStyle(s.key)}>{STYLE_LABEL[s.key]}</Toggle>
+          ))}
           <span className="mx-1 h-4 w-px bg-border" />
           {SKINS.map((s) => (
             <Toggle key={s.key} on={t.skin === s.key} onClick={() => t.setSkin(s.key)}>{s.label}</Toggle>

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { API_MODE } from "@/lib/api-mode";
+import { DEFAULT_THEME, DEFAULT_STYLE } from "@/lib/appearance-defaults";
 import { IBM_Plex_Sans, IBM_Plex_Sans_Arabic } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
@@ -34,13 +35,15 @@ export const metadata: Metadata = {
   description: "共享充电宝 SaaS 运营管理后台",
 };
 
-// 首帧前应用持久化主题色 + 语言/方向（避免闪烁）。key 对齐 stores/{theme,locale}.ts。
+// 首帧前应用持久化主题色 + 风格 + 语言/方向（避免闪烁）。key 对齐 stores/{theme,style,locale}.ts。
+// 没有存储时用 <html> 上写死的默认值（与 DEFAULT_THEME / DEFAULT_STYLE 一致）。
 const THEME_INIT = `try{var t=JSON.parse(localStorage.getItem('ops-theme')||'{}');var k=t&&t.state&&t.state.themeKey;if(k)document.documentElement.dataset.theme=k;}catch(e){}
+try{var s=JSON.parse(localStorage.getItem('ops-style')||'{}');var sk=s&&s.state&&s.state.styleKey;if(sk)document.documentElement.dataset.style=sk;}catch(e){}
 try{var l=JSON.parse(localStorage.getItem('ops-locale')||'{}');var lo=(l&&l.state&&l.state.locale)||'zh';var d=document.documentElement;d.lang=lo==='zh'?'zh-CN':lo;d.dir=lo==='ar'?'rtl':'ltr';}catch(e){}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="zh" className={`${plex.variable} ${plexArabic.variable}`} suppressHydrationWarning>
+    <html lang="zh" data-theme={DEFAULT_THEME} data-style={DEFAULT_STYLE} className={`${plex.variable} ${plexArabic.variable}`} suppressHydrationWarning>
       <head>
         {/* 这份产物连的是 mock 还是真后端。给 scripts/assert-prod-build.mjs 查用 ——
             漏配 USE_MOCK=0 会静默退回 mock，产物里没有别的痕迹能看出来。

@@ -131,6 +131,37 @@
 [data-theme="brand"]  { --primary: #17c3c0; --primary-foreground: #ffffff; }
 [data-theme="blue"]   { --primary: #2f6bff; --primary-foreground: #ffffff; }
 [data-theme="purple"] { --primary: #7c3aed; --primary-foreground: #ffffff; }
+[data-theme="teal"]   { --primary: #0f7173; --primary-foreground: #ffffff; }  /* 墨青：流程与工单原型的主色，白字 5.79:1 */
+
+/* ═══ 风格轴 data-style（与皮肤正交）══════════════════════════════════════
+   皮肤 data-theme 只换主色；**风格换整套 Tier 1 色阶**（12 档中性 + 语义色三档），
+   组件只消费 Tier 2，所以换风格不用改任何组件。
+   ink（墨青）取自流程与工单原型：中性色带一点青调、语义色降饱和。
+   ⚠️ 中性色是**固定色阶**，不从主色派生 —— 2026-07 的配色重做正是因为
+      中性色混入主色后整屏发糊（见 git 02a1aa2b）。这里的青调与皮肤无关。
+   ⚠️ 每一对取值的对比度由 lib/style-contrast.test.ts 锁住，改值先跑它。
+   ⚠️ 本块必须位于 .dark 之前：[data-style] 与 .dark 特异性相同，靠先后。 */
+[data-style="ink"] {
+  --gray-1:  #fbfcfc;
+  --gray-2:  #f6f8f8;
+  --gray-3:  #f0f3f4;
+  --gray-4:  #e9eef0;
+  --gray-5:  #e2e8ea;
+  --gray-6:  #d9e0e3;
+  --gray-7:  #cbd4d8;
+  --gray-8:  #b1bdc2;
+  --gray-9:  #87949a;
+  --gray-10: #79868c;
+  --gray-11: #566770;
+  --gray-12: #1b2429;
+
+  /* 降饱和的语义色。实心底压白字全部 ≥4.5（经典风格的绿 2.62、琥珀 2.35 不达标，
+     只是目前没有组件把白字压在这两色上）。 */
+  --green-solid: #2e7d4f; --green-subtle: #e7f3ec; --green-text: #1f5e3a;
+  --amber-solid: #a3690b; --amber-subtle: #fdf3e0; --amber-text: #6f4a0c;
+  --red-solid:   #b3403a; --red-subtle:   #fbecea; --red-text:   #8a2c27;
+  --blue-solid:  #3f6aa8; --blue-subtle:  #eef2f8; --blue-text:  #2b4e80;
+}
 
 .dark {
   --gray-1:  #0c0d10;
@@ -180,6 +211,29 @@
 
 /* 黑白灰皮肤在暗色下主色要反相，否则近黑主色在深底上完全看不见 */
 .dark[data-theme="mono"] { --primary: #f2f4f7; --primary-foreground: #16171d; }
+/* 墨青在深底上对比不足，暗色下提亮一档并改压深字（5.83:1）*/
+.dark[data-theme="teal"] { --primary: #2aa7a8; --primary-foreground: #06201f; }
+
+/* ink 风格的暗色阶。结构同 .dark：暗底上语义色提亮、色相不变，实心底改压深字。 */
+.dark[data-style="ink"] {
+  --gray-1:  #0b0e0f;
+  --gray-2:  #111618;
+  --gray-3:  #182023;
+  --gray-4:  #1d2528;
+  --gray-5:  #232c30;
+  --gray-6:  #2a3438;
+  --gray-7:  #343f44;
+  --gray-8:  #465257;
+  --gray-9:  #6c797f;
+  --gray-10: #7a878d;
+  --gray-11: #a1adb2;
+  --gray-12: #eef3f4;
+
+  --green-solid: #4fbf82; --green-subtle: #11261b; --green-text: #86d9a9;
+  --amber-solid: #e0a23d; --amber-subtle: #291e0b; --amber-text: #f0c374;
+  --red-solid:   #ec7a70; --red-subtle:   #2c1614; --red-text:   #f5aaa2;
+  --blue-solid:  #7fa1d8; --blue-subtle:  #141c2b; --blue-text:  #abc3eb;
+}
 
 [data-density="dense"] {
   --ctl-h: 30px;

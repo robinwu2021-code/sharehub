@@ -1,13 +1,19 @@
 "use client";
 
-// 色块主题切换器：点开一格调色板，每个主题一个圆润色块，白底不变。
+// 外观切换器：上面一行选「风格」（整套色阶），下面一格选「主题色」（只换主色）。
+// 两条轴正交，见 stores/style.ts 顶部说明。
 import { useEffect, useRef, useState } from "react";
 import { Check, Palette } from "lucide-react";
 import { THEMES, useTheme } from "@/lib/stores/theme";
+import { STYLES, useStyle } from "@/lib/stores/style";
+import { useI18n } from "@/lib/i18n";
+import { segmentedItemClass, segmentedTrackClass } from "@/components/ui/segmented";
 import { cn } from "@/lib/utils";
 
 export function ThemeSwitcher() {
   const { themeKey, setTheme } = useTheme();
+  const { styleKey, setStyle } = useStyle();
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -27,7 +33,7 @@ export function ThemeSwitcher() {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        aria-label="切换主题色"
+        aria-label={t("theme.label")}
         className="flex h-8 items-center gap-1.5 rounded-field bg-secondary px-2.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
       >
         <Palette className="size-4" />
@@ -35,9 +41,27 @@ export function ThemeSwitcher() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-10 z-50 w-56 rounded-card bg-card p-3 shadow-lg">
-          <div className="mb-2 px-1 txt-label text-muted-foreground">主题色</div>
-          <div className="grid grid-cols-4 gap-2">
+        <div className="absolute right-0 top-10 z-50 w-60 rounded-card bg-card p-3 shadow-lg">
+          <div className="mb-2 px-1 txt-label text-muted-foreground">{t("theme.style")}</div>
+          <div className={segmentedTrackClass("mb-3 flex w-full")} role="radiogroup" aria-label={t("theme.style")}>
+            {STYLES.map((st) => {
+              const active = st.key === styleKey;
+              return (
+                <button
+                  key={st.key}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => setStyle(st.key)}
+                  className={segmentedItemClass(active, "flex-1 px-2 py-1 text-sm")}
+                >
+                  {t(st.labelKey)}
+                </button>
+              );
+            })}
+          </div>
+          <div className="mb-2 px-1 txt-label text-muted-foreground">{t("theme.label")}</div>
+          <div className="grid grid-cols-5 gap-2">
             {THEMES.map((t) => {
               const active = t.key === themeKey;
               return (

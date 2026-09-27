@@ -58,7 +58,7 @@ export const zh = {
     VIEWER: "只读",
     AGENT: "代理商",
   },
-  theme: { label: "主题色" },
+  theme: { label: "主题色", style: "风格", styleInk: "墨青", styleClassic: "经典" },
   lang: { label: "语言", zh: "中文", en: "English", ar: "العربية" },
   online: { ONLINE: "在线", OFFLINE: "离线" },
   orderStatus: {
