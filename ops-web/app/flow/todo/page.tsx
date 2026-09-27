@@ -2,6 +2,9 @@
 
 // 待办中心（原型 P1）：审批与工单在同一张列表；只显示我够资格办、且在我数据范围内的。
 // 范围与资格由服务从宿主令牌解析（21/06），页面只传「来源」与「是否可抢」。
+import { ReadOnlyNotice } from "@/components/read-only-notice";
+import { useCan } from "@/lib/hooks/use-can";
+import { NeedPerm } from "@/components/flow/need-perm";
 import { useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -34,8 +37,11 @@ const EMPTY: Record<TabKey, string> = {
   pool: "抢单池里暂时没有你够资格领的单",
 };
 
-export default function FlowTodoPage() {
+function FlowTodo() {
   const qc = useQueryClient();
+  const allow = useCan();
+  // 抢单 = 领取后自己办理，与「办理」同一个码（功能权限清单 §16）
+  const canHandle = allow("flow:ticket:handle");
   const paging = usePaging();
   const [tab, setTab] = useState<TabKey>("all");
 
@@ -84,7 +90,7 @@ export default function FlowTodoPage() {
       cell: (t) => (
         <span className="inline-flex items-center gap-2">
           <SlaCell sla={t.sla} dueAtMs={t.dueAtMs} />
-          {t.claimable && t.ticketNo && (
+          {t.claimable && t.ticketNo && canHandle && (
             <Button
               size="sm"
               variant="secondary"
@@ -108,6 +114,9 @@ export default function FlowTodoPage() {
         value={tab}
         onChange={(k) => { setTab(k as TabKey); paging.reset(); }}
       />
+      {!canHandle && tab === "pool" && (
+        <ReadOnlyNotice what="工单办理" perm="flow:ticket:handle" note="看得到抢单池，但不能抢单" className="mb-3" />
+      )}
       <PagedTable
         query={query}
         paging={paging}
@@ -124,4 +133,8 @@ export default function FlowTodoPage() {
       />
     </div>
   );
+}
+
+export default function FlowTodoPage() {
+  return <NeedPerm code="flow:todo:read" what="待办中心"><FlowTodo /></NeedPerm>;
 }

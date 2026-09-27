@@ -2,6 +2,9 @@
 
 // 工单详情（原型 P5）：对象 · 时间线（迁移 / 派单 / SLA / 去重 / 备注同一条流水）· SLA 各指标 · 动作 · 备注。
 // 动作条 = 服务给的 actions（只含当前状态、当前操作人可走的迁移），前端不维护迁移表。
+import { ReadOnlyNotice } from "@/components/read-only-notice";
+import { useCan } from "@/lib/hooks/use-can";
+import { NeedPerm } from "@/components/flow/need-perm";
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -35,7 +38,7 @@ const REASON_FIELDS: FieldDef[] = [
 export default function Page() {
   return (
     <Suspense fallback={<Skeleton className="h-40" />}>
-      <TicketDetail />
+      <NeedPerm code="flow:ticket:read" what="工单详情"><TicketDetail /></NeedPerm>
     </Suspense>
   );
 }
@@ -43,6 +46,9 @@ export default function Page() {
 function TicketDetail() {
   const no = useSearchParams().get("no") ?? "";
   const qc = useQueryClient();
+  const allow = useCan();
+  const canDispatch = allow("flow:ticket:dispatch");
+  const canHandle = allow("flow:ticket:handle");
   const refresh = () => qc.invalidateQueries({ queryKey: FLOW_KEY });
   const q = useQuery({ queryKey: [...FLOW_KEY, "ticket", no], queryFn: () => flow.ticket(no), enabled: !!no });
   const tl = useQuery({ queryKey: [...FLOW_KEY, "timeline", no], queryFn: () => flow.timeline(no), enabled: !!no });
@@ -176,17 +182,23 @@ function TicketDetail() {
                     {a.name}{a.requires.comment ? "（需填原因）" : ""}
                   </Button>
                 ))}
-                <Button variant="secondary" onClick={() => setAssignOpen(true)}>改派 / 回抢单池</Button>
+                {canDispatch && <Button variant="secondary" onClick={() => setAssignOpen(true)}>改派 / 回抢单池</Button>}
               </div>
             )}
           </Card>
 
           <Card className="p-5">
             <h2 className="mb-3 txt-strong">备注</h2>
-            <Textarea value={note} onChange={setNote} rows={3} placeholder="添加备注：会进入时间线，受理方与运营都能看到" />
-            <div className="mt-2 flex justify-end">
-              <Button size="sm" loading={comment.isPending} disabled={!note.trim()} onClick={() => comment.mutate()}>提交备注</Button>
-            </div>
+            {canHandle ? (
+              <>
+                <Textarea value={note} onChange={setNote} rows={3} placeholder="添加备注：会进入时间线，受理方与运营都能看到" />
+                <div className="mt-2 flex justify-end">
+                  <Button size="sm" loading={comment.isPending} disabled={!note.trim()} onClick={() => comment.mutate()}>提交备注</Button>
+                </div>
+              </>
+            ) : (
+              <ReadOnlyNotice what="工单办理" perm="flow:ticket:handle" note="不能添加备注" className="mb-0" />
+            )}
           </Card>
         </div>
       </div>

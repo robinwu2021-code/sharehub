@@ -1,5 +1,6 @@
 // 配置管理的规则 = 对后端的期望。
 import { beforeEach, describe, expect, it } from "vitest";
+import { setMockOperatorPerms } from "./mock-auth";
 import {
   contentHash, createApp, definitionVersions, getProcess, listDeliveries, listProcesses, processVersions, publishProcess,
   redeliver, resetConfigDb, rotateCredential, upsertSlaPolicy, listSlaPolicies,
@@ -7,7 +8,7 @@ import {
 import { isValidationError } from "./errors";
 
 const NOW = new Date("2026-09-27T12:00:00").getTime();
-beforeEach(() => resetConfigDb(NOW));
+beforeEach(() => { setMockOperatorPerms(["*"]); resetConfigDb(NOW); });
 
 const caught = (f: () => unknown) => { try { f(); } catch (e) { return e; } throw new Error("没有抛错"); };
 

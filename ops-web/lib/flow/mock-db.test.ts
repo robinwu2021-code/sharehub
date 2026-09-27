@@ -1,12 +1,13 @@
 // flow mock 的行为 = 对后端的期望。每条都对应界面上一个看得见的后果。
 import { beforeEach, describe, expect, it } from "vitest";
+import { setMockOperatorPerms } from "./mock-auth";
 import {
   claimTicket, countTodos, getTicket, queryTickets, queryTodos, reassignTickets, resetFlowDb,
   ticketStats, transitionTicket, ME, ASSIGNEE_OPTIONS, getTicketView, getTimeline, addComment, assignTicket,
 } from "./mock-db";
 
 const NOW = new Date("2026-09-27T12:00:00").getTime();
-beforeEach(() => resetFlowDb(NOW));
+beforeEach(() => { setMockOperatorPerms(["*"]); resetFlowDb(NOW); });
 
 describe("待办", () => {
   it("四个页签的角标与各自列表的条数一致（角标不能骗人）", () => {

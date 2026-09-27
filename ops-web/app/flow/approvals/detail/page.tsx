@@ -2,6 +2,9 @@
 
 // 审批详情（原型 P2）：业务对象 · 审批进度（含条件步）· 历史轮次（永不覆盖）· 我的决定 · 规则提示。
 // 能不能决定、为什么不能，一律取服务给的 mine（规则在服务端强制，这里只呈现）。
+import { ReadOnlyNotice } from "@/components/read-only-notice";
+import { useCan } from "@/lib/hooks/use-can";
+import { NeedPerm } from "@/components/flow/need-perm";
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -24,7 +27,7 @@ import { FlowTimeline } from "@/components/flow/flow-timeline";
 export default function Page() {
   return (
     <Suspense fallback={<Skeleton className="h-40" />}>
-      <ApprovalDetail />
+      <NeedPerm code="flow:approval:read" what="审批详情"><ApprovalDetail /></NeedPerm>
     </Suspense>
   );
 }
@@ -32,6 +35,9 @@ export default function Page() {
 function ApprovalDetail() {
   const no = useSearchParams().get("no") ?? "";
   const qc = useQueryClient();
+  const allow = useCan();
+  // 两层：有没有「审批」这项能力（权限码，这里判）× 是不是这一步的审批人（服务端 mine 判）
+  const canDecidePerm = allow("flow:approval:decide");
   const { confirm, dialog } = useConfirm();
   const q = useQuery({ queryKey: [...FLOW_KEY, "approval", no], queryFn: () => flow.approval(no), enabled: !!no });
   const [reason, setReason] = useState("");
@@ -134,7 +140,9 @@ function ApprovalDetail() {
         <div className="space-y-4">
           <Card className="p-5">
             <h2 className="mb-3 txt-strong">我的决定</h2>
-            {a.mine.canDecide ? (
+            {!canDecidePerm ? (
+              <ReadOnlyNotice what="审批决定" perm="flow:approval:decide" note="只能查看进度与历史" className="mb-0" />
+            ) : a.mine.canDecide ? (
               <>
                 <Textarea
                   value={reason}

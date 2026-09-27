@@ -2,6 +2,7 @@
 
 // 接入管理（原型 P7，平台管理员）：接入应用 · webhook 投递 · 定义版本。
 // 凭证只在创建 / 轮换时显示一次（服务端之后读不到明文），关掉弹窗就再也看不到 —— 界面上明说。
+import { NeedPerm } from "@/components/flow/need-perm";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Copy, Plus } from "lucide-react";
@@ -35,7 +36,7 @@ const APP_FIELDS: FieldDef[] = [
   { key: "timeZone", label: "时区", required: true, help: "IANA 时区，如 Asia/Dubai；影响该应用的营业时间与统计口径" },
 ];
 
-export default function FlowAccessPage() {
+function FlowAccess() {
   const qc = useQueryClient();
   const { confirm, dialog } = useConfirm();
   const refresh = () => qc.invalidateQueries({ queryKey: FLOW_KEY });
@@ -160,4 +161,8 @@ export default function FlowAccessPage() {
       {dialog}
     </div>
   );
+}
+
+export default function FlowAccessPage() {
+  return <NeedPerm code="flow:access:manage" what="接入管理"><FlowAccess /></NeedPerm>;
 }

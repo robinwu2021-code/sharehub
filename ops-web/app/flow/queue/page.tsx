@@ -1,6 +1,7 @@
 "use client";
 
 // 审核队列（原型 P3）：领取后才能决定；领取超时 30 分钟自动放回并留痕（服务端读时放回，这里只显示倒计时）。
+import { NeedPerm } from "@/components/flow/need-perm";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { flow, FLOW_KEY } from "@/lib/flow/client";
@@ -39,7 +40,7 @@ const mmss = (ms: number) => {
   return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 };
 
-export default function FlowQueuePage() {
+function FlowQueue() {
   const qc = useQueryClient();
   const now = useNow();
   const paging = usePaging();
@@ -158,4 +159,8 @@ export default function FlowQueuePage() {
       />
     </div>
   );
+}
+
+export default function FlowQueuePage() {
+  return <NeedPerm code="flow:queue:claim" what="审核队列"><FlowQueue /></NeedPerm>;
 }

@@ -2,6 +2,7 @@
 
 // 审批列表（原型 P2a）：全部审批单（不只「待我审」），按数据范围过滤。
 // 每个筛选控件对应 approvals/query 的一个参数（21/06 §四：status[] · processCode · requestedBy · from · keyword）。
+import { NeedPerm } from "@/components/flow/need-perm";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
@@ -29,7 +30,7 @@ const DAY = 86_400_000;
 const SINCE = [{ value: "7", label: "提交时间：近 7 天" }, { value: "30", label: "提交时间：近 30 天" }];
 const MIN = 60_000;
 
-export default function FlowApprovalsPage() {
+function FlowApprovals() {
   const paging = usePaging();
   const [tab, setTab] = useState<TabKey>("PENDING");
   const [processCode, setProcessCode] = useState("");
@@ -103,4 +104,8 @@ export default function FlowApprovalsPage() {
       />
     </div>
   );
+}
+
+export default function FlowApprovalsPage() {
+  return <NeedPerm code="flow:approval:read" what="审批列表"><FlowApprovals /></NeedPerm>;
 }

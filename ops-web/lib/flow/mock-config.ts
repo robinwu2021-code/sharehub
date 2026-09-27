@@ -10,6 +10,7 @@ import { fail, notFound } from "@/lib/biz-error";
 import { ME } from "./mock-db";
 import { pendingCountOf } from "./mock-approvals";
 import { FlowValidationError } from "./errors";
+import { requirePerm } from "./mock-auth";
 import type {
   AppRow, DefinitionVersionRow, DeliveryRow, FieldError, Named, ProcessDef, ProcessSummary, ProcessVersion,
   PublishResult, QueueGroup, SlaPolicy, WorkCalendar,
@@ -151,6 +152,7 @@ function validate(def: ProcessDef, isNew: boolean): FieldError[] {
 
 /** PUT /workspaces/{ws}/processes/{code}：幂等发布 */
 export function publishProcess(def: ProcessDef, note: string, isNew: boolean, now: number = Date.now()): PublishResult {
+  requirePerm("flow:process:manage");
   const clean: ProcessDef = {
     ...def, name: def.name.trim(),
     steps: def.steps.map((s, i) => ({ ...s, code: s.code || `s${i + 1}`, name: s.name.trim(), approver: { ...s.approver, value: s.approver.value.trim() } })),
@@ -173,6 +175,7 @@ export function publishProcess(def: ProcessDef, note: string, isNew: boolean, no
 
 /** POST …/processes/{code}/disable · /enable：停用 = 不再接受新提交，在途走完 */
 export function setProcessEnabled(code: string, enabled: boolean): void {
+  requirePerm("flow:process:manage");
   prec(code).enabled = enabled;
 }
 
@@ -182,6 +185,7 @@ export const listCalendars = () => structuredClone(calendars);
 export const listQueueGroups = () => structuredClone(queues);
 
 export function upsertSlaPolicy(p: SlaPolicy): SlaPolicy {
+  requirePerm("flow:config:manage");
   const e: FieldError[] = [];
   if (!(p.respondMin > 0)) e.push({ path: "respondMin", error: "响应时限必须大于 0" });
   if (!(p.resolveMin > 0)) e.push({ path: "resolveMin", error: "解决时限必须大于 0" });
@@ -197,6 +201,7 @@ export function upsertSlaPolicy(p: SlaPolicy): SlaPolicy {
 }
 
 export function upsertCalendar(c: WorkCalendar): WorkCalendar {
+  requirePerm("flow:config:manage");
   const e: FieldError[] = [];
   if (!c.name.trim()) e.push({ path: "name", error: "名称必填" });
   if (!c.weekdays.length) e.push({ path: "weekdays", error: "至少选一个工作日" });
@@ -208,6 +213,7 @@ export function upsertCalendar(c: WorkCalendar): WorkCalendar {
 }
 
 export function upsertQueueGroup(q: QueueGroup, isNew: boolean): QueueGroup {
+  requirePerm("flow:config:manage");
   const e: FieldError[] = [];
   if (isNew && !/^[a-z][a-z0-9-]{1,31}$/.test(q.code)) e.push({ path: "code", error: "代号 2–32 位小写字母、数字、连字符" });
   if (isNew && queues.some((x) => x.code === q.code)) e.push({ path: "code", error: "代号已存在" });
@@ -226,6 +232,7 @@ export const listApps = () => structuredClone(apps);
 
 /** POST /accounts/{a}/apps：凭证只在这里返回一次 */
 export function createApp(a: Omit<AppRow, "id" | "enabled">): { app: AppRow; secret: string } {
+  requirePerm("flow:access:manage");
   const e: FieldError[] = [];
   if (!/^[A-Z][A-Z0-9_]{1,31}$/.test(a.code)) e.push({ path: "code", error: "代号 2–32 位，大写字母开头" });
   if (apps.some((x) => x.code === a.code)) e.push({ path: "code", error: "代号已存在" });
@@ -239,6 +246,7 @@ export function createApp(a: Omit<AppRow, "id" | "enabled">): { app: AppRow; sec
 
 /** POST /apps/{id}/rotate-credential：旧凭证立即失效，新凭证只返回一次 */
 export function rotateCredential(id: string): { secret: string } {
+  requirePerm("flow:access:manage");
   if (!apps.some((a) => a.id === id)) notFound("应用", "App", id);
   return { secret: newSecret() };
 }
@@ -247,6 +255,7 @@ export const listDeliveries = () => [...deliveries].sort((a, b) => b.atMs - a.at
 
 /** POST /webhook-deliveries/{id}/redeliver：只有失败的能重投 */
 export function redeliver(id: string, now: number = Date.now()): DeliveryRow {
+  requirePerm("flow:access:manage");
   const d = deliveries.find((x) => x.id === id);
   if (!d) notFound("投递", "Delivery", id);
   if (d.status !== "FAILED") fail("只有投递失败的才能手动重投", "Only failed deliveries can be redelivered");

@@ -10,6 +10,7 @@
 // 审核队列：领取后才能决定；领取超时（30 分钟）读时自动放回并留痕。
 import { fail, notFound } from "@/lib/biz-error";
 import { ME } from "./mock-db";
+import { requirePerm } from "./mock-auth";
 import type {
   ApprovalQuery, ApprovalRound, ApprovalRow, ApprovalStatus, ApprovalStep, ApprovalView, Named, Page,
   Priority, QueueSummary, QueueTask,
@@ -179,6 +180,7 @@ function row(r: ApprovalRec): ApprovalRow {
 }
 
 export function queryApprovals(q: ApprovalQuery): Page<ApprovalRow> {
+  requirePerm("flow:approval:read");
   const k = q.keyword?.trim().toLowerCase();
   const list = approvals
     .filter((r) => !q.status?.length || q.status.includes(r.status))
@@ -220,6 +222,7 @@ function whyNotDecide(r: ApprovalRec): string | null {
 }
 
 export function getApproval(no: string): ApprovalView {
+  requirePerm("flow:approval:read");
   const r = rec(no);
   const d = def(r);
   const steps: ApprovalStep[] = d.steps.map((s, i) => {
@@ -243,6 +246,7 @@ export function getApproval(no: string): ApprovalView {
 // ── 审批：写 ─────────────────────────────────────────────────────────────
 /** POST /approvals/{no}/decide {taskNo, decision, reason?}：五条规则固定顺序校验 */
 export function decide(no: string, taskNo: string, decision: "APPROVE" | "REJECT", reason: string | undefined, now: number = Date.now()): ApprovalView {
+  requirePerm("flow:approval:decide");
   const r = rec(no);
   if (r.status !== "PENDING" || r.taskNo !== taskNo) {
     fail("这张单已被他人处理，请刷新后再看", "This approval was already handled by someone else — refresh and try again");
@@ -327,6 +331,7 @@ function qrec(taskNo: string): QueueRec {
 
 /** POST /tasks/{no}/claim：已被他人领取 → 409 */
 export function claimTask(taskNo: string, now: number = Date.now()): QueueTask {
+  requirePerm("flow:queue:claim");
   sweep(now);
   const t = qrec(taskNo);
   if (t.done) fail("这项已经办结", "This task is already done");
@@ -337,6 +342,7 @@ export function claimTask(taskNo: string, now: number = Date.now()): QueueTask {
 
 /** POST /tasks/{no}/release：只能放回自己领的 */
 export function releaseTask(taskNo: string): QueueTask {
+  requirePerm("flow:queue:claim");
   const t = qrec(taskNo);
   if (t.claimedBy?.ref !== ME.ref) fail("只能放回自己领取的任务", "You can only release tasks you claimed");
   t.claimedBy = undefined; t.claimedAtMs = undefined;
@@ -346,6 +352,7 @@ export function releaseTask(taskNo: string): QueueTask {
 
 /** POST /tasks/{no}/complete：领取后才能决定；驳回必填原因 */
 export function completeTask(taskNo: string, decision: "APPROVE" | "REJECT", reason: string | undefined, now: number = Date.now()): void {
+  requirePerm("flow:queue:claim");
   sweep(now);
   const t = qrec(taskNo);
   if (t.claimedBy?.ref !== ME.ref) fail("领取后才能决定（可能已超时自动放回，刷新后再领）", "Claim it before deciding (it may have timed out and been released — refresh)");

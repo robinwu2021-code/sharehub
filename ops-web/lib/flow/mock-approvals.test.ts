@@ -1,12 +1,13 @@
 // 审批与审核队列的规则 = 对后端的期望。
 import { beforeEach, describe, expect, it } from "vitest";
+import { setMockOperatorPerms } from "./mock-auth";
 import {
   claimTask, completeTask, countApprovals, decide, getApproval, myClaimed, queryApprovals, queueSummaries,
   queueTasksOf, releaseTask, resetApprovalDb, withdraw, CLAIM_TIMEOUT_MS,
 } from "./mock-approvals";
 
 const NOW = new Date("2026-09-27T12:00:00").getTime();
-beforeEach(() => resetApprovalDb(NOW));
+beforeEach(() => { setMockOperatorPerms(["*"]); resetApprovalDb(NOW); });
 
 describe("审批", () => {
   it("状态页签的角标与各自列表条数一致", () => {

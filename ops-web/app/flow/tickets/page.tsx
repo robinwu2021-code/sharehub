@@ -2,6 +2,9 @@
 
 // 工单工作台（原型 P4）：统计卡可点，点进即筛好的列表；SLA 色条：绿 正常 · 黄 将超时 · 红 已超时 · 灰 暂停。
 // 每个筛选控件都对应 tickets/query 的一个参数（21/06），不做「取一页再页内过滤」。
+import { ReadOnlyNotice } from "@/components/read-only-notice";
+import { useCan } from "@/lib/hooks/use-can";
+import { NeedPerm } from "@/components/flow/need-perm";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { flow, FLOW_KEY } from "@/lib/flow/client";
@@ -42,8 +45,12 @@ const REASSIGN_FIELDS: FieldDef[] = [
     help: "会记入每张工单的时间线；例如「Musa 休假，片区改由 Omar 负责」" },
 ];
 
-export default function FlowTicketsPage() {
+function FlowTickets() {
   const qc = useQueryClient();
+  const allow = useCan();
+  // 行内的迁移动作（接单 / 升级 / 复核…）不在前端判权：服务端给的 actions[] 已按当前操作人算好，
+  // 前端再判一遍只会与服务端口径打架。前端只管不属于迁移的能力 —— 批量改派。
+  const canDispatch = allow("flow:ticket:dispatch");
   const paging = usePaging();
   const [keyword, setKeyword] = useState("");
   const [typeCode, setTypeCode] = useState("");
@@ -137,13 +144,16 @@ export default function FlowTicketsPage() {
         active={card?.key ?? null}
         onPick={(s) => onFilter(() => { setCard(s); if (s) { setTypeCode(""); setAssigneeKind(""); } })}
       />
+      {!canDispatch && (
+        <ReadOnlyNotice what="派单与改派" perm="flow:ticket:dispatch" note="不能勾选批量改派；单张工单的办理动作以各行按钮为准" className="mb-3" />
+      )}
       <Toolbar
         search={keyword}
         onSearch={(v) => onFilter(() => setKeyword(v))}
         searchPlaceholder="搜单号 / 标题 / 对象 / 受理方"
         selectedCount={selected.length}
         onClearSelection={() => setSelected([])}
-        batchActions={<Button size="sm" onClick={() => setReassignOpen(true)}>批量改派</Button>}
+        batchActions={canDispatch ? <Button size="sm" onClick={() => setReassignOpen(true)}>批量改派</Button> : undefined}
       >
         <FilterSelect
           aria-label="工单类型"
@@ -165,7 +175,7 @@ export default function FlowTicketsPage() {
         paging={paging}
         columns={columns}
         rowKey={(t) => t.ticketNo}
-        selectable
+        selectable={canDispatch}
         selectedKeys={selected}
         onSelectedChange={setSelected}
         empty={card || typeCode || assigneeKind || keyword ? "按当前筛选没有工单 —— 换个条件，或点已选中的统计卡取消筛选" : "还没有工单"}
@@ -188,4 +198,8 @@ export default function FlowTicketsPage() {
 
 function actionDone(code: string) {
   return { NUDGE: "已催办受理方", ESCALATE: "已升级给平台", TAKEOVER: "已接管，派给了你", REVIEW: "复核通过，工单已关闭" }[code] ?? "已完成";
+}
+
+export default function FlowTicketsPage() {
+  return <NeedPerm code="flow:ticket:read" what="工单工作台"><FlowTickets /></NeedPerm>;
 }

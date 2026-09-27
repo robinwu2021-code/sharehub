@@ -1,6 +1,7 @@
 "use client";
 
 // 运营配置（原型 P6）：SLA 规则 · 工作日历 · 队列。改规则只影响新单；进行中的单按开单时的规则走完。
+import { NeedPerm } from "@/components/flow/need-perm";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
@@ -25,7 +26,7 @@ const SORT_LABEL: Record<QueueGroup["sort"], string> = { PRIORITY_THEN_AGE: "优
 
 type Form = Record<string, unknown>;
 
-export default function FlowSettingsPage() {
+function FlowSettings() {
   const qc = useQueryClient();
   const refresh = () => qc.invalidateQueries({ queryKey: FLOW_KEY });
   const sla = useQuery({ queryKey: [...FLOW_KEY, "sla-policies"], queryFn: flow.slaPolicies });
@@ -190,4 +191,8 @@ export default function FlowSettingsPage() {
         onSubmit={() => saveQ.mutate()} submitting={saveQ.isPending} />
     </div>
   );
+}
+
+export default function FlowSettingsPage() {
+  return <NeedPerm code="flow:config:manage" what="运营配置"><FlowSettings /></NeedPerm>;
 }

@@ -3,6 +3,7 @@
 // 流程配置（原型 P5a）：表单化配置审批流程（不做图形设计器）。保存即发布新版本 ——
 // 版本 = 内容哈希，只增不改；进行中的审批按提交时的版本走完，新版本只影响新提交。
 // 校验在服务端（422 逐条带路径），这里把每条错误挂到对应字段、并在顶部汇总。
+import { NeedPerm } from "@/components/flow/need-perm";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
@@ -35,7 +36,7 @@ const COND: { value: "" | ConditionOp; label: string }[] = [
 
 const blankStep = (): ProcessStepDef => ({ code: "", name: "", approver: { kind: "PERM", value: "" }, mode: "ANY", timeLimitHours: 24 });
 
-export default function FlowProcessesPage() {
+function FlowProcesses() {
   const qc = useQueryClient();
   const { confirm, dialog } = useConfirm();
   const list = useQuery({ queryKey: [...FLOW_KEY, "processes"], queryFn: flow.processes });
@@ -281,4 +282,8 @@ function Rule({ label, locked, checked, onChange }: { label: string; locked?: bo
       {locked && <span className="txt-caption text-muted-foreground">（不可关）</span>}
     </div>
   );
+}
+
+export default function FlowProcessesPage() {
+  return <NeedPerm code="flow:process:manage" what="流程配置"><FlowProcesses /></NeedPerm>;
 }

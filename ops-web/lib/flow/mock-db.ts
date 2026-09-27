@@ -11,6 +11,7 @@
 //  1. SLA 状态**读时计算**（按截止时间与暂停），不是存死的字段；
 //  2. 工单的可走动作 actions[] 由这里按「状态 × SLA × 受理方」算好返回，页面不维护迁移表。
 import { fail, notFound } from "@/lib/biz-error";
+import { hasPerm, requirePerm } from "./mock-auth";
 import type {
   Member, Named, Page, Priority, SlaMetric, SlaState, SlaSummary, StatusCategory, TicketAction, TicketFilter,
   TicketQuery, TicketRow, TicketStat, TicketView, TimelineEvent, TodoCount, TodoItem, TodoQuery,
@@ -198,6 +199,12 @@ function slaOf(r: TicketRec, now: number): SlaSummary {
   };
 }
 
+/** 每个迁移动作要的权限码（服务端按它过滤 actions[]、并对直接调用判 403） */
+export const ACTION_PERM: Record<string, string> = {
+  ACCEPT: "flow:ticket:handle", TAKEOVER: "flow:ticket:handle", REVIEW: "flow:ticket:handle", CANCEL: "flow:ticket:handle",
+  NUDGE: "flow:ticket:dispatch", ESCALATE: "flow:ticket:dispatch",
+};
+
 const act = (code: string, name: string, toCategory: StatusCategory): TicketAction =>
   ({ code, name, requires: { fields: [], comment: false }, toCategory });
 
@@ -214,7 +221,8 @@ function actionsOf(r: TicketRec, state: SlaState): TicketAction[] {
   if (r.status === "PENDING_REVIEW") out.push(act("REVIEW", "复核", "DONE"));
   // 撤单要填原因：列表不出（requires 非空的动作只在详情里办）
   out.push({ code: "CANCEL", name: "撤单", toCategory: "CANCELLED", requires: { fields: [], comment: true } });
-  return out;
+  // 只给当前操作人有权限的（与服务端同：前端拿到的就是能点的）
+  return out.filter((a) => hasPerm(ACTION_PERM[a.code]));
 }
 
 function view(r: TicketRec, now: number): TicketRow & { closedAtMs: number | null } {
@@ -267,6 +275,7 @@ function matches(t: Row, f: TicketFilter): boolean {
 const out = ({ closedAtMs: _c, ...row }: Row): TicketRow => row;
 
 export function queryTickets(q: TicketQuery, now: number = Date.now()): Page<TicketRow> {
+  requirePerm("flow:ticket:read");
   const rows = tickets.map((r) => view(r, now)).filter((t) => matches(t, q));
   rows.sort((a, b) =>
     SLA_ORD[a.slaState] - SLA_ORD[b.slaState]
@@ -333,6 +342,7 @@ function todosAll(now: number): TodoItem[] {
 }
 
 export function queryTodos(q: TodoQuery, now: number = Date.now()): Page<TodoItem> {
+  requirePerm("flow:todo:read");
   const rows = todosAll(now).filter((t) =>
     (q.origin === "ALL" || t.origin === q.origin) && (q.claimable === undefined || t.claimable === q.claimable));
   return page(rows, q);
@@ -357,6 +367,7 @@ function row(no: string): TicketRec {
 
 /** 抢单：只有还在池里、未被领走的单能抢；抢到即派给我并进入处理中 */
 export function claimTicket(no: string, now: number = Date.now()): TicketRow {
+  requirePerm("flow:ticket:handle");
   const r = row(no);
   if (!r.pooled || r.assignee) {
     fail(`${no} 已被他人领取或不在抢单池里，刷新后再看`, `${no} was already claimed or is not in the pool — refresh and try again`);
@@ -371,6 +382,7 @@ export function claimTicket(no: string, now: number = Date.now()): TicketRow {
 
 /** 迁移：只接受服务端当前给出的动作；其余一律拒绝（不信页面按钮） */
 export function transitionTicket(no: string, code: string, now: number = Date.now(), comment?: string): TicketRow {
+  if (ACTION_PERM[code]) requirePerm(ACTION_PERM[code]);
   const r = row(no);
   const allowed = actionsOf(r, slaStateOf(r, now));
   const act = allowed.find((a) => a.code === code);
@@ -397,6 +409,7 @@ export function transitionTicket(no: string, code: string, now: number = Date.no
 
 /** 批量改派：原因必填；已结的单不能改派（整批拒绝，不做部分成功，免得界面上说不清哪些改了） */
 export function reassignTickets(nos: string[], to: Member, reason: string, now: number = Date.now()): TicketRow[] {
+  requirePerm("flow:ticket:dispatch");
   if (!nos.length) fail("没有选中任何工单", "No tickets selected");
   if (!reason.trim()) fail("改派必须填写原因（会记入工单时间线）", "A reason is required to reassign (it goes into the ticket timeline)");
   const rows = nos.map(row);
@@ -428,6 +441,7 @@ function log(no: string, atMs: number, kind: TimelineEvent["kind"], title: strin
 
 /** GET /workspaces/{ws}/tickets/{no}：行 + 全部字段 + 参与者 + 每个 SLA 指标 + 动作 */
 export function getTicketView(no: string, now: number = Date.now()): TicketView {
+  requirePerm("flow:ticket:read");
   const r = row(no);
   const base = out(view(r, now));
   // 待接单时，最近的运行中指标是「响应」（它就是列表上那个 SLA）；「解决」截止更晚。
@@ -470,6 +484,7 @@ export function getTimeline(no: string): TimelineEvent[] {
 
 /** POST /workspaces/{ws}/tickets/{no}/comments */
 export function addComment(no: string, body: string, now: number = Date.now()): TimelineEvent[] {
+  requirePerm("flow:ticket:handle");
   const r = row(no);
   if (!body.trim()) fail("备注不能为空", "The note cannot be empty");
   if (body.length > 1000) fail("备注不能超过 1000 字", "The note cannot exceed 1000 characters");
@@ -479,6 +494,7 @@ export function addComment(no: string, body: string, now: number = Date.now()): 
 
 /** POST /workspaces/{ws}/tickets/{no}/assign：to 为 null = 退回抢单池。原因必填 */
 export function assignTicket(no: string, to: Member | null, reason: string, now: number = Date.now()): TicketRow {
+  requirePerm("flow:ticket:dispatch");
   const r = row(no);
   if (!OPEN.includes(r.status)) fail(`工单 ${no} 已结，不能改派`, `Ticket ${no} is closed and cannot be reassigned`);
   if (!reason.trim()) fail("改派必须填写原因（会记入工单时间线）", "A reason is required to reassign (it goes into the ticket timeline)");
