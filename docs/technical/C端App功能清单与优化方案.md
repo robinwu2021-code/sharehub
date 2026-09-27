@@ -93,7 +93,7 @@
 |---|---|---|
 | a | `rent()` 落单为 `DISPENSING`，发 `EJECT` 指令，由设备回执（`EJECT_OK`）迁到 `IN_USE` | 状态机与 `cancelUndelivered(orderNo)` **都已存在**，后者正是「DISPENSING 才能撤」的那条；现在无人走到它 |
 | b | 出宝超时任务：到点调 `cancelUndelivered` 并释放预授权 | 目前只有告警处置链路（`TradeFixers`）会调，且注释写明「接入前只撤单不动钱」 |
-| c | 进行中订单的 `durationMin`/`feeAmount` 实时试算 | 有现成的 `priceEngine` + `PriceResolver.fromSnapshot`（`buyoutIfCapped` 就是这么算的），出参加两个「试算」字段即可 |
+| ~~c~~ | ~~进行中订单的实时试算~~ | **已做**（`a0e167e`）：`RentOrderService.estimateNow` 按与结算逐项相同的计价链试算，出参 `estimatedFee`/`estimatedDurationMin`/`capped`，只给单条投影（列表不带，N+1）；用例 `ConsumerLiveFeeTest` 钉住「试算 = 立即归还后的实付」，负对照已验 |
 
 
 **1. 借出「等弹出」是假的 —— 不轮询、不超时、不兜底（C-RT-04/05）**
@@ -139,7 +139,25 @@ mock 层给了 `CAB-TIMEOUT` 这个**永不回执的柜机号**做负对照，�
 「欠费拦下次借出」——于是用户被拦住，却在 App 里找不到能付钱的地方，只能找客服。
 这是一条闭死的环。
 
-**未做，缺一个后端字段**：`ConsumerOrderVO` 没有任何「已付/欠费」的表达
+**未做，而且比「缺个字段」更深一层（2026-09-27 查证）**：**结算从不请款。**
+`returnOrderAt` 算完钱就 `SETTLE` 并发结算事件，全仓**没有任何一处**在归还时
+`payments.pay(...)` 或 `capture(...)`（唯一的租借支付入口是 `POST /mp/trade/pay`，
+而端上从没调过）。押金同理 —— `rent()` 只写 `deposit_amount` 这一列，不收钱。
+
+于是「欠费」这个状态**在数据上还不成立**：`pay_order` 里每一张已结算订单都没有支付记录，
+照实算的话全部历史订单都是欠费。现在加 `paidAmount`/`unpaidAmount` 出参，结果是
+订单列表整页挂满「欠费」标记 —— 那不是修好了 C-BL-04，是把一个骨架缺口摊到用户脸上。
+
+顺带一个要在上线前拍板的次序问题：`OrderSettledEvent` → `ShareGenerator`
+**照「应收」生成了分润明细**，而那笔钱从没收过。桩支付阶段无所谓，接真通道时
+「先收钱还是先分账」必须有个说法。
+
+正确顺序：① 归还结算时按免押预授权 `capture`（ADR-005：capture ≤ 预授权额，超额走补付），
+失败才挂账；② 那之后「欠费」才有意义，再补 `paidAmount`/`unpaidAmount` 出参与端上入口
+（端点与入参都是现成的：`POST /mp/trade/pay {orderNo, scene}`，金额由服务端从订单取）。
+①是支付语义的决策（capture 自预授权 / 扣钱包余额 / 两者兼有），不该顺手做掉。
+
+（以下是原来的记述，仍然成立：）`ConsumerOrderVO` 没有任何「已付/欠费」的表达
 （只有 `feeAmount`），端上无从知道一张已结算的单到底付没付 —— 画个「立即支付」按钮
 要么对所有结算单都画（多数人已经付过），要么全靠猜。
 先补出参（`paidAmount` / `payStatus`，由 `pay_order` 派生），再接端上的入口：
