@@ -77,6 +77,41 @@ public class LocService {
     }
 
     /**
+     * 按站点号单查（未归档）。不存在返回 {@code null}。
+     *
+     * <p><b>为什么要单独一个方法</b>：调用方此前的做法是 {@code pageSites(1, 200, …)} 再按
+     * {@code siteNo} 过滤 —— 那把**分页默认值当成了业务上限**。站点一过 200 个，
+     * 靠后的站点查详情就报「门店不存在」：真实存在的店说不存在，而且不报错、不告警。
+     * 实测测试库已有 1600+ 站点，绝大多数门店详情早就查不到了。
+     *
+     * <p>把上限调大不是修复，只是把同一个洞推远一点。
+     */
+    public Site siteOf(String siteNo) {
+        if (siteNo == null || siteNo.isBlank()) return null;
+        LocSite e = siteMapper.selectOne(new LambdaQueryWrapper<LocSite>()
+                .eq(LocSite::getSiteNo, siteNo).isNull(LocSite::getArchivedAt).last("limit 1"));
+        if (e == null) return null;
+        return toSite(e, pointCountsOf(java.util.List.of(siteNo)).getOrDefault(siteNo, 0));
+    }
+
+    /**
+     * 按站点号集合批查（未归档），保持传入顺序无关、返回按 id 升序。
+     *
+     * <p>同 {@link #siteOf} 的理由：收藏夹此前是从 {@code pageSites(1, 200)} 里挑出
+     * 「我收藏的那些」—— 收藏了靠后的店，它就是不出现在收藏夹里。
+     */
+    public List<Site> sitesByNos(java.util.Collection<String> siteNos) {
+        if (siteNos == null || siteNos.isEmpty()) return List.of();
+        List<String> keys = siteNos.stream().filter(x -> x != null && !x.isBlank()).distinct().toList();
+        if (keys.isEmpty()) return List.of();
+        List<LocSite> rows = siteMapper.selectList(new LambdaQueryWrapper<LocSite>()
+                .in(LocSite::getSiteNo, keys).isNull(LocSite::getArchivedAt)
+                .orderByAsc(LocSite::getId));
+        Map<String, Integer> points = pointCountsOf(rows.stream().map(LocSite::getSiteNo).toList());
+        return rows.stream().map(x -> toSite(x, points.getOrDefault(x.getSiteNo(), 0))).toList();
+    }
+
+    /**
      * 按场地方统计名下在用站点数。
      *
      * <p><b>现算而不是读列</b>：`loc_venue.location_count` 曾是实体字段，但那一列

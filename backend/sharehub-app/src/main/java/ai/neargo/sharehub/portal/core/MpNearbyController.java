@@ -148,12 +148,17 @@ public class MpNearbyController {
                                              @RequestParam(required = false) Double lng) {
         String me = ConsumerContext.userNo();
         return DataScopeContext.executeWithoutScope(() -> {
-            java.util.Set<String> mine = favorites.pageByOwner(me, 1, 200).getList().stream()
-                    .map(f -> f.siteNo()).collect(java.util.stream.Collectors.toSet());
+            /*
+             * 取「我收藏的站点号」与「这些站点」都按键查，**不拿分页当查询**。
+             *
+             * 此前是 favorites.pageByOwner(me, 1, 200) + loc.pageSites(1, 200) 再取交集 ——
+             * 两个 200 都是分页默认值、不是业务上限：收藏超过 200 家、或站点总数超过 200，
+             * 靠后的那些店就悄悄不出现在收藏夹里，而接口一路 200、页面照常渲染。
+             */
+            java.util.Set<String> mine = favorites.siteNosOf(me);
             List<NearbyCabinetVO> out = new ArrayList<>();
             if (mine.isEmpty()) return out;
-            for (Site s : loc.pageSites(1, 200, null, false).getList()) {
-                if (!mine.contains(s.siteNo())) continue;
+            for (Site s : loc.sitesByNos(mine)) {
                 if (!consumerVisible(s)) continue;   // 收藏了一家后来关掉的店，不该还挂在列表上
                 Quote q = quoteOrSkip(s);
                 if (q == null) continue;                      // 同找柜列表：一家店算不出价不该让整个收藏夹空掉
@@ -202,9 +207,10 @@ public class MpNearbyController {
         // 游客也能看门店卡（点地图上的点就弹这个）；登录了才有「已收藏」这一位
         String me = ConsumerContext.optionalUserNo();
         return DataScopeContext.executeWithoutScope(() -> {
-            Site s = loc.pageSites(1, 200, null, false).getList().stream()
-                    .filter(x -> siteNo.equals(x.siteNo())).findFirst()
-                    .orElseThrow(() -> BizException.notFound(siteNo));
+            // 按键单查。此前是 pageSites(1, 200) 再过滤 —— 站点一过 200 个，
+            // 靠后的店查详情就报「门店不存在」：真实存在的店说不存在，且不报错不告警
+            Site s = loc.siteOf(siteNo);
+            if (s == null) throw BizException.notFound(siteNo);
             List<Cabinet> cs = cabinets.bySite(siteNo);
             /*
              * 可借数只算**真能借的柜**（与找柜列表、借出可用性同一个判法 StoreCardAssembler#borrowable）。
@@ -217,8 +223,8 @@ public class MpNearbyController {
             int borrow = cs.stream().filter(cards::borrowable).mapToInt(Cabinet::availableCount).sum();
             int ret = cs.stream().mapToInt(c -> Math.max(0, c.slotTotal() - c.availableCount())).sum();
             Quote q = cards.quoteOf(siteNo, s.sceneType());
-            boolean fav = me != null && favorites.pageByOwner(me, 1, 200).getList().stream()
-                    .anyMatch(f -> siteNo.equals(f.siteNo()));
+            // 条件计数，不是「取一页再 contains」—— 后者在收藏超过 200 家后心形永远不亮
+            boolean fav = favorites.isFavorite(me, siteNo);
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("siteNo", s.siteNo());
             out.put("siteName", s.name());
@@ -262,10 +268,16 @@ public class MpNearbyController {
 
     // ——————————————————————— 组装 ———————————————————————
 
+    /**
+     * 机柜 → 它所属站点。**按键单查**。
+     *
+     * <p>此前是 {@code loc.pageSites(1, 200, …)} 再过滤 —— 四处「拿分页当查询」里
+     * <b>这一处后果最重</b>：它服务的是借出确认页。站点落在第一页之外时本方法返 {@code null}，
+     * 于是 {@code quoteOf(null, null)} 按兜底报价算 ——
+     * <b>确认页给出的是错的价格</b>，而页面照常渲染、接口一路 200，用户点下去就按那个价借了。
+     */
     private Site siteOf(Cabinet c) {
-        return loc.pageSites(1, 200, null, false).getList().stream()
-                .filter(x -> x.siteNo() != null && x.siteNo().equals(c.siteNo()))
-                .findFirst().orElse(null);
+        return loc.siteOf(c.siteNo());
     }
 
 }

@@ -48,6 +48,23 @@ public class UserFavoriteServiceImpl implements UserFavoriteService {
     }
 
     @Override
+    public boolean isFavorite(String cUserNo, String siteNo) {
+        if (cUserNo == null || cUserNo.isBlank() || siteNo == null || siteNo.isBlank()) return false;
+        // 条件计数，不是「取一页再 contains」—— 见接口注释
+        return mapper.selectCount(new LambdaQueryWrapper<UsrFavorite>()
+                .eq(UsrFavorite::getCUserNo, cUserNo).eq(UsrFavorite::getSiteNo, siteNo)) > 0;
+    }
+
+    @Override
+    public java.util.Set<String> siteNosOf(String cUserNo) {
+        if (cUserNo == null || cUserNo.isBlank()) return java.util.Set.of();
+        return mapper.selectList(new LambdaQueryWrapper<UsrFavorite>()
+                        .select(UsrFavorite::getSiteNo)
+                        .eq(UsrFavorite::getCUserNo, cUserNo)).stream()
+                .map(UsrFavorite::getSiteNo).collect(Collectors.toSet());
+    }
+
+    @Override
     public boolean toggle(String cUserNo, String siteNo) {
         UsrFavorite active = mapper.selectOne(new LambdaQueryWrapper<UsrFavorite>()
                 .eq(UsrFavorite::getCUserNo, cUserNo)
