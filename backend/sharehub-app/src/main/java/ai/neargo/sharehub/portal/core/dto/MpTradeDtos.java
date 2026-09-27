@@ -45,6 +45,11 @@ public final class MpTradeDtos {
     /**
      * C 端订单（镜像 c-app {@code ConsumerOrder}）。
      *
+     * <p>{@code estimatedFee}/{@code estimatedDurationMin}/{@code capped} <b>只有进行中的单才有</b>
+     * （详情与「进行中订单」两处单条投影才带，列表不带）。它们回答的是
+     * 「现在已经多少钱了」—— 而 {@code durationMin}/{@code feeAmount} 这两列
+     * <b>只在归还那一刻写入</b>，进行中恒为 0，端上照着渲染就是一个不动的 0。
+     *
      * <p>{@code fees}/{@code timeline} <b>只有详情才带</b>，列表恒为 null ——
      * 时间线要逐单查 {@code ord_event_log}，挂在列表上就是 N+1。
      * 用 null（而不是空数组）表达「这个投影没带」，与「确实一步都没有」区分开。
@@ -55,6 +60,26 @@ public final class MpTradeDtos {
                                   String powerbankNo, String locationName,
                                   String rentStartAt, String rentEndAt, Integer durationMin,
                                   BigDecimal feeAmount, BigDecimal depositAmount, String currency,
-                                  List<FeeItemVO> fees, List<OrderStepVO> timeline) {
+                                  List<FeeItemVO> fees, List<OrderStepVO> timeline,
+                                  BigDecimal estimatedFee, Integer estimatedDurationMin, Boolean capped) {
+
+        /**
+         * 列表投影用：**不带试算**。
+         *
+         * <p>试算要按订单逐单跑一遍计价链（读快照、算封顶、查券），挂在列表上就是 N+1，
+         * 而订单列表恰恰是最长的那个列表。列表里的进行中单由端上按 {@code rentStartAt}
+         * 显示已用时长，不显示金额 —— 显示一个恒为 0 的金额比不显示更糟。
+         */
+        public ConsumerOrderVO(String orderNo, String cUserNo, String status,
+                               String cabinetNo, String siteName,
+                               String returnCabinetNo, String returnSiteName,
+                               String powerbankNo, String locationName,
+                               String rentStartAt, String rentEndAt, Integer durationMin,
+                               BigDecimal feeAmount, BigDecimal depositAmount, String currency,
+                               List<FeeItemVO> fees, List<OrderStepVO> timeline) {
+            this(orderNo, cUserNo, status, cabinetNo, siteName, returnCabinetNo, returnSiteName,
+                    powerbankNo, locationName, rentStartAt, rentEndAt, durationMin,
+                    feeAmount, depositAmount, currency, fees, timeline, null, null, null);
+        }
     }
 }

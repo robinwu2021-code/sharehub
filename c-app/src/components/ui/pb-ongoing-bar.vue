@@ -26,9 +26,11 @@ const lasted = computed(() => {
   const m = elapsedMin(props.order.rentStartAt) ?? props.order.durationMin;
   return durationText(m);
 });
-const amt = computed(() =>
-  props.order.feeAmount > 0 ? `${t("common.currency")} ${props.order.feeAmount.toFixed(2)}` : "",
-);
+const amt = computed(() => {
+  // 进行中用服务端试算；已结束用实付。两者都没有就留空 —— 不编一个 0.00 出来
+  const v = props.order.estimatedFee ?? (props.order.feeAmount > 0 ? props.order.feeAmount : null);
+  return v == null ? "" : `${t("common.currency")} ${v.toFixed(2)}`;
+});
 </script>
 
 <template>

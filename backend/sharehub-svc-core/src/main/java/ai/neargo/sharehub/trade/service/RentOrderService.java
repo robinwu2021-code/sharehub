@@ -66,6 +66,15 @@ public interface RentOrderService {
      */
     boolean cancelUndelivered(String orderNo, String reason);
 
+    /**
+     * 进行中订单的实时试算：按「现在」的时长跑一遍计价链，**只读** ——
+     * 不核销券、不扣免单额度、不写库。非 {@code IN_USE} 返回 null。
+     *
+     * <p>口径与 {@code returnOrderAt} 的结算逐项一致（同一套快照 + 倍率 + 券 + 免单 + 封顶），
+     * 否则用户看到的数与最终账单对不上，而那正是他会去投诉的那一种「对不上」。
+     */
+    ai.neargo.sharehub.trade.dto.TradeLegacyDtos.FeeEstimate estimateNow(String orderNo);
+
     /** 逾期达封顶自动买断：触顶则以封顶价买断并返回 true（执行清单 A1 · E17）。 */
     boolean buyoutIfCapped(String orderNo);
 

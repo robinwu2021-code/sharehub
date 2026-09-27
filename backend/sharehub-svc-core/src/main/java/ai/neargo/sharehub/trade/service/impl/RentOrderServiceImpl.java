@@ -462,6 +462,40 @@ public class RentOrderServiceImpl implements RentOrderService {
     }
 
     /**
+     * 进行中订单的实时试算。**只读**：不核销券（{@code coupons.consume}）、
+     * 不扣免单额度（{@code freeRents.consume}）、不写库。
+     *
+     * <p>计价口径与 {@link #returnOrderAt} 的结算**逐项对齐** —— 同一份下单快照、
+     * 同一个倍率、同一条券/免单/封顶链。对不齐的后果不是报错，是用户盯了一路的数
+     * 与最终账单不一样，而那件事只有他会发现。
+     *
+     * <p>并发下券可能被别的单抢走、免单额度可能被扣光：试算按**当下能用**的算，
+     * 到结算那一刻若抢输了会按无券重算（那条路已有 warn 日志）。试算本身不打日志，
+     * 见 {@link #couponOf(OrdOrder, boolean)}。
+     */
+    @Override
+    public ai.neargo.sharehub.trade.dto.TradeLegacyDtos.FeeEstimate estimateNow(String orderNo) {
+        return DataScopeContext.executeWithoutScope(() -> {
+            OrdOrder e = mapper.selectOne(new LambdaQueryWrapper<OrdOrder>()
+                    .eq(OrdOrder::getOrderNo, orderNo).last("limit 1"));
+            // 只有进行中的单才有「现在欠多少」这件事；已结算的单有实打实的 fee_amount
+            if (e == null || !OrderStatus.IN_USE.name().equals(e.getStatus())) return null;
+            long min = durationMinutes(e.getRentStartAt(), nowUtc());
+            java.math.BigDecimal gross = priceEngine.price(
+                    PriceResolver.fromSnapshot(e.getPriceSnapshot()),
+                    java.util.Map.of("MINUTE", java.math.BigDecimal.valueOf(min)),
+                    e.getCurrency()).total();
+            java.math.BigDecimal capTotal = PriceResolver.capTotalFromSnapshot(e.getPriceSnapshot());
+            ChargeChain.Charged charged = chargeChain.charge(gross,
+                    PriceResolver.multiplierFromSnapshot(e.getPriceSnapshot()),
+                    couponOf(e, false), capTotal, waiverOf(e, false));
+            return new ai.neargo.sharehub.trade.dto.TradeLegacyDtos.FeeEstimate(
+                    (int) min, charged.payable(), charged.couponUsed(), charged.waivedAmount(),
+                    charged.buyout(), e.getCurrency());
+        });
+    }
+
+    /**
      * 逾期达封顶自动买断（执行清单 A1 · 联动 E17）。按当前时长试算：触及方案总封顶（买断价）即以封顶价买断结单，
      * 宝 → SOLD，照常发结算事件走分润。未触顶 / 快照没有总封顶 / 已不在进行中 → 返回 false。
      */
@@ -586,10 +620,18 @@ public class RentOrderServiceImpl implements RentOrderService {
      * 这时 {@code grantFor} 返回 null，本方法也返回 null。
      */
     private ChargeChain.Waiver waiverOf(OrdOrder e) {
+        return waiverOf(e, true);
+    }
+
+    /**
+     * @param warn 结算时为 true；**试算时必须传 false** —— 试算每 15 秒来一次，
+     *             按结算的口径打 WARN 会把同一句话刷满日志，而真告警就淹在里面了
+     */
+    private ChargeChain.Waiver waiverOf(OrdOrder e, boolean warn) {
         if (e.getFreeReason() == null || e.getFreeReason().isBlank()) return null;
         var grant = freeRents.grantFor(e.getCUserNo(), e.getCurrency());
         if (grant == null) {
-            log.warn("结算时免单额度已不可用，本单按原价 orderNo={} reason={}", e.getOrderNo(), e.getFreeReason());
+            if (warn) log.warn("结算时免单额度已不可用，本单按原价 orderNo={} reason={}", e.getOrderNo(), e.getFreeReason());
             return null;
         }
         // reason 用订单上定格的那个，不用白名单当前的 —— 白名单改了用途不该改写历史订单
@@ -597,10 +639,15 @@ public class RentOrderServiceImpl implements RentOrderService {
     }
 
     private ChargeChain.Coupon couponOf(OrdOrder e) {
+        return couponOf(e, true);
+    }
+
+    /** @param warn 见 {@link #waiverOf(OrdOrder, boolean)}。 */
+    private ChargeChain.Coupon couponOf(OrdOrder e, boolean warn) {
         if (e.getCouponNo() == null || e.getCouponNo().isBlank()) return null;
         var offer = coupons.offerOf(e.getCUserNo(), e.getCouponNo(), e.getCurrency());
         if (offer == null) {
-            log.warn("结算时券已不可用，本单按无券计价 orderNo={} couponNo={}", e.getOrderNo(), e.getCouponNo());
+            if (warn) log.warn("结算时券已不可用，本单按无券计价 orderNo={} couponNo={}", e.getOrderNo(), e.getCouponNo());
             return null;
         }
         return new ChargeChain.Coupon(offer.type(), offer.value(), offer.threshold());

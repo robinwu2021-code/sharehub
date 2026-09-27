@@ -101,17 +101,26 @@ async function buyout() {
       <pb-card tint="primary">
         <view class="flex items-center justify-between">
           <pb-tag :type="tagType[order.status]">{{ $t("status." + order.status) }}</pb-tag>
-          <!-- 进行中显示走字的时长，不显示金额：那时 feeAmount 恒为 0，
-               一个大大的「AED 0.00」读起来像「这次免费」 -->
-          <text v-if="isInUse && liveMin != null" class="pb-num text-[44rpx] font-extrabold text-ink">{{ durationText(liveMin) }}</text>
+          <!-- 进行中：时长走字（端上按 rentStartAt 现算），金额用**服务端的试算**。
+               feeAmount 那一列在进行中恒为 0，一个大大的「AED 0.00」读起来像「这次免费」；
+               而端上自己乘单价得到的是个「差一点」的数，用户会拿它去对账单 —— 两个都不行 -->
+          <view v-if="isInUse" class="flex flex-col items-end">
+            <text class="pb-num text-[40rpx] font-extrabold text-ink">{{ liveMin == null ? "—" : durationText(liveMin) }}</text>
+            <view v-if="order.estimatedFee != null" class="mt-[4rpx] flex items-baseline gap-[6rpx]">
+              <text class="text-[22rpx] text-sub">{{ $t("orders.estimated") }}</text>
+              <pb-amount :value="order.estimatedFee" size="sm" />
+            </view>
+          </view>
           <pb-amount v-else :value="order.feeAmount" size="lg" />
         </view>
         <view class="mt-[10rpx] text-[24rpx] text-sub">{{ order.orderNo }}</view>
-        <view v-if="isInUse" class="mt-[16rpx] flex items-center gap-[8rpx] text-[22rpx] text-sub">
-          <pb-icon name="info" :size="26" /><text>{{ $t("orders.feeAtReturn") }}</text>
+        <!-- 封顶提示只在**真的到了**的时候说（C-US-02）。此前这句是恒显示的静态文案，
+             谁也不知道到底到没到 —— 那等于没说 -->
+        <view v-if="isInUse && order.capped" class="mt-[16rpx] flex items-center gap-[8rpx] text-[22rpx] text-sub">
+          <pb-icon name="info" :size="26" /><text>{{ $t("orders.cappedNow") }}</text>
         </view>
-        <view v-if="isInUse" class="mt-[8rpx] flex items-center gap-[8rpx] text-[22rpx] text-sub">
-          <pb-icon name="info" :size="26" /><text>{{ $t("orders.capNote") }}</text>
+        <view v-else-if="isInUse" class="mt-[16rpx] flex items-center gap-[8rpx] text-[22rpx] text-sub">
+          <pb-icon name="info" :size="26" /><text>{{ $t("orders.feeAtReturn") }}</text>
         </view>
       </pb-card>
 
@@ -134,8 +143,10 @@ async function buyout() {
         </pb-card>
       </view>
 
-      <!-- 费用明细 -->
-      <view class="mt-[20rpx]">
+      <!-- 费用明细：**结算后才有**。进行中的单这几项要么是 0、要么是上一次结算留下的旧值，
+           而头部已经给了试算 —— 两个数并排摆着只会让人以为账对不上（实测见过：
+           头部试算 30.00，下面明细写着 6.00） -->
+      <view v-if="!isInUse" class="mt-[20rpx]">
         <text class="mb-[12rpx] block text-[24rpx] text-sub">{{ $t("orders.feeDetail") }}</text>
         <pb-card>
           <view class="flex flex-col gap-[16rpx]">

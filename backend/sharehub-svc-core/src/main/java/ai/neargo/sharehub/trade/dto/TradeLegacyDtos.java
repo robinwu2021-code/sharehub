@@ -52,6 +52,23 @@ public final class TradeLegacyDtos {
         }
     }
 
+    /**
+     * 进行中订单的实时试算（只读，不核销券、不扣免单额度）。
+     *
+     * <p><b>为什么需要它</b>：{@code ord_order.duration_min}/{@code fee_amount} 只在归还那一刻写入，
+     * 进行中的单这两列恒为 0。于是 C 端「实时计时计费」在界面上是一个不动的 0，
+     * 而用户唯一的判断方式是退出重进 —— 界面不报错，只是什么都没发生。
+     *
+     * <p><b>为什么不让端上自己乘单价</b>：封顶、分时倍率、券、免单额度、会员权益都在服务端，
+     * 端上乘出来的是一个「差一点」的数字，而用户会拿它去对账单。差一点比不显示更糟。
+     *
+     * @param capped 已触及总封顶（买断价）—— 到这里费用不再增长，是 C-US-02 要的那句话；
+     *               此前端上写的是一句恒显示的静态提示，没人知道到底到没到
+     */
+    public record FeeEstimate(int durationMin, BigDecimal payable, BigDecimal couponUsed,
+                              BigDecimal waivedAmount, boolean capped, String currency) {
+    }
+
     /** C 端借出回执：订单号 + 弹出的充电宝 + 网关指令号（弹仓为骨架）。 */
     public record RentResult(String orderNo, String powerbankNo, String commandId) {
     }

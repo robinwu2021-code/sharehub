@@ -8,9 +8,12 @@ import ai.neargo.sharehub.loc.dto.LocDtos.Site;
 import ai.neargo.sharehub.portal.core.dto.MpTradeDtos.ConsumerOrderVO;
 import ai.neargo.sharehub.portal.core.dto.MpTradeDtos.FeeItemVO;
 import ai.neargo.sharehub.portal.core.dto.MpTradeDtos.OrderStepVO;
+import ai.neargo.sharehub.trade.dto.TradeLegacyDtos.FeeEstimate;
 import ai.neargo.sharehub.trade.dto.TradeLegacyDtos.RentOrder;
+import ai.neargo.sharehub.trade.service.RentOrderService;
 import ai.neargo.sharehub.trade.order.dto.OrderDtos.OrderEvent;
 import ai.neargo.sharehub.trade.order.service.OrderEventLogService;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -39,11 +42,19 @@ public class ConsumerOrderAssembler {
     private final CabinetService cabinets;
     private final LocService loc;
     private final OrderEventLogService eventLog;
+    private final ObjectProvider<RentOrderService> orders;
 
-    public ConsumerOrderAssembler(CabinetService cabinets, LocService loc, OrderEventLogService eventLog) {
+    /**
+     * {@code orders} 用 {@link ObjectProvider} 延迟取：{@code RentOrderService} 的实现
+     * 与本类同在一个上下文里，直接构造注入会和它的依赖链绕成环（它已经依赖了一串 dev/loc 服务）。
+     * 这里只在「单条投影且进行中」时用一次，延迟解析代价可以忽略。
+     */
+    public ConsumerOrderAssembler(CabinetService cabinets, LocService loc, OrderEventLogService eventLog,
+                                  ObjectProvider<RentOrderService> orders) {
         this.cabinets = cabinets;
         this.loc = loc;
         this.eventLog = eventLog;
+        this.orders = orders;
     }
 
     /** 列表投影：不带 fees/timeline（见 {@link ConsumerOrderVO}）。 */
@@ -57,17 +68,36 @@ public class ConsumerOrderAssembler {
         return out;
     }
 
-    /** 详情投影：带费用明细与状态时间线。 */
+    /** 详情投影：带费用明细、状态时间线，进行中的单还带实时试算。 */
     public ConsumerOrderVO detail(RentOrder o) {
         if (o == null) return null;
         Names names = namesOf(List.of(o));
-        return of(o, names, fees(o), timeline(o.orderNo()));
+        return withEstimate(of(o, names, fees(o), timeline(o.orderNo())), o);
     }
 
-    /** 单条但不带时间线（进行中订单的顶部条，只要能渲染一行就够）。 */
+    /** 单条但不带时间线（进行中订单的顶部条，只要能渲染一行就够）—— 带试算，那张卡上的数就是它。 */
     public ConsumerOrderVO one(RentOrder o) {
         if (o == null) return null;
-        return of(o, namesOf(List.of(o)), null, null);
+        return withEstimate(of(o, namesOf(List.of(o)), null, null), o);
+    }
+
+    /**
+     * 补上进行中的实时试算。非进行中 {@code estimateNow} 返回 null，原样返回。
+     *
+     * <p>这三个字段存在的理由：{@code ord_order.duration_min}/{@code fee_amount}
+     * <b>只在归还那一刻写入</b> —— 进行中的单它们恒为 0，而 C 端「实时计时计费」
+     * 照着渲染就是一个不动的 0，用户唯一的判断方式是退出重进。界面不报错，只是什么都没发生。
+     */
+    private ConsumerOrderVO withEstimate(ConsumerOrderVO vo, RentOrder o) {
+        RentOrderService svc = orders.getIfAvailable();
+        if (svc == null) return vo;
+        FeeEstimate est = svc.estimateNow(o.orderNo());
+        if (est == null) return vo;
+        return new ConsumerOrderVO(vo.orderNo(), vo.cUserNo(), vo.status(), vo.cabinetNo(), vo.siteName(),
+                vo.returnCabinetNo(), vo.returnSiteName(), vo.powerbankNo(), vo.locationName(),
+                vo.rentStartAt(), vo.rentEndAt(), vo.durationMin(), vo.feeAmount(), vo.depositAmount(),
+                vo.currency(), vo.fees(), vo.timeline(),
+                est.payable(), est.durationMin(), est.capped());
     }
 
     private ConsumerOrderVO of(RentOrder o, Names names, List<FeeItemVO> fees, List<OrderStepVO> timeline) {

@@ -15,6 +15,25 @@ const fmtNow = () => new Date().toISOString().slice(0, 19).replace("T", " ");
 /** 扫这个柜机号的单**永远不出宝** —— 专门用来验「弹出失败」那条路（见 rentOrder 注释）。 */
 const DISPENSE_FAIL_CABINET = "CAB-TIMEOUT";
 
+/**
+ * 进行中订单的实时试算（mock 版）。
+ *
+ * 后端按下单时的计价快照跑完整的计价链（倍率/券/免单/封顶）；mock 这里按小时价折算并压到
+ * 日封顶，**够端上验「数会走、到封顶就不走了」**。要比对金额口径得连真后端。
+ * 非进行中一律返 null —— 已结算的单有实打实的 feeAmount，没有「现在多少钱」这回事。
+ */
+function withEstimate(o: ConsumerOrder | null): ConsumerOrder | null {
+  if (!o) return null;
+  if (o.status !== "IN_USE") return { ...o, estimatedFee: null, estimatedDurationMin: null, capped: null };
+  const min = Math.max(0, Math.floor((Date.now() - new Date(o.rentStartAt.replace(" ", "T") + "Z").getTime()) / 60000));
+  const avail = db.availability[o.cabinetNo];
+  const perHour = avail?.pricePerHour ?? 5;
+  const cap = avail?.dailyCap ?? 30;
+  const raw = Math.ceil(min / 60) * perHour;
+  const payable = Math.min(raw, cap);
+  return { ...o, estimatedFee: payable, estimatedDurationMin: min, capped: payable >= cap };
+}
+
 export const mockApi: McpApi = {
   /**
    * mock 的口径**照抄后端默认行**（V126：otp 开、其余三个关）。
@@ -99,7 +118,8 @@ export const mockApi: McpApi = {
     else db.favorites.add(siteNo);
     return db.delay({ favorite: db.favorites.has(siteNo) }, 300);
   },
-  ongoingOrder: () => db.delay(db.orders.find((o) => o.status === "IN_USE" || o.status === "DISPENSING") ?? null),
+  ongoingOrder: () =>
+    db.delay(withEstimate(db.orders.find((o) => o.status === "IN_USE" || o.status === "DISPENSING") ?? null)),
   buyout: (orderNo: string) => {
     const o = db.orders.find((x) => x.orderNo === orderNo);
     if (o) {
@@ -155,6 +175,10 @@ export const mockApi: McpApi = {
       currency: cab.currency,
       depositAmount: p.useFreeDeposit ? 0 : db.availability[cab.cabinetNo]?.depositAmount ?? 50,
       fees: [],
+      // 新单还没进 IN_USE，没有「现在多少钱」这回事；进了之后由 withEstimate 现算
+      estimatedFee: null,
+      estimatedDurationMin: null,
+      capped: null,
       timeline: [
         { status: "CREATED", at: now },
         { status: "DISPENSING", at: now },
@@ -182,7 +206,9 @@ export const mockApi: McpApi = {
     }
     return db.delay(order, 480);
   },
-  getOrder: (orderNo: string) => db.delay(db.orders.find((o) => o.orderNo === orderNo) ?? db.orders[0]),
+  // 详情与进行中卡带试算，列表不带 —— 与后端投影同一约定（列表逐单跑计价链是 N+1）
+  getOrder: (orderNo: string) =>
+    db.delay(withEstimate(db.orders.find((o) => o.orderNo === orderNo) ?? db.orders[0]) as ConsumerOrder),
   listOrders: (q: OrderQ = {}) =>
     db.delay(db.paginate(db.orders, q.page, q.size, (o) => db.kwHit(q.keyword, o.orderNo, o.siteName) && (!q.status || o.status === q.status))),
 

@@ -75,6 +75,9 @@ export const orders: ConsumerOrder[] = [
     currency: CURRENCY,
     depositAmount: 0,
     fees: [{ type: "RENT", amount: 6 }],
+    estimatedFee: null,
+    estimatedDurationMin: null,
+    capped: null,
     timeline: [
       { status: "CREATED", at: "2026-07-12 09:39:40" },
       { status: "DISPENSING", at: "2026-07-12 09:39:45" },
@@ -101,6 +104,9 @@ export const orders: ConsumerOrder[] = [
       { type: "RENT", amount: 18 },
       { type: "WAIVE", amount: -3 },
     ],
+    estimatedFee: null,
+    estimatedDurationMin: null,
+    capped: null,
     timeline: [
       { status: "IN_USE", at: "2026-07-11 14:10:00" },
       { status: "RETURNED", at: "2026-07-11 16:25:00" },

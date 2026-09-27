@@ -120,6 +120,16 @@ export interface ConsumerOrder {
   currency: string;
   fees: FeeItem[] | null;
   timeline: OrderStep[] | null;
+  /**
+   * 实时试算，**只有进行中的单才有**（详情与「进行中订单」两处单条投影才带，列表恒为 null）。
+   *
+   * 为什么不能用 `feeAmount`/`durationMin` 代替：那两列在服务端**只在归还那一刻写入**，
+   * 进行中恒为 0 —— 照着渲染就是一个不动的 0，读起来像「这次免费」。
+   */
+  estimatedFee: number | null;
+  estimatedDurationMin: number | null;
+  /** 已触及总封顶：到这里费用不再增长（C-US-02）。此前端上是一句恒显示的静态提示。 */
+  capped: boolean | null;
 }
 
 export interface UserProfile {

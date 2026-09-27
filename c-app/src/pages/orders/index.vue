@@ -4,6 +4,7 @@ import { onShow } from "@dcloudio/uni-app";
 import { useI18n } from "vue-i18n";
 import { api } from "@/api";
 import type { ConsumerOrder, OrderStatus } from "@/types";
+import { elapsedMin, durationText } from "@/shared/format";
 
 const { t } = useI18n();
 const all = ref<ConsumerOrder[]>([]);
@@ -66,9 +67,16 @@ function detail(o: ConsumerOrder) {
               <pb-tag :type="tagType[o.status]">{{ $t("status." + o.status) }}</pb-tag>
             </view>
             <view class="mt-[8rpx] text-[24rpx] text-sub">{{ o.orderNo }}</view>
+            <!-- 进行中的行：时长按 rentStartAt 现算，金额**不显示** ——
+                 列表投影不带试算（逐单跑计价链是 N+1），而 feeAmount 此时恒为 0，
+                 印一个「AED 0.00」在那里读起来像这次免费 -->
             <view class="mt-[18rpx] flex items-center justify-between">
-              <text class="text-[24rpx] text-sub">{{ $t("orders.duration") }} · {{ o.durationMin }} {{ $t("common.min") }}</text>
-              <pb-amount :value="o.feeAmount" size="sm" />
+              <text class="text-[24rpx] text-sub">
+                {{ $t("orders.duration") }} ·
+                {{ ONGOING.includes(o.status) ? durationText(elapsedMin(o.rentStartAt) ?? o.durationMin) : o.durationMin + " " + $t("common.min") }}
+              </text>
+              <pb-amount v-if="!ONGOING.includes(o.status)" :value="o.feeAmount" size="sm" />
+              <text v-else class="text-[24rpx] text-sub">{{ $t("orders.inUseNoFeeYet") }}</text>
             </view>
           </pb-card>
         </view>
