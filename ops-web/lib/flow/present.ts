@@ -1,5 +1,6 @@
 // 展示上的派生规则（只依赖服务给的数据，不按动作代号写死）。
 import type { StatusCategory, TicketAction } from "./types";
+import { isValidationError } from "./errors";
 
 /**
  * 动作按钮样式：
@@ -28,4 +29,16 @@ export function fmtWhen(ms: number, now: number = Date.now()) {
   const d = new Date(ms), n = new Date(now);
   const sameDay = d.toDateString() === n.toDateString();
   return sameDay ? `今天 ${pad(d.getHours())}:${pad(d.getMinutes())}` : fmtShort(ms);
+}
+
+/** 失败提示：422 时把逐条错误拼进去（表单抽屉没有按服务端路径挂错误的位置） */
+export function failText(e: Error): string {
+  return isValidationError(e) ? `${e.message}：${e.errors.map((x) => x.error).join("；")}` : e.message;
+}
+
+/** 分钟 → 「30 分钟」「2 小时」「1 天」 */
+export function fmtSpan(min: number): string {
+  if (min % 1440 === 0) return `${min / 1440} 天`;
+  if (min % 60 === 0) return `${min / 60} 小时`;
+  return `${min} 分钟`;
 }

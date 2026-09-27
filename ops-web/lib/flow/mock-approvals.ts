@@ -352,3 +352,8 @@ export function completeTask(taskNo: string, decision: "APPROVE" | "REJECT", rea
   if (decision === "REJECT" && !reason?.trim()) fail("驳回必须填写原因", "A reason is required to reject");
   t.done = decision === "APPROVE" ? "APPROVED" : "REJECTED";
 }
+
+/** 某流程的在途（待审）单数 —— 流程配置页的「在途单」列 */
+export function pendingCountOf(processCode: string): number {
+  return approvals.filter((r) => r.processCode === processCode && r.status === "PENDING").length;
+}

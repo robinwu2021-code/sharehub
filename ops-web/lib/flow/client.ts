@@ -6,7 +6,10 @@
 // 页面不直接 import mock-db（architecture: 页面只认 client）。
 import * as db from "./mock-db";
 import * as ap from "./mock-approvals";
+import * as cfg from "./mock-config";
 import type {
+  AppRow, DefinitionVersionRow, DeliveryRow, ProcessDef, ProcessSummary, ProcessVersion, PublishResult, QueueGroup,
+  SlaPolicy, WorkCalendar,
   ApprovalQuery, ApprovalRow, ApprovalStatus, ApprovalView, Member, Named, Page, QueueSummary, QueueTask, TicketQuery,
   TicketRow, TicketStat, TicketView, TimelineEvent, TodoCount, TodoItem, TodoQuery,
 } from "./types";
@@ -78,6 +81,47 @@ export const flow = {
   /** POST /workspaces/{ws}/tasks/{no}/complete */
   completeTask: (taskNo: string, decision: "APPROVE" | "REJECT", reason?: string): Promise<void> =>
     tick(() => ap.completeTask(taskNo, decision, reason)),
+
+  // ── 流程定义 ──
+  /** GET /workspaces/{ws}/processes（含在途数） */
+  processes: (): Promise<ProcessSummary[]> => tick(() => cfg.listProcesses()),
+  /** GET /workspaces/{ws}/processes/{code} */
+  process: (code: string): Promise<ProcessDef> => tick(() => cfg.getProcess(code)),
+  /** GET /workspaces/{ws}/processes/{code}/versions */
+  processVersions: (code: string): Promise<ProcessVersion[]> => tick(() => cfg.processVersions(code)),
+  /** PUT /workspaces/{ws}/processes/{code}（幂等发布；422 逐条错误） */
+  publishProcess: (def: ProcessDef, note: string, isNew: boolean): Promise<PublishResult> => tick(() => cfg.publishProcess(def, note, isNew)),
+  /** POST …/processes/{code}/disable · /enable */
+  setProcessEnabled: (code: string, enabled: boolean): Promise<void> => tick(() => cfg.setProcessEnabled(code, enabled)),
+
+  // ── 运营配置 ──
+  /** GET …/sla-policies */
+  slaPolicies: (): Promise<SlaPolicy[]> => tick(() => cfg.listSlaPolicies()),
+  /** PUT …/sla-policies/{code} */
+  saveSlaPolicy: (p: SlaPolicy): Promise<SlaPolicy> => tick(() => cfg.upsertSlaPolicy(p)),
+  /** GET /workspaces/{ws}/calendars */
+  calendars: (): Promise<WorkCalendar[]> => tick(() => cfg.listCalendars()),
+  /** PUT /workspaces/{ws}/calendars/{code} */
+  saveCalendar: (c: WorkCalendar): Promise<WorkCalendar> => tick(() => cfg.upsertCalendar(c)),
+  /** GET …/queue-groups */
+  queueGroups: (): Promise<QueueGroup[]> => tick(() => cfg.listQueueGroups()),
+  /** PUT …/queue-groups/{code} */
+  saveQueueGroup: (q: QueueGroup, isNew: boolean): Promise<QueueGroup> => tick(() => cfg.upsertQueueGroup(q, isNew)),
+  ticketTypeOptions: () => cfg.TICKET_TYPE_OPTIONS,
+
+  // ── 接入 ──
+  /** GET /accounts/{a}/apps */
+  apps: (): Promise<AppRow[]> => tick(() => cfg.listApps()),
+  /** POST /accounts/{a}/apps（凭证只返回这一次） */
+  createApp: (a: Omit<AppRow, "id" | "enabled">): Promise<{ app: AppRow; secret: string }> => tick(() => cfg.createApp(a)),
+  /** POST /apps/{id}/rotate-credential（旧凭证立即失效） */
+  rotateCredential: (id: string): Promise<{ secret: string }> => tick(() => cfg.rotateCredential(id)),
+  /** POST /accounts/{a}/webhook-deliveries/query */
+  deliveries: (): Promise<DeliveryRow[]> => tick(() => cfg.listDeliveries()),
+  /** POST /webhook-deliveries/{id}/redeliver */
+  redeliver: (id: string): Promise<DeliveryRow> => tick(() => cfg.redeliver(id)),
+  /** 定义版本总览（processes / ticket-types / … 的 versions 汇总） */
+  definitionVersions: (): Promise<DefinitionVersionRow[]> => tick(() => cfg.definitionVersions()),
 };
 
 /** react-query 的 key 前缀：任何写操作后整体失效，待办角标、统计卡、列表一起刷新 */

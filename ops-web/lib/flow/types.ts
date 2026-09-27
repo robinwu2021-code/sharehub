@@ -260,3 +260,120 @@ export interface QueueTask {
   /** 领取后自动放回的时刻 */
   claimExpiresAtMs?: number;
 }
+
+// ── 流程定义（21/06 §四：PUT …/processes/{code} 幂等发布，校验失败 422 逐条）─────────
+/** 审批人只能选四种（原型 P5a「改动的边界」） */
+export type ApproverKind = "PERM" | "ROLE" | "QUEUE" | "ASSIGNED";
+/** 进入条件只支持「属性为真 / 等于 / 属于」；复杂判断由业务系统提交前算成属性 */
+export type ConditionOp = "TRUE" | "EQ" | "IN";
+
+export interface ProcessStepDef {
+  code: string;
+  name: string;
+  approver: { kind: ApproverKind; value: string };
+  /** ANY = 或签（一人通过即过）；ALL = 会签 */
+  mode: "ANY" | "ALL";
+  when?: { field: string; op: ConditionOp; value?: string };
+  timeLimitHours: number;
+}
+
+export interface ProcessDef {
+  code: string;
+  name: string;
+  steps: ProcessStepDef[];
+  /** 可关的规则只有跨步互斥；「提交人不能审自己」「驳回必填原因」恒开 */
+  crossStepExclusive: boolean;
+}
+
+export interface ProcessSummary {
+  code: string;
+  name: string;
+  stepsSummary: string;
+  version: string;
+  /** 在途（待审）单数 */
+  running: number;
+  enabled: boolean;
+}
+
+export interface ProcessVersion {
+  version: string;
+  atMs: number;
+  channel: "API" | "CONSOLE";
+  by: string;
+  note?: string;
+  current: boolean;
+}
+
+export interface PublishResult {
+  version: string;
+  /** false = 内容没变，没有生成新版本（幂等） */
+  created: boolean;
+  /** 还在按旧版本走的在途单数 */
+  runningOnOlderVersions: number;
+}
+
+/** 422 的逐条错误（21/06 §二 错误形状里的 errors[]） */
+export interface FieldError { path: string; error: string }
+
+// ── 运营配置 ────────────────────────────────────────────────────────────
+export interface SlaPolicy {
+  code: string;
+  ticketType: Named;
+  /** 优先级代号；"*" = 其余 */
+  priority: string;
+  respondMin: number;
+  resolveMin: number;
+  /** true = 按营业时间计（用 calendar）；false = 7×24 */
+  businessHours: boolean;
+  calendar?: string;
+}
+
+export interface WorkCalendar {
+  code: string;
+  name: string;
+  timeZone: string;
+  /** 1–7，周一为 1 */
+  weekdays: number[];
+  open: string;
+  close: string;
+  holidays: { date: string; name: string }[];
+}
+
+export interface QueueGroup {
+  code: string;
+  name: string;
+  sort: "PRIORITY_THEN_AGE" | "AGE";
+  claimTimeoutMin: number;
+}
+
+// ── 接入管理（21/06 §三：应用 · 订阅 · 投递）──────────────────────────────────
+export interface AppRow {
+  id: string;
+  code: string;
+  name: string;
+  callbackUrl: string;
+  timeZone: string;
+  enabled: boolean;
+}
+
+export interface DeliveryRow {
+  id: string;
+  eventType: string;
+  app: string;
+  idemKey: string;
+  status: "DELIVERED" | "FAILED" | "RETRYING";
+  httpStatus?: number;
+  error?: string;
+  durationMs?: number;
+  attempts: number;
+  maxAttempts: number;
+  atMs: number;
+}
+
+export interface DefinitionVersionRow {
+  kind: "PROCESS" | "TICKET_TYPE" | "STATE_MACHINE";
+  code: string;
+  version: string;
+  atMs: number;
+  by: string;
+}
