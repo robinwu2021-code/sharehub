@@ -96,8 +96,6 @@ public class RentOrderServiceImpl implements RentOrderService {
 
     /** 结算即请款、补缴（C-BL-04）。 */
     private final ai.neargo.sharehub.trade.pay.service.PaymentService payments;
-    /** 欠费告知（站内信）。ObjectProvider：告知是附带动作，缺了不该让结算起不来。 */
-    private final ObjectProvider<ai.neargo.sharehub.user.core.service.ConsumerInboxService> inbox;
 
     public RentOrderServiceImpl(OrdMapper mapper, OrdStateMachine stateMachine,
                                 OrdRentExtMapper rentExtMapper, InterventionMapper interventionMapper,
@@ -114,10 +112,8 @@ public class RentOrderServiceImpl implements RentOrderService {
                                 ai.neargo.sharehub.common.time.BizClock clock,
                                 ai.neargo.sharehub.dev.port.CabinetCommandPort cabinetCommands,
                                 ai.neargo.sharehub.trade.EjectSimulation ejectSimulation,
-                                ai.neargo.sharehub.trade.pay.service.PaymentService payments,
-                                ObjectProvider<ai.neargo.sharehub.user.core.service.ConsumerInboxService> inbox) {
+                                ai.neargo.sharehub.trade.pay.service.PaymentService payments) {
         this.payments = payments;
-        this.inbox = inbox;
         this.cabinetCommands = cabinetCommands;
         this.ejectSimulation = ejectSimulation;
         this.clock = clock;
@@ -757,28 +753,12 @@ public class RentOrderServiceImpl implements RentOrderService {
     }
 
     /**
-     * 欠费告知（2026-09-28）。扣款失败的人**下一次借的时候**才会被拦 —— 那时他站在柜机前、
-     * 急着用电，才第一次知道自己欠钱。结算时就告诉他欠多少、去哪补。
-     * 告知失败只记 WARN：丢的是一条消息，不是一笔钱（同 OrderSettledInboxListener）。
+     * 欠费告知：发 {@link ai.neargo.sharehub.api.core.event.OrderArrearsEvent}，由 user 域发站内信。
+     * 不直接调站内信服务 —— user 已依赖 trade，再反向依赖就成环（ArchitectureTest#noCyclesBetweenDomains）。
      */
     private void notifyArrears(OrdOrder e, java.math.BigDecimal due) {
-        var box = inbox.getIfAvailable();
-        if (box == null) return;
-        try {
-            String amt = due.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString();
-            String cur = e.getCurrency() == null ? "" : e.getCurrency();
-            box.post(e.getCUserNo(), "ORDER",
-                    new ai.neargo.sharehub.user.core.service.ConsumerInboxService.Text(
-                            "订单扣款未成功", "Payment didn't go through", "لم تتم عملية الدفع"),
-                    new ai.neargo.sharehub.user.core.service.ConsumerInboxService.Text(
-                            "订单 " + e.getOrderNo() + " 应付 " + amt + " " + cur + " 扣款未成功。请在订单详情补缴，补缴后才能借下一单。",
-                            "The charge of " + amt + " " + cur + " for order " + e.getOrderNo()
-                                    + " didn't go through. Please pay it in the order details before your next rental.",
-                            "لم يتم خصم مبلغ " + amt + " " + cur + " للطلب " + e.getOrderNo()
-                                    + ". يرجى الدفع من تفاصيل الطلب قبل الاستئجار التالي."));
-        } catch (RuntimeException ex) {
-            log.warn("欠费站内信发送失败 orderNo={}，欠费已记、仅告知缺失", e.getOrderNo(), ex);
-        }
+        eventBus.publish(new ai.neargo.sharehub.api.core.event.OrderArrearsEvent(
+                e.getOrderNo(), e.getCUserNo(), due, e.getCurrency()));
     }
 
     private void markPaid(OrdOrder e, java.math.BigDecimal amount, String payNo) {
