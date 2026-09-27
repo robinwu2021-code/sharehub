@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   claimTicket, countTodos, getTicket, queryTickets, queryTodos, reassignTickets, resetFlowDb,
-  ticketStats, transitionTicket, ME, ASSIGNEE_OPTIONS,
+  ticketStats, transitionTicket, ME, ASSIGNEE_OPTIONS, getTicketView, getTimeline, addComment, assignTicket,
 } from "./mock-db";
 
 const NOW = new Date("2026-09-27T12:00:00").getTime();
@@ -109,3 +109,33 @@ describe("工单", () => {
     expect(r.list.map((t) => t.ticketNo)).toContain("CS26092712");
   });
 });
+
+describe("工单详情", () => {
+  it("待接单时「响应」就是列表上那个 SLA；接单后响应达标", () => {
+    const row = getTicket("WO26092701", NOW);
+    const v = getTicketView("WO26092701", NOW);
+    const respond = v.slaMetrics.find((m) => m.code === "respond")!;
+    expect(respond.state).toBe(row.slaState);
+    expect(respond.dueAtMs).toBe(row.slaNextDueAtMs);
+    transitionTicket("WO26092701", "ACCEPT", NOW);
+    expect(getTicketView("WO26092701", NOW).slaMetrics.find((m) => m.code === "respond")!.state).toBe("MET");
+  });
+
+  it("撤单必须填原因；迁移、备注、改派都进时间线（新的在上）", () => {
+    expect(() => transitionTicket("WO26092701", "CANCEL", NOW)).toThrow(/原因/);
+    transitionTicket("WO26092701", "ACCEPT", NOW);
+    addComment("WO26092701", "已联系场地方", NOW + 1000);
+    const tl = getTimeline("WO26092701");
+    expect(tl[0]).toMatchObject({ kind: "COMMENT", detail: "已联系场地方" });
+    expect(tl[1].title).toMatch(/接单：待接单 → 处理中/);
+  });
+
+  it("退回抢单池：清空受理方、回到待接单，出现在可抢待办里", () => {
+    assignTicket("WO26092688", null, "受理方联系不上", NOW);
+    const t = getTicket("WO26092688", NOW);
+    expect(t.assignee).toBeUndefined();
+    expect(t.status.code).toBe("PENDING_ACCEPT");
+    expect(queryTodos({ origin: "ALL", claimable: true, page: 1, size: 50 }, NOW).list.map((x) => x.ticketNo)).toContain("WO26092688");
+  });
+});
+

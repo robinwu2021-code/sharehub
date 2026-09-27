@@ -2,7 +2,7 @@
 // 业务词（工单类型名、状态名、办理人类型、来源）一律用服务给的 name，不在这里内置（21/06 §七）。
 import type { BadgeTone } from "@/components/ui/badge";
 import type { StatusMap } from "@/components/ui/status-badge";
-import type { StatusCategory, TodoOrigin } from "./types";
+import type { ApprovalStatus, StatusCategory, TodoOrigin } from "./types";
 
 /** 待办类型徽标。可抢单单独一档：它和「已派给我的」要一眼分开 */
 export const TODO_KIND: StatusMap<TodoOrigin | "POOL"> = {
@@ -24,3 +24,11 @@ export const CATEGORY_TONE: Record<StatusCategory, BadgeTone> = {
 export function priorityTone(ordinal: number): BadgeTone {
   return ordinal <= 0 ? "danger" : ordinal === 1 ? "warning" : "muted";
 }
+
+/** 审批单状态（平台概念，非业务词） */
+export const APPROVAL_STATUS: StatusMap<ApprovalStatus> = {
+  PENDING: { label: "待审", tone: "warning" },
+  APPROVED: { label: "已通过", tone: "success" },
+  REJECTED: { label: "已驳回", tone: "danger" },
+  WITHDRAWN: { label: "已撤回", tone: "muted" },
+};

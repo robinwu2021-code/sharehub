@@ -5,7 +5,11 @@
 // 基址：经宿主同源反代 /api/opskit/v1；运行时资源在 /workspaces/{ws}/ 下，ShareHub 场景 ws = ext:{租户号}。
 // 页面不直接 import mock-db（architecture: 页面只认 client）。
 import * as db from "./mock-db";
-import type { Member, Named, Page, TicketQuery, TicketRow, TicketStat, TodoCount, TodoItem, TodoQuery } from "./types";
+import * as ap from "./mock-approvals";
+import type {
+  ApprovalQuery, ApprovalRow, ApprovalStatus, ApprovalView, Member, Named, Page, QueueSummary, QueueTask, TicketQuery,
+  TicketRow, TicketStat, TicketView, TimelineEvent, TodoCount, TodoItem, TodoQuery,
+} from "./types";
 
 /** 模拟网络往返：让加载态、按钮 loading 在 mock 下也真实出现 */
 const tick = <T,>(f: () => T) => new Promise<T>((resolve, reject) => {
@@ -24,7 +28,15 @@ export const flow = {
   /** POST /workspaces/{ws}/tickets/{no}/claim */
   claim: (no: string): Promise<TicketRow> => tick(() => db.claimTicket(no)),
   /** POST /workspaces/{ws}/tickets/{no}/transitions/{code} */
-  transition: (no: string, code: string): Promise<TicketRow> => tick(() => db.transitionTicket(no, code)),
+  transition: (no: string, code: string, comment?: string): Promise<TicketRow> => tick(() => db.transitionTicket(no, code, Date.now(), comment)),
+  /** GET /workspaces/{ws}/tickets/{no} */
+  ticket: (no: string): Promise<TicketView> => tick(() => db.getTicketView(no)),
+  /** GET /workspaces/{ws}/tickets/{no}/timeline */
+  timeline: (no: string): Promise<TimelineEvent[]> => tick(() => db.getTimeline(no)),
+  /** POST /workspaces/{ws}/tickets/{no}/comments */
+  comment: (no: string, body: string): Promise<TimelineEvent[]> => tick(() => db.addComment(no, body)),
+  /** POST /workspaces/{ws}/tickets/{no}/assign（to 为 null = 退回抢单池） */
+  assign: (no: string, to: Member | null, reason: string): Promise<TicketRow> => tick(() => db.assignTicket(no, to, reason)),
   /** POST /workspaces/{ws}/tickets/reassign */
   reassign: (nos: string[], to: Member, reason: string): Promise<TicketRow[]> =>
     tick(() => db.reassignTickets(nos, to, reason)),
@@ -34,6 +46,38 @@ export const flow = {
   ticketTypes: (): Named[] => db.TICKET_TYPES,
   /** 受理方筛选项：成员属性 partyType 的取值（接后端后：成员属性定义） */
   partyOptions: (): Named[] => db.PARTY_OPTIONS,
+
+  // ── 审批 ──
+  /** POST /workspaces/{ws}/approvals/query */
+  approvals: (q: ApprovalQuery): Promise<Page<ApprovalRow>> => tick(() => ap.queryApprovals(q)),
+  /** 状态页签角标（approvals/query 的计数，按 status 分组） */
+  approvalCount: (): Promise<Record<ApprovalStatus, number>> => tick(() => ap.countApprovals()),
+  /** GET /workspaces/{ws}/approvals/{no} */
+  approval: (no: string): Promise<ApprovalView> => tick(() => ap.getApproval(no)),
+  /** POST /workspaces/{ws}/approvals/{no}/decide {taskNo, decision, reason?} */
+  decide: (no: string, taskNo: string, decision: "APPROVE" | "REJECT", reason?: string): Promise<ApprovalView> =>
+    tick(() => ap.decide(no, taskNo, decision, reason)),
+  /** POST /workspaces/{ws}/approvals/{no}/withdraw */
+  withdraw: (no: string): Promise<ApprovalView> => tick(() => ap.withdraw(no)),
+  /** 流程筛选项（GET …/processes） */
+  processOptions: (): Named[] => ap.PROCESS_OPTIONS,
+  /** 提交人筛选项（成员查询） */
+  requesterOptions: (): Named[] => ap.REQUESTER_OPTIONS,
+
+  // ── 审核队列（任务）──
+  /** 各队列的未领数（tasks/query 按队列组计数） */
+  queues: (): Promise<QueueSummary[]> => tick(() => ap.queueSummaries()),
+  /** POST /workspaces/{ws}/tasks/query {queueGroup, status: OPEN} */
+  queueTasks: (queue: string, page: number, size: number): Promise<Page<QueueTask>> => tick(() => ap.queueTasksOf(queue, page, size)),
+  /** POST /workspaces/{ws}/tasks/query {assignee: me, claimed} */
+  myClaimed: (): Promise<QueueTask[]> => tick(() => ap.myClaimed()),
+  /** POST /workspaces/{ws}/tasks/{no}/claim */
+  claimTask: (taskNo: string): Promise<QueueTask> => tick(() => ap.claimTask(taskNo)),
+  /** POST /workspaces/{ws}/tasks/{no}/release */
+  releaseTask: (taskNo: string): Promise<QueueTask> => tick(() => ap.releaseTask(taskNo)),
+  /** POST /workspaces/{ws}/tasks/{no}/complete */
+  completeTask: (taskNo: string, decision: "APPROVE" | "REJECT", reason?: string): Promise<void> =>
+    tick(() => ap.completeTask(taskNo, decision, reason)),
 };
 
 /** react-query 的 key 前缀：任何写操作后整体失效，待办角标、统计卡、列表一起刷新 */

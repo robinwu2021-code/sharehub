@@ -19,6 +19,9 @@ import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
 import { SlaCell } from "@/components/flow/sla-cell";
 import { StatStrip } from "@/components/flow/stat-strip";
 import { PriorityBadge, TicketStatusBadge } from "@/components/flow/badges";
+import { FlowNav } from "@/components/flow/flow-nav";
+import { actionVariant, inlineActions } from "@/lib/flow/present";
+import Link from "next/link";
 
 // 筛选项都来自服务（工单类型 / 成员属性定义），不在前端内置业务词（21/06 §七）
 const TYPE_OPTIONS = flow.ticketTypes().map((t) => ({ value: t.code, label: t.name }));
@@ -88,7 +91,7 @@ export default function FlowTicketsPage() {
   });
 
   const columns: Column<TicketRow>[] = [
-    { header: "单号", pk: true, cell: (t) => t.ticketNo },
+    { header: "单号", pk: true, cell: (t) => <Link href={`/flow/tickets/detail/?no=${t.ticketNo}`} className="text-primary underline-offset-2 hover:underline">{t.ticketNo}</Link> },
     { header: "类型", cell: (t) => <Badge tone="default">{t.type.name}</Badge> },
     { header: "标题 / 对象", cell: (t) => <span>{t.title}{t.subject && <> · <span className="text-muted-foreground">{t.subject.display.title}</span></>}</span> },
     { header: "优先级", cell: (t) => <PriorityBadge p={t.priority} /> },
@@ -107,11 +110,11 @@ export default function FlowTicketsPage() {
       className: "text-end",
       cell: (t) => (
         <span className="inline-flex justify-end gap-2">
-          {t.actions.map((a) => (
+          {inlineActions(t.actions).map((a) => (
             <Button
               key={a.code}
               size="sm"
-              variant={a.toCategory === "DONE" ? "default" : "secondary"}
+              variant={actionVariant(a, t.statusCategory)}
               loading={act.isPending && act.variables?.no === t.ticketNo && act.variables?.code === a.code}
               disabled={act.isPending}
               onClick={() => act.mutate({ no: t.ticketNo, code: a.code })}
@@ -128,6 +131,7 @@ export default function FlowTicketsPage() {
 
   return (
     <div>
+      <FlowNav />
       <PageTitle title="工单工作台" desc="统计卡可点，点进即筛好的列表。SLA 色条：绿 正常 · 黄 将超时 · 红 已超时 · 灰 暂停。" />
       <StatStrip
         stats={stats.data}

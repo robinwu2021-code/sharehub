@@ -18,6 +18,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { SlaCell } from "@/components/flow/sla-cell";
 import { PriorityBadge } from "@/components/flow/badges";
+import { FlowNav } from "@/components/flow/flow-nav";
 
 type TabKey = "all" | "process" | "ticket" | "pool";
 const TAB_QUERY: Record<TabKey, Pick<TodoQuery, "origin" | "claimable">> = {
@@ -68,7 +69,15 @@ export default function FlowTodoPage() {
 
   const columns: Column<TodoItem>[] = [
     { header: "类型", cell: (t) => <StatusBadge map={TODO_KIND} value={t.claimable ? "POOL" : t.origin} /> },
-    { header: "标题", cell: (t) => <span className="txt-strong">{t.title}</span> },
+    {
+      header: "标题",
+      cell: (t) => {
+        const href = t.ticketNo ? `/flow/tickets/detail/?no=${t.ticketNo}` : t.approvalNo ? `/flow/approvals/detail/?no=${t.approvalNo}` : null;
+        return href && !t.claimable
+          ? <Link href={href} className="txt-strong text-primary underline-offset-2 hover:underline">{t.title}</Link>
+          : <span className="txt-strong">{t.title}</span>;
+      },
+    },
     { header: "业务对象", cell: (t) => t.subject.display.title },
     { header: "优先级", cell: (t) => <PriorityBadge p={t.priority} /> },
     {
@@ -94,6 +103,7 @@ export default function FlowTodoPage() {
 
   return (
     <div>
+      <FlowNav />
       <PageTitle title="待办中心" desc="审批与工单在同一张列表；只显示你够资格办、且在你数据范围内的。" />
       <Tabs
         tabs={tabs}

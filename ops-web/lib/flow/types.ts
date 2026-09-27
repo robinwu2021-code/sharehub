@@ -154,3 +154,109 @@ export interface Page<T> {
   list: T[];
   total: number;
 }
+
+// ── 工单详情（21/06 §七 TicketView）──────────────────────────────────────
+export interface SlaMetric extends SlaSummary {
+  code: string;
+  name: string;
+}
+
+export interface TicketView extends TicketRow {
+  description?: string;
+  /** 全部字段（详情用）；显示顺序与标签来自类型的字段配置 —— mock 直接给 label */
+  fieldList: { code: string; label: string; value: FieldValue }[];
+  participants: { role: Named; member: Pick<Member, "ref" | "displayName"> }[];
+  /** 每个 SLA 指标一项（响应、解决…） */
+  slaMetrics: SlaMetric[];
+  resolution?: Named;
+  mergedInto?: string;
+  /** 去重：并入本单的重复次数与去重键 */
+  dedupe?: { key: string; attachedCount: number };
+}
+
+/** 时间线（GET /tickets/{no}/timeline）：迁移、派单、SLA 事件、评论同一条流水 */
+export interface TimelineEvent {
+  seq: number;
+  atMs: number;
+  kind: "CREATED" | "ASSIGNED" | "TRANSITION" | "SLA" | "DEDUPE" | "COMMENT" | "ESCALATED";
+  title: string;
+  actor: string;
+  detail?: string;
+  /** 需要强调的事件（如 SLA 提醒） */
+  hot?: boolean;
+}
+
+// ── 审批（21/06 §四）─────────────────────────────────────────────────────
+export type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED" | "WITHDRAWN";
+
+export interface ApprovalRow {
+  approvalNo: string;
+  process: Named;
+  subject: SubjectRef;
+  status: ApprovalStatus;
+  currentStep?: Named;
+  currentRound: number;
+  requestedBy: Pick<Member, "ref" | "displayName">;
+  requestedAtMs: number;
+  finishedAtMs?: number;
+  /** 当前步开始时刻（待审时「已等待」= 现在 − 它） */
+  stepStartedAtMs?: number;
+  stepDueAtMs?: number;
+}
+
+export interface ApprovalQuery {
+  status?: ApprovalStatus[];
+  processCode?: string;
+  requestedBy?: string;
+  fromMs?: number;
+  keyword?: string;
+  page: number;
+  size: number;
+}
+
+export interface ApprovalStep {
+  code: string;
+  name: string;
+  /** 审批人说明（如「持 location:contract:audit」） */
+  approver: string;
+  /** 条件步的进入条件说明；无则必经 */
+  condition?: string;
+  state: "DONE" | "CURRENT" | "TODO" | "SKIPPED";
+  decidedBy?: string;
+  decidedAtMs?: number;
+}
+
+export interface ApprovalRound {
+  round: number;
+  status: ApprovalStatus | "IN_PROGRESS";
+  atMs: number;
+  by: string;
+  comment?: string;
+}
+
+export interface ApprovalView extends ApprovalRow {
+  /** 业务对象的关键字段（由业务系统提交时给出的展示字段） */
+  facts: { label: string; value: string; hint?: string }[];
+  steps: ApprovalStep[];
+  rounds: ApprovalRound[];
+  evidence: { name: string; count?: number }[];
+  /** 我在这张单上能做什么（服务按规则算） */
+  mine: { taskNo?: string; canDecide: boolean; whyNot?: string; canWithdraw: boolean };
+  /** 这条流程开着的内建规则（界面上的「规则提示」） */
+  rules: { crossStepExclusive: boolean };
+}
+
+// ── 审核队列（21/06 §四 任务）─────────────────────────────────────────────
+export interface QueueSummary extends Named { unclaimed: number }
+
+export interface QueueTask {
+  taskNo: string;
+  queue: Named;
+  subject: SubjectRef;
+  priority: Priority;
+  createdAtMs: number;
+  evidence: string;
+  claimedBy?: Pick<Member, "ref" | "displayName">;
+  /** 领取后自动放回的时刻 */
+  claimExpiresAtMs?: number;
+}

@@ -12,8 +12,8 @@
 //  2. 工单的可走动作 actions[] 由这里按「状态 × SLA × 受理方」算好返回，页面不维护迁移表。
 import { fail, notFound } from "@/lib/biz-error";
 import type {
-  Member, Named, Page, Priority, SlaState, SlaSummary, StatusCategory, TicketAction, TicketFilter,
-  TicketQuery, TicketRow, TicketStat, TodoCount, TodoItem, TodoQuery,
+  Member, Named, Page, Priority, SlaMetric, SlaState, SlaSummary, StatusCategory, TicketAction, TicketFilter,
+  TicketQuery, TicketRow, TicketStat, TicketView, TimelineEvent, TodoCount, TodoItem, TodoQuery,
 } from "./types";
 
 const MIN = 60_000;
@@ -78,6 +78,9 @@ interface TicketRec {
   source: { kind: SourceCode; ref?: string };
   escalated: boolean;
   nudgedAtMs: number | null;
+  description?: string;
+  dedupe?: { key: string; attachedCount: number };
+  cancelReason?: string;
   createdAtMs: number;
   closedAtMs: number | null;
 }
@@ -93,6 +96,8 @@ interface ApprovalTodoRec {
 }
 
 let tickets: TicketRec[] = [];
+/** 每张单的时间线（只追加） */
+let timelines: Record<string, TimelineEvent[]> = {};
 let approvalTodos: ApprovalTodoRec[] = [];
 let seq = 0;
 
@@ -109,7 +114,9 @@ function seed(now: number) {
   tickets = [
     t({ ticketNo: "WO26092701", title: "机柜离线", subject: sub("cabinet", "CAB1001", "CAB1001 万达广场 B1"), priority: "URGENT",
         status: "PENDING_ACCEPT", assignee: ME, slaStartMs: now - 3.5 * HOUR, slaDueAtMs: now + 28 * MIN,
-        source: { kind: "ALARM", ref: "ALM8812" } }),
+        source: { kind: "ALARM", ref: "ALM8812" }, createdAtMs: now - 3.5 * HOUR,
+        description: "告警引擎：CAB1001 连续 3 次心跳缺失，最后心跳 09:41",
+        dedupe: { key: "ALARM:CAB1001:OFFLINE", attachedCount: 2 } }),
     t({ ticketNo: "WO26092688", title: "仓位卡宝", subject: sub("cabinet", "CAB0223", "CAB0223 DXB 机场"), priority: "HIGH",
         status: "PROCESSING", assignee: member("STAFF", "musa", "Musa"), slaStartMs: now - 2.2 * HOUR,
         slaDueAtMs: now + 1.8 * HOUR, source: { kind: "ALARM" } }),
@@ -151,6 +158,19 @@ function seed(now: number) {
       closedAtMs: status === "CLOSED" ? now - (i % 5) * 40 * MIN : null,
     }));
   }
+  timelines = {};
+  for (const r of tickets) {
+    const ev: TimelineEvent[] = [{ seq: 1, atMs: r.createdAtMs, kind: "CREATED", title: "开单",
+      actor: r.source.kind === "ALARM" ? "系统（告警引擎）" : r.source.kind === "PATROL" ? "系统（巡检计划）" : "运营", detail: `优先级 ${PRIO[r.priority].name}` }];
+    if (r.assignee) ev.push({ seq: 2, atMs: r.createdAtMs + 2 * MIN, kind: "ASSIGNED", title: "派单", actor: "运营 Omar",
+      detail: `指派给 ${r.assignee.attrs?.partyType?.name ?? ""} · ${r.assignee.displayName} · SLA 起算` });
+    if (r.dedupe) ev.push({ seq: 3, atMs: now - 50 * MIN, kind: "DEDUPE", title: "重复告警并入", actor: "系统",
+      detail: `命中去重键 ${r.dedupe.key}，附加到本单` });
+    if (r.slaDueAtMs - now > 0 && r.slaDueAtMs - now < DUE_SOON_MS && r.pausedAtMs == null && r.closedAtMs == null) {
+      ev.push({ seq: 4, atMs: now - 2 * MIN, kind: "SLA", title: "SLA 提醒 · 即将超时", actor: "系统", detail: "已通知受理方与运营", hot: true });
+    }
+    timelines[r.ticketNo] = ev;
+  }
   approvalTodos = [
     { taskNo: "TK2609270001", approvalNo: "AP2609270001", title: "进场合同 · 运营审批", priority: "HIGH",
       subject: sub("contract", "CT0042", "CT0042 万达广场 · 分成 35% · 12 个月"), startMs: now - 7.4 * HOUR, dueAtMs: now + 4 * HOUR },
@@ -186,10 +206,14 @@ function actionsOf(r: TicketRec, state: SlaState): TicketAction[] {
   if (!OPEN.includes(r.status)) return [];
   const out: TicketAction[] = [];
   const cat = STATUS[r.status].category;
-  if (state === "BREACHED" && r.assignee && r.assignee.ref !== ME.ref) out.push(act("TAKEOVER", "接管", cat));
-  if (r.status === "PENDING_ACCEPT" && !r.pooled) out.push(act("NUDGE", "催办", cat));
-  if (r.status === "PROCESSING" && !r.escalated) out.push(act("ESCALATE", "升级", cat));
+  const mine = r.assignee?.ref === ME.ref;
+  if (r.status === "PENDING_ACCEPT" && mine) out.push(act("ACCEPT", "接单", "IN_PROGRESS"));
+  if (state === "BREACHED" && r.assignee && !mine) out.push(act("TAKEOVER", "接管", cat));
+  if (r.status === "PENDING_ACCEPT" && !r.pooled && !mine) out.push(act("NUDGE", "催办", cat));
+  if ((r.status === "PROCESSING" || (r.status === "PENDING_ACCEPT" && mine)) && !r.escalated) out.push(act("ESCALATE", "升级", cat));
   if (r.status === "PENDING_REVIEW") out.push(act("REVIEW", "复核", "DONE"));
+  // 撤单要填原因：列表不出（requires 非空的动作只在详情里办）
+  out.push({ code: "CANCEL", name: "撤单", toCategory: "CANCELLED", requires: { fields: [], comment: true } });
   return out;
 }
 
@@ -340,24 +364,34 @@ export function claimTicket(no: string, now: number = Date.now()): TicketRow {
   r.pooled = false;
   r.assignee = ME;
   r.status = "PROCESSING";
+  log(r.ticketNo, now, "ASSIGNED", "从抢单池领取", ME.displayName);
   seq++;
   return out(view(r, now));
 }
 
 /** 迁移：只接受服务端当前给出的动作；其余一律拒绝（不信页面按钮） */
-export function transitionTicket(no: string, code: string, now: number = Date.now()): TicketRow {
+export function transitionTicket(no: string, code: string, now: number = Date.now(), comment?: string): TicketRow {
   const r = row(no);
   const allowed = actionsOf(r, slaStateOf(r, now));
   const act = allowed.find((a) => a.code === code);
   if (!act) {
     fail(`工单 ${no} 当前是「${STATUS[r.status].name}」，不能执行 ${code}`, `Ticket ${no} is "${r.status}"; action ${code} is not allowed now`);
   }
+  if (act.requires.comment && !comment?.trim()) {
+    fail(`「${act.name}」必须填写原因（会记入时间线）`, `"${act.name}" requires a reason (it goes into the timeline)`);
+  }
+  const from = STATUS[r.status].name;
   switch (code) {
     case "NUDGE": r.nudgedAtMs = now; break;
     case "ESCALATE": r.escalated = true; break;
     case "TAKEOVER": r.assignee = ME; break;
+    case "ACCEPT": r.status = "PROCESSING"; break;
     case "REVIEW": r.status = "CLOSED"; r.closedAtMs = now; r.pausedAtMs = null; break;
+    case "CANCEL": r.status = "CANCELLED"; r.closedAtMs = now; r.pausedAtMs = null; r.cancelReason = comment; break;
   }
+  const to = STATUS[r.status].name;
+  log(r.ticketNo, now, code === "ESCALATE" ? "ESCALATED" : "TRANSITION",
+    from === to ? act.name : `${act.name}：${from} → ${to}`, ME.displayName, comment?.trim() || undefined);
   return out(view(r, now));
 }
 
@@ -370,7 +404,10 @@ export function reassignTickets(nos: string[], to: Member, reason: string, now: 
   if (closed.length) {
     fail(`以下工单已结，不能改派：${closed.join("、")}`, `These tickets are already closed and cannot be reassigned: ${closed.join(", ")}`);
   }
-  for (const r of rows) { r.assignee = to; r.pooled = false; }
+  for (const r of rows) {
+    r.assignee = to; r.pooled = false;
+    log(r.ticketNo, now, "ASSIGNED", "改派", ME.displayName, `改派给 ${to.attrs?.partyType?.name ?? ""} · ${to.displayName}：${reason.trim()}`);
+  }
   return rows.map((r) => out(view(r, now)));
 }
 
@@ -383,5 +420,77 @@ export const ASSIGNEE_OPTIONS: Member[] = [
 /** 受理方筛选的选项（成员属性 partyType 的取值；接后端后由成员属性定义给出） */
 export const PARTY_OPTIONS: Named[] = Object.entries(PARTY).map(([code, name]) => ({ code, name }));
 
-// 放在文件末尾：种子要用到上面定义的 ASSIGNEE_OPTIONS（const 有暂时性死区）
+// ── 工单详情 · 时间线 · 备注 · 退回抢单池 ────────────────────────────────────
+function log(no: string, atMs: number, kind: TimelineEvent["kind"], title: string, actor: string, detail?: string) {
+  const list = (timelines[no] ??= []);
+  list.push({ seq: list.length + 1, atMs, kind, title, actor, detail });
+}
+
+/** GET /workspaces/{ws}/tickets/{no}：行 + 全部字段 + 参与者 + 每个 SLA 指标 + 动作 */
+export function getTicketView(no: string, now: number = Date.now()): TicketView {
+  const r = row(no);
+  const base = out(view(r, now));
+  // 待接单时，最近的运行中指标是「响应」（它就是列表上那个 SLA）；「解决」截止更晚。
+  // 接单后响应达标，列表上的 SLA 换成「解决」。与原型 P5 同口径（响应 剩 28 分钟 · 解决 今天 17:32 前）。
+  const accepted = r.status !== "PENDING_ACCEPT";
+  const main = slaOf(r, now);
+  const resolveDue = accepted ? r.slaDueAtMs : r.slaDueAtMs + 6 * HOUR;
+  const resolveState: SlaState = main.state === "PAUSED" || main.state === "MET" ? main.state
+    : resolveDue < now ? "BREACHED" : resolveDue - now < DUE_SOON_MS ? "WARNING" : "RUNNING";
+  const metrics: SlaMetric[] = [
+    accepted
+      ? { code: "respond", name: "响应", state: "MET", startedAtMs: r.slaStartMs, dueAtMs: r.slaStartMs + 30 * MIN, pausedMs: 0 }
+      : { code: "respond", name: "响应", ...main },
+    { code: "resolve", name: "解决", state: resolveState, startedAtMs: r.slaStartMs, dueAtMs: resolveDue, pausedMs: main.pausedMs },
+  ];
+  return {
+    ...base,
+    description: r.description,
+    fieldList: [
+      { code: "subject", label: "对象", value: { value: r.subject.ref, name: r.subject.display.title } },
+      { code: "source", label: "来源", value: { value: r.source.kind, name: SOURCE_OPT[r.source.kind] } },
+      ...(r.source.ref ? [{ code: "sourceRef", label: "来源单号", value: { value: r.source.ref } }] : []),
+      { code: "type", label: "类型", value: { value: r.typeCode, name: TYPE_NAME[r.typeCode] } },
+    ],
+    participants: [
+      ...(r.assignee ? [{ role: { code: "ASSIGNEE", name: "受理方" }, member: r.assignee }] : []),
+      { role: { code: "OWNER", name: "负责运营" }, member: { ref: "omar", displayName: "Omar" } },
+    ],
+    slaMetrics: metrics,
+    ...(r.status === "CANCELLED" ? { resolution: { code: "CANCELLED", name: `已撤单：${r.cancelReason ?? ""}` } } : {}),
+    ...(r.dedupe ? { dedupe: r.dedupe } : {}),
+  };
+}
+
+/** GET /workspaces/{ws}/tickets/{no}/timeline：新的在上 */
+export function getTimeline(no: string): TimelineEvent[] {
+  row(no);
+  return [...(timelines[no] ?? [])].sort((a, b) => b.atMs - a.atMs || b.seq - a.seq);
+}
+
+/** POST /workspaces/{ws}/tickets/{no}/comments */
+export function addComment(no: string, body: string, now: number = Date.now()): TimelineEvent[] {
+  const r = row(no);
+  if (!body.trim()) fail("备注不能为空", "The note cannot be empty");
+  if (body.length > 1000) fail("备注不能超过 1000 字", "The note cannot exceed 1000 characters");
+  log(r.ticketNo, now, "COMMENT", "备注", ME.displayName, body.trim());
+  return getTimeline(no);
+}
+
+/** POST /workspaces/{ws}/tickets/{no}/assign：to 为 null = 退回抢单池。原因必填 */
+export function assignTicket(no: string, to: Member | null, reason: string, now: number = Date.now()): TicketRow {
+  const r = row(no);
+  if (!OPEN.includes(r.status)) fail(`工单 ${no} 已结，不能改派`, `Ticket ${no} is closed and cannot be reassigned`);
+  if (!reason.trim()) fail("改派必须填写原因（会记入工单时间线）", "A reason is required to reassign (it goes into the ticket timeline)");
+  if (to) {
+    r.assignee = to; r.pooled = false;
+    log(no, now, "ASSIGNED", "改派", ME.displayName, `改派给 ${to.attrs?.partyType?.name ?? ""} · ${to.displayName}：${reason.trim()}`);
+  } else {
+    r.assignee = null; r.pooled = true; r.status = "PENDING_ACCEPT";
+    log(no, now, "ASSIGNED", "退回抢单池", ME.displayName, reason.trim());
+  }
+  return out(view(r, now));
+}
+
+// 放在文件末尾：种子要用到上面定义的 ASSIGNEE_OPTIONS 与 log（const 有暂时性死区）
 resetFlowDb();
