@@ -26,10 +26,12 @@
 #   **只在注释里** —— 真实代码早就注入 Clock.systemUTC() 了。本卡口扫描前会剥注释。）
 
 # —— 钱：口径要先定，不是改个时区就对 ——
-RentOrderServiceImpl 1      # 分润归属 period。注释写着「按**结算时刻**定格，不用『今天』」，
-                            # 而下一行就是 LocalDate.now() —— 两层错。改对要先定哪个时间戳权威：
-                            # ord_order.endedAt 是 LocalDateTime（服务器时区写入），
-                            # rentEndAt 是 UTC 字符串 —— **数据本身就是混的**。待拍板。
+# （RentOrderServiceImpl 已移出：period 改为按 rentEndAt 定格 + 折算到业务日历。
+#   取 rentEndAt 而不是 endedAt —— 归还与逾期买断两条路都写它，且它存的是 **UTC**，
+#   折算精确，不需要「它是哪个时区的」这个假设。
+#   修之前是两层错：用「今天」（与它上面那句注释正好相反，跨月补算会记错月份），
+#   而且是服务器时区的今天（迪拜 9-30 20:00 之后结算的单 period 直接变成 2026-10，
+#   每月有 4 小时的单记错月份，结算单上看不出任何异常）。）
 ReferFeeGeneratorImpl 2     # 推荐费的 onDate 与 period。同上，跨月会记进错的月份。待拍板。
 # （AdjustmentServiceImpl 已从台账移出：撤场结清的关闭时刻现在显式折算成业务日 ——
 #   按写入方时区解释那个时间戳，再换到业务时区取日期。查清了「closedAt 是哪个时区」

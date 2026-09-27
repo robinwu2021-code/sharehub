@@ -85,6 +85,9 @@ public class RentOrderServiceImpl implements RentOrderService {
     /** 免单白名单。同 {@link #coupons}，走端口是为了不把 trade 与 user 连成环。 */
     private final ai.neargo.sharehub.api.core.port.FreeRentPort freeRents;
 
+    /** 分润归属期间是**业务日历**上的月份 —— 见 publishSettled 与 BizClock。 */
+    private final ai.neargo.sharehub.common.time.BizClock clock;
+
     public RentOrderServiceImpl(OrdMapper mapper, OrdStateMachine stateMachine,
                                 OrdRentExtMapper rentExtMapper, InterventionMapper interventionMapper,
                                 PriceResolver priceResolver, PriceEngine priceEngine,
@@ -95,7 +98,9 @@ public class RentOrderServiceImpl implements RentOrderService {
                                 ai.neargo.sharehub.trade.RentabilityGuard rentability,
                                 ai.neargo.sharehub.dev.port.PowerbankTracker powerbankTracker,
                                 ai.neargo.sharehub.api.core.port.CouponUsePort coupons,
-                                ai.neargo.sharehub.api.core.port.FreeRentPort freeRents) {
+                                ai.neargo.sharehub.api.core.port.FreeRentPort freeRents,
+                                ai.neargo.sharehub.common.time.BizClock clock) {
+        this.clock = clock;
         this.freeRents = freeRents;
         this.coupons = coupons;
         this.powerbankTracker = powerbankTracker;
@@ -539,8 +544,24 @@ public class RentOrderServiceImpl implements RentOrderService {
         DevCabinet cab = e.getCabinetNo() == null ? null : cabinetMapper.selectOne(
                 new LambdaQueryWrapper<DevCabinet>()
                         .eq(DevCabinet::getCabinetNo, e.getCabinetNo()).last("limit 1"));
-        // 归属周期按**结算时刻**定格，不用「今天」—— 跨月补算时用今天会把钱记进错的月份
-        String period = java.time.LocalDate.now().toString().substring(0, 7);
+        /*
+         * —— 归属周期：按**结算时刻**定格，且折算到**业务日历** ——
+         *
+         * 这一行此前是 `LocalDate.now().toString().substring(0, 7)`，与它上面那句注释
+         * （「按结算时刻定格，不用『今天』」）**正好相反**，而且还错了第二层：
+         *
+         * ① 用「今天」：跨月补算/重放时会把钱记进补算那个月，而不是原本该归的月；
+         * ② 用服务器时区的「今天」：生产跑在 Asia/Shanghai，业务在 Asia/Dubai ——
+         *    迪拜 9-30 20:00 之后结算的单，period 直接变成 `2026-10`。
+         *    每月有 4 小时的单会记错月份，而结算单上看不出任何异常。
+         *
+         * 取 rentEndAt 而不是 endedAt：两条结算路径（归还 / 逾期买断）都会写 rentEndAt，
+         * 而 endedAt 只有归还那条写；更要紧的是 **rentEndAt 存的是 UTC**，
+         * 折算到业务时区是精确的，不像 endedAt 那样得先假设「它是哪个时区的」。
+         */
+        String period = (e.getRentEndAt() == null ? clock.today()
+                : parseTs(e.getRentEndAt()).atZone(clock.zone()).toLocalDate())
+                .toString().substring(0, 7);
         eventBus.publish(new OrderSettledEvent(
                 e.getOrderNo(), e.getCabinetNo(),
                 cab == null ? null : cab.getSiteNo(),

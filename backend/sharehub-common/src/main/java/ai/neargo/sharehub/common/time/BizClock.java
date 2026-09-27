@@ -1,8 +1,10 @@
 package ai.neargo.sharehub.common.time;
 
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -47,19 +49,35 @@ import java.time.ZoneId;
 public class BizClock {
 
     private final ZoneId zone;
+    private final Clock clock;
 
-    public BizClock(@Value("${sharehub.biz-zone:Asia/Dubai}") String zone) {
+    /**
+     * @param clockProvider 走 {@link Clock} bean 而不是 {@code LocalDate.now(zone)}，
+     *                      是为了让「现在」在测试里**可以被钉住**。
+     *                      <p>时区缺陷的麻烦在于它每天只在几个小时里成立（服务器时区与业务时区
+     *                      跨日的那段），于是负对照白天做不出来 —— 实测栽过一次：退回旧实现后
+     *                      用例照样绿，因为那一刻两个实现根本没有可观察差异。
+     *                      有了这个缝，测试可以把时刻固定在跨日/跨月的那一瞬，
+     *                      让这类缺陷**任何时候都能被照出来**。
+     *                      <p>用 {@link ObjectProvider} 而不是直接依赖：{@code Clock} bean 由
+     *                      {@code ReportConfig} 提供（{@code @ConditionalOnMissingBean}），
+     *                      而不是每个模块都装配它 —— 缺席时回落 {@link Clock#systemUTC()}，
+     *                      与此前行为一致。
+     */
+    public BizClock(@Value("${sharehub.biz-zone:Asia/Dubai}") String zone,
+                    ObjectProvider<Clock> clockProvider) {
         this.zone = ZoneId.of(zone);
+        this.clock = clockProvider.getIfAvailable(Clock::systemUTC);
     }
 
     /** 业务日历上的今天。 */
     public LocalDate today() {
-        return LocalDate.now(zone);
+        return LocalDate.ofInstant(clock.instant(), zone);
     }
 
     /** 业务时区的此刻。 */
     public LocalDateTime now() {
-        return LocalDateTime.now(zone);
+        return LocalDateTime.ofInstant(clock.instant(), zone);
     }
 
     /** 业务时区本身 —— 需要自己换算时用（如把 UTC 字符串折算成业务日）。 */
