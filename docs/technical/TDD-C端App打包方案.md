@@ -109,6 +109,71 @@ gradle 那道在打包那一刻（`apply from:` 接进去，assemble 绕不过�
 | 3 | iOS | 本轮不排，方案只覆盖 Android |
 | 4 | 与功能缺口的先后 | **先修 B1 异常路径再对外发包**（见 §8） |
 
+## 六·五、重新评估（2026-09-27 下午）：Capacitor 作为备选 —— **裁决：维持原生打包**
+
+> **结论（用户 2026-09-27 拍板）：要用原生打包。** 本节保留为评估记录：
+> 对比表与迁移成本估算仍然成立，将来若要摆脱 DCloud 可以直接拿来用。
+> 原生路线当日已**首次打通**，见 [操作手册](C端App离线打包-操作手册.md) 的状态行。
+
+### 原评估（下文「建议：B」是当时的建议，未被采纳）
+
+> 起因：用户指出「打包 app 需要 dcloud 平台，非常不友好」，并要求三端（小程序 / H5 / App）同时支持。
+> 这一节推翻本文 §一的形态选择，[ADR-031](ADR/ADR-031-C端App生产形态为uni离线打包.md) 需随之修订。
+
+### 我先前的理由，只对了一半
+
+§一 里我否掉 Capacitor 的理由是「壳里 `uni.scanCode` 不生效，而扫码是唯一的借出入口」。
+这句话本身是对的，但结论下早了：**扫码不生效是因为端能力没换实现，不是因为壳不行。**
+`src/ports/*` 这一层当初就是为换实现建的。
+
+实测本仓库真正用到的 uni **原生** API 只有四处：
+
+| 用处 | 现在 | Capacitor 里换成 | 工作量 |
+|---|---|---|---|
+| 扫码（借出唯一入口） | `uni.scanCode` | `@capacitor-mlkit/barcode-scanning` | 一个 port 实现 + 权限声明 |
+| 定位 | `uni.getLocation` | **零改动** —— `ports/location.ts` 的 H5 分支本来就走 `navigator.geolocation`，WebView 里可用 | 0 |
+| 唤起导航 | `uni.openLocation` | 开 `geo:` / Google Maps URL | 几行 |
+| 报障选图 | `uni.chooseImage` | `@capacitor/camera` | 一个 port 实现（且这功能**目前本来就是摆设**，后端无附件字段） |
+| 推送（尚未实现） | UniPush | `@capacitor/push-notifications` + FCM/APNs | 与走 uni 一样要从零接 |
+
+小程序与 H5 **完全不受影响**：仍由 uni 编译，Capacitor 只接管「把 H5 产物装成 App」这一段。
+
+### 三条路对比
+
+| | A. uni 离线打包（本文原方案） | **B. Capacitor 壳（建议）** | C. HBuilderX 云端打包 |
+|---|---|---|---|
+| 平台账号 | DCloud appid + **离线 AppKey**（绑「包名+SHA1」，改一次占一个名额，每 AppID 前 6 个免费） | **不需要** | DCloud 账号，且排队/付费 |
+| 构建工程在哪 | **仓库外**（网盘发的 SDK 解压出来），闸门靠一行 `apply from:` 接进去，重解压就没了 | 仓库内（`c-app/android`，已存在） | 黑盒 |
+| 构建命令 | 本机 Gradle + 手工换 www | 标准 `cap sync` + Gradle / Xcode | 网页点按钮 |
+| CI | 难：工程不在仓库、SDK 不可分发 | 容易 | 有 API，受额度限制 |
+| 渲染 | WebView（vue 页面本来就是 WebView；nvue 才是原生） | WebView | 同 A |
+| iOS | 同样要离线 SDK + 证书 | 标准 Xcode 工程 | 同 A |
+| 原生能力 | uni 全家桶 + DCloud 插件市场 | Capacitor 插件（官方 + 社区），缺的自己写 | 同 A |
+
+### 建议：B
+
+代价对比很清楚 —— B 的迁移成本是**四个 port 实现**（其中一个是 0），
+A 的成本是**长期的**：一个平台账号、一份不在版本控制里的工程、一套只有本机能跑的构建、
+以及「改包名或 SHA1 就占一个 Key 名额」这种与工程无关的约束。
+
+### 风险（要认下来的）
+
+1. **Apple Pay 在 WKWebView 里不可用**（需原生 PassKit 或 Safari）。若 nearpay 只提供原生 SDK，
+   A 与 B 都得写原生桥 —— 但 B 写的是标准 Capacitor plugin，A 写的是 uni 原生插件（更小众、更难招人）。
+   **这条与选哪条路无关，但要在接支付前排期。**
+2. 用不了 DCloud 插件市场。目前一个都没用。
+3. 已落地的 `offline/` 那套要改写。**思路可整体复用**：产物自述 `pb-build-info.json`、
+   版本号单一真源、打包期闸门、对着旧包的产物体检 —— 换成 Capacitor 的 Gradle 工程后逐条搬。
+4. 蓝牙近场（C-BT-*，P2）：`@capacitor-community/bluetooth-le`，可行。
+
+### 已经做了、且两条路都用得上的
+
+- **签名证书已生成**（`~/keys/neargo-release.jks`，口令在未跟踪的 `offline/signing/keystore.properties`，
+  两者都要备份 —— 丢了包名 `ai.neargo.powerbank` 就再也发不出更新）。
+  SHA1 `FE:2B:…:CF:9A` / SHA256 `41:AE:…:4C:7D`。任何 Android 正式包都要它。
+- DCloud 应用已建（`__UNI__C1F3262`，应用名「搜电」），「各平台信息」表单已按上面的包名与指纹**填好待提交**
+  —— 走 B 的话这一步不需要，留着不提交也无妨。
+
 ## 七、发布纪律（写进脚本，不靠人记）
 
 - 版本号**只改** `c-app/src/manifest.json`，其余由脚本同步；改完**提交进仓库**（gradle 工程在仓库外，提交不了）。

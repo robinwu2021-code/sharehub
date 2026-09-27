@@ -1,0 +1,61 @@
+/*
+ * 离线工程的**本项目配置注入**：签名、DCloud 离线 AppKey、包名。
+ *
+ * 离线工程（DCloud Android 离线 SDK 里的 HBuilder-Integrate-AS）在**仓库外**，
+ * 重解压一次 SDK 就把工程里的改动全部退回出厂值 —— 包名变回 com.android.simple、
+ * 签名变回那把人人都有的 test.jks、AppKey 变回一句中文占位符。
+ * 所以配置逻辑放仓库里，工程里只留一行：
+ *
+ *   apply from: "<仓库>/c-app/offline/offline-config.gradle"
+ *
+ * **一行的缺失一眼看得出，几十行的逻辑丢了看不出**（ai-shop 的高德 key 注入整段写在工程里，
+ * 被重解压覆盖后断了六天没人发现）。
+ *
+ * 密钥与口令从 `c-app/offline/signing/keystore.properties` 读（未跟踪，chmod 600）。
+ * 读不到就**让构建失败**，不回落到 test.jks —— 用那把证书签出来的包装得上、跑得起来，
+ * 但 AppKey 校验不过（启动白屏），而且以后再也覆盖安装不了正式包。
+ */
+
+def pbProps = new Properties()
+def pbPropsFile = new File(buildscript.sourceFile.parentFile, 'signing/keystore.properties')
+if (!pbPropsFile.exists()) {
+    throw new GradleException("缺 ${pbPropsFile} —— 签名口令与 DCloud AppKey 都在里面。\n" +
+            "  从 signing/keystore.properties.example 复制后填写，或从备份恢复（丢了就只能换包名重新上架）。")
+}
+pbPropsFile.withInputStream { pbProps.load(it) }
+
+def need = { String k ->
+    def v = pbProps.getProperty(k)?.trim()
+    if (!v) throw new GradleException("${pbPropsFile} 里 ${k} 是空的")
+    return v
+}
+
+def storeFilePath = need('storeFile').replaceFirst(/^~/, System.getProperty('user.home'))
+def appKey = need('dcloudAppKey')
+if (appKey.contains('申请') || appKey.length() < 16) {
+    throw new GradleException("dcloudAppKey 看起来是占位符：${appKey.take(8)}… —— 装上去会启动白屏")
+}
+
+android {
+    defaultConfig {
+        // 包名与 AppKey 是绑在一起的（DCloud 按「包名 + 证书 SHA1」签发 AppKey），
+        // 这里写死而不是读配置：改包名 = AppKey 作废 = 要去后台重新生成，不该是改一行配置的事
+        applicationId 'ai.neargo.powerbank'
+        manifestPlaceholders = [DCLOUD_APPKEY: appKey]
+    }
+    signingConfigs {
+        pbRelease {
+            storeFile file(storeFilePath)
+            storePassword need('storePassword')
+            keyAlias need('keyAlias')
+            keyPassword need('keyPassword')
+            v1SigningEnabled true
+            v2SigningEnabled true
+        }
+    }
+    // debug 也用正式证书：AppKey 绑的是这把证书的 SHA1，用 test.jks 签的 debug 包启动即白屏
+    buildTypes.release.signingConfig signingConfigs.pbRelease
+    buildTypes.debug.signingConfig signingConfigs.pbRelease
+}
+
+println "[pb-offline] applicationId=ai.neargo.powerbank · keystore=${new File(storeFilePath).name} · appKey=…${appKey.takeRight(4)}"

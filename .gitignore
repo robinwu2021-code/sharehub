@@ -13,6 +13,12 @@ node_modules/
 # Maven
 **/target/
 
+# ── 签名证书与口令（丢了这把钥匙，包名就再也发不了更新；泄露了别人能冒名发版）──
+# 证书本体放仓库外（~/keys/），这里挡的是口令文件与误放进来的 keystore。
+**/signing/keystore.properties
+*.jks
+*.keystore
+
 # ── 环境变量（含密钥，不入库；保留 *.example）──
 **/.env
 **/.env.local

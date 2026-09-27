@@ -105,13 +105,16 @@ case "$LABEL_LINE" in
     原生库一个都没有 —— 而 gradle 会一路 BUILD SUCCESSFUL。" ;;
 esac
 
-APPLY_LINE=$(grep -c "c-app/offline/version-alignment\.gradle" "$GRADLE_FILE" || true)
-[ "${APPLY_LINE:-0}" -ge 1 ] || die "离线工程少了 apply from 接线。
-    把这一行加到 $GRADLE_FILE 末尾：
+APPLY_LINES=$(grep -c "c-app/offline/\(offline-config\|version-alignment\)\.gradle" "$GRADLE_FILE" || true)
+[ "${APPLY_LINES:-0}" -ge 2 ] || die "离线工程少了 apply from 接线（找到 ${APPLY_LINES:-0} 行，要 2 行）。
+    把这两行加到 $GRADLE_FILE 末尾：
+      apply from: \"$ROOT/offline/offline-config.gradle\"
       apply from: \"$ROOT/offline/version-alignment.gradle\"
-    它把「两处 versionCode 对齐」「这份 www 不是 mock 构建」两道闸门接进构建。
-    没有它，构建照样成功 —— 坏包要等到真机上点到下单才发现。"
-ok "apply from 接线在"
+    前者注入包名 / 正式签名 / DCloud AppKey —— 缺了会用 SDK 自带的 test.jks 签名、
+    AppKey 是一句中文占位符，装上去启动白屏；
+    后者是「两处 versionCode 对齐」「这份 www 不是 mock 构建」两道闸门。
+    两者缺了构建都照样成功。"
+ok "两行 apply from 接线在"
 
 [ -f "$KEYSTORE" ] || die "签名 keystore 不在：$KEYSTORE
     生成：c-app/offline/signing/keystore.properties 填好后跑 c-app/offline/gen-release-keystore.sh
@@ -124,8 +127,12 @@ ok "JDK：$JDK"
 # 编译器版本 ↔ 离线 SDK 版本。对不上时 App 启动会弹「不匹配的版本可能造成应用异常」，
 # 而更麻烦的是某些 API 静默不工作。取 @dcloudio/uni-app 版本号尾部的日期与 SDK 目录名比。
 DEP_VER=$(python3 -c 'import json;print(json.load(open("package.json"))["dependencies"]["@dcloudio/uni-app"])')
-DEP_DATE=$(printf '%s' "$DEP_VER" | sed -E 's/.*-[0-9]{6}([0-9]{8})[0-9]+$/\1/')
-SDK_DIR=$(basename "$(cd "$OFFLINE_PROJECT/.." && pwd)")
+# 版本号形如 3.0.0-5020420260813003 = 编译器 50204 + 日期 20260813 + 序号 003。
+# 按「20YYMMDD」这个形状取日期，别按位数切 —— 编译器段的位数会变（4.08 是 40804，5 位），
+# 按位切出来的是 02608130 这种看着像日期、其实哪儿都对不上的串（第一次跑就撞上了）
+DEP_DATE=$(printf '%s' "${DEP_VER#*-}" | grep -oE '20[2-9][0-9][01][0-9][0-3][0-9]' | head -1 || true)
+# SDK 版本记在工程旁的 SDK_VERSION 文件里（解压时写入）；没有就退回看目录名
+SDK_DIR=$(cat "$OFFLINE_PROJECT/../SDK_VERSION" 2>/dev/null || basename "$(cd "$OFFLINE_PROJECT/.." && pwd)")
 case "$SDK_DIR" in
     *"$DEP_DATE"*) ok "工具链与离线 SDK 同版（$DEP_DATE）" ;;
     *) die "工具链与离线 SDK 版本对不上，拒绝打包。

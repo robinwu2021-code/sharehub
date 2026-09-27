@@ -1,6 +1,8 @@
 # C 端 App 离线打包 · 操作手册
 
-状态：**待首次执行**（2026-09-27 建立；仓库内那半条链路已就绪并自验，仓库外那半条要人先办三件事，见 §0）
+状态：**已首次打通**（2026-09-27）—— `build-apk.sh` 一条命令出包，体检全绿；
+模拟器（Pixel 7 / Android 14）装机：启动正常（AppKey 运行时校验通过，无白屏）、
+系统弹出「允许搜电访问位置」、点扫码弹出相机授权且相机被本应用打开（模拟器无预览画面，**取景与识码须真机验**）。
 关联：[TDD-C端App打包方案](TDD-C端App打包方案.md) · [ADR-031](ADR/ADR-031-C端App生产形态为uni离线打包.md)
 参照：ai-shop `docs/technical/design/App离线打包-操作手册.md`（同机仓库）
 
@@ -42,21 +44,32 @@ c-app/offline/build-apk.sh --no-build            # www 已是最新，跳过 npm
 
 | 东西 | 在哪 | 状态 |
 | --- | --- | --- |
-| **DCloud appid** | `c-app/src/manifest.json` 的 `appid`（`__UNI__XXXXXXX`） | ⬜ **空的，必须先办**。dev.dcloud.net.cn 创建应用取得。离线包的 www 必须放在 `assets/apps/<appid>/`，没有它编不出也装不上 |
-| **离线 AppKey** | 离线工程 `AndroidManifest` 的 `dcloud_appkey` | ⬜ 同一后台按「包名 `ai.neargo.powerbank` + 证书 SHA1」申请。**错了或缺了运行时才炸**（启动白屏），编译期一个字都不说 |
-| **签名 keystore** | `~/keys/neargo-release.jks` | ⬜ `c-app/offline/gen-release-keystore.sh` 生成，它会打出 MD5/SHA1/SHA256。**SHA1 就是上一行要用的那个** |
-| **离线 SDK 工程** | `~/Downloads/powerbank-offline/HBuilder-Integrate-AS`（可用 `OFFLINE_PROJECT=` 覆盖） | ⬜ powerbank 要**自己的一份**，不能跟 ai-shop 共用 —— 那份的 applicationId 是 `top.hxmall.bapp`、appkey 绑的是它的包名，改一份会把另一条线打坏，而两边都不报错 |
-| 工具链版本 | `c-app/package.json` 的 `@dcloudio/*` | ✅ 已对齐到 `3.0.0-5020420260813003`（5.24），与本机 SDK `Android-SDK@5.24.82669_20260813` 同日期 |
-| Android 命令行工具 | `/opt/homebrew/share/android-commandlinetools` | ✅ 体检脚本读这个路径（`ANDROID_CMDLINE=` 可覆盖） |
+| **DCloud appid** | `c-app/src/manifest.json` 的 `appid` | ✅ `__UNI__C1F3262`（应用名「搜电」，所有者深圳市虹选科技） |
+| **离线 AppKey** | 未跟踪的 `c-app/offline/signing/keystore.properties` 的 `dcloudAppKey`，由 `offline-config.gradle` 注入 manifest | ✅ 已生成。绑「包名 `ai.neargo.powerbank` + 证书 SHA1」—— **换证书或包名即作废**，且重新生成占一个 Key 名额（每 AppID 前 6 个免费）|
+| **签名 keystore** | `~/keys/neargo-release.jks`，口令同在上面那份 properties | ✅ 已生成（有效期 30 年）。**两样都要备份** —— 丢了包名就再也发不出更新 |
+| **离线 SDK 工程** | `~/Downloads/powerbank-offline/HBuilder-Integrate-AS`（旁边 `SDK_VERSION` 记着 SDK 版本） | ✅ 自 5.24 SDK 解出的**独立一份**（不与 ai-shop 共用）：应用名、appid 控制文件、权限、临时图标、两行 `apply from:` 已配 |
+| 工具链版本 | `c-app/package.json` 的 `@dcloudio/*` | ✅ `3.0.0-5020420260813003`，与 SDK `5.24.82669_20260813` 同日期（`build-apk.sh` ⓪ 会核） |
+| Android 命令行工具 | `/opt/homebrew/share/android-commandlinetools` | ✅ |
 | Google Maps Key | `c-app/.env.local` 的 `VITE_GMAPS_KEY` | ✅ 本机有。⚠️ Android 限制要加「包名 + SHA1」那一对，否则真机上地图空白 |
+
+**DCloud 后台填写时的一个坑**：「Android 应用签名 MD5」按 keytool 口径填（冒号分隔大写）会被判
+「填写错误」，这一项是可选的（只有一键登录要用），**留空即可提交**。
+
+**已知未完成**：
+- 启动图标是临时生成的（主色方块 + 闪电），正式品牌图标到位后替换 `simpleDemo/src/main/res/drawable/icon.png`；
+- `uni.openLocation`（唤起导航）在 App 端需要地图模块，当前未集成 —— 点「导航」会走端上的失败提示，不会崩；
+- `targetSdkVersion` 仍是 SDK 默认的 33。内部 APK 直发无影响，**上 Google Play 要求 35**，届时一并处理（Android 15 的边到边强制会影响布局，要实测）。
 
 **这一行 `apply from:` 必须在**（离线工程 `simpleDemo/build.gradle` 末尾）：
 
 ```
+apply from: "/Users/robin/work/ai/powerbank/c-app/offline/offline-config.gradle"
 apply from: "/Users/robin/work/ai/powerbank/c-app/offline/version-alignment.gradle"
 ```
 
-它把两道构建期闸门接进来：**两处 versionCode 对齐**、**这份 www 不是 mock 构建**。
+前者注入**包名 / 正式签名 / DCloud AppKey**（口令与 Key 从未跟踪的 properties 读，读不到就让构建失败，
+不回落到 SDK 自带的 test.jks —— 那样签出的包装得上、但 AppKey 校验不过，启动白屏）；
+后者是两道构建期闸门：**两处 versionCode 对齐**、**这份 www 不是 mock 构建**。
 把逻辑放仓库里、工程里只留一行，是因为**一行的缺失一眼看得出，几十行的逻辑丢了看不出** ——
 ai-shop 那边整段写在工程里的注入逻辑，被重解压覆盖后断了六天没人发现。
 
