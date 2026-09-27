@@ -8,9 +8,9 @@ import * as db from "./mock-db";
 import * as ap from "./mock-approvals";
 import * as cfg from "./mock-config";
 import type {
-  AppRow, DefinitionVersionRow, DeliveryRow, ProcessDef, ProcessSummary, ProcessVersion, PublishResult, QueueGroup,
+  AppRow, ApprovalTemplate, DefinitionVersionRow, DeliveryRow, PublishResult, QueueGroup, TemplateSummary, TemplateVersion,
   SlaPolicy, WorkCalendar,
-  ApprovalQuery, ApprovalRow, ApprovalStatus, ApprovalView, Member, Named, Page, QueueSummary, QueueTask, TicketQuery,
+  ApprovalQuery, ApprovalRow, ApprovalStatus, ApprovalView, Member, Named, Page, QueueCount, QueueTask, TicketQuery,
   TicketRow, TicketStat, TicketView, TimelineEvent, TodoCount, TodoItem, TodoQuery,
 } from "./types";
 
@@ -38,8 +38,10 @@ export const flow = {
   timeline: (no: string): Promise<TimelineEvent[]> => tick(() => db.getTimeline(no)),
   /** POST /workspaces/{ws}/tickets/{no}/comments */
   comment: (no: string, body: string): Promise<TimelineEvent[]> => tick(() => db.addComment(no, body)),
-  /** POST /workspaces/{ws}/tickets/{no}/assign（to 为 null = 退回抢单池） */
-  assign: (no: string, to: Member | null, reason: string): Promise<TicketRow> => tick(() => db.assignTicket(no, to, reason)),
+  /** POST /workspaces/{ws}/tickets/{no}/assign {to, reason}（to 必填） */
+  assign: (no: string, to: Member, reason: string): Promise<TicketRow> => tick(() => db.assignTicket(no, to, reason)),
+  /** POST /workspaces/{ws}/tickets/{no}/pool {reason}：退回抢单池 */
+  pool: (no: string, reason: string): Promise<TicketRow> => tick(() => db.poolTicket(no, reason)),
   /** POST /workspaces/{ws}/tickets/reassign */
   reassign: (nos: string[], to: Member, reason: string): Promise<TicketRow[]> =>
     tick(() => db.reassignTickets(nos, to, reason)),
@@ -53,7 +55,7 @@ export const flow = {
   // ── 审批 ──
   /** POST /workspaces/{ws}/approvals/query */
   approvals: (q: ApprovalQuery): Promise<Page<ApprovalRow>> => tick(() => ap.queryApprovals(q)),
-  /** 状态页签角标（approvals/query 的计数，按 status 分组） */
+  /** POST /workspaces/{ws}/approvals/count：按状态分组计数（状态页签角标） */
   approvalCount: (): Promise<Record<ApprovalStatus, number>> => tick(() => ap.countApprovals()),
   /** GET /workspaces/{ws}/approvals/{no} */
   approval: (no: string): Promise<ApprovalView> => tick(() => ap.getApproval(no)),
@@ -68,8 +70,8 @@ export const flow = {
   requesterOptions: (): Named[] => ap.REQUESTER_OPTIONS,
 
   // ── 审核队列（任务）──
-  /** 各队列的未领数（tasks/query 按队列组计数） */
-  queues: (): Promise<QueueSummary[]> => tick(() => ap.queueSummaries()),
+  /** POST /workspaces/{ws}/tasks/queue-counts：每个队列组的待领数与我已领数 */
+  queueCounts: (): Promise<QueueCount[]> => tick(() => ap.queueCounts()),
   /** POST /workspaces/{ws}/tasks/query {queueGroup, status: OPEN} */
   queueTasks: (queue: string, page: number, size: number): Promise<Page<QueueTask>> => tick(() => ap.queueTasksOf(queue, page, size)),
   /** POST /workspaces/{ws}/tasks/query {assignee: me, claimed} */
@@ -82,17 +84,17 @@ export const flow = {
   completeTask: (taskNo: string, decision: "APPROVE" | "REJECT", reason?: string): Promise<void> =>
     tick(() => ap.completeTask(taskNo, decision, reason)),
 
-  // ── 流程定义 ──
-  /** GET /workspaces/{ws}/processes（含在途数） */
-  processes: (): Promise<ProcessSummary[]> => tick(() => cfg.listProcesses()),
-  /** GET /workspaces/{ws}/processes/{code} */
-  process: (code: string): Promise<ProcessDef> => tick(() => cfg.getProcess(code)),
-  /** GET /workspaces/{ws}/processes/{code}/versions */
-  processVersions: (code: string): Promise<ProcessVersion[]> => tick(() => cfg.processVersions(code)),
-  /** PUT /workspaces/{ws}/processes/{code}（幂等发布；422 逐条错误） */
-  publishProcess: (def: ProcessDef, note: string, isNew: boolean): Promise<PublishResult> => tick(() => cfg.publishProcess(def, note, isNew)),
-  /** POST …/processes/{code}/disable · /enable */
-  setProcessEnabled: (code: string, enabled: boolean): Promise<void> => tick(() => cfg.setProcessEnabled(code, enabled)),
+  // ── 审批模板（控制台编辑的形态，服务端编译成审批类流程）──
+  /** GET /workspaces/{ws}/approval-templates（含在途数） */
+  templates: (): Promise<TemplateSummary[]> => tick(() => cfg.listTemplates()),
+  /** GET /workspaces/{ws}/approval-templates/{code} */
+  template: (code: string): Promise<ApprovalTemplate> => tick(() => cfg.getTemplate(code)),
+  /** GET /workspaces/{ws}/approval-templates/{code}/versions */
+  templateVersions: (code: string): Promise<TemplateVersion[]> => tick(() => cfg.templateVersions(code)),
+  /** PUT /workspaces/{ws}/approval-templates/{code}（幂等发布；422 的 errors[].path 按模板字段给） */
+  publishTemplate: (def: ApprovalTemplate, note: string, isNew: boolean): Promise<PublishResult> => tick(() => cfg.publishTemplate(def, note, isNew)),
+  /** POST …/approval-templates/{code}/disable · /enable */
+  setTemplateEnabled: (code: string, enabled: boolean): Promise<void> => tick(() => cfg.setTemplateEnabled(code, enabled)),
 
   // ── 运营配置 ──
   /** GET …/sla-policies */
@@ -103,9 +105,9 @@ export const flow = {
   calendars: (): Promise<WorkCalendar[]> => tick(() => cfg.listCalendars()),
   /** PUT /workspaces/{ws}/calendars/{code} */
   saveCalendar: (c: WorkCalendar): Promise<WorkCalendar> => tick(() => cfg.upsertCalendar(c)),
-  /** GET …/queue-groups */
+  /** GET /workspaces/{ws}/groups?kind=QUEUE（队列组就是 kind=QUEUE 的组） */
   queueGroups: (): Promise<QueueGroup[]> => tick(() => cfg.listQueueGroups()),
-  /** PUT …/queue-groups/{code} */
+  /** PUT /workspaces/{ws}/groups/{code} */
   saveQueueGroup: (q: QueueGroup, isNew: boolean): Promise<QueueGroup> => tick(() => cfg.upsertQueueGroup(q, isNew)),
   ticketTypeOptions: () => cfg.TICKET_TYPE_OPTIONS,
 
@@ -120,7 +122,7 @@ export const flow = {
   deliveries: (): Promise<DeliveryRow[]> => tick(() => cfg.listDeliveries()),
   /** POST /webhook-deliveries/{id}/redeliver */
   redeliver: (id: string): Promise<DeliveryRow> => tick(() => cfg.redeliver(id)),
-  /** 定义版本总览（processes / ticket-types / … 的 versions 汇总） */
+  /** GET /accounts/{a}/definitions?workspace=：流程 · 审批模板 · 工单类型 · SLA 策略的当前版本 */
   definitionVersions: (): Promise<DefinitionVersionRow[]> => tick(() => cfg.definitionVersions()),
 };
 

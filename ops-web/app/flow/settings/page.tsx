@@ -22,7 +22,7 @@ const PRIORITY_OPTS = [
   { value: "LOW", label: "低" }, { value: "*", label: "*（其余）" },
 ];
 const prioLabel = (c: string) => PRIORITY_OPTS.find((o) => o.value === c)?.label ?? c;
-const SORT_LABEL: Record<QueueGroup["sort"], string> = { PRIORITY_THEN_AGE: "优先级 → 等待时长", AGE: "等待时长" };
+const ORDER_LABEL: Record<QueueGroup["orderBy"], string> = { PRIORITY: "优先级 → 等待时长", DUE: "到期时刻", CREATED: "等待时长" };
 
 type Form = Record<string, unknown>;
 
@@ -74,7 +74,11 @@ function FlowSettings() {
   const saveQ = useMutation({
     mutationFn: () => {
       const f = qEdit!.form;
-      return flow.saveQueueGroup({ code: String(f.code ?? ""), name: String(f.name ?? ""), sort: f.sort as QueueGroup["sort"], claimTimeoutMin: Number(f.claimTimeoutMin) }, qEdit!.isNew);
+      // 界面按分钟填，契约是秒（claimTimeoutSec）
+      return flow.saveQueueGroup({
+        code: String(f.code ?? ""), name: String(f.name ?? ""), kind: "QUEUE",
+        orderBy: f.orderBy as QueueGroup["orderBy"], claimTimeoutSec: Number(f.claimTimeoutMin) * 60,
+      }, qEdit!.isNew);
     },
     onSuccess: () => { notify.success("队列已保存"); setQEdit(null); refresh(); },
     onError: (e: Error) => notify.error(failText(e)),
@@ -103,12 +107,12 @@ function FlowSettings() {
     { key: "holidays", label: "节假日", type: "textarea", rows: 4, help: "一行一个：日期 名称，如「2026-12-02 国庆」" },
   ];
   /**
-   * @form-none 队列提交到 OpsKit（PUT …/queue-groups/{code}，21/06 §四），不是 ShareHub 后端。
+   * @form-none 队列提交到 OpsKit（队列即 kind=QUEUE 的组：PUT /workspaces/{ws}/groups/{code}，21/06 §三），不是 ShareHub 后端。
    */
   const Q_FIELDS: FieldDef[] = [
     { key: "code", label: "代号", required: true, readOnlyOnEdit: true, help: "小写字母、数字、连字符，创建后不能改" },
     { key: "name", label: "名称", required: true, maxLength: 40 },
-    { key: "sort", label: "排序", type: "select", required: true, options: Object.entries(SORT_LABEL).map(([value, label]) => ({ value, label })) },
+    { key: "orderBy", label: "排序", type: "select", required: true, options: Object.entries(ORDER_LABEL).map(([value, label]) => ({ value, label })) },
     { key: "claimTimeoutMin", label: "领取超时（分钟）", type: "number", required: true, min: 5, max: 240, help: "领取后超时未决定，自动放回队列并留痕" },
   ];
 
@@ -129,9 +133,10 @@ function FlowSettings() {
   const qCols: Column<QueueGroup>[] = [
     { header: "队列", cell: (q) => <span className="txt-strong">{q.name}</span> },
     { header: "代号", pk: true, cell: (q) => q.code },
-    { header: "排序", cell: (q) => SORT_LABEL[q.sort] },
-    { header: "领取超时", cell: (q) => fmtSpan(q.claimTimeoutMin) },
-    { header: "操作", className: "text-end", cell: (q) => <Button size="sm" variant="secondary" onClick={() => setQEdit({ isNew: false, form: { ...q } })}>编辑</Button> },
+    { header: "排序", cell: (q) => ORDER_LABEL[q.orderBy] },
+    { header: "领取超时", cell: (q) => fmtSpan(q.claimTimeoutSec / 60) },
+    { header: "操作", className: "text-end", cell: (q) => <Button size="sm" variant="secondary"
+      onClick={() => setQEdit({ isNew: false, form: { code: q.code, name: q.name, orderBy: q.orderBy, claimTimeoutMin: q.claimTimeoutSec / 60 } })}>编辑</Button> },
   ];
 
   return (
@@ -172,7 +177,7 @@ function FlowSettings() {
       <Card className="p-5">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="txt-strong">队列</h2>
-          <Button size="sm" onClick={() => setQEdit({ isNew: true, form: { code: "", name: "", sort: "PRIORITY_THEN_AGE", claimTimeoutMin: 30 } })}>
+          <Button size="sm" onClick={() => setQEdit({ isNew: true, form: { code: "", name: "", orderBy: "PRIORITY", claimTimeoutMin: 30 } })}>
             <Plus className="size-4" /> 新增
           </Button>
         </div>

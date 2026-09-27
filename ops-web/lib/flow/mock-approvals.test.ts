@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { setMockOperatorPerms } from "./mock-auth";
 import {
-  claimTask, completeTask, countApprovals, decide, getApproval, myClaimed, queryApprovals, queueSummaries,
+  claimTask, completeTask, countApprovals, decide, getApproval, myClaimed, queryApprovals, queueCounts,
   queueTasksOf, releaseTask, resetApprovalDb, withdraw, CLAIM_TIMEOUT_MS,
 } from "./mock-approvals";
 
@@ -60,9 +60,10 @@ describe("审批", () => {
 
 describe("审核队列", () => {
   it("队列角标 = 未领取的数量", () => {
-    const s = queueSummaries(NOW).find((q) => q.code === "merchant")!;
+    const s = queueCounts(NOW).find((q) => q.queue.code === "merchant")!;
     const all = queueTasksOf("merchant", 1, 200, NOW).list;
     expect(s.unclaimed).toBe(all.filter((t) => !t.claimedBy).length);
+    expect(s.claimedByMe).toBe(myClaimed(NOW).filter((t) => t.queue.code === "merchant").length);
   });
 
   it("领取超时 30 分钟读时自动放回", () => {
@@ -84,8 +85,9 @@ describe("审核队列", () => {
   });
 
   it("放回后回到队列、角标 +1", () => {
-    const before = queueSummaries(NOW).find((q) => q.code === "merchant")!.unclaimed;
+    const merchant = () => queueCounts(NOW).find((q) => q.queue.code === "merchant")!;
+    const before = merchant();
     releaseTask(myClaimed(NOW)[0].taskNo);
-    expect(queueSummaries(NOW).find((q) => q.code === "merchant")!.unclaimed).toBe(before + 1);
+    expect(merchant()).toMatchObject({ unclaimed: before.unclaimed + 1, claimedByMe: before.claimedByMe - 1 });
   });
 });

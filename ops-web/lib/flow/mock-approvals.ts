@@ -13,7 +13,7 @@ import { ME } from "./mock-db";
 import { requirePerm } from "./mock-auth";
 import type {
   ApprovalQuery, ApprovalRound, ApprovalRow, ApprovalStatus, ApprovalStep, ApprovalView, Named, Page,
-  Priority, QueueSummary, QueueTask,
+  Priority, QueueCount, QueueTask,
 } from "./types";
 
 const MIN = 60_000;
@@ -73,7 +73,8 @@ let taskSeq = 0;
 const newTask = () => `TK${String(++taskSeq).padStart(6, "0")}`;
 
 // ── 审核队列 ────────────────────────────────────────────────────────────
-interface QueueRec extends Omit<QueueTask, "claimedBy" | "claimExpiresAtMs"> {
+interface QueueRec extends Omit<QueueTask, "claimedBy" | "claimExpiresAtMs" | "evidenceSummary"> {
+  evidence: string;
   claimedBy?: { ref: string; displayName: string };
   claimedAtMs?: number;
   done?: "APPROVED" | "REJECTED";
@@ -173,7 +174,7 @@ function row(r: ApprovalRec): ApprovalRow {
   return {
     approvalNo: r.approvalNo, process: { code: d.code, name: d.name }, subject: r.subject, status: r.status,
     ...(r.status === "PENDING" && step ? { currentStep: { code: step.code, name: step.name } } : {}),
-    currentRound: r.round, requestedBy: r.requestedBy, requestedAtMs: r.requestedAtMs,
+    round: r.round, requestedBy: r.requestedBy, requestedAtMs: r.requestedAtMs,
     ...(r.finishedAtMs ? { finishedAtMs: r.finishedAtMs } : {}),
     ...(r.status === "PENDING" ? { stepStartedAtMs: r.stepStartedAtMs, stepDueAtMs: r.stepStartedAtMs + 8 * HOUR } : {}),
   };
@@ -231,7 +232,7 @@ export function getApproval(no: string): ApprovalView {
     const state: ApprovalStep["state"] = skipped ? "SKIPPED"
       : r.status === "APPROVED" || i < r.stepIdx ? "DONE"
       : r.status === "PENDING" && i === r.stepIdx ? "CURRENT" : "TODO";
-    return { code: s.code, name: s.name, approver: s.approver, ...(s.condition ? { condition: s.condition.label } : {}), state,
+    return { code: s.code, name: s.name, approverText: s.approver, ...(s.condition ? { conditionText: s.condition.label } : {}), state,
       ...(decided ? { decidedBy: decided.by, decidedAtMs: decided.atMs } : {}) };
   });
   const why = whyNotDecide(r);
@@ -298,13 +299,20 @@ function sweep(now: number) {
 }
 
 const qview = (t: QueueRec): QueueTask => ({
-  taskNo: t.taskNo, queue: t.queue, subject: t.subject, priority: t.priority, createdAtMs: t.createdAtMs, evidence: t.evidence,
+  taskNo: t.taskNo, queue: t.queue, subject: t.subject, priority: t.priority, createdAtMs: t.createdAtMs,
+  ...(t.evidence ? { evidenceSummary: t.evidence } : {}),
   ...(t.claimedBy ? { claimedBy: t.claimedBy, claimExpiresAtMs: t.claimedAtMs! + CLAIM_TIMEOUT_MS } : {}),
 });
 
-export function queueSummaries(now: number = Date.now()): QueueSummary[] {
+/** POST /workspaces/{ws}/tasks/queue-counts：每个队列组的待领数与我已领数 */
+export function queueCounts(now: number = Date.now()): QueueCount[] {
   sweep(now);
-  return QUEUES.map((q) => ({ ...q, unclaimed: queueTasks.filter((t) => t.queue.code === q.code && !t.done && !t.claimedBy).length }));
+  const open = queueTasks.filter((t) => !t.done);
+  return QUEUES.map((queue) => ({
+    queue,
+    unclaimed: open.filter((t) => t.queue.code === queue.code && !t.claimedBy).length,
+    claimedByMe: open.filter((t) => t.queue.code === queue.code && t.claimedBy?.ref === ME.ref).length,
+  }));
 }
 
 /** 队列里未办结的任务：按优先级 → 等待时长排序 */

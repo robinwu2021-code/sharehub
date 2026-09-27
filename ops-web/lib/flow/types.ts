@@ -11,11 +11,16 @@
 //
 // 2026-09-27 前端提出的 4 项补充（行内 actions、行内 sla、动作 toCategory、按成员属性筛选）
 // 后端已全部接受并写进 21/06 §七。
+// 2026-09-28 跟进后端第二轮：审批模板（approval-templates，02 §6.4a）· 队列即 kind=QUEUE 的组 ·
+// 退回抢单池独立端点 · approvals/count · tasks/queue-counts · definitions 总览 · 若干改名。
 
 export type TodoOrigin = "PROCESS" | "TICKET";
 export type TodoKind = "WORK" | "APPROVAL";
 export type StatusCategory = "NEW" | "IN_PROGRESS" | "WAITING" | "DONE" | "CANCELLED";
 export type SlaState = "RUNNING" | "WARNING" | "BREACHED" | "MET" | "PAUSED";
+
+/** 多语种文本（定义类资源的写入形状，如审批模板的 name{i18n}）；读出的运行时视图已按语言选好 */
+export type I18nText = Partial<Record<"zh" | "en" | "ar", string>>;
 
 /** 代号 + 显示名（+ 排序序数）：名称类字段的统一形状 */
 export interface Named { code: string; name: string }
@@ -174,16 +179,18 @@ export interface TicketView extends TicketRow {
   dedupe?: { key: string; attachedCount: number };
 }
 
-/** 时间线（GET /tickets/{no}/timeline）：迁移、派单、SLA 事件、评论同一条流水 */
+/** 时间线（GET /tickets/{no}/timeline，21/06 §七 TimelineEntry）：迁移、派单、SLA 事件、评论、审批、合并同一条流水 */
 export interface TimelineEvent {
   seq: number;
   atMs: number;
-  kind: "CREATED" | "ASSIGNED" | "TRANSITION" | "SLA" | "DEDUPE" | "COMMENT" | "ESCALATED";
+  kind: "CREATED" | "ASSIGNED" | "TRANSITION" | "SLA" | "DEDUPE" | "COMMENT" | "ESCALATED" | "APPROVAL" | "MERGE";
+  /** 服务按语言给好 */
   title: string;
-  actor: string;
+  /** 系统事件（如 SLA 到点）没有操作人 */
+  actor?: Pick<Member, "ref" | "displayName">;
   detail?: string;
-  /** 需要强调的事件（如 SLA 提醒） */
-  hot?: boolean;
+  /** 需要强调的事件（如超时、驳回） */
+  hot: boolean;
 }
 
 // ── 审批（21/06 §四）─────────────────────────────────────────────────────
@@ -195,9 +202,10 @@ export interface ApprovalRow {
   subject: SubjectRef;
   status: ApprovalStatus;
   currentStep?: Named;
-  currentRound: number;
+  round: number;
   requestedBy: Pick<Member, "ref" | "displayName">;
   requestedAtMs: number;
+  /** 办结时刻（已通过 / 已驳回 / 已撤回），列表「耗时」用 —— 2026-09-28 向后端补提 */
   finishedAtMs?: number;
   /** 当前步开始时刻（待审时「已等待」= 现在 − 它） */
   stepStartedAtMs?: number;
@@ -217,10 +225,10 @@ export interface ApprovalQuery {
 export interface ApprovalStep {
   code: string;
   name: string;
-  /** 审批人说明（如「持 location:contract:audit」） */
-  approver: string;
+  /** 审批人说明（服务按语言给好，如「持 location:contract:audit」） */
+  approverText: string;
   /** 条件步的进入条件说明；无则必经 */
-  condition?: string;
+  conditionText?: string;
   state: "DONE" | "CURRENT" | "TODO" | "SKIPPED";
   decidedBy?: string;
   decidedAtMs?: number;
@@ -247,7 +255,12 @@ export interface ApprovalView extends ApprovalRow {
 }
 
 // ── 审核队列（21/06 §四 任务）─────────────────────────────────────────────
-export interface QueueSummary extends Named { unclaimed: number }
+/** tasks/queue-counts 的一项：每个队列组的待领数与我已领数 */
+export interface QueueCount {
+  queue: Named;
+  unclaimed: number;
+  claimedByMe: number;
+}
 
 export interface QueueTask {
   taskNo: string;
@@ -255,38 +268,48 @@ export interface QueueTask {
   subject: SubjectRef;
   priority: Priority;
   createdAtMs: number;
-  evidence: string;
+  /** 证据摘要（业务提交时给的一句话） */
+  evidenceSummary?: string;
   claimedBy?: Pick<Member, "ref" | "displayName">;
   /** 领取后自动放回的时刻 */
   claimExpiresAtMs?: number;
 }
 
-// ── 流程定义（21/06 §四：PUT …/processes/{code} 幂等发布，校验失败 422 逐条）─────────
-/** 审批人只能选四种（原型 P5a「改动的边界」） */
-export type ApproverKind = "PERM" | "ROLE" | "QUEUE" | "ASSIGNED";
+// ── 审批模板（21/02 §6.4a · 21/06 §四 approval-templates）────────────────────────────
+// 控制台编辑的是**线性审批步骤**，服务端编译成审批类流程；版本 = 内容哈希，只增不改，
+// 校验失败 422，errors[].path 按模板字段给（如 steps[1].approver.value）。
+/**
+ * 审批人种类：MEMBER 指定成员 · GROUP 组（含队列组，领取制）· ROLE 角色 · PERM 宿主权限码 ·
+ * FIELD 提交时由业务在字段里给出人选（value = 字段代号）
+ */
+export type ApproverKind = "MEMBER" | "GROUP" | "ROLE" | "PERM" | "FIELD";
+/** 会签（ALL）只允许可枚举出全部人选的种类（ROLE / PERM 不可枚举） */
+export const ALL_MODE_KINDS: readonly ApproverKind[] = ["MEMBER", "GROUP", "FIELD"];
 /** 进入条件只支持「属性为真 / 等于 / 属于」；复杂判断由业务系统提交前算成属性 */
 export type ConditionOp = "TRUE" | "EQ" | "IN";
 
-export interface ProcessStepDef {
+export interface TemplateStep {
   code: string;
-  name: string;
+  name: I18nText;
   approver: { kind: ApproverKind; value: string };
   /** ANY = 或签（一人通过即过）；ALL = 会签 */
   mode: "ANY" | "ALL";
   when?: { field: string; op: ConditionOp; value?: string };
-  timeLimitHours: number;
+  /** 步骤时限（小时）：超时提醒，不自动通过；不给 = 不限 */
+  dueHours?: number;
 }
 
-export interface ProcessDef {
+export interface ApprovalTemplate {
   code: string;
-  name: string;
-  steps: ProcessStepDef[];
-  /** 可关的规则只有跨步互斥；「提交人不能审自己」「驳回必填原因」恒开 */
-  crossStepExclusive: boolean;
+  name: I18nText;
+  steps: TemplateStep[];
+  /** selfApproval：允许提交人审自己（缺省 false）· crossStepExclusive：跨步互斥（缺省 true）；驳回必填原因恒开 */
+  rules: { selfApproval: boolean; crossStepExclusive: boolean };
 }
 
-export interface ProcessSummary {
+export interface TemplateSummary {
   code: string;
+  /** 已按语言选好 */
   name: string;
   stepsSummary: string;
   version: string;
@@ -295,7 +318,7 @@ export interface ProcessSummary {
   enabled: boolean;
 }
 
-export interface ProcessVersion {
+export interface TemplateVersion {
   version: string;
   atMs: number;
   channel: "API" | "CONSOLE";
@@ -339,11 +362,15 @@ export interface WorkCalendar {
   holidays: { date: string; name: string }[];
 }
 
+/** 队列组 = kind=QUEUE 的组（PUT /workspaces/{ws}/groups/{code}），不另设队列资源 */
 export interface QueueGroup {
   code: string;
   name: string;
-  sort: "PRIORITY_THEN_AGE" | "AGE";
-  claimTimeoutMin: number;
+  kind: "QUEUE";
+  /** 领取后超时未决定，自动放回队列（秒） */
+  claimTimeoutSec: number;
+  /** 队列排序：优先级（同级按等待时长）· 到期时刻 · 创建时刻 */
+  orderBy: "PRIORITY" | "DUE" | "CREATED";
 }
 
 // ── 接入管理（21/06 §三：应用 · 订阅 · 投递）──────────────────────────────────
@@ -370,10 +397,12 @@ export interface DeliveryRow {
   atMs: number;
 }
 
+/** GET /accounts/{a}/definitions：各类定义的当前版本 */
 export interface DefinitionVersionRow {
-  kind: "PROCESS" | "TICKET_TYPE" | "STATE_MACHINE";
+  kind: "PROCESS" | "APPROVAL_TEMPLATE" | "TICKET_TYPE" | "SLA_POLICY";
   code: string;
   version: string;
-  atMs: number;
-  by: string;
+  publishedAtMs: number;
+  publishedBy: string;
+  channel: "API" | "CONSOLE";
 }

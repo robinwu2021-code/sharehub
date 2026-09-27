@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { setMockOperatorPerms } from "./mock-auth";
 import {
-  contentHash, createApp, definitionVersions, getProcess, listDeliveries, listProcesses, processVersions, publishProcess,
+  contentHash, createApp, definitionVersions, getTemplate, listDeliveries, listTemplates, templateVersions, publishTemplate,
   redeliver, resetConfigDb, rotateCredential, upsertSlaPolicy, listSlaPolicies,
 } from "./mock-config";
 import { isValidationError } from "./errors";
@@ -12,50 +12,68 @@ beforeEach(() => { setMockOperatorPerms(["*"]); resetConfigDb(NOW); });
 
 const caught = (f: () => unknown) => { try { f(); } catch (e) { return e; } throw new Error("没有抛错"); };
 
-describe("流程定义", () => {
+describe("审批模板", () => {
   it("内容没变再发布：幂等，不生成新版本", () => {
-    const before = processVersions("LOC_CONTRACT").length;
-    const r = publishProcess(getProcess("LOC_CONTRACT"), "", false, NOW);
+    const before = templateVersions("LOC_CONTRACT").length;
+    const r = publishTemplate(getTemplate("LOC_CONTRACT"), "", false, NOW);
     expect(r.created).toBe(false);
-    expect(processVersions("LOC_CONTRACT")).toHaveLength(before);
+    expect(templateVersions("LOC_CONTRACT")).toHaveLength(before);
   });
 
   it("改了内容：新版本号 = 内容哈希，旧版本保留；报告在途单仍按旧版走", () => {
-    const def = getProcess("LOC_CONTRACT");
-    def.steps[1].timeLimitHours = 12;
-    const r = publishProcess(def, "会签时限 24h → 12h", false, NOW);
+    const def = getTemplate("LOC_CONTRACT");
+    def.steps[1].dueHours = 12;
+    const r = publishTemplate(def, "会签时限 24h → 12h", false, NOW);
     expect(r.created).toBe(true);
     expect(r.version).toBe(contentHash({ ...def, steps: def.steps }));
-    expect(r.runningOnOlderVersions).toBe(listProcesses().find((p) => p.code === "LOC_CONTRACT")!.running);
-    const vs = processVersions("LOC_CONTRACT");
+    expect(r.runningOnOlderVersions).toBe(listTemplates().find((p) => p.code === "LOC_CONTRACT")!.running);
+    const vs = templateVersions("LOC_CONTRACT");
     expect(vs[0]).toMatchObject({ version: r.version, current: true, channel: "CONSOLE", note: "会签时限 24h → 12h" });
     expect(vs.filter((v) => v.current)).toHaveLength(1);
     expect(definitionVersions().find((d) => d.code === "LOC_CONTRACT")!.version).toBe(r.version);
   });
 
   it("校验失败：一次返回全部错误，每条带字段路径", () => {
-    const def = getProcess("LOC_CONTRACT");
-    def.steps[0].name = " ";
+    const def = getTemplate("LOC_CONTRACT");
+    def.steps[0].name = { zh: " " };
     def.steps[1].approver.value = "";
     def.steps[1].when = { field: "needsCosign", op: "EQ", value: "" };
-    const e = caught(() => publishProcess(def, "", false, NOW));
+    const e = caught(() => publishTemplate(def, "", false, NOW));
     expect(isValidationError(e)).toBe(true);
     if (!isValidationError(e)) return;
     expect(e.errors.map((x) => x.path).sort()).toEqual(["steps[0].name", "steps[1].approver.value", "steps[1].when.value"]);
   });
 
   it("全是条件步不行：至少一个必经步", () => {
-    const def = getProcess("FIN_WITHDRAWAL");
+    const def = getTemplate("FIN_WITHDRAWAL");
     def.steps[0].when = { field: "big", op: "TRUE" };
-    const e = caught(() => publishProcess(def, "", false, NOW));
+    const e = caught(() => publishTemplate(def, "", false, NOW));
     expect(isValidationError(e) && e.errors[0].path).toBe("steps");
   });
 
   it("新建：代号唯一且格式合法", () => {
-    const e = caught(() => publishProcess({ code: "LOC_CONTRACT", name: "x", crossStepExclusive: false, steps: getProcess("FIN_WITHDRAWAL").steps }, "", true, NOW));
+    const rules = { selfApproval: false, crossStepExclusive: true };
+    const e = caught(() => publishTemplate({ code: "LOC_CONTRACT", name: { zh: "x" }, rules, steps: getTemplate("FIN_WITHDRAWAL").steps }, "", true, NOW));
     expect(isValidationError(e) && e.errors.some((x) => x.path === "code")).toBe(true);
-    expect(publishProcess({ code: "NEW_FLOW", name: "新流程", crossStepExclusive: false, steps: getProcess("FIN_WITHDRAWAL").steps }, "", true, NOW).created).toBe(true);
-    expect(listProcesses().map((p) => p.code)).toContain("NEW_FLOW");
+    expect(publishTemplate({ code: "NEW_FLOW", name: { en: "New flow" }, rules, steps: getTemplate("FIN_WITHDRAWAL").steps }, "", true, NOW).created).toBe(true);
+    expect(listTemplates().find((p) => p.code === "NEW_FLOW")!.name).toBe("New flow");
+  });
+
+  it("会签只允许成员 / 组 / 字段指定：角色、权限码不可枚举", () => {
+    const def = getTemplate("CS_REFUND");
+    def.steps[0].mode = "ALL";
+    const e = caught(() => publishTemplate(def, "", false, NOW));
+    expect(isValidationError(e) && e.errors.map((x) => x.path)).toEqual(["steps[0].mode"]);
+    def.steps[0].approver = { kind: "GROUP", value: "cs-leads" };
+    expect(publishTemplate(def, "", false, NOW).created).toBe(true);
+  });
+
+  it("字段指定也要给字段代号；时限可不填", () => {
+    const def = getTemplate("FIN_WITHDRAWAL");
+    def.steps[0].approver = { kind: "FIELD", value: "" };
+    def.steps[0].dueHours = undefined;
+    const e = caught(() => publishTemplate(def, "", false, NOW));
+    expect(isValidationError(e) && e.errors.map((x) => x.path)).toEqual(["steps[0].approver.value"]);
   });
 });
 

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { setMockOperatorPerms } from "./mock-auth";
 import {
   claimTicket, countTodos, getTicket, queryTickets, queryTodos, reassignTickets, resetFlowDb,
-  ticketStats, transitionTicket, ME, ASSIGNEE_OPTIONS, getTicketView, getTimeline, addComment, assignTicket,
+  ticketStats, transitionTicket, ME, ASSIGNEE_OPTIONS, getTicketView, getTimeline, addComment, poolTicket,
 } from "./mock-db";
 
 const NOW = new Date("2026-09-27T12:00:00").getTime();
@@ -127,12 +127,13 @@ describe("工单详情", () => {
     transitionTicket("WO26092701", "ACCEPT", NOW);
     addComment("WO26092701", "已联系场地方", NOW + 1000);
     const tl = getTimeline("WO26092701");
-    expect(tl[0]).toMatchObject({ kind: "COMMENT", detail: "已联系场地方" });
+    expect(tl[0]).toMatchObject({ kind: "COMMENT", detail: "已联系场地方", actor: { ref: "admin" }, hot: false });
     expect(tl[1].title).toMatch(/接单：待接单 → 处理中/);
   });
 
   it("退回抢单池：清空受理方、回到待接单，出现在可抢待办里", () => {
-    assignTicket("WO26092688", null, "受理方联系不上", NOW);
+    expect(() => poolTicket("WO26092688", " ", NOW)).toThrow(/原因/);
+    poolTicket("WO26092688", "受理方联系不上", NOW);
     const t = getTicket("WO26092688", NOW);
     expect(t.assignee).toBeUndefined();
     expect(t.status.code).toBe("PENDING_ACCEPT");

@@ -29,6 +29,8 @@ const member = (party: string, ref: string, displayName: string): Member =>
 
 /** mock 的当前操作人。真实环境由服务从宿主令牌解析，前端不传 */
 export const ME = member("STAFF", "admin", "admin");
+/** 种子时间线里的派单人 */
+const OMAR = { ref: "omar", displayName: "Omar" };
 
 /** 优先级选项集（租户可配；ordinal 0 最急） */
 const PRIO: Record<string, Priority> = {
@@ -161,14 +163,16 @@ function seed(now: number) {
   }
   timelines = {};
   for (const r of tickets) {
-    const ev: TimelineEvent[] = [{ seq: 1, atMs: r.createdAtMs, kind: "CREATED", title: "开单",
-      actor: r.source.kind === "ALARM" ? "系统（告警引擎）" : r.source.kind === "PATROL" ? "系统（巡检计划）" : "运营", detail: `优先级 ${PRIO[r.priority].name}` }];
-    if (r.assignee) ev.push({ seq: 2, atMs: r.createdAtMs + 2 * MIN, kind: "ASSIGNED", title: "派单", actor: "运营 Omar",
+    // 系统事件没有操作人（actor 不给）；由告警 / 巡检自动开的单，来源写进 detail
+    const byEngine = r.source.kind === "ALARM" ? "告警引擎 · " : r.source.kind === "PATROL" ? "巡检计划 · " : "";
+    const ev: TimelineEvent[] = [{ seq: 1, atMs: r.createdAtMs, kind: "CREATED", title: "开单", hot: false,
+      ...(byEngine ? {} : { actor: OMAR }), detail: `${byEngine}优先级 ${PRIO[r.priority].name}` }];
+    if (r.assignee) ev.push({ seq: 2, atMs: r.createdAtMs + 2 * MIN, kind: "ASSIGNED", title: "派单", actor: OMAR, hot: false,
       detail: `指派给 ${r.assignee.attrs?.partyType?.name ?? ""} · ${r.assignee.displayName} · SLA 起算` });
-    if (r.dedupe) ev.push({ seq: 3, atMs: now - 50 * MIN, kind: "DEDUPE", title: "重复告警并入", actor: "系统",
+    if (r.dedupe) ev.push({ seq: 3, atMs: now - 50 * MIN, kind: "DEDUPE", title: "重复告警并入", hot: false,
       detail: `命中去重键 ${r.dedupe.key}，附加到本单` });
     if (r.slaDueAtMs - now > 0 && r.slaDueAtMs - now < DUE_SOON_MS && r.pausedAtMs == null && r.closedAtMs == null) {
-      ev.push({ seq: 4, atMs: now - 2 * MIN, kind: "SLA", title: "SLA 提醒 · 即将超时", actor: "系统", detail: "已通知受理方与运营", hot: true });
+      ev.push({ seq: 4, atMs: now - 2 * MIN, kind: "SLA", title: "SLA 提醒 · 即将超时", detail: "已通知受理方与运营", hot: true });
     }
     timelines[r.ticketNo] = ev;
   }
@@ -375,7 +379,7 @@ export function claimTicket(no: string, now: number = Date.now()): TicketRow {
   r.pooled = false;
   r.assignee = ME;
   r.status = "PROCESSING";
-  log(r.ticketNo, now, "ASSIGNED", "从抢单池领取", ME.displayName);
+  log(r.ticketNo, now, "ASSIGNED", "从抢单池领取", ME);
   seq++;
   return out(view(r, now));
 }
@@ -403,7 +407,7 @@ export function transitionTicket(no: string, code: string, now: number = Date.no
   }
   const to = STATUS[r.status].name;
   log(r.ticketNo, now, code === "ESCALATE" ? "ESCALATED" : "TRANSITION",
-    from === to ? act.name : `${act.name}：${from} → ${to}`, ME.displayName, comment?.trim() || undefined);
+    from === to ? act.name : `${act.name}：${from} → ${to}`, ME, comment?.trim() || undefined);
   return out(view(r, now));
 }
 
@@ -419,7 +423,7 @@ export function reassignTickets(nos: string[], to: Member, reason: string, now: 
   }
   for (const r of rows) {
     r.assignee = to; r.pooled = false;
-    log(r.ticketNo, now, "ASSIGNED", "改派", ME.displayName, `改派给 ${to.attrs?.partyType?.name ?? ""} · ${to.displayName}：${reason.trim()}`);
+    log(r.ticketNo, now, "ASSIGNED", "改派", ME, `改派给 ${to.attrs?.partyType?.name ?? ""} · ${to.displayName}：${reason.trim()}`);
   }
   return rows.map((r) => out(view(r, now)));
 }
@@ -434,9 +438,9 @@ export const ASSIGNEE_OPTIONS: Member[] = [
 export const PARTY_OPTIONS: Named[] = Object.entries(PARTY).map(([code, name]) => ({ code, name }));
 
 // ── 工单详情 · 时间线 · 备注 · 退回抢单池 ────────────────────────────────────
-function log(no: string, atMs: number, kind: TimelineEvent["kind"], title: string, actor: string, detail?: string) {
+function log(no: string, atMs: number, kind: TimelineEvent["kind"], title: string, actor: Member, detail?: string) {
   const list = (timelines[no] ??= []);
-  list.push({ seq: list.length + 1, atMs, kind, title, actor, detail });
+  list.push({ seq: list.length + 1, atMs, kind, title, actor: { ref: actor.ref, displayName: actor.displayName }, detail, hot: false });
 }
 
 /** GET /workspaces/{ws}/tickets/{no}：行 + 全部字段 + 参与者 + 每个 SLA 指标 + 动作 */
@@ -488,23 +492,31 @@ export function addComment(no: string, body: string, now: number = Date.now()): 
   const r = row(no);
   if (!body.trim()) fail("备注不能为空", "The note cannot be empty");
   if (body.length > 1000) fail("备注不能超过 1000 字", "The note cannot exceed 1000 characters");
-  log(r.ticketNo, now, "COMMENT", "备注", ME.displayName, body.trim());
+  log(r.ticketNo, now, "COMMENT", "备注", ME, body.trim());
   return getTimeline(no);
 }
 
-/** POST /workspaces/{ws}/tickets/{no}/assign：to 为 null = 退回抢单池。原因必填 */
-export function assignTicket(no: string, to: Member | null, reason: string, now: number = Date.now()): TicketRow {
+function dispatchable(no: string, reason: string, what: string) {
   requirePerm("flow:ticket:dispatch");
   const r = row(no);
-  if (!OPEN.includes(r.status)) fail(`工单 ${no} 已结，不能改派`, `Ticket ${no} is closed and cannot be reassigned`);
-  if (!reason.trim()) fail("改派必须填写原因（会记入工单时间线）", "A reason is required to reassign (it goes into the ticket timeline)");
-  if (to) {
-    r.assignee = to; r.pooled = false;
-    log(no, now, "ASSIGNED", "改派", ME.displayName, `改派给 ${to.attrs?.partyType?.name ?? ""} · ${to.displayName}：${reason.trim()}`);
-  } else {
-    r.assignee = null; r.pooled = true; r.status = "PENDING_ACCEPT";
-    log(no, now, "ASSIGNED", "退回抢单池", ME.displayName, reason.trim());
-  }
+  if (!OPEN.includes(r.status)) fail(`工单 ${no} 已结，不能${what}`, `Ticket ${no} is closed`);
+  if (!reason.trim()) fail(`${what}必须填写原因（会记入工单时间线）`, "A reason is required (it goes into the ticket timeline)");
+  return r;
+}
+
+/** POST /workspaces/{ws}/tickets/{no}/assign {to, reason}：to 必填（退回抢单池走 /pool） */
+export function assignTicket(no: string, to: Member, reason: string, now: number = Date.now()): TicketRow {
+  const r = dispatchable(no, reason, "改派");
+  r.assignee = to; r.pooled = false;
+  log(no, now, "ASSIGNED", "改派", ME, `改派给 ${to.attrs?.partyType?.name ?? ""} · ${to.displayName}：${reason.trim()}`);
+  return out(view(r, now));
+}
+
+/** POST /workspaces/{ws}/tickets/{no}/pool {reason}：退回抢单池（显式端点，不用 to: null） */
+export function poolTicket(no: string, reason: string, now: number = Date.now()): TicketRow {
+  const r = dispatchable(no, reason, "退回抢单池");
+  r.assignee = null; r.pooled = true; r.status = "PENDING_ACCEPT";
+  log(no, now, "ASSIGNED", "退回抢单池", ME, reason.trim());
   return out(view(r, now));
 }
 

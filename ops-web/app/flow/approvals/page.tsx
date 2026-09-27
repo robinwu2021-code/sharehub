@@ -59,7 +59,7 @@ function FlowApprovals() {
     { header: "流程", cell: (a) => a.process.name },
     { header: "业务对象", cell: (a) => a.subject.display.title },
     { header: "状态", cell: (a) => <StatusBadge map={APPROVAL_STATUS} value={a.status} /> },
-    { header: "当前步 / 轮次", cell: (a) => `${a.currentStep?.name ?? "—"} · 第 ${a.currentRound} 轮` },
+    { header: "当前步 / 轮次", cell: (a) => `${a.currentStep?.name ?? "—"} · 第 ${a.round} 轮` },
     { header: "提交人", cell: (a) => a.requestedBy.displayName },
     { header: "提交时间", cell: (a) => <span className="tabular-nums">{fmtShort(a.requestedAtMs)}</span> },
     {

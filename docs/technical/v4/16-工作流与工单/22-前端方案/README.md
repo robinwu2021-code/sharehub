@@ -65,11 +65,11 @@
 | P3 审核队列 | `/flow/queue/` | ✅ 队列待领数、领取倒计时、领取后才能决定、放回 |
 | P4 工单工作台 | `/flow/tickets/` | ✅ 可点统计卡（卡与列表同口径）、筛选、行内动作、批量改派 |
 | P5 工单详情 | `/flow/tickets/detail/?no=` | ✅ 对象、时间线、SLA 各指标、动作（撤单需原因）、改派 / 回抢单池、备注 |
-| P5a 流程配置 | `/flow/processes/` | ✅ 表单化步骤编辑、四种审批人、三种条件、规则开关、保存即发布（幂等）、422 逐条挂到字段、版本历史 |
-| P6 运营配置 | `/flow/settings/` | ✅ SLA 规则 · 工作日历 · 队列 |
+| P5a 流程配置 | `/flow/processes/` | ✅ 编辑「审批模板」（21/02 §6.4a）：五种审批人、会签限成员 / 组 / 字段、三种条件、三条规则（两条可关）、名称多语种、保存即发布（幂等）、422 逐条挂到字段、版本历史 |
+| P6 运营配置 | `/flow/settings/` | ✅ SLA 规则 · 工作日历 · 队列（= kind=QUEUE 的组，超时按秒存） |
 | P7 接入管理 | `/flow/access/` | ✅ 应用（凭证只显示一次）、webhook 投递（失败可重投）、定义版本 |
 
-全部在 mock 上；规则由 `lib/flow/mock-*.ts` 强制并有测试（flow 共 41 条，含负对照）。
+全部在 mock 上；规则由 `lib/flow/mock-*.ts` 强制并有测试（flow 共 43 条，含负对照）。
 
 **2026-09-28 进菜单与权限（F1–F3）**：
 - 10 个 `flow:*` 码进功能权限清单 §16（强制方 OpsKit）；`RolePerms` 与前端镜像逐码一致；V135 进权限目录
@@ -80,9 +80,17 @@
 - 按权限显示：页面查看守卫 + 非迁移类写能力判码；迁移动作以服务端 `actions[]` 为准；mock 同步按操作人判权
 - AGENT 持码但暂无入口：等 OpsKit 范围标签（21/07 P2）上线再挂代理门户
 
-**已提请后端确认的契约**（2026-09-27 第二轮，见后端会话往来）：流程配置的「线性审批步骤」表单与 OpsKit
-「状态机 + 审批门」模型如何对应；审批状态计数、队列待领数、队列组 CRUD、定义版本总览四个读接口；
-ApprovalView / QueueTask / TicketView 扩展字段与时间线事件形状；assign 与 decide 的校验顺序。
+**后端第二轮契约已跟进**（2026-09-28，21/06 §三 §四 §七、21/02 §6.4a）：
+- 流程配置改走 `approval-templates`：审批人 `MEMBER|GROUP|ROLE|PERM|FIELD`（原 QUEUE→GROUP、ASSIGNED→FIELD 且要填字段代号）、
+  `timeLimitHours`→`dueHours`（可空）、`name{i18n}`（按界面语言编辑一种、其余保留）、`rules{selfApproval, crossStepExclusive}`；
+  会签只许 MEMBER / GROUP / FIELD，界面把「会签」选项灰掉，服务端 422 路径 `steps[i].mode`
+- 队列 = `kind=QUEUE` 的组（`…/groups/{code}`，`claimTimeoutSec` · `orderBy: PRIORITY|DUE|CREATED`）
+- 新读接口：`approvals/count` · `tasks/queue-counts`（`{queue, unclaimed, claimedByMe}`）· `GET /accounts/{a}/definitions`
+- 改名：`approverText` / `conditionText` · `evidenceSummary?` · `ApprovalRow.round`；时间线 `actor?{ref, displayName}`（系统事件无）、
+  `hot` 必给、kind 增 `APPROVAL` · `MERGE`
+- 退回抢单池走 `POST …/tickets/{no}/pool {reason}`，`assign.to` 必填
+- 不变：`TicketRow.sla`（对象）与 `TicketView.slaMetrics`（数组）
+- **向后端补提**：`ApprovalRow.finishedAtMs?`（审批列表「耗时」列要用，21/06 §七 未列）
 
 后端现状（后端会话 2026-09-27 告知）：M0 骨架完成、M1 平台层服务层完成；**流程（M2）、工单（M3）未开工**，
 暂无可联调的端点。前端先在 mock 上推进；后端端点可用后只换 `lib/flow/client.ts`。

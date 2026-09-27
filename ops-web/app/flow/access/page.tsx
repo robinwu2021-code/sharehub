@@ -24,7 +24,7 @@ const APP_STATUS: StatusMap<"on" | "off"> = { on: { label: "启用", tone: "succ
 const DELIVERY: StatusMap<DeliveryRow["status"]> = {
   DELIVERED: { label: "成功", tone: "success" }, RETRYING: { label: "重试中", tone: "warning" }, FAILED: { label: "失败", tone: "danger" },
 };
-const KIND: Record<DefinitionVersionRow["kind"], string> = { PROCESS: "审批流程", TICKET_TYPE: "工单类型", STATE_MACHINE: "状态图" };
+const KIND: Record<DefinitionVersionRow["kind"], string> = { PROCESS: "流程", APPROVAL_TEMPLATE: "审批模板", TICKET_TYPE: "工单类型", SLA_POLICY: "SLA 策略" };
 
 /**
  * @form-none 新增应用提交到 OpsKit（POST /accounts/{a}/apps，21/06 §三），不是 ShareHub 后端，contract.json 管不到。
@@ -107,8 +107,8 @@ function FlowAccess() {
     { header: "类别", cell: (d) => KIND[d.kind] },
     { header: "代号", pk: true, cell: (d) => d.code },
     { header: "当前版本", cell: (d) => <span className="font-mono text-xs">{d.version}</span> },
-    { header: "登记时间", cell: (d) => <span className="tabular-nums">{fmtShort(d.atMs)}</span> },
-    { header: "登记方", cell: (d) => d.by },
+    { header: "发布时间", cell: (d) => <span className="tabular-nums">{fmtShort(d.publishedAtMs)}</span> },
+    { header: "发布方", cell: (d) => `${d.publishedBy}${d.channel === "CONSOLE" ? "（控制台）" : ""}` },
   ];
 
   return (

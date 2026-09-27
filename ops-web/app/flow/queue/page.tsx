@@ -49,7 +49,7 @@ function FlowQueue() {
   const [form, setForm] = useState<Record<string, unknown>>({ reason: "" });
   const refresh = () => qc.invalidateQueries({ queryKey: FLOW_KEY });
 
-  const queues = useQuery({ queryKey: [...FLOW_KEY, "queues"], queryFn: flow.queues });
+  const queues = useQuery({ queryKey: [...FLOW_KEY, "queue-counts"], queryFn: flow.queueCounts });
   const mine = useQuery({ queryKey: [...FLOW_KEY, "my-claimed"], queryFn: flow.myClaimed });
   const list = useQuery({
     queryKey: [...FLOW_KEY, "queue-tasks", queue, paging.page, paging.size],
@@ -76,7 +76,7 @@ function FlowQueue() {
     { header: "对象", cell: (t) => <span className="txt-strong">{t.subject.display.title}</span> },
     { header: "优先级", cell: (t) => <PriorityBadge p={t.priority} /> },
     { header: "等待", cell: (t) => <span className="tabular-nums">{age(t)}</span> },
-    { header: "证据", cell: (t) => <span className="text-muted-foreground">{t.evidence}</span> },
+    { header: "证据", cell: (t) => <span className="text-muted-foreground">{t.evidenceSummary ?? "—"}</span> },
     {
       header: "操作", className: "text-end",
       cell: (t) => (
@@ -105,7 +105,7 @@ function FlowQueue() {
     },
   ];
 
-  const qname = queues.data?.find((q) => q.code === queue)?.name ?? "";
+  const qname = queues.data?.find((q) => q.queue.code === queue)?.queue.name ?? "";
   const myList = mine.data ?? [];
   const soonest = myList.map((t) => t.claimExpiresAtMs ?? Infinity).sort((a, b) => a - b)[0];
 
@@ -113,7 +113,7 @@ function FlowQueue() {
     <div>
       <PageTitle title="审核队列" desc="领取后才能决定；领取超时 30 分钟自动放回并留痕。" />
       <Tabs
-        tabs={(queues.data ?? []).map((q) => ({ key: q.code, label: `${q.name} · 待领 ${q.unclaimed}` }))}
+        tabs={(queues.data ?? []).map((q) => ({ key: q.queue.code, label: `${q.queue.name} · 待领 ${q.unclaimed}` }))}
         value={queue}
         onChange={(k) => { setQueue(k); paging.reset(); }}
       />

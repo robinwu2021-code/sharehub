@@ -1,7 +1,7 @@
-// 配置管理的 mock：流程定义 · SLA 规则 · 工作日历 · 队列 · 接入应用 · webhook 投递 · 定义版本。
+// 配置管理的 mock：审批模板 · SLA 规则 · 工作日历 · 队列 · 接入应用 · webhook 投递 · 定义版本。
 //
 // 与服务端同构的几点：
-//  - 流程定义**版本 = 内容哈希，只增不改**；内容没变再发布是幂等的（created=false），
+//  - 审批模板**版本 = 内容哈希，只增不改**；内容没变再发布是幂等的（created=false），
 //    在途审批按提交时版本走完（runningOnOlderVersions）；
 //  - 校验失败 422，**一次返回全部错误**，每条带字段路径（页面挂到对应字段）；
 //  - 凭证只在创建 / 轮换时返回一次，之后读不到；
@@ -11,27 +11,32 @@ import { ME } from "./mock-db";
 import { pendingCountOf } from "./mock-approvals";
 import { FlowValidationError } from "./errors";
 import { requirePerm } from "./mock-auth";
+import { ALL_MODE_KINDS } from "./types";
 import type {
-  AppRow, DefinitionVersionRow, DeliveryRow, FieldError, Named, ProcessDef, ProcessSummary, ProcessVersion,
-  PublishResult, QueueGroup, SlaPolicy, WorkCalendar,
+  AppRow, ApprovalTemplate, DefinitionVersionRow, DeliveryRow, FieldError, I18nText, Named, TemplateStep, TemplateSummary,
+  TemplateVersion, PublishResult, QueueGroup, SlaPolicy, WorkCalendar,
 } from "./types";
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;
 
 /** 内容哈希（8 位十六进制）：同内容同版本号 */
-export function contentHash(def: ProcessDef): string {
-  const text = JSON.stringify({ n: def.name, s: def.steps, x: def.crossStepExclusive });
+export function contentHash(def: ApprovalTemplate): string {
+  const text = JSON.stringify({ n: def.name, s: def.steps, r: def.rules });
   let h = 0x811c9dc5;
   for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
   return h.toString(16).padStart(8, "0");
 }
 
 interface ProcessRec {
-  def: ProcessDef;
+  def: ApprovalTemplate;
   enabled: boolean;
-  versions: (ProcessVersion & { def: ProcessDef })[];
+  versions: (TemplateVersion & { def: ApprovalTemplate })[];
 }
+
+/** 服务按 Accept-Language 选名称；mock 固定中文、缺了回落到任一语种 */
+const pick = (t: I18nText) => t.zh ?? t.en ?? t.ar ?? "";
+const zh = (text: string): I18nText => ({ zh: text });
 
 let processes: ProcessRec[] = [];
 let slaPolicies: SlaPolicy[] = [];
@@ -42,28 +47,29 @@ let deliveries: DeliveryRow[] = [];
 let otherDefs: DefinitionVersionRow[] = [];
 let secretSeq = 0;
 
-const step = (code: string, name: string, kind: ProcessDef["steps"][0]["approver"]["kind"], value: string, hours: number,
-  when?: ProcessDef["steps"][0]["when"]): ProcessDef["steps"][0] => ({ code, name, approver: { kind, value }, mode: "ANY", timeLimitHours: hours, ...(when ? { when } : {}) });
+const step = (code: string, name: string, kind: TemplateStep["approver"]["kind"], value: string, hours: number,
+  when?: TemplateStep["when"]): TemplateStep => ({ code, name: zh(name), approver: { kind, value }, mode: "ANY", dueHours: hours, ...(when ? { when } : {}) });
+const rules = (crossStepExclusive: boolean) => ({ selfApproval: false, crossStepExclusive });
 
 export function resetConfigDb(now: number = Date.now()) {
   secretSeq = 0;
-  const loc: ProcessDef = { code: "LOC_CONTRACT", name: "进场合同", crossStepExclusive: true, steps: [
+  const loc: ApprovalTemplate = { code: "LOC_CONTRACT", name: { zh: "进场合同", en: "Venue contract" }, rules: rules(true), steps: [
     step("ops", "运营审批", "PERM", "location:contract:audit", 8),
     step("fin", "财务会签", "PERM", "location:contract:cosign", 24, { field: "needsCosign", op: "TRUE" }),
   ] };
-  const locV1: ProcessDef = { ...loc, steps: loc.steps.map((s) => (s.code === "fin" ? { ...s, timeLimitHours: 48 } : s)) };
-  const mk = (def: ProcessDef, version: string, atMs: number, channel: "API" | "CONSOLE", by: string, note?: string) =>
+  const locV1: ApprovalTemplate = { ...loc, steps: loc.steps.map((s) => (s.code === "fin" ? { ...s, dueHours: 48 } : s)) };
+  const mk = (def: ApprovalTemplate, version: string, atMs: number, channel: "API" | "CONSOLE", by: string, note?: string) =>
     ({ def, version, atMs, channel, by, note, current: false });
   processes = [
     { def: loc, enabled: true, versions: [
       mk(locV1, "88d3c0e5", now - 2.5 * 24 * HOUR, "API", "SHAREHUB", "上线初版"),
       mk(loc, "a3f8c2d1", now - 12 * HOUR, "CONSOLE", "Omar", "会签时限 48h → 24h"),
     ] },
-    { def: { code: "FIN_WITHDRAWAL", name: "提现审批", crossStepExclusive: false, steps: [step("fin", "财务审批", "PERM", "finance:withdrawal:audit", 24)] },
+    { def: { code: "FIN_WITHDRAWAL", name: zh("提现审批"), rules: rules(false), steps: [step("fin", "财务审批", "PERM", "finance:withdrawal:audit", 24)] },
       enabled: true, versions: [] },
-    { def: { code: "AGT_APPLY", name: "代理入驻", crossStepExclusive: false, steps: [step("ops", "运营审核", "PERM", "agent:apply:audit", 48)] },
+    { def: { code: "AGT_APPLY", name: zh("代理入驻"), rules: rules(false), steps: [step("ops", "运营审核", "PERM", "agent:apply:audit", 48)] },
       enabled: true, versions: [] },
-    { def: { code: "CS_REFUND", name: "退款审批", crossStepExclusive: false, steps: [step("cs", "客服主管审批", "ROLE", "cs-lead", 4)] },
+    { def: { code: "CS_REFUND", name: zh("退款审批"), rules: rules(false), steps: [step("cs", "客服主管审批", "ROLE", "cs-lead", 4)] },
       enabled: true, versions: [] },
   ];
   for (const p of processes) {
@@ -79,9 +85,9 @@ export function resetConfigDb(now: number = Date.now()) {
   calendars = [{ code: "dubai", name: "迪拜营业时间", timeZone: "Asia/Dubai", weekdays: [1, 2, 3, 4, 5, 6], open: "10:00", close: "22:00",
     holidays: [{ date: "2026-12-02", name: "国庆" }, { date: "2026-12-03", name: "国庆" }] }];
   queues = [
-    { code: "merchant", name: "商户资质", sort: "PRIORITY_THEN_AGE", claimTimeoutMin: 30 },
-    { code: "goods", name: "商品审核", sort: "AGE", claimTimeoutMin: 30 },
-    { code: "factory", name: "验厂", sort: "PRIORITY_THEN_AGE", claimTimeoutMin: 60 },
+    { code: "merchant", name: "商户资质", kind: "QUEUE", orderBy: "PRIORITY", claimTimeoutSec: 30 * 60 },
+    { code: "goods", name: "商品审核", kind: "QUEUE", orderBy: "CREATED", claimTimeoutSec: 30 * 60 },
+    { code: "factory", name: "验厂", kind: "QUEUE", orderBy: "PRIORITY", claimTimeoutSec: 60 * 60 },
   ];
   apps = [
     { id: "app_sharehub", code: "SHAREHUB", name: "ShareHub 共享充电", callbackUrl: "https://powerbank.ichain.top/api/opskit/callback", timeZone: "Asia/Dubai", enabled: true },
@@ -97,51 +103,53 @@ export function resetConfigDb(now: number = Date.now()) {
     d("dl_005", "ticket.created", "SHAREHUB", "WO26092701:1", "DELIVERED", 3.4 * HOUR, { httpStatus: 200, durationMs: 64 }),
   ];
   otherDefs = [
-    { kind: "TICKET_TYPE", code: "PB_MAINTENANCE", version: "7be04412", atMs: now - 12 * HOUR, by: "SHAREHUB" },
-    { kind: "STATE_MACHINE", code: "SHOP_AFTER_SALE", version: "c91177aa", atMs: now - 29 * HOUR, by: "SHOP" },
+    { kind: "TICKET_TYPE", code: "PB_MAINTENANCE", version: "7be04412", publishedAtMs: now - 12 * HOUR, publishedBy: "SHAREHUB", channel: "API" },
+    { kind: "PROCESS", code: "SHOP_AFTER_SALE", version: "c91177aa", publishedAtMs: now - 29 * HOUR, publishedBy: "SHOP", channel: "API" },
+    { kind: "SLA_POLICY", code: "ops-urgent", version: "5e21b0c4", publishedAtMs: now - 50 * HOUR, publishedBy: "Omar", channel: "CONSOLE" },
   ];
 }
 resetConfigDb();
 
-// ── 流程定义 ────────────────────────────────────────────────────────────
+// ── 审批模板 ────────────────────────────────────────────────────────────
 function prec(code: string): ProcessRec {
   const p = processes.find((x) => x.def.code === code);
-  if (!p) notFound("流程", "Process", code);
+  if (!p) notFound("审批模板", "Approval template", code);
   return p;
 }
 const currentVersion = (p: ProcessRec) => p.versions[p.versions.length - 1];
 
-export function listProcesses(): ProcessSummary[] {
+export function listTemplates(): TemplateSummary[] {
   return processes.map((p) => ({
-    code: p.def.code, name: p.def.name,
-    stepsSummary: p.def.steps.map((s) => `${s.name}${s.when ? "（条件）" : ""}`).join(" → "),
+    code: p.def.code, name: pick(p.def.name),
+    stepsSummary: p.def.steps.map((s) => `${pick(s.name)}${s.when ? "（条件）" : ""}`).join(" → "),
     version: currentVersion(p).version, running: pendingCountOf(p.def.code), enabled: p.enabled,
   }));
 }
 
-export function getProcess(code: string): ProcessDef {
+export function getTemplate(code: string): ApprovalTemplate {
   return structuredClone(prec(code).def);
 }
 
-export function processVersions(code: string): ProcessVersion[] {
+export function templateVersions(code: string): TemplateVersion[] {
   const p = prec(code);
   const cur = currentVersion(p).version;
   return [...p.versions].reverse().map(({ def: _d, ...v }) => ({ ...v, current: v.version === cur }));
 }
 
 /** 校验：一次返回全部错误 */
-function validate(def: ProcessDef, isNew: boolean): FieldError[] {
+function validate(def: ApprovalTemplate, isNew: boolean): FieldError[] {
   const e: FieldError[] = [];
   if (isNew && !/^[A-Z][A-Z0-9_]{2,31}$/.test(def.code)) e.push({ path: "code", error: "代号 3–32 位，大写字母开头，只含大写字母、数字、下划线" });
   if (isNew && processes.some((p) => p.def.code === def.code)) e.push({ path: "code", error: "代号已存在" });
-  if (!def.name.trim()) e.push({ path: "name", error: "流程名称必填" });
+  if (!pick(def.name)) e.push({ path: "name", error: "模板名称必填" });
   if (!def.steps.length) e.push({ path: "steps", error: "至少要有一个步骤" });
   if (def.steps.length && def.steps.every((s) => s.when)) e.push({ path: "steps", error: "至少要有一个必经步骤（不带进入条件）" });
   def.steps.forEach((s, i) => {
     const at = (k: string) => `steps[${i}].${k}`;
-    if (!s.name.trim()) e.push({ path: at("name"), error: "步骤名称必填" });
-    if (!s.approver.value.trim() && s.approver.kind !== "ASSIGNED") e.push({ path: at("approver.value"), error: "审批人必填" });
-    if (!(s.timeLimitHours > 0 && s.timeLimitHours <= 720)) e.push({ path: at("timeLimitHours"), error: "步骤时限 1–720 小时" });
+    if (!pick(s.name)) e.push({ path: at("name"), error: "步骤名称必填" });
+    if (!s.approver.value) e.push({ path: at("approver.value"), error: s.approver.kind === "FIELD" ? "要填给出审批人的字段代号" : "审批人必填" });
+    if (s.mode === "ALL" && !ALL_MODE_KINDS.includes(s.approver.kind)) e.push({ path: at("mode"), error: "会签只能用于成员 / 组 / 字段指定（角色、权限码的人选不可枚举）" });
+    if (s.dueHours !== undefined && !(s.dueHours > 0 && s.dueHours <= 720)) e.push({ path: at("dueHours"), error: "步骤时限 1–720 小时" });
     if (s.when) {
       if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(s.when.field)) e.push({ path: at("when.field"), error: "属性名只能是字母、数字、下划线，字母开头" });
       if ((s.when.op === "EQ" || s.when.op === "IN") && !s.when.value?.trim()) e.push({ path: at("when.value"), error: "「等于 / 属于」要填比较值" });
@@ -151,11 +159,13 @@ function validate(def: ProcessDef, isNew: boolean): FieldError[] {
 }
 
 /** PUT /workspaces/{ws}/processes/{code}：幂等发布 */
-export function publishProcess(def: ProcessDef, note: string, isNew: boolean, now: number = Date.now()): PublishResult {
+export function publishTemplate(def: ApprovalTemplate, note: string, isNew: boolean, now: number = Date.now()): PublishResult {
   requirePerm("flow:process:manage");
-  const clean: ProcessDef = {
-    ...def, name: def.name.trim(),
-    steps: def.steps.map((s, i) => ({ ...s, code: s.code || `s${i + 1}`, name: s.name.trim(), approver: { ...s.approver, value: s.approver.value.trim() } })),
+  const trimAll = (t: I18nText): I18nText =>
+    Object.fromEntries(Object.entries(t).map(([k, v]) => [k, v?.trim()]).filter(([, v]) => v)) as I18nText;
+  const clean: ApprovalTemplate = {
+    ...def, name: trimAll(def.name),
+    steps: def.steps.map((s, i) => ({ ...s, code: s.code || `s${i + 1}`, name: trimAll(s.name), approver: { ...s.approver, value: s.approver.value.trim() } })),
   };
   const errors = validate(clean, isNew);
   if (errors.length) throw new FlowValidationError(`保存被拒：有 ${errors.length} 处需要修改`, errors);
@@ -173,8 +183,8 @@ export function publishProcess(def: ProcessDef, note: string, isNew: boolean, no
   return { version, created: true, runningOnOlderVersions: pendingCountOf(def.code) };
 }
 
-/** POST …/processes/{code}/disable · /enable：停用 = 不再接受新提交，在途走完 */
-export function setProcessEnabled(code: string, enabled: boolean): void {
+/** POST …/approval-templates/{code}/disable · /enable：停用 = 不再接受新提交，在途走完 */
+export function setTemplateEnabled(code: string, enabled: boolean): void {
   requirePerm("flow:process:manage");
   prec(code).enabled = enabled;
 }
@@ -218,7 +228,7 @@ export function upsertQueueGroup(q: QueueGroup, isNew: boolean): QueueGroup {
   if (isNew && !/^[a-z][a-z0-9-]{1,31}$/.test(q.code)) e.push({ path: "code", error: "代号 2–32 位小写字母、数字、连字符" });
   if (isNew && queues.some((x) => x.code === q.code)) e.push({ path: "code", error: "代号已存在" });
   if (!q.name.trim()) e.push({ path: "name", error: "名称必填" });
-  if (!(q.claimTimeoutMin >= 5 && q.claimTimeoutMin <= 240)) e.push({ path: "claimTimeoutMin", error: "领取超时 5–240 分钟" });
+  if (!(q.claimTimeoutSec >= 300 && q.claimTimeoutSec <= 14_400)) e.push({ path: "claimTimeoutSec", error: "领取超时 5–240 分钟" });
   if (e.length) throw new FlowValidationError(`保存被拒：有 ${e.length} 处需要修改`, e);
   const i = queues.findIndex((x) => x.code === q.code);
   if (i >= 0) queues[i] = q; else queues.push(q);
@@ -267,10 +277,10 @@ export function definitionVersions(): DefinitionVersionRow[] {
   return [
     ...processes.map((p) => {
       const v = currentVersion(p);
-      return { kind: "PROCESS" as const, code: p.def.code, version: v.version, atMs: v.atMs, by: v.channel === "API" ? v.by : `${v.by}（控制台）` };
+      return { kind: "APPROVAL_TEMPLATE" as const, code: p.def.code, version: v.version, publishedAtMs: v.atMs, publishedBy: v.by, channel: v.channel };
     }),
     ...otherDefs,
-  ].sort((a, b) => b.atMs - a.atMs);
+  ].sort((a, b) => b.publishedAtMs - a.publishedAtMs);
 }
 
 export const TICKET_TYPE_OPTIONS: Named[] = [{ code: "ops", name: "运维工单" }, { code: "cs-report", name: "客服报障" }, { code: "after-sales", name: "售后" }];

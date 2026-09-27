@@ -66,8 +66,11 @@ function TicketDetail() {
   });
   const assign = useMutation({
     mutationFn: () => {
-      const to = assignForm.to === POOL ? null : flow.assigneeOptions().find((m) => m.ref === assignForm.to) ?? null;
-      return flow.assign(no, to, String(assignForm.reason ?? ""));
+      const reason = String(assignForm.reason ?? "");
+      if (assignForm.to === POOL) return flow.pool(no, reason);
+      const to = flow.assigneeOptions().find((m) => m.ref === assignForm.to);
+      if (!to) throw new Error("请选择改派对象");
+      return flow.assign(no, to, reason);
     },
     onSuccess: () => { notify.success(assignForm.to === POOL ? "已退回抢单池" : "已改派"); setAssignOpen(false); setAssignForm({ to: "", reason: "" }); refresh(); },
     onError: (e: Error) => notify.error(e.message),
@@ -85,7 +88,7 @@ function TicketDetail() {
   const open = !["DONE", "CANCELLED"].includes(t.statusCategory);
 
   /**
-   * @form-none 改派 / 退回抢单池提交到 OpsKit（POST /workspaces/{ws}/tickets/{no}/assign），
+   * @form-none 改派 / 退回抢单池提交到 OpsKit（POST /workspaces/{ws}/tickets/{no}/assign · /pool），
    * 不是 ShareHub 后端；字段以 21/06 为准。
    */
   const assignFields: FieldDef[] = [
@@ -141,7 +144,7 @@ function TicketDetail() {
                 empty={tl.isLoading ? "加载中…" : "还没有流转记录"}
                 items={(tl.data ?? []).map((e) => ({
                   key: String(e.seq), title: e.title, hot: e.hot,
-                  meta: `${fmtWhen(e.atMs)} · ${e.actor}${e.detail && e.kind !== "COMMENT" ? ` · ${e.detail}` : ""}`,
+                  meta: `${fmtWhen(e.atMs)} · ${e.actor?.displayName ?? "系统"}${e.detail && e.kind !== "COMMENT" ? ` · ${e.detail}` : ""}`,
                   detail: e.kind === "COMMENT" ? e.detail : undefined,
                 }))}
               />

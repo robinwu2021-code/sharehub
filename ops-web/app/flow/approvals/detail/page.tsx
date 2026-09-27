@@ -82,7 +82,7 @@ function ApprovalDetail() {
       <div className="mb-1 flex flex-wrap items-center gap-2">
         <h1 className="txt-title">{a.process.name}审批</h1>
         <StatusBadge map={APPROVAL_STATUS} value={a.status} />
-        <span className="txt-body text-muted-foreground">第 {a.currentRound} 轮</span>
+        <span className="txt-body text-muted-foreground">第 {a.round} 轮</span>
       </div>
       <p className="mb-4 txt-body text-muted-foreground">
         审批单 {a.approvalNo} · 流程 {a.process.code} · 提交人 {a.requestedBy.displayName} · {fmtShort(a.requestedAtMs)}
@@ -112,7 +112,7 @@ function ApprovalDetail() {
             <ul className="mt-3 space-y-1 txt-caption text-muted-foreground">
               {a.steps.map((s) => (
                 <li key={s.code}>
-                  {s.name}：{s.approver}{s.condition ? ` · ${s.condition}` : ""}
+                  {s.name}：{s.approverText}{s.conditionText ? ` · ${s.conditionText}` : ""}
                   {s.state === "SKIPPED" ? " · 进入条件不满足，已跳过" : ""}
                   {s.decidedBy ? ` · 决定人 ${s.decidedBy}` : ""}
                 </li>
