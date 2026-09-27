@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>流程与工单平台 · 产品原型</title>
+<style>
+  /* 原型样式：独立单文件，不复用 ops-web 类名（避免与其设计规范互相牵扯）。
+     色彩语义：绿=正常 黄=将超时 红=超时 灰=暂停/禁用；主色一处，克制。 */
+  :root{
+    --ink:#1b2429; --ink2:#5a6a70; --ink3:#8b979c; --line:#e3e8ea; --bg:#f4f6f7; --card:#fff;
+    --brand:#0f7173; --brand-bg:#e8f2f2;
+    --ok:#2e7d4f; --ok-bg:#e7f3ec; --warn:#a3690b; --warn-bg:#fdf3e0;
+    --bad:#b3403a; --bad-bg:#fbecea; --mute:#6b7a7c; --mute-bg:#eef1f1;
+    --appr:#5b7ba6; --appr-bg:#eef2f8; --wo:#b07d3a; --wo-bg:#fbf3e8; --pool:#7d63a3; --pool-bg:#f2edf7;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font:14px/1.6 -apple-system,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;color:var(--ink);background:var(--bg);display:flex;min-height:100vh}
+  aside{width:200px;background:#122024;color:#c8d4d8;padding:16px 0;flex-shrink:0}
+  aside h1{font-size:15px;color:#fff;padding:4px 20px 14px;letter-spacing:.5px}
+  aside h1 small{display:block;font-size:11px;color:#7d9096;font-weight:400;margin-top:2px}
+  aside .grp{font-size:11px;color:#63767c;padding:12px 20px 4px;letter-spacing:1px}
+  aside a{display:flex;justify-content:space-between;align-items:center;padding:9px 20px;color:#c8d4d8;text-decoration:none;font-size:13.5px;border-left:3px solid transparent}
+  aside a:hover{background:#1a2e33}
+  aside a.on{background:#173035;color:#fff;border-left-color:var(--brand)}
+  aside .n{background:var(--bad);color:#fff;font-size:11px;border-radius:9px;padding:0 7px;line-height:18px}
+  main{flex:1;padding:22px 28px;max-width:1180px}
+  .crumb{font-size:12px;color:var(--ink3);margin-bottom:6px}
+  h2{font-size:19px;margin-bottom:2px}
+  .sub{color:var(--ink2);font-size:13px;margin-bottom:16px}
+  .page{display:none}.page.on{display:block}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:14px}
+  .row{display:flex;gap:14px;flex-wrap:wrap}
+  .stat{flex:1;min-width:150px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 16px;cursor:pointer}
+  .stat:hover{border-color:var(--brand)}
+  .stat b{font-size:22px;display:block}
+  .stat span{font-size:12px;color:var(--ink2)}
+  table{width:100%;border-collapse:collapse;background:var(--card)}
+  th{font-size:12px;color:var(--ink2);text-align:left;font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:9px 10px;border-bottom:1px solid var(--line);font-size:13.5px;vertical-align:middle}
+  tr:hover td{background:#fafcfc;cursor:pointer}
+  .tag{display:inline-block;font-size:11.5px;border-radius:5px;padding:1px 8px;white-space:nowrap}
+  .t-appr{background:var(--appr-bg);color:var(--appr)} .t-wo{background:var(--wo-bg);color:var(--wo)}
+  .t-pool{background:var(--pool-bg);color:var(--pool)}
+  .t-ok{background:var(--ok-bg);color:var(--ok)} .t-warn{background:var(--warn-bg);color:var(--warn)}
+  .t-bad{background:var(--bad-bg);color:var(--bad)} .t-mute{background:var(--mute-bg);color:var(--mute)}
+  .sla{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;white-space:nowrap}
+  .bar{width:52px;height:6px;border-radius:3px;background:#e8ecee;overflow:hidden}
+  .bar i{display:block;height:100%}
+  .btn{display:inline-block;border:1px solid var(--line);background:#fff;border-radius:7px;padding:5px 14px;font-size:13px;cursor:pointer;color:var(--ink)}
+  .btn:hover{border-color:var(--brand);color:var(--brand)}
+  .btn.pri{background:var(--brand);border-color:var(--brand);color:#fff}
+  .btn.pri:hover{opacity:.9}
+  .btn.bad{color:var(--bad);border-color:#e5c4c2}
+  .btn[disabled]{opacity:.45;cursor:not-allowed;pointer-events:none}
+  .chips{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+  .chip{border:1px solid var(--line);background:#fff;border-radius:15px;padding:3px 14px;font-size:12.5px;cursor:pointer;color:var(--ink2)}
+  .chip.on{background:var(--brand-bg);border-color:var(--brand);color:var(--brand)}
+  .note{background:var(--warn-bg);border:1px solid #ecd9ae;border-radius:8px;padding:9px 13px;font-size:12.5px;color:#7a5410;margin:10px 0}
+  .note.err{background:var(--bad-bg);border-color:#e8c8c5;color:var(--bad)}
+  .kv{display:grid;grid-template-columns:96px 1fr 96px 1fr;gap:6px 10px;font-size:13px}
+  .kv dt{color:var(--ink3)} .kv dd{color:var(--ink)}
+  .steps{display:flex;align-items:center;gap:0;margin:12px 0 6px}
+  .step{display:flex;align-items:center;gap:7px}
+  .dot{width:22px;height:22px;border-radius:50%;background:var(--mute-bg);color:var(--mute);font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .step.done .dot{background:var(--ok);color:#fff} .step.cur .dot{background:var(--brand);color:#fff}
+  .step small{color:var(--ink3);font-size:11px;display:block}
+  .conn{width:56px;height:2px;background:var(--line);margin:0 10px}
+  .tl{list-style:none;border-left:2px solid var(--line);margin:8px 0 0 8px;padding-left:18px}
+  .tl li{position:relative;padding:0 0 14px}
+  .tl li::before{content:'';position:absolute;left:-24px;top:5px;width:10px;height:10px;border-radius:50%;background:#c6d0d3;border:2px solid #fff}
+  .tl li.hot::before{background:var(--brand)}
+  .tl .t{font-size:12px;color:var(--ink3)}
+  .split{display:grid;grid-template-columns:1fr 340px;gap:14px;align-items:start}
+  textarea,input[type=text]{width:100%;border:1px solid var(--line);border-radius:7px;padding:7px 10px;font:inherit;background:#fff}
+  .foot{font-size:11.5px;color:var(--ink3);margin-top:20px;border-top:1px solid var(--line);padding-top:10px}
+  .hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .hd h3{font-size:14.5px}
+  .sysline{font-size:12px;color:var(--ink3)}
+  .qtab{display:flex;gap:0;border-bottom:1px solid var(--line);margin-bottom:12px}
+  .qtab b{padding:7px 16px;font-size:13px;cursor:pointer;color:var(--ink2);border-bottom:2px solid transparent;font-weight:500}
+  .qtab b.on{color:var(--brand);border-bottom-color:var(--brand)}
+  .mono{font-family:ui-monospace,Menlo,monospace;font-size:12px}
+  .right{text-align:right}
+</style>
+</head>
+<body>
+<aside>
+  <h1>流程与工单平台<small>原型 v1 · 宿主：ShareHub 运营台</small></h1>
+  <div class="grp">我的</div>
+  <a href="#todo" class="nav on" data-p="todo">待办中心 <span class="n">5</span></a>
+  <div class="grp">审批</div>
+  <a href="#approval" class="nav" data-p="approval">审批详情（示例）</a>
+  <a href="#queue" class="nav" data-p="queue">审核队列</a>
+  <div class="grp">工单</div>
+  <a href="#orders" class="nav" data-p="orders">工单工作台</a>
+  <a href="#detail" class="nav" data-p="detail">工单详情（示例）</a>
+  <div class="grp">管理</div>
+  <a href="#config" class="nav" data-p="config">运营配置</a>
+  <a href="#admin" class="nav" data-p="admin">接入管理</a>
+</aside>
+<main>
+
+<!-- ═══════════ P1 待办中心 ═══════════ -->
+<section class="page on" id="p-todo">
+  <div class="crumb">流程与工单 / 待办中心</div>
+  <h2>待办中心</h2>
+  <p class="sub">审批与工单在同一张列表；只显示你够资格办、且在你数据范围内的。</p>
+  <div class="chips">
+    <span class="chip on">全部 5</span><span class="chip">审批 2</span><span class="chip">工单 2</span><span class="chip">可抢单 1</span>
+  </div>
+  <div class="card" style="padding:0">
+  <table>
+    <tr><th>类型</th><th>标题</th><th>业务对象</th><th>优先级</th><th>剩余时限</th><th>来源</th></tr>
+    <tr onclick="go('approval')"><td><span class="tag t-appr">审批</span></td><td>进场合同 · 运营审批</td><td>CT0042 万达广场 · 分成 35% · 12 个月</td><td><span class="tag t-warn">高</span></td>
+      <td><span class="sla"><span class="bar"><i style="width:35%;background:var(--warn)"></i></span>4 小时</span></td><td class="sysline">ShareHub</td></tr>
+    <tr onclick="go('detail')"><td><span class="tag t-wo">工单</span></td><td>机柜离线 · 待接单</td><td>CAB1001 · 万达广场 B1</td><td><span class="tag t-bad">紧急</span></td>
+      <td><span class="sla"><span class="bar"><i style="width:12%;background:var(--bad)"></i></span>28 分钟</span></td><td class="sysline">ShareHub</td></tr>
+    <tr><td><span class="tag t-appr">审批</span></td><td>提现审批</td><td>WD001392 · AG0007 · AED 4,200</td><td><span class="tag t-mute">普通</span></td>
+      <td><span class="sla"><span class="bar"><i style="width:80%;background:var(--ok)"></i></span>2 天</span></td><td class="sysline">ShareHub</td></tr>
+    <tr><td><span class="tag t-wo">工单</span></td><td>客服报障 · 处理中</td><td>用户反映无法归还 · DXB 机场</td><td><span class="tag t-warn">高</span></td>
+      <td><span class="sla"><span class="tag t-mute">已暂停 · 等用户补充</span></span></td><td class="sysline">ShareHub</td></tr>
+    <tr><td><span class="tag t-pool">可抢</span></td><td>巡检工单 · Deira 片区 6 台</td><td>巡检计划 IP-09 派生</td><td><span class="tag t-mute">普通</span></td>
+      <td><span class="sla"><span class="bar"><i style="width:64%;background:var(--ok)"></i></span>今天 18:00</span> <button class="btn" style="margin-left:8px" onclick="event.stopPropagation();grab(this)">抢单</button></td><td class="sysline">ShareHub</td></tr>
+  </table>
+  </div>
+  <p class="foot">没有待办 ≠ 没有工单 —— 全部工单去「工单工作台」；已办结的在各单详情的时间线里。</p>
+</section>
+
+<!-- ═══════════ P2 审批详情 ═══════════ -->
+<section class="page" id="p-approval">
+  <div class="crumb">流程与工单 / 待办中心 / 审批详情</div>
+  <h2>进场合同审批 <span class="tag t-warn" style="vertical-align:3px">待审 · 第 2 轮</span></h2>
+  <p class="sub">审批单 AP2609270001 · 流程 LOC_CONTRACT · 提交人 Ali（BD）· 2026-09-27 14:02</p>
+  <div class="split">
+    <div>
+      <div class="card">
+        <div class="hd"><h3>业务对象</h3><a class="btn" href="#" onclick="return false">在 ShareHub 中打开 ↗</a></div>
+        <dl class="kv">
+          <dt>合同</dt><dd>CT0042 · 万达广场进场合同</dd>
+          <dt>场地方</dt><dd>万达广场（VN0311）</dd>
+          <dt>分成比例</dt><dd><b>35%</b>（触发财务会签阈值 30%）</dd>
+          <dt>期限</dt><dd>2026-10-01 起 12 个月</dd>
+          <dt>进场费</dt><dd>AED 12,000</dd>
+          <dt>保底</dt><dd>无</dd>
+        </dl>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:4px">审批进度</h3>
+        <div class="steps">
+          <div class="step done"><span class="dot">✓</span><span>提交<small>Ali · 14:02</small></span></div><span class="conn"></span>
+          <div class="step cur"><span class="dot">2</span><span>运营审批<small>持 location:contract:audit</small></span></div><span class="conn"></span>
+          <div class="step"><span class="dot">3</span><span>财务会签<small>条件步：分成 &gt; 30% 触发</small></span></div>
+        </div>
+        <div class="note">跨步互斥已开启：运营审批的决定人不能再做财务会签。</div>
+      </div>
+      <div class="card">
+        <h3>历史轮次（永不覆盖）</h3>
+        <ul class="tl" style="margin-top:10px">
+          <li><b>第 1 轮 · 已驳回</b><div class="t">2026-09-26 11:20 · 运营 Omar 驳回：「分成比例与场地方口头约定不符，请核实后重提」</div></li>
+          <li class="hot"><b>第 2 轮 · 审批中</b><div class="t">2026-09-27 14:02 · Ali 修改分成比例后重新提交 · 当前在运营审批步</div></li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h3 style="margin-bottom:8px">我的决定</h3>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <button class="btn pri" style="flex:1" onclick="approve()">通过</button>
+          <button class="btn bad" style="flex:1" onclick="reject()">驳回</button>
+        </div>
+        <textarea id="reason" rows="3" placeholder="驳回原因（驳回时必填）"></textarea>
+        <div class="note err" id="reasonTip" style="display:none">驳回必须填写原因 —— 只说「已驳回」，提交人无从改正后重提。</div>
+        <div class="note" id="okTip" style="display:none">已通过。分成 35% &gt; 30%，自动进入财务会签步。</div>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:6px">规则提示（内建）</h3>
+        <ul style="padding-left:18px;font-size:12.5px;color:var(--ink2)">
+          <li>提交人不能审批自己提交的单</li>
+          <li>撤回仅提交人可用，且仅在待审时</li>
+          <li>他人已处理时提交会提示「请刷新」</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:6px">证据</h3>
+        <p class="sysline">场地方确认函.pdf · 现场照片 ×3</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ P3 审核队列 ═══════════ -->
+<section class="page" id="p-queue">
+  <div class="crumb">流程与工单 / 审核队列</div>
+  <h2>审核队列</h2>
+  <p class="sub">领取后才能决定；领取超时 30 分钟自动放回并留痕。</p>
+  <div class="qtab"><b class="on">商户资质 · 待领 12</b><b>商品 · 待领 34</b><b>验厂 · 待领 3</b></div>
+  <div class="card">
+    <div class="hd"><h3>我在审（1）</h3><span class="sysline">领取倒计时 24:31 后自动放回</span></div>
+    <table>
+      <tr><th>对象</th><th>优先级</th><th>等待</th><th>证据</th><th class="right">操作</th></tr>
+      <tr><td>商户主体申请 · 迪拜 Marina 果汁店</td><td><span class="tag t-warn">高</span></td><td>2.1 小时</td><td class="sysline">营业执照 · 店面照片 ×4</td>
+        <td class="right"><button class="btn pri">通过</button> <button class="btn bad">驳回</button> <button class="btn" onclick="release(this)">放回</button></td></tr>
+    </table>
+  </div>
+  <div class="card" style="padding-bottom:6px">
+    <div class="hd"><h3>队列 · 商户资质</h3><span class="sysline">按优先级 → 等待时长排序</span></div>
+    <table>
+      <tr><th>对象</th><th>优先级</th><th>等待</th><th>状态</th><th class="right">操作</th></tr>
+      <tr><td>商户主体申请 · Deira 五金店</td><td><span class="tag t-warn">高</span></td><td>3.4 小时</td><td></td><td class="right"><button class="btn pri" onclick="claim(this)">领取</button></td></tr>
+      <tr style="opacity:.55"><td>商户主体申请 · Yas Island 咖啡车</td><td><span class="tag t-mute">普通</span></td><td>1.2 小时</td><td><span class="tag t-mute">Sara 审核中</span></td><td class="right"><button class="btn" disabled>领取</button></td></tr>
+      <tr><td>商户主体申请 · Corniche 便利店</td><td><span class="tag t-mute">普通</span></td><td>50 分钟</td><td></td><td class="right"><button class="btn pri" onclick="claim(this)">领取</button></td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ═══════════ P4 工单工作台 ═══════════ -->
+<section class="page" id="p-orders">
+  <div class="crumb">流程与工单 / 工单工作台</div>
+  <h2>工单工作台</h2>
+  <p class="sub">统计卡可点，点进即筛好的列表。SLA 色条：绿 正常 · 黄 将超时 · 红 已超时 · 灰 暂停。</p>
+  <div class="row" style="margin-bottom:14px">
+    <div class="stat"><b>47</b><span>未结</span></div>
+    <div class="stat"><b>18</b><span>处理中</span></div>
+    <div class="stat" style="border-color:#ecd9ae"><b style="color:var(--warn)">6</b><span>即将超时（&lt; 2h）</span></div>
+    <div class="stat" style="border-color:#e8c8c5"><b style="color:var(--bad)">3</b><span>已超时</span></div>
+    <div class="stat"><b>21</b><span>今日关闭 · 达标率 90%</span></div>
+  </div>
+  <div class="chips">
+    <span class="chip on">全部类型</span><span class="chip">运维</span><span class="chip">客服报障</span><span class="chip">售后</span>
+    <span class="chip" style="margin-left:14px">受理方：全部</span><span class="chip">站点：全部</span>
+    <button class="btn" style="margin-left:auto">批量改派</button>
+  </div>
+  <div class="card" style="padding:0">
+  <table>
+    <tr><th>单号</th><th>类型</th><th>标题 / 对象</th><th>优先级</th><th>状态</th><th>受理方</th><th>SLA</th><th>来源</th><th class="right">操作</th></tr>
+    <tr onclick="go('detail')"><td class="mono">WO26092701</td><td><span class="tag t-wo">运维</span></td><td>机柜离线 · CAB1001 万达广场 B1</td><td><span class="tag t-bad">紧急</span></td><td><span class="tag t-warn">待接单</span></td><td>代理 · 迪拜城运</td>
+      <td><span class="sla"><span class="bar"><i style="width:12%;background:var(--bad)"></i></span>28 分钟</span></td><td class="sysline">告警 ALM8812</td><td class="right"><button class="btn">催办</button></td></tr>
+    <tr><td class="mono">WO26092688</td><td><span class="tag t-wo">运维</span></td><td>仓位卡宝 · CAB0223 DXB 机场</td><td><span class="tag t-warn">高</span></td><td><span class="tag t-ok">处理中</span></td><td>员工 · Musa</td>
+      <td><span class="sla"><span class="bar"><i style="width:55%;background:var(--warn)"></i></span>1.8 小时</span></td><td class="sysline">告警</td><td class="right"><button class="btn">升级</button></td></tr>
+    <tr><td class="mono">WO26092651</td><td><span class="tag t-wo">运维</span></td><td>更换电池 · 等配件</td><td><span class="tag t-mute">普通</span></td><td><span class="tag t-mute">等外部</span></td><td>员工 · Musa</td>
+      <td><span class="sla"><span class="bar"><i style="width:40%;background:#b9c3c6"></i></span>已暂停 6h</span></td><td class="sysline">巡检</td><td class="right"></td></tr>
+    <tr><td class="mono">CS26092712</td><td><span class="tag t-wo">报障</span></td><td>无法归还 · 用户 CU01…48</td><td><span class="tag t-warn">高</span></td><td><span class="tag t-bad">已超时</span></td><td>客服 · Lina</td>
+      <td><span class="sla"><span class="bar"><i style="width:100%;background:var(--bad)"></i></span>超 42 分钟</span></td><td class="sysline">C 端</td><td class="right"><button class="btn">接管</button></td></tr>
+    <tr><td class="mono">WO26092640</td><td><span class="tag t-wo">运维</span></td><td>安装新柜 · Sharjah City</td><td><span class="tag t-mute">普通</span></td><td><span class="tag t-appr">待复核</span></td><td>代理 · 沙迦服务商</td>
+      <td><span class="sla"><span class="bar"><i style="width:70%;background:var(--ok)"></i></span>已完工</span></td><td class="sysline">手工</td><td class="right"><button class="btn pri">复核</button></td></tr>
+  </table>
+  </div>
+</section>
+
+<!-- ═══════════ P5 工单详情 ═══════════ -->
+<section class="page" id="p-detail">
+  <div class="crumb">流程与工单 / 工单工作台 / WO26092701</div>
+  <h2>机柜离线 <span class="tag t-warn" style="vertical-align:3px">待接单</span> <span class="tag t-bad" style="vertical-align:3px">紧急</span></h2>
+  <p class="sub">WO26092701 · 运维工单 · 来源 告警 ALM8812（去重键 ALARM:CAB1001:OFFLINE，重复告警已并入 2 次）</p>
+  <div class="split">
+    <div>
+      <div class="card">
+        <div class="hd"><h3>对象</h3><a class="btn" href="#" onclick="return false">设备档案 ↗</a></div>
+        <dl class="kv">
+          <dt>设备</dt><dd>CAB1001 · 48 仓机柜</dd>
+          <dt>位置</dt><dd>万达广场 B1 中庭（快照）</dd>
+          <dt>站点 / 代理</dt><dd>ST0311 / AG0007 迪拜城运</dd>
+          <dt>最后心跳</dt><dd>今天 09:41（离线 3.2 小时）</dd>
+        </dl>
+      </div>
+      <div class="card">
+        <h3>时间线</h3>
+        <ul class="tl" style="margin-top:10px">
+          <li class="hot"><b>SLA 提醒 · 即将超时</b><div class="t">13:02 · 系统 · 响应时限剩 30 分钟，已通知受理方与运营</div></li>
+          <li><b>重复告警并入</b><div class="t">12:10 · 系统 · ALM8830 命中同一去重键，附加到本单</div></li>
+          <li><b>派单</b><div class="t">11:32 · 运营 Omar · 指派给 代理 · 迪拜城运（站点归属）· SLA 起算，响应 2 小时（营业时间 · Asia/Dubai）</div></li>
+          <li><b>开单</b><div class="t">11:30 · 系统（告警引擎）· 优先级 紧急</div></li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h3 style="margin-bottom:8px">SLA</h3>
+        <dl class="kv" style="grid-template-columns:80px 1fr">
+          <dt>响应</dt><dd><span class="tag t-bad">剩 28 分钟</span></dd>
+          <dt>解决</dt><dd>今天 17:32 前</dd>
+          <dt>已暂停</dt><dd>0 分钟</dd>
+        </dl>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:8px">动作 <span class="sysline">（仅当前状态可走的）</span></h3>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <button class="btn pri">接单</button>
+          <button class="btn">改派 / 回抢单池</button>
+          <button class="btn">升级给平台</button>
+          <button class="btn bad">撤单（需填原因）</button>
+        </div>
+        <div class="note" style="margin-top:10px">费用超过 AED 500 的维修将自动发起费用审批，审批期间本单暂停计时。</div>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:6px">备注 / 附件</h3>
+        <textarea rows="2" placeholder="添加备注，可传图"></textarea>
+        <div class="right" style="margin-top:8px"><button class="btn">上传图片</button> <button class="btn pri">提交备注</button></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ P6 运营配置 ═══════════ -->
+<section class="page" id="p-config">
+  <div class="crumb">流程与工单 / 运营配置</div>
+  <h2>运营配置</h2>
+  <p class="sub">改规则只影响新单；进行中的单按开单时的规则走完。</p>
+  <div class="card">
+    <div class="hd"><h3>SLA 规则 · 组 PB_WO</h3><button class="btn pri">新增规则</button></div>
+    <table>
+      <tr><th>适用</th><th>优先级</th><th>响应</th><th>解决</th><th>营业时间</th><th>日历</th><th class="right">操作</th></tr>
+      <tr><td>运维工单</td><td><span class="tag t-bad">紧急</span></td><td>30 分钟</td><td>4 小时</td><td>否（7×24）</td><td>—</td><td class="right"><button class="btn">编辑</button></td></tr>
+      <tr><td>运维工单</td><td><span class="tag t-warn">高</span></td><td>2 小时</td><td>8 小时</td><td>是</td><td>迪拜营业时间</td><td class="right"><button class="btn">编辑</button></td></tr>
+      <tr><td>运维工单</td><td>*（其余）</td><td>4 小时</td><td>24 小时</td><td>是</td><td>迪拜营业时间</td><td class="right"><button class="btn">编辑</button></td></tr>
+      <tr><td>客服报障</td><td>*</td><td>15 分钟</td><td>4 小时</td><td>否</td><td>—</td><td class="right"><button class="btn">编辑</button></td></tr>
+    </table>
+  </div>
+  <div class="row">
+    <div class="card" style="flex:1">
+      <div class="hd"><h3>工作日历 · 迪拜营业时间</h3><button class="btn">编辑</button></div>
+      <p style="font-size:13px">时区 Asia/Dubai · 周一至周六 10:00 – 22:00 · 节假日 2 天（12-02 国庆…）</p>
+    </div>
+    <div class="card" style="flex:1">
+      <div class="hd"><h3>队列</h3><button class="btn">新增</button></div>
+      <table>
+        <tr><th>队列</th><th>排序</th><th>领取超时</th></tr>
+        <tr><td>商户资质</td><td>优先级 → 等待时长</td><td>30 分钟</td></tr>
+        <tr><td>商品审核</td><td>等待时长</td><td>30 分钟</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ P7 接入管理 ═══════════ -->
+<section class="page" id="p-admin">
+  <div class="crumb">流程与工单 / 接入管理</div>
+  <h2>接入管理 <span class="sysline">（平台管理员）</span></h2>
+  <p class="sub">接入系统 · webhook 订阅与投递 · 定义版本。凭证只在创建时显示一次。</p>
+  <div class="card">
+    <div class="hd"><h3>接入系统</h3><button class="btn pri">新增系统</button></div>
+    <table>
+      <tr><th>代号</th><th>名称</th><th>回调地址</th><th>时区</th><th>状态</th><th class="right">操作</th></tr>
+      <tr><td class="mono">SHAREHUB</td><td>ShareHub 共享充电</td><td class="mono">https://…/callback/flow</td><td>Asia/Dubai</td><td><span class="tag t-ok">启用</span></td><td class="right"><button class="btn">轮换凭证</button></td></tr>
+      <tr><td class="mono">SHOP</td><td>ai-shop 电商</td><td class="mono">https://…/callback/flow</td><td>Asia/Shanghai</td><td><span class="tag t-ok">启用</span></td><td class="right"><button class="btn">轮换凭证</button></td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <div class="hd"><h3>Webhook 投递（最近）</h3><span class="sysline">重试：1m · 5m · 30m · 2h · 12h · 24h，共 8 次</span></div>
+    <table>
+      <tr><th>事件</th><th>系统</th><th>幂等键</th><th>状态</th><th>耗时</th><th>重试</th><th class="right">操作</th></tr>
+      <tr><td class="mono">work_order.sla.breached</td><td>SHAREHUB</td><td class="mono">CS26092712:9</td><td><span class="tag t-ok">200</span></td><td>86ms</td><td>0</td><td class="right"></td></tr>
+      <tr><td class="mono">approval.completed</td><td>SHAREHUB</td><td class="mono">AP2609260031:1</td><td><span class="tag t-bad">失败 · 连接超时</span></td><td>—</td><td>3 / 8</td><td class="right"><button class="btn pri">立即重投</button></td></tr>
+      <tr><td class="mono">work_order.transitioned</td><td>SHOP</td><td class="mono">AS26092240:4</td><td><span class="tag t-ok">200</span></td><td>120ms</td><td>1</td><td class="right"></td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <div class="hd"><h3>定义版本</h3><span class="sysline">内容哈希即版本；进行中的实例按提交时版本走完</span></div>
+    <table>
+      <tr><th>类别</th><th>代号</th><th>当前版本</th><th>登记时间</th><th>登记方</th></tr>
+      <tr><td>审批流程</td><td class="mono">LOC_CONTRACT</td><td class="mono">a3f8c2d1</td><td>09-27 10:12</td><td>SHAREHUB</td></tr>
+      <tr><td>工单类型</td><td class="mono">PB_MAINTENANCE</td><td class="mono">7be04412</td><td>09-27 10:12</td><td>SHAREHUB</td></tr>
+      <tr><td>状态图</td><td class="mono">SHOP_AFTER_SALE</td><td class="mono">c91177aa</td><td>09-26 18:40</td><td>SHOP</td></tr>
+    </table>
+  </div>
+</section>
+
+<p class="foot">原型说明：单文件静态页，数据为演示值。提交 / 发起入口不在平台（在各业务系统）；本原型对应 PRD（12-产品需求.md）§三 F1–F9。</p>
+</main>
+<script>
+function go(p){
+  document.querySelectorAll('.page').forEach(e=>e.classList.remove('on'));
+  document.getElementById('p-'+p).classList.add('on');
+  document.querySelectorAll('.nav').forEach(a=>a.classList.toggle('on',a.dataset.p===p));
+  window.scrollTo(0,0);
+}
+document.querySelectorAll('.nav').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();go(a.dataset.p);}));
+function reject(){
+  const r=document.getElementById('reason'), tip=document.getElementById('reasonTip');
+  if(!r.value.trim()){tip.style.display='block';r.focus();return;}
+  tip.style.display='none';document.getElementById('okTip').style.display='none';
+  alert('已驳回（原型演示）：提交人可修改后重新提交，进入第 3 轮；本轮记录保留。');
+}
+function approve(){
+  document.getElementById('reasonTip').style.display='none';
+  document.getElementById('okTip').style.display='block';
+}
+function claim(btn){
+  const row=btn.closest('tr');
+  row.style.opacity=.55;
+  row.cells[3].innerHTML='<span class="tag t-ok">已由我领取</span>';
+  btn.outerHTML='<button class="btn" disabled>已领取</button>';
+}
+function release(btn){ btn.closest('tr').remove(); }
+function grab(btn){
+  btn.outerHTML='<span class="tag t-ok">已抢到 → 待接单</span>';
+}
+</script>
+</body>
+</html>
