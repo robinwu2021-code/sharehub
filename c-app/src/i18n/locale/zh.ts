@@ -2,6 +2,7 @@ export default {
   appName: "共享充电宝",
   tabbar: { home: "附近", orders: "订单", me: "我的" },
   common: {
+    pressAgainToExit: "再按一次退出",
     available: "可用",
     navigate: "导航",
     login: "登录",

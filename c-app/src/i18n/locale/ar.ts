@@ -2,6 +2,7 @@ export default {
   appName: "باور بانك",
   tabbar: { home: "القريبة", orders: "الطلبات", me: "حسابي" },
   common: {
+    pressAgainToExit: "اضغط رجوع مرة أخرى للخروج",
     available: "متاح",
     navigate: "التنقل",
     login: "تسجيل الدخول",

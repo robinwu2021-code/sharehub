@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useAppStore } from "@/stores/app";
+const app = useAppStore();
 // 顶部栏（navigationStyle:custom 下自绘）。返回键在 RTL 下由 flex 自动镜像到另一侧。
 defineProps<{ title?: string; showBack?: boolean }>();
 function back() {
@@ -12,7 +14,8 @@ function back() {
 <template>
   <view class="pb-appbar">
     <view class="pb-appbar__side" @tap="showBack && back()">
-      <text v-if="showBack" class="pb-appbar__back">‹</text>
+      <!-- 阿语从右到左：返回箭头朝右 -->
+      <text v-if="showBack" class="pb-appbar__back" :style="app.isRtl ? 'transform:scaleX(-1)' : ''">‹</text>
     </view>
     <text class="pb-appbar__title">{{ title }}</text>
     <view class="pb-appbar__side pb-appbar__side--end"><slot name="right" /></view>

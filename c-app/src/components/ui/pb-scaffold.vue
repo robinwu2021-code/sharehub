@@ -3,6 +3,7 @@
 defineProps<{ title?: string; showBack?: boolean; tab?: "home" | "orders" | "me" }>();
 import { computed, watch } from "vue";
 import { useThemeStore } from "@/stores/theme";
+import { useAppStore } from "@/stores/app";
 import { NAV_BAR_BG } from "@/design/tokens";
 
 /*
@@ -14,7 +15,12 @@ import { NAV_BAR_BG } from "@/design/tokens";
 // （page{} 能生效是因为变量从 page 往下继承，不需要匹配）。apply-shared 让全局样式作用进来。
 defineOptions({ options: { styleIsolation: "apply-shared" } });
 const theme = useThemeStore();
-const themeClass = computed(() => [`pb-skin-${theme.skin}`, `pb-mode-${theme.mode}`]);
+/*
+ * 阿语从右到左同理：只有 H5 能改 <html dir>，原生 App 与小程序的逻辑层没有 document ——
+ * 此前阿语下文字翻译了、布局却仍是从左到右（模拟器实测）。在本节点设 direction，沿节点树继承。
+ */
+const appStore = useAppStore();
+const themeClass = computed(() => [`pb-skin-${theme.skin}`, `pb-mode-${theme.mode}`, appStore.isRtl ? "pb-rtl" : ""]);
 
 // 状态栏文字随明暗切换（全局 custom 导航，状态栏压在页面上）：暗色下黑字在深底上看不见。H5 没有原生状态栏
 // #ifndef H5
@@ -87,6 +93,7 @@ function paintSystemNavBar(dark: boolean) {
   /* 在这里重算一次：它在根上按根的主色算好后以**值**继承，App / 小程序在本节点换了主色（皮肤 class）它也不会跟着变 */
   --pb-primary-tint: color-mix(in srgb, var(--pb-primary) 12%, transparent);
 }
+.pb-rtl { direction: rtl; }
 .pb-scaffold__status { flex-shrink: 0; height: var(--status-bar-height, 0px); }
 .pb-scaffold__body { flex: 1; min-height: 0; box-sizing: border-box; }
 .pb-scaffold__body.has-tab { padding-bottom: 150rpx; }

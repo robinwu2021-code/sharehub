@@ -7,6 +7,9 @@ import type { ConsumerOrder, OrderStatus } from "@/types";
 import { elapsedMin, durationText } from "@/shared/format";
 import { storeToRefs } from "pinia";
 import { useUserStore } from "@/stores/user";
+import { useDoubleBackExit } from "@/shared/exit";
+
+useDoubleBackExit();
 
 const { t } = useI18n();
 /**

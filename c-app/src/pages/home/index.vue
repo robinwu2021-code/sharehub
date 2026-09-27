@@ -29,6 +29,9 @@ import { useUserStore } from "@/stores/user";
 import { useAppStore } from "@/stores/app";
 import { noticeTitle } from "@/shared/notice";
 import { MP_ICON } from "@/design/tokens";
+import { useDoubleBackExit } from "@/shared/exit";
+
+useDoubleBackExit();
 
 const { t } = useI18n();
 const appStore = useAppStore();

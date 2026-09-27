@@ -7,6 +7,9 @@ import { api } from "@/api";
 import { ensureLoggedIn } from "@/shared/auth-gate";
 import { phoneText } from "@/shared/format";
 import type { WalletOverview } from "@/types";
+import { useDoubleBackExit } from "@/shared/exit";
+
+useDoubleBackExit();
 
 const userStore = useUserStore();
 const { profile, isLoggedIn } = storeToRefs(userStore);

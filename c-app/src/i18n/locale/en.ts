@@ -2,6 +2,7 @@ export default {
   appName: "Powerbank",
   tabbar: { home: "Nearby", orders: "Orders", me: "Me" },
   common: {
+    pressAgainToExit: "Press back again to exit",
     available: "Available",
     navigate: "Navigate",
     login: "Log in",

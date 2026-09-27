@@ -5,6 +5,7 @@
 // 小程序端改成 CSS 背景图（data URI）；背景图里拿不到 currentColor，颜色用 color（默认墨色）。
 import { computed } from "vue";
 import { useThemeStore } from "@/stores/theme";
+import { useAppStore } from "@/stores/app";
 import { MP_ICON } from "@/design/tokens";
 
 const props = withDefaults(defineProps<{ name: string; size?: number; stroke?: number; color?: string }>(), {
@@ -61,6 +62,14 @@ const svg = computed(
 const px = computed(() => `${props.size}rpx`);
 
 /**
+ * 有方向的图标在从右到左（阿语）时水平翻转：「›」在 RTL 里指向左才是「往里走」。
+ * 用行内样式而不是 CSS 祖先选择器：小程序组件样式隔离，跨组件的 `.pb-rtl .x` 匹配不到。
+ */
+const DIRECTIONAL = new Set(["chevron"]);
+const app = useAppStore();
+const flip = computed(() => (app.isRtl && DIRECTIONAL.has(props.name) ? "transform:scaleX(-1);" : ""));
+
+/**
  * 小程序：同一段 SVG 换成显式颜色，作为 CSS 背景图（URL 编码的 data URI）。
  * 作为独立图片加载的 SVG **必须带 xmlns** —— 内联进 HTML 时可省，data URI 里省了就整张不画、也不报错
  * （开发者工具对照实验：同一段 SVG，带 xmlns 画得出、不带画不出）。宽高不用百分比，与 viewBox 同值。
@@ -71,7 +80,7 @@ const mpStyle = computed(() => {
     .replace('width="100%" height="100%"', 'width="24" height="24"')
     .replace('stroke="currentColor"', `stroke="${props.color ?? (theme.isDark ? MP_ICON.inkDark : MP_ICON.ink)}"`);
   const uri = "data:image/svg+xml," + encodeURIComponent(raw);
-  return `width:${px.value};height:${px.value};background:url("${uri}") center/contain no-repeat;`;
+  return `width:${px.value};height:${px.value};background:url("${uri}") center/contain no-repeat;${flip.value}`;
 });
 </script>
 
@@ -80,7 +89,7 @@ const mpStyle = computed(() => {
   <view class="pb-icon pb-icon--mp" :style="mpStyle" />
   <!-- #endif -->
   <!-- #ifndef MP -->
-  <view class="pb-icon" :style="{ width: px, height: px }" v-html="svg" />
+  <view class="pb-icon" :style="`width:${px};height:${px};${flip}`" v-html="svg" />
   <!-- #endif -->
 </template>
 
