@@ -28,7 +28,8 @@ function close() {
       <view class="mt-[12rpx] flex items-center gap-[10rpx] text-[24rpx] text-sub">
         <pb-icon name="pin" :size="26" /><text>{{ store.address }}{{ distance(store.distanceM) ? " · " + distance(store.distanceM) : "" }}</text>
       </view>
-      <view class="mt-[8rpx] flex items-center gap-[10rpx] text-[24rpx] text-sub">
+      <!-- 营业时间是选填：没填就整行不出，别留一个后面什么也没有的钟 -->
+      <view v-if="store.openHours" class="mt-[8rpx] flex items-center gap-[10rpx] text-[24rpx] text-sub">
         <pb-icon name="clock" :size="26" /><text>{{ store.openHours }}</text>
       </view>
 

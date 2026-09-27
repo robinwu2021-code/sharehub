@@ -26,8 +26,11 @@ import { openNavigation } from "@/ports/map";
 import { getUserLocation } from "@/ports/location";
 import { ensureLoggedIn } from "@/shared/auth-gate";
 import { useUserStore } from "@/stores/user";
+import { useAppStore } from "@/stores/app";
+import { noticeTitle } from "@/shared/notice";
 
 const { t } = useI18n();
+const appStore = useAppStore();
 const list = ref<NearbyCabinet[]>([]);
 const notice = ref<Notice | null>(null);
 const ongoing = ref<ConsumerOrder | null>(null);
@@ -107,6 +110,25 @@ onLoad((q) => {
 });
 onShow(load);
 
+/**
+ * 门店卡上的收藏（心形）。
+ *
+ * **此前这颗心点了没有任何反应**：pb-store-sheet 发出 favorite 事件，而首页从没监听 ——
+ * 登录与否都一样（Android 模拟器实测）。
+ * 切换后**重新取一次门店卡**，以服务端的 favorite 为准，不读切换接口的返回值：
+ * 后端那个口返回裸 boolean，而 c-app 契约写的是 {favorite}，两边对不上（另记待修）。
+ */
+async function toggleFav(s: StoreDetail) {
+  if (!ensureLoggedIn("/pages/home/index")) return;
+  try {
+    await api.toggleFavorite(s.siteNo);
+    const at = await getUserLocation();
+    store.value = await api.storeDetail(s.siteNo, { lat: at?.lat, lng: at?.lng });
+  } catch (e) {
+    uni.showToast({ title: (e as Error).message, icon: "none" });
+  }
+}
+
 async function openStore(c: NearbyCabinet) {
   const at = await getUserLocation();
   store.value = await api.storeDetail(c.siteNo, { lat: at?.lat, lng: at?.lng });
@@ -128,7 +150,8 @@ function goOrder() {
   if (ongoing.value) uni.navigateTo({ url: `/pages/order/detail?orderNo=${ongoing.value.orderNo}` });
 }
 function goNotice() {
-  uni.navigateTo({ url: "/pages/notice/index" });
+  // 从公告条进来要看的是公告，直接停在「公告」页签
+  uni.navigateTo({ url: "/pages/notice/index?tab=notices" });
 }
 /**
  * 主按钮：能扫码就扫码，不能就让用户**照着柜机上的编号输**。
@@ -188,7 +211,7 @@ async function onPrimary() {
         <view v-if="returnable" class="mt-[24rpx]"><pb-notice-bar :text="$t('home.returnableOnly')" /></view>
 
         <!-- 公告 -->
-        <view v-else-if="notice" class="mt-[24rpx]"><pb-notice-bar :text="notice.title" @click="goNotice" /></view>
+        <view v-else-if="notice" class="mt-[24rpx]"><pb-notice-bar :text="noticeTitle(notice, appStore.lang)" @click="goNotice" /></view>
 
         <!-- 使用中订单常驻 -->
         <view v-if="ongoing" class="mt-[20rpx]"><pb-ongoing-bar :order="ongoing" @click="goOrder" /></view>
@@ -284,6 +307,7 @@ async function onPrimary() {
       :store="store"
       @borrow="(s: StoreDetail) => borrow({ siteNo: s.siteNo })"
       @navigate="(s: StoreDetail) => openNavigation(list.find((c) => c.siteNo === s.siteNo)!)"
+      @favorite="toggleFav"
     />
   </pb-scaffold>
 </template>

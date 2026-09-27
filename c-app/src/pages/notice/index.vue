@@ -10,7 +10,9 @@
  * 表现是公告整页空白，而那个未读红点**永远亮着**，因为 `read` 恒为 undefined。
  */
 import { ref, computed } from "vue";
-import { onShow } from "@dcloudio/uni-app";
+import { onShow, onLoad } from "@dcloudio/uni-app";
+import { useUserStore } from "@/stores/user";
+import { noticeTitle as noticeTitleOf, noticeBody as noticeBodyOf } from "@/shared/notice";
 import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
 import { api } from "@/api";
@@ -18,7 +20,14 @@ import type { Notice, MessageItem } from "@/types";
 
 const { t } = useI18n();
 const app = useAppStore();
-const tab = ref("messages");
+/**
+ * 默认页签：从首页公告条进来（?tab=notices）或游客，停在「公告」。
+ * 游客没有站内信，默认停在收件箱只能看到「暂无消息」；从公告条点进来的人要看的也是那条公告。
+ */
+const tab = ref(useUserStore().isLoggedIn ? "messages" : "notices");
+onLoad((q) => {
+  if (q?.tab === "notices") tab.value = "notices";
+});
 const notices = ref<Notice[]>([]);
 const messages = ref<MessageItem[]>([]);
 const loading = ref(true);
@@ -31,17 +40,22 @@ const options = computed(() => [
 
 // 公告按当前语种取列。后端三语全下发正是为了让端上这一步自己挑，
 // 少了这一步就会出现「界面是阿语、公告是中文」。
-const pick = (zh: string, en: string, ar: string) =>
-  app.lang === "ar" ? ar || en || zh : app.lang === "en" ? en || zh : zh || en;
-const noticeTitle = (n: Notice) => pick(n.title, n.titleEn, n.titleAr);
-const noticeBody = (n: Notice) => pick(n.content, n.contentEn, n.contentAr);
+// 挑语言的规则与首页公告条共用一份（shared/notice.ts）
+const noticeTitle = (n: Notice) => noticeTitleOf(n, app.lang);
+const noticeBody = (n: Notice) => noticeBodyOf(n, app.lang);
 
 const unread = computed(() => messages.value.filter((m) => !m.read).length);
 
 async function load() {
   loading.value = true;
   try {
-    const [ns, ms] = await Promise.all([api.listNotices(), api.listMessages({ size: 50 })]);
+    // 公告是广播、游客可看；站内信是个人的、要登录。此前两者绑在一个 Promise.all 里：
+    // 游客的站内信 401 → 整个 all 失败 → **连公告也不显示**，从首页公告条点进来是一页空白。
+    const loggedIn = useUserStore().isLoggedIn;
+    const [ns, ms] = await Promise.all([
+      api.listNotices(),
+      loggedIn ? api.listMessages({ size: 50 }) : Promise.resolve({ list: [] as MessageItem[], total: 0 }),
+    ]);
     notices.value = ns;
     messages.value = ms.list;
   } finally {

@@ -54,7 +54,10 @@ function bindPhone() {
         <view class="flex items-center gap-[24rpx]">
           <pb-avatar :size="120" />
           <view class="flex-1">
-            <text class="text-[30rpx] font-bold text-ink">{{ profile?.nickname }}</text>
+            <!-- 没昵称时页头别空着：下面的输入框就是填它的地方 -->
+            <text class="text-[30rpx] font-bold" :class="profile?.nickname ? 'text-ink' : 'text-sub'">
+              {{ profile?.nickname || $t("profile.nicknamePh") }}
+            </text>
             <view class="mt-[6rpx] text-[24rpx] text-sub">{{ profile?.cUserNo }}</view>
           </view>
           <pb-tag v-if="profile?.memberLevel" type="primary">{{ profile.memberLevel }}</pb-tag>

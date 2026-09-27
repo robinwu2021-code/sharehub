@@ -4,6 +4,7 @@ import { onShow } from "@dcloudio/uni-app";
 import { storeToRefs } from "pinia";
 import { useUserStore } from "@/stores/user";
 import { api } from "@/api";
+import { ensureLoggedIn } from "@/shared/auth-gate";
 import type { WalletOverview } from "@/types";
 
 const userStore = useUserStore();
@@ -22,7 +23,19 @@ onShow(load);
 function goLogin() {
   uni.navigateTo({ url: "/pages/login/index" });
 }
+/**
+ * 需要登录的入口（钱包 / 收藏 / 券包 / 会员 / 报障 / 资料）。游客点它们先去登录，登录完回到目标页。
+ *
+ * 此前不设门禁，靠会话守卫在 401 时把人送去登录页；而守卫现在只处理「原本有会话、失效了」
+ * （游客撞 401 不再被 reLaunch —— 否则游客开 App 首页就被踢走）。于是游客点「钱包」，
+ * 两个接口 401，页面显示「暂无交易记录」：读起来是「你的钱包是空的」，而不是「请先登录」
+ * （Android 模拟器实测）。门禁放在入口，比让页面各自猜 401 的含义可靠。
+ * 设置页不在此列：关于、隐私政策游客也该能看。
+ */
+const NEEDS_LOGIN = ["/pages/wallet/", "/pages/me/favorites", "/pages/coupons/", "/pages/membership/", "/pages/reports/", "/pages/me/profile"];
+
 function go(url: string) {
+  if (NEEDS_LOGIN.some((p) => url.startsWith(p)) && !ensureLoggedIn(url)) return;
   uni.navigateTo({ url });
 }
 async function logout() {
@@ -47,8 +60,16 @@ async function logout() {
           <view class="flex items-center gap-[24rpx]">
             <pb-avatar :size="112" />
             <view class="flex-1">
-              <text class="text-[34rpx] font-bold text-ink">{{ profile.nickname }}</text>
-              <view class="mt-[6rpx] text-[24rpx] text-sub">{{ profile.phone }}</view>
+              <!--
+                昵称 / 手机号都可能是空的：验证码建户不收昵称，而手机号明文**没有存放处**
+                （pb_pii 未建，后端如实出空，见 ConsumerProfilePhoneTest）。此前两行照样渲染，
+                资料卡上只剩一个头像 —— 看起来像数据没加载出来（Android 模拟器实测）。
+                没昵称就引导去填（点卡片即进资料页）；没手机号就不画那一行，不编一个出来。
+              -->
+              <text class="text-[34rpx] font-bold" :class="profile.nickname ? 'text-ink' : 'text-sub'">
+                {{ profile.nickname || $t("profile.nicknamePh") }}
+              </text>
+              <view v-if="profile.phone" class="mt-[6rpx] text-[24rpx] text-sub">{{ profile.phone }}</view>
             </view>
             <pb-tag v-if="profile.freeDeposit" type="success">{{ $t("me.freeDeposit") }}</pb-tag>
             <pb-icon name="chevron" :size="30" class="text-sub" />

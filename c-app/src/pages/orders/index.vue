@@ -5,8 +5,18 @@ import { useI18n } from "vue-i18n";
 import { api } from "@/api";
 import type { ConsumerOrder, OrderStatus } from "@/types";
 import { elapsedMin, durationText } from "@/shared/format";
+import { storeToRefs } from "pinia";
+import { useUserStore } from "@/stores/user";
 
 const { t } = useI18n();
+/**
+ * 游客没有订单可言，也不该去调（那个口要登录）。此前游客点「订单」页签：接口 401，
+ * 页面写「暂无订单」—— 读起来是「你没借过」，而不是「请先登录」（Android 模拟器实测）。
+ */
+const { isLoggedIn } = storeToRefs(useUserStore());
+function goLogin() {
+  uni.navigateTo({ url: "/pages/login/index" });
+}
 const all = ref<ConsumerOrder[]>([]);
 const loading = ref(true);
 const filter = ref("all");
@@ -31,6 +41,11 @@ const tagType: Record<OrderStatus, "primary" | "success" | "warning" | "danger" 
 };
 
 async function load() {
+  if (!isLoggedIn.value) {
+    all.value = [];
+    loading.value = false;
+    return;
+  }
   loading.value = true;
   try {
     const r = await api.listOrders();
@@ -80,7 +95,14 @@ function detail(o: ConsumerOrder) {
             </view>
           </pb-card>
         </view>
-        <pb-empty v-if="!loading && !list.length" :text="$t('orders.none')" />
+        <!-- 游客：引导登录（与「我的」页同一张卡、同一套文案），不显示「暂无订单」 -->
+        <pb-card v-if="!isLoggedIn">
+          <view class="flex flex-col items-center gap-[20rpx] py-[24rpx]">
+            <text class="text-[30rpx] text-sub">{{ $t("me.loginHint") }}</text>
+            <pb-button size="lg" @click="goLogin">{{ $t("common.login") }}</pb-button>
+          </view>
+        </pb-card>
+        <pb-empty v-else-if="!loading && !list.length" :text="$t('orders.none')" />
       </view>
     </view>
   </pb-scaffold>
