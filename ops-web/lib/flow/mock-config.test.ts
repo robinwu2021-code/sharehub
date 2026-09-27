@@ -68,6 +68,17 @@ describe("审批模板", () => {
     expect(publishTemplate(def, "", false, NOW).created).toBe(true);
   });
 
+  it("成员审批人是 ID 列表：去空项、去重；空列表报必填", () => {
+    const def = getTemplate("FIN_WITHDRAWAL");
+    def.steps[0].approver = { kind: "MEMBER", value: [" omar", "", "sara", "omar"] };
+    def.steps[0].mode = "ALL";
+    publishTemplate(def, "", false, NOW);
+    expect(getTemplate("FIN_WITHDRAWAL").steps[0].approver).toEqual({ kind: "MEMBER", value: ["omar", "sara"] });
+    def.steps[0].approver = { kind: "MEMBER", value: [" ", ""] };
+    const e = caught(() => publishTemplate(def, "", false, NOW));
+    expect(isValidationError(e) && e.errors.map((x) => x.path)).toEqual(["steps[0].approver.value"]);
+  });
+
   it("字段指定也要给字段代号；时限可不填", () => {
     const def = getTemplate("FIN_WITHDRAWAL");
     def.steps[0].approver = { kind: "FIELD", value: "" };

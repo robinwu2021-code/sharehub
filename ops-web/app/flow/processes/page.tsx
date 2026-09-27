@@ -13,7 +13,7 @@ import { flow, FLOW_KEY } from "@/lib/flow/client";
 import { isValidationError } from "@/lib/flow/errors";
 import { fmtShort } from "@/lib/flow/present";
 import { ALL_MODE_KINDS } from "@/lib/flow/types";
-import type { ApprovalTemplate, ApproverKind, ConditionOp, FieldError, I18nText, TemplateStep, TemplateSummary } from "@/lib/flow/types";
+import type { ApprovalTemplate, ApproverKind, ApproverRef, ConditionOp, FieldError, I18nText, TemplateStep, TemplateSummary } from "@/lib/flow/types";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
 import { PageTitle } from "@/components/ui/misc";
@@ -32,12 +32,21 @@ const APPROVER: { value: ApproverKind; label: string; hint: string }[] = [
   { value: "PERM", label: "按权限码", hint: "如 location:contract:audit" },
   { value: "ROLE", label: "按角色", hint: "角色代号" },
   { value: "GROUP", label: "按组", hint: "组代号；队列组为领取制" },
-  { value: "MEMBER", label: "指定成员", hint: "成员号" },
+  { value: "MEMBER", label: "指定成员", hint: "成员号，多个用逗号分隔" },
   { value: "FIELD", label: "提交时指定", hint: "字段代号：业务系统提交时在这个字段里给出审批人" },
 ];
 const allowsAll = (k: ApproverKind) => ALL_MODE_KINDS.includes(k);
-/** 当前语言有就用，没有回落到任一语种（只作占位提示） */
-const fallback = (t: I18nText) => t.zh ?? t.en ?? t.ar ?? "";
+/** 换审批人种类时保留已填的内容：成员是列表，其余是单个代号 */
+const withKind = (a: ApproverRef, kind: ApproverKind): ApproverRef => {
+  const text = a.kind === "MEMBER" ? a.value.join(",") : a.value;
+  return kind === "MEMBER" ? { kind, value: text ? text.split(",") : [] } : { kind, value: text };
+};
+/** 编辑中的原文：成员列表按逗号拼回，不在输入时去空项（否则打不出逗号） */
+const approverText = (a: ApproverRef) => (a.kind === "MEMBER" ? a.value.join(",") : a.value);
+const setApproverText = (a: ApproverRef, text: string): ApproverRef =>
+  a.kind === "MEMBER" ? { kind: a.kind, value: text ? text.split(",") : [] } : { kind: a.kind, value: text };
+/** 当前语言没填时的占位提示：与服务端显示回退一致（en → 任意一种） */
+const fallback = (t: I18nText) => t.en || t.zh || t.ar || "";
 const COND: { value: "" | ConditionOp; label: string }[] = [
   { value: "", label: "无（必经）" }, { value: "TRUE", label: "属性为真" }, { value: "EQ", label: "属性等于" }, { value: "IN", label: "属性属于（逗号分隔）" },
 ];
@@ -181,13 +190,13 @@ function FlowProcesses() {
                         <div className="flex gap-2">
                           <Select className="w-36 shrink-0" value={s.approver.kind}
                             onChange={(e) => setStep(i, (x) => {
-                              x.approver.kind = e.target.value as ApproverKind;
+                              x.approver = withKind(x.approver, e.target.value as ApproverKind);
                               if (!allowsAll(x.approver.kind)) x.mode = "ANY";
                             })}>
                             {APPROVER.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
                           </Select>
-                          <Input value={s.approver.value} aria-invalid={!!err(p("approver.value"))}
-                            onChange={(e) => setStep(i, (x) => { x.approver.value = e.target.value; })} />
+                          <Input value={approverText(s.approver)} aria-invalid={!!err(p("approver.value"))}
+                            onChange={(e) => setStep(i, (x) => { x.approver = setApproverText(x.approver, e.target.value); })} />
                         </div>
                       </Field>
                       <Field label="模式" error={err(p("mode"))}

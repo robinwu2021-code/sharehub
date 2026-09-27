@@ -13,7 +13,7 @@ import { FlowValidationError } from "./errors";
 import { requirePerm } from "./mock-auth";
 import { ALL_MODE_KINDS } from "./types";
 import type {
-  AppRow, ApprovalTemplate, DefinitionVersionRow, DeliveryRow, FieldError, I18nText, Named, TemplateStep, TemplateSummary,
+  AppRow, ApprovalTemplate, ApproverRef, DefinitionVersionRow, DeliveryRow, FieldError, I18nText, Named, TemplateStep, TemplateSummary,
   TemplateVersion, PublishResult, QueueGroup, SlaPolicy, WorkCalendar,
 } from "./types";
 
@@ -34,8 +34,8 @@ interface ProcessRec {
   versions: (TemplateVersion & { def: ApprovalTemplate })[];
 }
 
-/** 服务按 Accept-Language 选名称；mock 固定中文、缺了回落到任一语种 */
-const pick = (t: I18nText) => t.zh ?? t.en ?? t.ar ?? "";
+/** 服务按请求语言 → en → 任意一种回退；mock 的请求语言固定中文 */
+const pick = (t: I18nText) => t.zh || t.en || t.ar || "";
 const zh = (text: string): I18nText => ({ zh: text });
 
 let processes: ProcessRec[] = [];
@@ -47,7 +47,7 @@ let deliveries: DeliveryRow[] = [];
 let otherDefs: DefinitionVersionRow[] = [];
 let secretSeq = 0;
 
-const step = (code: string, name: string, kind: TemplateStep["approver"]["kind"], value: string, hours: number,
+const step = (code: string, name: string, kind: "GROUP" | "ROLE" | "PERM" | "FIELD", value: string, hours: number,
   when?: TemplateStep["when"]): TemplateStep => ({ code, name: zh(name), approver: { kind, value }, mode: "ANY", dueHours: hours, ...(when ? { when } : {}) });
 const rules = (crossStepExclusive: boolean) => ({ selfApproval: false, crossStepExclusive });
 
@@ -147,7 +147,7 @@ function validate(def: ApprovalTemplate, isNew: boolean): FieldError[] {
   def.steps.forEach((s, i) => {
     const at = (k: string) => `steps[${i}].${k}`;
     if (!pick(s.name)) e.push({ path: at("name"), error: "步骤名称必填" });
-    if (!s.approver.value) e.push({ path: at("approver.value"), error: s.approver.kind === "FIELD" ? "要填给出审批人的字段代号" : "审批人必填" });
+    if (!s.approver.value.length) e.push({ path: at("approver.value"), error: s.approver.kind === "FIELD" ? "要填给出审批人的字段代号" : "审批人必填" });
     if (s.mode === "ALL" && !ALL_MODE_KINDS.includes(s.approver.kind)) e.push({ path: at("mode"), error: "会签只能用于成员 / 组 / 字段指定（角色、权限码的人选不可枚举）" });
     if (s.dueHours !== undefined && !(s.dueHours > 0 && s.dueHours <= 720)) e.push({ path: at("dueHours"), error: "步骤时限 1–720 小时" });
     if (s.when) {
@@ -159,13 +159,20 @@ function validate(def: ApprovalTemplate, isNew: boolean): FieldError[] {
 }
 
 /** PUT /workspaces/{ws}/processes/{code}：幂等发布 */
+/** 去空白；成员列表去掉空项与重复 */
+function cleanApprover(a: ApproverRef): ApproverRef {
+  return a.kind === "MEMBER"
+    ? { kind: a.kind, value: [...new Set(a.value.map((v) => v.trim()).filter(Boolean))] }
+    : { kind: a.kind, value: a.value.trim() };
+}
+
 export function publishTemplate(def: ApprovalTemplate, note: string, isNew: boolean, now: number = Date.now()): PublishResult {
   requirePerm("flow:process:manage");
   const trimAll = (t: I18nText): I18nText =>
     Object.fromEntries(Object.entries(t).map(([k, v]) => [k, v?.trim()]).filter(([, v]) => v)) as I18nText;
   const clean: ApprovalTemplate = {
     ...def, name: trimAll(def.name),
-    steps: def.steps.map((s, i) => ({ ...s, code: s.code || `s${i + 1}`, name: trimAll(s.name), approver: { ...s.approver, value: s.approver.value.trim() } })),
+    steps: def.steps.map((s, i) => ({ ...s, code: s.code || `s${i + 1}`, name: trimAll(s.name), approver: cleanApprover(s.approver) })),
   };
   const errors = validate(clean, isNew);
   if (errors.length) throw new FlowValidationError(`保存被拒：有 ${errors.length} 处需要修改`, errors);

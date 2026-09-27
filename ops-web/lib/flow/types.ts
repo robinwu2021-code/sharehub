@@ -288,10 +288,15 @@ export const ALL_MODE_KINDS: readonly ApproverKind[] = ["MEMBER", "GROUP", "FIEL
 /** 进入条件只支持「属性为真 / 等于 / 属于」；复杂判断由业务系统提交前算成属性 */
 export type ConditionOp = "TRUE" | "EQ" | "IN";
 
+/** 审批人：MEMBER 给成员 ID 列表；GROUP / ROLE / PERM 给代号；FIELD 给字段代号（21/02 §6.4a 字段口径） */
+export type ApproverRef =
+  | { kind: "MEMBER"; value: string[] }
+  | { kind: Exclude<ApproverKind, "MEMBER">; value: string };
+
 export interface TemplateStep {
   code: string;
   name: I18nText;
-  approver: { kind: ApproverKind; value: string };
+  approver: ApproverRef;
   /** ANY = 或签（一人通过即过）；ALL = 会签 */
   mode: "ANY" | "ALL";
   when?: { field: string; op: ConditionOp; value?: string };
@@ -301,6 +306,7 @@ export interface TemplateStep {
 
 export interface ApprovalTemplate {
   code: string;
+  /** 至少一种语言非空；显示按请求语言 → en → 任意一种回退 */
   name: I18nText;
   steps: TemplateStep[];
   /** selfApproval：允许提交人审自己（缺省 false）· crossStepExclusive：跨步互斥（缺省 true）；驳回必填原因恒开 */
