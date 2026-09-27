@@ -52,6 +52,14 @@ c-app/offline/build-apk.sh --no-build            # www 已是最新，跳过 npm
 | Android 命令行工具 | `/opt/homebrew/share/android-commandlinetools` | ✅ |
 | Google Maps Key | `c-app/.env.local` 的 `VITE_GMAPS_KEY` | ✅ 本机有。⚠️ Android 限制要加「包名 + SHA1」那一对，否则真机上地图空白 |
 
+**离线工程 manifest 里必须有的一处覆盖**：DCloud 基础库 `lib.5plus.base-release.aar` 自带
+`usesCleartextTraffic="true"`，合并进来后**每个离线包默认都开着明文 HTTP**
+（2026-09-27 发现：首个正式包就是这样；ai-shop 的包大概率同样如此）。
+我们的 `<application>` 上写 `android:usesCleartextTraffic="${PB_CLEARTEXT}"` + `tools:replace="android:usesCleartextTraffic"`
+（`<manifest>` 需声明 `xmlns:tools`），值由 `offline-config.gradle` 注入：正式包 false、测试包 true。
+重解压 SDK 丢了这两处的话，SDK 的 true 会悄悄合并进来 —— **体检会拦**（正式包明文开着即失败）。
+关掉后已装机验证：运行时正常、对线上的 HTTPS 请求正常。
+
 **DCloud 后台填写时的一个坑**：「Android 应用签名 MD5」按 keytool 口径填（冒号分隔大写）会被判
 「填写错误」，这一项是可选的（只有一键登录要用），**留空即可提交**。
 
