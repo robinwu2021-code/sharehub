@@ -84,6 +84,18 @@ public class AlarmCodeServiceImpl extends AbstractCrudService<DevAlarmCode, Alar
     }
 
     private static void validateBusiness(DevAlarmCode e) {
+        /*
+         * level 此前是这张表**唯一没有入口校验的词表列**（另外 7 列都在下面挨个 of 过了），
+         * 而它恰好就是 V82 那一次的主角：dev_alarm / dev_alarm_code 的 level 存进了
+         * **工单优先级**的词表（LOW/MEDIUM/HIGH/URGENT），而这一列声明的是 INFO/WARN/CRITICAL。
+         * 后果是运营端 /alarms 整页白屏、等级筛选选哪一档都筛不出东西。
+         * 当时修的是数据（V82 归一）与读侧（StatusBadge 降级），**入口一直没补** ——
+         * 也就是说同样的写入再来一次，同样的白屏会再来一次。
+         *
+         * ⚠️ 特别容易串的是 basePriority 与 level 这两列：一个是工单优先级（下面那行），
+         * 一个是告警等级，**四档 vs 三档、一个词都不重合**，而它们在同一个表单上相邻。
+         */
+        if (e.getLevel() != null) ai.neargo.sharehub.alarm.AlarmLevel.of(e.getLevel());
         if (e.getDomain() != null) ai.neargo.sharehub.alarm.AlarmDomain.of(e.getDomain());
         if (e.getSubjectType() != null) ai.neargo.sharehub.alarm.AlarmSubjectType.of(e.getSubjectType());
         if (e.getEvalType() != null) ai.neargo.sharehub.alarm.AlarmEvalType.of(e.getEvalType());

@@ -55,6 +55,15 @@ public class AdSlotServiceImpl extends AbstractCrudService<AdSlot, AdSlotVO> imp
     @Override
     protected void beforeCreate(AdSlot e) {
         if (e.getStatus() == null || e.getStatus().isBlank()) e.setStatus(AdSlotStatus.IDLE.name());
+        /*
+         * 补默认值 ≠ 校验传进来的值：前者只管「没传时填什么」，
+         * 传了非法值照样落库。ad_slot 现在 0 行，装闸趁早。
+         *
+         * ⚠️ 顺带一个发现：DDL 里 ad_slot.type 有词表（BODY 机身贴 / SCREEN 屏幕），
+         * 而**实体根本没映射这一列** —— 广告位类型存不进也读不出，界面上没有这一格。
+         * 不在这里顺手加字段：那是补功能，要先确认广告位要不要按类型区分计价。
+         */
+        AdSlotStatus.of(e.getStatus());
         if (e.getPosition() == null || e.getPosition().isBlank()) e.setPosition("SCREEN");
     }
 

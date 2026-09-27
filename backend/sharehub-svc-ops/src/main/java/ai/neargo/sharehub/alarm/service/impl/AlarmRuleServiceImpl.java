@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.alarm.service.impl;
 
+import ai.neargo.sharehub.alarm.AlarmNotifyMethod;
+import ai.neargo.sharehub.alarm.AlarmNotifyChannel;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.common.crud.AbstractCrudService;
 import ai.neargo.sharehub.alarm.AlarmRuleStatus;
@@ -53,14 +55,31 @@ public class AlarmRuleServiceImpl extends AbstractCrudService<DevAlarmRule, Alar
 
     @Override
     protected void beforeCreate(DevAlarmRule e) {
-        if (e.getMethod() == null || e.getMethod().isBlank()) e.setMethod("INSTANT");
+        if (e.getMethod() == null || e.getMethod().isBlank()) e.setMethod(AlarmNotifyMethod.INSTANT.name());
         if (e.getStatus() == null || e.getStatus().isBlank()) e.setStatus(AlarmRuleStatus.ACTIVE.name());
+        validateVocabulary(e);
         validateQuiet(e);
     }
 
     @Override
     protected void beforeUpdate(DevAlarmRule e, DevAlarmRule current) {
+        validateVocabulary(e);
         validateQuiet(e);
+    }
+
+    /**
+     * 三列词表此前**一处都没校验**：只在 beforeCreate 里补默认值，
+     * 而「补默认值」与「校验传进来的值」是两件事 —— 传了非法值照样落库。
+     *
+     * <p>这一列尤其不该漏：channel 写错的症状是**通知发不出去而没人知道**
+     * （告警照常开、规则照常匹配、然后什么都没发生），
+     * 而告警存在的全部意义就是让人收到它。
+     */
+    private static void validateVocabulary(DevAlarmRule e) {
+        AlarmNotifyChannel.ofNullable(e.getChannel());
+        AlarmNotifyMethod.ofNullable(e.getMethod());
+        AlarmRuleStatus.of(e.getStatus() == null || e.getStatus().isBlank()
+                ? AlarmRuleStatus.ACTIVE.name() : e.getStatus());
     }
 
     @Override

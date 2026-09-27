@@ -57,6 +57,12 @@ class VocabularyRejectedOnWriteTest extends ApiTestSupport {
     @Autowired
     private JdbcTemplate jdbc;
 
+    /**
+     * ⚠️ 这里任何一句 SQL 写错，**全部格子都会变成 Errors**（不是 Failures）——
+     * {@code @AfterEach} 抛异常算这个方法失败。实测过一次：给 {@code dev_alarm_code}
+     * 写了不存在的 {@code name} 列，7 格里 6 格瞬间报 Errors，而它们本身好着。
+     * 排障时先看是 Failures 还是 Errors：Errors 往往不在被测代码里。
+     */
     @AfterEach
     void cleanUp() {
         /*
@@ -68,6 +74,8 @@ class VocabularyRejectedOnWriteTest extends ApiTestSupport {
         jdbc.update("DELETE FROM notify_blacklist WHERE target LIKE '050000%'");
         jdbc.update("DELETE FROM mkt_push WHERE title = ?", MARK);
         jdbc.update("DELETE FROM coupon_tpl WHERE name = ?", MARK);
+        // dev_alarm_code 没有 name 列，业务键是 code —— 按探针码删
+        jdbc.update("DELETE FROM dev_alarm_code WHERE code LIKE 'TEST_VOCAB_PROBE%'");
     }
 
     @Test
@@ -128,6 +136,34 @@ class VocabularyRejectedOnWriteTest extends ApiTestSupport {
         var bad = post("/api/user/campaigns", Map.of(
                 "name", MARK, "kind", "WHATEVER", "status", "DRAFT"), t);
         assertThat(bad.status).as("kind=WHATEVER 竟然被接受了：%s", bad.msg()).isEqualTo(400);
+    }
+
+    @Test
+    @DisplayName("★★ dev_alarm_code.level 非法值 400——V82 白屏那一列，7 个兄弟都有闸就它没有")
+    void alarm_code_level_rejects_work_order_priority() {
+        /*
+         * V82：dev_alarm / dev_alarm_code 的 level 存进了**工单优先级**的词表
+         * （LOW/MEDIUM/HIGH/URGENT），而这一列声明的是 INFO/WARN/CRITICAL。
+         * 运营端 /alarms 整页白屏、等级筛选选哪一档都筛不出东西。
+         * 当时修了数据（归一迁移）与读侧（StatusBadge 降级），**入口一直没补** ——
+         * 同样的写入再来一次，同样的白屏会再来一次。这一格钉住它。
+         *
+         * 用 HIGH 而不是随便一个乱码：它是**真实串错过的那个值**，
+         * 而且 basePriority 与 level 在同一个表单上相邻、四档 vs 三档一个词都不重合。
+         */
+        String t = login("ADMIN");
+
+        var ok = post("/api/ops/alarms/codes", Map.of(
+                "code", "TEST_VOCAB_PROBE", "message", MARK, "level", "WARN",
+                "domain", "SERVICE", "subjectType", "CABINET", "evalType", "STATE"), t);
+        assertThat(ok.status).as("合法 level 应当能存：%s", ok.msg()).isEqualTo(200);
+
+        var bad = post("/api/ops/alarms/codes", Map.of(
+                "code", "TEST_VOCAB_PROBE2", "message", MARK, "level", "HIGH",
+                "domain", "SERVICE", "subjectType", "CABINET", "evalType", "STATE"), t);
+        assertThat(bad.status)
+                .as("level=HIGH（工单优先级的词表）竟然被接受了——V82 白屏会再来一次：%s", bad.msg())
+                .isEqualTo(400);
     }
 
     @Test
