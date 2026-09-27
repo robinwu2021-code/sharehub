@@ -232,8 +232,18 @@ async function onScan() {
   bottom: 196rpx;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 12rpx;
-  padding: 24rpx 58rpx;
+  /*
+   * 尺寸写死 + 不换行。此前是 padding 撑开，于是宽度随文案长短变，
+   * 而文案一长就换行 —— 实测同一个按钮：窗口 1280 时 233×47（一行），
+   * 窗口 400 时 200×74（两行）。同一个按钮两种形状。
+   * 三种语言 × 两种能力（扫码/手输）一共四句文案，只有固定尺寸才不会各长一个样。
+   * 也因此这四句必须短：放不下就会顶出去，而顶出去比换行更难看。
+   */
+  width: 280rpx;
+  height: 96rpx;
+  white-space: nowrap;
   border-radius: 9999px;
   background: var(--pb-primary);
   color: var(--pb-on-primary);
