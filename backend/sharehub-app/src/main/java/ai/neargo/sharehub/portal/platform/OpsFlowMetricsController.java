@@ -22,6 +22,7 @@ public class OpsFlowMetricsController {
         this.metrics = metrics;
     }
 
+    /** 运营核心流程指标（G5）。窗口缺省 = 最近 30 天（业务日历）。 */
     @GetMapping("/api/ops/ops-flow-metrics")
     @PreAuthorize("@perm.can('dashboard:overview:read')")
     public OpsFlowMetrics metrics(@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,

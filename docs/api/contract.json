@@ -33444,6 +33444,12 @@
      "name": "status",
      "type": "String",
      "required": false
+    },
+    {
+     "in": "query",
+     "name": "payStatus",
+     "type": "String",
+     "required": false
     }
    ],
    "bodyType": null,
