@@ -54,6 +54,11 @@
             "sdkConfigs" : {}
         }
     },
+    /* H5 特有相关。
+       ⚠️ 这里**不要**放 rpxCalcMaxDeviceWidth / rpxCalcBaseDeviceWidth：
+       本版 uni 不读它们（实测 __uniConfig 里没有对应键，uni.upx2px 仍按窗口宽算）。
+       锁 rpx 基准的地方在 App.vue —— uni 在 H5 把 rpx 编译成 rem，那里封顶了 <html> 字号。 */
+    "h5" : {},
     /* 快应用特有相关 */
     "quickapp" : {},
     /* 小程序特有相关 */

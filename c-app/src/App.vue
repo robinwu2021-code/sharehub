@@ -97,6 +97,9 @@ page {
  * （translateZ(0) 不产生视觉位移，只为建立包含块。）
  */
 :root {
+  /* ⚠️ 与 manifest.json 的 h5.rpxCalcMaxDeviceWidth / rpxCalcBaseDeviceWidth 是同一个数：
+     应用列有多宽，rpx 就按多宽折算。改这里必须同时改那里，否则列宽与内容基准不同步，
+     结果就是「列不动、内容一直长」（那正是加这两项之前的样子）。 */
   --pb-appw: 480px;
   /* 列外侧的页面底色：比应用本身略深一点，宽屏上才分得清「应用」与「背景」 */
   --pb-outside: #eceef2;
@@ -107,6 +110,26 @@ page {
 
 html {
   background: var(--pb-outside);
+  /*
+   * ===== 锁住 rpx 的基准，界面不再随窗口变形 =====
+   *
+   * uni 在 H5 下把 rpx **编译成 rem**（280rpx → 8.75rem，即 32rpx = 1rem），
+   * 再用 JS 给 <html> 内联一个 font-size = 窗口宽 / 750 * 32。
+   * 于是窗口越宽，字、间距、按钮一起变大 —— 而应用列已经被 --pb-appw 限住不动了。
+   * 实测窗口 800：主按钮 299×102（占 480 列宽的 62%）、.pb-h2 36px；
+   * 同一个按钮窗口 400 时是 149×51。这就是「不同尺寸下形状不同」的根。
+   *
+   * 这里把基准**封顶在应用列宽**：窗口超过 --pb-appw 之后 font-size 不再增长，
+   * 整套界面固定成「一台 480 宽的手机」；480 以下仍按窗口缩放（手机本该如此）。
+   * 一处生效，字体 / 间距 / 圆角 / 按钮全都跟着锁住，不用逐个组件改。
+   *
+   * ⚠️ 必须 !important：那个 font-size 是 uni 用 JS 写在 <html> 上的**内联样式**，
+   * 样式表里不带 !important 压不过它。
+   *
+   * ⚠️ manifest.json 的 h5.rpxCalcMaxDeviceWidth 一类选项在本版 uni 上**不生效**
+   * （实测 __uniConfig 里没有对应键、uni.upx2px(280) 仍按窗口算），别再去那边试。
+   */
+  font-size: min(calc(100vw / 750 * 32), calc(var(--pb-appw) / 750 * 32)) !important;
 }
 
 uni-app {
