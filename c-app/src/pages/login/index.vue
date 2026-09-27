@@ -99,7 +99,9 @@ async function sendOtp() {
   if (cooldown.value > 0 || !phone.value) return;
   const r = await api.sendOtp({ countryCode: country.value.dial, phone: phone.value, scene: "login" });
   uni.showToast({ title: t("auth.otpSent"), icon: "none" });
-  cooldown.value = r.cooldown;
+  // 服务端不回 cooldown 时按 60 秒兜底 —— 拿到 undefined 的话倒计时不出，而下面的定时器会一直跑（NaN 永不 ≤ 0）
+  cooldown.value = Number.isFinite(r?.cooldown) ? r.cooldown : 60;
+  if (cooldown.value <= 0) return;
   timer = setInterval(() => {
     cooldown.value -= 1;
     if (cooldown.value <= 0 && timer) clearInterval(timer);

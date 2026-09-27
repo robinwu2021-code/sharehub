@@ -48,3 +48,10 @@ export const MP_ICON = {
   danger: "#f04438",
   onPrimary: "#ffffff",
 } as const;
+
+/**
+ * 系统导航栏（手势条那一段）背后的颜色 = 底栏的面色（App.vue 的 --pb-surface，浅 / 暗）。
+ * targetSdk 35 起 Android 15+ 强制边到边，导航栏透明，露出来的是窗口底色 —— 默认黑色。
+ * 顶部状态栏后面是页面的白，底部却是一条黑：屏幕上下两端的圆角看起来就不一样（真机实测）。
+ */
+export const NAV_BAR_BG = { light: "#ffffff", dark: "#161a22" } as const;

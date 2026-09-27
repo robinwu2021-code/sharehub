@@ -34,8 +34,15 @@ function go(url: string, key: string, active: string) {
   bottom: 0;
   display: flex;
   gap: 12rpx;
-  padding: 10rpx 24rpx calc(10rpx + constant(safe-area-inset-bottom));
-  padding-bottom: calc(10rpx + env(safe-area-inset-bottom));
+  /*
+   * 左右内边距**单独写**。此前是 `padding: 10rpx 24rpx calc(10rpx + constant(…))` 一行简写：
+   * 新版 WebView 不认 constant()，一个值无效整条简写被丢，左右 24rpx 跟着没了 ——
+   * 选中块贴着屏幕边缘，圆角屏上两侧的弧度切掉了它（真机 REDMI K90 实测）。
+   */
+  /* 左右与底部多留一些：圆角屏两侧的弧度离文字近了会切到它（用户真机反馈） */
+  padding: 10rpx 40rpx;
+  padding-bottom: calc(22rpx + constant(safe-area-inset-bottom));
+  padding-bottom: calc(22rpx + env(safe-area-inset-bottom));
   background: var(--pb-surface);
   box-shadow: 0 -6rpx 28rpx rgba(18, 20, 34, 0.05);
 }

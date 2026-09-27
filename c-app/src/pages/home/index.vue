@@ -242,7 +242,9 @@ async function onPrimary() {
       </view>
 
       <!-- 地图（填满剩余高度） -->
-      <view v-show="view === 'map'" class="pb-home__fill"><pb-map :points="list" @select="openStore" /></view>
+      <!-- 地图底部让出悬浮「扫码 / 输入柜号」那一段：此前地图填到底，谷歌的版权与条款链接被「输入柜号」压住（真机实测），
+           而 Google Maps 的使用条款要求它们可见 -->
+      <view v-show="view === 'map'" class="pb-home__fill pb-home__map"><pb-map :points="list" @select="openStore" /></view>
 
       <!-- 列表（填满剩余高度，可滚动） -->
       <scroll-view v-show="view === 'list'" scroll-y class="pb-home__fill pb-home__list">
@@ -329,6 +331,8 @@ async function onPrimary() {
 .pb-home__hd { flex: none; padding: 40rpx 32rpx 0; }
 /* min-height:0 打破 flex 子项默认按内容撑高，使填充区可收缩、滚动收敛到内部 */
 .pb-home__fill { flex: 1; min-height: 0; padding: 20rpx 32rpx 0; box-sizing: border-box; }
+/* = 悬浮按钮顶端（230 + 96rpx）减去外壳已给底栏留的 150rpx，再留 24rpx 呼吸 */
+.pb-home__map { padding-bottom: 200rpx; }
 .pb-fab {
   position: fixed;
   left: 50%;

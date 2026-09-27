@@ -2,7 +2,10 @@
 // 顶部栏（navigationStyle:custom 下自绘）。返回键在 RTL 下由 flex 自动镜像到另一侧。
 defineProps<{ title?: string; showBack?: boolean }>();
 function back() {
-  uni.navigateBack({ fail: () => uni.reLaunch({ url: "/pages/home/index" }) });
+  // 先看栈深再决定：App 端在栈底调 navigateBack **不走 fail**，此前那个兜底永远到不了 ——
+  // 会话过期被守卫 reLaunch 到登录页的人，点返回没反应、不登录就回不到首页（模拟器实测）
+  if (getCurrentPages().length > 1) uni.navigateBack();
+  else uni.reLaunch({ url: "/pages/home/index" });
 }
 </script>
 

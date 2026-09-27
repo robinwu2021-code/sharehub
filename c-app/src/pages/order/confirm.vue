@@ -117,9 +117,13 @@ async function submit() {
     // 而不是弹一句「请先补缴」然后让他自己去订单列表里翻
     const owed = e instanceof ApiError ? (e.data as { orderNo?: string } | undefined)?.orderNo : undefined;
     if (owed) {
+      // 说明放 content 不放 title：系统弹窗标题只给两行，整句放标题会被「…」截掉后半句（真机 MIUI 实测）；
+      // 取消文案要显式给，否则系统按手机语言出「取消」，与 App 语言不一致
       uni.showModal({
-        title: (e as Error).message,
+        title: t("orders.arrearsTag"),
+        content: (e as Error).message,
         confirmText: t("orders.payNow"),
+        cancelText: t("common.cancel"),
         success: (r) => {
           if (r.confirm) uni.redirectTo({ url: `/pages/order/detail?orderNo=${owed}` });
         },

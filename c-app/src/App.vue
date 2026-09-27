@@ -55,29 +55,33 @@ page {
 }
 
 /* 皮肤：只改主色（中性面由明暗决定）。mono=黑白灰 / blue=时尚蓝 / purple=科幻紫 */
-/* 小程序没有 <html>，换肤靠 pb-scaffold 根节点上的 class（见其 themeClass）；变量沿节点树继承进组件 */
-/* #ifdef MP */
+/*
+ * 换肤 / 暗色：只有 H5 能改 <html> 的属性。小程序没有 <html>；原生 App 的业务 JS 跑在**逻辑层**，没有 document ——
+ * theme store 里的 setAttribute 在 App 端静默失败，原生包的换肤与暗色**从来没生效过**（模拟器实测：选暗色只有系统栏变了）。
+ * 所以 H5 以外都靠 pb-scaffold 根节点上的 class（见其 themeClass）；变量沿节点树继承进组件。
+ */
+/* #ifndef H5 */
 .pb-skin-blue {
 /* #endif */
-/* #ifndef MP */
+/* #ifdef H5 */
 :root[data-skin="blue"] {
 /* #endif */
   --pb-primary: #2f6bff;
 }
-/* #ifdef MP */
+/* #ifndef H5 */
 .pb-skin-purple {
 /* #endif */
-/* #ifndef MP */
+/* #ifdef H5 */
 :root[data-skin="purple"] {
 /* #endif */
   --pb-primary: #7c3aed;
 }
 
 /* 深色风格：改中性面 */
-/* #ifdef MP */
+/* #ifndef H5 */
 .pb-mode-dark {
 /* #endif */
-/* #ifndef MP */
+/* #ifdef H5 */
 :root[data-theme="dark"] {
 /* #endif */
   --pb-bg: #0b0e14;
@@ -88,6 +92,20 @@ page {
   --pb-faint: #232937;
   --pb-shadow: 0 6rpx 28rpx rgba(0, 0, 0, 0.32);
   --pb-shadow-sm: 0 2rpx 10rpx rgba(0, 0, 0, 0.28);
+}
+/*
+ * 默认皮肤（黑白灰）+ 暗色：主色要换成浅色。此前暗色块不动主色，而默认主色是近黑 #18181b ——
+ * 深底上选中的 Tab、主按钮文字都看不见（模拟器实测，H5 同样如此）。
+ * 只对默认皮肤：蓝 / 紫的主色在深底上本来就看得清。两个 class（两个属性）的优先级高于单个皮肤规则，与书写顺序无关。
+ */
+/* #ifndef H5 */
+.pb-skin-mono.pb-mode-dark {
+/* #endif */
+/* #ifdef H5 */
+:root[data-skin="mono"][data-theme="dark"] {
+/* #endif */
+  --pb-primary: #f2f4f7;
+  --pb-on-primary: #0b0e14;
 }
 
 /* ===== 扁平基座 ===== */

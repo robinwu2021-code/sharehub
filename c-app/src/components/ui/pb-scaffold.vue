@@ -3,6 +3,7 @@
 defineProps<{ title?: string; showBack?: boolean; tab?: "home" | "orders" | "me" }>();
 import { computed, watch } from "vue";
 import { useThemeStore } from "@/stores/theme";
+import { NAV_BAR_BG } from "@/design/tokens";
 
 /*
  * 小程序没有 <html>，换肤 / 暗色挂不到 data-skin / data-theme 上 —— 此前小程序只有默认皮肤。
@@ -19,9 +20,40 @@ const themeClass = computed(() => [`pb-skin-${theme.skin}`, `pb-mode-${theme.mod
 // #ifndef H5
 watch(
   () => theme.mode,
-  (m) => uni.setNavigationBarColor({ frontColor: m === "dark" ? "#ffffff" : "#000000", backgroundColor: "#00000000" }),
+  (m) => {
+    uni.setNavigationBarColor({ frontColor: m === "dark" ? "#ffffff" : "#000000", backgroundColor: "#00000000" });
+    // #ifdef APP-PLUS
+    paintSystemNavBar(m === "dark");
+    // #endif
+  },
   { immediate: true },
 );
+// #endif
+
+// #ifdef APP-PLUS
+/**
+ * 系统导航栏背后的窗口底色 = 底栏面色，并按明暗切换手势条的深浅。
+ * 此前那里露出窗口默认的黑色：顶部是页面的白、底部一条黑，屏幕上下的圆角看起来就不一样（真机实测）。
+ * 边到边之后 setNavigationBarColor 不再生效，所以改的是 decorView 的底色；失败只是颜色不对，不影响使用。
+ */
+function paintSystemNavBar(dark: boolean) {
+  try {
+    const p = (globalThis as unknown as { plus?: any }).plus;
+    if (!p || p.os?.name !== "Android") return;
+    const activity = p.android.runtimeMainActivity();
+    const Color = p.android.importClass("android.graphics.Color");
+    const color = Color.parseColor(dark ? NAV_BAR_BG.dark : NAV_BAR_BG.light);
+    const win = p.android.invoke(activity, "getWindow");
+    const decor = p.android.invoke(win, "getDecorView");
+    p.android.invoke(decor, "setBackgroundColor", color);
+    p.android.invoke(win, "setNavigationBarColor", color);   // 边到边之前的系统版本仍认这一句
+    // 手势条深浅：SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR = 0x10（浅底配深色手势条）
+    const flags = p.android.invoke(decor, "getSystemUiVisibility");
+    p.android.invoke(decor, "setSystemUiVisibility", dark ? flags & ~0x10 : flags | 0x10);
+  } catch (e) {
+    console.warn("[pb-scaffold] 系统导航栏着色失败", e);
+  }
+}
 // #endif
 </script>
 
@@ -45,8 +77,17 @@ watch(
 
 <style scoped>
 /* color 在这里重新声明：小程序里暗色变量挂在本节点上，而 page 上的 color 按浅色算好之后是以**值**继承下来的 */
-.pb-scaffold { display: flex; flex-direction: column; height: 100vh; background: var(--pb-bg); color: var(--pb-ink); }
+/*
+ * overflow: hidden + 滚动区 min-height: 0：只让 scroll-view 滚，外层不许滚。
+ * 此前内容一变长（订单刷新成结算态），flex 子项按内容撑开、外层跟着能滚，
+ * 整页往上挪了一个状态栏的高度 —— 标题压到状态栏上，按钮也不在手指点的位置（真机实测）。
+ */
+.pb-scaffold {
+  display: flex; flex-direction: column; height: 100vh; overflow: hidden; background: var(--pb-bg); color: var(--pb-ink);
+  /* 在这里重算一次：它在根上按根的主色算好后以**值**继承，App / 小程序在本节点换了主色（皮肤 class）它也不会跟着变 */
+  --pb-primary-tint: color-mix(in srgb, var(--pb-primary) 12%, transparent);
+}
 .pb-scaffold__status { flex-shrink: 0; height: var(--status-bar-height, 0px); }
-.pb-scaffold__body { flex: 1; box-sizing: border-box; }
+.pb-scaffold__body { flex: 1; min-height: 0; box-sizing: border-box; }
 .pb-scaffold__body.has-tab { padding-bottom: 150rpx; }
 </style>
