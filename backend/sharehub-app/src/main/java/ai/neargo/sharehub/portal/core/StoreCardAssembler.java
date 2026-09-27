@@ -30,16 +30,41 @@ public class StoreCardAssembler {
         this.prices = prices;
     }
 
+    /**
+     * 这台机柜此刻能不能借出。**找柜列表与机柜详情必须用同一个判断**。
+     *
+     * <p>2026-09-27 H5 对接实测：CAB1013 是 {@code ONLINE} 但 {@code status=FAULT}，
+     * 于是首页列表显示「可借 1」（它只看 {@code availableCount}），
+     * 而 {@code /mp/nearby/cabinets/{no}/availability} 返 {@code borrowable:false}
+     * （它判了在线与故障）。<b>用户走到店里才发现借不了。</b>
+     *
+     * <p>两处各写一遍判断是这类分叉的通用形状：两边单看都对，合起来对不上，
+     * 而没有任何东西会报错。收成这一个方法，两边都调它。
+     */
+    public static boolean borrowable(Cabinet c) {
+        return c.availableCount() > 0
+                && "ONLINE".equals(c.onlineStatus())
+                && !"FAULT".equals(c.status());
+    }
+
     public NearbyCabinetVO card(Cabinet c, Site s, Quote q, Double fromLat, Double fromLng) {
-        int borrow = c.availableCount();
+        boolean ok = borrowable(c);
+        // 借不了就出 0：仓里还有宝，但这台机柜给不出来 —— 报真实台数会让用户白跑一趟
+        int borrow = ok ? c.availableCount() : 0;
         int ret = Math.max(0, c.slotTotal() - c.availableCount());
+        /*
+         * status 此前只映射站点状态。机柜本身离线/故障时也要出 PAUSED ——
+         * 否则这张卡片会显示成「满仓」（端上 borrow=0 就渲染 Full），
+         * 而「满仓」与「这台坏了」对用户是两件事：前者换个柜子还，后者这家店白来。
+         */
+        String status = ("ACTIVE".equals(s.status()) && ok) ? "ACTIVE" : "PAUSED";
         return new NearbyCabinetVO(
                 c.cabinetNo(), s.siteNo(), s.name(), s.address(),
                 distanceM(fromLat, fromLng, s.lat(), s.lng()),
                 s.lat(), s.lng(),
                 borrow, ret,
                 q.perHour(), q.currency(),
-                "ACTIVE".equals(s.status()) ? "ACTIVE" : "PAUSED");
+                status);
     }
 
     /**

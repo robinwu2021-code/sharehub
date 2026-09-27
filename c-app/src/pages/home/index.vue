@@ -144,14 +144,20 @@ async function onScan() {
                     <pb-icon name="pin" :size="26" /><text>{{ c.address }}{{ distance(c.distanceM) ? " · " + distance(c.distanceM) : "" }}</text>
                   </view>
                   <view class="mt-[18rpx] flex gap-[12rpx]">
-                    <pb-tag :type="c.availableBorrow > 0 ? 'success' : 'neutral'">{{ $t("home.canBorrow") }} {{ c.availableBorrow }}</pb-tag>
+                    <!--
+                      status=PAUSED 是「这台机柜此刻给不出宝」（离线/故障），与「满仓」不是一回事：
+                      满仓换个柜子还就行，停用则这家店白来。此前端上不读 status，
+                      两种情况都渲染成「满仓」。
+                    -->
+                    <pb-tag v-if="c.status === 'PAUSED'" type="neutral">{{ $t("home.paused") }}</pb-tag>
+                    <pb-tag v-else :type="c.availableBorrow > 0 ? 'success' : 'neutral'">{{ $t("home.canBorrow") }} {{ c.availableBorrow }}</pb-tag>
                     <pb-tag type="primary">{{ $t("home.canReturn") }} {{ c.availableReturn }}</pb-tag>
                   </view>
                 </view>
                 <view class="ms-[16rpx] flex flex-col items-end gap-[16rpx]">
                   <view class="flex items-baseline gap-[4rpx]"><pb-amount :value="c.pricePerHour" size="sm" /><text class="text-[22rpx] text-sub">{{ $t("common.perHour") }}</text></view>
                   <pb-button size="sm" :type="c.availableBorrow > 0 ? 'primary' : 'tonal'" :disabled="c.availableBorrow <= 0" @click.stop="borrow(c)">
-                    {{ c.availableBorrow > 0 ? $t("home.canBorrow") : $t("home.full") }}
+                    {{ c.status === "PAUSED" ? $t("home.paused") : c.availableBorrow > 0 ? $t("home.canBorrow") : $t("home.full") }}
                   </pb-button>
                 </view>
               </view>

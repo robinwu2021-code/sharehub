@@ -6,6 +6,9 @@ import ai.neargo.sharehub.user.asset.RechargeOrderStatus;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.trade.entity.OrdOrder;
 import ai.neargo.sharehub.trade.mapper.OrdMapper;
+import ai.neargo.sharehub.trade.pay.PayAuthStatus;
+import ai.neargo.sharehub.trade.pay.entity.PayAuth;
+import ai.neargo.sharehub.trade.pay.mapper.PayAuthMapper;
 import ai.neargo.sharehub.user.asset.dto.UserAssetDtos.WalletOverview;
 import ai.neargo.sharehub.user.asset.dto.UserAssetDtos.WalletRow;
 import ai.neargo.sharehub.user.asset.dto.UserAssetDtos.WalletTxnRow;
@@ -50,6 +53,7 @@ public class WalletServiceImpl implements WalletService {
     private final UsrWalletTxnMapper txns;
     private final UsrRechargeOrderMapper recharges;
     private final OrdMapper orders;
+    private final PayAuthMapper auths;
     private final NicknameLookup nicknames;
     /** 手工调账流水的业务类型：审计时要能把「人改的」单独筛出来。 */
     private static final String BIZ_MANUAL_ADJUST = "MANUAL_ADJUST";
@@ -62,8 +66,10 @@ public class WalletServiceImpl implements WalletService {
 
     public WalletServiceImpl(UsrWalletMapper wallets, UsrWalletTxnMapper txns,
                              UsrRechargeOrderMapper recharges, OrdMapper orders,
+                             PayAuthMapper auths,
                              NicknameLookup nicknames,
                              ai.neargo.sharehub.user.mapper.UserMappers.UsrUserMapper users) {
+        this.auths = auths;
         this.users = users;
         this.wallets = wallets;
         this.txns = txns;
@@ -124,17 +130,50 @@ public class WalletServiceImpl implements WalletService {
         return new PageResult<>(rows, r.getTotal());
     }
 
+    /**
+     * 免押冻结额 = 这个人名下**还冻着**的预授权之和（{@code pay_auth.status=FROZEN}）。
+     *
+     * <h3>为什么不读 {@code usr_wallet.frozen_amount}</h3>
+     * 那一列**全仓没有任何一处写非零值** —— {@code WalletServiceImpl} 建钱包时把它置 0，
+     * 之后再没人动过。于是 2026-09-27 H5 对接实测看到：免押借出建了一条
+     * {@code pay_auth FROZEN 50}，而钱包页显示「免押冻结 AED 0.00」。
+     * 同一笔钱两个来源，一个有数据、一个恒为 0，没有任何东西对账。
+     *
+     * <h3>为什么是「改成算」而不是「补上写」</h3>
+     * 补第二个写入方就要在冻结 / 扣款 / 释放三处都记得同步，漏一处就开始漂 ——
+     * 而漂了之后两边都还是「有值」，比现在恒 0 更难发现。
+     * {@code pay_auth} 本来就是预授权的账本（状态机 {@code FROZEN → CAPTURED / RELEASED}），
+     * 直接按它求和，真源只有一个，漂不了。
+     *
+     * <p>{@code usr_wallet.frozen_amount} 这一列就此不再被读。它留在表里
+     * （删列要迁移、也要确认没有别的消费者），但不再是任何东西的依据。
+     */
+    private BigDecimal frozenOf(String cUserNo) {
+        List<PayAuth> frozen = auths.selectList(new LambdaQueryWrapper<PayAuth>()
+                .eq(PayAuth::getCUserNo, cUserNo)
+                .eq(PayAuth::getStatus, PayAuthStatus.FROZEN.name()));
+        return frozen.stream().map(PayAuth::getFreezeAmount)
+                .filter(java.util.Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
     @Override
     public WalletOverview overviewOf(String cUserNo) {
         UsrWallet e = wallets.selectOne(new LambdaQueryWrapper<UsrWallet>()
                 .eq(UsrWallet::getCUserNo, cUserNo).last("limit 1"));
         if (e == null) {
-            // 新用户尚未开钱包：返回零值而不是 404 —— 端上钱包页是常驻入口，报错会挡住整页
+            /*
+             * 新用户尚未开钱包：返回零值而不是 404 —— 端上钱包页是常驻入口，报错会挡住整页。
+             *
+             * ⚠️ 但**冻结额不能一并归零**：免押预授权不需要先有钱包行，
+             * 所以「没有钱包行」与「没冻钱」是两回事。一个刚注册就免押借出的用户，
+             * 额度已经被占住 50，而这里曾经告诉他「免押冻结 0.00」。
+             */
             return new WalletOverview(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-                    BigDecimal.ZERO, null);
+                    frozenOf(cUserNo), null);
         }
         return new WalletOverview(e.getBalance(), e.getGiftBalance(), e.getDepositAmount(),
-                e.getFrozenAmount(), e.getCurrency());
+                frozenOf(cUserNo), e.getCurrency());
     }
 
     @Override
@@ -240,7 +279,7 @@ public class WalletServiceImpl implements WalletService {
         if (gift.signum() > 0) writeTxn(w, TXN_BONUS, title, gift, bizType, bizNo);
 
         return new WalletOverview(w.getBalance(), w.getGiftBalance(),
-                nz(w.getDepositAmount()), nz(w.getFrozenAmount()), w.getCurrency());
+                nz(w.getDepositAmount()), frozenOf(cUserNo), w.getCurrency());
     }
 
     private void writeTxn(UsrWallet w, String type, String title, BigDecimal amount,

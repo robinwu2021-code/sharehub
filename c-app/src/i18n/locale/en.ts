@@ -30,6 +30,7 @@ export default {
     canBorrow: "Borrow",
     canReturn: "Return",
     full: "Full",
+    paused: "Unavailable",
     scan: "Scan to borrow",
     nearby: "Nearby stations",
     map: "Map",
@@ -85,6 +86,9 @@ export default {
     capNote: "No charge after the daily cap",
     findReturn: "Find a return station",
     feeAtReturn: "The fee is calculated on return",
+    estimated: "Estimated",
+    cappedNow: "Daily cap reached — the fee stops growing",
+    inUseNoFeeYet: "In use",
   },
   feedback: {
     pickType: "Pick a problem type first",

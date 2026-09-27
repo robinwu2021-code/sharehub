@@ -30,6 +30,7 @@ export default {
     canBorrow: "للاستعارة",
     canReturn: "للإرجاع",
     full: "ممتلئ",
+    paused: "غير متاح",
     scan: "امسح للاستعارة",
     nearby: "المحطات القريبة",
     map: "خريطة",
@@ -85,6 +86,9 @@ export default {
     capNote: "لا رسوم بعد الحد اليومي",
     findReturn: "ابحث عن محطة للإرجاع",
     feeAtReturn: "تُحتسب الرسوم عند الإرجاع",
+    estimated: "تقديري",
+    cappedNow: "تم بلوغ الحد اليومي — لن تزيد الرسوم",
+    inUseNoFeeYet: "قيد الاستخدام",
   },
   feedback: {
     pickType: "اختر نوع المشكلة أولاً",

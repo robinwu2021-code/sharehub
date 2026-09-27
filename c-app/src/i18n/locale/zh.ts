@@ -30,6 +30,7 @@ export default {
     canBorrow: "可借",
     canReturn: "可还",
     full: "已满",
+    paused: "暂停服务",
     scan: "扫码借出",
     nearby: "附近门店",
     map: "地图",
@@ -85,6 +86,9 @@ export default {
     capNote: "达每日封顶后不再计费",
     findReturn: "找可还网点",
     feeAtReturn: "费用在归还时按结算规则计算",
+    estimated: "预估",
+    cappedNow: "已达每日封顶，费用不再增长",
+    inUseNoFeeYet: "使用中",
   },
   feedback: {
     pickType: "请先选择问题类型",
