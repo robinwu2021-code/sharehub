@@ -59,6 +59,36 @@ public final class InstanceDao {
                 .update();
     }
 
+    // ── 外部确认门（21/02 §8.4）────────────────────────────
+    /** 进入外部确认门：记下本代次的一次性令牌哈希（令牌明文只随事件发给接入方，不入库）。 */
+    public int setConfirmToken(WorkspaceId ws, String instanceNo, int gateEpoch, String tokenHash) {
+        return jdbc.sql("UPDATE proc_instance SET confirm_token_hash = ?, confirm_result = NULL WHERE workspace_id = ? AND instance_no = ? AND gate_epoch = ?")
+                .params(tokenHash, ws.value(), instanceNo, gateEpoch).update();
+    }
+
+    public record ConfirmTarget(String instanceNo, String status, int gateEpoch, String confirmResult) {
+    }
+
+    /** 加锁读：并发的两次回复在这里排队，后到的读到先到者的结果（MySQL 可重复读下普通 SELECT 读不到）。 */
+    public Optional<ConfirmTarget> lockByConfirmToken(WorkspaceId ws, String tokenHash) {
+        return jdbc.sql("SELECT instance_no, status, gate_epoch, confirm_result FROM proc_instance WHERE workspace_id = ? AND confirm_token_hash = ? FOR UPDATE")
+                .params(ws.value(), tokenHash)
+                .query((rs, i) -> new ConfirmTarget(rs.getString(1), rs.getString(2), rs.getInt(3), rs.getString(4))).optional();
+    }
+
+    /** 记下回复（CONFIRM / REJECT / TIMEOUT）。只有令牌仍是本代次、且还没回复过时成功 —— 回复只生效一次。 */
+    public int recordConfirm(WorkspaceId ws, String instanceNo, int gateEpoch, String result) {
+        return jdbc.sql("UPDATE proc_instance SET confirm_result = ? WHERE workspace_id = ? AND instance_no = ? AND gate_epoch = ? "
+                        + "AND confirm_token_hash IS NOT NULL AND confirm_result IS NULL")
+                .params(result, ws.value(), instanceNo, gateEpoch).update();
+    }
+
+    /** 离开外部确认门时作废还没回复的令牌；已回复的保留，重复回复才能拿回首次结果。 */
+    public void clearUnansweredToken(WorkspaceId ws, String instanceNo) {
+        jdbc.sql("UPDATE proc_instance SET confirm_token_hash = NULL WHERE workspace_id = ? AND instance_no = ? AND confirm_result IS NULL")
+                .params(ws.value(), instanceNo).update();
+    }
+
     /** 只改字段（不迁移）。 */
     public int updateFields(WorkspaceId ws, String instanceNo, int expectedVersion, Map<String, Object> fields, long now) {
         return jdbc.sql("UPDATE proc_instance SET fields = " + dialect.jsonParam() + ", updated_at_ms = ?, version = version + 1 "
