@@ -2,6 +2,7 @@ package ai.neargo.sharehub.scenario;
 
 import ai.neargo.sharehub.dev.dto.DeviceOpsDtos.DeviceEvent;
 import ai.neargo.sharehub.dev.dto.DeviceOpsDtos.DeviceEventBatch;
+import ai.neargo.sharehub.dev.dto.DeviceOpsDtos.IngestResult;
 import ai.neargo.sharehub.dev.service.DeviceSignalService;
 import ai.neargo.sharehub.support.ApiTestSupport;
 import org.junit.jupiter.api.DisplayName;
@@ -36,9 +37,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  *       只是此前没有任何订单会停在 DISPENSING，于是永远走不到。</li>
  * </ol>
  *
- * <p>⚠️ 信号码用 {@code SLOT_EJECT_OK}：{@code dev_event_code} 字典里有它，而驱动清单
- * （{@code DemoPowerbankDriver}）声明的是 {@code EJECT_OK} —— 字典里没有这个码，
- * 进来会被当成「未知信号码」丢掉（记 WARN）。监听器两个名字都认，接真机时要把字典补齐。
+ * <p>驱动清单（{@code DemoPowerbankDriver}）归一化出来的是 {@code EJECT_OK} / {@code ITEM_INSERTED}，
+ * 字典里对应的码叫 {@code SLOT_EJECT_OK} / {@code RETURN_SN_SEEN}。此前入口按字典原样查，
+ * 驱动的名字进来就被当成「未知信号码」丢掉 —— 真柜机回执永远到不了订单，单子卡在出宝中。
+ * 见 {@link #driverVocabularyIsTranslated()}。
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestPropertySource(properties = "sharehub.trade.simulate-eject.enabled=false")
@@ -88,6 +90,27 @@ class RentDeliveredBySignalTest extends ApiTestSupport {
                 .as("没拿到宝就不该收钱").isZero();
     }
 
+    @Test
+    @DisplayName("驱动词表（EJECT_OK / ITEM_INSERTED）进来要被认出来，不能当未知码丢掉")
+    void driverVocabularyIsTranslated() {
+        String cabinetNo = jdbc.queryForObject(
+                "select cabinet_no from dev_cabinet where deleted=0 and available_count>0 "
+                        + "and online_status='ONLINE' and status<>'FAULT' limit 1", String.class);
+        String token = consumer();
+        String orderNo = post("/mp/trade/orders/rent",
+                Map.of("cabinetNo", cabinetNo, "useFreeDeposit", true), token)
+                .okData().path("orderNo").asText();
+        assertThat(status(orderNo)).isEqualTo("DISPENSING");
+
+        Integer slot = jdbc.queryForObject("select slot_index from ord_order where order_no=?", Integer.class, orderNo);
+        IngestResult r = signal(cabinetNo, "EJECT_OK", slot);
+        assertThat(r.unknownCode()).as("EJECT_OK 是驱动声明的事件，不是未知码").isZero();
+        assertThat(status(orderNo)).as("驱动报的出宝成功也要推进订单").isEqualTo("IN_USE");
+
+        assertThat(signal(cabinetNo, "ITEM_INSERTED", slot).unknownCode())
+                .as("ITEM_INSERTED 同理（字典里叫 RETURN_SN_SEEN）").isZero();
+    }
+
     private String consumer() {
         String phone = "+97150" + (System.nanoTime() % 10000000L);
         post("/mp/auth/otp", Map.of("phone", phone), null).okData();
@@ -100,8 +123,8 @@ class RentDeliveredBySignalTest extends ApiTestSupport {
         return jdbc.queryForObject("select status from ord_order where order_no=?", String.class, orderNo);
     }
 
-    private void signal(String cabinetNo, String code, Integer slot) {
-        signals.ingest(new DeviceEventBatch(List.of(new DeviceEvent(
+    private IngestResult signal(String cabinetNo, String code, Integer slot) {
+        return signals.ingest(new DeviceEventBatch(List.of(new DeviceEvent(
                 "E" + System.nanoTime(), code, cabinetNo, slot, null, "TEST", null,
                 LocalDateTime.now(), Map.of()))));
     }

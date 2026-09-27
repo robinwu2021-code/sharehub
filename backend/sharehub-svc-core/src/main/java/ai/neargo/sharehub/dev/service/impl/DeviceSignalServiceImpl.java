@@ -116,9 +116,26 @@ public class DeviceSignalServiceImpl implements DeviceSignalService {
                 .toList();
     }
 
+    /**
+     * 驱动词表 → 字典码。
+     *
+     * <p>网关驱动（{@code DriverManifest#events()}）归一化出来的事件名与 {@code dev_event_code} 字典
+     * 是两套词：同一个物理事实，驱动叫 {@code EJECT_OK}，字典叫 {@code SLOT_EJECT_OK}。
+     * 此前入口按原样查字典，驱动的名字进来一律「未知信号码」丢掉 —— 真柜机的出宝回执
+     * 永远到不了订单（卡在出宝中）、也解除不了卡宝保护、试借还等不到弹出。
+     *
+     * <p>在这里译一次、下游只认字典码：比往字典里加同义行好 —— 同义行是另一个码，
+     * 下游按 {@code SLOT_EJECT_OK} 判的地方（试借还、clears_code）照样认不出它。
+     * {@code SLOT_REPORT / ONLINE / OFFLINE} 是状态快照，字典里没有对应的信号，不在此列。
+     */
+    static final Map<String, String> DRIVER_ALIASES = Map.of(
+            "EJECT_OK", "SLOT_EJECT_OK",
+            "ITEM_INSERTED", "RETURN_SN_SEEN");
+
     /** @return 0 已处理 / 2 未知码或未知设备（记 WARN，不报错） */
     private int handle(DeviceEvent e) {
-        DevEventCode code = codes.selectOne(new LambdaQueryWrapper<DevEventCode>().eq(DevEventCode::getCode, e.type()).last("limit 1"));
+        String type = DRIVER_ALIASES.getOrDefault(e.type(), e.type());
+        DevEventCode code = codes.selectOne(new LambdaQueryWrapper<DevEventCode>().eq(DevEventCode::getCode, type).last("limit 1"));
         DevCabinet c = cabinets.selectOne(new LambdaQueryWrapper<DevCabinet>().eq(DevCabinet::getCabinetNo, e.deviceNo()).last("limit 1"));
         if (c == null) {
             log.warn("设备事件指向未知设备 deviceNo={} eventId={} vendor={} —— 设备未建档，需补档后网关重推", e.deviceNo(), e.eventId(), e.vendorCode());

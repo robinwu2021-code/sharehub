@@ -32,8 +32,11 @@ public class RentDeliveryListener {
 
     private static final Logger log = LoggerFactory.getLogger(RentDeliveryListener.class);
 
-    /** 出宝成功的物理事实：仓门弹出。驱动归一化后是 {@code EJECT_OK}；字典里仓位级那条叫 {@code SLOT_EJECT_OK}。 */
-    private static final Set<String> DELIVERED = Set.of("EJECT_OK", "SLOT_EJECT_OK");
+    /**
+     * 出宝成功的物理事实：仓门弹出。只认字典码 —— 驱动的 {@code EJECT_OK} 在信号入口已译成它
+     * （{@code DeviceSignalServiceImpl#DRIVER_ALIASES}），这里不再两个名字都认。
+     */
+    private static final Set<String> DELIVERED = Set.of("SLOT_EJECT_OK");
     /** 出宝失败：柜机自己报的弹仓超时。 */
     private static final Set<String> FAILED = Set.of("EJECT_TIMEOUT");
     /** 指令回执：成败在 {@code attrs.result}。 */
