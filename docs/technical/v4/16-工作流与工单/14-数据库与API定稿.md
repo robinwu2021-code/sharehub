@@ -110,5 +110,5 @@ ALTER TABLE wf_approval ADD KEY idx_submitter (system_code, submitted_by, submit
 | 项 | 定 |
 |---|---|
 | OpenAPI | `flow-svc` 生成 `openapi.yaml` 落盘入库（10 §五）；本篇 §二 的增量并入 |
-| ops-web 侧 | 前端契约方法名与本篇接口一一对应（见 [15 ops-web 落地](./15-opsweb落地.md)）；mock 按同一契约实现，状态机在 mock 层强制 |
+| ops-web 侧 | 前端契约方法名与本篇接口一一对应（见 [15 前端方案](./15-前端方案-独立可嵌入与皮肤.md)）；mock 按同一契约实现，状态机在 mock 层强制 |
 | 校验 | 「筛选控件 ↔ 查询参数」进表单字段卡口的同类检查：列表页的每个筛选项都要能在契约参数里找到同名字段 |
