@@ -104,7 +104,13 @@ public class ShareGeneratorImpl implements ShareGenerator {
             return 0;
         }
 
-        String onDate = e.period() == null ? null : e.period() + "-01";
+        /*
+         * 按**结算日**找当天生效的合同与代理角色。此前是 period + "-01"：
+         * 9-15 签约的站点，9 月的单在 9-01 那天查不到合同 —— 场地方整月拿不到钱，
+         * 只留一句「没有可用比例」（2026-09-28 修）。老事件没有 settledOn，回落到当月 1 号。
+         */
+        String onDate = e.settledOn() != null && !e.settledOn().isBlank() ? e.settledOn()
+                : e.period() == null ? null : e.period() + "-01";
         SiteSharingBrief site = siteSharing.sharingOf(e.siteNo(), onDate);
         int n = 0;
 

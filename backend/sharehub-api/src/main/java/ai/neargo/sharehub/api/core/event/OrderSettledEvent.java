@@ -29,10 +29,19 @@ import java.math.BigDecimal;
  *                    按它分账等于用平台的钱替用户给场地方付分成
  * @param currency    币种，随单快照
  * @param period      归属结算周期 {@code YYYY-MM}，由发布方按结算时刻定格
+ * @param settledOn   结算日 {@code YYYY-MM-DD}（业务日历）。消费方按它找<b>当天</b>生效的合同 ——
+ *                    此前按 {@code period + "-01"} 找，月中签约的站点当月订单一律落空（2026-09-28 修）。
+ *                    为空（老事件、发件箱里排队的）回落到当月 1 号
  */
 public record OrderSettledEvent(String orderNo, String cabinetNo, String siteNo, String agentNo,
-                                BigDecimal grossAmount, String currency, String period)
+                                BigDecimal grossAmount, String currency, String period, String settledOn)
         implements DomainEvent {
+
+    /** 兼容旧 7 参调用：结算日缺省 null（回落到当月 1 号）。 */
+    public OrderSettledEvent(String orderNo, String cabinetNo, String siteNo, String agentNo,
+                             BigDecimal grossAmount, String currency, String period) {
+        this(orderNo, cabinetNo, siteNo, agentNo, grossAmount, currency, period, null);
+    }
 
     @Override
     public String aggregateType() {

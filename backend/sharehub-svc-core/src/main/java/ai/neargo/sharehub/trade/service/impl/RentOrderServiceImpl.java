@@ -823,14 +823,14 @@ public class RentOrderServiceImpl implements RentOrderService {
          * 而 endedAt 只有归还那条写；更要紧的是 **rentEndAt 存的是 UTC**，
          * 折算到业务时区是精确的，不像 endedAt 那样得先假设「它是哪个时区的」。
          */
-        String period = (e.getRentEndAt() == null ? clock.today()
-                : parseTs(e.getRentEndAt()).atZone(clock.zone()).toLocalDate())
-                .toString().substring(0, 7);
+        java.time.LocalDate settledOn = e.getRentEndAt() == null ? clock.today()
+                : parseTs(e.getRentEndAt()).atZone(clock.zone()).toLocalDate();
+        String period = settledOn.toString().substring(0, 7);
         eventBus.publish(new OrderSettledEvent(
                 e.getOrderNo(), e.getCabinetNo(),
                 cab == null ? null : cab.getSiteNo(),
                 cab == null ? null : cab.getAgentNo(),
-                e.getAmount(), e.getCurrency(), period));
+                e.getAmount(), e.getCurrency(), period, settledOn.toString()));
     }
 
     /**

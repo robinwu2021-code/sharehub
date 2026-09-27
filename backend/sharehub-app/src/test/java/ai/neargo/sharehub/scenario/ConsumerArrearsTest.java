@@ -153,7 +153,7 @@ class ConsumerArrearsTest extends ApiTestSupport {
                 + " VALUES (?, 'MAIN', ?, ?, 'ACTIVE', '00:00-23:59', 'R-TEST')", site, venue, "欠费测试站点 " + site);
         jdbc.update("INSERT INTO loc_contract (contract_no, tenant_id, venue_no, site_no, share_rate, start_at, end_at, status)"
                         + " VALUES (?, 'MAIN', ?, ?, 0.2, ?, ?, 'ACTIVE')",
-                // 分润按「结算月 1 号」找生效合同（ShareGeneratorImpl 传 period-01），合同得从月初之前就生效
+                // 合同从上月初生效：本类测的是收款，不让合同生效日成为变量（按结算日找合同见 ShareMidMonthContractTest）
                 "CTAR" + rnd(), venue, site, bizToday().withDayOfMonth(1).minusMonths(1).toString(),
                 bizToday().plusYears(1).toString());
         String cab = "CBAR" + rnd();
