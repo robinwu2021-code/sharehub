@@ -6,6 +6,15 @@ import { useI18n } from "vue-i18n";
 import type { NearbyCabinet, Notice, ConsumerOrder, StoreDetail } from "@/types";
 import { distance } from "@/shared/format";
 import { scanCabinet } from "@/ports/scan";
+
+/** 本端有没有扫码能力。H5（含 Capacitor 的纯 WebView）没有 uni.scanCode。 */
+const canScan = (() => {
+  // #ifdef H5
+  return false;
+  // #endif
+  // eslint-disable-next-line no-unreachable
+  return true;
+})();
 import { openNavigation } from "@/ports/map";
 import { getUserLocation } from "@/ports/location";
 import { ensureLoggedIn } from "@/shared/auth-gate";
@@ -79,20 +88,39 @@ function goOrder() {
 function goNotice() {
   uni.navigateTo({ url: "/pages/notice/index" });
 }
+/**
+ * 主按钮：能扫码就扫码，不能就让用户**照着柜机上的编号输**。
+ *
+ * ⚠️ 这里原先在 H5 下的做法是：取列表里第一台有货的柜机，直接进确认页。
+ * 按钮写着「扫码借出」，而它既没扫码、也没问过用户 —— 用户可能就这样
+ * 从一家他根本没选过的店借走一台宝。**展示在说谎**，而且是替用户做了决定。
+ *
+ * uni.scanCode 是 App / 小程序的能力，H5 没有（当前 Android 产物是 Capacitor 壳，
+ * 纯 WebView 里同样没有）。所以按平台分：有扫码能力就扫，没有就输编号 ——
+ * 柜机上印着编号，这是扫码失败时的标准兜底，也是唯一不替用户猜的做法。
+ */
+const showManual = ref(false);
+const manualNo = ref("");
+
+function goConfirm(cabinetNo: string) {
+  const url = `/pages/order/confirm?cabinetNo=${cabinetNo.trim().toUpperCase()}`;
+  if (ensureLoggedIn(url)) uni.navigateTo({ url });
+}
+
 async function onScan() {
-  // #ifdef H5
-  const nearest = list.value.find((c) => c.availableBorrow > 0);
-  if (nearest) {
-    borrow(nearest);
+  if (!canScan) {
+    manualNo.value = "";
+    showManual.value = true;
     return;
   }
-  // #endif
   try {
-    const cabinetNo = await scanCabinet();
-    const url = `/pages/order/confirm?cabinetNo=${cabinetNo}`;
-    if (ensureLoggedIn(url)) uni.navigateTo({ url });
+    goConfirm(await scanCabinet());
   } catch (e) {
-    uni.showToast({ title: (e as Error).message, icon: "none" });
+    // 用户主动取消不该弹错误提示；其余失败给一句「扫不出来就手输」的出口
+    const msg = (e as Error).message || "";
+    if (/cancel/i.test(msg)) return;
+    manualNo.value = "";
+    showManual.value = true;
   }
 }
 </script>
@@ -167,10 +195,21 @@ async function onScan() {
       </scroll-view>
     </view>
 
+    <!-- 图标此前是 zap（闪电），读起来是「快充」不是「扫一扫」；文案与能力也要一致 -->
     <view class="pb-fab" hover-class="pb-fab--press" :hover-stay-time="40" @tap="onScan">
-      <pb-icon name="zap" :size="36" />
-      <text>{{ $t("home.scan") }}</text>
+      <pb-icon :name="canScan ? 'scan' : 'keyboard'" :size="36" />
+      <text>{{ canScan ? $t("home.scan") : $t("home.enterCabinet") }}</text>
     </view>
+
+    <!-- 无扫码能力时的兜底：照着柜机上印的编号输 -->
+    <pb-dialog
+      v-model:visible="showManual"
+      v-model:inputValue="manualNo"
+      :title="$t('home.enterCabinet')"
+      :message="$t('home.enterCabinetHint')"
+      :input-placeholder="$t('home.cabinetNoPlaceholder')"
+      @confirm="goConfirm(manualNo)"
+    />
 
     <pb-store-sheet
       v-model:visible="showStore"

@@ -81,6 +81,51 @@ class BorrowableAgreesTest extends ApiTestSupport {
                 .isEqualTo("PAUSED");
     }
 
+    /**
+     * 站点停用时，列表也不能报「可借 N」。
+     *
+     * <p>2026-09-27 H5 对接实测：停用站点 Dubai Mall L1 在首页列着「可借 7」，
+     * 而真去借会撞 409「该站点暂停服务」—— 因为「能不能借」当时在**三个地方各算一遍**：
+     * 列表只看台数、详情看「在线且非故障」、借出走 RentabilityGuard（还要判站点可租、
+     * DEPLOYED、整柜停借）。三处各自都说得通，合起来是用户白跑一趟。
+     *
+     * <p>现在展示层直接问那个权威守卫，判据只有一份。
+     */
+    @Test
+    @DisplayName("站点停用：列表不报可借，且与真去借的结果一致")
+    void pausedSiteIsNotOfferedInTheList() {
+        String cab = jdbc.queryForObject(
+                "select c.cabinet_no from dev_cabinet c join loc_site s on s.site_no = c.site_no "
+                        + "where s.deleted=0 and c.deleted=0 and c.available_count>0 "
+                        + "and c.online_status='ONLINE' and c.status='DEPLOYED' and s.status='ACTIVE' limit 1",
+                String.class);
+        assertThat(cab).isNotBlank();
+        String siteNo = jdbc.queryForObject(
+                "select site_no from dev_cabinet where cabinet_no=?", String.class, cab);
+        String siteStatus = jdbc.queryForObject(
+                "select status from loc_site where site_no=?", String.class, siteNo);
+
+        String phone = "+97150" + (System.nanoTime() % 10000000L);
+        post("/mp/auth/otp", Map.of("phone", phone), null).okData();
+        String token = post("/mp/auth/login",
+                Map.of("grantType", "phone_otp", "phone", phone, "otp", "000000"), null)
+                .okData().path("token").asText();
+
+        try {
+            jdbc.update("update loc_site set status='PAUSED' where site_no=?", siteNo);
+
+            assertThat(cardOf(token, cab).path("availableBorrow").asInt())
+                    .as("停用站点在列表里报「可借 N」，用户点进去才撞 409「该站点暂停服务」")
+                    .isZero();
+            assertThat(detailBorrowable(token, cab)).as("详情也要说借不了").isFalse();
+            assertThat(post("/mp/trade/orders/rent",
+                    Map.of("cabinetNo", cab, "useFreeDeposit", false), token).status)
+                    .as("真去借本来就会被拒 —— 三处必须是同一个答案").isEqualTo(409);
+        } finally {
+            jdbc.update("update loc_site set status=? where site_no=?", siteStatus, siteNo);
+        }
+    }
+
     private JsonNode cardOf(String token, String cabinetNo) {
         for (JsonNode c : get("/mp/nearby/cabinets", token).okData()) {
             if (cabinetNo.equals(c.path("cabinetNo").asText())) return c;

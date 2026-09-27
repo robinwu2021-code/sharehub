@@ -25,9 +25,12 @@ public class StoreCardAssembler {
     private static final double EARTH_RADIUS_M = 6_371_000d;
 
     private final PriceResolver prices;
+    private final ai.neargo.sharehub.trade.RentabilityGuard rentability;
 
-    public StoreCardAssembler(PriceResolver prices) {
+    public StoreCardAssembler(PriceResolver prices,
+                              ai.neargo.sharehub.trade.RentabilityGuard rentability) {
         this.prices = prices;
+        this.rentability = rentability;
     }
 
     /**
@@ -38,26 +41,50 @@ public class StoreCardAssembler {
      * 而 {@code /mp/nearby/cabinets/{no}/availability} 返 {@code borrowable:false}
      * （它判了在线与故障）。<b>用户走到店里才发现借不了。</b>
      *
-     * <p>两处各写一遍判断是这类分叉的通用形状：两边单看都对，合起来对不上，
-     * 而没有任何东西会报错。收成这一个方法，两边都调它。
+     * <p><b>而且原来是三处各写一遍</b>：列表只看台数、详情看「在线且非故障」、
+     * 真正的借出走 {@code RentabilityGuard}（站点可租 + DEPLOYED + 在线 + 未整柜停借 + 有货）。
+     * 于是停用站点在首页列着「可借 7」，点进去借才撞 409「该站点暂停服务」——
+     * 三处各自都说得通，合起来是用户白跑一趟。
+     *
+     * <p>所以这里**不再自己判**，直接问那个权威守卫：判据只有一份，
+     * 展示层取布尔、借出取异常，是同一份判断的两个视图。
      */
-    public static boolean borrowable(Cabinet c) {
-        return c.availableCount() > 0
-                && "ONLINE".equals(c.onlineStatus())
-                && !"FAULT".equals(c.status());
+    public boolean borrowable(Cabinet c) {
+        return blockedReason(c).isEmpty();
     }
 
+    /** 借不了的原因（i18n key），能借则空。来源是权威守卫，本类不自己判。 */
+    private java.util.Optional<String> blockedReason(Cabinet c) {
+        return rentability.blockedReason(c.cabinetNo(), c.siteNo(), c.status(),
+                c.onlineStatus(), c.availableCount());
+    }
+
+    /**
+     * 「没货」不算停用。
+     *
+     * <p>守卫把 {@code no_stock} 也算进「借不了」—— 对借出那条路是对的（确实借不了），
+     * 但对卡片不是：**没货是满仓，停用是这家店今天不营业**，对用户是两件事，
+     * 前者换个时间或换台柜子，后者别来。
+     *
+     * <p>第一版把两者一起标成 PAUSED，结果 48 张卡里 22 张显示「暂停服务」——
+     * 而实际停用的只有 11 台（4 台故障 + 7 台在停用站点），另外 11 台只是空了。
+     */
+    private static final String NO_STOCK = "error.rent.no_stock";
+
     public NearbyCabinetVO card(Cabinet c, Site s, Quote q, Double fromLat, Double fromLng) {
-        boolean ok = borrowable(c);
+        java.util.Optional<String> blocked = blockedReason(c);
+        boolean ok = blocked.isEmpty();
         // 借不了就出 0：仓里还有宝，但这台机柜给不出来 —— 报真实台数会让用户白跑一趟
         int borrow = ok ? c.availableCount() : 0;
         int ret = Math.max(0, c.slotTotal() - c.availableCount());
+        // 只是没货 → 仍然是「营业中」，端上按 borrow=0 渲染成「满仓」；见 NO_STOCK 的说明
+        boolean serviceable = ok || NO_STOCK.equals(blocked.orElse(null));
         /*
          * status 此前只映射站点状态。机柜本身离线/故障时也要出 PAUSED ——
          * 否则这张卡片会显示成「满仓」（端上 borrow=0 就渲染 Full），
          * 而「满仓」与「这台坏了」对用户是两件事：前者换个柜子还，后者这家店白来。
          */
-        String status = ("ACTIVE".equals(s.status()) && ok) ? "ACTIVE" : "PAUSED";
+        String status = ("ACTIVE".equals(s.status()) && serviceable) ? "ACTIVE" : "PAUSED";
         return new NearbyCabinetVO(
                 c.cabinetNo(), s.siteNo(), s.name(), s.address(),
                 distanceM(fromLat, fromLng, s.lat(), s.lng()),

@@ -1,16 +1,42 @@
 <script setup lang="ts">
 // 确认对话框（注销/退出等）。danger=危险操作红色确认。
-withDefaults(
-  defineProps<{ visible: boolean; title?: string; message?: string; confirmText?: string; cancelText?: string; danger?: boolean }>(),
+/**
+ * 确认弹窗。给了 `inputPlaceholder` 就变成**带输入的提示框**（prompt）。
+ *
+ * 为什么把输入做进这里而不是各页自绘：uni 的 `showModal({editable:true})` 各端行为不一，
+ * 而自绘一次就会有第二次 —— 两个长得差不多的弹窗迟早在圆角、按钮顺序、
+ * 遮罩透明度上分叉。
+ */
+const props = withDefaults(
+  defineProps<{
+    visible: boolean;
+    title?: string;
+    message?: string;
+    confirmText?: string;
+    cancelText?: string;
+    danger?: boolean;
+    /** 非空则渲染输入框；值通过 v-model:inputValue 双向绑定 */
+    inputPlaceholder?: string;
+    inputValue?: string;
+  }>(),
   { danger: false },
 );
-const emit = defineEmits<{ (e: "update:visible", v: boolean): void; (e: "confirm"): void }>();
+const emit = defineEmits<{
+  (e: "update:visible", v: boolean): void;
+  (e: "update:inputValue", v: string): void;
+  (e: "confirm"): void;
+}>();
 function cancel() {
   emit("update:visible", false);
 }
 function ok() {
+  // 要求输入却没填就不放行 —— 让它带着空值走下去，调用方多半只会得到一个看不懂的后端错误
+  if (props.inputPlaceholder && !(props.inputValue || "").trim()) return;
   emit("confirm");
   emit("update:visible", false);
+}
+function onInput(e: any) {
+  emit("update:inputValue", String(e?.detail?.value ?? ""));
 }
 </script>
 
@@ -20,6 +46,15 @@ function ok() {
     <view class="pb-dlg__box">
       <text class="pb-dlg__title">{{ title }}</text>
       <text v-if="message" class="pb-dlg__msg">{{ message }}</text>
+      <input
+        v-if="inputPlaceholder"
+        class="pb-dlg__input"
+        :value="inputValue"
+        :placeholder="inputPlaceholder"
+        confirm-type="done"
+        @input="onInput"
+        @confirm="ok"
+      />
       <view class="pb-dlg__btns">
         <view class="pb-dlg__btn is-cancel" @tap="cancel">{{ cancelText || $t("common.cancel") }}</view>
         <view class="pb-dlg__btn" :class="danger ? 'is-danger' : 'is-ok'" @tap="ok">{{ confirmText || $t("common.confirm") }}</view>
@@ -34,6 +69,18 @@ function ok() {
 .pb-dlg__box { position: relative; width: 78%; background: var(--pb-elev); border-radius: 30rpx; padding: 40rpx 36rpx 28rpx; }
 .pb-dlg__title { display: block; text-align: center; font-size: 32rpx; font-weight: 800; color: var(--pb-ink); }
 .pb-dlg__msg { display: block; text-align: center; font-size: 26rpx; color: var(--pb-sub); margin-top: 16rpx; line-height: 1.6; }
+.pb-dlg__input {
+  margin-top: 28rpx;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 24rpx 28rpx;
+  border-radius: 20rpx;
+  background: var(--pb-faint);
+  color: var(--pb-ink);
+  font-size: 30rpx;
+  text-align: center;
+  letter-spacing: 2rpx;
+}
 .pb-dlg__btns { display: flex; gap: 16rpx; margin-top: 36rpx; }
 .pb-dlg__btn { flex: 1; text-align: center; padding: 24rpx 0; border-radius: 9999px; font-size: 29rpx; font-weight: 700; }
 .is-cancel { background: var(--pb-faint); color: var(--pb-ink); }

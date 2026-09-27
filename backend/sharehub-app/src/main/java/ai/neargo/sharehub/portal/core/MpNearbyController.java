@@ -173,7 +173,7 @@ public class MpNearbyController {
             out.put("siteName", s == null ? c.locationName() : s.name());
             // 与找柜列表共用同一个判断（见 StoreCardAssembler#borrowable）——
             // 两处各写一遍，就会出现「列表说可借、详情说不可借」，而两边单看都对。
-            out.put("borrowable", StoreCardAssembler.borrowable(c));
+            out.put("borrowable", cards.borrowable(c));
             out.put("pricePerHour", q.perHour());
             out.put("dailyCap", q.dailyCap());
             out.put("buyoutPrice", billing == null || billing.buyoutPrice() == null

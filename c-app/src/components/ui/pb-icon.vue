@@ -12,6 +12,12 @@ const props = withDefaults(defineProps<{ name: string; size?: number; stroke?: n
 const P: Record<string, string> = {
   search: '<circle cx="11" cy="11" r="7.5"/><path d="m21 21-4.3-4.3"/>',
   zap: '<path d="M13 2 4 13.5h7L10 22l9-11.5h-7L13 2Z"/>',
+  // 扫码：四角取景框 + 中间扫描线。首页那个主按钮此前用的是 zap（闪电），
+  // 读起来是「快充」而不是「扫一扫」——图标与文案不是一回事。
+  // ⚠️ 路径一律用大写 M 起头：小写工具前缀字母紧跟小数（如 m9.5）会被 UnoCSS
+  // applet transformer 当成 margin 工具类改写，图标在生产构建里直接不显示（已踩过）。
+  scan: '<path d="M3 8V5.5A2.5 2.5 0 0 1 5.5 3H8"/><path d="M16 3h2.5A2.5 2.5 0 0 1 21 5.5V8"/><path d="M21 16v2.5A2.5 2.5 0 0 1 18.5 21H16"/><path d="M8 21H5.5A2.5 2.5 0 0 1 3 18.5V16"/><path d="M3 12h18"/>',
+  keyboard: '<rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M7 10h0M11 10h0M15 10h0M8 14h8"/>',
   navigation: '<path d="M3 11 22 2l-9 19-2-8-8-2Z"/>',
   pin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="2.6"/>',
   ticket: '<path d="M3 9a2.5 2.5 0 0 0 0 6v1.5A1.5 1.5 0 0 0 4.5 18h15a1.5 1.5 0 0 0 1.5-1.5V15a2.5 2.5 0 0 1 0-6V7.5A1.5 1.5 0 0 0 19.5 6h-15A1.5 1.5 0 0 0 3 7.5Z"/><path d="M13 6v2M13 15v2M13 11v1"/>',
