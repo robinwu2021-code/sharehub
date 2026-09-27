@@ -75,5 +75,10 @@ InternalJobController 1     # bizDate 缺省取昨天 —— 任务口径，与�
 JobInvocation 1             # 手动触发任务时 bizDate 取昨天。与上一条是同一个口径问题：
                             # 「昨天」相对哪个时区？手动跑与定时跑必须算同一个日子，
                             # 否则对不上账（那个类的注释正是这么写的）。与调度器一起定。
-LeadOpsServiceImpl 1        # 商机转站点时的默认开始日
+# （LeadOpsServiceImpl 已移出：商机转站点生成合同草稿时的默认开始日改用
+#   contractService.today() —— 合同的日期校验走的就是它。取两个不同的「今天」，
+#   会出现草稿刚生成就被自己的校验拒掉的那 4 小时。
+#   同时 ContractServiceImpl.today() 从 LocalDate.now(bizZone) 改为走 BizClock：
+#   值一样，但「现在」因此可以在测试里钉住 —— 合同那条路的时区缺陷不再只有
+#   每天 4 小时能被照出来。）
 DemoOpsFinanceSeeder 3      # 演示种子数据，不是生产路径

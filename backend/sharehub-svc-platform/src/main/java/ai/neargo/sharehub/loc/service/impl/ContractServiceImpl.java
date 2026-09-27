@@ -43,7 +43,6 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -53,7 +52,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -96,13 +94,14 @@ public class ContractServiceImpl implements ContractService {
     private final FileBindingPort fileBinding;
     private final SysParamPort params;
     private final TransactionTemplate perRow;
-    private final ZoneId bizZone;
+    /** 业务日历的「今天」。原先是自己持 ZoneId 调 LocalDate.now(zone) —— 那样测试钉不住。 */
+    private final ai.neargo.sharehub.common.time.BizClock clock;
 
     public ContractServiceImpl(LocMappers.ContractMapper contracts, LocMappers.SiteMapper sites,
                                LocMappers.VenueMapper venues, LocContractLogMapper logs, LocContractAttachMapper attaches,
                                ContractStateMachine sm, DomainEventBus events, FileBindingPort fileBinding,
                                SysParamPort params, PlatformTransactionManager tm,
-                               @Value("${sharehub.biz-zone:Asia/Dubai}") String bizZone) {
+                               ai.neargo.sharehub.common.time.BizClock clock) {
         this.contracts = contracts;
         this.sites = sites;
         this.venues = venues;
@@ -117,12 +116,14 @@ public class ContractServiceImpl implements ContractService {
         // 若调用方已在事务里（测试用例 @Transactional、人工在事务内调用），就加入它、随它回滚 ——
         // REQUIRES_NEW 会绕过外层回滚直接提交，JobCatalogTest 冒烟一次就把共享测试库写脏了（2026-09-25 实测）。
         this.perRow.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRED);
-        this.bizZone = ZoneId.of(bizZone);
+        this.clock = clock;
     }
 
     @Override
     public LocalDate today() {
-        return LocalDate.now(bizZone);
+        // 走 BizClock 而不是 LocalDate.now(bizZone)：值一样，但「现在」因此**可以在测试里钉住**，
+        // 于是合同日期这条路上的时区缺陷不再只有每天那 4 小时能被照出来（见 FixedBizClock）。
+        return clock.today();
     }
 
     // —— 查询 ——

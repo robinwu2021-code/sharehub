@@ -145,7 +145,9 @@ public class LeadOpsServiceImpl implements LeadOpsService {
         }
 
         // 3) 合同草稿：条款取请求，没给的取商机上谈下来的，再没有按纯分成、12 个月
-        LocalDate start = r.startAt() != null ? r.startAt() : LocalDate.now();
+        // 用 contractService.today() 而不是 LocalDate.now()：合同的日期校验走的就是它
+        // （业务时区）。取两个不同的「今天」，会出现草稿刚生成就被自己的校验拒掉的那 4 小时。
+        LocalDate start = r.startAt() != null ? r.startAt() : contractService.today();
         int months = r.termMonths() != null ? r.termMonths() : lead.getTermMonths() != null ? lead.getTermMonths() : 12;
         if (months <= 0) throw BizException.badRequest("error.common.invalid_value", "termMonths=" + months);
         Boolean exclusive = r.exclusive() != null ? r.exclusive() : lead.getExclusiveFlag();
