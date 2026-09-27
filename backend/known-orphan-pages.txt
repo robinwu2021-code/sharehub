@@ -19,3 +19,8 @@
 # 运营管理 L1 的 section 落地页；菜单上挂的是它下面的叶子
 # （/operation/overview 等 13 条），落地页本身不单独占一个菜单项。
 /operation
+
+# 流程与工单的两个详情页：深链目标，从列表 / 待办点单号进入（?no=），本身不该占菜单项。
+# 静态导出下动态段要枚举，所以详情页用固定路由 + 查询参数（前端方案 v4/16/22 §七）。
+/flow/tickets/detail
+/flow/approvals/detail

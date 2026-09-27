@@ -16,7 +16,6 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ErrorState, Skeleton } from "@/components/ui/misc";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
-import { FlowNav } from "@/components/flow/flow-nav";
 import { FlowTimeline } from "@/components/flow/flow-timeline";
 import { PriorityBadge, TicketStatusBadge } from "@/components/flow/badges";
 import { SlaCell } from "@/components/flow/sla-cell";
@@ -73,9 +72,9 @@ function TicketDetail() {
     onError: (e: Error) => notify.error(e.message),
   });
 
-  if (!no) return <><FlowNav /><ErrorState error={new Error("缺少工单号：从工单工作台或待办中心进入")} /></>;
-  if (q.isLoading) return <><FlowNav /><Skeleton className="h-40" /></>;
-  if (q.error || !q.data) return <><FlowNav /><ErrorState error={q.error} onRetry={() => q.refetch()} /></>;
+  if (!no) return <><ErrorState error={new Error("缺少工单号：从工单工作台或待办中心进入")} /></>;
+  if (q.isLoading) return <><Skeleton className="h-40" /></>;
+  if (q.error || !q.data) return <><ErrorState error={q.error} onRetry={() => q.refetch()} /></>;
   const t = q.data;
   const open = !["DONE", "CANCELLED"].includes(t.statusCategory);
 
@@ -94,7 +93,6 @@ function TicketDetail() {
 
   return (
     <div>
-      <FlowNav />
       <div className="mb-1 txt-caption text-muted-foreground">
         <Link href="/flow/tickets/" className="hover:text-foreground">工单工作台</Link> / {t.ticketNo}
       </div>

@@ -47,13 +47,18 @@ DOC = os.path.join(ROOT, 'docs/requirements/功能权限清单.md')
 CONTRACT = os.path.join(ROOT, 'docs/api/contract.json')
 BASELINE = os.path.join(ROOT, 'backend/known-perm-ssot-gaps.txt')
 
-# 外部强制模块：真源表登记「谁持有」，但**不由 ShareHub 端点强制**，而由另一个服务强制。
-# 这类码在 contract.json 里本就不会出现，按「声明未强制」判会永远红 —— 那不是缺口，是强制方不同。
-# ⚠️ 只登记确有外部强制方的模块，并写明是谁；新增要**同时**改 ops-web/scripts/check-perm-parity.py
-#    的同名常量（两个卡口口径必须一致），并在真源表对应一节写明「强制方」。
-EXTERNAL_MODULES = {
-    'flow': 'OpsKit（opskit-svc）—— 按 21/07 P3「权限码 → OpsKit 角色映射」判权；真源表 §16',
-}
+def external_perm_modules():
+    """backend/external-perm-modules.txt：强制方不是 ShareHub 的模块（见该文件头注）。"""
+    p = os.path.join(ROOT, 'backend/external-perm-modules.txt')
+    out = {}
+    for line in io.open(p, encoding='utf-8'):
+        line = line.rstrip('\n')
+        if line.strip() and not line.startswith('#'):
+            mod, why = line.split('\t', 1)
+            out[mod.strip()] = why.strip()
+    return out
+
+EXTERNAL_MODULES = external_perm_modules()
 
 # 完整码；中段允许 `*`（真源表写 `report:*:read` 覆盖一族资源）
 FULL = r'[a-z_]+:(?:[a-z_]+|\*):[a-z_]+'

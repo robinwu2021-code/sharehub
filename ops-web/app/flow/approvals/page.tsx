@@ -19,7 +19,6 @@ import { PagedTable } from "@/components/ui/paged-table";
 import type { Column } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Badge } from "@/components/ui/badge";
-import { FlowNav } from "@/components/flow/flow-nav";
 
 type TabKey = ApprovalStatus | "ALL";
 const TABS: { key: TabKey; label: string }[] = [
@@ -81,7 +80,6 @@ export default function FlowApprovalsPage() {
   const c = count.data;
   return (
     <div>
-      <FlowNav />
       <PageTitle title="审批列表" desc="全部审批单（不只「待我审」）；按数据范围过滤。筛选条件即查询接口参数，一一对应。" />
       <Tabs
         tabs={TABS.map((t) => ({ key: t.key, label: t.key !== "ALL" && c ? `${t.label} ${c[t.key]}` : t.label }))}

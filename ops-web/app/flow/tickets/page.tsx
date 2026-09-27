@@ -19,7 +19,6 @@ import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
 import { SlaCell } from "@/components/flow/sla-cell";
 import { StatStrip } from "@/components/flow/stat-strip";
 import { PriorityBadge, TicketStatusBadge } from "@/components/flow/badges";
-import { FlowNav } from "@/components/flow/flow-nav";
 import { actionVariant, inlineActions } from "@/lib/flow/present";
 import Link from "next/link";
 
@@ -131,7 +130,6 @@ export default function FlowTicketsPage() {
 
   return (
     <div>
-      <FlowNav />
       <PageTitle title="工单工作台" desc="统计卡可点，点进即筛好的列表。SLA 色条：绿 正常 · 黄 将超时 · 红 已超时 · 灰 暂停。" />
       <StatStrip
         stats={stats.data}

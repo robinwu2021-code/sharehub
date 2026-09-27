@@ -59,3 +59,19 @@ export function pageReady(page: OperationPage, useMock: boolean = USE_MOCK): boo
 export function featureReady(feature: PartialFeature, useMock: boolean = USE_MOCK): boolean {
   return useMock || PARTIAL_READY[feature];
 }
+
+/**
+ * 流程与工单（`/flow/*`）是否已接入真实后端（opskit-svc）。
+ *
+ * 这些页面取数走 `lib/flow/client.ts` —— **目前是浏览器内的 mock，不连任何后端**，
+ * 与本文件别的开关（「真后端里这个接口有没有」）性质不同：flow 在真后端模式下给出的是**演示数据**。
+ * 所以真实后端模式的产物里必须不可用：菜单叶灰显（nav.ts / menu-source.ts），
+ * 深链进来整模块显示「尚未接入」（app/flow/layout.tsx）—— 否则运营看到的假数据和真的一模一样。
+ * 对接 opskit-svc（改 client.ts 的实现）后改成 true。
+ */
+export const FLOW_BACKEND_READY = false;
+
+export function flowReady(useMock: boolean = USE_MOCK): boolean {
+  return useMock || FLOW_BACKEND_READY;
+}
+

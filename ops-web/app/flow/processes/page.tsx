@@ -20,7 +20,6 @@ import { Notice } from "@/components/ui/notice";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { FlowNav } from "@/components/flow/flow-nav";
 import { FlowTimeline } from "@/components/flow/flow-timeline";
 
 const ENABLED: StatusMap<"on" | "off"> = { on: { label: "启用", tone: "success" }, off: { label: "已停用", tone: "muted" } };
@@ -108,7 +107,6 @@ export default function FlowProcessesPage() {
 
   return (
     <div>
-      <FlowNav />
       <PageTitle title="流程配置" desc="表单化配置审批流程（不做图形设计器）。保存即发布新版本：进行中的审批按提交时的版本走完，新版本只影响新提交。" />
 
       <Card className="mb-4 p-5">

@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import type { NavSection, NavLeaf } from "./nav";
-import { pageReady, type OperationPage } from "./backend-ready";
+import { flowReady, pageReady, type OperationPage } from "./backend-ready";
 import type { MenuNode } from "./api/contracts/dashboard";
 
 /**
@@ -86,6 +86,8 @@ export function toNavSections(nodes: MenuNode[]): NavSection[] {
       // /operation/<page> 的叶子：后端就绪度是构建期常量，服务端不知道
       const m = /^\/operation\/([\w-]+)/.exec(leaf.href);
       if (m && !pageReady(m[1] as OperationPage)) leaf.soon = true;
+      // /flow/* 的叶子：同理，取决于 flow 客户端是否已接真后端（backend-ready.ts FLOW_BACKEND_READY）
+      if (leaf.href.startsWith("/flow/") && !flowReady()) leaf.soon = true;
       return leaf;
     });
     return {

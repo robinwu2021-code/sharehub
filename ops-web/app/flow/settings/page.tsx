@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
-import { FlowNav } from "@/components/flow/flow-nav";
 
 const WEEK = ["一", "二", "三", "四", "五", "六", "日"];
 const PRIORITY_OPTS = [
@@ -136,7 +135,6 @@ export default function FlowSettingsPage() {
 
   return (
     <div>
-      <FlowNav />
       <PageTitle title="运营配置" desc="SLA 规则 · 工作日历 · 队列。" />
       <Notice>改规则只影响新单；进行中的单按开单时的规则走完。</Notice>
 

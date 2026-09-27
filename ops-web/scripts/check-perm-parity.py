@@ -23,14 +23,19 @@ ADMIN 有 `*`、各角色有模块通配（`workorder:*`），所以窄授权之
 """
 import re, sys, pathlib, collections
 
-# 外部强制模块：前端用这些码做门禁，但强制方不是 ShareHub 后端（contract / @perm.can 里不会出现）。
-# 口径与 backend/scripts/perm-ssot-align.py 的 EXTERNAL_MODULES **必须一致** —— 改一处就要改另一处。
-EXTERNAL_MODULES = {
-    'flow': 'OpsKit（opskit-svc）—— 按 21/07 P3「权限码 → OpsKit 角色映射」判权；真源表 §16',
-}
-
 REPO = pathlib.Path(__file__).resolve().parents[2]
 OPS = REPO / "ops-web"
+
+def external_perm_modules():
+    """backend/external-perm-modules.txt：强制方不是 ShareHub 的模块（见该文件头注，五处读取方口径一致）。"""
+    out = {}
+    for line in (REPO / "backend/external-perm-modules.txt").read_text(encoding="utf-8").splitlines():
+        if line.strip() and not line.startswith("#"):
+            mod, why = line.split("\t", 1)
+            out[mod.strip()] = why.strip()
+    return out
+
+EXTERNAL_MODULES = external_perm_modules()
 
 def backend_required():
     """后端 @PreAuthorize("@perm.can('x')") 里出现的权限码 → {code: [文件…]}。"""

@@ -18,7 +18,6 @@ import { DataTable, type Column } from "@/components/ui/data-table";
 import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { FlowNav } from "@/components/flow/flow-nav";
 
 const APP_STATUS: StatusMap<"on" | "off"> = { on: { label: "启用", tone: "success" }, off: { label: "已停用", tone: "muted" } };
 const DELIVERY: StatusMap<DeliveryRow["status"]> = {
@@ -113,7 +112,6 @@ export default function FlowAccessPage() {
 
   return (
     <div>
-      <FlowNav />
       <PageTitle title="接入管理" desc="平台管理员：接入应用 · webhook 订阅与投递 · 定义版本。凭证只在创建时显示一次。" />
 
       <Card className="mb-4 p-5">

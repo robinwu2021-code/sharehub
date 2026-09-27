@@ -38,6 +38,39 @@ type Row = Record<string, string>;
 const MIGRATION_DIR = "../backend/sharehub-app/src/main/resources/db/migration/";
 const PATCHES: { file: string; mustContain: string; apply: (rows: Row[]) => void }[] = [
   {
+    // 流程与工单 L1 + 7 叶（OpsKit 运营界面）。放在 nav.ts **最末**，只插新行、不动任何既有 sort。
+    file: "V136__menu_flow_section.sql",
+    mustContain: "'M_flow' AS menu_no",
+    apply: (rows) => {
+      rows.push(
+        { menu_no: "M_flow", parent_no: "NULL", name: "流程与工单", name_en: "Workflow & Tickets", name_ar: "سير العمل والتذاكر",
+          type: "MENU", path: "/flow/todo", icon: "Workflow", group_name: "NULL", sort: "19", perm: "NULL", phase: "1", ready: "0",
+          module: "flow", modules: "NULL", match_paths: '["/flow"]', pin_bottom: "0", portal_for: "NULL" },
+        { menu_no: "M_flow__1", parent_no: "M_flow", name: "待办中心", name_en: "My Tasks", name_ar: "مهامي", type: "ITEM",
+          path: "/flow/todo", icon: "NULL", group_name: "我的待办", sort: "1", perm: "flow:todo:read", phase: "1", ready: "0",
+          module: "NULL", modules: "NULL", match_paths: "NULL", pin_bottom: "0", portal_for: "NULL" },
+        { menu_no: "M_flow__2", parent_no: "M_flow", name: "审批列表", name_en: "Approvals", name_ar: "الموافقات", type: "ITEM",
+          path: "/flow/approvals", icon: "NULL", group_name: "审批", sort: "2", perm: "flow:approval:read", phase: "1", ready: "0",
+          module: "NULL", modules: "NULL", match_paths: "NULL", pin_bottom: "0", portal_for: "NULL" },
+        { menu_no: "M_flow__3", parent_no: "M_flow", name: "审核队列", name_en: "Review Queue", name_ar: "قائمة المراجعة", type: "ITEM",
+          path: "/flow/queue", icon: "NULL", group_name: "审批", sort: "3", perm: "flow:queue:claim", phase: "1", ready: "0",
+          module: "NULL", modules: "NULL", match_paths: "NULL", pin_bottom: "0", portal_for: "NULL" },
+        { menu_no: "M_flow__4", parent_no: "M_flow", name: "工单工作台", name_en: "Ticket Desk", name_ar: "مكتب التذاكر", type: "ITEM",
+          path: "/flow/tickets", icon: "NULL", group_name: "工单", sort: "4", perm: "flow:ticket:read", phase: "1", ready: "0",
+          module: "NULL", modules: "NULL", match_paths: "NULL", pin_bottom: "0", portal_for: "NULL" },
+        { menu_no: "M_flow__5", parent_no: "M_flow", name: "流程配置", name_en: "Approval Templates", name_ar: "قوالب الموافقة", type: "ITEM",
+          path: "/flow/processes", icon: "NULL", group_name: "配置", sort: "5", perm: "flow:process:manage", phase: "1", ready: "0",
+          module: "NULL", modules: "NULL", match_paths: "NULL", pin_bottom: "0", portal_for: "NULL" },
+        { menu_no: "M_flow__6", parent_no: "M_flow", name: "运营配置", name_en: "SLA & Queues", name_ar: "اتفاقيات الخدمة والقوائم", type: "ITEM",
+          path: "/flow/settings", icon: "NULL", group_name: "配置", sort: "6", perm: "flow:config:manage", phase: "1", ready: "0",
+          module: "NULL", modules: "NULL", match_paths: "NULL", pin_bottom: "0", portal_for: "NULL" },
+        { menu_no: "M_flow__7", parent_no: "M_flow", name: "接入管理", name_en: "Integrations", name_ar: "التكاملات", type: "ITEM",
+          path: "/flow/access", icon: "NULL", group_name: "配置", sort: "7", perm: "flow:access:manage", phase: "1", ready: "0",
+          module: "NULL", modules: "NULL", match_paths: "NULL", pin_bottom: "0", portal_for: "NULL" },
+      );
+    },
+  },
+  {
     // 用户管理 › 会员套餐（mbr_plan 此前没有任何写入方，C 端会员页因此永远是空列表）。
     // 是 INSERT 而不是整表重灌 —— 故这条叶子在 nav.ts 里刻意放在本菜单末尾，
     // 往组中间插会让同组后面所有叶子的 sort 都要挪。

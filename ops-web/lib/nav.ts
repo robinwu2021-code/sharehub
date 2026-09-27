@@ -19,7 +19,7 @@ import type { Role } from "./auth";
 import { asViewer, can, canModule, type MaybeRole, type ViewerLike } from "./permissions";
 import type { Phase } from "./phase";
 import { isPhaseLocked } from "./phase";
-import { pageReady, type OperationPage } from "./backend-ready";
+import { flowReady, pageReady, type OperationPage } from "./backend-ready";
 import { useMenuStore } from "./menu-source";
 
 export const NAV_PREFS_STORAGE_KEY = "ops-nav-prefs";
@@ -150,6 +150,14 @@ export function opLeaves(
  *
  * ⚠️ **界面不要直接读它，读 {@link navTree}()** —— 否则开了服务端菜单也没用。
  */
+/**
+ * 流程与工单叶子的就绪度（见 backend-ready.ts FLOW_BACKEND_READY）。
+ * ⚠️ 必须是一个常量再展开，**不能在叶子字面量里写 `...(x ? {} : {…})`**：
+ * 菜单解析器（feature-align.py、MenuPermissionContractTest、gen-menu-seed）按花括号切叶子，
+ * 叶子里多一对花括号就整条解析不到 —— 实测这批叶子因此全被判成「孤儿页」，而菜单码检查直接漏掉了它们。
+ */
+const FLOW_SOON: Pick<NavLeaf, "soon"> = flowReady() ? {} : { soon: true };
+
 export const NAV: NavSection[] = [
   // ── 代理端门户（方案 §六 方案 A：不建新工程/新页，AGENT 登录后只出「我的」三项，
   //    深链复用运营端既有页面，数据由后端按 agent_no 收敛）。
@@ -439,6 +447,26 @@ export const NAV: NavSection[] = [
       { href: "/system?tab=tax", label: "税率与发票", perm: "system:tax:update", phase: 2, group: "开放与市场" },
       { href: "/system?tab=markets", label: "多国家市场", perm: "system:market:read", phase: 3, group: "开放与市场" },
       { href: "/system?tab=openapi", label: "OpenAPI 应用", perm: "system:openapi:read", phase: 3, group: "开放与市场" },
+    ],
+  },
+  {
+    // 2026-09-28 流程与工单（OpsKit 的运营界面，docs/technical/v4/16-工作流与工单/22-前端方案）。
+    // 权限码强制方是 OpsKit（功能权限清单 §16，backend/external-perm-modules.txt）。
+    //
+    // ⚠️ **放在最末**：L1 的 sort 是数组下标，插在中间会让后面每个 L1 的 sort 都要挪，
+    //    那就只能整表重灌 iam_menu（会冲掉「菜单管理」的线上改动）。V136 只插新行。
+    // ⚠️ soon：flow 的取数目前是浏览器内 mock（lib/flow/client.ts），真实后端模式的产物里必须灰显，
+    //    否则运营看到的是演示数据（backend-ready.ts FLOW_BACKEND_READY）。
+    key: "flow", label: "流程与工单", icon: "Workflow", module: "flow", href: "/flow/todo",
+    match: ["/flow"],
+    children: [
+      { href: "/flow/todo", label: "待办中心", perm: "flow:todo:read", group: "我的待办", ...FLOW_SOON },
+      { href: "/flow/approvals", label: "审批列表", perm: "flow:approval:read", group: "审批", ...FLOW_SOON },
+      { href: "/flow/queue", label: "审核队列", perm: "flow:queue:claim", group: "审批", ...FLOW_SOON },
+      { href: "/flow/tickets", label: "工单工作台", perm: "flow:ticket:read", group: "工单", ...FLOW_SOON },
+      { href: "/flow/processes", label: "流程配置", perm: "flow:process:manage", group: "配置", ...FLOW_SOON },
+      { href: "/flow/settings", label: "运营配置", perm: "flow:config:manage", group: "配置", ...FLOW_SOON },
+      { href: "/flow/access", label: "接入管理", perm: "flow:access:manage", group: "配置", ...FLOW_SOON },
     ],
   },
 ];

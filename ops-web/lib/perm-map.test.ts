@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { EXTERNAL_PERM_MODULES, UI_PERM_MAP, UNIMPLEMENTED } from "./perm-map";
+import { UI_PERM_MAP, UNIMPLEMENTED } from "./perm-map";
 import { BACKEND_ROLE_PERMS, can } from "./permissions";
 import type { Role } from "./auth";
 
@@ -75,9 +75,14 @@ describe("UI 权限码映射表", () => {
 
   it("★★★ 映射到的后端码必须真的被某个端点判过 —— 手滑一个字母 = 那个入口对所有人永久消失", () => {
     const real = backendEndpointPerms();
-    // 外部强制模块（EXTERNAL_PERM_MODULES）的码由别的服务判，ShareHub 契约里本就没有 —— 不算悬空
+    // 外部强制模块（backend/external-perm-modules.txt，五处读取方口径一致）的码由别的服务判，
+    // ShareHub 契约里本就没有 —— 不算悬空
+    const external = new Set(
+      read("backend/external-perm-modules.txt").split("\n")
+        .filter((l) => l.trim() && !l.startsWith("#")).map((l) => l.split("\t")[0].trim()),
+    );
     const covered = (c: string) =>
-      real.has(c) || c.split(":")[0] in EXTERNAL_PERM_MODULES
+      real.has(c) || external.has(c.split(":")[0])
       || (c.endsWith(":*") && [...real].some((r) => r.startsWith(c.slice(0, -1))));
 
     /*
@@ -96,7 +101,10 @@ describe("UI 权限码映射表", () => {
      * ⚠️ 契约禁止 `delete*`（软删除语义，用 `archive*`），所以 `*:delete` 这类
      * 本来就不该有端点 —— 它们该从码表里退役，不是补端点。
      */
-    const DANGLING_BASELINE = 39;
+    // 2026-09-28：39 → 21。实测只有 21，余量 18 —— 足够悄悄放进 18 个新悬空码不报警
+    // （上面那段注释警告过的正是这种余量）。发现于给 flow 模块加外部强制豁免时：
+    // 拿掉豁免做负对照，这条居然还是绿的。
+    const DANGLING_BASELINE = 21;
 
     const dangling = Object.entries(UI_PERM_MAP)
       .filter(([, m]) => m !== UNIMPLEMENTED && !covered(m as string))

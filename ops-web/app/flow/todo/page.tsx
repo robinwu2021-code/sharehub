@@ -18,7 +18,6 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { SlaCell } from "@/components/flow/sla-cell";
 import { PriorityBadge } from "@/components/flow/badges";
-import { FlowNav } from "@/components/flow/flow-nav";
 
 type TabKey = "all" | "process" | "ticket" | "pool";
 const TAB_QUERY: Record<TabKey, Pick<TodoQuery, "origin" | "claimable">> = {
@@ -103,7 +102,6 @@ export default function FlowTodoPage() {
 
   return (
     <div>
-      <FlowNav />
       <PageTitle title="待办中心" desc="审批与工单在同一张列表；只显示你够资格办、且在你数据范围内的。" />
       <Tabs
         tabs={tabs}

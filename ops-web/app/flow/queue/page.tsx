@@ -15,7 +15,6 @@ import { Button } from "@/components/ui/button";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { PagedTable } from "@/components/ui/paged-table";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
-import { FlowNav } from "@/components/flow/flow-nav";
 import { PriorityBadge } from "@/components/flow/badges";
 
 const MIN = 60_000;
@@ -111,7 +110,6 @@ export default function FlowQueuePage() {
 
   return (
     <div>
-      <FlowNav />
       <PageTitle title="审核队列" desc="领取后才能决定；领取超时 30 分钟自动放回并留痕。" />
       <Tabs
         tabs={(queues.data ?? []).map((q) => ({ key: q.code, label: `${q.name} · 待领 ${q.unclaimed}` }))}

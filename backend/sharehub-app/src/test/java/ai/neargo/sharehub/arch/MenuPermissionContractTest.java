@@ -88,9 +88,13 @@ class MenuPermissionContractTest {
         Set<String> beperms = backendPerms();
         assertThat(beperms).as("contract.json 应当有权限码").isNotEmpty();
 
+        // 外部强制模块（backend/external-perm-modules.txt，五处读取方口径一致）：强制方不是 ShareHub，
+        // 这些码在 contract.json 里本就没有端点 —— 不算孤儿。
+        Set<String> external = externalPermModules();
         Set<String> orphan = new TreeSet<>();
         for (Leaf lf : leaves()) {
-            if (lf.perm() != null && !beperms.contains(lf.perm())) orphan.add(lf.perm());
+            if (lf.perm() != null && !beperms.contains(lf.perm())
+                    && !external.contains(lf.perm().split(":")[0])) orphan.add(lf.perm());
         }
         Set<String> known = readLedger(backendRoot().resolve("known-menu-perm-mismatch.txt"));
 
@@ -200,6 +204,15 @@ class MenuPermissionContractTest {
 
     private static Path navTs() {
         return repoRoot().resolve("ops-web/lib/nav.ts");
+    }
+
+    /** backend/external-perm-modules.txt 登记的模块名（格式：模块<TAB>强制方）。 */
+    private static Set<String> externalPermModules() throws IOException {
+        Set<String> out = new TreeSet<>();
+        for (String line : Files.readAllLines(backendRoot().resolve("external-perm-modules.txt"), StandardCharsets.UTF_8)) {
+            if (!line.isBlank() && !line.startsWith("#")) out.add(line.split("\t", 2)[0].trim());
+        }
+        return out;
     }
 
     private static Path backendRoot() {

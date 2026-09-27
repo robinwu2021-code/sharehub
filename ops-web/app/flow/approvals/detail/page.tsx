@@ -19,7 +19,6 @@ import { ErrorState, Skeleton } from "@/components/ui/misc";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { StatusStepper } from "@/components/ui/status-stepper";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { FlowNav } from "@/components/flow/flow-nav";
 import { FlowTimeline } from "@/components/flow/flow-timeline";
 
 export default function Page() {
@@ -54,9 +53,9 @@ function ApprovalDetail() {
     onError: (e: Error) => notify.error(e.message),
   });
 
-  if (!no) return <><FlowNav /><ErrorState error={new Error("缺少审批单号：从审批列表或待办中心进入")} /></>;
-  if (q.isLoading) return <><FlowNav /><Skeleton className="h-40" /></>;
-  if (q.error || !q.data) return <><FlowNav /><ErrorState error={q.error} onRetry={() => q.refetch()} /></>;
+  if (!no) return <><ErrorState error={new Error("缺少审批单号：从审批列表或待办中心进入")} /></>;
+  if (q.isLoading) return <><Skeleton className="h-40" /></>;
+  if (q.error || !q.data) return <><ErrorState error={q.error} onRetry={() => q.refetch()} /></>;
   const a = q.data;
 
   // 进度：提交 + 各步；跳过的条件步不进步骤条，单独注明
@@ -71,7 +70,6 @@ function ApprovalDetail() {
 
   return (
     <div>
-      <FlowNav />
       <div className="mb-1 txt-caption text-muted-foreground">
         <Link href="/flow/approvals/" className="hover:text-foreground">审批列表</Link> / {a.approvalNo}
       </div>

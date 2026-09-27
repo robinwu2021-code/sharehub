@@ -27,18 +27,20 @@ class MenuTreeTest extends ApiTestSupport {
         /*
          * ADMIN 持 `*`，所以他看得到**除代理门户外**的全部 ——
          * 门户是排他的（ADR-012：代理只看门户，运营看不到门户），
-         * 所以是 15 个 section 而不是 18。
+         * 所以是 16 个 section 而不是 19。
          *
          * 端点从 P1 起**按权限剪枝**（此前下发完整树、前端自己筛）。
          * 要全量树用 MenuService.tree()，那是给菜单管理界面留的。
          */
         JsonNode t = tree(login("ADMIN"));
-        assertThat(t.size()).as("运营侧 section 数（18 个里 3 个是代理门户）").isEqualTo(15);
+        // 2026-09-28 +1：流程与工单（V136，放在最末）
+        assertThat(t.size()).as("运营侧 section 数（19 个里 3 个是代理门户）").isEqualTo(16);
         int leaves = 0;
         for (JsonNode s : t) leaves += s.path("children").size();
         // 2026-09-25 +2：用户管理 › 注销申请 / 开票申请（C 端一直在产生这两类待办，运营端此前没有入口）
         // 2026-09-27 +1：用户管理 › 会员套餐（mbr_plan 此前没有任何写入方，C 端会员页因此永远是空列表）
-        assertThat(leaves).as("ADMIN 看得到的叶子数").isEqualTo(106);
+        // 2026-09-28 +7：流程与工单的 7 个叶子（V136）
+        assertThat(leaves).as("ADMIN 看得到的叶子数").isEqualTo(113);
     }
 
     @Test

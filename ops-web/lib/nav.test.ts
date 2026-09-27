@@ -26,7 +26,7 @@ const sectionKeys = (role: Role) => visibleSections(role).map((s) => s.key);
 const L1_KEYS = [
   "my-biz", "my-asset", "my-service", // 代理端门户（portalFor: AGENT）
   "dashboard", "operation", "device", "alarm", "workorder", "venue", "agent", "order",
-  "finance", "user", "marketing", "cs", "report", "org", "system",
+  "finance", "user", "marketing", "cs", "report", "org", "system", "flow",
 ];
 // 叶子五元组 href|label|perm|phase|group —— 2026-07-30 层级重构前后逐条比对为零差异。
 // 2026-09-23 有意变更（A 类菜单重合收敛，见 docs/technical/菜单重合梳理与优化方案.md）：
@@ -169,7 +169,15 @@ const LEAF_TUPLES = [
   "/system?tab=params|系统参数|system:param:read||基础字典",
   "/system?tab=tax|税率与发票|system:tax:update|2|开放与市场",
   "/system?tab=markets|多国家市场|system:market:read|3|开放与市场",
-  "/system?tab=openapi|OpenAPI 应用|system:openapi:read|3|开放与市场"];
+  "/system?tab=openapi|OpenAPI 应用|system:openapi:read|3|开放与市场",
+  // 2026-09-28 流程与工单（OpsKit 运营界面）：整段放在最末，只插新行（V136）
+  "/flow/todo|待办中心|flow:todo:read||我的待办",
+  "/flow/approvals|审批列表|flow:approval:read||审批",
+  "/flow/queue|审核队列|flow:queue:claim||审批",
+  "/flow/tickets|工单工作台|flow:ticket:read||工单",
+  "/flow/processes|流程配置|flow:process:manage||配置",
+  "/flow/settings|运营配置|flow:config:manage||配置",
+  "/flow/access|接入管理|flow:access:manage||配置"];
 
 describe("结构回归基线（层级重构不改内容）", () => {
   // 2026-09-23 菜单收敛：第二步撤销「站点与点位」（16 → 15），第三步把场地方那条线
@@ -177,9 +185,10 @@ describe("结构回归基线（层级重构不改内容）", () => {
   // 2026-09-23 第三步（续）：「计费定价」L1 撤销（16 → 15）——
   // 计费模板/时段价早已并入运营管理 › 收费方案，最后剩的「差异化定价」随 ADR-028
   // 并入方案的「适用范围」，取价从此只有一处答案（V49）。那个 L1 已无内容。
-  it("L1 = 15 个运营项 + 3 个代理门户项，顺序固定", () => {
+  // 2026-09-28：新增「流程与工单」（15 → 16），放在最末（L1 的 sort 即下标，插中间要整表重灌）。
+  it("L1 = 16 个运营项 + 3 个代理门户项，顺序固定", () => {
     expect(NAV.map((s) => s.key)).toEqual(L1_KEYS);
-    expect(NAV.filter((s) => !s.portalFor)).toHaveLength(15);
+    expect(NAV.filter((s) => !s.portalFor)).toHaveLength(16);
     expect(NAV.filter((s) => s.portalFor)).toHaveLength(3);
   });
   it("叶子五元组集合与顺序逐条不变（href|label|perm|phase|group）", () => {
@@ -194,10 +203,10 @@ describe("结构回归基线（层级重构不改内容）", () => {
 });
 
 describe("A.9 角色×L1 可见性矩阵（抽查）", () => {
-  it("ADMIN 见全部 15 个运营项", () => {
+  it("ADMIN 见全部 16 个运营项", () => {
     expect(sectionKeys("ADMIN")).toEqual([
       "dashboard", "operation", "device", "alarm", "workorder", "venue", "agent", "order",
-      "finance", "user", "marketing", "cs", "report", "org", "system",
+      "finance", "user", "marketing", "cs", "report", "org", "system", "flow",
     ]);
   });
   it("VIEWER 不见 用户/营销/客服/员工与权限/系统设置", () => {

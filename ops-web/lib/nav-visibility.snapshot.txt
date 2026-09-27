@@ -1,7 +1,7 @@
 # 每个角色看得到的菜单（lib/nav-visibility.test.ts 生成，勿手改）
 # 改动菜单可见性时这份文件会变 —— diff 就是评审物，确认是有意的再提交。
 
-## ADMIN（106 项）
+## ADMIN（113 项）
 operation›站点概览
 operation›站点管理
 operation›点位管理
@@ -108,6 +108,13 @@ system›系统参数
 system›税率与发票
 system›多国家市场
 system›OpenAPI 应用
+flow›待办中心
+flow›审批列表
+flow›审核队列
+flow›工单工作台
+flow›流程配置
+flow›运营配置
+flow›接入管理
 
 ## AGENT（7 项）
 my-biz›我的看板
@@ -118,7 +125,7 @@ my-asset›我的设备
 my-asset›我的订单
 my-service›设备报修
 
-## BD（36 项）
+## BD（38 项）
 operation›站点概览
 operation›站点管理
 operation›点位管理
@@ -155,8 +162,10 @@ report›财务报表
 report›实时大屏
 report›自定义报表
 report›消费者分析
+flow›待办中心
+flow›审批列表
 
-## CS（40 项）
+## CS（44 项）
 operation›问题管理
 operation›公告管理
 device›设备台账
@@ -197,8 +206,12 @@ cs›退款/补偿
 cs›黑名单处理
 system›发送记录
 system›触达拉黑
+flow›待办中心
+flow›审批列表
+flow›审核队列
+flow›工单工作台
 
-## FINANCE（48 项）
+## FINANCE（50 项）
 operation›站点概览
 operation›站点坪效
 operation›收费方案
@@ -247,8 +260,10 @@ org›操作审计
 system›支付渠道
 system›业务规则
 system›税率与发票
+flow›待办中心
+flow›审批列表
 
-## OPS（39 项）
+## OPS（44 项）
 operation›站点概览
 operation›站点管理
 operation›点位管理
@@ -288,8 +303,13 @@ system›参数字典
 system›地区库
 system›系统参数
 system›多国家市场
+flow›待办中心
+flow›审批列表
+flow›审核队列
+flow›工单工作台
+flow›运营配置
 
-## VIEWER（29 项）
+## VIEWER（31 项）
 operation›站点概览
 operation›站点管理
 operation›点位管理
@@ -319,3 +339,5 @@ report›财务报表
 report›实时大屏
 report›自定义报表
 report›消费者分析
+flow›审批列表
+flow›工单工作台

@@ -98,6 +98,17 @@ def page_routes():
     return routes
 
 
+def external_perm_modules():
+    """backend/external-perm-modules.txt：强制方不是 ShareHub 的模块（见该文件头注）。"""
+    p = os.path.join(ROOT, 'backend/external-perm-modules.txt')
+    out = {}
+    for line in io.open(p, encoding='utf-8'):
+        line = line.rstrip('\n')
+        if line.strip() and not line.startswith('#'):
+            mod, why = line.split('\t', 1)
+            out[mod.strip()] = why.strip()
+    return out
+
 def backend_perms():
     """contract.json 里所有端点声明的权限码 → 端点数。"""
     c = json.load(io.open(os.path.join(ROOT, 'docs/api/contract.json'), encoding='utf-8'))
@@ -132,7 +143,8 @@ def main():
 
     # ② 菜单声明的权限码，后端没有任何端点用
     navperms = {lf['perm'] for lf in leaves if lf['perm']}
-    orphan_nav = sorted(p for p in navperms if p not in beperms)
+    ext = external_perm_modules()   # 强制方不是 ShareHub 的模块，不算「无人使用」
+    orphan_nav = sorted(p for p in navperms if p not in beperms and p.split(':')[0] not in ext)
     print('\n② 菜单权限码在后端无人使用                 %d' % len(orphan_nav))
     for p in orphan_nav:
         who = [lf['label'] for lf in leaves if lf['perm'] == p]
