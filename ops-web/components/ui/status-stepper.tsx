@@ -35,13 +35,14 @@ export function StatusStepper({
         第 {currentPos} / {total} 步 · <span className="txt-strong text-foreground">{currentLabel}</span>
       </div>
       {/* 宽屏：横向步骤 */}
-      <ol className="hidden items-center gap-1.5 sm:flex" aria-label="流程进度">
+      <ol data-slot="stepper" className="hidden items-center gap-1.5 sm:flex" aria-label="流程进度">
         {steps.map((s, i) => {
           const state = branch ? (i <= idx ? "done" : "todo") : i < idx ? "done" : i === idx ? "current" : "todo";
           return (
-            <li key={s.key} className="flex min-w-0 items-center gap-1.5" aria-current={state === "current" ? "step" : undefined}>
-              {i > 0 && <span className={cn("h-px w-4 shrink-0", state === "todo" ? "bg-border" : "bg-primary")} />}
+            <li key={s.key} data-state={state} className="flex min-w-0 items-center gap-1.5" aria-current={state === "current" ? "step" : undefined}>
+              {i > 0 && <span data-slot="step-conn" className={cn("h-px w-4 shrink-0", state === "todo" ? "bg-border" : "bg-primary")} />}
               <span
+                data-slot="step-dot"
                 className={cn(
                   "size-2 shrink-0 rounded-chip",
                   state === "current" && "bg-primary ring-2 ring-primary/30",
@@ -62,9 +63,9 @@ export function StatusStepper({
           );
         })}
         {branch && (
-          <li className="flex min-w-0 items-center gap-1.5" aria-current="step">
-            <span className="h-px w-4 shrink-0 bg-destructive" />
-            <span className="size-2 shrink-0 rounded-chip bg-destructive ring-2 ring-destructive/30" />
+          <li data-state="branch" className="flex min-w-0 items-center gap-1.5" aria-current="step">
+            <span data-slot="step-conn" className="h-px w-4 shrink-0 bg-destructive" />
+            <span data-slot="step-dot" className="size-2 shrink-0 rounded-chip bg-destructive ring-2 ring-destructive/30" />
             <span className="truncate txt-strong text-destructive-ink">{branch.label}</span>
           </li>
         )}

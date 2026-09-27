@@ -61,7 +61,7 @@ export const ar: Messages = {
     VIEWER: "قارئ",
     AGENT: "وكيل",
   },
-  theme: { label: "السمة", style: "النمط", styleInk: "حبر", styleClassic: "كلاسيكي" },
+  theme: { label: "السمة", style: "النمط", styleClean: "نظيف", styleClassic: "كلاسيكي" },
   lang: { label: "اللغة", zh: "中文", en: "English", ar: "العربية" },
   online: { ONLINE: "متصل", OFFLINE: "غير متصل" },
   orderStatus: {

@@ -33,9 +33,9 @@ export function Timeline({
   if (loading) return <span className="text-muted-foreground">{loadingText}</span>;
   if (!items.length) return <span className="text-muted-foreground">{empty}</span>;
   return (
-    <ol className="space-y-2.5">
+    <ol data-slot="timeline" className="space-y-2.5">
       {items.map((it) => (
-        <li key={it.key} className="border-l-2 border-[var(--border)] pl-3">
+        <li key={it.key} data-slot="timeline-item" className="border-l-2 border-[var(--border)] pl-3">
           <div className="flex flex-wrap items-center gap-1.5">
             {it.badge && <Badge tone={it.badge.tone}>{it.badge.label}</Badge>}
             <span className="txt-caption text-muted-foreground tabular-nums">{it.meta}</span>

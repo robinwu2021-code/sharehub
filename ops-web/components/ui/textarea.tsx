@@ -28,6 +28,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
     <textarea
       ref={ref}
       rows={rows}
+      data-slot="control"
       aria-invalid={invalid || undefined}
       onChange={(e) => {
         onChangeEvent?.(e);

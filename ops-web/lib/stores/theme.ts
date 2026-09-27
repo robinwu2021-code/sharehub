@@ -9,12 +9,12 @@ import { DEFAULT_THEME as DEFAULT_THEME_VALUE } from "../appearance-defaults";
 // 前四套皮肤与 C 端 c-app 的 SKINS 一一对应（src/design/tokens.ts）：
 // 同名、同 hex，两端截图放一起是同一个产品。
 // `teal`（墨青）是 2026-09-27 为运营台新增的，取自流程与工单原型，**C 端暂无对应** ——
-// 这是有意的例外：它和 ink 风格一起构成运营台的默认观感。
+// 这是有意的例外：它是原型的主色，也是运营台的默认主色；其余四套照常可选。
 // 皮肤只换 --primary —— 中性色与语义色由「风格」（stores/style.ts）决定，不参与换肤。
 export const THEMES = [
   { key: "mono", label: "黑白灰", color: "#1c2029" },
   { key: "brand", label: "简电青", color: "#17c3c0" },
-  { key: "blue", label: "时尚蓝", color: "#2f6bff" },
+  { key: "blue", label: "时尚蓝", color: "#2e6aff" },
   { key: "purple", label: "科幻紫", color: "#7c3aed" },
   { key: "teal", label: "墨青", color: "#0f7173" },
 ] as const;

@@ -33,7 +33,7 @@ import { STYLES, DEFAULT_STYLE } from "@/lib/stores/style";
 // 此前这里手抄了一份皮肤表，漏过简电青 —— 总览页少一套皮肤，等于那套皮肤的问题
 // 永远不会在这里被发现。新增 teal 时若仍是手抄，会第二次漏。
 const SKINS = THEMES;
-const STYLE_LABEL: Record<string, string> = { ink: "墨青风格", classic: "经典风格" };
+const STYLE_LABEL: Record<string, string> = { clean: "清爽风格", classic: "经典风格" };
 
 /** 顶部开关：直接改 <html>，离开本页还原。 */
 function useRootToggles() {

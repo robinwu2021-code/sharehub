@@ -1,25 +1,25 @@
 "use client";
 
-// 风格：换整套 Tier 1 色阶（12 档中性 + 语义色三档），与皮肤正交。
-// 皮肤（stores/theme.ts）只换主色；风格决定整个界面的底色与状态色。
+// 风格：换整体 UI 形态（表格、tab、徽章、卡片、按钮、输入框……），与皮肤正交。
+// 皮肤（stores/theme.ts）只换主色；风格不带色相，所以任何风格 × 任何主题色都成立。
 // 持久化 key = "ops-style"，与 app/layout.tsx 的首帧脚本 + globals.css 的 [data-style] 选择器一致。
 //
-// 为什么是两条轴而不是把 ink 做成一套皮肤：设计规范 §2.2 规定皮肤只换主色、
-// 「状态的含义不能随皮肤漂移」。风格换的是语义色的**色调**而非**含义**
-// （绿仍是正常、红仍是超时），且风格是运营台级的选择，不是个人偏好的配色。
+// 为什么是两条轴：颜色（主色）是个人偏好，形态是运营台级的选择 —— 两者独立变化。
+// 风格唯一动的颜色是语义色的色调（降饱和以过 AA），不改含义：绿仍是正常、红仍是超时。
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { DEFAULT_STYLE as DEFAULT_STYLE_VALUE } from "../appearance-defaults";
 
 export const STYLES = [
-  { key: "ink", labelKey: "theme.styleInk" },
+  { key: "clean", labelKey: "theme.styleClean" },
   { key: "classic", labelKey: "theme.styleClassic" },
 ] as const;
 
 export type StyleKey = (typeof STYLES)[number]["key"];
 
-// classic 是 2026-09-27 之前的色阶，暂留作对照与回退；
-// 验收 ink 后可删 —— 每多一种风格，全状态矩阵的 QA 面就翻一倍。
+// classic 是 2026-09-27 之前的形态，暂留作对照与回退；
+// 验收 clean 后可删 —— 每多一种风格，全状态矩阵的 QA 面就翻一倍。
+// 老用户存储里的 "ink"（2026-09-27 当天的旧名）在水合时落回默认值 clean。
 export const DEFAULT_STYLE: StyleKey = DEFAULT_STYLE_VALUE;
 
 /** 立即把风格写到 <html data-style>。 */

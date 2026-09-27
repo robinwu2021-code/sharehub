@@ -35,7 +35,7 @@ export function Drawer({
             width,
           )}
         >
-          <div className="flex items-start justify-between bg-muted/50 p-5">
+          <div data-slot="drawer-head" className="flex items-start justify-between bg-muted/50 p-5">
             <div>
               <Dialog.Title className="txt-heading">{title}</Dialog.Title>
               {desc && <Dialog.Description className="mt-0.5 txt-body text-muted-foreground">{desc}</Dialog.Description>}

@@ -15,7 +15,15 @@ export interface Column<T> {
   className?: string;
   /** 设了才可排序：点表头切 asc/desc（受控，实际排序由调用方做） */
   sortKey?: string;
+  /**
+   * 主键列（单号 / 编号）。不填时自动判：前两列里表头以「号」结尾的。
+   * 只打 `data-pk` 标记，本身不带样式 —— 「清爽」风格据此把它渲染成等宽字（对齐原型）。
+   * 口径与 /dev/ui 体检的「主键列」一致（前几列 + 单号形态）。
+   */
+  pk?: boolean;
 }
+
+const isPkColumn = <T,>(c: Column<T>, i: number) => c.pk ?? (i <= 1 && /号$/.test(c.header));
 
 export type SortDir = "asc" | "desc";
 
@@ -113,11 +121,11 @@ export function DataTable<T>({
 
   const headerCell = (c: Column<T>, i: number) => {
     const sortable = !!c.sortKey && !!onSortChange;
-    if (!sortable) return <TH key={i} className={c.className}>{c.header}</TH>;
+    if (!sortable) return <TH key={i} data-pk={isPkColumn(c, i) || undefined} className={c.className}>{c.header}</TH>;
     const active = sortKey === c.sortKey;
     const Icon = active ? (sortDir === "desc" ? ChevronDown : ChevronUp) : ChevronsUpDown;
     return (
-      <TH key={i} className={c.className}>
+      <TH key={i} data-pk={isPkColumn(c, i) || undefined} className={c.className}>
         <button
           type="button"
           className={cn(
@@ -199,7 +207,7 @@ export function DataTable<T>({
                         ) : null}
                       </TD>
                     )}
-                    {columns.map((c, i) => <TD key={i} className={cn("h-[var(--row-h)]", c.className)}>{c.cell(row)}</TD>)}
+                    {columns.map((c, i) => <TD key={i} data-pk={isPkColumn(c, i) || undefined} className={cn("h-[var(--row-h)]", c.className)}>{c.cell(row)}</TD>)}
                   </TR>
                   {expandable && isOpen && content && (
                     <TR className="hover:bg-muted">

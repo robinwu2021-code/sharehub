@@ -67,7 +67,7 @@ function RailItem({
             ref={ref}
             href={href}
             aria-label={label}
-            className={cn(base, active ? "bg-accent font-medium text-[var(--primary)]" : "text-sidebar-foreground hover:bg-accent/60 hover:text-foreground")}
+            className={cn(base, active ? "bg-accent font-medium text-[var(--primary-text)]" : "text-sidebar-foreground hover:bg-accent/60 hover:text-foreground")}
           >
             {inner}
           </Link>

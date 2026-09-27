@@ -79,6 +79,9 @@
   --accent-border: color-mix(in srgb, var(--primary) 32%, var(--background));
   --ring: var(--primary);
   --ring-offset-bg: var(--background);
+  /* 「主色写成的文字」（链接、选中 tab、悬停字）。默认就是主色；
+     主色本身压白底不够 4.5 的皮肤在自己的块里给一个同色相的深一档（见 brand）。 */
+  --primary-text: var(--primary);
 
   /* 语义色语义名（组件用这些，不用 Tier 1）*/
   --success: var(--green-solid);  --success-tint: var(--green-subtle);  --success-ink: var(--green-text);
@@ -128,35 +131,22 @@
 /* 黑白灰的主色带一点冷调、且不取最黑：纯中性近黑在白底上是"廉价的重"，
    微冷的墨色更接近高端产品的黑（对照 Linear / Vercel 的按钮）。 */
 [data-theme="mono"]   { --primary: #1c2029; --primary-foreground: #ffffff; }
-[data-theme="brand"]  { --primary: #17c3c0; --primary-foreground: #ffffff; }
-[data-theme="blue"]   { --primary: #2f6bff; --primary-foreground: #ffffff; }
+/* 简电青压白字只有 2.19:1（实心按钮与链接都过不了 AA）：按钮字改深色 7.77，文字用同色相深一档 #0f7b79（白 5.09 / 浅灰 4.79）。 */
+[data-theme="brand"]  { --primary: #17c3c0; --primary-foreground: #0b1f24; --primary-text: #0f7b79; }
+/* 时尚蓝原值 #2f6bff 压白字 4.498，差一点过不了 AA：每通道降 1/255（肉眼无差）；文字另取深一档。C 端 SKINS 仍是原值，差异仅此一处。 */
+[data-theme="blue"]   { --primary: #2e6aff; --primary-foreground: #ffffff; --primary-text: #1f5fff; }
 [data-theme="purple"] { --primary: #7c3aed; --primary-foreground: #ffffff; }
 [data-theme="teal"]   { --primary: #0f7173; --primary-foreground: #ffffff; }  /* 墨青：流程与工单原型的主色，白字 5.79:1 */
 
 /* ═══ 风格轴 data-style（与皮肤正交）══════════════════════════════════════
-   皮肤 data-theme 只换主色；**风格换整套 Tier 1 色阶**（12 档中性 + 语义色三档），
-   组件只消费 Tier 2，所以换风格不用改任何组件。
-   ink（墨青）取自流程与工单原型：中性色带一点青调、语义色降饱和。
-   ⚠️ 中性色是**固定色阶**，不从主色派生 —— 2026-07 的配色重做正是因为
-      中性色混入主色后整屏发糊（见 git 02a1aa2b）。这里的青调与皮肤无关。
-   ⚠️ 每一对取值的对比度由 lib/style-contrast.test.ts 锁住，改值先跑它。
+   皮肤 data-theme 只换主色（五套）；**风格换的是整体 UI 形态**：表格、tab、徽章、卡片、
+   按钮、输入框、时间线、步骤条……（规则在文件末尾的风格块）。
+   两条轴任意组合：任何风格在任何主题色下都必须成立 —— 所以风格**不带色相**，
+   中性色阶沿用上方的全站基线，不给风格单独调灰（曾试过带青调的灰，只配墨青一种主色）。
+   风格唯一改的颜色是语义色：降饱和、实心底压白字全部 ≥4.5（基线的绿 2.62、琥珀 2.35 不达标）。
+   ⚠️ 对比度由 lib/style-contrast.test.ts 锁住，改值先跑它。
    ⚠️ 本块必须位于 .dark 之前：[data-style] 与 .dark 特异性相同，靠先后。 */
-[data-style="ink"] {
-  --gray-1:  #fbfcfc;
-  --gray-2:  #f6f8f8;
-  --gray-3:  #f0f3f4;
-  --gray-4:  #e9eef0;
-  --gray-5:  #e2e8ea;
-  --gray-6:  #d9e0e3;
-  --gray-7:  #cbd4d8;
-  --gray-8:  #b1bdc2;
-  --gray-9:  #87949a;
-  --gray-10: #79868c;
-  --gray-11: #566770;
-  --gray-12: #1b2429;
-
-  /* 降饱和的语义色。实心底压白字全部 ≥4.5（经典风格的绿 2.62、琥珀 2.35 不达标，
-     只是目前没有组件把白字压在这两色上）。 */
+[data-style="clean"] {
   --green-solid: #2e7d4f; --green-subtle: #e7f3ec; --green-text: #1f5e3a;
   --amber-solid: #a3690b; --amber-subtle: #fdf3e0; --amber-text: #6f4a0c;
   --red-solid:   #b3403a; --red-subtle:   #fbecea; --red-text:   #8a2c27;
@@ -213,22 +203,11 @@
 .dark[data-theme="mono"] { --primary: #f2f4f7; --primary-foreground: #16171d; }
 /* 墨青在深底上对比不足，暗色下提亮一档并改压深字（5.83:1）*/
 .dark[data-theme="teal"] { --primary: #2aa7a8; --primary-foreground: #06201f; }
+/* 暗底上主色本身够亮，文字直接用主色 */
+.dark[data-theme="brand"] { --primary-text: var(--primary); }
 
-/* ink 风格的暗色阶。结构同 .dark：暗底上语义色提亮、色相不变，实心底改压深字。 */
-.dark[data-style="ink"] {
-  --gray-1:  #0b0e0f;
-  --gray-2:  #111618;
-  --gray-3:  #182023;
-  --gray-4:  #1d2528;
-  --gray-5:  #232c30;
-  --gray-6:  #2a3438;
-  --gray-7:  #343f44;
-  --gray-8:  #465257;
-  --gray-9:  #6c797f;
-  --gray-10: #7a878d;
-  --gray-11: #a1adb2;
-  --gray-12: #eef3f4;
-
+/* 「清爽」风格的暗色语义色：暗底上提亮、色相不变，实心底改压深字。 */
+.dark[data-style="clean"] {
   --green-solid: #4fbf82; --green-subtle: #11261b; --green-text: #86d9a9;
   --amber-solid: #e0a23d; --amber-subtle: #291e0b; --amber-text: #f0c374;
   --red-solid:   #ec7a70; --red-subtle:   #2c1614; --red-text:   #f5aaa2;
@@ -375,70 +354,135 @@ body {
   .animate-in { animation: none !important; }
 }
 
-/* ═══ ink 风格的组件形态（2026-09-27）════════════════════════════════════════
-   风格不只换色阶，也换标志性组件的形态，对齐流程与工单原型（v4/16/13）：
-   表格 = 白表头 + 行线（取代表头色带 + 斑马纹）；tab = 下划线（取代灰槽分段）；
-   徽章 = 小方角常规字重（取代药丸加粗）；卡片与统计卡 = 细描边无阴影；次按钮 = 白底描边。
-   ⚠️ 选择器一律以 [data-style="ink"] 开头：经典风格下完全不生效，切回即原样。
-   ⚠️ 钩子是组件上的 data-slot / data-surface / data-variant / data-tone，以及
-      segmented.ts 的三个 ui-seg 钩子类 —— 改组件时别删。
-   ⚠️ **不放进任何 @layer**：上方有一条非 layer 的全局规则给所有元素设 border-color，
-      layer 里的规则永远压不过它（实测：下划线与统计卡的彩色边框被吃成灰色）。
-      代价是页面上单独传的工具类也压不过这里 —— 所以这里只写形态，范围限定在 ink。
-   颜色只用 token，不写值。 */
-  /* ── 表格 ── */
-  [data-style="ink"] [data-slot="thead"] { background: var(--card); }
-  [data-style="ink"] [data-slot="thead"] th {
-    height: 36px; padding: 0 10px;
-    font-size: 12px; font-weight: 600; color: var(--muted-foreground);
-    border-bottom: 1px solid var(--border);
-  }
-  [data-style="ink"] [data-slot="tbody"] > tr:nth-child(even) { background: transparent; }
-  [data-style="ink"] [data-slot="tbody"] > tr:hover { background: color-mix(in srgb, var(--muted) 70%, transparent); }
-  [data-style="ink"] [data-slot="tbody"] td { padding: 9px 10px; border-bottom: 1px solid var(--border); }
-  [data-style="ink"] [data-slot="tbody"] > tr:last-child > td { border-bottom: 0; }
+/* 「主色写成的文字」统一走 --primary-text（与风格无关，所有风格都生效）。
+   text-primary 这个工具类取的是 --primary 本身；简电青、时尚蓝的主色压白底不到 4.5，
+   链接、选中文字就过不了 AA。这里把它改指 --primary-text —— 其余三套主题色下两者相等，零变化。
+   只改基础类；hover: 等变体是另一个类名，不受影响。 */
+.text-primary { color: var(--primary-text); }
 
-  /* ── 卡片、表格容器与统计卡：细描边，不用阴影 ── */
-  [data-style="ink"] [data-surface="card"]:not([class*="-tint"]),
-  [data-style="ink"] [data-surface="stat"] {
-    box-shadow: none;
-    border: 1px solid var(--border);
-  }
-  [data-style="ink"] [data-surface="stat"] { display: flex; flex-direction: column; }
-  [data-style="ink"] [data-surface="stat"] > [data-slot="value"] { order: -1; margin: 0 0 2px; }
-  [data-style="ink"] [data-surface="stat"][data-tone="warning"] { border-color: color-mix(in srgb, var(--warning) 45%, var(--card)); }
-  [data-style="ink"] [data-surface="stat"][data-tone="danger"]  { border-color: color-mix(in srgb, var(--destructive) 40%, var(--card)); }
-  [data-style="ink"] button[data-surface="stat"]:hover { background: var(--card); border-color: var(--primary); }
+/* ═══ 「清爽」风格的组件形态（对齐流程与工单原型 v4/16/13）═══════════════════
+   经典风格下全部不生效，切回即原样。颜色只用 token，所以任何主题色下都成立。
+   钩子：组件上的 data-slot / data-surface / data-variant / data-tone / data-pk / data-state，
+   以及 segmented.ts 的 ui-seg 钩子类 —— 改组件时别删。
+   ⚠️ **不放进任何 @layer**：上方有条非 layer 的全局 border-color 规则，layer 里的规则压不过它。
+      代价是页面单独传的工具类也压不过这里，所以这里只写形态。
+   ⚠️ **去阴影一律清 --tw-shadow，不写 box-shadow: none**：Tailwind 的焦点环、选中环也画在
+      box-shadow 上，直接清掉会把键盘焦点和统计卡的选中态一起抹掉（2026-09-27 实测踩过）。
+      同理，描边用真实 border，不用 inset 阴影。 */
+[data-style="clean"]:not([data-density="dense"]) { --row-h: 40px; }
 
-  /* ── tab：分段控件渲染为下划线 tab ── */
-  [data-style="ink"] .ui-seg {
-    gap: 0; padding: 0; border-radius: 0; background: transparent;
-    border-bottom: 1px solid var(--border);
-  }
-  [data-style="ink"] .ui-seg-block { display: flex; width: 100%; }
-  [data-style="ink"] .ui-seg-item {
-    padding: 7px 16px; margin-bottom: -1px; border-radius: 0;
-    background: transparent; box-shadow: none;
-    border-bottom: 2px solid transparent;
-    color: var(--muted-foreground); font-weight: 500;
-  }
-  [data-style="ink"] .ui-seg-item:hover { color: var(--foreground); }
-  [data-style="ink"] .ui-seg-on { color: var(--primary); border-bottom-color: var(--primary); }
+/* ── 表格：白表头 · 行线 · 无斑马纹 · 13.5px · 主键等宽 ── */
+[data-style="clean"] [data-surface="table"] table { font-size: 13.5px; }
+[data-style="clean"] [data-slot="thead"] { background: var(--card); }
+[data-style="clean"] [data-slot="thead"] th {
+  height: 36px; padding: 0 10px;
+  font-size: 12px; font-weight: 600; color: var(--muted-foreground);
+  border-bottom: 1px solid var(--border);
+}
+[data-style="clean"] [data-slot="tbody"] > tr:nth-child(even) { background: transparent; }
+[data-style="clean"] [data-slot="tbody"] > tr:hover { background: color-mix(in srgb, var(--muted) 70%, transparent); }
+[data-style="clean"] [data-slot="tbody"] td { padding: 9px 10px; border-bottom: 1px solid var(--border); }
+[data-style="clean"] [data-slot="tbody"] > tr:last-child > td { border-bottom: 0; }
+[data-style="clean"] td[data-pk],
+[data-style="clean"] td[data-pk] * {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12px; font-weight: 400;
+}
 
-  /* ── 徽章：小方角 + 常规字重 ── */
-  [data-style="ink"] [data-slot="badge"] {
-    border-radius: var(--r-field); padding: 1px 8px; font-weight: 400;  /* 原型 5px，取最近的一档 */
-  }
+/* ── 卡片 · 统计卡：细描边，无阴影 ── */
+[data-style="clean"] [data-surface="card"]:not([class*="-tint"]),
+[data-style="clean"] [data-surface="stat"] {
+  --tw-shadow: 0 0 transparent;
+  border: 1px solid var(--border);
+}
+[data-style="clean"] [data-surface="stat"] { display: flex; flex-direction: column; }
+[data-style="clean"] [data-surface="stat"] > [data-slot="value"] { order: -1; margin: 0 0 2px; }
+[data-style="clean"] [data-surface="stat"][data-tone="warning"] { border-color: color-mix(in srgb, var(--warning) 45%, var(--card)); }
+[data-style="clean"] [data-surface="stat"][data-tone="danger"]  { border-color: color-mix(in srgb, var(--destructive) 40%, var(--card)); }
+[data-style="clean"] button[data-surface="stat"]:hover { background: var(--card); border-color: var(--primary); }
 
-  /* ── 按钮：次按钮白底描边，悬停转主色；主按钮去阴影 ── */
-  [data-style="ink"] [data-variant="outline"],
-  [data-style="ink"] [data-variant="secondary"] {
-    background: var(--card); color: var(--foreground);
-    box-shadow: inset 0 0 0 1px var(--border-strong);
-  }
-  [data-style="ink"] [data-variant="outline"]:hover,
-  [data-style="ink"] [data-variant="secondary"]:hover {
-    background: var(--card); color: var(--primary);
-    box-shadow: inset 0 0 0 1px var(--primary);
-  }
-  [data-style="ink"] [data-variant="default"] { box-shadow: none; }
+/* ── tab：下划线 ── */
+[data-style="clean"] .ui-seg {
+  gap: 0; padding: 0; border-radius: 0; background: transparent;
+  border-bottom: 1px solid var(--border);
+}
+[data-style="clean"] .ui-seg-block { display: flex; width: 100%; }
+[data-style="clean"] .ui-seg-item {
+  --tw-shadow: 0 0 transparent;
+  padding: 7px 16px; margin-bottom: -1px; border-radius: 0;
+  background: transparent;
+  border-bottom: 2px solid transparent;
+  color: var(--muted-foreground); font-weight: 500;
+}
+[data-style="clean"] .ui-seg-item:hover { color: var(--foreground); }
+[data-style="clean"] .ui-seg-on { color: var(--primary-text); border-bottom-color: var(--primary); }
+
+/* ── 徽章：小方角 + 常规字重（原型 5px，取最近的一档）── */
+[data-style="clean"] [data-slot="badge"] { border-radius: var(--r-field); padding: 1px 8px; font-weight: 400; }
+
+/* ── 按钮：13px 常规字重；次按钮与危险按钮为白底描边 ── */
+[data-style="clean"] [data-variant] { font-size: 13px; font-weight: 400; }
+[data-style="clean"] [data-variant="default"] { --tw-shadow: 0 0 transparent; }
+[data-style="clean"] [data-variant="outline"],
+[data-style="clean"] [data-variant="secondary"] {
+  background: var(--card); color: var(--foreground);
+  border: 1px solid var(--border-strong);
+}
+[data-style="clean"] [data-variant="outline"]:hover,
+[data-style="clean"] [data-variant="secondary"]:hover { background: var(--card); color: var(--primary-text); border-color: var(--primary); }
+[data-style="clean"] [data-variant="destructive"] {
+  background: var(--card); color: var(--destructive-ink);
+  border: 1px solid color-mix(in srgb, var(--destructive) 35%, var(--card));
+}
+[data-style="clean"] [data-variant="destructive"]:hover { background: var(--destructive-tint); opacity: 1; }
+
+/* ── 输入框 · 下拉 · 多行文本：白底 + 1px 描边 ── */
+[data-style="clean"] [data-slot="control"] { background: var(--card); border: 1px solid var(--border-strong); }
+[data-style="clean"] [data-slot="control"]:hover:not(:disabled) { border-color: var(--gray-8); }
+[data-style="clean"] [data-slot="control"]:focus-visible { border-color: var(--primary); }
+
+/* ── 提示条：细描边块 ── */
+[data-style="clean"] [data-slot="notice"] {
+  border: 1px solid var(--border); border-radius: var(--r-field);
+  background: var(--muted); font-size: 13px;
+}
+
+/* ── 抽屉头：白底 + 底线 ── */
+[data-style="clean"] [data-slot="drawer-head"] { background: var(--card); border-bottom: 1px solid var(--border); }
+
+/* ── 时间线：整条竖线 + 圆点，首项主色 ── */
+[data-style="clean"] [data-slot="timeline"] { border-inline-start: 2px solid var(--border); margin-inline-start: 8px; padding-inline-start: 18px; }
+[data-style="clean"] [data-slot="timeline-item"] { position: relative; border: 0; padding-inline-start: 0; padding-bottom: 6px; }
+[data-style="clean"] [data-slot="timeline-item"]::before {
+  content: ""; position: absolute; inset-inline-start: -25px; top: 5px;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--gray-7); border: 2px solid var(--card);
+}
+[data-style="clean"] [data-slot="timeline-item"]:first-child::before { background: var(--primary); }
+
+/* ── 步骤条：带编号的圆 + 长连线；完成=成功色，当前=主色 ── */
+/* 连线按剩余空间伸缩、文字不收缩：定宽连线在抽屉里会把步骤名挤成省略号（实测「创..」）。 */
+[data-style="clean"] [data-slot="stepper"] { counter-reset: step; gap: 0; width: 100%; }
+[data-style="clean"] [data-slot="stepper"] > li { counter-increment: step; gap: 7px; flex: 1 1 0; }
+[data-style="clean"] [data-slot="stepper"] > li:first-child { flex: 0 0 auto; }
+[data-style="clean"] [data-slot="stepper"] > li > span:last-child { flex-shrink: 0; overflow: visible; text-overflow: clip; }
+[data-style="clean"] [data-slot="step-conn"] { flex: 1 1 auto; width: auto; min-width: 12px; height: 2px; margin: 0 8px; background: var(--border); }
+[data-style="clean"] [data-slot="step-dot"] {
+  --tw-ring-shadow: 0 0 transparent;
+  width: 22px; height: 22px; border: 0; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 12px; line-height: 1;
+  background: var(--muted); color: var(--muted-foreground);
+}
+[data-style="clean"] [data-slot="step-dot"]::before { content: counter(step); }
+[data-style="clean"] li[data-state="done"] > [data-slot="step-dot"] { background: var(--success); color: var(--on-semantic); }
+[data-style="clean"] li[data-state="current"] > [data-slot="step-dot"] { background: var(--primary); color: var(--primary-foreground); }
+[data-style="clean"] li[data-state="branch"] > [data-slot="step-dot"] { background: var(--destructive); color: var(--on-semantic); }
+[data-style="clean"] li[data-state="done"] > [data-slot="step-conn"] { background: var(--success); }
+
+/* ── SLA 迷你进度条（组件里默认隐藏）── */
+[data-style="clean"] [data-slot="sla-bar"] {
+  display: inline-block; width: 52px; height: 6px; margin-inline-end: 6px; vertical-align: middle;
+  border-radius: 3px; overflow: hidden; background: var(--muted);
+}
+[data-style="clean"] [data-slot="sla-bar"] > i { display: block; height: 100%; }

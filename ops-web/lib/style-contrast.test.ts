@@ -1,4 +1,9 @@
-// ink 风格与 teal 皮肤的对比度卡口。
+// 风格 × 主题色的对比度卡口。
+//
+// 风格（data-style）与主题色（data-theme）任意组合，所以两边各自保证：
+//   · 风格只动语义色 → 锁「清爽」风格的语义色（亮 / 暗）；
+//   · 主题色只动主色 → 对**每一套**主题色锁「主色上的字」与「主色写成的文字」。
+//     新增主题色时不用改这里：清单直接取 stores/theme.ts 的 THEMES。
 //
 // 色值一改就可能跌破 AA，而肉眼在白底上几乎分不出 4.4 和 4.6 ——
 // 本项目真实踩过：旧 Badge 直接拿语义色当文字色，只有约 2.8:1（见 globals.css 注释）。
@@ -9,6 +14,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { THEMES } from "./stores/theme";
 
 const css = readFileSync(join(new URL("..", import.meta.url).pathname, "app/globals.css"), "utf8");
 
@@ -46,63 +52,60 @@ function expectPairs(tokens: Record<string, string>, pairs: Pair[]) {
   }
 }
 
-describe("ink 风格 · 亮色", () => {
-  const t = block('[data-style="ink"]');
-  const W = "#ffffff";
-  it("中性色阶", () =>
-    expectPairs(t, [
+const W = "#ffffff";
+const base = block(":root");
+const baseDark = block(".dark");
+
+describe("基线中性色（所有风格共用）", () => {
+  it("亮色", () =>
+    expectPairs(base, [
       ["正文", "gray-12", W, 7],
       ["次要文字", "gray-11", W, 4.5],
       ["次要文字压表头浅带", "gray-11", "gray-2", 4.5],
       ["占位符", "gray-9", W, 3],
       ["表格行线", "gray-6", W, 1.3],
       ["元件描边", "gray-7", W, 1.45],
-      ["灰块与白面", "gray-3", W, 1.08],
     ]));
-  it("语义色：浅底上的文字 + 实心底上的白字", () =>
-    expectPairs(t, [
+});
+
+describe("「清爽」风格的语义色", () => {
+  it("亮色：浅底上的文字 + 实心底上的白字", () =>
+    expectPairs(block('[data-style="clean"]'), [
       ...(["green", "amber", "red", "blue"] as const).flatMap((c): Pair[] => [
         [`${c} 文字 / 浅底`, `${c}-text`, `${c}-subtle`, 4.5],
         [`白字 / ${c} 实心`, W, `${c}-solid`, 4.5],
       ]),
     ]));
-});
-
-describe("ink 风格 · 暗色", () => {
-  const t = block('.dark[data-style="ink"]');
-  it("中性色阶（暗色下卡片是 gray-2）", () =>
-    expectPairs(t, [
-      ["正文", "gray-12", "gray-2", 7],
-      ["次要文字", "gray-11", "gray-2", 4.5],
-      ["次要文字压 muted", "gray-11", "gray-4", 4.5],
-      ["占位符", "gray-9", "gray-2", 3],
-      ["表格行线", "gray-6", "gray-2", 1.3],
-      ["元件描边", "gray-7", "gray-2", 1.45],
-      ["卡片与画布", "gray-2", "gray-1", 1.05],
-    ]));
-  it("语义色：浅底上的文字 + 实心底上的深字（--on-semantic 在暗色下是 gray-1）", () =>
+  it("暗色：浅底上的文字 + 实心底上的深字（暗色下 --on-semantic 是 gray-1）", () => {
+    const t = { ...block('.dark[data-style="clean"]'), "gray-1": baseDark["gray-1"] };
     expectPairs(t, [
       ...(["green", "amber", "red", "blue"] as const).flatMap((c): Pair[] => [
         [`${c} 文字 / 浅底`, `${c}-text`, `${c}-subtle`, 4.5],
         [`深字 / ${c} 实心`, "gray-1", `${c}-solid`, 4.5],
       ]),
-    ]));
+    ]);
+  });
 });
 
-describe("teal 皮肤", () => {
-  it("亮色：主色上的字、白底上的主色", () => {
-    const t = block('[data-theme="teal"]');
-    expectPairs(t, [
+describe("每一套主题色（亮色）", () => {
+  for (const th of THEMES) {
+    it(`${th.label}（${th.key}）：主色上的字、主色写成的文字`, () => {
+      const t = block(`[data-theme="${th.key}"]`);
+      // --primary-text 没单独给就等于主色（:root 里的默认值）
+      const tokens = { ...t, "primary-text": t["primary-text"] ?? t["primary"] };
+      expectPairs(tokens, [
+        ["主色上的字（主按钮）", "primary-foreground", "primary", 4.5],
+        ["主色文字压白底（链接、选中 tab）", "primary-text", W, 4.5],
+        ["主色文字压浅带", "primary-text", base["gray-2"], 4.5],
+      ]);
+    });
+  }
+});
+
+describe("墨青（teal）暗色", () => {
+  it("主色上的字、卡片上的主色", () =>
+    expectPairs(block('.dark[data-theme="teal"]'), [
       ["主色上的字", "primary-foreground", "primary", 4.5],
-      ["白底上的主色（链接）", "primary", "#ffffff", 4.5],
-    ]);
-  });
-  it("暗色：主色上的字、卡片上的主色", () => {
-    const t = block('.dark[data-theme="teal"]');
-    const card = block('.dark[data-style="ink"]')["gray-2"];
-    expectPairs(t, [
-      ["主色上的字", "primary-foreground", "primary", 4.5],
-      ["卡片上的主色（链接）", "primary", card, 4.5],
-    ]);
-  });
+      ["卡片上的主色（链接）", "primary", baseDark["gray-2"], 4.5],
+    ]));
 });

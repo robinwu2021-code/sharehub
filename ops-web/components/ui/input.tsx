@@ -5,6 +5,7 @@ export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttribute
   ({ className, ...props }, ref) => (
     <input
       ref={ref}
+      data-slot="control"
       className={cn(
         // 控件档 6px，与 Button / Select / FilterSelect 同档。
         // 搜索框不再特殊化成药丸：工具栏一行里的控件形状必须一致。
@@ -21,6 +22,7 @@ export const Select = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttrib
   ({ className, children, ...props }, ref) => (
     <select
       ref={ref}
+      data-slot="control"
       className={cn(
         "h-[var(--ctl-h)] rounded-field bg-secondary px-3.5 txt-body transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ring-offset-bg)]",
         className,

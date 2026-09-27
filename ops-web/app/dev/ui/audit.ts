@@ -37,7 +37,7 @@ const RULES = {
   dur: "过渡时长走 var(--dur) / var(--dur-fast)",
   ctlH: "控件高走 var(--ctl-h)、表格行高走 var(--row-h)（否则密度切换无效）",
   numAlign: "数字单元格应右对齐（规范 §12：数字右对齐 + 等宽）",
-  pkWeight: "主键列应加强字重（规范 §12：扫描时需要锚点）",
+  pkWeight: "主键列应加强字重或用等宽字（规范 §12：扫描时需要锚点）",
 } as const;
 
 function classOf(el: Element): string {
@@ -124,8 +124,11 @@ function auditTables(root: HTMLElement, findings: Finding[]) {
       // 主键列：第一个非选择框列，内容形如 CAB1000 / ORD500001（字母前缀 + 数字）
       const isPk = c <= 2 && texts.every((t) => /^[A-Z]{2,4}[-_]?\d{3,}$/.test(t));
       if (isPk) {
-        const w = Number(getComputedStyle(cells[0]).fontWeight);
-        if (w < 500) {
+        const cs = getComputedStyle(cells[0]);
+        const w = Number(cs.fontWeight);
+        // 锚点可以是字重，也可以是等宽字：「清爽」风格按原型把主键列渲染成等宽常规字重
+        const mono = /mono|menlo|consolas|courier/i.test(cs.fontFamily);
+        if (w < 500 && !mono) {
           findings.push({
             comp: compOf(table), rule: RULES.pkWeight,
             detail: `第 ${c + 1} 列 font-weight: ${w}（示例 "${texts[0]}"）`,

@@ -11,7 +11,7 @@
 import { cn } from "@/lib/utils";
 
 // ui-seg / ui-seg-item / ui-seg-on 是**样式钩子**（没有自身样式），供 globals.css 里的
-// ink 风格把分段控件渲染成下划线 tab。这里只返回 className、没法挂 data-* 属性，所以用类名当钩子。
+// 「清爽」风格把分段控件渲染成下划线 tab。这里只返回 className、没法挂 data-* 属性，所以用类名当钩子。
 
 /** 分段控件的灰槽容器。 */
 export function segmentedTrackClass(className?: string) {
