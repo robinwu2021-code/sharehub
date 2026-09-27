@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import { onShow } from "@dcloudio/uni-app";
+import { onShow, onLoad } from "@dcloudio/uni-app";
 import { useI18n } from "vue-i18n";
 import { useUserStore } from "@/stores/user";
 import { useAppStore } from "@/stores/app";
@@ -20,6 +20,13 @@ const pwd = ref("");
 const loading = ref(false);
 const cooldown = ref(0);
 const showCC = ref(false);
+
+/**
+ * 登录成功后的回跳地址（由门禁带来，见 shared/auth-gate.ts）。
+ *
+ * 没有它的话，游客从扫码被挡下来、登录完只能回到首页 —— 柜机号丢了，得重扫一次。
+ */
+let redirect = "";
 
 /**
  * 可用登录方式由**后端下发**（`GET /mp/auth/methods`，需求 OPS-SYS-07 按国家可配）。
@@ -58,6 +65,32 @@ async function loadMethods() {
  * 正是这次要消掉的那种死路。仓库里 home/me/notice 已经都是 onShow。
  */
 onShow(loadMethods);
+onLoad((q) => {
+  redirect = decodeRedirect((q?.redirect as string) || "");
+});
+
+/**
+ * 回跳地址要**反复解码到底**。
+ *
+ * 门禁那边 `encodeURIComponent` 一次，uni 的 H5 路由把参数写进 hash 时**又编了一次**，
+ * 地址栏上是 `redirect=%252Fpages%252F…`（`%25` 就是 `%`）。只解一次得到的是
+ * `%2Fpages%2Forder%2Fconfirm%3FcabinetNo%3D…` —— 拿它去 `redirectTo` **不会报错**，
+ * 只是跳不过去（没有这么一个带 `%2F` 的路由），登录完停在原地，
+ * 而「停在原地」和「没写回跳」长得一模一样。
+ *
+ * 以「解到以 / 开头」为终止条件，最多三次。
+ */
+function decodeRedirect(raw: string): string {
+  let v = raw;
+  for (let i = 0; i < 3 && v && !v.startsWith("/"); i++) {
+    try {
+      v = decodeURIComponent(v);
+    } catch {
+      return "";   // 解不动就当没有回跳，总好过跳到一个坏地址
+    }
+  }
+  return v.startsWith("/") ? v : "";
+}
 // 换国家要重取：开关是按国家配的
 watch(() => country.value.iso, loadMethods);
 
@@ -93,7 +126,9 @@ async function submit() {
           };
     await userStore.login(params);
     uni.showToast({ title: "OK", icon: "success" });
-    setTimeout(() => uni.navigateBack(), 400);
+    // 有回跳就 redirectTo（**不是 navigateTo**）：登录页留在栈里的话，
+    // 用户在确认页按返回会退回到登录页，而他已经登录了 —— 那一页对他没有意义
+    setTimeout(() => (redirect ? uni.redirectTo({ url: redirect }) : uni.navigateBack()), 400);
   } catch (e) {
     uni.showToast({ title: (e as Error).message, icon: "none" });
   } finally {

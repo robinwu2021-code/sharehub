@@ -1,11 +1,13 @@
 <script setup lang="ts">
 // 借出确认 → 下单 → 等弹出(dispensing) → 借出成功。免押/押金二选一（端侧 PaymentPort，MVP Stub）。
 import { computed, ref } from "vue";
-import { onLoad } from "@dcloudio/uni-app";
+import { onLoad, onUnload } from "@dcloudio/uni-app";
 import { api } from "@/api";
 import { t } from "@/i18n";
 import type { CabinetAvailability, UserCoupon } from "@/types";
 import { payment } from "@/ports/payment";
+import { ensureLoggedIn } from "@/shared/auth-gate";
+import { POLL_INTERVAL_MS, DISPENSE_TIMEOUT_MS } from "@/shared/constants";
 
 const avail = ref<CabinetAvailability | null>(null);
 const agree = ref(true);
@@ -13,9 +15,10 @@ const useFree = ref(true);
 const coupons = ref<UserCoupon[]>([]);
 const picked = ref<string | null>(null);
 const pickerOpen = ref(false);
-const stage = ref<"confirm" | "dispensing" | "success">("confirm");
+const stage = ref<"confirm" | "dispensing" | "success" | "failed">("confirm");
 const orderNo = ref("");
 let cabinetNo = "";
+let pollTimer: ReturnType<typeof setInterval> | null = null;
 
 onLoad((q) => {
   cabinetNo = (q?.cabinetNo as string) || "";
@@ -69,11 +72,31 @@ function choose(couponNo: string | null) {
   pickerOpen.value = false;
 }
 
+/**
+ * 借出成功与否，**以服务端的订单状态为准**。
+ *
+ * 此前这里是 `setTimeout(() => stage = "success", 1000)` —— 下单请求一返回就宣布成功，
+ * 与柜机到底弹没弹出**毫无关系**。两种后果都不报错：
+ * 宝没出来而界面说成功（用户空手走人，订单在计费）；或者弹出确实失败了，
+ * 而端上从头到尾没给过一个「失败」的出口，用户只能反复重扫。
+ *
+ * 现在轮询订单，进 `IN_USE` 才算成功；超过 `DISPENSE_TIMEOUT_MS` 进失败页。
+ * 那两个常量此前定义在 `shared/constants.ts` 里，注释写着「超过触发解冻/关单兜底，
+ * C-RT-04」，而**全仓零引用** —— 常量定了，轮询没写。
+ *
+ * ⚠️ 已知边界：后端 `RentOrderServiceImpl.rent()` 当前**直接把订单置为 IN_USE**
+ * （那行注释写着「免押预授权 + 弹仓为骨架」），既不经 DISPENSING、也不等设备回执。
+ * 所以接真后端时这里第一轮就成功 —— 本页不再撒谎，但「等柜机回执」这件事
+ * 要等后端补上 DISPENSING + EJECT 指令 + 超时撤单才真正成立（见优化方案 §3.1）。
+ * mock 层已按目标状态机走（DISPENSING → IN_USE），所以这段逻辑本身可验。
+ */
 async function submit() {
   if (!agree.value) {
     uni.showToast({ title: t("borrow.agree"), icon: "none" });
     return;
   }
+  // 兜一道门禁：正常路径在首页已经拦过，但深链/扫码 URL 也能直接进到这一页
+  if (!ensureLoggedIn(`/pages/order/confirm?cabinetNo=${cabinetNo}`)) return;
   stage.value = "dispensing";
   try {
     if (useFree.value) await payment.preAuthFreeDeposit(cabinetNo);
@@ -84,14 +107,63 @@ async function submit() {
       ...(picked.value ? { couponNo: picked.value } : {}),
     });
     orderNo.value = order.orderNo;
-    setTimeout(() => (stage.value = "success"), 1000);
+    if (order.status === "IN_USE") {
+      stage.value = "success";   // 已经出宝了就别再演一遍等待动画
+      return;
+    }
+    waitForDispense();
   } catch (e) {
     stage.value = "confirm";
     uni.showToast({ title: (e as Error).message, icon: "none" });
   }
 }
+
+function waitForDispense() {
+  const deadline = Date.now() + DISPENSE_TIMEOUT_MS;
+  stopPolling();
+  pollTimer = setInterval(async () => {
+    try {
+      const o = await api.getOrder(orderNo.value);
+      if (o.status === "IN_USE") {
+        stopPolling();
+        stage.value = "success";
+      } else if (o.status === "EXCEPTION" || o.status === "CLOSED") {
+        // 后台已经判成异常/撤单 —— 按它说的来，别继续等
+        stopPolling();
+        stage.value = "failed";
+      } else if (Date.now() > deadline) {
+        stopPolling();
+        stage.value = "failed";
+      }
+    } catch {
+      // 单次轮询失败不算数（弱网很常见），交给 deadline 收口
+      if (Date.now() > deadline) {
+        stopPolling();
+        stage.value = "failed";
+      }
+    }
+  }, POLL_INTERVAL_MS);
+}
+
+function stopPolling() {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = null;
+}
+// 页面关了还在轮询 = 白烧请求，而且回调还会去改一个已经不存在的界面
+onUnload(stopPolling);
+
 function viewOrder() {
   uni.redirectTo({ url: `/pages/order/detail?orderNo=${orderNo.value}` });
+}
+/** 换个柜子再试：回首页重新选，而不是对着同一个失败的柜子重试。 */
+function tryAnother() {
+  uni.reLaunch({ url: "/pages/home/index" });
+}
+/** 带着这一单去报障 —— 失败页最要紧的出口，人工那边才知道该查哪个柜子。 */
+function report() {
+  uni.redirectTo({
+    url: `/pages/order/feedback?cabinetNo=${cabinetNo}${orderNo.value ? "&orderNo=" + orderNo.value : ""}`,
+  });
 }
 </script>
 
@@ -181,6 +253,18 @@ function viewOrder() {
       <text class="mt-[12rpx] text-[24rpx] text-sub">{{ $t("borrow.dispenseTip") }}</text>
     </view>
 
+    <!-- 没弹出：这一页此前根本不存在，弹出失败的人只能反复重扫 -->
+    <view v-else-if="stage === 'failed'" class="flex flex-col items-center px-[56rpx] pt-[200rpx]">
+      <view class="pb-bad"><pb-icon name="info" :size="84" :stroke="2.4" /></view>
+      <text class="mt-[44rpx] text-[36rpx] font-extrabold text-ink">{{ $t("borrow.failed") }}</text>
+      <text class="mt-[16rpx] text-center text-[24rpx] text-sub" style="line-height: 1.7">{{ $t("borrow.failedTip") }}</text>
+      <view class="mt-[52rpx] w-full"><pb-button block size="lg" @click="tryAnother">{{ $t("borrow.tryAnother") }}</pb-button></view>
+      <view class="mt-[20rpx] w-full"><pb-button block size="lg" type="tonal" @click="report">{{ $t("borrow.reportIt") }}</pb-button></view>
+      <view v-if="orderNo" class="mt-[28rpx]" @tap="viewOrder">
+        <text class="text-[24rpx] text-primary">{{ $t("borrow.viewOrder") }}</text>
+      </view>
+    </view>
+
     <!-- 成功 -->
     <view v-else class="flex flex-col items-center justify-center pt-[220rpx]">
       <view class="pb-ok"><pb-icon name="check" :size="88" :stroke="2.6" /></view>
@@ -234,6 +318,16 @@ function viewOrder() {
 }
 .pb-check.is-on { background: var(--pb-primary); border-color: var(--pb-primary); }
 .pb-dispense { display: inline-block; animation: pbbounce 1s ease-in-out infinite; }
+.pb-bad {
+  width: 168rpx;
+  height: 168rpx;
+  border-radius: 9999px;
+  background: var(--pb-faint);
+  color: var(--pb-sub);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 @keyframes pbbounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-16rpx); } }
 .pb-ok {
   width: 168rpx;

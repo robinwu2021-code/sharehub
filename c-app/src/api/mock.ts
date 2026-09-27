@@ -12,6 +12,9 @@ const fmt = (d: Date) => d.toISOString().slice(0, 19).replace("T", " ");
 /** 与后端一致的时间格式（yyyy-MM-dd HH:mm:ss）。mock 出 ISO 会让格式化函数在两种源下表现不同。 */
 const fmtNow = () => new Date().toISOString().slice(0, 19).replace("T", " ");
 
+/** 扫这个柜机号的单**永远不出宝** —— 专门用来验「弹出失败」那条路（见 rentOrder 注释）。 */
+const DISPENSE_FAIL_CABINET = "CAB-TIMEOUT";
+
 export const mockApi: McpApi = {
   /**
    * mock 的口径**照抄后端默认行**（V126：otp 开、其余三个关）。
@@ -135,7 +138,10 @@ export const mockApi: McpApi = {
     const order: ConsumerOrder = {
       orderNo,
       cUserNo: "CU-0001",
-      status: "IN_USE",
+      // **下单后不是立刻 IN_USE**：先 DISPENSING，等「设备回执」才转 IN_USE。
+      // mock 层照目标状态机走（与 ops-web 的 mock 同一约定：非法迁移抛错、状态真改 db），
+      // 否则端上那段「等弹出」的轮询在 mock 下第一轮就成功 —— 写没写它都一样绿。
+      status: "DISPENSING",
       cabinetNo: cab.cabinetNo,
       siteName: cab.siteName,
       returnCabinetNo: null,
@@ -152,10 +158,28 @@ export const mockApi: McpApi = {
       timeline: [
         { status: "CREATED", at: now },
         { status: "DISPENSING", at: now },
-        { status: "IN_USE", at: now },
       ],
     };
     db.orders.unshift(order);
+
+    /*
+     * 模拟设备回执：2 秒后转 IN_USE。
+     *
+     * **柜机号 CAB-TIMEOUT 永不回执** —— 这是给「弹出失败」那条路留的负对照入口。
+     * 没有它的话，失败页与超时逻辑在 mock 下**永远走不到**，
+     * 写错了也看不出来（而这正是它要防的那类错：不报错，只是结果不对）。
+     * 验法：直接开 /pages/order/confirm?cabinetNo=CAB-TIMEOUT，
+     * 界面应在 DISPENSE_TIMEOUT_MS 之后进失败页，而不是一直转圈或跳成功。
+     */
+    if (p.cabinetNo !== DISPENSE_FAIL_CABINET) {
+      setTimeout(() => {
+        const o = db.orders.find((x) => x.orderNo === orderNo);
+        if (o && o.status === "DISPENSING") {
+          o.status = "IN_USE";
+          o.timeline = [...(o.timeline ?? []), { status: "IN_USE", at: fmtNow() }];
+        }
+      }, 2000);
+    }
     return db.delay(order, 480);
   },
   getOrder: (orderNo: string) => db.delay(db.orders.find((o) => o.orderNo === orderNo) ?? db.orders[0]),

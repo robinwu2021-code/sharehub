@@ -1,12 +1,34 @@
 <script setup lang="ts">
 // 首页「使用中订单」常驻卡（主色实心 + 脉动电量图标）。
-import { computed } from "vue";
+import { computed, onUnmounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import type { ConsumerOrder } from "@/types";
+import { elapsedMin, durationText } from "@/shared/format";
 const props = defineProps<{ order: ConsumerOrder }>();
 const emit = defineEmits<{ (e: "click"): void }>();
 const { t } = useI18n();
-const amt = computed(() => `${t("common.currency")} ${props.order.feeAmount.toFixed(2)}`);
+
+/**
+ * 这张卡此前显示 `durationMin` 与 `feeAmount` —— 进行中的单这两个值在服务端**恒为 0**
+ * （只在归还那一刻写入）。于是首页最醒目的那张卡长期写着「0 分钟 · AED 0.00」，
+ * 读起来像「这次不要钱」。
+ *
+ * 现在：时长按 rentStartAt 现算（与订单详情同一个口径），金额只在**已有金额时**才显示，
+ * 没有就留空 —— 不编一个 0.00 出来。
+ */
+const tick = ref(Date.now());
+const timer = setInterval(() => (tick.value = Date.now()), 30000);
+onUnmounted(() => clearInterval(timer));
+
+const lasted = computed(() => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+  tick.value;
+  const m = elapsedMin(props.order.rentStartAt) ?? props.order.durationMin;
+  return durationText(m);
+});
+const amt = computed(() =>
+  props.order.feeAmount > 0 ? `${t("common.currency")} ${props.order.feeAmount.toFixed(2)}` : "",
+);
 </script>
 
 <template>
@@ -14,9 +36,9 @@ const amt = computed(() => `${t("common.currency")} ${props.order.feeAmount.toFi
     <view class="pb-ong__pulse"><pb-icon name="battery" :size="40" /></view>
     <view class="pb-ong__mid">
       <text class="pb-ong__t">{{ $t("orders.ongoing") }} · {{ order.siteName ?? order.locationName ?? order.cabinetNo }}</text>
-      <text class="pb-ong__s">{{ order.durationMin }} {{ $t("common.min") }}</text>
+      <text class="pb-ong__s">{{ lasted }}</text>
     </view>
-    <text class="pb-ong__amt pb-num">{{ amt }}</text>
+    <text v-if="amt" class="pb-ong__amt pb-num">{{ amt }}</text>
     <pb-icon name="chevron" :size="28" />
   </view>
 </template>

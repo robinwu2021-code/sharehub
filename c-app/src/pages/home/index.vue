@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { onShow } from "@dcloudio/uni-app";
+import { onShow, onLoad } from "@dcloudio/uni-app";
 import { api, IS_MOCK } from "@/api";
 import { useI18n } from "vue-i18n";
 import type { NearbyCabinet, Notice, ConsumerOrder, StoreDetail } from "@/types";
@@ -8,6 +8,7 @@ import { distance } from "@/shared/format";
 import { scanCabinet } from "@/ports/scan";
 import { openNavigation } from "@/ports/map";
 import { getUserLocation } from "@/ports/location";
+import { ensureLoggedIn } from "@/shared/auth-gate";
 
 const { t } = useI18n();
 const list = ref<NearbyCabinet[]>([]);
@@ -18,6 +19,13 @@ const keyword = ref("");
 const view = ref("map"); // map | list
 const store = ref<StoreDetail | null>(null);
 const showStore = ref(false);
+/**
+ * 「找可还网点」模式（由使用中订单详情带 `?returnable=1` 进来，C-US-03）。
+ *
+ * 归还是任意点归还，难的不是知道「可以随便还」，而是**手上这颗宝现在能还到哪** ——
+ * 附近柜子满仓的时候，站在柜子前才发现插不进去。所以这一屏只留有空仓的柜。
+ */
+const returnable = ref(false);
 
 const views = computed(() => [
   { label: t("home.map"), value: "map" },
@@ -31,7 +39,12 @@ async function load() {
     // 取不到返回 null —— 那时列表不带距离，而不是带一个编出来的距离。
     const at = await getUserLocation();
     const [cabs, notices, ong] = await Promise.all([
-      api.nearbyCabinets({ keyword: keyword.value, lat: at?.lat, lng: at?.lng }),
+      api.nearbyCabinets({
+        keyword: keyword.value,
+        lat: at?.lat,
+        lng: at?.lng,
+        ...(returnable.value ? { returnable: true } : {}),
+      }),
       api.listNotices(),
       api.ongoingOrder(),
     ]);
@@ -42,6 +55,9 @@ async function load() {
     loading.value = false;
   }
 }
+onLoad((q) => {
+  returnable.value = q?.returnable === "1";
+});
 onShow(load);
 
 async function openStore(c: NearbyCabinet) {
@@ -51,7 +67,11 @@ async function openStore(c: NearbyCabinet) {
 }
 function borrow(c: { cabinetNo?: string; siteNo?: string }) {
   const cabinetNo = c.cabinetNo ?? list.value.find((x) => x.siteNo === c.siteNo)?.cabinetNo;
-  if (cabinetNo) uni.navigateTo({ url: `/pages/order/confirm?cabinetNo=${cabinetNo}` });
+  if (!cabinetNo) return;
+  const url = `/pages/order/confirm?cabinetNo=${cabinetNo}`;
+  // 门禁前置：未登录先登录，登录完直接回到这一页（带着柜机号）。
+  // 让他点到提交再吃 401 的话，会话守卫会 reLaunch 回登录页，这次借出的上下文全丢。
+  if (ensureLoggedIn(url)) uni.navigateTo({ url });
 }
 function goOrder() {
   if (ongoing.value) uni.navigateTo({ url: `/pages/order/detail?orderNo=${ongoing.value.orderNo}` });
@@ -69,7 +89,8 @@ async function onScan() {
   // #endif
   try {
     const cabinetNo = await scanCabinet();
-    uni.navigateTo({ url: `/pages/order/confirm?cabinetNo=${cabinetNo}` });
+    const url = `/pages/order/confirm?cabinetNo=${cabinetNo}`;
+    if (ensureLoggedIn(url)) uni.navigateTo({ url });
   } catch (e) {
     uni.showToast({ title: (e as Error).message, icon: "none" });
   }
@@ -86,8 +107,11 @@ async function onScan() {
           <pb-tag v-if="IS_MOCK" type="warning">{{ $t("common.mock") }}</pb-tag>
         </view>
 
+        <!-- 找可还网点模式：只列有空仓的柜，并说明为什么这一屏变少了 -->
+        <view v-if="returnable" class="mt-[24rpx]"><pb-notice-bar :text="$t('home.returnableOnly')" /></view>
+
         <!-- 公告 -->
-        <view v-if="notice" class="mt-[24rpx]"><pb-notice-bar :text="notice.title" @click="goNotice" /></view>
+        <view v-else-if="notice" class="mt-[24rpx]"><pb-notice-bar :text="notice.title" @click="goNotice" /></view>
 
         <!-- 使用中订单常驻 -->
         <view v-if="ongoing" class="mt-[20rpx]"><pb-ongoing-bar :order="ongoing" @click="goOrder" /></view>

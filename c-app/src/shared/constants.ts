@@ -22,5 +22,9 @@ export const POLL_INTERVAL_MS = 1500;
 // 弹出超时阈值（超过触发解冻/关单兜底，C端功能清单 C-RT-04）
 export const DISPENSE_TIMEOUT_MS = 12000;
 
+// 进行中订单详情的刷新间隔。比弹出轮询慢一个量级 —— 那边在等一个几秒内的回执，
+// 这边等的是「他去还宝」这种以分钟计的事，1.5s 一次只是在烧电量和流量。
+export const ORDER_REFRESH_MS = 15000;
+
 // mock 模拟网络延迟
 export const MOCK_DELAY_MS = 220;
