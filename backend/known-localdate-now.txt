@@ -50,7 +50,30 @@
 #      -DargLine="-Duser.timezone=America/New_York"
 #   不加的话白天跑 SiteAssetFlowTest 改坏了也是绿的 —— 负对照就是这么栽过一次。）
 
-# —— 统计窗口：偏一天只影响显示，不影响钱 ——
+# —— 统计窗口：偏一天只影响显示，但**不能照前面那样简单替换** ——
+#
+# 这几处与前面那些不同：它们不是「取今天这个日期」，而是**拿日界去比存储的时间戳**
+# （`.ge(closedAt, LocalDate.now().atStartOfDay())` 这种形状）。
+#
+# 而 closed_at / occurred_at 都是 LocalDateTime.now() 写的 —— **服务器时区**。
+# 于是「服务器日的零点 vs 服务器时区的时间戳」目前是**自洽的**，只是那个「日」
+# 不是业务日。换成 `clock.today().atStartOfDay()` 会变成
+# 「业务日的零点 vs 服务器时区的时间戳」—— **另一种错，而且更难看出来**：
+# 迪拜 9-25 22:00 关闭的告警（业务日是 9-25）会被算进「9-26 今日」，因为
+# 它的服务器时间戳是 9-26T02:00 ≥ 9-26T00:00。
+#
+# 正确形态是把**业务日的起点换算到存储时区**再比：
+#     clock.today().atStartOfDay(clock.zone())
+#          .withZoneSameInstant(ZoneId.systemDefault()).toLocalDateTime()
+# （即 AdjustmentServiceImpl 那个折算的反方向：那边把存储时间戳折成业务日，
+#   这边把业务日界折成存储时间戳。）
+#
+# 近 7 天 / 近 30 天 / 近 N 天那几处更绕：它们拿 `LocalDate...toString()` 去和
+# **字符串列**比大小（字典序前缀比较），换算后还要保持字符串格式一致。
+#
+# 没有顺手改：这些都是运营台上的计数，偏一天不影响钱；而改错的代价是
+# 把一个自洽的偏差换成一个不自洽的偏差。要改就按上面的配方逐处改并各配一条
+# 钉住时钟的用例（见 FixedBizClock），而不是批量 sed。
 AlarmServiceImpl 3          # 今日已闭环数 / 近 7 天 / 近 N 天
 SharingQueryService 2       # 今日 + 近 30 天
 OperationOverviewService 2  # 概览的默认 to
