@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Set;
+import ai.neargo.sharehub.common.crud.BizNoSequence;
 
 /**
  * 库存调拨实现。手写 {@code LambdaQueryWrapper}（聚合根路线），状态流转经
@@ -39,8 +40,13 @@ public class InventoryTransferServiceImpl implements InventoryTransferService {
     private final InvTransferItemMapper itemMapper;
     private final InvTransferStateMachine stateMachine;
 
+    /** 取号专用 —— 必须绕开逻辑删除过滤，见 nextTransferNo。 */
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+
     public InventoryTransferServiceImpl(InvTransferMapper mapper, InvTransferItemMapper itemMapper,
-                                        InvTransferStateMachine stateMachine) {
+                                        InvTransferStateMachine stateMachine,
+                                        org.springframework.jdbc.core.JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
         this.mapper = mapper;
         this.itemMapper = itemMapper;
         this.stateMachine = stateMachine;
@@ -206,25 +212,34 @@ public class InventoryTransferServiceImpl implements InventoryTransferService {
      * 取号：扫描同前缀最大号 +1（[db-design §1.4.1]）。
      * <b>禁止</b>「前缀 + 行数」——那个写法在前端 mock 已导致过两次主键撞号。
      * 并发下仍可能撞，靠 {@code uk_transfer_no} 兜底。
+     *
+     * <h3>为什么委托给 BizNoSequence</h3>
+     * 原来这里用 {@code mapper.selectOne(...)} 自己扫，有两处**潜伏**的错：
+     *
+     * <ol>
+     *   <li><b>按字典序取最大</b>（{@code orderByDesc(transferNo)}）。位宽一律 4 位时侥幸正确，
+     *       一旦越过 {@code TR9999} 变成 5 位就取错 —— {@code 'TR9999' > 'TR10000'}。
+     *       {@link BizNoSequence} 按**数字序**取，没有这个问题。</li>
+     *   <li><b>看不见软删的号</b>。{@code @TableLogic} 会给 QueryWrapper 自动补
+     *       {@code deleted = 0}，而 {@code uk_transfer_no} 不含 deleted。
+     *       今天这张表**没有删除入口**，所以这一条还不成立；但列和过滤都已经在了，
+     *       哪天加一个归档功能就会立刻成立 —— 同一个病在本仓已经咬过两次
+     *       （代理商取号、{@code AbstractCrudService}）。</li>
+     * </ol>
+     *
+     * <h3>⚠️ 它不修 2026-09-27 那次 TR0002 撞号</h3>
+     * 那天实测到 {@code Duplicate entry 'TR0002' for key 'uk_transfer_no'}，
+     * 第一反应是「又是软删的洞」—— <b>查下来不是</b>：{@code inv_transfer} 69 行
+     * <b>一行软删都没有</b>，号段 TR0001–TR0069 连续。
+     * 最可能的原因是**两个会话共用同一个 test 库并发跑测试**
+     * （{@code application-test.yml} 就提醒过各自设 {@code SHAREHUB_TEST_DB}）。
+     *
+     * <p>而 {@link BizNoSequence} 的类注释写明了：**并发下它照样会撞**，靠唯一键兜底。
+     * 所以本次改动是修上面那两条潜伏的错，<b>不是</b>修那次报错 ——
+     * 把它写成「修好了」会让下次同样的撞号被当成已解决而不再追。
      */
     private String nextTransferNo() {
-        InvTransfer top = mapper.selectOne(new LambdaQueryWrapper<InvTransfer>()
-                .likeRight(InvTransfer::getTransferNo, BizKey.TRANSFER)
-                .orderByDesc(InvTransfer::getTransferNo)
-                .last("limit 1"));
-        long n = 0L;
-        if (top != null && top.getTransferNo() != null
-                && top.getTransferNo().length() > BizKey.TRANSFER.length()) {
-            String digits = top.getTransferNo().substring(BizKey.TRANSFER.length()).replaceAll("\\D", "");
-            if (!digits.isEmpty()) {
-                try {
-                    n = Long.parseLong(digits);
-                } catch (NumberFormatException ignore) {
-                    // 历史脏号（非纯数字后缀）不参与取号，由 UNIQUE 兜底
-                }
-            }
-        }
-        return BizKey.TRANSFER + String.format("%04d", n + 1);
+        return BizNoSequence.next(jdbc, "inv_transfer", "transfer_no", BizKey.TRANSFER, 4);
     }
 
     private static String itemNoOf(InvTransferItem i) {

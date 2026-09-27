@@ -17,9 +17,30 @@ import java.security.NoSuchAlgorithmException;
  * <ol>
  *   <li><b>不配就启动失败</b>（fail-closed）。给个默认值等于所有部署共用一个 pepper，等于没有；</li>
  *   <li><b>不进数据库、不进日志、不进异常消息</b>；</li>
- *   <li><b>轮换靠 {@code *_enc} 全表重算</b>：解出明文 → 用新 pepper 重算 hash → 统一切 {@code hash_ver}。
- *       唯一键不动。这是 {@code *_enc} 必须可逆的唯一理由（ADR-030 §2.3）。</li>
+ *   <li><b>⚠️ 换不了</b>。见下。</li>
  * </ol>
+ *
+ * <h2>pepper 不可轮换 —— 这是事实，不是待办</h2>
+ * 这里原本写着「轮换靠 {@code *_enc} 全表重算：解出明文 → 用新 pepper 重算 hash →
+ * 统一切 {@code hash_ver}」，并说这是 {@code *_enc} 必须可逆的唯一理由。
+ *
+ * <p><b>那条路从来没有铺过</b>：那四列全仓没有一处读或写，生产上恒为 NULL；
+ * 而 {@code iam_employee} 连这两列都没有 —— 员工那一侧从第一天起就没打算支持轮换。
+ * 2026-09-27 核实后，V130 把列删了，这段改成实话。
+ *
+ * <p>所以真要换 pepper，等于一次**业务事件**而不是运维操作：
+ * <ol>
+ *   <li>停写；</li>
+ *   <li>通知所有代理自然人与员工**重新验证**手机号/邮箱；</li>
+ *   <li>用新 pepper 重建 hash。</li>
+ * </ol>
+ * 没有第二条路 —— 哈希不可逆，而明文哪里都没有存。
+ *
+ * <p><b>为什么把它写这么清楚</b>：一个「做不到却看起来能做」的能力比明确做不到更危险，
+ * 它会被写进应急预案。真出事时才发现预案执行不了，是最坏的时刻。
+ *
+ * <p>{@code hash_ver} 仍然保留，但它**不是轮换进度标记** ——
+ * 它只记「这一行的 hash 是哪个 pepper 版本算的」。
  *
  * <p>输出长度固定 64，与 {@code agt_principal.phone_hash VARCHAR(64)} 对齐。
  * ⚠️ 那两列<b>必须是 {@code VARCHAR} 不能是 {@code CHAR}</b> —— {@code agt_apply.active_key}
@@ -47,7 +68,7 @@ public final class IdentifierHasher {
         this.version = version;
     }
 
-    /** 当前 pepper 版本，写进 {@code hash_ver}；轮换后据它判断哪些行还没重算。 */
+    /** 当前 pepper 版本，写进 {@code hash_ver}。**不是轮换进度标记** —— 见类注释。 */
     public int version() {
         return version;
     }

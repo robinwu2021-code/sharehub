@@ -33,17 +33,18 @@ public class AgtApply extends BaseEntity {
     private String source;
 
     /*
-     * ⚠️ phoneEnc / emailEnc 两列**全仓没有任何一处写入**，生产上恒为 NULL。
-     * 设计上它们是「需要还原时（发短信/邮件）」与「pepper 轮换时重算 hash 的依据」，
-     * 两个用途都没有落过地。要联系方式请看下面的 contact* 三列 ——
-     * 那才是运营真正要看见、要拨打的东西（V127）。
+     * 只存 hash（登录查找 + 唯一约束）与 mask（仅供显示）。
+     *
+     * **没有 *_enc**：那两列 V130 删掉了。它们存在的唯一理由是「pepper 轮换时解出明文重算
+     * hash」，而全仓从来没有一处写过它们 —— 于是 pepper 事实上不可轮换（见 IdentifierHasher）。
+     * 要联系方式看下面的 contact* 三列，那才是运营要拨打、要发件的东西（V127）。
      */
     private String phoneHash;
     private String phoneMask;
-    private byte[] phoneEnc;
     private String emailHash;
     private String emailMask;
-    private byte[] emailEnc;
+
+    /** 产生这些 hash 的 pepper 版本。**不是轮换进度标记** —— 见 IdentifierHasher 的类注释。 */
     private Integer hashVer;
 
     /** 命中已有自然人时回填；空 = 新人。<b>手机号已存在不是重复注册，是多主体申请</b>。 */

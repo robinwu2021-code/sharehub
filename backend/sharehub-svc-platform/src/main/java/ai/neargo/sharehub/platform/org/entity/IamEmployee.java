@@ -39,7 +39,7 @@ public class IamEmployee extends BaseEntity {
     /** 手机号的 HMAC 哈希（V114）。同 {@link #emailHash}。 */
     private String phoneHash;
 
-    /** pepper 版本。轮换后据它判断哪些行还没重算。 */
+    /** 产生这些 hash 的 pepper 版本。**不是轮换进度标记** —— pepper 不可轮换，见 IdentifierHasher。 */
     private Integer hashVer;
     /** ACTIVE / LEFT */
     private String status;
