@@ -20,6 +20,18 @@ type Method = "GET" | "POST" | "PUT";
  * 所以把"怎么清"交回给 store，本文件只负责判定"什么时候该清"。
  */
 let onUnauthorized: (() => void) | null = null;
+
+/**
+ * 业务错误：除了给人读的 message，还带服务端的 code 与**结构化的 data**。
+ * 调用方要据此做事时读 data，不要解析 message —— 例如借出被欠费拦下，
+ * data 里有那张欠费单的 orderNo，端上直接打开它去补缴（后端 BizException#withData）。
+ */
+export class ApiError extends Error {
+  constructor(message: string, readonly code: number, readonly data?: unknown) {
+    super(message);
+  }
+}
+
 export function setUnauthorizedHandler(fn: () => void) {
   onUnauthorized = fn;
 }
@@ -82,7 +94,7 @@ function request<T>(
           // 不处理的话 token 还留在 storage 里，isLoggedIn 仍为真，
           // 界面照常显示已登录，而每个请求各弹一个错。
           if (res.statusCode === 401 && isSessionSensitive(path)) onUnauthorized?.();
-          reject(new Error(body?.message || `HTTP ${res.statusCode}`));
+          reject(new ApiError(body?.message || `HTTP ${res.statusCode}`, body?.code ?? res.statusCode, body?.data));
         }
       },
       fail: (err) => reject(new Error(err.errMsg || "network error")),

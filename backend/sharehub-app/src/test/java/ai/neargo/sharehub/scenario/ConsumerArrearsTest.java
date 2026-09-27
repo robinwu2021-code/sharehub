@@ -75,12 +75,18 @@ class ConsumerArrearsTest extends ApiTestSupport {
                 .as("柜子已经还了、钱已经算了 —— 扣款失败不能让订单回到进行中").isEqualTo("SETTLED");
         assertThat(payStatus(orderNo)).as("请款失败 → 欠费").isEqualTo("UNPAID");
         assertThat(shares(orderNo)).as("没收到的钱不分 —— 此前按应收分，等于平台垫钱给场地方分成").isZero();
+        String user = jdbc.queryForObject("SELECT c_user_no FROM ord_order WHERE order_no=?", String.class, orderNo);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM usr_message WHERE c_user_no=? AND body LIKE ?",
+                Integer.class, user, "%" + orderNo + "%扣款未成功%"))
+                .as("结算时就告诉他欠钱 —— 否则他要等下次站在柜机前被拦才第一次知道").isEqualTo(1);
 
         assertThat(get("/mp/trade/orders/" + orderNo, token).okData().path("payStatus").asText())
                 .as("C 端详情要读得到欠费 —— 端上据此出「立即补缴」").isEqualTo("UNPAID");
 
         var blocked = post("/mp/trade/orders/rent", Map.of("cabinetNo", cab), token);
         assertThat(blocked.status).as("欠费拦下次借出（响应：%s）", blocked.msg()).isEqualTo(409);
+        assertThat(blocked.body.path("data").path("orderNo").asText())
+                .as("拦截要带上欠费单号 —— 端上据此直接打开那张单去补缴").isEqualTo(orderNo);
 
         post("/mp/trade/pay", Map.of("orderNo", orderNo, "scene", "RENT"), token).okData();
         assertThat(payStatus(orderNo)).as("补缴成功 → 已收").isEqualTo("PAID");

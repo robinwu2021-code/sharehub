@@ -74,4 +74,22 @@ public class BizException extends ServerException {
     public Object[] args() {
         return args.clone();
     }
+
+    /**
+     * 随错误一起回给调用方的<b>结构化</b>数据（放进 {@code Result.data}）。
+     *
+     * <p>文案是给人读的，调用方要据此<b>做事</b>时不该去解析文案 —— 例如借出被欠费拦下，
+     * 端上要直接打开那张欠费单，就需要单号本身（{@code {orderNo, amount}}），而不是从一句话里抠。
+     * 绝大多数错误不需要它，默认为空、响应与此前逐字节相同。
+     */
+    private Object data;
+
+    public BizException withData(Object data) {
+        this.data = data;
+        return this;
+    }
+
+    public Object data() {
+        return data;
+    }
 }

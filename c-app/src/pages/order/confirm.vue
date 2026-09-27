@@ -3,6 +3,7 @@
 import { computed, ref } from "vue";
 import { onLoad, onUnload } from "@dcloudio/uni-app";
 import { api } from "@/api";
+import { ApiError } from "@/api/http-client";
 import { t } from "@/i18n";
 import type { CabinetAvailability, UserCoupon } from "@/types";
 import { payment } from "@/ports/payment";
@@ -112,6 +113,19 @@ async function submit() {
     waitForDispense();
   } catch (e) {
     stage.value = "confirm";
+    // 欠费被拦（C-BL-04）：服务端带回了那张欠费单的单号 —— 直接带他去补缴，
+    // 而不是弹一句「请先补缴」然后让他自己去订单列表里翻
+    const owed = e instanceof ApiError ? (e.data as { orderNo?: string } | undefined)?.orderNo : undefined;
+    if (owed) {
+      uni.showModal({
+        title: (e as Error).message,
+        confirmText: t("orders.payNow"),
+        success: (r) => {
+          if (r.confirm) uni.redirectTo({ url: `/pages/order/detail?orderNo=${owed}` });
+        },
+      });
+      return;
+    }
     uni.showToast({ title: (e as Error).message, icon: "none" });
   }
 }
