@@ -45,14 +45,10 @@ VendorController#saveConfig
 #    旧 uid 是 hash(原始输入)，而原始输入没存下来，只有用户本人再登录时才同时拿到两者。
 #    见 ConsumerPhoneNormalizationTest（3 条，含负对照）。
 #
-# ⚠️ 未修（要先拍板）：countryCode 仍不参与派生。区号来自 phone 自带（+971…）或
-#    default-calling-code 补全，所以 +971 501234567 与 +966 501234567 仍是同一个账号
-#    （钱包/订单/券/押金共用），而 md_market_country 与充值套餐的「适用市场」都是为多市场建的。
-#    为什么不顺手改：让 countryCode 参与派生会**破掉惰性重键的唯一性** ——
-#    两个区号的旧 uid 是同一个 sha256("501234567")，两个人会争抢同一条历史行、
-#    把账号在彼此之间来回搬，比现在的共用更糟。所以它需要先回答：
-#    **存量里真有跨市场撞号的账号时，那条历史行归谁？**
-#    现状由 ConsumerPhoneIdentityTest 钉住：区号参与派生之后那条会红，届时连本段一起删。
+# ✅ 已修（9-27 拍板「历史行一律归 +971」）：countryCode 参与派生 —— phone 自带 + 以它为准，
+#    否则 countryCode，都没有才用默认区号（IdentifierNormalizer#phone(raw, callingCode)）。
+#    只有默认市场的号码才认领旧算法历史行（#isDefaultMarket），+966 的同号抢不走。
+#    见 ConsumerPhoneIdentityTest（3 条，含负对照：拆掉市场判断后「历史行」那条红）。
 
 # ✅ 2026-09-26 判定为**正当例外，不要转**：
 #   VendorController#saveConfig —— 服务里用 `body.containsKey("apiBase")` 区分

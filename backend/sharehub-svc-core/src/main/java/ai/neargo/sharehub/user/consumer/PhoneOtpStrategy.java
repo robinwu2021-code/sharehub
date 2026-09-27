@@ -52,11 +52,13 @@ public class PhoneOtpStrategy implements ConsumerLoginStrategy {
         }
         // 归一必须在校验之前：发码时存的键也是归一后的值（见 OtpService），
         // 否则「按 0501… 发码、按 +971501… 登录」会得到一句无从解释的「验证码错误」。
-        String phone = normalizer.phone(req.phone());
+        String phone = normalizer.phone(req.phone(), req.countryCode());
         otp.verify(phone, req.otp());
         String uid = hasher.hash(phone);
+        // 历史行一律归默认市场：别的区号的同号不去认领（见 IdentifierNormalizer#isDefaultMarket）
+        String legacy = normalizer.isDefaultMarket(phone) ? legacyUid(req.phone()) : null;
         return new ResolvedIdentity(Provider.PHONE, uid, "PHONE:" + uid,
-                phone, req.nickname(), req.avatar(), legacyUid(req.phone()));
+                phone, req.nickname(), req.avatar(), legacy);
     }
 
     /**

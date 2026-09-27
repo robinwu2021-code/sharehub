@@ -12,28 +12,23 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 手机号身份：{@code countryCode} 一直在发，一直没被用（**本类钉住的是这个现状，不是期望**）。
+ * 手机号身份里的区号（2026-09-27 拍板）。
  *
- * <h3>已经修掉的部分（2026-09-26，见 {@link ConsumerPhoneNormalizationTest}）</h3>
- * {@code PhoneOtpStrategy} 此前那句 {@code // 生产：E.164 归一} 是没有实现的意图
- * （实际只有 {@code .trim()}），且 uid 是裸 {@code sha256}。现已改用公共的
- * {@code IdentifierNormalizer} + {@code IdentifierHasher}，与员工侧同一个方法（ADR-030 §4.1）——
- * 同一个号的不同写法不再是不同账号，uid 也不再是可离线穷举的裸哈希。存量账号靠惰性重键认领。
+ * <h3>此前</h3>
+ * 端上每次都发 {@code countryCode}，后端一直没读：区号只来自 {@code phone} 自带或 {@code default-calling-code}。
+ * 于是 <b>+971 501234567 与 +966 501234567 是同一个账号</b>，钱包、订单、券、押金全部共用。
+ * 本类原先钉住的就是这个现状，并注明「区号参与派生后这条会红，届时更新」。
  *
- * <h3>还剩下的就是本类这一条</h3>
- * 区号由 {@code phone} 自带或由 {@code default-calling-code} 补全，端上那个 {@code countryCode}
- * 依然没人读。于是 <b>+971 501234567 与 +966 501234567 仍是同一个账号</b> ——
- * 钱包、订单、券、押金全部共用。而这个产品的 {@code md_market_country} 表和充值套餐的
- * 「适用市场」CSV 都是为多市场（AE/SA）建的。
+ * <h3>为什么当时没修</h3>
+ * 让区号参与派生会破掉惰性重键的唯一性：历史行的旧 uid 是 {@code sha256(端上原样发的本地号)}，
+ * 两个区号的同号会争抢同一条历史行。需要先回答「撞号的历史行归谁」。
  *
- * <h3>为什么这一条没跟着一起修</h3>
- * 让 {@code countryCode} 参与派生就<b>破掉了惰性重键的唯一性</b>：两个区号的旧 uid 是同一个
- * {@code sha256("501234567")}，两个人会争抢同一条历史行，把账号在彼此之间来回搬 ——
- * 比现在的共用更糟。所以它需要先回答一个只有业务能答的问题：
- * <b>存量里真有跨市场撞号的账号时，那条历史行归谁？</b>
- *
- * <p><b>本类的作用是让这件事改不动就一直显形</b>：等区号参与派生之后，
- * 下面这条会红，而那正是提醒「该来更新这个用例、并把台账里那一条删掉」的时刻。
+ * <h3>拍板：历史行一律归 +971</h3>
+ * 此前只在阿联酋运营，历史账号实际都是 +971 用户。所以：
+ * <ol>
+ *   <li>区号取值确定：{@code phone} 自带 {@code +} 以它为准 → 否则 {@code countryCode} → 都没有才用默认区号；</li>
+ *   <li>只有归一后落在默认区号（971）的号码才去认领旧行 —— +966 的同号从此是新账号，抢不走历史行。</li>
+ * </ol>
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ConsumerPhoneIdentityTest extends ApiTestSupport {
@@ -42,28 +37,61 @@ class ConsumerPhoneIdentityTest extends ApiTestSupport {
     JdbcTemplate jdbc;
 
     @Test
-    @DisplayName("⚠️ 现状：同号不同区号解析成同一个账号（修好后本条会红——那时请更新它）")
-    void sameLocalNumberAcrossCountriesIsOneAccount() {
+    @DisplayName("同一本地号：+971 与 +966 是两个账号；不传区号等同默认区号 +971")
+    void countryCodeTakesPartInIdentity() {
         String local = "5" + (System.nanoTime() % 100000000L);
 
         String ae = loginWith("+971", local);
         String sa = loginWith("+966", local);
-
-        assertThat(sa)
-                .as("""
-                        两个区号登录出的是同一个 c_user_no —— countryCode 没参与身份派生。
-                        这不是期望行为，是被钉住的现状：区号来自 default-calling-code，不是端上那个字段。
-                        （归一与 pepper 已于 9-26 修好，见 ConsumerPhoneNormalizationTest；剩下的就是这一条。）
-                        让它参与派生会破掉惰性重键的唯一性，需要先拍板「撞号的历史行归谁」。
-                        **本条变红 = 区号已参与身份**，请连同台账那一条一起更新。""")
-                .isEqualTo(ae);
+        assertThat(sa).as("区号不同就是不同的人 —— 此前两人共用钱包、订单、券、押金").isNotEqualTo(ae);
+        assertThat(loginWith(null, local)).as("不传区号 = 默认区号 +971").isEqualTo(ae);
     }
 
-    /** 用 (区号, 本地号) 走一次 OTP 登录，返回落到的 c_user_no。 */
-    private String loginWith(String countryCode, String local) {
-        post("/mp/auth/otp", Map.of("countryCode", countryCode, "phone", local), null).okData();
-        return post("/mp/auth/login",
-                Map.of("grantType", "phone_otp", "countryCode", countryCode, "phone", local, "otp", "000000"),
-                null).okData().path("cUserNo").asText();
+    @Test
+    @DisplayName("phone 自带 + 时以它为准，countryCode 不再覆盖（两个都填且不一致时有确定答案）")
+    void plusInPhoneWinsOverCountryCode() {
+        String local = "5" + (System.nanoTime() % 100000000L);
+        String ae = loginWith("+971", local);
+        assertThat(loginWith("+966", "+971" + local)).isEqualTo(ae);
+    }
+
+    @Test
+    @DisplayName("历史行归 +971：+966 的同号认领不了，+971 登录仍能认领回老账号")
+    void legacyRowBelongsToDefaultMarket() {
+        String local = "5" + (System.nanoTime() % 100000000L);
+        // 旧算法时期端上原样发本地号：uid = sha256("501234567") 前 32 位
+        String cUserNo = "CU" + Long.toHexString(System.nanoTime()) + "LEG";
+        jdbc.update("insert into usr_user (c_user_no, tenant_id, credit_score, status) values (?, 'MAIN', 600, 'ACTIVE')",
+                cUserNo);
+        String legacyUid = bareSha256(local);
+        jdbc.update("insert into usr_identity (c_user_no, tenant_id, provider, provider_uid, union_key) "
+                + "values (?, 'MAIN', 'PHONE', ?, ?)", cUserNo, legacyUid, "PHONE:" + legacyUid);
+
+        assertThat(loginWith("+966", local))
+                .as("+966 的同号先来也不能把 +971 用户的历史账号搬走").isNotEqualTo(cUserNo);
+        assertThat(loginWith("+971", local))
+                .as("+971 用户登录照旧认领自己的历史账号（钱包/订单/券都在）").isEqualTo(cUserNo);
+    }
+
+    /** 用 (区号, 本地号) 走一次 OTP 登录，返回落到的 c_user_no。区号为 null 表示不传。 */
+    private String loginWith(String countryCode, String phone) {
+        Map<String, Object> otp = new java.util.HashMap<>(Map.of("phone", phone));
+        Map<String, Object> login = new java.util.HashMap<>(Map.of("grantType", "phone_otp", "phone", phone, "otp", "000000"));
+        if (countryCode != null) {
+            otp.put("countryCode", countryCode);
+            login.put("countryCode", countryCode);
+        }
+        post("/mp/auth/otp", otp, null).okData();
+        return post("/mp/auth/login", login, null).okData().path("cUserNo").asText();
+    }
+
+    private static String bareSha256(String s) {
+        try {
+            byte[] d = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(s.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(d).substring(0, 32);
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
     }
 }

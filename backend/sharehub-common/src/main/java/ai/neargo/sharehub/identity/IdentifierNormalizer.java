@@ -60,6 +60,32 @@ public final class IdentifierNormalizer {
         return full;
     }
 
+    /**
+     * 手机号 + 端上选的区号 → 纯数字国际格式。区号取值**确定**（2026-09-27 拍板）：
+     * {@code raw} 自带 {@code +}/{@code 00} 以它为准 → 否则 {@code callingCode} → 都没有才用默认区号。
+     *
+     * <p>此前端上每次都发 {@code countryCode}，却没人读 —— +971 与 +966 的同一本地号是同一个账号，
+     * 钱包、订单、券、押金全部共用。「两个都填且不一致」按第一条有确定答案，不存在歧义。
+     */
+    public String phone(String raw, String callingCode) {
+        String cc = callingCode == null ? "" : callingCode.replaceAll("\\D", "");
+        if (raw == null || cc.isEmpty()) return phone(raw);
+        String t = raw.trim();
+        if (t.startsWith("+") || t.startsWith("00")) return phone(t);
+        return phone("+" + cc + stripLeadingZero(t.replaceAll("\\D", "")));
+    }
+
+    /**
+     * 归一后的号码是否属于默认区号的市场。
+     *
+     * <p>用途只有一个：<b>只有默认市场的号码才去认领旧算法的历史行</b>。历史行的旧 uid 是
+     * {@code sha256(端上原样发的本地号)}，不带区号 —— 不加这道判断，+966 的同号会把
+     * +971 用户的历史账号搬走。拍板：此前只在阿联酋运营，历史行一律归默认区号。
+     */
+    public boolean isDefaultMarket(String normalizedPhone) {
+        return normalizedPhone != null && normalizedPhone.startsWith(defaultCallingCode);
+    }
+
     /** 邮箱 → trim + ROOT 小写。 */
     public static String email(String raw) {
         if (raw == null) throw new IllegalArgumentException("邮箱必填");

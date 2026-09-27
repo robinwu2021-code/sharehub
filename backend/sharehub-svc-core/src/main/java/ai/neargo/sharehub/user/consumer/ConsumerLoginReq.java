@@ -22,5 +22,6 @@ public record ConsumerLoginReq(
         String identityToken, // apple
         String idToken,       // google
         String nickname,
-        String avatar) {
+        String avatar,
+        String countryCode) { // 端上选的拨号区号（+971/+966），见 IdentifierNormalizer#phone(String, String)
 }

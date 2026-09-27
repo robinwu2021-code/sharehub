@@ -63,9 +63,9 @@ public class ConsumerPasswordService {
      * <p>号不存在时也走完 OTP 校验才拒，理由同 {@link PasswordStrategy}：
      * 「秒失败 vs 验完码再失败」同样能区分出号存不存在。
      */
-    public void resetByOtp(String rawPhone, String code, String newPassword, String country) {
+    public void resetByOtp(String rawPhone, String callingCode, String code, String newPassword, String country) {
         requirePasswordEnabled(country);
-        String phone = normalizer.phone(rawPhone);   // 与发码时同一个方法，否则「收到码了但验不过」
+        String phone = normalizer.phone(rawPhone, callingCode);   // 与发码时同一个方法，否则「收到码了但验不过」
         otp.verify(phone, code);                     // 不通过直接抛，下面一行都到不了
         String cUserNo = findCUserNo(phone, rawPhone);
         if (cUserNo == null) throw BizException.badRequest(LOGIN_FAILED);
@@ -81,7 +81,8 @@ public class ConsumerPasswordService {
     /** 按手机号找 {@code cUserNo}：先新算法 uid，再旧算法（惰性重键的存量账号也要能用口令）。 */
     String findCUserNo(String normalizedPhone, String rawPhone) {
         String uid = hasher.hash(normalizedPhone);
-        String legacy = PhoneOtpStrategy.legacyUid(rawPhone);
+        // 历史行一律归默认市场（同 PhoneOtpStrategy）
+        String legacy = normalizer.isDefaultMarket(normalizedPhone) ? PhoneOtpStrategy.legacyUid(rawPhone) : null;
         return DataScopeContext.executeWithoutScope(() -> {
             UsrIdentity hit = byUid(uid);
             if (hit == null) hit = byUid(legacy);

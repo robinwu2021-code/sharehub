@@ -54,7 +54,7 @@ public class PasswordStrategy implements ConsumerLoginStrategy {
         if (req.phone() == null || req.phone().isBlank()) {
             throw BizException.badRequest(LOGIN_FAILED);
         }
-        String phone = normalizer.phone(req.phone());     // 与 PhoneOtpStrategy 同一个方法
+        String phone = normalizer.phone(req.phone(), req.countryCode());     // 与 PhoneOtpStrategy 同一个方法
         String uid = hasher.hash(phone);
 
         // 查找口径与「忘记密码」共用一份，见 ConsumerPasswordService#findCUserNo

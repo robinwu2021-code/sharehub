@@ -90,9 +90,9 @@ public class ConsumerAuthController {
         }
         // 归一在这里做（与代理侧 AgentLoginServiceImpl / ApplyServiceImpl 同一个方法），
         // 之后整条链路（码表键、uid）用的都是它的输出 —— ADR-030 §4.1。
-        // countryCode 仍不参与计算：区号已经由 phone 自带（+971…）或由 default-calling-code 补全，
-        // 再引入一个来源就会出现「两个都填且不一致」这种没有正确答案的输入。
-        String normalized = normalizer.phone(phone);
+        // 区号：phone 自带 + 以它为准 → 否则 countryCode → 都没有才用默认区号（9-27 拍板，
+        // 此前 countryCode 没人读，+971 与 +966 的同号是同一个账号）。登录/注册/重置必须同一个方法。
+        String normalized = normalizer.phone(phone, body.countryCode());
         OtpService.Issued issued = otpService.issue(normalized, body.scene());
         // sent 如实回传投递结果：投递失败时码已作废，端上该提示重试而不是等短信。
         return devMode.isEnabled()
@@ -119,7 +119,7 @@ public class ConsumerAuthController {
         // 注册走的是 phone_otp，默认行 otp_enabled=1，门禁按默认行判即正确。
         ConsumerLoginReq req = new ConsumerLoginReq("phone_otp", null, phone, otp.trim(),
                 null, null, null, null, null, null, null,
-                body.nickname(), null);
+                body.nickname(), null, body.countryCode());
         ConsumerLoginVO vo = authService.login(req);
         /*
          * 口令现在**受理**了（realm=CONSUMER 的凭据，见 TDD-C端密码登录与凭据）。
@@ -153,7 +153,7 @@ public class ConsumerAuthController {
         if (body == null || body.phone() == null || body.phone().isBlank()) {
             throw new IllegalArgumentException("手机号为空");
         }
-        passwords.resetByOtp(body.phone(), body.otp(), body.password(), body.country());
+        passwords.resetByOtp(body.phone(), body.countryCode(), body.otp(), body.password(), body.country());
         return Map.of("ok", true);
     }
 

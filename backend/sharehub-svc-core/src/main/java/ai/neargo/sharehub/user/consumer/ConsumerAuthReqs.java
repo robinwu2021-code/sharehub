@@ -20,16 +20,13 @@ public final class ConsumerAuthReqs {
      * 码仍只按手机号索引，所以 scene=reset 发的码拿去 login 一样能过。
      * 现在不可利用（密码重置端点本身未开通、一律 400），真开通前必须先把 scene 并进键。
      *
-     * <p><b>{@code countryCode} 仍不参与任何计算</b>，而 c-app 每一次都在发它
-     * （{@code {countryCode: "+971", phone: "501234567"}}）。区号由两处提供：
-     * {@code phone} 自带（{@code +971…} / {@code 00971…}），或由
-     * {@code sharehub.security.default-calling-code} 补全 —— 于是
-     * <b>+971 501234567 与 +966 501234567 仍是同一个账号</b>。
+     * <p><b>{@code countryCode} 参与身份派生</b>（2026-09-27 起）：{@code phone} 自带 {@code +} 以它为准，
+     * 否则用 {@code countryCode}，都没有才用 {@code default-calling-code}
+     * （{@code IdentifierNormalizer#phone(String, String)}）。此前它没人读，
+     * +971 与 +966 的同一本地号是同一个账号。
      *
-     * <p>为什么没在归一那批里一起改：让 {@code countryCode} 参与派生会让惰性重键
-     * 失去唯一性 —— 两个区号的旧 uid 是同一个 {@code sha256("501234567")}，
-     * 会争抢同一条历史行、把账号在两个人之间来回搬。这一条要先拍板
-     * （存量里真有跨市场撞号的账号时，它归谁？），见 {@code ConsumerPhoneIdentityTest}。
+     * <p>惰性重键的唯一性靠「历史行一律归默认市场」保住（拍板）：只有归一后落在默认区号的号码
+     * 才去认领旧 uid，见 {@code ConsumerPhoneIdentityTest}。
      *
      * <p>归一与 pepper 本身已经修了：{@code PhoneOtpStrategy} 改用公共的
      * {@code IdentifierNormalizer} + {@code IdentifierHasher}，与员工侧同一个方法
