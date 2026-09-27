@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>ai.neargo.opskit</groupId>
+        <artifactId>opskit-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>process-parent</artifactId>
+    <packaging>pom</packaging>
+    <name>process-parent</name>
+    <description>流程能力：定义 · 实例 · 迁移 · 任务 · 审批 / 外部确认 / 定时门 · SLA · 待办</description>
+
+    <modules>
+        <module>process-api</module>
+        <module>process-client</module>
+        <module>process-core</module>
+        <module>process-store</module>
+    </modules>
+</project>

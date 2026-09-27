@@ -1,0 +1,67 @@
+package ai.neargo.opskit.platform.store.dao;
+
+import ai.neargo.opskit.commons.jdbc.Dialect;
+import ai.neargo.opskit.commons.tenancy.AccountId;
+import ai.neargo.opskit.commons.tenancy.WorkspaceId;
+import ai.neargo.opskit.platform.store.row.OutboxRow;
+import java.util.List;
+import java.util.Optional;
+import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.core.simple.JdbcClient;
+
+/**
+ * 发件箱。投递方是 db-scheduler 的周期任务（同一时刻只有一个实例在跑），所以取行不加锁；
+ * 手工重投只改 next_at / failed，不与投递争行。
+ */
+public final class OutboxDao {
+
+    private static final RowMapper<OutboxRow> MAPPER = (rs, i) -> new OutboxRow(
+            rs.getLong("id"), rs.getString("account_id"), rs.getString("workspace_id"), rs.getString("event_type"), rs.getString("idem_key"),
+            rs.getString("payload"), rs.getInt("attempts"), rs.getLong("next_at_ms"), (Long) rs.getObject("done_at_ms", Long.class),
+            rs.getInt("failed") == 1, rs.getString("last_error"), rs.getLong("created_at_ms"));
+
+    private final JdbcClient jdbc;
+    private final Dialect dialect;
+
+    public OutboxDao(JdbcClient jdbc, Dialect dialect) {
+        this.jdbc = jdbc;
+        this.dialect = dialect;
+    }
+
+    /** 同空间同类型同幂等键只入箱一次（写请求重试会再次触发同一事件）；重复不报错。 */
+    public void enqueue(WorkspaceId ws, String accountId, String eventType, String idemKey, String payload, long now) {
+        String sql = dialect.upsert("plat_outbox", List.of("workspace_id", "event_type", "idem_key"),
+                List.of("account_id", "workspace_id", "event_type", "idem_key", "payload", "attempts", "next_at_ms", "failed", "created_at_ms"),
+                List.of());
+        jdbc.sql(sql).params(accountId, ws.value(), eventType, idemKey, payload, 0, now, 0, now).update();
+    }
+
+    /** 到期待投递的行（跨空间：投递是全局任务）。第一个参数显式写 UNKNOWN，让「没有租户条件」在调用处显形。 */
+    public List<OutboxRow> due(AccountId unknown, long now, int limit) {
+        if (!AccountId.UNKNOWN.equals(unknown)) {
+            throw new IllegalArgumentException("outbox relay is cross-tenant by design");
+        }
+        return jdbc.sql("SELECT * FROM plat_outbox WHERE done_at_ms IS NULL AND failed = 0 AND next_at_ms <= ? ORDER BY next_at_ms, id"
+                        + dialect.limitOffset(limit, 0))
+                .param(now).query(MAPPER).list();
+    }
+
+    public Optional<OutboxRow> find(AccountId account, long id) {
+        return jdbc.sql("SELECT * FROM plat_outbox WHERE account_id = ? AND id = ?").params(account.value(), id).query(MAPPER).optional();
+    }
+
+    public void markDone(AccountId account, long id, long now) {
+        jdbc.sql("UPDATE plat_outbox SET done_at_ms = ?, last_error = NULL WHERE account_id = ? AND id = ?").params(now, account.value(), id).update();
+    }
+
+    public void markRetry(AccountId account, long id, int attempts, long nextAt, boolean failed, String error) {
+        jdbc.sql("UPDATE plat_outbox SET attempts = ?, next_at_ms = ?, failed = ?, last_error = ? WHERE account_id = ? AND id = ?")
+                .params(attempts, nextAt, failed ? 1 : 0, error, account.value(), id).update();
+    }
+
+    /** 手工重投：清失败标记、立即到期；已完成的不动。 */
+    public int redeliver(AccountId account, long id, long now) {
+        return jdbc.sql("UPDATE plat_outbox SET failed = 0, next_at_ms = ? WHERE account_id = ? AND id = ? AND done_at_ms IS NULL")
+                .params(now, account.value(), id).update();
+    }
+}

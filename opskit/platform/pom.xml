@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>ai.neargo.opskit</groupId>
+        <artifactId>opskit-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>platform-parent</artifactId>
+    <packaging>pom</packaging>
+    <name>platform-parent</name>
+    <description>平台层：账户 · 空间 · 应用 · 身份联邦 · 成员目录 · 日历 · 事件投递 · 幂等 · 审计 · 定时</description>
+
+    <modules>
+        <module>platform-api</module>
+        <module>platform-client</module>
+        <module>platform-core</module>
+        <module>platform-store</module>
+    </modules>
+</project>

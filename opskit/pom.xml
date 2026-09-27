@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- OpsKit（运营套件）：通用运营基础能力 SaaS。
+         孵化期住在 powerbank 仓库根目录，与 backend/ 平级、不进 sharehub-parent；
+         成熟后 用 git subtree split（prefix = opskit）拆成独立仓库，坐标与包名不变。
+         设计准绳：docs/technical/v4/16-工作流与工单/21-设计方案-重梳/ -->
+    <parent>
+        <groupId>ai.neargo</groupId>
+        <artifactId>neargo-parent</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>ai.neargo.opskit</groupId>
+    <artifactId>opskit-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>opskit-parent</name>
+
+    <modules>
+        <module>commons</module>
+        <module>platform</module>
+        <module>process</module>
+        <module>ticket</module>
+        <module>opskit-svc</module>
+        <module>opskit-arch</module>
+    </modules>
+
+    <properties>
+        <db-scheduler.version>16.12.0</db-scheduler.version>
+        <archunit.version>1.3.0</archunit.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency><groupId>ai.neargo.opskit</groupId><artifactId>opskit-commons</artifactId><version>${project.version}</version></dependency>
+            <dependency><groupId>ai.neargo.opskit</groupId><artifactId>opskit-commons</artifactId><version>${project.version}</version><type>test-jar</type></dependency>
+            <dependency><groupId>ai.neargo.opskit</groupId><artifactId>platform-api</artifactId><version>${project.version}</version></dependency>
+            <dependency><groupId>ai.neargo.opskit</groupId><artifactId>platform-client</artifactId><version>${project.version}</version></dependency>
+            <dependency><groupId>ai.neargo.opskit</groupId><artifactId>platform-core</artifactId><version>${project.version}</version></dependency>
+            <dependency><groupId>ai.neargo.opskit</groupId><artifactId>platform-store</artifactId><version>${project.version}</version></dependency>
+            <dependency><groupId>ai.neargo.opskit</groupId><artifactId>process-api</artifactId><version>${project.version}</version></dependency>
+            <dependency><groupId>ai.neargo.opskit</groupId><artifactId>process-client</artifactId><version>${project.version}</version></dependency>
+            <dependency><groupId>ai.neargo.opskit</groupId><artifactId>process-core</artifactId><version>${project.version}</version></dependency>
+            <dependency><groupId>ai.neargo.opskit</groupId><artifactId>process-store</artifactId><version>${project.version}</version></dependency>
+            <dependency><groupId>ai.neargo.opskit</groupId><artifactId>ticket-api</artifactId><version>${project.version}</version></dependency>
+            <dependency><groupId>ai.neargo.opskit</groupId><artifactId>ticket-client</artifactId><version>${project.version}</version></dependency>
+            <dependency><groupId>ai.neargo.opskit</groupId><artifactId>ticket-core</artifactId><version>${project.version}</version></dependency>
+            <dependency><groupId>ai.neargo.opskit</groupId><artifactId>ticket-store</artifactId><version>${project.version}</version></dependency>
+            <dependency><groupId>ai.neargo.opskit</groupId><artifactId>opskit-svc</artifactId><version>${project.version}</version></dependency>
+
+            <dependency>
+                <groupId>com.github.kagkarlsson</groupId>
+                <artifactId>db-scheduler-spring-boot-starter</artifactId>
+                <version>${db-scheduler.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.tngtech.archunit</groupId>
+                <artifactId>archunit-junit5</artifactId>
+                <version>${archunit.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <plugins>
+            <!-- 依赖卡口（21/05 §三）。只放全局规则；模块边界由 opskit-arch 的 ArchUnit 规则守。 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>opskit-global-rules</id>
+                        <goals><goal>enforce</goal></goals>
+                        <configuration>
+                            <rules>
+                                <dependencyConvergence/>
+                                <banDuplicatePomDependencyVersions/>
+                                <bannedDependencies>
+                                    <excludes>
+                                        <!-- 引擎：绑 MyBatis，D8 -->
+                                        <exclude>org.flowable:*</exclude>
+                                        <exclude>org.camunda*:*</exclude>
+                                        <exclude>org.activiti:*</exclude>
+                                        <!-- 持久化统一 JdbcClient -->
+                                        <exclude>org.mybatis:*</exclude>
+                                        <exclude>com.baomidou:*</exclude>
+                                        <exclude>org.jooq:*</exclude>
+                                        <exclude>org.hibernate*:*</exclude>
+                                        <!-- 定时统一 db-scheduler -->
+                                        <exclude>net.javacrumbs.shedlock:*</exclude>
+                                        <exclude>org.quartz-scheduler:*</exclude>
+                                        <!-- 产品不依赖任何客户 -->
+                                        <exclude>ai.neargo.sharehub:*</exclude>
+                                        <exclude>ai.neargo.shop:*</exclude>
+                                        <exclude>top.ichain:*</exclude>
+                                    </excludes>
+                                    <!-- Jackson 2（com.fasterxml.jackson.core:jackson-databind）暂不在这里禁：
+                                         springdoc（swagger-core）是否传递它待 O4-2 接入时核实，核实后再决定是否加进来。
+                                         我们自己的代码不许用它，由 ArchUnit A10 守。 -->
+                                </bannedDependencies>
+                            </rules>
+                            <fail>true</fail>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

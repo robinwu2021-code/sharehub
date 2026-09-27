@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: opskit
+
+server:
+  port: ${OPSKIT_PORT:8090}
+
+opskit:
+  crypto:
+    # 32 字节密钥的 Base64（如 openssl rand -base64 32）。只经环境变量 / 密钥管理注入，不进仓库；缺了拒绝启动
+    key: ${OPSKIT_CRYPTO_KEY:}
+  outbox:
+    relay-interval: 5s
+  idempotency:
+    retention: 7d
+
+# 21/02 §九 · 21/05 §七：两项都已由 DbSchedulerTimerSchedulerTest 实测
+db-scheduler:
+  table-name: plat_scheduled_tasks
+  # MySQL 系的 DATETIME 不带时区；不开这项，执行时刻按 JVM 时区存，换时区部署就错位（默认 false）
+  always-persist-timestamp-in-utc: true
+  # 等平台迁移建好 plat_scheduled_tasks 再启动轮询（默认 false）
+  delay-startup-until-context-ready: true
+  threads: 10
+  polling-interval: 10s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
