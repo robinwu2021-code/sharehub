@@ -98,7 +98,7 @@ public class ConsumerOrderAssembler {
                 vo.returnCabinetNo(), vo.returnSiteName(), vo.powerbankNo(), vo.locationName(),
                 vo.rentStartAt(), vo.rentEndAt(), vo.durationMin(), vo.feeAmount(), vo.depositAmount(),
                 vo.currency(), vo.fees(), vo.timeline(),
-                est.payable(), est.durationMin(), est.capped());
+                est.payable(), est.durationMin(), est.capped(), vo.payStatus());
     }
 
     private ConsumerOrderVO of(RentOrder o, Names names, List<FeeItemVO> fees, List<OrderStepVO> timeline) {
@@ -109,7 +109,7 @@ public class ConsumerOrderAssembler {
                 o.powerbankNo(), o.locationName(),
                 o.rentStartAt(), o.rentEndAt(), o.durationMin(),
                 BigDecimal.valueOf(o.feeAmount()), BigDecimal.valueOf(o.depositAmount()), o.currency(),
-                fees, timeline);
+                fees, timeline, o.payStatus());
     }
 
     /**

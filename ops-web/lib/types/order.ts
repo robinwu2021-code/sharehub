@@ -46,6 +46,11 @@ export interface RentOrder {
    * 买断单恒为 0（买断收的是硬件钱，不是租金）。
    */
   memberDiscountAmount?: number;
+  /**
+   * 收款态（V134，C-BL-04）：`PAID` 已收 / `UNPAID` 欠费；进行中为空。
+   * 结算时自动请款，失败即欠费；欠费用户借不了下一单，需在 App 补缴。
+   */
+  payStatus?: "PAID" | "UNPAID" | null;
 }
 
 // —— 订单人工干预（S1：修 F0 伪实现）——

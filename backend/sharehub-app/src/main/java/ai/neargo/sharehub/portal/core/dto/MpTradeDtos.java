@@ -61,7 +61,9 @@ public final class MpTradeDtos {
                                   String rentStartAt, String rentEndAt, Integer durationMin,
                                   BigDecimal feeAmount, BigDecimal depositAmount, String currency,
                                   List<FeeItemVO> fees, List<OrderStepVO> timeline,
-                                  BigDecimal estimatedFee, Integer estimatedDurationMin, Boolean capped) {
+                                  BigDecimal estimatedFee, Integer estimatedDurationMin, Boolean capped,
+                                  // 收款态 PAID / UNPAID（欠费，端上据此出「补缴」）；进行中为空。C-BL-04
+                                  String payStatus) {
 
         /**
          * 列表投影用：**不带试算**。
@@ -76,10 +78,10 @@ public final class MpTradeDtos {
                                String powerbankNo, String locationName,
                                String rentStartAt, String rentEndAt, Integer durationMin,
                                BigDecimal feeAmount, BigDecimal depositAmount, String currency,
-                               List<FeeItemVO> fees, List<OrderStepVO> timeline) {
+                               List<FeeItemVO> fees, List<OrderStepVO> timeline, String payStatus) {
             this(orderNo, cUserNo, status, cabinetNo, siteName, returnCabinetNo, returnSiteName,
                     powerbankNo, locationName, rentStartAt, rentEndAt, durationMin,
-                    feeAmount, depositAmount, currency, fees, timeline, null, null, null);
+                    feeAmount, depositAmount, currency, fees, timeline, null, null, null, payStatus);
         }
     }
 }

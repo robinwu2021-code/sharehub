@@ -131,6 +131,11 @@ export interface ConsumerOrder {
   estimatedDurationMin: number | null;
   /** 已触及总封顶：到这里费用不再增长（C-US-02）。此前端上是一句恒显示的静态提示。 */
   capped: boolean | null;
+  /**
+   * 收款态（C-BL-04）：`PAID` 已收 / `UNPAID` 欠费；进行中为空。
+   * 结算时自动请款，失败即欠费 —— 欠费拦下次借出，详情页出「立即补缴」。
+   */
+  payStatus?: "PAID" | "UNPAID" | null;
 }
 
 export interface UserProfile {

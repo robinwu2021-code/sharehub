@@ -65,6 +65,11 @@ public class OrdOrder extends BaseEntity {
 
     /** 应收合计（共性）。与 {@link #feeAmount} 并存于过渡期，见类注释。 */
     private java.math.BigDecimal amount;
+    /** 收款态：PAID 已收 / UNPAID 欠费；进行中为空（V134，C-BL-04）。 */
+    private String payStatus;
+    private java.math.BigDecimal paidAmount;
+    private java.time.LocalDateTime paidAt;
+    private String payNo;
 
     private Double feeAmount;
     private Double depositAmount;

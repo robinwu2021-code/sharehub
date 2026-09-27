@@ -53,7 +53,24 @@ public class StubPaymentPort implements PaymentPort {
 
     @Override
     public PayResult pay(PayRequest req) {
+        if (req.orderNo() != null && declineNext.remove(req.orderNo())) {
+            return new PayResult(req.payNo(), null, PayOrderStatus.FAILED.name(), req.amount(), req.currency(),
+                    "STUB_DECLINED");
+        }
         return new PayResult(req.payNo(), ref("STUBTXN"), PayOrderStatus.PAID.name(), req.amount(), req.currency(), null);
+    }
+
+    /** 被指定「下一次请款失败」的订单号，用一次即清。 */
+    private final java.util.Set<String> declineNext = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /**
+     * <b>测试用</b>：让该订单的下一次 {@link #pay} 返回 FAILED。
+     *
+     * <p>桩恒成功，于是「请款失败 → 欠费 → 拦下次借出 → 补缴」这整条路径没法被触发
+     * （见 ConsumerArrearsTest）。没有 HTTP 入口；接 nearpay 后本类整体替换，钩子随之消失。
+     */
+    public void declineNextFor(String orderNo) {
+        declineNext.add(orderNo);
     }
 
     @Override

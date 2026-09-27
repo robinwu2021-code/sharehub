@@ -94,6 +94,9 @@ public class RentOrderServiceImpl implements RentOrderService {
     /** 分润归属期间是**业务日历**上的月份 —— 见 publishSettled 与 BizClock。 */
     private final ai.neargo.sharehub.common.time.BizClock clock;
 
+    /** 结算即请款、补缴（C-BL-04）。 */
+    private final ai.neargo.sharehub.trade.pay.service.PaymentService payments;
+
     public RentOrderServiceImpl(OrdMapper mapper, OrdStateMachine stateMachine,
                                 OrdRentExtMapper rentExtMapper, InterventionMapper interventionMapper,
                                 PriceResolver priceResolver, PriceEngine priceEngine,
@@ -108,7 +111,9 @@ public class RentOrderServiceImpl implements RentOrderService {
                                 ai.neargo.sharehub.api.core.port.MemberRightsPort memberRights,
                                 ai.neargo.sharehub.common.time.BizClock clock,
                                 ai.neargo.sharehub.dev.port.CabinetCommandPort cabinetCommands,
-                                ai.neargo.sharehub.trade.EjectSimulation ejectSimulation) {
+                                ai.neargo.sharehub.trade.EjectSimulation ejectSimulation,
+                                ai.neargo.sharehub.trade.pay.service.PaymentService payments) {
+        this.payments = payments;
         this.cabinetCommands = cabinetCommands;
         this.ejectSimulation = ejectSimulation;
         this.clock = clock;
@@ -211,7 +216,7 @@ public class RentOrderServiceImpl implements RentOrderService {
                     base.rentEndAt(), base.durationMin(), base.feeAmount(), base.depositAmount(),
                     base.currency(), e.getWaivedAmount(),
                     compensate.get(e.getOrderNo()), ejects.getOrDefault(e.getOrderNo(), 0),
-                    lastEject.get(e.getOrderNo()), e.getCouponAmount(), e.getMemberDiscountAmount());
+                    lastEject.get(e.getOrderNo()), e.getCouponAmount(), e.getMemberDiscountAmount(), e.getPayStatus());
         }).toList();
     }
 
@@ -252,6 +257,8 @@ public class RentOrderServiceImpl implements RentOrderService {
             // 看起来像「他还了柜子然后结算」，而事实是他没还
             appendEvent(orderNo, beforeBuyout, e.getStatus(), "BUYOUT", e.getCUserNo());
             powerbankTracker.sold(e.getPowerbankNo());
+            // 此前 App 发起的买断不发结算事件（只有逾期自动买断那条路补发）—— 那笔收入不分润
+            collect(e, "BUYOUT");
             return toVO(e);
         });
     }
@@ -326,6 +333,7 @@ public class RentOrderServiceImpl implements RentOrderService {
                 cabinetMapper.selectOne(new LambdaQueryWrapper<DevCabinet>()
                         .eq(DevCabinet::getCabinetNo, cabinetNo).last("limit 1")));
         rentability.checkRent(cab);
+        requireNoArrears(cUserNo);
         // 从柜内在库的宝里挑一颗；柜子有宝台账却挑不出能借的 → 拒借（没有台账的柜按旧行为放行）
         ai.neargo.sharehub.dev.port.PowerbankTracker.Pick pick = powerbankTracker.pickForRent(cabinetNo);
         if (pick.tracked() && pick.powerbankNo() == null) {
@@ -579,11 +587,11 @@ public class RentOrderServiceImpl implements RentOrderService {
         e.setBuyout(charged.buyout() ? 1 : 0);
         e.setFeeAmount(charged.payable().doubleValue());   // 过渡期双写，待前端与报表切到 amount 后移除
         String beforeSettle = e.getStatus();
-        e.setStatus(stateMachine.next(e.getStatus(), "SETTLE"));   // RETURNED→SETTLED（支付为骨架）
+        e.setStatus(stateMachine.next(e.getStatus(), "SETTLE"));   // RETURNED→SETTLED；请款见 collect
         mapper.updateById(e);
         appendEvent(orderNo, beforeSettle, e.getStatus(), "SETTLE", OPERATOR_SYSTEM);
 
-        publishSettled(e);
+        collect(e, "RENT");   // 收到钱才发结算事件（分润），见 #collect
         powerbankTracker.returned(e.getPowerbankNo(), returnCabinetNo, null);   // 仓位由设备的识别回执补齐
         return new OkResult(true);
     }
@@ -646,9 +654,7 @@ public class RentOrderServiceImpl implements RentOrderService {
             ChargeChain.Charged charged = chargeChain.charge(gross, PriceResolver.multiplierFromSnapshot(e.getPriceSnapshot()),
                     null, cap, null);
             if (!charged.buyout()) return false;
-            buyout(orderNo, cap);
-            OrdOrder done = mapper.selectOne(new LambdaQueryWrapper<OrdOrder>().eq(OrdOrder::getOrderNo, orderNo).last("limit 1"));
-            publishSettled(done);   // 买断也是收入，分润照常
+            buyout(orderNo, cap);   // 买断也是收入：请款与分润在 buyout 里（collect）
             log.info("逾期达封顶自动买断 orderNo={} minutes={} cap={}", orderNo, min, cap);
             return true;
         }));
@@ -689,6 +695,96 @@ public class RentOrderServiceImpl implements RentOrderService {
                 // 品牌取自站点（一站一品牌，B1 已落地）；站点查不到时留 null，
                 // 那一维就不参与匹配 —— 与其它层一样，缺失不当成通配。
                 c.getVendorCode(), c.getModel(), brandNo, at);
+    }
+
+    /**
+     * 结算即请款（C-BL-04，2026-09-27 拍板：先收钱再分账）。
+     *
+     * <p>此前结算从不请款：算完钱就 SETTLE 并发结算事件，finance 按「应收」生成分润 —— 那笔钱从没收过，
+     * 「欠费」在数据上也不成立。现在：
+     * <ul>
+     *   <li>应付为 0（免单 / 全额券抵）→ 已收，照常发事件（基数 0，finance 自己跳过）；</li>
+     *   <li>否则经支付通道请款：成功 → 已收并<b>此时才</b>发 {@link OrderSettledEvent}；
+     *       失败或抛异常 → 欠费（UNPAID），<b>结算不回滚</b> —— 柜子已还、钱已算，扣款失败不能让订单回到进行中。</li>
+     * </ul>
+     * 不新增事件：{@code OrderSettledEvent} 的基数注释本来就是「本单<b>实收</b>」，挪到收款之后才与它自己的定义一致。
+     *
+     * <p>资金来源一期统一走通道（桩恒成功；接 nearpay 后由通道扣卡 / 扣预授权）。
+     * 押金、预授权、钱包三个来源的前提都还不存在，见 TDD-欠费补缴与结算请款.md §6。
+     */
+    private void collect(OrdOrder e, String payType) {
+        java.math.BigDecimal due = e.getAmount() == null ? java.math.BigDecimal.ZERO : e.getAmount();
+        if (due.signum() <= 0) {
+            markPaid(e, java.math.BigDecimal.ZERO, null);
+            return;
+        }
+        ai.neargo.sharehub.trade.pay.dto.PayDtos.PayOrderEntry paid = null;
+        try {
+            paid = payments.pay(e.getOrderNo(), e.getCUserNo(), payType, due, e.getCurrency(), null,
+                    "SETTLE-" + e.getOrderNo());
+        } catch (RuntimeException ex) {
+            log.warn("结算请款异常，已记欠费 orderNo={} amount={} —— 用户可在订单详情补缴，运营可催缴",
+                    e.getOrderNo(), due, ex);
+        }
+        if (paid != null && ai.neargo.sharehub.trade.pay.PayOrderStatus.PAID.name().equals(paid.status())) {
+            markPaid(e, due, paid.payNo());
+            return;
+        }
+        e.setPayStatus(PAY_UNPAID);
+        mapper.updateById(e);
+        log.warn("结算请款未成功，已记欠费 orderNo={} amount={} status={} —— 用户可在订单详情补缴，运营可催缴",
+                e.getOrderNo(), due, paid == null ? "ERROR" : paid.status());
+    }
+
+    private void markPaid(OrdOrder e, java.math.BigDecimal amount, String payNo) {
+        e.setPayStatus(PAY_PAID);
+        e.setPaidAmount(amount);
+        e.setPaidAt(java.time.LocalDateTime.now(java.time.ZoneOffset.UTC));   // 同 rentStartAt，UTC
+        e.setPayNo(payNo);
+        mapper.updateById(e);
+        publishSettled(e);
+    }
+
+    private static final String PAY_PAID = "PAID";
+    private static final String PAY_UNPAID = "UNPAID";
+
+    /**
+     * 补缴（{@code POST /mp/trade/pay}）。只接受<b>已结算且欠费</b>的单 —— 此前这个口不看订单状态、
+     * 也不幂等，对同一张单调几次就收几次钱。金额取订单应付，不认请求体。
+     * 成功 → 已收并发结算事件：迟到的分润照常归结算那个月（period 按 rentEndAt 定格）。
+     */
+    @Override
+    public ai.neargo.sharehub.trade.pay.dto.PayDtos.PayOrderEntry repay(String orderNo, String payType) {
+        return DataScopeContext.executeWithoutScope(() -> {
+            OrdOrder e = require(orderNo);
+            if (PAY_PAID.equals(e.getPayStatus())) {
+                throw BizException.conflict("error.pay.already_paid", orderNo);
+            }
+            if (!PAY_UNPAID.equals(e.getPayStatus())) {
+                throw BizException.conflict("error.pay.not_payable", e.getStatus());
+            }
+            ai.neargo.sharehub.trade.pay.dto.PayDtos.PayOrderEntry paid = payments.pay(orderNo, e.getCUserNo(),
+                    payType, e.getAmount(), e.getCurrency(), null, "REPAY-" + orderNo + "-" + System.currentTimeMillis());
+            if (ai.neargo.sharehub.trade.pay.PayOrderStatus.PAID.name().equals(paid.status())) {
+                markPaid(e, e.getAmount(), paid.payNo());
+                log.info("补缴成功 orderNo={} amount={}", orderNo, e.getAmount());
+            }
+            return paid;
+        });
+    }
+
+    /**
+     * 欠费拦下次借出（C-BL-04 规则）。放这里而不是 {@code RentabilityGuard}：
+     * 那是<b>设备</b>能不能借（也给列表显示「可借」用），欠费是<b>人</b>能不能借。
+     */
+    private void requireNoArrears(String cUserNo) {
+        OrdOrder owed = DataScopeContext.executeWithoutScope(() -> mapper.selectOne(new LambdaQueryWrapper<OrdOrder>()
+                .eq(OrdOrder::getCUserNo, cUserNo)
+                .eq(OrdOrder::getPayStatus, PAY_UNPAID)
+                .orderByAsc(OrdOrder::getId).last("limit 1")));
+        if (owed != null) {
+            throw BizException.conflict("error.rent.arrears", owed.getAmount(), owed.getOrderNo());
+        }
     }
 
     /**
@@ -921,7 +1017,8 @@ public class RentOrderServiceImpl implements RentOrderService {
         return new RentOrder(e.getOrderNo(), e.getCUserNo(), e.getCabinetNo(), e.getReturnCabinetNo(),
                 e.getPowerbankNo(), e.getLocationName(), e.getStatus(), e.getRentStartAt(), e.getRentEndAt(),
                 e.getDurationMin(), e.getFeeAmount() == null ? 0 : e.getFeeAmount(),
-                e.getDepositAmount() == null ? 0 : e.getDepositAmount(), e.getCurrency());
+                e.getDepositAmount() == null ? 0 : e.getDepositAmount(), e.getCurrency(),
+                null, null, null, null, null, null, e.getPayStatus());
     }
 
     /** 统一时间戳：ISO-8601 本地日期时间（UTC 时钟，**无 Z 后缀**）——

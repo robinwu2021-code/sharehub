@@ -6,6 +6,9 @@ import { api } from "@/api";
 import type { ConsumerOrder, OrderStatus } from "@/types";
 import { utcTimeOf, elapsedMin, durationText } from "@/shared/format";
 import { ORDER_REFRESH_MS } from "@/shared/constants";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 const order = ref<ConsumerOrder | null>(null);
 const buying = ref(false);
@@ -83,6 +86,27 @@ function findReturn() {
 function report() {
   if (order.value) uni.navigateTo({ url: `/pages/order/feedback?orderNo=${order.value.orderNo}` });
 }
+/**
+ * 补缴欠费（C-BL-04）。结算时已自动请款，只有扣款失败的单才会走到这里；
+ * 欠费会拦下一次借出 —— 此前 App 里没有任何能付钱的地方，被拦住的用户只能找客服。
+ * 金额由服务端从订单取，不从这里传。
+ */
+const paying = ref(false);
+async function payArrears() {
+  if (!order.value || paying.value) return;
+  paying.value = true;
+  try {
+    const r = await api.pay({ orderNo: order.value.orderNo, scene: "RENT" });
+    if (r.status === "SUCCESS") uni.showToast({ title: t("orders.paidOk"), icon: "success" });
+    else uni.showToast({ title: t("common.retry"), icon: "none" });
+    await load();
+  } catch (e) {
+    uni.showToast({ title: (e as Error).message, icon: "none" });
+  } finally {
+    paying.value = false;
+  }
+}
+
 async function buyout() {
   if (!order.value) return;
   buying.value = true;
@@ -122,6 +146,16 @@ async function buyout() {
         <view v-else-if="isInUse" class="mt-[16rpx] flex items-center gap-[8rpx] text-[22rpx] text-sub">
           <pb-icon name="info" :size="26" /><text>{{ $t("orders.feeAtReturn") }}</text>
         </view>
+      </pb-card>
+
+      <!-- 欠费（C-BL-04）：本单扣款没成功。不补缴就借不了下一单，所以入口放在最显眼的位置 -->
+      <pb-card v-if="order.payStatus === 'UNPAID'" class="mt-[20rpx]" tint="danger">
+        <view class="flex items-center justify-between">
+          <text class="text-[28rpx] font-bold text-danger">{{ $t("orders.arrears") }}</text>
+          <pb-amount :value="order.feeAmount" size="sm" />
+        </view>
+        <view class="mt-[8rpx] text-[24rpx] text-sub">{{ $t("orders.arrearsHint") }}</view>
+        <view class="mt-[20rpx]"><pb-button block :loading="paying" @click="payArrears">{{ $t("orders.payNow") }}</pb-button></view>
       </pb-card>
 
       <!-- 使用中：先给归还指引（高频），买断是次要出口 -->

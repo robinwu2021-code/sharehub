@@ -46,6 +46,9 @@ class ConsumerPayAmountTest extends ApiTestSupport {
     JdbcTemplate jdbc;
     @Autowired
     RentOrderService rents;
+    /** 结算时已自动请款（C-BL-04）：要测补缴，得先让结算那一笔失败，造出一张欠费单。 */
+    @Autowired
+    ai.neargo.sharehub.trade.pay.StubPaymentPort stub;
 
     final List<String> cabinets = new ArrayList<>();
 
@@ -61,6 +64,7 @@ class ConsumerPayAmountTest extends ApiTestSupport {
         String token = consumerToken();
         String orderNo = post("/mp/trade/orders/rent", Map.of("cabinetNo", cab), token)
                 .okData().path("orderNo").asText();
+        stub.declineNextFor(orderNo);
         rents.returnOrderAt(orderNo, cab, LocalDateTime.now(ZoneOffset.UTC).plusHours(3));
 
         BigDecimal payable = jdbc.queryForObject(
@@ -73,7 +77,7 @@ class ConsumerPayAmountTest extends ApiTestSupport {
         body.put("amount", new BigDecimal("0.01"));   // 冒充「我只付一分钱」
         post("/mp/trade/pay", body, token).okData();
 
-        assertThat(jdbc.queryForObject("SELECT amount FROM pay_order WHERE order_no=?", BigDecimal.class, orderNo))
+        assertThat(jdbc.queryForObject("SELECT amount FROM pay_order WHERE order_no=? AND status='PAID'", BigDecimal.class, orderNo))
                 .as("落库的支付金额必须是订单应付 —— 收请求体里的金额等于让用户自己定价，"
                         + "而幂等键是 PAY-<orderNo>，先到的那笔就把这张单锁死了")
                 .isEqualByComparingTo(payable);
@@ -86,11 +90,12 @@ class ConsumerPayAmountTest extends ApiTestSupport {
         String token = consumerToken();
         String orderNo = post("/mp/trade/orders/rent", Map.of("cabinetNo", cab), token)
                 .okData().path("orderNo").asText();
+        stub.declineNextFor(orderNo);
         rents.returnOrderAt(orderNo, cab, LocalDateTime.now(ZoneOffset.UTC).plusHours(3));
 
         // c-app 历史上发的是小写 —— 归一成大写，而不是原样落进一个声明了大写词表的列
         post("/mp/trade/pay", Map.of("orderNo", orderNo, "scene", "rent"), token).okData();
-        assertThat(jdbc.queryForObject("SELECT type FROM pay_order WHERE order_no=?", String.class, orderNo))
+        assertThat(jdbc.queryForObject("SELECT type FROM pay_order WHERE order_no=? AND status='PAID'", String.class, orderNo))
                 .isEqualTo("RENT");
 
         String other = post("/mp/trade/orders/rent", Map.of("cabinetNo", cab), token)

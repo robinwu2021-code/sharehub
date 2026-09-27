@@ -137,4 +137,10 @@ public interface RentOrderService {
      * @param buyoutPrice 买断价（门面从 BizRules 取，服务不反向依赖 platform 域）
      */
     RentOrder buyout(String orderNo, java.math.BigDecimal buyoutPrice);
+
+    /**
+     * 补缴欠费单（C-BL-04）：只接受已结算且欠费的单；已收的单 409，不重复收钱。
+     * 金额取订单应付。成功后订单转已收并发结算事件（分润随之生成）。
+     */
+    ai.neargo.sharehub.trade.pay.dto.PayDtos.PayOrderEntry repay(String orderNo, String payType);
 }

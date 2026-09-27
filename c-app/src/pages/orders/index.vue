@@ -79,7 +79,11 @@ function detail(o: ConsumerOrder) {
           <pb-card>
             <view class="flex items-center justify-between">
               <text class="text-[30rpx] font-bold text-ink">{{ o.siteName ?? o.locationName ?? o.cabinetNo }}</text>
-              <pb-tag :type="tagType[o.status]">{{ $t("status." + o.status) }}</pb-tag>
+              <view class="flex items-center gap-[10rpx]">
+                <!-- 欠费（C-BL-04）：状态是「已结算」，但钱没收到 —— 不单独标出来，用户看不出为什么借不了 -->
+                <pb-tag v-if="o.payStatus === 'UNPAID'" type="danger">{{ $t("orders.arrearsTag") }}</pb-tag>
+                <pb-tag :type="tagType[o.status]">{{ $t("status." + o.status) }}</pb-tag>
+              </view>
             </view>
             <view class="mt-[8rpx] text-[24rpx] text-sub">{{ o.orderNo }}</view>
             <!-- 进行中的行：时长按 rentStartAt 现算，金额**不显示** ——

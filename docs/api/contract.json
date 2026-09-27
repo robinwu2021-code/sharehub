@@ -33526,6 +33526,10 @@
     {
      "name": "memberDiscountAmount",
      "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "payStatus",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -33627,6 +33631,10 @@
     {
      "name": "memberDiscountAmount",
      "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "payStatus",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -33732,6 +33740,10 @@
       {
        "name": "memberDiscountAmount",
        "type": "java.math.BigDecimal"
+      },
+      {
+       "name": "payStatus",
+       "type": "String"
       }
      ]
     },
@@ -41994,6 +42006,10 @@
       {
        "name": "memberDiscountAmount",
        "type": "java.math.BigDecimal"
+      },
+      {
+       "name": "payStatus",
+       "type": "String"
       }
      ]
     },
@@ -43198,6 +43214,10 @@
     {
      "name": "avatar",
      "type": "String"
+    },
+    {
+     "name": "countryCode",
+     "type": "String"
     }
    ]
   },
@@ -43775,6 +43795,10 @@
     {
      "name": "capped",
      "type": "Boolean"
+    },
+    {
+     "name": "payStatus",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -43891,6 +43915,10 @@
     {
      "name": "capped",
      "type": "Boolean"
+    },
+    {
+     "name": "payStatus",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -44055,6 +44083,10 @@
     {
      "name": "capped",
      "type": "Boolean"
+    },
+    {
+     "name": "payStatus",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -44178,6 +44210,10 @@
     {
      "name": "capped",
      "type": "Boolean"
+    },
+    {
+     "name": "payStatus",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -44188,7 +44224,7 @@
    "perm": null,
    "perms": [],
    "handler": "RentController#pay",
-   "summary": "支付（`scene`=ORDER/…）。",
+   "summary": "补缴欠费单（`scene`=RENT/BUYOUT/…）。",
    "params": [],
    "bodyType": "ai.neargo.sharehub.trade.dto.MpTradeReqs.PayReq",
    "returnType": "Map<String, Object>",

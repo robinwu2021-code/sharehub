@@ -119,7 +119,7 @@ public class RentController {
     }
 
     /**
-     * 支付（{@code scene}=ORDER/…）。桩通道即时 PAID → 映射 c-app 的 SUCCESS；
+     * 补缴欠费单（{@code scene}=RENT/BUYOUT/…）。桩通道即时 PAID → 映射 c-app 的 SUCCESS；
      * 真实收银台参数（cashierParams）待 nearpay 接入（ADR-005），当前恒 null。
      */
     @PostMapping("/pay")
@@ -138,9 +138,9 @@ public class RentController {
          * 隔壁 recharge 的注释早把这条规矩写清楚了：收前端传的金额，
          * 「充 1 元到账 100」就是一次普通的改参数请求。
          */
-        java.math.BigDecimal amount = java.math.BigDecimal.valueOf(o.feeAmount());
-        PayOrderEntry p = payments.pay(orderNo, ConsumerContext.userNo(), body.payType(), amount,
-                o.currency(), null, "PAY-" + orderNo);
+        // 2026-09-27 起这个口就是**补缴**（C-BL-04）：结算时已自动请款，只有欠费单才需要再付。
+        // 此前它不看订单状态、也不幂等 —— 对同一张单调几次就收几次钱。状态校验与金额在 repay 里。
+        PayOrderEntry p = orders.repay(orderNo, body.payType());
         String status = "PAID".equals(p.status()) ? "SUCCESS"
                 : "FAILED".equals(p.status()) ? "FAILED" : "PENDING";
         Map<String, Object> out = new java.util.HashMap<>();
