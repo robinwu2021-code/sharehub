@@ -71,22 +71,44 @@ public class StoreCardAssembler {
      */
     private static final String NO_STOCK = "error.rent.no_stock";
 
-    public NearbyCabinetVO card(Cabinet c, Site s, Quote q, Double fromLat, Double fromLng) {
-        java.util.Optional<String> blocked = blockedReason(c);
-        boolean ok = blocked.isEmpty();
-        // 借不了就出 0：仓里还有宝，但这台机柜给不出来 —— 报真实台数会让用户白跑一趟
-        int borrow = ok ? c.availableCount() : 0;
-        int ret = Math.max(0, c.slotTotal() - c.availableCount());
-        // 只是没货 → 仍然是「营业中」，端上按 borrow=0 渲染成「满仓」；见 NO_STOCK 的说明
-        boolean serviceable = ok || NO_STOCK.equals(blocked.orElse(null));
-        /*
-         * status 此前只映射站点状态。机柜本身离线/故障时也要出 PAUSED ——
-         * 否则这张卡片会显示成「满仓」（端上 borrow=0 就渲染 Full），
-         * 而「满仓」与「这台坏了」对用户是两件事：前者换个柜子还，后者这家店白来。
-         */
-        String status = ("ACTIVE".equals(s.status()) && serviceable) ? "ACTIVE" : "PAUSED";
+    /**
+     * 一家店一张卡：把站点下所有机柜汇总成一张（出参形状与单柜卡相同）。
+     *
+     * <p>此前找柜列表与收藏页都是「一台柜一行」，卡上只有店名 —— 测试库里连着 5～7 张一模一样的
+     * 「Dubai Mall L1」，用户分不出哪张是哪张；收藏是按站点存的，收藏一家店出 7 张卡。
+     * （2026-09-27 产品拍板：两处都按站点合并。）
+     *
+     * <ul>
+     *   <li><b>可借</b>只算真能借的柜（{@link #borrowable}），与门店卡 {@code /mp/sites/{no}} 同一个数；</li>
+     *   <li><b>可还</b>各柜空仓相加，同门店卡；</li>
+     *   <li><b>cabinetNo</b> 填「借」该去的那台：能借的柜里宝最多的；都借不了就给第一台 ——
+     *       行键不能空，借出确认页会说清楚为什么借不了；</li>
+     *   <li><b>status</b>：站点营业且至少一台柜在服务（能借或只是没货）才是 ACTIVE。
+     *       机柜离线/故障要算进 PAUSED —— 否则卡片显示成「满仓」，而「满仓」与「坏了」对用户是两件事：
+     *       前者换个柜子还，后者这家店白来。</li>
+     *   <li>借不了的柜不计可借：仓里还有宝，但这台给不出来，报真实台数会让用户白跑一趟。</li>
+     * </ul>
+     *
+     * @return 站点下没有机柜时为 {@code null}（列表跳过这家店）
+     */
+    public NearbyCabinetVO siteCard(java.util.List<Cabinet> cs, Site s, Quote q, Double fromLat, Double fromLng) {
+        if (cs == null || cs.isEmpty()) return null;
+        Cabinet pick = null;
+        int borrow = 0, ret = 0;
+        boolean anyServing = false;
+        for (Cabinet c : cs) {
+            java.util.Optional<String> blocked = blockedReason(c);
+            ret += Math.max(0, c.slotTotal() - c.availableCount());
+            if (blocked.isEmpty()) {
+                borrow += c.availableCount();
+                if (pick == null || c.availableCount() > pick.availableCount()) pick = c;
+            }
+            if (blocked.isEmpty() || NO_STOCK.equals(blocked.orElse(null))) anyServing = true;
+        }
+        if (pick == null) pick = cs.get(0);
+        String status = ("ACTIVE".equals(s.status()) && anyServing) ? "ACTIVE" : "PAUSED";
         return new NearbyCabinetVO(
-                c.cabinetNo(), s.siteNo(), s.name(), s.address(),
+                pick.cabinetNo(), s.siteNo(), s.name(), s.address(),
                 distanceM(fromLat, fromLng, s.lat(), s.lng()),
                 s.lat(), s.lng(),
                 borrow, ret,

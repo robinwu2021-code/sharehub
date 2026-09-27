@@ -86,11 +86,11 @@ public class MpNearbyController {
                 if (!consumerVisible(s)) continue;
                 Quote q = quoteOrSkip(s);
                 if (q == null) continue;                      // 见 quoteOrSkip：算不出价就不上榜
-                for (Cabinet c : cabinets.bySite(s.siteNo())) {
-                    int ret = Math.max(0, c.slotTotal() - c.availableCount());
-                    if (Boolean.TRUE.equals(returnable) && ret == 0) continue;
-                    out.add(cards.card(c, s, q, lat, lng));
-                }
+                // 一家店一张卡（见 StoreCardAssembler#siteCard）；「只看能还的」按整店空仓判
+                NearbyCabinetVO card = cards.siteCard(cabinets.bySite(s.siteNo()), s, q, lat, lng);
+                if (card == null) continue;
+                if (Boolean.TRUE.equals(returnable) && card.availableReturn() == 0) continue;
+                out.add(card);
             }
             if (lat != null && lng != null) {
                 // 算不出距离的排最后：把 null 当 0 会让没坐标的店冒到第一位
@@ -140,7 +140,8 @@ public class MpNearbyController {
      * 行键用的 {@code cabinetNo} 还会**全撞在 undefined 上**，点进去是
      * {@code confirm?cabinetNo=undefined}。页面照常渲染，不报错。
      *
-     * <p>一个站点有多台机柜时每台出一行，与找柜列表一致 —— 借出是对着机柜发生的。
+     * <p>一家店一张卡，与找柜列表一致（{@link StoreCardAssembler#siteCard}）：收藏本来就是按站点存的，
+     * 此前每台柜出一行，收藏一家店出 7 张一模一样的卡。借出仍对着机柜发生 —— 卡上的 cabinetNo 就是那台。
      */
     @GetMapping("/mp/user/favorites")
     public List<NearbyCabinetVO> myFavorites(@RequestParam(required = false) Double lat,
@@ -156,9 +157,8 @@ public class MpNearbyController {
                 if (!consumerVisible(s)) continue;   // 收藏了一家后来关掉的店，不该还挂在列表上
                 Quote q = quoteOrSkip(s);
                 if (q == null) continue;                      // 同找柜列表：一家店算不出价不该让整个收藏夹空掉
-                for (Cabinet c : cabinets.bySite(s.siteNo())) {
-                    out.add(cards.card(c, s, q, lat, lng));
-                }
+                NearbyCabinetVO card = cards.siteCard(cabinets.bySite(s.siteNo()), s, q, lat, lng);
+                if (card != null) out.add(card);
             }
             return out;
         });

@@ -126,4 +126,45 @@ class ConsumerStoreCardTest extends ApiTestSupport {
         post("/mp/user/favorites/" + siteNo, Map.of(), token).okData();
         assertThat(get("/mp/user/favorites", token).okData()).isEmpty();
     }
+
+    @Test
+    @DisplayName("★★ 一家店一张卡：多柜站点不再出 N 张同名卡，数字与门店卡一致，「借」指向能借的那台")
+    void one_card_per_site() {
+        String token = consumerToken();
+        JsonNode rows = get("/mp/nearby/cabinets", token).okData();
+
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (JsonNode r : rows) {
+            assertThat(seen.add(r.path("siteNo").asText()))
+                    .as("站点 %s 出了不止一张卡 —— 模拟器上是连着 5 张一模一样的「Dubai Mall L1」，分不出哪张是哪张",
+                            r.path("siteNo").asText())
+                    .isTrue();
+        }
+
+        // 挑一家列表里有的、名下不止一台柜的店
+        JsonNode multi = null;
+        for (JsonNode r : rows) {
+            Integer n = jdbc.queryForObject("SELECT COUNT(*) FROM dev_cabinet WHERE deleted=0 AND site_no=?",
+                    Integer.class, r.path("siteNo").asText());
+            if (n != null && n > 1) { multi = r; break; }
+        }
+        assertThat(multi).as("测试库里得有一家多柜站点出现在找柜列表里").isNotNull();
+
+        String siteNo = multi.path("siteNo").asText();
+        JsonNode store = get("/mp/sites/" + siteNo, token).okData();
+        assertThat(multi.path("availableBorrow").asInt())
+                .as("列表卡与门店卡说的是同一家店，可借数要一致").isEqualTo(store.path("availableBorrow").asInt());
+        assertThat(multi.path("availableReturn").asInt())
+                .as("可还数同理").isEqualTo(store.path("availableReturn").asInt());
+        if (multi.path("availableBorrow").asInt() > 0) {
+            JsonNode av = get("/mp/nearby/cabinets/" + multi.path("cabinetNo").asText() + "/availability", token).okData();
+            assertThat(av.path("borrowable").asBoolean())
+                    .as("卡上写着可借，点「借」进的那台柜就得真能借").isTrue();
+        }
+
+        // 收藏是按站点存的：收藏一家多柜店，收藏页只该有一行
+        post("/mp/user/favorites/" + siteNo, Map.of(), token).okData();
+        assertThat(get("/mp/user/favorites", token).okData()).as("收藏一家店出一张卡").hasSize(1);
+        post("/mp/user/favorites/" + siteNo, Map.of(), token).okData();
+    }
 }

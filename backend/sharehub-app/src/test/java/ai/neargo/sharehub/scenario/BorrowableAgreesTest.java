@@ -34,13 +34,14 @@ class BorrowableAgreesTest extends ApiTestSupport {
     JdbcTemplate jdbc;
 
     private String cabinetNo;
-    private String originalStatus;
+    /** 被置为故障的柜 → 原状态（找柜列表按站点出卡，要让整店都坏才能看到站点卡变 0）。 */
+    private final Map<String, String> originalStatus = new java.util.LinkedHashMap<>();
 
     @AfterEach
     void restore() {
-        if (cabinetNo != null && originalStatus != null) {
-            jdbc.update("update dev_cabinet set status=? where cabinet_no=?", originalStatus, cabinetNo);
-        }
+        originalStatus.forEach((cab, st) ->
+                jdbc.update("update dev_cabinet set status=? where cabinet_no=?", st, cab));
+        originalStatus.clear();
     }
 
     @Test
@@ -50,8 +51,7 @@ class BorrowableAgreesTest extends ApiTestSupport {
                 "select cabinet_no from dev_cabinet where deleted=0 and available_count>0 "
                         + "and online_status='ONLINE' and status<>'FAULT' limit 1", String.class);
         assertThat(cabinetNo).isNotBlank();
-        originalStatus = jdbc.queryForObject(
-                "select status from dev_cabinet where cabinet_no=?", String.class, cabinetNo);
+        String siteNo = jdbc.queryForObject("select site_no from dev_cabinet where cabinet_no=?", String.class, cabinetNo);
 
         String phone = "+97150" + (System.nanoTime() % 10000000L);
         post("/mp/auth/otp", Map.of("phone", phone), null).okData();
@@ -60,13 +60,15 @@ class BorrowableAgreesTest extends ApiTestSupport {
                 .okData().path("token").asText();
 
         // 正常态：两边都说能借
-        assertThat(cardOf(token, cabinetNo).path("availableBorrow").asInt()).isPositive();
+        assertThat(cardOf(token, siteNo).path("availableBorrow").asInt()).isPositive();
         assertThat(detailBorrowable(token, cabinetNo)).isTrue();
 
-        // 置为故障
-        jdbc.update("update dev_cabinet set status='FAULT' where cabinet_no=?", cabinetNo);
+        // 整店置为故障（一家店一张卡：只坏一台时站点卡照样有别的柜可借）
+        jdbc.queryForList("select cabinet_no, status from dev_cabinet where deleted=0 and site_no=?", siteNo)
+                .forEach(r -> originalStatus.put((String) r.get("cabinet_no"), (String) r.get("status")));
+        jdbc.update("update dev_cabinet set status='FAULT' where deleted=0 and site_no=?", siteNo);
 
-        JsonNode card = cardOf(token, cabinetNo);
+        JsonNode card = cardOf(token, siteNo);
         assertThat(detailBorrowable(token, cabinetNo))
                 .as("详情本来就判了故障").isFalse();
         assertThat(card.path("availableBorrow").asInt())
@@ -114,7 +116,7 @@ class BorrowableAgreesTest extends ApiTestSupport {
         try {
             jdbc.update("update loc_site set status='PAUSED' where site_no=?", siteNo);
 
-            assertThat(cardOf(token, cab).path("availableBorrow").asInt())
+            assertThat(cardOf(token, siteNo).path("availableBorrow").asInt())
                     .as("停用站点在列表里报「可借 N」，用户点进去才撞 409「该站点暂停服务」")
                     .isZero();
             assertThat(detailBorrowable(token, cab)).as("详情也要说借不了").isFalse();
@@ -126,11 +128,12 @@ class BorrowableAgreesTest extends ApiTestSupport {
         }
     }
 
-    private JsonNode cardOf(String token, String cabinetNo) {
+    /** 找柜列表一家店一张卡（StoreCardAssembler#siteCard），按站点号取。 */
+    private JsonNode cardOf(String token, String siteNo) {
         for (JsonNode c : get("/mp/nearby/cabinets", token).okData()) {
-            if (cabinetNo.equals(c.path("cabinetNo").asText())) return c;
+            if (siteNo.equals(c.path("siteNo").asText())) return c;
         }
-        throw new AssertionError("找柜列表里没有这台机柜：" + cabinetNo);
+        throw new AssertionError("找柜列表里没有这家店：" + siteNo);
     }
 
     private boolean detailBorrowable(String token, String cabinetNo) {
