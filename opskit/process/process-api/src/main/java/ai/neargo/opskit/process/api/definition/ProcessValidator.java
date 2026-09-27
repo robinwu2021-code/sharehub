@@ -1,16 +1,7 @@
-package ai.neargo.opskit.process.core.domain.definition;
+package ai.neargo.opskit.process.api.definition;
 
 import ai.neargo.opskit.commons.condition.Condition;
 import ai.neargo.opskit.commons.error.FieldError;
-import ai.neargo.opskit.process.api.definition.ActionDef;
-import ai.neargo.opskit.process.api.definition.ApprovalMode;
-import ai.neargo.opskit.process.api.definition.ApprovalStepDef;
-import ai.neargo.opskit.process.api.definition.ApproverKind;
-import ai.neargo.opskit.process.api.definition.ApproverRef;
-import ai.neargo.opskit.process.api.definition.GateDef;
-import ai.neargo.opskit.process.api.definition.ProcessDef;
-import ai.neargo.opskit.process.api.definition.StatusDef;
-import ai.neargo.opskit.process.api.definition.TransitionDef;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -172,7 +163,7 @@ public final class ProcessValidator {
     }
 
     /** {@code *} = 任意非终态。 */
-    static Set<String> fromStatuses(TransitionDef t, Map<String, StatusDef> statuses) {
+    public static Set<String> fromStatuses(TransitionDef t, Map<String, StatusDef> statuses) {
         if (!t.from().contains(TransitionDef.ANY)) {
             return t.from();
         }

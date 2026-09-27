@@ -11,6 +11,7 @@ import ai.neargo.opskit.process.api.definition.ApproverKind;
 import ai.neargo.opskit.process.api.definition.ApproverRef;
 import ai.neargo.opskit.process.api.definition.GateDef;
 import ai.neargo.opskit.process.api.definition.ProcessDef;
+import ai.neargo.opskit.process.api.definition.ProcessValidator;
 import ai.neargo.opskit.process.api.definition.StatusCategory;
 import ai.neargo.opskit.process.api.definition.StatusDef;
 import ai.neargo.opskit.process.api.definition.TransitionDef;

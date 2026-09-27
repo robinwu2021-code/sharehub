@@ -1,8 +1,5 @@
-package ai.neargo.opskit.process.core.domain.definition;
+package ai.neargo.opskit.process.api.definition;
 
-import ai.neargo.opskit.process.api.definition.ProcessDef;
-import ai.neargo.opskit.process.api.definition.StatusDef;
-import ai.neargo.opskit.process.api.definition.TransitionDef;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
