@@ -7,15 +7,16 @@ import { cn } from "@/lib/utils";
 import { fmtMinutes, woSlaRemain, WO_DUE_SOON_MINUTES, type WorkOrder } from "@/lib/types";
 
 /**
- * SLA 已消耗的比例（0–100）：从开单到截止这段时限用掉了多少。
+ * SLA **剩余**的比例（4–100）：从开单到截止这段时限还剩多少 —— 条越短越紧，对齐原型
+ * （原型：剩 2 天 ≈80%、剩 28 分钟 ≈12%；已超时整条红、已完工整条绿）。
  * 拿不到截止时间（例如只有后端给的剩余分钟）就返回 null —— 没有分母就不画条，不猜。
  */
-function slaUsedPct(w: WorkOrder, remain: number): number | null {
+function slaLeftPct(w: WorkOrder, remain: number): number | null {
   if (!w.slaDueAt) return null;
   const parse = (t: string) => Date.parse(t.includes("T") ? t : t.replace(" ", "T"));
   const total = (parse(w.slaDueAt) - parse(w.createdAt)) / 60_000;
   if (!Number.isFinite(total) || total <= 0) return null;
-  return Math.min(100, Math.max(4, Math.round((1 - remain / total) * 100)));
+  return Math.min(100, Math.max(4, Math.round((remain / total) * 100)));
 }
 
 /**
@@ -45,7 +46,7 @@ export function SlaRemain({ w, className }: { w: WorkOrder; className?: string }
       </span>
     );
   }
-  const pct = slaUsedPct(w, remain);
+  const pct = slaLeftPct(w, remain);
   if (remain < 0) {
     return (
       <span className={cn("whitespace-nowrap tabular-nums text-destructive-ink", className)} title="已超过解决时限">
