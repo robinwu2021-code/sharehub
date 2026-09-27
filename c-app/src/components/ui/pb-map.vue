@@ -59,6 +59,8 @@ export default defineComponent({
     },
   },
   mounted() {
+    // 成因只给排障的人看：界面上说什么都一样（用户改不了 key，也换不了浏览器）
+    if (!KEY) console.warn("[pb-map] 未配置 VITE_GMAPS_KEY，地图显示为占位");
     // 定位在逻辑层取（App 走 uni.getLocation 的原生定位），拿到了再交给视图层画蓝点。
     // 「我在这儿」**只有真拿到位置才画**：先画在迪拜市中心的话，人在阿布扎比时地图会告诉他「你在迪拜」。
     getUserLocation().then((c) => {
@@ -105,6 +107,34 @@ function loadScript(key) {
   return loading;
 }
 
+/**
+ * 「构造了但从没画出来」的兜底。
+ *
+ * 现有的失败处理只管**脚本没加载成功**（onMapFail）。而还有一种：脚本加载成功、
+ * `new google.maps.Map()` 也跑了（容器里能看到 Maps 的空骨架），但地图**永远没开始绘制**
+ * —— 没有 .gm-style、没有图块、连一次 /maps/vt 请求都不发。
+ * 2026-09-27 在本机浏览器里实测到过（该环境缺 WebGL2，而 3.66 的矢量地图要它）。
+ *
+ * 这种情况下用户看到的是一整块没有任何解释的空白，而下面的「用列表」出口他也不知道存在。
+ * 所以给一个看门狗：到点还没画出来就当失败处理，退回占位并提示改用列表。
+ *
+ * 8 秒是权衡：慢网下首帧可能要几秒，太短会把能用的地图误判掉；
+ * 而超过 8 秒还是空白的话，用户早就去点别处了。
+ */
+function watchPainted(el, owner) {
+  const deadline = 8000;
+  const t0 = Date.now();
+  const timer = setInterval(function () {
+    if (el.querySelector(".gm-style")) { clearInterval(timer); return; }
+    if (Date.now() - t0 > deadline) {
+      clearInterval(timer);
+      // 留一句给排障的人：区分「没加载出来」和「加载了但没画」
+      if (window.console) console.warn("[pb-map] Maps 已加载但未绘制，退回占位");
+      owner.callMethod("onMapFail");
+    }
+  }, 500);
+}
+
 function icon(available) {
   return {
     path: window.google.maps.SymbolPath.CIRCLE,
@@ -126,6 +156,7 @@ export default {
         if (!gmap) {
           const el = document.getElementById("pb-map-canvas");
           if (!el) return;
+          watchPainted(el, owner);
           gmap = new g.Map(el, {
             center: DUBAI,
             zoom: 13,
@@ -192,7 +223,12 @@ export default {
     </view>
     <view class="pb-map__note">
       <pb-icon name="map" :size="26" />
-      <text>{{ failed ? "Map unavailable — use List" : "Set VITE_GMAPS_KEY to enable map" }}</text>
+      <!--
+        原来这两句是写死的英文，而这是 zh/en/ar 三语应用 —— 阿语用户会看到一句英文。
+        「没配 key」对用户也不是可行动的信息（他改不了环境变量），所以两种情况对外
+        都说同一句「地图暂不可用，请用列表」，**成因写进控制台给排障的人**。
+      -->
+      <text>{{ $t("home.mapUnavailable") }}</text>
     </view>
   </view>
 </template>

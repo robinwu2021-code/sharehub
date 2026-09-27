@@ -38,6 +38,7 @@ export default {
     enterCabinetHint: "الرقم مطبوع على الخزانة",
     cabinetNoPlaceholder: "مثال: CAB1011",
     nearby: "المحطات القريبة",
+    mapUnavailable: "الخريطة غير متاحة — استخدم القائمة",
     map: "خريطة",
     list: "قائمة",
     returnableOnly: "عرض المحطات التي بها منافذ فارغة فقط",

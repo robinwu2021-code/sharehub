@@ -38,6 +38,7 @@ export default {
     enterCabinetHint: "The number is printed on the cabinet",
     cabinetNoPlaceholder: "e.g. CAB1011",
     nearby: "Nearby stations",
+    mapUnavailable: "Map unavailable — use the list",
     map: "Map",
     list: "List",
     returnableOnly: "Showing stations with free slots only",

@@ -38,6 +38,7 @@ export default {
     enterCabinetHint: "柜机机身上印着编号，照着输入即可",
     cabinetNoPlaceholder: "例如 CAB1011",
     nearby: "附近门店",
+    mapUnavailable: "地图暂不可用，请用列表查看",
     map: "地图",
     list: "列表",
     returnableOnly: "只显示有空仓的网点（可归还）",
