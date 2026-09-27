@@ -110,6 +110,13 @@ fi
 label=$(printf '%s\n' "$BADGING" | awk -F"'" '/^application-label:/{print $2; exit}')
 [ "$label" = "$APP_LABEL" ] && ok "应用名：$label" || bad "应用名是「$label」，应为「$APP_LABEL」"
 
+# 4½. targetSdk ≥ 35。Google Play 要求新包与更新都以 API 35 为目标（2025-08 起）；
+#    离线工程的 build.gradle 在仓库外，SDK 自带 demo 写的是 33 —— 换机器重解压工程就会悄悄退回去。
+#    ≥ 34 还须在 android{} 里配 packagingOptions.jniLibs.useLegacyPackaging（DCloud 文档），否则原生库加载失败。
+tsdk=$(printf '%s\n' "$BADGING" | awk -F"'" '/^targetSdkVersion:/{print $2; exit}')
+[ "${tsdk:-0}" -ge 35 ] && ok "targetSdk $tsdk" \
+    || bad "targetSdk 是 ${tsdk:-未知}，Google Play 要求 ≥ 35 —— 改离线工程 simpleDemo/build.gradle（见操作手册）"
+
 # 5. versionCode 两处一致。
 #    APK manifest 的那个给 Android 系统判覆盖安装；包内 www/manifest.json 的那个
 #    给 DCloud 运行时判要不要重新解压 www。只抬前者 = 静默坏包：

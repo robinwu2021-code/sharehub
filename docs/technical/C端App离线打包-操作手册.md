@@ -66,7 +66,11 @@ c-app/offline/build-apk.sh --no-build            # www 已是最新，跳过 npm
 **已知未完成**：
 - 启动图标是临时生成的（主色方块 + 闪电），正式品牌图标到位后替换 `simpleDemo/src/main/res/drawable/icon.png`；
 - `uni.openLocation`（唤起导航）在 App 端需要地图模块，当前未集成 —— 点「导航」会走端上的失败提示，不会崩；
-- `targetSdkVersion` 仍是 SDK 默认的 33。内部 APK 直发无影响，**上 Google Play 要求 35**，届时一并处理（Android 15 的边到边强制会影响布局，要实测）。
+- **`targetSdkVersion 35`**（2026-09-27 起；SDK 自带 demo 是 33，重解压工程会退回去）。Google Play 要求 ≥ 35，
+  `verify-apk.sh` 会拦。≥ 34 时 `android {}` 里还须有 `packagingOptions { jniLibs { useLegacyPackaging true } }`
+  （DCloud 文档；缺了原生库加载失败）。Android 15 模拟器（`pb_souDian35`，API 35）实测：边到边强制没有带来额外遮挡 ——
+  顶部是**本来就有**的缺陷（全局 `navigationStyle: custom` 而页面没给状态栏留位，标题压在时间上，刘海机更明显），
+  已在 `pb-scaffold` 用 `var(--status-bar-height)` 占位修掉；底部 Tab 栏早已处理 `safe-area-inset-bottom`。
 
 **这一行 `apply from:` 必须在**（离线工程 `simpleDemo/build.gradle` 末尾）：
 
