@@ -511,6 +511,15 @@ public class RentOrderServiceImpl implements RentOrderService {
 
     @Override
     public OkResult returnOrderAt(String orderNo, String returnCabinetNo, java.time.LocalDateTime endUtc) {
+        return settleReturn(orderNo, returnCabinetNo, endUtc, true);
+    }
+
+    /**
+     * 归还结算本体。{@code trackBank=false} 给运营「强制归还」用：那时并不知道宝在哪个柜子，
+     * 不能把宝的位置改成某个柜（更不能改成空）—— 宝的去向由真实的归还信号或资产盘点来定。
+     */
+    private OkResult settleReturn(String orderNo, String returnCabinetNo, java.time.LocalDateTime endUtc,
+                                  boolean trackBank) {
         OrdOrder e = require(orderNo);
         String beforeReturn = e.getStatus();
         e.setStatus(stateMachine.next(e.getStatus(), "RETURN"));   // IN_USE→RETURNED，非法迁移拒
@@ -592,7 +601,7 @@ public class RentOrderServiceImpl implements RentOrderService {
         appendEvent(orderNo, beforeSettle, e.getStatus(), "SETTLE", OPERATOR_SYSTEM);
 
         collect(e, "RENT");   // 收到钱才发结算事件（分润），见 #collect
-        powerbankTracker.returned(e.getPowerbankNo(), returnCabinetNo, null);   // 仓位由设备的识别回执补齐
+        if (trackBank) powerbankTracker.returned(e.getPowerbankNo(), returnCabinetNo, null);   // 仓位由设备的识别回执补齐
         return new OkResult(true);
     }
 
@@ -898,7 +907,10 @@ public class RentOrderServiceImpl implements RentOrderService {
         if (!rule.from().contains(OrderStatus.of(before)))
             throw new IllegalArgumentException("状态 " + before + " 不允许 " + req.action() + "，允许自: " + rule.from());
         String after = rule.to() == null ? before : rule.to().name();
-        if (rule.to() != null) {
+        if ("force_return".equals(req.action())) {
+            e = forceReturn(e);   // 走正常结算（计费 / 请款 / 分润），不再直接改状态
+            after = e.getStatus();
+        } else if (rule.to() != null) {
             e.setStatus(after);
             mapper.updateById(e);
         }
@@ -917,6 +929,32 @@ public class RentOrderServiceImpl implements RentOrderService {
         log.setCreatedAt(LocalDateTime.now(ZoneOffset.UTC));
         interventionMapper.insert(log);
         return new InterventionDtos.OrderInterveneResult(toVO(e), toInterventionVO(log));
+    }
+
+    /**
+     * 运营「强制归还」（2026-09-28 拍板：走正常结算）。
+     *
+     * <p>此前直接把订单写成 SETTLED：不计费、不请款、不发结算事件 —— 用了三小时账上是 0，
+     * 场地方分不到钱，订单也不在收款态里（既非已收也非欠费）。要免单另走「减免」（waive）。
+     * <ul>
+     *   <li>使用中：与正常归还同一条路（按实际时长计费 → 请款 → 分润），只是不改宝的位置；</li>
+     *   <li>出宝中 / 异常：宝没交到用户手上，0 元结清，照样经收款步骤落「已收」。</li>
+     * </ul>
+     */
+    private OrdOrder forceReturn(OrdOrder e) {
+        if (OrderStatus.IN_USE.name().equals(e.getStatus())) {
+            settleReturn(e.getOrderNo(), null, null, false);
+        } else {
+            String before = e.getStatus();
+            e.setRentEndAt(nowUtc());
+            e.setAmount(java.math.BigDecimal.ZERO);
+            e.setFeeAmount(0.0);
+            e.setStatus(OrderStatus.SETTLED.name());   // 出宝中 → 已结算不在正常状态机里，干预本就是绕开正常流程
+            mapper.updateById(e);
+            appendEvent(e.getOrderNo(), before, e.getStatus(), "SETTLE", OPERATOR_SYSTEM);
+            collect(e, "RENT");
+        }
+        return require(e.getOrderNo());
     }
 
     @Override
