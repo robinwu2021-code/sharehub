@@ -98,7 +98,8 @@ const PUSH_SEED_AUDIENCE: AudienceSpec[] = [
   { targetType: "MEMBER_LEVEL", targetValue: "PLATINUM" },
   { targetType: "SEGMENT", targetValue: "SEG905" },
 ];
-const PUSH_CHANNELS: PushMessage["channel"][] = ["APP_PUSH", "SUBSCRIBE", "SMS"];
+// 只有两档：后端 DDL 词表没有 SMS，而 mock 编出 SMS 行会让「切到真后端就没了」
+const PUSH_CHANNELS: PushMessage["channel"][] = ["APP_PUSH", "SUBSCRIBE"];
 export const pushMessages: PushMessage[] = Array.from({ length: 16 }, (_, i) => {
   const aud = resolveAudience(p(PUSH_SEED_AUDIENCE, i));
   const draft = i % 4 === 0;

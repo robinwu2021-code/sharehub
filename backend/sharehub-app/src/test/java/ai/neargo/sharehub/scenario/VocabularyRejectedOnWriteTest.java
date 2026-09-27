@@ -66,6 +66,8 @@ class VocabularyRejectedOnWriteTest extends ApiTestSupport {
         jdbc.update("DELETE FROM share_rule WHERE payee_name = ?", MARK);
         jdbc.update("DELETE FROM mkt_campaign WHERE name = ?", MARK);
         jdbc.update("DELETE FROM notify_blacklist WHERE target LIKE '050000%'");
+        jdbc.update("DELETE FROM mkt_push WHERE title = ?", MARK);
+        jdbc.update("DELETE FROM coupon_tpl WHERE name = ?", MARK);
     }
 
     @Test
@@ -126,6 +128,51 @@ class VocabularyRejectedOnWriteTest extends ApiTestSupport {
         var bad = post("/api/user/campaigns", Map.of(
                 "name", MARK, "kind", "WHATEVER", "status", "DRAFT"), t);
         assertThat(bad.status).as("kind=WHATEVER 竟然被接受了：%s", bad.msg()).isEqualTo(400);
+    }
+
+    @Test
+    @DisplayName("★ mkt_push 的 channel / audience_type 非法值 400——SMS 那档已随前端下拉一起撤掉")
+    void push_channel_and_audience_rejects_out_of_vocabulary() {
+        String t = login("ADMIN");
+
+        var ok = post("/api/user/push-messages", Map.of(
+                "title", MARK, "content", "正对照", "channel", "APP_PUSH",
+                "audienceType", "ALL"), t);
+        assertThat(ok.status).as("合法渠道应当能存：%s", ok.msg()).isEqualTo(200);
+
+        /*
+         * SMS 是刻意选的：运营端的渠道下拉曾经真有这一档（label 表直接喂给 select），
+         * 而后端从不按渠道分支、全仓没有一处给推送发短信 —— 选了就落库，然后什么都不发生。
+         * 现在两边都只有两档，这一格钉住「别再加回来」。
+         */
+        var badCh = post("/api/user/push-messages", Map.of(
+                "title", MARK, "content", "负例", "channel", "SMS", "audienceType", "ALL"), t);
+        assertThat(badCh.status).as("channel=SMS 竟然被接受了：%s", badCh.msg()).isEqualTo(400);
+
+        var badAud = post("/api/user/push-messages", Map.of(
+                "title", MARK, "content", "负例", "channel", "APP_PUSH",
+                "audienceType", "EVERYONE"), t);
+        assertThat(badAud.status).as("audienceType=EVERYONE 竟然被接受了：%s", badAud.msg()).isEqualTo(400);
+    }
+
+    @Test
+    @DisplayName("★ coupon_tpl 的 type / status 非法值 400")
+    void coupon_tpl_rejects_out_of_vocabulary() {
+        String t = login("ADMIN");
+
+        var ok = post("/api/user/coupons", Map.of(
+                "name", MARK, "type", "CUT", "value", "5", "currency", "AED", "status", "ACTIVE"), t);
+        assertThat(ok.status).as("合法值应当能存：%s", ok.msg()).isEqualTo(200);
+
+        var badType = post("/api/user/coupons", Map.of(
+                "name", MARK, "type", "FREEBIE", "value", "5", "currency", "AED", "status", "ACTIVE"), t);
+        assertThat(badType.status).as("type=FREEBIE 竟然被接受了：%s", badType.msg()).isEqualTo(400);
+
+        var badStatus = post("/api/user/coupons", Map.of(
+                "name", MARK, "type", "CUT", "value", "5", "currency", "AED", "status", "ENABLED"), t);
+        assertThat(badStatus.status)
+                .as("status=ENABLED 竟然被接受了——那是 agt_agent 的词表，不是这一列的：%s", badStatus.msg())
+                .isEqualTo(400);
     }
 
     @Test

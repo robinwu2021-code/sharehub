@@ -113,8 +113,14 @@ export const campaignActions = (c: Campaign): CampaignAction[] =>
   (Object.keys(CAMPAIGN_TRANSITIONS) as CampaignAction[]).filter((a) => campaignActionAllowed(c, a));
 // —— 推送触达（S2：`marketing:push:send` 已定义未用）——
 // 渠道沿用 PushMessage 自己的枚举（**不是** NotifyLogChannel，见 types/system.ts 顶部注释：
-// 这里是推送**类型**）。S2 补 SMS，凑齐「App 推送 / 站内订阅消息 / 短信」三条触达通路。
-export type PushChannel = "APP_PUSH" | "SUBSCRIBE" | "SMS";
+// 这里是推送**类型**）。
+/**
+ * 推送触达渠道。**没有 SMS** —— 曾经有，但后端从不按渠道分支、
+ * 全仓没有任何一处给推送发短信：运营选了「短信」，单子照样存下来，然后什么都不发生。
+ * 后端 DDL 词表（`mkt_push.channel`）一直只有两档，现由 `PushChannel` 枚举校验。
+ * 要做短信推送是加功能，不是加回一个下拉项。
+ */
+export type PushChannel = "APP_PUSH" | "SUBSCRIBE";
 /** 推送状态机：草稿 → （定时）已排期 → 发送中 → 已发送。SENT 是终态，不可重发。 */
 export type PushStatus = "DRAFT" | "SCHEDULED" | "SENDING" | "SENT";
 export type PushAction = "schedule" | "send" | "finish";

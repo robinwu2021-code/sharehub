@@ -116,7 +116,7 @@ const MEMBER_LEVEL_OPTS = [
   { value: "SILVER", label: "白银会员" }, { value: "GOLD", label: "黄金会员" }, { value: "PLATINUM", label: "白金会员" },
 ];
 const PUSH_CHANNEL_LABEL: Record<PushMessage["channel"], string> = {
-  APP_PUSH: "App 推送", SUBSCRIBE: "订阅消息（站内）", SMS: "短信",
+  APP_PUSH: "App 推送", SUBSCRIBE: "订阅消息（站内）",
 };
 const PUSH_STATUS: StatusMap<PushMessage["status"]> = {
   DRAFT: { label: "草稿", tone: "muted" },

@@ -1,5 +1,10 @@
 package ai.neargo.sharehub.user.marketing.dto;
 
+import ai.neargo.sharehub.common.BizException;
+import ai.neargo.sharehub.user.marketing.AudienceType;
+import ai.neargo.sharehub.user.marketing.CouponTplStatus;
+import ai.neargo.sharehub.user.marketing.CouponType;
+import ai.neargo.sharehub.user.marketing.PushChannel;
 import ai.neargo.sharehub.user.marketing.CampaignKind;
 
 import java.math.BigDecimal;
@@ -99,9 +104,15 @@ public final class MarketingDtos {
             e.setPushNo(pushNo);
             e.setTitle(title);
             e.setContent(content);
-            e.setChannel(channel);
+            PushChannel ch = PushChannel.ofNullable(channel);
+            e.setChannel(ch == null ? null : ch.name());
             e.setAudience(audience);
-            e.setAudienceType(audienceType);
+            // AudienceType.of 返回 Optional（本仓早先的写法），由调用方抛
+            e.setAudienceType(audienceType == null || audienceType.isBlank() ? null
+                    : AudienceType.of(audienceType)
+                            .orElseThrow(() -> BizException.badRequest(
+                                    "error.push.audience_type_invalid", audienceType))
+                            .name());
             e.setAudienceValue(audienceValue);
             e.setScheduledAt(scheduledAt);
             return e;
@@ -116,13 +127,15 @@ public final class MarketingDtos {
             var e = new ai.neargo.sharehub.user.marketing.entity.CouponTpl();
             e.setTplNo(tplNo);
             e.setName(name);
-            e.setType(type);
+            CouponType ct = CouponType.ofNullable(type);
+            e.setType(ct == null ? null : ct.name());
             e.setValue(value);
             e.setThreshold(threshold);
             e.setCurrency(currency);
             e.setValidRule(validRule);
             e.setStock(stock);
-            e.setStatus(status);
+            CouponTplStatus cs = CouponTplStatus.ofNullable(status);
+            e.setStatus(cs == null ? null : cs.name());
             return e;
         }
     }

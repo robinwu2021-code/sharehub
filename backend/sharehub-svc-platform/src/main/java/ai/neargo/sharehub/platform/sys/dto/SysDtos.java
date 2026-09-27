@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.platform.sys.dto;
 
+import ai.neargo.sharehub.platform.sys.AppPlatform;
 import java.math.BigDecimal;
 
 /**
@@ -99,7 +100,8 @@ public final class SysDtos {
             var e = new ai.neargo.sharehub.platform.sys.entity.SysAppVersion();
             e.setVersionId(versionId);
             e.setVersionNo(versionNo);
-            e.setPlatform(platform);
+            AppPlatform pf = AppPlatform.ofNullable(platform);
+            e.setPlatform(pf == null ? null : pf.name());
             e.setBuildNo(buildNo);
             e.setReleaseNote(releaseNote);
             e.setReleaseNoteEn(releaseNoteEn);

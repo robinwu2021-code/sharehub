@@ -57,7 +57,10 @@ public final class AgentExtDtos {
             e.setUsername(username);
             e.setDisplayName(displayName);
             e.setLoginPhone(loginPhone);
-            e.setStatus(status);
+            // agt_account.status 是 ACTIVE/DISABLED，与 agt_agent.status 的
+            // ENABLED/SUSPENDED 不是同一套（混用的症状是「停用了他还能登进来」）
+            var as = ai.neargo.sharehub.agent.AgentAccountStatus.ofNullable(status);
+            e.setStatus(as == null ? null : as.name());
             return e;
         }
     }
@@ -148,7 +151,10 @@ public final class AgentExtDtos {
             var e = new ai.neargo.sharehub.agent.ext.entity.AgtCommission();
             e.setRuleNo(ruleNo);
             e.setAgentNo(agentNo);
-            e.setDimension(basis);   // 列名 dimension，入参名随读出参叫 basis
+            // 列名 dimension，入参名随读出参叫 basis。词表是 GMV/ORDER_COUNT，
+            // **不是** share_rule.dimension 的 VENUE/AGENT —— 见 CommissionDimension 类注释
+            var cd = ai.neargo.sharehub.agent.CommissionDimension.ofNullable(basis);
+            e.setDimension(cd == null ? null : cd.name());
             e.setRate(rate);
             e.setFixedAmount(fixedAmount);
             e.setCurrency(currency);
