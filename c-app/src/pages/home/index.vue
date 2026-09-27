@@ -115,15 +115,13 @@ onShow(load);
  *
  * **此前这颗心点了没有任何反应**：pb-store-sheet 发出 favorite 事件，而首页从没监听 ——
  * 登录与否都一样（Android 模拟器实测）。
- * 切换后**重新取一次门店卡**，以服务端的 favorite 为准，不读切换接口的返回值：
- * 后端那个口返回裸 boolean，而 c-app 契约写的是 {favorite}，两边对不上（另记待修）。
+ * 以切换接口返回的「切换后是否已收藏」为准，不在前端取反 —— 连点两下时取反会和服务端错开。
  */
 async function toggleFav(s: StoreDetail) {
   if (!ensureLoggedIn("/pages/home/index")) return;
   try {
-    await api.toggleFavorite(s.siteNo);
-    const at = await getUserLocation();
-    store.value = await api.storeDetail(s.siteNo, { lat: at?.lat, lng: at?.lng });
+    const favorite = await api.toggleFavorite(s.siteNo);
+    if (store.value?.siteNo === s.siteNo) store.value = { ...store.value, favorite };
   } catch (e) {
     uni.showToast({ title: (e as Error).message, icon: "none" });
   }

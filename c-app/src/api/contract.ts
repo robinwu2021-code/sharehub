@@ -179,7 +179,9 @@ export interface McpApi {
   // 收藏门店。列表返的是**门店卡片**（与找柜同一形状）—— 收藏页要展示地址、可借可还、价格。
   // 给了坐标才算得出距离；不给则 distanceM 为 null，界面不显示那一段（不是显示 0）。
   listFavorites(at?: { lat?: number; lng?: number }): Promise<NearbyCabinet[]>;
-  toggleFavorite(siteNo: string): Promise<{ favorite: boolean }>;
+  // 返回切换后是否已收藏 —— 后端就是裸 boolean（见 reference.md），此前这里写成 {favorite}，
+  // 调用方读 .favorite 恒为 undefined
+  toggleFavorite(siteNo: string): Promise<boolean>;
   // 借还
   rentOrder(p: RentParams): Promise<RentReceipt>;
   getOrder(orderNo: string): Promise<ConsumerOrder>;

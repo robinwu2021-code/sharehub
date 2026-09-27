@@ -54,7 +54,7 @@ export const httpApi: McpApi = {
   storeDetail: (siteNo: string, at) => client.get<StoreDetail>(`/mp/sites/${siteNo}`, at),
 
   listFavorites: (at) => client.get<NearbyCabinet[]>("/mp/user/favorites", at),
-  toggleFavorite: (siteNo: string) => client.post<{ favorite: boolean }>(`/mp/user/favorites/${siteNo}`), // 待定
+  toggleFavorite: (siteNo: string) => client.post<boolean>(`/mp/user/favorites/${siteNo}`),
 
   rentOrder: (p: RentParams) => client.post<RentReceipt>("/mp/trade/orders/rent", p),
   getOrder: (orderNo: string) => client.get<ConsumerOrder>(`/mp/trade/orders/${orderNo}`),

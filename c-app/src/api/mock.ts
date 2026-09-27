@@ -116,7 +116,7 @@ export const mockApi: McpApi = {
   toggleFavorite: (siteNo: string) => {
     if (db.favorites.has(siteNo)) db.favorites.delete(siteNo);
     else db.favorites.add(siteNo);
-    return db.delay({ favorite: db.favorites.has(siteNo) }, 300);
+    return db.delay(db.favorites.has(siteNo), 300);
   },
   ongoingOrder: () =>
     db.delay(withEstimate(db.orders.find((o) => o.status === "IN_USE" || o.status === "DISPENSING") ?? null)),

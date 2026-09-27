@@ -24,7 +24,9 @@ async function load() {
 onShow(load);
 
 async function remove(c: NearbyCabinet) {
-  await api.toggleFavorite(c.siteNo);
+  // 接口是「切换」不是「取消」：列表过期（别处已取消过）时，这一下会把它**加回去**。
+  // 返回 true 说明刚被加回了，再切一次还原
+  if (await api.toggleFavorite(c.siteNo)) await api.toggleFavorite(c.siteNo);
   list.value = list.value.filter((x) => x.siteNo !== c.siteNo);
   uni.showToast({ title: t("favorites.removed"), icon: "none" });
 }
