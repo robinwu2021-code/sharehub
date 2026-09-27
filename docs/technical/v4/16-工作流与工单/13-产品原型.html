@@ -90,12 +90,14 @@
   <div class="grp">我的</div>
   <a href="#todo" class="nav on" data-p="todo">待办中心 <span class="n">5</span></a>
   <div class="grp">审批</div>
+  <a href="#aplist" class="nav" data-p="aplist">审批列表</a>
   <a href="#approval" class="nav" data-p="approval">审批详情（示例）</a>
   <a href="#queue" class="nav" data-p="queue">审核队列</a>
   <div class="grp">工单</div>
   <a href="#orders" class="nav" data-p="orders">工单工作台</a>
   <a href="#detail" class="nav" data-p="detail">工单详情（示例）</a>
   <div class="grp">管理</div>
+  <a href="#flowcfg" class="nav" data-p="flowcfg">流程配置</a>
   <a href="#config" class="nav" data-p="config">运营配置</a>
   <a href="#admin" class="nav" data-p="admin">接入管理</a>
 </aside>
@@ -125,6 +127,31 @@
   </table>
   </div>
   <p class="foot">没有待办 ≠ 没有工单 —— 全部工单去「工单工作台」；已办结的在各单详情的时间线里。</p>
+</section>
+
+<!-- ═══════════ P2a 审批列表 ═══════════ -->
+<section class="page" id="p-aplist">
+  <div class="crumb">流程与工单 / 审批列表</div>
+  <h2>审批列表</h2>
+  <p class="sub">全部审批单（不只「待我审」）；按数据范围过滤。筛选条件即查询接口参数，一一对应。</p>
+  <div class="chips">
+    <span class="chip on">待审 12</span><span class="chip">已通过</span><span class="chip">已驳回</span><span class="chip">已撤回</span><span class="chip">全部</span>
+    <span class="chip" style="margin-left:14px">流程：全部 ▾</span>
+    <span class="chip">提交人：全部 ▾</span>
+    <span class="chip">提交时间：近 7 天 ▾</span>
+    <input type="text" placeholder="搜 单号 / 对象编号 / 标题" style="width:220px;margin-left:auto">
+  </div>
+  <div class="card" style="padding:0">
+  <table>
+    <tr><th>审批单</th><th>流程</th><th>业务对象</th><th>状态</th><th>当前步 / 轮次</th><th>提交人</th><th>提交时间</th><th>已等待</th></tr>
+    <tr onclick="go('approval')"><td class="mono">AP2609270001</td><td>进场合同</td><td>CT0042 万达广场 · 分成 35%</td><td><span class="tag t-warn">待审</span></td><td>运营审批 · 第 2 轮</td><td>Ali（BD）</td><td>09-27 14:02</td><td><span class="tag t-warn">4.1 小时</span></td></tr>
+    <tr><td class="mono">AP2609270008</td><td>提现审批</td><td>WD001392 · AG0007 · AED 4,200</td><td><span class="tag t-warn">待审</span></td><td>财务审批 · 第 1 轮</td><td>系统（代理发起）</td><td>09-27 15:40</td><td>2.5 小时</td></tr>
+    <tr><td class="mono">AP2609260031</td><td>代理入驻</td><td>APL0917 · Deira 五金店</td><td><span class="tag t-ok">已通过</span></td><td>— · 第 1 轮</td><td>Yusuf（BD）</td><td>09-26 16:20</td><td>耗时 3.2 小时</td></tr>
+    <tr><td class="mono">AP2609260019</td><td>进场合同</td><td>CT0041 · Marina Mall</td><td><span class="tag t-bad">已驳回</span></td><td>— · 第 1 轮</td><td>Ali（BD）</td><td>09-26 11:02</td><td>耗时 18 分钟</td></tr>
+    <tr><td class="mono">AP2609250090</td><td>退款审批</td><td>RF260925 · 订单 OD…8871</td><td><span class="tag t-mute">已撤回</span></td><td>— · 第 1 轮</td><td>Lina（客服）</td><td>09-25 19:44</td><td>—</td></tr>
+  </table>
+  </div>
+  <p class="foot">「已等待」= 当前步开始至今；已结单显示总耗时。点行进详情。</p>
 </section>
 
 <!-- ═══════════ P2 审批详情 ═══════════ -->
@@ -297,6 +324,73 @@
         <h3 style="margin-bottom:6px">备注 / 附件</h3>
         <textarea rows="2" placeholder="添加备注，可传图"></textarea>
         <div class="right" style="margin-top:8px"><button class="btn">上传图片</button> <button class="btn pri">提交备注</button></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ P5a 流程配置 ═══════════ -->
+<section class="page" id="p-flowcfg">
+  <div class="crumb">流程与工单 / 流程配置</div>
+  <h2>流程配置</h2>
+  <p class="sub">表单化配置审批流程（不做图形设计器）。保存即发布<b>新版本</b>：进行中的审批按提交时的版本走完，新版本只影响新提交。</p>
+  <div class="split">
+    <div>
+      <div class="card">
+        <div class="hd"><h3>流程列表</h3><button class="btn pri">新建流程</button></div>
+        <table>
+          <tr><th>流程</th><th>代号</th><th>步骤</th><th>当前版本</th><th>在途单</th><th class="right">操作</th></tr>
+          <tr style="background:#fafcfc"><td><b>进场合同</b></td><td class="mono">LOC_CONTRACT</td><td>运营审批 → 财务会签（条件）</td><td class="mono">a3f8c2d1</td><td>3</td><td class="right"><button class="btn pri">编辑</button></td></tr>
+          <tr><td>提现审批</td><td class="mono">FIN_WITHDRAWAL</td><td>财务审批</td><td class="mono">90a1e7bc</td><td>7</td><td class="right"><button class="btn">编辑</button></td></tr>
+          <tr><td>代理入驻</td><td class="mono">AGT_APPLY</td><td>运营审核</td><td class="mono">5cd20a11</td><td>1</td><td class="right"><button class="btn">编辑</button></td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <div class="hd"><h3>编辑：进场合同 LOC_CONTRACT</h3><span class="sysline">改动保存后生成新版本</span></div>
+        <div class="card" style="background:#fafcfc;margin-bottom:10px">
+          <div class="hd"><h3>步骤 1 · 运营审批</h3><span class="sysline">↑ ↓ 删除</span></div>
+          <dl class="kv">
+            <dt>审批人</dt><dd>按权限码 · <span class="mono">location:contract:audit</span></dd>
+            <dt>模式</dt><dd>或签（一人通过即过）</dd>
+            <dt>进入条件</dt><dd>无（必经）</dd>
+            <dt>步骤时限</dt><dd>8 小时（超时提醒，不自动通过）</dd>
+          </dl>
+        </div>
+        <div class="card" style="background:#fafcfc;margin-bottom:10px">
+          <div class="hd"><h3>步骤 2 · 财务会签</h3><span class="sysline">↑ ↓ 删除</span></div>
+          <dl class="kv">
+            <dt>审批人</dt><dd>按权限码 · <span class="mono">location:contract:cosign</span></dd>
+            <dt>模式</dt><dd>或签</dd>
+            <dt>进入条件</dt><dd>属性 <span class="mono">needsCosign</span> 为真（由业务系统提交时计算）</dd>
+            <dt>步骤时限</dt><dd>24 小时</dd>
+          </dl>
+        </div>
+        <button class="btn" style="width:100%">＋ 添加步骤</button>
+        <div style="margin-top:12px;display:flex;gap:16px;font-size:13px;flex-wrap:wrap">
+          <label><input type="checkbox" checked> 提交人不能审自己</label>
+          <label><input type="checkbox" checked> 驳回必填原因（不可关）</label>
+          <label><input type="checkbox" checked> 跨步互斥（后步不能由前步决定人办）</label>
+        </div>
+        <div class="note" style="margin-top:10px">进入条件只支持「属性 = 值 / 为真 / 属于」；复杂判断由业务系统在提交前算成属性 —— 平台不认识合同与订单。</div>
+        <div class="right" style="margin-top:8px"><button class="btn">查看版本历史</button> <button class="btn pri" onclick="alert('已发布新版本 b17e09f2（原型演示）：在途 3 单仍按 a3f8c2d1 走完。')">保存并发布</button></div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h3 style="margin-bottom:6px">版本历史</h3>
+        <ul class="tl" style="margin-top:8px">
+          <li class="hot"><b class="mono">a3f8c2d1</b> · 当前<div class="t">09-27 10:12 · 控制台 · Omar · 会签时限 48h → 24h</div></li>
+          <li><b class="mono">88d3c0e5</b><div class="t">09-25 09:00 · API 登记 · SHAREHUB 上线初版</div></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:6px">改动的边界</h3>
+        <ul style="padding-left:18px;font-size:12.5px;color:var(--ink2)">
+          <li>版本 = 内容哈希，只增不改</li>
+          <li>在途审批按提交时版本走完</li>
+          <li>审批人只能选四种：权限码 / 角色 / 队列 / 提交时指定</li>
+          <li>删除流程 = 停用（在途走完后不再接受新提交）</li>
+        </ul>
       </div>
     </div>
   </div>
