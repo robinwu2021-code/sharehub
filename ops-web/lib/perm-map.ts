@@ -66,10 +66,16 @@ export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   "flow:todo:read": "flow:todo:read",
   // ——— agent ———
   "agent:account:manage": "agent:account:manage",
-  "agent:agent:create": "agent:agent:create",
+  // agent:agent:create 已退役（V125）：直连建档端点 2026-09-27 收掉，代理商一律经入驻审核产生。
+  // 留着它的后果不是报错，是管理员勾了却什么也不发生 —— 与 V116 收拾的三个工单码同类。
   "agent:agent:read": "agent:agent:read",
   "agent:agent:update": "agent:agent:update",
   "agent:apply:approve": "agent:apply:approve",
+  // 代建录入。**漏了它整整四天**（f7e1b07a 09-23 起 app/agents 就在 allow() 它）——
+  // 未登记的码按「拒绝优先」判 false，而查映射在判通配之前，所以**连超管也被挡**。
+  // 今天收掉直连建档之后，代建录入是唯一的建档路，于是「界面上建不了代理商」。
+  // 生产不打那条 warning（只在非 production 打），所以它一直没有任何可见信号。
+  "agent:apply:create": "agent:apply:create",
   "agent:apply:read": "agent:apply:read",
   "agent:performance:read": "agent:performance:read",
   "agent:scope:assign": "agent:scope:assign",

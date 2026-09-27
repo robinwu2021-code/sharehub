@@ -134,8 +134,15 @@ export function can(perms: string[] | undefined, code: string): boolean {
    */
   const mapped = UI_PERM_MAP[code];
   if (mapped === undefined) {
-    // 漏登记。守卫（perm-map.test.ts）会在 CI 拦住，这里是运行时兜底：
-    // **拒绝优先** —— 默认放行会静默开一个没人知道的口子
+    /*
+     * 漏登记。**拒绝优先** —— 默认放行会静默开一个没人知道的口子。
+     *
+     * ⚠️ 这里原本写着「守卫（perm-map.test.ts）会在 CI 拦住」，而那句话**当时只对 nav.ts 成立**：
+     * 守卫扫的是菜单码，扫不到页面里的 `allow("…")`。结果 `agent:apply:create`
+     * 从 2026-09-23 漏登记到 09-28 四天没人发现 —— 因为下面这条 warn **只在非 production 打**，
+     * 生产上零信号；而查映射在判通配之前，连超管都被挡。
+     * 09-28 给守卫补了「扫调用点」那条用例，这句话现在才成立。
+     */
     if (process.env.NODE_ENV !== "production") {
       console.warn(`[perm] UI 码未登记进 UI_PERM_MAP，按无权限处理：${code}`);
     }

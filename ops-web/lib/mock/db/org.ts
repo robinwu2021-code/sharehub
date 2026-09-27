@@ -234,7 +234,8 @@ const PERM_CATALOG: ReadonlyArray<readonly [string, string]> = [
   ["system:tax:update", "税率与发票设置 编辑"],
 
   ["agent:agent:read", "代理商 查看"],
-  ["agent:agent:create", "代理商 新增"],
+  // agent:agent:create 已退役（后端 V125，2026-09-27）：直连建档端点收掉，
+  // 代理商一律经入驻审核产生。留在目录里的后果是管理员勾了却什么也不发生。
   ["agent:agent:update", "代理商 编辑"],
   ["agent:scope:assign", "设备/点位 划拨给代理"],
   ["agent:share:config", "代理分润 配置"],

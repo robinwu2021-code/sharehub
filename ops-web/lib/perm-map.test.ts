@@ -51,6 +51,15 @@ function backendEndpointPerms(): Set<string> {
 }
 
 /** nav.ts 里用到的码 —— 两种写法都要扫到（`perm: "x"` 与元组 `[..., "x", ...]`）。 */
+function walk(dir: string): string[] {
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const full = path.join(dir, e.name);
+    if (e.isDirectory()) return walk(full);
+    return /\.tsx?$/.test(e.name) && !e.name.includes(".test.") ? [full] : [];
+  });
+}
+
 function navCodes(): Set<string> {
   return new Set([...read("ops-web/lib/nav.ts").matchAll(CODE_RE)].map((m) => m[1]));
 }
@@ -71,6 +80,36 @@ describe("UI 权限码映射表", () => {
      */
     const missing = [...navCodes()].filter((c) => !(c in UI_PERM_MAP)).sort();
     expect(missing, `这些码在 nav.ts 里用了但没登记进 UI_PERM_MAP：\n${missing.join("\n")}`).toEqual([]);
+  });
+
+  it("★★★ 页面里 allow()/can() 用到的码也要在映射表里 —— 未登记 = 连超管都点不到", () => {
+    /*
+     * 上一条只扫 nav.ts。**页面里的按钮级判权扫不到**，而那正是 2026-09-28 实测到的洞：
+     * `app/agents/page.tsx` 从 09-23 起就在 `allow("agent:apply:create")`，
+     * 而这个码一直没进映射表。后果比菜单消失更隐蔽：
+     *
+     *   · 未登记 → can() 走「拒绝优先」返回 false；
+     *   · 而**查映射在判通配之前**，所以 `perms=["*"]` 的超管同样被挡；
+     *   · 那条 `console.warn` 只在非 production 打 —— 生产上零信号。
+     *
+     * 于是「新增代理商」按钮对所有人不可见。而 2026-09-27 收掉直连建档之后，
+     * 代建录入是唯一的建档路 —— 等于**界面上建不了代理商**，四天没人发现。
+     *
+     * `permissions.ts` 里原本写着「守卫（perm-map.test.ts）会在 CI 拦住」，
+     * 那句话对调用点**是不成立的**；这条用例就是来让它成立的。
+     */
+    const files = ["app", "components"].flatMap((d) => walk(path.join(ROOT, "ops-web", d)));
+    const CALL_RE = /\ballow\(\s*"([^"]+)"|\bcan\([^,)]+,\s*"([^"]+)"/g;
+    const missing = new Map<string, string>();
+    for (const f of files) {
+      // 剥注释：`need-perm.tsx` 的说明里就有 `allow("…")` 这样的示例文案
+      const src = stripComments(fs.readFileSync(f, "utf8"));
+      for (const m of src.matchAll(CALL_RE)) {
+        const code = m[1] ?? m[2];
+        if (!(code in UI_PERM_MAP)) missing.set(code, path.relative(ROOT, f));
+      }
+    }
+    expect(missing.size, [...missing].map(([c, f]) => `  ${c}  ←  ${f}`).join("\n")).toBe(0);
   });
 
   it("★★★ 映射到的后端码必须真的被某个端点判过 —— 手滑一个字母 = 那个入口对所有人永久消失", () => {
