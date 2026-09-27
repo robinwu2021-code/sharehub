@@ -12,7 +12,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 /**
  * 审计（21/07 O1-11）。必须在被审计的变更的**同一事务**里调用：变更回滚审计也回滚，变更成功审计不会缺。
  */
-public final class AuditTrail {
+public final class AuditTrail implements ai.neargo.opskit.commons.audit.AuditRecorder {
 
     /** 运维面的操作者（M1 的运维凭证不区分个人）。 */
     public static final String OPS = "ops:console";
@@ -23,6 +23,11 @@ public final class AuditTrail {
     public AuditTrail(AuditDao dao, Clock clock) {
         this.dao = dao;
         this.clock = clock;
+    }
+
+    @Override
+    public void record(Actor actor, String workspaceId, String action, String target, Map<String, ?> detail) {
+        record(actor.tenant().accountId(), workspaceId, who(actor), action, target, detail);
     }
 
     public void record(Actor actor, String action, String target, Map<String, ?> detail) {

@@ -1,8 +1,6 @@
 package ai.neargo.opskit.platform.core.app;
 
 import ai.neargo.opskit.commons.actor.Actor;
-import ai.neargo.opskit.commons.error.CommonErrors;
-import ai.neargo.opskit.commons.error.OpsKitException;
 import ai.neargo.opskit.platform.api.Permission;
 
 /**
@@ -17,9 +15,6 @@ public final class Guards {
     }
 
     public static void require(Actor actor, Permission permission) {
-        if (actor.isAppItself() || actor.has(permission.code())) {
-            return;
-        }
-        throw new OpsKitException(CommonErrors.PERMISSION_DENIED, "missing permission " + permission.code());
+        ai.neargo.opskit.commons.security.PermissionGuard.require(actor, permission.code());
     }
 }
