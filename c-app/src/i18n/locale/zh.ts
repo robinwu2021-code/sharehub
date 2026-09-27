@@ -32,6 +32,8 @@ export default {
     full: "已满",
     paused: "暂停服务",
     scan: "扫码借",
+    scanTip: "把柜机上的二维码放进框内",
+    cameraDenied: "没有相机权限，可改用输入编号",
     enterCabinet: "输入编号",
     enterCabinetHint: "柜机机身上印着编号，照着输入即可",
     cabinetNoPlaceholder: "例如 CAB1011",

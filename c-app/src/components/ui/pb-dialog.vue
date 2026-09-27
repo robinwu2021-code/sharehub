@@ -35,9 +35,7 @@ function ok() {
   emit("confirm");
   emit("update:visible", false);
 }
-function onInput(e: any) {
-  emit("update:inputValue", String(e?.detail?.value ?? ""));
-}
+
 </script>
 
 <template>
@@ -46,15 +44,18 @@ function onInput(e: any) {
     <view class="pb-dlg__box">
       <text class="pb-dlg__title">{{ title }}</text>
       <text v-if="message" class="pb-dlg__msg">{{ message }}</text>
-      <input
-        v-if="inputPlaceholder"
-        class="pb-dlg__input"
-        :value="inputValue"
-        :placeholder="inputPlaceholder"
-        confirm-type="done"
-        @input="onInput"
-        @confirm="ok"
-      />
+      <!--
+        用 pb-field 而不是本组件自绘 input：全站输入都是那一个形状
+        （高 96rpx / 圆角 22rpx / 色块底 / 左对齐）。这里自绘过一版，
+        圆角、高度、对齐各差一点，摆在弹窗里就显得不是同一套东西。
+      -->
+      <view v-if="inputPlaceholder" class="pb-dlg__field">
+        <pb-field
+          :model-value="inputValue"
+          :placeholder="inputPlaceholder"
+          @update:model-value="(v: string) => emit('update:inputValue', v)"
+        />
+      </view>
       <view class="pb-dlg__btns">
         <view class="pb-dlg__btn is-cancel" @tap="cancel">{{ cancelText || $t("common.cancel") }}</view>
         <view class="pb-dlg__btn" :class="danger ? 'is-danger' : 'is-ok'" @tap="ok">{{ confirmText || $t("common.confirm") }}</view>
@@ -69,18 +70,7 @@ function onInput(e: any) {
 .pb-dlg__box { position: relative; width: 78%; background: var(--pb-elev); border-radius: 30rpx; padding: 40rpx 36rpx 28rpx; }
 .pb-dlg__title { display: block; text-align: center; font-size: 32rpx; font-weight: 800; color: var(--pb-ink); }
 .pb-dlg__msg { display: block; text-align: center; font-size: 26rpx; color: var(--pb-sub); margin-top: 16rpx; line-height: 1.6; }
-.pb-dlg__input {
-  margin-top: 28rpx;
-  width: 100%;
-  box-sizing: border-box;
-  padding: 24rpx 28rpx;
-  border-radius: 20rpx;
-  background: var(--pb-faint);
-  color: var(--pb-ink);
-  font-size: 30rpx;
-  text-align: center;
-  letter-spacing: 2rpx;
-}
+.pb-dlg__field { margin-top: 28rpx; }
 .pb-dlg__btns { display: flex; gap: 16rpx; margin-top: 36rpx; }
 .pb-dlg__btn { flex: 1; text-align: center; padding: 24rpx 0; border-radius: 9999px; font-size: 29rpx; font-weight: 700; }
 .is-cancel { background: var(--pb-faint); color: var(--pb-ink); }

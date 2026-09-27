@@ -5,16 +5,23 @@ import { api, IS_MOCK } from "@/api";
 import { useI18n } from "vue-i18n";
 import type { NearbyCabinet, Notice, ConsumerOrder, StoreDetail } from "@/types";
 import { distance } from "@/shared/format";
-import { scanCabinet } from "@/ports/scan";
+import { scanCabinet, canScanHere } from "@/ports/scan";
 
-/** 本端有没有扫码能力。H5（含 Capacitor 的纯 WebView）没有 uni.scanCode。 */
-const canScan = (() => {
+/**
+ * 本端能不能扫码。**扫码是借出的主要方式**，所以主按钮恒为扫码，
+ * 只有这里为 false（浏览器没有原生解码器 / 没相机 / 非安全上下文，如 Safari）
+ * 才退而把手输放到主位 —— 按钮不会「点了没反应」。
+ */
+const canScan = canScanHere();
+/** H5 用自绘取景层；App / 小程序用 uni.scanCode。 */
+const useWebScanner = (() => {
   // #ifdef H5
-  return false;
+  return true;
   // #endif
   // eslint-disable-next-line no-unreachable
-  return true;
+  return false;
 })();
+const showScanner = ref(false);
 import { openNavigation } from "@/ports/map";
 import { getUserLocation } from "@/ports/location";
 import { ensureLoggedIn } from "@/shared/auth-gate";
@@ -112,10 +119,14 @@ function openManual() {
   showManual.value = true;
 }
 
-/** 主按钮：能扫码的端去扫，扫不了的端直接手输。 */
+/** 主按钮：优先扫码；浏览器扫不了才落到手输。 */
 async function onPrimary() {
   if (!canScan) {
     openManual();
+    return;
+  }
+  if (useWebScanner) {
+    showScanner.value = true;
     return;
   }
   try {
@@ -208,9 +219,8 @@ async function onPrimary() {
     </view>
 
     <!--
-      次要入口只在**能扫码的端**出现：那里两种方式并存，扫码为主、手输为辅。
-      H5 本来就扫不了（uni.scanCode 是 App/小程序能力），主按钮已经是手输，
-      再挂一个同样的次要入口只是重复。
+      次要入口只在**主按钮是扫码时**出现：那时两种方式并存，扫码为主、手输为辅。
+      扫不了码的端（如 Safari）主按钮已经是手输，再挂一个同样的次要入口只是重复。
     -->
     <view v-if="canScan" class="pb-fab-alt" @tap="openManual">
       <pb-icon name="keyboard" :size="26" />
@@ -225,6 +235,13 @@ async function onPrimary() {
       :message="$t('home.enterCabinetHint')"
       :input-placeholder="$t('home.cabinetNoPlaceholder')"
       @confirm="goConfirm(manualNo)"
+    />
+
+    <!-- H5 取景层：扫到就直接进确认页；层内常驻「输入编号」出口 -->
+    <pb-scanner
+      v-model:visible="showScanner"
+      @result="goConfirm"
+      @manual="openManual"
     />
 
     <pb-store-sheet

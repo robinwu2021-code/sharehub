@@ -32,6 +32,8 @@ export default {
     full: "Full",
     paused: "Unavailable",
     scan: "Scan",
+    scanTip: "Point at the QR code on the cabinet",
+    cameraDenied: "No camera access. You can enter the code instead.",
     enterCabinet: "Enter code",
     enterCabinetHint: "The number is printed on the cabinet",
     cabinetNoPlaceholder: "e.g. CAB1011",
