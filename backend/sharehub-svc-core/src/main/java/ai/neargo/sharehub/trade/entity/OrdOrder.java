@@ -98,6 +98,17 @@ public class OrdOrder extends BaseEntity {
     /** 减免额 = 免单时**本应收**的金额。直接置 0 会让「本月减免总额」拿不到数。 */
     private java.math.BigDecimal waivedAmount;
 
+    /** 会员等级（源 {@code usr_membership.level}），空=非会员。答「这单凭什么打折」。 */
+    private String memberLevel;
+
+    /**
+     * 会员折扣额；买断单恒为 0（买断收的是硬件钱，见 {@code ChargeChain} 约束 3）。
+     *
+     * <p>与 {@link #memberLevel} 分开存的理由同 {@link #couponNo}/{@link #couponAmount}：
+     * 权益配置会改，折扣额还取决于当时的应收 —— 事后推不出来。
+     */
+    private java.math.BigDecimal memberDiscountAmount;
+
     /** 应收触及总封顶 → 买断（充电宝转 SOLD，[db-design §9A.1]）。 */
     private Integer buyout;
 

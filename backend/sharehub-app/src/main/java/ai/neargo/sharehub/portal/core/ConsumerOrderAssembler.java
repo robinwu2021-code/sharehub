@@ -38,6 +38,7 @@ public class ConsumerOrderAssembler {
     private static final String FEE_COUPON = "COUPON";
     private static final String FEE_WAIVE = "WAIVE";
     private static final String FEE_COMPENSATE = "COMPENSATE";
+    private static final String FEE_MEMBER = "MEMBER";
 
     private final CabinetService cabinets;
     private final LocService loc;
@@ -122,6 +123,7 @@ public class ConsumerOrderAssembler {
         BigDecimal payable = BigDecimal.valueOf(o.feeAmount());
         BigDecimal coupon = nz(o.couponAmount());
         BigDecimal waived = nz(o.waivedAmount());
+        BigDecimal member = nz(o.memberDiscountAmount());
 
         /*
          * 租借费这一行是**折扣前**的应收，不是 feeAmount。
@@ -134,10 +136,15 @@ public class ConsumerOrderAssembler {
          *     用户特地挑的那张券在账单上**完全不出现**。
          * 两种都不报错，只是账不对。
          *
-         * 折扣前应收 = 折后应付 + 券抵扣 + 减免，三项都已落列，不必再存一列。
+         * 折扣前应收 = 折后应付 + 券抵扣 + 减免 + 会员折扣，各项都已落列，不必再存一列。
+         *
+         * **新增一种折扣就必须同时加进这个和式**，否则那笔优惠会被这张表静默吞掉：
+         * 会员九折单的表现是「租借费」直接显示折后价、账单上看不到会员两个字，
+         * 而合计仍然对得上 —— 没有任何地方会报错。
          */
-        add(out, FEE_RENT, payable.add(coupon).add(waived));
-        // 券与减免记成负数：明细逐项相加要等于实付，否则这张表看着就不像账
+        add(out, FEE_RENT, payable.add(coupon).add(waived).add(member));
+        // 会员折扣 / 券 / 减免记成负数：明细逐项相加要等于实付，否则这张表看着就不像账
+        add(out, FEE_MEMBER, member.negate());
         add(out, FEE_COUPON, coupon.negate());
         add(out, FEE_WAIVE, waived.negate());
         add(out, FEE_COMPENSATE, o.compensateAmount());

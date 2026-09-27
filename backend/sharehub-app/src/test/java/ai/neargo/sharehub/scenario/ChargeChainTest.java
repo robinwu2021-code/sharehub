@@ -209,4 +209,115 @@ class ChargeChainTest {
         assertThat(c.buyout()).isFalse();
         assertThat(c.payable()).isEqualByComparingTo("12.00");
     }
+
+    // ─────────── 约束三：会员折扣在封顶之后、券之前，买断不打折 ───────────
+
+    /** 九折会员。折扣率不是折扣额 —— 见 {@link ChargeChain.Member}。 */
+    private static ChargeChain.Member member(String rate) {
+        return new ChargeChain.Member(new BigDecimal(rate));
+    }
+
+    /**
+     * 应收 100、九折 → 应付 90，折扣额 10。
+     *
+     * <p>把折扣率当折扣额用（{@code base × value}）会得到应付 10 —— **少收 90%**，
+     * 而金额照样算得出来，不报错。
+     */
+    @Test
+    void member_discount_is_a_rate_not_an_amount() {
+        ChargeChain.Charged c = chain.charge(new BigDecimal("100"), null, member("0.9"),
+                null, null, null);
+
+        assertThat(c.memberDiscount()).isEqualByComparingTo("10.00");
+        assertThat(c.payable()).as("九折 = 付 90%，不是付 10%").isEqualByComparingTo("90.00");
+    }
+
+    /**
+     * 应收 100、九折、满 50 减 20 券 → 90 − 20 = 70。
+     *
+     * <p>顺序反了（先券后折）是 (100−20)×0.9 = 72 —— **多收 2 块**。
+     * 两种顺序都算得出数，差别只有那 2 块。
+     */
+    @Test
+    void member_discount_applies_before_coupon() {
+        ChargeChain.Charged c = chain.charge(new BigDecimal("100"), null, member("0.9"),
+                new ChargeChain.Coupon("CUT", new BigDecimal("20"), new BigDecimal("50")),
+                null, null);
+
+        assertThat(c.beforeDiscount()).as("会员折扣后，即券的门槛基数").isEqualByComparingTo("90.00");
+        assertThat(c.payable()).as("90 - 20 = 70；先券后折会错成 72").isEqualByComparingTo("70.00");
+    }
+
+    /**
+     * 券的门槛按**折后价**判：应收 100、五折 → 50，一张「满 60 减 10」的券此时用不上。
+     *
+     * <p>基数只能有一个（同 {@link ChargeChain.Coupon#offAgainst} 的注释）——
+     * 两处用不同的数就是「页面说能用、结算说不能用」，而两边都不报错。
+     */
+    @Test
+    void coupon_threshold_uses_the_post_member_amount() {
+        ChargeChain.Charged c = chain.charge(new BigDecimal("100"), null, member("0.5"),
+                new ChargeChain.Coupon("CUT", new BigDecimal("10"), new BigDecimal("60")),
+                null, null);
+
+        assertThat(c.couponUsed()).as("折后 50 < 门槛 60").isEqualByComparingTo("0");
+        assertThat(c.payable()).isEqualByComparingTo("50.00");
+    }
+
+    /**
+     * 应收 100、封顶（买断价）30、九折会员 → 买断成立，**付满 30，不打折**。
+     *
+     * <p>买断那一刻收的是硬件钱，租金折扣打到设备价上没有道理。
+     * 若会员折扣先于封顶应用，100×0.9=90 仍 ≥ 30，买断照样成立但收 27 ——
+     * **平台按九折卖掉了一个充电宝**，而账面上一切正常。
+     */
+    @Test
+    void buyout_is_not_discounted_by_membership() {
+        ChargeChain.Charged c = chain.charge(new BigDecimal("100"), null, member("0.9"),
+                null, new BigDecimal("30"), null);
+
+        assertThat(c.buyout()).isTrue();
+        assertThat(c.memberDiscount()).as("买断单折扣恒为 0").isEqualByComparingTo("0");
+        assertThat(c.payable()).as("买断价照收，不打折").isEqualByComparingTo("30.00");
+    }
+
+    /**
+     * 买断**判定本身**也不受会员折扣影响：应收 40、封顶 30、九折。
+     *
+     * <p>折后 36 仍 ≥ 30，所以这一单无论如何都买断 —— 此例锁的是
+     * 「判定用未打折的 40」而不是「用 36」。临界处才看得出差别：
+     * 应收 32、封顶 30、九折 → 折后 28.8 < 30，若用折后判就**不买断了**，
+     * 于是会员可以无限期占着一个宝而永不触顶。
+     */
+    @Test
+    void buyout_detection_ignores_membership() {
+        assertThat(chain.charge(new BigDecimal("32"), null, member("0.9"),
+                null, new BigDecimal("30"), null).buyout())
+                .as("判定用未打折的 32 ≥ 30；用折后 28.8 会漏判").isTrue();
+    }
+
+    /** 非会员（null）与「不打折」（1）等价，且不在账单上占一行。 */
+    @Test
+    void no_membership_and_rate_one_are_the_same() {
+        assertThat(chain.charge(new BigDecimal("20"), null, null, null, null, null).memberDiscount())
+                .isEqualByComparingTo("0");
+        assertThat(chain.charge(new BigDecimal("20"), null, member("1"), null, null, null).memberDiscount())
+                .isEqualByComparingTo("0");
+    }
+
+    /**
+     * 会员折扣与免单并存：应收 100、九折、全免 → 减免额是 **90（折后）**，不是 100。
+     *
+     * <p>「本月减免总额」这个口径要的是平台实际让掉的钱。记 100 会把会员折扣
+     * 重复计一次，两条优惠加起来超过应收。
+     */
+    @Test
+    void waiver_waives_the_post_member_amount() {
+        ChargeChain.Charged c = chain.charge(new BigDecimal("100"), null, member("0.9"),
+                null, null, free("VIP"));
+
+        assertThat(c.memberDiscount()).isEqualByComparingTo("10.00");
+        assertThat(c.waivedAmount()).as("免掉的是折后的 90").isEqualByComparingTo("90.00");
+        assertThat(c.payable()).isEqualByComparingTo("0.00");
+    }
 }

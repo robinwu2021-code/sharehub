@@ -87,6 +87,9 @@ public class RentOrderServiceImpl implements RentOrderService {
     /** 免单白名单。同 {@link #coupons}，走端口是为了不把 trade 与 user 连成环。 */
     private final ai.neargo.sharehub.api.core.port.FreeRentPort freeRents;
 
+    /** 会员权益（折扣 / 免费时长）。同 {@link #coupons}，走端口是为了不把 trade 与 user 连成环。 */
+    private final ai.neargo.sharehub.api.core.port.MemberRightsPort memberRights;
+
     /** 分润归属期间是**业务日历**上的月份 —— 见 publishSettled 与 BizClock。 */
     private final ai.neargo.sharehub.common.time.BizClock clock;
 
@@ -101,6 +104,7 @@ public class RentOrderServiceImpl implements RentOrderService {
                                 ai.neargo.sharehub.dev.port.PowerbankTracker powerbankTracker,
                                 ai.neargo.sharehub.api.core.port.CouponUsePort coupons,
                                 ai.neargo.sharehub.api.core.port.FreeRentPort freeRents,
+                                ai.neargo.sharehub.api.core.port.MemberRightsPort memberRights,
                                 ai.neargo.sharehub.common.time.BizClock clock,
                                 ai.neargo.sharehub.dev.port.CabinetCommandPort cabinetCommands,
                                 ai.neargo.sharehub.trade.EjectSimulation ejectSimulation) {
@@ -108,6 +112,7 @@ public class RentOrderServiceImpl implements RentOrderService {
         this.ejectSimulation = ejectSimulation;
         this.clock = clock;
         this.freeRents = freeRents;
+        this.memberRights = memberRights;
         this.coupons = coupons;
         this.powerbankTracker = powerbankTracker;
         this.rentability = rentability;
@@ -181,7 +186,7 @@ public class RentOrderServiceImpl implements RentOrderService {
                     base.rentEndAt(), base.durationMin(), base.feeAmount(), base.depositAmount(),
                     base.currency(), e.getWaivedAmount(),
                     compensate.get(e.getOrderNo()), ejects.getOrDefault(e.getOrderNo(), 0),
-                    lastEject.get(e.getOrderNo()), e.getCouponAmount());
+                    lastEject.get(e.getOrderNo()), e.getCouponAmount(), e.getMemberDiscountAmount());
         }).toList();
     }
 
@@ -481,13 +486,19 @@ public class RentOrderServiceImpl implements RentOrderService {
         String endAt = endUtc == null ? nowUtc() : endUtc.toString();   // 同 rent()：DATETIME(3) 不接受带 Z 的字面量
         e.setRentEndAt(endAt);
         long min = durationMinutes(e.getRentStartAt(), endAt);
-        e.setDurationMin((int) min);
+        e.setDurationMin((int) min);   // **真实时长**，不扣会员免费时长 —— 那是运营数据，不是账
         e.setEndedAt(java.time.LocalDateTime.now());
+
+        /*
+         * 会员权益按**归还时刻**解析，不进快照 —— 与倍率（下单时定格）相反，
+         * 见 ChargeChain 类注释：「券与会员权益本来就是结算时才确定的」。
+         */
+        var rights = memberRights.rightsOf(e.getCUserNo());
 
         // ①② 按**下单时的快照**计价，不回读 price_plan —— 「改价不影响在途单」的落点。
         java.math.BigDecimal gross = priceEngine.price(
                 PriceResolver.fromSnapshot(e.getPriceSnapshot()),
-                java.util.Map.of("MINUTE", java.math.BigDecimal.valueOf(min)),
+                java.util.Map.of("MINUTE", java.math.BigDecimal.valueOf(billingMinutes(min, rights))),
                 e.getCurrency()).total();
 
         /*
@@ -503,7 +514,8 @@ public class RentOrderServiceImpl implements RentOrderService {
         java.math.BigDecimal capTotal = PriceResolver.capTotalFromSnapshot(e.getPriceSnapshot());
         java.math.BigDecimal multiplier = PriceResolver.multiplierFromSnapshot(e.getPriceSnapshot());
         ChargeChain.Waiver waiver = waiverOf(e);
-        ChargeChain.Charged charged = chargeChain.charge(gross, multiplier, couponOf(e), capTotal, waiver);
+        ChargeChain.Member member = memberOf(rights);
+        ChargeChain.Charged charged = chargeChain.charge(gross, multiplier, member, couponOf(e), capTotal, waiver);
 
         /*
          * 免单额度与券同一个套路：**先算后扣，扣不动就按原价重算**。
@@ -513,7 +525,7 @@ public class RentOrderServiceImpl implements RentOrderService {
                 && !freeRents.consume(e.getCUserNo(), orderNo, charged.waivedAmount())) {
             e.setFreeReason(null);
             waiver = null;
-            charged = chargeChain.charge(gross, multiplier, couponOf(e), capTotal, null);
+            charged = chargeChain.charge(gross, multiplier, member, couponOf(e), capTotal, null);
         }
 
         /*
@@ -529,10 +541,14 @@ public class RentOrderServiceImpl implements RentOrderService {
         if (charged.couponUsed().signum() > 0 && !coupons.consume(e.getCouponNo(), orderNo)) {
             log.warn("券已被其它订单核销，本单按无券结算 orderNo={} couponNo={}", orderNo, e.getCouponNo());
             e.setCouponNo(null);
-            charged = chargeChain.charge(gross, multiplier, null, capTotal, waiver);
+            charged = chargeChain.charge(gross, multiplier, member, null, capTotal, waiver);
         }
 
         e.setAmount(charged.payable());
+        // 与 couponNo/couponAmount 同一套路：等级答「凭什么打折」，金额答「折了多少」。
+        // 后者事后推不出来 —— 权益配置会改，而折扣额还取决于当时的应收
+        e.setMemberLevel(rights == null ? null : rights.level());
+        e.setMemberDiscountAmount(charged.memberDiscount());
         e.setCouponAmount(charged.couponUsed());
         e.setWaivedAmount(charged.waivedAmount());
         e.setBuyout(charged.buyout() ? 1 : 0);
@@ -567,14 +583,15 @@ public class RentOrderServiceImpl implements RentOrderService {
             // 只有进行中的单才有「现在欠多少」这件事；已结算的单有实打实的 fee_amount
             if (e == null || !OrderStatus.IN_USE.name().equals(e.getStatus())) return null;
             long min = durationMinutes(e.getRentStartAt(), nowUtc());
+            var rights = memberRights.rightsOf(e.getCUserNo());
             java.math.BigDecimal gross = priceEngine.price(
                     PriceResolver.fromSnapshot(e.getPriceSnapshot()),
-                    java.util.Map.of("MINUTE", java.math.BigDecimal.valueOf(min)),
+                    java.util.Map.of("MINUTE", java.math.BigDecimal.valueOf(billingMinutes(min, rights))),
                     e.getCurrency()).total();
             java.math.BigDecimal capTotal = PriceResolver.capTotalFromSnapshot(e.getPriceSnapshot());
             ChargeChain.Charged charged = chargeChain.charge(gross,
                     PriceResolver.multiplierFromSnapshot(e.getPriceSnapshot()),
-                    couponOf(e, false), capTotal, waiverOf(e, false));
+                    memberOf(rights), couponOf(e, false), capTotal, waiverOf(e, false));
             return new ai.neargo.sharehub.trade.dto.TradeLegacyDtos.FeeEstimate(
                     (int) min, charged.payable(), charged.couponUsed(), charged.waivedAmount(),
                     charged.buyout(), e.getCurrency());
@@ -593,8 +610,14 @@ public class RentOrderServiceImpl implements RentOrderService {
             java.math.BigDecimal cap = PriceResolver.capTotalFromSnapshot(e.getPriceSnapshot());
             if (cap == null) return false;
             long min = durationMinutes(e.getRentStartAt(), nowUtc());
+            /*
+             * 免费时长照扣（它改的是计费分钟数），但**买断判定不传会员折扣** ——
+             * 总封顶就是买断价，用折后金额判触顶会让会员逾期更久才买断（见 ChargeChain 约束 3）。
+             */
             java.math.BigDecimal gross = priceEngine.price(PriceResolver.fromSnapshot(e.getPriceSnapshot()),
-                    java.util.Map.of("MINUTE", java.math.BigDecimal.valueOf(min)), e.getCurrency()).total();
+                    java.util.Map.of("MINUTE", java.math.BigDecimal.valueOf(
+                            billingMinutes(min, memberRights.rightsOf(e.getCUserNo())))),
+                    e.getCurrency()).total();
             ChargeChain.Charged charged = chargeChain.charge(gross, PriceResolver.multiplierFromSnapshot(e.getPriceSnapshot()),
                     null, cap, null);
             if (!charged.buyout()) return false;
@@ -900,5 +923,23 @@ public class RentOrderServiceImpl implements RentOrderService {
 
     private static String nowUtc() {
         return LocalDateTime.now(ZoneOffset.UTC).toString();
+    }
+
+    /**
+     * 计费分钟数 = 真实时长 − 会员免费时长，下限 0。
+     *
+     * <p><b>只影响计价输入，不影响 {@code duration_min}</b> ——
+     * 把免费时长从时长里抹掉，运营看到的「平均借用时长」就永久偏短，而没有任何地方会报错。
+     */
+    private static long billingMinutes(long minutes, ai.neargo.sharehub.api.core.port.MemberRightsPort.Rights r) {
+        if (r == null || r.freeMinutes() <= 0) return minutes;
+        return Math.max(0L, minutes - r.freeMinutes());
+    }
+
+    /** 生效权益 → 取价链的会员折扣规格；无折扣时返回 null（不在账单上占一行）。 */
+    private static ChargeChain.Member memberOf(ai.neargo.sharehub.api.core.port.MemberRightsPort.Rights r) {
+        if (r == null || r.rentDiscount() == null
+                || r.rentDiscount().compareTo(java.math.BigDecimal.ONE) >= 0) return null;
+        return new ChargeChain.Member(r.rentDiscount());
     }
 }

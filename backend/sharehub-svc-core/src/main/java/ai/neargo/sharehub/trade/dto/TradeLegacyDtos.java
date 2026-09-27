@@ -27,7 +27,22 @@ public final class TradeLegacyDtos {
                            Integer ejectCount, String lastEjectAt,
                            // 券抵扣额。feeAmount 是**折后**应付，只有它答不出「券抵了多少」，
                            // 而费用明细要能逐项相加等于实付
-                           java.math.BigDecimal couponAmount) {
+                           java.math.BigDecimal couponAmount,
+                           // 会员折扣额。同 couponAmount 的理由：feeAmount 是折后应付，
+                           // 少了这一项，费用明细就加不出实付来（见 ConsumerOrderAssembler#fees）
+                           java.math.BigDecimal memberDiscountAmount) {
+
+        /** 兼容旧 18 参调用：会员折扣额缺省 null。 */
+        public RentOrder(String orderNo, String cUserNo, String cabinetNo, String returnCabinetNo,
+                         String powerbankNo, String locationName, String status,
+                         String rentStartAt, String rentEndAt, Integer durationMin,
+                         double feeAmount, double depositAmount, String currency,
+                         java.math.BigDecimal waivedAmount, java.math.BigDecimal compensateAmount,
+                         Integer ejectCount, String lastEjectAt, java.math.BigDecimal couponAmount) {
+            this(orderNo, cUserNo, cabinetNo, returnCabinetNo, powerbankNo, locationName, status,
+                    rentStartAt, rentEndAt, durationMin, feeAmount, depositAmount, currency,
+                    waivedAmount, compensateAmount, ejectCount, lastEjectAt, couponAmount, null);
+        }
 
         /** 兼容旧 17 参调用：券抵扣额缺省 null。 */
         public RentOrder(String orderNo, String cUserNo, String cabinetNo, String returnCabinetNo,

@@ -6,7 +6,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 
 /**
- * 取价链的后两层：**分时倍率 → 券抵扣 → 免单减免**（[TDD-核心业务逻辑 §1.1/§1.2]）。
+ * 取价链的后两层：**分时倍率 → 会员折扣 → 券抵扣 → 免单减免**（[TDD-核心业务逻辑 §1.1/§1.2]）。
  *
  * <p>{@link PriceEngine} 负责第 ①② 层（方案展开 + 逐项计价 + 单项封顶），
  * 本类负责其后的三步。分开是因为它们的**输入时机不同**：
@@ -19,6 +19,9 @@ import java.math.RoundingMode;
  *       应收 40 封顶 30、券 10，正确是 30-10=20；若先抵扣再封顶则是 min(40-10,30)=30，用户白拿券。</li>
  *   <li><b>免费单要先算出金额再减免</b> —— {@code fee=0} 且 {@code waivedAmount=本应收}。
  *       直接置 0 会让「本月减免总额」这个统计口径永远拿不到数。</li>
+ *   <li><b>会员折扣在封顶之后、券之前，且买断时不打折</b>（[TDD-会员套餐 §2]）——
+ *       总封顶就是买断价：用打折后的金额判触顶，会员要逾期更久才买断；
+ *       而买断那一刻收的是硬件钱，租金折扣打到设备价上没有道理。</li>
  * </ol>
  *
  * <p><b>纯函数，不碰 DB</b>（TDD 明确要求）：券和免单的读取在调用方做，
@@ -41,6 +44,16 @@ public class ChargeChain {
      */
     public Charged charge(BigDecimal gross, BigDecimal multiplier, Coupon coupon,
                           BigDecimal capTotal, Waiver waiver) {
+        return charge(gross, multiplier, null, coupon, capTotal, waiver);
+    }
+
+    /**
+     * 带会员折扣的取价链。
+     *
+     * @param member 会员折扣；null 表示非会员。**买断成立时本参数不生效**，见类注释约束 3
+     */
+    public Charged charge(BigDecimal gross, BigDecimal multiplier, Member member, Coupon coupon,
+                          BigDecimal capTotal, Waiver waiver) {
         BigDecimal amount = nz(gross);
 
         // ③ 分时倍率
@@ -56,6 +69,19 @@ public class ChargeChain {
             buyout = true;
         }
         amount = amount.setScale(MONEY_SCALE, RoundingMode.HALF_UP);
+
+        /*
+         * 会员折扣 —— 封顶之后、券之前，买断时跳过（见类注释约束 3）。
+         *
+         * 券的门槛基数因此是**折后价**：基数只能有一个，两处用不同的数就是
+         * 「页面说能用、结算说不能用」，而两边都不报错。
+         */
+        BigDecimal memberOff = BigDecimal.ZERO;
+        if (!buyout && member != null) {
+            memberOff = member.offAgainst(amount);
+            amount = amount.subtract(memberOff);
+        }
+
         BigDecimal beforeDiscount = amount;
 
         // ④ 券抵扣（封顶之后）。抵扣不产生负数应收 —— 券面额大于应收时按应收抵。
@@ -75,19 +101,37 @@ public class ChargeChain {
             amount = amount.subtract(waived);   // 额度不够时只免一部分，余额照收
         }
 
-        return new Charged(beforeDiscount, couponUsed, waived,
+        return new Charged(beforeDiscount, memberOff, couponUsed, waived,
                 amount.setScale(MONEY_SCALE, RoundingMode.HALF_UP), buyout);
     }
 
     /**
-     * @param beforeDiscount 封顶后、抵扣前的应收（券与免单的计算基数）
+     * @param beforeDiscount 封顶与会员折扣之后、券与免单之前的应收（券与免单的计算基数）
+     * @param memberDiscount 会员折扣额；买断单恒为 0
      * @param couponUsed     实际抵扣的券金额（可能小于券面额）
      * @param waivedAmount   免单减免额；非 0 时 {@code payable} 必为 0
      * @param payable        最终应付
      * @param buyout         是否触发买断（应收触及总封顶）
      */
-    public record Charged(BigDecimal beforeDiscount, BigDecimal couponUsed,
+    public record Charged(BigDecimal beforeDiscount, BigDecimal memberDiscount, BigDecimal couponUsed,
                           BigDecimal waivedAmount, BigDecimal payable, boolean buyout) {
+    }
+
+    /**
+     * 会员折扣规格（纯数据）。
+     *
+     * @param rentDiscount 折扣率，0.9 = 九折 = 付 90%；null 或 ≥1 = 不打折。
+     *                     <b>是折扣率不是折扣额</b> —— 与 {@link Coupon} 的 {@code DISCOUNT} 同一口径，
+     *                     写反是「九折变一折」，金额照样算得出来，只是少收了 90%
+     */
+    public record Member(BigDecimal rentDiscount) {
+
+        BigDecimal offAgainst(BigDecimal base) {
+            if (rentDiscount == null || rentDiscount.signum() <= 0) return BigDecimal.ZERO;
+            if (rentDiscount.compareTo(BigDecimal.ONE) >= 0) return BigDecimal.ZERO;
+            return base.multiply(BigDecimal.ONE.subtract(rentDiscount))
+                    .setScale(MONEY_SCALE, RoundingMode.HALF_UP);
+        }
     }
 
     /**
