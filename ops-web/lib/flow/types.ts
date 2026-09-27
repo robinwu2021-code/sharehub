@@ -405,7 +405,7 @@ export interface DeliveryRow {
 
 /** GET /accounts/{a}/definitions：各类定义的当前版本 */
 export interface DefinitionVersionRow {
-  kind: "PROCESS" | "APPROVAL_TEMPLATE" | "TICKET_TYPE" | "SLA_POLICY";
+  kind: "PROCESS" | "APPROVAL_TEMPLATE" | "TICKET_TYPE" | "SLA_POLICY" | "OPTION_SET";
   code: string;
   version: string;
   publishedAtMs: number;

@@ -6,14 +6,10 @@
 // 对接 opskit-svc 后把 backend-ready.ts 的 FLOW_BACKEND_READY 改成 true，这道闸自动撤掉。
 import { flowReady } from "@/lib/backend-ready";
 import { Notice } from "@/components/ui/notice";
+import { useFlowT } from "@/lib/flow/i18n";
 
 export default function FlowLayout({ children }: { children: React.ReactNode }) {
-  if (!flowReady()) {
-    return (
-      <Notice>
-        流程与工单尚未接入后端服务（OpsKit），暂不可用。联调完成后开放；在此之前请在原有的工单与审批页面办理。
-      </Notice>
-    );
-  }
+  const { tc } = useFlowT("common");
+  if (!flowReady()) return <Notice>{tc("notReady")}</Notice>;
   return <>{children}</>;
 }

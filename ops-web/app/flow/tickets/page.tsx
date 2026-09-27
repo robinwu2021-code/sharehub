@@ -23,6 +23,7 @@ import { SlaCell } from "@/components/flow/sla-cell";
 import { StatStrip } from "@/components/flow/stat-strip";
 import { PriorityBadge, TicketStatusBadge } from "@/components/flow/badges";
 import { actionVariant, inlineActions } from "@/lib/flow/present";
+import { useFlowT, type FlowKey } from "@/lib/flow/i18n";
 import Link from "next/link";
 
 // 筛选项都来自服务（工单类型 / 成员属性定义），不在前端内置业务词（21/06 §七）
@@ -38,15 +39,17 @@ const memberLabel = (m: Member) => {
  * @form-none 批量改派提交到 OpsKit（opskit-svc 的 POST /workspaces/{ws}/tickets/reassign，21/06），
  * 不是 ShareHub 后端，contract.json 管不到；字段以 21/06 为准，经 lib/flow/client 转发。
  */
-const REASSIGN_FIELDS: FieldDef[] = [
-  { key: "to", label: "改派给", type: "select", required: true,
+const reassignFields = (tt: TicketsT): FieldDef[] => [
+  { key: "to", label: tt("reassign.to"), type: "select", required: true,
     options: flow.assigneeOptions().map((a) => ({ value: a.ref, label: memberLabel(a) })) },
-  { key: "reason", label: "原因", type: "textarea", required: true, maxLength: 200,
-    help: "会记入每张工单的时间线；例如「Musa 休假，片区改由 Omar 负责」" },
+  { key: "reason", label: tt("reassign.reason"), type: "textarea", required: true, maxLength: 200,
+    help: tt("reassign.reasonHelp") },
 ];
+type TicketsT = (k: FlowKey<"tickets">, p?: Record<string, string | number>) => string;
 
 function FlowTickets() {
   const qc = useQueryClient();
+  const { t: tt, tc } = useFlowT("tickets");
   const allow = useCan();
   // 行内的迁移动作（接单 / 升级 / 复核…）不在前端判权：服务端给的 actions[] 已按当前操作人算好，
   // 前端再判一遍只会与服务端口径打架。前端只管不属于迁移的能力 —— 批量改派。
@@ -77,7 +80,7 @@ function FlowTickets() {
   const refresh = () => qc.invalidateQueries({ queryKey: FLOW_KEY });
   const act = useMutation({
     mutationFn: ({ no, code }: { no: string; code: string }) => flow.transition(no, code),
-    onSuccess: (t, v) => { notify.success(`${t.ticketNo}：${actionDone(v.code)}`); refresh(); },
+    onSuccess: (t, v) => { notify.success(`${t.ticketNo}${tc("colon")}${actionDone(tt, v.code)}`); refresh(); },
     onError: (e: Error) => { notify.error(e.message); refresh(); },
   });
   const reassign = useMutation({
@@ -87,7 +90,7 @@ function FlowTickets() {
       return flow.reassign(selected, to, String(reassignForm.reason ?? ""));
     },
     onSuccess: (list) => {
-      notify.success(`已改派 ${list.length} 张工单`);
+      notify.success(tt("reassign.done", { n: list.length }));
       setReassignOpen(false);
       setSelected([]);
       setReassignForm({ to: "", reason: "" });
@@ -97,22 +100,22 @@ function FlowTickets() {
   });
 
   const columns: Column<TicketRow>[] = [
-    { header: "单号", pk: true, cell: (t) => <Link href={`/flow/tickets/detail/?no=${t.ticketNo}`} className="text-primary underline-offset-2 hover:underline">{t.ticketNo}</Link> },
-    { header: "类型", cell: (t) => <Badge tone="default">{t.type.name}</Badge> },
-    { header: "标题 / 对象", cell: (t) => <span>{t.title}{t.subject && <> · <span className="text-muted-foreground">{t.subject.display.title}</span></>}</span> },
-    { header: "优先级", cell: (t) => <PriorityBadge p={t.priority} /> },
-    { header: "状态", cell: (t) => <TicketStatusBadge t={t} /> },
+    { header: tt("col.no"), pk: true, cell: (t) => <Link href={`/flow/tickets/detail/?no=${t.ticketNo}`} className="text-primary underline-offset-2 hover:underline">{t.ticketNo}</Link> },
+    { header: tt("col.type"), cell: (t) => <Badge tone="default">{t.type.name}</Badge> },
+    { header: tt("col.titleSubject"), cell: (t) => <span>{t.title}{t.subject && <> · <span className="text-muted-foreground">{t.subject.display.title}</span></>}</span> },
+    { header: tt("col.priority"), cell: (t) => <PriorityBadge p={t.priority} /> },
+    { header: tt("col.status"), cell: (t) => <TicketStatusBadge t={t} /> },
     {
-      header: "受理方",
-      cell: (t) => (t.assignee ? memberLabel(t.assignee) : <span className="text-muted-foreground">未派 · 抢单池</span>),
+      header: tt("col.assignee"),
+      cell: (t) => (t.assignee ? memberLabel(t.assignee) : <span className="text-muted-foreground">{tt("unassigned")}</span>),
     },
-    { header: "SLA", cell: (t) => <SlaCell sla={t.sla} state={t.slaState} dueAtMs={t.slaNextDueAtMs} /> },
+    { header: tt("col.sla"), cell: (t) => <SlaCell sla={t.sla} state={t.slaState} dueAtMs={t.slaNextDueAtMs} /> },
     {
-      header: "来源",
+      header: tt("col.source"),
       cell: (t) => <span className="text-muted-foreground">{[t.fields.source?.name, t.fields.sourceRef?.value as string | undefined].filter(Boolean).join(" ")}</span>,
     },
     {
-      header: "操作",
+      header: tt("col.actions"),
       className: "text-end",
       cell: (t) => (
         <span className="inline-flex justify-end gap-2">
@@ -137,7 +140,7 @@ function FlowTickets() {
 
   return (
     <div>
-      <PageTitle title="工单工作台" desc="统计卡可点，点进即筛好的列表。SLA 色条：绿 正常 · 黄 将超时 · 红 已超时 · 灰 暂停。" />
+      <PageTitle title={tc("page.tickets")} desc={tt("desc")} />
       <StatStrip
         stats={stats.data}
         loading={stats.isLoading}
@@ -145,29 +148,29 @@ function FlowTickets() {
         onPick={(s) => onFilter(() => { setCard(s); if (s) { setTypeCode(""); setAssigneeKind(""); } })}
       />
       {!canDispatch && (
-        <ReadOnlyNotice what="派单与改派" perm="flow:ticket:dispatch" note="不能勾选批量改派；单张工单的办理动作以各行按钮为准" className="mb-3" />
+        <ReadOnlyNotice what={tt("readOnly.what")} perm="flow:ticket:dispatch" note={tt("readOnly.note")} className="mb-3" />
       )}
       <Toolbar
         search={keyword}
         onSearch={(v) => onFilter(() => setKeyword(v))}
-        searchPlaceholder="搜单号 / 标题 / 对象 / 受理方"
+        searchPlaceholder={tt("searchPlaceholder")}
         selectedCount={selected.length}
         onClearSelection={() => setSelected([])}
-        batchActions={canDispatch ? <Button size="sm" onClick={() => setReassignOpen(true)}>批量改派</Button> : undefined}
+        batchActions={canDispatch ? <Button size="sm" onClick={() => setReassignOpen(true)}>{tt("reassign.btn")}</Button> : undefined}
       >
         <FilterSelect
-          aria-label="工单类型"
+          aria-label={tt("filter.type")}
           value={typeCode}
           onChange={(v) => onFilter(() => setTypeCode(v))}
           options={TYPE_OPTIONS}
-          allLabel="全部类型"
+          allLabel={tt("filter.typeAll")}
         />
         <FilterSelect
-          aria-label="受理方"
+          aria-label={tt("filter.assignee")}
           value={assigneeKind}
           onChange={(v) => onFilter(() => setAssigneeKind(v))}
           options={PARTY_OPTIONS}
-          allLabel="受理方：全部"
+          allLabel={tt("filter.assigneeAll")}
         />
       </Toolbar>
       <PagedTable
@@ -178,15 +181,15 @@ function FlowTickets() {
         selectable={canDispatch}
         selectedKeys={selected}
         onSelectedChange={setSelected}
-        empty={card || typeCode || assigneeKind || keyword ? "按当前筛选没有工单 —— 换个条件，或点已选中的统计卡取消筛选" : "还没有工单"}
+        empty={card || typeCode || assigneeKind || keyword ? tt("empty.filtered") : tt("empty.none")}
       />
       <FormDrawer
         open={reassignOpen}
         onOpenChange={setReassignOpen}
-        titleNew={`批量改派 ${selected.length} 张工单`}
+        titleNew={tt("reassign.title", { n: selected.length })}
         titleEdit=""
         isEdit={false}
-        fields={REASSIGN_FIELDS}
+        fields={reassignFields(tt)}
         value={reassignForm}
         onChange={setReassignForm}
         onSubmit={() => reassign.mutate()}
@@ -196,10 +199,12 @@ function FlowTickets() {
   );
 }
 
-function actionDone(code: string) {
-  return { NUDGE: "已催办受理方", ESCALATE: "已升级给平台", TAKEOVER: "已接管，派给了你", REVIEW: "复核通过，工单已关闭" }[code] ?? "已完成";
+const DONE_CODES = ["NUDGE", "ESCALATE", "TAKEOVER", "REVIEW"] as const;
+function actionDone(tt: TicketsT, code: string) {
+  const known = DONE_CODES.find((c) => c === code);
+  return tt(known ? `done.${known}` : "done.other");
 }
 
 export default function FlowTicketsPage() {
-  return <NeedPerm code="flow:ticket:read" what="工单工作台"><FlowTickets /></NeedPerm>;
+  return <NeedPerm code="flow:ticket:read" page="tickets"><FlowTickets /></NeedPerm>;
 }

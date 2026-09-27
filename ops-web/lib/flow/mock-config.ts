@@ -105,6 +105,7 @@ export function resetConfigDb(now: number = Date.now()) {
   otherDefs = [
     { kind: "TICKET_TYPE", code: "PB_MAINTENANCE", version: "7be04412", publishedAtMs: now - 12 * HOUR, publishedBy: "SHAREHUB", channel: "API" },
     { kind: "PROCESS", code: "SHOP_AFTER_SALE", version: "c91177aa", publishedAtMs: now - 29 * HOUR, publishedBy: "SHOP", channel: "API" },
+    { kind: "OPTION_SET", code: "ticket-source", version: "9a0c7e12", publishedAtMs: now - 60 * HOUR, publishedBy: "SHAREHUB", channel: "API" },
     { kind: "SLA_POLICY", code: "ops-urgent", version: "5e21b0c4", publishedAtMs: now - 50 * HOUR, publishedBy: "Omar", channel: "CONSOLE" },
   ];
 }

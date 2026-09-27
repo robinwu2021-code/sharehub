@@ -6,7 +6,7 @@
 // 色条沿用 SlaRemain 的做法：`data-slot="sla-bar"` 默认隐藏，只有「清爽」风格显示 ——
 // 经典风格仍是纯文字。色条是装饰（aria-hidden），含义由文字表达，颜色不单独承载语义（规范 §11.4）。
 import { cn } from "@/lib/utils";
-import { fmtMinutes } from "@/lib/types";
+import { useFlowT } from "@/lib/flow/i18n";
 import type { SlaState, SlaSummary } from "@/lib/flow/types";
 
 const MIN = 60_000;
@@ -27,7 +27,9 @@ function Bar({ pct, tone }: { pct: number; tone: "ok" | "warn" | "bad" | "mute" 
 export function SlaCell({
   sla, state, dueAtMs, now = Date.now(), className,
 }: { sla?: SlaSummary; state?: SlaState; dueAtMs?: number; now?: number; className?: string }) {
+  const { tc, fmt } = useFlowT("common");
   const st = sla?.state ?? state ?? "RUNNING";
+  const d = (min: number) => fmt.dur(min);
   const due = sla?.dueAtMs ?? dueAtMs;
   const base = cn("inline-flex items-center whitespace-nowrap tabular-nums", className);
   const window = sla ? sla.dueAtMs - sla.startedAtMs : 0;
@@ -35,31 +37,31 @@ export function SlaCell({
 
   switch (st) {
     case "MET":
-      return <span className={cn(base, "text-muted-foreground")}><Bar pct={100} tone="ok" />已完成</span>;
+      return <span className={cn(base, "text-muted-foreground")}><Bar pct={100} tone="ok" />{tc("sla.met")}</span>;
     case "PAUSED":
       return (
         <span className={cn(base, "text-muted-foreground")}>
           {leftPct != null && <Bar pct={leftPct} tone="mute" />}
-          已暂停{sla?.pausedMs ? ` ${fmtMinutes(sla.pausedMs / MIN)}` : ""}
+          {sla?.pausedMs ? tc("sla.pausedFor", { d: d(sla.pausedMs / MIN) }) : tc("sla.paused")}
         </span>
       );
     case "BREACHED":
       return (
-        <span className={cn(base, "text-destructive-ink")} title="已超过时限">
-          {sla && <Bar pct={100} tone="bad" />}超 {due != null ? fmtMinutes((now - due) / MIN) : "—"}
+        <span className={cn(base, "text-destructive-ink")} title={tc("sla.breachedTitle")}>
+          {sla && <Bar pct={100} tone="bad" />}{due != null ? tc("sla.breached", { d: d((now - due) / MIN) }) : tc("none")}
         </span>
       );
     case "WARNING":
       return (
-        <span className={cn(base, "text-warning-ink")} title="两小时内到期">
-          {leftPct != null && <Bar pct={leftPct} tone="warn" />}剩 {due != null ? fmtMinutes((due - now) / MIN) : "—"}
+        <span className={cn(base, "text-warning-ink")} title={tc("sla.warnTitle")}>
+          {leftPct != null && <Bar pct={leftPct} tone="warn" />}{due != null ? tc("sla.left", { d: d((due - now) / MIN) }) : tc("none")}
         </span>
       );
     default:
       return (
         <span className={cn(base, "text-muted-foreground")}>
           {leftPct != null && <Bar pct={leftPct} tone="ok" />}
-          {due != null ? `剩 ${fmtMinutes((due - now) / MIN)}` : "无时限"}
+          {due != null ? tc("sla.left", { d: d((due - now) / MIN) }) : tc("sla.noLimit")}
         </span>
       );
   }

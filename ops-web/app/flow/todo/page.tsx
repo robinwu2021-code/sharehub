@@ -9,7 +9,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { flow, FLOW_KEY } from "@/lib/flow/client";
-import { TODO_KIND } from "@/lib/flow/labels";
+import { todoKindMap } from "@/lib/flow/labels";
+import { useFlowT } from "@/lib/flow/i18n";
 import type { TodoItem, TodoQuery } from "@/lib/flow/types";
 import { usePaging } from "@/lib/hooks/use-paging";
 import { notify } from "@/lib/notify";
@@ -29,16 +30,10 @@ const TAB_QUERY: Record<TabKey, Pick<TodoQuery, "origin" | "claimable">> = {
   ticket: { origin: "TICKET", claimable: false },
   pool: { origin: "ALL", claimable: true },
 };
-/** 空态要说清「为什么空」，而不是「暂无数据」 */
-const EMPTY: Record<TabKey, string> = {
-  all: "你现在没有待办 —— 新的审批与派给你的工单会出现在这里",
-  process: "没有等你审批的单",
-  ticket: "没有派给你、还没办完的工单",
-  pool: "抢单池里暂时没有你够资格领的单",
-};
 
 function FlowTodo() {
   const qc = useQueryClient();
+  const { t: tt, tc } = useFlowT("todo");
   const allow = useCan();
   // 抢单 = 领取后自己办理，与「办理」同一个码（功能权限清单 §16）
   const canHandle = allow("flow:ticket:handle");
@@ -54,7 +49,7 @@ function FlowTodo() {
   const claim = useMutation({
     mutationFn: (no: string) => flow.claim(no),
     onSuccess: (t) => {
-      notify.success(`已领取 ${t.ticketNo}，派给了你`);
+      notify.success(tt("claimed", { no: t.ticketNo }));
       qc.invalidateQueries({ queryKey: FLOW_KEY });
     },
     onError: (e: Error) => {
@@ -66,16 +61,16 @@ function FlowTodo() {
   const c = count.data;
   const n = (v?: number) => (v === undefined ? "" : ` ${v}`);
   const tabs = [
-    { key: "all", label: `全部${n(c?.all)}` },
-    { key: "process", label: `审批${n(c?.process)}` },
-    { key: "ticket", label: `工单${n(c?.ticket)}` },
-    { key: "pool", label: `可抢单${n(c?.claimable)}` },
+    { key: "all", label: `${tt("tab.all")}${n(c?.all)}` },
+    { key: "process", label: `${tt("tab.process")}${n(c?.process)}` },
+    { key: "ticket", label: `${tt("tab.ticket")}${n(c?.ticket)}` },
+    { key: "pool", label: `${tt("tab.pool")}${n(c?.claimable)}` },
   ];
 
   const columns: Column<TodoItem>[] = [
-    { header: "类型", cell: (t) => <StatusBadge map={TODO_KIND} value={t.claimable ? "POOL" : t.origin} /> },
+    { header: tt("col.kind"), cell: (t) => <StatusBadge map={todoKindMap(tc)} value={t.claimable ? "POOL" : t.origin} /> },
     {
-      header: "标题",
+      header: tt("col.title"),
       cell: (t) => {
         const href = t.ticketNo ? `/flow/tickets/detail/?no=${t.ticketNo}` : t.approvalNo ? `/flow/approvals/detail/?no=${t.approvalNo}` : null;
         return href && !t.claimable
@@ -83,10 +78,10 @@ function FlowTodo() {
           : <span className="txt-strong">{t.title}</span>;
       },
     },
-    { header: "业务对象", cell: (t) => t.subject.display.title },
-    { header: "优先级", cell: (t) => <PriorityBadge p={t.priority} /> },
+    { header: tt("col.subject"), cell: (t) => t.subject.display.title },
+    { header: tt("col.priority"), cell: (t) => <PriorityBadge p={t.priority} /> },
     {
-      header: "剩余时限",
+      header: tt("col.sla"),
       cell: (t) => (
         <span className="inline-flex items-center gap-2">
           <SlaCell sla={t.sla} dueAtMs={t.dueAtMs} />
@@ -98,7 +93,7 @@ function FlowTodo() {
               disabled={claim.isPending}
               onClick={() => claim.mutate(t.ticketNo!)}
             >
-              抢单
+              {tt("claim")}
             </Button>
           )}
         </span>
@@ -108,26 +103,26 @@ function FlowTodo() {
 
   return (
     <div>
-      <PageTitle title="待办中心" desc="审批与工单在同一张列表；只显示你够资格办、且在你数据范围内的。" />
+      <PageTitle title={tc("page.todo")} desc={tt("desc")} />
       <Tabs
         tabs={tabs}
         value={tab}
         onChange={(k) => { setTab(k as TabKey); paging.reset(); }}
       />
       {!canHandle && tab === "pool" && (
-        <ReadOnlyNotice what="工单办理" perm="flow:ticket:handle" note="看得到抢单池，但不能抢单" className="mb-3" />
+        <ReadOnlyNotice what={tt("readOnly.what")} perm="flow:ticket:handle" note={tt("readOnly.note")} className="mb-3" />
       )}
       <PagedTable
         query={query}
         paging={paging}
         columns={columns}
         rowKey={(t) => t.taskNo}
-        empty={EMPTY[tab]}
+        empty={tt(`empty.${tab}`)}
         footer={
           <p className="mt-3 txt-caption text-muted-foreground">
-            没有待办 ≠ 没有工单 —— 全部工单去
-            <Link href="/flow/tickets/" className="mx-1 text-primary underline-offset-2 hover:underline">工单工作台</Link>
-            ；已办结的在各单详情的时间线里。
+            {tt("footer.before")}
+            <Link href="/flow/tickets/" className="mx-1 text-primary underline-offset-2 hover:underline">{tt("footer.link")}</Link>
+            {tt("footer.after")}
           </p>
         }
       />
@@ -136,5 +131,5 @@ function FlowTodo() {
 }
 
 export default function FlowTodoPage() {
-  return <NeedPerm code="flow:todo:read" what="待办中心"><FlowTodo /></NeedPerm>;
+  return <NeedPerm code="flow:todo:read" page="todo"><FlowTodo /></NeedPerm>;
 }

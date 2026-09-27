@@ -1,4 +1,5 @@
 // 中文（基准语言：key 全集以此为准；en/ar 必须与此 key 对齐，见 i18n.test.ts）。
+import { flowZh } from "./flow";
 export const zh = {
   common: {
     appName: "powerbank 运营",
@@ -114,7 +115,10 @@ export const zh = {
     selectedCount: "已选 {n} 项",
     clear: "清空",
     checkFields: "请先修正表单中的错误",
+    readOnly: "仅可查看：当前角色无{what}权限（{codes}）",
+    readOnlyNote: "，{note}",
   },
+  flow: flowZh,
 };
 
 export type Messages = typeof zh;

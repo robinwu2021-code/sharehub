@@ -91,3 +91,26 @@ describe("审核队列", () => {
     expect(merchant()).toMatchObject({ unclaimed: before.unclaimed + 1, claimedByMe: before.claimedByMe - 1 });
   });
 });
+
+describe("错误码与服务端同口径（decide：409 → 403 → 422）", () => {
+  const code = (f: () => unknown) => { try { f(); } catch (e) { return (e as { code: number }).code; } return 0; };
+  it("任务号过期先于一切：旧 taskNo 且不填原因驳回 → 409，不是 422", () => {
+    const a = getApproval("AP2609270001");
+    expect(code(() => decide(a.approvalNo, "TK_STALE", "REJECT", "", NOW))).toBe(409);
+  });
+  it("规则拒绝 → 403；驳回缺原因 → 422 且路径 reason", () => {
+    const mine = queryApprovals({ status: ["PENDING"], page: 1, size: 200 }).list
+      .map((r) => getApproval(r.approvalNo)).find((v) => v.mine.canWithdraw)!;
+    expect(code(() => decide(mine.approvalNo, mine.mine.taskNo!, "APPROVE", undefined, NOW))).toBe(403);
+    const ok = queryApprovals({ status: ["PENDING"], page: 1, size: 200 }).list
+      .map((r) => getApproval(r.approvalNo)).find((v) => v.mine.canDecide)!;
+    let err: unknown;
+    try { decide(ok.approvalNo, ok.mine.taskNo!, "REJECT", " ", NOW); } catch (e) { err = e; }
+    expect(err).toMatchObject({ code: 422, errors: [{ path: "reason" }] });
+  });
+  it("队列：被他人领着 → 409；放回别人的 → 403", () => {
+    const taken = queueTasksOf("merchant", 1, 50, NOW).list.find((t) => t.claimedBy && t.claimedBy.ref !== "admin")!;
+    expect(code(() => claimTask(taken.taskNo, NOW))).toBe(409);
+    expect(code(() => releaseTask(taken.taskNo))).toBe(403);
+  });
+});

@@ -1,12 +1,14 @@
 // 流程与工单平台的客户端 —— 页面唯一的取数入口。
 //
-// 现在转给 mock（lib/flow/mock-db.ts）；对接 opskit-svc 时**只改这个文件**：
+// 两份实现、同一形状：mockFlow（浏览器内 mock）与 httpFlow（opskit-svc，见 lib/flow/http.ts），
+// 构建时 NEXT_PUBLIC_FLOW_API=http 选后者。httpFlow 标注为 `typeof mockFlow`，两边形状不一致编译不过。
 // 方法名、参数、出参与 21/06 接口设计一一对应，注释里标了对应的端点。
 // 基址：经宿主同源反代 /api/opskit/v1；运行时资源在 /workspaces/{ws}/ 下，ShareHub 场景 ws = ext:{租户号}。
 // 页面不直接 import mock-db（architecture: 页面只认 client）。
 import * as db from "./mock-db";
 import * as ap from "./mock-approvals";
 import * as cfg from "./mock-config";
+import { FLOW_USE_HTTP, opskit, ws } from "./http";
 import type {
   AppRow, ApprovalTemplate, DefinitionVersionRow, DeliveryRow, PublishResult, QueueGroup, TemplateSummary, TemplateVersion,
   SlaPolicy, WorkCalendar,
@@ -19,7 +21,7 @@ const tick = <T,>(f: () => T) => new Promise<T>((resolve, reject) => {
   setTimeout(() => { try { resolve(f()); } catch (e) { reject(e); } }, 120);
 });
 
-export const flow = {
+const mockFlow = {
   /** POST /workspaces/{ws}/todos/query */
   todos: (q: TodoQuery): Promise<Page<TodoItem>> => tick(() => db.queryTodos(q)),
   /** POST /workspaces/{ws}/todos/count */
@@ -125,6 +127,77 @@ export const flow = {
   /** GET /accounts/{a}/definitions?workspace=：流程 · 审批模板 · 工单类型 · SLA 策略的当前版本 */
   definitionVersions: (): Promise<DefinitionVersionRow[]> => tick(() => cfg.definitionVersions()),
 };
+
+// ── 真实服务 ─────────────────────────────────────────────────────────────
+// ⚠️ 标「待对齐」的是契约里没写死请求体的，首次联调时按后端实际核对（22/README 联调记录）。
+const ACCOUNT = process.env.NEXT_PUBLIC_OPSKIT_ACCOUNT || "";
+const acct = (path: string) => `/accounts/${encodeURIComponent(ACCOUNT)}${path}`;
+const enc = encodeURIComponent;
+const POST = <T,>(path: string, body: unknown = {}) => opskit<T>("POST", path, body);
+const GET = <T,>(path: string) => opskit<T>("GET", path);
+const PUT = <T,>(path: string, body: unknown) => opskit<T>("PUT", path, body);
+
+const httpFlow: typeof mockFlow = {
+  todos: (q) => POST(ws("/todos/query"), q),
+  todoCount: () => POST(ws("/todos/count"), {}),
+  tickets: (q) => POST(ws("/tickets/query"), q),
+  ticketStats: () => POST(ws("/ticket-stats/summary"), {}),
+  claim: (no) => POST(ws(`/tickets/${enc(no)}/claim`)),
+  transition: (no, code, comment) => POST(ws(`/tickets/${enc(no)}/transitions/${enc(code)}`), comment ? { comment } : {}),
+  ticket: (no) => GET(ws(`/tickets/${enc(no)}`)),
+  timeline: (no) => GET(ws(`/tickets/${enc(no)}/timeline`)),
+  comment: async (no, body) => {
+    await POST(ws(`/tickets/${enc(no)}/comments`), { body, visibility: "INTERNAL" });
+    return GET(ws(`/tickets/${enc(no)}/timeline`));
+  },
+  assign: (no, to, reason) => POST(ws(`/tickets/${enc(no)}/assign`), { to: `member:${to.ref}`, reason }),
+  pool: (no, reason) => POST(ws(`/tickets/${enc(no)}/pool`), { reason }),
+  /** 待对齐：21/06 的批量改派按「原受理人」{from, to, reason}；界面是勾选若干单 */
+  reassign: (nos, to, reason) => POST(ws("/tickets/reassign"), { ticketNos: nos, to: `member:${to.ref}`, reason }),
+  // 待换异步（成员查询 / 工单类型 / 成员属性定义）：接真服务前这三项仍是 mock 的选项
+  assigneeOptions: () => mockFlow.assigneeOptions(),
+  ticketTypes: () => mockFlow.ticketTypes(),
+  partyOptions: () => mockFlow.partyOptions(),
+
+  approvals: ({ fromMs, ...q }) => POST(ws("/approvals/query"), { ...q, ...(fromMs ? { from: fromMs } : {}) }),
+  approvalCount: () => POST(ws("/approvals/count"), {}),
+  approval: (no) => GET(ws(`/approvals/${enc(no)}`)),
+  decide: (no, taskNo, decision, reason) => POST(ws(`/approvals/${enc(no)}/decide`), { taskNo, decision, ...(reason ? { reason } : {}) }),
+  withdraw: (no) => POST(ws(`/approvals/${enc(no)}/withdraw`)),
+  processOptions: () => mockFlow.processOptions(),
+  requesterOptions: () => mockFlow.requesterOptions(),
+
+  queueCounts: () => POST(ws("/tasks/queue-counts"), {}),
+  /** 待对齐：tasks/query 的参数名（队列组 / 状态 / 我已领） */
+  queueTasks: (queue, page, size) => POST(ws("/tasks/query"), { queueGroup: queue, status: ["OPEN"], claimed: false, page, size }),
+  myClaimed: async () => (await POST<{ list: Awaited<ReturnType<typeof mockFlow.myClaimed>> }>(ws("/tasks/query"), { assignee: "me", claimed: true, status: ["OPEN"], page: 1, size: 200 })).list,
+  claimTask: (taskNo) => POST(ws(`/tasks/${enc(taskNo)}/claim`)),
+  releaseTask: (taskNo) => POST(ws(`/tasks/${enc(taskNo)}/release`)),
+  completeTask: (taskNo, decision, reason) => POST(ws(`/tasks/${enc(taskNo)}/complete`), { decision, ...(reason ? { reason } : {}) }),
+
+  templates: () => GET(ws("/approval-templates")),
+  template: (code) => GET(ws(`/approval-templates/${enc(code)}`)),
+  templateVersions: (code) => GET(ws(`/approval-templates/${enc(code)}/versions`)),
+  publishTemplate: (def, note) => PUT(ws(`/approval-templates/${enc(def.code)}`), { ...def, ...(note ? { note } : {}) }),
+  setTemplateEnabled: (code, enabled) => POST(ws(`/approval-templates/${enc(code)}/${enabled ? "enable" : "disable"}`)),
+
+  slaPolicies: () => GET(ws("/sla-policies")),
+  saveSlaPolicy: (p) => PUT(ws(`/sla-policies/${enc(p.code)}`), p),
+  calendars: () => GET(ws("/calendars")),
+  saveCalendar: (c) => PUT(ws(`/calendars/${enc(c.code)}`), c),
+  queueGroups: () => GET(ws("/groups?kind=QUEUE")),
+  saveQueueGroup: (q) => PUT(ws(`/groups/${enc(q.code)}`), q),
+  ticketTypeOptions: () => mockFlow.ticketTypeOptions(),
+
+  apps: () => GET(acct("/apps")),
+  createApp: (a) => POST(acct("/apps"), a),
+  rotateCredential: (id) => POST(`/apps/${enc(id)}/rotate-credential`),
+  deliveries: async () => (await POST<{ list: Awaited<ReturnType<typeof mockFlow.deliveries>> }>(acct("/webhook-deliveries/query"), { page: 1, size: 200 })).list,
+  redeliver: (id) => POST(`/webhook-deliveries/${enc(id)}/redeliver`),
+  definitionVersions: () => GET(acct(`/definitions?workspace=${enc(process.env.NEXT_PUBLIC_OPSKIT_WS || "")}`)),
+};
+
+export const flow = FLOW_USE_HTTP ? httpFlow : mockFlow;
 
 /** react-query 的 key 前缀：任何写操作后整体失效，待办角标、统计卡、列表一起刷新 */
 export const FLOW_KEY = ["flow"] as const;

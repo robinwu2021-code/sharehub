@@ -7,11 +7,10 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { flow, FLOW_KEY } from "@/lib/flow/client";
-import { APPROVAL_STATUS } from "@/lib/flow/labels";
-import { fmtShort } from "@/lib/flow/present";
+import { approvalStatusMap } from "@/lib/flow/labels";
+import { useFlowT } from "@/lib/flow/i18n";
 import type { ApprovalRow, ApprovalStatus } from "@/lib/flow/types";
 import { usePaging } from "@/lib/hooks/use-paging";
-import { fmtMinutes } from "@/lib/types";
 import { PageTitle } from "@/components/ui/misc";
 import { Tabs } from "@/components/ui/tabs";
 import { Toolbar } from "@/components/ui/toolbar";
@@ -22,15 +21,14 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Badge } from "@/components/ui/badge";
 
 type TabKey = ApprovalStatus | "ALL";
-const TABS: { key: TabKey; label: string }[] = [
-  { key: "PENDING", label: "待审" }, { key: "APPROVED", label: "已通过" }, { key: "REJECTED", label: "已驳回" },
-  { key: "WITHDRAWN", label: "已撤回" }, { key: "ALL", label: "全部" },
-];
+const TAB_KEYS: TabKey[] = ["PENDING", "APPROVED", "REJECTED", "WITHDRAWN", "ALL"];
 const DAY = 86_400_000;
-const SINCE = [{ value: "7", label: "提交时间：近 7 天" }, { value: "30", label: "提交时间：近 30 天" }];
 const MIN = 60_000;
 
 function FlowApprovals() {
+  const { t: tt, tc, fmt } = useFlowT("approvals");
+  const TABS = TAB_KEYS.map((key) => ({ key, label: key === "ALL" ? tt("tab.all") : tc(`approvalStatus.${key}`) }));
+  const SINCE = [{ value: "7", label: tt("since.d7") }, { value: "30", label: tt("since.d30") }];
   const paging = usePaging();
   const [tab, setTab] = useState<TabKey>("PENDING");
   const [processCode, setProcessCode] = useState("");
@@ -55,25 +53,25 @@ function FlowApprovals() {
 
   const now = Date.now();
   const columns: Column<ApprovalRow>[] = [
-    { header: "审批单", pk: true, cell: (a) => <Link href={`/flow/approvals/detail/?no=${a.approvalNo}`} className="text-primary underline-offset-2 hover:underline">{a.approvalNo}</Link> },
-    { header: "流程", cell: (a) => a.process.name },
-    { header: "业务对象", cell: (a) => a.subject.display.title },
-    { header: "状态", cell: (a) => <StatusBadge map={APPROVAL_STATUS} value={a.status} /> },
-    { header: "当前步 / 轮次", cell: (a) => `${a.currentStep?.name ?? "—"} · 第 ${a.round} 轮` },
-    { header: "提交人", cell: (a) => a.requestedBy.displayName },
-    { header: "提交时间", cell: (a) => <span className="tabular-nums">{fmtShort(a.requestedAtMs)}</span> },
+    { header: tt("col.approvalNo"), pk: true, cell: (a) => <Link href={`/flow/approvals/detail/?no=${a.approvalNo}`} className="text-primary underline-offset-2 hover:underline">{a.approvalNo}</Link> },
+    { header: tt("col.process"), cell: (a) => a.process.name },
+    { header: tt("col.subject"), cell: (a) => a.subject.display.title },
+    { header: tt("col.status"), cell: (a) => <StatusBadge map={approvalStatusMap(tc)} value={a.status} /> },
+    { header: tt("col.stepRound"), cell: (a) => fmt.join(a.currentStep?.name ?? tc("none"), tt("round", { n: a.round })) },
+    { header: tt("col.requestedBy"), cell: (a) => a.requestedBy.displayName },
+    { header: tt("col.requestedAt"), cell: (a) => <span className="tabular-nums">{fmt.short(a.requestedAtMs)}</span> },
     {
-      header: "已等待",
+      header: tt("col.waited"),
       cell: (a) => {
         if (a.status === "PENDING" && a.stepStartedAtMs) {
-          const text = fmtMinutes((now - a.stepStartedAtMs) / MIN);
+          const text = fmt.dur((now - a.stepStartedAtMs) / MIN);
           return a.stepDueAtMs && now > a.stepDueAtMs
-            ? <Badge tone="warning" title="当前步已超过步骤时限">{text}</Badge>
+            ? <Badge tone="warning" title={tt("overdueTitle")}>{text}</Badge>
             : <span className="tabular-nums">{text}</span>;
         }
         return a.finishedAtMs && a.status !== "WITHDRAWN"
-          ? <span className="tabular-nums text-muted-foreground">耗时 {fmtMinutes((a.finishedAtMs - a.requestedAtMs) / MIN)}</span>
-          : <span className="text-muted-foreground">—</span>;
+          ? <span className="tabular-nums text-muted-foreground">{tt("took", { d: fmt.dur((a.finishedAtMs - a.requestedAtMs) / MIN) })}</span>
+          : <span className="text-muted-foreground">{tc("none")}</span>;
       },
     },
   ];
@@ -81,31 +79,31 @@ function FlowApprovals() {
   const c = count.data;
   return (
     <div>
-      <PageTitle title="审批列表" desc="全部审批单（不只「待我审」）；按数据范围过滤。筛选条件即查询接口参数，一一对应。" />
+      <PageTitle title={tc("page.approvals")} desc={tt("desc")} />
       <Tabs
         tabs={TABS.map((t) => ({ key: t.key, label: t.key !== "ALL" && c ? `${t.label} ${c[t.key]}` : t.label }))}
         value={tab}
         onChange={(k) => onFilter(() => setTab(k as TabKey))}
       />
-      <Toolbar search={keyword} onSearch={(v) => onFilter(() => setKeyword(v))} searchPlaceholder="搜单号 / 对象编号 / 标题">
-        <FilterSelect aria-label="流程" value={processCode} onChange={(v) => onFilter(() => setProcessCode(v))}
-          options={flow.processOptions().map((p) => ({ value: p.code, label: p.name }))} allLabel="流程：全部" />
-        <FilterSelect aria-label="提交人" value={requestedBy} onChange={(v) => onFilter(() => setRequestedBy(v))}
-          options={flow.requesterOptions().map((p) => ({ value: p.code, label: p.name }))} allLabel="提交人：全部" />
-        <FilterSelect aria-label="提交时间" value={since} onChange={(v) => onFilter(() => setSince(v))} options={SINCE} allLabel="提交时间：不限" />
+      <Toolbar search={keyword} onSearch={(v) => onFilter(() => setKeyword(v))} searchPlaceholder={tt("search")}>
+        <FilterSelect aria-label={tt("col.process")} value={processCode} onChange={(v) => onFilter(() => setProcessCode(v))}
+          options={flow.processOptions().map((p) => ({ value: p.code, label: p.name }))} allLabel={tt("filterAll.process")} />
+        <FilterSelect aria-label={tt("col.requestedBy")} value={requestedBy} onChange={(v) => onFilter(() => setRequestedBy(v))}
+          options={flow.requesterOptions().map((p) => ({ value: p.code, label: p.name }))} allLabel={tt("filterAll.requestedBy")} />
+        <FilterSelect aria-label={tt("col.requestedAt")} value={since} onChange={(v) => onFilter(() => setSince(v))} options={SINCE} allLabel={tt("filterAll.since")} />
       </Toolbar>
       <PagedTable
         query={query}
         paging={paging}
         columns={columns}
         rowKey={(a) => a.approvalNo}
-        empty={processCode || requestedBy || since || keyword ? "按当前筛选没有审批单 —— 换个条件试试" : tab === "PENDING" ? "没有待审的审批单" : "这个状态下没有审批单"}
-        footer={<p className="mt-3 txt-caption text-muted-foreground">「已等待」= 当前步开始至今；已结单显示总耗时。点单号进详情。</p>}
+        empty={processCode || requestedBy || since || keyword ? tt("empty.filtered") : tab === "PENDING" ? tt("empty.pending") : tt("empty.status")}
+        footer={<p className="mt-3 txt-caption text-muted-foreground">{tt("footer")}</p>}
       />
     </div>
   );
 }
 
 export default function FlowApprovalsPage() {
-  return <NeedPerm code="flow:approval:read" what="审批列表"><FlowApprovals /></NeedPerm>;
+  return <NeedPerm code="flow:approval:read" page="approvals"><FlowApprovals /></NeedPerm>;
 }

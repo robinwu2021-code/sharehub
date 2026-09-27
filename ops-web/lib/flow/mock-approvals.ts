@@ -8,9 +8,21 @@
 // 另：条件步（进入条件不满足就跳过）、历史轮次只追加不覆盖、撤回仅提交人且仅待审。
 //
 // 审核队列：领取后才能决定；领取超时（30 分钟）读时自动放回并留痕。
-import { fail, notFound } from "@/lib/biz-error";
+import { notFound } from "@/lib/biz-error";
 import { ME } from "./mock-db";
 import { requirePerm } from "./mock-auth";
+import { ApiError } from "@/lib/api/error";
+import { FlowValidationError } from "./errors";
+import { useLocaleStore } from "@/lib/stores/locale";
+
+/** 与服务端同码：409 冲突 · 403 规则拒绝 · 422 校验不过（带路径） */
+const pickLang = (zh: string, en: string) => (useLocaleStore.getState().locale === "zh" ? zh : en);
+const conflict = (zh: string, en: string): never => { throw new ApiError(409, pickLang(zh, en)); };
+const denied = (zh: string, en: string): never => { throw new ApiError(403, pickLang(zh, en)); };
+const invalid = (path: string, zh: string, en: string): never => {
+  const m = pickLang(zh, en);
+  throw new FlowValidationError(m, [{ path, error: m }]);
+};
 import type {
   ApprovalQuery, ApprovalRound, ApprovalRow, ApprovalStatus, ApprovalStep, ApprovalView, Named, Page,
   Priority, QueueCount, QueueTask,
@@ -245,17 +257,17 @@ export function getApproval(no: string): ApprovalView {
 }
 
 // ── 审批：写 ─────────────────────────────────────────────────────────────
-/** POST /approvals/{no}/decide {taskNo, decision, reason?}：五条规则固定顺序校验 */
+/** POST /approvals/{no}/decide {taskNo, decision, reason?}：固定顺序 409（任务号过期）→ 403（规则）→ 422（原因） */
 export function decide(no: string, taskNo: string, decision: "APPROVE" | "REJECT", reason: string | undefined, now: number = Date.now()): ApprovalView {
   requirePerm("flow:approval:decide");
   const r = rec(no);
   if (r.status !== "PENDING" || r.taskNo !== taskNo) {
-    fail("这张单已被他人处理，请刷新后再看", "This approval was already handled by someone else — refresh and try again");
+    conflict("这张单已被他人处理，请刷新后再看", "This approval was already handled by someone else — refresh and try again");
   }
   const why = whyNotDecide(r);
-  if (why) fail(why, why === "提交人不能审批自己提交的单" ? "Requesters cannot approve their own requests" : "Cross-step exclusion: you already decided an earlier step in this round");
+  if (why) denied(why, why === "提交人不能审批自己提交的单" ? "Requesters cannot approve their own requests" : "Cross-step exclusion: you already decided an earlier step in this round");
   if (decision === "REJECT" && !reason?.trim()) {
-    fail("驳回必须填写原因 —— 只说「已驳回」，提交人无从改正后重提", "A reason is required to reject — otherwise the requester cannot fix and resubmit");
+    invalid("reason", "驳回必须填写原因 —— 只说「已驳回」，提交人无从改正后重提", "A reason is required to reject — otherwise the requester cannot fix and resubmit");
   }
   r.decisions.push({ step: r.stepIdx, round: r.round, by: ME.ref, atMs: now });
   const cur = r.rounds.find((x) => x.round === r.round);
@@ -279,8 +291,8 @@ export function decide(no: string, taskNo: string, decision: "APPROVE" | "REJECT
 /** POST /approvals/{no}/withdraw：仅提交人、仅待审 */
 export function withdraw(no: string, now: number = Date.now()): ApprovalView {
   const r = rec(no);
-  if (r.requestedBy.ref !== ME.ref) fail("只有提交人可以撤回", "Only the requester can withdraw");
-  if (r.status !== "PENDING") fail("只能撤回待审的单", "Only pending approvals can be withdrawn");
+  if (r.requestedBy.ref !== ME.ref) denied("只有提交人可以撤回", "Only the requester can withdraw");
+  if (r.status !== "PENDING") conflict("只能撤回待审的单", "Only pending approvals can be withdrawn");
   r.status = "WITHDRAWN"; r.finishedAtMs = now; r.taskNo = newTask();
   const cur = r.rounds.find((x) => x.round === r.round);
   if (cur) Object.assign(cur, { status: "WITHDRAWN", atMs: now, by: ME.displayName });
@@ -342,8 +354,8 @@ export function claimTask(taskNo: string, now: number = Date.now()): QueueTask {
   requirePerm("flow:queue:claim");
   sweep(now);
   const t = qrec(taskNo);
-  if (t.done) fail("这项已经办结", "This task is already done");
-  if (t.claimedBy && t.claimedBy.ref !== ME.ref) fail(`已被 ${t.claimedBy.displayName} 领取，刷新后再看`, `Already claimed by ${t.claimedBy.displayName} — refresh`);
+  if (t.done) conflict("这项已经办结", "This task is already done");
+  if (t.claimedBy && t.claimedBy.ref !== ME.ref) conflict(`已被 ${t.claimedBy.displayName} 领取，刷新后再看`, `Already claimed by ${t.claimedBy.displayName} — refresh`);
   t.claimedBy = { ref: ME.ref, displayName: ME.displayName }; t.claimedAtMs = now;
   return qview(t);
 }
@@ -352,7 +364,7 @@ export function claimTask(taskNo: string, now: number = Date.now()): QueueTask {
 export function releaseTask(taskNo: string): QueueTask {
   requirePerm("flow:queue:claim");
   const t = qrec(taskNo);
-  if (t.claimedBy?.ref !== ME.ref) fail("只能放回自己领取的任务", "You can only release tasks you claimed");
+  if (t.claimedBy?.ref !== ME.ref) denied("只能放回自己领取的任务", "You can only release tasks you claimed");
   t.claimedBy = undefined; t.claimedAtMs = undefined;
   t.log.push("主动放回");
   return qview(t);
@@ -363,8 +375,8 @@ export function completeTask(taskNo: string, decision: "APPROVE" | "REJECT", rea
   requirePerm("flow:queue:claim");
   sweep(now);
   const t = qrec(taskNo);
-  if (t.claimedBy?.ref !== ME.ref) fail("领取后才能决定（可能已超时自动放回，刷新后再领）", "Claim it before deciding (it may have timed out and been released — refresh)");
-  if (decision === "REJECT" && !reason?.trim()) fail("驳回必须填写原因", "A reason is required to reject");
+  if (t.claimedBy?.ref !== ME.ref) conflict("领取后才能决定（可能已超时自动放回，刷新后再领）", "Claim it before deciding (it may have timed out and been released — refresh)");
+  if (decision === "REJECT" && !reason?.trim()) invalid("reason", "驳回必须填写原因", "A reason is required to reject");
   t.done = decision === "APPROVE" ? "APPROVED" : "REJECTED";
 }
 

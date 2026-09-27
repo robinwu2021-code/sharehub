@@ -10,8 +10,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { flow, FLOW_KEY } from "@/lib/flow/client";
-import { APPROVAL_STATUS } from "@/lib/flow/labels";
-import { fmtShort } from "@/lib/flow/present";
+import { approvalStatusMap } from "@/lib/flow/labels";
+import { useFlowT } from "@/lib/flow/i18n";
 import type { ApprovalView } from "@/lib/flow/types";
 import { notify } from "@/lib/notify";
 import { Card } from "@/components/ui/card";
@@ -27,7 +27,7 @@ import { FlowTimeline } from "@/components/flow/flow-timeline";
 export default function Page() {
   return (
     <Suspense fallback={<Skeleton className="h-40" />}>
-      <NeedPerm code="flow:approval:read" what="审批详情"><ApprovalDetail /></NeedPerm>
+      <NeedPerm code="flow:approval:read" page="approvalDetail"><ApprovalDetail /></NeedPerm>
     </Suspense>
   );
 }
@@ -35,6 +35,7 @@ export default function Page() {
 function ApprovalDetail() {
   const no = useSearchParams().get("no") ?? "";
   const qc = useQueryClient();
+  const { t: tt, tc, fmt } = useFlowT("approvalDetail");
   const allow = useCan();
   // 两层：有没有「审批」这项能力（权限码，这里判）× 是不是这一步的审批人（服务端 mine 判）
   const canDecidePerm = allow("flow:approval:decide");
@@ -44,94 +45,97 @@ function ApprovalDetail() {
   const [rejectTried, setRejectTried] = useState(false);
 
   const done = (v: ApprovalView, what: string) => {
-    notify.success(v.status === "PENDING" && v.currentStep ? `${what}，已进入「${v.currentStep.name}」步` : what);
+    notify.success(v.status === "PENDING" && v.currentStep ? tt("movedOn", { what, step: v.currentStep.name }) : what);
     setReason(""); setRejectTried(false);
     qc.invalidateQueries({ queryKey: FLOW_KEY });
   };
   const decide = useMutation({
     mutationFn: (d: "APPROVE" | "REJECT") => flow.decide(no, q.data!.mine.taskNo!, d, reason),
-    onSuccess: (v, d) => done(v, d === "APPROVE" ? "已通过" : "已驳回"),
+    onSuccess: (v, d) => done(v, tc(d === "APPROVE" ? "approvalStatus.APPROVED" : "approvalStatus.REJECTED")),
     onError: (e: Error) => { notify.error(e.message); qc.invalidateQueries({ queryKey: FLOW_KEY }); },
   });
   const withdraw = useMutation({
     mutationFn: () => flow.withdraw(no),
-    onSuccess: (v) => done(v, "已撤回"),
+    onSuccess: (v) => done(v, tc("approvalStatus.WITHDRAWN")),
     onError: (e: Error) => notify.error(e.message),
   });
 
-  if (!no) return <><ErrorState error={new Error("缺少审批单号：从审批列表或待办中心进入")} /></>;
+  if (!no) return <><ErrorState error={new Error(tt("missingNo"))} /></>;
   if (q.isLoading) return <><Skeleton className="h-40" /></>;
   if (q.error || !q.data) return <><ErrorState error={q.error} onRetry={() => q.refetch()} /></>;
   const a = q.data;
 
   // 进度：提交 + 各步；跳过的条件步不进步骤条，单独注明
   const active = a.steps.filter((s) => s.state !== "SKIPPED");
-  const steps = [{ key: "__submit", label: "提交" }, ...active.map((s) => ({ key: s.code, label: s.name }))];
+  const steps = [{ key: "__submit", label: tt("step.submit") }, ...active.map((s) => ({ key: s.code, label: s.name }))];
   const cur = a.steps.find((s) => s.state === "CURRENT");
   const current = a.status === "APPROVED" ? active.at(-1)?.code ?? "__submit" : cur?.code ?? "__submit";
-  const branch = a.status === "REJECTED" ? { label: "已驳回", after: cur?.code ?? active[0]?.code ?? "__submit" }
-    : a.status === "WITHDRAWN" ? { label: "已撤回", after: "__submit" } : null;
+  const branch = a.status === "REJECTED" ? { label: tc("approvalStatus.REJECTED"), after: cur?.code ?? active[0]?.code ?? "__submit" }
+    : a.status === "WITHDRAWN" ? { label: tc("approvalStatus.WITHDRAWN"), after: "__submit" } : null;
 
   const rejectEmpty = rejectTried && !reason.trim();
 
   return (
     <div>
       <div className="mb-1 txt-caption text-muted-foreground">
-        <Link href="/flow/approvals/" className="hover:text-foreground">审批列表</Link> / {a.approvalNo}
+        <Link href="/flow/approvals/" className="hover:text-foreground">{tc("page.approvals")}</Link> / {a.approvalNo}
       </div>
       <div className="mb-1 flex flex-wrap items-center gap-2">
-        <h1 className="txt-title">{a.process.name}审批</h1>
-        <StatusBadge map={APPROVAL_STATUS} value={a.status} />
-        <span className="txt-body text-muted-foreground">第 {a.round} 轮</span>
+        <h1 className="txt-title">{tt("heading", { name: a.process.name })}</h1>
+        <StatusBadge map={approvalStatusMap(tc)} value={a.status} />
+        <span className="txt-body text-muted-foreground">{tt("round", { n: a.round })}</span>
       </div>
       <p className="mb-4 txt-body text-muted-foreground">
-        审批单 {a.approvalNo} · 流程 {a.process.code} · 提交人 {a.requestedBy.displayName} · {fmtShort(a.requestedAtMs)}
+        {fmt.join(tt("meta.no", { no: a.approvalNo }), tt("meta.process", { code: a.process.code }), tt("meta.by", { name: a.requestedBy.displayName }), fmt.short(a.requestedAtMs))}
       </p>
 
       <div className="grid items-start gap-4 lg:grid-cols-[1fr_340px]">
         <div className="space-y-4">
           <Card className="p-5">
-            <h2 className="mb-3 txt-strong">业务对象</h2>
+            <h2 className="mb-3 txt-strong">{tt("card.facts")}</h2>
             <dl className="grid grid-cols-[88px_1fr] gap-x-3 gap-y-2 txt-body sm:grid-cols-[88px_1fr_88px_1fr]">
               {a.facts.map((f) => (
                 <Pair key={f.label} label={f.label}>
-                  {f.value}{f.hint && <span className="ms-1 txt-caption text-warning-ink">（{f.hint}）</span>}
+                  {f.value}{f.hint && <span className="ms-1 txt-caption text-warning-ink">{tt("paren", { text: f.hint })}</span>}
                 </Pair>
               ))}
             </dl>
             {a.evidence.length > 0 && (
               <p className="mt-3 txt-caption text-muted-foreground">
-                证据：{a.evidence.map((e) => (e.count ? `${e.name} ×${e.count}` : e.name)).join(" · ")}
+                {tt("evidence", { list: fmt.join(...a.evidence.map((e) => (e.count ? `${e.name} ×${e.count}` : e.name))) })}
               </p>
             )}
           </Card>
 
           <Card className="p-5">
-            <h2 className="mb-3 txt-strong">审批进度</h2>
+            <h2 className="mb-3 txt-strong">{tt("card.progress")}</h2>
             <StatusStepper steps={steps} current={current} branch={branch} />
             <ul className="mt-3 space-y-1 txt-caption text-muted-foreground">
               {a.steps.map((s) => (
                 <li key={s.code}>
-                  {s.name}：{s.approverText}{s.conditionText ? ` · ${s.conditionText}` : ""}
-                  {s.state === "SKIPPED" ? " · 进入条件不满足，已跳过" : ""}
-                  {s.decidedBy ? ` · 决定人 ${s.decidedBy}` : ""}
+                  {s.name}{tc("colon")}{fmt.join(
+                    s.approverText,
+                    s.conditionText,
+                    s.state === "SKIPPED" && tt("step.skipped"),
+                    s.decidedBy && tt("step.decidedBy", { name: s.decidedBy }),
+                  )}
                 </li>
               ))}
             </ul>
             {a.rules.crossStepExclusive && (
-              <Notice className="mb-0 mt-3">跨步互斥已开启：前一步的决定人不能再审后一步。</Notice>
+              <Notice className="mb-0 mt-3">{tt("crossStepOn")}</Notice>
             )}
           </Card>
 
           <Card className="p-5">
-            <h2 className="mb-3 txt-strong">历史轮次 <span className="txt-caption text-muted-foreground">（永不覆盖）</span></h2>
+            <h2 className="mb-3 txt-strong">{tt("card.rounds")} <span className="txt-caption text-muted-foreground">{tt("card.roundsNote")}</span></h2>
             <FlowTimeline
-              empty="还没有轮次记录"
+              empty={tt("emptyRounds")}
               items={[...a.rounds].reverse().map((r) => ({
                 key: String(r.round),
-                title: `第 ${r.round} 轮 · ${r.status === "IN_PROGRESS" ? "审批中" : APPROVAL_STATUS[r.status].label}`,
-                meta: `${fmtShort(r.atMs)} · ${r.by}`,
-                detail: r.comment ? `「${r.comment}」` : undefined,
+                title: fmt.join(tt("round", { n: r.round }), r.status === "IN_PROGRESS" ? tc("approvalStatus.IN_PROGRESS") : approvalStatusMap(tc)[r.status].label),
+                meta: fmt.join(fmt.short(r.atMs), r.by),
+                detail: r.comment ? tt("quote", { text: r.comment }) : undefined,
               }))}
             />
           </Card>
@@ -139,9 +143,9 @@ function ApprovalDetail() {
 
         <div className="space-y-4">
           <Card className="p-5">
-            <h2 className="mb-3 txt-strong">我的决定</h2>
+            <h2 className="mb-3 txt-strong">{tt("card.mine")}</h2>
             {!canDecidePerm ? (
-              <ReadOnlyNotice what="审批决定" perm="flow:approval:decide" note="只能查看进度与历史" className="mb-0" />
+              <ReadOnlyNotice what={tt("readOnly.what")} perm="flow:approval:decide" note={tt("readOnly.note")} className="mb-0" />
             ) : a.mine.canDecide ? (
               <>
                 <Textarea
@@ -149,38 +153,38 @@ function ApprovalDetail() {
                   onChange={setReason}
                   rows={3}
                   invalid={rejectEmpty}
-                  placeholder="意见（驳回时必填）"
+                  placeholder={tt("placeholder")}
                 />
                 <p className={rejectEmpty ? "mt-1 txt-caption text-destructive-ink" : "mt-1 txt-caption text-muted-foreground"}>
-                  驳回必须填写原因 —— 只说「已驳回」，提交人无从改正后重提。
+                  {tt("rejectHint")}
                 </p>
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   <Button loading={decide.isPending && decide.variables === "APPROVE"} disabled={decide.isPending}
-                    onClick={() => decide.mutate("APPROVE")}>通过</Button>
+                    onClick={() => decide.mutate("APPROVE")}>{tt("btn.approve")}</Button>
                   <Button variant="destructive" loading={decide.isPending && decide.variables === "REJECT"} disabled={decide.isPending}
-                    onClick={() => { setRejectTried(true); if (reason.trim()) decide.mutate("REJECT"); }}>驳回</Button>
+                    onClick={() => { setRejectTried(true); if (reason.trim()) decide.mutate("REJECT"); }}>{tt("btn.reject")}</Button>
                 </div>
               </>
             ) : (
-              <Notice className="mb-0">{a.mine.whyNot ?? "你不是这一步的审批人"}</Notice>
+              <Notice className="mb-0">{a.mine.whyNot ?? tt("notApprover")}</Notice>
             )}
             {a.mine.canWithdraw && (
               <Button className="mt-3 w-full" variant="secondary" loading={withdraw.isPending}
                 onClick={async () => {
-                  if (await confirm({ title: "撤回这张审批单？", desc: "撤回后本轮结束；需要时可在业务系统里重新提交。", confirmText: "撤回" })) withdraw.mutate();
+                  if (await confirm({ title: tt("withdrawConfirm.title"), desc: tt("withdrawConfirm.desc"), confirmText: tt("btn.withdraw") })) withdraw.mutate();
                 }}>
-                撤回
+                {tt("btn.withdraw")}
               </Button>
             )}
           </Card>
 
           <Card className="p-5">
-            <h2 className="mb-2 txt-strong">规则提示 <span className="txt-caption text-muted-foreground">（内建）</span></h2>
+            <h2 className="mb-2 txt-strong">{tt("card.rules")} <span className="txt-caption text-muted-foreground">{tt("card.rulesNote")}</span></h2>
             <ul className="list-disc space-y-1 ps-5 txt-body text-muted-foreground">
-              <li>提交人不能审批自己提交的单</li>
-              <li>撤回仅提交人可用，且仅在待审时</li>
-              <li>他人已处理时提交会提示「请刷新」</li>
-              {a.rules.crossStepExclusive && <li>跨步互斥：前一步的决定人不能审后一步</li>}
+              <li>{tt("rules.noSelf")}</li>
+              <li>{tt("rules.withdraw")}</li>
+              <li>{tt("rules.stale")}</li>
+              {a.rules.crossStepExclusive && <li>{tt("rules.crossStep")}</li>}
             </ul>
           </Card>
         </div>

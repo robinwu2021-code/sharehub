@@ -1,4 +1,5 @@
 import type { Messages } from "./zh";
+import { flowAr } from "./flow";
 
 // العربية (RTL). ⚠️ 机器生成的初版翻译，needs-review：请母语者校对术语与语气。
 // Auto-generated Arabic (MSA), NEEDS HUMAN REVIEW. Keys mirror zh.ts.
@@ -117,5 +118,8 @@ export const ar: Messages = {
     selectedCount: "تم اختيار {n}",
     clear: "مسح",
     checkFields: "الرجاء تصحيح الأخطاء في النموذج",
+    readOnly: "عرض فقط: لا يملك دورك صلاحية {what} ({codes})",
+    readOnlyNote: "، {note}",
   },
+  flow: flowAr,
 };

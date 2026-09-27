@@ -5,7 +5,10 @@
 //   仅可查看：当前角色无<what>权限（<perm>）[，<note>]
 // 原先 30 处各写各的 —— 有的写「不能新增、编辑或归档」，有的写「既无 A 也无 B」，
 // 有的干脆只写权限码。句式在此统一：主句恒定，差异一律落到 note。
+"use client";
+
 import { Notice } from "@/components/ui/notice";
+import { useI18n } from "@/lib/i18n";
 
 export function ReadOnlyNotice({
   what, perm, note, className,
@@ -18,10 +21,12 @@ export function ReadOnlyNotice({
   note?: string;
   className?: string;
 }) {
+  const { t } = useI18n();
   const codes = Array.isArray(perm) ? perm.join(" / ") : perm;
+  // 句式进 i18n（common.readOnly）；what / note 由调用方按当前语言传入
   return (
     <Notice className={className}>
-      仅可查看：当前角色无{what}权限（{codes}）{note ? `，${note}` : ""}
+      {t("common.readOnly", { what, codes })}{note ? t("common.readOnlyNote", { note }) : ""}
     </Notice>
   );
 }

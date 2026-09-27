@@ -5,6 +5,7 @@
 // 表面与工单摘要条同一套钩子（data-surface="stat" / data-tone / data-slot="value"），由风格决定形态。
 import { cn } from "@/lib/utils";
 import type { TicketStat } from "@/lib/flow/types";
+import { useFlowT } from "@/lib/flow/i18n";
 
 export function StatStrip({
   stats, loading, active, onPick,
@@ -14,9 +15,10 @@ export function StatStrip({
   active: string | null;
   onPick: (s: TicketStat | null) => void;
 }) {
+  const { tc } = useFlowT("common");
   const list = stats ?? [];
   return (
-    <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5" role="group" aria-label="工单统计（点击筛选）">
+    <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5" role="group" aria-label={tc("stat.aria")}>
       {(loading && !list.length ? Array.from({ length: 5 }, (_, i) => ({ key: `s${i}`, label: "", value: 0, queryParams: {} } as TicketStat)) : list).map((s) => {
         const on = active === s.key;
         const hot = s.value > 0 && !!s.tone;
@@ -35,7 +37,7 @@ export function StatStrip({
               on && "ring-2 ring-primary",
             )}
           >
-            {on && <span className="absolute end-3 top-3 txt-caption text-primary">✓ 已筛选</span>}
+            {on && <span className="absolute end-3 top-3 txt-caption text-primary">{tc("stat.picked")}</span>}
             <div className="txt-body text-muted-foreground">{s.label}</div>
             <div
               data-slot="value"

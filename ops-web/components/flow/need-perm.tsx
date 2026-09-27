@@ -5,11 +5,14 @@
 // 页内写操作用各页的 allow("…") + <ReadOnlyNotice>，不走这里。
 import { useCan } from "@/lib/hooks/use-can";
 import { Notice } from "@/components/ui/notice";
+import { useFlowT } from "@/lib/flow/i18n";
+import type { FlowMessages } from "@/lib/i18n/messages/flow";
 
-export function NeedPerm({ code, what, children }: { code: string; what: string; children: React.ReactNode }) {
+export function NeedPerm({ code, page, children }: { code: string; page: keyof FlowMessages["common"]["page"]; children: React.ReactNode }) {
   const allow = useCan();
+  const { tc } = useFlowT("common");
   if (!allow(code)) {
-    return <Notice>当前角色没有「{what}」的查看权限（{code}），请联系管理员在角色权限里开通。</Notice>;
+    return <Notice>{tc("needPerm", { what: tc(`page.${page}`), code })}</Notice>;
   }
   return <>{children}</>;
 }

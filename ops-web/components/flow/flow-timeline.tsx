@@ -17,7 +17,7 @@ export function FlowTimeline({ items, empty }: { items: FlowTimelineItem[]; empt
   return (
     <ol data-slot="timeline" className="space-y-2.5">
       {items.map((it) => (
-        <li key={it.key} data-slot="timeline-item" className="border-l-2 border-[var(--border)] pl-3">
+        <li key={it.key} data-slot="timeline-item" className="border-s-2 border-[var(--border)] ps-3">
           <div className={cn("txt-strong", it.hot && "text-warning-ink")}>{it.title}</div>
           <div className="txt-caption text-muted-foreground tabular-nums">{it.meta}</div>
           {it.detail && <div className="mt-0.5 txt-caption text-foreground">{it.detail}</div>}
