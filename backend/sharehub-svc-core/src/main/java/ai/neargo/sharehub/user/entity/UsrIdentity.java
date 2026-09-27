@@ -21,6 +21,8 @@ public class UsrIdentity {
     private String provider;      // WECHAT_MP/WECHAT_OA/APPLE/GOOGLE/PHONE
     private String providerUid;   // openid / apple·google sub / hash(phone)
     private String unionKey;      // 微信 unionid，或 'provider:uid'
+    /** 显示掩码（手机号前 3 后 4）。仅供显示：不可逆、不进唯一键、不做等值查询。V131 */
+    private String displayMask;
     private LocalDateTime boundAt;
     private LocalDateTime createdAt;
 }

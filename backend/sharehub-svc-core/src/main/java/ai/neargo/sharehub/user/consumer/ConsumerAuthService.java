@@ -7,6 +7,7 @@ import ai.neargo.sharehub.auth.LoginUser;
 import ai.neargo.sharehub.auth.PermVersion;
 import ai.neargo.sharehub.auth.Realm;
 import ai.neargo.sharehub.auth.TokenStore;
+import ai.neargo.sharehub.identity.IdentifierNormalizer;
 import ai.neargo.sharehub.user.entity.UsrIdentity;
 import ai.neargo.sharehub.user.entity.UsrUser;
 import ai.neargo.sharehub.user.mapper.UserMappers.UsrIdentityMapper;
@@ -86,6 +87,7 @@ public class ConsumerAuthService {
                     .eq(UsrIdentity::getProvider, id.provider().name())
                     .eq(UsrIdentity::getProviderUid, id.providerUid()).last("limit 1"));
             if (existing != null) {
+                refreshMask(existing, id);
                 return new Upsert(byNo(existing.getCUserNo()), false);   // 1) 同渠道同 uid
             }
             UsrIdentity legacy = byLegacyUid(tenant, id);
@@ -93,6 +95,7 @@ public class ConsumerAuthService {
                 // 1b) 旧算法命中 → 就地重键。不新建、不归并：这本来就是同一个人。
                 legacy.setProviderUid(id.providerUid());
                 legacy.setUnionKey(id.unionKey());
+                legacy.setDisplayMask(maskOf(id));
                 identityMapper.updateById(legacy);
                 log.info("登录标识重键 provider={} cUserNo={}", id.provider(), legacy.getCUserNo());
                 return new Upsert(byNo(legacy.getCUserNo()), false);
@@ -115,9 +118,27 @@ public class ConsumerAuthService {
             bind.setProvider(id.provider().name());
             bind.setProviderUid(id.providerUid());
             bind.setUnionKey(id.unionKey());
+            bind.setDisplayMask(maskOf(id));
             identityMapper.insert(bind);
             return new Upsert(byNo(cUserNo), isNew);
         });
+    }
+
+    /**
+     * 登录标识的显示掩码。登录这一刻是**唯一**同时拿到明文与身份行的时候 ——
+     * 此前明文随请求结束就丢了，「我的」页与运营端的「手机」列因此只能出空（V131）。
+     * 只存掩码不存密文：显示够用，且不必为此引入密钥管理。
+     */
+    private static String maskOf(ResolvedIdentity id) {
+        return id.phone() == null ? null : IdentifierNormalizer.mask(id.phone());
+    }
+
+    /** 老用户（V131 之前建的行）在这里补上掩码；已有且相同就不写。 */
+    private void refreshMask(UsrIdentity row, ResolvedIdentity id) {
+        String mask = maskOf(id);
+        if (mask == null || mask.equals(row.getDisplayMask())) return;
+        identityMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<UsrIdentity>()
+                .eq(UsrIdentity::getId, row.getId()).set(UsrIdentity::getDisplayMask, mask));
     }
 
     /**

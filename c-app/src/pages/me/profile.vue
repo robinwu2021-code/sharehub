@@ -3,6 +3,7 @@
 import { ref, computed } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { storeToRefs } from "pinia";
+import { phoneText } from "@/shared/format";
 import { useI18n } from "vue-i18n";
 import { useUserStore } from "@/stores/user";
 import { api } from "@/api";
@@ -76,7 +77,7 @@ function bindPhone() {
           <view class="px-[28rpx]">
             <pb-cell icon="phone" :title="$t('profile.phone')">
               <view class="flex items-center gap-[16rpx]">
-                <text class="text-sub">{{ profile?.phone || "—" }}</text>
+                <text class="text-sub">{{ phoneText(profile?.phone) || "—" }}</text>
                 <pb-button size="sm" type="tonal" @click="bindPhone">{{ $t("profile.change") }}</pb-button>
               </view>
             </pb-cell>

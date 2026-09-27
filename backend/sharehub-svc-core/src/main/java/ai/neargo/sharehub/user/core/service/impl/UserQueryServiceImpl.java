@@ -6,7 +6,9 @@ import ai.neargo.sharehub.user.core.dto.UserCoreDtos.CUserRow;
 import ai.neargo.sharehub.user.core.entity.UsrBlacklist;
 import ai.neargo.sharehub.user.core.mapper.UserCoreMappers.UsrBlacklistMapper;
 import ai.neargo.sharehub.user.core.service.UserQueryService;
+import ai.neargo.sharehub.user.entity.UsrIdentity;
 import ai.neargo.sharehub.user.entity.UsrUser;
+import ai.neargo.sharehub.user.mapper.UserMappers.UsrIdentityMapper;
 import ai.neargo.sharehub.user.mapper.UserMappers.UsrUserMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -26,12 +28,13 @@ public class UserQueryServiceImpl implements UserQueryService {
 
     private final UsrUserMapper users;
     private final UsrBlacklistMapper blacklists;
+    /** 只读 display_mask（V131）—— <b>不读 provider_uid</b>，那是哈希，见 {@link #phoneMasks}。 */
+    private final UsrIdentityMapper identities;
 
-    // usr_identity 不再被注入：它此前唯一的用途是拿 provider_uid 冒充手机号（见 NO_PHONE_SOURCE）。
-    // 留着一个没人用的 mapper，下一个人会以为这里还要读身份表。
-    public UserQueryServiceImpl(UsrUserMapper users, UsrBlacklistMapper blacklists) {
+    public UserQueryServiceImpl(UsrUserMapper users, UsrBlacklistMapper blacklists, UsrIdentityMapper identities) {
         this.users = users;
         this.blacklists = blacklists;
+        this.identities = identities;
     }
 
     @Override
@@ -67,36 +70,33 @@ public class UserQueryServiceImpl implements UserQueryService {
     }
 
     /**
-     * 手机号**没有明文来源**，所以一律出空串。
+     * 手机号掩码：读 {@code usr_identity.display_mask}（登录时由真号算出，V131）。
+     * 老用户还没再登录过就没有，出空串。
      *
      * <h3>它此前是什么</h3>
-     * 这里原来是 {@code mask(identity.providerUid)} —— 把 {@code usr_identity.provider_uid}
-     * 当手机号去掩码。而那一列存的是**登录标识的哈希**（HMAC-SHA256 的十六进制），
-     * 从来不是手机号。于是：
-     * <ul>
-     *   <li>C 端「我的资料」显示 {@code 056****7c12}（2026-09-27 H5 对接实测所见）；</li>
-     *   <li>运营端用户 / 风控 / 黑名单 / 白名单**四张表**的「手机」列，
-     *       每个消费者都是这种十六进制尾巴。</li>
-     * </ul>
-     * 掩码把它伪装得很像一个真手机号 —— <b>这正是它一直没被发现的原因</b>：
-     * 一个打了码的号，谁也不会去核对中间那几位对不对。
+     * 一开始是 {@code mask(identity.providerUid)} —— 把**登录标识的哈希**（HMAC 十六进制）当手机号掩码，
+     * C 端「我的资料」显示 {@code 056****7c12}，运营端用户 / 风控 / 黑名单 / 白名单四张表的「手机」列
+     * 全是十六进制尾巴。掩码把它伪装得很像真号 —— 这正是它一直没被发现的原因。
+     * 之后改成如实出空，直到 V131 在登录时存下真号的掩码。
      *
-     * <p>旧代码的注释自己就写着「明文只在 pb_pii」，而 {@code pb_pii} 分库**从没建过**
-     * （架构级 D4）。也就是说这个字段自始至终没有数据源。
-     *
-     * <h3>为什么是空串而不是继续掩码</h3>
-     * 同一个方法上面几行的 {@code email} 就是这么处理的：「无列（pb_pii 未建），如实出 null」。
-     * 空着能看出缺了什么，伪装成手机号看不出。
-     * pb_pii 落地（或另立明文列）之后，这里换成真来源即可。
+     * <p><b>绝不回退到 provider_uid</b>：没有掩码就出空，空着能看出缺了什么，伪装成手机号看不出。
+     * （{@code ConsumerProfilePhoneTest} 钉住：掩码两头只能是数字。）
      */
-    private static final String NO_PHONE_SOURCE = "";
+    private Map<String, String> phoneMasks(Collection<String> userNos) {
+        return identities.selectList(new LambdaQueryWrapper<UsrIdentity>()
+                        .in(UsrIdentity::getCUserNo, userNos)
+                        .eq(UsrIdentity::getProvider, "PHONE")
+                        .isNotNull(UsrIdentity::getDisplayMask)).stream()
+                .collect(Collectors.toMap(UsrIdentity::getCUserNo, UsrIdentity::getDisplayMask, (a, b) -> a));
+    }
 
     private List<CUserRow> rows(List<UsrUser> list) {
         if (list.isEmpty()) return List.of();
         Set<String> nos = list.stream().map(UsrUser::getCUserNo).collect(Collectors.toSet());
         Set<String> black = activeBlacklist(nos);
+        Map<String, String> masks = phoneMasks(nos);
         return list.stream().map(u -> new CUserRow(
-                u.getCUserNo(), u.getNickname(), u.getAvatar(), NO_PHONE_SOURCE,
+                u.getCUserNo(), u.getNickname(), u.getAvatar(), masks.getOrDefault(u.getCUserNo(), ""),
                 u.getCreditScore(), black.contains(u.getCUserNo()), 0L,
                 u.getCreatedAt() == null ? null : u.getCreatedAt().toString())).toList();
     }

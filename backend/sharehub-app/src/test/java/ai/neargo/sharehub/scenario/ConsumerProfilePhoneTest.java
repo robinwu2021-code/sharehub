@@ -25,15 +25,20 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 这正是这类缺陷的形状：它不报错、不空白、看起来完全正常。
  *
  * <p>根因是 {@code pb_pii} 分库从没建过（架构级 D4），所以明文**没有存放处**。
- * 既然没有来源，就该如实出空 —— 同一个出参里 {@code email} 早就是这么处理的
- * （「无列（pb_pii 未建），如实出 null」）。
+ * 修复第一步是如实出空（「我的」页因此只剩一个空卡）。
+ *
+ * <h3>2026-09-27 第二步：登录时存一份真号的掩码</h3>
+ * 登录那一刻手里有归一化后的明文（{@code ResolvedIdentity.phone}），只是一直没人存。
+ * 现在存进 {@code usr_identity.display_mask}：<b>只存掩码、不存可逆密文</b> ——
+ * 显示用掩码就够了，而可逆存储要引入密钥管理（V130 正是出于这个理由删掉了代理侧的 *_enc）。
+ * 老用户下次登录时补上。
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ConsumerProfilePhoneTest extends ApiTestSupport {
 
     @Test
-    @DisplayName("资料里的 phone 不是十六进制哈希的掩码")
-    void profilePhoneIsNotAMaskedHash() {
+    @DisplayName("资料里的 phone 是登录所用号码的掩码，不是十六进制哈希的掩码")
+    void profilePhoneIsTheMaskOfTheRealNumber() {
         String phone = "+97150" + (System.nanoTime() % 10000000L);
         post("/mp/auth/otp", Map.of("phone", phone), null).okData();
         String token = post("/mp/auth/login",
@@ -42,16 +47,17 @@ class ConsumerProfilePhoneTest extends ApiTestSupport {
 
         String got = get("/mp/user/profile", token).okData().path("phone").asText();
 
+        String digits = phone.replaceAll("\\D", "");
         assertThat(got)
-                .as("""
-                        没有明文来源就该出空。此前这里是 mask(provider_uid) ——
-                        一个 HMAC 掩码出来长得像 056****7c12，看着完全像个手机号。""")
-                .isEmpty();
+                .as("登录时存下的是真号的掩码：保留前 3 后 4")
+                .contains("****")
+                .startsWith(digits.substring(0, 3))
+                .endsWith(digits.substring(digits.length() - 4));
     }
 
     @Test
-    @DisplayName("掩码形状的回归钉子：一旦又出现 xxx****xxxx 就红")
-    void nothingPhoneShapedComesBack() {
+    @DisplayName("回归钉子：掩码的尾巴必须是数字 —— 出现十六进制说明又在拿哈希冒充手机号")
+    void maskIsNeverDerivedFromTheHash() {
         String phone = "+97150" + (System.nanoTime() % 10000000L);
         post("/mp/auth/otp", Map.of("phone", phone), null).okData();
         String token = post("/mp/auth/login",
@@ -60,10 +66,9 @@ class ConsumerProfilePhoneTest extends ApiTestSupport {
 
         String got = get("/mp/user/profile", token).okData().path("phone").asText();
 
-        // 单独写一条形状断言：将来若有人接上真明文，这条要跟着改（那时它才该是真号的掩码）；
-        // 而在那之前，任何「看起来像掩码手机号」的东西都是那个哈希又回来了。
+        // 此前的 mask(provider_uid) 长得像 056****7c12 —— 尾巴是十六进制
         assertThat(got)
-                .as("出现 ***  就说明又在拿什么东西冒充手机号了")
-                .doesNotContain("****");
+                .as("掩码两头只能是数字；出现 a-f 就是 HMAC 的尾巴")
+                .matches("\\d{3}\\*{4}\\d{4}");
     }
 }

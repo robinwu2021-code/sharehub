@@ -84,3 +84,12 @@ export function utcTimeOf(s: string | null): string {
   const p = (n: number) => String(n).padStart(2, "0");
   return `${p(d.getHours())}:${p(d.getMinutes())}`;
 }
+
+/**
+ * 手机号掩码的显示形式。后端存的是**归一化后**号码的掩码（去掉了前导 +，如 `971****4567`），
+ * 直接显示读起来像本地号；补回 + 才是用户认得的国际写法。空就是空（老用户下次登录才有）。
+ */
+export function phoneText(masked?: string | null): string {
+  if (!masked) return "";
+  return /^\d/.test(masked) ? "+" + masked : masked;
+}
