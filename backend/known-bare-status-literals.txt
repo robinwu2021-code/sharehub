@@ -89,7 +89,6 @@ MarketServiceImpl#status=PLANNED
 MenuService#status=ACTIVE
 OpenApiAppServiceImpl#status=ENABLED
 ProblemServiceImpl#status=ENABLED
-ProblemServiceImpl#suggestedAction=SELF_SERVICE
 
 # ── seed（8 条）──
 DemoOpsFinanceSeeder#handleStatus=OPEN

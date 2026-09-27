@@ -76,6 +76,9 @@ class VocabularyRejectedOnWriteTest extends ApiTestSupport {
         jdbc.update("DELETE FROM coupon_tpl WHERE name = ?", MARK);
         // dev_alarm_code 没有 name 列，业务键是 code —— 按探针码删
         jdbc.update("DELETE FROM dev_alarm_code WHERE code LIKE 'TEST_VOCAB_PROBE%'");
+        jdbc.update("DELETE FROM usr_free_whitelist WHERE c_user_no LIKE 'UVOCAB%'");
+        jdbc.update("DELETE FROM notify_template WHERE name = ?", MARK);
+        jdbc.update("DELETE FROM md_problem WHERE title = ?", MARK);
     }
 
     @Test
@@ -136,6 +139,74 @@ class VocabularyRejectedOnWriteTest extends ApiTestSupport {
         var bad = post("/api/user/campaigns", Map.of(
                 "name", MARK, "kind", "WHATEVER", "status", "DRAFT"), t);
         assertThat(bad.status).as("kind=WHATEVER 竟然被接受了：%s", bad.msg()).isEqualTo(400);
+    }
+
+    @Test
+    @DisplayName("★ usr_free_whitelist 的 reason / quota_type 非法值 400——额度类型错了就是免单口径错")
+    void free_whitelist_rejects_out_of_vocabulary() {
+        String t = login("ADMIN");
+
+        var ok = post("/api/user/free-whitelist", Map.of(
+                "cUserNo", "UVOCAB1", "reason", "INTERNAL_TEST", "quotaType", "TIMES",
+                "quotaValue", 3), t);
+        assertThat(ok.status).as("合法值应当能存：%s", ok.msg()).isEqualTo(200);
+
+        var badReason = post("/api/user/free-whitelist", Map.of(
+                "cUserNo", "UVOCAB2", "reason", "BECAUSE", "quotaType", "TIMES",
+                "quotaValue", 3), t);
+        assertThat(badReason.status).as("reason=BECAUSE 竟然被接受了：%s", badReason.msg()).isEqualTo(400);
+
+        // quotaType 决定 quota 怎么解释（次数 / 金额 / 不限）。写错就是免单口径错，而那是钱
+        var badQuota = post("/api/user/free-whitelist", Map.of(
+                "cUserNo", "UVOCAB3", "reason", "INTERNAL_TEST", "quotaType", "FOREVER",
+                "quotaValue", 3), t);
+        assertThat(badQuota.status).as("quotaType=FOREVER 竟然被接受了：%s", badQuota.msg()).isEqualTo(400);
+    }
+
+    @Test
+    @DisplayName("★ notify_template / notify_blacklist 的 channel 非法值 400——四套 channel 词表各自为界")
+    void notify_channels_reject_out_of_vocabulary() {
+        String t = login("ADMIN");
+
+        /*
+         * 这两列的词表**不一样**：模板是 INAPP/PUSH/SMS/SUBSCRIBE，拉黑是
+         * ALL/EMAIL/PUSH/SMS/WHATSAPP。所以两格各用对方的独有值做负例 ——
+         * 一旦哪天有人把它们合并成一个枚举，这两格会同时红。
+         */
+        var okTpl = post("/api/platform/notify-templates", Map.of(
+                "templateNo", "", "name", MARK, "channel", "SMS", "title", MARK, "content", MARK), t);
+        assertThat(okTpl.status).as("模板合法 channel 应当能存：%s", okTpl.msg()).isEqualTo(200);
+
+        var badTpl = post("/api/platform/notify-templates", Map.of(
+                "name", MARK, "channel", "WHATSAPP", "title", MARK, "content", MARK), t);
+        assertThat(badTpl.status)
+                .as("模板 channel=WHATSAPP 被接受了——那是拉黑的词表，不是模板的：%s", badTpl.msg())
+                .isEqualTo(400);
+
+        var badBl = post("/api/platform/notify-blacklist", Map.of(
+                "target", "0500000003", "channel", "SUBSCRIBE", "reason", "MANUAL"), t);
+        assertThat(badBl.status)
+                .as("拉黑 channel=SUBSCRIBE 被接受了——那是模板的词表，不是拉黑的：%s", badBl.msg())
+                .isEqualTo(400);
+    }
+
+    @Test
+    @DisplayName("★ md_problem 的 category / suggested_action 非法值 400——后者决定客服怎么路由")
+    void problem_catalog_rejects_out_of_vocabulary() {
+        String t = login("ADMIN");
+
+        var ok = post("/api/platform/problems", Map.of(
+                "title", MARK, "category", "DEVICE", "suggestedAction", "TO_WORKORDER"), t);
+        assertThat(ok.status).as("合法值应当能存：%s", ok.msg()).isEqualTo(200);
+
+        var badCat = post("/api/platform/problems", Map.of(
+                "title", MARK, "category", "HARDWARE", "suggestedAction", "TO_WORKORDER"), t);
+        assertThat(badCat.status).as("category=HARDWARE 竟然被接受了：%s", badCat.msg()).isEqualTo(400);
+
+        // suggestedAction 决定这条问题走自助/客服/退款/工单哪一条路，错了就是路由错
+        var badAct = post("/api/platform/problems", Map.of(
+                "title", MARK, "category", "DEVICE", "suggestedAction", "TO_MANAGER"), t);
+        assertThat(badAct.status).as("suggestedAction=TO_MANAGER 竟然被接受了：%s", badAct.msg()).isEqualTo(400);
     }
 
     @Test

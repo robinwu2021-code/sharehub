@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.platform.notify.service.impl;
 
+import ai.neargo.sharehub.platform.notify.NotifyTemplateChannel;
 import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.platform.notify.NotifyTemplateStatus;
 import ai.neargo.sharehub.platform.notify.NotifyLogStatus;
@@ -71,6 +72,26 @@ public class NotifyTemplateServiceImpl extends AbstractCrudService<NotifyTemplat
     protected void beforeCreate(NotifyTemplate e) {
         if (e.getStatus() == null || e.getStatus().isBlank()) e.setStatus(NotifyTemplateStatus.ENABLED.name());
         if (e.getLang() == null || e.getLang().isBlank()) e.setLang("en");
+        validateVocabulary(e);
+    }
+
+    @Override
+    protected void beforeUpdate(NotifyTemplate e, NotifyTemplate current) {
+        validateVocabulary(e);
+    }
+
+    /**
+     * channel 此前没有任何校验，实测 POST {@code channel=WHATSAPP} 是 200 落库 ——
+     * 而 {@code WHATSAPP} 是 {@code notify_blacklist.channel} 的词表，不是模板的。
+     * 四套 channel 词表两两不同，详见 {@link NotifyTemplateChannel} 的类注释。
+     *
+     * <p>渠道写错的症状是**这条模板永远匹配不上**（发送时按 channel 找模板），
+     * 于是该发的通知不发，而没有任何东西报错。
+     */
+    private static void validateVocabulary(NotifyTemplate e) {
+        NotifyTemplateChannel.ofNullable(e.getChannel());
+        NotifyTemplateStatus.of(e.getStatus() == null || e.getStatus().isBlank()
+                ? NotifyTemplateStatus.ENABLED.name() : e.getStatus());
     }
 
     @Override

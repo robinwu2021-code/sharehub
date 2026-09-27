@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.platform.notify.service.impl;
 
+import ai.neargo.sharehub.platform.notify.NotifyBlacklistChannel;
 import ai.neargo.sharehub.platform.notify.NotifyBlacklistReason;
 import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.auth.StaffContext;
@@ -75,6 +76,8 @@ public class NotifyBlacklistServiceImpl implements NotifyBlacklistService {
          * 这个入口直接收实体当请求体，所以闸只能落在这里。
          */
         body.setReason(NotifyBlacklistReason.of(body.getReason()).name());
+        // channel 是**范围**：该全渠道拉黑的只拉了短信，推送就照发给一个明确退订过的人
+        NotifyBlacklistChannel.ofNullable(body.getChannel());
         if (body.getBlockedAt() == null || body.getBlockedAt().isBlank()) body.setBlockedAt(now());
         body.setStatus(ACTIVE);
         // 谁拉的黑：按当前登录人回填，不接受客户端传。
@@ -99,7 +102,9 @@ public class NotifyBlacklistServiceImpl implements NotifyBlacklistService {
         }
         // target 不受理：它是脱敏存的，改掉等于换了一个人被拉黑，而从掩码上看不出换没换。
         // 拉黑别人请新建一条 —— 那样才留得下「谁在什么时候被拉黑」这条痕。
-        if (body.getChannel() != null && !body.getChannel().isBlank()) e.setChannel(body.getChannel());
+        if (body.getChannel() != null && !body.getChannel().isBlank()) {
+            e.setChannel(NotifyBlacklistChannel.of(body.getChannel()).name());
+        }
         if (body.getReason() != null && !body.getReason().isBlank()) {
             e.setReason(NotifyBlacklistReason.of(body.getReason()).name());
         }

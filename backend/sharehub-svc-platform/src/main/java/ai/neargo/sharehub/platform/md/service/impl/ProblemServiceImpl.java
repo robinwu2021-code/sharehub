@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.platform.md.service.impl;
 
+import ai.neargo.sharehub.platform.md.ProblemSuggestedAction;
+import ai.neargo.sharehub.platform.md.ProblemCategory;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.common.crud.AbstractCrudService;
 import ai.neargo.sharehub.platform.md.dto.MdDtos2.FaqItem;
@@ -71,7 +73,30 @@ public class ProblemServiceImpl extends AbstractCrudService<MdProblem, ProblemEn
     protected void beforeCreate(MdProblem e) {
         if (e.getSortNo() == null) e.setSortNo(0);
         if (e.getStatus() == null) e.setStatus("ENABLED");
-        if (e.getSuggestedAction() == null) e.setSuggestedAction("SELF_SERVICE");
+        if (e.getSuggestedAction() == null) e.setSuggestedAction(ProblemSuggestedAction.SELF_SERVICE.name());
+        validateVocabulary(e);
+    }
+
+    @Override
+    protected void beforeUpdate(MdProblem e, MdProblem current) {
+        validateVocabulary(e);
+    }
+
+    /**
+     * 两列词表此前**一处都没校验**，实测 POST {@code category=HARDWARE} 与
+     * {@code suggestedAction=TO_MANAGER} 都是 200 落库。
+     *
+     * <p>这里原本只有 {@code beforeCreate} 里那几行补默认值 —— 而「补默认值」与
+     * 「校验传进来的值」是两件事：没传时填一个对的，传了错的照样存。
+     * 编辑路径连默认值都没有，所以本条也补了 {@code beforeUpdate}。
+     *
+     * <p>{@code suggestedAction} 尤其不该漏：它不是展示字段而是**路由依据**
+     * （自助 / 客服 / 退款 / 工单），写错的后果是用户被送到错的地方，
+     * 而他不知道本该去别处。
+     */
+    private static void validateVocabulary(MdProblem e) {
+        ProblemCategory.ofNullable(e.getCategory());
+        ProblemSuggestedAction.ofNullable(e.getSuggestedAction());
     }
 
     @Override
