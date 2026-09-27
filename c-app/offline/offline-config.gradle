@@ -41,7 +41,11 @@ android {
         // 包名与 AppKey 是绑在一起的（DCloud 按「包名 + 证书 SHA1」签发 AppKey），
         // 这里写死而不是读配置：改包名 = AppKey 作废 = 要去后台重新生成，不该是改一行配置的事
         applicationId 'ai.neargo.powerbank'
-        manifestPlaceholders = [DCLOUD_APPKEY: appKey]
+        // 明文 HTTP 只给测试包（build-apk.sh --test-api 传 -PpbAllowLocal=true）。
+        // Android 9 起默认禁止明文流量，测试包连 http://10.0.2.2 不开这个就是一屏「网络异常」；
+        // 正式包必须是 false —— 开着等于允许任何一个 http 地址被中间人改写。
+        manifestPlaceholders = [DCLOUD_APPKEY: appKey,
+                                PB_CLEARTEXT : (project.findProperty('pbAllowLocal') == 'true') ? 'true' : 'false']
     }
     signingConfigs {
         pbRelease {

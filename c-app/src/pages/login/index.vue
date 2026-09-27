@@ -128,13 +128,31 @@ async function submit() {
     uni.showToast({ title: "OK", icon: "success" });
     // 有回跳就 redirectTo（**不是 navigateTo**）：登录页留在栈里的话，
     // 用户在确认页按返回会退回到登录页，而他已经登录了 —— 那一页对他没有意义
-    setTimeout(() => (redirect ? uni.redirectTo({ url: redirect }) : uni.navigateBack()), 400);
+    setTimeout(leave, 400);
   } catch (e) {
     uni.showToast({ title: (e as Error).message, icon: "none" });
   } finally {
     loading.value = false;
   }
 }
+/**
+ * 登录成功后去哪。
+ *
+ * **登录页经常是栈底**：会话失效（401）时守卫用的是 `reLaunch`，把整个页面栈清空了。
+ * 这时 `navigateBack()` 没有上一页可回 —— 在 H5 上什么也不发生，在 **App 上变成
+ * 「再按一次退出」**：登录明明成功了，用户却被卡在登录页，再点一次还会把 App 退掉。
+ * （Android 模拟器装机实测撞到；H5 上验回跳时看不出来，因为那边从首页 navigateTo 进来，栈里有上一页。）
+ */
+function leave() {
+  if (redirect) {
+    uni.redirectTo({ url: redirect });
+  } else if (getCurrentPages().length > 1) {
+    uni.navigateBack();
+  } else {
+    uni.reLaunch({ url: "/pages/home/index" });
+  }
+}
+
 function cycleLang() {
   const order = ["zh", "en", "ar"] as const;
   appStore.setLang(order[(order.indexOf(appStore.lang) + 1) % 3]);

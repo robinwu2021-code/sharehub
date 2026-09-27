@@ -106,7 +106,9 @@ tasks.register('checkAppBundleGates') {
                     "  离线包里没有同源反代这回事，base 为空 = 每个请求都打到 file:// 上。\n" +
                     "  文件：${bi}")
             }
-            if (base ==~ /(?i).*(localhost|127\.0\.0\.1|10\.0\.2\.2|0\.0\.0\.0).*/) {
+            // 测试包（build-apk.sh --test-api）明示放行，且同时要求 base 与 -PpbApiBase 一致
+            def allowLocal = project.hasProperty('pbAllowLocal') && project.property('pbAllowLocal') == 'true'
+            if (!allowLocal && base ==~ /(?i).*(localhost|127\.0\.0\.1|10\.0\.2\.2|0\.0\.0\.0).*/) {
                 throw new GradleException(
                     "后端源是本地地址：${base} —— 这种包在模拟器上一切正常，\n" +
                     "  到真机上每个列表都是「网络异常」，而产物里看不出哪里错。\n" +

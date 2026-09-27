@@ -42,7 +42,7 @@ if [ -z "$BI" ]; then
     bad "包里没有 www/pb-build-info.json —— 用老工具链打的，无法判断它连的是 mock 还是真后端"
 else
     BI_OUT=$(printf '%s' "$BI" | python3 -c '
-import json, re, sys
+import json, os, re, sys
 info = json.load(sys.stdin)
 want = sys.argv[1]
 msgs = []
@@ -51,7 +51,7 @@ if info.get("useMock"):
 base = info.get("apiBase") or ""
 if not base:
     msgs.append("BAD 后端源为空 —— 请求会打到 file:// 上")
-elif re.search(r"localhost|127\.0\.0\.1|10\.0\.2\.2", base, re.I):
+elif re.search(r"localhost|127\.0\.0\.1|10\.0\.2\.2", base, re.I) and os.environ.get("PB_ALLOW_LOCAL") != "1":
     msgs.append(f"BAD 后端源是本地地址 {base} —— 模拟器正常、真机全是「网络异常」")
 elif base != want:
     msgs.append(f"BAD 后端源 {base} ≠ 预期 {want}")
@@ -83,6 +83,14 @@ fi
 # 2b. 定位权限。首页整页就是「按距离排序的附近网点」，缺了它首页等于废掉一半。
 LOC=$(printf '%s\n' "$MANIFEST" | grep -c 'ACCESS_FINE_LOCATION\|ACCESS_COARSE_LOCATION' || true)
 [ "${LOC:-0}" -ge 1 ] && ok "定位权限已声明" || bad "没有定位权限 —— 首页拿不到坐标，列表退化成「按建站顺序」且不报错"
+
+# 2c. 明文 HTTP。正式包必须关（测试包为连本机后端才开）。
+CLEAR=$(printf '%s\n' "$MANIFEST" | grep -o 'usesCleartextTraffic="[a-z]*"' | head -1 || true)
+if [ "${PB_ALLOW_LOCAL:-0}" != "1" ] && [ "$CLEAR" = 'usesCleartextTraffic="true"' ]; then
+    bad "正式包开着明文 HTTP（usesCleartextTraffic=true）—— 任何 http 地址都可能被中间人改写"
+else
+    ok "明文 HTTP：${CLEAR:-未声明（默认关）}"
+fi
 
 # 3. DCloud 离线 AppKey。它绑「包名 + 证书 SHA1」，错了或缺了**运行时才炸**：
 #    启动白屏或弹 appkey 校验失败，编译期一个字都不说。
@@ -146,12 +154,15 @@ fi
 # 7. 启动图标。按文件名筛会**恒绿**（release 资源名混淆过，两边都筛出 0 个），
 #    所以问 aapt 要 `application: icon=` —— 那是运行时真正用的那一个，再比字节。
 #    判据方向也是反的：图标本来就该偶尔变（换 logo），真正该失败的是**取不到图标**。
-NEW_IC=$(printf '%s\n' "$BADGING" | grep -oE "icon='[^']*'" | tail -1 | sed "s/icon='//;s/'//" || true)
+# 只认 `application:` 那一行。badging 里 `launchable-activity:` 也带一个 icon=''（空的），
+# 取「最后一个 icon=」拿到的正是它 —— 于是图标明明在包里，这一条却报「取不到」（实测撞上过）。
+NEW_IC=$(printf '%s\n' "$BADGING" | awk '/^application:/{print; exit}' | grep -oE "icon='[^']*'" | sed "s/icon='//;s/'//" || true)
 if [ -z "$NEW_IC" ]; then
     bad "取不到启动图标 —— 这种包装上去图标是系统默认的小机器人"
 else
     NEW_IC_MD5=$(unzip -p "$NEW" "$NEW_IC" 2>/dev/null | md5 -q || true)
-    OLD_IC=$("$AAPT" dump badging "$OLD" 2>/dev/null | grep -oE "icon='[^']*'" | tail -1 | sed "s/icon='//;s/'//" || true)
+    OLD_BADGING=$("$AAPT" dump badging "$OLD" 2>/dev/null || true)
+    OLD_IC=$(printf '%s\n' "$OLD_BADGING" | awk '/^application:/{print; exit}' | grep -oE "icon='[^']*'" | sed "s/icon='//;s/'//" || true)
     OLD_IC_MD5=$(unzip -p "$OLD" "$OLD_IC" 2>/dev/null | md5 -q || true)
     [ "$NEW_IC_MD5" = "$OLD_IC_MD5" ] \
         && ok "启动图标与旧包一致（$NEW_IC）" \

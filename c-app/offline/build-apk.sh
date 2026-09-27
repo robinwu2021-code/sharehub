@@ -7,6 +7,7 @@
 #   c-app/offline/build-apk.sh                       # 打包 + 强制体检
 #   c-app/offline/build-apk.sh --install <设备序列号>   # 再装机自检
 #   c-app/offline/build-apk.sh --no-build            # www 已是最新，跳过 npm run build:app
+#   c-app/offline/build-apk.sh --test-api http://10.0.2.2:8095   # **测试包**：连本机后端（模拟器里 10.0.2.2 = 宿主机）
 #   OFFLINE_PROJECT=<路径> c-app/offline/build-apk.sh   # 换机器时指工程
 #
 # ─────────────────────────────────────────────────────────────────────────
@@ -38,9 +39,11 @@ OUT_DIR="${OUT_DIR:-$HOME/Downloads}"
 
 DO_BUILD=1
 INSTALL_TO=""
+TEST_API=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --no-build) DO_BUILD=0; shift ;;
+        --test-api) TEST_API="${2:?--test-api 要跟后端源，如 http://10.0.2.2:8095}"; shift 2 ;;
         --install)  INSTALL_TO="${2:?--install 要跟设备序列号}"; shift 2 ;;
         -h|--help)  sed -n '2,20p' "$0"; exit 0 ;;
         *) echo "不认识的参数：$1（--help 看用法）" >&2; exit 2 ;;
@@ -48,6 +51,28 @@ while [ $# -gt 0 ]; do
 done
 
 say() { printf '\033[36m›\033[0m %s\n' "$1"; }
+
+# ── 测试包模式 ──────────────────────────────────────────────────────────
+# 为什么需要：正式包连 powerbank.ichain.top，而线上没有开发模式、短信通道也没接 ——
+# 在模拟器里**登录不进去**，借还一步都测不了。测试包连本机开了 dev-mode 的后端（验证码 000000）。
+#
+# 为什么是显式开关而不是「把 base 改成 10.0.2.2 再打」：那正是闸门要拦的坏包
+# （模拟器正常、真机全是网络异常）。这里放行本地地址的前提是**你明说了这是测试包**，
+# 且产物文件名带 TEST —— 同一套闸门，只是换了预期值，不是把闸门拆掉。
+PB_ALLOW_LOCAL=0
+GRADLE_EXTRA=()
+if [ -n "$TEST_API" ]; then
+    EXPECT_API_BASE="$TEST_API"
+    PB_ALLOW_LOCAL=1
+    export VITE_API_BASE="$TEST_API"      # 进程环境变量优先于 .env.production（Vite 的规则）
+    GRADLE_EXTRA=(-PpbApiBase="$TEST_API" -PpbAllowLocal=true)
+    printf '\033[33m%s\033[0m\n' "
+============================================================
+ 测试包：后端 = $TEST_API（本机）
+ **不能发给任何人** —— 离开这台电脑就连不上后端。产物文件名带 TEST。
+============================================================"
+fi
+export PB_API_BASE="$EXPECT_API_BASE" PB_ALLOW_LOCAL
 ok()  { printf '  \033[32m✓\033[0m %s\n' "$1"; }
 die() { printf '  \033[31m✗\033[0m %s\n' "$1" >&2; exit 1; }
 
@@ -178,7 +203,7 @@ BI="dist/build/app/pb-build-info.json"
 [ -f "$BI" ] || die "没有 $BI —— 产物是老工具链出的（该文件由 vite.config.mts 的 pbBuildInfo 插件产出）。
     没有它就无法判断包连的是 mock 还是真后端：产物是压缩过的，按字符串判定只会得到假绿。"
 python3 - "$BI" "$EXPECT_API_BASE" <<'PY'
-import json, re, sys
+import json, os, re, sys
 info = json.load(open(sys.argv[1], encoding="utf-8"))
 want = sys.argv[2]
 bad = []
@@ -189,7 +214,7 @@ if info.get("useMock"):
 base = info.get("apiBase") or ""
 if not base:
     bad.append("后端源为空：离线包里没有同源反代这回事，请求会打到 file:// 上。")
-elif re.search(r"localhost|127\.0\.0\.1|10\.0\.2\.2|0\.0\.0\.0", base, re.I):
+elif re.search(r"localhost|127\.0\.0\.1|10\.0\.2\.2|0\.0\.0\.0", base, re.I) and os.environ.get("PB_ALLOW_LOCAL") != "1":
     bad.append(f"后端源是本地地址 {base}：模拟器上一切正常，真机上每个列表都是「网络异常」。")
 elif base != want:
     bad.append(f"后端源是 {base}，预期 {want}（确实要发别处就给 PB_API_BASE=）。")
@@ -224,16 +249,17 @@ ok "已换（上一版留在 $(basename "$WWW").prev）"
 # ── ⑤ 打包 ──────────────────────────────────────────────────────────────
 say "⑤ gradle assembleRelease"
 # 打 release 不打 debug —— debug 包会弹一串 HTML5+ Runtime 调试提示
-( cd "$OFFLINE_PROJECT" && JAVA_HOME="$JDK" ./gradlew :simpleDemo:assembleRelease )
+( cd "$OFFLINE_PROJECT" && JAVA_HOME="$JDK" ./gradlew :simpleDemo:assembleRelease ${GRADLE_EXTRA[@]+"${GRADLE_EXTRA[@]}"} )
 [ -f "$APK_OUT" ] || die "gradle 说成功，但产物不在：$APK_OUT"
 STAMP="$(date +%m%d-%H%M)"
-FINAL="$OUT_DIR/powerbank-c-$VERSION_NAME-$VERSION_CODE-$STAMP.apk"
+FINAL="$OUT_DIR/powerbank-c-${TEST_API:+TEST-}$VERSION_NAME-$VERSION_CODE-$STAMP.apk"
 cp "$APK_OUT" "$FINAL"
 ok "APK：$FINAL"
 
 # ── ⑥ 体检 ──────────────────────────────────────────────────────────────
 say "⑥ 产物体检"
-PREV=$(ls -t "$OUT_DIR"/powerbank-c-*.apk 2>/dev/null | awk 'NR==2{print}' || true)
+if [ -n "$TEST_API" ]; then PAT="powerbank-c-TEST-*.apk"; else PAT="powerbank-c-[0-9]*.apk"; fi
+PREV=$(ls -t "$OUT_DIR"/$PAT 2>/dev/null | awk 'NR==2{print}' || true)
 "$ROOT/offline/verify-apk.sh" "$FINAL" ${PREV:+"$PREV"}
 
 # ── ⑦ 装机（可选）────────────────────────────────────────────────────────

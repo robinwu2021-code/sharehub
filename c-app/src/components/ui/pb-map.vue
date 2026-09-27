@@ -1,17 +1,32 @@
-<script setup lang="ts">
-// pb-map: 有 VITE_GMAPS_KEY → 加载真实 Google Maps JavaScript API；无 key → 降级为样式占位。
-// Capacitor WebView = H5，Maps JS API 在 WebView 中完全可用，无需 renderjs。
-import { onMounted, onUnmounted, watch } from "vue";
+<script lang="ts">
+/*
+ * pb-map：附近网点地图（Google Maps JavaScript API）。
+ *
+ * **为什么是 renderjs**：原先这里在 `<script setup>` 里直接 `document.createElement` 注入
+ * Maps 脚本，注释写着「Capacitor WebView = H5，无需 renderjs」—— 那是按 Capacitor 壳写的。
+ * 改走 uni 原生打包之后，**App 的页面逻辑跑在独立的 JS 引擎里（app-service），那里没有
+ * `document`**：地图永远加载不出来，也不报错，只剩一个灰块（首页默认就是地图视图）。
+ * Android 模拟器装机实测撞到。
+ *
+ * renderjs 让 DOM 相关代码跑在**视图层 WebView** 里：H5 与 App 同一份实现。
+ * 小程序不支持 renderjs，仍显示占位（小程序要地图得用原生 `<map>`，另议）。
+ *
+ * 分工：逻辑层（本块）只准备数据（点位、我的位置、key）并接收「点了哪个点」；
+ * 画图全在下面的 renderjs 模块里。
+ */
+import { defineComponent, type PropType } from "vue";
 import type { NearbyCabinet } from "@/types";
 import { getUserLocation } from "@/ports/location";
 
-const props = defineProps<{ points: NearbyCabinet[] }>();
-const emit = defineEmits<{ (e: "select", p: NearbyCabinet): void }>();
+const KEY = (import.meta.env.VITE_GMAPS_KEY as string | undefined) || "";
 
-const KEY = import.meta.env.VITE_GMAPS_KEY as string | undefined;
-const hasKey = !!KEY;
+/** 小程序没有 renderjs，直接走占位。（写成变量而不是在 data 里条件编译两个同名字段 —— 那样 TS 不认） */
+let RENDERJS = true;
+// #ifdef MP
+RENDERJS = false;
+// #endif
 
-// 占位用固定布局（无 key 时）
+// 占位用固定布局（无 key / 加载失败 / 小程序）
 const POS = [
   { left: "22%", top: "30%" },
   { left: "64%", top: "24%" },
@@ -20,28 +35,79 @@ const POS = [
   { left: "30%", top: "46%" },
 ];
 
-// --- Google Maps 实例 ---
-let gmap: google.maps.Map | null = null;
-const markers: google.maps.Marker[] = [];
-let userMarker: google.maps.Marker | null = null;
+export default defineComponent({
+  props: { points: { type: Array as PropType<NearbyCabinet[]>, default: () => [] } },
+  emits: ["select"],
+  data() {
+    return {
+      POS,
+      real: RENDERJS && !!KEY,
+      failed: false,
+      me: null as { lat: number; lng: number } | null,
+    };
+  },
+  computed: {
+    /** 传给视图层的全部数据。只放画图要用的字段 —— 这个对象每次变化都会整份跨线程传一遍。 */
+    payload(): { key: string; me: { lat: number; lng: number } | null; points: { id: string; lat: number; lng: number; n: number; name: string }[] } {
+      return {
+        key: KEY,
+        me: this.me,
+        points: this.points
+          .filter((p) => p.lat != null && p.lng != null)
+          .map((p) => ({ id: p.cabinetNo, lat: p.lat as number, lng: p.lng as number, n: p.availableBorrow, name: p.siteName })),
+      };
+    },
+  },
+  mounted() {
+    // 定位在逻辑层取（App 走 uni.getLocation 的原生定位），拿到了再交给视图层画蓝点。
+    // 「我在这儿」**只有真拿到位置才画**：先画在迪拜市中心的话，人在阿布扎比时地图会告诉他「你在迪拜」。
+    getUserLocation().then((c) => {
+      this.me = c;
+    });
+  },
+  methods: {
+    /** 视图层回调：点了某个网点。 */
+    onPick(id: string) {
+      const p = this.points.find((x) => x.cabinetNo === id);
+      if (p) this.$emit("select", p);
+    },
+    /** 视图层回调：Maps 脚本没加载成功（网络 / key 限制）—— 退回占位，别留一个灰块。 */
+    onMapFail() {
+      this.failed = true;
+    },
+  },
+});
+</script>
 
-function loadScript(): Promise<void> {
-  return new Promise((resolve) => {
-    if ((window as any).google?.maps) { resolve(); return; }
+<script module="gm" lang="renderjs">
+// ⚠️ 这一块跑在视图层（WebView），不是逻辑层：这里有 document/window，
+// 但拿不到逻辑层的任何变量，数据只能经 :prop 进来、经 callMethod 回去。
+let gmap = null;
+let markers = [];
+let meMarker = null;
+let loading = null;
+const DUBAI = { lat: 25.2048, lng: 55.2708 };
+
+function loadScript(key) {
+  if (window.google && window.google.maps) return Promise.resolve(true);
+  if (loading) return loading;
+  loading = new Promise(function (resolve) {
     const cb = "__pb_gmaps_ready";
-    (window as any)[cb] = () => { delete (window as any)[cb]; resolve(); };
+    window[cb] = function () { delete window[cb]; resolve(true); };
     const s = document.createElement("script");
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${KEY}&callback=${cb}&libraries=places&language=en`;
+    s.src = "https://maps.googleapis.com/maps/api/js?key=" + key + "&callback=" + cb + "&language=en";
     s.async = true;
-    s.onerror = () => resolve(); // 加载失败时静默降级（网络/key 无效）
+    s.onerror = function () { resolve(false); };
     document.head.appendChild(s);
+    // 回调永远不来（被墙 / key 被拒且没触发 onerror）时别一直挂着
+    setTimeout(function () { resolve(!!(window.google && window.google.maps)); }, 15000);
   });
+  return loading;
 }
 
-
-function buildMarkerIcon(available: boolean): google.maps.Symbol {
+function icon(available) {
   return {
-    path: google.maps.SymbolPath.CIRCLE,
+    path: window.google.maps.SymbolPath.CIRCLE,
     fillColor: available ? "#22c55e" : "#9ca3af",
     fillOpacity: 1,
     strokeColor: "#ffffff",
@@ -50,98 +116,66 @@ function buildMarkerIcon(available: boolean): google.maps.Symbol {
   };
 }
 
-function placeMarkers() {
-  if (!gmap) return;
-  markers.forEach((m) => m.setMap(null));
-  markers.length = 0;
-
-  props.points.forEach((p) => {
-    if (p.lat == null || p.lng == null) return;
-    const available = p.availableBorrow > 0;
-    const m = new google.maps.Marker({
-      position: { lat: p.lat, lng: p.lng },
-      map: gmap!,
-      title: p.siteName,
-      label: { text: String(p.availableBorrow), color: "#fff", fontSize: "11px", fontWeight: "700" },
-      icon: buildMarkerIcon(available),
-      zIndex: available ? 100 : 50,
-    });
-    m.addListener("click", () => emit("select", p));
-    markers.push(m);
-  });
-}
-
-const DUBAI = { lat: 25.2048, lng: 55.2708 };
-
-function setUserMarker(pos: { lat: number; lng: number }) {
-  if (!gmap) return;
-  if (userMarker) {
-    userMarker.setPosition(pos);
-  } else {
-    userMarker = new google.maps.Marker({
-      position: pos,
-      map: gmap,
-      title: "You",
-      icon: {
-        path: google.maps.SymbolPath.CIRCLE,
-        fillColor: "#2F6BFF",
-        fillOpacity: 1,
-        strokeColor: "#fff",
-        strokeWeight: 3,
-        scale: 9,
-      },
-      zIndex: 9999,
-    });
-  }
-}
-
-async function initGMap() {
-  if (!hasKey) return;
-  await loadScript();
-  if (!(window as any).google?.maps) return; // 加载失败降级
-
-  const el = document.getElementById("pb-map-canvas");
-  if (!el || gmap) return;
-
-  // 先用默认中心立即构造地图，避免被地理定位阻塞
-  gmap = new google.maps.Map(el, {
-    center: DUBAI,
-    zoom: 13,
-    disableDefaultUI: true,
-    zoomControl: true,
-    gestureHandling: "greedy",
-    styles: [
-      { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] },
-      { featureType: "transit", elementType: "labels", stylers: [{ visibility: "off" }] },
-    ],
-  });
-  placeMarkers();
-
-  // 地图**居中**在迪拜是合理的默认视野（总得从某处开始看）；
-  // 但「我在这儿」那个蓝点**只有真拿到位置才画** —— 原来它先画在迪拜市中心，
-  // 于是人在阿布扎比时，地图上明确告诉他「你在迪拜」。
-  getUserLocation().then((center) => {
-    if (!gmap || !center) return;
-    setUserMarker(center);
-    gmap.setCenter(center);
-    gmap.setZoom(14);
-  });
-}
-
-onMounted(initGMap);
-watch(() => props.points, placeMarkers, { deep: true });
-onUnmounted(() => {
-  markers.forEach((m) => m.setMap(null));
-  userMarker?.setMap(null);
-  gmap = null;
-});
+export default {
+  methods: {
+    onPayload(p, _old, owner) {
+      if (!p || !p.key) return;
+      loadScript(p.key).then(function (ok) {
+        if (!ok) { owner.callMethod("onMapFail"); return; }
+        const g = window.google.maps;
+        if (!gmap) {
+          const el = document.getElementById("pb-map-canvas");
+          if (!el) return;
+          gmap = new g.Map(el, {
+            center: DUBAI,
+            zoom: 13,
+            disableDefaultUI: true,
+            zoomControl: true,
+            gestureHandling: "greedy",
+            styles: [
+              { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] },
+              { featureType: "transit", elementType: "labels", stylers: [{ visibility: "off" }] },
+            ],
+          });
+        }
+        markers.forEach(function (m) { m.setMap(null); });
+        markers = (p.points || []).map(function (pt) {
+          const m = new g.Marker({
+            position: { lat: pt.lat, lng: pt.lng },
+            map: gmap,
+            title: pt.name,
+            label: { text: String(pt.n), color: "#fff", fontSize: "11px", fontWeight: "700" },
+            icon: icon(pt.n > 0),
+            zIndex: pt.n > 0 ? 100 : 50,
+          });
+          m.addListener("click", function () { owner.callMethod("onPick", pt.id); });
+          return m;
+        });
+        if (p.me) {
+          if (!meMarker) {
+            meMarker = new g.Marker({
+              map: gmap,
+              title: "You",
+              zIndex: 9999,
+              icon: { path: g.SymbolPath.CIRCLE, fillColor: "#2F6BFF", fillOpacity: 1, strokeColor: "#fff", strokeWeight: 3, scale: 9 },
+            });
+            gmap.setCenter(p.me);
+            gmap.setZoom(14);
+          }
+          meMarker.setPosition(p.me);
+        }
+      });
+    },
+  },
+};
 </script>
 
 <template>
-  <!-- 真实地图容器（有 key） -->
-  <view v-if="hasKey" id="pb-map-canvas" class="pb-map pb-map--real" />
+  <!-- 真实地图：数据经 :prop 交给视图层的 renderjs（见上方 gm 模块） -->
+  <!-- @vue-expect-error renderjs 模块 gm 由 uni 编译器注入，vue-tsc 不认识 -->
+  <view v-if="real && !failed" id="pb-map-canvas" class="pb-map pb-map--real" :prop="payload" :change:prop="gm.onPayload" />
 
-  <!-- 占位（无 key） -->
+  <!-- 占位（无 key / 加载失败 / 小程序） -->
   <view v-else class="pb-map">
     <view class="pb-map__grid" />
     <view class="pb-map__me" />
@@ -151,14 +185,14 @@ onUnmounted(() => {
       class="pb-map__pin"
       :class="{ 'is-off': p.availableBorrow <= 0 }"
       :style="POS[i]"
-      @tap="emit('select', p)"
+      @tap="$emit('select', p)"
     >
       <pb-icon name="pin" :size="46" />
       <text class="pb-map__cnt">{{ p.availableBorrow }}</text>
     </view>
     <view class="pb-map__note">
       <pb-icon name="map" :size="26" />
-      <text>Set VITE_GMAPS_KEY to enable map</text>
+      <text>{{ failed ? "Map unavailable — use List" : "Set VITE_GMAPS_KEY to enable map" }}</text>
     </view>
   </view>
 </template>
