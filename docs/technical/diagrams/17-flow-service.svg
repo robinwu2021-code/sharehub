@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Source Han Sans SC','Noto Sans CJK SC',-apple-system,'Segoe UI',Roboto,sans-serif">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4A585B"/></marker><marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0F7173"/></marker></defs>
+<rect width="1600" height="900" fill="#FFFFFF"/>
+<text x="56" y="68" font-size="42" fill="#12181B" font-weight="750" text-anchor="start" letter-spacing="-1" opacity="1">流程与工单服务 flow：架构与集成</text>
+<text x="56" y="104" font-size="22" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">一个服务 · 审批 + 工单 · 与业务解耦　｜　现在嵌在 powerbank（形态 A），将来独立部署（形态 B）　｜　v4/16</text>
+<line x1="56" y1="126" x2="1544" y2="126" stroke="#D8E0DF" stroke-width="2"/>
+<rect x="56" y="144" width="1488" height="112" rx="10" fill="#EEF2F8"/>
+<rect x="56" y="144" width="6" height="112" rx="3" fill="#5B7BA6"/>
+<text x="78" y="174" font-size="21" fill="#5B7BA6" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">① 接入的业务系统</text>
+<rect x="76.0" y="186" width="276.8" height="60" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="3"/>
+<text x="214.4" y="212.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">powerbank</text>
+<text x="214.4" y="241.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">审批 · 工单 · 状态机</text>
+<rect x="368.8" y="186" width="276.8" height="60" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="507.20000000000005" y="212.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">ai-shop</text>
+<text x="507.20000000000005" y="241.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">售后 · 商品审核 · 客服</text>
+<rect x="661.6" y="186" width="276.8" height="60" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="800.0" y="212.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">ichain 等</text>
+<text x="800.0" y="241.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">审核队列 · 领取</text>
+<rect x="954.4000000000001" y="186" width="276.8" height="60" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="1092.8000000000002" y="212.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">ai-erp 等</text>
+<text x="1092.8000000000002" y="241.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">只用状态机库</text>
+<rect x="1247.2" y="186" width="276.8" height="60" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="1385.6000000000001" y="212.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">新业务</text>
+<text x="1385.6000000000001" y="241.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">按集成指南接入</text>
+<rect x="56" y="272" width="1488" height="128" rx="10" fill="#EDF4EE"/>
+<rect x="56" y="272" width="6" height="128" rx="3" fill="#5C8A63"/>
+<text x="78" y="302" font-size="21" fill="#5C8A63" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">② 业务进程内（每个接入业务各一份）</text>
+<rect x="76" y="316" width="440" height="72" rx="9" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.8"/>
+<text x="296.0" y="348.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">业务代码</text>
+<text x="296.0" y="377.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">定义 · 结果回调 · 三个 Provider</text>
+<rect x="532" y="316" width="440" height="72" rx="9" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.8"/>
+<text x="752.0" y="348.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">flow-api 状态机库</text>
+<text x="752.0" y="377.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">业务对象自身状态 · 不经服务</text>
+<rect x="988" y="316" width="536" height="72" rx="9" fill="#FFFFFF" stroke="#5C8A63" stroke-width="3"/>
+<text x="1256.0" y="348.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">flow-client</text>
+<text x="1256.0" y="377.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">本地 / 远程 · 回调接收 · 发件箱 · 对账</text>
+<line x1="296" y1="256" x2="296" y2="270" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="752" y1="256" x2="752" y2="270" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="1256" y1="256" x2="1256" y2="270" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="1244" y1="392" x2="1244" y2="456" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="1268" y1="456" x2="1268" y2="392" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)" stroke-dasharray="6 5"/>
+<rect x="56" y="416" width="1488" height="272" rx="10" fill="#FBF3E8"/>
+<rect x="56" y="416" width="6" height="272" rx="3" fill="#B07D3A"/>
+<text x="78" y="446" font-size="21" fill="#B07D3A" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">③ flow 服务　flow-core 引擎 · flow-store 持久化　｜　形态 A 嵌在业务进程 · 形态 B 为 flow-svc 独立进程</text>
+<rect x="76.0" y="460" width="472.0" height="92" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="3"/>
+<text x="312.0" y="502.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">审批</text>
+<text x="312.0" y="531.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">审批单 → 轮次 → 任务 · 五条内建规则</text>
+<rect x="564.0" y="460" width="472.0" height="92" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="3"/>
+<text x="800.0" y="502.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">工单</text>
+<text x="800.0" y="531.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">去重开单 · 派单抢单 · SLA · 内嵌审批</text>
+<rect x="1052.0" y="460" width="472.0" height="92" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="3"/>
+<text x="1288.0" y="502.0" font-size="27" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">待办</text>
+<text x="1288.0" y="531.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">审批任务与工单同一张待办</text>
+<rect x="76.0" y="566" width="472.0" height="92" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="1.8"/>
+<text x="312.0" y="608.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">定义</text>
+<text x="312.0" y="637.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">状态图 · 流程 · 工单类型 · SLA · 日历</text>
+<rect x="564.0" y="566" width="472.0" height="92" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="1.8"/>
+<text x="800.0" y="608.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">接入</text>
+<text x="800.0" y="637.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">接入系统 · 回调地址 · 按系统隔离</text>
+<rect x="1052.0" y="566" width="472.0" height="92" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="1.8"/>
+<text x="1288.0" y="608.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">集成</text>
+<text x="1288.0" y="637.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">发件箱 · 幂等 · 回调重试 · 对账</text>
+<rect x="56" y="702" width="1488" height="112" rx="10" fill="#F0F3F3"/>
+<rect x="56" y="702" width="6" height="112" rx="3" fill="#6B7A7C"/>
+<text x="78" y="732" font-size="21" fill="#6B7A7C" font-weight="700" text-anchor="start" letter-spacing="1.2" opacity="1">④ 数据与共用能力</text>
+<rect x="76.0" y="746" width="350.0" height="58" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="251.0" y="771.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">flw_* 数据</text>
+<text x="251.0" y="800.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">A：业务库 · B：独立库</text>
+<rect x="442.0" y="746" width="350.0" height="58" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="617.0" y="771.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">共用任务服务</text>
+<text x="617.0" y="800.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">定时扫 SLA · 领取超时</text>
+<rect x="808.0" y="746" width="350.0" height="58" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="983.0" y="771.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">通知组件</text>
+<text x="983.0" y="800.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">订阅事件 · 催办预警</text>
+<rect x="1174.0" y="746" width="350.0" height="58" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="1349.0" y="771.0" font-size="27" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">媒体组件</text>
+<text x="1349.0" y="800.0" font-size="19" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">工单与审批附件</text>
+<line x1="316.0" y1="660" x2="316.0" y2="744" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="340.0" y1="744" x2="340.0" y2="660" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)" stroke-dasharray="6 5"/>
+<line x1="617.0" y1="744" x2="617.0" y2="660" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<line x1="983.0" y1="660" x2="983.0" y2="744" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)" stroke-dasharray="6 5"/>
+<line x1="1349.0" y1="660" x2="1349.0" y2="744" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<text x="56" y="844" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">实线：调用（业务 → 服务：登记定义 · 提交 / 决定审批 · 开单 / 发事件 · 查待办）　虚线：回调与事件（审批结果 · 工单迁移，业务必须幂等）</text>
+<text x="56" y="876" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">解耦：服务只认「业务对象引用 + 属性 + 锚点」；业务只提供 操作人上下文 · 数据范围条件 · 锚点。只要状态机的业务依赖 flow-api 即可，不必接服务。</text>
+</svg>
