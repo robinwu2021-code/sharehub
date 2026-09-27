@@ -257,6 +257,7 @@ export default {
     min: "满",
     noMin: "无门槛",
     validTo: "有效期至",
+    noExpiry: "长期有效",
     off: "减",
     none: "暂无优惠券",
   },

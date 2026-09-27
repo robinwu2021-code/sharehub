@@ -145,7 +145,13 @@ async function claim(c: ClaimableCoupon) {
             <view class="mt-[8rpx] text-[22rpx] text-sub">
               {{ c.threshold > 0 ? $t("coupon.min") + " " + money(c.threshold) : $t("coupon.noMin") }}
             </view>
-            <view class="mt-[4rpx] text-[22rpx] text-sub">{{ $t("coupon.validTo") }} {{ c.expireAt }}</view>
+            <!--
+              expireAt 可能为空：**自助领取的券后端传的就是 null**（claim 里 insert(…, null)），
+              而 expired() 把空当「不限期」。无条件拼「有效期至 」会渲染成一句没有日期的残句。
+            -->
+            <view class="mt-[4rpx] text-[22rpx] text-sub">
+              {{ c.expireAt ? $t("coupon.validTo") + " " + c.expireAt : $t("coupon.noExpiry") }}
+            </view>
           </view>
           <pb-tag :type="tagType[c.status]">{{ $t(statusKey[c.status]) }}</pb-tag>
         </view>

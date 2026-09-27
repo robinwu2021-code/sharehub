@@ -65,7 +65,7 @@ export const httpApi: McpApi = {
   depositFree: (cabinetNo: string) => client.post<{ authNo: string; frozen: number }>("/mp/trade/deposit/free", { cabinetNo }),
   pay: (p: PayParams) => client.post<PayResult>("/mp/trade/pay", p),
 
-  listFaq: (category?: string) => client.get<FaqItem[]>("/mp/faq", { category }),
+  listFaq: (category?: string, lang?: string) => client.get<FaqItem[]>("/mp/faq", { category, lang }),
   report: (p: ReportInput) => client.post<ReportResult>("/mp/user/report", p),
   listReports: (q?: PageQ & { status?: string }) => client.get<PageResult<CsTicket>>("/mp/user/reports", q),
   getReport: (reportNo: string) => client.get<CsTicket | null>(`/mp/user/reports/${reportNo}`),

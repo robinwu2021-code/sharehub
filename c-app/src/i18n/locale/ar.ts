@@ -257,6 +257,7 @@ export default {
     min: "بحد أدنى",
     noMin: "بدون حد أدنى",
     validTo: "صالحة حتى",
+    noExpiry: "بدون تاريخ انتهاء",
     off: "خصم",
     none: "لا توجد قسائم",
   },

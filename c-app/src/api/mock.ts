@@ -217,7 +217,9 @@ export const mockApi: McpApi = {
   depositFree: (_cabinetNo: string) => db.delay({ authNo: `AUTH${Math.floor(performance.now())}`, frozen: 100 }, 420),
   pay: (p: PayParams) => db.delay({ payNo: `PAY${Math.floor(performance.now())}`, status: "SUCCESS" as const, cashierParams: { scene: p.scene } }, 480),
 
-  listFaq: (category?: string) =>
+  // lang 收下但不用：mock 的种子只有一种语言。收下是为了让签名与真实实现一致 ——
+  // 少一个形参，调用方传了也不会报错，切到真后端才发现「语言一直没传过去」。
+  listFaq: (category?: string, _lang?: string) =>
     db.delay(category ? db.faqs.filter((f) => f.category === category) : db.faqs),
 
   // 分流照后端的规矩来：出口由字典里的 suggestedAction 决定，不是前端挑的。

@@ -191,7 +191,14 @@ export interface McpApi {
   pay(p: PayParams): Promise<PayResult>;
   // 售后。问题字典（/mp/faq）既是帮助中心的内容，也是报障的下拉来源 ——
   // 两处各存一份的话，运营改一处就会不一致。
-  listFaq(category?: string): Promise<FaqItem[]>;
+  /**
+   * 问题字典（帮助中心 + 报障下拉的同一个数据源）。
+   *
+   * ⚠️ **必须传 lang**：后端是「按语言挑好的单语视图，端上不做三选一」
+   * （见 FaqItem 的 javadoc），挑的依据就是这个参数。不传就恒回默认语种 ——
+   * 界面是阿语、FAQ 是中文。后端那边三语挑选是好的，实测 en/ar 都对。
+   */
+  listFaq(category?: string, lang?: string): Promise<FaqItem[]>;
   report(p: ReportInput): Promise<ReportResult>;
   listReports(q?: PageQ & { status?: string }): Promise<PageResult<CsTicket>>;
   getReport(reportNo: string): Promise<CsTicket | null>;

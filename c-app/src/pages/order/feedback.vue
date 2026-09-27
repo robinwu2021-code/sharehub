@@ -11,7 +11,10 @@
 import { computed, ref } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import { api } from "@/api";
+import { useAppStore } from "@/stores/app";
 import type { FaqItem } from "@/types";
+
+const app = useAppStore();
 import { t } from "@/i18n";
 
 const faqs = ref<FaqItem[]>([]);
@@ -29,7 +32,8 @@ onLoad(async (q) => {
   orderNo = (q?.orderNo as string) || "";
   cabinetNo = (q?.cabinetNo as string) || "";
   try {
-    faqs.value = await api.listFaq();
+    // 传当前语种：后端按它挑三语中的一列（不传就恒回默认语种，界面阿语、FAQ 中文）
+    faqs.value = await api.listFaq(undefined, app.lang);
     if (faqs.value.length) problemNo.value = faqs.value[0].problemNo;
   } catch {
     faqs.value = [];

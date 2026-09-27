@@ -257,6 +257,7 @@ export default {
     min: "Min spend",
     noMin: "No minimum",
     validTo: "Valid until",
+    noExpiry: "No expiry",
     off: "OFF",
     none: "No coupons yet",
   },

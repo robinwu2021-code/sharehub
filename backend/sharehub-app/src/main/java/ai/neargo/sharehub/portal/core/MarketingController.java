@@ -106,7 +106,18 @@ public class MarketingController {
         return couponTplService.save(e);
     }
 
-    /** 定向发券。{@code cUserNos} 是收券人列表，{@code expireAt} 可空（走模板 validRule）。 */
+    /**
+     * 定向发券。{@code cUserNos} 是收券人列表。
+     *
+     * <p>⚠️ 这里原本写着「{@code expireAt} 可空（走模板 validRule）」—— **那是没有实现的意图**：
+     * {@code coupon_tpl.valid_rule} 是一个 JSON 列、DDL 里没有注释、**全仓没有任何读取方**。
+     * 所以 {@code expireAt} 传空就是**永不过期**（{@code LocalCouponUse.expired} 把空当不限期），
+     * 而不是回落到模板规则。自助领取那条路（{@code claim}）传的恰恰就是 null ——
+     * 也就是说<b>用户自己领的券全都不过期</b>，无论模板上怎么配。
+     *
+     * <p>怎么算才对是产品口径（领取后 N 天？模板上的固定截止日？两者都要？），
+     * 且 valid_rule 的结构本身也没定义过，所以这里只把事实写清楚，不替业务定。
+     */
     @PostMapping("/api/user/coupons/{tplNo}/issue")
     @PreAuthorize("@perm.can('marketing:coupon:issue')")
     public ai.neargo.sharehub.user.marketing.dto.MarketingDtos.CouponIssueResultVO issueCoupon(
