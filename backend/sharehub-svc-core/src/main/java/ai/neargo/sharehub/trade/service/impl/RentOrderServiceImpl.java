@@ -142,12 +142,18 @@ public class RentOrderServiceImpl implements RentOrderService {
 
     @Override
     public PageResult<RentOrder> pageAdmin(Integer page, Integer size, String keyword, String status) {
+        return pageAdmin(page, size, keyword, status, null);
+    }
+
+    @Override
+    public PageResult<RentOrder> pageAdmin(Integer page, Integer size, String keyword, String status, String payStatus) {
         int p = pg(page), s = sz(size);
         LambdaQueryWrapper<OrdOrder> w = new LambdaQueryWrapper<>();
         if (keyword != null && !keyword.isBlank()) {
             w.and(q -> q.like(OrdOrder::getOrderNo, keyword).or().like(OrdOrder::getCUserNo, keyword));
         }
         if (status != null && !status.isBlank()) w.eq(OrdOrder::getStatus, status);
+        if (payStatus != null && !payStatus.isBlank()) w.eq(OrdOrder::getPayStatus, payStatus);
         w.orderByDesc(OrdOrder::getId);
         Page<OrdOrder> r = mapper.selectPage(new Page<>(p, s), w);
         return new PageResult<>(enrich(r.getRecords()), r.getTotal());

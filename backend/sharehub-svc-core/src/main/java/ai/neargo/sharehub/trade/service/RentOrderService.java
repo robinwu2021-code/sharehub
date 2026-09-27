@@ -18,6 +18,9 @@ public interface RentOrderService {
     /** 运营端：全部订单分页（keyword=订单号/用户号；status 过滤）。 */
     PageResult<RentOrder> pageAdmin(Integer page, Integer size, String keyword, String status);
 
+    /** 同上，另可按收款态筛（PAID / UNPAID，C-BL-04）—— 运营催缴要能一眼筛出欠费单。 */
+    PageResult<RentOrder> pageAdmin(Integer page, Integer size, String keyword, String status, String payStatus);
+
     /** C 端：我的订单（按属主 c_user_no 过滤）。 */
     PageResult<RentOrder> pageByOwner(String cUserNo, Integer page, Integer size);
 

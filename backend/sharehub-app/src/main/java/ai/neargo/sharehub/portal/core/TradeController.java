@@ -37,8 +37,10 @@ public class TradeController {
     public PageResult<RentOrder> orders(@RequestParam(required = false) Integer page,
                                         @RequestParam(required = false) Integer size,
                                         @RequestParam(required = false) String keyword,
-                                        @RequestParam(required = false) String status) {
-        return orderService.pageAdmin(page, size, keyword, status);
+                                        @RequestParam(required = false) String status,
+                                        // 收款态 PAID / UNPAID（C-BL-04）：运营催缴筛欠费单
+                                        @RequestParam(required = false) String payStatus) {
+        return orderService.pageAdmin(page, size, keyword, status, payStatus);
     }
 
     @GetMapping("/orders/{orderNo}")

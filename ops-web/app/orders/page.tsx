@@ -69,6 +69,15 @@ const ORDER_STATUS_FILTER = [
   { value: "CLOSED", label: "已关闭" },
 ];
 
+/**
+ * 收款态（C-BL-04）。结算时自动扣款，失败即欠费 —— 欠费用户借不了下一单、需在 App 补缴。
+ * 只标欠费：「已收」是常态，每行都挂一个绿徽标只会淹没真正要处理的那几张。
+ */
+const PAY_STATUS: StatusMap<"UNPAID"> = {
+  UNPAID: { label: "欠费", tone: "danger" },
+};
+const PAY_STATUS_FILTER = [{ value: "UNPAID", label: "欠费" }, { value: "PAID", label: "已收" }];
+
 const REASON_LABEL: Record<WhitelistReason, string> = {
   INTERNAL_TEST: "内测",
   VIP: "VIP",
@@ -179,6 +188,7 @@ function OrdersInner() {
   const [keyword, setKeyword] = useState(qKeyword ?? "");
   useEffect(() => { if (qKeyword != null) { setKeyword(qKeyword); paging.reset(); } }, [qKeyword]);
   const [status, setStatus] = useState("");
+  const [payStatus, setPayStatus] = useState("");
   const [detail, setDetail] = useState<RentOrder | null>(null);
   // 干预确认抽屉：原因必填（沿用退款审批口径），补偿另需金额
   const [iv, setIv] = useState<{ order: RentOrder; action: OrderInterventionAction } | null>(null);
@@ -186,8 +196,9 @@ function OrdersInner() {
   const [ivAmount, setIvAmount] = useState("");
 
   const listQ = useQuery({
-    queryKey: ["orders", paging.page, paging.size, keyword, status],
-    queryFn: () => api.listOrders({ page: paging.page, size: paging.size, keyword, status: status || undefined }),
+    queryKey: ["orders", paging.page, paging.size, keyword, status, payStatus],
+    queryFn: () => api.listOrders({ page: paging.page, size: paging.size, keyword, status: status || undefined,
+      payStatus: payStatus || undefined }),
     placeholderData: keepPreviousData,
     enabled: tab === "list",
   });
@@ -520,7 +531,15 @@ function OrdersInner() {
     { header: "点位", cell: (o) => <span className="text-muted-foreground">{o.locationName}</span> },
     { header: "时长", className: "text-right", cell: (o) => <span className="tabular-nums">{o.durationMin != null ? `${o.durationMin} 分` : "-"}</span> },
     { header: "费用", className: "text-right", cell: (o) => <span className="tabular-nums">{money(o.feeAmount, o.currency)}</span> },
-    { header: "状态", cell: (o) => <OrderStatusBadge s={o.status} /> },
+    {
+      header: "状态",
+      cell: (o) => (
+        <span className="inline-flex items-center gap-1">
+          <OrderStatusBadge s={o.status} />
+          {o.payStatus === "UNPAID" && <StatusBadge map={PAY_STATUS} value="UNPAID" />}
+        </span>
+      ),
+    },
     { header: "操作", cell: (o) => <Button size="sm" variant="outline" onClick={() => setDetail(o)}>详情</Button> },
   ];
 
@@ -701,6 +720,7 @@ function OrdersInner() {
             ], listQ.data?.list ?? [])}
           >
             <FilterSelect value={status} onChange={(v) => { setStatus(v); paging.reset(); }} allLabel="全部状态" options={ORDER_STATUS_FILTER} />
+            <FilterSelect value={payStatus} onChange={(v) => { setPayStatus(v); paging.reset(); }} allLabel="全部收款" options={PAY_STATUS_FILTER} />
           </Toolbar>
           <DataTable
             rowKey={(o: RentOrder) => o.orderNo}
@@ -1170,6 +1190,10 @@ function OrdersInner() {
         {detail && (
           <>
             <Field label="状态"><OrderStatusBadge s={detail.status} /></Field>
+            <Field label="收款">
+              {detail.payStatus === "UNPAID" ? <StatusBadge map={PAY_STATUS} value="UNPAID" />
+                : detail.payStatus === "PAID" ? "已收" : "—"}
+            </Field>
             <Field label="用户">{detail.cUserNo}</Field>
             <Field label="借出柜机 / 点位">{detail.cabinetNo} · {detail.locationName}</Field>
             <Field label="归还柜机">{detail.returnCabinetNo ?? "-"}</Field>

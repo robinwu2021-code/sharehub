@@ -36,6 +36,9 @@ export const orders: RentOrder[] = Array.from({ length: 120 }, (_, i) => {
     status: st, rentStartAt: iso(i * 3600_000),
     rentEndAt: dur ? iso(i * 3600_000 - dur * 60000) : null, durationMin: dur,
     feeAmount: dur ? Math.min(30, Math.ceil(dur / 30) * 3) : 0, depositAmount: 50, currency: "AED",
+    // 收款态（C-BL-04）：已结算 / 已关闭才有；每 7 张已结算里有 1 张扣款失败成了欠费，
+    // 否则 mock 下「欠费」徽标与筛选永远看不到
+    payStatus: st === "SETTLED" || st === "CLOSED" ? (st === "SETTLED" && i % 7 === 3 ? "UNPAID" : "PAID") : null,
   };
 });
 

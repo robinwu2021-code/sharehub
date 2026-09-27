@@ -10,7 +10,8 @@ import { wait } from "./_wait";
 export const orderMock: OrderApi = {
   listOrders: (q: OrderQ = {}) =>
     wait(db.paginate(db.orders, q.page, q.size, (o) =>
-      db.kwHit(q.keyword, o.orderNo, o.cUserNo) && (!q.status || o.status === q.status))),
+      db.kwHit(q.keyword, o.orderNo, o.cUserNo) && (!q.status || o.status === q.status)
+      && (!q.payStatus || o.payStatus === q.payStatus))),
   getOrder: (no) => wait(db.orders.find((o) => o.orderNo === no)!),
   // 四个干预动作在 db 层真改订单状态并落干预记录（见 mock/db/order.ts 的状态机）。
   // 「申请退款」不是终态动作：先落一条 PENDING 退款申请（进 /orders?tab=refunds 审批队列），

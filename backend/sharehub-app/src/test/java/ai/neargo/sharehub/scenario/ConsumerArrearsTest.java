@@ -83,6 +83,12 @@ class ConsumerArrearsTest extends ApiTestSupport {
         assertThat(get("/mp/trade/orders/" + orderNo, token).okData().path("payStatus").asText())
                 .as("C 端详情要读得到欠费 —— 端上据此出「立即补缴」").isEqualTo("UNPAID");
 
+        String admin = login("ADMIN");
+        assertThat(get("/api/trade/orders?payStatus=UNPAID&keyword=" + orderNo, admin).okData().path("total").asInt())
+                .as("运营催缴要能按欠费筛出来").isEqualTo(1);
+        assertThat(get("/api/trade/orders?payStatus=PAID&keyword=" + orderNo, admin).okData().path("total").asInt())
+                .isZero();
+
         var blocked = post("/mp/trade/orders/rent", Map.of("cabinetNo", cab), token);
         assertThat(blocked.status).as("欠费拦下次借出（响应：%s）", blocked.msg()).isEqualTo(409);
         assertThat(blocked.body.path("data").path("orderNo").asText())

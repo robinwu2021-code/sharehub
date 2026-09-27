@@ -9,8 +9,8 @@ export interface PageQ { page?: number; size?: number; keyword?: string; [k: str
 
 /** 单 status 过滤。原 OrderQ / StatusQ 结构相同，已合并。 */
 export type StatusQ = PageQ & { status?: string };
-/** 订单列表。等价于 StatusQ，保留旧名。 */
-export type OrderQ = StatusQ;
+/** 订单列表：StatusQ + 收款态（PAID / UNPAID，C-BL-04 —— 运营催缴筛欠费单）。 */
+export type OrderQ = StatusQ & { payStatus?: string };
 
 /** status + type 双筛。原 WoQ / ReservationQ 结构相同，已合并。 */
 export type StatusTypeQ = PageQ & { status?: string; type?: string };
