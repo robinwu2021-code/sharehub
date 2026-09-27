@@ -4,12 +4,15 @@
 // 小程序不支持 v-html —— 此前小程序里**所有图标都不显示**（微信开发者工具实测）。
 // 小程序端改成 CSS 背景图（data URI）；背景图里拿不到 currentColor，颜色用 color（默认墨色）。
 import { computed } from "vue";
+import { useThemeStore } from "@/stores/theme";
+import { MP_ICON } from "@/design/tokens";
 
 const props = withDefaults(defineProps<{ name: string; size?: number; stroke?: number; color?: string }>(), {
   size: 40,
   stroke: 2,
-  color: "#16171d", // = MP_ICON.ink（design/tokens.ts）
+  color: undefined, // 不传 = 跟随明暗的墨色（MP_ICON.ink / inkDark）
 });
+const theme = useThemeStore();
 
 // Lucide 风格 24x24 路径
 const P: Record<string, string> = {
@@ -66,7 +69,7 @@ const mpStyle = computed(() => {
   const raw = svg.value
     .replace("<svg ", '<svg xmlns="http://www.w3.org/2000/svg" ')
     .replace('width="100%" height="100%"', 'width="24" height="24"')
-    .replace('stroke="currentColor"', `stroke="${props.color}"`);
+    .replace('stroke="currentColor"', `stroke="${props.color ?? (theme.isDark ? MP_ICON.inkDark : MP_ICON.ink)}"`);
   const uri = "data:image/svg+xml," + encodeURIComponent(raw);
   return `width:${px.value};height:${px.value};background:url("${uri}") center/contain no-repeat;`;
 });

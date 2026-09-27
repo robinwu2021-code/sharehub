@@ -23,7 +23,7 @@ function close() {
       <view class="flex items-start justify-between">
         <text class="pb-h2 flex-1">{{ store.siteName }}</text>
         <view class="pb-fav" :class="{ 'is-on': store.favorite }" @tap="emit('favorite', store)">
-          <pb-icon name="heart" :size="34" :color="store.favorite ? MP_ICON.danger : MP_ICON.sub" />
+          <pb-icon name="heart" :size="34" :color="store.favorite ? MP_ICON.danger : undefined" />
         </view>
       </view>
       <view class="mt-[12rpx] flex items-center gap-[10rpx] text-[24rpx] text-sub">

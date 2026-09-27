@@ -42,6 +42,9 @@ export const radius = { sm: "12rpx", md: "20rpx", lg: "28rpx", full: "9999px" } 
 export const MP_ICON = {
   ink: "#16171d",
   sub: "#8a8d97",
+  /** 暗色下的墨色 / 次要色（= App.vue 暗色块的 --pb-ink / --pb-sub）。pb-icon 默认色随明暗切换 */
+  inkDark: "#f2f4f7",
+  subDark: "#97a0af",
   danger: "#f04438",
   onPrimary: "#ffffff",
 } as const;

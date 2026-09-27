@@ -21,11 +21,15 @@ onLaunch(() => {
  * 换肤 / 暗色靠 <html> 上的 data 属性，小程序没有那个节点，目前只有默认皮肤。
  * page 只能在小程序里出现：H5 / App 会把它编译成页面主体节点（<html> 的后代），
  * 在那里再定义一遍浅色变量会盖掉 <html> 上的暗色 / 换肤 —— 所以用条件编译。
+ * ⚠️ 也**不能写成 `page, :root {`**：小程序的样式引擎会把含 :root 的整条选择器列表丢掉
+ * （开发者工具对照：`page,:root{}` 全部失色，改成 `page{}` 恢复）。每端只给自己那一个选择器。
  */
 /* #ifdef MP */
-page,
+page {
 /* #endif */
+/* #ifndef MP */
 :root {
+/* #endif */
   /* 默认皮肤：黑白灰（mono），白底为基 */
   --pb-primary: #18181b;
   --pb-on-primary: #ffffff;
@@ -51,15 +55,31 @@ page,
 }
 
 /* 皮肤：只改主色（中性面由明暗决定）。mono=黑白灰 / blue=时尚蓝 / purple=科幻紫 */
+/* 小程序没有 <html>，换肤靠 pb-scaffold 根节点上的 class（见其 themeClass）；变量沿节点树继承进组件 */
+/* #ifdef MP */
+.pb-skin-blue {
+/* #endif */
+/* #ifndef MP */
 :root[data-skin="blue"] {
+/* #endif */
   --pb-primary: #2f6bff;
 }
+/* #ifdef MP */
+.pb-skin-purple {
+/* #endif */
+/* #ifndef MP */
 :root[data-skin="purple"] {
+/* #endif */
   --pb-primary: #7c3aed;
 }
 
 /* 深色风格：改中性面 */
+/* #ifdef MP */
+.pb-mode-dark {
+/* #endif */
+/* #ifndef MP */
 :root[data-theme="dark"] {
+/* #endif */
   --pb-bg: #0b0e14;
   --pb-surface: #161a22;
   --pb-elev: #1e232d;
