@@ -10,7 +10,7 @@ package ai.neargo.sharehub.cs;
  *
  * <p><b>真实来源</b>：{@code md_problem} 表归 platform/md 子域（另一分片实现）。
  * 本域只消费该字典，不持有它、不写它。待 md 分片提供 {@code ProblemService} 后，
- * 用一个读该表的实现替换 {@link StubProblemActionResolver} 即可，本域代码零改动。
+ * 实现是 {@link MdProblemActionResolver}（经 ProblemDirectoryPort 读该表）—— 换实现时本域代码零改动。
  */
 public interface ProblemActionResolver {
 
