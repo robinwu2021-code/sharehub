@@ -232,4 +232,33 @@ class ProcessQueryServiceTest {
         assertThatThrownBy(() -> e.q.todos(a, new TodoQuery("EVERYTHING", null, 1, 20))).satisfies(ex ->
                 assertThat(errors(ex)).extracting(FieldError::path).containsExactly("origin"));
     }
+
+    @ParameterizedTest
+    @MethodSource("ai.neargo.opskit.commons.testing.TestDatabases#all")
+    void approvalsOutsideMyScopeAreHiddenFromListDetailAndDecision(TestDatabase db) {
+        Env e = env(db);
+        Actor bd = e.plain("mb_bd");
+        String no = e.instances.start(bd, new StartRequest("contract_approval", new SubjectRef("contract", "C-B", Map.of()),
+                Map.of("needsCosign", false), Map.of(), Set.of("site:B"))).instanceNo();
+        e.instances.transition(bd, no, "submit", TransitionRequest.empty());
+        String ap = e.f.jdbc.sql("SELECT approval_no FROM proc_approval WHERE instance_no = ?").param(no).query(String.class).single();
+        String task = e.f.jdbc.sql("SELECT task_no FROM proc_task WHERE approval_no = ?").param(ap).query(String.class).single();
+        Actor opsA = new Actor(e.f.tenant, Optional.of(PrincipalRef.member("mb_ops")), Optional.empty(), Set.of(), Set.of("contract-approver"),
+                Set.of(), Set.of(), Set.of("site:A"));
+        Actor opsB = new Actor(e.f.tenant, Optional.of(PrincipalRef.member("mb_ops")), Optional.empty(), Set.of(), Set.of("contract-approver"),
+                Set.of(), Set.of(), Set.of("site:B"));
+        ApprovalQuery all = new ApprovalQuery(null, null, null, null, null, 1, 20);
+
+        // 负对照：是候选，但范围不对 —— 列表、详情、决定三处一致按不存在
+        assertThat(e.q.approvals(opsA, all).total()).isZero();
+        assertThat(e.q.approvalCount(opsA, all).get("PENDING")).isZero();
+        assertThatThrownBy(() -> e.approvals.get(opsA, ap)).satisfies(ex -> assertThat(((OpsKitException) ex).errorKey()).isEqualTo(CommonErrors.NOT_FOUND));
+        assertThatThrownBy(() -> e.approvals.decide(opsA, ap, task, true, null))
+                .satisfies(ex -> assertThat(((OpsKitException) ex).errorKey()).isEqualTo(CommonErrors.NOT_FOUND));
+        assertThat(e.todos(opsA, "ALL", null).total()).as("与待办同口径").isZero();
+
+        assertThat(e.q.approvals(bd, all).total()).as("提交人不受范围限制").isEqualTo(1);
+        assertThat(e.q.approvals(opsB, all).total()).isEqualTo(1);
+        assertThat(e.approvals.decide(opsB, ap, task, true, null).status()).isEqualTo("APPROVED");
+    }
 }

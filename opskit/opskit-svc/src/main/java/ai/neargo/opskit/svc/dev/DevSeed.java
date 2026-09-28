@@ -52,7 +52,7 @@ import org.slf4j.LoggerFactory;
  *   <li>S2-2：alice 自己提交的待审单（自审负对照）</li>
  *   <li>S1 负对照：打了 site:B 标签的待审单 —— alice 是候选，但令牌只带 site:A，不进她的待办</li>
  *   <li>S3：队列组 review-queue 3 条任务，frank 领着 1 条（领取超时 120 秒）</li>
- *   <li>S5：viewer 令牌只带 flow:todo:read · flow:approval:read · flow:ticket:read</li>
+ *   <li>S5：viewer 令牌只带 flow:todo:read · flow:approval:read · flow:ticket:read；目录里是 auditor（能看全部审批），写接口一律 403</li>
  * </ul>
  */
 public class DevSeed {
@@ -124,7 +124,7 @@ public class DevSeed {
                 List.of(new GroupUpsert("finance", Map.of("zh", "财务组", "en", "Finance"), GroupKind.TEAM, null, null),
                         new GroupUpsert("review-queue", Map.of("zh", "证据审核队列", "en", "Evidence review"), GroupKind.QUEUE, 120, "CREATED")),
                 Map.of("finance", List.of("u_dave", "u_erin"), "review-queue", List.of("u_alice", "u_frank")),
-                List.of(new RoleBinding("approver", "member:@u_alice"), new RoleBinding("auditor", "member:@u_auditor"), new RoleBinding("flow-admin", "member:@u_admin"))));
+                List.of(new RoleBinding("approver", "member:@u_alice"), new RoleBinding("auditor", "member:@u_auditor"), new RoleBinding("auditor", "member:@u_viewer"), new RoleBinding("flow-admin", "member:@u_admin"))));
 
         templates.publish(app, ws, contractTemplate(), "local seed", "API");
         templates.publish(app, ws, evidenceTemplate(), "local seed", "API");
@@ -135,7 +135,7 @@ public class DevSeed {
         personas.put("dave", persona(t, "u_dave", List.of(), List.of(), "finance 组员（会签）"));
         personas.put("erin", persona(t, "u_erin", List.of(), List.of(), "finance 组员（会签）"));
         personas.put("frank", persona(t, "u_frank", List.of(), List.of(), "review-queue 组员，领着一条任务"));
-        personas.put("viewer", persona(t, "u_viewer", List.of("flow:todo:read", "flow:approval:read", "flow:ticket:read"), List.of(), "只读（S5）"));
+        personas.put("viewer", persona(t, "u_viewer", List.of("flow:todo:read", "flow:approval:read", "flow:ticket:read"), List.of(), "只读（S5）：能看全部审批（角色 auditor），不能审批、不能领取"));
         personas.put("auditor", persona(t, "u_auditor", List.of(), List.of(), "approval:view:all"));
         personas.put("admin", persona(t, "u_admin", List.of(), List.of(), "process:manage：发布 / 停用审批模板（S4）"));
 

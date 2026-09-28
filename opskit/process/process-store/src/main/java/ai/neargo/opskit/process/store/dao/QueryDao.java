@@ -267,8 +267,8 @@ public final class QueryDao {
     }
 
     /**
-     * 审批的可见 = 查看全部 ∨ 我是提交人 ∨ 我是实例参与者 ∨ 我是（或曾是）某个审批任务的候选或处理人。
-     * 比实例可见严：没配范围标签的实例对全空间可见，但审批单不能因此对全空间公开。
+     * 审批的可见 = 查看全部 ∨ 我是提交人 ∨ 我是实例参与者 ∨（我是（或曾是）某个审批任务的候选或处理人 ∧ 实例范围对我可见）。
+     * 比实例可见严：没配范围标签的实例对全空间可见，但审批单不能因此对全空间公开；与 ApprovalAppService.canSee 同一口径。
      */
     private Where approvalWhere(WorkspaceId ws, Viewer v, Collection<String> statuses, String processCode, String requestedBy, Long fromMs,
             String keyword) {
@@ -295,18 +295,27 @@ public final class QueryDao {
                 return w.and("1 = 0");
             }
             String in = marks(v.candidates().size());
+            // 提交人 ∨ 参与者：不受范围限制
             w.sql.append(" AND (a.requested_by = ?");
             w.params.add(v.me());
             w.sql.append(" OR EXISTS (SELECT 1 FROM proc_participant p WHERE p.workspace_id = a.workspace_id AND p.instance_no = a.instance_no AND p.principal IN (")
                     .append(in).append("))");
             w.params.addAll(v.candidates());
-            w.sql.append(" OR EXISTS (SELECT 1 FROM proc_task s WHERE s.workspace_id = a.workspace_id AND s.approval_no = a.approval_no AND (s.completed_by = ?")
+            // 审批任务的候选 / 处理人：还要实例范围对我可见
+            w.sql.append(" OR (EXISTS (SELECT 1 FROM proc_task s WHERE s.workspace_id = a.workspace_id AND s.approval_no = a.approval_no AND (s.completed_by = ?")
                     .append(" OR s.assignee = ?")
                     .append(" OR EXISTS (SELECT 1 FROM proc_task_candidate c WHERE c.workspace_id = s.workspace_id AND c.task_no = s.task_no AND c.candidate_key IN (")
-                    .append(in).append(")))))");
+                    .append(in).append("))))");
             w.params.add(v.me());
             w.params.add(v.me());
             w.params.addAll(v.candidates());
+            w.sql.append(" AND (NOT EXISTS (SELECT 1 FROM proc_instance_scope sc WHERE sc.workspace_id = a.workspace_id AND sc.instance_no = a.instance_no)");
+            if (!v.scopes().isEmpty()) {
+                w.sql.append(" OR EXISTS (SELECT 1 FROM proc_instance_scope sc WHERE sc.workspace_id = a.workspace_id AND sc.instance_no = a.instance_no AND sc.scope_tag IN (")
+                        .append(marks(v.scopes().size())).append("))");
+                w.params.addAll(v.scopes());
+            }
+            w.sql.append(")))");
         }
         return w;
     }

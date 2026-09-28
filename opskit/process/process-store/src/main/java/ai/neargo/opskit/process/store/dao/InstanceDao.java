@@ -89,6 +89,12 @@ public final class InstanceDao {
                 .params(ws.value(), instanceNo).update();
     }
 
+    /** 实例的范围标签（可见性判断用；没有 = 不设限）。 */
+    public java.util.Set<String> scopeTags(WorkspaceId ws, String instanceNo) {
+        return new java.util.TreeSet<>(jdbc.sql("SELECT scope_tag FROM proc_instance_scope WHERE workspace_id = ? AND instance_no = ?")
+                .params(ws.value(), instanceNo).query(String.class).list());
+    }
+
     /** 只改字段（不迁移）。 */
     public int updateFields(WorkspaceId ws, String instanceNo, int expectedVersion, Map<String, Object> fields, long now) {
         return jdbc.sql("UPDATE proc_instance SET fields = " + dialect.jsonParam() + ", updated_at_ms = ?, version = version + 1 "

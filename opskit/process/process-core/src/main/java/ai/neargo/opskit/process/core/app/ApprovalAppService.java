@@ -138,6 +138,9 @@ public class ApprovalAppService implements StatusHook {
         return tx.execute(s -> {
             TenantContext t = actor.tenant();
             ApprovalDao.Row a = load(t.workspaceId(), approvalNo);
+            if (!canSee(actor, a)) {
+                throw new OpsKitException(CommonErrors.NOT_FOUND, "approval not found");
+            }
             TaskDao.Row task = tasks.find(t.workspaceId(), taskNo).filter(x -> approvalNo.equals(x.approvalNo()))
                     .orElseThrow(() -> new OpsKitException(CommonErrors.NOT_FOUND, "task not found"));
             GateDef.Approval gate = gateOf(t, a);
@@ -303,17 +306,28 @@ public class ApprovalAppService implements StatusHook {
                 .map(r -> r.plan().stream().map(String::valueOf).toList()).orElse(List.of());
     }
 
+    /**
+     * 审批的可见（与 ProcessQueryService 的列表同一口径，21/02 §7.2）：应用自身 ∨ 查看全部 ∨ 提交人 ∨ 参与者
+     * ∨（审批任务的候选 / 处理人 ∧ 实例对我可见：未打范围标签或标签相交）。数据范围外按不存在处理。
+     */
     private boolean canSee(Actor actor, ApprovalDao.Row a) {
-        if (actor.isAppItself() || InstanceAppService.who(actor).equals(a.requestedBy())) {
+        if (actor.isAppItself() || actor.productPermissions().contains("approval:view:all") || InstanceAppService.who(actor).equals(a.requestedBy())) {
             return true;
         }
         Set<String> mine = CandidateKeys.of(actor);
+        if (!participants.rolesOf(actor.tenant().workspaceId(), a.instanceNo(), mine).isEmpty()) {
+            return true;
+        }
+        Set<String> tags = instances.scopeTags(actor.tenant().workspaceId(), a.instanceNo());
+        if (!tags.isEmpty() && tags.stream().noneMatch(actor.scopes()::contains)) {
+            return false;
+        }
         String me = actor.member().map(PrincipalRef::key).orElse("");
         boolean involved = approvals.rounds(actor.tenant().workspaceId(), a.approvalNo()).stream()
                 .flatMap(r -> approvals.tasksOfRound(actor.tenant().workspaceId(), a.approvalNo(), r.roundNo(), tasks).stream())
                 .anyMatch(x -> me.equals(x.assignee()) || me.equals(x.completedBy())
                         || tasks.candidates(actor.tenant().workspaceId(), x.taskNo()).stream().anyMatch(mine::contains));
-        return involved || !participants.rolesOf(actor.tenant().workspaceId(), a.instanceNo(), mine).isEmpty();
+        return involved;
     }
 
     private ApprovalView view(Actor actor, String approvalNo) {
