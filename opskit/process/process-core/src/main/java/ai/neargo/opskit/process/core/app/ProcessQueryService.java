@@ -16,6 +16,7 @@ import ai.neargo.opskit.process.api.definition.ApprovalStepDef;
 import ai.neargo.opskit.process.api.definition.CompiledProcess;
 import ai.neargo.opskit.process.api.definition.GateDef;
 import ai.neargo.opskit.process.api.model.SubjectRef;
+import ai.neargo.opskit.process.api.model.query.ApprovalDetail;
 import ai.neargo.opskit.process.api.model.query.ApprovalQuery;
 import ai.neargo.opskit.process.api.model.query.ApprovalRow;
 import ai.neargo.opskit.process.api.model.query.QueueCount;
@@ -161,6 +162,24 @@ public class ProcessQueryService {
                 })
                 .toList();
         return Page.of(list, total, page);
+    }
+
+    /** 单张审批的行 + 定义侧信息；看不见按不存在（与列表同一个可见口径）。 */
+    @SystemAction("只读：同 approvals")
+    public Optional<ApprovalDetail> approvalDetail(Actor actor, String approvalNo) {
+        TenantContext t = actor.tenant();
+        return queries.approvals(t.workspaceId(), approvalViewer(actor), null, null, null, null, approvalNo, 0, 2).stream()
+                .filter(r -> r.approvalNo().equals(approvalNo)).findFirst()
+                .map(r -> {
+                    Names names = new Names(t);
+                    boolean pending = "PENDING".equals(r.status());
+                    ApprovalRow row = new ApprovalRow(r.approvalNo(), r.instanceNo(), r.processCode(), names.process(r.definitionId()),
+                            subject(r.subjectType(), r.subjectRef(), r.subjectDisplay()), r.status(), pending ? r.currentStep() : null,
+                            pending ? names.step(r.definitionId(), r.gateStatus(), r.currentStep()) : null, r.currentRound(), r.requestedBy(),
+                            r.requestedAtMs(), r.finishedAtMs(), pending ? r.stepStartedAtMs() : null, pending ? r.stepDueAtMs() : null);
+                    GateDef.Approval gate = (GateDef.Approval) definitions.byDefinitionId(t, r.definitionId()).status(r.gateStatus()).gate();
+                    return new ApprovalDetail(row, gate.steps(), gate.rules());
+                });
     }
 
     /** 按状态计数，四种状态都给（没有的为 0）；参数同 approvals（status 不参与）。 */

@@ -1,0 +1,11 @@
+# 本地联调（21/07 O4-0）：内存库（每次启动重建并写种子）+ 测试身份提供方。启动：opskit/scripts/dev-run.sh
+spring:
+  datasource:
+    url: jdbc:h2:mem:opskit;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+
+opskit:
+  crypto:
+    # 仅本地：全零密钥。生产只经环境变量注入
+    key: ${OPSKIT_CRYPTO_KEY:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}

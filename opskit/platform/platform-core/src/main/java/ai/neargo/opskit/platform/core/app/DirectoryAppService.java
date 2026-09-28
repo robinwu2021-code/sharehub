@@ -6,6 +6,8 @@ import ai.neargo.opskit.commons.error.CommonErrors;
 import ai.neargo.opskit.commons.error.FieldError;
 import ai.neargo.opskit.commons.error.OpsKitException;
 import ai.neargo.opskit.commons.id.BizNoGenerator;
+import ai.neargo.opskit.commons.query.Page;
+import ai.neargo.opskit.commons.query.PageRequest;
 import ai.neargo.opskit.commons.security.RequiresPermission;
 import ai.neargo.opskit.commons.security.SystemAction;
 import ai.neargo.opskit.commons.tenancy.AccountId;
@@ -15,6 +17,7 @@ import ai.neargo.opskit.platform.api.Permission;
 import ai.neargo.opskit.platform.api.directory.DirectorySource;
 import ai.neargo.opskit.platform.api.directory.GroupKind;
 import ai.neargo.opskit.platform.api.directory.GroupUpsert;
+import ai.neargo.opskit.platform.api.directory.GroupView;
 import ai.neargo.opskit.platform.api.directory.MemberUpsert;
 import ai.neargo.opskit.platform.api.directory.MemberView;
 import ai.neargo.opskit.platform.api.directory.RoleBinding;
@@ -253,6 +256,41 @@ public class DirectoryAppService {
     @SystemAction("会签快照 / 派单内部调用")
     public List<String> membersOf(TenantContext t, String groupCode) {
         return groupMembers.membersOf(t.workspaceId(), groupCode);
+    }
+
+    @SystemAction("流程层内部调用：队列组的领取超时、是否队列")
+    public java.util.Optional<GroupView> findGroup(TenantContext t, String groupCode) {
+        return groups.find(t.workspaceId(), groupCode)
+                .map(g -> new GroupView(g.workspaceId(), g.groupCode(), g.name(), GroupKind.valueOf(g.kind()), g.claimTimeoutSec(), g.orderBy(),
+                        DirectorySource.valueOf(g.source())));
+    }
+
+    /**
+     * 成员选项（改派候选、提交人筛选）：空间内 ACTIVE 成员，关键词匹配显示名或宿主编号，可按组筛。
+     * 只给名录不给联系方式，空间内成员都可查；越界分页 422（{@link PageRequest}）。
+     */
+    @SystemAction("读：空间内成员名录（仅显示名与属性），供选项")
+    public Page<MemberView> queryMembers(Actor actor, String keyword, String group, PageRequest page) {
+        WorkspaceId ws = actor.tenant().workspaceId();
+        String kw = keyword == null || keyword.isBlank() ? null : keyword.strip();
+        String grp = group == null || group.isBlank() ? null : group;
+        long total = members.count(ws, kw, grp);
+        if (total == 0) {
+            return Page.empty(page);
+        }
+        return Page.of(members.query(ws, kw, grp, page.offset(), page.size()).stream().map(DirectoryAppService::toView).toList(), total, page);
+    }
+
+    /** 成员 ID → 显示名（列表补 displayName）；查不到或未设显示名的不在结果里。 */
+    @SystemAction("列表渲染内部调用")
+    public Map<String, String> displayNames(TenantContext t, java.util.Collection<String> memberIds) {
+        Map<String, String> out = new HashMap<>();
+        members.findByIds(t.workspaceId(), memberIds).forEach(m -> {
+            if (m.displayName() != null) {
+                out.put(m.memberId(), m.displayName());
+            }
+        });
+        return out;
     }
 
     /** 同代号时空间角色覆盖模板角色。 */

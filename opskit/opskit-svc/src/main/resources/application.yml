@@ -1,6 +1,9 @@
 spring:
   application:
     name: opskit
+  jackson:
+    # 可选字段缺省时不输出（21/06 §七 的「?」字段）；空数组照常输出
+    default-property-inclusion: non_null
 
 server:
   port: ${OPSKIT_PORT:8090}

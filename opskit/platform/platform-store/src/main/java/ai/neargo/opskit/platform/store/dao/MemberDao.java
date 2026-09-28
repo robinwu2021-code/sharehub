@@ -67,6 +67,47 @@ public final class MemberDao {
                 .param("ws", ws.value()).param("refs", externalRefs).query(MAPPER).list();
     }
 
+    public List<MemberRow> findByIds(WorkspaceId ws, Collection<String> memberIds) {
+        if (memberIds.isEmpty()) {
+            return List.of();
+        }
+        return jdbc.sql("SELECT * FROM plat_member WHERE workspace_id = :ws AND member_id IN (:ids)")
+                .param("ws", ws.value()).param("ids", memberIds).query(MAPPER).list();
+    }
+
+    /** 成员选项查询：关键词匹配显示名 / 宿主编号，可按组筛；只列 ACTIVE。列表与 {@link #count} 共用同一段条件。 */
+    public List<MemberRow> query(WorkspaceId ws, String keyword, String group, int offset, int limit) {
+        return jdbc.sql("SELECT m.* " + queryWhere(keyword, group) + " ORDER BY m.display_name, m.member_id LIMIT :limit OFFSET :offset")
+                .params(queryParams(ws, keyword, group)).param("limit", limit).param("offset", offset).query(MAPPER).list();
+    }
+
+    public long count(WorkspaceId ws, String keyword, String group) {
+        return jdbc.sql("SELECT COUNT(*) " + queryWhere(keyword, group)).params(queryParams(ws, keyword, group)).query(Long.class).single();
+    }
+
+    private static String queryWhere(String keyword, String group) {
+        StringBuilder sql = new StringBuilder("FROM plat_member m WHERE m.workspace_id = :ws AND m.status = 'ACTIVE'");
+        if (keyword != null) {
+            sql.append(" AND (LOWER(m.display_name) LIKE :kw OR LOWER(m.external_ref) LIKE :kw)");
+        }
+        if (group != null) {
+            sql.append(" AND EXISTS (SELECT 1 FROM plat_group_member g WHERE g.workspace_id = m.workspace_id AND g.member_id = m.member_id AND g.group_code = :grp)");
+        }
+        return sql.toString();
+    }
+
+    private static java.util.Map<String, Object> queryParams(WorkspaceId ws, String keyword, String group) {
+        java.util.Map<String, Object> ps = new java.util.HashMap<>();
+        ps.put("ws", ws.value());
+        if (keyword != null) {
+            ps.put("kw", "%" + keyword.toLowerCase(java.util.Locale.ROOT).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%");
+        }
+        if (group != null) {
+            ps.put("grp", group);
+        }
+        return ps;
+    }
+
     public void updateProfile(WorkspaceId ws, String memberId, String displayName, String attrsJson, String scopesJson, long now) {
         jdbc.sql("UPDATE plat_member SET display_name = ?, attrs = " + dialect.jsonParam() + ", scopes = " + dialect.jsonParam()
                         + ", updated_at_ms = ? WHERE workspace_id = ? AND member_id = ?")

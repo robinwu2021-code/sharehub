@@ -47,6 +47,14 @@ public class MemberAttrAppService {
         });
     }
 
+    /** 本空间可见的属性定义（空间级覆盖账户模板），供筛选控件的选项。 */
+    @SystemAction("读：属性定义是展示配置，空间内成员都可读")
+    public java.util.List<MemberAttrDef> list(TenantContext t) {
+        return dao.visibleIn(t.accountId(), t.workspaceId()).values().stream()
+                .map(r -> new MemberAttrDef(r.attrKey(), r.name(), r.valueLabels()))
+                .sorted(java.util.Comparator.comparing(MemberAttrDef::key)).toList();
+    }
+
     /**
      * 把成员的原始属性渲染成 {@code {key: {value, name?}}}（21/06 §七）。没有定义显示名的只给 value。
      *
