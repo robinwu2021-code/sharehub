@@ -157,3 +157,39 @@ ShareHub 的运维工单不只是「流转」：还有费用明细、处理记�
 4. **P1（14 个状态机改用状态机库）移出 M5**？—— 建议移出，接线不依赖它。
 
 拍板后：M5-0 的 OpsKit 部分交 OpsKit 会话，ShareHub 骨架与提现试点由本会话做，完成标准是 §五 M5-1 的端到端用例在私有实例与生产各跑通一次。
+
+---
+
+## 九、ShareHub 侧实施设计（M5-0 骨架 + M5-1 提现）
+
+### 9.1 分层落点
+
+| 模块 | 新增 / 改动 |
+|---|---|
+| `sharehub-common` | **修投递缺口**：`OutboxEventBus` 进程内投递后，若有跨进程消费者（`OutboxConsumer`）认领该类型，**不再直接标 SENT**，而是立即交给 `OutboxDispatcher.dispatchOne` —— 此前 `OutboxConsumer` 只有在进程内投递**失败**时才会被调用（零实现所以没人发现）；`OutboxConsumer` 加 `onDead(row)` 钩子，转死信时通知认领方 |
+| `sharehub-api` | 事件 `OpsKitApprovalRequested{bizType, bizNo, round, processCode, subject, fields, scopes, submitter}`；SPI `OpsKitApprovalOutcome`（`bizType()` · `onSubmitted` · `onSubmitFailed` · `onCompleted`） |
+| `sharehub-app` `integration/opskit` | `OpsKitProperties`（`sharehub.opskit.*`）· `OpsKitClient`（RestClient，应用凭证 + `Idempotency-Key`）· `OpsKitSubmitter`（`OutboxConsumer`）· `OpsKitWebhookController`（`POST /internal/opskit/webhook`：验签 → `EventIdempotency.once(idemKey)` → 按 `subject.type` 路由到 SPI） |
+| `sharehub-svc-finance` | 提现：`sharehub.flow.withdrawal.engine=LOCAL|OPSKIT`；申请时 OPSKIT 模式发事件；新列 `approval_no` · `approval_state`；`WithdrawalApprovalOutcome` 实现 SPI；OPSKIT 在审的单拒绝旧 `/audit`（409） |
+| `ops-web` | 财务 › 提现审核：OPSKIT 在审显示进度 + 「去审批」，隐藏通过 / 驳回；送审失败 / 审批通过未生效显示「重新送审」/「重试生效」 |
+
+### 9.2 提现的 `approval_state`（新列，词表）
+
+| 值 | 含义 | 出口 |
+|---|---|---|
+| 空 | LOCAL 模式（原样） | —— |
+| `SUBMITTING` | 已申请，送审事件在途 | → `IN_REVIEW`（OpsKit 建单成功）· → `SUBMIT_FAILED`（重投达上限） |
+| `IN_REVIEW` | OpsKit 审批中（`approval_no` 已回填） | → 空（审批结束且已回写 `status`） · → `APPROVED_BLOCKED` |
+| `SUBMIT_FAILED` | 送审失败 | 「重新送审」→ `SUBMITTING`（新轮次幂等键） |
+| `APPROVED_BLOCKED` | OpsKit 已通过，但 ShareHub 业务检查不让过（无收款账户 / 代理停用） | 补齐后「重试生效」→ 走 `audit(approve)` 同一段逻辑 |
+
+`status` 仍是原提现状态机（APPLY → PAYING → PAID / FAILED），**不新增状态**；`approval_state` 只描述「审批这件事」走到哪。
+
+### 9.3 配置（生产 env）
+
+`SHAREHUB_OPSKIT_BASE_URL=http://127.0.0.1:8090` · `SHAREHUB_OPSKIT_WS=ext:MAIN` · `SHAREHUB_OPSKIT_APP_TOKEN=okk_…` · `SHAREHUB_OPSKIT_WEBHOOK_SECRET=…` · `SHAREHUB_OUTBOX_DISPATCH_ENABLED=true`（单实例，打开重投轮询 —— 此前生产是关的，失败事件无人重投） · `SHAREHUB_FLOW_WITHDRAWAL_ENGINE=OPSKIT`（切回 `LOCAL` 即回滚）。
+
+### 9.4 测试
+
+- 投递修复：有跨进程消费者的事件，提交后立即调用消费者；消费者抛异常 → FAILED + 退避；达上限 → DEAD 且 `onDead` 被调（负对照：拆掉修复，消费者零调用）。
+- webhook：坏签名 / 过期时间戳 401 且不动业务；同一 `idemKey` 两次只推进一次；未知 `subject.type` 记 WARN 回 200。
+- 提现：OPSKIT 模式申请 → 送审请求体（subject / scopes / onBehalfOf / 幂等键）正确；`approval.completed` APPROVED → `status=PAYING`、审批人 = 回传的宿主编号；REJECTED 带原因；无收款账户 → `APPROVED_BLOCKED`；OPSKIT 在审时旧 `/audit` 409；LOCAL 模式既有提现用例全绿不改。
