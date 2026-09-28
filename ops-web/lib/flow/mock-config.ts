@@ -7,7 +7,7 @@
 //  - 凭证只在创建 / 轮换时返回一次，之后读不到；
 //  - 改 SLA / 日历 / 队列只影响新单（运行中的按开单时的规则走完）—— mock 不回溯改旧单。
 import { fail, notFound } from "@/lib/biz-error";
-import { ME, TICKET_TYPES } from "./mock-db";
+import { ME } from "./mock-db";
 import { pendingCountOf } from "./mock-approvals";
 import { FlowValidationError } from "./errors";
 import { requirePerm } from "./mock-auth";
@@ -75,15 +75,25 @@ export function resetConfigDb(now: number = Date.now()) {
   for (const p of processes) {
     if (!p.versions.length) p.versions.push(mk(p.def, contentHash(p.def), now - 3 * 24 * HOUR, "API", "SHAREHUB", "上线初版"));
   }
-  // 工单类型只有一份（mock-db 的 TICKET_TYPES）：这里曾另写一份，同代号不同名（「运维」与「运维工单」）
-  const typeOf = (code: string) => TICKET_TYPES.find((t) => t.code === code)!;
-  const ops = typeOf("ops"), cs = typeOf("cs-report");
-  slaPolicies = [
-    { code: "ops-urgent", ticketType: ops, priority: "URGENT", respondMin: 30, resolveMin: 240, businessHours: false },
-    { code: "ops-high", ticketType: ops, priority: "HIGH", respondMin: 120, resolveMin: 480, businessHours: true, calendar: "dubai" },
-    { code: "ops-other", ticketType: ops, priority: "*", respondMin: 240, resolveMin: 1440, businessHours: true, calendar: "dubai" },
-    { code: "cs-any", ticketType: cs, priority: "*", respondMin: 15, resolveMin: 240, businessHours: false },
+  // SLA：通用策略形状（后端 O2-8）。扁平规则的换算按后端给的口径：一个工单类型一条策略（首次响应 + 解决两个指标），
+  // 每个优先级一行 when {priority EQ …}，「其余」是最后一行兜底（不带 when），按营业时间计的填 calendar。
+  const std = (): SlaPolicy["metrics"] => [
+    { code: "FIRST_RESPONSE", name: { zh: "首次响应", en: "First response", ar: "الاستجابة الأولى" } },
+    { code: "RESOLUTION", name: { zh: "解决", en: "Resolution", ar: "الحل" } },
   ];
+  const pri = (value: string) => ({ field: "priority", op: "EQ" as const, value });
+  slaPolicies = [
+    { code: "ops", name: { zh: "运维工单", en: "Maintenance tickets" }, metrics: std(), warnAtPercent: 80, targets: [
+      { when: pri("URGENT"), targetsMin: { FIRST_RESPONSE: 30, RESOLUTION: 240 } },
+      { when: pri("HIGH"), targetsMin: { FIRST_RESPONSE: 120, RESOLUTION: 480 }, calendar: "dubai" },
+      { targetsMin: { FIRST_RESPONSE: 240, RESOLUTION: 1440 }, calendar: "dubai" },
+    ] },
+    { code: "cs-report", name: { zh: "客服报障" }, metrics: std(), warnAtPercent: 80, targets: [
+      { targetsMin: { FIRST_RESPONSE: 15, RESOLUTION: 240 } },
+    ] },
+    { code: "review_sla", name: { zh: "证据审核时限", en: "Evidence review" }, warnAtPercent: 80,
+      metrics: [{ code: "RESOLUTION", name: { zh: "解决", en: "Resolution" } }], targets: [{ targetsMin: { RESOLUTION: 240 } }] },
+  ].map((p) => ({ ...p, version: slaHash(p) }));
   calendars = [{ code: "dubai", name: "迪拜营业时间", timeZone: "Asia/Dubai", weekdays: [1, 2, 3, 4, 5, 6], open: "10:00", close: "22:00",
     holidays: [{ date: "2026-12-02", name: "国庆" }, { date: "2026-12-03", name: "国庆" }] }];
   queues = [
@@ -204,20 +214,41 @@ export const listSlaPolicies = () => structuredClone(slaPolicies);
 export const listCalendars = () => structuredClone(calendars);
 export const listQueueGroups = () => structuredClone(queues);
 
-export function upsertSlaPolicy(p: SlaPolicy): SlaPolicy {
+/** 内容哈希（与审批模板同法）：name / metrics / targets / warnAtPercent 不变即同版本 */
+function slaHash(p: Pick<SlaPolicy, "name" | "metrics" | "targets" | "warnAtPercent">): string {
+  const text = JSON.stringify({ n: p.name, m: p.metrics, t: p.targets, w: p.warnAtPercent ?? null });
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h.toString(16).padStart(8, "0");
+}
+
+/** PUT …/sla-policies/{code}：校验一次给全（路径按策略字段），内容不变 created=false（幂等） */
+export function upsertSlaPolicy(p: SlaPolicy, isNew = false): { version: string; created: boolean } {
   requirePerm("flow:config:manage");
   const e: FieldError[] = [];
-  if (!(p.respondMin > 0)) e.push({ path: "respondMin", error: "响应时限必须大于 0" });
-  if (!(p.resolveMin > 0)) e.push({ path: "resolveMin", error: "解决时限必须大于 0" });
-  if (p.respondMin > 0 && p.resolveMin > 0 && p.respondMin > p.resolveMin) e.push({ path: "resolveMin", error: "解决时限不能短于响应时限" });
-  if (p.businessHours && !calendars.some((c) => c.code === p.calendar)) e.push({ path: "calendar", error: "按营业时间计时要选一个工作日历" });
-  const dup = slaPolicies.find((x) => x.code !== p.code && x.ticketType.code === p.ticketType.code && x.priority === p.priority);
-  if (dup) e.push({ path: "priority", error: `「${p.ticketType.name} · ${p.priority === "*" ? "其余" : p.priority}」已有规则` });
+  if (isNew && !/^[a-z][a-z0-9_-]{1,31}$/.test(p.code)) e.push({ path: "code", error: "代号 2–32 位小写字母、数字、下划线、连字符" });
+  if (isNew && slaPolicies.some((x) => x.code === p.code)) e.push({ path: "code", error: "代号已存在" });
+  if (!Object.values(p.name).some((v) => v?.trim())) e.push({ path: "name", error: "名称必填（至少一种语言）" });
+  if (!p.metrics.length) e.push({ path: "metrics", error: "至少要有一个指标" });
+  const codes = new Set(p.metrics.map((m) => m.code));
+  if (!p.targets.length) e.push({ path: "targets", error: "至少要有一行目标" });
+  p.targets.forEach((t, i) => {
+    if (!t.when && i !== p.targets.length - 1) e.push({ path: `targets[${i}].when`, error: "兜底行（不带条件）只能是最后一行，否则它后面的行永远匹配不到" });
+    for (const [k, v] of Object.entries(t.targetsMin)) {
+      if (!codes.has(k)) e.push({ path: `targets[${i}].targetsMin.${k}`, error: `指标 ${k} 不在本策略的指标里` });
+      else if (!(v > 0)) e.push({ path: `targets[${i}].targetsMin.${k}`, error: "时限必须大于 0 分钟" });
+    }
+    if (t.calendar && !calendars.some((c) => c.code === t.calendar)) e.push({ path: `targets[${i}].calendar`, error: "工作日历不存在" });
+  });
+  if (p.warnAtPercent !== undefined && !(p.warnAtPercent >= 1 && p.warnAtPercent <= 99)) e.push({ path: "warnAtPercent", error: "预警比例 1–99" });
   if (e.length) throw new FlowValidationError(`保存被拒：有 ${e.length} 处需要修改`, e);
-  const clean = { ...p, ...(p.businessHours ? {} : { calendar: undefined }) };
+  const { version: _v, inherited: _i, note: _n, ...content } = p;
+  const version = slaHash(content);
   const i = slaPolicies.findIndex((x) => x.code === p.code);
-  if (i >= 0) slaPolicies[i] = clean; else slaPolicies.push({ ...clean, code: `sla-${slaPolicies.length + 1}` });
-  return clean;
+  if (i >= 0 && slaPolicies[i].version === version) return { version, created: false };
+  const saved = { ...structuredClone(content), version };
+  if (i >= 0) slaPolicies[i] = saved; else slaPolicies.push(saved);
+  return { version, created: true };
 }
 
 export function upsertCalendar(c: WorkCalendar): WorkCalendar {

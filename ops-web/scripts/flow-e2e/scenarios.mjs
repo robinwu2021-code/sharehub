@@ -236,8 +236,79 @@ export const SCENARIOS = [
     },
   },
 
+  // ── S7 流程实例 · 对账 · 统计（后端 O2-10）──────────────────────────────
+  {
+    id: "S7-1", title: "流程实例：筛未结后每行都在进行中；点进详情有流转历史", perms: ALL, url: () => "/flow/instances/",
+    run: async (h) => {
+      await h.waitFor(() => h.rows().length, "实例列表加载");
+      const sel = h.all("select").find((x) => [...x.options].some((o) => o.value === "yes"));
+      h.fill(sel, "yes");
+      await h.sleep(400);
+      await h.waitFor(() => h.rows().length || h.total() === 0, "筛选后加载");
+      const texts = h.rows().map((r) => h.txt(r.querySelectorAll("td")[6]));
+      h.expect(texts.every((x) => /进行中/.test(x)), `未结的 ${texts.length} 行都显示「进行中」`);
+      h.fill(sel, "");
+      await h.sleep(300);
+      const link = await h.waitFor(() => h.one("[data-slot=tbody] a[href*='/flow/instances/detail/']"), "实例号链接");
+      link.click();
+      await h.waitFor(() => /流转历史/.test(h.bodyText()), "进入实例详情");
+      await h.waitFor(() => h.all("[data-slot=timeline-item]").length >= 2, "流转历史至少两条");
+      h.expect(true, `历史 ${h.all("[data-slot=timeline-item]").length} 条`);
+    },
+  },
+  {
+    id: "S7-2", title: "对账：从实例列表进入，能看到该业务对象名下的实例与审批", perms: ALL, url: () => "/flow/instances/",
+    run: async (h) => {
+      const link = await h.waitFor(() => h.one("[data-slot=tbody] a[href*='/flow/instances/subject/']"), "对账链接");
+      link.click();
+      await h.waitFor(() => /对账：/.test(h.bodyText()), "进入对账页");
+      await h.waitFor(() => h.all("a[href*='/flow/instances/detail/']").length >= 1, "至少一个实例");
+      h.expect(h.all("a[href*='/flow/approvals/detail/']").length >= 1, "列出了名下的审批");
+    },
+  },
+  {
+    id: "S7-3", title: "流程统计：汇总卡 = 表格逐行相加；换时间段能重新取数", perms: ALL, url: () => "/flow/stats/",
+    run: async (h) => {
+      await h.waitFor(() => h.rows().length, "统计表加载");
+      const sumCol = (i) => h.rows().reduce((a, r) => a + Number(h.txt(r.querySelectorAll("td")[i]) || 0), 0);
+      const card = (label) => Number(h.txt([...document.querySelectorAll("main div")].find((d) => d.children.length >= 2 && h.txt(d.children[0]) === label && /^\d+$/.test(h.txt(d.children[1])))?.children[1]));
+      h.expect(card("发起") === sumCol(1), `发起 ${card("发起")} = 表格合计 ${sumCol(1)}`);
+      h.expect(card("未结") === sumCol(2), `未结 ${card("未结")} = 表格合计 ${sumCol(2)}`);
+      await h.click("[role=radio]", "全部", "时间段：全部");
+      await h.waitFor(() => h.one("[role=radio][aria-checked=true]") && h.txt(h.one("[role=radio][aria-checked=true]")) === "全部", "切到全部");
+      await h.waitFor(() => h.rows().length, "重新取数");
+      h.expect(sumCol(1) >= 1, `全部时间段共 ${sumCol(1)} 个实例`);
+    },
+  },
+
+  // ── S8 SLA 策略（后端 O2-8，通用策略形状）──────────────────────────────
+  {
+    id: "S8-1", title: "SLA 策略：不改再发布幂等；改时限生成新版本；兜底行不在最后被拒并指到字段", perms: ALL, as: "admin", url: () => "/flow/settings/",
+    run: async (h) => {
+      await h.waitFor(() => h.all("main table").length && h.btn("编辑"), "SLA 策略列表");
+      h.btn("编辑").click();
+      const ed = await h.waitFor(() => h.one("[data-slot=sla-editor]"), "编辑器");
+      await h.click("[data-slot=sla-editor] button", "保存并发布");
+      await h.toast(/没有变化/, "内容没有变化");
+      const minute = ed.querySelector("tbody input[type=number]");
+      h.fill(minute, String(Number(minute.value || 60) + 1));
+      await h.click("[data-slot=sla-editor] button", "保存并发布");
+      await h.toast(/已发布新版本/, "已发布新版本");
+      // 把第一行改成兜底（不带条件）且不在最后 —— 服务端 / mock 都应按字段路径拒绝
+      const rows = ed.querySelectorAll("tbody tr");
+      if (rows.length >= 2) {
+        h.fill(rows[0].querySelector("select"), "*");
+        await h.click("[data-slot=sla-editor] button", "保存并发布");
+        await h.waitFor(() => /targets\[0\]/.test(h.txt(ed)), "错误挂到 targets[0]");
+        h.expect(true, "兜底行不在最后被拒");
+      } else {
+        h.step("该策略只有一行，跳过兜底行校验");
+      }
+    },
+  },
+
   // ── I 三语与 RTL（界面文字；服务返回的数据不在此列）────────────────────────
-  ...["en", "ar"].flatMap((locale) => ["/flow/todo/", "/flow/approvals/", "/flow/queue/", "/flow/tickets/", "/flow/processes/", "/flow/settings/", "/flow/access/"]
+  ...["en", "ar"].flatMap((locale) => ["/flow/todo/", "/flow/approvals/", "/flow/queue/", "/flow/tickets/", "/flow/processes/", "/flow/settings/", "/flow/access/", "/flow/instances/", "/flow/stats/"]
     .map((url, i) => ({
       id: `I-${locale}-${i + 1}`, title: `${locale}：${url} 界面文字无中文、方向正确`, perms: ALL, locale, url: () => url,
       run: async (h) => {

@@ -11,8 +11,11 @@ import { ticketDetail } from "./ticketDetail";
 import { processes } from "./processes";
 import { settings } from "./settings";
 import { access } from "./access";
+import { sla } from "./sla";
+import { instances } from "./instances";
+import { stats } from "./stats";
 
-const NS = { common, todo, approvals, approvalDetail, queue, tickets, ticketDetail, processes, settings, access };
+const NS = { common, todo, approvals, approvalDetail, queue, tickets, ticketDetail, processes, settings, access, sla, instances, stats };
 
 export type FlowMessages = { [K in keyof typeof NS]: (typeof NS)[K]["zh"] };
 const pick = (l: "zh" | "en" | "ar") =>

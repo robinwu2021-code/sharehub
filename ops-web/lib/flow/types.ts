@@ -353,16 +353,124 @@ export interface PublishResult {
 export interface FieldError { path: string; error: string }
 
 // ── 运营配置 ────────────────────────────────────────────────────────────
+// ── SLA 策略（21/02 §6.5 · 21/06 §四 sla-policies；后端 O2-8 ea7bb0e8）────────────────────────
+// 通用形状：一条策略 = 若干**指标**（首次响应、解决…）× 一张**目标矩阵**（自上而下第一条匹配的行生效）。
+// 起算 / 暂停 / 停止不给即默认口径：创建即起算；WAITING 类别暂停；进入 DONE / CANCELLED 停止。
+/** 目标矩阵的进入条件：单条 {field, op, value}，或组合 {all:[…]} / {any:[…]} */
+export type SlaCondition =
+  | { field: string; op: "EQ" | "IN" | "TRUE"; value?: unknown }
+  | { all: SlaCondition[] }
+  | { any: SlaCondition[] };
+
+export interface SlaTrigger { onCreate?: boolean; categories?: StatusCategory[]; transitions?: string[] }
+
+export interface SlaMetricDef {
+  /** FIRST_RESPONSE · RESOLUTION · 自定义 */
+  code: string;
+  name: I18nText;
+  start?: SlaTrigger;
+  pause?: { categories?: StatusCategory[]; statuses?: string[] };
+  stop?: SlaTrigger;
+}
+
+export interface SlaTarget {
+  /** 不给 = 兜底行（必须是最后一行） */
+  when?: SlaCondition;
+  /** 指标代号 → 时限（分钟） */
+  targetsMin: Record<string, number>;
+  /** 给了就按营业时间计（该日历）；不给 = 7×24 */
+  calendar?: string;
+}
+
 export interface SlaPolicy {
   code: string;
-  ticketType: Named;
-  /** 优先级代号；"*" = 其余 */
-  priority: string;
-  respondMin: number;
-  resolveMin: number;
-  /** true = 按营业时间计（用 calendar）；false = 7×24 */
-  businessHours: boolean;
-  calendar?: string;
+  name: I18nText;
+  metrics: SlaMetricDef[];
+  targets: SlaTarget[];
+  /** 到时限的百分之几时预警（如 80） */
+  warnAtPercent?: number;
+  /** 读出时带：当前版本（内容哈希）、是否继承自账户模板 */
+  version?: string;
+  inherited?: boolean;
+  /** 发布说明（进版本历史） */
+  note?: string;
+}
+
+// ── 流程实例 · 历史 · 对账 · 统计（21/06 §四；后端 O2-10 6c913bab）──────────────────────────
+export interface InstanceRow {
+  instanceNo: string;
+  process: Named;
+  processVersion: string;
+  subject?: SubjectRef;
+  status: Named;
+  statusCategory: StatusCategory;
+  open: boolean;
+  /** 应用 / 系统发起时为空 */
+  createdBy?: Pick<Member, "ref" | "displayName">;
+  createdAtMs: number;
+  updatedAtMs: number;
+  closedAtMs?: number;
+}
+
+export interface InstanceQuery {
+  processCode?: string;
+  statusCategory?: StatusCategory[];
+  status?: string[];
+  open?: boolean;
+  subjectType?: string;
+  subjectRef?: string;
+  createdFromMs?: number;
+  createdToMs?: number;
+  page: number;
+  size: number;
+}
+
+/** 实例历史的一条：迁移、任务、审批、SLA、门的流水（同一条时间线） */
+export interface HistoryEntry {
+  entityKind: "INSTANCE" | "TASK" | "APPROVAL" | "SLA" | "GATE";
+  entityNo: string;
+  action: string;
+  from?: string;
+  to?: string;
+  seq?: number;
+  /** 成员操作时给；应用 / 系统操作时为空、看 actorText（app:x / system） */
+  actor?: Pick<Member, "ref" | "displayName">;
+  actorText?: string;
+  reason?: string;
+  payload?: Record<string, unknown>;
+  atMs: number;
+}
+
+export interface ApprovalBrief {
+  approvalNo: string;
+  status: ApprovalStatus;
+  round: number;
+  requestedBy: Pick<Member, "ref" | "displayName">;
+  requestedAtMs: number;
+  finishedAtMs?: number;
+}
+
+/** 对账：一个业务对象名下的全部实例、审批与流转（上限 200 张，超了 truncated） */
+export interface SubjectHistory {
+  type: string;
+  ref: string;
+  total: number;
+  truncated: boolean;
+  instances: { instance: InstanceRow; approvals: ApprovalBrief[]; history: HistoryEntry[] }[];
+}
+
+export interface ProcessStatsQuery { processCode?: string; fromMs?: number; toMs?: number }
+
+export interface ProcessStats {
+  process: Named;
+  total: number;
+  open: number;
+  /** 状态大类 → 实例数 */
+  byCategory: Partial<Record<StatusCategory, number>>;
+  /** 已结实例的平均用时（毫秒）；没有已结的不给 */
+  avgCycleMs?: number;
+  /** 审批状态 → 数量 */
+  approvals: Partial<Record<ApprovalStatus, number>>;
 }
 
 export interface WorkCalendar {

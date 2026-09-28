@@ -52,7 +52,7 @@ export function uuid(): string {
 }
 
 /** 列表一律 POST …/query（21/06 §二）：这些是读，不带幂等键 */
-const isRead = (path: string) => /\/(query|count|queue-counts|summary)(\?|$)/.test(path);
+const isRead = (path: string) => /\/(query|count|queue-counts|summary|process-stats)(\?|$)/.test(path);
 
 /** 空间内的路径：/workspaces/{ws}/… */
 export const ws = (path: string) => {

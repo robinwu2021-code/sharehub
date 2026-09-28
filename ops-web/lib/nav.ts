@@ -467,6 +467,9 @@ export const NAV: NavSection[] = [
       { href: "/flow/processes", label: "流程配置", perm: "flow:process:manage", group: "配置", ...FLOW_SOON },
       { href: "/flow/settings", label: "运营配置", perm: "flow:config:manage", group: "配置", ...FLOW_SOON },
       { href: "/flow/access", label: "接入管理", perm: "flow:access:manage", group: "配置", ...FLOW_SOON },
+      // V139：追加在末尾（不往既有分组中间插）。实例与对账同审批可见口径；统计是管理视角
+      { href: "/flow/instances", label: "流程实例", perm: "flow:approval:read", group: "流转与统计", ...FLOW_SOON },
+      { href: "/flow/stats", label: "流程统计", perm: "flow:process:manage", group: "流转与统计", ...FLOW_SOON },
     ],
   },
 ];

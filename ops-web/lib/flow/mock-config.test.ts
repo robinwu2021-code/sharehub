@@ -88,15 +88,30 @@ describe("审批模板", () => {
   });
 });
 
-describe("SLA 规则", () => {
-  it("解决不能短于响应；同类型同优先级只能一条；营业时间要有日历", () => {
-    const base = listSlaPolicies()[0];
-    const e = caught(() => upsertSlaPolicy({ ...base, respondMin: 300, resolveMin: 60 }));
-    expect(isValidationError(e) && e.errors[0].path).toBe("resolveMin");
-    const dup = caught(() => upsertSlaPolicy({ ...base, code: "x", priority: "HIGH" }));
-    expect(isValidationError(dup) && dup.errors.some((x) => x.path === "priority")).toBe(true);
-    const cal = caught(() => upsertSlaPolicy({ ...base, businessHours: true, calendar: "nope" }));
-    expect(isValidationError(cal) && cal.errors[0].path).toBe("calendar");
+describe("SLA 策略（后端 O2-8 的通用形状）", () => {
+  it("内容不变再发布是幂等的；改了才生成新版本", () => {
+    const base = listSlaPolicies().find((p) => p.code === "ops")!;
+    expect(upsertSlaPolicy(base)).toEqual({ version: base.version, created: false });
+    base.targets[0].targetsMin.RESOLUTION = 180;
+    const r = upsertSlaPolicy(base);
+    expect(r.created).toBe(true);
+    expect(r.version).not.toBe(base.version);
+    expect(listSlaPolicies().find((p) => p.code === "ops")!.version).toBe(r.version);
+  });
+
+  it("兜底行只能在最后；时限只能给本策略的指标且 > 0；日历要存在 —— 一次给全、路径按字段", () => {
+    const base = listSlaPolicies().find((p) => p.code === "ops")!;
+    base.targets = [{ targetsMin: { RESOLUTION: 60 } }, { when: { field: "priority", op: "EQ", value: "HIGH" }, targetsMin: { NOPE: 5, RESOLUTION: 0 }, calendar: "nope" }];
+    const e = caught(() => upsertSlaPolicy(base));
+    expect(isValidationError(e) && e.errors.map((x) => x.path).sort()).toEqual(
+      ["targets[0].when", "targets[1].calendar", "targets[1].targetsMin.NOPE", "targets[1].targetsMin.RESOLUTION"]);
+  });
+
+  it("新建：代号格式与唯一；至少一个指标、一行目标、名称至少一种语言", () => {
+    const e = caught(() => upsertSlaPolicy({ code: "ops", name: {}, metrics: [], targets: [] }, true));
+    expect(isValidationError(e) && e.errors.map((x) => x.path).sort()).toEqual(["code", "metrics", "name", "targets"]);
+    expect(upsertSlaPolicy({ code: "vip", name: { en: "VIP" }, metrics: [{ code: "RESOLUTION", name: { en: "Resolution" } }],
+      targets: [{ targetsMin: { RESOLUTION: 60 } }] }, true).created).toBe(true);
   });
 });
 

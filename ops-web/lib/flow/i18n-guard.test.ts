@@ -40,7 +40,7 @@ describe("页面名与菜单同一译法", () => {
     const { translate, tNav } = await import("@/lib/i18n");
     const LEAF: Record<string, string> = {
       todo: "待办中心", approvals: "审批列表", queue: "审核队列", tickets: "工单工作台",
-      processes: "流程配置", settings: "运营配置", access: "接入管理",
+      processes: "流程配置", settings: "运营配置", access: "接入管理", instances: "流程实例", stats: "流程统计",
     };
     for (const loc of ["zh", "en", "ar"] as const) {
       for (const [k, zh] of Object.entries(LEAF)) {

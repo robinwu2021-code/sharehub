@@ -24,3 +24,5 @@
 # 静态导出下动态段要枚举，所以详情页用固定路由 + 查询参数（前端方案 v4/16/22 §七）。
 /flow/tickets/detail
 /flow/approvals/detail
+/flow/instances/detail
+/flow/instances/subject

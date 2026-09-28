@@ -8,10 +8,11 @@
 import * as db from "./mock-db";
 import * as ap from "./mock-approvals";
 import * as cfg from "./mock-config";
+import * as inst from "./mock-instances";
 import { FLOW_USE_HTTP, opskit, ws } from "./http";
 import type {
   AppRow, ApprovalTemplate, DefinitionVersionRow, DeliveryRow, PublishResult, QueueGroup, TemplateSummary, TemplateVersion,
-  SlaPolicy, WorkCalendar,
+  SlaPolicy, WorkCalendar, HistoryEntry, InstanceQuery, InstanceRow, ProcessStats, ProcessStatsQuery, SubjectHistory,
   ApprovalQuery, ApprovalRow, ApprovalStatus, ApprovalView, Member, Named, Page, QueueCount, QueueTask, TicketQuery,
   ReassignResult, TicketRow, TicketStat, TicketView, TimelineEvent, TodoCount, TodoItem, TodoQuery,
 } from "./types";
@@ -103,7 +104,7 @@ const mockFlow = {
   /** GET …/sla-policies */
   slaPolicies: (): Promise<SlaPolicy[]> => tick(() => cfg.listSlaPolicies()),
   /** PUT …/sla-policies/{code} */
-  saveSlaPolicy: (p: SlaPolicy): Promise<SlaPolicy> => tick(() => cfg.upsertSlaPolicy(p)),
+  saveSlaPolicy: (p: SlaPolicy, isNew = false): Promise<{ version: string; created: boolean }> => tick(() => cfg.upsertSlaPolicy(p, isNew)),
   /** GET /workspaces/{ws}/calendars */
   calendars: (): Promise<WorkCalendar[]> => tick(() => cfg.listCalendars()),
   /** PUT /workspaces/{ws}/calendars/{code} */
@@ -112,6 +113,18 @@ const mockFlow = {
   queueGroups: (): Promise<QueueGroup[]> => tick(() => cfg.listQueueGroups()),
   /** PUT /workspaces/{ws}/groups/{code} */
   saveQueueGroup: (q: QueueGroup, isNew: boolean): Promise<QueueGroup> => tick(() => cfg.upsertQueueGroup(q, isNew)),
+
+  // ── 流程实例 · 历史 · 对账 · 统计（后端 O2-10）──
+  /** POST /workspaces/{ws}/instances/query */
+  instances: (q: InstanceQuery): Promise<Page<InstanceRow>> => tick(() => inst.queryInstances(q)),
+  /** GET /workspaces/{ws}/instances/{no}（待后端补：目前只有 query 与 history） */
+  instance: (no: string): Promise<InstanceRow> => tick(() => inst.instanceRow(no)),
+  /** GET /workspaces/{ws}/instances/{no}/history */
+  instanceHistory: (no: string): Promise<HistoryEntry[]> => tick(() => inst.instanceHistory(no)),
+  /** GET /workspaces/{ws}/subjects/{type}/{ref}/history：对账 */
+  subjectHistory: (type: string, ref: string): Promise<SubjectHistory> => tick(() => inst.subjectHistory(type, ref)),
+  /** POST /workspaces/{ws}/process-stats */
+  processStats: (q: ProcessStatsQuery): Promise<ProcessStats[]> => tick(() => inst.processStats(q)),
 
   // ── 接入 ──
   /** GET /accounts/{a}/apps */
@@ -186,11 +199,18 @@ const httpFlow: typeof mockFlow = {
   setTemplateEnabled: (code, enabled) => POST(ws(`/approval-templates/${enc(code)}/${enabled ? "enable" : "disable"}`)),
 
   slaPolicies: () => GET(ws("/sla-policies")),
-  saveSlaPolicy: (p) => PUT(ws(`/sla-policies/${enc(p.code)}`), p),
+  // 读出时带的 version / inherited 不回写；code 在路径里
+  saveSlaPolicy: ({ version: _v, inherited: _i, ...p }) => PUT(ws(`/sla-policies/${enc(p.code)}`), p),
   calendars: () => GET(ws("/calendars")),
   saveCalendar: (c) => PUT(ws(`/calendars/${enc(c.code)}`), c),
   queueGroups: () => GET(ws("/groups?kind=QUEUE")),
   saveQueueGroup: (q) => PUT(ws(`/groups/${enc(q.code)}`), q),
+
+  instances: (q) => POST(ws("/instances/query"), q),
+  instance: (no) => GET(ws(`/instances/${enc(no)}`)),
+  instanceHistory: (no) => GET(ws(`/instances/${enc(no)}/history`)),
+  subjectHistory: (type, ref) => GET(ws(`/subjects/${enc(type)}/${enc(ref)}/history`)),
+  processStats: (q) => POST(ws("/process-stats"), q),
 
   apps: () => GET(acct("/apps")),
   createApp: (a) => POST(acct("/apps"), a),

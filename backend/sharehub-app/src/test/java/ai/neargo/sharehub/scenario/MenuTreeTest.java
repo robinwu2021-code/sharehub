@@ -40,7 +40,7 @@ class MenuTreeTest extends ApiTestSupport {
         // 2026-09-25 +2：用户管理 › 注销申请 / 开票申请（C 端一直在产生这两类待办，运营端此前没有入口）
         // 2026-09-27 +1：用户管理 › 会员套餐（mbr_plan 此前没有任何写入方，C 端会员页因此永远是空列表）
         // 2026-09-28 +7：流程与工单的 7 个叶子（V136）
-        assertThat(leaves).as("ADMIN 看得到的叶子数").isEqualTo(113);
+        assertThat(leaves).as("ADMIN 看得到的叶子数").isEqualTo(115);  // V139 +2（流程实例 · 流程统计）
     }
 
     @Test

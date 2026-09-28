@@ -97,6 +97,22 @@ const PATCHES: { file: string; mustContain: string; apply: (rows: Row[]) => void
       }
     },
   },
+  {
+    // 流程与工单 › 流转与统计：流程实例 · 流程统计（OpsKit O2-10）。追加在 V136 七个叶子之后（sort 8、9），不动既有 sort。
+    // 迁移号 V139：V138 被另一会话的在途文件占用。
+    file: "V139__menu_flow_instances_stats.sql",
+    mustContain: "'M_flow__8' AS menu_no",
+    apply: (rows) => {
+      rows.push(
+        { menu_no: "M_flow__8", parent_no: "M_flow", name: "流程实例", name_en: "Process Instances", name_ar: "مثيلات المسارات", type: "ITEM",
+          path: "/flow/instances", icon: "NULL", group_name: "流转与统计", sort: "8", perm: "flow:approval:read", phase: "1", ready: "0",
+          module: "NULL", modules: "NULL", match_paths: "NULL", pin_bottom: "0", portal_for: "NULL" },
+        { menu_no: "M_flow__9", parent_no: "M_flow", name: "流程统计", name_en: "Process Stats", name_ar: "إحصاءات المسارات", type: "ITEM",
+          path: "/flow/stats", icon: "NULL", group_name: "流转与统计", sort: "9", perm: "flow:process:manage", phase: "1", ready: "0",
+          module: "NULL", modules: "NULL", match_paths: "NULL", pin_bottom: "0", portal_for: "NULL" },
+      );
+    },
+  },
 ];
 
 const COLS = [

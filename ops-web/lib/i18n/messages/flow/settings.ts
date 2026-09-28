@@ -1,19 +1,14 @@
-// 运营配置（/flow/settings/）：SLA 规则 · 工作日历 · 队列。ar 为机器初译，needs-review。
+// 运营配置（/flow/settings/）：工作日历 · 队列（SLA 策略另见 sla.ts）。ar 为机器初译，needs-review。
 const zh = {
   desc: "SLA 规则 · 工作日历 · 队列。",
   notice: "改规则只影响新单；进行中的单按开单时的规则走完。",
-  section: { sla: "SLA 规则", cal: "工作日历", queue: "队列" },
-  btn: { edit: "编辑", addRule: "新增规则", add: "新增" },
-  priority: { URGENT: "紧急", HIGH: "高", NORMAL: "普通", LOW: "低", any: "*（其余）" },
+  section: { cal: "工作日历", queue: "队列" },
+  btn: { edit: "编辑", add: "新增" },
   order: { PRIORITY: "优先级 → 等待时长", DUE: "到期时刻", CREATED: "等待时长" },
   week: { d1: "一", d2: "二", d3: "三", d4: "四", d5: "五", d6: "六", d7: "日" },
   weekday: "周{d}",
   weekdays: "周{days}",
   enumSep: "、",
-  slaCol: {
-    appliesTo: "适用", priority: "优先级", respond: "响应", resolve: "解决", businessHours: "营业时间", calendar: "日历", actions: "操作",
-  },
-  businessHours: { yes: "是", no: "否（7×24）" },
   qCol: { name: "队列", code: "代号", orderBy: "排序", claimTimeout: "领取超时", actions: "操作" },
   cal: {
     summary: "时区 {tz} · {days} {open}–{close}",
@@ -22,26 +17,14 @@ const zh = {
     holidayDefault: "节假日",
   },
   empty: {
-    sla: "还没有 SLA 规则 —— 没有规则的工单类型不计时",
     queue: "还没有队列 —— 领取制审核要先建队列",
   },
   drawer: {
-    slaNew: "新增 SLA 规则", slaEdit: "编辑 SLA 规则", calEdit: "编辑工作日历", qNew: "新增队列", qEdit: "编辑队列",
+    calEdit: "编辑工作日历", qNew: "新增队列", qEdit: "编辑队列",
   },
   saved: {
-    sla: "SLA 规则已保存：只影响之后开的单",
     cal: "工作日历已保存",
     queue: "队列已保存",
-  },
-  slaField: {
-    ticketType: "适用工单类型",
-    priority: "优先级",
-    priorityHelp: "「*」= 同类型里没单独配的其余优先级",
-    respondMin: "响应时限（分钟）",
-    resolveMin: "解决时限（分钟）",
-    businessHours: "按营业时间计时",
-    businessHoursHelp: "关 = 7×24 小时连续计时",
-    calendar: "工作日历",
   },
   calField: {
     name: "名称",
@@ -69,18 +52,13 @@ type M = typeof zh;
 const en = {
   desc: "SLA rules · Work calendars · Queues.",
   notice: "Rule changes only apply to new tickets; tickets already in progress finish under the rules they were opened with.",
-  section: { sla: "SLA rules", cal: "Work calendars", queue: "Queues" },
-  btn: { edit: "Edit", addRule: "Add rule", add: "Add" },
-  priority: { URGENT: "Urgent", HIGH: "High", NORMAL: "Normal", LOW: "Low", any: "* (all others)" },
+  section: { cal: "Work calendars", queue: "Queues" },
+  btn: { edit: "Edit", add: "Add" },
   order: { PRIORITY: "Priority → time waiting", DUE: "Due time", CREATED: "Time waiting" },
   week: { d1: "Mon", d2: "Tue", d3: "Wed", d4: "Thu", d5: "Fri", d6: "Sat", d7: "Sun" },
   weekday: "{d}",
   weekdays: "{days}",
   enumSep: ", ",
-  slaCol: {
-    appliesTo: "Applies to", priority: "Priority", respond: "Response", resolve: "Resolution", businessHours: "Business hours", calendar: "Calendar", actions: "Actions",
-  },
-  businessHours: { yes: "Yes", no: "No (24/7)" },
   qCol: { name: "Queue", code: "Code", orderBy: "Sort order", claimTimeout: "Claim timeout", actions: "Actions" },
   cal: {
     summary: "Time zone {tz} · {days} {open}–{close}",
@@ -89,26 +67,14 @@ const en = {
     holidayDefault: "Holiday",
   },
   empty: {
-    sla: "No SLA rules yet — ticket types without a rule are not timed",
     queue: "No queues yet — claim-based review needs a queue first",
   },
   drawer: {
-    slaNew: "Add SLA rule", slaEdit: "Edit SLA rule", calEdit: "Edit work calendar", qNew: "Add queue", qEdit: "Edit queue",
+    calEdit: "Edit work calendar", qNew: "Add queue", qEdit: "Edit queue",
   },
   saved: {
-    sla: "SLA rule saved: it only applies to tickets opened from now on",
     cal: "Work calendar saved",
     queue: "Queue saved",
-  },
-  slaField: {
-    ticketType: "Ticket type",
-    priority: "Priority",
-    priorityHelp: "\"*\" = every other priority of this type without its own rule",
-    respondMin: "Response time limit (minutes)",
-    resolveMin: "Resolution time limit (minutes)",
-    businessHours: "Count business hours only",
-    businessHoursHelp: "Off = timed continuously, 24/7",
-    calendar: "Work calendar",
   },
   calField: {
     name: "Name",
@@ -135,18 +101,13 @@ const en = {
 const ar = {
   desc: "قواعد SLA · تقويمات العمل · قوائم الانتظار.",
   notice: "تغيير القواعد يسري على التذاكر الجديدة فقط؛ التذاكر الجارية تكتمل وفق القواعد التي فُتحت بها.",
-  section: { sla: "قواعد SLA", cal: "تقويمات العمل", queue: "قوائم الانتظار" },
-  btn: { edit: "تعديل", addRule: "إضافة قاعدة", add: "إضافة" },
-  priority: { URGENT: "عاجل", HIGH: "مرتفع", NORMAL: "عادي", LOW: "منخفض", any: "* (البقية)" },
+  section: { cal: "تقويمات العمل", queue: "قوائم الانتظار" },
+  btn: { edit: "تعديل", add: "إضافة" },
   order: { PRIORITY: "الأولوية ← مدة الانتظار", DUE: "موعد الاستحقاق", CREATED: "مدة الانتظار" },
   week: { d1: "الاثنين", d2: "الثلاثاء", d3: "الأربعاء", d4: "الخميس", d5: "الجمعة", d6: "السبت", d7: "الأحد" },
   weekday: "{d}",
   weekdays: "{days}",
   enumSep: "، ",
-  slaCol: {
-    appliesTo: "ينطبق على", priority: "الأولوية", respond: "الاستجابة", resolve: "الحل", businessHours: "ساعات العمل", calendar: "التقويم", actions: "الإجراءات",
-  },
-  businessHours: { yes: "نعم", no: "لا (24/7)" },
   qCol: { name: "قائمة الانتظار", code: "الرمز", orderBy: "الترتيب", claimTimeout: "مهلة الاستلام", actions: "الإجراءات" },
   cal: {
     summary: "المنطقة الزمنية {tz} · {days} {open}–{close}",
@@ -155,26 +116,14 @@ const ar = {
     holidayDefault: "عطلة",
   },
   empty: {
-    sla: "لا توجد قواعد SLA بعد — أنواع التذاكر بلا قاعدة لا يُحتسب لها وقت",
     queue: "لا توجد قوائم انتظار بعد — المراجعة بالاستلام تتطلب إنشاء قائمة أولًا",
   },
   drawer: {
-    slaNew: "إضافة قاعدة SLA", slaEdit: "تعديل قاعدة SLA", calEdit: "تعديل تقويم العمل", qNew: "إضافة قائمة انتظار", qEdit: "تعديل قائمة الانتظار",
+    calEdit: "تعديل تقويم العمل", qNew: "إضافة قائمة انتظار", qEdit: "تعديل قائمة الانتظار",
   },
   saved: {
-    sla: "تم حفظ قاعدة SLA: تسري فقط على التذاكر المفتوحة من الآن",
     cal: "تم حفظ تقويم العمل",
     queue: "تم حفظ قائمة الانتظار",
-  },
-  slaField: {
-    ticketType: "نوع التذكرة",
-    priority: "الأولوية",
-    priorityHelp: "«*» = بقية أولويات هذا النوع التي ليس لها قاعدة خاصة",
-    respondMin: "مهلة الاستجابة (بالدقائق)",
-    resolveMin: "مهلة الحل (بالدقائق)",
-    businessHours: "الاحتساب خلال ساعات العمل",
-    businessHoursHelp: "إيقاف = احتساب متواصل على مدار 24/7",
-    calendar: "تقويم العمل",
   },
   calField: {
     name: "الاسم",

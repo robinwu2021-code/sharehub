@@ -393,3 +393,13 @@ export function completeTask(taskNo: string, decision: "APPROVE" | "REJECT", rea
 export function pendingCountOf(processCode: string): number {
   return approvals.filter((r) => r.processCode === processCode && r.status === "PENDING").length;
 }
+
+/** 只读快照（流程实例 / 历史 / 对账 / 统计的 mock 从这里派生，与审批页同一份数据；深拷贝，改不到内部） */
+export function approvalSnapshots() {
+  return approvals.map((r) => structuredClone({
+    approvalNo: r.approvalNo, process: { code: def(r).code, name: def(r).name }, subject: r.subject, status: r.status,
+    round: r.round, requestedBy: r.requestedBy, requestedAtMs: r.requestedAtMs, finishedAtMs: r.finishedAtMs,
+    currentStep: r.status === "PENDING" ? def(r).steps[r.stepIdx]?.name : undefined,
+    decisions: r.decisions.map((d) => ({ ...d, stepName: def(r).steps[d.step]?.name ?? "" })), rounds: r.rounds,
+  }));
+}

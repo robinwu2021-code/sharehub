@@ -177,7 +177,10 @@ const LEAF_TUPLES = [
   "/flow/tickets|工单工作台|flow:ticket:read||工单",
   "/flow/processes|流程配置|flow:process:manage||配置",
   "/flow/settings|运营配置|flow:config:manage||配置",
-  "/flow/access|接入管理|flow:access:manage||配置"];
+  "/flow/access|接入管理|flow:access:manage||配置",
+  // 2026-09-28 V139：流转与统计（追加在末尾）
+  "/flow/instances|流程实例|flow:approval:read||流转与统计",
+  "/flow/stats|流程统计|flow:process:manage||流转与统计"];
 
 describe("结构回归基线（层级重构不改内容）", () => {
   // 2026-09-23 菜单收敛：第二步撤销「站点与点位」（16 → 15），第三步把场地方那条线
