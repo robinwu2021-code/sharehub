@@ -50,6 +50,26 @@ class ConsumerReportPhotoTest extends ApiTestSupport {
     }
 
     @Test
+    @DisplayName("图能取回来；别人的取不到；列表带张数")
+    void ownerCanFetchTheImageAndNobodyElseCan() {
+        String token = consumerToken();
+        String fileNo = upload(PNG, "evidence.png", token).path("fileNo").asText();
+        String reportNo = post("/mp/user/report", Map.of(
+                "issue", "柜门卡住", "channel", "APP", "fileNos", List.of(fileNo)), token)
+                .okData().path("reportNo").asText();
+
+        assertThat(rawGet("/mp/files/" + fileNo, token))
+                .as("自己交的图要能取回来 —— 取不回来的话「已附 1 张」又是一句空话").isEqualTo(200);
+        assertThat(rawGet("/mp/files/" + fileNo, consumerToken()))
+                .as("别人的图取不到（与不存在同一结果）").isNotEqualTo(200);
+        assertThat(rawGet("/mp/files/" + fileNo, null)).as("不带令牌取不到").isNotEqualTo(200);
+
+        JsonNode row = firstRow(get("/mp/user/reports", token).okData(), reportNo);
+        assertThat(row.path("photoCount").asInt())
+                .as("列表要带张数 —— 列表不查图本身（N+1），但张数得有，否则界面无从显示").isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("不带截图照常受理 —— 附件是可选的")
     void reportWithoutPhotosStillWorks() {
         String token = consumerToken();
@@ -77,6 +97,36 @@ class ConsumerReportPhotoTest extends ApiTestSupport {
     }
 
     // —— 夹具 ——
+
+    private static JsonNode firstRow(JsonNode page, String ticketNo) {
+        for (JsonNode n : page.path("list")) {
+            if (ticketNo.equals(n.path("ticketNo").asText())) return n;
+        }
+        throw new AssertionError("列表里没有这张单：" + ticketNo);
+    }
+
+    /**
+     * 直接看 HTTP 状态：这条路返回的是图片字节，不是 Result 信封。
+     *
+     * <p>两处讲究：①把字节读完（ofByteArray）而不是 discarding；②**单开一个 HttpClient**。
+     * 这条响应是异步流式的，Tomcat 之后会关掉连接，而共享的 HttpClient 会把那条已关的连接
+     * 复用给下一个请求 —— POST 不会自动重试，于是下一句 `POST /mp/auth/otp` 报
+     * 「header parser received no bytes」。症状落在**下一条用例**上，跟这里对不上因果。
+     * （服务端本身没问题：curl 同一连接连发「取图 / 取图 / 普通接口」三次全 200。）
+     */
+    private int rawGet(String path, String token) {
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path)).GET();
+        if (token != null) b.header("Authorization", "Bearer " + token);
+        try (java.net.http.HttpClient one = java.net.http.HttpClient.newHttpClient()) {
+            var resp = one.send(b.build(), java.net.http.HttpResponse.BodyHandlers.ofByteArray());
+            if (resp.statusCode() == 200) {
+                assertThat(resp.body()).as("200 就得真有图片字节").isNotEmpty();
+            }
+            return resp.statusCode();
+        } catch (Exception e) {
+            throw new AssertionError(e);
+        }
+    }
 
     private static List<String> photoNos(JsonNode vo) {
         return vo.path("photos").findValuesAsText("fileNo");

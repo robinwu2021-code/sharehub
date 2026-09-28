@@ -260,7 +260,7 @@ public class CsTicketServiceImpl implements CsTicketService {
         List<FileRef> photos = fileBinding.listBound(BIZ_CS_TICKET, e.getTicketNo());
         return new CsTicketVO(vo.ticketNo(), vo.userNo(), vo.orderNo(), vo.cabinetNo(), vo.problemNo(),
                 vo.issue(), vo.channel(), vo.status(), vo.handlerNo(), vo.woNo(), vo.refundNo(),
-                vo.createdAt(), photos);
+                vo.createdAt(), photos, photos.size());
     }
 
     private PageResult<CsTicketVO> doPage(Integer page, Integer size, LambdaQueryWrapper<CsTicket> w) {
@@ -268,7 +268,12 @@ public class CsTicketServiceImpl implements CsTicketService {
         int s = (size == null || size < 1) ? 10 : Math.min(size, 200);
         w.orderByDesc(CsTicket::getId);
         Page<CsTicket> r = mapper.selectPage(new Page<>(p, s), w);
-        List<CsTicketVO> rows = r.getRecords().stream().map(CsTicketServiceImpl::toVO).toList();
+        java.util.Map<String, Integer> counts = fileBinding.countBound(BIZ_CS_TICKET,
+                r.getRecords().stream().map(CsTicket::getTicketNo).toList());
+        List<CsTicketVO> rows = r.getRecords().stream()
+                .map(CsTicketServiceImpl::toVO)
+                .map(vo -> vo.withPhotoCount(counts.getOrDefault(vo.ticketNo(), 0)))
+                .toList();
         return new PageResult<>(rows, r.getTotal());
     }
 

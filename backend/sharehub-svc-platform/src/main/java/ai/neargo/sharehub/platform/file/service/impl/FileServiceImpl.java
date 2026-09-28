@@ -217,6 +217,20 @@ public class FileServiceImpl implements FileService {
     }
 
     @Override
+    public java.util.Map<String, Integer> countBound(String bizType, List<String> bizNos) {
+        if (bizNos == null || bizNos.isEmpty()) return java.util.Map.of();
+        List<SysFile> rows = DataScopeContext.executeWithoutScope(() -> files.selectList(
+                new LambdaQueryWrapper<SysFile>().select(SysFile::getBizNo)
+                        .eq(SysFile::getBizType, bizType).in(SysFile::getBizNo, bizNos.stream().distinct().toList())
+                        .eq(SysFile::getStatus, FileStatus.BOUND.name())));
+        java.util.Map<String, Integer> out = new java.util.LinkedHashMap<>();
+        for (SysFile f : rows) {
+            out.merge(f.getBizNo(), 1, Integer::sum);
+        }
+        return out;
+    }
+
+    @Override
     public List<FileRef> refs(List<String> fileNos) {
         if (fileNos == null || fileNos.isEmpty()) return List.of();
         return DataScopeContext.executeWithoutScope(() -> files.selectList(new LambdaQueryWrapper<SysFile>()

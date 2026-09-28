@@ -14,9 +14,12 @@ import { onShow } from "@dcloudio/uni-app";
 import { api } from "@/api";
 import type { CsTicket } from "@/types";
 import { stampOf } from "@/shared/format";
+import { downloadAuthed } from "@/api/http-client";
+import { t } from "@/i18n";
 
 const list = ref<CsTicket[]>([]);
 const loading = ref(true);
+const failed = ref(false);
 
 const tagType: Record<CsTicket["status"], "primary" | "warning" | "neutral"> = {
   OPEN: "warning",
@@ -26,14 +29,42 @@ const tagType: Record<CsTicket["status"], "primary" | "warning" | "neutral"> = {
 
 async function load() {
   loading.value = true;
+  failed.value = false;
   try {
     const r = await api.listReports({ size: 50 });
     list.value = r.list;
+  } catch {
+    failed.value = true;
   } finally {
     loading.value = false;
   }
 }
 onShow(load);
+
+/**
+ * 看自己交上去的照片。
+ *
+ * 列表只带张数，图要按 fileNo 逐张取（个人数据，服务端不发公开链接，每次都要带 token）。
+ * 点开才取：一屏 50 条报障单如果每条都预下载几张图，进页面就是几十个请求。
+ */
+const opening = ref("");
+async function viewPhotos(k: CsTicket) {
+  if (!k.photoCount || opening.value) return;
+  opening.value = k.ticketNo;
+  uni.showLoading({ title: t("common.loading"), mask: true });
+  try {
+    const detail = await api.getReport(k.ticketNo);
+    const nos = (detail?.photos ?? []).map((p) => p.fileNo);
+    const paths = await Promise.all(nos.map((no) => downloadAuthed(`/mp/files/${no}`)));
+    if (!paths.length) throw new Error(t("common.loadFailed"));
+    uni.previewImage({ urls: paths });
+  } catch (e) {
+    uni.showToast({ title: (e as Error).message || t("common.loadFailed"), icon: "none" });
+  } finally {
+    uni.hideLoading();
+    opening.value = "";
+  }
+}
 </script>
 
 <template>
@@ -67,6 +98,14 @@ onShow(load);
             <pb-icon name="zap" :size="32" class="text-sub" />
             <text class="text-[24rpx] text-ink">{{ $t("reports.onOrder", { no: k.orderNo }) }}</text>
           </view>
+          <!--
+            交上去的照片：给出张数并且能点开看。
+            只写「已附 N 张」而点不开，用户仍然无法确认交的是不是那张 —— 那是把一句话换成了另一句话。
+          -->
+          <view v-if="k.photoCount" class="pb-row" @tap="viewPhotos(k)">
+            <pb-icon name="camera" :size="32" class="text-sub" />
+            <text class="text-[24rpx] text-primary">{{ $t("reports.photos", { n: k.photoCount }) }}</text>
+          </view>
           <!-- 既没工单也没退款、状态却是处理中 = 在人工队列里排着，这句要说出来 -->
           <view v-if="!k.woNo && !k.refundNo && k.status !== 'CLOSED'" class="pb-row">
             <pb-icon name="clock" :size="32" class="text-sub" />
@@ -74,7 +113,14 @@ onShow(load);
           </view>
         </view>
       </pb-card>
-      <pb-empty v-if="!loading && !list.length" icon="info" :text="$t('reports.none')" />
+      <pb-empty
+        v-if="!loading && failed"
+        icon="info"
+        :text="$t('common.loadFailed')"
+        :action-text="$t('common.retry')"
+        @action="load"
+      />
+      <pb-empty v-if="!loading && !failed && !list.length" icon="info" :text="$t('reports.none')" />
     </view>
   </pb-scaffold>
 </template>

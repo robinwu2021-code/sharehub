@@ -241,6 +241,7 @@ export default {
     latest: "أنت على أحدث إصدار",
   },
   reports: {
+    photos: "{n} صورة مرفقة",
     title: "تقاريري",
     none: "لم تُرسل أي تقرير بعد",
     OPEN: "تم الاستلام",

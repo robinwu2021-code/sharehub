@@ -5,12 +5,19 @@ import ai.neargo.sharehub.auth.ConsumerContext;
 import ai.neargo.sharehub.auth.LoginUser;
 import ai.neargo.sharehub.platform.file.FileCategory;
 import ai.neargo.sharehub.platform.file.service.FileService;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
+
+import java.io.InputStream;
 
 /**
  * C 端上传（{@code /mp/files}）—— 目前只有报障截图一种用途。
@@ -33,6 +40,33 @@ public class MpFileController {
 
     public MpFileController(FileService files) {
         this.files = files;
+    }
+
+    /**
+     * 取回一张图（自己那张单上的）。
+     *
+     * <p>**不发限时地址**：报障截图是 PII 桶，{@code signedUrl} 对它一律拒绝 ——
+     * 一个能直接打开的链接一旦被转发/进日志就等于泄露。这里每次都要带 token，
+     * 归属由 {@code CsTicketFileAccessChecker} 判（只认自己那张单）。
+     *
+     * <p>端上用 {@code uni.downloadFile}（它能带 header）落成临时文件再显示，
+     * 因为 {@code <image src>} 发不了 Authorization 头。
+     */
+    @GetMapping("/{fileNo}")
+    public ResponseEntity<StreamingResponseBody> get(@PathVariable String fileNo) {
+        ConsumerContext.require();
+        FileService.Stream s = files.openStream(fileNo);
+        StreamingResponseBody body = out -> {
+            try (InputStream in = s.in()) {
+                in.transferTo(out);
+            }
+        };
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
+                .header("X-Content-Type-Options", "nosniff")
+                .contentType(MediaType.parseMediaType(s.contentType()))
+                .contentLength(s.size())
+                .body(body);
     }
 
     /** 报障截图。返回 fileNo，提交报障时带回来。 */

@@ -320,6 +320,10 @@ export interface CsTicket {
   woNo: string | null;
   refundNo: string | null;
   createdAt: string;
+  /** 报障截图张数（列表也带，列表不带图本身）。 */
+  photoCount?: number;
+  /** 详情才有：截图的元信息；取图要另走 GET /mp/files/{fileNo}（带鉴权，不发公开链接）。 */
+  photos?: { fileNo: string; contentType: string }[];
 }
 
 /**

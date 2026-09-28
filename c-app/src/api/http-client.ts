@@ -147,6 +147,27 @@ export function upload(path: string, filePath: string): Promise<{ fileNo: string
   });
 }
 
+/**
+ * 下载一张受鉴权保护的图，返回本地临时路径。
+ *
+ * `<image src>` 发不了 Authorization 头，而报障截图是个人数据、服务端不发公开链接 ——
+ * 所以只能 `uni.downloadFile`（它能带 header）先落地，再把临时路径交给 `<image>` / `previewImage`。
+ */
+export function downloadAuthed(path: string): Promise<string> {
+  const { "Content-Type": _ct, ...headers } = authHeaders();
+  return new Promise((resolve, reject) => {
+    uni.downloadFile({
+      url: `${BASE}${path}`,
+      header: headers,
+      success: (res) => {
+        if (res.statusCode >= 200 && res.statusCode < 300 && res.tempFilePath) resolve(res.tempFilePath);
+        else reject(new ApiError(`HTTP ${res.statusCode}`, res.statusCode));
+      },
+      fail: (err) => reject(new Error(err.errMsg || "network error")),
+    });
+  });
+}
+
 export const client = {
   get: <T>(path: string, q?: object) => request<T>(`${path}${qs(q)}`),
   post: <T>(path: string, data?: unknown) => request<T>(path, { method: "POST", data: data ?? {} }),

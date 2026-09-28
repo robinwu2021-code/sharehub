@@ -241,6 +241,7 @@ export default {
     latest: "已是最新版本",
   },
   reports: {
+    photos: "已附 {n} 张照片",
     title: "我的报障",
     none: "还没有提交过报障",
     OPEN: "待受理",

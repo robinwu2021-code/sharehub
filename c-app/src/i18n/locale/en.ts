@@ -241,6 +241,7 @@ export default {
     latest: "You are on the latest version",
   },
   reports: {
+    photos: "{n} photo(s) attached",
     title: "My reports",
     none: "You have not submitted any reports",
     OPEN: "Received",

@@ -247,6 +247,9 @@ export const mockApi: McpApi = {
       woNo,
       refundNo,
       createdAt: at,
+      // mock 下没有真文件服务，但张数要如实反映这次交了几张 ——
+      // 恒为 0 的话「已附 N 张」那一行在 mock 里永远不出，改动等于没法自查
+      photoCount: p.fileNos?.length ?? 0,
     });
     const r: ReportResult = { reportNo: ticketNo, status, suggestedAction: action, woNo, refundNo, sessionNo, createdAt: at };
     return db.delay(r, 400);

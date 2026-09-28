@@ -27,4 +27,12 @@ public interface FileBindingPort {
 
     /** 批量取引用（按号，不校验归属；给已经鉴过权的业务读取用）。 */
     List<FileRef> refs(List<String> fileNos);
+
+    /**
+     * 一批业务对象各自的附件数（{@code bizNo → 张数}，没有附件的不出现在结果里）。
+     *
+     * <p>列表页要显示「已附 N 张」而逐行调 {@link #listBound} 就是 N+1 ——
+     * 一屏 50 条报障单会打 50 次库。
+     */
+    java.util.Map<String, Integer> countBound(String bizType, List<String> bizNos);
 }

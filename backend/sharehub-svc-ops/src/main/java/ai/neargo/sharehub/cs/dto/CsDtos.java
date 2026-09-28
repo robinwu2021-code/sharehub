@@ -20,14 +20,23 @@ public final class CsDtos {
     public record CsTicketVO(String ticketNo, String userNo, String orderNo, String cabinetNo,
                              String problemNo, String issue, String channel, String status,
                              String handlerNo, String woNo, String refundNo, String createdAt,
-                             java.util.List<FileRef> photos) {
+                             java.util.List<FileRef> photos, Integer photoCount) {
 
-        /** 列表行不带图（列表逐行查附件是 N+1）；详情用带图的构造。 */
+        /**
+         * 列表行不带图本身（逐行查附件是 N+1），但**带张数** ——
+         * 列表上要出「已附 N 张」，没有这个数就只能一直不显示，用户无从确认照片到底交上去没有。
+         * 张数由 {@code countBound} 一次批量查出。
+         */
         public CsTicketVO(String ticketNo, String userNo, String orderNo, String cabinetNo,
                           String problemNo, String issue, String channel, String status,
                           String handlerNo, String woNo, String refundNo, String createdAt) {
             this(ticketNo, userNo, orderNo, cabinetNo, problemNo, issue, channel, status,
-                    handlerNo, woNo, refundNo, createdAt, null);
+                    handlerNo, woNo, refundNo, createdAt, null, null);
+        }
+
+        public CsTicketVO withPhotoCount(Integer n) {
+            return new CsTicketVO(ticketNo, userNo, orderNo, cabinetNo, problemNo, issue, channel,
+                    status, handlerNo, woNo, refundNo, createdAt, photos, n);
         }
     }
 
