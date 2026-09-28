@@ -15,6 +15,7 @@
 | `platform/` | `platform-{api,client,core,store}` | 平台层；表前缀 `plat_` |
 | `process/` | `process-{api,client,core,store}` | 流程能力；表前缀 `proc_` |
 | `ticket/` | `ticket-{api,client,core,store}` | 工单能力；表前缀 `tkt_` |
+| `connector/` | `opskit-connector` | 宿主接入骨架（纯 JDK HttpClient + Jackson 3）：发起 / 代成员 / 幂等 · 外部确认回复 · 对账 · webhook 接收（验签 · 去重）· 接收端 TCK；指引 `docs/integration/` |
 | `opskit-svc/` | `opskit-svc` | 启动模块 |
 | `opskit-arch/` | —— | 架构测试（ArchUnit A1–A12 + 源码扫描 A7 / A9），每条规则带负对照；不发布 |
 

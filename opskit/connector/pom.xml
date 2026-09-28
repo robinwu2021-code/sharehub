@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>ai.neargo.opskit</groupId>
+        <artifactId>opskit-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>opskit-connector</artifactId>
+    <name>opskit-connector</name>
+    <description>Java 接入骨架（21/07 X1）：发起 / 代成员 / 幂等 · 外部确认回复 · 对账 · webhook 接收（验签 · 去重）· 接收端 TCK。只依赖 JDK HttpClient 与 Jackson 3，不依赖 Spring。</description>
+
+    <dependencies>
+        <!-- 签名算法与服务端共用同一份实现（SignatureSpec）；platform-api 只依赖 JDK -->
+        <dependency><groupId>ai.neargo.opskit</groupId><artifactId>platform-api</artifactId></dependency>
+        <dependency><groupId>tools.jackson.core</groupId><artifactId>jackson-databind</artifactId></dependency>
+        <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
+    </dependencies>
+</project>

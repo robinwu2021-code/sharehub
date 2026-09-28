@@ -307,4 +307,69 @@ class BootstrapIntrospectionTest {
                 "valueLabels", java.util.Map.of("AGENT", java.util.Map.of("zh", "代理"), "STAFF", java.util.Map.of("zh", "员工")))).status()).isEqualTo(200);
         assertThat(get(WS + "/member-attributes", "stk_admin").body().toString()).contains("partyType");
     }
+
+    /**
+     * 21/07 X1：接入骨架对真服务 —— 连接器发起（幂等重放）· 接收器验签去重收到 awaiting_confirmation · 回复确认（重复回复返回首次结论）
+     * · 对账三态（查无 / 在审 / 驳回）· 错误键可判。
+     */
+    @Test
+    void connectorDrivesConfirmationGatesAndReconciliation() throws Exception {
+        ai.neargo.opskit.connector.OpsKitConnector c = ai.neargo.opskit.connector.OpsKitConnector.builder()
+                .baseUrl("http://localhost:18093/api/opskit/v1").workspace("ext:MAIN").credential(APP).build();
+        java.util.Map<String, Object> flow = json.readValue("""
+                {"code":"site_activation","name":{"zh":"场地激活"},"initialStatus":"pending","participantRoles":[],
+                 "statuses":[
+                  {"code":"pending","name":{"zh":"待激活"},"category":"IN_PROGRESS",
+                   "gate":{"type":"EXTERNAL","topic":"site.activate","timeout":"PT1H","onConfirmed":"activate","onRejected":"reject","onTimeout":"reject"}},
+                  {"code":"active","name":{"zh":"已激活"},"category":"DONE"},
+                  {"code":"failed","name":{"zh":"激活失败"},"category":"CANCELLED"}],
+                 "transitions":[
+                  {"code":"activate","name":{"zh":"激活"},"from":["pending"],"to":"active","system":true},
+                  {"code":"reject","name":{"zh":"失败"},"from":["pending"],"to":"failed","system":true}]}
+                """, java.util.Map.class);
+        c.call("PUT", "/processes/site_activation", flow, null);
+
+        ai.neargo.opskit.connector.OpsKitConnector.StartInstance req = new ai.neargo.opskit.connector.OpsKitConnector.StartInstance("site_activation",
+                ai.neargo.opskit.connector.OpsKitConnector.Subject.of("site", "ST9", "一号店激活"), java.util.Map.of("siteNo", "ST9"), null, null);
+        ai.neargo.opskit.connector.OpsKitConnector.Started s1 = c.start(req, "opskit:site:ST9:1");
+        ai.neargo.opskit.connector.OpsKitConnector.Started s2 = c.start(req, "opskit:site:ST9:1");
+        assertThat(s2.instanceNo()).isEqualTo(s1.instanceNo());
+        assertThat(s2.replayed()).isTrue();
+
+        java.util.List<ai.neargo.opskit.connector.Envelope> awaiting = new java.util.concurrent.CopyOnWriteArrayList<>();
+        ai.neargo.opskit.connector.WebhookReceiver receiver = new ai.neargo.opskit.connector.WebhookReceiver(SECRET,
+                ai.neargo.opskit.connector.EventLedger.inMemory(), java.time.Clock.systemUTC()).on("instance.awaiting_confirmation", awaiting::add);
+        for (int i = 0; i < 60 && awaiting.isEmpty(); i++) {
+            for (String[] r : received) {
+                receiver.handle(r[0], r[1]);
+            }
+            Thread.sleep(250);
+        }
+        assertThat(awaiting).as("接收器验签后收到 awaiting_confirmation").hasSize(1);
+        String token = awaiting.get(0).data().path("token").asString();
+        assertThat(c.replyConfirmation(token, true, null).first()).isTrue();
+        ai.neargo.opskit.connector.OpsKitConnector.Replied again = c.replyConfirmation(token, false, "迟到的拒绝");
+        assertThat(again.first()).as("重复回复不再迁移").isFalse();
+        assertThat(again.result()).isEqualTo("CONFIRM");
+        assertThat(new ai.neargo.opskit.connector.Reconciler(c).check("site", "ST9", "site_activation").statusCategory()).isEqualTo("DONE");
+
+        ai.neargo.opskit.connector.Reconciler rec = new ai.neargo.opskit.connector.Reconciler(c);
+        assertThat(rec.check("withdrawal", "WD-NONE", "withdrawal_audit").state()).isEqualTo(ai.neargo.opskit.connector.Reconciler.State.NOT_FOUND);
+        ai.neargo.opskit.connector.OpsKitConnector.Started w = c.start(new ai.neargo.opskit.connector.OpsKitConnector.StartInstance("withdrawal_audit",
+                ai.neargo.opskit.connector.OpsKitConnector.Subject.of("withdrawal", "WD-REC", null), java.util.Map.of("amount", 10),
+                java.util.Set.of("agent:AG002"), ai.neargo.opskit.connector.OpsKitConnector.OnBehalfOf.of("AG-U10", "代理十")), "opskit:withdrawal:WD-REC:1");
+        assertThat(rec.check("withdrawal", "WD-REC", "withdrawal_audit").state()).isEqualTo(ai.neargo.opskit.connector.Reconciler.State.IN_PROGRESS);
+        String task = get(WS + "/approvals/" + w.approvalNo(), "stk_ops").body().get("mine").get("taskNo").asText();
+        send("POST", WS + "/approvals/" + w.approvalNo() + "/decide", "stk_ops", null, java.util.Map.of("taskNo", task, "decision", "REJECT", "reason", "资料不全"));
+        ai.neargo.opskit.connector.Reconciler.Outcome o = rec.check("withdrawal", "WD-REC", "withdrawal_audit");
+        assertThat(o.state()).isEqualTo(ai.neargo.opskit.connector.Reconciler.State.REJECTED);
+        assertThat(o.approvalNo()).isEqualTo(w.approvalNo());
+
+        ai.neargo.opskit.connector.OpsKitCallException ex = org.junit.jupiter.api.Assertions.assertThrows(
+                ai.neargo.opskit.connector.OpsKitCallException.class, () -> c.start(new ai.neargo.opskit.connector.OpsKitConnector.StartInstance("ghost",
+                        null, null, null, null), "opskit:ghost:1"));
+        assertThat(ex.status()).isEqualTo(404);
+        assertThat(ex.retryable()).isFalse();
+        assertThat(ex.traceId()).isNotBlank();
+    }
 }

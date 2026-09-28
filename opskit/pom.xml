@@ -28,6 +28,7 @@
         <module>platform</module>
         <module>process</module>
         <module>ticket</module>
+        <module>connector</module>
         <module>opskit-svc</module>
         <module>opskit-arch</module>
     </modules>
@@ -58,6 +59,7 @@
             <dependency><groupId>ai.neargo.opskit</groupId><artifactId>ticket-core</artifactId><version>${project.version}</version></dependency>
             <dependency><groupId>ai.neargo.opskit</groupId><artifactId>ticket-store</artifactId><version>${project.version}</version></dependency>
             <dependency><groupId>ai.neargo.opskit</groupId><artifactId>opskit-svc</artifactId><version>${project.version}</version></dependency>
+            <dependency><groupId>ai.neargo.opskit</groupId><artifactId>opskit-connector</artifactId><version>${project.version}</version></dependency>
 
             <dependency>
                 <groupId>com.github.kagkarlsson</groupId>

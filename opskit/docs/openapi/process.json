@@ -710,6 +710,31 @@
         },
         "type" : "object"
       },
+      "Replied" : {
+        "properties" : {
+          "first" : {
+            "type" : "boolean"
+          },
+          "instanceNo" : {
+            "type" : "string"
+          },
+          "result" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ReplyBody" : {
+        "properties" : {
+          "reason" : {
+            "type" : "string"
+          },
+          "result" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "Requires" : {
         "properties" : {
           "comment" : {
@@ -1881,6 +1906,49 @@
         "tags" : [ "approval-controller" ]
       }
     },
+    "/api/opskit/v1/workspaces/{ws}/confirmations/{token}" : {
+      "post" : {
+        "operationId" : "reply",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "token",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ReplyBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Replied"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "confirmation-controller" ]
+      }
+    },
     "/api/opskit/v1/workspaces/{ws}/instances" : {
       "post" : {
         "operationId" : "start_1",
@@ -2885,6 +2953,49 @@
           }
         },
         "tags" : [ "approval-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/confirmations/{token}" : {
+      "post" : {
+        "operationId" : "reply_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "token",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ReplyBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Replied"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "confirmation-controller" ]
       }
     },
     "/v1/workspaces/{ws}/instances" : {
