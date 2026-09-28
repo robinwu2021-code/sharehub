@@ -145,6 +145,12 @@ export interface TicketQuery {
 
 export type TicketFilter = Omit<TicketQuery, "page" | "size">;
 
+/** 批量改派的逐单结果（单张失败不回滚其余） */
+export interface ReassignResult {
+  succeeded: string[];
+  failed: { ticketNo: string; error: string }[];
+}
+
 /** 统计卡（ticket-stats/summary）：每个数字附 queryParams，原样回填 query，保证卡与列表同口径 */
 export interface TicketStat {
   key: string;

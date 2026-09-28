@@ -82,13 +82,16 @@ describe("工单", () => {
     expect(transitionTicket("CS26092712", "TAKEOVER", NOW).assignee?.ref).toBe(ME.ref);
   });
 
-  it("批量改派：原因必填；含已结单整批拒绝、一张都不改", () => {
+  it("批量改派：原因必填（整体拒绝）；逐单结果，已结的单记失败、其余照改不回滚", () => {
     const to = ASSIGNEE_OPTIONS.find((m) => m.ref === "omar")!;
     expect(() => reassignTickets(["WO26092688"], to, "  ", NOW)).toThrow(/原因/);
+    expect(() => reassignTickets(Array.from({ length: 201 }, (_, i) => `X${i}`), to, "休假", NOW)).toThrow(/200/);
     transitionTicket("WO26092640", "REVIEW", NOW);
-    expect(() => reassignTickets(["WO26092688", "WO26092640"], to, "休假", NOW)).toThrow(/已结/);
-    expect(getTicket("WO26092688", NOW).assignee?.ref).toBe("musa");
-    expect(reassignTickets(["WO26092688"], to, "休假", NOW)[0].assignee?.ref).toBe("omar");
+    const r = reassignTickets(["WO26092688", "WO26092640", "NOPE"], to, "休假", NOW);
+    expect(r.succeeded).toEqual(["WO26092688"]);
+    expect(r.failed.map((f) => f.ticketNo)).toEqual(["WO26092640", "NOPE"]);
+    expect(r.failed[0].error).toMatch(/已结/);
+    expect(getTicket("WO26092688", NOW).assignee?.ref).toBe("omar");
   });
 
   it("出参不带业务词的硬编码：办理人类型、来源都来自服务给的 name", () => {

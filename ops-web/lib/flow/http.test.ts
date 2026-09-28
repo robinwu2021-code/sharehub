@@ -67,6 +67,32 @@ describe("httpFlow：请求形状", () => {
   });
 });
 
+describe("httpFlow：选项与逐单结果（后端 9-28 定的形状）", () => {
+  it("成员查询：memberId → ref，保留 total（超出一页页面要明说）", async () => {
+    const { flow } = await load();
+    reply(200, { list: [{ memberId: "mb_1", displayName: "Omar", attrs: { partyType: { value: "STAFF", name: "员工" } } }], total: 350, page: 1, size: 200 });
+    const p = await flow.members();
+    expect(p.list[0]).toEqual({ ref: "mb_1", displayName: "Omar", attrs: { partyType: { value: "STAFF", name: "员工" } } });
+    expect(p.total).toBe(350);
+    expect(calls[0].url).toMatch(/\/members\/query$/);
+  });
+
+  it("成员属性定义：GET /member-attributes 取 partyType；没定义显示名时用原值", async () => {
+    const { flow } = await load();
+    reply(200, [{ key: "region", values: [] }, { key: "partyType", name: "类型", values: [{ value: "AGENT", name: "代理" }, { value: "CS" }] }]);
+    expect(await flow.partyOptions()).toEqual([{ code: "AGENT", name: "代理" }, { code: "CS", name: "CS" }]);
+    expect(calls[0].url).toMatch(/\/member-attributes$/);
+  });
+
+  it("批量改派：勾选式请求体；逐单结果原样交给页面", async () => {
+    const { flow } = await load();
+    reply(200, { succeeded: ["WO1"], failed: [{ ticketNo: "WO2", error: "已结" }] });
+    const r = await flow.reassign(["WO1", "WO2"], { ref: "omar", displayName: "Omar" }, "休假");
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({ ticketNos: ["WO1", "WO2"], to: "member:omar", reason: "休假" });
+    expect(r.failed).toEqual([{ ticketNo: "WO2", error: "已结" }]);
+  });
+});
+
 describe("httpFlow：错误体映射", () => {
   it("422 带 errors[] → FlowValidationError，路径原样给页面", async () => {
     const { flow } = await load();

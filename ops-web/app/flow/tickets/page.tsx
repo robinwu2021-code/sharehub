@@ -24,11 +24,9 @@ import { StatStrip } from "@/components/flow/stat-strip";
 import { PriorityBadge, TicketStatusBadge } from "@/components/flow/badges";
 import { actionVariant, inlineActions } from "@/lib/flow/present";
 import { useFlowT, type FlowKey } from "@/lib/flow/i18n";
+import { useMembers, usePartyOptions, useTicketTypes } from "@/lib/flow/options";
 import Link from "next/link";
 
-// 筛选项都来自服务（工单类型 / 成员属性定义），不在前端内置业务词（21/06 §七）
-const TYPE_OPTIONS = flow.ticketTypes().map((t) => ({ value: t.code, label: t.name }));
-const PARTY_OPTIONS = flow.partyOptions().map((p) => ({ value: p.code, label: p.name }));
 /** 受理方显示：成员属性 partyType 的显示名（未定义显示名时用原值）+ 成员名 */
 const memberLabel = (m: Member) => {
   const party = m.attrs?.partyType;
@@ -39,9 +37,9 @@ const memberLabel = (m: Member) => {
  * @form-none 批量改派提交到 OpsKit（opskit-svc 的 POST /workspaces/{ws}/tickets/reassign，21/06），
  * 不是 ShareHub 后端，contract.json 管不到；字段以 21/06 为准，经 lib/flow/client 转发。
  */
-const reassignFields = (tt: TicketsT): FieldDef[] => [
-  { key: "to", label: tt("reassign.to"), type: "select", required: true,
-    options: flow.assigneeOptions().map((a) => ({ value: a.ref, label: memberLabel(a) })) },
+const reassignFields = (tt: TicketsT, members: Member[], membersHelp?: string): FieldDef[] => [
+  { key: "to", label: tt("reassign.to"), type: "select", required: true, help: membersHelp,
+    options: members.map((a) => ({ value: a.ref, label: memberLabel(a) })) },
   { key: "reason", label: tt("reassign.reason"), type: "textarea", required: true, maxLength: 200,
     help: tt("reassign.reasonHelp") },
 ];
@@ -51,6 +49,10 @@ function FlowTickets() {
   const qc = useQueryClient();
   const { t: tt, tc } = useFlowT("tickets");
   const allow = useCan();
+  // 筛选项都来自服务（工单类型 / 成员属性定义），不在前端内置业务词（21/06 §七）
+  const typeOptions = useTicketTypes().map((t) => ({ value: t.code, label: t.name }));
+  const partyOptions = usePartyOptions().map((p) => ({ value: p.code, label: p.name }));
+  const members = useMembers();
   // 行内的迁移动作（接单 / 升级 / 复核…）不在前端判权：服务端给的 actions[] 已按当前操作人算好，
   // 前端再判一遍只会与服务端口径打架。前端只管不属于迁移的能力 —— 批量改派。
   const canDispatch = allow("flow:ticket:dispatch");
@@ -85,12 +87,18 @@ function FlowTickets() {
   });
   const reassign = useMutation({
     mutationFn: () => {
-      const to = flow.assigneeOptions().find((a) => a.ref === reassignForm.to)
+      const to = members.list.find((a) => a.ref === reassignForm.to)
         ?? { ref: String(reassignForm.to ?? ""), displayName: String(reassignForm.to ?? "") };
       return flow.reassign(selected, to, String(reassignForm.reason ?? ""));
     },
-    onSuccess: (list) => {
-      notify.success(tt("reassign.done", { n: list.length }));
+    // 逐单结果：单张失败不回滚其余，失败的逐条说出来（常见是「已结」）
+    onSuccess: (r) => {
+      if (r.failed.length) {
+        notify.error(tt("reassign.partial", { ok: r.succeeded.length, n: r.failed.length,
+          list: r.failed.map((f) => `${f.ticketNo}${tc("colon")}${f.error}`).join(tc("listSep")) }));
+      } else {
+        notify.success(tt("reassign.done", { n: r.succeeded.length }));
+      }
       setReassignOpen(false);
       setSelected([]);
       setReassignForm({ to: "", reason: "" });
@@ -162,14 +170,14 @@ function FlowTickets() {
           aria-label={tt("filter.type")}
           value={typeCode}
           onChange={(v) => onFilter(() => setTypeCode(v))}
-          options={TYPE_OPTIONS}
+          options={typeOptions}
           allLabel={tt("filter.typeAll")}
         />
         <FilterSelect
           aria-label={tt("filter.assignee")}
           value={assigneeKind}
           onChange={(v) => onFilter(() => setAssigneeKind(v))}
-          options={PARTY_OPTIONS}
+          options={partyOptions}
           allLabel={tt("filter.assigneeAll")}
         />
       </Toolbar>
@@ -189,7 +197,7 @@ function FlowTickets() {
         titleNew={tt("reassign.title", { n: selected.length })}
         titleEdit=""
         isEdit={false}
-        fields={reassignFields(tt)}
+        fields={reassignFields(tt, members.list, members.truncated ? tc("membersTruncated", { n: members.list.length, total: members.total }) : undefined)}
         value={reassignForm}
         onChange={setReassignForm}
         onSubmit={() => reassign.mutate()}

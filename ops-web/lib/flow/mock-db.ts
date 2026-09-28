@@ -12,10 +12,13 @@
 //  2. 工单的可走动作 actions[] 由这里按「状态 × SLA × 受理方」算好返回，页面不维护迁移表。
 import { fail, notFound } from "@/lib/biz-error";
 import { hasPerm, requirePerm } from "./mock-auth";
+import { useLocaleStore } from "@/lib/stores/locale";
 import type {
-  Member, Named, Page, Priority, SlaMetric, SlaState, SlaSummary, StatusCategory, TicketAction, TicketFilter,
+  Member, Named, Page, Priority, ReassignResult, SlaMetric, SlaState, SlaSummary, StatusCategory, TicketAction, TicketFilter,
   TicketQuery, TicketRow, TicketStat, TicketView, TimelineEvent, TodoCount, TodoItem, TodoQuery,
 } from "./types";
+
+const pickLang = (zh: string, en: string) => (useLocaleStore.getState().locale === "zh" ? zh : en);
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;
@@ -412,20 +415,25 @@ export function transitionTicket(no: string, code: string, now: number = Date.no
 }
 
 /** 批量改派：原因必填；已结的单不能改派（整批拒绝，不做部分成功，免得界面上说不清哪些改了） */
-export function reassignTickets(nos: string[], to: Member, reason: string, now: number = Date.now()): TicketRow[] {
+/**
+ * POST /workspaces/{ws}/tickets/reassign {ticketNos[≤200], to, reason}：**逐单结果**，单张失败不回滚其余
+ * （后端 9-28 定：响应 {succeeded[], failed[{ticketNo, error}]}）。请求本身不合法（没选、没原因、超 200）才整体拒绝。
+ */
+export function reassignTickets(nos: string[], to: Member, reason: string, now: number = Date.now()): ReassignResult {
   requirePerm("flow:ticket:dispatch");
   if (!nos.length) fail("没有选中任何工单", "No tickets selected");
+  if (nos.length > 200) fail("一次最多改派 200 张", "At most 200 tickets per reassignment");
   if (!reason.trim()) fail("改派必须填写原因（会记入工单时间线）", "A reason is required to reassign (it goes into the ticket timeline)");
-  const rows = nos.map(row);
-  const closed = rows.filter((r) => !OPEN.includes(r.status)).map((r) => r.ticketNo);
-  if (closed.length) {
-    fail(`以下工单已结，不能改派：${closed.join("、")}`, `These tickets are already closed and cannot be reassigned: ${closed.join(", ")}`);
-  }
-  for (const r of rows) {
+  const res: ReassignResult = { succeeded: [], failed: [] };
+  for (const no of nos) {
+    const r = tickets.find((x) => x.ticketNo === no);
+    if (!r) { res.failed.push({ ticketNo: no, error: pickLang("工单不存在", "Ticket not found") }); continue; }
+    if (!OPEN.includes(r.status)) { res.failed.push({ ticketNo: no, error: pickLang("工单已结，不能改派", "Already closed") }); continue; }
     r.assignee = to; r.pooled = false;
     log(r.ticketNo, now, "ASSIGNED", "改派", ME, `改派给 ${to.attrs?.partyType?.name ?? ""} · ${to.displayName}：${reason.trim()}`);
+    res.succeeded.push(no);
   }
-  return rows.map((r) => out(view(r, now)));
+  return res;
 }
 
 /** 改派时可选的受理方（接后端后：成员 / 组接口） */

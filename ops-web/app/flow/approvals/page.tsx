@@ -9,6 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { flow, FLOW_KEY } from "@/lib/flow/client";
 import { approvalStatusMap } from "@/lib/flow/labels";
 import { useFlowT } from "@/lib/flow/i18n";
+import { useProcessOptions, useRequesterOptions } from "@/lib/flow/options";
 import type { ApprovalRow, ApprovalStatus } from "@/lib/flow/types";
 import { usePaging } from "@/lib/hooks/use-paging";
 import { PageTitle } from "@/components/ui/misc";
@@ -27,6 +28,8 @@ const MIN = 60_000;
 
 function FlowApprovals() {
   const { t: tt, tc, fmt } = useFlowT("approvals");
+  const processOptions = useProcessOptions().map((p) => ({ value: p.code, label: p.name }));
+  const requesterOptions = useRequesterOptions().map((p) => ({ value: p.code, label: p.name }));
   const TABS = TAB_KEYS.map((key) => ({ key, label: key === "ALL" ? tt("tab.all") : tc(`approvalStatus.${key}`) }));
   const SINCE = [{ value: "7", label: tt("since.d7") }, { value: "30", label: tt("since.d30") }];
   const paging = usePaging();
@@ -87,9 +90,9 @@ function FlowApprovals() {
       />
       <Toolbar search={keyword} onSearch={(v) => onFilter(() => setKeyword(v))} searchPlaceholder={tt("search")}>
         <FilterSelect aria-label={tt("col.process")} value={processCode} onChange={(v) => onFilter(() => setProcessCode(v))}
-          options={flow.processOptions().map((p) => ({ value: p.code, label: p.name }))} allLabel={tt("filterAll.process")} />
+          options={processOptions} allLabel={tt("filterAll.process")} />
         <FilterSelect aria-label={tt("col.requestedBy")} value={requestedBy} onChange={(v) => onFilter(() => setRequestedBy(v))}
-          options={flow.requesterOptions().map((p) => ({ value: p.code, label: p.name }))} allLabel={tt("filterAll.requestedBy")} />
+          options={requesterOptions} allLabel={tt("filterAll.requestedBy")} />
         <FilterSelect aria-label={tt("col.requestedAt")} value={since} onChange={(v) => onFilter(() => setSince(v))} options={SINCE} allLabel={tt("filterAll.since")} />
       </Toolbar>
       <PagedTable

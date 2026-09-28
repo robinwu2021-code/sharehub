@@ -7,13 +7,13 @@
 //  - 凭证只在创建 / 轮换时返回一次，之后读不到；
 //  - 改 SLA / 日历 / 队列只影响新单（运行中的按开单时的规则走完）—— mock 不回溯改旧单。
 import { fail, notFound } from "@/lib/biz-error";
-import { ME } from "./mock-db";
+import { ME, TICKET_TYPES } from "./mock-db";
 import { pendingCountOf } from "./mock-approvals";
 import { FlowValidationError } from "./errors";
 import { requirePerm } from "./mock-auth";
 import { ALL_MODE_KINDS } from "./types";
 import type {
-  AppRow, ApprovalTemplate, ApproverRef, DefinitionVersionRow, DeliveryRow, FieldError, I18nText, Named, TemplateStep, TemplateSummary,
+  AppRow, ApprovalTemplate, ApproverRef, DefinitionVersionRow, DeliveryRow, FieldError, I18nText, TemplateStep, TemplateSummary,
   TemplateVersion, PublishResult, QueueGroup, SlaPolicy, WorkCalendar,
 } from "./types";
 
@@ -75,7 +75,9 @@ export function resetConfigDb(now: number = Date.now()) {
   for (const p of processes) {
     if (!p.versions.length) p.versions.push(mk(p.def, contentHash(p.def), now - 3 * 24 * HOUR, "API", "SHAREHUB", "上线初版"));
   }
-  const ops = { code: "ops", name: "运维工单" }, cs = { code: "cs-report", name: "客服报障" };
+  // 工单类型只有一份（mock-db 的 TICKET_TYPES）：这里曾另写一份，同代号不同名（「运维」与「运维工单」）
+  const typeOf = (code: string) => TICKET_TYPES.find((t) => t.code === code)!;
+  const ops = typeOf("ops"), cs = typeOf("cs-report");
   slaPolicies = [
     { code: "ops-urgent", ticketType: ops, priority: "URGENT", respondMin: 30, resolveMin: 240, businessHours: false },
     { code: "ops-high", ticketType: ops, priority: "HIGH", respondMin: 120, resolveMin: 480, businessHours: true, calendar: "dubai" },
@@ -291,4 +293,3 @@ export function definitionVersions(): DefinitionVersionRow[] {
   ].sort((a, b) => b.publishedAtMs - a.publishedAtMs);
 }
 
-export const TICKET_TYPE_OPTIONS: Named[] = [{ code: "ops", name: "运维工单" }, { code: "cs-report", name: "客服报障" }, { code: "after-sales", name: "售后" }];

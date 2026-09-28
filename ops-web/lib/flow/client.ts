@@ -13,7 +13,7 @@ import type {
   AppRow, ApprovalTemplate, DefinitionVersionRow, DeliveryRow, PublishResult, QueueGroup, TemplateSummary, TemplateVersion,
   SlaPolicy, WorkCalendar,
   ApprovalQuery, ApprovalRow, ApprovalStatus, ApprovalView, Member, Named, Page, QueueCount, QueueTask, TicketQuery,
-  TicketRow, TicketStat, TicketView, TimelineEvent, TodoCount, TodoItem, TodoQuery,
+  ReassignResult, TicketRow, TicketStat, TicketView, TimelineEvent, TodoCount, TodoItem, TodoQuery,
 } from "./types";
 
 /** 模拟网络往返：让加载态、按钮 loading 在 mock 下也真实出现 */
@@ -45,14 +45,15 @@ const mockFlow = {
   /** POST /workspaces/{ws}/tickets/{no}/pool {reason}：退回抢单池 */
   pool: (no: string, reason: string): Promise<TicketRow> => tick(() => db.poolTicket(no, reason)),
   /** POST /workspaces/{ws}/tickets/reassign */
-  reassign: (nos: string[], to: Member, reason: string): Promise<TicketRow[]> =>
+  reassign: (nos: string[], to: Member, reason: string): Promise<ReassignResult> =>
     tick(() => db.reassignTickets(nos, to, reason)),
-  /** 改派候选（接后端后：成员 / 组接口） */
-  assigneeOptions: (): Member[] => db.ASSIGNEE_OPTIONS,
-  /** 工单类型（接后端后：GET /workspaces/{ws}/ticket-types） */
-  ticketTypes: (): Named[] => db.TICKET_TYPES,
-  /** 受理方筛选项：成员属性 partyType 的取值（接后端后：成员属性定义） */
-  partyOptions: (): Named[] => db.PARTY_OPTIONS,
+  // ── 选项（下拉）：一律异步，走 lib/flow/options.ts 的钩子 ──
+  /** POST /workspaces/{ws}/members/query：改派候选 / 提交人筛选。给 total —— 超出一页时页面要说「只列了前 N 人」，不静默截断 */
+  members: (): Promise<Page<Member>> => tick(() => ({ list: db.ASSIGNEE_OPTIONS, total: db.ASSIGNEE_OPTIONS.length })),
+  /** GET /workspaces/{ws}/ticket-types（名称已按语言选好） */
+  ticketTypes: (): Promise<Named[]> => tick(() => db.TICKET_TYPES),
+  /** 成员属性 partyType 的取值与显示名（21/07 O1-12 成员属性定义） */
+  partyOptions: (): Promise<Named[]> => tick(() => db.PARTY_OPTIONS),
 
   // ── 审批 ──
   /** POST /workspaces/{ws}/approvals/query */
@@ -66,10 +67,10 @@ const mockFlow = {
     tick(() => ap.decide(no, taskNo, decision, reason)),
   /** POST /workspaces/{ws}/approvals/{no}/withdraw */
   withdraw: (no: string): Promise<ApprovalView> => tick(() => ap.withdraw(no)),
-  /** 流程筛选项（GET …/processes） */
-  processOptions: (): Named[] => ap.PROCESS_OPTIONS,
-  /** 提交人筛选项（成员查询） */
-  requesterOptions: (): Named[] => ap.REQUESTER_OPTIONS,
+  /** 审批列表的流程筛选项 = 审批模板列表（代号 + 已选语种的名称） */
+  processOptions: (): Promise<Named[]> => tick(() => ap.PROCESS_OPTIONS),
+  /** 提交人筛选项（成员查询；mock 另含「系统」这类非成员提交方） */
+  requesterOptions: (): Promise<Named[]> => tick(() => ap.REQUESTER_OPTIONS),
 
   // ── 审核队列（任务）──
   /** POST /workspaces/{ws}/tasks/queue-counts：每个队列组的待领数与我已领数 */
@@ -111,7 +112,6 @@ const mockFlow = {
   queueGroups: (): Promise<QueueGroup[]> => tick(() => cfg.listQueueGroups()),
   /** PUT /workspaces/{ws}/groups/{code} */
   saveQueueGroup: (q: QueueGroup, isNew: boolean): Promise<QueueGroup> => tick(() => cfg.upsertQueueGroup(q, isNew)),
-  ticketTypeOptions: () => cfg.TICKET_TYPE_OPTIONS,
 
   // ── 接入 ──
   /** GET /accounts/{a}/apps */
@@ -152,23 +152,27 @@ const httpFlow: typeof mockFlow = {
   },
   assign: (no, to, reason) => POST(ws(`/tickets/${enc(no)}/assign`), { to: `member:${to.ref}`, reason }),
   pool: (no, reason) => POST(ws(`/tickets/${enc(no)}/pool`), { reason }),
-  /** 待对齐：21/06 的批量改派按「原受理人」{from, to, reason}；界面是勾选若干单 */
+  /** 勾选式：{ticketNos[≤200], to, reason}（另一式按原受理人 {from, …} 界面不用）；逐单结果 */
   reassign: (nos, to, reason) => POST(ws("/tickets/reassign"), { ticketNos: nos, to: `member:${to.ref}`, reason }),
-  // 待换异步（成员查询 / 工单类型 / 成员属性定义）：接真服务前这三项仍是 mock 的选项
-  assigneeOptions: () => mockFlow.assigneeOptions(),
-  ticketTypes: () => mockFlow.ticketTypes(),
-  partyOptions: () => mockFlow.partyOptions(),
+  members: async () => {
+    const p = await POST<Page<{ memberId: string; displayName: string; attrs?: Member["attrs"] }>>(ws("/members/query"), { page: 1, size: 200 });
+    return { ...p, list: p.list.map(({ memberId, ...m }) => ({ ref: memberId, ...m })) };
+  },
+  ticketTypes: () => GET(ws("/ticket-types")),
+  /** GET /member-attributes 给全部属性定义，取 partyType 的取值与显示名 */
+  partyOptions: async () => ((await GET<{ key: string; values: { value: string; name?: string }[] }[]>(ws("/member-attributes")))
+    .find((a) => a.key === "partyType")?.values ?? []).map((v) => ({ code: v.value, name: v.name ?? v.value })),
 
   approvals: ({ fromMs, ...q }) => POST(ws("/approvals/query"), { ...q, ...(fromMs ? { from: fromMs } : {}) }),
   approvalCount: () => POST(ws("/approvals/count"), {}),
   approval: (no) => GET(ws(`/approvals/${enc(no)}`)),
   decide: (no, taskNo, decision, reason) => POST(ws(`/approvals/${enc(no)}/decide`), { taskNo, decision, ...(reason ? { reason } : {}) }),
   withdraw: (no) => POST(ws(`/approvals/${enc(no)}/withdraw`)),
-  processOptions: () => mockFlow.processOptions(),
-  requesterOptions: () => mockFlow.requesterOptions(),
+  processOptions: async () => (await GET<{ code: string; name: string }[]>(ws("/approval-templates"))).map(({ code, name }) => ({ code, name })),
+  requesterOptions: async () => (await httpFlow.members()).list.map((m) => ({ code: m.ref, name: m.displayName })),
 
   queueCounts: () => POST(ws("/tasks/queue-counts"), {}),
-  /** 待对齐：tasks/query 的参数名（队列组 / 状态 / 我已领） */
+  /** {queueGroup?, status?[], claimed?, assignee?: "me" | memberId}（后端 9-28 确认） */
   queueTasks: (queue, page, size) => POST(ws("/tasks/query"), { queueGroup: queue, status: ["OPEN"], claimed: false, page, size }),
   myClaimed: async () => (await POST<{ list: Awaited<ReturnType<typeof mockFlow.myClaimed>> }>(ws("/tasks/query"), { assignee: "me", claimed: true, status: ["OPEN"], page: 1, size: 200 })).list,
   claimTask: (taskNo) => POST(ws(`/tasks/${enc(taskNo)}/claim`)),
@@ -187,7 +191,6 @@ const httpFlow: typeof mockFlow = {
   saveCalendar: (c) => PUT(ws(`/calendars/${enc(c.code)}`), c),
   queueGroups: () => GET(ws("/groups?kind=QUEUE")),
   saveQueueGroup: (q) => PUT(ws(`/groups/${enc(q.code)}`), q),
-  ticketTypeOptions: () => mockFlow.ticketTypeOptions(),
 
   apps: () => GET(acct("/apps")),
   createApp: (a) => POST(acct("/apps"), a),

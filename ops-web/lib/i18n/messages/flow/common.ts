@@ -24,6 +24,7 @@ const zh = {
   approvalStatus: { PENDING: "待审", APPROVED: "已通过", REJECTED: "已驳回", WITHDRAWN: "已撤回", IN_PROGRESS: "审批中" },
   channel: { API: "API 登记", CONSOLE: "控制台" },
   loading: "加载中…",
+  membersTruncated: "只列出了前 {n} 人（共 {total} 人）",
 };
 type M = typeof zh;
 
@@ -50,6 +51,7 @@ const en = {
   approvalStatus: { PENDING: "Pending", APPROVED: "Approved", REJECTED: "Rejected", WITHDRAWN: "Withdrawn", IN_PROGRESS: "In review" },
   channel: { API: "Registered via API", CONSOLE: "Console" },
   loading: "Loading…",
+  membersTruncated: "Showing the first {n} of {total} people",
 } satisfies M;
 
 const ar = {
@@ -75,6 +77,7 @@ const ar = {
   approvalStatus: { PENDING: "قيد المراجعة", APPROVED: "مقبول", REJECTED: "مرفوض", WITHDRAWN: "مسحوب", IN_PROGRESS: "قيد الموافقة" },
   channel: { API: "مسجّل عبر API", CONSOLE: "لوحة التحكم" },
   loading: "جارٍ التحميل…",
+  membersTruncated: "يُعرض أول {n} من {total} شخصًا",
 } satisfies M;
 
 export const common = { zh, en, ar };

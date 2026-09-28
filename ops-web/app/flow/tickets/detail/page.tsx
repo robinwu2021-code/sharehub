@@ -12,6 +12,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { flow, FLOW_KEY } from "@/lib/flow/client";
 import { actionVariant } from "@/lib/flow/present";
 import { useFlowT, type FlowKey } from "@/lib/flow/i18n";
+import { useMembers } from "@/lib/flow/options";
 import type { Member, TicketAction } from "@/lib/flow/types";
 import { notify } from "@/lib/notify";
 import { Card } from "@/components/ui/card";
@@ -47,6 +48,7 @@ function TicketDetail() {
   const no = useSearchParams().get("no") ?? "";
   const qc = useQueryClient();
   const { t: tt, tc, fmt } = useFlowT("ticketDetail");
+  const members = useMembers();
   const allow = useCan();
   const canDispatch = allow("flow:ticket:dispatch");
   const canHandle = allow("flow:ticket:handle");
@@ -69,7 +71,7 @@ function TicketDetail() {
     mutationFn: () => {
       const reason = String(assignForm.reason ?? "");
       if (assignForm.to === POOL) return flow.pool(no, reason);
-      const to = flow.assigneeOptions().find((m) => m.ref === assignForm.to);
+      const to = members.list.find((m) => m.ref === assignForm.to);
       if (!to) throw new Error(tt("assign.pickTarget"));
       return flow.assign(no, to, reason);
     },
@@ -94,7 +96,8 @@ function TicketDetail() {
    */
   const assignFields: FieldDef[] = [
     { key: "to", label: tt("field.to.label"), type: "select", required: true,
-      options: [{ value: POOL, label: tt("field.to.pool") }, ...flow.assigneeOptions().map((m) => ({ value: m.ref, label: memberLabel(m) }))] },
+      help: members.truncated ? tc("membersTruncated", { n: members.list.length, total: members.total }) : undefined,
+      options: [{ value: POOL, label: tt("field.to.pool") }, ...members.list.map((m) => ({ value: m.ref, label: memberLabel(m) }))] },
     { key: "reason", label: tt("field.reason.label"), type: "textarea", required: true, maxLength: 200, help: tt("field.reason.help") },
   ];
 

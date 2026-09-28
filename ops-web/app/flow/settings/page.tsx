@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { flow, FLOW_KEY } from "@/lib/flow/client";
 import { useFlowT } from "@/lib/flow/i18n";
+import { useTicketTypes } from "@/lib/flow/options";
 import type { QueueGroup, SlaPolicy, WorkCalendar } from "@/lib/flow/types";
 import { notify } from "@/lib/notify";
 import { PageTitle } from "@/components/ui/misc";
@@ -25,6 +26,7 @@ type Form = Record<string, unknown>;
 function FlowSettings() {
   const qc = useQueryClient();
   const { t: tt, tc, fmt } = useFlowT("settings");
+  const ticketTypes = useTicketTypes();
   const WEEK = WEEK_KEYS.map((k) => tt(`week.${k}`));
   const PRIORITY_OPTS = PRIORITY_CODES.map((v) => ({ value: v, label: tt(v === "*" ? "priority.any" : `priority.${v}`) }));
   const prioLabel = (c: string) => PRIORITY_OPTS.find((o) => o.value === c)?.label ?? c;
@@ -44,7 +46,7 @@ function FlowSettings() {
   const saveSla = useMutation({
     mutationFn: () => {
       const f = slaEdit!.form;
-      const type = flow.ticketTypeOptions().find((t) => t.code === f.ticketType)!;
+      const type = ticketTypes.find((t) => t.code === f.ticketType)!;
       const p: SlaPolicy = {
         code: slaEdit!.code ?? "", ticketType: { code: type.code, name: type.name }, priority: String(f.priority),
         respondMin: Number(f.respondMin), resolveMin: Number(f.resolveMin), businessHours: !!f.businessHours,
@@ -89,7 +91,7 @@ function FlowSettings() {
    * @form-none SLA 规则提交到 OpsKit（PUT …/sla-policies/{code}，21/06 §四），不是 ShareHub 后端，contract.json 管不到。
    */
   const SLA_FIELDS: FieldDef[] = [
-    { key: "ticketType", label: tt("slaField.ticketType"), type: "select", required: true, options: flow.ticketTypeOptions().map((t) => ({ value: t.code, label: t.name })) },
+    { key: "ticketType", label: tt("slaField.ticketType"), type: "select", required: true, options: ticketTypes.map((t) => ({ value: t.code, label: t.name })) },
     { key: "priority", label: tt("slaField.priority"), type: "select", required: true, options: PRIORITY_OPTS, help: tt("slaField.priorityHelp") },
     { key: "respondMin", label: tt("slaField.respondMin"), type: "number", required: true, min: 1 },
     { key: "resolveMin", label: tt("slaField.resolveMin"), type: "number", required: true, min: 1 },
