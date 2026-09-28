@@ -35,7 +35,9 @@ import tools.jackson.databind.node.ObjectNode;
         "spring.datasource.url=jdbc:h2:mem:opskit-openapi;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1",
         "spring.datasource.username=sa",
         "spring.datasource.password=",
-        "opskit.crypto.key=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+        "opskit.crypto.key=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        // 按全限定名生成 schema：默认按简单名，两个同名类型（如各控制器里的 Row）会被合成一个，契约悄悄变错（9-28 发现）
+        "springdoc.use-fqn=true"
 })
 class OpenApiExportTest {
 
@@ -53,6 +55,7 @@ class OpenApiExportTest {
             Map.entry("confirmation-controller", "process"),
             Map.entry("settings-controller", "platform"),
             Map.entry("delivery-controller", "platform"),
+            Map.entry("ops-controller", "platform"),
             Map.entry("ticket-type-definition-controller", "ticket"));
 
     private static final Path OUT = Path.of("..", "docs", "openapi");
@@ -88,6 +91,32 @@ class OpenApiExportTest {
     }
 
     /**
+     * 全限定名 → 「外层类.内层类」（去掉包名）；缩短后仍重复则失败，而不是让两个类型共用一个名字。
+     * 形如 {@code ai.neargo.opskit.svc.api.TicketController.Row} → {@code TicketController.Row}。
+     */
+    private static String shortenSchemaNames(String text) {
+        // 名字里任何位置的包名都去掉（泛型包装会把类型参数的全限定名首字母大写后拼进来，如 PageAi.neargo.opskit….Row）
+        java.util.regex.Pattern pkg = java.util.regex.Pattern.compile("[Aa]i\\.neargo\\.opskit\\.([a-z0-9_]+\\.)+");
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"([^\"]*[Aa]i\\.neargo\\.opskit\\.[^\"]*)\"").matcher(text);
+        Map<String, String> shortOf = new java.util.HashMap<>();
+        Map<String, String> fullOf = new java.util.HashMap<>();
+        while (m.find()) {
+            String full = m.group(1);
+            String shortName = pkg.matcher(full).replaceAll("");
+            String prev = fullOf.putIfAbsent(shortName.replaceFirst("^#/components/schemas/", ""), full.replaceFirst("^#/components/schemas/", ""));
+            if (prev != null && !prev.equals(full.replaceFirst("^#/components/schemas/", ""))) {
+                throw new IllegalStateException("契约类型缩名后重复：" + prev + " 与 " + full + " 都成了 " + shortName + "，给其中一个换名");
+            }
+            shortOf.put(full, shortName);
+        }
+        String out = text;
+        for (Map.Entry<String, String> e : shortOf.entrySet()) {
+            out = out.replace("\"" + e.getKey() + "\"", "\"" + e.getValue() + "\"");
+        }
+        return out;
+    }
+
+    /**
      * 两处 springdoc 默认行为会让契约不稳 / 不对：
      * operationId 按方法名全局编号（query、query_1…），新加一个同名方法别的接口的 id 就变 —— 改为「方法 + 路径」确定生成；
      * 控制器的 Actor 参数被当成查询参数 actor —— 它来自令牌，从契约里去掉。
@@ -99,7 +128,8 @@ class OpenApiExportTest {
         if (params != null && params.isArray()) {
             tools.jackson.databind.node.ArrayNode kept = op.putArray("parameters");
             params.forEach(p -> {
-                if (!("query".equals(p.path("in").asText()) && "actor".equals(p.path("name").asText()))) {
+                // actor / op 是令牌解析出来的调用方（业务面 / 运维面），不是查询参数
+                if (!("query".equals(p.path("in").asText()) && java.util.Set.of("actor", "op").contains(p.path("name").asText()))) {
                     kept.add(p);
                 }
             });
@@ -162,7 +192,8 @@ class OpenApiExportTest {
             ObjectNode out = ((ObjectNode) doc.get("components")).putObject("schemas");
             used.forEach(name -> out.set(name, schemas.get(name)));
         }
-        Object sorted = json.treeToValue(doc, Object.class);
+        String text = shortenSchemaNames(json.writeValueAsString(doc));
+        Object sorted = json.treeToValue(json.readTree(text), Object.class);
         return json.writeValueAsString(sorted) + "\n";
     }
 }

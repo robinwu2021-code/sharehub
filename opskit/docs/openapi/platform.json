@@ -1,146 +1,103 @@
 {
   "components" : {
     "schemas" : {
-      "AttrBody" : {
+      "AppSecrets" : {
         "properties" : {
-          "name" : {
-            "additionalProperties" : {
-              "type" : "string"
-            },
-            "type" : "object"
+          "app" : {
+            "$ref" : "#/components/schemas/AppView"
           },
-          "valueLabels" : {
-            "additionalProperties" : {
-              "additionalProperties" : {
-                "type" : "string"
-              },
-              "type" : "object"
-            },
-            "type" : "object"
-          }
-        },
-        "type" : "object"
-      },
-      "AttrDef" : {
-        "properties" : {
-          "key" : {
+          "credential" : {
             "type" : "string"
           },
-          "name" : {
-            "type" : "string"
-          },
-          "names" : {
-            "additionalProperties" : {
-              "type" : "string"
-            },
-            "type" : "object"
-          },
-          "values" : {
-            "items" : {
-              "$ref" : "#/components/schemas/AttrValue"
-            },
-            "type" : "array"
-          }
-        },
-        "type" : "object"
-      },
-      "AttrValue" : {
-        "properties" : {
-          "name" : {
-            "type" : "string"
-          },
-          "names" : {
-            "additionalProperties" : {
-              "type" : "string"
-            },
-            "type" : "object"
-          },
-          "value" : {
+          "signingSecret" : {
             "type" : "string"
           }
         },
         "type" : "object"
       },
-      "CalendarBody" : {
+      "AppView" : {
         "properties" : {
-          "holidays" : {
-            "items" : {
-              "type" : "string"
-            },
-            "type" : "array"
-          },
-          "weekly" : {
-            "items" : {
-              "$ref" : "#/components/schemas/SlotBody"
-            },
-            "type" : "array"
-          },
-          "zone" : {
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "DeliveryQuery" : {
-        "properties" : {
-          "eventType" : {
+          "accountId" : {
             "type" : "string"
           },
-          "page" : {
-            "format" : "int32",
-            "type" : "integer"
+          "allWorkspaces" : {
+            "type" : "boolean"
           },
-          "size" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "state" : {
+          "appId" : {
             "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "DeliveryRow" : {
-        "properties" : {
-          "atMs" : {
+          },
+          "callbackBaseUrl" : {
+            "type" : "string"
+          },
+          "createdAtMs" : {
             "format" : "int64",
             "type" : "integer"
           },
-          "attempt" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "error" : {
+          "credentialHint" : {
             "type" : "string"
           },
-          "httpStatus" : {
-            "format" : "int32",
-            "type" : "integer"
+          "name" : {
+            "type" : "string"
           },
-          "latencyMs" : {
-            "format" : "int32",
-            "type" : "integer"
+          "status" : {
+            "type" : "string"
           },
-          "subscriptionId" : {
-            "format" : "int64",
-            "type" : "integer"
+          "workspaceIds" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "CreateAppRequest" : {
+        "properties" : {
+          "allWorkspaces" : {
+            "type" : "boolean"
           },
-          "url" : {
+          "callbackBaseUrl" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "workspaceIds" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "CreateWorkspaceRequest" : {
+        "properties" : {
+          "defaultLocale" : {
+            "type" : "string"
+          },
+          "defaultZone" : {
+            "type" : "string"
+          },
+          "externalRef" : {
+            "type" : "string"
+          },
+          "name" : {
             "type" : "string"
           }
         },
         "type" : "object"
       },
-      "Detail" : {
+      "DeliveryAppService.Detail" : {
         "properties" : {
           "attempts" : {
             "items" : {
-              "$ref" : "#/components/schemas/DeliveryRow"
+              "$ref" : "#/components/schemas/WebhookDao.DeliveryRow"
             },
             "type" : "array"
           },
           "event" : {
-            "$ref" : "#/components/schemas/EventRow"
+            "$ref" : "#/components/schemas/DeliveryAppService.EventRow"
           },
           "payload" : {
             "type" : "string"
@@ -148,7 +105,7 @@
         },
         "type" : "object"
       },
-      "EventRow" : {
+      "DeliveryAppService.EventRow" : {
         "properties" : {
           "attempts" : {
             "format" : "int32",
@@ -185,7 +142,107 @@
         },
         "type" : "object"
       },
-      "GroupBody" : {
+      "DeliveryController.DeliveryQuery" : {
+        "properties" : {
+          "eventType" : {
+            "type" : "string"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "state" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "DirectoryAppService.SyncResult" : {
+        "properties" : {
+          "groups" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "members" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "memberships" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "roleBindings" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "DirectoryController.AttrBody" : {
+        "properties" : {
+          "name" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "valueLabels" : {
+            "additionalProperties" : {
+              "additionalProperties" : {
+                "type" : "string"
+              },
+              "type" : "object"
+            },
+            "type" : "object"
+          }
+        },
+        "type" : "object"
+      },
+      "DirectoryController.AttrDef" : {
+        "properties" : {
+          "key" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "names" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "values" : {
+            "items" : {
+              "$ref" : "#/components/schemas/DirectoryController.AttrValue"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "DirectoryController.AttrValue" : {
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "names" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "value" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "DirectoryController.GroupBody" : {
         "properties" : {
           "claimTimeoutSec" : {
             "format" : "int32",
@@ -207,32 +264,7 @@
         },
         "type" : "object"
       },
-      "GroupUpsert" : {
-        "properties" : {
-          "claimTimeoutSec" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "code" : {
-            "type" : "string"
-          },
-          "kind" : {
-            "enum" : [ "TEAM", "QUEUE" ],
-            "type" : "string"
-          },
-          "name" : {
-            "additionalProperties" : {
-              "type" : "string"
-            },
-            "type" : "object"
-          },
-          "orderBy" : {
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "Me" : {
+      "DirectoryController.Me" : {
         "properties" : {
           "app" : {
             "type" : "string"
@@ -278,7 +310,7 @@
         },
         "type" : "object"
       },
-      "MemberQuery" : {
+      "DirectoryController.MemberQuery" : {
         "properties" : {
           "group" : {
             "type" : "string"
@@ -297,7 +329,7 @@
         },
         "type" : "object"
       },
-      "MemberRow" : {
+      "DirectoryController.MemberRow" : {
         "properties" : {
           "attrs" : {
             "additionalProperties" : {
@@ -310,6 +342,31 @@
             "type" : "string"
           },
           "memberId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "GroupUpsert" : {
+        "properties" : {
+          "claimTimeoutSec" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "code" : {
+            "type" : "string"
+          },
+          "kind" : {
+            "enum" : [ "TEAM", "QUEUE" ],
+            "type" : "string"
+          },
+          "name" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "orderBy" : {
             "type" : "string"
           }
         },
@@ -337,11 +394,84 @@
         },
         "type" : "object"
       },
-      "PageEventRow" : {
+      "OpsController.AuditQuery" : {
+        "properties" : {
+          "action" : {
+            "type" : "string"
+          },
+          "fromMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "toMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "workspaceId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "OpsController.AuditRow" : {
+        "properties" : {
+          "action" : {
+            "type" : "string"
+          },
+          "actor" : {
+            "type" : "string"
+          },
+          "atMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "detail" : {
+            "type" : "string"
+          },
+          "target" : {
+            "type" : "string"
+          },
+          "workspaceId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "OpsController.DeliveryQuery" : {
+        "properties" : {
+          "eventType" : {
+            "type" : "string"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "state" : {
+            "type" : "string"
+          },
+          "workspaceId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "PageDeliveryAppService.EventRow" : {
         "properties" : {
           "list" : {
             "items" : {
-              "$ref" : "#/components/schemas/EventRow"
+              "$ref" : "#/components/schemas/DeliveryAppService.EventRow"
             },
             "type" : "array"
           },
@@ -360,11 +490,34 @@
         },
         "type" : "object"
       },
-      "PageMemberRow" : {
+      "PageDirectoryController.MemberRow" : {
         "properties" : {
           "list" : {
             "items" : {
-              "$ref" : "#/components/schemas/MemberRow"
+              "$ref" : "#/components/schemas/DirectoryController.MemberRow"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "total" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PageOpsController.AuditRow" : {
+        "properties" : {
+          "list" : {
+            "items" : {
+              "$ref" : "#/components/schemas/OpsController.AuditRow"
             },
             "type" : "array"
           },
@@ -394,7 +547,27 @@
         },
         "type" : "object"
       },
-      "RoleBody" : {
+      "SettingsController.CalendarBody" : {
+        "properties" : {
+          "holidays" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "weekly" : {
+            "items" : {
+              "$ref" : "#/components/schemas/SettingsController.SlotBody"
+            },
+            "type" : "array"
+          },
+          "zone" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "SettingsController.RoleBody" : {
         "properties" : {
           "name" : {
             "additionalProperties" : {
@@ -412,7 +585,7 @@
         },
         "type" : "object"
       },
-      "SlotBody" : {
+      "SettingsController.SlotBody" : {
         "properties" : {
           "day" : {
             "type" : "string"
@@ -462,23 +635,64 @@
         },
         "type" : "object"
       },
-      "SyncResult" : {
+      "WebhookDao.DeliveryRow" : {
         "properties" : {
-          "groups" : {
+          "atMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "attempt" : {
             "format" : "int32",
             "type" : "integer"
           },
-          "members" : {
+          "error" : {
+            "type" : "string"
+          },
+          "httpStatus" : {
             "format" : "int32",
             "type" : "integer"
           },
-          "memberships" : {
+          "latencyMs" : {
             "format" : "int32",
             "type" : "integer"
           },
-          "roleBindings" : {
-            "format" : "int32",
+          "subscriptionId" : {
+            "format" : "int64",
             "type" : "integer"
+          },
+          "url" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "WorkspaceView" : {
+        "properties" : {
+          "accountId" : {
+            "type" : "string"
+          },
+          "createdAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "defaultLocale" : {
+            "type" : "string"
+          },
+          "defaultZone" : {
+            "type" : "string"
+          },
+          "externalRef" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "ACTIVE", "SUSPENDED", "ARCHIVED" ],
+            "type" : "string"
+          },
+          "workspaceId" : {
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -498,6 +712,207 @@
   },
   "openapi" : "3.1.0",
   "paths" : {
+    "/api/opskit/v1/accounts/{a}/apps" : {
+      "get" : {
+        "operationId" : "get_accounts_a_apps",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/AppView"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ops-controller" ]
+      },
+      "post" : {
+        "operationId" : "post_accounts_a_apps",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateAppRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AppSecrets"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ops-controller" ]
+      }
+    },
+    "/api/opskit/v1/accounts/{a}/apps/{id}/rotate-credential" : {
+      "post" : {
+        "operationId" : "post_accounts_a_apps_id_rotate_credential",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AppSecrets"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ops-controller" ]
+      }
+    },
+    "/api/opskit/v1/accounts/{a}/audit/query" : {
+      "post" : {
+        "operationId" : "post_accounts_a_audit_query",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/OpsController.AuditQuery"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageOpsController.AuditRow"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ops-controller" ]
+      }
+    },
+    "/api/opskit/v1/accounts/{a}/webhook-deliveries/query" : {
+      "post" : {
+        "operationId" : "post_accounts_a_webhook_deliveries_query",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/OpsController.DeliveryQuery"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageDeliveryAppService.EventRow"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ops-controller" ]
+      }
+    },
+    "/api/opskit/v1/accounts/{a}/webhook-deliveries/{id}/redeliver" : {
+      "post" : {
+        "operationId" : "post_accounts_a_webhook_deliveries_id_redeliver",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DeliveryAppService.EventRow"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ops-controller" ]
+      }
+    },
+    "/api/opskit/v1/accounts/{a}/workspaces" : {
+      "get" : {
+        "operationId" : "get_accounts_a_workspaces",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/WorkspaceView"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ops-controller" ]
+      },
+      "post" : {
+        "operationId" : "post_accounts_a_workspaces",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateWorkspaceRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WorkspaceView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ops-controller" ]
+      }
+    },
     "/api/opskit/v1/workspaces/{ws}/calendars/{code}" : {
       "get" : {
         "operationId" : "get_workspaces_ws_calendars_code",
@@ -514,7 +929,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/CalendarBody"
+                  "$ref" : "#/components/schemas/SettingsController.CalendarBody"
                 }
               }
             },
@@ -537,7 +952,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/CalendarBody"
+                "$ref" : "#/components/schemas/SettingsController.CalendarBody"
               }
             }
           },
@@ -569,7 +984,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/SyncResult"
+                  "$ref" : "#/components/schemas/DirectoryAppService.SyncResult"
                 }
               }
             },
@@ -594,7 +1009,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/GroupBody"
+                "$ref" : "#/components/schemas/DirectoryController.GroupBody"
               }
             }
           },
@@ -616,7 +1031,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/Me"
+                  "$ref" : "#/components/schemas/DirectoryController.Me"
                 }
               }
             },
@@ -635,7 +1050,7 @@
               "*/*" : {
                 "schema" : {
                   "items" : {
-                    "$ref" : "#/components/schemas/AttrDef"
+                    "$ref" : "#/components/schemas/DirectoryController.AttrDef"
                   },
                   "type" : "array"
                 }
@@ -662,7 +1077,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/AttrBody"
+                "$ref" : "#/components/schemas/DirectoryController.AttrBody"
               }
             }
           },
@@ -683,7 +1098,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/MemberQuery"
+                "$ref" : "#/components/schemas/DirectoryController.MemberQuery"
               }
             }
           }
@@ -693,7 +1108,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/PageMemberRow"
+                  "$ref" : "#/components/schemas/PageDirectoryController.MemberRow"
                 }
               }
             },
@@ -718,7 +1133,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/RoleBody"
+                "$ref" : "#/components/schemas/SettingsController.RoleBody"
               }
             }
           },
@@ -739,7 +1154,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/DeliveryQuery"
+                "$ref" : "#/components/schemas/DeliveryController.DeliveryQuery"
               }
             }
           }
@@ -749,7 +1164,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/PageEventRow"
+                  "$ref" : "#/components/schemas/PageDeliveryAppService.EventRow"
                 }
               }
             },
@@ -776,7 +1191,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/Detail"
+                  "$ref" : "#/components/schemas/DeliveryAppService.Detail"
                 }
               }
             },
@@ -803,7 +1218,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/EventRow"
+                  "$ref" : "#/components/schemas/DeliveryAppService.EventRow"
                 }
               }
             },
