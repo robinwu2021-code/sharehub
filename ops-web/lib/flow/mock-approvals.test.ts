@@ -28,7 +28,7 @@ describe("审批", () => {
     const a = getApproval("AP2609270001");
     const v = decide(a.approvalNo, a.mine.taskNo!, "APPROVE", undefined, NOW);
     expect(v.mine.canDecide).toBe(false);
-    expect(v.mine.whyNot).toMatch(/跨步互斥/);
+    expect(v.mine.whyNot).toBe("opskit.approval.cross_step");
     expect(() => decide(v.approvalNo, v.mine.taskNo!, "APPROVE", undefined, NOW)).toThrow(/跨步互斥/);
   });
 
@@ -51,7 +51,7 @@ describe("审批", () => {
   it("提交人不能审批自己的单，但能撤回；非提交人不能撤回", () => {
     const mine = getApproval("AP2609270015");
     expect(mine.mine.canDecide).toBe(false);
-    expect(mine.mine.whyNot).toMatch(/提交人/);
+    expect(mine.mine.whyNot).toBe("opskit.approval.self_review");
     expect(() => decide(mine.approvalNo, mine.mine.taskNo!, "APPROVE", undefined, NOW)).toThrow(/提交人/);
     expect(() => withdraw("AP2609270008", NOW)).toThrow(/只有提交人/);
     expect(withdraw(mine.approvalNo, NOW).status).toBe("WITHDRAWN");
@@ -123,5 +123,22 @@ describe("mock 不把内部对象的引用交出去", () => {
     withdraw(mine.approvalNo, NOW);
     expect(before.status).toBe("PENDING");
     expect(before.rounds.every((r) => r.status !== "WITHDRAWN")).toBe(true);
+  });
+});
+
+describe("whyNot 是错误键（后端 9-28：与 403 同键、不给文案）", () => {
+  it("办结的单不可决定、也不给 whyNot；目录里每个 mock 会给的键都有三语文案", async () => {
+    const { translate } = await import("@/lib/i18n");
+    const { errText } = await import("./i18n");
+    const done = queryApprovals({ status: ["APPROVED"], page: 1, size: 1 }).list[0];
+    const v = getApproval(done.approvalNo);
+    expect(v.mine.canDecide).toBe(false);
+    expect(v.mine.whyNot).toBeUndefined();
+    for (const key of ["opskit.approval.cross_step", "opskit.approval.self_review", "opskit.task.not_candidate"]) {
+      for (const loc of ["zh", "en", "ar"] as const) {
+        expect(errText((k, p) => translate(loc, k, p), key), `${loc}:${key}`).not.toBe(key);
+      }
+    }
+    expect(errText((k) => translate("zh", k), "opskit.nope.unknown")).toBe("opskit.nope.unknown");
   });
 });

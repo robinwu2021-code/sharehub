@@ -12,6 +12,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { flow, FLOW_KEY } from "@/lib/flow/client";
 import { approvalStatusMap } from "@/lib/flow/labels";
 import { useFlowT } from "@/lib/flow/i18n";
+import { who } from "@/lib/flow/present";
 import type { ApprovalView } from "@/lib/flow/types";
 import { notify } from "@/lib/notify";
 import { Card } from "@/components/ui/card";
@@ -35,7 +36,7 @@ export default function Page() {
 function ApprovalDetail() {
   const no = useSearchParams().get("no") ?? "";
   const qc = useQueryClient();
-  const { t: tt, tc, fmt } = useFlowT("approvalDetail");
+  const { t: tt, tc, fmt, err } = useFlowT("approvalDetail");
   const allow = useCan();
   // 两层：有没有「审批」这项能力（权限码，这里判）× 是不是这一步的审批人（服务端 mine 判）
   const canDecidePerm = allow("flow:approval:decide");
@@ -86,7 +87,7 @@ function ApprovalDetail() {
         <span className="txt-body text-muted-foreground">{tt("round", { n: a.round })}</span>
       </div>
       <p className="mb-4 txt-body text-muted-foreground">
-        {fmt.join(tt("meta.no", { no: a.approvalNo }), tt("meta.process", { code: a.process.code }), tt("meta.by", { name: a.requestedBy.displayName }), fmt.short(a.requestedAtMs))}
+        {fmt.join(tt("meta.no", { no: a.approvalNo }), tt("meta.process", { code: a.process.code }), tt("meta.by", { name: who(a.requestedBy) }), fmt.short(a.requestedAtMs))}
       </p>
 
       <div className="grid items-start gap-4 lg:grid-cols-[1fr_340px]">
@@ -166,7 +167,7 @@ function ApprovalDetail() {
                 </div>
               </>
             ) : (
-              <Notice className="mb-0">{a.mine.whyNot ?? tt("notApprover")}</Notice>
+              <div data-why={a.mine.whyNot ?? ""}><Notice className="mb-0">{a.mine.whyNot ? err(a.mine.whyNot) : tt("notApprover")}</Notice></div>
             )}
             {a.mine.canWithdraw && (
               <Button className="mt-3 w-full" variant="secondary" loading={withdraw.isPending}

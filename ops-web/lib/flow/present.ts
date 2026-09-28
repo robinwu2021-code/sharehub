@@ -23,3 +23,6 @@ export function fmtShort(ms: number) {
   const d = new Date(ms);
   return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+
+/** 人名：服务从目录补 displayName，查不到时为空 —— 回落显示 ref（后端 9-28 口径） */
+export const who = (m?: { ref: string; displayName?: string } | null) => (m ? m.displayName || m.ref : "");

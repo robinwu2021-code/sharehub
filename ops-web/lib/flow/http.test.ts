@@ -110,6 +110,21 @@ describe("httpFlow：错误体映射", () => {
     expect(e).toMatchObject({ name: "ApiError", code: 409, message: "已被 Sara 领取" });
   });
 
+  it("403 只给错误键（服务对这些键不给文案）→ 用前端三语文案", async () => {
+    const { flow } = await load();
+    reply(403, { error: "opskit.approval.cross_step" });
+    const e = await flow.decide("AP1", "TK1", "APPROVE").catch((x) => x);
+    expect(e.code).toBe(403);
+    expect(e.message).toMatch(/跨步互斥/);
+  });
+
+  it("我已领取：只发 {assignee:me, claimed:true}，不带 status（领取后是 CLAIMED，与 OPEN 交集为空）", async () => {
+    const { flow } = await load();
+    reply(200, { list: [], total: 0, page: 1, size: 200 });
+    await flow.myClaimed();
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({ assignee: "me", claimed: true, page: 1, size: 200 });
+  });
+
   it("没有 message 时按状态码给本地化兜底文案，不抛原始 JSON", async () => {
     const { flow } = await load();
     reply(403, {});

@@ -44,6 +44,16 @@ export function makeFlowFmt(tc: (k: CommonKey, p?: Params) => string) {
 }
 export type FlowFmt = ReturnType<typeof makeFlowFmt>;
 
+/**
+ * OpsKit 错误键 → 当前语言的文案（whyNot 与 403 的 error 同键）。目录里没有的键原样返回 ——
+ * 界面上看到 opskit.xxx 说明该补文案了，比静默显示空白好查。
+ */
+export function errText(t: TFn, key: string): string {
+  const path = `flow.common.err.${key.replace(/^opskit\./, "")}`;
+  const v = t(path);
+  return v === path ? key : v;
+}
+
 export const flowTc = (t: TFn) => (k: CommonKey, p?: Params) => t(`flow.common.${k}`, p);
 
 export function useFlowT<N extends FlowNs>(ns: N) {
@@ -54,5 +64,7 @@ export function useFlowT<N extends FlowNs>(ns: N) {
     t: (k: FlowKey<N>, p?: Params) => raw(`flow.${ns}.${k}`, p),
     tc,
     fmt: makeFlowFmt(tc),
+    /** OpsKit 错误键 → 三语文案（whyNot / 403） */
+    err: (key: string) => errText(raw, key),
   };
 }

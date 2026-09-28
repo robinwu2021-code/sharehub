@@ -11,6 +11,8 @@ export function TicketStatusBadge({ t }: { t: Pick<TicketRow, "status" | "status
   return <StatusBadge map={{ [t.status.code]: { label: t.status.name, tone: CATEGORY_TONE[t.statusCategory] } }} value={t.status.code} />;
 }
 
-export function PriorityBadge({ p }: { p: Priority }) {
+/** 流程任务可能不带优先级（后端 9-28）：缺省显示「—」 */
+export function PriorityBadge({ p }: { p?: Priority }) {
+  if (!p) return <span className="text-muted-foreground">—</span>;
   return <StatusBadge map={{ [p.code]: { label: p.name, tone: priorityTone(p.ordinal) } }} value={p.code} />;
 }

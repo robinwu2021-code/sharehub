@@ -25,6 +25,11 @@ const zh = {
   channel: { API: "API 登记", CONSOLE: "控制台" },
   loading: "加载中…",
   membersTruncated: "只列出了前 {n} 人（共 {total} 人）",
+  /** OpsKit 错误键（whyNot 与 403 同键、服务不给文案）→ 三语。键去掉 opskit. 前缀、按点分组 */
+  err: {
+    approval: { cross_step: "跨步互斥：你已在本轮前一步做过决定，不能再办这一步", self_review: "提交人不能审批自己提交的单" },
+    task: { not_candidate: "你不是这一步的审批人" },
+  },
 };
 type M = typeof zh;
 
@@ -52,6 +57,10 @@ const en = {
   channel: { API: "Registered via API", CONSOLE: "Console" },
   loading: "Loading…",
   membersTruncated: "Showing the first {n} of {total} people",
+  err: {
+    approval: { cross_step: "Cross-step rule: you already decided an earlier step in this round", self_review: "Requesters cannot approve their own requests" },
+    task: { not_candidate: "You are not an approver for this step" },
+  },
 } satisfies M;
 
 const ar = {
@@ -78,6 +87,10 @@ const ar = {
   channel: { API: "مسجّل عبر API", CONSOLE: "لوحة التحكم" },
   loading: "جارٍ التحميل…",
   membersTruncated: "يُعرض أول {n} من {total} شخصًا",
+  err: {
+    approval: { cross_step: "قاعدة الخطوات: اتخذت قرارًا في خطوة سابقة من هذه الجولة", self_review: "لا يمكن لمقدّم الطلب الموافقة على طلبه" },
+    task: { not_candidate: "لست من معتمدي هذه الخطوة" },
+  },
 } satisfies M;
 
 export const common = { zh, en, ar };

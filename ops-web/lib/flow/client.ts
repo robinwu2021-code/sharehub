@@ -174,7 +174,7 @@ const httpFlow: typeof mockFlow = {
   queueCounts: () => POST(ws("/tasks/queue-counts"), {}),
   /** {queueGroup?, status?[], claimed?, assignee?: "me" | memberId}（后端 9-28 确认） */
   queueTasks: (queue, page, size) => POST(ws("/tasks/query"), { queueGroup: queue, status: ["OPEN"], claimed: false, page, size }),
-  myClaimed: async () => (await POST<{ list: Awaited<ReturnType<typeof mockFlow.myClaimed>> }>(ws("/tasks/query"), { assignee: "me", claimed: true, status: ["OPEN"], page: 1, size: 200 })).list,
+  myClaimed: async () => (await POST<{ list: Awaited<ReturnType<typeof mockFlow.myClaimed>> }>(ws("/tasks/query"), { assignee: "me", claimed: true, page: 1, size: 200 })).list,
   claimTask: (taskNo) => POST(ws(`/tasks/${enc(taskNo)}/claim`)),
   releaseTask: (taskNo) => POST(ws(`/tasks/${enc(taskNo)}/release`)),
   completeTask: (taskNo, decision, reason) => POST(ws(`/tasks/${enc(taskNo)}/complete`), { decision, ...(reason ? { reason } : {}) }),

@@ -66,7 +66,8 @@ export interface TodoItem {
   origin: TodoOrigin;
   title: string;
   subject: SubjectRef;
-  priority: Priority;
+  /** 工单任务一定有；流程任务可能不给（后端 9-28） */
+  priority?: Priority;
   createdAtMs: number;
   dueAtMs?: number;
   sla?: SlaSummary;
@@ -272,7 +273,8 @@ export interface QueueTask {
   taskNo: string;
   queue: Named;
   subject: SubjectRef;
-  priority: Priority;
+  /** 流程任务可能不给 */
+  priority?: Priority;
   createdAtMs: number;
   /** 证据摘要（业务提交时给的一句话） */
   evidenceSummary?: string;

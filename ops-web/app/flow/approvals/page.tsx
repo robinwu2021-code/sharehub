@@ -9,6 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { flow, FLOW_KEY } from "@/lib/flow/client";
 import { approvalStatusMap } from "@/lib/flow/labels";
 import { useFlowT } from "@/lib/flow/i18n";
+import { who } from "@/lib/flow/present";
 import { useProcessOptions, useRequesterOptions } from "@/lib/flow/options";
 import type { ApprovalRow, ApprovalStatus } from "@/lib/flow/types";
 import { usePaging } from "@/lib/hooks/use-paging";
@@ -61,7 +62,7 @@ function FlowApprovals() {
     { header: tt("col.subject"), cell: (a) => a.subject.display.title },
     { header: tt("col.status"), cell: (a) => <StatusBadge map={approvalStatusMap(tc)} value={a.status} /> },
     { header: tt("col.stepRound"), cell: (a) => fmt.join(a.currentStep?.name ?? tc("none"), tt("round", { n: a.round })) },
-    { header: tt("col.requestedBy"), cell: (a) => a.requestedBy.displayName },
+    { header: tt("col.requestedBy"), cell: (a) => who(a.requestedBy) },
     { header: tt("col.requestedAt"), cell: (a) => <span className="tabular-nums">{fmt.short(a.requestedAtMs)}</span> },
     {
       header: tt("col.waited"),

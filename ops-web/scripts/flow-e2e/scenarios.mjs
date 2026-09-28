@@ -54,8 +54,9 @@ export const SCENARIOS = [
       h.expect(/待审/.test(h.bodyText()), "单子仍是待审");
       await h.click("button", "通过");
       await h.toast(/已进入「.+」步/, "已进入下一步");
-      // 等服务给出的 whyNot（「我的决定」卡里），而不是常驻的规则说明 —— 后者一直在，等了等于没等
-      await h.waitFor(() => /你已在本轮前一步做过决定/.test(h.bodyText()), "服务给出跨步互斥的 whyNot");
+      // 等服务给出的 whyNot（错误键挂在 data-why 上），而不是常驻的规则说明 —— 后者一直在，等了等于没等。
+      // 按键断言：与语言无关，对 mock 与真实 OpsKit 同样成立
+      await h.waitFor(() => h.one('[data-why="opskit.approval.cross_step"]'), "服务给出跨步互斥（opskit.approval.cross_step）");
       const b = h.btn("通过");
       h.expect(!b || b.disabled, "同一人不能再审后一步（通过按钮不可用）");
     },
@@ -64,7 +65,7 @@ export const SCENARIOS = [
     id: "S2-2", title: "审批：提交人不能审自己；只有提交人能撤回", perms: ALL,
     url: (fx) => `/flow/approvals/detail/?no=${fx.approvalMine}`,
     run: async (h) => {
-      await h.waitFor(() => /提交人不能审批自己提交的单/.test(h.bodyText()), "提交人不能审自己的说明");
+      await h.waitFor(() => h.one('[data-why="opskit.approval.self_review"]'), "提交人不能审自己（opskit.approval.self_review）");
       const b = h.btn("通过");
       h.expect(!b || b.disabled, "通过按钮不可用");
       await h.click("button", "撤回");

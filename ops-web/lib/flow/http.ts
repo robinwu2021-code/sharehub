@@ -14,6 +14,7 @@
 import { currentAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api/error";
 import { translate, LOCALE_TAG } from "@/lib/i18n";
+import { errText } from "./i18n";
 import { useLocaleStore } from "@/lib/stores/locale";
 import { FlowValidationError } from "./errors";
 import type { FieldError } from "./types";
@@ -60,7 +61,9 @@ export async function opskit<T>(method: "GET" | "POST" | "PUT" | "PATCH", path: 
   if (r.status === 204) return undefined as T;
   const data = (await r.json().catch(() => ({}))) as T & OpsKitError;
   if (!r.ok) {
-    const msg = data.message || translate(locale(), statusKey(r.status));
+    // 已知错误键用本地三语文案（服务对这些键不给文案）；其余用服务的 message，再退状态码兜底
+    const known = data.error ? errText((k, p) => translate(locale(), k, p), data.error) : undefined;
+    const msg = (known && known !== data.error ? known : "") || data.message || translate(locale(), statusKey(r.status));
     if (r.status === 422 && Array.isArray(data.errors)) throw new FlowValidationError(msg, data.errors);
     throw new ApiError(r.status, msg);
   }

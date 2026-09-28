@@ -9,6 +9,7 @@ import type { QueueTask } from "@/lib/flow/types";
 import { usePaging } from "@/lib/hooks/use-paging";
 import { notify } from "@/lib/notify";
 import { useFlowT } from "@/lib/flow/i18n";
+import { who } from "@/lib/flow/present";
 import { PageTitle } from "@/components/ui/misc";
 import { Tabs } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
@@ -94,7 +95,7 @@ function FlowQueue() {
     { header: tt("col.subject"), cell: (t) => t.subject.display.title },
     { header: tt("col.priority"), cell: (t) => <PriorityBadge p={t.priority} /> },
     { header: tt("col.wait"), cell: (t) => <span className="tabular-nums">{age(t)}</span> },
-    { header: tt("col.status"), cell: (t) => (t.claimedBy ? <span className="text-muted-foreground">{tt("status.reviewing", { name: t.claimedBy.displayName })}</span> : tt("status.unclaimed")) },
+    { header: tt("col.status"), cell: (t) => (t.claimedBy ? <span className="text-muted-foreground">{tt("status.reviewing", { name: who(t.claimedBy) })}</span> : tt("status.unclaimed")) },
     {
       header: tt("col.actions"), className: "text-end",
       cell: (t) => (

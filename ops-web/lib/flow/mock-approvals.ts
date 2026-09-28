@@ -14,11 +14,17 @@ import { requirePerm } from "./mock-auth";
 import { ApiError } from "@/lib/api/error";
 import { FlowValidationError } from "./errors";
 import { useLocaleStore } from "@/lib/stores/locale";
+import { translate } from "@/lib/i18n";
+import { errText } from "./i18n";
 
 /** 与服务端同码：409 冲突 · 403 规则拒绝 · 422 校验不过（带路径） */
 const pickLang = (zh: string, en: string) => (useLocaleStore.getState().locale === "zh" ? zh : en);
 const conflict = (zh: string, en: string): never => { throw new ApiError(409, pickLang(zh, en)); };
 const denied = (zh: string, en: string): never => { throw new ApiError(403, pickLang(zh, en)); };
+/** 403 + 错误键：消息按键取当前语言的文案（与 http.ts 对真服务的处理同一条路） */
+const forbidKey = (key: string): never => {
+  throw new ApiError(403, errText((k, p) => translate(useLocaleStore.getState().locale, k, p), key));
+};
 const invalid = (path: string, zh: string, en: string): never => {
   const m = pickLang(zh, en);
   throw new FlowValidationError(m, [{ path, error: m }]);
@@ -226,10 +232,11 @@ function rec(no: string): ApprovalRec {
 
 /** 为什么我不能决定这张单（null = 能） */
 function whyNotDecide(r: ApprovalRec): string | null {
-  if (r.status !== "PENDING") return "这张单已经办结";
-  if (r.requestedBy.ref === ME.ref) return "提交人不能审批自己提交的单";
+  // 与服务端同形：whyNot 是错误键（与 403 的 error 同键），文案由前端按键做三语（flow.common.err.*）
+  if (r.status !== "PENDING") return null;
+  if (r.requestedBy.ref === ME.ref) return "opskit.approval.self_review";
   if (def(r).crossStepExclusive && r.decisions.some((d) => d.round === r.round && d.by === ME.ref)) {
-    return "跨步互斥：你已在本轮前一步做过决定，不能再办这一步";
+    return "opskit.approval.cross_step";
   }
   return null;
 }
@@ -252,7 +259,7 @@ export function getApproval(no: string): ApprovalView {
   // （真服务是 JSON 不会这样，但会让界面在重新取数前就显示一半新状态，端到端场景 S2-2 抓到过）
   return structuredClone({
     ...row(r), facts: r.facts, steps, rounds: [...r.rounds].sort((a, b) => a.round - b.round), evidence: r.evidence,
-    mine: { ...(r.status === "PENDING" ? { taskNo: r.taskNo } : {}), canDecide: !why, ...(why ? { whyNot: why } : {}),
+    mine: { ...(r.status === "PENDING" ? { taskNo: r.taskNo } : {}), canDecide: r.status === "PENDING" && !why, ...(why ? { whyNot: why } : {}),
       canWithdraw: r.status === "PENDING" && r.requestedBy.ref === ME.ref },
     rules: { crossStepExclusive: d.crossStepExclusive },
   });
@@ -267,7 +274,7 @@ export function decide(no: string, taskNo: string, decision: "APPROVE" | "REJECT
     conflict("这张单已被他人处理，请刷新后再看", "This approval was already handled by someone else — refresh and try again");
   }
   const why = whyNotDecide(r);
-  if (why) denied(why, why === "提交人不能审批自己提交的单" ? "Requesters cannot approve their own requests" : "Cross-step exclusion: you already decided an earlier step in this round");
+  if (why) forbidKey(why);
   if (decision === "REJECT" && !reason?.trim()) {
     invalid("reason", "驳回必须填写原因 —— 只说「已驳回」，提交人无从改正后重提", "A reason is required to reject — otherwise the requester cannot fix and resubmit");
   }
@@ -334,7 +341,7 @@ export function queueTasksOf(queue: string, page: number, size: number, now: num
   sweep(now);
   const list = queueTasks
     .filter((t) => t.queue.code === queue && !t.done && t.claimedBy?.ref !== ME.ref)
-    .sort((a, b) => a.priority.ordinal - b.priority.ordinal || a.createdAtMs - b.createdAtMs)
+    .sort((a, b) => (a.priority?.ordinal ?? 9) - (b.priority?.ordinal ?? 9) || a.createdAtMs - b.createdAtMs)
     .map(qview);
   const from = (page - 1) * size;
   return { list: list.slice(from, from + size), total: list.length };
