@@ -1,5 +1,8 @@
 package ai.neargo.sharehub.cs;
 
+import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
@@ -20,6 +23,24 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class StubProblemActionResolver implements ProblemActionResolver {
+    private static final Logger log = LoggerFactory.getLogger(StubProblemActionResolver.class);
+
+    /**
+     * 照 {@code StubPaymentPort} 的做法在启动日志里喊一声。
+     *
+     * <p>本桩此前<b>完全静默</b>：它是唯一实现、无条件装配，于是被一路带到生产而没有任何症状 ——
+     * 症状全落在用户那一侧（见类注释），而看日志的人一无所知。
+     * 模拟成功的东西必须在日志里显形。
+     */
+    @PostConstruct
+    void warn() {
+        log.warn("════════════════════════════════════════════════════════════");
+        log.warn("  报障分流是**桩实现**（StubProblemActionResolver）：一律「转人工」，");
+        log.warn("  md_problem.suggested_action 那张表**从没被读过** —— 运营在字典里改策略不会有任何效果。");
+        log.warn("  真实现读该表并标 @Primary，本行随之消失。");
+        log.warn("════════════════════════════════════════════════════════════");
+    }
+
 
     @Override
     public String resolve(String problemNo) {
