@@ -453,4 +453,15 @@ class BootstrapIntrospectionTest {
         assertThat(r.status()).as("建单 %s", r.body()).isEqualTo(200);
         return r.body().path("ticketNo").asText();
     }
+
+    /** 仓库里的 ShareHub 部署定义（deploy/opskit/sharehub-definitions，引用示例目录里的流程与 SLA）必须能发布 —— 改坏了在这里红，而不是生产重启时拒绝启动。 */
+    @Test
+    void hostDeploymentDefinitionsPublish() throws Exception {
+        WorkspaceView ws = bootstrap.run();
+        TenantContext t = new TenantContext(new AccountId(ws.accountId()), new WorkspaceId(ws.workspaceId()));
+        Actor system = new Actor(t, Optional.empty(), Optional.of("opskit-bootstrap"), Set.of(), Set.of(), Set.of(), Set.of(), Set.of());
+        BootstrapDefinitions.Summary s = definitions.publishAll(system, t.workspaceId(), Path.of("../../deploy/opskit/sharehub-definitions"));
+        assertThat(s.published().size() + s.unchanged().size()).as("目录里至少有告警工单类型").isGreaterThanOrEqualTo(1);
+        assertThat(get(WS + "/ticket-types", "stk_admin").body().toString()).contains("\"alarm\"");
+    }
 }
