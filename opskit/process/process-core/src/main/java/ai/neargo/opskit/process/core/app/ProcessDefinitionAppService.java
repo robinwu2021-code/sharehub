@@ -119,6 +119,26 @@ public class ProcessDefinitionAppService {
         });
     }
 
+    /**
+     * 本空间可见的流程（空间级覆盖账户模板），每个代号取当前版本。
+     *
+     * @param fromTemplate 由审批模板编译出来的（改它要改模板，不要直接 PUT 流程）
+     */
+    public record Summary(String code, ai.neargo.opskit.commons.i18n.LocalizedText name, String version, boolean enabled, boolean inherited,
+            boolean fromTemplate, long publishedAtMs) {
+    }
+
+    @SystemAction("读：流程目录")
+    public List<Summary> list(TenantContext t) {
+        Map<String, DefinitionDao.Row> byCode = new java.util.LinkedHashMap<>();
+        for (DefinitionDao.Row r : definitions.latestVisible(t.accountId(), t.workspaceId(), KIND)) {
+            byCode.putIfAbsent(r.code(), r); // 查询已按「空间优先」排好
+        }
+        return byCode.values().stream().map(r -> new Summary(r.code(), compile(r).definition().name(), r.version(),
+                definitions.enabled(t.accountId(), t.workspaceId(), KIND, r.code()), r.workspaceId().isEmpty(),
+                r.note() != null && r.note().startsWith("template:"), r.publishedAtMs())).toList();
+    }
+
     @SystemAction("读：定义版本历史")
     public List<DefinitionDao.Row> versions(TenantContext t, WorkspaceId target, String code) {
         return definitions.versions(t.accountId(), target, KIND, code);

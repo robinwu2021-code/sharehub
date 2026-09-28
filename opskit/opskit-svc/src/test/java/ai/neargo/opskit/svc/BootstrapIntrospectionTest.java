@@ -372,4 +372,46 @@ class BootstrapIntrospectionTest {
         assertThat(ex.retryable()).isFalse();
         assertThat(ex.traceId()).isNotBlank();
     }
+
+    /** 实例迁移（requires 说明）· 参与者 / 范围整体替换（仅应用）· 角色 · 工作日历。 */
+    @Test
+    void instanceWritesRolesAndCalendars() throws Exception {
+        java.util.Map<String, Object> flow = json.readValue("""
+                {"code":"simple_flow","name":{"zh":"简单"},"initialStatus":"open","participantRoles":["OWNER"],
+                 "statuses":[{"code":"open","name":{"zh":"进行中"},"category":"IN_PROGRESS"},{"code":"done","name":{"zh":"完成"},"category":"DONE"}],
+                 "transitions":[{"code":"finish","name":{"zh":"完成"},"from":["open"],"to":"done","requires":{"fields":[],"comment":true}}]}
+                """, java.util.Map.class);
+        assertThat(send("PUT", WS + "/processes/simple_flow", APP, null, flow).status()).isEqualTo(200);
+        String no = send("POST", WS + "/instances", APP, "simple:1", java.util.Map.of("processCode", "simple_flow")).body().get("instanceNo").asText();
+
+        assertThat(send("PUT", WS + "/instances/" + no + "/participants", APP, null,
+                java.util.Map.of("role", "OWNER", "principals", List.of("member:mb_x"))).status()).isEqualTo(204);
+        assertThat(send("PUT", WS + "/instances/" + no + "/scopes", APP, null, java.util.Map.of("tags", List.of("agent:AG002"))).status()).isEqualTo(204);
+        assertThat(send("PUT", WS + "/instances/" + no + "/scopes", "stk_ops", null, java.util.Map.of("tags", List.of())).status())
+                .as("范围只由宿主（应用）改").isEqualTo(403);
+
+        Res noComment = send("POST", WS + "/instances/" + no + "/transitions/finish", APP, null, java.util.Map.of());
+        assertThat(noComment.status()).isEqualTo(422);
+        Res done = send("POST", WS + "/instances/" + no + "/transitions/finish", APP, null, java.util.Map.of("comment", "办完了"));
+        assertThat(done.status()).isEqualTo(200);
+        assertThat(done.body().get("status").asText()).isEqualTo("done");
+        assertThat(done.body().get("open").asBoolean()).isFalse();
+
+        assertThat(send("PUT", WS + "/roles/AUDITOR", APP, null, java.util.Map.of("name", java.util.Map.of("zh", "审计"),
+                "permissions", List.of("approval:view:all"))).status()).isEqualTo(204);
+        Res badRole = send("PUT", WS + "/roles/AUDITOR", APP, null, java.util.Map.of("permissions", List.of("no:such:perm")));
+        assertThat(badRole.status()).isEqualTo(422);
+        assertThat(badRole.body().toString()).contains("opskit.platform.unknown_permission");
+
+        java.util.Map<String, Object> cal = java.util.Map.of("zone", "Asia/Dubai", "weekly", List.of(java.util.Map.of("day", "MONDAY", "from", "09:00",
+                "to", "18:00")), "holidays", List.of("2026-12-02"));
+        assertThat(send("PUT", WS + "/calendars/office", APP, null, cal).status()).isEqualTo(204);
+        JsonNode got = get(WS + "/calendars/office", "stk_admin").body();
+        assertThat(got.get("weekly").get(0).get("to").asText()).isEqualTo("18:00");
+        assertThat(got.get("holidays").get(0).asText()).isEqualTo("2026-12-02");
+        Res badCal = send("PUT", WS + "/calendars/office", APP, null, java.util.Map.of("zone", "Asia/Dubai",
+                "weekly", List.of(java.util.Map.of("day", "FUNDAY", "from", "25:00", "to", "18:00"))));
+        assertThat(badCal.status()).isEqualTo(422);
+        assertThat(badCal.body().toString()).contains("weekly[0]");
+    }
 }

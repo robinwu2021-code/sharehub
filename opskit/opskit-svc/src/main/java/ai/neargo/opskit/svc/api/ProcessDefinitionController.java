@@ -10,6 +10,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import ai.neargo.opskit.commons.security.PermissionGuard;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import java.util.List;
+import java.util.Map;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -30,6 +33,44 @@ public class ProcessDefinitionController {
      * 当前生效的原始定义（配置界面编辑用）：形状与 PUT 请求体一致，取回改完可原样提交。需 process:manage（或应用自身）；
      * 响应头 {@code X-Definition-Version} 是版本号（内容哈希）。
      */
+    public record ProcessRow(String code, Map<String, String> name, String version, boolean enabled, boolean inherited, boolean fromTemplate,
+            long publishedAtMs) {
+    }
+
+    public record VersionRow(String version, long publishedAtMs, String channel, String publishedBy, String note, boolean current) {
+    }
+
+    /** 流程目录（process:manage）。fromTemplate = 审批模板编出来的：改它请改模板，不要直接 PUT。 */
+    @GetMapping("/processes")
+    public List<ProcessRow> list(Actor actor) {
+        PermissionGuard.require(actor, "process:manage");
+        return processes.list(actor.tenant()).stream().map(p -> new ProcessRow(p.code(), p.name() == null ? Map.of() : p.name().values(), p.version(),
+                p.enabled(), p.inherited(), p.fromTemplate(), p.publishedAtMs())).toList();
+    }
+
+    @GetMapping("/processes/{code}/versions")
+    public List<VersionRow> versions(Actor actor, @PathVariable("code") String code) {
+        PermissionGuard.require(actor, "process:manage");
+        List<ai.neargo.opskit.process.store.dao.DefinitionDao.Row> rows = processes.versions(actor.tenant(), actor.tenant().workspaceId(), code);
+        if (rows.isEmpty()) {
+            rows = processes.versions(actor.tenant(), ai.neargo.opskit.commons.tenancy.WorkspaceId.TEMPLATE, code);
+        }
+        return rows.stream().map(r -> new VersionRow(r.version(), r.publishedAtMs(), r.channel(), r.publishedBy(), r.note(), r.latest())).toList();
+    }
+
+    /** 停用 = 不接受新实例，在途的照常走完（process:manage）。 */
+    @PostMapping("/processes/{code}/disable")
+    public ResponseEntity<Void> disable(Actor actor, @PathVariable("code") String code) {
+        processes.setEnabled(actor, actor.tenant().workspaceId(), code, false);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/processes/{code}/enable")
+    public ResponseEntity<Void> enable(Actor actor, @PathVariable("code") String code) {
+        processes.setEnabled(actor, actor.tenant().workspaceId(), code, true);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/processes/{code}/definition")
     public ResponseEntity<String> definition(Actor actor, @PathVariable("code") String code) {
         PermissionGuard.require(actor, "process:manage");

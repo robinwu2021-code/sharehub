@@ -356,4 +356,27 @@ class LocalApiTest {
         assertThat(call("PUT", WS + "/processes/repair_flow", admin, json.readValue(flow.body(), Map.class)).body().get("created").asBoolean()).isFalse();
         assertThat(call("GET", WS + "/ticket-types/repair/definition", token("bob"), null).status()).isEqualTo(403);
     }
+
+    /** 流程目录 · 版本 · 停用（不接受新实例）· 启用。 */
+    @Test
+    void processCatalogAndDisable() throws Exception {
+        String admin = token("admin");
+        Map<String, Object> tpl = Map.of("name", Map.of("zh", "临时"), "steps", List.of(Map.of("code", "s1", "name", Map.of("zh", "一步"),
+                "approver", Map.of("kind", "ROLE", "value", "approver"), "mode", "ANY")));
+        assertThat(call("PUT", WS + "/approval-templates/disable_me", admin, tpl).status()).isEqualTo(200);
+        JsonNode list = call("GET", WS + "/processes", admin, null).body();
+        JsonNode row = list.valueStream().filter(n -> "disable_me".equals(n.get("code").asText())).findFirst().orElseThrow();
+        assertThat(row.get("fromTemplate").asBoolean()).isTrue();
+        assertThat(list.valueStream().anyMatch(n -> "repair_flow".equals(n.get("code").asText()) && !n.get("fromTemplate").asBoolean())).isTrue();
+        assertThat(call("GET", WS + "/processes/disable_me/versions", admin, null).body().size()).isEqualTo(1);
+        assertThat(call("GET", WS + "/processes", token("bob"), null).status()).isEqualTo(403);
+
+        String bob = token("bob");
+        assertThat(call("POST", WS + "/processes/disable_me/disable", admin, Map.of()).status()).isEqualTo(204);
+        Res off = call("POST", WS + "/instances", bob, Map.of("processCode", "disable_me"));
+        assertThat(off.status()).isEqualTo(422);
+        assertThat(off.body().get("error").asText()).isEqualTo("opskit.definition.disabled");
+        assertThat(call("POST", WS + "/processes/disable_me/enable", admin, Map.of()).status()).isEqualTo(204);
+        assertThat(call("POST", WS + "/instances", bob, Map.of("processCode", "disable_me")).status()).isEqualTo(200);
+    }
 }

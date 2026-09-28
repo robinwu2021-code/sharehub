@@ -31,6 +31,8 @@ import java.util.Map;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -132,6 +134,46 @@ public class InstanceController {
         }
         return new Started(v.instanceNo(), v.processCode(), v.processVersion(), v.status(), v.statusCategory().name(), v.open(), v.seq(),
                 history.pendingApprovalNo(actor.tenant(), v.instanceNo()).orElse(null), v.createdAtMs());
+    }
+
+    public record TransitionBody(Map<String, Object> fields, String comment) {
+    }
+
+    /**
+     * 走一条迁移（21/06 §实例）。授权由流程定义的 who 判定（应用自身按系统调用放行），{@code requires} 要求的字段 / 说明缺了 → 422。
+     * 应用凭证可带 onBehalfOf 以某人身份走。返回与发起同形（含迁移后若停在审批门的 approvalNo）。
+     */
+    @PostMapping("/instances/{no}/transitions/{code}")
+    public Started transition(Actor actor, @PathVariable("no") String no, @PathVariable("code") String code,
+            @RequestBody(required = false) TransitionBody body) {
+        InstanceView v = processes.transition(actor, no, code, new TransitionRequest(body == null ? Map.of() : body.fields(),
+                body == null ? null : body.comment()));
+        return new Started(v.instanceNo(), v.processCode(), v.processVersion(), v.status(), v.statusCategory().name(), v.open(), v.seq(),
+                history.pendingApprovalNo(actor.tenant(), v.instanceNo()).orElse(null), v.createdAtMs());
+    }
+
+    /** @param principals {@code member:…} / {@code group:…}；空列表 = 清空该角色 */
+    public record ParticipantsBody(String role, List<String> principals) {
+    }
+
+    /** 整体替换某个参与者角色（仅应用自身；宿主业务里负责人变了时同步过来）。 */
+    @PutMapping("/instances/{no}/participants")
+    public ResponseEntity<Void> participants(Actor actor, @PathVariable("no") String no, @RequestBody ParticipantsBody body) {
+        if (body == null || body.role() == null || body.role().isBlank()) {
+            throw new OpsKitException(CommonErrors.VALIDATION, "role is required", Map.of(), List.of(new FieldError("role", "opskit.validation.required")));
+        }
+        processes.replaceParticipants(actor, no, body.role(), body.principals() == null ? List.of() : body.principals());
+        return ResponseEntity.noContent().build();
+    }
+
+    public record ScopesBody(List<String> tags) {
+    }
+
+    /** 整体替换范围标签（仅应用自身；如业务行换了片区）。 */
+    @PutMapping("/instances/{no}/scopes")
+    public ResponseEntity<Void> scopes(Actor actor, @PathVariable("no") String no, @RequestBody ScopesBody body) {
+        processes.replaceScopes(actor, no, body == null || body.tags() == null ? List.of() : body.tags());
+        return ResponseEntity.noContent().build();
     }
 
     /** 单个实例行（与 instances/query 的行同形）；看不见 404。 */
