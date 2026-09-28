@@ -97,7 +97,7 @@ public class RefundServiceImpl implements RefundService {
         }
 
         OrdRefund e = new OrdRefund();
-        e.setRefundNo(OrderSupport.nextNo(mapper, "refund_no", BizKey.REFUND, KEY_WIDTH, OrdRefund::getRefundNo));
+        e.setRefundNo(OrderSupport.nextNo(mapper, "refund_no", BizKey.REFUND, KEY_WIDTH));
         e.setTenantId(OrderSupport.TENANT_MAIN);
         e.setOrderNo(req.orderNo());
         e.setCUserNo(req.userNo());

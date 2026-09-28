@@ -7,7 +7,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.function.Function;
+import java.util.List;
 
 /**
  * trade/order 子域内部工具（包内可见）。
@@ -58,26 +58,30 @@ final class OrderSupport {
      * <p>并发下仍可能撞号，靠业务键 UNIQUE 兜底；调用方需处理 {@code DuplicateKeyException} 重试。
      *
      * @param column 业务键的**下划线列名**，如 {@code "refund_no"}
-     * @param keyOf  从实体读业务键
      */
-    static <E> String nextNo(BaseMapper<E> mapper, String column, String prefix, int width, Function<E, String> keyOf) {
-        E top = mapper.selectOne(new QueryWrapper<E>()
-                .likeRight(column, prefix)
-                .orderByDesc(column)
-                .last("limit 1"));
-
+    static <E> String nextNo(BaseMapper<E> mapper, String column, String prefix, int width) {
+        /*
+         * 数字序取最大，**不是字符串序**。
+         *
+         * 原先写的是 orderByDesc(column) 取第一行再从号里抠数字 —— 那是**字符串序**，
+         * 只要表里混进一个非等宽/非纯数字的号，它就永远排在最前面，于是每次都算出同一个号：
+         * 第二次建单直接撞唯一键 500。2026-09-28 在 PowerbankServiceImpl 上实测到了这个后果
+         * （库里存量号是 PBDFECE7C9E0F 这种十六进制形，连续建第二只充电宝必定 500）。
+         * 本方法服务的三张表（exception/complaint/refund）目前号还是齐整的，
+         * 所以这里改的是**同一个形状的潜伏版本**，不是已经爆掉的缺陷。
+         *
+         * CAST(... AS UNSIGNED) 让非纯数字后缀算作 0，自然不参与取号 —— 不用再手写解析。
+         */
+        List<Object> top = mapper.selectObjs(new QueryWrapper<E>()
+                .select("MAX(CAST(SUBSTRING(" + column + ", " + (prefix.length() + 1)
+                        + ") AS UNSIGNED)) AS mx")
+                .likeRight(column, prefix));
         long n = 0L;
-        if (top != null) {
-            String k = keyOf.apply(top);
-            if (k != null && k.length() > prefix.length()) {
-                String digits = k.substring(prefix.length()).replaceAll("\\D", "");
-                if (!digits.isEmpty()) {
-                    try {
-                        n = Long.parseLong(digits);
-                    } catch (NumberFormatException ignore) {
-                        // 历史脏号（非纯数字后缀）不参与取号，从 0 重新计数由 UNIQUE 兜底
-                    }
-                }
+        if (top != null && !top.isEmpty() && top.get(0) != null) {
+            try {
+                n = Long.parseLong(String.valueOf(top.get(0)));
+            } catch (NumberFormatException ignore) {
+                // 全是脏号时从 0 起，由业务键 UNIQUE 兜底
             }
         }
         return prefix + String.format("%0" + width + "d", n + 1);

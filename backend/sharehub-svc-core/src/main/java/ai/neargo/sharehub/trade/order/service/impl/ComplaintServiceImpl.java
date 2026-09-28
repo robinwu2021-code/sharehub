@@ -85,8 +85,7 @@ public class ComplaintServiceImpl implements ComplaintService {
         }
 
         OrdComplaint e = new OrdComplaint();
-        e.setComplaintNo(OrderSupport.nextNo(mapper, "complaint_no", BizKey.COMPLAINT, KEY_WIDTH,
-                OrdComplaint::getComplaintNo));
+        e.setComplaintNo(OrderSupport.nextNo(mapper, "complaint_no", BizKey.COMPLAINT, KEY_WIDTH));
         e.setTenantId(OrderSupport.TENANT_MAIN);
         e.setOrderNo(req.orderNo());
         e.setCUserNo(req.userNo());

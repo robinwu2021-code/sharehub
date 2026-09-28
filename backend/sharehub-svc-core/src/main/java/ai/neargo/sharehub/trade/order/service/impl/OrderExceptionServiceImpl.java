@@ -101,8 +101,7 @@ public class OrderExceptionServiceImpl implements OrderExceptionService {
 
     /** 新建异常单（供本域/网关侧内部调用；无对外端点——异常由系统探测产生，不由人工登记）。 */
     String create(OrdException e) {
-        e.setExceptionNo(OrderSupport.nextNo(mapper, "exception_no", KEY_PREFIX, KEY_WIDTH,
-                OrdException::getExceptionNo));
+        e.setExceptionNo(OrderSupport.nextNo(mapper, "exception_no", KEY_PREFIX, KEY_WIDTH));
         if (e.getTenantId() == null) e.setTenantId(OrderSupport.TENANT_MAIN);
         if (e.getStatus() == null) e.setStatus(STATUS_OPEN);
         mapper.insert(e);
