@@ -110,6 +110,22 @@ class ProcessQueryServiceTest {
         return ((OpsKitException) ex).fieldErrors();
     }
 
+    /** 候选是参与者角色（字段值 participant:OWNER）：担任该角色的人才进待办（O4-5 改写待办 SQL 时补的守护）。 */
+    @ParameterizedTest
+    @MethodSource("ai.neargo.opskit.commons.testing.TestDatabases#all")
+    void participantRoleCandidatesReachWhoeverHoldsTheRole(TestDatabase db) {
+        Env e = env(db);
+        Actor r = e.plain("mb_req");
+        String no = e.instances.start(r, new StartRequest("dispatching", null, Map.of("assignTo", "participant:OWNER"),
+                Map.of("OWNER", List.of("member:mb_owner")), Set.of())).instanceNo();
+        e.instances.transition(r, no, "direct", TransitionRequest.empty());
+
+        assertThat(e.todos(e.plain("mb_owner"), "ALL", null).list()).extracting(TodoItem::instanceNo).containsExactly(no);
+        assertThat(e.todos(e.plain("mb_owner"), "PROCESS", null).total()).as("来源筛选同样经这一路").isEqualTo(1);
+        assertThat(e.q.todoCount(e.plain("mb_owner")).all()).as("角标同口径").isEqualTo(1);
+        assertThat(e.todos(e.plain("mb_other"), "ALL", null).total()).as("不担任该角色").isZero();
+    }
+
     @ParameterizedTest
     @MethodSource("ai.neargo.opskit.commons.testing.TestDatabases#all")
     void todosAreCandidateMatchIntersectVisible(TestDatabase db) {

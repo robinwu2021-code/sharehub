@@ -65,6 +65,8 @@ public final class QueryDao {
 
     /** 一段 WHERE 与它的参数；列表与计数共用。 */
     private static final class Where {
+        /** FROM 子句；参数（若有）已按顺序放在 params 最前面。 */
+        String from = TASK_FROM;
         final StringBuilder sql = new StringBuilder();
         final List<Object> params = new ArrayList<>();
 
@@ -99,8 +101,8 @@ public final class QueryDao {
         ps.add(limit);
         ps.add(offset);
         return jdbc.sql("SELECT t.task_no, t.kind, t.instance_no, t.approval_no, t.title, t.priority_ord, t.status, t.assignee, t.due_at_ms, "
-                        + "t.created_at_ms, t.queue_group, i.subject_type, i.subject_ref, i.subject_display, i.definition_id, " + ORIGIN + " AS origin "
-                        + TASK_FROM + " WHERE t.workspace_id = ?" + w.sql
+                        + "t.created_at_ms, t.queue_group, i.subject_type, i.subject_ref, i.subject_display, i.definition_id, m.origin AS origin "
+                        + w.from + " WHERE t.workspace_id = ?" + w.sql
                         + " ORDER BY CASE WHEN t.due_at_ms IS NULL THEN 1 ELSE 0 END, t.due_at_ms, t.created_at_ms, t.task_no LIMIT ? OFFSET ?")
                 .params(ps)
                 .query((rs, i) -> new TodoRow(rs.getString("task_no"), rs.getString("kind"), rs.getString("origin"), rs.getString("instance_no"),
@@ -113,7 +115,9 @@ public final class QueryDao {
 
     public long countTodos(WorkspaceId ws, Viewer v, String origin, Boolean claimable) {
         Where w = todoWhere(ws, v, origin, claimable);
-        return jdbc.sql("SELECT COUNT(*) " + TASK_FROM + " WHERE t.workspace_id = ?" + w.sql).params(w.params).query(Long.class).single();
+        // 包一层派生表：MariaDB 对「COUNT(*) 直接接 UNION 派生表 + 回表」会选一条慢得多的计划（O4-5 实测）
+        return jdbc.sql("SELECT COUNT(*) FROM (SELECT t.task_no " + w.from + " WHERE t.workspace_id = ?" + w.sql + ") x").params(w.params)
+                .query(Long.class).single();
     }
 
     /** 待办四个页签的角标，一次查完；和 {@link #todos} 同一段 WHERE。 */
@@ -123,7 +127,7 @@ public final class QueryDao {
                         + "COALESCE(SUM(CASE WHEN x.origin = 'PROCESS' THEN 1 ELSE 0 END), 0) AS p, "
                         + "COALESCE(SUM(CASE WHEN x.origin = 'TICKET' THEN 1 ELSE 0 END), 0) AS k, "
                         + "COALESCE(SUM(x.claimable), 0) AS c "
-                        + "FROM (SELECT CASE WHEN " + CLAIMABLE + " THEN 1 ELSE 0 END AS claimable, " + ORIGIN + " AS origin " + TASK_FROM
+                        + "FROM (SELECT CASE WHEN " + CLAIMABLE + " THEN 1 ELSE 0 END AS claimable, m.origin AS origin " + w.from
                         + " WHERE t.workspace_id = ?" + w.sql + ") x")
                 .params(w.params)
                 .query((rs, i) -> new TodoCounts(rs.getLong("a"), rs.getLong("p"), rs.getLong("k"), rs.getLong("c"))).single();
@@ -137,30 +141,60 @@ public final class QueryDao {
      */
     private Where todoWhere(WorkspaceId ws, Viewer v, String origin, Boolean claimable) {
         Where w = new Where();
-        w.params.add(ws.value());
-        w.and("t.status IN ('OPEN','CLAIMED','ASSIGNED')");
         if (v.me() == null) {
+            w.params.add(ws.value());
             return w.and("1 = 0"); // 应用自身没有「我的」待办
         }
+        mineFrom(w, ws, v);
+        w.params.add(ws.value());
+        w.and("t.status IN ('OPEN','CLAIMED','ASSIGNED')");
+        String viaCandidate = "(m.via = 'C' AND t.status = 'OPEN')";
+        String viaAssignee = "(m.via = 'A' AND t.status <> 'OPEN')";
         if (Boolean.TRUE.equals(claimable)) {
-            w.sql.append(" AND " + CLAIMABLE + " AND ");
-            candidateMatch(w, v);
+            w.and(viaCandidate + " AND " + CLAIMABLE);
         } else if (Boolean.FALSE.equals(claimable)) {
-            w.sql.append(" AND ((t.status <> 'OPEN' AND t.assignee = ?) OR (t.status = 'OPEN' AND NOT " + CLAIMABLE + " AND ");
-            w.params.add(v.me());
-            candidateMatch(w, v);
-            w.sql.append("))");
+            w.and("(" + viaAssignee + " OR (" + viaCandidate + " AND NOT " + CLAIMABLE + "))");
         } else {
-            w.sql.append(" AND ((t.status = 'OPEN' AND ");
-            candidateMatch(w, v);
-            w.sql.append(") OR (t.status <> 'OPEN' AND t.assignee = ?))");
-            w.params.add(v.me());
+            w.and("(" + viaCandidate + " OR " + viaAssignee + ")");
         }
         if (origin != null) {
-            w.and(ORIGIN + " = ?", origin);
+            w.and("m.origin = ?", origin);
         }
         instanceVisible(w, v);
         return w;
+    }
+
+    /**
+     * 「我的任务」集合，从我这一侧的索引出发（21/07 O4-5 实测：从空间内全部未结任务出发、逐行 EXISTS 判候选，
+     * 10 万任务时 P95 已近 500 ms）。三路各走一条索引，再回表：
+     * <ul>
+     *   <li>C：开放候选直接命中我的候选键（idx_mine）；</li>
+     *   <li>C：候选是参与者角色（participant:OWNER）而我担任该角色 —— 从我的参与记录出发（idx_principal → idx_inst_key）；</li>
+     *   <li>A：在我名下（idx_assignee）。</li>
+     * </ul>
+     * 候选行在任务被别人领取后仍开放（结束才关），所以 C 路还要在外层要求任务仍是 OPEN；A 路要求非 OPEN —— 与改写前的口径逐条一致。
+     * 来源（PROCESS / TICKET）记在候选行上，C 路顺手带出；A 路（在我名下，量小）按任务取。
+     */
+    private static void mineFrom(Where w, WorkspaceId ws, Viewer v) {
+        StringBuilder m = new StringBuilder();
+        if (!v.candidates().isEmpty()) {
+            String in = marks(v.candidates().size());
+            m.append("SELECT c.task_no, 'C' AS via, c.origin FROM proc_task_candidate c WHERE c.workspace_id = ? AND c.candidate_key IN (").append(in)
+                    .append(") AND c.is_open = 1 UNION SELECT c.task_no, 'C' AS via, c.origin FROM proc_participant p JOIN proc_task_candidate c ")
+                    .append("ON c.workspace_id = p.workspace_id AND c.instance_no = p.instance_no AND c.candidate_key = CONCAT('participant:', p.role) ")
+                    .append("WHERE p.workspace_id = ? AND p.principal IN (").append(in).append(") AND c.is_open = 1 UNION ");
+            w.params.add(ws.value());
+            w.params.addAll(v.candidates());
+            w.params.add(ws.value());
+            w.params.addAll(v.candidates());
+        }
+        m.append("SELECT a.task_no, 'A' AS via, (SELECT MAX(c.origin) FROM proc_task_candidate c WHERE c.workspace_id = a.workspace_id "
+                + "AND c.task_no = a.task_no) AS origin FROM proc_task a WHERE a.workspace_id = ? AND a.assignee = ? AND a.status IN ('CLAIMED','ASSIGNED')");
+        w.params.add(ws.value());
+        w.params.add(v.me());
+        w.from = "FROM (" + m + ") m JOIN proc_task t ON t.workspace_id = ? AND t.task_no = m.task_no "
+                + "JOIN proc_instance i ON i.workspace_id = t.workspace_id AND i.instance_no = t.instance_no";
+        w.params.add(ws.value());
     }
 
     // ── 队列 / 任务 ─────────────────────────────────────────
