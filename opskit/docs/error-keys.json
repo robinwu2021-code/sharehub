@@ -1,0 +1,770 @@
+{
+  "opskit.approval.cross_step": {
+    "status": 403,
+    "zh": "同一轮里你已审过另一步",
+    "en": "You already decided another step in this round",
+    "ar": "لقد قررت خطوة أخرى في هذه الجولة"
+  },
+  "opskit.approval.no_approver": {
+    "status": 422,
+    "zh": "这一步找不到审批人",
+    "en": "No approver found for this step",
+    "ar": "لا يوجد معتمد لهذه الخطوة"
+  },
+  "opskit.approval.reason_required": {
+    "status": 422,
+    "zh": "驳回须写原因",
+    "en": "A reason is required to reject",
+    "ar": "يلزم ذكر سبب الرفض"
+  },
+  "opskit.approval.self_review": {
+    "status": 403,
+    "zh": "提交人不能审批自己的申请",
+    "en": "You cannot approve your own request",
+    "ar": "لا يمكنك اعتماد طلبك الخاص"
+  },
+  "opskit.approval.withdraw_forbidden": {
+    "status": 403,
+    "zh": "只有提交人能在待审时撤回",
+    "en": "Only the requester can withdraw while pending",
+    "ar": "يمكن لمقدم الطلب فقط السحب أثناء الانتظار"
+  },
+  "opskit.bad_request": {
+    "status": 400,
+    "zh": "请求格式不正确",
+    "en": "Malformed request",
+    "ar": "طلب غير صحيح الصياغة"
+  },
+  "opskit.condition.invalid": {
+    "status": 422,
+    "zh": "条件写法不正确",
+    "en": "Invalid condition",
+    "ar": "شرط غير صالح"
+  },
+  "opskit.confirmation.expired": {
+    "status": 409,
+    "zh": "确认已过期或已失效",
+    "en": "The confirmation has expired",
+    "ar": "انتهت صلاحية التأكيد"
+  },
+  "opskit.definition.disabled": {
+    "status": 422,
+    "zh": "该定义已停用，不接受新的提交",
+    "en": "This definition is disabled and accepts no new submissions",
+    "ar": "هذا التعريف معطّل ولا يقبل طلبات جديدة"
+  },
+  "opskit.dev.seed_not_ready": {
+    "status": 503,
+    "zh": "本地种子数据尚未就绪",
+    "en": "Local seed data is not ready yet",
+    "ar": "بيانات البذرة المحلية غير جاهزة بعد"
+  },
+  "opskit.idempotency.in_progress": {
+    "status": 409,
+    "zh": "同一请求正在处理中",
+    "en": "The same request is still being processed",
+    "ar": "الطلب نفسه قيد المعالجة"
+  },
+  "opskit.idempotency.mismatch": {
+    "status": 409,
+    "zh": "同一幂等键对应了不同的请求内容",
+    "en": "This idempotency key was used with a different request",
+    "ar": "استُخدم مفتاح عدم التكرار مع طلب مختلف"
+  },
+  "opskit.internal": {
+    "status": 500,
+    "zh": "服务内部错误，请带上追踪号联系管理员",
+    "en": "Internal error; contact the administrator with the trace ID",
+    "ar": "خطأ داخلي؛ تواصل مع المسؤول مع رقم التتبع"
+  },
+  "opskit.method_not_allowed": {
+    "status": 405,
+    "zh": "不支持该请求方法",
+    "en": "Method not allowed",
+    "ar": "الطريقة غير مسموح بها"
+  },
+  "opskit.not_found": {
+    "status": 404,
+    "zh": "不存在或无权查看",
+    "en": "Not found, or you cannot see it",
+    "ar": "غير موجود أو لا يمكنك عرضه"
+  },
+  "opskit.page.out_of_range": {
+    "status": 422,
+    "zh": "页码从 1 开始",
+    "en": "Page numbers start at 1",
+    "ar": "تبدأ أرقام الصفحات من 1"
+  },
+  "opskit.page.size_out_of_range": {
+    "status": 422,
+    "zh": "每页条数须在 1–200 之间",
+    "en": "Page size must be between 1 and 200",
+    "ar": "يجب أن يكون حجم الصفحة بين 1 و200"
+  },
+  "opskit.permission.denied": {
+    "status": 403,
+    "zh": "没有执行此操作的权限",
+    "en": "You do not have permission for this action",
+    "ar": "ليست لديك صلاحية لهذا الإجراء"
+  },
+  "opskit.platform.invalid_calendar": {
+    "status": 422,
+    "zh": "工作日历配置不正确",
+    "en": "Invalid working calendar",
+    "ar": "تقويم عمل غير صالح"
+  },
+  "opskit.platform.issuer_taken": {
+    "status": 422,
+    "zh": "该签发方已被别的账户登记",
+    "en": "This issuer is registered by another account",
+    "ar": "هذا المُصدِر مسجّل لحساب آخر"
+  },
+  "opskit.platform.tenant_inactive": {
+    "status": 403,
+    "zh": "账户或空间已停用",
+    "en": "The account or workspace is inactive",
+    "ar": "الحساب أو مساحة العمل غير نشطة"
+  },
+  "opskit.platform.token_prefix_taken": {
+    "status": 422,
+    "zh": "该令牌前缀已被占用",
+    "en": "This token prefix is already taken",
+    "ar": "بادئة الرمز مستخدمة بالفعل"
+  },
+  "opskit.platform.unbindable_principal": {
+    "status": 422,
+    "zh": "只能绑定成员或组",
+    "en": "Only members or groups can be bound",
+    "ar": "يمكن ربط الأعضاء أو المجموعات فقط"
+  },
+  "opskit.platform.unknown_member": {
+    "status": 422,
+    "zh": "成员不存在",
+    "en": "Unknown member",
+    "ar": "عضو غير معروف"
+  },
+  "opskit.platform.unknown_permission": {
+    "status": 422,
+    "zh": "不认识的权限码",
+    "en": "Unknown permission code",
+    "ar": "رمز صلاحية غير معروف"
+  },
+  "opskit.platform.workspace_ref_taken": {
+    "status": 409,
+    "zh": "该外部编号已被本账户的其他空间使用",
+    "en": "This external reference is used by another workspace",
+    "ar": "هذا المرجع الخارجي مستخدم لمساحة عمل أخرى"
+  },
+  "opskit.process.condition_unmet": {
+    "status": 422,
+    "zh": "不满足这一步的条件",
+    "en": "The conditions for this step are not met",
+    "ar": "شروط هذه الخطوة غير مستوفاة"
+  },
+  "opskit.process.def.all_needs_enumerable_approvers": {
+    "status": 422,
+    "zh": "会签只能用可列出具体人选的审批人（成员 / 组 / 字段）",
+    "en": "Countersign needs approvers that can be listed (member, group or field)",
+    "ar": "يتطلب التوقيع المشترك معتمدين يمكن سردهم (عضو أو مجموعة أو حقل)"
+  },
+  "opskit.process.def.approval_needs_exits": {
+    "status": 422,
+    "zh": "审批门须配置通过 / 驳回的去向",
+    "en": "An approval gate needs approved / rejected exits",
+    "ar": "تحتاج بوابة الاعتماد إلى مخرجي القبول والرفض"
+  },
+  "opskit.process.def.condition_too_deep": {
+    "status": 422,
+    "zh": "条件嵌套过深",
+    "en": "The condition is nested too deeply",
+    "ar": "الشرط متداخل بعمق كبير"
+  },
+  "opskit.process.def.duplicate_status": {
+    "status": 422,
+    "zh": "状态代号重复",
+    "en": "Duplicate status code",
+    "ar": "رمز حالة مكرر"
+  },
+  "opskit.process.def.duplicate_step": {
+    "status": 422,
+    "zh": "步骤代号重复",
+    "en": "Duplicate step code",
+    "ar": "رمز خطوة مكرر"
+  },
+  "opskit.process.def.duplicate_transition": {
+    "status": 422,
+    "zh": "迁移代号重复",
+    "en": "Duplicate transition code",
+    "ar": "رمز انتقال مكرر"
+  },
+  "opskit.process.def.external_needs_both_exits": {
+    "status": 422,
+    "zh": "外部确认门须配置确认 / 驳回的去向",
+    "en": "An external confirmation gate needs confirmed / rejected exits",
+    "ar": "تحتاج بوابة التأكيد الخارجي إلى مخرجي التأكيد والرفض"
+  },
+  "opskit.process.def.gate_exit_missing": {
+    "status": 422,
+    "zh": "门缺少必需的去向迁移",
+    "en": "The gate is missing a required exit transition",
+    "ar": "البوابة تفتقد انتقال خروج مطلوب"
+  },
+  "opskit.process.def.gate_exit_not_system_from_here": {
+    "status": 422,
+    "zh": "门的去向须是从本状态出发的系统迁移",
+    "en": "A gate exit must be a system transition leaving this status",
+    "ar": "يجب أن يكون مخرج البوابة انتقال نظام يغادر هذه الحالة"
+  },
+  "opskit.process.def.gate_on_terminal": {
+    "status": 422,
+    "zh": "终态上不能放门",
+    "en": "A final status cannot have a gate",
+    "ar": "لا يمكن وضع بوابة على حالة نهائية"
+  },
+  "opskit.process.def.initial_is_terminal": {
+    "status": 422,
+    "zh": "初始状态不能是终态",
+    "en": "The initial status cannot be final",
+    "ar": "لا يمكن أن تكون الحالة الأولى نهائية"
+  },
+  "opskit.process.def.no_from": {
+    "status": 422,
+    "zh": "迁移缺少起点状态",
+    "en": "The transition has no source status",
+    "ar": "الانتقال بلا حالة بداية"
+  },
+  "opskit.process.def.no_status": {
+    "status": 422,
+    "zh": "至少要有一个状态",
+    "en": "At least one status is required",
+    "ar": "مطلوب حالة واحدة على الأقل"
+  },
+  "opskit.process.def.no_step": {
+    "status": 422,
+    "zh": "审批门至少要有一步",
+    "en": "An approval gate needs at least one step",
+    "ar": "تحتاج بوابة الاعتماد إلى خطوة واحدة على الأقل"
+  },
+  "opskit.process.def.no_terminal": {
+    "status": 422,
+    "zh": "至少要有一个终态",
+    "en": "At least one final status is required",
+    "ar": "مطلوب حالة نهائية واحدة على الأقل"
+  },
+  "opskit.process.def.system_transition_unused": {
+    "status": 422,
+    "zh": "系统迁移没有被任何门用到",
+    "en": "A system transition is not used by any gate",
+    "ar": "انتقال النظام غير مستخدم في أي بوابة"
+  },
+  "opskit.process.def.terminal_has_exit": {
+    "status": 422,
+    "zh": "终态不能再有出去的迁移",
+    "en": "A final status cannot have outgoing transitions",
+    "ar": "لا يمكن أن تكون للحالة النهائية انتقالات خارجة"
+  },
+  "opskit.process.def.unknown_participant_role": {
+    "status": 422,
+    "zh": "不认识的参与者角色",
+    "en": "Unknown participant role",
+    "ar": "دور مشارك غير معروف"
+  },
+  "opskit.process.def.unknown_status": {
+    "status": 422,
+    "zh": "引用了不存在的状态",
+    "en": "References an unknown status",
+    "ar": "يشير إلى حالة غير معروفة"
+  },
+  "opskit.process.def.unreachable": {
+    "status": 422,
+    "zh": "有状态永远到不了",
+    "en": "A status can never be reached",
+    "ar": "هناك حالة لا يمكن الوصول إليها"
+  },
+  "opskit.process.illegal_transition": {
+    "status": 422,
+    "zh": "当前状态不能走这一步",
+    "en": "This step is not available from the current status",
+    "ar": "هذه الخطوة غير متاحة من الحالة الحالية"
+  },
+  "opskit.process.instance_closed": {
+    "status": 422,
+    "zh": "已结束，不能再操作",
+    "en": "It is closed and can no longer be changed",
+    "ar": "مغلق ولا يمكن تعديله"
+  },
+  "opskit.process.not_allowed": {
+    "status": 403,
+    "zh": "你不能执行这一步",
+    "en": "You cannot perform this step",
+    "ar": "لا يمكنك تنفيذ هذه الخطوة"
+  },
+  "opskit.process.required_missing": {
+    "status": 422,
+    "zh": "缺少必填项",
+    "en": "Required input is missing",
+    "ar": "مدخلات مطلوبة مفقودة"
+  },
+  "opskit.process.task.no_candidate": {
+    "status": 422,
+    "zh": "任务至少要有一个候选人",
+    "en": "A task needs at least one candidate",
+    "ar": "تحتاج المهمة إلى مرشح واحد على الأقل"
+  },
+  "opskit.query.unknown_value": {
+    "status": 422,
+    "zh": "不认识的取值",
+    "en": "Unknown value",
+    "ar": "قيمة غير معروفة"
+  },
+  "opskit.quota.exceeded": {
+    "status": 429,
+    "zh": "超出配额",
+    "en": "Quota exceeded",
+    "ar": "تم تجاوز الحصة"
+  },
+  "opskit.sla.metric_code_format": {
+    "status": 422,
+    "zh": "指标代号须为大写字母、数字、下划线",
+    "en": "Metric codes use upper-case letters, digits and underscores",
+    "ar": "تستخدم رموز المقاييس حروفًا كبيرة وأرقامًا وشرطات سفلية"
+  },
+  "opskit.sla.never_starts": {
+    "status": 422,
+    "zh": "这个指标永远不会起算",
+    "en": "This metric never starts",
+    "ar": "هذا المقياس لا يبدأ أبدًا"
+  },
+  "opskit.sla.never_stops": {
+    "status": 422,
+    "zh": "这个指标永远不会停止",
+    "en": "This metric never stops",
+    "ar": "هذا المقياس لا يتوقف أبدًا"
+  },
+  "opskit.sla.stop_on_create": {
+    "status": 422,
+    "zh": "停止条件不能是「创建即停」",
+    "en": "The stop condition cannot be 'on create'",
+    "ar": "لا يمكن أن يكون شرط الإيقاف عند الإنشاء"
+  },
+  "opskit.sla.unknown_metric": {
+    "status": 422,
+    "zh": "目标里引用了不存在的指标",
+    "en": "The target references an unknown metric",
+    "ar": "يشير الهدف إلى مقياس غير معروف"
+  },
+  "opskit.sla.unknown_policy": {
+    "status": 422,
+    "zh": "SLA 策略不存在",
+    "en": "Unknown SLA policy",
+    "ar": "سياسة مستوى خدمة غير معروفة"
+  },
+  "opskit.sla.unreachable_target": {
+    "status": 422,
+    "zh": "兜底行后面的行永远轮不到",
+    "en": "Rows after the fallback row are never reached",
+    "ar": "الصفوف بعد صف الاحتياط لا يُوصل إليها أبدًا"
+  },
+  "opskit.state_changed": {
+    "status": 409,
+    "zh": "数据已被更新，请刷新后重试",
+    "en": "The data has changed; refresh and try again",
+    "ar": "تغيّرت البيانات؛ حدّث الصفحة وأعد المحاولة"
+  },
+  "opskit.task.complete_by_transition": {
+    "status": 422,
+    "zh": "办理任务请通过流转完成",
+    "en": "Complete work tasks by taking a transition",
+    "ar": "أكمل مهام العمل عبر انتقال"
+  },
+  "opskit.task.not_candidate": {
+    "status": 403,
+    "zh": "你不是这条任务的候选人",
+    "en": "You are not a candidate for this task",
+    "ar": "لست مرشحًا لهذه المهمة"
+  },
+  "opskit.template.code_expected": {
+    "status": 422,
+    "zh": "这里应填一个代号",
+    "en": "A single code is expected",
+    "ar": "يُتوقع رمز واحد"
+  },
+  "opskit.template.code_taken": {
+    "status": 409,
+    "zh": "已有同名的手工登记流程",
+    "en": "A hand-registered process already uses this code",
+    "ar": "عملية مسجلة يدويًا تستخدم هذا الرمز بالفعل"
+  },
+  "opskit.template.countersign_not_enumerable": {
+    "status": 422,
+    "zh": "会签不能用角色 / 权限作审批人（列不出全部人选）",
+    "en": "Countersign cannot use a role or permission as approver",
+    "ar": "لا يمكن للتوقيع المشترك استخدام دور أو صلاحية كمعتمد"
+  },
+  "opskit.template.member_list_expected": {
+    "status": 422,
+    "zh": "指定成员时须给成员列表",
+    "en": "A member list is expected",
+    "ar": "يُتوقع قائمة أعضاء"
+  },
+  "opskit.template.too_many_steps": {
+    "status": 422,
+    "zh": "步骤过多（最多 20 步）",
+    "en": "Too many steps (at most 20)",
+    "ar": "خطوات كثيرة جدًا (20 كحد أقصى)"
+  },
+  "opskit.ticket.assign_field_must_be_single_member": {
+    "status": 422,
+    "zh": "按字段派单须指向单值成员字段",
+    "en": "Field dispatch needs a single-member field",
+    "ar": "يتطلب الإسناد بالحقل حقل عضو مفرد"
+  },
+  "opskit.ticket.closed": {
+    "status": 422,
+    "zh": "工单已关闭",
+    "en": "The ticket is closed",
+    "ar": "التذكرة مغلقة"
+  },
+  "opskit.ticket.dedupe_field_type": {
+    "status": 422,
+    "zh": "这种字段不能用来去重",
+    "en": "This field type cannot be used for de-duplication",
+    "ar": "لا يمكن استخدام هذا النوع من الحقول لإزالة التكرار"
+  },
+  "opskit.ticket.expect_attachments": {
+    "status": 422,
+    "zh": "附件应为 [{id, name}]",
+    "en": "Attachments expected as [{id, name}]",
+    "ar": "يُتوقع مرفقات بالشكل [{id, name}]"
+  },
+  "opskit.ticket.expect_epoch_ms": {
+    "status": 422,
+    "zh": "应为毫秒时间戳",
+    "en": "Epoch milliseconds expected",
+    "ar": "يُتوقع طابع زمني بالمللي ثانية"
+  },
+  "opskit.ticket.expect_group": {
+    "status": 422,
+    "zh": "应为组代号",
+    "en": "Group code expected",
+    "ar": "يُتوقع رمز مجموعة"
+  },
+  "opskit.ticket.expect_member": {
+    "status": 422,
+    "zh": "应为成员",
+    "en": "Member expected",
+    "ar": "يُتوقع عضو"
+  },
+  "opskit.ticket.expect_member_list": {
+    "status": 422,
+    "zh": "应为成员列表",
+    "en": "List of members expected",
+    "ar": "يُتوقع قائمة أعضاء"
+  },
+  "opskit.ticket.expect_money": {
+    "status": 422,
+    "zh": "应为金额：{amount 最小单位整数, currency}",
+    "en": "Money expected: {amount in minor units, currency}",
+    "ar": "يُتوقع مبلغ: {المبلغ بأصغر وحدة، العملة}"
+  },
+  "opskit.ticket.expect_number": {
+    "status": 422,
+    "zh": "应为数字",
+    "en": "Number expected",
+    "ar": "يُتوقع رقم"
+  },
+  "opskit.ticket.expect_option": {
+    "status": 422,
+    "zh": "应为选项代号",
+    "en": "Option code expected",
+    "ar": "يُتوقع رمز خيار"
+  },
+  "opskit.ticket.expect_option_list": {
+    "status": 422,
+    "zh": "应为选项代号列表",
+    "en": "List of option codes expected",
+    "ar": "يُتوقع قائمة رموز خيارات"
+  },
+  "opskit.ticket.expect_ref": {
+    "status": 422,
+    "zh": "应为外部引用 {type, ref}",
+    "en": "Reference expected as {type, ref}",
+    "ar": "يُتوقع مرجع بالشكل {type, ref}"
+  },
+  "opskit.ticket.expect_text": {
+    "status": 422,
+    "zh": "应为文本",
+    "en": "Text expected",
+    "ar": "يُتوقع نص"
+  },
+  "opskit.ticket.fallback_invalid": {
+    "status": 422,
+    "zh": "外部指定须配置非外部的兜底策略",
+    "en": "External dispatch needs a non-external fallback",
+    "ar": "يتطلب الإسناد الخارجي استراتيجية احتياطية غير خارجية"
+  },
+  "opskit.ticket.field_filter_needs_one_type": {
+    "status": 422,
+    "zh": "按字段筛选须只选一个工单类型",
+    "en": "Field filters need exactly one ticket type",
+    "ar": "تتطلب مرشحات الحقول نوع تذكرة واحدًا بالضبط"
+  },
+  "opskit.ticket.field_invalid": {
+    "status": 422,
+    "zh": "工单内容不合法",
+    "en": "Invalid ticket data",
+    "ar": "بيانات التذكرة غير صالحة"
+  },
+  "opskit.ticket.field_not_filterable": {
+    "status": 422,
+    "zh": "该字段不可筛选",
+    "en": "This field is not filterable",
+    "ar": "هذا الحقل غير قابل للتصفية"
+  },
+  "opskit.ticket.filter_too_broad": {
+    "status": 422,
+    "zh": "匹配的受理方太多，请改用组筛选",
+    "en": "Too many assignees match; filter by group instead",
+    "ar": "عدد كبير جدًا من المكلفين؛ صفِّ حسب المجموعة"
+  },
+  "opskit.ticket.merge_into_self": {
+    "status": 422,
+    "zh": "不能把工单并入它自己",
+    "en": "A ticket cannot be merged into itself",
+    "ar": "لا يمكن دمج التذكرة في نفسها"
+  },
+  "opskit.ticket.merge_not_supported": {
+    "status": 422,
+    "zh": "该工单类型不支持合并",
+    "en": "This ticket type does not support merging",
+    "ar": "نوع التذكرة هذا لا يدعم الدمج"
+  },
+  "opskit.ticket.multiple_not_applicable": {
+    "status": 422,
+    "zh": "只有成员字段能多选",
+    "en": "Only member fields can be multiple",
+    "ar": "حقول الأعضاء فقط يمكن أن تكون متعددة"
+  },
+  "opskit.ticket.not_filterable_type": {
+    "status": 422,
+    "zh": "这种字段不能设为可筛选",
+    "en": "This field type cannot be filterable",
+    "ar": "لا يمكن جعل هذا النوع من الحقول قابلًا للتصفية"
+  },
+  "opskit.ticket.not_on_create": {
+    "status": 422,
+    "zh": "该字段建单时不可填",
+    "en": "This field cannot be set when creating",
+    "ar": "لا يمكن تعيين هذا الحقل عند الإنشاء"
+  },
+  "opskit.ticket.option_disabled": {
+    "status": 422,
+    "zh": "该选项已停用",
+    "en": "This option is disabled",
+    "ar": "هذا الخيار معطّل"
+  },
+  "opskit.ticket.options_either_inline_or_set": {
+    "status": 422,
+    "zh": "选项要么内联、要么引用选项集，二选一",
+    "en": "Give inline options or an option set, not both",
+    "ar": "أعطِ خيارات مضمنة أو مجموعة خيارات، وليس كليهما"
+  },
+  "opskit.ticket.options_not_applicable": {
+    "status": 422,
+    "zh": "这种字段不需要选项",
+    "en": "This field type takes no options",
+    "ar": "هذا النوع من الحقول لا يأخذ خيارات"
+  },
+  "opskit.ticket.prefix_format": {
+    "status": 422,
+    "zh": "编号前缀须为 1–6 个大写字母",
+    "en": "The number prefix must be 1–6 upper-case letters",
+    "ar": "يجب أن تكون بادئة الرقم من 1 إلى 6 حروف كبيرة"
+  },
+  "opskit.ticket.reassign_pick_one": {
+    "status": 422,
+    "zh": "勾选的工单与原受理人二选一",
+    "en": "Pick either ticket numbers or a current assignee",
+    "ar": "اختر أرقام التذاكر أو المكلف الحالي"
+  },
+  "opskit.ticket.ref_type_mismatch": {
+    "status": 422,
+    "zh": "外部引用的类型不对",
+    "en": "The reference type does not match",
+    "ar": "نوع المرجع لا يطابق"
+  },
+  "opskit.ticket.ref_type_not_applicable": {
+    "status": 422,
+    "zh": "只有外部引用字段能限定引用类型",
+    "en": "Only reference fields take a reference type",
+    "ar": "حقول المراجع فقط تأخذ نوع مرجع"
+  },
+  "opskit.ticket.requester_must_be_self": {
+    "status": 422,
+    "zh": "成员只能以自己的名义提单",
+    "en": "Members can only file tickets for themselves",
+    "ar": "يمكن للأعضاء تقديم التذاكر لأنفسهم فقط"
+  },
+  "opskit.ticket.required_needs_on_create": {
+    "status": 422,
+    "zh": "必填字段须允许建单时填写",
+    "en": "A required field must be fillable on create",
+    "ar": "يجب أن يكون الحقل المطلوب قابلًا للتعبئة عند الإنشاء"
+  },
+  "opskit.ticket.reserved_field": {
+    "status": 422,
+    "zh": "字段代号与工单自带的列重名",
+    "en": "The field code clashes with a built-in column",
+    "ar": "رمز الحقل يتعارض مع عمود مدمج"
+  },
+  "opskit.ticket.scope_source_type": {
+    "status": 422,
+    "zh": "这种字段不能用来派生范围标签",
+    "en": "This field type cannot derive scope tags",
+    "ar": "لا يمكن لهذا النوع من الحقول اشتقاق وسوم النطاق"
+  },
+  "opskit.ticket.type_disabled": {
+    "status": 422,
+    "zh": "该工单类型已停用",
+    "en": "This ticket type is disabled",
+    "ar": "نوع التذكرة هذا معطّل"
+  },
+  "opskit.ticket.unknown_field": {
+    "status": 422,
+    "zh": "字段不存在",
+    "en": "Unknown field",
+    "ar": "حقل غير معروف"
+  },
+  "opskit.ticket.unknown_group": {
+    "status": 422,
+    "zh": "组不存在",
+    "en": "Unknown group",
+    "ar": "مجموعة غير معروفة"
+  },
+  "opskit.ticket.unknown_option": {
+    "status": 422,
+    "zh": "选项不存在",
+    "en": "Unknown option",
+    "ar": "خيار غير معروف"
+  },
+  "opskit.ticket.unknown_option_set": {
+    "status": 422,
+    "zh": "选项集不存在",
+    "en": "Unknown option set",
+    "ar": "مجموعة خيارات غير معروفة"
+  },
+  "opskit.ticket.unknown_process": {
+    "status": 422,
+    "zh": "流程不存在",
+    "en": "Unknown process",
+    "ar": "عملية غير معروفة"
+  },
+  "opskit.ticket.unknown_transition": {
+    "status": 422,
+    "zh": "流程里没有这条迁移",
+    "en": "The process has no such transition",
+    "ar": "لا يوجد هذا الانتقال في العملية"
+  },
+  "opskit.ticket.unknown_type": {
+    "status": 422,
+    "zh": "工单类型不存在",
+    "en": "Unknown ticket type",
+    "ar": "نوع تذكرة غير معروف"
+  },
+  "opskit.unauthenticated": {
+    "status": 401,
+    "zh": "未登录或登录已失效",
+    "en": "Not signed in, or the session has expired",
+    "ar": "لم يتم تسجيل الدخول أو انتهت الجلسة"
+  },
+  "opskit.validation": {
+    "status": 422,
+    "zh": "提交的内容不合法",
+    "en": "The submitted data is invalid",
+    "ar": "البيانات المرسلة غير صالحة"
+  },
+  "opskit.validation.code_format": {
+    "status": 422,
+    "zh": "代号只能用小写字母、数字、下划线，且以字母开头",
+    "en": "Codes use lower-case letters, digits and underscores, starting with a letter",
+    "ar": "تستخدم الرموز حروفًا صغيرة وأرقامًا وشرطات سفلية وتبدأ بحرف"
+  },
+  "opskit.validation.duplicate": {
+    "status": 422,
+    "zh": "重复",
+    "en": "Duplicate",
+    "ar": "مكرر"
+  },
+  "opskit.validation.invalid": {
+    "status": 422,
+    "zh": "格式不正确",
+    "en": "Invalid format",
+    "ar": "صيغة غير صالحة"
+  },
+  "opskit.validation.invalid_code": {
+    "status": 422,
+    "zh": "代号格式不正确",
+    "en": "Invalid code",
+    "ar": "رمز غير صالح"
+  },
+  "opskit.validation.invalid_url": {
+    "status": 422,
+    "zh": "地址格式不正确",
+    "en": "Invalid URL",
+    "ar": "رابط غير صالح"
+  },
+  "opskit.validation.invalid_zone": {
+    "status": 422,
+    "zh": "时区不正确",
+    "en": "Invalid time zone",
+    "ar": "منطقة زمنية غير صالحة"
+  },
+  "opskit.validation.mismatch": {
+    "status": 422,
+    "zh": "与路径中的值不一致",
+    "en": "Does not match the value in the path",
+    "ar": "لا يطابق القيمة في المسار"
+  },
+  "opskit.validation.one_of": {
+    "status": 422,
+    "zh": "只能是给定的几种取值之一",
+    "en": "Must be one of the allowed values",
+    "ar": "يجب أن تكون إحدى القيم المسموح بها"
+  },
+  "opskit.validation.out_of_range": {
+    "status": 422,
+    "zh": "超出允许范围",
+    "en": "Out of range",
+    "ar": "خارج النطاق المسموح"
+  },
+  "opskit.validation.positive_duration": {
+    "status": 422,
+    "zh": "时长须大于 0",
+    "en": "Duration must be positive",
+    "ar": "يجب أن تكون المدة موجبة"
+  },
+  "opskit.validation.required": {
+    "status": 422,
+    "zh": "必填",
+    "en": "Required",
+    "ar": "مطلوب"
+  },
+  "opskit.validation.too_long": {
+    "status": 422,
+    "zh": "内容过长",
+    "en": "Too long",
+    "ar": "طويل جدًا"
+  },
+  "opskit.validation.too_many": {
+    "status": 422,
+    "zh": "数量过多",
+    "en": "Too many items",
+    "ar": "عدد العناصر كبير جدًا"
+  },
+  "opskit.validation.unsupported_locale": {
+    "status": 422,
+    "zh": "不支持的语言",
+    "en": "Unsupported language",
+    "ar": "لغة غير مدعومة"
+  }
+}

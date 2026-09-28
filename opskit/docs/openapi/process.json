@@ -1,0 +1,3088 @@
+{
+  "components" : {
+    "schemas" : {
+      "AccountId" : {
+        "properties" : {
+          "value" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Action" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "requires" : {
+            "$ref" : "#/components/schemas/Requires"
+          },
+          "toCategory" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Actor" : {
+        "properties" : {
+          "app" : {
+            "type" : "string"
+          },
+          "appItself" : {
+            "type" : "boolean"
+          },
+          "externalPerms" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array",
+            "uniqueItems" : true
+          },
+          "groups" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array",
+            "uniqueItems" : true
+          },
+          "member" : {
+            "$ref" : "#/components/schemas/PrincipalRef"
+          },
+          "productPermissions" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array",
+            "uniqueItems" : true
+          },
+          "roles" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array",
+            "uniqueItems" : true
+          },
+          "scopes" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array",
+            "uniqueItems" : true
+          },
+          "tenant" : {
+            "$ref" : "#/components/schemas/TenantContext"
+          }
+        },
+        "type" : "object"
+      },
+      "ApprovalBrief" : {
+        "properties" : {
+          "approvalNo" : {
+            "type" : "string"
+          },
+          "finishedAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "requestedAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "requestedBy" : {
+            "$ref" : "#/components/schemas/Person"
+          },
+          "round" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "status" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApprovalQuery" : {
+        "properties" : {
+          "fromMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "keyword" : {
+            "type" : "string"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "processCode" : {
+            "type" : "string"
+          },
+          "requestedBy" : {
+            "type" : "string"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "status" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "ApproverDto" : {
+        "properties" : {
+          "kind" : {
+            "type" : "string"
+          },
+          "value" : { }
+        },
+        "type" : "object"
+      },
+      "Assignee" : {
+        "properties" : {
+          "attrs" : {
+            "additionalProperties" : {
+              "additionalProperties" : { },
+              "type" : "object"
+            },
+            "type" : "object"
+          },
+          "displayName" : {
+            "type" : "string"
+          },
+          "ref" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "CompleteBody" : {
+        "properties" : {
+          "decision" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "DecideBody" : {
+        "properties" : {
+          "decision" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "taskNo" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Dedupe" : {
+        "properties" : {
+          "attachedCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "key" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Entry" : {
+        "properties" : {
+          "action" : {
+            "type" : "string"
+          },
+          "actionName" : {
+            "type" : "string"
+          },
+          "actor" : {
+            "$ref" : "#/components/schemas/Person"
+          },
+          "actorText" : {
+            "type" : "string"
+          },
+          "atMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "entityKind" : {
+            "type" : "string"
+          },
+          "entityNo" : {
+            "type" : "string"
+          },
+          "from" : {
+            "type" : "string"
+          },
+          "fromName" : {
+            "type" : "string"
+          },
+          "payload" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "seq" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "to" : {
+            "type" : "string"
+          },
+          "toName" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "FieldItem" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "label" : {
+            "type" : "string"
+          },
+          "value" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          }
+        },
+        "type" : "object"
+      },
+      "InstanceQuery" : {
+        "properties" : {
+          "createdFromMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "createdToMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "open" : {
+            "type" : "boolean"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "processCode" : {
+            "type" : "string"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "status" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "statusCategory" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "subjectRef" : {
+            "type" : "string"
+          },
+          "subjectType" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Metric" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "dueAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "pausedMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "startedAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "state" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "MetricDto" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "pause" : {
+            "$ref" : "#/components/schemas/PauseDto"
+          },
+          "start" : {
+            "$ref" : "#/components/schemas/TriggerDto"
+          },
+          "stop" : {
+            "$ref" : "#/components/schemas/TriggerDto"
+          }
+        },
+        "type" : "object"
+      },
+      "Named" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "names" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          }
+        },
+        "type" : "object"
+      },
+      "PageRow" : {
+        "properties" : {
+          "list" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Row"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "total" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PageTaskRow" : {
+        "properties" : {
+          "list" : {
+            "items" : {
+              "$ref" : "#/components/schemas/TaskRow"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "total" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PageTodoRow" : {
+        "properties" : {
+          "list" : {
+            "items" : {
+              "$ref" : "#/components/schemas/TodoRow"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "total" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "Participant" : {
+        "properties" : {
+          "member" : {
+            "$ref" : "#/components/schemas/Person"
+          },
+          "role" : {
+            "$ref" : "#/components/schemas/Named"
+          }
+        },
+        "type" : "object"
+      },
+      "PauseDto" : {
+        "properties" : {
+          "categories" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "statuses" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "Person" : {
+        "properties" : {
+          "displayName" : {
+            "type" : "string"
+          },
+          "ref" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "PolicyDto" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "inherited" : {
+            "type" : "boolean"
+          },
+          "metrics" : {
+            "items" : {
+              "$ref" : "#/components/schemas/MetricDto"
+            },
+            "type" : "array"
+          },
+          "name" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "note" : {
+            "type" : "string"
+          },
+          "targets" : {
+            "items" : {
+              "$ref" : "#/components/schemas/TargetDto"
+            },
+            "type" : "array"
+          },
+          "version" : {
+            "type" : "string"
+          },
+          "warnAtPercent" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PrincipalRef" : {
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "kind" : {
+            "enum" : [ "MEMBER", "GROUP", "ROLE", "PERM", "APP", "CONTACT", "PARTICIPANT" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Priority" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "names" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "ordinal" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PublishDto" : {
+        "properties" : {
+          "created" : {
+            "type" : "boolean"
+          },
+          "version" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "QueueCountQuery" : {
+        "properties" : {
+          "kind" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "QueueCountRow" : {
+        "properties" : {
+          "claimedByMe" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "queue" : {
+            "$ref" : "#/components/schemas/Named"
+          },
+          "unclaimed" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "Requires" : {
+        "properties" : {
+          "comment" : {
+            "type" : "boolean"
+          },
+          "fields" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array",
+            "uniqueItems" : true
+          }
+        },
+        "type" : "object"
+      },
+      "Row" : {
+        "properties" : {
+          "actions" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Action"
+            },
+            "type" : "array"
+          },
+          "assignee" : {
+            "$ref" : "#/components/schemas/Assignee"
+          },
+          "createdAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "escalated" : {
+            "type" : "boolean"
+          },
+          "fields" : {
+            "additionalProperties" : {
+              "additionalProperties" : { },
+              "type" : "object"
+            },
+            "type" : "object"
+          },
+          "priority" : {
+            "$ref" : "#/components/schemas/Priority"
+          },
+          "requester" : {
+            "$ref" : "#/components/schemas/Person"
+          },
+          "sla" : {
+            "$ref" : "#/components/schemas/Sla"
+          },
+          "slaNextDueAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "slaState" : {
+            "type" : "string"
+          },
+          "status" : {
+            "$ref" : "#/components/schemas/Named"
+          },
+          "statusCategory" : {
+            "type" : "string"
+          },
+          "subject" : {
+            "$ref" : "#/components/schemas/Subject"
+          },
+          "ticketNo" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "type" : {
+            "$ref" : "#/components/schemas/Named"
+          },
+          "updatedAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "RulesDto" : {
+        "properties" : {
+          "crossStepExclusive" : {
+            "type" : "boolean"
+          },
+          "selfApproval" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "Sla" : {
+        "properties" : {
+          "dueAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "pausedMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "startedAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "state" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "SlaSummary" : {
+        "properties" : {
+          "dueAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "pausedMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "startedAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "state" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "StatsDto" : {
+        "properties" : {
+          "approvals" : {
+            "additionalProperties" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "type" : "object"
+          },
+          "avgCycleMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "byCategory" : {
+            "additionalProperties" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "type" : "object"
+          },
+          "open" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "process" : {
+            "$ref" : "#/components/schemas/Named"
+          },
+          "total" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "StatsQuery" : {
+        "properties" : {
+          "fromMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "processCode" : {
+            "type" : "string"
+          },
+          "toMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "StepDto" : {
+        "properties" : {
+          "approver" : {
+            "$ref" : "#/components/schemas/ApproverDto"
+          },
+          "code" : {
+            "type" : "string"
+          },
+          "dueHours" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "mode" : {
+            "type" : "string"
+          },
+          "name" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "when" : {
+            "$ref" : "#/components/schemas/WhenDto"
+          }
+        },
+        "type" : "object"
+      },
+      "Subject" : {
+        "properties" : {
+          "display" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "ref" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "SubjectDto" : {
+        "properties" : {
+          "instances" : {
+            "items" : {
+              "$ref" : "#/components/schemas/SubjectItem"
+            },
+            "type" : "array"
+          },
+          "ref" : {
+            "type" : "string"
+          },
+          "total" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "truncated" : {
+            "type" : "boolean"
+          },
+          "type" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "SubjectItem" : {
+        "properties" : {
+          "approvals" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ApprovalBrief"
+            },
+            "type" : "array"
+          },
+          "history" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Entry"
+            },
+            "type" : "array"
+          },
+          "instance" : {
+            "$ref" : "#/components/schemas/Row"
+          }
+        },
+        "type" : "object"
+      },
+      "SummaryDto" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "enabled" : {
+            "type" : "boolean"
+          },
+          "inherited" : {
+            "type" : "boolean"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "names" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "running" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "stepsSummary" : {
+            "type" : "string"
+          },
+          "version" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "TargetDto" : {
+        "properties" : {
+          "calendar" : {
+            "type" : "string"
+          },
+          "targetsMin" : {
+            "additionalProperties" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "type" : "object"
+          },
+          "when" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          }
+        },
+        "type" : "object"
+      },
+      "TaskQuery" : {
+        "properties" : {
+          "assignee" : {
+            "type" : "string"
+          },
+          "claimed" : {
+            "type" : "boolean"
+          },
+          "kind" : {
+            "type" : "string"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "queueGroup" : {
+            "type" : "string"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "status" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "TaskRow" : {
+        "properties" : {
+          "approvalNo" : {
+            "type" : "string"
+          },
+          "claimExpiresAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "claimedBy" : {
+            "$ref" : "#/components/schemas/Person"
+          },
+          "createdAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "instanceNo" : {
+            "type" : "string"
+          },
+          "kind" : {
+            "type" : "string"
+          },
+          "priorityOrd" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "queue" : {
+            "$ref" : "#/components/schemas/Named"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "subject" : {
+            "$ref" : "#/components/schemas/Subject"
+          },
+          "taskNo" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "TemplateDto" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "note" : {
+            "type" : "string"
+          },
+          "rules" : {
+            "$ref" : "#/components/schemas/RulesDto"
+          },
+          "steps" : {
+            "items" : {
+              "$ref" : "#/components/schemas/StepDto"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "TenantContext" : {
+        "properties" : {
+          "accountId" : {
+            "$ref" : "#/components/schemas/AccountId"
+          },
+          "workspaceId" : {
+            "$ref" : "#/components/schemas/WorkspaceId"
+          }
+        },
+        "type" : "object"
+      },
+      "TodoCount" : {
+        "properties" : {
+          "all" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "claimable" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "process" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "ticket" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "TodoQuery" : {
+        "properties" : {
+          "claimable" : {
+            "type" : "boolean"
+          },
+          "origin" : {
+            "type" : "string"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "TodoRow" : {
+        "properties" : {
+          "approvalNo" : {
+            "type" : "string"
+          },
+          "claimable" : {
+            "type" : "boolean"
+          },
+          "createdAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "dueAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "instanceNo" : {
+            "type" : "string"
+          },
+          "kind" : {
+            "type" : "string"
+          },
+          "origin" : {
+            "type" : "string"
+          },
+          "priorityOrd" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "process" : {
+            "$ref" : "#/components/schemas/Named"
+          },
+          "queueGroup" : {
+            "type" : "string"
+          },
+          "sla" : {
+            "$ref" : "#/components/schemas/SlaSummary"
+          },
+          "subject" : {
+            "$ref" : "#/components/schemas/Subject"
+          },
+          "taskNo" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "TriggerDto" : {
+        "properties" : {
+          "categories" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "onCreate" : {
+            "type" : "boolean"
+          },
+          "transitions" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "Version" : {
+        "properties" : {
+          "atMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "by" : {
+            "type" : "string"
+          },
+          "channel" : {
+            "type" : "string"
+          },
+          "current" : {
+            "type" : "boolean"
+          },
+          "note" : {
+            "type" : "string"
+          },
+          "version" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "View" : {
+        "properties" : {
+          "actions" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Action"
+            },
+            "type" : "array"
+          },
+          "assignee" : {
+            "$ref" : "#/components/schemas/Assignee"
+          },
+          "attached" : {
+            "type" : "boolean"
+          },
+          "closedAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "createdAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "dedupe" : {
+            "$ref" : "#/components/schemas/Dedupe"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "escalated" : {
+            "type" : "boolean"
+          },
+          "fieldList" : {
+            "items" : {
+              "$ref" : "#/components/schemas/FieldItem"
+            },
+            "type" : "array"
+          },
+          "fields" : {
+            "additionalProperties" : {
+              "additionalProperties" : { },
+              "type" : "object"
+            },
+            "type" : "object"
+          },
+          "mergedInto" : {
+            "type" : "string"
+          },
+          "open" : {
+            "type" : "boolean"
+          },
+          "participants" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Participant"
+            },
+            "type" : "array"
+          },
+          "priority" : {
+            "$ref" : "#/components/schemas/Priority"
+          },
+          "requester" : {
+            "$ref" : "#/components/schemas/Person"
+          },
+          "resolution" : {
+            "$ref" : "#/components/schemas/Named"
+          },
+          "sla" : {
+            "$ref" : "#/components/schemas/Sla"
+          },
+          "slaMetrics" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Metric"
+            },
+            "type" : "array"
+          },
+          "slaNextDueAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "slaState" : {
+            "type" : "string"
+          },
+          "status" : {
+            "$ref" : "#/components/schemas/Named"
+          },
+          "statusCategory" : {
+            "type" : "string"
+          },
+          "subject" : {
+            "$ref" : "#/components/schemas/Subject"
+          },
+          "ticketNo" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "type" : {
+            "$ref" : "#/components/schemas/Named"
+          },
+          "updatedAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "WhenDto" : {
+        "properties" : {
+          "field" : {
+            "type" : "string"
+          },
+          "op" : {
+            "type" : "string"
+          },
+          "value" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "WorkspaceId" : {
+        "properties" : {
+          "template" : {
+            "type" : "boolean"
+          },
+          "value" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      }
+    }
+  },
+  "info" : {
+    "title" : "OpsKit process",
+    "version" : "v1"
+  },
+  "openapi" : "3.1.0",
+  "paths" : {
+    "/api/opskit/v1/workspaces/{ws}/approval-templates" : {
+      "get" : {
+        "operationId" : "list_3",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/SummaryDto"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "approval-template-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/approval-templates/{code}" : {
+      "get" : {
+        "operationId" : "get_2",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TemplateDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "approval-template-controller" ]
+      },
+      "put" : {
+        "operationId" : "publish_2",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TemplateDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PublishDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "approval-template-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/approval-templates/{code}/disable" : {
+      "post" : {
+        "operationId" : "disable",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "approval-template-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/approval-templates/{code}/enable" : {
+      "post" : {
+        "operationId" : "enable_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "approval-template-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/approval-templates/{code}/versions" : {
+      "get" : {
+        "operationId" : "versions",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/Version"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "approval-template-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/approvals/count" : {
+      "post" : {
+        "operationId" : "count",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ApprovalQuery"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "additionalProperties" : {
+                    "format" : "int64",
+                    "type" : "integer"
+                  },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "approval-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/approvals/query" : {
+      "post" : {
+        "operationId" : "query_5",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ApprovalQuery"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageRow"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "approval-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/approvals/{no}" : {
+      "get" : {
+        "operationId" : "get_6",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/View"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "approval-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/approvals/{no}/decide" : {
+      "post" : {
+        "operationId" : "decide_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DecideBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/View"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "approval-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/approvals/{no}/withdraw" : {
+      "post" : {
+        "operationId" : "withdraw_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/View"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "approval-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/instances/query" : {
+      "post" : {
+        "operationId" : "query_3",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/InstanceQuery"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageRow"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "instance-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/instances/{no}" : {
+      "get" : {
+        "operationId" : "instance_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Row"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "instance-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/instances/{no}/history" : {
+      "get" : {
+        "operationId" : "history",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/Entry"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "instance-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/process-stats" : {
+      "post" : {
+        "operationId" : "stats_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/StatsQuery"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/StatsDto"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "instance-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/sla-policies" : {
+      "get" : {
+        "operationId" : "list",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/PolicyDto"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "sla-policy-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/sla-policies/{code}" : {
+      "get" : {
+        "operationId" : "get_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PolicyDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "sla-policy-controller" ]
+      },
+      "put" : {
+        "operationId" : "publish_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PolicyDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PublishDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "sla-policy-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/subjects/{type}/{ref}/history" : {
+      "get" : {
+        "operationId" : "subject",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "type",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "ref",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SubjectDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "instance-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/tasks/query" : {
+      "post" : {
+        "operationId" : "tasks",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TaskQuery"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageTaskRow"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "todo-task-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/tasks/queue-counts" : {
+      "post" : {
+        "operationId" : "queueCounts",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/QueueCountQuery"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/QueueCountRow"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "todo-task-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/tasks/{no}/claim" : {
+      "post" : {
+        "operationId" : "claim_2",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TaskRow"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "todo-task-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/tasks/{no}/complete" : {
+      "post" : {
+        "operationId" : "complete_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CompleteBody"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "todo-task-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/tasks/{no}/release" : {
+      "post" : {
+        "operationId" : "release",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TaskRow"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "todo-task-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/todos/count" : {
+      "post" : {
+        "operationId" : "todoCount_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TodoCount"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "todo-task-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/todos/query" : {
+      "post" : {
+        "operationId" : "todos_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TodoQuery"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageTodoRow"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "todo-task-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/approval-templates" : {
+      "get" : {
+        "operationId" : "list_2",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/SummaryDto"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "approval-template-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/approval-templates/{code}" : {
+      "get" : {
+        "operationId" : "get_3",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TemplateDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "approval-template-controller" ]
+      },
+      "put" : {
+        "operationId" : "publish_3",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TemplateDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PublishDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "approval-template-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/approval-templates/{code}/disable" : {
+      "post" : {
+        "operationId" : "disable_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "approval-template-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/approval-templates/{code}/enable" : {
+      "post" : {
+        "operationId" : "enable",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "approval-template-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/approval-templates/{code}/versions" : {
+      "get" : {
+        "operationId" : "versions_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/Version"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "approval-template-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/approvals/count" : {
+      "post" : {
+        "operationId" : "count_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ApprovalQuery"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "additionalProperties" : {
+                    "format" : "int64",
+                    "type" : "integer"
+                  },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "approval-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/approvals/query" : {
+      "post" : {
+        "operationId" : "query_4",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ApprovalQuery"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageRow"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "approval-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/approvals/{no}" : {
+      "get" : {
+        "operationId" : "get_7",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/View"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "approval-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/approvals/{no}/decide" : {
+      "post" : {
+        "operationId" : "decide",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DecideBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/View"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "approval-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/approvals/{no}/withdraw" : {
+      "post" : {
+        "operationId" : "withdraw",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/View"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "approval-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/instances/query" : {
+      "post" : {
+        "operationId" : "query_2",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/InstanceQuery"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageRow"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "instance-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/instances/{no}" : {
+      "get" : {
+        "operationId" : "instance",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Row"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "instance-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/instances/{no}/history" : {
+      "get" : {
+        "operationId" : "history_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/Entry"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "instance-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/process-stats" : {
+      "post" : {
+        "operationId" : "stats",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/StatsQuery"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/StatsDto"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "instance-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/sla-policies" : {
+      "get" : {
+        "operationId" : "list_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/PolicyDto"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "sla-policy-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/sla-policies/{code}" : {
+      "get" : {
+        "operationId" : "get",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PolicyDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "sla-policy-controller" ]
+      },
+      "put" : {
+        "operationId" : "publish",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PolicyDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PublishDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "sla-policy-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/subjects/{type}/{ref}/history" : {
+      "get" : {
+        "operationId" : "subject_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "type",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "ref",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SubjectDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "instance-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/tasks/query" : {
+      "post" : {
+        "operationId" : "tasks_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TaskQuery"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageTaskRow"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "todo-task-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/tasks/queue-counts" : {
+      "post" : {
+        "operationId" : "queueCounts_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/QueueCountQuery"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/QueueCountRow"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "todo-task-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/tasks/{no}/claim" : {
+      "post" : {
+        "operationId" : "claim_3",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TaskRow"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "todo-task-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/tasks/{no}/complete" : {
+      "post" : {
+        "operationId" : "complete",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CompleteBody"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "todo-task-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/tasks/{no}/release" : {
+      "post" : {
+        "operationId" : "release_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TaskRow"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "todo-task-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/todos/count" : {
+      "post" : {
+        "operationId" : "todoCount",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TodoCount"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "todo-task-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/todos/query" : {
+      "post" : {
+        "operationId" : "todos",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TodoQuery"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageTodoRow"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "todo-task-controller" ]
+      }
+    }
+  }
+}

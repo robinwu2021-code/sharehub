@@ -99,9 +99,12 @@
                                         <exclude>ai.neargo.shop:*</exclude>
                                         <exclude>top.ichain:*</exclude>
                                     </excludes>
-                                    <!-- Jackson 2（com.fasterxml.jackson.core:jackson-databind）暂不在这里禁：
-                                         springdoc（swagger-core）是否传递它待 O4-2 接入时核实，核实后再决定是否加进来。
-                                         我们自己的代码不许用它，由 ArchUnit A10 守。 -->
+                                    <includes>
+                                        <!-- 例外：springdoc 运行时要用校验注解类，只在 test 作用域导出 OpenAPI（O4-2），不进产物 -->
+                                        <include>org.hibernate.validator:hibernate-validator:*:jar:test</include>
+                                    </includes>
+                                    <!-- Jackson 2（com.fasterxml.jackson.core:jackson-databind）不在这里禁：O4-2 核实 springdoc（swagger-core）
+                                         确实传递它，但 springdoc 只在 opskit-svc 的 test 作用域，产物里没有。我们自己的代码不许用它，由 ArchUnit A10 守。 -->
                                 </bannedDependencies>
                             </rules>
                             <fail>true</fail>

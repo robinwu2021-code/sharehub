@@ -1,0 +1,2699 @@
+{
+  "components" : {
+    "schemas" : {
+      "AccountId" : {
+        "properties" : {
+          "value" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Action" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "requires" : {
+            "$ref" : "#/components/schemas/Requires"
+          },
+          "toCategory" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Actor" : {
+        "properties" : {
+          "app" : {
+            "type" : "string"
+          },
+          "appItself" : {
+            "type" : "boolean"
+          },
+          "externalPerms" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array",
+            "uniqueItems" : true
+          },
+          "groups" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array",
+            "uniqueItems" : true
+          },
+          "member" : {
+            "$ref" : "#/components/schemas/PrincipalRef"
+          },
+          "productPermissions" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array",
+            "uniqueItems" : true
+          },
+          "roles" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array",
+            "uniqueItems" : true
+          },
+          "scopes" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array",
+            "uniqueItems" : true
+          },
+          "tenant" : {
+            "$ref" : "#/components/schemas/TenantContext"
+          }
+        },
+        "type" : "object"
+      },
+      "AssignBody" : {
+        "properties" : {
+          "reason" : {
+            "type" : "string"
+          },
+          "to" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Assignee" : {
+        "properties" : {
+          "attrs" : {
+            "additionalProperties" : {
+              "additionalProperties" : { },
+              "type" : "object"
+            },
+            "type" : "object"
+          },
+          "displayName" : {
+            "type" : "string"
+          },
+          "ref" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AssigneeAttr" : {
+        "properties" : {
+          "key" : {
+            "type" : "string"
+          },
+          "values" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "BulkReassignRequest" : {
+        "properties" : {
+          "from" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "ticketNos" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "to" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "BulkReassignResult" : {
+        "properties" : {
+          "failed" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Failure"
+            },
+            "type" : "array"
+          },
+          "remaining" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "succeeded" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "CardDto" : {
+        "properties" : {
+          "key" : {
+            "type" : "string"
+          },
+          "label" : {
+            "type" : "string"
+          },
+          "queryParams" : {
+            "$ref" : "#/components/schemas/TicketQuery"
+          },
+          "tone" : {
+            "type" : "string"
+          },
+          "value" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "CommentBody" : {
+        "properties" : {
+          "attachments" : {
+            "items" : {
+              "additionalProperties" : { },
+              "type" : "object"
+            },
+            "type" : "array"
+          },
+          "body" : {
+            "type" : "string"
+          },
+          "visibility" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "CountDto" : {
+        "properties" : {
+          "open" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "CreateBody" : {
+        "properties" : {
+          "dedupeKey" : {
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "fields" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "priority" : {
+            "type" : "string"
+          },
+          "requester" : {
+            "type" : "string"
+          },
+          "scopes" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array",
+            "uniqueItems" : true
+          },
+          "subject" : {
+            "$ref" : "#/components/schemas/SubjectBody"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "typeCode" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Dedupe" : {
+        "properties" : {
+          "attachedCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "key" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "EscalateBody" : {
+        "properties" : {
+          "reason" : {
+            "type" : "string"
+          },
+          "to" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ExternalBody" : {
+        "properties" : {
+          "to" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Failure" : {
+        "properties" : {
+          "error" : {
+            "type" : "string"
+          },
+          "ticketNo" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "FieldFilter" : {
+        "properties" : {
+          "field" : {
+            "type" : "string"
+          },
+          "op" : {
+            "type" : "string"
+          },
+          "value" : { }
+        },
+        "type" : "object"
+      },
+      "FieldItem" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "label" : {
+            "type" : "string"
+          },
+          "value" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          }
+        },
+        "type" : "object"
+      },
+      "GroupBody" : {
+        "properties" : {
+          "filter" : {
+            "$ref" : "#/components/schemas/TicketQuery"
+          },
+          "groups" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "MergeBody" : {
+        "properties" : {
+          "into" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Metric" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "dueAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "pausedMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "startedAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "state" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Named" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "names" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          }
+        },
+        "type" : "object"
+      },
+      "PageRow" : {
+        "properties" : {
+          "list" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Row"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "total" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "Participant" : {
+        "properties" : {
+          "member" : {
+            "$ref" : "#/components/schemas/Person"
+          },
+          "role" : {
+            "$ref" : "#/components/schemas/Named"
+          }
+        },
+        "type" : "object"
+      },
+      "Person" : {
+        "properties" : {
+          "displayName" : {
+            "type" : "string"
+          },
+          "ref" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "PrincipalRef" : {
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "kind" : {
+            "enum" : [ "MEMBER", "GROUP", "ROLE", "PERM", "APP", "CONTACT", "PARTICIPANT" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Priority" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "names" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "ordinal" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "ReasonBody" : {
+        "properties" : {
+          "reason" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Requires" : {
+        "properties" : {
+          "comment" : {
+            "type" : "boolean"
+          },
+          "fields" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array",
+            "uniqueItems" : true
+          }
+        },
+        "type" : "object"
+      },
+      "Row" : {
+        "properties" : {
+          "actions" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Action"
+            },
+            "type" : "array"
+          },
+          "assignee" : {
+            "$ref" : "#/components/schemas/Assignee"
+          },
+          "createdAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "escalated" : {
+            "type" : "boolean"
+          },
+          "fields" : {
+            "additionalProperties" : {
+              "additionalProperties" : { },
+              "type" : "object"
+            },
+            "type" : "object"
+          },
+          "priority" : {
+            "$ref" : "#/components/schemas/Priority"
+          },
+          "requester" : {
+            "$ref" : "#/components/schemas/Person"
+          },
+          "sla" : {
+            "$ref" : "#/components/schemas/Sla"
+          },
+          "slaNextDueAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "slaState" : {
+            "type" : "string"
+          },
+          "status" : {
+            "$ref" : "#/components/schemas/Named"
+          },
+          "statusCategory" : {
+            "type" : "string"
+          },
+          "subject" : {
+            "$ref" : "#/components/schemas/Subject"
+          },
+          "ticketNo" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "type" : {
+            "$ref" : "#/components/schemas/Named"
+          },
+          "updatedAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "RowDto" : {
+        "properties" : {
+          "assignee" : {
+            "$ref" : "#/components/schemas/Person"
+          },
+          "avgResolutionMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "closed" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "groupName" : {
+            "type" : "string"
+          },
+          "key" : {
+            "type" : "string"
+          },
+          "metRate" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "open" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "openBreached" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "queryParams" : {
+            "$ref" : "#/components/schemas/TicketQuery"
+          },
+          "total" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "Sla" : {
+        "properties" : {
+          "dueAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "pausedMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "startedAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "state" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Subject" : {
+        "properties" : {
+          "display" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "ref" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "SubjectBody" : {
+        "properties" : {
+          "display" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "ref" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "TenantContext" : {
+        "properties" : {
+          "accountId" : {
+            "$ref" : "#/components/schemas/AccountId"
+          },
+          "workspaceId" : {
+            "$ref" : "#/components/schemas/WorkspaceId"
+          }
+        },
+        "type" : "object"
+      },
+      "TicketQuery" : {
+        "properties" : {
+          "assignee" : {
+            "type" : "string"
+          },
+          "assigneeAttr" : {
+            "$ref" : "#/components/schemas/AssigneeAttr"
+          },
+          "closedFromMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "closedToMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "createdFromMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "createdToMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "escalated" : {
+            "type" : "boolean"
+          },
+          "fieldFilters" : {
+            "items" : {
+              "$ref" : "#/components/schemas/FieldFilter"
+            },
+            "type" : "array"
+          },
+          "group" : {
+            "type" : "string"
+          },
+          "keyword" : {
+            "type" : "string"
+          },
+          "open" : {
+            "type" : "boolean"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "priority" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "requester" : {
+            "type" : "string"
+          },
+          "scopes" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "slaState" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "sort" : {
+            "type" : "string"
+          },
+          "status" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "statusCategory" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "typeCode" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "TimelineDto" : {
+        "properties" : {
+          "actor" : {
+            "$ref" : "#/components/schemas/Person"
+          },
+          "atMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "attachments" : {
+            "items" : {
+              "additionalProperties" : { },
+              "type" : "object"
+            },
+            "type" : "array"
+          },
+          "detail" : {
+            "type" : "string"
+          },
+          "hot" : {
+            "type" : "boolean"
+          },
+          "kind" : {
+            "type" : "string"
+          },
+          "seq" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "visibility" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "TransitionBody" : {
+        "properties" : {
+          "comment" : {
+            "type" : "string"
+          },
+          "resolution" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "TypeDto" : {
+        "properties" : {
+          "assignment" : {
+            "type" : "string"
+          },
+          "code" : {
+            "type" : "string"
+          },
+          "enabled" : {
+            "type" : "boolean"
+          },
+          "fields" : {
+            "items" : {
+              "$ref" : "#/components/schemas/TypeField"
+            },
+            "type" : "array"
+          },
+          "inherited" : {
+            "type" : "boolean"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "names" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "numberPrefix" : {
+            "type" : "string"
+          },
+          "priorityOptions" : {
+            "items" : {
+              "$ref" : "#/components/schemas/TypeOption"
+            },
+            "type" : "array"
+          },
+          "processCode" : {
+            "type" : "string"
+          },
+          "resolutionOptions" : {
+            "items" : {
+              "$ref" : "#/components/schemas/TypeOption"
+            },
+            "type" : "array"
+          },
+          "version" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "TypeField" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "filterable" : {
+            "type" : "boolean"
+          },
+          "multiple" : {
+            "type" : "boolean"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "names" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "onCreate" : {
+            "type" : "boolean"
+          },
+          "options" : {
+            "items" : {
+              "$ref" : "#/components/schemas/TypeOption"
+            },
+            "type" : "array"
+          },
+          "refType" : {
+            "type" : "string"
+          },
+          "required" : {
+            "type" : "boolean"
+          },
+          "type" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "TypeOption" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "enabled" : {
+            "type" : "boolean"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "names" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          }
+        },
+        "type" : "object"
+      },
+      "UpdateTicketRequest" : {
+        "properties" : {
+          "description" : {
+            "type" : "string"
+          },
+          "fields" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "priority" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "View" : {
+        "properties" : {
+          "actions" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Action"
+            },
+            "type" : "array"
+          },
+          "assignee" : {
+            "$ref" : "#/components/schemas/Assignee"
+          },
+          "attached" : {
+            "type" : "boolean"
+          },
+          "closedAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "createdAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "dedupe" : {
+            "$ref" : "#/components/schemas/Dedupe"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "escalated" : {
+            "type" : "boolean"
+          },
+          "fieldList" : {
+            "items" : {
+              "$ref" : "#/components/schemas/FieldItem"
+            },
+            "type" : "array"
+          },
+          "fields" : {
+            "additionalProperties" : {
+              "additionalProperties" : { },
+              "type" : "object"
+            },
+            "type" : "object"
+          },
+          "mergedInto" : {
+            "type" : "string"
+          },
+          "open" : {
+            "type" : "boolean"
+          },
+          "participants" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Participant"
+            },
+            "type" : "array"
+          },
+          "priority" : {
+            "$ref" : "#/components/schemas/Priority"
+          },
+          "requester" : {
+            "$ref" : "#/components/schemas/Person"
+          },
+          "resolution" : {
+            "$ref" : "#/components/schemas/Named"
+          },
+          "sla" : {
+            "$ref" : "#/components/schemas/Sla"
+          },
+          "slaMetrics" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Metric"
+            },
+            "type" : "array"
+          },
+          "slaNextDueAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "slaState" : {
+            "type" : "string"
+          },
+          "status" : {
+            "$ref" : "#/components/schemas/Named"
+          },
+          "statusCategory" : {
+            "type" : "string"
+          },
+          "subject" : {
+            "$ref" : "#/components/schemas/Subject"
+          },
+          "ticketNo" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "type" : {
+            "$ref" : "#/components/schemas/Named"
+          },
+          "updatedAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "WatchersBody" : {
+        "properties" : {
+          "members" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "WorkspaceId" : {
+        "properties" : {
+          "template" : {
+            "type" : "boolean"
+          },
+          "value" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      }
+    }
+  },
+  "info" : {
+    "title" : "OpsKit ticket",
+    "version" : "v1"
+  },
+  "openapi" : "3.1.0",
+  "paths" : {
+    "/api/opskit/v1/workspaces/{ws}/ticket-stats/by-assignee" : {
+      "post" : {
+        "operationId" : "byAssignee_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TicketQuery"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/RowDto"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-stats-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/ticket-stats/by-group" : {
+      "post" : {
+        "operationId" : "byGroup_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/GroupBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/RowDto"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-stats-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/ticket-stats/open-count" : {
+      "post" : {
+        "operationId" : "openCount_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TicketQuery"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CountDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-stats-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/ticket-stats/summary" : {
+      "post" : {
+        "operationId" : "summary_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TicketQuery"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/CardDto"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-stats-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/ticket-types" : {
+      "get" : {
+        "operationId" : "types",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/TypeDto"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/ticket-types/{code}" : {
+      "get" : {
+        "operationId" : "type",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TypeDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/tickets" : {
+      "post" : {
+        "operationId" : "create",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/View"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/tickets/query" : {
+      "post" : {
+        "operationId" : "query",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TicketQuery"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageRow"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/tickets/reassign" : {
+      "post" : {
+        "operationId" : "reassign_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/BulkReassignRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BulkReassignResult"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/tickets/{no}" : {
+      "get" : {
+        "operationId" : "get_5",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/View"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      },
+      "patch" : {
+        "operationId" : "update_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateTicketRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/View"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/tickets/{no}/assign" : {
+      "post" : {
+        "operationId" : "assign_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AssignBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/View"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/tickets/{no}/assignment" : {
+      "post" : {
+        "operationId" : "externalAssignment",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ExternalBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/View"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/tickets/{no}/claim" : {
+      "post" : {
+        "operationId" : "claim_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/View"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/tickets/{no}/comments" : {
+      "post" : {
+        "operationId" : "comment",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CommentBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/TimelineDto"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/tickets/{no}/escalate" : {
+      "post" : {
+        "operationId" : "escalate_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/EscalateBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/View"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/tickets/{no}/merge" : {
+      "post" : {
+        "operationId" : "merge",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MergeBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/View"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/tickets/{no}/pool" : {
+      "post" : {
+        "operationId" : "pool_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ReasonBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/View"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/tickets/{no}/timeline" : {
+      "get" : {
+        "operationId" : "timeline_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/TimelineDto"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/tickets/{no}/transitions/{code}" : {
+      "post" : {
+        "operationId" : "transition_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TransitionBody"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/View"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/tickets/{no}/watchers" : {
+      "put" : {
+        "operationId" : "watchers",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/WatchersBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/View"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/ticket-stats/by-assignee" : {
+      "post" : {
+        "operationId" : "byAssignee",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TicketQuery"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/RowDto"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-stats-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/ticket-stats/by-group" : {
+      "post" : {
+        "operationId" : "byGroup",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/GroupBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/RowDto"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-stats-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/ticket-stats/open-count" : {
+      "post" : {
+        "operationId" : "openCount",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TicketQuery"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CountDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-stats-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/ticket-stats/summary" : {
+      "post" : {
+        "operationId" : "summary",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TicketQuery"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/CardDto"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-stats-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/ticket-types" : {
+      "get" : {
+        "operationId" : "types_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/TypeDto"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/ticket-types/{code}" : {
+      "get" : {
+        "operationId" : "type_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TypeDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/tickets" : {
+      "post" : {
+        "operationId" : "create_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/View"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/tickets/query" : {
+      "post" : {
+        "operationId" : "query_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TicketQuery"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageRow"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/tickets/reassign" : {
+      "post" : {
+        "operationId" : "reassign",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/BulkReassignRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BulkReassignResult"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/tickets/{no}" : {
+      "get" : {
+        "operationId" : "get_4",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/View"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      },
+      "patch" : {
+        "operationId" : "update",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateTicketRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/View"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/tickets/{no}/assign" : {
+      "post" : {
+        "operationId" : "assign",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AssignBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/View"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/tickets/{no}/assignment" : {
+      "post" : {
+        "operationId" : "externalAssignment_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ExternalBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/View"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/tickets/{no}/claim" : {
+      "post" : {
+        "operationId" : "claim",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/View"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/tickets/{no}/comments" : {
+      "post" : {
+        "operationId" : "comment_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CommentBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/TimelineDto"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/tickets/{no}/escalate" : {
+      "post" : {
+        "operationId" : "escalate",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/EscalateBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/View"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/tickets/{no}/merge" : {
+      "post" : {
+        "operationId" : "merge_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MergeBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/View"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/tickets/{no}/pool" : {
+      "post" : {
+        "operationId" : "pool",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ReasonBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/View"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/tickets/{no}/timeline" : {
+      "get" : {
+        "operationId" : "timeline",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/TimelineDto"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/tickets/{no}/transitions/{code}" : {
+      "post" : {
+        "operationId" : "transition",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TransitionBody"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/View"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/tickets/{no}/watchers" : {
+      "put" : {
+        "operationId" : "watchers_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "no",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/WatchersBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/View"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    }
+  }
+}
