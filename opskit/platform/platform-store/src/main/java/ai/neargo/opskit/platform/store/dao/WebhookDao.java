@@ -29,6 +29,16 @@ public final class WebhookDao {
                 .params(account.value(), workspaceId == null ? "" : workspaceId, appId, eventType, url, 1).update();
     }
 
+    /** 某应用在某空间的全部订阅（含停用的）。 */
+    public List<SubscriptionRow> ofApp(AccountId account, String workspaceId, String appId) {
+        return jdbc.sql("SELECT * FROM plat_webhook_subscription WHERE account_id = ? AND workspace_id = ? AND app_id = ? ORDER BY id")
+                .params(account.value(), workspaceId == null ? "" : workspaceId, appId).query(MAPPER).list();
+    }
+
+    public void disable(AccountId account, long subscriptionId) {
+        jdbc.sql("UPDATE plat_webhook_subscription SET enabled = 0 WHERE account_id = ? AND id = ?").params(account.value(), subscriptionId).update();
+    }
+
     /** 与该空间、该事件类型匹配的启用订阅。通配的匹配在内存里做（订阅量小）。 */
     public List<SubscriptionRow> matching(AccountId account, String workspaceId, String eventType) {
         return jdbc.sql("SELECT * FROM plat_webhook_subscription WHERE account_id = ? AND workspace_id IN ('', ?) AND enabled = 1 ORDER BY id")

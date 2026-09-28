@@ -33,6 +33,12 @@ public final class AppDao {
         return jdbc.sql("SELECT * FROM plat_app WHERE account_id = ? AND app_id = ?").params(accountId.value(), appId).query(MAPPER).optional();
     }
 
+    /** 按名称找（启动引导按名称识别部署方声明的应用；同名多个时取最早的）。 */
+    public Optional<AppRow> findByName(AccountId accountId, String name) {
+        return jdbc.sql("SELECT * FROM plat_app WHERE account_id = ? AND name = ? ORDER BY id").params(accountId.value(), name).query(MAPPER).list()
+                .stream().findFirst();
+    }
+
     /**
      * 按凭证哈希找应用 —— 认证入口，此时还不知道账户，是全表唯一的例外（凭证哈希全局唯一，uk_cred）。
      * 第一个参数用 {@link AccountId#UNKNOWN} 占位，让「这里没有租户条件」在调用处显形。

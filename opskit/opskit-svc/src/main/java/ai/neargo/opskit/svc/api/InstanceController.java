@@ -33,9 +33,12 @@ public class InstanceController {
     private final ProcessHistoryService history;
     private final DirectoryAppService directory;
 
-    public InstanceController(ProcessHistoryService history, DirectoryAppService directory) {
+    private final ai.neargo.opskit.process.client.ProcessClient processes;
+
+    public InstanceController(ProcessHistoryService history, DirectoryAppService directory, ai.neargo.opskit.process.client.ProcessClient processes) {
         this.history = history;
         this.directory = directory;
+        this.processes = processes;
     }
 
     public record Row(String instanceNo, Named process, String processVersion, Subject subject, Named status, String statusCategory, boolean open,
@@ -63,6 +66,34 @@ public class InstanceController {
     }
 
     public record StatsDto(Named process, long total, long open, Map<String, Long> byCategory, Long avgCycleMs, Map<String, Long> approvals) {
+    }
+
+    public record SubjectBody(String type, String ref, Map<String, Object> display) {
+    }
+
+    /** onBehalfOf 由 CallerResolver 从同一请求体解析，这里不重复声明。 */
+    public record StartBody(String processCode, SubjectBody subject, Map<String, Object> fields, Map<String, List<String>> participants,
+            java.util.Set<String> scopes, List<String> slaPolicies) {
+    }
+
+    /** approvalNo：发起后若停在审批门，带上当前审批单号（接入方据此在自己的业务页展示进度）。 */
+    public record Started(String instanceNo, String processCode, String processVersion, String status, String statusCategory, boolean open,
+            int seq, String approvalNo, long createdAtMs) {
+    }
+
+    /** 发起实例（21/06 §实例）：应用凭证可带 onBehalfOf 代提交人发起（提交人成为 REQUESTER，自审禁止据此判）。 */
+    @PostMapping("/instances")
+    public Started start(Actor actor, @RequestBody StartBody body) {
+        if (body == null || body.processCode() == null || body.processCode().isBlank()) {
+            throw new ai.neargo.opskit.commons.error.OpsKitException(ai.neargo.opskit.commons.error.CommonErrors.VALIDATION, "processCode is required",
+                    Map.of(), List.of(new ai.neargo.opskit.commons.error.FieldError("processCode", "opskit.validation.required")));
+        }
+        ai.neargo.opskit.process.api.model.SubjectRef subject = body.subject() == null ? null
+                : new ai.neargo.opskit.process.api.model.SubjectRef(body.subject().type(), body.subject().ref(), body.subject().display());
+        ai.neargo.opskit.process.api.model.InstanceView v = processes.start(actor, new ai.neargo.opskit.process.api.model.StartRequest(body.processCode(),
+                subject, body.fields(), body.participants(), body.scopes(), body.slaPolicies()));
+        return new Started(v.instanceNo(), v.processCode(), v.processVersion(), v.status(), v.statusCategory().name(), v.open(), v.seq(),
+                history.pendingApprovalNo(actor.tenant(), v.instanceNo()).orElse(null), v.createdAtMs());
     }
 
     /** 单个实例行（与 instances/query 的行同形）；看不见 404。 */

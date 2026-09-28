@@ -17,6 +17,8 @@ import ai.neargo.opskit.platform.api.federation.IdpKind;
 import ai.neargo.opskit.platform.core.app.DirectoryAppService;
 import ai.neargo.opskit.platform.core.app.FederationAppService;
 import ai.neargo.opskit.platform.core.app.TenancyAppService;
+import ai.neargo.opskit.platform.core.app.AppAppService;
+import ai.neargo.opskit.platform.core.app.WebhookAppService;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Optional;
@@ -37,11 +39,15 @@ public class OpsKitBootstrap {
     private final FederationAppService federation;
     private final DirectoryAppService directory;
     private final BootstrapDefinitions definitions;
+    private final AppAppService apps;
+    private final WebhookAppService webhooks;
     private volatile BootstrapDefinitions.Summary lastDefinitions = BootstrapDefinitions.Summary.NONE;
 
     public OpsKitBootstrap(BootstrapProperties props, TenancyAppService tenancy, FederationAppService federation, DirectoryAppService directory,
-            BootstrapDefinitions definitions) {
+            BootstrapDefinitions definitions, AppAppService apps, WebhookAppService webhooks) {
         this.props = props;
+        this.apps = apps;
+        this.webhooks = webhooks;
         this.tenancy = tenancy;
         this.federation = federation;
         this.directory = directory;
@@ -70,13 +76,41 @@ public class OpsKitBootstrap {
         Actor system = new Actor(t, Optional.empty(), Optional.of("opskit-bootstrap"), Set.of(), Set.of(), Set.of(), Set.of(), Set.of());
         props.roles().forEach((code, role) -> directory.upsertRole(system, t.workspaceId(),
                 new RoleUpsert(code, role.name().isEmpty() ? Map.of("en", code) : role.name(), new LinkedHashSet<>(role.permissions()))));
+        Map<String, String> appActions = declareApps(account, ws.workspaceId());
         BootstrapDefinitions.Summary defs = props.definitionsDir() == null || props.definitionsDir().isBlank()
                 ? BootstrapDefinitions.Summary.NONE
                 : definitions.publishAll(system, t.workspaceId(), java.nio.file.Path.of(props.definitionsDir()));
-        log.info("启动引导完成 account={} workspace={} ref={} idps={} roles={} definitions={}", account.value(), ws.workspaceId(), ws.externalRef(),
-                props.idps().size(), props.roles().keySet(), defs);
+        log.info("启动引导完成 account={} workspace={} ref={} idps={} roles={} apps={} webhooks={} definitions={}", account.value(), ws.workspaceId(),
+                ws.externalRef(), props.idps().size(), props.roles().keySet(), appActions, props.webhooks().size(), defs);
         lastDefinitions = defs;
         return ws;
+    }
+
+    /** 应用凭证与订阅。凭证本身永不进日志，只记动作（CREATED / ROTATED / UNCHANGED）。 */
+    private Map<String, String> declareApps(AccountId account, String workspaceId) {
+        Map<String, String> ids = new java.util.TreeMap<>();
+        Map<String, String> actions = new java.util.TreeMap<>();
+        props.apps().forEach((code, a) -> {
+            AppAppService.Declared d;
+            try {
+                d = apps.ensureDeclared(account, code, a.credential(), a.signingSecret(), java.util.List.of(workspaceId));
+            } catch (OpsKitException e) {
+                throw new IllegalStateException("opskit.bootstrap.apps." + code + " 不合法：" + e.fieldErrors()
+                        + "（凭证 okk_ / 签名密钥 oks_ 后接至少 43 / 32 位 Base64url，见部署说明的生成命令）", e);
+            }
+            ids.put(code, d.appId());
+            actions.put(code, d.action());
+        });
+        Map<String, java.util.List<WebhookAppService.Subscription>> byApp = new java.util.TreeMap<>();
+        for (BootstrapProperties.Webhook w : props.webhooks()) {
+            if (!ids.containsKey(w.app())) {
+                throw new IllegalStateException("opskit.bootstrap.webhooks 引用了 apps 段里没有的应用：" + w.app());
+            }
+            w.events().forEach(e -> byApp.computeIfAbsent(w.app(), k -> new java.util.ArrayList<>()).add(new WebhookAppService.Subscription(e, w.url())));
+        }
+        // 声明了应用却没声明订阅 = 该应用在本空间不订阅任何事件（整体替换为空）
+        ids.forEach((code, appId) -> webhooks.replace(account, workspaceId, appId, byApp.getOrDefault(code, java.util.List.of())));
+        return actions;
     }
 
     /** 最近一次引导发布定义的结果（测试与排障用）。 */

@@ -3,6 +3,8 @@ package ai.neargo.opskit.svc.bootstrap;
 import ai.neargo.opskit.platform.core.app.DirectoryAppService;
 import ai.neargo.opskit.platform.core.app.FederationAppService;
 import ai.neargo.opskit.platform.core.app.TenancyAppService;
+import ai.neargo.opskit.platform.core.app.AppAppService;
+import ai.neargo.opskit.platform.core.app.WebhookAppService;
 import ai.neargo.opskit.process.core.app.ProcessDefinitionAppService;
 import ai.neargo.opskit.process.core.app.SlaPolicyAppService;
 import ai.neargo.opskit.ticket.core.app.TicketDefinitionAppService;
@@ -20,8 +22,8 @@ public class BootstrapConfig {
 
     @Bean
     OpsKitBootstrap opsKitBootstrap(BootstrapProperties props, TenancyAppService tenancy, FederationAppService federation, DirectoryAppService directory,
-            BootstrapDefinitions definitions) {
-        return new OpsKitBootstrap(props, tenancy, federation, directory, definitions);
+            BootstrapDefinitions definitions, AppAppService apps, WebhookAppService webhooks) {
+        return new OpsKitBootstrap(props, tenancy, federation, directory, definitions, apps, webhooks);
     }
 
     @Bean

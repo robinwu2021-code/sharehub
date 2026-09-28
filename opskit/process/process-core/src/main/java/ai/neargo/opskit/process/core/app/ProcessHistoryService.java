@@ -92,6 +92,13 @@ public class ProcessHistoryService {
         return Page.of(queries.instances(ws, v, f, page.offset(), page.size()).stream().map(names::row).toList(), total, page);
     }
 
+    /** 实例当前在审（PENDING）的审批单号。只给刚由同一调用方发起 / 推进过的实例用（可见性已在那一步判过）。 */
+    @SystemAction("发起后回带审批单号")
+    public java.util.Optional<String> pendingApprovalNo(ai.neargo.opskit.commons.tenancy.TenantContext t, String instanceNo) {
+        return queries.approvalsOfInstances(t.workspaceId(), List.of(instanceNo)).stream().filter(a -> "PENDING".equals(a.status()))
+                .map(QueryDao.ApprovalRow::approvalNo).findFirst();
+    }
+
     /** 对账：这个业务对象上的全部实例（最新在前），各带审批与完整流转。上限 {@link SubjectHistory#LIMIT}，超了明说。 */
     @SystemAction("只读：同 history（应用自身看全部，成员只看自己可见的）")
     public SubjectHistory subject(Actor actor, String type, String ref) {

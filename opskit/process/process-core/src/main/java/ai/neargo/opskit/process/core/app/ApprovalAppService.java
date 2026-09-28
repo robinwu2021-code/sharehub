@@ -128,7 +128,7 @@ public class ApprovalAppService implements StatusHook {
             cancelOpenTasks(ctx.tenant(), a, "left the approval status");
             approvals.finishRound(ws, a.approvalNo(), a.currentRound(), "WITHDRAWN", clock.millis());
             ConditionalUpdate.requireExactlyOne(approvals.finish(ws, a.approvalNo(), a.version(), "WITHDRAWN", clock.millis()), "approval " + a.approvalNo());
-            events.publish(new ApprovalCompleted(ctx.tenant(), a.approvalNo(), a.instanceNo(), a.currentRound(), "WITHDRAWN", null,
+            events.publish(new ApprovalCompleted(ctx.tenant(), a.approvalNo(), a.instanceNo(), subjectOf(ctx.tenant(), a.instanceNo()), a.currentRound(), "WITHDRAWN", null,
                     ctx.actor().map(InstanceAppService::who).orElse("system"), clock.instant()));
         });
     }
@@ -280,7 +280,7 @@ public class ApprovalAppService implements StatusHook {
         approvals.finishRound(t.workspaceId(), a.approvalNo(), round, result, now);
         ConditionalUpdate.requireExactlyOne(approvals.finish(t.workspaceId(), a.approvalNo(), a.version(), result, now), "approval " + a.approvalNo());
         log(t, a.approvalNo(), a.instanceNo(), "completed", "PENDING", result, by, reason, now);
-        events.publish(new ApprovalCompleted(t, a.approvalNo(), a.instanceNo(), round, result, reason, by, clock.instant()));
+        events.publish(new ApprovalCompleted(t, a.approvalNo(), a.instanceNo(), subjectOf(t, a.instanceNo()), round, result, reason, by, clock.instant()));
         String exit = switch (result) {
             case "APPROVED" -> gate.onApproved();
             case "REJECTED" -> gate.onRejected();
@@ -289,6 +289,11 @@ public class ApprovalAppService implements StatusHook {
         if (exit != null) {
             instanceService.get().fireSystem(t, a.instanceNo(), exit, by, reason);
         }
+    }
+
+    private ai.neargo.opskit.process.api.model.SubjectRef subjectOf(TenantContext t, String instanceNo) {
+        return instances.find(t.workspaceId(), instanceNo).filter(r -> r.subjectType() != null)
+                .map(r -> new ai.neargo.opskit.process.api.model.SubjectRef(r.subjectType(), r.subjectRef(), null)).orElse(null);
     }
 
     private void cancelOpenTasks(TenantContext t, ApprovalDao.Row a, String why) {

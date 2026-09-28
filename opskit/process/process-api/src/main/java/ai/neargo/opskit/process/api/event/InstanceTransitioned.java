@@ -42,4 +42,9 @@ public record InstanceTransitioned(TenantContext tenant, String instanceNo, Stri
         d.put("actor", actor);
         return d;
     }
+
+    @Override
+    public java.util.Set<String> memberFields() {
+        return java.util.Set.of("actor");
+    }
 }

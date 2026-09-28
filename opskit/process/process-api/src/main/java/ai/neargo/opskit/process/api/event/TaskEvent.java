@@ -32,4 +32,9 @@ public record TaskEvent(TenantContext tenant, String action, String taskNo, Stri
         d.put("assignee", assignee);
         return d;
     }
+
+    @Override
+    public java.util.Set<String> memberFields() {
+        return java.util.Set.of("assignee");
+    }
 }

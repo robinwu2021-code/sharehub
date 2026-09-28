@@ -9,6 +9,17 @@ opskit:
     # 部署方定义（流程 / SLA / 工单类型 / 选项集），按代号幂等发布：内容不变不出新版本；任一文件不合法拒绝启动。
     # 目录结构与示例见同目录 definitions.example/（复制到服务器后按需改）。不需要时删掉这一行。
     definitions-dir: /etc/opskit/definitions
+    # 宿主应用（M5 接线）：凭证与签名密钥由部署方生成，同一对值分别交给 OpsKit（这里）与宿主（其 env）。按代号幂等，改值即轮换。
+    #   生成：echo "okk_$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')"   echo "oks_$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')"
+    apps:
+      sharehub:
+        credential: ${OPSKIT_APP_SHAREHUB_CREDENTIAL}
+        signing-secret: ${OPSKIT_APP_SHAREHUB_SIGNING_SECRET}
+    # 订阅以本段为准整体替换（不在这里的停用）。签名：X-OpsKit-Signature: t=<毫秒>,v1=hex(HMAC-SHA256(secret, t + "." + body))，±5 分钟
+    webhooks:
+      - app: sharehub
+        url: http://127.0.0.1:8082/internal/opskit/webhook
+        events: [instance.*, approval.completed]
     workspace:
       ref: MAIN                 # 与内省应答的 tenant 一致（令牌 workspace 声明）
       name: ShareHub

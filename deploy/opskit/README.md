@@ -18,6 +18,8 @@
 | `OPSKIT_INTROSPECT_CLIENT_ID` / `_SECRET` | ✅ | 与 ShareHub 的 `SHAREHUB_OPSKIT_INTROSPECT_CLIENT_ID` / `_SECRET` 同值 |
 | `OPSKIT_PORT` | | 默认 8090 |
 | `OPSKIT_BOOTSTRAP_FILE` | | 默认 `/etc/opskit/bootstrap.yml` |
+| `OPSKIT_APP_SHAREHUB_CREDENTIAL` / `_SIGNING_SECRET` | M5 | 宿主应用凭证 `okk_…` 与 webhook 签名密钥 `oks_…`（生成命令见 `bootstrap.yml.example`）；与 ShareHub 侧同值。日志只记动作（CREATED / ROTATED / UNCHANGED），不记值 |
+| `OPSKIT_BOOTSTRAP_REQUIRED` | 建议 | 设 `true`：引导文件缺失、是目录、或未 `enabled: true` 时拒绝启动（默认 false 只记 WARN —— 服务会健康却无人能登录）|
 | `OPSKIT_DB_POOL` | | 连接池上限，默认 20 |
 | `OPSKIT_LOG_DIR` | | 设了才落盘（`{dir}/spring.log`，按天滚动、保留 20 天、单文件 200MB）；不设只进 journal |
 
@@ -41,6 +43,7 @@
   定义文件里用 ISO-8601 时长（`PT4H`）。
 - 起点：复制 `definitions.example/`（设备报修：新建 → 处理中 → 已解决 / 已作废，解决与作废须写说明；优先级 紧急 / 高 / 普通；
   字段 来源（SELECT）· 来源单号（TEXT）；SLA 首响 P1 1h / 其余 4h，解决 P1 4h / 其余 24h）。
+- `processes/withdrawal_audit.json`：M5 提现试点。单级审批，候选人 = 令牌带宿主权限码 `finance:withdrawal:audit` 的人；禁止自审（提交人经 `onBehalfOf` 成为 REQUESTER）；驳回必填原因（OpsKit 对所有驳回都强制）。发起即进审批（无草稿态），通过 / 驳回 / 撤回分别落 `approved` / `rejected` / `withdrawn`。
 - 派单：示例用 `MANUAL`（不自动派，持 `ticket:assign` 的人在工单页指派，含指派给自己）。没有组就没有「抢单池」——
   `QUEUE` / `ROUND_ROBIN` / `LEAST_LOADED` 都要一个组；有了队列组后把 `assignment` 改成 `{"strategy": "QUEUE", "group": "<组代号>"}` 重启即可。
 

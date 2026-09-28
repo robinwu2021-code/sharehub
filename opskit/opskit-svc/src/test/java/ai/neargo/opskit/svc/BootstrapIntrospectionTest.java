@@ -61,10 +61,20 @@ import tools.jackson.databind.ObjectMapper;
         "opskit.bootstrap.roles.ADMIN.permissions=approval:view:all,report:view,ticket:view:all",
         "opskit.bootstrap.roles.OPS.permissions=approval:decide,ticket:view:scoped",
         // 部署示例目录本身就是被测对象：示例改坏了这里红
-        "opskit.bootstrap.definitions-dir=../../deploy/opskit/definitions.example"
+        "opskit.bootstrap.definitions-dir=../../deploy/opskit/definitions.example",
+        // M5-0：部署方声明的宿主应用与订阅（凭证 / 密钥为测试值）
+        "opskit.bootstrap.apps.host.credential=okk_AAAAAAAAAAAAAAAAAAAAbbbbbbbbbbbbbbbbbbbbbbb",
+        "opskit.bootstrap.apps.host.signing-secret=oks_SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS",
+        "opskit.bootstrap.webhooks[0].app=host",
+        "opskit.bootstrap.webhooks[0].url=http://127.0.0.1:18094/webhook",
+        "opskit.bootstrap.webhooks[0].events=instance.*,approval.completed",
+        "opskit.outbox.relay-interval=500ms"
 })
 class BootstrapIntrospectionTest {
 
+    static final String APP = "okk_AAAAAAAAAAAAAAAAAAAAbbbbbbbbbbbbbbbbbbbbbbb";
+    static final String SECRET = "oks_SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS";
+    static final java.util.List<String[]> received = new java.util.concurrent.CopyOnWriteArrayList<>();
     static HttpServer host;
     static final AtomicInteger calls = new AtomicInteger();
     static final String WS = "http://localhost:18093/api/opskit/v1/workspaces/ext:MAIN";
@@ -95,7 +105,8 @@ class BootstrapIntrospectionTest {
             } else if (form.contains("token=stk_admin")) {
                 body = "{\"active\":true,\"sub\":\"U1\",\"name\":\"管理员\",\"tenant\":\"MAIN\",\"roles\":[\"ADMIN\"],\"perms\":[\"flow:todo:read\"],\"scopes\":[\"*\"]}";
             } else if (form.contains("token=stk_ops")) {
-                body = "{\"active\":true,\"sub\":\"U2\",\"name\":\"运营\",\"tenant\":\"MAIN\",\"roles\":[\"OPS\"],\"scopes\":[\"agent:AG002\"]}";
+                body = "{\"active\":true,\"sub\":\"U2\",\"name\":\"运营\",\"tenant\":\"MAIN\",\"roles\":[\"OPS\"],\"scopes\":[\"agent:AG002\"],"
+                        + "\"perms\":[\"finance:withdrawal:audit\"]}";
             } else if (form.contains("token=stk_other")) {
                 body = "{\"active\":true,\"sub\":\"U3\",\"tenant\":\"OTHER\"}";
             } else {
@@ -108,6 +119,12 @@ class BootstrapIntrospectionTest {
                 o.write(b);
             }
         });
+        host.createContext("/webhook", ex -> {
+            received.add(new String[] {ex.getRequestHeaders().getFirst(ai.neargo.opskit.platform.api.webhook.SignatureSpec.HEADER),
+                    new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)});
+            ex.sendResponseHeaders(200, -1);
+            ex.close();
+        });
         host.start();
     }
 
@@ -116,7 +133,10 @@ class BootstrapIntrospectionTest {
         host.stop(0);
     }
 
-    record Res(int status, JsonNode body) {
+    record Res(int status, JsonNode body, String replayed) {
+        Res(int status, JsonNode body) {
+            this(status, body, null);
+        }
     }
 
     Res get(String url, String token) throws Exception {
@@ -163,7 +183,8 @@ class BootstrapIntrospectionTest {
     void deployedDefinitionsArePublishedOnceAndAreUsable() throws Exception {
         bootstrap.run();
         assertThat(bootstrap.lastDefinitions().published()).as("启动时已发布，内容没变不出新版本").isEmpty();
-        assertThat(bootstrap.lastDefinitions().unchanged()).containsExactly("process:repair_flow", "sla:repair_sla", "ticket-type:repair");
+        assertThat(bootstrap.lastDefinitions().unchanged()).containsExactly("process:repair_flow", "process:withdrawal_audit", "sla:repair_sla",
+                "ticket-type:repair");
 
         Res types = get(WS + "/ticket-types", "stk_admin");
         assertThat(types.status()).isEqualTo(200);
@@ -185,5 +206,82 @@ class BootstrapIntrospectionTest {
         Files.writeString(dir.resolve("processes/repair_flow.json"), flow.replace("\"to\": \"done\"", "\"to\": \"nowhere\""));
         assertThatThrownBy(() -> definitions.publishAll(system, t.workspaceId(), dir)).hasMessageContaining("repair_flow.json")
                 .hasMessageContaining("opskit.validation");
+    }
+
+    Res send(String method, String url, String token, String idemKey, Object body) throws Exception {
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(url)).header("Authorization", "Bearer " + token).header("Content-Type", "application/json");
+        if (idemKey != null) {
+            b.header("Idempotency-Key", idemKey);
+        }
+        HttpResponse<String> r = http.send(b.method(method, HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body))).build(),
+                HttpResponse.BodyHandlers.ofString());
+        return new Res(r.statusCode(), r.body().isEmpty() ? null : json.readTree(r.body()), r.headers().firstValue("Idempotent-Replayed").orElse(null));
+    }
+
+    /**
+     * M5-0 试点闭环：宿主用应用凭证代提交人送审（幂等）→ 审核人在 OpsKit 驳回 → 宿主收到签名的 approval.completed，
+     * 其中带业务对象与决定人的宿主编号，信封带宿主租户号。
+     */
+    @Test
+    void hostSubmitsOnBehalfIdempotentlyAndReceivesSignedDecision() throws Exception {
+        java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("processCode", "withdrawal_audit");
+        body.put("subject", java.util.Map.of("type", "withdrawal", "ref", "WD001", "display", java.util.Map.of("title", "提现 AED 1,200 · AG002")));
+        body.put("fields", java.util.Map.of("amount", 1200));
+        body.put("scopes", List.of("agent:AG002"));
+        body.put("onBehalfOf", java.util.Map.of("externalRef", "AG-U9", "displayName", "代理九"));
+
+        Res first = send("POST", WS + "/instances", APP, "opskit:withdrawal:WD001:1", body);
+        assertThat(first.status()).isEqualTo(200);
+        String instanceNo = first.body().get("instanceNo").asText();
+        String approvalNo = first.body().get("approvalNo").asText();
+        assertThat(approvalNo).as("停在审批门，回带审批单号").isNotBlank();
+
+        Res replay = send("POST", WS + "/instances", APP, "opskit:withdrawal:WD001:1", body);
+        assertThat(replay.status()).isEqualTo(200);
+        assertThat(replay.replayed()).isEqualTo("true");
+        assertThat(replay.body().get("instanceNo").asText()).as("重投拿到同一个实例").isEqualTo(instanceNo);
+
+        java.util.Map<String, Object> other = new java.util.LinkedHashMap<>(body);
+        other.put("fields", java.util.Map.of("amount", 999));
+        Res mismatch = send("POST", WS + "/instances", APP, "opskit:withdrawal:WD001:1", other);
+        assertThat(mismatch.status()).isEqualTo(409);
+        assertThat(mismatch.body().get("error").asText()).isEqualTo("opskit.idempotency.mismatch");
+
+        assertThat(send("POST", WS + "/instances", "stk_ops", null, body).status()).as("成员令牌不能代人").isEqualTo(403);
+
+        String task = get(WS + "/approvals/" + approvalNo, "stk_ops").body().get("mine").get("taskNo").asText();
+        Res decided = send("POST", WS + "/approvals/" + approvalNo + "/decide", "stk_ops", null,
+                java.util.Map.of("taskNo", task, "decision", "REJECT", "reason", "账户名与实名不符"));
+        assertThat(decided.status()).isEqualTo(200);
+
+        tools.jackson.databind.JsonNode completed = awaitEvent("approval.completed", approvalNo);
+        assertThat(completed.get("workspaceExternalRef").asText()).isEqualTo("MAIN");
+        assertThat(completed.at("/data/subject/type").asText()).isEqualTo("withdrawal");
+        assertThat(completed.at("/data/subject/ref").asText()).isEqualTo("WD001");
+        assertThat(completed.at("/data/result").asText()).isEqualTo("REJECTED");
+        assertThat(completed.at("/data/reason").asText()).isEqualTo("账户名与实名不符");
+        assertThat(completed.at("/data/decidedBy/externalRef").asText()).as("决定人的宿主编号").isEqualTo("U2");
+        assertThat(completed.at("/data/decidedBy/displayName").asText()).isEqualTo("运营");
+
+        tools.jackson.databind.JsonNode created = awaitEvent("instance.created", instanceNo);
+        assertThat(created.at("/data/actor/externalRef").asText()).as("发起人 = 代提交的代理").isEqualTo("AG-U9");
+    }
+
+    /** 等某类事件送达（投递间隔 500ms）；同时验签 —— 用错密钥必须验不过。 */
+    private tools.jackson.databind.JsonNode awaitEvent(String type, String mustContain) throws Exception {
+        for (int i = 0; i < 60; i++) {
+            for (String[] r : received) {
+                tools.jackson.databind.JsonNode env = json.readTree(r[1]);
+                if (type.equals(env.get("eventType").asText()) && r[1].contains(mustContain)) {
+                    long now = System.currentTimeMillis();
+                    assertThat(ai.neargo.opskit.platform.api.webhook.SignatureSpec.verify(SECRET, r[0], r[1], now)).isTrue();
+                    assertThat(ai.neargo.opskit.platform.api.webhook.SignatureSpec.verify("oks_wrong", r[0], r[1], now)).isFalse();
+                    return env;
+                }
+            }
+            Thread.sleep(250);
+        }
+        throw new AssertionError("没收到 " + type + "（" + mustContain + "）；已收到 " + received.size() + " 条");
     }
 }

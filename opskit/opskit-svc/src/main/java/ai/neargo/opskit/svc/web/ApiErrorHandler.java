@@ -33,6 +33,13 @@ public class ApiErrorHandler {
                 e.fieldErrors().stream().map(f -> new ApiError.Field(f.path(), f.error())).toList()));
     }
 
+    /** 幂等重放：首次结果原样返回，并用头标明是重放。 */
+    @ExceptionHandler(IdempotentReplay.class)
+    ResponseEntity<String> replay(IdempotentReplay r) {
+        return ResponseEntity.status(r.status()).header("Idempotent-Replayed", "true")
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON).body(r.body());
+    }
+
     @ExceptionHandler({HttpMessageNotReadableException.class, IllegalArgumentException.class, MissingRequestHeaderException.class})
     ResponseEntity<ApiError> badRequest(Exception e) {
         return ResponseEntity.badRequest().body(new ApiError("opskit.bad_request", "malformed request", Map.of(), traceId(), List.of()));

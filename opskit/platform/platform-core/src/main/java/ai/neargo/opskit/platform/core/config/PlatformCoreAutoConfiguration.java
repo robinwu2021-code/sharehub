@@ -5,6 +5,7 @@ import ai.neargo.opskit.commons.id.BizNoGenerator;
 import ai.neargo.opskit.commons.timer.TimerScheduler;
 import ai.neargo.opskit.platform.core.app.AppAppService;
 import ai.neargo.opskit.platform.core.app.AuditTrail;
+import ai.neargo.opskit.platform.core.app.WebhookAppService;
 import ai.neargo.opskit.platform.core.app.CalendarAppService;
 import ai.neargo.opskit.platform.core.app.DirectoryAppService;
 import ai.neargo.opskit.platform.core.app.TenancyAppService;
@@ -142,6 +143,11 @@ public class PlatformCoreAutoConfiguration {
     }
 
     @Bean
+    WebhookAppService webhookAppService(WebhookDao w, AppDao a, TransactionOperations tx, AuditTrail audit) {
+        return new WebhookAppService(w, a, tx, audit);
+    }
+
+    @Bean
     DirectoryAppService directoryAppService(MemberDao m, GroupDao g, GroupMemberDao gm, RoleDao r, RoleBindingDao b, BizNoGenerator ids,
             Clock clock, TransactionOperations tx, AuditTrail audit) {
         return new DirectoryAppService(m, g, gm, r, b, ids, clock, tx, audit);
@@ -192,8 +198,9 @@ public class PlatformCoreAutoConfiguration {
 
     // ── 事件 ──────────────────────────────────────────────
     @Bean
-    EventPublisher eventPublisher(OutboxDao outbox, ObjectProvider<InProcessListener> listeners, BizNoGenerator ids, Clock clock) {
-        return new OutboxWriter(outbox, listeners.orderedStream().toList(), ids, clock);
+    EventPublisher eventPublisher(OutboxDao outbox, ObjectProvider<InProcessListener> listeners, BizNoGenerator ids, Clock clock, WorkspaceDao workspaces,
+            MemberDao members) {
+        return new OutboxWriter(outbox, listeners.orderedStream().toList(), ids, clock, workspaces, members);
     }
 
     @Bean

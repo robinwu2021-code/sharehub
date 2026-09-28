@@ -32,6 +32,14 @@ class OutboxRelayTest {
     record TestEvent(TenantContext tenant, String eventType, String idemKey, Instant occurredAt, Object data) implements DomainEvent {
     }
 
+    /** 声明了成员字段的事件：信封里展开成 {ref, externalRef, displayName}。 */
+    record MemberEvent(TenantContext tenant, String eventType, String idemKey, Instant occurredAt, Object data) implements DomainEvent {
+        @Override
+        public java.util.Set<String> memberFields() {
+            return java.util.Set.of("actor", "decidedBy", "absent");
+        }
+    }
+
     /** 本地接收方：按预设状态码应答，并记下收到的请求。 */
     static final class Receiver implements AutoCloseable {
         final HttpServer server;
@@ -78,10 +86,35 @@ class OutboxRelayTest {
         DirectoryEnv d = new DirectoryEnv(db);
         OutboxDao outbox = new OutboxDao(d.f.jdbc, db.dialect());
         WebhookDao webhooks = new WebhookDao(d.f.jdbc, db.dialect());
-        OutboxWriter writer = new OutboxWriter(outbox, List.of(), d.f.ids, d.f.clock);
+        OutboxWriter writer = new OutboxWriter(outbox, List.of(), d.f.ids, d.f.clock, new ai.neargo.opskit.platform.store.dao.WorkspaceDao(d.f.jdbc),
+                new ai.neargo.opskit.platform.store.dao.MemberDao(d.f.jdbc, db.dialect()));
         OutboxRelay relay = new OutboxRelay(outbox, webhooks, d.apps, new WebhookDispatcher(d.f.clock),
                 new Backoff(List.of(Duration.ofMinutes(1), Duration.ofMinutes(5), Duration.ofMinutes(30))), d.f.clock, d.f.tx);
         return new Env(d, writer, relay, webhooks, outbox);
+    }
+
+    @ParameterizedTest
+    @MethodSource("ai.neargo.opskit.commons.testing.TestDatabases#all")
+    void envelopeCarriesTheHostRefsForWorkspaceAndMembers(TestDatabase db) throws Exception {
+        Env e = env(db);
+        ai.neargo.opskit.platform.api.directory.MemberView m = e.d.directory.provision(e.d.tenant,
+                new ai.neargo.opskit.platform.api.directory.MemberUpsert("E107", "Ali", null, null), ai.neargo.opskit.platform.api.directory.DirectorySource.JIT);
+        Map<String, Object> data = new java.util.LinkedHashMap<>();
+        data.put("approvalNo", "AP1");
+        data.put("actor", "member:" + m.memberId());
+        data.put("decidedBy", "app:app_x");
+        e.d.f.tx.executeWithoutResult(s -> e.writer.publish(new MemberEvent(e.d.tenant, "approval.completed", "AP1:1",
+                Instant.parse("2026-09-27T08:00:00Z"), data)));
+        String payload = e.d.f.jdbc.sql("SELECT payload FROM plat_outbox").query(String.class).single();
+        tools.jackson.databind.JsonNode env = new tools.jackson.databind.ObjectMapper().readTree(payload);
+        assertThat(env.get("workspaceExternalRef").asText()).isEqualTo("T0001");
+        assertThat(env.at("/data/actor/ref").asText()).isEqualTo("member:" + m.memberId());
+        assertThat(env.at("/data/actor/externalRef").asText()).isEqualTo("E107");
+        assertThat(env.at("/data/actor/displayName").asText()).isEqualTo("Ali");
+        assertThat(env.at("/data/decidedBy/ref").asText()).as("非成员只有 ref").isEqualTo("app:app_x");
+        assertThat(env.at("/data/decidedBy").has("externalRef")).isFalse();
+        assertThat(env.at("/data/approvalNo").asText()).as("其余字段原样").isEqualTo("AP1");
+        assertThat(env.at("/data").has("absent")).as("没有的字段不凭空加").isFalse();
     }
 
     @ParameterizedTest

@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.springframework.transaction.support.TransactionOperations;
 
 /** 应用与凭证（21/07 O1-2）。M1 只开放给运维面；账户管理员自助管理随成员令牌（O1-3）一起开放。 */
@@ -74,6 +75,68 @@ public class AppAppService {
             audit.record(accountId, "", AuditTrail.OPS, "credential.issued", "app:" + row.appId(),
                     Map.of("allWorkspaces", req.allWorkspaces(), "workspaceIds", granted));
             return new AppSecrets(toView(row, granted), credential, signingSecret);
+        });
+    }
+
+    /** @param action CREATED / ROTATED / UNCHANGED */
+    public record Declared(String appId, String action) {
+    }
+
+    private static final java.util.regex.Pattern DECLARED_CREDENTIAL = java.util.regex.Pattern.compile("okk_[A-Za-z0-9_-]{43,96}");
+    private static final java.util.regex.Pattern DECLARED_SECRET = java.util.regex.Pattern.compile("oks_[A-Za-z0-9_-]{32,96}");
+
+    /**
+     * 部署方声明的应用（启动引导的 apps 段）：凭证与签名密钥由部署方生成、经环境变量同时交给双方，服务端不产生明文。
+     * 按名称幂等：不存在 → 建；凭证或签名密钥变了 → 换成声明的值（旧的立即失效）；都没变 → 不动。可访问空间按声明整体替换。
+     */
+    @SystemAction("运维面：部署方声明应用凭证")
+    public Declared ensureDeclared(AccountId accountId, String name, String credential, String signingSecret, List<String> workspaceIds) {
+        List<FieldError> errors = new ArrayList<>();
+        if (name == null || name.isBlank()) {
+            errors.add(new FieldError("name", "opskit.validation.required"));
+        }
+        if (credential == null || !DECLARED_CREDENTIAL.matcher(credential).matches()) {
+            errors.add(new FieldError("credential", "opskit.validation.invalid"));
+        }
+        if (signingSecret == null || !DECLARED_SECRET.matcher(signingSecret).matches()) {
+            errors.add(new FieldError("signingSecret", "opskit.validation.invalid"));
+        }
+        if (workspaceIds == null || workspaceIds.isEmpty()) {
+            errors.add(new FieldError("workspaceIds", "opskit.validation.required"));
+        }
+        if (!errors.isEmpty()) {
+            throw new OpsKitException(CommonErrors.VALIDATION, "invalid declared app", Map.of("name", String.valueOf(name)), errors);
+        }
+        String hash = Credentials.hash(credential);
+        return tx.execute(s -> {
+            List<String> granted = requireOwnWorkspaces(accountId, workspaceIds);
+            apps.findByCredentialHash(AccountId.UNKNOWN, hash).filter(o -> !o.accountId().equals(accountId.value()) || !o.name().equals(name))
+                    .ifPresent(o -> {
+                        throw new OpsKitException(CommonErrors.VALIDATION, "credential already belongs to another app", Map.of("name", name),
+                                List.of(new FieldError("credential", "opskit.validation.duplicate")));
+                    });
+            long now = clock.millis();
+            Optional<AppRow> current = apps.findByName(accountId, name.strip());
+            if (current.isEmpty()) {
+                AppRow row = new AppRow(accountId.value(), ids.nextPublicId("app"), name.strip(), hash, Credentials.hint(credential), false, null,
+                        cipher.encrypt(signingSecret), "ACTIVE", now, now);
+                apps.insert(accountId, row);
+                apps.replaceWorkspaces(accountId, row.appId(), granted);
+                audit.record(accountId, "", AuditTrail.OPS, "credential.declared", "app:" + row.appId(), Map.of("workspaceIds", granted));
+                return new Declared(row.appId(), "CREATED");
+            }
+            AppRow app = current.get();
+            boolean changed = !app.credentialHash().equals(hash) || !cipher.decrypt(app.signingSecretEnc()).equals(signingSecret);
+            if (changed) {
+                ConditionalUpdate.requireExactlyOne(apps.rotateCredential(accountId, app.appId(), app.credentialHash(), hash, Credentials.hint(credential),
+                        cipher.encrypt(signingSecret), now), "app credential");
+                audit.record(accountId, "", AuditTrail.OPS, "credential.rotated", "app:" + app.appId(),
+                        Map.of("oldHint", app.credentialHint(), "newHint", Credentials.hint(credential), "by", "bootstrap"));
+            }
+            if (!apps.workspaces(accountId, app.appId()).equals(granted)) {
+                apps.replaceWorkspaces(accountId, app.appId(), granted);
+            }
+            return new Declared(app.appId(), changed ? "ROTATED" : "UNCHANGED");
         });
     }
 

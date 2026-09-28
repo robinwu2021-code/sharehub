@@ -802,6 +802,77 @@
         },
         "type" : "object"
       },
+      "StartBody" : {
+        "properties" : {
+          "fields" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "participants" : {
+            "additionalProperties" : {
+              "items" : {
+                "type" : "string"
+              },
+              "type" : "array"
+            },
+            "type" : "object"
+          },
+          "processCode" : {
+            "type" : "string"
+          },
+          "scopes" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array",
+            "uniqueItems" : true
+          },
+          "slaPolicies" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "subject" : {
+            "$ref" : "#/components/schemas/SubjectBody"
+          }
+        },
+        "type" : "object"
+      },
+      "Started" : {
+        "properties" : {
+          "approvalNo" : {
+            "type" : "string"
+          },
+          "createdAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "instanceNo" : {
+            "type" : "string"
+          },
+          "open" : {
+            "type" : "boolean"
+          },
+          "processCode" : {
+            "type" : "string"
+          },
+          "processVersion" : {
+            "type" : "string"
+          },
+          "seq" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "statusCategory" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "StatsDto" : {
         "properties" : {
           "approvals" : {
@@ -880,6 +951,21 @@
         "type" : "object"
       },
       "Subject" : {
+        "properties" : {
+          "display" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "ref" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "SubjectBody" : {
         "properties" : {
           "display" : {
             "additionalProperties" : { },
@@ -1747,6 +1833,42 @@
           }
         },
         "tags" : [ "approval-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/instances" : {
+      "post" : {
+        "operationId" : "start_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/StartBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Started"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "instance-controller" ]
       }
     },
     "/api/opskit/v1/workspaces/{ws}/instances/query" : {
@@ -2684,6 +2806,42 @@
           }
         },
         "tags" : [ "approval-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/instances" : {
+      "post" : {
+        "operationId" : "start",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/StartBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Started"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "instance-controller" ]
       }
     },
     "/v1/workspaces/{ws}/instances/query" : {

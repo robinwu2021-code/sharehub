@@ -25,9 +25,9 @@ class ErrorKeyCatalogTest {
     private static final Path ROOT = Path.of("..");
     /** 形如 "opskit.xxx" 或 "opskit.xxx:细节" 的字面量；后者冒号后是字段 / 取值细节，不属于键。 */
     private static final Pattern KEY = Pattern.compile("\"(opskit\\.[a-z0-9_.]+)[\":]");
-    /** 不是错误键的同前缀字面量：配置前缀与指标名。 */
-    private static final Set<String> NOT_ERROR_KEYS = Set.of("opskit.bootstrap", "opskit.bootstrap.enabled",
-            "opskit.outbox.due", "opskit.outbox.failed", "opskit.outbox.pending");
+    /** 不是错误键的同前缀字面量：配置项（opskit.bootstrap…，含拼接用的 "opskit.bootstrap.apps." 这类前缀）与指标名。 */
+    private static final Set<String> NOT_ERROR_KEYS = Set.of("opskit.outbox.due", "opskit.outbox.failed", "opskit.outbox.pending");
+    private static final String CONFIG_PREFIX = "opskit.bootstrap";
     private static final Set<Integer> STATUSES = Set.of(400, 401, 403, 404, 405, 409, 422, 429, 500, 503);
 
     @Test
@@ -65,6 +65,7 @@ class ErrorKeyCatalogTest {
             }
         }
         out.removeAll(NOT_ERROR_KEYS);
+        out.removeIf(k -> k.startsWith(CONFIG_PREFIX));
         return out;
     }
 }

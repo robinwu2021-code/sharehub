@@ -4,6 +4,7 @@ import ai.neargo.opskit.platform.core.app.AppAppService;
 import ai.neargo.opskit.platform.core.auth.ActorResolver;
 import ai.neargo.opskit.platform.core.auth.MemberTokenAuthenticator;
 import java.util.List;
+import ai.neargo.opskit.platform.core.idem.IdempotencyStore;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,8 +17,11 @@ public class WebConfig implements WebMvcConfigurer {
 
     private final CallerResolver caller;
 
-    public WebConfig(AppAppService apps, ActorResolver actors, MemberTokenAuthenticator members) {
-        this.caller = new CallerResolver(apps, actors, members);
+    private final IdempotencyStore idempotency;
+
+    public WebConfig(AppAppService apps, ActorResolver actors, MemberTokenAuthenticator members, IdempotencyStore idempotency) {
+        this.caller = new CallerResolver(apps, actors, members, idempotency);
+        this.idempotency = idempotency;
     }
 
     @Override
@@ -29,6 +33,14 @@ public class WebConfig implements WebMvcConfigurer {
     FilterRegistrationBean<TraceIdFilter> traceIdFilter() {
         FilterRegistrationBean<TraceIdFilter> r = new FilterRegistrationBean<>(new TraceIdFilter());
         r.setOrder(Ordered.HIGHEST_PRECEDENCE);
+        return r;
+    }
+
+    /** 排在 traceId 之后：幂等放弃 / 请求体过大的日志要带 traceId。 */
+    @Bean
+    FilterRegistrationBean<WriteRequestFilter> writeRequestFilter() {
+        FilterRegistrationBean<WriteRequestFilter> r = new FilterRegistrationBean<>(new WriteRequestFilter(idempotency));
+        r.setOrder(Ordered.HIGHEST_PRECEDENCE + 10);
         return r;
     }
 }
