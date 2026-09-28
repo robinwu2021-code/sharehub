@@ -69,6 +69,7 @@ Response r = receiver.handle(request.getHeader("X-OpsKit-Signature"), rawBody);
 Replied r = opskit.replyConfirmation(e.data().path("token").asString(), activationOk, activationOk ? null : "设备离线");
 ```
 
+连接器用的是 `POST /confirmations`（令牌在请求体里）；自己写 HTTP 调用时也请用它 —— 令牌放路径里会被反代的访问日志原样记下。
 回复本身幂等：重复回复返回首次结论（`first=false`），不会再触发迁移 —— 超时后放心重试。令牌过期 → `opskit.confirmation.expired`。
 
 ## 4. 对账 —— `Reconciler`

@@ -151,12 +151,13 @@ public final class OpsKitConnector {
      */
     public Replied replyConfirmation(String token, boolean confirm, String reason) {
         Map<String, Object> body = new LinkedHashMap<>();
+        body.put("token", token); // 放请求体而不是路径：路径会进反代访问日志
         body.put("result", confirm ? "CONFIRM" : "REJECT");
         if (reason != null) {
             body.put("reason", reason);
         }
         // 不带幂等键：回复本身在服务端就是幂等的（首次结论为准）
-        JsonNode n = send("POST", "/confirmations/" + enc(token), body, null).body();
+        JsonNode n = send("POST", "/confirmations", body, null).body();
         return new Replied(n.path("instanceNo").asString(), n.path("result").asString(), n.path("first").asBoolean());
     }
 

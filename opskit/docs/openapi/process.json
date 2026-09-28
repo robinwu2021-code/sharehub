@@ -1325,6 +1325,20 @@
         },
         "type" : "object"
       },
+      "TokenReplyBody" : {
+        "properties" : {
+          "reason" : {
+            "type" : "string"
+          },
+          "result" : {
+            "type" : "string"
+          },
+          "token" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "TransitionBody" : {
         "properties" : {
           "comment" : {
@@ -1831,6 +1845,34 @@
           }
         },
         "tags" : [ "approval-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/confirmations" : {
+      "post" : {
+        "operationId" : "post_workspaces_ws_confirmations",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TokenReplyBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Replied"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "confirmation-controller" ]
       }
     },
     "/api/opskit/v1/workspaces/{ws}/confirmations/{token}" : {

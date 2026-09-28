@@ -34,6 +34,23 @@ public class ConfirmationController {
     public record Replied(String instanceNo, String result, boolean first) {
     }
 
+    /** @param token 事件 instance.awaiting_confirmation 里的一次性令牌 */
+    public record TokenReplyBody(String token, String result, String reason) {
+    }
+
+    /**
+     * 推荐写法：令牌放在请求体里。放在路径里（下一个接口）会被反代 / 网关的访问日志原样记下 —— 令牌虽是一次性的，
+     * 在它被回复之前落进日志就等于泄露给能读日志的人。
+     */
+    @PostMapping("/confirmations")
+    public Replied replyWithBody(Actor actor, @RequestBody TokenReplyBody body) {
+        if (body == null || body.token() == null || body.token().isBlank()) {
+            throw new OpsKitException(CommonErrors.VALIDATION, "token is required", Map.of(), List.of(new FieldError("token", "opskit.validation.required")));
+        }
+        return reply(actor, body.token(), new ReplyBody(body.result(), body.reason()));
+    }
+
+    /** 兼容写法（令牌在路径里）：已接入方继续可用；经过会记访问日志的反代时请改用 {@code POST /confirmations}。 */
     @PostMapping("/confirmations/{token}")
     public Replied reply(Actor actor, @PathVariable("token") String token, @RequestBody ReplyBody body) {
         GateTimersAndConfirmations.Reply reply;

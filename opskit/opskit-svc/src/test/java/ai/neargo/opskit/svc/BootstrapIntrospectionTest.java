@@ -352,6 +352,10 @@ class BootstrapIntrospectionTest {
         assertThat(again.first()).as("重复回复不再迁移").isFalse();
         assertThat(again.result()).isEqualTo("CONFIRM");
         assertThat(new ai.neargo.opskit.connector.Reconciler(c).check("site", "ST9", "site_activation").statusCategory()).isEqualTo("DONE");
+        Res legacy = send("POST", WS + "/confirmations/" + token, APP, null, java.util.Map.of("result", "REJECT", "reason", "路径形式"));
+        assertThat(legacy.status()).as("兼容的路径形式仍可用").isEqualTo(200);
+        assertThat(legacy.body().get("first").asBoolean()).isFalse();
+        assertThat(send("POST", WS + "/confirmations", APP, null, java.util.Map.of("result", "CONFIRM")).status()).as("缺令牌").isEqualTo(422);
 
         ai.neargo.opskit.connector.Reconciler rec = new ai.neargo.opskit.connector.Reconciler(c);
         assertThat(rec.check("withdrawal", "WD-NONE", "withdrawal_audit").state()).isEqualTo(ai.neargo.opskit.connector.Reconciler.State.NOT_FOUND);
