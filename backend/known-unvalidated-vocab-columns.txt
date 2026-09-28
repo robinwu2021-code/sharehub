@@ -1,0 +1,600 @@
+# 词表列的写入侧**待核实**台账 —— 只准变短。
+#
+# 由 VocabularyWriteCoverageTest 卡住。格式：每行 `表.列`，一行一个**尚未核实**的列。
+#
+# ───────────────────────────────────────────────────────────────
+# 这台账要解决的是「没有任何东西说这一列的入口还没接」
+#
+# 事后卡口 StoredValueInVocabularyTest 比对**库里已存的值**与列注释，
+# 但脏数据必须**先落库**才会被它发现 —— 而那时该查的是当初写它的那次请求，
+# 现场早没了。2026-09-27 一天之内串错三次（V82 告警等级 / V84 对账差异 /
+# V85 活动类型与拉黑原因），三次的写入方都绕开了校验。
+#
+# 最值钱的一条实证：share_rule.mode / share_record.mode 曾有 17 行 RATE（V66 归一），
+# 写它们的是 ShareServiceImpl.saveRule —— 而 ShareMode.of() **那时已经存在、只是这里没调**。
+# 词表有定义、校验有实现、中间那一步没接上，三者都不报错。
+#
+# ───────────────────────────────────────────────────────────────
+# 怎么把一行从这里去掉
+#
+# 1. 写入口调对应枚举的 of()（**用 ofNullable 口径**：传了才校验 ——
+#    保存端点创建与编辑共用，编辑只传要改的字段，没传的 null 表示「不改」。
+#    第一版用 of() 的后果是「改个活动名字都会被拒」：改的是值的合法性，
+#    却顺手改了字段是否必填，而后者从来不是这道题）；
+# 2. 往 VocabularyRejectedOnWriteTest 里**加一格**（POST 词表外的值必须 400，
+#    并带正对照 —— 只验拒绝不验放行，会把「一律拒」也判成通过）；
+# 3. 从本文件删掉那一行。
+#
+# ⚠️ **新增词表列时必须当场表态**：要么接上校验，要么把它加进本文件并说明为什么先不接。
+# 卡口会拦住「悄悄多出一列没人管的词表列」—— 那正是这三次串错的共同形状。
+#
+# ───────────────────────────────────────────────────────────────
+# ⚠️ 这个数字是「**待核实**」不是「**有缺陷**」—— 两者差别很大
+#
+# 建账时我先用「VocabularyRejectedOnWriteTest 覆盖了哪几列」去推，当场就错了：
+# AlarmCodeServiceImpl 实际逐个 of() 校验了 8 列（level / domain / subjectType /
+# evalType / disposition / mergeScope / recoverRule / basePriority），
+# 而那条卡口只验过 level —— 于是另外 7 列被我误记成「没接」。
+#
+# 分清两件事：
+#   (a) **写入口调了校验** —— 真正的保护；
+#   (b) **有端点用例证明它会拒** —— 证明。
+# 台账记的是「(a) 尚未有人核实」。一行被移出，要么是读代码确认了 (a)，
+# 要么是补了 (b)（更好：(b) 顺带证明了 (a)，且以后改坏会红）。
+#
+# 也不能反过来按「代码里出现过 of()」自动判 —— 按字段名匹配两个方向都不准
+# （AlarmNo / SiteNo 之类根本不是词表校验），而**判不准的卡口比没有更糟**：
+# 它会让人以为「绿了就是接上了」。所以覆盖与否由人写，机器只管账对不对得上。
+#
+# 口径：与 StoredValueInVocabularyTest 同一套形状判据（列注释里凑得出两个及以上
+# 大写取值，或列名是 status/state/type/mode/level 这五个历来就查的）。
+# 2026-09-28 首次建账：词表列 303，已核实 22，**待核实 281**。
+# ───────────────────────────────────────────────────────────────
+
+# acct_account（2）
+acct_account.acct_type
+acct_account.owner_type
+
+# acct_ledger（1）
+acct_ledger.direction
+
+# ad_campaign（1）
+ad_campaign.status
+
+# ad_slot（2）
+ad_slot.status
+ad_slot.type
+
+# agt_account（1）
+agt_account.status
+
+# agt_agent（2）
+agt_agent.agent_type
+agt_agent.status
+
+# agt_apply（4）
+agt_apply.operator_type
+agt_apply.source
+agt_apply.status
+agt_apply.tenant_id
+
+# agt_assignment（2）
+agt_assignment.action
+agt_assignment.target_type
+
+# agt_commission（2）
+agt_commission.dimension
+agt_commission.status
+
+# agt_exit（1）
+agt_exit.status
+
+# agt_ops_assessment（1）
+agt_ops_assessment.period
+
+# agt_principal（4）
+agt_principal.email_hash
+agt_principal.phone_hash
+agt_principal.status
+agt_principal.tenant_id
+
+# coupon_tpl（2）
+coupon_tpl.status
+coupon_tpl.type
+
+# cred_credential（2）
+cred_credential.realm
+cred_credential.status
+
+# cs_message（1）
+cs_message.sender_type
+
+# cs_session（1）
+cs_session.status
+
+# cs_ticket（2）
+cs_ticket.channel
+cs_ticket.status
+
+# dev_alarm（11）
+dev_alarm.cause
+dev_alarm.close_reason
+dev_alarm.disposition_type
+dev_alarm.domain
+dev_alarm.impact_period
+dev_alarm.impact_scope
+dev_alarm.level
+dev_alarm.priority
+dev_alarm.source
+dev_alarm.status
+dev_alarm.subject_type
+
+
+# dev_alarm_log（1）
+dev_alarm_log.event
+
+# dev_alarm_notice（2）
+dev_alarm_notice.channel
+dev_alarm_notice.status
+
+# dev_alarm_route（3）
+dev_alarm_route.disposition
+dev_alarm_route.fallback
+dev_alarm_route.wo_type
+
+# dev_alarm_rule（3）
+dev_alarm_rule.channel
+dev_alarm_rule.method
+dev_alarm_rule.status
+
+# dev_alarm_todo（1）
+dev_alarm_todo.status
+
+# dev_alert_deprecated_v1（3）
+dev_alert_deprecated_v1.severity
+dev_alert_deprecated_v1.source
+dev_alert_deprecated_v1.status
+
+# dev_cabinet（4）
+dev_cabinet.device_type
+dev_cabinet.online_status
+dev_cabinet.qc_status
+dev_cabinet.status
+
+# dev_code_batch（2）
+dev_code_batch.code_type
+dev_code_batch.status
+
+# dev_event_code（3）
+dev_event_code.category
+dev_event_code.protective_action
+dev_event_code.scope
+
+# dev_ota_release（1）
+dev_ota_release.status
+
+# dev_ota_rollout（3）
+dev_ota_rollout.scope
+dev_ota_rollout.status
+dev_ota_rollout.strategy
+
+# dev_ota_task（1）
+dev_ota_task.status
+
+# dev_powerbank（3）
+dev_powerbank.health
+dev_powerbank.qc_status
+dev_powerbank.status
+
+# dev_protection（2）
+dev_protection.action
+dev_protection.holder_type
+
+# dev_qc_record（2）
+dev_qc_record.item_type
+dev_qc_record.result
+
+# dev_slot（3）
+dev_slot.health
+dev_slot.lock_status
+dev_slot.slot_kind
+
+# dev_trial_rent（1）
+dev_trial_rent.status
+
+# fin_invoice（2）
+fin_invoice.source_type
+fin_invoice.status
+
+# fin_invoice_item（1）
+fin_invoice_item.invoice_side
+
+# gw_command_log（2）
+gw_command_log.status
+gw_command_log.type
+
+# gw_message_log（1）
+gw_message_log.direction
+
+# gw_vendor（2）
+gw_vendor.access_mode
+gw_vendor.status
+
+# gw_vendor_device_type（2）
+gw_vendor_device_type.device_type
+gw_vendor_device_type.protocol
+
+# iam_audit_log（2）
+iam_audit_log.client_code
+iam_audit_log.outcome
+
+# iam_data_scope（2）
+iam_data_scope.scope_type
+iam_data_scope.subject_type
+
+# iam_dept（2）
+iam_dept.path
+iam_dept.status
+
+# iam_employee（3）
+iam_employee.email_hash
+iam_employee.phone_hash
+iam_employee.status
+
+# iam_menu（1）
+iam_menu.type
+
+# iam_role（2）
+iam_role.code
+iam_role.data_scope
+
+# iam_staff_perf（1）
+iam_staff_perf.role
+
+# inv_asset_diff（4）
+inv_asset_diff.item_type
+inv_asset_diff.kind
+inv_asset_diff.source_type
+inv_asset_diff.status
+
+# inv_stock（1）
+inv_stock.item_type
+
+# inv_transfer（4）
+inv_transfer.from_ref
+inv_transfer.item_type
+inv_transfer.source_type
+inv_transfer.status
+
+# loc_contract（7）
+loc_contract.audit_stage
+loc_contract.contract_kind
+loc_contract.settle_period
+loc_contract.share_base
+loc_contract.share_mode
+loc_contract.status
+loc_contract.term_req_status
+
+# loc_contract_log（3）
+loc_contract_log.event
+loc_contract_log.from_status
+loc_contract_log.to_status
+
+# loc_lead（3）
+loc_lead.owner_type
+loc_lead.share_mode
+loc_lead.stage
+
+# loc_lead_follow（1）
+loc_lead_follow.channel
+
+# loc_location（1）
+loc_location.status
+
+# loc_site（1）
+loc_site.status
+
+# loc_site_agent（1）
+loc_site_agent.role
+
+# loc_site_lifecycle（1）
+loc_site_lifecycle.stage
+
+# loc_site_lifecycle_log（2）
+loc_site_lifecycle_log.from_stage
+loc_site_lifecycle_log.to_stage
+
+# loc_site_status_log（3）
+loc_site_status_log.event
+loc_site_status_log.from_status
+loc_site_status_log.to_status
+
+# loc_site_survey（2）
+loc_site_survey.result
+loc_site_survey.signal_level
+
+# loc_venue（2）
+loc_venue.industry
+loc_venue.status
+
+# loc_venue_onboarding（2）
+loc_venue_onboarding.industry
+loc_venue_onboarding.status
+
+# mbr_benefit（2）
+mbr_benefit.level
+mbr_benefit.status
+
+# mbr_plan（2）
+mbr_plan.card_type
+mbr_plan.status
+
+# md_bank（2）
+md_bank.status
+md_bank.swift_prefix
+
+# md_brand（1）
+md_brand.status
+
+# md_device_type（3）
+md_device_type.default_metering
+md_device_type.reservation_target
+md_device_type.type_code
+
+# md_market_country（2）
+md_market_country.compliance
+md_market_country.status
+
+# md_problem（2）
+md_problem.problem_no
+md_problem.status
+
+# mkt_campaign（1）
+mkt_campaign.status
+
+# mkt_notice（2）
+mkt_notice.status
+mkt_notice.type
+
+# mkt_push（4）
+mkt_push.audience_type
+mkt_push.audience_value
+mkt_push.channel
+mkt_push.status
+
+# mkt_referral（1）
+mkt_referral.status
+
+# mkt_referral_rule（3）
+mkt_referral_rule.reward_to
+mkt_referral_rule.reward_type
+mkt_referral_rule.status
+
+# notify_blacklist（2）
+notify_blacklist.block_no
+notify_blacklist.status
+
+# notify_log（2）
+notify_log.channel
+notify_log.status
+
+# notify_template（1）
+notify_template.status
+
+# openapi_app（1）
+openapi_app.status
+
+# ord_charge_ext（1）
+ord_charge_ext.stop_reason
+
+# ord_complaint（3）
+ord_complaint.issue_type
+ord_complaint.resolution
+ord_complaint.status
+
+# ord_deposit（2）
+ord_deposit.last_dun_channel
+ord_deposit.status
+
+# ord_exception（3）
+ord_exception.handle_action
+ord_exception.status
+ord_exception.type
+
+# ord_order（5）
+ord_order.free_reason
+ord_order.pay_status
+ord_order.source_channel
+ord_order.status
+ord_order.sub_status
+
+# ord_refund（1）
+ord_refund.status
+
+# ord_reservation（2）
+ord_reservation.status
+ord_reservation.type
+
+# pay_auth（1）
+pay_auth.status
+
+# pay_channel（2）
+pay_channel.channel_code
+pay_channel.status
+
+# pay_channel_scope（2）
+pay_channel_scope.scope_type
+pay_channel_scope.scope_value
+
+# pay_order（3）
+pay_order.order_no
+pay_order.status
+pay_order.type
+
+# pay_refund（1）
+pay_refund.status
+
+# price_adjustment（1）
+price_adjustment.status
+
+# price_plan（1）
+price_plan.status
+
+# price_plan_item（3）
+price_plan_item.item_type
+price_plan_item.metering
+price_plan_item.rounding
+
+# price_plan_scope（1）
+price_plan_scope.scope_type
+
+# price_rule_deprecated_v1（1）
+price_rule_deprecated_v1.match_ref
+
+# price_schedule（2）
+price_schedule.mode
+price_schedule.period
+
+# recon_diff（2）
+recon_diff.diff_type
+recon_diff.handle_result
+
+# recon_task（3）
+recon_task.handle_result
+recon_task.handle_status
+recon_task.status
+
+# share_record（5）
+share_record.agent_no
+share_record.basis
+share_record.payee_type
+share_record.period
+share_record.status
+
+# stl_adjustment（5）
+stl_adjustment.kind
+stl_adjustment.payee_type
+stl_adjustment.period
+stl_adjustment.source
+stl_adjustment.status
+
+# stl_payout_account（3）
+stl_payout_account.payee_type
+stl_payout_account.status
+stl_payout_account.tenant_id
+
+# stl_settlement（2）
+stl_settlement.payee_type
+stl_settlement.status
+
+# stl_settlement_detail（1）
+stl_settlement_detail.ref_type
+
+# stl_withdrawal（2）
+stl_withdrawal.pay_channel
+stl_withdrawal.status
+
+# sys_app_version（3）
+sys_app_version.platform
+sys_app_version.status
+sys_app_version.version_id
+
+# sys_biz_rule（1）
+sys_biz_rule.category
+
+# sys_file（5）
+sys_file.biz_type
+sys_file.category
+sys_file.status
+sys_file.storage
+sys_file.uploader_realm
+
+# sys_outbox（3）
+sys_outbox.aggregate_id
+sys_outbox.event_type
+sys_outbox.status
+
+# tenant（1）
+tenant.status
+
+# tenant_config（1）
+tenant_config.category
+
+# usr_blacklist（1）
+usr_blacklist.status
+
+# usr_consent（2）
+usr_consent.action
+usr_consent.agreement_code
+
+# usr_coupon（1）
+usr_coupon.status
+
+# usr_coupon_issue（1）
+usr_coupon_issue.target_type
+
+# usr_credit（1）
+usr_credit.risk_level
+
+# usr_free_whitelist（1）
+usr_free_whitelist.status
+
+# usr_identity（1）
+usr_identity.provider
+
+# usr_invoice（1）
+usr_invoice.status
+
+# usr_invoice_title（2）
+usr_invoice_title.type
+usr_invoice_title.vat_trn
+
+# usr_logoff（1）
+usr_logoff.status
+
+# usr_membership（1）
+usr_membership.level
+
+# usr_message（1）
+usr_message.type
+
+# usr_notify_pref（1）
+usr_notify_pref.category
+
+# usr_push_token（1）
+usr_push_token.platform
+
+# usr_recharge_order（1）
+usr_recharge_order.status
+
+# usr_recharge_pkg（1）
+usr_recharge_pkg.status
+
+# usr_wallet_txn（2）
+usr_wallet_txn.direction
+usr_wallet_txn.type
+
+# wo_dispatch（2）
+wo_dispatch.action
+wo_dispatch.strategy
+
+# wo_handle（1）
+wo_handle.fault_reason_code
+
+# wo_order（12）
+wo_order.assignee_type
+wo_order.audit_result
+wo_order.close_reason
+wo_order.cost_bearer_type
+wo_order.dispatch_strategy
+wo_order.fault_reason_code
+wo_order.priority
+wo_order.review_status
+wo_order.source
+wo_order.status
+wo_order.type
+wo_order.wo_created_at
+
+# wo_sla_rule（2）
+wo_sla_rule.priority
+wo_sla_rule.wo_type
