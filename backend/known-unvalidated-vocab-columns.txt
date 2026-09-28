@@ -99,6 +99,16 @@
 # ⚠️ 这一批撞出两个与词表无关、但严重得多的缺陷，都已修（见实现状态总表 §六 ⑭）：
 # 告警路由**改第二次就 500**（软删的行占着唯一索引）· **连续建第二只充电宝必定 500**（取号每次给同一个号）。
 #
+# 同日第五批（合同域 + 工单域 24 列）：**已核实 112，待核实 167**。
+# 两处真缺口已接：loc_contract.settle_period（写错 = 保底永远不补差，
+# AdjustmentServiceImpl 判 !"MONTH".equalsIgnoreCase 就跳过、只 log.warn）、
+# wo_order.audit_result（它驱动「FAIL 不许关单」那道闸，原先却不校验 ——
+# 传小写 fail 那道闸拦不住，且最后报的是「关单原因必填」，指向错的字段）。
+#
+# ⚠️ 第五批反方向证了一次「只 grep setXxx 会判错」：wo_order 有七列
+# **一个 setXxx 都搜不到**，差点被当成死列 —— 它们是用 UpdateWrapper.set("列名", ...)
+# 按列名写的。实体 setter 与 UpdateWrapper 列名是两条写入路径，查一条不够。
+#
 # ⚠️ 三个「没有任何写入路径」的表/列**故意留在台账上**：
 # ord_exception（create 零调用方）· ord_reservation（只有 page/cancel，一处 insert 都没有）
 # · dev_ota_task（只读）。这里「没人写」不等于安全，等于这个功能没有生产者 ——
@@ -237,20 +247,6 @@ inv_stock.item_type
 inv_transfer.item_type
 inv_transfer.source_type
 inv_transfer.status
-
-# loc_contract（7）
-loc_contract.audit_stage
-loc_contract.contract_kind
-loc_contract.settle_period
-loc_contract.share_base
-loc_contract.share_mode
-loc_contract.status
-loc_contract.term_req_status
-
-# loc_contract_log（3）
-loc_contract_log.event
-loc_contract_log.from_status
-loc_contract_log.to_status
 
 # loc_lead_follow（1）
 loc_lead_follow.channel
@@ -489,23 +485,3 @@ usr_recharge_pkg.status
 
 # usr_wallet_txn（1）
 usr_wallet_txn.direction
-
-# wo_dispatch（2）
-wo_dispatch.action
-wo_dispatch.strategy
-
-# wo_handle（1）
-wo_handle.fault_reason_code
-
-# wo_order（11）
-wo_order.assignee_type
-wo_order.audit_result
-wo_order.close_reason
-wo_order.cost_bearer_type
-wo_order.dispatch_strategy
-wo_order.fault_reason_code
-wo_order.priority
-wo_order.review_status
-wo_order.source
-wo_order.status
-wo_order.type

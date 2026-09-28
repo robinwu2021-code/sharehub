@@ -16,6 +16,7 @@ import ai.neargo.sharehub.common.event.DomainEventBus;
 import ai.neargo.sharehub.api.platform.port.SysParamPort;
 import ai.neargo.sharehub.loc.ContractAuditStage;
 import ai.neargo.sharehub.loc.ContractKind;
+import ai.neargo.sharehub.loc.ContractSettlePeriod;
 import ai.neargo.sharehub.loc.ContractShareBase;
 import ai.neargo.sharehub.loc.ContractTermReqStatus;
 import ai.neargo.sharehub.loc.ContractShareMode;
@@ -298,7 +299,11 @@ public class ContractServiceImpl implements ContractService {
         c.setGuaranteeAmount(mode == ContractShareMode.GUARANTEE ? d.guaranteeAmount() : null);
         c.setEntryFee(mode == ContractShareMode.FREE ? 0d : nz(d.entryFee()).doubleValue());
         c.setCurrency(notBlank(d.currency()) ? d.currency() : "AED");
-        c.setSettlePeriod(notBlank(d.settlePeriod()) ? d.settlePeriod() : "MONTH");
+        // 原先只补默认值不校验。写成 MONTHLY 的后果不是报错，是**保底补差永远不生成**
+        // （AdjustmentServiceImpl 判 !"MONTH".equalsIgnoreCase 就跳过、只 log.warn），
+        // 而账面上一切正常。顺带归一大小写，免得库里同时有 MONTH 和 month
+        c.setSettlePeriod(notBlank(d.settlePeriod())
+                ? ContractSettlePeriod.of(d.settlePeriod()).name() : ContractSettlePeriod.MONTH.name());
         c.setStartAt(d.startAt().toString());
         c.setEndAt(d.endAt().toString());
         c.setAutoRenew(d.autoRenew());

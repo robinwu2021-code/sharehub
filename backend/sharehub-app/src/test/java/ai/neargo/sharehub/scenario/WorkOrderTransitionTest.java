@@ -3,6 +3,7 @@ package ai.neargo.sharehub.scenario;
 import ai.neargo.sharehub.support.ApiTestSupport;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
@@ -25,6 +26,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class WorkOrderTransitionTest extends ApiTestSupport {
+
+    @org.springframework.beans.factory.annotation.Autowired
+    org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     private String opsToken;
 
@@ -182,6 +186,40 @@ class WorkOrderTransitionTest extends ApiTestSupport {
     // ——————————————————————— 夹具 ———————————————————————
 
     /** 开一张干净的 FAULT 工单，返回单号。 */
+    @Test
+    @DisplayName("★★ audit_result 非法值 400 —— 它驱动「FAIL 不许关单」那道闸，原先却不校验")
+    void audit_result_out_of_vocabulary_is_rejected() {
+        String woNo = newWorkOrder("验收结论词表");
+        driveToDone(woNo);
+
+        /*
+         * 关单那段逻辑是拿字面量比出来的：`"FAIL".equals(auditResult)` 拒绝关单、
+         * `"PASS"/"PASS_WITH_ISSUE"` 把 closeReason 推成 RESOLVED。
+         * 而 audit_result 原先不校验 —— 传小写 fail：
+         *   · 「FAIL 不许关单」那道闸**拦不住它**；
+         *   · closeReason 也推不出来，于是落到「关单原因必填」上被拒 ——
+         *     报错说的是「原因没填」，而真正错的是验收结论那个词。
+         * 两种后果都不是「值非法」这个真相。现在归一之后，小写 fail 与 FAIL 同样被拦在关单前。
+         */
+        Resp lowerFail = post("/api/ops/work-orders/" + woNo + "/close",
+                Map.of("auditResult", "fail"), opsToken);
+        assertThat(lowerFail.status).as("小写 fail 应当与 FAIL 同样不许关单：%s", lowerFail.msg())
+                .isEqualTo(400);
+        assertThat(lowerFail.msg())
+                .as("报错说的应该是「不许关单」，不是「关单原因必填」—— 后者会把人指向错的字段")
+                .contains("返工");
+
+        Resp bogus = post("/api/ops/work-orders/" + woNo + "/close",
+                Map.of("auditResult", "OK", "closeReason", "RESOLVED"), opsToken);
+        assertThat(bogus.status).as("auditResult=OK 竟然被接受了：%s", bogus.msg()).isEqualTo(400);
+
+        // 正对照：合法的小写照样能走通，并且库里存的是归一后的大写
+        assertThat(status(post("/api/ops/work-orders/" + woNo + "/close",
+                Map.of("auditResult", "pass_with_issue"), opsToken))).isEqualTo("CLOSED");
+        assertThat(jdbc.queryForObject("SELECT audit_result FROM wo_order WHERE wo_no=?", String.class, woNo))
+                .as("小写没归一 —— 按验收结论统计会把同一档劈成两半").isEqualTo("PASS_WITH_ISSUE");
+    }
+
     private String newWorkOrder(String desc) {
         Map<String, Object> body = new HashMap<>();
         body.put("type", "FAULT");

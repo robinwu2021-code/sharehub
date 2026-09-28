@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.util.HashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -79,6 +80,9 @@ class VocabularyRejectedOnWriteTest extends ApiTestSupport {
         // 路由是「整体替换」语义（物理删旧行再插），所以只在探针码上试，不碰真码的路由
         jdbc.update("DELETE FROM dev_alarm_route WHERE alarm_code LIKE 'TEST_VOCAB_PROBE%'");
         jdbc.update("DELETE FROM dev_powerbank WHERE sn LIKE 'VOCABPB%'");
+        jdbc.update("DELETE FROM loc_contract_log WHERE contract_no IN"
+                + " (SELECT contract_no FROM loc_contract WHERE remark = ?)", MARK);
+        jdbc.update("DELETE FROM loc_contract WHERE remark = ?", MARK);
         jdbc.update("DELETE FROM usr_free_whitelist WHERE c_user_no LIKE 'UVOCAB%'");
         jdbc.update("DELETE FROM notify_template WHERE name = ?", MARK);
         jdbc.update("DELETE FROM md_problem WHERE title = ?", MARK);
@@ -477,6 +481,48 @@ class VocabularyRejectedOnWriteTest extends ApiTestSupport {
         assertThat(again.status)
                 .as("同一个码第二次保存路由失败了 —— 软删的旧行还占着唯一索引：%s", again.msg())
                 .isEqualTo(200);
+    }
+
+    @Test
+    @DisplayName("★★ loc_contract.settle_period 非法值 400 —— 写错的后果是保底永远不补差，只留一行 WARN")
+    void contract_settle_period_rejects_out_of_vocabulary() {
+        String t = login("ADMIN");
+
+        var ok = post("/api/ops/contracts", contract("MONTH"), t);
+        assertThat(ok.status).as("合法 settlePeriod 应当能存：%s", ok.msg()).isEqualTo(200);
+
+        /*
+         * 负例用 MONTHLY —— 它是「看起来对」的那种错。
+         * AdjustmentServiceImpl 出保底补差时判的是 !"MONTH".equalsIgnoreCase(settlePeriod)，
+         * 不等于就**跳过**、只 log.warn。于是这一个字母的代价是
+         * **场地方该拿的保底差额永远不生成**，而账面上一切正常。
+         */
+        var bad = post("/api/ops/contracts", contract("MONTHLY"), t);
+        assertThat(bad.status).as("settlePeriod=MONTHLY 竟然被接受了：%s", bad.msg()).isEqualTo(400);
+
+        // 小写归一：库里同时有 MONTH 和 month 的话，按周期分组统计会把同一批合同劈成两半
+        var lower = post("/api/ops/contracts", contract("quarter"), t);
+        assertThat(lower.status).as("合法但小写的 settlePeriod 被拒了：%s", lower.msg()).isEqualTo(200);
+        assertThat(jdbc.queryForObject("SELECT settle_period FROM loc_contract WHERE contract_no=?",
+                String.class, lower.okData().path("contractNo").asText()))
+                .as("小写没归一").isEqualTo("QUARTER");
+    }
+
+    /** 合同草稿：站点取库里现成的，本用例只关心 settlePeriod 这一列。 */
+    private Map<String, Object> contract(String settlePeriod) {
+        Map<String, Object> m = new HashMap<>();
+        String site = jdbc.queryForObject(
+                "SELECT site_no FROM loc_site WHERE deleted=0 AND venue_no IS NOT NULL ORDER BY id LIMIT 1",
+                String.class);
+        m.put("siteNo", site);
+        m.put("venueNo", jdbc.queryForObject("SELECT venue_no FROM loc_site WHERE site_no=?", String.class, site));
+        m.put("shareMode", "SHARE");
+        m.put("shareRate", 0.2);
+        m.put("startAt", java.time.LocalDate.now().plusDays(3).toString());
+        m.put("endAt", java.time.LocalDate.now().plusYears(1).toString());
+        m.put("settlePeriod", settlePeriod);
+        m.put("remark", MARK);
+        return m;
     }
 
     @Test

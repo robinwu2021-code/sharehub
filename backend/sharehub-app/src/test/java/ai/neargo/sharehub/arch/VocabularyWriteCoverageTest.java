@@ -142,7 +142,40 @@ class VocabularyWriteCoverageTest {
             "dev_powerbank.health",                              // 2026-09-28 接上 PowerbankHealth（原先原样落库，而它参与可借判定）
             "dev_protection.action", "dev_protection.holder_type",
             "dev_qc_record.item_type", "dev_qc_record.result",
-            "dev_trial_rent.status"));
+            "dev_trial_rent.status",
+
+            // ——— 2026-09-28 第五批：合同域 + 工单域 ———
+            // 新接上校验（各带端点格）：
+            "loc_contract.settle_period",                        // 写错 = 保底永远不补差，只留一行 WARN
+            "wo_order.audit_result",                             // 它驱动「FAIL 不许关单」那道闸，原先却不校验
+            // 读代码核实：白名单 / 枚举 / 服务端常量
+            "loc_contract.share_base", "loc_contract.share_mode", "loc_contract.contract_kind",
+            "loc_contract.status", "loc_contract.audit_stage", "loc_contract.term_req_status",
+            "loc_contract_log.event", "loc_contract_log.from_status", "loc_contract_log.to_status",
+            "wo_order.type", "wo_order.source", "wo_order.priority",   // WorkOrderType.of / SOURCES 白名单 / WoPriority.of
+            "wo_order.status", "wo_order.review_status",
+            "wo_order.close_reason",                             // CLOSE_REASONS 白名单
+            "wo_order.assignee_type",                            // assigneeTypeOf 只返回 AGENT/EMPLOYEE/null
+            "wo_order.dispatch_strategy", "wo_order.cost_bearer_type",
+            "wo_order.fault_reason_code", "wo_handle.fault_reason_code",  // WoFaultReason.of
+            "wo_dispatch.action", "wo_dispatch.strategy",
+
+            /*
+             * 本条卡口当场抓到的第一个「新列」：stl_withdrawal.approval_state（另一会话的 V143，
+             * 提现接 OpsKit 审批）。这正是它要守的形状 —— 列加上了、谁都没想起写入侧。
+             * 查证后归入「服务端全权」：WithdrawalServiceImpl 与 WithdrawalApprovalOutcome
+             * 里全部写 WithdrawalApprovalState.*.name() 常量，申请入参 WithdrawApplyReq
+             * 不含这个字段，前端传不了。
+             */
+            "stl_withdrawal.approval_state"));
+
+    /*
+     * ⚠️ 第五批又证了一次「只 grep setXxx 会判错」，而且是反方向：
+     * wo_order 有七列**一个 setXxx 都搜不到**（assignee_type / audit_result / close_reason /
+     * cost_bearer_type / dispatch_strategy / fault_reason_code / review_status），
+     * 差点被当成「死列」—— 它们是用 `UpdateWrapper.set("列名", ...)` 按**列名**写的。
+     * 实体 setter 与 UpdateWrapper 列名是两条写入路径，查一条不够。
+     */
 
     /*
      * ⚠️ 第三批的方法论教训：**只 grep `setXxx(` 那一行会得出错的结论**。

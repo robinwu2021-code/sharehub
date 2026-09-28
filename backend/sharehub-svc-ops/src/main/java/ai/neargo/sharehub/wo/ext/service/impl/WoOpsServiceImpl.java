@@ -474,7 +474,15 @@ public class WoOpsServiceImpl implements WoOpsService {
         // 前端 WorkOrderClosePayload 只传验收三件套：closeReason 缺省时由 auditResult 推导
         // （PASS/PASS_WITH_ISSUE→RESOLVED）；FAIL 不许直接关单 —— 那是 /rework 的活。
         String closeReason = req == null ? null : req.closeReason();
-        String auditResult = req == null ? null : req.auditResult();
+        /*
+         * 先归一再判。下面三处都是拿字面量比（"FAIL" 拒绝关单、"PASS"/"PASS_WITH_ISSUE"
+         * 推 closeReason），而 audit_result 原先不校验 —— 传小写 fail 的话
+         * 「FAIL 不许关单」那道闸**拦不住它**，且 closeReason 推不出来，
+         * 最后报的是「关单原因必填」，说的不是真正错的那件事。
+         */
+        String auditResult = req == null ? null
+                : java.util.Optional.ofNullable(ai.neargo.sharehub.wo.WoAuditResult.ofNullable(req.auditResult()))
+                        .map(Enum::name).orElse(null);
         if ((closeReason == null || closeReason.isBlank()) && notBlank(auditResult)) {
             if ("FAIL".equals(auditResult)) {
                 throw new IllegalArgumentException("验收不合格（FAIL）不允许关单，请走 /rework 退回返工");
