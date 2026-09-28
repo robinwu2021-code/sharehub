@@ -184,7 +184,7 @@ export const SCENARIOS = [
 
   // ── S6 工单 ──────────────────────────────────────────────────────────
   {
-    id: "S6-1", modes: ["mock"], title: "工单：每张统计卡的数字 = 点进去的列表条数", perms: ALL, url: () => "/flow/tickets/",
+    id: "S6-1", title: "工单：每张统计卡的数字 = 点进去的列表条数", perms: ALL, url: () => "/flow/tickets/",
     run: async (h) => {
       const cards = await h.waitFor(() => { const c = h.all("[data-surface=stat]"); return c.length >= 3 && !c[0].disabled ? c : null; }, "统计卡");
       for (let i = 0; i < cards.length; i++) {

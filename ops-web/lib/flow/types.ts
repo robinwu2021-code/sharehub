@@ -138,7 +138,11 @@ export interface TicketQuery {
    */
   assigneeAttr?: { key: string; values: string[] };
   keyword?: string;
-  /** 关闭时间下界（「今日关闭」统计卡的口径） */
+  /** "me" · "none"（未派）· 成员 ID —— 统计卡「未派」的 queryParams 用 none */
+  assignee?: string;
+  open?: boolean;
+  escalated?: boolean;
+  /** 关闭时间下界（「今日关闭」统计卡的口径：服务按空间业务时区算「今天」） */
   closedFromMs?: number;
   page: number;
   size: number;
