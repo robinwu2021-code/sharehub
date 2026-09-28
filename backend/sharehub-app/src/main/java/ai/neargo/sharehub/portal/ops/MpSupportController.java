@@ -4,6 +4,7 @@ import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.auth.ConsumerContext;
 import ai.neargo.sharehub.cs.dto.CsDtos.CsTicketVO;
 import ai.neargo.sharehub.cs.dto.CsDtos.ReportReq;
+import ai.neargo.sharehub.cs.dto.CsDtos.SendMessageReq;
 import ai.neargo.sharehub.cs.dto.CsDtos.ReportResultVO;
 import ai.neargo.sharehub.cs.dto.CsDtos.CsMessageVO;
 import ai.neargo.sharehub.cs.dto.CsDtos.CsSessionVO;
@@ -22,7 +23,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * C 端公告 / 券包 / 自助报障（[api/README §8.5 §8.6]）。
@@ -125,9 +125,8 @@ public class MpSupportController {
 
     /** 我在会话里说一句。落 sender_type=USER；会话已关闭则 409。 */
     @PostMapping("/mp/user/cs-sessions/{sessionNo}/messages")
-    public CsMessageVO sendMessage(@PathVariable String sessionNo, @RequestBody Map<String, String> body) {
-        return sessionService.sendByUser(ConsumerContext.userNo(), sessionNo,
-                body == null ? null : body.get("content"));
+    public CsMessageVO sendMessage(@PathVariable String sessionNo, @RequestBody SendMessageReq body) {
+        return sessionService.sendByUser(ConsumerContext.userNo(), sessionNo, body == null ? null : body.content());
     }
 
     /** 我的报障列表。 */

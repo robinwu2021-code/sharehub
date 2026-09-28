@@ -98,6 +98,10 @@ public final class CsDtos {
                                  String woNo, String refundNo, String sessionNo, String createdAt) {
     }
 
+    /** C 端在会话里发一句。用 record 不用裸 Map：请求体的形状要在签名上显形（MapRequestBodyRatchetTest 守着）。 */
+    public record SendMessageReq(String content) {
+    }
+
     /** 客服回复入参。 */
     public record ReplyReq(String content, String attach) {
     }
