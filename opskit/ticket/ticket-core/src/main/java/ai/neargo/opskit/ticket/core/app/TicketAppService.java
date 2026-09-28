@@ -25,6 +25,7 @@ import ai.neargo.opskit.ticket.api.model.CreateTicketRequest;
 import ai.neargo.opskit.ticket.api.model.CreateTicketResult;
 import ai.neargo.opskit.ticket.api.model.TicketDetail;
 import ai.neargo.opskit.ticket.api.model.TicketView;
+import ai.neargo.opskit.ticket.api.model.TimelineItem;
 import ai.neargo.opskit.ticket.api.model.UpdateTicketRequest;
 import ai.neargo.opskit.ticket.core.domain.FieldValues;
 import ai.neargo.opskit.ticket.core.domain.SlaRollup;
@@ -56,6 +57,7 @@ public class TicketAppService {
     public static final String WORK = "ticket:work";
     public static final String ASSIGN = "ticket:assign";
     public static final String ESCALATE = "ticket:escalate";
+    public static final String COMMENT_INTERNAL = "ticket:comment:internal";
     public static final String MERGE = "ticket:merge";
     public static final String WATCHER = "WATCHER";
     /** 数据范围不设限（令牌 scopes:["*"]），与流程层同一约定。 */
@@ -444,6 +446,154 @@ public class TicketAppService {
             processes.replaceParticipants(TicketDispatcher.internal(t), r.instanceNo(), WATCHER, refs);
             return view(t, r);
         });
+    }
+
+    // ── 评论 · 时间线（O3-7）─────────────────────────────────
+
+    /**
+     * 写评论。INTERNAL 须 ticket:comment:internal；PUBLIC 须看得见这张单且（ticket:work ∨ 参与者）。
+     * 附件只存引用 {@code [{id, name, size?, contentType?}]}，文件在接入方。
+     */
+    @SystemAction("可见性先判；内部评论另需 ticket:comment:internal")
+    public int comment(Actor actor, String ticketNo, String body, String visibility, List<Map<String, Object>> attachments) {
+        String vis = visibility == null ? "PUBLIC" : visibility;
+        if (!"PUBLIC".equals(vis) && !"INTERNAL".equals(vis)) {
+            throw invalid("visibility", "opskit.validation.one_of");
+        }
+        boolean noBody = body == null || body.isBlank();
+        List<Map<String, Object>> files = attachments(attachments);
+        if (noBody && files.isEmpty()) {
+            throw invalid("body", "opskit.validation.required");
+        }
+        if (body != null && body.length() > 20_000) {
+            throw invalid("body", "opskit.validation.too_long");
+        }
+        if ("INTERNAL".equals(vis)) {
+            requirePermission(actor, COMMENT_INTERNAL);
+        }
+        TenantContext t = actor.tenant();
+        return tx.execute(s -> {
+            TicketDao.Row r = visible(actor, ticketNo);
+            tickets.lock(t.workspaceId(), ticketNo);
+            String me = actor.member().map(PrincipalRef::key).orElse(null);
+            boolean participant = me != null && (me.equals(r.requester()) || me.equals(r.assignee()));
+            if (!actor.isAppItself() && !actor.productPermissions().contains(WORK) && !participant && !"INTERNAL".equals(vis)) {
+                throw new OpsKitException(CommonErrors.PERMISSION_DENIED, "commenting needs " + WORK + " or being a participant");
+            }
+            return comments.insert(t.workspaceId(), ticketNo, vis, "COMMENT", who(actor), onBehalf(actor), noBody ? null : body.strip(), files,
+                    clock.millis());
+        });
+    }
+
+    /** 时间线：流程历史（建单 · 迁移 · 派单 · 审批 · SLA）+ 工单评论，按时间合成一条流水；内部评论只给有权限的人。 */
+    @SystemAction("只读：同 get；内部评论另需 ticket:comment:internal")
+    public List<TimelineItem> timeline(Actor actor, String ticketNo) {
+        TicketDao.Row r = visible(actor, ticketNo);
+        TenantContext t = actor.tenant();
+        boolean internal = actor.isAppItself() || actor.productPermissions().contains(COMMENT_INTERNAL);
+        List<TimelineItem> raw = new ArrayList<>();
+        if (!r.instanceNo().startsWith(PENDING_INSTANCE)) {
+            TicketTypeDef def = definitions.typeById(t, r.typeDefinitionId());
+            Optional<ai.neargo.opskit.process.api.definition.ProcessDef> pd = processes.processDef(t, def.processCode());
+            for (ai.neargo.opskit.process.api.model.query.HistoryEntry h : processes.history(t, r.instanceNo())) {
+                TimelineItem it = fromHistory(h, pd.orElse(null));
+                if (it != null) {
+                    raw.add(it);
+                }
+            }
+        }
+        for (CommentDao.Row c : comments.of(t.workspaceId(), ticketNo)) {
+            if ("INTERNAL".equals(c.visibility()) && !internal) {
+                continue;
+            }
+            String kind = switch (c.kind()) {
+                case "DEDUPE_HIT" -> "DEDUPE";
+                case "MERGE" -> "MERGE";
+                case "SYSTEM" -> "ESCALATED";
+                default -> "COMMENT";
+            };
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> files = (List<Map<String, Object>>) (List<?>) c.attachments();
+            raw.add(new TimelineItem(0, c.atMs(), kind, c.author(), null, null, null, null, null, null, c.body(), c.visibility(), files, null,
+                    "ESCALATED".equals(kind)));
+        }
+        raw.sort(java.util.Comparator.comparingLong(TimelineItem::atMs));
+        List<TimelineItem> out = new ArrayList<>();
+        for (int i = 0; i < raw.size(); i++) {
+            TimelineItem x = raw.get(i);
+            out.add(new TimelineItem(i + 1, x.atMs(), x.kind(), x.actor(), x.action(), x.from(), x.to(), x.actionName(), x.fromName(), x.toName(), x.body(),
+                    x.visibility(), x.attachments(), x.reason(), x.hot()));
+        }
+        return out;
+    }
+
+    /** 历史 → 时间线条目；与办单无关的噪音（改字段、任务建 / 完成）不进时间线。 */
+    private static TimelineItem fromHistory(ai.neargo.opskit.process.api.model.query.HistoryEntry h, ai.neargo.opskit.process.api.definition.ProcessDef pd) {
+        switch (h.entityKind()) {
+            case "INSTANCE" -> {
+                if ("fields_updated".equals(h.action())) {
+                    return null;
+                }
+                if ("created".equals(h.action())) {
+                    return item(h, "CREATED", null, null, statusName(pd, h.to()), false);
+                }
+                ai.neargo.opskit.commons.i18n.LocalizedText name = pd == null ? null : pd.transitions().stream().filter(x -> x.code().equals(h.action()))
+                        .findFirst().map(ai.neargo.opskit.process.api.definition.TransitionDef::name).orElse(null);
+                boolean cancelled = pd != null && pd.statuses().stream().anyMatch(st -> st.code().equals(h.to())
+                        && st.category() == ai.neargo.opskit.process.api.definition.StatusCategory.CANCELLED);
+                return item(h, "TRANSITION", name, statusName(pd, h.from()), statusName(pd, h.to()), cancelled);
+            }
+            case "TASK" -> {
+                boolean assignedOnCreate = "created".equals(h.action()) && h.to() != null && h.to().startsWith("member:");
+                if (!assignedOnCreate && !Set.of("claimed", "released", "claim_timeout", "assigned", "reassigned", "pooled").contains(h.action())) {
+                    return null;
+                }
+                return item(h, "ASSIGNED", null, null, null, "claim_timeout".equals(h.action()));
+            }
+            case "APPROVAL" -> {
+                return item(h, "APPROVAL", null, null, null, "reject".equals(h.action()) || "REJECTED".equals(h.to()));
+            }
+            case "SLA" -> {
+                return item(h, "SLA", null, null, null, "BREACHED".equals(h.to()) || "WARNING".equals(h.to()));
+            }
+            default -> {
+                return null;
+            }
+        }
+    }
+
+    private static TimelineItem item(ai.neargo.opskit.process.api.model.query.HistoryEntry h, String kind, ai.neargo.opskit.commons.i18n.LocalizedText name,
+            ai.neargo.opskit.commons.i18n.LocalizedText fromName, ai.neargo.opskit.commons.i18n.LocalizedText toName, boolean hot) {
+        return new TimelineItem(0, h.atMs(), kind, h.actor(), h.action(), h.from(), h.to(), name, fromName, toName, null, null, null, h.reason(), hot);
+    }
+
+    private static ai.neargo.opskit.commons.i18n.LocalizedText statusName(ai.neargo.opskit.process.api.definition.ProcessDef pd, String code) {
+        return pd == null || code == null ? null : pd.statuses().stream().filter(s -> s.code().equals(code)).findFirst()
+                .map(ai.neargo.opskit.process.api.definition.StatusDef::name).orElse(null);
+    }
+
+    private static List<Map<String, Object>> attachments(List<Map<String, Object>> raw) {
+        if (raw == null || raw.isEmpty()) {
+            return List.of();
+        }
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (int i = 0; i < raw.size(); i++) {
+            Map<String, Object> m = raw.get(i);
+            if (m == null || !(m.get("id") instanceof String id) || id.isBlank() || !(m.get("name") instanceof String name)) {
+                throw invalid("attachments[" + i + "]", "opskit.ticket.expect_attachments");
+            }
+            Map<String, Object> a = new LinkedHashMap<>();
+            a.put("id", id);
+            a.put("name", name);
+            if (m.get("size") instanceof Number size) {
+                a.put("size", size.longValue());
+            }
+            if (m.get("contentType") instanceof String ct) {
+                a.put("contentType", ct);
+            }
+            out.add(a);
+        }
+        return out;
     }
 
     /** 定时任务只带空间，账户从工单行上取。 */

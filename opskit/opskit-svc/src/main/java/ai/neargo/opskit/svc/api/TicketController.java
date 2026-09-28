@@ -35,6 +35,7 @@ import ai.neargo.opskit.svc.api.Present.Subject;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -154,6 +155,14 @@ public class TicketController {
     public record ExternalBody(String to) {
     }
 
+    public record CommentBody(String body, String visibility, List<Map<String, Object>> attachments) {
+    }
+
+    /** TimelineEntry（21/06 §七）；另带 visibility / attachments（评论）。 */
+    public record TimelineDto(int seq, long atMs, String kind, String title, Person actor, String detail, boolean hot, String visibility,
+            List<Map<String, Object>> attachments) {
+    }
+
     // ── 工单类型 ────────────────────────────────────────────
 
     @GetMapping("/ticket-types")
@@ -253,6 +262,39 @@ public class TicketController {
     public View watchers(Actor actor, @PathVariable("no") String no, @RequestBody WatchersBody b, HttpServletRequest req) {
         tickets.setWatchers(actor, no, b.members());
         return get(actor, no, req);
+    }
+
+    @GetMapping("/tickets/{no}/timeline")
+    public List<TimelineDto> timeline(Actor actor, @PathVariable("no") String no, HttpServletRequest req) {
+        List<ai.neargo.opskit.ticket.api.model.TimelineItem> items = tickets.timeline(actor, no);
+        TenantContext t = actor.tenant();
+        List<String> principals = new ArrayList<>();
+        items.forEach(i -> {
+            principals.add(i.actor());
+            principals.add(i.to());
+            principals.add(i.from());
+        });
+        People people = new People(directory, t, principals);
+        String locale = Present.locale(req);
+        TicketDetail d = tickets.detail(actor, no);
+        Map<String, String> metricNames = new HashMap<>();
+        d.slaMetrics().forEach(m -> metricNames.put(m.metricCode(), Present.text(m.name(), locale)));
+        return items.stream().map(i -> {
+            Person who = i.actor() != null && i.actor().startsWith("member:") ? people.of(i.actor()) : null;
+            String title = TimelineTitles.title(i, locale, p -> {
+                Person x = p == null ? null : people.of(p);
+                return x == null ? "—" : x.displayName() == null ? x.ref() : x.displayName();
+            }, m -> metricNames.getOrDefault(m, m), txt -> Present.text(txt, locale));
+            return new TimelineDto(i.seq(), i.atMs(), i.kind(), title, who, i.body() != null ? i.body() : i.reason(), i.hot(), i.visibility(),
+                    i.attachments());
+        }).toList();
+    }
+
+    /** 写评论（visibility 缺省 PUBLIC；INTERNAL 需 ticket:comment:internal），回写后的时间线。 */
+    @PostMapping("/tickets/{no}/comments")
+    public List<TimelineDto> comment(Actor actor, @PathVariable("no") String no, @RequestBody CommentBody b, HttpServletRequest req) {
+        tickets.comment(actor, no, b.body(), b.visibility(), b.attachments());
+        return timeline(actor, no, req);
     }
 
     /** 批量改派：{ticketNos | from} 二选一 + to + reason；逐单结果，单张失败不回滚其余。toGroup 暂不支持。 */

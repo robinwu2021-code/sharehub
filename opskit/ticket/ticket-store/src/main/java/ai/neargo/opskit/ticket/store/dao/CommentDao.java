@@ -19,9 +19,11 @@ public final class CommentDao {
     }
 
     private final JdbcClient jdbc;
+    private final ai.neargo.opskit.commons.jdbc.Dialect dialect;
 
-    public CommentDao(JdbcClient jdbc) {
+    public CommentDao(JdbcClient jdbc, ai.neargo.opskit.commons.jdbc.Dialect dialect) {
         this.jdbc = jdbc;
+        this.dialect = dialect;
     }
 
     /** @return 新评论的序号 */
@@ -30,7 +32,7 @@ public final class CommentDao {
         int seq = jdbc.sql("SELECT COALESCE(MAX(seq), 0) + 1 FROM tkt_comment WHERE workspace_id = ? AND ticket_no = ?")
                 .params(ws.value(), ticketNo).query(Integer.class).single();
         jdbc.sql("INSERT INTO tkt_comment (workspace_id, ticket_no, seq, visibility, kind, author, on_behalf_of, body, attachments, at_ms) "
-                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, " + dialect.jsonParam() + ", ?)")
                 .params(ws.value(), ticketNo, seq, visibility, kind, author, onBehalfOf, body,
                         attachments == null || attachments.isEmpty() ? null : TicketJson.write(attachments), now)
                 .update();

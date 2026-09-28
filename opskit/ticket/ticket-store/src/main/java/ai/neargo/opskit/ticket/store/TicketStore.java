@@ -20,7 +20,7 @@ public record TicketStore(DefinitionDao definitions, TicketDao tickets, FieldInd
         JdbcClient j = JdbcClient.create(dataSource);
         Dialect d = Dialects.detect(dataSource);
         TicketDao tickets = new TicketDao(j, d);
-        return new TicketStore(new DefinitionDao(j, d), tickets, new FieldIndexDao(j), new TicketScopeDao(j), new CommentDao(j),
+        return new TicketStore(new DefinitionDao(j, d), tickets, new FieldIndexDao(j), new TicketScopeDao(j), new CommentDao(j, d),
                 new AssignCursorDao(j, d), new TicketQueryDao(j, tickets));
     }
 }

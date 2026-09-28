@@ -247,6 +247,12 @@ class LocalApiTest {
                 .containsExactly("CS");
         assertThat(call("POST", WS + "/tickets/query", token("dave"), Map.of("page", 1, "size", 20)).body().get("total").asLong())
                 .as("无工单权限、非参与者：列表为空（fail-closed）").isZero();
+        Res tl = call("POST", WS + "/tickets/" + no + "/comments", alice, Map.of("body", "已上门", "visibility", "INTERNAL"));
+        assertThat(tl.status()).isEqualTo(200);
+        List<String> titles = tl.body().valueStream().map(n -> n.get("title").asText()).toList();
+        assertThat(titles).contains("创建工单", "领取", "受理：新建 → 处理中", "内部备注");
+        assertThat(call("GET", WS + "/tickets/" + no + "/timeline", token("bob"), null).body().valueStream()
+                .map(n -> n.get("title").asText()).toList()).as("报单人看不到内部备注").doesNotContain("内部备注");
         String queued = (String) seed.manifest().fixtures().get("ticketQueued");
         assertThat(call("POST", WS + "/tickets/" + queued + "/pool", alice, Map.of("reason", "x")).status()).as("还没人办，退回池 → 409").isEqualTo(409);
         assertThat(call("GET", WS + "/tickets/" + queued, token("dave"), null).status()).as("无工单权限、非参与者").isEqualTo(404);
