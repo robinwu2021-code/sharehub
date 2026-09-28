@@ -310,6 +310,85 @@
         },
         "type" : "object"
       },
+      "JsonNode" : {
+        "properties" : {
+          "array" : {
+            "type" : "boolean"
+          },
+          "bigDecimal" : {
+            "type" : "boolean"
+          },
+          "bigInteger" : {
+            "type" : "boolean"
+          },
+          "binary" : {
+            "type" : "boolean"
+          },
+          "boolean" : {
+            "type" : "boolean"
+          },
+          "container" : {
+            "type" : "boolean"
+          },
+          "double" : {
+            "type" : "boolean"
+          },
+          "embeddedValue" : {
+            "type" : "boolean"
+          },
+          "empty" : {
+            "type" : "boolean"
+          },
+          "float" : {
+            "type" : "boolean"
+          },
+          "floatingPointNumber" : {
+            "type" : "boolean"
+          },
+          "int" : {
+            "type" : "boolean"
+          },
+          "integralNumber" : {
+            "type" : "boolean"
+          },
+          "long" : {
+            "type" : "boolean"
+          },
+          "missingNode" : {
+            "type" : "boolean"
+          },
+          "nodeType" : {
+            "enum" : [ "ARRAY", "BINARY", "BOOLEAN", "MISSING", "NULL", "NUMBER", "OBJECT", "POJO", "STRING" ],
+            "type" : "string"
+          },
+          "null" : {
+            "type" : "boolean"
+          },
+          "number" : {
+            "type" : "boolean"
+          },
+          "object" : {
+            "type" : "boolean"
+          },
+          "pojo" : {
+            "type" : "boolean"
+          },
+          "short" : {
+            "type" : "boolean"
+          },
+          "string" : {
+            "type" : "boolean"
+          },
+          "textual" : {
+            "deprecated" : true,
+            "type" : "boolean"
+          },
+          "valueNode" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
       "Metric" : {
         "properties" : {
           "code" : {
@@ -1358,7 +1437,7 @@
         "tags" : [ "approval-template-controller" ]
       },
       "put" : {
-        "operationId" : "publish_2",
+        "operationId" : "publish_4",
         "parameters" : [ {
           "in" : "query",
           "name" : "actor",
@@ -1812,6 +1891,49 @@
         "tags" : [ "instance-controller" ]
       }
     },
+    "/api/opskit/v1/workspaces/{ws}/processes/{code}" : {
+      "put" : {
+        "operationId" : "publish_3",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/JsonNode"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PublishDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "process-definition-controller" ]
+      }
+    },
     "/api/opskit/v1/workspaces/{ws}/sla-policies" : {
       "get" : {
         "operationId" : "list",
@@ -2252,7 +2374,7 @@
         "tags" : [ "approval-template-controller" ]
       },
       "put" : {
-        "operationId" : "publish_3",
+        "operationId" : "publish_5",
         "parameters" : [ {
           "in" : "query",
           "name" : "actor",
@@ -2704,6 +2826,49 @@
           }
         },
         "tags" : [ "instance-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/processes/{code}" : {
+      "put" : {
+        "operationId" : "publish_2",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/JsonNode"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PublishDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "process-definition-controller" ]
       }
     },
     "/v1/workspaces/{ws}/sla-policies" : {

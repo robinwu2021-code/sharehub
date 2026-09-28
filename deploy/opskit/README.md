@@ -21,6 +21,29 @@
 | `OPSKIT_DB_POOL` | | 连接池上限，默认 20 |
 | `OPSKIT_LOG_DIR` | | 设了才落盘（`{dir}/spring.log`，按天滚动、保留 20 天、单文件 200MB）；不设只进 journal |
 
+## 预置定义（流程 · SLA · 工单类型）
+
+`bootstrap.yml` 的 `definitions-dir` 指向一个目录，启动时按下列顺序发布其中的 `*.json`（工单类型要引用前面几种）：
+
+```
+/etc/opskit/definitions/
+  option-sets/    选项集（可选）
+  processes/      流程，如 repair_flow.json
+  sla-policies/   SLA 策略，如 repair_sla.json
+  ticket-types/   工单类型，如 repair.json
+```
+
+- **文件名须与定义里的 `code` 一致**；按代号幂等：内容不变 → 沿用原版本（日志 `unchanged=[…]`），变了 → 出新版本（`published=[…]`），
+  已在途的单子继续跑旧版本。
+- 任一文件形状不对或校验不过都**拒绝启动**，日志里给出文件名与逐字段错误键（文案见 `opskit/docs/error-keys.json`）。
+- JSON 形状 = 定义的规范化存储形状 = `PUT /workspaces/{ws}/processes/{code}`、`PUT …/ticket-types/{code}`、`PUT …/option-sets/{code}`
+  的请求体（多一个可选 `note`）。**SLA 例外**：它的 HTTP 接口 `PUT …/sla-policies/{code}` 用的是分钟制 DTO（`targetsMin`），
+  定义文件里用 ISO-8601 时长（`PT4H`）。
+- 起点：复制 `definitions.example/`（设备报修：新建 → 处理中 → 已解决 / 已作废，解决与作废须写说明；优先级 紧急 / 高 / 普通；
+  字段 来源（SELECT）· 来源单号（TEXT）；SLA 首响 P1 1h / 其余 4h，解决 P1 4h / 其余 24h）。
+- 派单：示例用 `MANUAL`（不自动派，持 `ticket:assign` 的人在工单页指派，含指派给自己）。没有组就没有「抢单池」——
+  `QUEUE` / `ROUND_ROBIN` / `LEAST_LOADED` 都要一个组；有了队列组后把 `assignment` 改成 `{"strategy": "QUEUE", "group": "<组代号>"}` 重启即可。
+
 ## 核对
 
 - 启动日志有 `启动引导完成 … ref=MAIN idps=2 roles=[…]`。

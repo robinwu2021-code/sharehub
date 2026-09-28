@@ -36,12 +36,16 @@ public class OpsKitBootstrap {
     private final TenancyAppService tenancy;
     private final FederationAppService federation;
     private final DirectoryAppService directory;
+    private final BootstrapDefinitions definitions;
+    private volatile BootstrapDefinitions.Summary lastDefinitions = BootstrapDefinitions.Summary.NONE;
 
-    public OpsKitBootstrap(BootstrapProperties props, TenancyAppService tenancy, FederationAppService federation, DirectoryAppService directory) {
+    public OpsKitBootstrap(BootstrapProperties props, TenancyAppService tenancy, FederationAppService federation, DirectoryAppService directory,
+            BootstrapDefinitions definitions) {
         this.props = props;
         this.tenancy = tenancy;
         this.federation = federation;
         this.directory = directory;
+        this.definitions = definitions;
     }
 
     /** @return 引导后的空间 */
@@ -66,9 +70,18 @@ public class OpsKitBootstrap {
         Actor system = new Actor(t, Optional.empty(), Optional.of("opskit-bootstrap"), Set.of(), Set.of(), Set.of(), Set.of(), Set.of());
         props.roles().forEach((code, role) -> directory.upsertRole(system, t.workspaceId(),
                 new RoleUpsert(code, role.name().isEmpty() ? Map.of("en", code) : role.name(), new LinkedHashSet<>(role.permissions()))));
-        log.info("启动引导完成 account={} workspace={} ref={} idps={} roles={}", account.value(), ws.workspaceId(), ws.externalRef(), props.idps().size(),
-                props.roles().keySet());
+        BootstrapDefinitions.Summary defs = props.definitionsDir() == null || props.definitionsDir().isBlank()
+                ? BootstrapDefinitions.Summary.NONE
+                : definitions.publishAll(system, t.workspaceId(), java.nio.file.Path.of(props.definitionsDir()));
+        log.info("启动引导完成 account={} workspace={} ref={} idps={} roles={} definitions={}", account.value(), ws.workspaceId(), ws.externalRef(),
+                props.idps().size(), props.roles().keySet(), defs);
+        lastDefinitions = defs;
         return ws;
+    }
+
+    /** 最近一次引导发布定义的结果（测试与排障用）。 */
+    public BootstrapDefinitions.Summary lastDefinitions() {
+        return lastDefinitions;
     }
 
     private WorkspaceView workspace(AccountId account) {

@@ -1,0 +1,27 @@
+{
+  "code": "repair",
+  "name": {"zh": "设备报修", "en": "Device repair", "ar": "إصلاح جهاز"},
+  "processCode": "repair_flow",
+  "numberPrefix": "RP",
+  "fields": [
+    {"code": "source", "name": {"zh": "来源", "en": "Source", "ar": "المصدر"}, "type": "SELECT",
+     "required": true, "onCreate": true, "filterable": true,
+     "options": {"inline": [
+       {"code": "APP", "name": {"zh": "用户报障", "en": "User report", "ar": "بلاغ مستخدم"}},
+       {"code": "OPS", "name": {"zh": "巡检", "en": "Inspection", "ar": "تفتيش"}},
+       {"code": "CS", "name": {"zh": "客服", "en": "Customer service", "ar": "خدمة العملاء"}}]}},
+    {"code": "sourceRef", "name": {"zh": "来源单号", "en": "Source ref", "ar": "مرجع المصدر"}, "type": "TEXT",
+     "required": false, "onCreate": true, "filterable": true}
+  ],
+  "priorityOptions": {"inline": [
+    {"code": "P1", "name": {"zh": "紧急", "en": "Urgent", "ar": "عاجل"}},
+    {"code": "P2", "name": {"zh": "高", "en": "High", "ar": "مرتفع"}},
+    {"code": "P3", "name": {"zh": "普通", "en": "Normal", "ar": "عادي"}}]},
+  "resolutionOptions": {"inline": [
+    {"code": "FIXED", "name": {"zh": "已修复", "en": "Fixed", "ar": "تم الإصلاح"}},
+    {"code": "NO_FAULT", "name": {"zh": "无故障", "en": "No fault", "ar": "لا عطل"}}]},
+  "assignment": {"strategy": "MANUAL"},
+  "slaPolicies": ["repair_sla"],
+  "scopeFrom": [],
+  "mergeTransition": "cancel"
+}

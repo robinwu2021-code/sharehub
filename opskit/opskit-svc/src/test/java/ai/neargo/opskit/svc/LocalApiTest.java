@@ -277,4 +277,33 @@ class LocalApiTest {
         HttpResponse<String> m = http.send(HttpRequest.newBuilder(URI.create(BASE + "/actuator/prometheus")).GET().build(), HttpResponse.BodyHandlers.ofString());
         assertThat(m.body()).contains("opskit_outbox_pending");
     }
+
+    /** 定义 PUT：请求体即部署示例的定义文件（同形）；幂等 · 判权 · 代号与路径一致 · 形状坏按 422 而非 500。 */
+    @Test
+    void definitionsPublishOverHttpIdempotently() throws Exception {
+        String admin = token("admin");
+        java.nio.file.Path ex = java.nio.file.Path.of("../../deploy/opskit/definitions.example");
+        Map<?, ?> flow = json.readValue(java.nio.file.Files.readString(ex.resolve("processes/repair_flow.json")).replace("repair_flow", "http_flow"), Map.class);
+        Map<?, ?> type = json.readValue(java.nio.file.Files.readString(ex.resolve("ticket-types/repair.json"))
+                .replace("\"repair\"", "\"http_repair\"").replace("repair_flow", "http_flow"), Map.class);
+
+        assertThat(call("PUT", WS + "/processes/http_flow", token("viewer"), flow).status()).as("无 process:manage").isEqualTo(403);
+        Res first = call("PUT", WS + "/processes/http_flow", admin, flow);
+        assertThat(first.status()).isEqualTo(200);
+        assertThat(first.body().get("created").asBoolean()).isTrue();
+        Res again = call("PUT", WS + "/processes/http_flow", admin, flow);
+        assertThat(again.body().get("created").asBoolean()).as("内容不变不出新版本").isFalse();
+        assertThat(again.body().get("version").asText()).isEqualTo(first.body().get("version").asText());
+
+        Res mismatch = call("PUT", WS + "/processes/other_code", admin, flow);
+        assertThat(mismatch.status()).isEqualTo(422);
+        assertThat(mismatch.body().toString()).contains("opskit.validation.mismatch");
+        Res malformed = call("PUT", WS + "/processes/http_flow", admin, Map.of("code", "http_flow", "statuses", "not-a-list"));
+        assertThat(malformed.status()).as("形状坏：422 而非 500").isEqualTo(422);
+
+        Res t = call("PUT", WS + "/ticket-types/http_repair", admin, type);
+        assertThat(t.status()).isEqualTo(200);
+        assertThat(t.body().get("created").asBoolean()).isTrue();
+        assertThat(call("GET", WS + "/ticket-types", admin, null).body().toString()).contains("http_repair");
+    }
 }

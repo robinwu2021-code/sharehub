@@ -330,6 +330,85 @@
         },
         "type" : "object"
       },
+      "JsonNode" : {
+        "properties" : {
+          "array" : {
+            "type" : "boolean"
+          },
+          "bigDecimal" : {
+            "type" : "boolean"
+          },
+          "bigInteger" : {
+            "type" : "boolean"
+          },
+          "binary" : {
+            "type" : "boolean"
+          },
+          "boolean" : {
+            "type" : "boolean"
+          },
+          "container" : {
+            "type" : "boolean"
+          },
+          "double" : {
+            "type" : "boolean"
+          },
+          "embeddedValue" : {
+            "type" : "boolean"
+          },
+          "empty" : {
+            "type" : "boolean"
+          },
+          "float" : {
+            "type" : "boolean"
+          },
+          "floatingPointNumber" : {
+            "type" : "boolean"
+          },
+          "int" : {
+            "type" : "boolean"
+          },
+          "integralNumber" : {
+            "type" : "boolean"
+          },
+          "long" : {
+            "type" : "boolean"
+          },
+          "missingNode" : {
+            "type" : "boolean"
+          },
+          "nodeType" : {
+            "enum" : [ "ARRAY", "BINARY", "BOOLEAN", "MISSING", "NULL", "NUMBER", "OBJECT", "POJO", "STRING" ],
+            "type" : "string"
+          },
+          "null" : {
+            "type" : "boolean"
+          },
+          "number" : {
+            "type" : "boolean"
+          },
+          "object" : {
+            "type" : "boolean"
+          },
+          "pojo" : {
+            "type" : "boolean"
+          },
+          "short" : {
+            "type" : "boolean"
+          },
+          "string" : {
+            "type" : "boolean"
+          },
+          "textual" : {
+            "deprecated" : true,
+            "type" : "boolean"
+          },
+          "valueNode" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
       "MergeBody" : {
         "properties" : {
           "into" : {
@@ -458,6 +537,17 @@
           "ordinal" : {
             "format" : "int32",
             "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PublishDto" : {
+        "properties" : {
+          "created" : {
+            "type" : "boolean"
+          },
+          "version" : {
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -1065,6 +1155,49 @@
   },
   "openapi" : "3.1.0",
   "paths" : {
+    "/api/opskit/v1/workspaces/{ws}/option-sets/{code}" : {
+      "put" : {
+        "operationId" : "publishOptionSet_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/JsonNode"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PublishDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-type-definition-controller" ]
+      }
+    },
     "/api/opskit/v1/workspaces/{ws}/ticket-stats/by-assignee" : {
       "post" : {
         "operationId" : "byAssignee_1",
@@ -1275,6 +1408,47 @@
           }
         },
         "tags" : [ "ticket-controller" ]
+      },
+      "put" : {
+        "operationId" : "publishType",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/JsonNode"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PublishDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-type-definition-controller" ]
       }
     },
     "/api/opskit/v1/workspaces/{ws}/tickets" : {
@@ -1880,6 +2054,49 @@
         "tags" : [ "ticket-controller" ]
       }
     },
+    "/v1/workspaces/{ws}/option-sets/{code}" : {
+      "put" : {
+        "operationId" : "publishOptionSet",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/JsonNode"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PublishDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-type-definition-controller" ]
+      }
+    },
     "/v1/workspaces/{ws}/ticket-stats/by-assignee" : {
       "post" : {
         "operationId" : "byAssignee",
@@ -2090,6 +2307,47 @@
           }
         },
         "tags" : [ "ticket-controller" ]
+      },
+      "put" : {
+        "operationId" : "publishType_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/JsonNode"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PublishDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-type-definition-controller" ]
       }
     },
     "/v1/workspaces/{ws}/tickets" : {

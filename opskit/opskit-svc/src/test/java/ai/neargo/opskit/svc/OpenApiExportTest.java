@@ -40,15 +40,17 @@ import tools.jackson.databind.node.ObjectNode;
 class OpenApiExportTest {
 
     /** 控制器（springdoc 默认标签）→ 所属层。新增控制器必须登记，否则测试红，避免悄悄漏出契约。 */
-    private static final Map<String, String> LAYER_OF_TAG = Map.of(
-            "directory-controller", "platform",
-            "todo-task-controller", "process",
-            "approval-controller", "process",
-            "approval-template-controller", "process",
-            "sla-policy-controller", "process",
-            "instance-controller", "process",
-            "ticket-controller", "ticket",
-            "ticket-stats-controller", "ticket");
+    private static final Map<String, String> LAYER_OF_TAG = Map.ofEntries(
+            Map.entry("directory-controller", "platform"),
+            Map.entry("todo-task-controller", "process"),
+            Map.entry("approval-controller", "process"),
+            Map.entry("approval-template-controller", "process"),
+            Map.entry("sla-policy-controller", "process"),
+            Map.entry("instance-controller", "process"),
+            Map.entry("ticket-controller", "ticket"),
+            Map.entry("ticket-stats-controller", "ticket"),
+            Map.entry("process-definition-controller", "process"),
+            Map.entry("ticket-type-definition-controller", "ticket"));
 
     private static final Path OUT = Path.of("..", "docs", "openapi");
 

@@ -6,6 +6,9 @@ opskit:
   bootstrap:
     enabled: true
     account-name: ShareHub
+    # 部署方定义（流程 / SLA / 工单类型 / 选项集），按代号幂等发布：内容不变不出新版本；任一文件不合法拒绝启动。
+    # 目录结构与示例见同目录 definitions.example/（复制到服务器后按需改）。不需要时删掉这一行。
+    definitions-dir: /etc/opskit/definitions
     workspace:
       ref: MAIN                 # 与内省应答的 tenant 一致（令牌 workspace 声明）
       name: ShareHub

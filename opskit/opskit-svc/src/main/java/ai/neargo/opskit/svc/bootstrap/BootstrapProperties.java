@@ -10,9 +10,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *
  * @param idps  至少一个；账户按第一个 IdP 的签发方识别（已登记 = 账户已建）
  * @param roles 角色代号 → 名称与产品权限；令牌 roles 声明里的代号据此生效
+ * @param definitionsDir 部署方的定义目录（可空）：其下 option-sets/ · processes/ · sla-policies/ · ticket-types/ 的 *.json
+ *                       按代号幂等发布 —— 内容不变不出新版本。JSON 形状与定义的规范化存储一致，见 deploy/opskit/definitions.example/
  */
 @ConfigurationProperties("opskit.bootstrap")
-public record BootstrapProperties(boolean enabled, String accountName, Workspace workspace, List<Idp> idps, Map<String, Role> roles) {
+public record BootstrapProperties(boolean enabled, String accountName, Workspace workspace, List<Idp> idps, Map<String, Role> roles,
+        String definitionsDir) {
 
     public BootstrapProperties {
         idps = idps == null ? List.of() : List.copyOf(idps);

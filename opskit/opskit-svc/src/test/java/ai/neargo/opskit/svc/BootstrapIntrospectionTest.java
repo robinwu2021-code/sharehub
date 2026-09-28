@@ -1,9 +1,19 @@
 package ai.neargo.opskit.svc;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import ai.neargo.opskit.platform.api.account.WorkspaceView;
+import ai.neargo.opskit.commons.actor.Actor;
+import ai.neargo.opskit.commons.tenancy.AccountId;
+import ai.neargo.opskit.commons.tenancy.TenantContext;
+import ai.neargo.opskit.commons.tenancy.WorkspaceId;
+import ai.neargo.opskit.svc.bootstrap.BootstrapDefinitions;
 import ai.neargo.opskit.svc.bootstrap.OpsKitBootstrap;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Optional;
+import java.util.Set;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -26,6 +36,7 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * 21/07 O4-1：启动引导（账户 · 空间 · 按前缀路由的内省 IdP · 角色 → 产品权限）幂等；成员令牌经宿主内省端点换成操作人。
  * 宿主的内省端点由本测试起一个小 HTTP 服务假扮（RFC 7662：表单 token + Basic 认证）。
+ * 定义段：deploy/opskit/definitions.example 的流程 / SLA / 工单类型按代号幂等发布，文件名与代号不符或定义不合法都拒绝。
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT, properties = {
         "server.port=18093",
@@ -48,7 +59,9 @@ import tools.jackson.databind.ObjectMapper;
         "opskit.bootstrap.idps[0].claims.perms=perms",
         "opskit.bootstrap.idps[0].claims.scopes=scopes",
         "opskit.bootstrap.roles.ADMIN.permissions=approval:view:all,report:view,ticket:view:all",
-        "opskit.bootstrap.roles.OPS.permissions=approval:decide,ticket:view:scoped"
+        "opskit.bootstrap.roles.OPS.permissions=approval:decide,ticket:view:scoped",
+        // 部署示例目录本身就是被测对象：示例改坏了这里红
+        "opskit.bootstrap.definitions-dir=../../deploy/opskit/definitions.example"
 })
 class BootstrapIntrospectionTest {
 
@@ -58,6 +71,9 @@ class BootstrapIntrospectionTest {
 
     @Autowired
     OpsKitBootstrap bootstrap;
+
+    @Autowired
+    BootstrapDefinitions definitions;
 
     final HttpClient http = HttpClient.newHttpClient();
     final ObjectMapper json = new ObjectMapper();
@@ -141,5 +157,33 @@ class BootstrapIntrospectionTest {
         assertThat(again.workspaceId()).isEqualTo(first.workspaceId());
         assertThat(again.externalRef()).isEqualTo("MAIN");
         assertThat(List.of(first.accountId())).containsExactly(again.accountId());
+    }
+
+    @Test
+    void deployedDefinitionsArePublishedOnceAndAreUsable() throws Exception {
+        bootstrap.run();
+        assertThat(bootstrap.lastDefinitions().published()).as("启动时已发布，内容没变不出新版本").isEmpty();
+        assertThat(bootstrap.lastDefinitions().unchanged()).containsExactly("process:repair_flow", "sla:repair_sla", "ticket-type:repair");
+
+        Res types = get(WS + "/ticket-types", "stk_admin");
+        assertThat(types.status()).isEqualTo(200);
+        assertThat(types.body().toString()).contains("\"repair\"").contains("repair_flow");
+    }
+
+    @Test
+    void misnamedOrInvalidDefinitionFilesStopTheStartup(@org.junit.jupiter.api.io.TempDir Path dir) throws Exception {
+        WorkspaceView ws = bootstrap.run();
+        TenantContext t = new TenantContext(new AccountId(ws.accountId()), new WorkspaceId(ws.workspaceId()));
+        Actor system = new Actor(t, Optional.empty(), Optional.of("opskit-bootstrap"), Set.of(), Set.of(), Set.of(), Set.of(), Set.of());
+        String flow = Files.readString(Path.of("../../deploy/opskit/definitions.example/processes/repair_flow.json"));
+        Files.createDirectories(dir.resolve("processes"));
+
+        Files.writeString(dir.resolve("processes/other_name.json"), flow);
+        assertThatThrownBy(() -> definitions.publishAll(system, t.workspaceId(), dir)).hasMessageContaining("other_name.json").hasMessageContaining("repair_flow");
+
+        Files.delete(dir.resolve("processes/other_name.json"));
+        Files.writeString(dir.resolve("processes/repair_flow.json"), flow.replace("\"to\": \"done\"", "\"to\": \"nowhere\""));
+        assertThatThrownBy(() -> definitions.publishAll(system, t.workspaceId(), dir)).hasMessageContaining("repair_flow.json")
+                .hasMessageContaining("opskit.validation");
     }
 }

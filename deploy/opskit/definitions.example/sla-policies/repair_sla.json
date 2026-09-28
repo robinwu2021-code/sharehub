@@ -1,0 +1,14 @@
+{
+  "code": "repair_sla",
+  "name": {"zh": "报修时限", "en": "Repair SLA", "ar": "مهلة الإصلاح"},
+  "warnAtPercent": 80,
+  "metrics": [
+    {"code": "FIRST_RESPONSE", "name": {"zh": "首次响应", "en": "First response", "ar": "الاستجابة الأولى"},
+     "stop": {"onCreate": false, "categories": [], "transitions": ["accept"]}},
+    {"code": "RESOLUTION", "name": {"zh": "解决", "en": "Resolution", "ar": "الحل"}}
+  ],
+  "targets": [
+    {"when": {"field": "priority", "op": "EQ", "value": "P1"}, "targets": {"FIRST_RESPONSE": "PT1H", "RESOLUTION": "PT4H"}},
+    {"targets": {"FIRST_RESPONSE": "PT4H", "RESOLUTION": "PT24H"}}
+  ]
+}
