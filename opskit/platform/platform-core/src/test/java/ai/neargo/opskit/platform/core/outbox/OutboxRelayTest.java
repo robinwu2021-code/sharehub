@@ -103,11 +103,17 @@ class OutboxRelayTest {
         data.put("approvalNo", "AP1");
         data.put("actor", "member:" + m.memberId());
         data.put("decidedBy", "app:app_x");
-        e.d.f.tx.executeWithoutResult(s -> e.writer.publish(new MemberEvent(e.d.tenant, "approval.completed", "AP1:1",
-                Instant.parse("2026-09-27T08:00:00Z"), data)));
+        org.slf4j.MDC.put("traceId", "4bf92f3577b34da6a3ce929d0e0e4736");
+        try {
+            e.d.f.tx.executeWithoutResult(s -> e.writer.publish(new MemberEvent(e.d.tenant, "approval.completed", "AP1:1",
+                    Instant.parse("2026-09-27T08:00:00Z"), data)));
+        } finally {
+            org.slf4j.MDC.remove("traceId");
+        }
         String payload = e.d.f.jdbc.sql("SELECT payload FROM plat_outbox").query(String.class).single();
         tools.jackson.databind.JsonNode env = new tools.jackson.databind.ObjectMapper().readTree(payload);
         assertThat(env.get("workspaceExternalRef").asText()).isEqualTo("T0001");
+        assertThat(env.get("traceparent").asText()).as("沿用请求的追踪号").matches("00-4bf92f3577b34da6a3ce929d0e0e4736-[0-9a-f]{16}-01");
         assertThat(env.at("/data/actor/ref").asText()).isEqualTo("member:" + m.memberId());
         assertThat(env.at("/data/actor/externalRef").asText()).isEqualTo("E107");
         assertThat(env.at("/data/actor/displayName").asText()).isEqualTo("Ali");
@@ -137,6 +143,7 @@ class OutboxRelayTest {
             assertThat(r.bodies.get(0)).contains("\"eventType\":\"ticket.created\"", "\"idemKey\":\"TK1:1\"", "\"ticketNo\":\"TK1:1\"",
                     "\"workspaceId\":\"" + e.d.workspace.value() + "\"");
             assertThat(e.outboxCount("done_at_ms IS NOT NULL")).isEqualTo(1);
+            assertThat(r.bodies.get(0)).as("没有请求上下文（无追踪号）时不带 traceparent").doesNotContain("traceparent");
         }
     }
 

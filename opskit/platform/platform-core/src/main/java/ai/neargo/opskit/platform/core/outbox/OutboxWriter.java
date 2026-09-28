@@ -57,6 +57,10 @@ public final class OutboxWriter implements EventPublisher {
                 .ifPresent(w -> envelope.put("workspaceExternalRef", w.externalRef()));
         envelope.put("occurredAt", event.occurredAt().toEpochMilli());
         envelope.put("idemKey", event.idemKey());
+        String traceparent = traceparent();
+        if (traceparent != null) {
+            envelope.put("traceparent", traceparent);
+        }
         envelope.put("data", expandMembers(event));
         outbox.enqueue(event.tenant().workspaceId(), event.tenant().accountId().value(), event.eventType(), event.idemKey(),
                 JsonColumns.write(envelope), clock.millis());
@@ -91,4 +95,18 @@ public final class OutboxWriter implements EventPublisher {
     }
 
     private static final String MEMBER = "member:";
+
+    /**
+     * W3C traceparent：trace-id 取当前请求的追踪号（MDC traceId，入口已接受调用方的 traceparent），接收方沿用它就能把两边日志串起来。
+     * 定时任务等没有请求上下文时不带。
+     */
+    static String traceparent() {
+        String traceId = org.slf4j.MDC.get("traceId");
+        if (traceId == null || !traceId.matches("[0-9a-f]{32}")) {
+            return null;
+        }
+        byte[] span = new byte[8];
+        java.util.concurrent.ThreadLocalRandom.current().nextBytes(span);
+        return "00-" + traceId + "-" + java.util.HexFormat.of().formatHex(span) + "-01";
+    }
 }
