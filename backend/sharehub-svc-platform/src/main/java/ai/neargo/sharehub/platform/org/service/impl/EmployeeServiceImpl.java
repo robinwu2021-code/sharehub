@@ -93,14 +93,27 @@ public class EmployeeServiceImpl extends AbstractCrudService<IamEmployee, Employ
     @Override
     protected void beforeCreate(IamEmployee e) {
         if (e.getStatus() == null || e.getStatus().isBlank()) e.setStatus(EmployeeStatus.ACTIVE.name());
+        checkStatus(e.getStatus());
         e.setPhone(maskPhone(e.getPhone()));
     }
 
     @Override
     protected void beforeUpdate(IamEmployee e, IamEmployee current) {
+        if (e.getStatus() == null || e.getStatus().isBlank()) e.setStatus(current.getStatus());
+        checkStatus(e.getStatus());
         e.setPhone(maskPhone(e.getPhone()));
         // 空手机不视为"清空"：编辑表单回填的是掩码值，漏传时保留原值，避免误擦
         if (e.getPhone() == null) e.setPhone(current.getPhone());
+    }
+
+    /**
+     * 在职/离职。本实体是请求体，这一列此前原样落库 ——
+     * 而登录与授权都按 {@code ACTIVE} 判：写错一个字母，这个人**既登不上也不算离职**，
+     * 运营端看着他还在，而他自己进不来。
+     */
+    private static void checkStatus(String status) {
+        EmployeeStatus.of(status)
+                .orElseThrow(() -> new IllegalArgumentException("员工状态非法: " + status + "（仅 ACTIVE/LEFT）"));
     }
 
     /** 保存后把角色同步进映射表。{@code roleNos == null} 表示不动角色，见 {@link #syncRoles}。 */

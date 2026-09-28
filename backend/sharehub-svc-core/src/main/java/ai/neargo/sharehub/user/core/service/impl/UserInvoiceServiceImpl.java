@@ -7,6 +7,7 @@ import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.user.core.dto.UserCoreDtos.InvoiceItem;
 import ai.neargo.sharehub.user.core.dto.UserCoreDtos.InvoiceTitleItem;
 import ai.neargo.sharehub.user.core.entity.UsrInvoice;
+import ai.neargo.sharehub.user.core.InvoiceTitleType;
 import ai.neargo.sharehub.user.core.entity.UsrInvoiceTitle;
 import ai.neargo.sharehub.user.core.mapper.UserCoreMappers.UsrInvoiceMapper;
 import ai.neargo.sharehub.user.core.mapper.UserCoreMappers.UsrInvoiceTitleMapper;
@@ -61,7 +62,14 @@ public class UserInvoiceServiceImpl implements UserInvoiceService {
     @Override
     @Transactional
     public InvoiceTitleItem saveTitle(String cUserNo, UsrInvoiceTitle body) {
-        if ("COMPANY".equals(body.getType()) && (body.getVatTrn() == null || body.getVatTrn().isBlank())) {
+        /*
+         * 先归一再判。原先这一行是 "COMPANY".equals(body.getType())，而 type 本身不校验：
+         * 传小写 company 就**绕过了税号必填**，抬头照样存下来，而那张发票开出去是废的。
+         * 归一之后大小写不再是绕过口，词表外的值直接 400。
+         */
+        body.setType(InvoiceTitleType.of(body.getType()).name());
+        if (InvoiceTitleType.COMPANY.name().equals(body.getType())
+                && (body.getVatTrn() == null || body.getVatTrn().isBlank())) {
             throw BizException.badRequest("error.invoice.vat_required");
         }
         body.setCUserNo(cUserNo); // 属主以会话为准，不信 body

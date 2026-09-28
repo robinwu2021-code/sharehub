@@ -82,6 +82,11 @@ class VocabularyRejectedOnWriteTest extends ApiTestSupport {
         // 发票有明细子表，先删子后删主 —— 反过来留下孤儿明细行
         jdbc.update("DELETE FROM fin_invoice_item WHERE invoice_no IN (SELECT invoice_no FROM fin_invoice WHERE payee_name = ?)", MARK);
         jdbc.update("DELETE FROM fin_invoice WHERE payee_name = ?", MARK);
+        jdbc.update("DELETE FROM iam_dept WHERE name = ?", MARK);
+        jdbc.update("DELETE FROM dev_code_batch WHERE range_start LIKE 'VOCABPROBE%'");
+        jdbc.update("DELETE FROM loc_lead WHERE venue_name = ?", MARK);
+        jdbc.update("DELETE FROM iam_employee WHERE name = ?", MARK);
+        jdbc.update("DELETE FROM usr_invoice_title WHERE title = ?", MARK);
     }
 
     @Test
@@ -234,13 +239,146 @@ class VocabularyRejectedOnWriteTest extends ApiTestSupport {
     }
 
     @Test
+    @DisplayName("★ iam_dept.status 非法值 400 —— 实体当请求体，这一列原先原样落库")
+    void dept_status_rejects_out_of_vocabulary() {
+        String t = login("ADMIN");
+
+        var ok = post("/api/platform/departments", Map.of("name", MARK, "status", "ACTIVE"), t);
+        assertThat(ok.status).as("合法 status 应当能存：%s", ok.msg()).isEqualTo(200);
+
+        /*
+         * 停用的部门不出现在「上级部门」候选里。写错一个字母之后它**既不是启用也不是停用**，
+         * 两边的筛选都落空 —— 组织树上它还在，而谁也选不到它。
+         */
+        var bad = post("/api/platform/departments", Map.of("name", MARK, "status", "DISABLE"), t);
+        assertThat(bad.status).as("status=DISABLE 竟然被接受了：%s", bad.msg()).isEqualTo(400);
+    }
+
+    @Test
+    @DisplayName("★ dev_code_batch 的 status / code_type 非法值 400 —— 编辑路径此前连 beforeUpdate 都没有")
+    void code_batch_rejects_out_of_vocabulary() {
+        String t = login("ADMIN");
+
+        var ok = post("/api/ops/device-code-batches", Map.of(
+                "vendorCode", "DEMO", "codeType", "QR",
+                "rangeStart", "VOCABPROBE0001", "rangeEnd", "VOCABPROBE0009",
+                "total", 9, "status", "PENDING"), t);
+        assertThat(ok.status).as("合法值应当能存：%s", ok.msg()).isEqualTo(200);
+
+        // 两列都在 filterFields 里 —— 写错就是这批码从列表筛不出来，
+        // 于是有人再建一批，号段跟丢掉的那批重叠
+        var badType = post("/api/ops/device-code-batches", Map.of(
+                "vendorCode", "DEMO", "codeType", "BARCODE",
+                "rangeStart", "VOCABPROBE1001", "rangeEnd", "VOCABPROBE1009", "total", 9), t);
+        assertThat(badType.status).as("codeType=BARCODE 竟然被接受了：%s", badType.msg()).isEqualTo(400);
+
+        var badStatus = post("/api/ops/device-code-batches", Map.of(
+                "vendorCode", "DEMO", "codeType", "QR",
+                "rangeStart", "VOCABPROBE2001", "rangeEnd", "VOCABPROBE2009",
+                "total", 9, "status", "DONE"), t);
+        assertThat(badStatus.status).as("status=DONE 竟然被接受了：%s", badStatus.msg()).isEqualTo(400);
+    }
+
+    @Test
+    @DisplayName("★ loc_lead.share_mode 非法值 400 —— 谈判条款会原样抄进合同")
+    void lead_share_mode_rejects_out_of_vocabulary() {
+        String t = login("ADMIN");
+
+        var ok = post("/api/ops/leads", Map.of(
+                "venueName", MARK, "contact", "0500000009", "shareMode", "GUARANTEE"), t);
+        assertThat(ok.status).as("合法 shareMode 应当能存：%s", ok.msg()).isEqualTo(200);
+
+        /*
+         * 负例刻意用 LEDGER —— 它是 ShareMode（结算路径）的词表，不是
+         * ContractShareMode（商业模式）的。两个枚举同名不同物，
+         * 哪天有人把它们合并，这一格会红。
+         */
+        var bad = post("/api/ops/leads", Map.of(
+                "venueName", MARK, "contact", "0500000009", "shareMode", "LEDGER"), t);
+        assertThat(bad.status)
+                .as("shareMode=LEDGER 被接受了 —— 那是结算路径的词表，不是商业模式的：%s", bad.msg())
+                .isEqualTo(400);
+    }
+
+    @Test
+    @DisplayName("★ iam_employee.status 非法值 400 —— 写错一个字母，这个人既登不上也不算离职")
+    void employee_status_rejects_out_of_vocabulary() {
+        String t = login("ADMIN");
+
+        var ok = post("/api/platform/employees", Map.of("name", MARK, "status", "ACTIVE"), t);
+        assertThat(ok.status).as("合法 status 应当能存：%s", ok.msg()).isEqualTo(200);
+
+        /*
+         * 登录与授权都按 ACTIVE 判。负例用 INACTIVE：那是别处的「开关」词表，
+         * 本列是 ACTIVE/LEFT（在职/离职）。串错之后运营端看着他还在，而他自己进不来。
+         */
+        var bad = post("/api/platform/employees", Map.of("name", MARK, "status", "INACTIVE"), t);
+        assertThat(bad.status)
+                .as("status=INACTIVE 被接受了 —— 本列词表是 ACTIVE/LEFT：%s", bad.msg())
+                .isEqualTo(400);
+    }
+
+    @Test
+    @DisplayName("★★ usr_invoice_title.type：小写 company 原先**绕过税号必填**，现在归一后照样拦")
+    void invoice_title_type_rejects_and_normalises() {
+        String token = consumerToken();
+
+        var ok = post("/mp/user/invoice-titles", Map.of(
+                "type", "PERSONAL", "title", MARK), token);
+        assertThat(ok.status).as("个人抬头无需税号：%s", ok.msg()).isEqualTo(200);
+
+        var bad = post("/mp/user/invoice-titles", Map.of(
+                "type", "ORGANISATION", "title", MARK), token);
+        assertThat(bad.status).as("type=ORGANISATION 竟然被接受了：%s", bad.msg()).isEqualTo(400);
+
+        /*
+         * ★ 这一格才是重点：判税号必填的那行原先写的是 "COMPANY".equals(type)，
+         * 于是传小写 company **既没报错也没要税号** —— 抬头存下来了，
+         * 而按它开出去的发票是废的。归一之后小写照样走到税号必填。
+         */
+        var lower = post("/mp/user/invoice-titles", Map.of(
+                "type", "company", "title", MARK), token);
+        assertThat(lower.status)
+                .as("小写 company 绕过了税号必填 —— 那正是这一格要拦的：%s", lower.msg())
+                .isEqualTo(400);
+
+        var withTrn = post("/mp/user/invoice-titles", Map.of(
+                "type", "company", "title", MARK, "vatTrn", "100000000000003"), token);
+        assertThat(withTrn.status).as("带税号的企业抬头应当能存：%s", withTrn.msg()).isEqualTo(200);
+        assertThat(withTrn.okData().path("type").asText())
+                .as("小写没归一 —— 库里会同时有 company 和 COMPANY").isEqualTo("COMPANY");
+    }
+
+    /** C 端令牌：dev-mode 下 OTP 明文回传，见 ConsumerCouponClaimTest 的同名夹具。 */
+    private String consumerToken() {
+        String phone = "0599" + String.valueOf(System.currentTimeMillis()).substring(7);
+        String otp = post("/mp/auth/otp", Map.of("phone", phone), null).okData().path("devCode").asText();
+        return post("/mp/auth/login", Map.of("grantType", "phone_otp", "phone", phone, "otp", otp), null)
+                .okData().path("token").asText();
+    }
+
+    @Test
     @DisplayName("★ md_problem 的 category / suggested_action 非法值 400——后者决定客服怎么路由")
     void problem_catalog_rejects_out_of_vocabulary() {
         String t = login("ADMIN");
 
         var ok = post("/api/platform/problems", Map.of(
-                "title", MARK, "category", "DEVICE", "suggestedAction", "TO_WORKORDER"), t);
+                "title", MARK, "category", "DEVICE", "suggestedAction", "TO_WORKORDER",
+                "status", "ENABLED"), t);
         assertThat(ok.status).as("合法值应当能存：%s", ok.msg()).isEqualTo(200);
+
+        /*
+         * status 是这张表的第三列词表，2026-09-28 才接上。C 端 FAQ 按
+         * status='ENABLED' 筛 —— 写错一个字母，这条问题从用户那边消失，
+         * 而运营端列表里它好好地在，两边都不报错。
+         * 负例用 ACTIVE：那是别处的「开关」词表，本列是 ENABLED/DISABLED。
+         */
+        var badStatus = post("/api/platform/problems", Map.of(
+                "title", MARK, "category", "DEVICE", "suggestedAction", "TO_WORKORDER",
+                "status", "ACTIVE"), t);
+        assertThat(badStatus.status)
+                .as("status=ACTIVE 被接受了 —— 本列词表是 ENABLED/DISABLED：%s", badStatus.msg())
+                .isEqualTo(400);
 
         var badCat = post("/api/platform/problems", Map.of(
                 "title", MARK, "category", "HARDWARE", "suggestedAction", "TO_WORKORDER"), t);

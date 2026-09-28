@@ -57,6 +57,28 @@ public class CodeBatchServiceImpl extends AbstractCrudService<DevCodeBatch, Code
         if (e.getCodeType() == null || e.getCodeType().isBlank()) e.setCodeType(DeviceCodeType.QR.name());
         if (e.getTotal() == null) e.setTotal(0);
         if (e.getBound() == null) e.setBound(0);
+        validateVocabulary(e);
+    }
+
+    /**
+     * 编辑路径此前**一个校验都没有**（连 beforeUpdate 都没写），而本实体是请求体 ——
+     * 词表外的值 PUT 一下就落库了。
+     */
+    @Override
+    protected void beforeUpdate(DevCodeBatch e, DevCodeBatch current) {
+        if (e.getStatus() == null || e.getStatus().isBlank()) e.setStatus(current.getStatus());
+        if (e.getCodeType() == null || e.getCodeType().isBlank()) e.setCodeType(current.getCodeType());
+        validateVocabulary(e);
+    }
+
+    /**
+     * 两列都进了 {@link #filterFields()} —— 也就是说列表页**按它们筛**。
+     * 串一个字母的后果不是报错，是这一批码从筛选结果里消失：
+     * 找不到就会有人再建一批，而那批码的号段与丢掉的那批重叠。
+     */
+    private static void validateVocabulary(DevCodeBatch e) {
+        CodeBatchStatus.of(e.getStatus());
+        DeviceCodeType.of(e.getCodeType());
     }
 
     @Override

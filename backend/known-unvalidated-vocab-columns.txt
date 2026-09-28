@@ -67,9 +67,21 @@
 # 不合大写形而掉了出去。它是这份判据目前唯一的假阴性，记在这里以免被当成不存在。
 #
 # 2026-09-28 建账：词表列 279，已核实 22，待核实 257。
-# 同日核实第一批（钱那一侧）：**已核实 27，待核实 252**。（fin_invoice.status 接上校验；
+# 同日核实第一批（钱那一侧）：已核实 27，待核实 252。（fin_invoice.status 接上校验；
 # 四个 payee_type 查明不来自请求体 —— 常量/派生/已有白名单，见 COVERED 旁的说明。）
+# 同日第二批（实体请求体可写的那 18 个）：**已核实 44，待核实 235**。
+# 挑这一批不是凭印象，是拿 known-entity-writable-fields.txt 跟本清单求交集 ——
+# 那些列前端直接写得进去、中间**没有任何 setXxx 拦着**，风险最高。
+# 18 个里 7 个真没接（已接上并各带端点格）、8 个原来就有校验（建账时没人核，属于虚高）、
+# 2 个服务端全权。剩 1 个 usr_invoice_title.vat_trn **不是词表列**（税号是自由文本），
+# 只因那张表是空的、判据看不到取值而留在这里 —— 表一有数据它会自动掉出去。
+#
+# ⚠️ 这一批最值钱的发现与词表无关：usr_invoice_title 判税号必填写的是
+# "COMPANY".equals(type)，而 type 不校验 —— 传小写 company **既不报错也不要税号**，
+# 抬头存下来了，按它开出去的发票是废的。归一大小写才是真正的修复。
 # ───────────────────────────────────────────────────────────────
+
+# acct_account（2）
 
 # acct_account（2）
 acct_account.acct_type
@@ -81,8 +93,7 @@ acct_ledger.direction
 # ad_campaign（1）
 ad_campaign.status
 
-# ad_slot（2）
-ad_slot.status
+# ad_slot（1）
 ad_slot.type
 
 # agt_account（1）
@@ -157,11 +168,6 @@ dev_alarm_route.disposition
 dev_alarm_route.fallback
 dev_alarm_route.wo_type
 
-# dev_alarm_rule（3）
-dev_alarm_rule.channel
-dev_alarm_rule.method
-dev_alarm_rule.status
-
 # dev_alarm_todo（1）
 dev_alarm_todo.status
 
@@ -175,10 +181,6 @@ dev_cabinet.device_type
 dev_cabinet.online_status
 dev_cabinet.qc_status
 dev_cabinet.status
-
-# dev_code_batch（2）
-dev_code_batch.code_type
-dev_code_batch.status
 
 # dev_event_code（3）
 dev_event_code.category
@@ -246,12 +248,6 @@ iam_audit_log.outcome
 iam_data_scope.scope_type
 iam_data_scope.subject_type
 
-# iam_dept（1）
-iam_dept.status
-
-# iam_employee（1）
-iam_employee.status
-
 # iam_menu（1）
 iam_menu.type
 
@@ -288,11 +284,6 @@ loc_contract.term_req_status
 loc_contract_log.event
 loc_contract_log.from_status
 loc_contract_log.to_status
-
-# loc_lead（3）
-loc_lead.owner_type
-loc_lead.share_mode
-loc_lead.stage
 
 # loc_lead_follow（1）
 loc_lead_follow.channel
@@ -354,9 +345,6 @@ md_device_type.type_code
 md_market_country.compliance
 md_market_country.status
 
-# md_problem（1）
-md_problem.status
-
 # mkt_campaign（1）
 mkt_campaign.status
 
@@ -378,15 +366,9 @@ mkt_referral_rule.reward_to
 mkt_referral_rule.reward_type
 mkt_referral_rule.status
 
-# notify_blacklist（1）
-notify_blacklist.status
-
 # notify_log（2）
 notify_log.channel
 notify_log.status
-
-# notify_template（1）
-notify_template.status
 
 # openapi_app（1）
 openapi_app.status
@@ -528,17 +510,13 @@ usr_coupon_issue.target_type
 # usr_credit（1）
 usr_credit.risk_level
 
-# usr_free_whitelist（1）
-usr_free_whitelist.status
-
 # usr_identity（1）
 usr_identity.provider
 
 # usr_invoice（1）
 usr_invoice.status
 
-# usr_invoice_title（2）
-usr_invoice_title.type
+# usr_invoice_title（1）
 usr_invoice_title.vat_trn
 
 # usr_logoff（1）
@@ -581,6 +559,3 @@ wo_order.review_status
 wo_order.source
 wo_order.status
 wo_order.type
-
-# wo_sla_rule（1）
-wo_sla_rule.wo_type

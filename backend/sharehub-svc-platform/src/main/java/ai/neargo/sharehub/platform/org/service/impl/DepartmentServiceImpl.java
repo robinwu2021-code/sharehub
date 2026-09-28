@@ -3,6 +3,7 @@ package ai.neargo.sharehub.platform.org.service.impl;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.common.crud.AbstractCrudService;
 import ai.neargo.sharehub.platform.org.dto.OrgDtos.Department;
+import ai.neargo.sharehub.platform.iam.DeptStatus;
 import ai.neargo.sharehub.platform.org.entity.IamDept;
 import ai.neargo.sharehub.platform.org.entity.IamEmployee;
 import ai.neargo.sharehub.platform.org.mapper.IamDeptMapper;
@@ -76,8 +77,9 @@ public class DepartmentServiceImpl extends AbstractCrudService<IamDept, Departme
 
     @Override
     protected void beforeCreate(IamDept e) {
-        if (e.getStatus() == null || e.getStatus().isBlank()) e.setStatus("ACTIVE");
+        if (e.getStatus() == null || e.getStatus().isBlank()) e.setStatus(DeptStatus.ACTIVE.name());
         if (e.getSort() == null) e.setSort(0);
+        DeptStatus.of(e.getStatus());
         e.setPath(buildPath(e));
     }
 
@@ -88,6 +90,9 @@ public class DepartmentServiceImpl extends AbstractCrudService<IamDept, Departme
         }
         if (e.getSort() == null) e.setSort(current.getSort());
         if (e.getStatus() == null) e.setStatus(current.getStatus());
+        // 本实体是请求体：status 原先原样落库。停用的部门不出现在上级候选里，
+        // 写错一个字母 = 这个部门既不是启用也不是停用，在两边的筛选里都消失
+        DeptStatus.of(e.getStatus());
         e.setPath(buildPath(e));
     }
 

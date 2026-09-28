@@ -87,7 +87,25 @@ class VocabularyWriteCoverageTest {
             "fin_invoice.status",
             // ——— 以下是第三种来源：**前端根本传不了这一列**（见 SERVER_SET 说明）———
             "stl_payout_account.payee_type", "stl_adjustment.payee_type",
-            "share_record.payee_type", "stl_settlement.payee_type"));
+            "share_record.payee_type", "stl_settlement.payee_type",
+
+            // ——— 2026-09-28 第二批：从 known-entity-writable-fields 的交集查起 ———
+            // 那份台账记的是「实体当请求体」上客户端可写的字段。与本清单取交集，
+            // 得到 18 个**前端直接写得进去、且没有任何 setXxx 拦在中间**的词表列 ——
+            // 风险最高的一批，而且是自动算出来的，不靠谁记得。
+            //
+            // 新接上校验（各带端点格）：
+            "iam_dept.status", "iam_employee.status",
+            "dev_code_batch.status", "dev_code_batch.code_type",
+            "loc_lead.share_mode", "md_problem.status", "usr_invoice_title.type",
+            // 读代码核实：原来就有校验，只是建账时没人核过（台账虚高的那部分）
+            "ad_slot.status",                                    // AdSlotStatus.of
+            "notify_template.status",                            // NotifyTemplateStatus.of
+            "dev_alarm_rule.channel", "dev_alarm_rule.method", "dev_alarm_rule.status",
+            "wo_sla_rule.wo_type",                               // WorkOrderType.of
+            "loc_lead.stage", "loc_lead.owner_type",             // checkStage / checkOwnerType
+            // 服务端全权（第三种答案）：创建写常量、编辑抄 current、状态迁移走专门端点
+            "notify_blacklist.status", "usr_free_whitelist.status"));
 
     /*
      * 核实一列时会遇到第三种答案，它和「接上了校验」一样牢靠，有时更牢靠：

@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.loc.ext.service.impl;
 
+import ai.neargo.sharehub.loc.ContractShareMode;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.common.crud.AbstractCrudService;
 import ai.neargo.sharehub.loc.ext.dto.LocExtDtos.Lead;
@@ -100,6 +101,7 @@ public class LeadServiceImpl extends AbstractCrudService<LocLead, Lead> implemen
         }
         LeadStatus stage = checkStage(e.getStage());
         checkOwnerType(e.getOwnerType());
+        checkShareMode(e.getShareMode());
         if (stage == LeadStatus.LOST) requireLostReason(e.getLostReason());
         LocalDateTime now = LocalDateTime.now();
         e.setContractNo(null);
@@ -122,6 +124,7 @@ public class LeadServiceImpl extends AbstractCrudService<LocLead, Lead> implemen
         if (e.getOwnerType() == null || e.getOwnerType().isBlank()) e.setOwnerType(current.getOwnerType());
         LeadStatus to = checkStage(e.getStage());
         checkOwnerType(e.getOwnerType());
+        checkShareMode(e.getShareMode());
         String event = sm.check(current.getStage(), to.name());
         e.setContractNo(current.getContractNo());
         e.setInPool(current.getInPool());
@@ -242,6 +245,19 @@ public class LeadServiceImpl extends AbstractCrudService<LocLead, Lead> implemen
 
     private static LeadStatus checkStage(String stage) {
         return LeadStatus.of(stage).orElseThrow(() -> BizException.badRequest("error.lead.stage_invalid", stage));
+    }
+
+    /**
+     * 谈判条款的商业模式。没传不校验（编辑只传要改的字段），传了必须在词表里。
+     *
+     * <p>写错的症状不是报错，是**这条商机的条款解释错了**：SHARE 与 GUARANTEE
+     * 对应的是完全不同的收入结构，而签约时这些条款会抄进合同。
+     *
+     * <p>⚠️ 与 {@code ShareMode}（CHANNEL_SPLIT/LEDGER，结算路径）同名不同物，
+     * 见 {@link ContractShareMode} 与 {@code ShareMode} 两边的类注释。
+     */
+    private static void checkShareMode(String shareMode) {
+        if (shareMode != null && !shareMode.isBlank()) ContractShareMode.of(shareMode);
     }
 
     private static void checkOwnerType(String ownerType) {

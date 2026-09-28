@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.platform.md.service.impl;
 
+import ai.neargo.sharehub.platform.md.ProblemStatus;
 import ai.neargo.sharehub.platform.md.ProblemSuggestedAction;
 import ai.neargo.sharehub.platform.md.ProblemCategory;
 import ai.neargo.sharehub.common.BizKey;
@@ -72,13 +73,14 @@ public class ProblemServiceImpl extends AbstractCrudService<MdProblem, ProblemEn
     @Override
     protected void beforeCreate(MdProblem e) {
         if (e.getSortNo() == null) e.setSortNo(0);
-        if (e.getStatus() == null) e.setStatus("ENABLED");
+        if (e.getStatus() == null) e.setStatus(ProblemStatus.ENABLED.name());
         if (e.getSuggestedAction() == null) e.setSuggestedAction(ProblemSuggestedAction.SELF_SERVICE.name());
         validateVocabulary(e);
     }
 
     @Override
     protected void beforeUpdate(MdProblem e, MdProblem current) {
+        if (e.getStatus() == null || e.getStatus().isBlank()) e.setStatus(current.getStatus());
         validateVocabulary(e);
     }
 
@@ -97,6 +99,9 @@ public class ProblemServiceImpl extends AbstractCrudService<MdProblem, ProblemEn
     private static void validateVocabulary(MdProblem e) {
         ProblemCategory.ofNullable(e.getCategory());
         ProblemSuggestedAction.ofNullable(e.getSuggestedAction());
+        // status 是第三列，同样没校验过：C 端 FAQ 按 status='ENABLED' 筛，
+        // 写错一个字母这条问题就从用户那边消失，而运营端列表里它好好地在
+        ProblemStatus.of(e.getStatus());
     }
 
     @Override
