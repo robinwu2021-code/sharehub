@@ -15,4 +15,9 @@ public interface Directory {
 
     /** 队列组的领取超时；不是队列组或未配置时为空。 */
     Optional<Integer> claimTimeoutSec(TenantContext t, String groupCode);
+
+    /** 是不是队列组（kind=QUEUE）。队列计数据此把「一条任务都没有」的队列也列出来（待领 0）。 */
+    default boolean isQueue(TenantContext t, String groupCode) {
+        return false;
+    }
 }
