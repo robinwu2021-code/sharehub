@@ -147,6 +147,12 @@ public class PlatformCoreAutoConfiguration {
         return new DirectoryAppService(m, g, gm, r, b, ids, clock, tx, audit);
     }
 
+    /** 上层模块读目录的入口（21/05：只经客户端接口）。 */
+    @Bean
+    ai.neargo.opskit.platform.client.DirectoryClient directoryClient(DirectoryAppService directory) {
+        return new ai.neargo.opskit.platform.core.embedded.EmbeddedDirectoryClient(directory);
+    }
+
     @Bean
     CalendarAppService calendarAppService(CalendarDao c, Clock clock, TransactionOperations tx, AuditTrail audit) {
         return new CalendarAppService(c, clock, tx, audit);

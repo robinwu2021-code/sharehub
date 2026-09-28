@@ -11,7 +11,13 @@ import ai.neargo.opskit.process.core.app.InstanceAppService;
 import ai.neargo.opskit.process.core.app.ProcessDefinitionAppService;
 import ai.neargo.opskit.process.core.app.ProcessHistoryService;
 import ai.neargo.opskit.process.core.app.ProcessQueryService;
+import ai.neargo.opskit.process.client.InstanceObserver;
+import ai.neargo.opskit.process.client.ProcessClient;
+import ai.neargo.opskit.process.client.TaskClient;
+import ai.neargo.opskit.process.core.app.ObserverHook;
 import ai.neargo.opskit.process.core.app.ProcessTimers;
+import ai.neargo.opskit.process.core.embedded.EmbeddedProcessClient;
+import ai.neargo.opskit.process.core.embedded.EmbeddedTaskClient;
 import ai.neargo.opskit.process.core.app.SlaPolicyAppService;
 import ai.neargo.opskit.process.core.app.SlaTracker;
 import ai.neargo.opskit.process.core.port.Calendars;
@@ -81,15 +87,29 @@ public class ProcessCoreAutoConfiguration {
     /** 没接日历端口时按自然时间计（引用了日历的策略会记警告）。 */
     @Bean
     SlaTracker slaTracker(SlaPolicyAppService policies, ProcessStore s, ObjectProvider<Calendars> calendars, TimerScheduler timers, EventPublisher events,
-            BizNoGenerator ids, Clock clock, TransactionOperations tx) {
-        return new SlaTracker(policies, s.slaClocks(), s.logs(), calendars.getIfAvailable(() -> Calendars.NONE), timers, events, ids, clock, tx);
+            BizNoGenerator ids, Clock clock, TransactionOperations tx, ObjectProvider<InstanceObserver> observers) {
+        return new SlaTracker(policies, s.slaClocks(), s.logs(), calendars.getIfAvailable(() -> Calendars.NONE), timers, events, ids, clock, tx,
+                observers.orderedStream().toList());
     }
 
     @Bean
     InstanceAppService instanceAppService(ProcessDefinitionAppService defs, ProcessStore s, TaskAppService tasks, ApprovalAppService approvals,
-            GateTimersAndConfirmations gates, SlaTracker sla, EventPublisher events, BizNoGenerator ids, Clock clock, TransactionOperations tx) {
-        return new InstanceAppService(defs, s.instances(), s.participants(), s.scopes(), s.logs(), List.of(tasks, approvals, gates, sla),
-                Optional.of(tasks), events, ids, clock, tx);
+            GateTimersAndConfirmations gates, SlaTracker sla, ObjectProvider<InstanceObserver> observers, EventPublisher events, BizNoGenerator ids,
+            Clock clock, TransactionOperations tx) {
+        // ObserverHook 排最后：门、任务、SLA 都处理完，上层读到的是完整状态
+        return new InstanceAppService(defs, s.instances(), s.participants(), s.scopes(), s.logs(),
+                List.of(tasks, approvals, gates, sla, new ObserverHook(observers.orderedStream().toList())), Optional.of(tasks), events, ids, clock, tx);
+    }
+
+    @Bean
+    ProcessClient processClient(InstanceAppService instances, ProcessDefinitionAppService defs, SlaPolicyAppService policies, SlaTracker sla,
+            ProcessStore s) {
+        return new EmbeddedProcessClient(instances, defs, policies, sla, s.logs());
+    }
+
+    @Bean
+    TaskClient taskClient(TaskAppService tasks) {
+        return new EmbeddedTaskClient(tasks);
     }
 
     @Bean

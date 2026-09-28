@@ -18,6 +18,7 @@ import ai.neargo.opskit.process.api.definition.StatusCategory;
 import ai.neargo.opskit.process.api.definition.StatusDef;
 import ai.neargo.opskit.process.api.definition.sla.SlaPolicyDef;
 import ai.neargo.opskit.process.api.event.SlaChanged;
+import ai.neargo.opskit.process.client.InstanceObserver;
 import ai.neargo.opskit.process.core.port.Calendars;
 import ai.neargo.opskit.process.store.dao.SlaClockDao;
 import ai.neargo.opskit.process.store.dao.SlaClockDao.Row;
@@ -64,9 +65,17 @@ public class SlaTracker implements StatusHook {
     private final BizNoGenerator ids;
     private final Clock clock;
     private final TransactionOperations tx;
+    private final List<InstanceObserver> observers;
 
     public SlaTracker(SlaPolicyAppService policies, SlaClockDao clocks, TransitionLogDao logs, Calendars calendars, TimerScheduler timers,
             EventPublisher events, BizNoGenerator ids, Clock clock, TransactionOperations tx) {
+        this(policies, clocks, logs, calendars, timers, events, ids, clock, tx, List.of());
+    }
+
+    /** @param observers 定时触发的预警 / 逾期写回后通知（迁移、改字段引起的变化由 ObserverHook 统一通知） */
+    public SlaTracker(SlaPolicyAppService policies, SlaClockDao clocks, TransitionLogDao logs, Calendars calendars, TimerScheduler timers,
+            EventPublisher events, BizNoGenerator ids, Clock clock, TransactionOperations tx, List<InstanceObserver> observers) {
+        this.observers = List.copyOf(observers);
         this.policies = policies;
         this.clocks = clocks;
         this.logs = logs;
@@ -162,6 +171,7 @@ public class SlaTracker implements StatusHook {
                 .filter(c -> c.epoch() == epoch && ("RUNNING".equals(c.state()) || "WARNING".equals(c.state())))
                 .map(c -> {
                     breach(t, c, clock.millis());
+                    observers.forEach(o -> o.onInstanceChanged(t, c.instanceNo()));
                     return true;
                 }).orElse(false)));
     }
@@ -172,6 +182,7 @@ public class SlaTracker implements StatusHook {
                 .filter(c -> c.epoch() == epoch && "RUNNING".equals(c.state()))
                 .map(c -> {
                     save(t, c, withState(c, "WARNING", null));
+                    observers.forEach(o -> o.onInstanceChanged(t, c.instanceNo()));
                     return true;
                 }).orElse(false)));
     }

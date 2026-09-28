@@ -225,6 +225,12 @@ public class TaskAppService implements AssignmentHandler, StatusHook {
                 row.assignee(), row.version() + 1, clock.instant()));
     }
 
+    /** 实例上未结束的办理任务（工单详情里的「当前任务」）。可见性由调用方先判。 */
+    @SystemAction("上层模块内部调用：调用方已判实例可见")
+    public List<TaskView> openWorkTasks(TenantContext t, String instanceNo) {
+        return tasks.unfinishedOfInstance(t.workspaceId(), instanceNo, WORK).stream().map(r -> view(t, r, null)).toList();
+    }
+
     @SystemAction("读")
     public TaskView get(Actor actor, String taskNo) {
         TenantContext t = actor.tenant();
