@@ -29,21 +29,31 @@ function row(a: Snap): InstanceRow {
   };
 }
 
+/** 历史：词表与后端 37e78b21 一致（全小写；实例迁移代号是流程里定义的，名称放 actionName / fromName / toName） */
 function history(a: Snap): HistoryEntry[] {
+  const inst = instNo(a), tk = `TK${a.approvalNo.slice(2)}`;
   const e: HistoryEntry[] = [
-    { entityKind: "INSTANCE", entityNo: instNo(a), action: "START", to: "DRAFT", actor: a.requestedBy, atMs: a.requestedAtMs - 60_000 },
-    { entityKind: "INSTANCE", entityNo: instNo(a), action: "TRANSITION", from: "DRAFT", to: "REVIEWING", actor: a.requestedBy, atMs: a.requestedAtMs },
-    { entityKind: "APPROVAL", entityNo: a.approvalNo, action: "SUBMITTED", actor: a.requestedBy, atMs: a.requestedAtMs },
+    { entityKind: "INSTANCE", entityNo: inst, action: "created", to: "DRAFT", toName: "草稿", actor: a.requestedBy, atMs: a.requestedAtMs - 60_000 },
+    { entityKind: "INSTANCE", entityNo: inst, action: "submit", actionName: "提交", from: "DRAFT", fromName: "草稿", to: "REVIEWING", toName: "审批中",
+      actor: a.requestedBy, atMs: a.requestedAtMs },
+    { entityKind: "APPROVAL", entityNo: a.approvalNo, action: "submitted", to: "PENDING", actor: a.requestedBy, atMs: a.requestedAtMs },
+    { entityKind: "TASK", entityNo: tk, action: "created", to: "OPEN", actorText: "system", atMs: a.requestedAtMs },
   ];
   for (const d of a.decisions) {
-    e.push({ entityKind: "APPROVAL", entityNo: a.approvalNo, action: "DECIDED", to: d.stepName, actor: { ref: d.by, displayName: d.by }, atMs: d.atMs });
+    e.push({ entityKind: "APPROVAL", entityNo: a.approvalNo, action: "approve", from: d.stepName, actor: { ref: d.by, displayName: d.by }, atMs: d.atMs });
   }
-  for (const r of a.rounds.filter((x) => x.status !== "IN_PROGRESS")) {
-    e.push({ entityKind: "APPROVAL", entityNo: a.approvalNo, action: r.status, reason: r.comment, actor: { ref: r.by, displayName: r.by }, atMs: r.atMs });
+  for (const r of a.rounds.filter((x) => x.status === "REJECTED")) {
+    e.push({ entityKind: "APPROVAL", entityNo: a.approvalNo, action: "reject", reason: r.comment, actor: { ref: r.by, displayName: r.by }, atMs: r.atMs });
   }
-  if (!STATE[a.status].open || a.status === "WITHDRAWN") {
-    e.push({ entityKind: "INSTANCE", entityNo: instNo(a), action: "TRANSITION", from: "REVIEWING", to: STATE[a.status].code, actorText: "system",
-      atMs: a.finishedAtMs ?? a.requestedAtMs });
+  if (a.status !== "PENDING") {
+    const at = a.finishedAtMs ?? a.requestedAtMs;
+    e.push({ entityKind: "APPROVAL", entityNo: a.approvalNo, action: "completed", from: "PENDING", to: a.status, actorText: "system", atMs: at });
+    e.push({ entityKind: "TASK", entityNo: tk, action: a.status === "WITHDRAWN" ? "cancelled" : "completed", from: "OPEN",
+      to: a.status === "WITHDRAWN" ? "CANCELLED" : "DONE", actorText: "system", atMs: at });
+    const to = STATE[a.status];
+    e.push({ entityKind: "INSTANCE", entityNo: inst, action: a.status === "WITHDRAWN" ? "withdraw" : a.status === "APPROVED" ? "approved" : "rejected",
+      actionName: a.status === "WITHDRAWN" ? "撤回" : a.status === "APPROVED" ? "审批通过" : "审批驳回",
+      from: "REVIEWING", fromName: "审批中", to: to.code, toName: to.name, actorText: "system", atMs: at });
   }
   return e.sort((x, y) => x.atMs - y.atMs).map((x, i) => ({ ...x, seq: i + 1 }));
 }

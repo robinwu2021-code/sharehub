@@ -426,10 +426,21 @@ export interface InstanceQuery {
 }
 
 /** 实例历史的一条：迁移、任务、审批、SLA、门的流水（同一条时间线） */
+/**
+ * 动作词表（后端 37e78b21，全小写原始代号）：
+ *  INSTANCE  created · fields_updated · 其余为租户流程里的迁移代号 → 显示 actionName；from / to 是状态代号 → 显示 fromName / toName
+ *  TASK      created · claimed · released · claim_timeout · assigned · reassigned · pooled · completed · cancelled（from / to 是 member:x 或任务状态）
+ *  APPROVAL  submitted · approve · reject（from = 步骤代号）· completed（to = APPROVED / REJECTED / WITHDRAWN）
+ *  SLA       action = 指标代号（如 RESOLUTION）；from / to 是计时状态 PENDING · RUNNING · WARNING · PAUSED · BREACHED · MET · CANCELLED
+ */
 export interface HistoryEntry {
   entityKind: "INSTANCE" | "TASK" | "APPROVAL" | "SLA" | "GATE";
   entityNo: string;
   action: string;
+  /** 仅 INSTANCE：服务按 Accept-Language 选好的迁移名 / 状态名 */
+  actionName?: string;
+  fromName?: string;
+  toName?: string;
   from?: string;
   to?: string;
   seq?: number;

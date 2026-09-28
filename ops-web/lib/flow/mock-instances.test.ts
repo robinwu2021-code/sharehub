@@ -29,7 +29,11 @@ describe("流程实例", () => {
     expect(row).toMatchObject({ instanceNo: no, status: { code: "DRAFT" }, statusCategory: "NEW" });
     const h = instanceHistory(no);
     expect(h.length).toBeGreaterThan(before);
-    expect(h.at(-1)).toMatchObject({ entityKind: "INSTANCE", to: "DRAFT", actorText: "system" });
+    // 词表与后端一致：实例迁移代号自定义、名称在 actionName / toName；审批办结与任务取消都有条目
+    expect(h.find((x) => x.entityKind === "INSTANCE" && x.action === "withdraw")).toMatchObject({ to: "DRAFT", toName: "草稿", actorText: "system" });
+    expect(h.find((x) => x.entityKind === "APPROVAL" && x.action === "completed")).toMatchObject({ from: "PENDING", to: "WITHDRAWN" });
+    expect(h.find((x) => x.entityKind === "TASK" && x.action === "cancelled")).toMatchObject({ to: "CANCELLED" });
+    expect(h.every((x) => x.action === x.action.toLowerCase())).toBe(true);
     expect(h.map((x) => x.seq)).toEqual(h.map((_, i) => i + 1));
   });
 

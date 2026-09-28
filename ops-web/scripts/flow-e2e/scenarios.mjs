@@ -267,7 +267,7 @@ export const SCENARIOS = [
     },
   },
   {
-    id: "S7-3", title: "流程统计：汇总卡 = 表格逐行相加；换时间段能重新取数", perms: ALL, url: () => "/flow/stats/",
+    id: "S7-3", as: "admin", title: "流程统计：汇总卡 = 表格逐行相加；换时间段能重新取数", perms: ALL, url: () => "/flow/stats/",
     run: async (h) => {
       await h.waitFor(() => h.rows().length, "统计表加载");
       const sumCol = (i) => h.rows().reduce((a, r) => a + Number(h.txt(r.querySelectorAll("td")[i]) || 0), 0);

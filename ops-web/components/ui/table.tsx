@@ -10,7 +10,7 @@ export function Table({ className, ...props }: React.HTMLAttributes<HTMLTableEle
 }
 export function THead({ className, ...props }: React.HTMLAttributes<HTMLTableSectionElement>) {
   // 表头 = 一条色块（bg-muted），代替下划线
-  return <thead data-slot="thead" className={cn("bg-muted [&_th]:h-11 [&_th]:px-3.5 [&_th]:text-left [&_th]:align-middle [&_th]:text-xs [&_th]:font-medium [&_th]:text-muted-foreground", className)} {...props} />;
+  return <thead data-slot="thead" className={cn("bg-muted [&_th]:h-11 [&_th]:px-3.5 [&_th]:text-start [&_th]:align-middle [&_th]:text-xs [&_th]:font-medium [&_th]:text-muted-foreground", className)} {...props} />;
 }
 export function TBody({ className, ...props }: React.HTMLAttributes<HTMLTableSectionElement>) {
   // 无行线，隔行浅色块（zebra）分隔

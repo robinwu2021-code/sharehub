@@ -610,3 +610,12 @@ body {
 [data-style="classic"] main .gap-4 { gap: 20px; }
 [data-style="classic"] main .space-y-4 > * + * { margin-top: 20px; }
 [data-style="classic"] main [data-variant] { font-size: 13px; font-weight: 500; }
+
+/* ── 表格首末列的呼吸（两种风格都生效）────────────────────────────────────────
+   用户 2026-09-28：「列表 table 左侧数据太靠近边距」。单元格左右内边距清爽 10px / 经典 14px，
+   中间列够用，但首列紧贴表格边框就显挤。只放大**首列起始侧、末列结束侧**到 20px（逻辑属性，阿语自动镜像），
+   中间列不动 —— 表格不会因此变宽多少。选择器带 [data-style] 抬高优先级，压过风格块里的 padding 简写。 */
+[data-style] [data-slot="thead"] th:first-child,
+[data-style] [data-slot="tbody"] td:first-child { padding-inline-start: 20px; }
+[data-style] [data-slot="thead"] th:last-child,
+[data-style] [data-slot="tbody"] td:last-child { padding-inline-end: 20px; }

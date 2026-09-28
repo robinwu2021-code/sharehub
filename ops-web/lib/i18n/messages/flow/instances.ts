@@ -34,11 +34,16 @@ const zh = {
   },
   kind: { INSTANCE: "实例", TASK: "任务", APPROVAL: "审批", SLA: "SLA", GATE: "门" },
   action: {
-    START: "发起", TRANSITION: "流转", SUBMITTED: "提交审批", DECIDED: "做出决定", APPROVED: "审批通过", REJECTED: "审批驳回",
-    WITHDRAWN: "撤回", CLAIMED: "领取", RELEASED: "放回", ASSIGNED: "指派", REASSIGNED: "转派", POOLED: "退回池",
-    COMPLETED: "办结", CREATED: "创建", STARTED: "开始计时", WARNED: "SLA 预警", BREACHED: "SLA 超时", PAUSED: "暂停计时",
-    RESUMED: "恢复计时", STOPPED: "停止计时", TIMEOUT: "超时", REPLIED: "外部确认回复",
+    instance: { created: "创建", fields_updated: "修改字段" },
+    task: {
+      created: "生成任务", claimed: "领取", released: "放回", claim_timeout: "领取超时，自动放回", assigned: "指派", reassigned: "转派",
+      pooled: "退回池", completed: "办结", cancelled: "取消",
+    },
+    approval: { submitted: "提交审批", approve: "通过", reject: "驳回", completed: "审批办结" },
   },
+  timer: { PENDING: "未开始", RUNNING: "计时中", WARNING: "预警", PAUSED: "暂停", BREACHED: "超时", MET: "达标", CANCELLED: "取消" },
+  taskState: { OPEN: "待领", CLAIMED: "已领", ASSIGNED: "已派", DONE: "已完成", CANCELLED: "已取消" },
+  step: "步骤 {code}",
   actorApp: "应用 {app}",
 };
 type M = typeof zh;
@@ -78,11 +83,16 @@ const en = {
   },
   kind: { INSTANCE: "Instance", TASK: "Task", APPROVAL: "Approval", SLA: "SLA", GATE: "Gate" },
   action: {
-    START: "Started", TRANSITION: "Moved", SUBMITTED: "Submitted for approval", DECIDED: "Decided", APPROVED: "Approved", REJECTED: "Rejected",
-    WITHDRAWN: "Withdrawn", CLAIMED: "Claimed", RELEASED: "Released", ASSIGNED: "Assigned", REASSIGNED: "Reassigned", POOLED: "Returned to pool",
-    COMPLETED: "Completed", CREATED: "Created", STARTED: "Clock started", WARNED: "SLA warning", BREACHED: "SLA breached", PAUSED: "Clock paused",
-    RESUMED: "Clock resumed", STOPPED: "Clock stopped", TIMEOUT: "Timed out", REPLIED: "External reply",
+    instance: { created: "Created", fields_updated: "Fields updated" },
+    task: {
+      created: "Task created", claimed: "Claimed", released: "Released", claim_timeout: "Claim timed out, released", assigned: "Assigned", reassigned: "Reassigned",
+      pooled: "Returned to pool", completed: "Completed", cancelled: "Cancelled",
+    },
+    approval: { submitted: "Submitted for approval", approve: "Approved", reject: "Rejected", completed: "Approval closed" },
   },
+  timer: { PENDING: "Not started", RUNNING: "Running", WARNING: "Warning", PAUSED: "Paused", BREACHED: "Breached", MET: "Met", CANCELLED: "Cancelled" },
+  taskState: { OPEN: "Open", CLAIMED: "Claimed", ASSIGNED: "Assigned", DONE: "Done", CANCELLED: "Cancelled" },
+  step: "Step {code}",
   actorApp: "App {app}",
 } satisfies M;
 
@@ -121,11 +131,16 @@ const ar = {
   },
   kind: { INSTANCE: "مثيل", TASK: "مهمة", APPROVAL: "موافقة", SLA: "SLA", GATE: "بوابة" },
   action: {
-    START: "بدء", TRANSITION: "انتقال", SUBMITTED: "أُرسل للموافقة", DECIDED: "قرار", APPROVED: "موافق", REJECTED: "مرفوض",
-    WITHDRAWN: "سحب", CLAIMED: "استلام", RELEASED: "إرجاع", ASSIGNED: "إسناد", REASSIGNED: "إعادة إسناد", POOLED: "إرجاع للمجمّع",
-    COMPLETED: "إنجاز", CREATED: "إنشاء", STARTED: "بدء التوقيت", WARNED: "تنبيه SLA", BREACHED: "تجاوز SLA", PAUSED: "إيقاف التوقيت مؤقتًا",
-    RESUMED: "استئناف التوقيت", STOPPED: "إيقاف التوقيت", TIMEOUT: "انتهت المهلة", REPLIED: "رد خارجي",
+    instance: { created: "إنشاء", fields_updated: "تعديل الحقول" },
+    task: {
+      created: "إنشاء مهمة", claimed: "استلام", released: "إرجاع", claim_timeout: "انتهت مهلة الاستلام وأُرجعت", assigned: "إسناد", reassigned: "إعادة إسناد",
+      pooled: "إرجاع للمجمّع", completed: "إنجاز", cancelled: "إلغاء",
+    },
+    approval: { submitted: "أُرسل للموافقة", approve: "موافقة", reject: "رفض", completed: "إغلاق الموافقة" },
   },
+  timer: { PENDING: "لم يبدأ", RUNNING: "قيد العد", WARNING: "تنبيه", PAUSED: "متوقف", BREACHED: "متجاوز", MET: "محقق", CANCELLED: "ملغى" },
+  taskState: { OPEN: "مفتوحة", CLAIMED: "مستلمة", ASSIGNED: "مسندة", DONE: "منجزة", CANCELLED: "ملغاة" },
+  step: "الخطوة {code}",
   actorApp: "التطبيق {app}",
 } satisfies M;
 
