@@ -15,6 +15,7 @@ import ai.neargo.opskit.process.api.model.StartRequest;
 import ai.neargo.opskit.process.api.model.SubjectRef;
 import ai.neargo.opskit.process.api.model.TransitionRequest;
 import ai.neargo.opskit.process.client.ProcessClient;
+import ai.neargo.opskit.process.client.TaskClient;
 import ai.neargo.opskit.ticket.api.TicketErrors;
 import ai.neargo.opskit.ticket.api.definition.OptionDef;
 import ai.neargo.opskit.ticket.api.definition.TicketTypeDef;
@@ -50,6 +51,7 @@ public class TicketAppService {
     public static final String VIEW_SCOPED = "ticket:view:scoped";
     public static final String CREATE = "ticket:create";
     public static final String WORK = "ticket:work";
+    public static final String ASSIGN = "ticket:assign";
     public static final String REQUESTER = "REQUESTER";
     public static final String ASSIGNEE = "ASSIGNEE";
     private static final String PENDING_INSTANCE = "pending:";
@@ -60,12 +62,16 @@ public class TicketAppService {
     private final TicketScopeDao scopes;
     private final CommentDao comments;
     private final ProcessClient processes;
+    private final TaskClient taskClient;
+    private final TicketDispatcher dispatcher;
     private final BizNoGenerator ids;
     private final Clock clock;
     private final TransactionOperations tx;
 
     public TicketAppService(TicketDefinitionAppService definitions, TicketDao tickets, FieldIndexDao index, TicketScopeDao scopes, CommentDao comments,
-            ProcessClient processes, BizNoGenerator ids, Clock clock, TransactionOperations tx) {
+            ProcessClient processes, TaskClient taskClient, TicketDispatcher dispatcher, BizNoGenerator ids, Clock clock, TransactionOperations tx) {
+        this.taskClient = taskClient;
+        this.dispatcher = dispatcher;
         this.definitions = definitions;
         this.tickets = tickets;
         this.index = index;
@@ -130,6 +136,7 @@ public class TicketAppService {
             tickets.bindInstance(ws, no, inst.instanceNo());
             index.replace(ws, no, def.code(), indexRows(values));
             scopes.replace(ws, no, tags);
+            dispatcher.dispatch(t, tickets.find(ws, no).orElseThrow(), def);
             syncSnapshot(t, no);
             return new CreateTicketResult(view(t, tickets.find(ws, no).orElseThrow()), false);
         });
@@ -203,6 +210,120 @@ public class TicketAppService {
             syncSnapshot(t, ticketNo);
             return view(t, tickets.find(t.workspaceId(), ticketNo).orElseThrow());
         });
+    }
+
+    // ── 派单操作（O3-5）──────────────────────────────────────
+
+    /**
+     * 领取：工单的当前办理任务在池里、且操作人是候选。是候选本身就是办这张单的资格（它就在他的待办里），
+     * 所以这里不再叠加工单可见性 —— 由流程按候选判定，非候选得 403。
+     */
+    @SystemAction("资格由任务候选判定")
+    public TicketView claim(Actor actor, String ticketNo) {
+        TenantContext t = actor.tenant();
+        return tx.execute(s -> {
+            TicketDao.Row r = openTicket(t, ticketNo);
+            taskClient.claim(actor, openTask(t, r).orElseThrow(() -> new OpsKitException(CommonErrors.STATE_CHANGED, "nothing to claim")));
+            syncSnapshot(t, ticketNo);
+            return view(t, tickets.find(t.workspaceId(), ticketNo).orElseThrow());
+        });
+    }
+
+    /** 指派 / 改派：已有办理人时须写原因。没有办理任务（手工派单的类型）时直接建一条给他。 */
+    @SystemAction("应用自身或 ticket:assign")
+    public TicketView assign(Actor actor, String ticketNo, String to, String reason) {
+        requirePermission(actor, ASSIGN);
+        TenantContext t = actor.tenant();
+        String member = to == null || to.isBlank() ? null : to.startsWith("member:") ? to : "member:" + to;
+        if (member == null) {
+            throw invalid("to", "opskit.validation.required");
+        }
+        return tx.execute(s -> {
+            TicketDao.Row r = openTicket(t, ticketNo);
+            Optional<String> task = openTask(t, r);
+            if (task.isPresent()) {
+                taskClient.assignTo(TicketDispatcher.internal(t), task.get(), member, reason);
+            } else {
+                tickets.setCurrentTask(t.workspaceId(), ticketNo,
+                        taskClient.createWork(t, r.instanceNo(), List.of(member), null, r.title(), r.priorityOrd(), "TICKET"));
+            }
+            syncSnapshot(t, ticketNo);
+            return view(t, tickets.find(t.workspaceId(), ticketNo).orElseThrow());
+        });
+    }
+
+    /** 退回抢单池：去掉办理人，回到任务的候选（队列 / 组）里；须写原因。 */
+    @SystemAction("应用自身或 ticket:assign")
+    public TicketView pool(Actor actor, String ticketNo, String reason) {
+        requirePermission(actor, ASSIGN);
+        if (reason == null || reason.isBlank()) {
+            throw invalid("reason", "opskit.validation.required");
+        }
+        TenantContext t = actor.tenant();
+        return tx.execute(s -> {
+            TicketDao.Row r = openTicket(t, ticketNo);
+            String task = openTask(t, r).orElseThrow(() -> new OpsKitException(CommonErrors.STATE_CHANGED, "no work task to pool"));
+            taskClient.pool(TicketDispatcher.internal(t), task, reason);
+            syncSnapshot(t, ticketNo);
+            return view(t, tickets.find(t.workspaceId(), ticketNo).orElseThrow());
+        });
+    }
+
+    /** 外部指定派单的回填（仅应用）。已派出（含超时兜底已派）→ 409。 */
+    @SystemAction("仅应用自身：接入方回填受理人")
+    public TicketView externalAssignment(Actor actor, String ticketNo, String to) {
+        if (!actor.isAppItself()) {
+            throw new OpsKitException(CommonErrors.PERMISSION_DENIED, "external assignment is filled by the integrating system");
+        }
+        TenantContext t = actor.tenant();
+        return tx.execute(s -> {
+            TicketDao.Row r = openTicket(t, ticketNo);
+            if (r.assignee() != null || openTask(t, r).isPresent()) {
+                throw new OpsKitException(CommonErrors.STATE_CHANGED, "ticket already dispatched");
+            }
+            String member = to != null && to.startsWith("member:") ? to : "member:" + to;
+            tickets.setCurrentTask(t.workspaceId(), ticketNo, taskClient.createWork(t, r.instanceNo(), List.of(member), null, r.title(), r.priorityOrd(),
+                    "TICKET"));
+            syncSnapshot(t, ticketNo);
+            return view(t, tickets.find(t.workspaceId(), ticketNo).orElseThrow());
+        });
+    }
+
+    /** 外部指定超时（定时触发，ID = {@code ws:ticketNo:0}）：仍未派出则按兜底策略派。 */
+    @SystemAction("定时触发")
+    public boolean onAssignTimeout(TenantContext t, String ticketNo) {
+        return Boolean.TRUE.equals(tx.execute(s -> tickets.lock(t.workspaceId(), ticketNo).map(r -> {
+            boolean done = dispatcher.fallback(t, r, definitions.typeById(t, r.typeDefinitionId())).isPresent();
+            if (done) {
+                syncSnapshot(t, ticketNo);
+            }
+            return done;
+        }).orElse(false)));
+    }
+
+    /** 定时任务只带空间，账户从工单行上取。 */
+    @SystemAction("定时触发")
+    public Optional<TenantContext> tenantOf(WorkspaceId ws, String ticketNo) {
+        return tickets.find(ws, ticketNo).map(r -> new TenantContext(new ai.neargo.opskit.commons.tenancy.AccountId(r.accountId()), ws));
+    }
+
+    private Optional<String> openTask(TenantContext t, TicketDao.Row r) {
+        return taskClient.openWorkTasks(TicketDispatcher.internal(t), r.instanceNo()).stream().map(ai.neargo.opskit.process.api.model.TaskView::taskNo)
+                .findFirst();
+    }
+
+    private TicketDao.Row openTicket(TenantContext t, String ticketNo) {
+        TicketDao.Row r = tickets.lock(t.workspaceId(), ticketNo).orElseThrow(TicketAppService::notFound);
+        if (!r.open()) {
+            throw new OpsKitException(TicketErrors.TICKET_CLOSED, "ticket is closed");
+        }
+        return r;
+    }
+
+    private static void requirePermission(Actor actor, String perm) {
+        if (!actor.isAppItself() && !actor.productPermissions().contains(perm)) {
+            throw new OpsKitException(CommonErrors.PERMISSION_DENIED, "needs " + perm);
+        }
     }
 
     // ── 快照同步（O3-4）──────────────────────────────────────

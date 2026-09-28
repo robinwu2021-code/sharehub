@@ -107,6 +107,19 @@ public final class TaskDao {
         }
     }
 
+    /** 各办理人名下未结的办理任务数（最少负载派单用）；没有任务的成员不在结果里。 */
+    public java.util.Map<String, Long> openWorkByAssignee(WorkspaceId ws, java.util.Collection<String> assignees) {
+        if (assignees.isEmpty()) {
+            return java.util.Map.of();
+        }
+        java.util.Map<String, Long> out = new java.util.HashMap<>();
+        jdbc.sql("SELECT assignee, COUNT(*) AS n FROM proc_task WHERE workspace_id = :ws AND kind = 'WORK' AND status IN ('CLAIMED','ASSIGNED') "
+                        + "AND assignee IN (:who) GROUP BY assignee")
+                .param("ws", ws.value()).param("who", assignees)
+                .query((rs, i) -> out.put(rs.getString("assignee"), rs.getLong("n"))).list();
+        return out;
+    }
+
     public Set<String> candidates(WorkspaceId ws, String taskNo) {
         return Set.copyOf(jdbc.sql("SELECT candidate_key FROM proc_task_candidate WHERE workspace_id = ? AND task_no = ?")
                 .params(ws.value(), taskNo).query(String.class).list());

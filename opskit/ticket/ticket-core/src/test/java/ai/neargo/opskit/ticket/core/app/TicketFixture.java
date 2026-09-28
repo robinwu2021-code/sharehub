@@ -33,6 +33,7 @@ import ai.neargo.opskit.process.core.app.SlaPolicyAppService;
 import ai.neargo.opskit.process.core.app.SlaTracker;
 import ai.neargo.opskit.process.core.app.TaskAppService;
 import ai.neargo.opskit.process.core.embedded.EmbeddedProcessClient;
+import ai.neargo.opskit.process.core.embedded.EmbeddedTaskClient;
 import ai.neargo.opskit.process.core.port.Calendars;
 import ai.neargo.opskit.process.core.port.Directory;
 import ai.neargo.opskit.process.store.ProcessMigrations;
@@ -97,6 +98,12 @@ final class TicketFixture {
     final SlaTracker sla;
     final TicketDefinitionAppService definitions;
     final TicketAppService tickets;
+    final ai.neargo.opskit.process.client.TaskClient taskClient;
+    final TicketDispatcher dispatcher;
+    /** 组 → 成员 ID（轮转 / 最少负载派单用），测试里可改。 */
+    final Map<String, List<String>> groups = new java.util.concurrent.ConcurrentHashMap<>();
+    final List<ai.neargo.opskit.commons.event.DomainEvent> events = new java.util.concurrent.CopyOnWriteArrayList<>();
+    final List<String> scheduled = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     TicketFixture(TestDatabase db) {
         ProcessMigrations.migrate(db.dataSource());
@@ -140,7 +147,7 @@ final class TicketFixture {
 
             @Override
             public List<String> membersOf(TenantContext t, String g) {
-                return List.of();
+                return groups.getOrDefault(g, List.of());
             }
 
             @Override
@@ -149,7 +156,11 @@ final class TicketFixture {
             }
         };
         definitions = new TicketDefinitionAppService(ts.definitions(), processes, directory, audit, clock, tx);
-        tickets = new TicketAppService(definitions, ts.tickets(), ts.fieldIndex(), ts.scopes(), ts.comments(), processes, ids, clock, tx);
+        taskClient = new EmbeddedTaskClient(tasks);
+        dispatcher = new TicketDispatcher(taskClient, directory, ts.cursors(), ts.tickets(), events::add, (n, id, at) -> scheduled.add(n + "@" + id.encode()),
+                clock);
+        tickets = new TicketAppService(definitions, ts.tickets(), ts.fieldIndex(), ts.scopes(), ts.comments(), processes, taskClient, dispatcher, ids, clock,
+                tx);
         ticketRef.set(tickets);
 
         defs.publish(app(), T.workspaceId(), desk(), null, "API");

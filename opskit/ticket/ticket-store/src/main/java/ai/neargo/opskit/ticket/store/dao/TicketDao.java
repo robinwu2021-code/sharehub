@@ -92,6 +92,10 @@ public final class TicketDao {
                 .params(title, description, priority, priorityOrd, TicketJson.write(fields), now, ws.value(), ticketNo, expectedVersion).update();
     }
 
+    public void setCurrentTask(WorkspaceId ws, String ticketNo, String taskNo) {
+        jdbc.sql("UPDATE tkt_ticket SET current_task_no = ? WHERE workspace_id = ? AND ticket_no = ?").params(taskNo, ws.value(), ticketNo).update();
+    }
+
     public void setResolution(WorkspaceId ws, String ticketNo, String resolution) {
         jdbc.sql("UPDATE tkt_ticket SET resolution = ? WHERE workspace_id = ? AND ticket_no = ?").params(resolution, ws.value(), ticketNo).update();
     }

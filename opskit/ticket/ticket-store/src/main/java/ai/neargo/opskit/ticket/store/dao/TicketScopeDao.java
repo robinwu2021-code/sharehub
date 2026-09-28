@@ -15,8 +15,13 @@ public final class TicketScopeDao {
         this.jdbc = jdbc;
     }
 
+    /** 整体替换；按主键删（理由同 FieldIndexDao.replace：避免二级索引范围删的间隙锁死锁）。 */
     public void replace(WorkspaceId ws, String ticketNo, Collection<String> tags) {
-        jdbc.sql("DELETE FROM tkt_ticket_scope WHERE workspace_id = ? AND ticket_no = ?").params(ws.value(), ticketNo).update();
+        java.util.List<Long> ids = jdbc.sql("SELECT id FROM tkt_ticket_scope WHERE workspace_id = ? AND ticket_no = ?").params(ws.value(), ticketNo)
+                .query(Long.class).list();
+        if (!ids.isEmpty()) {
+            jdbc.sql("DELETE FROM tkt_ticket_scope WHERE id IN (:ids)").param("ids", ids).update();
+        }
         for (String tag : new TreeSet<>(tags)) {
             jdbc.sql("INSERT INTO tkt_ticket_scope (workspace_id, ticket_no, scope_tag) VALUES (?, ?, ?)").params(ws.value(), ticketNo, tag).update();
         }

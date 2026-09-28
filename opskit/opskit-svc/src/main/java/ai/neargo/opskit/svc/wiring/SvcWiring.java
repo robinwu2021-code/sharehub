@@ -67,6 +67,15 @@ public class SvcWiring {
         });
     }
 
+    /** 外部指定派单超时 → 兜底策略（任务 ID ws:ticketNo:0）。 */
+    @Bean
+    Task<Void> assignTimeoutTask(ai.neargo.opskit.ticket.core.app.TicketAppService tickets) {
+        return Tasks.oneTime(ai.neargo.opskit.ticket.core.app.TicketDispatcher.ASSIGN_TIMEOUT_TASK).execute((inst, ctx) -> {
+            ai.neargo.opskit.commons.timer.TimerId id = ai.neargo.opskit.commons.timer.TimerId.decode(inst.getId());
+            tickets.tenantOf(id.workspace(), id.key()).ifPresent(t -> tickets.onAssignTimeout(t, id.key()));
+        });
+    }
+
     @Bean
     Task<Void> claimTimeoutTask(ProcessTimers timers) {
         return Tasks.oneTime(TaskAppService.CLAIM_TIMEOUT_TASK).execute((inst, ctx) -> timers.claimTimeout(inst.getId()));

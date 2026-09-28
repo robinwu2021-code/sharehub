@@ -4,7 +4,11 @@ import ai.neargo.opskit.commons.audit.AuditRecorder;
 import ai.neargo.opskit.platform.client.DirectoryClient;
 import ai.neargo.opskit.process.client.ProcessClient;
 import ai.neargo.opskit.commons.id.BizNoGenerator;
+import ai.neargo.opskit.commons.event.EventPublisher;
+import ai.neargo.opskit.commons.timer.TimerScheduler;
 import ai.neargo.opskit.process.client.InstanceObserver;
+import ai.neargo.opskit.process.client.TaskClient;
+import ai.neargo.opskit.ticket.core.app.TicketDispatcher;
 import ai.neargo.opskit.ticket.core.app.TicketAppService;
 import ai.neargo.opskit.ticket.core.app.TicketDefinitionAppService;
 import ai.neargo.opskit.ticket.core.app.TicketObserver;
@@ -42,9 +46,14 @@ public class TicketCoreAutoConfiguration {
     }
 
     @Bean
-    TicketAppService ticketAppService(TicketDefinitionAppService defs, TicketStore s, ProcessClient processes, BizNoGenerator ids, Clock clock,
-            TransactionOperations tx) {
-        return new TicketAppService(defs, s.tickets(), s.fieldIndex(), s.scopes(), s.comments(), processes, ids, clock, tx);
+    TicketDispatcher ticketDispatcher(TaskClient tasks, DirectoryClient directory, TicketStore s, EventPublisher events, TimerScheduler timers, Clock clock) {
+        return new TicketDispatcher(tasks, directory, s.cursors(), s.tickets(), events, timers, clock);
+    }
+
+    @Bean
+    TicketAppService ticketAppService(TicketDefinitionAppService defs, TicketStore s, ProcessClient processes, TaskClient tasks, TicketDispatcher dispatcher,
+            BizNoGenerator ids, Clock clock, TransactionOperations tx) {
+        return new TicketAppService(defs, s.tickets(), s.fieldIndex(), s.scopes(), s.comments(), processes, tasks, dispatcher, ids, clock, tx);
     }
 
     /**

@@ -249,6 +249,12 @@ public class TaskAppService implements AssignmentHandler, StatusHook {
         }
     }
 
+    /** 成员名下未结的办理任务数（最少负载派单）。 */
+    @SystemAction("上层模块内部调用：派单策略")
+    public Map<String, Long> openWorkload(TenantContext t, java.util.Collection<String> memberRefs) {
+        return tasks.openWorkByAssignee(t.workspaceId(), memberRefs);
+    }
+
     /** 实例上未结束的办理任务（工单详情里的「当前任务」）。可见性由调用方先判。 */
     @SystemAction("上层模块内部调用：调用方已判实例可见")
     public List<TaskView> openWorkTasks(TenantContext t, String instanceNo) {
