@@ -31304,6 +31304,23 @@
    ]
   },
   {
+   "verb": "GET",
+   "path": "/api/platform/sys-params/timezones",
+   "perm": "system:param:read",
+   "perms": [
+    "system:param:read"
+   ],
+   "handler": "SysConfigController#timezoneOptions",
+   "summary": "业务时区的候选与当前值。",
+   "params": [],
+   "bodyType": null,
+   "returnType": "Map<String, Object>",
+   "returnContainer": null,
+   "returnElement": "Map<String, Object>",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
    "verb": "POST",
    "path": "/api/platform/sys-params/{paramKey}",
    "perm": "system:param:update",
@@ -46275,9 +46292,9 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 523,
-  "records": 475,
-  "withPerm": 450,
+  "endpoints": 524,
+  "records": 476,
+  "withPerm": 451,
   "withBody": 221,
   "shapedResponses": 408
  }

@@ -19,6 +19,7 @@ import ai.neargo.sharehub.platform.sys.service.SysParamService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -40,8 +41,13 @@ public class SysConfigController {
     private final ProblemService problems;
     private final SysParamService sysParams;
 
+    /** 只用于「当前业务时区 / 业务时刻」的回显 —— 见 timezoneOptions()。 */
+    private final ai.neargo.sharehub.common.time.BizClock bizClock;
+
     public SysConfigController(DictEntryService dictEntries, RegionService regions,
-                               ProblemService problems, SysParamService sysParams) {
+                               ProblemService problems, SysParamService sysParams,
+                               ai.neargo.sharehub.common.time.BizClock bizClock) {
+        this.bizClock = bizClock;
         this.dictEntries = dictEntries;
         this.regions = regions;
         this.problems = problems;
@@ -163,6 +169,31 @@ public class SysConfigController {
                                                @RequestParam(required = false) String keyword,
                                                @RequestParam(required = false) String groupName) {
         return sysParams.page(page, size, keyword, Map.of("groupName", nz(groupName)));
+    }
+
+    /**
+     * 业务时区的候选与当前值。
+     *
+     * <h3>为什么候选由后端给</h3>
+     * 前端写死一份列表，早晚会与后端 {@code ZoneId} 能解析的集合漂移 ——
+     * 而漂移的表现是「界面上选得到、保存时报 400」，运营不会知道为什么。
+     *
+     * <h3>为什么同时回当前业务时刻</h3>
+     * 光给一个 {@code Asia/Dubai} 看不出选对没有。回一个「现在是几号几点」，
+     * 选完一眼就能核 —— 这类配置最怕的是「保存成功了但选错了一个字母」。
+     */
+    @GetMapping("/sys-params/timezones")
+    @PreAuthorize("@perm.can('system:param:read')")
+    public Map<String, Object> timezoneOptions() {
+        // 常用集合而不是 ZoneId.getAvailableZoneIds() 的六百多个 —— 那种下拉没法用。
+        // 不在这里做「可解析校验」：这几个是常量，写错了启动就该发现，不该留到运行时。
+        List<String> common = List.of(
+                "Asia/Dubai", "Asia/Riyadh", "Asia/Qatar", "Asia/Kuwait", "Asia/Bahrain",
+                "Asia/Muscat", "Asia/Shanghai", "Asia/Singapore", "Europe/London", "UTC");
+        return Map.of(
+                "current", bizClock.zone().getId(),
+                "currentBizTime", bizClock.now().toString(),
+                "options", common);
     }
 
     @PostMapping("/sys-params")

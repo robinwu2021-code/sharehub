@@ -48,8 +48,10 @@ import java.time.ZoneId;
 @Component
 public class BizClock {
 
-    private final ZoneId zone;
+    /** 启动期默认值，也是参数表没配 / 来源缺席时的兜底。构造时即校验，非法则启动失败。 */
+    private final ZoneId fallbackZone;
     private final Clock clock;
+    private final ObjectProvider<BizZoneSource> zoneSource;
 
     /**
      * @param clockProvider 走 {@link Clock} bean 而不是 {@code LocalDate.now(zone)}，
@@ -65,25 +67,55 @@ public class BizClock {
      *                      与此前行为一致。
      */
     public BizClock(@Value("${sharehub.biz-zone:Asia/Dubai}") String zone,
-                    ObjectProvider<Clock> clockProvider) {
-        this.zone = ZoneId.of(zone);
+                    ObjectProvider<Clock> clockProvider,
+                    ObjectProvider<BizZoneSource> zoneSource) {
+        // 这里不 try/catch：属性写错了就该**启动失败**，而不是带着一个错的时区跑起来
+        this.fallbackZone = ZoneId.of(zone);
         this.clock = clockProvider.getIfAvailable(Clock::systemUTC);
+        this.zoneSource = zoneSource;
     }
 
     /** 业务日历上的今天。 */
     public LocalDate today() {
-        return LocalDate.ofInstant(clock.instant(), zone);
+        return LocalDate.ofInstant(clock.instant(), zone());
     }
 
     /** 业务时区的此刻。 */
     public LocalDateTime now() {
-        return LocalDateTime.ofInstant(clock.instant(), zone);
+        return LocalDateTime.ofInstant(clock.instant(), zone());
     }
 
-    /** 业务时区本身 —— 需要自己换算时用（如把 UTC 字符串折算成业务日）。 */
+    /**
+     * 业务时区本身 —— 需要自己换算时用（如把 UTC 字符串折算成业务日）。
+     *
+     * <h3>每次都读，不缓存</h3>
+     * 管理员在运营台改完，期待的是**立刻生效**，不是「大约一分钟后」。
+     * 读一次 {@code sys_param} 是一次主键查询，而业务日期不在热路径上
+     * （不是每笔订单都算）。
+     *
+     * <p>真要加缓存，必须是**带失效事件**的，不能是 TTL ——
+     * TTL 会制造「改了但还没生效」的窗口，而那正是时区缺陷最擅长藏身的地方
+     * （它本来就每天只在几个小时里成立）。
+     *
+     * <h3>为什么这里吞异常</h3>
+     * 值非法应当在**写入时**被拒（见 SysConfigController 的校验）。
+     * 万一库里已经有一个脏值，这里回落到启动期默认值并记一条 WARN ——
+     * 让系统继续按一个**确定**的时区跑，好过每次取日期都抛异常。
+     */
     public ZoneId zone() {
-        return zone;
+        BizZoneSource src = zoneSource.getIfAvailable();
+        if (src == null) return fallbackZone;
+        String id = src.zoneId();
+        if (id == null || id.isBlank()) return fallbackZone;
+        try {
+            return ZoneId.of(id.trim());
+        } catch (java.time.DateTimeException e) {
+            LOG.warn("业务时区参数非法，回落到 {}：biz.timezone={}", fallbackZone, id);
+            return fallbackZone;
+        }
     }
+
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(BizClock.class);
 
     /**
      * **业务日的起点，换算成「存储时区」的 {@link LocalDateTime}** ——
@@ -106,7 +138,7 @@ public class BizClock {
      * 拆成独立进程且时区不同时，这些列该带偏移量存，而不是靠这个假设。
      */
     public LocalDateTime startOfDayAsStored(LocalDate bizDay) {
-        return bizDay.atStartOfDay(zone).withZoneSameInstant(ZoneId.systemDefault()).toLocalDateTime();
+        return bizDay.atStartOfDay(zone()).withZoneSameInstant(ZoneId.systemDefault()).toLocalDateTime();
     }
 
     /** {@link #startOfDayAsStored} 的今天。 */

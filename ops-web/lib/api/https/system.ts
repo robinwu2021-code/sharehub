@@ -18,6 +18,7 @@ export const systemHttp: SystemApi = {
   listDictEntries: (q?: PageQ) => client.get("/api/platform/dict-entries", q),
   listRegions: (q?: PageQ) => client.get("/api/platform/regions", q),
   listSysParams: (q?: PageQ) => client.get("/api/platform/sys-params", q),
+  getTimezoneOptions: () => client.get("/api/platform/sys-params/timezones"),
   listOpenApiApps: (q?: PageQ) => client.get("/api/platform/openapi-apps", q),
   listMarketCountries: (q?: PageQ) => client.get("/api/platform/markets", q),
   saveNotifyTemplate: (x) => client.post(x.templateNo ? `/api/platform/notify-templates/${x.templateNo}` : "/api/platform/notify-templates", x),

@@ -24,6 +24,17 @@ export const systemMock: SystemApi = {
   listDictEntries: (q: PageQ = {}) => wait(db.listDictEntries(q)),
   listRegions: (q: PageQ = {}) => wait(db.listRegions(q)),
   listSysParams: (q: PageQ = {}) => wait(db.listSysParams(q)),
+  // mock 与服务端同形：候选来自后端常量表，当前值取 mock 库里的 biz.timezone（没配则默认）
+  getTimezoneOptions: () => wait((() => {
+    const cur = db.sysParams.find((p) => p.paramKey === "biz.timezone")?.value || "Asia/Dubai";
+    return {
+      current: cur,
+      // mock 不做真时区换算 —— 这里只要形状对，取值对不对由后端那条用例守
+      currentBizTime: new Date().toISOString().slice(0, 19).replace("T", " "),
+      options: ["Asia/Dubai", "Asia/Riyadh", "Asia/Qatar", "Asia/Kuwait", "Asia/Bahrain",
+                "Asia/Muscat", "Asia/Shanghai", "Asia/Singapore", "Europe/London", "UTC"],
+    };
+  })(), 120),
   listOpenApiApps: (q: PageQ = {}) => wait(db.listOpenApiApps(q)),
   listMarketCountries: (q: PageQ = {}) => wait(db.listMarketCountries(q)),
   saveNotifyTemplate: (x) => wait(db.saveNotifyTemplate(x), 350),

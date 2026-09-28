@@ -24,6 +24,16 @@ export interface SystemApi {
   listDictEntries(q?: PageQ): Promise<PageResult<DictEntry>>;
   listRegions(q?: PageQ): Promise<PageResult<Region>>;
   listSysParams(q?: PageQ): Promise<PageResult<SysParam>>;
+  /**
+   * 业务时区的候选与当前值（2026-09-28 裁决：UTC+4 阿联酋，可配，改动需管理员权限）。
+   *
+   * **候选由后端给，前端不写死** —— 写死的列表早晚与后端 `ZoneId` 能解析的集合漂移，
+   * 而漂移的表现是「界面上选得到、保存时报 400」，运营不会知道为什么。
+   *
+   * `currentBizTime` 用来让人一眼核对选对没有：光看 `Asia/Dubai` 看不出，
+   * 看到「现在是 09-28 15:20」就能。这类配置最怕「保存成功了但选错一个字母」。
+   */
+  getTimezoneOptions(): Promise<{ current: string; currentBizTime: string; options: string[] }>;
   listOpenApiApps(q?: PageQ): Promise<PageResult<OpenApiApp>>;
   listMarketCountries(q?: PageQ): Promise<PageResult<MarketCountry>>;
   saveNotifyTemplate(x: Partial<NotifyTemplate> & { templateNo?: string }): Promise<NotifyTemplate>;
