@@ -50,6 +50,37 @@ public class OpsKitClient {
     public record StartedInstance(String instanceNo, String approvalNo) {
     }
 
+    /** 目录同步（POST /workspaces/{ws}/directory/sync，只认应用凭证；整批一个事务）。返回 OpsKit 的计数摘要 */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> syncDirectory(Map<String, Object> batch) {
+        return exchange("POST", "/directory/sync", batch, "目录同步");
+    }
+
+    /** 成员属性定义（PUT /workspaces/{ws}/member-attributes/{key}）：给属性值配三语显示名，界面上不再显示原值 */
+    public void putMemberAttribute(String key, Map<String, Object> def) {
+        exchange("PUT", "/member-attributes/" + key, def, "成员属性定义");
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> exchange(String method, String path, Object body, String what) {
+        if (!configured()) {
+            throw new IllegalStateException("OpsKit 未配置（SHAREHUB_OPSKIT_BASE_URL / _WS / _APP_TOKEN），无法" + what);
+        }
+        try {
+            return http.method(org.springframework.http.HttpMethod.valueOf(method))
+                    .uri(baseUrl + "/api/opskit/v1/workspaces/{ws}" + path, workspace)
+                    .header("Authorization", "Bearer " + appToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(body)
+                    .retrieve()
+                    .body(Map.class);
+        } catch (RestClientResponseException ex) {
+            String snippet = ex.getResponseBodyAsString();
+            throw new IllegalStateException("OpsKit " + what + "被拒 " + ex.getStatusCode().value() + " "
+                    + (snippet.length() > 300 ? snippet.substring(0, 300) : snippet), ex);
+        }
+    }
+
     public record CreatedTicket(String ticketNo, boolean attached) {
     }
 

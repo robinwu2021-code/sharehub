@@ -1,6 +1,7 @@
 package ai.neargo.sharehub.portal.platform;
 
 import ai.neargo.common.data.scope.DataScopeSpec;
+import ai.neargo.sharehub.api.platform.port.EmployeeDirectoryPort;
 import ai.neargo.sharehub.api.platform.port.PermCatalogPort;
 import ai.neargo.sharehub.auth.LoginUser;
 import ai.neargo.sharehub.auth.StaffTokenAuthFilter;
@@ -58,6 +59,8 @@ public class OpsKitIntrospectController {
     private final String clientSecret;
     /** 可空：只有展开通配码用得到；测试里直接 new 本类时不给 */
     private final PermCatalogPort catalog;
+    /** 可空：员工显示名取姓名（登录名即工号，不给姓名的话 OpsKit 里派单列表是一串工号） */
+    private final EmployeeDirectoryPort employees;
     private volatile Set<String> catalogCache = Set.of();
     private volatile long catalogAt;
     private static final long CATALOG_TTL_MS = 60_000;
@@ -66,16 +69,18 @@ public class OpsKitIntrospectController {
     public OpsKitIntrospectController(StaffTokenAuthFilter tokens,
                                       @Value("${sharehub.opskit.introspect.client-id:}") String clientId,
                                       @Value("${sharehub.opskit.introspect.client-secret:}") String clientSecret,
-                                      PermCatalogPort catalog) {
+                                      PermCatalogPort catalog,
+                                      EmployeeDirectoryPort employees) {
         this.tokens = tokens;
         this.clientId = clientId;
         this.clientSecret = clientSecret;
         this.catalog = catalog;
+        this.employees = employees;
     }
 
     /** 测试用：不展开通配码 */
     public OpsKitIntrospectController(StaffTokenAuthFilter tokens, String clientId, String clientSecret) {
-        this(tokens, clientId, clientSecret, null);
+        this(tokens, clientId, clientSecret, null, null);
     }
 
     @PostMapping(value = "/introspect", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
@@ -91,7 +96,7 @@ public class OpsKitIntrospectController {
             return;
         }
         LoginUser u = token == null || token.isBlank() ? null : tokens.resolve(token.trim()).orElse(null);
-        write(resp, u == null ? Map.of("active", false) : claims(u, expand(u.perms())));
+        write(resp, u == null ? Map.of("active", false) : claims(u, expand(u.perms()), displayName(u)));
     }
 
     /** 声明名与 21/06 §八 的示例一致；OpsKit 侧按 IdP 登记里的声明映射对上 */
@@ -140,11 +145,20 @@ public class OpsKitIntrospectController {
         return catalogCache;
     }
 
-    private static Map<String, Object> claims(LoginUser u, List<String> perms) {
+    /** 员工取在职档案的姓名；查不到（共享 admin、演示登录）或代理时用会话里的名字 */
+    private String displayName(LoginUser u) {
+        if (employees != null && u.realm() != null && "STAFF".equals(u.realm().name()) && u.userNo() != null) {
+            var b = employees.briefsOf(List.of(u.userNo())).get(u.userNo());
+            if (b != null && b.name() != null && !b.name().isBlank()) return b.name();
+        }
+        return u.username();
+    }
+
+    private static Map<String, Object> claims(LoginUser u, List<String> perms, String name) {
         Map<String, Object> c = new LinkedHashMap<>();
         c.put("active", true);
         c.put("sub", u.userNo());
-        c.put("name", u.username());
+        c.put("name", name);
         c.put("tenant", u.tenantId());
         c.put("realm", u.realm().name());
         c.put("roles", u.role() == null || u.role().isBlank() ? List.of() : List.of(u.role()));
