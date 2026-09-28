@@ -3,7 +3,12 @@ package ai.neargo.opskit.ticket.core.config;
 import ai.neargo.opskit.commons.audit.AuditRecorder;
 import ai.neargo.opskit.platform.client.DirectoryClient;
 import ai.neargo.opskit.process.client.ProcessClient;
+import ai.neargo.opskit.commons.id.BizNoGenerator;
+import ai.neargo.opskit.process.client.InstanceObserver;
+import ai.neargo.opskit.ticket.core.app.TicketAppService;
 import ai.neargo.opskit.ticket.core.app.TicketDefinitionAppService;
+import ai.neargo.opskit.ticket.core.app.TicketObserver;
+import org.springframework.context.annotation.Lazy;
 import ai.neargo.opskit.ticket.store.TicketMigrations;
 import ai.neargo.opskit.ticket.store.TicketStore;
 import java.time.Clock;
@@ -34,5 +39,19 @@ public class TicketCoreAutoConfiguration {
     TicketDefinitionAppService ticketDefinitionAppService(TicketStore s, ProcessClient processes, DirectoryClient directory, AuditRecorder audit,
             Clock clock, TransactionOperations tx) {
         return new TicketDefinitionAppService(s.definitions(), processes, directory, audit, clock, tx);
+    }
+
+    @Bean
+    TicketAppService ticketAppService(TicketDefinitionAppService defs, TicketStore s, ProcessClient processes, BizNoGenerator ids, Clock clock,
+            TransactionOperations tx) {
+        return new TicketAppService(defs, s.tickets(), s.fieldIndex(), s.scopes(), s.comments(), processes, ids, clock, tx);
+    }
+
+    /**
+     * 流程 → 工单快照同步。流程层装配时就要拿到观察者列表，而工单服务又依赖流程客户端 —— 用 @Lazy 代理打断创建期的环。
+     */
+    @Bean
+    InstanceObserver ticketObserver(@Lazy TicketAppService tickets) {
+        return new TicketObserver(tickets);
     }
 }

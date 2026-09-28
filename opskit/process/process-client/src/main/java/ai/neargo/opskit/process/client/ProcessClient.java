@@ -25,6 +25,9 @@ public interface ProcessClient {
 
     InstanceView get(Actor actor, String instanceNo);
 
+    /** 按租户读实例（不做操作人可见性判断）：供上层同步快照；不存在为空。 */
+    Optional<InstanceView> snapshot(TenantContext t, String instanceNo);
+
     InstanceView updateFields(Actor actor, String instanceNo, Map<String, Object> patch);
 
     void replaceScopes(Actor actor, String instanceNo, Collection<String> tags);

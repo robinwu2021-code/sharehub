@@ -93,6 +93,11 @@ class TicketDefinitionAppServiceTest {
         }
 
         @Override
+        public Optional<InstanceView> snapshot(TenantContext t, String n) {
+            return Optional.empty();
+        }
+
+        @Override
         public InstanceView updateFields(Actor a, String n, Map<String, Object> p) {
             throw new UnsupportedOperationException();
         }

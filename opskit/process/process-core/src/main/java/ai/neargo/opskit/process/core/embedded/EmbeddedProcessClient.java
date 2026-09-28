@@ -19,6 +19,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /** {@link ProcessClient} 的进程内实现：直接调流程应用服务（事务模板加入调用方事务 → 同进程同事务）。 */
 public class EmbeddedProcessClient implements ProcessClient {
@@ -51,6 +52,16 @@ public class EmbeddedProcessClient implements ProcessClient {
     @Override
     public InstanceView get(Actor actor, String instanceNo) {
         return instances.get(actor, instanceNo);
+    }
+
+    @Override
+    public Optional<InstanceView> snapshot(TenantContext t, String instanceNo) {
+        try {
+            return Optional.of(instances.get(new Actor(t, Optional.empty(), Optional.of("opskit-internal"), Set.of(), Set.of(), Set.of(), Set.of(), Set.of()),
+                    instanceNo));
+        } catch (OpsKitException e) {
+            return Optional.empty();
+        }
     }
 
     @Override
