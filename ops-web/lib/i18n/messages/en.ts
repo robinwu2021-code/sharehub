@@ -4,6 +4,8 @@ import { flowEn } from "./flow";
 // English. Keys must mirror zh.ts (verified by i18n.test.ts).
 export const en: Messages = {
   common: {
+    readOnly: "View only: your role lacks the {what} permission ({codes})",
+    readOnlyNote: "; {note}",
     appName: "powerbank Ops",
     appTitle: "Operations Console",
     success: "Done",
@@ -117,8 +119,6 @@ export const en: Messages = {
     selectedCount: "{n} selected",
     clear: "Clear",
     checkFields: "Please fix the errors in the form",
-    readOnly: "View only: your role lacks the {what} permission ({codes})",
-    readOnlyNote: "; {note}",
   },
   flow: flowEn,
 };

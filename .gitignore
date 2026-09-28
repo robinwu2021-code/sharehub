@@ -50,3 +50,6 @@ coverage/
 
 # 本地跑出来的日志目录（生产走 SHAREHUB_LOG_DIR 指向 /data/log）
 logs/
+
+# 端到端验证的隔离构建副本与报告（ops-web/scripts/flow-e2e.sh）
+/.e2e/

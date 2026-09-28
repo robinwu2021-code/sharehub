@@ -248,12 +248,14 @@ export function getApproval(no: string): ApprovalView {
       ...(decided ? { decidedBy: decided.by, decidedAtMs: decided.atMs } : {}) };
   });
   const why = whyNotDecide(r);
-  return {
+  // 深拷贝：浅拷贝时轮次对象与 mock 内部同一引用，写操作原地改它会「穿透」进页面缓存里的旧数据
+  // （真服务是 JSON 不会这样，但会让界面在重新取数前就显示一半新状态，端到端场景 S2-2 抓到过）
+  return structuredClone({
     ...row(r), facts: r.facts, steps, rounds: [...r.rounds].sort((a, b) => a.round - b.round), evidence: r.evidence,
     mine: { ...(r.status === "PENDING" ? { taskNo: r.taskNo } : {}), canDecide: !why, ...(why ? { whyNot: why } : {}),
       canWithdraw: r.status === "PENDING" && r.requestedBy.ref === ME.ref },
     rules: { crossStepExclusive: d.crossStepExclusive },
-  };
+  });
 }
 
 // ── 审批：写 ─────────────────────────────────────────────────────────────

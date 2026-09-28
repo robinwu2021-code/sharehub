@@ -1,0 +1,7 @@
+{
+  "_note": "对真实 OpsKit 跑时的夹具：单号等后端种子（O4-0 D）给出后填；token 用 opskit/scripts/dev-token.sh 现签，勿提交真实令牌",
+  "approvalTwoStep": "",
+  "approvalMine": "",
+  "ticketAssigned": "",
+  "token": ""
+}

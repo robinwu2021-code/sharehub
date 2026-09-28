@@ -2,6 +2,8 @@
 import { flowZh } from "./flow";
 export const zh = {
   common: {
+    readOnly: "仅可查看：当前角色无{what}权限（{codes}）",
+    readOnlyNote: "，{note}",
     appName: "powerbank 运营",
     appTitle: "运营管理后台",
     success: "操作成功",
@@ -115,8 +117,6 @@ export const zh = {
     selectedCount: "已选 {n} 项",
     clear: "清空",
     checkFields: "请先修正表单中的错误",
-    readOnly: "仅可查看：当前角色无{what}权限（{codes}）",
-    readOnlyNote: "，{note}",
   },
   flow: flowZh,
 };

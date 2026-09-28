@@ -5,6 +5,8 @@ import { flowAr } from "./flow";
 // Auto-generated Arabic (MSA), NEEDS HUMAN REVIEW. Keys mirror zh.ts.
 export const ar: Messages = {
   common: {
+    readOnly: "عرض فقط: لا يملك دورك صلاحية {what} ({codes})",
+    readOnlyNote: "، {note}",
     appName: "powerbank التشغيل",
     appTitle: "لوحة التشغيل",
     success: "تم بنجاح",
@@ -118,8 +120,6 @@ export const ar: Messages = {
     selectedCount: "تم اختيار {n}",
     clear: "مسح",
     checkFields: "الرجاء تصحيح الأخطاء في النموذج",
-    readOnly: "عرض فقط: لا يملك دورك صلاحية {what} ({codes})",
-    readOnlyNote: "، {note}",
   },
   flow: flowAr,
 };

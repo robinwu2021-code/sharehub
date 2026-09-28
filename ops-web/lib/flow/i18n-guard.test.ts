@@ -49,3 +49,14 @@ describe("页面名与菜单同一译法", () => {
     }
   });
 });
+
+describe("ReadOnlyNotice 的句式真能取到", () => {
+  // 回归：readOnly 曾被插进 form 分组 —— 三语 key 齐平所以 i18n.test 全绿，界面却显示原始 key
+  it("三语都不回退成 key 原文", async () => {
+    const { translate } = await import("@/lib/i18n");
+    for (const loc of ["zh", "en", "ar"] as const) {
+      expect(translate(loc, "common.readOnly", { what: "x", codes: "y" })).not.toMatch(/^common\./);
+      expect(translate(loc, "common.readOnlyNote", { note: "z" })).not.toMatch(/^common\./);
+    }
+  });
+});

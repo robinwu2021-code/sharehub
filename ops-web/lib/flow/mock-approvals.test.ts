@@ -114,3 +114,14 @@ describe("错误码与服务端同口径（decide：409 → 403 → 422）", () 
     expect(code(() => releaseTask(taken.taskNo))).toBe(403);
   });
 });
+
+describe("mock 不把内部对象的引用交出去", () => {
+  it("写操作不会改到之前读出来的视图（与 JSON 响应同语义）", () => {
+    const mine = queryApprovals({ status: ["PENDING"], page: 1, size: 200 }).list
+      .map((r) => getApproval(r.approvalNo)).find((v) => v.mine.canWithdraw)!;
+    const before = getApproval(mine.approvalNo);
+    withdraw(mine.approvalNo, NOW);
+    expect(before.status).toBe("PENDING");
+    expect(before.rounds.every((r) => r.status !== "WITHDRAWN")).toBe(true);
+  });
+});
