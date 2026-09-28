@@ -1,0 +1,40 @@
+# 单宿主 / 私有化部署的启动引导（部署方数据）：账户 · 空间 · 身份提供方 · 角色 → 产品权限 · 预置定义。
+# 每次启动幂等执行；空间只在首次启动时创建（事后改 zone / locale 不生效）。
+opskit:
+  bootstrap:
+    enabled: true
+    account-name: Example Co
+    workspace:
+      ref: MAIN               # 宿主的租户号；令牌里 workspace 声明须与它一致
+      name: Example Co
+      zone: UTC               # 宿主的业务时区（「今天」「工作日」都按它算）
+      locale: en
+    # 预置定义目录（compose 里挂载 ./definitions）；不需要就删掉这一行
+    definitions-dir: /etc/opskit/definitions
+    idps:
+      # 二选一或都配。JWT：宿主签发的 JWT，OpsKit 用 JWKS 验签
+      - issuer: https://idp.example.com
+        kind: JWT
+        jwks-url: https://idp.example.com/.well-known/jwks.json
+        audience: opskit
+        claims: {member: sub, displayName: name, workspace: tenant, roles: roles, groups: groups, scopes: scopes}
+      # INTROSPECT：不透明令牌，按前缀路由到宿主的 RFC 7662 内省端点
+      # - issuer: host-staff
+      #   kind: INTROSPECT
+      #   introspect-url: http://host.internal/introspect
+      #   client-id: opskit
+      #   client-secret: ${OPSKIT_INTROSPECT_SECRET}
+      #   token-prefix: stk_
+      #   claims: {member: sub, displayName: name, workspace: tenant, roles: roles, scopes: scopes}
+    roles:
+      # 令牌 roles 声明里的代号 → 产品权限（完整清单见 21/02 §权限）
+      ADMIN:
+        name: {zh: 管理员, en: Admin}
+        permissions: [approval:decide, approval:view:all, ticket:create, ticket:view:all, ticket:work, ticket:assign, ticket:escalate,
+                      ticket:merge, ticket:comment:internal, process:manage, ticket-type:manage, sla:manage, report:view, directory:manage]
+      AGENT:
+        name: {zh: 处理人, en: Agent}
+        permissions: [ticket:create, ticket:view:scoped, ticket:work, ticket:comment:internal]
+      VIEWER:
+        name: {zh: 只读, en: Viewer}
+        permissions: [approval:view:all, ticket:view:scoped]

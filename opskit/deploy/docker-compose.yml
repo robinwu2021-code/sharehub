@@ -1,0 +1,58 @@
+# OpsKit 单机部署样板（21/07 O4-4）：MariaDB + OpsKit。
+#   cp .env.example .env && cp bootstrap.example.yml bootstrap.yml   # 按注释改
+#   docker compose up -d && docker compose logs -f opskit
+# 已有数据库时删掉 db 服务，把 OPSKIT_DB_URL 指过去即可（库与用户须事先建好，Flyway 只建表）。
+name: opskit
+
+services:
+  db:
+    image: mariadb:11.4
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: opskit
+      MARIADB_USER: ${OPSKIT_DB_USER:-opskit}
+      MARIADB_PASSWORD: ${OPSKIT_DB_PASSWORD:?在 .env 里设置 OPSKIT_DB_PASSWORD}
+      MARIADB_RANDOM_ROOT_PASSWORD: "1"
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  opskit:
+    image: ${OPSKIT_IMAGE:-opskit}:${OPSKIT_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      OPSKIT_DB_URL: ${OPSKIT_DB_URL:-jdbc:mariadb://db:3306/opskit}
+      OPSKIT_DB_USER: ${OPSKIT_DB_USER:-opskit}
+      OPSKIT_DB_PASSWORD: ${OPSKIT_DB_PASSWORD}
+      # 生成后不可更换（已加密的 IdP 密钥会读不出）
+      OPSKIT_CRYPTO_KEY: ${OPSKIT_CRYPTO_KEY:?在 .env 里设置 OPSKIT_CRYPTO_KEY（openssl rand -base64 32）}
+      OPSKIT_BOOTSTRAP_FILE: /etc/opskit/bootstrap.yml
+      # 挂载失败（文件变空目录）或忘了 enabled: true 时拒绝启动，而不是健康却无人能登录
+      OPSKIT_BOOTSTRAP_REQUIRED: "true"
+      OPSKIT_LOG_DIR: /data/log/opskit
+      TZ: UTC
+    volumes:
+      - ./bootstrap.yml:/etc/opskit/bootstrap.yml:ro
+      - ./definitions:/etc/opskit/definitions:ro
+      - logs:/data/log/opskit
+    ports:
+      - "${OPSKIT_BIND:-127.0.0.1}:${OPSKIT_PORT:-8090}:8090"
+    healthcheck:
+      # 镜像里没有 curl：用 bash 的 /dev/tcp 取 /actuator/health
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8090 && printf 'GET /actuator/health HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q '\"status\":\"UP\"' <&3"]
+      interval: 10s
+      timeout: 5s
+      start_period: 60s
+      retries: 6
+
+volumes:
+  db-data:
+  logs:

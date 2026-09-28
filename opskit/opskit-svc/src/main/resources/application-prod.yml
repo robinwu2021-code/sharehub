@@ -11,6 +11,13 @@ spring:
     # 部署方的引导配置（账户 · 空间 · IdP · 角色 → 产品权限）；文件不存在时不引导
     import: optional:file:${OPSKIT_BOOTSTRAP_FILE:/etc/opskit/bootstrap.yml}
 
+opskit:
+  deploy:
+    # 与上面 import 的是同一个文件：spring.config.import 遇到目录会静默跳过，由 BootstrapFileGuard 把它变成启动失败
+    bootstrap-file: ${OPSKIT_BOOTSTRAP_FILE:/etc/opskit/bootstrap.yml}
+    # 单宿主部署设 true：文件缺失或未启用即拒绝启动（多租户 SaaS 形态不需要引导，默认 false 只记 WARN）
+    require-bootstrap: ${OPSKIT_BOOTSTRAP_REQUIRED:false}
+
 server:
   forward-headers-strategy: native
 

@@ -1,0 +1,20 @@
+{
+  "code": "repair_flow",
+  "name": {"zh": "报修流程", "en": "Repair flow", "ar": "سير الإصلاح"},
+  "initialStatus": "new",
+  "statuses": [
+    {"code": "new", "name": {"zh": "新建", "en": "New", "ar": "جديد"}, "category": "NEW"},
+    {"code": "doing", "name": {"zh": "处理中", "en": "In progress", "ar": "قيد المعالجة"}, "category": "IN_PROGRESS"},
+    {"code": "done", "name": {"zh": "已解决", "en": "Resolved", "ar": "تم الحل"}, "category": "DONE"},
+    {"code": "cancelled", "name": {"zh": "已作废", "en": "Cancelled", "ar": "ملغى"}, "category": "CANCELLED"}
+  ],
+  "transitions": [
+    {"code": "accept", "name": {"zh": "受理", "en": "Accept", "ar": "قبول"}, "from": ["new"], "to": "doing"},
+    {"code": "resolve", "name": {"zh": "解决", "en": "Resolve", "ar": "حل"}, "from": ["doing"], "to": "done",
+     "requires": {"fields": [], "comment": true}},
+    {"code": "cancel", "name": {"zh": "作废", "en": "Cancel", "ar": "إلغاء"}, "from": ["new", "doing"], "to": "cancelled",
+     "who": {"participantRoles": ["ASSIGNEE", "REQUESTER"], "roles": [], "groups": [], "perms": []},
+     "requires": {"fields": [], "comment": true}}
+  ],
+  "participantRoles": []
+}
