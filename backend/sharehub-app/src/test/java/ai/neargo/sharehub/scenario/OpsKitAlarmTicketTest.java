@@ -72,6 +72,9 @@ class OpsKitAlarmTicketTest extends ApiTestSupport {
             if (path.startsWith("/tickets/CLOSED-") && path.endsWith("/transitions/cancel")) {
                 status = 422;
                 out = Map.of("error", "opskit.ticket.closed", "message", "ticket closed");
+            } else if (path.startsWith("/tickets/BUSY-")) {
+                status = 409;
+                out = Map.of("error", "opskit.state_changed", "message", "concurrent change");
             } else if (path.startsWith("/tickets/BAD-")) {
                 status = 422;
                 out = Map.of("error", "opskit.validation", "message", "invalid");
@@ -213,7 +216,7 @@ class OpsKitAlarmTicketTest extends ApiTestSupport {
     }
 
     @Test
-    @DisplayName("命令执行器：单已结（422 opskit.ticket.closed）按「已完成」返回、不重投；其他 422 照常抛出进重投")
+    @DisplayName("命令执行器：只有单已结（422 opskit.ticket.closed）按「已完成」；409 并发冲突与其他 422 都抛出进重投，不静默丢")
     void closedTicketIsDone() {
         var closed = new ai.neargo.sharehub.common.event.entity.SysOutbox();
         closed.setEventNo("EVT" + RUN + "C");
@@ -227,6 +230,12 @@ class OpsKitAlarmTicketTest extends ApiTestSupport {
         bad.setPayload(ai.neargo.sharehub.common.Json.write(new ai.neargo.sharehub.api.platform.flow.OpsKitTicketCommand(
                 "alarm", "ALM-Y", "BAD-" + RUN, "COMMENT", Map.of("body", "x"))));
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> executor.deliver(bad)).as("其他 422 要重投，不能吞").isInstanceOf(RuntimeException.class);
+
+        var busy = new ai.neargo.sharehub.common.event.entity.SysOutbox();
+        busy.setEventNo("EVT" + RUN + "S");
+        busy.setPayload(ai.neargo.sharehub.common.Json.write(new ai.neargo.sharehub.api.platform.flow.OpsKitTicketCommand(
+                "alarm", "ALM-Z", "BUSY-" + RUN, "COMMENT", Map.of("body", "x"))));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> executor.deliver(busy)).as("409 state_changed 是并发冲突，要重试").isInstanceOf(RuntimeException.class);
     }
 
     private Resp webhook(String type, String ticketNo, String alarmNo, String seq) throws Exception {

@@ -14,10 +14,13 @@ import java.util.Set;
 /**
  * 执行 {@link OpsKitTicketCommand}（告警联动：提优先级 / 并单 / 评论 / 告警已恢复；方案 23 §十）。
  *
- * <h3>「已经是想要的状态」按成功处理</h3>
+ * <h3>只有「单已结」按成功处理</h3>
  * 对已并 / 已结的单再并、再作废、再改优先级：OpsKit 回 {@code 422 opskit.ticket.closed}（b4045a1f 前是
- * {@code opskit.process.instance_closed}），状态已被人改动回 409 —— 这些说明<b>事情已经不需要做了</b>，
- * 重投只会一直失败到死信。所以记 INFO 后返回；其余失败抛出，交给 outbox 退避重投。
+ * {@code opskit.process.instance_closed}）—— 说明<b>事情已经不需要做了</b>，记 INFO 后返回。
+ *
+ * <p><b>409 不能当完成</b>（OpsKit 会话 9-28 纠正）：{@code state_changed} 是并发改动、{@code idempotency.in_progress}
+ * 是同键上一次还在处理，都该重试（OpsKit 不记 409 的结果，同键重试即可）；{@code idempotency.mismatch} 说明执行器有缺陷。
+ * 所以除「单已结」外一律抛出：可恢复的随 outbox 退避重试成功，不可恢复的耗尽后转死信、记 ERROR，由人处理 —— 不静默丢命令。
  *
  * <p>幂等键取 outbox 事件号：同一条命令无论重投多少次，OpsKit 只执行一次。
  */
@@ -66,8 +69,8 @@ public class OpsKitTicketCommandExecutor implements OutboxConsumer {
             }
             log.info("OpsKit 工单命令已执行 {} ticketNo={} biz={}:{}", c.command(), ticketNo, c.bizType(), c.bizNo());
         } catch (OpsKitClient.Rejected r) {
-            if (r.status == 409 || (r.status == 422 && ALREADY_CLOSED.contains(r.errorKey))) {
-                // 单已结 / 已并 / 已被人接走：这件事已经不需要做了，不重投
+            if (r.status == 422 && ALREADY_CLOSED.contains(r.errorKey)) {
+                // 单已结 / 已并：这件事已经不需要做了，不重投
                 log.info("OpsKit 工单命令无需执行（{} {}）{} ticketNo={}", r.status, r.errorKey, c.command(), ticketNo);
                 return;
             }
