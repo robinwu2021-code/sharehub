@@ -109,6 +109,21 @@
 # **一个 setXxx 都搜不到**，差点被当成死列 —— 它们是用 UpdateWrapper.set("列名", ...)
 # 按列名写的。实体 setter 与 UpdateWrapper 列名是两条写入路径，查一条不够。
 #
+# 同日第六批（钱那一侧剩下的 21 列）：**已核实 134，待核实 146**。
+# 这一批**一个真缺口都没查出来** —— finance 域的守法很统一：要么枚举 .name()、
+# 要么方法开头的白名单（ACTION_RESULT / PAY_CHANNELS / DEBIT-CREDIT 的 else-throw），
+# 而白名单**离 setter 有十几行远**，只看 setter 那一行会连着误判三次（本轮就撞了三次）。
+#
+# ⚠️ pay_auth / pay_order / pay_refund 的 status 带**前提**：它们落的是 PaymentPort
+# 返回的 r.status()，是**支付驱动**给的，不是请求体。当前 StubPaymentPort 返的就是
+# 本仓枚举名，所以成立；接 nearpay 之后那个 Port 实现必须把渠道方状态映射成本仓词表，
+# 原样透传就要把这三行挪回台账。与 stl_withdrawal.approval_state 同类。
+#
+# ⚠️ 两个 `period` 列（stl_adjustment / agt_ops_assessment）不是词表列 ——
+# 装的是 YYYY-MM。它们留在这儿的原因和 usr_invoice_title.vat_trn 一样：
+# 表是空的，取值判据看不到值。表一有数据就会自动掉出去。
+# pay_channel.channel_code 同理是**可扩展的自然键**（STRIPE/TABBY/NEARPAY…）不是固定枚举。
+#
 # ⚠️ 三个「没有任何写入路径」的表/列**故意留在台账上**：
 # ord_exception（create 零调用方）· ord_reservation（只有 page/cancel，一处 insert 都没有）
 # · dev_ota_task（只读）。这里「没人写」不等于安全，等于这个功能没有生产者 ——
@@ -118,9 +133,6 @@
 # acct_account（2）
 acct_account.acct_type
 acct_account.owner_type
-
-# acct_ledger（1）
-acct_ledger.direction
 
 # ad_campaign（1）
 ad_campaign.status
@@ -195,9 +207,6 @@ dev_powerbank.qc_status
 dev_slot.health
 dev_slot.lock_status
 dev_slot.slot_kind
-
-# fin_invoice（1）
-fin_invoice.source_type
 
 # fin_invoice_item（1）
 fin_invoice_item.invoice_side
@@ -350,9 +359,6 @@ ord_order.sub_status
 # ord_reservation（1）
 ord_reservation.type
 
-# pay_auth（1）
-pay_auth.status
-
 # pay_channel（2）
 pay_channel.channel_code
 pay_channel.status
@@ -361,12 +367,8 @@ pay_channel.status
 pay_channel_scope.scope_type
 pay_channel_scope.scope_value
 
-# pay_order（2）
-pay_order.status
+# pay_order（1）
 pay_order.type
-
-# pay_refund（1）
-pay_refund.status
 
 # price_adjustment（1）
 price_adjustment.status
@@ -385,36 +387,8 @@ price_plan_scope.scope_type
 # price_schedule（1）
 price_schedule.mode
 
-# recon_diff（2）
-recon_diff.diff_type
-recon_diff.handle_result
-
-# recon_task（3）
-recon_task.handle_result
-recon_task.handle_status
-recon_task.status
-
-# share_record（1）
-share_record.basis
-
-# stl_adjustment（4）
-stl_adjustment.kind
+# stl_adjustment（1）
 stl_adjustment.period
-stl_adjustment.source
-stl_adjustment.status
-
-# stl_payout_account（1）
-stl_payout_account.status
-
-# stl_settlement（1）
-stl_settlement.status
-
-# stl_settlement_detail（1）
-stl_settlement_detail.ref_type
-
-# stl_withdrawal（2）
-stl_withdrawal.pay_channel
-stl_withdrawal.status
 
 # sys_app_version（2）
 sys_app_version.platform
@@ -477,11 +451,5 @@ usr_notify_pref.category
 # usr_push_token（1）
 usr_push_token.platform
 
-# usr_recharge_order（1）
-usr_recharge_order.status
-
 # usr_recharge_pkg（1）
 usr_recharge_pkg.status
-
-# usr_wallet_txn（1）
-usr_wallet_txn.direction

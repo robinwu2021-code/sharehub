@@ -177,7 +177,31 @@ class VocabularyWriteCoverageTest {
              * 这个布尔，{@code d.result()} 只参与 {@code "WITHDRAWN".equals(...)} 挑措辞，
              * 没有进过这一列。
              */
-            "stl_withdrawal.approval_state"));
+            "stl_withdrawal.approval_state",
+
+            // ——— 2026-09-28 第六批：钱那一侧剩下的 21 列，全部是「读代码核实」，一处新缺口都没有 ———
+            // 这一批一个真缺口都没查出来，值得记一笔：finance 域的守法很统一 ——
+            // 要么枚举 .name()、要么写在方法开头的白名单（ACTION_RESULT / PAY_CHANNELS /
+            // DEBIT-CREDIT 的 else-throw），而白名单**离 setter 有十几行远**。
+            "share_record.basis",                    // 派生自 share_rule.basis（已覆盖）/ 常量 REFER
+            "stl_withdrawal.pay_channel",            // PAY_CHANNELS 白名单（在 setPayChannel 上面五行）
+            "acct_ledger.direction",                 // DEBIT/CREDIT，校验在写入循环之前，非法值 else-throw
+            "usr_wallet_txn.direction",              // amount.signum() > 0 ? IN : OUT
+            "recon_diff.diff_type", "recon_diff.handle_result",
+            "recon_task.handle_result", "recon_task.handle_status", "recon_task.status",
+            "stl_adjustment.kind", "stl_adjustment.source", "stl_adjustment.status",
+            "stl_settlement.status", "stl_settlement_detail.ref_type", "stl_payout_account.status",
+            "stl_withdrawal.status", "usr_recharge_order.status", "fin_invoice.source_type",
+
+            /*
+             * pay_auth / pay_order / pay_refund 的 status 有**同一个前提**，写在这里：
+             * 它们落的是 `r.status()`，而 r 是 {@code PaymentPort} 的返回值 ——
+             * 不是请求体，是**支付驱动**给的。当前 StubPaymentPort 返的就是我们自己的枚举名，
+             * 所以成立；接 nearpay 之后，<b>那个 Port 实现必须把渠道方的状态映射成本仓词表</b>，
+             * 原样透传就等于让外部系统往我们的状态列里写值，这三行要挪回台账。
+             * 与 stl_withdrawal.approval_state 是同一类前提：结论属于「当前写法」，不属于这一列。
+             */
+            "pay_auth.status", "pay_order.status", "pay_refund.status"));
 
     /*
      * ⚠️ 第五批又证了一次「只 grep setXxx 会判错」，而且是反方向：
