@@ -5,6 +5,7 @@ import ai.neargo.opskit.commons.event.EventPublisher;
 import ai.neargo.opskit.commons.id.BizNoGenerator;
 import ai.neargo.opskit.commons.timer.TimerScheduler;
 import ai.neargo.opskit.process.core.app.ApprovalAppService;
+import ai.neargo.opskit.process.core.app.ApprovalTemplateAppService;
 import ai.neargo.opskit.process.core.app.GateTimersAndConfirmations;
 import ai.neargo.opskit.process.core.app.InstanceAppService;
 import ai.neargo.opskit.process.core.app.ProcessDefinitionAppService;
@@ -73,6 +74,12 @@ public class ProcessCoreAutoConfiguration {
             GateTimersAndConfirmations gates, EventPublisher events, BizNoGenerator ids, Clock clock, TransactionOperations tx) {
         return new InstanceAppService(defs, s.instances(), s.participants(), s.scopes(), s.logs(), List.of(tasks, approvals, gates), Optional.of(tasks),
                 events, ids, clock, tx);
+    }
+
+    @Bean
+    ApprovalTemplateAppService approvalTemplateAppService(ProcessStore s, ProcessDefinitionAppService defs, AuditRecorder audit, Clock clock,
+            TransactionOperations tx) {
+        return new ApprovalTemplateAppService(s.definitions(), defs, s.queries(), audit, clock, tx);
     }
 
     @Bean

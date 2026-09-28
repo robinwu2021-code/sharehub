@@ -2,8 +2,6 @@ package ai.neargo.opskit.svc.dev;
 
 import ai.neargo.opskit.commons.actor.Actor;
 import ai.neargo.opskit.commons.actor.PrincipalRef;
-import ai.neargo.opskit.commons.condition.Condition;
-import ai.neargo.opskit.commons.condition.Op;
 import ai.neargo.opskit.commons.i18n.LocalizedText;
 import ai.neargo.opskit.commons.tenancy.AccountId;
 import ai.neargo.opskit.commons.tenancy.TenantContext;
@@ -26,27 +24,17 @@ import ai.neargo.opskit.platform.core.app.DirectoryAppService;
 import ai.neargo.opskit.platform.core.app.FederationAppService;
 import ai.neargo.opskit.platform.core.app.MemberAttrAppService;
 import ai.neargo.opskit.platform.core.app.TenancyAppService;
-import ai.neargo.opskit.process.api.definition.ApprovalMode;
-import ai.neargo.opskit.process.api.definition.ApprovalRules;
-import ai.neargo.opskit.process.api.definition.ApprovalStepDef;
 import ai.neargo.opskit.process.api.definition.ApproverKind;
-import ai.neargo.opskit.process.api.definition.ApproverRef;
-import ai.neargo.opskit.process.api.definition.GateDef;
-import ai.neargo.opskit.process.api.definition.ProcessDef;
-import ai.neargo.opskit.process.api.definition.StatusCategory;
-import ai.neargo.opskit.process.api.definition.StatusDef;
-import ai.neargo.opskit.process.api.definition.TransitionDef;
-import ai.neargo.opskit.process.api.definition.Who;
 import ai.neargo.opskit.process.api.model.StartRequest;
 import ai.neargo.opskit.process.api.model.SubjectRef;
 import ai.neargo.opskit.process.api.model.TransitionRequest;
 import ai.neargo.opskit.process.api.model.query.QueueTask;
 import ai.neargo.opskit.process.api.model.query.TaskQuery;
 import ai.neargo.opskit.process.core.app.InstanceAppService;
-import ai.neargo.opskit.process.core.app.ProcessDefinitionAppService;
+import ai.neargo.opskit.process.core.app.ApprovalTemplateAppService;
+import ai.neargo.opskit.process.api.definition.template.ApprovalTemplate;
 import ai.neargo.opskit.process.core.app.ProcessQueryService;
 import ai.neargo.opskit.process.core.app.TaskAppService;
-import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -83,7 +71,7 @@ public class DevSeed {
     private final FederationAppService federation;
     private final DirectoryAppService directory;
     private final MemberAttrAppService attrs;
-    private final ProcessDefinitionAppService definitions;
+    private final ApprovalTemplateAppService templates;
     private final InstanceAppService instances;
     private final TaskAppService tasks;
     private final ProcessQueryService queries;
@@ -91,12 +79,12 @@ public class DevSeed {
     private volatile Manifest manifest;
 
     public DevSeed(TenancyAppService tenancy, FederationAppService federation, DirectoryAppService directory, MemberAttrAppService attrs,
-            ProcessDefinitionAppService definitions, InstanceAppService instances, TaskAppService tasks, ProcessQueryService queries, String jwksUrl) {
+            ApprovalTemplateAppService templates, InstanceAppService instances, TaskAppService tasks, ProcessQueryService queries, String jwksUrl) {
         this.tenancy = tenancy;
         this.federation = federation;
         this.directory = directory;
         this.attrs = attrs;
-        this.definitions = definitions;
+        this.templates = templates;
         this.instances = instances;
         this.tasks = tasks;
         this.queries = queries;
@@ -125,19 +113,21 @@ public class DevSeed {
 
         directory.upsertRole(app, ws, new RoleUpsert("approver", Map.of("zh", "审批人", "en", "Approver"), Set.of("approval:decide")));
         directory.upsertRole(app, ws, new RoleUpsert("auditor", Map.of("zh", "审计", "en", "Auditor"), Set.of("approval:view:all")));
+        directory.upsertRole(app, ws, new RoleUpsert("flow-admin", Map.of("zh", "流程管理员", "en", "Flow admin"),
+                Set.of("process:manage", "approval:view:all", "directory:manage")));
         attrs.upsert(app, ws, new MemberAttrDef("partyType", Map.of("zh", "身份", "en", "Party", "ar", "الجهة"),
                 Map.of("STAFF", Map.of("zh", "员工", "en", "Staff", "ar", "موظف"), "AGENT", Map.of("zh", "代理", "en", "Agent", "ar", "وكيل"))));
         directory.sync(app, new SyncBatch(SyncBatch.Mode.MERGE,
                 List.of(member("u_alice", "Alice 审批人", "STAFF"), member("u_bob", "Bob 业务员", "AGENT"), member("u_dave", "Dave 财务", "STAFF"),
                         member("u_erin", "Erin 财务", "STAFF"), member("u_frank", "Frank 审核员", "STAFF"), member("u_viewer", "Vera 只读", "STAFF"),
-                        member("u_auditor", "Axel 审计", "STAFF")),
+                        member("u_auditor", "Axel 审计", "STAFF"), member("u_admin", "Ada 流程管理员", "STAFF")),
                 List.of(new GroupUpsert("finance", Map.of("zh", "财务组", "en", "Finance"), GroupKind.TEAM, null, null),
                         new GroupUpsert("review-queue", Map.of("zh", "证据审核队列", "en", "Evidence review"), GroupKind.QUEUE, 120, "CREATED")),
                 Map.of("finance", List.of("u_dave", "u_erin"), "review-queue", List.of("u_alice", "u_frank")),
-                List.of(new RoleBinding("approver", "member:@u_alice"), new RoleBinding("auditor", "member:@u_auditor"))));
+                List.of(new RoleBinding("approver", "member:@u_alice"), new RoleBinding("auditor", "member:@u_auditor"), new RoleBinding("flow-admin", "member:@u_admin"))));
 
-        definitions.publish(app, ws, contractApproval(), "local seed", "API");
-        definitions.publish(app, ws, evidenceReview(), "local seed", "API");
+        templates.publish(app, ws, contractTemplate(), "local seed", "API");
+        templates.publish(app, ws, evidenceTemplate(), "local seed", "API");
 
         Map<String, Persona> personas = new LinkedHashMap<>();
         personas.put("alice", persona(t, "u_alice", List.of(), List.of("site:A"), "第一步候选（角色 approver）· review-queue 组员 · 令牌带 site:A"));
@@ -147,6 +137,7 @@ public class DevSeed {
         personas.put("frank", persona(t, "u_frank", List.of(), List.of(), "review-queue 组员，领着一条任务"));
         personas.put("viewer", persona(t, "u_viewer", List.of("flow:todo:read", "flow:approval:read", "flow:ticket:read"), List.of(), "只读（S5）"));
         personas.put("auditor", persona(t, "u_auditor", List.of(), List.of(), "approval:view:all"));
+        personas.put("admin", persona(t, "u_admin", List.of(), List.of(), "process:manage：发布 / 停用审批模板（S4）"));
 
         Actor bob = actor(t, personas.get("bob"), Set.of());
         Actor alice = actor(t, personas.get("alice"), Set.of("review-queue"));
@@ -200,43 +191,21 @@ public class DevSeed {
         return new LocalizedText(Map.of("zh", zh, "en", en, "ar", ar));
     }
 
-    /** 两步：运营审批（角色 approver，或签）→ 财务会签（组 finance，仅当 needsCosign=true）。 */
-    static ProcessDef contractApproval() {
-        GateDef.Approval gate = new GateDef.Approval(List.of(
-                new ApprovalStepDef("ops", t("运营审批", "Ops review", "مراجعة العمليات"), null,
-                        new ApproverRef(ApproverKind.ROLE, List.of("approver")), ApprovalMode.ANY, Duration.ofHours(24)),
-                new ApprovalStepDef("finance", t("财务会签", "Finance countersign", "توقيع المالية"), new Condition.Compare("needsCosign", Op.EQ, true),
-                        new ApproverRef(ApproverKind.GROUP, List.of("finance")), ApprovalMode.ALL, Duration.ofHours(48))),
-                ApprovalRules.DEFAULT, "approved", "rejected", "withdrawn");
-        Who requester = new Who(Set.of("REQUESTER"), null, null, null);
-        return new ProcessDef("contract_approval", t("合同审批", "Contract approval", "اعتماد العقد"), "draft",
-                List.of(new StatusDef("draft", t("草稿", "Draft", "مسودة"), StatusCategory.NEW, null),
-                        new StatusDef("reviewing", t("审批中", "In review", "قيد المراجعة"), StatusCategory.IN_PROGRESS, gate),
-                        new StatusDef("active", t("已生效", "Active", "سارٍ"), StatusCategory.DONE, null),
-                        new StatusDef("rejected", t("已驳回", "Rejected", "مرفوض"), StatusCategory.CANCELLED, null)),
-                List.of(new TransitionDef("submit", t("提交", "Submit", "إرسال"), Set.of("draft"), "reviewing", requester, null, null, null, false),
-                        new TransitionDef("approved", t("通过", "Approved", "معتمد"), Set.of("reviewing"), "active", null, null, null, null, true),
-                        new TransitionDef("rejected", t("驳回", "Rejected", "مرفوض"), Set.of("reviewing"), "rejected", null, null, null, null, true),
-                        new TransitionDef("withdrawn", t("撤回", "Withdrawn", "مسحوب"), Set.of("reviewing"), "draft", null, null, null, null, true)),
-                Set.of());
+    /** 两步：运营审批（角色 approver，或签）→ 财务会签（组 finance，仅当 needsCosign 为真）。 */
+    static ApprovalTemplate contractTemplate() {
+        return new ApprovalTemplate("contract_approval", t("合同审批", "Contract approval", "اعتماد العقد"), List.of(
+                new ApprovalTemplate.Step("ops", t("运营审批", "Ops review", "مراجعة العمليات"),
+                        new ApprovalTemplate.Approver(ApproverKind.ROLE, List.of("approver")), "ANY", null, 24),
+                new ApprovalTemplate.Step("finance", t("财务会签", "Finance countersign", "توقيع المالية"),
+                        new ApprovalTemplate.Approver(ApproverKind.GROUP, List.of("finance")), "ALL", new ApprovalTemplate.When("needsCosign", "TRUE", null), 48)),
+                ApprovalTemplate.Rules.DEFAULT);
     }
 
-    /** 队列审核：一步，候选是队列组 review-queue（任务进队列，领取后办理）。 */
-    static ProcessDef evidenceReview() {
-        GateDef.Approval gate = new GateDef.Approval(List.of(
-                new ApprovalStepDef("review", t("证据审核", "Evidence review", "مراجعة الأدلة"), null,
-                        new ApproverRef(ApproverKind.GROUP, List.of("review-queue")), ApprovalMode.ANY, Duration.ofHours(4))),
-                ApprovalRules.DEFAULT, "passed", "failed", "withdrawn");
-        Who requester = new Who(Set.of("REQUESTER"), null, null, null);
-        return new ProcessDef("evidence_review", t("证据审核", "Evidence review", "مراجعة الأدلة"), "draft",
-                List.of(new StatusDef("draft", t("草稿", "Draft", "مسودة"), StatusCategory.NEW, null),
-                        new StatusDef("reviewing", t("待审核", "Awaiting review", "بانتظار المراجعة"), StatusCategory.IN_PROGRESS, gate),
-                        new StatusDef("passed", t("已通过", "Passed", "مقبول"), StatusCategory.DONE, null),
-                        new StatusDef("failed", t("未通过", "Failed", "مرفوض"), StatusCategory.CANCELLED, null)),
-                List.of(new TransitionDef("submit", t("提交", "Submit", "إرسال"), Set.of("draft"), "reviewing", requester, null, null, null, false),
-                        new TransitionDef("passed", t("通过", "Pass", "قبول"), Set.of("reviewing"), "passed", null, null, null, null, true),
-                        new TransitionDef("failed", t("不通过", "Fail", "رفض"), Set.of("reviewing"), "failed", null, null, null, null, true),
-                        new TransitionDef("withdrawn", t("撤回", "Withdraw", "سحب"), Set.of("reviewing"), "draft", null, null, null, null, true)),
-                Set.of());
+    /** 队列审核：一步，审批人是队列组 review-queue（任务进队列，领取后办理）。 */
+    static ApprovalTemplate evidenceTemplate() {
+        return new ApprovalTemplate("evidence_review", t("证据审核", "Evidence review", "مراجعة الأدلة"), List.of(
+                new ApprovalTemplate.Step("review", t("证据审核", "Evidence review", "مراجعة الأدلة"),
+                        new ApprovalTemplate.Approver(ApproverKind.GROUP, List.of("review-queue")), "ANY", null, 4)),
+                ApprovalTemplate.Rules.DEFAULT);
     }
 }

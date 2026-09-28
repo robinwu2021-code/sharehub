@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 本地联调的令牌与种子（服务须以 local 配置档运行：scripts/dev-run.sh）。
-#   dev-token.sh alice                 # 按人设签成员令牌（alice / bob / dave / erin / frank / viewer / auditor）
+#   dev-token.sh alice                 # 按人设签成员令牌（alice / bob / dave / erin / frank / viewer / auditor / admin）
 #   dev-token.sh --sub u_x --perms a,b # 不用人设：任意宿主编号（不存在即开通）与宿主权限
 #   dev-token.sh seed                  # 种子清单（账户 · 空间 · 人设 · 单号）
 #   dev-token.sh fixtures              # 生成前端 e2e 夹具（fixtures.opskit.json 的内容，令牌为 alice）

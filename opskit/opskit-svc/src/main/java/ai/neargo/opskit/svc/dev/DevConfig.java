@@ -5,7 +5,7 @@ import ai.neargo.opskit.platform.core.app.FederationAppService;
 import ai.neargo.opskit.platform.core.app.MemberAttrAppService;
 import ai.neargo.opskit.platform.core.app.TenancyAppService;
 import ai.neargo.opskit.process.core.app.InstanceAppService;
-import ai.neargo.opskit.process.core.app.ProcessDefinitionAppService;
+import ai.neargo.opskit.process.core.app.ApprovalTemplateAppService;
 import ai.neargo.opskit.process.core.app.ProcessQueryService;
 import ai.neargo.opskit.process.core.app.TaskAppService;
 import java.nio.file.Path;
@@ -28,9 +28,9 @@ public class DevConfig {
 
     @Bean
     DevSeed devSeed(TenancyAppService tenancy, FederationAppService federation, DirectoryAppService directory, MemberAttrAppService attrs,
-            ProcessDefinitionAppService definitions, InstanceAppService instances, TaskAppService tasks, ProcessQueryService queries,
+            ApprovalTemplateAppService templates, InstanceAppService instances, TaskAppService tasks, ProcessQueryService queries,
             @Value("${opskit.dev.jwks-url:http://localhost:${server.port:8090}/dev/jwks.json}") String jwksUrl) {
-        return new DevSeed(tenancy, federation, directory, attrs, definitions, instances, tasks, queries, jwksUrl);
+        return new DevSeed(tenancy, federation, directory, attrs, templates, instances, tasks, queries, jwksUrl);
     }
 
     @Bean

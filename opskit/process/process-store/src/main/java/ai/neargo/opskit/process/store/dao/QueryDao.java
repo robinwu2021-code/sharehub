@@ -311,6 +311,19 @@ public final class QueryDao {
         return w;
     }
 
+    // ── 定义统计 ────────────────────────────────────────────
+
+    /** 某流程在途（未关闭）的实例数；{@code notOnDefinition} 非空时只数不在该定义行上的（= 还按旧版本走的）。 */
+    public long openInstances(WorkspaceId ws, String processCode, Long notOnDefinition) {
+        String sql = "SELECT COUNT(*) FROM proc_instance WHERE workspace_id = ? AND process_code = ? AND is_open = 1"
+                + (notOnDefinition == null ? "" : " AND definition_id <> ?");
+        List<Object> ps = new ArrayList<>(List.of(ws.value(), processCode));
+        if (notOnDefinition != null) {
+            ps.add(notOnDefinition);
+        }
+        return jdbc.sql(sql).params(ps).query(Long.class).single();
+    }
+
     // ── 共用片段 ────────────────────────────────────────────
 
     private static final String TASK_FROM = "FROM proc_task t JOIN proc_instance i ON i.workspace_id = t.workspace_id AND i.instance_no = t.instance_no";

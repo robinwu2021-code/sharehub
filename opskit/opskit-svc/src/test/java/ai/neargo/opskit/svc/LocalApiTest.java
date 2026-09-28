@@ -118,4 +118,32 @@ class LocalApiTest {
         assertThat(call("POST", BASE + "/api/opskit/v1/workspaces/ext:NOPE/todos/count", token("alice"), Map.of()).status())
                 .as("令牌属于 T001，访问别的租户按不存在").isEqualTo(404);
     }
+
+    @Test
+    void approvalTemplatesPublishIdempotentlyAndReportFieldPaths() throws Exception {
+        String admin = token("admin");
+        Map<String, Object> tpl = Map.of("code", "leave_tpl", "name", Map.of("zh", "请假审批", "en", ""),
+                "steps", List.of(Map.of("code", "lead", "name", Map.of("zh", "主管"), "approver", Map.of("kind", "MEMBER", "value", List.of("mb_x")), "mode", "ANY")),
+                "rules", Map.of("selfApproval", false, "crossStepExclusive", true));
+        Res first = call("PUT", WS + "/approval-templates/leave_tpl", admin, tpl);
+        assertThat(first.status()).isEqualTo(200);
+        assertThat(first.body().get("created").asBoolean()).isTrue();
+        Res again = call("PUT", WS + "/approval-templates/leave_tpl", admin, tpl);
+        assertThat(again.body().get("created").asBoolean()).as("内容没变不出新版本").isFalse();
+        assertThat(again.body().get("version").asText()).isEqualTo(first.body().get("version").asText());
+
+        Res got = call("GET", WS + "/approval-templates/leave_tpl", admin, null);
+        assertThat(got.body().get("steps").get(0).get("approver").get("value").isArray()).as("MEMBER 的 value 是列表").isTrue();
+        assertThat(got.body().get("name").has("en")).as("空白语种不存").isFalse();
+
+        Map<String, Object> bad = Map.of("name", Map.of("zh", "坏的"),
+                "steps", List.of(Map.of("code", "s1", "name", Map.of("zh", "会签"), "approver", Map.of("kind", "ROLE", "value", "approver"), "mode", "ALL")));
+        Res rejected = call("PUT", WS + "/approval-templates/bad_tpl", admin, bad);
+        assertThat(rejected.status()).isEqualTo(422);
+        assertThat(rejected.body().get("errors").get(0).get("path").asText()).isEqualTo("steps[0].mode");
+
+        assertThat(call("PUT", WS + "/approval-templates/leave_tpl", token("alice"), tpl).status()).as("无 process:manage").isEqualTo(403);
+        List<String> codes = call("GET", WS + "/approval-templates", token("alice"), null).body().valueStream().map(n -> n.get("code").asText()).toList();
+        assertThat(codes).contains("contract_approval", "evidence_review", "leave_tpl");
+    }
 }
