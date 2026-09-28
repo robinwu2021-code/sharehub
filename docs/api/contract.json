@@ -37153,6 +37153,10 @@
     {
      "name": "failReason",
      "type": "String"
+    },
+    {
+     "name": "sameOperator",
+     "type": "boolean"
     }
    ],
    "requestShape": null
@@ -37255,6 +37259,10 @@
     {
      "name": "failReason",
      "type": "String"
+    },
+    {
+     "name": "sameOperator",
+     "type": "boolean"
     }
    ],
    "requestShape": [
@@ -37393,6 +37401,10 @@
     {
      "name": "failReason",
      "type": "String"
+    },
+    {
+     "name": "sameOperator",
+     "type": "boolean"
     }
    ],
    "requestShape": [
@@ -37511,6 +37523,10 @@
     {
      "name": "failReason",
      "type": "String"
+    },
+    {
+     "name": "sameOperator",
+     "type": "boolean"
     }
    ],
    "requestShape": [
@@ -45938,6 +45954,10 @@
    "CONFIRMED",
    "SETTLED",
    "VOID"
+  ],
+  "WithdrawalSeparation": [
+   "REQUIRE",
+   "WARN"
   ],
   "AdjustmentKind": [
    "DEPOSIT_REFUND",

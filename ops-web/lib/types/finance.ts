@@ -149,6 +149,12 @@ export interface Withdrawal extends AuditTrail {
   payRef: string | null;   // 渠道流水号：银行回单号 / nearpay 打款单号
   payerName: string | null; // 登记回执的人。与 auditorName 分开，才查得出是不是同一个人放的款
   failReason: string | null; // 打款失败原因。**不是** rejectReason（那是审批驳回）
+  /**
+   * 审批人与放款人是否同一人。**在放款那一刻由服务端定格**，不是前端拿两个名字比 ——
+   * auditorName / payerName 是展示名，会重名；而这条是合规事实，要落在行上。
+   * REQUIRE 模式下不会为 true（那时直接拦住了）；WARN / OFF 才可能。
+   */
+  sameOperator: boolean;
   paidAt: string | null;
 }
 

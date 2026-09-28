@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { BizTimezoneCard } from "@/components/system/biz-timezone-card";
+import { WithdrawalSeparationCard } from "@/components/system/withdrawal-separation-card";
 import { Input, Select } from "@/components/ui/input";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { ShowArchivedToggle, archivedRowClass, ArchivedAt, ArchiveActions, archiveConfirm, unarchiveConfirm } from "@/components/archive";
@@ -1156,6 +1157,7 @@ function SystemInner() {
         （2026-09-28 裁决：UTC+4 阿联酋，可配，改动需 system:param:update）
       */}
       {tab === "params" && <BizTimezoneCard canEdit={canParam} />}
+      {tab === "params" && <WithdrawalSeparationCard canEdit={canParam} />}
       {tab === "params" && <DataTable rowKey={(p: SysParam) => p.paramKey} columns={paramCols} rows={q.data?.list as SysParam[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无系统参数——超时/重试等全局开关都在这里，未配置时按代码默认值运行" />}
       {tab === "openapi" && <DataTable rowKey={(a: OpenApiApp) => a.appNo} columns={openapiCols} rows={q.data?.list as OpenApiApp[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无 OpenAPI 应用——还没有合作方接入，需要对外开放接口时在此新增应用并分配 AppKey" />}
       {tab === "markets" && <DataTable rowKey={(m: MarketCountry) => m.countryCode} columns={marketCols} rows={q.data?.list as MarketCountry[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无国家市场——开城前需先登记国家、币种与合规主体，否则该国无法上线" />}

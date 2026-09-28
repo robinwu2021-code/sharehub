@@ -178,6 +178,9 @@ export const withdrawals: Withdrawal[] = Array.from({ length: 20 }, (_, i) => {
     payChannel: paidOrPayoutFailed(status, i) ? p(["MANUAL", "NEARPAY"] as const, i) : null,
     payRef: paidOrPayoutFailed(status, i) ? `REF${20260900 + i}` : null,
     payerName: paidOrPayoutFailed(status, i) ? p(["Sara Ahmed", "admin"], i) : null,
+    // 种子里按「两个名字相同」推 —— 真实判定在服务端比 userNo，mock 只需形状自洽
+    sameOperator: paidOrPayoutFailed(status, i)
+      && p(["Sara Ahmed", "admin"], i) === (audited ? p(["Sara Ahmed", "Omar Khan", "admin"], i) : null),
     paidAt: status === "PAID" ? iso(i * 43200_000 - 3600_000) : null,
   };
 });
@@ -699,6 +702,7 @@ export function applyWithdrawal(req: WithdrawApplyPayload, applicantNo?: string)
     // 审批四件套一律留空：这张单子还没人看过
     auditorName: null, auditedAt: null, rejectReason: null,
     payChannel: null, payRef: null, payerName: null, failReason: null, paidAt: null,
+    sameOperator: false,   // 还没放款，谈不上同一人
   };
   // 新单排在最前 —— 列表默认按申请时间倒序，追加到末尾的话提交完看不见自己刚提的那张
   withdrawals.unshift(w);
@@ -740,7 +744,17 @@ export function payWithdrawal(withdrawNo: string, body: PayReceiptPayload, payer
 
   w.payChannel = body.channel;
   w.payRef = ref;
-  w.payerName = payerName || "admin";
+  const payer = payerName || "admin";
+  w.payerName = payer;
+  /*
+   * 与服务端同形：放款那一刻定格「审批人与放款人是否同一人」。
+   * mock 只有名字可比（没有 userNo），所以这里比名字 —— 服务端比的是 userNo，
+   * 因为展示名会重名、会改。形状一致即可，判得准不准由后端那四条用例守。
+   *
+   * **mock 不实现三态拦截**：REQUIRE/WARN/OFF 读的是系统参数，属于服务端口径；
+   * mock 照旧放行并落标记，避免这里与服务端各写一套三态而慢慢漂开。
+   */
+  w.sameOperator = !!w.auditorName && w.auditorName === payer;
   if (body.success) {
     w.status = "PAID";
     w.paidAt = new Date().toISOString();

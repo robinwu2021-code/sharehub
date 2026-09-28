@@ -67,6 +67,14 @@ const RULE_VIEWS = [{ key: "VENUE", label: "按场地方看" }, { key: "AGENT", 
 const RULE_VIEW_LABEL = { VENUE: "场地方", AGENT: "代理商" } as const;
 const SUMMARY_PERIODS = ["2026-07", "2026-06", "2026-05"];
 const PERIOD_OPTIONS = SUMMARY_PERIODS.map((p) => ({ value: p, label: p }));
+/**
+ * 「同一人经办」徽标。单键 map 而不是内联 tone —— 规范要求状态展示统一走 StatusBadge，
+ * 文案与色调成对定义在一处（见 design-tokens 的内联 tone 棘轮）。
+ */
+const SAME_OPERATOR: StatusMap<"SAME"> = {
+  SAME: { label: "同一人经办", tone: "warning" },
+};
+
 const RECHARGE_STATUS: StatusMap<RechargeOrder["status"]> = {
   PENDING: { label: "待支付", tone: "warning" },
   PAID: { label: "已支付", tone: "success" },
@@ -743,7 +751,19 @@ function FinanceInner() {
     { header: "状态", cell: (w) => <StatusBadge map={WD_STATUS} value={w.status} /> },
     { header: "申请时间", cell: (w) => <span className="text-muted-foreground">{fmtTime(w.appliedAt)}</span> },
     // 审批留痕三列：谁批的 / 何时批的 / 驳回为什么
-    { header: "审批人", cell: (w) => w.auditorName ?? <span className="text-muted-foreground">未审批</span> },
+    {
+      header: "审批人",
+      cell: (w) => (
+        <div className="flex items-center gap-1.5">
+          <span>{w.auditorName ?? <span className="text-muted-foreground">未审批</span>}</span>
+          {/*
+            同一人既审批又放款 —— 标出来，否则这条合规规则没有观察面。
+            只在 WARN / OFF 配置下才会出现（REQUIRE 直接拦住了）。
+          */}
+          {w.sameOperator && <StatusBadge map={SAME_OPERATOR} value="SAME" />}
+        </div>
+      ),
+    },
     { header: "审批时间", cell: (w) => <span className="text-muted-foreground">{w.auditedAt ? fmtTime(w.auditedAt) : "-"}</span> },
     /*
      * 「没通过」有两种，分两列显示而不是合成一列：
