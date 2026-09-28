@@ -8,6 +8,7 @@ export default {
     login: "登录",
     logout: "退出登录",
     loading: "加载中…",
+    loadFailed: "没能加载出来，请检查网络后重试",
     retry: "重试",
     currency: "AED",
     mock: "演示数据",

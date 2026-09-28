@@ -8,6 +8,7 @@ export default {
     login: "Log in",
     logout: "Log out",
     loading: "Loading…",
+    loadFailed: "Couldn't load. Check your connection and try again",
     retry: "Retry",
     currency: "AED",
     mock: "Mock",

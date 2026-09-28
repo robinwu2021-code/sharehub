@@ -22,6 +22,9 @@ function goLogin() {
 }
 const all = ref<ConsumerOrder[]>([]);
 const loading = ref(true);
+// 加载失败与「没有订单」分开：此前失败也渲染成「暂无订单」——真机上 USB 断线时就是这个样子，
+// 屏幕上说的是一句确定的假话，而用户刚借还过一单
+const failed = ref(false);
 const filter = ref("all");
 
 const ONGOING: OrderStatus[] = ["CREATED", "DISPENSING", "IN_USE", "RETURNED"];
@@ -50,9 +53,12 @@ async function load() {
     return;
   }
   loading.value = true;
+  failed.value = false;
   try {
     const r = await api.listOrders();
     all.value = r.list;
+  } catch {
+    failed.value = true;
   } finally {
     loading.value = false;
   }
@@ -109,6 +115,13 @@ function detail(o: ConsumerOrder) {
             <pb-button size="lg" @click="goLogin">{{ $t("common.login") }}</pb-button>
           </view>
         </pb-card>
+        <pb-empty
+          v-else-if="!loading && failed"
+          icon="info"
+          :text="$t('common.loadFailed')"
+          :action-text="$t('common.retry')"
+          @action="load"
+        />
         <pb-empty v-else-if="!loading && !list.length" :text="$t('orders.none')" />
       </view>
     </view>
