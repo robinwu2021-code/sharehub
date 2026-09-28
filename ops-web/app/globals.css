@@ -589,3 +589,24 @@ body {
 [data-style="clean"][lang="ar"] body { font-family: var(--font-plex-ar), -apple-system, "Segoe UI", sans-serif; }
 [data-style="clean"] .txt-body { line-height: 1.6; }
 
+
+/* ── 经典风格：大气一点、有呼吸感（用户 2026-09-28 定：只改经典风格、适度放松）─────────────
+   原先的局促：内容区上边距 8px（页头贴顶栏）、页面标题 18px 与卡片标题 14px 拉不开层级、卡片内边距 20 / 间距 16、
+   中文用 IBM Plex Sans SC（字形窄长，密排显挤）、正文行高 1.5、按钮 12px / 600 显重。
+   适度放松 = 留白与层级加大，表格行高（56）不动 —— 一屏行数基本不变。亮色暗色都生效。
+   字体：中文改系统字（苹方 / 雅黑）；拉丁与数字**保留 IBM Plex**（规范当初选它为数字辨识度，经典风格留住这一点）；阿语不变。 */
+[data-style="classic"] body {
+  font-family: var(--font-plex), "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", var(--font-plex-ar),
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.6;
+}
+[data-style="classic"] .txt-body { line-height: 1.6; }
+[data-style="classic"] [data-shell="sheet"] main > div { padding: 24px 32px 40px; }
+[data-style="classic"] main h1.txt-title { font-size: 22px; line-height: 1.3; letter-spacing: -0.3px; }
+[data-style="classic"] main h2.txt-strong { font-size: 16px; font-weight: 600; }
+[data-style="classic"] main [data-surface="card"].p-5 { padding: 24px; }
+[data-style="classic"] main [data-surface="stat"] { padding: 20px; }
+[data-style="classic"] main .mb-4 { margin-bottom: 20px; }
+[data-style="classic"] main .gap-4 { gap: 20px; }
+[data-style="classic"] main .space-y-4 > * + * { margin-top: 20px; }
+[data-style="classic"] main [data-variant] { font-size: 13px; font-weight: 500; }
