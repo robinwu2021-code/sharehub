@@ -125,6 +125,29 @@ describe("httpFlow：错误体映射", () => {
     expect(e.errors).toEqual([{ path: "steps[0].mode", error: "会签不可用于角色" }]);
   });
 
+  it("建单 422：整体键与逐条键都换本地文案；不认识的键原样留着（9-28 对真 OpsKit 实测形状）", async () => {
+    const { flow } = await load();
+    const { isValidationError } = await import("./errors");
+    reply(422, { error: "opskit.ticket.field_invalid", message: "invalid ticket", errors: [
+      { path: "priority", error: "opskit.ticket.unknown_option" }, { path: "fields.site", error: "opskit.validation.required" },
+      { path: "fields.x", error: "opskit.ticket.brand_new_key" }] });
+    const e = await flow.createTicket({ typeCode: "repair", title: "x", priority: "LOW" }).catch((x) => x);
+    expect(isValidationError(e)).toBe(true);
+    expect(e.message).toBe("工单内容有误");
+    expect(e.errors).toEqual([{ path: "priority", error: "不是可选的选项" }, { path: "fields.site", error: "必填" },
+      { path: "fields.x", error: "opskit.ticket.brand_new_key" }]);
+  });
+
+  it("评论带可见范围；应答即完整时间线，不再多 GET 一次", async () => {
+    const { flow } = await load();
+    reply(200, [{ seq: 1, atMs: 1, kind: "COMMENT", title: "备注", detail: "x", hot: false, visibility: "PUBLIC" }]);
+    const tl = await flow.comment("RP1", "x", "PUBLIC");
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toMatch(/\/tickets\/RP1\/comments$/);
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({ body: "x", visibility: "PUBLIC" });
+    expect(tl[0].visibility).toBe("PUBLIC");
+  });
+
   it("403 / 409 → ApiError，服务端本地化 message 优先", async () => {
     const { flow } = await load();
     reply(409, { error: "opskit.task.already_claimed", message: "已被 Sara 领取" });
@@ -140,11 +163,21 @@ describe("httpFlow：错误体映射", () => {
     expect(e.message).toMatch(/跨步互斥/);
   });
 
-  it("我已领取：只发 {assignee:me, claimed:true}，不带 status（领取后是 CLAIMED，与 OPEN 交集为空）", async () => {
+  it("我已领取：发 {assignee:me, claimed:true, kind:APPROVAL}，不带 status（领取后是 CLAIMED，与 OPEN 交集为空）", async () => {
     const { flow } = await load();
     reply(200, { list: [], total: 0, page: 1, size: 200 });
     await flow.myClaimed();
-    expect(JSON.parse(String(calls[0].init.body))).toEqual({ assignee: "me", claimed: true, page: 1, size: 200 });
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({ assignee: "me", claimed: true, kind: "APPROVAL", page: 1, size: 200 });
+  });
+
+  it("审核队列只要审批任务：队列计数与队列列表都带 kind=APPROVAL（队列组也用于工单派单）", async () => {
+    const { flow } = await load();
+    reply(200, []);
+    await flow.queueCounts();
+    reply(200, { list: [], total: 0, page: 1, size: 20 });
+    await flow.queueTasks("review-queue", 1, 20);
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({ kind: "APPROVAL" });
+    expect(JSON.parse(String(calls[1].init.body))).toMatchObject({ queueGroup: "review-queue", kind: "APPROVAL" });
   });
 
   it("没有 message 时按状态码给本地化兜底文案，不抛原始 JSON", async () => {

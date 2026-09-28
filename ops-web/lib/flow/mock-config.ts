@@ -233,7 +233,8 @@ export function upsertSlaPolicy(p: SlaPolicy, isNew = false): { version: string;
   const codes = new Set(p.metrics.map((m) => m.code));
   if (!p.targets.length) e.push({ path: "targets", error: "至少要有一行目标" });
   p.targets.forEach((t, i) => {
-    if (!t.when && i !== p.targets.length - 1) e.push({ path: `targets[${i}].when`, error: "兜底行（不带条件）只能是最后一行，否则它后面的行永远匹配不到" });
+    // 与 OpsKit SlaPolicyValidator 同口径：错误挂在兜底行「后面那一行」（它才是永远匹配不到的）
+    if (!t.when && i !== p.targets.length - 1) e.push({ path: `targets[${i + 1}]`, error: "兜底行（不带条件）后面的这一行永远匹配不到 —— 兜底行只能放最后" });
     for (const [k, v] of Object.entries(t.targetsMin)) {
       if (!codes.has(k)) e.push({ path: `targets[${i}].targetsMin.${k}`, error: `指标 ${k} 不在本策略的指标里` });
       else if (!(v > 0)) e.push({ path: `targets[${i}].targetsMin.${k}`, error: "时限必须大于 0 分钟" });

@@ -9,6 +9,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { flow, FLOW_KEY } from "@/lib/flow/client";
 import { useFlowT } from "@/lib/flow/i18n";
+import { useTicketTypes } from "@/lib/flow/options";
 import { isValidationError } from "@/lib/flow/errors";
 import type { FieldError, I18nText, SlaCondition, SlaPolicy, SlaTarget } from "@/lib/flow/types";
 import { notify } from "@/lib/notify";
@@ -20,7 +21,6 @@ import { Notice } from "@/components/ui/notice";
 import { DataTable, type Column } from "@/components/ui/data-table";
 
 const STD = ["FIRST_RESPONSE", "RESOLUTION"] as const;
-const PRIORITIES = ["URGENT", "HIGH", "NORMAL", "LOW"] as const;
 const FALLBACK = "*";
 const ADVANCED = "__advanced";
 
@@ -35,6 +35,9 @@ const pick = (t: I18nText, locale: keyof I18nText) => t[locale] || t.en || t.zh 
 export function SlaPolicies({ calendarsDemo }: { calendarsDemo?: boolean }) {
   const qc = useQueryClient();
   const { t, tc, locale } = useFlowT("sla");
+  // 行条件里的优先级取自工单类型的优先级选项集（代号与名称都由租户定，如 P1 紧急），前端不内置
+  const ticketTypes = useTicketTypes();
+  const priorities = [...new Map(ticketTypes.flatMap((ty) => ty.priorityOptions.map((o) => [o.code, o.name] as const))).entries()];
   const list = useQuery({ queryKey: [...FLOW_KEY, "sla-policies"], queryFn: flow.slaPolicies });
   const cals = useQuery({ queryKey: [...FLOW_KEY, "calendars"], queryFn: flow.calendars });
   const [editing, setEditing] = useState<{ p: SlaPolicy; isNew: boolean } | null>(null);
@@ -167,7 +170,9 @@ export function SlaPolicies({ calendarsDemo }: { calendarsDemo?: boolean }) {
                           {k === ADVANCED ? <span className="txt-caption text-muted-foreground">{t("target.advanced")}</span> : (
                             <Select className="w-44" value={k} aria-label={t("target.when")}
                               onChange={(e) => setRow(i, (x) => { const v = e.target.value; x.when = v === FALLBACK ? undefined : { field: "priority", op: "EQ", value: v }; })}>
-                              {PRIORITIES.map((pr) => <option key={pr} value={pr}>{t("target.priority", { p: t(`priority.${pr}`) })}</option>)}
+                              {/* 已存的代号不在任何类型的选项里（类型改过）时也列出来，原样显示代号，不让它悄悄变成别的 */}
+                              {(priorities.some(([c]) => c === k) || k === FALLBACK ? priorities : [...priorities, [k, k] as const])
+                                .map(([code, name]) => <option key={code} value={code}>{t("target.priority", { p: name })}</option>)}
                               <option value={FALLBACK}>{t("target.fallback")}</option>
                             </Select>
                           )}
@@ -201,11 +206,11 @@ export function SlaPolicies({ calendarsDemo }: { calendarsDemo?: boolean }) {
             </div>
           )}
           {calendarsDemo && <p className="mt-2 txt-caption text-muted-foreground">{t("calendarPending")}</p>}
-          <Button className="mt-3" size="sm" variant="secondary" disabled={timed.length === 0}
+          <Button className="mt-3" size="sm" variant="secondary" disabled={timed.length === 0 || priorities.length === 0}
             onClick={() => set((x) => {
               // 新行插在兜底行之前（兜底必须最后）；没有兜底行时追加
               const at = x.targets.length && !x.targets[x.targets.length - 1].when ? x.targets.length - 1 : x.targets.length;
-              x.targets.splice(at, 0, { when: { field: "priority", op: "EQ", value: "HIGH" }, targetsMin: {} });
+              x.targets.splice(at, 0, { when: { field: "priority", op: "EQ", value: priorities[0]?.[0] ?? "" }, targetsMin: {} });
             })}>
             <Plus className="size-4" /> {t("target.add")}
           </Button>

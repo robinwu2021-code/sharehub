@@ -4,7 +4,7 @@ const zh = {
   tab: { unclaimed: "待领 {n}" },
   col: { subject: "对象", priority: "优先级", wait: "等待", evidence: "证据", status: "状态", actions: "操作" },
   status: { reviewing: "{name} 审核中", unclaimed: "待领" },
-  btn: { approve: "通过", reject: "驳回", release: "放回", claim: "领取" },
+  btn: { approve: "通过", reject: "驳回", release: "放回", claim: "领取", work: "去工单办理" },
   toast: { claimed: "已领取，30 分钟内完成审核", released: "已放回队列", approved: "已通过", rejected: "已驳回" },
   mine: {
     title: "我在审（{n}）",
@@ -24,7 +24,7 @@ const en = {
   tab: { unclaimed: "{n} unclaimed" },
   col: { subject: "Object", priority: "Priority", wait: "Waiting", evidence: "Evidence", status: "Status", actions: "Actions" },
   status: { reviewing: "{name} reviewing", unclaimed: "Unclaimed" },
-  btn: { approve: "Approve", reject: "Reject", release: "Release", claim: "Claim" },
+  btn: { approve: "Approve", reject: "Reject", release: "Release", claim: "Claim", work: "Work on ticket" },
   toast: { claimed: "Claimed — finish the review within 30 minutes", released: "Released back to the queue", approved: "Approved", rejected: "Rejected" },
   mine: {
     title: "My reviews ({n})",
@@ -43,7 +43,7 @@ const ar = {
   tab: { unclaimed: "{n} غير مستلَم" },
   col: { subject: "الكائن", priority: "الأولوية", wait: "الانتظار", evidence: "الأدلة", status: "الحالة", actions: "الإجراءات" },
   status: { reviewing: "{name} يراجع", unclaimed: "غير مستلَم" },
-  btn: { approve: "موافقة", reject: "رفض", release: "إرجاع", claim: "استلام" },
+  btn: { approve: "موافقة", reject: "رفض", release: "إرجاع", claim: "استلام", work: "العمل على التذكرة" },
   toast: { claimed: "تم الاستلام، أكمل المراجعة خلال 30 دقيقة", released: "أُعيد إلى الطابور", approved: "تمت الموافقة", rejected: "تم الرفض" },
   mine: {
     title: "قيد مراجعتي ({n})",

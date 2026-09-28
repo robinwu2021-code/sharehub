@@ -146,9 +146,38 @@ export interface TicketQuery {
 
 export type TicketFilter = Omit<TicketQuery, "page" | "size">;
 
+/** 工单类型的选项（优先级 / 字段选项 / 解决结果）：名称已按语言选好；停用的选项不能用于新值 */
+export interface TicketTypeOption { code: string; name: string; enabled: boolean }
+
+/** 工单类型字段的类型（21/06 §七；与 OpsKit FieldType 一一对应） */
+export type TicketFieldType =
+  | "TEXT" | "LONG_TEXT" | "NUMBER" | "MONEY" | "DATETIME" | "SELECT" | "MULTI_SELECT"
+  | "MEMBER" | "GROUP" | "ATTACHMENT" | "REF";
+
+export interface TicketTypeField {
+  code: string;
+  name: string;
+  type: TicketFieldType;
+  required: boolean;
+  /** 建单时可填；false 的字段建单时给值会被拒（not_on_create） */
+  onCreate: boolean;
+  filterable?: boolean;
+  options?: TicketTypeOption[];
+}
+
 /**
- * 建单（21/06 §五 POST /workspaces/{ws}/tickets）。界面上的「手工建单」只用到其中一部分；
- * 字段按类型的字段配置走 fields（手工建单暂不填类型字段，来源由服务记为手工）。
+ * 工单类型（GET ticket-types）。建单表单由它驱动：优先级只能取本类型的 priorityOptions，
+ * 必填且 onCreate 的字段必须在建单时给 —— 前端不内置优先级代号或字段（不同租户、不同类型各不相同）。
+ */
+export interface TicketTypeDef extends Named {
+  enabled: boolean;
+  priorityOptions: TicketTypeOption[];
+  fields: TicketTypeField[];
+}
+
+/**
+ * 建单（21/06 §五 POST /workspaces/{ws}/tickets）。类型字段走 fields（原始值：选项给代号、多选给代号数组、数字给数值），
+ * 必填与可填范围按类型的字段配置（onCreate）；界面上的「手工建单」只收其中五种字段类型。
  */
 export interface CreateTicketRequest {
   typeCode: string;
@@ -221,7 +250,12 @@ export interface TimelineEvent {
   detail?: string;
   /** 需要强调的事件（如超时、驳回） */
   hot: boolean;
+  /** 评论的可见范围：INTERNAL 只有持内部评论权限的人看得到（服务端已按权限滤掉，前端只负责标出来） */
+  visibility?: CommentVisibility;
 }
+
+/** 评论可见范围（21/06 O3-7）：PUBLIC 参与方都能看；INTERNAL 仅内部（ShareHub：员工可发，代理不可发也看不到） */
+export type CommentVisibility = "PUBLIC" | "INTERNAL";
 
 // ── 审批（21/06 §四）─────────────────────────────────────────────────────
 export type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED" | "WITHDRAWN";
@@ -294,6 +328,11 @@ export interface QueueCount {
 
 export interface QueueTask {
   taskNo: string;
+  /**
+   * APPROVAL 审批任务（本页通过 / 驳回）；WORK 工单办理任务（队列组也可用于工单派单，完成靠工单迁移，
+   * 服务端拒绝对它 complete）—— 本页只让领取与放回，办理去工单详情。缺省按 APPROVAL。
+   */
+  kind?: "APPROVAL" | "WORK";
   queue: Named;
   subject: SubjectRef;
   /** 流程任务可能不给 */

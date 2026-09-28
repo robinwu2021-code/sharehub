@@ -15,9 +15,11 @@ describe("待办", () => {
     const n = (q: Parameters<typeof queryTodos>[0]) => queryTodos({ ...q, page: 1, size: 200 }, NOW).total;
     expect(c.all).toBe(n({ origin: "ALL", page: 1, size: 1 }));
     expect(c.process).toBe(n({ origin: "PROCESS", page: 1, size: 1 }));
-    expect(c.ticket).toBe(n({ origin: "TICKET", claimable: false, page: 1, size: 1 }));
+    expect(c.ticket).toBe(n({ origin: "TICKET", page: 1, size: 1 }));
     expect(c.claimable).toBe(n({ origin: "ALL", claimable: true, page: 1, size: 1 }));
-    expect(c.all).toBe(c.process + c.ticket + c.claimable);
+    // 与 OpsKit 同口径（9-28 对真服务实测）：按来源切分；可抢是横切，与前两者重叠
+    expect(c.all).toBe(c.process + c.ticket);
+    expect(c.claimable).toBeGreaterThan(0);
   });
 
   it("最紧的排最前", () => {
@@ -34,7 +36,10 @@ describe("待办", () => {
     expect(t.statusCategory).toBe("IN_PROGRESS");
     const after = countTodos(NOW);
     expect(after.claimable).toBe(before.claimable - 1);
-    expect(after.ticket).toBe(before.ticket + 1);
+    // 工单页签按来源算：抢之前就在里面（池里），抢之后仍在，只是不再是可抢
+    expect(after.ticket).toBe(before.ticket);
+    const mine = queryTodos({ origin: "TICKET", page: 1, size: 200 }, NOW).list.find((x) => x.ticketNo === pool.ticketNo);
+    expect(mine?.claimable).toBe(false);
   });
 
   it("同一张单不能被抢两次", () => {
@@ -128,9 +133,9 @@ describe("工单详情", () => {
   it("撤单必须填原因；迁移、备注、改派都进时间线（新的在上）", () => {
     expect(() => transitionTicket("WO26092701", "CANCEL", NOW)).toThrow(/原因/);
     transitionTicket("WO26092701", "ACCEPT", NOW);
-    addComment("WO26092701", "已联系场地方", NOW + 1000);
+    addComment("WO26092701", "已联系场地方", "INTERNAL", NOW + 1000);
     const tl = getTimeline("WO26092701");
-    expect(tl[0]).toMatchObject({ kind: "COMMENT", detail: "已联系场地方", actor: { ref: "admin" }, hot: false });
+    expect(tl[0]).toMatchObject({ kind: "COMMENT", detail: "已联系场地方", actor: { ref: "admin" }, hot: false, visibility: "INTERNAL" });
     expect(tl[1].title).toMatch(/接单：待接单 → 处理中/);
   });
 
@@ -149,20 +154,29 @@ describe("手工建单（21/06 §五 POST tickets）", () => {
   it("校验一次给全、路径按字段；合法的新开进抢单池、出现在可抢待办", async () => {
     const { createTicket } = await import("./mock-db");
     const { isValidationError } = await import("./errors");
-    let err: unknown;
-    try { createTicket({ typeCode: "nope", title: " ", priority: "X", subject: { type: "cabinet", ref: " " } }, NOW); } catch (e) { err = e; }
-    expect(isValidationError(err) && err.errors.map((x) => x.path).sort()).toEqual(["priority", "subject", "title", "typeCode"]);
-    const r = createTicket({ typeCode: "ops", title: "机柜离线", priority: "HIGH", subject: { type: "cabinet", ref: "CAB9001" } }, NOW);
+    const paths = (fn: () => unknown) => {
+      try { fn(); } catch (e) { return isValidationError(e) ? e.errors.map((x) => x.path).sort() : e; }
+      return null;
+    };
+    expect(paths(() => createTicket({ typeCode: "nope", title: " ", subject: { type: "cabinet", ref: " " } }, NOW)))
+      .toEqual(["subject", "title", "typeCode"]);
+    // 与 OpsKit 同口径：优先级只认本类型的选项集；未知字段、必填缺失都按 fields.<code> 报
+    expect(paths(() => createTicket({ typeCode: "ops", title: "x", priority: "P1", fields: { nope: "1" } }, NOW)))
+      .toEqual(["fields.nope", "fields.source", "priority"]);
+    expect(paths(() => createTicket({ typeCode: "ops", title: "x", fields: { source: "BOGUS" } }, NOW))).toEqual(["fields.source"]);
+    const r = createTicket({ typeCode: "ops", title: "机柜离线", priority: "HIGH", subject: { type: "cabinet", ref: "CAB9001" },
+      fields: { source: "PATROL", sourceRef: "PT1" } }, NOW);
     expect(r.attached).toBe(false);
-    expect(r.ticket).toMatchObject({ status: { code: "PENDING_ACCEPT" }, priority: { code: "HIGH" }, fields: { source: { value: "MANUAL" } } });
+    expect(r.ticket).toMatchObject({ status: { code: "PENDING_ACCEPT" }, priority: { code: "HIGH" },
+      fields: { source: { value: "PATROL" }, sourceRef: { value: "PT1" } } });
     expect(queryTodos({ origin: "ALL", claimable: true, page: 1, size: 200 }, NOW).list.map((x) => x.ticketNo)).toContain(r.ticket.ticketNo);
     expect(getTimeline(r.ticket.ticketNo)[0]).toMatchObject({ kind: "CREATED" });
   });
 
   it("去重键命中未结单 → 并入它（attached），不另开；已结的不算", async () => {
     const { createTicket } = await import("./mock-db");
-    const a = createTicket({ typeCode: "ops", title: "告警 ALM9", dedupeKey: "ALM9" }, NOW);
-    const b = createTicket({ typeCode: "ops", title: "告警 ALM9 再报", dedupeKey: "ALM9" }, NOW + 1000);
+    const a = createTicket({ typeCode: "ops", title: "告警 ALM9", dedupeKey: "ALM9", fields: { source: "ALARM" } }, NOW);
+    const b = createTicket({ typeCode: "ops", title: "告警 ALM9 再报", dedupeKey: "ALM9", fields: { source: "ALARM" } }, NOW + 1000);
     expect(b).toMatchObject({ attached: true, ticket: { ticketNo: a.ticket.ticketNo } });
     expect(getTimeline(a.ticket.ticketNo)[0]).toMatchObject({ kind: "DEDUPE" });
   });

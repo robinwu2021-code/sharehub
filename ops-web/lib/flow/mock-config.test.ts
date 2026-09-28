@@ -104,7 +104,7 @@ describe("SLA 策略（后端 O2-8 的通用形状）", () => {
     base.targets = [{ targetsMin: { RESOLUTION: 60 } }, { when: { field: "priority", op: "EQ", value: "HIGH" }, targetsMin: { NOPE: 5, RESOLUTION: 0 }, calendar: "nope" }];
     const e = caught(() => upsertSlaPolicy(base));
     expect(isValidationError(e) && e.errors.map((x) => x.path).sort()).toEqual(
-      ["targets[0].when", "targets[1].calendar", "targets[1].targetsMin.NOPE", "targets[1].targetsMin.RESOLUTION"]);
+      ["targets[1]", "targets[1].calendar", "targets[1].targetsMin.NOPE", "targets[1].targetsMin.RESOLUTION"]);
   });
 
   it("新建：代号格式与唯一；至少一个指标、一行目标、名称至少一种语言", () => {

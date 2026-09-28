@@ -5,7 +5,7 @@ const zh = {
   empty: {
     all: "你现在没有待办 —— 新的审批与派给你的工单会出现在这里",
     process: "没有等你审批的单",
-    ticket: "没有派给你、还没办完的工单",
+    ticket: "没有待你办理或可以领取的工单",
     pool: "抢单池里暂时没有你够资格领的单",
   },
   col: { kind: "类型", title: "标题", subject: "业务对象", priority: "优先级", sla: "剩余时限" },
@@ -22,7 +22,7 @@ const en = {
   empty: {
     all: "Nothing to do right now — new approvals and tickets assigned to you will show up here",
     process: "No approvals waiting for you",
-    ticket: "No open tickets assigned to you",
+    ticket: "No tickets for you to work on or claim",
     pool: "Nothing in the pool you are eligible to claim right now",
   },
   col: { kind: "Type", title: "Title", subject: "Business object", priority: "Priority", sla: "Time left" },
@@ -38,7 +38,7 @@ const ar = {
   empty: {
     all: "لا توجد مهام الآن — ستظهر هنا الموافقات الجديدة والتذاكر المسندة إليك",
     process: "لا توجد موافقات بانتظارك",
-    ticket: "لا توجد تذاكر مفتوحة مسندة إليك",
+    ticket: "لا توجد تذاكر لتعمل عليها أو تستلمها",
     pool: "لا يوجد في المجمّع حاليًا ما يحق لك استلامه",
   },
   col: { kind: "النوع", title: "العنوان", subject: "كائن العمل", priority: "الأولوية", sla: "الوقت المتبقي" },

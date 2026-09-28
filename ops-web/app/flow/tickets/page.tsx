@@ -8,9 +8,10 @@ import { NeedPerm } from "@/components/flow/need-perm";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { flow, FLOW_KEY } from "@/lib/flow/client";
-import type { Member, TicketRow, TicketFilter, TicketStat } from "@/lib/flow/types";
+import type { Member, TicketFieldType, TicketRow, TicketFilter, TicketStat, TicketTypeDef, TicketTypeOption } from "@/lib/flow/types";
 import { usePaging } from "@/lib/hooks/use-paging";
 import { notify } from "@/lib/notify";
+import { isValidationError } from "@/lib/flow/errors";
 import { PageTitle } from "@/components/ui/misc";
 import { Toolbar } from "@/components/ui/toolbar";
 import { FilterChips } from "@/components/ui/filter-chips";
@@ -20,7 +21,7 @@ import type { Column } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
-import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
+import { FormDrawer, type FieldDef, type FieldType } from "@/components/ui/form-drawer";
 import { SlaCell } from "@/components/flow/sla-cell";
 import { StatStrip } from "@/components/flow/stat-strip";
 import { PriorityBadge, TicketStatusBadge } from "@/components/flow/badges";
@@ -48,30 +49,69 @@ const reassignFields = (tt: TicketsT, members: Member[], membersHelp?: string): 
 ];
 type TicketsT = (k: FlowKey<"tickets">, p?: Record<string, string | number>) => string;
 
-const CREATE_PRIORITIES = ["URGENT", "HIGH", "NORMAL", "LOW"] as const;
 const SUBJECT_TYPES = ["cabinet", "site", "user"] as const;
+/** 类型字段在表单里的键前缀：与固定项（title、priority…）隔开，字段代号由租户定义，可能重名 */
+const FIELD_KEY = "f.";
+/** OpsKit 字段类型 → 表单控件。日期时间、金额、成员、组、附件、引用建单页暂不收（帮助文字里点名，不静默丢） */
+const FORM_TYPE: Partial<Record<TicketFieldType, FieldType>> = {
+  TEXT: "text", LONG_TEXT: "textarea", NUMBER: "number", SELECT: "select", MULTI_SELECT: "multiselect",
+};
+const TEXT_MAX = 255;
+/**
+ * 必填下拉要带空项：没有空项时，状态是空、浏览器却显示第一项 —— 用户以为选了，提交报「不能为空」，
+ * 且再选同一项 React 不认为有变化（9-28 e2e 实测）。
+ */
+const usable = (pick: string, o?: TicketTypeOption[]) =>
+  [{ value: "", label: pick }, ...(o ?? []).filter((x) => x.enabled).map((x) => ({ value: x.code, label: x.name }))];
 /**
  * @form-none 手工建单提交到 OpsKit（opskit-svc 的 POST /workspaces/{ws}/tickets，21/06 §五），
  * 不是 ShareHub 后端，contract.json 管不到；字段以 21/06 为准，经 lib/flow/client 转发。
+ * 表单由所选工单类型驱动：优先级取类型的选项集，类型里 onCreate 的字段逐个出控件（必填照类型）。
  */
-const createFields = (tt: TicketsT, types: { value: string; label: string }[]): FieldDef[] => [
-  { key: "typeCode", label: tt("create.field.typeCode"), type: "select", required: true, options: types },
-  { key: "title", label: tt("create.field.title"), required: true, maxLength: 80, help: tt("create.field.titleHelp") },
-  { key: "priority", label: tt("create.field.priority"), type: "select", required: true,
-    options: CREATE_PRIORITIES.map((p) => ({ value: p, label: tt(`create.priority.${p}`) })) },
-  { key: "subjectType", label: tt("create.field.subjectType"), type: "select",
-    options: [{ value: "", label: tt("create.subject.none") }, ...SUBJECT_TYPES.map((s) => ({ value: s, label: tt(`create.subject.${s}`) }))] },
-  { key: "subjectRef", label: tt("create.field.subjectRef"), help: tt("create.field.subjectRefHelp"), disabledWhen: (v) => !v.subjectType },
-  { key: "description", label: tt("create.field.description"), type: "textarea", rows: 4, maxLength: 1000 },
-  { key: "dedupeKey", label: tt("create.field.dedupeKey"), help: tt("create.field.dedupeKeyHelp"), maxLength: 128 },
-];
+const createFields = (tt: TicketsT, listSep: string, types: TicketTypeDef[], type?: TicketTypeDef): FieldDef[] => {
+  const onCreate = (type?.fields ?? []).filter((f) => f.onCreate);
+  const skipped = onCreate.filter((f) => !FORM_TYPE[f.type]);
+  return [
+    { key: "typeCode", label: tt("create.field.typeCode"), type: "select", required: true,
+      options: [{ value: "", label: tt("create.field.pick") }, ...types.filter((t) => t.enabled).map((t) => ({ value: t.code, label: t.name }))],
+      help: skipped.length ? tt("create.field.skipped", { list: skipped.map((f) => f.name).join(listSep) }) : undefined },
+    { key: "title", label: tt("create.field.title"), required: true, maxLength: 80, help: tt("create.field.titleHelp") },
+    { key: "priority", label: tt("create.field.priority"), type: "select", required: true,
+      options: usable(tt("create.field.pick"), type?.priorityOptions), disabledWhen: (v) => !v.typeCode },
+    ...onCreate.filter((f) => FORM_TYPE[f.type]).map((f): FieldDef => ({
+      key: FIELD_KEY + f.code, label: f.name, type: FORM_TYPE[f.type], required: f.required,
+      ...(f.options ? { options: f.type === "SELECT" ? usable(tt("create.field.pick"), f.options) : usable("", f.options).slice(1) } : {}),
+      ...(f.type === "TEXT" ? { maxLength: TEXT_MAX } : {}),
+    })),
+    { key: "subjectType", label: tt("create.field.subjectType"), type: "select",
+      options: [{ value: "", label: tt("create.subject.none") }, ...SUBJECT_TYPES.map((s) => ({ value: s, label: tt(`create.subject.${s}`) }))] },
+    { key: "subjectRef", label: tt("create.field.subjectRef"), help: tt("create.field.subjectRefHelp"), disabledWhen: (v) => !v.subjectType },
+    { key: "description", label: tt("create.field.description"), type: "textarea", rows: 4, maxLength: 1000 },
+    { key: "dedupeKey", label: tt("create.field.dedupeKey"), help: tt("create.field.dedupeKeyHelp"), maxLength: 128 },
+  ];
+};
+
+/** 表单值 → 类型字段的原始值（与 OpsKit FieldValues 的入参同形：选项给代号、多选给代号数组、数字给数值）；空值不发 */
+function typeFieldValues(type: TicketTypeDef | undefined, form: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const f of type?.fields ?? []) {
+    if (!f.onCreate || !FORM_TYPE[f.type]) continue;
+    const v = form[FIELD_KEY + f.code];
+    if (v == null || v === "" || (Array.isArray(v) && v.length === 0)) continue;
+    if (f.type === "NUMBER") out[f.code] = Number(v);
+    else if (f.type === "MULTI_SELECT") out[f.code] = Array.isArray(v) ? v : String(v).split(",").filter(Boolean);
+    else out[f.code] = typeof v === "string" ? v.trim() : v;
+  }
+  return out;
+}
 
 function FlowTickets() {
   const qc = useQueryClient();
   const { t: tt, tc, fmt } = useFlowT("tickets");
   const allow = useCan();
   // 筛选项都来自服务（工单类型 / 成员属性定义），不在前端内置业务词（21/06 §七）
-  const typeOptions = useTicketTypes().map((t) => ({ value: t.code, label: t.name }));
+  const ticketTypes = useTicketTypes();
+  const typeOptions = ticketTypes.map((t) => ({ value: t.code, label: t.name }));
   const partyOptions = usePartyOptions().map((p) => ({ value: p.code, label: p.name }));
   const members = useMembers();
   // 行内的迁移动作（接单 / 升级 / 复核…）不在前端判权：服务端给的 actions[] 已按当前操作人算好，
@@ -81,8 +121,15 @@ function FlowTickets() {
   const canCreate = allow("flow:ticket:handle");
   const router = useRouter();
   const [createOpen, setCreateOpen] = useState(false);
-  const blankCreate = { typeCode: "", title: "", priority: "NORMAL", subjectType: "", subjectRef: "", description: "", dedupeKey: "" };
+  const blankCreate = { typeCode: "", title: "", priority: "", subjectType: "", subjectRef: "", description: "", dedupeKey: "" };
   const [createForm, setCreateForm] = useState<Record<string, unknown>>(blankCreate);
+  const createType = ticketTypes.find((t) => t.code === createForm.typeCode);
+  /** 换类型：优先级与类型字段都属于旧类型，清掉（留着会提交别的类型的代号，被服务拒） */
+  const onCreateChange = (next: Record<string, unknown>) => {
+    if (next.typeCode === createForm.typeCode) return setCreateForm(next);
+    const kept = Object.fromEntries(Object.entries(next).filter(([k]) => !k.startsWith(FIELD_KEY)));
+    setCreateForm({ ...kept, priority: "" });
+  };
   const paging = usePaging();
   const [keyword, setKeyword] = useState("");
   const [typeCode, setTypeCode] = useState("");
@@ -122,6 +169,7 @@ function FlowTickets() {
       const str = (k: string) => String(f[k] ?? "").trim();
       return flow.createTicket({
         typeCode: str("typeCode"), title: str("title"), priority: str("priority") || undefined,
+        ...(() => { const fields = typeFieldValues(createType, f); return Object.keys(fields).length ? { fields } : {}; })(),
         ...(str("description") ? { description: str("description") } : {}),
         ...(str("subjectType") && str("subjectRef") ? { subject: { type: str("subjectType"), ref: str("subjectRef") } } : {}),
         ...(str("dedupeKey") ? { dedupeKey: str("dedupeKey") } : {}),
@@ -129,12 +177,23 @@ function FlowTickets() {
     },
     onSuccess: (r) => {
       if (r.attached) notify.info(tt("create.attached", { no: r.ticket.ticketNo }));
+      // 派单策略可能建单即派人（OpsKit 的类型可配），按返回的受理人如实说
+      else if (r.ticket.assignee) notify.success(tt("create.doneAssigned", { no: r.ticket.ticketNo, name: r.ticket.assignee.displayName }));
       else notify.success(tt("create.done", { no: r.ticket.ticketNo }));
       setCreateOpen(false);
       refresh();
       router.push(`/flow/tickets/detail/?no=${r.ticket.ticketNo}`);
     },
-    onError: (e: Error) => notify.error(fmt.fail(e)),
+    // 422 逐条说「哪个字段：什么问题」—— 路径按表单反查标签（fields.<code> → 类型字段名）
+    onError: (e: Error) => {
+      if (!isValidationError(e)) return notify.error(e.message);
+      const defs = createFields(tt, tc("listSep"), ticketTypes, createType);
+      const label = (path: string) => {
+        const key = path.startsWith("fields.") ? FIELD_KEY + path.slice(7) : path === "subject" ? "subjectRef" : path;
+        return defs.find((d) => d.key === key)?.label ?? path;
+      };
+      notify.error(`${e.message}${tc("colon")}${e.errors.map((x) => `${label(x.path)}${tc("colon")}${x.error}`).join(tc("listSep"))}`);
+    },
   });
   const reassign = useMutation({
     mutationFn: () => {
@@ -269,9 +328,9 @@ function FlowTickets() {
         titleNew={tt("create.title")}
         titleEdit=""
         isEdit={false}
-        fields={createFields(tt, typeOptions)}
+        fields={createFields(tt, tc("listSep"), ticketTypes, createType)}
         value={createForm}
-        onChange={setCreateForm}
+        onChange={onCreateChange}
         onSubmit={() => create.mutate()}
         submitting={create.isPending}
       />

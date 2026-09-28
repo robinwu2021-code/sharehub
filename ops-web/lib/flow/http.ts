@@ -80,7 +80,10 @@ export async function opskit<T>(method: "GET" | "POST" | "PUT" | "PATCH", path: 
     // 已知错误键用本地三语文案（服务对这些键不给文案）；其余用服务的 message，再退状态码兜底
     const known = data.error ? errText((k, p) => translate(locale(), k, p), data.error) : undefined;
     const msg = (known && known !== data.error ? known : "") || data.message || translate(locale(), statusKey(r.status));
-    if (r.status === 422 && Array.isArray(data.errors)) throw new FlowValidationError(msg, data.errors);
+    // 逐条错误的 error 也是键（opskit.validation.required…）：一并换成本地文案；不认识的原样留着，看得到键比空白好查
+    if (r.status === 422 && Array.isArray(data.errors)) {
+      throw new FlowValidationError(msg, data.errors.map((x) => ({ ...x, error: errText((k, p) => translate(locale(), k, p), x.error) })));
+    }
     throw new ApiError(r.status, msg);
   }
   return data;

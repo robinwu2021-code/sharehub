@@ -13,7 +13,7 @@ export const SCENARIOS = [
     run: async (h) => {
       for (const tab of [/^全部/, /^审批/, /^工单/, /^可抢单/]) {
         await h.click("button", tab, String(tab));
-        // 0 是合法的角标（真服务上工单模块未上线，工单页签恒为 0）—— 别让 waitFor 把 0 当「没取到」
+        // 0 是合法的角标（某个页签可能确实为空）—— 别让 waitFor 把 0 当「没取到」
         const n = await h.num(() => h.tabNum(tab), "页签数字");
         await h.sleep(250);
         const total = h.total() ?? h.rows().length;
@@ -237,12 +237,52 @@ export const SCENARIOS = [
   },
 
   {
-    id: "S6-4", modes: ["mock"], title: "工单：手工建单后进详情；空标题被拒", perms: ALL, url: () => "/flow/tickets/",
+    id: "S6-5", title: "工单列表：按单号搜索收窄到这一张；点进详情是同一张", perms: ALL, url: () => "/flow/tickets/",
+    run: async (h, fx) => {
+      await h.waitFor(() => h.rows().length, "列表加载");
+      const all = h.total() ?? h.rows().length;
+      h.expect(!!fx.ticketAssigned, `夹具里有工单号（${fx.ticketAssigned || "空"}）`);
+      const box = await h.waitFor(() => h.one("[data-surface=toolbar] input"), "搜索框");
+      h.fill(box, fx.ticketAssigned);
+      await h.waitFor(() => h.rows().length === 1 && h.txt(h.rows()[0]).includes(fx.ticketAssigned), "只剩这一张");
+      h.expect(all >= 1, `全部 ${all} 条 → 搜 ${fx.ticketAssigned} 剩 1 条`);
+      h.rows()[0].querySelector("a[href*='/flow/tickets/detail/']").click();
+      await h.waitFor(() => /tickets\/detail/.test(location.pathname) && h.bodyText().includes(fx.ticketAssigned), "详情是同一张");
+    },
+  },
+
+  {
+    id: "S6-6", title: "工单详情：勾掉「仅内部」发公开备注，进时间线",
+    perms: ALL, url: (fx) => `/flow/tickets/detail/?no=${fx.ticketAssigned}`,
+    run: async (h) => {
+      const ta = await h.waitFor(() => h.one("main textarea"), "备注框");
+      const text = `现场已联系（e2e ${Date.now() % 100000}）`;
+      const internal = await h.waitFor(() => h.all("main [role=checkbox]").find((x) => /仅内部/.test(h.txt(x.closest("label") ?? x.parentElement))), "仅内部勾选");
+      if (internal.getAttribute("aria-checked") === "true") internal.click();
+      await h.waitFor(() => internal.getAttribute("aria-checked") === "false", "已切到公开");
+      h.fill(ta, text);
+      await h.click("main button", "提交备注");
+      await h.toast(/备注已提交/, "备注已提交");
+      await h.waitFor(() => h.bodyText().includes(text), "时间线里出现这条备注");
+      h.expect(true, "公开备注进了时间线");
+    },
+  },
+
+  {
+    id: "S6-4", modes: ["mock", "opskit"], title: "工单：表单按类型出优先级与必填字段；空标题被拒；建单后进详情",
+    perms: ALL, url: () => "/flow/tickets/",
     run: async (h) => {
       await h.click("button", /新建工单/);
       const dr = await h.waitFor(() => h.one("[role=dialog]"), "建单抽屉");
-      const selects = dr.querySelectorAll("select");
-      h.fill(selects[0], [...selects[0].options].find((o) => o.value)?.value ?? "");
+      const typeSel = dr.querySelector("select");
+      h.fill(typeSel, [...typeSel.options].find((o) => o.value)?.value ?? "");
+      // 选了类型才出本类型的优先级选项与字段（mock：来源；真服务 repair：站点、来源）
+      await h.waitFor(() => dr.querySelectorAll("select").length >= 3 && [...dr.querySelectorAll("select")][1].options.length > 1, "类型驱动的字段出现");
+      for (const sel of [...dr.querySelectorAll("select")].slice(1)) {
+        if (sel.value || [...sel.options].some((o) => /不涉及/.test(o.textContent))) continue;
+        h.fill(sel, [...sel.options].find((o) => o.value)?.value ?? "");
+        await h.sleep(50);
+      }
       await h.click("[role=dialog] button", /^(保存|提交|确定|确认)$/, "提交");
       await h.sleep(300);
       h.expect(!!h.one("[role=dialog]"), "标题为空时抽屉不关（前端必填拦下）");
@@ -276,11 +316,21 @@ export const SCENARIOS = [
   {
     id: "S7-2", title: "对账：从实例列表进入，能看到该业务对象名下的实例与审批", perms: ALL, url: () => "/flow/instances/",
     run: async (h) => {
-      const link = await h.waitFor(() => h.one("[data-slot=tbody] a[href*='/flow/instances/subject/']"), "对账链接");
-      link.click();
-      await h.waitFor(() => /对账：/.test(h.bodyText()), "进入对账页");
-      await h.waitFor(() => h.all("a[href*='/flow/instances/detail/']").length >= 1, "至少一个实例");
-      h.expect(h.all("a[href*='/flow/approvals/detail/']").length >= 1, "列出了名下的审批");
+      // 列表里既有审批流程也有工单流程（工单名下没有审批）：逐个对象进对账页，找到一个名下有审批的即可
+      await h.waitFor(() => h.one("[data-slot=tbody] a[href*='/flow/instances/subject/']"), "对账链接");
+      const hrefs = [...new Set(h.all("[data-slot=tbody] a[href*='/flow/instances/subject/']").map((a) => a.getAttribute("href")))].slice(0, 8);
+      let hit = "";
+      for (const href of hrefs) {
+        const a = await h.waitFor(() => h.all("[data-slot=tbody] a").find((x) => x.getAttribute("href") === href), "对账链接");
+        a.click();
+        await h.waitFor(() => /对账：/.test(h.bodyText()), "进入对账页");
+        await h.waitFor(() => h.all("a[href*='/flow/instances/detail/']").length >= 1, "至少一个实例");
+        await h.sleep(300);
+        if (h.all("a[href*='/flow/approvals/detail/']").length >= 1) { hit = href; break; }
+        history.back();
+        await h.waitFor(() => /\/flow\/instances\/?$/.test(location.pathname) && h.one("[data-slot=tbody] a"), "回到实例列表");
+      }
+      h.expect(!!hit, `列出了名下的审批（试了 ${hrefs.length} 个对象）`);
     },
   },
   {
@@ -316,7 +366,8 @@ export const SCENARIOS = [
       if (rows.length >= 2) {
         h.fill(rows[0].querySelector("select"), "*");
         await h.click("[data-slot=sla-editor] button", "保存并发布");
-        await h.waitFor(() => /targets\[0\]/.test(h.txt(ed)), "错误挂到 targets[0]");
+        // 服务把错误挂在兜底行后面那一行（永远匹配不到的是它），mock 同口径
+        await h.waitFor(() => /targets\[1\]/.test(h.txt(ed)), "错误挂到 targets[1]");
         h.expect(true, "兜底行不在最后被拒");
       } else {
         h.step("该策略只有一行，跳过兜底行校验");

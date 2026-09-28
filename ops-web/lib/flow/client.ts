@@ -14,7 +14,7 @@ import type {
   AppRow, ApprovalTemplate, DefinitionVersionRow, DeliveryRow, PublishResult, QueueGroup, TemplateSummary, TemplateVersion,
   SlaPolicy, WorkCalendar, HistoryEntry, InstanceQuery, InstanceRow, ProcessStats, ProcessStatsQuery, SubjectHistory,
   ApprovalQuery, ApprovalRow, ApprovalStatus, ApprovalView, Member, Named, Page, QueueCount, QueueTask, TicketQuery,
-  CreateTicketRequest, CreateTicketResult, ReassignResult, TicketRow, TicketStat, TicketView, TimelineEvent, TodoCount, TodoItem, TodoQuery,
+  CommentVisibility, CreateTicketRequest, CreateTicketResult, TicketTypeDef, ReassignResult, TicketRow, TicketStat, TicketView, TimelineEvent, TodoCount, TodoItem, TodoQuery,
 } from "./types";
 
 /** 模拟网络往返：让加载态、按钮 loading 在 mock 下也真实出现 */
@@ -42,7 +42,7 @@ const mockFlow = {
   /** GET /workspaces/{ws}/tickets/{no}/timeline */
   timeline: (no: string): Promise<TimelineEvent[]> => tick(() => db.getTimeline(no)),
   /** POST /workspaces/{ws}/tickets/{no}/comments */
-  comment: (no: string, body: string): Promise<TimelineEvent[]> => tick(() => db.addComment(no, body)),
+  comment: (no: string, body: string, visibility: CommentVisibility): Promise<TimelineEvent[]> => tick(() => db.addComment(no, body, visibility)),
   /** POST /workspaces/{ws}/tickets/{no}/assign {to, reason}（to 必填） */
   assign: (no: string, to: Member, reason: string): Promise<TicketRow> => tick(() => db.assignTicket(no, to, reason)),
   /** POST /workspaces/{ws}/tickets/{no}/pool {reason}：退回抢单池 */
@@ -54,7 +54,7 @@ const mockFlow = {
   /** POST /workspaces/{ws}/members/query：改派候选 / 提交人筛选。给 total —— 超出一页时页面要说「只列了前 N 人」，不静默截断 */
   members: (): Promise<Page<Member>> => tick(() => ({ list: db.ASSIGNEE_OPTIONS, total: db.ASSIGNEE_OPTIONS.length })),
   /** GET /workspaces/{ws}/ticket-types（名称已按语言选好） */
-  ticketTypes: (): Promise<Named[]> => tick(() => db.TICKET_TYPES),
+  ticketTypes: (): Promise<TicketTypeDef[]> => tick(() => db.TICKET_TYPES),
   /** 成员属性 partyType 的取值与显示名（21/07 O1-12 成员属性定义） */
   partyOptions: (): Promise<Named[]> => tick(() => db.PARTY_OPTIONS),
 
@@ -167,10 +167,9 @@ const httpFlow: typeof mockFlow = {
   transition: (no, code, comment) => POST(ws(`/tickets/${enc(no)}/transitions/${enc(code)}`), comment ? { comment } : {}),
   ticket: (no) => GET(ws(`/tickets/${enc(no)}`)),
   timeline: (no) => GET(ws(`/tickets/${enc(no)}/timeline`)),
-  comment: async (no, body) => {
-    await POST(ws(`/tickets/${enc(no)}/comments`), { body, visibility: "INTERNAL" });
-    return GET(ws(`/tickets/${enc(no)}/timeline`));
-  },
+  /** 应答即写后的完整时间线（98b3ad0e），不用再 GET 一次 */
+  comment: (no, body, visibility) => POST(ws(`/tickets/${enc(no)}/comments`), { body, visibility }),
+
   assign: (no, to, reason) => POST(ws(`/tickets/${enc(no)}/assign`), { to: `member:${to.ref}`, reason }),
   pool: (no, reason) => POST(ws(`/tickets/${enc(no)}/pool`), { reason }),
   /** 勾选式：{ticketNos[≤200], to, reason}（另一式按原受理人 {from, …} 界面不用）；逐单结果 */
@@ -192,10 +191,11 @@ const httpFlow: typeof mockFlow = {
   processOptions: async () => (await GET<{ code: string; name: string }[]>(ws("/approval-templates"))).map(({ code, name }) => ({ code, name })),
   requesterOptions: async () => (await httpFlow.members()).list.map((m) => ({ code: m.ref, name: m.displayName })),
 
-  queueCounts: () => POST(ws("/tasks/queue-counts"), {}),
+  // kind：审核队列只要审批任务（队列组也会用于工单派单）；服务端未支持前会被忽略，页面对 WORK 行另有兜底
+  queueCounts: () => POST(ws("/tasks/queue-counts"), { kind: "APPROVAL" }),
   /** {queueGroup?, status?[], claimed?, assignee?: "me" | memberId}（后端 9-28 确认） */
-  queueTasks: (queue, page, size) => POST(ws("/tasks/query"), { queueGroup: queue, status: ["OPEN"], claimed: false, page, size }),
-  myClaimed: async () => (await POST<{ list: Awaited<ReturnType<typeof mockFlow.myClaimed>> }>(ws("/tasks/query"), { assignee: "me", claimed: true, page: 1, size: 200 })).list,
+  queueTasks: (queue, page, size) => POST(ws("/tasks/query"), { queueGroup: queue, kind: "APPROVAL", status: ["OPEN"], claimed: false, page, size }),
+  myClaimed: async () => (await POST<{ list: Awaited<ReturnType<typeof mockFlow.myClaimed>> }>(ws("/tasks/query"), { assignee: "me", claimed: true, kind: "APPROVAL", page: 1, size: 200 })).list,
   claimTask: (taskNo) => POST(ws(`/tasks/${enc(taskNo)}/claim`)),
   releaseTask: (taskNo) => POST(ws(`/tasks/${enc(taskNo)}/release`)),
   completeTask: (taskNo, decision, reason) => POST(ws(`/tasks/${enc(taskNo)}/complete`), { decision, ...(reason ? { reason } : {}) }),

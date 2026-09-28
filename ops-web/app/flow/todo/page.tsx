@@ -27,7 +27,8 @@ type TabKey = "all" | "process" | "ticket" | "pool";
 const TAB_QUERY: Record<TabKey, Pick<TodoQuery, "origin" | "claimable">> = {
   all: { origin: "ALL" },
   process: { origin: "PROCESS" },
-  ticket: { origin: "TICKET", claimable: false },
+  // 页签按来源切（与 OpsKit todos/count 同口径：all = process + ticket）；「可抢单」是横切的一栏，与前两者有重叠
+  ticket: { origin: "TICKET" },
   pool: { origin: "ALL", claimable: true },
 };
 

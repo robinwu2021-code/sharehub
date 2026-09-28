@@ -3,6 +3,7 @@
 // 审核队列（原型 P3）：领取后才能决定；领取超时 30 分钟自动放回并留痕（服务端读时放回，这里只显示倒计时）。
 import { NeedPerm } from "@/components/flow/need-perm";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { flow, FLOW_KEY } from "@/lib/flow/client";
 import type { QueueTask } from "@/lib/flow/types";
@@ -87,8 +88,15 @@ function FlowQueue() {
       header: tt("col.actions"), className: "text-end",
       cell: (t) => (
         <span className="inline-flex gap-2">
-          <Button size="sm" disabled={busy} onClick={() => complete.mutate({ t, d: "APPROVE" })}>{tt("btn.approve")}</Button>
-          <Button size="sm" variant="destructive" disabled={busy} onClick={() => setRejecting(t)}>{tt("btn.reject")}</Button>
+          {t.kind === "WORK" ? (
+            <Link href={`/flow/tickets/detail/?no=${encodeURIComponent(t.subject.ref)}`}
+              className="txt-strong text-primary underline-offset-2 hover:underline">{tt("btn.work")}</Link>
+          ) : (
+            <>
+              <Button size="sm" disabled={busy} onClick={() => complete.mutate({ t, d: "APPROVE" })}>{tt("btn.approve")}</Button>
+              <Button size="sm" variant="destructive" disabled={busy} onClick={() => setRejecting(t)}>{tt("btn.reject")}</Button>
+            </>
+          )}
           <Button size="sm" variant="secondary" disabled={busy} onClick={() => release.mutate(t.taskNo)}>{tt("btn.release")}</Button>
         </span>
       ),

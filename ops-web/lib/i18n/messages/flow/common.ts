@@ -38,6 +38,17 @@ const zh = {
     template: { countersign_not_enumerable: "会签只能用于成员 / 组 / 字段指定（角色、权限码的人选不可枚举）", code_taken: "这个代号已被一条流程占用" },
     state_changed: "这张单已被他人处理，请刷新后再看",
     permission: { denied: "服务端拒绝：当前身份没有这项权限，请联系管理员在流程平台里开通" },
+    ticket: {
+      field_invalid: "工单内容有误", unknown_option: "不是可选的选项", option_disabled: "这个选项已停用", unknown_field: "本类型没有这个字段",
+      not_on_create: "建单时不能填", expect_text: "应为文字", expect_number: "应为数字", expect_option: "应为一个选项", expect_option_list: "应为一组选项",
+      type_disabled: "这个工单类型已停用", unknown_type: "工单类型不存在", unknown_transition: "当前状态不能做这个操作", closed: "工单已结",
+    },
+    validation: { required: "必填", too_long: "太长了", too_many: "太多了", one_of: "取值不在允许范围内", duplicate: "重复了" },
+    sla: {
+      unreachable_target: "这一行永远匹配不到：前面有兜底行（不带条件），兜底行只能放最后", unknown_metric: "本策略没有这个指标",
+      never_starts: "这个指标永远不会开始计时", never_stops: "这个指标永远不会停止计时", stop_on_create: "不能在建单时就停止计时",
+      metric_code_format: "指标代号格式不对", unknown_policy: "SLA 策略不存在",
+    },
   },
 };
 type M = typeof zh;
@@ -78,6 +89,17 @@ const en = {
     template: { countersign_not_enumerable: "\"All must approve\" only works with members, groups or a submitted field (roles and permissions cannot be enumerated)", code_taken: "This code is already used by a process" },
     state_changed: "Someone else has already handled this — refresh and try again",
     permission: { denied: "Refused by the service: your identity lacks this permission — ask an administrator to grant it in the workflow platform" },
+    ticket: {
+      field_invalid: "The ticket has invalid fields", unknown_option: "Not one of the options", option_disabled: "This option is disabled", unknown_field: "This type has no such field",
+      not_on_create: "Cannot be set when creating", expect_text: "Should be text", expect_number: "Should be a number", expect_option: "Should be one option", expect_option_list: "Should be a list of options",
+      type_disabled: "This ticket type is disabled", unknown_type: "Ticket type not found", unknown_transition: "This action is not available in the current status", closed: "The ticket is closed",
+    },
+    validation: { required: "Required", too_long: "Too long", too_many: "Too many", one_of: "Not an allowed value", duplicate: "Duplicate" },
+    sla: {
+      unreachable_target: "This row can never match: a catch-all row (no condition) comes before it — the catch-all must be last", unknown_metric: "This policy has no such metric",
+      never_starts: "This metric would never start", never_stops: "This metric would never stop", stop_on_create: "Cannot stop timing on creation",
+      metric_code_format: "Invalid metric code", unknown_policy: "SLA policy not found",
+    },
   },
 } satisfies M;
 
@@ -117,6 +139,17 @@ const ar = {
     template: { countersign_not_enumerable: "الموافقة الجماعية تصلح فقط للأعضاء أو المجموعات أو حقل مُرسَل (لا يمكن حصر الأدوار والصلاحيات)", code_taken: "هذا الرمز مستخدم في مسار آخر" },
     state_changed: "عالج شخص آخر هذا الطلب — حدّث الصفحة وأعد المحاولة",
     permission: { denied: "رفضت الخدمة: هويتك لا تملك هذه الصلاحية — اطلب من المسؤول منحها في منصة سير العمل" },
+    ticket: {
+      field_invalid: "في التذكرة حقول غير صالحة", unknown_option: "ليس من الخيارات المتاحة", option_disabled: "هذا الخيار معطّل", unknown_field: "لا يوجد هذا الحقل في هذا النوع",
+      not_on_create: "لا يمكن تعيينه عند الإنشاء", expect_text: "يجب أن يكون نصًا", expect_number: "يجب أن يكون رقمًا", expect_option: "يجب أن يكون خيارًا واحدًا", expect_option_list: "يجب أن يكون قائمة خيارات",
+      type_disabled: "نوع التذكرة هذا معطّل", unknown_type: "نوع التذكرة غير موجود", unknown_transition: "هذا الإجراء غير متاح في الحالة الحالية", closed: "التذكرة مغلقة",
+    },
+    validation: { required: "إلزامي", too_long: "طويل جدًا", too_many: "كثير جدًا", one_of: "قيمة غير مسموح بها", duplicate: "مكرر" },
+    sla: {
+      unreachable_target: "لن يطابق هذا الصف أبدًا: يسبقه صف شامل (بلا شرط) — يجب أن يكون الصف الشامل الأخير", unknown_metric: "لا يوجد هذا المقياس في هذه السياسة",
+      never_starts: "لن يبدأ هذا المقياس أبدًا", never_stops: "لن يتوقف هذا المقياس أبدًا", stop_on_create: "لا يمكن إيقاف التوقيت عند الإنشاء",
+      metric_code_format: "رمز المقياس غير صالح", unknown_policy: "سياسة SLA غير موجودة",
+    },
   },
 } satisfies M;
 

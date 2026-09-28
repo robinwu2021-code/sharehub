@@ -15,8 +15,8 @@ import { hasPerm, requirePerm } from "./mock-auth";
 import { useLocaleStore } from "@/lib/stores/locale";
 import { FlowValidationError } from "./errors";
 import type {
-  CreateTicketRequest, CreateTicketResult, Member, Named, Page, Priority, ReassignResult, SlaMetric, SlaState, SlaSummary, StatusCategory, TicketAction, TicketFilter,
-  TicketQuery, TicketRow, TicketStat, TicketView, TimelineEvent, TodoCount, TodoItem, TodoQuery,
+  CommentVisibility, CreateTicketRequest, CreateTicketResult, Member, Named, Page, Priority, ReassignResult, SlaMetric, SlaState, SlaSummary, StatusCategory, TicketAction, TicketFilter,
+  TicketQuery, TicketRow, TicketStat, TicketTypeDef, TicketTypeField, TicketTypeOption, TicketView, TimelineEvent, TodoCount, TodoItem, TodoQuery,
 } from "./types";
 
 const pickLang = (zh: string, en: string) => (useLocaleStore.getState().locale === "zh" ? zh : en);
@@ -62,10 +62,16 @@ const STATUS: Record<StatusCode, { name: string; category: StatusCategory }> = {
 const OPEN: StatusCode[] = ["PENDING_ACCEPT", "PROCESSING", "WAITING_EXTERNAL", "PENDING_REVIEW"];
 
 const TYPE_NAME: Record<string, string> = { ops: "运维", "cs-report": "报障", "after-sales": "售后" };
-/** 工单类型清单（接后端后：GET ticket-types） */
-export const TICKET_TYPES: Named[] = [
-  { code: "ops", name: "运维" }, { code: "cs-report", name: "客服报障" }, { code: "after-sales", name: "售后" },
+/** 工单类型清单（GET ticket-types）：与 OpsKit 同形 —— 优先级选项集与建单字段随类型走 */
+const TYPE_FIELDS: TicketTypeField[] = [
+  { code: "source", name: "来源", type: "SELECT", required: true, onCreate: true, filterable: true,
+    options: Object.entries(SOURCE_OPT).map(([code, name]) => ({ code, name, enabled: true })) },
+  { code: "sourceRef", name: "来源单号", type: "TEXT", required: false, onCreate: true, filterable: true },
 ];
+const TYPE_PRIORITIES: TicketTypeOption[] = Object.values(PRIO).map((p) => ({ code: p.code, name: p.name, enabled: true }));
+export const TICKET_TYPES: TicketTypeDef[] = [
+  { code: "ops", name: "运维" }, { code: "cs-report", name: "客服报障" }, { code: "after-sales", name: "售后" },
+].map((t) => ({ ...t, enabled: true, priorityOptions: TYPE_PRIORITIES, fields: TYPE_FIELDS }));
 
 interface TicketRec {
   ticketNo: string;
@@ -272,8 +278,8 @@ function matches(t: Row, f: TicketFilter): boolean {
   if (f.closedFromMs != null && !(t.closedAtMs != null && t.closedAtMs >= f.closedFromMs)) return false;
   if (f.keyword) {
     const k = f.keyword.trim().toLowerCase();
-    const hay = [t.ticketNo, t.title, t.subject?.ref ?? "", t.subject?.display.title ?? "",
-      String(t.fields.sourceRef?.value ?? ""), t.assignee?.displayName ?? ""].join(" ").toLowerCase();
+    // 与 OpsKit tickets/query 同口径（9-28）：只匹配单号、标题、业务对象编号 —— 受理方用受理方筛选
+    const hay = [t.ticketNo, t.title, t.subject?.ref ?? ""].join(" ").toLowerCase();
     if (!hay.includes(k)) return false;
   }
   return true;
@@ -361,7 +367,7 @@ export function countTodos(now: number = Date.now()): TodoCount {
   return {
     all: all.length,
     process: all.filter((t) => t.origin === "PROCESS").length,
-    ticket: all.filter((t) => t.origin === "TICKET" && !t.claimable).length,
+    ticket: all.filter((t) => t.origin === "TICKET").length,
     claimable: all.filter((t) => t.claimable).length,
   };
 }
@@ -447,9 +453,10 @@ export const ASSIGNEE_OPTIONS: Member[] = [
 export const PARTY_OPTIONS: Named[] = Object.entries(PARTY).map(([code, name]) => ({ code, name }));
 
 // ── 工单详情 · 时间线 · 备注 · 退回抢单池 ────────────────────────────────────
-function log(no: string, atMs: number, kind: TimelineEvent["kind"], title: string, actor: Member, detail?: string) {
+function log(no: string, atMs: number, kind: TimelineEvent["kind"], title: string, actor: Member, detail?: string, visibility?: CommentVisibility) {
   const list = (timelines[no] ??= []);
-  list.push({ seq: list.length + 1, atMs, kind, title, actor: { ref: actor.ref, displayName: actor.displayName }, detail, hot: false });
+  list.push({ seq: list.length + 1, atMs, kind, title, actor: { ref: actor.ref, displayName: actor.displayName }, detail, hot: false,
+    ...(visibility ? { visibility } : {}) });
 }
 
 /** GET /workspaces/{ws}/tickets/{no}：行 + 全部字段 + 参与者 + 每个 SLA 指标 + 动作 */
@@ -496,12 +503,12 @@ export function getTimeline(no: string): TimelineEvent[] {
 }
 
 /** POST /workspaces/{ws}/tickets/{no}/comments */
-export function addComment(no: string, body: string, now: number = Date.now()): TimelineEvent[] {
+export function addComment(no: string, body: string, visibility: CommentVisibility = "PUBLIC", now: number = Date.now()): TimelineEvent[] {
   requirePerm("flow:ticket:handle");
   const r = row(no);
   if (!body.trim()) fail("备注不能为空", "The note cannot be empty");
   if (body.length > 1000) fail("备注不能超过 1000 字", "The note cannot exceed 1000 characters");
-  log(r.ticketNo, now, "COMMENT", "备注", ME, body.trim());
+  log(r.ticketNo, now, "COMMENT", "备注", ME, body.trim(), visibility);
   return getTimeline(no);
 }
 
@@ -540,11 +547,28 @@ const NO_PREFIX: Record<string, string> = { ops: "WO", "cs-report": "CS", "after
 export function createTicket(req: CreateTicketRequest, now: number = Date.now()): CreateTicketResult {
   requirePerm("flow:ticket:handle");
   const e: { path: string; error: string }[] = [];
-  if (!TICKET_TYPES.some((t) => t.code === req.typeCode)) e.push({ path: "typeCode", error: pickLang("请选择工单类型", "Pick a ticket type") });
+  const type = TICKET_TYPES.find((t) => t.code === req.typeCode && t.enabled);
+  if (!type) e.push({ path: "typeCode", error: pickLang("请选择工单类型", "Pick a ticket type") });
   const title = req.title?.trim() ?? "";
   if (!title) e.push({ path: "title", error: pickLang("标题必填", "Title is required") });
   else if (title.length > 80) e.push({ path: "title", error: pickLang("标题不超过 80 字", "Title is at most 80 characters") });
-  if (req.priority && !(req.priority in PRIO)) e.push({ path: "priority", error: pickLang("优先级不存在", "Unknown priority") });
+  if (req.priority && type && !type.priorityOptions.some((p) => p.code === req.priority && p.enabled)) {
+    e.push({ path: "priority", error: pickLang("优先级不在本类型的选项里", "Priority is not an option of this type") });
+  }
+  // 与 OpsKit FieldValues 同口径：未知字段 / 非建单字段 / 必填缺失 / 选项不存在，路径 fields.<code>
+  const given = req.fields ?? {};
+  for (const code of Object.keys(given)) {
+    if (type && !type.fields.some((f) => f.code === code)) e.push({ path: `fields.${code}`, error: pickLang("本类型没有这个字段", "Unknown field") });
+  }
+  for (const f of type?.fields ?? []) {
+    const v = given[f.code];
+    const empty = v == null || v === "" || (Array.isArray(v) && v.length === 0);
+    if (!f.onCreate && !empty) e.push({ path: `fields.${f.code}`, error: pickLang("建单时不能填", "Cannot be set when creating") });
+    else if (f.required && empty) e.push({ path: `fields.${f.code}`, error: pickLang("必填", "Required") });
+    else if (!empty && f.type === "SELECT" && !f.options?.some((o) => o.code === v && o.enabled)) {
+      e.push({ path: `fields.${f.code}`, error: pickLang("不是可选的选项", "Not one of the options") });
+    }
+  }
   if (req.subject && (!req.subject.type.trim() || !req.subject.ref.trim())) e.push({ path: "subject", error: pickLang("业务对象要同时给类型与编号", "Give both type and number for the business object") });
   if (e.length) throw new FlowValidationError(pickLang(`建单被拒：有 ${e.length} 处需要修改`, `Ticket rejected: ${e.length} field(s) to fix`), e);
 
@@ -570,7 +594,9 @@ export function createTicket(req: CreateTicketRequest, now: number = Date.now())
       : { type: "manual", ref: "-", display: { title } },
     priority: prio, status: "PENDING_ACCEPT", assignee: null, pooled: true,
     slaStartMs: now, slaDueAtMs: now + (CREATE_SLA_MIN[prio] ?? 1440) * MIN, pausedAtMs: null,
-    source: { kind: "MANUAL" }, escalated: false, nudgedAtMs: null,
+    source: { kind: (String(given.source ?? "") in SOURCE_OPT ? given.source : "MANUAL") as SourceCode,
+      ...(typeof given.sourceRef === "string" && given.sourceRef.trim() ? { ref: given.sourceRef.trim() } : {}) },
+    escalated: false, nudgedAtMs: null,
     ...(req.description?.trim() ? { description: req.description.trim() } : {}),
     ...(key ? { dedupe: { key, attachedCount: 0 } } : {}),
     createdAtMs: now, closedAtMs: null,

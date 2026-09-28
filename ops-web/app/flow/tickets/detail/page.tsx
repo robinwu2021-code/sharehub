@@ -18,6 +18,9 @@ import { notify } from "@/lib/notify";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { CheckboxField } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/lib/auth";
 import { ErrorState, Skeleton } from "@/components/ui/misc";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
 import { FlowTimeline } from "@/components/flow/flow-timeline";
@@ -61,6 +64,10 @@ function TicketDetail() {
   const [assignOpen, setAssignOpen] = useState(false);
   const [assignForm, setAssignForm] = useState<Record<string, unknown>>({ to: "", reason: "" });
   const [note, setNote] = useState("");
+  // 内部评论只有员工能发（OpsKit ticket:comment:internal 只映射给员工角色，§16.1）；代理发的一律公开。
+  // 员工默认内部 —— 运营之间的沟通不该默认让代理看到，要给代理看时再勾掉
+  const isAgent = useAuth((s) => s.realm) === "AGENT";
+  const [internal, setInternal] = useState(true);
 
   const act = useMutation({
     mutationFn: ({ a, comment }: { a: TicketAction; comment?: string }) => flow.transition(no, a.code, comment),
@@ -79,7 +86,7 @@ function TicketDetail() {
     onError: (e: Error) => notify.error(e.message),
   });
   const comment = useMutation({
-    mutationFn: () => flow.comment(no, note),
+    mutationFn: () => flow.comment(no, note, !isAgent && internal ? "INTERNAL" : "PUBLIC"),
     onSuccess: () => { notify.success(tt("note.submitted")); setNote(""); refresh(); },
     onError: (e: Error) => notify.error(e.message),
   });
@@ -149,7 +156,8 @@ function TicketDetail() {
                 items={(tl.data ?? []).map((e) => ({
                   key: String(e.seq), title: e.title, hot: e.hot,
                   meta: fmt.join(fmt.when(e.atMs), e.actor?.displayName ?? tc("system"), e.kind !== "COMMENT" && e.detail),
-                  detail: e.kind === "COMMENT" ? e.detail : undefined,
+                  detail: e.kind === "COMMENT" ? (e.visibility === "INTERNAL"
+                    ? <><Badge tone="default" className="me-2">{tt("note.internalTag")}</Badge>{e.detail}</> : e.detail) : undefined,
                 }))}
               />
             )}
@@ -200,8 +208,11 @@ function TicketDetail() {
             <h2 className="mb-3 txt-strong">{tt("section.note")}</h2>
             {canHandle ? (
               <>
-                <Textarea value={note} onChange={setNote} rows={3} placeholder={tt("note.placeholder")} />
-                <div className="mt-2 flex justify-end">
+                <Textarea value={note} onChange={setNote} rows={3} placeholder={tt(isAgent || !internal ? "note.placeholderPublic" : "note.placeholder")} />
+                <div className="mt-2 flex items-center justify-end gap-3">
+                  {!isAgent && (
+                    <CheckboxField className="me-auto" label={tt("note.internal")} checked={internal} onChange={(v) => setInternal(v === true)} />
+                  )}
                   <Button size="sm" loading={comment.isPending} disabled={!note.trim()} onClick={() => comment.mutate()}>{tt("note.submit")}</Button>
                 </div>
               </>
