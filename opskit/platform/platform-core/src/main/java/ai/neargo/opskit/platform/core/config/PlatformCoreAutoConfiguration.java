@@ -154,6 +154,11 @@ public class PlatformCoreAutoConfiguration {
     }
 
     @Bean
+    ai.neargo.opskit.platform.client.WorkspaceClient workspaceClient(TenancyAppService tenancy) {
+        return new ai.neargo.opskit.platform.core.embedded.EmbeddedWorkspaceClient(tenancy);
+    }
+
+    @Bean
     CalendarAppService calendarAppService(CalendarDao c, Clock clock, TransactionOperations tx, AuditTrail audit) {
         return new CalendarAppService(c, clock, tx, audit);
     }

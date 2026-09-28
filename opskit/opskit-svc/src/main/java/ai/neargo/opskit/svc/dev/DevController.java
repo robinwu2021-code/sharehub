@@ -57,8 +57,12 @@ public class DevController {
         return Map.of("token", idp.sign(r.sub(), r.name(), m.tenant(), r.perms(), r.scopes(), ttl));
     }
 
+    /** 种子写完前返回 503（健康检查在种子写完前就会是 200，别以它为准）。 */
     @GetMapping("/seed")
-    public DevSeed.Manifest seed() {
-        return seed.manifest();
+    public org.springframework.http.ResponseEntity<Object> seed() {
+        if (!seed.ready()) {
+            return org.springframework.http.ResponseEntity.status(503).body(Map.of("error", "opskit.dev.seed_not_ready", "message", "seed is being written"));
+        }
+        return org.springframework.http.ResponseEntity.ok(seed.manifest());
     }
 }

@@ -74,6 +74,31 @@ public final class TicketQueryDao {
         return jdbc.sql("SELECT COUNT(*) FROM tkt_ticket t WHERE t.workspace_id = ?" + w.sql).params(w.params).query(Long.class).single();
     }
 
+    /**
+     * 按受理方聚合（统计：按人 / 按组）。与列表同一段 WHERE。
+     *
+     * @param assignee 空 = 未派
+     */
+    public record AssigneeStat(String assignee, long total, long open, long openBreached, long closed, long closedMet, long closedBreached,
+            long closedDurationMs) {
+    }
+
+    public List<AssigneeStat> statsByAssignee(WorkspaceId ws, Viewer v, Filter f) {
+        Where w = where(ws, v, f);
+        return jdbc.sql("SELECT t.assignee, COUNT(*) AS n, "
+                        + "COALESCE(SUM(CASE WHEN t.is_open = 1 THEN 1 ELSE 0 END), 0) AS o, "
+                        + "COALESCE(SUM(CASE WHEN t.is_open = 1 AND t.sla_state = 'BREACHED' THEN 1 ELSE 0 END), 0) AS ob, "
+                        + "COALESCE(SUM(CASE WHEN t.is_open = 0 THEN 1 ELSE 0 END), 0) AS c, "
+                        + "COALESCE(SUM(CASE WHEN t.is_open = 0 AND t.sla_state = 'MET' THEN 1 ELSE 0 END), 0) AS cm, "
+                        + "COALESCE(SUM(CASE WHEN t.is_open = 0 AND t.sla_state = 'BREACHED' THEN 1 ELSE 0 END), 0) AS cb, "
+                        + "COALESCE(SUM(CASE WHEN t.is_open = 0 AND t.closed_at_ms IS NOT NULL THEN t.closed_at_ms - t.created_at_ms ELSE 0 END), 0) AS cd "
+                        + "FROM tkt_ticket t WHERE t.workspace_id = ?" + w.sql + " GROUP BY t.assignee ORDER BY t.assignee")
+                .params(w.params)
+                .query((rs, i) -> new AssigneeStat(rs.getString("assignee"), rs.getLong("n"), rs.getLong("o"), rs.getLong("ob"), rs.getLong("c"),
+                        rs.getLong("cm"), rs.getLong("cb"), rs.getLong("cd")))
+                .list();
+    }
+
     public List<TicketDao.Row> rows(WorkspaceId ws, List<String> ticketNos) {
         return ticketNos.stream().map(no -> tickets.find(ws, no).orElseThrow()).toList();
     }

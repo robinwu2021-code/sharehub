@@ -104,6 +104,10 @@ public class DevSeed {
         this.jwksUrl = jwksUrl;
     }
 
+    public boolean ready() {
+        return manifest != null;
+    }
+
     public Manifest manifest() {
         if (manifest == null) {
             throw new IllegalStateException("dev seed not run yet");

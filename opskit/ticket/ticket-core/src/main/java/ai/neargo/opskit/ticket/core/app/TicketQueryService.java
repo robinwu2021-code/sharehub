@@ -54,9 +54,32 @@ public class TicketQueryService {
         this.directory = directory;
     }
 
+    /** 校验并解析好的查询（列表、计数、统计共用 —— 统计卡与列表同口径的来源）。 */
+    record Prepared(TicketQueryDao.Viewer viewer, TicketQueryDao.Filter filter, String order) {
+    }
+
     @SystemAction("只读：可见性在查询里 fail-closed 判定")
     public Page<TicketView> query(Actor actor, TicketQuery q) {
         PageRequest page = PageRequest.of(q.page(), q.size());
+        TenantContext t = actor.tenant();
+        Prepared p = prepare(actor, q);
+        long total = queries.count(t.workspaceId(), p.viewer(), p.filter());
+        if (total == 0) {
+            return Page.empty(page);
+        }
+        List<TicketDao.Row> rows = queries.rows(t.workspaceId(), queries.ticketNos(t.workspaceId(), p.viewer(), p.filter(), p.order(), page.offset(),
+                page.size()));
+        return Page.of(rows.stream().map(r -> tickets.viewOf(t, r)).toList(), total, page);
+    }
+
+    /** 与 query 的 total 完全同口径。 */
+    @SystemAction("只读：同 query")
+    public long count(Actor actor, TicketQuery q) {
+        Prepared p = prepare(actor, q);
+        return queries.count(actor.tenant().workspaceId(), p.viewer(), p.filter());
+    }
+
+    Prepared prepare(Actor actor, TicketQuery q) {
         TenantContext t = actor.tenant();
         List<FieldError> errors = new ArrayList<>();
         check(q.statusCategory(), CATEGORIES, "statusCategory", errors);
@@ -85,12 +108,7 @@ public class TicketQueryService {
                 q.scopes(), fields, q.keyword(), q.open(), q.createdFromMs(), q.createdToMs(), q.closedFromMs(), q.closedToMs(), q.escalated());
         TicketQueryDao.Viewer v = new TicketQueryDao.Viewer(actor.isAppItself() || actor.productPermissions().contains(TicketAppService.VIEW_ALL),
                 actor.productPermissions().contains(TicketAppService.VIEW_SCOPED), actor.scopes().contains(TicketAppService.ANY_SCOPE), actor.scopes(), me);
-        long total = queries.count(t.workspaceId(), v, f);
-        if (total == 0) {
-            return Page.empty(page);
-        }
-        List<TicketDao.Row> rows = queries.rows(t.workspaceId(), queries.ticketNos(t.workspaceId(), v, f, order, page.offset(), page.size()));
-        return Page.of(rows.stream().map(r -> tickets.viewOf(t, r)).toList(), total, page);
+        return new Prepared(v, f, order);
     }
 
     /** 组 / 成员属性 → 受理方集合（两者都给时取交集）；属性匹配太多 → 422，提示改用组筛选。 */

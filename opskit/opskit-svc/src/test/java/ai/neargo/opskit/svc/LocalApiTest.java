@@ -253,6 +253,15 @@ class LocalApiTest {
         assertThat(titles).contains("创建工单", "领取", "受理：新建 → 处理中", "内部备注");
         assertThat(call("GET", WS + "/tickets/" + no + "/timeline", token("bob"), null).body().valueStream()
                 .map(n -> n.get("title").asText()).toList()).as("报单人看不到内部备注").doesNotContain("内部备注");
+        Res cards = call("POST", WS + "/ticket-stats/summary", alice, Map.of("typeCode", List.of("repair")));
+        assertThat(cards.status()).isEqualTo(200);
+        JsonNode open = cards.body().valueStream().filter(n -> "open".equals(n.get("key").asText())).findFirst().orElseThrow();
+        assertThat(open.get("label").asText()).isEqualTo("未结");
+        Map<String, Object> linked = json.convertValue(open.get("queryParams"), Map.class);
+        linked.put("page", 1);
+        linked.put("size", 200);
+        assertThat(call("POST", WS + "/tickets/query", alice, linked).body().get("total").asLong()).as("卡与列表同口径")
+                .isEqualTo(open.get("value").asLong());
         String queued = (String) seed.manifest().fixtures().get("ticketQueued");
         assertThat(call("POST", WS + "/tickets/" + queued + "/pool", alice, Map.of("reason", "x")).status()).as("还没人办，退回池 → 409").isEqualTo(409);
         assertThat(call("GET", WS + "/tickets/" + queued, token("dave"), null).status()).as("无工单权限、非参与者").isEqualTo(404);
