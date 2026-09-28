@@ -112,13 +112,19 @@ public final class QueryDao {
         return jdbc.sql("SELECT COUNT(*) AS a, "
                         + "COALESCE(SUM(CASE WHEN x.origin = 'PROCESS' THEN 1 ELSE 0 END), 0) AS p, "
                         + "COALESCE(SUM(CASE WHEN x.origin = 'TICKET' THEN 1 ELSE 0 END), 0) AS k, "
-                        + "COALESCE(SUM(CASE WHEN x.status = 'OPEN' THEN 1 ELSE 0 END), 0) AS c "
-                        + "FROM (SELECT t.status, " + ORIGIN + " AS origin " + TASK_FROM + " WHERE t.workspace_id = ?" + w.sql + ") x")
+                        + "COALESCE(SUM(x.claimable), 0) AS c "
+                        + "FROM (SELECT CASE WHEN " + CLAIMABLE + " THEN 1 ELSE 0 END AS claimable, " + ORIGIN + " AS origin " + TASK_FROM
+                        + " WHERE t.workspace_id = ?" + w.sql + ") x")
                 .params(w.params)
                 .query((rs, i) -> new TodoCounts(rs.getLong("a"), rs.getLong("p"), rs.getLong("k"), rs.getLong("c"))).single();
     }
 
-    /** 我的待办 = （池里且我是候选 ∨ 在我名下）∧ 实例对我可见（21/02 §7.2 · §8.2）。 */
+    /**
+     * 我的待办 = （池里且我是候选 ∨ 在我名下）∧ 实例对我可见（21/02 §7.2 · §8.2）。
+     *
+     * <p>{@code claimable} 的口径（2026-09-28 与前端对齐）：<b>必须先领取才能办</b> —— 池里的办理任务（领了才能走迁移）与队列组任务。
+     * 普通审批的候选任务可以直接决定，不算可领，它属于 claimable=false 那一页（「待我处理」）。
+     */
     private Where todoWhere(WorkspaceId ws, Viewer v, String origin, Boolean claimable) {
         Where w = new Where();
         w.params.add(ws.value());
@@ -127,10 +133,13 @@ public final class QueryDao {
             return w.and("1 = 0"); // 应用自身没有「我的」待办
         }
         if (Boolean.TRUE.equals(claimable)) {
-            w.sql.append(" AND t.status = 'OPEN' AND ");
+            w.sql.append(" AND " + CLAIMABLE + " AND ");
             candidateMatch(w, v);
         } else if (Boolean.FALSE.equals(claimable)) {
-            w.and("t.status <> 'OPEN' AND t.assignee = ?", v.me());
+            w.sql.append(" AND ((t.status <> 'OPEN' AND t.assignee = ?) OR (t.status = 'OPEN' AND NOT " + CLAIMABLE + " AND ");
+            w.params.add(v.me());
+            candidateMatch(w, v);
+            w.sql.append("))");
         } else {
             w.sql.append(" AND ((t.status = 'OPEN' AND ");
             candidateMatch(w, v);
@@ -335,6 +344,8 @@ public final class QueryDao {
 
     // ── 共用片段 ────────────────────────────────────────────
 
+    /** 必须先领取才能办：池里（OPEN）的办理任务，或队列组任务。与 ProcessQueryService.claimable 同口径。 */
+    private static final String CLAIMABLE = "(t.status = 'OPEN' AND (t.kind = 'WORK' OR t.queue_group IS NOT NULL))";
     private static final String TASK_FROM = "FROM proc_task t JOIN proc_instance i ON i.workspace_id = t.workspace_id AND i.instance_no = t.instance_no";
     private static final String APPROVAL_FROM = "FROM proc_approval a JOIN proc_instance i ON i.workspace_id = a.workspace_id AND i.instance_no = a.instance_no";
     /** 待办来源记在候选行上（由建任务的调用方给出）；一条任务的所有候选行来源相同。 */

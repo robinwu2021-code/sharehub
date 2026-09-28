@@ -91,7 +91,7 @@ public class ProcessQueryService {
         List<TodoItem> list = rows.stream()
                 .map(r -> new TodoItem(r.taskNo(), r.kind(), r.origin(), r.title(), names.process(r.definitionId()),
                         subject(r.subjectType(), r.subjectRef(), r.subjectDisplay()), r.priorityOrd(), r.createdAtMs(), r.dueAtMs(),
-                        "OPEN".equals(r.status()), r.instanceNo(), r.approvalNo(), r.queueGroup(), sla.get(r.instanceNo())))
+                        claimable(r.status(), r.kind(), r.queueGroup()), r.instanceNo(), r.approvalNo(), r.queueGroup(), sla.get(r.instanceNo())))
                 .toList();
         return Page.of(list, total, page);
     }
@@ -206,6 +206,11 @@ public class ProcessQueryService {
     }
 
     // ── 内部 ────────────────────────────────────────────────
+
+    /** 必须先领取才能办（与 QueryDao 的 CLAIMABLE 同口径）：普通审批的候选可以直接决定，不算。 */
+    static boolean claimable(String status, String kind, String queueGroup) {
+        return "OPEN".equals(status) && ("WORK".equals(kind) || queueGroup != null);
+    }
 
     /** 每个实例取到期最近的未停指标（逾期未停的也算：它最该被看见）。 */
     private Map<String, SlaSummary> slaOf(WorkspaceId ws, List<String> instanceNos) {

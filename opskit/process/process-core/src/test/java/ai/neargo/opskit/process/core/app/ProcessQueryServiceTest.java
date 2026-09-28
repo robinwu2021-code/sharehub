@@ -261,4 +261,26 @@ class ProcessQueryServiceTest {
         assertThat(e.q.approvals(opsB, all).total()).isEqualTo(1);
         assertThat(e.approvals.decide(opsB, ap, task, true, null).status()).isEqualTo("APPROVED");
     }
+
+    @ParameterizedTest
+    @MethodSource("ai.neargo.opskit.commons.testing.TestDatabases#all")
+    void claimableMeansMustClaimFirstSoPlainApprovalsAreNot(TestDatabase db) {
+        Env e = env(db);
+        e.dispatched("mb_req", "D-1", Set.of()); // 队列里的办理任务：要先领
+        Actor bd = e.plain("mb_bd");
+        String no = e.instances.start(bd, new StartRequest("contract_approval", null, Map.of("needsCosign", false), Map.of(), Set.of())).instanceNo();
+        e.instances.transition(bd, no, "submit", TransitionRequest.empty());
+        Actor both = new Actor(e.f.tenant, Optional.of(PrincipalRef.member("mb_x")), Optional.empty(), Set.of("field-ops"), Set.of("contract-approver"),
+                Set.of(), Set.of(), Set.of());
+
+        TodoCount c = e.q.todoCount(both);
+        assertThat(c).isEqualTo(new TodoCount(2, 2, 0, 1));
+        assertThat(e.todos(both, "ALL", true).list()).singleElement().satisfies(t -> assertThat(t.kind()).isEqualTo("WORK"));
+        assertThat(e.todos(both, "ALL", false).list()).as("普通审批可直接决定：在「待我处理」页").singleElement()
+                .satisfies(t -> {
+                    assertThat(t.kind()).isEqualTo("APPROVAL");
+                    assertThat(t.claimable()).isFalse();
+                });
+        assertThat(e.todos(both, "ALL", true).total() + e.todos(both, "ALL", false).total()).as("两页不重不漏").isEqualTo(c.all());
+    }
 }
