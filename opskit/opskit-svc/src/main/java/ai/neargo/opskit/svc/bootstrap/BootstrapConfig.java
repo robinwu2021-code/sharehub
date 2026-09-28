@@ -22,8 +22,8 @@ public class BootstrapConfig {
 
     @Bean
     OpsKitBootstrap opsKitBootstrap(BootstrapProperties props, TenancyAppService tenancy, FederationAppService federation, DirectoryAppService directory,
-            BootstrapDefinitions definitions, AppAppService apps, WebhookAppService webhooks) {
-        return new OpsKitBootstrap(props, tenancy, federation, directory, definitions, apps, webhooks);
+            BootstrapDefinitions definitions, AppAppService apps, WebhookAppService webhooks, ai.neargo.opskit.platform.core.auth.OperatorAuth operators) {
+        return new OpsKitBootstrap(props, tenancy, federation, directory, definitions, apps, webhooks, operators);
     }
 
     @Bean

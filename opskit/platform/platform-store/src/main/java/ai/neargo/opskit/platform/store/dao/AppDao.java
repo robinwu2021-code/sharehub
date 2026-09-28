@@ -33,6 +33,10 @@ public final class AppDao {
         return jdbc.sql("SELECT * FROM plat_app WHERE account_id = ? AND app_id = ?").params(accountId.value(), appId).query(MAPPER).optional();
     }
 
+    public List<AppRow> list(AccountId accountId) {
+        return jdbc.sql("SELECT * FROM plat_app WHERE account_id = ? ORDER BY id").param(accountId.value()).query(MAPPER).list();
+    }
+
     /** 按名称找（启动引导按名称识别部署方声明的应用；同名多个时取最早的）。 */
     public Optional<AppRow> findByName(AccountId accountId, String name) {
         return jdbc.sql("SELECT * FROM plat_app WHERE account_id = ? AND name = ? ORDER BY id").params(accountId.value(), name).query(MAPPER).list()

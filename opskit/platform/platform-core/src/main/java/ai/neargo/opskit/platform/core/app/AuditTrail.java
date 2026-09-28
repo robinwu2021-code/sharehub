@@ -50,4 +50,22 @@ public final class AuditTrail implements ai.neargo.opskit.commons.audit.AuditRec
         return a.member().map(m -> m + a.app().map(app -> " via app:" + app).orElse(""))
                 .orElseGet(() -> "app:" + a.app().orElse("?"));
     }
+
+    /**
+     * 账户级审计查询（运维面）。时间窗默认最近 30 天、最长 366 天。
+     *
+     * @param workspaceId 空 = 全部（含账户级操作）；{@code ""} = 只看账户级操作
+     */
+    public ai.neargo.opskit.commons.query.Page<AuditDao.Entry> query(AccountId account, String workspaceId, String action, Long fromMs, Long toMs,
+            ai.neargo.opskit.commons.query.PageRequest page) {
+        long to = toMs == null ? clock.millis() + 1 : toMs;
+        long from = fromMs == null ? to - java.time.Duration.ofDays(30).toMillis() : fromMs;
+        if (to - from > java.time.Duration.ofDays(366).toMillis() || from > to) {
+            throw new ai.neargo.opskit.commons.error.OpsKitException(ai.neargo.opskit.commons.error.CommonErrors.VALIDATION, "time window out of range",
+                    Map.of(), java.util.List.of(new ai.neargo.opskit.commons.error.FieldError("fromMs", "opskit.validation.out_of_range")));
+        }
+        long total = dao.countAccount(account, workspaceId, action, from, to);
+        return ai.neargo.opskit.commons.query.Page.of(total == 0 ? java.util.List.of() : dao.queryAccount(account, workspaceId, action, from, to,
+                page.offset(), page.size()), total, page);
+    }
 }

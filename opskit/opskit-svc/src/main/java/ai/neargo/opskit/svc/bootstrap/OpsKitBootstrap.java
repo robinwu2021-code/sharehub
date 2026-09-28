@@ -41,10 +41,12 @@ public class OpsKitBootstrap {
     private final BootstrapDefinitions definitions;
     private final AppAppService apps;
     private final WebhookAppService webhooks;
+    private final ai.neargo.opskit.platform.core.auth.OperatorAuth operators;
     private volatile BootstrapDefinitions.Summary lastDefinitions = BootstrapDefinitions.Summary.NONE;
 
     public OpsKitBootstrap(BootstrapProperties props, TenancyAppService tenancy, FederationAppService federation, DirectoryAppService directory,
-            BootstrapDefinitions definitions, AppAppService apps, WebhookAppService webhooks) {
+            BootstrapDefinitions definitions, AppAppService apps, WebhookAppService webhooks, ai.neargo.opskit.platform.core.auth.OperatorAuth operators) {
+        this.operators = operators;
         this.props = props;
         this.apps = apps;
         this.webhooks = webhooks;
@@ -77,11 +79,19 @@ public class OpsKitBootstrap {
         props.roles().forEach((code, role) -> directory.upsertRole(system, t.workspaceId(),
                 new RoleUpsert(code, role.name().isEmpty() ? Map.of("en", code) : role.name(), new LinkedHashSet<>(role.permissions()))));
         Map<String, String> appActions = declareApps(account, ws.workspaceId());
+        props.operators().forEach((code, o) -> {
+            try {
+                operators.register(code, o.credential(), account);
+            } catch (IllegalArgumentException e) {
+                throw new IllegalStateException("opskit.bootstrap.operators." + code + " 不合法：" + e.getMessage(), e);
+            }
+        });
         BootstrapDefinitions.Summary defs = props.definitionsDir() == null || props.definitionsDir().isBlank()
                 ? BootstrapDefinitions.Summary.NONE
                 : definitions.publishAll(system, t.workspaceId(), java.nio.file.Path.of(props.definitionsDir()));
-        log.info("启动引导完成 account={} workspace={} ref={} idps={} roles={} apps={} webhooks={} definitions={}", account.value(), ws.workspaceId(),
-                ws.externalRef(), props.idps().size(), props.roles().keySet(), appActions, props.webhooks().size(), defs);
+        log.info("启动引导完成 account={} workspace={} ref={} idps={} roles={} apps={} webhooks={} operators={} definitions={}", account.value(),
+                ws.workspaceId(), ws.externalRef(), props.idps().size(), props.roles().keySet(), appActions, props.webhooks().size(),
+                props.operators().keySet(), defs);
         lastDefinitions = defs;
         return ws;
     }

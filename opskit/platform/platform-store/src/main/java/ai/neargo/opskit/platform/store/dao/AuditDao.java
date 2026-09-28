@@ -33,4 +33,36 @@ public final class AuditDao {
                         rs.getString("action"), rs.getString("target"), rs.getString("detail"), rs.getLong("at_ms")))
                 .list();
     }
+
+    /**
+     * 账户级审计查询（运维面）。workspaceId：空 = 全部（含账户级操作）；{@code ""} = 只看账户级操作。新的在前。
+     */
+    public List<Entry> queryAccount(AccountId account, String workspaceId, String action, long fromMs, long toMs, int offset, int limit) {
+        StringBuilder sql = new StringBuilder("SELECT * FROM plat_audit_log WHERE account_id = ? AND at_ms >= ? AND at_ms < ?");
+        List<Object> ps = new java.util.ArrayList<>(List.of(account.value(), fromMs, toMs));
+        filter(sql, ps, workspaceId, action);
+        sql.append(" ORDER BY at_ms DESC, id DESC").append(dialect.limitOffset(limit, offset));
+        return jdbc.sql(sql.toString()).params(ps)
+                .query((rs, i) -> new Entry(rs.getString("account_id"), rs.getString("workspace_id"), rs.getString("actor"),
+                        rs.getString("action"), rs.getString("target"), rs.getString("detail"), rs.getLong("at_ms")))
+                .list();
+    }
+
+    public long countAccount(AccountId account, String workspaceId, String action, long fromMs, long toMs) {
+        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM plat_audit_log WHERE account_id = ? AND at_ms >= ? AND at_ms < ?");
+        List<Object> ps = new java.util.ArrayList<>(List.of(account.value(), fromMs, toMs));
+        filter(sql, ps, workspaceId, action);
+        return jdbc.sql(sql.toString()).params(ps).query(Long.class).single();
+    }
+
+    private static void filter(StringBuilder sql, List<Object> ps, String workspaceId, String action) {
+        if (workspaceId != null) {
+            sql.append(" AND workspace_id = ?");
+            ps.add(workspaceId);
+        }
+        if (action != null) {
+            sql.append(" AND action = ?");
+            ps.add(action);
+        }
+    }
 }

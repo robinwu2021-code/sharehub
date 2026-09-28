@@ -149,6 +149,16 @@ public class PlatformCoreAutoConfiguration {
     }
 
     @Bean
+    ai.neargo.opskit.platform.core.app.OperatorAppService operatorAppService(TenancyAppService tenancy, AuditTrail audit, TransactionOperations tx) {
+        return new ai.neargo.opskit.platform.core.app.OperatorAppService(tenancy, audit, tx);
+    }
+
+    @Bean
+    ai.neargo.opskit.platform.core.auth.OperatorAuth operatorAuth() {
+        return new ai.neargo.opskit.platform.core.auth.OperatorAuth();
+    }
+
+    @Bean
     WebhookAppService webhookAppService(WebhookDao w, AppDao a, TransactionOperations tx, AuditTrail audit) {
         return new WebhookAppService(w, a, tx, audit);
     }

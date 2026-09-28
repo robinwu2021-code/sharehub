@@ -140,6 +140,12 @@ public class AppAppService {
         });
     }
 
+    /** 账户下全部应用（运维面）。只有提示位，没有凭证与密钥。 */
+    @SystemAction("运维面：应用列表")
+    public List<AppView> list(AccountId accountId) {
+        return apps.list(accountId).stream().map(r -> toView(r, apps.workspaces(accountId, r.appId()))).toList();
+    }
+
     /** 立即失效旧凭证与旧签名密钥（M1 不做宽限期；需要平滑切换时由接入方先改配置再轮换）。 */
     @SystemAction("运维面：轮换凭证")
     public AppSecrets rotate(AccountId accountId, String appId) {

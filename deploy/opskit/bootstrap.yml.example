@@ -25,6 +25,11 @@ opskit:
       name: ShareHub
       zone: Asia/Dubai          # 按宿主的业务时区填（ShareHub：sys_param biz.timezone）；空间只在首次启动时创建，事后改这里不生效
       locale: zh
+    # 运维凭证（账户级运维面：开空间 · 签发 / 轮换应用凭证 · 审计 · 跨空间投递）；不需要就删掉。只存哈希、改值重启即换
+    #   生成：echo "opk_$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')"
+    operators:
+      console:
+        credential: ${OPSKIT_OPERATOR_CREDENTIAL}
     idps:
       - issuer: sharehub-staff  # 员工令牌 stk_…
         kind: INTROSPECT

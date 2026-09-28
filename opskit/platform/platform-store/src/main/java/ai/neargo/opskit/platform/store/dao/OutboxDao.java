@@ -76,12 +76,13 @@ public final class OutboxDao {
     }
 
     /**
-     * 某空间的事件（接入管理页：投递状态）。state：FAILED = 重试耗尽待人工；PENDING = 未完成（含重试中）；DONE；空 = 全部。
+     * 某空间（ws 为空 = 账户下全部）的事件（接入管理页：投递状态）。state：FAILED = 重试耗尽待人工；PENDING = 未完成（含重试中）；DONE；空 = 全部。
      * 新的在前。
      */
     public List<OutboxRow> query(AccountId account, WorkspaceId ws, String state, String eventType, int offset, int limit) {
-        StringBuilder sql = new StringBuilder("SELECT * FROM plat_outbox WHERE account_id = ? AND workspace_id = ?");
-        List<Object> ps = new java.util.ArrayList<>(List.of(account.value(), ws.value()));
+        StringBuilder sql = new StringBuilder("SELECT * FROM plat_outbox WHERE account_id = ?");
+        List<Object> ps = new java.util.ArrayList<>(List.of(account.value()));
+        appendWorkspace(sql, ps, ws);
         appendState(sql, state);
         if (eventType != null) {
             sql.append(" AND event_type = ?");
@@ -92,14 +93,23 @@ public final class OutboxDao {
     }
 
     public long count(AccountId account, WorkspaceId ws, String state, String eventType) {
-        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM plat_outbox WHERE account_id = ? AND workspace_id = ?");
-        List<Object> ps = new java.util.ArrayList<>(List.of(account.value(), ws.value()));
+        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM plat_outbox WHERE account_id = ?");
+        List<Object> ps = new java.util.ArrayList<>(List.of(account.value()));
+        appendWorkspace(sql, ps, ws);
         appendState(sql, state);
         if (eventType != null) {
             sql.append(" AND event_type = ?");
             ps.add(eventType);
         }
         return jdbc.sql(sql.toString()).params(ps).query(Long.class).single();
+    }
+
+    /** ws 为空 = 账户下全部空间（运维面）。 */
+    private static void appendWorkspace(StringBuilder sql, List<Object> ps, WorkspaceId ws) {
+        if (ws != null) {
+            sql.append(" AND workspace_id = ?");
+            ps.add(ws.value());
+        }
     }
 
     private static void appendState(StringBuilder sql, String state) {

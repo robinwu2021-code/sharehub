@@ -18,15 +18,19 @@ public class WebConfig implements WebMvcConfigurer {
     private final CallerResolver caller;
 
     private final IdempotencyStore idempotency;
+    private final OperatorResolver operator;
 
-    public WebConfig(AppAppService apps, ActorResolver actors, MemberTokenAuthenticator members, IdempotencyStore idempotency) {
+    public WebConfig(AppAppService apps, ActorResolver actors, MemberTokenAuthenticator members, IdempotencyStore idempotency,
+            ai.neargo.opskit.platform.core.auth.OperatorAuth operators) {
         this.caller = new CallerResolver(apps, actors, members, idempotency);
         this.idempotency = idempotency;
+        this.operator = new OperatorResolver(operators, idempotency);
     }
 
     @Override
     public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
         resolvers.add(caller);
+        resolvers.add(operator);
     }
 
     @Bean

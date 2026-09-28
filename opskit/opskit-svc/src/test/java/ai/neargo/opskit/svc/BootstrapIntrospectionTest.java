@@ -68,11 +68,13 @@ import tools.jackson.databind.ObjectMapper;
         "opskit.bootstrap.webhooks[0].app=host",
         "opskit.bootstrap.webhooks[0].url=http://127.0.0.1:18094/webhook",
         "opskit.bootstrap.webhooks[0].events=instance.*,approval.completed",
-        "opskit.outbox.relay-interval=500ms"
+        "opskit.outbox.relay-interval=500ms",
+        "opskit.bootstrap.operators.console.credential=opk_OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO"
 })
 class BootstrapIntrospectionTest {
 
     static final String APP = "okk_AAAAAAAAAAAAAAAAAAAAbbbbbbbbbbbbbbbbbbbbbbb";
+    static final String OPS = "opk_OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO";
     static final String SECRET = "oks_SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS";
     static final java.util.List<String[]> received = new java.util.concurrent.CopyOnWriteArrayList<>();
     static HttpServer host;
@@ -467,5 +469,45 @@ class BootstrapIntrospectionTest {
         BootstrapDefinitions.Summary s = definitions.publishAll(system, t.workspaceId(), Path.of("../../deploy/opskit/sharehub-definitions"));
         assertThat(s.published().size() + s.unchanged().size()).as("目录里至少有告警工单类型").isGreaterThanOrEqualTo(1);
         assertThat(get(WS + "/ticket-types", "stk_admin").body().toString()).contains("\"alarm\"");
+    }
+
+    /** 账户级运维面：只认运维凭证、只看自己账户；开空间（幂等）· 签发 / 轮换凭证（旧的立即失效）· 审计 · 跨空间投递。 */
+    @Test
+    void operatorPlane() throws Exception {
+        String acct = "http://localhost:18093/api/opskit/v1/accounts/";
+        assertThat(get(acct + "self/workspaces", APP).status()).as("应用凭证进不了运维面").isEqualTo(401);
+        assertThat(get(acct + "self/workspaces", "opk_" + "x".repeat(44)).status()).isEqualTo(401);
+        assertThat(get(WS + "/ticket-types", OPS).status()).as("运维凭证调不了业务面").isEqualTo(401);
+        JsonNode wss = get(acct + "self/workspaces", OPS).body();
+        assertThat(wss.toString()).contains("\"MAIN\"");
+        String accountId = wss.get(0).get("accountId").asText();
+        assertThat(get(acct + accountId + "/workspaces", OPS).status()).isEqualTo(200);
+        assertThat(get(acct + "ac_someone_else/workspaces", OPS).status()).as("别的账户按不存在").isEqualTo(404);
+
+        java.util.Map<String, Object> ws2 = java.util.Map.of("name", "二号租户", "externalRef", "BRANCH2", "defaultZone", "Asia/Dubai", "defaultLocale", "zh");
+        Res created = send("POST", acct + "self/workspaces", OPS, "ops:ws:BRANCH2", ws2);
+        assertThat(created.status()).isEqualTo(200);
+        Res replay = send("POST", acct + "self/workspaces", OPS, "ops:ws:BRANCH2", ws2);
+        assertThat(replay.replayed()).isEqualTo("true");
+        assertThat(replay.body().get("workspaceId").asText()).isEqualTo(created.body().get("workspaceId").asText());
+        assertThat(send("POST", acct + "self/workspaces", OPS, null, ws2).status()).as("外部编号重复").isEqualTo(409);
+
+        Res app = send("POST", acct + "self/apps", OPS, null, java.util.Map.of("name", "ops-issued", "allWorkspaces", false,
+                "workspaceIds", List.of(created.body().get("workspaceId").asText())));
+        assertThat(app.status()).isEqualTo(200);
+        String cred = app.body().get("credential").asText();
+        String appId = app.body().get("app").get("appId").asText();
+        String ws2Base = "http://localhost:18093/api/opskit/v1/workspaces/ext:BRANCH2";
+        assertThat(get(ws2Base + "/ticket-types", cred).status()).as("新凭证可用").isEqualTo(200);
+        assertThat(get(WS + "/ticket-types", cred).status()).as("未授权的空间").isEqualTo(404);
+        Res rotated = send("POST", acct + "self/apps/" + appId + "/rotate-credential", OPS, null, java.util.Map.of());
+        assertThat(get(ws2Base + "/ticket-types", cred).status()).as("旧凭证立即失效").isEqualTo(401);
+        assertThat(get(ws2Base + "/ticket-types", rotated.body().get("credential").asText()).status()).isEqualTo(200);
+        assertThat(get(acct + "self/apps", OPS).body().toString()).contains("ops-issued").doesNotContain(cred);
+
+        String audit = send("POST", acct + "self/audit/query", OPS, null, java.util.Map.of("size", 200)).body().toString();
+        assertThat(audit).contains("workspace.created", "credential.issued", "credential.rotated", "ops:console");
+        assertThat(send("POST", acct + "self/webhook-deliveries/query", OPS, null, java.util.Map.of("state", "DONE")).status()).isEqualTo(200);
+        assertThat(send("POST", acct + "self/webhook-deliveries/999999999/redeliver", OPS, null, java.util.Map.of()).status()).isEqualTo(404);
     }
 }
