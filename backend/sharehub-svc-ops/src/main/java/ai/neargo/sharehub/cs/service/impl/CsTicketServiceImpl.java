@@ -21,6 +21,8 @@ import ai.neargo.sharehub.cs.service.CsSessionService;
 import ai.neargo.sharehub.cs.service.CsTicketService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import ai.neargo.sharehub.api.platform.dto.FileRef;
 import ai.neargo.sharehub.api.platform.port.FileBindingPort;
@@ -43,6 +45,8 @@ import java.util.Set;
  */
 @Service
 public class CsTicketServiceImpl implements CsTicketService {
+
+    private static final Logger log = LoggerFactory.getLogger(CsTicketServiceImpl.class);
 
     private static final String TENANT_MAIN = "MAIN";
     /** 与 {@code FileCategory.CS_EVIDENCE} 的 bizTypes 对应 —— 绑定时会校验用途与它相符。 */
@@ -212,15 +216,30 @@ public class CsTicketServiceImpl implements CsTicketService {
 
         // 分流依据来自字典，不是 if-else 硬编码（[api/README §6A.2]）
         String action = actionResolver.resolve(e.getProblemNo());
+        action = action == null ? ProblemActionResolver.TO_CS : action;
         String sessionNo = null;
-        switch (action == null ? ProblemActionResolver.TO_CS : action) {
+        switch (action) {
             case ProblemActionResolver.SELF_SERVICE -> e.setStatus(CsTicketStatus.CLOSED.name()); // 自助解决，直接关单
             case ProblemActionResolver.TO_WORKORDER -> {
                 e.setWoNo(workOrderPort.createWorkOrder(e));
                 e.setStatus(CsTicketStatus.PROCESSING.name());
             }
             case ProblemActionResolver.TO_REFUND -> {
-                e.setRefundNo(refundPort.createRefund(e));
+                /*
+                 * 退款端口走不通（没关联订单 / 订单查不到 / 没有可退金额）时返回 null ——
+                 * **改走人工**，不要留一个空的 refundNo。
+                 * 空号的后果与旧的桩一样：单子看起来「已转退款」，而财务侧什么都没有。
+                 */
+                String refundNo = refundPort.createRefund(e);
+                if (refundNo == null || refundNo.isBlank()) {
+                    action = ProblemActionResolver.TO_CS;
+                    sessionNo = sessionService.openFor(cUserNo, e.getIssue());
+                    log.warn("报障转退款走不通，已改走人工 ticketNo={} orderNo={} —— "
+                            + "多半是这条问题配了 TO_REFUND 但用户的诉求没关联订单，请核对问题字典",
+                            e.getTicketNo(), e.getOrderNo());
+                } else {
+                    e.setRefundNo(refundNo);
+                }
                 e.setStatus(CsTicketStatus.PROCESSING.name());
             }
             default -> { // TO_CS 及一切未知值：转人工，最安全的兜底方向

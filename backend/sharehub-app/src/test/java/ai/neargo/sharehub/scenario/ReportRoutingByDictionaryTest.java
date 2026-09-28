@@ -29,10 +29,29 @@ class ReportRoutingByDictionaryTest extends ApiTestSupport {
 
     @Autowired
     JdbcTemplate jdbc;
+    @Autowired
+    ai.neargo.sharehub.trade.service.RentOrderService rents;
+
+    final java.util.List<String> cabinets = new java.util.ArrayList<>();
 
     @AfterAll
     void cleanup() {
         jdbc.update("DELETE FROM md_problem WHERE problem_no LIKE 'ISRT%'");
+        ai.neargo.sharehub.support.FixtureCleanup.dropCabinets(jdbc, cabinets);
+    }
+
+    /** 一台能借的柜（转退款那条要有真订单）。 */
+    private String liveCabinet() {
+        String site = "STRT" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        String venue = jdbc.queryForObject("SELECT venue_no FROM loc_venue WHERE deleted=0 ORDER BY id LIMIT 1", String.class);
+        jdbc.update("INSERT INTO loc_site (site_no, tenant_id, venue_no, name, status, open_hours, region_id)"
+                + " VALUES (?, 'MAIN', ?, ?, 'ACTIVE', '00:00-23:59', 'R-TEST')", site, venue, "分流用例站点 " + site);
+        String cab = "CBRT" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        cabinets.add(cab);
+        jdbc.update("INSERT INTO dev_cabinet (cabinet_no, tenant_id, sn, vendor_code, device_type, site_no, slot_total,"
+                + " available_count, status, online_status, last_heartbeat_at)"
+                + " VALUES (?, 'MAIN', ?, 'TEST', 'POWERBANK', ?, 8, 6, 'DEPLOYED', 'ONLINE', NOW(3))", cab, cab, site);
+        return cab;
     }
 
     @Test
@@ -44,11 +63,56 @@ class ReportRoutingByDictionaryTest extends ApiTestSupport {
     }
 
     @Test
-    @DisplayName("字典说转工单 → 出工单号；说转退款 → 出退款号")
-    void workOrderAndRefundRoutesCarryTheirNumbers() {
-        assertThat(report(problem("TO_WORKORDER", "ENABLED")).path("woNo").asText())
-                .as("转工单要给出去向单号，否则用户与运营都追不下去").isNotBlank();
-        assertThat(report(problem("TO_REFUND", "ENABLED")).path("refundNo").asText()).isNotBlank();
+    @DisplayName("字典说转工单 → wo_order 里真有这张单，且重复转不出第二张")
+    void workOrderRouteCreatesARealWorkOrder() {
+        String probNo = problem("TO_WORKORDER", "ENABLED");
+        var vo = report(probNo);
+        String woNo = vo.path("woNo").asText();
+        String ticketNo = vo.path("reportNo").asText();
+
+        assertThat(woNo).as("要给出去向单号，否则用户与运营都追不下去").isNotBlank();
+        assertThat(woNo).as("此前发的是 WO-STUB-*，wo_order 里查无此单 —— 没有人会去处理它")
+                .doesNotContain("STUB");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM wo_order WHERE wo_no=?", Integer.class, woNo))
+                .as("工单表里真有这张单").isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT source FROM wo_order WHERE wo_no=?", String.class, woNo))
+                .isEqualTo("USER");
+        assertThat(jdbc.queryForObject("SELECT source_ref FROM wo_order WHERE wo_no=?", String.class, woNo))
+                .as("来源指回那张报障单 —— 运维看单时要知道是谁报的").isEqualTo(ticketNo);
+        assertThat(jdbc.queryForObject("SELECT description FROM wo_order WHERE wo_no=?", String.class, woNo))
+                .as("描述里带单号与用户原话").contains(ticketNo);
+    }
+
+    @Test
+    @DisplayName("字典说转退款 → ord_refund 里真有一张待财务审批的单（这一步不动钱）")
+    void refundRouteCreatesARealPendingRefund() {
+        String token = consumerToken();
+        String cab = liveCabinet();
+        String orderNo = post("/mp/trade/orders/rent", Map.of("cabinetNo", cab), token).okData().path("orderNo").asText();
+        rents.returnOrderAt(orderNo, cab, java.time.LocalDateTime.now(java.time.ZoneOffset.UTC).plusHours(2));
+
+        var vo = post("/mp/user/report", Map.of("problemNo", problem("TO_REFUND", "ENABLED"),
+                "orderNo", orderNo, "issue", "这一单不该收钱", "channel", "APP"), token).okData();
+        String refundNo = vo.path("refundNo").asText();
+
+        assertThat(refundNo).as("此前发的是 RFD-STUB-*，财务侧没有任何待办 —— 钱不会到用户手上")
+                .isNotBlank().doesNotContain("STUB");
+        assertThat(jdbc.queryForObject("SELECT status FROM ord_refund WHERE refund_no=?", String.class, refundNo))
+                .as("建的是**待审批**的单，不是已退款 —— 钱要等财务点头").isEqualTo("PENDING");
+        assertThat(jdbc.queryForObject("SELECT order_no FROM ord_refund WHERE refund_no=?", String.class, refundNo))
+                .isEqualTo(orderNo);
+        assertThat(jdbc.queryForObject("SELECT idempotency_key FROM ord_refund WHERE refund_no=?", String.class, refundNo))
+                .as("幂等键用报障单号 —— 重复转退款不会退第二笔").isEqualTo(vo.path("reportNo").asText());
+    }
+
+    @Test
+    @DisplayName("配了转退款却没关联订单 → 改走人工，而不是留一个空的退款号")
+    void refundWithoutOrderFallsBackToHuman() {
+        var vo = report(problem("TO_REFUND", "ENABLED"));
+        // asText() 对 JSON null 返回字符串 "null"，断言要看节点本身
+        assertThat(vo.path("refundNo").isNull())
+                .as("空号的后果与旧桩一样：看起来已转退款，财务侧什么都没有（实得：%s）", vo.path("refundNo")).isTrue();
+        assertThat(vo.path("sessionNo").asText()).as("改走人工要真的开出会话").isNotBlank();
     }
 
     @Test
