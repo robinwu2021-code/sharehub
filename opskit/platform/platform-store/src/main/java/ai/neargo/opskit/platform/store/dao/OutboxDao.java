@@ -111,4 +111,21 @@ public final class OutboxDao {
             sql.append(" AND done_at_ms IS NOT NULL");
         }
     }
+
+    /**
+     * 清掉早于 before 送达的事件及其投递记录，一批最多 limit 条；返回本批删除的事件数（0 = 清完）。跨空间是有意为之（全局维护任务）。
+     * 先查主键再按主键删：按范围 DELETE 在 MySQL 可重复读下会加间隙锁，与投递中的写入互相阻塞。
+     */
+    public int purgeDeliveredBefore(AccountId unknown, long before, int limit) {
+        if (!AccountId.UNKNOWN.equals(unknown)) {
+            throw new IllegalArgumentException("outbox purge is cross-tenant by design");
+        }
+        List<Long> ids = jdbc.sql("SELECT id FROM plat_outbox WHERE done_at_ms IS NOT NULL AND done_at_ms < ? ORDER BY id" + dialect.limitOffset(limit, 0))
+                .param(before).query(Long.class).list();
+        if (ids.isEmpty()) {
+            return 0;
+        }
+        jdbc.sql("DELETE FROM plat_webhook_delivery WHERE outbox_id IN (:ids)").param("ids", ids).update();
+        return jdbc.sql("DELETE FROM plat_outbox WHERE id IN (:ids)").param("ids", ids).update();
+    }
 }

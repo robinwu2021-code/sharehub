@@ -10,7 +10,7 @@ public record PlatformProperties(Crypto crypto, Outbox outbox, Idempotency idemp
 
     public PlatformProperties {
         crypto = crypto == null ? new Crypto(null) : crypto;
-        outbox = outbox == null ? new Outbox(null, null) : outbox;
+        outbox = outbox == null ? new Outbox(null, null, null) : outbox;
         idempotency = idempotency == null ? new Idempotency(null) : idempotency;
         auth = auth == null ? new Auth(null) : auth;
     }
@@ -26,9 +26,14 @@ public record PlatformProperties(Crypto crypto, Outbox outbox, Idempotency idemp
     public record Crypto(String key) {
     }
 
-    public record Outbox(Duration relayInterval, List<Duration> backoff) {
+    /**
+     * @param retention 已送达事件（连同每次投递记录）保留多久，之后每日清掉；失败待人工与仍在重试的不清。
+     *                  事件信封里可能有外部确认的一次性令牌明文，不宜无限期留存
+     */
+    public record Outbox(Duration relayInterval, List<Duration> backoff, Duration retention) {
         public Outbox {
             relayInterval = relayInterval == null ? Duration.ofSeconds(5) : relayInterval;
+            retention = retention == null ? Duration.ofDays(30) : retention;
         }
     }
 

@@ -31,6 +31,7 @@ docker compose up -d && docker compose logs -f opskit
 | `OPSKIT_BOOTSTRAP_REQUIRED` | | compose 里为 `true`：引导文件缺失、**被挂成了目录**、或没写 `enabled: true` 都拒绝启动 |
 | `OPSKIT_DB_POOL` | | 连接池上限，默认 20 |
 | `OPSKIT_LOG_DIR` | | 设了才落盘 |
+| `OPSKIT_OUTBOX_RETENTION` | | 已送达事件保留期，默认 `30d` |
 
 ## 坑
 

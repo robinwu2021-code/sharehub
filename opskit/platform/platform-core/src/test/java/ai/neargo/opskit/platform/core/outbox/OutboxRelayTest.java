@@ -256,6 +256,36 @@ class OutboxRelayTest {
         }
     }
 
+    /** 保留期：已送达超期的连同投递记录清掉；未超期的、失败待人工的都留着。 */
+    @ParameterizedTest
+    @MethodSource("ai.neargo.opskit.commons.testing.TestDatabases#all")
+    void retentionPurgesOnlyOldDeliveredEvents(TestDatabase db) throws Exception {
+        Env e = env(db);
+        AppSecrets app = e.d.apps.createApp(e.d.account, new CreateAppRequest("x", true, List.of(), null));
+        try (Receiver ok = new Receiver(); Receiver broken = new Receiver()) {
+            e.webhooks.subscribe(e.d.account, null, app.app().appId(), "ticket.*", ok.url());
+            e.webhooks.subscribe(e.d.account, null, app.app().appId(), "instance.*", broken.url());
+            broken.status.set(500);
+            e.publish(e.event("ticket.created", "OLD:1"));
+            e.publish(e.event("instance.created", "DEAD:1"));
+            for (int i = 0; i < 3; i++) {
+                e.relay.relayOnce();
+                e.d.f.clock.advanceMillis(Duration.ofHours(1).toMillis());
+            }
+            e.d.f.clock.advanceMillis(Duration.ofDays(31).toMillis());
+            e.publish(e.event("ticket.created", "NEW:1"));
+            e.relay.relayOnce();
+
+            int purged = OutboxRetention.purge(e.outbox, e.d.f.clock, e.d.f.tx, Duration.ofDays(30));
+            assertThat(purged).isEqualTo(1);
+            assertThat(e.d.f.jdbc.sql("SELECT idem_key FROM plat_outbox ORDER BY idem_key").query(String.class).list())
+                    .as("超期已送达的清掉；失败待人工与新近的留着").containsExactly("DEAD:1", "NEW:1");
+            assertThat(e.d.f.jdbc.sql("SELECT COUNT(*) FROM plat_webhook_delivery d JOIN plat_outbox o ON o.id = d.outbox_id WHERE o.idem_key = 'DEAD:1'")
+                    .query(Integer.class).single()).as("失败事件的投递记录保留，供排查").isEqualTo(3);
+            assertThat(e.d.f.jdbc.sql("SELECT COUNT(*) FROM plat_webhook_delivery").query(Integer.class).single()).as("清掉的事件不留孤儿投递记录").isEqualTo(4);
+        }
+    }
+
     @ParameterizedTest
     @MethodSource("ai.neargo.opskit.commons.testing.TestDatabases#all")
     void subscriptionsFilterByWorkspaceAndType(TestDatabase db) throws Exception {

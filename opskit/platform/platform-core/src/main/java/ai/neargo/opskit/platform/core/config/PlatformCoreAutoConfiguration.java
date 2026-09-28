@@ -222,6 +222,13 @@ public class PlatformCoreAutoConfiguration {
         return Tasks.recurring("outbox-relay", FixedDelay.of(props.outbox().relayInterval())).execute((inst, ctx) -> relay.relayOnce());
     }
 
+    /** 每日清已送达且超过保留期的事件（opskit.outbox.retention，默认 30 天），分批各自提交。 */
+    @Bean
+    Task<Void> outboxPurgeTask(OutboxDao outbox, Clock clock, TransactionOperations tx, PlatformProperties props) {
+        return Tasks.recurring("outbox-purge", Schedules.daily(java.time.ZoneOffset.UTC, java.time.LocalTime.of(3, 45))).execute((inst, ctx) ->
+                ai.neargo.opskit.platform.core.outbox.OutboxRetention.purge(outbox, clock, tx, props.outbox().retention()));
+    }
+
     @Bean
     Task<Void> idempotencyPurgeTask(IdempotencyStore store) {
         return Tasks.recurring("idempotency-purge", Schedules.daily(java.time.ZoneOffset.UTC, java.time.LocalTime.of(3, 30))).execute((inst, ctx) -> store.purgeExpired());

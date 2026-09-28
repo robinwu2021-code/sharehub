@@ -21,6 +21,7 @@
 | `OPSKIT_APP_SHAREHUB_CREDENTIAL` / `_SIGNING_SECRET` | M5 | 宿主应用凭证 `okk_…` 与 webhook 签名密钥 `oks_…`（生成命令见 `bootstrap.yml.example`）；与 ShareHub 侧同值。日志只记动作（CREATED / ROTATED / UNCHANGED），不记值 |
 | `OPSKIT_BOOTSTRAP_REQUIRED` | 建议 | 设 `true`：引导文件缺失、是目录、或未 `enabled: true` 时拒绝启动（默认 false 只记 WARN —— 服务会健康却无人能登录）|
 | `OPSKIT_DB_POOL` | | 连接池上限，默认 20 |
+| `OPSKIT_OUTBOX_RETENTION` | | 已送达 webhook 事件的保留期，默认 `30d`（每日清理；失败待人工的不清）|
 | `OPSKIT_LOG_DIR` | | 设了才落盘（`{dir}/spring.log`，按天滚动、保留 20 天、单文件 200MB）；不设只进 journal |
 
 ## 预置定义（流程 · SLA · 工单类型）

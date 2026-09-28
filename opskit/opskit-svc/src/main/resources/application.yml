@@ -14,6 +14,8 @@ opskit:
     key: ${OPSKIT_CRYPTO_KEY:}
   outbox:
     relay-interval: 5s
+    # 已送达事件（连同投递记录）保留期，每日 03:45 UTC 清理；失败待人工的不清（信封里可能有外部确认令牌明文，不宜无限期留存）
+    retention: ${OPSKIT_OUTBOX_RETENTION:30d}
   idempotency:
     retention: 7d
 
