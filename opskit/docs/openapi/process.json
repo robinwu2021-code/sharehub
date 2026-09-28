@@ -641,6 +641,10 @@
             "format" : "int64",
             "type" : "integer"
           },
+          "running" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
           "version" : {
             "type" : "string"
           }

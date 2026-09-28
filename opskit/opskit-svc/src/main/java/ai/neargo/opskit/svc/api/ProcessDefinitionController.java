@@ -25,7 +25,10 @@ public class ProcessDefinitionController {
 
     private final ProcessDefinitionAppService processes;
 
-    public ProcessDefinitionController(ProcessDefinitionAppService processes) {
+    private final ai.neargo.opskit.process.core.app.ProcessHistoryService history;
+
+    public ProcessDefinitionController(ProcessDefinitionAppService processes, ai.neargo.opskit.process.core.app.ProcessHistoryService history) {
+        this.history = history;
         this.processes = processes;
     }
 
@@ -33,8 +36,9 @@ public class ProcessDefinitionController {
      * 当前生效的原始定义（配置界面编辑用）：形状与 PUT 请求体一致，取回改完可原样提交。需 process:manage（或应用自身）；
      * 响应头 {@code X-Definition-Version} 是版本号（内容哈希）。
      */
+    /** @param running 未结束的实例数（任何版本） */
     public record ProcessRow(String code, Map<String, String> name, String version, boolean enabled, boolean inherited, boolean fromTemplate,
-            long publishedAtMs) {
+            long publishedAtMs, long running) {
     }
 
     public record VersionRow(String version, long publishedAtMs, String channel, String publishedBy, String note, boolean current) {
@@ -45,7 +49,7 @@ public class ProcessDefinitionController {
     public List<ProcessRow> list(Actor actor) {
         PermissionGuard.require(actor, "process:manage");
         return processes.list(actor.tenant()).stream().map(p -> new ProcessRow(p.code(), p.name() == null ? Map.of() : p.name().values(), p.version(),
-                p.enabled(), p.inherited(), p.fromTemplate(), p.publishedAtMs())).toList();
+                p.enabled(), p.inherited(), p.fromTemplate(), p.publishedAtMs(), history.openInstances(actor.tenant(), p.code()))).toList();
     }
 
     @GetMapping("/processes/{code}/versions")

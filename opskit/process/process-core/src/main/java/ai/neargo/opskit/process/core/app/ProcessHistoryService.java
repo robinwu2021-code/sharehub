@@ -92,6 +92,12 @@ public class ProcessHistoryService {
         return Page.of(queries.instances(ws, v, f, page.offset(), page.size()).stream().map(names::row).toList(), total, page);
     }
 
+    /** 某流程在本空间未结束的实例数（流程目录的「在途」；停用前看一眼还有多少单在跑）。 */
+    @SystemAction("流程目录：在途数")
+    public long openInstances(ai.neargo.opskit.commons.tenancy.TenantContext t, String processCode) {
+        return queries.openInstances(t.workspaceId(), processCode, null);
+    }
+
     /** 实例当前在审（PENDING）的审批单号。只给刚由同一调用方发起 / 推进过的实例用（可见性已在那一步判过）。 */
     @SystemAction("发起后回带审批单号")
     public java.util.Optional<String> pendingApprovalNo(ai.neargo.opskit.commons.tenancy.TenantContext t, String instanceNo) {

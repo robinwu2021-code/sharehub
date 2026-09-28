@@ -378,5 +378,8 @@ class LocalApiTest {
         assertThat(off.body().get("error").asText()).isEqualTo("opskit.definition.disabled");
         assertThat(call("POST", WS + "/processes/disable_me/enable", admin, Map.of()).status()).isEqualTo(204);
         assertThat(call("POST", WS + "/instances", bob, Map.of("processCode", "disable_me")).status()).isEqualTo(200);
+        JsonNode after = call("GET", WS + "/processes", admin, null).body().valueStream().filter(n -> "disable_me".equals(n.get("code").asText()))
+                .findFirst().orElseThrow();
+        assertThat(after.get("running").asLong()).as("在途数").isEqualTo(1);
     }
 }
