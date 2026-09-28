@@ -25,11 +25,32 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class WithdrawalPayoutTest extends ApiTestSupport {
 
+    @org.springframework.beans.factory.annotation.Autowired
+    org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+
     private static String randomPayee() {
         return "AGT" + (100_000 + ThreadLocalRandom.current().nextInt(800_000));
     }
 
     /** 建一笔提现并审批通过，返回单号（此时应为 PAYING）。 */
+    /**
+     * 放款人令牌 —— **必须与审批人是不同的 userNo**。
+     *
+     * 2026-09-28 起 `finance.withdrawal.separation` 默认 REQUIRE：审批人不得兼放款人
+     * （裁决见 docs/technical/方案-提现审批与放款分离.md）。这个用例原先全程用 admin
+     * 一个令牌审批又放款，于是 /pay 全部 409 —— 红得对，它正说明默认口径真的生效了。
+     *
+     * 临时发码而不是依赖种子：库里没有任何角色持 finance:withdrawal:pay
+     * （只有 ADMIN 的通配），依赖种子的话别人调整角色这条就会红。
+     */
+    private String payerToken() {
+        jdbc.update("DELETE FROM iam_role_perm WHERE role_no=?", "TMPPAYER");
+        jdbc.update("INSERT INTO iam_role_perm (role_no, perm_code) VALUES (?, 'finance:withdrawal:pay')",
+                "TMPPAYER");
+        return login("TMPPAYER");
+    }
+
     private String approvedWithdrawal(String admin, String payeeNo) {
         Map<String, Object> acct = new HashMap<>();
         acct.put("payeeType", "AGENT");
@@ -103,7 +124,7 @@ class WithdrawalPayoutTest extends ApiTestSupport {
         String no = approvedWithdrawal(admin, randomPayee());
 
         JsonNode paid = post("/api/trade/withdrawals/" + no + "/pay",
-                receipt(true, "MANUAL", randomRef(), null), admin).okData();
+                receipt(true, "MANUAL", randomRef(), null), payerToken()).okData();
 
         assertThat(paid.path("status").asText())
                 .as("这一步此前整个是缺的：批完就停在 PAYING").isEqualTo("PAID");
@@ -119,7 +140,7 @@ class WithdrawalPayoutTest extends ApiTestSupport {
         String no = approvedWithdrawal(admin, randomPayee());
 
         JsonNode failed = post("/api/trade/withdrawals/" + no + "/pay",
-                receipt(false, "MANUAL", null, "收款账号已销户"), admin).okData();
+                receipt(false, "MANUAL", null, "收款账号已销户"), payerToken()).okData();
 
         assertThat(failed.path("status").asText()).isEqualTo("FAILED");
         assertThat(failed.path("failReason").asText()).isEqualTo("收款账号已销户");
@@ -135,7 +156,7 @@ class WithdrawalPayoutTest extends ApiTestSupport {
         String no = approvedWithdrawal(admin, randomPayee());
 
         Resp r = post("/api/trade/withdrawals/" + no + "/pay",
-                receipt(true, "MANUAL", null, null), admin);
+                receipt(true, "MANUAL", null, null), payerToken());
         assertThat(r.code())
                 .as("「已到账」要能被对账证实，没有流水号就只是一句话: %s", r.msg())
                 .isNotEqualTo(0);
@@ -150,7 +171,7 @@ class WithdrawalPayoutTest extends ApiTestSupport {
         String no = approvedWithdrawal(admin, randomPayee());
 
         Resp r = post("/api/trade/withdrawals/" + no + "/pay",
-                receipt(false, "MANUAL", null, null), admin);
+                receipt(false, "MANUAL", null, null), payerToken());
         assertThat(r.code()).as("失败必须留原因: %s", r.msg()).isNotEqualTo(0);
         assertThat(statusOf(admin, no)).isEqualTo("PAYING");
     }
@@ -164,7 +185,7 @@ class WithdrawalPayoutTest extends ApiTestSupport {
         String admin = login("ADMIN");
         String no = approvedWithdrawal(admin, randomPayee());
         post("/api/trade/withdrawals/" + no + "/pay",
-                receipt(false, "MANUAL", null, "银行拒收"), admin).okData();
+                receipt(false, "MANUAL", null, "银行拒收"), payerToken()).okData();
 
         JsonNode row = find(admin, no);
         assertThat(row.path("failReason").asText()).isEqualTo("银行拒收");
@@ -187,7 +208,7 @@ class WithdrawalPayoutTest extends ApiTestSupport {
         String no = post("/api/trade/withdrawals", req, admin).okData().path("withdrawNo").asText();
 
         Resp r = post("/api/trade/withdrawals/" + no + "/pay",
-                receipt(true, "MANUAL", randomRef(), null), admin);
+                receipt(true, "MANUAL", randomRef(), null), payerToken());
         assertThat(r.code())
                 .as("APPLY 直接跳到 PAID 等于绕过审批: %s", r.msg()).isNotEqualTo(0);
     }
@@ -197,10 +218,10 @@ class WithdrawalPayoutTest extends ApiTestSupport {
         String admin = login("ADMIN");
         String no = approvedWithdrawal(admin, randomPayee());
         post("/api/trade/withdrawals/" + no + "/pay",
-                receipt(true, "MANUAL", randomRef(), null), admin).okData();
+                receipt(true, "MANUAL", randomRef(), null), payerToken()).okData();
 
         Resp again = post("/api/trade/withdrawals/" + no + "/pay",
-                receipt(true, "MANUAL", randomRef(), null), admin);
+                receipt(true, "MANUAL", randomRef(), null), payerToken());
         assertThat(again.code()).as("PAID 是终态，没有出边: %s", again.msg()).isNotEqualTo(0);
     }
 
@@ -216,10 +237,10 @@ class WithdrawalPayoutTest extends ApiTestSupport {
         String second = approvedWithdrawal(admin, randomPayee());
 
         post("/api/trade/withdrawals/" + first + "/pay",
-                receipt(true, "MANUAL", ref, null), admin).okData();
+                receipt(true, "MANUAL", ref, null), payerToken()).okData();
 
         Resp dup = post("/api/trade/withdrawals/" + second + "/pay",
-                receipt(true, "MANUAL", ref, null), admin);
+                receipt(true, "MANUAL", ref, null), payerToken());
         assertThat(dup.code()).as("同一笔流水不能记两次: %s", dup.msg()).isNotEqualTo(0);
         // **为正确的理由失败**：只断言「不为 0」的话，单号写错、权限不足同样能让它变绿
         assertThat(dup.msg()).as("要因为流水号重复而拒，而不是别的原因").contains("流水号");
@@ -231,7 +252,7 @@ class WithdrawalPayoutTest extends ApiTestSupport {
         String admin = login("ADMIN");
         String no = approvedWithdrawal(admin, randomPayee());
         Resp r = post("/api/trade/withdrawals/" + no + "/pay",
-                receipt(true, "WECHAT_RED_PACKET", randomRef(), null), admin);
+                receipt(true, "WECHAT_RED_PACKET", randomRef(), null), payerToken());
         assertThat(r.code()).as("渠道白名单之外一律拒: %s", r.msg()).isNotEqualTo(0);
     }
 

@@ -29,6 +29,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.Optional;
+import ai.neargo.sharehub.finance.WithdrawalSeparation;
 
 /**
  * 提现实现 —— 资金审批合规四件套（{@code fee} / {@code auditor_no}+{@code auditor_name} /
@@ -56,10 +57,18 @@ public class WithdrawalServiceImpl implements WithdrawalService {
     private final PayoutAccountService payoutAccounts;
     private final ai.neargo.sharehub.api.platform.port.AgentDirectoryPort agents;
 
+    private static final org.slf4j.Logger log =
+            org.slf4j.LoggerFactory.getLogger(WithdrawalServiceImpl.class);
+
+    /** 读 finance.withdrawal.separation —— 审批人能不能兼放款人，由管理员配。 */
+    private final ai.neargo.sharehub.api.platform.port.SysParamPort params;
+
     public WithdrawalServiceImpl(StlWithdrawalMapper mapper, WithdrawFeePolicy feePolicy,
                                  WithdrawalStateMachine stateMachine,
                                  PayoutAccountService payoutAccounts,
-                                 ai.neargo.sharehub.api.platform.port.AgentDirectoryPort agents) {
+                                 ai.neargo.sharehub.api.platform.port.AgentDirectoryPort agents,
+                                 ai.neargo.sharehub.api.platform.port.SysParamPort params) {
+        this.params = params;
         this.agents = agents;
         this.mapper = mapper;
         this.feePolicy = feePolicy;
@@ -224,8 +233,36 @@ public class WithdrawalServiceImpl implements WithdrawalService {
 
         // 登记人服务端回填，且**与审批人分列** —— 查「谁批的、谁放的款」不用翻操作日志
         LoginUser u = SecurityUtils.currentUser().orElse(null);
-        e.setPayerNo(Optional.ofNullable(u).map(LoginUser::userNo).orElse(null));
+        String payerNo = Optional.ofNullable(u).map(LoginUser::userNo).orElse(null);
+        e.setPayerNo(payerNo);
         e.setPayerName(Optional.ofNullable(u).map(LoginUser::username).orElse(null));
+
+        /*
+         * —— 审批人不得兼放款人（2026-09-28 裁决：不硬拦，由管理员配）——
+         *
+         * **判在 pay() 而不是 audit()**：审批发生在前，那时还不知道谁会来放款。
+         * 放在 audit() 里判等于要求「审批时就锁定放款人」，那是指派制，不是本裁决的意思。
+         *
+         * **比 userNo 不比 username**：后者是展示名，会重名、会改。
+         *
+         * 标记在**发生那一刻定格**，不是每次拿两列比一下 —— auditor_no / payer_no
+         * 将来可能被归档清理，而「当时是不是同一人」是个事实。
+         * OFF 同样落这个标记：**关掉的是拦截，不是记录**。
+         */
+        boolean same = payerNo != null && payerNo.equals(e.getAuditorNo());
+        if (same) {
+            WithdrawalSeparation mode =
+                    WithdrawalSeparation.of(params.textOf(WithdrawalSeparation.KEY, null));
+            if (mode == WithdrawalSeparation.REQUIRE) {
+                throw ai.neargo.sharehub.common.BizException.conflict(
+                        "error.withdrawal.self_payout", withdrawNo);
+            }
+            if (mode == WithdrawalSeparation.WARN) {
+                log.warn("同一人既审批又放款 withdrawNo={} operator={} —— 当前配置 WARN，已放行；"
+                        + "补到两个财务后请把 {} 改回 REQUIRE", withdrawNo, payerNo, WithdrawalSeparation.KEY);
+            }
+        }
+        e.setSameOperator(same ? 1 : 0);
 
         if (ok) {
             e.setPaidAt(LocalDateTime.now().format(TS));
@@ -264,6 +301,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
                 amount.subtract(fee),   // 实际到账 = amount - fee，派生值不落库（[db-design §5.5]）
                 e.getCurrency(), e.getBankCode(), e.getStatus(), e.getAppliedAt(), e.getApplicantNo(),
                 e.getAuditorName(), e.getAuditedAt(), e.getRejectReason(), e.getPaidAt(),
-                e.getPayChannel(), e.getPayRef(), e.getPayerName(), e.getFailReason());
+                e.getPayChannel(), e.getPayRef(), e.getPayerName(), e.getFailReason(),
+                e.getSameOperator() != null && e.getSameOperator() == 1);
     }
 }

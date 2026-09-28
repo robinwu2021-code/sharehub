@@ -93,6 +93,14 @@ public class StlWithdrawal extends BaseEntity {
     /** 快照：登记人姓名。 */
     private String payerName;
 
+    /**
+     * 审批人与放款人是否同一人（1=是）。**在放款那一刻定格**，不是每次比一下 ——
+     * auditor_no / payer_no 将来可能被归档清理，而「当时是不是同一人」是个事实。
+     * REQUIRE 模式下不会出现 1（直接拦住了）；WARN / OFF 才可能留下 1 ——
+     * 关掉的是拦截，不是记录。
+     */
+    private Integer sameOperator;
+
     /** 打款失败原因。**不要与 rejectReason 合并** —— 那是审批驳回（钱从没打算出去）。 */
     private String failReason;
 }

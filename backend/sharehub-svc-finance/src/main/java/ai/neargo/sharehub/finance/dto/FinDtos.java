@@ -105,7 +105,9 @@ public final class FinDtos {
                              String applicantNo, String auditorName, String auditedAt, String rejectReason,
                              String paidAt,
                              // —— 打款回执（V57）。列表要能一眼回答「钱到底出去没有、走的哪条道」——
-                             String payChannel, String payRef, String payerName, String failReason) {
+                             String payChannel, String payRef, String payerName, String failReason,
+                             // 审批人与放款人是否同一人 —— 列表上标出来，否则这条规则没有观察面
+                             boolean sameOperator) {
     }
 
     /**
