@@ -5,7 +5,7 @@
 
 - 设计准绳：[`docs/technical/v4/16-工作流与工单/21-设计方案-重梳/`](../docs/technical/v4/16-工作流与工单/21-设计方案-重梳/README.md)
 - 执行入口：[`21/07-任务清单.md`](../docs/technical/v4/16-工作流与工单/21-设计方案-重梳/07-任务清单.md)
-- 孵化期住在 powerbank 仓库根目录，**不进 `sharehub-parent`、不依赖任何业务构件**；成熟后按 `git subtree split` 拆为独立仓库，坐标与包名不变。
+- 孵化期住在 powerbank 仓库根目录，**不进 `sharehub-parent`、不依赖任何业务构件**（父 POM 直接是 `spring-boot-starter-parent`，干净机器只靠 Maven Central 就能构建）；成熟后按 `git subtree split` 拆为独立仓库，坐标与包名不变。
 
 ## 模块
 
@@ -28,9 +28,13 @@ scripts/verify.sh -pl commons               # 透传 mvn 参数
 OPSKIT_TEST_DATABASES=h2 scripts/verify.sh  # 只跑 H2 快速档（不作为通过依据）
 ```
 
-脚本自动处理两件本机上容易卡住的事：选 JDK 21（`neargo-parent` 的 enforcer 锁 [21,22)）；
+脚本自动处理两件本机上容易卡住的事：选 JDK 21（根 POM 的 enforcer 锁 [21,22)）；
 从当前 docker context 推出 `DOCKER_HOST`（Testcontainers 不读 docker context，colima / OrbStack 下否则找不到 Docker）。
 四库 = MariaDB 11.4（生产同系）· MySQL 8.4 · PostgreSQL 16 · H2，需要本机有容器运行时（如 `colima start`）。
+
+## CI
+
+`.github/workflows/opskit.yml`：改动 `opskit/**` 或 `deploy/opskit/**` 时跑 `scripts/verify.sh`（构建 + 四库测试 + 架构测试 + OpenAPI / 错误键比对）并构建运行镜像。
 
 ## 已知的坑（都已由用例钉住）
 

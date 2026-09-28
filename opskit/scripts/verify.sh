@@ -6,7 +6,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# neargo-parent 的 enforcer 锁 JDK [21,22)；本机默认 JDK 往往不是 21。
+# 根 POM 的 enforcer 锁 JDK [21,22)；本机默认 JDK 往往不是 21。
 if [[ -z "${JAVA_HOME:-}" || ! "$("$JAVA_HOME/bin/java" -version 2>&1)" =~ \"21\. ]]; then
   if command -v /usr/libexec/java_home >/dev/null && /usr/libexec/java_home -v 21 >/dev/null 2>&1; then
     JAVA_HOME="$(/usr/libexec/java_home -v 21)"

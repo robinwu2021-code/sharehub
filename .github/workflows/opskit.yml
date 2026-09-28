@@ -1,0 +1,48 @@
+# OpsKit CI（21/07 O0-7）：构建 + 四库测试（MariaDB / MySQL / PostgreSQL 走 Testcontainers，H2 内存）+ 架构测试
+# + OpenAPI 与错误键目录比对（OpenApiExportTest / ErrorKeyCatalogTest，文件过期即红）+ 运行镜像能构建。
+# 本地同一入口：opskit/scripts/verify.sh
+name: opskit
+
+on:
+  push:
+    branches: [main]
+    paths: ["opskit/**", "deploy/opskit/**", ".github/workflows/opskit.yml"]
+  pull_request:
+    paths: ["opskit/**", "deploy/opskit/**", ".github/workflows/opskit.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: opskit-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: opskit/**/pom.xml
+
+      # 启动引导的用例读 deploy/opskit/definitions.example（部署示例本身就是被测对象）
+      - name: verify（构建 + 四库测试 + 架构测试 + 契约比对）
+        run: opskit/scripts/verify.sh -B -ntp
+
+      - name: 运行镜像能构建
+        run: SKIP_PACKAGE=1 opskit/scripts/build-image.sh
+
+      - name: 失败时留下测试报告
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: opskit/**/target/surefire-reports/
+          retention-days: 7

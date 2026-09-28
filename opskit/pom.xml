@@ -7,11 +7,13 @@
     <!-- OpsKit（运营套件）：通用运营基础能力 SaaS。
          孵化期住在 powerbank 仓库根目录，与 backend/ 平级、不进 sharehub-parent；
          成熟后 用 git subtree split（prefix = opskit）拆成独立仓库，坐标与包名不变。
-         设计准绳：docs/technical/v4/16-工作流与工单/21-设计方案-重梳/ -->
+         设计准绳：docs/technical/v4/16-工作流与工单/21-设计方案-重梳/
+         父 POM 直接用 Spring Boot（21/07 O0-7）：原先继承 ai-neargo 的 neargo-parent，它只装在开发机本地仓库、私仓没有，
+         CI 拉不到；而它给 OpsKit 的只有 Boot 版本、JDK 21 与 JDK 门禁（其余是 MyBatis / Nacos / 业务模块，与本产品无关）。 -->
     <parent>
-        <groupId>ai.neargo</groupId>
-        <artifactId>neargo-parent</artifactId>
-        <version>1.0.0-SNAPSHOT</version>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.0.7</version>
         <relativePath/>
     </parent>
 
@@ -31,6 +33,10 @@
     </modules>
 
     <properties>
+        <java.version>21</java.version>
+        <maven.compiler.release>21</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <db-scheduler.version>16.12.0</db-scheduler.version>
         <archunit.version>1.3.0</archunit.version>
     </properties>
@@ -72,7 +78,23 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-enforcer-plugin</artifactId>
+                <version>3.5.0</version>
                 <executions>
+                    <!-- 构建环境：JDK 21（Boot 4.0 目标版本）。原由 neargo-parent 提供 -->
+                    <execution>
+                        <id>enforce-build-env</id>
+                        <goals><goal>enforce</goal></goals>
+                        <configuration>
+                            <rules>
+                                <requireJavaVersion>
+                                    <version>[21,22)</version>
+                                    <message>OpsKit 需用 JDK 21 构建（Spring Boot 4.0 目标版本）。scripts/verify.sh 会自动选 JDK 21。</message>
+                                </requireJavaVersion>
+                                <requireMavenVersion><version>[3.8.0,)</version></requireMavenVersion>
+                            </rules>
+                            <fail>true</fail>
+                        </configuration>
+                    </execution>
                     <execution>
                         <id>opskit-global-rules</id>
                         <goals><goal>enforce</goal></goals>
