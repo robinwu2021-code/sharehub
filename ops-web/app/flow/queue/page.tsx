@@ -46,16 +46,20 @@ function FlowQueue() {
   const { t: tt, tc, fmt } = useFlowT("queue");
   const now = useNow();
   const paging = usePaging();
-  const [queue, setQueue] = useState("merchant");
+  // 选中的队列：没点过就用服务返回的第一个（原先写死 mock 的 "merchant"，对真服务时页签有数、列表却是空的）
+  const [picked, setPicked] = useState<string | null>(null);
   const [rejecting, setRejecting] = useState<QueueTask | null>(null);
   const [form, setForm] = useState<Record<string, unknown>>({ reason: "" });
   const refresh = () => qc.invalidateQueries({ queryKey: FLOW_KEY });
 
   const queues = useQuery({ queryKey: [...FLOW_KEY, "queue-counts"], queryFn: flow.queueCounts });
+  const queue = picked ?? queues.data?.[0]?.queue.code ?? "";
+  const setQueue = setPicked;
   const mine = useQuery({ queryKey: [...FLOW_KEY, "my-claimed"], queryFn: flow.myClaimed });
   const list = useQuery({
     queryKey: [...FLOW_KEY, "queue-tasks", queue, paging.page, paging.size],
     queryFn: () => flow.queueTasks(queue, paging.page, paging.size),
+    enabled: !!queue,
   });
 
   // 倒计时走到 0：服务端会在下次读时放回；这里主动刷新一次，让「我在审」及时变化

@@ -141,8 +141,9 @@
 /* ═══ 风格轴 data-style（与皮肤正交）══════════════════════════════════════
    皮肤 data-theme 只换主色（五套）；**风格换的是整体 UI 形态**：表格、tab、徽章、卡片、
    按钮、输入框、时间线、步骤条……（规则在文件末尾的风格块）。
-   两条轴任意组合：任何风格在任何主题色下都必须成立 —— 所以风格**不带色相**，
-   中性色阶沿用上方的全站基线，不给风格单独调灰（曾试过带青调的灰，只配墨青一种主色）。
+   两条轴任意组合：任何风格在任何主题色下都必须成立 —— 所以风格**不写死色相**。
+   2026-09-28 起清爽风格的中性色**随主题色着色**（下方五个「风格 × 主题」块）：
+   曾试过一套固定的青调灰，只配墨青一种主色；改成每套主题一套灰后，这个问题不再成立。
    风格唯一改的颜色是语义色：降饱和、实心底压白字全部 ≥4.5（基线的绿 2.62、琥珀 2.35 不达标）。
    ⚠️ 对比度由 lib/style-contrast.test.ts 锁住，改值先跑它。
    ⚠️ 本块必须位于 .dark 之前：[data-style] 与 .dark 特异性相同，靠先后。 */
@@ -151,6 +152,41 @@
   --amber-solid: #a3690b; --amber-subtle: #fdf3e0; --amber-text: #6f4a0c;
   --red-solid:   #b3403a; --red-subtle:   #fbecea; --red-text:   #8a2c27;
   --blue-solid:  #3f6aa8; --blue-subtle:  #eef2f8; --blue-text:  #2b4e80;
+  --control-border: var(--border-strong);  /* 控件描边；亮色下改为浅线（见文件末尾「清爽风格的外壳」） */
+}
+
+/* ── 清爽风格 × 主题色：带主色色相的中性色阶（仅亮色）──────────────────────────
+   为什么：原型的灰是带青的石板灰，文字 / 边框 / 次要字与主色同一家族；全站基线的灰偏蓝紫，
+   配青色主色时整页显得发灰、发暗（2026-09-28 与原型逐像素对照的结论）。
+   怎么来的：**明度沿用基线每一档**（基线本就按对比度调好），只换色相、给一点彩度（OKLCH，
+   彩度参照原型：浅档 0.003–0.008、文字档 0.016–0.018；黑白灰减半）。色相取主题主色，
+   两套青色主题取原型实测的 222°（主色本身 197° 会让灰偏绿，反而不像原型）。
+   --canvas-clean：内容区画布，浅灰；白卡 / 白表格浮在上面（白卡/画布 ≥1.10，规范硬指标）。
+   ⚠️ 对比度由 lib/style-contrast.test.ts 逐套锁住；改值先跑它。 */
+[data-style="clean"][data-theme="mono"]:not(.dark) {  /* 黑白灰 */
+  --gray-1: #fcfcfd; --gray-2: #f7f8f9; --gray-3: #f1f2f4; --gray-4: #ecedef; --gray-5: #e6e7e9; --gray-6: #dfe0e3;
+  --gray-7: #d4d5d9; --gray-8: #bbbdc2; --gray-9: #8d8f94; --gray-10: #808288; --gray-11: #63656a; --gray-12: #1d1f23;
+  --canvas-clean: #f2f2f4;
+}
+[data-style="clean"][data-theme="brand"]:not(.dark) {  /* 简电青 */
+  --gray-1: #fafdfe; --gray-2: #f5f9fa; --gray-3: #eff3f5; --gray-4: #e9eef0; --gray-5: #e2e8ea; --gray-6: #dbe2e4;
+  --gray-7: #ced7da; --gray-8: #b5bfc3; --gray-9: #859297; --gray-10: #78858a; --gray-11: #5a686d; --gray-12: #172124;
+  --canvas-clean: #eff3f5;
+}
+[data-style="clean"][data-theme="blue"]:not(.dark) {  /* 时尚蓝 */
+  --gray-1: #fbfcfe; --gray-2: #f7f8fb; --gray-3: #f0f2f6; --gray-4: #ebedf1; --gray-5: #e5e7ec; --gray-6: #dde0e6;
+  --gray-7: #d2d5dc; --gray-8: #b9bdc6; --gray-9: #8a909a; --gray-10: #7d838d; --gray-11: #606570; --gray-12: #1b1f27;
+  --canvas-clean: #f1f2f6;
+}
+[data-style="clean"][data-theme="purple"]:not(.dark) {  /* 科幻紫 */
+  --gray-1: #fcfcfe; --gray-2: #f8f8fb; --gray-3: #f2f2f5; --gray-4: #ededf1; --gray-5: #e7e6eb; --gray-6: #e0dfe5;
+  --gray-7: #d5d4db; --gray-8: #bdbcc5; --gray-9: #8f8e99; --gray-10: #82818c; --gray-11: #65636f; --gray-12: #1f1e26;
+  --canvas-clean: #f2f2f6;
+}
+[data-style="clean"][data-theme="teal"]:not(.dark) {  /* 墨青 */
+  --gray-1: #fafdfe; --gray-2: #f5f9fa; --gray-3: #eff3f5; --gray-4: #e9eef0; --gray-5: #e2e8ea; --gray-6: #dbe2e4;
+  --gray-7: #ced7da; --gray-8: #b5bfc3; --gray-9: #859297; --gray-10: #78858a; --gray-11: #5a686d; --gray-12: #172124;
+  --canvas-clean: #eff3f5;
 }
 
 .dark {
@@ -426,7 +462,7 @@ body {
 [data-style="clean"] [data-variant="outline"],
 [data-style="clean"] [data-variant="secondary"] {
   background: var(--card); color: var(--foreground);
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--control-border);
 }
 [data-style="clean"] [data-variant="outline"]:hover,
 [data-style="clean"] [data-variant="secondary"]:hover { background: var(--card); color: var(--primary-text); border-color: var(--primary); }
@@ -437,7 +473,7 @@ body {
 [data-style="clean"] [data-variant="destructive"]:hover { background: var(--destructive-tint); opacity: 1; }
 
 /* ── 输入框 · 下拉 · 多行文本：白底 + 1px 描边 ── */
-[data-style="clean"] [data-slot="control"] { background: var(--card); border: 1px solid var(--border-strong); }
+[data-style="clean"] [data-slot="control"] { background: var(--card); border: 1px solid var(--control-border); }
 [data-style="clean"] [data-slot="control"]:hover:not(:disabled) { border-color: var(--gray-8); }
 [data-style="clean"] [data-slot="control"]:focus-visible { border-color: var(--primary); }
 
@@ -486,3 +522,31 @@ body {
   border-radius: 3px; overflow: hidden; background: var(--muted);
 }
 [data-style="clean"] [data-slot="sla-bar"] > i { display: block; height: 100%; }
+
+/* ── 清爽风格的外壳与字体（仅亮色）────────────────────────────────────────────
+   对齐原型的明暗结构：内容画布浅灰、卡片 / 表格白、导航白 —— 白面浮在浅灰上才有「亮」和层次；
+   原先导航白 + 二级灰 + 内容白 + 卡片白全挤在明度 95–100%，白上叠白、只靠 1px 线分界，显得发灰。
+   用户 2026-09-28 定：导航保持浅色（不用原型的深色侧栏）；顶栏保留、改成透明融进画布；字体改系统字。
+   经典风格不受影响（仍是规范 §9 的「一级白 / 二级灰 / 内容白」）。 */
+/* 线：原型只有**一种浅线**（#e3e8ea，对白 1.24），卡片边、行线、按钮边、输入框边全用它；
+   ops-web 原先控件用深一档的描边（1.47），工作台一页二十几个行内按钮 —— 满屏深框就是「线条感」。
+   用户 2026-09-28 定：清爽风格统一浅线，输入框悬停 / 聚焦才加深（见 [data-slot="control"] 的 hover / focus）。
+   暗色与经典风格不变：--control-border 在那里仍是 --border-strong。 */
+[data-style="clean"]:not(.dark) { --border: var(--gray-5); --control-border: var(--border); }
+
+[data-style="clean"]:not(.dark) { --canvas: var(--canvas-clean, var(--gray-3)); }
+[data-style="clean"]:not(.dark) [data-shell="sheet"] { background: var(--canvas); }
+[data-style="clean"]:not(.dark) [data-shell="sheet"] header { background: color-mix(in srgb, var(--canvas) 86%, transparent); }
+/* 二级导航也用白面（经典风格是灰块）。导航与画布之间**不画线**：白对浅灰的色差就是分界（少一条线） */
+[data-style="clean"]:not(.dark) aside[class*="bg-sidebar"]:not([data-shell="rail"]) { background: var(--surface); }
+
+/* 字体：系统字（苹方 / SF），行高 1.6 —— 原型的字形更舒展；阿语仍用 IBM Plex Arabic（系统阿语字形与界面不搭）。
+   等宽（单号、金额）不在此列：font-mono 自带字族。 */
+[data-style="clean"] body {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑",
+    var(--font-plex-ar), "Segoe UI", Roboto, sans-serif;
+  line-height: 1.6;
+}
+[data-style="clean"][lang="ar"] body { font-family: var(--font-plex-ar), -apple-system, "Segoe UI", sans-serif; }
+[data-style="clean"] .txt-body { line-height: 1.6; }
+

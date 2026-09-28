@@ -68,12 +68,13 @@ function FlowTodo() {
   ];
 
   const columns: Column<TodoItem>[] = [
-    { header: tt("col.kind"), cell: (t) => <StatusBadge map={todoKindMap(tc)} value={t.claimable ? "POOL" : t.origin} /> },
+    { header: tt("col.kind"), cell: (t) => <StatusBadge map={todoKindMap(tc)} value={t.claimable && t.origin === "TICKET" ? "POOL" : t.origin} /> },
     {
       header: tt("col.title"),
       cell: (t) => {
         const href = t.ticketNo ? `/flow/tickets/detail/?no=${t.ticketNo}` : t.approvalNo ? `/flow/approvals/detail/?no=${t.approvalNo}` : null;
-        return href && !t.claimable
+        // 可抢的**工单**要先抢单才能办，不给链接；审批候选任务（服务标 claimable）直接进详情决定
+        return href && !(t.claimable && t.origin === "TICKET")
           ? <Link href={href} className="txt-strong text-primary underline-offset-2 hover:underline">{t.title}</Link>
           : <span className="txt-strong">{t.title}</span>;
       },

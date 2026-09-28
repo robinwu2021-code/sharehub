@@ -33,9 +33,9 @@ if [[ "$MODE" == opskit ]]; then
   export NEXT_PUBLIC_FLOW_API=http NEXT_PUBLIC_OPSKIT_WS="${OPSKIT_WS:?要设 OPSKIT_WS}" NEXT_PUBLIC_OPSKIT_ACCOUNT="${OPSKIT_ACCOUNT:-}"
   # 夹具与令牌现生成（单号每次重启服务都会变；含令牌，放 .e2e/ 不进仓库）
   mkdir -p .e2e
-  python3 - "$(opskit/scripts/dev-token.sh fixtures)" "$(opskit/scripts/dev-token.sh viewer)" > .e2e/fixtures.opskit.json <<'PY'
+  python3 - "$(opskit/scripts/dev-token.sh fixtures)" "$(opskit/scripts/dev-token.sh viewer)" "$(opskit/scripts/dev-token.sh admin)" > .e2e/fixtures.opskit.json <<'PY'
 import json, sys
-fx = json.loads(sys.argv[1]); fx["viewerToken"] = sys.argv[2].strip()
+fx = json.loads(sys.argv[1]); fx["viewerToken"] = sys.argv[2].strip(); fx["adminToken"] = sys.argv[3].strip()
 print(json.dumps(fx))
 PY
   FIXTURE_ARGS=(--fixtures .e2e/fixtures.opskit.json)

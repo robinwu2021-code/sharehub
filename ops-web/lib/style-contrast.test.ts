@@ -87,6 +87,35 @@ describe("「清爽」风格的语义色", () => {
   });
 });
 
+describe("「清爽」风格 × 每一套主题色：带色相的中性色阶（亮色）", () => {
+  // 每套主题一块 [data-style="clean"][data-theme="…"]:not(.dark)：门槛与基线相同，另加画布两项
+  for (const th of THEMES) {
+    it(`${th.label}（${th.key}）`, () => {
+      const t = block(`[data-style="clean"][data-theme="${th.key}"]:not(.dark)`);
+      expectPairs(t, [
+        ["正文", "gray-12", W, 7],
+        ["次要文字", "gray-11", W, 4.5],
+        ["次要文字压表头浅带", "gray-11", "gray-2", 4.5],
+        ["次要文字压画布（工具栏说明、分页）", "gray-11", "canvas-clean", 4.5],
+        ["正文压画布", "gray-12", "canvas-clean", 7],
+        ["占位符", "gray-9", W, 3],
+        // 清爽风格只有「一种浅线」（--border = gray-5，行线 / 卡片 / 按钮 / 输入框共用，原型 1.24）：
+        // 下限 1.2 —— 再浅就看不见；控件在悬停 / 聚焦时加深到 gray-8 / 主色，靠它找到输入框
+        ["一种浅线（行线 · 卡片 · 控件边）", "gray-5", W, 1.2],
+        ["浅线压画布（画布上的输入框、筛选标签）", "gray-5", "canvas-clean", 1.08],
+        ["控件悬停描边", "gray-8", W, 1.8],
+        ["白卡浮在画布上（规范硬指标）", W, "canvas-clean", 1.1],
+      ]);
+      // 主色文字压该套的浅带 —— 带色相的浅带比基线略深，要重算
+      const theme = block(`[data-theme="${th.key}"]`);
+      expectPairs({ ...t, "primary-text": theme["primary-text"] ?? theme["primary"] }, [
+        ["主色文字压浅带", "primary-text", "gray-2", 4.5],
+        ["主色文字压画布", "primary-text", "canvas-clean", 4.5],
+      ]);
+    });
+  }
+});
+
 describe("每一套主题色（亮色）", () => {
   for (const th of THEMES) {
     it(`${th.label}（${th.key}）：主色上的字、主色写成的文字`, () => {

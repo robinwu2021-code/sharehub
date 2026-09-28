@@ -134,7 +134,9 @@ describe("whyNot 是错误键（后端 9-28：与 403 同键、不给文案）",
     const v = getApproval(done.approvalNo);
     expect(v.mine.canDecide).toBe(false);
     expect(v.mine.whyNot).toBeUndefined();
-    for (const key of ["opskit.approval.cross_step", "opskit.approval.self_review", "opskit.task.not_candidate"]) {
+    // 后端 9-28 给的全部键（whyNot / 403 / 409 / 422）
+    for (const key of ["opskit.approval.cross_step", "opskit.approval.self_review", "opskit.task.not_candidate", "opskit.process.not_allowed",
+      "opskit.state_changed", "opskit.approval.reason_required", "opskit.template.countersign_not_enumerable", "opskit.template.code_taken"]) {
       for (const loc of ["zh", "en", "ar"] as const) {
         expect(errText((k, p) => translate(loc, k, p), key), `${loc}:${key}`).not.toBe(key);
       }

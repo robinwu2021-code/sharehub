@@ -13,6 +13,7 @@ import { usePaging } from "@/lib/hooks/use-paging";
 import { notify } from "@/lib/notify";
 import { PageTitle } from "@/components/ui/misc";
 import { Toolbar } from "@/components/ui/toolbar";
+import { FilterChips } from "@/components/ui/filter-chips";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { PagedTable } from "@/components/ui/paged-table";
 import type { Column } from "@/components/ui/data-table";
@@ -63,6 +64,10 @@ function FlowTickets() {
   /** 统计卡带来的筛选（与上面两个下拉互斥：点卡 = 换成卡的口径） */
   const [card, setCard] = useState<TicketStat | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
+  // 勾选列按需出现（原型做法，用户 2026-09-28 定）：常驻的一列勾选框是「线条感」的一大来源，
+  // 而批量改派是低频操作。点「批量改派」进入选择模式，改派完成或取消即退出。
+  const [selecting, setSelecting] = useState(false);
+  const exitSelecting = () => { setSelecting(false); setSelected([]); };
   const [reassignOpen, setReassignOpen] = useState(false);
   const [reassignForm, setReassignForm] = useState<Record<string, unknown>>({ to: "", reason: "" });
 
@@ -100,7 +105,7 @@ function FlowTickets() {
         notify.success(tt("reassign.done", { n: r.succeeded.length }));
       }
       setReassignOpen(false);
-      setSelected([]);
+      exitSelecting();
       setReassignForm({ to: "", reason: "" });
       refresh();
     },
@@ -163,10 +168,10 @@ function FlowTickets() {
         onSearch={(v) => onFilter(() => setKeyword(v))}
         searchPlaceholder={tt("searchPlaceholder")}
         selectedCount={selected.length}
-        onClearSelection={() => setSelected([])}
+        onClearSelection={exitSelecting}
         batchActions={canDispatch ? <Button size="sm" onClick={() => setReassignOpen(true)}>{tt("reassign.btn")}</Button> : undefined}
       >
-        <FilterSelect
+        <FilterChips
           aria-label={tt("filter.type")}
           value={typeCode}
           onChange={(v) => onFilter(() => setTypeCode(v))}
@@ -180,13 +185,21 @@ function FlowTickets() {
           options={partyOptions}
           allLabel={tt("filter.assigneeAll")}
         />
+        {canDispatch && (selecting ? (
+          <span className="ms-auto inline-flex items-center gap-2">
+            <span className="txt-caption text-muted-foreground">{tt("reassign.pickHint")}</span>
+            <Button size="sm" variant="ghost" onClick={exitSelecting}>{tt("reassign.cancel")}</Button>
+          </span>
+        ) : (
+          <Button size="sm" variant="secondary" className="ms-auto" onClick={() => setSelecting(true)}>{tt("reassign.btn")}</Button>
+        ))}
       </Toolbar>
       <PagedTable
         query={query}
         paging={paging}
         columns={columns}
         rowKey={(t) => t.ticketNo}
-        selectable={canDispatch}
+        selectable={canDispatch && selecting}
         selectedKeys={selected}
         onSelectedChange={setSelected}
         empty={card || typeCode || assigneeKind || keyword ? tt("empty.filtered") : tt("empty.none")}

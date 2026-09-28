@@ -17,6 +17,8 @@ const zh = {
   empty: { filtered: "按当前筛选没有工单 —— 换个条件，或点已选中的统计卡取消筛选", none: "还没有工单" },
   reassign: {
     btn: "批量改派",
+    pickHint: "勾选要改派的工单",
+    cancel: "取消",
     title: "批量改派 {n} 张工单",
     done: "已改派 {n} 张工单",
     partial: "已改派 {ok} 张；{n} 张没改：{list}",
@@ -44,6 +46,8 @@ const en = {
   empty: { filtered: "No tickets match the current filters — change them, or click the selected stat card to clear it", none: "No tickets yet" },
   reassign: {
     btn: "Bulk reassign",
+    pickHint: "Select the tickets to reassign",
+    cancel: "Cancel",
     title: "Reassign {n} tickets",
     done: "Reassigned {n} tickets",
     partial: "Reassigned {ok}; {n} not reassigned: {list}",
@@ -70,6 +74,8 @@ const ar = {
   empty: { filtered: "لا توجد تذاكر تطابق عوامل التصفية الحالية — غيّرها، أو انقر بطاقة الإحصاء المحددة لإلغائها", none: "لا توجد تذاكر بعد" },
   reassign: {
     btn: "إعادة إسناد جماعية",
+    pickHint: "حدّد التذاكر المراد إعادة إسنادها",
+    cancel: "إلغاء",
     title: "إعادة إسناد {n} تذكرة",
     done: "تمت إعادة إسناد {n} تذكرة",
     partial: "أُعيد إسناد {ok}؛ لم يُعَد إسناد {n}: {list}",

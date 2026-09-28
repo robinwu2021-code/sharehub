@@ -27,8 +27,14 @@ const zh = {
   membersTruncated: "只列出了前 {n} 人（共 {total} 人）",
   /** OpsKit 错误键（whyNot 与 403 同键、服务不给文案）→ 三语。键去掉 opskit. 前缀、按点分组 */
   err: {
-    approval: { cross_step: "跨步互斥：你已在本轮前一步做过决定，不能再办这一步", self_review: "提交人不能审批自己提交的单" },
+    approval: {
+      cross_step: "跨步互斥：你已在本轮前一步做过决定，不能再办这一步", self_review: "提交人不能审批自己提交的单",
+      reason_required: "驳回必须填写原因",
+    },
     task: { not_candidate: "你不是这一步的审批人" },
+    process: { not_allowed: "你不在这个队列里，不能领取" },
+    template: { countersign_not_enumerable: "会签只能用于成员 / 组 / 字段指定（角色、权限码的人选不可枚举）", code_taken: "这个代号已被一条流程占用" },
+    state_changed: "这张单已被他人处理，请刷新后再看",
   },
 };
 type M = typeof zh;
@@ -58,8 +64,14 @@ const en = {
   loading: "Loading…",
   membersTruncated: "Showing the first {n} of {total} people",
   err: {
-    approval: { cross_step: "Cross-step rule: you already decided an earlier step in this round", self_review: "Requesters cannot approve their own requests" },
+    approval: {
+      cross_step: "Cross-step rule: you already decided an earlier step in this round", self_review: "Requesters cannot approve their own requests",
+      reason_required: "A reason is required to reject",
+    },
     task: { not_candidate: "You are not an approver for this step" },
+    process: { not_allowed: "You are not in this queue and cannot claim" },
+    template: { countersign_not_enumerable: "\"All must approve\" only works with members, groups or a submitted field (roles and permissions cannot be enumerated)", code_taken: "This code is already used by a process" },
+    state_changed: "Someone else has already handled this — refresh and try again",
   },
 } satisfies M;
 
@@ -88,8 +100,14 @@ const ar = {
   loading: "جارٍ التحميل…",
   membersTruncated: "يُعرض أول {n} من {total} شخصًا",
   err: {
-    approval: { cross_step: "قاعدة الخطوات: اتخذت قرارًا في خطوة سابقة من هذه الجولة", self_review: "لا يمكن لمقدّم الطلب الموافقة على طلبه" },
+    approval: {
+      cross_step: "قاعدة الخطوات: اتخذت قرارًا في خطوة سابقة من هذه الجولة", self_review: "لا يمكن لمقدّم الطلب الموافقة على طلبه",
+      reason_required: "يجب ذكر سبب الرفض",
+    },
     task: { not_candidate: "لست من معتمدي هذه الخطوة" },
+    process: { not_allowed: "لست ضمن هذه القائمة ولا يمكنك الاستلام" },
+    template: { countersign_not_enumerable: "الموافقة الجماعية تصلح فقط للأعضاء أو المجموعات أو حقل مُرسَل (لا يمكن حصر الأدوار والصلاحيات)", code_taken: "هذا الرمز مستخدم في مسار آخر" },
+    state_changed: "عالج شخص آخر هذا الطلب — حدّث الصفحة وأعد المحاولة",
   },
 } satisfies M;
 

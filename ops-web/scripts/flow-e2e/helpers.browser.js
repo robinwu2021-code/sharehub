@@ -18,6 +18,8 @@
         await sleep(80);
       }
     },
+    /** 等一个数字出现（0 也算）。waitFor 以真值为准，直接等数字会把 0 当「没取到」一直等到超时 —— 对真服务时踩过两次 */
+    async num(fn, msg, ms) { return (await h.waitFor(() => { const v = fn(); return Number.isFinite(v) ? { v } : null; }, msg, ms)).v; },
     all(sel, m) { return [...document.querySelectorAll(sel)].filter((e) => visible(e) && (m == null || match(e, m))); },
     one(sel, m) { return h.all(sel, m)[0]; },
     btn(m) { return h.one("button", m); },

@@ -72,8 +72,14 @@ async function onPaused({ requestId, request }) {
   }
 }
 
-function authState(perms) {
-  return JSON.stringify({ state: { realm: "STAFF", subjectNo: "admin", username: "admin", role: perms.includes("*") ? "ADMIN" : "VIEWER", perms, memberships: [], currentOperatorNo: "", token: FIXTURES.token || "e2e", operatorGen: 1 }, version: 0 });
+/** 场景用哪个令牌：as 指定（如 admin 才能发布模板）→ 只读场景用只读令牌 → 其余主令牌 */
+const tokenFor = (s) => (s.as && FIXTURES[`${s.as}Token`]) || (!s.perms.includes("*") && FIXTURES.viewerToken) || FIXTURES.token;
+
+// ⚠️ 令牌必须写进宿主会话：生产构建的 http.ts 不读开发用的覆盖键，只用宿主会话的令牌。
+// 此前只写了覆盖键 —— 所有场景其实都是主令牌身份，只读场景的「服务端 403」从没被测到
+function authState(s) {
+  const perms = s.perms;
+  return JSON.stringify({ state: { realm: "STAFF", subjectNo: "admin", username: "admin", role: perms.includes("*") ? "ADMIN" : "VIEWER", perms, memberships: [], currentOperatorNo: "", token: tokenFor(s) || "e2e", operatorGen: 1 }, version: 0 });
 }
 
 const results = [];
@@ -98,11 +104,12 @@ try {
     const t0 = Date.now();
     consoleErrors.length = 0;
     const ls = {
-      "pb-ops-auth-v2": authState(s.perms),
+      "pb-ops-auth-v2": authState(s),
       "ops-locale": JSON.stringify({ state: { locale: s.locale || "zh" }, version: 0 }),
       "ops-style": JSON.stringify({ state: { styleKey: "clean" }, version: 0 }),
       // 只读场景用只读令牌（服务端判权），其余用主令牌
-    ...(FIXTURES.token ? { "ops-opskit-token": (!s.perms.includes("*") && FIXTURES.viewerToken) || FIXTURES.token } : {}),
+    // 令牌按场景的身份取：as 指定（如 admin 才能发布模板）→ 只读场景用只读令牌 → 其余主令牌
+    ...(FIXTURES.token ? { "ops-opskit-token": tokenFor(s) } : {}),
     };
     await evaluate(`localStorage.clear(); ${Object.entries(ls).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(v)})`).join(";")}`);
     await send("Page.navigate", { url: ORIGIN + s.url(FIXTURES) });

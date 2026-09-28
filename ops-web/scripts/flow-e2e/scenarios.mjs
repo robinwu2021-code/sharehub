@@ -13,7 +13,8 @@ export const SCENARIOS = [
     run: async (h) => {
       for (const tab of [/^全部/, /^审批/, /^工单/, /^可抢单/]) {
         await h.click("button", tab, String(tab));
-        const n = await h.waitFor(() => { const v = h.tabNum(tab); return Number.isFinite(v) ? v : null; }, "页签数字");
+        // 0 是合法的角标（真服务上工单模块未上线，工单页签恒为 0）—— 别让 waitFor 把 0 当「没取到」
+        const n = await h.num(() => h.tabNum(tab), "页签数字");
         await h.sleep(250);
         const total = h.total() ?? h.rows().length;
         h.expect(total === n, `${tab} 角标 ${n} = 列表 ${total}`);
@@ -34,7 +35,7 @@ export const SCENARIOS = [
       await h.toast(/已退回抢单池/, "已退回抢单池");
       await h.click("a", "待办中心", "侧栏的待办中心");
       await h.click("button", /^可抢单/);
-      const before = await h.waitFor(() => h.tabNum(/^可抢单/), "可抢数");
+      const before = await h.num(() => h.tabNum(/^可抢单/), "可抢数");
       await h.click("button", "抢单");
       await h.toast(/已领取/, "已领取");
       const after = await h.waitFor(() => { const v = h.tabNum(/^可抢单/); return v === before - 1 ? v : null; }, "可抢数减一");
@@ -51,6 +52,11 @@ export const SCENARIOS = [
       const hrefs = h.all("a").map((a) => a.getAttribute("href") || "");
       h.expect(!hrefs.some((x) => x.includes(fx.approvalHidden)), `${fx.approvalHidden}（site:B）不在待办里`);
       h.expect(hrefs.some((x) => x.includes(fx.approvalTwoStep)), "同一候选、范围内的单在待办里（正对照）");
+      // 后端 9-28 统一可见性：列表、详情、决定同一条规则 —— 审批列表里也不该有它
+      await h.click("a", "审批列表", "侧栏的审批列表");
+      await h.waitFor(() => h.total() !== null && h.rows().length, "审批列表加载");
+      const inList = h.all("a").some((a) => (a.getAttribute("href") || "").includes(fx.approvalHidden));
+      h.expect(!inList, "审批列表里也看不到它");
     },
   },
 
@@ -93,8 +99,8 @@ export const SCENARIOS = [
     id: "S3-1", title: "队列：领取进「我在审」、待领 −1；放回后恢复", perms: ALL, url: () => "/flow/queue/",
     run: async (h) => {
       const tab = /待领 \d+$/;
-      const before = await h.waitFor(() => h.tabNum(tab), "待领数");
-      const mine0 = await h.waitFor(() => { const m = h.bodyText().match(/我在审（(\d+)）/); return m ? Number(m[1]) : null; }, "我在审数");
+      const before = await h.num(() => h.tabNum(tab), "待领数");
+      const mine0 = await h.num(() => { const m = h.bodyText().match(/我在审（(\d+)）/); return m ? Number(m[1]) : NaN; }, "我在审数");
       await h.click("button", "领取");
       await h.toast(/已领取/, "已领取");
       await h.waitFor(() => h.tabNum(tab) === before - 1, "待领减一");
@@ -108,6 +114,9 @@ export const SCENARIOS = [
   {
     id: "S3-2", title: "队列：通过后从队列消失", perms: ALL, url: () => "/flow/queue/",
     run: async (h) => {
+      // 先领一条（真服务种子里「我在审」是空的；mock 里已有一条也无妨），再对「我在审」第一行做决定
+      await h.click("button", "领取");
+      await h.toast(/已领取/, "已领取");
       const title = await h.waitFor(() => h.txt(h.rows()[0]?.querySelector("td")), "我在审第一行");
       await h.click("button", "通过");
       await h.toast(/已通过/, "已通过");
@@ -118,7 +127,7 @@ export const SCENARIOS = [
 
   // ── S4 审批模板 ──────────────────────────────────────────────────────
   {
-    id: "S4-1", modes: ["mock"], title: "模板：内容不变再发布是幂等的；改了才生成新版本；会签对角色不可选", perms: ALL, url: () => "/flow/processes/",
+    id: "S4-1", as: "admin", title: "模板：内容不变再发布是幂等的；改了才生成新版本；会签对角色不可选", perms: ALL, url: () => "/flow/processes/",
     run: async (h) => {
       await h.click("button", "编辑");
       await h.waitFor(() => h.btn("保存并发布"), "编辑区");
@@ -205,6 +214,25 @@ export const SCENARIOS = [
       await h.toast(/已退回抢单池/, "已退回抢单池");
       await h.waitFor(() => /受理方联系不上（e2e）/.test(h.bodyText()), "时间线里有原因");
       h.expect(/未派|抢单池/.test(h.bodyText()), "受理方显示为抢单池");
+    },
+  },
+
+  {
+    id: "S6-3", modes: ["mock"], title: "工单：勾选列按需出现；标签筛选只看一类", perms: ALL, url: () => "/flow/tickets/",
+    run: async (h) => {
+      await h.waitFor(() => h.rows().length, "列表加载");
+      h.expect(h.all("[data-slot=tbody] [role=checkbox]").length === 0, "平时没有勾选列");
+      await h.click("button", "批量改派");
+      await h.waitFor(() => h.all("[data-slot=tbody] [role=checkbox]").length > 0, "进入选择模式后出现勾选列");
+      h.all("[data-slot=tbody] [role=checkbox]")[0].click();
+      await h.waitFor(() => /已选 1/.test(h.bodyText()), "批量操作条显示已选 1");
+      await h.click("button", /清除|取消/, "退出选择");
+      await h.waitFor(() => h.all("[data-slot=tbody] [role=checkbox]").length === 0, "退出后勾选列消失");
+      const all = h.total();
+      const chip = h.all("[role=radio]").find((e) => e.getAttribute("aria-checked") === "false");
+      chip.click();
+      await h.waitFor(() => chip.getAttribute("aria-checked") === "true" && h.total() !== all, "按类型筛选后条数变化");
+      h.expect(h.total() < all, `「${h.txt(chip)}」${h.total()} < 全部 ${all}`);
     },
   },
 
