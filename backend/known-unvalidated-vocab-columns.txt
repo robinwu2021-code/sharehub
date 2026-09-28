@@ -79,7 +79,23 @@
 # ⚠️ 这一批最值钱的发现与词表无关：usr_invoice_title 判税号必填写的是
 # "COMPANY".equals(type)，而 type 不校验 —— 传小写 company **既不报错也不要税号**，
 # 抬头存下来了，按它开出去的发票是废的。归一大小写才是真正的修复。
+#
+# 同日第三批（订单域 + 设备 OTA）：**已核实 59，待核实 220**。
+# OTA 四列新接上校验（原先只在空的时候补默认值）；ord_deposit.last_dun_channel 接上；
+# 其余 10 列读代码核实为「原本就有白名单」或「服务端常量/状态机」。
+#
+# ⚠️ 第三批的方法论教训：**只 grep `setXxx(` 那一行会得出错的结论**。
+# ord_complaint.resolution 的 setter 是 `e.setResolution(req.resolution())`，
+# 看着是请求体直达，而白名单 RESOLUTIONS.contains(...) 就在它上面几行。
+# 自动分类只能排优先级，判定必须读方法。
+#
+# ⚠️ 三个「没有任何写入路径」的表/列**故意留在台账上**：
+# ord_exception（create 零调用方）· ord_reservation（只有 page/cancel，一处 insert 都没有）
+# · dev_ota_task（只读）。这里「没人写」不等于安全，等于这个功能没有生产者 ——
+# 等补上写入口时照样要接校验。三张表在测试库里都是 0 行。
 # ───────────────────────────────────────────────────────────────
+
+# acct_account（2）
 
 # acct_account（2）
 
@@ -186,14 +202,6 @@ dev_cabinet.status
 dev_event_code.category
 dev_event_code.protective_action
 dev_event_code.scope
-
-# dev_ota_release（1）
-dev_ota_release.status
-
-# dev_ota_rollout（3）
-dev_ota_rollout.scope
-dev_ota_rollout.status
-dev_ota_rollout.strategy
 
 # dev_ota_task（1）
 dev_ota_task.status
@@ -376,32 +384,15 @@ openapi_app.status
 # ord_charge_ext（1）
 ord_charge_ext.stop_reason
 
-# ord_complaint（3）
-ord_complaint.issue_type
-ord_complaint.resolution
-ord_complaint.status
-
-# ord_deposit（2）
-ord_deposit.last_dun_channel
-ord_deposit.status
-
-# ord_exception（3）
-ord_exception.handle_action
-ord_exception.status
+# ord_exception（1）
 ord_exception.type
 
-# ord_order（5）
+# ord_order（3）
 ord_order.free_reason
-ord_order.pay_status
-ord_order.source_channel
 ord_order.status
 ord_order.sub_status
 
-# ord_refund（1）
-ord_refund.status
-
-# ord_reservation（2）
-ord_reservation.status
+# ord_reservation（1）
 ord_reservation.type
 
 # pay_auth（1）

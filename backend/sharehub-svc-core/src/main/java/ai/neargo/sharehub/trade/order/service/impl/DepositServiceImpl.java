@@ -4,6 +4,7 @@ import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.ServerException;
 import ai.neargo.common.core.ErrorCode;
 import ai.neargo.sharehub.trade.order.DepositStatus;
+import ai.neargo.sharehub.trade.order.DunChannel;
 
 import ai.neargo.common.core.PageResult;
 import org.springframework.transaction.annotation.Transactional;
@@ -116,7 +117,13 @@ public class DepositServiceImpl implements DepositService {
         // **催缴只留痕，不改状态** —— 催缴不改变欠款事实，改状态会让「已催缴」被误读成「已解决」。
         e.setDunCount((e.getDunCount() == null ? 0 : e.getDunCount()) + 1);
         e.setLastDunAt(java.time.LocalDateTime.now());
-        e.setLastDunChannel(channel);
+        /*
+         * 渠道原先原样落库。催缴只留痕不改状态 —— 这一列就是「催过没有、怎么催的」
+         * 的唯一记录，而那正是判断「该不该升级处理」的依据。
+         * 没传不校验（线下催的情况可以不注明渠道），传了必须在词表里，并归一大小写。
+         */
+        DunChannel c = DunChannel.ofNullable(channel);
+        e.setLastDunChannel(c == null ? null : c.name());
         e.setOperatorName(ai.neargo.sharehub.auth.SecurityUtils.currentUser()
                 .map(ai.neargo.sharehub.auth.LoginUser::username).orElse(null));
         if (note != null && !note.isBlank()) e.setNote(note);

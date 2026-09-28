@@ -105,7 +105,39 @@ class VocabularyWriteCoverageTest {
             "wo_sla_rule.wo_type",                               // WorkOrderType.of
             "loc_lead.stage", "loc_lead.owner_type",             // checkStage / checkOwnerType
             // 服务端全权（第三种答案）：创建写常量、编辑抄 current、状态迁移走专门端点
-            "notify_blacklist.status", "usr_free_whitelist.status"));
+            "notify_blacklist.status", "usr_free_whitelist.status",
+
+            // ——— 2026-09-28 第三批：订单域与设备 OTA ———
+            // 新接上校验：OTA 四列（各带端点格）——原先只在**空的时候**补默认值，
+            // 传了词表外的值照样落库。scope 错=打给错的一批设备，strategy 错=该灰度的全量推了出去，
+            // 而固件是刷进硬件里的，发现时已经刷完
+            "dev_ota_release.status", "dev_ota_rollout.status",
+            "dev_ota_rollout.strategy", "dev_ota_rollout.scope",
+            "ord_deposit.last_dun_channel",                      // DunChannel.ofNullable（无端点格：ord_deposit 造数据太贵）
+            // 读代码核实：原来就有校验
+            "ord_complaint.issue_type",                          // ISSUE_TYPES 白名单
+            "ord_complaint.resolution",                          // RESOLUTIONS 白名单（在 setResolution 之前，只看 setter 那行会误判）
+            "ord_exception.handle_action",                       // switch + default -> throw
+            // 服务端常量 / 状态机
+            "ord_complaint.status", "ord_deposit.status", "ord_exception.status",
+            "ord_order.pay_status", "ord_order.source_channel",
+            "ord_refund.status", "ord_reservation.status"));
+
+    /*
+     * ⚠️ 第三批的方法论教训：**只 grep `setXxx(` 那一行会得出错的结论**。
+     * ord_complaint.resolution 的 setter 写的是 `e.setResolution(req.resolution())`，
+     * 看起来是「请求体直达」，而白名单 `RESOLUTIONS.contains(...)` 在它上面几行。
+     * 自动分类只能用来**排优先级**，判定必须读方法。
+     *
+     * ⚠️ 查这一批时撞见三个**没有任何写入路径**的表/列，它们留在台账上没有移走 ——
+     * 「没人写」在这里不等于安全，等于这个功能没有生产者，等哪天补上写入口时
+     * 照样要接校验：
+     *   · ord_exception：create(...) 存在但**零调用方**，异常单永远产生不了；
+     *   · ord_reservation：ReservationServiceImpl 只有 page/cancel，**一处 insert 都没有**；
+     *   · dev_ota_task：只读，没有任何东西创建 OTA 任务。
+     * 三张表在测试库里都是 0 行，与这个结论一致。实现状态总表把订单域记成
+     * 「异常/投诉/退款/预约齐」，而其中两项在生产上是永远空的页面。
+     */
 
     /*
      * 核实一列时会遇到第三种答案，它和「接上了校验」一样牢靠，有时更牢靠：

@@ -3,6 +3,8 @@ package ai.neargo.sharehub.dev.service.impl;
 import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.dev.OtaReleaseStatus;
 import ai.neargo.sharehub.dev.OtaRolloutStatus;
+import ai.neargo.sharehub.dev.OtaRolloutScope;
+import ai.neargo.sharehub.dev.OtaRolloutStrategy;
 
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.common.BizKey;
@@ -86,7 +88,7 @@ public class OtaServiceImpl implements OtaService {
         if (no == null || no.isBlank()) {
             body.setReleaseNo(nextReleaseNo());
             if (body.getTenantId() == null) body.setTenantId(TENANT_MAIN);
-            if (body.getStatus() == null || body.getStatus().isBlank()) body.setStatus(OtaReleaseStatus.DRAFT.name());
+            body.setStatus(normReleaseStatus(body.getStatus()));
             if (body.getMandatory() == null) body.setMandatory(0);
             releaseMapper.insert(body);
             return toVO(selectRelease(body.getReleaseNo()));
@@ -94,12 +96,15 @@ public class OtaServiceImpl implements OtaService {
         DevOtaRelease cur = selectRelease(no);
         if (cur == null) {
             if (body.getTenantId() == null) body.setTenantId(TENANT_MAIN);
-            if (body.getStatus() == null || body.getStatus().isBlank()) body.setStatus(OtaReleaseStatus.DRAFT.name());
+            body.setStatus(normReleaseStatus(body.getStatus()));
             releaseMapper.insert(body);
         } else {
             body.setId(cur.getId());
             body.setLockVersion(cur.getLockVersion());
             if (body.getTenantId() == null) body.setTenantId(cur.getTenantId());
+            // 编辑路径原先完全不校验 status —— 实体就是请求体，PUT 什么存什么
+            if (body.getStatus() == null || body.getStatus().isBlank()) body.setStatus(cur.getStatus());
+            body.setStatus(OtaReleaseStatus.of(body.getStatus()).name());
             releaseMapper.updateById(body);
         }
         return toVO(selectRelease(no));
@@ -134,9 +139,17 @@ public class OtaServiceImpl implements OtaService {
         String no = body.getRolloutNo();
         if (no == null || no.isBlank()) {
             body.setRolloutNo(nextRolloutNo());
-            if (body.getStatus() == null || body.getStatus().isBlank()) body.setStatus(OtaRolloutStatus.PENDING.name());
-            if (body.getStrategy() == null || body.getStrategy().isBlank()) body.setStrategy("GRAY");
-            if (body.getScope() == null || body.getScope().isBlank()) body.setScope("ALL");
+            /*
+             * 三列原先只在**空的时候**补默认值 —— 传了词表外的值照样落库。
+             * scope 写错打给错的一批设备、strategy 写错把该灰度的一次全量推出去，
+             * 而固件是刷进硬件里的，发现时已经刷完了。
+             */
+            body.setStatus(body.getStatus() == null || body.getStatus().isBlank()
+                    ? OtaRolloutStatus.PENDING.name() : OtaRolloutStatus.of(body.getStatus()).name());
+            body.setStrategy(body.getStrategy() == null || body.getStrategy().isBlank()
+                    ? OtaRolloutStrategy.GRAY.name() : OtaRolloutStrategy.of(body.getStrategy()).name());
+            body.setScope(body.getScope() == null || body.getScope().isBlank()
+                    ? OtaRolloutScope.ALL.name() : OtaRolloutScope.of(body.getScope()).name());
             if (body.getProgress() == null) body.setProgress(0);
             fillFwVersion(body);
             rolloutMapper.insert(body);
@@ -149,8 +162,10 @@ public class OtaServiceImpl implements OtaService {
             checkRolloutTransition(cur.getStatus(), body.getStatus());
             cur.setStatus(body.getStatus());
         }
-        if (body.getStrategy() != null) cur.setStrategy(body.getStrategy());
-        if (body.getScope() != null) cur.setScope(body.getScope());
+        // status 的迁移由 checkRolloutTransition 拦（词表外的值不在任何一条边上），
+        // 而 strategy / scope 没有状态机，原先一路直达库里
+        if (body.getStrategy() != null) cur.setStrategy(OtaRolloutStrategy.of(body.getStrategy()).name());
+        if (body.getScope() != null) cur.setScope(OtaRolloutScope.of(body.getScope()).name());
         if (body.getTargetRef() != null) cur.setTargetRef(body.getTargetRef());
         if (body.getProgress() != null) cur.setProgress(body.getProgress());
         rolloutMapper.updateById(cur);
@@ -166,6 +181,12 @@ public class OtaServiceImpl implements OtaService {
     }
 
     // ——————————————————————— 内部 ———————————————————————
+
+    /** 空则 DRAFT，非空必须在词表里 —— 「补默认值」与「校验传进来的值」是两件事。 */
+    private static String normReleaseStatus(String v) {
+        return v == null || v.isBlank()
+                ? OtaReleaseStatus.DRAFT.name() : OtaReleaseStatus.of(v).name();
+    }
 
     /** 投放状态迁移校验；非法迁移抛异常（主控后续接 409）。 */
     private static void checkRolloutTransition(String from, String to) {

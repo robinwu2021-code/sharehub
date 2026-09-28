@@ -87,6 +87,11 @@ class VocabularyRejectedOnWriteTest extends ApiTestSupport {
         jdbc.update("DELETE FROM loc_lead WHERE venue_name = ?", MARK);
         jdbc.update("DELETE FROM iam_employee WHERE name = ?", MARK);
         jdbc.update("DELETE FROM usr_invoice_title WHERE title = ?", MARK);
+        jdbc.update("DELETE FROM dev_ota_rollout WHERE fw_version LIKE 'VOCAB%'");
+        // ⚠️ 按 fw_version 删，不是 version —— 实体的 `version` 字段落在 `fw_version` 列上
+        // （`version` 是 BIGINT 死列，见 V141）。第一版写成 version，MySQL 把它当数字比，
+        // **一行都没删掉还不报错**，是姊妹卡口 StoredValueInVocabularyTest 红了才发现的。
+        jdbc.update("DELETE FROM dev_ota_release WHERE fw_version LIKE 'VOCAB%'");
     }
 
     @Test
@@ -355,6 +360,50 @@ class VocabularyRejectedOnWriteTest extends ApiTestSupport {
         String otp = post("/mp/auth/otp", Map.of("phone", phone), null).okData().path("devCode").asText();
         return post("/mp/auth/login", Map.of("grantType", "phone_otp", "phone", phone, "otp", otp), null)
                 .okData().path("token").asText();
+    }
+
+    @Test
+    @DisplayName("★★ OTA 发布/投放的四列 —— 原先只在空的时候补默认值，传了错的照样落库")
+    void ota_rejects_out_of_vocabulary() {
+        String t = login("ADMIN");
+
+        var okRel = post("/api/ops/ota-releases", Map.of(
+                "fwType", "CABINET", "vendorCode", "DEMO", "version", "VOCAB1.0.0",
+                "versionCode", 100, "status", "DRAFT"), t);
+        assertThat(okRel.status).as("合法发布单应当能存：%s", okRel.msg()).isEqualTo(200);
+        String releaseNo = okRel.okData().path("releaseNo").asText();
+
+        var badRel = post("/api/ops/ota-releases", Map.of(
+                "fwType", "CABINET", "vendorCode", "DEMO", "version", "VOCAB1.0.1",
+                "versionCode", 101, "status", "RELEASED"), t);
+        assertThat(badRel.status)
+                .as("status=RELEASED 被接受了 —— 本列词表是 DRAFT/PUBLISHED/PAUSED/COMPLETED/ARCHIVED：%s",
+                        badRel.msg())
+                .isEqualTo(400);
+
+        var okRo = post("/api/ops/ota-rollouts", Map.of(
+                "releaseNo", releaseNo, "fwVersion", "VOCAB1.0.0",
+                "strategy", "GRAY", "scope", "ALL"), t);
+        assertThat(okRo.status).as("合法投放单应当能存：%s", okRo.msg()).isEqualTo(200);
+
+        /*
+         * scope 写错 = 这次投放打给了错的一批设备；strategy 写错 = 本该灰度的一次全量推了出去。
+         * 固件是刷进硬件里的 —— 发现的时候已经刷完了，没有「撤回」这一说。
+         */
+        var badScope = post("/api/ops/ota-rollouts", Map.of(
+                "releaseNo", releaseNo, "fwVersion", "VOCAB1.0.0", "scope", "CABINET"), t);
+        assertThat(badScope.status).as("scope=CABINET 竟然被接受了：%s", badScope.msg()).isEqualTo(400);
+
+        var badStrategy = post("/api/ops/ota-rollouts", Map.of(
+                "releaseNo", releaseNo, "fwVersion", "VOCAB1.0.0", "strategy", "CANARY"), t);
+        assertThat(badStrategy.status).as("strategy=CANARY 竟然被接受了：%s", badStrategy.msg()).isEqualTo(400);
+
+        var badRoStatus = post("/api/ops/ota-rollouts", Map.of(
+                "releaseNo", releaseNo, "fwVersion", "VOCAB1.0.0", "status", "STARTED"), t);
+        assertThat(badRoStatus.status)
+                .as("创建时 status=STARTED 被接受了 —— 状态机只拦编辑路径的迁移，拦不住创建：%s",
+                        badRoStatus.msg())
+                .isEqualTo(400);
     }
 
     @Test

@@ -33,7 +33,15 @@ public class DevOtaRelease {
     /** 适用供应商；空表示通用。 */
     private String vendorCode;
 
-    /** 固件版本号（对应 DDL 的 {@code version} 列，非乐观锁）。 */
+    /**
+     * 固件版本号（如 {@code 1.4.2}）。
+     *
+     * <p>⚠️ 落在 {@code fw_version} 而不是 {@code version}：后者是 BIGINT。
+     * 原先映射到 {@code version}，于是**任何非纯数字的版本号都会 500**
+     * （Data truncation），OTA 发布从来没成功过一次。见 V141 的说明。
+     * 出参字段名仍叫 {@code version}，契约不变。
+     */
+    @TableField("fw_version")
     private String version;
 
     /** 版本序号，用于比大小判断可升级。 */
