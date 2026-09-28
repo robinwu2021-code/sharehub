@@ -31,7 +31,10 @@ import static org.assertj.core.api.Assertions.assertThat;
         // 生产是 fail-closed（未配 sharehub.admin.password 即拒登）且角色只由账号决定。
         // 真实账号登录的回归要等 A3 的凭据库；在那之前集成测试显式开 dev-mode。
         // **生产姿态**（dev-mode 关）由 SecurityHotfixTest 专门守。
-        properties = "sharehub.dev-mode.enabled=true")
+        // OpsKit 内省凭据（OpsKitIntrospectTest 用）：放在基类里 —— 单开一个属性就是多起一个 Spring 上下文
+        properties = {"sharehub.dev-mode.enabled=true",
+                "sharehub.opskit.introspect.client-id=opskit-test",
+                "sharehub.opskit.introspect.client-secret=introspect-test-secret"})
 public abstract class ApiTestSupport {
 
     @LocalServerPort

@@ -128,6 +128,13 @@ public class SecurityConfig {
                          * /api/platform/...，在那之前一刀切会立刻打断线上调用方。
                          * 迁移一批就往这里加一条（与 InternalTokenFilter 的前缀保持一致）。
                          */
+                        /*
+                         * OpsKit 令牌内省（21/06 §八）：OpsKit 拿运营台令牌来问「这是谁」。
+                         * 这里放行、由 OpsKitIntrospectController 按 Basic 凭据（SHAREHUB_OPSKIT_INTROSPECT_*）再判 ——
+                         * 凭据没配一律 401（fail-closed）。不走 ROLE_INTERNAL：OpsKit 的 IdP 登记按 RFC 7662 发 Basic，
+                         * 不认本服务私有的 X-Internal-Token 头。
+                         */
+                        .requestMatchers(HttpMethod.POST, "/internal/opskit/introspect").permitAll()
                         .requestMatchers("/internal/events/**", "/internal/ping").hasRole("INTERNAL")
                         .anyRequest().authenticated())
                 // 顺序要紧：内部凭证先于员工令牌 —— 内部调用不带 Bearer，

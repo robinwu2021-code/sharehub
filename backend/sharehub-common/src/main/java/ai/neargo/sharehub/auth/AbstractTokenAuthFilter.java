@@ -14,6 +14,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 两端认证过滤器的共同骨架。运营端 {@link StaffTokenAuthFilter} 与 C 端
@@ -93,26 +94,16 @@ public abstract class AbstractTokenAuthFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         boolean authenticated = false;
         String token = bearer(req);
-        // 前缀已经明确不属于本链 → 连查都不用查
-        if (token != null && mayBelongHere(token)) {
-            TokenStore.SessionData d = tokenStore.get(token).orElse(null);
-            if (d != null && accepts(d.user().realm()) && prefixAgrees(token, d.user())) {
-                // 返回 null = 主体已失效（离职/停用）→ 不认证，后续由 Security 出 401/403。
-                // **必须嵌在这一层里**：把它拆成平级的第二个 if 会让「realm 不对 / 前缀不符」
-                // 的会话也落进认证分支 —— 那是把一道门改成了摆设。
-                d = onSession(token, d);
-                if (d != null) {
-                    LoginUser u = d.user();
-                    SecurityContextHolder.getContext().setAuthentication(
-                            new UsernamePasswordAuthenticationToken(u, null, authorities(u)));
-                    // 与 SecurityContext 成对写：后者只在 web 请求线程上有值，
-                    // CurrentUser 让非 web 线程（@Async、定时任务）也读得到当前身份
-                    CurrentUser.set(u);
-                    DataScopeContext.set(u.dataScope());   // 供 DataScopeHandler 注入 SQL
-                    if (carriesToken()) CallContext.setToken(token);
-                    authenticated = true;
-                }
-            }
+        LoginUser u = resolve(token).orElse(null);
+        if (u != null) {
+            SecurityContextHolder.getContext().setAuthentication(
+                    new UsernamePasswordAuthenticationToken(u, null, authorities(u)));
+            // 与 SecurityContext 成对写：后者只在 web 请求线程上有值，
+            // CurrentUser 让非 web 线程（@Async、定时任务）也读得到当前身份
+            CurrentUser.set(u);
+            DataScopeContext.set(u.dataScope());   // 供 DataScopeHandler 注入 SQL
+            if (carriesToken()) CallContext.setToken(token);
+            authenticated = true;
         }
         try {
             chain.doFilter(req, resp);
@@ -125,6 +116,25 @@ public abstract class AbstractTokenAuthFilter extends OncePerRequestFilter {
                 CallContext.clear();
             }
         }
+    }
+
+    /**
+     * 令牌 → 当前有效的主体；无效一律 empty。**过滤器与宿主内省端点共用这一条路径**
+     * （OpsKit 按 21/06 §八 调 {@code /internal/opskit/introspect}）—— 两处各写一份的话，
+     * 迟早一处先改了（比如加了停用判断）另一处没跟上，于是「运营台登不进、OpsKit 里还能办事」。
+     *
+     * <p>顺序不能拆：前缀快速排除 → 查会话 → 身份域与前缀对账 → {@link #onSession}（权限重算、主体失效即 null）。
+     * 把 {@code onSession} 拆成平级的第二步会让「realm 不对 / 前缀不符」的会话也被放行 —— 那是把一道门改成了摆设。
+     * 不写 SecurityContext：调用方自己决定拿主体做什么。
+     */
+    public final Optional<LoginUser> resolve(String token) {
+        // 前缀已经明确不属于本链 → 连查都不用查
+        if (token == null || !mayBelongHere(token)) return Optional.empty();
+        TokenStore.SessionData d = tokenStore.get(token).orElse(null);
+        if (d == null || !accepts(d.user().realm()) || !prefixAgrees(token, d.user())) return Optional.empty();
+        // 返回 null = 主体已失效（离职/停用）
+        d = onSession(token, d);
+        return d == null ? Optional.empty() : Optional.of(d.user());
     }
 
     private static String bearer(HttpServletRequest req) {

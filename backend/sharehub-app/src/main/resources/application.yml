@@ -62,6 +62,12 @@ management:
 
 # 开发期 CORS 允许源（ops-web Next dev）。生产走同源 nginx 反代 /api，无需 CORS。
 sharehub:
+  # OpsKit 令牌内省（21/06 §八，OpsKitIntrospectController）：OpsKit 调 POST /internal/opskit/introspect 时带的 Basic 凭据。
+  # 两项都为空 → 端点一律 401（fail-closed）。只走环境变量，不进仓库；与 OpsKit 的 IdP 登记（clientId / secret）一致。
+  opskit:
+    introspect:
+      client-id: ${SHAREHUB_OPSKIT_INTROSPECT_CLIENT_ID:}
+      client-secret: ${SHAREHUB_OPSKIT_INTROSPECT_CLIENT_SECRET:}
   # 文件存储（方案-文件上传与COS存储）：生产 cos，测试 / 离线开发 local。
   # type=cos 时桶名与密钥任一为空 → 启动失败（CosFileStorage#selfCheck）。密钥只走环境变量。
   storage:
