@@ -62,6 +62,7 @@ public class CallerResolver implements HandlerMethodArgumentResolver {
         WorkspaceRef ref = WorkspaceRef.parse(ws);
         Actor actor = bearer.startsWith(APP_PREFIX) ? actors.forApp(apps.authenticate(bearer), ref, null) : members.authenticate(bearer, ref);
         MDC.put("actor", actor.member().map(m -> m.key()).orElse("app:" + actor.app().orElse("?")));
+        MDC.put("workspace", actor.tenant().workspaceId().value());
         return actor;
     }
 }

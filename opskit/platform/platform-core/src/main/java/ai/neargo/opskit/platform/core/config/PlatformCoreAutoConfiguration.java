@@ -211,6 +211,6 @@ public class PlatformCoreAutoConfiguration {
 
     @Bean
     Task<Void> idempotencyPurgeTask(IdempotencyStore store) {
-        return Tasks.recurring("idempotency-purge", Schedules.daily(java.time.LocalTime.of(3, 30))).execute((inst, ctx) -> store.purgeExpired());
+        return Tasks.recurring("idempotency-purge", Schedules.daily(java.time.ZoneOffset.UTC, java.time.LocalTime.of(3, 30))).execute((inst, ctx) -> store.purgeExpired());
     }
 }

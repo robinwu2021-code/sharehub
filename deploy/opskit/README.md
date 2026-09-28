@@ -19,9 +19,12 @@
 | `OPSKIT_PORT` | | 默认 8090 |
 | `OPSKIT_BOOTSTRAP_FILE` | | 默认 `/etc/opskit/bootstrap.yml` |
 | `OPSKIT_DB_POOL` | | 连接池上限，默认 20 |
+| `OPSKIT_LOG_DIR` | | 设了才落盘（`{dir}/spring.log`，按天滚动、保留 20 天、单文件 200MB）；不设只进 journal |
 
 ## 核对
 
 - 启动日志有 `启动引导完成 … ref=MAIN idps=2 roles=[…]`。
 - `curl -H "Authorization: Bearer <运营台员工令牌>" http://127.0.0.1:8090/api/opskit/v1/workspaces/ext:MAIN/me` 返回角色与产品权限。
 - `/dev/**` 只在 local 配置档存在，prod 不暴露。
+- 健康：`/actuator/health` 含 `scheduler`（db-scheduler 在跑）与 `outbox`（投递积压，已到期未投出 > 1000 条时为 UNKNOWN）；指标：`/actuator/prometheus` 的 `opskit_outbox_pending / due / failed`。
+- 日志每行带 `[traceId] [ws=…] [actor=…]`，排障按 traceId 串起一次请求。

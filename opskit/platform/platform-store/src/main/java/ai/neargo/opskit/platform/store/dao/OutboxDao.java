@@ -46,6 +46,16 @@ public final class OutboxDao {
                 .param(now).query(MAPPER).list();
     }
 
+    /** 积压（跨空间，指标用）：未投完且未判失败的行数，以及其中已到期仍未投出的行数。 */
+    public long[] backlog(AccountId unknown, long now) {
+        if (!AccountId.UNKNOWN.equals(unknown)) {
+            throw new IllegalArgumentException("outbox backlog is cross-tenant by design");
+        }
+        return jdbc.sql("SELECT COUNT(*), COALESCE(SUM(CASE WHEN next_at_ms <= ? THEN 1 ELSE 0 END), 0), "
+                        + "COALESCE(SUM(CASE WHEN failed = 1 THEN 1 ELSE 0 END), 0) FROM plat_outbox WHERE done_at_ms IS NULL")
+                .param(now).query((rs, i) -> new long[] {rs.getLong(1), rs.getLong(2), rs.getLong(3)}).single();
+    }
+
     public Optional<OutboxRow> find(AccountId account, long id) {
         return jdbc.sql("SELECT * FROM plat_outbox WHERE account_id = ? AND id = ?").params(account.value(), id).query(MAPPER).optional();
     }

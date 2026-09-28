@@ -32,3 +32,21 @@ management:
     web:
       exposure:
         include: health,prometheus
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+
+# 日志（21/07 O4-3）：每行带 traceId / workspace / actor。设了 OPSKIT_LOG_DIR 才落盘（{dir}/spring.log，按天滚动保留 20 天）；不设只打控制台（systemd 下进 journal）
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%X{traceId:-}] [ws=%X{workspace:-}] [actor=%X{actor:-}] %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%X{traceId:-}] [ws=%X{workspace:-}] [actor=%X{actor:-}] %logger{36} - %msg%n"
+  file:
+    path: ${OPSKIT_LOG_DIR:}
+  logback:
+    rollingpolicy:
+      file-name-pattern: "${LOG_FILE}.%d{yyyy-MM-dd}.%i.gz"
+      max-file-size: 200MB
+      max-history: 20
+      total-size-cap: 10GB

@@ -266,4 +266,15 @@ class LocalApiTest {
         assertThat(call("POST", WS + "/tickets/" + queued + "/pool", alice, Map.of("reason", "x")).status()).as("还没人办，退回池 → 409").isEqualTo(409);
         assertThat(call("GET", WS + "/tickets/" + queued, token("dave"), null).status()).as("无工单权限、非参与者").isEqualTo(404);
     }
+
+    @Test
+    void healthReportsSchedulerAndOutbox() throws Exception {
+        HttpResponse<String> r = http.send(HttpRequest.newBuilder(URI.create(BASE + "/actuator/health")).GET().build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(r.statusCode()).isEqualTo(200);
+        JsonNode h = json.readTree(r.body());
+        assertThat(h.get("components").get("scheduler").get("status").asText()).isEqualTo("UP");
+        assertThat(h.get("components").get("outbox").get("details").has("due")).isTrue();
+        HttpResponse<String> m = http.send(HttpRequest.newBuilder(URI.create(BASE + "/actuator/prometheus")).GET().build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(m.body()).contains("opskit_outbox_pending");
+    }
 }

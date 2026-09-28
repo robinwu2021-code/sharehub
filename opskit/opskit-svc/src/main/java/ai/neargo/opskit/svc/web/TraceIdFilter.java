@@ -32,6 +32,7 @@ public class TraceIdFilter extends OncePerRequestFilter {
         } finally {
             MDC.remove(MDC_KEY);
             MDC.remove("actor");
+            MDC.remove("workspace");
         }
     }
 
