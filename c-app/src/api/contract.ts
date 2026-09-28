@@ -22,8 +22,7 @@ import type {
   AppVersionCheck,
   StoreDetail,
   WalletTxn,
-  LogoffItem,
-} from "@/types";
+  LogoffItem, FileRef } from "@/types";
 
 export interface PageQ {
   page?: number;
@@ -201,6 +200,10 @@ export interface McpApi {
    * 界面是阿语、FAQ 是中文。后端那边三语挑选是好的，实测 en/ar 都对。
    */
   listFaq(category?: string, lang?: string): Promise<FaqItem[]>;
+  /** 报障截图上传：传本地临时路径（uni.chooseImage 给的），回 fileNo，提交报障时带上。 */
+  uploadEvidence(filePath: string): Promise<FileRef>;
+  /** 取回一张自己交的截图，返回可直接显示的本地路径（个人数据，服务端不发公开链接）。 */
+  fetchEvidence(fileNo: string): Promise<string>;
   report(p: ReportInput): Promise<ReportResult>;
   listReports(q?: PageQ & { status?: string }): Promise<PageResult<CsTicket>>;
   getReport(reportNo: string): Promise<CsTicket | null>;

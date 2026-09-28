@@ -10151,6 +10151,14 @@
     {
      "name": "createdAt",
      "type": "String"
+    },
+    {
+     "name": "photos",
+     "type": "java.util.List<FileRef>"
+    },
+    {
+     "name": "photoCount",
+     "type": "Integer"
     }
    ],
    "requestShape": null
@@ -10217,6 +10225,14 @@
     {
      "name": "createdAt",
      "type": "String"
+    },
+    {
+     "name": "photos",
+     "type": "java.util.List<FileRef>"
+    },
+    {
+     "name": "photoCount",
+     "type": "Integer"
     }
    ],
    "requestShape": [
@@ -10253,6 +10269,87 @@
      "type": "String"
     }
    ]
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/cs/tickets/{ticketNo}",
+   "perm": "cs:ticket:read",
+   "perms": [
+    "cs:ticket:read"
+   ],
+   "handler": "CsController#ticket",
+   "summary": "单张详情 —— 列表放不下报障截图，而截图往往是唯一能看清现场的东西。",
+   "params": [
+    {
+     "in": "path",
+     "name": "ticketNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "CsTicketVO",
+   "returnContainer": null,
+   "returnElement": "CsTicketVO",
+   "responseShape": [
+    {
+     "name": "ticketNo",
+     "type": "String"
+    },
+    {
+     "name": "userNo",
+     "type": "String"
+    },
+    {
+     "name": "orderNo",
+     "type": "String"
+    },
+    {
+     "name": "cabinetNo",
+     "type": "String"
+    },
+    {
+     "name": "problemNo",
+     "type": "String"
+    },
+    {
+     "name": "issue",
+     "type": "String"
+    },
+    {
+     "name": "channel",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "handlerNo",
+     "type": "String"
+    },
+    {
+     "name": "woNo",
+     "type": "String"
+    },
+    {
+     "name": "refundNo",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "String"
+    },
+    {
+     "name": "photos",
+     "type": "java.util.List<FileRef>"
+    },
+    {
+     "name": "photoCount",
+     "type": "Integer"
+    }
+   ],
+   "requestShape": null
   },
   {
    "verb": "POST",
@@ -10323,6 +10420,14 @@
     {
      "name": "createdAt",
      "type": "String"
+    },
+    {
+     "name": "photos",
+     "type": "java.util.List<FileRef>"
+    },
+    {
+     "name": "photoCount",
+     "type": "Integer"
     }
    ],
    "requestShape": [
@@ -10409,6 +10514,14 @@
     {
      "name": "createdAt",
      "type": "String"
+    },
+    {
+     "name": "photos",
+     "type": "java.util.List<FileRef>"
+    },
+    {
+     "name": "photoCount",
+     "type": "Integer"
     }
    ],
    "requestShape": null
@@ -10482,6 +10595,14 @@
     {
      "name": "createdAt",
      "type": "String"
+    },
+    {
+     "name": "photos",
+     "type": "java.util.List<FileRef>"
+    },
+    {
+     "name": "photoCount",
+     "type": "Integer"
     }
    ],
    "requestShape": null
@@ -43462,6 +43583,91 @@
    "requestShape": null
   },
   {
+   "verb": "POST",
+   "path": "/mp/files",
+   "perm": null,
+   "perms": [],
+   "handler": "MpFileController#uploadEvidence",
+   "summary": "报障截图。",
+   "params": [
+    {
+     "in": "query",
+     "name": "file",
+     "type": "MultipartFile",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "FileRef",
+   "returnContainer": null,
+   "returnElement": "FileRef",
+   "responseShape": [
+    {
+     "name": "fileNo",
+     "type": "String"
+    },
+    {
+     "name": "category",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "originalName",
+     "type": "String"
+    },
+    {
+     "name": "contentType",
+     "type": "String"
+    },
+    {
+     "name": "sizeBytes",
+     "type": "long"
+    },
+    {
+     "name": "previewable",
+     "type": "boolean"
+    },
+    {
+     "name": "imageWidth",
+     "type": "Integer"
+    },
+    {
+     "name": "imageHeight",
+     "type": "Integer"
+    },
+    {
+     "name": "uploadedAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/mp/files/{fileNo}",
+   "perm": null,
+   "perms": [],
+   "handler": "MpFileController#get",
+   "summary": "C 端上传（`/mp/files`）—— 目前只有报障截图一种用途。",
+   "params": [
+    {
+     "in": "path",
+     "name": "fileNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ResponseEntity<StreamingResponseBody>",
+   "returnContainer": "ResponseEntity",
+   "returnElement": "StreamingResponseBody",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
    "verb": "GET",
    "path": "/mp/nearby/cabinets",
    "perm": null,
@@ -45427,6 +45633,10 @@
     {
      "name": "channel",
      "type": "String"
+    },
+    {
+     "name": "fileNos",
+     "type": "java.util.List<String>"
     }
    ]
   },
@@ -45509,6 +45719,14 @@
     {
      "name": "createdAt",
      "type": "String"
+    },
+    {
+     "name": "photos",
+     "type": "java.util.List<FileRef>"
+    },
+    {
+     "name": "photoCount",
+     "type": "Integer"
     }
    ],
    "requestShape": null
@@ -45580,6 +45798,14 @@
     {
      "name": "createdAt",
      "type": "String"
+    },
+    {
+     "name": "photos",
+     "type": "java.util.List<FileRef>"
+    },
+    {
+     "name": "photoCount",
+     "type": "Integer"
     }
    ],
    "requestShape": null
@@ -46312,10 +46538,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 524,
+  "endpoints": 527,
   "records": 476,
-  "withPerm": 451,
+  "withPerm": 452,
   "withBody": 221,
-  "shapedResponses": 408
+  "shapedResponses": 410
  }
 }

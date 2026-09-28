@@ -1,7 +1,7 @@
 // Mock 实现（McpApi）。全部走 mock/db 内存数据 + 模拟延迟。后端未就绪即可跑通全部 UI。
 import * as db from "@/mock/db";
 import type { McpApi, LoginParams, RentParams, PayParams, OrderQ, NearbyQ } from "./contract";
-import type { ConsumerOrder, LogoffItem, UserCoupon, RechargeResult, CsTicket, ReportResult } from "@/types";
+import type { ConsumerOrder, LogoffItem, UserCoupon, RechargeResult, CsTicket, ReportResult, FileRef } from "@/types";
 import { t } from "@/i18n";
 
 /** 注销申请的 mock 状态。模块级而非 db 里：它是会话内的一次性流程，不是种子数据。 */
@@ -224,6 +224,15 @@ export const mockApi: McpApi = {
 
   // 分流照后端的规矩来：出口由字典里的 suggestedAction 决定，不是前端挑的。
   // mock 里也走这条，否则 mock 下永远看不到「自助解答」和「转退款」两种出口。
+  // mock 下没有文件服务：上传回一个假的 fileNo（让「已附 N 张」这条路能自查），
+  // 取图则如实失败 —— 假装能取到会让「取不到图」这种真缺陷在 mock 下永远看不见
+  uploadEvidence: () => db.delay<FileRef>({
+    fileNo: "FLMOCK" + Math.random().toString(36).slice(2, 10).toUpperCase(),
+    category: "CS_EVIDENCE", status: "TEMP", originalName: "evidence.png", contentType: "image/png",
+    sizeBytes: 0, previewable: true, imageWidth: null, imageHeight: null,
+    uploadedAt: new Date().toISOString().slice(0, 19).replace("T", " "),
+  }, 300),
+  fetchEvidence: () => Promise.reject(new Error("mock 下没有文件服务")),
   report: (p) => {
     const faq = db.faqs.find((f) => f.problemNo === p.problemNo);
     const action = faq ? faq.suggestedAction : "TO_CS"; // 未知问题兜底转人工，与后端一致

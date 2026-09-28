@@ -3,7 +3,7 @@
 // App 版本、银行字典、常见问题、税率设置。
 // 端点前缀：字典/组织类在 /api/platform/**，B2/B3/B5 新增项在 /api/platform/**，
 // 供应商接入走 /internal/gw/**（沿用现状，未改动）。
-import { client } from "../http-client";
+import { client, fetchBlobUrl } from "../http-client";
 import type { SystemApi } from "../contracts/system";
 import type { PageQ, NotifyLogQ, NotifyBlacklistQ, AppVersionQ, BankQ, ProblemQ } from "../query";
 
@@ -84,4 +84,5 @@ export const systemHttp: SystemApi = {
     return client.upload("/api/platform/files", form, onProgress);
   },
   fileUrl: (fileNo) => client.get(`/api/platform/files/${fileNo}/url`),
+  fileBlobUrl: (fileNo) => fetchBlobUrl(`/api/platform/files/${fileNo}`),
 };

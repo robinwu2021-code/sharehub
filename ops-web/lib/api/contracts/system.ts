@@ -117,4 +117,11 @@ export interface SystemApi {
 
   /** 取限时下载地址。**每次要用时现取** —— expiresAt 过了就失效，别缓存成长期链接。 */
   fileUrl(fileNo: string): Promise<SignedFileUrl>;
+  /**
+   * 取个人数据类文件的本地可显示地址（blob）。
+   *
+   * PII 桶（报障截图、入驻资质）**不发限时签名地址**：能直接打开的链接被转发或进了日志就是泄露。
+   * 所以带 token 取字节再包成 blob 地址，用完由调用方 revokeObjectURL。
+   */
+  fileBlobUrl(fileNo: string): Promise<string>;
 }

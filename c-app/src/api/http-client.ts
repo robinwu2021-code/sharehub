@@ -119,7 +119,7 @@ function qs(q?: object): string {
  *
  * 出参是字符串，要自己 JSON.parse，与 uni.request 不同。
  */
-export function upload(path: string, filePath: string): Promise<{ fileNo: string }> {
+export function upload<T>(path: string, filePath: string): Promise<T> {
   const { "Content-Type": _ct, ...headers } = authHeaders();
   return new Promise((resolve, reject) => {
     uni.uploadFile({
@@ -128,15 +128,15 @@ export function upload(path: string, filePath: string): Promise<{ fileNo: string
       name: "file",
       header: headers,
       success: (res) => {
-        let body: Partial<Result<{ fileNo: string }>> = {};
+        let body: Partial<Result<T>> = {};
         try {
-          body = JSON.parse(res.data) as Partial<Result<{ fileNo: string }>>;
+          body = JSON.parse(res.data) as Partial<Result<T>>;
         } catch {
           reject(new ApiError(`HTTP ${res.statusCode}`, res.statusCode));
           return;
         }
         if (res.statusCode >= 200 && res.statusCode < 300 && body.code === 0) {
-          resolve(body.data as { fileNo: string });
+          resolve(body.data as T);
         } else {
           if (res.statusCode === 401) onUnauthorized?.();
           reject(new ApiError(body.message || `HTTP ${res.statusCode}`, body.code ?? res.statusCode));

@@ -21,6 +21,10 @@ export interface CsTicket {
   woNo: string | null;
   refundNo: string | null;
   createdAt: string;
+  /** 用户交上来的报障截图张数（列表带；图本身要按 fileNo 另取，PII 不发签名地址）。 */
+  photoCount?: number;
+  /** 详情才有：截图元信息。 */
+  photos?: { fileNo: string; contentType: string; originalName: string }[];
 }
 /** 与后端 `CsSessionStatus` 枚举同名同值。**具名不是风格** —— 两端同名词表比对只认
  *  具名 `export type`，内联在 interface 里的联合它一个都发现不了。 */

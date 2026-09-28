@@ -26,6 +26,8 @@ export const csTickets: CsTicket[] = Array.from({ length: 24 }, (_, i) => ({
   woNo: i % 6 === 1 ? `WO${70000 + i}` : null,
   refundNo: i % 6 === 2 ? `RFD${80000 + (i % 13)}` : null,
   createdAt: iso(i * 3600_000),
+  // 一部分单带用户交上来的截图：张数为 0 的话「看截图」按钮在 mock 下永远不出，改动没法自查
+  photoCount: i % 3 === 0 ? (i % 2) + 1 : 0,
 }));
 export const csSessions: CsSession[] = Array.from({ length: 20 }, (_, i) => ({
   sessionNo: `CS${9000 + i}`, userNo: `U${3000 + (i % 40)}`, agentName: p(["Sara Ahmed", "Noura K.", "客服机器人"], i),
@@ -44,6 +46,22 @@ export const csMessages: CsMessage[] = csSessions.flatMap((s, i) => {
     { id: base + 3, sessionNo: s.sessionNo, senderType: "USER" as const, senderNo: s.userNo, content: p(["好的，麻烦您了", "我再试一下", "收到，谢谢"], i), attach: i % 4 === 0 ? `https://placehold.co/720x1280?text=${s.sessionNo}` : null, createdAt: iso(i * 1800_000) },
   ];
 });
+
+/**
+ * 单张详情（mock）。截图用占位图：mock 下没有文件服务，
+ * 但**张数与列表一致**，否则点开发现对不上，比不显示更让人困惑。
+ */
+export function getCsTicket(ticketNo: string): CsTicket {
+  const tk = csTickets.find((x) => x.ticketNo === ticketNo);
+  if (!tk) throw notFound("报障单", "Support ticket", ticketNo);
+  const n = tk.photoCount ?? 0;
+  return {
+    ...tk,
+    photos: Array.from({ length: n }, (_, k) => ({
+      fileNo: `FL-${ticketNo}-${k + 1}`, contentType: "image/png", originalName: `evidence-${k + 1}.png`,
+    })),
+  };
+}
 
 export const listCsTickets = (q: PageQuery = {}) => paginate(csTickets, q.page, q.size, (x) => kwHit(q.keyword, x.ticketNo, x.userNo, x.cabinetNo, x.issue));
 export const listCsSessions = (q: PageQuery = {}) => paginate(csSessions, q.page, q.size, (x) => kwHit(q.keyword, x.sessionNo, x.userNo, x.agentName));

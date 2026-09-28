@@ -95,4 +95,6 @@ export const systemMock: SystemApi = {
     return wait(ref, 150);
   },
   fileUrl: async (fileNo) => wait(fileDb.fileUrl(fileNo), 120),
+  // mock 下没有文件服务：如实失败，别用占位图假装取到了 —— 那会让「取不到图」这种真缺陷看不见
+  fileBlobUrl: async () => Promise.reject(new Error("mock 下没有文件服务")),
 };

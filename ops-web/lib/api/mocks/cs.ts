@@ -8,6 +8,7 @@ import { wait } from "./_wait";
 
 export const csMock: CsApi = {
   listCsTickets: (q: PageQ = {}) => wait(db.listCsTickets(q)),
+  getCsTicket: (no) => wait(csDb.getCsTicket(no)),
   listCsSessions: (q: PageQ = {}) => wait(db.listCsSessions(q)),
   saveCsTicket: (x) => wait(db.saveCsTicket(x), 350),
   refundCsTicket: (no) => wait(csDb.refundCsTicket(no), 350),

@@ -11,7 +11,6 @@
 import { computed, ref } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import { api } from "@/api";
-import { upload } from "@/api/http-client";
 import { useAppStore } from "@/stores/app";
 import type { FaqItem } from "@/types";
 
@@ -73,7 +72,7 @@ async function submit() {
     if (photos.value.length) {
       uni.showLoading({ title: t("feedback.uploading"), mask: true });
       try {
-        fileNos = await Promise.all(photos.value.map(async (p) => (await upload("/mp/files", p)).fileNo));
+        fileNos = await Promise.all(photos.value.map(async (p) => (await api.uploadEvidence(p)).fileNo));
       } catch (e) {
         throw new Error(t("feedback.uploadFailed") + "：" + (e as Error).message);
       } finally {

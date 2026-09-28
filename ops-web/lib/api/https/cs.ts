@@ -5,6 +5,7 @@ import type { PageQ } from "../query";
 
 export const csHttp: CsApi = {
   listCsTickets: (q?: PageQ) => client.get("/api/ops/cs/tickets", q),
+  getCsTicket: (no) => client.get(`/api/ops/cs/tickets/${no}`),
   listCsSessions: (q?: PageQ) => client.get("/api/ops/cs/sessions", q),
   saveCsTicket: (x) => client.post(x.ticketNo ? `/api/ops/cs/tickets/${x.ticketNo}` : "/api/ops/cs/tickets", x),
   refundCsTicket: (no) => client.post(`/api/ops/cs/tickets/${no}/refund`),

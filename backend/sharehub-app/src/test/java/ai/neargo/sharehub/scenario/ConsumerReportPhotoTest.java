@@ -64,6 +64,9 @@ class ConsumerReportPhotoTest extends ApiTestSupport {
                 .as("别人的图取不到（与不存在同一结果）").isNotEqualTo(200);
         assertThat(rawGet("/mp/files/" + fileNo, null)).as("不带令牌取不到").isNotEqualTo(200);
 
+        assertThat(rawGet("/api/platform/files/" + fileNo, login("ADMIN")))
+                .as("运营也要取得到 —— 详情里列出文件名却下载不了，等于还是看不见").isEqualTo(200);
+
         JsonNode row = firstRow(get("/mp/user/reports", token).okData(), reportNo);
         assertThat(row.path("photoCount").asInt())
                 .as("列表要带张数 —— 列表不查图本身（N+1），但张数得有，否则界面无从显示").isEqualTo(1);

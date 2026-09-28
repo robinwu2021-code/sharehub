@@ -115,6 +115,22 @@ function upload<T>(path: string, form: FormData, onProgress?: (p: number) => voi
   });
 }
 
+/**
+ * 取一份受鉴权保护的二进制，返回可直接放进 `<img src>` 的本地地址。
+ *
+ * 个人数据（PII 桶：报障截图、入驻资质）**不发限时签名地址** —— 一个能直接打开的链接
+ * 转发出去或进了日志就等于泄露。所以只能带 token 取字节，再包成 blob 地址。
+ * 用完由调用方 `URL.revokeObjectURL`，否则这一页开着的时间里每取一张都留一份在内存里。
+ */
+export async function fetchBlobUrl(path: string): Promise<string> {
+  const r = await fetch(`${BASE}${path}`, { headers: headers() });
+  if (!r.ok) {
+    if (r.status === 401 && isSessionSensitive(path)) sessionExpired();
+    throw new ApiError(r.status, translate(curLocale(), statusKey(r.status)));
+  }
+  return URL.createObjectURL(await r.blob());
+}
+
 export const client = {
   get: <T>(path: string, q?: object) => req<T>(`${path}${qs(q)}`),
   post: <T>(path: string, data?: unknown) => req<T>(path, { method: "POST", body: JSON.stringify(data ?? {}) }),

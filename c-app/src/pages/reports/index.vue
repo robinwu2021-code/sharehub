@@ -14,7 +14,6 @@ import { onShow } from "@dcloudio/uni-app";
 import { api } from "@/api";
 import type { CsTicket } from "@/types";
 import { stampOf } from "@/shared/format";
-import { downloadAuthed } from "@/api/http-client";
 import { t } from "@/i18n";
 
 const list = ref<CsTicket[]>([]);
@@ -55,7 +54,7 @@ async function viewPhotos(k: CsTicket) {
   try {
     const detail = await api.getReport(k.ticketNo);
     const nos = (detail?.photos ?? []).map((p) => p.fileNo);
-    const paths = await Promise.all(nos.map((no) => downloadAuthed(`/mp/files/${no}`)));
+    const paths = await Promise.all(nos.map((no) => api.fetchEvidence(no)));
     if (!paths.length) throw new Error(t("common.loadFailed"));
     uni.previewImage({ urls: paths });
   } catch (e) {

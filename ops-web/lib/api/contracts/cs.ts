@@ -5,6 +5,8 @@ import type { PageResult, CsTicket, CsSession, CsMessage } from "../../types";
 export interface CsApi {
   listCsTickets(q?: PageQ): Promise<PageResult<CsTicket>>;
   listCsSessions(q?: PageQ): Promise<PageResult<CsSession>>;
+  /** 单张详情 —— 列表放不下截图，而截图常常是唯一能看清现场的东西。 */
+  getCsTicket(ticketNo: string): Promise<CsTicket>;
   saveCsTicket(x: Partial<CsTicket> & { ticketNo?: string }): Promise<CsTicket>;
   /** 报障转退款申请。**幂等**：已转过原样返回既有 refundNo，绝不建第二笔（重复退款是资金事故）。 */
   refundCsTicket(ticketNo: string): Promise<CsTicket>;

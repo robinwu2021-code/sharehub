@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { fmtTime } from "@/lib/utils";
 import { useCan } from "@/lib/hooks/use-can";
 import { useI18n } from "@/lib/i18n";
+import { TicketPhotos } from "@/components/cs/ticket-photos";
 import { notify } from "@/lib/notify";
 import { exportCsv } from "@/lib/export-csv";
 import type { CsTicket, CsSession, CsMessage, PageResult } from "@/lib/types";
@@ -70,6 +71,8 @@ function CsInner() {
   const [keyword, setKeyword] = useState("");
   const [ticketForm, setTicketForm] = useState<Partial<CsTicket> | null>(null);
   const [session, setSession] = useState<CsSession | null>(null);
+  // 看截图：列表只带张数，图要按 fileNo 逐张取，所以点开才拉详情
+  const [photoOf, setPhotoOf] = useState<string | null>(null);
   const [reply, setReply] = useState("");
   const [attach, setAttach] = useState("");
   const allow = useCan();
@@ -123,6 +126,12 @@ function CsInner() {
     placeholderData: keepWithinTab(tab),
   });
 
+  const photoQ = useQuery({
+    queryKey: ["cs-ticket", photoOf],
+    queryFn: () => api.getCsTicket(photoOf as string),
+    enabled: !!photoOf,
+  });
+
   const ticketCols: Column<CsTicket>[] = [
     // 业务号列是扫描锚点：body-strong（§12.3）+ 等宽数字，整列不跳
     { header: "工单号", cell: (t) => <span className="txt-strong tabular-nums">{t.ticketNo}</span> },
@@ -132,6 +141,10 @@ function CsInner() {
     { header: "渠道", cell: (t) => <Badge tone="outline">{t.channel}</Badge> },
     { header: "状态", cell: (t) => <StatusBadge map={TICKET_STATUS} value={t.status} /> },
     { header: "创建时间", cell: (t) => <span className="text-muted-foreground">{fmtTime(t.createdAt)}</span> },
+    // 用户交上来的现场照片往往是唯一能看清问题的东西；列表放不下图，但要让人知道有、并且点得开
+    { header: "截图", cell: (row) => (row.photoCount ?? 0) > 0
+      ? <Button size="sm" variant="outline" onClick={() => setPhotoOf(row.ticketNo)}>{row.photoCount} 张</Button>
+      : <span className="text-muted-foreground">-</span> },
     // 处置去向：已转出的单号直接列出来，点开抽屉才能看到等于查不到
     { header: "退款单", cell: (row) => row.refundNo
       ? <span className="tabular-nums">{row.refundNo}</span>
@@ -231,6 +244,24 @@ function CsInner() {
         onSubmit={() => ticketForm && saveTicket.mutate(ticketForm)}
         submitting={saveTicket.isPending}
       />
+
+      {/* 报障截图：图是带鉴权取的，不发公开链接（PII 桶） */}
+      <Drawer
+        open={!!photoOf}
+        onOpenChange={(o) => !o && setPhotoOf(null)}
+        title={`报障截图 ${photoOf ?? ""}`}
+        desc="用户在 App 里提交报障时上传的现场照片"
+        width="w-[520px]"
+      >
+        {photoQ.isLoading ? (
+          <span className="text-muted-foreground">加载中…</span>
+        ) : photoQ.data?.photos?.length ? (
+          <TicketPhotos fileNos={photoQ.data.photos.map((p) => p.fileNo)} />
+        ) : (
+          // 列表说有几张、点开却是空，只能是出了问题；别用泛化空态把它说成「没有照片」
+          <span className="text-muted-foreground">没取到截图，请重试或联系管理员</span>
+        )}
+      </Drawer>
 
       {/* 会话详情：消息时间线 + 回复框。已结束的会话只读（后端也会拒） */}
       <Drawer

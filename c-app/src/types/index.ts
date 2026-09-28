@@ -295,6 +295,23 @@ export interface ReportInput {
   fileNos?: string[]; // 报障截图：先传 /mp/files 拿 fileNo，提交时带上
 }
 
+/**
+ * 文件引用（镜像后端 `FileRef`）。C 端只用到 `fileNo`，其余字段如实声明：
+ * 少声明会让前后端对齐卡口把这条端点记成「后端出参在前端没有对应类型」。
+ */
+export interface FileRef {
+  fileNo: string;
+  category: string;
+  status: string;
+  originalName: string;
+  contentType: string;
+  sizeBytes: number;
+  previewable: boolean;
+  imageWidth: number | null;
+  imageHeight: number | null;
+  uploadedAt: string;
+}
+
 /** 报障受理结果（镜像后端 `ReportResultVO`）。`suggestedAction` 决定提交后往哪跳。 */
 export interface ReportResult {
   reportNo: string;

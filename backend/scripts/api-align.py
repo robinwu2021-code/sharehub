@@ -56,7 +56,15 @@ def scan_frontend_calls():
 # 用 `<[^>()]*>` 会在内层 `>` 处截断、整条调用匹配不上 —— 于是 c-app 明明调了，
 # 报告里却说「前端未调用」。排除 `()` 而不排除 `>`：括号排除保证不会跨到下一个调用去。
 # （与本文件上一条注释里那个 84% 误报是同一类错：正则把真实写法挡在外面。）
-VERB_CALL = re.compile(r'\b(get|post|put|del|delete|patch)\s*(?:<[^()]*>)?\s*\(')
+# 除了 client.get/post/…，两端还有**不带动词名的助手**，它们也是真实调用：
+#   · upload / uploadFile   → POST（multipart，必须让浏览器/端自己拼 boundary，所以不走 client.post）
+#   · downloadAuthed / fetchBlobUrl → GET（取受鉴权保护的二进制：<img>/<image> 发不了 Authorization 头）
+# 不认它们的后果不是漏防，而是**误报成「后端建了、前端没调」**：
+# `/api/platform/files` 的上传与下载就这样被当成缺口写进了台账（2026-09-28 查实并删除），
+# 而台账上的假条目会让人去做不存在的工作 —— 与本文件 84% 误报那次同形。
+HELPER_VERB = {'upload': 'POST', 'uploadFile': 'POST', 'downloadAuthed': 'GET', 'fetchBlobUrl': 'GET'}
+VERB_CALL = re.compile(
+    r'\b(get|post|put|del|delete|patch|upload|uploadFile|downloadAuthed|fetchBlobUrl)\s*(?:<[^()]*>)?\s*\(')
 PATH_LIT = re.compile(r'[`"\'](/(?:api|internal|mp)/[^`"\']*)[`"\']')
 
 
@@ -77,7 +85,8 @@ def calls_in(src, relpath):
     """
     out = []
     for m in VERB_CALL.finditer(src):
-        verb = {'del': 'DELETE'}.get(m.group(1), m.group(1).upper())
+        name = m.group(1)
+        verb = HELPER_VERB.get(name) or {'del': 'DELETE'}.get(name, name.upper())
         i, depth = m.end() - 1, 0
         while i < len(src):                     # 括号配平，取完整实参区
             if src[i] == '(':

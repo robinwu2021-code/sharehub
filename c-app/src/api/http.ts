@@ -1,6 +1,6 @@
 // 真实后端实现（McpApi）。端点对齐 docs/api/README §六/§七 的 /mp/**。
 // auth 路径由 ConsumerRentFlowTest 实测确认（/mp/auth/*），标「待定」者需服务端补齐。
-import { client } from "./http-client";
+import { client, upload, downloadAuthed } from "./http-client";
 import type { McpApi, LoginParams, LoginMethods, RentParams, RentReceipt, PayParams, PayResult, OrderQ, NearbyQ, PageQ, ProfilePatch } from "./contract";
 import type {
   PageResult,
@@ -24,8 +24,7 @@ import type {
   AppVersionCheck,
   StoreDetail,
   WalletTxn,
-  LogoffItem,
-} from "@/types";
+  LogoffItem, FileRef } from "@/types";
 
 export const httpApi: McpApi = {
   loginMethods: (country?: string) =>
@@ -66,6 +65,8 @@ export const httpApi: McpApi = {
   pay: (p: PayParams) => client.post<PayResult>("/mp/trade/pay", p),
 
   listFaq: (category?: string, lang?: string) => client.get<FaqItem[]>("/mp/faq", { category, lang }),
+  uploadEvidence: (filePath: string) => upload<FileRef>("/mp/files", filePath),
+  fetchEvidence: (fileNo: string) => downloadAuthed(`/mp/files/${fileNo}`),
   report: (p: ReportInput) => client.post<ReportResult>("/mp/user/report", p),
   listReports: (q?: PageQ & { status?: string }) => client.get<PageResult<CsTicket>>("/mp/user/reports", q),
   getReport: (reportNo: string) => client.get<CsTicket | null>(`/mp/user/reports/${reportNo}`),
