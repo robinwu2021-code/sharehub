@@ -11,12 +11,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -57,12 +54,6 @@ class VocabularyWriteCoverageTest {
 
     private static final String LEDGER = "known-unvalidated-vocab-columns.txt";
 
-    /** 与 {@code StoredValueInVocabularyTest} 同一套形状判据 —— 两边分叉会让台账对不上。 */
-    private static final Pattern VOCAB_TOKEN = Pattern.compile("\\b[A-Z][A-Z0-9_]+\\b");
-    private static final int MIN_VOCABULARY_SIZE = 2;
-    private static final Set<String> CLASSIC_NAMES =
-            Set.of("status", "state", "type", "mode", "level");
-
     /**
      * **已核实写入侧有校验**的列。两种来源，都算：
      * <ul>
@@ -94,6 +85,8 @@ class VocabularyWriteCoverageTest {
 
     @Autowired
     JdbcTemplate jdbc;
+
+    private Set<String> cache;
 
     @Test
     @DisplayName("★★ 每个词表列要么已接校验、要么在台账里 —— 不许悄悄多出一列没人管的")
@@ -147,27 +140,23 @@ class VocabularyWriteCoverageTest {
 
     // ───────────────────────── 读取 ─────────────────────────
 
+    /**
+     * 写入侧要管的词表列。判据与 {@code StoredValueInVocabularyTest} 共用
+     * （{@link VocabularyColumns}），<b>唯一的分歧是空列</b>：
+     * 库里还没有取值时形状判不出来，事后卡口跳过它，本条保留它 ——
+     * 新建的空表恰恰是最该当场表态的。理由写在 {@code VocabularyColumns} 类注释里。
+     *
+     * <p>一次扫描要对每一列各查一次取值分布，三条用例共用一份结果。
+     */
     private Set<String> vocabularyColumns() {
-        List<Map<String, Object>> cols = jdbc.queryForList("""
-                SELECT table_name AS t, column_name AS c, column_comment AS cmt
-                  FROM information_schema.columns
-                 WHERE table_schema = DATABASE()
-                   AND data_type = 'varchar'
-                   AND column_comment <> ''
-                   AND table_name NOT LIKE 'flyway%'""");
-        Set<String> out = new LinkedHashSet<>();
-        for (Map<String, Object> r : cols) {
-            String c = String.valueOf(r.get("c"));
-            String cmt = String.valueOf(r.get("cmt"));
-            Set<String> tokens = new TreeSet<>();
-            for (var m = VOCAB_TOKEN.matcher(cmt); m.find(); ) {
-                tokens.add(m.group());
+        if (cache == null) {
+            Set<String> out = new TreeSet<>();
+            for (VocabularyColumns.Column c : VocabularyColumns.scan(jdbc)) {
+                if (c.looksLikeEnum() || c.hasNoValues() || c.classicName()) out.add(c.key());
             }
-            if (tokens.size() >= MIN_VOCABULARY_SIZE || CLASSIC_NAMES.contains(c)) {
-                out.add(r.get("t") + "." + c);
-            }
+            cache = out;
         }
-        return out;
+        return cache;
     }
 
     private Set<String> readLedger() throws IOException {

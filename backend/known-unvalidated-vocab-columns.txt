@@ -46,9 +46,27 @@
 # （AlarmNo / SiteNo 之类根本不是词表校验），而**判不准的卡口比没有更糟**：
 # 它会让人以为「绿了就是接上了」。所以覆盖与否由人写，机器只管账对不对得上。
 #
-# 口径：与 StoredValueInVocabularyTest 同一套形状判据（列注释里凑得出两个及以上
-# 大写取值，或列名是 status/state/type/mode/level 这五个历来就查的）。
-# 2026-09-28 首次建账：词表列 303，已核实 22，**待核实 281**。
+# 口径：与 StoredValueInVocabularyTest **共用同一份判据**（VocabularyColumns）——
+# 注释里凑得出两个及以上大写取值，且列名不是 _no / _ref / _hash / tenant_id
+# （按本仓库约定不可能是枚举），且库里存的值像枚举（≤25 种、个个大写形）。
+#
+# 建账当天分叉过一次：只抄了「注释里有没有词表」那半条，漏了「存的值像不像枚举」，
+# 于是 agt_principal.phone_hash（注释写着 HMAC-SHA256）这类列被记了进来。
+# 判据抽成 VocabularyColumns 之后两条卡口不可能再分叉。
+#
+# 与事后卡口唯一的分歧是**空列**：库里还没有任何取值时形状判不出来。
+# 事后卡口跳过它（没有数据就没有脏数据），本台账**保留**它 ——
+# 新建的空表恰恰是最该当场表态的，跳过等于说「新表的状态列不用接校验」。
+# 当前 279 列里有 90 列是这种情况。
+#
+# ⚠️ 已知漏网 8 列：按取值形状判成了非枚举，其中 6 个确实是自由文本
+# （sys_app_version.version_id / sys_outbox.aggregate_id / iam_dept.path /
+# wo_order.wo_created_at / share_record.period / price_schedule.period），
+# iam_role.code 是可扩展的角色码（191 种）不算固定枚举，
+# 而 wo_sla_rule.priority **是真枚举**，只因词表里有个 `*` 哨兵值（「类型默认」）
+# 不合大写形而掉了出去。它是这份判据目前唯一的假阴性，记在这里以免被当成不存在。
+#
+# 2026-09-28 建账：词表列 279，已核实 22，**待核实 257**。
 # ───────────────────────────────────────────────────────────────
 
 # acct_account（2）
@@ -72,11 +90,10 @@ agt_account.status
 agt_agent.agent_type
 agt_agent.status
 
-# agt_apply（4）
+# agt_apply（3）
 agt_apply.operator_type
 agt_apply.source
 agt_apply.status
-agt_apply.tenant_id
 
 # agt_assignment（2）
 agt_assignment.action
@@ -92,11 +109,8 @@ agt_exit.status
 # agt_ops_assessment（1）
 agt_ops_assessment.period
 
-# agt_principal（4）
-agt_principal.email_hash
-agt_principal.phone_hash
+# agt_principal（1）
 agt_principal.status
-agt_principal.tenant_id
 
 # coupon_tpl（2）
 coupon_tpl.status
@@ -128,7 +142,6 @@ dev_alarm.priority
 dev_alarm.source
 dev_alarm.status
 dev_alarm.subject_type
-
 
 # dev_alarm_log（1）
 dev_alarm_log.event
@@ -232,20 +245,16 @@ iam_audit_log.outcome
 iam_data_scope.scope_type
 iam_data_scope.subject_type
 
-# iam_dept（2）
-iam_dept.path
+# iam_dept（1）
 iam_dept.status
 
-# iam_employee（3）
-iam_employee.email_hash
-iam_employee.phone_hash
+# iam_employee（1）
 iam_employee.status
 
 # iam_menu（1）
 iam_menu.type
 
-# iam_role（2）
-iam_role.code
+# iam_role（1）
 iam_role.data_scope
 
 # iam_staff_perf（1）
@@ -260,8 +269,7 @@ inv_asset_diff.status
 # inv_stock（1）
 inv_stock.item_type
 
-# inv_transfer（4）
-inv_transfer.from_ref
+# inv_transfer（3）
 inv_transfer.item_type
 inv_transfer.source_type
 inv_transfer.status
@@ -345,8 +353,7 @@ md_device_type.type_code
 md_market_country.compliance
 md_market_country.status
 
-# md_problem（2）
-md_problem.problem_no
+# md_problem（1）
 md_problem.status
 
 # mkt_campaign（1）
@@ -370,8 +377,7 @@ mkt_referral_rule.reward_to
 mkt_referral_rule.reward_type
 mkt_referral_rule.status
 
-# notify_blacklist（2）
-notify_blacklist.block_no
+# notify_blacklist（1）
 notify_blacklist.status
 
 # notify_log（2）
@@ -426,8 +432,7 @@ pay_channel.status
 pay_channel_scope.scope_type
 pay_channel_scope.scope_value
 
-# pay_order（3）
-pay_order.order_no
+# pay_order（2）
 pay_order.status
 pay_order.type
 
@@ -448,12 +453,8 @@ price_plan_item.rounding
 # price_plan_scope（1）
 price_plan_scope.scope_type
 
-# price_rule_deprecated_v1（1）
-price_rule_deprecated_v1.match_ref
-
-# price_schedule（2）
+# price_schedule（1）
 price_schedule.mode
-price_schedule.period
 
 # recon_diff（2）
 recon_diff.diff_type
@@ -464,12 +465,9 @@ recon_task.handle_result
 recon_task.handle_status
 recon_task.status
 
-# share_record（5）
-share_record.agent_no
+# share_record（2）
 share_record.basis
 share_record.payee_type
-share_record.period
-share_record.status
 
 # stl_adjustment（5）
 stl_adjustment.kind
@@ -478,10 +476,9 @@ stl_adjustment.period
 stl_adjustment.source
 stl_adjustment.status
 
-# stl_payout_account（3）
+# stl_payout_account（2）
 stl_payout_account.payee_type
 stl_payout_account.status
-stl_payout_account.tenant_id
 
 # stl_settlement（2）
 stl_settlement.payee_type
@@ -494,10 +491,9 @@ stl_settlement_detail.ref_type
 stl_withdrawal.pay_channel
 stl_withdrawal.status
 
-# sys_app_version（3）
+# sys_app_version（2）
 sys_app_version.platform
 sys_app_version.status
-sys_app_version.version_id
 
 # sys_biz_rule（1）
 sys_biz_rule.category
@@ -509,8 +505,7 @@ sys_file.status
 sys_file.storage
 sys_file.uploader_realm
 
-# sys_outbox（3）
-sys_outbox.aggregate_id
+# sys_outbox（2）
 sys_outbox.event_type
 sys_outbox.status
 
@@ -552,9 +547,6 @@ usr_invoice_title.vat_trn
 # usr_logoff（1）
 usr_logoff.status
 
-# usr_membership（1）
-usr_membership.level
-
 # usr_message（1）
 usr_message.type
 
@@ -570,9 +562,8 @@ usr_recharge_order.status
 # usr_recharge_pkg（1）
 usr_recharge_pkg.status
 
-# usr_wallet_txn（2）
+# usr_wallet_txn（1）
 usr_wallet_txn.direction
-usr_wallet_txn.type
 
 # wo_dispatch（2）
 wo_dispatch.action
@@ -581,7 +572,7 @@ wo_dispatch.strategy
 # wo_handle（1）
 wo_handle.fault_reason_code
 
-# wo_order（12）
+# wo_order（11）
 wo_order.assignee_type
 wo_order.audit_result
 wo_order.close_reason
@@ -593,8 +584,6 @@ wo_order.review_status
 wo_order.source
 wo_order.status
 wo_order.type
-wo_order.wo_created_at
 
-# wo_sla_rule（2）
-wo_sla_rule.priority
+# wo_sla_rule（1）
 wo_sla_rule.wo_type
