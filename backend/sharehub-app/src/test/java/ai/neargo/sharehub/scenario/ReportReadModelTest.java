@@ -28,7 +28,14 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class ReportReadModelTest extends ApiTestSupport {
 
-    /** 取全量而非默认 10 条：合计断言必须覆盖所有行，分页一截就永远对不上。 */
+    /**
+     * 取全量而非默认 10 条：合计断言必须覆盖所有行，分页一截就永远对不上。
+     *
+     * <p>⚠️ 只给一个大 size <b>不算全量</b>：2026-09-28 测试库涨到 749 个站点、越过了当时写死的 500，
+     * 于是「按站点折」只拿到前 500 行、「按桶折」是全量，三条合计断言一起红 ——
+     * 看起来像报表算错了，其实是<b>拿分页当查询</b>。合计类断言一律走 {@link #allRows}：它翻完所有页，
+     * 并核对拿到的行数 = 服务端说的 total，数据再涨也不会退回这种假失败。
+     */
     private static final String ALL = "page=1&size=500";
 
     /** 断言用周期取 LAST_12M（360 天）：窗口足够宽，不会因为种子数据变旧而变成全 0 空断言。 */
@@ -84,7 +91,7 @@ class ReportReadModelTest extends ApiTestSupport {
 
     @Test
     void finance_table_sum_equals_trend_sum_equals_summary() {
-        JsonNode table = admin("/api/ops/reports/finance?" + WIDE + "&" + ALL).path("list");
+        JsonNode table = allRows("/api/ops/reports/finance?" + WIDE);
         JsonNode trend = admin("/api/ops/reports/trend?kind=FINANCE&" + WIDE);
 
         double tableGmv = sum(table, "gmv");
@@ -106,7 +113,7 @@ class ReportReadModelTest extends ApiTestSupport {
 
     @Test
     void device_table_orders_sum_equals_trend_summary() {
-        JsonNode table = admin("/api/ops/reports/device?" + WIDE + "&" + ALL).path("list");
+        JsonNode table = allRows("/api/ops/reports/device?" + WIDE);
         JsonNode trend = admin("/api/ops/reports/trend?kind=DEVICE&" + WIDE);
 
         double tableOrders = sum(table, "orders");
@@ -122,8 +129,8 @@ class ReportReadModelTest extends ApiTestSupport {
     @Test
     void location_table_revenue_sum_equals_finance_gmv() {
         // 点位报表（按站点折）与财务报表（按桶折）是同一份事实，营收必须一分不差。
-        double byLocation = sum(admin("/api/ops/reports/location?" + WIDE + "&" + ALL).path("list"), "revenue");
-        double byBucket = sum(admin("/api/ops/reports/finance?" + WIDE + "&" + ALL).path("list"), "gmv");
+        double byLocation = sum(allRows("/api/ops/reports/location?" + WIDE), "revenue");
+        double byBucket = sum(allRows("/api/ops/reports/finance?" + WIDE), "gmv");
         assertThat(byLocation).isGreaterThan(0d);
         assertThat(byLocation).as("点位报表 Σrevenue = 财务报表 Σgmv")
                 .isCloseTo(byBucket, org.assertj.core.api.Assertions.within(0.01));
@@ -164,7 +171,7 @@ class ReportReadModelTest extends ApiTestSupport {
                 .as("同一维度（PERIOD）画像 Σvalue = totalUsers —— 饼图分母")
                 .isCloseTo(total, org.assertj.core.api.Assertions.within(0.5));
 
-        double segUsers = sum(admin("/api/ops/reports/consumer-segments?" + ALL).path("list"), "userCount");
+        double segUsers = sum(allRows("/api/ops/reports/consumer-segments"), "userCount");
         assertThat(segUsers).as("人群分层 Σ 用户数 = totalUsers（表与图必须是同一批人）")
                 .isCloseTo(total, org.assertj.core.api.Assertions.within(0.5));
 
@@ -182,9 +189,9 @@ class ReportReadModelTest extends ApiTestSupport {
     @Test
     void custom_report_gmv_by_site_equals_gmv_by_scene() {
         // 自定义报表换维度只是换折法，GMV 总量不该随维度变。
-        double bySite = sumMetric(admin("/api/ops/reports/custom?dim=SITE&metrics=GMV&" + WIDE + "&" + ALL));
-        double byScene = sumMetric(admin("/api/ops/reports/custom?dim=SCENE&metrics=GMV&" + WIDE + "&" + ALL));
-        double byMonth = sumMetric(admin("/api/ops/reports/custom?dim=MONTH&metrics=GMV&" + WIDE + "&" + ALL));
+        double bySite = sum(allRows("/api/ops/reports/custom?dim=SITE&metrics=GMV&" + WIDE), "value");
+        double byScene = sum(allRows("/api/ops/reports/custom?dim=SCENE&metrics=GMV&" + WIDE), "value");
+        double byMonth = sum(allRows("/api/ops/reports/custom?dim=MONTH&metrics=GMV&" + WIDE), "value");
         assertThat(bySite).isGreaterThan(0d);
         assertThat(byScene).as("按场景折 Σ = 按站点折 Σ")
                 .isCloseTo(bySite, org.assertj.core.api.Assertions.within(0.01));
@@ -278,6 +285,34 @@ class ReportReadModelTest extends ApiTestSupport {
         return get(path, login("ADMIN")).okData();
     }
 
+    /**
+     * 翻完所有页，返回全部行；并核对行数 = 服务端的 total。
+     *
+     * <p>合计断言的前提是「两边都是全量」。分页端点一旦有一边被截断，断言比的就是
+     * 「一页 vs 全部」—— 差额看起来像业务缺陷，排查方向整个跑偏（实测踩过一次）。
+     */
+    private JsonNode allRows(String pathWithQuery) {
+        String sep = pathWithQuery.contains("?") ? "&" : "?";
+        com.fasterxml.jackson.databind.node.ArrayNode out =
+                com.fasterxml.jackson.databind.json.JsonMapper.builder().build().createArrayNode();
+        int size = 500;
+        long total;
+        int page = 1;
+        do {
+            JsonNode data = admin(pathWithQuery + sep + "page=" + page + "&size=" + size);
+            JsonNode list = data.path("list");
+            total = data.path("total").asLong();
+            list.forEach(out::add);
+            if (list.isEmpty()) {
+                break;                       // 服务端把越界页当空页返回时不能无限翻
+            }
+            page++;
+        } while (out.size() < total);
+        assertThat((long) out.size()).as("翻页没取全（%s）——合计断言不能拿一页比全部", pathWithQuery)
+                .isEqualTo(total);
+        return out;
+    }
+
     private static double sum(JsonNode arr, String field) {
         double s = 0;
         for (JsonNode n : arr) {
@@ -286,10 +321,6 @@ class ReportReadModelTest extends ApiTestSupport {
         return s;
     }
 
-    /** 自定义报表是长表（dim × metric × value），只有一个指标时直接求 value 之和。 */
-    private static double sumMetric(JsonNode page) {
-        return sum(page.path("list"), "value");
-    }
 
     private static double summary(JsonNode trend, String label) {
         for (JsonNode item : trend.path("summary")) {
