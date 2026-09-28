@@ -1,5 +1,6 @@
 package ai.neargo.opskit.ticket.api.model;
 
+import ai.neargo.opskit.process.api.model.SubjectRef;
 import java.util.Map;
 import java.util.Set;
 
@@ -11,5 +12,5 @@ import java.util.Set;
 public record TicketView(String ticketNo, String typeCode, String typeVersion, String instanceNo, String title, String description, String priority,
         Integer priorityOrd, String resolution, Map<String, Object> fields, String requester, String assignee, String status, String statusCategory,
         boolean open, String slaState, Long slaNextDueAtMs, Long slaStartedAtMs, long slaPausedMs, boolean escalated, String mergedInto,
-        String dedupeKey, Set<String> scopes, String createdBy, long createdAtMs, long updatedAtMs, Long closedAtMs) {
+        String dedupeKey, Set<String> scopes, String createdBy, long createdAtMs, long updatedAtMs, Long closedAtMs, SubjectRef subject) {
 }

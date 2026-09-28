@@ -19,7 +19,7 @@ public final class TicketDao {
             String title, String description, String priority, Integer priorityOrd, String resolution, Map<String, Object> fields, String requester,
             String owner, String assignee, String status, String statusCategory, boolean open, String slaState, Long slaNextDueAtMs, Long slaStartedAtMs,
             long slaPausedMs, boolean escalated, String mergedInto, String dedupeKey, String dedupeOpenKey, String createdBy, long createdAtMs,
-            long updatedAtMs, Long closedAtMs, int version) {
+            long updatedAtMs, Long closedAtMs, int version, String subjectType, String subjectRef, Map<String, Object> subjectDisplay) {
     }
 
     /** 快照：流程实例的状态 + SLA 摘要。 */
@@ -34,11 +34,12 @@ public final class TicketDao {
             rs.getString("status_category"), rs.getInt("is_open") == 1, rs.getString("sla_state"), rs.getObject("sla_next_due_at_ms", Long.class),
             rs.getObject("sla_started_at_ms", Long.class), rs.getLong("sla_paused_ms"), rs.getInt("escalated") == 1, rs.getString("merged_into"),
             rs.getString("dedupe_key"), rs.getString("dedupe_open_key"), rs.getString("created_by"), rs.getLong("created_at_ms"),
-            rs.getLong("updated_at_ms"), rs.getObject("closed_at_ms", Long.class), rs.getInt("version"));
+            rs.getLong("updated_at_ms"), rs.getObject("closed_at_ms", Long.class), rs.getInt("version"), rs.getString("subject_type"),
+            rs.getString("subject_ref"), TicketJson.readMap(rs.getString("subject_display")));
 
     private static final List<String> COLUMNS = List.of("account_id", "workspace_id", "ticket_no", "type_definition_id", "type_code", "type_version",
             "instance_no", "title", "description", "priority", "priority_ord", "fields", "requester", "status", "status_category", "is_open",
-            "dedupe_key", "dedupe_open_key", "created_by", "created_at_ms", "updated_at_ms", "version");
+            "dedupe_key", "dedupe_open_key", "created_by", "created_at_ms", "updated_at_ms", "version", "subject_type", "subject_ref", "subject_display");
 
     private final JdbcClient jdbc;
     private final Dialect dialect;
@@ -54,11 +55,12 @@ public final class TicketDao {
      */
     public void insert(WorkspaceId ws, Row r) {
         String sql = r.dedupeOpenKey() == null
-                ? "INSERT INTO tkt_ticket (" + String.join(", ", COLUMNS) + ") VALUES (" + dialect.valuePlaceholders(COLUMNS, Set.of("fields")) + ")"
-                : dialect.upsert("tkt_ticket", List.of("workspace_id", "dedupe_open_key"), COLUMNS, List.of(), Set.of("fields"));
+                ? "INSERT INTO tkt_ticket (" + String.join(", ", COLUMNS) + ") VALUES (" + dialect.valuePlaceholders(COLUMNS, Set.of("fields", "subject_display")) + ")"
+                : dialect.upsert("tkt_ticket", List.of("workspace_id", "dedupe_open_key"), COLUMNS, List.of(), Set.of("fields", "subject_display"));
         jdbc.sql(sql).params(r.accountId(), ws.value(), r.ticketNo(), r.typeDefinitionId(), r.typeCode(), r.typeVersion(), r.instanceNo(), r.title(),
                 r.description(), r.priority(), r.priorityOrd(), TicketJson.write(r.fields()), r.requester(), r.status(), r.statusCategory(),
-                r.open() ? 1 : 0, r.dedupeKey(), r.dedupeOpenKey(), r.createdBy(), r.createdAtMs(), r.updatedAtMs(), 0).update();
+                r.open() ? 1 : 0, r.dedupeKey(), r.dedupeOpenKey(), r.createdBy(), r.createdAtMs(), r.updatedAtMs(), 0, r.subjectType(), r.subjectRef(),
+                r.subjectDisplay() == null || r.subjectDisplay().isEmpty() ? null : TicketJson.write(r.subjectDisplay())).update();
     }
 
     /** 加锁读（读最新已提交版本，MySQL 可重复读下普通读看不到并发一方刚插的行）。 */

@@ -25,6 +25,9 @@ public interface ProcessClient {
 
     InstanceView get(Actor actor, String instanceNo);
 
+    /** 操作人可走的迁移（名称 · 目标类别 · 必填项）；不判实例可见（上层已判）。 */
+    List<ai.neargo.opskit.process.api.model.ActionView> actions(Actor actor, String instanceNo);
+
     /** 按租户读实例（不做操作人可见性判断）：供上层同步快照；不存在为空。 */
     Optional<InstanceView> snapshot(TenantContext t, String instanceNo);
 

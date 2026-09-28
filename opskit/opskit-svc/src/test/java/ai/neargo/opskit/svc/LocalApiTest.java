@@ -201,4 +201,40 @@ class LocalApiTest {
         assertThat(h.body().valueStream().filter(n -> "submit".equals(n.get("action").asText())).findFirst().orElseThrow().get("actionName").asText())
                 .isEqualTo("提交");
     }
+
+    @Test
+    void ticketsFirstBatch() throws Exception {
+        String alice = token("alice");
+        Res types = call("GET", WS + "/ticket-types", alice, null);
+        assertThat(types.body().valueStream().map(n -> n.get("code").asText()).toList()).contains("repair");
+        JsonNode repair = types.body().valueStream().filter(n -> "repair".equals(n.get("code").asText())).findFirst().orElseThrow();
+        assertThat(repair.get("priorityOptions").size()).isEqualTo(3);
+
+        Res created = call("POST", WS + "/tickets", token("bob"), Map.of("typeCode", "repair", "title", "扫码无反应", "priority", "P1",
+                "fields", Map.of("site", "S1", "source", "APP", "sourceRef", "SR-9"), "subject", Map.of("type", "cabinet", "ref", "CAB-9")));
+        assertThat(created.status()).isEqualTo(200);
+        String no = created.body().get("ticketNo").asText();
+        assertThat(created.body().get("attached").asBoolean()).isFalse();
+        assertThat(created.body().get("priority").get("name").asText()).isEqualTo("紧急");
+        assertThat(created.body().get("fields").get("site").get("name").asText()).isEqualTo("一号店");
+        assertThat(created.body().get("subject").get("ref").asText()).isEqualTo("CAB-9");
+        assertThat(created.body().get("slaMetrics").size()).isEqualTo(2);
+
+        Res claimed = call("POST", WS + "/tickets/" + no + "/claim", alice, null);
+        assertThat(claimed.status()).isEqualTo(200);
+        assertThat(claimed.body().get("assignee").get("displayName").asText()).isEqualTo("Alice 审批人");
+        assertThat(claimed.body().get("actions").valueStream().map(a -> a.get("code").asText()).toList()).contains("accept");
+
+        Res accepted = call("POST", WS + "/tickets/" + no + "/transitions/accept", alice, Map.of());
+        assertThat(accepted.body().get("status").get("name").asText()).isEqualTo("处理中");
+        Res noComment = call("POST", WS + "/tickets/" + no + "/transitions/resolve", alice, Map.of("resolution", "FIXED"));
+        assertThat(noComment.status()).as("解决须写说明").isEqualTo(422);
+        Res resolved = call("POST", WS + "/tickets/" + no + "/transitions/resolve", alice, Map.of("comment", "换了扫码头", "resolution", "FIXED"));
+        assertThat(resolved.body().get("open").asBoolean()).isFalse();
+        assertThat(resolved.body().get("resolution").get("name").asText()).isEqualTo("已修复");
+
+        String queued = (String) seed.manifest().fixtures().get("ticketQueued");
+        assertThat(call("POST", WS + "/tickets/" + queued + "/pool", alice, Map.of("reason", "x")).status()).as("还没人办，退回池 → 409").isEqualTo(409);
+        assertThat(call("GET", WS + "/tickets/" + queued, token("dave"), null).status()).as("无工单权限、非参与者").isEqualTo(404);
+    }
 }

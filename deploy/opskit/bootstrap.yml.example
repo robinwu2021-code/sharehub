@@ -9,7 +9,7 @@ opskit:
     workspace:
       ref: MAIN                 # 与内省应答的 tenant 一致（令牌 workspace 声明）
       name: ShareHub
-      zone: Asia/Shanghai
+      zone: Asia/Dubai          # 按宿主的业务时区填（ShareHub：sys_param biz.timezone）；空间只在首次启动时创建，事后改这里不生效
       locale: zh
     idps:
       - issuer: sharehub-staff  # 员工令牌 stk_…

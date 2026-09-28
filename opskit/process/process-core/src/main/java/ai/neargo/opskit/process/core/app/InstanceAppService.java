@@ -177,6 +177,22 @@ public class InstanceAppService {
         return view(actor, instanceNo);
     }
 
+    /** 操作人在这个实例上可走的迁移（按 who / when 判定）。不判实例可见 —— 上层（工单）已按自己的规则判过。 */
+    @SystemAction("上层模块内部调用：调用方已判可见")
+    public List<ActionView> actions(Actor actor, String instanceNo) {
+        TenantContext t = actor.tenant();
+        InstanceDao.Row row = load(t.workspaceId(), instanceNo);
+        if (!row.open()) {
+            return List.of();
+        }
+        CompiledProcess p = definitions.byDefinitionId(t, row.definitionId());
+        Set<String> roles = rolesOf(actor, row);
+        return p.manualTransitionsFrom(row.status()).stream().filter(tr -> Transitioner.canSee(tr, actor, roles, row.fields()))
+                .map(tr -> new ActionView(tr.code(), tr.name() == null ? Map.of() : tr.name().values(), p.status(tr.to()).category(),
+                        tr.requires().fields(), tr.requires().comment()))
+                .toList();
+    }
+
     @SystemAction("负责人 / 办理人或应用自身可改字段")
     public InstanceView updateFields(Actor actor, String instanceNo, Map<String, Object> patch) {
         return tx.execute(() -> {

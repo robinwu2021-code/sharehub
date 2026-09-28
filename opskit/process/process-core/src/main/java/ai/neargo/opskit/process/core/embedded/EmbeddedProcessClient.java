@@ -55,6 +55,11 @@ public class EmbeddedProcessClient implements ProcessClient {
     }
 
     @Override
+    public List<ai.neargo.opskit.process.api.model.ActionView> actions(Actor actor, String instanceNo) {
+        return instances.actions(actor, instanceNo);
+    }
+
+    @Override
     public Optional<InstanceView> snapshot(TenantContext t, String instanceNo) {
         try {
             return Optional.of(instances.get(new Actor(t, Optional.empty(), Optional.of("opskit-internal"), Set.of(), Set.of(), Set.of(), Set.of(), Set.of()),

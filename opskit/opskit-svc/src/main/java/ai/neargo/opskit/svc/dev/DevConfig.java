@@ -29,9 +29,11 @@ public class DevConfig {
 
     @Bean
     DevSeed devSeed(TenancyAppService tenancy, FederationAppService federation, DirectoryAppService directory, MemberAttrAppService attrs,
-            ApprovalTemplateAppService templates, SlaPolicyAppService slaPolicies, InstanceAppService instances, TaskAppService tasks, ProcessQueryService queries,
+            ApprovalTemplateAppService templates, SlaPolicyAppService slaPolicies,
+            ai.neargo.opskit.process.core.app.ProcessDefinitionAppService processDefs, ai.neargo.opskit.ticket.core.app.TicketDefinitionAppService ticketDefs,
+            ai.neargo.opskit.ticket.core.app.TicketAppService tickets, InstanceAppService instances, TaskAppService tasks, ProcessQueryService queries,
             @Value("${opskit.dev.jwks-url:http://localhost:${server.port:8090}/dev/jwks.json}") String jwksUrl) {
-        return new DevSeed(tenancy, federation, directory, attrs, templates, slaPolicies, instances, tasks, queries, jwksUrl);
+        return new DevSeed(tenancy, federation, directory, attrs, templates, slaPolicies, processDefs, ticketDefs, tickets, instances, tasks, queries, jwksUrl);
     }
 
     @Bean

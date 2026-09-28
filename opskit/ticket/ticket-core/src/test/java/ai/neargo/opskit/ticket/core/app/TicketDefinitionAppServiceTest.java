@@ -93,6 +93,11 @@ class TicketDefinitionAppServiceTest {
         }
 
         @Override
+        public List<ai.neargo.opskit.process.api.model.ActionView> actions(Actor a, String n) {
+            return List.of();
+        }
+
+        @Override
         public Optional<InstanceView> snapshot(TenantContext t, String n) {
             return Optional.empty();
         }

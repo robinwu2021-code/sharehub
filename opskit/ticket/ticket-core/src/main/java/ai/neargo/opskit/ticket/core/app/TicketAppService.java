@@ -23,6 +23,7 @@ import ai.neargo.opskit.ticket.api.model.BulkReassignRequest;
 import ai.neargo.opskit.ticket.api.model.BulkReassignResult;
 import ai.neargo.opskit.ticket.api.model.CreateTicketRequest;
 import ai.neargo.opskit.ticket.api.model.CreateTicketResult;
+import ai.neargo.opskit.ticket.api.model.TicketDetail;
 import ai.neargo.opskit.ticket.api.model.TicketView;
 import ai.neargo.opskit.ticket.api.model.UpdateTicketRequest;
 import ai.neargo.opskit.ticket.core.domain.FieldValues;
@@ -122,7 +123,8 @@ public class TicketAppService {
             String no = ids.next(def.numberPrefix() == null ? "TK" : def.numberPrefix());
             tickets.insert(ws, new TicketDao.Row(t.accountId().value(), ws.value(), no, type.definitionId(), def.code(), type.version(), PENDING_INSTANCE + no,
                     title, req.description(), req.priority(), priorityOrd, null, values.values(), requester, null, null, "-", "NEW", true, null, null, null,
-                    0, false, null, dedupeKey, dedupeKey, who(actor), now, now, null, 0));
+                    0, false, null, dedupeKey, dedupeKey, who(actor), now, now, null, 0, req.subject() == null ? null : req.subject().type(),
+                    req.subject() == null ? null : req.subject().ref(), req.subject() == null ? null : req.subject().display()));
             if (dedupeKey != null) {
                 TicketDao.Row holder = tickets.lockByDedupeOpenKey(ws, dedupeKey).orElseThrow();
                 if (!holder.ticketNo().equals(no)) {
@@ -138,7 +140,8 @@ public class TicketAppService {
             if (requester != null) {
                 participants.put(REQUESTER, List.of(requester));
             }
-            InstanceView inst = processes.start(actor, new StartRequest(def.processCode(), new SubjectRef("ticket", no, Map.of("title", title)),
+            SubjectRef subject = req.subject() != null ? req.subject() : new SubjectRef("ticket", no, Map.of("title", title));
+            InstanceView inst = processes.start(actor, new StartRequest(def.processCode(), subject,
                     processFields(values.values(), req.priority()), participants, tags, def.slaPolicies()));
             tickets.bindInstance(ws, no, inst.instanceNo());
             index.replace(ws, no, def.code(), indexRows(values));
@@ -156,6 +159,18 @@ public class TicketAppService {
     public TicketView get(Actor actor, String ticketNo) {
         TicketDao.Row r = visible(actor, ticketNo);
         return view(actor.tenant(), r);
+    }
+
+    /** 详情：可见性同 get；动作按当前操作人算（流程的 who / when）。 */
+    @SystemAction("只读：同 get")
+    public TicketDetail detail(Actor actor, String ticketNo) {
+        TicketDao.Row r = visible(actor, ticketNo);
+        TenantContext t = actor.tenant();
+        boolean bound = !r.instanceNo().startsWith(PENDING_INSTANCE);
+        Map<String, Set<String>> participants = bound ? processes.snapshot(t, r.instanceNo()).map(InstanceView::participants).orElse(Map.of()) : Map.of();
+        return new TicketDetail(view(t, r), bound ? processes.slaMetrics(t, r.instanceNo()) : List.of(), participants,
+                bound && r.open() ? processes.actions(actor, r.instanceNo()) : List.of(),
+                (int) comments.of(t.workspaceId(), ticketNo).stream().filter(c -> "DEDUPE_HIT".equals(c.kind())).count());
     }
 
     // ── 改内容 · 流转 ────────────────────────────────────────
@@ -504,7 +519,8 @@ public class TicketAppService {
         return new TicketView(r.ticketNo(), r.typeCode(), r.typeVersion(), r.instanceNo(), r.title(), r.description(), r.priority(), r.priorityOrd(),
                 r.resolution(), r.fields(), r.requester(), r.assignee(), r.status(), r.statusCategory(), r.open(), r.slaState(), r.slaNextDueAtMs(),
                 r.slaStartedAtMs(), r.slaPausedMs(), r.escalated(), r.mergedInto(), r.dedupeKey(), scopes.of(t.workspaceId(), r.ticketNo()), r.createdBy(),
-                r.createdAtMs(), r.updatedAtMs(), r.closedAtMs());
+                r.createdAtMs(), r.updatedAtMs(), r.closedAtMs(), r.subjectType() == null ? null : new SubjectRef(r.subjectType(), r.subjectRef(),
+                r.subjectDisplay()));
     }
 
     /** 传给流程的字段：全部字段值 + priority（SLA 目标矩阵常按它匹配）。 */
