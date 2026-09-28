@@ -1,6 +1,7 @@
 package ai.neargo.sharehub.portal.core;
 
 import ai.neargo.sharehub.auth.DevMode;
+import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.auth.TokenStore;
 import ai.neargo.sharehub.user.consumer.ConsumerAuthService;
 import ai.neargo.sharehub.user.consumer.OtpService;
@@ -93,7 +94,14 @@ public class ConsumerAuthController {
         // 区号：phone 自带 + 以它为准 → 否则 countryCode → 都没有才用默认区号（9-27 拍板，
         // 此前 countryCode 没人读，+971 与 +966 的同号是同一个账号）。登录/注册/重置必须同一个方法。
         String normalized = normalizer.phone(phone, body.countryCode());
-        OtpService.Issued issued = otpService.issue(normalized, body.scene());
+        OtpService.Issued issued;
+        try {
+            issued = otpService.issue(normalized, body.scene());
+        } catch (IllegalStateException e) {
+            // 重发间隔内再发（OtpService 节流）。此前没接住 → 未处理异常 500 + 一条 ERROR：
+            // 用户看到「系统错误」，告警里全是一个人多点了一下发送（代理侧 AuthController 早就接住了）
+            throw BizException.conflict("error.otp.too_frequent");
+        }
         // sent 如实回传投递结果：投递失败时码已作废，端上该提示重试而不是等短信。
         // cooldown：端上倒计时的秒数，与服务端「重发太频繁」同一个数。此前不回 —— c-app 契约写着有、
         // 实际拿到 undefined：按钮不倒计时，而那个每秒 -1 的定时器算成 NaN 永不停（真机实测）。

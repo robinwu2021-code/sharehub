@@ -26,5 +26,8 @@ class ConsumerOtpCooldownTest extends ApiTestSupport {
 
         var again = post("/mp/auth/otp", Map.of("phone", phone), null);
         assertThat(again.code()).as("倒计时内服务端也确实拦 —— 两边是同一个数").isNotZero();
+        assertThat(again.status).as("是业务拒绝而不是未处理异常 500（此前如此：用户看到「系统错误」，还打一条 ERROR）")
+                .isEqualTo(409);
+        assertThat(again.msg()).isEqualTo("发送过于频繁，请稍后再试");
     }
 }
