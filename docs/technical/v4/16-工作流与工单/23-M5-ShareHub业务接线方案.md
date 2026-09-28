@@ -193,3 +193,42 @@ ShareHub 的运维工单不只是「流转」：还有费用明细、处理记�
 - 投递修复：有跨进程消费者的事件，提交后立即调用消费者；消费者抛异常 → FAILED + 退避；达上限 → DEAD 且 `onDead` 被调（负对照：拆掉修复，消费者零调用）。
 - webhook：坏签名 / 过期时间戳 401 且不动业务；同一 `idemKey` 两次只推进一次；未知 `subject.type` 记 WARN 回 200。
 - 提现：OPSKIT 模式申请 → 送审请求体（subject / scopes / onBehalfOf / 幂等键）正确；`approval.completed` APPROVED → `status=PAYING`、审批人 = 回传的宿主编号；REJECTED 带原因；无收款账户 → `APPROVED_BLOCKED`；OPSKIT 在审时旧 `/audit` 409；LOCAL 模式既有提现用例全绿不改。
+
+---
+
+## 十、告警开单接 OpsKit：八处联动的对应（待拍板）
+
+> 2026-09-28 · 报障开单已切 OPSKIT（生产开关 `SHAREHUB_FLOW_CS_TICKET_ENGINE=OPSKIT`）；告警开单**暂未切**。
+> 原因：告警引擎对「处置单」不只是开单，还有 7 处联动直接调本地工单服务（`AlarmEngineImpl` · `WorkOrderReviewListener`）。
+> 只把开单切过去，其余联动会**静默失效**（调本地服务查不到 OpsKit 单号 → 返回空 → 什么都不做，不报错）。
+
+### 10.1 八处联动与对应
+
+| # | 联动（现在调本地工单） | 何时发生 | OpsKit 侧对应 | 同步 / 异步 |
+|:-:|---|---|---|:-:|
+| 1 | `openOrAttach` 开单 / 并入 | 告警处置为「工单」 | `POST /tickets`（应用凭证，`dedupeKey` = 现有并单键 `mergeKey`）；单号回填 `disposition_ref` | 异步（outbox） |
+| 2 | `raisePriority` 提优先级 | 告警影响升级 | `PATCH /tickets/{no}` `{priority}` + 内部评论「告警 X 影响升级」 | 异步 |
+| 3 | `mergeInto` 并单 | 站点级告警取代柜级告警 | `POST /tickets/{no}/merge` `{into, reason}` | 异步 |
+| 4 | `annotate` 改挂说明 | 上层告警还没单，下层单改挂上层 | 内部评论 | 异步 |
+| 5 | `withdraw` 撤单 | 告警自愈 / 自动修复，且单还没人接 | 迁移 `cancel`（必须写说明：「关联告警已自动恢复」） | 异步 |
+| 6 | `markAlarmRecovered` 标记恢复 | 告警自愈，但单已在处理 | 内部评论「关联告警已于 … 自动恢复」 | 异步 |
+| 7 | `statusOf` 查单状态 | 5/6 二选一的依据 | **不在告警引擎里同步查**：把「告警已恢复」作为一条命令交给执行器，执行时 `GET /tickets/{no}`：`NEW` → 撤单，其余 → 评论 | 异步 |
+| 8 | 完工复核（`WorkOrderReviewListener`） | 工单完工 | `ticket.transitioned` 到 `DONE` 的 webhook → 复核 `disposition_ref` = 该单号的全部告警：全恢复 → 关告警；未恢复 → 内部评论「复核未通过：…」并让告警保持打开 | webhook |
+
+另：处置预览里的「建议受理人」（`woOps.candidates`）在 OPSKIT 模式下改为显示派单策略（由 OpsKit 派），不再算本地候选。
+
+### 10.2 实现形状
+
+- **一个通用命令事件** `OPSKIT_TICKET_COMMAND {ticketNo, command, args}`（与业务同事务落 outbox），命令：`RAISE_PRIORITY` · `MERGE` · `COMMENT` · `ALARM_RECOVERED`（执行时自己查状态决定撤单还是评论）。
+  执行器幂等：重复的合并 / 撤单遇到「已合并 / 已结」按成功处理，不无限重投。
+- **告警开单与报障同一条路**：`TicketRequestedEvent(bizType=alarm, bizNo=告警号)`；单号未回填前的联动命令排在开单之后（同一 outbox 按序投递；执行时单号仍空则重投）。
+- **开关** `sharehub.flow.alarm-ticket.engine=LOCAL|OPSKIT`：告警引擎里 7 处调用改走一个「处置单端口」，LOCAL 实现即现有 `woOps` 调用，行为不变。
+- **工单类型**：新建「告警工单」类型（代号 `alarm`，经「运营配置 › 工单类型」或 bootstrap），字段：告警码、站点、机柜；流程沿用 `repair_flow`；优先级沿用告警的四档（URGENT / HIGH / MEDIUM / LOW 映射 P1–P4）。
+
+### 10.3 需要 OpsKit 确认（应用凭证能否做）
+
+1. `PATCH /tickets/{no}` 改优先级；2. `POST /tickets/{no}/merge`；3. 迁移 `cancel`（repair_flow 的作废原定「提出人或办理人」—— 应用自身是否放行）；4. 应用凭证写 INTERNAL 评论。
+
+### 10.4 工作量与测试
+
+约 3 人日。测试按 8 处联动各一条：假 OpsKit 记录收到的命令并断言顺序与内容；完工复核用签名 webhook 驱动（全恢复 → 告警关；未恢复 → 评论 + 告警仍开）；开关 LOCAL 下既有告警用例全绿不改。
