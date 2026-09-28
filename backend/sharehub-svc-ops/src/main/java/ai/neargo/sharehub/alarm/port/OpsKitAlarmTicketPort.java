@@ -17,6 +17,9 @@ import java.util.Map;
  * 其余联动发 {@link OpsKitTicketCommand}，与告警写入同事务，OpsKit 暂时不可用不拖住告警判定。
  *
  * <p>并单沿用告警引擎的并单键作 OpsKit {@code dedupeKey}：同键的告警落到同一张单，回填同一个单号。
+ *
+ * <p><b>切换期</b>：开关打开前开出的处置单是本地工单（号以 {@code WO} 开头）。它们的后续联动（升级、并单、恢复）
+ * 仍交本地实现 —— 拿本地单号去找 OpsKit 只会一路失败到死信，而本地那张单反倒没人动。新开的单一律走 OpsKit。
  */
 @Component
 @ConditionalOnProperty(name = "sharehub.flow.alarm-ticket.engine", havingValue = "OPSKIT")
@@ -26,9 +29,17 @@ public class OpsKitAlarmTicketPort implements AlarmTicketPort {
     static final String TYPE_CODE = "alarm";
 
     private final DomainEventBus events;
+    /** 切换期兜底：本地工单号仍按本地处理 */
+    private final LocalAlarmTicketPort local;
 
-    public OpsKitAlarmTicketPort(DomainEventBus events) {
+    public OpsKitAlarmTicketPort(DomainEventBus events, ai.neargo.sharehub.wo.ext.service.WoOpsService woOps) {
         this.events = events;
+        this.local = new LocalAlarmTicketPort(woOps);
+    }
+
+    /** 开关打开前的本地工单（wo_order 的号一律 WO 开头；OpsKit 告警工单前缀 AL） */
+    static boolean isLocal(String ref) {
+        return ref != null && ref.startsWith("WO");
     }
 
     /** 告警四档 → 「告警工单」类型的优先级代号（P1 最急） */
@@ -62,16 +73,20 @@ public class OpsKitAlarmTicketPort implements AlarmTicketPort {
 
     @Override
     public boolean isFinished(String ref) {
-        return false;
+        return isLocal(ref) && local.isFinished(ref);
     }
 
     @Override
     public void raisePriority(String ref, DevAlarm alarm, String priority, String reason) {
+        if (isLocal(ref)) { local.raisePriority(ref, alarm, priority, reason); return; }
         command(ref, alarm, OpsKitTicketCommand.RAISE_PRIORITY, Map.of("priority", priorityOf(priority), "note", reason));
     }
 
     @Override
     public void merge(String ref, DevAlarm lower, String intoRef, DevAlarm upper, String reason) {
+        // 两张都是本地单才能本地并；一本地一 OpsKit 并不到一起 —— 留说明，各自走完
+        if (isLocal(ref) && isLocal(intoRef)) { local.merge(ref, lower, intoRef, upper, reason); return; }
+        if (isLocal(ref)) { local.annotate(ref, lower, reason + "（上层为 OpsKit 工单 " + (intoRef == null ? "开单中" : intoRef) + "，未并单）"); return; }
         Map<String, Object> args = new LinkedHashMap<>();
         if (intoRef != null) args.put("intoTicketNo", intoRef); else args.put("intoBizNo", upper.getAlarmNo());
         args.put("reason", reason);
@@ -80,11 +95,13 @@ public class OpsKitAlarmTicketPort implements AlarmTicketPort {
 
     @Override
     public void annotate(String ref, DevAlarm alarm, String note) {
+        if (isLocal(ref)) { local.annotate(ref, alarm, note); return; }
         command(ref, alarm, OpsKitTicketCommand.COMMENT, Map.of("body", note));
     }
 
     @Override
     public void recovered(String ref, DevAlarm alarm, String note) {
+        if (isLocal(ref)) { local.recovered(ref, alarm, note); return; }
         command(ref, alarm, OpsKitTicketCommand.ALARM_RECOVERED, Map.of("note", note));
     }
 
