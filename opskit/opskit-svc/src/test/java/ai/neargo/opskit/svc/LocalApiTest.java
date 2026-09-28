@@ -146,4 +146,31 @@ class LocalApiTest {
         List<String> codes = call("GET", WS + "/approval-templates", token("alice"), null).body().valueStream().map(n -> n.get("code").asText()).toList();
         assertThat(codes).contains("contract_approval", "evidence_review", "leave_tpl");
     }
+
+    @Test
+    void slaPoliciesRoundTripAndTodosCarryTheNearestClock() throws Exception {
+        String admin = token("admin");
+        Map<String, Object> policy = Map.of("name", Map.of("zh", "响应时限"),
+                "metrics", List.of(Map.of("code", "FIRST_RESPONSE", "name", Map.of("zh", "首次响应"))),
+                "targets", List.of(Map.of("when", Map.of("field", "priority", "op", "EQ", "value", "P1"), "targetsMin", Map.of("FIRST_RESPONSE", 30)),
+                        Map.of("targetsMin", Map.of("FIRST_RESPONSE", 120))),
+                "warnAtPercent", 80);
+        Res put = call("PUT", WS + "/sla-policies/resp_sla", admin, policy);
+        assertThat(put.status()).isEqualTo(200);
+        assertThat(call("PUT", WS + "/sla-policies/resp_sla", admin, policy).body().get("created").asBoolean()).isFalse();
+        Res got = call("GET", WS + "/sla-policies/resp_sla", admin, null);
+        assertThat(got.body().get("targets").get(0).get("targetsMin").get("FIRST_RESPONSE").asLong()).isEqualTo(30);
+        assertThat(got.body().get("targets").get(0).get("when").get("op").asText()).isEqualTo("EQ");
+
+        Res bad = call("PUT", WS + "/sla-policies/bad_sla", admin, Map.of("metrics", List.of(Map.of("code", "X")),
+                "targets", List.of(Map.of("targetsMin", Map.of("Y", 10)))));
+        assertThat(bad.status()).isEqualTo(422);
+        assertThat(bad.body().get("errors").valueStream().map(n -> n.get("path").asText()).toList()).contains("targets[0].targets.Y");
+        assertThat(call("PUT", WS + "/sla-policies/resp_sla", token("alice"), policy).status()).as("无 sla:manage").isEqualTo(403);
+
+        Res todos = call("POST", WS + "/todos/query", token("alice"), Map.of("origin", "ALL", "page", 1, "size", 50));
+        JsonNode evidence = todos.body().get("list").valueStream().filter(n -> n.get("subject").get("ref").asText().startsWith("E-")).findFirst().orElseThrow();
+        assertThat(evidence.get("sla").get("state").asText()).isEqualTo("RUNNING");
+        assertThat(evidence.get("sla").get("dueAtMs").asLong() - evidence.get("sla").get("startedAtMs").asLong()).isEqualTo(4 * 3600_000L);
+    }
 }

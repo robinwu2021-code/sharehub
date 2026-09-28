@@ -32,6 +32,8 @@ import ai.neargo.opskit.process.api.model.query.QueueTask;
 import ai.neargo.opskit.process.api.model.query.TaskQuery;
 import ai.neargo.opskit.process.core.app.InstanceAppService;
 import ai.neargo.opskit.process.core.app.ApprovalTemplateAppService;
+import ai.neargo.opskit.process.core.app.SlaPolicyAppService;
+import ai.neargo.opskit.process.api.definition.sla.SlaPolicyDef;
 import ai.neargo.opskit.process.api.definition.template.ApprovalTemplate;
 import ai.neargo.opskit.process.core.app.ProcessQueryService;
 import ai.neargo.opskit.process.core.app.TaskAppService;
@@ -51,7 +53,7 @@ import org.slf4j.LoggerFactory;
  *   <li>S2-1：bob 提交的两步审批单，第二步是条件会签且条件成立；alice 是第一步候选、不是提交人</li>
  *   <li>S2-2：alice 自己提交的待审单（自审负对照）</li>
  *   <li>S1 负对照：打了 site:B 标签的待审单 —— alice 是候选，但令牌只带 site:A，不进她的待办</li>
- *   <li>S3：队列组 review-queue 3 条任务，frank 领着 1 条（领取超时 120 秒）</li>
+ *   <li>S3：队列组 review-queue 3 条任务，frank 领着 1 条（领取超时 120 秒）；这 3 张单挂了 SLA 策略 review_sla（4 小时，80% 预警）</li>
  *   <li>S5：viewer 令牌只带 flow:todo:read · flow:approval:read · flow:ticket:read；目录里是 auditor（能看全部审批），写接口一律 403</li>
  * </ul>
  */
@@ -72,6 +74,7 @@ public class DevSeed {
     private final DirectoryAppService directory;
     private final MemberAttrAppService attrs;
     private final ApprovalTemplateAppService templates;
+    private final SlaPolicyAppService slaPolicies;
     private final InstanceAppService instances;
     private final TaskAppService tasks;
     private final ProcessQueryService queries;
@@ -79,12 +82,13 @@ public class DevSeed {
     private volatile Manifest manifest;
 
     public DevSeed(TenancyAppService tenancy, FederationAppService federation, DirectoryAppService directory, MemberAttrAppService attrs,
-            ApprovalTemplateAppService templates, InstanceAppService instances, TaskAppService tasks, ProcessQueryService queries, String jwksUrl) {
+            ApprovalTemplateAppService templates, SlaPolicyAppService slaPolicies, InstanceAppService instances, TaskAppService tasks, ProcessQueryService queries, String jwksUrl) {
         this.tenancy = tenancy;
         this.federation = federation;
         this.directory = directory;
         this.attrs = attrs;
         this.templates = templates;
+        this.slaPolicies = slaPolicies;
         this.instances = instances;
         this.tasks = tasks;
         this.queries = queries;
@@ -114,7 +118,7 @@ public class DevSeed {
         directory.upsertRole(app, ws, new RoleUpsert("approver", Map.of("zh", "审批人", "en", "Approver"), Set.of("approval:decide")));
         directory.upsertRole(app, ws, new RoleUpsert("auditor", Map.of("zh", "审计", "en", "Auditor"), Set.of("approval:view:all")));
         directory.upsertRole(app, ws, new RoleUpsert("flow-admin", Map.of("zh", "流程管理员", "en", "Flow admin"),
-                Set.of("process:manage", "approval:view:all", "directory:manage")));
+                Set.of("process:manage", "sla:manage", "approval:view:all", "directory:manage")));
         attrs.upsert(app, ws, new MemberAttrDef("partyType", Map.of("zh", "身份", "en", "Party", "ar", "الجهة"),
                 Map.of("STAFF", Map.of("zh", "员工", "en", "Staff", "ar", "موظف"), "AGENT", Map.of("zh", "代理", "en", "Agent", "ar", "وكيل"))));
         directory.sync(app, new SyncBatch(SyncBatch.Mode.MERGE,
@@ -128,6 +132,9 @@ public class DevSeed {
 
         templates.publish(app, ws, contractTemplate(), "local seed", "API");
         templates.publish(app, ws, evidenceTemplate(), "local seed", "API");
+        slaPolicies.publish(app, ws, new SlaPolicyDef("review_sla", t("审核时限", "Review SLA", "مهلة المراجعة"),
+                List.of(new SlaPolicyDef.Metric("RESOLUTION", t("审核完成", "Reviewed", "تمت المراجعة"), null, null, null)),
+                List.of(new SlaPolicyDef.Target(null, Map.of("RESOLUTION", java.time.Duration.ofHours(4)), null)), 80), "local seed", "API");
 
         Map<String, Persona> personas = new LinkedHashMap<>();
         personas.put("alice", persona(t, "u_alice", List.of(), List.of("site:A"), "第一步候选（角色 approver）· review-queue 组员 · 令牌带 site:A"));
@@ -146,7 +153,7 @@ public class DevSeed {
         fx.put("approvalMine", submit(app, alice, "contract_approval", "C-1002", "合同 C-1002 · 自己提交", Map.of("needsCosign", false), Set.of()));
         fx.put("approvalHidden", submit(app, bob, "contract_approval", "C-1003", "合同 C-1003 · site:B", Map.of("needsCosign", false), Set.of("site:B")));
         for (int i = 1; i <= 3; i++) {
-            submit(app, bob, "evidence_review", "E-10" + i, "证据包 E-10" + i, Map.of(), Set.of());
+            submit(app, bob, "evidence_review", "E-10" + i, "证据包 E-10" + i, Map.of(), Set.of(), List.of("review_sla"));
         }
         List<QueueTask> queue = queries.tasks(app, new TaskQuery("review-queue", List.of("OPEN"), null, null, 1, 50)).list();
         Actor frank = actor(t, personas.get("frank"), Set.of("review-queue"));
@@ -164,8 +171,13 @@ public class DevSeed {
     /** 提交一张单并返回 {instanceNo, approvalNo}。 */
     private Map<String, String> submit(Actor app, Actor requester, String process, String ref, String title, Map<String, Object> fields,
             Set<String> scopes) {
+        return submit(app, requester, process, ref, title, fields, scopes, List.of());
+    }
+
+    private Map<String, String> submit(Actor app, Actor requester, String process, String ref, String title, Map<String, Object> fields,
+            Set<String> scopes, List<String> slaPolicies) {
         String no = instances.start(requester, new StartRequest(process, new SubjectRef(process.startsWith("contract") ? "contract" : "evidence", ref,
-                Map.of("title", title)), fields, Map.of(), scopes)).instanceNo();
+                Map.of("title", title)), fields, Map.of(), scopes, slaPolicies)).instanceNo();
         instances.transition(requester, no, "submit", TransitionRequest.empty());
         String approvalNo = queries.approvals(app, new ai.neargo.opskit.process.api.model.query.ApprovalQuery(null, null, null, null, no, 1, 1))
                 .list().get(0).approvalNo();

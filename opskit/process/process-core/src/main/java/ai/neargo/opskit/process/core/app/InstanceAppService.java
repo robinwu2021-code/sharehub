@@ -105,7 +105,10 @@ public class InstanceAppService {
             HookContext ctx = new HookContext(t, no, p, fields, Optional.of(actor), 1, 1);
             events.publish(new InstanceTransitioned(t, no, p.definition().code(), subj, "created", null, initial.code(), initial.category(),
                     !initial.category().isTerminal(), 1, who(actor), clock.instant()));
-            runTopLevel(() -> hooks.forEach(h -> h.onEnter(ctx, initial)));
+            runTopLevel(() -> {
+                hooks.forEach(h -> h.onStarted(ctx, initial, req.slaPolicies()));
+                hooks.forEach(h -> h.onEnter(ctx, initial));
+            });
             return view(actor, no);
         });
     }
@@ -187,6 +190,9 @@ public class InstanceAppService {
             ConditionalUpdate.requireExactlyOne(instances.updateFields(actor.tenant().workspaceId(), instanceNo, row.version(), merged, clock.millis()),
                     "instance " + instanceNo);
             log(actor.tenant(), instanceNo, subject(row), "fields_updated", null, null, null, actor, null, clock.millis());
+            CompiledProcess p = definitions.byDefinitionId(actor.tenant(), row.definitionId());
+            HookContext ctx = new HookContext(actor.tenant(), instanceNo, p, merged, Optional.of(actor), row.gateEpoch(), row.eventSeq());
+            hooks.forEach(h -> h.onFieldsChanged(ctx, p.status(row.status())));
             return view(actor, instanceNo);
         });
     }
@@ -256,6 +262,7 @@ public class InstanceAppService {
         events.publish(new InstanceTransitioned(t, instanceNo, row.processCode(), subject(row), code, from.code(), to.code(), to.category(),
                 open, seq, by, clock.instant()));
         hooks.forEach(h -> h.onEnter(ctx, to));
+        hooks.forEach(h -> h.onTransitioned(ctx, from, to, code));
         if (!open) {
             hooks.forEach(h -> h.onClosed(ctx));
         }

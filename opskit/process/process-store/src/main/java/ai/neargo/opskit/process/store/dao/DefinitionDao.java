@@ -49,6 +49,11 @@ public final class DefinitionDao {
                 .params(account.value(), ws.value(), kind, code).query(MAPPER).optional();
     }
 
+    public Optional<Row> byVersion(AccountId account, WorkspaceId ws, String kind, String code, String version) {
+        return jdbc.sql("SELECT * FROM proc_definition WHERE account_id = ? AND workspace_id = ? AND kind = ? AND code = ? AND version = ?")
+                .params(account.value(), ws.value(), kind, code, version).query(MAPPER).optional();
+    }
+
     public Optional<Row> byId(AccountId account, long id) {
         return jdbc.sql("SELECT * FROM proc_definition WHERE account_id = ? AND id = ?").params(account.value(), id).query(MAPPER).optional();
     }

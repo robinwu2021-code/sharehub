@@ -53,7 +53,8 @@ public class TodoTaskController {
     }
 
     public record TodoRow(String taskNo, String kind, String origin, String title, Subject subject, Named process, Integer priorityOrd,
-            long createdAtMs, Long dueAtMs, boolean claimable, String instanceNo, String approvalNo, String queueGroup) {
+            long createdAtMs, Long dueAtMs, boolean claimable, String instanceNo, String approvalNo, String queueGroup,
+            ai.neargo.opskit.process.api.model.query.SlaSummary sla) {
     }
 
     public record TaskRow(String taskNo, String kind, String status, Named queue, String title, Subject subject, Integer priorityOrd,
@@ -72,7 +73,7 @@ public class TodoTaskController {
         return queries.todos(actor, q == null ? new TodoQuery(null, null, null, null) : q).map(t -> new TodoRow(t.taskNo(), t.kind(), t.origin(),
                 t.title() != null ? t.title() : Present.text(t.processName(), locale), Present.subject(t.subject()),
                 new Named(null, Present.text(t.processName(), locale), t.processName() == null ? Map.of() : t.processName().values()),
-                t.priorityOrd(), t.createdAtMs(), t.dueAtMs(), t.claimable(), t.instanceNo(), t.approvalNo(), t.queueGroup()));
+                t.priorityOrd(), t.createdAtMs(), t.dueAtMs(), t.claimable(), t.instanceNo(), t.approvalNo(), t.queueGroup(), t.sla()));
     }
 
     @PostMapping("/todos/count")

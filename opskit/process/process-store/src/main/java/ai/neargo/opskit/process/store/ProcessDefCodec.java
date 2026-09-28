@@ -171,7 +171,7 @@ public final class ProcessDefCodec {
         return m;
     }
 
-    private static Object condition(Condition c) {
+    static Object condition(Condition c) {
         if (c == null) {
             return null;
         }
@@ -275,7 +275,7 @@ public final class ProcessDefCodec {
     }
 
     @SuppressWarnings("unchecked")
-    private static Condition readCondition(Object o) {
+    static Condition readCondition(Object o) {
         if (o == null) {
             return null;
         }

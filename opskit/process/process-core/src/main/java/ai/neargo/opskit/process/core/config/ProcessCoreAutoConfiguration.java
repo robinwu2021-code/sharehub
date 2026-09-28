@@ -11,6 +11,9 @@ import ai.neargo.opskit.process.core.app.InstanceAppService;
 import ai.neargo.opskit.process.core.app.ProcessDefinitionAppService;
 import ai.neargo.opskit.process.core.app.ProcessQueryService;
 import ai.neargo.opskit.process.core.app.ProcessTimers;
+import ai.neargo.opskit.process.core.app.SlaPolicyAppService;
+import ai.neargo.opskit.process.core.app.SlaTracker;
+import ai.neargo.opskit.process.core.port.Calendars;
 import ai.neargo.opskit.process.core.app.TaskAppService;
 import ai.neargo.opskit.process.core.port.Directory;
 import ai.neargo.opskit.process.store.ProcessMigrations;
@@ -70,10 +73,22 @@ public class ProcessCoreAutoConfiguration {
     }
 
     @Bean
+    SlaPolicyAppService slaPolicyAppService(ProcessStore s, AuditRecorder audit, Clock clock, TransactionOperations tx) {
+        return new SlaPolicyAppService(s.definitions(), audit, clock, tx);
+    }
+
+    /** 没接日历端口时按自然时间计（引用了日历的策略会记警告）。 */
+    @Bean
+    SlaTracker slaTracker(SlaPolicyAppService policies, ProcessStore s, ObjectProvider<Calendars> calendars, TimerScheduler timers, EventPublisher events,
+            BizNoGenerator ids, Clock clock, TransactionOperations tx) {
+        return new SlaTracker(policies, s.slaClocks(), s.logs(), calendars.getIfAvailable(() -> Calendars.NONE), timers, events, ids, clock, tx);
+    }
+
+    @Bean
     InstanceAppService instanceAppService(ProcessDefinitionAppService defs, ProcessStore s, TaskAppService tasks, ApprovalAppService approvals,
-            GateTimersAndConfirmations gates, EventPublisher events, BizNoGenerator ids, Clock clock, TransactionOperations tx) {
-        return new InstanceAppService(defs, s.instances(), s.participants(), s.scopes(), s.logs(), List.of(tasks, approvals, gates), Optional.of(tasks),
-                events, ids, clock, tx);
+            GateTimersAndConfirmations gates, SlaTracker sla, EventPublisher events, BizNoGenerator ids, Clock clock, TransactionOperations tx) {
+        return new InstanceAppService(defs, s.instances(), s.participants(), s.scopes(), s.logs(), List.of(tasks, approvals, gates, sla),
+                Optional.of(tasks), events, ids, clock, tx);
     }
 
     @Bean
@@ -84,11 +99,11 @@ public class ProcessCoreAutoConfiguration {
 
     @Bean
     ProcessQueryService processQueryService(ProcessDefinitionAppService defs, ProcessStore s, Directory directory) {
-        return new ProcessQueryService(defs, s.queries(), directory);
+        return new ProcessQueryService(defs, s.queries(), directory, s.slaClocks());
     }
 
     @Bean
-    ProcessTimers processTimers(TaskAppService tasks, GateTimersAndConfirmations gates, ProcessStore s, Directory directory, Clock clock) {
-        return new ProcessTimers(tasks, gates, s.tasks(), s.instances(), directory, clock);
+    ProcessTimers processTimers(TaskAppService tasks, GateTimersAndConfirmations gates, SlaTracker sla, ProcessStore s, Directory directory, Clock clock) {
+        return new ProcessTimers(tasks, gates, sla, s.tasks(), s.instances(), s.slaClocks(), directory, clock);
     }
 }

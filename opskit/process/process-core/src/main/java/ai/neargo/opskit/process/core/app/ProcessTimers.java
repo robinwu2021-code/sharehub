@@ -6,6 +6,7 @@ import ai.neargo.opskit.commons.tenancy.TenantContext;
 import ai.neargo.opskit.commons.timer.TimerId;
 import ai.neargo.opskit.process.core.port.Directory;
 import ai.neargo.opskit.process.store.dao.InstanceDao;
+import ai.neargo.opskit.process.store.dao.SlaClockDao;
 import ai.neargo.opskit.process.store.dao.TaskDao;
 import java.time.Clock;
 import java.util.List;
@@ -21,15 +22,19 @@ public class ProcessTimers {
 
     private final TaskAppService tasks;
     private final GateTimersAndConfirmations gates;
+    private final SlaTracker sla;
+    private final SlaClockDao slaRows;
     private final TaskDao taskRows;
     private final InstanceDao instanceRows;
     private final Directory directory;
     private final Clock clock;
 
-    public ProcessTimers(TaskAppService tasks, GateTimersAndConfirmations gates, TaskDao taskRows, InstanceDao instanceRows, Directory directory,
-            Clock clock) {
+    public ProcessTimers(TaskAppService tasks, GateTimersAndConfirmations gates, SlaTracker sla, TaskDao taskRows, InstanceDao instanceRows,
+            SlaClockDao slaRows, Directory directory, Clock clock) {
         this.tasks = tasks;
         this.gates = gates;
+        this.sla = sla;
+        this.slaRows = slaRows;
         this.taskRows = taskRows;
         this.instanceRows = instanceRows;
         this.directory = directory;
@@ -54,6 +59,25 @@ public class ProcessTimers {
     public boolean gateTimer(String timerId) {
         TimerId id = TimerId.decode(timerId);
         return tenantOfInstance(id).map(t -> gates.onGateTimer(t, id.key(), id.epoch())).orElse(false);
+    }
+
+    @SystemAction("定时触发：SLA 到期")
+    public boolean slaDue(String timerId) {
+        TimerId id = TimerId.decode(timerId);
+        return slaRows.find(id.workspace(), id.key())
+                .map(r -> sla.onDue(new TenantContext(new AccountId(r.accountId()), id.workspace()), id.key(), id.epoch())).orElse(false);
+    }
+
+    @SystemAction("定时触发：SLA 预警")
+    public boolean slaWarn(String timerId) {
+        TimerId id = TimerId.decode(timerId);
+        return slaRows.find(id.workspace(), id.key())
+                .map(r -> sla.onWarn(new TenantContext(new AccountId(r.accountId()), id.workspace()), id.key(), id.epoch())).orElse(false);
+    }
+
+    @SystemAction("定时兜底：SLA")
+    public int reconcileSla(int limit) {
+        return sla.reconcile(limit);
     }
 
     /**

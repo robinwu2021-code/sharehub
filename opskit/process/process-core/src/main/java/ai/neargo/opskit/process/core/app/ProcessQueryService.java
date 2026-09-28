@@ -26,7 +26,9 @@ import ai.neargo.opskit.process.api.model.query.TodoCount;
 import ai.neargo.opskit.process.api.model.query.TodoItem;
 import ai.neargo.opskit.process.api.model.query.TodoQuery;
 import ai.neargo.opskit.process.core.port.Directory;
+import ai.neargo.opskit.process.api.model.query.SlaSummary;
 import ai.neargo.opskit.process.store.dao.QueryDao;
+import ai.neargo.opskit.process.store.dao.SlaClockDao;
 import ai.neargo.opskit.process.store.dao.QueryDao.Viewer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -57,11 +59,18 @@ public class ProcessQueryService {
     private final ProcessDefinitionAppService definitions;
     private final QueryDao queries;
     private final Directory directory;
+    private final SlaClockDao slaClocks;
 
     public ProcessQueryService(ProcessDefinitionAppService definitions, QueryDao queries, Directory directory) {
+        this(definitions, queries, directory, null);
+    }
+
+    /** @param slaClocks 为空时列表不带 SLA 摘要 */
+    public ProcessQueryService(ProcessDefinitionAppService definitions, QueryDao queries, Directory directory, SlaClockDao slaClocks) {
         this.definitions = definitions;
         this.queries = queries;
         this.directory = directory;
+        this.slaClocks = slaClocks;
     }
 
     // ── 待办 ────────────────────────────────────────────────
@@ -77,10 +86,12 @@ public class ProcessQueryService {
             return Page.empty(page);
         }
         Names names = new Names(actor.tenant());
-        List<TodoItem> list = queries.todos(ws, v, origin, q.claimable(), page.offset(), page.size()).stream()
+        List<QueryDao.TodoRow> rows = queries.todos(ws, v, origin, q.claimable(), page.offset(), page.size());
+        Map<String, SlaSummary> sla = slaOf(ws, rows.stream().map(QueryDao.TodoRow::instanceNo).distinct().toList());
+        List<TodoItem> list = rows.stream()
                 .map(r -> new TodoItem(r.taskNo(), r.kind(), r.origin(), r.title(), names.process(r.definitionId()),
                         subject(r.subjectType(), r.subjectRef(), r.subjectDisplay()), r.priorityOrd(), r.createdAtMs(), r.dueAtMs(),
-                        "OPEN".equals(r.status()), r.instanceNo(), r.approvalNo(), r.queueGroup()))
+                        "OPEN".equals(r.status()), r.instanceNo(), r.approvalNo(), r.queueGroup(), sla.get(r.instanceNo())))
                 .toList();
         return Page.of(list, total, page);
     }
@@ -195,6 +206,22 @@ public class ProcessQueryService {
     }
 
     // ── 内部 ────────────────────────────────────────────────
+
+    /** 每个实例取到期最近的未停指标（逾期未停的也算：它最该被看见）。 */
+    private Map<String, SlaSummary> slaOf(WorkspaceId ws, List<String> instanceNos) {
+        Map<String, SlaSummary> out = new HashMap<>();
+        if (slaClocks == null || instanceNos.isEmpty()) {
+            return out;
+        }
+        for (SlaClockDao.Row c : slaClocks.ofInstances(ws, instanceNos)) {
+            if (!c.active() || c.startedAtMs() == null || c.dueAtMs() == null) {
+                continue;
+            }
+            SlaSummary s = new SlaSummary(c.state(), c.startedAtMs(), c.dueAtMs(), c.pausedMs());
+            out.merge(c.instanceNo(), s, (a, b) -> a.dueAtMs() <= b.dueAtMs() ? a : b);
+        }
+        return out;
+    }
 
     private static Viewer viewer(Actor actor, boolean all) {
         return new Viewer(all, actor.member().map(PrincipalRef::key).orElse(null), CandidateKeys.of(actor), actor.scopes());

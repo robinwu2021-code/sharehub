@@ -1,6 +1,12 @@
 package ai.neargo.opskit.svc.wiring;
 
+import ai.neargo.opskit.commons.error.OpsKitException;
+import ai.neargo.opskit.platform.api.calendar.BusinessCalendar;
+import ai.neargo.opskit.platform.core.app.CalendarAppService;
 import ai.neargo.opskit.platform.core.app.DirectoryAppService;
+import ai.neargo.opskit.process.core.app.SlaTracker;
+import ai.neargo.opskit.process.core.port.Calendars;
+import java.util.Optional;
 import ai.neargo.opskit.process.core.app.GateTimersAndConfirmations;
 import ai.neargo.opskit.process.core.app.ProcessTimers;
 import ai.neargo.opskit.process.core.app.TaskAppService;
@@ -26,6 +32,39 @@ public class SvcWiring {
     @Bean
     Directory processDirectory(DirectoryAppService directory) {
         return new PlatformDirectory(directory);
+    }
+
+    /** SLA 按工作日历计时：取平台日历；未配置的日历为空（计时器退回自然时间并记警告）。 */
+    @Bean
+    Calendars processCalendars(CalendarAppService calendars) {
+        return (t, code) -> {
+            try {
+                return Optional.of(new BusinessCalendar(calendars.get(t, code)));
+            } catch (OpsKitException e) {
+                return Optional.empty();
+            }
+        };
+    }
+
+    @Bean
+    Task<Void> slaDueTask(ProcessTimers timers) {
+        return Tasks.oneTime(SlaTracker.DUE_TASK).execute((inst, ctx) -> timers.slaDue(inst.getId()));
+    }
+
+    @Bean
+    Task<Void> slaWarnTask(ProcessTimers timers) {
+        return Tasks.oneTime(SlaTracker.WARN_TASK).execute((inst, ctx) -> timers.slaWarn(inst.getId()));
+    }
+
+    /** 兜底：到期 / 预警定时丢了也会补上（21/02 §8.5，每 10 分钟）。 */
+    @Bean
+    Task<Void> slaReconcileTask(ProcessTimers timers) {
+        return Tasks.recurring("sla-reconcile", FixedDelay.of(Duration.ofMinutes(10))).execute((inst, ctx) -> {
+            int n = timers.reconcileSla(500);
+            if (n > 0) {
+                log.info("SLA 兜底扫描补触发 count={}", n);
+            }
+        });
     }
 
     @Bean
