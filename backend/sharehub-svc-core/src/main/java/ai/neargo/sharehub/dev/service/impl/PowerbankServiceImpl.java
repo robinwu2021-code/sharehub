@@ -4,6 +4,7 @@ import ai.neargo.sharehub.common.BizException;
 import ai.neargo.common.core.PageResult;
 import org.springframework.transaction.annotation.Transactional;
 import ai.neargo.sharehub.common.BizKey;
+import ai.neargo.sharehub.dev.PowerbankHealth;
 import ai.neargo.sharehub.dev.PowerbankStateMachine;
 import ai.neargo.sharehub.dev.dto.DevDtos.PowerbankCmd;
 import ai.neargo.sharehub.dev.dto.DevDtos.PowerbankRow;
@@ -36,8 +37,11 @@ public class PowerbankServiceImpl implements PowerbankService {
 
     private final PowerbankMapper mapper;
     private final PowerbankStateMachine stateMachine;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
-    public PowerbankServiceImpl(PowerbankMapper mapper, PowerbankStateMachine stateMachine) {
+    public PowerbankServiceImpl(PowerbankMapper mapper, PowerbankStateMachine stateMachine,
+                                org.springframework.jdbc.core.JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
         this.mapper = mapper;
         this.stateMachine = stateMachine;
     }
@@ -78,7 +82,9 @@ public class PowerbankServiceImpl implements PowerbankService {
         e.setVendorCode(cmd.vendorCode());
         e.setBattery(cmd.battery() == null ? 100 : cmd.battery());
         e.setCycles(cmd.cycles() == null ? 0 : cmd.cycles());
-        e.setHealth(cmd.health() == null ? "OK" : cmd.health());
+        // health 参与可借判定，原先原样落库 —— 写错一个字母，这只宝既不是 OK 也不是 FAULT
+        e.setHealth(cmd.health() == null || cmd.health().isBlank()
+                ? PowerbankHealth.OK.name() : PowerbankHealth.of(cmd.health()).name());
         // 建档即入库：起始态固定 IN_STOCK，不接受调用方指定（否则可绕过状态机凭空造出 RENTED）
         e.setStatus(INIT_STATUS);
         mapper.insert(e);
@@ -109,7 +115,7 @@ public class PowerbankServiceImpl implements PowerbankService {
         if (cmd.vendorCode() != null) e.setVendorCode(cmd.vendorCode());
         if (cmd.battery() != null) e.setBattery(cmd.battery());
         if (cmd.cycles() != null) e.setCycles(cmd.cycles());
-        if (cmd.health() != null) e.setHealth(cmd.health());
+        if (cmd.health() != null) e.setHealth(PowerbankHealth.of(cmd.health()).name());
 
         mapper.updateById(e);
         return toVO(selectByNo(powerbankNo));
@@ -132,24 +138,22 @@ public class PowerbankServiceImpl implements PowerbankService {
                 .eq(DevPowerbank::getPowerbankNo, no).last("limit 1"));
     }
 
-    /** 取号：扫描同前缀最大号 +1（[db-design §1.4.1]，禁止「前缀 + 数组长度」）。并发撞号由 UK 兜底。 */
+    /**
+     * 取号：交给 {@link ai.neargo.sharehub.common.crud.BizNoSequence}（[db-design §1.4.1]）。
+     *
+     * <h3>原先那版每次都返回同一个号</h3>
+     * 它按 {@code orderByDesc(powerbankNo)} 取「最大号」再 +1，而库里的存量号是
+     * {@code PBDFECE7C9E0F} 这种十六进制形 —— 字符串序下它<b>永远是最大的那一行</b>，
+     * 于是 `%04d` 算出来的永远是同一个号：**连续建第二只充电宝必定 500（撞唯一键）**，
+     * 第一只成功只是因为那个号恰好还没被占。
+     *
+     * <p>顺带修掉第二个洞：{@code selectOne(LambdaQueryWrapper)} 会被 {@code @TableLogic}
+     * 补上 {@code deleted = 0} —— <b>软删的号仍占着唯一索引，跳过它们就是在制造撞号</b>
+     * （生产 AG010 那次就是这个）。{@code BizNoSequence} 用裸 SQL，不过滤 deleted，
+     * 并且 {@code CAST(... AS UNSIGNED)} 让十六进制形的历史号算作 0、自然不参与取号。
+     */
     private String nextNo(String prefix) {
-        DevPowerbank top = mapper.selectOne(new LambdaQueryWrapper<DevPowerbank>()
-                .likeRight(DevPowerbank::getPowerbankNo, prefix)
-                .orderByDesc(DevPowerbank::getPowerbankNo)
-                .last("limit 1"));
-        long n = 0L;
-        if (top != null && top.getPowerbankNo() != null && top.getPowerbankNo().length() > prefix.length()) {
-            String digits = top.getPowerbankNo().substring(prefix.length()).replaceAll("\\D", "");
-            if (!digits.isEmpty()) {
-                try {
-                    n = Long.parseLong(digits);
-                } catch (NumberFormatException ignore) {
-                    // 历史脏号不参与取号
-                }
-            }
-        }
-        return prefix + String.format("%04d", n + 1);
+        return ai.neargo.sharehub.common.crud.BizNoSequence.next(jdbc, "dev_powerbank", "powerbank_no", prefix, 4);
     }
 
     static PowerbankRow toVO(DevPowerbank e) {

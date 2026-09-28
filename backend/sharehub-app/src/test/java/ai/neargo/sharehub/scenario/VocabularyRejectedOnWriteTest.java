@@ -76,6 +76,9 @@ class VocabularyRejectedOnWriteTest extends ApiTestSupport {
         jdbc.update("DELETE FROM coupon_tpl WHERE name = ?", MARK);
         // dev_alarm_code 没有 name 列，业务键是 code —— 按探针码删
         jdbc.update("DELETE FROM dev_alarm_code WHERE code LIKE 'TEST_VOCAB_PROBE%'");
+        // 路由是「整体替换」语义（物理删旧行再插），所以只在探针码上试，不碰真码的路由
+        jdbc.update("DELETE FROM dev_alarm_route WHERE alarm_code LIKE 'TEST_VOCAB_PROBE%'");
+        jdbc.update("DELETE FROM dev_powerbank WHERE sn LIKE 'VOCABPB%'");
         jdbc.update("DELETE FROM usr_free_whitelist WHERE c_user_no LIKE 'UVOCAB%'");
         jdbc.update("DELETE FROM notify_template WHERE name = ?", MARK);
         jdbc.update("DELETE FROM md_problem WHERE title = ?", MARK);
@@ -404,6 +407,76 @@ class VocabularyRejectedOnWriteTest extends ApiTestSupport {
                 .as("创建时 status=STARTED 被接受了 —— 状态机只拦编辑路径的迁移，拦不住创建：%s",
                         badRoStatus.msg())
                 .isEqualTo(400);
+    }
+
+    @Test
+    @DisplayName("★ dev_powerbank.health 非法值 400 —— 这一列参与可借判定")
+    void powerbank_health_rejects_out_of_vocabulary() {
+        String t = login("ADMIN");
+
+        var ok = post("/api/ops/powerbanks", Map.of("sn", "VOCABPB001", "health", "OK"), t);
+        assertThat(ok.status).as("合法 health 应当能存：%s", ok.msg()).isEqualTo(200);
+
+        /*
+         * 负例用 GOOD：它是「看起来对」的那种错 —— 本列词表是 OK/FAULT/AGED。
+         * 串错之后这只宝既不是 OK 也不是 FAULT，按健康筛查不到，而没有任何报错。
+         */
+        var bad = post("/api/ops/powerbanks", Map.of("sn", "VOCABPB002", "health", "GOOD"), t);
+        assertThat(bad.status).as("health=GOOD 竟然被接受了：%s", bad.msg()).isEqualTo(400);
+
+        /*
+         * ★★ 与词表无关，是做这一格时撞出来的：**连续建第二只充电宝必定 500**。
+         * 原先 nextNo 按 orderByDesc(powerbankNo) 取「最大号」，而库里存量号是
+         * PBDFECE7C9E0F 这种十六进制形 —— 字符串序下它永远最大，于是每次算出同一个号。
+         * 第一只成功只是因为那个号还没被占。已改走 BizNoSequence。
+         */
+        var second = post("/api/ops/powerbanks", Map.of("sn", "VOCABPB003", "health", "FAULT"), t);
+        assertThat(second.status)
+                .as("连续建第二只充电宝失败了 —— 取号每次都给同一个号：%s", second.msg())
+                .isEqualTo(200);
+        assertThat(second.okData().path("powerbankNo").asText())
+                .as("两只宝拿到了同一个编号")
+                .isNotEqualTo(ok.okData().path("powerbankNo").asText());
+    }
+
+    @Test
+    @DisplayName("★ dev_alarm_route.wo_type：换个处置方式原先就能把词表外的值存进去")
+    void alarm_route_wo_type_is_checked_regardless_of_disposition() {
+        String t = login("ADMIN");
+        String code = "TEST_VOCAB_PROBE_ROUTE";
+        assertThat(post("/api/ops/alarms/codes", Map.of(
+                "code", code, "message", MARK, "level", "WARN",
+                "domain", "SERVICE", "subjectType", "CABINET", "evalType", "STATE"), t).status)
+                .as("探针告警码应当能建出来").isEqualTo(200);
+
+        var ok = post("/api/ops/alarms/codes/" + code + "/routes",
+                java.util.List.of(Map.of("cause", "*", "disposition", "WORK_ORDER", "woType", "FAULT")), t);
+        assertThat(ok.status).as("合法路由应当能存：%s", ok.msg()).isEqualTo(200);
+
+        /*
+         * ★ 这一格钉的是**条件校验的盲区**：原先 woType 只在 disposition=WORK_ORDER
+         * 时才校验。换成 NOTIFY 就能把词表外的 woType 存进去，而它会一直留在这条路由上 ——
+         * 哪天有人把处置改回 WORK_ORDER，开单时才炸，那时查的是「谁改的处置」
+         * 而不是「谁存的 woType」。
+         */
+        var bad = post("/api/ops/alarms/codes/" + code + "/routes",
+                java.util.List.of(Map.of("cause", "*", "disposition", "NOTIFY", "woType", "REPAIR")), t);
+        assertThat(bad.status)
+                .as("处置不是 WORK_ORDER 时 woType=REPAIR 被放了进去：%s", bad.msg())
+                .isEqualTo(400);
+
+        /*
+         * ★★ 正对照之外还要验「**第二次保存**」—— 路由是整体替换语义，
+         * 而 DevAlarmRoute 带 @TableLogic：`routeMapper.delete(...)` 是**逻辑删**
+         * （代码注释写的却是「物理删旧路由」），而 uk_alarm_route(alarm_code, cause)
+         * **不含 deleted** —— 于是同一个码改第二次路由直接 500。
+         * 这一格不是词表的事，是本仓库栽过的同一个形状（软删的行仍占着唯一索引）。
+         */
+        var again = post("/api/ops/alarms/codes/" + code + "/routes",
+                java.util.List.of(Map.of("cause", "*", "disposition", "NOTIFY")), t);
+        assertThat(again.status)
+                .as("同一个码第二次保存路由失败了 —— 软删的旧行还占着唯一索引：%s", again.msg())
+                .isEqualTo(200);
     }
 
     @Test

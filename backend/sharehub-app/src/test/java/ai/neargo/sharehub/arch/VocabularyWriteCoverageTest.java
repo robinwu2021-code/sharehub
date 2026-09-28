@@ -121,7 +121,28 @@ class VocabularyWriteCoverageTest {
             // 服务端常量 / 状态机
             "ord_complaint.status", "ord_deposit.status", "ord_exception.status",
             "ord_order.pay_status", "ord_order.source_channel",
-            "ord_refund.status", "ord_reservation.status"));
+            "ord_refund.status", "ord_reservation.status",
+
+            // ——— 2026-09-28 第四批：告警域 + 设备域 ———
+            // 告警域 18 列几乎全是「服务端全权」：引擎内部用枚举 .name() 写，
+            // 人工关闭走 AlarmCloseReason.of()，通知渠道抄自 dev_alarm_rule.channel（已覆盖），
+            // 时间线 event 是 private writeLog 的字面量
+            "dev_alarm.cause", "dev_alarm.close_reason", "dev_alarm.disposition_type",
+            "dev_alarm.domain", "dev_alarm.impact_period", "dev_alarm.impact_scope",
+            "dev_alarm.level", "dev_alarm.priority", "dev_alarm.source",
+            "dev_alarm.status", "dev_alarm.subject_type",
+            "dev_alarm_log.event", "dev_alarm_notice.channel", "dev_alarm_notice.status",
+            "dev_alarm_route.disposition", "dev_alarm_route.fallback",
+            "dev_alarm_route.wo_type",                           // 2026-09-28 补：原先只在 disposition=WORK_ORDER 时才校验
+            "dev_alarm_todo.status",
+            // 设备域：建档写常量、状态走状态机、质检结果是枚举
+            "dev_cabinet.status", "dev_cabinet.device_type", "dev_cabinet.qc_status",
+            "dev_cabinet.online_status",                         // 建档 OFFLINE，转 ONLINE 在 DeviceSignalServiceImpl
+            "dev_powerbank.status",
+            "dev_powerbank.health",                              // 2026-09-28 接上 PowerbankHealth（原先原样落库，而它参与可借判定）
+            "dev_protection.action", "dev_protection.holder_type",
+            "dev_qc_record.item_type", "dev_qc_record.result",
+            "dev_trial_rent.status"));
 
     /*
      * ⚠️ 第三批的方法论教训：**只 grep `setXxx(` 那一行会得出错的结论**。

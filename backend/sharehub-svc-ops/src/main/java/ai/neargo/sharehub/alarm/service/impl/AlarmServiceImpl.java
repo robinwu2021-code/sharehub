@@ -357,14 +357,22 @@ public class AlarmServiceImpl implements AlarmService {
             if (!"*".equals(cause)) ai.neargo.sharehub.alarm.AlarmCause.of(cause);
             if (!causes.add(cause)) throw ai.neargo.sharehub.common.BizException.badRequest("error.common.duplicate_value", cause);
             ai.neargo.sharehub.alarm.AlarmDisposition d = ai.neargo.sharehub.alarm.AlarmDisposition.of(r.disposition());
-            if (d == ai.neargo.sharehub.alarm.AlarmDisposition.WORK_ORDER && notBlank(r.woType())) {
-                ai.neargo.sharehub.wo.ext.WorkOrderType.of(r.woType());
-            }
+            /*
+             * woType 传了就校验，**不再只在 disposition=WORK_ORDER 时校验** ——
+             * 原先换个处置方式就能把词表外的 woType 存进去，而它会一直留在这条路由上；
+             * 哪天有人把处置改回 WORK_ORDER，开单时才炸，那时查的是「谁改的处置」
+             * 而不是「谁存的 woType」。
+             */
+            if (notBlank(r.woType())) ai.neargo.sharehub.wo.ext.WorkOrderType.of(r.woType());
             if (notBlank(r.fallback())) ai.neargo.sharehub.alarm.AlarmDisposition.of(r.fallback());
         }
-        // 整体替换：物理删旧路由（全局配置表，无业务历史意义；改动经审计拦截器留痕）
-        routeMapper.delete(new LambdaQueryWrapper<ai.neargo.sharehub.alarm.entity.AlarmEngineEntities.DevAlarmRoute>()
-                .eq(ai.neargo.sharehub.alarm.entity.AlarmEngineEntities.DevAlarmRoute::getAlarmCode, code));
+        /*
+         * 整体替换：**物理**删旧路由（全局配置表，无业务历史意义；改动经审计拦截器留痕）。
+         * 原先写的是 routeMapper.delete(wrapper) —— 而实体带 @TableLogic，那是逻辑删，
+         * uk_alarm_route(alarm_code, cause) 又不含 deleted，于是**同一个码改第二次路由直接 500**。
+         * 注释说物理删、注解让它逻辑删，两者不一致了很久。见 deleteByAlarmCode 的说明。
+         */
+        routeMapper.deleteByAlarmCode(code);
         for (var r : in) {
             var e = new ai.neargo.sharehub.alarm.entity.AlarmEngineEntities.DevAlarmRoute();
             e.setAlarmCode(code);
