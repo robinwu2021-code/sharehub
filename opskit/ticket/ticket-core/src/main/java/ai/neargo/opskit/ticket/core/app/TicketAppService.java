@@ -1,10 +1,13 @@
 package ai.neargo.opskit.ticket.core.app;
 
+import ai.neargo.opskit.ticket.api.event.TicketEvent;
+import ai.neargo.opskit.process.api.model.query.HistoryEntry;
 import ai.neargo.opskit.commons.actor.Actor;
 import ai.neargo.opskit.commons.actor.PrincipalRef;
 import ai.neargo.opskit.commons.error.CommonErrors;
 import ai.neargo.opskit.commons.error.FieldError;
 import ai.neargo.opskit.commons.error.OpsKitException;
+import ai.neargo.opskit.commons.event.EventPublisher;
 import ai.neargo.opskit.commons.id.BizNoGenerator;
 import ai.neargo.opskit.commons.jdbc.ConditionalUpdate;
 import ai.neargo.opskit.commons.security.SystemAction;
@@ -65,6 +68,8 @@ public class TicketAppService {
     public static final String REQUESTER = "REQUESTER";
     public static final String ASSIGNEE = "ASSIGNEE";
     private static final String PENDING_INSTANCE = "pending:";
+    /** 建单时写入的占位状态，首次快照同步前的值。 */
+    private static final String INITIAL_STATUS = "-";
 
     private final TicketDefinitionAppService definitions;
     private final TicketDao tickets;
@@ -77,9 +82,12 @@ public class TicketAppService {
     private final BizNoGenerator ids;
     private final Clock clock;
     private final TransactionOperations tx;
+    private final EventPublisher events;
 
     public TicketAppService(TicketDefinitionAppService definitions, TicketDao tickets, FieldIndexDao index, TicketScopeDao scopes, CommentDao comments,
-            ProcessClient processes, TaskClient taskClient, TicketDispatcher dispatcher, BizNoGenerator ids, Clock clock, TransactionOperations tx) {
+            ProcessClient processes, TaskClient taskClient, TicketDispatcher dispatcher, BizNoGenerator ids, Clock clock, TransactionOperations tx,
+            EventPublisher events) {
+        this.events = events;
         this.taskClient = taskClient;
         this.dispatcher = dispatcher;
         this.definitions = definitions;
@@ -150,7 +158,9 @@ public class TicketAppService {
             scopes.replace(ws, no, tags);
             dispatcher.dispatch(t, tickets.find(ws, no).orElseThrow(), def);
             syncSnapshot(t, no);
-            return new CreateTicketResult(view(t, tickets.find(ws, no).orElseThrow()), false);
+            TicketDao.Row created = tickets.find(ws, no).orElseThrow();
+            publish(t, created, "created", null, null, inst.seq(), who(actor), null);
+            return new CreateTicketResult(view(t, created), false);
         });
     }
 
@@ -480,8 +490,12 @@ public class TicketAppService {
             if (!actor.isAppItself() && !actor.productPermissions().contains(WORK) && !participant && !"INTERNAL".equals(vis)) {
                 throw new OpsKitException(CommonErrors.PERMISSION_DENIED, "commenting needs " + WORK + " or being a participant");
             }
-            return comments.insert(t.workspaceId(), ticketNo, vis, "COMMENT", who(actor), onBehalf(actor), noBody ? null : body.strip(), files,
+            int seq = comments.insert(t.workspaceId(), ticketNo, vis, "COMMENT", who(actor), onBehalf(actor), noBody ? null : body.strip(), files,
                     clock.millis());
+            if ("PUBLIC".equals(vis)) {
+                publish(t, r, "commented", null, null, seq, who(actor), noBody ? null : body.strip());
+            }
+            return seq;
         });
     }
 
@@ -640,6 +654,25 @@ public class TicketAppService {
         String assignee = inst.participants().getOrDefault(ASSIGNEE, Set.of()).stream().findFirst().orElse(null);
         tickets.updateSnapshot(t.workspaceId(), ticketNo, new TicketDao.Snapshot(inst.status(), inst.statusCategory().name(), inst.open(), sla.state(),
                 sla.nextDueAtMs(), sla.startedAtMs(), sla.pausedMs(), assignee), clock.millis());
+        // 状态变了才发事件（覆盖人工迁移与系统迁移：SLA、合并、外部确认…）；建单途中的首次同步由 create 自己发 created
+        if (!INITIAL_STATUS.equals(r.status()) && !r.status().equals(inst.status())) {
+            HistoryEntry step = processes.history(t, r.instanceNo()).stream().filter(h -> "INSTANCE".equals(h.entityKind()) && h.seq() != null
+                    && h.seq() == inst.seq()).reduce((a, b) -> b).orElse(null);
+            TicketDao.Row now = tickets.find(t.workspaceId(), ticketNo).orElseThrow();
+            String transition = step == null ? null : step.action();
+            String actor = step == null ? "system" : step.actor();
+            publish(t, now, "transitioned", transition, r.status(), inst.seq(), actor, null);
+            if (r.open() && !inst.open()) {
+                publish(t, now, "closed", transition, r.status(), inst.seq(), actor, null);
+            }
+        }
+    }
+
+    private void publish(TenantContext t, TicketDao.Row r, String action, String transition, String from, int seq, String actor, String body) {
+        String subjectType = r.subjectType() != null ? r.subjectType() : "ticket";
+        String subjectRef = r.subjectType() != null ? r.subjectRef() : r.ticketNo();
+        events.publish(new TicketEvent(t, action, r.ticketNo(), r.typeCode(), subjectType, subjectRef, r.status(), r.statusCategory(), r.open(),
+                r.resolution(), transition, from, seq, actor, body, clock.instant()));
     }
 
     // ── 内部 ────────────────────────────────────────────────

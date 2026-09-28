@@ -61,6 +61,26 @@
         },
         "type" : "object"
       },
+      "AttrBody" : {
+        "properties" : {
+          "name" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "valueLabels" : {
+            "additionalProperties" : {
+              "additionalProperties" : {
+                "type" : "string"
+              },
+              "type" : "object"
+            },
+            "type" : "object"
+          }
+        },
+        "type" : "object"
+      },
       "AttrDef" : {
         "properties" : {
           "key" : {
@@ -96,6 +116,53 @@
             "type" : "object"
           },
           "value" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "GroupBody" : {
+        "properties" : {
+          "claimTimeoutSec" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "kind" : {
+            "enum" : [ "TEAM", "QUEUE" ],
+            "type" : "string"
+          },
+          "name" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "orderBy" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "GroupUpsert" : {
+        "properties" : {
+          "claimTimeoutSec" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "code" : {
+            "type" : "string"
+          },
+          "kind" : {
+            "enum" : [ "TEAM", "QUEUE" ],
+            "type" : "string"
+          },
+          "name" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "orderBy" : {
             "type" : "string"
           }
         },
@@ -184,6 +251,28 @@
         },
         "type" : "object"
       },
+      "MemberUpsert" : {
+        "properties" : {
+          "attrs" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "displayName" : {
+            "type" : "string"
+          },
+          "externalRef" : {
+            "type" : "string"
+          },
+          "scopes" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array",
+            "uniqueItems" : true
+          }
+        },
+        "type" : "object"
+      },
       "PageMemberRow" : {
         "properties" : {
           "list" : {
@@ -219,6 +308,74 @@
         },
         "type" : "object"
       },
+      "RoleBinding" : {
+        "properties" : {
+          "principal" : {
+            "type" : "string"
+          },
+          "roleCode" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "SyncBatch" : {
+        "properties" : {
+          "groups" : {
+            "items" : {
+              "$ref" : "#/components/schemas/GroupUpsert"
+            },
+            "type" : "array"
+          },
+          "members" : {
+            "items" : {
+              "$ref" : "#/components/schemas/MemberUpsert"
+            },
+            "type" : "array"
+          },
+          "memberships" : {
+            "additionalProperties" : {
+              "items" : {
+                "type" : "string"
+              },
+              "type" : "array"
+            },
+            "type" : "object"
+          },
+          "mode" : {
+            "enum" : [ "MERGE", "REPLACE" ],
+            "type" : "string"
+          },
+          "roleBindings" : {
+            "items" : {
+              "$ref" : "#/components/schemas/RoleBinding"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "SyncResult" : {
+        "properties" : {
+          "groups" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "members" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "memberships" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "roleBindings" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "TenantContext" : {
         "properties" : {
           "accountId" : {
@@ -249,6 +406,78 @@
   },
   "openapi" : "3.1.0",
   "paths" : {
+    "/api/opskit/v1/workspaces/{ws}/directory/sync" : {
+      "post" : {
+        "operationId" : "sync",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SyncBatch"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SyncResult"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "directory-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/groups/{code}" : {
+      "put" : {
+        "operationId" : "upsertGroup_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/GroupBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "directory-controller" ]
+      }
+    },
     "/api/opskit/v1/workspaces/{ws}/me" : {
       "get" : {
         "operationId" : "me_1",
@@ -304,6 +533,42 @@
         "tags" : [ "directory-controller" ]
       }
     },
+    "/api/opskit/v1/workspaces/{ws}/member-attributes/{key}" : {
+      "put" : {
+        "operationId" : "upsertAttr",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "key",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AttrBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "directory-controller" ]
+      }
+    },
     "/api/opskit/v1/workspaces/{ws}/members/query" : {
       "post" : {
         "operationId" : "members",
@@ -333,6 +598,78 @@
                 }
               }
             },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "directory-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/directory/sync" : {
+      "post" : {
+        "operationId" : "sync_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SyncBatch"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SyncResult"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "directory-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/groups/{code}" : {
+      "put" : {
+        "operationId" : "upsertGroup",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/GroupBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
             "description" : "OK"
           }
         },
@@ -388,6 +725,42 @@
                 }
               }
             },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "directory-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/member-attributes/{key}" : {
+      "put" : {
+        "operationId" : "upsertAttr_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "key",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AttrBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
             "description" : "OK"
           }
         },

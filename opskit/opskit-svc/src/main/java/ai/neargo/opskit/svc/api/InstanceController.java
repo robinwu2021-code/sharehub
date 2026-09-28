@@ -1,5 +1,15 @@
 package ai.neargo.opskit.svc.api;
 
+import ai.neargo.opskit.commons.error.CommonErrors;
+import ai.neargo.opskit.commons.error.FieldError;
+import ai.neargo.opskit.commons.error.OpsKitException;
+import ai.neargo.opskit.platform.api.Permission;
+import ai.neargo.opskit.process.api.definition.template.ApprovalTemplate;
+import ai.neargo.opskit.process.api.model.InstanceView;
+import ai.neargo.opskit.process.api.model.StartRequest;
+import ai.neargo.opskit.process.api.model.SubjectRef;
+import ai.neargo.opskit.process.api.model.TransitionRequest;
+import ai.neargo.opskit.process.core.domain.definition.ApprovalTemplateCompiler;
 import ai.neargo.opskit.commons.actor.Actor;
 import ai.neargo.opskit.commons.query.Page;
 import ai.neargo.opskit.platform.core.app.DirectoryAppService;
@@ -34,8 +44,11 @@ public class InstanceController {
     private final DirectoryAppService directory;
 
     private final ai.neargo.opskit.process.client.ProcessClient processes;
+    private final ai.neargo.opskit.process.core.app.ApprovalTemplateAppService templates;
 
-    public InstanceController(ProcessHistoryService history, DirectoryAppService directory, ai.neargo.opskit.process.client.ProcessClient processes) {
+    public InstanceController(ProcessHistoryService history, DirectoryAppService directory, ai.neargo.opskit.process.client.ProcessClient processes,
+            ai.neargo.opskit.process.core.app.ApprovalTemplateAppService templates) {
+        this.templates = templates;
         this.history = history;
         this.directory = directory;
         this.processes = processes;
@@ -81,17 +94,42 @@ public class InstanceController {
             int seq, String approvalNo, long createdAtMs) {
     }
 
-    /** 发起实例（21/06 §实例）：应用凭证可带 onBehalfOf 代提交人发起（提交人成为 REQUESTER，自审禁止据此判）。 */
+    /**
+     * 发起实例（21/06 §实例）。
+     * <ul>
+     *   <li>应用凭证：任何流程；可带 onBehalfOf 代提交人发起（提交人成为 REQUESTER，自审禁止据此判）。</li>
+     *   <li>成员令牌（运营台「发起审批」）：只能发起<b>审批模板</b>，需 {@code approval:submit}；填的字段按模板的发起表单校验。</li>
+     * </ul>
+     * 审批模板编译出的流程以「草稿」起步：这里发起后立即走 submit 进入审批（没有草稿编辑界面，停在草稿没有意义），同一请求内完成。
+     */
     @PostMapping("/instances")
     public Started start(Actor actor, @RequestBody StartBody body) {
         if (body == null || body.processCode() == null || body.processCode().isBlank()) {
-            throw new ai.neargo.opskit.commons.error.OpsKitException(ai.neargo.opskit.commons.error.CommonErrors.VALIDATION, "processCode is required",
-                    Map.of(), List.of(new ai.neargo.opskit.commons.error.FieldError("processCode", "opskit.validation.required")));
+            throw new OpsKitException(CommonErrors.VALIDATION, "processCode is required", Map.of(),
+                    List.of(new FieldError("processCode", "opskit.validation.required")));
         }
-        ai.neargo.opskit.process.api.model.SubjectRef subject = body.subject() == null ? null
-                : new ai.neargo.opskit.process.api.model.SubjectRef(body.subject().type(), body.subject().ref(), body.subject().display());
-        ai.neargo.opskit.process.api.model.InstanceView v = processes.start(actor, new ai.neargo.opskit.process.api.model.StartRequest(body.processCode(),
-                subject, body.fields(), body.participants(), body.scopes(), body.slaPolicies()));
+        java.util.Optional<ApprovalTemplate> template = templates.get(actor.tenant(), body.processCode());
+        boolean member = actor.app().isEmpty();
+        if (member) {
+            if (!actor.productPermissions().contains(Permission.APPROVAL_SUBMIT.code())) {
+                throw new OpsKitException(CommonErrors.PERMISSION_DENIED, "submitting approvals needs " + Permission.APPROVAL_SUBMIT.code());
+            }
+            if (template.isEmpty()) {
+                throw new OpsKitException(CommonErrors.PERMISSION_DENIED, "members can only start approval templates");
+            }
+        }
+        Map<String, Object> fields = body.fields() == null ? Map.of() : body.fields();
+        if (template.isPresent()) {
+            List<FieldError> errors = ApprovalTemplateCompiler.validateSubmission(template.get(), fields);
+            if (!errors.isEmpty()) {
+                throw new OpsKitException(CommonErrors.VALIDATION, "invalid submission", Map.of("code", body.processCode()), errors);
+            }
+        }
+        SubjectRef subject = body.subject() == null ? null : new SubjectRef(body.subject().type(), body.subject().ref(), body.subject().display());
+        InstanceView v = processes.start(actor, new StartRequest(body.processCode(), subject, fields, body.participants(), body.scopes(), body.slaPolicies()));
+        if (template.isPresent() && ApprovalTemplateCompiler.DRAFT.equals(v.status())) {
+            v = processes.transition(actor, v.instanceNo(), "submit", new TransitionRequest(Map.of(), null));
+        }
         return new Started(v.instanceNo(), v.processCode(), v.processVersion(), v.status(), v.statusCategory().name(), v.open(), v.seq(),
                 history.pendingApprovalNo(actor.tenant(), v.instanceNo()).orElse(null), v.createdAtMs());
     }

@@ -170,7 +170,7 @@ final class TicketFixture {
         dispatcher = new TicketDispatcher(taskClient, directory, ts.cursors(), ts.tickets(), events::add, (n, id, at) -> scheduled.add(n + "@" + id.encode()),
                 clock);
         tickets = new TicketAppService(definitions, ts.tickets(), ts.fieldIndex(), ts.scopes(), ts.comments(), processes, taskClient, dispatcher, ids, clock,
-                tx);
+                tx, events::add);
         ticketRef.set(tickets);
 
         defs.publish(app(), T.workspaceId(), desk(), null, "API");

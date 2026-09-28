@@ -17,6 +17,7 @@ public enum Permission {
     TICKET_ESCALATE("ticket:escalate"),
     TICKET_MERGE("ticket:merge"),
     TICKET_COMMENT_INTERNAL("ticket:comment:internal"),
+    APPROVAL_SUBMIT("approval:submit"),
     APPROVAL_DECIDE("approval:decide"),
     APPROVAL_VIEW_ALL("approval:view:all"),
     PROCESS_MANAGE("process:manage"),

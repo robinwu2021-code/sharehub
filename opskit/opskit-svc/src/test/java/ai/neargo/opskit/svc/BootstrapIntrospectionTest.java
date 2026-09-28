@@ -58,7 +58,7 @@ import tools.jackson.databind.ObjectMapper;
         "opskit.bootstrap.idps[0].claims.roles=roles",
         "opskit.bootstrap.idps[0].claims.perms=perms",
         "opskit.bootstrap.idps[0].claims.scopes=scopes",
-        "opskit.bootstrap.roles.ADMIN.permissions=approval:view:all,report:view,ticket:view:all",
+        "opskit.bootstrap.roles.ADMIN.permissions=approval:view:all,report:view,ticket:view:all,directory:manage",
         "opskit.bootstrap.roles.OPS.permissions=approval:decide,ticket:view:scoped",
         // 部署示例目录本身就是被测对象：示例改坏了这里红
         "opskit.bootstrap.definitions-dir=../../deploy/opskit/definitions.example",
@@ -151,7 +151,7 @@ class BootstrapIntrospectionTest {
         assertThat(me.status()).isEqualTo(200);
         assertThat(me.body().get("roles").valueStream().map(JsonNode::asText).toList()).containsExactly("ADMIN");
         assertThat(me.body().get("permissions").valueStream().map(JsonNode::asText).toList())
-                .containsExactlyInAnyOrder("approval:view:all", "report:view", "ticket:view:all");
+                .containsExactlyInAnyOrder("approval:view:all", "report:view", "ticket:view:all", "directory:manage");
         assertThat(me.body().get("externalPerms").valueStream().map(JsonNode::asText).toList()).containsExactly("flow:todo:read");
         assertThat(me.body().get("scopes").valueStream().map(JsonNode::asText).toList()).containsExactly("*");
 
@@ -283,5 +283,28 @@ class BootstrapIntrospectionTest {
             Thread.sleep(250);
         }
         throw new AssertionError("没收到 " + type + "（" + mustContain + "）；已收到 " + received.size() + " 条");
+    }
+
+    /** 目录同步只认应用凭证；同步进来的成员（没登录过）即可被查到 / 指派；组与属性定义可维护。 */
+    @Test
+    void hostSyncsTheDirectoryWithItsApplicationCredential() throws Exception {
+        java.util.Map<String, Object> batch = java.util.Map.of("mode", "MERGE",
+                "members", List.of(java.util.Map.of("externalRef", "AG-100", "displayName", "代理一百", "attrs", java.util.Map.of("partyType", "AGENT"),
+                        "scopes", List.of("agent:AG100"))),
+                "groups", List.of(java.util.Map.of("code", "agent_co_100", "name", java.util.Map.of("zh", "一百号代理公司"), "kind", "TEAM")),
+                "memberships", java.util.Map.of("agent_co_100", List.of("AG-100")));
+        assertThat(send("POST", WS + "/directory/sync", "stk_admin", null, batch).status()).as("成员令牌（哪怕持 directory:manage）不能灌目录").isEqualTo(403);
+        Res synced = send("POST", WS + "/directory/sync", APP, null, batch);
+        assertThat(synced.status()).isEqualTo(200);
+        assertThat(synced.body().get("members").asInt()).isEqualTo(1);
+
+        Res found = send("POST", WS + "/members/query", "stk_admin", null, java.util.Map.of("keyword", "代理一百"));
+        assertThat(found.body().get("total").asLong()).as("没登录过也在目录里").isEqualTo(1);
+
+        assertThat(send("PUT", WS + "/groups/night_ops", APP, null, java.util.Map.of("name", java.util.Map.of("zh", "夜班"), "kind", "QUEUE",
+                "claimTimeoutSec", 900)).status()).isEqualTo(200);
+        assertThat(send("PUT", WS + "/member-attributes/partyType", APP, null, java.util.Map.of("name", java.util.Map.of("zh", "身份"),
+                "valueLabels", java.util.Map.of("AGENT", java.util.Map.of("zh", "代理"), "STAFF", java.util.Map.of("zh", "员工")))).status()).isEqualTo(200);
+        assertThat(get(WS + "/member-attributes", "stk_admin").body().toString()).contains("partyType");
     }
 }

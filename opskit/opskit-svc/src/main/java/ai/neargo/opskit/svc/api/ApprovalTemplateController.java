@@ -51,7 +51,14 @@ public class ApprovalTemplateController {
     }
 
     /** PUT 的请求体 = 模板 + 可选 note；GET 的响应不带 note。 */
-    public record TemplateDto(String code, Map<String, String> name, List<StepDto> steps, RulesDto rules, String note) {
+    public record OptionDto(String code, Map<String, String> name) {
+    }
+
+    /** 发起表单字段；type：TEXT / TEXTAREA / NUMBER / DATE / SELECT。 */
+    public record FieldDto(String code, Map<String, String> name, String type, Boolean required, List<OptionDto> options) {
+    }
+
+    public record TemplateDto(String code, Map<String, String> name, List<StepDto> steps, RulesDto rules, String note, List<FieldDto> fields) {
     }
 
     public record SummaryDto(String code, String name, Map<String, String> names, String stepsSummary, String version, long running, boolean enabled,
@@ -135,7 +142,13 @@ public class ApprovalTemplateController {
         }
         ApprovalTemplate.Rules rules = d.rules() == null ? ApprovalTemplate.Rules.DEFAULT
                 : new ApprovalTemplate.Rules(Boolean.TRUE.equals(d.rules().selfApproval()), !Boolean.FALSE.equals(d.rules().crossStepExclusive()));
-        return new ApprovalTemplate(code, text(d.name()), steps, rules);
+        List<ApprovalTemplate.FormField> fields = new ArrayList<>();
+        for (FieldDto f : d.fields() == null ? List.<FieldDto>of() : d.fields()) {
+            fields.add(f == null ? null : new ApprovalTemplate.FormField(f.code(), text(f.name()), f.type(), Boolean.TRUE.equals(f.required()),
+                    f.options() == null ? List.of() : f.options().stream().map(o -> o == null ? null
+                            : new ApprovalTemplate.Option(o.code(), text(o.name()))).toList()));
+        }
+        return new ApprovalTemplate(code, text(d.name()), steps, rules, fields);
     }
 
     private static List<String> values(Object v, ApproverKind kind, int i, List<FieldError> shape) {
@@ -175,6 +188,8 @@ public class ApprovalTemplateController {
                 s.name() == null ? Map.of() : s.name().values(),
                 new ApproverDto(s.approver().kind().name(), s.approver().kind() == ApproverKind.MEMBER ? s.approver().values() : s.approver().values().get(0)),
                 s.mode(), s.when() == null ? null : new WhenDto(s.when().field(), s.when().op(), s.when().value()), s.dueHours())).toList(),
-                new RulesDto(t.rules().selfApproval(), t.rules().crossStepExclusive()), null);
+                new RulesDto(t.rules().selfApproval(), t.rules().crossStepExclusive()), null,
+                t.fields().stream().map(f -> new FieldDto(f.code(), f.name() == null ? Map.of() : f.name().values(), f.type(), f.required(),
+                        f.options().stream().map(o -> new OptionDto(o.code(), o.name() == null ? Map.of() : o.name().values())).toList())).toList());
     }
 }

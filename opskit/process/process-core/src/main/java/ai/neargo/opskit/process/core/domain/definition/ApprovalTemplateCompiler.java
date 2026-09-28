@@ -111,6 +111,97 @@ public final class ApprovalTemplateCompiler {
                 e.add(new FieldError(p + ".dueHours", "opskit.validation.out_of_range"));
             }
         }
+        validateForm(t.fields(), e);
+        return e;
+    }
+
+    public static final Set<String> FIELD_TYPES = Set.of("TEXT", "TEXTAREA", "NUMBER", "DATE", "SELECT");
+    private static final int MAX_FIELDS = 30;
+
+    private static void validateForm(List<ApprovalTemplate.FormField> fields, List<FieldError> e) {
+        if (fields.size() > MAX_FIELDS) {
+            e.add(new FieldError("fields", "opskit.validation.too_many"));
+        }
+        Set<String> codes = new HashSet<>();
+        for (int i = 0; i < fields.size(); i++) {
+            ApprovalTemplate.FormField f = fields.get(i);
+            String p = "fields[" + i + "]";
+            if (f == null) {
+                e.add(new FieldError(p, "opskit.validation.required"));
+                continue;
+            }
+            if (f.code() == null || !CODE.matcher(f.code()).matches()) {
+                e.add(new FieldError(p + ".code", "opskit.validation.code_format"));
+            } else if (!codes.add(f.code())) {
+                e.add(new FieldError(p + ".code", "opskit.validation.duplicate"));
+            }
+            if (blank(f.name())) {
+                e.add(new FieldError(p + ".name", "opskit.validation.required"));
+            }
+            if (!FIELD_TYPES.contains(f.type())) {
+                e.add(new FieldError(p + ".type", "opskit.validation.one_of"));
+            } else if ("SELECT".equals(f.type())) {
+                if (f.options().isEmpty()) {
+                    e.add(new FieldError(p + ".options", "opskit.validation.required"));
+                }
+                Set<String> oc = new HashSet<>();
+                for (int j = 0; j < f.options().size(); j++) {
+                    ApprovalTemplate.Option o = f.options().get(j);
+                    if (o == null || o.code() == null || o.code().isBlank()) {
+                        e.add(new FieldError(p + ".options[" + j + "].code", "opskit.validation.required"));
+                    } else if (!oc.add(o.code())) {
+                        e.add(new FieldError(p + ".options[" + j + "].code", "opskit.validation.duplicate"));
+                    }
+                }
+            } else if (!f.options().isEmpty()) {
+                e.add(new FieldError(p + ".options", "opskit.validation.invalid"));
+            }
+        }
+    }
+
+    /**
+     * 发起时按表单校验填的值：必填 · 类型 · 选项。错误路径 {@code fields.<代号>}。表单外的键原样放行（宿主可能带额外字段给条件用）。
+     */
+    public static List<FieldError> validateSubmission(ApprovalTemplate t, Map<String, Object> values) {
+        List<FieldError> e = new ArrayList<>();
+        for (ApprovalTemplate.FormField f : t.fields()) {
+            Object v = values.get(f.code());
+            String p = "fields." + f.code();
+            boolean empty = v == null || (v instanceof String str && str.isBlank());
+            if (empty) {
+                if (f.required()) {
+                    e.add(new FieldError(p, "opskit.validation.required"));
+                }
+                continue;
+            }
+            switch (f.type()) {
+                case "TEXT", "TEXTAREA" -> {
+                    if (!(v instanceof String str)) {
+                        e.add(new FieldError(p, "opskit.validation.invalid"));
+                    } else if (str.length() > ("TEXT".equals(f.type()) ? 200 : 4000)) {
+                        e.add(new FieldError(p, "opskit.validation.too_long"));
+                    }
+                }
+                case "NUMBER" -> {
+                    if (!(v instanceof Number)) {
+                        e.add(new FieldError(p, "opskit.validation.invalid"));
+                    }
+                }
+                case "DATE" -> {
+                    try {
+                        java.time.LocalDate.parse(String.valueOf(v));
+                    } catch (java.time.format.DateTimeParseException ex) {
+                        e.add(new FieldError(p, "opskit.validation.invalid"));
+                    }
+                }
+                case "SELECT" -> {
+                    if (f.options().stream().noneMatch(o -> o.code().equals(String.valueOf(v)))) {
+                        e.add(new FieldError(p, "opskit.validation.one_of"));
+                    }
+                }
+                default -> { }
+            }
+        }
         return e;
     }
 

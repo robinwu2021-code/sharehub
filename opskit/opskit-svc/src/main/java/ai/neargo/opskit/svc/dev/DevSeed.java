@@ -132,7 +132,8 @@ public class DevSeed {
         directory.upsertRole(app, ws, new RoleUpsert("auditor", Map.of("zh", "审计", "en", "Auditor"), Set.of("approval:view:all", "ticket:view:all")));
         directory.upsertRole(app, ws, new RoleUpsert("ticket-agent", Map.of("zh", "工单处理", "en", "Ticket agent"), Set.of("ticket:create", "ticket:view:all",
                 "ticket:work", "ticket:assign", "ticket:escalate", "ticket:merge", "ticket:comment:internal")));
-        directory.upsertRole(app, ws, new RoleUpsert("reporter", Map.of("zh", "报单人", "en", "Reporter"), Set.of("ticket:create", "ticket:view:own")));
+        directory.upsertRole(app, ws, new RoleUpsert("reporter", Map.of("zh", "报单人", "en", "Reporter"), Set.of("ticket:create", "ticket:view:own",
+                "approval:submit")));
         directory.upsertRole(app, ws, new RoleUpsert("flow-admin", Map.of("zh", "流程管理员", "en", "Flow admin"),
                 Set.of("process:manage", "sla:manage", "report:view", "approval:view:all", "directory:manage", "ticket-type:manage",
                 "ticket:view:all")));
@@ -157,7 +158,7 @@ public class DevSeed {
 
         Map<String, Persona> personas = new LinkedHashMap<>();
         personas.put("alice", persona(t, "u_alice", List.of(), List.of("site:A"), "第一步候选（角色 approver）· review-queue 组员 · 令牌带 site:A"));
-        personas.put("bob", persona(t, "u_bob", List.of(), List.of(), "提交人"));
+        personas.put("bob", persona(t, "u_bob", List.of(), List.of(), "提交人（approval:submit：可在运营台发起审批模板）"));
         personas.put("dave", persona(t, "u_dave", List.of(), List.of(), "finance 组员（会签）"));
         personas.put("erin", persona(t, "u_erin", List.of(), List.of(), "finance 组员（会签）"));
         personas.put("frank", persona(t, "u_frank", List.of(), List.of(), "review-queue 组员，领着一条任务"));

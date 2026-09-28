@@ -36,6 +36,39 @@ class TicketAppServiceTest {
 
     static final Actor BOB = member("mb_bob", Set.of(TicketAppService.CREATE), Set.of());
 
+    /** 工单事件（M5 回写用）：建单 · 每次状态变化 · 关单 · 公开评论；内部评论与去重附加不发。 */
+    @ParameterizedTest
+    @MethodSource("ai.neargo.opskit.commons.testing.TestDatabases#all")
+    void lifecycleEventsFollowStatusChangesAndPublicComments(TestDatabase db) {
+        TicketFixture f = new TicketFixture(db);
+        String no = f.tickets.create(BOB, req("D-EV", "P2")).ticket().ticketNo();
+        f.tickets.create(BOB, req("D-EV", "P2")); // 去重附加：不算新建
+        f.tickets.transition(BOB, no, "accept", null, null);
+        f.tickets.comment(BOB, no, "已派师傅", "PUBLIC", List.of());
+        f.tickets.comment(app(), no, "内部：备件缺货", "INTERNAL", List.of());
+        f.tickets.transition(BOB, no, "finish", "换了屏", "FIXED");
+
+        List<ai.neargo.opskit.ticket.api.event.TicketEvent> evs = f.events.stream()
+                .filter(e -> e instanceof ai.neargo.opskit.ticket.api.event.TicketEvent).map(e -> (ai.neargo.opskit.ticket.api.event.TicketEvent) e).toList();
+        assertThat(evs).extracting(e -> e.eventType()).containsExactly("ticket.created", "ticket.transitioned", "ticket.commented",
+                "ticket.transitioned", "ticket.closed");
+        ai.neargo.opskit.ticket.api.event.TicketEvent accepted = evs.get(1);
+        assertThat(accepted.transition()).isEqualTo("accept");
+        assertThat(accepted.from()).isEqualTo("new");
+        assertThat(accepted.status()).isEqualTo("doing");
+        assertThat(accepted.actor()).isEqualTo("member:mb_bob");
+        assertThat(accepted.seq()).isGreaterThan(evs.get(0).seq());
+        assertThat(evs.get(2).body()).isEqualTo("已派师傅");
+        ai.neargo.opskit.ticket.api.event.TicketEvent closed = evs.get(4);
+        assertThat(closed.open()).isFalse();
+        assertThat(closed.resolution()).isEqualTo("FIXED");
+        assertThat(closed.idemKey()).isEqualTo(evs.get(3).idemKey()).as("同一次迁移：类型不同、幂等键相同");
+        assertThat(evs).allSatisfy(e -> {
+            assertThat(e.subjectType()).isEqualTo("ticket");
+            assertThat(e.subjectRef()).isEqualTo(no);
+        });
+    }
+
     static CreateTicketRequest req(String device, String priority) {
         return new CreateTicketRequest("repair", "扫码没反应", "柜机屏幕无响应", fields("S1", device), priority, null, Set.of("region:east"), null);
     }

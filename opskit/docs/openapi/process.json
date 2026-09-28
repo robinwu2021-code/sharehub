@@ -250,6 +250,32 @@
         },
         "type" : "object"
       },
+      "FieldDto" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "options" : {
+            "items" : {
+              "$ref" : "#/components/schemas/OptionDto"
+            },
+            "type" : "array"
+          },
+          "required" : {
+            "type" : "boolean"
+          },
+          "type" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "FieldItem" : {
         "properties" : {
           "code" : {
@@ -447,6 +473,20 @@
             "type" : "string"
           },
           "names" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          }
+        },
+        "type" : "object"
+      },
+      "OptionDto" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
             "additionalProperties" : {
               "type" : "string"
             },
@@ -1155,6 +1195,12 @@
         "properties" : {
           "code" : {
             "type" : "string"
+          },
+          "fields" : {
+            "items" : {
+              "$ref" : "#/components/schemas/FieldDto"
+            },
+            "type" : "array"
           },
           "name" : {
             "additionalProperties" : {
@@ -2047,6 +2093,39 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/PublishDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "process-definition-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/processes/{code}/definition" : {
+      "get" : {
+        "operationId" : "definition_3",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "string"
                 }
               }
             },
@@ -3020,6 +3099,39 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/PublishDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "process-definition-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/processes/{code}/definition" : {
+      "get" : {
+        "operationId" : "definition_2",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "string"
                 }
               }
             },

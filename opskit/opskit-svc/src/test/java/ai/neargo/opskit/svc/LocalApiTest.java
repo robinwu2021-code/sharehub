@@ -306,4 +306,54 @@ class LocalApiTest {
         assertThat(t.body().get("created").asBoolean()).isTrue();
         assertThat(call("GET", WS + "/ticket-types", admin, null).body().toString()).contains("http_repair");
     }
+
+    /** 运营台「发起审批」：成员只能发起审批模板（需 approval:submit），按模板发起表单校验，发起即提交进入审批。 */
+    @Test
+    void membersSubmitApprovalTemplatesThroughTheirForm() throws Exception {
+        String admin = token("admin");
+        Map<String, Object> tpl = Map.of("name", Map.of("zh", "请假"), "steps", List.of(Map.of("code", "mgr", "name", Map.of("zh", "主管"),
+                        "approver", Map.of("kind", "ROLE", "value", "approver"), "mode", "ANY")),
+                "fields", List.of(Map.of("code", "days", "name", Map.of("zh", "天数"), "type", "NUMBER", "required", true),
+                        Map.of("code", "kind", "name", Map.of("zh", "类型"), "type", "SELECT", "required", true,
+                                "options", List.of(Map.of("code", "ANNUAL", "name", Map.of("zh", "年假")), Map.of("code", "SICK", "name", Map.of("zh", "病假"))))));
+        assertThat(call("PUT", WS + "/approval-templates/leave_req", admin, tpl).status()).isEqualTo(200);
+        Res got = call("GET", WS + "/approval-templates/leave_req", admin, null);
+        assertThat(got.body().get("fields").size()).as("模板带回发起表单").isEqualTo(2);
+
+        String bob = token("bob");
+        Res bad = call("POST", WS + "/instances", bob, Map.of("processCode", "leave_req", "fields", Map.of("days", "三", "kind", "OTHER")));
+        assertThat(bad.status()).isEqualTo(422);
+        assertThat(bad.body().toString()).contains("fields.days").contains("fields.kind");
+        assertThat(call("POST", WS + "/instances", bob, Map.of("processCode", "leave_req", "fields", Map.of("kind", "SICK"))).body().toString())
+                .as("必填").contains("fields.days");
+        assertThat(call("POST", WS + "/instances", token("viewer"), Map.of("processCode", "leave_req", "fields", Map.of("days", 2, "kind", "SICK")))
+                .status()).as("没有 approval:submit").isEqualTo(403);
+        assertThat(call("POST", WS + "/instances", bob, Map.of("processCode", "repair_flow")).status()).as("成员不能直接发起非模板流程").isEqualTo(403);
+
+        Res ok = call("POST", WS + "/instances", bob, Map.of("processCode", "leave_req", "fields", Map.of("days", 2, "kind", "SICK")));
+        assertThat(ok.status()).isEqualTo(200);
+        assertThat(ok.body().get("status").asText()).as("发起即提交").isEqualTo("reviewing");
+        assertThat(ok.body().get("approvalNo").asText()).isNotBlank();
+    }
+
+    /** 配置界面：取回原始定义（与 PUT 同形），原样提交不出新版本；无管理权限 403。 */
+    @Test
+    void rawDefinitionsRoundTripUnchanged() throws Exception {
+        String admin = token("admin");
+        HttpResponse<String> r = http.send(HttpRequest.newBuilder(URI.create(WS + "/ticket-types/repair/definition")).header("Authorization", "Bearer " + admin)
+                .GET().build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(r.statusCode()).isEqualTo(200);
+        JsonNode def = json.readTree(r.body());
+        assertThat(def.get("name").get("ar").asText()).as("三语原值").isNotBlank();
+        assertThat(def.get("assignment").get("strategy").asText()).isEqualTo("QUEUE");
+        Res again = call("PUT", WS + "/ticket-types/repair", admin, json.convertValue(def, Map.class));
+        assertThat(again.status()).isEqualTo(200);
+        assertThat(again.body().get("created").asBoolean()).as("原样提交不出新版本").isFalse();
+        assertThat(again.body().get("version").asText()).isEqualTo(r.headers().firstValue("X-Definition-Version").orElseThrow());
+
+        HttpResponse<String> flow = http.send(HttpRequest.newBuilder(URI.create(WS + "/processes/repair_flow/definition"))
+                .header("Authorization", "Bearer " + admin).GET().build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(call("PUT", WS + "/processes/repair_flow", admin, json.readValue(flow.body(), Map.class)).body().get("created").asBoolean()).isFalse();
+        assertThat(call("GET", WS + "/ticket-types/repair/definition", token("bob"), null).status()).isEqualTo(403);
+    }
 }

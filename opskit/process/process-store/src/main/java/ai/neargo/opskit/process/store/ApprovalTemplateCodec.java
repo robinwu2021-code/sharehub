@@ -49,6 +49,25 @@ public final class ApprovalTemplateCodec {
             steps.add(sm);
         }
         m.put("steps", steps);
+        // 只在有表单时写：没有表单的旧模板 JSON 与版本哈希保持不变
+        if (!t.fields().isEmpty()) {
+            m.put("fields", t.fields().stream().map(f -> {
+                Map<String, Object> fm = new TreeMap<>();
+                fm.put("code", f.code());
+                fm.put("name", text(f.name()));
+                fm.put("type", f.type());
+                fm.put("required", f.required());
+                if (!f.options().isEmpty()) {
+                    fm.put("options", f.options().stream().map(o -> {
+                        Map<String, Object> om = new TreeMap<>();
+                        om.put("code", o.code());
+                        om.put("name", text(o.name()));
+                        return om;
+                    }).toList());
+                }
+                return fm;
+            }).toList());
+        }
         return JSON.writeValueAsString(m);
     }
 
@@ -66,8 +85,19 @@ public final class ApprovalTemplateCodec {
                     s.get("dueHours") == null ? null : ((Number) s.get("dueHours")).intValue()));
         }
         Map<String, Object> r = (Map<String, Object>) m.get("rules");
+        List<ApprovalTemplate.FormField> fields = new ArrayList<>();
+        for (Object o : (List<Object>) m.getOrDefault("fields", List.of())) {
+            Map<String, Object> f = (Map<String, Object>) o;
+            List<ApprovalTemplate.Option> options = new ArrayList<>();
+            for (Object x : (List<Object>) f.getOrDefault("options", List.of())) {
+                Map<String, Object> om = (Map<String, Object>) x;
+                options.add(new ApprovalTemplate.Option((String) om.get("code"), readText(om.get("name"))));
+            }
+            fields.add(new ApprovalTemplate.FormField((String) f.get("code"), readText(f.get("name")), (String) f.get("type"),
+                    Boolean.TRUE.equals(f.get("required")), options));
+        }
         return new ApprovalTemplate((String) m.get("code"), readText(m.get("name")), steps,
-                new ApprovalTemplate.Rules(Boolean.TRUE.equals(r.get("selfApproval")), Boolean.TRUE.equals(r.get("crossStepExclusive"))));
+                new ApprovalTemplate.Rules(Boolean.TRUE.equals(r.get("selfApproval")), Boolean.TRUE.equals(r.get("crossStepExclusive"))), fields);
     }
 
     private static Map<String, String> text(LocalizedText t) {

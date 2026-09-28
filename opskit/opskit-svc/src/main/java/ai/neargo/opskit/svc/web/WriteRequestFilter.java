@@ -39,6 +39,8 @@ public class WriteRequestFilter extends OncePerRequestFilter {
     static final String IDEM_CLAIM = WriteRequestFilter.class.getName() + ".idem";
     static final String IDEM_HEADER = "Idempotency-Key";
     static final int MAX_BODY = 1024 * 1024;
+    /** 目录全量同步一批可能有上万成员：放宽到 16 MiB（仍建议宿主分批，见 21/06 §三）。 */
+    static final int MAX_SYNC_BODY = 16 * 1024 * 1024;
     private static final Set<String> WRITES = Set.of("POST", "PUT", "PATCH", "DELETE");
 
     private final IdempotencyStore idempotency;
@@ -55,11 +57,12 @@ public class WriteRequestFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res, FilterChain chain) throws ServletException, IOException {
-        byte[] body = req.getInputStream().readNBytes(MAX_BODY + 1);
-        if (body.length > MAX_BODY) {
+        int max = req.getRequestURI().endsWith("/directory/sync") ? MAX_SYNC_BODY : MAX_BODY;
+        byte[] body = req.getInputStream().readNBytes(max + 1);
+        if (body.length > max) {
             res.setStatus(413);
             res.setContentType("application/json");
-            res.getWriter().write("{\"error\":\"opskit.bad_request\",\"message\":\"request body exceeds 1 MiB\"}");
+            res.getWriter().write("{\"error\":\"opskit.bad_request\",\"message\":\"request body too large\"}");
             return;
         }
         CachedBodyRequest wrapped = new CachedBodyRequest(req, body);

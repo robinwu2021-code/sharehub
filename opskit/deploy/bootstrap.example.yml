@@ -30,7 +30,7 @@ opskit:
       # 令牌 roles 声明里的代号 → 产品权限（完整清单见 21/02 §权限）
       ADMIN:
         name: {zh: 管理员, en: Admin}
-        permissions: [approval:decide, approval:view:all, ticket:create, ticket:view:all, ticket:work, ticket:assign, ticket:escalate,
+        permissions: [approval:submit, approval:decide, approval:view:all, ticket:create, ticket:view:all, ticket:work, ticket:assign, ticket:escalate,
                       ticket:merge, ticket:comment:internal, process:manage, ticket-type:manage, sla:manage, report:view, directory:manage]
       AGENT:
         name: {zh: 处理人, en: Agent}

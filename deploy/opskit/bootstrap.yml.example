@@ -51,22 +51,22 @@ opskit:
     roles:
       ADMIN:
         name: {zh: 管理员, en: Admin}
-        permissions: [approval:decide, approval:view:all, ticket:create, ticket:view:own, ticket:view:scoped, ticket:view:all, ticket:work,
+        permissions: [approval:submit, approval:decide, approval:view:all, ticket:create, ticket:view:own, ticket:view:scoped, ticket:view:all, ticket:work,
                       ticket:assign, ticket:escalate, ticket:merge, ticket:comment:internal, process:manage, ticket-type:manage, sla:manage,
                       report:view, directory:manage]
       OPS:
         name: {zh: 运营, en: Ops}
-        permissions: [approval:decide, approval:view:all, ticket:create, ticket:view:scoped, ticket:work, ticket:assign, ticket:escalate,
+        permissions: [approval:submit, approval:decide, approval:view:all, ticket:create, ticket:view:scoped, ticket:work, ticket:assign, ticket:escalate,
                       ticket:merge, ticket:comment:internal, sla:manage]
       CS:
         name: {zh: 客服, en: Customer service}
-        permissions: [approval:decide, approval:view:all, ticket:create, ticket:view:scoped, ticket:work, ticket:comment:internal]
+        permissions: [approval:submit, approval:decide, approval:view:all, ticket:create, ticket:view:scoped, ticket:work, ticket:comment:internal]
       FINANCE:
         name: {zh: 财务, en: Finance}
-        permissions: [approval:decide, approval:view:all]
+        permissions: [approval:submit, approval:decide, approval:view:all]
       BD:
         name: {zh: 商务, en: BD}
-        permissions: [approval:view:all]
+        permissions: [approval:submit, approval:view:all]
       VIEWER:
         name: {zh: 只读, en: Viewer}
         permissions: [approval:view:all, ticket:view:scoped]

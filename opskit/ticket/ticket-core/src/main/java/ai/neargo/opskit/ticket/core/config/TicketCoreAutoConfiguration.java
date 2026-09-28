@@ -54,8 +54,8 @@ public class TicketCoreAutoConfiguration {
 
     @Bean
     TicketAppService ticketAppService(TicketDefinitionAppService defs, TicketStore s, ProcessClient processes, TaskClient tasks, TicketDispatcher dispatcher,
-            BizNoGenerator ids, Clock clock, TransactionOperations tx) {
-        return new TicketAppService(defs, s.tickets(), s.fieldIndex(), s.scopes(), s.comments(), processes, tasks, dispatcher, ids, clock, tx);
+            BizNoGenerator ids, Clock clock, TransactionOperations tx, EventPublisher events) {
+        return new TicketAppService(defs, s.tickets(), s.fieldIndex(), s.scopes(), s.comments(), processes, tasks, dispatcher, ids, clock, tx, events);
     }
 
     @Bean
