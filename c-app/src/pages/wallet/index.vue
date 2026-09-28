@@ -105,7 +105,7 @@ async function recharge(p: RechargePackage) {
             <view class="pb-txn__chip"><pb-icon :name="txnIcon[x.type]" :size="34" /></view>
             <view class="flex-1">
               <text class="text-[28rpx] font-semibold text-ink">{{ x.title }}</text>
-              <view class="mt-[4rpx] text-[22rpx] text-sub">{{ $t("wallet." + x.type) }} · {{ dateTimeOf(x.createdAt) }}</view>
+              <view class="mt-[4rpx] text-[22rpx] text-sub">{{ $t("wallet." + x.type) }} · <text class="pb-ltr">{{ dateTimeOf(x.createdAt) }}</text></view>
             </view>
             <text class="pb-num text-[30rpx] font-extrabold" :class="x.amount >= 0 ? 'text-success' : 'text-ink'">
               {{ x.amount >= 0 ? "+" : "-" }}{{ money(Math.abs(x.amount)) }}

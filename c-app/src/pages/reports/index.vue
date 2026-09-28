@@ -13,6 +13,7 @@ import { ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { api } from "@/api";
 import type { CsTicket } from "@/types";
+import { stampOf } from "@/shared/format";
 
 const list = ref<CsTicket[]>([]);
 const loading = ref(true);
@@ -47,7 +48,7 @@ onShow(load);
         <view class="flex items-start justify-between">
           <view class="flex-1">
             <text class="text-[29rpx] font-bold text-ink">{{ k.issue || k.ticketNo }}</text>
-            <view class="mt-[6rpx] text-[22rpx] text-sub">{{ k.ticketNo }} · {{ k.createdAt }}</view>
+            <view class="mt-[6rpx] text-[22rpx] text-sub"><text class="pb-ltr">{{ k.ticketNo }}</text> · <text class="pb-ltr">{{ stampOf(k.createdAt) }}</text></view>
           </view>
           <pb-tag :type="tagType[k.status]">{{ $t("reports." + k.status) }}</pb-tag>
         </view>

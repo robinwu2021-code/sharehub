@@ -2,13 +2,17 @@
 // 外观选择器（底部弹层）：皮肤(色) + 明暗(风格) + 语言(中/英/阿)。选中即时全局生效（实时预览）。
 import { useThemeStore } from "@/stores/theme";
 import { useAppStore } from "@/stores/app";
-import { SKINS, MODES } from "@/design/tokens";
+import { SKINS, MODES, type SkinDef } from "@/design/tokens";
 import { LANGS } from "@/shared/constants";
 
 defineProps<{ visible: boolean }>();
 const emit = defineEmits<{ (e: "update:visible", v: boolean): void }>();
 const theme = useThemeStore();
 const app = useAppStore();
+// 暗色下画该皮肤在暗色里真正的主色 —— 所见即所得，也不会在深底上画一个看不见的黑点（真机实测）
+function swatchColor(s: SkinDef) {
+  return theme.isDark && s.colorDark ? s.colorDark : s.color;
+}
 function close() {
   emit("update:visible", false);
 }
@@ -30,8 +34,8 @@ function close() {
           :class="{ 'is-on': theme.skin === s.id }"
           @tap="theme.setSkin(s.id)"
         >
-          <view class="pb-swatch__dot" :style="{ background: s.color }">
-            <text v-if="theme.skin === s.id" class="pb-swatch__tick">✓</text>
+          <view class="pb-swatch__dot" :style="{ background: swatchColor(s) }">
+            <text v-if="theme.skin === s.id" class="pb-swatch__tick" :class="{ 'is-dark': theme.isDark && s.colorDark }">✓</text>
           </view>
           <text class="pb-swatch__name">{{ s.label[app.lang] }}</text>
         </view>
@@ -88,6 +92,7 @@ function close() {
 .pb-swatch__dot { width: 88rpx; height: 88rpx; border-radius: 9999px; display: flex; align-items: center; justify-content: center; }
 .pb-swatch.is-on .pb-swatch__dot { box-shadow: 0 0 0 6rpx var(--pb-surface), 0 0 0 12rpx var(--pb-primary); }
 .pb-swatch__tick { color: #fff; font-size: 40rpx; font-weight: 700; }
+.pb-swatch__tick.is-dark { color: var(--pb-on-primary); }
 .pb-swatch__name { font-size: 24rpx; color: var(--pb-ink); }
 .pb-opts { display: flex; gap: 16rpx; }
 .pb-opts__item {

@@ -36,6 +36,7 @@ export default {
     scanTip: "Point at the QR code on the cabinet",
     cameraDenied: "No camera access. You can enter the code instead.",
     enterCabinet: "Enter code",
+    torch: "Flashlight",
     enterCabinetHint: "The number is printed on the cabinet",
     cabinetNoPlaceholder: "e.g. CAB1011",
     nearby: "Nearby stations",

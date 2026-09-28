@@ -22,6 +22,7 @@ import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
 import { api } from "@/api";
 import type { Notice, MessageItem } from "@/types";
+import { stampOf } from "@/shared/format";
 
 const { t } = useI18n();
 const app = useAppStore();
@@ -109,7 +110,7 @@ async function open(m: MessageItem) {
           <view v-if="!m.read" class="pb-dot-red" />
         </view>
         <text class="mt-[12rpx] block text-[26rpx] text-sub" style="line-height: 1.6">{{ messageBody(m) }}</text>
-        <text class="mt-[14rpx] block text-[22rpx] text-sub">{{ m.createdAt }}</text>
+        <view class="mt-[14rpx] text-[22rpx] text-sub"><text class="pb-ltr">{{ stampOf(m.createdAt) }}</text></view>
       </pb-card>
       <pb-empty v-if="!loading && !messages.length" icon="bell" :text="$t('notice.noMessages')" />
     </view>
@@ -122,7 +123,7 @@ async function open(m: MessageItem) {
           <text class="text-[30rpx] font-bold text-ink">{{ noticeTitle(n) }}</text>
         </view>
         <text class="mt-[12rpx] block text-[26rpx] text-sub" style="line-height: 1.6">{{ noticeBody(n) }}</text>
-        <text class="mt-[14rpx] block text-[22rpx] text-sub">{{ n.createdAt }}</text>
+        <view class="mt-[14rpx] text-[22rpx] text-sub"><text class="pb-ltr">{{ stampOf(n.createdAt) }}</text></view>
       </pb-card>
       <pb-empty v-if="!loading && !notices.length" icon="bell" :text="$t('notice.noNotices')" />
     </view>

@@ -36,6 +36,7 @@ export default {
     scanTip: "把柜机上的二维码放进框内",
     cameraDenied: "没有相机权限，可改用输入编号",
     enterCabinet: "输入编号",
+    torch: "手电筒",
     enterCabinetHint: "柜机机身上印着编号，照着输入即可",
     cabinetNoPlaceholder: "例如 CAB1011",
     nearby: "附近门店",

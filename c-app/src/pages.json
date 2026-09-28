@@ -14,6 +14,7 @@
     { "path": "pages/login/index" },
     { "path": "pages/auth/forgot" },
     { "path": "pages/auth/register" },
+    { "path": "pages/scan/index" },
     { "path": "pages/order/confirm" },
     { "path": "pages/order/detail" },
     { "path": "pages/order/feedback" },

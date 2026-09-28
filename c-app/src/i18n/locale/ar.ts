@@ -36,6 +36,7 @@ export default {
     scanTip: "وجّه الكاميرا إلى رمز QR على الخزانة",
     cameraDenied: "لا يوجد إذن للكاميرا، يمكنك إدخال الرقم",
     enterCabinet: "أدخل الرقم",
+    torch: "المصباح",
     enterCabinetHint: "الرقم مطبوع على الخزانة",
     cabinetNoPlaceholder: "مثال: CAB1011",
     nearby: "المحطات القريبة",

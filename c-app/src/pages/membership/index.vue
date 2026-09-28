@@ -4,6 +4,7 @@ import { onShow } from "@dcloudio/uni-app";
 import { api } from "@/api";
 import { t } from "@/i18n";
 import type { MembershipPlan } from "@/types";
+import { stampOf } from "@/shared/format";
 
 const list = ref<MembershipPlan[]>([]);
 const loading = ref(true);
@@ -85,7 +86,7 @@ function buy(_m: MembershipPlan) {
           </view>
         </view>
         <view v-if="m.active && m.expireAt" class="mt-[18rpx] text-[22rpx] text-sub">
-          {{ $t("member.validTo") }} {{ m.expireAt }}
+          {{ $t("member.validTo") }} <text class="pb-ltr">{{ stampOf(m.expireAt) }}</text>
         </view>
         <view class="mt-[28rpx]">
           <pb-button block :type="m.active ? 'tonal' : 'primary'" @click="buy(m)">

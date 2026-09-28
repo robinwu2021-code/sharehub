@@ -13,11 +13,13 @@ export interface Labeled {
 export interface SkinDef {
   id: SkinId;
   color: string; // 选择器上的预览色（= light 下主色）
+  /** 暗色下的主色（与 App.vue 暗色块一致）。不给 = 与 color 相同。黑白灰在暗色下主色是浅灰，色块照原色画就是深底上一个黑点，看不见 */
+  colorDark?: string;
   label: Labeled;
 }
 
 export const SKINS: SkinDef[] = [
-  { id: "mono", color: "#18181B", label: { zh: "黑白灰", en: "Mono", ar: "رمادي" } },
+  { id: "mono", color: "#18181B", colorDark: "#F2F4F7", label: { zh: "黑白灰", en: "Mono", ar: "رمادي" } },
   { id: "blue", color: "#2F6BFF", label: { zh: "时尚蓝", en: "Blue", ar: "أزرق" } },
   { id: "purple", color: "#7C3AED", label: { zh: "科幻紫", en: "Purple", ar: "بنفسجي" } },
 ];

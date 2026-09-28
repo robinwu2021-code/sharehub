@@ -14,7 +14,7 @@ import { onShow } from "@dcloudio/uni-app";
 import { useI18n } from "vue-i18n";
 import { api } from "@/api";
 import type { UserCoupon, ClaimableCoupon } from "@/types";
-import { money } from "@/shared/format";
+import { money, stampOf } from "@/shared/format";
 
 const { t } = useI18n();
 const tab = ref("center");
@@ -150,7 +150,8 @@ async function claim(c: ClaimableCoupon) {
               而 expired() 把空当「不限期」。无条件拼「有效期至 」会渲染成一句没有日期的残句。
             -->
             <view class="mt-[4rpx] text-[22rpx] text-sub">
-              {{ c.expireAt ? $t("coupon.validTo") + " " + c.expireAt : $t("coupon.noExpiry") }}
+              <template v-if="c.expireAt">{{ $t("coupon.validTo") }} <text class="pb-ltr">{{ stampOf(c.expireAt) }}</text></template>
+              <template v-else>{{ $t("coupon.noExpiry") }}</template>
             </view>
           </view>
           <pb-tag :type="tagType[c.status]">{{ $t(statusKey[c.status]) }}</pb-tag>

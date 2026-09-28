@@ -1,5 +1,22 @@
-// 扫码端能力：App uni.scanCode / 小程序微信扫一扫（uni API 统一）。解析柜机号。
+// 扫码端能力：App 自有扫码页（pages/scan）/ 小程序微信扫一扫。解析柜机号。
+//
+// reject 的 message：含 "cancel" = 用户返回（调用方静默）；"manual" = 用户点了「输入编号」（调用方打开输入框）。
 export function scanCabinet(): Promise<string> {
+  // #ifdef APP-PLUS
+  // 不用 uni.scanCode：它的扫码界面语言跟系统走、不跟 App 走，也没有输入编号的兜底（见 pages/scan）
+  return new Promise((resolve, reject) => {
+    uni.navigateTo({
+      url: "/pages/scan/index",
+      events: {
+        result: (raw: string) => resolve(parseCabinetNo(raw)),
+        manual: () => reject(new Error("manual")),
+        cancel: () => reject(new Error("scan cancelled")),
+      },
+      fail: (e) => reject(new Error(e.errMsg || "scan page failed")),
+    });
+  });
+  // #endif
+  // eslint-disable-next-line no-unreachable
   return new Promise((resolve, reject) => {
     uni.scanCode({
       scanType: ["qrCode"],
