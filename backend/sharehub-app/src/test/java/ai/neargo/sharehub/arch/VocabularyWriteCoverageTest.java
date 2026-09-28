@@ -164,8 +164,18 @@ class VocabularyWriteCoverageTest {
              * 本条卡口当场抓到的第一个「新列」：stl_withdrawal.approval_state（另一会话的 V143，
              * 提现接 OpsKit 审批）。这正是它要守的形状 —— 列加上了、谁都没想起写入侧。
              * 查证后归入「服务端全权」：WithdrawalServiceImpl 与 WithdrawalApprovalOutcome
-             * 里全部写 WithdrawalApprovalState.*.name() 常量，申请入参 WithdrawApplyReq
+             * 里全部写 WithdrawalApprovalState.*.name() 常量或 null，申请入参 WithdrawApplyReq
              * 不含这个字段，前端传不了。
+             *
+             * <p><b>⚠️ 这个结论有一个前提，写在这里以免它哪天悄悄失效</b>：
+             * 这一列的值来自 OpsKit 的审批回调，而回调体里带的是 {@code result}
+             * （APPROVED / REJECTED / WITHDRAWN），<b>不是 approval_state 的取值</b>。
+             * 接收端必须把 {@code result} 映射成枚举常量再写库 —— 一旦有人图省事把
+             * webhook 里的字符串原样 {@code setApprovalState(d.result())}，
+             * 「服务端全权」就不成立了，这一行要从 COVERED 挪回台账并接上校验。
+             * 2026-09-28 复核过：{@code onCompleted} 的分支走的是 {@code d.approved()}
+             * 这个布尔，{@code d.result()} 只参与 {@code "WITHDRAWN".equals(...)} 挑措辞，
+             * 没有进过这一列。
              */
             "stl_withdrawal.approval_state"));
 
