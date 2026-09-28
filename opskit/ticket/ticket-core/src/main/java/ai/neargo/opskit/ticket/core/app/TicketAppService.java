@@ -515,6 +515,12 @@ public class TicketAppService {
         throw notFound();
     }
 
+    /** 行 → 视图（列表用；可见性由调用方的查询判过）。 */
+    @SystemAction("列表渲染内部调用：可见性已在查询里判定")
+    public TicketView viewOf(TenantContext t, TicketDao.Row r) {
+        return view(t, r);
+    }
+
     private TicketView view(TenantContext t, TicketDao.Row r) {
         return new TicketView(r.ticketNo(), r.typeCode(), r.typeVersion(), r.instanceNo(), r.title(), r.description(), r.priority(), r.priorityOrd(),
                 r.resolution(), r.fields(), r.requester(), r.assignee(), r.status(), r.statusCategory(), r.open(), r.slaState(), r.slaNextDueAtMs(),

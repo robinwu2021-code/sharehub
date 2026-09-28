@@ -98,12 +98,16 @@ final class TicketFixture {
     final SlaTracker sla;
     final TicketDefinitionAppService definitions;
     final TicketAppService tickets;
+    final TicketStore ticketStore;
+    final DirectoryClient directory;
     final ai.neargo.opskit.process.client.TaskClient taskClient;
     final TicketDispatcher dispatcher;
     /** 组 → 成员 ID（轮转 / 最少负载派单用），测试里可改。 */
     final Map<String, List<String>> groups = new java.util.concurrent.ConcurrentHashMap<>();
     final List<ai.neargo.opskit.commons.event.DomainEvent> events = new java.util.concurrent.CopyOnWriteArrayList<>();
     final List<String> scheduled = new java.util.concurrent.CopyOnWriteArrayList<>();
+    /** 「属性=值,值」→ 成员 ID（按受理方属性筛的替身），测试里可改。 */
+    java.util.function.Function<String, List<String>> attrMembers = k -> List.of();
 
     TicketFixture(TestDatabase db) {
         ProcessMigrations.migrate(db.dataSource());
@@ -112,6 +116,7 @@ final class TicketFixture {
         tx = new TransactionTemplate(new DataSourceTransactionManager(db.dataSource()));
         ProcessStore ps = ProcessStore.create(db.dataSource());
         TicketStore ts = TicketStore.create(db.dataSource());
+        ticketStore = ts;
         AuditRecorder audit = (a, ws, action, target, detail) -> { };
         BizNoGenerator ids = new BizNoGenerator(clock);
         Directory dir = new Directory() {
@@ -139,7 +144,7 @@ final class TicketFixture {
                 List.of(tasks, approvals, gates, sla, new ObserverHook(observers)), Optional.of(tasks), e -> { }, ids, clock, tx);
         instRef.set(instances);
         processes = new EmbeddedProcessClient(instances, defs, policies, sla, ps.logs());
-        DirectoryClient directory = new DirectoryClient() {
+        directory = new DirectoryClient() {
             @Override
             public Optional<GroupView> findGroup(TenantContext t, String code) {
                 return Optional.of(new GroupView(t.workspaceId().value(), code, Map.of(), GroupKind.QUEUE, null, null, DirectorySource.SYNC));
@@ -148,6 +153,11 @@ final class TicketFixture {
             @Override
             public List<String> membersOf(TenantContext t, String g) {
                 return groups.getOrDefault(g, List.of());
+            }
+
+            @Override
+            public List<String> membersWithAttr(TenantContext t, String key, Collection<String> values, int limit) {
+                return attrMembers.apply(key + "=" + String.join(",", values));
             }
 
             @Override

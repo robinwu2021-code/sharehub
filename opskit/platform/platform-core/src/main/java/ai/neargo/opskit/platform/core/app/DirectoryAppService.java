@@ -286,6 +286,25 @@ public class DirectoryAppService {
         return Page.of(members.query(ws, kw, grp, page.offset(), page.size()).stream().map(DirectoryAppService::toView).toList(), total, page);
     }
 
+    /**
+     * 属性值落在给定集合里的 ACTIVE 成员 ID（按受理方属性筛工单）。属性是 JSON 列，各库取值语法不同，所以在内存里筛；
+     * 超过 {@code limit} 时返回 {@code limit + 1} 条，由调用方判「范围太宽」。
+     */
+    @SystemAction("上层模块内部调用：列表筛选")
+    public List<String> membersWithAttr(TenantContext t, String key, java.util.Collection<String> values, int limit) {
+        List<String> out = new ArrayList<>();
+        for (var e : members.activeAttrs(t.workspaceId())) {
+            Object v = e.getValue().get(key);
+            if (v != null && values.contains(String.valueOf(v))) {
+                out.add(e.getKey());
+                if (out.size() > limit) {
+                    break;
+                }
+            }
+        }
+        return out;
+    }
+
     /** 成员 ID → 显示名（列表补 displayName）；查不到或未设显示名的不在结果里。 */
     @SystemAction("列表渲染内部调用")
     public Map<String, String> displayNames(TenantContext t, java.util.Collection<String> memberIds) {

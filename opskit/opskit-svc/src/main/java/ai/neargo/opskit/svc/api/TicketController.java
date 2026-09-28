@@ -26,6 +26,8 @@ import ai.neargo.opskit.ticket.api.model.TicketView;
 import ai.neargo.opskit.ticket.api.model.UpdateTicketRequest;
 import ai.neargo.opskit.ticket.core.app.TicketAppService;
 import ai.neargo.opskit.ticket.core.app.TicketDefinitionAppService;
+import ai.neargo.opskit.ticket.core.app.TicketQueryService;
+import ai.neargo.opskit.ticket.api.model.TicketQuery;
 import ai.neargo.opskit.svc.api.Present.Named;
 import ai.neargo.opskit.svc.api.Present.People;
 import ai.neargo.opskit.svc.api.Present.Person;
@@ -57,9 +59,11 @@ public class TicketController {
     private final ProcessClient processes;
     private final DirectoryAppService directory;
     private final MemberAttrAppService attrs;
+    private final TicketQueryService queries;
 
     public TicketController(TicketAppService tickets, TicketDefinitionAppService definitions, ProcessClient processes, DirectoryAppService directory,
-            MemberAttrAppService attrs) {
+            MemberAttrAppService attrs, TicketQueryService queries) {
+        this.queries = queries;
         this.tickets = tickets;
         this.definitions = definitions;
         this.processes = processes;
@@ -172,6 +176,28 @@ public class TicketController {
         CreateTicketResult r = tickets.create(actor, new CreateTicketRequest(b.typeCode(), b.title(), b.description(), b.fields(), b.priority(), b.requester(),
                 b.scopes(), b.dedupeKey(), b.subject() == null ? null : new SubjectRef(b.subject().type(), b.subject().ref(), b.subject().display())));
         return view(actor, tickets.detail(actor.isAppItself() ? actor : actorOrApp(actor, r), r.ticket().ticketNo()), Present.locale(req), r.attached());
+    }
+
+    /** 列表（TicketRow）：每个筛选控件一个参数；fields 只含可筛选字段；actions 按当前操作人算。 */
+    @PostMapping("/tickets/query")
+    public ai.neargo.opskit.commons.query.Page<Row> query(Actor actor, @RequestBody(required = false) TicketQuery q, HttpServletRequest req) {
+        ai.neargo.opskit.commons.query.Page<TicketView> page = queries.query(actor, q == null ? new TicketQuery(null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null) : q);
+        TenantContext t = actor.tenant();
+        List<String> principals = new ArrayList<>();
+        page.list().forEach(v -> {
+            principals.add(v.assignee());
+            principals.add(v.requester());
+        });
+        People people = new People(directory, t, principals);
+        String locale = Present.locale(req);
+        return page.map(v -> {
+            TicketTypeDef def = definitions.resolveType(t, v.typeCode()).map(TicketDefinitionAppService.ResolvedType::def).orElse(null);
+            return new Row(v.ticketNo(), typeName(def, v.typeCode(), locale), v.title(), subject(v.subject()), priority(t, def, v, locale),
+                    status(t, def, v.status(), locale), v.statusCategory(), assignee(t, v.assignee(), people, locale), people.of(v.requester()), v.slaState(),
+                    v.slaNextDueAtMs(), sla(v), v.escalated(), v.createdAtMs(), v.updatedAtMs(), fields(t, def, v.fields(), people, locale, true),
+                    v.open() ? actions(processes.actions(actor, v.instanceNo()), locale) : List.of());
+        });
     }
 
     @GetMapping("/tickets/{no}")

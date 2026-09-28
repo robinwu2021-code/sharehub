@@ -29,6 +29,11 @@ public class EmbeddedDirectoryClient implements DirectoryClient {
     }
 
     @Override
+    public List<String> membersWithAttr(TenantContext t, String key, Collection<String> values, int limit) {
+        return directory.membersWithAttr(t, key, values, limit);
+    }
+
+    @Override
     public Map<String, String> displayNames(TenantContext t, Collection<String> memberIds) {
         return directory.displayNames(t, memberIds);
     }

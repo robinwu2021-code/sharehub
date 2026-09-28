@@ -233,6 +233,20 @@ class LocalApiTest {
         assertThat(resolved.body().get("open").asBoolean()).isFalse();
         assertThat(resolved.body().get("resolution").get("name").asText()).isEqualTo("已修复");
 
+        Res list = call("POST", WS + "/tickets/query", alice, Map.of("typeCode", List.of("repair"), "statusCategory", List.of("NEW"), "sort", "priority",
+                "page", 1, "size", 20));
+        assertThat(list.status()).isEqualTo(200);
+        assertThat(list.body().get("total").asLong()).isEqualTo(list.body().get("list").size());
+        JsonNode first = list.body().get("list").get(0);
+        assertThat(first.get("priority").get("code").asText()).as("按优先级排，P1 在前").isEqualTo("P1");
+        assertThat(first.get("fields").get("source").get("name").asText()).isNotBlank();
+        assertThat(first.has("fieldList")).as("列表行不带详情字段").isFalse();
+        Res byField = call("POST", WS + "/tickets/query", alice, Map.of("typeCode", List.of("repair"),
+                "fieldFilters", List.of(Map.of("field", "source", "value", "CS")), "page", 1, "size", 20));
+        assertThat(byField.body().get("list").valueStream().map(n -> n.get("fields").get("source").get("value").asText()).distinct().toList())
+                .containsExactly("CS");
+        assertThat(call("POST", WS + "/tickets/query", token("dave"), Map.of("page", 1, "size", 20)).body().get("total").asLong())
+                .as("无工单权限、非参与者：列表为空（fail-closed）").isZero();
         String queued = (String) seed.manifest().fixtures().get("ticketQueued");
         assertThat(call("POST", WS + "/tickets/" + queued + "/pool", alice, Map.of("reason", "x")).status()).as("还没人办，退回池 → 409").isEqualTo(409);
         assertThat(call("GET", WS + "/tickets/" + queued, token("dave"), null).status()).as("无工单权限、非参与者").isEqualTo(404);

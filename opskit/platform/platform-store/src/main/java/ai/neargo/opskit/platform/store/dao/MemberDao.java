@@ -67,6 +67,12 @@ public final class MemberDao {
                 .param("ws", ws.value()).param("refs", externalRefs).query(MAPPER).list();
     }
 
+    /** 空间内 ACTIVE 成员的 ID 与属性（按属性筛成员用；只取两列）。 */
+    public List<java.util.Map.Entry<String, java.util.Map<String, Object>>> activeAttrs(WorkspaceId ws) {
+        return jdbc.sql("SELECT member_id, attrs FROM plat_member WHERE workspace_id = ? AND status = 'ACTIVE' ORDER BY member_id").param(ws.value())
+                .query((rs, i) -> java.util.Map.entry(rs.getString(1), JsonColumns.readMap(rs.getString(2)))).list();
+    }
+
     public List<MemberRow> findByIds(WorkspaceId ws, Collection<String> memberIds) {
         if (memberIds.isEmpty()) {
             return List.of();

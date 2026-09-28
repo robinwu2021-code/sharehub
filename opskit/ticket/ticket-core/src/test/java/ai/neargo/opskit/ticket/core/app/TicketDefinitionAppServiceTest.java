@@ -146,6 +146,11 @@ class TicketDefinitionAppServiceTest {
         }
 
         @Override
+        public List<String> membersWithAttr(TenantContext t, String key, Collection<String> values, int limit) {
+            return List.of();
+        }
+
+        @Override
         public Map<String, String> displayNames(TenantContext t, Collection<String> ids) {
             return Map.of();
         }

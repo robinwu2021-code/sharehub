@@ -12,6 +12,7 @@ import ai.neargo.opskit.ticket.core.app.TicketDispatcher;
 import ai.neargo.opskit.ticket.core.app.TicketAppService;
 import ai.neargo.opskit.ticket.core.app.TicketDefinitionAppService;
 import ai.neargo.opskit.ticket.core.app.TicketObserver;
+import ai.neargo.opskit.ticket.core.app.TicketQueryService;
 import org.springframework.context.annotation.Lazy;
 import ai.neargo.opskit.ticket.store.TicketMigrations;
 import ai.neargo.opskit.ticket.store.TicketStore;
@@ -54,6 +55,11 @@ public class TicketCoreAutoConfiguration {
     TicketAppService ticketAppService(TicketDefinitionAppService defs, TicketStore s, ProcessClient processes, TaskClient tasks, TicketDispatcher dispatcher,
             BizNoGenerator ids, Clock clock, TransactionOperations tx) {
         return new TicketAppService(defs, s.tickets(), s.fieldIndex(), s.scopes(), s.comments(), processes, tasks, dispatcher, ids, clock, tx);
+    }
+
+    @Bean
+    TicketQueryService ticketQueryService(TicketStore s, TicketDefinitionAppService defs, TicketAppService tickets, DirectoryClient directory) {
+        return new TicketQueryService(s.queries(), defs, tickets, directory);
     }
 
     /**
