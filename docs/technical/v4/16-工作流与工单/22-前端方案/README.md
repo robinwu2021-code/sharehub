@@ -17,6 +17,7 @@
 | 05 | [依赖关系](./05-依赖关系.md) | 包之间的依赖矩阵；外部依赖版本（已核）；禁止依赖；架构测试 |
 | 06 | [接口调用](./06-接口调用.md) | 前端怎么调后端：界面面、客户端生成、mock、错误与会话处理 |
 | 07 | [任务清单](./07-任务清单.md) | 前端任务、前置、估算、验收 |
+| 08 | [联调与测试场景](./08-联调与测试场景.md) | 各端测什么、用什么测、现在能不能跑；S1–S6 场景与对真服务跑的步骤；跨端场景 |
 | —— | [业界调研](../19-前端模块化-业界方案调研.md) | 六类前端模块化方案的对比（推导过程，保留） |
 
 ## 一、一页结论
@@ -90,7 +91,13 @@
   `hot` 必给、kind 增 `APPROVAL` · `MERGE`
 - 退回抢单池走 `POST …/tickets/{no}/pool {reason}`，`assign.to` 必填
 - 不变：`TicketRow.sla`（对象）与 `TicketView.slaMetrics`（数组）
-- **向后端补提**：`ApprovalRow.finishedAtMs?`（审批列表「耗时」列要用，21/06 §七 未列）
+- 后端第三轮已答复（49e7c893）：finishedAtMs 已补；MEMBER 审批人为 ID 列表；决定校验顺序 409 → 403 → 422；definitions 增 OPTION_SET
+
+**2026-09-28 三语 / 真服务客户端 / 端到端**：
+- F4：9 页三语 + RTL（`lib/i18n/messages/flow/<页>.ts`，`useFlowT`），卡口 `i18n-guard.test.ts`
+- `lib/flow/http.ts` + `client.ts` 的 httpFlow：`NEXT_PUBLIC_FLOW_API=http` 切真服务
+- 端到端 27 条（`ops-web/scripts/flow-e2e.sh`），mock 全绿；对真服务跑的步骤见 [08](./08-联调与测试场景.md)
+- 联调：后端已接 O4-0，按 A 查询层 → B HTTP → C 本地令牌 → D 种子 → E 超时放回 → F 模板发布 交付
 
 后端现状（后端会话 2026-09-27 告知）：M0 骨架完成、M1 平台层服务层完成；**流程（M2）、工单（M3）未开工**，
 暂无可联调的端点。前端先在 mock 上推进；后端端点可用后只换 `lib/flow/client.ts`。
