@@ -60,10 +60,20 @@ public class ProcessHistoryService {
     @SystemAction("只读：可见性按参与者 / 任务候选 ∧ 范围过滤，看不见按不存在")
     public List<HistoryEntry> history(Actor actor, String instanceNo) {
         WorkspaceId ws = actor.tenant().workspaceId();
-        if (queries.countInstances(ws, viewer(actor), filter(instanceNo, null, null)) == 0) {
-            throw new OpsKitException(CommonErrors.NOT_FOUND, "instance not found");
-        }
-        return logs.ofInstance(ws, instanceNo).stream().map(ProcessHistoryService::entry).toList();
+        QueryDao.InstanceRow row = visibleRow(actor, instanceNo);
+        Names names = new Names(actor.tenant());
+        return logs.ofInstance(ws, instanceNo).stream().map(e -> names.named(entry(e), row.definitionId())).toList();
+    }
+
+    /** 单个实例行（实例详情页头），与 instances 的行同形。 */
+    @SystemAction("只读：同 history")
+    public InstanceRow instance(Actor actor, String instanceNo) {
+        return new Names(actor.tenant()).row(visibleRow(actor, instanceNo));
+    }
+
+    private QueryDao.InstanceRow visibleRow(Actor actor, String instanceNo) {
+        return queries.instances(actor.tenant().workspaceId(), viewer(actor), filter(instanceNo, null, null), 0, 1).stream().findFirst()
+                .orElseThrow(() -> new OpsKitException(CommonErrors.NOT_FOUND, "instance not found"));
     }
 
     @SystemAction("只读：同 history")
@@ -98,7 +108,8 @@ public class ProcessHistoryService {
                     names.process(a.definitionId()), subject(a.subjectType(), a.subjectRef(), a.subjectDisplay()), a.status(), null, null,
                     a.currentRound(), a.requestedBy(), a.requestedAtMs(), a.finishedAtMs(), null, null));
         }
-        Map<String, List<HistoryEntry>> history = logs.ofInstances(ws, nos).stream().map(ProcessHistoryService::entry)
+        Map<String, Long> defOf = rows.stream().collect(Collectors.toMap(QueryDao.InstanceRow::instanceNo, QueryDao.InstanceRow::definitionId));
+        Map<String, List<HistoryEntry>> history = logs.ofInstances(ws, nos).stream().map(e -> names.named(entry(e), defOf.get(e.instanceNo())))
                 .collect(Collectors.groupingBy(HistoryEntry::instanceNo, LinkedHashMap::new, Collectors.toList()));
         List<SubjectHistory.Item> items = rows.stream().map(r -> new SubjectHistory.Item(names.row(r), approvals.getOrDefault(r.instanceNo(), List.of()),
                 history.getOrDefault(r.instanceNo(), List.of()))).toList();
@@ -186,6 +197,22 @@ public class ProcessHistoryService {
 
         LocalizedText process(long definitionId) {
             return compiled(definitionId).definition().name();
+        }
+
+        /** INSTANCE 条目补迁移名与状态名（action 是租户定义的迁移代号，前端词表覆盖不了）。 */
+        HistoryEntry named(HistoryEntry h, Long definitionId) {
+            if (!"INSTANCE".equals(h.entityKind()) || definitionId == null) {
+                return h;
+            }
+            CompiledProcess p = compiled(definitionId);
+            LocalizedText action = p.definition().transitions().stream().filter(t -> t.code().equals(h.action())).findFirst()
+                    .map(ai.neargo.opskit.process.api.definition.TransitionDef::name).orElse(null);
+            return h.withNames(action, statusName(p, h.from()), statusName(p, h.to()));
+        }
+
+        private LocalizedText statusName(CompiledProcess p, String code) {
+            return code == null ? null : p.definition().statuses().stream().filter(s -> s.code().equals(code)).findFirst()
+                    .map(ai.neargo.opskit.process.api.definition.StatusDef::name).orElse(null);
         }
 
         InstanceRow row(QueryDao.InstanceRow r) {

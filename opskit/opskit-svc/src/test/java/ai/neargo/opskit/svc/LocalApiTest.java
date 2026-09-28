@@ -193,5 +193,12 @@ class LocalApiTest {
         assertThat(q.body().get("total").asLong()).as("bob 提交的两张合同").isEqualTo(2);
 
         assertThat(call("POST", WS + "/process-stats", bob, Map.of()).status()).as("无 report:view").isEqualTo(403);
+        assertThat(call("POST", WS + "/process-stats", token("admin"), Map.of()).status()).isEqualTo(200);
+        Res one = call("GET", WS + "/instances/" + twoStep, bob, null);
+        assertThat(one.status()).isEqualTo(200);
+        assertThat(one.body().get("process").get("code").asText()).isEqualTo("contract_approval");
+        assertThat(call("GET", WS + "/instances/" + no, bob, null).status()).isEqualTo(404);
+        assertThat(h.body().valueStream().filter(n -> "submit".equals(n.get("action").asText())).findFirst().orElseThrow().get("actionName").asText())
+                .isEqualTo("提交");
     }
 }

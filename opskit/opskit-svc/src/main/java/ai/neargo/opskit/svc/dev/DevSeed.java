@@ -118,7 +118,7 @@ public class DevSeed {
         directory.upsertRole(app, ws, new RoleUpsert("approver", Map.of("zh", "审批人", "en", "Approver"), Set.of("approval:decide")));
         directory.upsertRole(app, ws, new RoleUpsert("auditor", Map.of("zh", "审计", "en", "Auditor"), Set.of("approval:view:all")));
         directory.upsertRole(app, ws, new RoleUpsert("flow-admin", Map.of("zh", "流程管理员", "en", "Flow admin"),
-                Set.of("process:manage", "sla:manage", "approval:view:all", "directory:manage")));
+                Set.of("process:manage", "sla:manage", "report:view", "approval:view:all", "directory:manage")));
         attrs.upsert(app, ws, new MemberAttrDef("partyType", Map.of("zh", "身份", "en", "Party", "ar", "الجهة"),
                 Map.of("STAFF", Map.of("zh", "员工", "en", "Staff", "ar", "موظف"), "AGENT", Map.of("zh", "代理", "en", "Agent", "ar", "وكيل"))));
         directory.sync(app, new SyncBatch(SyncBatch.Mode.MERGE,
@@ -144,7 +144,7 @@ public class DevSeed {
         personas.put("frank", persona(t, "u_frank", List.of(), List.of(), "review-queue 组员，领着一条任务"));
         personas.put("viewer", persona(t, "u_viewer", List.of("flow:todo:read", "flow:approval:read", "flow:ticket:read"), List.of(), "只读（S5）：能看全部审批（角色 auditor），不能审批、不能领取"));
         personas.put("auditor", persona(t, "u_auditor", List.of(), List.of(), "approval:view:all"));
-        personas.put("admin", persona(t, "u_admin", List.of(), List.of(), "process:manage：发布 / 停用审批模板（S4）"));
+        personas.put("admin", persona(t, "u_admin", List.of(), List.of(), "process:manage · sla:manage · report:view：发布模板 / SLA 策略、看流程统计"));
 
         Actor bob = actor(t, personas.get("bob"), Set.of());
         Actor alice = actor(t, personas.get("alice"), Set.of("review-queue"));

@@ -75,7 +75,8 @@ class ProcessHistoryServiceTest {
             }
         };
         BizNoGenerator ids = new BizNoGenerator(f.clock);
-        TaskAppService tasks = new TaskAppService(f.store.tasks(), f.store.participants(), dir, (n, id, at) -> { }, ev -> { }, ids, f.clock, f.tx);
+        TaskAppService tasks = new TaskAppService(f.store.tasks(), f.store.participants(), dir, (n, id, at) -> { }, ev -> { }, ids, f.clock, f.tx,
+                f.store.logs());
         AtomicReference<InstanceAppService> ref = new AtomicReference<>();
         ApprovalAppService approvals = new ApprovalAppService(defs, f.store.approvals(), f.store.tasks(), f.store.instances(), f.store.participants(),
                 f.store.logs(), tasks, ref::get, dir, ev -> { }, ids, f.clock, f.tx);
@@ -99,6 +100,16 @@ class ProcessHistoryServiceTest {
         List<HistoryEntry> h = e.history.history(e.bd(), no);
         assertThat(h).extracting(HistoryEntry::entityKind).contains("INSTANCE", "APPROVAL");
         assertThat(h).filteredOn(x -> "INSTANCE".equals(x.entityKind())).extracting(HistoryEntry::action).containsSubsequence("created", "submit", "approved");
+        assertThat(h).filteredOn(x -> "TASK".equals(x.entityKind())).extracting(HistoryEntry::action).as("审批任务的建与完成也在历史里")
+                .containsSubsequence("created", "completed");
+        assertThat(h).filteredOn(x -> "submit".equals(x.action())).singleElement().satisfies(x -> {
+            assertThat(x.actionName().resolve("zh", "en")).as("迁移代号是租户定义的，名称随行给出").isEqualTo("提交");
+            assertThat(x.fromName().resolve("zh", "en")).isEqualTo("草稿");
+            assertThat(x.toName().resolve("zh", "en")).isEqualTo("审批中");
+        });
+        assertThat(e.history.instance(e.bd(), no).statusName().resolve("zh", "en")).isEqualTo("生效确认中");
+        assertThatThrownBy(() -> e.history.instance(e.member("mb_stranger", Set.of(), Set.of(), Set.of()), no))
+                .extracting(ProcessHistoryServiceTest::key).isEqualTo(CommonErrors.NOT_FOUND);
         assertThat(e.history.history(e.ops(), no)).as("审批过的人看得见").isNotEmpty();
         assertThat(e.history.history(e.f.system(), no)).hasSameSizeAs(h);
         assertThatThrownBy(() -> e.history.history(e.member("mb_stranger", Set.of(), Set.of(), Set.of()), no))

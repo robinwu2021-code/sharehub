@@ -24,6 +24,7 @@ import ai.neargo.opskit.process.api.model.TaskView;
 import ai.neargo.opskit.process.core.port.Directory;
 import ai.neargo.opskit.process.store.dao.ParticipantDao;
 import ai.neargo.opskit.process.store.dao.TaskDao;
+import ai.neargo.opskit.process.store.dao.TransitionLogDao;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -57,9 +58,17 @@ public class TaskAppService implements AssignmentHandler, StatusHook {
     private final BizNoGenerator ids;
     private final Clock clock;
     private final TransactionOperations tx;
+    private final TransitionLogDao logs;
 
     public TaskAppService(TaskDao tasks, ParticipantDao participants, Directory directory, TimerScheduler timers, EventPublisher events,
             BizNoGenerator ids, Clock clock, TransactionOperations tx) {
+        this(tasks, participants, directory, timers, events, ids, clock, tx, null);
+    }
+
+    /** @param logs 任务的每次变化写进实例历史（entity_kind = TASK）；为空时不写（只在不关心历史的单元测试里） */
+    public TaskAppService(TaskDao tasks, ParticipantDao participants, Directory directory, TimerScheduler timers, EventPublisher events,
+            BizNoGenerator ids, Clock clock, TransactionOperations tx, TransitionLogDao logs) {
+        this.logs = logs;
         this.tasks = tasks;
         this.participants = participants;
         this.directory = directory;
@@ -104,6 +113,7 @@ public class TaskAppService implements AssignmentHandler, StatusHook {
             }
         }
         events.publish(new TaskEvent(t, "created", no, kind, instanceNo, direct, 0, Instant.ofEpochMilli(now)));
+        trace(t, no, instanceNo, "created", null, direct == null ? "OPEN" : direct, "system", null);
         return no;
     }
 
@@ -126,6 +136,7 @@ public class TaskAppService implements AssignmentHandler, StatusHook {
                     : directory.claimTimeoutSec(t, claimed.queueGroup()).orElse(DEFAULT_CLAIM_TIMEOUT_SEC);
             timers.schedule(CLAIM_TIMEOUT_TASK, new TimerId(t.workspaceId(), taskNo, claimed.claimEpoch()), Instant.ofEpochMilli(now + timeout * 1000L));
             events.publish(new TaskEvent(t, "assigned", taskNo, claimed.kind(), claimed.instanceNo(), me, claimed.version(), Instant.ofEpochMilli(now)));
+            trace(t, taskNo, claimed.instanceNo(), "claimed", null, me, me, null);
             return view(t, claimed, timeout);
         });
     }
@@ -145,6 +156,7 @@ public class TaskAppService implements AssignmentHandler, StatusHook {
                 participants.remove(t.workspaceId(), released.instanceNo(), InstanceAppService.ASSIGNEE, me);
             }
             events.publish(new TaskEvent(t, "assigned", taskNo, released.kind(), released.instanceNo(), null, released.version(), clock.instant()));
+            trace(t, taskNo, released.instanceNo(), "released", me, null, me, null);
             return view(t, released, null);
         });
     }
@@ -169,6 +181,7 @@ public class TaskAppService implements AssignmentHandler, StatusHook {
                 participants.remove(t.workspaceId(), row.get().instanceNo(), InstanceAppService.ASSIGNEE, who);
             }
             events.publish(new TaskEvent(t, "assigned", taskNo, row.get().kind(), row.get().instanceNo(), null, row.get().version() + 1, clock.instant()));
+            trace(t, taskNo, row.get().instanceNo(), "claim_timeout", who, null, "system", null);
             return true;
         }));
     }
@@ -196,6 +209,7 @@ public class TaskAppService implements AssignmentHandler, StatusHook {
             }
             TaskDao.Row assigned = load(t.workspaceId(), taskNo);
             events.publish(new TaskEvent(t, "assigned", taskNo, assigned.kind(), assigned.instanceNo(), to.key(), assigned.version(), clock.instant()));
+            trace(t, taskNo, assigned.instanceNo(), row.assignee() == null ? "assigned" : "reassigned", row.assignee(), to.key(), InstanceAppService.who(actor), reason);
             return view(t, assigned, null);
         });
     }
@@ -212,6 +226,7 @@ public class TaskAppService implements AssignmentHandler, StatusHook {
             }
             TaskDao.Row pooled = load(t.workspaceId(), taskNo);
             events.publish(new TaskEvent(t, "assigned", taskNo, pooled.kind(), pooled.instanceNo(), null, pooled.version(), clock.instant()));
+            trace(t, taskNo, pooled.instanceNo(), "pooled", row.assignee(), null, InstanceAppService.who(actor), reason);
             return view(t, pooled, null);
         });
     }
@@ -223,6 +238,15 @@ public class TaskAppService implements AssignmentHandler, StatusHook {
                 "task " + row.taskNo());
         events.publish(new TaskEvent(t, "DONE".equals(status) ? "completed" : "cancelled", row.taskNo(), row.kind(), row.instanceNo(),
                 row.assignee(), row.version() + 1, clock.instant()));
+        trace(t, row.taskNo(), row.instanceNo(), "DONE".equals(status) ? "completed" : "cancelled", row.status(), status, by, reason);
+    }
+
+    /** 任务变化写进实例历史（21/06 §七 时间线）：from / to 为办理人（{@code member:x}）或任务状态。 */
+    private void trace(TenantContext t, String taskNo, String instanceNo, String action, String from, String to, String by, String reason) {
+        if (logs != null) {
+            logs.insert(t.workspaceId(), new TransitionLogDao.Entry(t.accountId().value(), "TASK", taskNo, instanceNo, null, null, action, from, to,
+                    null, by == null ? "system" : by, null, reason, Map.of(), clock.millis()));
+        }
     }
 
     /** 实例上未结束的办理任务（工单详情里的「当前任务」）。可见性由调用方先判。 */

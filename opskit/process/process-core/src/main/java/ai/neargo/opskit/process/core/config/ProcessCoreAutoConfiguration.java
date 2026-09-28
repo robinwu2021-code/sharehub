@@ -63,7 +63,7 @@ public class ProcessCoreAutoConfiguration {
     @Bean
     TaskAppService taskAppService(ProcessStore s, Directory directory, TimerScheduler timers, EventPublisher events, BizNoGenerator ids, Clock clock,
             TransactionOperations tx) {
-        return new TaskAppService(s.tasks(), s.participants(), directory, timers, events, ids, clock, tx);
+        return new TaskAppService(s.tasks(), s.participants(), directory, timers, events, ids, clock, tx, s.logs());
     }
 
     @Bean

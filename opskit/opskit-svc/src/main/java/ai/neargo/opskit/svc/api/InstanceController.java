@@ -46,8 +46,8 @@ public class InstanceController {
      * @param actor     成员给 {ref, displayName}；应用 / 系统操作时为空，看 {@code actorText}（{@code app:x} / {@code system}）
      * @param entityKind INSTANCE / TASK / APPROVAL / SLA / GATE
      */
-    public record Entry(String entityKind, String entityNo, String action, String from, String to, Integer seq, Person actor, String actorText,
-            String reason, Map<String, Object> payload, long atMs) {
+    public record Entry(String entityKind, String entityNo, String action, String actionName, String from, String fromName, String to, String toName,
+            Integer seq, Person actor, String actorText, String reason, Map<String, Object> payload, long atMs) {
     }
 
     public record ApprovalBrief(String approvalNo, String status, int round, Person requestedBy, long requestedAtMs, Long finishedAtMs) {
@@ -65,11 +65,19 @@ public class InstanceController {
     public record StatsDto(Named process, long total, long open, Map<String, Long> byCategory, Long avgCycleMs, Map<String, Long> approvals) {
     }
 
+    /** 单个实例行（与 instances/query 的行同形）；看不见 404。 */
+    @GetMapping("/instances/{no}")
+    public Row instance(Actor actor, @PathVariable("no") String no, HttpServletRequest req) {
+        InstanceRow r = history.instance(actor, no);
+        return row(r, new People(directory, actor.tenant(), java.util.Collections.singletonList(r.createdBy())), Present.locale(req));
+    }
+
     @GetMapping("/instances/{no}/history")
-    public List<Entry> history(Actor actor, @PathVariable("no") String no) {
+    public List<Entry> history(Actor actor, @PathVariable("no") String no, HttpServletRequest req) {
         List<HistoryEntry> hs = history.history(actor, no);
         People people = new People(directory, actor.tenant(), hs.stream().map(HistoryEntry::actor).toList());
-        return hs.stream().map(h -> entry(h, people)).toList();
+        String locale = Present.locale(req);
+        return hs.stream().map(h -> entry(h, people, locale)).toList();
     }
 
     @PostMapping("/instances/query")
@@ -95,7 +103,7 @@ public class InstanceController {
         return new SubjectDto(s.type(), s.ref(), s.total(), s.truncated(), s.instances().stream().map(i -> new SubjectItem(row(i.instance(), people, locale),
                 i.approvals().stream().map((ApprovalRow a) -> new ApprovalBrief(a.approvalNo(), a.status(), a.round(), people.of(a.requestedBy()),
                         a.requestedAtMs(), a.finishedAtMs())).toList(),
-                i.history().stream().map(h -> entry(h, people)).toList())).toList());
+                i.history().stream().map(h -> entry(h, people, locale)).toList())).toList());
     }
 
     /** 流程统计（需 report:view）。 */
@@ -113,9 +121,10 @@ public class InstanceController {
                 r.closedAtMs());
     }
 
-    private static Entry entry(HistoryEntry h, People people) {
+    private static Entry entry(HistoryEntry h, People people, String locale) {
         boolean member = h.actor() != null && h.actor().startsWith("member:");
-        return new Entry(h.entityKind(), h.entityNo(), h.action(), h.from(), h.to(), h.seq(), member ? people.of(h.actor()) : null,
-                member ? null : h.actor(), h.reason(), h.payload() == null || h.payload().isEmpty() ? null : h.payload(), h.atMs());
+        return new Entry(h.entityKind(), h.entityNo(), h.action(), Present.text(h.actionName(), locale), h.from(), Present.text(h.fromName(), locale),
+                h.to(), Present.text(h.toName(), locale), h.seq(), member ? people.of(h.actor()) : null, member ? null : h.actor(), h.reason(),
+                h.payload() == null || h.payload().isEmpty() ? null : h.payload(), h.atMs());
     }
 }
