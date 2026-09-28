@@ -83,6 +83,7 @@ class VocabularyRejectedOnWriteTest extends ApiTestSupport {
         jdbc.update("DELETE FROM loc_contract_log WHERE contract_no IN"
                 + " (SELECT contract_no FROM loc_contract WHERE remark = ?)", MARK);
         jdbc.update("DELETE FROM loc_contract WHERE remark = ?", MARK);
+        jdbc.update("DELETE FROM cs_ticket WHERE issue = ?", MARK);
         jdbc.update("DELETE FROM usr_free_whitelist WHERE c_user_no LIKE 'UVOCAB%'");
         jdbc.update("DELETE FROM notify_template WHERE name = ?", MARK);
         jdbc.update("DELETE FROM md_problem WHERE title = ?", MARK);
@@ -523,6 +524,24 @@ class VocabularyRejectedOnWriteTest extends ApiTestSupport {
         m.put("settlePeriod", settlePeriod);
         m.put("remark", MARK);
         return m;
+    }
+
+    @Test
+    @DisplayName("★★ cs_ticket.channel 非法值 400 —— 一行中文「电话」曾把整列从姊妹卡口的视野里抹掉")
+    void cs_ticket_channel_rejects_out_of_vocabulary() {
+        String t = login("ADMIN");
+
+        var ok = post("/api/ops/cs/tickets", Map.of("issue", MARK, "channel", "PHONE"), t);
+        assertThat(ok.status).as("合法 channel 应当能存：%s", ok.msg()).isEqualTo(200);
+
+        /*
+         * 负例就用那个真实写进过库的值。它的代价不在这一行本身：
+         * StoredValueInVocabularyTest 按「取值是不是全都大写形」判该不该查一列，
+         * 这一个中文值进去之后，整列从那条卡口的视野里消失，而它依旧显示为绿。
+         * 唯一能发现脏数据的卡口，被脏数据本身关掉了。
+         */
+        var bad = post("/api/ops/cs/tickets", Map.of("issue", MARK, "channel", "电话"), t);
+        assertThat(bad.status).as("channel=电话 竟然被接受了：%s", bad.msg()).isEqualTo(400);
     }
 
     @Test

@@ -9,6 +9,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -83,6 +85,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class StoredValueInVocabularyTest extends ApiTestSupport {
 
+    /** 与 {@link VocabularyColumns} 同一个形状判据 —— 本类第二条用例要逐个取值判。 */
+    private static final Pattern ENUM_SHAPED = Pattern.compile("^[A-Z][A-Z0-9_]*$");
+
     @Autowired
     private JdbcTemplate jdbc;
 
@@ -125,6 +130,78 @@ class StoredValueInVocabularyTest extends ApiTestSupport {
 
                 注意排查写入方**包括种子与演示数据** —— V66 那次就是演示种子写进去的，
                 而演示数据长得跟真数据一模一样。""")
+                .isEmpty();
+    }
+
+    /**
+     * 已知的「混形列」豁免：<b>这两列本来就不是枚举</b>，不是脏数据。
+     *
+     * <ul>
+     *   <li>{@code wo_sla_rule.priority} —— 词表里带一个 {@code *} 哨兵（「类型默认」），
+     *       它在注释里写着，但 {@code [A-Z][A-Z0-9_]+} 提不出这种符号；</li>
+     *   <li>{@code iam_dept.path} —— 祖先路径 {@code /D1/D3/}，本来就是自由文本，
+     *       注释里那几个大写词说的是别的意思。</li>
+     * </ul>
+     *
+     * <p><b>这份清单不许变长</b>：再多一个，多半不是「又一个哨兵」，而是又一列被脏值关掉了。
+     */
+    private static final Set<String> MIXED_SHAPE_ALLOWED =
+            Set.of("wo_sla_rule.priority", "iam_dept.path");
+
+    /**
+     * ★★ <b>一个脏值不能把整列的检查悄悄关掉。</b>
+     *
+     * <h2>上面那条有个洞，这条堵它</h2>
+     * 上面按「取值像不像枚举」判一列该不该查，而判据是<b>全部取值都得是大写形</b>。
+     * 于是：<b>往一个枚举列里写一个中文值，这一列从此不再被检查</b> ——
+     * 连同它原有的脏数据一起，从卡口的视野里消失。
+     * <b>唯一能发现脏数据的卡口，可以被脏数据本身关掉。</b>
+     *
+     * <p>2026-09-28 实测到了这个形状：{@code cs_ticket.channel} 140 行里有 1 行是
+     * {@code '电话'}（词表是 APP/MP/H5/PHONE/EMAIL/MANUAL/ALARM）。
+     * 那一行进去之后，上面那条对这一列**静默停检**，而它显示为绿。
+     *
+     * <h2>为什么不干脆放宽上面的判据</h2>
+     * 想过把「全部大写形」改成「大部分大写形」，量过全库只有 3 列是混形的：
+     * {@code cs_ticket.channel}（1/140 行非枚举形）· {@code iam_dept.path}（2/4）·
+     * {@code wo_sla_rule.priority}（4/7）。按行数比例能分开，但那是个会漂的魔法数；
+     * 按「非枚举形的值有没有写在注释里」也分不开（path 的 {@code D001/D002} 不在注释里，
+     * 却是正常值）。<b>放宽判据的代价是误报，而误报会让人把卡口关掉</b> ——
+     * 那比漏报更糟。所以这里另立一条窄的，带一份**只准变短**的豁免清单。
+     */
+    @Test
+    @DisplayName("★★ 枚举列里混进非枚举形的值——一个脏值就能把上面那条对整列停检")
+    void a_single_dirty_value_must_not_silently_disable_the_column() {
+        List<String> mixed = new ArrayList<>();
+        for (VocabularyColumns.Column col : VocabularyColumns.scan(jdbc)) {
+            if (col.hasNoValues() || col.looksLikeEnum()) continue;      // 空列 / 本来就全是枚举形
+            if (col.rows().size() > VocabularyColumns.MAX_DISTINCT_FOR_ENUM) continue;  // 取值太多，是自由文本
+            if (MIXED_SHAPE_ALLOWED.contains(col.key())) continue;
+
+            List<String> odd = col.rows().stream()
+                    .map(r -> String.valueOf(r.get("v")))
+                    .filter(v -> !ENUM_SHAPED.matcher(v).matches())
+                    .toList();
+            long enumShaped = col.rows().size() - odd.size();
+            if (enumShaped == 0) continue;   // 一个大写形取值都没有 = 这一列本来就不是枚举
+
+            mixed.add(col.key() + " 混进了 " + odd + "（另有 " + enumShaped
+                    + " 个取值是枚举形；词表 " + col.vocabulary() + "）");
+        }
+
+        assertThat(mixed).as("""
+                这些列**大部分取值是枚举形，却混进了非枚举形的值**。
+
+                要紧的不是这一个值本身，是它的副作用：
+                上面那条「库里存的值必须在词表里」按「取值全是大写形」判该不该查这一列，
+                **混进一个异形值，这一列就从那条卡口的视野里整个消失了** ——
+                连同它原有的脏数据，而那条依旧显示为绿。
+
+                二选一：
+                  · 值是错的 → 修数据 + 补写入侧校验（词表列的写入侧台账见
+                    known-unvalidated-vocab-columns.txt）；
+                  · 这一列本来就不是枚举（哨兵值 / 自由文本）→ 加进 MIXED_SHAPE_ALLOWED
+                    并写明理由。**那份清单只准变短。**""")
                 .isEmpty();
     }
 }

@@ -201,7 +201,33 @@ class VocabularyWriteCoverageTest {
              * 原样透传就等于让外部系统往我们的状态列里写值，这三行要挪回台账。
              * 与 stl_withdrawal.approval_state 是同一类前提：结论属于「当前写法」，不属于这一列。
              */
-            "pay_auth.status", "pay_order.status", "pay_refund.status"));
+            "pay_auth.status", "pay_order.status", "pay_refund.status",
+
+            // ——— 2026-09-28 第七批：代理域 + 库存域 18 列，同样一个真缺口都没有 ———
+            // 又是三处「白名单离 setter 有十几行远」：AgentAssignmentServiceImpl 的
+            // TARGET_TYPES / ACTIONS、ApplyServiceImpl 的 OPERATOR_TYPES、
+            // InventoryTransferServiceImpl 的 ITEM_TYPES（在 validateEndpoints 里）。
+            "agt_agent.agent_type",                  // AgentType.of
+            "agt_agent.status", "agt_account.status", "agt_principal.status",
+            "agt_apply.status", "agt_exit.status", "agt_commission.status",
+            "agt_commission.dimension",
+            "agt_apply.source",                      // 常量 OPS_CREATED / SELF_SERVICE
+            "agt_apply.operator_type",               // OPERATOR_TYPES 白名单
+            "agt_assignment.action", "agt_assignment.target_type",   // ACTIONS / TARGET_TYPES 白名单
+            "inv_transfer.item_type",                // ITEM_TYPES 白名单（validateEndpoints）
+            "inv_transfer.source_type", "inv_transfer.status",
+            "inv_asset_diff.item_type",              // 派生自已校验的调拨单 / 常量 POWERBANK
+            "inv_asset_diff.kind", "inv_asset_diff.source_type", "inv_asset_diff.status",
+
+            /*
+             * cs_ticket.channel：2026-09-28 接上 CsTicketChannel。
+             * 它是被**另一条卡口**推出来的 —— 本类第三条用例（台账里不许有已经不存在的列）
+             * 突然红了，查下来是 CsTicketCreateTest 往库里写了一行 channel='电话'，
+             * 而那一个异形值让这一列不再满足「取值全是大写形」，于是从词表列清单里掉了出去。
+             * 顺着查到写入侧根本没校验。详见 CsTicketChannel 与
+             * StoredValueInVocabularyTest 里新加的「混形列」那条。
+             */
+            "cs_ticket.channel"));
 
     /*
      * ⚠️ 第五批又证了一次「只 grep setXxx 会判错」，而且是反方向：

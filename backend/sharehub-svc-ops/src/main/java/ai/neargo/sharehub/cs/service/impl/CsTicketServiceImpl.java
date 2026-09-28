@@ -131,7 +131,11 @@ public class CsTicketServiceImpl implements CsTicketService {
         e.setCabinetNo(blank(req.cabinetNo()));
         e.setProblemNo(blank(req.problemNo()));
         e.setIssue(req.issue().trim());
-        e.setChannel(req.channel() == null || req.channel().isBlank() ? "MANUAL" : req.channel().trim());
+        // 原先是 req.channel().trim() 原样落库 —— 用例因此写进过一行 channel='电话'，
+        // 而那一个异形值把整列从 StoredValueInVocabularyTest 的视野里抹掉了（见 CsTicketChannel 类注释）
+        e.setChannel(req.channel() == null || req.channel().isBlank()
+                ? ai.neargo.sharehub.cs.CsTicketChannel.MANUAL.name()
+                : ai.neargo.sharehub.cs.CsTicketChannel.of(req.channel()).name());
         e.setStatus(req.status() == null || req.status().isBlank()
                 ? CsTicketStatus.OPEN.name()
                 : CsTicketStatus.of(req.status()).name());
@@ -203,7 +207,9 @@ public class CsTicketServiceImpl implements CsTicketService {
         e.setCabinetNo(req == null ? null : req.cabinetNo());
         e.setProblemNo(req == null ? null : req.problemNo());
         e.setIssue(req == null ? null : req.issue());
-        e.setChannel(req == null || req.channel() == null || req.channel().isBlank() ? "APP" : req.channel());
+        e.setChannel(req == null || req.channel() == null || req.channel().isBlank()
+                ? ai.neargo.sharehub.cs.CsTicketChannel.APP.name()
+                : ai.neargo.sharehub.cs.CsTicketChannel.of(req.channel()).name());
         e.setStatus(CsTicketStatus.OPEN.name());
         mapper.insert(e); // 受理单必建 —— 分流失败也不能丢用户诉求
 

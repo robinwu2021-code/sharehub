@@ -43,7 +43,7 @@ class CsTicketCreateTest extends ApiTestSupport {
         Map<String, Object> m = new HashMap<>();
         m.put("userNo", userNo);          // 运营端发的就是这个键
         m.put("issue", issue);
-        m.put("channel", "电话");
+        m.put("channel", "PHONE");   // 词表是 APP/MP/H5/PHONE/... —— 原先写的是中文「电话」，见 CsTicketChannel
         return post("/api/ops/cs/tickets", m, admin).okData();
     }
 
@@ -76,7 +76,7 @@ class CsTicketCreateTest extends ApiTestSupport {
         String admin = login("ADMIN");
         Map<String, Object> m = new HashMap<>();
         m.put("issue", "匿名来电探针");
-        m.put("channel", "电话");
+        m.put("channel", "PHONE");   // 词表是 APP/MP/H5/PHONE/... —— 原先写的是中文「电话」，见 CsTicketChannel
         JsonNode t = post("/api/ops/cs/tickets", m, admin).okData();
         String no = t.path("ticketNo").asText();
         try {

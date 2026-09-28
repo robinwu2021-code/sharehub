@@ -119,6 +119,24 @@
 # 本仓枚举名，所以成立；接 nearpay 之后那个 Port 实现必须把渠道方状态映射成本仓词表，
 # 原样透传就要把这三行挪回台账。与 stl_withdrawal.approval_state 同类。
 #
+# 同日第七批（代理域 + 库存域 18 列 + cs_ticket.channel）：**已核实 154，待核实 126**。
+# 又是三处「白名单离 setter 有十几行远」：AgentAssignmentServiceImpl 的 TARGET_TYPES/ACTIONS、
+# ApplyServiceImpl 的 OPERATOR_TYPES、InventoryTransferServiceImpl 的 ITEM_TYPES
+# （在 validateEndpoints 里，setter 之后才调）。**这个坑本轮累计踩了七次。**
+#
+# 连着两批零缺口，可以下一个结论了：**2026-09-27 那三次串错不是「到处都没接」**，
+# 而是集中在**实体当请求体**那条路上（第二批 18 列里 7 个真没接）。
+# 走 DTO + service 的域（finance / agent / inventory）守法反而很统一。
+# 这也解释了为什么 known-entity-writable-fields 求交集能一次挑出风险最高的那批。
+#
+# ⚠️ 第七批途中**卡口自己抓到了一件更要紧的事**：台账第三条用例（不许有已经不存在的列）
+# 突然红在 cs_ticket.channel —— 查下来是 CsTicketCreateTest 往库里写了一行
+# channel='电话'，那一个异形值让这一列不再满足「取值全是大写形」，于是从词表列清单掉出去。
+# 真正的代价是：**StoredValueInVocabularyTest 对整列静默停检，而它显示为绿** ——
+# 唯一能发现脏数据的卡口，可以被脏数据本身关掉。
+# 已堵：同类里新加「混形列」用例（带只准变短的两项豁免：wo_sla_rule.priority 的 * 哨兵、
+# iam_dept.path 的自由文本），并给 cs_ticket.channel 接上 CsTicketChannel。
+#
 # ⚠️ 两个 `period` 列（stl_adjustment / agt_ops_assessment）不是词表列 ——
 # 装的是 YYYY-MM。它们留在这儿的原因和 usr_invoice_title.vat_trn 一样：
 # 表是空的，取值判据看不到值。表一有数据就会自动掉出去。
@@ -140,34 +158,8 @@ ad_campaign.status
 # ad_slot（1）
 ad_slot.type
 
-# agt_account（1）
-agt_account.status
-
-# agt_agent（2）
-agt_agent.agent_type
-agt_agent.status
-
-# agt_apply（3）
-agt_apply.operator_type
-agt_apply.source
-agt_apply.status
-
-# agt_assignment（2）
-agt_assignment.action
-agt_assignment.target_type
-
-# agt_commission（2）
-agt_commission.dimension
-agt_commission.status
-
-# agt_exit（1）
-agt_exit.status
-
 # agt_ops_assessment（1）
 agt_ops_assessment.period
-
-# agt_principal（1）
-agt_principal.status
 
 # coupon_tpl（2）
 coupon_tpl.status
@@ -183,8 +175,7 @@ cs_message.sender_type
 # cs_session（1）
 cs_session.status
 
-# cs_ticket（2）
-cs_ticket.channel
+# cs_ticket（1）
 cs_ticket.status
 
 # dev_alert_deprecated_v1（3）
@@ -243,19 +234,8 @@ iam_role.data_scope
 # iam_staff_perf（1）
 iam_staff_perf.role
 
-# inv_asset_diff（4）
-inv_asset_diff.item_type
-inv_asset_diff.kind
-inv_asset_diff.source_type
-inv_asset_diff.status
-
 # inv_stock（1）
 inv_stock.item_type
-
-# inv_transfer（3）
-inv_transfer.item_type
-inv_transfer.source_type
-inv_transfer.status
 
 # loc_lead_follow（1）
 loc_lead_follow.channel
