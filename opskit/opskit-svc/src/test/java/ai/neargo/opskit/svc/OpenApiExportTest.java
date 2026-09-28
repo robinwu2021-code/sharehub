@@ -52,6 +52,7 @@ class OpenApiExportTest {
             Map.entry("process-definition-controller", "process"),
             Map.entry("confirmation-controller", "process"),
             Map.entry("settings-controller", "platform"),
+            Map.entry("delivery-controller", "platform"),
             Map.entry("ticket-type-definition-controller", "ticket"));
 
     private static final Path OUT = Path.of("..", "docs", "openapi");

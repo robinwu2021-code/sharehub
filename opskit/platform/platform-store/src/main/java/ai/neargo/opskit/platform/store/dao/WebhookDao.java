@@ -74,4 +74,17 @@ public final class WebhookDao {
         return jdbc.sql("SELECT COUNT(*) FROM plat_webhook_delivery WHERE account_id = ? AND outbox_id = ?")
                 .params(account.value(), outboxId).query(Integer.class).single();
     }
+
+    public record DeliveryRow(long subscriptionId, String url, int attempt, Integer httpStatus, Integer latencyMs, String error, long atMs) {
+    }
+
+    /** 一个事件的每次投递尝试（按时间）。 */
+    public List<DeliveryRow> deliveries(AccountId account, long outboxId) {
+        return jdbc.sql("SELECT d.subscription_id, s.url, d.attempt, d.http_status, d.latency_ms, d.error, d.at_ms FROM plat_webhook_delivery d "
+                        + "LEFT JOIN plat_webhook_subscription s ON s.id = d.subscription_id WHERE d.account_id = ? AND d.outbox_id = ? ORDER BY d.id")
+                .params(account.value(), outboxId)
+                .query((rs, i) -> new DeliveryRow(rs.getLong("subscription_id"), rs.getString("url"), rs.getInt("attempt"),
+                        rs.getObject("http_status", Integer.class), rs.getObject("latency_ms", Integer.class), rs.getString("error"), rs.getLong("at_ms")))
+                .list();
+    }
 }

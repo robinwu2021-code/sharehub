@@ -74,4 +74,41 @@ public final class OutboxDao {
         return jdbc.sql("UPDATE plat_outbox SET failed = 0, next_at_ms = ? WHERE account_id = ? AND id = ? AND done_at_ms IS NULL")
                 .params(now, account.value(), id).update();
     }
+
+    /**
+     * 某空间的事件（接入管理页：投递状态）。state：FAILED = 重试耗尽待人工；PENDING = 未完成（含重试中）；DONE；空 = 全部。
+     * 新的在前。
+     */
+    public List<OutboxRow> query(AccountId account, WorkspaceId ws, String state, String eventType, int offset, int limit) {
+        StringBuilder sql = new StringBuilder("SELECT * FROM plat_outbox WHERE account_id = ? AND workspace_id = ?");
+        List<Object> ps = new java.util.ArrayList<>(List.of(account.value(), ws.value()));
+        appendState(sql, state);
+        if (eventType != null) {
+            sql.append(" AND event_type = ?");
+            ps.add(eventType);
+        }
+        sql.append(" ORDER BY id DESC").append(dialect.limitOffset(limit, offset));
+        return jdbc.sql(sql.toString()).params(ps).query(MAPPER).list();
+    }
+
+    public long count(AccountId account, WorkspaceId ws, String state, String eventType) {
+        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM plat_outbox WHERE account_id = ? AND workspace_id = ?");
+        List<Object> ps = new java.util.ArrayList<>(List.of(account.value(), ws.value()));
+        appendState(sql, state);
+        if (eventType != null) {
+            sql.append(" AND event_type = ?");
+            ps.add(eventType);
+        }
+        return jdbc.sql(sql.toString()).params(ps).query(Long.class).single();
+    }
+
+    private static void appendState(StringBuilder sql, String state) {
+        if ("FAILED".equals(state)) {
+            sql.append(" AND done_at_ms IS NULL AND failed = 1");
+        } else if ("PENDING".equals(state)) {
+            sql.append(" AND done_at_ms IS NULL AND failed = 0");
+        } else if ("DONE".equals(state)) {
+            sql.append(" AND done_at_ms IS NOT NULL");
+        }
+    }
 }

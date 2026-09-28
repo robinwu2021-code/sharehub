@@ -143,6 +143,12 @@ public class PlatformCoreAutoConfiguration {
     }
 
     @Bean
+    ai.neargo.opskit.platform.core.app.DeliveryAppService deliveryAppService(OutboxDao o, WebhookDao w, Clock clock, TransactionOperations tx,
+            AuditTrail audit) {
+        return new ai.neargo.opskit.platform.core.app.DeliveryAppService(o, w, clock, tx, audit);
+    }
+
+    @Bean
     WebhookAppService webhookAppService(WebhookDao w, AppDao a, TransactionOperations tx, AuditTrail audit) {
         return new WebhookAppService(w, a, tx, audit);
     }

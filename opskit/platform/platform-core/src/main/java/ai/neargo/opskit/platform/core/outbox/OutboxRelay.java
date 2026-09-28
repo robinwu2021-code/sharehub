@@ -76,9 +76,10 @@ public class OutboxRelay {
         String error = firstError;
         tx.executeWithoutResult(t -> outbox.markRetry(account, row.id(), attempt, nextAt, exhausted, error));
         if (exhausted) {
-            // 谁该做什么：接入方修好回调后，在接入管理页或调重投接口
-            log.error("webhook 投递重试耗尽，需接入方修复回调后手工重投 outboxId={} eventType={} idemKey={} workspace={} lastError={}",
-                    row.id(), row.eventType(), row.idemKey(), row.workspaceId(), error);
+            // 谁该做什么：接入方修好回调后重投 —— POST /workspaces/{ws}/webhook-deliveries/{outboxId}/redeliver（integration:manage）
+            log.error("webhook 投递重试耗尽，需接入方修复回调后调 POST /workspaces/{}/webhook-deliveries/{}/redeliver 重投 outboxId={} eventType={} idemKey={} lastError={}",
+                    row.workspaceId(), row.id(),
+                    row.id(), row.eventType(), row.idemKey(), error);
         } else {
             log.warn("webhook 投递失败，将自动重试 outboxId={} eventType={} attempt={} nextAtMs={} error={}",
                     row.id(), row.eventType(), attempt, nextAt, error);

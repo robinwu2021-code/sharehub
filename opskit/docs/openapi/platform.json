@@ -141,6 +141,110 @@
         },
         "type" : "object"
       },
+      "DeliveryQuery" : {
+        "properties" : {
+          "eventType" : {
+            "type" : "string"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "state" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "DeliveryRow" : {
+        "properties" : {
+          "atMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "attempt" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "error" : {
+            "type" : "string"
+          },
+          "httpStatus" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "latencyMs" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "subscriptionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "url" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Detail" : {
+        "properties" : {
+          "attempts" : {
+            "items" : {
+              "$ref" : "#/components/schemas/DeliveryRow"
+            },
+            "type" : "array"
+          },
+          "event" : {
+            "$ref" : "#/components/schemas/EventRow"
+          },
+          "payload" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "EventRow" : {
+        "properties" : {
+          "attempts" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "createdAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "doneAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "eventType" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "idemKey" : {
+            "type" : "string"
+          },
+          "lastError" : {
+            "type" : "string"
+          },
+          "nextAtMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "state" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "GroupBody" : {
         "properties" : {
           "claimTimeoutSec" : {
@@ -289,6 +393,29 @@
             },
             "type" : "array",
             "uniqueItems" : true
+          }
+        },
+        "type" : "object"
+      },
+      "PageEventRow" : {
+        "properties" : {
+          "list" : {
+            "items" : {
+              "$ref" : "#/components/schemas/EventRow"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "total" : {
+            "format" : "int64",
+            "type" : "integer"
           }
         },
         "type" : "object"
@@ -759,6 +886,109 @@
         "tags" : [ "settings-controller" ]
       }
     },
+    "/api/opskit/v1/workspaces/{ws}/webhook-deliveries/query" : {
+      "post" : {
+        "operationId" : "query",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DeliveryQuery"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageEventRow"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "delivery-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/webhook-deliveries/{id}" : {
+      "get" : {
+        "operationId" : "get_7",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Detail"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "delivery-controller" ]
+      }
+    },
+    "/api/opskit/v1/workspaces/{ws}/webhook-deliveries/{id}/redeliver" : {
+      "post" : {
+        "operationId" : "redeliver",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EventRow"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "delivery-controller" ]
+      }
+    },
     "/v1/workspaces/{ws}/calendars/{code}" : {
       "get" : {
         "operationId" : "calendar_1",
@@ -1058,6 +1288,109 @@
           }
         },
         "tags" : [ "settings-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/webhook-deliveries/query" : {
+      "post" : {
+        "operationId" : "query_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DeliveryQuery"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageEventRow"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "delivery-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/webhook-deliveries/{id}" : {
+      "get" : {
+        "operationId" : "get_6",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Detail"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "delivery-controller" ]
+      }
+    },
+    "/v1/workspaces/{ws}/webhook-deliveries/{id}/redeliver" : {
+      "post" : {
+        "operationId" : "redeliver_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "actor",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Actor"
+          }
+        }, {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EventRow"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "delivery-controller" ]
       }
     }
   }

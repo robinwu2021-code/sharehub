@@ -206,6 +206,49 @@ class OutboxRelayTest {
         }
     }
 
+    /** 运维面：耗尽的事件查得到（带每次尝试），修好回调后经服务重投；无 integration:manage 403，别的空间 404，已送达的 409。 */
+    @ParameterizedTest
+    @MethodSource("ai.neargo.opskit.commons.testing.TestDatabases#all")
+    void exhaustedEventsAreFoundAndRedeliveredThroughTheOpsService(TestDatabase db) throws Exception {
+        Env e = env(db);
+        ai.neargo.opskit.platform.core.app.DeliveryAppService ops = new ai.neargo.opskit.platform.core.app.DeliveryAppService(e.outbox, e.webhooks,
+                e.d.f.clock, e.d.f.tx, e.d.audit);
+        AppSecrets app = e.d.apps.createApp(e.d.account, new CreateAppRequest("x", true, List.of(), null));
+        try (Receiver r = new Receiver()) {
+            e.webhooks.subscribe(e.d.account, null, app.app().appId(), "*", r.url());
+            e.publish(e.event("ticket.created", "TK9:1"));
+            r.status.set(500);
+            for (int i = 0; i < 3; i++) {
+                e.relay.relayOnce();
+                e.d.f.clock.advanceMillis(Duration.ofHours(1).toMillis());
+            }
+            ai.neargo.opskit.commons.query.Page<ai.neargo.opskit.platform.core.app.DeliveryAppService.EventRow> failed =
+                    ops.query(e.d.system(), "FAILED", null, ai.neargo.opskit.commons.query.PageRequest.of(1, 20));
+            assertThat(failed.total()).isEqualTo(1);
+            long id = failed.list().get(0).id();
+            assertThat(failed.list().get(0).lastError()).isEqualTo("HTTP 500");
+            assertThat(ops.get(e.d.system(), id).attempts()).hasSize(3).allMatch(a -> a.httpStatus() == 500 && a.url().equals(r.url()));
+
+            ai.neargo.opskit.commons.actor.Actor member = new ai.neargo.opskit.commons.actor.Actor(e.d.tenant,
+                    java.util.Optional.of(ai.neargo.opskit.commons.actor.PrincipalRef.member("mb_x")), java.util.Optional.empty(), java.util.Set.of(),
+                    java.util.Set.of(), java.util.Set.of(), java.util.Set.of(), java.util.Set.of());
+            assertThatThrownBy(() -> ops.redeliver(member, id)).isInstanceOf(ai.neargo.opskit.commons.error.OpsKitException.class)
+                    .hasMessageContaining("integration:manage");
+            String other = e.d.tenancy.createWorkspace(e.d.account, new CreateWorkspaceRequest("别的", "T0009", null, null)).workspaceId();
+            ai.neargo.opskit.commons.actor.Actor elsewhere = new ai.neargo.opskit.commons.actor.Actor(
+                    new ai.neargo.opskit.commons.tenancy.TenantContext(e.d.account, new ai.neargo.opskit.commons.tenancy.WorkspaceId(other)),
+                    java.util.Optional.empty(), java.util.Optional.of("app_test"), java.util.Set.of(), java.util.Set.of(), java.util.Set.of(),
+                    java.util.Set.of(), java.util.Set.of());
+            assertThatThrownBy(() -> ops.redeliver(elsewhere, id)).hasMessageContaining("not found");
+
+            r.status.set(200);
+            assertThat(ops.redeliver(e.d.system(), id).state()).isEqualTo("PENDING");
+            assertThat(e.relay.relayOnce()).isEqualTo(1);
+            assertThat(ops.get(e.d.system(), id).event().state()).isEqualTo("DONE");
+            assertThatThrownBy(() -> ops.redeliver(e.d.system(), id)).as("已送达").hasMessageContaining("already delivered");
+        }
+    }
+
     @ParameterizedTest
     @MethodSource("ai.neargo.opskit.commons.testing.TestDatabases#all")
     void subscriptionsFilterByWorkspaceAndType(TestDatabase db) throws Exception {
