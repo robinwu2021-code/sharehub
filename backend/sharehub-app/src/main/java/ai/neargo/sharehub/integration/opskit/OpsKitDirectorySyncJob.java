@@ -29,7 +29,7 @@ import java.util.TreeMap;
  * <ul>
  *   <li><b>成员</b>：员工按工号、代理按人（principal_no）—— 与内省的 sub 同一口径，登录后 JIT 认得是同一个人；
  *       属性 {@code partyType}（STAFF / AGENT，工作台「受理方」列按它显示）；代理带 {@code agent:<号>} 范围（多个账户即多个）。</li>
- *   <li><b>组</b>：每个代理一个 TEAM 组 {@code agent-<代理号>}，成员是它名下的人 —— 派单能「派给某代理」。</li>
+ *   <li><b>组</b>：每个代理一个 TEAM 组 {@code agent-<代理号小写>}，成员是它名下的人 —— 派单能「派给某代理」。</li>
  *   <li><b>REPLACE</b>：对本批出现的组，成员名单以本批为准（有人离开代理即移出组）。
  *       本批没出现的成员 / 组不动 —— 离职员工不会被这里删掉，由 OpsKit 侧另行停用。</li>
  * </ul>
@@ -83,7 +83,8 @@ public class OpsKitDirectorySyncJob implements JobHandler {
             Set<String> scopes = new LinkedHashSet<>();
             for (var a : accts) {
                 scopes.add("agent:" + a.agentNo());
-                String code = "agent-" + a.agentNo();
+                // OpsKit 组代号只收小写（[a-z0-9][a-z0-9_.-]{0,63}；9-28 生产同步实测 AG011 被拒）
+                String code = "agent-" + a.agentNo().toLowerCase(java.util.Locale.ROOT);
                 memberships.computeIfAbsent(code, k -> new LinkedHashSet<>()).add(entry.getKey());
                 groups.computeIfAbsent(code, k -> {
                     Map<String, Object> g = new LinkedHashMap<>();

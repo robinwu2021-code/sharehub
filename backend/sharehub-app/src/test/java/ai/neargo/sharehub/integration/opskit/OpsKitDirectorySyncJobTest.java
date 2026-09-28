@@ -36,10 +36,10 @@ class OpsKitDirectorySyncJobTest {
         assertThat((Map<String, Object>) omar.get("attrs")).containsEntry("partyType", "AGENT").containsEntry("agentNo", "AG002");
 
         Map<String, List<String>> ms = (Map<String, List<String>>) b.get("memberships");
-        assertThat(ms.get("agent-AG001")).containsExactlyInAnyOrder("P7", "P9");
-        assertThat(ms.get("agent-AG002")).containsExactly("P9");
+        assertThat(ms.get("agent-ag001")).containsExactlyInAnyOrder("P7", "P9");
+        assertThat(ms.get("agent-ag002")).containsExactly("P9");
         assertThat((List<Map<String, Object>>) b.get("groups")).extracting(g -> g.get("code") + "/" + g.get("kind"))
-                .containsExactly("agent-AG001/TEAM", "agent-AG002/TEAM");
+                .as("组代号只能小写").containsExactly("agent-ag001/TEAM", "agent-ag002/TEAM");
         assertThat(((List<Map<String, Object>>) b.get("groups")).get(0).get("name")).as("组名是三语对象，不是字符串")
                 .isEqualTo(Map.of("zh", "Alpha", "en", "Alpha"));
     }
