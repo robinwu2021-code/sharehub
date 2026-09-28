@@ -126,6 +126,9 @@ page {
 .pb-h1 { font-size: 46rpx; font-weight: 800; letter-spacing: -0.4rpx; line-height: 1.2; }
 .pb-h2 { font-size: 34rpx; font-weight: 700; letter-spacing: -0.2rpx; }
 .pb-num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+/* 手机号 / 号码类：在阿语（RTL）里整体按从左到右排，否则 +971 被挪到末尾（真机实测「8133****971+」）。
+   只加在内联的 text 上：加在块上会连对齐一起翻成靠左 */
+.pb-ltr { direction: ltr; unicode-bidi: isolate; }
 /* 列表入场：淡入 + 轻微上移（配合行内错峰 animation-delay） */
 @keyframes pbRise { from { opacity: 0; transform: translateY(18rpx); } to { opacity: 1; transform: none; } }
 .pb-rise { animation: pbRise 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }

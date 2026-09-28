@@ -74,8 +74,13 @@ function paintSystemNavBar(dark: boolean) {
     <pb-appbar v-if="title || showBack" :title="title" :show-back="showBack">
       <template #right><slot name="appbar-right" /></template>
     </pb-appbar>
-    <scroll-view scroll-y class="pb-scaffold__body" :class="{ 'has-tab': tab }">
+    <scroll-view scroll-y class="pb-scaffold__body">
       <slot />
+      <!--
+        给底部菜单让位用**占位块**而不是滚动区的 padding-bottom：滚动容器的下内边距在部分 WebView 里
+        不计入可滚动高度，真机上「退出登录」整个压在菜单下面、滚到底也露不出来。
+      -->
+      <view v-if="tab" class="pb-scaffold__tab-gap" />
     </scroll-view>
     <pb-tabbar v-if="tab" :active="tab" />
   </view>
@@ -96,5 +101,9 @@ function paintSystemNavBar(dark: boolean) {
 .pb-rtl { direction: rtl; }
 .pb-scaffold__status { flex-shrink: 0; height: var(--status-bar-height, 0px); }
 .pb-scaffold__body { flex: 1; min-height: 0; box-sizing: border-box; }
-.pb-scaffold__body.has-tab { padding-bottom: 150rpx; }
+/* 菜单高度（约 130rpx）+ 手势条安全区 + 余量；constant/env 分开写，同一条里带 constant() 会被新 WebView 整条丢掉 */
+.pb-scaffold__tab-gap {
+  height: calc(170rpx + constant(safe-area-inset-bottom));
+  height: calc(170rpx + env(safe-area-inset-bottom));
+}
 </style>

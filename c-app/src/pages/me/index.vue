@@ -76,7 +76,7 @@ async function logout() {
               <text class="text-[34rpx] font-bold" :class="profile.nickname ? 'text-ink' : 'text-sub'">
                 {{ profile.nickname || $t("profile.nicknamePh") }}
               </text>
-              <view v-if="profile.phone" class="mt-[6rpx] text-[24rpx] text-sub">{{ phoneText(profile.phone) }}</view>
+              <view v-if="profile.phone" class="mt-[6rpx] text-[24rpx] text-sub"><text class="pb-ltr">{{ phoneText(profile.phone) }}</text></view>
             </view>
             <pb-tag v-if="profile.freeDeposit" type="success">{{ $t("me.freeDeposit") }}</pb-tag>
             <pb-icon name="chevron" :size="30" class="text-sub" />

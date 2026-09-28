@@ -77,7 +77,7 @@ function bindPhone() {
           <view class="px-[28rpx]">
             <pb-cell icon="phone" :title="$t('profile.phone')">
               <view class="flex items-center gap-[16rpx]">
-                <text class="text-sub">{{ phoneText(profile?.phone) || "—" }}</text>
+                <text class="text-sub pb-ltr">{{ phoneText(profile?.phone) || "—" }}</text>
                 <pb-button size="sm" type="tonal" @click="bindPhone">{{ $t("profile.change") }}</pb-button>
               </view>
             </pb-cell>
