@@ -61,22 +61,69 @@ public class OpsKitClient {
         exchange("PUT", "/member-attributes/" + key, def, "成员属性定义");
     }
 
-    @SuppressWarnings("unchecked")
     private Map<String, Object> exchange(String method, String path, Object body, String what) {
+        return exchange(method, path, body, what, null);
+    }
+
+    // ── 工单操作（告警联动的命令执行器用；方案 23 §十）─────────────────────────────
+
+    /** OpsKit 拒绝了一次工单操作：保留状态码与错误键，执行器据此判断「已经是想要的状态」还是真失败 */
+    public static final class Rejected extends RuntimeException {
+        public final int status;
+        public final String errorKey;
+
+        Rejected(int status, String errorKey, String message, Throwable cause) {
+            super(message, cause);
+            this.status = status;
+            this.errorKey = errorKey;
+        }
+    }
+
+    public Map<String, Object> getTicket(String ticketNo) {
+        return exchange("GET", "/tickets/" + ticketNo, null, "查工单", null);
+    }
+
+    public void patchTicketPriority(String ticketNo, String priority, String idemKey) {
+        exchange("PATCH", "/tickets/" + ticketNo, Map.of("priority", priority), "改工单优先级", idemKey);
+    }
+
+    public void mergeTicket(String ticketNo, String intoTicketNo, String reason, String idemKey) {
+        Map<String, Object> b = new LinkedHashMap<>();
+        b.put("into", intoTicketNo);
+        if (reason != null) b.put("reason", reason);
+        exchange("POST", "/tickets/" + ticketNo + "/merge", b, "并单", idemKey);
+    }
+
+    public void transitionTicket(String ticketNo, String code, String comment, String idemKey) {
+        exchange("POST", "/tickets/" + ticketNo + "/transitions/" + code, comment == null ? Map.of() : Map.of("comment", comment), "工单迁移", idemKey);
+    }
+
+    public void commentTicket(String ticketNo, String body, String idemKey) {
+        exchange("POST", "/tickets/" + ticketNo + "/comments", Map.of("body", body, "visibility", "INTERNAL"), "写工单评论", idemKey);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> exchange(String method, String path, Object body, String what, String idemKey) {
         if (!configured()) {
             throw new IllegalStateException("OpsKit 未配置（SHAREHUB_OPSKIT_BASE_URL / _WS / _APP_TOKEN），无法" + what);
         }
         try {
-            return http.method(org.springframework.http.HttpMethod.valueOf(method))
+            var req = http.method(org.springframework.http.HttpMethod.valueOf(method))
                     .uri(baseUrl + "/api/opskit/v1/workspaces/{ws}" + path, workspace)
-                    .header("Authorization", "Bearer " + appToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(body)
-                    .retrieve()
-                    .body(Map.class);
+                    .header("Authorization", "Bearer " + appToken);
+            if (idemKey != null) req = req.header("Idempotency-Key", idemKey);
+            if (body != null) req = req.contentType(MediaType.APPLICATION_JSON).body(body);
+            return req.retrieve().body(Map.class);
         } catch (RestClientResponseException ex) {
             String snippet = ex.getResponseBodyAsString();
-            throw new IllegalStateException("OpsKit " + what + "被拒 " + ex.getStatusCode().value() + " "
+            String key = null;
+            try {
+                Object k = new com.fasterxml.jackson.databind.ObjectMapper().readValue(snippet, Map.class).get("error");
+                key = k == null ? null : String.valueOf(k);
+            } catch (Exception ignored) {
+                // 应答不是 JSON（网关页等）：错误键留空，按真失败处理
+            }
+            throw new Rejected(ex.getStatusCode().value(), key, "OpsKit " + what + "被拒 " + ex.getStatusCode().value() + " "
                     + (snippet.length() > 300 ? snippet.substring(0, 300) : snippet), ex);
         }
     }

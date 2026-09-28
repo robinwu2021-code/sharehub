@@ -9,10 +9,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * 送单：把 {@link TicketRequestedEvent} 发到 OpsKit 开工单（M5-3）。与送审同一套：至少一次投递 + OpsKit 幂等键兜重复，
@@ -24,11 +20,11 @@ public class OpsKitTicketSubmitter implements OutboxConsumer {
     private static final Logger log = LoggerFactory.getLogger(OpsKitTicketSubmitter.class);
 
     private final OpsKitClient client;
-    private final Map<String, TicketOutcomeHandler> handlers;
+    private final TicketOutcomeHandlers handlers;
 
-    public OpsKitTicketSubmitter(OpsKitClient client, List<TicketOutcomeHandler> all) {
+    public OpsKitTicketSubmitter(OpsKitClient client, TicketOutcomeHandlers handlers) {
         this.client = client;
-        this.handlers = all.stream().collect(Collectors.toMap(TicketOutcomeHandler::bizType, Function.identity()));
+        this.handlers = handlers;
     }
 
     @Override
@@ -52,8 +48,7 @@ public class OpsKitTicketSubmitter implements OutboxConsumer {
     }
 
     private TicketOutcomeHandler handler(String bizType) {
-        TicketOutcomeHandler h = handlers.get(bizType);
-        if (h == null) throw new IllegalStateException("没有业务类型 " + bizType + " 的工单回写实现");
-        return h;
+        return handlers.find(bizType)
+                .orElseThrow(() -> new IllegalStateException("没有业务类型 " + bizType + " 的工单回写实现"));
     }
 }

@@ -1,0 +1,25 @@
+{
+  "code": "alarm",
+  "name": {"zh": "告警工单", "en": "Alarm ticket", "ar": "تذكرة إنذار"},
+  "processCode": "repair_flow",
+  "numberPrefix": "AL",
+  "fields": [
+    {"code": "alarmCode", "name": {"zh": "告警码", "en": "Alarm code", "ar": "رمز الإنذار"}, "type": "TEXT", "required": true, "onCreate": true, "filterable": true},
+    {"code": "siteNo", "name": {"zh": "站点", "en": "Site", "ar": "الموقع"}, "type": "TEXT", "required": false, "onCreate": true, "filterable": true},
+    {"code": "cabinetNo", "name": {"zh": "机柜", "en": "Cabinet", "ar": "الخزانة"}, "type": "TEXT", "required": false, "onCreate": true, "filterable": true}
+  ],
+  "priorityOptions": {"inline": [
+    {"code": "P1", "name": {"zh": "紧急", "en": "Urgent", "ar": "عاجل"}},
+    {"code": "P2", "name": {"zh": "高", "en": "High", "ar": "مرتفع"}},
+    {"code": "P3", "name": {"zh": "中", "en": "Medium", "ar": "متوسط"}},
+    {"code": "P4", "name": {"zh": "低", "en": "Low", "ar": "منخفض"}}
+  ]},
+  "resolutionOptions": {"inline": [
+    {"code": "FIXED", "name": {"zh": "已修复", "en": "Fixed", "ar": "تم الإصلاح"}},
+    {"code": "NO_FAULT", "name": {"zh": "无故障", "en": "No fault", "ar": "لا عطل"}}
+  ]},
+  "assignment": {"strategy": "MANUAL"},
+  "slaPolicies": ["repair_sla"],
+  "scopeFrom": [],
+  "mergeTransition": "cancel"
+}

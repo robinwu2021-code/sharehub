@@ -46,7 +46,6 @@ import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.cs.dto.CsDtos.TicketCreateReq;
 import ai.neargo.sharehub.cs.service.CsTicketService;
 import ai.neargo.sharehub.wo.WoPriority;
-import ai.neargo.sharehub.wo.WorkOrderStatus;
 import ai.neargo.sharehub.wo.ext.dto.WoExtDtos.AlarmDraft;
 import ai.neargo.sharehub.wo.ext.service.WoOpsService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -108,6 +107,8 @@ public class AlarmEngineImpl implements AlarmEngine {
     private final DeviceProtectionPort protection;
     private final TradeAnomalyPort trade;
     private final WoOpsService woOps;
+    /** 处置单的全部联动经此（方案 23 §十）：LOCAL = 本地工单（即原来直接调 woOps 的那几行）· OPSKIT = OpsKit 工单 */
+    private final ai.neargo.sharehub.alarm.port.AlarmTicketPort tickets;
     private final CsTicketService csTickets;
     private final AlarmTodoService todos;
     private final ai.neargo.sharehub.alarm.dispose.AlarmNotifier notifier;
@@ -124,7 +125,9 @@ public class AlarmEngineImpl implements AlarmEngine {
                            List<StateEvaluator> stateEvaluators, List<EventEvaluator<?>> eventEvaluators, List<AutoFixer> fixers,
                            ImpactAssessor impact, SiteStatePort siteState, SiteQueryPort siteQuery, DeviceProtectionPort protection,
                            TradeAnomalyPort trade, WoOpsService woOps, CsTicketService csTickets, AlarmTodoService todos,
-                           ai.neargo.sharehub.alarm.dispose.AlarmNotifier notifier, PlatformTransactionManager tm) {
+                           ai.neargo.sharehub.alarm.dispose.AlarmNotifier notifier, PlatformTransactionManager tm,
+                           ai.neargo.sharehub.alarm.port.AlarmTicketPort tickets) {
+        this.tickets = tickets;
         this.notifier = notifier;
         this.alarms = alarms;
         this.codeMapper = codeMapper;
@@ -451,7 +454,7 @@ public class AlarmEngineImpl implements AlarmEngine {
             a.setPriority(im.priority().name());
             notifySafely(a, "IMPACT_UP", code, now);
             if (AlarmDisposition.WORK_ORDER.name().equals(a.getDispositionType()) && a.getDispositionRef() != null) {
-                woOps.raisePriority(a.getDispositionRef(), im.priority().name(), "告警 " + a.getAlarmNo() + " 影响升级");
+                tickets.raisePriority(a.getDispositionRef(), a, im.priority().name(), "告警 " + a.getAlarmNo() + " 影响升级");
             }
         }
     }
@@ -534,19 +537,21 @@ public class AlarmEngineImpl implements AlarmEngine {
             return;
         }
         if (!AlarmDisposition.WORK_ORDER.name().equals(a.getDispositionType())) return;
-        String status = woOps.statusOf(ref);
-        if (status == null || WorkOrderStatus.CLOSED.name().equals(status)) return;
+        if (tickets.isFinished(ref)) return;
         if (reason == AlarmCloseReason.SUPERSEDED && a.getParentAlarmNo() != null) {
             DevAlarm upper = byNo(a.getParentAlarmNo());
             if (upper == null) return;
             if (AlarmDisposition.WORK_ORDER.name().equals(upper.getDispositionType()) && upper.getDispositionRef() != null) {
-                woOps.mergeInto(ref, upper.getDispositionRef(), "告警 " + a.getAlarmNo() + " 并入 " + upper.getAlarmNo());
+                tickets.merge(ref, a, upper.getDispositionRef(), upper, "告警 " + a.getAlarmNo() + " 并入 " + upper.getAlarmNo());
+            } else if (AlarmDisposition.WORK_ORDER.name().equals(upper.getDispositionType()) && tickets.viaOpsKit()) {
+                // 上层的 OpsKit 单还在开（号未回填）：按上层告警号并，执行时再取单号
+                tickets.merge(ref, a, null, upper, "告警 " + a.getAlarmNo() + " 并入 " + upper.getAlarmNo());
             } else {
                 // 上层还没有工单：把下层工单直接改挂为上层告警的处置
                 alarms.update(null, new LambdaUpdateWrapper<DevAlarm>().eq(DevAlarm::getId, upper.getId())
                         .set(DevAlarm::getDispositionType, AlarmDisposition.WORK_ORDER.name()).set(DevAlarm::getDispositionRef, ref)
                         .set(DevAlarm::getWoNo, ref));
-                woOps.annotate(ref, "改挂到上层告警 " + upper.getAlarmNo());
+                tickets.annotate(ref, a, "改挂到上层告警 " + upper.getAlarmNo());
             }
             return;
         }
@@ -554,11 +559,7 @@ public class AlarmEngineImpl implements AlarmEngine {
             boolean othersOpen = alarms.selectCount(new LambdaQueryWrapper<DevAlarm>().eq(DevAlarm::getDispositionRef, ref)
                     .in(DevAlarm::getStatus, OPEN).ne(DevAlarm::getId, a.getId())) > 0;
             if (othersOpen) return;
-            if (WorkOrderStatus.CREATED.name().equals(status) || WorkOrderStatus.DISPATCHED.name().equals(status)) {
-                woOps.withdraw(ref, "关联告警已自动恢复");
-            } else {
-                woOps.markAlarmRecovered(ref, LocalDateTime.now());
-            }
+            tickets.recovered(ref, a, "关联告警已自动恢复");
         }
         // FALSE_ALARM：不自动关单（前端提示是否同时以误报关单）
     }
@@ -656,13 +657,19 @@ public class AlarmEngineImpl implements AlarmEngine {
                 return null;
             }
             case WORK_ORDER -> {
+                // 同一轮里它可能刚被「改挂」了下层告警的单（linkDisposition：上层还没单时把下层的单挂过来）——
+                // 此时手里的对象是旧的；不重读就会再开一张新单并覆盖单号，下层那张从此没人管（2026-09-28 OpsKit 告警用例测出，本地同样存在）
+                DevAlarm fresh = byNo(a.getAlarmNo());
+                if (fresh != null && fresh.getDispositionRef() != null && AlarmDisposition.WORK_ORDER.name().equals(fresh.getDispositionType())) {
+                    return fresh.getDispositionRef();
+                }
                 String woType = route != null && route.getWoType() != null ? route.getWoType() : "FAULT";
                 int delta = route != null && route.getPriorityDelta() != null ? route.getPriorityDelta() : 0;
                 WoPriority p = WoPriority.of(a.getPriority() == null ? code.getBasePriority() : a.getPriority()).plus(delta);
-                String woNo = woOps.openOrAttach(new AlarmDraft(woType, p.name(), mergeKey(a, code, woType, now),
+                String woNo = tickets.open(new AlarmDraft(woType, p.name(), mergeKey(a, code, woType, now),
                         a.getSubjectType() != null && AlarmSubjectType.SITE.name().equals(a.getSubjectType()) ? null : a.getCabinetNo(),
-                        a.getSiteNo(), description(a, code), a.getAlarmNo()));
-                markDisposed(a, AlarmDisposition.WORK_ORDER, woNo, "工单 " + woNo);
+                        a.getSiteNo(), description(a, code), a.getAlarmNo()), a);
+                markDisposed(a, AlarmDisposition.WORK_ORDER, woNo, woNo == null ? "已送 OpsKit 开单" : "工单 " + woNo);
                 return woNo;
             }
             case CS_CASE -> {
@@ -738,10 +745,10 @@ public class AlarmEngineImpl implements AlarmEngine {
         if (a.getDispositionRef() != null) return a.getDispositionRef();   // 幂等：已处置返回首次单号
         if (!EVAL.equals(a.getSource())) {
             // 存量设备告警：没有业务码与路由，按故障工单处置（取代原先的假单号）
-            String woNo = woOps.openOrAttach(new AlarmDraft("FAULT", WoPriority.MEDIUM.name(), "ALM:" + a.getAlarmNo(),
-                    a.getCabinetNo(), a.getSiteNo(), "设备告警 " + a.getAlarmCode() + "｜告警 " + a.getAlarmNo(), a.getAlarmNo()));
+            String woNo = tickets.open(new AlarmDraft("FAULT", WoPriority.MEDIUM.name(), "ALM:" + a.getAlarmNo(),
+                    a.getCabinetNo(), a.getSiteNo(), "设备告警 " + a.getAlarmCode() + "｜告警 " + a.getAlarmNo(), a.getAlarmNo()), a);
             DataScopeContext.executeWithoutScope(() -> {
-                markDisposed(a, AlarmDisposition.WORK_ORDER, woNo, "工单 " + woNo);
+                markDisposed(a, AlarmDisposition.WORK_ORDER, woNo, woNo == null ? "已送 OpsKit 开单" : "工单 " + woNo);
                 return null;
             });
             return woNo;
@@ -767,7 +774,8 @@ public class AlarmEngineImpl implements AlarmEngine {
                             .in(DevAlarm::getStatus, OPEN).isNotNull(DevAlarm::getDispositionRef))
                     .stream().filter(x -> key.equals(mergeKey(x, code, woType, LocalDateTime.now()))).map(DevAlarm::getDispositionRef)
                     .findFirst().orElse(null);
-            var c = woOps.candidates(a.getSiteNo()).stream().filter(x -> x.siteOwner()).findFirst().orElse(null);
+            // OpsKit 模式由 OpsKit 按类型的派单策略派，不再算本地候选
+            var c = tickets.viaOpsKit() ? null : woOps.candidates(a.getSiteNo()).stream().filter(x -> x.siteOwner()).findFirst().orElse(null);
             if (c != null) {
                 assigneeType = c.type();
                 assigneeNo = c.no();

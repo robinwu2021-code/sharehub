@@ -83,7 +83,7 @@ class OpsKitCsTicketTest extends ApiTestSupport {
         String admin = login("ADMIN");
         Map<String, Object> m = new HashMap<>();
         m.put("issue", "M5-3 探针：借不出");
-        m.put("channel", "电话");
+        m.put("channel", "PHONE");   // 渠道是受控词表（CsTicketChannel，d1f9a6b3 起）
         m.put("cabinetNo", "CB-M5-" + RUN);
         String no = post("/api/ops/cs/tickets", m, admin).okData().path("ticketNo").asText();
 

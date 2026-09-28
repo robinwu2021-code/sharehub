@@ -29,15 +29,18 @@ public class OpsKitWebhookService {
 
     private final EventIdempotency once;
     private final ApprovalOutcomeHandlers handlers;
+    private final TicketOutcomeHandlers tickets;
 
-    public OpsKitWebhookService(EventIdempotency once, ApprovalOutcomeHandlers handlers) {
+    public OpsKitWebhookService(EventIdempotency once, ApprovalOutcomeHandlers handlers, TicketOutcomeHandlers tickets) {
         this.once = once;
         this.handlers = handlers;
+        this.tickets = tickets;
     }
 
     /** @return true = 本次真的处理了；false = 重复到达或不关心的事件 */
     @Transactional
     public boolean handle(String eventType, String idemKey, Map<String, Object> data) {
+        if (eventType != null && eventType.startsWith("ticket.")) return ticketEvent(eventType, idemKey, data);
         if (!"approval.completed".equals(eventType)) {
             // instance.* / task.* / sla.* 目前不需要回写（业务行只关心审批结论）；订阅面收窄前先忽略
             log.debug("OpsKit 事件不需要回写，忽略 type={} idemKey={}", eventType, idemKey);
@@ -58,6 +61,25 @@ public class OpsKitWebhookService {
         }
         ApprovalDecision d = decision(data);
         return once.once(dedupKey(idemKey), HANDLER, eventType, () -> handler.get().onCompleted(bizNo, d));
+    }
+
+    /**
+     * 工单事件 → 按业务对象类型路由（告警完工复核等）。去重键带上事件类型：关单时 transitioned 与 closed
+     * <b>幂等键相同、类型不同</b>（OpsKit 约定），只按键去重会把第二个吞掉。
+     */
+    private boolean ticketEvent(String eventType, String idemKey, Map<String, Object> data) {
+        Map<?, ?> subject = data.get("subject") instanceof Map<?, ?> m ? m : Map.of();
+        String bizType = str(subject.get("type"));
+        var h = tickets.find(bizType);
+        if (h.isEmpty()) return false;   // 不是本系统送的单（手工建的、subject.type=ticket 的），不需要回写
+        if (idemKey == null || idemKey.isBlank()) throw new IllegalArgumentException("OpsKit event has no idemKey; cannot dedupe");
+        String bizNo = str(subject.get("ref"));
+        String ticketNo = str(data.get("ticketNo"));
+        String category = str(data.get("statusCategory"));
+        Object res = data.get("resolution");
+        String resolution = res instanceof Map<?, ?> rm ? str(rm.get("code")) : str(res);
+        return once.once(dedupKey(eventType + ":" + idemKey), HANDLER, eventType,
+                () -> h.get().onTicketEvent(eventType, bizNo, ticketNo, category, resolution));
     }
 
     static ApprovalDecision decision(Map<String, Object> data) {
