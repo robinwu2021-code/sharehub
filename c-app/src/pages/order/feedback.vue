@@ -11,6 +11,7 @@
 import { computed, ref } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import { api } from "@/api";
+import { upload } from "@/api/http-client";
 import { useAppStore } from "@/stores/app";
 import type { FaqItem } from "@/types";
 
@@ -62,11 +63,29 @@ async function submit() {
   }
   loading.value = true;
   try {
+    /*
+     * 先把照片传上去换成 fileNo，再随报障一起提交。
+     * 此前这一步根本不存在：选好的图只留在手机上，运营永远看不到 ——
+     * 而界面上它们看起来是交出去了（2026-09-28 真机核对发现）。
+     * 传失败就整单不提交并说明：用户宁可重来，也好过以为证据交了其实没交。
+     */
+    let fileNos: string[] | undefined;
+    if (photos.value.length) {
+      uni.showLoading({ title: t("feedback.uploading"), mask: true });
+      try {
+        fileNos = await Promise.all(photos.value.map(async (p) => (await upload("/mp/files", p)).fileNo));
+      } catch (e) {
+        throw new Error(t("feedback.uploadFailed") + "：" + (e as Error).message);
+      } finally {
+        uni.hideLoading();
+      }
+    }
     const r = await api.report({
       problemNo: problemNo.value,
       orderNo: orderNo || undefined,
       cabinetNo: cabinetNo || undefined,
       issue: desc.value,
+      fileNos,
     });
     uni.showToast({ title: t(OUTCOME[r.suggestedAction] || "feedback.submitted"), icon: "none" });
     // 跳到进度页而不是退回去：报障之后用户最想知道的是「现在到哪一步了」

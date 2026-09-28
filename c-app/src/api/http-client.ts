@@ -110,6 +110,43 @@ function qs(q?: object): string {
   return parts.length ? `?${parts.join("&")}` : "";
 }
 
+/**
+ * 上传一个本地文件（`uni.chooseImage` 给的临时路径），返回服务端的 fileNo。
+ *
+ * 走 `uni.uploadFile` 而不是 `uni.request`：端上拿到的是临时路径不是二进制，
+ * 只有前者会读文件并拼 multipart。**不能带 `Content-Type`** —— 那个头由它自己拼
+ * （里面要带 boundary），手动塞一个 application/json 会让服务端解不出表单。
+ *
+ * 出参是字符串，要自己 JSON.parse，与 uni.request 不同。
+ */
+export function upload(path: string, filePath: string): Promise<{ fileNo: string }> {
+  const { "Content-Type": _ct, ...headers } = authHeaders();
+  return new Promise((resolve, reject) => {
+    uni.uploadFile({
+      url: `${BASE}${path}`,
+      filePath,
+      name: "file",
+      header: headers,
+      success: (res) => {
+        let body: Partial<Result<{ fileNo: string }>> = {};
+        try {
+          body = JSON.parse(res.data) as Partial<Result<{ fileNo: string }>>;
+        } catch {
+          reject(new ApiError(`HTTP ${res.statusCode}`, res.statusCode));
+          return;
+        }
+        if (res.statusCode >= 200 && res.statusCode < 300 && body.code === 0) {
+          resolve(body.data as { fileNo: string });
+        } else {
+          if (res.statusCode === 401) onUnauthorized?.();
+          reject(new ApiError(body.message || `HTTP ${res.statusCode}`, body.code ?? res.statusCode));
+        }
+      },
+      fail: (err) => reject(new Error(err.errMsg || "network error")),
+    });
+  });
+}
+
 export const client = {
   get: <T>(path: string, q?: object) => request<T>(`${path}${qs(q)}`),
   post: <T>(path: string, data?: unknown) => request<T>(path, { method: "POST", data: data ?? {} }),

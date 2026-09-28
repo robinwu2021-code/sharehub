@@ -150,7 +150,13 @@ public class DataScopeRegistration implements DataScopeRegistrar {
          */
         registry.register("loc_contract", Map.of("SITE", "site_no"));
         registry.register("loc_site_status_log", Map.of("SITE", "site_no"));
-        registry.register("sys_file", Map.of("AGENT", "agent_no"));
+        /*
+         * SELF → uploader_no：C 端会话的 spec 是 SELF，而本表此前只登记了 AGENT ——
+         * handler fail-closed，于是 C 端连自己刚传的文件都读不到（2026-09-28 实测：
+         * 报障带截图提交时绑定报「找不到指定记录」）。uploader_no 是本表天然的属主锚点，
+         * 登记它同时给上传文件加了一层 SQL 兜底：别人的 fileNo 在 SQL 层就取不到。
+         */
+        registry.register("sys_file", Map.of("AGENT", "agent_no", "SELF", "uploader_no"));
         registry.register("dev_protection", Map.of("AGENT", "agent_no", "SITE", "site_no"));
         registry.register("dev_trial_rent", Map.of("AGENT", "agent_no", "SITE", "site_no"));
         registry.register("dev_alarm_todo", Map.of("AGENT", "agent_no", "SITE", "site_no"));

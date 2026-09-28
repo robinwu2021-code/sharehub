@@ -22,6 +22,8 @@ import ai.neargo.sharehub.cs.service.CsTicketService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.stereotype.Service;
+import ai.neargo.sharehub.api.platform.dto.FileRef;
+import ai.neargo.sharehub.api.platform.port.FileBindingPort;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.format.DateTimeFormatter;
@@ -43,6 +45,8 @@ import java.util.Set;
 public class CsTicketServiceImpl implements CsTicketService {
 
     private static final String TENANT_MAIN = "MAIN";
+    /** 与 {@code FileCategory.CS_EVIDENCE} 的 bizTypes 对应 —— 绑定时会校验用途与它相符。 */
+    private static final String BIZ_CS_TICKET = "CS_TICKET";
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     /** 状态机：当前态 → 允许迁往的态。CLOSED 是终态。 */
@@ -56,17 +60,20 @@ public class CsTicketServiceImpl implements CsTicketService {
     private final TicketWorkOrderPort workOrderPort;
     private final TicketRefundPort refundPort;
     private final CsSessionService sessionService;
+    private final FileBindingPort fileBinding;
 
     public CsTicketServiceImpl(CsTicketMapper mapper,
                                ProblemActionResolver actionResolver,
                                TicketWorkOrderPort workOrderPort,
                                TicketRefundPort refundPort,
-                               CsSessionService sessionService) {
+                               CsSessionService sessionService,
+                               FileBindingPort fileBinding) {
         this.mapper = mapper;
         this.actionResolver = actionResolver;
         this.workOrderPort = workOrderPort;
         this.refundPort = refundPort;
         this.sessionService = sessionService;
+        this.fileBinding = fileBinding;
     }
 
     // ——————————————————————— 运营端 ———————————————————————
@@ -88,7 +95,7 @@ public class CsTicketServiceImpl implements CsTicketService {
     @Override
     public CsTicketVO get(String ticketNo) {
         CsTicket e = find(ticketNo);
-        return e == null ? null : toVO(e);
+        return e == null ? null : withPhotos(e);
     }
 
     /**
@@ -196,6 +203,13 @@ public class CsTicketServiceImpl implements CsTicketService {
         e.setStatus(CsTicketStatus.OPEN.name());
         mapper.insert(e); // 受理单必建 —— 分流失败也不能丢用户诉求
 
+        // 截图归到这张单上。绑定失败（别人的文件 / 已绑过 / 用途不符）整单失败：
+        // 与其把诉求收下、把证据丢掉，不如让用户当场重来 —— 丢了的证据事后补不回来。
+        List<String> fileNos = req == null ? null : req.fileNos();
+        if (fileNos != null && !fileNos.isEmpty()) {
+            fileBinding.bind(fileNos, BIZ_CS_TICKET, e.getTicketNo(), null);
+        }
+
         // 分流依据来自字典，不是 if-else 硬编码（[api/README §6A.2]）
         String action = actionResolver.resolve(e.getProblemNo());
         String sessionNo = null;
@@ -235,10 +249,19 @@ public class CsTicketServiceImpl implements CsTicketService {
                 .eq(CsTicket::getTicketNo, reportNo)
                 .eq(CsTicket::getCUserNo, cUserNo) // 他人单号查不到 = 不存在，不泄露存在性
                 .last("limit 1"));
-        return e == null ? null : toVO(e);
+        return e == null ? null : withPhotos(e);
     }
 
     // ——————————————————————— 内部 ———————————————————————
+
+    /** 详情才查附件：列表逐行查是 N+1，而列表上也放不下图。 */
+    private CsTicketVO withPhotos(CsTicket e) {
+        CsTicketVO vo = toVO(e);
+        List<FileRef> photos = fileBinding.listBound(BIZ_CS_TICKET, e.getTicketNo());
+        return new CsTicketVO(vo.ticketNo(), vo.userNo(), vo.orderNo(), vo.cabinetNo(), vo.problemNo(),
+                vo.issue(), vo.channel(), vo.status(), vo.handlerNo(), vo.woNo(), vo.refundNo(),
+                vo.createdAt(), photos);
+    }
 
     private PageResult<CsTicketVO> doPage(Integer page, Integer size, LambdaQueryWrapper<CsTicket> w) {
         int p = (page == null || page < 1) ? 1 : page;

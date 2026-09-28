@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.cs.dto;
 
+import ai.neargo.sharehub.api.platform.dto.FileRef;
+
 /**
  * user/cs 子域 DTO。出参字段镜像 ops-web {@code lib/types/cs.ts}
  * （{@code CsTicket} / {@code CsSession}），并补上前端尚缺的两个出口字段。
@@ -17,7 +19,16 @@ public final class CsDtos {
      */
     public record CsTicketVO(String ticketNo, String userNo, String orderNo, String cabinetNo,
                              String problemNo, String issue, String channel, String status,
-                             String handlerNo, String woNo, String refundNo, String createdAt) {
+                             String handlerNo, String woNo, String refundNo, String createdAt,
+                             java.util.List<FileRef> photos) {
+
+        /** 列表行不带图（列表逐行查附件是 N+1）；详情用带图的构造。 */
+        public CsTicketVO(String ticketNo, String userNo, String orderNo, String cabinetNo,
+                          String problemNo, String issue, String channel, String status,
+                          String handlerNo, String woNo, String refundNo, String createdAt) {
+            this(ticketNo, userNo, orderNo, cabinetNo, problemNo, issue, channel, status,
+                    handlerNo, woNo, refundNo, createdAt, null);
+        }
     }
 
     /** 客服会话行，镜像前端 {@code CsSession}。 */
@@ -59,8 +70,12 @@ public final class CsDtos {
     }
 
     /** C 端自助报障入参（{@code POST /mp/user/report}）。{@code cUserNo} 由会话决定，不从这里取。 */
+    /**
+     * @param fileNos 报障截图（先经 {@code POST /mp/files} 传上来拿到的 fileNo）。
+     *                此前没有这个字段 —— 端上的图片选择器选完就留在手机里，运营永远看不到。
+     */
     public record ReportReq(String problemNo, String orderNo, String cabinetNo,
-                            String issue, String channel) {
+                            String issue, String channel, java.util.List<String> fileNos) {
     }
 
     /**

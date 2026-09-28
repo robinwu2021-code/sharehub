@@ -105,6 +105,8 @@ export default {
     inUseNoFeeYet: "In use",
   },
   feedback: {
+    uploading: "Uploading photos…",
+    uploadFailed: "Photo upload failed",
     pickType: "Pick a problem type first",
     doneSelf: "Handled per the help note — submit again if it is not resolved",
     doneWorkOrder: "Received and sent to a repair order; track it in My reports",

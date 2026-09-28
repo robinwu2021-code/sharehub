@@ -105,6 +105,8 @@ export default {
     inUseNoFeeYet: "使用中",
   },
   feedback: {
+    uploading: "正在上传照片…",
+    uploadFailed: "照片上传失败",
     pickType: "请先选择问题类型",
     doneSelf: "已按帮助说明处理，如未解决可再提交",
     doneWorkOrder: "已受理并转维修工单，可在「我的报障」查看进度",

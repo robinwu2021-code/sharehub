@@ -292,6 +292,7 @@ export interface ReportInput {
   cabinetNo?: string;
   issue: string; // 用户自己描述的问题
   channel?: string; // APP / MP，缺省由后端填 APP
+  fileNos?: string[]; // 报障截图：先传 /mp/files 拿 fileNo，提交时带上
 }
 
 /** 报障受理结果（镜像后端 `ReportResultVO`）。`suggestedAction` 决定提交后往哪跳。 */

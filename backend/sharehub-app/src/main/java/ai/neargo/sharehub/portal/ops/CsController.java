@@ -53,6 +53,17 @@ public class CsController {
         return ticketService.page(page, size, keyword, status, channel);
     }
 
+    /**
+     * 单张详情 —— 列表放不下报障截图，而截图往往是唯一能看清现场的东西。
+     *
+     * <p>此前这条路只有列表与受理两个端点：C 端传上来的图没有任何地方能看（2026-09-28 补）。
+     */
+    @GetMapping("/tickets/{ticketNo}")
+    @PreAuthorize("@perm.can('cs:ticket:read')")
+    public CsTicketVO ticket(@PathVariable String ticketNo) {
+        return ticketService.get(ticketNo);
+    }
+
     /** 受理 / 更新（状态、处理人、补充描述）。非法状态迁移由 service 抛异常。 */
     /**
      * 运营端手工建单（客服接到来电后登记）。

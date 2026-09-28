@@ -105,6 +105,8 @@ export default {
     inUseNoFeeYet: "قيد الاستخدام",
   },
   feedback: {
+    uploading: "جارٍ رفع الصور…",
+    uploadFailed: "فشل رفع الصور",
     pickType: "اختر نوع المشكلة أولاً",
     doneSelf: "تمت المعالجة وفق الإرشادات — أعد الإرسال إن لم تُحل",
     doneWorkOrder: "تم الاستلام وأُحيل إلى أمر إصلاح؛ تابعه في «تقاريري»",
