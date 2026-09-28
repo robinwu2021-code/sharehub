@@ -21,7 +21,7 @@ export const SCENARIOS = [
     },
   },
   {
-    id: "S1-2", title: "工单→待办：退回抢单池的单出现在可抢；抢单后派给我、可抢 −1", perms: ALL,
+    id: "S1-2", modes: ["mock"], title: "工单→待办：退回抢单池的单出现在可抢；抢单后派给我、可抢 −1", perms: ALL,
     url: (fx) => `/flow/tickets/detail/?no=${fx.ticketAssigned}`,
     run: async (h) => {
       // 前提：先造一张池里的单（种子里抢单池是空的）；之后走应用内跳转，状态不丢
@@ -39,6 +39,18 @@ export const SCENARIOS = [
       await h.toast(/已领取/, "已领取");
       const after = await h.waitFor(() => { const v = h.tabNum(/^可抢单/); return v === before - 1 ? v : null; }, "可抢数减一");
       h.expect(after === before - 1, `可抢 ${before} → ${after}`);
+    },
+  },
+
+  {
+    id: "S1-3", modes: ["opskit"], title: "待办：候选但不在我数据范围内的单不进待办（负对照）", perms: ALL, url: () => "/flow/todo/",
+    run: async (h, fx) => {
+      await h.click("button", /^全部/);
+      await h.waitFor(() => h.total() !== null, "列表加载");
+      h.expect(h.total() >= 1, "待办非空（确认不是整页跑空）");
+      const hrefs = h.all("a").map((a) => a.getAttribute("href") || "");
+      h.expect(!hrefs.some((x) => x.includes(fx.approvalHidden)), `${fx.approvalHidden}（site:B）不在待办里`);
+      h.expect(hrefs.some((x) => x.includes(fx.approvalTwoStep)), "同一候选、范围内的单在待办里（正对照）");
     },
   },
 
@@ -106,7 +118,7 @@ export const SCENARIOS = [
 
   // ── S4 审批模板 ──────────────────────────────────────────────────────
   {
-    id: "S4-1", title: "模板：内容不变再发布是幂等的；改了才生成新版本；会签对角色不可选", perms: ALL, url: () => "/flow/processes/",
+    id: "S4-1", modes: ["mock"], title: "模板：内容不变再发布是幂等的；改了才生成新版本；会签对角色不可选", perms: ALL, url: () => "/flow/processes/",
     run: async (h) => {
       await h.click("button", "编辑");
       await h.waitFor(() => h.btn("保存并发布"), "编辑区");
@@ -125,7 +137,7 @@ export const SCENARIOS = [
     },
   },
   {
-    id: "S4-2", title: "模板：校验错误一次全给，挂到对应字段", perms: ALL, url: () => "/flow/processes/",
+    id: "S4-2", modes: ["mock"], title: "模板：校验错误一次全给，挂到对应字段", perms: ALL, url: () => "/flow/processes/",
     run: async (h) => {
       await h.click("button", /新建流程/);
       await h.click("button", "保存并发布");
@@ -163,7 +175,7 @@ export const SCENARIOS = [
 
   // ── S6 工单 ──────────────────────────────────────────────────────────
   {
-    id: "S6-1", title: "工单：每张统计卡的数字 = 点进去的列表条数", perms: ALL, url: () => "/flow/tickets/",
+    id: "S6-1", modes: ["mock"], title: "工单：每张统计卡的数字 = 点进去的列表条数", perms: ALL, url: () => "/flow/tickets/",
     run: async (h) => {
       const cards = await h.waitFor(() => { const c = h.all("[data-surface=stat]"); return c.length >= 3 && !c[0].disabled ? c : null; }, "统计卡");
       for (let i = 0; i < cards.length; i++) {
@@ -180,7 +192,7 @@ export const SCENARIOS = [
     },
   },
   {
-    id: "S6-2", title: "工单：退回抢单池要原因，退回后受理方清空、时间线留痕", perms: ALL,
+    id: "S6-2", modes: ["mock"], title: "工单：退回抢单池要原因，退回后受理方清空、时间线留痕", perms: ALL,
     url: (fx) => `/flow/tickets/detail/?no=${fx.ticketAssigned}`,
     run: async (h) => {
       await h.click("button", /改派 \/ 回抢单池/);

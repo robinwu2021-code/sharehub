@@ -22,7 +22,9 @@ const ONLY = arg("only")?.split(",");
 const REPORT = arg("report", join(here, "..", "..", "..", ".e2e", "report"));
 if (!OUT || !existsSync(OUT)) { console.error("用法：--out <next build 的 out 目录>"); process.exit(2); }
 
-const FIXTURES = JSON.parse(readFileSync(join(here, OPSKIT ? "fixtures.opskit.json" : "fixtures.mock.json"), "utf8"));
+// 夹具：--fixtures 指定（对真服务时由 dev-token.sh fixtures 生成到 .e2e/ 下 —— 含令牌，不进仓库）
+const MODE = OPSKIT ? "opskit" : "mock";
+const FIXTURES = JSON.parse(readFileSync(arg("fixtures", join(here, `fixtures.${MODE}.json`)), "utf8"));
 const HELPERS = readFileSync(join(here, "helpers.browser.js"), "utf8");
 const ORIGIN = "http://flow.e2e";
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "application/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".woff2": "font/woff2", ".ico": "image/x-icon", ".txt": "text/plain" };
@@ -91,14 +93,16 @@ try {
   await send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   await send("Page.navigate", { url: ORIGIN + "/login/" }); await sleep(1500);
 
-  for (const s of SCENARIOS.filter((x) => !ONLY || ONLY.some((o) => x.id.startsWith(o)))) {
+  // modes：场景只在哪些模式下有意义（如工单接口随后端 M3、模板随 O2-11，真服务模式先跳过）
+  for (const s of SCENARIOS.filter((x) => (!ONLY || ONLY.some((o) => x.id.startsWith(o))) && (!x.modes || x.modes.includes(MODE)))) {
     const t0 = Date.now();
     consoleErrors.length = 0;
     const ls = {
       "pb-ops-auth-v2": authState(s.perms),
       "ops-locale": JSON.stringify({ state: { locale: s.locale || "zh" }, version: 0 }),
       "ops-style": JSON.stringify({ state: { styleKey: "clean" }, version: 0 }),
-      ...(FIXTURES.token ? { "ops-opskit-token": FIXTURES.token } : {}),
+      // 只读场景用只读令牌（服务端判权），其余用主令牌
+    ...(FIXTURES.token ? { "ops-opskit-token": (!s.perms.includes("*") && FIXTURES.viewerToken) || FIXTURES.token } : {}),
     };
     await evaluate(`localStorage.clear(); ${Object.entries(ls).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(v)})`).join(";")}`);
     await send("Page.navigate", { url: ORIGIN + s.url(FIXTURES) });

@@ -23,7 +23,7 @@ beforeEach(() => { calls = []; });
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
 describe("httpFlow：请求形状", () => {
-  it("空间寻址 + 编码；POST 带幂等键与 JSON；读接口按语言", async () => {
+  it("空间寻址 + 编码；查询是 POST + JSON、不带幂等键；按语言", async () => {
     const { flow } = await load();
     reply(200, { list: [], total: 0, page: 1, size: 20 });
     await flow.todos({ origin: "ALL", page: 1, size: 20 });
@@ -31,10 +31,32 @@ describe("httpFlow：请求形状", () => {
     expect(c.url).toBe("http://opskit.test/api/opskit/v1/workspaces/ext%3AT001/todos/query");
     const h = c.init.headers as Record<string, string>;
     expect(c.init.method).toBe("POST");
-    expect(h["Idempotency-Key"]).toMatch(/^[0-9a-f-]{36}$/);
+    expect(h["Idempotency-Key"]).toBeUndefined();
     expect(h["Content-Type"]).toBe("application/json");
     expect(h["Accept-Language"]).toBeTruthy();
     expect(JSON.parse(String(c.init.body))).toEqual({ origin: "ALL", page: 1, size: 20 });
+  });
+
+  it("查询类 POST（…/query、/count、/queue-counts）不带幂等键 —— 那是读", async () => {
+    const { flow } = await load();
+    reply(200, { list: [], total: 0, page: 1, size: 20 });
+    await flow.todos({ origin: "ALL", page: 1, size: 20 });
+    await flow.todoCount();
+    await flow.queueCounts();
+    for (const c of calls) expect((c.init.headers as Record<string, string>)["Idempotency-Key"], c.url).toBeUndefined();
+  });
+
+  it("非安全上下文（http 内网地址）没有 randomUUID 时，写请求照样带合法幂等键", async () => {
+    const { flow } = await load();
+    const orig = crypto.randomUUID;
+    Object.defineProperty(crypto, "randomUUID", { value: undefined, configurable: true });
+    try {
+      reply(200, {});
+      await flow.withdraw("AP1");
+      expect((calls[0].init.headers as Record<string, string>)["Idempotency-Key"]).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    } finally {
+      Object.defineProperty(crypto, "randomUUID", { value: orig, configurable: true });
+    }
   });
 
   it("GET 不带幂等键；两次写入的幂等键不同", async () => {

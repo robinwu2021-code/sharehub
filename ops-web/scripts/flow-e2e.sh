@@ -26,11 +26,22 @@ if "turbopack:" not in s:
     open(p, "w", encoding="utf-8").write(s)
 PY
 
+FIXTURE_ARGS=()
 if [[ "$MODE" == opskit ]]; then
-  export NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_FLOW_API=http NEXT_PUBLIC_OPSKIT_WS="${OPSKIT_WS:?要设 OPSKIT_WS}" NEXT_PUBLIC_OPSKIT_ACCOUNT="${OPSKIT_ACCOUNT:-}"
+  # 只让流程模块走真服务；宿主（菜单、权限同步、登录）仍用 mock —— 这里测的是「运营端 ↔ OpsKit」这一段，
+  # 整站切真实后端会先卡在本机没有的 ShareHub 上
+  export NEXT_PUBLIC_FLOW_API=http NEXT_PUBLIC_OPSKIT_WS="${OPSKIT_WS:?要设 OPSKIT_WS}" NEXT_PUBLIC_OPSKIT_ACCOUNT="${OPSKIT_ACCOUNT:-}"
+  # 夹具与令牌现生成（单号每次重启服务都会变；含令牌，放 .e2e/ 不进仓库）
+  mkdir -p .e2e
+  python3 - "$(opskit/scripts/dev-token.sh fixtures)" "$(opskit/scripts/dev-token.sh viewer)" > .e2e/fixtures.opskit.json <<'PY'
+import json, sys
+fx = json.loads(sys.argv[1]); fx["viewerToken"] = sys.argv[2].strip()
+print(json.dumps(fx))
+PY
+  FIXTURE_ARGS=(--fixtures .e2e/fixtures.opskit.json)
 fi
 echo "▶ 构建（$MODE）…"
 (cd "$DIR" && npx next build > "$ROOT/.e2e/build-$MODE.log" 2>&1) || { echo "构建失败，见 .e2e/build-$MODE.log"; exit 1; }
 
 echo "▶ 跑场景…"
-node ops-web/scripts/flow-e2e/run.mjs --out "$DIR/out" ${OPSKIT:+--opskit "$OPSKIT"} "$@"
+node ops-web/scripts/flow-e2e/run.mjs --out "$DIR/out" ${OPSKIT:+--opskit "$OPSKIT"} ${FIXTURE_ARGS[@]+"${FIXTURE_ARGS[@]}"} "$@"

@@ -38,6 +38,22 @@ function token(): string | undefined {
 const statusKey = (s: number) => s === 401 ? "error.unauthorized" : s === 403 ? "error.forbidden" : s === 404 ? "error.notFound"
   : s === 400 ? "error.badRequest" : s >= 500 ? "error.serverError" : "error.unknown";
 
+/**
+ * 幂等键（v4 UUID）。`crypto.randomUUID` 只在安全上下文（https / localhost）里有 ——
+ * 运营台跑在普通 http 地址（内网 IP 等）时它是 undefined，**所有写请求直接抛错**
+ * （对真服务的端到端首轮抓到的）。退回 getRandomValues，它在非安全上下文也可用。
+ */
+export function uuid(): string {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
+  const h = [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
+/** 列表一律 POST …/query（21/06 §二）：这些是读，不带幂等键 */
+const isRead = (path: string) => /\/(query|count|queue-counts|summary)(\?|$)/.test(path);
+
 /** 空间内的路径：/workspaces/{ws}/… */
 export const ws = (path: string) => {
   if (!WS) throw new ApiError(-1, "NEXT_PUBLIC_OPSKIT_WS 未配置");
@@ -50,7 +66,7 @@ export async function opskit<T>(method: "GET" | "POST" | "PUT" | "PATCH", path: 
     "Accept-Language": LOCALE_TAG[locale()],
     ...(tk ? { Authorization: `Bearer ${tk}` } : {}),
     ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
-    ...(method !== "GET" ? { "Idempotency-Key": crypto.randomUUID() } : {}),
+    ...(method !== "GET" && !isRead(path) ? { "Idempotency-Key": uuid() } : {}),
   };
   let r: Response;
   try {
