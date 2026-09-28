@@ -66,7 +66,9 @@
 # 而 wo_sla_rule.priority **是真枚举**，只因词表里有个 `*` 哨兵值（「类型默认」）
 # 不合大写形而掉了出去。它是这份判据目前唯一的假阴性，记在这里以免被当成不存在。
 #
-# 2026-09-28 建账：词表列 279，已核实 22，**待核实 257**。
+# 2026-09-28 建账：词表列 279，已核实 22，待核实 257。
+# 同日核实第一批（钱那一侧）：**已核实 27，待核实 252**。（fin_invoice.status 接上校验；
+# 四个 payee_type 查明不来自请求体 —— 常量/派生/已有白名单，见 COVERED 旁的说明。）
 # ───────────────────────────────────────────────────────────────
 
 # acct_account（2）
@@ -215,9 +217,8 @@ dev_slot.slot_kind
 # dev_trial_rent（1）
 dev_trial_rent.status
 
-# fin_invoice（2）
+# fin_invoice（1）
 fin_invoice.source_type
-fin_invoice.status
 
 # fin_invoice_item（1）
 fin_invoice_item.invoice_side
@@ -465,23 +466,19 @@ recon_task.handle_result
 recon_task.handle_status
 recon_task.status
 
-# share_record（2）
+# share_record（1）
 share_record.basis
-share_record.payee_type
 
-# stl_adjustment（5）
+# stl_adjustment（4）
 stl_adjustment.kind
-stl_adjustment.payee_type
 stl_adjustment.period
 stl_adjustment.source
 stl_adjustment.status
 
-# stl_payout_account（2）
-stl_payout_account.payee_type
+# stl_payout_account（1）
 stl_payout_account.status
 
-# stl_settlement（2）
-stl_settlement.payee_type
+# stl_settlement（1）
 stl_settlement.status
 
 # stl_settlement_detail（1）

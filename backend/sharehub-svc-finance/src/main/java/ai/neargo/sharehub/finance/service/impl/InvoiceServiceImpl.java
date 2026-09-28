@@ -98,7 +98,13 @@ public class InvoiceServiceImpl implements InvoiceService {
         e.setAmount(req.amount());
         e.setVatTrn(req.vatTrn());
         e.setCurrency(req.currency());
-        String status = (req.status() == null || req.status().isBlank()) ? "DRAFT" : req.status();
+        /*
+         * 词表在 InvoiceStatus 里，写入侧原先没调 —— 前端传什么就存什么。
+         * 串一个字母（"ISUED"）的后果不是报错而是**这张发票从此筛不出来**，
+         * 而它是税务单据。顺带归一大小写：of() 认 "draft"，存的是 DRAFT。
+         */
+        String status = (req.status() == null || req.status().isBlank())
+                ? InvoiceStatus.DRAFT.name() : InvoiceStatus.of(req.status()).name();
         e.setStatus(status);
         if (InvoiceStatus.ISSUED.name().equals(status) && e.getIssuedAt() == null) {
             e.setIssuedAt(LocalDateTime.now().format(TS)); // 开票时间只在首次开出时落，重复保存不覆盖

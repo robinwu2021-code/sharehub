@@ -79,6 +79,9 @@ class VocabularyRejectedOnWriteTest extends ApiTestSupport {
         jdbc.update("DELETE FROM usr_free_whitelist WHERE c_user_no LIKE 'UVOCAB%'");
         jdbc.update("DELETE FROM notify_template WHERE name = ?", MARK);
         jdbc.update("DELETE FROM md_problem WHERE title = ?", MARK);
+        // 发票有明细子表，先删子后删主 —— 反过来留下孤儿明细行
+        jdbc.update("DELETE FROM fin_invoice_item WHERE invoice_no IN (SELECT invoice_no FROM fin_invoice WHERE payee_name = ?)", MARK);
+        jdbc.update("DELETE FROM fin_invoice WHERE payee_name = ?", MARK);
     }
 
     @Test
@@ -188,6 +191,46 @@ class VocabularyRejectedOnWriteTest extends ApiTestSupport {
         assertThat(badBl.status)
                 .as("拉黑 channel=SUBSCRIBE 被接受了——那是模板的词表，不是拉黑的：%s", badBl.msg())
                 .isEqualTo(400);
+    }
+
+    @Test
+    @DisplayName("★ fin_invoice.status 非法值 400 —— 此前 req.status() 原样落库，而发票是税务单据")
+    void invoice_status_rejects_out_of_vocabulary() {
+        String t = login("FINANCE");
+
+        var ok = post("/api/trade/invoices", Map.of(
+                "payeeType", "AGENT", "payeeNo", "AG0002", "payeeName", MARK,
+                "amount", "100", "currency", "AED", "status", "DRAFT"), t);
+        assertThat(ok.status).as("合法 status 应当能存：%s", ok.msg()).isEqualTo(200);
+
+        /*
+         * 串一个字母的后果不是报错，是**这张发票从此按状态筛不出来** ——
+         * 开票方以为开了，对账方一条都查不到，两边都不报错。
+         */
+        var bad = post("/api/trade/invoices", Map.of(
+                "payeeType", "AGENT", "payeeNo", "AG0002", "payeeName", MARK,
+                "amount", "100", "currency", "AED", "status", "ISUED"), t);
+        assertThat(bad.status).as("status=ISUED 竟然被接受了：%s", bad.msg()).isEqualTo(400);
+    }
+
+    @Test
+    @DisplayName("★ 发票 status 留空 = DRAFT，小写 issued 归一成 ISSUED —— 校验管的是值，不是必填")
+    void invoice_status_defaults_and_normalises() {
+        String t = login("FINANCE");
+
+        var blank = post("/api/trade/invoices", Map.of(
+                "payeeType", "AGENT", "payeeNo", "AG0002", "payeeName", MARK,
+                "amount", "100", "currency", "AED"), t);
+        assertThat(blank.status).as("没传 status 被拒了 —— 那是把必填和合法性搞混了：%s", blank.msg())
+                .isEqualTo(200);
+        assertThat(blank.okData().path("invoice").path("status").asText()).isEqualTo("DRAFT");
+
+        var lower = post("/api/trade/invoices", Map.of(
+                "payeeType", "AGENT", "payeeNo", "AG0002", "payeeName", MARK,
+                "amount", "100", "currency", "AED", "status", "issued"), t);
+        assertThat(lower.okData().path("invoice").path("status").asText())
+                .as("小写没归一 —— 库里就会同时有 issued 和 ISSUED，按状态筛只筛得到一半")
+                .isEqualTo("ISSUED");
     }
 
     @Test

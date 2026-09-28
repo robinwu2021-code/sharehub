@@ -81,7 +81,34 @@ class VocabularyWriteCoverageTest {
             // 其中只有 level 另有端点级用例（V82 白屏那一列）
             "dev_alarm_code.level", "dev_alarm_code.domain", "dev_alarm_code.subject_type",
             "dev_alarm_code.eval_type", "dev_alarm_code.disposition", "dev_alarm_code.merge_scope",
-            "dev_alarm_code.recover_rule", "dev_alarm_code.base_priority"));
+            "dev_alarm_code.recover_rule", "dev_alarm_code.base_priority",
+            // 2026-09-28 接上：req.status() 原先原样落库（InvoiceServiceImpl），
+            // 现在走 InvoiceStatus.of() 并归一大小写，VocabularyRejectedOnWriteTest 两格
+            "fin_invoice.status",
+            // ——— 以下是第三种来源：**前端根本传不了这一列**（见 SERVER_SET 说明）———
+            "stl_payout_account.payee_type", "stl_adjustment.payee_type",
+            "share_record.payee_type", "stl_settlement.payee_type"));
+
+    /*
+     * 核实一列时会遇到第三种答案，它和「接上了校验」一样牢靠，有时更牢靠：
+     * **这一列压根不来自请求体**。上面那四个 payee_type 就是：
+     *
+     *   · stl_payout_account.payee_type —— PayoutAccountServiceImpl 有白名单
+     *     PAYEE_TYPES（AGENT/VENUE），不在其中直接 400。这是真的校验；
+     *   · stl_adjustment.payee_type —— AdjustmentServiceImpl 两处都写死常量 VENUE；
+     *   · share_record.payee_type —— ShareGeneratorImpl 抄自 share_rule.dimension
+     *     （那一列已在本清单里），ReferFeeGeneratorImpl 写死 AGENT；
+     *   · stl_settlement.payee_type —— SettlementServiceImpl 从上面两张表的表头抄。
+     *
+     * 判据是 grep 全部 setPayeeType 的写入点（8 处，全在 svc-finance），逐个看来源。
+     * 「派生自另一个已覆盖的列」要连着上游一起看：dimension 哪天松了，这四列跟着松。
+     *
+     * ⚠️ 顺带查出来两件不在本卡口范围内的事，记在这儿免得下次重查：
+     *   · stl_withdrawal.payee_type **既没注释也没校验**，WithdrawalServiceImpl
+     *     直接 e.setPayeeType(req.payeeType())。没注释 = 本卡口看不见它；
+     *   · fin_invoice.payee_type 的注释是占位文字「既有DDL同名列×3」，同样看不见。
+     * 两个都该补注释（那是 DdlStatusVocabularyCommentTest 的地盘），补完会自动进本清单。
+     */
 
     @Autowired
     JdbcTemplate jdbc;
