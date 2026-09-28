@@ -9,6 +9,7 @@ import ai.neargo.opskit.process.core.app.ApprovalTemplateAppService;
 import ai.neargo.opskit.process.core.app.GateTimersAndConfirmations;
 import ai.neargo.opskit.process.core.app.InstanceAppService;
 import ai.neargo.opskit.process.core.app.ProcessDefinitionAppService;
+import ai.neargo.opskit.process.core.app.ProcessHistoryService;
 import ai.neargo.opskit.process.core.app.ProcessQueryService;
 import ai.neargo.opskit.process.core.app.ProcessTimers;
 import ai.neargo.opskit.process.core.app.SlaPolicyAppService;
@@ -100,6 +101,11 @@ public class ProcessCoreAutoConfiguration {
     @Bean
     ProcessQueryService processQueryService(ProcessDefinitionAppService defs, ProcessStore s, Directory directory) {
         return new ProcessQueryService(defs, s.queries(), directory, s.slaClocks());
+    }
+
+    @Bean
+    ProcessHistoryService processHistoryService(ProcessDefinitionAppService defs, ProcessStore s) {
+        return new ProcessHistoryService(defs, s.queries(), s.logs());
     }
 
     @Bean

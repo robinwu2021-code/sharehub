@@ -173,4 +173,25 @@ class LocalApiTest {
         assertThat(evidence.get("sla").get("state").asText()).isEqualTo("RUNNING");
         assertThat(evidence.get("sla").get("dueAtMs").asLong() - evidence.get("sla").get("startedAtMs").asLong()).isEqualTo(4 * 3600_000L);
     }
+
+    @Test
+    void historyReconcileAndStats() throws Exception {
+        String bob = token("bob");
+        String no = fixture("approvalMine", "instanceNo");
+        String twoStep = fixture("approvalTwoStep", "instanceNo");
+        Res h = call("GET", WS + "/instances/" + twoStep + "/history", bob, null);
+        assertThat(h.status()).isEqualTo(200);
+        assertThat(h.body().valueStream().map(n -> n.get("action").asText()).toList()).contains("created", "submit");
+        assertThat(h.body().get(0).get("actor").get("displayName").asText()).isEqualTo("Bob 业务员");
+        assertThat(call("GET", WS + "/instances/" + no + "/history", bob, null).status()).as("alice 自己提交的单，bob 无关").isEqualTo(404);
+
+        Res s = call("GET", WS + "/subjects/contract/C-1001/history", token("alice"), null);
+        assertThat(s.body().get("total").asLong()).isEqualTo(1);
+        assertThat(s.body().get("instances").get(0).get("approvals").size()).isEqualTo(1);
+
+        Res q = call("POST", WS + "/instances/query", bob, Map.of("processCode", "contract_approval", "page", 1, "size", 20));
+        assertThat(q.body().get("total").asLong()).as("bob 提交的两张合同").isEqualTo(2);
+
+        assertThat(call("POST", WS + "/process-stats", bob, Map.of()).status()).as("无 report:view").isEqualTo(403);
+    }
 }

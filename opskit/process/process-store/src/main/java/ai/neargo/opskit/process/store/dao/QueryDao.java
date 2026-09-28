@@ -329,6 +329,164 @@ public final class QueryDao {
         return w;
     }
 
+    // ── 实例 / 对账 ─────────────────────────────────────────
+
+    public record InstanceRow(String instanceNo, long definitionId, String processCode, String processVersion, String subjectType, String subjectRef,
+            Map<String, Object> subjectDisplay, String status, String statusCategory, boolean open, String createdBy, long createdAtMs,
+            long updatedAtMs, Long closedAtMs) {
+    }
+
+    /** 实例筛选；各项为空 = 不限。 */
+    public record InstanceFilter(String instanceNo, String processCode, Collection<String> statusCategories, Collection<String> statuses, Boolean open,
+            String subjectType, String subjectRef, Long createdFromMs, Long createdToMs) {
+    }
+
+    public List<InstanceRow> instances(WorkspaceId ws, Viewer v, InstanceFilter f, int offset, int limit) {
+        Where w = instanceWhere(ws, v, f);
+        List<Object> ps = new ArrayList<>(w.params);
+        ps.add(limit);
+        ps.add(offset);
+        return jdbc.sql("SELECT i.* FROM proc_instance i WHERE i.workspace_id = ?" + w.sql
+                        + " ORDER BY i.created_at_ms DESC, i.instance_no DESC LIMIT ? OFFSET ?")
+                .params(ps)
+                .query((rs, n) -> new InstanceRow(rs.getString("instance_no"), rs.getLong("definition_id"), rs.getString("process_code"),
+                        rs.getString("process_version"), rs.getString("subject_type"), rs.getString("subject_ref"),
+                        ProcessJson.readMap(rs.getString("subject_display")), rs.getString("status"), rs.getString("status_category"),
+                        rs.getInt("is_open") == 1, rs.getString("created_by"), rs.getLong("created_at_ms"), rs.getLong("updated_at_ms"),
+                        rs.getObject("closed_at_ms", Long.class)))
+                .list();
+    }
+
+    public long countInstances(WorkspaceId ws, Viewer v, InstanceFilter f) {
+        Where w = instanceWhere(ws, v, f);
+        return jdbc.sql("SELECT COUNT(*) FROM proc_instance i WHERE i.workspace_id = ?" + w.sql).params(w.params).query(Long.class).single();
+    }
+
+    /**
+     * 实例的「读」可见（历史、实例查询、对账共用；与审批可见同一口径）：应用自身 ∨ 参与者
+     * ∨（办理 / 审批任务的候选或处理人 ∧ 实例范围可见）。没配范围标签的实例也不因此对全空间公开。
+     */
+    private Where instanceWhere(WorkspaceId ws, Viewer v, InstanceFilter f) {
+        Where w = new Where();
+        w.params.add(ws.value());
+        if (f.instanceNo() != null) {
+            w.and("i.instance_no = ?", f.instanceNo());
+        }
+        if (f.processCode() != null) {
+            w.and("i.process_code = ?", f.processCode());
+        }
+        if (f.statusCategories() != null && !f.statusCategories().isEmpty()) {
+            w.andIn("i.status_category", f.statusCategories());
+        }
+        if (f.statuses() != null && !f.statuses().isEmpty()) {
+            w.andIn("i.status", f.statuses());
+        }
+        if (f.open() != null) {
+            w.and("i.is_open = ?", f.open() ? 1 : 0);
+        }
+        if (f.subjectType() != null) {
+            w.and("i.subject_type = ?", f.subjectType());
+        }
+        if (f.subjectRef() != null) {
+            w.and("i.subject_ref = ?", f.subjectRef());
+        }
+        if (f.createdFromMs() != null) {
+            w.and("i.created_at_ms >= ?", f.createdFromMs());
+        }
+        if (f.createdToMs() != null) {
+            w.and("i.created_at_ms < ?", f.createdToMs());
+        }
+        if (!v.all()) {
+            if (v.me() == null || v.candidates().isEmpty()) {
+                return w.and("1 = 0");
+            }
+            String in = marks(v.candidates().size());
+            w.sql.append(" AND (EXISTS (SELECT 1 FROM proc_participant p WHERE p.workspace_id = i.workspace_id AND p.instance_no = i.instance_no AND p.principal IN (")
+                    .append(in).append("))");
+            w.params.addAll(v.candidates());
+            w.sql.append(" OR (EXISTS (SELECT 1 FROM proc_task s WHERE s.workspace_id = i.workspace_id AND s.instance_no = i.instance_no AND (s.completed_by = ?")
+                    .append(" OR s.assignee = ?")
+                    .append(" OR EXISTS (SELECT 1 FROM proc_task_candidate c WHERE c.workspace_id = s.workspace_id AND c.task_no = s.task_no AND c.candidate_key IN (")
+                    .append(in).append("))))");
+            w.params.add(v.me());
+            w.params.add(v.me());
+            w.params.addAll(v.candidates());
+            w.sql.append(" AND (NOT EXISTS (SELECT 1 FROM proc_instance_scope sc WHERE sc.workspace_id = i.workspace_id AND sc.instance_no = i.instance_no)");
+            if (!v.scopes().isEmpty()) {
+                w.sql.append(" OR EXISTS (SELECT 1 FROM proc_instance_scope sc WHERE sc.workspace_id = i.workspace_id AND sc.instance_no = i.instance_no AND sc.scope_tag IN (")
+                        .append(marks(v.scopes().size())).append("))");
+                w.params.addAll(v.scopes());
+            }
+            w.sql.append(")))");
+        }
+        return w;
+    }
+
+    public List<ApprovalRow> approvalsOfInstances(WorkspaceId ws, Collection<String> instanceNos) {
+        if (instanceNos.isEmpty()) {
+            return List.of();
+        }
+        List<Object> ps = new ArrayList<>();
+        ps.add(ws.value());
+        ps.addAll(instanceNos);
+        return jdbc.sql("SELECT a.approval_no, a.instance_no, a.gate_status, a.status, a.current_round, a.current_step, a.requested_by, "
+                        + "a.requested_at_ms, a.finished_at_ms, i.definition_id, i.process_code, i.subject_type, i.subject_ref, i.subject_display "
+                        + APPROVAL_FROM + " WHERE a.workspace_id = ? AND a.instance_no IN ("
+                        + marks(instanceNos.size()) + ") ORDER BY a.requested_at_ms, a.approval_no")
+                // 对账不需要「当前步」时刻；不查这两列（无类型的 NULL 在 PG 是 text、CAST AS BIGINT 在 MySQL 系不认）
+                .params(ps).query((rs, n) -> new ApprovalRow(rs.getString("approval_no"), rs.getString("instance_no"), rs.getString("gate_status"),
+                        rs.getString("status"), rs.getInt("current_round"), rs.getString("current_step"), rs.getString("requested_by"),
+                        rs.getLong("requested_at_ms"), rs.getObject("finished_at_ms", Long.class), null, null, rs.getLong("definition_id"),
+                        rs.getString("process_code"), rs.getString("subject_type"), rs.getString("subject_ref"),
+                        ProcessJson.readMap(rs.getString("subject_display"))))
+                .list();
+    }
+
+    // ── 流程统计 ────────────────────────────────────────────
+
+    /** @param closedCount 已关闭数；@param closedDurationMs 已关闭实例的「创建 → 关闭」时长之和（平均 = 和 / 数） */
+    public record CategoryStat(String processCode, String statusCategory, long count, long closedCount, long closedDurationMs) {
+    }
+
+    public record ApprovalStat(String processCode, String status, long count) {
+    }
+
+    /** 按流程 × 状态类别计数（创建时间落在区间内的实例）。聚合，不按人过滤 —— 调用方先判 report:view。 */
+    public List<CategoryStat> instanceStats(WorkspaceId ws, String processCode, Long fromMs, Long toMs) {
+        Where w = statWhere(ws, "i", processCode, fromMs, toMs);
+        return jdbc.sql("SELECT i.process_code, i.status_category, COUNT(*) AS n, "
+                        + "COALESCE(SUM(CASE WHEN i.closed_at_ms IS NOT NULL THEN 1 ELSE 0 END), 0) AS closed_n, "
+                        + "COALESCE(SUM(CASE WHEN i.closed_at_ms IS NOT NULL THEN i.closed_at_ms - i.created_at_ms ELSE 0 END), 0) AS closed_ms "
+                        + "FROM proc_instance i WHERE i.workspace_id = ?" + w.sql + " GROUP BY i.process_code, i.status_category ORDER BY i.process_code, i.status_category")
+                .params(w.params)
+                .query((rs, n) -> new CategoryStat(rs.getString("process_code"), rs.getString("status_category"), rs.getLong("n"), rs.getLong("closed_n"),
+                        rs.getLong("closed_ms")))
+                .list();
+    }
+
+    public List<ApprovalStat> approvalStats(WorkspaceId ws, String processCode, Long fromMs, Long toMs) {
+        Where w = statWhere(ws, "i", processCode, fromMs, toMs);
+        return jdbc.sql("SELECT i.process_code, a.status, COUNT(*) AS n " + APPROVAL_FROM + " WHERE a.workspace_id = ?" + w.sql
+                        + " GROUP BY i.process_code, a.status ORDER BY i.process_code, a.status")
+                .params(w.params)
+                .query((rs, n) -> new ApprovalStat(rs.getString("process_code"), rs.getString("status"), rs.getLong("n"))).list();
+    }
+
+    private static Where statWhere(WorkspaceId ws, String alias, String processCode, Long fromMs, Long toMs) {
+        Where w = new Where();
+        w.params.add(ws.value());
+        if (processCode != null) {
+            w.and(alias + ".process_code = ?", processCode);
+        }
+        if (fromMs != null) {
+            w.and(alias + ".created_at_ms >= ?", fromMs);
+        }
+        if (toMs != null) {
+            w.and(alias + ".created_at_ms < ?", toMs);
+        }
+        return w;
+    }
+
     // ── 定义统计 ────────────────────────────────────────────
 
     /** 某流程在途（未关闭）的实例数；{@code notOnDefinition} 非空时只数不在该定义行上的（= 还按旧版本走的）。 */

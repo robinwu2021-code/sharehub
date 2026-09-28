@@ -90,6 +90,14 @@ public class ProcessDefinitionAppService {
     }
 
     /** 在途实例用：按它绑定的定义行取，不看当前版本。 */
+    /** 当前版本的流程名；已不存在的流程返回 null（统计里仍按代号列出）。 */
+    @SystemAction("读：统计 / 列表渲染内部调用")
+    public ai.neargo.opskit.commons.i18n.LocalizedText resolveName(TenantContext t, String code) {
+        return definitions.latest(t.accountId(), t.workspaceId(), KIND, code)
+                .or(() -> definitions.latest(t.accountId(), WorkspaceId.TEMPLATE, KIND, code))
+                .map(r -> compile(r).definition().name()).orElse(null);
+    }
+
     @SystemAction("实例迁移内部调用")
     public CompiledProcess byDefinitionId(TenantContext t, long definitionId) {
         CompiledProcess hit = compiled.get(definitionId);

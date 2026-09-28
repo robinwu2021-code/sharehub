@@ -33,6 +33,19 @@ public final class TransitionLogDao {
                 .update();
     }
 
+    public List<Entry> ofInstances(WorkspaceId ws, java.util.Collection<String> instanceNos) {
+        if (instanceNos.isEmpty()) {
+            return List.of();
+        }
+        return jdbc.sql("SELECT * FROM proc_transition_log WHERE workspace_id = :ws AND instance_no IN (:nos) ORDER BY at_ms, id")
+                .param("ws", ws.value()).param("nos", instanceNos)
+                .query((rs, i) -> new Entry(rs.getString("account_id"), rs.getString("entity_kind"), rs.getString("entity_no"),
+                        rs.getString("instance_no"), rs.getString("subject_type"), rs.getString("subject_ref"), rs.getString("action"),
+                        rs.getString("from_value"), rs.getString("to_value"), (Integer) rs.getObject("seq", Integer.class), rs.getString("actor"),
+                        rs.getString("on_behalf_of"), rs.getString("reason"), ProcessJson.readMap(rs.getString("payload")), rs.getLong("at_ms")))
+                .list();
+    }
+
     public List<Entry> ofInstance(WorkspaceId ws, String instanceNo) {
         return jdbc.sql("SELECT * FROM proc_transition_log WHERE workspace_id = ? AND instance_no = ? ORDER BY at_ms, id")
                 .params(ws.value(), instanceNo)
