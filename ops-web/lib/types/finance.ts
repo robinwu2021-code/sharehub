@@ -156,7 +156,19 @@ export interface Withdrawal extends AuditTrail {
    */
   sameOperator: boolean;
   paidAt: string | null;
+  /**
+   * 送 OpsKit 审批时的进度（M5，后端 `sharehub.flow.withdrawal.engine=OPSKIT`）；本地审批恒为空。
+   * 有值时决定只在「流程与工单 › 审批列表」做，本页不出通过 / 驳回（两处都能批一定打架）。
+   */
+  approvalState?: WithdrawalApprovalState | null;
+  /** OpsKit 审批单号 —— 「去审批」链接用；审批结束后保留便于追溯 */
+  approvalNo?: string | null;
+  /** 送审失败 / 已通过未生效的原因（服务端原文） */
+  approvalNote?: string | null;
 }
+
+/** 与后端 WithdrawalApprovalState 同一词表（V143 列注释为准） */
+export type WithdrawalApprovalState = "SUBMITTING" | "IN_REVIEW" | "SUBMIT_FAILED" | "APPROVED_BLOCKED";
 
 /**
  * 提现申请入参。

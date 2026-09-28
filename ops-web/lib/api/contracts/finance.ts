@@ -52,6 +52,10 @@ export interface FinanceApi {
    * 成功必填渠道流水号，失败必填原因，判据见 `payReceiptError`。
    */
   payWithdrawal(withdrawNo: string, body: PayReceiptPayload): Promise<Withdrawal>;
+  /** OpsKit 送审失败（死信）后重新送审（M5）。只对 approvalState=SUBMIT_FAILED 有效，否则 409 */
+  resubmitWithdrawalApproval(withdrawNo: string): Promise<Withdrawal>;
+  /** OpsKit 已通过但业务检查没过（APPROVED_BLOCKED），补齐后重试生效（M5）；仍不满足时 400 */
+  retryWithdrawalApprovalEffect(withdrawNo: string): Promise<Withdrawal>;
   /**
    * 提现申请。由**代理商/场地方本人**发起（api/README §六·A：运营端没有也不该有创建入口）。
    *

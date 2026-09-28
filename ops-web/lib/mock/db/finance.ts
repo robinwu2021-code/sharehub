@@ -715,6 +715,23 @@ export class WithdrawalError extends Error {
 }
 
 /**
+ * OpsKit 送审的补救（M5）。mock 恒为本地审批（approvalState 恒空），非对应状态一律拒绝（后端是 409，mock 的 fail 固定 400，只差状态码）。
+ */
+export function resubmitWithdrawalApproval(withdrawNo: string): Withdrawal {
+  const w = withdrawals.find((x) => x.withdrawNo === withdrawNo);
+  if (!w) throw new WithdrawalError(`提现单 ${withdrawNo} 不存在`);
+  if (w.approvalState !== "SUBMIT_FAILED") fail(`提现 ${withdrawNo} 不是「送审失败」状态，不能重新送审`, `Withdrawal ${withdrawNo} did not fail to submit`);
+  return w;
+}
+
+export function retryWithdrawalApprovalEffect(withdrawNo: string): Withdrawal {
+  const w = withdrawals.find((x) => x.withdrawNo === withdrawNo);
+  if (!w) throw new WithdrawalError(`提现单 ${withdrawNo} 不存在`);
+  if (w.approvalState !== "APPROVED_BLOCKED") fail(`提现 ${withdrawNo} 不是「审批已通过但未生效」状态，无需重试`, `Withdrawal ${withdrawNo} is not approved-but-blocked`);
+  return w;
+}
+
+/**
  * 打款回执登记（mock）：PAYING → PAID / FAILED（⑮）。
  *
  * 与后端 `WithdrawalServiceImpl.pay()` 逐条对齐，**三道校验一个都不能省**——

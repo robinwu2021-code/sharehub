@@ -405,6 +405,15 @@ function FinanceInner() {
     enabled: tab === "withdrawals",
   });
   const feeRule = bizRulesQ.data?.withdraw;
+  // OpsKit 送审的两个补救（M5）：审批本身在「流程与工单 › 审批列表」里做，这里只管把单送到 / 让结论生效
+  const resubmitApproval = useMutation({
+    mutationFn: (no: string) => api.resubmitWithdrawalApproval(no),
+    onSuccess: (w) => { notify.success(`${w.withdrawNo} 已重新送审`); qc.invalidateQueries({ queryKey: ["fin", "withdrawals"] }); },
+  });
+  const retryApprovalEffect = useMutation({
+    mutationFn: (no: string) => api.retryWithdrawalApprovalEffect(no),
+    onSuccess: (w) => { notify.success(`${w.withdrawNo} 已生效，转打款中`); qc.invalidateQueries({ queryKey: ["fin", "withdrawals"] }); },
+  });
   const audit = useMutation({
     mutationFn: (v: { no: string; approve: boolean; rejectReason?: string }) =>
       api.auditWithdrawal(v.no, v.approve, v.rejectReason, username || undefined),
@@ -792,6 +801,28 @@ function FinanceInner() {
     {
       header: t("common.actions"),
       cell: (w) => {
+        // 在流程平台审批（M5）：决定只在「流程与工单 › 审批列表」做，本页只看进度与补救 ——
+        // 两处都能点「通过」，两边状态一定打架（方案 23 §3.4）
+        if (w.approvalState) {
+          const note = w.approvalNote ? <div className="txt-caption text-muted-foreground">{w.approvalNote}</div> : null;
+          if (w.approvalState === "SUBMIT_FAILED") {
+            return <div>{canAuditWithdrawal_
+              ? <Button size="sm" variant="outline" loading={resubmitApproval.isPending && resubmitApproval.variables === w.withdrawNo}
+                  onClick={() => resubmitApproval.mutate(w.withdrawNo)}>重新送审</Button>
+              : <span className="text-destructive-ink">送审失败</span>}{note}</div>;
+          }
+          if (w.approvalState === "APPROVED_BLOCKED") {
+            return <div>{canAuditWithdrawal_
+              ? <Button size="sm" variant="outline" loading={retryApprovalEffect.isPending && retryApprovalEffect.variables === w.withdrawNo}
+                  onClick={() => retryApprovalEffect.mutate(w.withdrawNo)}>重试生效</Button>
+              : <span className="text-destructive-ink">已通过未生效</span>}{note}</div>;
+          }
+          if (w.approvalState === "IN_REVIEW" && w.approvalNo) {
+            return <Link href={`/flow/approvals/detail/?no=${encodeURIComponent(w.approvalNo)}`}
+              className="text-primary underline underline-offset-2">审批中 · 去审批</Link>;
+          }
+          return <span className="text-muted-foreground">送审中</span>;
+        }
         // 能不能审批由状态机说了算（WITHDRAW_TRANSITIONS 的 approve/reject from 集）。
         // 此前这里手写 `(w.status === "AUDIT" || w.status === "APPLY")` —— 抄了后端
         // WithdrawalStateMachine 的 APPROVE from 集一份，后端加边时没人会想起改这里。
