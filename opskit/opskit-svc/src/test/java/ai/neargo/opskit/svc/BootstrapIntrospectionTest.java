@@ -414,4 +414,43 @@ class BootstrapIntrospectionTest {
         assertThat(badCal.status()).isEqualTo(422);
         assertThat(badCal.body().toString()).contains("weekly[0]");
     }
+
+    /**
+     * 告警开单（23/§十）要用的四个应用自身调用，按生产同款 repair 定义钉住：改优先级 · 并单 · 作废（who 限提出人 / 办理人，应用自身放行）·
+     * 内部评论；以及对已并 / 已结的单重复操作时的错误键（执行器据此当「已完成」、不无限重投）。
+     */
+    @Test
+    void alarmExecutorCallsAsTheApplication() throws Exception {
+        String cabinet = repairTicket("柜机离线 C1");
+        String site = repairTicket("站点断电 S1");
+        String healed = repairTicket("柜机离线 C2");
+
+        Res up = send("PATCH", WS + "/tickets/" + cabinet, APP, null, java.util.Map.of("priority", "P1"));
+        assertThat(up.status()).isEqualTo(200);
+        assertThat(up.body().path("priority").path("code").asText()).isEqualTo("P1");
+
+        Res note = send("POST", WS + "/tickets/" + cabinet + "/comments", APP, null, java.util.Map.of("body", "告警已恢复", "visibility", "INTERNAL"));
+        assertThat(note.status()).as("应用写内部评论").isEqualTo(200);
+
+        assertThat(send("POST", WS + "/tickets/" + cabinet + "/merge", APP, null, java.util.Map.of("into", site, "reason", "站点级告警取代")).status())
+                .isEqualTo(200);
+        Res mergedAgain = send("POST", WS + "/tickets/" + cabinet + "/merge", APP, null, java.util.Map.of("into", site, "reason", "重投"));
+        assertThat(mergedAgain.status()).isEqualTo(422);
+        assertThat(mergedAgain.body().path("error").asText()).isEqualTo("opskit.ticket.closed");
+
+        assertThat(send("POST", WS + "/tickets/" + healed + "/transitions/cancel", APP, null, java.util.Map.of("comment", "告警自愈")).status())
+                .as("who 限提出人 / 办理人，应用自身放行").isEqualTo(200);
+        Res cancelAgain = send("POST", WS + "/tickets/" + healed + "/transitions/cancel", APP, null, java.util.Map.of("comment", "重投"));
+        assertThat(cancelAgain.status()).isEqualTo(422);
+        assertThat(cancelAgain.body().path("error").asText()).as("三种重复操作同一个键").isEqualTo("opskit.ticket.closed");
+        assertThat(send("PATCH", WS + "/tickets/" + healed, APP, null, java.util.Map.of("priority", "P1")).body().path("error").asText())
+                .isEqualTo("opskit.ticket.closed");
+    }
+
+    private String repairTicket(String title) throws Exception {
+        Res r = send("POST", WS + "/tickets", APP, "alarm:" + Integer.toHexString(title.hashCode()), java.util.Map.of("typeCode", "repair", "title", title, "priority", "P3",
+                "fields", java.util.Map.of("source", "OPS")));
+        assertThat(r.status()).as("建单 %s", r.body()).isEqualTo(200);
+        return r.body().path("ticketNo").asText();
+    }
 }

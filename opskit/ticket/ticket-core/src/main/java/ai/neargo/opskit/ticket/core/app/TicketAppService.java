@@ -232,6 +232,10 @@ public class TicketAppService {
         TenantContext t = actor.tenant();
         return tx.execute(s -> {
             TicketDao.Row r = visible(actor, ticketNo);
+            if (!r.open()) {
+                // 与改单 / 并单同一个错误键：对已结的单再走迁移（如重投的作废）接入方可统一当「已完成」处理
+                throw new OpsKitException(TicketErrors.TICKET_CLOSED, "ticket is closed");
+            }
             if (resolution != null) {
                 TicketTypeDef def = definitions.typeById(t, r.typeDefinitionId());
                 boolean ok = definitions.optionsOf(t, def.resolutionOptions()).stream().anyMatch(o -> o.code().equals(resolution) && o.enabled());
