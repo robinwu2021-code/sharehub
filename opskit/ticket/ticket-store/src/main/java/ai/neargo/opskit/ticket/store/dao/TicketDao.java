@@ -96,6 +96,21 @@ public final class TicketDao {
         jdbc.sql("UPDATE tkt_ticket SET current_task_no = ? WHERE workspace_id = ? AND ticket_no = ?").params(taskNo, ws.value(), ticketNo).update();
     }
 
+    public void setEscalated(WorkspaceId ws, String ticketNo) {
+        jdbc.sql("UPDATE tkt_ticket SET escalated = 1 WHERE workspace_id = ? AND ticket_no = ?").params(ws.value(), ticketNo).update();
+    }
+
+    public void setMergedInto(WorkspaceId ws, String ticketNo, String into) {
+        jdbc.sql("UPDATE tkt_ticket SET merged_into = ? WHERE workspace_id = ? AND ticket_no = ?").params(into, ws.value(), ticketNo).update();
+    }
+
+    /** 某人名下的未结工单号（批量改派「按原受理人」）；取 limit + 1 条，调用方据此判断是否还有剩余。 */
+    public List<String> openOfAssignee(WorkspaceId ws, String assignee, int limit) {
+        return jdbc.sql("SELECT ticket_no FROM tkt_ticket WHERE workspace_id = ? AND assignee = ? AND is_open = 1 ORDER BY created_at_ms, ticket_no"
+                        + dialect.limitOffset(limit + 1, 0))
+                .params(ws.value(), assignee).query(String.class).list();
+    }
+
     public void setResolution(WorkspaceId ws, String ticketNo, String resolution) {
         jdbc.sql("UPDATE tkt_ticket SET resolution = ? WHERE workspace_id = ? AND ticket_no = ?").params(resolution, ws.value(), ticketNo).update();
     }

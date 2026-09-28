@@ -197,6 +197,21 @@ public class InstanceAppService {
         });
     }
 
+    /** 整体替换某个参与者角色的主体（如工单的关注人 WATCHER）。只允许应用自身（上层模块已判权限）。 */
+    @SystemAction("仅应用自身")
+    public void replaceParticipants(Actor actor, String instanceNo, String role, Collection<String> principals) {
+        if (!actor.isAppItself()) {
+            throw new OpsKitException(ProcessErrors.NOT_ALLOWED, "participants are set by the integrating system");
+        }
+        tx.execute(() -> {
+            load(actor.tenant().workspaceId(), instanceNo);
+            long now = clock.millis();
+            participants.removeRole(actor.tenant().workspaceId(), instanceNo, role);
+            principals.forEach(p -> participants.add(actor.tenant().workspaceId(), instanceNo, role, PrincipalRef.parse(p).key(), now));
+            return null;
+        });
+    }
+
     /** 范围标签由业务决定（它才知道这件事属于哪个站点 / 区域），只允许应用自身改。 */
     @SystemAction("仅应用自身")
     public void replaceScopes(Actor actor, String instanceNo, Collection<String> tags) {

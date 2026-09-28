@@ -75,6 +75,16 @@ public class EmbeddedProcessClient implements ProcessClient {
     }
 
     @Override
+    public void replaceParticipants(Actor actor, String instanceNo, String role, Collection<String> principals) {
+        instances.replaceParticipants(actor, instanceNo, role, principals);
+    }
+
+    @Override
+    public void fireSystem(TenantContext t, String instanceNo, String code, String by, String reason) {
+        instances.fireSystem(t, instanceNo, code, by, reason);
+    }
+
+    @Override
     public Optional<ProcessDef> processDef(TenantContext t, String processCode) {
         try {
             return Optional.of(definitions.resolve(t, processCode).process().definition());

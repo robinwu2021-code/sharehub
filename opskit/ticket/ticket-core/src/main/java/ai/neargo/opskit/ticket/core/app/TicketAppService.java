@@ -19,6 +19,8 @@ import ai.neargo.opskit.process.client.TaskClient;
 import ai.neargo.opskit.ticket.api.TicketErrors;
 import ai.neargo.opskit.ticket.api.definition.OptionDef;
 import ai.neargo.opskit.ticket.api.definition.TicketTypeDef;
+import ai.neargo.opskit.ticket.api.model.BulkReassignRequest;
+import ai.neargo.opskit.ticket.api.model.BulkReassignResult;
 import ai.neargo.opskit.ticket.api.model.CreateTicketRequest;
 import ai.neargo.opskit.ticket.api.model.CreateTicketResult;
 import ai.neargo.opskit.ticket.api.model.TicketView;
@@ -52,6 +54,9 @@ public class TicketAppService {
     public static final String CREATE = "ticket:create";
     public static final String WORK = "ticket:work";
     public static final String ASSIGN = "ticket:assign";
+    public static final String ESCALATE = "ticket:escalate";
+    public static final String MERGE = "ticket:merge";
+    public static final String WATCHER = "WATCHER";
     public static final String REQUESTER = "REQUESTER";
     public static final String ASSIGNEE = "ASSIGNEE";
     private static final String PENDING_INSTANCE = "pending:";
@@ -144,7 +149,7 @@ public class TicketAppService {
 
     // ── 读 ──────────────────────────────────────────────────
 
-    /** 可见 = 应用自身 ∨ ticket:view:all ∨ 提出人 / 办理人 ∨（ticket:view:scoped ∧ 标签相交）；否则按不存在（O3-8 补齐参与者全集）。 */
+    /** 可见 = 应用自身 ∨ ticket:view:all ∨ 参与者（提出人 / 办理人 / 关注人 …）∨（ticket:view:scoped ∧ 标签相交）；否则按不存在。 */
     @SystemAction("只读：可见性见方法说明，看不见 404")
     public TicketView get(Actor actor, String ticketNo) {
         TicketDao.Row r = visible(actor, ticketNo);
@@ -301,6 +306,129 @@ public class TicketAppService {
         }).orElse(false)));
     }
 
+    // ── 升级 · 合并 · 批量改派 · 关注人（O3-6）────────────────────
+
+    /** 升级：打标记、留内部评论；给了 {@code to} 时同时改派给他（接管）。 */
+    @SystemAction("应用自身或 ticket:escalate")
+    public TicketView escalate(Actor actor, String ticketNo, String to, String reason) {
+        requirePermission(actor, ESCALATE);
+        if (reason == null || reason.isBlank()) {
+            throw invalid("reason", "opskit.validation.required");
+        }
+        TenantContext t = actor.tenant();
+        return tx.execute(s -> {
+            TicketDao.Row r = openTicket(t, ticketNo);
+            tickets.setEscalated(t.workspaceId(), ticketNo);
+            comments.insert(t.workspaceId(), ticketNo, "INTERNAL", "SYSTEM", who(actor), onBehalf(actor), "escalated: " + reason, List.of(), clock.millis());
+            if (to != null && !to.isBlank()) {
+                String member = to.startsWith("member:") ? to : "member:" + to;
+                Optional<String> task = openTask(t, r);
+                if (task.isPresent()) {
+                    taskClient.assignTo(TicketDispatcher.internal(t), task.get(), member, "escalated: " + reason);
+                } else {
+                    tickets.setCurrentTask(t.workspaceId(), ticketNo, taskClient.createWork(t, r.instanceNo(), List.of(member), null, r.title(),
+                            r.priorityOrd(), "TICKET"));
+                }
+            }
+            syncSnapshot(t, ticketNo);
+            return view(t, tickets.find(t.workspaceId(), ticketNo).orElseThrow());
+        });
+    }
+
+    /**
+     * 合并：{@code ticketNo} 并入 {@code into}。不能并入自己；两张都须未结；被并单走类型配置的合并迁移（通常进 CANCELLED 类别）、
+     * 记去向；两边各留一条 MERGE 评论。
+     */
+    @SystemAction("应用自身或 ticket:merge")
+    public TicketView merge(Actor actor, String ticketNo, String into, String reason) {
+        requirePermission(actor, MERGE);
+        if (ticketNo.equals(into)) {
+            throw new OpsKitException(TicketErrors.MERGE_INTO_SELF, "cannot merge a ticket into itself", Map.of(), List.of(new FieldError("into",
+                    TicketErrors.MERGE_INTO_SELF.key())));
+        }
+        TenantContext t = actor.tenant();
+        return tx.execute(s -> {
+            // 按工单号顺序加锁，两张单互相合并的并发请求不会死锁
+            String first = ticketNo.compareTo(into) < 0 ? ticketNo : into;
+            String second = first.equals(ticketNo) ? into : ticketNo;
+            TicketDao.Row a = openTicket(t, first);
+            TicketDao.Row b = openTicket(t, second);
+            TicketDao.Row source = a.ticketNo().equals(ticketNo) ? a : b;
+            TicketTypeDef def = definitions.typeById(t, source.typeDefinitionId());
+            if (def.mergeTransition() == null) {
+                throw invalid("ticketNo", "opskit.ticket.merge_not_supported");
+            }
+            long now = clock.millis();
+            tickets.setMergedInto(t.workspaceId(), ticketNo, into);
+            comments.insert(t.workspaceId(), ticketNo, "PUBLIC", "MERGE", who(actor), onBehalf(actor), "merged into " + into
+                    + (reason == null ? "" : ": " + reason), List.of(), now);
+            comments.insert(t.workspaceId(), into, "PUBLIC", "MERGE", who(actor), onBehalf(actor), "merged from " + ticketNo
+                    + (reason == null ? "" : ": " + reason), List.of(), now);
+            processes.fireSystem(t, source.instanceNo(), def.mergeTransition(), who(actor), reason);
+            syncSnapshot(t, ticketNo);
+            return view(t, tickets.find(t.workspaceId(), ticketNo).orElseThrow());
+        });
+    }
+
+    /** 批量改派：逐单各自一个事务，单张失败（已关、无权限、并发冲突）记进 failed，不影响其余。 */
+    @SystemAction("应用自身或 ticket:assign（逐单再校验）")
+    public BulkReassignResult bulkReassign(Actor actor, BulkReassignRequest req) {
+        requirePermission(actor, ASSIGN);
+        boolean byList = req.ticketNos() != null && !req.ticketNos().isEmpty();
+        boolean byFrom = req.from() != null && !req.from().isBlank();
+        List<FieldError> errors = new ArrayList<>();
+        if (byList == byFrom) {
+            errors.add(new FieldError("ticketNos", "opskit.ticket.reassign_pick_one"));
+        }
+        if (byList && req.ticketNos().size() > BulkReassignRequest.MAX) {
+            errors.add(new FieldError("ticketNos", "opskit.validation.too_many"));
+        }
+        if (req.to() == null || req.to().isBlank()) {
+            errors.add(new FieldError("to", "opskit.validation.required"));
+        }
+        if (req.reason() == null || req.reason().isBlank()) {
+            errors.add(new FieldError("reason", "opskit.validation.required"));
+        }
+        if (!errors.isEmpty()) {
+            throw new OpsKitException(CommonErrors.VALIDATION, "invalid bulk reassign", Map.of(), errors);
+        }
+        List<String> nos;
+        int remaining = 0;
+        if (byList) {
+            nos = req.ticketNos().stream().distinct().toList();
+        } else {
+            String from = req.from().startsWith("member:") ? req.from() : "member:" + req.from();
+            List<String> found = tickets.openOfAssignee(actor.tenant().workspaceId(), from, BulkReassignRequest.MAX);
+            nos = found.size() > BulkReassignRequest.MAX ? found.subList(0, BulkReassignRequest.MAX) : found;
+            remaining = found.size() > BulkReassignRequest.MAX ? 1 : 0;
+        }
+        List<String> ok = new ArrayList<>();
+        List<BulkReassignResult.Failure> failed = new ArrayList<>();
+        for (String no : nos) {
+            try {
+                assign(actor, no, req.to(), req.reason());
+                ok.add(no);
+            } catch (OpsKitException e) {
+                failed.add(new BulkReassignResult.Failure(no, e.errorKey().key()));
+            }
+        }
+        return new BulkReassignResult(ok, failed, remaining);
+    }
+
+    /** 关注人整体替换（实例参与者 WATCHER）：关注人看得见这张单。 */
+    @SystemAction("应用自身或 ticket:work")
+    public TicketView setWatchers(Actor actor, String ticketNo, List<String> members) {
+        requireWork(actor);
+        TenantContext t = actor.tenant();
+        List<String> refs = members == null ? List.of()
+                : members.stream().filter(m -> m != null && !m.isBlank()).map(m -> m.startsWith("member:") ? m : "member:" + m).distinct().toList();
+        return tx.execute(s -> {
+            TicketDao.Row r = tickets.lock(t.workspaceId(), ticketNo).orElseThrow(TicketAppService::notFound);
+            processes.replaceParticipants(TicketDispatcher.internal(t), r.instanceNo(), WATCHER, refs);
+            return view(t, r);
+        });
+    }
+
     /** 定时任务只带空间，账户从工单行上取。 */
     @SystemAction("定时触发")
     public Optional<TenantContext> tenantOf(WorkspaceId ws, String ticketNo) {
@@ -356,6 +484,11 @@ public class TicketAppService {
         }
         String me = actor.member().map(PrincipalRef::key).orElse(null);
         if (me != null && (me.equals(r.requester()) || me.equals(r.assignee()))) {
+            return r;
+        }
+        // 其余参与者（关注人 · 负责人 …）：以实例上的参与者为准
+        if (me != null && !r.instanceNo().startsWith(PENDING_INSTANCE) && processes.snapshot(actor.tenant(), r.instanceNo())
+                .map(i -> i.participants().values().stream().anyMatch(set -> set.contains(me))).orElse(false)) {
             return r;
         }
         if (actor.productPermissions().contains(VIEW_SCOPED) && scopes.of(actor.tenant().workspaceId(), ticketNo).stream().anyMatch(actor.scopes()::contains)) {

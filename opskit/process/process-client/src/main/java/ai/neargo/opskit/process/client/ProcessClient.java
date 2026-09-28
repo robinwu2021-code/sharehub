@@ -32,6 +32,16 @@ public interface ProcessClient {
 
     void replaceScopes(Actor actor, String instanceNo, Collection<String> tags);
 
+    /** 整体替换某个参与者角色（如 WATCHER）；仅应用身份。 */
+    void replaceParticipants(Actor actor, String instanceNo, String role, Collection<String> principals);
+
+    /**
+     * 以系统身份走一条迁移（不校验 who；系统迁移也可走）：上层模块在自己判完权限后用，如工单合并走类型配置的合并迁移。
+     *
+     * @param by 记进历史的操作人（{@code member:x} / {@code app:x}）
+     */
+    void fireSystem(TenantContext t, String instanceNo, String code, String by, String reason);
+
     /** 流程定义的当前版本（空间优先，其次账户模板）；不存在为空。 */
     Optional<ProcessDef> processDef(TenantContext t, String processCode);
 

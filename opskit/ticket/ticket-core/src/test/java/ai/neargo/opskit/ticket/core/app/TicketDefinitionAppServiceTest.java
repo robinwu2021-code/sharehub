@@ -108,6 +108,16 @@ class TicketDefinitionAppServiceTest {
         }
 
         @Override
+        public void replaceParticipants(Actor a, String n, String role, Collection<String> p) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void fireSystem(TenantContext t, String n, String code, String by, String reason) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public List<SlaMetric> slaMetrics(TenantContext t, String n) {
             return List.of();
         }
