@@ -462,8 +462,8 @@ export const NAV: NavSection[] = [
     //
     // ⚠️ **放在最末**：L1 的 sort 是数组下标，插在中间会让后面每个 L1 的 sort 都要挪，
     //    那就只能整表重灌 iam_menu（会冲掉「菜单管理」的线上改动）。V136 只插新行。
-    // ⚠️ soon：flow 的取数目前是浏览器内 mock（lib/flow/client.ts），真实后端模式的产物里必须灰显，
-    //    否则运营看到的是演示数据（backend-ready.ts FLOW_BACKEND_READY）。
+    // ⚠️ soon：只有构建时配了 NEXT_PUBLIC_FLOW_API=http（真连 OpsKit）才放开，否则灰显 ——
+    //    不连 OpsKit 时 flow 取的是浏览器内演示数据（backend-ready.ts FLOW_BACKEND_READY）。
     key: "flow", label: "流程与工单", icon: "Workflow", module: "flow", href: "/flow/todo",
     match: ["/flow"],
     children: [
