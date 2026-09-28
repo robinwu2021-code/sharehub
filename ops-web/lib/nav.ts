@@ -386,8 +386,15 @@ export const NAV: NavSection[] = [
     // 复用项为跨 section 深链，可点
     key: "cs", label: "客服管理", icon: "Headset", module: "cs", href: "/cs",
     children: [
-      { href: "/cs", label: "报障受理", phase: 1, perm: "cs:ticket:read" },
-      { href: "/cs?tab=sessions", label: "客服会话", phase: 2, perm: "cs:session:read" },
+      /*
+       * 2026-09-28 解锁这两叶（徽章仍是 L1/L2，ready 只放宽分期）。
+       * 在此之前生产跑在 L0，这两页都点不开 —— 而 **C 端的报障全部落在这里**：
+       * 用户提交（连同截图）→ 落 cs_ticket / 转人工会话 → 运营端没有任何界面能打开它，
+       * 而 C 端还写着「正在排队处理」。L0 可达的「待办中心」只接告警，兜不住这条。
+       * 后端就绪：列表 / 详情（含截图）/ 受理 / 转工单 / 转退款 / 会话消息与回复端点齐备。
+       */
+      { href: "/cs", label: "报障受理", phase: 1, ready: true, perm: "cs:ticket:read" },
+      { href: "/cs?tab=sessions", label: "客服会话", phase: 2, ready: true, perm: "cs:session:read" },
       { href: "/orders", label: "退款/补偿", perm: "order:refund:apply" },
       { href: "/users", label: "黑名单处理", perm: "user:risk:update", phase: 1 },
     ],

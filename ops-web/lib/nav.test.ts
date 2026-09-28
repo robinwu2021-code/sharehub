@@ -356,8 +356,10 @@ describe("默认落地与面包屑", () => {
     // 站点与点位撤销后，FINANCE 在运营管理的首个可点叶子仍是「站点概览」
     expect(sectionDefaultHref(sec("operation"), "FINANCE")).toBe("/operation/overview");
   });
-  it("客服管理：报障受理/客服会话为 Phase 2，P1 下首个可点叶子 = 退款/补偿(/orders)", () => {
-    expect(sectionDefaultHref(sec("cs"), "CS")).toBe("/orders");
+  it("客服管理：报障受理已解锁（ready），落地就是它 —— 客服进来第一眼该看用户报了什么", () => {
+    // 2026-09-28 改口径：此前两叶被分期挡着、落地退到 /orders，
+    // 而 C 端的报障全落在 /cs —— 客服点进「客服管理」看到的却是退款列表。
+    expect(sectionDefaultHref(sec("cs"), "CS")).toBe("/cs");
   });
   it("面包屑三级：L1 › 分组 › 子功能", () => {
     expect(breadcrumb("/devices", "monitor", null, "OPS")).toEqual(["设备管理", "在线运行", "实时监控"]);

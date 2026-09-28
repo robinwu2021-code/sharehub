@@ -38,6 +38,16 @@ type Row = Record<string, string>;
 const MIGRATION_DIR = "../backend/sharehub-app/src/main/resources/db/migration/";
 const PATCHES: { file: string; mustContain: string; apply: (rows: Row[]) => void }[] = [
   {
+    // 放开客服两叶（生产跑在 L0，这两页点不开，而 C 端报障全落在这里）。
+    file: "V140__menu_cs_leaves_ready.sql",
+    mustContain: "UPDATE iam_menu SET ready = 1 WHERE menu_no IN ('M_cs__1', 'M_cs__2')",
+    apply: (rows) => {
+      for (const r of rows) {
+        if (r.menu_no === "M_cs__1" || r.menu_no === "M_cs__2") r.ready = "1";
+      }
+    },
+  },
+  {
     // 流程与工单 L1 + 7 叶（OpsKit 运营界面）。放在 nav.ts **最末**，只插新行、不动任何既有 sort。
     file: "V136__menu_flow_section.sql",
     mustContain: "'M_flow' AS menu_no",
