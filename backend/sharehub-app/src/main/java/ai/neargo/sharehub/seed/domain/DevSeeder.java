@@ -1,6 +1,8 @@
 package ai.neargo.sharehub.seed.domain;
 
+import ai.neargo.sharehub.dev.PowerbankStatus;
 import ai.neargo.sharehub.dev.entity.DevCabinet;
+import ai.neargo.sharehub.dev.entity.DevPowerbank;
 import ai.neargo.sharehub.loc.entity.LocLocation;
 import ai.neargo.sharehub.loc.entity.LocSite;
 import ai.neargo.sharehub.dev.mapper.CabinetMapper;
@@ -25,14 +27,17 @@ public class DevSeeder implements CommandLineRunner {
 
     private final SeedData seed;
     private final CabinetMapper mapper;
+    private final ai.neargo.sharehub.dev.mapper.PowerbankMapper powerbanks;
     private final ai.neargo.sharehub.loc.mapper.LocMappers.LocationMapper locations;
     private final ai.neargo.sharehub.loc.mapper.LocMappers.SiteMapper sites;
 
     public DevSeeder(SeedData seed, CabinetMapper mapper,
+                     ai.neargo.sharehub.dev.mapper.PowerbankMapper powerbanks,
                      ai.neargo.sharehub.loc.mapper.LocMappers.LocationMapper locations,
                      ai.neargo.sharehub.loc.mapper.LocMappers.SiteMapper sites) {
         this.seed = seed;
         this.mapper = mapper;
+        this.powerbanks = powerbanks;
         this.locations = locations;
         this.sites = sites;
     }
@@ -73,6 +78,36 @@ public class DevSeeder implements CommandLineRunner {
             e.setFwVersion(c.fwVersion());
             e.setLastHeartbeatAt(SeedTime.dt(c.lastHeartbeatAt()));
             mapper.insert(e);
+            seedBanks(e);
+        }
+    }
+
+    /**
+     * 每台柜按 availableCount 建出同样多的在柜宝。
+     *
+     * <p>此前只建柜不建宝，于是 {@code dev_powerbank} 全库零行 —— 而借还是靠**宝台账**驱动的：
+     * {@code PowerbankTracker} 查不到台账就走「该柜未接仓位级上报」的兼容分支，
+     * 既不挑宝也不回写可借数。结果是门店卡上的「可借 N」永远等于种子里那个数：
+     * 借走一个还是 N，还回来也是 N（2026-09-28 真机实测）。
+     * 宝台账为空同时让「宝疑似丢失」「老化报废」「按宝查订单」整条资产线都在空转。
+     *
+     * <p>电量给 60–100 的散值而不是统一 100：统一值会让「挑电量最高的宝」这条规则
+     * 在演示环境里永远看不出效果，也掩盖 {@code minBattery} 门槛配错的情况。
+     */
+    private void seedBanks(DevCabinet cab) {
+        int n = cab.getAvailableCount() == null ? 0 : cab.getAvailableCount();
+        for (int slot = 1; slot <= n; slot++) {
+            DevPowerbank b = new DevPowerbank();
+            b.setPowerbankNo("PB" + cab.getCabinetNo() + String.format("%02d", slot));
+            b.setTenantId("MAIN");
+            b.setSn(b.getPowerbankNo());
+            b.setVendorCode(cab.getVendorCode());
+            b.setBattery(60 + (slot * 7) % 41);
+            b.setCycles(0);
+            b.setStatus(PowerbankStatus.IN_CABINET.name());
+            b.setCabinetNo(cab.getCabinetNo());
+            b.setSlotIndex(slot);
+            powerbanks.insert(b);
         }
     }
 }
