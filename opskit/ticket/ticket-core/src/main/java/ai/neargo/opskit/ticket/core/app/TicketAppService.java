@@ -57,6 +57,8 @@ public class TicketAppService {
     public static final String ESCALATE = "ticket:escalate";
     public static final String MERGE = "ticket:merge";
     public static final String WATCHER = "WATCHER";
+    /** 数据范围不设限（令牌 scopes:["*"]），与流程层同一约定。 */
+    public static final String ANY_SCOPE = "*";
     public static final String REQUESTER = "REQUESTER";
     public static final String ASSIGNEE = "ASSIGNEE";
     private static final String PENDING_INSTANCE = "pending:";
@@ -491,7 +493,8 @@ public class TicketAppService {
                 .map(i -> i.participants().values().stream().anyMatch(set -> set.contains(me))).orElse(false)) {
             return r;
         }
-        if (actor.productPermissions().contains(VIEW_SCOPED) && scopes.of(actor.tenant().workspaceId(), ticketNo).stream().anyMatch(actor.scopes()::contains)) {
+        if (actor.productPermissions().contains(VIEW_SCOPED) && (actor.scopes().contains(ANY_SCOPE)
+                || scopes.of(actor.tenant().workspaceId(), ticketNo).stream().anyMatch(actor.scopes()::contains))) {
             return r;
         }
         throw notFound();

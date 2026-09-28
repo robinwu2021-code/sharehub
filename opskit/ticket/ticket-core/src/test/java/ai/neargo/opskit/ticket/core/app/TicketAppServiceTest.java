@@ -187,6 +187,9 @@ class TicketAppServiceTest {
         assertThatThrownBy(() -> f.tickets.get(member("mb_stranger", Set.of(), Set.of()), no)).extracting(TicketAppServiceTest::key)
                 .isEqualTo(CommonErrors.NOT_FOUND);
         assertThat(f.tickets.get(member("mb_ops", Set.of(TicketAppService.VIEW_SCOPED), Set.of("site:S1")), no)).isNotNull();
+        assertThat(f.tickets.get(member("mb_ops", Set.of(TicketAppService.VIEW_SCOPED), Set.of("*")), no)).as("scopes:[\"*\"] 范围不设限").isNotNull();
+        assertThatThrownBy(() -> f.tickets.get(member("mb_ops", Set.of(), Set.of("*")), no)).as("* 不代替 ticket:view:scoped 权限")
+                .extracting(TicketAppServiceTest::key).isEqualTo(CommonErrors.NOT_FOUND);
         assertThatThrownBy(() -> f.tickets.get(member("mb_ops", Set.of(TicketAppService.VIEW_SCOPED), Set.of("site:S2")), no))
                 .as("负对照：范围不相交").extracting(TicketAppServiceTest::key).isEqualTo(CommonErrors.NOT_FOUND);
     }

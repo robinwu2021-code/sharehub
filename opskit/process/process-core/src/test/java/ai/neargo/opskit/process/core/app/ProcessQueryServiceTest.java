@@ -257,6 +257,18 @@ class ProcessQueryServiceTest {
                 .satisfies(ex -> assertThat(((OpsKitException) ex).errorKey()).isEqualTo(CommonErrors.NOT_FOUND));
         assertThat(e.todos(opsA, "ALL", null).total()).as("与待办同口径").isZero();
 
+        Actor auditorB = e.member("mb_aud", Set.of(), Set.of("site:B"), Set.of(ProcessQueryService.APPROVAL_VIEW_ALL));
+        Actor auditorA = e.member("mb_aud", Set.of(), Set.of("site:A"), Set.of(ProcessQueryService.APPROVAL_VIEW_ALL));
+        assertThat(e.q.approvals(auditorB, all).total()).as("approval:view:all：范围内的全部").isEqualTo(1);
+        assertThat(e.q.approvals(auditorA, all).total()).as("approval:view:all 不越过数据范围").isZero();
+        assertThatThrownBy(() -> e.approvals.get(auditorA, ap)).extracting(x -> ((OpsKitException) x).errorKey()).isEqualTo(CommonErrors.NOT_FOUND);
+        assertThat(e.approvals.get(auditorB, ap).approvalNo()).isEqualTo(ap);
+        Actor opsAny = new Actor(e.f.tenant, Optional.of(PrincipalRef.member("mb_ops")), Optional.empty(), Set.of(), Set.of("contract-approver"),
+                Set.of(), Set.of(), Set.of("*"));
+        assertThat(e.q.approvals(opsAny, all).total()).as("scopes:[\"*\"] = 数据范围不设限").isEqualTo(1);
+        assertThat(e.todos(opsAny, "ALL", null).total()).isEqualTo(1);
+        assertThat(e.approvals.get(opsAny, ap).approvalNo()).isEqualTo(ap);
+        assertThat(e.q.approvals(e.member("mb_stranger", Set.of(), Set.of("*"), Set.of()), all).total()).as("但 * 不放开候选 / 参与者条件").isZero();
         assertThat(e.q.approvals(bd, all).total()).as("提交人不受范围限制").isEqualTo(1);
         assertThat(e.q.approvals(opsB, all).total()).isEqualTo(1);
         assertThat(e.approvals.decide(opsB, ap, task, true, null).status()).isEqualTo("APPROVED");

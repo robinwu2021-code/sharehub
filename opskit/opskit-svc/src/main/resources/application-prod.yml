@@ -1,0 +1,21 @@
+# 生产 / 私有化（21/07 O4-1）。启动：java -jar opskit-svc.jar --spring.profiles.active=prod
+# 数据库、密钥只经环境变量注入；账户 / 空间 / IdP / 角色映射放在部署方的外部配置文件里（见 OPSKIT_BOOTSTRAP_FILE）。
+spring:
+  datasource:
+    url: ${OPSKIT_DB_URL}
+    username: ${OPSKIT_DB_USER}
+    password: ${OPSKIT_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${OPSKIT_DB_POOL:20}
+  config:
+    # 部署方的引导配置（账户 · 空间 · IdP · 角色 → 产品权限）；文件不存在时不引导
+    import: optional:file:${OPSKIT_BOOTSTRAP_FILE:/etc/opskit/bootstrap.yml}
+
+server:
+  forward-headers-strategy: native
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus

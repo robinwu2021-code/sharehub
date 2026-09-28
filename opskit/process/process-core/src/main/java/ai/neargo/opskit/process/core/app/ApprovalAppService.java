@@ -24,6 +24,7 @@ import ai.neargo.opskit.process.api.event.ApprovalCompleted;
 import ai.neargo.opskit.process.api.model.ApprovalView;
 import ai.neargo.opskit.process.core.port.Directory;
 import ai.neargo.opskit.process.store.dao.ApprovalDao;
+import ai.neargo.opskit.process.store.dao.QueryDao;
 import ai.neargo.opskit.process.store.dao.InstanceDao;
 import ai.neargo.opskit.process.store.dao.ParticipantDao;
 import ai.neargo.opskit.process.store.dao.TaskDao;
@@ -307,11 +308,11 @@ public class ApprovalAppService implements StatusHook {
     }
 
     /**
-     * 审批的可见（与 ProcessQueryService 的列表同一口径，21/02 §7.2）：应用自身 ∨ 查看全部 ∨ 提交人 ∨ 参与者
-     * ∨（审批任务的候选 / 处理人 ∧ 实例对我可见：未打范围标签或标签相交）。数据范围外按不存在处理。
+     * 审批的可见（与 ProcessQueryService 的列表同一口径，21/02 §7.2）：应用自身 ∨ 提交人 ∨ 参与者
+     * ∨（（approval:view:all ∨ 审批任务的候选 / 处理人）∧ 实例范围可见：未打标签 / 标签相交 / scopes 含 *）。数据范围外按不存在处理。
      */
     private boolean canSee(Actor actor, ApprovalDao.Row a) {
-        if (actor.isAppItself() || actor.productPermissions().contains("approval:view:all") || InstanceAppService.who(actor).equals(a.requestedBy())) {
+        if (actor.isAppItself() || InstanceAppService.who(actor).equals(a.requestedBy())) {
             return true;
         }
         Set<String> mine = CandidateKeys.of(actor);
@@ -319,8 +320,12 @@ public class ApprovalAppService implements StatusHook {
             return true;
         }
         Set<String> tags = instances.scopeTags(actor.tenant().workspaceId(), a.instanceNo());
-        if (!tags.isEmpty() && tags.stream().noneMatch(actor.scopes()::contains)) {
+        if (!tags.isEmpty() && !actor.scopes().contains(QueryDao.ANY_SCOPE) && tags.stream().noneMatch(actor.scopes()::contains)) {
             return false;
+        }
+        // approval:view:all = 范围内的全部（范围已在上面判过）
+        if (actor.productPermissions().contains("approval:view:all")) {
+            return true;
         }
         String me = actor.member().map(PrincipalRef::key).orElse("");
         boolean involved = approvals.rounds(actor.tenant().workspaceId(), a.approvalNo()).stream()

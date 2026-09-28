@@ -26,10 +26,20 @@ public final class QueryDao {
      * @param candidates 候选键（{@code member:x} ∪ 组 ∪ 角色 ∪ 宿主权限），也用作「是不是参与者」的主体集合
      * @param scopes     可见的范围标签
      */
-    public record Viewer(boolean all, String me, Collection<String> candidates, Collection<String> scopes) {
+    /** 数据范围不设限的标签：令牌带 {@code scopes:["*"]} 时，任何范围标签都算命中（只放开「范围」这一条，不放开候选 / 参与者 / 权限）。 */
+    public static final String ANY_SCOPE = "*";
+
+    /**
+     * @param viewAllInScope 审批：持 approval:view:all —— 看得见范围内的全部审批（不必是候选 / 参与者），但仍受范围标签约束
+     */
+    public record Viewer(boolean all, String me, Collection<String> candidates, Collection<String> scopes, boolean viewAllInScope) {
         public Viewer {
             candidates = List.copyOf(candidates);
             scopes = List.copyOf(scopes);
+        }
+
+        public Viewer(boolean all, String me, Collection<String> candidates, Collection<String> scopes) {
+            this(all, me, candidates, scopes, false);
         }
     }
 
@@ -276,7 +286,8 @@ public final class QueryDao {
     }
 
     /**
-     * 审批的可见 = 查看全部 ∨ 我是提交人 ∨ 我是实例参与者 ∨（我是（或曾是）某个审批任务的候选或处理人 ∧ 实例范围对我可见）。
+     * 审批的可见 = 应用自身 ∨ 我是提交人 ∨ 我是实例参与者 ∨（（持 approval:view:all ∨ 我是（或曾是）某个审批任务的候选或处理人）∧ 实例范围对我可见）。
+     * approval:view:all 是「范围内的全部」，不越过数据范围（2026-09-28 与宿主的角色映射对齐；全量范围的人带 scopes:["*"]）。
      * 比实例可见严：没配范围标签的实例对全空间可见，但审批单不能因此对全空间公开；与 ApprovalAppService.canSee 同一口径。
      */
     private Where approvalWhere(WorkspaceId ws, Viewer v, Collection<String> statuses, String processCode, String requestedBy, Long fromMs,
@@ -310,16 +321,19 @@ public final class QueryDao {
             w.sql.append(" OR EXISTS (SELECT 1 FROM proc_participant p WHERE p.workspace_id = a.workspace_id AND p.instance_no = a.instance_no AND p.principal IN (")
                     .append(in).append("))");
             w.params.addAll(v.candidates());
-            // 审批任务的候选 / 处理人：还要实例范围对我可见
-            w.sql.append(" OR (EXISTS (SELECT 1 FROM proc_task s WHERE s.workspace_id = a.workspace_id AND s.approval_no = a.approval_no AND (s.completed_by = ?")
+            // 审批任务的候选 / 处理人，或持 approval:view:all：还要实例范围对我可见
+            w.sql.append(" OR ((" + (v.viewAllInScope() ? "1 = 1 OR " : "")
+                    + "EXISTS (SELECT 1 FROM proc_task s WHERE s.workspace_id = a.workspace_id AND s.approval_no = a.approval_no AND (s.completed_by = ?")
                     .append(" OR s.assignee = ?")
                     .append(" OR EXISTS (SELECT 1 FROM proc_task_candidate c WHERE c.workspace_id = s.workspace_id AND c.task_no = s.task_no AND c.candidate_key IN (")
-                    .append(in).append("))))");
+                    .append(in).append(")))))");
             w.params.add(v.me());
             w.params.add(v.me());
             w.params.addAll(v.candidates());
             w.sql.append(" AND (NOT EXISTS (SELECT 1 FROM proc_instance_scope sc WHERE sc.workspace_id = a.workspace_id AND sc.instance_no = a.instance_no)");
-            if (!v.scopes().isEmpty()) {
+            if (v.scopes().contains(ANY_SCOPE)) {
+                w.sql.append(" OR 1 = 1"); // 数据范围不设限（令牌 scopes:["*"]）
+            } else if (!v.scopes().isEmpty()) {
                 w.sql.append(" OR EXISTS (SELECT 1 FROM proc_instance_scope sc WHERE sc.workspace_id = a.workspace_id AND sc.instance_no = a.instance_no AND sc.scope_tag IN (")
                         .append(marks(v.scopes().size())).append("))");
                 w.params.addAll(v.scopes());
@@ -412,7 +426,9 @@ public final class QueryDao {
             w.params.add(v.me());
             w.params.addAll(v.candidates());
             w.sql.append(" AND (NOT EXISTS (SELECT 1 FROM proc_instance_scope sc WHERE sc.workspace_id = i.workspace_id AND sc.instance_no = i.instance_no)");
-            if (!v.scopes().isEmpty()) {
+            if (v.scopes().contains(ANY_SCOPE)) {
+                w.sql.append(" OR 1 = 1"); // 数据范围不设限（令牌 scopes:["*"]）
+            } else if (!v.scopes().isEmpty()) {
                 w.sql.append(" OR EXISTS (SELECT 1 FROM proc_instance_scope sc WHERE sc.workspace_id = i.workspace_id AND sc.instance_no = i.instance_no AND sc.scope_tag IN (")
                         .append(marks(v.scopes().size())).append("))");
                 w.params.addAll(v.scopes());
@@ -536,7 +552,9 @@ public final class QueryDao {
             return;
         }
         w.sql.append(" AND (NOT EXISTS (SELECT 1 FROM proc_instance_scope s WHERE s.workspace_id = i.workspace_id AND s.instance_no = i.instance_no)");
-        if (!v.scopes().isEmpty()) {
+        if (v.scopes().contains(ANY_SCOPE)) {
+                w.sql.append(" OR 1 = 1"); // 数据范围不设限（令牌 scopes:["*"]）
+            } else if (!v.scopes().isEmpty()) {
             w.sql.append(" OR EXISTS (SELECT 1 FROM proc_instance_scope s WHERE s.workspace_id = i.workspace_id AND s.instance_no = i.instance_no AND s.scope_tag IN (")
                     .append(marks(v.scopes().size())).append("))");
             w.params.addAll(v.scopes());

@@ -1,0 +1,61 @@
+# OpsKit 在 ShareHub 生产上的引导配置（部署方数据，不进 OpsKit 产品默认配置）。
+# 放到服务器 /etc/opskit/bootstrap.yml（或用 OPSKIT_BOOTSTRAP_FILE 指定），随 --spring.profiles.active=prod 生效。
+# 每次启动幂等执行：账户 / 空间已存在就不重建；IdP 与角色按本文件覆盖更新。
+# 角色 → 产品权限的唯一真源：docs/requirements/功能权限清单.md §16.1（改映射先改那里，再同步本文件）。
+opskit:
+  bootstrap:
+    enabled: true
+    account-name: ShareHub
+    workspace:
+      ref: MAIN                 # 与内省应答的 tenant 一致（令牌 workspace 声明）
+      name: ShareHub
+      zone: Asia/Shanghai
+      locale: zh
+    idps:
+      - issuer: sharehub-staff  # 员工令牌 stk_…
+        kind: INTROSPECT
+        introspect-url: ${OPSKIT_INTROSPECT_URL}
+        client-id: ${OPSKIT_INTROSPECT_CLIENT_ID}
+        client-secret: ${OPSKIT_INTROSPECT_CLIENT_SECRET}
+        token-prefix: stk_
+        claims: &claims
+          member: sub
+          displayName: name
+          workspace: tenant
+          roles: roles
+          perms: perms
+          scopes: scopes        # 全量范围的员工发 ["*"]；不发 = 没有范围
+        jit: true
+      - issuer: sharehub-agent  # 代理令牌 atk_…
+        kind: INTROSPECT
+        introspect-url: ${OPSKIT_INTROSPECT_URL}
+        client-id: ${OPSKIT_INTROSPECT_CLIENT_ID}
+        client-secret: ${OPSKIT_INTROSPECT_CLIENT_SECRET}
+        token-prefix: atk_
+        claims: *claims
+        jit: true
+    roles:
+      ADMIN:
+        name: {zh: 管理员, en: Admin}
+        permissions: [approval:decide, approval:view:all, ticket:create, ticket:view:own, ticket:view:scoped, ticket:view:all, ticket:work,
+                      ticket:assign, ticket:escalate, ticket:merge, ticket:comment:internal, process:manage, ticket-type:manage, sla:manage,
+                      report:view, directory:manage]
+      OPS:
+        name: {zh: 运营, en: Ops}
+        permissions: [approval:decide, approval:view:all, ticket:create, ticket:view:scoped, ticket:work, ticket:assign, ticket:escalate,
+                      ticket:merge, ticket:comment:internal, sla:manage]
+      CS:
+        name: {zh: 客服, en: Customer service}
+        permissions: [approval:decide, approval:view:all, ticket:create, ticket:view:scoped, ticket:work, ticket:comment:internal]
+      FINANCE:
+        name: {zh: 财务, en: Finance}
+        permissions: [approval:decide, approval:view:all]
+      BD:
+        name: {zh: 商务, en: BD}
+        permissions: [approval:view:all]
+      VIEWER:
+        name: {zh: 只读, en: Viewer}
+        permissions: [approval:view:all, ticket:view:scoped]
+      AGENT:
+        name: {zh: 代理, en: Agent}
+        permissions: [ticket:view:scoped, ticket:work]

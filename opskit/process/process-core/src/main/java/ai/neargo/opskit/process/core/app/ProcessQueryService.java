@@ -232,8 +232,10 @@ public class ProcessQueryService {
         return new Viewer(all, actor.member().map(PrincipalRef::key).orElse(null), CandidateKeys.of(actor), actor.scopes());
     }
 
+    /** approval:view:all = 范围内的全部审批（不越过数据范围）；只有应用自身完全不限。 */
     private static Viewer approvalViewer(Actor actor) {
-        return viewer(actor, actor.isAppItself() || actor.productPermissions().contains(APPROVAL_VIEW_ALL));
+        return new Viewer(actor.isAppItself(), actor.member().map(PrincipalRef::key).orElse(null), CandidateKeys.of(actor), actor.scopes(),
+                actor.productPermissions().contains(APPROVAL_VIEW_ALL));
     }
 
     /** {@code "me"} → 操作人（应用自身时为空串，表示「没有」）；成员 ID → {@code member:x}。 */

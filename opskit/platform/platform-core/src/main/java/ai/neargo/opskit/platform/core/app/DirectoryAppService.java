@@ -49,6 +49,8 @@ import org.springframework.transaction.support.TransactionOperations;
 public class DirectoryAppService {
 
     private static final Pattern CODE = Pattern.compile("[a-z0-9][a-z0-9_.-]{0,63}");
+    /** 角色代号来自宿主（令牌 roles 声明原样带来，常见 ADMIN / OPS 这种大写），所以放开大小写；组代号仍只许小写。 */
+    private static final Pattern ROLE_CODE = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_.-]{0,63}");
     private static final int MAX_EXTERNAL_REF = 128;
 
     private final MemberDao members;
@@ -143,7 +145,10 @@ public class DirectoryAppService {
     @RequiresPermission("directory:manage")
     public void upsertRole(Actor actor, WorkspaceId workspace, RoleUpsert r) {
         Guards.require(actor, Permission.DIRECTORY_MANAGE);
-        requireCode(r.code());
+        if (r.code() == null || !ROLE_CODE.matcher(r.code()).matches()) {
+            throw new OpsKitException(CommonErrors.VALIDATION, "invalid role code: " + r.code(), Map.of(),
+                    List.of(new FieldError("code", "opskit.validation.invalid_code")));
+        }
         List<FieldError> errors = new ArrayList<>();
         r.permissions().stream().filter(p -> Permission.ofCode(p).isEmpty()).sorted()
                 .forEach(p -> errors.add(new FieldError("permissions", "opskit.platform.unknown_permission:" + p)));

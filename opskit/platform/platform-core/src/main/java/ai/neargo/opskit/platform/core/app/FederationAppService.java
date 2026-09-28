@@ -39,6 +39,12 @@ public class FederationAppService {
         this.onChange = onChange;
     }
 
+    /** 这个签发方登记在哪个账户下（启动引导据此判断账户是否已建）。 */
+    @SystemAction("启动引导内部调用")
+    public java.util.Optional<AccountId> accountOfIssuer(String issuer) {
+        return idps.findByIssuer(AccountId.UNKNOWN, issuer).map(r -> new AccountId(r.accountId()));
+    }
+
     @SystemAction("运维面：登记账户的身份提供方")
     public void upsert(AccountId account, IdpConfig c) {
         List<FieldError> errors = new ArrayList<>();
