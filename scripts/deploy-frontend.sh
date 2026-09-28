@@ -17,7 +17,9 @@ case "$APP" in
         # ops-web 用 pnpm（c-app 仍是 npm）。--frozen-lockfile 是 `npm ci` 的对应物：
         # 锁文件与 package.json 不一致就报错，而不是静默解析出另一套版本。
         INSTALL_CMD='pnpm install --frozen-lockfile --reporter=silent'
-        BUILD_CMD='NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE= pnpm run build'
+        # 流程与工单连生产 OpsKit（同机 nginx /api/opskit/ → 8090）；FLOW_API=http 同时就是 /flow/* 的上线开关（backend-ready.ts）。
+        # 账户号是生产引导建的（2026-09-28，/etc/opskit/bootstrap.yml），重建库才会变
+        BUILD_CMD='NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE= NEXT_PUBLIC_FLOW_API=http NEXT_PUBLIC_OPSKIT_WS=ext:MAIN NEXT_PUBLIC_OPSKIT_ACCOUNT=ac_01m3k9kg5es8hzphpjqrv81s09 pnpm run build'
         OUT='out'
         URL_PATH='/'
         ;;
