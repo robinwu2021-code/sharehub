@@ -5,6 +5,9 @@ import ai.neargo.sharehub.auth.ConsumerContext;
 import ai.neargo.sharehub.cs.dto.CsDtos.CsTicketVO;
 import ai.neargo.sharehub.cs.dto.CsDtos.ReportReq;
 import ai.neargo.sharehub.cs.dto.CsDtos.ReportResultVO;
+import ai.neargo.sharehub.cs.dto.CsDtos.CsMessageVO;
+import ai.neargo.sharehub.cs.dto.CsDtos.CsSessionVO;
+import ai.neargo.sharehub.cs.service.CsSessionService;
 import ai.neargo.sharehub.cs.service.CsTicketService;
 import ai.neargo.sharehub.user.marketing.dto.MarketingDtos.ClaimableCouponVO;
 import ai.neargo.sharehub.user.marketing.dto.MarketingDtos.NoticeVO;
@@ -19,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * C 端公告 / 券包 / 自助报障（[api/README §8.5 §8.6]）。
@@ -36,13 +40,16 @@ public class MpSupportController {
     private final NoticeService noticeService;
     private final UserCouponService userCouponService;
     private final CsTicketService ticketService;
+    private final CsSessionService sessionService;
 
     public MpSupportController(NoticeService noticeService,
                                UserCouponService userCouponService,
-                               CsTicketService ticketService) {
+                               CsTicketService ticketService,
+                               CsSessionService sessionService) {
         this.noticeService = noticeService;
         this.userCouponService = userCouponService;
         this.ticketService = ticketService;
+        this.sessionService = sessionService;
     }
 
     /**
@@ -93,6 +100,34 @@ public class MpSupportController {
     @PostMapping("/mp/user/report")
     public ReportResultVO report(@RequestBody ReportReq body) {
         return ticketService.report(ConsumerContext.userNo(), body);
+    }
+
+    // ——————————————————————— 人工客服会话 ———————————————————————
+
+    /**
+     * 我的人工会话。**没有会话时返回 null**，不是 404 —— 端上据此不显示入口。
+     *
+     * <p>在此之前 {@code /mp} 下没有任何会话端点：用户被转人工之后，
+     * 进度页永远停在「正在排队处理」，客服回了什么他看不到、也没法追问。
+     * 而「转人工」是分流的兜底方向，也就是最常走的那条。
+     */
+    @GetMapping("/mp/user/cs-session")
+    public CsSessionVO mySession() {
+        return sessionService.myActiveSession(ConsumerContext.userNo());
+    }
+
+    /** 会话消息（正序）。非属主与不存在同一结果，不泄露会话是否存在。 */
+    @GetMapping("/mp/user/cs-sessions/{sessionNo}/messages")
+    public List<CsMessageVO> myMessages(@PathVariable String sessionNo,
+                                        @RequestParam(required = false) Integer limit) {
+        return sessionService.myMessages(ConsumerContext.userNo(), sessionNo, limit);
+    }
+
+    /** 我在会话里说一句。落 sender_type=USER；会话已关闭则 409。 */
+    @PostMapping("/mp/user/cs-sessions/{sessionNo}/messages")
+    public CsMessageVO sendMessage(@PathVariable String sessionNo, @RequestBody Map<String, String> body) {
+        return sessionService.sendByUser(ConsumerContext.userNo(), sessionNo,
+                body == null ? null : body.get("content"));
     }
 
     /** 我的报障列表。 */

@@ -240,6 +240,14 @@ export default {
     updateNow: "Update now",
     latest: "You are on the latest version",
   },
+  cs: {
+    title: "Support chat",
+    noSession: "No conversation yet. One appears here when a report needs a human.",
+    closed: "This conversation is closed. Please file a new report.",
+    placeholder: "Type a message…",
+    send: "Send",
+    entry: "Contact support",
+  },
   reports: {
     photos: "{n} photo(s) attached",
     title: "My reports",

@@ -47,6 +47,10 @@ onShow(load);
  * 点开才取：一屏 50 条报障单如果每条都预下载几张图，进页面就是几十个请求。
  */
 const opening = ref("");
+
+function openCs() {
+  uni.navigateTo({ url: "/pages/cs/index" });
+}
 async function viewPhotos(k: CsTicket) {
   if (!k.photoCount || opening.value) return;
   opening.value = k.ticketNo;
@@ -105,10 +109,14 @@ async function viewPhotos(k: CsTicket) {
             <pb-icon name="camera" :size="32" class="text-sub" />
             <text class="text-[24rpx] text-primary">{{ $t("reports.photos", { n: k.photoCount }) }}</text>
           </view>
-          <!-- 既没工单也没退款、状态却是处理中 = 在人工队列里排着，这句要说出来 -->
-          <view v-if="!k.woNo && !k.refundNo && k.status !== 'CLOSED'" class="pb-row">
-            <pb-icon name="clock" :size="32" class="text-sub" />
-            <text class="text-[24rpx] text-sub">{{ $t("reports.inQueue") }}</text>
+          <!--
+            既没工单也没退款、状态却是处理中 = 在人工队列里排着。
+            这一行要能点进会话 —— 只说「正在排队处理」而没有入口，正是此前那条死胡同：
+            客服回了什么用户看不到，也没法追问。
+          -->
+          <view v-if="!k.woNo && !k.refundNo && k.status !== 'CLOSED'" class="pb-row" @tap="openCs">
+            <pb-icon name="message" :size="32" class="text-sub" />
+            <text class="text-[24rpx] text-primary">{{ $t("reports.inQueue") }} · {{ $t("cs.entry") }}</text>
           </view>
         </view>
       </pb-card>

@@ -16,6 +16,8 @@ import type {
   CsTicket,
   MessageItem,
   AppVersionCheck,
+  CsSession,
+  CsMessage,
 } from "@/types";
 import { CURRENCY, MOCK_DELAY_MS } from "@/shared/constants";
 
@@ -178,6 +180,39 @@ export const tickets: CsTicket[] = [
   { ticketNo: "TK000002", userNo: "CU-0001", orderNo: "ORD000031", cabinetNo: "CAB1005", problemNo: "ISS000003", issue: "归还后还在计费", channel: "APP", status: "PROCESSING", handlerNo: null, woNo: null, refundNo: "RF000003", createdAt: "2026-09-20 10:12:00" },
   { ticketNo: "TK000001", userNo: "CU-0001", orderNo: "ORD000021", cabinetNo: "CAB1002", problemNo: "ISS000001", issue: "扫码后没弹出充电宝", channel: "APP", status: "CLOSED", handlerNo: "EMP0007", woNo: "WO000011", refundNo: null, createdAt: "2026-09-12 19:40:00" },
 ];
+
+/*
+ * 人工客服会话（mock）。**真存在内存里**：发一句能读回，会话的价值就在于「上次说到哪」还在。
+ * 预置一问一答，让「客服回了我看得到」这件事在 mock 下就能自查 ——
+ * 它正是 2026-09-28 之前断掉的那一环（C 端压根没有会话端点）。
+ */
+export const csSession: CsSession = {
+  sessionNo: "CS000001", userNo: "CU-0001", agentName: "Sara",
+  lastMessage: "已为您登记，稍后回电", status: "ACTIVE", updatedAt: "2026-09-20 10:20:00",
+};
+export const csMessages: CsMessage[] = [
+  { id: 1, sessionNo: "CS000001", senderType: "USER", senderNo: "CU-0001", content: "归还后还在计费", attach: null, createdAt: "2026-09-20 10:12:00" },
+  { id: 2, sessionNo: "CS000001", senderType: "AGENT", senderNo: "EMP0007", content: "已为您登记，稍后回电", attach: null, createdAt: "2026-09-20 10:20:00" },
+];
+
+export function myCsSession(): CsSession | null {
+  return csSession;
+}
+
+export function listCsMessages(sessionNo: string): CsMessage[] {
+  return csMessages.filter((m) => m.sessionNo === sessionNo);
+}
+
+export function sendCsMessage(sessionNo: string, content: string): CsMessage {
+  const m: CsMessage = {
+    id: csMessages.length + 1, sessionNo, senderType: "USER", senderNo: "CU-0001",
+    content, attach: null,
+    createdAt: new Date().toISOString().slice(0, 19).replace("T", " "),
+  };
+  csMessages.push(m);
+  csSession.lastMessage = content;   // 与后端同口径：摘要跟着走
+  return m;
+}
 
 // 权益是**结构化**的（rights），不是文案数组 —— 见 types/index.ts 的 PlanRights
 export const memberships: MembershipPlan[] = [

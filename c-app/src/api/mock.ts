@@ -266,6 +266,10 @@ export const mockApi: McpApi = {
   listReports: (q = {}) => db.delay(db.paginate(db.tickets.filter((t) => !q.status || t.status === q.status), q.page, q.size)),
   getReport: (reportNo: string) => db.delay(db.tickets.find((t) => t.ticketNo === reportNo) ?? null),
 
+  // 人工会话（mock）：db 里真存，重开能读回 —— 会话的价值就在于「上次说到哪」还在
+  myCsSession: () => db.delay(db.myCsSession()),
+  listCsMessages: (sessionNo: string) => db.delay(db.listCsMessages(sessionNo)),
+  sendCsMessage: (sessionNo: string, content: string) => db.delay(db.sendCsMessage(sessionNo, content), 300),
   getWallet: () => db.delay(db.wallet),
   listRechargePackages: () => db.delay(db.rechargePackages.filter((p) => p.status === "ENABLED")),
   recharge: (packageNo: string) => {

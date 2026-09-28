@@ -295,6 +295,27 @@ export interface ReportInput {
   fileNos?: string[]; // 报障截图：先传 /mp/files 拿 fileNo，提交时带上
 }
 
+/** 人工客服会话（镜像后端 `CsSessionVO`）。 */
+export interface CsSession {
+  sessionNo: string;
+  userNo: string;
+  agentName: string | null;
+  lastMessage: string | null;
+  status: "ACTIVE" | "CLOSED";
+  updatedAt: string;
+}
+
+/** 会话里的一条消息（镜像后端 `CsMessageVO`）。 */
+export interface CsMessage {
+  id: number;
+  sessionNo: string;
+  senderType: "USER" | "AGENT";
+  senderNo: string;
+  content: string;
+  attach: string | null;
+  createdAt: string;
+}
+
 /**
  * 文件引用（镜像后端 `FileRef`）。C 端只用到 `fileNo`，其余字段如实声明：
  * 少声明会让前后端对齐卡口把这条端点记成「后端出参在前端没有对应类型」。

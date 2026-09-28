@@ -24,7 +24,7 @@ import type {
   AppVersionCheck,
   StoreDetail,
   WalletTxn,
-  LogoffItem, FileRef } from "@/types";
+  LogoffItem, FileRef, CsSession, CsMessage } from "@/types";
 
 export const httpApi: McpApi = {
   loginMethods: (country?: string) =>
@@ -70,6 +70,11 @@ export const httpApi: McpApi = {
   report: (p: ReportInput) => client.post<ReportResult>("/mp/user/report", p),
   listReports: (q?: PageQ & { status?: string }) => client.get<PageResult<CsTicket>>("/mp/user/reports", q),
   getReport: (reportNo: string) => client.get<CsTicket | null>(`/mp/user/reports/${reportNo}`),
+  myCsSession: () => client.get<CsSession | null>("/mp/user/cs-session"),
+  listCsMessages: (sessionNo: string, limit?: number) =>
+    client.get<CsMessage[]>(`/mp/user/cs-sessions/${sessionNo}/messages`, { limit }),
+  sendCsMessage: (sessionNo: string, content: string) =>
+    client.post<CsMessage>(`/mp/user/cs-sessions/${sessionNo}/messages`, { content }),
 
   getWallet: () => client.get<WalletOverview>("/mp/user/wallet"),
   listRechargePackages: () => client.get<RechargePackage[]>("/mp/user/recharge-packages"),

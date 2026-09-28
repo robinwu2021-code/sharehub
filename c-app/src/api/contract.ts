@@ -22,7 +22,7 @@ import type {
   AppVersionCheck,
   StoreDetail,
   WalletTxn,
-  LogoffItem, FileRef } from "@/types";
+  LogoffItem, FileRef, CsSession, CsMessage } from "@/types";
 
 export interface PageQ {
   page?: number;
@@ -207,6 +207,10 @@ export interface McpApi {
   report(p: ReportInput): Promise<ReportResult>;
   listReports(q?: PageQ & { status?: string }): Promise<PageResult<CsTicket>>;
   getReport(reportNo: string): Promise<CsTicket | null>;
+  /** 我的人工会话；没有会话返回 null（不是错误）—— 端上据此不显示入口。 */
+  myCsSession(): Promise<CsSession | null>;
+  listCsMessages(sessionNo: string, limit?: number): Promise<CsMessage[]>;
+  sendCsMessage(sessionNo: string, content: string): Promise<CsMessage>;
   // 钱包 / 营销
   getWallet(): Promise<WalletOverview>;
   // 充值：**只传套餐号**。金额由服务端按套餐算 —— 端上传金额等于把定价权交给端。

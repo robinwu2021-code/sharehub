@@ -38,4 +38,26 @@ public interface CsSessionService {
      * @return 会话业务键
      */
     String openFor(String cUserNo, String firstMessage);
+
+    // ——————————————————————— C 端 ———————————————————————
+
+    /**
+     * 我的会话（C 端）。属主过滤写死在服务端，不看调用方传了什么。
+     *
+     * <p>返回 {@code null} = 这个人还没有会话（不是报错）—— 端上据此不显示入口。
+     */
+    CsSessionVO myActiveSession(String cUserNo);
+
+    /**
+     * 我的会话消息（C 端）。非属主一律当作不存在 —— 用 403 区分会泄露会话是否存在。
+     */
+    List<CsMessageVO> myMessages(String cUserNo, String sessionNo, Integer limit);
+
+    /**
+     * 用户在会话里说一句（C 端），落 {@code sender_type=USER}。
+     *
+     * <p>在此之前**只有客服能发**：用户被转人工之后，界面上永远停在「正在排队处理」，
+     * 客服回了什么他看不到、也没法追问（2026-09-28 查实）。
+     */
+    CsMessageVO sendByUser(String cUserNo, String sessionNo, String content);
 }

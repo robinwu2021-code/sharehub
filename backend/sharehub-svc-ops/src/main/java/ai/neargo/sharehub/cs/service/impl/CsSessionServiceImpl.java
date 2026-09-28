@@ -155,6 +155,62 @@ public class CsSessionServiceImpl implements CsSessionService {
         return s.length() <= SUMMARY_MAX ? s : s.substring(0, SUMMARY_MAX);
     }
 
+    // ——————————————————————— C 端 ———————————————————————
+
+    @Override
+    public CsSessionVO myActiveSession(String cUserNo) {
+        CsSession e = mapper.selectOne(new LambdaQueryWrapper<CsSession>()
+                .eq(CsSession::getCUserNo, cUserNo)
+                .eq(CsSession::getStatus, CsSessionStatus.ACTIVE.name())
+                .orderByDesc(CsSession::getId).last("limit 1"));
+        return e == null ? null : toVO(e);   // 没有会话不是错误，端上据此不显示入口
+    }
+
+    @Override
+    public List<CsMessageVO> myMessages(String cUserNo, String sessionNo, Integer limit) {
+        requireMine(cUserNo, sessionNo);
+        return messages(sessionNo, limit);
+    }
+
+    @Override
+    @Transactional
+    public CsMessageVO sendByUser(String cUserNo, String sessionNo, String content) {
+        if (content == null || content.isBlank()) {
+            throw BizException.badRequest("error.common.missing_parameter", "content");
+        }
+        CsSession session = requireMine(cUserNo, sessionNo);
+        if (CsSessionStatus.CLOSED.name().equals(session.getStatus())) {
+            throw ServerException.of(ErrorCode.CONFLICT, "会话已关闭，不能再发送: " + sessionNo);
+        }
+
+        CsMessage m = new CsMessage();
+        m.setTenantId(session.getTenantId() == null ? TENANT_MAIN : session.getTenantId());
+        m.setSessionNo(sessionNo);
+        m.setSenderType(CsSenderType.USER.name());
+        m.setSenderNo(cUserNo);
+        m.setContent(content.trim());
+        m.setCreatedAt(LocalDateTime.now().format(TS));
+        messageMapper.insert(m);
+
+        // 与客服回复同一口径：列表直出这一列，漏更就显示成上一条
+        session.setLastMessage(summarize(content));
+        mapper.updateById(session);
+        return toVO(m);
+    }
+
+    /**
+     * 属主校验：**非属主与不存在返回同一个结果**（404）——
+     * 用 403 区分等于告诉调用方「这个会话号是真的」。
+     */
+    private CsSession requireMine(String cUserNo, String sessionNo) {
+        CsSession e = mapper.selectOne(new LambdaQueryWrapper<CsSession>()
+                .eq(CsSession::getSessionNo, sessionNo)
+                .eq(CsSession::getCUserNo, cUserNo)   // 属主过滤不可选，必须恒生效
+                .last("limit 1"));
+        if (e == null) throw BizException.notFound(sessionNo);
+        return e;
+    }
+
     private static CsSessionVO toVO(CsSession e) {
         return new CsSessionVO(e.getSessionNo(), e.getCUserNo(), e.getAgentName(),
                 e.getLastMessage(), e.getStatus(),

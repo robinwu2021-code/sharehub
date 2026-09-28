@@ -240,6 +240,14 @@ export default {
     updateNow: "立即更新",
     latest: "已是最新版本",
   },
+  cs: {
+    title: "人工客服",
+    noSession: "还没有会话。报障之后如果需要人工处理，这里就会出现对话。",
+    closed: "会话已结束。有新问题请重新报障。",
+    placeholder: "说点什么…",
+    send: "发送",
+    entry: "联系客服",
+  },
   reports: {
     photos: "已附 {n} 张照片",
     title: "我的报障",
