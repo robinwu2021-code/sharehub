@@ -15,6 +15,19 @@ const zh = {
   searchPlaceholder: "搜单号 / 标题 / 对象 / 受理方",
   filter: { type: "工单类型", typeAll: "全部类型", assignee: "受理方", assigneeAll: "受理方：全部" },
   empty: { filtered: "按当前筛选没有工单 —— 换个条件，或点已选中的统计卡取消筛选", none: "还没有工单" },
+  create: {
+    btn: "新建工单",
+    title: "新建工单",
+    done: "已建单 {no}，已进抢单池",
+    attached: "去重键命中未结工单 {no}，已并入它（没有另开新单）",
+    field: {
+      typeCode: "工单类型", title: "标题", titleHelp: "一句话说清问题，如「机柜离线」", priority: "优先级",
+      subjectType: "业务对象", subjectRef: "对象编号", subjectRefHelp: "如 CAB1001、ST0311、CU0148；不涉及具体对象可不填",
+      description: "描述", dedupeKey: "去重键", dedupeKeyHelp: "同一件事重复报时填同一个键（如告警号），会并入未结的那张单",
+    },
+    subject: { none: "不涉及", cabinet: "柜机", site: "站点", user: "用户" },
+    priority: { URGENT: "紧急", HIGH: "高", NORMAL: "普通", LOW: "低" },
+  },
   reassign: {
     btn: "批量改派",
     pickHint: "勾选要改派的工单",
@@ -44,6 +57,19 @@ const en = {
   searchPlaceholder: "Search no. / title / object / assignee",
   filter: { type: "Ticket type", typeAll: "All types", assignee: "Assignee", assigneeAll: "Assignee: all" },
   empty: { filtered: "No tickets match the current filters — change them, or click the selected stat card to clear it", none: "No tickets yet" },
+  create: {
+    btn: "New ticket",
+    title: "New ticket",
+    done: "Ticket {no} created and placed in the pool",
+    attached: "Dedupe key matched open ticket {no}; merged into it (no new ticket)",
+    field: {
+      typeCode: "Ticket type", title: "Title", titleHelp: "One line describing the problem, e.g. \"Cabinet offline\"", priority: "Priority",
+      subjectType: "Business object", subjectRef: "Object number", subjectRefHelp: "e.g. CAB1001, ST0311, CU0148; leave empty if none",
+      description: "Description", dedupeKey: "Dedupe key", dedupeKeyHelp: "Use the same key for repeat reports of the same issue (e.g. alarm no.); it merges into the open ticket",
+    },
+    subject: { none: "None", cabinet: "Cabinet", site: "Site", user: "User" },
+    priority: { URGENT: "Urgent", HIGH: "High", NORMAL: "Normal", LOW: "Low" },
+  },
   reassign: {
     btn: "Bulk reassign",
     pickHint: "Select the tickets to reassign",
@@ -72,6 +98,19 @@ const ar = {
   searchPlaceholder: "ابحث بالرقم / العنوان / الكائن / المسؤول",
   filter: { type: "نوع التذكرة", typeAll: "كل الأنواع", assignee: "المسؤول", assigneeAll: "المسؤول: الكل" },
   empty: { filtered: "لا توجد تذاكر تطابق عوامل التصفية الحالية — غيّرها، أو انقر بطاقة الإحصاء المحددة لإلغائها", none: "لا توجد تذاكر بعد" },
+  create: {
+    btn: "تذكرة جديدة",
+    title: "تذكرة جديدة",
+    done: "أُنشئت التذكرة {no} ووُضعت في المجمّع",
+    attached: "طابق مفتاح التكرار التذكرة المفتوحة {no}؛ دُمجت فيها (لا تذكرة جديدة)",
+    field: {
+      typeCode: "نوع التذكرة", title: "العنوان", titleHelp: "سطر واحد يصف المشكلة، مثل «خزانة غير متصلة»", priority: "الأولوية",
+      subjectType: "كائن العمل", subjectRef: "رقم الكائن", subjectRefHelp: "مثل CAB1001 أو ST0311 أو CU0148؛ اتركه فارغًا إن لم يوجد",
+      description: "الوصف", dedupeKey: "مفتاح التكرار", dedupeKeyHelp: "استخدم المفتاح نفسه للبلاغات المتكررة عن المشكلة نفسها (مثل رقم التنبيه)؛ تُدمج في التذكرة المفتوحة",
+    },
+    subject: { none: "لا يوجد", cabinet: "خزانة", site: "موقع", user: "مستخدم" },
+    priority: { URGENT: "عاجل", HIGH: "مرتفع", NORMAL: "عادي", LOW: "منخفض" },
+  },
   reassign: {
     btn: "إعادة إسناد جماعية",
     pickHint: "حدّد التذاكر المراد إعادة إسنادها",

@@ -13,8 +13,9 @@
 import { fail, notFound } from "@/lib/biz-error";
 import { hasPerm, requirePerm } from "./mock-auth";
 import { useLocaleStore } from "@/lib/stores/locale";
+import { FlowValidationError } from "./errors";
 import type {
-  Member, Named, Page, Priority, ReassignResult, SlaMetric, SlaState, SlaSummary, StatusCategory, TicketAction, TicketFilter,
+  CreateTicketRequest, CreateTicketResult, Member, Named, Page, Priority, ReassignResult, SlaMetric, SlaState, SlaSummary, StatusCategory, TicketAction, TicketFilter,
   TicketQuery, TicketRow, TicketStat, TicketView, TimelineEvent, TodoCount, TodoItem, TodoQuery,
 } from "./types";
 
@@ -526,6 +527,57 @@ export function poolTicket(no: string, reason: string, now: number = Date.now())
   r.assignee = null; r.pooled = true; r.status = "PENDING_ACCEPT";
   log(no, now, "ASSIGNED", "退回抢单池", ME, reason.trim());
   return out(view(r, now));
+}
+
+/** 手工建单的 SLA 起算：按优先级给解决时限（mock 口径；真服务按类型挂的 SLA 策略算） */
+const CREATE_SLA_MIN: Record<string, number> = { URGENT: 240, HIGH: 480, NORMAL: 1440, LOW: 2880 };
+const NO_PREFIX: Record<string, string> = { ops: "WO", "cs-report": "CS", "after-sales": "AS" };
+
+/**
+ * POST /workspaces/{ws}/tickets：校验一次给全（路径按字段）→ 去重键命中未结单则并入 → 否则新开、进抢单池。
+ * 建单与办理同一个码（flow:ticket:handle）：客服报障是手工建单的主要来源，而客服没有派单码（功能权限清单 §16）。
+ */
+export function createTicket(req: CreateTicketRequest, now: number = Date.now()): CreateTicketResult {
+  requirePerm("flow:ticket:handle");
+  const e: { path: string; error: string }[] = [];
+  if (!TICKET_TYPES.some((t) => t.code === req.typeCode)) e.push({ path: "typeCode", error: pickLang("请选择工单类型", "Pick a ticket type") });
+  const title = req.title?.trim() ?? "";
+  if (!title) e.push({ path: "title", error: pickLang("标题必填", "Title is required") });
+  else if (title.length > 80) e.push({ path: "title", error: pickLang("标题不超过 80 字", "Title is at most 80 characters") });
+  if (req.priority && !(req.priority in PRIO)) e.push({ path: "priority", error: pickLang("优先级不存在", "Unknown priority") });
+  if (req.subject && (!req.subject.type.trim() || !req.subject.ref.trim())) e.push({ path: "subject", error: pickLang("业务对象要同时给类型与编号", "Give both type and number for the business object") });
+  if (e.length) throw new FlowValidationError(pickLang(`建单被拒：有 ${e.length} 处需要修改`, `Ticket rejected: ${e.length} field(s) to fix`), e);
+
+  const key = req.dedupeKey?.trim();
+  if (key) {
+    const hit = tickets.find((t) => t.dedupe?.key === key && OPEN.includes(t.status));
+    if (hit) {
+      hit.dedupe = { key, attachedCount: (hit.dedupe?.attachedCount ?? 0) + 1 };
+      log(hit.ticketNo, now, "DEDUPE", "重复并入", ME, `去重键 ${key}：${title}`);
+      return { ticket: out(view(hit, now)), attached: true };
+    }
+  }
+  const prio = (req.priority ?? "NORMAL") as PrioCode;
+  const d = new Date(now);
+  const day = `${String(d.getFullYear()).slice(2)}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+  const prefix = NO_PREFIX[req.typeCode] ?? "TK";
+  let n = 1;
+  while (tickets.some((t) => t.ticketNo === `${prefix}${day}${String(900 + n)}`)) n++;
+  const rec: TicketRec = {
+    ticketNo: `${prefix}${day}${String(900 + n)}`, typeCode: req.typeCode, title,
+    subject: req.subject ? { type: req.subject.type.trim(), ref: req.subject.ref.trim(),
+      display: req.subject.display ?? { title: `${req.subject.type.trim()} ${req.subject.ref.trim()}` } }
+      : { type: "manual", ref: "-", display: { title } },
+    priority: prio, status: "PENDING_ACCEPT", assignee: null, pooled: true,
+    slaStartMs: now, slaDueAtMs: now + (CREATE_SLA_MIN[prio] ?? 1440) * MIN, pausedAtMs: null,
+    source: { kind: "MANUAL" }, escalated: false, nudgedAtMs: null,
+    ...(req.description?.trim() ? { description: req.description.trim() } : {}),
+    ...(key ? { dedupe: { key, attachedCount: 0 } } : {}),
+    createdAtMs: now, closedAtMs: null,
+  };
+  tickets.push(rec);
+  log(rec.ticketNo, now, "CREATED", "开单", ME, `手工建单 · 优先级 ${PRIO[prio].name}`);
+  return { ticket: out(view(rec, now)), attached: false };
 }
 
 // 放在文件末尾：种子要用到上面定义的 ASSIGNEE_OPTIONS 与 log（const 有暂时性死区）

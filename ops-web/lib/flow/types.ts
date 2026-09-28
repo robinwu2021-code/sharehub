@@ -146,6 +146,29 @@ export interface TicketQuery {
 
 export type TicketFilter = Omit<TicketQuery, "page" | "size">;
 
+/**
+ * 建单（21/06 §五 POST /workspaces/{ws}/tickets）。界面上的「手工建单」只用到其中一部分；
+ * 字段按类型的字段配置走 fields（手工建单暂不填类型字段，来源由服务记为手工）。
+ */
+export interface CreateTicketRequest {
+  typeCode: string;
+  title: string;
+  description?: string;
+  /** 优先级代号；不给用类型的默认 */
+  priority?: string;
+  /** 业务对象（柜机、站点、用户…）；可不填 */
+  subject?: { type: string; ref: string; display?: { title: string } };
+  fields?: Record<string, unknown>;
+  /** 去重键：同键的未结单已存在 → 并入它（attached=true），不另开 */
+  dedupeKey?: string;
+}
+
+export interface CreateTicketResult {
+  ticket: TicketRow;
+  /** true = 命中去重，并入了已有工单（HTTP 200）；false = 新开（201） */
+  attached: boolean;
+}
+
 /** 批量改派的逐单结果（单张失败不回滚其余） */
 export interface ReassignResult {
   succeeded: string[];

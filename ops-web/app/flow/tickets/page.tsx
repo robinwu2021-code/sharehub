@@ -19,6 +19,7 @@ import { PagedTable } from "@/components/ui/paged-table";
 import type { Column } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
 import { SlaCell } from "@/components/flow/sla-cell";
 import { StatStrip } from "@/components/flow/stat-strip";
@@ -27,6 +28,7 @@ import { actionVariant, inlineActions } from "@/lib/flow/present";
 import { useFlowT, type FlowKey } from "@/lib/flow/i18n";
 import { useMembers, usePartyOptions, useTicketTypes } from "@/lib/flow/options";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 /** 受理方显示：成员属性 partyType 的显示名（未定义显示名时用原值）+ 成员名 */
 const memberLabel = (m: Member) => {
@@ -46,9 +48,27 @@ const reassignFields = (tt: TicketsT, members: Member[], membersHelp?: string): 
 ];
 type TicketsT = (k: FlowKey<"tickets">, p?: Record<string, string | number>) => string;
 
+const CREATE_PRIORITIES = ["URGENT", "HIGH", "NORMAL", "LOW"] as const;
+const SUBJECT_TYPES = ["cabinet", "site", "user"] as const;
+/**
+ * @form-none 手工建单提交到 OpsKit（opskit-svc 的 POST /workspaces/{ws}/tickets，21/06 §五），
+ * 不是 ShareHub 后端，contract.json 管不到；字段以 21/06 为准，经 lib/flow/client 转发。
+ */
+const createFields = (tt: TicketsT, types: { value: string; label: string }[]): FieldDef[] => [
+  { key: "typeCode", label: tt("create.field.typeCode"), type: "select", required: true, options: types },
+  { key: "title", label: tt("create.field.title"), required: true, maxLength: 80, help: tt("create.field.titleHelp") },
+  { key: "priority", label: tt("create.field.priority"), type: "select", required: true,
+    options: CREATE_PRIORITIES.map((p) => ({ value: p, label: tt(`create.priority.${p}`) })) },
+  { key: "subjectType", label: tt("create.field.subjectType"), type: "select",
+    options: [{ value: "", label: tt("create.subject.none") }, ...SUBJECT_TYPES.map((s) => ({ value: s, label: tt(`create.subject.${s}`) }))] },
+  { key: "subjectRef", label: tt("create.field.subjectRef"), help: tt("create.field.subjectRefHelp"), disabledWhen: (v) => !v.subjectType },
+  { key: "description", label: tt("create.field.description"), type: "textarea", rows: 4, maxLength: 1000 },
+  { key: "dedupeKey", label: tt("create.field.dedupeKey"), help: tt("create.field.dedupeKeyHelp"), maxLength: 128 },
+];
+
 function FlowTickets() {
   const qc = useQueryClient();
-  const { t: tt, tc } = useFlowT("tickets");
+  const { t: tt, tc, fmt } = useFlowT("tickets");
   const allow = useCan();
   // 筛选项都来自服务（工单类型 / 成员属性定义），不在前端内置业务词（21/06 §七）
   const typeOptions = useTicketTypes().map((t) => ({ value: t.code, label: t.name }));
@@ -57,6 +77,12 @@ function FlowTickets() {
   // 行内的迁移动作（接单 / 升级 / 复核…）不在前端判权：服务端给的 actions[] 已按当前操作人算好，
   // 前端再判一遍只会与服务端口径打架。前端只管不属于迁移的能力 —— 批量改派。
   const canDispatch = allow("flow:ticket:dispatch");
+  // 建单与办理同一个码：客服报障是手工建单的主要来源，而客服没有派单码（功能权限清单 §16）
+  const canCreate = allow("flow:ticket:handle");
+  const router = useRouter();
+  const [createOpen, setCreateOpen] = useState(false);
+  const blankCreate = { typeCode: "", title: "", priority: "NORMAL", subjectType: "", subjectRef: "", description: "", dedupeKey: "" };
+  const [createForm, setCreateForm] = useState<Record<string, unknown>>(blankCreate);
   const paging = usePaging();
   const [keyword, setKeyword] = useState("");
   const [typeCode, setTypeCode] = useState("");
@@ -89,6 +115,26 @@ function FlowTickets() {
     mutationFn: ({ no, code }: { no: string; code: string }) => flow.transition(no, code),
     onSuccess: (t, v) => { notify.success(`${t.ticketNo}${tc("colon")}${actionDone(tt, v.code)}`); refresh(); },
     onError: (e: Error) => { notify.error(e.message); refresh(); },
+  });
+  const create = useMutation({
+    mutationFn: () => {
+      const f = createForm;
+      const str = (k: string) => String(f[k] ?? "").trim();
+      return flow.createTicket({
+        typeCode: str("typeCode"), title: str("title"), priority: str("priority") || undefined,
+        ...(str("description") ? { description: str("description") } : {}),
+        ...(str("subjectType") && str("subjectRef") ? { subject: { type: str("subjectType"), ref: str("subjectRef") } } : {}),
+        ...(str("dedupeKey") ? { dedupeKey: str("dedupeKey") } : {}),
+      });
+    },
+    onSuccess: (r) => {
+      if (r.attached) notify.info(tt("create.attached", { no: r.ticket.ticketNo }));
+      else notify.success(tt("create.done", { no: r.ticket.ticketNo }));
+      setCreateOpen(false);
+      refresh();
+      router.push(`/flow/tickets/detail/?no=${r.ticket.ticketNo}`);
+    },
+    onError: (e: Error) => notify.error(fmt.fail(e)),
   });
   const reassign = useMutation({
     mutationFn: () => {
@@ -153,7 +199,8 @@ function FlowTickets() {
 
   return (
     <div>
-      <PageTitle title={tc("page.tickets")} desc={tt("desc")} />
+      <PageTitle title={tc("page.tickets")} desc={tt("desc")}
+        action={canCreate ? <Button size="sm" onClick={() => { setCreateForm(blankCreate); setCreateOpen(true); }}><Plus className="size-4" /> {tt("create.btn")}</Button> : undefined} />
       <StatStrip
         stats={stats.data}
         loading={stats.isLoading}
@@ -215,6 +262,18 @@ function FlowTickets() {
         onChange={setReassignForm}
         onSubmit={() => reassign.mutate()}
         submitting={reassign.isPending}
+      />
+      <FormDrawer
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        titleNew={tt("create.title")}
+        titleEdit=""
+        isEdit={false}
+        fields={createFields(tt, typeOptions)}
+        value={createForm}
+        onChange={setCreateForm}
+        onSubmit={() => create.mutate()}
+        submitting={create.isPending}
       />
     </div>
   );

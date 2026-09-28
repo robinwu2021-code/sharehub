@@ -236,6 +236,23 @@ export const SCENARIOS = [
     },
   },
 
+  {
+    id: "S6-4", modes: ["mock"], title: "工单：手工建单后进详情；空标题被拒", perms: ALL, url: () => "/flow/tickets/",
+    run: async (h) => {
+      await h.click("button", /新建工单/);
+      const dr = await h.waitFor(() => h.one("[role=dialog]"), "建单抽屉");
+      const selects = dr.querySelectorAll("select");
+      h.fill(selects[0], [...selects[0].options].find((o) => o.value)?.value ?? "");
+      await h.click("[role=dialog] button", /^(保存|提交|确定|确认)$/, "提交");
+      await h.sleep(300);
+      h.expect(!!h.one("[role=dialog]"), "标题为空时抽屉不关（前端必填拦下）");
+      h.fill(dr.querySelector("input:not([type=number])"), "机柜离线（e2e 建单）");
+      await h.click("[role=dialog] button", /^(保存|提交|确定|确认)$/, "提交");
+      await h.toast(/已建单/, "已建单");
+      await h.waitFor(() => /机柜离线（e2e 建单）/.test(h.bodyText()) && /tickets\/detail/.test(location.pathname), "跳到新单详情");
+    },
+  },
+
   // ── S7 流程实例 · 对账 · 统计（后端 O2-10）──────────────────────────────
   {
     id: "S7-1", title: "流程实例：筛未结后每行都在进行中；点进详情有流转历史", perms: ALL, url: () => "/flow/instances/",

@@ -14,7 +14,7 @@ import type {
   AppRow, ApprovalTemplate, DefinitionVersionRow, DeliveryRow, PublishResult, QueueGroup, TemplateSummary, TemplateVersion,
   SlaPolicy, WorkCalendar, HistoryEntry, InstanceQuery, InstanceRow, ProcessStats, ProcessStatsQuery, SubjectHistory,
   ApprovalQuery, ApprovalRow, ApprovalStatus, ApprovalView, Member, Named, Page, QueueCount, QueueTask, TicketQuery,
-  ReassignResult, TicketRow, TicketStat, TicketView, TimelineEvent, TodoCount, TodoItem, TodoQuery,
+  CreateTicketRequest, CreateTicketResult, ReassignResult, TicketRow, TicketStat, TicketView, TimelineEvent, TodoCount, TodoItem, TodoQuery,
 } from "./types";
 
 /** 模拟网络往返：让加载态、按钮 loading 在 mock 下也真实出现 */
@@ -31,6 +31,8 @@ const mockFlow = {
   tickets: (q: TicketQuery): Promise<Page<TicketRow>> => tick(() => db.queryTickets(q)),
   /** POST /workspaces/{ws}/ticket-stats/summary */
   ticketStats: (): Promise<TicketStat[]> => tick(() => db.ticketStats()),
+  /** POST /workspaces/{ws}/tickets：建单（去重命中 → attached=true 并入已有单） */
+  createTicket: (req: CreateTicketRequest): Promise<CreateTicketResult> => tick(() => db.createTicket(req)),
   /** POST /workspaces/{ws}/tickets/{no}/claim */
   claim: (no: string): Promise<TicketRow> => tick(() => db.claimTicket(no)),
   /** POST /workspaces/{ws}/tickets/{no}/transitions/{code} */
@@ -154,6 +156,12 @@ const httpFlow: typeof mockFlow = {
   todos: (q) => POST(ws("/todos/query"), q),
   todoCount: () => POST(ws("/todos/count"), {}),
   tickets: (q) => POST(ws("/tickets/query"), q),
+  /** 21/06：新开 201 + 工单；去重命中 200 + attached=true。响应形状以 O3 交付为准（待对齐） */
+  createTicket: async (req) => {
+    const r = await POST<TicketRow & { attached?: boolean }>(ws("/tickets"), req);
+    const { attached, ...ticket } = r;
+    return { ticket: ticket as TicketRow, attached: !!attached };
+  },
   ticketStats: () => POST(ws("/ticket-stats/summary"), {}),
   claim: (no) => POST(ws(`/tickets/${enc(no)}/claim`)),
   transition: (no, code, comment) => POST(ws(`/tickets/${enc(no)}/transitions/${enc(code)}`), comment ? { comment } : {}),

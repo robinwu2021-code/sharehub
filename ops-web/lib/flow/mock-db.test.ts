@@ -144,3 +144,32 @@ describe("工单详情", () => {
   });
 });
 
+
+describe("手工建单（21/06 §五 POST tickets）", () => {
+  it("校验一次给全、路径按字段；合法的新开进抢单池、出现在可抢待办", async () => {
+    const { createTicket } = await import("./mock-db");
+    const { isValidationError } = await import("./errors");
+    let err: unknown;
+    try { createTicket({ typeCode: "nope", title: " ", priority: "X", subject: { type: "cabinet", ref: " " } }, NOW); } catch (e) { err = e; }
+    expect(isValidationError(err) && err.errors.map((x) => x.path).sort()).toEqual(["priority", "subject", "title", "typeCode"]);
+    const r = createTicket({ typeCode: "ops", title: "机柜离线", priority: "HIGH", subject: { type: "cabinet", ref: "CAB9001" } }, NOW);
+    expect(r.attached).toBe(false);
+    expect(r.ticket).toMatchObject({ status: { code: "PENDING_ACCEPT" }, priority: { code: "HIGH" }, fields: { source: { value: "MANUAL" } } });
+    expect(queryTodos({ origin: "ALL", claimable: true, page: 1, size: 200 }, NOW).list.map((x) => x.ticketNo)).toContain(r.ticket.ticketNo);
+    expect(getTimeline(r.ticket.ticketNo)[0]).toMatchObject({ kind: "CREATED" });
+  });
+
+  it("去重键命中未结单 → 并入它（attached），不另开；已结的不算", async () => {
+    const { createTicket } = await import("./mock-db");
+    const a = createTicket({ typeCode: "ops", title: "告警 ALM9", dedupeKey: "ALM9" }, NOW);
+    const b = createTicket({ typeCode: "ops", title: "告警 ALM9 再报", dedupeKey: "ALM9" }, NOW + 1000);
+    expect(b).toMatchObject({ attached: true, ticket: { ticketNo: a.ticket.ticketNo } });
+    expect(getTimeline(a.ticket.ticketNo)[0]).toMatchObject({ kind: "DEDUPE" });
+  });
+
+  it("建单要 flow:ticket:handle（客服有、只读没有）", async () => {
+    const { createTicket } = await import("./mock-db");
+    setMockOperatorPerms(["flow:ticket:read"]);
+    expect(() => createTicket({ typeCode: "ops", title: "x" }, NOW)).toThrow(/flow:ticket:handle/);
+  });
+});
