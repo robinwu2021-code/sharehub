@@ -37278,6 +37278,18 @@
     {
      "name": "sameOperator",
      "type": "boolean"
+    },
+    {
+     "name": "approvalState",
+     "type": "String"
+    },
+    {
+     "name": "approvalNo",
+     "type": "String"
+    },
+    {
+     "name": "approvalNote",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -37384,6 +37396,18 @@
     {
      "name": "sameOperator",
      "type": "boolean"
+    },
+    {
+     "name": "approvalState",
+     "type": "String"
+    },
+    {
+     "name": "approvalNo",
+     "type": "String"
+    },
+    {
+     "name": "approvalNote",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -37416,6 +37440,256 @@
      "type": "String"
     }
    ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/trade/withdrawals/{withdrawNo}/approval/resubmit",
+   "perm": "finance:withdrawal:audit",
+   "perms": [
+    "finance:withdrawal:audit"
+   ],
+   "handler": "FinanceController#resubmitWithdrawalApproval",
+   "summary": "OpsKit 送审失败（死信）后重新送审（M5-1）。",
+   "params": [
+    {
+     "in": "path",
+     "name": "withdrawNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "FinDtos.Withdrawal",
+   "returnContainer": null,
+   "returnElement": "FinDtos.Withdrawal",
+   "responseShape": [
+    {
+     "name": "withdrawNo",
+     "type": "String"
+    },
+    {
+     "name": "accountNo",
+     "type": "String"
+    },
+    {
+     "name": "payeeType",
+     "type": "String"
+    },
+    {
+     "name": "payeeNo",
+     "type": "String"
+    },
+    {
+     "name": "payeeName",
+     "type": "String"
+    },
+    {
+     "name": "amount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "fee",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "netAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "bankCode",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "appliedAt",
+     "type": "String"
+    },
+    {
+     "name": "applicantNo",
+     "type": "String"
+    },
+    {
+     "name": "auditorName",
+     "type": "String"
+    },
+    {
+     "name": "auditedAt",
+     "type": "String"
+    },
+    {
+     "name": "rejectReason",
+     "type": "String"
+    },
+    {
+     "name": "paidAt",
+     "type": "String"
+    },
+    {
+     "name": "payChannel",
+     "type": "String"
+    },
+    {
+     "name": "payRef",
+     "type": "String"
+    },
+    {
+     "name": "payerName",
+     "type": "String"
+    },
+    {
+     "name": "failReason",
+     "type": "String"
+    },
+    {
+     "name": "sameOperator",
+     "type": "boolean"
+    },
+    {
+     "name": "approvalState",
+     "type": "String"
+    },
+    {
+     "name": "approvalNo",
+     "type": "String"
+    },
+    {
+     "name": "approvalNote",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/trade/withdrawals/{withdrawNo}/approval/retry-effect",
+   "perm": "finance:withdrawal:audit",
+   "perms": [
+    "finance:withdrawal:audit"
+   ],
+   "handler": "FinanceController#retryWithdrawalApprovalEffect",
+   "summary": "OpsKit 已通过但业务检查没过（如收款账户缺失），补齐后重试生效（M5-1）。",
+   "params": [
+    {
+     "in": "path",
+     "name": "withdrawNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "FinDtos.Withdrawal",
+   "returnContainer": null,
+   "returnElement": "FinDtos.Withdrawal",
+   "responseShape": [
+    {
+     "name": "withdrawNo",
+     "type": "String"
+    },
+    {
+     "name": "accountNo",
+     "type": "String"
+    },
+    {
+     "name": "payeeType",
+     "type": "String"
+    },
+    {
+     "name": "payeeNo",
+     "type": "String"
+    },
+    {
+     "name": "payeeName",
+     "type": "String"
+    },
+    {
+     "name": "amount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "fee",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "netAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "bankCode",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "appliedAt",
+     "type": "String"
+    },
+    {
+     "name": "applicantNo",
+     "type": "String"
+    },
+    {
+     "name": "auditorName",
+     "type": "String"
+    },
+    {
+     "name": "auditedAt",
+     "type": "String"
+    },
+    {
+     "name": "rejectReason",
+     "type": "String"
+    },
+    {
+     "name": "paidAt",
+     "type": "String"
+    },
+    {
+     "name": "payChannel",
+     "type": "String"
+    },
+    {
+     "name": "payRef",
+     "type": "String"
+    },
+    {
+     "name": "payerName",
+     "type": "String"
+    },
+    {
+     "name": "failReason",
+     "type": "String"
+    },
+    {
+     "name": "sameOperator",
+     "type": "boolean"
+    },
+    {
+     "name": "approvalState",
+     "type": "String"
+    },
+    {
+     "name": "approvalNo",
+     "type": "String"
+    },
+    {
+     "name": "approvalNote",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
   },
   {
    "verb": "POST",
@@ -37526,6 +37800,18 @@
     {
      "name": "sameOperator",
      "type": "boolean"
+    },
+    {
+     "name": "approvalState",
+     "type": "String"
+    },
+    {
+     "name": "approvalNo",
+     "type": "String"
+    },
+    {
+     "name": "approvalNote",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -37648,6 +37934,18 @@
     {
      "name": "sameOperator",
      "type": "boolean"
+    },
+    {
+     "name": "approvalState",
+     "type": "String"
+    },
+    {
+     "name": "approvalNo",
+     "type": "String"
+    },
+    {
+     "name": "approvalNote",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -43003,6 +43301,43 @@
   },
   {
    "verb": "POST",
+   "path": "/internal/opskit/introspect",
+   "perm": null,
+   "perms": [],
+   "handler": "OpsKitIntrospectController#introspect",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "token",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "void",
+   "returnContainer": null,
+   "returnElement": "void",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/internal/opskit/webhook",
+   "perm": null,
+   "perms": [],
+   "handler": "OpsKitWebhookController#receive",
+   "summary": "",
+   "params": [],
+   "bodyType": "String",
+   "returnType": "void",
+   "returnContainer": null,
+   "returnElement": "void",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
    "path": "/internal/platform/notify/send",
    "perm": null,
    "perms": [],
@@ -44683,6 +45018,154 @@
   },
   {
    "verb": "GET",
+   "path": "/mp/user/cs-session",
+   "perm": null,
+   "perms": [],
+   "handler": "MpSupportController#mySession",
+   "summary": "我的人工会话。",
+   "params": [],
+   "bodyType": null,
+   "returnType": "CsSessionVO",
+   "returnContainer": null,
+   "returnElement": "CsSessionVO",
+   "responseShape": [
+    {
+     "name": "sessionNo",
+     "type": "String"
+    },
+    {
+     "name": "userNo",
+     "type": "String"
+    },
+    {
+     "name": "agentName",
+     "type": "String"
+    },
+    {
+     "name": "lastMessage",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "updatedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/mp/user/cs-sessions/{sessionNo}/messages",
+   "perm": null,
+   "perms": [],
+   "handler": "MpSupportController#myMessages",
+   "summary": "会话消息（正序）。",
+   "params": [
+    {
+     "in": "path",
+     "name": "sessionNo",
+     "type": "String",
+     "required": true
+    },
+    {
+     "in": "query",
+     "name": "limit",
+     "type": "Integer",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "List<CsMessageVO>",
+   "returnContainer": "List",
+   "returnElement": "CsMessageVO",
+   "responseShape": [
+    {
+     "name": "id",
+     "type": "Long"
+    },
+    {
+     "name": "sessionNo",
+     "type": "String"
+    },
+    {
+     "name": "senderType",
+     "type": "String"
+    },
+    {
+     "name": "senderNo",
+     "type": "String"
+    },
+    {
+     "name": "content",
+     "type": "String"
+    },
+    {
+     "name": "attach",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/mp/user/cs-sessions/{sessionNo}/messages",
+   "perm": null,
+   "perms": [],
+   "handler": "MpSupportController#sendMessage",
+   "summary": "我在会话里说一句。",
+   "params": [
+    {
+     "in": "path",
+     "name": "sessionNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "Map<String, String>",
+   "returnType": "CsMessageVO",
+   "returnContainer": null,
+   "returnElement": "CsMessageVO",
+   "responseShape": [
+    {
+     "name": "id",
+     "type": "Long"
+    },
+    {
+     "name": "sessionNo",
+     "type": "String"
+    },
+    {
+     "name": "senderType",
+     "type": "String"
+    },
+    {
+     "name": "senderNo",
+     "type": "String"
+    },
+    {
+     "name": "content",
+     "type": "String"
+    },
+    {
+     "name": "attach",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
    "path": "/mp/user/favorites",
    "perm": null,
    "perms": [],
@@ -45999,6 +46482,10 @@
    "RELEASED",
    "BOUGHT_OUT"
   ],
+  "DunChannel": [
+   "SMS",
+   "PUSH"
+  ],
   "PayChannelMode": [
    "DELEGATED"
   ],
@@ -46033,6 +46520,9 @@
    "AGENT",
    "SCENE",
    "REGION"
+  ],
+  "InvoiceTitleType": [
+   "PERSONAL"
   ],
   "AdSlotStatus": [
    "IDLE"
@@ -46095,6 +46585,9 @@
   "DeviceCodeType": [
    "QR"
   ],
+  "OtaRolloutStrategy": [
+   "GRAY"
+  ],
   "ProtectionAction": [
    "STOP_RENT",
    "SLOT_DISABLE",
@@ -46107,8 +46600,7 @@
   ],
   "PowerbankHealth": [
    "OK",
-   "FAULT",
-   "AGED"
+   "FAULT"
   ],
   "OtaReleaseStatus": [
    "DRAFT",
@@ -46148,6 +46640,10 @@
    "FAULT",
    "LOST",
    "SOLD"
+  ],
+  "OtaRolloutScope": [
+   "DEVICE",
+   "LOCATION"
   ],
   "ShareRecordStatus": [
    "PENDING"
@@ -46195,6 +46691,12 @@
    "AUDIT",
    "PAYING",
    "PAID"
+  ],
+  "WithdrawalApprovalState": [
+   "SUBMITTING",
+   "IN_REVIEW",
+   "SUBMIT_FAILED",
+   "APPROVED_BLOCKED"
   ],
   "VendorStatus": [
    "ENABLED"
@@ -46319,6 +46821,10 @@
    "SCREEN",
    "DAMAGE"
   ],
+  "WoAuditResult": [
+   "PASS",
+   "PASS_WITH_ISSUE"
+  ],
   "WorkOrderStatus": [
    "CREATED",
    "DISPATCHED",
@@ -46408,6 +46914,9 @@
    "PAUSED",
    "WITHDRAWING"
   ],
+  "ContractSettlePeriod": [
+   "MONTH"
+  ],
   "LeadStatus": [
    "NEW",
    "CONTACTED",
@@ -46492,8 +47001,14 @@
    "IOS",
    "ANDROID"
   ],
+  "DeptStatus": [
+   "ACTIVE"
+  ],
   "EmployeeStatus": [
    "ACTIVE"
+  ],
+  "ProblemStatus": [
+   "ENABLED"
   ],
   "ProblemSuggestedAction": [
    "SELF_SERVICE",
@@ -46538,10 +47053,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 527,
-  "records": 476,
-  "withPerm": 452,
-  "withBody": 221,
-  "shapedResponses": 410
+  "endpoints": 534,
+  "records": 479,
+  "withPerm": 454,
+  "withBody": 223,
+  "shapedResponses": 415
  }
 }

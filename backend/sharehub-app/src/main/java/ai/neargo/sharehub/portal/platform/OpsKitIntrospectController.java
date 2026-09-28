@@ -1,6 +1,7 @@
 package ai.neargo.sharehub.portal.platform;
 
 import ai.neargo.common.data.scope.DataScopeSpec;
+import ai.neargo.sharehub.api.platform.port.PermCatalogPort;
 import ai.neargo.sharehub.auth.LoginUser;
 import ai.neargo.sharehub.auth.StaffTokenAuthFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,6 +25,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 宿主令牌内省端点（OpsKit 21/06 §八，形状同 RFC 7662）：OpsKit 拿到运营台的 {@code stk_…} / {@code atk_…} 令牌，
@@ -54,13 +56,26 @@ public class OpsKitIntrospectController {
     private final StaffTokenAuthFilter tokens;
     private final String clientId;
     private final String clientSecret;
+    /** 可空：只有展开通配码用得到；测试里直接 new 本类时不给 */
+    private final PermCatalogPort catalog;
+    private volatile Set<String> catalogCache = Set.of();
+    private volatile long catalogAt;
+    private static final long CATALOG_TTL_MS = 60_000;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public OpsKitIntrospectController(StaffTokenAuthFilter tokens,
                                       @Value("${sharehub.opskit.introspect.client-id:}") String clientId,
-                                      @Value("${sharehub.opskit.introspect.client-secret:}") String clientSecret) {
+                                      @Value("${sharehub.opskit.introspect.client-secret:}") String clientSecret,
+                                      PermCatalogPort catalog) {
         this.tokens = tokens;
         this.clientId = clientId;
         this.clientSecret = clientSecret;
+        this.catalog = catalog;
+    }
+
+    /** 测试用：不展开通配码 */
+    public OpsKitIntrospectController(StaffTokenAuthFilter tokens, String clientId, String clientSecret) {
+        this(tokens, clientId, clientSecret, null);
     }
 
     @PostMapping(value = "/introspect", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
@@ -76,11 +91,56 @@ public class OpsKitIntrospectController {
             return;
         }
         LoginUser u = token == null || token.isBlank() ? null : tokens.resolve(token.trim()).orElse(null);
-        write(resp, u == null ? Map.of("active", false) : claims(u));
+        write(resp, u == null ? Map.of("active", false) : claims(u, expand(u.perms())));
     }
 
     /** 声明名与 21/06 §八 的示例一致；OpsKit 侧按 IdP 登记里的声明映射对上 */
-    private static Map<String, Object> claims(LoginUser u) {
+    /**
+     * 通配码展开成目录里的具体码（原通配码也保留）。OpsKit 按候选键<b>精确</b>匹配审批人 ——
+     * 只发 {@code finance:*} 的话，「持 finance:withdrawal:audit 的人」这一步永远没有候选人（M5 实测前发现）。
+     * 规则与 ShareHub 判权一致的直觉：{@code *} 单独 = 全部；末段 {@code *} = 该前缀下全部；中段 {@code *} = 恰好一段。
+     */
+    List<String> expand(List<String> perms) {
+        if (perms == null || perms.isEmpty()) return List.of();
+        if (perms.stream().noneMatch(p -> p.contains("*"))) return perms;
+        Set<String> codes = catalogCodes();
+        java.util.LinkedHashSet<String> out = new java.util.LinkedHashSet<>(perms);
+        for (String p : perms) {
+            if (!p.contains("*")) continue;
+            for (String c : codes) {
+                if (globMatches(p, c)) out.add(c);
+            }
+        }
+        return List.copyOf(out);
+    }
+
+    public static boolean globMatches(String pattern, String code) {
+        if ("*".equals(pattern)) return true;
+        String[] ps = pattern.split(":");
+        String[] cs = code.split(":");
+        for (int i = 0; i < ps.length; i++) {
+            boolean last = i == ps.length - 1;
+            if ("*".equals(ps[i])) {
+                if (last) return cs.length >= ps.length;   // 末段通配：前缀下任意深度
+                if (i >= cs.length) return false;
+                continue;                                   // 中段通配：恰好一段
+            }
+            if (i >= cs.length || !ps[i].equals(cs[i])) return false;
+        }
+        return cs.length == ps.length;
+    }
+
+    private Set<String> catalogCodes() {
+        if (catalog == null) return Set.of();
+        long now = System.currentTimeMillis();
+        if (now - catalogAt > CATALOG_TTL_MS) {
+            catalogCache = catalog.allCodes();
+            catalogAt = now;
+        }
+        return catalogCache;
+    }
+
+    private static Map<String, Object> claims(LoginUser u, List<String> perms) {
         Map<String, Object> c = new LinkedHashMap<>();
         c.put("active", true);
         c.put("sub", u.userNo());
@@ -88,7 +148,7 @@ public class OpsKitIntrospectController {
         c.put("tenant", u.tenantId());
         c.put("realm", u.realm().name());
         c.put("roles", u.role() == null || u.role().isBlank() ? List.of() : List.of(u.role()));
-        c.put("perms", u.perms() == null ? List.of() : u.perms());
+        c.put("perms", perms);
         c.put("scopes", scopes(u));
         return c;
     }

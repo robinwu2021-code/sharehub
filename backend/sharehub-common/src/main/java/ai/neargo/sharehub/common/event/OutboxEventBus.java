@@ -6,6 +6,7 @@ import ai.neargo.sharehub.common.event.mapper.SysOutboxMapper;
 import ai.neargo.sharehub.auth.SecurityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -33,10 +34,14 @@ public class OutboxEventBus implements DomainEventBus {
 
     private final SysOutboxMapper mapper;
     private final ApplicationEventPublisher publisher;
+    /** 延迟取：分发器依赖全部 OutboxConsumer，消费者又可能间接依赖本类 —— 构造期直接注入会成环 */
+    private final ObjectProvider<OutboxDispatcher> dispatcher;
 
-    public OutboxEventBus(SysOutboxMapper mapper, ApplicationEventPublisher publisher) {
+    public OutboxEventBus(SysOutboxMapper mapper, ApplicationEventPublisher publisher,
+                          ObjectProvider<OutboxDispatcher> dispatcher) {
         this.mapper = mapper;
         this.publisher = publisher;
+        this.dispatcher = dispatcher;
     }
 
     @Override
@@ -70,6 +75,21 @@ public class OutboxEventBus implements DomainEventBus {
     private void deliver(Long id, DomainEvent event) {
         try {
             publisher.publishEvent(event);
+            /*
+             * 有跨进程消费者认领这类事件 → 不能在这里标 SENT，要交给分发器送出去。
+             * 2026-09-28 之前这里无条件标 SENT，而分发器只捞 PENDING / FAILED ——
+             * 于是 OutboxConsumer **只有在进程内投递失败时才会被调用**，正常路径永远送不出去。
+             * 当时 OutboxConsumer 零实现，所以没人发现；OpsKit 送审是第一个实现（M5）。
+             * 分发器自带成败落库（SENT / FAILED + 退避 / DEAD），这里不再改状态。
+             */
+            OutboxDispatcher d = dispatcher.getIfAvailable();
+            if (d != null && d.hasCrossProcessConsumer(event.eventType())) {
+                SysOutbox row = mapper.selectById(id);
+                if (row != null) {
+                    d.dispatchOne(row);
+                    return;
+                }
+            }
             SysOutbox upd = new SysOutbox();
             upd.setId(id);
             upd.setStatus(OutboxStatus.SENT.name());

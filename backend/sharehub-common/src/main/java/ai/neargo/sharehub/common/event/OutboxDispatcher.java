@@ -93,6 +93,11 @@ public class OutboxDispatcher {
         return done;
     }
 
+    /** 是否有跨进程消费者认领这类事件（{@link OutboxEventBus} 据此决定提交后是否立即交给本类送出）。 */
+    public boolean hasCrossProcessConsumer(String eventType) {
+        return consumers.stream().anyMatch(c -> c.supports(eventType));
+    }
+
     /**
      * 单条投递。**独立事务**：一条毒消息不该让整批回滚重来。
      *
@@ -145,6 +150,7 @@ public class OutboxDispatcher {
             // 用 error 级别：死信是需要人介入的，不能只留在 info 里等人翻
             log.error("Outbox 事件重投达上限转死信：eventNo={} type={} 重试={} 次",
                     row.getEventNo(), row.getEventType(), next, e);
+            notifyDead(row);
         } else {
             upd.setStatus(FAILED);
             upd.setNextRetryAt(LocalDateTime.now().plus(backoffOf(next)));
@@ -152,6 +158,18 @@ public class OutboxDispatcher {
                     next, backoffOf(next), row.getEventNo(), row.getEventType());
         }
         mapper.updateById(upd);
+    }
+
+    /** 转死信时通知认领方（如把业务行标成「送审失败」，让人能在界面上重试）。钩子失败只记日志，不影响死信落库 */
+    private void notifyDead(SysOutbox row) {
+        for (OutboxConsumer c : consumers) {
+            if (!c.supports(row.getEventType())) continue;
+            try {
+                c.onDead(row);
+            } catch (RuntimeException ex) {
+                log.error("死信钩子失败（死信已落库，需人工处理）eventNo={} handler={}", row.getEventNo(), c.handlerName(), ex);
+            }
+        }
     }
 
     static Duration backoffOf(int attempts) {

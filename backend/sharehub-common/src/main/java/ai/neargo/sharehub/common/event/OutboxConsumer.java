@@ -29,6 +29,13 @@ public interface OutboxConsumer {
      */
     void deliver(SysOutbox row);
 
+    /**
+     * 重投达上限、转死信时回调（默认不做事）。用来把业务侧标成「送不出去」，让人能在界面上看到并重试 ——
+     * 否则死信只躺在 sys_outbox 里，业务页上看起来永远是「处理中」。
+     */
+    default void onDead(SysOutbox row) {
+    }
+
     /** 消费者标识，用于去重与日志。默认取实现类名。 */
     default String handlerName() {
         return getClass().getSimpleName();

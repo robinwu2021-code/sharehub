@@ -43,6 +43,26 @@ class OpsKitIntrospectTest extends ApiTestSupport {
     }
 
     @Test
+    @DisplayName("★ 通配码展开成具体码：FINANCE 持 finance:*，应答里要有 finance:withdrawal:audit（OpsKit 按具体码匹配审批人）")
+    void wildcardPermsExpanded() throws Exception {
+        R r = introspect(login("FINANCE"), BASIC);
+        String perms = r.body.path("perms").toString();
+        assertThat(perms).as("原通配码保留").contains("\"finance:*\"");
+        assertThat(perms).as("不展开的话提现审批在 OpsKit 里没有候选人").contains("\"finance:withdrawal:audit\"");
+    }
+
+    @Test
+    @DisplayName("通配规则：* 全部 · 末段 * 前缀下任意深度 · 中段 * 恰好一段")
+    void globRules() {
+        assertThat(ai.neargo.sharehub.portal.platform.OpsKitIntrospectController.globMatches("*", "a:b:c")).isTrue();
+        assertThat(ai.neargo.sharehub.portal.platform.OpsKitIntrospectController.globMatches("finance:*", "finance:withdrawal:audit")).isTrue();
+        assertThat(ai.neargo.sharehub.portal.platform.OpsKitIntrospectController.globMatches("finance:*", "financex:a:b")).isFalse();
+        assertThat(ai.neargo.sharehub.portal.platform.OpsKitIntrospectController.globMatches("report:*:read", "report:device:read")).isTrue();
+        assertThat(ai.neargo.sharehub.portal.platform.OpsKitIntrospectController.globMatches("report:*:read", "report:device:export")).isFalse();
+        assertThat(ai.neargo.sharehub.portal.platform.OpsKitIntrospectController.globMatches("report:*:read", "report:a:b:read")).isFalse();
+    }
+
+    @Test
     @DisplayName("员工令牌：active、编号、权限、租户；应答是 RFC 7662 裸 JSON，不带手机号")
     void staff() throws Exception {
         R r = introspect(login("OPS"), BASIC);

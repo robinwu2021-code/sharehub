@@ -103,4 +103,14 @@ public class StlWithdrawal extends BaseEntity {
 
     /** 打款失败原因。**不要与 rejectReason 合并** —— 那是审批驳回（钱从没打算出去）。 */
     private String failReason;
+
+    // —— OpsKit 审批（M5，V143）。LOCAL 模式下三列都空 ——
+    /** 审批在哪一步：{@link ai.neargo.sharehub.finance.WithdrawalApprovalState}；空 = 本地审批 / 已结束 */
+    private String approvalState;
+    /** OpsKit 审批单号（业务页「去审批」链接用）；审批结束后保留，便于追溯 */
+    private String approvalNo;
+    /** 送审轮次，从 1 起；「重新送审」加一（进 OpsKit 幂等键） */
+    private Integer approvalRound;
+    /** APPROVED_BLOCKED / SUBMIT_FAILED 时的原因，业务页照原文显示 */
+    private String approvalNote;
 }

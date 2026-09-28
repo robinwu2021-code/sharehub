@@ -135,6 +135,8 @@ public class SecurityConfig {
                          * 不认本服务私有的 X-Internal-Token 头。
                          */
                         .requestMatchers(HttpMethod.POST, "/internal/opskit/introspect").permitAll()
+                        // OpsKit webhook（M5）：放行后由 OpsKitWebhookController 按 HMAC 签名再判，密钥没配一律 401
+                        .requestMatchers(HttpMethod.POST, "/internal/opskit/webhook").permitAll()
                         .requestMatchers("/internal/events/**", "/internal/ping").hasRole("INTERNAL")
                         .anyRequest().authenticated())
                 // 顺序要紧：内部凭证先于员工令牌 —— 内部调用不带 Bearer，

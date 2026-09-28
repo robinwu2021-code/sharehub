@@ -224,6 +224,23 @@ public class FinanceController {
     }
 
     /**
+     * OpsKit 送审失败（死信）后重新送审（M5-1）。审批本身在「流程与工单 › 审批列表」里做，
+     * 这里只负责把单再送一次；码用 {@code :audit}：能审的人才需要关心它有没有送到审批那里。
+     */
+    @PostMapping("/api/trade/withdrawals/{withdrawNo}/approval/resubmit")
+    @PreAuthorize("@perm.can('finance:withdrawal:audit')")
+    public FinDtos.Withdrawal resubmitWithdrawalApproval(@PathVariable String withdrawNo) {
+        return withdrawalService.resubmitApproval(withdrawNo);
+    }
+
+    /** OpsKit 已通过但业务检查没过（如收款账户缺失），补齐后重试生效（M5-1）。审批人仍记 OpsKit 里做决定的人 */
+    @PostMapping("/api/trade/withdrawals/{withdrawNo}/approval/retry-effect")
+    @PreAuthorize("@perm.can('finance:withdrawal:audit')")
+    public FinDtos.Withdrawal retryWithdrawalApprovalEffect(@PathVariable String withdrawNo) {
+        return withdrawalService.retryApprovedEffect(withdrawNo);
+    }
+
+    /**
      * 打款回执登记：把「出款在途」推到终态（必要功能清单 ⑮）。
      *
      * <p><b>为什么要单独一个端点，而不是并进 audit</b>：审批是「同意把钱打出去」，

@@ -2,6 +2,7 @@ package ai.neargo.sharehub.finance.service.impl;
 
 import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.finance.WithdrawalStatus;
+import ai.neargo.sharehub.finance.WithdrawalApprovalState;
 
 import ai.neargo.sharehub.auth.LoginUser;
 import ai.neargo.sharehub.auth.SecurityUtils;
@@ -63,11 +64,24 @@ public class WithdrawalServiceImpl implements WithdrawalService {
     /** 读 finance.withdrawal.separation —— 审批人能不能兼放款人，由管理员配。 */
     private final ai.neargo.sharehub.api.platform.port.SysParamPort params;
 
+    /** 送审事件与提现行同事务落 outbox（M5） */
+    private final ai.neargo.sharehub.common.event.DomainEventBus events;
+    /** LOCAL = 业务页直接审（原样）· OPSKIT = 送 OpsKit（sharehub.flow.withdrawal.engine） */
+    private final boolean viaOpsKit;
+
+    /** OpsKit 流程代号（随生产 bootstrap definitions-dir 发布） */
+    static final String PROCESS_CODE = "withdrawal_audit";
+    public static final String BIZ_TYPE = "withdrawal";
+
     public WithdrawalServiceImpl(StlWithdrawalMapper mapper, WithdrawFeePolicy feePolicy,
                                  WithdrawalStateMachine stateMachine,
                                  PayoutAccountService payoutAccounts,
                                  ai.neargo.sharehub.api.platform.port.AgentDirectoryPort agents,
-                                 ai.neargo.sharehub.api.platform.port.SysParamPort params) {
+                                 ai.neargo.sharehub.api.platform.port.SysParamPort params,
+                                 ai.neargo.sharehub.common.event.DomainEventBus events,
+                                 @org.springframework.beans.factory.annotation.Value("${sharehub.flow.withdrawal.engine:LOCAL}") String engine) {
+        this.events = events;
+        this.viaOpsKit = "OPSKIT".equalsIgnoreCase(engine == null ? "" : engine.trim());
         this.params = params;
         this.agents = agents;
         this.mapper = mapper;
@@ -107,8 +121,87 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         e.setStatus(WithdrawalStatus.APPLY.name());              // 状态由服务端置，不接受入参
         e.setAppliedAt(LocalDateTime.now().format(TS));
         e.setApplicantNo(SecurityUtils.userNo());
+        if (viaOpsKit) {
+            /*
+             * 送审前先确认「批了能生效」：OpsKit 里通过之后撤不回来，
+             * 若到回写时才发现没有收款账户，就只能停在「审批已通过但未生效」让人补救。
+             * 能在申请时拦的，就不要留到审批之后。
+             */
+            if (payoutAccounts.defaultOf(req.payeeType(), req.payeeNo()).isEmpty()) {
+                throw new IllegalArgumentException("该受益方还没有可用的收款账户，无法提交提现 —— 请先补录收款账户");
+            }
+            e.setApprovalState(WithdrawalApprovalState.SUBMITTING.name());
+            e.setApprovalRound(1);
+        }
         mapper.insert(e);
+        if (viaOpsKit) requestApproval(e);
         return toVO(require(e.getWithdrawNo()));
+    }
+
+    /** 发送审事件（与业务行同事务落 outbox，提交后由 OpsKit 送审消费者发出） */
+    private void requestApproval(StlWithdrawal e) {
+        java.util.Map<String, Object> fields = new java.util.LinkedHashMap<>();
+        fields.put("amount", e.getAmount());
+        fields.put("currency", e.getCurrency());
+        fields.put("payeeType", e.getPayeeType());
+        fields.put("payeeNo", e.getPayeeNo());
+        // 代理的提现带代理范围标签：代理在 OpsKit 里只看得到自己的；财务（范围 *）看全部
+        java.util.List<String> scopes = "AGENT".equalsIgnoreCase(e.getPayeeType()) && e.getPayeeNo() != null
+                ? java.util.List.of("agent:" + e.getPayeeNo()) : java.util.List.of();
+        String title = "提现 " + (e.getCurrency() == null ? "" : e.getCurrency() + " ")
+                + (e.getAmount() == null ? "" : e.getAmount().toPlainString())
+                + " · " + (e.getPayeeName() == null ? e.getPayeeNo() : e.getPayeeName());
+        LoginUser u = SecurityUtils.currentUser().orElse(null);
+        events.publish(new ai.neargo.sharehub.api.platform.flow.ApprovalRequestedEvent(
+                BIZ_TYPE, e.getWithdrawNo(), e.getApprovalRound(), PROCESS_CODE, title, fields, scopes,
+                Optional.ofNullable(u).map(LoginUser::userNo).orElse(e.getApplicantNo()),
+                Optional.ofNullable(u).map(LoginUser::username).orElse(null)));
+    }
+
+    /**
+     * 清掉审批进度与备注。**不能靠 set(null) + updateById**：MyBatis-Plus 默认跳过 null 字段，
+     * 那样写等于没写（9-28 用例实测：审批结束后仍显示「审批中」）。
+     */
+    private void clearNote(String withdrawNo) {
+        mapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<StlWithdrawal>()
+                .eq(StlWithdrawal::getWithdrawNo, withdrawNo).set(StlWithdrawal::getApprovalNote, null));
+    }
+
+    public void clearApprovalProgress(String withdrawNo) {
+        mapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<StlWithdrawal>()
+                .eq(StlWithdrawal::getWithdrawNo, withdrawNo)
+                .set(StlWithdrawal::getApprovalState, null)
+                .set(StlWithdrawal::getApprovalNote, null));
+    }
+
+    /** 送审失败后「重新送审」：轮次加一（新的幂等键，OpsKit 建新实例） */
+    @Override
+    @Transactional
+    public Withdrawal resubmitApproval(String withdrawNo) {
+        StlWithdrawal e = require(withdrawNo);
+        if (!WithdrawalApprovalState.SUBMIT_FAILED.name().equals(e.getApprovalState())) {
+            throw BizException.conflict("error.withdrawal.approval_not_resubmittable", withdrawNo);
+        }
+        e.setApprovalRound((e.getApprovalRound() == null ? 1 : e.getApprovalRound()) + 1);
+        e.setApprovalState(WithdrawalApprovalState.SUBMITTING.name());
+        mapper.updateById(e);
+        clearNote(withdrawNo);
+        requestApproval(e);
+        return toVO(require(withdrawNo));
+    }
+
+    /** 「审批已通过但未生效」补齐条件后重试：走与审批通过同一段逻辑，审批人仍是 OpsKit 里做决定的人 */
+    @Override
+    @Transactional
+    public Withdrawal retryApprovedEffect(String withdrawNo) {
+        StlWithdrawal e = require(withdrawNo);
+        if (!WithdrawalApprovalState.APPROVED_BLOCKED.name().equals(e.getApprovalState())) {
+            throw BizException.conflict("error.withdrawal.approval_not_blocked", withdrawNo);
+        }
+        applyDecision(e, true, null, e.getAuditorNo(), e.getAuditorName());
+        mapper.updateById(e);
+        clearApprovalProgress(withdrawNo);
+        return toVO(require(withdrawNo));
     }
 
     /**
@@ -152,6 +245,26 @@ public class WithdrawalServiceImpl implements WithdrawalService {
     @Transactional
     public Withdrawal audit(String withdrawNo, boolean approve, String rejectReason) {
         StlWithdrawal e = require(withdrawNo);
+        // 在流程平台审批中的单不许在这里审：两处都能点「通过」，两边状态一定打架（方案 23 §3.4）
+        if (e.getApprovalState() != null) {
+            throw BizException.conflict("error.withdrawal.approval_in_flow", withdrawNo);
+        }
+        // —— 审批人一律服务端回填（不读入参），保证留痕不可伪造 ——
+        LoginUser u = SecurityUtils.currentUser().orElse(null);
+        applyDecision(e, approve, rejectReason,
+                Optional.ofNullable(u).map(LoginUser::userNo).orElse(null),
+                Optional.ofNullable(u).map(LoginUser::username).orElse(null));
+        mapper.updateById(e);
+        return toVO(require(withdrawNo));
+    }
+
+    /**
+     * 审批结论落到提现行（本地审批与 OpsKit 回写共用 —— 业务规则只有这一份）。只改实体，不落库。
+     *
+     * @param auditorNo   审批人编号：本地审批取当前登录人；OpsKit 回写取回传的宿主编号
+     */
+    // public 是必须的：回写实现经事务代理（CGLIB）调它 —— 包级私有方法不被代理转发，会落在代理对象上，字段全空
+    public void applyDecision(StlWithdrawal e, boolean approve, String rejectReason, String auditorNo, String auditorName) {
         if (approve) requireAgentNotSuspended(e.getPayeeType(), e.getPayeeNo());   // 驳回照常可做：停用期间的单可以直接驳掉
 
         // —— 合规下界：驳回必须留原因，没有原因的驳回等于没有审批记录 ——
@@ -185,15 +298,10 @@ public class WithdrawalServiceImpl implements WithdrawalService {
 
         e.setStatus(stateMachine.next(e.getStatus(), approve ? "APPROVE" : "REJECT"));
 
-        // —— 审批人一律服务端回填（不读入参），保证留痕不可伪造 ——
-        LoginUser u = SecurityUtils.currentUser().orElse(null);
-        e.setAuditorNo(Optional.ofNullable(u).map(LoginUser::userNo).orElse(null));
-        e.setAuditorName(Optional.ofNullable(u).map(LoginUser::username).orElse(null));
+        e.setAuditorNo(auditorNo);
+        e.setAuditorName(auditorName);
         e.setAuditedAt(LocalDateTime.now().format(TS));
         e.setRejectReason(approve ? null : rejectReason.trim());
-
-        mapper.updateById(e);
-        return toVO(require(withdrawNo));
     }
 
     @Override
@@ -302,6 +410,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
                 e.getCurrency(), e.getBankCode(), e.getStatus(), e.getAppliedAt(), e.getApplicantNo(),
                 e.getAuditorName(), e.getAuditedAt(), e.getRejectReason(), e.getPaidAt(),
                 e.getPayChannel(), e.getPayRef(), e.getPayerName(), e.getFailReason(),
-                e.getSameOperator() != null && e.getSameOperator() == 1);
+                e.getSameOperator() != null && e.getSameOperator() == 1,
+                e.getApprovalState(), e.getApprovalNo(), e.getApprovalNote());
     }
 }

@@ -55,4 +55,10 @@ public interface WithdrawalService {
      * <b>宁可报错也不要静默写两遍</b>，两条「已付」记录在对账时没人分得清哪条是真的。
      */
     Withdrawal pay(String withdrawNo, PayReceiptReq req);
+
+    /** OpsKit 送审失败（死信）后重新送审：轮次加一。只对 SUBMIT_FAILED 的单有效（M5） */
+    Withdrawal resubmitApproval(String withdrawNo);
+
+    /** OpsKit 已通过但业务检查没过（APPROVED_BLOCKED），补齐条件后重试生效（M5） */
+    Withdrawal retryApprovedEffect(String withdrawNo);
 }

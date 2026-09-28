@@ -107,7 +107,9 @@ public final class FinDtos {
                              // —— 打款回执（V57）。列表要能一眼回答「钱到底出去没有、走的哪条道」——
                              String payChannel, String payRef, String payerName, String failReason,
                              // 审批人与放款人是否同一人 —— 列表上标出来，否则这条规则没有观察面
-                             boolean sameOperator) {
+                             boolean sameOperator,
+                             // —— OpsKit 审批（M5）：空 = 本地审批；有值时业务页不出通过 / 驳回，改显示进度与「去审批」——
+                             String approvalState, String approvalNo, String approvalNote) {
     }
 
     /**
