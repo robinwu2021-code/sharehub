@@ -50,6 +50,51 @@ public class OpsKitClient {
     public record StartedInstance(String instanceNo, String approvalNo) {
     }
 
+    public record CreatedTicket(String ticketNo, boolean attached) {
+    }
+
+    /** 建单（POST /workspaces/{ws}/tickets）；同一幂等键重投拿到同一张；去重键命中未结单时 attached=true */
+    @SuppressWarnings("unchecked")
+    public CreatedTicket createTicket(ai.neargo.sharehub.api.platform.flow.TicketRequestedEvent e) {
+        if (!configured()) {
+            throw new IllegalStateException("OpsKit 未配置（SHAREHUB_OPSKIT_BASE_URL / _WS / _APP_TOKEN），无法建单 " + e.bizType() + ":" + e.bizNo());
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("typeCode", e.typeCode());
+        body.put("title", e.title());
+        if (e.description() != null) body.put("description", e.description());
+        if (e.priority() != null) body.put("priority", e.priority());
+        body.put("fields", e.fields() == null ? Map.of() : e.fields());
+        body.put("subject", Map.of("type", e.bizType(), "ref", e.bizNo(), "display", Map.of("title", e.subjectTitle())));
+        body.put("scopes", e.scopes() == null ? List.of() : e.scopes());
+        if (e.dedupeKey() != null) body.put("dedupeKey", e.dedupeKey());
+        if (e.requesterNo() != null) {
+            Map<String, Object> behalf = new LinkedHashMap<>();
+            behalf.put("externalRef", e.requesterNo());
+            behalf.put("displayName", e.requesterName() == null ? e.requesterNo() : e.requesterName());
+            body.put("onBehalfOf", behalf);
+        }
+        Map<String, Object> r;
+        try {
+            r = http.post()
+                    .uri(baseUrl + "/api/opskit/v1/workspaces/{ws}/tickets", workspace)
+                    .header("Authorization", "Bearer " + appToken)
+                    .header("Idempotency-Key", e.idempotencyKey())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(body)
+                    .retrieve()
+                    .body(Map.class);
+        } catch (RestClientResponseException ex) {
+            String snippet = ex.getResponseBodyAsString();
+            throw new IllegalStateException("OpsKit 建单被拒 " + ex.getStatusCode().value() + " "
+                    + (snippet.length() > 300 ? snippet.substring(0, 300) : snippet), ex);
+        }
+        if (r == null || !(r.get("ticketNo") instanceof String ticketNo)) {
+            throw new IllegalStateException("OpsKit 建单应答缺 ticketNo：" + r);
+        }
+        return new CreatedTicket(ticketNo, Boolean.TRUE.equals(r.get("attached")));
+    }
+
     /** 发起审批流程实例（POST /workspaces/{ws}/instances）；同一幂等键重投拿到的是同一个实例 */
     @SuppressWarnings("unchecked")
     public StartedInstance startApproval(ApprovalRequestedEvent e) {

@@ -78,6 +78,9 @@ sharehub:
   flow:
     withdrawal:
       engine: ${SHAREHUB_FLOW_WITHDRAWAL_ENGINE:LOCAL}
+    # 报障「转工单」的去处：LOCAL = 本地 wo_order（原样）· OPSKIT = OpsKit「设备报修」单（M5-3）
+    cs-ticket:
+      engine: ${SHAREHUB_FLOW_CS_TICKET_ENGINE:LOCAL}
   # 文件存储（方案-文件上传与COS存储）：生产 cos，测试 / 离线开发 local。
   # type=cos 时桶名与密钥任一为空 → 启动失败（CosFileStorage#selfCheck）。密钥只走环境变量。
   storage:

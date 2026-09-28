@@ -29,6 +29,9 @@ import org.springframework.stereotype.Component;
  */
 @Primary
 @Component
+// 报障工单的去处由开关定（M5-3）：LOCAL（默认）= 本地 wo_order；OPSKIT = OpsKitTicketWorkOrderPort
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "sharehub.flow.cs-ticket.engine",
+        havingValue = "LOCAL", matchIfMissing = true)
 public class WoTicketWorkOrderPort implements TicketWorkOrderPort {
 
     private final WoOpsService workOrders;
