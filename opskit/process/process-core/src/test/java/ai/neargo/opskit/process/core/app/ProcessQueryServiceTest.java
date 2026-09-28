@@ -180,6 +180,11 @@ class ProcessQueryServiceTest {
         assertThat(e.tasks(e.plain("mb_outsider"), "field-ops", null, null, null).total()).as("不是候选也不在名下").isZero();
         assertThat(e.tasks(e.f.system(), "field-ops", null, null, null).total()).as("应用自身不限").isEqualTo(3);
         assertThat(e.tasks(e.f.system(), null, null, null, "me").total()).as("应用自身问「我的」").isZero();
+        assertThat(e.q.queueCounts(a, "APPROVAL")).as("按种类：只有办理任务的队列组不出现").isEmpty();
+        assertThat(e.q.queueCounts(a, "WORK")).containsExactly(new QueueCount("field-ops", 1, 1));
+        assertThat(e.q.tasks(a, new TaskQuery("field-ops", null, null, null, "APPROVAL", 1, 20)).total()).isZero();
+        assertThat(e.q.tasks(a, new TaskQuery("field-ops", List.of("OPEN"), null, null, "WORK", 1, 20)).total()).isEqualTo(1);
+        assertThatThrownBy(() -> e.q.queueCounts(a, "TICKET")).satisfies(ex -> assertThat(errors(ex)).extracting(FieldError::path).containsExactly("kind"));
     }
 
     @ParameterizedTest

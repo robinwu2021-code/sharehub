@@ -83,7 +83,7 @@ public class TodoTaskController {
 
     @PostMapping("/tasks/query")
     public Page<TaskRow> tasks(Actor actor, @RequestBody(required = false) TaskQuery q, HttpServletRequest req) {
-        Page<QueueTask> page = queries.tasks(actor, q == null ? new TaskQuery(null, null, null, null, null, null) : q);
+        Page<QueueTask> page = queries.tasks(actor, q == null ? new TaskQuery(null, null, null, null, null, null, null) : q);
         People people = new People(directory, actor.tenant(), page.list().stream().map(QueueTask::claimedBy).toList());
         Map<String, Named> groups = new HashMap<>();
         String locale = Present.locale(req);
@@ -92,11 +92,14 @@ public class TodoTaskController {
                 t.claimExpiresAtMs()));
     }
 
+    public record QueueCountQuery(String kind) {
+    }
+
     @PostMapping("/tasks/queue-counts")
-    public List<QueueCountRow> queueCounts(Actor actor, HttpServletRequest req) {
+    public List<QueueCountRow> queueCounts(Actor actor, @RequestBody(required = false) QueueCountQuery q, HttpServletRequest req) {
         Map<String, Named> groups = new HashMap<>();
         String locale = Present.locale(req);
-        return queries.queueCounts(actor).stream()
+        return queries.queueCounts(actor, q == null ? null : q.kind()).stream()
                 .map((QueueCount c) -> new QueueCountRow(queue(actor, c.queueGroup(), locale, groups), c.unclaimed(), c.claimedByMe())).toList();
     }
 

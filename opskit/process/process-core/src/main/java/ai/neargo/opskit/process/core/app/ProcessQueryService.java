@@ -115,12 +115,13 @@ public class ProcessQueryService {
         WorkspaceId ws = actor.tenant().workspaceId();
         Viewer v = viewer(actor, actor.isAppItself());
         String who = assignee.orElse(null);
-        long total = queries.countTasks(ws, v, q.queueGroup(), statuses, q.claimed(), who);
+        String kind = kind(q.kind());
+        long total = queries.countTasks(ws, v, q.queueGroup(), statuses, q.claimed(), who, kind);
         if (total == 0) {
             return Page.empty(page);
         }
         Map<String, Optional<Integer>> timeouts = new HashMap<>();
-        List<QueueTask> list = queries.tasks(ws, v, q.queueGroup(), statuses, q.claimed(), who, page.offset(), page.size()).stream()
+        List<QueueTask> list = queries.tasks(ws, v, q.queueGroup(), statuses, q.claimed(), who, kind, page.offset(), page.size()).stream()
                 .map(r -> {
                     Long expires = null;
                     if ("CLAIMED".equals(r.status()) && r.queueGroup() != null && r.claimedAtMs() != null) {
@@ -138,13 +139,22 @@ public class ProcessQueryService {
     /** 成员：自己所在的队列组（含一条任务都没有的）；应用自身：所有有任务的队列组。 */
     @SystemAction("只读：同 tasks")
     public List<QueueCount> queueCounts(Actor actor) {
+        return queueCounts(actor, null);
+    }
+
+    /**
+     * @param kind APPROVAL / WORK；给了时只统计该种任务，且只列出当下有该种任务的队列组（否则工单派单的队列会以 0 条排在审核队列前面）
+     */
+    @SystemAction("只读：同 tasks")
+    public List<QueueCount> queueCounts(Actor actor, String kind) {
+        String k = kind(kind);
         TenantContext t = actor.tenant();
         boolean app = actor.isAppItself();
         Map<String, QueueCount> out = new TreeMap<>();
-        if (!app) {
+        if (!app && k == null) {
             actor.groups().stream().filter(g -> directory.isQueue(t, g)).forEach(g -> out.put(g, new QueueCount(g, 0, 0)));
         }
-        queries.queueCounts(t.workspaceId(), viewer(actor, app), app ? null : actor.groups())
+        queries.queueCounts(t.workspaceId(), viewer(actor, app), app ? null : actor.groups(), k)
                 .forEach(r -> out.put(r.queueGroup(), new QueueCount(r.queueGroup(), r.unclaimed(), r.claimedByMe())));
         return List.copyOf(out.values());
     }
@@ -254,6 +264,16 @@ public class ProcessQueryService {
             return null;
         }
         return raw.startsWith("member:") ? raw : PrincipalRef.member(raw).key();
+    }
+
+    private static String kind(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        if (!"APPROVAL".equals(raw) && !"WORK".equals(raw)) {
+            throw invalid("kind", "opskit.query.unknown_value");
+        }
+        return raw;
     }
 
     private static String origin(String raw) {

@@ -172,9 +172,9 @@ public final class QueryDao {
      * @param claimed   true = 已被领取（CLAIMED）；false = 未被领取
      * @param assignee  {@code member:x}；空 = 不限
      */
-    public List<TaskRow> tasks(WorkspaceId ws, Viewer v, String queueGroup, Collection<String> statuses, Boolean claimed, String assignee,
+    public List<TaskRow> tasks(WorkspaceId ws, Viewer v, String queueGroup, Collection<String> statuses, Boolean claimed, String assignee, String kind,
             int offset, int limit) {
-        Where w = taskWhere(ws, v, queueGroup, statuses, claimed, assignee);
+        Where w = taskWhere(ws, v, queueGroup, statuses, claimed, assignee, kind);
         List<Object> ps = new ArrayList<>(w.params);
         ps.add(limit);
         ps.add(offset);
@@ -190,8 +190,8 @@ public final class QueryDao {
                 .list();
     }
 
-    public long countTasks(WorkspaceId ws, Viewer v, String queueGroup, Collection<String> statuses, Boolean claimed, String assignee) {
-        Where w = taskWhere(ws, v, queueGroup, statuses, claimed, assignee);
+    public long countTasks(WorkspaceId ws, Viewer v, String queueGroup, Collection<String> statuses, Boolean claimed, String assignee, String kind) {
+        Where w = taskWhere(ws, v, queueGroup, statuses, claimed, assignee, kind);
         return jdbc.sql("SELECT COUNT(*) " + TASK_FROM + " WHERE t.workspace_id = ?" + w.sql).params(w.params).query(Long.class).single();
     }
 
@@ -200,8 +200,8 @@ public final class QueryDao {
      *
      * @param groups 只统计这些组；空 = 全部有任务的队列组（应用自身）
      */
-    public List<QueueCountRow> queueCounts(WorkspaceId ws, Viewer v, Collection<String> groups) {
-        Where w = taskWhere(ws, v, null, List.of("OPEN", "CLAIMED"), null, null);
+    public List<QueueCountRow> queueCounts(WorkspaceId ws, Viewer v, Collection<String> groups, String kind) {
+        Where w = taskWhere(ws, v, null, List.of("OPEN", "CLAIMED"), null, null, kind);
         w.and("t.queue_group IS NOT NULL");
         if (groups != null) {
             if (groups.isEmpty()) {
@@ -219,9 +219,12 @@ public final class QueryDao {
                 .query((rs, i) -> new QueueCountRow(rs.getString("queue_group"), rs.getLong("unclaimed"), rs.getLong("mine"))).list();
     }
 
-    private Where taskWhere(WorkspaceId ws, Viewer v, String queueGroup, Collection<String> statuses, Boolean claimed, String assignee) {
+    private Where taskWhere(WorkspaceId ws, Viewer v, String queueGroup, Collection<String> statuses, Boolean claimed, String assignee, String kind) {
         Where w = new Where();
         w.params.add(ws.value());
+        if (kind != null) {
+            w.and("t.kind = ?", kind);
+        }
         if (statuses == null || statuses.isEmpty()) {
             w.and("t.status IN ('OPEN','CLAIMED','ASSIGNED')");
         } else {
