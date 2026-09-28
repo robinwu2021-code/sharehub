@@ -131,15 +131,29 @@
 /* 黑白灰的主色带一点冷调、且不取最黑：纯中性近黑在白底上是"廉价的重"，
    微冷的墨色更接近高端产品的黑（对照 Linear / Vercel 的按钮）。 */
 [data-theme="mono"]   { --primary: #1c2029; --primary-foreground: #ffffff; }
+/* 黑白灰的链接必须有非颜色线索（规范 §2.2）：主色近黑，链接与正文几乎同色，「可点」只剩悬停时才露的下划线。
+   2026-09-28 默认皮肤改回黑白灰，这条缺口一直没落实 —— 补上：内容区里用主色文字写的链接常驻一条浅下划线，
+   悬停加深。按钮型链接（主色底、或带 data-variant）不在此列。 */
+[data-theme="mono"] main a[class*="text-primary"]:not([class*="bg-"]):not([data-variant]) {
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 3px;
+}
+[data-theme="mono"] main a[class*="text-primary"]:not([class*="bg-"]):not([data-variant]):hover { text-decoration-color: currentColor; }
 /* 简电青压白字只有 2.19:1（实心按钮与链接都过不了 AA）：按钮字改深色 7.77，文字用同色相深一档 #0f7b79（白 5.09 / 浅灰 4.79）。 */
 [data-theme="brand"]  { --primary: #17c3c0; --primary-foreground: #0b1f24; --primary-text: #0f7b79; }
 /* 时尚蓝原值 #2f6bff 压白字 4.498，差一点过不了 AA：每通道降 1/255（肉眼无差）；文字另取深一档。C 端 SKINS 仍是原值，差异仅此一处。 */
 [data-theme="blue"]   { --primary: #2e6aff; --primary-foreground: #ffffff; --primary-text: #1f5fff; }
 [data-theme="purple"] { --primary: #7c3aed; --primary-foreground: #ffffff; }
 [data-theme="teal"]   { --primary: #0f7173; --primary-foreground: #ffffff; }  /* 墨青：流程与工单原型的主色，白字 5.79:1 */
+/* 2026-09-28 新增四套「运营高端常用、耐看」色：低明度低饱和、避开语义色相。白字对比度见注释，全部进 style-contrast 测试。 */
+[data-theme="navy"]   { --primary: #1d3557; --primary-foreground: #ffffff; }  /* 藏青 12.4:1 */
+[data-theme="indigo"] { --primary: #4a55c8; --primary-foreground: #ffffff; }  /* 靛蓝 6.1:1 */
+[data-theme="forest"] { --primary: #1e5b46; --primary-foreground: #ffffff; }  /* 墨绿 8.0:1 */
+[data-theme="mocha"]  { --primary: #6b4e3d; --primary-foreground: #ffffff; }  /* 摩卡 7.6:1 */
 
 /* ═══ 风格轴 data-style（与皮肤正交）══════════════════════════════════════
-   皮肤 data-theme 只换主色（五套）；**风格换的是整体 UI 形态**：表格、tab、徽章、卡片、
+   皮肤 data-theme 只换主色（九套）；**风格换的是整体 UI 形态**：表格、tab、徽章、卡片、
    按钮、输入框、时间线、步骤条……（规则在文件末尾的风格块）。
    两条轴任意组合：任何风格在任何主题色下都必须成立 —— 所以风格**不写死色相**。
    2026-09-28 起清爽风格的中性色**随主题色着色**（下方五个「风格 × 主题」块）：
@@ -187,6 +201,26 @@
   --gray-1: #fafdfe; --gray-2: #f5f9fa; --gray-3: #eff3f5; --gray-4: #e9eef0; --gray-5: #e2e8ea; --gray-6: #dbe2e4;
   --gray-7: #ced7da; --gray-8: #b5bfc3; --gray-9: #859297; --gray-10: #78858a; --gray-11: #5a686d; --gray-12: #172124;
   --canvas-clean: #eff3f5;
+}
+[data-style="clean"][data-theme="navy"]:not(.dark) {  /* 藏青 */
+  --gray-1: #fbfcfe; --gray-2: #f6f8fb; --gray-3: #f0f2f6; --gray-4: #ebedf1; --gray-5: #e4e7ec; --gray-6: #dde0e6;
+  --gray-7: #d1d6dc; --gray-8: #b8bec6; --gray-9: #899099; --gray-10: #7c838d; --gray-11: #5f6670; --gray-12: #1a1f27;
+  --canvas-clean: #f0f3f6;
+}
+[data-style="clean"][data-theme="indigo"]:not(.dark) {  /* 靛蓝 */
+  --gray-1: #fbfcfe; --gray-2: #f7f8fb; --gray-3: #f1f2f6; --gray-4: #ecedf1; --gray-5: #e5e7ec; --gray-6: #dee0e6;
+  --gray-7: #d3d5dc; --gray-8: #babdc6; --gray-9: #8c8f9a; --gray-10: #7f828d; --gray-11: #626570; --gray-12: #1c1f27;
+  --canvas-clean: #f1f2f6;
+}
+[data-style="clean"][data-theme="forest"]:not(.dark) {  /* 墨绿（暖 / 绿色相彩度 ×0.7–0.75，灰带色太多会显脏） */
+  --gray-1: #fbfdfc; --gray-2: #f6f9f8; --gray-3: #f0f3f2; --gray-4: #ebeeed; --gray-5: #e4e8e6; --gray-6: #dde1df;
+  --gray-7: #d1d7d4; --gray-8: #b8bfbc; --gray-9: #89928e; --gray-10: #7c8581; --gray-11: #5e6863; --gray-12: #1a211e;
+  --canvas-clean: #f0f3f2;
+}
+[data-style="clean"][data-theme="mocha"]:not(.dark) {  /* 摩卡（暖 / 绿色相彩度 ×0.7–0.75，灰带色太多会显脏） */
+  --gray-1: #fdfcfb; --gray-2: #faf7f6; --gray-3: #f4f1f0; --gray-4: #f0eceb; --gray-5: #eae6e4; --gray-6: #e3dfdd;
+  --gray-7: #d9d4d1; --gray-8: #c2bcb8; --gray-9: #958e89; --gray-10: #89817c; --gray-11: #6b635f; --gray-12: #231e1a;
+  --canvas-clean: #f4f2f0;
 }
 
 .dark {
@@ -239,6 +273,11 @@
 .dark[data-theme="mono"] { --primary: #f2f4f7; --primary-foreground: #16171d; }
 /* 墨青在深底上对比不足，暗色下提亮一档并改压深字（5.83:1）*/
 .dark[data-theme="teal"] { --primary: #2aa7a8; --primary-foreground: #06201f; }
+/* 新增四套在深底上都太暗：提亮到压暗卡 ≥5.0、按钮字改压深色（同色相，OKLCH 只抬明度） */
+.dark[data-theme="navy"] { --primary: #6c87ae; --primary-foreground: #0c0d10; }
+.dark[data-theme="indigo"] { --primary: #6f7fdc; --primary-foreground: #0c0d10; }
+.dark[data-theme="forest"] { --primary: #559079; --primary-foreground: #0c0d10; }
+.dark[data-theme="mocha"] { --primary: #9e7f6c; --primary-foreground: #0c0d10; }
 /* 暗底上主色本身够亮，文字直接用主色 */
 .dark[data-theme="brand"] { --primary-text: var(--primary); }
 

@@ -131,6 +131,17 @@ describe("每一套主题色（亮色）", () => {
   }
 });
 
+describe("9-28 新增四套主题色的暗色", () => {
+  // 藏青 / 靛蓝 / 墨绿 / 摩卡本身都很暗，深底上看不见 —— 暗色块提亮了主色、按钮字改压深色
+  for (const key of ["navy", "indigo", "forest", "mocha"] as const) {
+    it(key, () =>
+      expectPairs(block(`.dark[data-theme="${key}"]`), [
+        ["主色上的字（深字）", "primary-foreground", "primary", 4.5],
+        ["卡片上的主色（链接、选中）", "primary", baseDark["gray-2"], 4.5],
+      ]));
+  }
+});
+
 describe("墨青（teal）暗色", () => {
   it("主色上的字、卡片上的主色", () =>
     expectPairs(block('.dark[data-theme="teal"]'), [
@@ -138,3 +149,13 @@ describe("墨青（teal）暗色", () => {
       ["卡片上的主色（链接）", "primary", baseDark["gray-2"], 4.5],
     ]));
 });
+
+describe("黑白灰皮肤的链接有非颜色线索（规范 §2.2）", () => {
+  // 主色近黑：链接与正文几乎同色。默认皮肤是黑白灰（9-28），这条缺了等于默认界面里「哪些字能点」看不出来
+  it("主色文字写的链接常驻下划线", () => {
+    const at = css.indexOf('[data-theme="mono"] main a[class*="text-primary"]');
+    expect(at, "缺黑白灰链接下划线规则").toBeGreaterThan(-1);
+    expect(css.slice(at, css.indexOf("}", at))).toMatch(/text-decoration:\s*underline/);
+  });
+});
+

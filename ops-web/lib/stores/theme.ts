@@ -8,8 +8,9 @@ import { DEFAULT_THEME as DEFAULT_THEME_VALUE } from "../appearance-defaults";
 
 // 前四套皮肤与 C 端 c-app 的 SKINS 一一对应（src/design/tokens.ts）：
 // 同名、同 hex，两端截图放一起是同一个产品。
-// `teal`（墨青）是 2026-09-27 为运营台新增的，取自流程与工单原型，**C 端暂无对应** ——
-// 这是有意的例外：它是原型的主色，也是运营台的默认主色；其余四套照常可选。
+// `teal`（墨青，2026-09-27）与 navy / indigo / forest / mocha（2026-09-28）是运营台独有的，**C 端暂无对应**。
+// 后四套是用户要的「运营高端常用、耐看」的颜色：低明度低饱和（主色出现在每个链接 / 选中态 / 主按钮上，
+// 高饱和会显跳），并**避开语义色相**（红 = 超时 / 失败、琥珀 = 将超时），所以没有酒红、金色。
 // 皮肤只换 --primary —— 中性色与语义色由「风格」（stores/style.ts）决定，不参与换肤。
 export const THEMES = [
   { key: "mono", label: "黑白灰", color: "#1c2029" },
@@ -17,6 +18,10 @@ export const THEMES = [
   { key: "blue", label: "时尚蓝", color: "#2e6aff" },
   { key: "purple", label: "科幻紫", color: "#7c3aed" },
   { key: "teal", label: "墨青", color: "#0f7173" },
+  { key: "navy", label: "藏青", color: "#1d3557" },
+  { key: "indigo", label: "靛蓝", color: "#4a55c8" },
+  { key: "forest", label: "墨绿", color: "#1e5b46" },
+  { key: "mocha", label: "摩卡", color: "#6b4e3d" },
 ] as const;
 
 export type ThemeKey = (typeof THEMES)[number]["key"];
@@ -25,10 +30,8 @@ export type ThemeKey = (typeof THEMES)[number]["key"];
 // 布局定案为"两张白纸放在浅灰桌面上"后，全白底与它直接矛盾——
 // 画布若也是白的，两纸之间那道缝就不存在了，分隔手段随之失效。
 // 现在只有一套体系：page 是唯一的非白面，导航与内容都是白纸。
-// 运营台默认墨青（2026-09-27 起；此前是黑白灰）。
-// 当初不用彩色主色做默认，理由是「主色出现在每个链接/激活态/主按钮上，彩色会显跳」——
-// 那次被否的是简电青 #17C3C0（高明度高饱和）。墨青 #0f7173 明度低、饱和度低，
-// 读起来接近墨色，不重复那个问题；且它是原型观感的主要来源。
+// 运营台默认**黑白灰**（2026-09-28 用户定：「颜色默认尽量用黑白灰」）。9-27 曾改为墨青（原型主色），
+// 现回到黑白灰：原型的观感主要来自明暗结构与线条（规范 §2.6 #13/#14），而不是主色。
 // 已存过皮肤的老用户保持原选择，只有新用户拿到默认值。
 export const DEFAULT_THEME: ThemeKey = DEFAULT_THEME_VALUE;
 
