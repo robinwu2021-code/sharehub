@@ -25,6 +25,7 @@ import { DataTable, type Column } from "@/components/ui/data-table";
 import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { FlowTimeline } from "@/components/flow/flow-timeline";
+import { TemplateFormFields } from "@/components/flow/template-form-fields";
 
 type PT = ReturnType<typeof useFlowT<"processes">>["t"];
 const enabledMap = (tt: PT): StatusMap<"on" | "off"> => ({ on: { label: tt("enabled.on"), tone: "success" }, off: { label: tt("enabled.off"), tone: "muted" } });
@@ -232,6 +233,9 @@ function FlowProcesses() {
               })}
               <Button variant="secondary" onClick={() => set((d) => { d.steps.push(blankStep()); })}><Plus className="size-4" /> {tt("btn.addStep")}</Button>
             </div>
+
+            <TemplateFormFields fields={editing.def.fields ?? []} err={err}
+              onChange={(fn) => set((d) => { d.fields ??= []; fn(d.fields); })} />
 
             <div className="mt-5 space-y-2">
               <Rule label={tt("rule.selfApproval")} checked={!editing.def.rules.selfApproval}

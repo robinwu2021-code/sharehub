@@ -1,5 +1,10 @@
 // 审批列表（/flow/approvals/）。状态名走 common.approvalStatus.*。ar 为机器初译，needs-review。
 const zh = {
+  start: {
+    btn: "发起审批", title: "发起审批", template: "审批模板", pick: "请选择",
+    noForm: "这个模板没有发起表单，直接发起即可",
+    done: "已发起审批 {no}", doneNoApproval: "已发起 {no}",
+  },
   desc: "全部审批单（不只「待我审」）；按数据范围过滤。筛选条件即查询接口参数，一一对应。",
   tab: { all: "全部" },
   since: { d7: "提交时间：近 7 天", d30: "提交时间：近 30 天" },
@@ -22,6 +27,11 @@ const zh = {
 type M = typeof zh;
 
 const en = {
+  start: {
+    btn: "Start approval", title: "Start an approval", template: "Approval template", pick: "Select…",
+    noForm: "This template has no form; just submit",
+    done: "Approval {no} started", doneNoApproval: "Started {no}",
+  },
   desc: "All approvals (not just those waiting on you), filtered by your data scope. Each filter maps one-to-one to a query API parameter.",
   tab: { all: "All" },
   since: { d7: "Submitted: last 7 days", d30: "Submitted: last 30 days" },
@@ -43,6 +53,11 @@ const en = {
 } satisfies M;
 
 const ar = {
+  start: {
+    btn: "بدء موافقة", title: "بدء طلب موافقة", template: "قالب الموافقة", pick: "اختر…",
+    noForm: "لا يحتوي هذا القالب على نموذج؛ أرسل مباشرة",
+    done: "تم بدء الموافقة {no}", doneNoApproval: "تم البدء {no}",
+  },
   desc: "جميع طلبات الموافقة (وليس فقط ما ينتظر مراجعتك)، مُصفّاة حسب نطاق بياناتك. كل عامل تصفية يقابل معاملًا واحدًا في واجهة الاستعلام.",
   tab: { all: "الكل" },
   since: { d7: "وقت التقديم: آخر 7 أيام", d30: "وقت التقديم: آخر 30 يومًا" },

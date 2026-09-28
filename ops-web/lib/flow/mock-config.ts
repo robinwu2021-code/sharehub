@@ -71,6 +71,18 @@ export function resetConfigDb(now: number = Date.now()) {
       enabled: true, versions: [] },
     { def: { code: "CS_REFUND", name: zh("退款审批"), rules: rules(false), steps: [step("cs", "客服主管审批", "ROLE", "cs-lead", 4)] },
       enabled: true, versions: [] },
+    // 带发起表单的模板：运营台「发起审批」按它的 fields 渲染（五种字段类型各一个）
+    { def: { code: "OPS_EXPENSE", name: { zh: "运营费用申请", en: "Ops expense request", ar: "طلب مصروفات تشغيلية" }, rules: rules(false),
+      steps: [step("lead", "运营主管审批", "ROLE", "ops-lead", 24)],
+      fields: [
+        { code: "purpose", name: { zh: "用途", en: "Purpose", ar: "الغرض" }, type: "TEXT", required: true },
+        { code: "amount", name: { zh: "金额（AED）", en: "Amount (AED)", ar: "المبلغ (درهم)" }, type: "NUMBER", required: true },
+        { code: "category", name: { zh: "类别", en: "Category", ar: "الفئة" }, type: "SELECT", required: true, options: [
+          { code: "TRAVEL", name: { zh: "差旅", en: "Travel", ar: "سفر" } }, { code: "PARTS", name: { zh: "配件", en: "Parts", ar: "قطع غيار" } }] },
+        { code: "needBy", name: { zh: "需用日期", en: "Needed by", ar: "مطلوب بحلول" }, type: "DATE", required: false },
+        { code: "note", name: { zh: "说明", en: "Notes", ar: "ملاحظات" }, type: "TEXTAREA", required: false },
+      ] },
+      enabled: true, versions: [] },
   ];
   for (const p of processes) {
     if (!p.versions.length) p.versions.push(mk(p.def, contentHash(p.def), now - 3 * 24 * HOUR, "API", "SHAREHUB", "上线初版"));
@@ -156,6 +168,14 @@ function validate(def: ApprovalTemplate, isNew: boolean): FieldError[] {
   if (isNew && processes.some((p) => p.def.code === def.code)) e.push({ path: "code", error: "代号已存在" });
   if (!pick(def.name)) e.push({ path: "name", error: "模板名称必填" });
   if (!def.steps.length) e.push({ path: "steps", error: "至少要有一个步骤" });
+  // 发起表单（与 OpsKit 同口径）：代号唯一、名称必填、SELECT 至少一个选项
+  (def.fields ?? []).forEach((f, i) => {
+    const at = (k: string) => `fields[${i}].${k}`;
+    if (!/^[a-zA-Z][a-zA-Z0-9_]{0,31}$/.test(f.code)) e.push({ path: at("code"), error: "字段代号 1–32 位，字母开头，只含字母、数字、下划线" });
+    else if ((def.fields ?? []).findIndex((x) => x.code === f.code) !== i) e.push({ path: at("code"), error: "字段代号重复" });
+    if (!pick(f.name)) e.push({ path: at("name"), error: "字段名称必填" });
+    if (f.type === "SELECT" && !(f.options ?? []).length) e.push({ path: at("options"), error: "下拉字段至少要有一个选项" });
+  });
   if (def.steps.length && def.steps.every((s) => s.when)) e.push({ path: "steps", error: "至少要有一个必经步骤（不带进入条件）" });
   def.steps.forEach((s, i) => {
     const at = (k: string) => `steps[${i}].${k}`;

@@ -21,6 +21,10 @@ import { PagedTable } from "@/components/ui/paged-table";
 import type { Column } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
+import { useCan } from "@/lib/hooks/use-can";
+import { StartApprovalDrawer } from "@/components/flow/start-approval";
 
 type TabKey = ApprovalStatus | "ALL";
 const TAB_KEYS: TabKey[] = ["PENDING", "APPROVED", "REJECTED", "WITHDRAWN", "ALL"];
@@ -35,6 +39,9 @@ function FlowApprovals() {
   const SINCE = [{ value: "7", label: tt("since.d7") }, { value: "30", label: tt("since.d30") }];
   const paging = usePaging();
   const [tab, setTab] = useState<TabKey>("PENDING");
+  // 发起审批：按审批模板的发起表单（OpsKit approval:submit ↔ 运营台 flow:approval:submit，功能权限清单 §16）
+  const canStart = useCan()("flow:approval:submit");
+  const [startOpen, setStartOpen] = useState(false);
   const [processCode, setProcessCode] = useState("");
   const [requestedBy, setRequestedBy] = useState("");
   const [since, setSince] = useState("");
@@ -83,7 +90,9 @@ function FlowApprovals() {
   const c = count.data;
   return (
     <div>
-      <PageTitle title={tc("page.approvals")} desc={tt("desc")} />
+      <PageTitle title={tc("page.approvals")} desc={tt("desc")}
+        action={canStart ? <Button size="sm" onClick={() => setStartOpen(true)}><Plus className="size-4" /> {tt("start.btn")}</Button> : undefined} />
+      <StartApprovalDrawer open={startOpen} onOpenChange={setStartOpen} />
       <Tabs
         tabs={TABS.map((t) => ({ key: t.key, label: t.key !== "ALL" && c ? `${t.label} ${c[t.key]}` : t.label }))}
         value={tab}

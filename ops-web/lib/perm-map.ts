@@ -56,6 +56,7 @@ export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   // 流程与工单（强制方 OpsKit，见 backend/external-perm-modules.txt）：界面码即 OpsKit 映射用的码，恒等
   "flow:access:manage": "flow:access:manage",
   "flow:approval:decide": "flow:approval:decide",
+  "flow:approval:submit": "flow:approval:submit",
   "flow:approval:read": "flow:approval:read",
   "flow:config:manage": "flow:config:manage",
   "flow:process:manage": "flow:process:manage",

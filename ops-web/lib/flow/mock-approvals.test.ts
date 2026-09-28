@@ -144,3 +144,32 @@ describe("whyNot 是错误键（后端 9-28：与 403 同键、不给文案）",
     expect(errText((k) => translate("zh", k), "opskit.nope.unknown")).toBe("opskit.nope.unknown");
   });
 });
+
+describe("运营台发起审批（POST /instances，按审批模板的发起表单）", () => {
+  it("逐字段校验一次给全（路径 fields.<代号>）；合法的发起即进入审批、出现在待审列表", async () => {
+    const { startFromTemplate, queryApprovals, getApproval } = await import("./mock-approvals");
+    const { getTemplate, resetConfigDb } = await import("./mock-config");
+    const { isValidationError } = await import("./errors");
+    resetConfigDb(NOW);
+    const tpl = getTemplate("OPS_EXPENSE");
+    let err: unknown;
+    try { startFromTemplate(tpl, { amount: "12", category: "NOPE", needBy: "2026/10/01", ghost: 1 }, NOW); } catch (e) { err = e; }
+    expect(isValidationError(err) && err.errors.map((x) => x.path).sort())
+      .toEqual(["fields.amount", "fields.category", "fields.ghost", "fields.needBy", "fields.purpose"]);
+
+    const r = startFromTemplate(tpl, { purpose: "更换 3 台柜机屏幕", amount: 450, category: "PARTS", needBy: "2026-10-01" }, NOW);
+    expect(r.approvalNo).toBeTruthy();
+    const v = getApproval(r.approvalNo!);
+    expect(v).toMatchObject({ status: "PENDING", subject: { type: "manual", display: { title: "运营费用申请 · 更换 3 台柜机屏幕" } } });
+    expect(v.facts).toContainEqual({ label: "类别", value: "配件" });
+    expect(queryApprovals({ status: ["PENDING"], page: 1, size: 200 }).list.map((x) => x.approvalNo)).toContain(r.approvalNo);
+  });
+
+  it("发起要 flow:approval:submit（只读没有）", async () => {
+    const { startFromTemplate } = await import("./mock-approvals");
+    const { getTemplate, resetConfigDb } = await import("./mock-config");
+    resetConfigDb(NOW);
+    setMockOperatorPerms(["flow:approval:read"]);
+    expect(() => startFromTemplate(getTemplate("OPS_EXPENSE"), {}, NOW)).toThrow(/flow:approval:submit/);
+  });
+});

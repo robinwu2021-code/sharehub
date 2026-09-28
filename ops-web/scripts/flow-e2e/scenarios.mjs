@@ -94,6 +94,29 @@ export const SCENARIOS = [
     },
   },
 
+  {
+    id: "S2-9", modes: ["mock"], title: "审批：按模板的发起表单发起审批；必填不填被拦；发起后进详情", perms: ALL, url: () => "/flow/approvals/",
+    run: async (h) => {
+      await h.click("button", /发起审批/);
+      const dr = await h.waitFor(() => h.one("[role=dialog]"), "发起抽屉");
+      const tplSel = dr.querySelector("select");
+      const opt = await h.waitFor(() => [...tplSel.options].find((o) => /运营费用申请/.test(o.textContent)), "模板列表加载");
+      h.fill(tplSel, opt.value);
+      await h.waitFor(() => dr.querySelectorAll("input, textarea").length >= 3, "模板的表单字段出现");
+      await h.click("[role=dialog] button", /^(保存|提交|确定|确认)$/, "提交");
+      await h.sleep(300);
+      h.expect(!!h.one("[role=dialog]"), "必填未填时抽屉不关（前端必填拦下）");
+      const inputs = [...dr.querySelectorAll("input:not([type=number]):not([type=date])")];
+      h.fill(inputs[0], "更换柜机屏幕（e2e）");
+      h.fill(dr.querySelector("input[type=number]"), "450");
+      const cat = [...dr.querySelectorAll("select")].find((x) => [...x.options].some((o) => /配件/.test(o.textContent)));
+      h.fill(cat, [...cat.options].find((o) => /配件/.test(o.textContent)).value);
+      await h.click("[role=dialog] button", /^(保存|提交|确定|确认)$/, "提交");
+      await h.toast(/已发起审批/, "已发起审批");
+      await h.waitFor(() => /approvals\/detail/.test(location.pathname) && /更换柜机屏幕（e2e）/.test(h.bodyText()), "跳到新审批详情");
+    },
+  },
+
   // ── S3 审核队列 ──────────────────────────────────────────────────────
   {
     id: "S3-1", title: "队列：领取进「我在审」、待领 −1；放回后恢复", perms: ALL, url: () => "/flow/queue/",

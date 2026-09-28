@@ -385,7 +385,24 @@ export interface ApprovalTemplate {
   steps: TemplateStep[];
   /** selfApproval：允许提交人审自己（缺省 false）· crossStepExclusive：跨步互斥（缺省 true）；驳回必填原因恒开 */
   rules: { selfApproval: boolean; crossStepExclusive: boolean };
+  /** 发起表单（OpsKit 38983255）：运营台「发起审批」按它渲染；没有表单的旧模板为空数组 */
+  fields?: TemplateFormField[];
 }
+
+/** 发起表单的字段类型（与 OpsKit 一致；DATE 的值是 yyyy-MM-dd，NUMBER 传数字，SELECT 传选项代号） */
+export type TemplateFieldType = "TEXT" | "TEXTAREA" | "NUMBER" | "DATE" | "SELECT";
+
+export interface TemplateFormField {
+  code: string;
+  name: I18nText;
+  type: TemplateFieldType;
+  required: boolean;
+  /** 仅 SELECT */
+  options?: { code: string; name: I18nText }[];
+}
+
+/** 发起审批的结果：审批模板发起即进入审批，带审批单号 */
+export interface StartedApproval { instanceNo: string; approvalNo?: string }
 
 export interface TemplateSummary {
   code: string;

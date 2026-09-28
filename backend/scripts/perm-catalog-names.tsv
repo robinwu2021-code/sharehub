@@ -196,6 +196,7 @@ workorder:wo:update	工单 编辑	workorder	1
 flow:todo:read	流程与工单 · 待办中心	flow	0
 flow:approval:read	流程与工单 · 审批 查看	flow	0
 flow:approval:decide	流程与工单 · 审批 通过/驳回	flow	0
+flow:approval:submit	流程与工单 · 发起审批	flow	0
 flow:queue:claim	流程与工单 · 审核队列 领取/决定	flow	0
 flow:ticket:read	流程与工单 · 工单 查看	flow	0
 flow:ticket:handle	流程与工单 · 工单 办理/抢单	flow	0

@@ -19,7 +19,7 @@ public final class RolePerms {
             "ADMIN", List.of("*"),
             "OPS", List.of(
                     // 流程与工单（强制方 OpsKit，功能权限清单 §16）
-                    "flow:todo:read", "flow:approval:read", "flow:approval:decide", "flow:queue:claim", "flow:ticket:read", "flow:ticket:handle", "flow:ticket:dispatch", "flow:config:manage",
+                    "flow:todo:read", "flow:approval:read", "flow:approval:submit", "flow:approval:decide", "flow:queue:claim", "flow:ticket:read", "flow:ticket:handle", "flow:ticket:dispatch", "flow:config:manage",
                     "dashboard:overview:read", "dashboard:todo:read",
                     "device:cabinet:*", "device:slot:read", "device:powerbank:*",
                     "device:command:*", "device:inventory:*", "device:ota:*", "device:vendor:read",
@@ -40,7 +40,7 @@ public final class RolePerms {
                     "system:market:read", "system:param:read"),
             "CS", List.of(
                     // 流程与工单（强制方 OpsKit，功能权限清单 §16）
-                    "flow:todo:read", "flow:approval:read", "flow:approval:decide", "flow:queue:claim", "flow:ticket:read", "flow:ticket:handle",
+                    "flow:todo:read", "flow:approval:read", "flow:approval:submit", "flow:approval:decide", "flow:queue:claim", "flow:ticket:read", "flow:ticket:handle",
                     "dashboard:overview:read", "dashboard:todo:read",
                     "device:cabinet:read", "device:slot:read", "device:command:send",
                     "order:order:read", "order:order:export", "order:exception:read", "order:exception:handle",
@@ -65,7 +65,7 @@ public final class RolePerms {
                     "system:problem:read", "system:problem:update"),
             "FINANCE", List.of(
                     // 流程与工单（强制方 OpsKit，功能权限清单 §16）
-                    "flow:todo:read", "flow:approval:read", "flow:approval:decide",
+                    "flow:todo:read", "flow:approval:read", "flow:approval:submit", "flow:approval:decide",
                     "dashboard:overview:read", "dashboard:todo:read",
                     "order:order:read", "order:order:export", "order:refund:audit",
                     // 押金解冻/买断与欠费催缴（真源表 §4）：动钱的归财务，
@@ -93,7 +93,7 @@ public final class RolePerms {
                     "system:biz_rule:update", "system:payment_channel:read"),
             "BD", List.of(
                     // 流程与工单（强制方 OpsKit，功能权限清单 §16）
-                    "flow:todo:read", "flow:approval:read",
+                    "flow:todo:read", "flow:approval:read", "flow:approval:submit",
                     "dashboard:overview:read", "location:*", "pricing:rule:read", "pricing:rule:update",
                     "marketing:*", "agent:*",
                     "finance:share_rule:read", "finance:share_record:read", "report:*"),

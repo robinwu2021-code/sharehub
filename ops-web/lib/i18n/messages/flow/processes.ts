@@ -1,5 +1,11 @@
 // 流程配置（/flow/processes/）。ar 为机器初译，needs-review。
 const zh = {
+  form: {
+    title: "发起表单", hint: "运营台「发起审批」按这里的字段出表单；不设字段也能发起",
+    add: "添加字段", remove: "删除字段", code: "字段代号", name: "字段名称", type: "类型", required: "必填",
+    options: "下拉选项", optionsHelp: "一行一个：代号 名称（如 TRAVEL 差旅）",
+    types: { TEXT: "单行文字", TEXTAREA: "多行文字", NUMBER: "数字", DATE: "日期", SELECT: "下拉选择" },
+  },
   desc: "表单化配置审批流程（不做图形设计器）。保存即发布新版本：进行中的审批按提交时的版本走完，新版本只影响新提交。",
   enabled: { on: "启用", off: "已停用" },
   approver: {
@@ -66,6 +72,12 @@ const zh = {
 type M = typeof zh;
 
 const en = {
+  form: {
+    title: "Start form", hint: "“Start approval” in the console renders these fields; a template without fields can still be started",
+    add: "Add field", remove: "Remove field", code: "Field code", name: "Field name", type: "Type", required: "Required",
+    options: "Options", optionsHelp: "One per line: code name (e.g. TRAVEL Travel)",
+    types: { TEXT: "Text", TEXTAREA: "Long text", NUMBER: "Number", DATE: "Date", SELECT: "Dropdown" },
+  },
   desc: "Configure approval flows with forms (no graphical designer). Saving publishes a new version: approvals in progress finish on the version they were submitted with; the new version only applies to new submissions.",
   enabled: { on: "Enabled", off: "Disabled" },
   approver: {
@@ -131,6 +143,12 @@ const en = {
 } satisfies M;
 
 const ar = {
+  form: {
+    title: "نموذج البدء", hint: "يعرض «بدء موافقة» في لوحة التشغيل هذه الحقول؛ ويمكن بدء قالب بلا حقول",
+    add: "إضافة حقل", remove: "حذف الحقل", code: "رمز الحقل", name: "اسم الحقل", type: "النوع", required: "إلزامي",
+    options: "الخيارات", optionsHelp: "خيار في كل سطر: الرمز الاسم (مثل TRAVEL سفر)",
+    types: { TEXT: "نص", TEXTAREA: "نص طويل", NUMBER: "رقم", DATE: "تاريخ", SELECT: "قائمة منسدلة" },
+  },
   desc: "إعداد مسارات الموافقة عبر النماذج (بدون مصمم رسومي). الحفظ ينشر إصدارًا جديدًا: تكتمل الموافقات الجارية وفق الإصدار الذي قُدّمت به، ولا يسري الإصدار الجديد إلا على الطلبات الجديدة.",
   enabled: { on: "مفعّل", off: "معطّل" },
   approver: {

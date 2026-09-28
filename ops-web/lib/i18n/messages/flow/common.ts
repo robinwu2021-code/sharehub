@@ -43,7 +43,7 @@ const zh = {
       not_on_create: "建单时不能填", expect_text: "应为文字", expect_number: "应为数字", expect_option: "应为一个选项", expect_option_list: "应为一组选项",
       type_disabled: "这个工单类型已停用", unknown_type: "工单类型不存在", unknown_transition: "当前状态不能做这个操作", closed: "工单已结",
     },
-    validation: { required: "必填", too_long: "太长了", too_many: "太多了", one_of: "取值不在允许范围内", duplicate: "重复了" },
+    validation: { required: "必填", invalid: "格式不对", too_long: "太长了", too_many: "太多了", one_of: "取值不在允许范围内", duplicate: "重复了" },
     sla: {
       unreachable_target: "这一行永远匹配不到：前面有兜底行（不带条件），兜底行只能放最后", unknown_metric: "本策略没有这个指标",
       never_starts: "这个指标永远不会开始计时", never_stops: "这个指标永远不会停止计时", stop_on_create: "不能在建单时就停止计时",
@@ -94,7 +94,7 @@ const en = {
       not_on_create: "Cannot be set when creating", expect_text: "Should be text", expect_number: "Should be a number", expect_option: "Should be one option", expect_option_list: "Should be a list of options",
       type_disabled: "This ticket type is disabled", unknown_type: "Ticket type not found", unknown_transition: "This action is not available in the current status", closed: "The ticket is closed",
     },
-    validation: { required: "Required", too_long: "Too long", too_many: "Too many", one_of: "Not an allowed value", duplicate: "Duplicate" },
+    validation: { required: "Required", invalid: "Invalid format", too_long: "Too long", too_many: "Too many", one_of: "Not an allowed value", duplicate: "Duplicate" },
     sla: {
       unreachable_target: "This row can never match: a catch-all row (no condition) comes before it — the catch-all must be last", unknown_metric: "This policy has no such metric",
       never_starts: "This metric would never start", never_stops: "This metric would never stop", stop_on_create: "Cannot stop timing on creation",
@@ -144,7 +144,7 @@ const ar = {
       not_on_create: "لا يمكن تعيينه عند الإنشاء", expect_text: "يجب أن يكون نصًا", expect_number: "يجب أن يكون رقمًا", expect_option: "يجب أن يكون خيارًا واحدًا", expect_option_list: "يجب أن يكون قائمة خيارات",
       type_disabled: "نوع التذكرة هذا معطّل", unknown_type: "نوع التذكرة غير موجود", unknown_transition: "هذا الإجراء غير متاح في الحالة الحالية", closed: "التذكرة مغلقة",
     },
-    validation: { required: "إلزامي", too_long: "طويل جدًا", too_many: "كثير جدًا", one_of: "قيمة غير مسموح بها", duplicate: "مكرر" },
+    validation: { required: "إلزامي", invalid: "صيغة غير صالحة", too_long: "طويل جدًا", too_many: "كثير جدًا", one_of: "قيمة غير مسموح بها", duplicate: "مكرر" },
     sla: {
       unreachable_target: "لن يطابق هذا الصف أبدًا: يسبقه صف شامل (بلا شرط) — يجب أن يكون الصف الشامل الأخير", unknown_metric: "لا يوجد هذا المقياس في هذه السياسة",
       never_starts: "لن يبدأ هذا المقياس أبدًا", never_stops: "لن يتوقف هذا المقياس أبدًا", stop_on_create: "لا يمكن إيقاف التوقيت عند الإنشاء",

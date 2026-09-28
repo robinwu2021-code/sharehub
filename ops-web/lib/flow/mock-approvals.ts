@@ -30,8 +30,8 @@ const invalid = (path: string, zh: string, en: string): never => {
   throw new FlowValidationError(m, [{ path, error: m }]);
 };
 import type {
-  ApprovalQuery, ApprovalRound, ApprovalRow, ApprovalStatus, ApprovalStep, ApprovalView, Named, Page,
-  Priority, QueueCount, QueueTask,
+  ApprovalQuery, ApprovalRound, ApprovalRow, ApprovalStatus, ApprovalStep, ApprovalTemplate, ApprovalView, FieldError, I18nText, Named, Page,
+  Priority, QueueCount, QueueTask, StartedApproval,
 } from "./types";
 
 const MIN = 60_000;
@@ -390,6 +390,58 @@ export function completeTask(taskNo: string, decision: "APPROVE" | "REJECT", rea
 }
 
 /** 某流程的在途（待审）单数 —— 流程配置页的「在途单」列 */
+/**
+ * 运营台「发起审批」（POST /instances，按审批模板）：与 OpsKit 同口径 —— 发起即进入审批、带审批单号；
+ * 发起表单逐字段校验，一次给全，路径 fields.<代号>。mock 按模板动态登记一个流程（步骤名 / 审批人描述）。
+ */
+export function startFromTemplate(tpl: ApprovalTemplate, values: Record<string, unknown>, now: number = Date.now()): StartedApproval {
+  requirePerm("flow:approval:submit");
+  const name = (t: I18nText) => t.zh || t.en || t.ar || "";
+  const errors: FieldError[] = [];
+  const facts: ApprovalView["facts"] = [];
+  for (const f of tpl.fields ?? []) {
+    const v = values[f.code];
+    const empty = v == null || v === "";
+    const path = `fields.${f.code}`;
+    if (empty) {
+      if (f.required) errors.push({ path, error: pickLang("必填", "Required") });
+      continue;
+    }
+    if (f.type === "NUMBER" && typeof v !== "number") errors.push({ path, error: pickLang("应为数字", "Should be a number") });
+    else if (f.type === "DATE" && !/^\d{4}-\d{2}-\d{2}$/.test(String(v))) errors.push({ path, error: pickLang("日期格式应为 yyyy-MM-dd", "Date must be yyyy-MM-dd") });
+    else if (f.type === "SELECT" && !(f.options ?? []).some((o) => o.code === v)) errors.push({ path, error: pickLang("取值不在允许范围内", "Not an allowed value") });
+    else if ((f.type === "TEXT" && String(v).length > 200) || String(v).length > 2000) errors.push({ path, error: pickLang("太长了", "Too long") });
+    else {
+      const shown = f.type === "SELECT" ? name((f.options ?? []).find((o) => o.code === v)!.name) : String(v);
+      facts.push({ label: name(f.name), value: shown });
+    }
+  }
+  for (const k of Object.keys(values)) {
+    if (!(tpl.fields ?? []).some((f) => f.code === k)) errors.push({ path: `fields.${k}`, error: pickLang("模板没有这个字段", "Unknown field") });
+  }
+  if (errors.length) throw new FlowValidationError(pickLang(`发起被拒：有 ${errors.length} 处需要修改`, `Rejected: ${errors.length} field(s) to fix`), errors);
+
+  PROCESSES[tpl.code] ??= {
+    code: tpl.code, name: name(tpl.name), crossStepExclusive: tpl.rules.crossStepExclusive,
+    steps: tpl.steps.map((st, i) => ({ code: st.code || `s${i + 1}`, name: name(st.name),
+      approver: `${st.approver.kind} ${[st.approver.value].flat().join(" / ")}` })),
+  };
+  const d = new Date(now);
+  const day = `${String(d.getFullYear()).slice(2)}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+  let n = 1;
+  while (approvals.some((a) => a.approvalNo === `AP${day}${String(800 + n)}`)) n++;
+  const approvalNo = `AP${day}${String(800 + n)}`;
+  const first = facts[0]?.value;
+  approvals.push({
+    approvalNo, processCode: tpl.code,
+    subject: { type: "manual", ref: approvalNo, display: { title: first ? `${name(tpl.name)} · ${first}` : name(tpl.name) } },
+    fields: {}, facts, evidence: [], status: "PENDING", stepIdx: 0, round: 1,
+    requestedBy: { ref: ME.ref, displayName: ME.displayName }, requestedAtMs: now, stepStartedAtMs: now,
+    taskNo: newTask(), decisions: [], rounds: [{ round: 1, status: "IN_PROGRESS", atMs: now, by: ME.displayName }],
+  });
+  return { instanceNo: `PI${approvalNo.slice(2)}`, approvalNo };
+}
+
 export function pendingCountOf(processCode: string): number {
   return approvals.filter((r) => r.processCode === processCode && r.status === "PENDING").length;
 }

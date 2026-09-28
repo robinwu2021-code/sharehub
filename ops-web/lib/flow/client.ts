@@ -14,7 +14,7 @@ import type {
   AppRow, ApprovalTemplate, DefinitionVersionRow, DeliveryRow, PublishResult, QueueGroup, TemplateSummary, TemplateVersion,
   SlaPolicy, WorkCalendar, HistoryEntry, InstanceQuery, InstanceRow, ProcessStats, ProcessStatsQuery, SubjectHistory,
   ApprovalQuery, ApprovalRow, ApprovalStatus, ApprovalView, Member, Named, Page, QueueCount, QueueTask, TicketQuery,
-  CommentVisibility, CreateTicketRequest, CreateTicketResult, TicketTypeDef, ReassignResult, TicketRow, TicketStat, TicketView, TimelineEvent, TodoCount, TodoItem, TodoQuery,
+  CommentVisibility, CreateTicketRequest, CreateTicketResult, TicketTypeDef, ReassignResult, TicketRow, TicketStat, TicketView, TimelineEvent, TodoCount, TodoItem, TodoQuery, StartedApproval,
 } from "./types";
 
 /** 模拟网络往返：让加载态、按钮 loading 在 mock 下也真实出现 */
@@ -95,6 +95,9 @@ const mockFlow = {
   templates: (): Promise<TemplateSummary[]> => tick(() => cfg.listTemplates()),
   /** GET /workspaces/{ws}/approval-templates/{code} */
   template: (code: string): Promise<ApprovalTemplate> => tick(() => cfg.getTemplate(code)),
+  /** POST /workspaces/{ws}/instances：运营台按审批模板发起（成员令牌需 approval:submit；只能发起模板）；发起即进入审批 */
+  startApproval: (code: string, fields: Record<string, unknown>): Promise<StartedApproval> =>
+    tick(() => ap.startFromTemplate(cfg.getTemplate(code), fields)),
   /** GET /workspaces/{ws}/approval-templates/{code}/versions */
   templateVersions: (code: string): Promise<TemplateVersion[]> => tick(() => cfg.templateVersions(code)),
   /** PUT /workspaces/{ws}/approval-templates/{code}（幂等发布；422 的 errors[].path 按模板字段给） */
@@ -201,6 +204,7 @@ const httpFlow: typeof mockFlow = {
   completeTask: (taskNo, decision, reason) => POST(ws(`/tasks/${enc(taskNo)}/complete`), { decision, ...(reason ? { reason } : {}) }),
 
   templates: () => GET(ws("/approval-templates")),
+  startApproval: (code, fields) => POST(ws("/instances"), { processCode: code, fields }),
   template: (code) => GET(ws(`/approval-templates/${enc(code)}`)),
   templateVersions: (code) => GET(ws(`/approval-templates/${enc(code)}/versions`)),
   publishTemplate: (def, note) => PUT(ws(`/approval-templates/${enc(def.code)}`), { ...def, ...(note ? { note } : {}) }),
