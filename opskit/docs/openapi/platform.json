@@ -1,66 +1,6 @@
 {
   "components" : {
     "schemas" : {
-      "AccountId" : {
-        "properties" : {
-          "value" : {
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "Actor" : {
-        "properties" : {
-          "app" : {
-            "type" : "string"
-          },
-          "appItself" : {
-            "type" : "boolean"
-          },
-          "externalPerms" : {
-            "items" : {
-              "type" : "string"
-            },
-            "type" : "array",
-            "uniqueItems" : true
-          },
-          "groups" : {
-            "items" : {
-              "type" : "string"
-            },
-            "type" : "array",
-            "uniqueItems" : true
-          },
-          "member" : {
-            "$ref" : "#/components/schemas/PrincipalRef"
-          },
-          "productPermissions" : {
-            "items" : {
-              "type" : "string"
-            },
-            "type" : "array",
-            "uniqueItems" : true
-          },
-          "roles" : {
-            "items" : {
-              "type" : "string"
-            },
-            "type" : "array",
-            "uniqueItems" : true
-          },
-          "scopes" : {
-            "items" : {
-              "type" : "string"
-            },
-            "type" : "array",
-            "uniqueItems" : true
-          },
-          "tenant" : {
-            "$ref" : "#/components/schemas/TenantContext"
-          }
-        },
-        "type" : "object"
-      },
       "AttrBody" : {
         "properties" : {
           "name" : {
@@ -443,18 +383,6 @@
         },
         "type" : "object"
       },
-      "PrincipalRef" : {
-        "properties" : {
-          "id" : {
-            "type" : "string"
-          },
-          "kind" : {
-            "enum" : [ "MEMBER", "GROUP", "ROLE", "PERM", "APP", "CONTACT", "PARTICIPANT" ],
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
       "RoleBinding" : {
         "properties" : {
           "principal" : {
@@ -554,32 +482,17 @@
           }
         },
         "type" : "object"
-      },
-      "TenantContext" : {
-        "properties" : {
-          "accountId" : {
-            "$ref" : "#/components/schemas/AccountId"
-          },
-          "workspaceId" : {
-            "$ref" : "#/components/schemas/WorkspaceId"
-          }
-        },
-        "type" : "object"
-      },
-      "WorkspaceId" : {
-        "properties" : {
-          "template" : {
-            "type" : "boolean"
-          },
-          "value" : {
-            "type" : "string"
-          }
-        },
-        "type" : "object"
+      }
+    },
+    "securitySchemes" : {
+      "bearer" : {
+        "scheme" : "bearer",
+        "type" : "http"
       }
     }
   },
   "info" : {
+    "description" : "同一套接口也挂在 /v1/workspaces/{ws}/… 下（别名）。认证：Authorization: Bearer <应用凭证 okk_… 或成员令牌>；操作人只来自令牌（应用凭证可在请求体带 onBehalfOf 代成员）。错误体 {error, message, args, traceId, errors?}，错误键见 docs/error-keys.json。",
     "title" : "OpsKit platform",
     "version" : "v1"
   },
@@ -587,15 +500,8 @@
   "paths" : {
     "/api/opskit/v1/workspaces/{ws}/calendars/{code}" : {
       "get" : {
-        "operationId" : "calendar",
+        "operationId" : "get_workspaces_ws_calendars_code",
         "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
           "in" : "path",
           "name" : "code",
           "required" : true,
@@ -618,15 +524,8 @@
         "tags" : [ "settings-controller" ]
       },
       "put" : {
-        "operationId" : "upsertCalendar",
+        "operationId" : "put_workspaces_ws_calendars_code",
         "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
           "in" : "path",
           "name" : "code",
           "required" : true,
@@ -654,15 +553,7 @@
     },
     "/api/opskit/v1/workspaces/{ws}/directory/sync" : {
       "post" : {
-        "operationId" : "sync",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        } ],
+        "operationId" : "post_workspaces_ws_directory_sync",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -690,15 +581,8 @@
     },
     "/api/opskit/v1/workspaces/{ws}/groups/{code}" : {
       "put" : {
-        "operationId" : "upsertGroup_1",
+        "operationId" : "put_workspaces_ws_groups_code",
         "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
           "in" : "path",
           "name" : "code",
           "required" : true,
@@ -726,15 +610,7 @@
     },
     "/api/opskit/v1/workspaces/{ws}/me" : {
       "get" : {
-        "operationId" : "me_1",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        } ],
+        "operationId" : "get_workspaces_ws_me",
         "responses" : {
           "200" : {
             "content" : {
@@ -752,15 +628,7 @@
     },
     "/api/opskit/v1/workspaces/{ws}/member-attributes" : {
       "get" : {
-        "operationId" : "memberAttributes_1",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        } ],
+        "operationId" : "get_workspaces_ws_member_attributes",
         "responses" : {
           "200" : {
             "content" : {
@@ -781,15 +649,8 @@
     },
     "/api/opskit/v1/workspaces/{ws}/member-attributes/{key}" : {
       "put" : {
-        "operationId" : "upsertAttr",
+        "operationId" : "put_workspaces_ws_member_attributes_key",
         "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
           "in" : "path",
           "name" : "key",
           "required" : true,
@@ -817,15 +678,7 @@
     },
     "/api/opskit/v1/workspaces/{ws}/members/query" : {
       "post" : {
-        "operationId" : "members",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        } ],
+        "operationId" : "post_workspaces_ws_members_query",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -852,15 +705,8 @@
     },
     "/api/opskit/v1/workspaces/{ws}/roles/{code}" : {
       "put" : {
-        "operationId" : "upsertRole",
+        "operationId" : "put_workspaces_ws_roles_code",
         "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
           "in" : "path",
           "name" : "code",
           "required" : true,
@@ -888,15 +734,7 @@
     },
     "/api/opskit/v1/workspaces/{ws}/webhook-deliveries/query" : {
       "post" : {
-        "operationId" : "query",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        } ],
+        "operationId" : "post_workspaces_ws_webhook_deliveries_query",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -923,15 +761,8 @@
     },
     "/api/opskit/v1/workspaces/{ws}/webhook-deliveries/{id}" : {
       "get" : {
-        "operationId" : "get_7",
+        "operationId" : "get_workspaces_ws_webhook_deliveries_id",
         "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
           "in" : "path",
           "name" : "id",
           "required" : true,
@@ -957,419 +788,8 @@
     },
     "/api/opskit/v1/workspaces/{ws}/webhook-deliveries/{id}/redeliver" : {
       "post" : {
-        "operationId" : "redeliver",
+        "operationId" : "post_workspaces_ws_webhook_deliveries_id_redeliver",
         "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
-          "in" : "path",
-          "name" : "id",
-          "required" : true,
-          "schema" : {
-            "format" : "int64",
-            "type" : "integer"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/EventRow"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "delivery-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/calendars/{code}" : {
-      "get" : {
-        "operationId" : "calendar_1",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
-          "in" : "path",
-          "name" : "code",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/CalendarBody"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "settings-controller" ]
-      },
-      "put" : {
-        "operationId" : "upsertCalendar_1",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
-          "in" : "path",
-          "name" : "code",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/CalendarBody"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "settings-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/directory/sync" : {
-      "post" : {
-        "operationId" : "sync_1",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/SyncBatch"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/SyncResult"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "directory-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/groups/{code}" : {
-      "put" : {
-        "operationId" : "upsertGroup",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
-          "in" : "path",
-          "name" : "code",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/GroupBody"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "directory-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/me" : {
-      "get" : {
-        "operationId" : "me",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Me"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "directory-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/member-attributes" : {
-      "get" : {
-        "operationId" : "memberAttributes",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "items" : {
-                    "$ref" : "#/components/schemas/AttrDef"
-                  },
-                  "type" : "array"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "directory-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/member-attributes/{key}" : {
-      "put" : {
-        "operationId" : "upsertAttr_1",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
-          "in" : "path",
-          "name" : "key",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/AttrBody"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "directory-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/members/query" : {
-      "post" : {
-        "operationId" : "members_1",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/MemberQuery"
-              }
-            }
-          }
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/PageMemberRow"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "directory-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/roles/{code}" : {
-      "put" : {
-        "operationId" : "upsertRole_1",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
-          "in" : "path",
-          "name" : "code",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/RoleBody"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "settings-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/webhook-deliveries/query" : {
-      "post" : {
-        "operationId" : "query_1",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/DeliveryQuery"
-              }
-            }
-          }
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/PageEventRow"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "delivery-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/webhook-deliveries/{id}" : {
-      "get" : {
-        "operationId" : "get_6",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
-          "in" : "path",
-          "name" : "id",
-          "required" : true,
-          "schema" : {
-            "format" : "int64",
-            "type" : "integer"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Detail"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "delivery-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/webhook-deliveries/{id}/redeliver" : {
-      "post" : {
-        "operationId" : "redeliver_1",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
           "in" : "path",
           "name" : "id",
           "required" : true,
@@ -1393,5 +813,8 @@
         "tags" : [ "delivery-controller" ]
       }
     }
-  }
+  },
+  "security" : [ {
+    "bearer" : [ ]
+  } ]
 }

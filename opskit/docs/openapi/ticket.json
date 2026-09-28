@@ -1,14 +1,6 @@
 {
   "components" : {
     "schemas" : {
-      "AccountId" : {
-        "properties" : {
-          "value" : {
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
       "Action" : {
         "properties" : {
           "code" : {
@@ -22,58 +14,6 @@
           },
           "toCategory" : {
             "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "Actor" : {
-        "properties" : {
-          "app" : {
-            "type" : "string"
-          },
-          "appItself" : {
-            "type" : "boolean"
-          },
-          "externalPerms" : {
-            "items" : {
-              "type" : "string"
-            },
-            "type" : "array",
-            "uniqueItems" : true
-          },
-          "groups" : {
-            "items" : {
-              "type" : "string"
-            },
-            "type" : "array",
-            "uniqueItems" : true
-          },
-          "member" : {
-            "$ref" : "#/components/schemas/PrincipalRef"
-          },
-          "productPermissions" : {
-            "items" : {
-              "type" : "string"
-            },
-            "type" : "array",
-            "uniqueItems" : true
-          },
-          "roles" : {
-            "items" : {
-              "type" : "string"
-            },
-            "type" : "array",
-            "uniqueItems" : true
-          },
-          "scopes" : {
-            "items" : {
-              "type" : "string"
-            },
-            "type" : "array",
-            "uniqueItems" : true
-          },
-          "tenant" : {
-            "$ref" : "#/components/schemas/TenantContext"
           }
         },
         "type" : "object"
@@ -516,18 +456,6 @@
         },
         "type" : "object"
       },
-      "PrincipalRef" : {
-        "properties" : {
-          "id" : {
-            "type" : "string"
-          },
-          "kind" : {
-            "enum" : [ "MEMBER", "GROUP", "ROLE", "PERM", "APP", "CONTACT", "PARTICIPANT" ],
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
       "Priority" : {
         "properties" : {
           "code" : {
@@ -736,17 +664,6 @@
           },
           "type" : {
             "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "TenantContext" : {
-        "properties" : {
-          "accountId" : {
-            "$ref" : "#/components/schemas/AccountId"
-          },
-          "workspaceId" : {
-            "$ref" : "#/components/schemas/WorkspaceId"
           }
         },
         "type" : "object"
@@ -1143,21 +1060,17 @@
           }
         },
         "type" : "object"
-      },
-      "WorkspaceId" : {
-        "properties" : {
-          "template" : {
-            "type" : "boolean"
-          },
-          "value" : {
-            "type" : "string"
-          }
-        },
-        "type" : "object"
+      }
+    },
+    "securitySchemes" : {
+      "bearer" : {
+        "scheme" : "bearer",
+        "type" : "http"
       }
     }
   },
   "info" : {
+    "description" : "同一套接口也挂在 /v1/workspaces/{ws}/… 下（别名）。认证：Authorization: Bearer <应用凭证 okk_… 或成员令牌>；操作人只来自令牌（应用凭证可在请求体带 onBehalfOf 代成员）。错误体 {error, message, args, traceId, errors?}，错误键见 docs/error-keys.json。",
     "title" : "OpsKit ticket",
     "version" : "v1"
   },
@@ -1165,15 +1078,8 @@
   "paths" : {
     "/api/opskit/v1/workspaces/{ws}/option-sets/{code}" : {
       "put" : {
-        "operationId" : "publishOptionSet_1",
+        "operationId" : "put_workspaces_ws_option_sets_code",
         "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
           "in" : "path",
           "name" : "code",
           "required" : true,
@@ -1208,15 +1114,7 @@
     },
     "/api/opskit/v1/workspaces/{ws}/ticket-stats/by-assignee" : {
       "post" : {
-        "operationId" : "byAssignee_1",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        } ],
+        "operationId" : "post_workspaces_ws_ticket_stats_by_assignee",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -1246,15 +1144,7 @@
     },
     "/api/opskit/v1/workspaces/{ws}/ticket-stats/by-group" : {
       "post" : {
-        "operationId" : "byGroup_1",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        } ],
+        "operationId" : "post_workspaces_ws_ticket_stats_by_group",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -1285,15 +1175,7 @@
     },
     "/api/opskit/v1/workspaces/{ws}/ticket-stats/open-count" : {
       "post" : {
-        "operationId" : "openCount_1",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        } ],
+        "operationId" : "post_workspaces_ws_ticket_stats_open_count",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -1320,15 +1202,7 @@
     },
     "/api/opskit/v1/workspaces/{ws}/ticket-stats/summary" : {
       "post" : {
-        "operationId" : "summary_1",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        } ],
+        "operationId" : "post_workspaces_ws_ticket_stats_summary",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -1358,15 +1232,7 @@
     },
     "/api/opskit/v1/workspaces/{ws}/ticket-types" : {
       "get" : {
-        "operationId" : "types",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        } ],
+        "operationId" : "get_workspaces_ws_ticket_types",
         "responses" : {
           "200" : {
             "content" : {
@@ -1387,15 +1253,8 @@
     },
     "/api/opskit/v1/workspaces/{ws}/ticket-types/{code}" : {
       "get" : {
-        "operationId" : "type",
+        "operationId" : "get_workspaces_ws_ticket_types_code",
         "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
           "in" : "path",
           "name" : "code",
           "required" : true,
@@ -1418,15 +1277,8 @@
         "tags" : [ "ticket-controller" ]
       },
       "put" : {
-        "operationId" : "publishType",
+        "operationId" : "put_workspaces_ws_ticket_types_code",
         "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
           "in" : "path",
           "name" : "code",
           "required" : true,
@@ -1461,15 +1313,8 @@
     },
     "/api/opskit/v1/workspaces/{ws}/ticket-types/{code}/definition" : {
       "get" : {
-        "operationId" : "definition",
+        "operationId" : "get_workspaces_ws_ticket_types_code_definition",
         "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
           "in" : "path",
           "name" : "code",
           "required" : true,
@@ -1494,15 +1339,7 @@
     },
     "/api/opskit/v1/workspaces/{ws}/tickets" : {
       "post" : {
-        "operationId" : "create",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        } ],
+        "operationId" : "post_workspaces_ws_tickets",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -1530,15 +1367,7 @@
     },
     "/api/opskit/v1/workspaces/{ws}/tickets/query" : {
       "post" : {
-        "operationId" : "query",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        } ],
+        "operationId" : "post_workspaces_ws_tickets_query",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -1565,15 +1394,7 @@
     },
     "/api/opskit/v1/workspaces/{ws}/tickets/reassign" : {
       "post" : {
-        "operationId" : "reassign_1",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        } ],
+        "operationId" : "post_workspaces_ws_tickets_reassign",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -1601,15 +1422,8 @@
     },
     "/api/opskit/v1/workspaces/{ws}/tickets/{no}" : {
       "get" : {
-        "operationId" : "get_5",
+        "operationId" : "get_workspaces_ws_tickets_no",
         "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
           "in" : "path",
           "name" : "no",
           "required" : true,
@@ -1632,15 +1446,8 @@
         "tags" : [ "ticket-controller" ]
       },
       "patch" : {
-        "operationId" : "update_1",
+        "operationId" : "patch_workspaces_ws_tickets_no",
         "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
           "in" : "path",
           "name" : "no",
           "required" : true,
@@ -1675,15 +1482,8 @@
     },
     "/api/opskit/v1/workspaces/{ws}/tickets/{no}/assign" : {
       "post" : {
-        "operationId" : "assign_1",
+        "operationId" : "post_workspaces_ws_tickets_no_assign",
         "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
           "in" : "path",
           "name" : "no",
           "required" : true,
@@ -1718,15 +1518,8 @@
     },
     "/api/opskit/v1/workspaces/{ws}/tickets/{no}/assignment" : {
       "post" : {
-        "operationId" : "externalAssignment",
+        "operationId" : "post_workspaces_ws_tickets_no_assignment",
         "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
           "in" : "path",
           "name" : "no",
           "required" : true,
@@ -1761,15 +1554,8 @@
     },
     "/api/opskit/v1/workspaces/{ws}/tickets/{no}/claim" : {
       "post" : {
-        "operationId" : "claim_1",
+        "operationId" : "post_workspaces_ws_tickets_no_claim",
         "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
           "in" : "path",
           "name" : "no",
           "required" : true,
@@ -1794,15 +1580,8 @@
     },
     "/api/opskit/v1/workspaces/{ws}/tickets/{no}/comments" : {
       "post" : {
-        "operationId" : "comment",
+        "operationId" : "post_workspaces_ws_tickets_no_comments",
         "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
           "in" : "path",
           "name" : "no",
           "required" : true,
@@ -1840,15 +1619,8 @@
     },
     "/api/opskit/v1/workspaces/{ws}/tickets/{no}/escalate" : {
       "post" : {
-        "operationId" : "escalate_1",
+        "operationId" : "post_workspaces_ws_tickets_no_escalate",
         "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
           "in" : "path",
           "name" : "no",
           "required" : true,
@@ -1883,15 +1655,8 @@
     },
     "/api/opskit/v1/workspaces/{ws}/tickets/{no}/merge" : {
       "post" : {
-        "operationId" : "merge",
+        "operationId" : "post_workspaces_ws_tickets_no_merge",
         "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
           "in" : "path",
           "name" : "no",
           "required" : true,
@@ -1926,15 +1691,8 @@
     },
     "/api/opskit/v1/workspaces/{ws}/tickets/{no}/pool" : {
       "post" : {
-        "operationId" : "pool_1",
+        "operationId" : "post_workspaces_ws_tickets_no_pool",
         "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
           "in" : "path",
           "name" : "no",
           "required" : true,
@@ -1969,15 +1727,8 @@
     },
     "/api/opskit/v1/workspaces/{ws}/tickets/{no}/timeline" : {
       "get" : {
-        "operationId" : "timeline_1",
+        "operationId" : "get_workspaces_ws_tickets_no_timeline",
         "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
           "in" : "path",
           "name" : "no",
           "required" : true,
@@ -2005,15 +1756,8 @@
     },
     "/api/opskit/v1/workspaces/{ws}/tickets/{no}/transitions/{code}" : {
       "post" : {
-        "operationId" : "transition_1",
+        "operationId" : "post_workspaces_ws_tickets_no_transitions_code",
         "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
           "in" : "path",
           "name" : "no",
           "required" : true,
@@ -2054,947 +1798,8 @@
     },
     "/api/opskit/v1/workspaces/{ws}/tickets/{no}/watchers" : {
       "put" : {
-        "operationId" : "watchers",
+        "operationId" : "put_workspaces_ws_tickets_no_watchers",
         "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
-          "in" : "path",
-          "name" : "no",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/WatchersBody"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/View"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "ticket-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/option-sets/{code}" : {
-      "put" : {
-        "operationId" : "publishOptionSet",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
-          "in" : "path",
-          "name" : "code",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/JsonNode"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/PublishDto"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "ticket-type-definition-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/ticket-stats/by-assignee" : {
-      "post" : {
-        "operationId" : "byAssignee",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/TicketQuery"
-              }
-            }
-          }
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "items" : {
-                    "$ref" : "#/components/schemas/RowDto"
-                  },
-                  "type" : "array"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "ticket-stats-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/ticket-stats/by-group" : {
-      "post" : {
-        "operationId" : "byGroup",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/GroupBody"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "items" : {
-                    "$ref" : "#/components/schemas/RowDto"
-                  },
-                  "type" : "array"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "ticket-stats-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/ticket-stats/open-count" : {
-      "post" : {
-        "operationId" : "openCount",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/TicketQuery"
-              }
-            }
-          }
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/CountDto"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "ticket-stats-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/ticket-stats/summary" : {
-      "post" : {
-        "operationId" : "summary",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/TicketQuery"
-              }
-            }
-          }
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "items" : {
-                    "$ref" : "#/components/schemas/CardDto"
-                  },
-                  "type" : "array"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "ticket-stats-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/ticket-types" : {
-      "get" : {
-        "operationId" : "types_1",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "items" : {
-                    "$ref" : "#/components/schemas/TypeDto"
-                  },
-                  "type" : "array"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "ticket-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/ticket-types/{code}" : {
-      "get" : {
-        "operationId" : "type_1",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
-          "in" : "path",
-          "name" : "code",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/TypeDto"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "ticket-controller" ]
-      },
-      "put" : {
-        "operationId" : "publishType_1",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
-          "in" : "path",
-          "name" : "code",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/JsonNode"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/PublishDto"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "ticket-type-definition-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/ticket-types/{code}/definition" : {
-      "get" : {
-        "operationId" : "definition_1",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
-          "in" : "path",
-          "name" : "code",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "type" : "string"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "ticket-type-definition-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/tickets" : {
-      "post" : {
-        "operationId" : "create_1",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/CreateBody"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/View"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "ticket-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/tickets/query" : {
-      "post" : {
-        "operationId" : "query_1",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/TicketQuery"
-              }
-            }
-          }
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/PageRow"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "ticket-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/tickets/reassign" : {
-      "post" : {
-        "operationId" : "reassign",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/BulkReassignRequest"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/BulkReassignResult"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "ticket-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/tickets/{no}" : {
-      "get" : {
-        "operationId" : "get_4",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
-          "in" : "path",
-          "name" : "no",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/View"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "ticket-controller" ]
-      },
-      "patch" : {
-        "operationId" : "update",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
-          "in" : "path",
-          "name" : "no",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/UpdateTicketRequest"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/View"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "ticket-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/tickets/{no}/assign" : {
-      "post" : {
-        "operationId" : "assign",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
-          "in" : "path",
-          "name" : "no",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/AssignBody"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/View"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "ticket-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/tickets/{no}/assignment" : {
-      "post" : {
-        "operationId" : "externalAssignment_1",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
-          "in" : "path",
-          "name" : "no",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/ExternalBody"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/View"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "ticket-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/tickets/{no}/claim" : {
-      "post" : {
-        "operationId" : "claim",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
-          "in" : "path",
-          "name" : "no",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/View"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "ticket-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/tickets/{no}/comments" : {
-      "post" : {
-        "operationId" : "comment_1",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
-          "in" : "path",
-          "name" : "no",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/CommentBody"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "items" : {
-                    "$ref" : "#/components/schemas/TimelineDto"
-                  },
-                  "type" : "array"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "ticket-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/tickets/{no}/escalate" : {
-      "post" : {
-        "operationId" : "escalate",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
-          "in" : "path",
-          "name" : "no",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/EscalateBody"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/View"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "ticket-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/tickets/{no}/merge" : {
-      "post" : {
-        "operationId" : "merge_1",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
-          "in" : "path",
-          "name" : "no",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/MergeBody"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/View"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "ticket-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/tickets/{no}/pool" : {
-      "post" : {
-        "operationId" : "pool",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
-          "in" : "path",
-          "name" : "no",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/ReasonBody"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/View"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "ticket-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/tickets/{no}/timeline" : {
-      "get" : {
-        "operationId" : "timeline",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
-          "in" : "path",
-          "name" : "no",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "items" : {
-                    "$ref" : "#/components/schemas/TimelineDto"
-                  },
-                  "type" : "array"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "ticket-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/tickets/{no}/transitions/{code}" : {
-      "post" : {
-        "operationId" : "transition",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
-          "in" : "path",
-          "name" : "no",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        }, {
-          "in" : "path",
-          "name" : "code",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/TransitionBody"
-              }
-            }
-          }
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/View"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "ticket-controller" ]
-      }
-    },
-    "/v1/workspaces/{ws}/tickets/{no}/watchers" : {
-      "put" : {
-        "operationId" : "watchers_1",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "actor",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Actor"
-          }
-        }, {
           "in" : "path",
           "name" : "no",
           "required" : true,
@@ -3027,5 +1832,8 @@
         "tags" : [ "ticket-controller" ]
       }
     }
-  }
+  },
+  "security" : [ {
+    "bearer" : [ ]
+  } ]
 }

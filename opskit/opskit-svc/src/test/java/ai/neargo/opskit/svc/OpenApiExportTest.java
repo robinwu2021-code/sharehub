@@ -87,6 +87,28 @@ class OpenApiExportTest {
         assertThat(stale).as("契约文件过期：带 -Dopskit.openapi.write=true 重跑本测试并提交").isEmpty();
     }
 
+    /**
+     * 两处 springdoc 默认行为会让契约不稳 / 不对：
+     * operationId 按方法名全局编号（query、query_1…），新加一个同名方法别的接口的 id 就变 —— 改为「方法 + 路径」确定生成；
+     * 控制器的 Actor 参数被当成查询参数 actor —— 它来自令牌，从契约里去掉。
+     */
+    private static void normalize(String path, String method, ObjectNode op) {
+        String rel = path.replaceFirst("^/api/opskit/v1", "").replaceAll("[{}]", "").replaceAll("[^A-Za-z0-9]+", "_").replaceAll("^_|_$", "");
+        op.put("operationId", method + "_" + rel);
+        JsonNode params = op.get("parameters");
+        if (params != null && params.isArray()) {
+            tools.jackson.databind.node.ArrayNode kept = op.putArray("parameters");
+            params.forEach(p -> {
+                if (!("query".equals(p.path("in").asText()) && "actor".equals(p.path("name").asText()))) {
+                    kept.add(p);
+                }
+            });
+            if (kept.isEmpty()) {
+                op.remove("parameters");
+            }
+        }
+    }
+
     /** 取该层的路径，再按 $ref 闭包带上用到的 schema；去掉随端口变化的 servers，键全排序保证稳定。 */
     private String render(JsonNode full, String layer, Set<String> unknownTags) throws Exception {
         ObjectNode doc = json.createObjectNode();
@@ -94,10 +116,21 @@ class OpenApiExportTest {
         ObjectNode info = doc.putObject("info");
         info.put("title", "OpsKit " + layer);
         info.put("version", "v1");
+        info.put("description", "同一套接口也挂在 /v1/workspaces/{ws}/… 下（别名）。认证：Authorization: Bearer <应用凭证 okk_… 或成员令牌>；"
+                + "操作人只来自令牌（应用凭证可在请求体带 onBehalfOf 代成员）。错误体 {error, message, args, traceId, errors?}，错误键见 docs/error-keys.json。");
+        ObjectNode bearer = doc.putObject("components").putObject("securitySchemes").putObject("bearer");
+        bearer.put("type", "http");
+        bearer.put("scheme", "bearer");
+        doc.putArray("security").addObject().putArray("bearer");
         ObjectNode paths = doc.putObject("paths");
         for (Map.Entry<String, JsonNode> p : full.get("paths").properties()) {
+            // /v1/… 是别名，只落 /api/opskit/v1/… 一份
+            if (!p.getKey().startsWith("/api/opskit/v1/") && !p.getKey().startsWith("/dev/")) {
+                continue;
+            }
             ObjectNode ops = json.createObjectNode();
             for (Map.Entry<String, JsonNode> op : p.getValue().properties()) {
+                normalize(p.getKey(), op.getKey(), (ObjectNode) op.getValue());
                 String tag = op.getValue().path("tags").path(0).asText("");
                 String owner = LAYER_OF_TAG.get(tag);
                 if (owner == null) {
@@ -126,7 +159,7 @@ class OpenApiExportTest {
             n.forEach(todo::push);
         }
         if (!used.isEmpty()) {
-            ObjectNode out = doc.putObject("components").putObject("schemas");
+            ObjectNode out = ((ObjectNode) doc.get("components")).putObject("schemas");
             used.forEach(name -> out.set(name, schemas.get(name)));
         }
         Object sorted = json.treeToValue(doc, Object.class);
