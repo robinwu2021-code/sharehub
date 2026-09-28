@@ -88,7 +88,10 @@ public class OpsKitDirectorySyncJob implements JobHandler {
                 groups.computeIfAbsent(code, k -> {
                     Map<String, Object> g = new LinkedHashMap<>();
                     g.put("code", code);
-                    g.put("name", a.agentName() == null ? a.agentNo() : a.agentName());
+                    // OpsKit 的组名是三语对象（GroupUpsert.name: Map），发字符串整批 400（9-28 生产首次同步实测）；
+                    // 代理名是专有名词，中英同值
+                    String n = a.agentName() == null ? a.agentNo() : a.agentName();
+                    g.put("name", Map.of("zh", n, "en", n));
                     g.put("kind", "TEAM");
                     return g;
                 });

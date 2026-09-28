@@ -40,5 +40,7 @@ class OpsKitDirectorySyncJobTest {
         assertThat(ms.get("agent-AG002")).containsExactly("P9");
         assertThat((List<Map<String, Object>>) b.get("groups")).extracting(g -> g.get("code") + "/" + g.get("kind"))
                 .containsExactly("agent-AG001/TEAM", "agent-AG002/TEAM");
+        assertThat(((List<Map<String, Object>>) b.get("groups")).get(0).get("name")).as("组名是三语对象，不是字符串")
+                .isEqualTo(Map.of("zh", "Alpha", "en", "Alpha"));
     }
 }
