@@ -187,3 +187,26 @@ describe("手工建单（21/06 §五 POST tickets）", () => {
     expect(() => createTicket({ typeCode: "ops", title: "x" }, NOW)).toThrow(/flow:ticket:handle/);
   });
 });
+
+describe("工单类型配置（GET …/definition ↔ PUT …/ticket-types/{code}）", () => {
+  it("取回原样保存不出新版本；改了才出；校验一次给全；保存后展示形（建单表单用的）立即更新", async () => {
+    const { getTicketTypeDefinition, saveTicketType, TICKET_TYPES } = await import("./mock-db");
+    const { isValidationError } = await import("./errors");
+    const def = getTicketTypeDefinition("ops");
+    expect(saveTicketType(def, false).created).toBe(false);
+
+    const bad = structuredClone(def);
+    bad.fields.push({ code: "source", name: {}, type: "SELECT", required: true, onCreate: false });
+    bad.assignment = { strategy: "QUEUE" };
+    let err: unknown;
+    try { saveTicketType(bad, false); } catch (e) { err = e; }
+    expect(isValidationError(err) && err.errors.map((x) => x.path).sort()).toEqual(
+      ["assignment.group", "fields[2].code", "fields[2].name", "fields[2].onCreate", "fields[2].options"]);
+
+    const ok = structuredClone(def);
+    ok.fields.push({ code: "floor", name: { zh: "楼层" }, type: "TEXT", required: false, onCreate: true });
+    expect(saveTicketType(ok, false).created).toBe(true);
+    expect(TICKET_TYPES.find((t) => t.code === "ops")!.fields.map((f) => f.code)).toContain("floor");
+    expect(getTicketTypeDefinition("ops").fields.map((f) => f.code)).toContain("floor");
+  });
+});

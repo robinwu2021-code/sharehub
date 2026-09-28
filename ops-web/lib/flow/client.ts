@@ -14,7 +14,7 @@ import type {
   AppRow, ApprovalTemplate, DefinitionVersionRow, DeliveryRow, PublishResult, QueueGroup, TemplateSummary, TemplateVersion,
   SlaPolicy, WorkCalendar, HistoryEntry, InstanceQuery, InstanceRow, ProcessStats, ProcessStatsQuery, SubjectHistory,
   ApprovalQuery, ApprovalRow, ApprovalStatus, ApprovalView, Member, Named, Page, QueueCount, QueueTask, TicketQuery,
-  CommentVisibility, CreateTicketRequest, CreateTicketResult, TicketTypeDef, ReassignResult, TicketRow, TicketStat, TicketView, TimelineEvent, TodoCount, TodoItem, TodoQuery, StartedApproval,
+  CommentVisibility, CreateTicketRequest, CreateTicketResult, TicketTypeDef, ReassignResult, TicketRow, TicketStat, TicketView, TimelineEvent, TodoCount, TodoItem, TodoQuery, StartedApproval, TicketTypeDefinition, ProcessCatalogRow,
 } from "./types";
 
 /** 模拟网络往返：让加载态、按钮 loading 在 mock 下也真实出现 */
@@ -53,6 +53,12 @@ const mockFlow = {
   // ── 选项（下拉）：一律异步，走 lib/flow/options.ts 的钩子 ──
   /** POST /workspaces/{ws}/members/query：改派候选 / 提交人筛选。给 total —— 超出一页时页面要说「只列了前 N 人」，不静默截断 */
   members: (): Promise<Page<Member>> => tick(() => ({ list: db.ASSIGNEE_OPTIONS, total: db.ASSIGNEE_OPTIONS.length })),
+  /** GET …/ticket-types/{code}/definition：原始定义（三语名称 · 选项集 · 派单 · SLA），与 PUT 同形 */
+  ticketTypeDefinition: (code: string): Promise<TicketTypeDefinition> => tick(() => db.getTicketTypeDefinition(code)),
+  /** PUT …/ticket-types/{code}：按代号幂等发布；内容不变 created=false */
+  saveTicketType: (def: TicketTypeDefinition, isNew = false): Promise<{ version: string; created: boolean }> => tick(() => db.saveTicketType(def, isNew)),
+  /** GET …/processes：流程目录（选工单类型挂哪个流程；审批模板编出来的不列） */
+  processCatalog: (): Promise<ProcessCatalogRow[]> => tick(() => db.processCatalog()),
   /** GET /workspaces/{ws}/ticket-types（名称已按语言选好） */
   ticketTypes: (): Promise<TicketTypeDef[]> => tick(() => db.TICKET_TYPES),
   /** 成员属性 partyType 的取值与显示名（21/07 O1-12 成员属性定义） */
@@ -182,6 +188,9 @@ const httpFlow: typeof mockFlow = {
     return { ...p, list: p.list.map(({ memberId, ...m }) => ({ ref: memberId, ...m })) };
   },
   ticketTypes: () => GET(ws("/ticket-types")),
+  ticketTypeDefinition: (code) => GET(ws(`/ticket-types/${enc(code)}/definition`)),
+  saveTicketType: (def) => PUT(ws(`/ticket-types/${enc(def.code)}`), def),
+  processCatalog: () => GET(ws("/processes")),
   /** GET /member-attributes 给全部属性定义，取 partyType 的取值与显示名 */
   partyOptions: async () => ((await GET<{ key: string; values: { value: string; name?: string }[] }[]>(ws("/member-attributes")))
     .find((a) => a.key === "partyType")?.values ?? []).map((v) => ({ code: v.value, name: v.name ?? v.value })),

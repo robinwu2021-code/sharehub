@@ -16,7 +16,7 @@ import { useLocaleStore } from "@/lib/stores/locale";
 import { FlowValidationError } from "./errors";
 import type {
   CommentVisibility, CreateTicketRequest, CreateTicketResult, Member, Named, Page, Priority, ReassignResult, SlaMetric, SlaState, SlaSummary, StatusCategory, TicketAction, TicketFilter,
-  TicketQuery, TicketRow, TicketStat, TicketTypeDef, TicketTypeField, TicketTypeOption, TicketView, TimelineEvent, TodoCount, TodoItem, TodoQuery,
+  TicketQuery, TicketRow, TicketStat, TicketTypeDef, TicketTypeField, TicketTypeOption, TicketView, TicketTypeDefinition, OptionSource, ProcessCatalogRow, I18nText, TimelineEvent, TodoCount, TodoItem, TodoQuery,
 } from "./types";
 
 const pickLang = (zh: string, en: string) => (useLocaleStore.getState().locale === "zh" ? zh : en);
@@ -604,6 +604,67 @@ export function createTicket(req: CreateTicketRequest, now: number = Date.now())
   tickets.push(rec);
   log(rec.ticketNo, now, "CREATED", "开单", ME, `手工建单 · 优先级 ${PRIO[prio].name}`);
   return { ticket: out(view(rec, now)), attached: false };
+}
+
+// ── 工单类型原始定义（GET …/ticket-types/{code}/definition · PUT …/ticket-types/{code}）──────────────
+// 初始由 TICKET_TYPES 生成；保存后同步刷新 TICKET_TYPES（展示形），建单表单与筛选立即用上新定义。
+const zhName = (t: I18nText) => t.zh || t.en || t.ar || "";
+const inlineOf = (o: TicketTypeOption[]) => ({ inline: o.map((x) => ({ code: x.code, name: { zh: x.name } as I18nText })) });
+let ticketTypeDefs: TicketTypeDefinition[] = TICKET_TYPES.map((t) => ({
+  code: t.code, name: { zh: t.name }, processCode: "ticket_flow", numberPrefix: NO_PREFIX[t.code] ?? "TK",
+  fields: t.fields.map((f) => ({ code: f.code, name: { zh: f.name }, type: f.type, required: f.required, onCreate: f.onCreate,
+    filterable: f.filterable, ...(f.options ? { options: inlineOf(f.options) } : {}) })),
+  priorityOptions: inlineOf(t.priorityOptions), resolutionOptions: { inline: [{ code: "FIXED", name: { zh: "已修复" } }] },
+  assignment: { strategy: "MANUAL" }, slaPolicies: [],
+}));
+const STRATEGIES = ["MANUAL", "QUEUE", "ROUND_ROBIN", "LEAST_LOADED"];
+
+export function getTicketTypeDefinition(code: string): TicketTypeDefinition {
+  requirePerm("flow:config:manage");
+  const d = ticketTypeDefs.find((x) => x.code === code);
+  if (!d) notFound("工单类型", "Ticket type", code);
+  return structuredClone(d);
+}
+
+/** 流程目录（GET …/processes）：工单类型只能挂非模板流程 */
+export function processCatalog(): ProcessCatalogRow[] {
+  return [{ code: "ticket_flow", name: { zh: "工单流程", en: "Ticket flow" }, version: "v1", enabled: true, fromTemplate: false }];
+}
+
+export function saveTicketType(def: TicketTypeDefinition, isNew: boolean): { version: string; created: boolean } {
+  requirePerm("flow:config:manage");
+  const e: { path: string; error: string }[] = [];
+  const opts = (o?: OptionSource) => o?.set ? 1 : (o?.inline ?? []).length;
+  if (!/^[a-z][a-z0-9_-]{1,31}$/.test(def.code)) e.push({ path: "code", error: pickLang("代号 2–32 位，小写字母开头，只含小写字母、数字、- 和 _", "Code: 2–32 chars, lowercase letter first") });
+  else if (isNew && ticketTypeDefs.some((x) => x.code === def.code)) e.push({ path: "code", error: pickLang("代号已存在", "Code already exists") });
+  if (!zhName(def.name)) e.push({ path: "name", error: pickLang("名称必填", "Name is required") });
+  if (!def.processCode) e.push({ path: "processCode", error: pickLang("要选一个工单流程", "Pick a ticket process") });
+  if (!opts(def.priorityOptions)) e.push({ path: "priorityOptions", error: pickLang("至少一个优先级", "At least one priority") });
+  def.fields.forEach((f, i) => {
+    if (!/^[a-zA-Z][a-zA-Z0-9_]{0,31}$/.test(f.code)) e.push({ path: `fields[${i}].code`, error: pickLang("字段代号格式不对", "Invalid field code") });
+    else if (def.fields.findIndex((x) => x.code === f.code) !== i) e.push({ path: `fields[${i}].code`, error: pickLang("字段代号重复", "Duplicate field code") });
+    if (!zhName(f.name)) e.push({ path: `fields[${i}].name`, error: pickLang("字段名称必填", "Field name is required") });
+    if ((f.type === "SELECT" || f.type === "MULTI_SELECT") && !opts(f.options)) e.push({ path: `fields[${i}].options`, error: pickLang("下拉字段至少一个选项", "At least one option") });
+    if (f.required && !f.onCreate) e.push({ path: `fields[${i}].onCreate`, error: pickLang("必填字段必须建单时可填", "Required fields must be settable on create") });
+  });
+  const st = def.assignment?.strategy ?? "MANUAL";
+  if (!STRATEGIES.includes(st)) e.push({ path: "assignment.strategy", error: pickLang("派单策略不存在", "Unknown strategy") });
+  else if (st !== "MANUAL" && !def.assignment?.group) e.push({ path: "assignment.group", error: pickLang("这个派单策略要指定一个组", "This strategy needs a group") });
+  if (e.length) throw new FlowValidationError(pickLang(`保存被拒：有 ${e.length} 处需要修改`, `Rejected: ${e.length} field(s) to fix`), e);
+
+  const i = ticketTypeDefs.findIndex((x) => x.code === def.code);
+  const before = i >= 0 ? JSON.stringify(ticketTypeDefs[i]) : "";
+  const changed = before !== JSON.stringify(def);
+  if (i >= 0) ticketTypeDefs[i] = structuredClone(def); else ticketTypeDefs.push(structuredClone(def));
+  const toOpts = (o?: OptionSource): TicketTypeOption[] => (o?.inline ?? []).map((x) => ({ code: x.code, name: zhName(x.name), enabled: x.enabled !== false }));
+  const view: TicketTypeDef = {
+    code: def.code, name: zhName(def.name), enabled: true, priorityOptions: toOpts(def.priorityOptions),
+    fields: def.fields.map((f) => ({ code: f.code, name: zhName(f.name), type: f.type, required: f.required, onCreate: f.onCreate,
+      filterable: f.filterable, ...(f.options ? { options: toOpts(f.options) } : {}) })),
+  };
+  const vi = TICKET_TYPES.findIndex((x) => x.code === def.code);
+  if (vi >= 0) TICKET_TYPES[vi] = view; else TICKET_TYPES.push(view);
+  return { version: `v${Math.abs([...JSON.stringify(def)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 7)).toString(16)}`, created: changed };
 }
 
 // 放在文件末尾：种子要用到上面定义的 ASSIGNEE_OPTIONS 与 log（const 有暂时性死区）

@@ -375,8 +375,10 @@ export const SCENARIOS = [
   {
     id: "S8-1", title: "SLA 策略：不改再发布幂等；改时限生成新版本；兜底行不在最后被拒并指到字段", perms: ALL, as: "admin", url: () => "/flow/settings/",
     run: async (h) => {
-      await h.waitFor(() => h.all("main table").length && h.btn("编辑"), "SLA 策略列表");
-      h.btn("编辑").click();
+      // 页面上还有工单类型区块（也有「编辑」）：只点 SLA 那一块的
+      const slaEdit = () => h.all("main button").find((b) => h.txt(b) === "编辑" && !b.closest("[data-slot=ticket-types]"));
+      await h.waitFor(() => h.all("main table").length && slaEdit(), "SLA 策略列表");
+      slaEdit().click();
       const ed = await h.waitFor(() => h.one("[data-slot=sla-editor]"), "编辑器");
       await h.click("[data-slot=sla-editor] button", "保存并发布");
       await h.toast(/没有变化/, "内容没有变化");
@@ -395,6 +397,27 @@ export const SCENARIOS = [
       } else {
         h.step("该策略只有一行，跳过兜底行校验");
       }
+    },
+  },
+
+  {
+    id: "S8-2", title: "工单类型：原样保存不出新版本；加一个字段才出新版本", perms: ALL, as: "admin", url: () => "/flow/settings/",
+    run: async (h) => {
+      const card = await h.waitFor(() => h.one("[data-slot=ticket-types]"), "工单类型区块");
+      const edit = await h.waitFor(() => [...card.querySelectorAll("tbody button")].find((b) => /编辑/.test(h.txt(b))), "类型列表加载");
+      edit.click();
+      const ed = await h.waitFor(() => h.one("[data-slot=ticket-type-editor]"), "编辑器");
+      await h.click("[data-slot=ticket-type-editor] button", "保存并发布");
+      await h.toast(/没有变化/, "内容没有变化");
+      await h.click("[data-slot=ticket-type-editor] button", "添加字段");
+      const codes = await h.waitFor(() => { const x = ed.querySelectorAll("input[aria-label=字段代号]"); return x.length ? x : null; }, "新字段行");
+      const code = `e2e${Date.now() % 100000}`;
+      h.fill(codes[codes.length - 1], code);
+      const names = ed.querySelectorAll("input[aria-label=字段名称]");
+      h.fill(names[names.length - 1], "e2e 字段");
+      await h.click("[data-slot=ticket-type-editor] button", "保存并发布");
+      await h.toast(/已发布新版本/, "已发布新版本");
+      h.expect(true, `新字段 ${code} 已发布`);
     },
   },
 

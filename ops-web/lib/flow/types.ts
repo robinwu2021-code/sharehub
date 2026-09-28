@@ -179,6 +179,41 @@ export interface TicketTypeDef extends Named {
   fields: TicketTypeField[];
 }
 
+// ── 工单类型的原始定义（GET …/ticket-types/{code}/definition ↔ PUT …/ticket-types/{code}，同形）────────
+// 与 TicketTypeDef（按语言选好名字的展示形）不同：这里是三语名称、选项集引用、派单策略、SLA 引用的原样。
+// 编辑器在副本上改，**不认识的键原样保留**（scopeFrom / mergeTransition…），提交回去不丢配置。
+
+/** 选项来源：内联一组选项，或引用一个选项集（引用时编辑器只读展示） */
+export interface OptionSource { inline?: { code: string; name: I18nText; enabled?: boolean }[]; set?: string }
+
+export interface TicketFieldDefinition {
+  code: string;
+  name: I18nText;
+  type: TicketFieldType;
+  required: boolean;
+  onCreate: boolean;
+  filterable?: boolean;
+  options?: OptionSource;
+  [k: string]: unknown;
+}
+
+export interface TicketTypeDefinition {
+  code: string;
+  name: I18nText;
+  processCode: string;
+  numberPrefix?: string;
+  fields: TicketFieldDefinition[];
+  priorityOptions?: OptionSource;
+  resolutionOptions?: OptionSource;
+  /** MANUAL = 建单不自动派；QUEUE / ROUND_ROBIN / LEAST_LOADED 必须给 group */
+  assignment?: { strategy: string; group?: string; [k: string]: unknown };
+  slaPolicies?: string[];
+  [k: string]: unknown;
+}
+
+/** 流程目录一行（GET …/processes）。fromTemplate = 审批模板编出来的，工单类型不该挂它 */
+export interface ProcessCatalogRow { code: string; name: I18nText; version: string; enabled: boolean; fromTemplate: boolean }
+
 /**
  * 建单（21/06 §五 POST /workspaces/{ws}/tickets）。类型字段走 fields（原始值：选项给代号、多选给代号数组、数字给数值），
  * 必填与可填范围按类型的字段配置（onCreate）；界面上的「手工建单」只收其中五种字段类型。

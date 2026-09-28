@@ -10,6 +10,7 @@ import { useFlowT } from "@/lib/flow/i18n";
 import type { QueueGroup, WorkCalendar } from "@/lib/flow/types";
 import { FLOW_USE_HTTP } from "@/lib/flow/http";
 import { SlaPolicies } from "@/components/flow/sla-policies";
+import { TicketTypes } from "@/components/flow/ticket-types";
 import { notify } from "@/lib/notify";
 import { PageTitle } from "@/components/ui/misc";
 import { Card } from "@/components/ui/card";
@@ -101,6 +102,7 @@ function FlowSettings() {
       <PageTitle title={tc("page.settings")} desc={tt("desc")} />
       <Notice>{tt("notice")}</Notice>
 
+      <TicketTypes />
       <SlaPolicies calendarsDemo={FLOW_USE_HTTP} />
 
 
