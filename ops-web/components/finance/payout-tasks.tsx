@@ -20,6 +20,7 @@ import { ReadOnlyNotice } from "@/components/read-only-notice";
 import { useCan } from "@/lib/hooks/use-can";
 import { notify } from "@/lib/notify";
 import { money, fmtTime } from "@/lib/utils";
+import { PAGE_SIZE } from "@/lib/constants";
 import type {
   PayoutBlockedReason, PayoutPreviewItem, PayoutTask, PayoutTaskItem, PayoutTaskStatus, WithdrawalStatus,
 } from "@/lib/types";
@@ -65,7 +66,7 @@ export function PayoutTasks() {
   const [cutoff, setCutoff] = useState(lastMonthEnd());
   const [openNo, setOpenNo] = useState<string | null>(null);
 
-  const listQ = useQuery({ queryKey: ["fin", "payout-tasks"], queryFn: () => api.listPayoutTasks({ page: 1, size: 20 }) });
+  const listQ = useQuery({ queryKey: ["fin", "payout-tasks"], queryFn: () => api.listPayoutTasks({ page: 1, size: PAGE_SIZE }) });
   const previewQ = useQuery({
     queryKey: ["fin", "payout-preview", cutoff],
     queryFn: () => api.previewPayoutTask(cutoff),

@@ -22,7 +22,9 @@ const API_METHODS: Record<string, readonly string[]> = {
   agent: ["listAgents", "saveAgent", "grantAgentLogin", "listAgentAssignments", "listAgentPerformance", "listAgentAccounts", "saveAgentAccount", "listAgentApplies", "acceptAgentApply", "auditAgentApply", "createAgentApply", "sendApplyOtp", "selfServiceApply", "myApply", "listAssignableAssets", "assignAgentAssets", "reclaimAgentAssets", "listAgentAssignmentRecords", "listAgentCommissions", "saveAgentCommission", "archiveAgent", "unarchiveAgent", "getAgentAccount", "getAgentCommission", "startAgentExit", "getAgentExit", "getAgentOpenExit", "agentExitGate", "advanceAgentExit", "listAgentOpsAssessments"],
   order: ["listOrders", "getOrder", "interveneOrder", "listOrderInterventions", "listOrderEvents", "listOrderExceptions", "handleOrderException", "listDepositRecords", "releaseDeposit", "buyoutDeposit", "dunArrears", "listOrderComplaints", "createOrderComplaint", "handleOrderComplaint", "raiseComplaintWorkOrder", "listRefundRecords", "createRefund", "auditRefund", "listReservations", "cancelReservation", "listFreeOrders", "getFreeOrderStats"],
   pricing: ["listPricePlans", "listPricingSchedules", "savePricePlan", "savePricingSchedule", "listPlanScopes", "savePlanScope", "removePlanScope", "archivePricePlan", "unarchivePricePlan"],
-  finance: ["listShareRules", "listLedger", "getVoucher", "createVoucher", "listSettlements", "listWithdrawals", "auditWithdrawal", "payWithdrawal", "resubmitWithdrawalApproval", "retryWithdrawalApprovalEffect", "applyWithdrawal", "generateSettlements", "confirmSettlement", "listSettlementRecords", "listShareRecords", "listReconciles", "listInvoices", "getInvoice", "saveShareRule", "saveInvoice", "listReconDiffs", "handleRecon", "getReconStats", "issueInvoice", "voidInvoice", "listShareSummaries", "listRechargeOrders", "listPayoutAccounts", "savePayoutAccount", "disablePayoutAccount", "getSettlement", "getSettlementStatement", "getSettlementStatementHtml", "listSettlementAdjustments", "confirmSettlementAdjustment", "voidSettlementAdjustment"],
+  finance: ["listShareRules", "listLedger", "getVoucher", "createVoucher", "listSettlements", "listWithdrawals", "auditWithdrawal", "payWithdrawal", "resubmitWithdrawalApproval", "retryWithdrawalApprovalEffect", "applyWithdrawal", "generateSettlements", "confirmSettlement", "listSettlementRecords", "listShareRecords", "listReconciles", "listInvoices", "getInvoice", "saveShareRule", "saveInvoice", "listReconDiffs", "handleRecon", "getReconStats", "issueInvoice", "voidInvoice", "listShareSummaries", "listRechargeOrders", "listPayoutAccounts", "savePayoutAccount", "disablePayoutAccount", "getSettlement", "getSettlementStatement", "getSettlementStatementHtml", "listSettlementAdjustments", "confirmSettlementAdjustment", "voidSettlementAdjustment",
+    // 付款任务（V158，商家一期 B4）
+    "previewPayoutTask", "createPayoutTask", "listPayoutTasks", "getPayoutTask", "auditPayoutTask", "exportPayoutTask", "confirmPayoutTask"],
   user: ["listUsers", "setBlacklist", "getUserProfile", "listMembers", "listWallets", "listWalletTxns", "saveMember", "listMemberPlans", "saveMemberPlan", "enableMemberPlan", "disableMemberPlan", "listMemberBenefits", "saveMemberBenefit", "listMemberCards", "grantMemberCard", "saveWallet", "listConsumerSegments", "listUserRisks", "listUserBlacklist", "adjustCreditScore", "listCreditScoreChanges", "listFreeWhitelist", "saveFreeWhitelist", "revokeFreeWhitelist", "listRechargePackages", "saveRechargePackage", "archiveRechargePackage", "unarchiveRechargePackage", "listLogoffs", "revokeLogoff", "listCUserInvoices", "issueCUserInvoice", "rejectCUserInvoice"],
   marketing: ["listCoupons", "saveCoupon", "issueCoupon", "listCouponIssueRecords", "listCampaigns", "listPushMessages", "listReferrals", "listAdSlots", "listAdCampaigns", "listAdDeliveries", "transitionAdCampaign", "listReferralRules", "saveReferralRule", "saveCampaign", "transitionCampaign", "savePushMessage", "sendPushMessage", "finishPushMessage", "saveAdSlot", "saveAdCampaign", "listNotices", "saveNotice", "transitionNotice", "archiveCoupon", "unarchiveCoupon", "archiveNotice", "unarchiveNotice"],
   cs: ["listCsTickets", "getCsTicket", "listCsSessions", "saveCsTicket", "refundCsTicket", "woCsTicket", "listCsMessages", "replyCsSession"],
@@ -83,7 +85,7 @@ describe("域切片划分", () => {
     expect(sorted(keysOf((HTTP_SLICES as Record<string, object>)[domain]))).toEqual(expected);
   });
 
-  it("方法总数仍为 417（新增/删除 API 时须自觉更新此数）", () => {
+  it("方法总数仍为 424（新增/删除 API 时须自觉更新此数）", () => {
     // 2026-09-23：差异化定价 2 个退役，适用范围 3 个新增（ADR-028 / V49），净 +1。
     // 2026-09-23 B1：品牌四个端点（list/save/archive/unarchive）。
         // 2026-09-23 A2-1：站点伙伴责任三个端点。
@@ -121,6 +123,6 @@ describe("域切片划分", () => {
     // 415：+1 = fileBlobUrl（带鉴权取个人数据文件的字节，2026-09-28）——
     //      PII 不发签名地址，<img> 又发不了 Authorization 头
     // 2026-09-28 M5 提现送 OpsKit：重新送审 / 重试生效（+2）；标题里的数此前停在 367，一并改正
-    expect(ALL_METHODS.length).toBe(417);
+    expect(ALL_METHODS.length).toBe(424);
   });
 });
