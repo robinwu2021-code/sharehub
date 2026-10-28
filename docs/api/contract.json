@@ -16402,6 +16402,44 @@
   },
   {
    "verb": "GET",
+   "path": "/api/ops/merchant-revenue/alerts",
+   "perm": "dashboard:overview:read",
+   "perms": [
+    "dashboard:overview:read"
+   ],
+   "handler": "MerchantRevenueController#alerts",
+   "summary": "设备提醒：在用设备里离线几台、在线但没有可借电池几台，各带最多 20 个柜号供点进去处理。",
+   "params": [],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.dev.service.impl.DeviceAlertQuery.DeviceAlerts",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.dev.service.impl.DeviceAlertQuery.DeviceAlerts",
+   "responseShape": [
+    {
+     "name": "deployed",
+     "type": "long"
+    },
+    {
+     "name": "offline",
+     "type": "long"
+    },
+    {
+     "name": "noBorrowable",
+     "type": "long"
+    },
+    {
+     "name": "offlineSample",
+     "type": "List<String>"
+    },
+    {
+     "name": "noBorrowableSample",
+     "type": "List<String>"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
    "path": "/api/ops/merchant-revenue/by-device",
    "perm": "dashboard:overview:read",
    "perms": [
@@ -49203,10 +49241,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 554,
-  "records": 517,
-  "withPerm": 474,
+  "endpoints": 555,
+  "records": 518,
+  "withPerm": 475,
   "withBody": 233,
-  "shapedResponses": 432
+  "shapedResponses": 433
  }
 }

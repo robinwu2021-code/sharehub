@@ -107,3 +107,15 @@ export interface RevenueByDevice {
   orderCount: number;
   gross: number;
 }
+
+/**
+ * 营收首页设备提醒（后端 `DeviceAlertQuery.DeviceAlerts`，`GET /api/ops/merchant-revenue/alerts`）。
+ * 只数在用设备；离线与「在线无可借」互斥。样本最多 20 个柜号。按「现在」，不随时间窗口变。
+ */
+export interface DeviceAlerts {
+  deployed: number;
+  offline: number;
+  noBorrowable: number;
+  offlineSample: string[];
+  noBorrowableSample: string[];
+}

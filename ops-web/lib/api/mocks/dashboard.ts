@@ -7,7 +7,7 @@ import { fail } from "../../biz-error";
 import { currentAuth, type Role } from "../../auth";
 import * as menuDb from "../../mock/db/menu";
 import { opsFlowMetrics } from "../../mock/db/ops-flow-metrics";
-import { revenueByDevice, revenueSummary, revenueTrend } from "../../mock/db/merchant-revenue";
+import { revenueAlerts, revenueByDevice, revenueSummary, revenueTrend } from "../../mock/db/merchant-revenue";
 
 /** 商家会话收窄到当前主体，与后端数据范围同口径；员工会话看全部。 */
 const revenueScope = () => {
@@ -104,4 +104,5 @@ export const dashboardMock: DashboardApi = {
   getRevenueSummary: async (q) => wait(revenueSummary(revenueScope(), q ?? {})),
   getRevenueTrend: async (q) => wait(revenueTrend(revenueScope(), q ?? {})),
   getRevenueByDevice: async (q) => wait(revenueByDevice(revenueScope(), q ?? {})),
+  getRevenueAlerts: async () => wait(revenueAlerts(revenueScope())),
 };

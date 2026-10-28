@@ -1,5 +1,5 @@
 // 覆盖范围：认证登录 + 工作台首页统计。
-import type { DashboardStats, OpsFlowMetrics, RevenueByDevice, RevenueDay, RevenueSummary } from "../../types";
+import type { DashboardStats, DeviceAlerts, OpsFlowMetrics, RevenueByDevice, RevenueDay, RevenueSummary } from "../../types";
 
 /** 一个人在某运营主体下的成员关系（ADR-030）。仅 AGENT realm 返回。 */
 export interface OperatorRef { operatorNo: string; name: string; isOwner: boolean; isPrimary: boolean; }
@@ -144,4 +144,6 @@ export interface DashboardApi {
   getRevenueTrend(q?: RevenueWindow): Promise<RevenueDay[]>;
   /** 按设备排行，`limit` 缺省 10。 */
   getRevenueByDevice(q?: RevenueWindow & { limit?: number }): Promise<RevenueByDevice[]>;
+  /** 设备提醒：在用设备里离线、在线无可借各几台，带柜号样本。 */
+  getRevenueAlerts(): Promise<DeviceAlerts>;
 }

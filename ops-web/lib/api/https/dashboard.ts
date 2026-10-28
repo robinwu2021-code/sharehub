@@ -22,4 +22,5 @@ export const dashboardHttp: DashboardApi = {
   getRevenueSummary: (q) => client.get("/api/ops/merchant-revenue/summary", q),
   getRevenueTrend: (q) => client.get("/api/ops/merchant-revenue/trend", q),
   getRevenueByDevice: (q) => client.get("/api/ops/merchant-revenue/by-device", q),
+  getRevenueAlerts: () => client.get("/api/ops/merchant-revenue/alerts"),
 };

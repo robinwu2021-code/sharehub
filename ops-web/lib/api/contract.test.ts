@@ -12,7 +12,7 @@ import { httpApi, HTTP_SLICES } from "./http";
 
 /** Api interface 的运行时锚：按域分组，顺序与 contracts/*.ts 一致。 */
 const API_METHODS: Record<string, readonly string[]> = {
-  dashboard: ["login", "logout", "me", "getMenus", "getDashboard", "getOpsFlowMetrics", "getRevenueSummary", "getRevenueTrend", "getRevenueByDevice", "sendLoginOtp", "listOperators", "switchOperator", "changePassword"],
+  dashboard: ["login", "logout", "me", "getMenus", "getDashboard", "getOpsFlowMetrics", "getRevenueSummary", "getRevenueTrend", "getRevenueByDevice", "getRevenueAlerts", "sendLoginOtp", "listOperators", "switchOperator", "changePassword"],
   device: ["goLiveGate", "goLive", "markDeviceFault", "repairDevice", "undeployDevice", "retireDevice", "listTrialRents", "startTrialRent", "listProtections", "applyProtection", "releaseProtection", "listSignalCodes", "listCabinets", "getCabinet", "saveCabinet", "sendCommand", "listPowerbanks", "listCabinetMonitor", "listCommandRecords", "listInventoryTransfers", "getInventoryTransfer", "listOtaRollouts", "savePowerbank", "saveInventoryTransfer", "saveOtaRollout", "listOtaReleases", "saveOtaRelease", "listOtaTasks", "listDeviceLogs", "listDeviceCodeBatches", "saveDeviceCodeBatch", "archiveCabinet", "unarchiveCabinet", "archivePowerbank", "unarchivePowerbank", "importCabinets", "transitPowerbank", "inspectCabinet", "inspectPowerbank",
   // 疑似丢失核实（后端 V113）：失联满 7 天打标记，由人确认丢失或找回
   "confirmPowerbankLost", "dismissPowerbankLost", "listQcRecords", "setTransferItems", "shipTransfer", "receiveTransfer", "listAssetDiffs", "resolveAssetDiff", "issueDevices", "returnPoolDevices", "issuedSummary", "bindDevice", "bindDevices", "unbindDevice"],
@@ -126,6 +126,7 @@ describe("域切片划分", () => {
     // 433：+3 = 商家营收首页 summary / trend / by-device（商家一期 B5，2026-10-28）
     // 434：+1 = resendAgentInvite（重发开通邀请，2026-10-28）
     // 436：+2 = 商家资料 getMyProfile / updateMyContact（V175，2026-10-28）
-    expect(ALL_METHODS.length).toBe(436);
+    // 437：+1 = getRevenueAlerts（营收首页设备提醒，2026-10-28）
+    expect(ALL_METHODS.length).toBe(437);
   });
 });

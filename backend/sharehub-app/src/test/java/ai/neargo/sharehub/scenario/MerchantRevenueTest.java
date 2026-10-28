@@ -78,4 +78,26 @@ class MerchantRevenueTest extends ApiTestSupport {
         assertThat(get("/api/ops/merchant-revenue/summary?from=2002-03-31&to=2002-03-01", admin).status).isEqualTo(400);
         assertThat(get("/api/ops/merchant-revenue/summary?from=2001-01-01&to=2002-06-01", admin).status).isEqualTo(400);
     }
+
+    @Test
+    @DisplayName("★ 设备提醒：在用设备里离线与「在线无可借」分开数，各带柜号；仓里的柜子不算")
+    void device_alerts_count_deployed_only() {
+        String off = "CABAL" + tag + "1", empty = "CABAL" + tag + "2", stock = "CABAL" + tag + "3";
+        jdbc.update("INSERT INTO dev_cabinet (cabinet_no, tenant_id, sn, vendor_code, slot_total, available_count, online_status, status) "
+                + "VALUES (?, 'MAIN', ?, 'TEST', 8, 3, 'OFFLINE', 'DEPLOYED')", off, off);
+        jdbc.update("INSERT INTO dev_cabinet (cabinet_no, tenant_id, sn, vendor_code, slot_total, available_count, online_status, status) "
+                + "VALUES (?, 'MAIN', ?, 'TEST', 8, 0, 'ONLINE', 'DEPLOYED')", empty, empty);
+        jdbc.update("INSERT INTO dev_cabinet (cabinet_no, tenant_id, sn, vendor_code, slot_total, available_count, online_status, status) "
+                + "VALUES (?, 'MAIN', ?, 'TEST', 8, 0, 'OFFLINE', 'IN_STOCK')", stock, stock);
+
+        JsonNode a = get("/api/ops/merchant-revenue/alerts", login("ADMIN")).okData();
+        assertThat(a.path("offline").asLong()).isPositive();
+        assertThat(a.path("noBorrowable").asLong()).isPositive();
+        java.util.List<String> offs = new java.util.ArrayList<>(), empties = new java.util.ArrayList<>();
+        a.path("offlineSample").forEach(n -> offs.add(n.asText()));
+        a.path("noBorrowableSample").forEach(n -> empties.add(n.asText()));
+        long all = jdbc.queryForObject("SELECT COUNT(*) FROM dev_cabinet WHERE status = 'DEPLOYED' AND online_status = 'OFFLINE' AND deleted = 0", Long.class);
+        if (all <= 20) assertThat(offs).contains(off).doesNotContain(empty, stock);
+        assertThat(empties).doesNotContain(off, stock);
+    }
 }

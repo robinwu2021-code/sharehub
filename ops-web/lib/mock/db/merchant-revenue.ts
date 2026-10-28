@@ -2,7 +2,7 @@
 // 交易额 / 订单数按**已结算订单**、按结束时间落窗口；税前与我的分成按**分成明细**；
 // 钱的状态（待结算 / 已结算未付 / 已付）按现在，不随窗口变。
 // 商家会话只看自己的：订单经机柜的 agentNo 归属，分成与结算经 payeeNo。
-import type { RevenueByDevice, RevenueDay, RevenueSummary } from "../../types";
+import type { DeviceAlerts, RevenueByDevice, RevenueDay, RevenueSummary } from "../../types";
 import { fail } from "../../biz-error";
 import { cabinets } from "./device";
 import { orders } from "./order";
@@ -89,4 +89,14 @@ export function revenueByDevice(agentNo: string | null, q: { from?: string; to?:
     acc.set(o.cabinetNo, d);
   }
   return [...acc.values()].sort((a, b) => b.gross - a.gross).slice(0, q.limit ?? 10);
+}
+
+/** 设备提醒：与后端 DeviceAlertQuery 同口径（只数在用；离线与在线无可借互斥；样本 20）。 */
+export function revenueAlerts(agentNo: string | null): DeviceAlerts {
+  const mine = cabinets.filter((c) => c.status === "DEPLOYED" && (!agentNo || c.agentNo === agentNo));
+  const offline = mine.filter((c) => c.onlineStatus === "OFFLINE");
+  const empty = mine.filter((c) => c.onlineStatus === "ONLINE" && !(c.availableCount > 0));
+  const no = (xs: typeof mine) => xs.map((c) => c.cabinetNo).sort().slice(0, 20);
+  return { deployed: mine.length, offline: offline.length, noBorrowable: empty.length,
+    offlineSample: no(offline), noBorrowableSample: no(empty) };
 }

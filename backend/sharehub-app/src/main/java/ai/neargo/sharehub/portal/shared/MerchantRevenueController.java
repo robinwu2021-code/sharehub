@@ -30,8 +30,11 @@ public class MerchantRevenueController {
     private final OrderRevenueQuery orders;
     private final ShareRevenueQuery shares;
     private final BizClock clock;
+    private final ai.neargo.sharehub.dev.service.impl.DeviceAlertQuery devices;
 
-    public MerchantRevenueController(OrderRevenueQuery orders, ShareRevenueQuery shares, BizClock clock) {
+    public MerchantRevenueController(OrderRevenueQuery orders, ShareRevenueQuery shares, BizClock clock,
+                                     ai.neargo.sharehub.dev.service.impl.DeviceAlertQuery devices) {
+        this.devices = devices;
         this.orders = orders;
         this.shares = shares;
         this.clock = clock;
@@ -101,5 +104,15 @@ public class MerchantRevenueController {
                                  BigDecimal net, BigDecimal preTax, BigDecimal myShare,
                                  BigDecimal pending, BigDecimal settledUnpaid, BigDecimal paid,
                                  int prevOrderCount, BigDecimal prevGross, BigDecimal prevMyShare) {
+    }
+
+    /**
+     * 设备提醒：在用设备里离线几台、在线但没有可借电池几台，各带最多 20 个柜号供点进去处理。
+     * 按「现在」，不随时间窗口变。
+     */
+    @GetMapping("/api/ops/merchant-revenue/alerts")
+    @PreAuthorize("@perm.can('dashboard:overview:read')")
+    public ai.neargo.sharehub.dev.service.impl.DeviceAlertQuery.DeviceAlerts alerts() {
+        return devices.alerts();
     }
 }

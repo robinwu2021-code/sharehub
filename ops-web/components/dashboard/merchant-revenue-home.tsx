@@ -13,6 +13,7 @@ import { StatCard, Skeleton } from "@/components/ui/misc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { DateInput } from "@/components/ui/date-input";
+import { RefLink } from "@/components/ref-link";
 import { segmentedItemClass, segmentedTrackClass } from "@/components/ui/segmented";
 import { money } from "@/lib/utils";
 
@@ -62,6 +63,8 @@ export function MerchantRevenueHome() {
   const summary = useQuery({ queryKey: ["merchant-revenue", "summary", w], queryFn: () => api.getRevenueSummary(w), enabled });
   const trend = useQuery({ queryKey: ["merchant-revenue", "trend", w], queryFn: () => api.getRevenueTrend(w), enabled });
   const devices = useQuery({ queryKey: ["merchant-revenue", "by-device", w], queryFn: () => api.getRevenueByDevice({ ...w, limit: 10 }), enabled });
+  // 设备提醒按「现在」，与时间窗口无关，所以不进上面三个查询的键
+  const alerts = useQuery({ queryKey: ["merchant-revenue", "alerts"], queryFn: () => api.getRevenueAlerts() });
   const s = summary.data;
   const cur = "AED";
 
@@ -125,6 +128,17 @@ export function MerchantRevenueHome() {
         </>
       )}
 
+      {/* 设备提醒（§10.2）：离线、在线却借不出 —— 两件都在直接少收钱。点柜号进详情处理；都没有就不占地方 */}
+      {alerts.data && (alerts.data.offline > 0 || alerts.data.noBorrowable > 0) && (
+        <Card>
+          <CardHeader><CardTitle>需要处理的设备（截至现在）</CardTitle></CardHeader>
+          <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <AlertGroup label="离线" hint="设备连不上，用户借不了也还不了" count={alerts.data.offline} nos={alerts.data.offlineSample} />
+            <AlertGroup label="无可借电池" hint="在线但没有可借的充电宝，需要补货" count={alerts.data.noBorrowable} nos={alerts.data.noBorrowableSample} />
+          </CardContent>
+        </Card>
+      )}
+
       {!customBad && (
         <Card>
           <CardHeader><CardTitle>按天交易额与订单数</CardTitle></CardHeader>
@@ -182,6 +196,22 @@ export function MerchantRevenueHome() {
             )}
           </CardContent>
         </Card>
+      )}
+    </div>
+  );
+}
+
+function AlertGroup({ label, hint, count, nos }: { label: string; hint: string; count: number; nos: string[] }) {
+  return (
+    <div className="rounded-card border border-border p-4">
+      <p className="txt-body text-muted-foreground">{label}</p>
+      <p className="mt-1 txt-display tabular-nums">{count} 台</p>
+      <p className="mt-1 txt-caption text-muted-foreground">{hint}</p>
+      {count > 0 && (
+        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+          {nos.map((no) => <RefLink key={no} kind="cabinet" no={no} />)}
+          {count > nos.length && <span className="txt-caption text-muted-foreground">等 {count} 台</span>}
+        </div>
       )}
     </div>
   );
