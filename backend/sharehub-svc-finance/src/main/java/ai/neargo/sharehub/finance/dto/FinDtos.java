@@ -49,7 +49,10 @@ public final class FinDtos {
     public record ShareRecord(String recordNo, String orderNo, String dimension, String payeeNo,
                               String payeeName, String basis, BigDecimal amount, BigDecimal rate,
                               String currency, String mode, String status, String settleNo,
-                              String createdAt, String period, BigDecimal grossAmount) {
+                              String createdAt, String period, BigDecimal grossAmount,
+                              /* G22（V155 起有数）：基数口径 PRE_TAX/GROSS、税率百分数、税前基数；V155 之前的旧明细为 null。
+                               * refundNo 非空 = 退款冲回行（V170，金额为负） */
+                              String baseMode, BigDecimal taxRate, BigDecimal baseAmount, String refundNo) {
     }
 
     /**

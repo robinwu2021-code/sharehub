@@ -38781,6 +38781,22 @@
     {
      "name": "grossAmount",
      "type": "BigDecimal"
+    },
+    {
+     "name": "baseMode",
+     "type": "String"
+    },
+    {
+     "name": "taxRate",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "baseAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "refundNo",
+     "type": "String"
     }
    ],
    "requestShape": null

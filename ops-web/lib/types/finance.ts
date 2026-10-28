@@ -368,6 +368,15 @@ export interface ShareRecord {
   /** 归属结算周期 `2026-07`（= createdAt 所在月，冗余一列便于按周期汇总与筛选）。 */
   period: string;
   createdAt: string;
+  /**
+   * G22：分成基数口径与快照（V155 起有数；之前的旧明细为 null，页面显示「—」）。
+   * `PRE_TAX` 税前：基数 = 实收 ÷ (1 + 税率)；`GROSS` 含税：基数 = 实收。`taxRate` 是**百分数**（5 = 5%）。
+   */
+  baseMode?: "PRE_TAX" | "GROSS" | null;
+  taxRate?: number | null;
+  baseAmount?: number | null;
+  /** 非空 = 退款冲回行（V170，金额为负），值是退款单号。 */
+  refundNo?: string | null;
 }
 // —— 对账 · 差错处理（trade 域 · S2）——
 // `status` 是**比对结果**（跑批算出来的，人改不了）；`handleStatus` 是**处置进度**（人推动的）。

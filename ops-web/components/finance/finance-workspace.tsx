@@ -890,7 +890,13 @@ export function FinanceWorkspace({ path, tabKeys }: {
   ];
 
   const recordCols: Column<ShareRecord>[] = [
-    { header: "明细号", cell: (r) => <span className="txt-strong">{r.recordNo}</span> },
+    { header: "明细号", cell: (r) => (
+      <div>
+        <span className="txt-strong">{r.recordNo}</span>
+        {/* 退款冲回行（V170）：金额为负，标出来源退款单，免得被当成算错 */}
+        {r.refundNo && <div className="txt-caption text-muted-foreground">退款冲回 · {r.refundNo}</div>}
+      </div>
+    ) },
     { header: "订单", cell: (r) => <span className="text-muted-foreground tabular-nums">{r.orderNo}</span> },
     // 加「模式」列后这一列被挤到竖排成「场/地/方」，nowrap 让它宁可撑宽表也别折行
     { header: "维度", className: "whitespace-nowrap", cell: (r) => PAYEE_TYPE_LABEL[r.dimension] },
@@ -905,7 +911,15 @@ export function FinanceWorkspace({ path, tabKeys }: {
     // 依据：同一单同一伙伴可能有两条（出资 + 运维），不显示这列就分不清哪条是哪条
     { header: "依据", cell: (r) => r.basis ? SHARE_BASIS_LABEL[r.basis] ?? r.basis : <span className="text-muted-foreground">—</span> },
     // 基数与比例并排：金额对不上时，一眼看出是基数错还是比例错
-    { header: "基数", className: "text-right", cell: (r) => <span className="tabular-nums text-muted-foreground">{money(r.grossAmount, r.currency)}</span> },
+    // G22：实收（含税）→ 税率 → 税前基数 → × 比例 = 金额，四列连起来一行能自己验算。
+    // 旧明细（V155 前）没有快照，税率与税前基数显示「—」，基数就是实收
+    { header: "实收", className: "text-right", cell: (r) => <span className="tabular-nums text-muted-foreground">{money(r.grossAmount, r.currency)}</span> },
+    { header: "税率", className: "text-right whitespace-nowrap", cell: (r) => r.taxRate == null
+      ? <span className="text-muted-foreground">—</span>
+      : <span className="tabular-nums">{r.baseMode === "GROSS" ? "含税计" : `${Number(r.taxRate)}%`}</span> },
+    { header: "税前基数", className: "text-right", cell: (r) => r.baseAmount == null
+      ? <span className="text-muted-foreground">—</span>
+      : <span className="tabular-nums">{money(r.baseAmount, r.currency)}</span> },
     { header: "金额", className: "text-right", cell: (r) => <span className="tabular-nums">{money(r.amount, r.currency)}</span> },
     { header: "比例", className: "text-right", cell: (r) => <span className="tabular-nums">{(r.rate * 100).toFixed(0)}%</span> },
     // 「这笔结没结、算进哪张单」是财务对账第一个问的

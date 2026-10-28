@@ -65,6 +65,15 @@ class RefundShareReversalTest extends ApiTestSupport {
         assertThat(rev.get("source_no")).isEqualTo("SRRV" + o);
         assertThat(jdbc.queryForObject("SELECT amount FROM share_record WHERE record_no = ?", BigDecimal.class, "SRRV" + o))
                 .as("原行是当时的事实，不改").isEqualByComparingTo("6.00");
+
+        // G22：明细接口带出口径快照与冲回来源，页面据此显示「税率、税前基数」与「退款冲回」
+        com.fasterxml.jackson.databind.JsonNode list = get("/api/trade/share-records?page=1&size=20&keyword=" + o, login("FINANCE"))
+                .okData().path("list");
+        com.fasterxml.jackson.databind.JsonNode back = null;
+        for (com.fasterxml.jackson.databind.JsonNode n : list) if (!n.path("refundNo").isNull() && n.has("refundNo")) back = n;
+        assertThat(back).as("冲回行在列表里且带 refundNo").isNotNull();
+        assertThat(back.has("baseAmount")).isTrue();
+        assertThat(back.has("taxRate")).isTrue();
     }
 
     @Test

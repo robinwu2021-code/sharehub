@@ -85,12 +85,15 @@ export const shareRecords: ShareRecord[] = SHARE_PERIODS.flatMap((period, pi) =>
         // 代理明细带依据：同一伙伴在一单里可以有出资 + 运维两条，靠它区分（V53）
         basis: payee.dimension === "AGENT" ? (["OPERATE", "INVEST", "DEVELOP"] as const)[k % 3] : "",
         grossAmount: gmv,
+        // G22 快照：一期口径税前、阿联酋 VAT 5%（与后端 V155 默认同），基数 = 实收 ÷ 1.05
+        baseMode: "PRE_TAX" as const, taxRate: 5, baseAmount: Number((gmv / 1.05).toFixed(2)), refundNo: null,
         // 老周期的明细已结算、当期的还挂着：两种状态都要有样本，
         // 否则「这笔结没结」在页面上看不出差别。
         ...(pi === 0
           ? { status: "PENDING" as const, settleNo: null }
           : { status: "DONE" as const, settleNo: `STL${7000 + pi * 10 + i}` }),
-        amount: Number((gmv * rate).toFixed(2)), rate, currency: "AED",
+        // 与后端 ShareGeneratorImpl 同：税前基数 × 比例，向下取整到分（分账合计不得超过基数）
+        amount: Math.floor((gmv / 1.05) * rate * 100) / 100, rate, currency: "AED",
         period,
         // 明细时间必须落在它声明的周期内，否则「按周期汇总」和「按时间筛选」会互相打脸
         createdAt: `${period}-${String(4 + k * 8).padStart(2, "0")}T${String(9 + (i % 8)).padStart(2, "0")}:20:00.000Z`,

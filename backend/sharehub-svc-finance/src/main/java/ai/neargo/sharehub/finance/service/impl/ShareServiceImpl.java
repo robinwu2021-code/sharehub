@@ -258,7 +258,8 @@ public class ShareServiceImpl implements ShareService {
         return new FinDtos.ShareRecord(e.getRecordNo(), e.getOrderNo(), e.getDimension(), e.getPayeeNo(),
                 e.getPayeeName(), e.getBasis(), e.getAmount(), e.getRate(), e.getCurrency(), e.getMode(),
                 e.getStatus(), e.getSettleNo(), fmt(e.getCreatedAt()),
-                e.getPeriod(), e.getGrossAmount());
+                e.getPeriod(), e.getGrossAmount(),
+                e.getBaseMode(), e.getTaxRate(), e.getBaseAmount(), e.getRefundNo());
     }
 
     private static FinDtos.ShareSummary toSummary(Map<String, Object> m) {
