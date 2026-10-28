@@ -59,6 +59,7 @@ const LEAF_TUPLES = [
   "/settlement?tab=records|我的收益|finance:share_record:read||经营概览",
   "/settlement?tab=settlements|我的结算|agent:settlement:read||经营概览",
   "/settlement?tab=withdrawals|申请提现|finance:withdrawal:apply||经营概览",
+  "/operation/sites|我的站点|location:poi:read||设备与订单",
   "/devices|我的设备|device:cabinet:read||设备与订单",
   "/orders|我的订单|order:order:read||设备与订单",
   "/work-orders?view=list|设备报修|workorder:wo:create||报修与跟进",
@@ -70,18 +71,19 @@ const LEAF_TUPLES = [
   "/operation/problems|问题管理|system:problem:read||基础管理",
   "/operation/notices|公告管理|marketing:notice:read||基础管理",
   // 分成两项 2026-10-28 迁到结算（OM08）
-  // 2026-10-28 设备管理按运营顺序（OM03）：资产台账 → 库存与流转 → 设备接入 → 在线运行
-  "/devices|设备台账|device:cabinet:read||资产台账",
-  "/devices?tab=powerbanks|充电宝管理|device:powerbank:read||资产台账",
-  "/devices?tab=codes|设备编码|device:cabinet:read|1|资产台账",
-  "/devices?tab=stock|库存余额|device:inventory:read|1|库存与流转",
-  "/devices?tab=inventory|库存调拨|device:inventory:read|2|库存与流转",
-  "/devices?tab=asset-diffs|资产差异|device:inventory:read|2|库存与流转",
-  "/devices?tab=vendors|供应商接入|device:vendor:read||设备接入",
-  "/devices?tab=monitor|实时监控|device:cabinet:read||在线运行",
-  "/devices?tab=commands|远程控制与指令记录|device:command:send||在线运行",
-  "/devices?tab=logs|设备日志|device:cabinet:read|1|在线运行",
-  "/devices?tab=ota|固件 OTA|device:ota:read|2|在线运行",
+  // 2026-10-28 设备管理按生命周期（V163）：设备档案 → 仓储与出库（含出库池）→ 绑定上线 → 运行监控
+  "/devices|设备台账|device:cabinet:read||设备档案",
+  "/devices?tab=powerbanks|充电宝管理|device:powerbank:read||设备档案",
+  "/devices?tab=stock|库存余额|device:inventory:read|1|仓储与出库",
+  "/devices?tab=inventory|库存调拨|device:inventory:read|2|仓储与出库",
+  "/devices?tab=issued|出库池|device:inventory:read||仓储与出库",
+  "/devices?tab=asset-diffs|资产差异|device:inventory:read|2|仓储与出库",
+  "/devices?tab=codes|设备编码|device:cabinet:read|1|绑定上线",
+  "/devices?tab=vendors|厂商接入|device:vendor:read||绑定上线",
+  "/devices?tab=monitor|实时监控|device:cabinet:read||运行监控",
+  "/devices?tab=commands|远程控制与指令记录|device:command:send||运行监控",
+  "/devices?tab=logs|设备日志|device:cabinet:read|1|运行监控",
+  "/devices?tab=ota|固件 OTA|device:ota:read|2|运行监控",
   // 2026-10-28 运维管理（OM06）：告警 + 客服 + 工单三个 L1 合一；客服两个快捷入口撤销
   "/alarms|告警记录|workorder:alarm:read||告警",
   "/alarms?tab=notices|告警通知|workorder:alarm:read||告警",
@@ -271,10 +273,11 @@ describe("A.9 角色×L1 可见性矩阵（抽查）", () => {
       for (const k of ["my-biz", "my-asset", "my-service"]) expect(sectionKeys(r)).not.toContain(k);
     }
   });
-  it("AGENT 门户只含「我的」七项，不含任何运营方功能", () => {
+  it("AGENT 门户只含「我的」八项，不含任何运营方功能", () => {
     // 2026-09-23 加「申请提现」(AGT-06)：分级矩阵把代理自助提现定为 L0（⑦ 分钱的最后一步）。
+    // 2026-10-28 加「我的站点」（V163）：站点就是门店，商家端只读，站点由运营代建。
     const labels = visibleSections("AGENT").flatMap((s) => visibleLeaves(s, "AGENT").map((l) => l.label));
-    expect(labels).toEqual(["我的看板", "我的收益", "我的结算", "申请提现", "我的设备", "我的订单", "设备报修"]);
+    expect(labels).toEqual(["我的看板", "我的收益", "我的结算", "申请提现", "我的站点", "我的设备", "我的订单", "设备报修"]);
     for (const forbidden of ["SLA 管理", "巡检计划", "BD 拓展 CRM", "押金与欠费", "分润配置"]) {
       expect(labels).not.toContain(forbidden);
     }
@@ -400,7 +403,8 @@ describe("默认落地与面包屑", () => {
     expect(["/alarms", "/cs"]).toContain(csLand);
   });
   it("面包屑三级：L1 › 分组 › 子功能", () => {
-    expect(breadcrumb("/devices", "monitor", null, "OPS")).toEqual(["设备管理", "在线运行", "实时监控"]);
+    expect(breadcrumb("/devices", "monitor", null, "OPS")).toEqual(["设备管理", "运行监控", "实时监控"]);
+    expect(breadcrumb("/devices", "issued", null, "OPS")).toEqual(["设备管理", "仓储与出库", "出库池"]);
   });
   it("面包屑：工单在运维管理下三级（OM06 起工单有分组）", () => {
     expect(breadcrumb("/work-orders", null, "board", "OPS")).toEqual(["运维管理", "工单", "工单看板"]);
@@ -416,6 +420,10 @@ describe("默认落地与面包屑", () => {
   });
   it("面包屑按角色区分：AGENT 的 /devices 走门户", () => {
     expect(breadcrumb("/devices", null, null, "AGENT")).toEqual(["我的资产", "设备与订单", "我的设备"]);
+    // 2026-10-28「我的站点」：门户认领 /operation/sites，商家点进去面包屑不丢（V163）
+    expect(findActiveSection("/operation/sites", "AGENT")?.key).toBe("my-asset");
+    expect(breadcrumb("/operation/sites", null, null, "AGENT")).toEqual(["我的资产", "设备与订单", "我的站点"]);
+    expect(findActiveSection("/operation/sites", "OPS")?.key).toBe("venue");
   });
 });
 

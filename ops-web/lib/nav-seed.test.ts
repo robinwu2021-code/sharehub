@@ -410,6 +410,39 @@ const PATCHES: { file: string; mustContain: string; apply: (rows: Row[]) => void
         { name: "付款任务", name_en: "Payout Tasks", name_ar: "مهام الدفع" });
     },
   },
+  {
+    // 设备管理按生命周期重排 + 出库池；商家门户加「我的站点」并认领三条路径。
+    file: "V163__menu_device_lifecycle_issue_pool.sql",
+    mustContain: "UPDATE iam_menu SET menu_no = CONCAT('M_tmp163_', id) WHERE parent_no IN ('M_device', 'M_my-asset')",
+    apply: (rows) => {
+      const dev: [string, string, string][] = [
+        ["/devices", "1", "设备档案"], ["/devices?tab=powerbanks", "2", "设备档案"],
+        ["/devices?tab=stock", "3", "仓储与出库"], ["/devices?tab=inventory", "4", "仓储与出库"],
+        ["/devices?tab=asset-diffs", "6", "仓储与出库"],
+        ["/devices?tab=codes", "7", "绑定上线"], ["/devices?tab=vendors", "8", "绑定上线"],
+        ["/devices?tab=monitor", "9", "运行监控"], ["/devices?tab=commands", "10", "运行监控"],
+        ["/devices?tab=logs", "11", "运行监控"], ["/devices?tab=ota", "12", "运行监控"],
+      ];
+      const devRows = dev.map(([path]) => rows.find((r) => r.parent_no === "M_device" && r.path === path)!);
+      dev.forEach(([, sort, group], i) => Object.assign(devRows[i], { menu_no: `M_device__${sort}`, sort, group_name: group }));
+      Object.assign(rows.find((r) => r.menu_no === "M_device__8")!, { name: "厂商接入", name_en: "Vendor Integration", name_ar: "تكامل المصنّعين" });
+      const mine = (path: string) => rows.find((r) => r.parent_no === "M_my-asset" && r.path === path)!;
+      const d = mine("/devices"); const o = mine("/orders");
+      Object.assign(d, { menu_no: "M_my-asset__2", sort: "2" });
+      Object.assign(o, { menu_no: "M_my-asset__3", sort: "3" });
+      rows.find((r) => r.menu_no === "M_my-asset")!.match_paths = '["/devices","/operation/sites","/orders"]';
+      rows.push(
+        { menu_no: "M_device__5", parent_no: "M_device", name: "出库池", name_en: "Outbound Pool", name_ar: "مجمع الإخراج",
+          type: "ITEM", path: "/devices?tab=issued", icon: "NULL", group_name: "仓储与出库", sort: "5",
+          perm: "device:inventory:read", phase: "1", ready: "0", module: "NULL", modules: "NULL", match_paths: "NULL",
+          pin_bottom: "0", portal_for: "NULL" },
+        { menu_no: "M_my-asset__1", parent_no: "M_my-asset", name: "我的站点", name_en: "My Sites", name_ar: "مواقعي",
+          type: "ITEM", path: "/operation/sites", icon: "NULL", group_name: "设备与订单", sort: "1",
+          perm: "location:poi:read", phase: "1", ready: "0", module: "NULL", modules: "NULL", match_paths: "NULL",
+          pin_bottom: "0", portal_for: "NULL" },
+      );
+    },
+  },
 ];
 
 const COLS = [

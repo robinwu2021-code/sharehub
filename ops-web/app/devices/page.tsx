@@ -45,6 +45,7 @@ import { CAB_STATUS, PB_STATUS, PB_HEALTH, TRANSFER_STATUS, daysSince } from "@/
 import { TransferForm, TransferDetailDrawer, AssetDiffsTable } from "@/components/device/transfer";
 import { StockBalanceTab } from "@/components/device/stock-balance";
 import { VendorsTab } from "@/components/device/vendors-tab";
+import { IssuedPoolTab } from "@/components/device/issued-pool";
 import { PowerbankActions } from "@/components/device/powerbank-actions";
 import { ReasonDrawer, type ReasonRequest } from "@/components/device/reason-drawer";
 import { QcDrawer, type QcTarget } from "@/components/device/qc";
@@ -54,12 +55,13 @@ import { CabinetSummaryStrip } from "@/components/device/cabinet-summary";
 // 「机柜」在菜单里叫「设备台账」——以菜单为准。
 // 2026-10-28 按运营顺序（OM03）：资产台账 → 库存与流转 → 设备接入 → 在线运行。
 // 资产差异从「库存调拨」的子视图拆成独立页签；供应商接入从系统设置搬来；库存余额新增。
-const TAB_KEYS = ["cabinets", "powerbanks", "codes",
-  "stock", "inventory", "asset-diffs",
-  "vendors",
+// 2026-10-28 与菜单同序（按设备生命周期）：设备档案 → 仓储与出库（含出库池）→ 绑定上线 → 运行监控
+const TAB_KEYS = ["cabinets", "powerbanks",
+  "stock", "inventory", "issued", "asset-diffs",
+  "codes", "vendors",
   "monitor", "commands", "logs", "ota"] as const;
 // 自建 tab（自带筛选器与查询），不走页面共用的 keyword/Toolbar/分页那一套
-const STANDALONE_TABS = ["cabinets", "logs", "codes", "stock", "asset-diffs", "vendors"];
+const STANDALONE_TABS = ["cabinets", "logs", "codes", "stock", "issued", "asset-diffs", "vendors"]; // issued：出库池自带查询与分页
 
 /**
  * 同一张 tab 内的视图切换段控（监控的「列表/地图」、固件 OTA 的「投放/版本库」）。
@@ -1690,6 +1692,7 @@ function DevicesInner() {
       {tab === "asset-diffs" && <AssetDiffsTable />}
       {tab === "stock" && <StockBalanceTab />}
       {tab === "vendors" && <VendorsTab />}
+      {tab === "issued" && <IssuedPoolTab />}
       {isReleases && <OtaReleasesTab canManage={canManageOta} viewSwitch={otaViewSwitch} />}
       {tab === "ota" && !isReleases && <DataTable rowKey={(r: OtaRollout) => r.rolloutNo} columns={otaColsFull} rows={q.data?.list as OtaRollout[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} />}
       {!isStandalone && q.data && <Pagination page={paging.page} size={paging.size} total={q.data.total} onPage={paging.setPage} onSize={paging.setSize} />}

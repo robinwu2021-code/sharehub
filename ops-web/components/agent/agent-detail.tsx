@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { StateActions } from "@/components/state-actions";
+import { AgentSites, AgentDevices } from "./agent-sites";
 import { AgentOpsAssessments } from "./agent-ops-assessments";
 import { AGENT_EXIT_STATUS } from "./agent-exit-drawer";
 
@@ -103,7 +104,7 @@ export function AgentDetailDrawer({
   const qc = useQueryClient();
   const allow = useCan();
   const { confirm, dialog } = useConfirm();
-  const [tab, setTab] = useState<"overview" | "assessments">("overview");
+  const [tab, setTab] = useState<"overview" | "sites" | "devices" | "assessments">("overview");
   const [exitForm, setExitForm] = useState<{ reason: string } | null>(null);
   const [lookup, setLookup] = useState("");
 
@@ -243,9 +244,15 @@ export function AgentDetailDrawer({
           )}
 
           <Tabs
-            tabs={[{ key: "overview", label: "概况" }, { key: "assessments", label: "运维考核" }]}
+            tabs={[
+              { key: "overview", label: "概况" },
+              // 2026-10-28 设备出库与绑定（开发计划 F3）：站点就是门店，一期运营代建；设备从出库池绑定到这里
+              { key: "sites", label: "站点与点位" },
+              { key: "devices", label: "设备" },
+              { key: "assessments", label: "运维考核" },
+            ]}
             value={tab}
-            onChange={(k) => setTab(k as "overview" | "assessments")}
+            onChange={(k) => setTab(k as "overview" | "sites" | "devices" | "assessments")}
           />
 
           {tab === "overview" && (
@@ -280,6 +287,8 @@ export function AgentDetailDrawer({
             </div>
           )}
 
+          {tab === "sites" && <AgentSites agent={agent} />}
+          {tab === "devices" && <AgentDevices agentNo={agent.agentNo} />}
           {tab === "assessments" && <AgentOpsAssessments agentNo={agent.agentNo} />}
         </div>
       )}

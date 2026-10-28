@@ -572,7 +572,7 @@ function AgentsInner() {
       placeholder: assignForm?.agentNo ? "选择要划拨的站点" : "先选目标商家",
       options: toOptions(assignableQ.data?.list, "SITE"),
       disabledWhen: (v) => !v.agentNo,
-      help: "站点划拨只改站点归属，站内机柜的归属需另行选择",
+      help: "站点划拨会一并改站内全部点位与机柜的归属（后端级联）；分成按站点责任行，见站点详情 › 分成",
     },
   ], [agentOptions, assignableQ.data, assignForm?.agentNo]);
 
@@ -611,7 +611,7 @@ function AgentsInner() {
       title: "确认回收",
       danger: true,
       desc: `将把 ${cabs.length} 台机柜、${sts.length} 个站点从 ${reclaimForm.agentName}（${reclaimForm.agentNo}）收回平台直营。`
-        + "商家将不再有这些资产的收益与数据权限。",
+        + "商家立即失去这些资产的数据权限；分成按站点责任行计算，如需停止分成请到站点详情 › 分成调整。",
       confirmText: "确认回收",
     });
     if (ok) reclaimAssets.mutate({ cabinetNos: cabs, siteNos: sts });

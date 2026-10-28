@@ -71,11 +71,12 @@ const NAV: Record<string, Pair> = {
   "工单": { en: "Tickets", ar: "التذاكر" },
   "配置": { en: "Configuration", ar: "الإعدادات" },
   // L3 分组小标题（按机构/对象聚类）
-  "资产台账": { en: "Asset Ledger", ar: "سجل الأصول" },
-  "在线运行": { en: "Live Ops", ar: "التشغيل المباشر" },
+  "设备档案": { en: "Device Records", ar: "سجلات الأجهزة" },
+  "运行监控": { en: "Monitoring", ar: "المراقبة" },
   // 设备管理四组（2026-10-28 按运营顺序，OM03）；原「资产流转」作废
-  "库存与流转": { en: "Stock & Transfers", ar: "المخزون والتحويلات" },
-  "设备接入": { en: "Device Access", ar: "ربط الأجهزة" },
+  "仓储与出库": { en: "Stock & Outbound", ar: "المخزون والإخراج" },
+  "出库池": { en: "Outbound Pool", ar: "مجمع الإخراج" },
+  "绑定上线": { en: "Binding & Go-live", ar: "الربط والتشغيل" },
   // 2026-09-23 菜单收敛：「站点与点位」L1 撤销（二步），场地方那条线独立成
   // 「场地方与拓展」L1（三步）。原分组「场地资产 / 场地方机构 / 场站报表」作废。
   // 2026-10-28「场地方与拓展」与运营管理的站点四项合并为「网点管理」（OM02），分三组
@@ -195,7 +196,8 @@ const NAV: Record<string, Pair> = {
   "操作审计": { en: "Audit Log", ar: "سجل التدقيق" },
   "组织架构": { en: "Org Chart", ar: "الهيكل التنظيمي" },
   "绩效报表": { en: "Performance", ar: "الأداء" },
-  "供应商接入": { en: "Vendors", ar: "الموردون" },
+  "厂商接入": { en: "Vendor Integration", ar: "تكامل المصنّعين" },
+  "我的站点": { en: "My Sites", ar: "مواقعي" },
   "通知模板": { en: "Templates", ar: "قوالب الإشعارات" },
   "参数字典": { en: "Dictionaries", ar: "القواميس" },
   "地区库": { en: "Regions", ar: "المناطق" },

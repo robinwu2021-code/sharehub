@@ -17,10 +17,14 @@ export const locationMock: LocationApi = {
   listSiteAgents: (siteNo) => wait(db.listSiteAgents(siteNo)),
   saveSiteAgent: async (siteNo, x) => wait(db.saveSiteAgent(siteNo, x), 350),
   removeSiteAgent: async (siteNo, id) => wait(db.removeSiteAgent(siteNo, id), 350),
-  listSites: (q: SiteQ = {}) =>
-    wait(db.paginate(db.sites, q.page, q.size, (s) => db.liveHit(s, q.showArchived)
+  listSites: (q: SiteQ = {}) => {
+    if (q.agentNo) dp.ensurePoolSeed();   // 按商家查站点前补齐默认站点（见 device-pool.ensurePoolSeed）
+    return wait(db.paginate(db.sites.map((s) => ({
+      ...s, defaultLocationNo: db.locations.find((l) => l.siteNo === s.siteNo && l.isDefault && !l.archivedAt)?.locationNo ?? null,
+    })), q.page, q.size, (s) => db.liveHit(s, q.showArchived)
       && (!q.agentNo || s.agentNo === q.agentNo)
-      && db.kwHit(q.keyword, s.name, s.venueName, s.regionId))),
+      && db.kwHit(q.keyword, s.name, s.venueName, s.regionId)));
+  },
   // async：让 assertSiteCoords 抛的 SiteCoordError 变成 rejected promise，交给全局 MutationCache 弹错
   saveSite: async (s) => {
     const idx = db.sites.findIndex((x) => x.siteNo === s.siteNo);
@@ -50,6 +54,10 @@ export const locationMock: LocationApi = {
     const idx = db.locations.findIndex((x) => x.locationNo === l.locationNo);
     const prev = idx >= 0 ? db.locations[idx] : null;
     const siteNo = l.siteNo ?? prev?.siteNo ?? "";
+    // 编辑不许换站点（后端 409 error.location.site_immutable）：点位换站点 = 设备归属整体跳到另一个商家
+    if (prev && l.siteNo && l.siteNo !== prev.siteNo) {
+      fail(`点位 ${prev.locationNo} 不能换站点：要放到别的站点请在那里新建点位`, `Point ${prev.locationNo} cannot move to another site`);
+    }
     const site = db.sites.find((s) => s.siteNo === siteNo);
     // 后端今天建点位不校验站点、不写商家（技术设计 §一）；mock 按目标口径：站点必须存在、商家随站点
     if (!site) fail(`站点不存在：${siteNo || "(空)"}，点位必须挂在站点下`, `Site not found: ${siteNo || "(empty)"}`);

@@ -1,6 +1,7 @@
 // 覆盖范围：代理商主档、区域分配、业绩、资金账户、分润规则。
 import * as db from "../../mock/db";
 import * as ax from "../../mock/db/agent-exit";
+import * as dp from "../../mock/db/device-pool";
 import { notFound } from "@/lib/biz-error";
 import type { AgentApi } from "../contracts/agent";
 import type { PageQ, ArchiveQ, AssignmentRecordQ, AssignableAssetQ , ReportQ } from "../query";
@@ -11,6 +12,9 @@ export const agentMock: AgentApi = {
   listAgents: (q: ArchiveQ = {}) => {
     // 设备数是从 cabinets.agentNo 反算的：查询前先对齐，否则划拨后档案页的「设备数」还是旧值
     db.refreshAgentAssetCounts();
+    // 资料齐全的商家都该有默认站点（后端 8271deaa 补齐资料即建）；mock 在第一次读商家时补上，
+    // 否则整页刷新后商家详情会显示「还没有默认站点」（mock 状态随页面重载重置）
+    dp.ensurePoolSeed();
     return wait(db.paginate(db.agents, q.page, q.size, (a) => db.liveHit(a, q.showArchived) && db.kwHit(q.keyword, a.name, a.agentNo, a.regionScope)));
   },
   saveAgent: (a) => {

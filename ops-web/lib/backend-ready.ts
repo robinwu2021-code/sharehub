@@ -53,6 +53,8 @@ export const PARTIAL_READY = {
    */
   "devices.pool": true,    // 0a5c511f · V161 · 契约 6f275650
   "devices.bind": false,
+  // 商家站点：建站时带 agentNo（同事务 OPERATE 责任行 + 默认点位），商户入驻会话第 2 步（V162 起）
+  "sites.merchant": true,  // 4a508d8b · V162 · 契约已同步
   // 原有 "fee-plans.sites" 已删：登记了却**没有任何页面用它**，留着只会让人以为还有一块没做
 } as const;
 

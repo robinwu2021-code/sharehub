@@ -1,6 +1,6 @@
 "use client";
 
-// 供应商接入（硬件厂商目录 · OM03-17）。
+// 厂商接入（硬件厂商目录 · OM03-17；2026-10-28 由「供应商接入」更名，「供应商」留给采购）。
 //
 // 2026-10-28 从「系统设置」搬到「设备管理 › 设备接入」（docs/requirements/运营端菜单清单-按运营顺序.md）：
 // 新厂商的设备要先在这里接入才能上线，它是设备布放（P4）的前置一步，不是系统参数。
@@ -88,7 +88,7 @@ export function VendorsTab() {
   return (
     <>
       <Toolbar
-        onExport={() => exportCsv<Vendor>("供应商接入", [
+        onExport={() => exportCsv<Vendor>("厂商接入", [
           { header: "供应商码", value: (v) => v.vendorCode },
           { header: "名称", value: (v) => v.name },
           { header: "接入方式", value: (v) => ACCESS_MODE_LABEL[v.accessMode] },

@@ -178,7 +178,11 @@ export const NAV: NavSection[] = [
   {
     key: "my-asset", label: "我的资产", icon: "Server", module: "device", href: "/devices",
     portalFor: ["AGENT"],
+    // 2026-10-28「我的站点」（用户裁决：站点就是门店，商家端叫「我的站点」；一期运营代建，商家只读）。
+    // 复用运营端站点页，按数据范围只看自己的；match 认领三条路径，门户里点进去面包屑才不丢。
+    match: ["/devices", "/operation/sites", "/orders"],
     children: [
+      { href: "/operation/sites", label: "我的站点", perm: "location:poi:read", group: "设备与订单" },
       { href: "/devices", label: "我的设备", perm: "device:cabinet:read", group: "设备与订单" },
       { href: "/orders", label: "我的订单", perm: "order:order:read", group: "设备与订单" },
     ],
@@ -237,25 +241,28 @@ export const NAV: NavSection[] = [
   },
   {
     key: "device", label: "设备管理", icon: "Server", module: "device", href: "/devices",
-    // 2026-10-28 按运营顺序（OM03 · docs/requirements/运营端菜单清单-按运营顺序.md）：
-    // 资产台账 → 库存与流转 → 设备接入 → 在线运行（P4 布放：有账 → 能调 → 能连 → 在跑）。
-    // 「采购与入库」组（供应商 / 采购单 / 收货入库 / 期初登记）待后端补实体后再加，见优化清单 OM03。
-    // ⚠️ 菜单真源在库里：本段与系统设置段的行由 V150 重编号，改这里要同步新开迁移（见 nav-seed.test.ts）。
+    // 2026-10-28 按设备生命周期重排（docs/requirements/设备生命周期管理-运营端设计.md §五）：
+    //   设备档案 → 仓储与出库 → 绑定上线 → 运行监控（只建今天能用的叶；采购入库、装机、待上线、维修等视图随后续批次）。
+    // 「出库池」（设备出库与绑定 · 开发计划 F3）：绑定商家先出库，出库必须选商家；绑定只从出库池里选，
+    // 默认绑到商家的默认站点、默认点位。
+    // 「供应商接入」更名「厂商接入」：它是硬件厂商的协议接入，「供应商」留给采购。
+    // ⚠️ 菜单真源在库里：本段的行由 V150 重编号、V163 再重排，改这里要同步新开迁移（见 nav-seed.test.ts）。
     children: [
-      { href: "/devices", label: "设备台账", perm: "device:cabinet:read", group: "资产台账" },
-      { href: "/devices?tab=powerbanks", label: "充电宝管理", perm: "device:powerbank:read", group: "资产台账" },
-      { href: "/devices?tab=codes", label: "设备编码", perm: "device:cabinet:read", phase: 1, group: "资产台账" },
+      { href: "/devices", label: "设备台账", perm: "device:cabinet:read", group: "设备档案" },
+      { href: "/devices?tab=powerbanks", label: "充电宝管理", perm: "device:powerbank:read", group: "设备档案" },
       // 库存余额由柜机 / 充电宝两个既有读端点在页内汇总，不新增后端端点
-      { href: "/devices?tab=stock", label: "库存余额", perm: "device:inventory:read", phase: 1, ready: true, group: "库存与流转" },
-      { href: "/devices?tab=inventory", label: "库存调拨", perm: "device:inventory:read", phase: 2, group: "库存与流转" },
+      { href: "/devices?tab=stock", label: "库存余额", perm: "device:inventory:read", phase: 1, ready: true, group: "仓储与出库" },
+      { href: "/devices?tab=inventory", label: "库存调拨", perm: "device:inventory:read", phase: 2, group: "仓储与出库" },
+      { href: "/devices?tab=issued", label: "出库池", perm: "device:inventory:read", group: "仓储与出库" },
       // 此前是库存调拨里的子视图（同分期），菜单里找不到；拆出来不改分期
-      { href: "/devices?tab=asset-diffs", label: "资产差异", perm: "device:inventory:read", phase: 2, group: "库存与流转" },
-      // 从系统设置搬来：新厂商的设备要先接入才能上线，是布放的前置一步，不是系统参数
-      { href: "/devices?tab=vendors", label: "供应商接入", perm: "device:vendor:read", group: "设备接入" },
-      { href: "/devices?tab=monitor", label: "实时监控", perm: "device:cabinet:read", group: "在线运行" },
-      { href: "/devices?tab=commands", label: "远程控制与指令记录", perm: "device:command:send", group: "在线运行" },
-      { href: "/devices?tab=logs", label: "设备日志", perm: "device:cabinet:read", phase: 1, group: "在线运行" },
-      { href: "/devices?tab=ota", label: "固件 OTA", perm: "device:ota:read", phase: 2, group: "在线运行" },
+      { href: "/devices?tab=asset-diffs", label: "资产差异", perm: "device:inventory:read", phase: 2, group: "仓储与出库" },
+      // 设备码是绑定的第一层（码 ↔ 设备）；厂商接入是第二层（网关 ↔ 设备）
+      { href: "/devices?tab=codes", label: "设备编码", perm: "device:cabinet:read", phase: 1, group: "绑定上线" },
+      { href: "/devices?tab=vendors", label: "厂商接入", perm: "device:vendor:read", group: "绑定上线" },
+      { href: "/devices?tab=monitor", label: "实时监控", perm: "device:cabinet:read", group: "运行监控" },
+      { href: "/devices?tab=commands", label: "远程控制与指令记录", perm: "device:command:send", group: "运行监控" },
+      { href: "/devices?tab=logs", label: "设备日志", perm: "device:cabinet:read", phase: 1, group: "运行监控" },
+      { href: "/devices?tab=ota", label: "固件 OTA", perm: "device:ota:read", phase: 2, group: "运行监控" },
     ],
   },
   {

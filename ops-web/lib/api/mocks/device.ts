@@ -9,8 +9,8 @@ import { wait } from "./_wait";
 
 export const deviceMock: DeviceApi = {
   listCabinets: (q: CabinetQ = {}) => {
-    // 出库池筛选第一次出现时补演示数据（见 device-pool.ensurePoolSeed 的说明）
-    if (q.issuedAgentNo || q.pool) dp.ensurePoolSeed();
+    // 出库池字段回填与演示数据（见 device-pool.ensurePoolSeed；后端 V161 对存量设备同样回填）
+    dp.ensurePoolSeed();
     return wait(db.paginate(db.cabinets, q.page, q.size, (c) =>
       dp.poolHit(c, q.issuedAgentNo, q.pool) &&
       db.liveHit(c, q.showArchived) &&
@@ -19,7 +19,7 @@ export const deviceMock: DeviceApi = {
       (!q.onlineStatus || c.onlineStatus === q.onlineStatus) &&
       (!q.status || c.status === q.status)));
   },
-  getCabinet: (no) => wait({ cabinet: db.cabinets.find((c) => c.cabinetNo === no)!, slots: db.slotsOf(no) }),
+  getCabinet: (no) => (dp.ensurePoolSeed(), wait({ cabinet: db.cabinets.find((c) => c.cabinetNo === no)!, slots: db.slotsOf(no) })),
   // async：让 CabinetError / CommandError 变成 rejected promise，交给全局 MutationCache 弹错
   saveCabinet: async (x) => wait(db.saveCabinet(x), 350),
   // 下发即留痕：返回的 commandId 就是刚落库那条记录的号，指令记录 tab 刷新后能立刻认回

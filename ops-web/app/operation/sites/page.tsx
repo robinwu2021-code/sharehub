@@ -15,10 +15,11 @@ import Link from "next/link";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { BarChart3, Pause, Pencil, Play } from "lucide-react";
 import { api } from "@/lib/api";
-import type { Site } from "@/lib/types";
+import type { Site, Agent } from "@/lib/types";
 import { SITE_TRANSITIONS } from "@/lib/types";
 import { SITE_COORD_BOUNDS } from "@/lib/types/location";
 import { useCan } from "@/lib/hooks/use-can";
+import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
 import { featureReady } from "@/lib/backend-ready";
@@ -82,21 +83,27 @@ function fieldsFor(
   venues: { value: string; label: string }[],
   regions: { value: string; label: string }[],
   brands: { value: string; label: string }[],
+  merchants: { value: string; label: string }[] | null,
 ): FieldDef[] {
   return [
+    // 商家站点（用户裁决 2026-10-28：站点就是门店；一期运营代建；技术设计 §3.6）。
+    // 只在新建时选；建好后换商家走「整站换商家」，不在编辑里改归属。后端未上线时不出这一格（merchants 为 null）。
+    ...(merchants ? [{ key: "agentNo", label: "商家（可选）", type: "select", section: "基本信息", readOnlyOnEdit: true,
+      options: [{ value: "", label: "平台直营（不选商家）" }, ...merchants],
+      help: "选了商家 = 商家站点：同时建默认点位与运维责任行，场地方与区域可不填（场地方一期只记录）。设备从该商家的出库池绑定到这里" } as FieldDef] : []),
     { key: "name", label: "站点名称", required: true, maxLength: 128, section: "基本信息" },
     // 这里**没有**阿语名那一格（2026-09-26 去掉）。`loc_site.name_ar` 有列、SiteReq 也收，
     // 但 C 端 BFF（MpNearbyController）里没有任何 lang 处理、一次都没读过它 ——
     // 运营填的阿语站名**没有任何地方会显示**，两个并排的「站点名称」只是让人犹豫填哪个。
     // 要做阿语店名的话缺口在 C 端出参那一侧，不在这张表单；届时连同 nameEn 一起设计。
-    { key: "venueNo", label: "场地方", type: "select", required: true, section: "基本信息",
+    { key: "venueNo", label: "场地方", type: "select", section: "基本信息",
       options: [{ value: "", label: "请选择场地方" }, ...venues],
       help: "分成按场地方结算；这里选的是档案里的场地方，不是手打名字" },
     { key: "brandNo", label: "品牌", type: "select", required: true, section: "基本信息",
       options: [{ value: "", label: "请选择品牌" }, ...brands],
       help: "站点以哪个品牌对 C 端呈现。一站只能挂一个品牌 —— 分成与坪效都按站点统计，挂两个品牌会让「这笔钱算哪个品牌的」没有答案" },
     { key: "sceneType", label: "场景类型", type: "select", required: true, section: "基本信息", options: SCENES.map((s) => ({ value: s, label: s })) },
-    { key: "regionId", label: "区域", type: "select", required: true, section: "位置",
+    { key: "regionId", label: "区域", type: "select", section: "位置",
       options: [{ value: "", label: "请选择区域" }, ...regions],
       help: "数据权限按区域收敛，必须选字典里的区域" },
     { key: "address", label: "地址", type: "address", latKey: "lat", lngKey: "lng",
@@ -118,6 +125,10 @@ function SitesInner() {
   const pathname = usePathname();
   const sp = useSearchParams();
   const canWrite = allow("location:poi:create") || allow("location:poi:update");
+  // 商家端（我的站点）复用本页：只读、只看自己的（数据范围），不出归属列与商家筛选
+  const isMerchant = useAuth((s) => s.realm) === "AGENT";
+  const merchantSites = featureReady("sites.merchant");
+  const [agentFilter, setAgentFilter] = useState("");
   const canPause = featureReady("sites.pause");
   const canStats = featureReady("sites.stats");
 
@@ -146,8 +157,8 @@ function SitesInner() {
   };
 
   const q = useQuery({
-    queryKey: ["op", "sites", paging.page, paging.size, keyword, status, scene, showArchived],
-    queryFn: () => api.listSites({ page: paging.page, size: paging.size, keyword, status, showArchived }),
+    queryKey: ["op", "sites", paging.page, paging.size, keyword, status, scene, showArchived, agentFilter],
+    queryFn: () => api.listSites({ page: paging.page, size: paging.size, keyword, status, showArchived, agentNo: agentFilter || undefined }),
     // 场景筛选后端列表参数不支持，只能前端筛。放在 select 里而不是拿到 list 之后再 filter：
     // 那样 PagedTable 就得多开一个 rows 口子，而「rows 可以自己传」正是错误态漏接的来源。
     // 代价照旧且已在空态文案里说明：total 仍是后端的数，筛选只作用于当前页。
@@ -202,7 +213,23 @@ function SitesInner() {
       .map((b) => ({ value: b.brandNo, label: `${b.name}（${b.brandNo}）` })),
     [brandQ.data],
   );
-  const fields = useMemo(() => fieldsFor(venueOpts, regionOpts, brandOpts), [venueOpts, regionOpts, brandOpts]);
+  // 商家列表：归属列显示名字、「默认站点」标记、新建时选商家都用它
+  const agentsQ = useQuery({
+    queryKey: ["agents", "for-sites"],
+    queryFn: () => api.listAgents({ size: UNPAGED_SIZE }),
+    enabled: !isMerchant && allow("agent:agent:read"),
+  });
+  const agentList: Agent[] = agentsQ.data?.list ?? [];
+  const agentName = (no: string) => agentList.find((a) => a.agentNo === no)?.name ?? no;
+  const isDefaultSite = (siteNo: string) => agentList.some((a) => a.defaultSiteNo === siteNo);
+  const merchantOpts = useMemo(
+    () => agentList.filter((a) => a.status === "ENABLED" && !a.archivedAt).map((a) => ({ value: a.agentNo, label: `${a.name}（${a.agentNo}）` })),
+    [agentList],
+  );
+  const fields = useMemo(
+    () => fieldsFor(venueOpts, regionOpts, brandOpts, merchantSites && !isMerchant ? merchantOpts : null),
+    [venueOpts, regionOpts, brandOpts, merchantOpts, merchantSites, isMerchant],
+  );
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["op", "sites"] });
 
@@ -271,8 +298,9 @@ function SitesInner() {
   const submit = () => {
     if (!form) return;
     if (!(form.name ?? "").trim()) { notify.error("请填写站点名称"); return; }
-    if (!form.venueNo) { notify.error("请选择场地方——分成按场地方结算"); return; }
-    if (!form.regionId) { notify.error("请选择区域——数据权限按区域收敛"); return; }
+    // 商家站点：场地方与区域可空（场地方一期只记录，D10；默认站点也是这么建的）；直营站点照旧必填
+    if (!form.agentNo && !form.venueNo) { notify.error("请选择场地方——分成按场地方结算"); return; }
+    if (!form.agentNo && !form.regionId) { notify.error("请选择区域——数据权限按区域收敛"); return; }
     if (!form.brandNo) { notify.error("请选择品牌——站点必须以某个品牌对 C 端呈现"); return; }
 
     const lat = Number(form.lat ?? 0), lng = Number(form.lng ?? 0);
@@ -307,7 +335,9 @@ function SitesInner() {
       </button>
     ) },
     { header: "区域 · 场景", className: "whitespace-nowrap", cell: (s) => <span className="txt-caption">{s.regionName} · {s.sceneType}</span> },
-    { header: "归属", className: "whitespace-nowrap", cell: (s) => s.agentNo ?? <span className="text-muted-foreground">平台直营</span> },
+    ...(isMerchant ? [] : [{ header: "商家", className: "whitespace-nowrap", cell: (s: Site) => s.agentNo
+      ? <span className="inline-flex items-center gap-1.5">{agentName(s.agentNo)}{isDefaultSite(s.siteNo) && <Badge tone="outline">默认站点</Badge>}</span>
+      : <span className="text-muted-foreground">平台直营</span> }]),
     { header: "地址", cell: (s) => <span className="line-clamp-2 txt-caption text-muted-foreground">{s.address}</span> },
     { header: "点位 / 机柜", className: "whitespace-nowrap text-right", cell: (s) => {
       if (relQ.isLoading) return <span className="text-muted-foreground">…</span>;
@@ -397,6 +427,10 @@ function SitesInner() {
       >
         <FilterSelect aria-label="状态" value={status} onChange={(v) => { setStatus(v); paging.reset(); }} options={SITE_STATUS} allLabel="全部状态" />
         <FilterSelect aria-label="场景" value={scene} onChange={(v) => { setScene(v); paging.reset(); }} options={SCENES.map((s) => ({ value: s, label: s }))} allLabel="全部场景" />
+        {!isMerchant && agentList.length > 0 && (
+          <FilterSelect aria-label="商家" value={agentFilter} onChange={(v) => { setAgentFilter(v); paging.reset(); }}
+            options={agentList.map((a) => ({ value: a.agentNo, label: a.name }))} allLabel="全部商家" />
+        )}
         <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); paging.reset(); }} />
       </Toolbar>
       <PagedTable

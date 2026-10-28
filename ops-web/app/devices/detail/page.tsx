@@ -23,6 +23,7 @@ import { QcDrawer, QcRecords, type QcTarget } from "@/components/device/qc";
 import { TrialRentPanel } from "@/components/device/trial-rents";
 import { ProtectionPanel, useSlotProtections } from "@/components/device/protections";
 import { SignalCodesTable } from "@/components/device/signal-codes";
+import { OwnershipCard } from "@/components/device/ownership-card";
 import { PROTECTION_ACTION, QC_STATUS } from "@/components/device/device-maps";
 import { fmtTime, cn } from "@/lib/utils";
 import { useCan } from "@/lib/hooks/use-can";
@@ -137,24 +138,21 @@ function Overview({ cabinet, gateQ, onQc }: {
       <Card>
         <CardContent className="grid grid-cols-2 gap-4 pt-5 md:grid-cols-4">
           <Field label="点位" className="mb-0">{cabinet.locationName ?? "未上架"}</Field>
-          {/* 归属站点（偏差 A1）：站点号 + 点位号一起给，排障时能一路查到站点与合同 */}
-          <Field label="归属站点" className="mb-0">
-            {cabinet.siteNo ? <RefLink kind="site" no={cabinet.siteNo} /> : "未归属"}
-            {cabinet.locationNo && <span className="text-muted-foreground"> · {cabinet.locationNo}</span>}
-          </Field>
           <Field label="供应商 / 型号" className="mb-0">{cabinet.vendorCode} · {cabinet.model}</Field>
           <Field label="SN" className="mb-0"><span className="tabular-nums">{cabinet.sn}</span></Field>
           <Field label="固件" className="mb-0">{cabinet.fwVersion}</Field>
           <Field label="在线" className="mb-0"><OnlineBadge s={cabinet.onlineStatus} /></Field>
           <Field label="可借 / 仓位" className="mb-0">{`${cabinet.availableCount} / ${cabinet.slotTotal}`}</Field>
           <Field label="最后心跳" className="mb-0">{fmtTime(cabinet.lastHeartbeatAt)}</Field>
-          <Field label="归属代理" className="mb-0">{cabinet.agentNo ? <RefLink kind="agent" no={cabinet.agentNo} /> : "平台直营"}</Field>
           {/* 质检状态后端机柜出参没有，取最近一条质检记录；没有记录 = 质检上线前入库的存量，免检 */}
           <Field label="入库质检" className="mb-0">
             {lastQc ? <StatusBadge map={QC_STATUS} value={lastQc.result} /> : <span className="text-muted-foreground">无记录（存量免检）</span>}
           </Field>
         </CardContent>
       </Card>
+
+      {/* 归属站点 / 归属代理 两格挪进归属卡：与出库池、分成对象并排看（开发计划 F0-2） */}
+      <OwnershipCard cabinet={cabinet} />
 
       {cabinet.status === "IN_STOCK" ? (
         <Card>

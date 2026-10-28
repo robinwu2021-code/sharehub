@@ -167,6 +167,8 @@ export interface Site extends Archivable {
   opsEmployeeNo?: string | null;
   /** 运营信息。列表不返回（只详情给），故可空。 */
   ops?: SiteOps | null;
+  /** 站点的默认点位（建站时自动建，4a508d8b · V162）。绑定不选点位时落在这里。 */
+  defaultLocationNo?: string | null;
 }
 
 /**

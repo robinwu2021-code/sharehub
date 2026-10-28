@@ -89,8 +89,10 @@ function LocationsInner() {
 
   const pointCols: Column<SitePoint>[] = [
     { header: "点位号", cell: (l) => <span className="txt-strong tabular-nums">{l.locationNo}</span> },
-    { header: "名称", cell: (l) => l.name },
-    { header: "所属站点", cell: (l) => <span className="text-muted-foreground">{l.siteName}</span> },
+    // 默认点位：建站时自动建，绑定不选点位就落在这里（设备出库与绑定 · 技术设计 §2.3）
+    { header: "名称", cell: (l) => <span className="inline-flex items-center gap-1.5">{l.name}{l.isDefault && <Badge tone="outline">默认点位</Badge>}</span> },
+    // 商家随站点派生（只读）；空 = 平台直营站点
+    { header: "所属站点 · 商家", cell: (l) => <span className="text-muted-foreground">{l.siteName}{l.agentNo ? ` · ${l.agentNo}` : " · 直营"}</span> },
     { header: "位置", cell: (l) => l.spotDesc },
     { header: "设备数", className: "text-right", cell: (l) => <span className="tabular-nums">{l.cabinetCount}</span> },
     { header: "状态", cell: (l) => l.status === "ACTIVE" ? <Badge tone="success">启用</Badge> : <Badge tone="muted">暂停</Badge> },
