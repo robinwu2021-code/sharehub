@@ -102,7 +102,11 @@ public class ApplyServiceImpl implements ApplyService {
         if (!OPERATOR_TYPES.contains(req.operatorType())) {
             throw new IllegalArgumentException("主体类型只能是 AGENT 或 CITY_PARTNER");
         }
-        String phone = normalizer.phone(req.phone());
+        // 商家一期 B2：邮箱是必填的主标识（R1），手机号选填（R2）——
+        // 但自助提交仍要验手机 OTP（见下），那条路上手机号照旧必填
+        boolean noPhone = req.phone() == null || req.phone().isBlank();
+        if (noPhone && !opsCreated) requireText(req.phone(), "手机号必填");
+        String phone = noPhone ? null : normalizer.phone(req.phone());
         String email = IdentifierNormalizer.email(req.email());
 
         /*
@@ -114,31 +118,28 @@ public class ApplyServiceImpl implements ApplyService {
             otpGate.verify(phone, req.otp());
         }
 
-        String phoneHash = hasher.hash(phone);
+        String phoneHash = phone == null ? null : hasher.hash(phone);
         String emailHash = hasher.hash(email);
 
         /*
-         * 手机号已有自然人 **不是重复注册**，是多主体申请（ADR-030 §3.5）。
-         * 这里只做一件事：把已知的 principal 带上，供审核台显示。
-         *
-         * ⚠️ 邮箱与已有记录不一致时**不静默覆盖** —— 那要么是换了邮箱（该走改邮箱流程并重新验证），
-         * 要么是填错了。留给审核人裁决，见 ApplyView.knownEmailMask。
+         * 邮箱已有自然人 **不是重复注册**，是多主体申请（ADR-030 §3.5；需求方案 R7「同一邮箱属于多个商家」）。
+         * 这里只做一件事：把已知的 principal 带上，供审核台显示。V168 起按邮箱找人，不再按手机号。
          */
-        AgtPrincipal known = findPrincipalByPhone(phoneHash);
+        AgtPrincipal known = findPrincipalByEmail(emailHash);
 
-        // 同手机号至多一张在途：DB 的 uk_agt_apply_active 是最终防线，
+        // 同邮箱至多一张在途（V168 起 uk_agt_apply_active 按 email_hash）：DB 唯一键是最终防线，
         // 这里先查一次只为给出人话（撞唯一键的报错没法给用户看）
         Long inFlight = applyMapper.selectCount(new QueryWrapper<AgtApply>()
-                .eq("phone_hash", phoneHash).in("status", IN_FLIGHT_NAMES).eq("deleted", 0));
+                .eq("email_hash", emailHash).in("status", IN_FLIGHT_NAMES).eq("deleted", 0));
         if (inFlight != null && inFlight > 0) {
-            throw new IllegalArgumentException("该手机号已有一张在途申请，请先等待审核结果");
+            throw new IllegalArgumentException("该邮箱已有一张在途申请，请先等待审核结果");
         }
 
         AgtApply e = new AgtApply();
         e.setApplyNo(nextApplyNo());
         e.setSource(opsCreated ? "OPS_CREATED" : "SELF_SERVICE");
         e.setPhoneHash(phoneHash);
-        e.setPhoneMask(IdentifierNormalizer.mask(phone));
+        e.setPhoneMask(phone == null ? null : IdentifierNormalizer.mask(phone));
         e.setEmailHash(emailHash);
         e.setEmailMask(IdentifierNormalizer.maskEmail(email));
         e.setHashVer(hasher.version());
@@ -161,7 +162,7 @@ public class ApplyServiceImpl implements ApplyService {
         e.setShareRate(req.shareRate());
         e.setPayload(req.payload());
         e.setStatus(ApplyStatus.SUBMITTED.name());
-        e.setSubmittedBy(opsCreated ? staffNo : phoneHash.substring(0, 12));
+        e.setSubmittedBy(opsCreated ? staffNo : phoneHash.substring(0, 12));   // 自助路径上手机号必填，phoneHash 非空
         e.setSubmittedAt(LocalDateTime.now());
         e.setTenantId("MAIN");
         applyMapper.insert(e);
@@ -289,22 +290,40 @@ public class ApplyServiceImpl implements ApplyService {
         agentMapper.insert(agent);
 
         /*
-         * ② 自然人：按 phone_hash 查，**命中则复用**（这就是「第 2 个主体」的情形）。
+         * ② 自然人：按邮箱查，**命中则复用**（这就是「第 2 个主体」的情形，需求方案 §五「开通产物」）。
          *    复用时绝不动 cred_ref —— 一个人一套密码，改密一处全主体生效。
+         *
+         *    新建时两个标识都记**未验证**（R3）：运营录入的可能录错，录错的不能把账号交给陌生人，
+         *    也不能占住唯一键挡住真正的号主（R6，见 V168）。邮箱在首登收码时验证（R4）。
          */
-        AgtPrincipal principal = findPrincipalByPhone(e.getPhoneHash());
+        // 自助申请在提交时用验证码证明过手机号（见 submit），这个手机号就是已验证的；代建的不是（R3）
+        boolean phoneProven = "SELF_SERVICE".equals(e.getSource()) && e.getPhoneHash() != null;
+        AgtPrincipal principal = findPrincipalByEmail(e.getEmailHash());
+        if (principal == null && phoneProven) {
+            // 换了邮箱、手机号还是那个已验证的号：是同一个人，不新建（否则撞 phone_uk）
+            principal = principalMapper.selectOne(new QueryWrapper<AgtPrincipal>()
+                    .eq("phone_uk", e.getPhoneHash()).eq("deleted", 0).last("limit 1"));
+        }
         boolean firstOperatorOfThisPerson = principal == null;
         if (principal == null) {
             principal = new AgtPrincipal();
             principal.setPrincipalNo(nextNo("agt_principal", "principal_no", "PR"));
             principal.setPhoneHash(e.getPhoneHash());
             principal.setPhoneMask(e.getPhoneMask());
+            principal.setPhoneVerified(phoneProven ? 1 : 0);
             principal.setEmailHash(e.getEmailHash());
             principal.setEmailMask(e.getEmailMask());
+            principal.setEmailVerified(0);
             principal.setHashVer(e.getHashVer());
             principal.setStatus(AccountStatus.ACTIVE.name());
             principal.setTenantId("MAIN");
             principalMapper.insert(principal);
+        } else if (principal.getPhoneHash() == null && e.getPhoneHash() != null) {
+            // 已有的人还没留手机号、这次填了：补上，记未验证（R5：本人登录后自己验证）
+            principal.setPhoneHash(e.getPhoneHash());
+            principal.setPhoneMask(e.getPhoneMask());
+            principal.setPhoneVerified(phoneProven && !phoneTakenByAnother(e.getPhoneHash(), principal) ? 1 : 0);
+            principalMapper.updateById(principal);
         }
 
         /*
@@ -339,9 +358,24 @@ public class ApplyServiceImpl implements ApplyService {
 
     // ——————————————————————— 内部 ———————————————————————
 
-    private AgtPrincipal findPrincipalByPhone(String phoneHash) {
+    /**
+     * 邮箱 → 自然人：已验证的优先（V168 起唯一），否则取最早建的未验证行。
+     * 与登录侧 {@code AgentLoginServiceImpl.findByEmail} 同一口径 —— 两边找的人不一致，
+     * 就会出现「开通挂在 A 上、登录进的是 B」。
+     */
+    private AgtPrincipal findPrincipalByEmail(String emailHash) {
+        AgtPrincipal verified = principalMapper.selectOne(new QueryWrapper<AgtPrincipal>()
+                .eq("email_uk", emailHash).eq("deleted", 0).last("limit 1"));
+        if (verified != null) return verified;
         return principalMapper.selectOne(new QueryWrapper<AgtPrincipal>()
-                .eq("phone_hash", phoneHash).eq("deleted", 0).last("limit 1"));
+                .eq("email_hash", emailHash).eq("deleted", 0).orderByAsc("id").last("limit 1"));
+    }
+
+    /** 该手机号是否已作为已验证标识挂在别人身上 —— 是的话这次只能记未验证，不能抢 phone_uk。 */
+    private boolean phoneTakenByAnother(String phoneHash, AgtPrincipal self) {
+        AgtPrincipal owner = principalMapper.selectOne(new QueryWrapper<AgtPrincipal>()
+                .eq("phone_uk", phoneHash).eq("deleted", 0).last("limit 1"));
+        return owner != null && !owner.getPrincipalNo().equals(self.getPrincipalNo());
     }
 
     private AgtApply mustFind(String applyNo) {
@@ -366,7 +400,7 @@ public class ApplyServiceImpl implements ApplyService {
     }
 
     private ApplyView toView(AgtApply e) {
-        AgtPrincipal known = e.getPrincipalNo() == null ? findPrincipalByPhone(e.getPhoneHash()) : null;
+        AgtPrincipal known = e.getPrincipalNo() == null ? findPrincipalByEmail(e.getEmailHash()) : null;
         AgtPrincipal p = known != null ? known : null;
         boolean phoneKnown = e.getPrincipalNo() != null || p != null;
         // 邮箱与已有自然人不一致时，把已有的掩码一并给审核台 —— 由人裁决，不静默覆盖

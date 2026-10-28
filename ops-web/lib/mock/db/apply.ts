@@ -248,36 +248,36 @@ export function myApply(phone: string, otp: string) {
 }
 
 export function createAgentApply(x: {
-  phone: string; email: string; operatorName: string; operatorType: OperatorType;
+  phone?: string; email: string; operatorName: string; operatorType: OperatorType;
   contactName?: string;
   regionScope?: string; shareRate?: number; payload?: string;
 }): AgentApply {
   if (!x.operatorName?.trim()) fail("主体名称必填", "Operator name is required");
-  if (!x.phone?.trim()) fail("手机号必填", "Phone is required");
   if (!x.email?.trim()) fail("邮箱必填", "Email is required");
-
-  const key = phoneKey(x.phone);
-  // 同手机号至多一张在途 —— 服务端靠生成列 active_key 强制，这里给出人话
-  if (applies.some((r) => r._phoneKey === key && IN_FLIGHT.includes(r.status))) {
-    fail("该手机号已有一张在途申请，请先等待审核结果",
-         "This phone already has an application in progress");
+  // 手机号选填（商家一期 B2）；邮箱是主标识，在途唯一与「同一个人」都按邮箱（与后端 V168 同口径）
+  const phone = x.phone?.trim() || null;
+  const key = phone ? phoneKey(phone) : "";
+  const mail = x.email.trim().toLowerCase();
+  if (applies.some((r) => r.contactEmail?.toLowerCase() === mail && IN_FLIGHT.includes(r.status))) {
+    fail("该邮箱已有一张在途申请，请先等待审核结果",
+         "This email already has an application in progress");
   }
-  // 手机号已有主体**不是重复注册**，是多主体申请：带出已知信息给审核人，不拦
-  const known = applies.find((r) => r._phoneKey === key && r.status === "APPROVED");
+  // 邮箱已有主体**不是重复注册**，是多主体申请：带出已知信息给审核人，不拦
+  const known = applies.find((r) => r.contactEmail?.toLowerCase() === mail && r.status === "APPROVED");
 
   const row: ApplyRow = {
     applyNo: `AP${String(applies.length + 1).padStart(3, "0")}`,
     source: "OPS_CREATED",              // 本入口只给运营；自助入口在公开页（D5）
     status: "SUBMITTED",
     operatorName: x.operatorName.trim(), operatorType: x.operatorType,
-    phoneMask: maskPhone(x.phone), emailMask: maskEmail(x.email),
+    phoneMask: phone ? maskPhone(phone) : "", emailMask: maskEmail(x.email),
     /*
      * 业务联系方式是**明文**，与上面的掩码语义不同：掩码只用于显示，
      * 这三列是运营要拨打、要发件的东西，审核通过时回填到代理商档案。
      * 电话/邮箱默认取提交时填的那个，不让人填两遍。
      */
     contactName: x.contactName?.trim() || null,
-    contactPhone: x.phone.trim(), contactEmail: x.email.trim(),
+    contactPhone: phone, contactEmail: x.email.trim(),
     regionScope: x.regionScope ?? null,
     shareRate: x.shareRate ?? null,
     payload: x.payload ?? null,
@@ -286,7 +286,7 @@ export function createAgentApply(x: {
     submittedBy: "OPS", submittedAt: new Date().toISOString(),
     reviewedBy: null, reviewedAt: null, operatorNo: null,
     phoneAlreadyKnown: !!known,
-    knownEmailMask: known && known.emailMask !== maskEmail(x.email) ? known.emailMask : null,
+    knownEmailMask: null,   // 按邮箱找人，命中的就是同一个邮箱
     _phoneKey: key,
   };
   applies.push(row);

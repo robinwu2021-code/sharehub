@@ -3,14 +3,14 @@ import { client } from "../http-client";
 import type { DashboardApi } from "../contracts/dashboard";
 
 export const dashboardHttp: DashboardApi = {
-  // AGENT 走手机号 + 验证码：后端字段名是 phone/otp（identifier 对 STAFF 仍是 username）。
+  // AGENT 走「邮箱或手机号 + 验证码」（商家一期 B2，R8）：标识放 identifier，由后端判是哪种。
   // 两条路只差一个 otp —— 合成一个端点，免得前端先判断「这是哪种登录」，
   // 那个判断迟早和后端不一致。
   login: (realm, identifier, password, otp) =>
     client.post("/api/auth/login", otp
-      ? { realm, phone: identifier, otp }
+      ? { realm, identifier, otp }
       : { realm, identifier, username: identifier, password }),
-  sendLoginOtp: (phone) => client.post("/api/auth/otp", { phone }),
+  sendLoginOtp: (identifier) => client.post("/api/auth/otp", { identifier }),
   changePassword: (oldPassword, newPassword) => client.post("/api/auth/password", { oldPassword, newPassword }),
   listOperators: () => client.get("/api/auth/operators"),
   switchOperator: (agentNo) => client.post(`/api/auth/operators/${agentNo}/switch`, {}),

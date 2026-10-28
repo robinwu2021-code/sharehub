@@ -60,7 +60,8 @@ export interface AgentApi {
    * 合成一个的话「能录入」就等于「能放行」，四眼原则以后没有落脚点。
    */
   createAgentApply(x: {
-    phone: string; email: string; operatorName: string; operatorType: OperatorType;
+    /** 选填（商家一期 B2）：邮箱是主登录标识；不填手机号的商家只能用邮箱登录。 */
+    phone?: string; email: string; operatorName: string; operatorType: OperatorType;
     /**
      * 业务联系人姓名，可选。**联系电话/邮箱不单独收** —— 默认就是上面
      * `phone`/`email` 的明文，不让人把同一个号填两遍（运营可在代理商档案里改）。

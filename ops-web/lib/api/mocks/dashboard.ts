@@ -43,7 +43,7 @@ export const dashboardMock: DashboardApi = {
     // mock 放行而后端拒绝的话，离线开发一路顺，切后端当场登不进去。
     if (realm === "AGENT" && !otp?.trim()) fail("请输入验证码", "Verification code required", "رمز التحقق مطلوب");
     // 两种失败说同一句话：区分开就等于送出一个账号枚举接口
-    if (realm === "AGENT" && otp !== DEV_OTP) fail("手机号或验证码不正确", "Incorrect phone number or code", "رقم الهاتف أو الرمز غير صحيح");
+    if (realm === "AGENT" && otp !== DEV_OTP) fail("账号或验证码不正确", "Incorrect account or code", "الحساب أو الرمز غير صحيح");
     const operators = realm === "AGENT" ? agentOperators() : undefined;
     return wait({
       token: `mock-${role}`, subjectNo: identifier, username: identifier, role,
@@ -59,7 +59,7 @@ export const dashboardMock: DashboardApi = {
     return wait(db.changeOwnPassword(who, oldPassword, newPassword), 350);
   },
   // 查无此号也返回 ok：见契约注释（否则是一台手机号枚举器）。mock 一律回显固定码
-  sendLoginOtp: (_phone) => wait({ ok: true, code: DEV_OTP }),
+  sendLoginOtp: (_identifier) => wait({ ok: true, code: DEV_OTP }),
   listOperators: () => wait(agentOperators()),
   switchOperator: (agentNo) => {
     const all = agentOperators();

@@ -86,8 +86,14 @@ public class AuthController {
      * 字段留着是为了两个前端不必同步改就能继续登录，可在前端改完后删除。
      */
     public record LoginReq(String username, String password, String role, String agentNo,
-                          // —— 代理端实名登录（④）：手机号 + 验证码。两者都给才走代理分支 ——
-                          String phone, String otp) {
+                          // —— 代理端实名登录（④）：标识 + 验证码。带 otp 才走代理分支 ——
+                          // 商家一期 B2：标识是邮箱或手机号（R8），放 identifier；phone 留作旧前端兼容
+                          String phone, String otp, String identifier) {
+
+        /** 代理分支的登录标识：优先 identifier，旧前端只传 phone。 */
+        String agentIdentifier() {
+            return identifier != null && !identifier.isBlank() ? identifier : phone;
+        }
     }
 
     /**
@@ -224,14 +230,15 @@ public class AuthController {
 
     @PostMapping("/otp")
     public Map<String, Object> loginOtp(@RequestBody Map<String, String> body) {
-        String phone = body == null ? null : body.get("phone");
-        if (phone == null || phone.isBlank()) {
+        // 商家一期 B2：标识是邮箱或手机号（R8）；旧前端只传 phone，照收
+        String identifier = body == null ? null : body.getOrDefault("identifier", body.get("phone"));
+        if (identifier == null || identifier.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "error.auth.phone_required");
         }
         String code;
         try {
-            code = agentLogin.sendLoginOtp(phone);
-        } catch (IllegalArgumentException e) {           // 手机号格式不合法
+            code = agentLogin.sendLoginOtp(identifier);
+        } catch (IllegalArgumentException e) {           // 标识格式不合法
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         } catch (IllegalStateException e) {              // 重发过频（OtpGate 节流）
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, e.getMessage());
@@ -330,7 +337,7 @@ public class AuthController {
     private LoginResp agentLogin(LoginReq in) {
         String principalNo;
         try {
-            principalNo = agentLogin.verifyLoginOtp(in.phone(), in.otp());
+            principalNo = agentLogin.verifyLoginOtp(in.agentIdentifier(), in.otp());
         } catch (IllegalArgumentException e) {
             // 文案由 service 统一给（不区分「号不存在」与「码不对」）
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, e.getMessage());

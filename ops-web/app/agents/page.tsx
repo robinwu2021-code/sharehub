@@ -114,12 +114,13 @@ const APPLY_FIELDS: FieldDef[] = [
   { key: "operatorName", label: "主体名称", required: true, placeholder: "营业执照上的名称" },
   { key: "operatorType", label: "主体类型", type: "select", required: true,
     options: [{ value: "AGENT", label: "代理商" }, { value: "CITY_PARTNER", label: "城市合伙人" }] },
-  // 手机号与邮箱**都必填**（2026-09-23 用户定）：手机号是 OTP 通道与身份锚，
-  // 邮箱承载审核结果、驳回原因、结算账单这类需要留存的长文
-  { key: "phone", label: "手机号", required: true,
-    pattern: { re: "^\\+?[0-9 -]{6,20}$", msg: "手机号格式不对（可带国际区号）" } },
-  { key: "email", label: "邮箱", required: true,
+  // 商家一期 B2（2026-10-28，需求方案 R1 / R2）：**邮箱必填、是主登录标识**，手机号选填。
+  // 此前「两者都必填」（2026-09-23）是因为手机号是唯一的 OTP 通道；现在邮箱也能收码。
+  // 运营录入的两个标识都记未验证 —— 商家用邮箱收码首登时才验证（V168）。
+  { key: "email", label: "邮箱（登录用）", required: true,
     pattern: { re: "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", msg: "邮箱格式不对" } },
+  { key: "phone", label: "手机号（选填）",
+    pattern: { re: "^\\+?[0-9 -]{6,20}$", msg: "手机号格式不对（可带国际区号）" } },
   /*
    * 业务联系人**只收姓名**（V127）：联系电话与邮箱就是上面那两个，
    * 不让人把同一个号填两遍。审核通过时三样一起落到代理商档案上。
@@ -407,7 +408,7 @@ function AgentsInner() {
   });
   const createApply = useMutation({
     mutationFn: (v: Record<string, unknown>) => api.createAgentApply({
-      phone: String(v.phone ?? ""), email: String(v.email ?? ""),
+      phone: v.phone ? String(v.phone) : undefined, email: String(v.email ?? ""),
       operatorName: String(v.operatorName ?? ""),
       operatorType: (v.operatorType as OperatorType) ?? "AGENT",
       regionScope: v.regionScope ? String(v.regionScope) : undefined,

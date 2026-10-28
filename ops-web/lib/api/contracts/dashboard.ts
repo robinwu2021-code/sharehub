@@ -92,14 +92,14 @@ export interface DashboardApi {
    */
   login(realm: "STAFF" | "AGENT", identifier: string, password: string, otp?: string): Promise<LoginResp>;
   /**
-   * 代理端登录发码（匿名）。
+   * 商家端登录发码（匿名）。标识是邮箱或手机号（商家一期 B2）：邮箱发邮件、已验证的手机号发短信。
    *
    * **查无此号也返回成功** —— 「存在」与「不存在」一旦响应不同，
-   * 这个接口就成了代理商手机号枚举器。代价是输错号的人会等一条永远不到的短信。
+   * 这个接口就成了商家邮箱 / 手机号枚举器。代价是输错的人会等一条永远不到的码。
    *
    * @returns dev-mode 下回显验证码供联调；生产走短信通道，接口不回传
    */
-  sendLoginOtp(phone: string): Promise<{ ok: boolean; code?: string }>;
+  sendLoginOtp(identifier: string): Promise<{ ok: boolean; code?: string }>;
   /**
    * 本人改密。**不传「给谁改」** —— 主体由后端从 token 取。
    * 让前端传 subjectNo 等于把改密做成越权接口。

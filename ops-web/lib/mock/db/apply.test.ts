@@ -86,39 +86,42 @@ describe("审核通过 = 激活派生", () => {
   });
 });
 
-describe("同手机号至多一张在途", () => {
+describe("同邮箱至多一张在途（商家一期 B2：V168 起在途唯一按邮箱）", () => {
   it("★ 第二张在途被拒（服务端靠生成列 active_key 强制，这里给的是人话）", () => {
-    const phone = freshPhone();
-    newApply({ phone });
-    expect(() => newApply({ phone })).toThrow(/在途/);
+    const email = `inflight${seq}@example.com`;
+    newApply({ email });
+    expect(() => newApply({ email })).toThrow(/在途/);
   });
 
   it("★ 推到终态之后可以再提——驳回重提是正常路径，不能被这条约束卡死", () => {
-    const phone = freshPhone();
-    const a = newApply({ phone });
+    const email = `retry${seq}@example.com`;
+    const a = newApply({ email });
     auditAgentApply({ applyNo: a.applyNo, approve: false, rejectReason: "补材料" });
-    expect(() => newApply({ phone })).not.toThrow();
+    expect(() => newApply({ email })).not.toThrow();
+  });
+
+  it("★ 手机号选填：只填邮箱也能代建", () => {
+    expect(() => newApply({ phone: undefined, email: `nophone${seq}@example.com` })).not.toThrow();
   });
 });
 
-describe("多主体：手机号已存在不是重复注册", () => {
-  it("★ 同一手机号在已有主体后仍可再申请，并带出已知信息给审核台", () => {
-    const phone = freshPhone();
-    const first = newApply({ phone, email: "boss@first.com" });
+describe("多主体：邮箱已存在不是重复注册（R7）", () => {
+  it("★ 同一邮箱在已有主体后仍可再申请，并带出已知信息给审核台", () => {
+    const first = newApply({ email: "boss@first.com" });
     auditAgentApply({ applyNo: first.applyNo, approve: true });
 
-    // 关键断言：不抛错。把这条写反（当成重复注册拒掉）用户会卡死在注册页
-    const second = newApply({ phone, email: "boss@first.com", operatorName: "第二个主体" });
+    // 关键断言：不抛错。把这条写反（当成重复注册拒掉）同一个老板就开不了第二家
+    const second = newApply({ email: "Boss@First.com ", operatorName: "第二个主体" });
     expect(second.phoneAlreadyKnown).toBe(true);
   });
 
-  it("★ 邮箱与已有记录不一致时给出旧掩码——由审核人裁决，不静默覆盖", () => {
+  it("★ 同一手机号、不同邮箱：按邮箱找人，是另一个人——手机号未验证前不能拿来认人（R3 / R6）", () => {
     const phone = freshPhone();
     const first = newApply({ phone, email: "old@mail.com" });
     auditAgentApply({ applyNo: first.applyNo, approve: true });
 
     const second = newApply({ phone, email: "new@mail.com" });
-    expect(second.knownEmailMask).toBe("o***@mail.com");
+    expect(second.phoneAlreadyKnown).toBe(false);
   });
 });
 
