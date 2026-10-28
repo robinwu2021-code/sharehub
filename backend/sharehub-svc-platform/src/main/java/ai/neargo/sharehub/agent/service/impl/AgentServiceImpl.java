@@ -183,11 +183,35 @@ public class AgentServiceImpl implements AgentService {
 
         e.setDefaultSiteNo(site.siteNo());
         mapper.updateById(e);
+        attachSite(e.getAgentNo(), site.siteNo(), "商家默认站点（系统建）");
+    }
+
+    /**
+     * 站点归商家（V157 / V162）：经划拨写归属（留流水并级联站点、点位、机柜的 agent_no），并写 OPERATE 责任行。
+     * 数据范围读 agent_no、分润读责任行 —— 两者只写一份，「谁看得到」与「谁分到钱」就会分开。
+     */
+    private void attachSite(String agentNo, String siteNo, String remark) {
         assignments.assign(new ai.neargo.sharehub.agent.ext.dto.AgentExtDtos.AssignReq(
-                e.getAgentNo(), "SITE", site.siteNo(), "ASSIGN", ai.neargo.sharehub.auth.SecurityUtils.userNo()));
-        siteAgents.upsert(site.siteNo(), new ai.neargo.sharehub.loc.ext.dto.SiteAgentDtos.SiteAgentRow(
-                null, site.siteNo(), e.getAgentNo(), null, null, "OPERATE", null, null,
-                java.time.LocalDateTime.now().toString(), null, "商家默认站点（系统建）"));
+                agentNo, "SITE", siteNo, "ASSIGN", ai.neargo.sharehub.auth.SecurityUtils.userNo()));
+        siteAgents.upsert(siteNo, new ai.neargo.sharehub.loc.ext.dto.SiteAgentDtos.SiteAgentRow(
+                null, siteNo, agentNo, null, null, "OPERATE", null, null,
+                java.time.LocalDateTime.now().toString(), null, remark));
+    }
+
+    /**
+     * 运营为商家新建站点（V162；用户 2026-10-28：商家可有多个站点，一期由运营代建，商家端只读）。
+     *
+     * <p>一个事务：建站（含默认点位）→ 划给商家 → 写运维责任。商家须存在且已补齐核心资料 ——
+     * 划拨门禁要求如此（只有默认站点例外），先在这里说清楚，比让划拨那一步抛错更好懂。
+     */
+    @Override
+    @Transactional
+    public ai.neargo.sharehub.loc.dto.LocDtos.Site createSite(String agentNo, ai.neargo.sharehub.loc.dto.SiteDtos.SiteReq req) {
+        AgtAgent a = mapper.selectOne(new LambdaQueryWrapper<AgtAgent>().eq(AgtAgent::getAgentNo, agentNo).last("limit 1"));
+        if (a == null) throw BizException.notFound(agentNo);
+        var site = sites.createForMerchant(req);
+        attachSite(agentNo, site.siteNo(), "运营为商家建站");
+        return sites.get(site.siteNo());
     }
 
     private static boolean sameDecimal(java.math.BigDecimal a, java.math.BigDecimal b) {

@@ -22,7 +22,13 @@ import java.util.List;
 public interface SiteService {
 
     record Query(Integer page, Integer size, String keyword, Boolean showArchived, String status,
-                 Boolean missingOwner, Boolean missingOpenHours) {
+                 Boolean missingOwner, Boolean missingOpenHours,
+                 /* V162：只看某商家的站点 */ String agentNo) {
+
+        public Query(Integer page, Integer size, String keyword, Boolean showArchived, String status,
+                     Boolean missingOwner, Boolean missingOpenHours) {
+            this(page, size, keyword, showArchived, status, missingOwner, missingOpenHours, null);
+        }
     }
 
     /** 运维责任人对账 / 暂停到期扫描的结果。 */
@@ -36,6 +42,9 @@ public interface SiteService {
     SiteSummary summary();
 
     Site create(SiteReq r);
+
+    /** 为商家建站（V162）：场地方、区域、营业时间可空，位置必填；同事务建默认点位。归属与责任由调用方写。 */
+    Site createForMerchant(SiteReq r);
 
     /**
      * 商家默认站点（V157，优化方案 §2.4）：建或更新一个只带名称、地址、坐标的站点。

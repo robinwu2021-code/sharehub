@@ -16,7 +16,17 @@ public final class SiteDtos {
      */
     public record SiteReq(String name, String nameAr, String venueNo, String brandNo, String regionId,
                           String address, BigDecimal lng, BigDecimal lat, String sceneType, String openHours,
-                          String opsEmployeeNo) {
+                          String opsEmployeeNo,
+                          // V162：为商家建站时给商家号 —— 有值则场地方、区域、营业时间可空，同事务写归属、
+                          // 运维责任与默认点位；编辑时忽略（归属只经划拨改）
+                          String agentNo) {
+
+        /** V162 之前的形状。 */
+        public SiteReq(String name, String nameAr, String venueNo, String brandNo, String regionId,
+                       String address, BigDecimal lng, BigDecimal lat, String sceneType, String openHours,
+                       String opsEmployeeNo) {
+            this(name, nameAr, venueNo, brandNo, regionId, address, lng, lat, sceneType, openHours, opsEmployeeNo, null);
+        }
     }
 
     public record PauseReq(String reason, LocalDate pauseUntil) {

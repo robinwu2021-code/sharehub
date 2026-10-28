@@ -141,17 +141,20 @@ class OperatorDailyFlowTest extends ApiTestSupport {
         exp.get("site").fields().forEachRemaining(f -> siteReq.put(f.getKey(), f.getValue().isNull() ? null : f.getValue().asText()));
         siteReq.put("venueNo", get("/api/ops/venues?page=1&size=1", bdToken).okData().path("list").get(0).path("venueNo").asText());
         siteReq.put("openHours", "10:00-22:00");
+        // 夹具里的 agentNo 此前被建站接口忽略；V162 起带商家号 = 为商家建站。本步验的是 BD 建直营站点，去掉它
+        siteReq.remove("agentNo");
         JsonNode site = post("/api/ops/sites", siteReq, bdToken).okData();
         String siteNo = site.path("siteNo").asText();
         assertThat(site.path("status").asText()).isEqualTo("PREPARING");
         assertThat(site.path("regionId").asText()).isEqualTo("Dubai Marina");
 
-        String locNo = exp.at("/location/locationNo").asText();
         java.util.Map<String, Object> locReq = new java.util.HashMap<>();
         exp.get("location").fields().forEachRemaining(f -> locReq.put(f.getKey(), f.getValue().isNumber() ? f.getValue().numberValue() : f.getValue().asText()));
         locReq.put("siteNo", siteNo);
-        JsonNode loc = post("/api/ops/locations/" + locNo, locReq, bdToken).okData();
-        assertThat(loc.path("locationNo").asText()).isEqualTo(locNo);
+        // V162：点位号服务端取（请求体里的 locationNo 不作数）；路径带号 = 编辑已有点位
+        JsonNode loc = post("/api/ops/locations", locReq, bdToken).okData();
+        assertThat(loc.path("locationNo").asText()).startsWith("LOC").isNotEqualTo(exp.at("/location/locationNo").asText());
+        assertThat(loc.path("siteNo").asText()).isEqualTo(siteNo);
 
         // 复查：新站点可被关键词检索到（走 MariaDB，重启存活）
         // keyword 保留 —— 这条用例测的就是「关键词检索得到」；翻页只是去掉「一页就是全量」的假设

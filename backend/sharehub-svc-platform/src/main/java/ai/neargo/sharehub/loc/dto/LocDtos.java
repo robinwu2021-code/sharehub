@@ -40,7 +40,25 @@ public final class LocDtos {
                       // 2026-09-25 站点状态机：运营信息收成一个子对象追加在末尾
                       ai.neargo.sharehub.loc.dto.SiteDtos.SiteOps ops,
                       // 运营端要平铺的员工责任人（与 ops.opsEmployeeNo 同值；前端列表 / 表单直接读它）
-                      String opsEmployeeNo) {
+                      String opsEmployeeNo,
+                      // V162：站点的默认点位号（绑定不指定点位时落这里）；只读
+                      String defaultLocationNo) {
+
+        /** V162 之前的形状：默认点位缺省 null。 */
+        public Site(String siteNo, String name, String venueNo, String venueName, String agentNo, String brandNo,
+                    String regionId, String regionName, String address, java.math.BigDecimal lng,
+                    java.math.BigDecimal lat, String sceneType, Integer pointCount, Integer cabinetCount,
+                    String status, String archivedAt, String nameAr, String openHours,
+                    ai.neargo.sharehub.loc.dto.SiteDtos.SiteOps ops, String opsEmployeeNo) {
+            this(siteNo, name, venueNo, venueName, agentNo, brandNo, regionId, regionName, address, lng, lat,
+                    sceneType, pointCount, cabinetCount, status, archivedAt, nameAr, openHours, ops, opsEmployeeNo, null);
+        }
+
+        /** 补上默认点位号（列表批量查完再回填）。 */
+        public Site withDefaultLocationNo(String locationNo) {
+            return new Site(siteNo, name, venueNo, venueName, agentNo, brandNo, regionId, regionName, address, lng, lat,
+                    sceneType, pointCount, cabinetCount, status, archivedAt, nameAr, openHours, ops, opsEmployeeNo, locationNo);
+        }
 
         /** 兼容构造点：平铺字段从运营信息里取。 */
         public Site(String siteNo, String name, String venueNo, String venueName, String agentNo, String brandNo,
@@ -70,7 +88,15 @@ public final class LocDtos {
      *                     「Cannot map null into type int」，调用方看到的是 500。
      */
     public record Location(String locationNo, String name, String siteNo, String siteName,
-                          String spotDesc, Integer cabinetCount, String status) {
+                          String spotDesc, Integer cabinetCount, String status,
+                          // V162：追加在末尾。是否站点的默认点位（只读，建站时定）；商家随站点（只读）
+                          Boolean isDefault, String agentNo) {
+
+        /** V162 之前的形状。 */
+        public Location(String locationNo, String name, String siteNo, String siteName,
+                        String spotDesc, Integer cabinetCount, String status) {
+            this(locationNo, name, siteNo, siteName, spotDesc, cabinetCount, status, null, null);
+        }
     }
 
     /**

@@ -105,6 +105,13 @@ public class SiteServiceImpl implements SiteService {
 
     private final LocMappers.SiteMapper sites;
     private final LocMappers.LocationMapper locations;
+    /** 默认点位（V162）：三个建站入口都与建站同事务建。 */
+    private ai.neargo.sharehub.loc.DefaultPoints defaultPoints;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setDefaultPoints(ai.neargo.sharehub.loc.DefaultPoints defaultPoints) {
+        this.defaultPoints = defaultPoints;
+    }
     private final LocMappers.VenueMapper venues;
     private final MdRegionMapper regions;
     private final LocSiteStatusLogMapper logs;
@@ -183,6 +190,7 @@ public class SiteServiceImpl implements SiteService {
         }
         if (Boolean.TRUE.equals(q.missingOwner())) w.apply(MISSING_OWNER_SQL);
         if (Boolean.TRUE.equals(q.missingOpenHours())) w.and(x -> x.isNull(LocSite::getOpenHours).or().eq(LocSite::getOpenHours, ""));
+        if (notBlank(q.agentNo())) w.eq(LocSite::getAgentNo, q.agentNo());
         w.orderByAsc(LocSite::getId);
         Page<LocSite> r = sites.selectPage(new Page<>(page, size), w);
         return new PageResult<>(toVOs(r.getRecords()), r.getTotal());
@@ -228,11 +236,37 @@ public class SiteServiceImpl implements SiteService {
         LocSite e = new LocSite();
         e.setSiteNo(IdGenerator.next(BizKey.SITE));
         e.setTenantId("MAIN");
-        apply(e, r);
+        apply(e, r, false);
         e.setStatus(PREPARING.name());
         sites.insert(e);
+        defaultPoints.create(e.getSiteNo(), e.getName(), null);
         writeLog(e.getSiteNo(), "CREATE", null, PREPARING.name(), operator(), null);
         log.info("站点建档 siteNo={} venueNo={}", e.getSiteNo(), e.getVenueNo());
+        return toVO(e);
+    }
+
+    /**
+     * 为商家建站（V162；用户 2026-10-28：商家可有多个站点，一期由运营代建）。
+     *
+     * <p>与直营建站的差别只在必填：场地方一期只记录（需求方案 D10），区域、营业时间也可后补；
+     * 但**位置必填**（地址 + 坐标）—— 站点会上 C 端「找附近」，没有坐标就排不到。
+     * 归属与运维责任不在这里写：调用方（商家侧）随后走划拨与责任行，同一事务。
+     */
+    @Override
+    @Transactional
+    public Site createForMerchant(SiteReq r) {
+        if (r == null || !notBlank(r.address()) || r.lng() == null || r.lat() == null) {
+            throw ai.neargo.sharehub.common.BizException.badRequest("error.agent.location_incomplete");
+        }
+        LocSite e = new LocSite();
+        e.setSiteNo(IdGenerator.next(BizKey.SITE));
+        e.setTenantId("MAIN");
+        apply(e, r, true);
+        e.setStatus(PREPARING.name());
+        sites.insert(e);
+        defaultPoints.create(e.getSiteNo(), e.getName(), null);
+        writeLog(e.getSiteNo(), "CREATE", null, PREPARING.name(), operator(), "商家站点");
+        log.info("商家站点建档 siteNo={}", e.getSiteNo());
         return toVO(e);
     }
 
@@ -260,6 +294,7 @@ public class SiteServiceImpl implements SiteService {
         e.setLat(lat);
         e.setStatus(PREPARING.name());
         sites.insert(e);
+        defaultPoints.create(e.getSiteNo(), e.getName(), null);
         writeLog(e.getSiteNo(), "CREATE", null, PREPARING.name(), operator(), "商家默认站点");
         log.info("商家默认站点建档 siteNo={}", e.getSiteNo());
         return toVO(e);
@@ -275,20 +310,29 @@ public class SiteServiceImpl implements SiteService {
         AuditChanges.record("场地方", e.getVenueNo(), r.venueNo());
         AuditChanges.record("营业时间", e.getOpenHours(), r.openHours());
         AuditChanges.record("运维责任人", e.getOpsEmployeeNo(), blankToNull(r.opsEmployeeNo()));
-        apply(e, r);
+        apply(e, r, e.getAgentNo() != null && e.getVenueNo() == null);
         sites.updateById(e);
         return toVO(e);
     }
 
     /** 属性写入。status 与 agentNo 不在请求里 —— 状态只经动作改，归属只经划拨改。 */
-    private void apply(LocSite e, SiteReq r) {
+    /**
+     * @param merchantSite 商家站点（V162）：场地方、区域、营业时间可空（场地方一期只记录，D10）。
+     *                     给了场地方仍校验它存在。
+     */
+    private void apply(LocSite e, SiteReq r, boolean merchantSite) {
         if (r == null) throw ai.neargo.sharehub.common.BizException.badRequest("error.common.missing_parameter", "body");
         if (!notBlank(r.name())) throw ai.neargo.sharehub.common.BizException.badRequest("error.common.missing_parameter", "name");
-        if (!notBlank(r.venueNo())) throw ai.neargo.sharehub.common.BizException.badRequest("error.common.missing_parameter", "venueNo");
-        if (!notBlank(r.regionId())) throw ai.neargo.sharehub.common.BizException.badRequest("error.common.missing_parameter", "regionId");
-        if (!notBlank(r.openHours())) throw ai.neargo.sharehub.common.BizException.badRequest("error.site.open_hours_required");
-        LocVenue v = venues.selectOne(new LambdaQueryWrapper<LocVenue>().eq(LocVenue::getVenueNo, r.venueNo()).last("limit 1"));
-        if (v == null) throw BizException.notFound(r.venueNo());
+        if (!merchantSite) {
+            if (!notBlank(r.venueNo())) throw ai.neargo.sharehub.common.BizException.badRequest("error.common.missing_parameter", "venueNo");
+            if (!notBlank(r.regionId())) throw ai.neargo.sharehub.common.BizException.badRequest("error.common.missing_parameter", "regionId");
+            if (!notBlank(r.openHours())) throw ai.neargo.sharehub.common.BizException.badRequest("error.site.open_hours_required");
+        }
+        LocVenue v = null;
+        if (notBlank(r.venueNo())) {
+            v = venues.selectOne(new LambdaQueryWrapper<LocVenue>().eq(LocVenue::getVenueNo, r.venueNo()).last("limit 1"));
+            if (v == null) throw BizException.notFound(r.venueNo());
+        }
         String ops = blankToNull(r.opsEmployeeNo());
         if (ops != null) {
             EmployeeBrief b = employees.briefsOf(List.of(ops)).get(ops);
@@ -296,8 +340,8 @@ public class SiteServiceImpl implements SiteService {
         }
         e.setName(r.name().trim());
         e.setNameAr(r.nameAr());
-        e.setVenueNo(v.getVenueNo());
-        e.setVenueName(v.getName());
+        e.setVenueNo(v == null ? null : v.getVenueNo());
+        e.setVenueName(v == null ? null : v.getName());
         e.setBrandNo(r.brandNo());
         e.setRegionId(r.regionId());
         e.setAddress(r.address());
@@ -305,7 +349,7 @@ public class SiteServiceImpl implements SiteService {
         if (r.lng() != null) e.setLng(r.lng());
         if (r.lat() != null) e.setLat(r.lat());
         e.setSceneType(r.sceneType());
-        e.setOpenHours(r.openHours().trim());
+        e.setOpenHours(notBlank(r.openHours()) ? r.openHours().trim() : null);
         e.setOpsEmployeeNo(ops);
     }
 
@@ -750,9 +794,11 @@ public class SiteServiceImpl implements SiteService {
         if (rows.isEmpty()) return List.of();
         List<String> nos = rows.stream().map(LocSite::getSiteNo).toList();
         Map<String, Integer> points = new HashMap<>();
+        Map<String, String> defaults = new HashMap<>();
         for (LocLocation l : locations.selectList(new LambdaQueryWrapper<LocLocation>()
                 .in(LocLocation::getSiteNo, nos).isNull(LocLocation::getArchivedAt))) {
             points.merge(l.getSiteNo(), 1, Integer::sum);
+            if (l.getIsDefault() != null && l.getIsDefault() == 1) defaults.put(l.getSiteNo(), l.getLocationNo());
         }
         Map<String, ContractBrief> active = contracts.activeBySites(nos);
         Map<String, String> operate = operateAgentsOf(nos);
@@ -770,7 +816,8 @@ public class SiteServiceImpl implements SiteService {
                 e.getNameAr(), e.getOpenHours(),
                 new SiteOps(e.getOpsEmployeeNo(), operate.get(e.getSiteNo()), e.getFirstLiveAt(), e.getPauseReason(),
                         e.getPauseUntil(), e.getWithdrawReason(), e.getWithdrawPlannedAt(), e.getClosedAt(),
-                        active.containsKey(e.getSiteNo()) ? active.get(e.getSiteNo()).contractNo() : null)))
+                        active.containsKey(e.getSiteNo()) ? active.get(e.getSiteNo()).contractNo() : null))
+                        .withDefaultLocationNo(defaults.get(e.getSiteNo())))
                 .toList();
     }
 

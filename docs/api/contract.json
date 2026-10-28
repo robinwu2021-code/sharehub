@@ -14958,6 +14958,18 @@
      "name": "showArchived",
      "type": "Boolean",
      "required": false
+    },
+    {
+     "in": "query",
+     "name": "siteNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "agentNo",
+     "type": "String",
+     "required": false
     }
    ],
    "bodyType": null,
@@ -14991,6 +15003,14 @@
     },
     {
      "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "isDefault",
+     "type": "Boolean"
+    },
+    {
+     "name": "agentNo",
      "type": "String"
     }
    ],
@@ -15045,6 +15065,14 @@
     {
      "name": "status",
      "type": "String"
+    },
+    {
+     "name": "isDefault",
+     "type": "Boolean"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -15074,6 +15102,14 @@
     },
     {
      "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "isDefault",
+     "type": "Boolean"
+    },
+    {
+     "name": "agentNo",
      "type": "String"
     }
    ]
@@ -15127,6 +15163,14 @@
     {
      "name": "status",
      "type": "String"
+    },
+    {
+     "name": "isDefault",
+     "type": "Boolean"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -15156,6 +15200,14 @@
     },
     {
      "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "isDefault",
+     "type": "Boolean"
+    },
+    {
+     "name": "agentNo",
      "type": "String"
     }
    ]
@@ -18672,7 +18724,7 @@
     "location:poi:read"
    ],
    "handler": "SiteController#page",
-   "summary": "站点（2026-09-25 定：站点状态与门店生命周期合并为一套状态机；TDD-运营核心流程/03）。",
+   "summary": "",
    "params": [
     {
      "in": "query",
@@ -18714,6 +18766,12 @@
      "in": "query",
      "name": "missingOpenHours",
      "type": "Boolean",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "agentNo",
+     "type": "String",
      "required": false
     }
    ],
@@ -18838,6 +18896,10 @@
     },
     {
      "name": "opsEmployeeNo",
+     "type": "String"
+    },
+    {
+     "name": "defaultLocationNo",
      "type": "String"
     }
    ],
@@ -18975,6 +19037,10 @@
     {
      "name": "opsEmployeeNo",
      "type": "String"
+    },
+    {
+     "name": "defaultLocationNo",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -19020,6 +19086,10 @@
     },
     {
      "name": "opsEmployeeNo",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
      "type": "String"
     }
    ]
@@ -19209,6 +19279,10 @@
     {
      "name": "opsEmployeeNo",
      "type": "String"
+    },
+    {
+     "name": "defaultLocationNo",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -19352,6 +19426,10 @@
     {
      "name": "opsEmployeeNo",
      "type": "String"
+    },
+    {
+     "name": "defaultLocationNo",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -19397,6 +19475,10 @@
     },
     {
      "name": "opsEmployeeNo",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
      "type": "String"
     }
    ]
@@ -19758,6 +19840,10 @@
     {
      "name": "opsEmployeeNo",
      "type": "String"
+    },
+    {
+     "name": "defaultLocationNo",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -19900,6 +19986,10 @@
     },
     {
      "name": "opsEmployeeNo",
+     "type": "String"
+    },
+    {
+     "name": "defaultLocationNo",
      "type": "String"
     }
    ],
@@ -20159,6 +20249,10 @@
     {
      "name": "opsEmployeeNo",
      "type": "String"
+    },
+    {
+     "name": "defaultLocationNo",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -20310,6 +20404,10 @@
     },
     {
      "name": "opsEmployeeNo",
+     "type": "String"
+    },
+    {
+     "name": "defaultLocationNo",
      "type": "String"
     }
    ],
@@ -20791,6 +20889,10 @@
     {
      "name": "opsEmployeeNo",
      "type": "String"
+    },
+    {
+     "name": "defaultLocationNo",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -20933,6 +21035,10 @@
     },
     {
      "name": "opsEmployeeNo",
+     "type": "String"
+    },
+    {
+     "name": "defaultLocationNo",
      "type": "String"
     }
    ],
