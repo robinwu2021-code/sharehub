@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Source Han Sans SC','Noto Sans CJK SC',-apple-system,'Segoe UI',Roboto,sans-serif">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4A585B"/></marker><marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0F7173"/></marker></defs>
+<rect width="1600" height="900" fill="#FFFFFF"/>
+<text x="56" y="68" font-size="42" fill="#12181B" font-weight="750" text-anchor="start" letter-spacing="-1" opacity="1">业务模块目录（单体内 · 按服务组）</text>
+<text x="56" y="104" font-size="22" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">同组模块将来一起拆成一个服务　｜　✓ 已实现　◐ 部分　＋ 第一阶段新增　｜　右上角为代码包</text>
+<line x1="56" y1="126" x2="1544" y2="126" stroke="#D8E0DF" stroke-width="2"/>
+<rect x="56.0" y="146" width="284.8" height="62" rx="9" fill="#FFFFFF" stroke="#5C8A63" stroke-width="3"/>
+<text x="198.4" y="175.76" font-size="25" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">平台服务组</text>
+<text x="198.4" y="194" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">sharehub-svc-platform</text>
+<rect x="56.0" y="218" width="284.8" height="196" rx="10" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.8"/>
+<text x="72.0" y="250" font-size="23" fill="#12181B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">商家管理</text>
+<text x="326.8" y="249" font-size="15" fill="#7C8B8E" font-weight="400" text-anchor="end" letter-spacing="0" opacity="1">agent</text>
+<text x="72.0" y="280" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">入驻申请 · 审核 ✓</text>
+<text x="72.0" y="305" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">商家档案 · 账号 · 多主体 ✓</text>
+<text x="72.0" y="330" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">收款账户 ◐</text>
+<text x="72.0" y="355" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">渠道商户进件 ＋</text>
+<text x="72.0" y="380" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">商家分润规则 ◐</text>
+<rect x="56.0" y="426" width="284.8" height="196" rx="10" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.8"/>
+<text x="72.0" y="458" font-size="23" fill="#12181B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">网点管理</text>
+<text x="326.8" y="457" font-size="15" fill="#7C8B8E" font-weight="400" text-anchor="end" letter-spacing="0" opacity="1">loc</text>
+<text x="72.0" y="488" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">拓展线索 · 场地方 ✓</text>
+<text x="72.0" y="513" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">站点 · 点位 · 生命周期 ✓</text>
+<text x="72.0" y="538" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">进场合同 · 补充协议 ✓</text>
+<text x="72.0" y="563" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">合同到期提醒（可配）◐</text>
+<rect x="56.0" y="634" width="284.8" height="196" rx="10" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.8"/>
+<text x="72.0" y="666" font-size="23" fill="#12181B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">系统管理</text>
+<text x="326.8" y="665" font-size="15" fill="#7C8B8E" font-weight="400" text-anchor="end" letter-spacing="0" opacity="1">platform</text>
+<text x="72.0" y="696" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">组织 · 员工 · 角色 · 菜单 ✓</text>
+<text x="72.0" y="721" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">字典 · 参数 · 税务设置 ✓</text>
+<text x="72.0" y="746" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">通知模板 · 文件 ✓</text>
+<text x="72.0" y="771" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">操作审计 ✓</text>
+<rect x="356.8" y="146" width="284.8" height="62" rx="9" fill="#FFFFFF" stroke="#7D63A3" stroke-width="3"/>
+<text x="499.20000000000005" y="175.76" font-size="25" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">交易服务组</text>
+<text x="499.20000000000005" y="194" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">sharehub-svc-core</text>
+<rect x="356.8" y="218" width="284.8" height="196" rx="10" fill="#FFFFFF" stroke="#7D63A3" stroke-width="1.8"/>
+<text x="372.8" y="250" font-size="23" fill="#12181B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">设备管理</text>
+<text x="627.6" y="249" font-size="15" fill="#7C8B8E" font-weight="400" text-anchor="end" letter-spacing="0" opacity="1">dev · inv</text>
+<text x="372.8" y="280" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">柜机 · 仓位 · 充电宝台账 ✓</text>
+<text x="372.8" y="305" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">生命周期 · 质检 · 调拨 ✓</text>
+<text x="372.8" y="330" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">采购 · 收货入库 ＋</text>
+<text x="372.8" y="355" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">设备履历 · 盘点 ＋</text>
+<text x="372.8" y="380" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">库存余额与变动 ＋</text>
+<rect x="356.8" y="426" width="284.8" height="196" rx="10" fill="#FFFFFF" stroke="#7D63A3" stroke-width="1.8"/>
+<text x="372.8" y="458" font-size="23" fill="#12181B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">销售管理</text>
+<text x="627.6" y="457" font-size="15" fill="#7C8B8E" font-weight="400" text-anchor="end" letter-spacing="0" opacity="1">trade</text>
+<text x="372.8" y="488" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">租借订单 · 状态机 ✓</text>
+<text x="372.8" y="513" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">计费 · 最长时限 · 最高收费 ◐</text>
+<text x="372.8" y="538" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">支付编排 · 退款 ◐</text>
+<text x="372.8" y="563" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">逾期与扣款失败监控 ＋</text>
+<text x="372.8" y="588" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">优惠券 · 会员 · 活动 ✓</text>
+<rect x="356.8" y="634" width="284.8" height="196" rx="10" fill="#FFFFFF" stroke="#7D63A3" stroke-width="1.8"/>
+<text x="372.8" y="666" font-size="23" fill="#12181B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">用户管理</text>
+<text x="627.6" y="665" font-size="15" fill="#7C8B8E" font-weight="400" text-anchor="end" letter-spacing="0" opacity="1">user</text>
+<text x="372.8" y="696" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">消费者账号 · 身份归并 ✓</text>
+<text x="372.8" y="721" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">钱包 · 充值 ✓</text>
+<text x="372.8" y="746" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">信用 · 黑名单 · 免押 ✓</text>
+<text x="372.8" y="771" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">消息 · 反馈 ✓</text>
+<rect x="657.6" y="146" width="284.8" height="62" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="3"/>
+<text x="800.0" y="175.76" font-size="25" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">财务服务组</text>
+<text x="800.0" y="194" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">sharehub-svc-finance</text>
+<rect x="657.6" y="218" width="284.8" height="196" rx="10" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="673.6" y="250" font-size="23" fill="#12181B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">财务管理</text>
+<text x="928.4000000000001" y="249" font-size="15" fill="#7C8B8E" font-weight="400" text-anchor="end" letter-spacing="0" opacity="1">finance</text>
+<text x="673.6" y="280" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">复式账务分录 ✓</text>
+<text x="673.6" y="305" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">业务对账 · 差错处置 ◐</text>
+<text x="673.6" y="330" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">应付台账（按商家）＋</text>
+<text x="673.6" y="355" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">调整单 · 审批 ◐</text>
+<text x="673.6" y="380" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">网关手续费 ＋</text>
+<rect x="657.6" y="426" width="284.8" height="196" rx="10" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="673.6" y="458" font-size="23" fill="#12181B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">结算</text>
+<text x="928.4000000000001" y="457" font-size="15" fill="#7C8B8E" font-weight="400" text-anchor="end" letter-spacing="0" opacity="1">finance</text>
+<text x="673.6" y="488" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">分润记录（按商家）✓</text>
+<text x="673.6" y="513" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">账期结算单 · 对账单 ✓</text>
+<text x="673.6" y="538" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">付款登记 · 提现审批 ◐</text>
+<text x="673.6" y="563" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">付款来源可切换 ＋</text>
+<rect x="657.6" y="634" width="284.8" height="196" rx="10" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="673.6" y="666" font-size="23" fill="#12181B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">发票</text>
+<text x="928.4000000000001" y="665" font-size="15" fill="#7C8B8E" font-weight="400" text-anchor="end" letter-spacing="0" opacity="1">finance</text>
+<text x="673.6" y="696" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">结算票据（给商家）◐</text>
+<text x="673.6" y="721" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">租赁票据（给客户）＋</text>
+<text x="673.6" y="746" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">开票规则 · 自动开具 ＋</text>
+<text x="673.6" y="771" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">贷项通知单 · PDF ＋</text>
+<rect x="958.4000000000001" y="146" width="284.8" height="62" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="3"/>
+<text x="1100.8000000000002" y="175.76" font-size="25" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">运维服务组</text>
+<text x="1100.8000000000002" y="194" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">sharehub-svc-ops</text>
+<rect x="958.4000000000001" y="218" width="284.8" height="196" rx="10" fill="#FFFFFF" stroke="#B07D3A" stroke-width="1.8"/>
+<text x="974.4000000000001" y="250" font-size="23" fill="#12181B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">运维管理</text>
+<text x="1229.2" y="249" font-size="15" fill="#7C8B8E" font-weight="400" text-anchor="end" letter-spacing="0" opacity="1">alarm · wo · cs</text>
+<text x="974.4000000000001" y="280" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">告警规则 · 告警单 ✓</text>
+<text x="974.4000000000001" y="305" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">工单 · 巡检 · SLA ✓</text>
+<text x="974.4000000000001" y="330" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">客服会话 ✓</text>
+<text x="974.4000000000001" y="355" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">逾期 · 扣款失败告警 ＋</text>
+<rect x="958.4000000000001" y="426" width="284.8" height="62" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="3"/>
+<text x="1100.8000000000002" y="455.76" font-size="25" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">报表服务组</text>
+<text x="1100.8000000000002" y="474" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">新建 sharehub-svc-report</text>
+<rect x="958.4000000000001" y="498" width="284.8" height="196" rx="10" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="974.4000000000001" y="530" font-size="23" fill="#12181B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">报表管理</text>
+<text x="1229.2" y="529" font-size="15" fill="#7C8B8E" font-weight="400" text-anchor="end" letter-spacing="0" opacity="1">report</text>
+<text x="974.4000000000001" y="560" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">按角色经营看板 ◐</text>
+<text x="974.4000000000001" y="585" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">设备 · 点位 · 财务报表 ◐</text>
+<text x="974.4000000000001" y="610" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">15 张报表目录 ＋</text>
+<text x="974.4000000000001" y="635" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">导出中心 Excel / PDF ＋</text>
+<rect x="958.4000000000001" y="706" width="284.8" height="124" rx="10" fill="#FFFFFF" stroke="#B07D3A" stroke-width="3"/>
+<text x="974.4000000000001" y="738" font-size="23" fill="#12181B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">设备对接服务</text>
+<text x="1229.2" y="737" font-size="15" fill="#7C8B8E" font-weight="400" text-anchor="end" letter-spacing="0" opacity="1">gateway</text>
+<text x="974.4000000000001" y="768" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">独立微服务 · 不在单体内</text>
+<text x="974.4000000000001" y="793" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">驱动 · 指令 · 事件 · 心跳</text>
+<rect x="1259.2" y="146" width="284.8" height="62" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="3"/>
+<text x="1401.6000000000001" y="175.76" font-size="25" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">单体公共层</text>
+<text x="1401.6000000000001" y="194" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">sharehub-app · common</text>
+<rect x="1259.2" y="218" width="284.8" height="196" rx="10" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="1275.2" y="250" font-size="23" fill="#12181B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">接入层 API</text>
+<text x="1530.0" y="249" font-size="15" fill="#7C8B8E" font-weight="400" text-anchor="end" letter-spacing="0" opacity="1">portal</text>
+<text x="1275.2" y="280" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">B 端 /api/** 六前缀 ✓</text>
+<text x="1275.2" y="305" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">C 端 /mp/** ✓</text>
+<text x="1275.2" y="330" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">内部 /internal/** ✓</text>
+<text x="1275.2" y="355" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">按端分包 ＋</text>
+<rect x="1259.2" y="426" width="284.8" height="196" rx="10" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="1275.2" y="458" font-size="23" fill="#12181B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">认证</text>
+<text x="1530.0" y="457" font-size="15" fill="#7C8B8E" font-weight="400" text-anchor="end" letter-spacing="0" opacity="1">auth · iam</text>
+<text x="1275.2" y="488" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">B 端：员工 · 商家 ✓</text>
+<text x="1275.2" y="513" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">C 端：6 种登录方式 ✓</text>
+<text x="1275.2" y="538" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">令牌存储 MySQL + 缓存 ✓</text>
+<text x="1275.2" y="563" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">抽成独立模块 ＋</text>
+<rect x="1259.2" y="634" width="284.8" height="196" rx="10" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="1275.2" y="666" font-size="23" fill="#12181B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">集成适配</text>
+<text x="1530.0" y="665" font-size="15" fill="#7C8B8E" font-weight="400" text-anchor="end" letter-spacing="0" opacity="1">integration</text>
+<text x="1275.2" y="696" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">设备服务客户端 ◐</text>
+<text x="1275.2" y="721" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">支付客户端（现为桩）◐</text>
+<text x="1275.2" y="746" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">OpsKit 流程工单 ◐</text>
+<text x="1275.2" y="771" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">会计端口 Zoho（预留）</text>
+<text x="56" y="878" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">设备对接（协议 · 驱动 · 指令 · 在线心跳）不在单体内，是独立微服务；单体的「设备管理」只管资产与业务状态。</text>
+</svg>

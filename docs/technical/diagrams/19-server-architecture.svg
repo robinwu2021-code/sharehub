@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Source Han Sans SC','Noto Sans CJK SC',-apple-system,'Segoe UI',Roboto,sans-serif">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4A585B"/></marker><marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0F7173"/></marker></defs>
+<rect width="1600" height="900" fill="#FFFFFF"/>
+<text x="56" y="68" font-size="42" fill="#12181B" font-weight="750" text-anchor="start" letter-spacing="-1" opacity="1">ShareHub 服务端架构（第一阶段）</text>
+<text x="56" y="104" font-size="22" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">大单体 + 分模块 · 设备对接独立微服务 · 支付与任务共用 ai-shop　｜　ADR-020 / 025 / 032</text>
+<line x1="56" y1="126" x2="1544" y2="126" stroke="#D8E0DF" stroke-width="2"/>
+<rect x="56.0" y="138" width="322.6666666666667" height="64" rx="9" fill="#FFFFFF" stroke="#7D63A3" stroke-width="1.8"/>
+<text x="217.33333333333334" y="168.72" font-size="25" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">运营台 ops-web</text>
+<text x="217.33333333333334" y="188" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">员工 · /api</text>
+<line x1="217.33333333333334" y1="204" x2="217.33333333333334" y2="244" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<rect x="394.6666666666667" y="138" width="322.6666666666667" height="64" rx="9" fill="#FFFFFF" stroke="#7D63A3" stroke-width="1.8"/>
+<text x="556.0" y="168.72" font-size="25" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">商家视图 ops-web</text>
+<text x="556.0" y="188" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">商家 · /api</text>
+<line x1="556.0" y1="204" x2="556.0" y2="244" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<rect x="733.3333333333334" y="138" width="322.6666666666667" height="64" rx="9" fill="#FFFFFF" stroke="#7D63A3" stroke-width="1.8"/>
+<text x="894.6666666666667" y="168.72" font-size="25" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">C 端 c-app</text>
+<text x="894.6666666666667" y="188" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">App · 小程序 · H5 · /mp</text>
+<line x1="894.6666666666667" y1="204" x2="894.6666666666667" y2="244" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<text x="1110" y="166" font-size="18" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">外部回调同样经 nginx 进入：</text>
+<text x="1110" y="192" font-size="18" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">支付 /pay/callback · 厂商 /gw · /ocpp</text>
+<rect x="56" y="246" width="1000" height="552" rx="10" fill="#FFFFFF" stroke="#A35D63" stroke-width="3"/>
+<text x="76" y="280" font-size="24" fill="#12181B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">sharehub-app · 业务大单体（:8082 · 无状态 · 可多副本）</text>
+<text x="76" y="308" font-size="18" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">接入层：两端 API 都在单体内</text>
+<rect x="76.0" y="318" width="312.0" height="64" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="3"/>
+<text x="232.0" y="348.72" font-size="25" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">B 端 API</text>
+<text x="232.0" y="368" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">/api/** 六前缀 · 运营台与商家</text>
+<rect x="400.0" y="318" width="312.0" height="64" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="3"/>
+<text x="556.0" y="348.72" font-size="25" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">C 端 API</text>
+<text x="556.0" y="368" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">/mp/** · App / 小程序 / H5</text>
+<rect x="724.0" y="318" width="312.0" height="64" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="880.0" y="348.72" font-size="25" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">内部 API</text>
+<text x="880.0" y="368" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">/internal/** · 服务凭证</text>
+<text x="76" y="406" font-size="18" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">认证：两套方案，共用令牌存储</text>
+<rect x="76" y="416" width="474.0" height="64" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="3"/>
+<text x="313.0" y="446.72" font-size="25" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">B 端认证</text>
+<text x="313.0" y="466" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">账号密码 / 手机验证码 · RBAC + 数据范围</text>
+<rect x="562.0" y="416" width="474.0" height="64" rx="9" fill="#FFFFFF" stroke="#7D63A3" stroke-width="3"/>
+<text x="799.0" y="446.72" font-size="25" fill="#12181B" font-weight="700" text-anchor="middle" letter-spacing="0" opacity="1">C 端认证</text>
+<text x="799.0" y="466" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">手机验证码 · 密码 · Apple · Google · 微信 · 属主校验</text>
+<text x="76" y="504" font-size="18" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">业务模块（11 个）</text>
+<rect x="76.0" y="514" width="150.0" height="64" rx="9" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.8"/>
+<text x="151.0" y="544.72" font-size="25" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">商家管理</text>
+<text x="151.0" y="564" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">入驻·档案·账号</text>
+<rect x="238.0" y="514" width="150.0" height="64" rx="9" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.8"/>
+<text x="313.0" y="544.72" font-size="25" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">网点管理</text>
+<text x="313.0" y="564" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">场地·站点·合同</text>
+<rect x="400.0" y="514" width="150.0" height="64" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="1.8"/>
+<text x="475.0" y="544.72" font-size="25" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">设备管理</text>
+<text x="475.0" y="564" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">台账·库存·采购</text>
+<rect x="562.0" y="514" width="150.0" height="64" rx="9" fill="#FFFFFF" stroke="#7D63A3" stroke-width="1.8"/>
+<text x="637.0" y="544.72" font-size="25" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">销售管理</text>
+<text x="637.0" y="564" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">订单·计价·营销</text>
+<rect x="724.0" y="514" width="150.0" height="64" rx="9" fill="#FFFFFF" stroke="#7D63A3" stroke-width="1.8"/>
+<text x="799.0" y="544.72" font-size="25" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">用户管理</text>
+<text x="799.0" y="564" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">C端用户·钱包</text>
+<rect x="886.0" y="514" width="150.0" height="64" rx="9" fill="#FFFFFF" stroke="#B07D3A" stroke-width="1.8"/>
+<text x="961.0" y="544.72" font-size="25" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">运维管理</text>
+<text x="961.0" y="564" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">告警·工单·客服</text>
+<rect x="76.0" y="588" width="182.4" height="64" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="167.2" y="618.72" font-size="25" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">财务管理</text>
+<text x="167.2" y="638" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">账务·对账·应付</text>
+<rect x="270.4" y="588" width="182.4" height="64" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="361.59999999999997" y="618.72" font-size="25" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">结算</text>
+<text x="361.59999999999997" y="638" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">分润·结算单·付款</text>
+<rect x="464.8" y="588" width="182.4" height="64" rx="9" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="556.0" y="618.72" font-size="25" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">发票</text>
+<text x="556.0" y="638" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">租赁票据·结算票据</text>
+<rect x="659.2" y="588" width="182.4" height="64" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="750.4000000000001" y="618.72" font-size="25" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">报表管理</text>
+<text x="750.4000000000001" y="638" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">看板·报表·导出</text>
+<rect x="853.6" y="588" width="182.4" height="64" rx="9" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="944.8000000000001" y="618.72" font-size="25" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">系统管理</text>
+<text x="944.8000000000001" y="638" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">组织·权限·参数</text>
+<text x="76" y="676" font-size="18" fill="#7C8B8E" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">集成适配：调用外部服务的唯一出口</text>
+<rect x="76.0" y="686" width="231.0" height="60" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="191.5" y="714.8" font-size="25" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">设备服务客户端</text>
+<text x="191.5" y="732" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">DeviceCommandPort</text>
+<rect x="319.0" y="686" width="231.0" height="60" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="434.5" y="714.8" font-size="25" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">支付客户端</text>
+<text x="434.5" y="732" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">PaymentPort</text>
+<rect x="562.0" y="686" width="231.0" height="60" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="677.5" y="714.8" font-size="25" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">OpsKit 客户端</text>
+<text x="677.5" y="732" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">流程 · 工单（可选）</text>
+<rect x="805.0" y="686" width="231.0" height="60" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="920.5" y="714.8" font-size="25" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">会计端口</text>
+<text x="920.5" y="732" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">Zoho（预留）</text>
+<rect x="76" y="756" width="127.44999999999999" height="34" rx="17" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.6"/>
+<text x="139.725" y="778" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">事件 Outbox</text>
+<rect x="213.45" y="756" width="113.0" height="34" rx="17" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.6"/>
+<text x="269.95" y="778" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">任务处理器</text>
+<rect x="336.45" y="756" width="96.0" height="34" rx="17" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.6"/>
+<text x="384.45" y="778" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">操作审计</text>
+<rect x="442.45" y="756" width="62.0" height="34" rx="17" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.6"/>
+<text x="473.45" y="778" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">幂等</text>
+<rect x="514.45" y="756" width="96.0" height="34" rx="17" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.6"/>
+<text x="562.45" y="778" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">链路追踪</text>
+<rect x="620.45" y="756" width="140.2" height="34" rx="17" fill="#FFFFFF" stroke="#5C8A63" stroke-width="1.6"/>
+<text x="690.5500000000001" y="778" font-size="17" fill="#4A585B" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">zh / en / ar</text>
+<rect x="1110" y="318" width="434" height="152" rx="10" fill="#FFFFFF" stroke="#B07D3A" stroke-width="3"/>
+<text x="1130" y="352" font-size="25" fill="#12181B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">设备对接服务（独立微服务）</text>
+<text x="1130" y="382" font-size="18" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">sharehub-gateway :8091 · 库 sharehub_gw</text>
+<text x="1130" y="409" font-size="18" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">厂商目录 · 驱动插件 · 指令与事件 · 心跳</text>
+<text x="1130" y="436" font-size="18" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">HTTP/Webhook · TCP · MQTT · OCPP</text>
+<rect x="1110" y="484" width="434" height="84" rx="10" fill="#FFFFFF" stroke="#A35D63" stroke-width="1.8"/>
+<text x="1130" y="518" font-size="24" fill="#12181B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">支付服务 · 共用 ai-shop</text>
+<text x="1130" y="550" font-size="18" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">通道 · 预授权 · 请款 · 退款 · 打款</text>
+<rect x="1110" y="582" width="434" height="70" rx="10" fill="#FFFFFF" stroke="#5B7BA6" stroke-width="1.8"/>
+<text x="1130" y="614" font-size="24" fill="#12181B" font-weight="700" text-anchor="start" letter-spacing="0" opacity="1">任务调度 · 共用 ai-shop</text>
+<text x="1130" y="640" font-size="17" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">按 cron 回调各进程 /internal/job</text>
+<rect x="1110.0" y="666" width="211.0" height="60" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="1215.5" y="694.8" font-size="22" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">厂商云 / 柜机</text>
+<text x="1215.5" y="712" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">经设备对接服务</text>
+<rect x="1333.0" y="666" width="211.0" height="60" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="1438.5" y="694.8" font-size="22" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">支付通道</text>
+<text x="1438.5" y="712" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">AE 卡 · 经支付服务</text>
+<rect x="1110.0" y="734" width="211.0" height="60" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="1215.5" y="762.8" font-size="22" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">OpsKit</text>
+<text x="1215.5" y="780" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">流程工单 · 可选</text>
+<rect x="1333.0" y="734" width="211.0" height="60" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="1438.5" y="762.8" font-size="22" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">Zoho Books</text>
+<text x="1438.5" y="780" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">会计 · 预留</text>
+<line x1="1058" y1="376" x2="1106" y2="376" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)"/>
+<line x1="1108" y1="424" x2="1062" y2="424" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)" stroke-dasharray="6 5"/>
+<line x1="1058" y1="512" x2="1106" y2="512" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)"/>
+<line x1="1108" y1="546" x2="1062" y2="546" stroke="#4A585B" stroke-width="2.6" marker-end="url(#a)" stroke-dasharray="6 5"/>
+<line x1="1108" y1="617" x2="1062" y2="617" stroke="#0F7173" stroke-width="2.6" marker-end="url(#ao)"/>
+<rect x="56.0" y="808" width="322.6666666666667" height="58" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="217.33333333333334" y="835.84" font-size="23" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">sharehub_core</text>
+<text x="217.33333333333334" y="852" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">业务表 · 单体独占</text>
+<rect x="394.6666666666667" y="808" width="322.6666666666667" height="58" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="556.0" y="835.84" font-size="23" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">sharehub_auth</text>
+<text x="556.0" y="852" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">凭据 · 会话</text>
+<rect x="733.3333333333334" y="808" width="322.6666666666667" height="58" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="894.6666666666667" y="835.84" font-size="23" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">sharehub_pii</text>
+<text x="894.6666666666667" y="852" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">个人数据 · PDPL</text>
+<rect x="1110" y="808" width="434" height="58" rx="9" fill="#FFFFFF" stroke="#6B7A7C" stroke-width="1.8"/>
+<text x="1327.0" y="835.84" font-size="23" fill="#12181B" font-weight="600" text-anchor="middle" letter-spacing="0" opacity="1">各服务自有库</text>
+<text x="1327.0" y="852" font-size="16" fill="#7C8B8E" font-weight="400" text-anchor="middle" letter-spacing="0" opacity="1">sharehub_gw · 共用服务的库</text>
+<text x="56" y="892" font-size="19" fill="#4A585B" font-weight="400" text-anchor="start" letter-spacing="0" opacity="1">实线 = 同步调用　虚线 = 事件 / 回调（至少一次 · 消费幂等）　青色 = 调度器回调任务端点　｜　模块明细见 20 · 认证见 21 · 拆分见 22</text>
+</svg>
