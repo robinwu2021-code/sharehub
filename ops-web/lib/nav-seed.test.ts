@@ -315,6 +315,34 @@ const PATCHES: { file: string; mustContain: string; apply: (rows: Row[]) => void
       for (const no of ["M_finance__11", "M_finance__12"]) rows.splice(rows.findIndex((r) => r.menu_no === no), 1);
     },
   },
+  {
+    // 运维管理（OM06）：告警管理 + 客服管理并入工单管理（更名、落地页改 /alarms）；客服两个快捷入口删除；
+    // 三段叶子按 path 重编号并分三组；删 M_alarm / M_cs 两个 L1，其后 L1 排序前移。
+    file: "V153__menu_ops_maintenance_section_by_ops_order.sql",
+    mustContain: "UPDATE iam_menu SET menu_no = CONCAT('M_tmp153_', id)",
+    apply: (rows) => {
+      const at = (no: string) => rows.find((r) => r.menu_no === no)!;
+      Object.assign(at("M_workorder"), { name: "运维管理", name_en: "Operations & Maintenance", name_ar: "التشغيل والصيانة",
+        path: "/alarms", match_paths: '["/alarms","/cs","/work-orders"]' });
+      const parents = ["M_alarm", "M_cs", "M_workorder"];
+      for (const path of ["/orders", "/users"]) {
+        rows.splice(rows.findIndex((r) => r.parent_no === "M_cs" && r.path === path), 1);
+      }
+      const plan: [string, string][] = [
+        ["/alarms", "告警"], ["/alarms?tab=notices", "告警"], ["/alarms?tab=codes", "告警"], ["/alarms?tab=rules", "告警"],
+        ["/cs", "客服"], ["/cs?tab=sessions", "客服"],
+        ["/work-orders?view=list", "工单"], ["/work-orders?view=board", "工单"],
+        ["/work-orders?view=inspection", "工单"], ["/work-orders?view=sla", "工单"],
+      ];
+      const targets = plan.map(([path]) => rows.find((r) => parents.includes(r.parent_no) && r.path === path)!);
+      plan.forEach(([, group], i) => {
+        Object.assign(targets[i], { menu_no: `M_workorder__${i + 1}`, parent_no: "M_workorder", sort: String(i + 1), group_name: group });
+      });
+      for (const no of ["M_alarm", "M_cs"]) rows.splice(rows.findIndex((r) => r.menu_no === no), 1);
+      const l1 = ["M_workorder", "M_venue", "M_agent", "M_order", "M_finance", "M_user", "M_report", "M_org", "M_system", "M_flow"];
+      l1.forEach((no, i) => { at(no).sort = String(i + 7); });
+    },
+  },
 ];
 
 const COLS = [

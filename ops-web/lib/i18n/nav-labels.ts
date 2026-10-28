@@ -30,7 +30,11 @@ const NAV: Record<string, Pair> = {
   // 模块
   "经营看板": { en: "Dashboard", ar: "لوحة المعلومات" },
   "设备管理": { en: "Devices", ar: "الأجهزة" },
-  "工单管理": { en: "Work Orders", ar: "أوامر العمل" },
+  // 2026-10-28 告警管理 + 客服管理 + 工单管理合并为「运维管理」（OM06），分三组；
+  // 「工单」组名与流程与工单的「工单」组共用一个键（按中文取键），英文沿用 Tickets
+  "运维管理": { en: "Operations & Maintenance", ar: "التشغيل والصيانة" },
+  "告警": { en: "Alarms", ar: "الإنذارات" },
+  "客服": { en: "Customer Service", ar: "خدمة العملاء" },
   "商家管理": { en: "Merchants", ar: "التجار" },
   // 2026-10-28 订单管理 + 营销管理 + 计费 + 会员 + 支付渠道合并为「销售管理」（OM04），分七组
   "销售管理": { en: "Sales", ar: "المبيعات" },
@@ -49,7 +53,6 @@ const NAV: Record<string, Pair> = {
   "广告": { en: "Advertising", ar: "الإعلانات" },
   "财务管理": { en: "Finance", ar: "المالية" },
   "用户管理": { en: "Users", ar: "المستخدمون" },
-  "客服管理": { en: "Support", ar: "الدعم" },
   "员工与权限": { en: "Staff & Roles", ar: "الموظفون والأدوار" },
   "系统设置": { en: "Settings", ar: "الإعدادات" },
   "流程与工单": { en: "Workflow & Tickets", ar: "سير العمل والتذاكر" },
@@ -91,8 +94,6 @@ const NAV: Record<string, Pair> = {
   "人与组织": { en: "People & Org", ar: "الأفراد والتنظيم" },
   "授权": { en: "Authorization", ar: "التفويض" },
   "留痕与考核": { en: "Audit & Review", ar: "التدقيق والتقييم" },
-  "告警处置": { en: "Alarm Handling", ar: "معالجة الإنذارات" },
-  "规则配置": { en: "Rule Config", ar: "إعداد القواعد" },
   "运营内容": { en: "Content", ar: "المحتوى التشغيلي" },
   "消息触达": { en: "Messaging", ar: "المراسلة" },
   "业务规则": { en: "Business Rules", ar: "قواعد العمل" },
@@ -109,7 +110,6 @@ const NAV: Record<string, Pair> = {
   "固件 OTA": { en: "Firmware OTA", ar: "تحديث البرمجيات" },
   "设备日志": { en: "Device Logs", ar: "سجلات الجهاز" },
   "设备编码": { en: "Device Codes", ar: "أكواد الأجهزة" },
-  "告警管理": { en: "Alarms", ar: "الإنذارات" },
   "告警记录": { en: "Alarm Records", ar: "سجلات الإنذار" },
   "告警通知": { en: "Alarm Notices", ar: "إشعارات الإنذار" },
   "告警代码": { en: "Alarm Codes", ar: "أكواد الإنذار" },
@@ -180,8 +180,6 @@ const NAV: Record<string, Pair> = {
   "投放与曝光": { en: "Ad Delivery", ar: "عرض الإعلانات" },
   "报障受理": { en: "Tickets", ar: "تذاكر الأعطال" },
   "客服会话": { en: "Sessions", ar: "المحادثات" },
-  "退款/补偿": { en: "Refunds", ar: "المبالغ المستردة" },
-  "黑名单处理": { en: "Blacklist", ar: "القائمة السوداء" },
   "设备运营分析": { en: "Device Analytics", ar: "تحليلات الأجهزة" },
   "点位坪效": { en: "Point Yield", ar: "أداء النقاط" },
   "财务报表": { en: "Financials", ar: "التقارير المالية" },

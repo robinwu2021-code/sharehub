@@ -261,23 +261,37 @@ export const NAV: NavSection[] = [
     ],
   },
   {
-    // 对标简电云「告警管理」（补齐清单 A）：告警码字典 → 通知规则 → 记录 → 触达。
-    // 我们比它多一环：记录带「关联工单号」，规则带「静默窗口/升级策略」，字典带「建议处置/自动开工单」。
-    key: "alarm", label: "告警管理", icon: "BellRing", module: "workorder", href: "/alarms",
+    // 2026-10-28 按运营顺序合并为「运维管理」（OM06 · docs/requirements/运营端菜单清单-按运营顺序.md）：
+    // 告警管理 + 客服管理 + 工单管理三个 L1 合一。三组是同一条处置链：
+    //   告警（机器发现问题）→ 客服（用户报来问题）→ 工单（派人去现场解决）。
+    // 前两组是问题的两个入口，工单是两者共同的出口（告警「转工单」、报障「转工单」都落到这里）。
+    // 告警组仍对标简电云「告警管理」：码字典 → 通知规则 → 记录 → 触达；我们多一环关联工单号与处置路由。
+    // 客服原先的「退款/补偿」「黑名单处理」两个快捷入口撤销：它们指向 /orders、/users，
+    // 一个 URL 只属于一个 L1，在这里点进去面包屑与 Rail 高亮跳到别的菜单，运营反而找不到回来的路；
+    // 退款直达销售管理 › 售后，黑名单直达用户管理 › 风险。
+    // 三个页面 URL 不动（/alarms、/cs、/work-orders），靠 match 认领；落地页是告警记录（href）。
+    // ⚠️ 菜单真源在库里：本段的行由 V153 重编号（M_alarm / M_cs 两个 L1 删除），改这里要同步新开迁移（见 nav-seed.test.ts）。
+    key: "workorder", label: "运维管理", icon: "Wrench", module: "workorder", href: "/alarms",
+    match: ["/alarms", "/cs", "/work-orders"],
     children: [
-      { href: "/alarms", label: "告警记录", perm: "workorder:alarm:read", group: "告警处置" },
-      { href: "/alarms?tab=notices", label: "告警通知", perm: "workorder:alarm:read", group: "告警处置" },
-      { href: "/alarms?tab=codes", label: "告警代码", perm: "workorder:alarm:read", group: "规则配置" },
-      { href: "/alarms?tab=rules", label: "通知规则", perm: "workorder:alarm:read", group: "规则配置" },
-    ],
-  },
-  {
-    key: "workorder", label: "工单管理", icon: "Wrench", module: "workorder", href: "/work-orders",
-    children: [
-      { href: "/work-orders?view=list", label: "工单列表", perm: "workorder:wo:read" },
-      { href: "/work-orders?view=board", label: "工单看板", perm: "workorder:wo:read" },
-      { href: "/work-orders?view=sla", label: "SLA 管理", phase: 2, perm: "workorder:wo:read" },
-      { href: "/work-orders?view=inspection", label: "巡检计划", phase: 2, perm: "workorder:wo:read" },
+      { href: "/alarms", label: "告警记录", perm: "workorder:alarm:read", group: "告警" },
+      { href: "/alarms?tab=notices", label: "告警通知", perm: "workorder:alarm:read", group: "告警" },
+      { href: "/alarms?tab=codes", label: "告警代码", perm: "workorder:alarm:read", group: "告警" },
+      { href: "/alarms?tab=rules", label: "通知规则", perm: "workorder:alarm:read", group: "告警" },
+      /*
+       * 2026-09-28 解锁客服两叶（徽章仍是 L1/L2，ready 只放宽分期）。
+       * 在此之前生产跑在 L0，这两页都点不开 —— 而 **C 端的报障全部落在这里**：
+       * 用户提交（连同截图）→ 落 cs_ticket / 转人工会话 → 运营端没有任何界面能打开它，
+       * 而 C 端还写着「正在排队处理」。L0 可达的「待办中心」只接告警，兜不住这条。
+       * 后端就绪：列表 / 详情（含截图）/ 受理 / 转工单 / 转退款 / 会话消息与回复端点齐备。
+       */
+      { href: "/cs", label: "报障受理", phase: 1, ready: true, perm: "cs:ticket:read", group: "客服" },
+      { href: "/cs?tab=sessions", label: "客服会话", phase: 2, ready: true, perm: "cs:session:read", group: "客服" },
+      { href: "/work-orders?view=list", label: "工单列表", perm: "workorder:wo:read", group: "工单" },
+      { href: "/work-orders?view=board", label: "工单看板", perm: "workorder:wo:read", group: "工单" },
+      // 先定巡检、再定时效：巡检计划生成工单，SLA 量的是所有工单
+      { href: "/work-orders?view=inspection", label: "巡检计划", phase: 2, perm: "workorder:wo:read", group: "工单" },
+      { href: "/work-orders?view=sla", label: "SLA 管理", phase: 2, perm: "workorder:wo:read", group: "工单" },
     ],
   },
   {
@@ -413,23 +427,8 @@ export const NAV: NavSection[] = [
   },
   // 「营销管理」L1 2026-10-28 整段并入「销售管理」（OM04）：营销与广告是收入线上的增长手段。
   // /marketing 页面不动，由销售管理的 match 认领。
-  {
-    // 复用项为跨 section 深链，可点
-    key: "cs", label: "客服管理", icon: "Headset", module: "cs", href: "/cs",
-    children: [
-      /*
-       * 2026-09-28 解锁这两叶（徽章仍是 L1/L2，ready 只放宽分期）。
-       * 在此之前生产跑在 L0，这两页都点不开 —— 而 **C 端的报障全部落在这里**：
-       * 用户提交（连同截图）→ 落 cs_ticket / 转人工会话 → 运营端没有任何界面能打开它，
-       * 而 C 端还写着「正在排队处理」。L0 可达的「待办中心」只接告警，兜不住这条。
-       * 后端就绪：列表 / 详情（含截图）/ 受理 / 转工单 / 转退款 / 会话消息与回复端点齐备。
-       */
-      { href: "/cs", label: "报障受理", phase: 1, ready: true, perm: "cs:ticket:read" },
-      { href: "/cs?tab=sessions", label: "客服会话", phase: 2, ready: true, perm: "cs:session:read" },
-      { href: "/orders", label: "退款/补偿", perm: "order:refund:apply" },
-      { href: "/users", label: "黑名单处理", perm: "user:risk:update", phase: 1 },
-    ],
-  },
+  // 「客服管理」L1 2026-10-28 并入「运维管理」（OM06）：报障受理 / 客服会话归「客服」组，
+  // 两个快捷入口（退款/补偿、黑名单处理）撤销。/cs 页面不动，由运维管理的 match 认领。
   {
     // 分期说明（导航审查 #2）：PDF V4 的「基础运营报表 P1」由「经营看板」承载
     // （KPI/趋势/实时告警/待办中心/排名榜单），本 section 全部为 P2/P3 的专题分析报表，

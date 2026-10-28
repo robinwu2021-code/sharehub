@@ -102,6 +102,12 @@ export function previewSentences(p: DispositionPreview): string[] {
   return out;
 }
 
+/** 处置按钮名：路由是工单时明说「转工单」（并单时说「并入工单」），其余仍是「立即处置」。 */
+export function disposeLabel(p?: DispositionPreview): string {
+  if (p?.type !== "WORK_ORDER") return "立即处置";
+  return p.mergeIntoWoNo ? "并入工单" : "转工单";
+}
+
 function parseEvidence(raw: string | null): { rows: AlarmEvidence[] | null; raw: string | null } {
   if (!raw) return { rows: [], raw: null };
   try {
@@ -169,13 +175,18 @@ export function AlarmDetailDrawer({
 
   const actions: ActionSpec[] = a ? [
     {
-      key: "dispose", label: "立即处置", primary: true, perm: "workorder:wo:create",
+      // 「转工单」与「立即处置」是同一个动作：后端 toWorkOrder 自 2026-09-25 起也走处置引擎，
+      // 开不开工单由告警码的处置路由决定，不由按钮决定。所以按钮名跟着处置预览走 ——
+      // 路由是工单时就叫「转工单 / 并入工单」，运营一眼看到这个按钮会开单；
+      // 路由是待办 / 客服 / 自愈 / 仅通知时仍叫「立即处置」，不让按钮名许诺一张不会出现的工单。
+      // 「无视路由强制开工单」需要后端加参数，已登记（运营端优化清单 OM06）。
+      key: "dispose", label: disposeLabel(pv.data), primary: true, perm: "workorder:wo:create",
       when: open && !disposed,
       blockedReason: pv.isLoading ? "正在计算处置方案…" : pv.error ? "处置预览失败，刷新后再试" : null,
       confirm: {
         title: `处置告警 ${a.alarmNo}`,
         desc: pv.data ? `将要发生：${previewSentences(pv.data).join("；")}。` : undefined,
-        confirmText: "确认处置",
+        confirmText: `确认${disposeLabel(pv.data)}`,
       },
       onRun: () => dispose.mutateAsync(a.alarmNo),
     },
@@ -184,7 +195,7 @@ export function AlarmDetailDrawer({
       when: canAlarmAction(a.status, "ack"),
       confirm: {
         title: `受理告警 ${a.alarmNo}`,
-        desc: "受理表示已认领处置责任，告警转为「已受理」，不开单也不关闭；要派人去现场请用「立即处置」。",
+        desc: "受理表示已认领处置责任，告警转为「已受理」，不开单也不关闭；要派人去现场请用「转工单 / 立即处置」。",
         confirmText: "确认受理",
       },
       onRun: () => ack.mutateAsync(a.alarmNo),
@@ -427,7 +438,7 @@ function DispositionTab({
   return (
     <div className="space-y-2">
       <p className="txt-caption text-muted-foreground">
-        还没处置{b?.dueAt ? `（按开单延迟应在 ${fmtTime(b.dueAt)} 自动处置）` : ""}。现在点「立即处置」将会：
+        还没处置{b?.dueAt ? `（按开单延迟应在 ${fmtTime(b.dueAt)} 自动处置）` : ""}。现在点「{disposeLabel(preview)}」将会：
       </p>
       <ul className="list-disc space-y-1 ps-5 txt-body">
         {previewSentences(preview).map((s) => <li key={s}>{s}</li>)}

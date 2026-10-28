@@ -25,8 +25,8 @@ const sectionKeys = (role: Role) => visibleSections(role).map((s) => s.key);
 // L1 顺序即 Rail 顺序；改动必须是有意识的产品决策，连带更新 docs。
 const L1_KEYS = [
   "my-biz", "my-asset", "my-service", // 代理端门户（portalFor: AGENT）
-  "dashboard", "operation", "device", "alarm", "workorder", "venue", "agent", "order",
-  "finance", "user", "cs", "report", "org", "system", "flow",
+  "dashboard", "operation", "device", "workorder", "venue", "agent", "order",
+  "finance", "user", "report", "org", "system", "flow",
 ];
 // 叶子五元组 href|label|perm|phase|group —— 2026-07-30 层级重构前后逐条比对为零差异。
 // 2026-09-23 有意变更（A 类菜单重合收敛，见 docs/technical/菜单重合梳理与优化方案.md）：
@@ -83,14 +83,17 @@ const LEAF_TUPLES = [
   "/devices?tab=commands|远程控制与指令记录|device:command:send||在线运行",
   "/devices?tab=logs|设备日志|device:cabinet:read|1|在线运行",
   "/devices?tab=ota|固件 OTA|device:ota:read|2|在线运行",
-  "/alarms|告警记录|workorder:alarm:read||告警处置",
-  "/alarms?tab=notices|告警通知|workorder:alarm:read||告警处置",
-  "/alarms?tab=codes|告警代码|workorder:alarm:read||规则配置",
-  "/alarms?tab=rules|通知规则|workorder:alarm:read||规则配置",
-  "/work-orders?view=list|工单列表|workorder:wo:read||",
-  "/work-orders?view=board|工单看板|workorder:wo:read||",
-  "/work-orders?view=sla|SLA 管理|workorder:wo:read|2|",
-  "/work-orders?view=inspection|巡检计划|workorder:wo:read|2|",
+  // 2026-10-28 运维管理（OM06）：告警 + 客服 + 工单三个 L1 合一；客服两个快捷入口撤销
+  "/alarms|告警记录|workorder:alarm:read||告警",
+  "/alarms?tab=notices|告警通知|workorder:alarm:read||告警",
+  "/alarms?tab=codes|告警代码|workorder:alarm:read||告警",
+  "/alarms?tab=rules|通知规则|workorder:alarm:read||告警",
+  "/cs|报障受理|cs:ticket:read|1|客服",
+  "/cs?tab=sessions|客服会话|cs:session:read|2|客服",
+  "/work-orders?view=list|工单列表|workorder:wo:read||工单",
+  "/work-orders?view=board|工单看板|workorder:wo:read||工单",
+  "/work-orders?view=inspection|巡检计划|workorder:wo:read|2|工单",
+  "/work-orders?view=sla|SLA 管理|workorder:wo:read|2|工单",
   // 2026-10-28 网点管理按运营顺序（OM02）：拓展 → 场地方与合同 → 站点与点位
   "/venues?tab=crm|BD 拓展 CRM|location:lead:read||拓展",
   "/venues?tab=onboarding|门店 Onboarding|location:venue:read|2|拓展",
@@ -153,10 +156,7 @@ const LEAF_TUPLES = [
   // 会员套餐（2026-09-27）：mbr_plan 此前没有任何写入方，C 端会员页因此永远是空列表。
   // 在本菜单末尾而非紧挨「会员/次卡」—— 菜单真源在库里，往组中间插要整表重灌种子
   // 会员两项与营销管理整段 2026-10-28 并入销售管理（OM04）
-  "/cs|报障受理|cs:ticket:read|1|",
-  "/cs?tab=sessions|客服会话|cs:session:read|2|",
-  "/orders|退款/补偿|order:refund:apply||",
-  "/users|黑名单处理|user:risk:update|1|",
+  // 客服管理 2026-10-28 并入运维管理（OM06），见上方
   "/reports?tab=device|设备运营分析|report:device:read|2|",
   "/reports?tab=location|点位坪效|report:location:read|2|",
   "/reports?tab=finance|财务报表|report:finance:read|2|",
@@ -201,9 +201,10 @@ describe("结构回归基线（层级重构不改内容）", () => {
   // 并入方案的「适用范围」，取价从此只有一处答案（V49）。那个 L1 已无内容。
   // 2026-09-28：新增「流程与工单」（15 → 16），放在最末（L1 的 sort 即下标，插中间要整表重灌）。
   // 2026-10-28：「营销管理」并入「销售管理」（16 → 15，V151）。
-  it("L1 = 15 个运营项 + 3 个代理门户项，顺序固定", () => {
+  // 2026-10-28：「告警管理」「客服管理」并入「运维管理」（15 → 13，V153）。
+  it("L1 = 13 个运营项 + 3 个代理门户项，顺序固定", () => {
     expect(NAV.map((s) => s.key)).toEqual(L1_KEYS);
-    expect(NAV.filter((s) => !s.portalFor)).toHaveLength(15);
+    expect(NAV.filter((s) => !s.portalFor)).toHaveLength(13);
     expect(NAV.filter((s) => s.portalFor)).toHaveLength(3);
   });
   it("叶子五元组集合与顺序逐条不变（href|label|perm|phase|group）", () => {
@@ -218,10 +219,10 @@ describe("结构回归基线（层级重构不改内容）", () => {
 });
 
 describe("A.9 角色×L1 可见性矩阵（抽查）", () => {
-  it("ADMIN 见全部 15 个运营项", () => {
+  it("ADMIN 见全部 13 个运营项", () => {
     expect(sectionKeys("ADMIN")).toEqual([
-      "dashboard", "operation", "device", "alarm", "workorder", "venue", "agent", "order",
-      "finance", "user", "cs", "report", "org", "system", "flow",
+      "dashboard", "operation", "device", "workorder", "venue", "agent", "order",
+      "finance", "user", "report", "org", "system", "flow",
     ]);
   });
   it("VIEWER 不见 用户/客服/员工与权限/系统设置", () => {
@@ -319,7 +320,8 @@ describe("findActiveSection 路径反推（4.2-3，含尾斜杠/最长前缀）"
     ["/devices/detail", "device"],
     ["/system/", "system"],
     ["/work-orders", "workorder"],
-    ["/alarms", "alarm"],
+    ["/alarms", "workorder"], // OM06：告警 / 客服 / 工单同属运维管理
+    ["/cs", "workorder"],
     ["/agents", "agent"],
   ])("%s → %s", (path, key) => {
     expect(findActiveSection(path)?.key).toBe(key);
@@ -379,16 +381,20 @@ describe("默认落地与面包屑", () => {
     expect(sectionDefaultHref(sec("agent"), "ADMIN")).toBe("/agents?tab=applies");
     expect(sectionDefaultHref(sec("agent"), "FINANCE")).toBe("/agents");
   });
-  it("客服管理：报障受理已解锁（ready），落地就是它 —— 客服进来第一眼该看用户报了什么", () => {
-    // 2026-09-28 改口径：此前两叶被分期挡着、落地退到 /orders，
+  it("运维管理：运营落告警记录；客服没有告警码时落报障受理 —— 客服进来第一眼该看用户报了什么", () => {
+    // 2026-09-28 改口径：此前客服两叶被分期挡着、落地退到 /orders，
     // 而 C 端的报障全落在 /cs —— 客服点进「客服管理」看到的却是退款列表。
-    expect(sectionDefaultHref(sec("cs"), "CS")).toBe("/cs");
+    // 2026-10-28 客服管理并入运维管理（OM06），落地按 section.href → 第一个可点叶。
+    expect(sectionDefaultHref(sec("workorder"), "ADMIN")).toBe("/alarms");
+    const csLand = sectionDefaultHref(sec("workorder"), "CS");
+    expect(["/alarms", "/cs"]).toContain(csLand);
   });
   it("面包屑三级：L1 › 分组 › 子功能", () => {
     expect(breadcrumb("/devices", "monitor", null, "OPS")).toEqual(["设备管理", "在线运行", "实时监控"]);
   });
-  it("面包屑两级：叶子无 group 时退化", () => {
-    expect(breadcrumb("/work-orders", null, "board", "OPS")).toEqual(["工单管理", "工单看板"]);
+  it("面包屑：工单在运维管理下三级（OM06 起工单有分组）", () => {
+    expect(breadcrumb("/work-orders", null, "board", "OPS")).toEqual(["运维管理", "工单", "工单看板"]);
+    expect(breadcrumb("/cs", "sessions", null, "ADMIN")).toEqual(["运维管理", "客服", "客服会话"]);
   });
   it("面包屑：/finance?tab=withdrawals → 提现审核 2026-09-23 升为 L0，不再被锁，面包屑到 L3", () => {
     // 旧断言是 Phase 2 被锁故只到 L1。分级矩阵 §六：提现是分钱的最后一步，缺了业务开不了张 → L0。

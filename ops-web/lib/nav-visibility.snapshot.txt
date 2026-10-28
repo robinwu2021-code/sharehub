@@ -1,7 +1,7 @@
 # 每个角色看得到的菜单（lib/nav-visibility.test.ts 生成，勿手改）
 # 改动菜单可见性时这份文件会变 —— diff 就是评审物，确认是有意的再提交。
 
-## ADMIN（116 项）
+## ADMIN（114 项）
 operation›应用版本
 operation›银行管理
 operation›品牌管理
@@ -20,14 +20,16 @@ device›实时监控
 device›远程控制与指令记录
 device›设备日志
 device›固件 OTA
-alarm›告警记录
-alarm›告警通知
-alarm›告警代码
-alarm›通知规则
+workorder›告警记录
+workorder›告警通知
+workorder›告警代码
+workorder›通知规则
+workorder›报障受理
+workorder›客服会话
 workorder›工单列表
 workorder›工单看板
-workorder›SLA 管理
 workorder›巡检计划
+workorder›SLA 管理
 venue›BD 拓展 CRM
 venue›门店 Onboarding
 venue›场地方
@@ -82,10 +84,6 @@ user›免押白名单
 user›钱包
 user›充值订单与套餐
 user›开票申请
-cs›报障受理
-cs›客服会话
-cs›退款/补偿
-cs›黑名单处理
 report›设备运营分析
 report›点位坪效
 report›财务报表
@@ -170,7 +168,7 @@ flow›待办中心
 flow›审批列表
 flow›流程实例
 
-## CS（43 项）
+## CS（41 项）
 operation›问题管理
 operation›公告管理
 device›设备台账
@@ -178,14 +176,16 @@ device›设备编码
 device›实时监控
 device›远程控制与指令记录
 device›设备日志
-alarm›告警记录
-alarm›告警通知
-alarm›告警代码
-alarm›通知规则
+workorder›告警记录
+workorder›告警通知
+workorder›告警代码
+workorder›通知规则
+workorder›报障受理
+workorder›客服会话
 workorder›工单列表
 workorder›工单看板
-workorder›SLA 管理
 workorder›巡检计划
+workorder›SLA 管理
 order›订单列表
 order›预约订单
 order›押金与欠费
@@ -203,10 +203,6 @@ user›免押白名单
 user›钱包
 user›充值订单与套餐
 user›开票申请
-cs›报障受理
-cs›客服会话
-cs›退款/补偿
-cs›黑名单处理
 system›发送记录
 system›触达拉黑
 flow›待办中心
@@ -279,14 +275,14 @@ device›实时监控
 device›远程控制与指令记录
 device›设备日志
 device›固件 OTA
-alarm›告警记录
-alarm›告警通知
-alarm›告警代码
-alarm›通知规则
+workorder›告警记录
+workorder›告警通知
+workorder›告警代码
+workorder›通知规则
 workorder›工单列表
 workorder›工单看板
-workorder›SLA 管理
 workorder›巡检计划
+workorder›SLA 管理
 venue›门店 Onboarding
 venue›场地方
 venue›站点管理
