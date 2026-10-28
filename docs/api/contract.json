@@ -376,6 +376,26 @@
     {
      "name": "email",
      "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "lng",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "lat",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "industry",
+     "type": "String"
+    },
+    {
+     "name": "defaultSiteNo",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -449,6 +469,26 @@
     {
      "name": "email",
      "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "lng",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "lat",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "industry",
+     "type": "String"
+    },
+    {
+     "name": "defaultSiteNo",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -498,6 +538,26 @@
     },
     {
      "name": "email",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "lng",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "lat",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "industry",
+     "type": "String"
+    },
+    {
+     "name": "defaultSiteNo",
      "type": "String"
     }
    ]
@@ -1184,7 +1244,7 @@
    "perm": null,
    "perms": [],
    "handler": "AgentApplyController#applyOtp",
-   "summary": "提交入驻申请 —— **自助与代建共用同一个端点**。",
+   "summary": "自助入口关闭时三个免鉴权端点一律 404。",
    "params": [],
    "bodyType": "Map<String, String>",
    "returnType": "Map<String, Object>",
@@ -5392,6 +5452,18 @@
      "name": "status",
      "type": "String",
      "required": false
+    },
+    {
+     "in": "query",
+     "name": "issuedAgentNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "pool",
+     "type": "String",
+     "required": false
     }
    ],
    "bodyType": null,
@@ -5465,6 +5537,14 @@
     },
     {
      "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAgentNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
      "type": "String"
     }
    ],
@@ -5603,6 +5683,14 @@
       },
       {
        "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "issuedAgentNo",
+       "type": "String"
+      },
+      {
+       "name": "issuedAt",
        "type": "String"
       }
      ]
@@ -11224,6 +11312,216 @@
   },
   {
    "verb": "POST",
+   "path": "/api/ops/devices/issue",
+   "perm": "device:inventory:transfer",
+   "perms": [
+    "device:inventory:transfer"
+   ],
+   "handler": "DevicePoolController#issue",
+   "summary": "设备出库池（V161）：出库给商家、退回仓库、按商家汇总。",
+   "params": [],
+   "bodyType": "IssueReq",
+   "returnType": "List<Cabinet>",
+   "returnContainer": "List",
+   "returnElement": "Cabinet",
+   "responseShape": [
+    {
+     "name": "cabinetNo",
+     "type": "String"
+    },
+    {
+     "name": "sn",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "model",
+     "type": "String"
+    },
+    {
+     "name": "locationNo",
+     "type": "String"
+    },
+    {
+     "name": "locationName",
+     "type": "String"
+    },
+    {
+     "name": "slotTotal",
+     "type": "int"
+    },
+    {
+     "name": "availableCount",
+     "type": "int"
+    },
+    {
+     "name": "onlineStatus",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "fwVersion",
+     "type": "String"
+    },
+    {
+     "name": "lastHeartbeatAt",
+     "type": "String"
+    },
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    },
+    {
+     "name": "qcStatus",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAgentNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "cabinetNos",
+     "type": "List<String>"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/devices/pool-return",
+   "perm": "device:inventory:transfer",
+   "perms": [
+    "device:inventory:transfer"
+   ],
+   "handler": "DevicePoolController#poolReturn",
+   "summary": "",
+   "params": [],
+   "bodyType": "PoolReturnReq",
+   "returnType": "List<Cabinet>",
+   "returnContainer": "List",
+   "returnElement": "Cabinet",
+   "responseShape": [
+    {
+     "name": "cabinetNo",
+     "type": "String"
+    },
+    {
+     "name": "sn",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "model",
+     "type": "String"
+    },
+    {
+     "name": "locationNo",
+     "type": "String"
+    },
+    {
+     "name": "locationName",
+     "type": "String"
+    },
+    {
+     "name": "slotTotal",
+     "type": "int"
+    },
+    {
+     "name": "availableCount",
+     "type": "int"
+    },
+    {
+     "name": "onlineStatus",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "fwVersion",
+     "type": "String"
+    },
+    {
+     "name": "lastHeartbeatAt",
+     "type": "String"
+    },
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    },
+    {
+     "name": "qcStatus",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAgentNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "cabinetNos",
+     "type": "List<String>"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "reason",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
    "path": "/api/ops/devices/protections/{protectionNo}/release",
    "perm": "device:cabinet:update",
    "perms": [
@@ -11479,6 +11777,14 @@
     {
      "name": "warehouseNo",
      "type": "String"
+    },
+    {
+     "name": "issuedAgentNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -11626,6 +11932,14 @@
     },
     {
      "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAgentNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
      "type": "String"
     }
    ],
@@ -11882,6 +12196,14 @@
     {
      "name": "warehouseNo",
      "type": "String"
+    },
+    {
+     "name": "issuedAgentNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -11974,6 +12296,14 @@
     },
     {
      "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAgentNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
      "type": "String"
     }
    ],
@@ -12202,6 +12532,14 @@
     },
     {
      "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAgentNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
      "type": "String"
     }
    ],
@@ -13287,6 +13625,51 @@
        "type": "boolean"
       }
      ]
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/issued-summary",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "DevicePoolController#summary",
+   "summary": "出库池页左侧的商家汇总。",
+   "params": [
+    {
+     "in": "query",
+     "name": "agentNo",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "List<IssuedSummary>",
+   "returnContainer": "List",
+   "returnElement": "IssuedSummary",
+   "responseShape": [
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "agentName",
+     "type": "String"
+    },
+    {
+     "name": "unbound",
+     "type": "int"
+    },
+    {
+     "name": "bound",
+     "type": "int"
+    },
+    {
+     "name": "live",
+     "type": "int"
     }
    ],
    "requestShape": null
@@ -34281,6 +34664,894 @@
   },
   {
    "verb": "GET",
+   "path": "/api/trade/payout-tasks",
+   "perm": "finance:withdrawal:read",
+   "perms": [
+    "finance:withdrawal:read"
+   ],
+   "handler": "PayoutTaskController#page",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "status",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<PayoutTask>",
+   "returnContainer": "PageResult",
+   "returnElement": "PayoutTask",
+   "responseShape": [
+    {
+     "name": "taskNo",
+     "type": "String"
+    },
+    {
+     "name": "cutoffDate",
+     "type": "String"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "itemCount",
+     "type": "int"
+    },
+    {
+     "name": "totalAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "createdBy",
+     "type": "String"
+    },
+    {
+     "name": "createdName",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "String"
+    },
+    {
+     "name": "reviewedName",
+     "type": "String"
+    },
+    {
+     "name": "reviewedAt",
+     "type": "String"
+    },
+    {
+     "name": "rejectReason",
+     "type": "String"
+    },
+    {
+     "name": "bankBatchRef",
+     "type": "String"
+    },
+    {
+     "name": "transferDate",
+     "type": "String"
+    },
+    {
+     "name": "confirmedAt",
+     "type": "String"
+    },
+    {
+     "name": "exportCount",
+     "type": "int"
+    },
+    {
+     "name": "items",
+     "type": "List<PayoutTaskItem>",
+     "fields": [
+      {
+       "name": "seq",
+       "type": "int"
+      },
+      {
+       "name": "withdrawNo",
+       "type": "String"
+      },
+      {
+       "name": "payeeNo",
+       "type": "String"
+      },
+      {
+       "name": "payeeName",
+       "type": "String"
+      },
+      {
+       "name": "amount",
+       "type": "BigDecimal"
+      },
+      {
+       "name": "currency",
+       "type": "String"
+      },
+      {
+       "name": "accountName",
+       "type": "String"
+      },
+      {
+       "name": "accountMasked",
+       "type": "String"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "settleNos",
+       "type": "List<String>"
+      },
+      {
+       "name": "payRef",
+       "type": "String"
+      },
+      {
+       "name": "paidAt",
+       "type": "String"
+      },
+      {
+       "name": "failReason",
+       "type": "String"
+      }
+     ]
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/trade/payout-tasks",
+   "perm": "finance:withdrawal:create",
+   "perms": [
+    "finance:withdrawal:create"
+   ],
+   "handler": "PayoutTaskController#create",
+   "summary": "",
+   "params": [],
+   "bodyType": "PayoutTaskCreateReq",
+   "returnType": "PayoutTask",
+   "returnContainer": null,
+   "returnElement": "PayoutTask",
+   "responseShape": [
+    {
+     "name": "taskNo",
+     "type": "String"
+    },
+    {
+     "name": "cutoffDate",
+     "type": "String"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "itemCount",
+     "type": "int"
+    },
+    {
+     "name": "totalAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "createdBy",
+     "type": "String"
+    },
+    {
+     "name": "createdName",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "String"
+    },
+    {
+     "name": "reviewedName",
+     "type": "String"
+    },
+    {
+     "name": "reviewedAt",
+     "type": "String"
+    },
+    {
+     "name": "rejectReason",
+     "type": "String"
+    },
+    {
+     "name": "bankBatchRef",
+     "type": "String"
+    },
+    {
+     "name": "transferDate",
+     "type": "String"
+    },
+    {
+     "name": "confirmedAt",
+     "type": "String"
+    },
+    {
+     "name": "exportCount",
+     "type": "int"
+    },
+    {
+     "name": "items",
+     "type": "List<PayoutTaskItem>",
+     "fields": [
+      {
+       "name": "seq",
+       "type": "int"
+      },
+      {
+       "name": "withdrawNo",
+       "type": "String"
+      },
+      {
+       "name": "payeeNo",
+       "type": "String"
+      },
+      {
+       "name": "payeeName",
+       "type": "String"
+      },
+      {
+       "name": "amount",
+       "type": "BigDecimal"
+      },
+      {
+       "name": "currency",
+       "type": "String"
+      },
+      {
+       "name": "accountName",
+       "type": "String"
+      },
+      {
+       "name": "accountMasked",
+       "type": "String"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "settleNos",
+       "type": "List<String>"
+      },
+      {
+       "name": "payRef",
+       "type": "String"
+      },
+      {
+       "name": "paidAt",
+       "type": "String"
+      },
+      {
+       "name": "failReason",
+       "type": "String"
+      }
+     ]
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "cutoffDate",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "GET",
+   "path": "/api/trade/payout-tasks/preview",
+   "perm": "finance:withdrawal:read",
+   "perms": [
+    "finance:withdrawal:read"
+   ],
+   "handler": "PayoutTaskController#preview",
+   "summary": "付款任务（商家一期 B4，需求方案 §八）：平台向商家付款，财务在运营端手动执行。",
+   "params": [
+    {
+     "in": "query",
+     "name": "cutoffDate",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PayoutPreview",
+   "returnContainer": null,
+   "returnElement": "PayoutPreview",
+   "responseShape": [
+    {
+     "name": "cutoffDate",
+     "type": "String"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "payableCount",
+     "type": "int"
+    },
+    {
+     "name": "payableTotal",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "items",
+     "type": "List<PayoutPreviewItem>",
+     "fields": [
+      {
+       "name": "payeeNo",
+       "type": "String"
+      },
+      {
+       "name": "payeeName",
+       "type": "String"
+      },
+      {
+       "name": "settleNos",
+       "type": "List<String>"
+      },
+      {
+       "name": "periods",
+       "type": "List<String>"
+      },
+      {
+       "name": "amount",
+       "type": "BigDecimal"
+      },
+      {
+       "name": "currency",
+       "type": "String"
+      },
+      {
+       "name": "accountMasked",
+       "type": "String"
+      },
+      {
+       "name": "blockedReason",
+       "type": "String"
+      }
+     ]
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/trade/payout-tasks/{taskNo}",
+   "perm": "finance:withdrawal:read",
+   "perms": [
+    "finance:withdrawal:read"
+   ],
+   "handler": "PayoutTaskController#detail",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "taskNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PayoutTask",
+   "returnContainer": null,
+   "returnElement": "PayoutTask",
+   "responseShape": [
+    {
+     "name": "taskNo",
+     "type": "String"
+    },
+    {
+     "name": "cutoffDate",
+     "type": "String"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "itemCount",
+     "type": "int"
+    },
+    {
+     "name": "totalAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "createdBy",
+     "type": "String"
+    },
+    {
+     "name": "createdName",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "String"
+    },
+    {
+     "name": "reviewedName",
+     "type": "String"
+    },
+    {
+     "name": "reviewedAt",
+     "type": "String"
+    },
+    {
+     "name": "rejectReason",
+     "type": "String"
+    },
+    {
+     "name": "bankBatchRef",
+     "type": "String"
+    },
+    {
+     "name": "transferDate",
+     "type": "String"
+    },
+    {
+     "name": "confirmedAt",
+     "type": "String"
+    },
+    {
+     "name": "exportCount",
+     "type": "int"
+    },
+    {
+     "name": "items",
+     "type": "List<PayoutTaskItem>",
+     "fields": [
+      {
+       "name": "seq",
+       "type": "int"
+      },
+      {
+       "name": "withdrawNo",
+       "type": "String"
+      },
+      {
+       "name": "payeeNo",
+       "type": "String"
+      },
+      {
+       "name": "payeeName",
+       "type": "String"
+      },
+      {
+       "name": "amount",
+       "type": "BigDecimal"
+      },
+      {
+       "name": "currency",
+       "type": "String"
+      },
+      {
+       "name": "accountName",
+       "type": "String"
+      },
+      {
+       "name": "accountMasked",
+       "type": "String"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "settleNos",
+       "type": "List<String>"
+      },
+      {
+       "name": "payRef",
+       "type": "String"
+      },
+      {
+       "name": "paidAt",
+       "type": "String"
+      },
+      {
+       "name": "failReason",
+       "type": "String"
+      }
+     ]
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/trade/payout-tasks/{taskNo}/audit",
+   "perm": "finance:withdrawal:audit",
+   "perms": [
+    "finance:withdrawal:audit"
+   ],
+   "handler": "PayoutTaskController#audit",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "taskNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "PayoutTaskAuditReq",
+   "returnType": "PayoutTask",
+   "returnContainer": null,
+   "returnElement": "PayoutTask",
+   "responseShape": [
+    {
+     "name": "taskNo",
+     "type": "String"
+    },
+    {
+     "name": "cutoffDate",
+     "type": "String"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "itemCount",
+     "type": "int"
+    },
+    {
+     "name": "totalAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "createdBy",
+     "type": "String"
+    },
+    {
+     "name": "createdName",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "String"
+    },
+    {
+     "name": "reviewedName",
+     "type": "String"
+    },
+    {
+     "name": "reviewedAt",
+     "type": "String"
+    },
+    {
+     "name": "rejectReason",
+     "type": "String"
+    },
+    {
+     "name": "bankBatchRef",
+     "type": "String"
+    },
+    {
+     "name": "transferDate",
+     "type": "String"
+    },
+    {
+     "name": "confirmedAt",
+     "type": "String"
+    },
+    {
+     "name": "exportCount",
+     "type": "int"
+    },
+    {
+     "name": "items",
+     "type": "List<PayoutTaskItem>",
+     "fields": [
+      {
+       "name": "seq",
+       "type": "int"
+      },
+      {
+       "name": "withdrawNo",
+       "type": "String"
+      },
+      {
+       "name": "payeeNo",
+       "type": "String"
+      },
+      {
+       "name": "payeeName",
+       "type": "String"
+      },
+      {
+       "name": "amount",
+       "type": "BigDecimal"
+      },
+      {
+       "name": "currency",
+       "type": "String"
+      },
+      {
+       "name": "accountName",
+       "type": "String"
+      },
+      {
+       "name": "accountMasked",
+       "type": "String"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "settleNos",
+       "type": "List<String>"
+      },
+      {
+       "name": "payRef",
+       "type": "String"
+      },
+      {
+       "name": "paidAt",
+       "type": "String"
+      },
+      {
+       "name": "failReason",
+       "type": "String"
+      }
+     ]
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "approve",
+     "type": "Boolean"
+    },
+    {
+     "name": "rejectReason",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/trade/payout-tasks/{taskNo}/confirm",
+   "perm": "finance:withdrawal:pay",
+   "perms": [
+    "finance:withdrawal:pay"
+   ],
+   "handler": "PayoutTaskController#confirm",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "taskNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "PayoutConfirmReq",
+   "returnType": "PayoutTask",
+   "returnContainer": null,
+   "returnElement": "PayoutTask",
+   "responseShape": [
+    {
+     "name": "taskNo",
+     "type": "String"
+    },
+    {
+     "name": "cutoffDate",
+     "type": "String"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "itemCount",
+     "type": "int"
+    },
+    {
+     "name": "totalAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "createdBy",
+     "type": "String"
+    },
+    {
+     "name": "createdName",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "String"
+    },
+    {
+     "name": "reviewedName",
+     "type": "String"
+    },
+    {
+     "name": "reviewedAt",
+     "type": "String"
+    },
+    {
+     "name": "rejectReason",
+     "type": "String"
+    },
+    {
+     "name": "bankBatchRef",
+     "type": "String"
+    },
+    {
+     "name": "transferDate",
+     "type": "String"
+    },
+    {
+     "name": "confirmedAt",
+     "type": "String"
+    },
+    {
+     "name": "exportCount",
+     "type": "int"
+    },
+    {
+     "name": "items",
+     "type": "List<PayoutTaskItem>",
+     "fields": [
+      {
+       "name": "seq",
+       "type": "int"
+      },
+      {
+       "name": "withdrawNo",
+       "type": "String"
+      },
+      {
+       "name": "payeeNo",
+       "type": "String"
+      },
+      {
+       "name": "payeeName",
+       "type": "String"
+      },
+      {
+       "name": "amount",
+       "type": "BigDecimal"
+      },
+      {
+       "name": "currency",
+       "type": "String"
+      },
+      {
+       "name": "accountName",
+       "type": "String"
+      },
+      {
+       "name": "accountMasked",
+       "type": "String"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "settleNos",
+       "type": "List<String>"
+      },
+      {
+       "name": "payRef",
+       "type": "String"
+      },
+      {
+       "name": "paidAt",
+       "type": "String"
+      },
+      {
+       "name": "failReason",
+       "type": "String"
+      }
+     ]
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "bankBatchRef",
+     "type": "String"
+    },
+    {
+     "name": "transferDate",
+     "type": "String"
+    },
+    {
+     "name": "results",
+     "type": "List<PayoutConfirmItem>",
+     "fields": [
+      {
+       "name": "withdrawNo",
+       "type": "String"
+      },
+      {
+       "name": "success",
+       "type": "Boolean"
+      },
+      {
+       "name": "payRef",
+       "type": "String"
+      },
+      {
+       "name": "failReason",
+       "type": "String"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "verb": "GET",
+   "path": "/api/trade/payout-tasks/{taskNo}/export",
+   "perm": "finance:withdrawal:export",
+   "perms": [
+    "finance:withdrawal:export"
+   ],
+   "handler": "PayoutTaskController#export",
+   "summary": "转账文件下载。",
+   "params": [
+    {
+     "in": "path",
+     "name": "taskNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "void",
+   "returnContainer": null,
+   "returnElement": "void",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
    "path": "/api/trade/price-adjustments",
    "perm": "pricing:adjustment:read",
    "perms": [
@@ -36358,7 +37629,8 @@
    "path": "/api/trade/settlements/{settleNo}/statement",
    "perm": "finance:settlement:read",
    "perms": [
-    "finance:settlement:read"
+    "finance:settlement:read",
+    "agent:settlement:read"
    ],
    "handler": "StatementController#statement",
    "summary": "场地方对账单（运营核心流程 G3，裁决 #2）：结算单导出对账单线下发给场地方，首版不做场地方门户。",
@@ -36491,7 +37763,8 @@
    "path": "/api/trade/settlements/{settleNo}/statement.html",
    "perm": "finance:settlement:read",
    "perms": [
-    "finance:settlement:read"
+    "finance:settlement:read",
+    "agent:settlement:read"
    ],
    "handler": "StatementController#printable",
    "summary": "可打印对账单：浏览器打开后「打印 → 存为 PDF」。",
@@ -43305,7 +44578,7 @@
    "perm": null,
    "perms": [],
    "handler": "OpsKitIntrospectController#introspect",
-   "summary": "",
+   "summary": "测试用：不展开通配码",
    "params": [
     {
      "in": "query",
@@ -45128,7 +46401,7 @@
      "required": true
     }
    ],
-   "bodyType": "Map<String, String>",
+   "bodyType": "SendMessageReq",
    "returnType": "CsMessageVO",
    "returnContainer": null,
    "returnElement": "CsMessageVO",
@@ -45162,7 +46435,12 @@
      "type": "String"
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "content",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "GET",
@@ -46652,6 +47930,18 @@
    "GEN",
    "CONFIRMED"
   ],
+  "WithdrawalOrigin": [
+   "APPLY",
+   "PAYOUT_TASK"
+  ],
+  "PayoutTaskStatus": [
+   "PENDING_REVIEW",
+   "PENDING_TRANSFER",
+   "DONE"
+  ],
+  "ShareBaseMode": [
+   "PRE_TAX"
+  ],
   "ReconTaskStatus": [
    "MATCHED"
   ],
@@ -46707,6 +47997,14 @@
   "CsTicketStatus": [
    "OPEN",
    "PROCESSING"
+  ],
+  "CsTicketChannel": [
+   "APP",
+   "MP",
+   "H5",
+   "PHONE",
+   "EMAIL",
+   "MANUAL"
   ],
   "CsSenderType": [
    "USER"
@@ -47053,10 +48351,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 534,
-  "records": 479,
-  "withPerm": 454,
-  "withBody": 223,
-  "shapedResponses": 415
+  "endpoints": 544,
+  "records": 503,
+  "withPerm": 464,
+  "withBody": 228,
+  "shapedResponses": 424
  }
 }
