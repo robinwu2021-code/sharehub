@@ -5,7 +5,7 @@ import { navTabs, NAV, leafParts } from "./nav";
 import { roleHas } from "./permissions";
 import type { Role } from "./auth";
 
-/** 与 components/finance/finance-workspace.tsx 的 SETTLEMENT_TAB_KEYS 同一组，用于「主属 section」判定 */
+/** 与 lib/finance-routes.ts 的 SETTLEMENT_TAB_KEYS 同一组，用于「主属 section」判定 */
 const SETTLEMENT_KEYS = ["rules", "records", "summary", "settlements",
   "withdrawals", "payout-accounts"] as const; // 2026-10-28 自 /finance 拆到 /settlement（OM08）
 

@@ -382,6 +382,25 @@ const PATCHES: { file: string; mustContain: string; apply: (rows: Row[]) => void
       l1.forEach((no, i) => { at(no).sort = String(i + 11); });
     },
   },
+  {
+    // 财务管理（OM07）：对账 → 账务 → 发票；调整单新插（原是结算单页签里的视图）；落地页改对账。
+    file: "V156__menu_finance_section_by_ops_order.sql",
+    mustContain: "UPDATE iam_menu SET menu_no = CONCAT('M_tmp156_', id) WHERE parent_no = 'M_finance'",
+    apply: (rows) => {
+      rows.find((r) => r.menu_no === "M_finance")!.path = "/finance?tab=reconcile";
+      const byPath = (path: string) => rows.find((r) => r.parent_no === "M_finance" && r.path === path)!;
+      const reconcile = byPath("/finance?tab=reconcile");
+      const ledger = byPath("/finance?tab=ledger");
+      const invoices = byPath("/finance?tab=invoices");
+      Object.assign(reconcile, { menu_no: "M_finance__1", sort: "1", group_name: "对账" });
+      Object.assign(ledger, { menu_no: "M_finance__2", sort: "2", group_name: "账务" });
+      Object.assign(invoices, { menu_no: "M_finance__4", sort: "4", group_name: "发票" });
+      rows.push({ menu_no: "M_finance__3", parent_no: "M_finance", name: "调整单", name_en: "Adjustments", name_ar: "قيود التسوية",
+        type: "ITEM", path: "/finance?tab=adjustments", icon: "NULL", group_name: "账务", sort: "3",
+        perm: "finance:settlement:read", phase: "1", ready: "0", module: "NULL", modules: "NULL", match_paths: "NULL",
+        pin_bottom: "0", portal_for: "NULL" });
+    },
+  },
 ];
 
 const COLS = [

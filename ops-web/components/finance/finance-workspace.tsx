@@ -58,11 +58,8 @@ const periodLabel = (p: string) => REPORT_PERIODS.find((x) => x.value === p)?.la
 //
 // 2026-10-28 按运营顺序拆成两个 L1（OM08 结算 / OM07 财务管理，docs/requirements/运营端菜单清单-按运营顺序.md）：
 // 一个 URL 只属于一个 L1（findActiveSection 按路径前缀定归属），所以结算的六个页签换到 /settlement，
-// /finance 只留账务分录、对账、发票。两页共用本组件（列表查询、抽屉、权限判断原样不动），
-// 各自只声明有哪些页签 —— 先拆路由不拆代码，后续模块调整时再按页签拆文件。
-export const SETTLEMENT_TAB_KEYS = ["rules", "records", "summary", "settlements",
-  "withdrawals", "payout-accounts"] as const;
-export const FINANCE_TAB_KEYS = ["ledger", "reconcile", "invoices"] as const;
+// /finance 留对账、账务分录、调整单、发票。两页共用本组件（列表查询、抽屉、权限判断原样不动），
+// 各自只声明有哪些页签（lib/finance-routes.ts）—— 先拆路由不拆代码，后续模块调整时再按页签拆文件。
 
 // 分润统计：维度切换器（竞品把「运营商佣金」「商户佣金」拆成两套菜单两张表，
 // 我们一张表切 dimension——列完全相同，少一次跳转）
@@ -234,7 +231,6 @@ export function FinanceWorkspace({ path, tabKeys }: {
   };
   const stlNo = sp.get("no");
   const openStl = (no: string) => patchQuery({ tab: "settlements", no });
-  const stlView = sp.get("view") === "adjustments" ? "adjustments" : "list";
   const [stlStatus, setStlStatus] = useState("");
   const [ruleForm, setRuleForm] = useState<Partial<ShareRule> | null>(null);
   // 分润规则视角：默认场地方（规则数量最多的一侧）
@@ -323,6 +319,8 @@ export function FinanceWorkspace({ path, tabKeys }: {
           payeeNo: realm === "AGENT" ? currentOperatorNo : undefined,
         }),
     placeholderData: keepWithinTab(tab),
+    // 调整单页签自带查询与分页（SettlementAdjustments），这条共用列表查询不该跑
+    enabled: tab !== "adjustments",
   });
 
   // 尾下划线 = **权限**标志，与类型层同名的**状态**判定（canAuditWithdrawal /
@@ -1223,16 +1221,9 @@ export function FinanceWorkspace({ path, tabKeys }: {
           />
         </Toolbar>
       )}
-      {/* 结算单下两个视图：结算单列表 / 调整项（不开新菜单 —— 菜单变更要走库迁移） */}
+      {/* 调整单（OM07-02）：2026-10-28 从「结算单」页签里的一个视图升为财务管理的页签 */}
+      {tab === "adjustments" && <SettlementAdjustments />}
       {tab === "settlements" && (
-        <Tabs
-          tabs={[{ key: "list", label: "结算单" }, { key: "adjustments", label: "调整项" }]}
-          value={stlView}
-          onChange={(k) => { patchQuery({ view: k === "adjustments" ? "adjustments" : null }); paging.reset(); }}
-        />
-      )}
-      {tab === "settlements" && stlView === "adjustments" && <SettlementAdjustments />}
-      {tab === "settlements" && stlView === "list" && (
         <Toolbar
           search={keyword}
           onSearch={(v) => { setKeyword(v); paging.reset(); }}
@@ -1438,10 +1429,10 @@ export function FinanceWorkspace({ path, tabKeys }: {
         />
       )}
       {tab === "ledger" && <DataTable rowKey={(l: LedgerEntry) => l.entryNo} columns={ledgerCols} rows={q.data?.list as LedgerEntry[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty={`${periodLabel(ledgerPeriod)}内没有账务分录——订单结算与分账完成后自动记账，可换更长的期间或放宽搜索条件`} />}
-      {tab === "settlements" && stlView === "list" && !canGenSettlement && !canConfirmSettlement && (
+      {tab === "settlements" && !canGenSettlement && !canConfirmSettlement && (
         <ReadOnlyNotice what="结算单生成/确认" perm={["finance:settlement:generate", ":confirm"]} />
       )}
-      {tab === "settlements" && stlView === "list" && <DataTable rowKey={(s: Settlement) => s.settleNo} columns={stlCols} rows={q.data?.list as Settlement[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无结算单——点右上「生成结算单」按周期出账（金额取该周期分润明细汇总），或放宽筛选条件" />}
+      {tab === "settlements" && <DataTable rowKey={(s: Settlement) => s.settleNo} columns={stlCols} rows={q.data?.list as Settlement[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无结算单——点右上「生成结算单」按周期出账（金额取该周期分润明细汇总），或放宽筛选条件" />}
       {tab === "withdrawals" && !canAuditWithdrawal_ && <ReadOnlyNotice what="提现审批" perm="finance:withdrawal:audit" />}
       {/* 手续费口径必须写明出处：审批人看到的数从哪来、改哪里能改，否则「唯一来源」只是一句话 */}
       {/*
@@ -1513,7 +1504,7 @@ export function FinanceWorkspace({ path, tabKeys }: {
           而不是 PagedTable：共用查询是 union 类型，逐 tab 断言反而更容易出错。
           代价是错误态要自己接——上面每个列表都接了，棘轮 lib/table-wiring.test.ts 守住不回退。 */}
       {/* 调整项视图自带分页（PagedTable），这里的分页属于上面那张共享列表 */}
-      {q.data && !(tab === "settlements" && stlView === "adjustments") && <Pagination page={paging.page} size={paging.size} total={q.data.total} onPage={paging.setPage} onSize={paging.setSize} />}
+      {q.data && tab !== "adjustments" && <Pagination page={paging.page} size={paging.size} total={q.data.total} onPage={paging.setPage} onSize={paging.setSize} />}
 
       {/* 提现审批抽屉：通过 → 转打款中；驳回必填原因；审批人取当前登录账号 */}
       <Drawer

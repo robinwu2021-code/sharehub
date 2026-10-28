@@ -141,10 +141,11 @@ const LEAF_TUPLES = [
   "/settlement?tab=settlements|结算单|finance:settlement:read||结算",
   "/settlement?tab=withdrawals|提现审核|finance:withdrawal:read||付款",
   "/settlement?tab=payout-accounts|收款账户|finance:payout_account:read||付款",
-  // 财务管理只剩平台账三项（OM07 调整时重排）；「代理分润配置」跨 L1 深链撤销
-  "/finance?tab=ledger|账务分录|finance:ledger:read|2|平台账",
-  "/finance?tab=reconcile|对账|finance:recon:read|1|平台账",
-  "/finance?tab=invoices|发票|finance:invoice:read|2|平台账",
+  // 2026-10-28 财务管理（OM07）：对账 → 账务 → 发票；调整单从结算单的视图升为页签；「代理分润配置」深链已撤
+  "/finance?tab=reconcile|对账|finance:recon:read|1|对账",
+  "/finance?tab=ledger|账务分录|finance:ledger:read|2|账务",
+  "/finance?tab=adjustments|调整单|finance:settlement:read||账务",
+  "/finance?tab=invoices|发票|finance:invoice:read|2|发票",
   // 「用户账」组 2026-10-28 撤销：用户钱包深链去掉，充值订单并入用户管理（OM05）
   // 2026-10-28 用户管理按运营顺序（OM05）：用户 → 风险 → 资产
   "/users|用户列表|user:cuser:read|1|用户",
@@ -231,10 +232,10 @@ describe("A.9 角色×L1 可见性矩阵（抽查）", () => {
   it("VIEWER 不见 用户/客服/员工与权限/系统设置", () => {
     const keys = sectionKeys("VIEWER");
     for (const k of ["user", "cs", "org", "system"]) expect(keys).not.toContain(k);
-    expect(keys).toEqual(expect.arrayContaining(["dashboard", "device", "order", "settlement", "report"]));
-    // 2026-10-28：VIEWER 在运营管理只看得到两项分成、在财务管理只看得到结算类五项 ——
-    // 这些都搬到了「结算」（OM08），两个 L1 对它不再有可见叶，整段隐藏
-    for (const k of ["operation", "finance"]) expect(keys).not.toContain(k);
+    expect(keys).toEqual(expect.arrayContaining(["dashboard", "device", "order", "settlement", "finance", "report"]));
+    // 2026-10-28：VIEWER 在运营管理只看得到两项分成，都搬到了「结算」（OM08），运营管理对它整段隐藏。
+    // 财务管理对它只剩调整单一项（OM07 升为页签；此前它在结算单页签的视图里一样看得到）
+    expect(keys).not.toContain("operation");
   });
   it("BD 不见 设备/告警/工单；CS 不见 数据报表", () => {
     for (const k of ["device", "alarm", "workorder"]) expect(sectionKeys("BD")).not.toContain(k);
@@ -288,19 +289,19 @@ describe("A.9 角色×L1 可见性矩阵（抽查）", () => {
 
 describe("L3 叶子过滤（4.2-2）", () => {
   const settlement = () => sec("settlement");
-  it("VIEWER 的结算：规则/明细/统计/两项分成/结算单/提现，无收款账户；财务管理一项都没有", () => {
+  it("VIEWER 的结算：规则/明细/统计/两项分成/结算单/提现，无收款账户；财务管理只有调整单", () => {
     const labels = visibleLeaves(settlement(), "VIEWER").map((l) => l.label);
     expect(labels).toEqual(["分润规则", "分润明细", "分润统计", "站点分成", "分成方分成", "结算单", "提现审核"]);
-    expect(visibleLeaves(sec("finance"), "VIEWER")).toEqual([]);
+    expect(visibleLeaves(sec("finance"), "VIEWER").map((l) => l.label)).toEqual(["调整单"]);
   });
   // 2026-09-23 B3：伙伴账新增「收款账户」—— 没有它提现审批放行不了，所以它和提现审核同组、同样给 FINANCE。
   // 2026-10-28：结算拆出（OM08），「代理分润配置」跨 L1 深链撤销（商家管理 › 商家分润规则 本身在）。
-  it("FINANCE 的结算：8 项，以收款账户收尾；财务管理剩平台账三项", () => {
+  it("FINANCE 的结算：8 项，以收款账户收尾；财务管理四项：对账 → 账务分录 → 调整单 → 发票", () => {
     const labels = visibleLeaves(settlement(), "FINANCE").map((l) => l.label);
     expect(labels).toHaveLength(8);
     expect(labels).not.toContain("代理分润配置");
     expect(labels.at(-1)).toBe("收款账户");
-    expect(visibleLeaves(sec("finance"), "FINANCE").map((l) => l.label)).toEqual(["账务分录", "对账", "发票"]);
+    expect(visibleLeaves(sec("finance"), "FINANCE").map((l) => l.label)).toEqual(["对账", "账务分录", "调整单", "发票"]);
   });
   // OPS 有 poi/venue，没有 contract/analysis/lead —— 并成网点管理后按 perm 过滤的结论不变。
   it("OPS：网点管理有站点、点位与场地方；无坪效、合同与 CRM；运营管理只剩应用版本", () => {
@@ -340,7 +341,7 @@ describe("findActiveSection 路径反推（4.2-3，含尾斜杠/最长前缀）"
 
 describe("activeLeafIndex 深链高亮（4.2-6）", () => {
   const financeLeaves = (role: Role) => visibleLeaves(sec("finance"), role);
-  it("裸 /settlement 无 query → 默认首个可点叶子（分润规则）；裸 /finance → 对账（账务分录被锁）", () => {
+  it("裸 /settlement 无 query → 默认首个可点叶子（分润规则）；裸 /finance → 对账", () => {
     const stl = visibleLeaves(sec("settlement"), "FINANCE");
     expect(stl[activeLeafIndex(stl, "/settlement", null, null)].label).toBe("分润规则");
     const leaves = financeLeaves("FINANCE");
@@ -555,8 +556,13 @@ describe("分级屏蔽（tier gating，默认 CURRENT_PHASE=0）", () => {
     expect(isSectionLocked(s, "ADMIN")).toBe(false); // 有一个 ready 叶 → 整段不锁
     expect(sectionDefaultHref(s, "ADMIN")).toBe("/x?tab=b"); // 落到 ready 叶而非被锁首叶
   });
-  it("sectionDefaultHref：跳过被锁叶，落到首个可点叶（财务→对账：账务分录 L2 被锁）", () => {
+  it("财务管理落对账（section.href）；没有对账码的角色退回首个可点叶", () => {
     expect(sectionDefaultHref(sec("finance"), "ADMIN")).toBe("/finance?tab=reconcile");
+    expect(sectionDefaultHref(sec("finance"), "VIEWER")).toBe("/finance?tab=adjustments");
+  });
+  it("财务管理分三组：对账 → 账务 → 发票（OM07；发票组待 OM09 迁走）", () => {
+    const segs = groupedLeaves(visibleLeaves(sec("finance"), "ADMIN"));
+    expect(segs.map((x) => x.group)).toEqual(["对账", "账务", "发票"]);
   });
   it("结算落地结算单（section.href），不是第一项分润规则", () => {
     expect(sectionDefaultHref(sec("settlement"), "ADMIN")).toBe("/settlement?tab=settlements");

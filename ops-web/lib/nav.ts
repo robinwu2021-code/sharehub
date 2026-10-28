@@ -412,14 +412,22 @@ export const NAV: NavSection[] = [
     ],
   },
   {
-    // 2026-10-28 结算六项拆到「结算」L1（OM08）后只剩平台账三项；按运营顺序的重排在 OM07 模块调整时做。
-    // 「用户账」组（用户钱包深链、充值订单）2026-10-28 撤销：两者归「用户管理 › 资产」（OM05）。
-    // ⚠️ 菜单真源在库里：本段的行由 V154 重编号。
-    key: "finance", label: "财务管理", icon: "Wallet", module: "finance", href: "/finance",
+    // 2026-10-28 按运营顺序调整（OM07 · docs/requirements/运营端菜单清单-按运营顺序.md）：
+    // 回答「钱对不对得上、欠谁多少」。先核对（对账）、再记账与更正（账务分录 · 调整单）、最后看应付。
+    // 结算六项已拆到「结算」L1（OM08）；「用户账」组归「用户管理 › 资产」（OM05）。
+    // 调整单从「结算单」页签里的一个视图升为本段的页签（/finance?tab=adjustments）：
+    // 它更正的是应付与账务，不是结算单列表的另一种看法；后端端点一直独立（/api/ops/settlement-adjustments）。
+    // 暂不建叶（都没有后端实体与端点，契约草案在服务端评审 S11 §四、S12 §四）：
+    //   网关手续费与到账（OM07-05，还取决于网关给不给清算数据）、应付台账（OM07-03）；
+    //   Zoho 连接与映射（OM07-06）是架构预留，不编码。
+    // 发票待发票模块（OM09）调整时迁走，暂自成一组放在末尾。
+    // 落地页是对账（href）。⚠️ 菜单真源在库里：本段的行由 V156 重编号，改这里要同步新开迁移（见 nav-seed.test.ts）。
+    key: "finance", label: "财务管理", icon: "Wallet", module: "finance", href: "/finance?tab=reconcile",
     children: [
-      { href: "/finance?tab=ledger", label: "账务分录", perm: "finance:ledger:read", phase: 2, group: "平台账" },
-      { href: "/finance?tab=reconcile", label: "对账", perm: "finance:recon:read", phase: 1, ready: true, group: "平台账" },
-      { href: "/finance?tab=invoices", label: "发票", perm: "finance:invoice:read", phase: 2, ready: true, group: "平台账" },
+      { href: "/finance?tab=reconcile", label: "对账", perm: "finance:recon:read", phase: 1, ready: true, group: "对账" },
+      { href: "/finance?tab=ledger", label: "账务分录", perm: "finance:ledger:read", phase: 2, group: "账务" },
+      { href: "/finance?tab=adjustments", label: "调整单", perm: "finance:settlement:read", group: "账务" },
+      { href: "/finance?tab=invoices", label: "发票", perm: "finance:invoice:read", phase: 2, ready: true, group: "发票" },
     ],
   },
   {

@@ -88,7 +88,9 @@ const NAV: Record<string, Pair> = {
   "入驻与档案": { en: "Onboarding & Profiles", ar: "الانضمام والملفات" },
   "分润与划拨": { en: "Commission & Allocation", ar: "العمولة والتخصيص" },
   "经营与退出": { en: "Business & Exit", ar: "الأعمال والخروج" },
-  "平台账": { en: "Platform Books", ar: "حسابات المنصة" },
+  // 财务管理（OM07）：对账 → 账务 → 发票（发票组待 OM09 迁走）；「对账」「发票」两个键组名与叶名共用
+  "账务": { en: "Accounting", ar: "المحاسبة" },
+  "调整单": { en: "Adjustments", ar: "قيود التسوية" },
   // 2026-10-28 从财务管理拆出「结算」（OM08），分三组：分润 → 结算 → 付款
   "结算": { en: "Settlement", ar: "التسوية" },
   "分润": { en: "Revenue Sharing", ar: "تقاسم العائدات" },

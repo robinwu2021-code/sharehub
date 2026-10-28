@@ -1,24 +1,19 @@
 "use client";
 
-// 财务管理（OM07）：账务分录 · 对账 · 发票（发票待 OM09 调整时迁走）。
-// 2026-10-28 结算六个页签拆到 /settlement（OM08）。旧链接 /finance?tab=settlements… 仍然散在各处：
-// 收藏夹、后端清退门禁给的「去处理」（AgentExitServiceImpl）、已发出去的通知 ——
-// 这里把它们原样转到 /settlement（保留 no / payee / view 等参数），不让人点进一个没有那个页签的页面。
+// 财务管理（OM07）：对账 · 账务分录 · 调整单 · 发票（发票待 OM09 调整时迁走）。
+// 2026-10-28 结算六个页签拆到 /settlement（OM08）；调整单从结算单的一个视图升为本页页签（OM07）。
+// 旧链接的改写规则在 lib/finance-routes.ts，与 /settlement 共用。
 import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FinanceWorkspace, FINANCE_TAB_KEYS, SETTLEMENT_TAB_KEYS } from "@/components/finance/finance-workspace";
-
-const MOVED = new Set<string>(SETTLEMENT_TAB_KEYS);
+import { FinanceWorkspace } from "@/components/finance/finance-workspace";
+import { FINANCE_TAB_KEYS, financeRedirect } from "@/lib/finance-routes";
 
 function FinanceRoute() {
   const sp = useSearchParams();
   const router = useRouter();
-  const tab = sp.get("tab");
-  const moved = !!tab && MOVED.has(tab);
-  useEffect(() => {
-    if (moved) router.replace(`/settlement?${sp.toString()}`);
-  }, [moved, router, sp]);
-  if (moved) return null;
+  const to = financeRedirect("/finance", new URLSearchParams(sp.toString()));
+  useEffect(() => { if (to) router.replace(to); }, [to, router]);
+  if (to) return null;
   return <FinanceWorkspace path="/finance" tabKeys={FINANCE_TAB_KEYS} />;
 }
 
