@@ -481,6 +481,15 @@ const PATCHES: { file: string; mustContain: string; apply: (rows: Row[]) => void
         { name: "提现记录", name_en: "Withdrawal Records", name_ar: "سجل السحوبات", perm: "finance:withdrawal:read" });
     },
   },
+  {
+    // 商家管理 ›「设备/点位划拨」更名「整站换商家」（V169 留空，见迁移说明）。
+    file: "V171__menu_assign_site_owner.sql",
+    mustContain: "UPDATE iam_menu SET name = '整站换商家'",
+    apply: (rows) => {
+      Object.assign(rows.find((r) => r.parent_no === "M_agent" && r.path === "/agents?tab=assign")!,
+        { name: "整站换商家", name_en: "Site Owner Change", name_ar: "نقل الموقع إلى تاجر" });
+    },
+  },
 ];
 
 const COLS = [

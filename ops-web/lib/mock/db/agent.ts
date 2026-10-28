@@ -9,7 +9,7 @@ import type {
 import { p, iso, phone, OPERATORS } from "./internal";
 import { paginate, kwHit, upsert, nextNo, archiveRow, unarchiveRow } from "./helpers";
 import { cabinets } from "./device";
-import { sites, ensureDefaultPoint } from "./location";
+import { sites, locations, ensureDefaultPoint } from "./location";
 import { fail, notFound } from "@/lib/biz-error";
 import { agentCoreComplete } from "../../types";
 import { VENUE_INDUSTRIES } from "../../types/location";
@@ -329,16 +329,12 @@ export function assignAgentAssets(x: AssignAssetsPayload): AgentAssignmentRecord
   if (!agentCoreComplete(agent)) {
     throw new AgentAssignError(`商家 ${agent.agentNo} 的核心资料未补齐：位置（地址与地图坐标）和行业都填好后才能划拨设备`);
   }
-  const cabinetNos = uniq(x.cabinetNos);
+  // 划拨只剩站点粒度（620656d9：CABINET / LOCATION → 400 error.assign.granularity_retired）。
+  // 机柜随站点走；单台设备换位置走出库池的绑定 / 解绑，或撤机。
+  if (uniq(x.cabinetNos).length) throw new AgentAssignError("按机柜划拨已下线：机柜随站点整站换商家，单台设备在出库池里绑定 / 解绑");
   const siteNos = uniq(x.siteNos);
-  if (!cabinetNos.length && !siteNos.length) throw new AgentAssignError("请至少选择一台机柜或一个站点");
+  if (!siteNos.length) throw new AgentAssignError("请至少选择一个站点");
 
-  const cabs = cabinetNos.map((no) => {
-    const c = cabinets.find((y) => y.cabinetNo === no);
-    if (!c) throw new AgentAssignError(`机柜 ${no} 不存在`);
-    if (c.agentNo === agent.agentNo) throw new AgentAssignError(`机柜 ${no} 已归属 ${agent.agentNo}，无需重复划拨`);
-    return c;
-  });
   const sts = siteNos.map((no) => {
     const s = sites.find((y) => y.siteNo === no);
     if (!s) throw new AgentAssignError(`站点 ${no} 不存在`);
@@ -347,24 +343,37 @@ export function assignAgentAssets(x: AssignAssetsPayload): AgentAssignmentRecord
   });
 
   const out: AgentAssignmentRecord[] = [];
-  for (const c of cabs) { c.agentNo = agent.agentNo; out.push(logAssignment(agent.agentNo, "CABINET", c.cabinetNo, "ASSIGN", x.operatorName)); }
-  for (const s of sts) { s.agentNo = agent.agentNo; out.push(logAssignment(agent.agentNo, "SITE", s.siteNo, "ASSIGN", x.operatorName)); }
+  for (const s of sts) { moveSite(s.siteNo, agent.agentNo); out.push(logAssignment(agent.agentNo, "SITE", s.siteNo, "ASSIGN", x.operatorName)); }
   refreshAgentAssetCounts();
   return out;
 }
 
+/**
+ * 整站换商家（620656d9）：同一事务改站点、站上柜子的商家与出库池归属、OPERATE 责任行。
+ * 只写站点不写责任行，钱会继续分给原商家（设备绑定与商家归属分析 §四.1）。
+ * `to` 为空 = 收回平台直营：柜子的商家与出库池归属一并清空（直营站点不经出库池）。
+ */
+function moveSite(siteNo: string, to: string | null) {
+  const site = sites.find((x) => x.siteNo === siteNo)!;
+  site.agentNo = to;
+  const locNos = new Set(locations.filter((l) => l.siteNo === siteNo).map((l) => l.locationNo));
+  for (const c of cabinets) {
+    if (c.locationNo && locNos.has(c.locationNo)) { c.agentNo = to; c.issuedAgentNo = to; }
+  }
+  // 责任行：先补齐懒种子，再换掉旧的运维方
+  listSiteAgents(siteNo);
+  for (let i = siteAgents.length - 1; i >= 0; i--) {
+    if (siteAgents[i].siteNo === siteNo && siteAgents[i].role === "OPERATE") siteAgents.splice(i, 1);
+  }
+  if (to) saveSiteAgent(siteNo, { agentNo: to, role: "OPERATE", effectiveFrom: new Date().toISOString().slice(0, 10), remark: "整站换商家" });
+}
+
 /** 回收：资产收回平台直营（agentNo 置 null）。流水记的是收回前的归属方。 */
 export function reclaimAgentAssets(x: ReclaimAssetsPayload): AgentAssignmentRecord[] {
-  const cabinetNos = uniq(x.cabinetNos);
+  if (uniq(x.cabinetNos).length) throw new AgentAssignError("按机柜回收已下线：整站收回，或在出库池里解绑 / 撤机");
   const siteNos = uniq(x.siteNos);
-  if (!cabinetNos.length && !siteNos.length) throw new AgentAssignError("请至少选择一台机柜或一个站点");
+  if (!siteNos.length) throw new AgentAssignError("请至少选择一个站点");
 
-  const cabs = cabinetNos.map((no) => {
-    const c = cabinets.find((y) => y.cabinetNo === no);
-    if (!c) throw new AgentAssignError(`机柜 ${no} 不存在`);
-    if (!c.agentNo) throw new AgentAssignError(`机柜 ${no} 本就是平台直营，无需回收`);
-    return c;
-  });
   const sts = siteNos.map((no) => {
     const s = sites.find((y) => y.siteNo === no);
     if (!s) throw new AgentAssignError(`站点 ${no} 不存在`);
@@ -373,8 +382,7 @@ export function reclaimAgentAssets(x: ReclaimAssetsPayload): AgentAssignmentReco
   });
 
   const out: AgentAssignmentRecord[] = [];
-  for (const c of cabs) { const from = c.agentNo!; c.agentNo = null; out.push(logAssignment(from, "CABINET", c.cabinetNo, "RECLAIM", x.operatorName)); }
-  for (const s of sts) { const from = s.agentNo!; s.agentNo = null; out.push(logAssignment(from, "SITE", s.siteNo, "RECLAIM", x.operatorName)); }
+  for (const s of sts) { const from = s.agentNo!; moveSite(s.siteNo, null); out.push(logAssignment(from, "SITE", s.siteNo, "RECLAIM", x.operatorName)); }
   refreshAgentAssetCounts();
   return out;
 }

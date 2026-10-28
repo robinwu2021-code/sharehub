@@ -323,8 +323,8 @@ export function SiteDetailDrawer({
           </Field>
           <Field label="归属代理">
             {site.agentNo
-              ? <>{site.agentNo}<span className="ms-2 txt-caption text-muted-foreground">改归属请走「商家管理 › 设备/点位划拨」，那里会连同点位与机柜一起变更并留流水</span></>
-              : <>平台直营<span className="ms-2 txt-caption text-muted-foreground">如需划给商家，请走「商家管理 › 设备/点位划拨」</span></>}
+              ? <>{site.agentNo}<span className="ms-2 txt-caption text-muted-foreground">换商家请走「商家管理 › 整站换商家」，站内点位、柜子与运维责任行会一起变更并留流水</span></>
+              : <>平台直营<span className="ms-2 txt-caption text-muted-foreground">如需换给商家，请走「商家管理 › 整站换商家」</span></>}
           </Field>
           <Field label="运维责任人">
             {site.ops?.operateAgentNo

@@ -142,7 +142,7 @@ const NAV: Record<string, Pair> = {
   "入驻审核": { en: "Onboarding Review", ar: "مراجعة الانضمام" },
   "商家档案": { en: "Merchant Profiles", ar: "ملفات التجار" },
   "商家分润规则": { en: "Merchant Commission", ar: "عمولة التجار" },
-  "设备/点位划拨": { en: "Allocation", ar: "التخصيص" },
+  "整站换商家": { en: "Site Owner Change", ar: "نقل الموقع إلى تاجر" },
   "商家经营视图": { en: "Merchant Business", ar: "أعمال التجار" },
   "商家绩效": { en: "Merchant Performance", ar: "أداء التجار" },
   "退出与清算": { en: "Exit & Liquidation", ar: "الخروج والتصفية" },

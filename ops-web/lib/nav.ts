@@ -357,7 +357,9 @@ export const NAV: NavSection[] = [
       { href: "/agents?tab=accounts", label: "商家账号", perm: "agent:account:manage", group: "入驻与档案" },
       // 先定分润、再划资产：划拨只影响之后的订单归属，规则得先在
       { href: "/agents?tab=commission", label: "商家分润规则", perm: "agent:share:config", group: "分润与划拨" },
-      { href: "/agents?tab=assign", label: "设备/点位划拨", perm: "agent:scope:assign", group: "分润与划拨" },
+      // 2026-10-28 更名「整站换商家」（V171）：划拨只剩站点粒度（620656d9），站内柜子与运维责任行一并换；
+      // 单台设备换位置走设备管理 › 出库池的绑定 / 解绑或撤机
+      { href: "/agents?tab=assign", label: "整站换商家", perm: "agent:scope:assign", group: "分润与划拨" },
       // 经营视图由三个既有读端点在页内拼出（商家 / 绩效 / 分润汇总），不新增后端端点
       { href: "/agents?tab=business", label: "商家经营视图", perm: "agent:agent:read", phase: 1, ready: true, group: "经营与退出" },
       { href: "/agents?tab=performance", label: "商家绩效", perm: "agent:performance:read", phase: 2, group: "经营与退出" },

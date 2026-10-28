@@ -115,7 +115,7 @@ const LEAF_TUPLES = [
   "/agents|商家档案|agent:agent:read||入驻与档案",
   "/agents?tab=accounts|商家账号|agent:account:manage||入驻与档案",
   "/agents?tab=commission|商家分润规则|agent:share:config||分润与划拨",
-  "/agents?tab=assign|设备/点位划拨|agent:scope:assign||分润与划拨",
+  "/agents?tab=assign|整站换商家|agent:scope:assign||分润与划拨",
   "/agents?tab=business|商家经营视图|agent:agent:read|1|经营与退出",
   "/agents?tab=performance|商家绩效|agent:performance:read|2|经营与退出",
   "/agents?tab=exits|退出与清算|agent:agent:update|2|经营与退出",

@@ -47,7 +47,7 @@ agent›入驻审核
 agent›商家档案
 agent›商家账号
 agent›商家分润规则
-agent›设备/点位划拨
+agent›整站换商家
 agent›商家经营视图
 agent›商家绩效
 agent›退出与清算
@@ -148,7 +148,7 @@ agent›入驻审核
 agent›商家档案
 agent›商家账号
 agent›商家分润规则
-agent›设备/点位划拨
+agent›整站换商家
 agent›商家经营视图
 agent›商家绩效
 agent›退出与清算
@@ -306,7 +306,7 @@ venue›站点管理
 venue›点位管理
 venue›站点概览
 venue›门店生命周期
-agent›设备/点位划拨
+agent›整站换商家
 order›订单列表
 order›预约订单
 order›押金与欠费

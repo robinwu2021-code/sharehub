@@ -561,61 +561,49 @@ function AgentsInner() {
       options: [{ value: "", label: "请选择商家" }, ...agentOptions],
       help: "只列启用中的商家；已停用/已归档的不能作为划拨对象",
     },
-    {
-      key: "cabinetNos", label: "机柜（可多选）", type: "multiselect", csv: true,
-      placeholder: assignForm?.agentNo ? "选择要划拨的机柜" : "先选目标商家",
-      options: toOptions(assignableQ.data?.list, "CABINET"),
-      disabledWhen: (v) => !v.agentNo,
-      help: "只列未归属或归属其它商家的机柜，括号里是当前归属——别把别人的柜子划走了",
-    },
+    // 2026-10-28 只剩站点（后端 620656d9：按机柜 / 点位划拨 400）。单台设备换位置走出库池的绑定 / 解绑或撤机
     {
       key: "siteNos", label: "站点（可多选）", type: "multiselect", csv: true,
-      placeholder: assignForm?.agentNo ? "选择要划拨的站点" : "先选目标商家",
+      placeholder: assignForm?.agentNo ? "选择要换给这个商家的站点" : "先选目标商家",
       options: toOptions(assignableQ.data?.list, "SITE"),
       disabledWhen: (v) => !v.agentNo,
-      help: "站点划拨会一并改站内全部点位与机柜的归属（后端级联）；分成按站点责任行，见站点详情 › 分成",
+      help: "整站换商家：站点、站内点位与柜子（含出库池归属）、运维责任行在同一事务里一起换；括号里是当前商家",
     },
   ], [agentOptions, assignableQ.data, assignForm?.agentNo]);
 
   const reclaimFields: FieldDef[] = useMemo(() => [
     {
-      key: "cabinetNos", label: "回收机柜（可多选）", type: "multiselect", csv: true,
-      placeholder: "选择要收回的机柜", options: toOptions(reclaimableQ.data?.list, "CABINET"),
-    },
-    {
-      key: "siteNos", label: "回收站点（可多选）", type: "multiselect", csv: true,
+      key: "siteNos", label: "收回的站点（可多选）", type: "multiselect", csv: true,
       placeholder: "选择要收回的站点", options: toOptions(reclaimableQ.data?.list, "SITE"),
     },
   ], [reclaimableQ.data]);
 
   async function submitAssign() {
     if (!assignForm) return;
-    const cabs = csvArr(assignForm.cabinetNos);
     const sts = csvArr(assignForm.siteNos);
     if (!assignForm.agentNo) { notify.error("请先选择目标商家"); return; }
-    if (!cabs.length && !sts.length) { notify.error("请至少选择一台机柜或一个站点"); return; }
+    if (!sts.length) { notify.error("请至少选择一个站点"); return; }
     const target = agentOptionsQ.data?.list.find((a) => a.agentNo === assignForm.agentNo);
     const ok = await confirm({
-      title: "确认划拨",
-      desc: `将把 ${cabs.length} 台机柜、${sts.length} 个站点划拨给 ${target?.name ?? ""}（${assignForm.agentNo}）。`
-        + "划拨后这些资产的归属立即变更，并记入划拨流水（可追溯操作人）。",
-      confirmText: "确认划拨",
+      title: "确认整站换商家",
+      desc: `将把 ${sts.length} 个站点换给 ${target?.name ?? ""}（${assignForm.agentNo}）。`
+        + "站内点位、柜子（含出库池归属）与运维责任行一并变更，此后的订单与分成归新商家；已产生的订单仍归原商家。记入划拨流水。",
+      confirmText: "确认换商家",
     });
-    if (ok) assignAssets.mutate({ agentNo: assignForm.agentNo, cabinetNos: cabs, siteNos: sts });
+    if (ok) assignAssets.mutate({ agentNo: assignForm.agentNo, cabinetNos: [], siteNos: sts });
   }
   async function submitReclaim() {
     if (!reclaimForm) return;
-    const cabs = csvArr(reclaimForm.cabinetNos);
     const sts = csvArr(reclaimForm.siteNos);
-    if (!cabs.length && !sts.length) { notify.error("请至少选择一台机柜或一个站点"); return; }
+    if (!sts.length) { notify.error("请至少选择一个站点"); return; }
     const ok = await confirm({
-      title: "确认回收",
+      title: "确认收回平台直营",
       danger: true,
-      desc: `将把 ${cabs.length} 台机柜、${sts.length} 个站点从 ${reclaimForm.agentName}（${reclaimForm.agentNo}）收回平台直营。`
-        + "商家立即失去这些资产的数据权限；分成按站点责任行计算，如需停止分成请到站点详情 › 分成调整。",
-      confirmText: "确认回收",
+      desc: `将把 ${sts.length} 个站点从 ${reclaimForm.agentName}（${reclaimForm.agentNo}）收回平台直营。`
+        + "站内柜子的商家与出库池归属清空、运维责任行删除：商家立即看不到这些站点与设备，此后的订单也不再分给它。",
+      confirmText: "确认收回",
     });
-    if (ok) reclaimAssets.mutate({ cabinetNos: cabs, siteNos: sts });
+    if (ok) reclaimAssets.mutate({ cabinetNos: [], siteNos: sts });
   }
 
   function open(a: Agent) { setEdit(a); setForm(a); }
@@ -693,7 +681,7 @@ function AgentsInner() {
     { header: "区域", cell: (a) => <span className="text-muted-foreground">{a.region}</span> },
     // 这两列由 cabinets.agentNo / sites.agentNo 实时反算：划拨/回收后数字当场变
     { header: "设备数", className: "text-right", cell: (a) => <span className="tabular-nums">{a.cabinetCount}</span> },
-    { header: "点位数", className: "text-right", cell: (a) => <span className="tabular-nums">{a.siteCount}</span> },
+    { header: "站点数", className: "text-right", cell: (a) => <span className="tabular-nums">{a.siteCount}</span> },
     {
       header: "操作",
       cell: (a) => (
@@ -701,13 +689,13 @@ function AgentsInner() {
           <Button size="sm" variant="outline" onClick={() => setRecordsFor({ agentNo: a.agentNo, agentName: a.agentName })}>流水</Button>
           {canAssign && (
             <>
-              <Button size="sm" variant="outline" onClick={() => setAssignForm({ agentNo: a.agentNo, cabinetNos: "", siteNos: "" })}>划拨</Button>
+              <Button size="sm" variant="outline" onClick={() => setAssignForm({ agentNo: a.agentNo, cabinetNos: "", siteNos: "" })}>换入站点</Button>
               <Button
                 size="sm"
                 variant="outline"
-                disabled={a.cabinetCount + a.siteCount === 0}
+                disabled={a.siteCount === 0}
                 onClick={() => setReclaimForm({ agentNo: a.agentNo, agentName: a.agentName, cabinetNos: "", siteNos: "" })}
-              >回收</Button>
+              >收回站点</Button>
             </>
           )}
         </div>
@@ -824,7 +812,7 @@ function AgentsInner() {
     { header: "生效日期", value: (c) => c.effectiveAt },
     { header: "状态", value: (c) => (c.status === "ACTIVE" ? "启用" : "停用") },
   ], commissions.data?.list ?? []);
-  const exportAssign = () => exportCsv<AgentAssignment>("设备点位划拨", [
+  const exportAssign = () => exportCsv<AgentAssignment>("整站换商家", [
     { header: "商家编号", value: (a) => a.agentNo },
     { header: "商家名称", value: (a) => a.agentName },
     { header: "区域", value: (a) => a.region },
@@ -1048,7 +1036,7 @@ function AgentsInner() {
             searchPlaceholder="搜索商家编号 / 名称 / 区域"
             onExport={exportIf(exportAssign, assign.data?.list?.length)}
             onAdd={canAssign ? () => setAssignForm({ agentNo: "", cabinetNos: "", siteNos: "" }) : undefined}
-            addLabel="划拨设备/点位"
+            addLabel="整站换商家"
           >
             <Button variant="outline" onClick={() => { setRecordsFor({ agentNo: "", agentName: "" }); recPaging.reset(); }}>全部划拨流水</Button>
           </Toolbar>
@@ -1073,7 +1061,7 @@ function AgentsInner() {
             />
           </Toolbar>
           <DataTable rowKey={(a: AgentPerformance) => a.agentNo} columns={perfCols} rows={performance.data?.list} loading={performance.isLoading} error={performance.error} onRetry={performance.refetch}
-            empty={`${periodLabel(period)}内没有绩效数据——统计截至昨日（T+1），商家名下站点需先产生订单；可换更长周期，或先在「设备/点位划拨」把资产划给商家`} />
+            empty={`${periodLabel(period)}内没有绩效数据——统计截至昨日（T+1），商家名下站点需先产生订单；可换更长周期，或先在「整站换商家」把站点换给商家`} />
         </>
       )}
       {tab === "accounts" && (
@@ -1327,12 +1315,12 @@ function AgentsInner() {
         submitting={saveAccount.isPending}
       />
 
-      {/* 划拨抽屉：选目标代理 + 多选机柜/站点，提交前二次确认（写明 N 台机柜、M 个站点、给谁） */}
+      {/* 整站换商家抽屉：选目标商家 + 多选站点，提交前二次确认（写明几个站点、给谁、一并变更什么） */}
       <FormDrawer
         open={!!assignForm}
         onOpenChange={(o) => !o && setAssignForm(null)}
-        titleNew="划拨设备 / 点位"
-        titleEdit="划拨设备 / 点位"
+        titleNew="整站换商家"
+        titleEdit="整站换商家"
         isEdit={false}
         width="w-[520px]"
         fields={assignFields}
@@ -1346,7 +1334,7 @@ function AgentsInner() {
       <FormDrawer
         open={!!reclaimForm}
         onOpenChange={(o) => !o && setReclaimForm(null)}
-        titleNew={`回收资产 · ${reclaimForm?.agentName ?? ""}（${reclaimForm?.agentNo ?? ""}）`}
+        titleNew={`收回站点 · ${reclaimForm?.agentName ?? ""}（${reclaimForm?.agentNo ?? ""}）`}
         titleEdit=""
         isEdit={false}
         width="w-[520px]"
