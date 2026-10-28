@@ -87,6 +87,14 @@ public class ShareRecord extends BaseEntity {
      */
     private String sourceNo;
 
+    /** 冲回来源退款单号（V170）；非空 = 本行是退款冲回，金额为负。原行为空。 */
+    private String refundNo;
+
+    /** 生成列 COALESCE(refund_no, '')，进唯一键。只读。 */
+    @com.baomidou.mybatisplus.annotation.TableField(insertStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.NEVER,
+            updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.NEVER)
+    private String reversalKey;
+
     // createdAt / updatedAt / version / deleted 见 BaseEntity，**不重复声明**（[SKELETON_BRIEF §4]）。
     // 统计口径里的 period（YYYY-MM）就是从 created_at 现算的，本表没有也不需要 period 列。
 }
