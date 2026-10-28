@@ -1,4 +1,4 @@
-package ai.neargo.sharehub.agent.apply.service.impl;
+package ai.neargo.sharehub.agent.apply.service;
 
 import ai.neargo.sharehub.agent.apply.entity.AgtApply;
 import ai.neargo.sharehub.agent.apply.mapper.AgtApplyMapper;

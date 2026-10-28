@@ -16,6 +16,7 @@ import ai.neargo.sharehub.agent.apply.service.ApplyService;
 import ai.neargo.sharehub.agent.entity.AgtAgent;
 import ai.neargo.sharehub.agent.ext.AccountStatus;
 import ai.neargo.sharehub.agent.ext.entity.AgtAccount;
+import ai.neargo.sharehub.agent.apply.service.MerchantInvite;
 import ai.neargo.sharehub.agent.ext.entity.AgtPrincipal;
 import ai.neargo.sharehub.agent.ext.mapper.AgtAccountMapper;
 import ai.neargo.sharehub.agent.ext.mapper.AgtPrincipalMapper;

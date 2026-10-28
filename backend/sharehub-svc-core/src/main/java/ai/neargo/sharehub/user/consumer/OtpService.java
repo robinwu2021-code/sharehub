@@ -40,6 +40,9 @@ public class OtpService {
     /** 开发固定码：只在 dev-mode 开启时可通过校验，且不再作为「发出去的码」。 */
     static final String DEV_MASTER = "000000";
 
+    /** 重发太频繁与当日已达上限说同一句话：对调用方都是「现在别再发了」。 */
+    private static final String TOO_FREQUENT = "发送过于频繁，请稍后再试";
+
     private static final int CODE_DIGITS = 6;
     private static final int CODE_BOUND = 1_000_000;          // 6 位十进制的上界
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -69,6 +72,9 @@ public class OtpService {
     }
 
     private final ConcurrentHashMap<String, Entry> codes = new ConcurrentHashMap<>();
+    /** 同一标识当天已发几次（需求方案 §四「同一标识每日上限」）。键 = 码表键，值 = [日期, 次数]。 */
+    private final ConcurrentHashMap<String, long[]> daily = new ConcurrentHashMap<>();
+    private final int dailyLimit;
 
     /** 一次发码：码本身、发出时刻、已校验次数。 */
     private static final class Entry {
@@ -89,7 +95,9 @@ public class OtpService {
                       @Value("${sharehub.auth.otp.sms-template:Your ShareHub verification code is {code}. It expires in 5 minutes.}")
                       String smsTemplate,
                       @Value("${sharehub.auth.otp.email-template:Your ShareHub verification code is {code}. It expires in 5 minutes. If you did not request it, ignore this email.}")
-                      String emailTemplate) {
+                      String emailTemplate,
+                      @Value("${sharehub.auth.otp.daily-limit:10}") int dailyLimit) {
+        this.dailyLimit = dailyLimit;
         this.emailTemplate = emailTemplate;
         this.devMode = devMode;
         this.notify = notify;
@@ -142,8 +150,16 @@ public class OtpService {
     private Issued issue(String key, String target, String channel, String template, String scene) {
         Instant now = Instant.now();
         Entry prev = codes.get(key);
-        if (prev != null && now.isBefore(prev.issuedAt.plus(resendInterval))) {
-            throw new IllegalStateException("发送过于频繁，请稍后再试");
+        boolean tooSoon = prev != null && now.isBefore(prev.issuedAt.plus(resendInterval));
+        // 每日上限：重发间隔只挡连点，挡不住「每分钟一条、发一整天」地轰炸同一个号或邮箱。
+        // 「一天」按 UTC 切 —— 这是限流窗口，不是业务日期，不需要随业务时区走
+        long today = now.getEpochSecond() / 86_400;
+        long[] sentToday = daily.compute(key, (k, v) -> v == null || v[0] != today ? new long[]{today, 0} : v);
+        synchronized (sentToday) {
+            if (tooSoon || sentToday[1] >= dailyLimit) {
+                throw new IllegalStateException(TOO_FREQUENT);
+            }
+            sentToday[1]++;
         }
         String code = devMode.isEnabled() ? DEV_MASTER : randomCode();
         codes.put(key, new Entry(code, now));

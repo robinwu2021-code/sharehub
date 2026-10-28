@@ -1,4 +1,4 @@
-package ai.neargo.sharehub.finance.service.impl;
+package ai.neargo.sharehub.finance.service;
 
 import ai.neargo.sharehub.api.core.event.OrderRefundedEvent;
 import ai.neargo.sharehub.common.BizKey;

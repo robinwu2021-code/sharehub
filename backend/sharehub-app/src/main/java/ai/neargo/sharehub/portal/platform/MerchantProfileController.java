@@ -1,8 +1,8 @@
 package ai.neargo.sharehub.portal.platform;
 
-import ai.neargo.sharehub.agent.service.impl.MerchantProfileService;
-import ai.neargo.sharehub.agent.service.impl.MerchantProfileService.ContactReq;
-import ai.neargo.sharehub.agent.service.impl.MerchantProfileService.MerchantProfile;
+import ai.neargo.sharehub.agent.service.MerchantProfileService;
+import ai.neargo.sharehub.agent.service.MerchantProfileService.ContactReq;
+import ai.neargo.sharehub.agent.service.MerchantProfileService.MerchantProfile;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;

@@ -60,7 +60,17 @@ public class AgentLoginServiceImpl implements AgentIdentityPort {
          * 批量跑一遍就是一份商家邮箱 / 手机号名单。宁可让输错号的人等一条永远不到的码。
          */
         if (t == null) return null;
-        return t.email() != null ? otpGate.issueEmail(t.email()) : otpGate.issue(t.phone());
+        try {
+            return t.email() != null ? otpGate.issueEmail(t.email()) : otpGate.issue(t.phone());
+        } catch (IllegalStateException throttled) {
+            /*
+             * 重发太频繁 / 当日已达上限：**同样静默**（需求方案 §四：号码不存在、验证码错误、超频对外提示一致）。
+             * 只有存在的账号才会被限流，回 429 就等于告诉对方「这个号是商家」。代价是被限的人收不到码，
+             * 但他本来就该等。
+             */
+            log.info("商家登录发码被限流，静默返回 principalNo={}", t.principal().getPrincipalNo());
+            return null;
+        }
     }
 
     @Override

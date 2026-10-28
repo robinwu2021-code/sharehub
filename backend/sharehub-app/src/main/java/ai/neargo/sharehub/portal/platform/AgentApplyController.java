@@ -46,10 +46,10 @@ public class AgentApplyController {
     /** 自助注册开关（V155）。一期只走运营代建（需求方案 D2），默认关。 */
     static final String KEY_SELF_SERVICE = "agent.apply.self_service_enabled";
 
-    private final ai.neargo.sharehub.agent.apply.service.impl.MerchantInvite invite;
+    private final ai.neargo.sharehub.agent.apply.service.MerchantInvite invite;
 
     public AgentApplyController(ApplyService applyService, DevMode devMode, SysParamPort params,
-                                ai.neargo.sharehub.agent.apply.service.impl.MerchantInvite invite) {
+                                ai.neargo.sharehub.agent.apply.service.MerchantInvite invite) {
         this.invite = invite;
         this.applyService = applyService;
         this.devMode = devMode;

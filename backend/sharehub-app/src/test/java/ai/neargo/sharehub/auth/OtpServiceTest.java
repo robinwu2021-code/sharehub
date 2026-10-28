@@ -37,7 +37,7 @@ class OtpServiceTest {
     }
 
     private static OtpService prod(Duration ttl, Duration resend, int maxAttempts) {
-        return new OtpService(new DevMode(false), okChannel(), ttl, resend, maxAttempts, TEMPLATE, TEMPLATE);
+        return new OtpService(new DevMode(false), okChannel(), ttl, resend, maxAttempts, TEMPLATE, TEMPLATE, 10);
     }
 
     static final String TEMPLATE = "code {code}";
@@ -90,7 +90,7 @@ class OtpServiceTest {
     @DisplayName("dev-mode：固定码 000000 仍可用（本机联调）")
     void masterCodeAcceptedInDevMode() {
         OtpService otp = new OtpService(new DevMode(true), okChannel(),
-                Duration.ofMinutes(5), Duration.ofSeconds(60), 5, TEMPLATE, TEMPLATE);
+                Duration.ofMinutes(5), Duration.ofSeconds(60), 5, TEMPLATE, TEMPLATE, 10);
         assertThatCode(() -> otp.verify(PHONE, "000000")).doesNotThrowAnyException();
     }
 
@@ -153,7 +153,7 @@ class OtpServiceTest {
     void deliversThroughNotifyPort() {
         java.util.List<String[]> sent = new java.util.ArrayList<>();
         OtpService otp = new OtpService(new DevMode(false), recordingChannel(sent, true),
-                Duration.ofMinutes(5), Duration.ofSeconds(60), 5, TEMPLATE, TEMPLATE);
+                Duration.ofMinutes(5), Duration.ofSeconds(60), 5, TEMPLATE, TEMPLATE, 10);
 
         OtpService.Issued r = otp.issue(PHONE, "register");
 
@@ -168,11 +168,23 @@ class OtpServiceTest {
     }
 
     @Test
+    @DisplayName("同一标识每日上限：到顶后拒发（重发间隔挡不住「每分钟一条发一整天」）")
+    void dailyLimitPerIdentifier() {
+        OtpService otp = new OtpService(new DevMode(false), okChannel(),
+                Duration.ofMinutes(5), Duration.ZERO, 5, TEMPLATE, TEMPLATE, 2);
+        otp.issue(PHONE, "login");
+        otp.issue(PHONE, "login");
+        assertThatThrownBy(() -> otp.issue(PHONE, "login")).isInstanceOf(IllegalStateException.class);
+        assertThatCode(() -> otp.issueEmail("other@example.com", "login")).as("按标识计，别的标识不受影响")
+                .doesNotThrowAnyException();
+    }
+
+    @Test
     @DisplayName("邮箱验证码（商家一期 B2）：走 EMAIL 通道；与同一串字符的手机号码表分开，互不顶掉")
     void emailCodesUseTheirOwnChannelAndKeys() {
         java.util.List<String[]> sent = new java.util.ArrayList<>();
         OtpService otp = new OtpService(new DevMode(false), recordingChannel(sent, true),
-                Duration.ofMinutes(5), Duration.ofSeconds(60), 5, TEMPLATE, TEMPLATE);
+                Duration.ofMinutes(5), Duration.ofSeconds(60), 5, TEMPLATE, TEMPLATE, 10);
 
         OtpService.Issued r = otp.issueEmail("owner@example.com", "login");
         assertThat(sent.get(0)[0]).isEqualTo("owner@example.com");
@@ -193,7 +205,7 @@ class OtpServiceTest {
     void failedDeliveryDoesNotLockOutResend() {
         java.util.List<String[]> sent = new java.util.ArrayList<>();
         OtpService otp = new OtpService(new DevMode(false), recordingChannel(sent, false),
-                Duration.ofMinutes(5), Duration.ofSeconds(60), 5, TEMPLATE, TEMPLATE);
+                Duration.ofMinutes(5), Duration.ofSeconds(60), 5, TEMPLATE, TEMPLATE, 10);
 
         OtpService.Issued r = otp.issue(PHONE, "login");
         assertThat(r.delivered()).isFalse();

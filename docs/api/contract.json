@@ -16411,9 +16411,9 @@
    "summary": "设备提醒：在用设备里离线几台、在线但没有可借电池几台，各带最多 20 个柜号供点进去处理。",
    "params": [],
    "bodyType": null,
-   "returnType": "ai.neargo.sharehub.dev.service.impl.DeviceAlertQuery.DeviceAlerts",
+   "returnType": "ai.neargo.sharehub.dev.service.DeviceAlertQuery.DeviceAlerts",
    "returnContainer": null,
-   "returnElement": "ai.neargo.sharehub.dev.service.impl.DeviceAlertQuery.DeviceAlerts",
+   "returnElement": "ai.neargo.sharehub.dev.service.DeviceAlertQuery.DeviceAlerts",
    "responseShape": [
     {
      "name": "deployed",

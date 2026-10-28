@@ -1,7 +1,7 @@
 package ai.neargo.sharehub.finance.port;
 
 import ai.neargo.sharehub.api.core.event.OrderRefundedEvent;
-import ai.neargo.sharehub.finance.service.impl.ShareReversal;
+import ai.neargo.sharehub.finance.service.ShareReversal;
 import ai.neargo.common.data.scope.DataScopeContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

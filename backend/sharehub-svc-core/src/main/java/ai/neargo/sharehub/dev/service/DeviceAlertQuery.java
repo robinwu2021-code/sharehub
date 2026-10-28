@@ -1,4 +1,4 @@
-package ai.neargo.sharehub.dev.service.impl;
+package ai.neargo.sharehub.dev.service;
 
 import ai.neargo.sharehub.dev.CabinetStatus;
 import ai.neargo.sharehub.dev.OnlineStatus;

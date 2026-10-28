@@ -30,10 +30,10 @@ public class MerchantRevenueController {
     private final OrderRevenueQuery orders;
     private final ShareRevenueQuery shares;
     private final BizClock clock;
-    private final ai.neargo.sharehub.dev.service.impl.DeviceAlertQuery devices;
+    private final ai.neargo.sharehub.dev.service.DeviceAlertQuery devices;
 
     public MerchantRevenueController(OrderRevenueQuery orders, ShareRevenueQuery shares, BizClock clock,
-                                     ai.neargo.sharehub.dev.service.impl.DeviceAlertQuery devices) {
+                                     ai.neargo.sharehub.dev.service.DeviceAlertQuery devices) {
         this.devices = devices;
         this.orders = orders;
         this.shares = shares;
@@ -112,7 +112,7 @@ public class MerchantRevenueController {
      */
     @GetMapping("/api/ops/merchant-revenue/alerts")
     @PreAuthorize("@perm.can('dashboard:overview:read')")
-    public ai.neargo.sharehub.dev.service.impl.DeviceAlertQuery.DeviceAlerts alerts() {
+    public ai.neargo.sharehub.dev.service.DeviceAlertQuery.DeviceAlerts alerts() {
         return devices.alerts();
     }
 }
