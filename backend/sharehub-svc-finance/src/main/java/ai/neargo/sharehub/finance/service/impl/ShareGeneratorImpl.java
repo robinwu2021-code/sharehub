@@ -8,6 +8,9 @@ import ai.neargo.sharehub.api.platform.dto.SiteAgentBrief;
 import ai.neargo.sharehub.api.platform.dto.SiteSharingBrief;
 import ai.neargo.sharehub.api.platform.port.SiteAgentQueryPort;
 import ai.neargo.sharehub.api.platform.port.SiteSharingQueryPort;
+import ai.neargo.sharehub.api.platform.port.SysParamPort;
+import ai.neargo.sharehub.api.platform.port.TaxRatePort;
+import ai.neargo.sharehub.finance.ShareBaseMode;
 import ai.neargo.sharehub.common.BizKey;
 import ai.neargo.sharehub.finance.FinNos;
 import ai.neargo.sharehub.finance.entity.ShareRecord;
@@ -54,6 +57,10 @@ import java.util.List;
  *   <li><b>幂等靠唯一键</b>（V53 {@code uk_srec_order_payee_basis}，V37 那条的细化）：
  *       outbox 重投是设计内的，撞键即跳过，不报错也不重复记账。
  *       键里含 {@code basis}，所以同一代理在一单里可以有出资 + 运维两条，而重投仍然拦得住。</li>
+ *   <li><b>基数默认税前</b>（V155，需求方案 D9）：实收按「税率与发票设置」折回税前再乘比例，
+ *       口径由 {@code finance.share.base_mode} 决定，每笔快照口径、税率与基数。改口径不追溯。</li>
+ *   <li><b>场地方一期不分成</b>（需求方案 D10）：{@code finance.share.venue_enabled=0} 时整段跳过。
+ *       场地方档案与进场合同照常维护，只是不生成分润明细，因而也不会进结算单。</li>
  *   <li><b>REFER 不在逐单分润里</b>：牵线的对价是一次性介绍费，签约时付（A2-4）。
  *       按逐单比例付会变成「介绍一次、分十年」。</li>
  * </ul>
@@ -77,11 +84,21 @@ public class ShareGeneratorImpl implements ShareGenerator {
     private final SiteSharingQueryPort siteSharing;
     private final SiteAgentQueryPort siteAgents;
     private final ai.neargo.sharehub.api.platform.port.AgentDirectoryPort agentDirectory;
+    private final SysParamPort params;
+    private final TaxRatePort taxRates;
+
+    /** 参数键：基数口径 / 取哪国税率 / 场地方是否分成。默认值与 V155 种子一致。 */
+    static final String KEY_BASE_MODE = "finance.share.base_mode";
+    static final String KEY_TAX_COUNTRY = "finance.share.tax_country";
+    static final String KEY_VENUE_ENABLED = "finance.share.venue_enabled";
 
     public ShareGeneratorImpl(ShareRecordMapper records, ShareRuleMapper rules,
                               SiteSharingQueryPort siteSharing, SiteAgentQueryPort siteAgents,
-                              ai.neargo.sharehub.api.platform.port.AgentDirectoryPort agentDirectory) {
+                              ai.neargo.sharehub.api.platform.port.AgentDirectoryPort agentDirectory,
+                              SysParamPort params, TaxRatePort taxRates) {
         this.agentDirectory = agentDirectory;
+        this.params = params;
+        this.taxRates = taxRates;
         this.records = records;
         this.rules = rules;
         this.siteSharing = siteSharing;
@@ -112,10 +129,16 @@ public class ShareGeneratorImpl implements ShareGenerator {
         String onDate = e.settledOn() != null && !e.settledOn().isBlank() ? e.settledOn()
                 : e.period() == null ? null : e.period() + "-01";
         SiteSharingBrief site = siteSharing.sharingOf(e.siteNo(), onDate);
+        ShareBaseMode.Base base = baseOf(gross);
         int n = 0;
 
-        // ── 场地方 ──
-        if (site != null && site.venueNo() != null && !site.venueNo().isBlank()) {
+        // ── 场地方（一期关闭：需求方案 D10）──
+        boolean venueShares = params.intOf(KEY_VENUE_ENABLED, 0) == 1;
+        if (!venueShares && site != null && site.venueNo() != null && !site.venueNo().isBlank()) {
+            log.debug("订单 {} 所在站点 {} 关联场地方 {}，场地方分成未开启（{}=0），不生成场地方分润",
+                    e.orderNo(), e.siteNo(), site.venueNo(), KEY_VENUE_ENABLED);
+        }
+        if (venueShares && site != null && site.venueNo() != null && !site.venueNo().isBlank()) {
             BigDecimal rate = site.venueRate();
             String source = site.contractNo();
             if (rate == null) {
@@ -127,12 +150,12 @@ public class ShareGeneratorImpl implements ShareGenerator {
                             e.siteNo(), source, rate);
                 }
             }
-            n += write(e, "VENUE", NO_BASIS, site.venueNo(), site.venueName(), rate, source, gross,
+            n += write(e, "VENUE", NO_BASIS, site.venueNo(), site.venueName(), rate, source, gross, base,
                     site.currency());
         }
 
         // ── 伙伴（按责任逐条）──
-        n += agentShares(e, onDate, gross);
+        n += agentShares(e, onDate, gross, base);
         return n;
     }
 
@@ -146,7 +169,7 @@ public class ShareGeneratorImpl implements ShareGenerator {
      * <p><b>REFER 跳过</b>：牵线的对价是「把关系介绍过来」这个一次性动作，
      * 按逐单比例付会变成「介绍一次、分十年」。它走签约事件（A2-4），不在这里。
      */
-    private int agentShares(OrderSettledEvent e, String onDate, BigDecimal gross) {
+    private int agentShares(OrderSettledEvent e, String onDate, BigDecimal gross, ShareBaseMode.Base base) {
         List<SiteAgentBrief> roles = siteAgents.agentsOf(e.siteNo(), onDate);
 
         // ── 回落：站点没配责任行 ──
@@ -158,7 +181,7 @@ public class ShareGeneratorImpl implements ShareGenerator {
             log.info("站点 {} 未配责任行，代理分成回落到 share_rule(AGENT, {})，依据记为 {}",
                     e.siteNo(), e.agentNo(), FALLBACK_BASIS);
             return write(e, "AGENT", FALLBACK_BASIS, e.agentNo(), r == null ? null : r.getPayeeName(),
-                    opsAdjusted(e, e.agentNo(), FALLBACK_BASIS, r == null ? null : r.getRate()), r == null ? null : r.getRuleNo(), gross, null);
+                    opsAdjusted(e, e.agentNo(), FALLBACK_BASIS, r == null ? null : r.getRate()), r == null ? null : r.getRuleNo(), gross, base, null);
         }
 
         int n = 0;
@@ -170,7 +193,7 @@ public class ShareGeneratorImpl implements ShareGenerator {
             String name = role.agentName() != null ? role.agentName()
                     : (r == null ? null : r.getPayeeName());
             n += write(e, "AGENT", role.role(), role.agentNo(), name,
-                    opsAdjusted(e, role.agentNo(), role.role(), r == null ? null : r.getRate()), r == null ? null : r.getRuleNo(), gross, null);
+                    opsAdjusted(e, role.agentNo(), role.role(), r == null ? null : r.getRate()), r == null ? null : r.getRuleNo(), gross, base, null);
         }
         return n;
     }
@@ -186,6 +209,25 @@ public class ShareGeneratorImpl implements ShareGenerator {
         BigDecimal adjusted = rate.multiply(coef).setScale(4, RoundingMode.DOWN);
         log.info("运维分成系数 orderNo={} agentNo={} period={} {} × {} = {}", e.orderNo(), agentNo, e.period(), rate, coef, adjusted);
         return adjusted;
+    }
+
+    /**
+     * 本单的分成基数。一单只算一次，场地方与各伙伴用同一个基数。
+     *
+     * <p>税率找不到（「税率与发票设置」没有对应国家也没有默认行）时按 0 处理并告警：
+     * 这时基数等于实收，等价于含税口径 —— 多分了税额，需要运营补配税率。
+     */
+    private ShareBaseMode.Base baseOf(BigDecimal gross) {
+        ShareBaseMode mode = ShareBaseMode.parse(params.textOf(KEY_BASE_MODE, ShareBaseMode.PRE_TAX.name()));
+        if (mode == ShareBaseMode.GROSS) return mode.baseOf(gross, BigDecimal.ZERO, true);
+        String country = params.textOf(KEY_TAX_COUNTRY, "AE");
+        TaxRatePort.TaxRate tax = taxRates.rateOf(country);
+        if (tax == null) {
+            log.warn("分成按税前口径计算，但「税率与发票设置」里没有 {} 也没有默认行，本单按税率 0 处理（基数=实收）；"
+                    + "请运营在系统配置里补税率", country);
+            return mode.baseOf(gross, BigDecimal.ZERO, true);
+        }
+        return mode.baseOf(gross, tax.ratePercent(), tax.includedInPrice());
     }
 
     /** 责任行指名了规则号时按号取 —— 指名就是运营的明确意图，不该再被 priority 覆盖。 */
@@ -223,7 +265,7 @@ public class ShareGeneratorImpl implements ShareGenerator {
 
     private int write(OrderSettledEvent e, String dimension, String basis, String payeeNo,
                       String payeeName, BigDecimal rate, String sourceNo, BigDecimal gross,
-                      String currency) {
+                      ShareBaseMode.Base base, String currency) {
         if (rate == null || rate.signum() <= 0) {
             // 没配比例 ≠ 比例为 0。前者是配置缺失（该有人去配），后者是明确的「不分」。
             // 记一条 0 元明细会把两者混为一谈，所以这里只告警不落库。
@@ -241,8 +283,11 @@ public class ShareGeneratorImpl implements ShareGenerator {
         r.setPayeeName(payeeName);
         r.setRate(rate);
         r.setGrossAmount(gross);
+        r.setBaseMode(base.mode().name());
+        r.setTaxRate(base.taxRate());
+        r.setBaseAmount(base.amount());
         // 向下取整到分：分账合计不得超过基数
-        r.setAmount(gross.multiply(rate).setScale(2, RoundingMode.DOWN));
+        r.setAmount(base.amount().multiply(rate).setScale(2, RoundingMode.DOWN));
         r.setCurrency(currency == null ? e.currency() : currency);
         r.setMode(ShareMode.LEDGER.name());
         r.setStatus(ShareRecordStatus.PENDING.name());

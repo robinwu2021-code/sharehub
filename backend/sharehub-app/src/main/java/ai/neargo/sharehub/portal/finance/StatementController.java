@@ -21,7 +21,7 @@ public class StatementController {
     }
 
     @GetMapping("/api/trade/settlements/{settleNo}/statement")
-    @PreAuthorize("@perm.can('finance:settlement:read')")
+    @PreAuthorize("@perm.can('finance:settlement:read') or @perm.can('agent:settlement:read')")
     public Statement statement(@PathVariable String settleNo) {
         return statements.statement(settleNo);
     }
@@ -31,7 +31,7 @@ public class StatementController {
      * 统一响应信封只适合 JSON，套在一张页面上会变成 {code, data:"<html>…"}。
      */
     @GetMapping("/api/trade/settlements/{settleNo}/statement.html")
-    @PreAuthorize("@perm.can('finance:settlement:read')")
+    @PreAuthorize("@perm.can('finance:settlement:read') or @perm.can('agent:settlement:read')")
     public void printable(@PathVariable String settleNo, @RequestParam(required = false) String lang,
                           jakarta.servlet.http.HttpServletResponse response) throws java.io.IOException {
         String html = statements.html(settleNo, lang);   // 先生成：查不到结算单时抛业务异常走统一错误处理，而不是写半张页面

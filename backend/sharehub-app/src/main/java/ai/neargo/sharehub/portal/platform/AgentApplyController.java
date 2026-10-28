@@ -7,8 +7,10 @@ import ai.neargo.sharehub.agent.apply.dto.ApplyDtos.AuditReq;
 import ai.neargo.sharehub.agent.apply.dto.ApplyDtos.MyApplyView;
 import ai.neargo.sharehub.agent.apply.dto.ApplyDtos.SubmitReq;
 import ai.neargo.sharehub.agent.apply.service.ApplyService;
+import ai.neargo.sharehub.api.platform.port.SysParamPort;
 import ai.neargo.sharehub.auth.DevMode;
 import ai.neargo.sharehub.auth.SecurityUtils;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
 
@@ -38,10 +41,27 @@ public class AgentApplyController {
 
     private final ApplyService applyService;
     private final DevMode devMode;
+    private final SysParamPort params;
 
-    public AgentApplyController(ApplyService applyService, DevMode devMode) {
+    /** 自助注册开关（V155）。一期只走运营代建（需求方案 D2），默认关。 */
+    static final String KEY_SELF_SERVICE = "agent.apply.self_service_enabled";
+
+    public AgentApplyController(ApplyService applyService, DevMode devMode, SysParamPort params) {
         this.applyService = applyService;
         this.devMode = devMode;
+        this.params = params;
+    }
+
+    /**
+     * 自助入口关闭时三个免鉴权端点一律 404。
+     *
+     * <p>用 404 而不是 403：关闭期间这是一个不该被发现的入口，403 等于告诉对方「这里有东西，只是你进不去」。
+     * 白名单与限流照旧保留 —— 二期开开关即可，不必再改安全配置。
+     */
+    private void requireSelfServiceOpen() {
+        if (params.intOf(KEY_SELF_SERVICE, 0) != 1) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
     }
 
     /**
@@ -62,6 +82,7 @@ public class AgentApplyController {
      */
     @PostMapping("/apply/otp")
     public Map<String, Object> applyOtp(@RequestBody Map<String, String> body) {
+        requireSelfServiceOpen();
         String code = applyService.sendOtp(body.get("phone"));
         return devMode.isEnabled() ? Map.of("sent", true, "devCode", code) : Map.of("sent", true);
     }
@@ -77,6 +98,7 @@ public class AgentApplyController {
      */
     @PostMapping("/apply")
     public ApplyResult selfServiceApply(@RequestBody SubmitReq req) {
+        requireSelfServiceOpen();
         return applyService.submit(req, null);
     }
 
@@ -104,6 +126,7 @@ public class AgentApplyController {
     /** 申请人查进度与驳回原因（免鉴权，凭手机号 + OTP）。驳回原因**原样回显**，不是只给运营看。 */
     @GetMapping("/apply/mine")
     public MyApplyView mine(@RequestParam String phone, @RequestParam String otp) {
+        requireSelfServiceOpen();
         return applyService.mine(phone, otp);
     }
 

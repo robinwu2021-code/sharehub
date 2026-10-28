@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.scenario;
 
+import ai.neargo.sharehub.support.SelfServiceApplyOpen;
 import ai.neargo.sharehub.support.ApiTestSupport;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.Test;
@@ -36,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         // 十次/分钟的闸三四个用例就用完了。第一次跑绿、第二次全红，而代码一行没改。
         "sharehub.security.apply-rate-per-minute=10000",
 })
+@SelfServiceApplyOpen
 class AgentApplyFlowTest extends ApiTestSupport {
 
     /** dev-mode 下的固定验证码（{@code OtpService.DEV_MASTER}）。 */

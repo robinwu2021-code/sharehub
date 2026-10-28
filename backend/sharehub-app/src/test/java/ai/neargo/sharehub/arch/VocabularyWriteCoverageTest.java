@@ -184,6 +184,7 @@ class VocabularyWriteCoverageTest {
             // 要么枚举 .name()、要么写在方法开头的白名单（ACTION_RESULT / PAY_CHANNELS /
             // DEBIT-CREDIT 的 else-throw），而白名单**离 setter 有十几行远**。
             "share_record.basis",                    // 派生自 share_rule.basis（已覆盖）/ 常量 REFER
+            "share_record.base_mode",                // V155：ShareGeneratorImpl 写 ShareBaseMode.name()；参数值写坏时 parse 回落 PRE_TAX，无外部写入口
             "stl_withdrawal.pay_channel",            // PAY_CHANNELS 白名单（在 setPayChannel 上面五行）
             "acct_ledger.direction",                 // DEBIT/CREDIT，校验在写入循环之前，非法值 else-throw
             "usr_wallet_txn.direction",              // amount.signum() > 0 ? IN : OUT

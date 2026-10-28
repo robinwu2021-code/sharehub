@@ -9,6 +9,7 @@ import type { AgentApply, ApplyStatus, OperatorType } from "../../types";
 import { fail, notFound } from "@/lib/biz-error";
 import { paginate, kwHit } from "./helpers";
 import { agents } from "./agent";
+import { paramOf } from "./system";
 
 /** 在途状态。**必须与后端 V48 生成列 `active_key` 的 CASE 分支一致**，改一处要改两处。 */
 const IN_FLIGHT: ApplyStatus[] = ["DRAFT", "SUBMITTED", "REVIEWING"];
@@ -194,7 +195,17 @@ export function auditAgentApply(x: {
  * 真实现有重发间隔与有效期；mock 不模拟那些，因为它们只会让离线调页面变难，
  * 而「码错了会怎样」这条路径在 verify 里照样验得到。
  */
+/**
+ * 自助注册开关（V155 `agent.apply.self_service_enabled`）。一期只走运营代建，关闭时三个公开端点一律 404，
+ * 与后端同语义 —— 关闭期间这是不该被发现的入口，403 等于告诉对方「这里有东西」。
+ */
+export const SELF_SERVICE_KEY = "agent.apply.self_service_enabled";
+function requireSelfServiceOpen() {
+  if (paramOf(SELF_SERVICE_KEY, "0") !== "1") notFound("自助注册入口", "Self-service sign-up", "");
+}
+
 export function sendApplyOtp(phone: string): { sent: boolean; devCode?: string } {
+  requireSelfServiceOpen();
   if (!phone?.trim()) fail("手机号必填", "Phone is required");
   return { sent: true, devCode: "000000" };
 }
@@ -210,6 +221,7 @@ export function selfServiceApply(x: {
   operatorName: string; operatorType: OperatorType; contactName?: string;
   regionScope?: string; payload?: string;
 }): { applyNo: string; status: ApplyStatus } {
+  requireSelfServiceOpen();
   checkOtp(x.otp);
   const row = createAgentApply(x);
   // source 由入口决定 —— 这里是自助那一侧
@@ -221,6 +233,7 @@ export function selfServiceApply(x: {
 
 /** 申请人查进度。只返回掩码与状态 —— 公开页不能多给任何可枚举的信息。 */
 export function myApply(phone: string, otp: string) {
+  requireSelfServiceOpen();
   checkOtp(otp);
   const key = phoneKey(phone);
   const rows = applies.filter((r) => r._phoneKey === key);

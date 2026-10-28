@@ -44,6 +44,9 @@ public class SettlementServiceImpl implements SettlementService {
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SettlementServiceImpl.class);
 
+    /** 受益方类型：场地方。一期不出单（需求方案 D10），开关见 {@link ShareGeneratorImpl#KEY_VENUE_ENABLED}。 */
+    private static final String VENUE = ai.neargo.sharehub.finance.ShareDimension.VENUE.name();
+
 
     private final StlSettlementMapper mapper;
     private final StlSettlementDetailMapper detailMapper;
@@ -51,12 +54,15 @@ public class SettlementServiceImpl implements SettlementService {
     private final SettlementStateMachine stateMachine;
     private final StlAdjustmentMapper adjustmentMapper;
     private final ai.neargo.sharehub.finance.service.AdjustmentService adjustmentService;
+    private final ai.neargo.sharehub.api.platform.port.SysParamPort params;
 
     public SettlementServiceImpl(StlSettlementMapper mapper, StlSettlementDetailMapper detailMapper,
                                  ShareRecordMapper recordMapper, SettlementStateMachine stateMachine,
                                  StlAdjustmentMapper adjustmentMapper,
-                                 ai.neargo.sharehub.finance.service.AdjustmentService adjustmentService) {
+                                 ai.neargo.sharehub.finance.service.AdjustmentService adjustmentService,
+                                 ai.neargo.sharehub.api.platform.port.SysParamPort params) {
         this.adjustmentService = adjustmentService;
+        this.params = params;
         this.mapper = mapper;
         this.detailMapper = detailMapper;
         this.recordMapper = recordMapper;
@@ -131,11 +137,20 @@ public class SettlementServiceImpl implements SettlementService {
         java.util.Set<String> only = payeeNos == null ? java.util.Set.of()
                 : payeeNos.stream().filter(n -> n != null && !n.isBlank()).collect(java.util.stream.Collectors.toSet());
 
+        // 场地方一期不结算（需求方案 D10）：存量的场地方分润与调整项留在库里，不出单、不进付款
+        boolean venueOn = params.intOf(ShareGeneratorImpl.KEY_VENUE_ENABLED, 0) == 1;
+        if (!venueOn && VENUE.equalsIgnoreCase(payeeType)) {
+            log.info("场地方结算未开启（{}=0），按场地方出账的请求不生成结算单 period={}",
+                    ShareGeneratorImpl.KEY_VENUE_ENABLED, period);
+            return List.of();
+        }
+
         QueryWrapper<ShareRecord> w = new QueryWrapper<>();
         w.eq("status", ShareRecordStatus.PENDING.name());
         // 按归属账期列取（V34）：创建时刻不等于归属周期，且函数包列无法走索引
         w.eq("period", period);
         if (payeeType != null && !payeeType.isBlank()) w.eq("payee_type", payeeType);
+        if (!venueOn) w.ne("payee_type", VENUE);
         if (!only.isEmpty()) w.in("payee_no", only);
         List<ShareRecord> pending = recordMapper.selectList(w);
 
@@ -146,13 +161,14 @@ public class SettlementServiceImpl implements SettlementService {
         }
 
         // 保底补差（G2）：先把本账期的补差算出来（已确认），下面随调整项一起并入场地方结算单
-        if (payeeType == null || payeeType.isBlank() || "VENUE".equalsIgnoreCase(payeeType)) adjustmentService.topUpGuarantees(period);
+        if (venueOn && (payeeType == null || payeeType.isBlank() || VENUE.equalsIgnoreCase(payeeType))) adjustmentService.topUpGuarantees(period);
 
         // 已确认、尚未出账的结算调整项（撤场结清押金 / 进场费，V107）：并入该收款方本期结算单。
         // 没有分润、只有调整项的收款方同样要出一张单 —— 撤场后的站点正是这样
         LambdaQueryWrapper<StlAdjustment> aw = new LambdaQueryWrapper<StlAdjustment>()
                 .eq(StlAdjustment::getStatus, AdjustmentStatus.CONFIRMED.name()).isNull(StlAdjustment::getSettleNo);
         if (payeeType != null && !payeeType.isBlank()) aw.eq(StlAdjustment::getPayeeType, payeeType);
+        if (!venueOn) aw.ne(StlAdjustment::getPayeeType, VENUE);
         if (!only.isEmpty()) aw.in(StlAdjustment::getPayeeNo, only);
         Map<String, List<StlAdjustment>> adjByPayee = new LinkedHashMap<>();
         for (StlAdjustment a : adjustmentMapper.selectList(aw)) {

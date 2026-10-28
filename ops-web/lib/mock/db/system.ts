@@ -76,7 +76,18 @@ export const sysParams: SysParam[] = [
   { paramKey: "whatsapp.enabled", label: "WhatsApp通知", value: "true", groupName: "通知", updatedAt: iso(13 * 86400_000) },
   { paramKey: "credit.min", label: "最低信用分", value: "550", groupName: "风控", updatedAt: iso(14 * 86400_000) },
   { paramKey: "invite.reward", label: "邀请奖励(AED)", value: "5", groupName: "营销", updatedAt: iso(15 * 86400_000) },
+  // 商家一期（与后端 V155 同键同默认值）
+  { paramKey: "finance.share.base_mode", label: "分成基数口径：PRE_TAX 税前 / GROSS 含税实收（只影响之后的订单）", value: "PRE_TAX", groupName: "财务", updatedAt: iso(16 * 86400_000) },
+  { paramKey: "finance.share.tax_country", label: "分成折算税前时取哪个国家的税率", value: "AE", groupName: "财务", updatedAt: iso(16 * 86400_000) },
+  { paramKey: "finance.share.venue_enabled", label: "场地方是否参与分成与结算：1 是 / 0 否（一期为 0）", value: "0", groupName: "财务", updatedAt: iso(16 * 86400_000) },
+  { paramKey: "agent.apply.self_service_enabled", label: "商家自助注册入口：1 开 / 0 关（一期只走运营代建）", value: "0", groupName: "商家", updatedAt: iso(16 * 86400_000) },
 ];
+
+/** 读系统参数（mock）。与后端 SysParamPort 同语义：缺失或空串回落默认值。 */
+export function paramOf(key: string, fallback: string): string {
+  const v = sysParams.find((p) => p.paramKey === key)?.value;
+  return v == null || v.trim() === "" ? fallback : v.trim();
+}
 export const openApiApps: OpenApiApp[] = Array.from({ length: 12 }, (_, i) => ({
   appNo: `APP${300 + i}`, name: p(["Careem 集成", "Noon 广告平台", "Emirates NBD 支付", "第三方BI", "场地方门户", "代理商开放平台"], i),
   appKey: `ak_${String(1000000000 + i * 7654321).slice(0, 10)}`, rateLimit: p([100, 300, 500, 1000], i),

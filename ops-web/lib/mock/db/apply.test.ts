@@ -5,11 +5,17 @@
 //  ② 「同手机号至多一张在途」漏掉 —— 一个人刷十张申请，审核队列被淹掉；
 //  ③ 多主体申请被当成重复注册拒掉 —— 用户卡死在注册页，而他只是想开第二个主体；
 //  ④ 审核通过了但主体没建出来 —— 列表里查无此人，要到联调或上线才发现。
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   applies, listAgentApplies, acceptAgentApply, auditAgentApply,
-  createAgentApply, selfServiceApply, myApply,
+  createAgentApply, selfServiceApply, myApply, sendApplyOtp, SELF_SERVICE_KEY,
 } from "./apply";
+import { sysParams } from "./system";
+
+/** 自助入口一期默认关闭（V155）。下面验自助流程的用例显式打开，跑完还原，不影响别的文件。 */
+function setSelfService(v: "0" | "1") {
+  sysParams.find((p) => p.paramKey === SELF_SERVICE_KEY)!.value = v;
+}
 import { agents } from "./agent";
 
 const OTP = "000000";
@@ -116,7 +122,24 @@ describe("多主体：手机号已存在不是重复注册", () => {
   });
 });
 
+describe("自助入口开关（一期只走运营代建）", () => {
+  it("★ 关闭时发码、提交、查进度一律 404，代建不受影响", () => {
+    setSelfService("0");
+    const phone = freshPhone();
+    for (const call of [
+      () => sendApplyOtp(phone),
+      () => selfServiceApply({ phone, otp: OTP, email: "x@example.com", operatorName: "关闭期间", operatorType: "AGENT" }),
+      () => myApply(phone, OTP),
+    ]) {
+      expect(call).toThrow(expect.objectContaining({ code: 404 }));
+    }
+    expect(newApply().status).toBe("SUBMITTED");
+  });
+});
+
 describe("自助与代建：同一张表、同一个状态机，只有来源不同", () => {
+  beforeAll(() => setSelfService("1"));
+  afterAll(() => setSelfService("0"));
   it("★ 自助提交落 SELF_SERVICE，代建落 OPS_CREATED，两者进同一个队列", () => {
     const selfPhone = freshPhone();
     const s = selfServiceApply({
@@ -151,6 +174,8 @@ describe("自助与代建：同一张表、同一个状态机，只有来源不�
 });
 
 describe("申请人查进度", () => {
+  beforeAll(() => setSelfService("1"));
+  afterAll(() => setSelfService("0"));
   it("★ 只返回掩码与状态——公开页不能多给任何可枚举的信息", () => {
     const phone = freshPhone();
     const a = newApply({ phone, email: "who@example.com" });

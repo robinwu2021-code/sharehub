@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.scenario;
 
+import ai.neargo.sharehub.support.LegacyShareParams;
 import ai.neargo.sharehub.api.core.event.OrderSettledEvent;
 import ai.neargo.sharehub.finance.service.ShareGenerator;
 import ai.neargo.sharehub.support.ApiTestSupport;
@@ -28,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 所以生成逻辑直接调 {@link ShareGenerator}：**真库、真 Port、真规则解析**，
  * 只有事件是合成的 —— 而事件本身的发布由 {@code ConsumerRentFlowTest} 的归还闭环覆盖。
  */
+@LegacyShareParams
 class OrderShareGenerationTest extends ApiTestSupport {
 
     /** ST305 挂着场地方 VEN300，且有生效合同 CT405（V38 回填）。 */

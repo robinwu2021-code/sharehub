@@ -56,6 +56,18 @@ public class ShareRecord extends BaseEntity {
     private BigDecimal grossAmount;
 
     /**
+     * 分成基数口径（V155，需求方案 D9）：{@link ai.neargo.sharehub.finance.ShareBaseMode} 的名字。
+     * 空 = V155 之前生成，当时按含税实收。改口径只影响之后的订单，所以每笔都要自带口径。
+     */
+    private String baseMode;
+
+    /** 折算所用税率，百分数口径（5.00 = 5%）。GROSS 口径或价外税时为 0。 */
+    private BigDecimal taxRate;
+
+    /** 分成基数：{@code amount = baseAmount × rate}（向下取整到分）。PRE_TAX 时为实收折回税前。 */
+    private BigDecimal baseAmount;
+
+    /**
      * 分成依据（V53 / ADR-027）：INVEST / DEVELOP / OPERATE / REFER。
      *
      * <p>一个代理在一个站点上可以既出资又运维，两笔钱的比例与去向都不同。

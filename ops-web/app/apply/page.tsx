@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { notify } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 import type { OperatorType } from "@/lib/types";
+import { SelfServiceClosed, isSelfServiceClosed } from "@/components/agent/self-service-closed";
 
 type Step = 1 | 2 | 3;
 
@@ -39,6 +40,8 @@ export default function ApplyPage() {
   const [regionScope, setRegionScope] = useState("");
   const [payload, setPayload] = useState("");
   const [applyNo, setApplyNo] = useState("");
+  // 一期只走运营代建：自助入口关闭时发码返回 404，整页换成「请联系运营开通」
+  const [closed, setClosed] = useState(false);
 
   const sendOtp = useMutation({
     mutationFn: () => api.sendApplyOtp(phone),
@@ -46,7 +49,7 @@ export default function ApplyPage() {
       // devCode 只在 dev-mode 回传；生产走短信，这里拿不到
       notify.success(r.devCode ? `验证码已发送（联调码 ${r.devCode}）` : "验证码已发送");
     },
-    onError: (e: Error) => notify.error(e.message),
+    onError: (e: Error) => (isSelfServiceClosed(e) ? setClosed(true) : notify.error(e.message)),
   });
 
   const submit = useMutation({
@@ -58,6 +61,8 @@ export default function ApplyPage() {
     onSuccess: (r) => { setApplyNo(r.applyNo); setStep(3); },
     onError: (e: Error) => notify.error(e.message),
   });
+
+  if (closed) return <SelfServiceClosed />;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">

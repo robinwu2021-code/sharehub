@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.scenario;
 
+import ai.neargo.sharehub.support.LegacyShareParams;
 import ai.neargo.sharehub.finance.service.SettlementService;
 import ai.neargo.sharehub.support.ApiTestSupport;
 import org.junit.jupiter.api.AfterEach;
@@ -36,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 已打款的单则不能动（钱已经出去了），记 WARN 让它显形。
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@LegacyShareParams
 class SettlementLateShareTest extends ApiTestSupport {
 
     @Autowired
