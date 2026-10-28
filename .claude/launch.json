@@ -37,6 +37,18 @@
       "runtimeExecutable": "opskit/scripts/dev-run.sh",
       "runtimeArgs": [],
       "port": 8090
+    },
+    {
+      "name": "flow-preview",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "4310",
+        "--directory",
+        ".e2e/flow-e2e-mock/out"
+      ],
+      "port": 4310
     }
   ]
 }
