@@ -1,5 +1,5 @@
 // 覆盖范围：认证登录 + 工作台首页统计。
-import type { DashboardStats, OpsFlowMetrics } from "../../types";
+import type { DashboardStats, OpsFlowMetrics, RevenueByDevice, RevenueDay, RevenueSummary } from "../../types";
 
 /** 一个人在某运营主体下的成员关系（ADR-030）。仅 AGENT realm 返回。 */
 export interface OperatorRef { operatorNo: string; name: string; isOwner: boolean; isPrimary: boolean; }
@@ -70,6 +70,9 @@ export interface MenuNode {
   children: MenuNode[];
 }
 
+/** 营收窗口：闭区间，YYYY-MM-DD。 */
+export interface RevenueWindow { from?: string; to?: string }
+
 export interface DashboardApi {
   /**
    * 当前登录人**可见的**菜单树（服务端已按权限剪枝，前端拿到就渲染）。
@@ -132,4 +135,13 @@ export interface DashboardApi {
    * 比率为 null = 分母为 0，**不是 0%**。
    */
   getOpsFlowMetrics(q?: { from?: string; to?: string }): Promise<OpsFlowMetrics>;
+  /**
+   * 商家营收首页（`dashboard:overview:read`，商家一期 B5）。窗口 `[from, to]` 闭区间，YYYY-MM-DD；
+   * 缺省本月 1 日到今天，最长 366 天。商家只看自己的（服务端数据范围），运营看全部。
+   */
+  getRevenueSummary(q?: RevenueWindow): Promise<RevenueSummary>;
+  /** 按天趋势，缺天补 0。 */
+  getRevenueTrend(q?: RevenueWindow): Promise<RevenueDay[]>;
+  /** 按设备排行，`limit` 缺省 10。 */
+  getRevenueByDevice(q?: RevenueWindow & { limit?: number }): Promise<RevenueByDevice[]>;
 }

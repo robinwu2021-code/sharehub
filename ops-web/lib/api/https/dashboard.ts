@@ -19,4 +19,7 @@ export const dashboardHttp: DashboardApi = {
   logout: () => client.post("/api/auth/logout"),
   getDashboard: () => client.get("/api/ops/dashboard"),
   getOpsFlowMetrics: (q) => client.get("/api/ops/ops-flow-metrics", q),
+  getRevenueSummary: (q) => client.get("/api/ops/merchant-revenue/summary", q),
+  getRevenueTrend: (q) => client.get("/api/ops/merchant-revenue/trend", q),
+  getRevenueByDevice: (q) => client.get("/api/ops/merchant-revenue/by-device", q),
 };

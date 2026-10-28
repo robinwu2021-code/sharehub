@@ -7,6 +7,13 @@ import { fail } from "../../biz-error";
 import { currentAuth, type Role } from "../../auth";
 import * as menuDb from "../../mock/db/menu";
 import { opsFlowMetrics } from "../../mock/db/ops-flow-metrics";
+import { revenueByDevice, revenueSummary, revenueTrend } from "../../mock/db/merchant-revenue";
+
+/** 商家会话收窄到当前主体，与后端数据范围同口径；员工会话看全部。 */
+const revenueScope = () => {
+  const a = currentAuth();
+  return a?.role === "AGENT" ? a.currentOperatorNo || null : null;
+};
 
 /** dev-mode 固定验证码，与后端 OtpService.DEV_MASTER 同值 —— 两边不一致就「收到码了但验不过」。 */
 const DEV_OTP = "000000";
@@ -93,4 +100,7 @@ export const dashboardMock: DashboardApi = {
   logout: () => wait(undefined as void),
   getDashboard: () => wait(db.dashboard),
   getOpsFlowMetrics: (q) => wait(opsFlowMetrics(q ?? {})),
+  getRevenueSummary: async (q) => wait(revenueSummary(revenueScope(), q ?? {})),
+  getRevenueTrend: async (q) => wait(revenueTrend(revenueScope(), q ?? {})),
+  getRevenueByDevice: async (q) => wait(revenueByDevice(revenueScope(), q ?? {})),
 };
