@@ -13,14 +13,14 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 菜单管理：**改「怎么显示、谁看得到」，不改「指向哪」。**
  *
  * <h2>这块为什么危险</h2>
- * 菜单是运营端<b>唯一</b>的入口。把「员工与权限」那一支藏了之后，
+ * 菜单是运营端<b>唯一</b>的入口。 把「系统管理」（V172 起菜单管理所在的那一支）藏了之后，
  * 谁都没法再进来把它改回去 —— 只能改库。所以护栏比功能本身更要紧。
  */
 class MenuAdminTest extends ApiTestSupport {
 
     private static final String MENUS = "/api/platform/iam/menus";
     /** 回得来的那扇门。与被测代码同值——断言消息里**不出现**它。 */
-    private static final String ADMIN_SECTION = "M_org";
+    private static final String ADMIN_SECTION = "M_system"; // V172：菜单管理随员工与权限并入系统管理
 
     private JsonNode node(String admin, String menuNo) {
         for (JsonNode s : get(MENUS, admin).okData()) {
@@ -75,11 +75,11 @@ class MenuAdminTest extends ApiTestSupport {
     @Test
     void you_cannot_lock_yourself_out() {
         /*
-         * **本文件最重要的一条。** 把「员工与权限」藏掉之后，
+         * **本文件最重要的一条。** 把「系统管理」（菜单管理所在的那一支）藏掉之后，
          * 连「进来改回去」的入口都没有了 —— 只能改库。所以必须在事务里拦住并回滚。
          */
         String admin = login("ADMIN");
-        var resp = put(MENUS + "/M_org", patch("visible", 0), admin);
+        var resp = put(MENUS + "/M_system", patch("visible", 0), admin);
         assertThat(resp.status).as("藏掉自己那一支必须被拒").isEqualTo(400);
 
         /*
@@ -91,13 +91,13 @@ class MenuAdminTest extends ApiTestSupport {
         assertThat(resp.msg())
                 .as("拒绝的理由要送到调用方，否则界面上只剩一个没头没脑的 500")
                 .contains("谁都进不来")
-                // 用菜单名而不是 menuNo：操作者那一栏写着「员工与权限」，弹「M_org」对不上号
-                .contains("员工与权限")
+                // 用菜单名而不是 menuNo：操作者那一栏写着「系统管理」，弹「M_system」对不上号
+                .contains("系统管理")
                 .doesNotContain(ADMIN_SECTION);
 
-        assertThat(node(admin, "M_org")).as("而且要回滚——它还得在").isNotNull();
+        assertThat(node(admin, "M_system")).as("而且要回滚——它还得在").isNotNull();
         assertThat(get("/api/auth/menus", admin).okData().toString())
-                .as("超管仍然进得来").contains("M_org");
+                .as("超管仍然进得来").contains("M_system");
     }
 
     @Test

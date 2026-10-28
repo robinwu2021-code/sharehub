@@ -23,7 +23,7 @@ export const orgMock: OrgApi = {
 
   // 功能权限（S6）
   // 全量（连停用的也在）+ 改。两者都走 mock db —— 改动要能读回，
-  // 且两道闸（perm 在目录里 / 不能藏掉「员工与权限」）在 mock 层同样强制。
+  // 且两道闸（perm 在目录里 / 不能藏掉「系统管理」）在 mock 层同样强制。
   listAllMenus: async () => wait(await menuDb.allMenus()),
   updateMenu: async (menuNo, patch) =>
     wait(await menuDb.updateMenu(menuNo, patch, db.permissions.map((p) => p.code)), 350),

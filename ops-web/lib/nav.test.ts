@@ -25,8 +25,8 @@ const sectionKeys = (role: Role) => visibleSections(role).map((s) => s.key);
 // L1 顺序即 Rail 顺序；改动必须是有意识的产品决策，连带更新 docs。
 const L1_KEYS = [
   "my-biz", "my-asset", "my-service", // 代理端门户（portalFor: AGENT）
-  "dashboard", "operation", "device", "workorder", "venue", "agent", "order",
-  "settlement", "finance", "user", "report", "org", "system", "flow",
+  "dashboard", "device", "workorder", "venue", "agent", "order",
+  "settlement", "finance", "user", "report", "system", "flow",
 ];
 // 叶子五元组 href|label|perm|phase|group —— 2026-07-30 层级重构前后逐条比对为零差异。
 // 2026-09-23 有意变更（A 类菜单重合收敛，见 docs/technical/菜单重合梳理与优化方案.md）：
@@ -63,13 +63,7 @@ const LEAF_TUPLES = [
   "/devices|我的设备|device:cabinet:read||设备与订单",
   "/orders|我的订单|order:order:read||设备与订单",
   "/work-orders?view=list|设备报修|workorder:wo:create||报修与跟进",
-  // 2026-10-28：站点四项迁到网点管理（OM02），见下方 venue 段
-  // 计费两项 2026-10-28 迁到销售管理（OM04）
-  "/operation/app-versions|应用版本|system:app_version:read||基础管理",
-  "/operation/banks|银行管理|system:bank:read||基础管理",
-  "/operation/brands|品牌管理|system:brand:read||基础管理",
-  "/operation/problems|问题管理|system:problem:read||基础管理",
-  "/operation/notices|公告管理|marketing:notice:read||基础管理",
+  // 「运营管理」L1 2026-10-28 撤销（OM11）：基础管理五项归系统管理 › 基础资料，见下方 system 段
   // 分成两项 2026-10-28 迁到结算（OM08）
   // 2026-10-28 设备管理按生命周期（V163）：设备档案 → 仓储与出库（含出库池）→ 绑定上线 → 运行监控
   "/devices|设备台账|device:cabinet:read||设备档案",
@@ -173,35 +167,39 @@ const LEAF_TUPLES = [
   "/reports?tab=screen|实时大屏|report:screen:read|3|",
   "/reports?tab=custom|自定义报表|report:custom:read|3|",
   "/reports?tab=consumer|消费者分析|report:consumer:read|3|",
-  "/employees?tab=employees|员工|org:employee:read||人与组织",
-  "/employees?tab=org|组织架构|org:employee:read|2|人与组织",
-  "/employees?tab=roles|角色权限|org:role:read||授权",
-  "/employees?tab=menus|菜单管理|org:role:read||授权",
-  "/employees?tab=audit|操作审计|org:audit:read|1|留痕与考核",
-  "/employees?tab=performance|绩效报表|org:employee:read|3|留痕与考核",
-  // 供应商接入 2026-10-28 搬到设备管理（OM03）
+  // 2026-10-28 系统管理（OM11，V172）：员工与权限 → 规则与参数 → 基础资料 → 消息触达 → 流程
+  "/employees?tab=employees|员工|org:employee:read||员工与权限",
+  "/employees?tab=org|组织架构|org:employee:read|2|员工与权限",
+  "/employees?tab=roles|角色权限|org:role:read||员工与权限",
+  "/employees?tab=menus|菜单管理|org:role:read||员工与权限",
+  "/employees?tab=audit|操作审计|org:audit:read|1|员工与权限",
+  "/employees?tab=performance|绩效报表|org:employee:read|3|员工与权限",
+  "/system?tab=rules|业务规则|system:biz_rule:update|1|规则与参数",
+  "/system?tab=login|登录设置|system:login_setting:update|1|规则与参数",
+  "/system?tab=params|系统参数|system:param:read||规则与参数",
+  "/system?tab=tax|税率与发票|system:tax:update|2|规则与参数",
+  "/system?tab=markets|多国家市场|system:market:read|3|规则与参数",
+  "/system?tab=openapi|OpenAPI 应用|system:openapi:read|3|规则与参数",
+  "/system?tab=dict|参数字典|system:dict:read||基础资料",
+  "/system?tab=region|地区库|system:dict:read||基础资料",
+  "/operation/banks|银行管理|system:bank:read||基础资料",
+  "/operation/brands|品牌管理|system:brand:read||基础资料",
+  "/operation/problems|问题管理|system:problem:read||基础资料",
+  "/operation/app-versions|应用版本|system:app_version:read||基础资料",
+  "/operation/notices|公告管理|marketing:notice:read||基础资料",
   "/system?tab=notify|通知模板|system:notify_template:read||消息触达",
   "/system?tab=notify-log|发送记录|system:notify_log:read|1|消息触达",
   "/system?tab=notify-blacklist|触达拉黑|system:notify_blacklist:read|1|消息触达",
-  "/system?tab=rules|业务规则|system:biz_rule:update|1|业务规则",
-  "/system?tab=login|登录设置|system:login_setting:update|1|业务规则",
-  "/system?tab=dict|参数字典|system:dict:read||基础字典",
-  "/system?tab=region|地区库|system:dict:read||基础字典",
-  "/system?tab=params|系统参数|system:param:read||基础字典",
-  "/system?tab=tax|税率与发票|system:tax:update|2|开放与市场",
-  "/system?tab=markets|多国家市场|system:market:read|3|开放与市场",
-  "/system?tab=openapi|OpenAPI 应用|system:openapi:read|3|开放与市场",
-  // 2026-09-28 流程与工单（OpsKit 运营界面）：整段放在最末，只插新行（V136）
+  "/flow/processes|流程配置|flow:process:manage||流程",
+  "/flow/settings|运营配置|flow:config:manage||流程",
+  "/flow/access|接入管理|flow:access:manage||流程",
+  "/flow/instances|流程实例|flow:approval:read||流程",
+  "/flow/stats|流程统计|flow:process:manage||流程",
+  // 流程与工单只剩待办与审批四项（归工作台 OM00）
   "/flow/todo|待办中心|flow:todo:read||我的待办",
   "/flow/approvals|审批列表|flow:approval:read||审批",
   "/flow/queue|审核队列|flow:queue:claim||审批",
-  "/flow/tickets|工单工作台|flow:ticket:read||工单",
-  "/flow/processes|流程配置|flow:process:manage||配置",
-  "/flow/settings|运营配置|flow:config:manage||配置",
-  "/flow/access|接入管理|flow:access:manage||配置",
-  // 2026-09-28 V139：流转与统计（追加在末尾）
-  "/flow/instances|流程实例|flow:approval:read||流转与统计",
-  "/flow/stats|流程统计|flow:process:manage||流转与统计"];
+  "/flow/tickets|工单工作台|flow:ticket:read||工单"];
 
 describe("结构回归基线（层级重构不改内容）", () => {
   // 2026-09-23 菜单收敛：第二步撤销「站点与点位」（16 → 15），第三步把场地方那条线
@@ -213,9 +211,10 @@ describe("结构回归基线（层级重构不改内容）", () => {
   // 2026-10-28：「营销管理」并入「销售管理」（16 → 15，V151）。
   // 2026-10-28：「告警管理」「客服管理」并入「运维管理」（15 → 13，V153）。
   // 2026-10-28：从财务管理拆出「结算」（13 → 14，V154）。
-  it("L1 = 14 个运营项 + 3 个代理门户项，顺序固定", () => {
+  // 2026-10-28：「员工与权限」「运营管理」并入「系统管理」（14 → 12，V172）。
+  it("L1 = 12 个运营项 + 3 个代理门户项，顺序固定", () => {
     expect(NAV.map((s) => s.key)).toEqual(L1_KEYS);
-    expect(NAV.filter((s) => !s.portalFor)).toHaveLength(14);
+    expect(NAV.filter((s) => !s.portalFor)).toHaveLength(12);
     expect(NAV.filter((s) => s.portalFor)).toHaveLength(3);
   });
   it("叶子五元组集合与顺序逐条不变（href|label|perm|phase|group）", () => {
@@ -230,15 +229,17 @@ describe("结构回归基线（层级重构不改内容）", () => {
 });
 
 describe("A.9 角色×L1 可见性矩阵（抽查）", () => {
-  it("ADMIN 见全部 14 个运营项", () => {
+  it("ADMIN 见全部 12 个运营项", () => {
     expect(sectionKeys("ADMIN")).toEqual([
-      "dashboard", "operation", "device", "workorder", "venue", "agent", "order",
-      "settlement", "finance", "user", "report", "org", "system", "flow",
+      "dashboard", "device", "workorder", "venue", "agent", "order",
+      "settlement", "finance", "user", "report", "system", "flow",
     ]);
   });
-  it("VIEWER 不见 用户/客服/员工与权限/系统设置", () => {
+  it("VIEWER 不见 用户 / 客服；系统管理里只有流程实例（审批可见口径）", () => {
     const keys = sectionKeys("VIEWER");
-    for (const k of ["user", "cs", "org", "system"]) expect(keys).not.toContain(k);
+    for (const k of ["user", "cs"]) expect(keys).not.toContain(k);
+    // 2026-10-28 系统管理（OM11）：VIEWER 原本在流程与工单里能看流程实例，它随流程组搬进系统管理
+    expect(visibleLeaves(sec("system"), "VIEWER").map((l) => l.label)).toEqual(["流程实例"]);
     expect(keys).toEqual(expect.arrayContaining(["dashboard", "device", "order", "settlement", "finance", "report"]));
     // 2026-10-28：VIEWER 在运营管理只看得到两项分成，都搬到了「结算」（OM08），运营管理对它整段隐藏。
     // 财务管理对它只剩调整单一项（OM07 升为页签；此前它在结算单页签的视图里一样看得到）
@@ -252,11 +253,12 @@ describe("A.9 角色×L1 可见性矩阵（抽查）", () => {
   // 2026-07-29 对标补齐后语义变更：税率/提现规则/支付渠道属财务职责，FINANCE 因此能进系统设置
   // ——但只见这几项，看不到登录设置/系统参数等运维项。
   // 2026-09-23：银行管理移到运营管理 › 基础管理，FINANCE 在那边仍看得到（见下方运营管理用例）。
-  it("FINANCE 进 系统设置：只见财务相关项", () => {
-    expect(sectionKeys("FINANCE")).toEqual(expect.arrayContaining(["org", "system"]));
-    // 支付渠道 2026-10-28 搬到销售管理（OM04），FINANCE 从那边进
+  it("FINANCE 进 系统管理：只见财务相关项", () => {
+    expect(sectionKeys("FINANCE")).toContain("system");
+    // 支付渠道 2026-10-28 搬到销售管理（OM04），FINANCE 从那边进；
+    // 操作审计（原员工与权限）、银行管理（原运营管理）、流程实例（原流程与工单）随 OM11 并入
     expect(visibleLeaves(sec("system"), "FINANCE").map((l) => l.label))
-      .toEqual(["业务规则", "税率与发票"]);
+      .toEqual(["操作审计", "业务规则", "税率与发票", "银行管理", "流程实例"]);
     expect(visibleLeaves(sec("order"), "FINANCE").map((l) => l.label)).toContain("支付渠道");
   });
   it("系统设置每个叶子都有显式 perm：防「无 perm 跟随父级」导致越权可见", () => {
@@ -264,9 +266,9 @@ describe("A.9 角色×L1 可见性矩阵（抽查）", () => {
     expect(noPerm).toEqual([]);
   });
   // 2026-09-23：问题管理移到运营管理 › 基础管理，CS 从那边进（见下方运营管理用例）。
-  it("CS 在系统设置只见触达相关两项（发送记录/触达拉黑）", () => {
+  it("CS 在系统管理只见问题 / 公告与触达两项，外加流程实例", () => {
     expect(visibleLeaves(sec("system"), "CS").map((l) => l.label))
-      .toEqual(["发送记录", "触达拉黑"]);
+      .toEqual(["问题管理", "公告管理", "发送记录", "触达拉黑", "流程实例"]);
   });
   // 2026-07-29 代理端门户（B8）：AGENT 是受限外部伙伴，不再走通用运营项。
   // 此前它靠「无 perm 的叶子跟随父级」漏出了 SLA 管理/巡检计划/BD 拓展 CRM/押金与欠费。
@@ -312,11 +314,12 @@ describe("L3 叶子过滤（4.2-2）", () => {
     expect(visibleLeaves(sec("finance"), "FINANCE").map((l) => l.label)).toEqual(["对账", "账务分录", "调整单", "发票"]);
   });
   // OPS 有 poi/venue，没有 contract/analysis/lead —— 并成网点管理后按 perm 过滤的结论不变。
-  it("OPS：网点管理有站点、点位与场地方；无坪效、合同与 CRM；运营管理只剩应用版本", () => {
+  it("OPS：网点管理有站点、点位与场地方；无坪效、合同与 CRM；基础资料只有应用版本", () => {
     const venue = visibleLeaves(sec("venue"), "OPS").map((l) => l.label);
     for (const x of ["站点管理", "点位管理", "站点概览", "场地方"]) expect(venue).toContain(x);
     for (const x of ["站点坪效", "进场合同", "BD 拓展 CRM"]) expect(venue).not.toContain(x);
-    expect(visibleLeaves(sec("operation"), "OPS").map((l) => l.label)).toEqual(["应用版本"]);
+    expect(visibleLeaves(sec("system"), "OPS").filter((l) => l.group === "基础资料").map((l) => l.label))
+      .toEqual(["参数字典", "地区库", "应用版本"]);
   });
   it("CS 在「网点管理」一个叶子都没有 → 整个 L1 对它不可见", () => {
     expect(visibleLeaves(sec("venue"), "CS")).toEqual([]);
@@ -332,7 +335,7 @@ describe("findActiveSection 路径反推（4.2-3，含尾斜杠/最长前缀）"
     ["/settlement", "settlement"], // OM08：结算从财务管理拆出，独占 /settlement
     ["/operation/site-sharing", "settlement"],
     ["/operation/payee-sharing/", "settlement"],
-    ["/operation/banks", "operation"],
+    ["/operation/banks", "system"], // OM11：基础资料五页归系统管理
     ["/devices/detail", "device"],
     ["/system/", "system"],
     ["/work-orders", "workorder"],
@@ -386,8 +389,9 @@ describe("默认落地与面包屑", () => {
   it("section 默认落地 = 首个可点叶子", () => {
     expect(sectionDefaultHref(sec("order"), "FINANCE")).toBe("/orders");
     expect(sectionDefaultHref(sec("device"), "OPS")).toBe("/devices");
-    // 站点四项、计费两项迁走后，FINANCE 在运营管理的首个可点叶子是「银行管理」
-    expect(sectionDefaultHref(sec("operation"), "FINANCE")).toBe("/operation/banks");
+    // 系统管理落员工（section.href）；FINANCE 没有员工码，操作审计、业务规则在 L0 分期锁着，落到银行管理
+    expect(sectionDefaultHref(sec("system"), "ADMIN")).toBe("/employees?tab=employees");
+    expect(sectionDefaultHref(sec("system"), "FINANCE")).toBe("/operation/banks");
     // 销售管理第一项是收费方案，落地却是订单列表（section.href）
     expect(sectionDefaultHref(sec("order"), "ADMIN")).toBe("/orders");
   });
@@ -457,9 +461,9 @@ describe("L2 分组（按机构/对象聚类，2026-07-29 结构优化）", () =
     expect(segs.map((x) => x.group)).toEqual(["分润", "结算", "付款"]);
   });
   // 2026-09-23：站点与点位撤销，原两组（场地资产/场地方机构）换成按动线切的分组，见下方运营管理用例。
-  it("运营管理只剩基础管理（场站四项迁网点管理、计费两项迁销售管理、分成两项迁结算）", () => {
-    const segs = groupedLeaves(visibleLeaves(sec("operation"), "ADMIN"));
-    expect(segs.map((x) => x.group)).toEqual(["基础管理"]);
+  it("系统管理分五组：员工与权限 → 规则与参数 → 基础资料 → 消息触达 → 流程（OM11）", () => {
+    const segs = groupedLeaves(visibleLeaves(sec("system"), "ADMIN"));
+    expect(segs.map((x) => x.group)).toEqual(["员工与权限", "规则与参数", "基础资料", "消息触达", "流程"]);
   });
   it("销售管理分七组，跟着收入线走", () => {
     const segs = groupedLeaves(visibleLeaves(sec("order"), "ADMIN"));
@@ -609,53 +613,31 @@ describe("portalTitleOverride（拍板 #5：代理端只改标题）", () => {
 });
 
 // ── 运营管理（2026-09-22，对标简电三分组；TDD-运营管理菜单-前端.md）──────────
-describe("运营管理：跨模块 section", () => {
-  const op = () => sec("operation");
-  const leafLabels = (r: Role) => visibleLeaves(op(), r).map((l) => l.label);
+describe("系统管理 › 基础资料（原运营管理五页，/operation/*）", () => {
+  const sys = () => sec("system");
+  const baseLabels = (r: Role) => visibleLeaves(sys(), r).filter((l) => l.href.startsWith("/operation/")).map((l) => l.label);
 
-  it("各角色可见的子页面与后端权限码一致", () => {
-    // 2026-10-28：站点概览 / 站点管理 / 点位管理 / 站点坪效迁到网点管理（OM02）
-    // 计费两项 2026-10-28 迁到销售管理（OM04）
-    // 分成两项 2026-10-28 迁到结算（OM08）
-    expect(leafLabels("ADMIN")).toEqual(["应用版本", "银行管理", "品牌管理", "问题管理", "公告管理"]);
-    expect(leafLabels("OPS")).toEqual(["应用版本"]);
-    expect(leafLabels("FINANCE")).toEqual(["银行管理"]);
-    expect(leafLabels("BD")).toEqual(["公告管理"]);
-    expect(leafLabels("VIEWER")).toEqual([]);
+  it("各角色可见的五页与后端权限码一致（权限码未变，只换了菜单位置）", () => {
+    expect(baseLabels("ADMIN")).toEqual(["银行管理", "品牌管理", "问题管理", "应用版本", "公告管理"]);
+    expect(baseLabels("OPS")).toEqual(["应用版本"]);
+    expect(baseLabels("FINANCE")).toEqual(["银行管理"]);
+    expect(baseLabels("BD")).toEqual(["公告管理"]);
+    expect(baseLabels("CS")).toEqual(["问题管理", "公告管理"]);
+    expect(baseLabels("VIEWER")).toEqual([]);
   });
 
-  it("CS 没有 location 模块权限，也能通过 system/marketing 看到运营管理（多模块规则）", () => {
-    expect(sectionKeys("CS")).toContain("operation");
-    expect(leafLabels("CS")).toEqual(["问题管理", "公告管理"]);
-    // 默认落地到它第一个能打开的页面，而不是它没权限的站点概览
-    expect(sectionDefaultHref(op(), "CS")).toBe("/operation/problems");
+  it("AGENT 走门户，看不到系统管理", () => {
+    expect(sectionKeys("AGENT")).not.toContain("system");
   });
 
-  it("AGENT 走门户，看不到运营管理", () => {
-    expect(sectionKeys("AGENT")).not.toContain("operation");
-  });
-
-  it("凡是能看到运营管理的角色，至少有一个子页面（不出现点开是空的一级菜单）", () => {
-    for (const r of ["ADMIN", "OPS", "CS", "FINANCE", "BD", "VIEWER"] as Role[]) {
-      if (sectionKeys(r).includes("operation")) expect(leafLabels(r).length).toBeGreaterThan(0);
-    }
-  });
-
-  it("分组与顺序固定（公告已并进「基础管理」：原先那一组只有一条同名叶子）", () => {
-    expect(groupedLeaves(visibleLeaves(op(), "ADMIN")).map((g) => g.group))
-      .toEqual(["基础管理"]);
-  });
-
-  it("多个独立页面：路径反推与高亮按页面路径", () => {
-    // 分成两页 2026-10-28 归结算（OM08）：/operation/site-sharing 靠 match 最长前缀胜过 /operation
+  it("路径反推：/operation 下的页按最长前缀各归其主", () => {
+    expect(findActiveSection("/operation/banks", "ADMIN")?.key).toBe("system");
+    expect(breadcrumb("/operation/banks", null, null, "ADMIN")).toEqual(["系统管理", "基础资料", "银行管理"]);
     expect(findActiveSection("/operation/site-sharing", "ADMIN")?.key).toBe("settlement");
     expect(findActiveSection("/operation/site-sharing/", "ADMIN")?.key).toBe("settlement");
-    expect(findActiveSection("/operation/banks", "ADMIN")?.key).toBe("operation");
     const leaves = visibleLeaves(sec("settlement"), "ADMIN");
     expect(leaves[activeLeafIndex(leaves, "/operation/site-sharing", null, null)]?.label).toBe("站点分成");
     expect(breadcrumb("/operation/fee-adjustments", null, null, "ADMIN")).toEqual(["销售管理", "计费", "预约调价"]);
-    // 2026-10-28 网点管理（OM02）认领 /venues、/locations 与 /operation 下的两个站点页 ——
-    // 一个 URL 只能属于一个 L1，靠最长前缀：/operation/sites 胜过运营管理的 /operation。
     expect(findActiveSection("/locations", "ADMIN")?.key).toBe("venue");
     expect(breadcrumb("/locations", "points", null, "ADMIN")).toEqual(["网点管理", "站点与点位", "点位管理"]);
     expect(findActiveSection("/operation/sites", "ADMIN")?.key).toBe("venue");
@@ -663,21 +645,22 @@ describe("运营管理：跨模块 section", () => {
     expect(breadcrumb("/operation/sites", null, null, "ADMIN")).toEqual(["网点管理", "站点与点位", "站点管理"]);
     expect(findActiveSection("/operation/fee-plans", "ADMIN")?.key).toBe("order");
     expect(findActiveSection("/marketing", "ADMIN")?.key).toBe("order");
-    expect(findActiveSection("/operation/banks", "ADMIN")?.key).toBe("operation");
     expect(findActiveSection("/venues", "ADMIN")?.key).toBe("venue");
     expect(breadcrumb("/venues", "venues", null, "ADMIN")).toEqual(["网点管理", "场地方与合同", "场地方"]);
     expect(breadcrumb("/venues", "crm", null, "BD")).toEqual(["网点管理", "拓展", "BD 拓展 CRM"]);
-    // 旧菜单的同名功能不受影响
+    // 员工页与流程配置五页也归系统管理；流程的待办 / 审批仍归流程与工单
+    expect(findActiveSection("/employees", "ADMIN")?.key).toBe("system");
     expect(findActiveSection("/system", "ADMIN")?.key).toBe("system");
+    expect(findActiveSection("/flow/processes", "ADMIN")?.key).toBe("system");
+    expect(findActiveSection("/flow/todo", "ADMIN")?.key).toBe("flow");
   });
 
   it("灰显完全由 backend-ready 决定（当前两种模式都不灰）", () => {
-    // 只有 /operation/<page> 这些叶子走 backend-ready；并进来的 /locations?tab= 七项不参与灰显。
-    // 网点管理的站点管理 / 站点概览、销售管理的收费方案 / 预约调价也是 /operation/<page>，一并纳入
-    const rows = [...(op().children ?? []), ...(sec("venue").children ?? []), ...(sec("order").children ?? [])]
+    // 只有 /operation/<page> 这些叶子走 backend-ready。
+    // 网点管理的站点管理 / 站点概览、销售管理的收费方案 / 预约调价、结算的两页分成也是 /operation/<page>，一并纳入
+    const rows = [...(sys().children ?? []), ...(sec("venue").children ?? []), ...(sec("order").children ?? []), ...(sec("settlement").children ?? [])]
       .filter((l) => l.href.startsWith("/operation/"))
       .map((l) => [l.href.replace("/operation/", ""), l.label, l.perm ?? "", l.group ?? ""] as [OperationPage, string, string, string]);
-    // 2026-09-23 后端补齐后，真实模式下也不再有灰显项。
     // 这条断言**不删**：它守的是「灰显完全由 backend-ready 决定」这条机制，
     // 哪天再有新页面未就绪，它会立刻把那一项列出来。
     const soonReal = opLeaves(rows, false).filter((l) => l.soon).map((l) => l.label);

@@ -199,47 +199,9 @@ export const NAV: NavSection[] = [
   // ── 运营端 16 项 ────────────────────────────────────────────────────
   // 它没有叶子，可见性只能看自己这一个码（别的 section 看「有没有可见叶子」）
   { key: "dashboard", label: "经营看板", icon: "LayoutDashboard", module: "dashboard", href: "/", perm: "dashboard:overview:read" },
-  {
-    // 2026-09-22 新菜单：对标简电云「运营管理」三个分组（场站管理 / 基础管理 / 公告管理），
-    // 不在旧菜单上叠加，将来替换站点/计费/系统设置/营销里的对应项。
-    // 需求：docs/requirements/features/运营管理-功能清单.md；方案：TDD-运营管理菜单-前端.md
-    // 与其它 section 不同：一个 section 下是**多个独立页面**（/operation/<page>），不是同页 tab。
-    // soon 由 backend-ready.ts 决定：真实后端模式下接口未就绪的页面灰显，mock 模式恒可点。
-    key: "operation", label: "运营管理", icon: "Store", module: "location",
-    modules: ["location", "pricing", "finance", "system", "marketing"],
-    // 2026-10-28：站点四项迁到「网点管理」（OM02），计费两项迁到「销售管理」（OM04），分成两项迁到「结算」（OM08），
-    // 本段只剩基础管理一组，待系统（OM11）模块调整时迁走，届时本段撤销。
-    // /operation/sites、/operation/overview、/operation/fee-* 由各自新 L1 的 match 认领（最长前缀胜出），这里只留 /operation。
-    href: "/operation/app-versions", match: ["/operation"],
-    // 2026-09-23 菜单收敛（docs/technical/菜单重合梳理与优化方案.md）：
-    //
-    // 第一步（A 类重合）：站点管理、收费方案、时段倍率、应用版本、银行、问题、公告
-    // 此前**每一项都有第二个入口**且调同一组 API。一律并到本 section，旧入口连页面代码一起撤。
-    //
-    // 第二步：撤销「站点与点位」L1，点位与坪效并进来（URL 仍是 /locations，故 match 带它）。
-    //
-    // 第三步（续）：「计费定价」L1 整体撤销 —— 它的计费模板/时段价早已并入本 section 的
-    // 「收费方案」，最后剩的「差异化定价」在 ADR-028 落地后并入方案的「适用范围」，
-    // 取价从此只有一处答案（V49）。那个 L1 已无内容，留着只是一个空壳。
-    //
-    // 第三步：场地方 / 合同 / BD CRM / 进件 / 生命周期 **移出本 section**，
-    // 独立成「场地方与拓展」L1 —— 拓展是签约前的获客，不是经营已有站点；
-    // 而分成是分账动作、不是报表，故原「场站报表」组改名「分成」，坪效归回场站管理。
-    //
-    // ⚠️ 顺序即分组：groupedLeaves 只合并**相邻**的同名 group，插叶子时别打断连续段。
-    children: [
-      ...opLeaves([
-        // 公告并进「基础管理」：原先它自成一组，而组名与唯一那条叶子完全同名 ——
-        // 一个只为一条叶子存在的分组标题只是多一行噪音。四项都是运营日常要维护的基础内容。
-        ["app-versions", "应用版本", "system:app_version:read", "基础管理"],
-        ["banks", "银行管理", "system:bank:read", "基础管理"],
-        ["brands", "品牌管理", "system:brand:read", "基础管理"],
-        ["problems", "问题管理", "system:problem:read", "基础管理"],
-        ["notices", "公告管理", "marketing:notice:read", "基础管理"],
-        // 「分成」两项（站点分成、分成方分成）2026-10-28 迁到「结算 › 分润」（OM08）
-      ]),
-    ],
-  },
+  // 「运营管理」L1 2026-10-28 撤销（OM11）：站点四项归网点管理、计费两项归销售管理、分成两项归结算，
+  // 最后的基础管理五项（应用版本 / 银行 / 品牌 / 问题 / 公告）归系统管理 › 基础资料。
+  // /operation/* 页面路径不动，由各新 L1 的 match 认领（最长前缀胜出）。
   {
     key: "device", label: "设备管理", icon: "Server", module: "device", href: "/devices",
     // 2026-10-28 按设备生命周期重排（docs/requirements/设备生命周期管理-运营端设计.md §五）：
@@ -484,46 +446,52 @@ export const NAV: NavSection[] = [
       { href: "/reports?tab=consumer", label: "消费者分析", phase: 3, perm: "report:consumer:read" },
     ],
   },
+  // 「员工与权限」L1 2026-10-28 并入系统管理（OM11），六项成为「员工与权限」组。/employees 由系统管理 match 认领。
   {
-    key: "org", label: "员工与权限", icon: "Users", module: "org", href: "/employees",
-    children: [
-      // 按「人与组织 / 授权 / 留痕」分组
-      { href: "/employees?tab=employees", label: "员工", perm: "org:employee:read", group: "人与组织" },
-      // 组织架构与绩效展示的都是员工数据，与「员工」同一个码 ——
-      // 此前菜单没写 perm 而页面写了，两边不一致时以更严的那边为准
-      { href: "/employees?tab=org", label: "组织架构", perm: "org:employee:read", phase: 2, group: "人与组织" },
-      { href: "/employees?tab=roles", label: "角色权限", perm: "org:role:read", group: "授权" },
-      // 菜单本身也在库里（V67 起），所以它的维护入口也是一条菜单 ——
-      // 加这一条要写迁移，这就是「菜单真源迁进库」的代价（方案 §8）
-      { href: "/employees?tab=menus", label: "菜单管理", perm: "org:role:read", group: "授权" },
-      { href: "/employees?tab=audit", label: "操作审计", perm: "org:audit:read", phase: 1, group: "留痕与考核" },
-      { href: "/employees?tab=performance", label: "绩效报表", perm: "org:employee:read", phase: 3, group: "留痕与考核" },
-    ],
-  },
-  {
+    // 2026-10-28 按运营顺序合并为「系统管理」（OM11 · docs/requirements/运营端菜单清单-按运营顺序.md）：
+    // 回答「谁能做什么、系统按什么规则跑」。员工与权限（原 L1）+ 系统设置 + 运营管理的基础管理五项
+    // + 流程与工单的配置与统计五项，分五组：员工与权限 → 规则与参数 → 基础资料 → 消息触达 → 流程（矩阵叫「流程配置」，与同名叶撞 i18n 键，改「流程」）。
+    // 「流程与工单」只留待办 / 审批 / 审核队列 / 工单工作台四项（归工作台 OM00，届时迁走）。
+    // 「备份与恢复」（OM11-21）没有后端，不建叶。税率与发票待发票模块（OM09）迁走，暂留规则与参数组末尾。
+    // 落地页是员工（href）。页面路径不动：/employees、/system、/operation/*（基础资料五页）、/flow/<配置与统计>，
+    // 靠 match 认领；/flow/todo 等仍归流程与工单（/flow 前缀短，配置五页按完整路径认领）。
     // D1：菜单按 system 模块过滤（供应商接入已于 2026-10-28 搬到设备管理，其 device:vendor:* 码随之归设备段）
-    // 2026-10-28：供应商接入搬到设备管理（OM03）、支付渠道搬到销售管理（OM04），首页改为通知模板
-    key: "system", label: "系统设置", icon: "Settings", module: "system", href: "/system?tab=notify",
-    match: ["/system"],
+    // ⚠️ 菜单真源在库里：本段与员工与权限、运营管理、流程与工单三段的行由 V172 重编号，改这里要同步新开迁移（见 nav-seed.test.ts）。
+    key: "system", label: "系统管理", icon: "Settings", module: "system", href: "/employees?tab=employees",
+    match: ["/system", "/employees", "/operation", "/flow/processes", "/flow/settings", "/flow/access", "/flow/instances", "/flow/stats"],
     pinBottom: true,
     children: [
-      // 按「接入 / 消息触达 / 业务规则 / 基础字典 / 开放与市场」分组（补齐清单 E）。
-      // 注：对方把 提现设置/预约设置/充电设置 拆三个菜单、7 个支付渠道各占一菜单；
-      //     我们合并为「业务规则」一页与「支付渠道」一页 —— 少菜单噪音即"信息更清晰"。
+      { href: "/employees?tab=employees", label: "员工", perm: "org:employee:read", group: "员工与权限" },
+      { href: "/employees?tab=org", label: "组织架构", perm: "org:employee:read", phase: 2, group: "员工与权限" },
+      { href: "/employees?tab=roles", label: "角色权限", perm: "org:role:read", group: "员工与权限" },
+      { href: "/employees?tab=menus", label: "菜单管理", perm: "org:role:read", group: "员工与权限" },
+      { href: "/employees?tab=audit", label: "操作审计", perm: "org:audit:read", phase: 1, group: "员工与权限" },
+      { href: "/employees?tab=performance", label: "绩效报表", perm: "org:employee:read", phase: 3, group: "员工与权限" },
+      { href: "/system?tab=rules", label: "业务规则", perm: "system:biz_rule:update", phase: 1, group: "规则与参数" },
+      { href: "/system?tab=login", label: "登录设置", perm: "system:login_setting:update", phase: 1, group: "规则与参数" },
+      { href: "/system?tab=params", label: "系统参数", perm: "system:param:read", group: "规则与参数" },
+      { href: "/system?tab=tax", label: "税率与发票", perm: "system:tax:update", phase: 2, group: "规则与参数" },
+      { href: "/system?tab=markets", label: "多国家市场", perm: "system:market:read", phase: 3, group: "规则与参数" },
+      // OpenAPI 应用：S15 指出重置密钥明文被丢弃、新建不生成密钥、无签名验证 —— 三期前不放开（分期锁住）
+      { href: "/system?tab=openapi", label: "OpenAPI 应用", perm: "system:openapi:read", phase: 3, group: "规则与参数" },
+      { href: "/system?tab=dict", label: "参数字典", perm: "system:dict:read", group: "基础资料" },
+      { href: "/system?tab=region", label: "地区库", perm: "system:dict:read", group: "基础资料" },
+      ...opLeaves([
+        ["banks", "银行管理", "system:bank:read", "基础资料"],
+        ["brands", "品牌管理", "system:brand:read", "基础资料"],
+        ["problems", "问题管理", "system:problem:read", "基础资料"],
+        ["app-versions", "应用版本", "system:app_version:read", "基础资料"],
+        ["notices", "公告管理", "marketing:notice:read", "基础资料"],
+      ]),
       { href: "/system?tab=notify", label: "通知模板", perm: "system:notify_template:read", group: "消息触达" },
       { href: "/system?tab=notify-log", label: "发送记录", perm: "system:notify_log:read", phase: 1, group: "消息触达" },
       { href: "/system?tab=notify-blacklist", label: "触达拉黑", perm: "system:notify_blacklist:read", phase: 1, group: "消息触达" },
-      { href: "/system?tab=rules", label: "业务规则", perm: "system:biz_rule:update", phase: 1, group: "业务规则" },
-      { href: "/system?tab=login", label: "登录设置", perm: "system:login_setting:update", phase: 1, group: "业务规则" },
-      // 「应用版本」「银行管理」「问题管理」2026-09-23 并入 运营管理 › 基础管理
-      // （同一组 listAppVersions/saveAppVersion/rollbackAppVersion、listBanks/saveBank、
-      // listProblems/saveProblem），本页不再留第二份。
-      { href: "/system?tab=dict", label: "参数字典", perm: "system:dict:read", group: "基础字典" },
-      { href: "/system?tab=region", label: "地区库", perm: "system:dict:read", group: "基础字典" },
-      { href: "/system?tab=params", label: "系统参数", perm: "system:param:read", group: "基础字典" },
-      { href: "/system?tab=tax", label: "税率与发票", perm: "system:tax:update", phase: 2, group: "开放与市场" },
-      { href: "/system?tab=markets", label: "多国家市场", perm: "system:market:read", phase: 3, group: "开放与市场" },
-      { href: "/system?tab=openapi", label: "OpenAPI 应用", perm: "system:openapi:read", phase: 3, group: "开放与市场" },
+      // 流程组：配置与统计（OpsKit 运营界面）：权限码强制方是 OpsKit；未连 OpsKit 时灰显（FLOW_SOON）
+      { href: "/flow/processes", label: "流程配置", perm: "flow:process:manage", group: "流程", ...FLOW_SOON },
+      { href: "/flow/settings", label: "运营配置", perm: "flow:config:manage", group: "流程", ...FLOW_SOON },
+      { href: "/flow/access", label: "接入管理", perm: "flow:access:manage", group: "流程", ...FLOW_SOON },
+      { href: "/flow/instances", label: "流程实例", perm: "flow:approval:read", group: "流程", ...FLOW_SOON },
+      { href: "/flow/stats", label: "流程统计", perm: "flow:process:manage", group: "流程", ...FLOW_SOON },
     ],
   },
   {
@@ -541,12 +509,8 @@ export const NAV: NavSection[] = [
       { href: "/flow/approvals", label: "审批列表", perm: "flow:approval:read", group: "审批", ...FLOW_SOON },
       { href: "/flow/queue", label: "审核队列", perm: "flow:queue:claim", group: "审批", ...FLOW_SOON },
       { href: "/flow/tickets", label: "工单工作台", perm: "flow:ticket:read", group: "工单", ...FLOW_SOON },
-      { href: "/flow/processes", label: "流程配置", perm: "flow:process:manage", group: "配置", ...FLOW_SOON },
-      { href: "/flow/settings", label: "运营配置", perm: "flow:config:manage", group: "配置", ...FLOW_SOON },
-      { href: "/flow/access", label: "接入管理", perm: "flow:access:manage", group: "配置", ...FLOW_SOON },
-      // V139：追加在末尾（不往既有分组中间插）。实例与对账同审批可见口径；统计是管理视角
-      { href: "/flow/instances", label: "流程实例", perm: "flow:approval:read", group: "流转与统计", ...FLOW_SOON },
-      { href: "/flow/stats", label: "流程统计", perm: "flow:process:manage", group: "流转与统计", ...FLOW_SOON },
+      // 流程配置 / 运营配置 / 接入管理 / 流程实例 / 流程统计 2026-10-28 迁到系统管理 › 流程配置（OM11，V172）；
+      // 本段剩下的四项归工作台（OM00），届时整段撤销
     ],
   },
 ];

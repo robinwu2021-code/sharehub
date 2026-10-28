@@ -55,6 +55,9 @@ export const PARTIAL_READY = {
   "devices.bind": true,    // ae233365 · V164 · 契约已同步
   // 商家站点：建站时带 agentNo（同事务 OPERATE 责任行 + 默认点位），商户入驻会话第 2 步（V162 起）
   "sites.merchant": true,  // 4a508d8b · V162 · 契约已同步
+  // 应用版本「发布」：后端新建恒为草稿、更新锁定状态，C 端只认已发布 —— 没有可用的发布动作（S15 OPT-S15-09）。
+  // 真实后端模式下按钮禁用并写明原因；后端补上发布动作后改 true。
+  "app-versions.publish": false,
   // 原有 "fee-plans.sites" 已删：登记了却**没有任何页面用它**，留着只会让人以为还有一块没做
 } as const;
 

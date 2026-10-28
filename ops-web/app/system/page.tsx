@@ -223,9 +223,11 @@ const LOGIN_FIELDS: FieldDef[] = [
   { key: "appleEnabled", label: "Apple 登录", type: "switch", section: "第三方登录" },
   { key: "googleEnabled", label: "Google 登录", type: "switch", section: "第三方登录" },
   // 联动：关掉 OTP 登录，两个 OTP 策略字段自动禁用并清空——避免留下不生效的脏配置
-  { key: "otpExpireSec", label: "OTP 有效期（秒）", type: "number", required: true, min: 60, max: 1800, section: "OTP 策略", disabledWhen: (v) => !v.otpEnabled, help: "60~1800 秒；关闭 OTP 登录后不适用" },
-  { key: "otpDailyLimit", label: "单用户日发送上限（条）", type: "number", required: true, min: 1, max: 50, section: "OTP 策略", disabledWhen: (v) => !v.otpEnabled, help: "防刷与短信成本的主要闸门" },
-  { key: "forceRealName", label: "强制实名", type: "switch", section: "合规", help: "沙特等地监管要求；开启后未实名用户不能借出" },
+  // 下面三项后端照存，但登录 / 借出逻辑**目前不读**（服务端评审 S15）：写明「只保存、不生效」，
+  // 别让运营以为改了就有效。强制实名删还是实现待运营方裁决。
+  { key: "otpExpireSec", label: "OTP 有效期（秒）", type: "number", required: true, min: 60, max: 1800, section: "OTP 策略", disabledWhen: (v) => !v.otpEnabled, help: "60~1800 秒；⚠️ 目前只保存、不生效：验证码有效期按系统默认" },
+  { key: "otpDailyLimit", label: "单用户日发送上限（条）", type: "number", required: true, min: 1, max: 50, section: "OTP 策略", disabledWhen: (v) => !v.otpEnabled, help: "防刷与短信成本的主要闸门；⚠️ 目前只保存、不生效" },
+  { key: "forceRealName", label: "强制实名", type: "switch", section: "合规", help: "沙特等地监管要求；⚠️ 目前只保存、不生效：开启后未实名用户仍能借出（实现与否待裁决）" },
 ];
 
 // —— §16 税率与发票 ——
@@ -778,7 +780,8 @@ function SystemInner() {
     },
     { header: "OTP 有效期", cell: (s) => s.otpEnabled ? <span className="tabular-nums">{s.otpExpireSec} 秒</span> : <span className="text-muted-foreground">-</span> },
     { header: "日发送上限", cell: (s) => s.otpEnabled ? <span className="tabular-nums">{s.otpDailyLimit} 条/人</span> : <span className="text-muted-foreground">-</span> },
-    { header: "强制实名", cell: (s) => s.forceRealName ? <Badge tone="warning">强制</Badge> : <Badge tone="muted">不强制</Badge> },
+    // 后端目前不读这三项（S15）：列表照显示，标题注明未生效
+    { header: "强制实名（未生效）", cell: (s) => s.forceRealName ? <Badge tone="warning">强制</Badge> : <Badge tone="muted">不强制</Badge> },
     { header: t("common.actions"), cell: editBtn<LoginSetting>(canLogin, setLoginForm) },
   ];
 

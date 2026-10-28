@@ -490,6 +490,37 @@ const PATCHES: { file: string; mustContain: string; apply: (rows: Row[]) => void
         { name: "整站换商家", name_en: "Site Owner Change", name_ar: "نقل الموقع إلى تاجر" });
     },
   },
+  {
+    // 系统管理（OM11）：员工与权限 + 系统设置 + 运营管理基础资料 + 流程配置与统计，五组；删 M_org / M_operation，其后 L1 前移。
+    file: "V172__menu_system_section_by_ops_order.sql",
+    mustContain: "UPDATE iam_menu SET menu_no = CONCAT('M_tmp172_', id) WHERE parent_no IN ('M_org', 'M_system', 'M_operation', 'M_flow')",
+    apply: (rows) => {
+      const at = (no: string) => rows.find((r) => r.menu_no === no)!;
+      Object.assign(at("M_system"), { name: "系统管理", name_en: "System", name_ar: "إدارة النظام", path: "/employees?tab=employees",
+        match_paths: '["/system","/employees","/operation","/flow/processes","/flow/settings","/flow/access","/flow/instances","/flow/stats"]' });
+      const parents = ["M_org", "M_system", "M_operation", "M_flow"];
+      const plan: [string, string][] = [
+        ["/employees?tab=employees", "员工与权限"], ["/employees?tab=org", "员工与权限"], ["/employees?tab=roles", "员工与权限"],
+        ["/employees?tab=menus", "员工与权限"], ["/employees?tab=audit", "员工与权限"], ["/employees?tab=performance", "员工与权限"],
+        ["/system?tab=rules", "规则与参数"], ["/system?tab=login", "规则与参数"], ["/system?tab=params", "规则与参数"],
+        ["/system?tab=tax", "规则与参数"], ["/system?tab=markets", "规则与参数"], ["/system?tab=openapi", "规则与参数"],
+        ["/system?tab=dict", "基础资料"], ["/system?tab=region", "基础资料"],
+        ["/operation/banks", "基础资料"], ["/operation/brands", "基础资料"], ["/operation/problems", "基础资料"],
+        ["/operation/app-versions", "基础资料"], ["/operation/notices", "基础资料"],
+        ["/system?tab=notify", "消息触达"], ["/system?tab=notify-log", "消息触达"], ["/system?tab=notify-blacklist", "消息触达"],
+        ["/flow/processes", "流程"], ["/flow/settings", "流程"], ["/flow/access", "流程"], ["/flow/instances", "流程"], ["/flow/stats", "流程"],
+      ];
+      const flow = ["/flow/todo", "/flow/approvals", "/flow/queue", "/flow/tickets"];
+      const find = (path: string) => rows.find((r) => parents.includes(r.parent_no) && r.path === path)!;
+      const sysRows = plan.map(([path]) => find(path));
+      const flowRows = flow.map(find);
+      sysRows.forEach((r, i) => Object.assign(r, { menu_no: `M_system__${i + 1}`, parent_no: "M_system", sort: String(i + 1), group_name: plan[i][1] }));
+      flowRows.forEach((r, i) => Object.assign(r, { menu_no: `M_flow__${i + 1}`, parent_no: "M_flow", sort: String(i + 1) }));
+      for (const no of ["M_org", "M_operation"]) rows.splice(rows.findIndex((r) => r.menu_no === no), 1);
+      ["M_device", "M_workorder", "M_venue", "M_agent", "M_order", "M_settlement", "M_finance", "M_user", "M_report", "M_system", "M_flow"]
+        .forEach((no, i) => { at(no).sort = String(i + 5); });
+    },
+  },
 ];
 
 const COLS = [

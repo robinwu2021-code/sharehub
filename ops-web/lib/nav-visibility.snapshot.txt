@@ -2,11 +2,6 @@
 # 改动菜单可见性时这份文件会变 —— diff 就是评审物，确认是有意的再提交。
 
 ## ADMIN（120 项）
-operation›应用版本
-operation›银行管理
-operation›品牌管理
-operation›问题管理
-operation›公告管理
 device›设备台账
 device›充电宝管理
 device›库存余额
@@ -96,32 +91,37 @@ report›财务报表
 report›实时大屏
 report›自定义报表
 report›消费者分析
-org›员工
-org›组织架构
-org›角色权限
-org›菜单管理
-org›操作审计
-org›绩效报表
-system›通知模板
-system›发送记录
-system›触达拉黑
+system›员工
+system›组织架构
+system›角色权限
+system›菜单管理
+system›操作审计
+system›绩效报表
 system›业务规则
 system›登录设置
-system›参数字典
-system›地区库
 system›系统参数
 system›税率与发票
 system›多国家市场
 system›OpenAPI 应用
+system›参数字典
+system›地区库
+system›银行管理
+system›品牌管理
+system›问题管理
+system›应用版本
+system›公告管理
+system›通知模板
+system›发送记录
+system›触达拉黑
+system›流程配置
+system›运营配置
+system›接入管理
+system›流程实例
+system›流程统计
 flow›待办中心
 flow›审批列表
 flow›审核队列
 flow›工单工作台
-flow›流程配置
-flow›运营配置
-flow›接入管理
-flow›流程实例
-flow›流程统计
 
 ## AGENT（8 项）
 my-biz›我的看板
@@ -134,7 +134,6 @@ my-asset›我的订单
 my-service›设备报修
 
 ## BD（39 项）
-operation›公告管理
 venue›BD 拓展 CRM
 venue›门店 Onboarding
 venue›场地方
@@ -170,13 +169,12 @@ report›财务报表
 report›实时大屏
 report›自定义报表
 report›消费者分析
+system›公告管理
+system›流程实例
 flow›待办中心
 flow›审批列表
-flow›流程实例
 
 ## CS（46 项）
-operation›问题管理
-operation›公告管理
 device›设备台账
 device›部署与装机
 device›待上线
@@ -214,16 +212,17 @@ user›免押白名单
 user›钱包
 user›充值订单与套餐
 user›开票申请
+system›问题管理
+system›公告管理
 system›发送记录
 system›触达拉黑
+system›流程实例
 flow›待办中心
 flow›审批列表
 flow›审核队列
 flow›工单工作台
-flow›流程实例
 
 ## FINANCE（49 项）
-operation›银行管理
 venue›门店 Onboarding
 venue›场地方
 venue›进场合同
@@ -266,15 +265,15 @@ report›财务报表
 report›实时大屏
 report›自定义报表
 report›消费者分析
-org›操作审计
+system›操作审计
 system›业务规则
 system›税率与发票
+system›银行管理
+system›流程实例
 flow›待办中心
 flow›审批列表
-flow›流程实例
 
 ## OPS（53 项）
-operation›应用版本
 device›设备台账
 device›充电宝管理
 device›库存余额
@@ -315,18 +314,19 @@ order›异常订单
 order›投诉订单
 report›设备运营分析
 report›点位坪效
-system›通知模板
-system›发送记录
-system›参数字典
-system›地区库
 system›系统参数
 system›多国家市场
+system›参数字典
+system›地区库
+system›应用版本
+system›通知模板
+system›发送记录
+system›运营配置
+system›流程实例
 flow›待办中心
 flow›审批列表
 flow›审核队列
 flow›工单工作台
-flow›运营配置
-flow›流程实例
 
 ## VIEWER（37 项）
 device›设备台账
@@ -363,6 +363,6 @@ report›财务报表
 report›实时大屏
 report›自定义报表
 report›消费者分析
+system›流程实例
 flow›审批列表
 flow›工单工作台
-flow›流程实例

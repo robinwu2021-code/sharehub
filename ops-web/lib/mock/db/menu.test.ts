@@ -27,10 +27,10 @@ describe("菜单管理（mock）", () => {
       .rejects.toThrow();
   });
 
-  it("藏掉「员工与权限」要拒并回滚——那是回得来的唯一一扇门", async () => {
-    await expect(updateMenu("M_org", { visible: 0 }, catalog())).rejects.toThrow();
+  it("藏掉「系统管理」要拒并回滚——菜单管理在它下面，那是回得来的唯一一扇门（V172 起）", async () => {
+    await expect(updateMenu("M_system", { visible: 0 }, catalog())).rejects.toThrow();
     const tree = await visibleMenus(["*"], "ADMIN");
-    expect(tree.map((s) => s.menuNo)).toContain("M_org");
+    expect(tree.map((s) => s.menuNo)).toContain("M_system");
   });
 
   it("藏别的可以，且真的从「我看得到的」那棵里消失", async () => {

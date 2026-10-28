@@ -27,15 +27,16 @@ class MenuTreeTest extends ApiTestSupport {
         /*
          * ADMIN 持 `*`，所以他看得到**除代理门户外**的全部 ——
          * 门户是排他的（ADR-012：代理只看门户，运营看不到门户），
-         * 所以是 14 个 section 而不是 17。
+         * 所以是 12 个 section 而不是 15。
          *
          * 端点从 P1 起**按权限剪枝**（此前下发完整树、前端自己筛）。
          * 要全量树用 MenuService.tree()，那是给菜单管理界面留的。
          */
         JsonNode t = tree(login("ADMIN"));
         // 2026-09-28 +1：流程与工单（V136，放在最末）；2026-10-28 −1：营销管理并入销售管理（V151）；
-        // 2026-10-28 −2：告警管理、客服管理并入运维管理（V153）；+1：从财务管理拆出结算（V154）
-        assertThat(t.size()).as("运营侧 section 数（17 个里 3 个是代理门户）").isEqualTo(14);
+        // 2026-10-28 −2：告警管理、客服管理并入运维管理（V153）；+1：从财务管理拆出结算（V154）；
+        // −2：员工与权限、运营管理并入系统管理（V172）
+        assertThat(t.size()).as("运营侧 section 数（15 个里 3 个是代理门户）").isEqualTo(12);
         int leaves = 0;
         for (JsonNode s : t) leaves += s.path("children").size();
         // 2026-09-25 +2：用户管理 › 注销申请 / 开票申请（C 端一直在产生这两类待办，运营端此前没有入口）
@@ -55,20 +56,22 @@ class MenuTreeTest extends ApiTestSupport {
     void the_six_new_columns_survive_the_whole_chain() {
         // 实体没映射 / DTO 没带 / JSON 没序列化 —— 三处任一漏掉都只是「少一种修饰」，不报错
         // 门户只在代理的树里，运营的树里没有 —— 所以两个角色各取一棵
-        JsonNode operation = null, myBiz = null;
+        // V172：运营管理（唯一用 modules 的跨模块段）并入系统管理，改用系统管理验 match；
+        // modules 列仍在，但眼下没有 section 用它 —— 再有跨模块段时在这里补回断言
+        JsonNode system = null, myBiz = null;
         for (JsonNode s : tree(login("ADMIN"))) {
-            if ("M_operation".equals(s.path("menuNo").asText())) operation = s;
+            if ("M_system".equals(s.path("menuNo").asText())) system = s;
         }
         for (JsonNode s : tree(login("AGENT"))) {
             if ("M_my-biz".equals(s.path("menuNo").asText())) myBiz = s;
         }
-        assertThat(operation).as("前提：运营管理在运营的树里").isNotNull();
+        assertThat(system).as("前提：系统管理在运营的树里").isNotNull();
         assertThat(myBiz).as("前提：代理门户在代理的树里").isNotNull();
 
-        assertThat(operation.path("module").asText()).isNotBlank();
-        assertThat(operation.path("modules")).as("跨模块 section 的 modules 是数组").hasSize(5);
-        // V149：/locations 随站点四项迁到网点管理，运营管理只留 /operation
-        assertThat(operation.path("match")).as("路径归属前缀").hasSize(1);
+        assertThat(system.path("module").asText()).isNotBlank();
+        // /system、/employees、/operation + 流程配置与统计五个路径
+        assertThat(system.path("match")).as("路径归属前缀").hasSize(8);
+        assertThat(system.path("pinBottom").asBoolean()).as("系统管理沉底").isTrue();
         assertThat(myBiz.path("portalFor")).as("专属门户角色").hasSize(1);
         assertThat(myBiz.path("portalFor").get(0).asText()).isEqualTo("AGENT");
     }
