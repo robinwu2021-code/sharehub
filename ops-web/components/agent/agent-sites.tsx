@@ -24,11 +24,13 @@ import { RefLink } from "@/components/ref-link";
 import { POOL_STATE_MAP, poolStateOf } from "@/components/device/issued-pool";
 import type { Agent, Cabinet, Site, SitePoint } from "@/lib/types";
 
+/** @form POST /api/ops/sites */
 const SITE_FIELDS: FieldDef[] = [
   { key: "name", label: "站点名称", required: true, maxLength: 128, placeholder: "如：Marina Mall 店" },
   { key: "address", label: "地址", type: "address", latKey: "lat", lngKey: "lng", required: true, maxLength: 256,
     placeholder: "输入地点名或地址，边打边找", help: "选中候选后坐标自动带上；C 端「找附近」按坐标排" },
 ];
+/** @form POST /api/ops/locations */
 const POINT_FIELDS: FieldDef[] = [
   { key: "name", label: "点位名称", required: true, maxLength: 128, placeholder: "如：一层服务台" },
   { key: "spotDesc", label: "位置说明", maxLength: 128, placeholder: "如：收银台旁" },

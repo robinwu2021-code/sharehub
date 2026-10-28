@@ -35,16 +35,13 @@ describe("机柜建档：只接受建档字段", () => {
     expect(c.agentNo).toBeNull(); // 归属代理只能经代理域划拨
   });
 
-  it("归属站点与站点名一律由点位反查，表单传什么都不采信", () => {
+  it("建档不受理点位与归属：新建一律在库无归属；上点位只走出库池绑定（ae233365 · V164）", () => {
     const loc = locations[3];
-    const c = saveCabinet(draft({
-      locationNo: loc.locationNo,
-      // 故意塞矛盾值：这三个字段没有任何一个应该按入参落库
-      siteNo: "ST999", locationName: "伪造站点", onlineStatus: "ONLINE",
-    }));
-    expect(c.siteNo).toBe(loc.siteNo);
-    expect(c.locationName).toBe(loc.siteName);
-    expect(c.onlineStatus).toBe("OFFLINE");
+    // 新建时带点位：拒绝（后端 400 error.device.bind_via_action）
+    expect(() => saveCabinet(draft({ locationNo: loc.locationNo }))).toThrow(/出库池/);
+    // 故意塞矛盾的归属与在线态：一个都不按入参落库
+    const c = saveCabinet(draft({ siteNo: "ST999", locationName: "伪造站点", onlineStatus: "ONLINE" }));
+    expect(c).toMatchObject({ locationNo: null, siteNo: null, onlineStatus: "OFFLINE" });
     expect(cabinetPlacement(loc.locationNo)).toEqual({ siteNo: loc.siteNo, locationName: loc.siteName });
   });
 
@@ -79,9 +76,9 @@ describe("机柜建档：校验守在落库层", () => {
     expect(() => saveCabinet(draft({ cabinetNo: "机柜一号" }))).toThrow(/CAB/);
   });
 
-  it("未接入的供应商 / 不存在的点位一律拒绝，不留悬空引用", () => {
+  it("未接入的供应商拒绝；点位一律不经建档（不留悬空引用，也不绕过出库池）", () => {
     expect(() => saveCabinet(draft({ vendorCode: "no-such-vendor" }))).toThrow(/未接入的供应商/);
-    expect(() => saveCabinet(draft({ locationNo: "LOC99999" }))).toThrow(/点位不存在/);
+    expect(() => saveCabinet(draft({ locationNo: "LOC99999" }))).toThrow(/出库池/);
   });
 
   it("仓位数越界拒绝，且不得缩到在仓充电宝数以下", () => {

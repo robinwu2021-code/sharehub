@@ -168,7 +168,11 @@ export function repairDevice(deviceNo: string): Cabinet {
   return c;
 }
 
-/** 撤机回库：解绑点位 / 站点（代理归属保留）。换了点位，之前的试借还随之失效。 */
+/**
+ * 撤机回库：解绑点位 / 站点，**商家随点位清空**（ae233365 · V164：agentNo 只由点位派生），
+ * 出库池归属（issuedAgentNo）保留 —— 柜子回到同一商家的出库池，回不回仓看撤机单的去向。
+ * 换了点位，之前的试借还随之失效。
+ */
 export function undeployDevice(deviceNo: string, reason?: string): Cabinet {
   requireReason(reason);
   const c = find(deviceNo);
@@ -176,6 +180,7 @@ export function undeployDevice(deviceNo: string, reason?: string): Cabinet {
   c.locationNo = null;
   c.locationName = null;
   c.siteNo = null;
+  c.agentNo = null;
   trialPassedAt.delete(c.cabinetNo);
   return c;
 }

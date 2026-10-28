@@ -97,11 +97,15 @@ function ViewSwitch<T extends string>({ label, value, options, onChange }: {
 // ============================================================================
 const IMPORT_SAMPLE = {
   柜机号: "CAB2000", SN: "SN95000", 供应商: "cd-tech", 型号: "X6",
-  点位编号: "LOC200", 仓位数: "8", 固件版本: "1.4.0",
+  仓位数: "8", 固件版本: "1.4.0",
 };
 
-/** 列定义依赖「已接入供应商」「已建点位」两份主数据做存在性校验，故做成工厂函数。 */
-const importColumns = (vendorCodes: string[], locationNos: string[]): ImportColumn<Partial<Cabinet>>[] => [
+/**
+ * 列定义依赖「已接入供应商」主数据做存在性校验，故做成工厂函数。
+ * 2026-10-28 去掉「点位编号」列：导入的柜子一律进库，上点位只走出库池的绑定（ae233365 · V164，
+ * 点位商家须 = 出库池商家）。导入时直接填点位等于绕过出库与这条校验。
+ */
+const importColumns = (vendorCodes: string[]): ImportColumn<Partial<Cabinet>>[] => [
   { header: "柜机号", key: "cabinetNo", required: true, unique: true,
     validate: (v) => (/^CAB\d+$/.test(String(v)) ? null : "格式应为 CAB + 数字，如 CAB2000") },
   { header: "SN", key: "sn", required: true, unique: true,
@@ -109,10 +113,6 @@ const importColumns = (vendorCodes: string[], locationNos: string[]): ImportColu
   { header: "供应商", key: "vendorCode", required: true,
     validate: (v) => (vendorCodes.includes(String(v)) ? null : `未接入的供应商，可选：${vendorCodes.join(" / ")}`) },
   { header: "型号", key: "model", required: true },
-  // 点位可留空（到货未上架的机柜就是没点位），但填了就必须是真实存在的点位编号，
-  // 否则台账里会出现「点进去查无此点位」的悬空引用。
-  { header: "点位编号", key: "locationNo",
-    validate: (v) => (locationNos.includes(String(v)) ? null : "点位编号不存在，请先在「场所管理 · 点位」建档") },
   { header: "仓位数", key: "slotTotal", required: true,
     parse: (raw) => { const n = Number(raw); if (!Number.isInteger(n)) throw new Error("必须是整数"); return n; },
     validate: (v) => ((v as number) >= 1 && (v as number) <= 48 ? null : "应在 1~48 之间") },
@@ -128,13 +128,9 @@ function ImportCabinetsDrawer({ open, onOpenChange }: { open: boolean; onOpenCha
   const [rows, setRows] = useState<Partial<Cabinet>[]>([]);
   const [errors, setErrors] = useState<RowError[]>([]);
 
-  // 供应商 / 点位主数据：用于「填的值是否真实存在」这类跨表校验
+  // 供应商主数据：用于「填的值是否真实存在」这类跨表校验
   const vendorsQ = useQuery({ queryKey: ["vendors"], queryFn: () => api.listVendors() });
-  const pointsQ = useQuery({ queryKey: ["locations", "all"], queryFn: () => api.listLocations({ size: UNPAGED_SIZE }) });
-  const cols = importColumns(
-    (vendorsQ.data ?? []).map((v) => v.vendorCode),
-    (pointsQ.data?.list ?? []).map((l) => l.locationNo),
-  );
+  const cols = importColumns((vendorsQ.data ?? []).map((v) => v.vendorCode));
 
   const reset = () => { setStep("upload"); setFileName(""); setRows([]); setErrors([]); };
   const close = (o: boolean) => { if (!o) reset(); onOpenChange(o); };
@@ -301,11 +297,7 @@ const SLOT_COMMANDS = ["EJECT", "LOCK"];
  * @form POST /api/ops/cabinets
  * @form POST /api/ops/cabinets/{cabinetNo}
  */
-const cabinetFields = (
-  vendorCodes: string[],
-  points: { locationNo: string; name: string }[],
-  siteHint: string,
-): FieldDef[] => [
+const cabinetFields = (vendorCodes: string[]): FieldDef[] => [
   { key: "cabinetNo", label: "柜机号", readOnlyOnEdit: true, placeholder: "留空自动生成", section: "设备信息",
     help: "手填需形如 CAB2000（与导入模板同一条规则）" },
   { key: "sn", label: "出厂序列号 SN", required: true, maxLength: 32, placeholder: "SN95000", section: "设备信息",
@@ -317,10 +309,8 @@ const cabinetFields = (
     help: "1~48；编辑时不得小于当前在仓充电宝数" },
   { key: "fwVersion", label: "出厂固件版本", placeholder: "1.4.0", section: "设备信息",
     help: "留空按出厂默认 1.0.0 记账；真实版本以设备首次心跳上报为准" },
-  // 点位是唯一的「归属入口」：站点号与站点名都从它反查，所以这里给的是选择而非输入
-  { key: "locationNo", label: "点位", type: "select", section: "上架归属",
-    options: [{ value: "", label: "未上架（到货待部署）" }, ...points.map((p) => ({ value: p.locationNo, label: `${p.locationNo} · ${p.name}` }))],
-    help: `归属站点由点位反查，不单独维护 —— 当前：${siteHint}。新建的柜子一律在库，过了上线门禁才在用` },
+  // **没有点位字段**（2026-10-28，ae233365 · V164）：编辑接口改点位后端一律 400 error.device.bind_via_action。
+  // 上点位只走「设备管理 › 出库池」的绑定 —— 先出库给商家，再绑到它的站点点位（点位商家须 = 出库池商家）。
   // **没有状态字段**（R1，同后端「编辑不再改状态」）：上线 / 标故障 / 撤机 / 报废都在设备详情页走动作，
   // 此前这里的状态下拉能把一台没过门禁的柜子直接改成「在用」
 ];
@@ -338,9 +328,8 @@ function CabinetsTab({ canWrite }: { canWrite: boolean }) {
   const [importOpen, setImportOpen] = useState(false);
   const [cabForm, setCabForm] = useState<Partial<Cabinet> | null>(null);
 
-  // 建档抽屉的两份主数据（供应商 / 点位）。查询键与导入抽屉一致，两处共用同一份缓存
+  // 建档抽屉的供应商主数据。查询键与导入抽屉一致，两处共用同一份缓存（点位不在建档里，走出库池绑定）
   const vendorsQ = useQuery({ queryKey: ["vendors"], queryFn: () => api.listVendors() });
-  const pointsQ = useQuery({ queryKey: ["locations", "all"], queryFn: () => api.listLocations({ size: UNPAGED_SIZE }) });
 
   // 换页/改筛选后选中的行已不在视野内，继续留着会造成「对看不见的行动手」
   const resetPage = (fn: () => void) => { fn(); paging.reset(); setSelected([]); };
@@ -384,8 +373,8 @@ function CabinetsTab({ canWrite }: { canWrite: boolean }) {
   // 服务端虽然不采信，但请求体里出现「表单改得了在线态」的假象本身就是误导
   const submitCab = () => {
     if (!cabForm) return;
-    const { cabinetNo, sn, vendorCode, model, slotTotal, locationNo, fwVersion } = cabForm;
-    saveCab.mutate({ cabinetNo, sn, vendorCode, model, slotTotal, locationNo: locationNo || null, fwVersion });
+    const { cabinetNo, sn, vendorCode, model, slotTotal, fwVersion } = cabForm;
+    saveCab.mutate({ cabinetNo, sn, vendorCode, model, slotTotal, fwVersion });
   };
 
   const onArchive = async (c: Cabinet) => {
@@ -471,7 +460,7 @@ function CabinetsTab({ canWrite }: { canWrite: boolean }) {
         }
         // 主按钮给「新增机柜」（到货补一台是日常动作），导入退到筛选区——
         // 为了加一台机柜先编一个 CSV 是原先最别扭的一处
-        onAdd={canWrite ? () => setCabForm({ vendorCode: vendorsQ.data?.[0]?.vendorCode ?? "cd-tech", model: "", sn: "", slotTotal: 8, locationNo: "", fwVersion: "" }) : undefined}
+        onAdd={canWrite ? () => setCabForm({ vendorCode: vendorsQ.data?.[0]?.vendorCode ?? "cd-tech", model: "", sn: "", slotTotal: 8, fwVersion: "" }) : undefined}
         addLabel="新增机柜"
         onExport={() => exportCsv<Cabinet>("机柜台账", [
           { header: "柜机号", value: (c) => c.cabinetNo },
@@ -531,12 +520,7 @@ function CabinetsTab({ canWrite }: { canWrite: boolean }) {
         titleNew="新增机柜（建档）"
         titleEdit={`编辑机柜 ${cabForm?.cabinetNo ?? ""}`}
         isEdit={!!cabForm?.cabinetNo}
-        fields={cabinetFields(
-          (vendorsQ.data ?? []).map((v) => v.vendorCode),
-          (pointsQ.data?.list ?? []).map((l) => ({ locationNo: l.locationNo, name: l.name })),
-          // 站点名随选中的点位实时变，让「填点位 = 定归属」这件事在抽屉里就看得见
-          (pointsQ.data?.list ?? []).find((l) => l.locationNo === cabForm?.locationNo)?.siteName ?? "未归属（未上架）",
-        )}
+        fields={cabinetFields((vendorsQ.data ?? []).map((v) => v.vendorCode))}
         value={(cabForm ?? {}) as Record<string, unknown>}
         onChange={(v) => setCabForm(v as Partial<Cabinet>)}
         onSubmit={submitCab}

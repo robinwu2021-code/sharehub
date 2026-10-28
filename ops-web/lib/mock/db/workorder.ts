@@ -158,6 +158,10 @@ export function createWorkOrder(x: WorkOrderDraft): WorkOrder {
   if (!x.type) throw fail("工单类型必填", "Work order type is required", "نوع أمر العمل مطلوب");
   if (!x.cabinetNo?.trim()) throw fail("机柜号必填", "Cabinet number is required", "رقم الخزانة مطلوب");
   if (!x.description?.trim()) throw fail("问题描述必填", "A problem description is required", "وصف المشكلة مطلوب");
+  // 撤机去向（ae233365 · V164）：只认两个值；非撤机单带了也不采信
+  if (x.type === "REMOVE" && x.disposition && !["RETURN_TO_POOL", "RETURN_TO_WAREHOUSE"].includes(x.disposition)) {
+    throw fail(`撤机去向取值非法：${x.disposition}`, `Invalid removal disposition: ${x.disposition}`);
+  }
   const cab = cabinets.find((c) => c.cabinetNo === x.cabinetNo);
   const created: WorkOrder = {
     // 手工开单从 WO70400 起，避开告警转工单(70200+)/投诉转工单(70300+)两段号段
