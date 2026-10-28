@@ -1457,13 +1457,47 @@
   },
   {
    "verb": "POST",
+   "path": "/api/agent/assignments/batch",
+   "perm": "agent:scope:assign",
+   "perms": [
+    "agent:scope:assign"
+   ],
+   "handler": "AgentExtController#assignBatch",
+   "summary": "批量回收到平台直营。",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.agent.ext.dto.AgentExtDtos.AssignBatchReq",
+   "returnType": "java.util.List<AssignmentLog>",
+   "returnContainer": null,
+   "returnElement": "java.util.List<AssignmentLog>",
+   "responseShape": null,
+   "requestShape": [
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "siteNos",
+     "type": "java.util.List<String>"
+    },
+    {
+     "name": "action",
+     "type": "String"
+    },
+    {
+     "name": "operator",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
    "path": "/api/agent/assignments/reclaim",
    "perm": "agent:scope:assign",
    "perms": [
     "agent:scope:assign"
    ],
    "handler": "AgentExtController#reclaim",
-   "summary": "批量回收到平台直营。",
+   "summary": "",
    "params": [],
    "bodyType": "ReclaimReq",
    "returnType": "java.util.List<AssignmentLog>",
@@ -48805,10 +48839,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 547,
-  "records": 507,
-  "withPerm": 467,
-  "withBody": 231,
+  "endpoints": 548,
+  "records": 511,
+  "withPerm": 468,
+  "withBody": 232,
   "shapedResponses": 427
  }
 }

@@ -190,6 +190,7 @@ class VocabularyWriteCoverageTest {
             "stl_payout_task.status",                // PayoutTaskServiceImpl 只写 PayoutTaskStatus.name()，无外部写入口
             "stl_withdrawal.origin",                 // 只由 PayoutTaskServiceImpl 写 WithdrawalOrigin.PAYOUT_TASK.name()
             "stl_payout_export.format",              // 只写常量 CSV（一期唯一导出格式），无外部写入口
+            "wo_order.removal_disposition",          // V164：WoOpsServiceImpl.create 调 RemovalDisposition.ofNullable，词表外 400；只对撤机单写
             "stl_withdrawal.pay_channel",            // PAY_CHANNELS 白名单（在 setPayChannel 上面五行）
             "acct_ledger.direction",                 // DEBIT/CREDIT，校验在写入循环之前，非法值 else-throw
             "usr_wallet_txn.direction",              // amount.signum() > 0 ? IN : OUT

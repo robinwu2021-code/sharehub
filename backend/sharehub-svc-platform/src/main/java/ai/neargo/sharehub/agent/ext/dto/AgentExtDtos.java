@@ -105,6 +105,10 @@ public final class AgentExtDtos {
      * 因为两者的风险不同：划拨传错代理会被「代理必须存在」挡下一部分，
      * 回收传错代理则会**静默收走无关资产**。
      */
+    /** 批量整站换商家（V165）。action 缺省 ASSIGN；REVOKE = 收回为直营。 */
+    public record AssignBatchReq(String agentNo, java.util.List<String> siteNos, String action, String operator) {
+    }
+
     public record ReclaimReq(java.util.List<String> cabinetNos, java.util.List<String> siteNos,
                              String operatorName) {
     }

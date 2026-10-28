@@ -22,6 +22,9 @@ public interface AgentAssignmentService {
     /** 划拨 / 收回，落一行 append 记录并返回之。 */
     AssignmentLog assign(AssignReq req);
 
+    /** 批量整站换商家（V165）：一个事务。 */
+    List<AssignmentLog> assignBatch(String agentNo, List<String> siteNos, String action, String operator);
+
     /**
      * 可划拨资产候选池（机柜 + 站点，带当前归属）。
      *

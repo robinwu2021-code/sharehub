@@ -29,7 +29,10 @@ public class LocalDeviceOwnership implements DeviceOwnershipPort {
         if (locationNos == null || locationNos.isEmpty()) return 0;
         LambdaUpdateWrapper<DevCabinet> w = new LambdaUpdateWrapper<DevCabinet>()
                 .in(DevCabinet::getLocationNo, locationNos)
-                .set(DevCabinet::getAgentNo, agentNo);
+                .set(DevCabinet::getAgentNo, agentNo)
+                // 整站换商家（V165）：站上已绑定的设备一并转进新商家的出库池；收回为直营则离开出库池（I5）。
+                // 不同步的话「绑了商家点位必在出库池」（chk_cab_bound_issued）与 I2 都会被打破
+                .set(DevCabinet::getIssuedAgentNo, agentNo);
         // siteNo 为 null 表示调用方不掌握站点（按点位划拨），此时不动冗余列
         if (siteNo != null) w.set(DevCabinet::getSiteNo, siteNo);
         return cabinets.update(null, w);

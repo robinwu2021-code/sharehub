@@ -23,6 +23,8 @@ import java.util.List;
 @Service
 public class AgentServiceImpl implements AgentService {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AgentServiceImpl.class);
+
     /** 取号要绕开逻辑删除过滤，只能走原生 SQL —— 见 BizNoSequence 的类注释。 */
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
@@ -191,11 +193,10 @@ public class AgentServiceImpl implements AgentService {
      * 数据范围读 agent_no、分润读责任行 —— 两者只写一份，「谁看得到」与「谁分到钱」就会分开。
      */
     private void attachSite(String agentNo, String siteNo, String remark) {
+        // 划拨同事务写 OPERATE 责任行（V165 起由划拨服务统一处理，这里不再另写一份）
         assignments.assign(new ai.neargo.sharehub.agent.ext.dto.AgentExtDtos.AssignReq(
                 agentNo, "SITE", siteNo, "ASSIGN", ai.neargo.sharehub.auth.SecurityUtils.userNo()));
-        siteAgents.upsert(siteNo, new ai.neargo.sharehub.loc.ext.dto.SiteAgentDtos.SiteAgentRow(
-                null, siteNo, agentNo, null, null, "OPERATE", null, null,
-                java.time.LocalDateTime.now().toString(), null, remark));
+        log.info("站点归商家 agentNo={} siteNo={}（{}）", agentNo, siteNo, remark);
     }
 
     /**
