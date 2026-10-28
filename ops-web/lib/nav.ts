@@ -169,8 +169,8 @@ export const NAV: NavSection[] = [
       { href: "/finance?tab=records", label: "我的收益", perm: "finance:share_record:read", group: "经营概览" },
       { href: "/finance?tab=settlements", label: "我的结算", perm: "agent:settlement:read", group: "经营概览" },
       // 2026-09-23 分级矩阵 AGT-06：代理自助提现是 L0（⑦ 分钱的最后一步），权限码 finance:withdrawal:apply
-      // 前后端与 POST /api/trade/withdrawals 三处一致。soon = 申请侧页面未建（/finance?tab=withdrawals
-      // 是运营方的审核页，要 finance:withdrawal:read，AGENT 不持有）——先登记入口，页建好再去掉 soon。
+      // 前后端与 POST /api/trade/withdrawals 三处一致。申请侧已在 /finance 页按 AGENT 角色分流
+      // （app/finance/page.tsx 的申请流），不再是 soon。
       { href: "/finance?tab=withdrawals", label: "申请提现", perm: "finance:withdrawal:apply", group: "经营概览" },
     ],
   },
@@ -295,19 +295,28 @@ export const NAV: NavSection[] = [
     ],
   },
   {
-    key: "agent", label: "代理商管理", icon: "Handshake", module: "agent", href: "/agents",
+    // 2026-10-28 按运营顺序重排（docs/requirements/运营端菜单清单-按运营顺序.md · OM01）：
+    // 「代理商管理」更名「商家管理」—— 商家是第一阶段的结算单元（ADR-032），代理商 / 城市合伙人
+    // 只是它的登记类型。三组顺序跟着商家的一生走：进来 → 定钱与资产 → 经营与退出。
+    // 入驻审核排在档案之前：档案是「已经在的」，入驻是「正在进来的」—— 待办优先于台账。
+    // 代建录入不单开叶子，它是本页的一个按钮（权限码另发，见 ADR-030 §3.3）。
+    // 「代理收益结算」深链撤销：它指向财务的结算单，挂的 agent:settlement:read 没有任何后端端点
+    // 挂载（功能权限清单 §缺口 2），BD 从这里点进去对真后端必 403。结算单归「结算」模块。
+    // ⚠️ 菜单真源在库里：本段的行由 V148 定点更新，改这里要同步新开迁移（见 nav-seed.test.ts）。
+    key: "agent", label: "商家管理", icon: "Handshake", module: "agent", href: "/agents",
     children: [
-      // 按「机构生命周期」分组：先建档授权，再谈钱，最后看经营。
-      // 入驻审核排在档案之前：档案是「已经在的」，入驻是「正在进来的」——
-      // 待办优先于台账。代建录入不单开叶子，它是本页的一个按钮（权限码另发，见 §3.3）
-      { href: "/agents?tab=applies", label: "入驻审核", perm: "agent:apply:read", group: "机构档案" },
-      { href: "/agents", label: "代理商档案", perm: "agent:agent:read", group: "机构档案" },
-      { href: "/agents?tab=accounts", label: "代理账号管理", perm: "agent:agent:update", group: "机构档案" },
-      { href: "/agents?tab=assign", label: "设备/点位划拨", perm: "agent:scope:assign", group: "机构档案" },
-      { href: "/agents?tab=commission", label: "分润配置", perm: "agent:share:config", group: "机构收益" },
-      // 跨 section 深链（D3）：复用财务结算单，面包屑按 URL 归属财务管理
-      { href: "/finance?tab=settlements", label: "代理收益结算", perm: "agent:settlement:read", group: "机构收益" },
-      { href: "/agents?tab=performance", label: "代理绩效", perm: "agent:performance:read", phase: 2, group: "机构经营" },
+      { href: "/agents?tab=applies", label: "入驻审核", perm: "agent:apply:read", group: "入驻与档案" },
+      { href: "/agents", label: "商家档案", perm: "agent:agent:read", group: "入驻与档案" },
+      // 码与后端账号端点一致（/api/agent/accounts 全挂 agent:account:manage），此前挂的 agent:agent:update 对不上
+      { href: "/agents?tab=accounts", label: "商家账号", perm: "agent:account:manage", group: "入驻与档案" },
+      // 先定分润、再划资产：划拨只影响之后的订单归属，规则得先在
+      { href: "/agents?tab=commission", label: "商家分润规则", perm: "agent:share:config", group: "分润与划拨" },
+      { href: "/agents?tab=assign", label: "设备/点位划拨", perm: "agent:scope:assign", group: "分润与划拨" },
+      // 经营视图由三个既有读端点在页内拼出（商家 / 绩效 / 分润汇总），不新增后端端点
+      { href: "/agents?tab=business", label: "商家经营视图", perm: "agent:agent:read", phase: 1, ready: true, group: "经营与退出" },
+      { href: "/agents?tab=performance", label: "商家绩效", perm: "agent:performance:read", phase: 2, group: "经营与退出" },
+      // 清退流程早已在档案详情里跑通（四步门禁），这里补的是「所有在途清退」的列表入口
+      { href: "/agents?tab=exits", label: "退出与清算", perm: "agent:agent:update", phase: 2, ready: true, group: "经营与退出" },
     ],
   },
   {
@@ -670,7 +679,10 @@ function resolveTabs(
       continue;
     }
     if (leaf.perm && !can(perms, leaf.perm)) continue; // 无权限：tab 不渲染，与菜单同一口径
-    out.push({ key, label: leaf.label, phase: leaf.phase });
+    // 分期也与菜单同一口径（isLeafLocked）：ready 的叶子不受分期屏蔽，所以不带 phase 出去。
+    // 此前原样带出 phase，TabHeader 按它隐藏 —— 于是 ready 叶「菜单能点进来、页签条上却没有它」，
+    // 生产跑在 L0 时押金与欠费、对账、发票、风控用户、优惠券、推送触达、报障受理、客服会话都是这样。
+    out.push({ key, label: leaf.label, phase: leaf.ready ? undefined : leaf.phase });
   }
   return { tabs: out, missing };
 }

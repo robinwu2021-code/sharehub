@@ -68,7 +68,9 @@ export const agentAccounts: AgentAccount[] = Array.from({ length: 12 }, (_, i) =
 const AGENT_COMMISSION_SEED: Omit<AgentCommission, "agentName">[] = [
   { ruleNo: "AC0001", agentNo: "AG001", basis: "GMV", rate: 0.12, fixedAmount: null, currency: "AED", mode: "CHANNEL_SPLIT", effectiveAt: "2026-01-01", status: "ACTIVE" },
   { ruleNo: "AC0002", agentNo: "AG002", basis: "GMV", rate: 0.10, fixedAmount: null, currency: "AED", mode: "LEDGER", effectiveAt: "2026-01-01", status: "ACTIVE" },
-  { ruleNo: "AC0003", agentNo: "AG003", basis: "ORDER_COUNT", rate: 0.08, fixedAmount: null, currency: "AED", mode: "LEDGER", effectiveAt: "2026-03-01", status: "INACTIVE" },
+  // 按订单数计佣 = 单均固定额（后端 checkDimension：ORDER_COUNT 时 fixedAmount + currency 必填，rate 不参与）。
+  // 此前这条种子是「订单量 + 比例 0.08、无固定额」—— 后端根本存不进去，mock 却一直把它当正常规则展示。
+  { ruleNo: "AC0003", agentNo: "AG003", basis: "ORDER_COUNT", rate: 0, fixedAmount: 0.5, currency: "AED", mode: "LEDGER", effectiveAt: "2026-03-01", status: "INACTIVE" },
 ];
 export const agentCommissions: AgentCommission[] = AGENT_COMMISSION_SEED.map((r) => ({
   ...r, agentName: agents.find((a) => a.agentNo === r.agentNo)!.name,
@@ -86,7 +88,48 @@ export const listAgentAccounts = (q: PageQuery = {}) => paginate(agentAccounts, 
 export const listAgentCommissions = (q: PageQuery = {}) => paginate(agentCommissions, q.page, q.size, (x) => kwHit(q.keyword, x.ruleNo, x.agentNo, x.agentName));
 
 export const saveAgentAccount = (x: Partial<AgentAccount>) => upsert(agentAccounts, x, "accountNo", () => nextNo("AA", agentAccounts));
-export const saveAgentCommission = (x: Partial<AgentCommission>) => upsert(agentCommissions, x, "ruleNo", () => nextNo("AC", agentCommissions));
+/**
+ * 分润规则写入，口径与后端 `AgentCommissionServiceImpl` 一致：
+ *  · **计佣基数决定必填项**（checkDimension）：GMV → 比例必填且在 0..1，固定额归零；
+ *    ORDER_COUNT → 单均固定额必填且不为负，币种必填。规则配错要在保存那一刻报出来，
+ *    而不是结算跑批时按 0 分完了才发现。
+ *  · **编辑不改归属**（beforeUpdate）：规则算给谁由建档时定，改归属走划拨。
+ *  · **状态不随编辑写入**：后端写入参里没有 status（启停该走专门动作，后端尚未提供）。
+ */
+export const saveAgentCommission = (x: Partial<AgentCommission>) => {
+  const cur = x.ruleNo ? agentCommissions.find((r) => r.ruleNo === x.ruleNo) : undefined;
+  const next: Partial<AgentCommission> = { ...x };
+  delete next.status;
+  if (cur) {
+    next.agentNo = cur.agentNo;
+    next.agentName = cur.agentName;
+    if (!next.basis) next.basis = cur.basis;
+    if (!next.currency) next.currency = cur.currency;
+  } else {
+    if (!next.agentNo) fail("请选择商家", "Merchant is required");
+    const a = agents.find((g) => g.agentNo === next.agentNo);
+    if (!a) notFound("商家", "Merchant", String(next.agentNo));
+    next.agentName = a.name;
+    next.status = "ACTIVE";
+  }
+  if (next.basis === "GMV") {
+    const r = next.rate;
+    if (r == null || Number.isNaN(Number(r))) fail("按交易额计佣时比例必填（0~1 的小数）", "Rate is required when basis is GMV (0–1)");
+    if (Number(r) < 0 || Number(r) > 1) fail(`比例须在 0~1 之间：${r}`, `Rate must be between 0 and 1: ${r}`);
+    next.rate = Number(r);
+    next.fixedAmount = 0;
+  } else if (next.basis === "ORDER_COUNT") {
+    const f = next.fixedAmount;
+    if (f == null || Number.isNaN(Number(f))) fail("按订单数计佣时单均固定额必填", "Fixed amount per order is required when basis is ORDER_COUNT");
+    if (Number(f) < 0) fail(`固定额不可为负：${f}`, `Fixed amount cannot be negative: ${f}`);
+    if (!next.currency?.trim()) fail("按订单数计佣时币种必填", "Currency is required when basis is ORDER_COUNT");
+    next.fixedAmount = Number(f);
+    next.rate = 0;
+  } else {
+    fail(`未知的计佣基数：${String(next.basis)}`, `Unknown commission basis: ${String(next.basis)}`);
+  }
+  return upsert(agentCommissions, next, "ruleNo", () => nextNo("AC", agentCommissions));
+};
 
 // —— G1 软删除：代理商档案 ——
 export const archiveAgent = (no: string) => archiveRow(agents, "agentNo", no);

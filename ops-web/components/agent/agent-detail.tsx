@@ -154,7 +154,7 @@ export function AgentDetailDrawer({
   const startExit = useMutation({
     mutationFn: (v: { agentNo: string; reason: string }) => api.startAgentExit(v.agentNo, v.reason),
     onSuccess: (e) => {
-      notify.success(`已发起清退 ${e.exitNo}，代理已停用`);
+      notify.success(`已发起清退 ${e.exitNo}，商家已停用`);
       setExitForm(null);
       invalidate();
       onOpenExit(e.exitNo);
@@ -167,7 +167,7 @@ export function AgentDetailDrawer({
     const ok = await confirm({
       title: `发起清退 ${agent.agentNo}`,
       desc: "发起即停用：提现冻结（结清步除外）、名下未完结工单改派平台、不能再划拨。"
-        + "之后须依次完成收回资产、结清、关闭账号三步，最后一步不可恢复。请输入代理编号确认。",
+        + "之后须依次完成收回资产、结清、关闭账号三步，最后一步不可恢复。请输入商家编号确认。",
       danger: true,
       confirmText: "发起清退",
       requireText: agent.agentNo,
@@ -183,7 +183,7 @@ export function AgentDetailDrawer({
     <Drawer
       open={!!agentNo}
       onOpenChange={(o) => !o && onClose()}
-      title="代理商详情"
+      title="商家详情"
       desc="档案 · 停用影响 · 运维考核 · 清退"
       width="w-[720px]"
     >
@@ -192,7 +192,7 @@ export function AgentDetailDrawer({
       ) : agentQ.isLoading ? (
         <div className="txt-caption text-muted-foreground">加载中…</div>
       ) : !agent ? (
-        <Notice>找不到代理商 {agentNo} —— 编号可能输错了，或它不在你的数据范围内。</Notice>
+        <Notice>找不到商家 {agentNo} —— 编号可能输错了，或它不在你的数据范围内。</Notice>
       ) : (
         <div className="space-y-5">
           <DetailHeader
@@ -213,14 +213,14 @@ export function AgentDetailDrawer({
                 {
                   key: "suspend", label: "停用", danger: true, perm: "agent:agent:update",
                   when: agent.status === "ENABLED" && !archived,
-                  confirm: { title: `停用代理 ${agent.agentNo}`, desc: suspendDesc, confirmText: "确认停用" },
+                  confirm: { title: `停用商家 ${agent.agentNo}`, desc: suspendDesc, confirmText: "确认停用" },
                   onRun: () => setStatus.mutateAsync({ agent, status: "SUSPENDED" }),
                 },
                 {
                   key: "resume", label: "恢复启用", perm: "agent:agent:update",
                   when: agent.status === "SUSPENDED" && !archived,
                   blockedReason: exitOpen ? `清退 ${exit!.exitNo} 进行中，清退是单向的，不能恢复` : null,
-                  confirm: { title: `恢复代理 ${agent.agentNo}`, desc: "恢复后可再派单、可划拨；停用期间挂起的提现单继续走审批与打款。", confirmText: "恢复启用" },
+                  confirm: { title: `恢复商家 ${agent.agentNo}`, desc: "恢复后可再派单、可划拨；停用期间挂起的提现单继续走审批与打款。", confirmText: "恢复启用" },
                   onRun: () => setStatus.mutateAsync({ agent, status: "ENABLED" }),
                 },
                 {

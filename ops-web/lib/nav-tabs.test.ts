@@ -23,9 +23,10 @@ describe("navTabs 取名", () => {
   });
 
   it("同一 href 在多个菜单登记时，取**本页主属 section** 的名字", () => {
-    // /finance?tab=settlements 在「代理商管理 › 代理收益结算」和「财务管理 › 结算单」
-    // 各有一条。财务页请求的 9 个 tab 绝大多数属于财务域，所以该取「结算单」。
-    // 按 NAV 顺序取第一个会拿到「代理收益结算」——在财务页上是错的名字。
+    // /finance?tab=settlements 在「我的经营 › 我的结算」（商家门户）和「财务管理 › 结算单」
+    // 各有一条（2026-10-28 前还有「代理商管理 › 代理收益结算」，已随 V148 撤销）。
+    // 财务页请求的 9 个 tab 绝大多数属于财务域，所以该取「结算单」；
+    // 按 NAV 顺序取第一个会拿到门户的「我的结算」——在财务页上是错的名字。
     const [tab] = navTabs("/finance", [...FINANCE_KEYS], "ADMIN");
     expect(navTabs("/finance", [...FINANCE_KEYS], "ADMIN").find((t) => t.key === "settlements")!.label)
       .toBe("结算单");
@@ -35,6 +36,18 @@ describe("navTabs 取名", () => {
   it("带出 phase（由 TabHeader 决定是否隐藏，这里不替它做主）", () => {
     const [tab] = navTabs("/finance", ["ledger"], "ADMIN");
     expect(tab.phase).toBe(2);
+  });
+
+  it("ready 的叶子不带 phase —— 与菜单的 isLeafLocked 同口径，否则「菜单能点、页签条没有」", () => {
+    // 发票 phase 2 + ready；账务分录 phase 2 未 ready
+    const tabs = navTabs("/finance", ["ledger", "invoices"], "ADMIN");
+    expect(tabs.find((t) => t.key === "invoices")!.phase).toBeUndefined();
+    expect(tabs.find((t) => t.key === "ledger")!.phase).toBe(2);
+    // 商家管理两片 ready 叶（OM01）
+    const agentTabs = navTabs("/agents", ["profiles", "business", "performance", "exits"], "ADMIN", "profiles");
+    expect(agentTabs.find((t) => t.key === "business")!.phase).toBeUndefined();
+    expect(agentTabs.find((t) => t.key === "exits")!.phase).toBeUndefined();
+    expect(agentTabs.find((t) => t.key === "performance")!.phase).toBe(2);
   });
 
   it("非菜单叶的页内子视图：自带 label，不抛错", () => {

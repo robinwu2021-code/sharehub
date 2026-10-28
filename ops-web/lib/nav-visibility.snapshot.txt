@@ -1,7 +1,7 @@
 # 每个角色看得到的菜单（lib/nav-visibility.test.ts 生成，勿手改）
 # 改动菜单可见性时这份文件会变 —— diff 就是评审物，确认是有意的再提交。
 
-## ADMIN（115 项）
+## ADMIN（116 项）
 operation›站点概览
 operation›站点管理
 operation›点位管理
@@ -37,12 +37,13 @@ venue›BD 拓展 CRM
 venue›门店 Onboarding
 venue›门店生命周期
 agent›入驻审核
-agent›代理商档案
-agent›代理账号管理
+agent›商家档案
+agent›商家账号
+agent›商家分润规则
 agent›设备/点位划拨
-agent›分润配置
-agent›代理收益结算
-agent›代理绩效
+agent›商家经营视图
+agent›商家绩效
+agent›退出与清算
 order›订单列表
 order›预约订单
 order›异常订单
@@ -127,7 +128,7 @@ my-asset›我的设备
 my-asset›我的订单
 my-service›设备报修
 
-## BD（39 项）
+## BD（40 项）
 operation›站点概览
 operation›站点管理
 operation›点位管理
@@ -141,12 +142,13 @@ venue›BD 拓展 CRM
 venue›门店 Onboarding
 venue›门店生命周期
 agent›入驻审核
-agent›代理商档案
-agent›代理账号管理
+agent›商家档案
+agent›商家账号
+agent›商家分润规则
 agent›设备/点位划拨
-agent›分润配置
-agent›代理收益结算
-agent›代理绩效
+agent›商家经营视图
+agent›商家绩效
+agent›退出与清算
 finance›分润规则
 finance›分润明细
 finance›分润统计
@@ -227,10 +229,10 @@ venue›场地方
 venue›进场合同
 venue›门店 Onboarding
 venue›门店生命周期
-agent›代理商档案
-agent›分润配置
-agent›代理收益结算
-agent›代理绩效
+agent›商家档案
+agent›商家分润规则
+agent›商家经营视图
+agent›商家绩效
 order›订单列表
 order›预约订单
 order›退款记录
@@ -315,7 +317,7 @@ flow›工单工作台
 flow›运营配置
 flow›流程实例
 
-## VIEWER（32 项）
+## VIEWER（33 项）
 operation›站点概览
 operation›站点管理
 operation›点位管理
@@ -329,7 +331,8 @@ device›设备编码
 venue›场地方
 venue›门店 Onboarding
 venue›门店生命周期
-agent›代理商档案
+agent›商家档案
+agent›商家经营视图
 order›订单列表
 order›预约订单
 order›押金与欠费

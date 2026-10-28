@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
-import { UNPAGED_SIZE } from "@/lib/constants";
+import { UNPAGED_SIZE, DEFAULT_CURRENCY } from "@/lib/constants";
 import { api } from "@/lib/api";
 import { PageTitle, Pagination } from "@/components/ui/misc";
 import { usePaging } from "@/lib/hooks/use-paging";
@@ -31,13 +31,20 @@ import { notify } from "@/lib/notify";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
 import { AgentDetailDrawer, AGENT_STATUS } from "@/components/agent/agent-detail";
-import { AgentExitDrawer } from "@/components/agent/agent-exit-drawer";
+import { AgentExitDrawer, AGENT_EXIT_STATUS } from "@/components/agent/agent-exit-drawer";
+import { Notice } from "@/components/ui/notice";
 // 绩效周期复用报表域枚举：代理 GMV = 名下站点营收之和，必须与站点坪效同一套周期口径
 import { REPORT_PERIODS, REPORT_PERIOD_DEFAULT, type ReportPeriod } from "@/lib/types";
 import type {
   Agent, AgentAssignment, AgentPerformance, AgentAccount, AgentCommission, DataScope,
   AgentAssignmentRecord, AssignableAsset, AgentApply, ApplyStatus, OperatorType, AgentType,
+  AgentExit, ShareSummary,
 } from "@/lib/types";
+
+/** 商家经营视图的一行：档案 + 近期在线率 + 当月分润汇总（三个读端点在页内拼）。 */
+type BizRow = { agent: Agent; onlineRate: number | null; share: ShareSummary | null };
+/** 退出与清算的一行：在途清退单 + 它所属的商家。 */
+type ExitRow = { agent: Agent; exit: AgentExit };
 
 /** 周期码 → 中文标签。取自 REPORT_PERIODS，不另抄一份。 */
 const periodLabel = (p: string) => REPORT_PERIODS.find((x) => x.value === p)?.label ?? p;
@@ -46,7 +53,7 @@ const periodLabel = (p: string) => REPORT_PERIODS.find((x) => x.value === p)?.la
 // 「按站点」而不是「按点位」：后端实现的档位是 SITE（登记在 loc_site / loc_location /
 // dev_cabinet / ord_order / wo_order 五张表），选中的也是站点。
 // 此前这里是 LOCATION —— 一个后端一张表都没登记的档位，选了就什么都看不见（见 DataScope 注释）。
-const SCOPE_LABEL: Record<DataScope, string> = { ALL: "全部数据", REGION: "按区域", SITE: "按站点", AGENT: "按代理(自己)", SELF: "仅自己经手" };
+const SCOPE_LABEL: Record<DataScope, string> = { ALL: "全部数据", REGION: "按区域", SITE: "按站点", AGENT: "按商家(自己)", SELF: "仅自己经手" };
 /**
  * 入驻申请状态。
  *
@@ -112,9 +119,9 @@ const APPLY_FIELDS: FieldDef[] = [
   { key: "payload", label: "资质材料说明", placeholder: "线下已签约 / 材料清单" },
 ];
 
-// tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）
-// 注意「代理账号」在菜单里叫「代理账号管理」——以菜单为准，这里不再写第二份名字
-const TAB_KEYS = ["applies", "profiles", "commission", "assign", "performance", "accounts"] as const;
+// tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）。
+// 顺序与菜单一致（2026-10-28 按运营顺序，OM01）：入驻与档案 → 分润与划拨 → 经营与退出
+const TAB_KEYS = ["applies", "profiles", "accounts", "commission", "assign", "business", "performance", "exits"] as const;
 /**
  * 分润规则字段。代理商**选**不**打** —— 原先是「代理编号 + 代理名称」两个文本框，
  * 要人手填两遍同一件事，填不一致时以哪个为准没人说得清。现在只选编号，名字提交时带出。
@@ -126,16 +133,38 @@ const TAB_KEYS = ["applies", "profiles", "commission", "assign", "performance", 
 function commissionFieldsFor(agents: { value: string; label: string }[]): FieldDef[] {
   return [
     { key: "ruleNo", label: "规则号", readOnlyOnEdit: true, placeholder: "留空自动生成" },
-    { key: "agentNo", label: "代理商", type: "select", required: true,
-      options: [{ value: "", label: "请选择代理商" }, ...agents] },
-    { key: "basis", label: "计佣基数", type: "select", options: [{ value: "GMV", label: "GMV" }, { value: "ORDER_COUNT", label: "订单量" }] },
+    // 归属建档时定，编辑不改：后端 beforeUpdate 会回填原值（规则算给谁，改了等于把钱划给别人；改归属走划拨）
+    { key: "agentNo", label: "商家", type: "select", required: true, readOnlyOnEdit: true,
+      options: [{ value: "", label: "请选择商家" }, ...agents] },
+    { key: "basis", label: "计佣基数", type: "select", required: true,
+      options: [{ value: "GMV", label: "按交易额（比例）" }, { value: "ORDER_COUNT", label: "按订单数（单均固定额）" }] },
+    /*
+     * 基数决定填哪一格，口径与后端 checkDimension 一致：
+     *   GMV         → 比例必填（0~1），固定额归零；
+     *   ORDER_COUNT → 单均固定额与币种必填，比例不参与。
+     * 此前表单不论基数都只给比例 —— 选「订单量」保存，真后端必报「fixedAmount 必填」。
+     * 被禁用的那一格会清空且不校验，不会把另一种口径的脏值带过去。
+     */
     // 上限 1：这里填 20（本意 20%）就是二十倍分润，而且要等分完才发现。
-    { key: "rate", label: "分润比例（0~1，如 0.15 = 15%）", type: "number", required: true, min: 0, max: 1 },
+    { key: "rate", label: "分润比例（0~1，如 0.15 = 15%）", type: "number", required: true, min: 0, max: 1,
+      disabledWhen: (v) => v.basis === "ORDER_COUNT" },
+    { key: "fixedAmount", label: "单均固定额", type: "number", required: true, min: 0,
+      disabledWhen: (v) => v.basis !== "ORDER_COUNT", help: "每完成一单分给商家的固定金额" },
+    { key: "currency", label: "币种", required: true, placeholder: "AED",
+      pattern: { re: "^[A-Z]{3}$", msg: "三位大写币种代码，如 AED" },
+      disabledWhen: (v) => v.basis !== "ORDER_COUNT" },
     { key: "mode", label: "结算模式", type: "select", options: [{ value: "CHANNEL_SPLIT", label: "渠道分成" }, { value: "LEDGER", label: "账务分录" }] },
     { key: "effectiveAt", label: "生效日期", type: "date", required: true },
-    { key: "status", label: "状态", type: "select", options: [{ value: "ACTIVE", label: "启用" }, { value: "INACTIVE", label: "停用" }] },
+    // 这里**没有**「状态」：后端写入参不收 status（启停该走专门动作，后端尚未提供），
+    // 选了只会得到一个成功提示而规则状态不变（known-form-field-drift 原登记项，已随本次移除）。
   ];
 }
+
+/** 规则的分润额：固定额与比例二选一，按基数显示（只显示比例的话，按单计佣的规则看起来像「0%」）。 */
+const commissionAmount = (c: AgentCommission) =>
+  c.basis === "ORDER_COUNT"
+    ? `${money(c.fixedAmount ?? 0, c.currency ?? DEFAULT_CURRENCY)} / 单`
+    : `${(c.rate * 100).toFixed(0)}%`;
 // —— 划拨（S1）——
 /** multiselect + csv 的值是逗号分隔业务号串（与 employees 页数据权限抽屉同一套约定）。 */
 const csvArr = (v: unknown) => String(v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
@@ -154,8 +183,8 @@ const ASSET_TYPE_LABEL: Record<AssignableAsset["assetType"], string> = { CABINET
 function accountFieldsFor(agents: { value: string; label: string }[]): FieldDef[] {
   return [
     { key: "accountNo", label: "账号编号", readOnlyOnEdit: true, placeholder: "留空自动生成" },
-    { key: "agentNo", label: "代理商", type: "select", required: true,
-      options: [{ value: "", label: "请选择代理商" }, ...agents] },
+    { key: "agentNo", label: "商家", type: "select", required: true,
+      options: [{ value: "", label: "请选择商家" }, ...agents] },
     { key: "loginPhone", label: "登录手机", required: true,
       pattern: { re: "^\\+?[0-9 -]{6,20}$", msg: "手机号格式不对（可带国际区号）" } },
     { key: "status", label: "状态", type: "select", options: [{ value: "ACTIVE", label: "启用" }, { value: "DISABLED", label: "停用" }] },
@@ -264,6 +293,72 @@ function AgentsInner() {
     placeholderData: keepPreviousData,
     enabled: tab === "commission",
   });
+
+  /*
+   * —— 商家经营视图（OM01-07）——
+   * 一行一个商家：档案（类型 / 状态 / 设备数）+ 近 30 天在线率 + 所选月份的分润汇总。
+   * **三个既有读端点在页内拼**，不新增后端端点：商家列表、商家绩效、分润汇总（商家维度）。
+   * 三者各有自己的码；缺哪个，对应几列显示「—」并在表头上方说明缺的是哪个码，而不是整页报错 ——
+   * 只读角色有分润汇总码、没有绩效码，这一页对他照样有用。
+   * 应付未结要等「应付台账」（OM07-03），这里先用分润汇总里的「待结算」。
+   */
+  const canReadPerf = allow("agent:performance:read");
+  const canReadShare = allow("finance:share_record:read");
+  const [bizMonth, setBizMonth] = useState("");
+  const bizAgentsQ = useQuery({
+    queryKey: ["agents", "business-all"],
+    queryFn: () => api.listAgents({ page: 1, size: UNPAGED_SIZE }),
+    enabled: tab === "business",
+  });
+  const bizPerfQ = useQuery({
+    queryKey: ["agent-performance", "business", REPORT_PERIOD_DEFAULT],
+    queryFn: () => api.listAgentPerformance({ page: 1, size: UNPAGED_SIZE, period: REPORT_PERIOD_DEFAULT }),
+    enabled: tab === "business" && canReadPerf,
+  });
+  // 不带 period 一次取全部月份：月份下拉只列真有数据的月，切月份不再发请求
+  const bizShareQ = useQuery({
+    queryKey: ["share-summaries", "AGENT", "all"],
+    queryFn: () => api.listShareSummaries({ page: 1, size: UNPAGED_SIZE, dimension: "AGENT" }),
+    enabled: tab === "business" && canReadShare,
+  });
+  const bizMonths = useMemo(
+    () => [...new Set((bizShareQ.data?.list ?? []).map((s) => s.period))].sort().reverse(),
+    [bizShareQ.data],
+  );
+  const month = bizMonth || bizMonths[0] || "";
+  const bizRows: BizRow[] = useMemo(() => {
+    const perf = new Map((bizPerfQ.data?.list ?? []).map((p) => [p.agentNo, p.onlineRate]));
+    const share = new Map((bizShareQ.data?.list ?? []).filter((s) => s.period === month).map((s) => [s.payeeNo, s]));
+    const kw = keyword.trim().toLowerCase();
+    return (bizAgentsQ.data?.list ?? [])
+      .filter((a) => !kw || [a.agentNo, a.name, a.regionScope].some((x) => x?.toLowerCase().includes(kw)))
+      .map((a) => ({ agent: a, onlineRate: perf.get(a.agentNo) ?? null, share: share.get(a.agentNo) ?? null }));
+  }, [bizAgentsQ.data, bizPerfQ.data, bizShareQ.data, month, keyword]);
+
+  /*
+   * —— 退出与清算（OM01-09）——
+   * 清退流程早在档案详情里跑通（发起 → 收回资产 → 结清 → 关闭，每步门禁），缺的是「所有在途清退」的入口。
+   * 后端没有清退列表端点，只有「某商家当前在途的那一张」：发起即停用，所以在途清退一定挂在停用的商家上 ——
+   * 取停用商家，逐个问一次。停用商家通常只有个位数；后端补上列表端点后改成一次查询（已提给服务端评审）。
+   * 已完成的清退随商家一起归档，这里不显示。
+   * queryKey 以 "agent-exit" 开头：进度抽屉推进后会作废这个前缀，列表里的步骤跟着变。
+   */
+  const exitsQ = useQuery({
+    queryKey: ["agent-exit", "open-list"],
+    queryFn: async (): Promise<ExitRow[]> => {
+      const all = await api.listAgents({ page: 1, size: UNPAGED_SIZE });
+      const suspended = all.list.filter((a) => a.status === "SUSPENDED");
+      const rows = await Promise.all(suspended.map(async (agent) => ({ agent, exit: await api.getAgentOpenExit(agent.agentNo) })));
+      return rows.filter((r): r is ExitRow => r.exit != null);
+    },
+    enabled: tab === "exits",
+  });
+  const exitRows = useMemo(() => {
+    const kw = keyword.trim().toLowerCase();
+    return (exitsQ.data ?? []).filter((r) => !kw || [r.exit.exitNo, r.agent.agentNo, r.agent.name].some((x) => x.toLowerCase().includes(kw)));
+  }, [exitsQ.data, keyword]);
+  /** 这两页的数据是拼出来的全量，分页在前端切。 */
+  const pageOf = <T,>(rows: T[]) => rows.slice((paging.page - 1) * paging.size, paging.page * paging.size);
 
   const appliesQ = useQuery({
     queryKey: ["agent-applies", paging.page, paging.size, keyword, applyStatus, applyFrom, applyTo],
@@ -382,7 +477,9 @@ function AgentsInner() {
     enabled: !!recordsFor,
   });
 
-  const canEditAccount = allow("agent:agent:update");
+  // 与后端 /api/agent/accounts 的码一致（菜单叶同码）。此前门的是 agent:agent:update ——
+  // 两个码今天都只有 BD 持有，所以没出过事，但角色一拆分就会「按钮在、点了 403」。
+  const canEditAccount = allow("agent:account:manage");
   const save = useMutation({
     // 只改档 —— 新建走入驻申请（见 createApply）。类型上要求 agentNo 必有，
     // 于是「从这里新建」在编译期就过不去，而不是运行时打一个已不存在的端点
@@ -445,20 +542,20 @@ function AgentsInner() {
 
   const assignFields: FieldDef[] = useMemo(() => [
     {
-      key: "agentNo", label: "目标代理商", type: "select", required: true,
-      options: [{ value: "", label: "请选择代理商" }, ...agentOptions],
-      help: "只列启用中的代理商；已停用/已归档的不能作为划拨对象",
+      key: "agentNo", label: "目标商家", type: "select", required: true,
+      options: [{ value: "", label: "请选择商家" }, ...agentOptions],
+      help: "只列启用中的商家；已停用/已归档的不能作为划拨对象",
     },
     {
       key: "cabinetNos", label: "机柜（可多选）", type: "multiselect", csv: true,
-      placeholder: assignForm?.agentNo ? "选择要划拨的机柜" : "先选目标代理商",
+      placeholder: assignForm?.agentNo ? "选择要划拨的机柜" : "先选目标商家",
       options: toOptions(assignableQ.data?.list, "CABINET"),
       disabledWhen: (v) => !v.agentNo,
-      help: "只列未归属或归属其它代理的机柜，括号里是当前归属——别把别人的柜子划走了",
+      help: "只列未归属或归属其它商家的机柜，括号里是当前归属——别把别人的柜子划走了",
     },
     {
       key: "siteNos", label: "站点（可多选）", type: "multiselect", csv: true,
-      placeholder: assignForm?.agentNo ? "选择要划拨的站点" : "先选目标代理商",
+      placeholder: assignForm?.agentNo ? "选择要划拨的站点" : "先选目标商家",
       options: toOptions(assignableQ.data?.list, "SITE"),
       disabledWhen: (v) => !v.agentNo,
       help: "站点划拨只改站点归属，站内机柜的归属需另行选择",
@@ -480,7 +577,7 @@ function AgentsInner() {
     if (!assignForm) return;
     const cabs = csvArr(assignForm.cabinetNos);
     const sts = csvArr(assignForm.siteNos);
-    if (!assignForm.agentNo) { notify.error("请先选择目标代理商"); return; }
+    if (!assignForm.agentNo) { notify.error("请先选择目标商家"); return; }
     if (!cabs.length && !sts.length) { notify.error("请至少选择一台机柜或一个站点"); return; }
     const target = agentOptionsQ.data?.list.find((a) => a.agentNo === assignForm.agentNo);
     const ok = await confirm({
@@ -500,7 +597,7 @@ function AgentsInner() {
       title: "确认回收",
       danger: true,
       desc: `将把 ${cabs.length} 台机柜、${sts.length} 个站点从 ${reclaimForm.agentName}（${reclaimForm.agentNo}）收回平台直营。`
-        + "代理商将不再有这些资产的收益与数据权限。",
+        + "商家将不再有这些资产的收益与数据权限。",
       confirmText: "确认回收",
     });
     if (ok) reclaimAssets.mutate({ cabinetNos: cabs, siteNos: sts });
@@ -511,7 +608,7 @@ function AgentsInner() {
   // 业务号列一律 txt-strong（§12.3 主键列加强）；比例/计数/金额列 text-right + tabular-nums（§12.4）
   const profileCols: Column<Agent>[] = [
     {
-      header: "代理编号",
+      header: "商家编号",
       cell: (a) => (
         <button type="button" className="txt-strong tabular-nums underline-offset-4 hover:underline" onClick={() => openAgent(a.agentNo)}>
           {a.agentNo}
@@ -556,7 +653,7 @@ function AgentsInner() {
                   title={missing.length ? `先在「配置」里补上${missing.join("与")}` : ""}
                   onClick={async () => {
                     if (await confirm({
-                      title: `给 ${a.name} 开通代理端登录`,
+                      title: `给 ${a.name} 开通商家端登录`,
                       desc: `用档案上的 ${a.phone} 与 ${a.email} 建登录身份。已开通过则不会重复建。`
                         + "注意：此后改档案里的手机或邮箱，不会改登录方式。",
                       confirmText: "开通",
@@ -567,16 +664,16 @@ function AgentsInner() {
             })()}
           </>}
           // 代理商是主数据：要求手输代理编号确认
-          onArchive={async () => { if (await confirm(archiveConfirm("代理商", a.agentNo, a.agentNo))) archiveAgent.mutate(a.agentNo); }}
-          onUnarchive={async () => { if (await confirm(unarchiveConfirm("代理商", a.agentNo))) unarchiveAgent.mutate(a.agentNo); }}
+          onArchive={async () => { if (await confirm(archiveConfirm("商家", a.agentNo, a.agentNo))) archiveAgent.mutate(a.agentNo); }}
+          onUnarchive={async () => { if (await confirm(unarchiveConfirm("商家", a.agentNo))) unarchiveAgent.mutate(a.agentNo); }}
         />
       ),
     },
   ];
 
   const assignCols: Column<AgentAssignment>[] = [
-    { header: "代理编号", cell: (a) => <span className="txt-strong tabular-nums">{a.agentNo}</span> },
-    { header: "代理名称", cell: (a) => a.agentName },
+    { header: "商家编号", cell: (a) => <span className="txt-strong tabular-nums">{a.agentNo}</span> },
+    { header: "商家名称", cell: (a) => a.agentName },
     { header: "区域", cell: (a) => <span className="text-muted-foreground">{a.region}</span> },
     // 这两列由 cabinets.agentNo / sites.agentNo 实时反算：划拨/回收后数字当场变
     { header: "设备数", className: "text-right", cell: (a) => <span className="tabular-nums">{a.cabinetCount}</span> },
@@ -604,7 +701,7 @@ function AgentsInner() {
 
   const recordCols: Column<AgentAssignmentRecord>[] = [
     { header: "流水号", cell: (r) => <span className="txt-strong tabular-nums">{r.assignmentNo}</span> },
-    { header: "代理", cell: (r) => <span>{r.agentName} <span className="text-muted-foreground tabular-nums">{r.agentNo}</span></span> },
+    { header: "商家", cell: (r) => <span>{r.agentName} <span className="text-muted-foreground tabular-nums">{r.agentNo}</span></span> },
     { header: "资产", cell: (r) => <span className="tabular-nums">{r.assetNo}</span> },
     { header: "类型", cell: (r) => <Badge tone="outline">{ASSET_TYPE_LABEL[r.assetType]}</Badge> },
     { header: "动作", cell: (r) => r.action === "ASSIGN" ? <Badge tone="success">划拨</Badge> : <Badge tone="warning">回收</Badge> },
@@ -614,8 +711,8 @@ function AgentsInner() {
 
   const perfCols: Column<AgentPerformance>[] = [
     { header: "排名", className: "text-right", cell: (a) => <span className="txt-strong tabular-nums">#{a.rank}</span> },
-    { header: "代理编号", cell: (a) => <span className="txt-strong tabular-nums">{a.agentNo}</span> },
-    { header: "代理名称", cell: (a) => a.agentName },
+    { header: "商家编号", cell: (a) => <span className="txt-strong tabular-nums">{a.agentNo}</span> },
+    { header: "商家名称", cell: (a) => a.agentName },
     { header: "GMV", className: "text-right", cell: (a) => <span className="tabular-nums">{money(a.gmv, a.currency)}</span> },
     { header: "设备数", className: "text-right", cell: (a) => <span className="tabular-nums">{a.cabinetCount}</span> },
     { header: "在线率", className: "text-right", cell: (a) => <span className="tabular-nums">{(a.onlineRate * 100).toFixed(0)}%</span> },
@@ -623,8 +720,8 @@ function AgentsInner() {
 
   const accountCols: Column<AgentAccount>[] = [
     { header: "账号编号", cell: (a) => <span className="txt-strong tabular-nums">{a.accountNo}</span> },
-    { header: "代理编号", cell: (a) => <span className="text-muted-foreground tabular-nums">{a.agentNo}</span> },
-    { header: "代理名称", cell: (a) => a.agentName },
+    { header: "商家编号", cell: (a) => <span className="text-muted-foreground tabular-nums">{a.agentNo}</span> },
+    { header: "商家名称", cell: (a) => a.agentName },
     // 手机号可能多账号共用，运营找「是哪个账号」靠登录名
     { header: "登录名", cell: (a) => a.username ? <span className="tabular-nums">{a.username}</span> : <span className="text-muted-foreground">—</span> },
     { header: "登录手机", cell: (a) => <span className="tabular-nums">{a.loginPhone}</span> },
@@ -638,26 +735,61 @@ function AgentsInner() {
 
   const commissionCols: Column<AgentCommission>[] = [
     { header: "规则号", cell: (c) => <span className="txt-strong tabular-nums">{c.ruleNo}</span> },
-    { header: "代理编号", cell: (c) => <span className="text-muted-foreground tabular-nums">{c.agentNo}</span> },
-    { header: "代理名称", cell: (c) => c.agentName },
-    { header: "计佣基数", cell: (c) => <Badge tone="outline">{c.basis === "GMV" ? "GMV" : "订单量"}</Badge> },
-    // 固定额与比例是二选一：只显示比例的话，配了固定额的那几条看起来像「0%」
-    {
-      header: "分润",
-      className: "text-right",
-      cell: (c) => c.fixedAmount != null && c.fixedAmount > 0
-        ? <span className="tabular-nums">{money(c.fixedAmount, c.currency ?? "AED")}</span>
-        : <span className="tabular-nums">{(c.rate * 100).toFixed(0)}%</span>,
-    },
+    { header: "商家编号", cell: (c) => <span className="text-muted-foreground tabular-nums">{c.agentNo}</span> },
+    { header: "商家名称", cell: (c) => c.agentName },
+    { header: "计佣基数", cell: (c) => <Badge tone="outline">{c.basis === "GMV" ? "按交易额" : "按订单数"}</Badge> },
+    { header: "分润", className: "text-right", cell: (c) => <span className="tabular-nums">{commissionAmount(c)}</span> },
     { header: "结算模式", cell: (c) => c.mode === "CHANNEL_SPLIT" ? "渠道分成" : "账务分录" },
     { header: "生效日期", cell: (c) => <span className="text-muted-foreground">{c.effectiveAt}</span> },
     { header: "状态", cell: (c) => c.status === "ACTIVE" ? <Badge tone="success">启用</Badge> : <Badge tone="muted">停用</Badge> },
     { header: "操作", cell: (c) => canConfigCommission ? <Button size="sm" variant="outline" onClick={() => setCommissionForm(c)}>编辑</Button> : <span className="text-muted-foreground">-</span> },
   ];
 
+  /** 无对应读码时的格子：显示破折号，原因在表格上方的说明里统一讲。 */
+  const dash = <span className="text-muted-foreground">—</span>;
+  const shareCell = (r: BizRow, pick: (s: ShareSummary) => number, asMoney = true) =>
+    !canReadShare || !r.share ? dash
+      : <span className="tabular-nums">{asMoney ? money(pick(r.share), r.share.currency) : pick(r.share)}</span>;
+  const bizCols: Column<BizRow>[] = [
+    {
+      header: "商家编号",
+      cell: (r) => (
+        <button type="button" className="txt-strong tabular-nums underline-offset-4 hover:underline" onClick={() => openAgent(r.agent.agentNo)}>
+          {r.agent.agentNo}
+        </button>
+      ),
+    },
+    { header: "商家名称", cell: (r) => r.agent.name },
+    { header: "类型", className: "whitespace-nowrap", cell: (r) => <StatusBadge map={AGENT_TYPE} value={r.agent.agentType ?? "AGENT"} /> },
+    { header: "状态", cell: (r) => <StatusBadge map={AGENT_STATUS} value={r.agent.status} /> },
+    { header: "设备数", className: "text-right", cell: (r) => <span className="tabular-nums">{r.agent.cabinetCount}</span> },
+    // 表头保持短：口径（近 30 天 / 所选月份）在表格上方那行说明里讲，塞进表头会在窄屏挤成竖排
+    {
+      header: "在线率", className: "text-right",
+      cell: (r) => !canReadPerf || r.onlineRate == null ? dash : <span className="tabular-nums">{(r.onlineRate * 100).toFixed(0)}%</span>,
+    },
+    { header: "订单数", className: "text-right", cell: (r) => shareCell(r, (s) => s.orderCount, false) },
+    { header: "交易额", className: "text-right", cell: (r) => shareCell(r, (s) => s.gmv) },
+    { header: "分润", className: "text-right", cell: (r) => shareCell(r, (s) => s.shareAmount) },
+    { header: "已结算", className: "text-right", cell: (r) => shareCell(r, (s) => s.settledAmount) },
+    // 财务最关心的数：分了多少还没结给商家。应付台账（OM07-03）上线后换成「应付未结」
+    { header: "待结算", className: "text-right", cell: (r) => shareCell(r, (s) => s.pendingAmount) },
+    { header: "操作", cell: (r) => <Button size="sm" variant="outline" onClick={() => openAgent(r.agent.agentNo)}>详情</Button> },
+  ];
+
+  const exitCols: Column<ExitRow>[] = [
+    { header: "清退单号", cell: (r) => <span className="txt-strong tabular-nums">{r.exit.exitNo}</span> },
+    { header: "商家", cell: (r) => <span>{r.agent.name} <span className="text-muted-foreground tabular-nums">{r.agent.agentNo}</span></span> },
+    { header: "当前步骤", cell: (r) => <StatusBadge map={AGENT_EXIT_STATUS} value={r.exit.status} /> },
+    { header: "原因", cell: (r) => r.exit.reason ?? dash },
+    { header: "发起人", cell: (r) => r.exit.startedBy ?? dash },
+    { header: "发起时间", cell: (r) => <span className="text-muted-foreground">{r.exit.startedAt ? fmtTime(r.exit.startedAt) : "-"}</span> },
+    { header: "操作", cell: (r) => <Button size="sm" variant="outline" onClick={() => openExit(r.exit.exitNo)}>查看进度</Button> },
+  ];
+
   // —— 导出（TDD §10.2）：当页数据，列与表格可见列严格一致 ——
-  const exportProfiles = () => exportCsv<Agent>("代理商档案", [
-    { header: "代理编号", value: (a) => a.agentNo },
+  const exportProfiles = () => exportCsv<Agent>("商家档案", [
+    { header: "商家编号", value: (a) => a.agentNo },
     { header: "名称", value: (a) => a.name },
     { header: "辖域", value: (a) => a.regionScope },
     { header: "联系方式", value: (a) => a.contact },
@@ -668,38 +800,52 @@ function AgentsInner() {
   ], profiles.data?.list ?? []);
   const exportCommissions = () => exportCsv<AgentCommission>("分润配置", [
     { header: "规则号", value: (c) => c.ruleNo },
-    { header: "代理编号", value: (c) => c.agentNo },
-    { header: "代理名称", value: (c) => c.agentName },
-    { header: "计佣基数", value: (c) => (c.basis === "GMV" ? "GMV" : "订单量") },
-    { header: "分润比例", value: (c) => `${(c.rate * 100).toFixed(0)}%` },
+    { header: "商家编号", value: (c) => c.agentNo },
+    { header: "商家名称", value: (c) => c.agentName },
+    { header: "计佣基数", value: (c) => (c.basis === "GMV" ? "按交易额" : "按订单数") },
+    { header: "分润", value: (c) => commissionAmount(c) },
     { header: "结算模式", value: (c) => (c.mode === "CHANNEL_SPLIT" ? "渠道分成" : "账务分录") },
     { header: "生效日期", value: (c) => c.effectiveAt },
     { header: "状态", value: (c) => (c.status === "ACTIVE" ? "启用" : "停用") },
   ], commissions.data?.list ?? []);
   const exportAssign = () => exportCsv<AgentAssignment>("设备点位划拨", [
-    { header: "代理编号", value: (a) => a.agentNo },
-    { header: "代理名称", value: (a) => a.agentName },
+    { header: "商家编号", value: (a) => a.agentNo },
+    { header: "商家名称", value: (a) => a.agentName },
     { header: "区域", value: (a) => a.region },
     { header: "设备数", value: (a) => a.cabinetCount },
     { header: "点位数", value: (a) => a.siteCount },
   ], assign.data?.list ?? []);
-  const exportPerformance = () => exportCsv<AgentPerformance>(`代理绩效-${periodLabel(period)}`, [
+  const exportPerformance = () => exportCsv<AgentPerformance>(`商家绩效-${periodLabel(period)}`, [
     { header: "排名", value: (a) => a.rank },
-    { header: "代理编号", value: (a) => a.agentNo },
-    { header: "代理名称", value: (a) => a.agentName },
+    { header: "商家编号", value: (a) => a.agentNo },
+    { header: "商家名称", value: (a) => a.agentName },
     { header: "GMV", value: (a) => money(a.gmv, a.currency) },
     { header: "设备数", value: (a) => a.cabinetCount },
     { header: "在线率", value: (a) => `${(a.onlineRate * 100).toFixed(0)}%` },
   ], performance.data?.list ?? []);
-  const exportAccounts = () => exportCsv<AgentAccount>("代理账号", [
+  const exportAccounts = () => exportCsv<AgentAccount>("商家账号", [
     { header: "账号编号", value: (a) => a.accountNo },
-    { header: "代理编号", value: (a) => a.agentNo },
-    { header: "代理名称", value: (a) => a.agentName },
+    { header: "商家编号", value: (a) => a.agentNo },
+    { header: "商家名称", value: (a) => a.agentName },
     { header: "登录手机", value: (a) => a.loginPhone },
     { header: "状态", value: (a) => (a.status === "ACTIVE" ? "启用" : "停用") },
     { header: "数据范围", value: (a) => (a.dataScope ? SCOPE_LABEL[a.dataScope] : "未设置") },
     { header: "创建时间", value: (a) => fmtTime(a.createdAt) },
   ], accounts.data?.list ?? []);
+  // 经营视图导出全部筛选结果（数据本来就是拼出来的全量），无权限的列导出为空
+  const exportBusiness = () => exportCsv<BizRow>(`商家经营视图-${month || "无分润数据"}`, [
+    { header: "商家编号", value: (r) => r.agent.agentNo },
+    { header: "商家名称", value: (r) => r.agent.name },
+    { header: "类型", value: (r) => AGENT_TYPE[r.agent.agentType ?? "AGENT"].label },
+    { header: "状态", value: (r) => (r.agent.status === "ENABLED" ? "启用" : "停用") },
+    { header: "设备数", value: (r) => r.agent.cabinetCount },
+    { header: `在线率（${periodLabel(REPORT_PERIOD_DEFAULT)}）`, value: (r) => (r.onlineRate == null ? "" : `${(r.onlineRate * 100).toFixed(0)}%`) },
+    { header: "订单数", value: (r) => r.share?.orderCount ?? "" },
+    { header: "交易额", value: (r) => (r.share ? money(r.share.gmv, r.share.currency) : "") },
+    { header: "分润", value: (r) => (r.share ? money(r.share.shareAmount, r.share.currency) : "") },
+    { header: "已结算", value: (r) => (r.share ? money(r.share.settledAmount, r.share.currency) : "") },
+    { header: "待结算", value: (r) => (r.share ? money(r.share.pendingAmount, r.share.currency) : "") },
+  ], bizRows);
   // 无数据时不给导出按钮：导出一个空 CSV 只会让人以为功能坏了
   const exportIf = (fn: () => void, n?: number) => (n ? fn : undefined);
 
@@ -772,6 +918,8 @@ function AgentsInner() {
     : tab === "commission" ? commissions.data?.total
     : tab === "assign" ? assign.data?.total
     : tab === "performance" ? performance.data?.total
+    : tab === "business" ? (bizAgentsQ.data ? bizRows.length : undefined)
+    : tab === "exits" ? (exitsQ.data ? exitRows.length : undefined)
     : accounts.data?.total;
 
   return (
@@ -835,18 +983,18 @@ function AgentsInner() {
           <Toolbar
             search={keyword}
             onSearch={(v) => { setKeyword(v); paging.reset(); }}
-            searchPlaceholder="搜索代理名称 / 编号 / 辖域"
+            searchPlaceholder="搜索商家名称 / 编号 / 辖域"
             onExport={exportIf(exportProfiles, profiles.data?.list?.length)}
             /*
               「新增」走的是**入驻申请**，不是直连建档（2026-09-26 裁决：
-              不论代理商自助注册还是运营端代录，都要过审核）。
+              不论商家自助注册还是运营端代录，都要过审核）。
               点这里开的是代建录入抽屉，提交后进「入驻审核」队列等人放行 ——
               而且**放行的人不能是录入的人**（服务端拦）。
               直连建档的端点已经收掉：它建出来就是启用态、立刻能划拨资产与配分润，
               全程零审核，与同一系统里入驻那条路的治理强度差得太远。
             */
             onAdd={canCreateApply ? () => setApplyForm({ operatorType: "AGENT" }) : undefined}
-            addLabel="新增代理商"
+            addLabel="新增商家"
           >
             <ShowArchivedToggle checked={showArchived} onChange={(v) => { setShowArchived(v); paging.reset(); }} />
           </Toolbar>
@@ -857,8 +1005,8 @@ function AgentsInner() {
             loading={profiles.isLoading} error={profiles.error} onRetry={profiles.refetch}
             rowClassName={archivedRowClass}
             empty={showArchived
-              ? "没有匹配的代理商——换个关键词试试"
-              : "没有在用的代理商——可能都已归档（打开「显示已归档」查看），或换个关键词试试"}
+              ? "没有匹配的商家——换个关键词试试"
+              : "没有在用的商家——可能都已归档（打开「显示已归档」查看），或换个关键词试试"}
           />
         </>
       )}
@@ -867,13 +1015,13 @@ function AgentsInner() {
           <Toolbar
             search={keyword}
             onSearch={(v) => { setKeyword(v); paging.reset(); }}
-            searchPlaceholder="搜索规则号 / 代理编号 / 名称"
+            searchPlaceholder="搜索规则号 / 商家编号 / 名称"
             onExport={exportIf(exportCommissions, commissions.data?.list?.length)}
-            onAdd={canConfigCommission ? () => setCommissionForm({ status: "ACTIVE", basis: "GMV", mode: "CHANNEL_SPLIT", rate: 0.1 }) : undefined}
+            onAdd={canConfigCommission ? () => setCommissionForm({ basis: "GMV", mode: "CHANNEL_SPLIT", rate: 0.1, currency: DEFAULT_CURRENCY }) : undefined}
             addLabel="新增分润规则"
           />
           <DataTable rowKey={(c: AgentCommission) => c.ruleNo} columns={commissionCols} rows={commissions.data?.list} loading={commissions.isLoading} error={commissions.error} onRetry={commissions.refetch}
-            empty="暂无分润规则——代理商需配置规则后才会参与分润，可点「新增分润规则」建一条" />
+            empty="暂无分润规则——商家需配置规则后才会参与分润，可点「新增分润规则」建一条" />
         </>
       )}
       {tab === "assign" && (
@@ -881,7 +1029,7 @@ function AgentsInner() {
           <Toolbar
             search={keyword}
             onSearch={(v) => { setKeyword(v); paging.reset(); }}
-            searchPlaceholder="搜索代理编号 / 名称 / 区域"
+            searchPlaceholder="搜索商家编号 / 名称 / 区域"
             onExport={exportIf(exportAssign, assign.data?.list?.length)}
             onAdd={canAssign ? () => setAssignForm({ agentNo: "", cabinetNos: "", siteNos: "" }) : undefined}
             addLabel="划拨设备/点位"
@@ -894,12 +1042,12 @@ function AgentsInner() {
             <ReadOnlyNotice what="划拨" perm="agent:scope:assign" note="可查看归属汇总与划拨流水" />
           )}
           <DataTable rowKey={(a: AgentAssignment) => a.agentNo} columns={assignCols} rows={assign.data?.list} loading={assign.isLoading} error={assign.error} onRetry={assign.refetch}
-            empty="没有匹配的代理商——划拨以代理商为单位进行，先在「代理商档案」建档，或换个关键词" />
+            empty="没有匹配的商家——划拨以商家为单位进行，先在「商家档案」建档，或换个关键词" />
         </>
       )}
       {tab === "performance" && (
         <>
-          <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); paging.reset(); }} searchPlaceholder="搜索代理编号 / 名称"
+          <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); paging.reset(); }} searchPlaceholder="搜索商家编号 / 名称"
             onExport={exportIf(exportPerformance, performance.data?.list?.length)}>
             <FilterSelect
               value={period}
@@ -909,7 +1057,7 @@ function AgentsInner() {
             />
           </Toolbar>
           <DataTable rowKey={(a: AgentPerformance) => a.agentNo} columns={perfCols} rows={performance.data?.list} loading={performance.isLoading} error={performance.error} onRetry={performance.refetch}
-            empty={`${periodLabel(period)}内没有绩效数据——统计截至昨日（T+1），代理名下站点需先产生订单；可换更长周期，或先在「设备/点位划拨」把资产划给代理`} />
+            empty={`${periodLabel(period)}内没有绩效数据——统计截至昨日（T+1），商家名下站点需先产生订单；可换更长周期，或先在「设备/点位划拨」把资产划给商家`} />
         </>
       )}
       {tab === "accounts" && (
@@ -917,13 +1065,74 @@ function AgentsInner() {
           <Toolbar
             search={keyword}
             onSearch={(v) => { setKeyword(v); paging.reset(); }}
-            searchPlaceholder="搜索账号编号 / 代理 / 登录手机"
+            searchPlaceholder="搜索账号编号 / 商家 / 登录手机"
             onExport={exportIf(exportAccounts, accounts.data?.list?.length)}
             onAdd={canEditAccount ? () => setAccountForm({ status: "ACTIVE" }) : undefined}
-            addLabel="新增代理账号"
+            addLabel="新增商家账号"
           />
           <DataTable rowKey={(a: AgentAccount) => a.accountNo} columns={accountCols} rows={accounts.data?.list} loading={accounts.isLoading} error={accounts.error} onRetry={accounts.refetch}
-            empty="暂无代理账号——代理商需要账号才能登录代理端，可点「新增代理账号」开通" />
+            empty="暂无商家账号——商家需要账号才能登录商家端，可点「新增商家账号」开通" />
+        </>
+      )}
+
+      {tab === "business" && (
+        <>
+          <Toolbar
+            search={keyword}
+            onSearch={(v) => { setKeyword(v); paging.reset(); }}
+            searchPlaceholder="搜索商家编号 / 名称 / 辖域"
+            onExport={exportIf(exportBusiness, bizRows.length)}
+          >
+            {canReadShare && bizMonths.length > 0 && (
+              <FilterSelect
+                value={month}
+                onChange={(v) => { setBizMonth(v); paging.reset(); }}
+                options={bizMonths.map((m) => ({ value: m, label: `${m} 分润` }))}
+                aria-label="按分润月份筛选"
+              />
+            )}
+          </Toolbar>
+          <p className="mb-3 txt-caption text-muted-foreground">
+            设备数为当前值；在线率取{periodLabel(REPORT_PERIOD_DEFAULT)}；订单数至待结算取所选月份的分润汇总，「—」表示该月没有分润记录。
+          </p>
+          {(!canReadPerf || !canReadShare) && (
+            <Notice>
+              {[
+                !canReadPerf && "在线率需要 agent:performance:read",
+                !canReadShare && "订单数、交易额、分润与结算需要 finance:share_record:read",
+              ].filter(Boolean).join("；")}。当前角色没有，这几列显示为「—」。
+            </Notice>
+          )}
+          <DataTable
+            rowKey={(r: BizRow) => r.agent.agentNo}
+            columns={bizCols}
+            rows={pageOf(bizRows)}
+            loading={bizAgentsQ.isLoading} error={bizAgentsQ.error} onRetry={bizAgentsQ.refetch}
+            empty={keyword
+              ? "没有匹配的商家——换个关键词试试"
+              : "还没有在用的商家——商家经入驻审核通过后出现在这里，可从「入驻审核」代建录入"}
+          />
+        </>
+      )}
+
+      {tab === "exits" && (
+        <>
+          <Toolbar
+            search={keyword}
+            onSearch={(v) => { setKeyword(v); paging.reset(); }}
+            searchPlaceholder="搜索清退单号 / 商家编号 / 名称"
+          />
+          <Notice>
+            清退从「商家档案 › 详情 › 发起清退」开始，发起即停用该商家。这里列出所有在途的清退；
+            已完成的清退随商家一起归档，在商家档案打开「显示已归档」查看。
+          </Notice>
+          <DataTable
+            rowKey={(r: ExitRow) => r.exit.exitNo}
+            columns={exitCols}
+            rows={pageOf(exitRows)}
+            loading={exitsQ.isLoading} error={exitsQ.error} onRetry={exitsQ.refetch}
+            empty={keyword ? "没有匹配的清退单——换个关键词试试" : "没有在途的清退——当前所有商家都在正常经营或已完成清退"}
+          />
         </>
       )}
 
@@ -932,10 +1141,10 @@ function AgentsInner() {
       <Drawer
         open={!!edit}
         onOpenChange={(o) => !o && setEdit(null)}
-        title={edit?.agentNo ? `代理商 ${edit.agentNo}` : "新增代理商"}
+        title={edit?.agentNo ? `商家 ${edit.agentNo}` : "新增商家"}
         desc={edit?.agentNo
           ? "档案与默认分润（分润执行/打款经 nearpay）"
-          : "编号由服务端取，建完可在「代理账号」里给他开登录号"}
+          : "编号由服务端取，建完可在「商家账号」里给他开登录号"}
         footer={
           <>
             <Button variant="outline" onClick={() => setEdit(null)}>取消</Button>
@@ -956,7 +1165,7 @@ function AgentsInner() {
         <Field label="辖域"><Input value={form.regionScope ?? ""} onChange={(e) => setForm({ ...form, regionScope: e.target.value })} /></Field>
         {/*
           联系方式拆成三格（V123）。原先是一个自由文本框，生产 9 条里**全是纯手机号** ——
-          联系人是谁、邮箱是什么无处可放，而「开通代理端登录」要的恰恰是**结构化的手机号**
+          联系人是谁、邮箱是什么无处可放，而「开通商家端登录」要的恰恰是**结构化的手机号**
           （自由文本里可能是「Ali +971500001234」，取不出来）。
         */}
         <Field label="联系人"><Input value={form.contactName ?? ""} onChange={(e) => setForm({ ...form, contactName: e.target.value })} placeholder="姓名" /></Field>
@@ -1067,8 +1276,8 @@ function AgentsInner() {
       <FormDrawer
         open={!!accountForm}
         onOpenChange={(o) => !o && setAccountForm(null)}
-        titleNew="新增代理账号"
-        titleEdit={`编辑代理账号 ${accountForm?.accountNo ?? ""}`}
+        titleNew="新增商家账号"
+        titleEdit={`编辑商家账号 ${accountForm?.accountNo ?? ""}`}
         isEdit={!!accountForm?.accountNo}
         fields={accountFields}
         value={(accountForm ?? {}) as Record<string, unknown>}
@@ -1111,7 +1320,7 @@ function AgentsInner() {
       <Drawer
         open={!!recordsFor}
         onOpenChange={(o) => { if (!o) { setRecordsFor(null); recPaging.reset(); } }}
-        title={recordsFor?.agentNo ? `划拨流水 · ${recordsFor.agentName}（${recordsFor.agentNo}）` : "划拨流水（全部代理）"}
+        title={recordsFor?.agentNo ? `划拨流水 · ${recordsFor.agentName}（${recordsFor.agentNo}）` : "划拨流水（全部商家）"}
         desc="资产归属的每次变更都在此留痕，含操作人与时间"
         width="w-[760px]"
       >
@@ -1120,7 +1329,7 @@ function AgentsInner() {
           columns={recordCols}
           rows={records.data?.list}
           loading={records.isLoading} error={records.error} onRetry={records.refetch}
-          empty="暂无划拨流水——该代理名下的资产还没有过划拨或回收操作"
+          empty="暂无划拨流水——该商家名下的资产还没有过划拨或回收操作"
         />
         {records.data && <Pagination page={recPaging.page} size={recPaging.size} total={records.data.total} onPage={recPaging.setPage} onSize={recPaging.setSize} />}
       </Drawer>

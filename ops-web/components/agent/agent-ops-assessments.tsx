@@ -61,7 +61,7 @@ export function AgentOpsAssessments({ agentNo }: { agentNo: string }) {
     enabled: canRead,
   });
   if (!canRead) {
-    return <Notice>当前角色无代理绩效查看权限（agent:performance:read），看不到运维考核。</Notice>;
+    return <Notice>当前角色无商家绩效查看权限（agent:performance:read），看不到运维考核。</Notice>;
   }
   return (
     <div className="space-y-3">
@@ -76,7 +76,7 @@ export function AgentOpsAssessments({ agentNo }: { agentNo: string }) {
         loading={q.isLoading}
         error={q.error}
         onRetry={q.refetch}
-        empty="还没有考核记录 —— 考核每月初由定时任务对上月跑一次，新签约或上月没有运维工单的代理在跑批后才会出现"
+        empty="还没有考核记录 —— 考核每月初由定时任务对上月跑一次，新签约或上月没有运维工单的商家在跑批后才会出现"
       />
     </div>
   );

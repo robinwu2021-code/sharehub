@@ -123,6 +123,35 @@ const PATCHES: { file: string; mustContain: string; apply: (rows: Row[]) => void
       );
     },
   },
+  {
+    // 代理商管理 → 商家管理，按运营顺序重排（OM01）。按旧编号定点更新、互换分润与划拨两行，
+    // 撤「代理收益结算」深链，插经营视图与退出与清算两叶。重放顺序与迁移语句一致。
+    file: "V148__menu_agent_section_by_ops_order.sql",
+    mustContain: "UPDATE iam_menu SET menu_no = 'M_agent__x4'",
+    apply: (rows) => {
+      const at = (no: string) => rows.find((r) => r.menu_no === no)!;
+      Object.assign(at("M_agent"), { name: "商家管理", name_en: "Merchants", name_ar: "التجار" });
+      rows.splice(rows.findIndex((r) => r.menu_no === "M_agent__6" && r.path === "/finance?tab=settlements"), 1);
+      Object.assign(at("M_agent__1"), { group_name: "入驻与档案", sort: "1" });
+      Object.assign(at("M_agent__2"), { name: "商家档案", name_en: "Merchant Profiles", name_ar: "ملفات التجار", group_name: "入驻与档案", sort: "2" });
+      Object.assign(at("M_agent__3"), { name: "商家账号", name_en: "Merchant Accounts", name_ar: "حسابات التجار",
+        perm: "agent:account:manage", group_name: "入驻与档案", sort: "3" });
+      const assign = at("M_agent__4");
+      const commission = at("M_agent__5");
+      Object.assign(commission, { menu_no: "M_agent__4", name: "商家分润规则", name_en: "Merchant Commission", name_ar: "عمولة التجار",
+        group_name: "分润与划拨", sort: "4" });
+      Object.assign(assign, { menu_no: "M_agent__5", group_name: "分润与划拨", sort: "5" });
+      Object.assign(at("M_agent__7"), { name: "商家绩效", name_en: "Merchant Performance", name_ar: "أداء التجار", group_name: "经营与退出", sort: "7" });
+      rows.push(
+        { menu_no: "M_agent__6", parent_no: "M_agent", name: "商家经营视图", name_en: "Merchant Business", name_ar: "أعمال التجار", type: "ITEM",
+          path: "/agents?tab=business", icon: "NULL", group_name: "经营与退出", sort: "6", perm: "agent:agent:read", phase: "1", ready: "1",
+          module: "NULL", modules: "NULL", match_paths: "NULL", pin_bottom: "0", portal_for: "NULL" },
+        { menu_no: "M_agent__8", parent_no: "M_agent", name: "退出与清算", name_en: "Exit & Liquidation", name_ar: "الخروج والتصفية", type: "ITEM",
+          path: "/agents?tab=exits", icon: "NULL", group_name: "经营与退出", sort: "8", perm: "agent:agent:update", phase: "2", ready: "1",
+          module: "NULL", modules: "NULL", match_paths: "NULL", pin_bottom: "0", portal_for: "NULL" },
+      );
+    },
+  },
 ];
 
 const COLS = [

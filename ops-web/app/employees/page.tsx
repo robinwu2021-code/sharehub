@@ -207,7 +207,7 @@ const PERM_MODULE_LABEL: Record<string, string> = {
   // 模块名跟着菜单走：「计费定价」L1 已于 2026-09-23 撤销，其内容并入运营管理 › 计费与调价
   pricing: "计费与调价", finance: "财务分润", workorder: "工单运维", user: "用户运营",
   marketing: "营销", cs: "客服", org: "员工与权限", report: "数据报表",
-  system: "系统配置", agent: "代理商管理",
+  system: "系统配置", agent: "商家管理",
 };
 /**
  * 资源层中文名：后端 iam_permission 只有 code/module/name，**没有**资源层的名字。
