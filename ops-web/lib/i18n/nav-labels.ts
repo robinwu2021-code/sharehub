@@ -164,7 +164,7 @@ const NAV: Record<string, Pair> = {
   "分润明细": { en: "Share Records", ar: "سجلات التقسيم" },
   "账务分录": { en: "Ledger", ar: "القيود المحاسبية" },
   "结算单": { en: "Settlements", ar: "التسويات" },
-  "提现审核": { en: "Withdrawals", ar: "طلبات السحب" },
+  "付款任务": { en: "Payout Tasks", ar: "مهام الدفع" },
   "收款账户": { en: "Payout Accounts", ar: "حسابات التحويل" },
   "对账": { en: "Reconcile", ar: "المطابقة" },
   "发票": { en: "Invoices", ar: "الفواتير" },

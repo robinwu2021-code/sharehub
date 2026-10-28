@@ -70,7 +70,7 @@ settlement›分润统计
 settlement›站点分成
 settlement›分成方分成
 settlement›结算单
-settlement›提现审核
+settlement›付款任务
 settlement›收款账户
 finance›对账
 finance›账务分录
@@ -238,7 +238,7 @@ settlement›分润统计
 settlement›站点分成
 settlement›分成方分成
 settlement›结算单
-settlement›提现审核
+settlement›付款任务
 settlement›收款账户
 finance›对账
 finance›账务分录
@@ -334,7 +334,7 @@ settlement›分润统计
 settlement›站点分成
 settlement›分成方分成
 settlement›结算单
-settlement›提现审核
+settlement›付款任务
 finance›调整单
 report›设备运营分析
 report›点位坪效

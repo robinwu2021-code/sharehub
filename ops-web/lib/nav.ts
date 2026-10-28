@@ -393,7 +393,7 @@ export const NAV: NavSection[] = [
     // 「代理分润配置」深链撤销：它指向商家管理 › 商家分润规则，跨 L1 深链点进去面包屑与高亮跳走。
     // 「付款登记」（OM08-06）暂不建叶：结算单维度的付款没有后端实体与端点（契约草案在服务端评审 S11 §四）。
     // 落地页是结算单（href），不是第一项分润规则。
-    // ⚠️ 菜单真源在库里：本段与财务管理、运营管理段的行由 V154 重编号，改这里要同步新开迁移（见 nav-seed.test.ts）。
+    // ⚠️ 菜单真源在库里：本段与财务管理、运营管理段的行由 V154 重编号、V160 改名，改这里要同步新开迁移（见 nav-seed.test.ts）。
     key: "settlement", label: "结算", icon: "HandCoins", module: "finance", href: "/settlement?tab=settlements",
     match: ["/settlement", "/operation/site-sharing", "/operation/payee-sharing"],
     children: [
@@ -406,8 +406,10 @@ export const NAV: NavSection[] = [
         ["payee-sharing", "分成方分成", "finance:share_rule:read", "分润"],
       ]),
       { href: "/settlement?tab=settlements", label: "结算单", perm: "finance:settlement:read", group: "结算" },
-      { href: "/settlement?tab=withdrawals", label: "提现审核", perm: "finance:withdrawal:read", group: "付款" },
-      // 排在提现审核之后：没有收款账户，提现审批根本放行不了（B3）
+      // 2026-10-28 「提现审核」更名「付款任务」（V160）：一期提现就是平台主动付款（商家一期方案 D8 / D12），
+      // 商家不申请；页签顶部是付款任务区块（5c33ee42），下面仍是提现单列表。tab key 不变，旧链接照常。
+      { href: "/settlement?tab=withdrawals", label: "付款任务", perm: "finance:withdrawal:read", group: "付款" },
+      // 排在付款任务之后：没有收款账户，付款根本放行不了（B3）
       { href: "/settlement?tab=payout-accounts", label: "收款账户", perm: "finance:payout_account:read", group: "付款" },
     ],
   },

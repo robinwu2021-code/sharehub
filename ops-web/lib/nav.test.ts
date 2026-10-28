@@ -139,7 +139,7 @@ const LEAF_TUPLES = [
   "/operation/site-sharing|站点分成|finance:share_rule:read||分润",
   "/operation/payee-sharing|分成方分成|finance:share_rule:read||分润",
   "/settlement?tab=settlements|结算单|finance:settlement:read||结算",
-  "/settlement?tab=withdrawals|提现审核|finance:withdrawal:read||付款",
+  "/settlement?tab=withdrawals|付款任务|finance:withdrawal:read||付款",
   "/settlement?tab=payout-accounts|收款账户|finance:payout_account:read||付款",
   // 2026-10-28 财务管理（OM07）：对账 → 账务 → 发票；调整单从结算单的视图升为页签；「代理分润配置」深链已撤
   "/finance?tab=reconcile|对账|finance:recon:read|1|对账",
@@ -291,7 +291,7 @@ describe("L3 叶子过滤（4.2-2）", () => {
   const settlement = () => sec("settlement");
   it("VIEWER 的结算：规则/明细/统计/两项分成/结算单/提现，无收款账户；财务管理只有调整单", () => {
     const labels = visibleLeaves(settlement(), "VIEWER").map((l) => l.label);
-    expect(labels).toEqual(["分润规则", "分润明细", "分润统计", "站点分成", "分成方分成", "结算单", "提现审核"]);
+    expect(labels).toEqual(["分润规则", "分润明细", "分润统计", "站点分成", "分成方分成", "结算单", "付款任务"]);
     expect(visibleLeaves(sec("finance"), "VIEWER").map((l) => l.label)).toEqual(["调整单"]);
   });
   // 2026-09-23 B3：伙伴账新增「收款账户」—— 没有它提现审批放行不了，所以它和提现审核同组、同样给 FINANCE。
@@ -406,9 +406,9 @@ describe("默认落地与面包屑", () => {
     expect(breadcrumb("/work-orders", null, "board", "OPS")).toEqual(["运维管理", "工单", "工单看板"]);
     expect(breadcrumb("/cs", "sessions", null, "ADMIN")).toEqual(["运维管理", "客服", "客服会话"]);
   });
-  it("面包屑：/settlement?tab=withdrawals → 提现审核 2026-09-23 升为 L0，不再被锁，面包屑到 L3", () => {
+  it("面包屑：/settlement?tab=withdrawals → 付款任务 2026-09-23 升为 L0，不再被锁，面包屑到 L3", () => {
     // 旧断言是 Phase 2 被锁故只到 L1。分级矩阵 §六：提现是分钱的最后一步，缺了业务开不了张 → L0。
-    expect(breadcrumb("/settlement/", "withdrawals", null, "FINANCE")).toEqual(["结算", "付款", "提现审核"]);
+    expect(breadcrumb("/settlement/", "withdrawals", null, "FINANCE")).toEqual(["结算", "付款", "付款任务"]);
     expect(breadcrumb("/operation/site-sharing", null, null, "FINANCE")).toEqual(["结算", "分润", "站点分成"]);
   });
   it("面包屑：经营看板无子功能，只有一级", () => {

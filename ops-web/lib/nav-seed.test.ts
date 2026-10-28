@@ -401,6 +401,15 @@ const PATCHES: { file: string; mustContain: string; apply: (rows: Row[]) => void
         pin_bottom: "0", portal_for: "NULL" });
     },
   },
+  {
+    // 结算 › 付款：「提现审核」更名「付款任务」（一期提现 = 平台主动付款，D8 / D12）。
+    file: "V160__menu_payout_task_rename.sql",
+    mustContain: "UPDATE iam_menu SET name = '付款任务'",
+    apply: (rows) => {
+      Object.assign(rows.find((r) => r.menu_no === "M_settlement__7")!,
+        { name: "付款任务", name_en: "Payout Tasks", name_ar: "مهام الدفع" });
+    },
+  },
 ];
 
 const COLS = [

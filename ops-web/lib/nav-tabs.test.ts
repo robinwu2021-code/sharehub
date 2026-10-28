@@ -14,7 +14,7 @@ describe("navTabs 取名", () => {
     // 整理前 /finance 页面把这个 tab 叫「提现」，菜单叫「提现审核」——
     // 同一个功能两个名字，改一处不改另一处没有任何东西会报错
     const [tab] = navTabs("/settlement", ["withdrawals"], "ADMIN");
-    expect(tab.label).toBe("提现审核");
+    expect(tab.label).toBe("付款任务"); // 2026-10-28 由「提现审核」更名（V160）
   });
 
   it("保序：按传入顺序返回，不按菜单顺序", () => {
