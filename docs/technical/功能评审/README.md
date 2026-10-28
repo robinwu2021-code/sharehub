@@ -13,22 +13,22 @@
 | S2 | [S2-拓展与签约](S2-拓展与签约.md) | 28 | 5 | — | 15 | 8 |
 | S3 | [S3-建站点与点位](S3-建站点与点位.md) | 26 | 5 | — | 10 | 11 |
 | S4 | [S4-设备采购入库](S4-设备采购入库.md) | 21 | 10 | 8 | 7 | 4 |
-| S5 | [S5-设备上线与归属](S5-设备上线与归属.md) | 28 | 8 | 4 | 13 | 7 |
+| S5 | [S5-设备上线与归属](S5-设备上线与归属.md) | 30 | 9 | 4 | 14 | 7 |
 | S6 | [S6-定价与借还付款](S6-定价与借还付款.md) | 31 | 7 | — | 19 | 5 |
 | S7 | [S7-异常收费与售后](S7-异常收费与售后.md) | 23 | 6 | — | 13 | 4 |
 | S8 | [S8-开票](S8-开票.md) | 24 | 9 | 6 | 13 | 2 |
 | S9 | [S9-监控告警工单客服](S9-监控告警工单客服.md) | 32 | 5 | — | 19 | 8 |
-| S10 | [S10-资产流转与撤场](S10-资产流转与撤场.md) | 23 | 4 | — | 14 | 5 |
+| S10 | [S10-资产流转与撤场](S10-资产流转与撤场.md) | 24 | 5 | — | 14 | 5 |
 | S11 | [S11-分钱](S11-分钱.md) | 30 | 8 | 1 | 15 | 7 |
 | S12 | [S12-账务与对账](S12-账务与对账.md) | 17 | 6 | 2 | 8 | 3 |
 | S13 | [S13-经营分析与报表](S13-经营分析与报表.md) | 26 | 4 | — | 14 | 8 |
 | S14 | [S14-用户运营与营销](S14-用户运营与营销.md) | 29 | 6 | — | 15 | 8 |
 | S15 | [S15-系统配置与基础资料](S15-系统配置与基础资料.md) | 22 | 1 | — | 14 | 7 |
-| **合计** | | **420** | **98** | 23 | **220** | **102** |
+| **合计** | | **423** | **100** | 23 | **221** | **102** |
 
 ## 二、P0 清单
 
-### 2.1 无前提的 P0（75）
+### 2.1 无前提的 P0（77）
 
 | 编号 | 模块 | 功能 | 内容 | 规模 | 依赖 |
 |---|---|---|---|---|---|
@@ -60,6 +60,7 @@
 | [OPT-S5-02](S5-设备上线与归属.md) | sharehub-svc-core | DEV-01 | 导入改 CabinetImportReq、不收 siteNo，逐行走与新建相同的归属派生，点位不存在 / 已归档 /… | S | — |
 | [OPT-S5-03](S5-设备上线与归属.md) | sharehub-svc-core | DEV-01 | 新表 dev_cabinet_status_log，transit 同事务写（含原因、原新点位、操作人） | M | — |
 | [OPT-S5-27](S5-设备上线与归属.md) | 跨模块 | 跨功能 | /internal/\*\* 全前缀验服务凭证 | S | OPT-S3-20 · OPT-S5-18 |
+| [OPT-S5-29](S5-设备上线与归属.md) | sharehub-svc-platform | OPR-05 · DEV-01 | 从出库池绑定（U1、U2，一期主流程） | M | OPT-S10-10 · OPT-S10-24 · OPT-S5-11 |
 | [OPT-S6-01](S6-定价与借还付款.md) | sharehub-svc-core | SAL-09 · SAL-10 | 收费方案写入面 = 费用项 | M | — |
 | [OPT-S6-02](S6-定价与借还付款.md) | sharehub-svc-core | SAL-09 | 封顶名实一致 | M | — |
 | [OPT-S6-10](S6-定价与借还付款.md) | sharehub-svc-platform | NET-08 · SAL-02 | 买断价单一来源（D4） | S | — |
@@ -85,6 +86,7 @@
 | [OPT-S10-02](S10-资产流转与撤场.md) | sharehub-svc-core | DEV-07 | 仓库主数据 | M | OPT-S4-04 |
 | [OPT-S10-10](S10-资产流转与撤场.md) | sharehub-svc-core | DEV-08 | 新表 dev_movement_log | M | OPT-S0-22 · OPT-S5-03 |
 | [OPT-S10-11](S10-资产流转与撤场.md) | sharehub-svc-core | DEV-08 | 写入方接入 | M | OPT-S4-05 · OPT-S5-01 |
+| [OPT-S10-24](S10-资产流转与撤场.md) | sharehub-svc-core | DEV-07 | 出库给商家（U1，一期主流程） | M | OPT-S10-01 · OPT-S5-29 |
 | [OPT-S11-01](S11-分钱.md) | sharehub-svc-finance | STL-03 | 确认即冻结 | M | — |
 | [OPT-S11-02](S11-分钱.md) | sharehub-svc-finance | FIN-02 | 已出账调整项不可作废 | S | — |
 | [OPT-S11-03](S11-分钱.md) | sharehub-svc-finance | STL-04 | 提现申请重写 | M | OPT-S11-04 |
@@ -138,8 +140,8 @@
 
 | 模块 | P0 | P1 | P2 | 合计 | 约人天 | 其中 P0 人天 |
 |---|---:|---:|---:|---:|---:|---:|
-| `sharehub-svc-platform` | 23 | 72 | 37 | 132 | 118 | 22 |
-| `sharehub-svc-core` | 34 | 62 | 23 | 119 | 122 | 42 |
+| `sharehub-svc-platform` | 24 | 72 | 37 | 133 | 120 | 24 |
+| `sharehub-svc-core` | 35 | 63 | 23 | 121 | 126 | 44 |
 | `sharehub-svc-ops` | 4 | 13 | 5 | 22 | 20 | 5 |
 | `sharehub-svc-finance` | 22 | 30 | 7 | 59 | 84 | 52 |
 | `sharehub-svc-report 🆕` | 4 | 11 | 5 | 20 | 32 | 12 |
@@ -148,7 +150,7 @@
 | `sharehub-common` | 2 | 4 | 1 | 7 | 14 | 4 |
 | `sharehub-app` | 0 | 4 | 2 | 6 | 4 | 0 |
 | `跨模块` | 4 | 18 | 17 | 39 | 42 | 10 |
-| **合计** | 98 | 220 | 102 | 420 | **471** | **164** |
+| **合计** | 100 | 221 | 102 | 423 | **477** | **168** |
 
 ## 四、依赖关系
 
@@ -171,11 +173,11 @@
 | [OPT-S11-04](S11-分钱.md) | P0 | 4 | 应付台账 |
 | [OPT-S0-23](S0-平台底座.md) | P1 | 3 | 事件信封 |
 | [OPT-S0-28](S0-平台底座.md) | P0 | 3 | 基类拆 create / update |
+| [OPT-S5-29](S5-设备上线与归属.md) | P0 | 3 | 从出库池绑定（U1、U2，一期主流程） |
 | [OPT-S5-15](S5-设备上线与归属.md) | P0 | 3 | 指令生命周期 |
+| [OPT-S5-03](S5-设备上线与归属.md) | P0 | 3 | 新表 dev_cabinet_status_log，transit 同事务写（含原因、原新点位、操作人） |
 | [OPT-S6-21](S6-定价与借还付款.md) | P0 | 3 | 结算条件迁移（D2） |
 | [OPT-S7-10](S7-异常收费与售后.md) | P0 | 3 | 退款入口闸 |
-| [OPT-S13-02](S13-经营分析与报表.md) | P0 | 3 | 金额口径重定 |
-| [OPT-S1-25](S1-商家入驻.md) | P0 | 2 | 商家分润规则页面编辑的 agt_commission 不参与分润计算 |
 
 ### 4.2 依赖了非 P0 任务的 P0（排期时须一并提前）
 
@@ -183,6 +185,7 @@
 |---|---|
 | [OPT-S0-21](S0-平台底座.md) | OPT-S0-23（P1） |
 | [OPT-S5-27](S5-设备上线与归属.md) | OPT-S3-20（P2） · OPT-S5-18（P1） |
+| [OPT-S5-29](S5-设备上线与归属.md) | OPT-S5-11（P1） |
 | [OPT-S6-21](S6-定价与借还付款.md) | OPT-S0-29（P1） |
 | [OPT-S7-09](S7-异常收费与售后.md) | OPT-S6-18（P1） |
 | [OPT-S8-13](S8-开票.md) | OPT-S6-17（P1） |
@@ -277,6 +280,7 @@
 | [OPT-S5-02](S5-设备上线与归属.md) | P0 | S | sharehub-svc-core | DEV-01 | API · CODE · TEST | 导入改 CabinetImportReq、不收 siteNo，逐行走与新建相同的归属派生，点位不存在 / 已归档 /… |
 | [OPT-S5-03](S5-设备上线与归属.md) | P0 | M | sharehub-svc-core | DEV-01 | DB · API · CODE | 新表 dev_cabinet_status_log，transit 同事务写（含原因、原新点位、操作人） |
 | [OPT-S5-27](S5-设备上线与归属.md) | P0 | S | 跨模块 | 跨功能 | CODE · TEST | /internal/\*\* 全前缀验服务凭证 |
+| [OPT-S5-29](S5-设备上线与归属.md) | P0 | M | sharehub-svc-platform | OPR-05 · DEV-01 | DB · API · CODE · TEST | 从出库池绑定（U1、U2，一期主流程） |
 | [OPT-S6-01](S6-定价与借还付款.md) | P0 | M | sharehub-svc-core | SAL-09 · SAL-10 | DB · API · CODE · TEST | 收费方案写入面 = 费用项 |
 | [OPT-S6-02](S6-定价与借还付款.md) | P0 | M | sharehub-svc-core | SAL-09 | CODE · TEST · DB | 封顶名实一致 |
 | [OPT-S6-10](S6-定价与借还付款.md) | P0 | S | sharehub-svc-platform | NET-08 · SAL-02 | API · CODE · TEST | 买断价单一来源（D4） |
@@ -302,6 +306,7 @@
 | [OPT-S10-02](S10-资产流转与撤场.md) | P0 | M | sharehub-svc-core | DEV-07 | DB · API · CODE | 仓库主数据 |
 | [OPT-S10-10](S10-资产流转与撤场.md) | P0 | M | sharehub-svc-core | DEV-08 | DB · CODE | 新表 dev_movement_log |
 | [OPT-S10-11](S10-资产流转与撤场.md) | P0 | M | sharehub-svc-core | DEV-08 | CODE · TEST | 写入方接入 |
+| [OPT-S10-24](S10-资产流转与撤场.md) | P0 | M | sharehub-svc-core | DEV-07 | DB · API · CODE · TEST | 出库给商家（U1，一期主流程） |
 | [OPT-S11-01](S11-分钱.md) | P0 | M | sharehub-svc-finance | STL-03 | DB · CODE · TEST | 确认即冻结 |
 | [OPT-S11-02](S11-分钱.md) | P0 | S | sharehub-svc-finance | FIN-02 | CODE · TEST | 已出账调整项不可作废 |
 | [OPT-S11-03](S11-分钱.md) | P0 | M | sharehub-svc-finance | STL-04 | API · CODE · TEST | 提现申请重写 |
@@ -413,13 +418,14 @@
 | [OPT-S5-08](S5-设备上线与归属.md) | P1 | M | sharehub-svc-platform | OPR-05 | DB · CODE · TEST | 划拨回写保序 |
 | [OPT-S5-09](S5-设备上线与归属.md) | P1 | M | sharehub-svc-platform | OPR-05 | DB · CODE | ADR-019 ③ 对账 |
 | [OPT-S5-10](S5-设备上线与归属.md) | P1 | S | sharehub-svc-platform | OPR-05 | API · CODE · DB | 操作人取会话、请求体删 operator / operatorName |
-| [OPT-S5-11](S5-设备上线与归属.md) | P1 | S | sharehub-svc-platform | OPR-05 | CODE · 文档 | 需裁决 |
+| [OPT-S5-11](S5-设备上线与归属.md) | P1 | S | sharehub-svc-platform | OPR-05 | CODE · 文档 | 已裁决 A |
 | [OPT-S5-17](S5-设备上线与归属.md) | P1 | M | sharehub-svc-gateway | GW-01 | CODE · DB · TEST | 网关独立部署 |
 | [OPT-S5-18](S5-设备上线与归属.md) | P1 | M | sharehub-svc-gateway | GW-01 | API · DB | 厂商目录对运营端改 /api/ops/vendors\*（现网 nginx 不转发 /internal），经 Ven… |
 | [OPT-S5-19](S5-设备上线与归属.md) | P1 | S | sharehub-svc-core | DEV-10 | DB · API · CODE | 未知设备 / 未知码不消费 eventId |
 | [OPT-S5-20](S5-设备上线与归属.md) | P1 | S | sharehub-svc-core | DEV-10 | CODE · TEST | 在线统一由心跳窗口派生（可借判定改用派生值） |
 | [OPT-S5-21](S5-设备上线与归属.md) | P1 | S | sharehub-svc-core | DEV-10 | DB · API | 监控视图改读 dev_cabinet（带范围） |
 | [OPT-S5-23](S5-设备上线与归属.md) | P1 | S | sharehub-svc-core | DEV-11 | API · CODE | 远控 |
+| [OPT-S5-30](S5-设备上线与归属.md) | P1 | M | sharehub-svc-core | DEV-01 | CODE · TEST | 撤机两种去向 |
 | [OPT-S6-03](S6-定价与借还付款.md) | P1 | S | sharehub-svc-core | SAL-09 | CODE | 取价健壮性 |
 | [OPT-S6-04](S6-定价与借还付款.md) | P1 | S | sharehub-svc-core | SAL-09 | DB · API | 方案加最长时限、遗失费（或合一）字段并进快照 |
 | [OPT-S6-08](S6-定价与借还付款.md) | P1 | S | sharehub-svc-platform | SYS-05 | API · CODE | 下线「计费默认值」分区 |
