@@ -7,7 +7,7 @@ import type { Role } from "./auth";
 
 /** 与 app/finance/page.tsx 的 TAB_KEYS 同一组，用于「主属 section」判定 */
 const FINANCE_KEYS = ["rules", "records", "summary", "settlements", "ledger",
-  "withdrawals", "reconcile", "invoices", "recharges"] as const;
+  "withdrawals", "reconcile", "invoices"] as const; // recharges 2026-10-28 搬到用户管理（OM05）
 
 describe("navTabs 取名", () => {
   it("名字来自菜单，不是页面自己写的那一份", () => {

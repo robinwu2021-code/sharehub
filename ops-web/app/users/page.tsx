@@ -35,6 +35,7 @@ import { notify } from "@/lib/notify";
 import { exportCsv } from "@/lib/export-csv";
 // 等级名与次卡状态：用户详情抽屉与「销售管理 › 会员」共用一份
 import { LEVEL, CARD_STATUS } from "@/components/user/membership";
+import { RechargeOrdersPanel } from "@/components/user/recharge-orders";
 import {
   CREDIT_SCORE_MIN, CREDIT_SCORE_MAX, RISK_MEDIUM_BELOW, riskLevelOf,
   MEMBER_CARD_LABEL, MEMBER_CARD_NONE, PROFILE_RECENT_TXNS,
@@ -49,7 +50,9 @@ import type {
 // tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）。
 // 「用户」在菜单里叫「用户列表」——以菜单为准。
 // 2026-10-28「会员套餐」「会员 / 次卡」搬到「销售管理 › 会员」（components/user/membership.tsx），本页不再留第二份。
-const TAB_KEYS = ["list", "risk", "blacklist", "whitelist", "wallets", "recharge", "logoffs", "invoices"] as const;
+// 2026-10-28 按运营顺序（OM05）：用户 → 风险 → 资产，与菜单一致。充值订单自财务管理搬来，与套餐同在 recharge 页签。
+// 开票申请（invoices）属发票模块（OM09），该模块调整时迁走。
+const TAB_KEYS = ["list", "logoffs", "risk", "blacklist", "whitelist", "wallets", "recharge", "invoices"] as const;
 
 // —— 账号 / 风控 / 黑名单三张表的状态映射 ——
 // 拉黑与否不是后端枚举，但同一对徽标在列表页和详情抽屉各出现一次，
@@ -216,6 +219,8 @@ function UsersInner() {
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   // 充值套餐「显示已归档」（G1）。切 tab 复位，避免在别的 tab 残留一个看不见的过滤态。
   const [showArchived, setShowArchived] = useState(false);
+  // 「充值订单与套餐」页签的两个视图：套餐（卖什么）/ 订单（卖出去了什么）
+  const [rcView, setRcView] = useState<"packages" | "orders">("packages");
   const qc = useQueryClient();
   const allow = useCan();
   const { t } = useI18n();
@@ -871,6 +876,13 @@ function UsersInner() {
         </>
       )}
       {tab === "recharge" && (
+        <div className="mb-3 flex gap-2" role="group" aria-label="充值视图">
+          <Button size="sm" variant={rcView === "packages" ? "default" : "outline"} onClick={() => setRcView("packages")}>充值套餐</Button>
+          <Button size="sm" variant={rcView === "orders" ? "default" : "outline"} onClick={() => setRcView("orders")}>充值订单</Button>
+        </div>
+      )}
+      {tab === "recharge" && rcView === "orders" && <RechargeOrdersPanel />}
+      {tab === "recharge" && rcView === "packages" && (
         <>
           <Toolbar
             search={keyword}
@@ -938,7 +950,8 @@ function UsersInner() {
             empty="暂无钱包记录——用户首次充值或产生余额后才会在此出现" />
         </>
       )}
-      {active.data && <Pagination page={paging.page} size={paging.size} total={active.data.total} onPage={goPage} onSize={paging.setSize} />}
+      {/* 充值订单视图自带分页，共用分页条只服务套餐视图 */}
+      {active.data && !(tab === "recharge" && rcView === "orders") && <Pagination page={paging.page} size={paging.size} total={active.data.total} onPage={goPage} onSize={paging.setSize} />}
 
       {tab === "logoffs" && (
         <>

@@ -300,6 +300,20 @@ const PATCHES: { file: string; mustContain: string; apply: (rows: Row[]) => void
       rows.splice(rows.findIndex((r) => r.menu_no === "M_marketing"), 1);
       for (const [no, sort] of [["M_cs", "14"], ["M_report", "15"], ["M_org", "16"], ["M_system", "17"], ["M_flow", "18"]]) at(no).sort = sort;
     },
+  },  {
+    // 用户管理（OM05）：用户 → 风险 → 资产；改两项名称；删财务「用户账」组两行（在段末，不影响编号）。
+    file: "V152__menu_user_section_by_ops_order.sql",
+    mustContain: "DELETE FROM iam_menu WHERE menu_no = 'M_finance__12'",
+    apply: (rows) => {
+      const at = (no: string) => rows.find((r) => r.menu_no === no)!;
+      for (const no of ["M_user__1", "M_user__2"]) at(no).group_name = "用户";
+      for (const no of ["M_user__3", "M_user__4"]) at(no).group_name = "风险";
+      Object.assign(at("M_user__5"), { group_name: "风险", name: "免押白名单", name_en: "Deposit-free Whitelist",
+        name_ar: "القائمة البيضاء المعفاة من التأمين" });
+      for (const no of ["M_user__6", "M_user__8"]) at(no).group_name = "资产";
+      Object.assign(at("M_user__7"), { group_name: "资产", name: "充值订单与套餐", name_en: "Top-ups & Packages", name_ar: "الشحن والباقات" });
+      for (const no of ["M_finance__11", "M_finance__12"]) rows.splice(rows.findIndex((r) => r.menu_no === no), 1);
+    },
   },
 ];
 

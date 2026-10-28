@@ -140,16 +140,16 @@ const LEAF_TUPLES = [
   "/agents?tab=commission|代理分润配置|agent:share:config||伙伴账",
   "/finance?tab=withdrawals|提现审核|finance:withdrawal:read||伙伴账",
   "/finance?tab=payout-accounts|收款账户|finance:payout_account:read||伙伴账",
-  "/users?tab=wallets|用户钱包|user:wallet:read|2|用户账",
-  "/finance?tab=recharges|充值订单|user:wallet:read|2|用户账",
-  "/users|用户列表|user:cuser:read|1|用户主体",
-  "/users?tab=logoffs|注销申请|user:logoff:read|2|用户主体",
-  "/users?tab=risk|风控用户|user:risk:read|1|风险治理",
-  "/users?tab=blacklist|黑名单|user:risk:update|1|风险治理",
-  "/users?tab=whitelist|免费用户白名单|user:risk:update|2|风险治理",
-  "/users?tab=wallets|钱包|user:wallet:read|2|用户资产",
-  "/users?tab=recharge|充值套餐|user:wallet:read|2|用户资产",
-  "/users?tab=invoices|开票申请|user:invoice:read|2|用户资产",
+  // 「用户账」组 2026-10-28 撤销：用户钱包深链去掉，充值订单并入用户管理（OM05）
+  // 2026-10-28 用户管理按运营顺序（OM05）：用户 → 风险 → 资产
+  "/users|用户列表|user:cuser:read|1|用户",
+  "/users?tab=logoffs|注销申请|user:logoff:read|2|用户",
+  "/users?tab=risk|风控用户|user:risk:read|1|风险",
+  "/users?tab=blacklist|黑名单|user:risk:update|1|风险",
+  "/users?tab=whitelist|免押白名单|user:risk:update|2|风险",
+  "/users?tab=wallets|钱包|user:wallet:read|2|资产",
+  "/users?tab=recharge|充值订单与套餐|user:wallet:read|2|资产",
+  "/users?tab=invoices|开票申请|user:invoice:read|2|资产",
   // 会员套餐（2026-09-27）：mbr_plan 此前没有任何写入方，C 端会员页因此永远是空列表。
   // 在本菜单末尾而非紧挨「会员/次卡」—— 菜单真源在库里，往组中间插要整表重灌种子
   // 会员两项与营销管理整段 2026-10-28 并入销售管理（OM04）
@@ -287,11 +287,13 @@ describe("L3 叶子过滤（4.2-2）", () => {
   });
   // 2026-09-23 B3：伙伴账新增「收款账户」—— 没有它提现审批放行不了，
   // 所以它和提现审核同组、同样给 FINANCE。8 → 9 项。
-  it("FINANCE 的财务：9 项 + 代理分润配置/用户钱包/充值订单 三条跨 section 深链", () => {
+  // 2026-10-28：「用户账」组（用户钱包深链、充值订单）撤销，归用户管理（OM05）。12 → 10 项
+  it("FINANCE 的财务：9 项 + 代理分润配置一条跨 section 深链", () => {
     const labels = visibleLeaves(finance(), "FINANCE").map((l) => l.label);
-    expect(labels).toHaveLength(12);
+    expect(labels).toHaveLength(10);
     expect(labels).toContain("代理分润配置");
-    expect(labels.at(-1)).toBe("充值订单"); // 用户账 分组殿后
+    expect(labels).not.toContain("充值订单");
+    expect(labels.at(-1)).toBe("收款账户");
   });
   it("VIEWER 无 agent:share:config → 财务不出现代理分润配置深链", () => {
     expect(visibleLeaves(finance(), "VIEWER").map((l) => l.label)).not.toContain("代理分润配置");
@@ -420,9 +422,9 @@ describe("L2 分组（按机构/对象聚类，2026-07-29 结构优化）", () =
     }
     expect(mixed).toEqual([]);
   });
-  it("财务按资金主体分四组：分润与结算/平台账/伙伴账/用户账", () => {
+  it("财务按资金主体分三组：分润与结算/平台账/伙伴账（用户账 2026-10-28 归用户管理）", () => {
     const segs = groupedLeaves(visibleLeaves(sec("finance"), "ADMIN"));
-    expect(segs.map((x) => x.group)).toEqual(["分润与结算", "平台账", "伙伴账", "用户账"]);
+    expect(segs.map((x) => x.group)).toEqual(["分润与结算", "平台账", "伙伴账"]);
   });
   // 2026-09-23：站点与点位撤销，原两组（场地资产/场地方机构）换成按动线切的分组，见下方运营管理用例。
   it("运营管理剩两组：基础 / 分成（场站四项迁网点管理、计费两项迁销售管理）", () => {

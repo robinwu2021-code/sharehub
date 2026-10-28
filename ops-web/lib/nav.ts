@@ -390,26 +390,25 @@ export const NAV: NavSection[] = [
       { href: "/finance?tab=withdrawals", label: "提现审核", perm: "finance:withdrawal:read", group: "伙伴账" },
       // 排在提现审核之后：没有收款账户，提现审批根本放行不了（B3）
       { href: "/finance?tab=payout-accounts", label: "收款账户", perm: "finance:payout_account:read", group: "伙伴账" },
-      { href: "/users?tab=wallets", label: "用户钱包", perm: "user:wallet:read", phase: 2, group: "用户账" },
-      { href: "/finance?tab=recharges", label: "充值订单", perm: "user:wallet:read", phase: 2, group: "用户账" },
+      // 「用户账」组（用户钱包深链、充值订单）2026-10-28 撤销：两者归「用户管理 › 资产」（OM05），
+      // 钱包本就在用户页，充值订单页签搬过去与套餐合并
     ],
   },
   {
+    // 2026-10-28 按运营顺序（OM05 · docs/requirements/运营端菜单清单-按运营顺序.md）：用户 → 风险 → 资产。
+    // 会员两项迁到销售管理（OM04）；充值订单自财务管理迁入，与充值套餐合为一项；
+    // 开票申请属发票模块（OM09），该模块调整时迁走，暂留资产组末尾。
+    // ⚠️ 菜单真源在库里：本段与财务管理段的行由 V152 重编号，改这里要同步新开迁移（见 nav-seed.test.ts）。
     key: "user", label: "用户管理", icon: "UserCircle", module: "user", href: "/users",
     children: [
-      // 按「用户主体 / 风险治理 / 用户资产」分组
-      { href: "/users", label: "用户列表", perm: "user:cuser:read", phase: 1, group: "用户主体" },
-      { href: "/users?tab=logoffs", label: "注销申请", perm: "user:logoff:read", phase: 2, group: "用户主体" },
-      { href: "/users?tab=risk", label: "风控用户", perm: "user:risk:read", phase: 1, ready: true, group: "风险治理" },
-      { href: "/users?tab=blacklist", label: "黑名单", perm: "user:risk:update", phase: 1, group: "风险治理" },
-      { href: "/users?tab=whitelist", label: "免费用户白名单", perm: "user:risk:update", phase: 2, group: "风险治理" },
-      { href: "/users?tab=wallets", label: "钱包", perm: "user:wallet:read", phase: 2, group: "用户资产" },
-      { href: "/users?tab=recharge", label: "充值套餐", perm: "user:wallet:read", phase: 2, group: "用户资产" },
-      // 2026-09-25：C 端一直在产生这两类待办，而运营端此前没有入口 ——
-      // 不报错、不红、用户也不会投诉，因为他们不知道本该有。
-      // 同名 group 的叶子必须相邻：「注销申请」在用户主体组里，「开票申请」跟在用户资产组末尾。
-      { href: "/users?tab=invoices", label: "开票申请", perm: "user:invoice:read", phase: 2, group: "用户资产" },
-      // 会员套餐、会员/次卡 2026-10-28 迁到「销售管理 › 会员」（OM04）
+      { href: "/users", label: "用户列表", perm: "user:cuser:read", phase: 1, group: "用户" },
+      { href: "/users?tab=logoffs", label: "注销申请", perm: "user:logoff:read", phase: 2, group: "用户" },
+      { href: "/users?tab=risk", label: "风控用户", perm: "user:risk:read", phase: 1, ready: true, group: "风险" },
+      { href: "/users?tab=blacklist", label: "黑名单", perm: "user:risk:update", phase: 1, group: "风险" },
+      { href: "/users?tab=whitelist", label: "免押白名单", perm: "user:risk:update", phase: 2, group: "风险" },
+      { href: "/users?tab=wallets", label: "钱包", perm: "user:wallet:read", phase: 2, group: "资产" },
+      { href: "/users?tab=recharge", label: "充值订单与套餐", perm: "user:wallet:read", phase: 2, group: "资产" },
+      { href: "/users?tab=invoices", label: "开票申请", perm: "user:invoice:read", phase: 2, group: "资产" },
     ],
   },
   // 「营销管理」L1 2026-10-28 整段并入「销售管理」（OM04）：营销与广告是收入线上的增长手段。

@@ -30,9 +30,18 @@ import { paginate, kwHit, upsert, nextNo } from "./helpers";
 const ORDERS_PER_SEEDED_USER = 3;
 const SEEDED_ORDER_USERS = 40;
 
+/**
+ * 手机号掩码，与后端 `IdentifierNormalizer.mask` 同一算法：前 3 位 + **** + 后 4 位。
+ *
+ * 后端用户列表的 `phone` **出参即掩码**（读 `usr_identity.display_mask`，V131），
+ * 明文只在 `pb_pii`，要 `pii:read` 且逐次审计（RQ-SEC-10）。此前 mock 直出明文，
+ * 运营端在 mock 下看到完整手机号、在真后端下看到掩码 —— 两边对不上，也让人以为前端没做脱敏。
+ */
+export const maskPhone = (v: string): string => (v.length < 7 ? "***" : `${v.slice(0, 3)}****${v.slice(-4)}`);
+
 export const cUsers: CUser[] = Array.from({ length: 60 }, (_, i) => ({
   cUserNo: `U${3000 + i}`, nickname: p(["Ahmed", "Mohammed", "Fatima", "Layla", "Yusuf", "李明"], i),
-  phone: `+9715${String(5000000 + i * 173).slice(0, 7)}`, creditScore: 550 + (i * 7) % 300,
+  phone: maskPhone(`+9715${String(5000000 + i * 173).slice(0, 7)}`), creditScore: 550 + (i * 7) % 300,
   blacklisted: i % 17 === 0,
   // 头像**只给三分之二**：C 端用户不是人人都传头像，全给的话
   // 「没有头像时长什么样」这条路径没有数据能走到。

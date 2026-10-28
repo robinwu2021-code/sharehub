@@ -36,7 +36,7 @@ import { exportCsv } from "@/lib/export-csv";
 import type {
   ShareRule, Settlement, SettlementStatus, Withdrawal, LedgerEntry, ShareRecord,
   Reconcile, ReconAction, ReconHandleStatus, ReconDiff, ReconDiffType, Invoice, InvoiceStatus,
-  ShareSummary, RechargeOrder, PageResult,
+  ShareSummary, PageResult,
 
   VoucherCreatePayload, PayoutAccount, PayReceiptPayload, PayChannel,
 } from "@/lib/types";
@@ -56,7 +56,7 @@ const periodLabel = (p: string) => REPORT_PERIODS.find((x) => x.value === p)?.la
 // 此前这里自己写了一份 label（把「提现审核」写成「提现」），且完全不判权：
 // 没有 finance:withdrawal:read 的角色照样看得到并点得动那个 tab。
 const TAB_KEYS = ["rules", "records", "summary", "settlements", "ledger",
-  "withdrawals", "payout-accounts", "reconcile", "invoices", "recharges"] as const;
+  "withdrawals", "payout-accounts", "reconcile", "invoices"] as const;
 
 // 分润统计：维度切换器（竞品把「运营商佣金」「商户佣金」拆成两套菜单两张表，
 // 我们一张表切 dimension——列完全相同，少一次跳转）
@@ -73,13 +73,6 @@ const PERIOD_OPTIONS = SUMMARY_PERIODS.map((p) => ({ value: p, label: p }));
  */
 const SAME_OPERATOR: StatusMap<"SAME"> = {
   SAME: { label: "同一人经办", tone: "warning" },
-};
-
-const RECHARGE_STATUS: StatusMap<RechargeOrder["status"]> = {
-  PENDING: { label: "待支付", tone: "warning" },
-  PAID: { label: "已支付", tone: "success" },
-  FAILED: { label: "支付失败", tone: "danger" },
-  REFUNDED: { label: "已退款", tone: "muted" },
 };
 
 // 结算单状态：全站同色（待确认=warning / 已确认=default / 已打款=success）。与详情抽屉共用一份
@@ -280,9 +273,6 @@ function FinanceInner() {
   const [sumSortKey, setSumSortKey] = useState("shareAmount");
   const [sumSortDir, setSumSortDir] = useState<SortDir>("desc");
   // 充值订单：状态 + 日期范围（按下单时间）
-  const [rcStatus, setRcStatus] = useState("");
-  const [rcFrom, setRcFrom] = useState("");
-  const [rcTo, setRcTo] = useState("");
   useEffect(() => { setKeyword(""); }, [tab]);
   // 从分润统计深链过来：/finance?tab=records&payee=xxx —— 把 payee 落成分润明细的搜索词，
   // 不静默丢弃参数（本 effect 必须排在上面的清空 effect 之后，否则会被清掉）
@@ -301,18 +291,17 @@ function FinanceInner() {
   // 差错明细是只读下钻，与「对账」菜单同一个权限码（nav.ts 上 /finance?tab=reconcile 就挂它）
   const canReadRecon = allow("finance:recon:read");
 
-  const q = useQuery<PageResult<ShareRule | Settlement | Withdrawal | LedgerEntry | ShareRecord | Reconcile | Invoice | ShareSummary | RechargeOrder | PayoutAccount>>({
+  const q = useQuery<PageResult<ShareRule | Settlement | Withdrawal | LedgerEntry | ShareRecord | Reconcile | Invoice | ShareSummary | PayoutAccount>>({
     // currentOperatorNo 进 key：代理端的列表是按主体收敛的，换了主体就是另一份数据。
     // 切换器那边也会 qc.clear()，但那是**另一处代码**的善后 —— 依赖它等于把正确性
     // 押在「以后没人改那行」上。key 带上它，这里自己就说得通。
-    queryKey: ["fin", tab, paging.page, paging.size, keyword, ruleDim, sumDim, sumPeriod, sumSortKey, sumSortDir, rcStatus, rcFrom, rcTo, stlStatus, reconStatusFilter, invStatusFilter, ledgerPeriod, currentOperatorNo],
+    queryKey: ["fin", tab, paging.page, paging.size, keyword, ruleDim, sumDim, sumPeriod, sumSortKey, sumSortDir, stlStatus, reconStatusFilter, invStatusFilter, ledgerPeriod, currentOperatorNo],
     queryFn: () =>
       tab === "rules" ? api.listShareRules({ page: paging.page, size: paging.size, keyword, dimension: ruleDim })
       : tab === "ledger" ? api.listLedger({ page: paging.page, size: paging.size, keyword, period: ledgerPeriod })
       : tab === "settlements" ? api.listSettlements({ page: paging.page, size: paging.size, keyword, status: stlStatus || undefined })
       : tab === "records" ? api.listShareRecords({ page: paging.page, size: paging.size, keyword })
       : tab === "summary" ? api.listShareSummaries({ page: paging.page, size: paging.size, keyword, dimension: sumDim, period: sumPeriod, sortKey: sumSortKey, sortDir: sumSortDir })
-      : tab === "recharges" ? api.listRechargeOrders({ page: paging.page, size: paging.size, keyword, status: rcStatus || undefined, from: rcFrom || undefined, to: rcTo || undefined })
       : tab === "reconcile" ? api.listReconciles({ page: paging.page, size: paging.size, keyword, handleStatus: reconStatusFilter || undefined })
       : tab === "invoices" ? api.listInvoices({ page: paging.page, size: paging.size, keyword, status: invStatusFilter || undefined })
       : tab === "payout-accounts" ? api.listPayoutAccounts({ page: paging.page, size: paging.size, keyword })
@@ -951,20 +940,6 @@ function FinanceInner() {
     },
   ];
 
-  const rechargeCols: Column<RechargeOrder>[] = [
-    { header: "充值单号", cell: (r) => <span className="txt-strong tabular-nums">{r.rechargeNo}</span> },
-    { header: "用户", cell: (r) => <span>{r.nickname} <span className="text-muted-foreground tabular-nums">{r.userNo}</span></span> },
-    { header: "套餐", cell: (r) => r.packageNo ? <span className="tabular-nums">{r.packageNo}</span> : <Badge tone="outline">自定义金额</Badge> },
-    { header: "实付", className: "text-right", cell: (r) => <span className="tabular-nums">{money(r.payAmount, r.currency)}</span> },
-    { header: "赠送", className: "text-right", cell: (r) => <span className="tabular-nums text-muted-foreground">{money(r.giftAmount, r.currency)}</span> },
-    { header: "到账", className: "text-right", cell: (r) => <span className="txt-strong tabular-nums">{money(r.creditAmount, r.currency)}</span> },
-    // 渠道码与 系统设置·支付渠道（/system?tab=payment）同一套 channelCode
-    { header: "支付渠道", cell: (r) => <Badge tone="outline">{r.channelCode}</Badge> },
-    { header: "状态", cell: (r) => <StatusBadge map={RECHARGE_STATUS} value={r.status} /> },
-    { header: "支付时间", cell: (r) => <span className="text-muted-foreground">{r.paidAt ? fmtTime(r.paidAt) : "-"}</span> },
-    { header: "网关流水号", cell: (r) => <span className="text-muted-foreground tabular-nums">{r.pspTxnNo ?? "-"}</span> },
-  ];
-
   const reconcileCols: Column<Reconcile>[] = [
     { header: "批次号", cell: (r) => <span className="txt-strong">{r.batchNo}</span> },
     { header: "周期", cell: (r) => <span className="tabular-nums">{r.period}</span> },
@@ -1364,34 +1339,6 @@ function FinanceInner() {
           </Toolbar>
         </>
       )}
-      {tab === "recharges" && (
-        <Toolbar
-          search={keyword}
-          onSearch={(v) => { setKeyword(v); paging.reset(); }}
-          searchPlaceholder="搜索充值单号/用户/网关流水号"
-          onExport={() => exportCsv<RechargeOrder>("充值订单", [
-            { header: "充值单号", value: (r) => r.rechargeNo },
-            { header: "用户号", value: (r) => r.userNo },
-            { header: "昵称", value: (r) => r.nickname },
-            { header: "套餐", value: (r) => r.packageNo ?? "自定义金额" },
-            { header: "实付", value: (r) => r.payAmount },
-            { header: "赠送", value: (r) => r.giftAmount },
-            { header: "到账", value: (r) => r.creditAmount },
-            { header: "币种", value: (r) => r.currency },
-            { header: "支付渠道", value: (r) => r.channelCode },
-            { header: "状态", value: (r) => RECHARGE_STATUS[r.status].label },
-            { header: "下单时间", value: (r) => r.createdAt },
-            { header: "支付时间", value: (r) => r.paidAt },
-            { header: "网关流水号", value: (r) => r.pspTxnNo },
-          ], (q.data?.list ?? []) as RechargeOrder[])}
-        >
-          <FilterSelect value={rcStatus} onChange={(v) => { setRcStatus(v); paging.reset(); }} allLabel="全部状态" options={RECHARGE_STATUS} />
-          {/* 日期范围按下单时间：待支付/失败单没有支付时间，用支付时间会把它们全筛掉 */}
-          <DateInput className="w-40" aria-label="下单时间起" value={rcFrom} onChange={(e) => { setRcFrom(e.target.value); paging.reset(); }} />
-          <span className="text-muted-foreground">~</span>
-          <DateInput className="w-40" aria-label="下单时间止" value={rcTo} onChange={(e) => { setRcTo(e.target.value); paging.reset(); }} />
-        </Toolbar>
-      )}
       {tab === "reconcile" && (
         <>
           {/* 汇总条：未结差错笔数/金额来自服务端同一份对账数据，处理完一笔当场下降（不是前端按当前页算的） */}
@@ -1542,15 +1489,6 @@ function FinanceInner() {
           sortKey={sumSortKey}
           sortDir={sumSortDir}
           onSortChange={(k, d) => { setSumSortKey(k); setSumSortDir(d); paging.reset(); }}
-        />
-      )}
-      {tab === "recharges" && (
-        <DataTable
-          rowKey={(r: RechargeOrder) => r.rechargeNo}
-          columns={rechargeCols}
-          rows={q.data?.list as RechargeOrder[]}
-          loading={q.isLoading} error={q.error} onRetry={q.refetch}
-          empty="暂无充值订单 —— 该筛选条件下没有记录，或用户尚未使用钱包充值"
         />
       )}
       {tab === "reconcile" && !canHandleRecon && (
