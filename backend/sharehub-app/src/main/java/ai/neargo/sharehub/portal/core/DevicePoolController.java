@@ -24,9 +24,40 @@ import java.util.List;
 public class DevicePoolController {
 
     private final CabinetPoolService pool;
+    private final ai.neargo.sharehub.dev.service.CabinetBindService binds;
 
-    public DevicePoolController(CabinetPoolService pool) {
+    public DevicePoolController(CabinetPoolService pool, ai.neargo.sharehub.dev.service.CabinetBindService binds) {
         this.pool = pool;
+        this.binds = binds;
+    }
+
+    /**
+     * 绑定（V164）：出库池设备绑到点位；不给点位 = 出库池商家默认站点的默认点位。
+     * 点位的商家须 = 出库池商家（否则 409 error.bind.agent_mismatch）。可同事务开装机单。
+     */
+    @PostMapping("/api/ops/devices/{deviceNo}/bind")
+    @PreAuthorize("@perm.can('device:cabinet:update')")
+    public ai.neargo.sharehub.dev.dto.BindDtos.BindResult bind(@org.springframework.web.bind.annotation.PathVariable String deviceNo,
+                                                               @RequestBody(required = false) ai.neargo.sharehub.dev.dto.BindDtos.BindReq req) {
+        return binds.bind(deviceNo, req == null ? null : req.locationNo(),
+                req != null && Boolean.TRUE.equals(req.openInstallWo()), req == null ? null : req.expectedAt());
+    }
+
+    /** 批量绑定：同一商家的一批出库池设备，一个事务（任一台不满足整批不动）。 */
+    @PostMapping("/api/ops/devices/bind-batch")
+    @PreAuthorize("@perm.can('device:cabinet:update')")
+    public List<ai.neargo.sharehub.dev.dto.BindDtos.BindResult> bindBatch(@RequestBody ai.neargo.sharehub.dev.dto.BindDtos.BindBatchReq req) {
+        return binds.bindBatch(req == null ? null : req.agentNo(), req == null ? null : req.locationNo(),
+                req == null ? null : req.deviceNos(), req != null && Boolean.TRUE.equals(req.openInstallWo()),
+                req == null ? null : req.expectedAt());
+    }
+
+    /** 解绑：仅已绑定未上线；回同一商家的出库池。已上线的走撤机单。 */
+    @PostMapping("/api/ops/devices/{deviceNo}/unbind")
+    @PreAuthorize("@perm.can('device:cabinet:update')")
+    public Cabinet unbind(@org.springframework.web.bind.annotation.PathVariable String deviceNo,
+                          @RequestBody ai.neargo.sharehub.dev.dto.BindDtos.UnbindReq req) {
+        return binds.unbind(deviceNo, req == null ? null : req.reason());
     }
 
     @PostMapping("/api/ops/devices/issue")

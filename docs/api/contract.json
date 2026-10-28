@@ -11312,13 +11312,138 @@
   },
   {
    "verb": "POST",
+   "path": "/api/ops/devices/bind-batch",
+   "perm": "device:cabinet:update",
+   "perms": [
+    "device:cabinet:update"
+   ],
+   "handler": "DevicePoolController#bindBatch",
+   "summary": "批量绑定：同一商家的一批出库池设备，一个事务（任一台不满足整批不动）。",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.dev.dto.BindDtos.BindBatchReq",
+   "returnType": "List<ai.neargo.sharehub.dev.dto.BindDtos.BindResult>",
+   "returnContainer": "List",
+   "returnElement": "ai.neargo.sharehub.dev.dto.BindDtos.BindResult",
+   "responseShape": [
+    {
+     "name": "cabinet",
+     "type": "Cabinet",
+     "fields": [
+      {
+       "name": "cabinetNo",
+       "type": "String"
+      },
+      {
+       "name": "sn",
+       "type": "String"
+      },
+      {
+       "name": "vendorCode",
+       "type": "String"
+      },
+      {
+       "name": "model",
+       "type": "String"
+      },
+      {
+       "name": "locationNo",
+       "type": "String"
+      },
+      {
+       "name": "locationName",
+       "type": "String"
+      },
+      {
+       "name": "slotTotal",
+       "type": "int"
+      },
+      {
+       "name": "availableCount",
+       "type": "int"
+      },
+      {
+       "name": "onlineStatus",
+       "type": "String"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "fwVersion",
+       "type": "String"
+      },
+      {
+       "name": "lastHeartbeatAt",
+       "type": "String"
+      },
+      {
+       "name": "siteNo",
+       "type": "String"
+      },
+      {
+       "name": "agentNo",
+       "type": "String"
+      },
+      {
+       "name": "archivedAt",
+       "type": "String"
+      },
+      {
+       "name": "qcStatus",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "issuedAgentNo",
+       "type": "String"
+      },
+      {
+       "name": "issuedAt",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "woNo",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "locationNo",
+     "type": "String"
+    },
+    {
+     "name": "deviceNos",
+     "type": "List<String>"
+    },
+    {
+     "name": "openInstallWo",
+     "type": "Boolean"
+    },
+    {
+     "name": "expectedAt",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
    "path": "/api/ops/devices/issue",
    "perm": "device:inventory:transfer",
    "perms": [
     "device:inventory:transfer"
    ],
    "handler": "DevicePoolController#issue",
-   "summary": "设备出库池（V161）：出库给商家、退回仓库、按商家汇总。",
+   "summary": "",
    "params": [],
    "bodyType": "IssueReq",
    "returnType": "List<Cabinet>",
@@ -11684,6 +11809,123 @@
     },
     {
      "name": "note",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/devices/{deviceNo}/bind",
+   "perm": "device:cabinet:update",
+   "perms": [
+    "device:cabinet:update"
+   ],
+   "handler": "DevicePoolController#bind",
+   "summary": "绑定（V164）：出库池设备绑到点位；不给点位 = 出库池商家默认站点的默认点位。",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.dev.dto.BindDtos.BindReq",
+   "returnType": "ai.neargo.sharehub.dev.dto.BindDtos.BindResult",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.dev.dto.BindDtos.BindResult",
+   "responseShape": [
+    {
+     "name": "cabinet",
+     "type": "Cabinet",
+     "fields": [
+      {
+       "name": "cabinetNo",
+       "type": "String"
+      },
+      {
+       "name": "sn",
+       "type": "String"
+      },
+      {
+       "name": "vendorCode",
+       "type": "String"
+      },
+      {
+       "name": "model",
+       "type": "String"
+      },
+      {
+       "name": "locationNo",
+       "type": "String"
+      },
+      {
+       "name": "locationName",
+       "type": "String"
+      },
+      {
+       "name": "slotTotal",
+       "type": "int"
+      },
+      {
+       "name": "availableCount",
+       "type": "int"
+      },
+      {
+       "name": "onlineStatus",
+       "type": "String"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "fwVersion",
+       "type": "String"
+      },
+      {
+       "name": "lastHeartbeatAt",
+       "type": "String"
+      },
+      {
+       "name": "siteNo",
+       "type": "String"
+      },
+      {
+       "name": "agentNo",
+       "type": "String"
+      },
+      {
+       "name": "archivedAt",
+       "type": "String"
+      },
+      {
+       "name": "qcStatus",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "issuedAgentNo",
+       "type": "String"
+      },
+      {
+       "name": "issuedAt",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "woNo",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "locationNo",
+     "type": "String"
+    },
+    {
+     "name": "openInstallWo",
+     "type": "Boolean"
+    },
+    {
+     "name": "expectedAt",
      "type": "String"
     }
    ]
@@ -12443,6 +12685,105 @@
     }
    ],
    "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/devices/{deviceNo}/unbind",
+   "perm": "device:cabinet:update",
+   "perms": [
+    "device:cabinet:update"
+   ],
+   "handler": "DevicePoolController#unbind",
+   "summary": "解绑：仅已绑定未上线；回同一商家的出库池。",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.dev.dto.BindDtos.UnbindReq",
+   "returnType": "Cabinet",
+   "returnContainer": null,
+   "returnElement": "Cabinet",
+   "responseShape": [
+    {
+     "name": "cabinetNo",
+     "type": "String"
+    },
+    {
+     "name": "sn",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "model",
+     "type": "String"
+    },
+    {
+     "name": "locationNo",
+     "type": "String"
+    },
+    {
+     "name": "locationName",
+     "type": "String"
+    },
+    {
+     "name": "slotTotal",
+     "type": "int"
+    },
+    {
+     "name": "availableCount",
+     "type": "int"
+    },
+    {
+     "name": "onlineStatus",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "fwVersion",
+     "type": "String"
+    },
+    {
+     "name": "lastHeartbeatAt",
+     "type": "String"
+    },
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    },
+    {
+     "name": "qcStatus",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAgentNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "reason",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "POST",
@@ -22591,6 +22932,10 @@
     },
     {
      "name": "expectedAt",
+     "type": "String"
+    },
+    {
+     "name": "disposition",
      "type": "String"
     }
    ]
@@ -48246,6 +48591,9 @@
    "PASSED",
    "FAILED"
   ],
+  "RemovalDisposition": [
+   "RETURN_TO_POOL"
+  ],
   "WoPriority": [
    "LOW",
    "MEDIUM",
@@ -48457,10 +48805,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 544,
-  "records": 503,
-  "withPerm": 464,
-  "withBody": 228,
-  "shapedResponses": 424
+  "endpoints": 547,
+  "records": 507,
+  "withPerm": 467,
+  "withBody": 231,
+  "shapedResponses": 427
  }
 }

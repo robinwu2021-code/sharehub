@@ -21,6 +21,13 @@ public class LocalWorkOrderCommand implements WorkOrderCommandPort {
     }
 
     @Override
+    public String openInstall(String cabinetNo, String locationNo, String locationName, String expectedAt) {
+        String key = "BIND:" + cabinetNo + ":" + locationNo;
+        return DataScopeContext.executeWithoutScope(() -> workOrders.create(new WorkOrderDraft(WorkOrderType.INSTALL.name(), "MANUAL",
+                key, "MEDIUM", cabinetNo, locationNo, locationName, null, null, "绑定点位后装机", expectedAt)).woNo());
+    }
+
+    @Override
     public String openRemoval(String siteNo, String cabinetNo, String reason) {
         String key = "WD:" + siteNo + ":" + cabinetNo;
         return DataScopeContext.executeWithoutScope(() -> workOrders.create(new WorkOrderDraft(WorkOrderType.REMOVE.name(), "MANUAL",

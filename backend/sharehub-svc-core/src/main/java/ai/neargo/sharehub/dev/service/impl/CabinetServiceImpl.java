@@ -87,23 +87,13 @@ public class CabinetServiceImpl implements CabinetService {
          * 归属：**只认 locationNo，siteNo/agentNo 一律反查**（见接口注释）。
          * 调用方传来的 siteNo/agentNo 直接忽略 —— 接受它们就等于允许三者互相矛盾。
          */
+        /*
+         * 绑定只经专用动作（V164）：POST /api/ops/devices/{no}/bind · /unbind。
+         * 编辑接口再收 locationNo，就能绕过「只从出库池绑、点位商家 = 出库池商家」这两条（I2）。
+         * 带了且与现值不同 → 400 并指明该去哪；与现值相同（表单原样回传）不算改，放行。
+         */
         if (in.containsKey("locationNo") && !java.util.Objects.equals(str(in.get("locationNo")), e.getLocationNo())) {
-            // 已布放 / 故障的设备换点位 = 搬机，必须先撤机：否则站点门禁、在借订单与试借还结果都会指错地方
-            if (!creating && !CabinetStatus.IN_STOCK.name().equals(e.getStatus())) {
-                throw ai.neargo.sharehub.common.BizException.conflict("error.device.relocate_deployed");
-            }
-            e.setBoundAt(java.time.LocalDateTime.now());   // 试借还结果早于它即失效
-            String locNo = str(in.get("locationNo"));
-            if (locNo == null || locNo.isBlank()) {
-                e.setLocationNo(null); e.setLocationName(null); e.setSiteNo(null); e.setAgentNo(null);
-            } else {
-                var own = locationQuery.ownershipOf(locNo);
-                if (own == null) throw BizException.notFound(locNo);
-                e.setLocationNo(own.locationNo());
-                e.setLocationName(own.locationName());
-                e.setSiteNo(own.siteNo());
-                e.setAgentNo(own.agentNo());
-            }
+            throw ai.neargo.sharehub.common.BizException.badRequest("error.device.bind_via_action", no);
         }
         if (!creating) {
             AuditChanges.record("序列号", oldSn, e.getSn());

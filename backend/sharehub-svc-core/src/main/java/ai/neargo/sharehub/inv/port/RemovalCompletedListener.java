@@ -38,6 +38,9 @@ public class RemovalCompletedListener {
     private static final String INSPECT = "INSPECT";
     private static final Set<String> ON_SITE = Set.of(CabinetStatus.DEPLOYED.name(), CabinetStatus.FAULT.name());
 
+    /** 撤机去向「回出库池」（V164，wo 的 RemovalDisposition；core 不依赖 wo，按事件里的名字比）。 */
+    private static final String RETURN_TO_POOL = "RETURN_TO_POOL";
+
     private final CabinetMapper cabinets;
     private final PowerbankMapper powerbanks;
     private final CabinetLifecycleService lifecycle;
@@ -100,7 +103,12 @@ public class RemovalCompletedListener {
         compare(e, "REMOVAL");
         // 2) 撤机：解绑点位与站点，回在库（已经撤过的不重复）
         if (ON_SITE.contains(c.getStatus())) lifecycle.undeploy(c.getCabinetNo(), "撤场撤机（工单 " + e.woNo() + "）");
-        // 3) 回仓调拨草稿：发货 / 签收仍由人操作，签收时逐件核对
+        // 3) 去向（V164）：回出库池 = 留在原商家那里，不生成回仓单，可再绑别的点位
+        if (RETURN_TO_POOL.equals(e.disposition())) {
+            log.info("撤机回出库池 woNo={} cabinetNo={} 出库池商家={}", e.woNo(), c.getCabinetNo(), c.getIssuedAgentNo());
+            return;
+        }
+        //    回仓调拨草稿：发货 / 签收仍由人操作，签收时逐件核对；签收进仓时离开出库池（V161）
         String siteName = siteNo == null ? null
                 : sites.briefsByNos(List.of(siteNo)).stream().findFirst().map(SiteBrief::name).orElse(null);
         if (siteNo != null) transfers.openReturn(siteNo, siteName, c.getCabinetNo(), e.woNo());

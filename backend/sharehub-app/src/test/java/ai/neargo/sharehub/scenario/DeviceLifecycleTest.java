@@ -100,15 +100,18 @@ class DeviceLifecycleTest extends ApiTestSupport {
     }
 
     @Test
-    @DisplayName("③⑨ 编辑带 status 被忽略；已布放换点位 409；撤机后换点位 → 试借还项重新未通过")
+    @DisplayName("③⑨ 编辑带 status 被忽略；编辑改点位 400、已布放绑定 409；撤机后绑定新点位 → 试借还项重新未通过")
     void editIgnoresStatusAndRelocation() {
         Fx f = fixture(true);
         assertThat(post("/api/ops/cabinets/" + f.cabinet, Map.of("status", "RETIRED"), admin).okData().path("status").asText())
                 .isEqualTo("DEPLOYED");
         String other = location(f.site);
-        assertThat(post("/api/ops/cabinets/" + f.cabinet, Map.of("locationNo", other), admin).status).isEqualTo(409);
+        // V164：点位不再经编辑改，只经绑定动作；已上线的先撤机
+        assertThat(post("/api/ops/cabinets/" + f.cabinet, Map.of("locationNo", other), admin).status).isEqualTo(400);
+        assertThat(post("/api/ops/devices/" + f.cabinet + "/bind", Map.of("locationNo", other), admin).status).isEqualTo(409);
         post("/api/ops/devices/" + f.cabinet + "/undeploy", Map.of("reason", "迁机"), admin).okData();
-        post("/api/ops/cabinets/" + f.cabinet, Map.of("locationNo", other), admin).okData();
+        // 直营站点（商家为空）不经出库池：撤机后直接绑到同站点的另一个点位
+        post("/api/ops/devices/" + f.cabinet + "/bind", Map.of("locationNo", other), admin).okData();
         assertThat(failed(get("/api/ops/devices/" + f.cabinet + "/go-live-gate", admin).okData())).contains("TRIAL");
     }
 

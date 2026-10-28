@@ -238,14 +238,17 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
     public Cabinet undeploy(String cabinetNo, String reason) {
         String r = requireReason(reason);
         DevCabinet c = require(cabinetNo);
-        // 撤机回仓：解绑点位 / 站点（agent_no 是划拨归属，保留）。换点位后试借还随 bound_at 失效
+        // 撤机：解绑点位 / 站点，商家号随点位一起清（V164：agent_no 只由点位派生，I3）。
+        // 出库池归属 issued_agent_no 保留 —— 去向是回出库池就留在原商家那里，回仓则签收进仓时清（V161）。
+        // 换点位后试借还随 bound_at 失效
         AuditChanges.record("所属点位", c.getLocationNo(), null);
         transit(c, "UNDEPLOY", u -> u.set(DevCabinet::getLocationNo, null).set(DevCabinet::getLocationName, null)
-                        .set(DevCabinet::getSiteNo, null).set(DevCabinet::getFaultReason, r),
+                        .set(DevCabinet::getSiteNo, null).set(DevCabinet::getAgentNo, null).set(DevCabinet::getFaultReason, r),
                 x -> {
                     x.setLocationNo(null);
                     x.setLocationName(null);
                     x.setSiteNo(null);
+                    x.setAgentNo(null);
                     x.setFaultReason(r);
                 });
         return CabinetServiceImpl.toVO(c);

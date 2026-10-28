@@ -46,6 +46,9 @@ public interface AgentDirectoryPort {
      */
     boolean readyForDevices(String agentNo);
 
+    /** 商家的默认站点号（V157，补齐位置时系统建）；没有返回 null。绑定不指定点位时落到它的默认点位。 */
+    String defaultSiteNo(String agentNo);
+
     /**
      * 运维分成系数（批次 F5，裁决 #1）：该代理在 {@code period}（YYYY-MM，订单归属账期）适用的系数 ——
      * 取上一月考核的结果；没有考核记录按 1（不打折）。乘在 OPERATE 分润比例上。
