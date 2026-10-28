@@ -27,6 +27,8 @@ import { useCan } from "@/lib/hooks/use-can";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
 import { exportCsv } from "@/lib/export-csv";
+import { PaymentChannelsTab } from "@/components/system/payment-channels-tab";
+import { MemberPlansTab, MembersTab } from "@/components/user/membership";
 import { ORDER_INTERVENTIONS, interveneActions, depositActions, exceptionHandleActions, EXCEPTION_HANDLINGS } from "@/lib/types";
 import type {
   RentOrder, OrderException, OrderExceptionStatus, ExceptionHandleAction, DepositRecord,
@@ -36,9 +38,14 @@ import type {
   Reservation, FreeOrder, WhitelistReason,
 } from "@/lib/types";
 
-// 顺序对齐 lib/nav.ts 的深链顺序（交易流水 → 售后 → 特殊单据）
-// tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）
-const TAB_KEYS = ["list", "reservations", "exceptions", "complaints", "refunds", "free", "deposit"] as const;
+// tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）。
+// 2026-10-28 本页归「销售管理」（OM04），顺序与菜单分组一致：订单 → 支付 → 售后 → 会员。
+// 支付渠道（自系统设置）、会员套餐与会员 / 次卡（自用户管理）搬来这里，组件见 components/system、components/user。
+// 计费（/operation/fee-*）与营销、广告（/marketing）是同一 L1 下的其它页面，不在本页的 tab 里。
+const TAB_KEYS = ["list", "reservations", "deposit", "free",
+  "payment-channels",
+  "exceptions", "complaints", "refunds",
+  "plans", "members"] as const;
 
 // —— 预约订单（规格 §3）：竞品是电车预约充电桩，充电宝映射为「预约取宝 / 预约还位」——
 const RES_TYPE: StatusMap<Reservation["type"]> = {
@@ -256,7 +263,7 @@ function OrdersInner() {
   const [excResult, setExcResult] = useState("");
   const handleExc = useMutation({
     mutationFn: (v: { no: string; action: ExceptionHandleAction; result: string }) =>
-      api.handleOrderException(v.no, v.action, { result: v.result }),
+      api.handleOrderException(v.no, v.action, { handleResult: v.result }),
     onSuccess: (r, v) => {
       notify.success(
         v.action === "work_order" ? `已转工单 ${r.workOrderNo}`
@@ -967,6 +974,10 @@ function OrdersInner() {
           {depQ.data && <Pagination page={depPaging.page} size={depPaging.size} total={depQ.data.total} onPage={depPaging.setPage} onSize={depPaging.setSize} />}
         </>
       )}
+
+      {tab === "payment-channels" && <PaymentChannelsTab />}
+      {tab === "plans" && <MemberPlansTab />}
+      {tab === "members" && <MembersTab />}
 
       {/* 代客登记投诉抽屉：客服接到电话/线下投诉时手工入队。
           投诉号/提交时间/状态由服务端决定（新登记一律「待处理」），故表单里没有这几项。 */}

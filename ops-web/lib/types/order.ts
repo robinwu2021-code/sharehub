@@ -217,7 +217,8 @@ export const exceptionHandleActions = (status: OrderExceptionStatus): ExceptionH
 
 /** 处置入参：结论/原因**必填**（无结论的处置事后无从追责，沿用干预/退款审批口径）。 */
 export interface OrderExceptionHandlePayload {
-  result: string;
+  /** 处置结论。键名与后端 ExceptionHandleReq.handleResult 一致（此前叫 result，真后端读不到，结论丢失）。 */
+  handleResult: string;
   operatorName?: string;
   /**
    * 退款申请号。退款记录住在 cs.ts 而 cs.ts 反向依赖订单域，db 层不能反向 import，

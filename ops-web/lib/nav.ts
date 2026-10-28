@@ -201,10 +201,10 @@ export const NAV: NavSection[] = [
     // soon 由 backend-ready.ts 决定：真实后端模式下接口未就绪的页面灰显，mock 模式恒可点。
     key: "operation", label: "运营管理", icon: "Store", module: "location",
     modules: ["location", "pricing", "finance", "system", "marketing"],
-    // 2026-10-28：站点概览 / 站点管理 / 点位管理 / 站点坪效迁到「网点管理」（OM02），本段只剩计费、基础、分成三组，
-    // 待销售（OM04）、系统（OM11）、结算（OM08）三个模块调整时各自迁走，届时本段撤销。
-    // /operation/sites 与 /operation/overview 由网点管理的 match 认领（最长前缀胜出），这里只留 /operation。
-    href: "/operation/fee-plans", match: ["/operation"],
+    // 2026-10-28：站点四项迁到「网点管理」（OM02），计费两项迁到「销售管理」（OM04），本段只剩基础、分成两组，
+    // 待系统（OM11）、结算（OM08）两个模块调整时各自迁走，届时本段撤销。
+    // /operation/sites、/operation/overview、/operation/fee-* 由各自新 L1 的 match 认领（最长前缀胜出），这里只留 /operation。
+    href: "/operation/app-versions", match: ["/operation"],
     // 2026-09-23 菜单收敛（docs/technical/菜单重合梳理与优化方案.md）：
     //
     // 第一步（A 类重合）：站点管理、收费方案、时段倍率、应用版本、银行、问题、公告
@@ -223,8 +223,6 @@ export const NAV: NavSection[] = [
     // ⚠️ 顺序即分组：groupedLeaves 只合并**相邻**的同名 group，插叶子时别打断连续段。
     children: [
       ...opLeaves([
-        ["fee-plans", "收费方案", "pricing:plan:read", "计费与调价"],
-        ["fee-adjustments", "预约调价", "pricing:adjustment:read", "计费与调价"],
         // 公告并进「基础管理」：原先它自成一组，而组名与唯一那条叶子完全同名 ——
         // 一个只为一条叶子存在的分组标题只是多一行噪音。四项都是运营日常要维护的基础内容。
         ["app-versions", "应用版本", "system:app_version:read", "基础管理"],
@@ -341,16 +339,37 @@ export const NAV: NavSection[] = [
     ],
   },
   {
-    key: "order", label: "订单管理", icon: "ReceiptText", module: "order", href: "/orders",
+    // 2026-10-28 按运营顺序合并为「销售管理」（OM04 · docs/requirements/运营端菜单清单-按运营顺序.md）：
+    // 订单管理 + 营销管理（整段并入）+ 运营管理的计费两项 + 用户管理的会员两项 + 系统设置的支付渠道。
+    // 收入线：先有价格，再有订单，订单产生支付，异常走售后；营销、会员、广告是增长手段，排在主线之后。
+    // 跨三条路径：/orders（订单、支付渠道、会员 tab）、/marketing、/operation/fee-*（match 最长前缀认领）。
+    // 落地页是订单列表（href），不是第一项收费方案。
+    // ⚠️ 菜单真源在库里：本段及其它四段的行由 V151 重编号，改这里要同步新开迁移（见 nav-seed.test.ts）。
+    key: "order", label: "销售管理", icon: "ReceiptText", module: "order", href: "/orders",
+    match: ["/orders", "/marketing", "/operation/fee-plans", "/operation/fee-adjustments"],
     children: [
-      // 按「交易流水 / 售后处置 / 特殊单据」分组（补齐清单 B）
-      { href: "/orders", label: "订单列表", perm: "order:order:read", group: "交易流水" },
-      { href: "/orders?tab=reservations", label: "预约订单", perm: "order:order:read", phase: 2, group: "交易流水" },
-      { href: "/orders?tab=exceptions", label: "异常订单", perm: "order:exception:read", group: "售后处置" },
-      { href: "/orders?tab=complaints", label: "投诉订单", perm: "order:exception:read", group: "售后处置" },
-      { href: "/orders?tab=refunds", label: "退款记录", perm: "order:refund:audit", group: "售后处置" },
-      { href: "/orders?tab=deposit", label: "押金与欠费", perm: "order:order:read", phase: 1, ready: true, group: "特殊单据" },
-      { href: "/orders?tab=free", label: "免费订单", perm: "order:order:read", phase: 2, group: "特殊单据" },
+      ...opLeaves([
+        ["fee-plans", "收费方案", "pricing:plan:read", "计费"],
+        ["fee-adjustments", "预约调价", "pricing:adjustment:read", "计费"],
+      ]),
+      { href: "/orders", label: "订单列表", perm: "order:order:read", group: "订单" },
+      { href: "/orders?tab=reservations", label: "预约订单", perm: "order:order:read", phase: 2, group: "订单" },
+      { href: "/orders?tab=deposit", label: "押金与欠费", perm: "order:order:read", phase: 1, ready: true, group: "订单" },
+      { href: "/orders?tab=free", label: "免费订单", perm: "order:order:read", phase: 2, group: "订单" },
+      // 支付流水 / 扣款失败与重试（OM04-12 / 04）待后端补实体后加在这一组
+      { href: "/orders?tab=payment-channels", label: "支付渠道", perm: "system:payment_channel:read", group: "支付" },
+      { href: "/orders?tab=exceptions", label: "异常订单", perm: "order:exception:read", group: "售后" },
+      { href: "/orders?tab=complaints", label: "投诉订单", perm: "order:exception:read", group: "售后" },
+      { href: "/orders?tab=refunds", label: "退款记录", perm: "order:refund:audit", group: "售后" },
+      { href: "/marketing", label: "优惠券", perm: "marketing:coupon:read", phase: 2, ready: true, group: "营销" },
+      { href: "/marketing?tab=campaigns", label: "活动", phase: 2, group: "营销", perm: "marketing:campaign:read" },
+      { href: "/marketing?tab=push", label: "推送触达", perm: "marketing:push:send", phase: 3, ready: true, group: "营销" },
+      { href: "/marketing?tab=referral", label: "邀请裂变", phase: 3, group: "营销", perm: "marketing:campaign:read" },
+      { href: "/orders?tab=plans", label: "会员套餐", perm: "user:member:read", phase: 2, group: "会员" },
+      { href: "/orders?tab=members", label: "会员/次卡", perm: "user:member:read", phase: 2, group: "会员" },
+      { href: "/marketing?tab=ad-slots", label: "广告位管理", phase: 3, group: "广告", perm: "marketing:ad:read" },
+      { href: "/marketing?tab=ad-campaigns", label: "广告活动", phase: 3, group: "广告", perm: "marketing:ad:read" },
+      { href: "/marketing?tab=ad-delivery", label: "投放与曝光", phase: 3, group: "广告", perm: "marketing:ad:read" },
     ],
   },
   {
@@ -384,34 +403,17 @@ export const NAV: NavSection[] = [
       { href: "/users?tab=risk", label: "风控用户", perm: "user:risk:read", phase: 1, ready: true, group: "风险治理" },
       { href: "/users?tab=blacklist", label: "黑名单", perm: "user:risk:update", phase: 1, group: "风险治理" },
       { href: "/users?tab=whitelist", label: "免费用户白名单", perm: "user:risk:update", phase: 2, group: "风险治理" },
-      { href: "/users?tab=members", label: "会员/次卡", perm: "user:member:read", phase: 2, group: "用户资产" },
       { href: "/users?tab=wallets", label: "钱包", perm: "user:wallet:read", phase: 2, group: "用户资产" },
       { href: "/users?tab=recharge", label: "充值套餐", perm: "user:wallet:read", phase: 2, group: "用户资产" },
       // 2026-09-25：C 端一直在产生这两类待办，而运营端此前没有入口 ——
       // 不报错、不红、用户也不会投诉，因为他们不知道本该有。
       // 同名 group 的叶子必须相邻：「注销申请」在用户主体组里，「开票申请」跟在用户资产组末尾。
       { href: "/users?tab=invoices", label: "开票申请", perm: "user:invoice:read", phase: 2, group: "用户资产" },
-      // 2026-09-27：mbr_plan 此前没有任何写入方 —— C 端会员页因此永远是空列表。
-      // 放在本菜单**末尾**而不是紧挨「会员/次卡」：菜单真源在库里，往中间插一条
-      // 会让同组后面所有叶子的 sort 都要挪，而那就得整表重灌 ——
-      // 整表重灌会冲掉「菜单管理」里的线上改动（见 nav-seed.test.ts）。
-      { href: "/users?tab=plans", label: "会员套餐", perm: "user:member:read", phase: 2, group: "用户资产" },
+      // 会员套餐、会员/次卡 2026-10-28 迁到「销售管理 › 会员」（OM04）
     ],
   },
-  {
-    key: "marketing", label: "营销管理", icon: "Ticket", module: "marketing", href: "/marketing",
-    children: [
-      // 公告管理 2026-09-23 并入 运营管理 › 公告管理（同一组 listNotices/saveNotice/archiveNotice）。
-      // c-app 首页 Hub 的「公告条」发布口仍在，只是换了一个菜单位置。
-      { href: "/marketing", label: "优惠券", perm: "marketing:coupon:read", phase: 2, ready: true, group: "促销玩法" },
-      { href: "/marketing?tab=campaigns", label: "活动", phase: 2, group: "促销玩法", perm: "marketing:campaign:read" },
-      { href: "/marketing?tab=push", label: "推送触达", perm: "marketing:push:send", phase: 3, ready: true, group: "促销玩法" },
-      { href: "/marketing?tab=referral", label: "邀请裂变", phase: 3, group: "促销玩法", perm: "marketing:campaign:read" },
-      { href: "/marketing?tab=ad-slots", label: "广告位管理", phase: 3, group: "广告经营", perm: "marketing:ad:read" },
-      { href: "/marketing?tab=ad-campaigns", label: "广告活动", phase: 3, group: "广告经营", perm: "marketing:ad:read" },
-      { href: "/marketing?tab=ad-delivery", label: "投放与曝光", phase: 3, group: "广告经营", perm: "marketing:ad:read" },
-    ],
-  },
+  // 「营销管理」L1 2026-10-28 整段并入「销售管理」（OM04）：营销与广告是收入线上的增长手段。
+  // /marketing 页面不动，由销售管理的 match 认领。
   {
     // 复用项为跨 section 深链，可点
     key: "cs", label: "客服管理", icon: "Headset", module: "cs", href: "/cs",
@@ -461,15 +463,14 @@ export const NAV: NavSection[] = [
   },
   {
     // D1：菜单按 system 模块过滤（供应商接入已于 2026-10-28 搬到设备管理，其 device:vendor:* 码随之归设备段）
-    // 2026-10-28：供应商接入搬到设备管理（OM03），首页改为支付渠道
-    key: "system", label: "系统设置", icon: "Settings", module: "system", href: "/system?tab=payment",
+    // 2026-10-28：供应商接入搬到设备管理（OM03）、支付渠道搬到销售管理（OM04），首页改为通知模板
+    key: "system", label: "系统设置", icon: "Settings", module: "system", href: "/system?tab=notify",
     match: ["/system"],
     pinBottom: true,
     children: [
       // 按「接入 / 消息触达 / 业务规则 / 基础字典 / 开放与市场」分组（补齐清单 E）。
       // 注：对方把 提现设置/预约设置/充电设置 拆三个菜单、7 个支付渠道各占一菜单；
       //     我们合并为「业务规则」一页与「支付渠道」一页 —— 少菜单噪音即"信息更清晰"。
-      { href: "/system?tab=payment", label: "支付渠道", perm: "system:payment_channel:read", group: "接入与支付" },
       { href: "/system?tab=notify", label: "通知模板", perm: "system:notify_template:read", group: "消息触达" },
       { href: "/system?tab=notify-log", label: "发送记录", perm: "system:notify_log:read", phase: 1, group: "消息触达" },
       { href: "/system?tab=notify-blacklist", label: "触达拉黑", perm: "system:notify_blacklist:read", phase: 1, group: "消息触达" },

@@ -233,6 +233,73 @@ const PATCHES: { file: string; mustContain: string; apply: (rows: Row[]) => void
         leaf("M_device__6", "资产差异", "Asset Discrepancies", "فروقات الأصول", "/devices?tab=asset-diffs", "6", "2", "0"),
       );
     },
+  },  {
+    // 销售管理（OM04）：订单管理更名，营销管理整段并入后删该 L1，计费 / 会员 / 支付渠道迁入；
+    // 五段叶子按 path 重编号（会员两项、支付渠道换到 /orders 的 tab），其后 L1 排序前移一位。
+    file: "V151__menu_sales_section_by_ops_order.sql",
+    mustContain: "UPDATE iam_menu SET menu_no = CONCAT('M_tmp151_', id)",
+    apply: (rows) => {
+      const at = (no: string) => rows.find((r) => r.menu_no === no)!;
+      Object.assign(at("M_order"), { name: "销售管理", name_en: "Sales", name_ar: "المبيعات",
+        match_paths: '["/orders","/marketing","/operation/fee-plans","/operation/fee-adjustments"]' });
+      Object.assign(at("M_operation"), { path: "/operation/app-versions" });
+      Object.assign(at("M_system"), { path: "/system?tab=notify" });
+      const parents = ["M_order", "M_marketing", "M_operation", "M_user", "M_system"];
+      const plan: [string[], string, string, string | null][] = [
+        [["/operation/fee-plans"], "M_order", "1", "计费"],
+        [["/operation/fee-adjustments"], "M_order", "2", "计费"],
+        [["/orders"], "M_order", "3", "订单"],
+        [["/orders?tab=reservations"], "M_order", "4", "订单"],
+        [["/orders?tab=deposit"], "M_order", "5", "订单"],
+        [["/orders?tab=free"], "M_order", "6", "订单"],
+        [["/system?tab=payment", "/orders?tab=payment-channels"], "M_order", "7", "支付"],
+        [["/orders?tab=exceptions"], "M_order", "8", "售后"],
+        [["/orders?tab=complaints"], "M_order", "9", "售后"],
+        [["/orders?tab=refunds"], "M_order", "10", "售后"],
+        [["/marketing"], "M_order", "11", "营销"],
+        [["/marketing?tab=campaigns"], "M_order", "12", "营销"],
+        [["/marketing?tab=push"], "M_order", "13", "营销"],
+        [["/marketing?tab=referral"], "M_order", "14", "营销"],
+        [["/users?tab=plans", "/orders?tab=plans"], "M_order", "15", "会员"],
+        [["/users?tab=members", "/orders?tab=members"], "M_order", "16", "会员"],
+        [["/marketing?tab=ad-slots"], "M_order", "17", "广告"],
+        [["/marketing?tab=ad-campaigns"], "M_order", "18", "广告"],
+        [["/marketing?tab=ad-delivery"], "M_order", "19", "广告"],
+        [["/operation/app-versions"], "M_operation", "1", null],
+        [["/operation/banks"], "M_operation", "2", null],
+        [["/operation/brands"], "M_operation", "3", null],
+        [["/operation/problems"], "M_operation", "4", null],
+        [["/operation/notices"], "M_operation", "5", null],
+        [["/operation/site-sharing"], "M_operation", "6", null],
+        [["/operation/payee-sharing"], "M_operation", "7", null],
+        [["/users"], "M_user", "1", null],
+        [["/users?tab=logoffs"], "M_user", "2", null],
+        [["/users?tab=risk"], "M_user", "3", null],
+        [["/users?tab=blacklist"], "M_user", "4", null],
+        [["/users?tab=whitelist"], "M_user", "5", null],
+        [["/users?tab=wallets"], "M_user", "6", null],
+        [["/users?tab=recharge"], "M_user", "7", null],
+        [["/users?tab=invoices"], "M_user", "8", null],
+        [["/system?tab=notify"], "M_system", "1", null],
+        [["/system?tab=notify-log"], "M_system", "2", null],
+        [["/system?tab=notify-blacklist"], "M_system", "3", null],
+        [["/system?tab=rules"], "M_system", "4", null],
+        [["/system?tab=login"], "M_system", "5", null],
+        [["/system?tab=dict"], "M_system", "6", null],
+        [["/system?tab=region"], "M_system", "7", null],
+        [["/system?tab=params"], "M_system", "8", null],
+        [["/system?tab=tax"], "M_system", "9", null],
+        [["/system?tab=markets"], "M_system", "10", null],
+        [["/system?tab=openapi"], "M_system", "11", null],
+      ];
+      const targets = plan.map(([paths]) => rows.find((r) => parents.includes(r.parent_no) && paths.includes(r.path))!);
+      plan.forEach(([paths, parent, sort, group], i) => {
+        Object.assign(targets[i], { menu_no: `${parent}__${sort}`, parent_no: parent, sort, path: paths[paths.length - 1],
+          ...(group ? { group_name: group } : {}) });
+      });
+      rows.splice(rows.findIndex((r) => r.menu_no === "M_marketing"), 1);
+      for (const [no, sort] of [["M_cs", "14"], ["M_report", "15"], ["M_org", "16"], ["M_system", "17"], ["M_flow", "18"]]) at(no).sort = sort;
+    },
   },
 ];
 

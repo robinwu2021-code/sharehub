@@ -27,12 +27,13 @@ ops-web/app/marketing/page.tsx::AD_FIELDS status
 # validFrom/validTo/note 塞进一个必然 500 的端点没有意义，只会让它看起来对齐了。
 # 正确顺序：先接会员权益计价（C-MB-02）→ 实现发卡 → 再按那时的入参定字段。
 # 期间这张表单提交必然失败（500），不是静默丢弃，运营看得见。
-ops-web/app/users/page.tsx::CARD_FIELDS cardType
-ops-web/app/users/page.tsx::CARD_FIELDS note
-ops-web/app/users/page.tsx::CARD_FIELDS totalTimes
-ops-web/app/users/page.tsx::CARD_FIELDS userNo
-ops-web/app/users/page.tsx::CARD_FIELDS validFrom
-ops-web/app/users/page.tsx::CARD_FIELDS validTo
+# 2026-10-28 表单随会员页签搬到 components/user/membership.tsx（销售管理 › 会员），条目只改路径、不增减。
+ops-web/components/user/membership.tsx::CARD_FIELDS cardType
+ops-web/components/user/membership.tsx::CARD_FIELDS note
+ops-web/components/user/membership.tsx::CARD_FIELDS totalTimes
+ops-web/components/user/membership.tsx::CARD_FIELDS userNo
+ops-web/components/user/membership.tsx::CARD_FIELDS validFrom
+ops-web/components/user/membership.tsx::CARD_FIELDS validTo
 
 # ── 2026-09-26：给 venues/devices/agents/employees/work-orders/cs 19 张表单挂端点后显形 ──
 #

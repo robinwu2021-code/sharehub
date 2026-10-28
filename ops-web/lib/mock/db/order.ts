@@ -435,7 +435,7 @@ export function handleOrderException(
 ): OrderException {
   const e = findException(orderNo);
   if (!e) throw new OrderExceptionError(orderNo, action, null, `异常单 ${orderNo} 不存在`);
-  const result = payload?.result?.trim();
+  const result = payload?.handleResult?.trim();
   if (!result) throw new OrderExceptionError(orderNo, action, e.status, `「${EXC_LABEL[action]}」必须填写处置结论`);
   if (!canHandleException(e.status, action)) throw new OrderExceptionError(orderNo, action, e.status);
 
@@ -488,8 +488,8 @@ interveneOrder(orders[4].orderNo, "compensate", {
 // 「发起退款」不在此处种：退款申请要先落 cs.ts 的退款队列，db 层不能反向 import，
 // 该链路由 API mock 层组合（见 lib/api/mocks/order.ts），页面上点一次即可验证。
 handleOrderException(orderExceptions[0].orderNo, "close", {
-  result: "核查柜机日志确认宝已正常弹出，用户未取走，无资损，直接关闭", operatorName: "Sara Ahmed",
+  handleResult: "核查柜机日志确认宝已正常弹出，用户未取走，无资损，直接关闭", operatorName: "Sara Ahmed",
 });
 handleOrderException(orderExceptions[1].orderNo, "work_order", {
-  result: "柜机仓位卡宝导致未弹出，转运维现场检修", operatorName: "Omar Khan",
+  handleResult: "柜机仓位卡宝导致未弹出，转运维现场检修", operatorName: "Omar Khan",
 });

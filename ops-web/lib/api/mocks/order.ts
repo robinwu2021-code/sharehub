@@ -33,7 +33,7 @@ export const orderMock: OrderApi = {
   //（与订单干预的 refund_apply 同一套做法）。转工单/直接关闭 db 层自己就能完成。
   handleOrderException: (no, action, payload) => {
     if (action === "refund") {
-      const r = db.applyRefund(no, payload.result?.trim() || "异常订单处置退款");
+      const r = db.applyRefund(no, payload.handleResult?.trim() || "异常订单处置退款");
       return wait(db.handleOrderException(no, action, { ...payload, refundNo: r.refundNo }), 400);
     }
     return wait(db.handleOrderException(no, action, payload), 400);

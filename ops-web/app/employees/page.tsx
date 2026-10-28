@@ -204,8 +204,8 @@ function filterDepts(rows: Department[], kw: string): Department[] {
 // —— 功能权限勾选树 ——
 const PERM_MODULE_LABEL: Record<string, string> = {
   dashboard: "经营看板", device: "设备运营", location: "点位拓展", order: "订单交易",
-  // 模块名跟着菜单走：「计费定价」L1 已于 2026-09-23 撤销，其内容并入运营管理 › 计费与调价
-  pricing: "计费与调价", finance: "财务分润", workorder: "工单运维", user: "用户运营",
+  // 模块名跟着菜单走：计费 2026-10-28 并入「销售管理 › 计费」（OM04）
+  pricing: "计费", finance: "财务分润", workorder: "工单运维", user: "用户运营",
   marketing: "营销", cs: "客服", org: "员工与权限", report: "数据报表",
   system: "系统配置", agent: "商家管理",
 };

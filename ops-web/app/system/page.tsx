@@ -31,7 +31,7 @@ import { useCan } from "@/lib/hooks/use-can";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
 import { exportCsv } from "@/lib/export-csv";
-import type { NotifyTemplate, DictEntry, Region, RegionNode, SysParam, OpenApiApp, MarketCountry, PaymentChannel, PageResult } from "@/lib/types";
+import type { NotifyTemplate, DictEntry, Region, RegionNode, SysParam, OpenApiApp, MarketCountry, PageResult } from "@/lib/types";
 import type {
   NotifyLog, NotifyBlacklist, LoginSetting, TaxSetting,
   WithdrawRule, ReservationRule, BillingDefaultRule,
@@ -44,8 +44,9 @@ import type {
 // 三个页面调同一组 API（listAppVersions/saveAppVersion/rollbackAppVersion、listBanks/
 // saveBank/archiveBank、listProblems/saveProblem/archiveProblem），是同一张表的两个
 // 维护入口。按「重合功能一律并到运营管理」收敛到那边，本页不再留第二份。
-// 2026-10-28「供应商接入」搬到「设备管理 › 设备接入」（components/device/vendors-tab.tsx），本页不再留第二份。
-const TAB_KEYS = ["payment", "notify", "notify-log", "notify-blacklist", "rules",
+// 2026-10-28「供应商接入」搬到「设备管理 › 设备接入」（components/device/vendors-tab.tsx），
+// 「支付渠道」搬到「销售管理 › 支付」（components/system/payment-channels-tab.tsx），本页不再留第二份。
+const TAB_KEYS = ["notify", "notify-log", "notify-blacklist", "rules",
   "login", "dict", "region", "params", "tax",
   "markets", "openapi"] as const;
 
@@ -110,35 +111,6 @@ const PARAM_FIELDS: FieldDef[] = [
   { key: "label", label: "说明", placeholder: "订单超时分钟数" },
   { key: "value", label: "取值", placeholder: "30" },
   { key: "groupName", label: "分组", placeholder: "订单" },
-];
-
-// 密钥类字段一律 password 型 + 掩码占位，前端永不承载真实密钥（真实值仅后端保管）
-/**
- * @form POST /api/platform/payment-channels
- * @form POST /api/platform/payment-channels/{channelCode}
- */
-const PAYMENT_FIELDS: FieldDef[] = [
-  { key: "channelCode", label: "渠道码", readOnlyOnEdit: true, placeholder: "NEARPAY / STRIPE / PAYPAL" },
-  { key: "channelName", label: "渠道名称", placeholder: "NearPay（聚合收单）" },
-  // 英/阿名后端一直存着，此前表单里没有 —— 等于只能由 DBA 直接改库。
-  // 展示仍用 channelName：本仓还没有「按当前语言取名」的统一做法（品牌/站点同理）。
-  { key: "channelNameEn", label: "渠道名称（English）", placeholder: "NearPay (Aggregated)" },
-  { key: "channelNameAr", label: "渠道名称（العربية）", placeholder: "نير باي" },
-  { key: "mode", label: "接入模式", type: "select", options: [{ value: "DELEGATED", label: "委托" }, { value: "DIRECT", label: "直连" }] },
-  { key: "status", label: "状态", type: "select", options: [{ value: "ENABLED", label: "启用" }, { value: "DISABLED", label: "停用" }] },
-  { key: "countries", label: "适用国家", placeholder: "AE,SA" },
-  { key: "currencies", label: "币种", placeholder: "AED,SAR" },
-  { key: "capabilities", label: "能力", placeholder: "支付,退款,预授权,分账" },
-  { key: "apiBase", label: "API 基址", placeholder: "https://api.nearpay.example" },
-  {
-    key: "merchantId", label: "商户号", placeholder: "MID-AE-100286",
-    help: "密钥不在这里配：明文走 KMS/vault 轮换（ADR-005），库里只存掩码供核对末四位，列表「密钥」列可读",
-  },
-  // 这里原本有 apiKeyMasked / apiSecretMasked 两个 password 输入框。
-  // **后端刻意不收**（PaymentChannelController 类注释：「入参即使带了明文密钥字段也无处可落
-  // —— 实体压根没有那个字段」，ChannelBody 里确实没有这两项）。
-  // 于是运营填进去、拿到 200、什么都没存，而列表里的掩码还是原来那个。
-  // 掩码是**出参**，不是入参：可读不可填，读的地方挪到列表那一列。
 ];
 
 // 国家码是业务主键（ISO alpha-2），新增必填、编辑只读
@@ -417,7 +389,6 @@ function SystemInner() {
   const canRegion = allow("system:region:update");
   const canParam = allow("system:param:update");
   const canOpenapi = allow("system:openapi:update");
-  const canPayment = allow("system:payment_channel:update");
   const canMarket = allow("system:market:update");
 
   const [notifyForm, setNotifyForm] = useState<Partial<NotifyTemplate> | null>(null);
@@ -425,7 +396,6 @@ function SystemInner() {
   const [regionForm, setRegionForm] = useState<Partial<Region> | null>(null);
   const [paramForm, setParamForm] = useState<Partial<SysParam> | null>(null);
   const [openapiForm, setOpenapiForm] = useState<Partial<OpenApiApp> | null>(null);
-  const [paymentForm, setPaymentForm] = useState<Partial<PaymentChannel> | null>(null);
   const [marketForm, setMarketForm] = useState<Partial<MarketCountry> | null>(null);
 
   // —— B2/B3/B5 八个 tab：写权限门控（权限码见 功能权限清单 §13）——
@@ -503,7 +473,6 @@ function SystemInner() {
   const saveRegion = useMutation({ mutationFn: (v: Partial<Region>) => api.saveRegion(v), onSuccess: onSaved(setRegionForm) });
   const saveParam = useMutation({ mutationFn: (v: Partial<SysParam>) => api.saveSysParam(v), onSuccess: onSaved(setParamForm) });
   const saveOpenapi = useMutation({ mutationFn: (v: Partial<OpenApiApp>) => api.saveOpenApiApp(v), onSuccess: onSaved(setOpenapiForm) });
-  const savePayment = useMutation({ mutationFn: (v: Partial<PaymentChannel>) => api.savePaymentChannel(v), onSuccess: onSaved(setPaymentForm) });
   const saveMarket = useMutation({ mutationFn: (v: Partial<MarketCountry>) => api.saveMarketCountry(v), onSuccess: onSaved(setMarketForm) });
   const saveBlacklist = useMutation({ mutationFn: (v: Partial<NotifyBlacklist>) => api.saveNotifyBlacklist(v), onSuccess: onSaved(setBlacklistForm) });
   const saveLogin = useMutation({ mutationFn: (v: Partial<LoginSetting>) => api.saveLoginSetting(v), onSuccess: onSaved(setLoginForm) });
@@ -529,11 +498,10 @@ function SystemInner() {
     setShowArchived(false);
   };
 
-  const q = useQuery<PageResult<NotifyTemplate | DictEntry | Region | SysParam | OpenApiApp | MarketCountry | PaymentChannel | NotifyLog | NotifyBlacklist | LoginSetting | TaxSetting>>({
+  const q = useQuery<PageResult<NotifyTemplate | DictEntry | Region | SysParam | OpenApiApp | MarketCountry | NotifyLog | NotifyBlacklist | LoginSetting | TaxSetting>>({
     queryKey: ["sys", tab, paging.page, paging.size, keyword, filterKey],
     queryFn: () =>
-      tab === "payment" ? api.listPaymentChannels({ page: paging.page, size: paging.size, keyword })
-      : tab === "notify" ? api.listNotifyTemplates({ page: paging.page, size: paging.size, keyword })
+      tab === "notify" ? api.listNotifyTemplates({ page: paging.page, size: paging.size, keyword })
       : tab === "notify-log" ? api.listNotifyLogs({ page: paging.page, size: paging.size, keyword, channel: logChannel, status: logStatus, sort: logSort.key, dir: logSort.dir })
       : tab === "notify-blacklist" ? api.listNotifyBlacklist({ page: paging.page, size: paging.size, keyword, channel: blChannel, reason: blReason })
       : tab === "login" ? api.listLoginSettings({ page: paging.page, size: paging.size, keyword })
@@ -597,36 +565,6 @@ function SystemInner() {
     { header: t("common.actions"), cell: (m) => canMarket ? <Button size="sm" variant="outline" onClick={() => setMarketForm(m)}>{t("common.edit")}</Button> : <span className="text-muted-foreground">-</span> },
   ];
 
-  const paymentCols: Column<PaymentChannel>[] = [
-    { header: "渠道码", cell: (c) => <span className="font-medium">{c.channelCode}</span> },
-    { header: "名称", cell: (c) => c.channelName },
-    {
-      header: "密钥",
-      className: "whitespace-nowrap",
-      // 只说"配没配"，不显示掩码本身 —— 列表是扫描用的，掩码要看进抽屉。
-      // key 有 secret 没有是最常见的半配状态，单独标出来。
-      cell: (c) => !c.apiKeyMasked
-        ? <Badge tone="danger">未配置</Badge>
-        : !c.apiSecretMasked
-          ? <Badge tone="warning">缺 Secret</Badge>
-          : <Badge tone="success">已配置</Badge>,
-    },
-    { header: "模式", cell: (c) => <Badge tone="outline">{c.mode === "DELEGATED" ? "委托" : "直连"}</Badge> },
-    { header: "适用国家", cell: (c) => <span className="tabular-nums">{c.countries}</span> },
-    { header: "币种", cell: (c) => <span className="tabular-nums">{c.currencies}</span> },
-    // 能力矩阵：决定能否走预授权（免押）与分账（场地方/代理商）
-    { header: "能力", cell: (c) => <span className="text-muted-foreground">{c.capabilities}</span> },
-    { header: "商户号", cell: (c) => <span className="text-muted-foreground tabular-nums">{c.merchantId}</span> },
-    {
-      // 此前这一列写死 `****`，与上面那个「密钥」徽标列同名且不带任何信息。
-      // 掩码本来就是为了给人核对末四位的（明文永不落前端），所以这里出真值。
-      header: "密钥掩码",
-      cell: (c) => <span className="text-muted-foreground tabular-nums">{c.apiKeyMasked || "—"}{c.apiSecretMasked ? ` / ${c.apiSecretMasked}` : ""}</span>,
-    },
-    { header: "状态", cell: (c) => <EnabledBadge on={c.status === "ENABLED"} /> },
-    { header: "更新时间", cell: (c) => <span className="text-muted-foreground">{fmtTime(c.updatedAt)}</span> },
-    { header: "操作", cell: (c) => canPayment ? <Button size="sm" variant="outline" onClick={() => setPaymentForm(c)}>配置</Button> : <span className="text-muted-foreground">-</span> },
-  ];
 
   const editBtn = <T,>(can: boolean, open: (r: T) => void) => (row: T) =>
     can ? <Button size="sm" variant="outline" onClick={() => open(row)}>{t("common.edit")}</Button> : <span className="text-muted-foreground">-</span>;
@@ -875,23 +813,6 @@ function SystemInner() {
         </div>
       )}
 
-      {tab === "payment" && (
-        <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); paging.reset(); }} searchPlaceholder="搜索渠道码 / 名称 / 国家 / 币种"
-          // 密钥列导出为掩码占位，与表格一致——CSV 落到本地更不能带真实密钥
-          onExport={() => exportCsv<PaymentChannel>("支付渠道", [
-            { header: "渠道码", value: (c) => c.channelCode },
-            { header: "名称", value: (c) => c.channelName },
-            { header: "模式", value: (c) => (c.mode === "DELEGATED" ? "委托" : "直连") },
-            { header: "适用国家", value: (c) => c.countries },
-            { header: "币种", value: (c) => c.currencies },
-            { header: "能力", value: (c) => c.capabilities },
-            { header: "商户号", value: (c) => c.merchantId },
-            { header: "密钥", value: () => "****" },
-            { header: "状态", value: (c) => (c.status === "ENABLED" ? "启用" : "停用") },
-            { header: "更新时间", value: (c) => fmtTime(c.updatedAt) },
-          ], (q.data?.list ?? []) as PaymentChannel[])}
-          onAdd={canPayment ? () => setPaymentForm({ mode: "DIRECT", status: "DISABLED", countries: "AE", currencies: "AED", capabilities: "支付,退款", apiBase: "", merchantId: "" }) : undefined} addLabel="新增支付渠道" />
-      )}
       {tab === "notify" && (
         <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); paging.reset(); }} searchPlaceholder="搜索模板号 / 名称"
           onExport={() => exportCsv<NotifyTemplate>("通知模板", [
@@ -1070,7 +991,6 @@ function SystemInner() {
       {tab === "login" && <DataTable rowKey={(s: LoginSetting) => s.country} columns={loginCols} rows={q.data?.list as LoginSetting[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无登录设置——至少应保留一条 * 默认档，否则各国登录方式无处可依" />}
       {tab === "tax" && <DataTable rowKey={(x: TaxSetting) => x.country} columns={taxCols} rows={q.data?.list as TaxSetting[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无税率配置——未配置的国家按不含税出账，开票会缺税号" />}
 
-      {tab === "payment" && <DataTable rowKey={(c: PaymentChannel) => c.channelCode} columns={paymentCols} rows={q.data?.list as PaymentChannel[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无支付渠道——未配置渠道时 C 端无法下单支付，请先新增并启用至少一个渠道" />}
       {tab === "notify" && <DataTable rowKey={(t: NotifyTemplate) => t.templateNo} columns={notifyCols} rows={q.data?.list as NotifyTemplate[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无通知模板——OTP/借还/扣费短信都取自这里，请先新增模板再启用" />}
       {tab === "dict" && <DataTable rowKey={(d: DictEntry) => d.dictNo} columns={dictCols} rows={q.data?.list as DictEntry[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无字典项——所选分组下还没有枚举值，请新增字典项供下拉与状态展示使用" />}
       {/* S6 地区库：三级树。层级/上级由 parentId 推出，故树上不可能出现「层级与位置矛盾」的行 */}
@@ -1097,13 +1017,6 @@ function SystemInner() {
       {tab === "openapi" && <DataTable rowKey={(a: OpenApiApp) => a.appNo} columns={openapiCols} rows={q.data?.list as OpenApiApp[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无 OpenAPI 应用——还没有合作方接入，需要对外开放接口时在此新增应用并分配 AppKey" />}
       {tab === "markets" && <DataTable rowKey={(m: MarketCountry) => m.countryCode} columns={marketCols} rows={q.data?.list as MarketCountry[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无国家市场——开城前需先登记国家、币种与合规主体，否则该国无法上线" />}
       {tab !== "rules" && tab !== "region" && q.data && <Pagination page={paging.page} size={paging.size} total={q.data.total} onPage={paging.setPage} onSize={paging.setSize} />}
-
-      {/* 支付渠道 配置抽屉（密钥仅掩码，真实值由后端保管）*/}
-      <FormDrawer open={!!paymentForm} onOpenChange={(o) => !o && setPaymentForm(null)}
-        titleNew="新增支付渠道" titleEdit={`配置支付渠道 ${paymentForm?.channelCode ?? ""}`} isEdit={!!paymentForm?.channelCode}
-        fields={PAYMENT_FIELDS} value={(paymentForm ?? {}) as Record<string, unknown>}
-        onChange={(v) => setPaymentForm(v as Partial<PaymentChannel>)}
-        onSubmit={() => paymentForm && savePayment.mutate(paymentForm)} submitting={savePayment.isPending} />
 
       {/* 通知模板 编辑抽屉 */}
       <FormDrawer open={!!notifyForm} onOpenChange={(o) => !o && setNotifyForm(null)}

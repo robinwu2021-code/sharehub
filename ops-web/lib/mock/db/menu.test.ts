@@ -34,11 +34,11 @@ describe("菜单管理（mock）", () => {
   });
 
   it("藏别的可以，且真的从「我看得到的」那棵里消失", async () => {
-    await updateMenu("M_marketing", { visible: 0 }, catalog());
-    expect((await visibleMenus(["*"], "ADMIN")).map((s) => s.menuNo)).not.toContain("M_marketing");
+    await updateMenu("M_report", { visible: 0 }, catalog());
+    expect((await visibleMenus(["*"], "ADMIN")).map((s) => s.menuNo)).not.toContain("M_report");
     // 但管理树里还在 —— 否则藏了就再也找不回来
-    expect((await allMenus()).map((s) => s.menuNo)).toContain("M_marketing");
-    await updateMenu("M_marketing", { visible: 1 }, catalog());
+    expect((await allMenus()).map((s) => s.menuNo)).toContain("M_report");
+    await updateMenu("M_report", { visible: 1 }, catalog());
   });
 
   it("不存在的菜单要拒，而不是凭空造一个", async () => {

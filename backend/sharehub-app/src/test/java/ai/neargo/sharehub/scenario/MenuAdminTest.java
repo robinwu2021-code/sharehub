@@ -105,14 +105,14 @@ class MenuAdminTest extends ApiTestSupport {
         // 护栏只保「回得来的那扇门」，别的该藏就能藏 —— 否则这个功能等于没有
         String admin = login("ADMIN");
         try {
-            put(MENUS + "/M_marketing", patch("visible", 0), admin).okData();
+            put(MENUS + "/M_report", patch("visible", 0), admin).okData();
             assertThat(get("/api/auth/menus", admin).okData().toString())
                     .as("藏了就不该出现在「我看得到的」那棵树里")
-                    .doesNotContain("M_marketing");
-            assertThat(node(admin, "M_marketing"))
+                    .doesNotContain("M_report");
+            assertThat(node(admin, "M_report"))
                     .as("但管理用的全量树里还在——否则藏了就再也找不回来").isNotNull();
         } finally {
-            put(MENUS + "/M_marketing", patch("visible", 1), admin).okData();
+            put(MENUS + "/M_report", patch("visible", 1), admin).okData();
         }
     }
 
