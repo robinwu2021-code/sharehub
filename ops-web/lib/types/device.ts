@@ -55,6 +55,60 @@ export interface Cabinet extends Archivable {
   qcStatus: QcStatus | null;
   /** 所在仓；在库设备才有。调拨按仓选设备要用它。 */
   warehouseNo: string | null;
+  /**
+   * 出库池归属：出库给了哪个商家（V161，商户入驻会话）。空 = 在仓或平台直营。
+   * 与 `warehouseNo` 互斥（在仓就不在出库池）。绑定只能绑到这个商家的站点点位上；
+   * `agentNo` 仍只由点位派生 —— 设备在出库池里、还没绑定时 `agentNo` 为空。
+   * 设计：docs/technical/设备出库与绑定-技术设计.md §2.1。
+   */
+  issuedAgentNo?: string | null;
+  /** 进入出库池的时刻。 */
+  issuedAt?: string | null;
+}
+
+/** 出库池筛选：未绑定 / 已绑定（含已上线）/ 全部。 */
+export type PoolFilter = "UNBOUND" | "BOUND" | "ALL";
+
+/** 出库给商家（POST /api/ops/devices/issue）。一个事务，全成或全不成。 */
+export interface IssueDevicesReq {
+  agentNo: string;
+  cabinetNos: string[];
+}
+/** 出库池退回仓库（POST /api/ops/devices/pool-return）。只收未绑定的设备；原因必填。 */
+export interface PoolReturnReq {
+  cabinetNos: string[];
+  warehouseNo?: string;
+  reason: string;
+}
+/** 出库池按商家汇总（GET /api/ops/inventory/issued-summary）。 */
+export interface IssuedSummary {
+  agentNo: string;
+  agentName: string;
+  /** 在出库池、未绑定 */
+  unbound: number;
+  /** 已绑定点位、尚未上线 */
+  bound: number;
+  /** 已上线（含故障） */
+  live: number;
+}
+/**
+ * 绑定（POST /api/ops/devices/{deviceNo}/bind）。`locationNo` 缺省 = 出库池商家的默认站点默认点位。
+ * 点位所属站点的商家必须等于设备的出库池商家，否则 409。
+ */
+export interface BindReq {
+  locationNo?: string;
+  /** 同时建装机工单 */
+  openInstallWo?: boolean;
+}
+/** 批量绑定（POST /api/ops/devices/bind-batch）。一个事务，任一失败整批回滚。 */
+export interface BindBatchReq extends BindReq {
+  agentNo: string;
+  deviceNos: string[];
+}
+export interface BindResult {
+  cabinet: Cabinet;
+  /** openInstallWo 时生成的装机工单号 */
+  woNo?: string | null;
 }
 
 export type SlotLock = "LOCKED" | "UNLOCKED";

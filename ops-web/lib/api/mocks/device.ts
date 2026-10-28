@@ -1,19 +1,24 @@
 // 覆盖范围：机柜与仓位、下发指令、充电宝、实时监控、指令记录、调拨、OTA、设备日志、设备编码批次。
 import * as dg from "../../mock/db/device-gate";
 import * as da from "../../mock/db/device-asset";
+import * as dp from "../../mock/db/device-pool";
 import * as db from "../../mock/db";
 import type { DeviceApi } from "../contracts/device";
 import type { PageQ, CabinetQ, DeviceLogQ, ArchiveQ, OtaReleaseQ } from "../query";
 import { wait } from "./_wait";
 
 export const deviceMock: DeviceApi = {
-  listCabinets: (q: CabinetQ = {}) =>
-    wait(db.paginate(db.cabinets, q.page, q.size, (c) =>
+  listCabinets: (q: CabinetQ = {}) => {
+    // 出库池筛选第一次出现时补演示数据（见 device-pool.ensurePoolSeed 的说明）
+    if (q.issuedAgentNo || q.pool) dp.ensurePoolSeed();
+    return wait(db.paginate(db.cabinets, q.page, q.size, (c) =>
+      dp.poolHit(c, q.issuedAgentNo, q.pool) &&
       db.liveHit(c, q.showArchived) &&
       // 站点号也进搜索：从站点相关页面（坪效/生命周期）拿到 ST3xx 时能直接搜出这个站的机柜
       db.kwHit(q.keyword, c.cabinetNo, c.locationName, c.siteNo) &&
       (!q.onlineStatus || c.onlineStatus === q.onlineStatus) &&
-      (!q.status || c.status === q.status))),
+      (!q.status || c.status === q.status)));
+  },
   getCabinet: (no) => wait({ cabinet: db.cabinets.find((c) => c.cabinetNo === no)!, slots: db.slotsOf(no) }),
   // async：让 CabinetError / CommandError 变成 rejected promise，交给全局 MutationCache 弹错
   saveCabinet: async (x) => wait(db.saveCabinet(x), 350),
@@ -79,4 +84,12 @@ export const deviceMock: DeviceApi = {
   receiveTransfer: async (no, receivedNos, note) => wait(da.receiveTransfer(no, receivedNos, note), 400),
   listAssetDiffs: async (q = {}) => wait(da.listAssetDiffs(q)),
   resolveAssetDiff: async (diffNo, note) => wait(da.resolveAssetDiff(diffNo, note), 350),
+
+  // —— 出库池与绑定：规则（不变式 I1 ~ I5）在 db 层，这里只延迟透传；async 让同步抛错变成 rejected promise ——
+  issueDevices: async (x) => wait(dp.issueDevices(x), 400),
+  returnPoolDevices: async (x) => wait(dp.returnDevicesToWarehouse(x), 400),
+  issuedSummary: async (agentNo) => wait(dp.issuedSummary(agentNo)),
+  bindDevice: async (no, x) => wait(dp.bindDevice(no, x), 400),
+  bindDevices: async (x) => wait(dp.bindDevices(x), 500),
+  unbindDevice: async (no, reason) => wait(dp.unbindDevice(no, reason), 400),
 };

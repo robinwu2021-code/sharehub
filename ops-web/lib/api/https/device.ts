@@ -1,6 +1,7 @@
 // 覆盖范围：机柜与仓位、下发指令、充电宝、实时监控、指令记录、调拨、OTA、设备日志、设备编码批次。
 // 端点前缀：/api/ops/**
 import { client } from "../http-client";
+import { ApiError } from "../error";
 import type { DeviceApi } from "../contracts/device";
 import type { PageQ, CabinetQ, DeviceLogQ, ArchiveQ, OtaReleaseQ } from "../query";
 import type { Checklist } from "../../types";
@@ -117,4 +118,20 @@ export const deviceHttp: DeviceApi = {
   receiveTransfer: (no, receivedNos, note) => client.post(`/api/ops/inventory-transfers/${no}/receive`, { receivedNos, note }),
   listAssetDiffs: (q) => client.get("/api/ops/asset-diffs", q),
   resolveAssetDiff: (diffNo, note) => client.post(`/api/ops/asset-diffs/${diffNo}/resolve`, { note }),
+
+  // 出库池（商户入驻会话 0a5c511f，V161；契约 6f275650）。整批一个事务；
+  // 错误码 error.issue.agent_not_ready / not_issuable / not_in_pool、error.device.qc_not_passed 均为 409。
+  issueDevices: (x) => client.post("/api/ops/devices/issue", x),
+  returnPoolDevices: (x) => client.post("/api/ops/devices/pool-return", x),
+  issuedSummary: (agentNo) => client.get("/api/ops/inventory/issued-summary", agentNo ? { agentNo } : {}),
+  // 绑定：后端未上线前明确拒绝（501），不发请求 —— 契约缺口棘轮（drift.test）为 0，
+  // 前端不得调用后端还没有的路径。页面按 featureReady("devices.bind") 显示「后端未上线」。
+  // 已商定路径：POST /api/ops/devices/{no}/bind · /api/ops/devices/bind-batch · /api/ops/devices/{no}/unbind
+  bindDevice: () => pending("绑定"),
+  bindDevices: () => pending("批量绑定"),
+  unbindDevice: () => pending("解绑"),
 };
+
+function pending(what: string): Promise<never> {
+  return Promise.reject(new ApiError(501, `${what}：后端接口尚未上线（设备出库与绑定，商户入驻会话实现中）`));
+}

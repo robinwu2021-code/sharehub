@@ -5,6 +5,7 @@ import type {
   InventoryTransfer, InventoryTransferDetail, OtaRollout, OtaRelease, OtaTask, DeviceLog, DeviceCodeBatch,
   Checklist, TrialRent, Protection, ProtectionReq, SignalCode,
   InvTransferReq, QcReq, QcRecord, ReceiveResult, AssetDiff, AssetDiffStatus, PowerbankAction,
+  IssueDevicesReq, PoolReturnReq, IssuedSummary, BindReq, BindBatchReq, BindResult,
 } from "../../types";
 
 export interface DeviceApi {
@@ -130,4 +131,18 @@ export interface DeviceApi {
   listAssetDiffs(q?: PageQ & { status?: AssetDiffStatus; sourceType?: string; sourceRef?: string }): Promise<PageResult<AssetDiff>>;
   /** 处理一条差异：写明去向结论。**结论必填** —— 没有结论的「已处理」等于把差异藏起来。 */
   resolveAssetDiff(diffNo: string, note: string): Promise<AssetDiff>;
+
+  // === 出库池与绑定（docs/technical/设备出库与绑定-技术设计.md §3.2 ~ 3.4）===
+  /** 出库给商家：一个事务，全成或全不成。商家须已补齐资料（有默认站点）。 */
+  issueDevices(x: IssueDevicesReq): Promise<Cabinet[]>;
+  /** 出库池退回仓库：只收未绑定的设备；原因必填。 */
+  returnPoolDevices(x: PoolReturnReq): Promise<Cabinet[]>;
+  /** 出库池按商家汇总：未绑定 / 已绑定 / 已上线。 */
+  issuedSummary(agentNo?: string): Promise<IssuedSummary[]>;
+  /** 绑定：不给点位 = 出库池商家的默认站点默认点位；点位商家 ≠ 出库池商家 409。 */
+  bindDevice(deviceNo: string, x?: BindReq): Promise<BindResult>;
+  /** 批量绑定：一个事务。 */
+  bindDevices(x: BindBatchReq): Promise<BindResult[]>;
+  /** 解绑：只限已绑定未上线，回到同一商家的出库池。 */
+  unbindDevice(deviceNo: string, reason: string): Promise<Cabinet>;
 }

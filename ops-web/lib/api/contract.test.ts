@@ -15,7 +15,7 @@ const API_METHODS: Record<string, readonly string[]> = {
   dashboard: ["login", "logout", "me", "getMenus", "getDashboard", "getOpsFlowMetrics", "sendLoginOtp", "listOperators", "switchOperator", "changePassword"],
   device: ["goLiveGate", "goLive", "markDeviceFault", "repairDevice", "undeployDevice", "retireDevice", "listTrialRents", "startTrialRent", "listProtections", "applyProtection", "releaseProtection", "listSignalCodes", "listCabinets", "getCabinet", "saveCabinet", "sendCommand", "listPowerbanks", "listCabinetMonitor", "listCommandRecords", "listInventoryTransfers", "getInventoryTransfer", "listOtaRollouts", "savePowerbank", "saveInventoryTransfer", "saveOtaRollout", "listOtaReleases", "saveOtaRelease", "listOtaTasks", "listDeviceLogs", "listDeviceCodeBatches", "saveDeviceCodeBatch", "archiveCabinet", "unarchiveCabinet", "archivePowerbank", "unarchivePowerbank", "importCabinets", "transitPowerbank", "inspectCabinet", "inspectPowerbank",
   // 疑似丢失核实（后端 V113）：失联满 7 天打标记，由人确认丢失或找回
-  "confirmPowerbankLost", "dismissPowerbankLost", "listQcRecords", "setTransferItems", "shipTransfer", "receiveTransfer", "listAssetDiffs", "resolveAssetDiff"],
+  "confirmPowerbankLost", "dismissPowerbankLost", "listQcRecords", "setTransferItems", "shipTransfer", "receiveTransfer", "listAssetDiffs", "resolveAssetDiff", "issueDevices", "returnPoolDevices", "issuedSummary", "bindDevice", "bindDevices", "unbindDevice"],
   alarm: ["alarmSummary", "getAlarmDetail", "alarmDispositionPreview", "disposeAlarm", "listAlarmRoutes", "saveAlarmRoutes", "alarmCodeStats", "listAlarmTodos", "alarmTodoCount", "doneAlarmTodo", "listAlarmRecords", "listAlarmNotices", "listAlarmCodes", "listAlarmRules", "saveAlarmCode", "saveAlarmRule", "raiseAlarmWorkOrder", "ackAlarm", "closeAlarm", "autoRaiseWorkOrders", "resendAlarmNotice", "archiveAlarmCode", "unarchiveAlarmCode", "archiveAlarmRule", "unarchiveAlarmRule"],
   workorder: ["woSummary", "getWorkOrderDetail", "assigneeCandidates", "deriveWorkOrder", "takeoverWorkOrder", "listWorkOrders", "createWorkOrder", "dispatchWorkOrder", "acceptWorkOrder", "processWorkOrder", "completeWorkOrder", "closeWorkOrder", "rejectWorkOrder", "reworkWorkOrder", "listSlaRules", "listInspectionPlans", "saveSlaRule", "saveInspectionPlan", "runInspectionPlan", "getSlaRule", "getInspectionPlan", "listWoPool", "grabWorkOrder", "listWoCosts"],
   location: ["listSiteAgents", "saveSiteAgent", "removeSiteAgent", "listSites", "saveSite", "listLocations", "savePoint", "listVenues", "listContracts", "listLeads", "getLead", "claimLead", "convertLead", "listSiteAnalysis", "saveLead", "saveVenue", "saveContract", "listLeadFollowUps", "addLeadFollowUp", "addContractAttachment", "removeContractAttachment", "listVenueOnboardings", "getVenueOnboarding", "saveVenueOnboarding", "reviewVenueOnboarding", "listSiteLifecycles", "siteLifecycleFunnel", "getContract", "contractSummary", "listContractLogs", "submitContract", "withdrawContract", "auditContract", "cosignContract", "signContract", "terminateContract", "auditContractTermination", "renewContract", "supplementContract", "getSite", "siteSummary", "listSiteStatusLogs", "siteOpeningChecklist", "siteCloseGate", "withdrawSite", "closeSite", "listSiteSurveys", "recordSiteSurvey", "archiveSite", "unarchiveSite", "archivePoint", "unarchivePoint", "archiveVenue", "unarchiveVenue"],
@@ -85,7 +85,7 @@ describe("域切片划分", () => {
     expect(sorted(keysOf((HTTP_SLICES as Record<string, object>)[domain]))).toEqual(expected);
   });
 
-  it("方法总数仍为 424（新增/删除 API 时须自觉更新此数）", () => {
+  it("方法总数仍为 430（新增/删除 API 时须自觉更新此数）", () => {
     // 2026-09-23：差异化定价 2 个退役，适用范围 3 个新增（ADR-028 / V49），净 +1。
     // 2026-09-23 B1：品牌四个端点（list/save/archive/unarchive）。
         // 2026-09-23 A2-1：站点伙伴责任三个端点。
@@ -123,6 +123,6 @@ describe("域切片划分", () => {
     // 415：+1 = fileBlobUrl（带鉴权取个人数据文件的字节，2026-09-28）——
     //      PII 不发签名地址，<img> 又发不了 Authorization 头
     // 2026-09-28 M5 提现送 OpsKit：重新送审 / 重试生效（+2）；标题里的数此前停在 367，一并改正
-    expect(ALL_METHODS.length).toBe(424);
+    expect(ALL_METHODS.length).toBe(430);
   });
 });

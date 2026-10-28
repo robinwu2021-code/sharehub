@@ -38,7 +38,17 @@ export type ArchiveQ = PageQ & { showArchived?: boolean };
 // ——— 域特有形状 ———
 
 /** 设备：在线状态 + 业务状态双筛。 */
-export type CabinetQ = PageQ & { onlineStatus?: string; status?: string; showArchived?: boolean };
+export type CabinetQ = PageQ & {
+  onlineStatus?: string; status?: string; showArchived?: boolean;
+  /** 出库池商家（技术设计 §3.3） */
+  issuedAgentNo?: string;
+  /** 出库池筛选：未绑定 / 已绑定 / 全部 */
+  pool?: "UNBOUND" | "BOUND" | "ALL";
+};
+/** 站点列表：加按商家筛（技术设计 §3.6）。 */
+export type SiteQ = ArchiveQ & { agentNo?: string };
+/** 点位列表：加按站点、商家筛。 */
+export type LocationQ = ArchiveQ & { siteNo?: string; agentNo?: string };
 /** 告警记录：级别 + 处理状态。 */
 /**
  * 告警记录筛选。`status` / `domain` 后端按逗号拆成 IN —— 「未关闭」就是 `OPEN,ACKED`，

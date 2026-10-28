@@ -9,7 +9,7 @@ import type {
 import { p, iso, phone, OPERATORS } from "./internal";
 import { paginate, kwHit, upsert, nextNo, archiveRow, unarchiveRow } from "./helpers";
 import { cabinets } from "./device";
-import { sites } from "./location";
+import { sites, ensureDefaultPoint } from "./location";
 import { fail, notFound } from "@/lib/biz-error";
 import { agentCoreComplete } from "../../types";
 import { VENUE_INDUSTRIES } from "../../types/location";
@@ -310,6 +310,12 @@ export function syncDefaultSite(a: Agent, locationChanged: boolean) {
   });
   a.defaultSiteNo = siteNo;
   logAssignment(a.agentNo, "SITE", siteNo, "ASSIGN");
+  // 与后端 8271deaa 同一事务的另外两件事：OPERATE 责任行（分润读它，只写归属不写责任钱会分给别人）
+  // + 默认点位（设备出库与绑定 · 技术设计 §2.3：不选点位的绑定落在这里）
+  if (!listSiteAgents(siteNo).some((r) => r.agentNo === a.agentNo && r.role === "OPERATE")) {
+    saveSiteAgent(siteNo, { agentNo: a.agentNo, role: "OPERATE", remark: "商家默认站点（系统建）" });
+  }
+  ensureDefaultPoint(siteNo);
   refreshAgentAssetCounts();
 }
 

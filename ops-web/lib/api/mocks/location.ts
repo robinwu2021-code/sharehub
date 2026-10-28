@@ -7,16 +7,20 @@ import * as db from "../../mock/db";
 import * as loc from "../../mock/db/location";
 import * as svy from "../../mock/db/location-survey";
 import type { LocationApi, ContractQ } from "../contracts/location";
-import type { PageQ, ArchiveQ , ReportQ } from "../query";
+import type { PageQ, ArchiveQ , ReportQ, SiteQ, LocationQ } from "../query";
+import * as dp from "../../mock/db/device-pool";
 import type { Site, SitePoint } from "../../types";
 import { wait } from "./_wait";
+import { fail } from "@/lib/biz-error";
 
 export const locationMock: LocationApi = {
   listSiteAgents: (siteNo) => wait(db.listSiteAgents(siteNo)),
   saveSiteAgent: async (siteNo, x) => wait(db.saveSiteAgent(siteNo, x), 350),
   removeSiteAgent: async (siteNo, id) => wait(db.removeSiteAgent(siteNo, id), 350),
-  listSites: (q: ArchiveQ = {}) =>
-    wait(db.paginate(db.sites, q.page, q.size, (s) => db.liveHit(s, q.showArchived) && db.kwHit(q.keyword, s.name, s.venueName, s.regionId))),
+  listSites: (q: SiteQ = {}) =>
+    wait(db.paginate(db.sites, q.page, q.size, (s) => db.liveHit(s, q.showArchived)
+      && (!q.agentNo || s.agentNo === q.agentNo)
+      && db.kwHit(q.keyword, s.name, s.venueName, s.regionId))),
   // async：让 assertSiteCoords 抛的 SiteCoordError 变成 rejected promise，交给全局 MutationCache 弹错
   saveSite: async (s) => {
     const idx = db.sites.findIndex((x) => x.siteNo === s.siteNo);
@@ -24,14 +28,38 @@ export const locationMock: LocationApi = {
     // 坐标在**落库前**校验：写进去再发现飘到印度洋，地图上只会表现为「站点不见了」
     loc.assertSiteCoords(merged.lat, merged.lng);
     merged.lat = Number(merged.lat); merged.lng = Number(merged.lng); // 表单 number input 可能给字符串
+    // 商家归属只在建站时定（一期运营代建，技术设计 §3.6）；改站点不改归属 —— 换商家走「整站换商家」
+    if (idx >= 0) merged.agentNo = db.sites[idx].agentNo;
     if (idx >= 0) db.sites[idx] = merged; else db.sites.unshift(merged);
+    // 商家站点同事务的另外两件事：OPERATE 责任行 + 默认点位
+    if (idx < 0 && merged.agentNo) dp.provisionMerchantSite(merged.siteNo, merged.agentNo);
     return wait(merged, 350);
   },
-  listLocations: (q: ArchiveQ = {}) =>
-    wait(db.paginate(db.locations, q.page, q.size, (l) => db.liveHit(l, q.showArchived) && db.kwHit(q.keyword, l.name, l.siteName))),
-  savePoint: (l) => {
+  listLocations: (q: LocationQ = {}) => {
+    // 点位的商家由所属站点派生（只读），出参带上 —— 商家看自己的点位、绑定时校验都靠它
+    const agentOfSite = (siteNo: string) => db.sites.find((s) => s.siteNo === siteNo)?.agentNo ?? null;
+    return wait(db.paginate(
+      db.locations.map((l) => ({ ...l, isDefault: !!l.isDefault, agentNo: agentOfSite(l.siteNo) })),
+      q.page, q.size, (l) => db.liveHit(l, q.showArchived)
+        && (!q.siteNo || l.siteNo === q.siteNo)
+        && (!q.agentNo || l.agentNo === q.agentNo)
+        && db.kwHit(q.keyword, l.name, l.siteName)));
+  },
+  // async：站点不存在时同步抛错，要变成 rejected promise
+  savePoint: async (l) => {
     const idx = db.locations.findIndex((x) => x.locationNo === l.locationNo);
-    const merged = { ...(db.locations[idx] ?? { name: "", siteNo: "", siteName: "", spotDesc: "", cabinetCount: 0, status: "ACTIVE", archivedAt: null, locationNo: `LOC${200 + db.locations.length}` }), ...l } as SitePoint;
+    const prev = idx >= 0 ? db.locations[idx] : null;
+    const siteNo = l.siteNo ?? prev?.siteNo ?? "";
+    const site = db.sites.find((s) => s.siteNo === siteNo);
+    // 后端今天建点位不校验站点、不写商家（技术设计 §一）；mock 按目标口径：站点必须存在、商家随站点
+    if (!site) fail(`站点不存在：${siteNo || "(空)"}，点位必须挂在站点下`, `Site not found: ${siteNo || "(empty)"}`);
+    const merged = {
+      ...(prev ?? { name: "", spotDesc: "", cabinetCount: 0, status: "ACTIVE", archivedAt: null, isDefault: false,
+        locationNo: db.nextNo("LOC", db.locations, 200, "locationNo") }),
+      ...l, siteNo, siteName: site.name, agentNo: site.agentNo ?? null,
+      // 默认点位是建站时系统建的，表单改不了这个标记
+      isDefault: prev?.isDefault ?? false,
+    } as SitePoint;
     if (idx >= 0) db.locations[idx] = merged; else db.locations.unshift(merged);
     return wait(merged, 350);
   },

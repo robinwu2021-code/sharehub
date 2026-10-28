@@ -1,6 +1,6 @@
 // 覆盖范围：场所域（ADR-013）—— 站点 / 点位 / 场地方 / 合同 / 商机线索 / 选址分析 /
 // 门店 Onboarding / 站点生命周期。
-import type { PageQ, ArchiveQ , ReportQ } from "../query";
+import type { PageQ, ArchiveQ , ReportQ, SiteQ, LocationQ } from "../query";
 import type {
   PageResult, Site, SitePoint, Venue, Contract, ContractAttachmentReq, ContractSaveReq,
   Lead, LeadQ, LeadSaveReq, LeadConvertReq, LeadConversion, LeadFollowUp, LeadFollowUpReq, SiteAnalysis,
@@ -23,9 +23,15 @@ export interface LocationApi {
   /** 契约禁止 delete*，用 remove。撤销就是删这一行。 */
   removeSiteAgent(siteNo: string, id: number): Promise<{ ok: boolean }>;
 
-  listSites(q?: ArchiveQ): Promise<PageResult<Site>>;
+  /** 站点列表；`agentNo` 筛商家的站点（技术设计 §3.6）。 */
+  listSites(q?: SiteQ): Promise<PageResult<Site>>;
+  /**
+   * 建 / 改站点。带 `agentNo` = 商家站点（运营代建）：同事务写 OPERATE 责任行与默认点位，
+   * 场地方可空；不带 = 平台直营站点。
+   */
   saveSite(s: Partial<Site> & { siteNo?: string }): Promise<Site>;
-  listLocations(q?: ArchiveQ): Promise<PageResult<SitePoint>>;
+  /** 点位列表；`siteNo` / `agentNo` 筛选。出参带 `isDefault` 与派生的 `agentNo`。 */
+  listLocations(q?: LocationQ): Promise<PageResult<SitePoint>>;
   savePoint(l: Partial<SitePoint> & { locationNo?: string }): Promise<SitePoint>;
   listVenues(q?: ArchiveQ): Promise<PageResult<Venue>>;
   listContracts(q?: ContractQ): Promise<PageResult<Contract>>;

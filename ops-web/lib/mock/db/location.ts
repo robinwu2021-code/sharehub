@@ -810,3 +810,22 @@ export const archivePoint = (no: string) => archiveRow(locations, "locationNo", 
 export const unarchivePoint = (no: string) => unarchiveRow(locations, "locationNo", no);
 export const archiveVenue = (no: string) => archiveRow(venues, "venueNo", no);
 export const unarchiveVenue = (no: string) => unarchiveRow(venues, "venueNo", no);
+
+// ————————————————————————————— 站点的默认点位（设备出库与绑定 · 技术设计 §2.3） —————————————————————————————
+
+/**
+ * 站点的默认点位：没有就建一个（每站至多一个，技术设计 §2.3）。
+ * 点位的商家由站点派生 —— 今天后端新建点位从不写它，商家因此看不到自己的新点位（技术设计 §一）。
+ */
+export function ensureDefaultPoint(siteNo: string): SitePoint {
+  const site = sites.find((s) => s.siteNo === siteNo) ?? notFound("站点", "Site", siteNo);
+  const existing = locations.find((l) => l.siteNo === siteNo && l.isDefault && !l.archivedAt);
+  if (existing) return existing;
+  const point: SitePoint = {
+    locationNo: nextNo("LOC", locations, 200, "locationNo"),
+    name: `${site.name} · 默认点位`, siteNo, siteName: site.name, spotDesc: "建站时自动建",
+    cabinetCount: 0, status: "ACTIVE", archivedAt: null, isDefault: true, agentNo: site.agentNo ?? null,
+  };
+  locations.unshift(point);
+  return point;
+}
