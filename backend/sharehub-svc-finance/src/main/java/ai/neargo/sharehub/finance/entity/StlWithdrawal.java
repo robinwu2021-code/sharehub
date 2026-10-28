@@ -28,6 +28,10 @@ import java.math.BigDecimal;
 public class StlWithdrawal extends BaseEntity {
 
     private String withdrawNo;
+    /** 所属付款任务（V158）；空 = 商家自助申请的单。 */
+    private String taskNo;
+    /** 来源 {@link ai.neargo.sharehub.finance.WithdrawalOrigin}（V158）。 */
+    private String origin;
 
     /** 出款账户 {@code acct_account.account_no}。 */
     private String accountNo;

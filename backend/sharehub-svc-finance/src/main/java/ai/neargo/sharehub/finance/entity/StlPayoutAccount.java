@@ -53,6 +53,9 @@ public class StlPayoutAccount extends BaseEntity {
      */
     private String accountMasked;
 
+    /** 完整账号（IBAN）密文（V158，FieldCipher）。付款任务导出转账文件时解密；空 = 需补录。 */
+    private byte[] accountEnc;
+
     private String currency;
 
     /**

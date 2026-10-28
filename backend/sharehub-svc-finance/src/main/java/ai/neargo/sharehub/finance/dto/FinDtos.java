@@ -238,4 +238,55 @@ public final class FinDtos {
                                    String bankCode, String accountName, String accountMasked,
                                    String currency, Boolean makeDefault) {
     }
+
+    // —— 付款任务（V158，商家一期 B4；需求方案 §八）——
+
+    /**
+     * 预览一行 = 一个商家。{@code blockedReason} 非空即本次不能付款（收款账户未录 / 缺完整账号 / 商家停用），
+     * 这一行不会进入任务，结算单留在可付款范围，下次再带上。
+     */
+    public record PayoutPreviewItem(String payeeNo, String payeeName, List<String> settleNos, List<String> periods,
+                                    BigDecimal amount, String currency, String accountMasked, String blockedReason) {
+    }
+
+    /** 预览：可付的笔数与合计只算 blockedReason 为空的行。 */
+    public record PayoutPreview(String cutoffDate, String currency, int payableCount, BigDecimal payableTotal,
+                                List<PayoutPreviewItem> items) {
+    }
+
+    /** 生成付款任务。只有截止日，其余全部由服务端按预览口径重算 —— 不接受客户端传金额。 */
+    public record PayoutTaskCreateReq(String cutoffDate) {
+    }
+
+    /** 复核：通过 / 驳回（驳回必填原因，整任务撤回）。 */
+    public record PayoutTaskAuditReq(Boolean approve, String rejectReason) {
+    }
+
+    /**
+     * 确认到账。{@code results} 为空 = 全部成功，单笔流水号用「任务号-序号」；
+     * 不为空 = 逐笔结果（导入银行回单时由前端解析后传入），没列出的单不处理、留待下次确认。
+     */
+    public record PayoutConfirmReq(String bankBatchRef, String transferDate, List<PayoutConfirmItem> results) {
+    }
+
+    /** 逐笔结果。成功时 payRef 可空（用「任务号-序号」）；失败必填 failReason。 */
+    public record PayoutConfirmItem(String withdrawNo, Boolean success, String payRef, String failReason) {
+    }
+
+    /** 付款任务里的一笔（运营端看）。账号只给掩码 —— 完整账号只出现在导出文件里。 */
+    public record PayoutTaskItem(int seq, String withdrawNo, String payeeNo, String payeeName, BigDecimal amount,
+                                 String currency, String accountName, String accountMasked, String status,
+                                 List<String> settleNos, String payRef, String paidAt, String failReason) {
+    }
+
+    public record PayoutTask(String taskNo, String cutoffDate, String currency, int itemCount, BigDecimal totalAmount,
+                             String status, String createdBy, String createdName, String createdAt,
+                             String reviewedName, String reviewedAt, String rejectReason,
+                             String bankBatchRef, String transferDate, String confirmedAt, int exportCount,
+                             List<PayoutTaskItem> items) {
+    }
+
+    /** 导出结果：文件内容由控制器写成下载。 */
+    public record PayoutExportFile(String filename, String contentType, byte[] content) {
+    }
 }

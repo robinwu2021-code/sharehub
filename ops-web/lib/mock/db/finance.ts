@@ -1027,6 +1027,10 @@ export const payoutAccounts: PayoutAccount[] = [
     accountName: "Emaar Malls", accountMasked: "****9012", currency: "AED",
     isDefault: true, status: "ACTIVE" },
   // AG002 **故意没有账户** —— 代理门户「你还不能收款」那条路径要有数据能走到
+  // AG003 有账户：付款任务（V158）在 mock 下要有一个能付的商家，否则预览永远是 0 笔、整条流程走不下去
+  { accountNo: "PA004", payeeType: "AGENT", payeeNo: "AG003", bankCode: "ENBD",
+    accountName: "Deira Agent Trading LLC", accountMasked: "****5521", currency: "AED",
+    isDefault: true, status: "ACTIVE" },
 ];
 
 export function listPayoutAccounts(q: { page?: number; size?: number; keyword?: string; payeeType?: string; payeeNo?: string } = {}) {

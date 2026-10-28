@@ -1,6 +1,8 @@
 // 覆盖范围：分账规则与流水、总账、结算、提现审批、对账、发票、分润统计、充值订单。
 import * as db from "../../mock/db";
 import * as sa from "../../mock/db/settlement-adjust";
+import * as pt from "../../mock/db/payout-task";
+import { currentAuth } from "../../auth";
 // 走具体模块不改变行为——同一份模块级状态，只是绕过桶文件
 import type { FinanceApi } from "../contracts/finance";
 import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ , ReportQ, WithdrawalQ } from "../query";
@@ -68,4 +70,13 @@ export const financeMock: FinanceApi = {
   // 财务 B5：分润统计（维度/周期/排序在 db 层处理）/ 充值订单
   listShareSummaries: (q: ShareSummaryQ = {}) => wait(db.listShareSummaries(q)),
   listRechargeOrders: (q: RechargeQ = {}) => wait(db.listRechargeOrders(q)),
+
+  // 付款任务（V158）：发起人 / 复核人 / 确认人取当前会话 —— 四眼判定靠它，不从入参取
+  previewPayoutTask: (cutoff) => wait(pt.previewPayoutTask(cutoff), 300),
+  createPayoutTask: (cutoff) => wait(pt.createPayoutTask(cutoff, currentAuth()?.username ?? ""), 400),
+  listPayoutTasks: (q = {}) => wait(pt.listPayoutTasks(q)),
+  getPayoutTask: (no) => wait(pt.getPayoutTask(no)),
+  auditPayoutTask: (no, approve, reason) => wait(pt.auditPayoutTask(no, approve, reason, currentAuth()?.username ?? ""), 400),
+  exportPayoutTask: (no) => wait(pt.exportPayoutTask(no), 300),
+  confirmPayoutTask: (no, body) => wait(pt.confirmPayoutTask(no, body, currentAuth()?.username ?? ""), 400),
 };

@@ -13,6 +13,7 @@ import { TabHeader } from "@/components/ui/tab-header";
 import { Toolbar } from "@/components/ui/toolbar";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
 import { PayoutAccountDrawer } from "@/components/finance/payout-account-drawer";
+import { PayoutTasks } from "@/components/finance/payout-tasks";
 import { DataTable, type Column, type SortDir } from "@/components/ui/data-table";
 import { Drawer, Field } from "@/components/ui/drawer";
 import { FilterSelect } from "@/components/ui/filter-select";
@@ -1274,6 +1275,8 @@ export function FinanceWorkspace({ path, tabKeys }: {
         </>
       )}
 
+      {/* 付款任务（V158）：一期提现 = 平台主动付款，运营端在这里发起；商家端不出现 */}
+      {tab === "withdrawals" && realm !== "AGENT" && <PayoutTasks />}
       {tab === "withdrawals" && (
         <Toolbar
           search={keyword}

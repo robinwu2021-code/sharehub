@@ -17,6 +17,9 @@
 # —— 环境 / 依赖坏了：不介入会持续出错 ——
 IdentifierHasher 3          # HMAC 不可用 / 盐未配置
 IdentifierNormalizer 1      # 规范化能力不可用
+FieldCipher 5               # 字段密钥长度不对 / AES-GCM 不可用 / 密文版本不支持 / 解密失败（密钥错或密文被改）/ 未配密钥却要解密 —— 都要运维介入
+IdentityConfig 1            # SHA-256 不可用（JVM 环境坏了）
+PayoutTaskServiceImpl 1     # 转账文件摘要：SHA-256 不可用（JVM 环境坏了）
 Json 1                      # JSON 序列化失败
 OpenApiAppServiceImpl 1     # SHA-256 不可用（JDK 保证有，走到就是环境坏了）
 RedisTokenStore 2           # 会话序列化/反序列化失败

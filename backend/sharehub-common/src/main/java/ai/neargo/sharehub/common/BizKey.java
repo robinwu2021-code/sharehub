@@ -76,6 +76,8 @@ public final class BizKey {
     public static final String SHARE_RECORD = "SREC";
     public static final String SETTLEMENT = "STL";
     public static final String WITHDRAWAL = "WD";
+    /** 付款任务（V158）：平台向商家付款的批次，一个商家一笔提现单。 */
+    public static final String PAYOUT_TASK = "PT";
     public static final String LEDGER_ENTRY = "LE";
     public static final String VOUCHER = "V";
     public static final String RECONCILE = "RC";

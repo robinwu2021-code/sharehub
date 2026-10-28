@@ -185,6 +185,11 @@ class VocabularyWriteCoverageTest {
             // DEBIT-CREDIT 的 else-throw），而白名单**离 setter 有十几行远**。
             "share_record.basis",                    // 派生自 share_rule.basis（已覆盖）/ 常量 REFER
             "share_record.base_mode",                // V155：ShareGeneratorImpl 写 ShareBaseMode.name()；参数值写坏时 parse 回落 PRE_TAX，无外部写入口
+            // ——— 商家一期（V157 / V158）———
+            "agt_agent.industry",                    // AgentServiceImpl.applyCoreProfile 调 VenueIndustry.of，词表外 400；正反对照见 Phase1MerchantProfileTest
+            "stl_payout_task.status",                // PayoutTaskServiceImpl 只写 PayoutTaskStatus.name()，无外部写入口
+            "stl_withdrawal.origin",                 // 只由 PayoutTaskServiceImpl 写 WithdrawalOrigin.PAYOUT_TASK.name()
+            "stl_payout_export.format",              // 只写常量 CSV（一期唯一导出格式），无外部写入口
             "stl_withdrawal.pay_channel",            // PAY_CHANNELS 白名单（在 setPayChannel 上面五行）
             "acct_ledger.direction",                 // DEBIT/CREDIT，校验在写入循环之前，非法值 else-throw
             "usr_wallet_txn.direction",              // amount.signum() > 0 ? IN : OUT

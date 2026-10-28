@@ -753,3 +753,86 @@ export interface Statement {
 }
 /** 可打印对账单的语言（后端 `statement.html?lang=`，ar 为右到左）。 */
 export type StatementLang = "zh" | "en" | "ar";
+
+// —— 付款任务（V158，商家一期 B4；需求方案 §八）——
+// 平台向商家付款，财务在运营端手动执行，一般三个月一次：选截止日 → 预览 → 生成 → 复核 → 导出 → 银行转账 → 确认到账。
+
+/** 与后端 PayoutTaskStatus 同名同值（V158 列注释为准）。 */
+export type PayoutTaskStatus = "PENDING_REVIEW" | "PENDING_TRANSFER" | "DONE" | "CANCELLED";
+
+/** 预览里「本次不能付款」的原因码；文案由前端出（阿语/英语界面也要看得懂）。 */
+export type PayoutBlockedReason = "NO_ACCOUNT" | "NO_FULL_ACCOUNT" | "SUSPENDED" | "MIXED_CURRENCY";
+
+export interface PayoutPreviewItem {
+  payeeNo: string;
+  payeeName: string;
+  settleNos: string[];
+  periods: string[];
+  amount: number;
+  currency: string;
+  accountMasked: string | null;
+  /** 非空 = 本次不能付，结算单留在可付款范围，下次再带上。 */
+  blockedReason: PayoutBlockedReason | null;
+}
+
+export interface PayoutPreview {
+  cutoffDate: string;
+  currency: string;
+  payableCount: number;
+  payableTotal: number;
+  items: PayoutPreviewItem[];
+}
+
+/** 付款任务里的一笔（一个商家一笔）。账号只给掩码 —— 完整账号只出现在导出文件里。 */
+export interface PayoutTaskItem {
+  seq: number;
+  withdrawNo: string;
+  payeeNo: string;
+  payeeName: string;
+  amount: number;
+  currency: string;
+  accountName: string | null;
+  accountMasked: string | null;
+  status: WithdrawalStatus;
+  settleNos: string[];
+  payRef: string | null;
+  paidAt: string | null;
+  /** 打款失败原因，或复核驳回原因。 */
+  failReason: string | null;
+}
+
+export interface PayoutTask {
+  taskNo: string;
+  cutoffDate: string;
+  currency: string;
+  itemCount: number;
+  totalAmount: number;
+  status: PayoutTaskStatus;
+  createdBy: string | null;
+  createdName: string | null;
+  createdAt: string | null;
+  reviewedName: string | null;
+  reviewedAt: string | null;
+  rejectReason: string | null;
+  bankBatchRef: string | null;
+  transferDate: string | null;
+  confirmedAt: string | null;
+  exportCount: number;
+  /** 列表接口不带明细（空数组），详情才有。 */
+  items: PayoutTaskItem[];
+}
+
+/** 逐笔到账结果。成功时 payRef 可空（服务端用「任务号-序号」）；失败必填 failReason。 */
+export interface PayoutConfirmItem {
+  withdrawNo: string;
+  success: boolean;
+  payRef?: string;
+  failReason?: string;
+}
+
+/** 确认到账。results 为空 = 整批成功；不为空 = 只处理列出的那几笔。 */
+export interface PayoutConfirmPayload {
+  bankBatchRef: string;
+  transferDate: string;
+  results?: PayoutConfirmItem[];
+}

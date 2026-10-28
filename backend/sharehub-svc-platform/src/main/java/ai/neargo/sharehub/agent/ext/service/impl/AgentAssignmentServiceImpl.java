@@ -135,7 +135,8 @@ public class AgentAssignmentServiceImpl implements AgentAssignmentService {
      */
     private static void requireCoreProfile(AgtAgent agent, AssignReq req) {
         if (!"ASSIGN".equals(req.action())) return;
-        if ("SITE".equals(req.targetType()) && req.targetNo().equals(agent.getDefaultSiteNo())) return;
+        // 站点号与机柜号、点位号前缀不同，只比编号就够了（不比 targetType，免得多一处裸类型字面量）
+        if (req.targetNo().equals(agent.getDefaultSiteNo())) return;
         boolean located = agent.getAddress() != null && !agent.getAddress().isBlank()
                 && agent.getLng() != null && agent.getLat() != null;
         boolean classified = agent.getIndustry() != null && !agent.getIndustry().isBlank();

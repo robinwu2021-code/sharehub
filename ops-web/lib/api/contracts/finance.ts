@@ -7,6 +7,7 @@ import type {
   VoucherDetail,
   VoucherCreatePayload, PayoutAccount, PayReceiptPayload, WithdrawApplyPayload,
   SettlementView, Statement, StatementLang, Adjustment, AdjustmentConfirmPayload,
+  PayoutPreview, PayoutTask, PayoutTaskStatus, PayoutConfirmPayload,
 } from "../../types";
 
 export interface FinanceApi {
@@ -135,4 +136,17 @@ export interface FinanceApi {
   /** 分润统计：dimension 是维度切换器的参数——一张表两种主体，不是两个接口。 */
   listShareSummaries(q?: ShareSummaryQ): Promise<PageResult<ShareSummary>>;
   listRechargeOrders(q?: RechargeQ): Promise<PageResult<RechargeOrder>>;
+
+  // === 付款任务（V158，商家一期 B4）===
+  /** 预览：只读，不占结算单。 */
+  previewPayoutTask(cutoffDate: string): Promise<PayoutPreview>;
+  /** 生成：只传截止日，金额由服务端按结算单重算。 */
+  createPayoutTask(cutoffDate: string): Promise<PayoutTask>;
+  listPayoutTasks(q?: PageQ & { status?: PayoutTaskStatus }): Promise<PageResult<PayoutTask>>;
+  getPayoutTask(taskNo: string): Promise<PayoutTask>;
+  /** 复核：复核人不得是发起人；驳回必填原因，整任务撤回。 */
+  auditPayoutTask(taskNo: string, approve: boolean, rejectReason?: string): Promise<PayoutTask>;
+  /** 转账文件（CSV 文本，含完整 IBAN）。非信封端点，由页面包成文件下载。 */
+  exportPayoutTask(taskNo: string): Promise<string>;
+  confirmPayoutTask(taskNo: string, body: PayoutConfirmPayload): Promise<PayoutTask>;
 }
