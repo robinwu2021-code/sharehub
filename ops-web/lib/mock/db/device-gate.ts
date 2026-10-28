@@ -7,6 +7,11 @@ import { cabinets, slotsOf } from "./device";
 import { contracts, locations, sites } from "./location";
 import { workOrders } from "./workorder";
 import { qcStatusOf } from "./device-asset";
+import { paramOf } from "./system";
+
+/** 合同 / 勘测门禁开关（后端 V174 site.venue_gate.enabled）：一期 0 跳过，二期改 1 恢复强制。 */
+export const venueGateOn = () => paramOf("site.venue_gate.enabled", "0") === "1";
+export const PHASE1_SKIP = "一期跳过（平台运营直接操作）";
 
 /**
  * 设备上线门禁 · 状态动作 · 试借还 · 保护动作的 mock。**逐条照后端**
@@ -75,7 +80,8 @@ export function goLiveGate(deviceNo: string): Checklist {
   // 勘测只卡「首台上线」：站点已在营业说明现场早验过了
   const firstLive = site?.status === "PREPARING";
   const surveyPassed = (site as { surveyPassed?: boolean | null } | undefined)?.surveyPassed;
-  const survey = !firstLive || surveyPassed === true;
+  const venueGate = venueGateOn();
+  const survey = !venueGate || !firstLive || surveyPassed === true;
   const installed = workOrders.some((w) => w.type === "INSTALL" && w.cabinetNo === no
     && ["DONE", "AUDITED", "CLOSED"].includes(w.status));
   const inCabinet = slotsOf(no).filter((s) => s.powerbankNo).length;
@@ -88,7 +94,7 @@ export function goLiveGate(deviceNo: string): Checklist {
       detail: qcOk ? (qc == null ? "存量设备免检" : "质检通过") : qc === "FAILED" ? "质检不通过" : "未做入库质检",
       fixHref: devHref(no, "qc") },
     { key: "SURVEY", label: "现场勘测", passed: survey,
-      detail: !firstLive ? "站点已营业，免勘测" : surveyPassed == null ? "站点首台上线须先做现场勘测" : survey ? "勘测通过" : "最近一次勘测不通过",
+      detail: !venueGate ? PHASE1_SKIP : !firstLive ? "站点已营业，免勘测" : surveyPassed == null ? "站点首台上线须先做现场勘测" : survey ? "勘测通过" : "最近一次勘测不通过",
       fixHref: `${siteHref}${c.siteNo ? "&" : "?"}tab=survey` },
     { key: "INSTALL_WO", label: "装机工单", passed: installed,
       detail: installed ? "装机工单已完工" : "没有已完工的装机工单",
@@ -104,8 +110,8 @@ export function goLiveGate(deviceNo: string): Checklist {
     { key: "SITE_OPEN", label: "站点开放", passed: siteOpen,
       detail: !site ? "点位所属站点不存在" : siteOpen ? site.status : `站点状态为 ${site.status}，不能上线新设备`,
       fixHref: siteHref },
-    { key: "CONTRACT", label: "生效合同", passed: !!contract,
-      detail: contract ? contract.contractNo : "站点没有生效中的合同",
+    { key: "CONTRACT", label: "生效合同", passed: !venueGate || !!contract,
+      detail: contract ? contract.contractNo : !venueGate ? PHASE1_SKIP : "站点没有生效中的合同",
       fixHref: `/venues?tab=contracts&siteNo=${c.siteNo ?? ""}` },
     { key: "ONLINE", label: "设备在线", passed: online,
       detail: online ? `最近心跳 ${c.lastHeartbeatAt}` : !c.lastHeartbeatAt ? "从未收到心跳" : `最近心跳 ${c.lastHeartbeatAt}，已超过 3 分钟`,

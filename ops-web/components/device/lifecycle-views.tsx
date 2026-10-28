@@ -109,7 +109,8 @@ export function PendingLiveTab() {
     <div className="space-y-4">
       <Notice className="mb-0">
         已绑定点位、还没上线的设备。上线门禁 10 项（质检、勘测、装机工单、装宝比例、点位、站点营业、合同、在线、试借还、计费方案）
-        由后端强制；展开一行看卡在哪一项，每项都给了去处。门禁没过时点「上线」会被拒并说明原因。
+        由后端强制；其中合同与勘测一期跳过，由平台运营直接操作（系统参数 site.venue_gate.enabled 改 1 即恢复）。
+        展开一行看卡在哪一项，每项都给了去处。门禁没过时点「上线」会被拒并说明原因。
       </Notice>
       <DataTable rowKey={(c: Cabinet) => c.cabinetNo} columns={cols} rows={q.data ? rows : undefined}
         loading={q.isLoading} error={q.error} onRetry={q.refetch}

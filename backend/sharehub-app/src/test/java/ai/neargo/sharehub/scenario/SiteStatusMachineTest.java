@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * 站点状态机（TDD-运营核心流程/03 §九）。每个用例自建站点，不依赖共享库里的历史站点。
  */
+@ai.neargo.sharehub.support.VenueGateOn
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class SiteStatusMachineTest extends ApiTestSupport {
 

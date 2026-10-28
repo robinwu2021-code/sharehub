@@ -33,6 +33,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 // 撤场结清会出场地方结算单（押金 / 进场费调整项）—— 验的是开关打开时的逻辑，一期默认关（V155）
 @LegacyShareParams
+// 勘测清单项、装机驱动上线验的是合同 / 勘测门禁强制时的逻辑，一期默认跳过（V174）
+@ai.neargo.sharehub.support.VenueGateOn
 class SiteAssetFlowTest extends ApiTestSupport {
 
     @Autowired

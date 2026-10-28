@@ -80,6 +80,8 @@ export const sysParams: SysParam[] = [
   { paramKey: "finance.share.base_mode", label: "分成基数口径：PRE_TAX 税前 / GROSS 含税实收（只影响之后的订单）", value: "PRE_TAX", groupName: "财务", updatedAt: iso(16 * 86400_000) },
   { paramKey: "finance.share.tax_country", label: "分成折算税前时取哪个国家的税率", value: "AE", groupName: "财务", updatedAt: iso(16 * 86400_000) },
   { paramKey: "finance.share.venue_enabled", label: "场地方是否参与分成与结算：1 是 / 0 否（一期为 0）", value: "0", groupName: "财务", updatedAt: iso(16 * 86400_000) },
+  // 一期跳过合同 / 勘测门禁（与后端 V174 同键同默认值）：项照列、判通过，二期改 1 恢复强制
+  { paramKey: "site.venue_gate.enabled", label: "合同 / 勘测门禁：1 强制，0 跳过（一期跳过）", value: "0", groupName: "设备", updatedAt: iso(16 * 86400_000) },
   { paramKey: "agent.apply.self_service_enabled", label: "商家自助注册入口：1 开 / 0 关（一期只走运营代建）", value: "0", groupName: "商家", updatedAt: iso(16 * 86400_000) },
 ];
 

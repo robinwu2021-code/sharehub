@@ -54,6 +54,9 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
     static final int ONLINE_WINDOW_MIN = 3;
     /** 门禁「站点开着」：筹备中也可以上线（首台上线正是它转营业的触发点）。 */
     private static final Set<String> SITE_OPEN = Set.of("PREPARING", "ACTIVE", "PAUSED");
+    /** 合同 / 勘测门禁开关（V174）：1 强制，0 跳过。一期默认跳过。 */
+    static final String VENUE_GATE = "site.venue_gate.enabled";
+    static final String PHASE1_SKIP = "一期跳过（平台运营直接操作）";
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final CabinetMapper cabinets;
@@ -105,14 +108,16 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
         boolean qc = QcStatus.cleared(c.getQcStatus());
         // 勘测只卡「首台上线」：站点已在营业说明现场早验过了，存量站点不补勘测也能加柜
         boolean firstLive = site != null && "PREPARING".equals(site.status());
-        boolean survey = !firstLive || Boolean.TRUE.equals(site.surveyPassed());
+        // 一期跳过合同 / 勘测（V174 site.venue_gate.enabled=0）：项照列、判通过，二期改参数即恢复强制
+        boolean venueGate = params.intOf(VENUE_GATE, 0) == 1;
+        boolean survey = !venueGate || !firstLive || Boolean.TRUE.equals(site.surveyPassed());
         boolean installed = workOrders.installDoneCabinets(List.of(no)).contains(no);
         Load load = load(c);
         return Checklist.of(List.of(
                 new Checklist.Item("QC", "入库质检", qc, qc ? (c.getQcStatus() == null ? "存量设备免检" : "质检通过")
                         : QcStatus.FAILED.name().equals(c.getQcStatus()) ? "质检不通过" : "未做入库质检", "/devices/detail?no=" + no + "&tab=qc"),
                 new Checklist.Item("SURVEY", "现场勘测", survey,
-                        !firstLive ? "站点已营业，免勘测" : site.surveyPassed() == null ? "站点首台上线须先做现场勘测" : survey ? "勘测通过" : "最近一次勘测不通过",
+                        !venueGate ? PHASE1_SKIP : !firstLive ? "站点已营业，免勘测" : site.surveyPassed() == null ? "站点首台上线须先做现场勘测" : survey ? "勘测通过" : "最近一次勘测不通过",
                         siteHref + "?tab=survey"),
                 new Checklist.Item("INSTALL_WO", "装机工单", installed, installed ? "装机工单已完工" : "没有已完工的装机工单",
                         "/work-orders?view=list&type=INSTALL&cabinetNo=" + no),
@@ -121,8 +126,8 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
                         "/devices/detail?no=" + no + "&tab=overview"),
                 new Checklist.Item("SITE_OPEN", "站点开放", siteOpen,
                         site == null ? "点位所属站点不存在" : siteOpen ? site.status() : "站点状态为 " + site.status() + "，不能上线新设备", siteHref),
-                new Checklist.Item("CONTRACT", "生效合同", contract != null,
-                        contract != null ? contract.contractNo() : "站点没有生效中的合同", "/venues?tab=contracts&siteNo=" + c.getSiteNo()),
+                new Checklist.Item("CONTRACT", "生效合同", !venueGate || contract != null,
+                        contract != null ? contract.contractNo() : !venueGate ? PHASE1_SKIP : "站点没有生效中的合同", "/venues?tab=contracts&siteNo=" + c.getSiteNo()),
                 new Checklist.Item("ONLINE", "设备在线", online,
                         online ? "最近心跳 " + c.getLastHeartbeatAt() : hb == null ? "从未收到心跳" : "最近心跳 " + c.getLastHeartbeatAt() + "，已超过 "
                                 + ONLINE_WINDOW_MIN + " 分钟", "/devices/detail?no=" + no),

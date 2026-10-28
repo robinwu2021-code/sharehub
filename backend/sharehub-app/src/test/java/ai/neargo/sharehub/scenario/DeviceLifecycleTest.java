@@ -29,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * 机柜状态机 / 上线门禁 / 试借还 / 保护动作 / 停借保还（TDD-运营核心流程/04 §六）。
  * 设备信号经 DeviceSignalService 注入 —— 与网关推送的 /internal/events/device 同一入口。
  */
+@ai.neargo.sharehub.support.VenueGateOn
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class DeviceLifecycleTest extends ApiTestSupport {
 
@@ -52,6 +53,28 @@ class DeviceLifecycleTest extends ApiTestSupport {
     @BeforeAll
     void tokens() {
         admin = login("ADMIN");
+    }
+
+    @Test
+    @DisplayName("⓪ 一期跳过合同 / 勘测（V174 开关为 0）：两项照列、判通过、写明一期跳过；站点开业清单同样")
+    void phase1SkipsContractAndSurvey() {
+        jdbc.update("UPDATE sys_param SET value='0' WHERE tenant_id='MAIN' AND param_key='site.venue_gate.enabled'");
+        try {
+            Fx f = fixture(false);
+            JsonNode gate = get("/api/ops/devices/" + f.cabinet + "/go-live-gate", admin).okData();
+            assertThat(failed(gate)).doesNotContain("CONTRACT", "SURVEY").contains("ONLINE", "TRIAL");
+            JsonNode opening = get("/api/ops/sites/" + f.site + "/opening-checklist", admin).okData();
+            for (JsonNode g : java.util.List.of(gate, opening)) {
+                for (JsonNode i : g.path("items")) {
+                    if (java.util.Set.of("CONTRACT", "SURVEY").contains(i.path("key").asText())) {
+                        assertThat(i.path("passed").asBoolean()).isTrue();
+                        assertThat(i.path("detail").asText()).contains("一期跳过");
+                    }
+                }
+            }
+        } finally {
+            jdbc.update("UPDATE sys_param SET value='1' WHERE tenant_id='MAIN' AND param_key='site.venue_gate.enabled'");
+        }
     }
 
     @Test

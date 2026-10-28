@@ -91,6 +91,7 @@ public class SiteServiceImpl implements SiteService {
 
     private static final Logger log = LoggerFactory.getLogger(SiteServiceImpl.class);
     private static final String SYSTEM = "SYSTEM";
+    private static final String PHASE1_SKIP = "一期跳过（平台运营直接操作）";
     private static final String OPERATE = "OPERATE";
     /** 关闭门禁：站点下仍算「有设备」的机柜状态（RETIRED 之外）。 */
     private static final Set<String> CABINET_PRESENT = Set.of("IN_STOCK", "IN_TRANSIT", "DEPLOYED", "FAULT");
@@ -377,7 +378,7 @@ public class SiteServiceImpl implements SiteService {
     @Transactional
     public Site resume(String siteNo) {
         LocSite e = requireLive(siteNo);
-        if (contracts.activeBySites(List.of(siteNo)).get(siteNo) == null) {
+        if (venueGate() && contracts.activeBySites(List.of(siteNo)).get(siteNo) == null) {
             throw ai.neargo.sharehub.common.BizException.conflict("error.site.no_contract");
         }
         transit(e, "RESUME", null,
@@ -492,6 +493,11 @@ public class SiteServiceImpl implements SiteService {
                 v.getSurveyedBy(), v.getSurveyedAt());
     }
 
+    /** 合同 / 勘测门禁开关（V174 site.venue_gate.enabled）：一期默认 0 跳过，二期改 1 恢复强制。 */
+    private boolean venueGate() {
+        return params.intOf("site.venue_gate.enabled", 0) == 1;
+    }
+
     private Boolean latestSurveyPassed(String siteNo) {
         LocSiteSurvey v = surveyMapper.selectOne(new LambdaQueryWrapper<LocSiteSurvey>().eq(LocSiteSurvey::getSiteNo, siteNo)
                 .orderByDesc(LocSiteSurvey::getId).last("limit 1"));
@@ -531,12 +537,13 @@ public class SiteServiceImpl implements SiteService {
         String owner = ownerProblem(e);
         long live = cabinets.countBySites(List.of(no), CABINET_LIVE).getOrDefault(no, 0L);
         Boolean surveyed = latestSurveyPassed(no);
+        boolean gate = venueGate();
         return Checklist.of(List.of(
-                new Checklist.Item("SURVEY", "现场勘测", Boolean.TRUE.equals(surveyed),
-                        surveyed == null ? "还没有勘测记录" : surveyed ? "最近一次勘测通过" : "最近一次勘测不通过",
+                new Checklist.Item("SURVEY", "现场勘测", !gate || Boolean.TRUE.equals(surveyed),
+                        !gate ? PHASE1_SKIP : surveyed == null ? "还没有勘测记录" : surveyed ? "最近一次勘测通过" : "最近一次勘测不通过",
                         "/operation/sites?no=" + no + "&tab=survey"),
-                new Checklist.Item("CONTRACT", "生效合同", c != null,
-                        c != null ? c.contractNo() : "站点没有生效中的合同", "/venues?tab=contracts&siteNo=" + no),
+                new Checklist.Item("CONTRACT", "生效合同", !gate || c != null,
+                        c != null ? c.contractNo() : !gate ? PHASE1_SKIP : "站点没有生效中的合同", "/venues?tab=contracts&siteNo=" + no),
                 new Checklist.Item("LOCATION", "点位", nz(points) > 0,
                         nz(points) > 0 ? points + " 个点位" : "还没有点位", "/operation/sites?no=" + no + "&tab=points"),
                 new Checklist.Item("OPS_OWNER", "运维责任人", owner == null,

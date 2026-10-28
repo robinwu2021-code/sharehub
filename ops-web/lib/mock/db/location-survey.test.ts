@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { sysParams } from "./system";
 import { listSiteSurveys, recordSiteSurvey, latestSurveyPassed } from "./location-survey";
 import { siteOpeningChecklist } from "./site-status";
 import { sites } from "./location";
@@ -18,7 +19,13 @@ const mkSite = (status: Site["status"] = "PREPARING"): string => {
   return no;
 };
 
+const setVenueGate = (v: string) => { sysParams.find((p) => p.paramKey === "site.venue_gate.enabled")!.value = v; };
+
 describe("现场勘测", () => {
+  // 验的是合同 / 勘测门禁强制时的规则；一期默认跳过（V174），这里显式打开、跑完还原
+  beforeEach(() => setVenueGate("1"));
+  afterEach(() => setVenueGate("0"));
+
   it("★ 无信号或不能接电不能判通过 —— 没信号借不出也还不了", () => {
     const no = mkSite();
     expect(() => recordSiteSurvey(no, { signalLevel: "NONE", powerOk: true, result: "PASS" })).toThrow(/不能判为通过/);
