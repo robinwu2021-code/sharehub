@@ -60,7 +60,8 @@ class MenuTreeTest extends ApiTestSupport {
 
         assertThat(operation.path("module").asText()).isNotBlank();
         assertThat(operation.path("modules")).as("跨模块 section 的 modules 是数组").hasSize(5);
-        assertThat(operation.path("match")).as("路径归属前缀").hasSize(2);
+        // V149：/locations 随站点四项迁到网点管理，运营管理只留 /operation
+        assertThat(operation.path("match")).as("路径归属前缀").hasSize(1);
         assertThat(myBiz.path("portalFor")).as("专属门户角色").hasSize(1);
         assertThat(myBiz.path("portalFor").get(0).asText()).isEqualTo("AGENT");
     }

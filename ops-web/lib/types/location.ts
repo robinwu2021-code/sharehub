@@ -301,6 +301,13 @@ export type ContractAuditStage = "OPS" | "FINANCE";
 export type ContractTerminationStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 /** 合同条款（后端 `ContractTerms`）。与流程信息分开，避免 Contract 平铺二十个字段。 */
+/**
+ * 合同保存入参：后端写入面是**平铺**的（`ContractReq`：venueNo、siteNo、shareMode、shareBase、
+ * guaranteeAmount、currency、settlePeriod……），读出参的条款却嵌在 `terms` 里。
+ * 表单按写入面平铺填，编辑时把详情的 `terms` 摊平进来；嵌套的 terms / flow 不随保存发出。
+ */
+export type ContractSaveReq = Partial<Omit<Contract, "terms" | "flow">> & Partial<ContractTerms> & { contractNo?: string };
+
 export interface ContractTerms {
   shareMode: ContractShareMode | null;
   shareBase: ContractShareBase | null;

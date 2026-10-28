@@ -32,7 +32,7 @@ import { notify } from "@/lib/notify";
 import { ReadOnlyNotice } from "@/components/read-only-notice";
 import { StateActions } from "@/components/state-actions";
 import { RefLink } from "@/components/ref-link";
-import { ContractDetailDrawer, CONTRACT_STATUS } from "@/components/location/contract-detail";
+import { ContractDetailDrawer, CONTRACT_STATUS, SHARE_BASE, SETTLE_PERIOD } from "@/components/location/contract-detail";
 import { useContractActions } from "@/components/location/contract-actions";
 import { LeadDetailDrawer } from "@/components/location/lead-detail";
 import { OnboardingDetailDrawer, OB_STATUS } from "@/components/location/onboarding-detail";
@@ -43,18 +43,16 @@ import { LEAD_STAGE, SHARE_MODE_LABEL, FOLLOW_DUE, followDue } from "@/component
 import { FILE_CATEGORY_RULES, fileSize, VENUE_INDUSTRIES, VENUE_INDUSTRY_LABEL } from "@/lib/types";
 import type {
   Venue, VenueIndustry, Contract, Lead, LeadStage, LeadSaveReq, VenueOnboarding, LifecycleRow, SiteStatus, PageResult, FunnelStage,
-  PayoutAccount,
+  PayoutAccount, ContractSaveReq, ContractShareMode, ContractShareBase, ContractSettlePeriod,
 } from "@/lib/types";
 
 // tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）。
-// 2026-09-23 第三步：本页从 /locations 拆出，承载「场地方与拓展」这条线 ——
-// 场地方档案与合同（签下来的关系）+ 拓展（线索 → 进件 → 生命周期）。
-// 点位管理与站点坪效留在 /locations（属运营管理）。拆页的硬原因：
-// findActiveSection 按**路径前缀**定归属，一个 URL 只能属于一个 L1。
+// 2026-10-28 本页归「网点管理」（OM02），与 /locations、/operation/sites、/operation/overview 同属一个 L1。
+// 顺序与菜单一致（拓展 → 场地方与合同 → 生命周期）；不带 ?tab= 时仍落场地方（defaultKey）。
 //
 // 详情抽屉读 `?no=`（RefLink 的路由规则只在 components/ref-link.tsx 一处维护）：
 //   /venues?tab=crm&no=LD…  商机详情 · /venues?tab=contracts&no=CT…  合同详情 · /venues?tab=onboarding&no=OB…  进件详情
-const TAB_KEYS = ["venues", "contracts", "crm", "onboarding", "lifecycle"] as const;
+const TAB_KEYS = ["crm", "onboarding", "venues", "contracts", "lifecycle"] as const;
 
 /**
  * 漏斗档位 = **商机阶段 ∪ 站点状态**（2026-09-25 合并后的唯一一套）。键序 = 从线索到闭店的真实先后。
@@ -133,17 +131,44 @@ function contractFieldsFor(
   sites: { value: string; label: string }[],
 ): FieldDef[] {
   return [
-    { key: "contractNo", label: "合同号", readOnlyOnEdit: true, placeholder: "新增自动生成" },
-    { key: "venueNo", label: "场地方", type: "select", required: true,
+    { key: "contractNo", label: "合同号", readOnlyOnEdit: true, placeholder: "新增自动生成", section: "合同主体" },
+    { key: "venueNo", label: "场地方", type: "select", required: true, section: "合同主体",
       options: [{ value: "", label: "请选择场地方" }, ...venues] },
-    { key: "siteNo", label: "站点", type: "select", required: true,
+    { key: "siteNo", label: "站点", type: "select", required: true, section: "合同主体",
       options: [{ value: "", label: "请选择站点" }, ...sites],
       help: "只列所选场地方名下的站点" },
+    { key: "startAt", label: "生效时间", type: "date", required: true, section: "合同主体" },
+    { key: "endAt", label: "到期时间", type: "date", required: true, section: "合同主体" },
+    /*
+     * 分成条款（2026-10-28 补齐，OM02-06）：后端写入面早就收这些字段，表单此前只给比例与进场费，
+     * 分成模式、基数、保底等只能在详情里看、录不进去。规则与后端 ContractServiceImpl 一致：
+     *   纯分成 → 比例 > 0；保底 + 分成 → 比例 > 0 且保底 > 0；固定进场费 → 进场费 > 0；免费入驻 → 比例与费用清零。
+     * 用不上的格子随模式禁用（禁用即清空、不校验），不把另一种模式的脏值带过去。
+     */
+    { key: "shareMode", label: "分成模式", type: "select", required: true, section: "分成",
+      options: (Object.keys(SHARE_MODE_LABEL) as ContractShareMode[]).map((k) => ({ value: k, label: SHARE_MODE_LABEL[k] })) },
     // 上限 1 不是形式主义：这里填 20（本意 20%）就是**二十倍分成**，而且分完才会被发现。
-    { key: "shareRate", label: "分成比例（0~1，如 0.15 = 15%）", type: "number", required: true, min: 0, max: 1 },
-    { key: "entryFee", label: "进场费", type: "number", min: 0 },
-    { key: "startAt", label: "生效时间", type: "date", required: true },
-    { key: "endAt", label: "到期时间", type: "date", required: true },
+    { key: "shareRate", label: "分成比例（0~1，如 0.15 = 15%）", type: "number", required: true, min: 0, max: 1, section: "分成",
+      disabledWhen: (v) => v.shareMode === "ENTRY_FEE" || v.shareMode === "FREE" },
+    { key: "shareBase", label: "分成基数", type: "select", section: "分成",
+      options: (Object.keys(SHARE_BASE) as ContractShareBase[]).map((k) => ({ value: k, label: SHARE_BASE[k] })),
+      disabledWhen: (v) => v.shareMode === "ENTRY_FEE" || v.shareMode === "FREE" },
+    { key: "guaranteeAmount", label: "保底金额（每结算周期）", type: "number", required: true, min: 0, section: "分成",
+      disabledWhen: (v) => v.shareMode !== "GUARANTEE", help: "按比例算出的分成低于保底时，结算单补足差额" },
+    { key: "entryFee", label: "进场费", type: "number", min: 0, section: "分成",
+      disabledWhen: (v) => v.shareMode === "FREE", help: "固定进场费模式下必填且大于 0" },
+    { key: "currency", label: "币种", placeholder: "AED", section: "分成",
+      pattern: { re: "^[A-Z]{3}$", msg: "三位大写币种代码，如 AED" } },
+    { key: "settlePeriod", label: "结算周期", type: "select", section: "分成",
+      options: (Object.keys(SETTLE_PERIOD) as ContractSettlePeriod[]).map((k) => ({ value: k, label: SETTLE_PERIOD[k] })) },
+    { key: "depositAmount", label: "押金", type: "number", min: 0, section: "押金与约定" },
+    { key: "depositTerms", label: "押金条款", placeholder: "如：撤场后 30 天内无息退还", section: "押金与约定" },
+    { key: "exclusive", label: "排他（场地内不进竞品）", type: "switch", section: "押金与约定" },
+    { key: "deviceQuota", label: "设备配额（台）", type: "number", min: 0, section: "押金与约定" },
+    { key: "autoRenew", label: "到期自动续约", type: "switch", section: "押金与约定" },
+    { key: "placementNote", label: "点位约定", type: "textarea", rows: 2, placeholder: "如：一楼中庭 2 台、美食广场 1 台", section: "押金与约定" },
+    { key: "signerName", label: "签约人", section: "押金与约定" },
+    { key: "remark", label: "备注", type: "textarea", rows: 2, section: "押金与约定" },
   ];
 }
 /** 商机档案字段。**没有阶段**（R1）：阶段只经动作改（记跟进顺带推进 / 标记丢单 / 签约转化）。 */
@@ -253,9 +278,9 @@ function VenuesInner() {
   const router = useRouter();
   const pathname = usePathname();
   const sp = useSearchParams();
-  const tabs = useNavTabs("/venues", TAB_KEYS);
+  const tabs = useNavTabs("/venues", TAB_KEYS, "venues");
   const onTabChange = () => { paging.reset(); setShowArchived(false); setFilters({}); };
-  const { tab, setTab } = usePageTab(tabs, onTabChange);
+  const { tab, setTab } = usePageTab(tabs, onTabChange, { defaultKey: "venues" });
 
   // —— 深链：?no= 打开当前 tab 的详情抽屉；打开 / 关闭都回写 URL，刷新与分享不丢 ——
   const detailNo = sp.get("no");
@@ -317,7 +342,8 @@ function VenuesInner() {
   const setFilter = (k: string, v: string) => { setFilters((f) => ({ ...f, [k]: v })); paging.reset(); };
   const toggleFilter = (k: string, v: string) => setFilter(k, filters[k] === v ? "" : v);
   const [venueForm, setVenueForm] = useState<Partial<Venue> | null>(null);
-  const [contractForm, setContractForm] = useState<Partial<Contract> | null>(null);
+  // 表单按后端写入面平铺（含条款）；编辑时由 editContract 把详情的 terms 摊平进来
+  const [contractForm, setContractForm] = useState<ContractSaveReq | null>(null);
   const [leadForm, setLeadForm] = useState<LeadSaveReq | null>(null);
   const [onboardingForm, setOnboardingForm] = useState<Partial<VenueOnboarding> | null>(null);
   const [rejectForm, setRejectForm] = useState<{ onboardingNo: string; note: string } | null>(null);
@@ -392,10 +418,20 @@ function VenuesInner() {
     if (c.startAt && c.endAt && c.endAt < c.startAt) { notify.error("到期时间早于生效时间"); return; }
     const venueName = venuesQ.data?.list.find((v) => v.venueNo === c.venueNo)?.name ?? c.venueName ?? "";
     const siteName = sitesQ.data?.list.find((x) => x.siteNo === c.siteNo)?.name ?? c.siteName ?? "";
-    saveContract.mutate({ ...c, venueName, siteName });
+    // 详情带来的嵌套对象不随保存发出：写入面是平铺的，嵌套的 terms 发过去只会被忽略（mock 也同样丢弃）
+    const { terms: _t, flow: _f, ...flat } = c as ContractSaveReq & Pick<Contract, "terms" | "flow">;
+    saveContract.mutate({ ...flat, venueName, siteName });
+  };
+  /**
+   * 打开编辑：列表行不带条款（只详情给），先取详情再把 terms 摊平进表单 ——
+   * 否则编辑抽屉里条款全是空的，随手一存就把已录的分成模式、保底等按缺省覆盖掉。
+   */
+  const editContract = async (c: Contract) => {
+    const full = c.terms ? c : await qc.fetchQuery({ queryKey: ["contract-detail", c.contractNo], queryFn: () => api.getContract(c.contractNo) });
+    setContractForm({ ...full, ...(full.terms ?? {}) });
   };
   const saveContract = useMutation({
-    mutationFn: (c: Partial<Contract>) => api.saveContract(c),
+    mutationFn: (c: ContractSaveReq) => api.saveContract(c),
     onSuccess: (c) => {
       qc.invalidateQueries({ queryKey: ["venue-bd", "contracts"] });
       qc.invalidateQueries({ queryKey: ["contract-detail", c.contractNo] });
@@ -472,7 +508,7 @@ function VenuesInner() {
   /** 漏斗计数。只在生命周期 tab 拉。 */
   const funnel = useQuery({ queryKey: ["site-lifecycle-funnel"], queryFn: () => api.siteLifecycleFunnel(), enabled: tab === "lifecycle" });
 
-  const contractActions = useContractActions({ onEdit: (c) => setContractForm(c), onAttach: openAttach });
+  const contractActions = useContractActions({ onEdit: (c) => { void editContract(c); }, onAttach: openAttach });
 
   // 归档 / 恢复（G1 软删除）。错误由全局 MutationCache 接管，页面不重复 catch。
   const invalidatePlace = () => qc.invalidateQueries({ queryKey: ["venue-bd"] });
@@ -822,7 +858,8 @@ function VenuesInner() {
       {tab === "contracts" && (
         <Toolbar search={keyword} onSearch={onSearch} searchPlaceholder="搜索合同号 / 场地方 / 站点" onExport={onExport}
           onAdd={allow("location:contract:create") ? () => setContractForm({
-            shareRate: 0.15, entryFee: 0,
+            shareMode: "SHARE", shareBase: "NET", shareRate: 0.15, entryFee: 0, currency: "AED", settlePeriod: "MONTH",
+            exclusive: false, autoRenew: false,
             ...(siteNoParam ? { siteNo: siteNoParam, venueNo: sitesQ.data?.list.find((x) => x.siteNo === siteNoParam)?.venueNo ?? undefined } : {}),
           }) : undefined} addLabel="新增合同">
           <FilterSelect aria-label="状态" value={filters.status ?? ""} onChange={(v) => setFilter("status", v)}
@@ -931,7 +968,7 @@ function VenuesInner() {
         isEdit={!!contractForm?.contractNo}
         fields={contractFields}
         value={(contractForm ?? {}) as Record<string, unknown>}
-        onChange={(v) => setContractForm(v as Partial<Contract>)}
+        onChange={(v) => setContractForm(v as ContractSaveReq)}
         onSubmit={() => contractForm && submitContract()}
         submitting={saveContract.isPending}
       />
@@ -967,7 +1004,7 @@ function VenuesInner() {
       <ContractDetailDrawer
         contractNo={tab === "contracts" ? detailNo : null}
         onOpenChange={(o) => !o && closeDetail()}
-        onEdit={(c) => setContractForm(c)}
+        onEdit={(c) => { void editContract(c); }}
         onAttach={openAttach}
       />
       <LeadDetailDrawer

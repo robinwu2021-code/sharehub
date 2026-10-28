@@ -152,6 +152,44 @@ const PATCHES: { file: string; mustContain: string; apply: (rows: Row[]) => void
       );
     },
   },
+  {
+    // 场地方与拓展 + 运营管理的站点四项 → 网点管理（OM02）。两段叶子按 path 重编号；
+    // M_agent 首页改入驻审核（落地页先认 section.href）。
+    file: "V149__menu_network_section_by_ops_order.sql",
+    mustContain: "UPDATE iam_menu SET menu_no = CONCAT('M_tmp149_', id)",
+    apply: (rows) => {
+      const at = (no: string) => rows.find((r) => r.menu_no === no)!;
+      Object.assign(at("M_venue"), { name: "网点管理", name_en: "Network", name_ar: "إدارة الشبكة", path: "/operation/sites",
+        match_paths: '["/venues","/locations","/operation/sites","/operation/overview"]' });
+      Object.assign(at("M_operation"), { path: "/operation/fee-plans", match_paths: '["/operation"]' });
+      Object.assign(at("M_agent"), { path: "/agents?tab=applies" });
+      const plan: [string, string, string, string | null][] = [
+        ["/venues?tab=crm", "M_venue", "1", "拓展"],
+        ["/venues?tab=onboarding", "M_venue", "2", "拓展"],
+        ["/venues?tab=venues", "M_venue", "3", "场地方与合同"],
+        ["/venues?tab=contracts", "M_venue", "4", "场地方与合同"],
+        ["/operation/sites", "M_venue", "5", "站点与点位"],
+        ["/locations?tab=points", "M_venue", "6", "站点与点位"],
+        ["/operation/overview", "M_venue", "7", "站点与点位"],
+        ["/locations?tab=analysis", "M_venue", "8", "站点与点位"],
+        ["/venues?tab=lifecycle", "M_venue", "9", "站点与点位"],
+        ["/operation/fee-plans", "M_operation", "1", null],
+        ["/operation/fee-adjustments", "M_operation", "2", null],
+        ["/operation/app-versions", "M_operation", "3", null],
+        ["/operation/banks", "M_operation", "4", null],
+        ["/operation/brands", "M_operation", "5", null],
+        ["/operation/problems", "M_operation", "6", null],
+        ["/operation/notices", "M_operation", "7", null],
+        ["/operation/site-sharing", "M_operation", "8", null],
+        ["/operation/payee-sharing", "M_operation", "9", null],
+      ];
+      // 先认出行再改（同迁移的「先打散后赋值」）：边找边改会把刚改好的行当成下一条的候选
+      const targets = plan.map(([path]) => rows.find((r) => (r.parent_no === "M_venue" || r.parent_no === "M_operation") && r.path === path)!);
+      plan.forEach(([, parent, sort, group], i) => {
+        Object.assign(targets[i], { menu_no: `${parent}__${sort}`, parent_no: parent, sort, ...(group ? { group_name: group } : {}) });
+      });
+    },
+  },
 ];
 
 const COLS = [

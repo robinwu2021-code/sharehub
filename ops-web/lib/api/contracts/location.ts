@@ -2,7 +2,7 @@
 // 门店 Onboarding / 站点生命周期。
 import type { PageQ, ArchiveQ , ReportQ } from "../query";
 import type {
-  PageResult, Site, SitePoint, Venue, Contract, ContractAttachmentReq,
+  PageResult, Site, SitePoint, Venue, Contract, ContractAttachmentReq, ContractSaveReq,
   Lead, LeadQ, LeadSaveReq, LeadConvertReq, LeadConversion, LeadFollowUp, LeadFollowUpReq, SiteAnalysis,
   VenueOnboarding, LifecycleRow, FunnelStage, SiteAgent, ContractSummary, ContractLogItem,
   SiteSummary, SiteStatusLogItem, Checklist, SiteSurvey, SurveyReq,
@@ -50,7 +50,8 @@ export interface LocationApi {
    */
   saveLead(x: LeadSaveReq): Promise<Lead>;
   saveVenue(x: Partial<Venue> & { venueNo?: string }): Promise<Venue>;
-  saveContract(x: Partial<Contract> & { contractNo?: string }): Promise<Contract>;
+  /** 入参平铺（含条款），与后端 ContractReq 同形；条款规则见 mock saveContract。 */
+  saveContract(x: ContractSaveReq): Promise<Contract>;
 
   /** 线索跟进流水（BD CRM 时间线），新的在前。 */
   listLeadFollowUps(leadNo: string, q?: PageQ): Promise<PageResult<LeadFollowUp>>;

@@ -201,7 +201,10 @@ export const NAV: NavSection[] = [
     // soon 由 backend-ready.ts 决定：真实后端模式下接口未就绪的页面灰显，mock 模式恒可点。
     key: "operation", label: "运营管理", icon: "Store", module: "location",
     modules: ["location", "pricing", "finance", "system", "marketing"],
-    href: "/operation/overview", match: ["/operation", "/locations"],
+    // 2026-10-28：站点概览 / 站点管理 / 点位管理 / 站点坪效迁到「网点管理」（OM02），本段只剩计费、基础、分成三组，
+    // 待销售（OM04）、系统（OM11）、结算（OM08）三个模块调整时各自迁走，届时本段撤销。
+    // /operation/sites 与 /operation/overview 由网点管理的 match 认领（最长前缀胜出），这里只留 /operation。
+    href: "/operation/fee-plans", match: ["/operation"],
     // 2026-09-23 菜单收敛（docs/technical/菜单重合梳理与优化方案.md）：
     //
     // 第一步（A 类重合）：站点管理、收费方案、时段倍率、应用版本、银行、问题、公告
@@ -219,12 +222,6 @@ export const NAV: NavSection[] = [
     //
     // ⚠️ 顺序即分组：groupedLeaves 只合并**相邻**的同名 group，插叶子时别打断连续段。
     children: [
-      ...opLeaves([
-        ["overview", "站点概览", "location:overview:read", "场站管理"],
-        ["sites", "站点管理", "location:poi:read", "场站管理"],
-      ]),
-      { href: "/locations?tab=points", label: "点位管理", perm: "location:poi:read", group: "场站管理" },
-      { href: "/locations?tab=analysis", label: "站点坪效", perm: "location:analysis:read", phase: 3, group: "场站管理" },
       ...opLeaves([
         ["fee-plans", "收费方案", "pricing:plan:read", "计费与调价"],
         ["fee-adjustments", "预约调价", "pricing:adjustment:read", "计费与调价"],
@@ -283,15 +280,29 @@ export const NAV: NavSection[] = [
     // 与经营已有站点是两件事、两拨人；混在一个菜单里，运营每天要从一堆线索里找自己的站点。
     // 页面在 /venues（从 /locations 拆出）：一个 URL 只能属于一个 L1，
     // 否则面包屑与 Rail 高亮必错一边（findActiveSection 按路径前缀定归属）。
-    key: "venue", label: "场地方与拓展", icon: "Building2", module: "location", href: "/venues?tab=venues",
-    match: ["/venues"],
+    //
+    // 2026-10-28 按运营顺序合并为「网点管理」（OM02 · docs/requirements/运营端菜单清单-按运营顺序.md）：
+    // 场地方这条线与运营管理里的站点四项合成一个 L1，三组跟着 P1 拓场 → P2 签约 → P3 建站走。
+    // 站点页的 URL 不动（/operation/sites、/operation/overview、/locations），靠 match 认领 ——
+    // findActiveSection 取最长前缀，/operation/sites 胜过运营管理的 /operation。
+    // 落地页是站点管理（href），不是第一项 BD CRM：sectionDefaultHref 先认 section.href。
+    // ⚠️ 菜单真源在库里：本段与运营管理段的行由 V149 重编号，改这里要同步新开迁移（见 nav-seed.test.ts）。
+    key: "venue", label: "网点管理", icon: "Building2", module: "location", href: "/operation/sites",
+    match: ["/venues", "/locations", "/operation/sites", "/operation/overview"],
     children: [
-      { href: "/venues?tab=venues", label: "场地方", perm: "location:venue:read", group: "机构档案" },
-      { href: "/venues?tab=contracts", label: "进场合同", perm: "location:contract:read", group: "机构档案" },
       // 必须有显式 perm：无 perm 的叶子跟随 section，客服/运维不该看到 BD 的线索池。
       { href: "/venues?tab=crm", label: "BD 拓展 CRM", perm: "location:lead:read", group: "拓展" },
       { href: "/venues?tab=onboarding", label: "门店 Onboarding", perm: "location:venue:read", phase: 2, group: "拓展" },
-      { href: "/venues?tab=lifecycle", label: "门店生命周期", perm: "location:venue:read", phase: 3, group: "拓展" },
+      { href: "/venues?tab=venues", label: "场地方", perm: "location:venue:read", group: "场地方与合同" },
+      { href: "/venues?tab=contracts", label: "进场合同", perm: "location:contract:read", group: "场地方与合同" },
+      // 「合同提醒设置」（OM02-07）暂不建叶：到期提醒的 60 / 30 / 7 天在后端写死（合同汇总与 V104 告警码），
+      // 前端做配置页没有任何东西读它。已提给服务端评审，后端可配后再加。
+      ...opLeaves([["sites", "站点管理", "location:poi:read", "站点与点位"]]),
+      { href: "/locations?tab=points", label: "点位管理", perm: "location:poi:read", group: "站点与点位" },
+      ...opLeaves([["overview", "站点概览", "location:overview:read", "站点与点位"]]),
+      { href: "/locations?tab=analysis", label: "站点坪效", perm: "location:analysis:read", phase: 3, group: "站点与点位" },
+      // 门店生命周期已并入站点状态（运营核心流程 §10.2），它统计的是站点，从「拓展」挪到这里
+      { href: "/venues?tab=lifecycle", label: "门店生命周期", perm: "location:venue:read", phase: 3, group: "站点与点位" },
     ],
   },
   {
@@ -303,7 +314,8 @@ export const NAV: NavSection[] = [
     // 「代理收益结算」深链撤销：它指向财务的结算单，挂的 agent:settlement:read 没有任何后端端点
     // 挂载（功能权限清单 §缺口 2），BD 从这里点进去对真后端必 403。结算单归「结算」模块。
     // ⚠️ 菜单真源在库里：本段的行由 V148 定点更新，改这里要同步新开迁移（见 nav-seed.test.ts）。
-    key: "agent", label: "商家管理", icon: "Handshake", module: "agent", href: "/agents",
+    // 落地页 = 入驻审核（待办优先于台账）。sectionDefaultHref 先认 href，所以 href 必须指向它而不是档案页
+    key: "agent", label: "商家管理", icon: "Handshake", module: "agent", href: "/agents?tab=applies",
     children: [
       { href: "/agents?tab=applies", label: "入驻审核", perm: "agent:apply:read", group: "入驻与档案" },
       { href: "/agents", label: "商家档案", perm: "agent:agent:read", group: "入驻与档案" },
@@ -797,8 +809,15 @@ export function activeLeafIndex(
 
 /** section 的默认落地地址：首个可点叶子（排除 soon 和 phase-locked），无则 section 首页。 */
 export function sectionDefaultHref(section: NavSection, v: ViewerLike): string {
-  const leaf = visibleLeaves(section, v).find((l) => !l.soon && !isLeafLocked(l));
-  return leaf?.href ?? section.href;
+  const open = visibleLeaves(section, v).filter((l) => !l.soon && !isLeafLocked(l));
+  /*
+   * 落地页先认 section.href（2026-10-28，运营端菜单清单 §一）：菜单按运营顺序排之后，
+   * 第一项不一定是高频页（网点管理的第一项是 BD CRM，日常却是站点管理）。
+   * section.href 指向的叶子对当前角色可见且未锁时落到它，否则退回第一个可点叶 ——
+   * 没这个码的角色不会落到一个看不见的页面上。
+   */
+  const own = open.find((l) => normPath(l.href) === normPath(section.href) || l.href === section.href);
+  return (own ?? open[0])?.href ?? section.href;
 }
 
 /** 叶子是否不可点：待建 或 分期锁定（渲染层统一判定）。 */

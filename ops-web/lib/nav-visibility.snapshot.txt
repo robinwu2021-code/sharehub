@@ -2,10 +2,6 @@
 # 改动菜单可见性时这份文件会变 —— diff 就是评审物，确认是有意的再提交。
 
 ## ADMIN（116 项）
-operation›站点概览
-operation›站点管理
-operation›点位管理
-operation›站点坪效
 operation›收费方案
 operation›预约调价
 operation›应用版本
@@ -31,10 +27,14 @@ workorder›工单列表
 workorder›工单看板
 workorder›SLA 管理
 workorder›巡检计划
-venue›场地方
-venue›进场合同
 venue›BD 拓展 CRM
 venue›门店 Onboarding
+venue›场地方
+venue›进场合同
+venue›站点管理
+venue›点位管理
+venue›站点概览
+venue›站点坪效
 venue›门店生命周期
 agent›入驻审核
 agent›商家档案
@@ -129,17 +129,17 @@ my-asset›我的订单
 my-service›设备报修
 
 ## BD（40 项）
-operation›站点概览
-operation›站点管理
-operation›点位管理
-operation›站点坪效
 operation›公告管理
 operation›站点分成
 operation›分成方分成
-venue›场地方
-venue›进场合同
 venue›BD 拓展 CRM
 venue›门店 Onboarding
+venue›场地方
+venue›进场合同
+venue›站点管理
+venue›点位管理
+venue›站点概览
+venue›站点坪效
 venue›门店生命周期
 agent›入驻审核
 agent›商家档案
@@ -218,16 +218,16 @@ flow›工单工作台
 flow›流程实例
 
 ## FINANCE（51 项）
-operation›站点概览
-operation›站点坪效
 operation›收费方案
 operation›预约调价
 operation›银行管理
 operation›站点分成
 operation›分成方分成
+venue›门店 Onboarding
 venue›场地方
 venue›进场合同
-venue›门店 Onboarding
+venue›站点概览
+venue›站点坪效
 venue›门店生命周期
 agent›商家档案
 agent›商家分润规则
@@ -271,9 +271,6 @@ flow›审批列表
 flow›流程实例
 
 ## OPS（45 项）
-operation›站点概览
-operation›站点管理
-operation›点位管理
 operation›应用版本
 device›设备台账
 device›充电宝管理
@@ -291,8 +288,11 @@ workorder›工单列表
 workorder›工单看板
 workorder›SLA 管理
 workorder›巡检计划
-venue›场地方
 venue›门店 Onboarding
+venue›场地方
+venue›站点管理
+venue›点位管理
+venue›站点概览
 venue›门店生命周期
 agent›设备/点位划拨
 order›订单列表
@@ -318,18 +318,18 @@ flow›运营配置
 flow›流程实例
 
 ## VIEWER（33 项）
-operation›站点概览
-operation›站点管理
-operation›点位管理
-operation›站点坪效
 operation›站点分成
 operation›分成方分成
 device›设备台账
 device›实时监控
 device›设备日志
 device›设备编码
-venue›场地方
 venue›门店 Onboarding
+venue›场地方
+venue›站点管理
+venue›点位管理
+venue›站点概览
+venue›站点坪效
 venue›门店生命周期
 agent›商家档案
 agent›商家经营视图

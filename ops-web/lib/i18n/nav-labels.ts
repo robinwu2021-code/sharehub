@@ -60,12 +60,13 @@ const NAV: Record<string, Pair> = {
   "资产流转": { en: "Asset Flow", ar: "حركة الأصول" },
   // 2026-09-23 菜单收敛：「站点与点位」L1 撤销（二步），场地方那条线独立成
   // 「场地方与拓展」L1（三步）。原分组「场地资产 / 场地方机构 / 场站报表」作废。
-  // 「机构档案」是场地方与拓展的分组（2026-10-28 起商家管理改用「入驻与档案」）。
-  "场地方与拓展": { en: "Venues & BD", ar: "الأماكن وتطوير الأعمال" },
+  // 2026-10-28「场地方与拓展」与运营管理的站点四项合并为「网点管理」（OM02），分三组
+  "网点管理": { en: "Network", ar: "إدارة الشبكة" },
+  "场地方与合同": { en: "Venues & Contracts", ar: "الأماكن والعقود" },
+  "站点与点位": { en: "Sites & Points", ar: "المواقع والنقاط" },
   "拓展": { en: "Business Development", ar: "تطوير الأعمال" },
   "分成": { en: "Revenue Share", ar: "تقاسم الإيرادات" },
   "计费与调价": { en: "Pricing & Adjustments", ar: "التسعير والتعديلات" },
-  "机构档案": { en: "Partner Profile", ar: "ملف الشريك" },
   // 商家管理三组（2026-10-28 按运营顺序：进来 → 定钱与资产 → 经营与退出）
   "入驻与档案": { en: "Onboarding & Profiles", ar: "الانضمام والملفات" },
   "分润与划拨": { en: "Commission & Allocation", ar: "العمولة والتخصيص" },
@@ -200,7 +201,6 @@ const NAV: Record<string, Pair> = {
   "OpenAPI 应用": { en: "OpenAPI Apps", ar: "تطبيقات OpenAPI" },
   // 运营管理新菜单（2026-09-22）
   "运营管理": { en: "Operations", ar: "إدارة العمليات" },
-  "场站管理": { en: "Site Operations", ar: "تشغيل المواقع" },
   "基础管理": { en: "Base Data", ar: "البيانات الأساسية" },
   "站点概览": { en: "Site Overview", ar: "نظرة عامة على المواقع" },
   "收费方案": { en: "Fee Plans", ar: "خطط الرسوم" },

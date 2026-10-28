@@ -62,10 +62,7 @@ const LEAF_TUPLES = [
   "/devices|我的设备|device:cabinet:read||设备与订单",
   "/orders|我的订单|order:order:read||设备与订单",
   "/work-orders?view=list|设备报修|workorder:wo:create||报修与跟进",
-  "/operation/overview|站点概览|location:overview:read||场站管理",
-  "/operation/sites|站点管理|location:poi:read||场站管理",
-  "/locations?tab=points|点位管理|location:poi:read||场站管理",
-  "/locations?tab=analysis|站点坪效|location:analysis:read|3|场站管理",
+  // 2026-10-28：站点四项迁到网点管理（OM02），见下方 venue 段
   "/operation/fee-plans|收费方案|pricing:plan:read||计费与调价",
   "/operation/fee-adjustments|预约调价|pricing:adjustment:read||计费与调价",
   "/operation/app-versions|应用版本|system:app_version:read||基础管理",
@@ -91,11 +88,16 @@ const LEAF_TUPLES = [
   "/work-orders?view=board|工单看板|workorder:wo:read||",
   "/work-orders?view=sla|SLA 管理|workorder:wo:read|2|",
   "/work-orders?view=inspection|巡检计划|workorder:wo:read|2|",
-  "/venues?tab=venues|场地方|location:venue:read||机构档案",
-  "/venues?tab=contracts|进场合同|location:contract:read||机构档案",
+  // 2026-10-28 网点管理按运营顺序（OM02）：拓展 → 场地方与合同 → 站点与点位
   "/venues?tab=crm|BD 拓展 CRM|location:lead:read||拓展",
   "/venues?tab=onboarding|门店 Onboarding|location:venue:read|2|拓展",
-  "/venues?tab=lifecycle|门店生命周期|location:venue:read|3|拓展",
+  "/venues?tab=venues|场地方|location:venue:read||场地方与合同",
+  "/venues?tab=contracts|进场合同|location:contract:read||场地方与合同",
+  "/operation/sites|站点管理|location:poi:read||站点与点位",
+  "/locations?tab=points|点位管理|location:poi:read||站点与点位",
+  "/operation/overview|站点概览|location:overview:read||站点与点位",
+  "/locations?tab=analysis|站点坪效|location:analysis:read|3|站点与点位",
+  "/venues?tab=lifecycle|门店生命周期|location:venue:read|3|站点与点位",
   // 2026-10-28 商家管理按运营顺序（OM01）：进来 → 定钱与资产 → 经营与退出
   "/agents?tab=applies|入驻审核|agent:apply:read||入驻与档案",
   "/agents|商家档案|agent:agent:read||入驻与档案",
@@ -284,17 +286,14 @@ describe("L3 叶子过滤（4.2-2）", () => {
   it("VIEWER 无 agent:share:config → 财务不出现代理分润配置深链", () => {
     expect(visibleLeaves(finance(), "VIEWER").map((l) => l.label)).not.toContain("代理分润配置");
   });
-  // OPS 有 poi/venue，没有 contract/analysis/lead —— 拆成两个 L1 后按 perm 过滤的结论不变。
-  it("OPS：运营管理有点位无坪效；场地方与拓展有场地方、无合同与 CRM", () => {
-    const op = visibleLeaves(sec("operation"), "OPS").map((l) => l.label);
-    expect(op).toContain("点位管理");
-    expect(op).not.toContain("站点坪效");
+  // OPS 有 poi/venue，没有 contract/analysis/lead —— 并成网点管理后按 perm 过滤的结论不变。
+  it("OPS：网点管理有站点、点位与场地方；无坪效、合同与 CRM；运营管理只剩应用版本", () => {
     const venue = visibleLeaves(sec("venue"), "OPS").map((l) => l.label);
-    expect(venue).toContain("场地方");
-    expect(venue).not.toContain("进场合同");
-    expect(venue).not.toContain("BD 拓展 CRM");
+    for (const x of ["站点管理", "点位管理", "站点概览", "场地方"]) expect(venue).toContain(x);
+    for (const x of ["站点坪效", "进场合同", "BD 拓展 CRM"]) expect(venue).not.toContain(x);
+    expect(visibleLeaves(sec("operation"), "OPS").map((l) => l.label)).toEqual(["应用版本"]);
   });
-  it("CS 在「场地方与拓展」一个叶子都没有 → 整个 L1 对它不可见", () => {
+  it("CS 在「网点管理」一个叶子都没有 → 整个 L1 对它不可见", () => {
     expect(visibleLeaves(sec("venue"), "CS")).toEqual([]);
     expect(sectionKeys("CS")).not.toContain("venue");
   });
@@ -355,8 +354,16 @@ describe("默认落地与面包屑", () => {
   it("section 默认落地 = 首个可点叶子", () => {
     expect(sectionDefaultHref(sec("order"), "FINANCE")).toBe("/orders");
     expect(sectionDefaultHref(sec("device"), "OPS")).toBe("/devices");
-    // 站点与点位撤销后，FINANCE 在运营管理的首个可点叶子仍是「站点概览」
-    expect(sectionDefaultHref(sec("operation"), "FINANCE")).toBe("/operation/overview");
+    // 站点四项迁到网点管理后，FINANCE 在运营管理的首个可点叶子是「收费方案」
+    expect(sectionDefaultHref(sec("operation"), "FINANCE")).toBe("/operation/fee-plans");
+  });
+  it("section.href 指向的叶子可见且未锁时先落到它（按运营顺序排后第一项不一定是高频页）", () => {
+    // 网点管理第一项是 BD CRM，日常落地却该是站点管理
+    expect(sectionDefaultHref(sec("venue"), "ADMIN")).toBe("/operation/sites");
+    expect(sectionDefaultHref(sec("venue"), "BD")).toBe("/operation/sites");
+    // 商家管理落入驻审核（待办优先于台账）；没有入驻码的角色退回第一个可点叶
+    expect(sectionDefaultHref(sec("agent"), "ADMIN")).toBe("/agents?tab=applies");
+    expect(sectionDefaultHref(sec("agent"), "FINANCE")).toBe("/agents");
   });
   it("客服管理：报障受理已解锁（ready），落地就是它 —— 客服进来第一眼该看用户报了什么", () => {
     // 2026-09-28 改口径：此前两叶被分期挡着、落地退到 /orders，
@@ -406,13 +413,13 @@ describe("L2 分组（按机构/对象聚类，2026-07-29 结构优化）", () =
     expect(segs.map((x) => x.group)).toEqual(["分润与结算", "平台账", "伙伴账", "用户账"]);
   });
   // 2026-09-23：站点与点位撤销，原两组（场地资产/场地方机构）换成按动线切的分组，见下方运营管理用例。
-  it("运营管理分四组：场站 / 计费 / 基础 / 分成", () => {
+  it("运营管理剩三组：计费 / 基础 / 分成（场站四项已迁网点管理）", () => {
     const segs = groupedLeaves(visibleLeaves(sec("operation"), "ADMIN"));
-    expect(segs.map((x) => x.group)).toEqual(["场站管理", "计费与调价", "基础管理", "分成"]);
+    expect(segs.map((x) => x.group)).toEqual(["计费与调价", "基础管理", "分成"]);
   });
-  it("场地方与拓展分两组：机构档案（签下来的关系）/ 拓展（签约前的获客）", () => {
+  it("网点管理分三组，跟着 P1 拓场 → P2 签约 → P3 建站", () => {
     const segs = groupedLeaves(visibleLeaves(sec("venue"), "ADMIN"));
-    expect(segs.map((x) => x.group)).toEqual(["机构档案", "拓展"]);
+    expect(segs.map((x) => x.group)).toEqual(["拓展", "场地方与合同", "站点与点位"]);
   });
   it("RBAC 过滤后不产生空组（VIEWER 看财务）", () => {
     const segs = groupedLeaves(visibleLeaves(sec("finance"), "VIEWER"));
@@ -547,22 +554,16 @@ describe("运营管理：跨模块 section", () => {
   const leafLabels = (r: Role) => visibleLeaves(op(), r).map((l) => l.label);
 
   it("各角色可见的子页面与后端权限码一致", () => {
+    // 2026-10-28：站点概览 / 站点管理 / 点位管理 / 站点坪效迁到网点管理（OM02）
     expect(leafLabels("ADMIN")).toEqual([
-      "站点概览", "站点管理", "点位管理", "站点坪效",
       "收费方案", "预约调价",
       "应用版本", "银行管理", "品牌管理", "问题管理", "公告管理",
       "站点分成", "分成方分成",
     ]);
-    expect(leafLabels("OPS")).toEqual(["站点概览", "站点管理", "点位管理", "应用版本"]);
-    expect(leafLabels("FINANCE")).toEqual([
-      "站点概览", "站点坪效", "收费方案", "预约调价", "银行管理", "站点分成", "分成方分成",
-    ]);
-    expect(leafLabels("BD")).toEqual([
-      "站点概览", "站点管理", "点位管理", "站点坪效", "公告管理", "站点分成", "分成方分成",
-    ]);
-    expect(leafLabels("VIEWER")).toEqual([
-      "站点概览", "站点管理", "点位管理", "站点坪效", "站点分成", "分成方分成",
-    ]);
+    expect(leafLabels("OPS")).toEqual(["应用版本"]);
+    expect(leafLabels("FINANCE")).toEqual(["收费方案", "预约调价", "银行管理", "站点分成", "分成方分成"]);
+    expect(leafLabels("BD")).toEqual(["公告管理", "站点分成", "分成方分成"]);
+    expect(leafLabels("VIEWER")).toEqual(["站点分成", "分成方分成"]);
   });
 
   it("CS 没有 location 模块权限，也能通过 system/marketing 看到运营管理（多模块规则）", () => {
@@ -584,7 +585,7 @@ describe("运营管理：跨模块 section", () => {
 
   it("分组与顺序固定（公告已并进「基础管理」：原先那一组只有一条同名叶子）", () => {
     expect(groupedLeaves(visibleLeaves(op(), "ADMIN")).map((g) => g.group))
-      .toEqual(["场站管理", "计费与调价", "基础管理", "分成"]);
+      .toEqual(["计费与调价", "基础管理", "分成"]);
   });
 
   it("多个独立页面：路径反推与高亮按页面路径", () => {
@@ -593,20 +594,25 @@ describe("运营管理：跨模块 section", () => {
     const leaves = visibleLeaves(op(), "ADMIN");
     expect(leaves[activeLeafIndex(leaves, "/operation/site-sharing", null, null)]?.label).toBe("站点分成");
     expect(breadcrumb("/operation/fee-adjustments", null, null, "ADMIN")).toEqual(["运营管理", "计费与调价", "预约调价"]);
-    // 点位与坪效留在 /locations（归运营管理）；场地方那条线在 /venues（归新 L1）。
-    // 一个 URL 只能属于一个 L1 —— 这正是第三步必须拆页面的原因。
-    expect(findActiveSection("/locations", "ADMIN")?.key).toBe("operation");
-    expect(breadcrumb("/locations", "points", null, "ADMIN")).toEqual(["运营管理", "场站管理", "点位管理"]);
+    // 2026-10-28 网点管理（OM02）认领 /venues、/locations 与 /operation 下的两个站点页 ——
+    // 一个 URL 只能属于一个 L1，靠最长前缀：/operation/sites 胜过运营管理的 /operation。
+    expect(findActiveSection("/locations", "ADMIN")?.key).toBe("venue");
+    expect(breadcrumb("/locations", "points", null, "ADMIN")).toEqual(["网点管理", "站点与点位", "点位管理"]);
+    expect(findActiveSection("/operation/sites", "ADMIN")?.key).toBe("venue");
+    expect(findActiveSection("/operation/overview/", "ADMIN")?.key).toBe("venue");
+    expect(breadcrumb("/operation/sites", null, null, "ADMIN")).toEqual(["网点管理", "站点与点位", "站点管理"]);
+    expect(findActiveSection("/operation/fee-plans", "ADMIN")?.key).toBe("operation");
     expect(findActiveSection("/venues", "ADMIN")?.key).toBe("venue");
-    expect(breadcrumb("/venues", "venues", null, "ADMIN")).toEqual(["场地方与拓展", "机构档案", "场地方"]);
-    expect(breadcrumb("/venues", "crm", null, "BD")).toEqual(["场地方与拓展", "拓展", "BD 拓展 CRM"]);
+    expect(breadcrumb("/venues", "venues", null, "ADMIN")).toEqual(["网点管理", "场地方与合同", "场地方"]);
+    expect(breadcrumb("/venues", "crm", null, "BD")).toEqual(["网点管理", "拓展", "BD 拓展 CRM"]);
     // 旧菜单的同名功能不受影响
     expect(findActiveSection("/system", "ADMIN")?.key).toBe("system");
   });
 
   it("灰显完全由 backend-ready 决定（当前两种模式都不灰）", () => {
     // 只有 /operation/<page> 这些叶子走 backend-ready；并进来的 /locations?tab= 七项不参与灰显。
-    const rows = (op().children ?? [])
+    // 网点管理里的站点管理 / 站点概览也是 /operation/<page>，一并纳入
+    const rows = [...(op().children ?? []), ...(sec("venue").children ?? [])]
       .filter((l) => l.href.startsWith("/operation/"))
       .map((l) => [l.href.replace("/operation/", ""), l.label, l.perm ?? "", l.group ?? ""] as [OperationPage, string, string, string]);
     // 2026-09-23 后端补齐后，真实模式下也不再有灰显项。

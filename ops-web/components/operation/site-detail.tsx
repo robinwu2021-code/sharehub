@@ -379,7 +379,7 @@ export function SiteDetailDrawer({
           columns={contractCols}
           rows={contractsQ.isLoading ? undefined : siteContracts}
           loading={contractsQ.isLoading}
-          empty="该站点还没有进场合同 —— 没有生效合同站点无法上线，分成也无依据。到「场地方与拓展 › 进场合同」新建。"
+          empty="该站点还没有进场合同 —— 没有生效合同站点无法上线，分成也无依据。到「网点管理 › 进场合同」新建。"
         />
       )}
 
