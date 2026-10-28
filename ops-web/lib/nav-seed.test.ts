@@ -190,6 +190,50 @@ const PATCHES: { file: string; mustContain: string; apply: (rows: Row[]) => void
       });
     },
   },
+  {
+    // 设备管理按运营顺序（OM03）：两段叶子按 path 重编号，供应商接入从系统设置搬入，插库存余额与资产差异。
+    file: "V150__menu_device_section_by_ops_order.sql",
+    mustContain: "UPDATE iam_menu SET menu_no = CONCAT('M_tmp150_', id)",
+    apply: (rows) => {
+      Object.assign(rows.find((r) => r.menu_no === "M_system")!, { path: "/system?tab=payment" });
+      const plan: [string, string, string, string | null, Partial<Row>?][] = [
+        ["/devices", "M_device", "1", "资产台账"],
+        ["/devices?tab=powerbanks", "M_device", "2", "资产台账"],
+        ["/devices?tab=codes", "M_device", "3", "资产台账"],
+        ["/devices?tab=inventory", "M_device", "5", "库存与流转"],
+        ["/system?tab=vendors", "M_device", "7", "设备接入", { path: "/devices?tab=vendors" }],
+        ["/devices?tab=monitor", "M_device", "8", "在线运行"],
+        ["/devices?tab=commands", "M_device", "9", "在线运行", { name: "远程控制与指令记录" }],
+        ["/devices?tab=logs", "M_device", "10", "在线运行"],
+        ["/devices?tab=ota", "M_device", "11", "在线运行"],
+        ["/system?tab=payment", "M_system", "1", null],
+        ["/system?tab=notify", "M_system", "2", null],
+        ["/system?tab=notify-log", "M_system", "3", null],
+        ["/system?tab=notify-blacklist", "M_system", "4", null],
+        ["/system?tab=rules", "M_system", "5", null],
+        ["/system?tab=login", "M_system", "6", null],
+        ["/system?tab=dict", "M_system", "7", null],
+        ["/system?tab=region", "M_system", "8", null],
+        ["/system?tab=params", "M_system", "9", null],
+        ["/system?tab=tax", "M_system", "10", null],
+        ["/system?tab=markets", "M_system", "11", null],
+        ["/system?tab=openapi", "M_system", "12", null],
+      ];
+      const targets = plan.map(([path]) => rows.find((r) => (r.parent_no === "M_device" || r.parent_no === "M_system") && r.path === path)!);
+      plan.forEach(([, parent, sort, group, extra], i) => {
+        Object.assign(targets[i], { menu_no: `${parent}__${sort}`, parent_no: parent, sort, ...(group ? { group_name: group } : {}), ...(extra ?? {}) });
+      });
+      const leaf = (no: string, name: string, en: string, ar: string, path: string, sort: string, phase: string, ready: string): Row => ({
+        menu_no: no, parent_no: "M_device", name, name_en: en, name_ar: ar, type: "ITEM", path, icon: "NULL",
+        group_name: "库存与流转", sort, perm: "device:inventory:read", phase, ready,
+        module: "NULL", modules: "NULL", match_paths: "NULL", pin_bottom: "0", portal_for: "NULL",
+      });
+      rows.push(
+        leaf("M_device__4", "库存余额", "Stock Balance", "رصيد المخزون", "/devices?tab=stock", "4", "1", "1"),
+        leaf("M_device__6", "资产差异", "Asset Discrepancies", "فروقات الأصول", "/devices?tab=asset-diffs", "6", "2", "0"),
+      );
+    },
+  },
 ];
 
 const COLS = [

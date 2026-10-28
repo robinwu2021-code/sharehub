@@ -57,7 +57,9 @@ const NAV: Record<string, Pair> = {
   // L3 分组小标题（按机构/对象聚类）
   "资产台账": { en: "Asset Ledger", ar: "سجل الأصول" },
   "在线运行": { en: "Live Ops", ar: "التشغيل المباشر" },
-  "资产流转": { en: "Asset Flow", ar: "حركة الأصول" },
+  // 设备管理四组（2026-10-28 按运营顺序，OM03）；原「资产流转」作废
+  "库存与流转": { en: "Stock & Transfers", ar: "المخزون والتحويلات" },
+  "设备接入": { en: "Device Access", ar: "ربط الأجهزة" },
   // 2026-09-23 菜单收敛：「站点与点位」L1 撤销（二步），场地方那条线独立成
   // 「场地方与拓展」L1（三步）。原分组「场地资产 / 场地方机构 / 场站报表」作废。
   // 2026-10-28「场地方与拓展」与运营管理的站点四项合并为「网点管理」（OM02），分三组
@@ -98,7 +100,9 @@ const NAV: Record<string, Pair> = {
   "设备台账": { en: "Cabinets", ar: "الخزائن" },
   "充电宝管理": { en: "Power Banks", ar: "بنوك الطاقة" },
   "实时监控": { en: "Monitoring", ar: "المراقبة" },
-  "远程控制·指令记录": { en: "Remote & Commands", ar: "التحكم والأوامر" },
+  "远程控制与指令记录": { en: "Remote & Commands", ar: "التحكم والأوامر" },
+  "库存余额": { en: "Stock Balance", ar: "رصيد المخزون" },
+  "资产差异": { en: "Asset Discrepancies", ar: "فروقات الأصول" },
   "库存调拨": { en: "Inventory", ar: "المخزون" },
   "固件 OTA": { en: "Firmware OTA", ar: "تحديث البرمجيات" },
   "设备日志": { en: "Device Logs", ar: "سجلات الجهاز" },

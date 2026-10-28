@@ -31,7 +31,7 @@ import { useCan } from "@/lib/hooks/use-can";
 import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
 import { exportCsv } from "@/lib/export-csv";
-import type { Vendor, AccessMode, NotifyTemplate, DictEntry, Region, RegionNode, SysParam, OpenApiApp, MarketCountry, PaymentChannel, PageResult, VendorProbeResult } from "@/lib/types";
+import type { NotifyTemplate, DictEntry, Region, RegionNode, SysParam, OpenApiApp, MarketCountry, PaymentChannel, PageResult } from "@/lib/types";
 import type {
   NotifyLog, NotifyBlacklist, LoginSetting, TaxSetting,
   WithdrawRule, ReservationRule, BillingDefaultRule,
@@ -44,11 +44,11 @@ import type {
 // 三个页面调同一组 API（listAppVersions/saveAppVersion/rollbackAppVersion、listBanks/
 // saveBank/archiveBank、listProblems/saveProblem/archiveProblem），是同一张表的两个
 // 维护入口。按「重合功能一律并到运营管理」收敛到那边，本页不再留第二份。
-const TAB_KEYS = ["vendors", "payment", "notify", "notify-log", "notify-blacklist", "rules",
+// 2026-10-28「供应商接入」搬到「设备管理 › 设备接入」（components/device/vendors-tab.tsx），本页不再留第二份。
+const TAB_KEYS = ["payment", "notify", "notify-log", "notify-blacklist", "rules",
   "login", "dict", "region", "params", "tax",
   "markets", "openapi"] as const;
 
-const MODE_LABEL: Record<AccessMode, string> = { TCP: "TCP 私有协议", MQTT: "MQTT 直连", HTTP_API: "HTTP 云对接" };
 const CHANNEL_LABEL: Record<NotifyTemplate["channel"], string> = { SMS: "短信", EMAIL: "邮件", PUSH: "推送", WHATSAPP: "WhatsApp" };
 const LANG_LABEL: Record<NotifyTemplate["lang"], string> = { ar: "阿拉伯语", en: "英语" };
 // 地区库定死三级：国家 → 城市/酋长国 → 商圈。层级名比数字 1/2/3 更能说明"这一层是什么"
@@ -411,31 +411,6 @@ function SystemInner() {
   const { tab, setTab } = usePageTab(tabs, () => onTabChange());
   const [keyword, setKeyword] = useState("");
 
-  // —— 供应商接入（Vendor[]，非分页；含配置抽屉，保留）——
-  const vendorsQ = useQuery({ queryKey: ["vendors"], queryFn: () => api.listVendors(), enabled: tab === "vendors" });
-  const [edit, setEdit] = useState<Vendor | null>(null);
-  const [form, setForm] = useState<Partial<Vendor>>({});
-  const save = useMutation({
-    mutationFn: (v: Partial<Vendor> & { vendorCode: string }) => api.saveVendor(v),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["vendors"] }); setEdit(null); },
-  });
-  function openVendor(v: Vendor) { setEdit(v); setForm(v); }
-
-  // —— S7 供应商连通性测试：探测不改配置，结果落抽屉（一句话结论 + 原始信息）——
-  // 探测权限用 device:vendor:read 而非 :config —— 排障是运维日常，不该要改配置的权。
-  const canVendorProbe = allow("device:vendor:read");
-  const [probe, setProbe] = useState<VendorProbeResult | null>(null);
-  const [probingCode, setProbingCode] = useState<string | null>(null);
-  const testVendor = useMutation({
-    mutationFn: (code: string) => api.testVendorConnectivity(code),
-    onSuccess: (r) => {
-      setProbe(r);
-      // 失败结论也用 success 提示条？不 —— 结论本身要带情绪，否则运维会以为"测过就是通了"
-      if (r.ok) notify.success(`${r.vendorCode} ${r.message}`); else notify.error(`${r.vendorCode} 探测失败：${r.message}`);
-    },
-    onSettled: () => setProbingCode(null),
-  });
-
   // —— 编辑门控与表单 state ——
   const canNotify = allow("system:notify_template:update");
   const canDict = allow("system:dict:update");
@@ -568,8 +543,8 @@ function SystemInner() {
       : tab === "markets" ? api.listMarketCountries({ page: paging.page, size: paging.size, keyword })
       : api.listOpenApiApps({ page: paging.page, size: paging.size, keyword }),
     placeholderData: keepWithinTab(tab),
-    // vendors 非分页、rules 是分区表单、region 已改树（整棵取回）——三者都不走这个分页查询
-    enabled: tab !== "vendors" && tab !== "rules" && tab !== "region",
+    // rules 是分区表单、region 已改树（整棵取回）——两者都不走这个分页查询
+    enabled: tab !== "rules" && tab !== "region",
   });
   // 发送记录页头统计：全量口径（今日发送量 / 失败率 / 今日成本），与当页数据无关。
   const logStats = useQuery({ queryKey: ["sys", "notify-log-stats"], queryFn: () => api.getNotifyLogStats(), enabled: tab === "notify-log" });
@@ -655,33 +630,6 @@ function SystemInner() {
 
   const editBtn = <T,>(can: boolean, open: (r: T) => void) => (row: T) =>
     can ? <Button size="sm" variant="outline" onClick={() => open(row)}>{t("common.edit")}</Button> : <span className="text-muted-foreground">-</span>;
-
-  const vendorCols: Column<Vendor>[] = [
-    { header: "供应商码", cell: (v) => <span className="font-medium">{v.vendorCode}</span> },
-    { header: "名称", cell: (v) => v.name },
-    { header: "接入方式", cell: (v) => <Badge tone="outline">{MODE_LABEL[v.accessMode]}</Badge> },
-    { header: "设备数", cell: (v) => <span className="tabular-nums">{v.deviceCount}</span> },
-    { header: "状态", cell: (v) => <EnabledBadge on={v.status === "ENABLED"} /> },
-    {
-      header: "操作",
-      cell: (v) => (
-        <div className="flex gap-2">
-          {allow("device:vendor:config") && <Button size="sm" variant="outline" onClick={() => openVendor(v)}>配置</Button>}
-          {canVendorProbe && (
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={testVendor.isPending}
-              onClick={() => { setProbingCode(v.vendorCode); testVendor.mutate(v.vendorCode); }}
-            >
-              {probingCode === v.vendorCode ? "探测中…" : "连通性测试"}
-            </Button>
-          )}
-          {!allow("device:vendor:config") && !canVendorProbe && <span className="text-muted-foreground">-</span>}
-        </div>
-      ),
-    },
-  ];
 
   const notifyCols: Column<NotifyTemplate>[] = [
     { header: "模板号", cell: (t) => <span className="font-medium">{t.templateNo}</span> },
@@ -927,18 +875,6 @@ function SystemInner() {
         </div>
       )}
 
-      {/* 供应商接入：非分页列表，只给导出（配置走行内抽屉，无搜索/新增）*/}
-      {tab === "vendors" && (
-        <Toolbar
-          onExport={() => exportCsv<Vendor>("供应商接入", [
-            { header: "供应商码", value: (v) => v.vendorCode },
-            { header: "名称", value: (v) => v.name },
-            { header: "接入方式", value: (v) => MODE_LABEL[v.accessMode] },
-            { header: "设备数", value: (v) => v.deviceCount },
-            { header: "状态", value: (v) => (v.status === "ENABLED" ? "启用" : "停用") },
-          ], vendorsQ.data ?? [])}
-        />
-      )}
       {tab === "payment" && (
         <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); paging.reset(); }} searchPlaceholder="搜索渠道码 / 名称 / 国家 / 币种"
           // 密钥列导出为掩码占位，与表格一致——CSV 落到本地更不能带真实密钥
@@ -1134,7 +1070,6 @@ function SystemInner() {
       {tab === "login" && <DataTable rowKey={(s: LoginSetting) => s.country} columns={loginCols} rows={q.data?.list as LoginSetting[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无登录设置——至少应保留一条 * 默认档，否则各国登录方式无处可依" />}
       {tab === "tax" && <DataTable rowKey={(x: TaxSetting) => x.country} columns={taxCols} rows={q.data?.list as TaxSetting[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无税率配置——未配置的国家按不含税出账，开票会缺税号" />}
 
-      {tab === "vendors" && <DataTable rowKey={(v: Vendor) => v.vendorCode} columns={vendorCols} rows={vendorsQ.data} loading={vendorsQ.isLoading} error={vendorsQ.error} onRetry={vendorsQ.refetch} empty="暂无供应商——还没有硬件厂商注册 driver，设备台账将无法接入，请先由平台管理员登记供应商" />}
       {tab === "payment" && <DataTable rowKey={(c: PaymentChannel) => c.channelCode} columns={paymentCols} rows={q.data?.list as PaymentChannel[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无支付渠道——未配置渠道时 C 端无法下单支付，请先新增并启用至少一个渠道" />}
       {tab === "notify" && <DataTable rowKey={(t: NotifyTemplate) => t.templateNo} columns={notifyCols} rows={q.data?.list as NotifyTemplate[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无通知模板——OTP/借还/扣费短信都取自这里，请先新增模板再启用" />}
       {tab === "dict" && <DataTable rowKey={(d: DictEntry) => d.dictNo} columns={dictCols} rows={q.data?.list as DictEntry[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无字典项——所选分组下还没有枚举值，请新增字典项供下拉与状态展示使用" />}
@@ -1161,37 +1096,7 @@ function SystemInner() {
       {tab === "params" && <DataTable rowKey={(p: SysParam) => p.paramKey} columns={paramCols} rows={q.data?.list as SysParam[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无系统参数——超时/重试等全局开关都在这里，未配置时按代码默认值运行" />}
       {tab === "openapi" && <DataTable rowKey={(a: OpenApiApp) => a.appNo} columns={openapiCols} rows={q.data?.list as OpenApiApp[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无 OpenAPI 应用——还没有合作方接入，需要对外开放接口时在此新增应用并分配 AppKey" />}
       {tab === "markets" && <DataTable rowKey={(m: MarketCountry) => m.countryCode} columns={marketCols} rows={q.data?.list as MarketCountry[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无国家市场——开城前需先登记国家、币种与合规主体，否则该国无法上线" />}
-      {tab !== "vendors" && tab !== "rules" && tab !== "region" && q.data && <Pagination page={paging.page} size={paging.size} total={q.data.total} onPage={paging.setPage} onSize={paging.setSize} />}
-
-      {/* 供应商 配置抽屉（保留）*/}
-      <Drawer
-        open={!!edit}
-        onOpenChange={(o) => !o && setEdit(null)}
-        title={`配置供应商 ${edit?.vendorCode ?? ""}`}
-        desc="driver 接入参数（mock 保存到内存；接后端写 gw_vendor_config）"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setEdit(null)}>取消</Button>
-            <Button onClick={() => form.vendorCode && save.mutate(form as Vendor)} disabled={save.isPending}>保存</Button>
-          </>
-        }
-      >
-        <Field label="名称"><Input value={form.name ?? ""} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
-        <Field label="接入方式">
-          <Select className="w-full" value={form.accessMode ?? "HTTP_API"} onChange={(e) => setForm({ ...form, accessMode: e.target.value as AccessMode })}>
-            <option value="TCP">TCP 私有协议</option>
-            <option value="MQTT">MQTT 直连</option>
-            <option value="HTTP_API">HTTP 云对接</option>
-          </Select>
-        </Field>
-        <Field label="API 基址（云对接型）"><Input value={form.apiBase ?? ""} onChange={(e) => setForm({ ...form, apiBase: e.target.value })} placeholder="https://api.vendor.example" /></Field>
-        <Field label="状态">
-          <Select className="w-full" value={form.status ?? "ENABLED"} onChange={(e) => setForm({ ...form, status: e.target.value as Vendor["status"] })}>
-            <option value="ENABLED">启用</option>
-            <option value="DISABLED">停用</option>
-          </Select>
-        </Field>
-      </Drawer>
+      {tab !== "rules" && tab !== "region" && q.data && <Pagination page={paging.page} size={paging.size} total={q.data.total} onPage={paging.setPage} onSize={paging.setSize} />}
 
       {/* 支付渠道 配置抽屉（密钥仅掩码，真实值由后端保管）*/}
       <FormDrawer open={!!paymentForm} onOpenChange={(o) => !o && setPaymentForm(null)}
@@ -1317,30 +1222,6 @@ function SystemInner() {
             号码/邮箱无效或用户退订的，请到「触达拉黑」登记，避免持续扣费重发。
           </span>
         </Field>
-      </Drawer>
-
-      {/* S7 连通性测试结果：只读抽屉。结论 + 原始信息分开摆——前者给判断，后者给厂商对质 */}
-      <Drawer
-        open={!!probe}
-        onOpenChange={(o) => !o && setProbe(null)}
-        title={`连通性测试 ${probe?.vendorCode ?? ""}`}
-        desc="仅探测，不改任何接入配置"
-        footer={<Button variant="outline" onClick={() => setProbe(null)}>{t("common.cancel")}</Button>}
-      >
-        {probe && (
-          <>
-            <Field label="结论">
-              <Badge tone={probe.ok ? "success" : "danger"}>{probe.ok ? "连通" : "不通"}</Badge>
-            </Field>
-            <Field label="探测目标"><span className="tabular-nums">{probe.endpoint || "-"}</span></Field>
-            <Field label="往返延迟">{probe.ok ? <span className="tabular-nums">{probe.latencyMs} ms</span> : <span className="text-muted-foreground">-</span>}</Field>
-            <Field label="探测时间">{fmtTime(probe.checkedAt)}</Field>
-            <Field label="说明">{probe.message}</Field>
-            <Field label="原始信息">
-              <div className="rounded-card bg-muted px-3.5 py-2 text-sm">{probe.detail}</div>
-            </Field>
-          </>
-        )}
       </Drawer>
 
       {/* S7 模板预览 / 试发：改变量即重渲染；试发带幂等键，服务端拒绝重复提交 */}

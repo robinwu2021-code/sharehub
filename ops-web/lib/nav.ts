@@ -241,16 +241,25 @@ export const NAV: NavSection[] = [
   },
   {
     key: "device", label: "设备管理", icon: "Server", module: "device", href: "/devices",
+    // 2026-10-28 按运营顺序（OM03 · docs/requirements/运营端菜单清单-按运营顺序.md）：
+    // 资产台账 → 库存与流转 → 设备接入 → 在线运行（P4 布放：有账 → 能调 → 能连 → 在跑）。
+    // 「采购与入库」组（供应商 / 采购单 / 收货入库 / 期初登记）待后端补实体后再加，见优化清单 OM03。
+    // ⚠️ 菜单真源在库里：本段与系统设置段的行由 V150 重编号，改这里要同步新开迁移（见 nav-seed.test.ts）。
     children: [
-      // 按「资产台账 / 在线运行 / 资产流转」分组
       { href: "/devices", label: "设备台账", perm: "device:cabinet:read", group: "资产台账" },
       { href: "/devices?tab=powerbanks", label: "充电宝管理", perm: "device:powerbank:read", group: "资产台账" },
+      { href: "/devices?tab=codes", label: "设备编码", perm: "device:cabinet:read", phase: 1, group: "资产台账" },
+      // 库存余额由柜机 / 充电宝两个既有读端点在页内汇总，不新增后端端点
+      { href: "/devices?tab=stock", label: "库存余额", perm: "device:inventory:read", phase: 1, ready: true, group: "库存与流转" },
+      { href: "/devices?tab=inventory", label: "库存调拨", perm: "device:inventory:read", phase: 2, group: "库存与流转" },
+      // 此前是库存调拨里的子视图（同分期），菜单里找不到；拆出来不改分期
+      { href: "/devices?tab=asset-diffs", label: "资产差异", perm: "device:inventory:read", phase: 2, group: "库存与流转" },
+      // 从系统设置搬来：新厂商的设备要先接入才能上线，是布放的前置一步，不是系统参数
+      { href: "/devices?tab=vendors", label: "供应商接入", perm: "device:vendor:read", group: "设备接入" },
       { href: "/devices?tab=monitor", label: "实时监控", perm: "device:cabinet:read", group: "在线运行" },
-      { href: "/devices?tab=commands", label: "远程控制·指令记录", perm: "device:command:send", group: "在线运行" },
+      { href: "/devices?tab=commands", label: "远程控制与指令记录", perm: "device:command:send", group: "在线运行" },
       { href: "/devices?tab=logs", label: "设备日志", perm: "device:cabinet:read", phase: 1, group: "在线运行" },
-      { href: "/devices?tab=inventory", label: "库存调拨", perm: "device:inventory:read", phase: 2, group: "资产流转" },
-      { href: "/devices?tab=ota", label: "固件 OTA", perm: "device:ota:read", phase: 2, group: "资产流转" },
-      { href: "/devices?tab=codes", label: "设备编码", perm: "device:cabinet:read", phase: 1, group: "资产流转" },
+      { href: "/devices?tab=ota", label: "固件 OTA", perm: "device:ota:read", phase: 2, group: "在线运行" },
     ],
   },
   {
@@ -451,15 +460,15 @@ export const NAV: NavSection[] = [
     ],
   },
   {
-    // D1：菜单按 system 模块过滤；供应商页按钮级用 device:vendor:*（权限双源，后端 SSOT 不改）
-    key: "system", label: "系统设置", icon: "Settings", module: "system", href: "/system?tab=vendors",
+    // D1：菜单按 system 模块过滤（供应商接入已于 2026-10-28 搬到设备管理，其 device:vendor:* 码随之归设备段）
+    // 2026-10-28：供应商接入搬到设备管理（OM03），首页改为支付渠道
+    key: "system", label: "系统设置", icon: "Settings", module: "system", href: "/system?tab=payment",
     match: ["/system"],
     pinBottom: true,
     children: [
       // 按「接入 / 消息触达 / 业务规则 / 基础字典 / 开放与市场」分组（补齐清单 E）。
       // 注：对方把 提现设置/预约设置/充电设置 拆三个菜单、7 个支付渠道各占一菜单；
       //     我们合并为「业务规则」一页与「支付渠道」一页 —— 少菜单噪音即"信息更清晰"。
-      { href: "/system?tab=vendors", label: "供应商接入", perm: "device:vendor:read", group: "接入与支付" },
       { href: "/system?tab=payment", label: "支付渠道", perm: "system:payment_channel:read", group: "接入与支付" },
       { href: "/system?tab=notify", label: "通知模板", perm: "system:notify_template:read", group: "消息触达" },
       { href: "/system?tab=notify-log", label: "发送记录", perm: "system:notify_log:read", phase: 1, group: "消息触达" },

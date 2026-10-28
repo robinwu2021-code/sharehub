@@ -1,7 +1,7 @@
 # 每个角色看得到的菜单（lib/nav-visibility.test.ts 生成，勿手改）
 # 改动菜单可见性时这份文件会变 —— diff 就是评审物，确认是有意的再提交。
 
-## ADMIN（116 项）
+## ADMIN（118 项）
 operation›收费方案
 operation›预约调价
 operation›应用版本
@@ -13,12 +13,15 @@ operation›站点分成
 operation›分成方分成
 device›设备台账
 device›充电宝管理
-device›实时监控
-device›远程控制·指令记录
-device›设备日志
-device›库存调拨
-device›固件 OTA
 device›设备编码
+device›库存余额
+device›库存调拨
+device›资产差异
+device›供应商接入
+device›实时监控
+device›远程控制与指令记录
+device›设备日志
+device›固件 OTA
 alarm›告警记录
 alarm›告警通知
 alarm›告警代码
@@ -96,7 +99,6 @@ org›角色权限
 org›菜单管理
 org›操作审计
 org›绩效报表
-system›供应商接入
 system›支付渠道
 system›通知模板
 system›发送记录
@@ -174,10 +176,10 @@ flow›流程实例
 operation›问题管理
 operation›公告管理
 device›设备台账
-device›实时监控
-device›远程控制·指令记录
-device›设备日志
 device›设备编码
+device›实时监控
+device›远程控制与指令记录
+device›设备日志
 alarm›告警记录
 alarm›告警通知
 alarm›告警代码
@@ -270,16 +272,19 @@ flow›待办中心
 flow›审批列表
 flow›流程实例
 
-## OPS（45 项）
+## OPS（47 项）
 operation›应用版本
 device›设备台账
 device›充电宝管理
-device›实时监控
-device›远程控制·指令记录
-device›设备日志
-device›库存调拨
-device›固件 OTA
 device›设备编码
+device›库存余额
+device›库存调拨
+device›资产差异
+device›供应商接入
+device›实时监控
+device›远程控制与指令记录
+device›设备日志
+device›固件 OTA
 alarm›告警记录
 alarm›告警通知
 alarm›告警代码
@@ -303,7 +308,6 @@ order›押金与欠费
 order›免费订单
 report›设备运营分析
 report›点位坪效
-system›供应商接入
 system›通知模板
 system›发送记录
 system›参数字典
@@ -321,9 +325,9 @@ flow›流程实例
 operation›站点分成
 operation›分成方分成
 device›设备台账
+device›设备编码
 device›实时监控
 device›设备日志
-device›设备编码
 venue›门店 Onboarding
 venue›场地方
 venue›站点管理

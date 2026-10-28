@@ -43,17 +43,23 @@ import type {
 import { RefLink } from "@/components/ref-link";
 import { CAB_STATUS, PB_STATUS, PB_HEALTH, TRANSFER_STATUS, daysSince } from "@/components/device/device-maps";
 import { TransferForm, TransferDetailDrawer, AssetDiffsTable } from "@/components/device/transfer";
+import { StockBalanceTab } from "@/components/device/stock-balance";
+import { VendorsTab } from "@/components/device/vendors-tab";
 import { PowerbankActions } from "@/components/device/powerbank-actions";
 import { ReasonDrawer, type ReasonRequest } from "@/components/device/reason-drawer";
 import { QcDrawer, type QcTarget } from "@/components/device/qc";
 import { CabinetSummaryStrip } from "@/components/device/cabinet-summary";
 
 // tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）。
-// 「机柜」在菜单里叫「设备台账」、「远程指令记录」叫「远程控制·指令记录」——以菜单为准。
-const TAB_KEYS = ["cabinets", "powerbanks", "monitor", "commands", "logs",
-  "inventory", "codes", "ota"] as const;
+// 「机柜」在菜单里叫「设备台账」——以菜单为准。
+// 2026-10-28 按运营顺序（OM03）：资产台账 → 库存与流转 → 设备接入 → 在线运行。
+// 资产差异从「库存调拨」的子视图拆成独立页签；供应商接入从系统设置搬来；库存余额新增。
+const TAB_KEYS = ["cabinets", "powerbanks", "codes",
+  "stock", "inventory", "asset-diffs",
+  "vendors",
+  "monitor", "commands", "logs", "ota"] as const;
 // 自建 tab（自带筛选器与查询），不走页面共用的 keyword/Toolbar/分页那一套
-const STANDALONE_TABS = ["cabinets", "logs", "codes"];
+const STANDALONE_TABS = ["cabinets", "logs", "codes", "stock", "asset-diffs", "vendors"];
 
 /**
  * 同一张 tab 内的视图切换段控（监控的「列表/地图」、固件 OTA 的「投放/版本库」）。
@@ -1411,8 +1417,6 @@ function DevicesInner() {
     }
   };
   useEffect(() => { const n = sp.get("no"); if (n) setInvDetailState(n); }, [sp]);
-  // 库存调拨 tab 的两个视图：调拨单 / 资产差异（签收差异、撤机清点差异逐条查清）
-  const [invView, setInvView] = useState<"transfers" | "diffs">("transfers");
   const [qcTarget, setQcTarget] = useState<QcTarget | null>(null);
   // 「已找回 / 误判」要填说明（后端必填）：复用写原因抽屉，打开它本身无副作用
   const [lostDismiss, setLostDismiss] = useState<ReasonRequest | null>(null);
@@ -1447,9 +1451,7 @@ function DevicesInner() {
   const isCabinets = tab === "cabinets";
   // 版本库视图与自建 tab 同类：自带筛选/查询/分页，页面共用的 Toolbar 与 q 都不参与
   const isReleases = tab === "ota" && otaView === "releases";
-  // 资产差异视图同理：AssetDiffsTable 自带筛选与分页
-  const isDiffs = tab === "inventory" && invView === "diffs";
-  const isStandalone = STANDALONE_TABS.includes(tab) || isReleases || isDiffs;
+  const isStandalone = STANDALONE_TABS.includes(tab) || isReleases;
   const canEditCabinet = allow("device:cabinet:update");
   // 自动开工单借用工单域的码：能不能开单由工单域授权说了算，不是「有设备权限就能批量开单」
   const canRaiseWo = allow("workorder:wo:create");
@@ -1644,14 +1646,6 @@ function DevicesInner() {
           )}
           {/* 固件 OTA：投放列表 / 版本库 双视图。版本库是投放引用的「货架」，同一张 tab 内切换 */}
           {tab === "ota" && otaViewSwitch}
-          {tab === "inventory" && (
-            <ViewSwitch
-              label="库存调拨视图"
-              value={invView}
-              options={[{ value: "transfers", label: "调拨单" }, { value: "diffs", label: "资产差异" }] as const}
-              onChange={(v) => { setInvView(v); paging.reset(); setKeyword(""); }}
-            />
-          )}
           {/* 充电宝是可归档实体，故只有它需要「显示已归档」开关 */}
           {tab === "powerbanks" && (
             <ShowArchivedToggle
@@ -1684,27 +1678,18 @@ function DevicesInner() {
           <DataTable rowKey={(r: CommandRecord) => r.commandId} columns={cmdColsFull} rows={q.data?.list as CommandRecord[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} />
         </>
       )}
-      {tab === "inventory" && !isDiffs && (
+      {tab === "inventory" && (
         <>
           {!canEditInventory && <ReadOnlyNotice what="调拨执行" perm="device:inventory:transfer" note="不能建单、发出或签收" />}
           <DataTable rowKey={(r: InventoryTransfer) => r.transferNo} columns={invColsFull} rows={q.data?.list as InventoryTransfer[]} loading={q.isLoading} error={q.error} onRetry={q.refetch}
             empty="还没有调拨单——仓库之间、仓库与站点之间搬设备前先建单，发出与签收都按单逐件核对" />
         </>
       )}
-      {isDiffs && (
-        <div>
-          {/* 自建视图不走共用 Toolbar，段控在这里再给一份，否则切进来就切不回去 */}
-          <div className="mb-3">
-            <ViewSwitch
-              label="库存调拨视图"
-              value={invView}
-              options={[{ value: "transfers", label: "调拨单" }, { value: "diffs", label: "资产差异" }] as const}
-              onChange={(v) => setInvView(v)}
-            />
-          </div>
-          <AssetDiffsTable />
-        </div>
-      )}
+      {/* 资产差异（OM03-12）：调拨签收、撤机清点、巡检清点、盘点发现的账实不符，逐条处置。
+          此前是「库存调拨」页签里的一个子视图，菜单里找不到；现在独立成页签。AssetDiffsTable 自带筛选与分页 */}
+      {tab === "asset-diffs" && <AssetDiffsTable />}
+      {tab === "stock" && <StockBalanceTab />}
+      {tab === "vendors" && <VendorsTab />}
       {isReleases && <OtaReleasesTab canManage={canManageOta} viewSwitch={otaViewSwitch} />}
       {tab === "ota" && !isReleases && <DataTable rowKey={(r: OtaRollout) => r.rolloutNo} columns={otaColsFull} rows={q.data?.list as OtaRollout[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} />}
       {!isStandalone && q.data && <Pagination page={paging.page} size={paging.size} total={q.data.total} onPage={paging.setPage} onSize={paging.setSize} />}
