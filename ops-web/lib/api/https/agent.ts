@@ -113,6 +113,8 @@ export const agentHttp: AgentApi = {
 
   getAgentAccount: (no) => client.get(`/api/agent/accounts/${no}`),
   getAgentCommission: (no) => client.get(`/api/agent/commissions/${no}`),
+  getMyProfile: () => client.get("/api/agent/me/profile"),
+  updateMyContact: (x) => client.post("/api/agent/me/contact", x),
 
   // 代理清退（AgentExitController）：发起挂在代理资源下，推进 / 门禁挂在清退单资源下
   startAgentExit: (agentNo, reason) => client.post(`/api/agent/agents/${agentNo}/exit`, { reason }),

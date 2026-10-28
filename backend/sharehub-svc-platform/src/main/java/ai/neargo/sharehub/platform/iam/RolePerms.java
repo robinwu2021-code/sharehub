@@ -116,6 +116,9 @@ public final class RolePerms {
                     // 一期提现 = 平台按付款任务主动付款（需求方案 D8），商家只看提现记录，不申请（V158 起）
                     "finance:share_record:read", "finance:withdrawal:read",
                     "agent:settlement:read", "location:poi:read",
+                    // 商家资料（V175）：看自己的档案、改联系人。不给 agent:agent:read —— agt_agent 没有数据范围，
+                    // 给了就能列出所有商家；这两个码只作用于 /api/agent/me/**，商家号取自会话
+                    "agent:profile:read", "agent:profile:update",
                     // 代理门户要显示「你还不能收款」，判据是有没有可用收款账户 ——
                     // 没有这个码的话 can() 判 false、查询被 disable，那条提示**永远不显示**，
                     // 而代理商会一路提交到审批被拒才知道。**只给读，不给 update**：

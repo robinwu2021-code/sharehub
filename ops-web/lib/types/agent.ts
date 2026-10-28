@@ -323,3 +323,22 @@ export interface AgentOpsAssessment {
   computedAt: string | null;
   createdAt: string | null;
 }
+
+
+/**
+ * 商家门户「商家资料」（后端 `MerchantProfileService.Profile`，`GET /api/agent/me/profile`，V175）。
+ * 商家号取自会话；名称、位置、行业只读，联系人可改。联系人是业务联系方式，**不是登录标识**。
+ */
+export interface MerchantProfile {
+  agentNo: string;
+  name: string;
+  address: string | null;
+  lng: number | null;
+  lat: number | null;
+  industry: string | null;
+  contactName: string | null;
+  phone: string | null;
+  email: string | null;
+  defaultSiteNo: string | null;
+  status: string;
+}

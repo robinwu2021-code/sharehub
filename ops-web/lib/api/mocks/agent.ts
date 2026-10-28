@@ -7,6 +7,22 @@ import type { AgentApi } from "../contracts/agent";
 import type { PageQ, ArchiveQ, AssignmentRecordQ, AssignableAssetQ , ReportQ } from "../query";
 import type { Agent } from "../../types";
 import { wait } from "./_wait";
+import { currentAuth } from "../../auth";
+import { fail } from "../../biz-error";
+import type { MerchantProfile } from "../../types";
+
+/** 商家号取自会话（与后端同：不接受入参）；运营会话没有商家号 → 403 语义。 */
+function myAgent(): Agent {
+  const no = currentAuth()?.currentOperatorNo;
+  const a = no ? db.agents.find((x) => x.agentNo === no) : undefined;
+  if (!a) fail("只有商家会话可以查看或修改商家资料", "Only a merchant session can view or edit the merchant profile");
+  return a;
+}
+const toProfile = (a: Agent): MerchantProfile => ({
+  agentNo: a.agentNo, name: a.name, address: a.address ?? null, lng: a.lng ?? null, lat: a.lat ?? null,
+  industry: a.industry ?? null, contactName: a.contactName ?? null, phone: a.phone ?? null, email: a.email ?? null,
+  defaultSiteNo: a.defaultSiteNo ?? null, status: a.status,
+});
 
 export const agentMock: AgentApi = {
   listAgents: (q: ArchiveQ = {}) => {
@@ -73,6 +89,13 @@ export const agentMock: AgentApi = {
   saveAgentCommission: (x) => wait(db.saveAgentCommission(x), 350),
 
   getAgentAccount: async (no) => wait(db.agentAccounts.find((x) => x.accountNo === no) ?? notFound("代理账号", "Agent account", no)),
+  getMyProfile: async () => wait(toProfile(myAgent())),
+  updateMyContact: async (x) => {
+    const a = myAgent();
+    if (!x.contactName?.trim()) fail("联系人姓名必填", "Contact name is required");
+    Object.assign(a, { contactName: x.contactName.trim(), phone: x.phone?.trim() || null, email: x.email?.trim().toLowerCase() || null });
+    return wait(toProfile(a), 300);
+  },
   getAgentCommission: async (no) => wait(db.agentCommissions.find((x) => x.ruleNo === no) ?? notFound("分润规则", "Commission rule", no)),
 
   // 代理清退 / 运维考核：状态机与门禁在 db 层（agent-exit.ts）强制；async 让抛错变成 rejected promise

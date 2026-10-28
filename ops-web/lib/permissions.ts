@@ -99,6 +99,8 @@ export const BACKEND_ROLE_PERMS: Record<Role, string[]> = {
     "workorder:wo:read", "order:order:read", "finance:share_record:read",
     // 一期提现 = 平台按付款任务主动付款（需求方案 D8），商家只看提现记录 —— 与后端 RolePerms 同步
     "finance:withdrawal:read", "agent:settlement:read", "location:poi:read", "finance:payout_account:read",
+    // 商家资料（V175）：只作用于自己（/api/agent/me/**），不是 agent:agent:read
+    "agent:profile:read", "agent:profile:update",
   ],
 };
 

@@ -482,6 +482,18 @@ const PATCHES: { file: string; mustContain: string; apply: (rows: Row[]) => void
     },
   },
   {
+    // 商家门户「我的经营」加叶子「商家资料」（agent:profile:read，只看自己）。
+    file: "V175__merchant_profile.sql",
+    mustContain: "'M_my-biz__5' AS menu_no",
+    apply: (rows) => {
+      rows.push({
+        menu_no: "M_my-biz__5", parent_no: "M_my-biz", name: "商家资料", name_en: "Merchant Profile", name_ar: "ملف التاجر",
+        type: "ITEM", path: "/profile", icon: "NULL", group_name: "我的商家", sort: "5", perm: "agent:profile:read",
+        phase: "1", ready: "0", module: "NULL", modules: "NULL", match_paths: "NULL", pin_bottom: "0", portal_for: "NULL",
+      });
+    },
+  },
+  {
     // 商家管理 ›「设备/点位划拨」更名「整站换商家」（V169 留空，见迁移说明）。
     file: "V171__menu_assign_site_owner.sql",
     mustContain: "UPDATE iam_menu SET name = '整站换商家'",

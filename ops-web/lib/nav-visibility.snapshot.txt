@@ -123,11 +123,12 @@ flow›审批列表
 flow›审核队列
 flow›工单工作台
 
-## AGENT（8 项）
+## AGENT（9 项）
 my-biz›我的看板
 my-biz›我的收益
 my-biz›我的结算
 my-biz›提现记录
+my-biz›商家资料
 my-asset›我的站点
 my-asset›我的设备
 my-asset›我的订单

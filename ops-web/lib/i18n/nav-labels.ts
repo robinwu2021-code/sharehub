@@ -18,6 +18,8 @@ const NAV: Record<string, Pair> = {
   "我的订单": { en: "My Orders", ar: "طلباتي" },
   "设备报修": { en: "Report Fault", ar: "الإبلاغ عن عطل" },
   "经营概览": { en: "Business Overview", ar: "نظرة عامة على الأعمال" },
+  "我的商家": { en: "My Merchant", ar: "تاجري" },
+  "商家资料": { en: "Merchant Profile", ar: "ملف التاجر" },
   "设备与订单": { en: "Devices & Orders", ar: "الأجهزة والطلبات" },
   "报修与跟进": { en: "Faults & Follow-up", ar: "الأعطال والمتابعة" },
   "概览": { en: "Overview", ar: "نظرة عامة" },

@@ -2094,6 +2094,143 @@
    "requestShape": null
   },
   {
+   "verb": "POST",
+   "path": "/api/agent/me/contact",
+   "perm": "agent:profile:update",
+   "perms": [
+    "agent:profile:update"
+   ],
+   "handler": "MerchantProfileController#updateContact",
+   "summary": "只改联系人（姓名、电话、邮箱）；名称、位置、行业由运营维护。",
+   "params": [],
+   "bodyType": "ContactReq",
+   "returnType": "MerchantProfile",
+   "returnContainer": null,
+   "returnElement": "MerchantProfile",
+   "responseShape": [
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "lng",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "lat",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "industry",
+     "type": "String"
+    },
+    {
+     "name": "contactName",
+     "type": "String"
+    },
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "email",
+     "type": "String"
+    },
+    {
+     "name": "defaultSiteNo",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "contactName",
+     "type": "String"
+    },
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "email",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "GET",
+   "path": "/api/agent/me/profile",
+   "perm": "agent:profile:read",
+   "perms": [
+    "agent:profile:read"
+   ],
+   "handler": "MerchantProfileController#profile",
+   "summary": "",
+   "params": [],
+   "bodyType": null,
+   "returnType": "MerchantProfile",
+   "returnContainer": null,
+   "returnElement": "MerchantProfile",
+   "responseShape": [
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "lng",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "lat",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "industry",
+     "type": "String"
+    },
+    {
+     "name": "contactName",
+     "type": "String"
+    },
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "email",
+     "type": "String"
+    },
+    {
+     "name": "defaultSiteNo",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
    "verb": "GET",
    "path": "/api/agent/performance",
    "perm": "agent:performance:read",
@@ -49066,10 +49203,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 552,
-  "records": 515,
-  "withPerm": 472,
-  "withBody": 232,
-  "shapedResponses": 430
+  "endpoints": 554,
+  "records": 517,
+  "withPerm": 474,
+  "withBody": 233,
+  "shapedResponses": 432
  }
 }

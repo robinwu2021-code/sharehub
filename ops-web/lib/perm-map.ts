@@ -81,6 +81,9 @@ export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   "agent:performance:read": "agent:performance:read",
   "agent:scope:assign": "agent:scope:assign",
   "agent:settlement:read": "agent:settlement:read",
+  // 商家资料（V175）：只作用于自己（/api/agent/me/**）
+  "agent:profile:read": "agent:profile:read",
+  "agent:profile:update": "agent:profile:update",
   "agent:share:config": "agent:share:config",
   // ——— cs ———
   "cs:session:read": "cs:session:read",

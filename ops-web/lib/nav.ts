@@ -174,6 +174,8 @@ export const NAV: NavSection[] = [
       // （components/finance/finance-workspace.tsx 的申请流），不再是 soon。
       // 2026-10-28 商家一期 D8：提现在运营端按付款任务进行，商家只看记录（V166）
       { href: "/settlement?tab=withdrawals", label: "提现记录", perm: "finance:withdrawal:read", group: "经营概览" },
+      // 2026-10-28 商家资料（V175，G23）：只看自己的档案、改联系人。码是 agent:profile:*，不是 agent:agent:read
+      { href: "/profile", label: "商家资料", perm: "agent:profile:read", group: "我的商家" },
     ],
   },
   {

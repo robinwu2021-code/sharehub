@@ -27,7 +27,8 @@ import {
   ShowArchivedToggle, ArchiveActions, ArchivedAt, archivedRowClass,
   archiveConfirm, unarchiveConfirm,
 } from "@/components/archive";
-import { fmtTime, cn } from "@/lib/utils";
+import { fmtTime, cn, money } from "@/lib/utils";
+import { useAuth } from "@/lib/auth";
 import { useCan } from "@/lib/hooks/use-can";
 import { notify } from "@/lib/notify";
 import { exportCsv } from "@/lib/export-csv";
@@ -410,6 +411,18 @@ function CabinetsTab({ canWrite }: { canWrite: boolean }) {
     if (ok) batchCommand.mutate({ nos: selected, type: cmdType });
   };
 
+  // 商家门户「我的设备」加本月交易额（需求方案 §10.3）。复用营收按设备端点（本月 1 日至今、数据范围收窄到本商家），
+  // 不另开列表字段。端点一次最多给 100 台：拿满 100 条时，没出现在里面的柜子显示「—」而不是 0 —— 那可能只是排在 100 名之后。
+  const isMerchant = useAuth((st) => st.role) === "AGENT";
+  const monthStart = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`; })();
+  const monthGrossQ = useQuery({
+    queryKey: ["merchant-revenue", "by-device", "month", monthStart],
+    queryFn: () => api.getRevenueByDevice({ from: monthStart, limit: 100 }),
+    enabled: isMerchant,
+  });
+  const monthGross = new Map((monthGrossQ.data ?? []).map((d) => [d.cabinetNo, d.gross]));
+  const monthGrossCapped = (monthGrossQ.data?.length ?? 0) >= 100;
+
   const cabCols: Column<Cabinet>[] = [
     // 柜机号就是详情入口（R3）：门禁、试借还、保护、质检都在详情页
     { header: "柜机号", cell: (c) => <RefLink kind="cabinet" no={c.cabinetNo} /> },
@@ -419,6 +432,14 @@ function CabinetsTab({ canWrite }: { canWrite: boolean }) {
     { header: "归属站点", cell: (c) => (c.siteNo ? <RefLink kind="site" no={c.siteNo} /> : <span className="text-muted-foreground">未归属</span>) },
     { header: "供应商", cell: (c) => c.vendorCode },
     { header: "可借/仓位", cell: (c) => <span className="tabular-nums">{c.availableCount}/{c.slotTotal}</span> },
+    ...(isMerchant ? [{
+      header: "本月交易额", className: "text-right whitespace-nowrap",
+      cell: (c: Cabinet) => {
+        const g = monthGross.get(c.cabinetNo);
+        if (g !== undefined) return <span className="tabular-nums">{money(g, "AED")}</span>;
+        return <span className="tabular-nums text-muted-foreground">{monthGrossCapped || !monthGrossQ.data ? "—" : money(0, "AED")}</span>;
+      },
+    }] : []),
     { header: "在线", cell: (c) => <OnlineBadge s={c.onlineStatus} /> },
     { header: "状态", cell: (c) => <CabinetStatusBadge s={c.status} /> },
     // 生命周期环节（展示态，设计 §三.1）：由状态 + 出库池 / 点位 / 质检派生，回答「在哪一步」

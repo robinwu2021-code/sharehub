@@ -1,7 +1,7 @@
 // 覆盖范围：代理商主档、区域分配、业绩、资金账户、分润规则。
 import type { PageQ, ArchiveQ, AssignmentRecordQ, AssignableAssetQ , ReportQ, ApplyQ } from "../query";
 import type {
-  PageResult, Agent, AgentAssignment, AgentPerformance, AgentAccount, AgentCommission, GrantLoginResult,
+  PageResult, Agent, MerchantProfile, AgentAssignment, AgentPerformance, AgentAccount, AgentCommission, GrantLoginResult,
   AgentAssignmentRecord, AssignableAsset, AssignAssetsPayload, ReclaimAssetsPayload,
   AgentApply, ApplyStatus, OperatorType, MyApplyView,
   AgentExit, AgentOpsAssessment, Checklist,
@@ -111,6 +111,11 @@ export interface AgentApi {
   getAgentAccount(accountNo: string): Promise<AgentAccount>;
   /** 分润规则详情（权限码 `agent:share:config`）。 */
   getAgentCommission(ruleNo: string): Promise<AgentCommission>;
+
+  // === 商家门户：商家资料（V175，agent:profile:*，商家号取自会话）===
+  getMyProfile(): Promise<MerchantProfile>;
+  /** 只改联系人（姓名、电话、邮箱）；不影响登录方式。 */
+  updateMyContact(x: { contactName: string; phone?: string; email?: string }): Promise<MerchantProfile>;
 
   // === 代理清退（运营核心流程 F3）===
   /**
