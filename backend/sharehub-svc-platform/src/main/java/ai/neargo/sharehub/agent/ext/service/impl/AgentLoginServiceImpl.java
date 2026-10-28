@@ -48,8 +48,8 @@ public class AgentLoginServiceImpl implements AgentIdentityPort {
     /**
      * 发登录验证码。标识是**一个**字段：含 {@code @} 走邮箱（主登录方式，R1），否则走手机号（R8）。
      *
-     * <p>手机号只认**已验证**的（R5）：运营录入的手机号可能录错，未验证就能收码登录，
-     * 等于把账号交给号码的真实主人 —— 那个人不是商家。
+     * <p>手机号不要求先验证（用户 2026-10-28 裁决：运营代录的手机号也可以登录）。
+     * 已验证的号优先认人，见 {@link #resolve}。
      */
     @Override
     public String sendLoginOtp(String identifier) {
@@ -99,7 +99,20 @@ public class AgentLoginServiceImpl implements AgentIdentityPort {
             p.setEmailVerified(1);
             principalMapper.updateById(p);
         }
+        // 手机号同理：收到短信码就证明了号码归属。号已被别人验证过时不抢（phone_uk 唯一），保持未验证
+        if (t.phone() != null && !Integer.valueOf(1).equals(p.getPhoneVerified())
+                && principalMapper.selectCount(new LambdaQueryWrapper<AgtPrincipal>()
+                        .eq(AgtPrincipal::getPhoneUk, hasher.hash(t.phone()))) == 0) {
+            p.setPhoneVerified(1);
+            principalMapper.updateById(p);
+        }
         return p.getPrincipalNo();
+    }
+
+    @Override
+    public String resolvePrincipal(String identifier) {
+        Target t = resolve(identifier);
+        return t == null ? null : t.principal().getPrincipalNo();
     }
 
     /** 一次登录要找的人：邮箱登录时 {@code email} 非空，手机号登录时 {@code phone} 非空。 */
@@ -115,9 +128,16 @@ public class AgentLoginServiceImpl implements AgentIdentityPort {
                 AgtPrincipal p = findByEmail(email);
                 return active(p) ? new Target(p, email, null) : null;
             }
+            // 用户 2026-10-28：运营代录的手机号也可以登录（不要求先验证）。已验证的那一个优先，
+            // 否则取最早建的 —— 与邮箱同一口径
             String phone = normalizer.phone(identifier);
+            String h = hasher.hash(phone);
             AgtPrincipal p = principalMapper.selectOne(new LambdaQueryWrapper<AgtPrincipal>()
-                    .eq(AgtPrincipal::getPhoneUk, hasher.hash(phone)).last("limit 1"));
+                    .eq(AgtPrincipal::getPhoneUk, h).last("limit 1"));
+            if (p == null) {
+                p = principalMapper.selectOne(new LambdaQueryWrapper<AgtPrincipal>()
+                        .eq(AgtPrincipal::getPhoneHash, h).orderByAsc(AgtPrincipal::getId).last("limit 1"));
+            }
             return active(p) ? new Target(p, null, phone) : null;
         } catch (IllegalArgumentException malformed) {
             return null;

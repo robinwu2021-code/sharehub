@@ -699,6 +699,30 @@
   },
   {
    "verb": "POST",
+   "path": "/api/agent/agents/{agentNo}/invite",
+   "perm": "agent:apply:approve",
+   "perms": [
+    "agent:apply:approve"
+   ],
+   "handler": "AgentApplyController#resendInvite",
+   "summary": "重发开通邀请：作废旧口令、发新的一次性口令（首登强制改）并重寄邀请邮件。",
+   "params": [
+    {
+     "in": "path",
+     "name": "agentNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "java.util.Map<String, Object>",
+   "returnContainer": null,
+   "returnElement": "java.util.Map<String, Object>",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
    "path": "/api/agent/agents/{agentNo}/login-account",
    "perm": "agent:account:manage",
    "perms": [
@@ -984,6 +1008,10 @@
     {
      "name": "operatorNo",
      "type": "String"
+    },
+    {
+     "name": "initialPassword",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -1058,6 +1086,10 @@
     {
      "name": "operatorNo",
      "type": "String"
+    },
+    {
+     "name": "initialPassword",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -1094,6 +1126,10 @@
     },
     {
      "name": "operatorNo",
+     "type": "String"
+    },
+    {
+     "name": "initialPassword",
      "type": "String"
     }
    ],
@@ -1139,6 +1175,10 @@
     },
     {
      "name": "operatorNo",
+     "type": "String"
+    },
+    {
+     "name": "initialPassword",
      "type": "String"
     }
    ],
@@ -2233,6 +2273,10 @@
     },
     {
      "name": "identifier",
+     "type": "String"
+    },
+    {
+     "name": "realm",
      "type": "String"
     }
    ]
@@ -49022,9 +49066,9 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 551,
-  "records": 514,
-  "withPerm": 471,
+  "endpoints": 552,
+  "records": 515,
+  "withPerm": 472,
   "withBody": 232,
   "shapedResponses": 430
  }

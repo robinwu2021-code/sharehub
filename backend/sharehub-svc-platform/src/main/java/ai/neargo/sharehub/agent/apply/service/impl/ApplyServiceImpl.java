@@ -57,12 +57,15 @@ public class ApplyServiceImpl implements ApplyService {
     private final IdentifierNormalizer normalizer;
     private final IdentifierHasher hasher;
     private final OtpGate otpGate;
+    private final MerchantInvite invite;
 
     public ApplyServiceImpl(AgtApplyMapper applyMapper, AgtPrincipalMapper principalMapper,
                             AgtAccountMapper accountMapper, AgentMapper agentMapper,
                             IdentifierNormalizer normalizer, IdentifierHasher hasher,
                             OtpGate otpGate,
-                            org.springframework.jdbc.core.JdbcTemplate jdbc) {
+                            org.springframework.jdbc.core.JdbcTemplate jdbc,
+                            MerchantInvite invite) {
+        this.invite = invite;
         this.jdbc = jdbc;
         this.applyMapper = applyMapper;
         this.principalMapper = principalMapper;
@@ -263,7 +266,11 @@ public class ApplyServiceImpl implements ApplyService {
         e.setRejectReason(null);
         stamp(e, staffNo);
         applyMapper.updateById(e);
-        return new ApplyResult(e.getApplyNo(), e.getStatus(), operatorNo);
+        // 开通即邀请：新的人发一次性初始口令（首登强制改）并寄邀请邮件；已有口令的人只寄通知
+        AgtAccount owner = accountMapper.selectOne(new QueryWrapper<AgtAccount>()
+                .eq("agent_no", operatorNo).eq("is_owner", 1).last("limit 1"));
+        String initialPassword = owner == null ? null : invite.onActivated(e, operatorNo, owner.getPrincipalNo());
+        return new ApplyResult(e.getApplyNo(), e.getStatus(), operatorNo, initialPassword);
     }
 
     /**

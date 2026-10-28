@@ -55,6 +55,7 @@ export const agentMock: AgentApi = {
   listAgentApplies: (q = {}) => wait(db.listAgentApplies(q)),
   acceptAgentApply: (applyNo, operatorName) => wait(db.acceptAgentApply(applyNo, operatorName), 350),
   auditAgentApply: (x) => wait(db.auditAgentApply(x), 400),
+  resendAgentInvite: async (agentNo) => wait(db.resendAgentInvite(agentNo), 400),
   createAgentApply: (x) => wait(db.createAgentApply(x), 400),
   // 自助注册（公开页）：与代建落同一份数据，只是 source 不同
   sendApplyOtp: (phone) => wait(db.sendApplyOtp(phone), 300),

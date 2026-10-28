@@ -68,6 +68,10 @@ export default function LoginPage() {
   const isEmail = identifier.includes("@");
   const realm: Exclude<Realm, ""> = looksLikePhone(identifier) ? "AGENT" : isEmail ? emailPool : "STAFF";
 
+  // 商家两种登录方式：验证码，或开通时发的口令（用户 2026-10-28：代录商家给初始密码，登录后改）
+  const [agentMode, setAgentMode] = useState<"otp" | "password">("otp");
+  const usePassword = realm === "STAFF" || agentMode === "password";
+
   function pickPool(p: Exclude<Realm, "">) {
     setEmailPool(p); setErr(""); setOtpSent(false);
     try { localStorage.setItem(POOL_KEY, p); } catch { /* 隐私模式等：只是少记一次选择 */ }
@@ -77,7 +81,7 @@ export default function LoginPage() {
     e.preventDefault();
     setBusy(true); setErr("");
     try {
-      const r = await api.login(realm, identifier, password, realm === "AGENT" ? otp : undefined);
+      const r = await api.login(realm, identifier, password, usePassword ? undefined : otp);
       login({
         realm,
         subjectNo: r.subjectNo,
@@ -150,11 +154,22 @@ export default function LoginPage() {
               )}
               <p className="text-xs text-muted-foreground">
                 {realm === "AGENT"
-                  ? (isEmail ? "商家邮箱 —— 用验证码登录" : "手机号 —— 用验证码登录")
+                  ? `${isEmail ? "商家邮箱" : "商家手机号"} —— 用${agentMode === "otp" ? "验证码" : "口令"}登录`
                   : "邮箱或员工号 —— 用口令登录"}
               </p>
+              {realm === "AGENT" && (
+                <div className={segmentedTrackClass("mt-1")} role="radiogroup" aria-label="登录方式">
+                  {([["otp", "验证码"], ["password", "口令"]] as const).map(([k, label]) => (
+                    <button key={k} type="button" role="radio" aria-checked={agentMode === k}
+                      className={segmentedItemClass(agentMode === k, "px-3 py-1 text-xs")}
+                      onClick={() => { setAgentMode(k); setErr(""); }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-            {realm === "STAFF" ? (
+            {usePassword ? (
               <div className="space-y-1">
                 <label className="text-sm text-muted-foreground" htmlFor="password">{t("login.password")}</label>
                 <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("login.password")} autoComplete="current-password" />

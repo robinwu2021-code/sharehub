@@ -7,10 +7,15 @@ import { dashboardMock } from "./dashboard";
  * 钉的是**与后端的一致性**：mock 放行而后端拒绝，离线开发一路顺、切后端当场登不进去。
  * 这类分叉最贵 —— 它要到联调那天才暴露，而那时两边都以为对方错了。
  */
-describe("④ 代理登录必须带验证码", () => {
+describe("④ 商家登录：验证码或口令，二者必居其一", () => {
   // 校验是**同步抛**的（与 db 层各 mock 同约定），所以断言包一层函数而不是用 rejects
-  it("没有验证码进不来——后端压根没有口令登录这条路", () => {
-    expect(() => dashboardMock.login("AGENT", "+971501234567", "任意口令")).toThrow(/验证码/);
+  it("验证码与口令都没给进不来", () => {
+    expect(() => dashboardMock.login("AGENT", "+971501234567", "")).toThrow(/验证码或口令/);
+  });
+
+  it("口令登录（开通时发的一次性口令，2026-10-28 起）可以进来", async () => {
+    const r = await dashboardMock.login("AGENT", "owner@shop.ae", "Temp#Pass1");
+    expect(r.role).toBe("AGENT");
   });
 
   it("错码被拒", () => {

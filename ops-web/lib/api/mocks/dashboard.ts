@@ -41,9 +41,10 @@ export const dashboardMock: DashboardApi = {
       : (["ADMIN", "OPS", "CS", "FINANCE", "BD", "VIEWER"] as const).find((r) => r === guess) ?? "ADMIN");
     // 代理端必须带验证码 —— 后端就是这么判的（口令登录压根没有凭据存储）。
     // mock 放行而后端拒绝的话，离线开发一路顺，切后端当场登不进去。
-    if (realm === "AGENT" && !otp?.trim()) fail("请输入验证码", "Verification code required", "رمز التحقق مطلوب");
+    // 商家可用验证码或口令（开通时发的一次性口令，2026-10-28）；mock 不存口令，口令非空即放行
+    if (realm === "AGENT" && !otp?.trim() && !_password?.trim()) fail("请输入验证码或口令", "Code or password required", "الرمز أو كلمة المرور مطلوبة");
     // 两种失败说同一句话：区分开就等于送出一个账号枚举接口
-    if (realm === "AGENT" && otp !== DEV_OTP) fail("账号或验证码不正确", "Incorrect account or code", "الحساب أو الرمز غير صحيح");
+    if (realm === "AGENT" && otp?.trim() && otp !== DEV_OTP) fail("账号或验证码不正确", "Incorrect account or code", "الحساب أو الرمز غير صحيح");
     const operators = realm === "AGENT" ? agentOperators() : undefined;
     return wait({
       token: `mock-${role}`, subjectNo: identifier, username: identifier, role,

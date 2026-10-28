@@ -30,6 +30,9 @@ public interface CredentialService {
      */
     String resetPassword(String realm, String subjectNo);
 
+    /** 该主体在该账号池里有没有凭据。开通商家时据此决定发不发初始口令 —— 同一个人第二家商家不重置他的口令。 */
+    boolean exists(String realm, String subjectNo);
+
     /** 本人改密。校验旧口令，通过后换新并清掉 {@code mustChange}。 */
     void changePassword(String realm, String subjectNo, String oldPassword, String newPassword);
 

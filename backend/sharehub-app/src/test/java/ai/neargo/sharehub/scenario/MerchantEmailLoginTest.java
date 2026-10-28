@@ -38,8 +38,8 @@ class MerchantEmailLoginTest extends ApiTestSupport {
         return "+97152" + (1_000_000 + ThreadLocalRandom.current().nextInt(8_000_000));
     }
 
-    /** 运营代建并开通，返回商家号。{@code phone} 可为 null（R2）。 */
-    private String opsCreate(String email, String phone, String name) {
+    /** 运营代建并开通，返回审核结果（含商家号与一次性初始口令）。{@code phone} 可为 null（R2）。 */
+    private JsonNode opsCreateResult(String email, String phone, String name) {
         Map<String, Object> b = new HashMap<>();
         b.put("email", email);
         if (phone != null) b.put("phone", phone);
@@ -48,8 +48,15 @@ class MerchantEmailLoginTest extends ApiTestSupport {
         String applyNo = post("/api/agent/applies", b, login("BD")).okData().path("applyNo").asText();
         String admin = login("ADMIN");
         post("/api/agent/applies/" + applyNo + "/accept", Map.of(), admin).okData();
-        return post("/api/agent/applies/" + applyNo + "/audit", Map.of("approve", true), admin)
-                .okData().path("operatorNo").asText();
+        return post("/api/agent/applies/" + applyNo + "/audit", Map.of("approve", true), admin).okData();
+    }
+
+    private String opsCreate(String email, String phone, String name) {
+        return opsCreateResult(email, phone, name).path("operatorNo").asText();
+    }
+
+    private Resp passwordLogin(String identifier, String password) {
+        return post("/api/auth/login", Map.of("realm", "AGENT", "identifier", identifier, "password", password), null);
     }
 
     private Resp loginWith(String identifier, String otp) {
@@ -88,30 +95,52 @@ class MerchantEmailLoginTest extends ApiTestSupport {
     }
 
     @Test
-    @DisplayName("★★ 运营录入的手机号未验证：不能用它登录（R5）；也不占唯一，号主自助入驻照样建得出来（R6）")
-    void unverified_phone_neither_logs_in_nor_blocks_the_owner() {
+    @DisplayName("★★ 运营代录的手机号也能登录（用户 2026-10-28），收码登录后记为已验证")
+    void ops_entered_phone_can_log_in() {
         String p = phone();
-        String typo = opsCreate(email(), p, "录错手机号 " + p);
-        assertThat(((Number) principalByEmailOf(typo).get("phone_verified")).intValue()).isZero();
-        assertThat(loginWith(p, OTP).code()).as("未验证的手机号收不到登录码，也登不进去").isNotEqualTo(0);
+        String agentNo = opsCreate(email(), p, "代录手机号 " + p);
+        assertThat(((Number) principalByEmailOf(agentNo).get("phone_verified")).intValue()).isZero();
+        assertThat(loginWith(p, OTP).okData().path("agentNo").asText()).isEqualTo(agentNo);
+        assertThat(((Number) principalByEmailOf(agentNo).get("phone_verified")).intValue()).isEqualTo(1);
+    }
 
-        // 真正的号主自助入驻：验证码证明了手机号，开通后这个号是他的、已验证
-        post("/api/agent/apply/otp", Map.of("phone", p), null).okData();
-        Map<String, Object> b = new HashMap<>();
-        b.put("phone", p);
-        b.put("otp", OTP);
-        b.put("email", email());
-        b.put("operatorName", "号主 " + p);
-        b.put("operatorType", "AGENT");
-        String applyNo = post("/api/agent/apply", b, null).okData().path("applyNo").asText();
-        String admin = login("ADMIN");
-        post("/api/agent/applies/" + applyNo + "/accept", Map.of(), admin).okData();
-        String owner = post("/api/agent/applies/" + applyNo + "/audit", Map.of("approve", true), admin)
-                .okData().path("operatorNo").asText();
+    @Test
+    @DisplayName("★★ 开通给一次性初始口令：邮箱或手机号 + 口令登录，首登必须改；改完用新口令登录不再要求")
+    void initial_password_then_forced_change() {
+        String mail = email(), p = phone();
+        JsonNode r = opsCreateResult(mail, p, "初始口令 " + mail);
+        String temp = r.path("initialPassword").asText();
+        assertThat(temp).as("新的人开通即发一次性口令").isNotBlank();
+        // 发送流水只存掩码（日志规范），所以按「发生过」核对，不按地址
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notify_log WHERE scene = 'MERCHANT_INVITE' AND channel = 'EMAIL' "
+                + "AND created_at >= NOW() - INTERVAL 1 MINUTE", Integer.class)).as("开通即寄邀请邮件").isPositive();
 
-        assertThat(principalByEmailOf(owner).get("principal_no")).as("不是同一个人")
-                .isNotEqualTo(principalByEmailOf(typo).get("principal_no"));
-        assertThat(loginWith(p, OTP).okData().path("agentNo").asText()).as("号主用手机号登进自己的商家").isEqualTo(owner);
+        JsonNode s = passwordLogin(mail, temp).okData();
+        assertThat(s.path("mustChange").asBoolean()).isTrue();
+        assertThat(passwordLogin(p, temp).okData().path("agentNo").asText()).as("手机号 + 口令同样能登").isEqualTo(r.path("operatorNo").asText());
+
+        post("/api/auth/password", Map.of("oldPassword", temp, "newPassword", "Merchant#2026x"), s.path("token").asText()).okData();
+        assertThat(passwordLogin(mail, "Merchant#2026x").okData().path("mustChange").asBoolean()).isFalse();
+        assertThat(passwordLogin(mail, temp).status).as("旧口令作废").isEqualTo(401);
+    }
+
+    @Test
+    @DisplayName("★ 同一个人开第二家不重置口令；重发邀请作废旧口令、发新的；查无此人与口令错同一句话")
+    void second_merchant_keeps_password_and_resend_rotates_it() {
+        String mail = email();
+        String first = opsCreateResult(mail, null, "口令甲 " + mail).path("initialPassword").asText();
+        JsonNode second = opsCreateResult(mail, null, "口令乙 " + mail);
+        assertThat(second.path("initialPassword").isNull()).as("一个人一套口令").isTrue();
+
+        String fresh = post("/api/agent/agents/" + second.path("operatorNo").asText() + "/invite", Map.of(), login("ADMIN"))
+                .okData().path("initialPassword").asText();
+        assertThat(fresh).isNotBlank().isNotEqualTo(first);
+        assertThat(passwordLogin(mail, first).status).isEqualTo(401);
+        assertThat(passwordLogin(mail, fresh).okData().path("mustChange").asBoolean()).isTrue();
+
+        Resp unknown = passwordLogin(email(), fresh), wrong = passwordLogin(mail, "nope");
+        assertThat(unknown.status).isEqualTo(401);
+        assertThat(unknown.msg()).isEqualTo(wrong.msg());
     }
 
     @Test

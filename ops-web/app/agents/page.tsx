@@ -231,6 +231,8 @@ function AgentsInner() {
   const [applyTo, setApplyTo] = useState("");
   /** 审核抽屉里的那一条；null = 关闭。 */
   const [auditing, setAuditing] = useState<AgentApply | null>(null);
+  // 开通 / 重发邀请拿到的一次性初始口令。只显示这一次（后端不落日志、查不回来）
+  const [newCred, setNewCred] = useState<{ agentNo: string; name: string; password: string } | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [applyForm, setApplyForm] = useState<Record<string, unknown> | null>(null);
 
@@ -400,7 +402,8 @@ function AgentsInner() {
     mutationFn: (v: { applyNo: string; approve: boolean; rejectReason?: string }) =>
       api.auditAgentApply({ ...v, operatorName: username || undefined }),
     onSuccess: (r) => {
-      notify.success(r.status === "APPROVED" ? `已通过，主体 ${r.operatorNo} 已建档` : "已驳回，原因将回显给申请人");
+      notify.success(r.status === "APPROVED" ? `已通过，商家 ${r.operatorNo} 已建档并寄出邀请邮件` : "已驳回，原因将回显给申请人");
+      if (r.initialPassword && r.operatorNo) setNewCred({ agentNo: r.operatorNo, name: r.operatorName, password: r.initialPassword });
       setAuditing(null); setRejectReason("");
       afterApplyWrite();
     },
@@ -509,6 +512,14 @@ function AgentsInner() {
    * 断在第一环，而且建得出、划得了资产、配得了分润，唯独那个代理商自己进不来，
    * 两处都不报错（见 docs/technical/梳理-代理商域.md §四）。
    */
+  const resendInvite = useMutation({
+    mutationFn: (a: { agentNo: string; name: string }) => api.resendAgentInvite(a.agentNo),
+    onSuccess: (r, a) => {
+      notify.success("已重发邀请邮件，旧口令作废");
+      setNewCred({ agentNo: r.agentNo, name: a.name, password: r.initialPassword });
+    },
+    onError: (e: Error) => notify.error(e.message),
+  });
   const grantLogin = useMutation({
     mutationFn: (no: string) => api.grantAgentLogin(no),
     onSuccess: (r) => {
@@ -649,6 +660,18 @@ function AgentsInner() {
               （与入驻申请一致，那边也是两者必填）。
               缺了就禁用并在 title 里说清楚 —— 按钮能点却必被服务端拒，是最没用的那种反馈。
             */}
+            {allow("agent:apply:approve") && (
+              <Button
+                size="sm" variant="outline" disabled={resendInvite.isPending}
+                onClick={async () => {
+                  if (await confirm({
+                    title: `给 ${a.name} 重发开通邀请`,
+                    desc: "会生成新的一次性登录口令并重寄邀请邮件，旧口令立即作废。商家首次登录须改密。",
+                    confirmText: "重发",
+                  })) resendInvite.mutate({ agentNo: a.agentNo, name: a.name });
+                }}
+              >重发邀请</Button>
+            )}
             {allow("agent:account:manage") && (() => {
               const missing = [!a.phone && "联系手机", !a.email && "联系邮箱"].filter(Boolean);
               return (
@@ -1208,6 +1231,32 @@ function AgentsInner() {
       </Drawer>
 
       {/* 代建录入：与商家自助**同一套必填**，只是谁来填不同 */}
+      {/*
+        一次性初始口令面板（开通 / 重发邀请）。**没有「再看一次」** —— 后端不落日志、没有第二个能查出它的接口，
+        与员工页同一套。邀请邮件里也有这串，面板是给运营当面转告用的。
+      */}
+      <Drawer
+        open={!!newCred}
+        onOpenChange={(o) => !o && setNewCred(null)}
+        title={`${newCred?.name ?? ""} 的一次性登录口令`}
+        desc="只显示这一次。关掉之后查不回来，只能重发邀请生成新的。"
+        footer={<Button onClick={() => setNewCred(null)}>我已记下，关闭</Button>}
+      >
+        <div className="space-y-3">
+          <Field label="商家编号">
+            <span className="txt-strong tabular-nums">{newCred?.agentNo}</span>
+          </Field>
+          <Field label="一次性口令">
+            <code className="block select-all rounded-field bg-muted px-3 py-2 font-mono text-sm tabular-nums">
+              {newCred?.password}
+            </code>
+          </Field>
+          <Notice className="mb-0 text-warning">
+            商家用登录邮箱或手机号加这串口令登录，首次登录会被强制改密。请通过可信渠道转述，别发在群里。
+          </Notice>
+        </div>
+      </Drawer>
+
       <FormDrawer
         open={!!applyForm}
         onOpenChange={(o) => !o && setApplyForm(null)}

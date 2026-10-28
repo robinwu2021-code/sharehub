@@ -36,12 +36,8 @@ public class PayoutAccountServiceImpl implements PayoutAccountService {
 
     private final StlPayoutAccountMapper mapper;
 
-    /** 完整账号加密（V158）。未配密钥时 enabled()=false，只落掩码 —— 与此前行为一致，导出时再拦。 */
-    private final ai.neargo.sharehub.identity.FieldCipher cipher;
-
-    public PayoutAccountServiceImpl(StlPayoutAccountMapper mapper, ai.neargo.sharehub.identity.FieldCipher cipher) {
+    public PayoutAccountServiceImpl(StlPayoutAccountMapper mapper) {
         this.mapper = mapper;
-        this.cipher = cipher;
     }
 
     @Override
@@ -108,12 +104,12 @@ public class PayoutAccountServiceImpl implements PayoutAccountService {
         e.setPayeeNo(req.payeeNo());
         e.setBankCode(req.bankCode());
         e.setAccountName(req.accountName().trim());
-        // 入参给的是明文（字段名历史原因叫 accountMasked）：掩码给人看，完整账号加密存（V158）——
-        // 付款任务导出银行转账文件要原文。传回来的若已是掩码（编辑时没改账号），不动密文
+        // 入参给的是明文（字段名历史原因叫 accountMasked）：掩码给人看，完整账号明文存（V173，
+        // 用户裁决收款账号不属于敏感信息）—— 付款任务导出银行转账文件要原文。
+        // 传回来的若已是掩码（编辑时没改账号），不动已存的完整账号
         String raw = req.accountMasked();
         if (raw != null && !raw.contains("*")) {
-            byte[] enc = cipher.encrypt(raw.replaceAll("\\s", "").toUpperCase(java.util.Locale.ROOT));
-            if (enc != null) e.setAccountEnc(enc);
+            e.setAccountFull(raw.replaceAll("\\s", "").toUpperCase(java.util.Locale.ROOT));
         }
         e.setAccountMasked(mask(raw));
         e.setCurrency(req.currency() == null || req.currency().isBlank() ? "AED" : req.currency());

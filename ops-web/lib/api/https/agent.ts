@@ -63,6 +63,7 @@ export const agentHttp: AgentApi = {
   listAgentApplies: (q) => client.get("/api/agent/applies", q),
   acceptAgentApply: (applyNo) => client.post(`/api/agent/applies/${applyNo}/accept`, {}),
   auditAgentApply: ({ applyNo, ...body }) => client.post(`/api/agent/applies/${applyNo}/audit`, body),
+  resendAgentInvite: (agentNo) => client.post(`/api/agent/agents/${agentNo}/invite`, {}),
   // 自助注册三件套：全部免鉴权，防刷靠 OTP + 单 IP 限流 + 同手机号至多一张在途
   sendApplyOtp: (phone) => client.post("/api/agent/apply/otp", { phone }),
   selfServiceApply: (x) => client.post("/api/agent/apply", x),

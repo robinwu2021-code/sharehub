@@ -92,6 +92,11 @@ export type ApplyStatus = "DRAFT" | "SUBMITTED" | "REVIEWING" | "APPROVED" | "RE
 export type OperatorType = "AGENT" | "CITY_PARTNER";
 
 export interface AgentApply {
+  /**
+   * 仅审核通过的响应里有：开通时新建凭据才发的**一次性初始口令**（首登强制改）。
+   * 同一个人开第二家商家时为 null；列表与详情接口不带。只显示这一次。
+   */
+  initialPassword?: string | null;
   applyNo: string;
   source: ApplySource;
   status: ApplyStatus;

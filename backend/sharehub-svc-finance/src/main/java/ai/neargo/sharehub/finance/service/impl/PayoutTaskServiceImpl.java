@@ -154,7 +154,7 @@ public class PayoutTaskServiceImpl implements PayoutTaskService {
             String blocked = null;
             if (group.stream().anyMatch(s -> !currency.equals(s.getCurrency()))) blocked = MIXED_CURRENCY;
             else if (acct == null) blocked = NO_ACCOUNT;
-            else if (acct.getAccountEnc() == null || acct.getAccountEnc().length == 0) blocked = NO_FULL_ACCOUNT;
+            else if (fullAccount(acct) == null) blocked = NO_FULL_ACCOUNT;
             else if (suspended(en.getKey())) blocked = SUSPENDED;
 
             items.add(new PayoutPreviewItem(en.getKey(), group.get(0).getPayeeName(),
@@ -320,7 +320,7 @@ public class PayoutTaskServiceImpl implements PayoutTaskService {
             if (!WithdrawalStatus.PAYING.name().equals(w.getStatus())) continue;
             StlPayoutAccount acct = accounts.selectOne(new LambdaQueryWrapper<StlPayoutAccount>()
                     .eq(StlPayoutAccount::getAccountNo, w.getPayoutAccountNo()).last("limit 1"));
-            String iban = acct == null || acct.getAccountEnc() == null ? null : cipher.decrypt(acct.getAccountEnc());
+            String iban = acct == null ? null : fullAccount(acct);
             if (iban == null) throw BizException.badRequest("error.payout.account_incomplete", w.getWithdrawNo());
             csv.append(seq).append(',')
                     .append(cell(w.getWithdrawNo())).append(',')
@@ -397,6 +397,12 @@ public class PayoutTaskServiceImpl implements PayoutTaskService {
     }
 
     // ── 内部 ────────────────────────────────────────────────────────────
+
+    /** 完整账号：V173 明文列优先，老数据回落解密 V158 密文；都没有返回 null（需补录）。 */
+    private String fullAccount(StlPayoutAccount a) {
+        if (a.getAccountFull() != null && !a.getAccountFull().isBlank()) return a.getAccountFull();
+        return a.getAccountEnc() == null || a.getAccountEnc().length == 0 ? null : cipher.decrypt(a.getAccountEnc());
+    }
 
     /** 到账：该提现单纳入的结算单置已付（CONFIRMED → PAID，经状态机）。 */
     private void markSettlementsPaid(String withdrawNo) {

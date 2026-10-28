@@ -46,7 +46,11 @@ public class AgentApplyController {
     /** 自助注册开关（V155）。一期只走运营代建（需求方案 D2），默认关。 */
     static final String KEY_SELF_SERVICE = "agent.apply.self_service_enabled";
 
-    public AgentApplyController(ApplyService applyService, DevMode devMode, SysParamPort params) {
+    private final ai.neargo.sharehub.agent.apply.service.impl.MerchantInvite invite;
+
+    public AgentApplyController(ApplyService applyService, DevMode devMode, SysParamPort params,
+                                ai.neargo.sharehub.agent.apply.service.impl.MerchantInvite invite) {
+        this.invite = invite;
         this.applyService = applyService;
         this.devMode = devMode;
         this.params = params;
@@ -159,5 +163,15 @@ public class AgentApplyController {
     @PreAuthorize("@perm.can('agent:apply:approve')")
     public ApplyResult audit(@PathVariable String applyNo, @RequestBody AuditReq req) {
         return applyService.audit(applyNo, req, SecurityUtils.userNo());
+    }
+
+    /**
+     * 重发开通邀请：作废旧口令、发新的一次性口令（首登强制改）并重寄邀请邮件。
+     * 口令只在这次响应里出现，给运营当面转告；码与「放行」同一个 —— 能开通就能重发。
+     */
+    @PostMapping("/agents/{agentNo}/invite")
+    @PreAuthorize("@perm.can('agent:apply:approve')")
+    public java.util.Map<String, Object> resendInvite(@PathVariable String agentNo) {
+        return java.util.Map.of("agentNo", agentNo, "initialPassword", invite.resend(agentNo));
     }
 }

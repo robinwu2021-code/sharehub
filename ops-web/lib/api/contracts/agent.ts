@@ -48,6 +48,11 @@ export interface AgentApi {
    *
    * 驳回必须带原因 —— 它会原样回显给申请人。
    */
+  /**
+   * 重发开通邀请（`agent:apply:approve`）：作废旧口令、发新的一次性口令（首登强制改）并重寄邀请邮件。
+   * 口令只在这次响应里出现。
+   */
+  resendAgentInvite(agentNo: string): Promise<{ agentNo: string; initialPassword: string }>;
   auditAgentApply(x: {
     applyNo: string; approve: boolean; rejectReason?: string;
     shareRate?: number; regionScope?: string; operatorName?: string;

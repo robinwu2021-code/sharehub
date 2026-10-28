@@ -186,7 +186,22 @@ export function auditAgentApply(x: {
   r.rejectReason = null;
   if (x.shareRate !== undefined) r.shareRate = x.shareRate;
   if (x.regionScope !== undefined) r.regionScope = x.regionScope;
-  return strip(r);
+  // 开通即发一次性初始口令（与后端 MerchantInvite 同口径）：同一邮箱此前已开通过 = 同一个人已有口令，不再发
+  const mail = r.contactEmail?.toLowerCase();
+  const samePersonBefore = applies.some((o) => o !== r && o.status === "APPROVED" && o.contactEmail?.toLowerCase() === mail);
+  return { ...strip(r), initialPassword: samePersonBefore ? null : oneTimePassword() };
+}
+
+/** mock 一次性口令：形近字符（0/O、1/l/I）去掉，与后端字母表同口径。 */
+export function oneTimePassword(): string {
+  const abc = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  return Array.from({ length: 12 }, () => abc[Math.floor(Math.random() * abc.length)]).join("");
+}
+
+/** 重发邀请：作废旧口令、发新的（mock 不存口令，只回一个新的）。 */
+export function resendAgentInvite(agentNo: string): { agentNo: string; initialPassword: string } {
+  if (!agents.some((a) => a.agentNo === agentNo)) fail(`商家不存在：${agentNo}`, `Merchant not found: ${agentNo}`);
+  return { agentNo, initialPassword: oneTimePassword() };
 }
 
 /**
