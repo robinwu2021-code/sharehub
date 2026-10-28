@@ -53,6 +53,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
     private static final java.util.Set<String> PAY_CHANNELS = java.util.Set.of("NEARPAY", "MANUAL");
 
     private final StlWithdrawalMapper mapper;
+    private final PayoutLedgerPoster postings;
     private final WithdrawFeePolicy feePolicy;
     private final WithdrawalStateMachine stateMachine;
     private final PayoutAccountService payoutAccounts;
@@ -79,7 +80,9 @@ public class WithdrawalServiceImpl implements WithdrawalService {
                                  ai.neargo.sharehub.api.platform.port.AgentDirectoryPort agents,
                                  ai.neargo.sharehub.api.platform.port.SysParamPort params,
                                  ai.neargo.sharehub.common.event.DomainEventBus events,
-                                 @org.springframework.beans.factory.annotation.Value("${sharehub.flow.withdrawal.engine:LOCAL}") String engine) {
+                                 @org.springframework.beans.factory.annotation.Value("${sharehub.flow.withdrawal.engine:LOCAL}") String engine,
+                                 PayoutLedgerPoster postings) {
+        this.postings = postings;
         this.events = events;
         this.viaOpsKit = "OPSKIT".equalsIgnoreCase(engine == null ? "" : engine.trim());
         this.params = params;
@@ -391,6 +394,8 @@ public class WithdrawalServiceImpl implements WithdrawalService {
             throw new IllegalArgumentException(
                     "该渠道流水号已登记在另一张提现单上，请核对后重填：" + e.getPayRef());
         }
+        // 到账即冲减应付（G19）：付款任务批量确认与单笔登记回执都走这里，记账只有这一个入口
+        if (ok) postings.onWithdrawalPaid(e);
         return toVO(require(withdrawNo));
     }
 

@@ -55,12 +55,15 @@ public class SettlementServiceImpl implements SettlementService {
     private final StlAdjustmentMapper adjustmentMapper;
     private final ai.neargo.sharehub.finance.service.AdjustmentService adjustmentService;
     private final ai.neargo.sharehub.api.platform.port.SysParamPort params;
+    private final PayoutLedgerPoster postings;
 
     public SettlementServiceImpl(StlSettlementMapper mapper, StlSettlementDetailMapper detailMapper,
                                  ShareRecordMapper recordMapper, SettlementStateMachine stateMachine,
                                  StlAdjustmentMapper adjustmentMapper,
                                  ai.neargo.sharehub.finance.service.AdjustmentService adjustmentService,
-                                 ai.neargo.sharehub.api.platform.port.SysParamPort params) {
+                                 ai.neargo.sharehub.api.platform.port.SysParamPort params,
+                                 PayoutLedgerPoster postings) {
+        this.postings = postings;
         this.adjustmentService = adjustmentService;
         this.params = params;
         this.mapper = mapper;
@@ -123,6 +126,8 @@ public class SettlementServiceImpl implements SettlementService {
                 .map(ai.neargo.sharehub.auth.LoginUser::username).orElse("system"));
         e.setConfirmedAt(java.time.LocalDateTime.now());
         mapper.updateById(e);
+        // 应付在确认这一刻成立（G19）：同事务记账，确认成功而账没记上的状态不存在
+        postings.onSettlementConfirmed(e);
         return detail(settleNo);
     }
 
