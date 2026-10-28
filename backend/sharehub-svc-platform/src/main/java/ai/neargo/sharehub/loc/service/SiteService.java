@@ -37,6 +37,17 @@ public interface SiteService {
 
     Site create(SiteReq r);
 
+    /**
+     * 商家默认站点（V157，优化方案 §2.4）：建或更新一个只带名称、地址、坐标的站点。
+     *
+     * <p>与 {@link #create} 分开，因为常规建站要求场地方、区域、营业时间 —— 一期场地方只是记录（需求方案 D10），
+     * 商家补齐位置时这些都不存在。归属不在这里写：调用方随后走划拨，留流水并级联。
+     *
+     * @param siteNo 已有的默认站点编号；空 = 新建
+     */
+    Site upsertDefaultSite(String siteNo, String name, String address,
+                           java.math.BigDecimal lng, java.math.BigDecimal lat);
+
     Site update(String siteNo, SiteReq r);
 
     Site pause(String siteNo, String reason, LocalDate pauseUntil);

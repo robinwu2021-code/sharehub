@@ -103,6 +103,7 @@ public class AgentAssignmentServiceImpl implements AgentAssignmentService {
         if ("ASSIGN".equals(req.action()) && !"ENABLED".equals(agent.getStatus())) {
             throw new IllegalArgumentException("代理商已停用，不可划入资产: " + req.agentNo());
         }
+        requireCoreProfile(agent, req);
 
         AgtAssignment e = new AgtAssignment();
         e.setAssignNo(IdGenerator.next(ASSIGN_PREFIX));
@@ -121,6 +122,26 @@ public class AgentAssignmentServiceImpl implements AgentAssignmentService {
         ownershipSync.apply(req.targetType(), req.targetNo(), target);
 
         return toVO(e);
+    }
+
+    /**
+     * 划拨门禁（V157，需求方案 §六「位置、行业补齐后才能划拨设备」，验收 AC-04）。
+     *
+     * <p>位置决定默认站点的地图落点，行业决定报表口径；缺了就划设备，
+     * 设备会落在一个没有坐标的商家名下，「找附近」排不到，按行业的统计也漏掉它，而且不报错。
+     *
+     * <p>例外是商家自己的默认站点：它正是补齐位置那一刻由系统建出来并划给商家的，此时行业可能还没填。
+     * 收回（REVOKE）不受限 —— 资料不全不该妨碍把设备收回来。
+     */
+    private static void requireCoreProfile(AgtAgent agent, AssignReq req) {
+        if (!"ASSIGN".equals(req.action())) return;
+        if ("SITE".equals(req.targetType()) && req.targetNo().equals(agent.getDefaultSiteNo())) return;
+        boolean located = agent.getAddress() != null && !agent.getAddress().isBlank()
+                && agent.getLng() != null && agent.getLat() != null;
+        boolean classified = agent.getIndustry() != null && !agent.getIndustry().isBlank();
+        if (!located || !classified) {
+            throw BizException.badRequest("error.agent.core_profile_incomplete", agent.getAgentNo());
+        }
     }
 
     /** 可划拨资产候选池：机柜经 Port 取（core 的表），站点读 platform 自己的 {@code loc_site}。 */

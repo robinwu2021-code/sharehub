@@ -238,6 +238,35 @@ public class SiteServiceImpl implements SiteService {
 
     @Override
     @Transactional
+    public Site upsertDefaultSite(String siteNo, String name, String address,
+                                  java.math.BigDecimal lng, java.math.BigDecimal lat) {
+        if (siteNo != null && !siteNo.isBlank()) {
+            LocSite e = require(siteNo);
+            AuditChanges.record("名称", e.getName(), name);
+            AuditChanges.record("地址", e.getAddress(), address);
+            e.setName(name);
+            e.setAddress(address);
+            e.setLng(lng);
+            e.setLat(lat);
+            sites.updateById(e);
+            return toVO(e);
+        }
+        LocSite e = new LocSite();
+        e.setSiteNo(IdGenerator.next(BizKey.SITE));
+        e.setTenantId("MAIN");
+        e.setName(name);
+        e.setAddress(address);
+        e.setLng(lng);
+        e.setLat(lat);
+        e.setStatus(PREPARING.name());
+        sites.insert(e);
+        writeLog(e.getSiteNo(), "CREATE", null, PREPARING.name(), operator(), "商家默认站点");
+        log.info("商家默认站点建档 siteNo={}", e.getSiteNo());
+        return toVO(e);
+    }
+
+    @Override
+    @Transactional
     public Site update(String siteNo, SiteReq r) {
         LocSite e = require(siteNo);
         if (CLOSED.name().equals(e.getStatus())) throw ai.neargo.sharehub.common.BizException.conflict("error.site.closed_readonly");

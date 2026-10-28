@@ -48,6 +48,7 @@ export {
   archiveAgent, unarchiveAgent, grantAgentLogin,
   // S1 设备/点位划拨
   agentAssignmentRecords, listAgentAssignmentRecords, listAssignableAssets,
+  checkAgentCoreProfile, syncDefaultSite,
   assignAgentAssets, reclaimAgentAssets, refreshAgentAssetCounts, AgentAssignError,
 } from "./agent";
 export type { AssignmentRecordQuery, AssignableAssetQuery } from "./agent";

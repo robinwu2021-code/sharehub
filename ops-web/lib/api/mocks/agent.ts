@@ -25,9 +25,15 @@ export const agentMock: AgentApi = {
     const no = a.agentNo?.trim() || db.nextNo("AG", db.agents);
     const idx = db.agents.findIndex((x) => x.agentNo === no);
     const before = idx >= 0 ? db.agents[idx].status : null;
+    db.checkAgentCoreProfile(a);
+    const prev = idx >= 0 ? db.agents[idx] : null;
     const merged = { ...(db.agents[idx] ?? { name: "", contact: "", regionScope: "", shareRate: 0.3, cabinetCount: 0, status: "ENABLED", archivedAt: null }), ...a, agentNo: no } as Agent;
     // 新建的排最上（与场地方同口径，也与真后端的倒序一致）
     if (idx >= 0) db.agents[idx] = merged; else db.agents.unshift(merged);
+    // 默认站点只由服务端定，请求体里的不作数
+    merged.defaultSiteNo = prev?.defaultSiteNo ?? null;
+    db.syncDefaultSite(merged, !prev || prev.name !== merged.name || prev.address !== merged.address
+      || prev.lng !== merged.lng || prev.lat !== merged.lat);
     // 停用联动（F2）：名下未完结工单改派平台 —— 后端由 AgentStatusChangedEvent 的监听器做
     if (before && before !== "SUSPENDED" && merged.status === "SUSPENDED") ax.onAgentSuspended(merged.agentNo);
     return wait(merged, 350);

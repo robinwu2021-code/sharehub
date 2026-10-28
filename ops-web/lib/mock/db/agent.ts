@@ -11,6 +11,8 @@ import { paginate, kwHit, upsert, nextNo, archiveRow, unarchiveRow } from "./hel
 import { cabinets } from "./device";
 import { sites } from "./location";
 import { fail, notFound } from "@/lib/biz-error";
+import { agentCoreComplete } from "../../types";
+import { VENUE_INDUSTRIES } from "../../types/location";
 
 export const agents: Agent[] = Array.from({ length: 9 }, (_, i) => ({
   agentNo: `AG${String(i + 1).padStart(3, "0")}`, name: p(["North Hub", "Marina Partner", "Deira Agent", "Airport Ops", "JBR Franchise"], i),
@@ -21,6 +23,12 @@ export const agents: Agent[] = Array.from({ length: 9 }, (_, i) => ({
   agentType: i % 3 === 0 ? "CITY_PARTNER" : "AGENT",
   shareRate: [0.3, 0.35, 0.4][i % 3], cabinetCount: 0, status: i % 6 === 0 ? "SUSPENDED" : "ENABLED",
   archivedAt: null,
+  // 核心资料（V157）：前 8 个补齐，最后一个（AG009）留空 —— 页面上能看到「待补位置与行业」与划拨被拦
+  ...(i < 8 ? {
+    address: `${p(["Dubai North", "Dubai Marina", "Deira", "DXB", "JBR"], i)}, Dubai, UAE`,
+    lng: Number((55.13 + i * 0.021).toFixed(6)), lat: Number((25.08 + i * 0.017).toFixed(6)),
+    industry: p(["SHOPPING_MALL", "HOTEL", "F_AND_B", "AIRPORT", "RETAIL"] as const, i),
+  } : {}),
 }));
 
 export const agentAssignments: AgentAssignment[] = agents.map((a) => ({
@@ -268,12 +276,53 @@ function logAssignment(agentNo: string, assetType: AssetType, assetNo: string, a
   return rec;
 }
 
+/**
+ * 位置与行业（V157）的写入校验 —— 与后端 AgentServiceImpl.applyCoreProfile 同口径：
+ * 位置三项要么都给要么都不给，行业必须在词表里。
+ */
+export function checkAgentCoreProfile(a: Partial<Agent>) {
+  const any = a.address != null || a.lng != null || a.lat != null;
+  if (any && (!a.address?.trim() || a.lng == null || a.lat == null)) {
+    fail("位置要同时给地址与地图坐标（经度、纬度），只给一部分无法建站点",
+      "Location needs an address and map coordinates (longitude and latitude) together");
+  }
+  if (a.industry != null && !VENUE_INDUSTRIES.includes(a.industry)) {
+    fail(`行业取值不在词表里：${a.industry}`, `Industry is not in the vocabulary: ${a.industry}`);
+  }
+}
+
+/**
+ * 默认站点（V157，优化方案 §2.4）—— 与后端 AgentServiceImpl.syncDefaultSite 同口径：
+ * 位置补齐时建站并划给商家（留流水），之后位置或店名变了只同步站点名称、地址、坐标，不动归属。
+ */
+export function syncDefaultSite(a: Agent, locationChanged: boolean) {
+  if (!a.address?.trim() || a.lng == null || a.lat == null) return;
+  const existing = a.defaultSiteNo ? sites.find((s) => s.siteNo === a.defaultSiteNo) : undefined;
+  if (existing) {
+    if (locationChanged) Object.assign(existing, { name: a.name, address: a.address, lng: a.lng, lat: a.lat });
+    return;
+  }
+  const siteNo = nextNo("ST", sites, 900, "siteNo");
+  sites.unshift({
+    siteNo, name: a.name, venueNo: null, venueName: "", brandNo: null,
+    agentNo: a.agentNo, regionId: "", regionName: "", address: a.address, lat: a.lat, lng: a.lng,
+    sceneType: "", pointCount: 0, cabinetCount: 0, status: "PREPARING", archivedAt: null,
+  });
+  a.defaultSiteNo = siteNo;
+  logAssignment(a.agentNo, "SITE", siteNo, "ASSIGN");
+  refreshAgentAssetCounts();
+}
+
 /** 划拨：把机柜/站点挂到目标代理名下。任一资产不存在/已在目标名下 → 整批拒绝（不做半成功）。 */
 export function assignAgentAssets(x: AssignAssetsPayload): AgentAssignmentRecord[] {
   const agent = agents.find((a) => a.agentNo === x.agentNo);
   if (!agent) throw new AgentAssignError(`代理商 ${x.agentNo ?? ""} 不存在`);
   if (agent.archivedAt) throw new AgentAssignError(`代理商 ${agent.agentNo} 已归档，不能作为划拨对象`);
   if (agent.status === "SUSPENDED") throw new AgentAssignError(`代理商 ${agent.agentNo} 已停用，先启用再划拨`);
+  // 划拨门禁（V157，AC-04）：位置与行业补齐后才能划入资产
+  if (!agentCoreComplete(agent)) {
+    throw new AgentAssignError(`商家 ${agent.agentNo} 的核心资料未补齐：位置（地址与地图坐标）和行业都填好后才能划拨设备`);
+  }
   const cabinetNos = uniq(x.cabinetNos);
   const siteNos = uniq(x.siteNos);
   if (!cabinetNos.length && !siteNos.length) throw new AgentAssignError("请至少选择一台机柜或一个站点");

@@ -1,3 +1,4 @@
+import type { VenueIndustry } from "./location";
 import type { Archivable } from "./common";
 
 import type { DataScope } from "./org";
@@ -41,6 +42,22 @@ export interface Agent extends Archivable {
   shareRate: number; // 默认分润比例 0..1
   cabinetCount: number;
   status: AgentStatus;
+  /**
+   * 位置（V157，商家核心资料，需求方案 D6）：地址 + 地图坐标三者同时给。
+   * 补齐后系统建默认站点；位置或行业缺一样就不能划拨设备。保存时**不传 = 不改**。
+   */
+  address?: string | null;
+  lng?: number | null;
+  lat?: number | null;
+  /** 行业，与场地方同一词表。 */
+  industry?: VenueIndustry | null;
+  /** 系统建的默认站点（只读）。商家端不出现「站点」这个词。 */
+  defaultSiteNo?: string | null;
+}
+
+/** 核心资料是否齐全：位置（地址 + 坐标）与行业。店名、联系人建账号时已必填。 */
+export function agentCoreComplete(a: Pick<Agent, "address" | "lng" | "lat" | "industry">): boolean {
+  return !!a.address?.trim() && a.lng != null && a.lat != null && !!a.industry;
 }
 
 /**

@@ -35,11 +35,23 @@ import { AgentExitDrawer, AGENT_EXIT_STATUS } from "@/components/agent/agent-exi
 import { Notice } from "@/components/ui/notice";
 // 绩效周期复用报表域枚举：代理 GMV = 名下站点营收之和，必须与站点坪效同一套周期口径
 import { REPORT_PERIODS, REPORT_PERIOD_DEFAULT, type ReportPeriod } from "@/lib/types";
+import { agentCoreComplete, VENUE_INDUSTRIES, VENUE_INDUSTRY_LABEL, type VenueIndustry } from "@/lib/types";
+import { AddressPicker } from "@/components/ui/address-picker";
 import type {
   Agent, AgentAssignment, AgentPerformance, AgentAccount, AgentCommission, DataScope,
   AgentAssignmentRecord, AssignableAsset, AgentApply, ApplyStatus, OperatorType, AgentType,
   AgentExit, ShareSummary,
 } from "@/lib/types";
+
+/**
+ * 核心资料（V157，需求方案 D6）：店名、联系人建账号时已必填，这里只看位置与行业。
+ * 缺了不能划拨设备 —— 列表上直接显出来，运营不用逐个点开详情找。
+ */
+type CoreState = "DONE" | "TODO";
+const CORE_STATE: StatusMap<CoreState> = {
+  DONE: { label: "已补齐", tone: "success" },
+  TODO: { label: "待补位置与行业", tone: "warning" },
+};
 
 /** 商家经营视图的一行：档案 + 近期在线率 + 当月分润汇总（三个读端点在页内拼）。 */
 type BizRow = { agent: Agent; onlineRate: number | null; share: ShareSummary | null };
@@ -485,6 +497,8 @@ function AgentsInner() {
     // 于是「从这里新建」在编译期就过不去，而不是运行时打一个已不存在的端点
     mutationFn: (a: Partial<Agent> & { agentNo: string }) => api.saveAgent(a),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["agents"] }); setEdit(null); },
+    // 位置只给了地址没选点、行业不在词表：服务端会拒，原因要让人看见
+    onError: (e: Error) => notify.error(e.message),
   });
   /**
    * 开通代理端登录。
@@ -616,6 +630,7 @@ function AgentsInner() {
       ),
     },
     { header: "名称", cell: (a) => a.name },
+    { header: "核心资料", className: "whitespace-nowrap", cell: (a) => <StatusBadge map={CORE_STATE} value={agentCoreComplete(a) ? "DONE" : "TODO"} /> },
     { header: "类型", className: "whitespace-nowrap", cell: (a) => <StatusBadge map={AGENT_TYPE} value={a.agentType ?? "AGENT"} /> },
     { header: "辖域", cell: (a) => <span className="text-muted-foreground">{a.regionScope}</span> },
     { header: "联系方式", cell: (a) => (
@@ -1173,6 +1188,31 @@ function AgentsInner() {
           <Input value={form.phone ?? ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+9715xxxxxxx" />
         </Field>
         <Field label="联系邮箱"><Input value={form.email ?? ""} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="partner@example.ae" /></Field>
+        {/*
+          核心资料第二阶段（V157，需求方案 D4 / D6）：位置与行业。
+          位置走地图选点 —— 地址与坐标必须一致，分开手填两者对不上没人拦得住；
+          补齐位置时系统自动给商家建默认站点（一期不做门店，D11）。
+        */}
+        {!agentCoreComplete(form) && (
+          <Notice>位置与行业补齐后才能给这个商家划拨设备。补齐位置时，系统会按店名与地址自动建一个站点并划给商家。</Notice>
+        )}
+        <Field label="位置">
+          <AddressPicker
+            value={{ address: form.address ?? "", lat: form.lat ?? "", lng: form.lng ?? "" }}
+            placeholder="搜索地址或在地图上选点"
+            onChange={(v) => setForm({ ...form, address: v.address, lat: v.lat === "" ? null : v.lat, lng: v.lng === "" ? null : v.lng })}
+          />
+        </Field>
+        <Field label="行业">
+          <Select className="w-full" value={form.industry ?? ""}
+            onChange={(e) => setForm({ ...form, industry: (e.target.value || null) as VenueIndustry | null })}>
+            <option value="">请选择行业</option>
+            {VENUE_INDUSTRIES.map((v) => <option key={v} value={v}>{VENUE_INDUSTRY_LABEL[v]}</option>)}
+          </Select>
+        </Field>
+        {form.defaultSiteNo && (
+          <Field label="默认站点"><span className="txt-body tabular-nums text-muted-foreground">{form.defaultSiteNo}（系统建，随位置同步）</span></Field>
+        )}
         <Field label="默认分润比例（%）">
           <Input type="number" value={form.shareRate != null ? Math.round(form.shareRate * 100) : ""} onChange={(e) => setForm({ ...form, shareRate: Number(e.target.value) / 100 })} />
         </Field>

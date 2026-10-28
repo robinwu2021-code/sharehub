@@ -28,6 +28,18 @@ public class AgtAgent extends BaseEntity implements ai.neargo.sharehub.common.cr
     private String phone;
     /** 联系邮箱，同上。 */
     private String email;
+
+    /**
+     * 位置（V157，商家核心资料，需求方案 D6）：地址 + 坐标三者同时写入。
+     * 补齐后系统建默认站点；缺位置或行业时不能划拨设备。
+     */
+    private String address;
+    private java.math.BigDecimal lng;
+    private java.math.BigDecimal lat;
+    /** 行业（V157）：与场地方同一词表 {@link ai.neargo.sharehub.loc.VenueIndustry}。 */
+    private String industry;
+    /** 默认站点（V157）：补齐位置时系统所建，商家端不出现「站点」这个词。 */
+    private String defaultSiteNo;
     private String regionScope;
 
     /**
