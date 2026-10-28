@@ -24,6 +24,7 @@ import { TrialRentPanel } from "@/components/device/trial-rents";
 import { ProtectionPanel, useSlotProtections } from "@/components/device/protections";
 import { SignalCodesTable } from "@/components/device/signal-codes";
 import { OwnershipCard } from "@/components/device/ownership-card";
+import { LifecycleBar } from "@/components/device/lifecycle-bar";
 import { PROTECTION_ACTION, QC_STATUS } from "@/components/device/device-maps";
 import { fmtTime, cn } from "@/lib/utils";
 import { useCan } from "@/lib/hooks/use-can";
@@ -135,6 +136,8 @@ function Overview({ cabinet, gateQ, onQc }: {
   const lastQc = qcQ.data?.[0];
   return (
     <div className="space-y-6">
+      {/* 生命周期：在哪一环、下一步谁做（设计 §五.3） */}
+      <LifecycleBar cabinet={cabinet} />
       <Card>
         <CardContent className="grid grid-cols-2 gap-4 pt-5 md:grid-cols-4">
           <Field label="点位" className="mb-0">{cabinet.locationName ?? "未上架"}</Field>

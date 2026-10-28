@@ -242,11 +242,12 @@ export const NAV: NavSection[] = [
   {
     key: "device", label: "设备管理", icon: "Server", module: "device", href: "/devices",
     // 2026-10-28 按设备生命周期重排（docs/requirements/设备生命周期管理-运营端设计.md §五）：
-    //   设备档案 → 仓储与出库 → 绑定上线 → 运行监控（只建今天能用的叶；采购入库、装机、待上线、维修等视图随后续批次）。
+    //   设备档案 → 仓储与出库 → 部署与安装 → 绑定上线 → 运行监控 → 维护与退出
+    //   （采购入库等后端；V165 补上装机、待上线、故障与维修、撤机与回仓、报废与遗失五个设备视图）。
     // 「出库池」（设备出库与绑定 · 开发计划 F3）：绑定商家先出库，出库必须选商家；绑定只从出库池里选，
     // 默认绑到商家的默认站点、默认点位。
     // 「供应商接入」更名「厂商接入」：它是硬件厂商的协议接入，「供应商」留给采购。
-    // ⚠️ 菜单真源在库里：本段的行由 V150 重编号、V163 再重排，改这里要同步新开迁移（见 nav-seed.test.ts）。
+    // ⚠️ 菜单真源在库里：本段的行由 V150 重编号、V163 / V165 再重排，改这里要同步新开迁移（见 nav-seed.test.ts）。
     children: [
       { href: "/devices", label: "设备台账", perm: "device:cabinet:read", group: "设备档案" },
       { href: "/devices?tab=powerbanks", label: "充电宝管理", perm: "device:powerbank:read", group: "设备档案" },
@@ -256,6 +257,9 @@ export const NAV: NavSection[] = [
       { href: "/devices?tab=issued", label: "出库池", perm: "device:inventory:read", group: "仓储与出库" },
       // 此前是库存调拨里的子视图（同分期），菜单里找不到；拆出来不改分期
       { href: "/devices?tab=asset-diffs", label: "资产差异", perm: "device:inventory:read", phase: 2, group: "仓储与出库" },
+      // 五个生命周期视图（V165）：都是既有数据的设备视角，不新增后端端点；装机 / 撤机单仍在运维管理 › 工单里办理
+      { href: "/devices?tab=installs", label: "部署与装机", perm: "workorder:wo:read", group: "部署与安装" },
+      { href: "/devices?tab=pending-live", label: "待上线", perm: "device:cabinet:read", group: "绑定上线" },
       // 设备码是绑定的第一层（码 ↔ 设备）；厂商接入是第二层（网关 ↔ 设备）
       { href: "/devices?tab=codes", label: "设备编码", perm: "device:cabinet:read", phase: 1, group: "绑定上线" },
       { href: "/devices?tab=vendors", label: "厂商接入", perm: "device:vendor:read", group: "绑定上线" },
@@ -263,6 +267,9 @@ export const NAV: NavSection[] = [
       { href: "/devices?tab=commands", label: "远程控制与指令记录", perm: "device:command:send", group: "运行监控" },
       { href: "/devices?tab=logs", label: "设备日志", perm: "device:cabinet:read", phase: 1, group: "运行监控" },
       { href: "/devices?tab=ota", label: "固件 OTA", perm: "device:ota:read", phase: 2, group: "运行监控" },
+      { href: "/devices?tab=repairs", label: "故障与维修", perm: "device:cabinet:read", group: "维护与退出" },
+      { href: "/devices?tab=removals", label: "撤机与回仓", perm: "workorder:wo:read", group: "维护与退出" },
+      { href: "/devices?tab=retired", label: "报废与遗失", perm: "device:cabinet:read", group: "维护与退出" },
     ],
   },
   {

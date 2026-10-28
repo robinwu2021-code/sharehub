@@ -443,6 +443,35 @@ const PATCHES: { file: string; mustContain: string; apply: (rows: Row[]) => void
       );
     },
   },
+  {
+    // 设备管理补五个生命周期视图：设备段按 path 重编号，插五条新叶。
+    file: "V165__menu_device_lifecycle_views.sql",
+    mustContain: "UPDATE iam_menu SET menu_no = CONCAT('M_tmp165_', id) WHERE parent_no = 'M_device'",
+    apply: (rows) => {
+      const plan: [string, string, string][] = [
+        ["/devices", "1", "设备档案"], ["/devices?tab=powerbanks", "2", "设备档案"],
+        ["/devices?tab=stock", "3", "仓储与出库"], ["/devices?tab=inventory", "4", "仓储与出库"],
+        ["/devices?tab=issued", "5", "仓储与出库"], ["/devices?tab=asset-diffs", "6", "仓储与出库"],
+        ["/devices?tab=codes", "9", "绑定上线"], ["/devices?tab=vendors", "10", "绑定上线"],
+        ["/devices?tab=monitor", "11", "运行监控"], ["/devices?tab=commands", "12", "运行监控"],
+        ["/devices?tab=logs", "13", "运行监控"], ["/devices?tab=ota", "14", "运行监控"],
+      ];
+      const targets = plan.map(([path]) => rows.find((r) => r.parent_no === "M_device" && r.path === path)!);
+      plan.forEach(([, sort, group], i) => Object.assign(targets[i], { menu_no: `M_device__${sort}`, sort, group_name: group }));
+      const leaf = (sort: string, name: string, en: string, ar: string, tab: string, group: string, perm: string) => ({
+        menu_no: `M_device__${sort}`, parent_no: "M_device", name, name_en: en, name_ar: ar, type: "ITEM",
+        path: `/devices?tab=${tab}`, icon: "NULL", group_name: group, sort, perm, phase: "1", ready: "0",
+        module: "NULL", modules: "NULL", match_paths: "NULL", pin_bottom: "0", portal_for: "NULL",
+      });
+      rows.push(
+        leaf("7", "部署与装机", "Installations", "عمليات التركيب", "installs", "部署与安装", "workorder:wo:read"),
+        leaf("8", "待上线", "Pending Go-live", "بانتظار التشغيل", "pending-live", "绑定上线", "device:cabinet:read"),
+        leaf("15", "故障与维修", "Faults & Repairs", "الأعطال والإصلاح", "repairs", "维护与退出", "device:cabinet:read"),
+        leaf("16", "撤机与回仓", "Removals & Returns", "الإزالة والإرجاع", "removals", "维护与退出", "workorder:wo:read"),
+        leaf("17", "报废与遗失", "Scrapped & Lost", "المُتلَف والمفقود", "retired", "维护与退出", "device:cabinet:read"),
+      );
+    },
+  },
 ];
 
 const COLS = [

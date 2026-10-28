@@ -46,6 +46,8 @@ import { TransferForm, TransferDetailDrawer, AssetDiffsTable } from "@/component
 import { StockBalanceTab } from "@/components/device/stock-balance";
 import { VendorsTab } from "@/components/device/vendors-tab";
 import { IssuedPoolTab } from "@/components/device/issued-pool";
+import { InstallsTab, PendingLiveTab, RepairsTab, RemovalsTab, RetiredTab } from "@/components/device/lifecycle-views";
+import { lifecycleStage, STAGE_LABEL, STAGE_TONE } from "@/lib/device-lifecycle";
 import { PowerbankActions } from "@/components/device/powerbank-actions";
 import { ReasonDrawer, type ReasonRequest } from "@/components/device/reason-drawer";
 import { QcDrawer, type QcTarget } from "@/components/device/qc";
@@ -58,10 +60,14 @@ import { CabinetSummaryStrip } from "@/components/device/cabinet-summary";
 // 2026-10-28 与菜单同序（按设备生命周期）：设备档案 → 仓储与出库（含出库池）→ 绑定上线 → 运行监控
 const TAB_KEYS = ["cabinets", "powerbanks",
   "stock", "inventory", "issued", "asset-diffs",
-  "codes", "vendors",
-  "monitor", "commands", "logs", "ota"] as const;
+  "installs",
+  "pending-live", "codes", "vendors",
+  "monitor", "commands", "logs", "ota",
+  "repairs", "removals", "retired"] as const;
 // 自建 tab（自带筛选器与查询），不走页面共用的 keyword/Toolbar/分页那一套
-const STANDALONE_TABS = ["cabinets", "logs", "codes", "stock", "issued", "asset-diffs", "vendors"]; // issued：出库池自带查询与分页
+// issued 与五个生命周期视图（installs … retired）自带查询与分页
+const STANDALONE_TABS = ["cabinets", "logs", "codes", "stock", "issued", "asset-diffs", "vendors",
+  "installs", "pending-live", "repairs", "removals", "retired"];
 
 /**
  * 同一张 tab 内的视图切换段控（监控的「列表/地图」、固件 OTA 的「投放/版本库」）。
@@ -415,6 +421,8 @@ function CabinetsTab({ canWrite }: { canWrite: boolean }) {
     { header: "可借/仓位", cell: (c) => <span className="tabular-nums">{c.availableCount}/{c.slotTotal}</span> },
     { header: "在线", cell: (c) => <OnlineBadge s={c.onlineStatus} /> },
     { header: "状态", cell: (c) => <CabinetStatusBadge s={c.status} /> },
+    // 生命周期环节（展示态，设计 §三.1）：由状态 + 出库池 / 点位 / 质检派生，回答「在哪一步」
+    { header: "生命周期", cell: (c) => { const st = lifecycleStage(c); return <Badge tone={STAGE_TONE[st]}>{STAGE_LABEL[st]}</Badge>; } },
     { header: "固件", cell: (c) => <span className="text-muted-foreground">{c.fwVersion}</span> },
     { header: "最后心跳", cell: (c) => <span className="text-muted-foreground">{fmtTime(c.lastHeartbeatAt)}</span> },
     // 归档时间列只在打开「显示已归档」时才有信息量，故随开关出现
@@ -474,6 +482,7 @@ function CabinetsTab({ canWrite }: { canWrite: boolean }) {
           { header: "仓位数", value: (c) => c.slotTotal },
           { header: "在线", value: (c) => (c.onlineStatus === "ONLINE" ? "在线" : "离线") },
           { header: "状态", value: (c) => CAB_STATUS[c.status]?.label ?? c.status },
+          { header: "生命周期", value: (c) => STAGE_LABEL[lifecycleStage(c)] },
           { header: "固件", value: (c) => c.fwVersion },
           { header: "最后心跳", value: (c) => c.lastHeartbeatAt },
           { header: "归档时间", value: (c) => c.archivedAt },
@@ -1677,6 +1686,11 @@ function DevicesInner() {
       {tab === "stock" && <StockBalanceTab />}
       {tab === "vendors" && <VendorsTab />}
       {tab === "issued" && <IssuedPoolTab />}
+      {tab === "installs" && <InstallsTab />}
+      {tab === "pending-live" && <PendingLiveTab />}
+      {tab === "repairs" && <RepairsTab />}
+      {tab === "removals" && <RemovalsTab />}
+      {tab === "retired" && <RetiredTab />}
       {isReleases && <OtaReleasesTab canManage={canManageOta} viewSwitch={otaViewSwitch} />}
       {tab === "ota" && !isReleases && <DataTable rowKey={(r: OtaRollout) => r.rolloutNo} columns={otaColsFull} rows={q.data?.list as OtaRollout[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} />}
       {!isStandalone && q.data && <Pagination page={paging.page} size={paging.size} total={q.data.total} onPage={paging.setPage} onSize={paging.setSize} />}
