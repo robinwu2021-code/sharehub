@@ -48,4 +48,14 @@ public class DevCabinet extends BaseEntity implements ai.neargo.sharehub.common.
     private String qcStatus;
     /** 在库时所在仓（调拨签收回写）。 */
     private String warehouseNo;
+
+    /**
+     * 出库池归属（V161）：出库给了哪个商家。退回仓库后清空。
+     * 出库池里的柜子仍是 IN_STOCK —— 「在仓 / 在出库池未绑定 / 已绑定」由本列与 warehouseNo、locationNo 派生。
+     * 数据范围锚点 scope_agent_no 是库里的生成列（COALESCE(agent_no, issued_agent_no)），**不映射进实体**：
+     * 映射了 MyBatis 就会在 insert / update 里写它，而生成列不许写。
+     */
+    private String issuedAgentNo;
+    private java.time.LocalDateTime issuedAt;
+    private String issuedBy;
 }

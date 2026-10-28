@@ -41,6 +41,12 @@ public interface AgentDirectoryPort {
     AgentBrief briefOf(String agentNo);
 
     /**
+     * 商家能否接收设备（V157 / V161）：启用，且核心资料「位置、行业」已补齐。
+     * 出库给商家与划拨共用同一个判据 —— 设备落在没有坐标的商家名下，「找附近」排不到它，且不报错。
+     */
+    boolean readyForDevices(String agentNo);
+
+    /**
      * 运维分成系数（批次 F5，裁决 #1）：该代理在 {@code period}（YYYY-MM，订单归属账期）适用的系数 ——
      * 取上一月考核的结果；没有考核记录按 1（不打折）。乘在 OPERATE 分润比例上。
      */

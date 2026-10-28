@@ -75,6 +75,15 @@ public class LocalAgentDirectory implements AgentDirectoryPort {
         return a == null ? null : toBrief(a);
     }
 
+    @Override
+    public boolean readyForDevices(String agentNo) {
+        AgtAgent a = agentNo == null || agentNo.isBlank() ? null : agents.selectOne(new LambdaQueryWrapper<AgtAgent>()
+                .eq(AgtAgent::getAgentNo, agentNo).last("limit 1"));
+        return a != null && ai.neargo.sharehub.agent.AgentStatus.ENABLED.name().equals(a.getStatus())
+                && a.getAddress() != null && !a.getAddress().isBlank() && a.getLng() != null && a.getLat() != null
+                && a.getIndustry() != null && !a.getIndustry().isBlank();
+    }
+
     private AgentBrief toBrief(AgtAgent a) {
         boolean settling = !ai.neargo.sharehub.agent.AgentStatus.ENABLED.name().equals(a.getStatus()) && exits.selectCount(new LambdaQueryWrapper<ai.neargo.sharehub.agent.ext.entity.AgtExit>()
                 .eq(ai.neargo.sharehub.agent.ext.entity.AgtExit::getAgentNo, a.getAgentNo())

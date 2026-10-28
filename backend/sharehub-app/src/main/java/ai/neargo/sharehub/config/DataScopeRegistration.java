@@ -77,9 +77,11 @@ public class DataScopeRegistration implements DataScopeRegistrar {
         registry.register("agt_exit", Map.of("AGENT", "agent_no"));
         registry.register("agt_ops_assessment", Map.of("AGENT", "agent_no"));
 
-        // —— 设备：机柜归属随点位 ——
+        // —— 设备：机柜归属随点位；未绑定的看出库池（V161）——
+        // scope_agent_no = COALESCE(agent_no, issued_agent_no) 是生成列：出库给商家、还没绑定的柜子
+        // agent_no 为空，按 agent_no 收敛商家就看不到自己「待安装」的设备
         registry.register("dev_cabinet", Map.of(
-                "AGENT", "agent_no",
+                "AGENT", "scope_agent_no",
                 "SITE", "site_no",
                 "REGION", "region_id"));
 

@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.scenario;
 
+import ai.neargo.sharehub.support.LegacyShareParams;
 import ai.neargo.sharehub.finance.service.SettlementService;
 import ai.neargo.sharehub.loc.service.SiteService;
 import ai.neargo.sharehub.support.ApiTestSupport;
@@ -30,6 +31,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 撤机清点与回仓 + 撤场自动关闭 + 结算调整项（C7 / C8 / C9）。
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+// 撤场结清会出场地方结算单（押金 / 进场费调整项）—— 验的是开关打开时的逻辑，一期默认关（V155）
+@LegacyShareParams
 class SiteAssetFlowTest extends ApiTestSupport {
 
     @Autowired

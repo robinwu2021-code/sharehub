@@ -26,14 +26,26 @@ public final class DevLegacyDtos {
                           String locationNo, String locationName, int slotTotal, int availableCount,
                           String onlineStatus, String status, String fwVersion, String lastHeartbeatAt,
                           String siteNo, String agentNo, String archivedAt,
-                          String qcStatus, String warehouseNo) {
+                          String qcStatus, String warehouseNo,
+                          // V161 出库池：追加在末尾（理由同 LocDtos.Site —— 参数几乎全是 String，插中间会静默错位）
+                          String issuedAgentNo, String issuedAt) {
+
+        /** V161 之前的形状：出库池两项缺省 null。 */
+        public Cabinet(String cabinetNo, String sn, String vendorCode, String model,
+                       String locationNo, String locationName, int slotTotal, int availableCount,
+                       String onlineStatus, String status, String fwVersion, String lastHeartbeatAt,
+                       String siteNo, String agentNo, String archivedAt, String qcStatus, String warehouseNo) {
+            this(cabinetNo, sn, vendorCode, model, locationNo, locationName, slotTotal, availableCount,
+                    onlineStatus, status, fwVersion, lastHeartbeatAt, siteNo, agentNo, archivedAt, qcStatus, warehouseNo,
+                    null, null);
+        }
 
         /** 兼容旧 12 参调用（种子/历史代码），siteNo / agentNo / archivedAt 缺省 null。 */
         public Cabinet(String cabinetNo, String sn, String vendorCode, String model,
                        String locationNo, String locationName, int slotTotal, int availableCount,
                        String onlineStatus, String status, String fwVersion, String lastHeartbeatAt) {
             this(cabinetNo, sn, vendorCode, model, locationNo, locationName, slotTotal, availableCount,
-                    onlineStatus, status, fwVersion, lastHeartbeatAt, null, null, null, null, null);
+                    onlineStatus, status, fwVersion, lastHeartbeatAt, null, null, null, null, null, null, null);
         }
 
         /** 兼容旧 13 参调用（带 siteNo）。 */
@@ -42,7 +54,7 @@ public final class DevLegacyDtos {
                        String onlineStatus, String status, String fwVersion, String lastHeartbeatAt,
                        String siteNo) {
             this(cabinetNo, sn, vendorCode, model, locationNo, locationName, slotTotal, availableCount,
-                    onlineStatus, status, fwVersion, lastHeartbeatAt, siteNo, null, null, null, null);
+                    onlineStatus, status, fwVersion, lastHeartbeatAt, siteNo, null, null, null, null, null, null);
         }
     }
 

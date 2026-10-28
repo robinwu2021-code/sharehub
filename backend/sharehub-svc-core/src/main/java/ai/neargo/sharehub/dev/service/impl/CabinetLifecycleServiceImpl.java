@@ -183,7 +183,22 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
     @Transactional
     public void receive(String cabinetNo, String warehouseNo) {
         DevCabinet c = require(cabinetNo);
-        transit(c, "RECEIVE", u -> u.set(DevCabinet::getWarehouseNo, warehouseNo), x -> x.setWarehouseNo(warehouseNo));
+        // 进仓即离开出库池（V161，I1：库里有 CHECK 保证两者互斥 —— 只写仓不清出库池会被库拒掉）。
+        // 签收到站点 / 点位（warehouseNo 为空）不是进仓，出库池不动
+        boolean intoWarehouse = warehouseNo != null && !warehouseNo.isBlank();
+        transit(c, "RECEIVE", u -> {
+                    u.set(DevCabinet::getWarehouseNo, warehouseNo);
+                    if (intoWarehouse) u.set(DevCabinet::getIssuedAgentNo, null).set(DevCabinet::getIssuedAt, null)
+                            .set(DevCabinet::getIssuedBy, null);
+                },
+                x -> {
+                    x.setWarehouseNo(warehouseNo);
+                    if (intoWarehouse) {
+                        x.setIssuedAgentNo(null);
+                        x.setIssuedAt(null);
+                        x.setIssuedBy(null);
+                    }
+                });
     }
 
     @Override

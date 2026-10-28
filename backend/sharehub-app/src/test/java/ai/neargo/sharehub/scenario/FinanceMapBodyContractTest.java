@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.scenario;
 
+import ai.neargo.sharehub.support.LegacyShareParams;
 import ai.neargo.sharehub.support.ApiTestSupport;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.DisplayName;
@@ -34,6 +35,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * </ol>
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+// 用场地方出账验入参是否被读 —— 场地方结算一期默认关（V155），验的是开关打开时的口径
+@LegacyShareParams
 class FinanceMapBodyContractTest extends ApiTestSupport {
 
     @Autowired

@@ -66,8 +66,11 @@ public class OpsController {
                                       @RequestParam(required = false) Integer size,
                                       @RequestParam(required = false) String keyword,
                                       @RequestParam(required = false) String onlineStatus,
-                                      @RequestParam(required = false) String status) {
-        return cabinetService.page(page, size, keyword, onlineStatus, status);
+                                      @RequestParam(required = false) String status,
+                                      // 出库池（V161）：只看出库给某商家的；pool = UNBOUND / BOUND
+                                      @RequestParam(required = false) String issuedAgentNo,
+                                      @RequestParam(required = false) String pool) {
+        return cabinetService.page(page, size, keyword, onlineStatus, status, issuedAgentNo, pool);
     }
 
     @GetMapping("/cabinets/{cabinetNo}")

@@ -135,6 +135,16 @@ public class CabinetServiceImpl implements CabinetService {
 
     @Override
     public PageResult<Cabinet> page(Integer page, Integer size, String keyword, String onlineStatus, String status) {
+        return page(page, size, keyword, onlineStatus, status, null, null);
+    }
+
+    /**
+     * 出库池筛选（V161）：{@code issuedAgentNo} 只看出库给某商家的；
+     * {@code pool} = UNBOUND（在出库池未绑定）/ BOUND（出库池里已绑定点位）/ 其它或空 = 不按出库池筛。
+     */
+    @Override
+    public PageResult<Cabinet> page(Integer page, Integer size, String keyword, String onlineStatus, String status,
+                                    String issuedAgentNo, String pool) {
         int p = (page == null || page < 1) ? 1 : page;
         int s = (size == null || size < 1) ? 10 : size;
         LambdaQueryWrapper<DevCabinet> w = new LambdaQueryWrapper<>();
@@ -143,6 +153,9 @@ public class CabinetServiceImpl implements CabinetService {
         }
         if (onlineStatus != null && !onlineStatus.isBlank()) w.eq(DevCabinet::getOnlineStatus, onlineStatus);
         if (status != null && !status.isBlank()) w.eq(DevCabinet::getStatus, status);
+        if (issuedAgentNo != null && !issuedAgentNo.isBlank()) w.eq(DevCabinet::getIssuedAgentNo, issuedAgentNo);
+        if ("UNBOUND".equalsIgnoreCase(pool)) w.isNotNull(DevCabinet::getIssuedAgentNo).isNull(DevCabinet::getLocationNo);
+        else if ("BOUND".equalsIgnoreCase(pool)) w.isNotNull(DevCabinet::getIssuedAgentNo).isNotNull(DevCabinet::getLocationNo);
         w.orderByAsc(DevCabinet::getId);
         Page<DevCabinet> r = mapper.selectPage(new Page<>(p, s), w);
         List<Cabinet> rows = r.getRecords().stream().map(CabinetServiceImpl::toVO).toList();
@@ -192,7 +205,8 @@ public class CabinetServiceImpl implements CabinetService {
                 e.getOnlineStatus(), e.getStatus(), e.getFwVersion(), e.getLastHeartbeatAt(),
                 e.getSiteNo(), e.getAgentNo(),
                 e.getArchivedAt() == null ? null : e.getArchivedAt().toString(),
-                e.getQcStatus(), e.getWarehouseNo());
+                e.getQcStatus(), e.getWarehouseNo(),
+                e.getIssuedAgentNo(), e.getIssuedAt() == null ? null : e.getIssuedAt().toString());
     }
 
     // ── 归档 / 取消归档（前端契约 Archivable）──
