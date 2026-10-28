@@ -7,9 +7,9 @@ describe("exitFixHref", () => {
     ["/agents/AG001?tab=assign", "/agents?tab=assign"],
     ["/agents/AG001?tab=sites", "/operation/sites"],
     ["/work-orders?assignee=AG001", "/work-orders?view=list&assignee=AG001"],
-    ["/finance/shares?payeeNo=AG001", "/finance?tab=records&payee=AG001"],
-    ["/finance/settlements?payeeNo=AG001", "/finance?tab=settlements&payee=AG001"],
-    ["/finance/withdrawals?payeeNo=AG001", "/finance?tab=withdrawals&payee=AG001"],
+    ["/finance/shares?payeeNo=AG001", "/settlement?tab=records&payee=AG001"],
+    ["/finance/settlements?payeeNo=AG001", "/settlement?tab=settlements&payee=AG001"],
+    ["/finance/withdrawals?payeeNo=AG001", "/settlement?tab=withdrawals&payee=AG001"],
   ])("%s → %s", (from, to) => expect(exitFixHref(from)).toBe(to));
 
   it("已经是运营端路由的原样透传（后端修好之后这里不该再改写）", () => {

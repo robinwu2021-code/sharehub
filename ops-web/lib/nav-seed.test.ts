@@ -343,6 +343,45 @@ const PATCHES: { file: string; mustContain: string; apply: (rows: Row[]) => void
       l1.forEach((no, i) => { at(no).sort = String(i + 7); });
     },
   },
+  {
+    // 结算（OM08）：新插 M_settlement；财务段结算六项（页签换到 /settlement）与运营管理两项分成迁入并分三组；
+    // 删「代理分润配置」深链；财务段剩三项重编号；门户三项换路径；结算插在财务之前，其后 L1 排序后移。
+    file: "V154__menu_settlement_section_by_ops_order.sql",
+    mustContain: "UPDATE iam_menu SET menu_no = CONCAT('M_tmp154_', id)",
+    apply: (rows) => {
+      const at = (no: string) => rows.find((r) => r.menu_no === no)!;
+      rows.push({ menu_no: "M_settlement", parent_no: "NULL", name: "结算", name_en: "Settlement", name_ar: "التسوية",
+        type: "MENU", path: "/settlement?tab=settlements", icon: "HandCoins", group_name: "NULL", sort: "11", perm: "NULL",
+        phase: "1", ready: "0", module: "finance", modules: "NULL",
+        match_paths: '["/settlement","/operation/site-sharing","/operation/payee-sharing"]', pin_bottom: "0", portal_for: "NULL" });
+      for (const tab of ["records", "settlements", "withdrawals"]) {
+        rows.find((r) => r.parent_no === "M_my-biz" && r.path === `/finance?tab=${tab}`)!.path = `/settlement?tab=${tab}`;
+      }
+      rows.splice(rows.findIndex((r) => r.parent_no === "M_finance" && r.path === "/agents?tab=commission"), 1);
+      const from = (r: Row) => r.parent_no === "M_finance"
+        || (r.parent_no === "M_operation" && ["/operation/site-sharing", "/operation/payee-sharing"].includes(r.path));
+      const plan: [string, string, string, string | null, string | null][] = [
+        ["/finance?tab=rules", "M_settlement", "1", "分润", "/settlement?tab=rules"],
+        ["/finance?tab=records", "M_settlement", "2", "分润", "/settlement?tab=records"],
+        ["/finance?tab=summary", "M_settlement", "3", "分润", "/settlement?tab=summary"],
+        ["/operation/site-sharing", "M_settlement", "4", "分润", null],
+        ["/operation/payee-sharing", "M_settlement", "5", "分润", null],
+        ["/finance?tab=settlements", "M_settlement", "6", "结算", "/settlement?tab=settlements"],
+        ["/finance?tab=withdrawals", "M_settlement", "7", "付款", "/settlement?tab=withdrawals"],
+        ["/finance?tab=payout-accounts", "M_settlement", "8", "付款", "/settlement?tab=payout-accounts"],
+        ["/finance?tab=ledger", "M_finance", "1", null, null],
+        ["/finance?tab=reconcile", "M_finance", "2", null, null],
+        ["/finance?tab=invoices", "M_finance", "3", null, null],
+      ];
+      const targets = plan.map(([path]) => rows.find((r) => from(r) && r.path === path)!);
+      plan.forEach(([, parent, sort, group, path], i) => {
+        Object.assign(targets[i], { menu_no: `${parent}__${sort}`, parent_no: parent, sort,
+          ...(group ? { group_name: group } : {}), ...(path ? { path } : {}) });
+      });
+      const l1 = ["M_settlement", "M_finance", "M_user", "M_report", "M_org", "M_system", "M_flow"];
+      l1.forEach((no, i) => { at(no).sort = String(i + 11); });
+    },
+  },
 ];
 
 const COLS = [

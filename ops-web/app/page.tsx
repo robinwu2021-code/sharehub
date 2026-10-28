@@ -106,7 +106,7 @@ export default function DashboardPage() {
                 </Card>
               </Link>
             )}
-            <Link href="/finance?tab=withdrawals">
+            <Link href="/settlement?tab=withdrawals">
               <Card className="hover:border-primary/50 transition-colors cursor-pointer">
                 <CardContent className="pt-5">
                   <p className="text-muted-foreground text-sm">待审提现</p>

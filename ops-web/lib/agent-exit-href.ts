@@ -12,7 +12,7 @@ const RULES: [RegExp, (m: RegExpMatchArray, q: URLSearchParams) => string][] = [
   [/^\/finance\/(shares|settlements|withdrawals)$/, (m, q) => {
     const tab = m[1] === "shares" ? "records" : m[1];
     const payee = q.get("payeeNo");
-    return `/finance?tab=${tab}${payee ? `&payee=${encodeURIComponent(payee)}` : ""}`;
+    return `/settlement?tab=${tab}${payee ? `&payee=${encodeURIComponent(payee)}` : ""}`;
   }],
 ];
 

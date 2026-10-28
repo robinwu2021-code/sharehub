@@ -166,12 +166,13 @@ export const NAV: NavSection[] = [
     portalFor: ["AGENT"],
     children: [
       { href: "/", label: "我的看板", perm: "dashboard:overview:read", group: "经营概览" },
-      { href: "/finance?tab=records", label: "我的收益", perm: "finance:share_record:read", group: "经营概览" },
-      { href: "/finance?tab=settlements", label: "我的结算", perm: "agent:settlement:read", group: "经营概览" },
+      // 2026-10-28 三项随结算页签搬到 /settlement（OM08）；/finance 上的旧链接会被转过去
+      { href: "/settlement?tab=records", label: "我的收益", perm: "finance:share_record:read", group: "经营概览" },
+      { href: "/settlement?tab=settlements", label: "我的结算", perm: "agent:settlement:read", group: "经营概览" },
       // 2026-09-23 分级矩阵 AGT-06：代理自助提现是 L0（⑦ 分钱的最后一步），权限码 finance:withdrawal:apply
-      // 前后端与 POST /api/trade/withdrawals 三处一致。申请侧已在 /finance 页按 AGENT 角色分流
-      // （app/finance/page.tsx 的申请流），不再是 soon。
-      { href: "/finance?tab=withdrawals", label: "申请提现", perm: "finance:withdrawal:apply", group: "经营概览" },
+      // 前后端与 POST /api/trade/withdrawals 三处一致。申请侧在结算页按 AGENT 角色分流
+      // （components/finance/finance-workspace.tsx 的申请流），不再是 soon。
+      { href: "/settlement?tab=withdrawals", label: "申请提现", perm: "finance:withdrawal:apply", group: "经营概览" },
     ],
   },
   {
@@ -201,8 +202,8 @@ export const NAV: NavSection[] = [
     // soon 由 backend-ready.ts 决定：真实后端模式下接口未就绪的页面灰显，mock 模式恒可点。
     key: "operation", label: "运营管理", icon: "Store", module: "location",
     modules: ["location", "pricing", "finance", "system", "marketing"],
-    // 2026-10-28：站点四项迁到「网点管理」（OM02），计费两项迁到「销售管理」（OM04），本段只剩基础、分成两组，
-    // 待系统（OM11）、结算（OM08）两个模块调整时各自迁走，届时本段撤销。
+    // 2026-10-28：站点四项迁到「网点管理」（OM02），计费两项迁到「销售管理」（OM04），分成两项迁到「结算」（OM08），
+    // 本段只剩基础管理一组，待系统（OM11）模块调整时迁走，届时本段撤销。
     // /operation/sites、/operation/overview、/operation/fee-* 由各自新 L1 的 match 认领（最长前缀胜出），这里只留 /operation。
     href: "/operation/app-versions", match: ["/operation"],
     // 2026-09-23 菜单收敛（docs/technical/菜单重合梳理与优化方案.md）：
@@ -230,10 +231,7 @@ export const NAV: NavSection[] = [
         ["brands", "品牌管理", "system:brand:read", "基础管理"],
         ["problems", "问题管理", "system:problem:read", "基础管理"],
         ["notices", "公告管理", "marketing:notice:read", "基础管理"],
-        // 「分成」不是报表：这两页展示的是钱**实际分给了谁、各多少**，是分账口径本身，
-        // 不是给人分析用的统计。组名叫报表会让人以为它可改可不看。
-        ["site-sharing", "站点分成", "finance:share_rule:read", "分成"],
-        ["payee-sharing", "分成方分成", "finance:share_rule:read", "分成"],
+        // 「分成」两项（站点分成、分成方分成）2026-10-28 迁到「结算 › 分润」（OM08）
       ]),
     ],
   },
@@ -387,25 +385,41 @@ export const NAV: NavSection[] = [
     ],
   },
   {
+    // 2026-10-28 按运营顺序从财务管理拆出「结算」（OM08 · docs/requirements/运营端菜单清单-按运营顺序.md）：
+    // 分润 → 结算单 → 付款，回答「该分给商家多少、付了没有」。排在财务管理之前：
+    // 应付台账与调整单都消费本模块的产出。
+    // 页签从 /finance 搬到 /settlement（一个 URL 只属于一个 L1）；站点分成 / 分成方分成两页
+    // 仍在 /operation/*-sharing，靠 match 认领（最长前缀胜过运营管理的 /operation）。
+    // 「代理分润配置」深链撤销：它指向商家管理 › 商家分润规则，跨 L1 深链点进去面包屑与高亮跳走。
+    // 「付款登记」（OM08-06）暂不建叶：结算单维度的付款没有后端实体与端点（契约草案在服务端评审 S11 §四）。
+    // 落地页是结算单（href），不是第一项分润规则。
+    // ⚠️ 菜单真源在库里：本段与财务管理、运营管理段的行由 V154 重编号，改这里要同步新开迁移（见 nav-seed.test.ts）。
+    key: "settlement", label: "结算", icon: "HandCoins", module: "finance", href: "/settlement?tab=settlements",
+    match: ["/settlement", "/operation/site-sharing", "/operation/payee-sharing"],
+    children: [
+      { href: "/settlement?tab=rules", label: "分润规则", perm: "finance:share_rule:read", group: "分润" },
+      { href: "/settlement?tab=records", label: "分润明细", perm: "finance:share_record:read", group: "分润" },
+      { href: "/settlement?tab=summary", label: "分润统计", perm: "finance:share_record:read", phase: 1, group: "分润" },
+      // 「分成」不是报表：这两页展示的是钱**实际分给了谁、各多少**，是分账口径本身
+      ...opLeaves([
+        ["site-sharing", "站点分成", "finance:share_rule:read", "分润"],
+        ["payee-sharing", "分成方分成", "finance:share_rule:read", "分润"],
+      ]),
+      { href: "/settlement?tab=settlements", label: "结算单", perm: "finance:settlement:read", group: "结算" },
+      { href: "/settlement?tab=withdrawals", label: "提现审核", perm: "finance:withdrawal:read", group: "付款" },
+      // 排在提现审核之后：没有收款账户，提现审批根本放行不了（B3）
+      { href: "/settlement?tab=payout-accounts", label: "收款账户", perm: "finance:payout_account:read", group: "付款" },
+    ],
+  },
+  {
+    // 2026-10-28 结算六项拆到「结算」L1（OM08）后只剩平台账三项；按运营顺序的重排在 OM07 模块调整时做。
+    // 「用户账」组（用户钱包深链、充值订单）2026-10-28 撤销：两者归「用户管理 › 资产」（OM05）。
+    // ⚠️ 菜单真源在库里：本段的行由 V154 重编号。
     key: "finance", label: "财务管理", icon: "Wallet", module: "finance", href: "/finance",
     children: [
-      // 按「资金主体」分组（对标简电云 平台/运营商/商户/会员 四套财务视图）：
-      // 分润与结算 = 跨主体的规则与产出；平台账 = 自家的账；伙伴账 = 代理商/场地方的钱；用户账 = C 端的钱。
-      { href: "/finance?tab=rules", label: "分润规则", perm: "finance:share_rule:read", group: "分润与结算" },
-      { href: "/finance?tab=records", label: "分润明细", perm: "finance:share_record:read", group: "分润与结算" },
-      { href: "/finance?tab=summary", label: "分润统计", perm: "finance:share_record:read", phase: 1, group: "分润与结算" },
-      { href: "/finance?tab=settlements", label: "结算单", perm: "finance:settlement:read", group: "分润与结算" },
       { href: "/finance?tab=ledger", label: "账务分录", perm: "finance:ledger:read", phase: 2, group: "平台账" },
       { href: "/finance?tab=reconcile", label: "对账", perm: "finance:recon:read", phase: 1, ready: true, group: "平台账" },
       { href: "/finance?tab=invoices", label: "发票", perm: "finance:invoice:read", phase: 2, ready: true, group: "平台账" },
-      // 跨 section 深链（导航审查 #4）：FINANCE 岗管场地方分润在本页、代理分润在 /agents，
-      // 此处回链避免找不到入口；面包屑按 URL 归属「代理商管理」。
-      { href: "/agents?tab=commission", label: "代理分润配置", perm: "agent:share:config", group: "伙伴账" },
-      { href: "/finance?tab=withdrawals", label: "提现审核", perm: "finance:withdrawal:read", group: "伙伴账" },
-      // 排在提现审核之后：没有收款账户，提现审批根本放行不了（B3）
-      { href: "/finance?tab=payout-accounts", label: "收款账户", perm: "finance:payout_account:read", group: "伙伴账" },
-      // 「用户账」组（用户钱包深链、充值订单）2026-10-28 撤销：两者归「用户管理 › 资产」（OM05），
-      // 钱包本就在用户页，充值订单页签搬过去与套餐合并
     ],
   },
   {
@@ -853,9 +867,11 @@ export function routeLockedPhase(
     if (parts.view) return parts.view === view;
     return !tab && !view;
   });
-  // section 首页（无 tab/view）：落到该 path 的首叶，兜底首叶
+  // section 首页（无 tab/view）：落到该 path 的**首个未锁叶**（页面 usePageTab 的默认 tab 也这么取），
+  // 都被锁才判锁。此前取该 path 的首叶 —— 首叶被锁而后面有能用的 tab 时，裸路径整页被拦。
   if (!leaf && !tab && !view) {
-    leaf = leaves.find((l) => leafParts(l.href).path === p) ?? leaves[0];
+    const onPath = leaves.filter((l) => leafParts(l.href).path === p);
+    leaf = onPath.find((l) => !isLeafLocked(l)) ?? onPath[0] ?? leaves[0];
   }
   return leaf && isLeafLocked(leaf) ? leaf.phase : undefined;
 }

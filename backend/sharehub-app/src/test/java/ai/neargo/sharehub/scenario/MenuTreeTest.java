@@ -27,15 +27,15 @@ class MenuTreeTest extends ApiTestSupport {
         /*
          * ADMIN 持 `*`，所以他看得到**除代理门户外**的全部 ——
          * 门户是排他的（ADR-012：代理只看门户，运营看不到门户），
-         * 所以是 13 个 section 而不是 16。
+         * 所以是 14 个 section 而不是 17。
          *
          * 端点从 P1 起**按权限剪枝**（此前下发完整树、前端自己筛）。
          * 要全量树用 MenuService.tree()，那是给菜单管理界面留的。
          */
         JsonNode t = tree(login("ADMIN"));
         // 2026-09-28 +1：流程与工单（V136，放在最末）；2026-10-28 −1：营销管理并入销售管理（V151）；
-        // 2026-10-28 −2：告警管理、客服管理并入运维管理（V153）
-        assertThat(t.size()).as("运营侧 section 数（16 个里 3 个是代理门户）").isEqualTo(13);
+        // 2026-10-28 −2：告警管理、客服管理并入运维管理（V153）；+1：从财务管理拆出结算（V154）
+        assertThat(t.size()).as("运营侧 section 数（17 个里 3 个是代理门户）").isEqualTo(14);
         int leaves = 0;
         for (JsonNode s : t) leaves += s.path("children").size();
         // 2026-09-25 +2：用户管理 › 注销申请 / 开票申请（C 端一直在产生这两类待办，运营端此前没有入口）
@@ -45,7 +45,8 @@ class MenuTreeTest extends ApiTestSupport {
         // V150 设备管理 +2（库存余额、资产差异；供应商接入是从系统设置搬来，不增减）；
         // V152 用户管理 −2（财务「用户账」组的用户钱包深链与充值订单撤销，后者并入用户管理 › 充值订单与套餐）
         // V153 运维管理 −2（客服的退款/补偿、黑名单处理两个跨段快捷入口撤销）
-        assertThat(leaves).as("ADMIN 看得到的叶子数").isEqualTo(114);
+        // V154 结算 −1（财务管理的「代理分润配置」跨段深链撤销；其余八项从财务、运营管理搬来，不增减）
+        assertThat(leaves).as("ADMIN 看得到的叶子数").isEqualTo(113);
     }
 
     @Test

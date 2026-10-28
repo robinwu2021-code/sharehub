@@ -77,7 +77,7 @@ export default function SiteSharingPage() {
     ) },
     { header: "去配置", className: "whitespace-nowrap", cell: (r) => (
       <div className="flex w-max gap-2 txt-caption">
-        <Link href="/finance?tab=rules" className="text-primary hover:underline">分润规则</Link>
+        <Link href="/settlement?tab=rules" className="text-primary hover:underline">分润规则</Link>
         <Link href="/venues?tab=contracts" className="text-primary hover:underline">进场合同</Link>
       </div>
     ) },
@@ -89,7 +89,7 @@ export default function SiteSharingPage() {
       <Notice>
         本页只读：分润规则按分成方配置、不含站点维度，站点级比例只存在进场合同里（运营管理清单 D2 待定案）。
         在「以哪一份为准」定下来之前，这里如实展示两个来源各自的值并标出问题；修改请到
-        <Link href="/finance?tab=rules" className="mx-1 text-primary hover:underline">财务 › 分润规则</Link>
+        <Link href="/settlement?tab=rules" className="mx-1 text-primary hover:underline">结算 › 分润规则</Link>
         或
         <Link href="/venues?tab=contracts" className="mx-1 text-primary hover:underline">网点管理 › 场地方与合同 › 进场合同</Link>。
       </Notice>

@@ -61,7 +61,7 @@ export default function PayeeSharingPage() {
         : <span className="text-muted-foreground">无权查看</span>,
     },
     { header: "明细", className: "whitespace-nowrap", cell: (r) => (
-      <Link href="/finance?tab=records" className="txt-caption text-primary hover:underline">分润明细</Link>
+      <Link href="/settlement?tab=records" className="txt-caption text-primary hover:underline">分润明细</Link>
     ) },
   ];
 

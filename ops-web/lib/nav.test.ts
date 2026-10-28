@@ -26,7 +26,7 @@ const sectionKeys = (role: Role) => visibleSections(role).map((s) => s.key);
 const L1_KEYS = [
   "my-biz", "my-asset", "my-service", // 代理端门户（portalFor: AGENT）
   "dashboard", "operation", "device", "workorder", "venue", "agent", "order",
-  "finance", "user", "report", "org", "system", "flow",
+  "settlement", "finance", "user", "report", "org", "system", "flow",
 ];
 // 叶子五元组 href|label|perm|phase|group —— 2026-07-30 层级重构前后逐条比对为零差异。
 // 2026-09-23 有意变更（A 类菜单重合收敛，见 docs/technical/菜单重合梳理与优化方案.md）：
@@ -56,9 +56,9 @@ const L1_KEYS = [
 // 代建录入不单开叶子：它是该页的一个按钮，权限码 agent:apply:create 与放行码分开（ADR-030 §3.3）。
 const LEAF_TUPLES = [
   "/|我的看板|dashboard:overview:read||经营概览",
-  "/finance?tab=records|我的收益|finance:share_record:read||经营概览",
-  "/finance?tab=settlements|我的结算|agent:settlement:read||经营概览",
-  "/finance?tab=withdrawals|申请提现|finance:withdrawal:apply||经营概览",
+  "/settlement?tab=records|我的收益|finance:share_record:read||经营概览",
+  "/settlement?tab=settlements|我的结算|agent:settlement:read||经营概览",
+  "/settlement?tab=withdrawals|申请提现|finance:withdrawal:apply||经营概览",
   "/devices|我的设备|device:cabinet:read||设备与订单",
   "/orders|我的订单|order:order:read||设备与订单",
   "/work-orders?view=list|设备报修|workorder:wo:create||报修与跟进",
@@ -69,8 +69,7 @@ const LEAF_TUPLES = [
   "/operation/brands|品牌管理|system:brand:read||基础管理",
   "/operation/problems|问题管理|system:problem:read||基础管理",
   "/operation/notices|公告管理|marketing:notice:read||基础管理",
-  "/operation/site-sharing|站点分成|finance:share_rule:read||分成",
-  "/operation/payee-sharing|分成方分成|finance:share_rule:read||分成",
+  // 分成两项 2026-10-28 迁到结算（OM08）
   // 2026-10-28 设备管理按运营顺序（OM03）：资产台账 → 库存与流转 → 设备接入 → 在线运行
   "/devices|设备台账|device:cabinet:read||资产台账",
   "/devices?tab=powerbanks|充电宝管理|device:powerbank:read||资产台账",
@@ -133,16 +132,19 @@ const LEAF_TUPLES = [
   "/marketing?tab=ad-slots|广告位管理|marketing:ad:read|3|广告",
   "/marketing?tab=ad-campaigns|广告活动|marketing:ad:read|3|广告",
   "/marketing?tab=ad-delivery|投放与曝光|marketing:ad:read|3|广告",
-  "/finance?tab=rules|分润规则|finance:share_rule:read||分润与结算",
-  "/finance?tab=records|分润明细|finance:share_record:read||分润与结算",
-  "/finance?tab=summary|分润统计|finance:share_record:read|1|分润与结算",
-  "/finance?tab=settlements|结算单|finance:settlement:read||分润与结算",
+  // 2026-10-28 结算（OM08）：从财务管理拆出，分润 → 结算 → 付款；页签换到 /settlement
+  "/settlement?tab=rules|分润规则|finance:share_rule:read||分润",
+  "/settlement?tab=records|分润明细|finance:share_record:read||分润",
+  "/settlement?tab=summary|分润统计|finance:share_record:read|1|分润",
+  "/operation/site-sharing|站点分成|finance:share_rule:read||分润",
+  "/operation/payee-sharing|分成方分成|finance:share_rule:read||分润",
+  "/settlement?tab=settlements|结算单|finance:settlement:read||结算",
+  "/settlement?tab=withdrawals|提现审核|finance:withdrawal:read||付款",
+  "/settlement?tab=payout-accounts|收款账户|finance:payout_account:read||付款",
+  // 财务管理只剩平台账三项（OM07 调整时重排）；「代理分润配置」跨 L1 深链撤销
   "/finance?tab=ledger|账务分录|finance:ledger:read|2|平台账",
   "/finance?tab=reconcile|对账|finance:recon:read|1|平台账",
   "/finance?tab=invoices|发票|finance:invoice:read|2|平台账",
-  "/agents?tab=commission|代理分润配置|agent:share:config||伙伴账",
-  "/finance?tab=withdrawals|提现审核|finance:withdrawal:read||伙伴账",
-  "/finance?tab=payout-accounts|收款账户|finance:payout_account:read||伙伴账",
   // 「用户账」组 2026-10-28 撤销：用户钱包深链去掉，充值订单并入用户管理（OM05）
   // 2026-10-28 用户管理按运营顺序（OM05）：用户 → 风险 → 资产
   "/users|用户列表|user:cuser:read|1|用户",
@@ -202,9 +204,10 @@ describe("结构回归基线（层级重构不改内容）", () => {
   // 2026-09-28：新增「流程与工单」（15 → 16），放在最末（L1 的 sort 即下标，插中间要整表重灌）。
   // 2026-10-28：「营销管理」并入「销售管理」（16 → 15，V151）。
   // 2026-10-28：「告警管理」「客服管理」并入「运维管理」（15 → 13，V153）。
-  it("L1 = 13 个运营项 + 3 个代理门户项，顺序固定", () => {
+  // 2026-10-28：从财务管理拆出「结算」（13 → 14，V154）。
+  it("L1 = 14 个运营项 + 3 个代理门户项，顺序固定", () => {
     expect(NAV.map((s) => s.key)).toEqual(L1_KEYS);
-    expect(NAV.filter((s) => !s.portalFor)).toHaveLength(13);
+    expect(NAV.filter((s) => !s.portalFor)).toHaveLength(14);
     expect(NAV.filter((s) => s.portalFor)).toHaveLength(3);
   });
   it("叶子五元组集合与顺序逐条不变（href|label|perm|phase|group）", () => {
@@ -219,16 +222,19 @@ describe("结构回归基线（层级重构不改内容）", () => {
 });
 
 describe("A.9 角色×L1 可见性矩阵（抽查）", () => {
-  it("ADMIN 见全部 13 个运营项", () => {
+  it("ADMIN 见全部 14 个运营项", () => {
     expect(sectionKeys("ADMIN")).toEqual([
       "dashboard", "operation", "device", "workorder", "venue", "agent", "order",
-      "finance", "user", "report", "org", "system", "flow",
+      "settlement", "finance", "user", "report", "org", "system", "flow",
     ]);
   });
   it("VIEWER 不见 用户/客服/员工与权限/系统设置", () => {
     const keys = sectionKeys("VIEWER");
     for (const k of ["user", "cs", "org", "system"]) expect(keys).not.toContain(k);
-    expect(keys).toEqual(expect.arrayContaining(["dashboard", "operation", "device", "order", "finance", "report"]));
+    expect(keys).toEqual(expect.arrayContaining(["dashboard", "device", "order", "settlement", "report"]));
+    // 2026-10-28：VIEWER 在运营管理只看得到两项分成、在财务管理只看得到结算类五项 ——
+    // 这些都搬到了「结算」（OM08），两个 L1 对它不再有可见叶，整段隐藏
+    for (const k of ["operation", "finance"]) expect(keys).not.toContain(k);
   });
   it("BD 不见 设备/告警/工单；CS 不见 数据报表", () => {
     for (const k of ["device", "alarm", "workorder"]) expect(sectionKeys("BD")).not.toContain(k);
@@ -281,23 +287,20 @@ describe("A.9 角色×L1 可见性矩阵（抽查）", () => {
 });
 
 describe("L3 叶子过滤（4.2-2）", () => {
-  const finance = () => sec("finance");
-  it("VIEWER 的财务：无 账务分录/对账/发票，有 规则/明细/统计/结算/提现", () => {
-    const labels = visibleLeaves(finance(), "VIEWER").map((l) => l.label);
-    expect(labels).toEqual(["分润规则", "分润明细", "分润统计", "结算单", "提现审核"]);
+  const settlement = () => sec("settlement");
+  it("VIEWER 的结算：规则/明细/统计/两项分成/结算单/提现，无收款账户；财务管理一项都没有", () => {
+    const labels = visibleLeaves(settlement(), "VIEWER").map((l) => l.label);
+    expect(labels).toEqual(["分润规则", "分润明细", "分润统计", "站点分成", "分成方分成", "结算单", "提现审核"]);
+    expect(visibleLeaves(sec("finance"), "VIEWER")).toEqual([]);
   });
-  // 2026-09-23 B3：伙伴账新增「收款账户」—— 没有它提现审批放行不了，
-  // 所以它和提现审核同组、同样给 FINANCE。8 → 9 项。
-  // 2026-10-28：「用户账」组（用户钱包深链、充值订单）撤销，归用户管理（OM05）。12 → 10 项
-  it("FINANCE 的财务：9 项 + 代理分润配置一条跨 section 深链", () => {
-    const labels = visibleLeaves(finance(), "FINANCE").map((l) => l.label);
-    expect(labels).toHaveLength(10);
-    expect(labels).toContain("代理分润配置");
-    expect(labels).not.toContain("充值订单");
+  // 2026-09-23 B3：伙伴账新增「收款账户」—— 没有它提现审批放行不了，所以它和提现审核同组、同样给 FINANCE。
+  // 2026-10-28：结算拆出（OM08），「代理分润配置」跨 L1 深链撤销（商家管理 › 商家分润规则 本身在）。
+  it("FINANCE 的结算：8 项，以收款账户收尾；财务管理剩平台账三项", () => {
+    const labels = visibleLeaves(settlement(), "FINANCE").map((l) => l.label);
+    expect(labels).toHaveLength(8);
+    expect(labels).not.toContain("代理分润配置");
     expect(labels.at(-1)).toBe("收款账户");
-  });
-  it("VIEWER 无 agent:share:config → 财务不出现代理分润配置深链", () => {
-    expect(visibleLeaves(finance(), "VIEWER").map((l) => l.label)).not.toContain("代理分润配置");
+    expect(visibleLeaves(sec("finance"), "FINANCE").map((l) => l.label)).toEqual(["账务分录", "对账", "发票"]);
   });
   // OPS 有 poi/venue，没有 contract/analysis/lead —— 并成网点管理后按 perm 过滤的结论不变。
   it("OPS：网点管理有站点、点位与场地方；无坪效、合同与 CRM；运营管理只剩应用版本", () => {
@@ -317,6 +320,10 @@ describe("findActiveSection 路径反推（4.2-3，含尾斜杠/最长前缀）"
     ["/", "dashboard"],
     ["/finance", "finance"],
     ["/finance/", "finance"],
+    ["/settlement", "settlement"], // OM08：结算从财务管理拆出，独占 /settlement
+    ["/operation/site-sharing", "settlement"],
+    ["/operation/payee-sharing/", "settlement"],
+    ["/operation/banks", "operation"],
     ["/devices/detail", "device"],
     ["/system/", "system"],
     ["/work-orders", "workorder"],
@@ -333,9 +340,11 @@ describe("findActiveSection 路径反推（4.2-3，含尾斜杠/最长前缀）"
 
 describe("activeLeafIndex 深链高亮（4.2-6）", () => {
   const financeLeaves = (role: Role) => visibleLeaves(sec("finance"), role);
-  it("裸 /finance 无 query → 默认首个可点叶子（分润规则）", () => {
+  it("裸 /settlement 无 query → 默认首个可点叶子（分润规则）；裸 /finance → 对账（账务分录被锁）", () => {
+    const stl = visibleLeaves(sec("settlement"), "FINANCE");
+    expect(stl[activeLeafIndex(stl, "/settlement", null, null)].label).toBe("分润规则");
     const leaves = financeLeaves("FINANCE");
-    expect(leaves[activeLeafIndex(leaves, "/finance", null, null)].label).toBe("分润规则");
+    expect(leaves[activeLeafIndex(leaves, "/finance", null, null)].label).toBe("对账");
   });
   it("?tab=ledger → 账务分录 Phase 2，当前 P1 下不命中(-1)", () => {
     expect(activeLeafIndex(financeLeaves("FINANCE"), "/finance/", "ledger", null)).toBe(-1);
@@ -396,9 +405,10 @@ describe("默认落地与面包屑", () => {
     expect(breadcrumb("/work-orders", null, "board", "OPS")).toEqual(["运维管理", "工单", "工单看板"]);
     expect(breadcrumb("/cs", "sessions", null, "ADMIN")).toEqual(["运维管理", "客服", "客服会话"]);
   });
-  it("面包屑：/finance?tab=withdrawals → 提现审核 2026-09-23 升为 L0，不再被锁，面包屑到 L3", () => {
+  it("面包屑：/settlement?tab=withdrawals → 提现审核 2026-09-23 升为 L0，不再被锁，面包屑到 L3", () => {
     // 旧断言是 Phase 2 被锁故只到 L1。分级矩阵 §六：提现是分钱的最后一步，缺了业务开不了张 → L0。
-    expect(breadcrumb("/finance/", "withdrawals", null, "FINANCE")).toEqual(["财务管理", "伙伴账", "提现审核"]);
+    expect(breadcrumb("/settlement/", "withdrawals", null, "FINANCE")).toEqual(["结算", "付款", "提现审核"]);
+    expect(breadcrumb("/operation/site-sharing", null, null, "FINANCE")).toEqual(["结算", "分润", "站点分成"]);
   });
   it("面包屑：经营看板无子功能，只有一级", () => {
     expect(breadcrumb("/", null, null, "ADMIN")).toEqual(["经营看板"]);
@@ -428,14 +438,14 @@ describe("L2 分组（按机构/对象聚类，2026-07-29 结构优化）", () =
     }
     expect(mixed).toEqual([]);
   });
-  it("财务按资金主体分三组：分润与结算/平台账/伙伴账（用户账 2026-10-28 归用户管理）", () => {
-    const segs = groupedLeaves(visibleLeaves(sec("finance"), "ADMIN"));
-    expect(segs.map((x) => x.group)).toEqual(["分润与结算", "平台账", "伙伴账"]);
+  it("结算分三组，跟着钱走：分润 → 结算 → 付款（OM08）", () => {
+    const segs = groupedLeaves(visibleLeaves(sec("settlement"), "ADMIN"));
+    expect(segs.map((x) => x.group)).toEqual(["分润", "结算", "付款"]);
   });
   // 2026-09-23：站点与点位撤销，原两组（场地资产/场地方机构）换成按动线切的分组，见下方运营管理用例。
-  it("运营管理剩两组：基础 / 分成（场站四项迁网点管理、计费两项迁销售管理）", () => {
+  it("运营管理只剩基础管理（场站四项迁网点管理、计费两项迁销售管理、分成两项迁结算）", () => {
     const segs = groupedLeaves(visibleLeaves(sec("operation"), "ADMIN"));
-    expect(segs.map((x) => x.group)).toEqual(["基础管理", "分成"]);
+    expect(segs.map((x) => x.group)).toEqual(["基础管理"]);
   });
   it("销售管理分七组，跟着收入线走", () => {
     const segs = groupedLeaves(visibleLeaves(sec("order"), "ADMIN"));
@@ -445,8 +455,8 @@ describe("L2 分组（按机构/对象聚类，2026-07-29 结构优化）", () =
     const segs = groupedLeaves(visibleLeaves(sec("venue"), "ADMIN"));
     expect(segs.map((x) => x.group)).toEqual(["拓展", "场地方与合同", "站点与点位"]);
   });
-  it("RBAC 过滤后不产生空组（VIEWER 看财务）", () => {
-    const segs = groupedLeaves(visibleLeaves(sec("finance"), "VIEWER"));
+  it("RBAC 过滤后不产生空组（VIEWER 看结算）", () => {
+    const segs = groupedLeaves(visibleLeaves(sec("settlement"), "VIEWER"));
     expect(segs.every((x) => x.leaves.length > 0)).toBe(true);
   });
   it("groupedLeaves 对无 group 的 section 返回单段且 group 为 undefined", () => {
@@ -520,6 +530,11 @@ describe("分级屏蔽（tier gating，默认 CURRENT_PHASE=0）", () => {
     // 优惠券 2026-07-30 标 ready（发放功能已实机验证），故首页不再被 P2 拦。
     expect(routeLockedPhase("/marketing", null, null, "ADMIN")).toBeUndefined();
   });
+  it("routeLockedPhase：裸路径首叶被锁、后面有能用的叶 → 不锁（与面包屑、页面默认 tab 同口径）", () => {
+    // /finance 首叶账务分录 L2；拆出结算（OM08）后裸 /finance 曾整页被拦，而面包屑显示的是「对账」
+    expect(routeLockedPhase("/finance", null, null, "ADMIN")).toBeUndefined();
+    expect(routeLockedPhase("/finance", "ledger", null, "ADMIN")).toBe(2);
+  });
   it("routeLockedPhase：设备详情等非叶路由 → 不锁（透传页面）", () => {
     expect(routeLockedPhase("/devices/detail", null, null, "ADMIN")).toBeUndefined();
   });
@@ -540,8 +555,12 @@ describe("分级屏蔽（tier gating，默认 CURRENT_PHASE=0）", () => {
     expect(isSectionLocked(s, "ADMIN")).toBe(false); // 有一个 ready 叶 → 整段不锁
     expect(sectionDefaultHref(s, "ADMIN")).toBe("/x?tab=b"); // 落到 ready 叶而非被锁首叶
   });
-  it("sectionDefaultHref：跳过被锁叶，落到首个可点叶（财务→分润规则）", () => {
-    expect(sectionDefaultHref(sec("finance"), "ADMIN")).toBe("/finance?tab=rules");
+  it("sectionDefaultHref：跳过被锁叶，落到首个可点叶（财务→对账：账务分录 L2 被锁）", () => {
+    expect(sectionDefaultHref(sec("finance"), "ADMIN")).toBe("/finance?tab=reconcile");
+  });
+  it("结算落地结算单（section.href），不是第一项分润规则", () => {
+    expect(sectionDefaultHref(sec("settlement"), "ADMIN")).toBe("/settlement?tab=settlements");
+    expect(sectionDefaultHref(sec("settlement"), "VIEWER")).toBe("/settlement?tab=settlements");
   });
 });
 
@@ -554,10 +573,10 @@ describe("portalTitleOverride（拍板 #5：代理端只改标题）", () => {
     expect(portalTitleOverride("AGENT", "/devices", "monitor", false)).toBeUndefined();
   });
   it("AGENT 命中带 tab/view 的门户叶：按 key 精确匹配", () => {
-    expect(portalTitleOverride("AGENT", "/finance", "records", false)).toBe("我的收益");
-    expect(portalTitleOverride("AGENT", "/finance", "settlements", false)).toBe("我的结算");
+    expect(portalTitleOverride("AGENT", "/settlement", "records", false)).toBe("我的收益");
+    expect(portalTitleOverride("AGENT", "/settlement", "settlements", false)).toBe("我的结算");
     expect(portalTitleOverride("AGENT", "/work-orders", "list", true)).toBe("设备报修");
-    expect(portalTitleOverride("AGENT", "/finance", "rules", true)).toBeUndefined();
+    expect(portalTitleOverride("AGENT", "/settlement", "rules", true)).toBeUndefined();
   });
   it("非门户角色一律不覆盖（运营端标题不受影响）", () => {
     for (const role of ["ADMIN", "OPS", "CS", "FINANCE", "BD", "VIEWER"] as const) {
@@ -578,14 +597,12 @@ describe("运营管理：跨模块 section", () => {
   it("各角色可见的子页面与后端权限码一致", () => {
     // 2026-10-28：站点概览 / 站点管理 / 点位管理 / 站点坪效迁到网点管理（OM02）
     // 计费两项 2026-10-28 迁到销售管理（OM04）
-    expect(leafLabels("ADMIN")).toEqual([
-      "应用版本", "银行管理", "品牌管理", "问题管理", "公告管理",
-      "站点分成", "分成方分成",
-    ]);
+    // 分成两项 2026-10-28 迁到结算（OM08）
+    expect(leafLabels("ADMIN")).toEqual(["应用版本", "银行管理", "品牌管理", "问题管理", "公告管理"]);
     expect(leafLabels("OPS")).toEqual(["应用版本"]);
-    expect(leafLabels("FINANCE")).toEqual(["银行管理", "站点分成", "分成方分成"]);
-    expect(leafLabels("BD")).toEqual(["公告管理", "站点分成", "分成方分成"]);
-    expect(leafLabels("VIEWER")).toEqual(["站点分成", "分成方分成"]);
+    expect(leafLabels("FINANCE")).toEqual(["银行管理"]);
+    expect(leafLabels("BD")).toEqual(["公告管理"]);
+    expect(leafLabels("VIEWER")).toEqual([]);
   });
 
   it("CS 没有 location 模块权限，也能通过 system/marketing 看到运营管理（多模块规则）", () => {
@@ -607,13 +624,15 @@ describe("运营管理：跨模块 section", () => {
 
   it("分组与顺序固定（公告已并进「基础管理」：原先那一组只有一条同名叶子）", () => {
     expect(groupedLeaves(visibleLeaves(op(), "ADMIN")).map((g) => g.group))
-      .toEqual(["基础管理", "分成"]);
+      .toEqual(["基础管理"]);
   });
 
   it("多个独立页面：路径反推与高亮按页面路径", () => {
-    expect(findActiveSection("/operation/site-sharing", "ADMIN")?.key).toBe("operation");
-    expect(findActiveSection("/operation/site-sharing/", "ADMIN")?.key).toBe("operation");
-    const leaves = visibleLeaves(op(), "ADMIN");
+    // 分成两页 2026-10-28 归结算（OM08）：/operation/site-sharing 靠 match 最长前缀胜过 /operation
+    expect(findActiveSection("/operation/site-sharing", "ADMIN")?.key).toBe("settlement");
+    expect(findActiveSection("/operation/site-sharing/", "ADMIN")?.key).toBe("settlement");
+    expect(findActiveSection("/operation/banks", "ADMIN")?.key).toBe("operation");
+    const leaves = visibleLeaves(sec("settlement"), "ADMIN");
     expect(leaves[activeLeafIndex(leaves, "/operation/site-sharing", null, null)]?.label).toBe("站点分成");
     expect(breadcrumb("/operation/fee-adjustments", null, null, "ADMIN")).toEqual(["销售管理", "计费", "预约调价"]);
     // 2026-10-28 网点管理（OM02）认领 /venues、/locations 与 /operation 下的两个站点页 ——
