@@ -113,7 +113,8 @@ public final class RolePerms {
                     // **保留**的理由：代理门户有「设备报修」（wo:create），能提报却看不到自己提的工单
                     // 说不通。倾向清单漏标，确认后补进清单。
                     "workorder:wo:create", "workorder:wo:read", "order:order:read",
-                    "finance:share_record:read", "finance:withdrawal:apply",
+                    // 一期提现 = 平台按付款任务主动付款（需求方案 D8），商家只看提现记录，不申请（V158 起）
+                    "finance:share_record:read", "finance:withdrawal:read",
                     "agent:settlement:read", "location:poi:read",
                     // 代理门户要显示「你还不能收款」，判据是有没有可用收款账户 ——
                     // 没有这个码的话 can() 判 false、查询被 disable，那条提示**永远不显示**，

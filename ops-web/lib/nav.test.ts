@@ -58,7 +58,7 @@ const LEAF_TUPLES = [
   "/|我的看板|dashboard:overview:read||经营概览",
   "/settlement?tab=records|我的收益|finance:share_record:read||经营概览",
   "/settlement?tab=settlements|我的结算|agent:settlement:read||经营概览",
-  "/settlement?tab=withdrawals|申请提现|finance:withdrawal:apply||经营概览",
+  "/settlement?tab=withdrawals|提现记录|finance:withdrawal:read||经营概览",
   "/operation/sites|我的站点|location:poi:read||设备与订单",
   "/devices|我的设备|device:cabinet:read||设备与订单",
   "/orders|我的订单|order:order:read||设备与订单",
@@ -282,7 +282,7 @@ describe("A.9 角色×L1 可见性矩阵（抽查）", () => {
     // 2026-09-23 加「申请提现」(AGT-06)：分级矩阵把代理自助提现定为 L0（⑦ 分钱的最后一步）。
     // 2026-10-28 加「我的站点」（V163）：站点就是门店，商家端只读，站点由运营代建。
     const labels = visibleSections("AGENT").flatMap((s) => visibleLeaves(s, "AGENT").map((l) => l.label));
-    expect(labels).toEqual(["我的看板", "我的收益", "我的结算", "申请提现", "我的站点", "我的设备", "我的订单", "设备报修"]);
+    expect(labels).toEqual(["我的看板", "我的收益", "我的结算", "提现记录", "我的站点", "我的设备", "我的订单", "设备报修"]);
     for (const forbidden of ["SLA 管理", "巡检计划", "BD 拓展 CRM", "押金与欠费", "分润配置"]) {
       expect(labels).not.toContain(forbidden);
     }

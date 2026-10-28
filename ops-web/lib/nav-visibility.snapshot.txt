@@ -127,7 +127,7 @@ flow›流程统计
 my-biz›我的看板
 my-biz›我的收益
 my-biz›我的结算
-my-biz›申请提现
+my-biz›提现记录
 my-asset›我的站点
 my-asset›我的设备
 my-asset›我的订单

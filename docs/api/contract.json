@@ -16217,6 +16217,185 @@
   },
   {
    "verb": "GET",
+   "path": "/api/ops/merchant-revenue/by-device",
+   "perm": "dashboard:overview:read",
+   "perms": [
+    "dashboard:overview:read"
+   ],
+   "handler": "MerchantRevenueController#byDevice",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "from",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "to",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "limit",
+     "type": "Integer",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "List<OrderRevenueQuery.RevenueByDevice>",
+   "returnContainer": "List",
+   "returnElement": "OrderRevenueQuery.RevenueByDevice",
+   "responseShape": [
+    {
+     "name": "cabinetNo",
+     "type": "String"
+    },
+    {
+     "name": "orderCount",
+     "type": "int"
+    },
+    {
+     "name": "gross",
+     "type": "BigDecimal"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/merchant-revenue/summary",
+   "perm": "dashboard:overview:read",
+   "perms": [
+    "dashboard:overview:read"
+   ],
+   "handler": "MerchantRevenueController#summary",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "from",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "to",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "RevenueSummary",
+   "returnContainer": null,
+   "returnElement": "RevenueSummary",
+   "responseShape": [
+    {
+     "name": "from",
+     "type": "String"
+    },
+    {
+     "name": "to",
+     "type": "String"
+    },
+    {
+     "name": "orderCount",
+     "type": "int"
+    },
+    {
+     "name": "gross",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "refund",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "net",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "preTax",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "myShare",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "pending",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "settledUnpaid",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "paid",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "prevOrderCount",
+     "type": "int"
+    },
+    {
+     "name": "prevGross",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "prevMyShare",
+     "type": "BigDecimal"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/merchant-revenue/trend",
+   "perm": "dashboard:overview:read",
+   "perms": [
+    "dashboard:overview:read"
+   ],
+   "handler": "MerchantRevenueController#trend",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "from",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "to",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "List<OrderRevenueQuery.RevenueDay>",
+   "returnContainer": "List",
+   "returnElement": "OrderRevenueQuery.RevenueDay",
+   "responseShape": [
+    {
+     "name": "date",
+     "type": "String"
+    },
+    {
+     "name": "orderCount",
+     "type": "int"
+    },
+    {
+     "name": "gross",
+     "type": "BigDecimal"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
    "path": "/api/ops/operation/overview",
    "perm": "location:overview:read",
    "perms": [
@@ -48839,10 +49018,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 548,
-  "records": 511,
-  "withPerm": 468,
+  "endpoints": 551,
+  "records": 514,
+  "withPerm": 471,
   "withBody": 232,
-  "shapedResponses": 427
+  "shapedResponses": 430
  }
 }

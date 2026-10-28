@@ -172,7 +172,8 @@ export const NAV: NavSection[] = [
       // 2026-09-23 分级矩阵 AGT-06：代理自助提现是 L0（⑦ 分钱的最后一步），权限码 finance:withdrawal:apply
       // 前后端与 POST /api/trade/withdrawals 三处一致。申请侧在结算页按 AGENT 角色分流
       // （components/finance/finance-workspace.tsx 的申请流），不再是 soon。
-      { href: "/settlement?tab=withdrawals", label: "申请提现", perm: "finance:withdrawal:apply", group: "经营概览" },
+      // 2026-10-28 商家一期 D8：提现在运营端按付款任务进行，商家只看记录（V166）
+      { href: "/settlement?tab=withdrawals", label: "提现记录", perm: "finance:withdrawal:read", group: "经营概览" },
     ],
   },
   {
@@ -700,7 +701,7 @@ function resolveTabs(
     /*
      * 同一个 tab key 可能在**多个 section 登记，且权限码不同**：
      * `/finance?tab=withdrawals` 在「财务管理 › 提现审核」判 `finance:withdrawal:read`，
-     * 在「我的经营 › 申请提现」判 `finance:withdrawal:apply`。
+     * 在「我的经营 › 提现记录」也判 `finance:withdrawal:read`（V166 前是「申请提现」判 `:apply`）。
      *
      * 只取排名最高的那一条会出错：财务管理的 /finance 叶子多、评分高，于是代理商
      * 拿到的是「提现审核」那条 —— 他没有 `:read`，整个 tab 就被丢掉了，

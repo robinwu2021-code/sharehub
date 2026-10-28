@@ -472,6 +472,15 @@ const PATCHES: { file: string; mustContain: string; apply: (rows: Row[]) => void
       );
     },
   },
+  {
+    // 商家门户「申请提现」→「提现记录」，改挂 :read（一期提现 = 平台付款任务，商家只看记录，D8）。
+    file: "V166__menu_my_withdrawals_read_only.sql",
+    mustContain: "UPDATE iam_menu SET name = '提现记录'",
+    apply: (rows) => {
+      Object.assign(rows.find((r) => r.menu_no === "M_my-biz__4")!,
+        { name: "提现记录", name_en: "Withdrawal Records", name_ar: "سجل السحوبات", perm: "finance:withdrawal:read" });
+    },
+  },
 ];
 
 const COLS = [
