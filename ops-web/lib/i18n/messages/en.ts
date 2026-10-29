@@ -31,6 +31,7 @@ export const en: Messages = {
     disabled: "Disabled",
     mockData: "Mock data",
     logout: "Sign out",
+    menu: "Menu",
     agent: "Agent",
     soon: "Soon",
     switchView: "Switch view",

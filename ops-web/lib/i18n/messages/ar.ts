@@ -32,6 +32,7 @@ export const ar: Messages = {
     disabled: "مُعطّل",
     mockData: "بيانات تجريبية",
     logout: "تسجيل الخروج",
+    menu: "القائمة",
     agent: "وكيل",
     soon: "قريباً",
     switchView: "تبديل العرض",

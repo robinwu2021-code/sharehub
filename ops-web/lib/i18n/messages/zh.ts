@@ -29,6 +29,7 @@ export const zh = {
     disabled: "停用",
     mockData: "Mock 数据",
     logout: "退出",
+    menu: "菜单",
     agent: "代理",
     soon: "待建",
     switchView: "切换视图",
