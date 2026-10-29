@@ -14,6 +14,7 @@ import ai.neargo.sharehub.dev.entity.DevPowerbank;
 import ai.neargo.sharehub.dev.mapper.CabinetMapper;
 import ai.neargo.sharehub.dev.mapper.PowerbankMapper;
 import ai.neargo.sharehub.dev.service.QcService;
+import ai.neargo.sharehub.inv.IntakeStatus;
 import ai.neargo.sharehub.inv.WarehouseDirectory;
 import ai.neargo.sharehub.inv.dto.IntakeDtos.CreateReq;
 import ai.neargo.sharehub.inv.dto.IntakeDtos.DisposeReq;
@@ -170,7 +171,7 @@ public class IntakeServiceImpl implements IntakeService {
         h.setWarehouseName(wh.name());
         h.setSourceRef(blankToNull(r.sourceRef()));
         h.setArrivedAt(notBlank(r.arrivedAt()) ? LocalDateTime.parse(r.arrivedAt().trim().replace(' ', 'T')) : LocalDateTime.now());
-        h.setStatus("OPEN");
+        h.setStatus(IntakeStatus.OPEN.name());
         h.setNote(blankToNull(r.note()));
         h.setCreatedBy(operator());
         intakes.insert(h);
@@ -268,7 +269,7 @@ public class IntakeServiceImpl implements IntakeService {
                 .eq(InvIntakeItem::getDisposition, PENDING));
         if (left == null || left == 0) {
             intakes.update(null, new LambdaUpdateWrapper<InvIntake>().eq(InvIntake::getIntakeNo, h.getIntakeNo())
-                    .eq(InvIntake::getStatus, "OPEN").set(InvIntake::getStatus, "DONE"));
+                    .eq(InvIntake::getStatus, IntakeStatus.OPEN.name()).set(InvIntake::getStatus, IntakeStatus.DONE.name()));
         }
     }
 
@@ -312,7 +313,7 @@ public class IntakeServiceImpl implements IntakeService {
 
     private InvIntake requireOpen(String intakeNo) {
         InvIntake h = require(intakeNo);
-        if (!"OPEN".equals(h.getStatus())) throw BizException.conflict("error.intake.closed", intakeNo);
+        if (!IntakeStatus.OPEN.name().equals(h.getStatus())) throw BizException.conflict("error.intake.closed", intakeNo);
         return h;
     }
 
