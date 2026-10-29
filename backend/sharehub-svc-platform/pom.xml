@@ -26,6 +26,20 @@
   <packaging>jar</packaging>
 
   <dependencies>
+    <!--
+      邮件通道（SmtpMailGateway）：直接用 jakarta.mail + angus，不引 spring-boot-starter-mail ——
+      与 ai-shop 同一取舍：只需要 Session + Transport，且离线构建（mvn -o）要求依赖已在本地仓。
+      版本由 Boot BOM 管。
+    -->
+    <dependency>
+      <groupId>jakarta.mail</groupId>
+      <artifactId>jakarta.mail-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.angus</groupId>
+      <artifactId>angus-mail</artifactId>
+      <scope>runtime</scope>
+    </dependency>
     <dependency>
       <groupId>ai.neargo.sharehub</groupId>
       <artifactId>sharehub-common</artifactId>

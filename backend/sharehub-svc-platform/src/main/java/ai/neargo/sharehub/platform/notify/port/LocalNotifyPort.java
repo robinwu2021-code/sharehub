@@ -30,7 +30,9 @@ public class LocalNotifyPort implements NotifyPort {
         if (target.contains("*")) return new Delivery(false, "MASKED_ONLY");
         try {
             var r = sender.send(new SendReq(ch, null, target, scene, content, null, null));
-            return r.blocked() ? new Delivery(false, "BLACKLISTED") : new Delivery(true, null);
+            if (r.blocked()) return new Delivery(false, "BLACKLISTED");
+            // 渠道投递失败（如 SMTP 认证失败）：如实回给调用方 —— OTP 据此作废码、放开重发
+            return "FAILED".equals(r.status()) ? new Delivery(false, r.failReason()) : new Delivery(true, null);
         } catch (RuntimeException ex) {
             // 不打 target：手机号属敏感信息（CLAUDE.md 日志规范），scene 足以定位
             log.warn("按联系方式投递失败 channel={} scene={}，业务已生效、仅通知缺失", ch, scene, ex);

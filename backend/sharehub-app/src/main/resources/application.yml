@@ -163,6 +163,20 @@ sharehub:
     # 保留天数管正常情况，两者都要。
     total-size-cap: ${SHAREHUB_LOG_TOTAL_CAP:10GB}
 
+  # 邮件通道（Office 365 SMTP，2026-10-29；做法照 ai-shop）。验证码与商家邀请邮件走它。
+  # 凭据放 backend/.env.mail.local（已被 .gitignore 的 .env.*.local 忽略），启动前 source。
+  mail:
+    # 桩开关：缺省 true 只记日志不投递。配好 MAIL_PASSWORD 后设 SHAREHUB_MAIL_STUB=false 才真发；
+    # 设了 false 却缺账号或密码 → 应用起不来（不悄悄退回桩）
+    stub: ${SHAREHUB_MAIL_STUB:true}
+    host: ${MAIL_HOST:smtp.office365.com}
+    port: ${MAIL_PORT:587}
+    protocols: ${MAIL_PROTOCOLS:TLSv1.2}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    # **必须与 username 一致**，除非 M365 后台授了「发送为」：否则认证成功而投递被拒（554 SendAsDenied）
+    from: ${MAIL_FROM:}
+
   auth:
     # 令牌存储。四选一，随时可切，业务代码不感知（都走 TokenStore 接口）：
     #   mysql+ehcache  缺省 —— MySQL 持久 + 本地热层。会话活过重启，又不必每个请求查一次库
