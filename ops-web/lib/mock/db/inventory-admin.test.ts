@@ -34,3 +34,18 @@ describe("仓库管理与供应商（V201 mock）", () => {
     ia.unarchiveSupplier(s.supplierNo);
   });
 });
+
+describe("入库单（V202 mock）", () => {
+  it("期初建账登记即入库；采购到货带单价合计", () => {
+    const free = ["CABRC1", "CABRC2", "CABRC3"];
+    for (const no of free) cabinets.push({ ...cabinets[0], cabinetNo: no, sn: no, status: "IN_STOCK", archivedAt: null,
+      locationNo: null, issuedAgentNo: null, warehouseNo: null });
+    const op = ik.createIntake({ kind: "OPENING", warehouseNo: "WH003", cabinetNos: [free[0]] });
+    expect(op.intake.status).toBe("DONE");
+    expect(cabinets.find((x) => x.cabinetNo === free[0])!.warehouseNo).toBe("WH003");
+    expect(() => ik.createIntake({ warehouseNo: "WH003", unitCosts: { [free[1]]: 10 }, cabinetNos: [free[1]] })).toThrow(/币种/);
+    const ar = ik.createIntake({ warehouseNo: "WH003", currency: "aed", unitCosts: { [free[1]]: 10, [free[2]]: 5.5 }, cabinetNos: [free[1], free[2]] });
+    expect(ar.intake.totalCost).toBe(15.5);
+    expect(ar.intake.currency).toBe("AED");
+  });
+});

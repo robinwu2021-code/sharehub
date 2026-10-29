@@ -21,6 +21,8 @@ public class InvIntake {
     /** 供应商（V201，到货登记可选）与名称快照。 */
     private String supplierNo;
     private String supplierName;
+    /** 单价币种（V202）。 */
+    private String currency;
     private String warehouseName;
     private String sourceRef;
     private LocalDateTime arrivedAt;

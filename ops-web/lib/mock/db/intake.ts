@@ -11,7 +11,7 @@ import { activeSupplierName } from "./inventory-admin";
 import { paginate } from "./helpers";
 import { recordMovement, ref } from "./movement";
 
-interface Head extends Omit<Intake, "total" | "pending" | "passed" | "failed" | "inbound" | "disposed"> {}
+interface Head extends Omit<Intake, "total" | "pending" | "passed" | "failed" | "inbound" | "disposed" | "totalCost"> {}
 
 const heads: Head[] = [];
 const items = new Map<string, IntakeItem[]>();
@@ -50,7 +50,10 @@ function counts(no: string) {
   return c;
 }
 
-const vo = (h: Head): Intake => ({ ...h, ...counts(h.intakeNo) });
+const vo = (h: Head): Intake => {
+  const costs = (items.get(h.intakeNo) ?? []).map((i) => i.unitCost).filter((v): v is number => v != null);
+  return { ...h, ...counts(h.intakeNo), totalCost: costs.length ? costs.reduce((a, b) => a + b, 0) : null };
+};
 const head = (no: string) => heads.find((h) => h.intakeNo === no) ?? notFound("待检单", "Intake", no);
 const detail = (no: string): IntakeDetail => ({ intake: vo(head(no)), items: (items.get(no) ?? []).map((i) => ({ ...i })) });
 
@@ -75,13 +78,14 @@ function insert(x: IntakeCreateReq, kind: IntakeKind = "ARRIVAL"): IntakeDetail 
   const no = `IK${String(++seq).padStart(4, "0")}`;
   heads.unshift({
     intakeNo: no, kind, warehouseNo: wh.warehouseNo, warehouseName: wh.name, sourceRef: x.sourceRef?.trim() || null, supplierNo, supplierName,
+    currency: x.currency?.trim().toUpperCase() || null,
     arrivedAt: x.arrivedAt || now(), status: "OPEN", note: x.note?.trim() || null, createdBy: "mock", createdAt: now(),
   });
   const mk = (itemType: IntakeItemType, itemNo: string): IntakeItem => {
     const c = itemType === "CABINET" ? cabinets.find((k) => k.cabinetNo === itemNo) : undefined;
     const p = itemType === "POWERBANK" ? powerbanks.find((k) => k.powerbankNo === itemNo) : undefined;
     return {
-      itemType, itemNo, sn: c?.sn ?? p?.sn ?? null, model: c?.model ?? null, qcNo: null, qcResult: "PENDING",
+      itemType, itemNo, unitCost: x.unitCosts?.[itemNo] ?? null, sn: c?.sn ?? p?.sn ?? null, model: c?.model ?? null, qcNo: null, qcResult: "PENDING",
       disposition: "PENDING", dispositionNote: null, handledBy: null, handledAt: null,
     };
   };
@@ -105,6 +109,11 @@ export function getIntake(no: string): IntakeDetail {
 export function createIntake(x: IntakeCreateReq): IntakeDetail {
   ensureSeed();
   if (!x?.warehouseNo) fail("请选择仓库", "Warehouse required");
+  const kind = x.kind ?? "ARRIVAL";
+  if (kind !== "ARRIVAL" && kind !== "OPENING") fail("入库类型不对", "Invalid kind");
+  const costs = Object.values(x.unitCosts ?? {});
+  if (costs.some((v) => v < 0)) fail("单价不能为负", "Negative unit cost");
+  if (costs.length && !x.currency?.trim()) fail("填了单价请选币种", "Currency required");
   const cabNos = [...new Set((x.cabinetNos ?? []).map((s) => s.trim()).filter(Boolean))];
   const pbNos = [...new Set((x.powerbankNos ?? []).map((s) => s.trim()).filter(Boolean))];
   if (!cabNos.length && !pbNos.length) fail("请至少录入一台设备", "At least one device");
@@ -128,7 +137,19 @@ export function createIntake(x: IntakeCreateReq): IntakeDetail {
     else if (openNos.has(`POWERBANK:${no}`)) bad.push(`${no}：已在未处理的待检单上`);
   }
   if (bad.length) fail(`以下设备不能办理：${bad.join("；")}`, `Rejected: ${bad.join("; ")}`);
-  return insert({ ...x, cabinetNos: cabNos, powerbankNos: pbNos });
+  const d = insert({ ...x, cabinetNos: cabNos, powerbankNos: pbNos }, kind);
+  if (kind !== "OPENING") return d;
+  // 期初建账：登记即入库，放行凭证 OPEN-{设备号}（与后端同口径）
+  const h = head(d.intake.intakeNo);
+  for (const i of items.get(h.intakeNo) ?? []) {
+    if (i.itemType === "CABINET") cabinets.find((k) => k.cabinetNo === i.itemNo)!.warehouseNo = h.warehouseNo;
+    else powerbanks.find((k) => k.powerbankNo === i.itemNo)!.warehouseNo = h.warehouseNo;
+    recordMovement({ itemType: i.itemType, itemNo: i.itemNo, event: "INBOUND", toRef: ref.wh(h.warehouseNo),
+      reason: `期初建账 OPEN-${i.itemNo}`, sourceRef: h.intakeNo });
+    Object.assign(i, { disposition: "INBOUND", handledBy: "mock", handledAt: now() });
+  }
+  closeIfDone(h);
+  return detail(h.intakeNo);
 }
 
 export function inspectIntakeItem(no: string, type: IntakeItemType, itemNo: string, req: QcReq): IntakeDetail {

@@ -31,8 +31,23 @@ const DISPOSITION: StatusMap<"PENDING" | "INBOUND" | "RETURN_SUPPLIER" | "SCRAP"
   RETURN_SUPPLIER: { label: "退供应商", tone: "warning" }, SCRAP: { label: "报废", tone: "danger" },
 };
 const TYPE_LABEL = { CABINET: "机柜", POWERBANK: "充电宝" } as const;
-const KIND_LABEL = { ARRIVAL: "到货", RETURN: "撤机回仓" } as const;
-const lines = (v: unknown) => String(v ?? "").split(/[\s,，]+/).map((s) => s.trim()).filter(Boolean);
+const KIND_LABEL = { ARRIVAL: "采购到货", RETURN: "撤机回仓", OPENING: "期初建账" } as const;
+/**
+ * 设备号清单，兼作批量导入：每行「设备号」或「设备号,单价」（从 Excel 粘贴的制表符分隔同样认）。
+ * 一行里第二列不是数字时整行都当设备号（兼容一行逗号分隔多台）。
+ */
+export function parseLines(v: unknown): { nos: string[]; costs: Record<string, number> } {
+  const nos: string[] = [];
+  const costs: Record<string, number> = {};
+  for (const line of String(v ?? "").split(/\r?\n/)) {
+    const cells = line.split(/[\t,，\s]+/).map((s) => s.trim()).filter(Boolean);
+    if (cells.length === 2 && /^\d+(\.\d+)?$/.test(cells[1])) {
+      nos.push(cells[0]);
+      costs[cells[0]] = Number(cells[1]);
+    } else nos.push(...cells);
+  }
+  return { nos, costs };
+}
 const keyOf = (i: IntakeItem) => `${i.itemType}:${i.itemNo}`;
 const refOf = (k: string): IntakeItemRef => { const [itemType, itemNo] = k.split(":"); return { itemType: itemType as IntakeItemRef["itemType"], itemNo }; };
 
@@ -58,10 +73,18 @@ export function IntakesTab() {
   });
 
   const create = useMutation({
-    mutationFn: (v: Record<string, unknown>) => api.createIntake({
-      warehouseNo: String(v.warehouseNo ?? ""), supplierNo: String(v.supplierNo ?? "") || null, sourceRef: String(v.sourceRef ?? "") || undefined, note: String(v.note ?? "") || undefined,
-      cabinetNos: lines(v.cabinetNos), powerbankNos: lines(v.powerbankNos),
-    }),
+    mutationFn: (v: Record<string, unknown>) => {
+      const cab = parseLines(v.cabinetNos);
+      const pb = parseLines(v.powerbankNos);
+      const unitCosts = { ...cab.costs, ...pb.costs };
+      return api.createIntake({
+        kind: v.kind === "OPENING" ? "OPENING" : "ARRIVAL",
+        warehouseNo: String(v.warehouseNo ?? ""), supplierNo: String(v.supplierNo ?? "") || null, sourceRef: String(v.sourceRef ?? "") || undefined, note: String(v.note ?? "") || undefined,
+        currency: Object.keys(unitCosts).length ? String(v.currency ?? "") || null : null,
+        unitCosts: Object.keys(unitCosts).length ? unitCosts : undefined,
+        cabinetNos: cab.nos, powerbankNos: pb.nos,
+      });
+    },
     onSuccess: (d) => {
       notify.success(`已登记 ${d.intake.intakeNo}`);
       qc.invalidateQueries({ queryKey: ["intakes"] });
@@ -74,11 +97,16 @@ export function IntakesTab() {
    * @form POST /api/ops/inventory/intakes
    */
   const FIELDS: FieldDef[] = [
+    { key: "kind", label: "入库类型", type: "select", required: true, options: [
+      { value: "ARRIVAL", label: "采购到货（先质检再入库）" }, { value: "OPENING", label: "期初建账（登记即入库）" }] },
     { key: "warehouseNo", label: "仓库", type: "select", required: true, options: whOptions },
     { key: "supplierNo", label: "供应商", type: "select", options: spOptions, help: "采购到货选供应商；不合格「退供应商」时据此知道退给谁" },
     { key: "sourceRef", label: "来源单号", maxLength: 64 },
-    { key: "cabinetNos", label: "机柜编号", type: "textarea", rows: 4, placeholder: "每行一个，可扫码" },
-    { key: "powerbankNos", label: "充电宝编号", type: "textarea", rows: 4, placeholder: "每行一个，可扫码" },
+    { key: "cabinetNos", label: "机柜编号", type: "textarea", rows: 4, placeholder: "每行一个，可扫码；带单价写「编号,单价」",
+      help: "批量导入：从 Excel 复制两列（编号、单价）直接粘贴" },
+    { key: "powerbankNos", label: "充电宝编号", type: "textarea", rows: 4, placeholder: "每行一个，可扫码；带单价写「编号,单价」" },
+    { key: "currency", label: "币种", type: "select", options: [{ value: "AED", label: "AED" }, { value: "USD", label: "USD" }, { value: "CNY", label: "CNY" }],
+      help: "填了单价才需要" },
     { key: "note", label: "备注", type: "textarea", rows: 2, maxLength: 512 },
   ];
 
@@ -87,6 +115,9 @@ export function IntakesTab() {
     { header: "类型", className: "whitespace-nowrap", cell: (h) => KIND_LABEL[h.kind] },
     { header: "仓库", className: "whitespace-nowrap", cell: (h) => h.warehouseName ?? h.warehouseNo },
     { header: "供应商", cell: (h) => h.supplierName ?? <span className="text-muted-foreground">-</span> },
+    { header: "金额", className: "text-right tabular-nums whitespace-nowrap", cell: (h) => (h.totalCost != null
+      ? `${h.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${h.currency ?? ""}`
+      : <span className="text-muted-foreground">-</span>) },
     { header: "来源单号", cell: (h) => h.sourceRef ?? <span className="text-muted-foreground">-</span> },
     { header: "到达", className: "whitespace-nowrap", cell: (h) => fmtTime(h.arrivedAt) },
     { header: "台数", className: "text-right tabular-nums whitespace-nowrap", cell: (h) => h.total },
@@ -102,7 +133,7 @@ export function IntakesTab() {
     <div>
       {!canWrite && <ReadOnlyNotice what="到货登记与入库" perm="device:inventory:inbound" className="mb-3" />}
       <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); paging.reset(); }} searchPlaceholder="单号 / 来源单号"
-        onAdd={() => setForm({ warehouseNo: whQ.data?.find((w) => w.isDefault)?.warehouseNo ?? "" })} addLabel="到货登记" canAdd={canWrite}>
+        onAdd={() => setForm({ kind: "ARRIVAL", currency: "AED", warehouseNo: whQ.data?.find((w) => w.isDefault)?.warehouseNo ?? "" })} addLabel="新建入库单" canAdd={canWrite}>
         <FilterSelect aria-label="状态" value={status} onChange={(v) => { setStatus(v); paging.reset(); }} options={STATUS} allLabel="全部状态" />
         <FilterSelect aria-label="仓库" value={warehouseNo} onChange={(v) => { setWarehouseNo(v); paging.reset(); }} options={whOptions} allLabel="全部仓库" />
       </Toolbar>
@@ -160,6 +191,7 @@ function IntakeDrawer({ intakeNo, onClose }: { intakeNo: string | null; onClose:
     { header: "设备", cell: (i) => <span className="font-mono">{i.itemNo}</span> },
     { header: "SN", cell: (i) => i.sn ?? "-" },
     { header: "型号", cell: (i) => i.model ?? "-" },
+    { header: "单价", className: "text-right tabular-nums whitespace-nowrap", cell: (i) => (i.unitCost != null ? i.unitCost.toFixed(2) : "-") },
     { header: "质检", className: "whitespace-nowrap", cell: (i) => <StatusBadge map={QC} value={i.qcResult} /> },
     { header: "处置", className: "whitespace-nowrap", cell: (i) => <StatusBadge map={DISPOSITION} value={i.disposition} /> },
     { header: "", className: "whitespace-nowrap", cell: (i) => (open && canQc && i.disposition === "PENDING"

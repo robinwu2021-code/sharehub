@@ -145,8 +145,11 @@ export type IntakeStatus = "OPEN" | "DONE";
 export type IntakeQcResult = "PENDING" | "PASSED" | "FAILED";
 export type IntakeDisposition = "PENDING" | "INBOUND" | "RETURN_SUPPLIER" | "SCRAP";
 export type IntakeItemType = "CABINET" | "POWERBANK";
-export type IntakeKind = "ARRIVAL" | "RETURN";
+/** ARRIVAL 采购到货（走质检）/ RETURN 撤机回仓 / OPENING 期初建账（V202，登记即入库）。 */
+export type IntakeKind = "ARRIVAL" | "RETURN" | "OPENING";
 export type IntakeDisposal = "RETURN_SUPPLIER" | "SCRAP";
+/** 能手工新建的入库类型（RETURN 只由回仓调拨签收生成）。 */
+export type IntakeCreateKind = "ARRIVAL" | "OPENING";
 export interface Intake {
   intakeNo: string;
   kind: IntakeKind;
@@ -156,6 +159,9 @@ export interface Intake {
   /** 供应商（V201，到货登记可选）与名称快照。 */
   supplierNo: string | null;
   supplierName: string | null;
+  /** 单价币种与明细单价合计（V202；无单价为 null）。 */
+  currency: string | null;
+  totalCost: number | null;
   arrivedAt: string;
   status: IntakeStatus;
   note: string | null;
@@ -171,6 +177,7 @@ export interface Intake {
 export interface IntakeItem {
   itemType: IntakeItemType;
   itemNo: string;
+  unitCost: number | null;
   sn: string | null;
   model: string | null;
   qcNo: string | null;
@@ -185,6 +192,11 @@ export interface IntakeDetail {
   items: IntakeItem[];
 }
 export interface IntakeCreateReq {
+  /** 缺省 ARRIVAL；OPENING 登记即入库。 */
+  kind?: IntakeCreateKind;
+  currency?: string | null;
+  /** 设备号 → 单价。 */
+  unitCosts?: Record<string, number>;
   warehouseNo: string;
   supplierNo?: string | null;
   sourceRef?: string;

@@ -15643,6 +15643,14 @@
      "type": "String"
     },
     {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "totalCost",
+     "type": "java.math.BigDecimal"
+    },
+    {
      "name": "arrivedAt",
      "type": "LocalDateTime"
     },
@@ -15737,6 +15745,14 @@
        "type": "String"
       },
       {
+       "name": "currency",
+       "type": "String"
+      },
+      {
+       "name": "totalCost",
+       "type": "java.math.BigDecimal"
+      },
+      {
        "name": "arrivedAt",
        "type": "LocalDateTime"
       },
@@ -15795,6 +15811,10 @@
        "type": "String"
       },
       {
+       "name": "unitCost",
+       "type": "java.math.BigDecimal"
+      },
+      {
        "name": "sn",
        "type": "String"
       },
@@ -15831,6 +15851,10 @@
    ],
    "requestShape": [
     {
+     "name": "kind",
+     "type": "String"
+    },
+    {
      "name": "warehouseNo",
      "type": "String"
     },
@@ -15849,6 +15873,14 @@
     {
      "name": "note",
      "type": "String"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "unitCosts",
+     "type": "java.util.Map<String, java.math.BigDecimal>"
     },
     {
      "name": "cabinetNos",
@@ -15915,6 +15947,14 @@
        "type": "String"
       },
       {
+       "name": "currency",
+       "type": "String"
+      },
+      {
+       "name": "totalCost",
+       "type": "java.math.BigDecimal"
+      },
+      {
        "name": "arrivedAt",
        "type": "LocalDateTime"
       },
@@ -15971,6 +16011,10 @@
       {
        "name": "itemNo",
        "type": "String"
+      },
+      {
+       "name": "unitCost",
+       "type": "java.math.BigDecimal"
       },
       {
        "name": "sn",
@@ -16064,6 +16108,14 @@
        "type": "String"
       },
       {
+       "name": "currency",
+       "type": "String"
+      },
+      {
+       "name": "totalCost",
+       "type": "java.math.BigDecimal"
+      },
+      {
        "name": "arrivedAt",
        "type": "LocalDateTime"
       },
@@ -16120,6 +16172,10 @@
       {
        "name": "itemNo",
        "type": "String"
+      },
+      {
+       "name": "unitCost",
+       "type": "java.math.BigDecimal"
       },
       {
        "name": "sn",
@@ -16236,6 +16292,14 @@
        "type": "String"
       },
       {
+       "name": "currency",
+       "type": "String"
+      },
+      {
+       "name": "totalCost",
+       "type": "java.math.BigDecimal"
+      },
+      {
        "name": "arrivedAt",
        "type": "LocalDateTime"
       },
@@ -16292,6 +16356,10 @@
       {
        "name": "itemNo",
        "type": "String"
+      },
+      {
+       "name": "unitCost",
+       "type": "java.math.BigDecimal"
       },
       {
        "name": "sn",
@@ -16402,6 +16470,14 @@
        "type": "String"
       },
       {
+       "name": "currency",
+       "type": "String"
+      },
+      {
+       "name": "totalCost",
+       "type": "java.math.BigDecimal"
+      },
+      {
        "name": "arrivedAt",
        "type": "LocalDateTime"
       },
@@ -16458,6 +16534,10 @@
       {
        "name": "itemNo",
        "type": "String"
+      },
+      {
+       "name": "unitCost",
+       "type": "java.math.BigDecimal"
       },
       {
        "name": "sn",

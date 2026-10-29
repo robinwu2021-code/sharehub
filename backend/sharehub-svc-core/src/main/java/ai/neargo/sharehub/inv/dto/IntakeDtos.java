@@ -10,21 +10,26 @@ public final class IntakeDtos {
 
     /** 列表行：单头 + 明细计数。 */
     public record Intake(String intakeNo, String kind, String warehouseNo, String warehouseName, String sourceRef,
-                         String supplierNo, String supplierName,
+                         String supplierNo, String supplierName, String currency, java.math.BigDecimal totalCost,
                          LocalDateTime arrivedAt, String status, String note,
                          int total, int pending, int passed, int failed, int inbound, int disposed,
                          String createdBy, LocalDateTime createdAt) {
     }
 
-    public record IntakeItem(String itemType, String itemNo, String sn, String model, String qcNo, String qcResult,
+    public record IntakeItem(String itemType, String itemNo, java.math.BigDecimal unitCost, String sn, String model, String qcNo, String qcResult,
                              String disposition, String dispositionNote, String handledBy, LocalDateTime handledAt) {
     }
 
     public record IntakeDetail(Intake intake, List<IntakeItem> items) {
     }
 
-    /** 到货登记：仓 + 设备号（柜与宝分开列）。arrivedAt 为空取现在。 */
-    public record CreateReq(String warehouseNo, String supplierNo, String sourceRef, String arrivedAt, String note,
+    /**
+     * 入库单登记：仓 + 设备号（柜与宝分开列）。arrivedAt 为空取现在。
+     * kind：ARRIVAL 采购到货（默认，走质检）/ OPENING 期初建账（登记即入库）。
+     * unitCosts：设备号 → 单价（可只填部分），币种 currency。
+     */
+    public record CreateReq(String kind, String warehouseNo, String supplierNo, String sourceRef, String arrivedAt, String note,
+                            String currency, java.util.Map<String, java.math.BigDecimal> unitCosts,
                             List<String> cabinetNos, List<String> powerbankNos) {
     }
 

@@ -64,6 +64,8 @@ public class IntakeServiceImpl implements IntakeService {
     static final String PASSED = "PASSED";
     static final String FAILED = "FAILED";
     static final String INBOUND = "INBOUND";
+    static final String ARRIVAL = "ARRIVAL";
+    static final String OPENING = "OPENING";
     static final Set<String> DISPOSALS = Set.of("RETURN_SUPPLIER", "SCRAP");
     private static final int MAX_ITEMS = 200;
 
@@ -140,7 +142,7 @@ public class IntakeServiceImpl implements IntakeService {
             } else if (POWERBANK.equals(r.getItemType()) && pbs.containsKey(r.getItemNo())) {
                 sn = pbs.get(r.getItemNo()).getSn();
             }
-            return new IntakeItem(r.getItemType(), r.getItemNo(), sn, model, r.getQcNo(), r.getQcResult(),
+            return new IntakeItem(r.getItemType(), r.getItemNo(), r.getUnitCost(), sn, model, r.getQcNo(), r.getQcResult(),
                     r.getDisposition(), r.getDispositionNote(), r.getHandledBy(), r.getHandledAt());
         }).toList();
         return new IntakeDetail(vo(h, rows), out);
@@ -156,6 +158,13 @@ public class IntakeServiceImpl implements IntakeService {
     @Transactional
     public IntakeDetail create(CreateReq r) {
         if (r == null || !notBlank(r.warehouseNo())) throw BizException.badRequest("error.common.missing_parameter", "warehouseNo");
+        String kind = notBlank(r.kind()) ? r.kind().trim() : ARRIVAL;
+        if (!ARRIVAL.equals(kind) && !OPENING.equals(kind)) throw BizException.badRequest("error.common.invalid_value", "kind");
+        Map<String, java.math.BigDecimal> costs = r.unitCosts() == null ? Map.of() : r.unitCosts();
+        if (costs.values().stream().anyMatch(v -> v != null && v.signum() < 0))
+            throw BizException.badRequest("error.common.invalid_value", "unitCost");
+        if (costs.values().stream().anyMatch(java.util.Objects::nonNull) && !notBlank(r.currency()))
+            throw BizException.badRequest("error.common.missing_parameter", "currency");
         WarehouseItem wh = warehouses.list().stream().filter(x -> x.warehouseNo().equals(r.warehouseNo().trim()) && x.archivedAt() == null)
                 .findFirst()
                 .orElseThrow(() -> BizException.notFound(r.warehouseNo()));
@@ -192,7 +201,8 @@ public class IntakeServiceImpl implements IntakeService {
         InvIntake h = new InvIntake();
         h.setIntakeNo(IdGenerator.next("IK"));
         h.setTenantId("MAIN");
-        h.setKind("ARRIVAL");
+        h.setKind(kind);
+        h.setCurrency(notBlank(r.currency()) ? r.currency().trim().toUpperCase() : null);
         h.setWarehouseNo(wh.warehouseNo());
         h.setWarehouseName(wh.name());
         h.setSupplierNo(supplierName == null ? null : r.supplierNo().trim());
@@ -203,9 +213,19 @@ public class IntakeServiceImpl implements IntakeService {
         h.setNote(blankToNull(r.note()));
         h.setCreatedBy(operator());
         intakes.insert(h);
-        cabNos.forEach(no -> insertItem(h.getIntakeNo(), CABINET, no));
-        pbNos.forEach(no -> insertItem(h.getIntakeNo(), POWERBANK, no));
-        log.info("到货登记 intakeNo={} warehouseNo={} 柜={} 宝={}", h.getIntakeNo(), wh.warehouseNo(), cabNos.size(), pbNos.size());
+        cabNos.forEach(no -> insertItem(h.getIntakeNo(), CABINET, no, costs.get(no)));
+        pbNos.forEach(no -> insertItem(h.getIntakeNo(), POWERBANK, no, costs.get(no)));
+        if (OPENING.equals(kind)) {
+            // 期初建账：历史在仓、已验收的存量，登记即入库；放行凭证记 OPEN-{设备号}（与存量迁移 MIG- 同口径）
+            String me = operator();
+            LocalDateTime now = LocalDateTime.now();
+            for (InvIntakeItem i : itemsOf(h.getIntakeNo())) {
+                inventory.inbound(i.getItemType(), i.getItemNo(), h.getWarehouseNo(), "OPEN-" + i.getItemNo(), h.getIntakeNo());
+                mark(i, INBOUND, null, me, now);
+            }
+            closeIfDone(h);
+        }
+        log.info("入库单登记 kind={} intakeNo={} warehouseNo={} 柜={} 宝={}", kind, h.getIntakeNo(), wh.warehouseNo(), cabNos.size(), pbNos.size());
         return get(h.getIntakeNo());
     }
 
@@ -234,7 +254,7 @@ public class IntakeServiceImpl implements IntakeService {
         h.setNote(blankToNull(note));
         h.setCreatedBy(operator());
         intakes.insert(h);
-        cabNos.forEach(no -> insertItem(h.getIntakeNo(), CABINET, no));
+        cabNos.forEach(no -> insertItem(h.getIntakeNo(), CABINET, no, null));
         log.info("撤机回仓待检 intakeNo={} warehouseNo={} sourceRef={} 柜={}", h.getIntakeNo(), wh.warehouseNo(), sourceRef, cabNos);
         return h.getIntakeNo();
     }
@@ -311,11 +331,12 @@ public class IntakeServiceImpl implements IntakeService {
 
     // —— 内部 ——
 
-    private void insertItem(String intakeNo, String type, String no) {
+    private void insertItem(String intakeNo, String type, String no, java.math.BigDecimal unitCost) {
         InvIntakeItem i = new InvIntakeItem();
         i.setIntakeNo(intakeNo);
         i.setItemType(type);
         i.setItemNo(no);
+        i.setUnitCost(unitCost);
         i.setQcResult(PENDING);
         i.setDisposition(PENDING);
         items.insert(i);
@@ -399,7 +420,9 @@ public class IntakeServiceImpl implements IntakeService {
             else pending++;
         }
         return new Intake(h.getIntakeNo(), h.getKind(), h.getWarehouseNo(), h.getWarehouseName(), h.getSourceRef(),
-                h.getSupplierNo(), h.getSupplierName(),
+                h.getSupplierNo(), h.getSupplierName(), h.getCurrency(),
+                rows.stream().map(InvIntakeItem::getUnitCost).filter(java.util.Objects::nonNull)
+                        .reduce(java.math.BigDecimal::add).orElse(null),
                 h.getArrivedAt(), h.getStatus(), h.getNote(), rows.size(), pending, passed, failed, inbound, disposed,
                 h.getCreatedBy(), h.getCreatedAt());
     }
