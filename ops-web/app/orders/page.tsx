@@ -71,7 +71,8 @@ const isExpiringSoon = (r: Reservation) => {
  *  已创建/弹出中必须在列——远程弹出干预会把订单落到「弹出中」，筛不出来就找不回。 */
 const ORDER_STATUS_FILTER = [
   { value: "CREATED", label: "已创建" }, { value: "DISPENSING", label: "弹出中" },
-  { value: "IN_USE", label: "使用中" }, { value: "SETTLED", label: "已结算" },
+  { value: "IN_USE", label: "使用中" }, { value: "OVERDUE_CHARGED", label: "已扣款未归还" },
+  { value: "SETTLED", label: "已结算" },
   { value: "RETURNED", label: "已归还" }, { value: "EXCEPTION", label: "异常" },
   { value: "CLOSED", label: "已关闭" },
 ];

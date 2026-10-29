@@ -26,6 +26,9 @@ WorkOrderStatus: AUDITED->CLOSED
 # 运营端能做的是**干预**（强制归还 / 免单 / 补偿），那张表是 ORDER_INTERVENTIONS，
 # 已与后端 InterventionDtos.RULES 逐边比对通过。
 OrderStatus: IN_USE->RETURNED
+# V180 超时扣款（B 类，非人工推进）：到时限由定时任务发起最高收费；已扣款未归还的单由设备归还信号结单
+OrderStatus: IN_USE->OVERDUE_CHARGED
+OrderStatus: OVERDUE_CHARGED->RETURNED
 OrderStatus: RETURNED->SETTLED
 OrderStatus: SETTLED->CLOSED
 # 机柜运输中（2026-09-25 批次 C4）：由调拨单的发货 / 签收驱动（AssetOpsController），机柜页不单独出按钮

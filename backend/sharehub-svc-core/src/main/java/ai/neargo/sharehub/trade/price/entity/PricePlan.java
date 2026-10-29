@@ -45,6 +45,14 @@ public class PricePlan extends BaseEntity implements ai.neargo.sharehub.common.c
     /** 总封顶 = 买断价（前端 {@code buyoutPrice}）。 */
     private BigDecimal capTotal;
 
+    /**
+     * 遗失费（V180，K5）：空 = 与 {@link #capTotal} 合一；填了 = 用户不还时按它收，与最高租赁收费独立。
+     * 更新策略 ALWAYS：清空它（回到合一）也要能存进去 —— 默认策略跳过 null，填过一次就再也清不掉。
+     * 方案保存端点每次都带整张表单，不会因为没传而被误清。
+     */
+    @com.baomidou.mybatisplus.annotation.TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
+    private BigDecimal lostFee;
+
     private String currency;
 
     /** v1 遗留的 CSV 适用范围；权威落法见 {@link PricePlanScope}。 */

@@ -36688,6 +36688,10 @@
     {
      "name": "archivedAt",
      "type": "String"
+    },
+    {
+     "name": "lostFee",
+     "type": "BigDecimal"
     }
    ],
    "requestShape": null
@@ -36750,6 +36754,10 @@
     {
      "name": "archivedAt",
      "type": "String"
+    },
+    {
+     "name": "lostFee",
+     "type": "BigDecimal"
     }
    ],
    "requestShape": [
@@ -36792,6 +36800,10 @@
     {
      "name": "deviceType",
      "type": "String"
+    },
+    {
+     "name": "lostFee",
+     "type": "java.math.BigDecimal"
     }
    ]
   },
@@ -36908,6 +36920,10 @@
     {
      "name": "archivedAt",
      "type": "String"
+    },
+    {
+     "name": "lostFee",
+     "type": "BigDecimal"
     }
    ],
    "requestShape": [
@@ -36950,6 +36966,10 @@
     {
      "name": "deviceType",
      "type": "String"
+    },
+    {
+     "name": "lostFee",
+     "type": "java.math.BigDecimal"
     }
    ]
   },
@@ -48654,6 +48674,7 @@
    "CREATED",
    "DISPENSING",
    "IN_USE",
+   "OVERDUE_CHARGED",
    "RETURNED",
    "SETTLED",
    "CLOSED"

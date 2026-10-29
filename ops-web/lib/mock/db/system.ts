@@ -77,6 +77,7 @@ export const sysParams: SysParam[] = [
   { paramKey: "credit.min", label: "最低信用分", value: "550", groupName: "风控", updatedAt: iso(14 * 86400_000) },
   { paramKey: "invite.reward", label: "邀请奖励(AED)", value: "5", groupName: "营销", updatedAt: iso(15 * 86400_000) },
   // 商家一期（与后端 V155 同键同默认值）
+  { paramKey: "rent.overdue.mode", label: "超时扣款模型：CAP_AMOUNT 累计触顶买断 / TIME_LIMIT 到时限发起最高收费", value: "CAP_AMOUNT", groupName: "计费", updatedAt: iso(1 * 86400_000) },
   { paramKey: "finance.share.base_mode", label: "分成基数口径：PRE_TAX 税前 / GROSS 含税实收（只影响之后的订单）", value: "PRE_TAX", groupName: "财务", updatedAt: iso(16 * 86400_000) },
   { paramKey: "finance.share.tax_country", label: "分成折算税前时取哪个国家的税率", value: "AE", groupName: "财务", updatedAt: iso(16 * 86400_000) },
   { paramKey: "finance.share.venue_enabled", label: "场地方是否参与分成与结算：1 是 / 0 否（一期为 0）", value: "0", groupName: "财务", updatedAt: iso(16 * 86400_000) },

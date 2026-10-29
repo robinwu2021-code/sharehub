@@ -49,7 +49,9 @@ public final class PriceDtos {
                                //     → 「逾期达封顶自动买断」永不触发，宝也永不转 SOLD。
                                // 读侧显示正常（VO 改过名），所以这一格看起来一直是对的。
                                java.math.BigDecimal buyoutPrice, String currency, String scope,
-                               String deviceType) {
+                               String deviceType,
+                               // V180 遗失费（K5）：空 = 与买断价 / 总封顶合一
+                               java.math.BigDecimal lostFee) {
         /** 映射到实体。**status / archivedAt 有意不设**（见类注释）。 */
         public ai.neargo.sharehub.trade.price.entity.PricePlan toEntity() {
             var e = new ai.neargo.sharehub.trade.price.entity.PricePlan();
@@ -60,6 +62,7 @@ public final class PriceDtos {
             e.setUnitPrice(unitPrice);
             e.setCapDaily(capDaily);
             e.setCapTotal(buyoutPrice);   // 列名 cap_total，入参名随读出参叫 buyoutPrice
+            e.setLostFee(lostFee);
             e.setCurrency(currency);
             e.setScope(scope);
             e.setDeviceType(deviceType);
@@ -69,7 +72,8 @@ public final class PriceDtos {
 
     public record PricePlanEntry(String planNo, String name, Integer freeMinutes, Integer unitMinutes,
                                  BigDecimal unitPrice, BigDecimal capDaily, BigDecimal buyoutPrice,
-                                 String currency, String scope, String status, String archivedAt) {
+                                 String currency, String scope, String status, String archivedAt,
+                                 /* V180 遗失费；null = 与 buyoutPrice 合一 */ BigDecimal lostFee) {
     }
 
     /**

@@ -65,7 +65,8 @@ const PLAN_FIELDS: FieldDef[] = [
   { key: "unitMinutes", label: "计费单位（分钟）", type: "number", required: true, min: 1, section: "计费规则", help: "不足一个单位按一个算" },
   { key: "unitPrice", label: "单价", type: "number", required: true, min: 0, section: "计费规则", help: "每个计费单位收多少" },
   { key: "capDaily", label: "日封顶", type: "number", required: true, min: 0, section: "计费规则", help: "每 24 小时最多收这么多；0 = 不封顶" },
-  { key: "buyoutPrice", label: "买断价", type: "number", required: true, min: 0, section: "计费规则", help: "累计到这个金额就不再计费，设备归用户；须 ≥ 日封顶" },
+  { key: "buyoutPrice", label: "买断价", type: "number", required: true, min: 0, section: "计费规则", help: "累计到这个金额就不再计费，设备归用户；须 ≥ 日封顶。超时扣款按时限时，到时限收的也是它" },
+  { key: "lostFee", label: "遗失费（选填）", type: "number", min: 0, section: "计费规则", help: "留空 = 与买断价相同。填了则用户不还 / 主动买断按它收，与最高租赁收费分开" },
 ];
 
 /*
@@ -198,6 +199,8 @@ function FeePlansInner() {
       ...form,
       freeMinutes: Number(form.freeMinutes), unitMinutes: Number(form.unitMinutes),
       unitPrice: Number(form.unitPrice), capDaily: Number(form.capDaily), buyoutPrice: Number(form.buyoutPrice),
+      // 遗失费留空 = 与买断价合一；空串与 undefined 都按 null 发，后端据此清掉（V180 lost_fee 更新策略 ALWAYS）
+      lostFee: form.lostFee === undefined || form.lostFee === null || String(form.lostFee) === "" ? null : Number(form.lostFee),
     };
     const errors = validatePricePlan(v, editing, plansQ.data?.list ?? []);
     if (errors.length) { notify.error(errors[0]); return; }

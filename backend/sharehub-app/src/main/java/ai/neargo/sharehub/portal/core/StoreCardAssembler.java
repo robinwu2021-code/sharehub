@@ -156,9 +156,14 @@ public class StoreCardAssembler {
             dailyCap = spec.capDaily() == null ? BigDecimal.ZERO : spec.capDaily();
             break;   // 取首个时间计费项；多项叠加的复杂方案在借出确认页由 PriceEngine 精算
         }
-        return new Quote(perHour, dailyCap, r.currency() == null ? "AED" : r.currency());
+        return new Quote(perHour, dailyCap, r.currency() == null ? "AED" : r.currency(), r.capTotal(), r.lostCharge());
     }
 
-    public record Quote(BigDecimal perHour, BigDecimal dailyCap, String currency) {
+    /**
+     * @param maxCharge  最高租赁收费 = 方案总封顶；null = 方案没配（不封顶）
+     * @param lostCharge 不还时收多少 = 独立遗失费，没配则等于 maxCharge（V180）
+     */
+    public record Quote(BigDecimal perHour, BigDecimal dailyCap, String currency,
+                        BigDecimal maxCharge, BigDecimal lostCharge) {
     }
 }

@@ -66,7 +66,7 @@ export const zh = {
   lang: { label: "语言", zh: "中文", en: "English", ar: "العربية" },
   online: { ONLINE: "在线", OFFLINE: "离线" },
   orderStatus: {
-    CREATED: "已创建", DISPENSING: "弹出中", IN_USE: "使用中",
+    CREATED: "已创建", DISPENSING: "弹出中", IN_USE: "使用中", OVERDUE_CHARGED: "已扣款未归还",
     RETURNED: "已归还", SETTLED: "已结算", CLOSED: "已关闭", EXCEPTION: "异常",
   },
   woStatus: {

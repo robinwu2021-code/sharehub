@@ -52,6 +52,8 @@ export default {
     price: "السعر",
     dailyCap: "الحد اليومي",
     buyout: "سعر الشراء",
+    maxCharge: "الحد الأقصى لرسوم الإيجار",
+    lostFee: "رسوم فقدان الجهاز",
     deposit: "تأمين",
     freeDeposit: "بدون تأمين",
     freeDepositOn: "تفويض بطاقة، بدون تأمين",

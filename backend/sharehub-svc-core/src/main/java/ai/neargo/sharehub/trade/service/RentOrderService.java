@@ -117,6 +117,16 @@ public interface RentOrderService {
     boolean buyoutIfCapped(String orderNo);
 
     /**
+     * 到最长时限发起最高收费（V180，{@code rent.overdue.mode=TIME_LIMIT}，运营方原文 RQ-BIL-02）。
+     *
+     * <p>借出时长达到 {@code hours} 的使用中订单：按计费方案总封顶请款，订单进 {@code OVERDUE_CHARGED}
+     * 「已扣款未归还」，宝仍算在用户手里。之后归还只结单、不冲销（RQ-BIL-04 / AC-03）。
+     *
+     * @return 这一单是否在本次发起了最高收费
+     */
+    boolean chargeOverdueIfDue(String orderNo, int hours);
+
+    /**
      * 客服干预：按 {@link InterventionDtos#RULES} 迁移状态，并**同事务写审计留痕**。
      *
      * <p>改造前这里无论什么动作都把订单置 {@code CLOSED} 且不留痕 ——

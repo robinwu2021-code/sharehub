@@ -199,8 +199,13 @@ function report() {
             <text class="text-[26rpx] text-sub">{{ $t("borrow.dailyCap") }}</text>
             <pb-amount :value="avail.dailyCap" size="sm" />
           </view>
+          <!-- 运营方原文 RQ-APP-02/06：最高收费与遗失费独立时分开写；数取自本柜命中的计费方案，与实扣一致（D4） -->
+          <view v-if="avail.lostFeeSeparate" class="flex items-center justify-between">
+            <text class="text-[26rpx] text-sub">{{ $t("borrow.maxCharge") }}</text>
+            <pb-amount :value="avail.maxCharge" size="sm" />
+          </view>
           <view class="flex items-center justify-between">
-            <text class="text-[26rpx] text-sub">{{ $t("borrow.buyout") }}</text>
+            <text class="text-[26rpx] text-sub">{{ $t(avail.lostFeeSeparate ? "borrow.lostFee" : "borrow.buyout") }}</text>
             <pb-amount :value="avail.buyoutPrice" size="sm" />
           </view>
         </view>

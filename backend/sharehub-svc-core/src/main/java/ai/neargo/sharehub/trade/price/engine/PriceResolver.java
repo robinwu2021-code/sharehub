@@ -106,7 +106,9 @@ public class PriceResolver {
         }
         // 总封顶（= 买断价）随快照定格：0 / 空表示不封顶
         BigDecimal cap = plan.getCapTotal() == null || plan.getCapTotal().signum() <= 0 ? null : plan.getCapTotal();
-        return new Resolved(hit.planNo(), plan.getCurrency(), expand(hit.planNo()), hit, null, cap);
+        // 遗失费（V180，K5）：空 = 与总封顶合一；随快照定格，改方案不影响在途单
+        BigDecimal lost = plan.getLostFee() == null || plan.getLostFee().signum() <= 0 ? null : plan.getLostFee();
+        return new Resolved(hit.planNo(), plan.getCurrency(), expand(hit.planNo()), hit, null, cap, lost);
     }
 
     /**
@@ -251,17 +253,30 @@ public class PriceResolver {
                            Hit hit, BigDecimal multiplier,
                            // 2026-09-25 总封顶（方案的 cap_total，前端叫「买断价」）；null = 不封顶。
                            // 此前结算时总封顶一律传 null —— 借得越久付得越多、永不触顶，「逾期达封顶转买断」也就无从谈起
-                           BigDecimal capTotal) {
+                           BigDecimal capTotal,
+                           // 2026-10-29 遗失费（V180）；null = 与 capTotal 合一
+                           BigDecimal lostFee) {
 
         /** 兼容旧构造点：不封顶。 */
         public Resolved(String planNo, String currency, List<PriceItemSpec> specs, Hit hit, BigDecimal multiplier) {
-            this(planNo, currency, specs, hit, multiplier, null);
+            this(planNo, currency, specs, hit, multiplier, null, null);
+        }
+
+        /** 兼容旧构造点：有总封顶、无独立遗失费。 */
+        public Resolved(String planNo, String currency, List<PriceItemSpec> specs, Hit hit, BigDecimal multiplier,
+                        BigDecimal capTotal) {
+            this(planNo, currency, specs, hit, multiplier, capTotal, null);
+        }
+
+        /** 用户不还（遗失 / 主动买断）收多少：独立遗失费优先，否则就是总封顶。 */
+        public BigDecimal lostCharge() {
+            return lostFee != null ? lostFee : capTotal;
         }
 
         /** 带上时段倍率（下单时解析一次，随快照定格）。 */
         public Resolved withMultiplier(BigDecimal m) {
             return new Resolved(planNo, currency, specs,
-                    hit == null ? null : hit.withMultiplier(m), m, capTotal);
+                    hit == null ? null : hit.withMultiplier(m), m, capTotal, lostFee);
         }
 
         /** 序列化为订单快照。改价不影响在途单的实现手段。 */
@@ -271,6 +286,7 @@ public class PriceResolver {
             m.put("currency", currency);
             m.put("items", specs);
             if (capTotal != null) m.put("capTotal", capTotal.toPlainString());
+            if (lostFee != null) m.put("lostFee", lostFee.toPlainString());
             if (hit != null) {
                 // 命中原因不是可选装饰：没有它，事后只能用**今天的配置**去解释昨天的订单。
                 m.put("hit", Map.of(
@@ -296,6 +312,16 @@ public class PriceResolver {
         Object v = hit.get("multiplier");
         String s = v == null ? "" : String.valueOf(v);
         return s.isBlank() ? null : new BigDecimal(s);
+    }
+
+    /** 从快照读回遗失费（V180）；没有 = 与总封顶合一，返回总封顶。 */
+    @SuppressWarnings("unchecked")
+    public static BigDecimal lostChargeFromSnapshot(String snapshot) {
+        if (snapshot == null || snapshot.isBlank()) return null;
+        Map<String, Object> m = Json.read(snapshot, Map.class);
+        Object v = m == null ? null : m.get("lostFee");
+        String s = v == null ? "" : String.valueOf(v);
+        return s.isBlank() ? capTotalFromSnapshot(snapshot) : new BigDecimal(s);
     }
 
     /** 从快照读回总封顶；旧快照（2026-09-25 之前）没有这一项 → null，按原口径不封顶。 */

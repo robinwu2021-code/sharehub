@@ -65,7 +65,11 @@ export interface CabinetAvailability {
   borrowable: boolean;
   pricePerHour: number;
   dailyCap: number; // 日封顶
-  buyoutPrice: number; // 买断价
+  buyoutPrice: number; // 买断价 = 不还时收多少（方案配了独立遗失费时就是遗失费）
+  /** 最高租赁收费 = 计费方案总封顶（V180，与借出后实扣同一份数）；老后端没有这一项 */
+  maxCharge?: number;
+  /** 方案配了独立遗失费：确认页分开写「最高收费」与「遗失费」 */
+  lostFeeSeparate?: boolean;
   depositAmount: number; // 押金（降级）
   freeQuota: number; // 免押冻结额度
   currency: string;

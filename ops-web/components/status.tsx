@@ -9,7 +9,7 @@ type Tone = BadgeTone;
 
 // 只保留「枚举→色调」在代码；文案统一走 i18n（orderStatus.* / woStatus.* / cabStatus.* / online.* / woType.*）。
 const ORDER_TONE: Record<OrderStatus, Tone> = {
-  CREATED: "muted", DISPENSING: "warning", IN_USE: "success",
+  CREATED: "muted", DISPENSING: "warning", IN_USE: "success", OVERDUE_CHARGED: "danger",
   RETURNED: "default", SETTLED: "success", CLOSED: "muted", EXCEPTION: "danger",
 };
 const WO_TONE: Record<WorkOrderStatus, Tone> = {

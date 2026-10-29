@@ -6,7 +6,10 @@ import type { AuditTrail } from "./common";
 import type { WhitelistReason } from "./user";
 
 export type OrderStatus =
-  | "CREATED" | "DISPENSING" | "IN_USE" | "RETURNED" | "SETTLED" | "CLOSED" | "EXCEPTION";
+  | "CREATED" | "DISPENSING" | "IN_USE"
+  // V180：已扣款未归还（超时扣款模型 TIME_LIMIT：到时限已发起最高收费，宝还在用户手里；之后归还只结单、不冲销）
+  | "OVERDUE_CHARGED"
+  | "RETURNED" | "SETTLED" | "CLOSED" | "EXCEPTION";
 export interface RentOrder {
   orderNo: string;
   cUserNo: string;

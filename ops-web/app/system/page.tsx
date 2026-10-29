@@ -365,7 +365,7 @@ function BizRulesPanel({ canEdit }: { canEdit: boolean }) {
         <NumField label="默认计费单位" unit="分钟 / 计费周期" value={billing.unitMinutes} disabled={!canEdit} onChange={(v) => setBilling({ ...billing, unitMinutes: v })} />
         <NumField label="默认日封顶" unit={currency} value={billing.capDaily} disabled={!canEdit} onChange={(v) => setBilling({ ...billing, capDaily: v })} />
         <NumField label="默认买断价" unit={currency} value={billing.buyoutPrice} disabled={!canEdit} onChange={(v) => setBilling({ ...billing, buyoutPrice: v })} />
-        <NumField label="超时判定阈值" unit="小时" value={billing.overdueHours} disabled={!canEdit} onChange={(v) => setBilling({ ...billing, overdueHours: v })} help="超过即判定逾期并触发买断" />
+        <NumField label="超时判定阈值" unit="小时" value={billing.overdueHours} disabled={!canEdit} onChange={(v) => setBilling({ ...billing, overdueHours: v })} help="仅在超时扣款模型为「到时限最高收费」（系统参数 rent.overdue.mode=TIME_LIMIT）时生效：借出超过此时长即按计费方案买断价发起最高收费，订单进「已扣款未归还」。默认模型（CAP_AMOUNT）按累计费用触顶买断，不看这个时长" />
         <SaveBar onSave={() => {
           if (!nonNegative(billing.freeMinutes, billing.unitMinutes, billing.capDaily, billing.buyoutPrice, billing.overdueHours)) { notify.error("计费默认值：数值不能为负数"); return; }
           if (billing.unitMinutes <= 0) { notify.error("计费单位必须大于 0 分钟"); return; }

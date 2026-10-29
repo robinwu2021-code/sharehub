@@ -19,6 +19,8 @@ export interface PricePlan extends Archivable {
   unitPrice: number;
   capDaily: number;
   buyoutPrice: number; // 买断价
+  /** 遗失费（V180）：空 = 与买断价合一；填了 = 用户不还时按它收，与最高租赁收费独立。 */
+  lostFee?: number | null;
   currency: string;
   scope: string; // 默认/点位/场景
   status: PricePlanStatus;

@@ -244,12 +244,24 @@ public class RentOrderServiceImpl implements RentOrderService {
 
     @Override
     public RentOrder buyout(String orderNo, java.math.BigDecimal buyoutPrice) {
+        /*
+         * 用户主动买断（不还了）按**本单计费方案快照**收：独立遗失费优先，否则总封顶（V180，K5）。
+         * 此前一律收调用方传来的系统默认买断价 —— 借出确认页显示的、自动买断实扣的、这里收的是三个来源（D4）。
+         * 快照里两者都没有（老单）才用调用方给的兜底价。
+         */
+        return buyoutAt(orderNo, null, buyoutPrice);
+    }
+
+    /** {@code exact} 非空 = 就按它收（逾期触顶买断收总封顶）；否则按快照的遗失费 / 总封顶，再否则 {@code fallback}。 */
+    private RentOrder buyoutAt(String orderNo, java.math.BigDecimal exact, java.math.BigDecimal fallback) {
         return DataScopeContext.executeWithoutScope(() -> {
             OrdOrder e = require(orderNo);
             if (!"IN_USE".equals(e.getStatus())) {
                 throw BizException.conflict("error.order.buyout_only_in_use", e.getStatus());
             }
-            java.math.BigDecimal price = buyoutPrice == null ? java.math.BigDecimal.ZERO : buyoutPrice;
+            java.math.BigDecimal fromPlan = PriceResolver.lostChargeFromSnapshot(e.getPriceSnapshot());
+            java.math.BigDecimal chosen = exact != null ? exact : fromPlan != null ? fromPlan : fallback;
+            java.math.BigDecimal price = chosen == null ? java.math.BigDecimal.ZERO : chosen;
             e.setRentEndAt(nowUtc());
             e.setAmount(price);
             e.setFeeAmount(price.doubleValue());   // 过渡期双写，同 returnOrder
@@ -527,6 +539,9 @@ public class RentOrderServiceImpl implements RentOrderService {
     private OkResult settleReturn(String orderNo, String returnCabinetNo, java.time.LocalDateTime endUtc,
                                   boolean trackBank) {
         OrdOrder e = require(orderNo);
+        if (OrderStatus.OVERDUE_CHARGED.name().equals(e.getStatus())) {
+            return returnAfterOverdueCharge(e, returnCabinetNo, endUtc, trackBank);
+        }
         String beforeReturn = e.getStatus();
         e.setStatus(stateMachine.next(e.getStatus(), "RETURN"));   // IN_USE→RETURNED，非法迁移拒
         appendEvent(orderNo, beforeReturn, e.getStatus(), "RETURN", OPERATOR_SYSTEM);
@@ -670,7 +685,7 @@ public class RentOrderServiceImpl implements RentOrderService {
                     null, cap, null);
             if (!charged.buyout()) return false;
             try {
-                buyout(orderNo, cap);   // 买断也是收入：请款与分润在 buyout 里（collect）
+                buyoutAt(orderNo, cap, null);   // 触顶买断收的就是总封顶；请款与分润在里面（collect）
             } catch (BizException lost) {
                 // 读到 IN_USE 之后用户恰好归还（或别处已结）：那边已经请过款，这里不再扣
                 log.info("逾期买断让位于并发的归还/结算 orderNo={} reason={}", orderNo, lost.getMessage());
@@ -740,6 +755,56 @@ public class RentOrderServiceImpl implements RentOrderService {
      * 却照常往下走到 {@link #collect}，于是同一单请款两次，而 {@code pay_order} 没有唯一约束兜底。
      * 冲突必须在请款**之前**抛出。
      */
+    /**
+     * 已扣款未归还的单被归还（V180）：只更新归还信息并结单，**不重新计费、不冲销已收的最高收费**
+     * —— 原文 RQ-BIL-04 / AC-03「超时扣费后归还不自动冲销」。退不退、退多少走退款审批，不在这里自动做。
+     */
+    private OkResult returnAfterOverdueCharge(OrdOrder e, String returnCabinetNo, java.time.LocalDateTime endUtc,
+                                              boolean trackBank) {
+        String before = e.getStatus();
+        e.setStatus(stateMachine.next(before, "RETURN"));
+        e.setStatus(stateMachine.next(e.getStatus(), "SETTLE"));
+        e.setReturnCabinetNo(returnCabinetNo);
+        e.setRentEndAt(endUtc == null ? nowUtc() : endUtc.toString());
+        e.setDurationMin((int) durationMinutes(e.getRentStartAt(), e.getRentEndAt()));
+        updateOrConflict(e);
+        appendEvent(e.getOrderNo(), before, e.getStatus(), "RETURN_AFTER_OVERDUE_CHARGE", OPERATOR_SYSTEM);
+        if (trackBank) powerbankTracker.returned(e.getPowerbankNo(), returnCabinetNo, null);
+        log.info("已扣款未归还的单归还 orderNo={}，不冲销已收的最高收费 amount={}", e.getOrderNo(), e.getAmount());
+        return new OkResult(true);
+    }
+
+    @Override
+    public boolean chargeOverdueIfDue(String orderNo, int hours) {
+        if (hours <= 0) return false;
+        return Boolean.TRUE.equals(DataScopeContext.executeWithoutScope(() -> {
+            OrdOrder e = mapper.selectOne(new LambdaQueryWrapper<OrdOrder>().eq(OrdOrder::getOrderNo, orderNo).last("limit 1"));
+            if (e == null || !OrderStatus.IN_USE.name().equals(e.getStatus())) return false;
+            if (durationMinutes(e.getRentStartAt(), nowUtc()) < hours * 60L) return false;
+            java.math.BigDecimal max = PriceResolver.capTotalFromSnapshot(e.getPriceSnapshot());
+            if (max == null || max.signum() <= 0) {
+                // 方案没配总封顶就没有「最高收费」可收 —— 不猜一个数，留给运营在逾期视图里处理
+                log.warn("超时到限但计费方案无总封顶，未发起最高收费 orderNo={}，请运营给该方案配总封顶", orderNo);
+                return false;
+            }
+            String before = e.getStatus();
+            e.setStatus(stateMachine.next(before, "OVERDUE_CHARGE"));
+            e.setAmount(max);
+            e.setFeeAmount(max.doubleValue());   // 过渡期双写，同 returnOrder
+            e.setOverdueChargedAt(java.time.LocalDateTime.now());
+            try {
+                updateOrConflict(e);
+            } catch (BizException lost) {
+                return false;   // 同一刻用户归还了：那边已经结算，这里不再收
+            }
+            appendEvent(orderNo, before, e.getStatus(), "OVERDUE_CHARGE", OPERATOR_SYSTEM);
+            // 宝不转 SOLD：用户还可能还回来（AC-03）。请款与分润同买断（collect，幂等键 SETTLE-订单号）
+            collect(e, "RENT");
+            log.info("超时到限发起最高收费 orderNo={} hours={} amount={}", orderNo, hours, max);
+            return true;
+        }));
+    }
+
     private void updateOrConflict(OrdOrder e) {
         if (mapper.updateById(e) == 0) {
             throw BizException.conflict("error.common.state_changed");

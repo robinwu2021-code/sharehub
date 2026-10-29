@@ -28,7 +28,10 @@ public class OrdStateMachine {
     private static final Map<String, Map<OrderStatus, OrderStatus>> TRANSITIONS = Map.of(
             // 设备回执（EJECT_OK / COMMAND_RESULT=OK）：宝真的出来了才开始计费
             "DELIVER", Map.of(OrderStatus.DISPENSING, OrderStatus.IN_USE),
-            "RETURN", Map.of(OrderStatus.IN_USE, OrderStatus.RETURNED),
+            // 已扣款未归还的单也能归还（V180）：归还只结单、不再计费，见 RentOrderServiceImpl#settleReturn
+            "RETURN", Map.of(OrderStatus.IN_USE, OrderStatus.RETURNED, OrderStatus.OVERDUE_CHARGED, OrderStatus.RETURNED),
+            // 到最长时限发起最高收费（V180，rent.overdue.mode=TIME_LIMIT）
+            "OVERDUE_CHARGE", Map.of(OrderStatus.IN_USE, OrderStatus.OVERDUE_CHARGED),
             "SETTLE", Map.of(OrderStatus.RETURNED, OrderStatus.SETTLED),
             "CLOSE", Map.of(OrderStatus.SETTLED, OrderStatus.CLOSED),
             // 2026-09-25 业务告警自愈：出宝失败（一直停在出宝中）的订单撤销，不收费（RENT_NOT_DELIVERED）

@@ -69,7 +69,7 @@ export const ar: Messages = {
   lang: { label: "اللغة", zh: "中文", en: "English", ar: "العربية" },
   online: { ONLINE: "متصل", OFFLINE: "غير متصل" },
   orderStatus: {
-    CREATED: "تم الإنشاء", DISPENSING: "قيد الإخراج", IN_USE: "قيد الاستخدام",
+    CREATED: "تم الإنشاء", DISPENSING: "قيد الإخراج", IN_USE: "قيد الاستخدام", OVERDUE_CHARGED: "تم التحصيل ولم يُرجع",
     RETURNED: "تمت الإعادة", SETTLED: "تمت التسوية", CLOSED: "مغلق", EXCEPTION: "استثناء",
   },
   woStatus: {

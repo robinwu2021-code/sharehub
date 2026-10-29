@@ -75,7 +75,7 @@ public class PricePlanServiceImpl extends AbstractCrudService<PricePlan, PricePl
     protected PricePlanEntry toVO(PricePlan e) {
         return new PricePlanEntry(e.getPlanNo(), e.getName(), e.getFreeMinutes(), e.getUnitMinutes(),
                 e.getUnitPrice(), e.getCapDaily(), e.getCapTotal(), e.getCurrency(), e.getScope(), e.getStatus(),
-                e.getArchivedAt() == null ? null : e.getArchivedAt().toString());
+                e.getArchivedAt() == null ? null : e.getArchivedAt().toString(), e.getLostFee());
     }
 
     // ——————————————————————— §1.7 多值拆表 ———————————————————————
