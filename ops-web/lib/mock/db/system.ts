@@ -60,6 +60,12 @@ export const regions: Region[] = [
   { regionId: "AE-AJ", name: "阿治曼", parent: "阿联酋", parentId: "AE", level: 2, cityCount: 1 },
 ];
 export const sysParams: SysParam[] = [
+  // 字典化参数（V191）样例：与后端迁移同口径，演示下拉 / 开关 / 范围与「待拍板」筛选
+  { paramKey: "rent.service_fee.amount", label: "服务费（每单）", value: "0", groupName: "计费", updatedAt: iso(0), valueType: "DECIMAL", minValue: 0, maxValue: 100, nullable: false, hint: "C09：0 = 不收；借出时定格。原文举例 0.60 / 0.90", pendingDecision: true },
+  { paramKey: "rent.service_fee.payer", label: "服务费谁付", value: "USER", groupName: "计费", updatedAt: iso(0), valueType: "ENUM", options: [{ value: "USER", label: "用户付（加到应付）" }, { value: "PLATFORM", label: "平台承担（不进订单）" }], nullable: false, hint: "C09", pendingDecision: true },
+  { paramKey: "billing.unit_rounding", label: "计费周期取整缺省", value: "CEIL", groupName: "计费", updatedAt: iso(0), valueType: "ENUM", options: [{ value: "CEIL", label: "不足一个周期按一个收（现行）" }, { value: "FLOOR", label: "不足一个周期不收" }, { value: "HALF_UP", label: "过半按一个收" }], nullable: false, hint: "C03：新建计费方案的缺省", pendingDecision: true },
+  { paramKey: "invoice.b2c.enabled", label: "C 端租赁税务发票", value: "0", groupName: "发票", updatedAt: iso(0), valueType: "BOOL", nullable: false, hint: "C05 / K6：是否每笔租赁自动开税务发票", pendingDecision: true },
+  { paramKey: "approval.compensation.threshold", label: "客服补偿 / 免单审批线", value: "", groupName: "财务", updatedAt: iso(0), valueType: "DECIMAL", minValue: 0, maxValue: 100000, nullable: true, hint: "SEC-03：留空 = 不需要审批", pendingDecision: true },
   { paramKey: "deposit.default", label: "默认押金", value: "50", groupName: "计费", updatedAt: iso(0) },
   { paramKey: "free.minutes", label: "免费时长(分钟)", value: "5", groupName: "计费", updatedAt: iso(86400_000) },
   { paramKey: "cap.daily", label: "每日封顶", value: "30", groupName: "计费", updatedAt: iso(2 * 86400_000) },
@@ -112,7 +118,9 @@ export const marketCountries: MarketCountry[] = [
 export const listNotifyTemplates = (q: PageQuery = {}) => paginate(notifyTemplates, q.page, q.size, (x) => kwHit(q.keyword, x.templateNo, x.name));
 export const listDictEntries = (q: PageQuery = {}) => paginate(dictEntries, q.page, q.size, (x) => kwHit(q.keyword, x.dictNo, x.group, x.code, x.label));
 export const listRegions = (q: PageQuery = {}) => paginate(regions, q.page, q.size, (x) => kwHit(q.keyword, x.regionId, x.name, x.parent));
-export const listSysParams = (q: PageQuery = {}) => paginate(sysParams, q.page, q.size, (x) => kwHit(q.keyword, x.paramKey, x.label, x.groupName));
+export const listSysParams = (q: PageQuery & { groupName?: string; pendingDecision?: string } = {}) =>
+  paginate(sysParams, q.page, q.size, (x) => kwHit(q.keyword, x.paramKey, x.label, x.groupName)
+    && (!q.groupName || x.groupName === q.groupName) && (q.pendingDecision !== "1" || !!x.pendingDecision));
 export const listOpenApiApps = (q: PageQuery = {}) => paginate(openApiApps, q.page, q.size, (x) => kwHit(q.keyword, x.appNo, x.name, x.appKey));
 export const listMarketCountries = (q: PageQuery = {}) => paginate(marketCountries, q.page, q.size, (x) => kwHit(q.keyword, x.countryCode, x.name, x.currency));
 

@@ -127,12 +127,35 @@ export interface Region {
 export interface RegionNode extends Region {
   children: RegionNode[];
 }
+/** 系统参数取值类型（V191 字典，sys_param.value_type）。 */
+export type ParamValueType = "TEXT" | "INT" | "DECIMAL" | "BOOL" | "ENUM";
+
 export interface SysParam {
   paramKey: string;
   label: string;
   value: string;
   groupName: string;
   updatedAt: string;
+  // —— 字典元数据（V191）：只由迁移维护，界面据此渲染输入控件；保存时后端按它校验，请求体带了也不认 ——
+  valueType?: ParamValueType;
+  options?: { value: string; label: string }[];
+  minValue?: number | null;
+  maxValue?: number | null;
+  pattern?: string | null;
+  /** true = 允许留空（留空 = 关闭，如审批阈值）。 */
+  nullable?: boolean;
+  /** 改了会影响什么（只影响之后的订单 / 原文举例值）。 */
+  hint?: string | null;
+  /** 运营方待拍板项。 */
+  pendingDecision?: boolean;
+}
+
+/** 参数取值的人读形式：枚举显示含义、开关显示开/关、可留空的空值显示「未设（关闭）」。 */
+export function paramDisplay(p: SysParam): string {
+  if (p.value === "" || p.value == null) return p.nullable ? "未设（关闭）" : "—";
+  if (p.valueType === "BOOL") return p.value === "1" ? "开" : "关";
+  if (p.valueType === "ENUM") return p.options?.find((o) => o.value === p.value)?.label ?? p.value;
+  return p.value;
 }
 export interface OpenApiApp {
   appNo: string;

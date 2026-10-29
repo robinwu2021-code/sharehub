@@ -32,6 +32,7 @@ import { useI18n } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
 import { exportCsv } from "@/lib/export-csv";
 import type { NotifyTemplate, DictEntry, Region, RegionNode, SysParam, OpenApiApp, MarketCountry, PageResult } from "@/lib/types";
+import { paramDisplay } from "@/lib/types";
 import type {
   NotifyLog, NotifyBlacklist, LoginSetting, TaxSetting,
   WithdrawRule, ReservationRule, BillingDefaultRule,
@@ -112,6 +113,27 @@ const PARAM_FIELDS: FieldDef[] = [
   { key: "value", label: "取值", placeholder: "30" },
   { key: "groupName", label: "分组", placeholder: "订单" },
 ];
+
+/**
+ * 字典化参数（V191）的表单：取值控件按类型渲染（枚举 → 下拉、开关 → 开/关、数字带范围说明），
+ * 说明与分组归迁移维护、这里只读；hint 写在取值下方。没有字典的参数仍是自由文本。
+ * 校验以后端为准（按字典拒非法值）—— 这里只是让管理员一眼看到能填什么。
+ */
+function paramFieldsFor(p: Partial<SysParam> | null): FieldDef[] {
+  if (!p?.paramKey || !p.valueType || p.valueType === "TEXT" && !p.pattern) return PARAM_FIELDS;
+  const range = p.minValue != null || p.maxValue != null ? `范围 ${p.minValue ?? "-"} ~ ${p.maxValue ?? "-"}` : "";
+  const help = [p.hint, range, p.nullable ? "留空 = 关闭" : ""].filter(Boolean).join("；");
+  const value: FieldDef =
+    p.valueType === "ENUM" ? { key: "value", label: "取值", type: "select", options: p.options ?? [], help }
+    : p.valueType === "BOOL" ? { key: "value", label: "取值", type: "select", options: [{ value: "1", label: "开" }, { value: "0", label: "关" }], help }
+    : { key: "value", label: "取值", placeholder: p.valueType === "TEXT" ? p.pattern ?? "" : range, help };
+  return [
+    { key: "paramKey", label: "参数键", readOnlyOnEdit: true },
+    { key: "label", label: "说明", readOnlyOnEdit: true },
+    value,
+    { key: "groupName", label: "分组", readOnlyOnEdit: true },
+  ];
+}
 
 // 国家码是业务主键（ISO alpha-2），新增必填、编辑只读
 /**
@@ -400,6 +422,8 @@ function SystemInner() {
   const [dictForm, setDictForm] = useState<Partial<DictEntry> | null>(null);
   const [regionForm, setRegionForm] = useState<Partial<Region> | null>(null);
   const [paramForm, setParamForm] = useState<Partial<SysParam> | null>(null);
+  // V191：「只看待拍板」—— 运营方要定的取值（服务费、分成区间、审批线、开票…）一键筛出
+  const [pendingOnly, setPendingOnly] = useState(false);
   const [openapiForm, setOpenapiForm] = useState<Partial<OpenApiApp> | null>(null);
   const [marketForm, setMarketForm] = useState<Partial<MarketCountry> | null>(null);
 
@@ -512,7 +536,7 @@ function SystemInner() {
       : tab === "login" ? api.listLoginSettings({ page: paging.page, size: paging.size, keyword })
       : tab === "tax" ? api.listTaxSettings({ page: paging.page, size: paging.size, keyword })
       : tab === "dict" ? api.listDictEntries({ page: paging.page, size: paging.size, keyword })
-      : tab === "params" ? api.listSysParams({ page: paging.page, size: paging.size, keyword })
+      : tab === "params" ? api.listSysParams({ page: paging.page, size: paging.size, keyword, pendingDecision: pendingOnly ? "1" : undefined })
       : tab === "markets" ? api.listMarketCountries({ page: paging.page, size: paging.size, keyword })
       : api.listOpenApiApps({ page: paging.page, size: paging.size, keyword }),
     placeholderData: keepWithinTab(tab),
@@ -607,8 +631,16 @@ function SystemInner() {
 
   const paramCols: Column<SysParam>[] = [
     { header: "参数键", cell: (p) => <span className="font-medium">{p.paramKey}</span> },
-    { header: "说明", cell: (p) => p.label },
-    { header: "取值", cell: (p) => <span className="tabular-nums">{p.value}</span> },
+    {
+      header: "说明",
+      cell: (p) => (
+        <span>
+          {p.label}{p.pendingDecision && <Badge tone="warning" className="ms-1.5">待拍板</Badge>}
+          {p.hint && <span className="block text-muted-foreground">{p.hint}</span>}
+        </span>
+      ),
+    },
+    { header: "取值", cell: (p) => <span className="tabular-nums">{paramDisplay(p)}</span> },
     { header: "分组", cell: (p) => <Badge tone="outline">{p.groupName}</Badge> },
     { header: "更新时间", cell: (p) => <span className="text-muted-foreground">{fmtTime(p.updatedAt)}</span> },
     { header: t("common.actions"), cell: editBtn<SysParam>(canParam, setParamForm) },
@@ -864,7 +896,10 @@ function SystemInner() {
             { header: "分组", value: (p) => p.groupName },
             { header: "更新时间", value: (p) => fmtTime(p.updatedAt) },
           ], (q.data?.list ?? []) as SysParam[])}
-          onAdd={canParam ? () => setParamForm({ value: "", groupName: "" }) : undefined} addLabel="新增参数" />
+          onAdd={canParam ? () => setParamForm({ value: "", groupName: "" }) : undefined} addLabel="新增参数">
+          <FilterSelect value={pendingOnly ? "1" : ""} onChange={(v) => { setPendingOnly(v === "1"); paging.reset(); }}
+            allLabel="全部参数" options={[{ value: "1", label: "只看待拍板" }]} />
+        </Toolbar>
       )}
       {tab === "openapi" && (
         <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); paging.reset(); }} searchPlaceholder="搜索应用号 / 名称 / AppKey"
@@ -1058,7 +1093,7 @@ function SystemInner() {
       {/* 系统参数 编辑抽屉 */}
       <FormDrawer open={!!paramForm} onOpenChange={(o) => !o && setParamForm(null)}
         titleNew="新增系统参数" titleEdit={`编辑系统参数 ${paramForm?.paramKey ?? ""}`} isEdit={!!paramForm?.paramKey}
-        fields={PARAM_FIELDS} value={(paramForm ?? {}) as Record<string, unknown>}
+        fields={paramFieldsFor(paramForm)} value={(paramForm ?? {}) as Record<string, unknown>}
         onChange={(v) => setParamForm(v as Partial<SysParam>)}
         onSubmit={() => paramForm && saveParam.mutate(paramForm)} submitting={saveParam.isPending} />
 
