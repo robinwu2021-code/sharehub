@@ -24,6 +24,8 @@ public final class RolePerms {
                     "device:cabinet:*", "device:slot:read", "device:powerbank:*",
                     "device:command:*", "device:inventory:*", "device:ota:*", "device:vendor:read",
                     "location:poi:read", "location:venue:read", "location:overview:read",
+                    // 合同只读（运营方原文 MER-08，2026-10-29）：运维上门要知道站点的合同还有多久、谁签的
+                    "location:contract:read",
                     "order:order:read", "order:exception:read", "order:exception:handle",
                     "workorder:*", "agent:scope:assign",
                     "report:device:read", "report:location:read",

@@ -315,10 +315,11 @@ describe("L3 叶子过滤（4.2-2）", () => {
     expect(visibleLeaves(sec("finance"), "FINANCE").map((l) => l.label)).toEqual(["对账", "账务分录", "调整单", "发票"]);
   });
   // OPS 有 poi/venue，没有 contract/analysis/lead —— 并成网点管理后按 perm 过滤的结论不变。
-  it("OPS：网点管理有站点、点位与场地方；无坪效、合同与 CRM；基础资料只有应用版本", () => {
+  // 2026-10-29 运营方原文 MER-08：OPS 补合同只读（V185）—— 上门要知道站点合同还有多久
+  it("OPS：网点管理有站点、点位、场地方与进场合同（只读）；无坪效与 CRM；基础资料只有应用版本", () => {
     const venue = visibleLeaves(sec("venue"), "OPS").map((l) => l.label);
-    for (const x of ["站点管理", "点位管理", "站点概览", "场地方"]) expect(venue).toContain(x);
-    for (const x of ["站点坪效", "进场合同", "BD 拓展 CRM"]) expect(venue).not.toContain(x);
+    for (const x of ["站点管理", "点位管理", "站点概览", "场地方", "进场合同"]) expect(venue).toContain(x);
+    for (const x of ["站点坪效", "BD 拓展 CRM"]) expect(venue).not.toContain(x);
     expect(visibleLeaves(sec("system"), "OPS").filter((l) => l.group === "基础资料").map((l) => l.label))
       .toEqual(["参数字典", "地区库", "应用版本"]);
   });

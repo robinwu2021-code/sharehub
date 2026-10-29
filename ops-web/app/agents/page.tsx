@@ -1226,6 +1226,9 @@ function AgentsInner() {
           <Field label="默认站点"><span className="txt-body tabular-nums text-muted-foreground">{form.defaultSiteNo}（系统建，随位置同步）</span></Field>
         )}
         {/* C10 自开票（V183）：有税号 = VAT 登记户，分成到账时平台代开税务发票；清空 = 不再出 */}
+        <Field label="营业执照号（选填）">
+          <Input value={form.licenseNo ?? ""} maxLength={64} onChange={(e) => setForm({ ...form, licenseNo: e.target.value })} />
+        </Field>
         <Field label="VAT 税号（TRN，选填）">
           <Input value={form.vatTrn ?? ""} maxLength={32} placeholder="15 位，如 100222333444555"
             onChange={(e) => setForm({ ...form, vatTrn: e.target.value })} />

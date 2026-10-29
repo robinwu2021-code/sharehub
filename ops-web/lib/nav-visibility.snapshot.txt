@@ -274,7 +274,7 @@ system›流程实例
 flow›待办中心
 flow›审批列表
 
-## OPS（53 项）
+## OPS（54 项）
 device›设备台账
 device›充电宝管理
 device›库存余额
@@ -302,6 +302,7 @@ workorder›巡检计划
 workorder›SLA 管理
 venue›门店 Onboarding
 venue›场地方
+venue›进场合同
 venue›站点管理
 venue›点位管理
 venue›站点概览

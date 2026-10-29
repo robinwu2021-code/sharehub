@@ -55,6 +55,8 @@ export interface Agent extends Archivable {
   defaultSiteNo?: string | null;
   /** VAT 税号（V183，C10）：有 = VAT 登记户，分成到账时出自开票单据；保存时不传 = 不改，空串 = 清掉。 */
   vatTrn?: string | null;
+  /** 营业执照号（V185，MER-01）。保存时不传 = 不改。 */
+  licenseNo?: string | null;
 }
 
 /** 核心资料是否齐全：位置（地址 + 坐标）与行业。店名、联系人建账号时已必填。 */

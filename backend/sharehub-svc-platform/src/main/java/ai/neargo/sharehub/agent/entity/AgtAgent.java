@@ -43,6 +43,8 @@ public class AgtAgent extends BaseEntity implements ai.neargo.sharehub.common.cr
     /** VAT 税号（V183，C10 自开票）：空 = 非 VAT 登记户，分成付款不出自开票单据。 */
     @com.baomidou.mybatisplus.annotation.TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
     private String vatTrn;
+    /** 营业执照号（V185，运营方原文 MER-01）：发票与合同上要用。 */
+    private String licenseNo;
     private String regionScope;
 
     /**

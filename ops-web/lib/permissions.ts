@@ -28,7 +28,7 @@ export const BACKEND_ROLE_PERMS: Record<Role, string[]> = {
     "flow:todo:read", "flow:approval:read", "flow:approval:submit", "flow:approval:decide", "flow:queue:claim", "flow:ticket:read", "flow:ticket:handle", "flow:ticket:dispatch", "flow:config:manage",
     "dashboard:overview:read", "dashboard:todo:read", "device:cabinet:*", "device:slot:read",
     "device:powerbank:*", "device:command:*", "device:inventory:*", "device:ota:*",
-    "device:vendor:read", "location:poi:read", "location:venue:read", "location:overview:read",
+    "device:vendor:read", "location:poi:read", "location:venue:read", "location:overview:read", "location:contract:read",
     "order:order:read", "order:exception:read", "order:exception:handle", "workorder:*",
     "agent:scope:assign", "report:device:read", "report:location:read",
     "system:notify_template:read", "system:dict:read", "system:notify_log:read",
