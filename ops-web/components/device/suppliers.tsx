@@ -26,8 +26,9 @@ type Form = SupplierReq & { supplierNo?: string };
  * @form POST /api/ops/inventory/suppliers
  * @form POST /api/ops/inventory/suppliers/{supplierNo}
  */
-const FIELDS: FieldDef[] = [
+const fieldsOf = (vendors: { value: string; label: string }[]): FieldDef[] => [
   { key: "name", label: "供应商名称", required: true, maxLength: 128 },
+  { key: "vendorCode", label: "对应设备厂商", type: "select", options: vendors, help: "供的是哪家厂商的设备（厂商接入）；贸易商可不选" },
   { key: "contactName", label: "联系人", maxLength: 64 },
   { key: "phone", label: "电话", maxLength: 32 },
   { key: "email", label: "邮箱", maxLength: 128 },
@@ -48,6 +49,10 @@ export function SuppliersTab() {
     queryKey: ["suppliers", paging.page, paging.size, keyword, showArchived],
     queryFn: () => api.listSuppliers({ page: paging.page, size: paging.size, keyword, showArchived }),
   });
+  const vendorsQ = useQuery({ queryKey: ["vendors"], queryFn: () => api.listVendors() });
+  const vendorOptions = (vendorsQ.data ?? []).map((v) => ({ value: v.vendorCode, label: v.name ?? v.vendorCode }));
+  const statsQ = useQuery({ queryKey: ["suppliers", "stats"], queryFn: () => api.listSupplierStats() });
+  const statOf = new Map((statsQ.data ?? []).map((s) => [s.supplierNo, s]));
   const refresh = () => qc.invalidateQueries({ queryKey: ["suppliers"] });
   const save = useMutation({
     mutationFn: ({ supplierNo, ...x }: Form) => (supplierNo ? api.updateSupplier(supplierNo, x) : api.createSupplier(x)),
@@ -64,6 +69,13 @@ export function SuppliersTab() {
         <div className="truncate font-mono txt-caption text-muted-foreground">{s.supplierNo}</div>
       </div>
     ) },
+    { header: "厂商", className: "whitespace-nowrap", cell: (s) => muted(s.vendorCode) },
+    { header: "到货", className: "text-right tabular-nums whitespace-nowrap", cell: (s) => statOf.get(s.supplierNo)?.received ?? 0 },
+    { header: "合格率", className: "text-right tabular-nums whitespace-nowrap", cell: (s) => {
+      const r = statOf.get(s.supplierNo)?.passRate;
+      return r == null ? <span className="text-muted-foreground">-</span> : `${(r * 100).toFixed(1)}%`;
+    } },
+    { header: "退货", className: "text-right tabular-nums whitespace-nowrap", cell: (s) => statOf.get(s.supplierNo)?.returned ?? 0 },
     { header: "联系人", className: "whitespace-nowrap", cell: (s) => muted(s.contactName) },
     { header: "电话", className: "whitespace-nowrap", cell: (s) => muted(s.phone) },
     { header: "邮箱", cell: (s) => muted(s.email) },
@@ -87,6 +99,10 @@ export function SuppliersTab() {
   const onExport = () => exportCsv<Supplier>("供应商", [
     { header: "供应商号", value: (s) => s.supplierNo },
     { header: "名称", value: (s) => s.name },
+    { header: "厂商", value: (s) => s.vendorCode ?? "" },
+    { header: "到货", value: (s) => statOf.get(s.supplierNo)?.received ?? 0 },
+    { header: "合格率", value: (s) => { const r = statOf.get(s.supplierNo)?.passRate; return r == null ? "" : `${(r * 100).toFixed(1)}%`; } },
+    { header: "退货", value: (s) => statOf.get(s.supplierNo)?.returned ?? 0 },
     { header: "联系人", value: (s) => s.contactName ?? "" },
     { header: "电话", value: (s) => s.phone ?? "" },
     { header: "邮箱", value: (s) => s.email ?? "" },
@@ -110,7 +126,7 @@ export function SuppliersTab() {
         titleNew="新建供应商"
         titleEdit={`编辑供应商 ${form?.supplierNo ?? ""}`}
         isEdit={!!form?.supplierNo}
-        fields={FIELDS}
+        fields={fieldsOf(vendorOptions)}
         value={(form ?? {}) as Record<string, unknown>}
         onChange={(v) => setForm(v as unknown as Form)}
         onSubmit={() => form && save.mutate(form)}

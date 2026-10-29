@@ -128,6 +128,8 @@ export interface WarehouseReq {
 export interface Supplier {
   supplierNo: string;
   name: string;
+  /** 对应的设备厂商（厂商接入，V207），可空。 */
+  vendorCode: string | null;
   contactName: string | null;
   phone: string | null;
   email: string | null;
@@ -172,6 +174,18 @@ export interface StockThresholdReq {
   itemType: IntakeItemType;
   minQty: number;
 }
+/**
+ * 供应商绩效（V207，GET /api/ops/inventory/suppliers/stats）：到货 / 入库 / 质检不合格 / 退货台数，
+ * 合格率 = (到货 − 不合格) / 到货，没到过货为 null。
+ */
+export interface SupplierStats {
+  supplierNo: string;
+  received: number;
+  inbound: number;
+  failed: number;
+  returned: number;
+  passRate: number | null;
+}
 /** 处置出库（V203，GET /api/ops/inventory/disposals）：在库设备报废 / 退供应商，建单即过账。 */
 export type DisposalKind = "SCRAP" | "RETURN_SUPPLIER";
 /** 报废原因码：BROKEN 损坏 / OBSOLETE 淘汰 / OTHER 其他（SCRAP 必填）。 */
@@ -211,6 +225,7 @@ export interface DisposalReq {
 }
 export interface SupplierReq {
   name: string;
+  vendorCode?: string | null;
   contactName?: string | null;
   phone?: string | null;
   email?: string | null;

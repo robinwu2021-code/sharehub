@@ -16,6 +16,8 @@ public class InvSupplier extends BaseEntity {
     /** 业务键。 */
     private String supplierNo;
     private String name;
+    /** 对应的设备厂商（厂商接入，V207），可空。 */
+    private String vendorCode;
     private String contactName;
     private String phone;
     private String email;

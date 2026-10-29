@@ -135,6 +135,7 @@ export const deviceMock: DeviceApi = {
   listDisposals: async (q) => wait(dp2.listDisposals(q)),
   getDisposal: async (no) => wait(dp2.getDisposal(no)),
   createDisposal: async (x) => wait(dp2.createDisposal(x), 400),
+  listSupplierStats: async () => wait(ia.supplierStats()),
   listSuppliers: async (q) => wait(ia.listSuppliers(q)),
   createSupplier: async (x) => wait(ia.createSupplier(x), 350),
   updateSupplier: async (no, x) => wait(ia.updateSupplier(no, x), 350),

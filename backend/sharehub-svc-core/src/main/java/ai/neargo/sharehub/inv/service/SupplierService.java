@@ -17,6 +17,9 @@ public interface SupplierService {
 
     Supplier unarchive(String supplierNo);
 
+    /** 供应商绩效（V207），全部供应商各一行（含已归档）。 */
+    java.util.List<ai.neargo.sharehub.inv.dto.SupplierDtos.SupplierStats> stats();
+
     /** 启用中的供应商名称；不存在或已归档返回 null（待检单登记时校验用）。 */
     String activeName(String supplierNo);
 }

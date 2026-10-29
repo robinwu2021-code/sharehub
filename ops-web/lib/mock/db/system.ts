@@ -66,6 +66,12 @@ export const sysParams: SysParam[] = [
   { paramKey: "billing.unit_rounding", label: "计费周期取整缺省", value: "CEIL", groupName: "计费", updatedAt: iso(0), valueType: "ENUM", options: [{ value: "CEIL", label: "不足一个周期按一个收（现行）" }, { value: "FLOOR", label: "不足一个周期不收" }, { value: "HALF_UP", label: "过半按一个收" }], nullable: false, hint: "C03：新建计费方案的缺省", pendingDecision: true },
   { paramKey: "invoice.b2c.enabled", label: "C 端租赁税务发票", value: "0", groupName: "发票", updatedAt: iso(0), valueType: "BOOL", nullable: false, hint: "C05 / K6：是否每笔租赁自动开税务发票", pendingDecision: true },
   { paramKey: "approval.compensation.threshold", label: "客服补偿 / 免单审批线", value: "", groupName: "财务", updatedAt: iso(0), valueType: "DECIMAL", minValue: 0, maxValue: 100000, nullable: true, hint: "SEC-03：留空 = 不需要审批", pendingDecision: true },
+  // 库存（V198 / V201 / V207）：仓库页「库存设置」维护
+  { paramKey: "inv.engine", label: "库存引擎：LOCAL 本地设备表 / SERVICE 独立进销存", value: "LOCAL", groupName: "库存", updatedAt: iso(0), valueType: "ENUM", options: [{ value: "LOCAL", label: "本地设备表" }, { value: "SERVICE", label: "独立进销存" }], nullable: false, hint: "S3：切到 SERVICE 前须配好库存服务并完成主数据与存量迁移" },
+  { paramKey: "inv.return_warehouse", label: "撤机回仓默认仓库（空 = 取第一个仓库）", value: "WH001", groupName: "库存", updatedAt: iso(0) },
+  { paramKey: "inv.intake.overdue_days", label: "到仓待检超期天数", value: "7", groupName: "库存", updatedAt: iso(0), valueType: "INT", minValue: 1, maxValue: 90, nullable: false, hint: "到达超过这么多天还没处理完的待检单，给仓管发待办" },
+  { paramKey: "inv.removal.return_grace_minutes", label: "撤机未回仓宽限（分钟）", value: "30", groupName: "库存", updatedAt: iso(0), valueType: "INT", minValue: 1, maxValue: 1440, nullable: false, hint: "撤机完工去向回仓，超过这么久还没有回仓调拨单就给运营发待办" },
+  { paramKey: "inv.qc.powerbank_policy", label: "充电宝质检策略", value: "FULL", groupName: "库存", updatedAt: iso(0), valueType: "ENUM", options: [{ value: "FULL", label: "逐块质检" }, { value: "SKIP", label: "免检（登记即入库）" }], nullable: false, hint: "只影响采购到货的充电宝；机柜始终逐台质检，撤机回仓始终复检" },
   { paramKey: "deposit.default", label: "默认押金", value: "50", groupName: "计费", updatedAt: iso(0) },
   { paramKey: "free.minutes", label: "免费时长(分钟)", value: "5", groupName: "计费", updatedAt: iso(86400_000) },
   { paramKey: "cap.daily", label: "每日封顶", value: "30", groupName: "计费", updatedAt: iso(2 * 86400_000) },

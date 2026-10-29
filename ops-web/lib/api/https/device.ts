@@ -154,6 +154,7 @@ export const deviceHttp: DeviceApi = {
   listDisposals: (q) => client.get("/api/ops/inventory/disposals", q),
   getDisposal: (no) => client.get(`/api/ops/inventory/disposals/${no}`),
   createDisposal: (x) => client.post("/api/ops/inventory/disposals", x),
+  listSupplierStats: () => client.get("/api/ops/inventory/suppliers/stats"),
   listSuppliers: (q) => client.get("/api/ops/inventory/suppliers", q),
   createSupplier: (x) => client.post("/api/ops/inventory/suppliers", x),
   updateSupplier: (no, x) => client.post(`/api/ops/inventory/suppliers/${no}`, x),

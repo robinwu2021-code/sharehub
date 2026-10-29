@@ -317,6 +317,13 @@ public class InventoryController {
         return suppliers.page(page, size, keyword, showArchived);
     }
 
+    /** 供应商绩效（V207）：到货 / 入库 / 不合格 / 退货台数与合格率。 */
+    @GetMapping("/inventory/suppliers/stats")
+    @PreAuthorize("@perm.can('device:inventory:read')")
+    public java.util.List<ai.neargo.sharehub.inv.dto.SupplierDtos.SupplierStats> supplierStats() {
+        return suppliers.stats();
+    }
+
     @PostMapping("/inventory/suppliers")
     @PreAuthorize("@perm.can('device:inventory:warehouse')")
     public ai.neargo.sharehub.inv.dto.SupplierDtos.Supplier createSupplier(@RequestBody ai.neargo.sharehub.inv.dto.SupplierDtos.SupplierReq req) {

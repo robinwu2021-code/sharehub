@@ -66,6 +66,8 @@ public class IntakeServiceImpl implements IntakeService {
     static final String INBOUND = "INBOUND";
     static final String ARRIVAL = "ARRIVAL";
     static final String OPENING = "OPENING";
+    /** 充电宝质检策略（V207）：FULL 逐块质检 / SKIP 免检。 */
+    static final String PB_POLICY = "inv.qc.powerbank_policy";
     static final Set<String> DISPOSALS = Set.of("RETURN_SUPPLIER", "SCRAP");
     private static final int MAX_ITEMS = 200;
 
@@ -105,6 +107,14 @@ public class IntakeServiceImpl implements IntakeService {
     @org.springframework.beans.factory.annotation.Autowired
     void setInventory(ai.neargo.sharehub.inv.port.InventoryPort inventory) {
         this.inventory = inventory;
+    }
+
+    /** 库存参数（V207 质检策略）：setter 注入，构造参数已经很长。 */
+    private ai.neargo.sharehub.api.platform.port.SysParamPort params;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setParams(ai.neargo.sharehub.api.platform.port.SysParamPort params) {
+        this.params = params;
     }
 
     // —— 查询 ——
@@ -215,12 +225,16 @@ public class IntakeServiceImpl implements IntakeService {
         intakes.insert(h);
         cabNos.forEach(no -> insertItem(h.getIntakeNo(), CABINET, no, costs.get(no)));
         pbNos.forEach(no -> insertItem(h.getIntakeNo(), POWERBANK, no, costs.get(no)));
-        if (OPENING.equals(kind)) {
-            // 期初建账：历史在仓、已验收的存量，登记即入库；放行凭证记 OPEN-{设备号}（与存量迁移 MIG- 同口径）
+        // 期初建账：历史在仓、已验收的存量，登记即入库，放行凭证 OPEN-{设备号}（与存量迁移 MIG- 同口径）；
+        // 充电宝免检（inv.qc.powerbank_policy = SKIP，V207）：采购到货的宝同样登记即入库，凭证 NOQC-{设备号}，柜照常质检
+        boolean opening = OPENING.equals(kind);
+        boolean skipPb = !opening && "SKIP".equals(params == null ? null : params.textOf(PB_POLICY, "FULL"));
+        if (opening || (skipPb && !pbNos.isEmpty())) {
             String me = operator();
             LocalDateTime now = LocalDateTime.now();
             for (InvIntakeItem i : itemsOf(h.getIntakeNo())) {
-                inventory.inbound(i.getItemType(), i.getItemNo(), h.getWarehouseNo(), "OPEN-" + i.getItemNo(), h.getIntakeNo());
+                if (!opening && !POWERBANK.equals(i.getItemType())) continue;
+                inventory.inbound(i.getItemType(), i.getItemNo(), h.getWarehouseNo(), (opening ? "OPEN-" : "NOQC-") + i.getItemNo(), h.getIntakeNo());
                 mark(i, INBOUND, null, me, now);
             }
             closeIfDone(h);

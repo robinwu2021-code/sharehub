@@ -8,7 +8,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil } from "lucide-react";
 import { api } from "@/lib/api";
 import { UNPAGED_SIZE } from "@/lib/constants";
-import type { InventoryMigrationResult, MigrationCandidate, MigrationFailure, StockThreshold, Warehouse, WarehouseReq } from "@/lib/types";
+import type { InventoryMigrationResult, MigrationCandidate, MigrationFailure, StockThreshold, SysParam, Warehouse, WarehouseReq } from "@/lib/types";
+import { Select } from "@/components/ui/input";
 import { Input } from "@/components/ui/input";
 import { useCan } from "@/lib/hooks/use-can";
 import { notify } from "@/lib/notify";
@@ -52,6 +53,7 @@ export function WarehousesTab() {
   const canMigrate = canSetDefault;
   const [migrating, setMigrating] = useState(false);
   const [thresholdOf, setThresholdOf] = useState<Warehouse | null>(null);
+  const [settings, setSettings] = useState(false);
   const q = useQuery({ queryKey: ["warehouses"], queryFn: () => api.listWarehouses() });
   const thQ = useQuery({ queryKey: ["stock-thresholds"], queryFn: () => api.listStockThresholds() });
   const lowWh = new Set((thQ.data ?? []).filter((t) => t.low).map((t) => t.warehouseNo));
@@ -132,6 +134,7 @@ export function WarehousesTab() {
         onExport={rows.length ? onExport : undefined}
         onAdd={() => setForm({ name: "", regionId: null, address: "" })} addLabel="新建仓库" canAdd={canWrite}>
         <ShowArchivedToggle checked={showArchived} onChange={setShowArchived} />
+        <Button size="sm" variant="outline" onClick={() => setSettings(true)}>库存设置</Button>
         {canMigrate && <Button size="sm" variant="outline" onClick={() => setMigrating(true)}>迁移到独立进销存</Button>}
       </Toolbar>
       <DataTable rowKey={(w: Warehouse) => w.warehouseNo} columns={cols} rows={q.data ? rows : undefined}
@@ -152,8 +155,69 @@ export function WarehousesTab() {
       />
       <MigrationDrawer open={migrating} onClose={() => setMigrating(false)} />
       <ThresholdDrawer warehouse={thresholdOf} canWrite={canWrite} onClose={() => setThresholdOf(null)} />
+      <SettingsDrawer open={settings} canWrite={canSetDefault} warehouses={activeWarehouses(q.data)} onClose={() => setSettings(false)} />
       {dialog}
     </div>
+  );
+}
+
+/**
+ * 库存设置（V207）：系统参数「库存」组的统一入口，控件按字典渲染（枚举 → 下拉、整数 → 数字），
+ * 默认回仓仓给仓库下拉。改动走系统参数接口（system:param:update），后端按字典校验。
+ * 跟踪方式不设参数：柜与宝都是逐件（序列号）跟踪。
+ */
+function SettingsDrawer({ open, canWrite, warehouses, onClose }: {
+  open: boolean; canWrite: boolean; warehouses: Warehouse[]; onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const q = useQuery({ queryKey: ["sys-params", "库存"], enabled: open,
+    queryFn: () => api.listSysParams({ groupName: "库存", page: 1, size: UNPAGED_SIZE }) });
+  const save = useMutation({
+    mutationFn: (p: SysParam) => api.saveSysParam({ paramKey: p.paramKey, value: draft[p.paramKey] ?? p.value }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sys-params"] });
+      qc.invalidateQueries({ queryKey: ["warehouses"] });
+      notify.success("已保存");
+    },
+  });
+  const valueOf = (p: SysParam) => draft[p.paramKey] ?? p.value;
+  const control = (p: SysParam) => {
+    const set = (v: string) => setDraft({ ...draft, [p.paramKey]: v });
+    if (!canWrite) return <span>{p.options?.find((o) => o.value === p.value)?.label ?? (p.value || "-")}</span>;
+    if (p.paramKey === "inv.return_warehouse")
+      return (
+        <Select aria-label={p.label} value={valueOf(p)} onChange={(e) => set(e.target.value)}>
+          <option value="">（第一个仓库）</option>
+          {warehouses.map((w) => <option key={w.warehouseNo} value={w.warehouseNo}>{w.name}</option>)}
+        </Select>
+      );
+    if (p.valueType === "ENUM")
+      return (
+        <Select aria-label={p.label} value={valueOf(p)} onChange={(e) => set(e.target.value)}>
+          {(p.options ?? []).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </Select>
+      );
+    return <Input aria-label={p.label} type={p.valueType === "INT" ? "number" : "text"} value={valueOf(p)} onChange={(e) => set(e.target.value)} />;
+  };
+  const cols: Column<SysParam>[] = [
+    { header: "参数", cell: (p) => (
+      <div className="min-w-0">
+        <div>{p.label}</div>
+        {p.hint && <div className="txt-caption text-muted-foreground">{p.hint}</div>}
+      </div>
+    ) },
+    { header: "取值", className: "w-48", cell: control },
+    { header: "", className: "whitespace-nowrap", cell: (p) => (canWrite
+      ? <Button size="sm" variant="outline" disabled={save.isPending || valueOf(p) === p.value} onClick={() => save.mutate(p)}>保存</Button>
+      : null) },
+  ];
+  return (
+    <Drawer open={open} onOpenChange={(o) => { if (!o) { setDraft({}); onClose(); } }} width="w-[720px]" title="库存设置">
+      {!canWrite && <ReadOnlyNotice what="库存设置" perm="system:param:update" className="mb-3" />}
+      <DataTable rowKey={(p: SysParam) => p.paramKey} columns={cols} rows={q.data?.list}
+        loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="没有库存参数" />
+    </Drawer>
   );
 }
 

@@ -8,6 +8,7 @@ import { cabinets, powerbanks } from "./device";
 import { consumeQc, inspectCabinet, inspectPowerbank } from "./device-asset";
 import { WAREHOUSES } from "./device-pool";
 import { activeSupplierName } from "./inventory-admin";
+import { sysParams } from "./system";
 import { paginate } from "./helpers";
 import { recordMovement, ref } from "./movement";
 
@@ -144,14 +145,16 @@ export function createIntake(x: IntakeCreateReq): IntakeDetail {
   }
   if (bad.length) fail(`以下设备不能办理：${bad.join("；")}`, `Rejected: ${bad.join("; ")}`);
   const d = insert({ ...x, cabinetNos: cabNos, powerbankNos: pbNos }, kind);
-  if (kind !== "OPENING") return d;
-  // 期初建账：登记即入库，放行凭证 OPEN-{设备号}（与后端同口径）
+  // 期初建账：登记即入库（OPEN-）；充电宝免检（inv.qc.powerbank_policy = SKIP）：采购到货的宝登记即入库（NOQC-），柜照常质检
+  const skipPb = kind !== "OPENING" && sysParams.find((p) => p.paramKey === "inv.qc.powerbank_policy")?.value === "SKIP";
+  if (kind !== "OPENING" && !(skipPb && pbNos.length)) return d;
   const h = head(d.intake.intakeNo);
   for (const i of items.get(h.intakeNo) ?? []) {
+    if (kind !== "OPENING" && i.itemType !== "POWERBANK") continue;
     if (i.itemType === "CABINET") cabinets.find((k) => k.cabinetNo === i.itemNo)!.warehouseNo = h.warehouseNo;
     else powerbanks.find((k) => k.powerbankNo === i.itemNo)!.warehouseNo = h.warehouseNo;
     recordMovement({ itemType: i.itemType, itemNo: i.itemNo, event: "INBOUND", toRef: ref.wh(h.warehouseNo),
-      reason: `期初建账 OPEN-${i.itemNo}`, sourceRef: h.intakeNo });
+      reason: kind === "OPENING" ? `期初建账 OPEN-${i.itemNo}` : `充电宝免检 NOQC-${i.itemNo}`, sourceRef: h.intakeNo });
     Object.assign(i, { disposition: "INBOUND", handledBy: "mock", handledAt: now() });
   }
   closeIfDone(h);

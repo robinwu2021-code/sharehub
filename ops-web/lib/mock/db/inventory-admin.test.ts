@@ -99,3 +99,23 @@ describe("阶段下钻（P2 #6 mock）", () => {
     expect(() => st.stageItems("NOPE")).toThrow();
   });
 });
+
+describe("库存设置与供应商绩效（V207 mock）", () => {
+  it("宝免检：采购到货的宝登记即入库、柜仍待检；绩效按到货计", async () => {
+    const { sysParams } = await import("./system");
+    const { powerbanks } = await import("./device");
+    const p = sysParams.find((x) => x.paramKey === "inv.qc.powerbank_policy")!;
+    p.value = "SKIP";
+    cabinets.push({ ...cabinets[0], cabinetNo: "CABQP1", sn: "CABQP1", status: "IN_STOCK", archivedAt: null, locationNo: null, issuedAgentNo: null, warehouseNo: null });
+    powerbanks.push({ ...powerbanks[0], powerbankNo: "PBQP1", sn: "PBQP1", status: "IN_STOCK", archivedAt: null, cabinetNo: null, warehouseNo: null });
+    const s = ia.createSupplier({ name: "绩效供应商" });
+    const d = ik.createIntake({ warehouseNo: "WH002", supplierNo: s.supplierNo, cabinetNos: ["CABQP1"], powerbankNos: ["PBQP1"] });
+    p.value = "FULL";
+    expect(d.intake.inbound).toBe(1);
+    expect(d.intake.pending).toBe(1);
+    expect(powerbanks.find((x) => x.powerbankNo === "PBQP1")!.warehouseNo).toBe("WH002");
+    const st = ia.supplierStats().find((x) => x.supplierNo === s.supplierNo)!;
+    expect(st.received).toBe(2);
+    expect(st.passRate).toBe(1);
+  });
+});

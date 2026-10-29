@@ -1,11 +1,12 @@
 // 仓库管理与供应商（V201）mock：与后端 WarehouseAdminServiceImpl / SupplierServiceImpl 同规则。
 // 归档仓前须：不是默认回仓仓、仓里没有设备、没有未结待检单 —— 一次列全原因。
-import type { IntakeItemType, StockThreshold, StockThresholdReq, Supplier, SupplierReq, Warehouse, WarehouseReq, PageResult } from "../../types";
+import type { IntakeItemType, StockThreshold, StockThresholdReq, Supplier, SupplierReq, SupplierStats, Warehouse, WarehouseReq, PageResult } from "../../types";
 import type { ArchiveQ } from "../../api/query";
 import { fail, notFound } from "../../biz-error";
 import { cabinets, powerbanks } from "./device";
 import { WAREHOUSES, listWarehouses } from "./device-pool";
-import { listIntakes } from "./intake";
+import { getIntake, listIntakes } from "./intake";
+import { listDisposals } from "./disposal";
 import { kwHit, nextNo, paginate } from "./helpers";
 
 const now = () => new Date().toISOString();
@@ -51,8 +52,8 @@ export function unarchiveWarehouse(no: string): Warehouse {
 // ————————————————————————————— 供应商 —————————————————————————————
 
 export const suppliers: Supplier[] = [
-  { supplierNo: "SP0001", name: "深圳云充科技", contactName: "Li Wei", phone: "+86 755 0000 0001", email: "sales@example.cn", address: "深圳市南山区", note: "机柜主供", archivedAt: null },
-  { supplierNo: "SP0002", name: "Gulf Power Devices LLC", contactName: "Omar", phone: "+971 4 000 0002", email: null, address: "Dubai, JAFZA", note: "充电宝", archivedAt: null },
+  { supplierNo: "SP0001", name: "深圳云充科技", vendorCode: null, contactName: "Li Wei", phone: "+86 755 0000 0001", email: "sales@example.cn", address: "深圳市南山区", note: "机柜主供", archivedAt: null },
+  { supplierNo: "SP0002", name: "Gulf Power Devices LLC", vendorCode: null, contactName: "Omar", phone: "+971 4 000 0002", email: null, address: "Dubai, JAFZA", note: "充电宝", archivedAt: null },
 ];
 
 const spOf = (no: string) => suppliers.find((s) => s.supplierNo === no) ?? notFound("供应商", "Supplier", no);
@@ -63,7 +64,7 @@ export function listSuppliers(q: ArchiveQ = {}): PageResult<Supplier> {
 }
 
 const fields = (x: SupplierReq) => ({
-  name: name(x), contactName: opt(x.contactName), phone: opt(x.phone), email: opt(x.email),
+  name: name(x), vendorCode: opt(x.vendorCode), contactName: opt(x.contactName), phone: opt(x.phone), email: opt(x.email),
   address: opt(x.address), note: opt(x.note),
 });
 
@@ -118,4 +119,25 @@ export function saveStockThreshold(x: StockThresholdReq): StockThreshold {
   const w = WAREHOUSES.find((k) => k.warehouseNo === x.warehouseNo && !k.archivedAt) ?? notFound("仓库", "Warehouse", x.warehouseNo);
   minQty.set(`${w.warehouseNo}:${x.itemType}`, x.minQty);
   return thresholdRow(w, x.itemType);
+}
+
+// ————————————————————————————— 供应商绩效（V207） —————————————————————————————
+
+export function supplierStats(): SupplierStats[] {
+  const c = new Map<string, SupplierStats>(suppliers.map((s) => [s.supplierNo,
+    { supplierNo: s.supplierNo, received: 0, inbound: 0, failed: 0, returned: 0, passRate: null }]));
+  for (const h of listIntakes({ size: 10_000 }).list) {
+    const st = h.supplierNo ? c.get(h.supplierNo) : undefined;
+    if (!st) continue;
+    for (const i of getIntake(h.intakeNo).items) {
+      st.received++;
+      if (i.disposition === "INBOUND") st.inbound++;
+      if (i.qcResult === "FAILED") st.failed++;
+    }
+  }
+  for (const d of listDisposals({ size: 10_000, kind: "RETURN_SUPPLIER" }).list) {
+    const st = d.supplierNo ? c.get(d.supplierNo) : undefined;
+    if (st) st.returned += d.itemCount;
+  }
+  return [...c.values()].map((s) => ({ ...s, passRate: s.received ? (s.received - s.failed) / s.received : null }));
 }

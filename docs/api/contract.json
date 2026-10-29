@@ -17460,6 +17460,10 @@
      "type": "String"
     },
     {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
      "name": "contactName",
      "type": "String"
     },
@@ -17510,6 +17514,10 @@
      "type": "String"
     },
     {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
      "name": "contactName",
      "type": "String"
     },
@@ -17540,6 +17548,10 @@
      "type": "String"
     },
     {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
      "name": "contactName",
      "type": "String"
     },
@@ -17560,6 +17572,23 @@
      "type": "String"
     }
    ]
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/suppliers/stats",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#supplierStats",
+   "summary": "供应商绩效（V207）：到货 / 入库 / 不合格 / 退货台数与合格率。",
+   "params": [],
+   "bodyType": null,
+   "returnType": "java.util.List<ai.neargo.sharehub.inv.dto.SupplierDtos.SupplierStats>",
+   "returnContainer": null,
+   "returnElement": "java.util.List<ai.neargo.sharehub.inv.dto.SupplierDtos.SupplierStats>",
+   "responseShape": null,
+   "requestShape": null
   },
   {
    "verb": "POST",
@@ -17592,6 +17621,10 @@
      "type": "String"
     },
     {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
      "name": "contactName",
      "type": "String"
     },
@@ -17619,6 +17652,10 @@
    "requestShape": [
     {
      "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
      "type": "String"
     },
     {
@@ -17671,6 +17708,10 @@
     },
     {
      "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
      "type": "String"
     },
     {
@@ -17728,6 +17769,10 @@
     },
     {
      "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
      "type": "String"
     },
     {
@@ -54756,9 +54801,9 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 615,
-  "records": 592,
-  "withPerm": 533,
+  "endpoints": 616,
+  "records": 593,
+  "withPerm": 534,
   "withBody": 253,
   "shapedResponses": 479
  }
