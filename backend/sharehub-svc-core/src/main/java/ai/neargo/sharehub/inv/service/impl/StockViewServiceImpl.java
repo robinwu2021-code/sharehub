@@ -82,25 +82,85 @@ public class StockViewServiceImpl implements StockViewService {
     public List<StockStage> stages() {
         return DataScopeContext.executeWithoutScope(() -> {
             List<StockStage> out = new ArrayList<>();
-            out.add(new StockStage("INTAKE", pendingIntake("CABINET"), pendingIntake("POWERBANK")));
-            out.add(new StockStage("IN_STOCK", cab(w -> w.eq(DevCabinet::getStatus, CabinetStatus.IN_STOCK.name())
-                    .isNotNull(DevCabinet::getWarehouseNo).isNull(DevCabinet::getLocationNo).isNull(DevCabinet::getIssuedAgentNo)),
-                    pb(w -> w.eq(DevPowerbank::getStatus, PowerbankStatus.IN_STOCK.name()).isNotNull(DevPowerbank::getWarehouseNo))));
-            out.add(new StockStage("IN_TRANSIT", cab(w -> w.eq(DevCabinet::getStatus, CabinetStatus.IN_TRANSIT.name())), 0));
-            out.add(new StockStage("DISPATCHED", cab(w -> w.isNotNull(DevCabinet::getIssuedAgentNo).isNull(DevCabinet::getLocationNo)
-                    .isNull(DevCabinet::getIssueClaimedAt).eq(DevCabinet::getStatus, CabinetStatus.IN_STOCK.name())), 0));
-            out.add(new StockStage("ISSUED", cab(w -> w.isNotNull(DevCabinet::getIssuedAgentNo).isNull(DevCabinet::getLocationNo)
-                    .isNotNull(DevCabinet::getIssueClaimedAt).eq(DevCabinet::getStatus, CabinetStatus.IN_STOCK.name())), 0));
-            out.add(new StockStage("BOUND", cab(w -> w.isNotNull(DevCabinet::getLocationNo).eq(DevCabinet::getStatus, CabinetStatus.IN_STOCK.name())), 0));
-            out.add(new StockStage("LIVE", cab(w -> w.eq(DevCabinet::getStatus, CabinetStatus.DEPLOYED.name())),
-                    pb(w -> w.eq(DevPowerbank::getStatus, PowerbankStatus.IN_CABINET.name()))));
-            out.add(new StockStage("RENTED", 0, pb(w -> w.eq(DevPowerbank::getStatus, PowerbankStatus.RENTED.name()))));
-            out.add(new StockStage("FAULT", cab(w -> w.eq(DevCabinet::getStatus, CabinetStatus.FAULT.name())),
-                    pb(w -> w.eq(DevPowerbank::getStatus, PowerbankStatus.FAULT.name()))));
-            out.add(new StockStage("LOST", 0, pb(w -> w.eq(DevPowerbank::getStatus, PowerbankStatus.LOST.name()))));
-            out.add(new StockStage("RETIRED", cab(w -> w.eq(DevCabinet::getStatus, CabinetStatus.RETIRED.name())),
-                    pb(w -> w.in(DevPowerbank::getStatus, PowerbankStatus.SCRAP.name(), PowerbankStatus.SOLD.name()))));
+            for (String stage : STAGES) {
+                if ("INTAKE".equals(stage)) {
+                    out.add(new StockStage(stage, pendingIntake("CABINET"), pendingIntake("POWERBANK")));
+                    continue;
+                }
+                var c = CAB_STAGE.get(stage);
+                var p = PB_STAGE.get(stage);
+                out.add(new StockStage(stage, c == null ? 0 : cab(c), p == null ? 0 : pb(p)));
+            }
             return out;
+        });
+    }
+
+    /** 阶段顺序（= 设备生命周期），与 {@link #CAB_STAGE} / {@link #PB_STAGE} 的键一致；INTAKE 读待检单。 */
+    private static final List<String> STAGES = List.of("INTAKE", "IN_STOCK", "IN_TRANSIT", "DISPATCHED", "ISSUED", "BOUND", "LIVE",
+            "RENTED", "FAULT", "LOST", "RETIRED");
+
+    /** 阶段 → 柜的筛选条件。总数与下钻（{@link #stageItems}）共用这一份，口径不会分叉。 */
+    private static final Map<String, java.util.function.Consumer<LambdaQueryWrapper<DevCabinet>>> CAB_STAGE = Map.of(
+            "IN_STOCK", w -> w.eq(DevCabinet::getStatus, CabinetStatus.IN_STOCK.name())
+                    .isNotNull(DevCabinet::getWarehouseNo).isNull(DevCabinet::getLocationNo).isNull(DevCabinet::getIssuedAgentNo),
+            "IN_TRANSIT", w -> w.eq(DevCabinet::getStatus, CabinetStatus.IN_TRANSIT.name()),
+            "DISPATCHED", w -> w.isNotNull(DevCabinet::getIssuedAgentNo).isNull(DevCabinet::getLocationNo)
+                    .isNull(DevCabinet::getIssueClaimedAt).eq(DevCabinet::getStatus, CabinetStatus.IN_STOCK.name()),
+            "ISSUED", w -> w.isNotNull(DevCabinet::getIssuedAgentNo).isNull(DevCabinet::getLocationNo)
+                    .isNotNull(DevCabinet::getIssueClaimedAt).eq(DevCabinet::getStatus, CabinetStatus.IN_STOCK.name()),
+            "BOUND", w -> w.isNotNull(DevCabinet::getLocationNo).eq(DevCabinet::getStatus, CabinetStatus.IN_STOCK.name()),
+            "LIVE", w -> w.eq(DevCabinet::getStatus, CabinetStatus.DEPLOYED.name()),
+            "FAULT", w -> w.eq(DevCabinet::getStatus, CabinetStatus.FAULT.name()),
+            "RETIRED", w -> w.eq(DevCabinet::getStatus, CabinetStatus.RETIRED.name()));
+
+    /** 阶段 → 宝的筛选条件（同上）。 */
+    private static final Map<String, java.util.function.Consumer<LambdaQueryWrapper<DevPowerbank>>> PB_STAGE = Map.of(
+            "IN_STOCK", w -> w.eq(DevPowerbank::getStatus, PowerbankStatus.IN_STOCK.name()).isNotNull(DevPowerbank::getWarehouseNo),
+            "LIVE", w -> w.eq(DevPowerbank::getStatus, PowerbankStatus.IN_CABINET.name()),
+            "RENTED", w -> w.eq(DevPowerbank::getStatus, PowerbankStatus.RENTED.name()),
+            "FAULT", w -> w.eq(DevPowerbank::getStatus, PowerbankStatus.FAULT.name()),
+            "LOST", w -> w.eq(DevPowerbank::getStatus, PowerbankStatus.LOST.name()),
+            "RETIRED", w -> w.in(DevPowerbank::getStatus, PowerbankStatus.SCRAP.name(), PowerbankStatus.SOLD.name()));
+
+    private static final int STAGE_ITEMS_MAX = 2000;
+
+    @Override
+    public ai.neargo.sharehub.inv.dto.StockDtos.StageItems stageItems(String stage, String itemType) {
+        if (stage == null || !STAGES.contains(stage.trim())) throw BizException.badRequest("error.common.invalid_value", "stage");
+        String st = stage.trim();
+        boolean cabinet = !"POWERBANK".equals(itemType == null ? null : itemType.trim());
+        if (itemType != null && !itemType.isBlank() && !"CABINET".equals(itemType.trim()) && cabinet)
+            throw BizException.badRequest("error.common.invalid_value", "itemType");
+        String type = cabinet ? "CABINET" : "POWERBANK";
+        return DataScopeContext.executeWithoutScope(() -> {
+            List<ai.neargo.sharehub.inv.dto.StockDtos.StageItem> rows = new ArrayList<>();
+            long total;
+            if ("INTAKE".equals(st)) {
+                LambdaQueryWrapper<InvIntakeItem> w = new LambdaQueryWrapper<InvIntakeItem>().eq(InvIntakeItem::getItemType, type)
+                        .eq(InvIntakeItem::getDisposition, "PENDING");
+                total = intakeItems.selectCount(w);
+                for (InvIntakeItem i : intakeItems.selectList(w.orderByAsc(InvIntakeItem::getId).last("limit " + STAGE_ITEMS_MAX)))
+                    rows.add(new ai.neargo.sharehub.inv.dto.StockDtos.StageItem(type, i.getItemNo(), null, null, null, null, null, i.getIntakeNo()));
+            } else if (cabinet) {
+                var f = CAB_STAGE.get(st);
+                if (f == null) return new ai.neargo.sharehub.inv.dto.StockDtos.StageItems(st, type, 0, List.of());
+                LambdaQueryWrapper<DevCabinet> w = new LambdaQueryWrapper<DevCabinet>().isNull(DevCabinet::getArchivedAt);
+                f.accept(w);
+                total = cabinets.selectCount(w);
+                for (DevCabinet c : cabinets.selectList(w.orderByAsc(DevCabinet::getId).last("limit " + STAGE_ITEMS_MAX)))
+                    rows.add(new ai.neargo.sharehub.inv.dto.StockDtos.StageItem(type, c.getCabinetNo(), c.getModel(), c.getWarehouseNo(),
+                            c.getIssuedAgentNo() != null ? c.getIssuedAgentNo() : c.getAgentNo(), c.getSiteNo(), c.getLocationNo(), null));
+            } else {
+                var f = PB_STAGE.get(st);
+                if (f == null) return new ai.neargo.sharehub.inv.dto.StockDtos.StageItems(st, type, 0, List.of());
+                LambdaQueryWrapper<DevPowerbank> w = new LambdaQueryWrapper<DevPowerbank>().isNull(DevPowerbank::getArchivedAt);
+                f.accept(w);
+                total = powerbanks.selectCount(w);
+                for (DevPowerbank p : powerbanks.selectList(w.orderByAsc(DevPowerbank::getId).last("limit " + STAGE_ITEMS_MAX)))
+                    rows.add(new ai.neargo.sharehub.inv.dto.StockDtos.StageItem(type, p.getPowerbankNo(), p.getVendorCode(), p.getWarehouseNo(),
+                            null, null, p.getCabinetNo(), null));
+            }
+            return new ai.neargo.sharehub.inv.dto.StockDtos.StageItems(st, type, total, rows);
         });
     }
 

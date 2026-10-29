@@ -39,6 +39,18 @@ public final class StockDtos {
     public record StockStage(String stage, long cabinets, long powerbanks) {
     }
 
+    /**
+     * 阶段下钻的一台设备。model：柜为型号、宝为厂商码；agentNo：出库池商家或绑定商家；
+     * locationRef：柜为点位号、宝为所在柜号；intakeNo 仅 INTAKE 阶段有。
+     */
+    public record StageItem(String itemType, String itemNo, String model, String warehouseNo, String agentNo, String siteNo,
+                            String locationRef, String intakeNo) {
+    }
+
+    /** total 为该阶段全量台数；items 最多 2000 台（前端分组、筛选）。 */
+    public record StageItems(String stage, String itemType, long total, java.util.List<StageItem> items) {
+    }
+
     /** 期间报表一行（S6）：期初 + 入 − 出 = 期末；入 / 出按原因（本地为履历事件，进销存为单据原因）。 */
     public record StockPeriodRow(String warehouseNo, String itemType, long opening, long inQty, long outQty, long closing,
                                  java.util.Map<String, Long> inByReason, java.util.Map<String, Long> outByReason) {

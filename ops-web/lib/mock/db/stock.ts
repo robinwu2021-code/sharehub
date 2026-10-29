@@ -1,7 +1,7 @@
 // 库存流水与盘点（S4）mock：演示按独立进销存引擎（盘点可用）。
 // 流水取 mock 履历里进出仓的行（同后端本地引擎口径）；盘点账面 = 该仓在库、未出库的柜机。
 import type {
-  InventoryEngine, StockStage, StockPeriodRow, InventoryMigrationPlan, InventoryMigrationResult, MigrationCandidate, PageResult, StockCount, StockCountDetail, StockCountStatus, StockLedgerRow,
+  InventoryEngine, StockStage, StockStageCode, StageItem, StageItems, IntakeItemType, StockPeriodRow, InventoryMigrationPlan, InventoryMigrationResult, MigrationCandidate, PageResult, StockCount, StockCountDetail, StockCountStatus, StockLedgerRow,
 } from "../../types";
 import { fail, notFound } from "../../biz-error";
 import { cabinets, powerbanks } from "./device";
@@ -91,26 +91,55 @@ export function cancelStockCount(no: string): StockCountDetail {
   return detail(no);
 }
 
+type Cab = (typeof cabinets)[number];
+type Pb = (typeof powerbanks)[number];
+const STAGE_ORDER: StockStageCode[] = ["INTAKE", "IN_STOCK", "IN_TRANSIT", "DISPATCHED", "ISSUED", "BOUND", "LIVE", "RENTED", "FAULT", "LOST", "RETIRED"];
+/** 阶段 → 筛选条件（同后端 CAB_STAGE / PB_STAGE）：总数与下钻共用，口径不分叉。 */
+const CAB_STAGE: Partial<Record<StockStageCode, (c: Cab) => boolean>> = {
+  INTAKE: (c) => c.status === "IN_STOCK" && !c.warehouseNo && !c.issuedAgentNo && !c.locationNo,
+  IN_STOCK: (c) => c.status === "IN_STOCK" && !!c.warehouseNo && !c.issuedAgentNo && !c.locationNo,
+  IN_TRANSIT: (c) => c.status === "IN_TRANSIT",
+  DISPATCHED: (c) => !!c.issuedAgentNo && !c.locationNo && c.issueClaimedAt === null,
+  ISSUED: (c) => !!c.issuedAgentNo && !c.locationNo && c.issueClaimedAt !== null && c.status === "IN_STOCK",
+  BOUND: (c) => !!c.locationNo && c.status === "IN_STOCK",
+  LIVE: (c) => c.status === "DEPLOYED",
+  FAULT: (c) => c.status === "FAULT",
+  RETIRED: (c) => c.status === "RETIRED",
+};
+const PB_STAGE: Partial<Record<StockStageCode, (p: Pb) => boolean>> = {
+  IN_STOCK: (p) => p.status === "IN_STOCK" && !!p.warehouseNo,
+  LIVE: (p) => p.status === "IN_CABINET",
+  RENTED: (p) => p.status === "RENTED",
+  FAULT: (p) => p.status === "FAULT",
+  LOST: (p) => p.status === "LOST",
+  RETIRED: (p) => p.status === "SCRAP" || p.status === "SOLD",
+};
+
 /** 统一库存视图（同后端 stages 口径）。 */
 export function stages(): StockStage[] {
   ensurePoolSeed();
   const cab = cabinets.filter((c) => !c.archivedAt);
   const pb = powerbanks.filter((p) => !p.archivedAt);
-  const n = <T>(xs: T[], f: (x: T) => boolean) => xs.filter(f).length;
-  return [
-    { stage: "INTAKE", cabinets: n(cab, (c) => c.status === "IN_STOCK" && !c.warehouseNo && !c.issuedAgentNo && !c.locationNo), powerbanks: 0 },
-    { stage: "IN_STOCK", cabinets: n(cab, (c) => c.status === "IN_STOCK" && !!c.warehouseNo && !c.issuedAgentNo && !c.locationNo),
-      powerbanks: n(pb, (p) => p.status === "IN_STOCK" && !!p.warehouseNo) },
-    { stage: "IN_TRANSIT", cabinets: n(cab, (c) => c.status === "IN_TRANSIT"), powerbanks: 0 },
-    { stage: "DISPATCHED", cabinets: n(cab, (c) => !!c.issuedAgentNo && !c.locationNo && c.issueClaimedAt === null), powerbanks: 0 },
-    { stage: "ISSUED", cabinets: n(cab, (c) => !!c.issuedAgentNo && !c.locationNo && c.issueClaimedAt !== null && c.status === "IN_STOCK"), powerbanks: 0 },
-    { stage: "BOUND", cabinets: n(cab, (c) => !!c.locationNo && c.status === "IN_STOCK"), powerbanks: 0 },
-    { stage: "LIVE", cabinets: n(cab, (c) => c.status === "DEPLOYED"), powerbanks: n(pb, (p) => p.status === "IN_CABINET") },
-    { stage: "RENTED", cabinets: 0, powerbanks: n(pb, (p) => p.status === "RENTED") },
-    { stage: "FAULT", cabinets: n(cab, (c) => c.status === "FAULT"), powerbanks: n(pb, (p) => p.status === "FAULT") },
-    { stage: "LOST", cabinets: 0, powerbanks: n(pb, (p) => p.status === "LOST") },
-    { stage: "RETIRED", cabinets: n(cab, (c) => c.status === "RETIRED"), powerbanks: n(pb, (p) => p.status === "SCRAP" || p.status === "SOLD") },
-  ];
+  return STAGE_ORDER.map((stage) => ({
+    stage,
+    cabinets: CAB_STAGE[stage] ? cab.filter(CAB_STAGE[stage]!).length : 0,
+    powerbanks: PB_STAGE[stage] ? pb.filter(PB_STAGE[stage]!).length : 0,
+  }));
+}
+
+/** 阶段下钻（P2 #6，同后端 stageItems）：某阶段 × 类型的设备清单，最多 2000 台。 */
+export function stageItems(stage: string, itemType: IntakeItemType = "CABINET"): StageItems {
+  if (!STAGE_ORDER.includes(stage as StockStageCode)) fail("阶段不对", "Invalid stage");
+  ensurePoolSeed();
+  const st = stage as StockStageCode;
+  const items: StageItem[] = itemType === "CABINET"
+    ? cabinets.filter((c) => !c.archivedAt && !!CAB_STAGE[st] && CAB_STAGE[st]!(c)).map((c) => ({
+      itemType, itemNo: c.cabinetNo, model: c.model ?? null, warehouseNo: c.warehouseNo ?? null,
+      agentNo: c.issuedAgentNo ?? c.agentNo ?? null, siteNo: c.siteNo ?? null, locationRef: c.locationNo ?? null, intakeNo: null }))
+    : powerbanks.filter((p) => !p.archivedAt && !!PB_STAGE[st] && PB_STAGE[st]!(p)).map((p) => ({
+      itemType, itemNo: p.powerbankNo, model: p.vendorCode ?? null, warehouseNo: p.warehouseNo ?? null,
+      agentNo: null, siteNo: null, locationRef: p.cabinetNo ?? null, intakeNo: null }));
+  return { stage: st, itemType, total: items.length, items: items.slice(0, 2000) };
 }
 
 /** 期间报表（同后端本地口径：期末 = 当前在仓 − 期后净进出；期初 = 期末 − 入 + 出）。 */

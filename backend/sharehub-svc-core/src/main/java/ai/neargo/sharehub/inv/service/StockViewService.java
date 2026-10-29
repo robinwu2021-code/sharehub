@@ -19,6 +19,9 @@ public interface StockViewService {
     /** 统一库存视图（S6）：取本地投影，两个引擎同口径。 */
     List<ai.neargo.sharehub.inv.dto.StockDtos.StockStage> stages();
 
+    /** 阶段下钻（库存缺口 P2 #6）：某阶段 × 设备类型的设备清单（最多 2000 台，total 为全量），口径同 {@link #stages()}。 */
+    ai.neargo.sharehub.inv.dto.StockDtos.StageItems stageItems(String stage, String itemType);
+
     /** 期间报表（S6）：SERVICE 读库存服务期间汇总；LOCAL 由当前在仓数与履历倒推（履历自 V196 起）。 */
     List<ai.neargo.sharehub.inv.dto.StockDtos.StockPeriodRow> periodSummary(java.time.LocalDate from, java.time.LocalDate to,
                                                                           String warehouseNo);

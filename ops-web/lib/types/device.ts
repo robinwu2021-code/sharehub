@@ -884,6 +884,28 @@ export interface StockStage {
   powerbanks: number;
 }
 
+/**
+ * 阶段下钻的一台设备（P2 #6，GET /api/ops/inventory/stage-items）。
+ * model：柜为型号、宝为厂商码；agentNo：出库池或绑定商家；locationRef：柜为点位号、宝为所在柜号。
+ */
+export interface StageItem {
+  itemType: IntakeItemType;
+  itemNo: string;
+  model: string | null;
+  warehouseNo: string | null;
+  agentNo: string | null;
+  siteNo: string | null;
+  locationRef: string | null;
+  intakeNo: string | null;
+}
+/** total 为全量；items 最多 2000 台。 */
+export interface StageItems {
+  stage: StockStageCode;
+  itemType: IntakeItemType;
+  total: number;
+  items: StageItem[];
+}
+
 /** 期间报表一行（S6）：期初 + 入 − 出 = 期末。 */
 export interface StockPeriodRow {
   warehouseNo: string | null;

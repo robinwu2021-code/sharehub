@@ -76,6 +76,14 @@ public class InventoryController {
         return stock.stages();
     }
 
+    /** 阶段下钻（P2 #6）：某阶段 × 类型的设备清单，口径同 stages。 */
+    @GetMapping("/inventory/stage-items")
+    @PreAuthorize("@perm.can('device:inventory:read')")
+    public ai.neargo.sharehub.inv.dto.StockDtos.StageItems stageItems(@RequestParam String stage,
+                                                                      @RequestParam(required = false) String itemType) {
+        return stock.stageItems(stage, itemType);
+    }
+
     /** 期间报表（S6）：期初 / 入 / 出 / 期末，按仓与设备类型。 */
     @GetMapping("/inventory/period-summary")
     @PreAuthorize("@perm.can('device:inventory:read')")

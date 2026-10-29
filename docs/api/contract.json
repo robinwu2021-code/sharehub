@@ -17270,6 +17270,53 @@
   },
   {
    "verb": "GET",
+   "path": "/api/ops/inventory/stage-items",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#stageItems",
+   "summary": "阶段下钻（P2 #6）：某阶段 × 类型的设备清单，口径同 stages。",
+   "params": [
+    {
+     "in": "query",
+     "name": "stage",
+     "type": "String",
+     "required": true
+    },
+    {
+     "in": "query",
+     "name": "itemType",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.StockDtos.StageItems",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.StockDtos.StageItems",
+   "responseShape": [
+    {
+     "name": "stage",
+     "type": "String"
+    },
+    {
+     "name": "itemType",
+     "type": "String"
+    },
+    {
+     "name": "total",
+     "type": "long"
+    },
+    {
+     "name": "items",
+     "type": "java.util.List<StageItem>"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
    "path": "/api/ops/inventory/stages",
    "perm": "device:inventory:read",
    "perms": [
@@ -54709,10 +54756,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 614,
-  "records": 590,
-  "withPerm": 532,
+  "endpoints": 615,
+  "records": 592,
+  "withPerm": 533,
   "withBody": 253,
-  "shapedResponses": 478
+  "shapedResponses": 479
  }
 }

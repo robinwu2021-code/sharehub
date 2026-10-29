@@ -115,6 +115,7 @@ export const deviceHttp: DeviceApi = {
   listDeviceMovements: (itemNo) => client.get("/api/ops/device-movements", { itemNo }),
   getInventoryEngine: () => client.get("/api/ops/inventory/engine"),
   getStockStages: () => client.get("/api/ops/inventory/stages"),
+  getStageItems: (stage, itemType) => client.get("/api/ops/inventory/stage-items", { stage, itemType }),
   getInventoryMigrationPlan: () => client.get("/api/ops/inventory/migration"),
   runInventoryMigration: (limit) => client.post("/api/ops/inventory/migration", { limit }),
   getStockPeriodSummary: (q) => client.get("/api/ops/inventory/period-summary", q),

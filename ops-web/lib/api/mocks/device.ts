@@ -89,6 +89,7 @@ export const deviceMock: DeviceApi = {
   listDeviceMovements: async (itemNo) => wait(mv.listDeviceMovements(itemNo)),
   getInventoryEngine: async () => wait(st.engine()),
   getStockStages: async () => wait(st.stages()),
+  getStageItems: async (stage, itemType) => wait(st.stageItems(stage, itemType)),
   getInventoryMigrationPlan: async () => wait(st.migrationPlan()),
   runInventoryMigration: async (limit) => wait(st.runMigration(limit ?? 200), 600),
   getStockPeriodSummary: async (q) => wait(st.periodSummary(q)),

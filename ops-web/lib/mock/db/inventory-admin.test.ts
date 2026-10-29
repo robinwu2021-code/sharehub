@@ -88,3 +88,14 @@ describe("发货物流（V205 mock）", () => {
     expect(() => sh.listShipments({})).toThrow();
   });
 });
+
+describe("阶段下钻（P2 #6 mock）", () => {
+  it("每个阶段 × 类型：清单台数 = 总览台数", async () => {
+    const st = await import("./stock");
+    for (const s of st.stages()) {
+      expect(st.stageItems(s.stage, "CABINET").total).toBe(s.cabinets);
+      expect(st.stageItems(s.stage, "POWERBANK").total).toBe(s.powerbanks);
+    }
+    expect(() => st.stageItems("NOPE")).toThrow();
+  });
+});
