@@ -71,7 +71,7 @@ st, tr, raw = req("POST", "/api/ops/inventory-transfers", {"fromType": "WAREHOUS
 ck("调拨：建单", st == 200 and tr, raw)
 tno = tr["transferNo"]
 st, _, raw = req("POST", f"/api/ops/inventory-transfers/{tno}/items", {"itemNos": [cab2]}, admin); ck("调拨：明细", st == 200, raw)
-st, _, raw = req("POST", f"/api/ops/inventory-transfers/{tno}/ship", {}, admin); ck("调拨：发货（柜在途）", st == 200, raw)
+st, _, raw = req("POST", f"/api/ops/inventory-transfers/{tno}/ship", {"carrier": "Aramex", "trackingNo": "AX" + tag}, admin); ck("调拨：发货（柜在途，带物流）", st == 200, raw)
 st, rc, raw = req("POST", f"/api/ops/inventory-transfers/{tno}/receive", {"receivedNos": ["CAB-NOT-ON-LIST"], "note": "少一台多一台"}, admin)
 ck("调拨：签收（缺 1 多 1 → 资产差异）", st == 200 and len(rc["diffs"]) == 2, raw)
 st, df, raw = req("GET", f"/api/ops/asset-diffs?page=1&size=10&sourceRef={tno}", tok=admin)
@@ -113,6 +113,31 @@ req("POST", "/api/ops/cabinets", {"cabinetNo": cab3, "sn": cab3, "vendorCode": "
 st, ik3, raw = req("POST", "/api/ops/inventory/intakes", {"warehouseNo": "WH002", "supplierNo": sp["supplierNo"], "cabinetNos": [cab3]}, admin)
 ck("到货登记带供应商", st == 200 and ik3["intake"]["supplierName"] == "冒烟供应商 " + tag, raw)
 st, _, raw = req("POST", f"/api/ops/inventory/suppliers/{sp['supplierNo']}/archive", {}, admin); ck("供应商：归档", st == 200, raw)
+# 库存缺口 P0–P2（V202–V208）
+cab4, cab5 = "CABOP" + tag, "CABDS" + tag
+for c in (cab4, cab5):
+    req("POST", "/api/ops/cabinets", {"cabinetNo": c, "sn": c, "vendorCode": "TEST", "slotTotal": 8}, admin)
+st, op, raw = req("POST", "/api/ops/inventory/intakes", {"kind": "OPENING", "warehouseNo": "WH003",
+    "currency": "AED", "unitCosts": {cab4: 1200, cab5: 800}, "cabinetNos": [cab4, cab5]}, admin)
+ck("入库单：期初建账登记即入库、带金额", st == 200 and op["intake"]["status"] == "DONE" and float(op["intake"]["totalCost"]) == 2000, raw)
+st, dp, raw = req("POST", "/api/ops/inventory/disposals", {"kind": "SCRAP", "reasonCode": "BROKEN", "warehouseNo": "WH003",
+    "note": "冒烟报废", "cabinetNos": [cab5]}, admin)
+ck("处置出库：报废", st == 200 and dp["disposal"]["itemCount"] == 1, raw)
+st, th, raw = req("POST", "/api/ops/inventory/stock-thresholds", {"warehouseNo": "WH003", "itemType": "CABINET", "minQty": 999}, admin)
+ck("安全库存：设下限后标记低库存", st == 200 and th["low"], raw)
+req("POST", "/api/ops/inventory/stock-thresholds", {"warehouseNo": "WH003", "itemType": "CABINET", "minQty": 0}, admin)
+st, sh, raw = req("GET", f"/api/ops/inventory/shipments?docRef={tno}", tok=admin)
+ck("发货物流：调拨发出的运单号可查", st == 200 and len(sh) == 1 and sh[0]["trackingNo"] == "AX" + tag, raw)
+st, rp, raw = req("GET", "/api/ops/reports/inventory?warehouseNo=WH003", tok=admin)
+ck("库存报表：处置汇总含本次报废", st == 200 and rp["disposals"].get("SCRAP:BROKEN", 0) >= 1 and rp["purchases"], raw)
+st, si, raw = req("GET", "/api/ops/inventory/stage-items?stage=IN_STOCK&itemType=CABINET", tok=admin)
+stages = {x["stage"]: x for x in req("GET", "/api/ops/inventory/stages", tok=admin)[1]}
+ck("库存下钻：清单总数 = 总览", st == 200 and si["total"] == stages["IN_STOCK"]["cabinets"], raw)
+st, ss, raw = req("GET", "/api/ops/inventory/suppliers/stats", tok=admin)
+ck("供应商绩效：可查", st == 200 and any(x["supplierNo"] == sp["supplierNo"] for x in ss), raw)
+st, ps, raw = req("GET", "/api/platform/sys-params?groupName=%E5%BA%93%E5%AD%98&page=1&size=50", tok=admin)
+keys = {x["paramKey"] for x in (ps or {}).get("list", [])}
+ck("库存设置：参数齐（含质检策略）", st == 200 and {"inv.qc.powerbank_policy", "inv.intake.overdue_days"} <= keys, raw)
 for p in ["/api/ops/dashboard", "/api/trade/orders?page=1&size=5", "/api/ops/work-orders?page=1&size=5", "/api/ops/sites?page=1&size=5"]:
     st, _, raw = req("GET", p, tok=admin); ck("GET " + p.split("?")[0], st == 200, raw)
 print(f"\n{sum(res)}/{len(res)} 通过")
