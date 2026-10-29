@@ -572,13 +572,13 @@ function AgentsInner() {
       options: [{ value: "", label: "请选择商家" }, ...agentOptions],
       help: "只列启用中的商家；已停用/已归档的不能作为划拨对象",
     },
-    // 2026-10-28 只剩站点（后端 620656d9：按机柜 / 点位划拨 400）。单台设备换位置走出库池的绑定 / 解绑或撤机
+    // 2026-10-28 只剩站点（后端 620656d9：按机柜 / 点位划拨 400）。单台设备换位置走出库单的绑定 / 解绑或撤机
     {
       key: "siteNos", label: "站点（可多选）", type: "multiselect", csv: true,
       placeholder: assignForm?.agentNo ? "选择要换给这个商家的站点" : "先选目标商家",
       options: toOptions(assignableQ.data?.list, "SITE"),
       disabledWhen: (v) => !v.agentNo,
-      help: "整站换商家：站点、站内点位与柜子（含出库池归属）、运维责任行在同一事务里一起换；括号里是当前商家",
+      help: "整站换商家：站点、站内点位与柜子（含出库单归属）、运维责任行在同一事务里一起换；括号里是当前商家",
     },
   ], [agentOptions, assignableQ.data, assignForm?.agentNo]);
 
@@ -598,7 +598,7 @@ function AgentsInner() {
     const ok = await confirm({
       title: "确认整站换商家",
       desc: `将把 ${sts.length} 个站点换给 ${target?.name ?? ""}（${assignForm.agentNo}）。`
-        + "站内点位、柜子（含出库池归属）与运维责任行一并变更，此后的订单与分成归新商家；已产生的订单仍归原商家。记入划拨流水。",
+        + "站内点位、柜子（含出库单归属）与运维责任行一并变更，此后的订单与分成归新商家；已产生的订单仍归原商家。记入划拨流水。",
       confirmText: "确认换商家",
     });
     if (ok) assignAssets.mutate({ agentNo: assignForm.agentNo, cabinetNos: [], siteNos: sts });
@@ -611,7 +611,7 @@ function AgentsInner() {
       title: "确认收回平台直营",
       danger: true,
       desc: `将把 ${sts.length} 个站点从 ${reclaimForm.agentName}（${reclaimForm.agentNo}）收回平台直营。`
-        + "站内柜子的商家与出库池归属清空、运维责任行删除：商家立即看不到这些站点与设备，此后的订单也不再分给它。",
+        + "站内柜子的商家与出库单归属清空、运维责任行删除：商家立即看不到这些站点与设备，此后的订单也不再分给它。",
       confirmText: "确认收回",
     });
     if (ok) reclaimAssets.mutate({ cabinetNos: [], siteNos: sts });

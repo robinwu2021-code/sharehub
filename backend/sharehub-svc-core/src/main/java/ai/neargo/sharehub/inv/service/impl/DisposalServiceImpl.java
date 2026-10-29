@@ -138,8 +138,6 @@ public class DisposalServiceImpl implements DisposalService {
             supplierName = suppliers.activeName(supplierNo);
             if (supplierName == null) throw BizException.notFound(supplierNo);
         }
-        // 独立进销存下出库须带原因码与供应商去向调库存服务，那条接口还没接 —— 拒绝而不是只改本地，免得两本账对不上
-        if (!"LOCAL".equals(inventory.engine())) throw BizException.conflict("error.inventory.disposal_engine_unsupported", inventory.engine());
         WarehouseItem wh = warehouses.list().stream().filter(x -> x.warehouseNo().equals(r.warehouseNo().trim()) && x.archivedAt() == null)
                 .findFirst().orElseThrow(() -> BizException.notFound(r.warehouseNo()));
 
@@ -156,7 +154,7 @@ public class DisposalServiceImpl implements DisposalService {
             if (c == null) bad.add(no + "：不存在");
             else if (!CabinetStatus.IN_STOCK.name().equals(c.getStatus())) bad.add(no + "：不在库（" + c.getStatus() + "）");
             else if (c.getLocationNo() != null) bad.add(no + "：已绑定点位");
-            else if (c.getIssuedAgentNo() != null) bad.add(no + "：在商家出库池");
+            else if (c.getIssuedAgentNo() != null) bad.add(no + "：已出库给商家");
             else if (!wh.warehouseNo().equals(c.getWarehouseNo())) bad.add(no + "：不在 " + wh.name());
         }
         Map<String, DevPowerbank> pbs = pbNos.isEmpty() ? Map.of() : powerbanks.selectList(new LambdaQueryWrapper<DevPowerbank>()
@@ -204,11 +202,52 @@ public class DisposalServiceImpl implements DisposalService {
             movements.record(new MovementRecorder.Move(MovementRecorder.POWERBANK, no, MovementEvent.RETIRE, MovementRecorder.wh(wh.warehouseNo()),
                     MovementRecorder.OUT, null, null, why, d.getDisposalNo()));
         }
+        if (!"LOCAL".equals(inventory.engine())) remoteOutbound(kind, reason, supplierNo, supplierName, wh.warehouseNo(), cabNos, pbNos, d);
         if (ship != null) shipments.record(ai.neargo.sharehub.inv.ShipmentDocType.DISPOSAL, d.getDisposalNo(),
                 Map.of(MovementRecorder.CABINET, cabNos, MovementRecorder.POWERBANK, pbNos), ship);
         log.info("处置出库 disposalNo={} kind={} warehouseNo={} supplierNo={} 柜={} 宝={}", d.getDisposalNo(), kind,
                 wh.warehouseNo(), supplierNo, cabNos.size(), pbNos.size());
         return get(d.getDisposalNo());
+    }
+
+    /**
+     * 独立进销存引擎（V210 起支持）：同一事务里在库存服务做一张出库 —— 报废 SCRAP 带原因码，退供应商 RETURN_SUPPLIER 带
+     * SUPPLIER 去向（先同步供应商为外部目标）。库存服务拒绝即整单回滚，两本账不会一边有一边没有。
+     */
+    private void remoteOutbound(DisposalKind kind, String reason, String supplierNo, String supplierName, String warehouseNo,
+                                List<String> cabNos, List<String> pbNos, InvDisposal d) {
+        ai.neargo.sharehub.inv.remote.InventoryApi api = remote.api();
+        if (!api.configured()) throw BizException.conflict("error.inventory.not_configured");
+        try {
+            String loc = links.locationId(api, warehouseNo);
+            // 确保两种设备的物料已在库存服务登记（出库按序列号，不需要 itemId，但首次接入时要有物料）
+            if (!cabNos.isEmpty()) links.itemId(api, MovementRecorder.CABINET);
+            if (!pbNos.isEmpty()) links.itemId(api, MovementRecorder.POWERBANK);
+            java.util.Map<String, String> targets = java.util.Map.of();
+            if (kind == DisposalKind.RETURN_SUPPLIER) {
+                api.upsertTarget("SUPPLIER", supplierNo, supplierName, null);
+                targets = java.util.Map.of("SUPPLIER", supplierNo);
+            }
+            List<String> sns = new ArrayList<>(cabNos);
+            sns.addAll(pbNos);
+            String out = api.createOutbound(loc, kind.name(), reason, targets, "处置出库 " + d.getDisposalNo() + "：" + d.getNote(),
+                    List.of(), sns, "dp-out-" + d.getDisposalNo());
+            api.postOutbound(out, "dp-out-post-" + d.getDisposalNo());
+            log.info("处置出库同步库存服务 disposalNo={} outNo={}", d.getDisposalNo(), out);
+        } catch (ai.neargo.sharehub.inv.remote.InventoryRemoteException e) {
+            log.warn("库存服务拒绝处置出库 disposalNo={} code={} args={}：本地改动已回滚", d.getDisposalNo(), e.code, e.args);
+            throw BizException.conflict("error.inventory.remote", e.code, String.join("；", e.args));
+        }
+    }
+
+    private ai.neargo.sharehub.inv.remote.RemoteInventoryPort remote;
+    private ai.neargo.sharehub.inv.remote.InventoryLinks links;
+
+    /** 独立进销存（V210）：setter 注入，构造参数已经很长。 */
+    @org.springframework.beans.factory.annotation.Autowired
+    void setRemote(ai.neargo.sharehub.inv.remote.RemoteInventoryPort remote, ai.neargo.sharehub.inv.remote.InventoryLinks links) {
+        this.remote = remote;
+        this.links = links;
     }
 
     private void insertItem(String disposalNo, String type, String no) {

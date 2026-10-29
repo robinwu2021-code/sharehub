@@ -1,7 +1,7 @@
 // 设备生命周期环节（展示态）—— docs/requirements/设备生命周期管理-运营端设计.md §三.1。
 //
 // 存储态少而严（机柜 5 个状态，状态机强制）；运营看的是「这台设备在生命周期的哪一步、下一步谁做」，
-// 由存储态 + 出库池 / 点位 / 质检派生。后端出 `assetStatus` 之前前端按同一口径算，之后改读它。
+// 由存储态 + 出库单 / 点位 / 质检派生。后端出 `assetStatus` 之前前端按同一口径算，之后改读它。
 import type { Cabinet } from "./types";
 
 export type LifecycleStage =
@@ -9,7 +9,7 @@ export type LifecycleStage =
   | "IN_STOCK"       // 在仓 · 可出库
   | "IN_TRANSIT"     // 在途
   | "DISPATCHED"     // 已发货 · 待签收（V195：有接收人、还没签收；不能绑定）
-  | "ISSUED"         // 已出库 · 待绑定（在商家出库池）
+  | "ISSUED"         // 已出库 · 待绑定（已出库给商家）
   | "BOUND"          // 已绑定 · 待上线（装机、试借还、过门禁）
   | "LIVE"           // 已上线
   | "FAULT"          // 故障
@@ -76,10 +76,10 @@ export function lifecyclePhase(stage: LifecycleStage): LifecyclePhase {
 export function nextStep(c: CabLike): { text: string; who: string; href?: string } {
   switch (lifecycleStage(c)) {
     case "PENDING_QC": return { text: c.qcStatus === "FAILED" ? "质检未通过：返修或报废" : "待入库质检：质检放行后才能出库", who: "仓管" };
-    case "IN_STOCK": return { text: "在仓可用：出库给商家后进入它的出库池", who: "仓管 / 运营", href: "/inventory?tab=issued" };
+    case "IN_STOCK": return { text: "在仓可用：出库给商家后进入它名下（已出库待绑定）", who: "仓管 / 运营", href: "/inventory?tab=issued" };
     case "IN_TRANSIT": return { text: "调拨在途：签收后回到在库", who: "仓管", href: "/inventory?tab=transfers" };
     case "DISPATCHED": return { text: "已发货待签收：接收人签收后才能绑定", who: "接收人", href: "/inventory?tab=issued" };
-    case "ISSUED": return { text: "在商家出库池：绑定到它的站点点位（默认站点默认点位）", who: "运营", href: "/inventory?tab=issued" };
+    case "ISSUED": return { text: "已出库给商家：绑定到它的站点点位（默认站点默认点位）", who: "运营", href: "/inventory?tab=issued" };
     case "BOUND": return { text: "已绑定点位：装机完工、试借还、过上线门禁后上线", who: "运维", href: "/devices?tab=pending-live" };
     case "LIVE": return { text: "运行中：在线与可借看实时监控；移位走撤机工单", who: "运维", href: "/devices?tab=monitor" };
     case "FAULT": return { text: "故障：派维修工单，修复后恢复运行；修不好撤机回仓", who: "运维", href: "/devices?tab=repairs" };

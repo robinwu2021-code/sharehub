@@ -47,7 +47,7 @@ export const PARTIAL_READY = {
   "fee-plans.status": true,
   /*
    * 设备出库与绑定（docs/technical/设备出库与绑定-开发计划.md）：后端由商户入驻会话按顺序实现 ——
-   *   devices.pool：出库给商家 / 退回 / 出库池列表筛选与汇总（第 1 步，V161）
+   *   devices.pool：出库给商家 / 退回 / 出库单列表筛选与汇总（第 1 步，V161）
    *   devices.bind：绑定 / 批量绑定 / 解绑（第 3 步）
    * 后端落地后改 true，并把 lib/api/https/device.ts 里对应的 pending 换成真实调用。
    */

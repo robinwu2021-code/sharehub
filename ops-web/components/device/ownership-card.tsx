@@ -44,7 +44,7 @@ export function OwnershipCard({ cabinet }: { cabinet: Cabinet }) {
             ? <span><RefLink kind="site" no={cabinet.siteNo} /> › <span className="tabular-nums">{cabinet.locationNo}</span></span>
             : <span className="text-muted-foreground">未绑定</span>}
         </Field>
-        <Field label="出库池" className="mb-0">
+        <Field label="出库商家" className="mb-0">
           {cabinet.issuedAgentNo
             ? <span><RefLink kind="agent" no={cabinet.issuedAgentNo} />{cabinet.issuedAt && <span className="txt-caption text-muted-foreground"> · {fmtTime(cabinet.issuedAt)} 出库</span>}</span>
             : <span className="text-muted-foreground">{cabinet.warehouseNo ? `在仓 ${cabinet.warehouseNo}` : "—"}</span>}

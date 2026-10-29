@@ -11,7 +11,7 @@ describe("设备生命周期环节（展示态派生）", () => {
     // 存量免检（qcStatus 为空）视同放行
     expect(lifecycleStage({ ...base, qcStatus: null })).toBe("IN_STOCK");
   });
-  it("出库池 → 绑定 → 上线", () => {
+  it("出库单 → 绑定 → 上线", () => {
     expect(lifecycleStage({ ...base, warehouseNo: null, issuedAgentNo: "AG1" })).toBe("ISSUED");
     expect(lifecycleStage({ ...base, warehouseNo: null, issuedAgentNo: "AG1", locationNo: "L1" })).toBe("BOUND");
     expect(lifecycleStage({ ...base, status: "DEPLOYED", locationNo: "L1" })).toBe("LIVE");

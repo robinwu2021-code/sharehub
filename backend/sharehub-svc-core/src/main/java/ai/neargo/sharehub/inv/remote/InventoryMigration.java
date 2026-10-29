@@ -160,7 +160,7 @@ public class InventoryMigration {
                 } else if (c.getLocationNo() != null) {
                     out.add(skip(CAB, c.getCabinetNo(), "直营站点的柜：没有商家可出库，暂不迁"));
                 } else {
-                    out.add(skip(CAB, c.getCabinetNo(), "不在仓也不在出库池（多半在到仓待检）：入库后再迁"));
+                    out.add(skip(CAB, c.getCabinetNo(), "不在仓也未出库给商家（多半在到仓待检）：入库后再迁"));
                 }
             }
             for (DevPowerbank p : powerbanks.selectList(new LambdaQueryWrapper<DevPowerbank>().isNull(DevPowerbank::getArchivedAt)

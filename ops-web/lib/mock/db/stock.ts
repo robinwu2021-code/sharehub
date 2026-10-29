@@ -199,7 +199,7 @@ function candidates(): MigrationCandidate[] {
         claimed: c.issueClaimedAt !== null };
     }
     if (c.locationNo) return { ...base, itemType: "CABINET", itemNo: c.cabinetNo, kind: "SKIP", reason: "直营站点的柜：没有商家可出库，暂不迁" };
-    return { ...base, itemType: "CABINET", itemNo: c.cabinetNo, kind: "SKIP", reason: "不在仓也不在出库池（多半在到仓待检）：入库后再迁" };
+    return { ...base, itemType: "CABINET", itemNo: c.cabinetNo, kind: "SKIP", reason: "不在仓也未出库给商家（多半在到仓待检）：入库后再迁" };
   });
 }
 

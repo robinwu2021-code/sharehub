@@ -9,7 +9,7 @@ import type { DeviceMovement, MovementEvent, QcRecord } from "@/lib/types";
 import { DataTable, type Column } from "@/components/ui/data-table";
 
 const EVENT_LABEL: Record<MovementEvent, string> = {
-  ISSUE: "出库", CLAIM: "签收", REDIRECT: "出库调整", POOL_RETURN: "出库池退回", BIND: "绑定", UNBIND: "解绑",
+  ISSUE: "出库", CLAIM: "签收", REDIRECT: "出库调整", POOL_RETURN: "出库退回", BIND: "绑定", UNBIND: "解绑",
   SHIP: "调拨发货", RECEIVE: "调拨签收", UNDEPLOY: "撤机", RETURN_INTAKE: "回仓待检", INBOUND: "入库",
   REASSIGN: "换商家", RETIRE: "报废", LOST: "遗失",
 };

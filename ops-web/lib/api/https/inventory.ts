@@ -1,9 +1,7 @@
 // 覆盖范围：库存管理 · 物料（V209）。端点前缀沿用 /api/ops/inventory。
 //
-// ⚠️ 后端缺口（2026-10-29 契约先行，用户确认「先上契约，显式登记缺口」）：以下十个端点后端都还没有。
-//    漂移棘轮（lib/drift.test.ts）的「契约缺口」上限因此显式调到 10；菜单三项未置 ready，真实后端模式下灰显。
-//    后端实现时以 ai-shop 库存服务为账本（物料 → items/by-ref、单据 → inbounds / outbounds、余额 → balances），
-//    本服务只做宿主转发与主数据（docs/technical/设计规范-库存管理菜单.md §四）。
+// 后端 V210：InventoryController（物料档案为宿主主数据；物料单据与物料库存的账在 ai-shop 库存服务，
+// 只在独立进销存引擎下可用，LOCAL 下返回 409 error.inventory.material_service_only）。
 import type { InventoryApi } from "../contracts/inventory";
 import { client } from "../http-client";
 

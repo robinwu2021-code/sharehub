@@ -16,7 +16,7 @@ import { currentAuth } from "../../auth";
 
 export const deviceMock: DeviceApi = {
   listCabinets: (q: CabinetQ = {}) => {
-    // 出库池字段回填与演示数据（见 device-pool.ensurePoolSeed；后端 V161 对存量设备同样回填）
+    // 出库单字段回填与演示数据（见 device-pool.ensurePoolSeed；后端 V161 对存量设备同样回填）
     dp.ensurePoolSeed();
     return wait(db.paginate(db.cabinets, q.page, q.size, (c) =>
       dp.poolHit(c, q.issuedAgentNo, q.pool, currentAuth()?.username) &&
@@ -113,7 +113,7 @@ export const deviceMock: DeviceApi = {
   listAssetDiffs: async (q = {}) => wait(da.listAssetDiffs(q)),
   resolveAssetDiff: async (diffNo, note) => wait(da.resolveAssetDiff(diffNo, note), 350),
 
-  // —— 出库池与绑定：规则（不变式 I1 ~ I5）在 db 层，这里只延迟透传；async 让同步抛错变成 rejected promise ——
+  // —— 出库单与绑定：规则（不变式 I1 ~ I5）在 db 层，这里只延迟透传；async 让同步抛错变成 rejected promise ——
   issueDevices: async (x) => wait((() => {
     sh.validateShip(x);
     const r = dp.issueDevices(x);

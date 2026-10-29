@@ -694,6 +694,18 @@ const PATCHES: { file: string; mustContain: string; apply: (rows: Row[]) => void
       rows.push(leaf("14", "库存设置", "Inventory Settings", "إعدادات المخزون", "settings", "设置", "1"));
     },
   },
+  {
+    // 物料三叶后端就绪（V210，物料账接 ai-shop 库存服务）；「出库池」更名「出库单」（与入库单对应）。
+    file: "V210__inventory_materials.sql",
+    mustContain: "UPDATE iam_menu SET name = '出库单'",
+    apply: (rows) => {
+      for (const tab of ["materials", "material-docs", "material-stock"]) {
+        rows.find((r) => r.parent_no === "M_inventory" && r.path === `/inventory?tab=${tab}`)!.ready = "1";
+      }
+      Object.assign(rows.find((r) => r.parent_no === "M_inventory" && r.path === "/inventory?tab=issued")!,
+        { name: "出库单", name_en: "Outbound Orders", name_ar: "أوامر الصرف" });
+    },
+  },
 ];
 
 const COLS = [

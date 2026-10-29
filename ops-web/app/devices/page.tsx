@@ -57,7 +57,7 @@ import { inventoryRedirect } from "@/lib/inventory-routes";
 // 2026-10-28 按运营顺序（OM03）：资产台账 → 库存与流转 → 设备接入 → 在线运行。
 // 资产差异从「库存调拨」的子视图拆成独立页签；供应商接入从系统设置搬来；库存余额新增。
 // 2026-10-28 与菜单同序（按设备生命周期）：设备档案 → 部署与安装 → 绑定上线 → 运行监控 → 维护与退出
-// 2026-10-29 库存页签（仓库、入库、出库池、调拨、盘点、余额、流水…）整体搬到 /inventory（V209），
+// 2026-10-29 库存页签（仓库、入库、出库单、调拨、盘点、余额、流水…）整体搬到 /inventory（V209），
 // 旧链接由 inventoryRedirect 转过去（lib/inventory-routes.ts）。
 const TAB_KEYS = ["cabinets", "powerbanks",
   "installs",
@@ -108,8 +108,8 @@ const IMPORT_SAMPLE = {
 
 /**
  * 列定义依赖「已接入供应商」主数据做存在性校验，故做成工厂函数。
- * 2026-10-28 去掉「点位编号」列：导入的柜子一律进库，上点位只走出库池的绑定（ae233365 · V164，
- * 点位商家须 = 出库池商家）。导入时直接填点位等于绕过出库与这条校验。
+ * 2026-10-28 去掉「点位编号」列：导入的柜子一律进库，上点位只走出库单的绑定（ae233365 · V164，
+ * 点位商家须 = 出库单商家）。导入时直接填点位等于绕过出库与这条校验。
  */
 const importColumns = (vendorCodes: string[]): ImportColumn<Partial<Cabinet>>[] => [
   { header: "柜机号", key: "cabinetNo", required: true, unique: true,
@@ -316,7 +316,7 @@ const cabinetFields = (vendorCodes: string[]): FieldDef[] => [
   { key: "fwVersion", label: "出厂固件版本", placeholder: "1.4.0", section: "设备信息",
     help: "留空按出厂默认 1.0.0 记账；真实版本以设备首次心跳上报为准" },
   // **没有点位字段**（2026-10-28，ae233365 · V164）：编辑接口改点位后端一律 400 error.device.bind_via_action。
-  // 上点位只走「设备管理 › 出库池」的绑定 —— 先出库给商家，再绑到它的站点点位（点位商家须 = 出库池商家）。
+  // 上点位只走「库存管理 › 出库单」的绑定 —— 先出库给商家，再绑到它的站点点位（点位商家须 = 出库单商家）。
   // **没有状态字段**（R1，同后端「编辑不再改状态」）：上线 / 标故障 / 撤机 / 报废都在设备详情页走动作，
   // 此前这里的状态下拉能把一台没过门禁的柜子直接改成「在用」
 ];
@@ -336,7 +336,7 @@ function CabinetsTab({ canWrite }: { canWrite: boolean }) {
   const [importOpen, setImportOpen] = useState(false);
   const [cabForm, setCabForm] = useState<Partial<Cabinet> | null>(null);
 
-  // 建档抽屉的供应商主数据。查询键与导入抽屉一致，两处共用同一份缓存（点位不在建档里，走出库池绑定）
+  // 建档抽屉的供应商主数据。查询键与导入抽屉一致，两处共用同一份缓存（点位不在建档里，走出库单绑定）
   const vendorsQ = useQuery({ queryKey: ["vendors"], queryFn: () => api.listVendors() });
 
   // 换页/改筛选后选中的行已不在视野内，继续留着会造成「对看不见的行动手」
@@ -443,7 +443,7 @@ function CabinetsTab({ canWrite }: { canWrite: boolean }) {
     }] : []),
     { header: "在线", cell: (c) => <OnlineBadge s={c.onlineStatus} /> },
     { header: "状态", cell: (c) => <CabinetStatusBadge s={c.status} /> },
-    // 生命周期环节（展示态，设计 §三.1）：由状态 + 出库池 / 点位 / 质检派生，回答「在哪一步」
+    // 生命周期环节（展示态，设计 §三.1）：由状态 + 出库单 / 点位 / 质检派生，回答「在哪一步」
     { header: "生命周期", cell: (c) => { const st = lifecycleStage(c); return <Badge tone={STAGE_TONE[st]}>{STAGE_LABEL[st]}</Badge>; } },
     { header: "固件", cell: (c) => <span className="text-muted-foreground">{c.fwVersion}</span> },
     { header: "最后心跳", cell: (c) => <span className="text-muted-foreground">{fmtTime(c.lastHeartbeatAt)}</span> },

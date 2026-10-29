@@ -81,10 +81,10 @@ export const agentHttp: AgentApi = {
 
   // 整站换商家（V164 之后后端只收 SITE 粒度，按机柜 / 按点位划拨返回 error.assign.granularity_retired）。
   // 走 POST /api/agent/assignments/batch：一个事务，整批成功或整批不动 —— 此前 N 次单资产请求的扇出
-  // 会留下「部分划拨」，已撤掉。机柜跟着站点走，不再单独划拨；绑定 / 解绑走设备域的出库池动作。
+  // 会留下「部分划拨」，已撤掉。机柜跟着站点走，不再单独划拨；绑定 / 解绑走设备域名下（已出库待绑定）动作。
   assignAgentAssets: async (x) => {
     if (x.cabinetNos.length > 0) {
-      throw new Error("按机柜划拨已下线：机柜随站点整站换商家，或在出库池里绑定 / 解绑");
+      throw new Error("按机柜划拨已下线：机柜随站点整站换商家，或在出库单里绑定 / 解绑");
     }
     const logs = await client.post<AssignmentLogRaw[]>("/api/agent/assignments/batch", {
       agentNo: x.agentNo, siteNos: x.siteNos, action: "ASSIGN", operator: x.operatorName,

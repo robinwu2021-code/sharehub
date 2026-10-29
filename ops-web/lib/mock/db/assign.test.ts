@@ -1,7 +1,7 @@
 // 整站换商家（原「设备/点位划拨」）的落库与守卫测试。
 //
 // 2026-10-28 起划拨只剩站点粒度（后端 620656d9：CABINET / LOCATION → 400 granularity_retired）：
-// 机柜随站点走，单台设备换位置走出库池的绑定 / 解绑或撤机。
+// 机柜随站点走，单台设备换位置走出库单的绑定 / 解绑或撤机。
 // 最容易退化的两件事：
 //  ① 只改了站点、没改站上柜子与 OPERATE 责任行 ——「看得到」与「分得到」就分成两个商家
 //    （docs/technical/设备绑定与商家归属-现状分析.md §四.1）；
@@ -27,7 +27,7 @@ const someSiteNotOf = (agentNo: string) =>
 const enabled = () => agents.find((a) => a.status === "ENABLED" && !a.archivedAt)!;
 
 describe("整站换商家：站点、柜子、责任行一起变", () => {
-  it("站点、站上柜子的商家与出库池归属、OPERATE 责任行同时落到目标商家", () => {
+  it("站点、站上柜子的商家与出库单归属、OPERATE 责任行同时落到目标商家", () => {
     const target = enabled();
     const site = someSiteNotOf(target.agentNo);
     const beforeSites = assignRowOf(target.agentNo).siteCount;
@@ -47,7 +47,7 @@ describe("整站换商家：站点、柜子、责任行一起变", () => {
     expect(agentAssignmentRecords[0].assignmentNo).toBe(recs[0].assignmentNo);
   });
 
-  it("收回平台直营：站点、柜子的商家与出库池归属清空，OPERATE 责任行删掉；流水记收回前的商家", () => {
+  it("收回平台直营：站点、柜子的商家与出库单归属清空，OPERATE 责任行删掉；流水记收回前的商家", () => {
     const target = enabled();
     const site = someSiteNotOf(target.agentNo);
     assignAgentAssets({ agentNo: target.agentNo, cabinetNos: [], siteNos: [site.siteNo] });

@@ -67,7 +67,7 @@ export function AgentSites({ agent }: { agent: Agent }) {
   return (
     <div className="space-y-4">
       <Notice className="mb-0">
-        站点是商家经营设备的场所（商家端叫「我的站点」），一期由运营代建。每个站点建好就有一个默认点位；从出库池绑定设备时，不选点位就落在默认站点的默认点位。
+        站点是商家经营设备的场所（商家端叫「我的站点」），一期由运营代建。每个站点建好就有一个默认点位；从出库单绑定设备时，不选点位就落在默认站点的默认点位。
         {!agent.defaultSiteNo && " 这个商家还没补齐位置与行业，所以还没有默认站点 —— 补齐后系统自动建。"}
       </Notice>
       {canCreate && (
@@ -114,7 +114,7 @@ export function AgentSites({ agent }: { agent: Agent }) {
   );
 }
 
-/** 设备：出库池汇总 + 该商家出库的全部设备（未绑定 / 已绑定 / 已上线）。 */
+/** 设备：出库单汇总 + 该商家出库的全部设备（未绑定 / 已绑定 / 已上线）。 */
 export function AgentDevices({ agentNo }: { agentNo: string }) {
   const ready = featureReady("devices.pool");
   const sumQ = useQuery({ queryKey: ["issued-summary", agentNo], queryFn: () => api.issuedSummary(agentNo), enabled: ready });
@@ -123,7 +123,7 @@ export function AgentDevices({ agentNo }: { agentNo: string }) {
     queryFn: () => api.listCabinets({ issuedAgentNo: agentNo, pool: "ALL", size: UNPAGED_SIZE }),
     enabled: ready,
   });
-  if (!ready) return <Notice>出库池的后端接口尚未上线。</Notice>;
+  if (!ready) return <Notice>出库单的后端接口尚未上线。</Notice>;
   const s = sumQ.data?.[0];
   const cols: Column<Cabinet>[] = [
     { header: "柜机号", cell: (c) => <Link href={`/devices/detail?no=${c.cabinetNo}`} className="txt-strong tabular-nums hover:underline">{c.cabinetNo}</Link> },
@@ -136,16 +136,16 @@ export function AgentDevices({ agentNo }: { agentNo: string }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-3">
-        <SummaryCard label="待绑定" value={String(s?.unbound ?? 0)} sub="在出库池，还没定点位" />
+        <SummaryCard label="待绑定" value={String(s?.unbound ?? 0)} sub="已出库，还没定点位" />
         <SummaryCard label="待安装" value={String(s?.bound ?? 0)} sub="已绑定点位，未上线" />
         <SummaryCard label="已上线" value={String(s?.live ?? 0)} sub="产生营收" />
       </div>
       <div className="flex justify-end">
-        <Link href="/inventory?tab=issued" className="txt-caption text-primary hover:underline">去出库池出库 / 绑定 →</Link>
+        <Link href="/inventory?tab=issued" className="txt-caption text-primary hover:underline">去出库单出库 / 绑定 →</Link>
       </div>
       <DataTable rowKey={(c: Cabinet) => c.cabinetNo} columns={cols} rows={listQ.data?.list}
         loading={listQ.isLoading} error={listQ.error} onRetry={listQ.refetch}
-        empty="还没有设备出库给这个商家 —— 在设备管理 › 出库池里出库" />
+        empty="还没有设备出库给这个商家 —— 在库存管理 › 出库单里出库" />
     </div>
   );
 }

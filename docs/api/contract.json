@@ -17065,6 +17065,1013 @@
   },
   {
    "verb": "GET",
+   "path": "/api/ops/inventory/material-balances",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#materialBalances",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "warehouseNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "materialNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "category",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "lowOnly",
+     "type": "Boolean",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "java.util.List<ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialBalance>",
+   "returnContainer": null,
+   "returnElement": "java.util.List<ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialBalance>",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/material-docs",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#materialDocs",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "keyword",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "kind",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "purpose",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "warehouseNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "materialNo",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialDoc>",
+   "returnContainer": "PageResult",
+   "returnElement": "ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialDoc",
+   "responseShape": [
+    {
+     "name": "docNo",
+     "type": "String"
+    },
+    {
+     "name": "kind",
+     "type": "String"
+    },
+    {
+     "name": "purpose",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "warehouseName",
+     "type": "String"
+    },
+    {
+     "name": "toWarehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "toWarehouseName",
+     "type": "String"
+    },
+    {
+     "name": "supplierNo",
+     "type": "String"
+    },
+    {
+     "name": "supplierName",
+     "type": "String"
+    },
+    {
+     "name": "reasonCode",
+     "type": "String"
+    },
+    {
+     "name": "receiverNo",
+     "type": "String"
+    },
+    {
+     "name": "woNo",
+     "type": "String"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    },
+    {
+     "name": "totalQty",
+     "type": "int"
+    },
+    {
+     "name": "lines",
+     "type": "List<MaterialDocLine>",
+     "fields": [
+      {
+       "name": "materialNo",
+       "type": "String"
+      },
+      {
+       "name": "materialName",
+       "type": "String"
+      },
+      {
+       "name": "qty",
+       "type": "Integer"
+      },
+      {
+       "name": "serialNos",
+       "type": "List<String>"
+      },
+      {
+       "name": "unitCost",
+       "type": "BigDecimal"
+      }
+     ]
+    },
+    {
+     "name": "createdBy",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/material-docs",
+   "perm": "device:inventory:inbound",
+   "perms": [
+    "device:inventory:inbound",
+    "device:inventory:transfer"
+   ],
+   "handler": "InventoryController#createMaterialDoc",
+   "summary": "入库类用途判 :inbound，出库与调拨判 :transfer（与设备单据同口径）。",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialDocReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialDoc",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialDoc",
+   "responseShape": [
+    {
+     "name": "docNo",
+     "type": "String"
+    },
+    {
+     "name": "kind",
+     "type": "String"
+    },
+    {
+     "name": "purpose",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "warehouseName",
+     "type": "String"
+    },
+    {
+     "name": "toWarehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "toWarehouseName",
+     "type": "String"
+    },
+    {
+     "name": "supplierNo",
+     "type": "String"
+    },
+    {
+     "name": "supplierName",
+     "type": "String"
+    },
+    {
+     "name": "reasonCode",
+     "type": "String"
+    },
+    {
+     "name": "receiverNo",
+     "type": "String"
+    },
+    {
+     "name": "woNo",
+     "type": "String"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    },
+    {
+     "name": "totalQty",
+     "type": "int"
+    },
+    {
+     "name": "lines",
+     "type": "List<MaterialDocLine>",
+     "fields": [
+      {
+       "name": "materialNo",
+       "type": "String"
+      },
+      {
+       "name": "materialName",
+       "type": "String"
+      },
+      {
+       "name": "qty",
+       "type": "Integer"
+      },
+      {
+       "name": "serialNos",
+       "type": "List<String>"
+      },
+      {
+       "name": "unitCost",
+       "type": "BigDecimal"
+      }
+     ]
+    },
+    {
+     "name": "createdBy",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "purpose",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "toWarehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "supplierNo",
+     "type": "String"
+    },
+    {
+     "name": "reasonCode",
+     "type": "String"
+    },
+    {
+     "name": "receiverNo",
+     "type": "String"
+    },
+    {
+     "name": "woNo",
+     "type": "String"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    },
+    {
+     "name": "lines",
+     "type": "List<MaterialDocLine>",
+     "fields": [
+      {
+       "name": "materialNo",
+       "type": "String"
+      },
+      {
+       "name": "materialName",
+       "type": "String"
+      },
+      {
+       "name": "qty",
+       "type": "Integer"
+      },
+      {
+       "name": "serialNos",
+       "type": "List<String>"
+      },
+      {
+       "name": "unitCost",
+       "type": "BigDecimal"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/material-docs/{docNo}",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#materialDoc",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "docNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialDoc",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialDoc",
+   "responseShape": [
+    {
+     "name": "docNo",
+     "type": "String"
+    },
+    {
+     "name": "kind",
+     "type": "String"
+    },
+    {
+     "name": "purpose",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "warehouseName",
+     "type": "String"
+    },
+    {
+     "name": "toWarehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "toWarehouseName",
+     "type": "String"
+    },
+    {
+     "name": "supplierNo",
+     "type": "String"
+    },
+    {
+     "name": "supplierName",
+     "type": "String"
+    },
+    {
+     "name": "reasonCode",
+     "type": "String"
+    },
+    {
+     "name": "receiverNo",
+     "type": "String"
+    },
+    {
+     "name": "woNo",
+     "type": "String"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    },
+    {
+     "name": "totalQty",
+     "type": "int"
+    },
+    {
+     "name": "lines",
+     "type": "List<MaterialDocLine>",
+     "fields": [
+      {
+       "name": "materialNo",
+       "type": "String"
+      },
+      {
+       "name": "materialName",
+       "type": "String"
+      },
+      {
+       "name": "qty",
+       "type": "Integer"
+      },
+      {
+       "name": "serialNos",
+       "type": "List<String>"
+      },
+      {
+       "name": "unitCost",
+       "type": "BigDecimal"
+      }
+     ]
+    },
+    {
+     "name": "createdBy",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/material-thresholds",
+   "perm": "device:inventory:warehouse",
+   "perms": [
+    "device:inventory:warehouse"
+   ],
+   "handler": "InventoryController#saveMaterialMinQty",
+   "summary": "",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialMinQtyReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialBalance",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialBalance",
+   "responseShape": [
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "warehouseName",
+     "type": "String"
+    },
+    {
+     "name": "materialNo",
+     "type": "String"
+    },
+    {
+     "name": "materialName",
+     "type": "String"
+    },
+    {
+     "name": "category",
+     "type": "String"
+    },
+    {
+     "name": "trackingMode",
+     "type": "String"
+    },
+    {
+     "name": "uom",
+     "type": "String"
+    },
+    {
+     "name": "onHand",
+     "type": "int"
+    },
+    {
+     "name": "minQty",
+     "type": "int"
+    },
+    {
+     "name": "low",
+     "type": "boolean"
+    },
+    {
+     "name": "serialNos",
+     "type": "List<String>"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "materialNo",
+     "type": "String"
+    },
+    {
+     "name": "minQty",
+     "type": "Integer"
+    }
+   ]
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/materials",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#materials",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "keyword",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "category",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "showArchived",
+     "type": "Boolean",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<ai.neargo.sharehub.inv.dto.MaterialDtos.Material>",
+   "returnContainer": "PageResult",
+   "returnElement": "ai.neargo.sharehub.inv.dto.MaterialDtos.Material",
+   "responseShape": [
+    {
+     "name": "materialNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "category",
+     "type": "String"
+    },
+    {
+     "name": "trackingMode",
+     "type": "String"
+    },
+    {
+     "name": "uom",
+     "type": "String"
+    },
+    {
+     "name": "spec",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "defaultSupplierNo",
+     "type": "String"
+    },
+    {
+     "name": "builtin",
+     "type": "boolean"
+    },
+    {
+     "name": "hasMovements",
+     "type": "boolean"
+    },
+    {
+     "name": "archivedAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/materials",
+   "perm": "device:inventory:warehouse",
+   "perms": [
+    "device:inventory:warehouse"
+   ],
+   "handler": "InventoryController#createMaterial",
+   "summary": "",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.MaterialDtos.Material",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.MaterialDtos.Material",
+   "responseShape": [
+    {
+     "name": "materialNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "category",
+     "type": "String"
+    },
+    {
+     "name": "trackingMode",
+     "type": "String"
+    },
+    {
+     "name": "uom",
+     "type": "String"
+    },
+    {
+     "name": "spec",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "defaultSupplierNo",
+     "type": "String"
+    },
+    {
+     "name": "builtin",
+     "type": "boolean"
+    },
+    {
+     "name": "hasMovements",
+     "type": "boolean"
+    },
+    {
+     "name": "archivedAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "category",
+     "type": "String"
+    },
+    {
+     "name": "trackingMode",
+     "type": "String"
+    },
+    {
+     "name": "uom",
+     "type": "String"
+    },
+    {
+     "name": "spec",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "defaultSupplierNo",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/materials/{materialNo}",
+   "perm": "device:inventory:warehouse",
+   "perms": [
+    "device:inventory:warehouse"
+   ],
+   "handler": "InventoryController#updateMaterial",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "materialNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.MaterialDtos.Material",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.MaterialDtos.Material",
+   "responseShape": [
+    {
+     "name": "materialNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "category",
+     "type": "String"
+    },
+    {
+     "name": "trackingMode",
+     "type": "String"
+    },
+    {
+     "name": "uom",
+     "type": "String"
+    },
+    {
+     "name": "spec",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "defaultSupplierNo",
+     "type": "String"
+    },
+    {
+     "name": "builtin",
+     "type": "boolean"
+    },
+    {
+     "name": "hasMovements",
+     "type": "boolean"
+    },
+    {
+     "name": "archivedAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "category",
+     "type": "String"
+    },
+    {
+     "name": "trackingMode",
+     "type": "String"
+    },
+    {
+     "name": "uom",
+     "type": "String"
+    },
+    {
+     "name": "spec",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "defaultSupplierNo",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/materials/{materialNo}/archive",
+   "perm": "device:inventory:warehouse",
+   "perms": [
+    "device:inventory:warehouse"
+   ],
+   "handler": "InventoryController#archiveMaterial",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "materialNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.MaterialDtos.Material",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.MaterialDtos.Material",
+   "responseShape": [
+    {
+     "name": "materialNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "category",
+     "type": "String"
+    },
+    {
+     "name": "trackingMode",
+     "type": "String"
+    },
+    {
+     "name": "uom",
+     "type": "String"
+    },
+    {
+     "name": "spec",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "defaultSupplierNo",
+     "type": "String"
+    },
+    {
+     "name": "builtin",
+     "type": "boolean"
+    },
+    {
+     "name": "hasMovements",
+     "type": "boolean"
+    },
+    {
+     "name": "archivedAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/materials/{materialNo}/unarchive",
+   "perm": "device:inventory:warehouse",
+   "perms": [
+    "device:inventory:warehouse"
+   ],
+   "handler": "InventoryController#unarchiveMaterial",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "materialNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.MaterialDtos.Material",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.MaterialDtos.Material",
+   "responseShape": [
+    {
+     "name": "materialNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "category",
+     "type": "String"
+    },
+    {
+     "name": "trackingMode",
+     "type": "String"
+    },
+    {
+     "name": "uom",
+     "type": "String"
+    },
+    {
+     "name": "spec",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "defaultSupplierNo",
+     "type": "String"
+    },
+    {
+     "name": "builtin",
+     "type": "boolean"
+    },
+    {
+     "name": "hasMovements",
+     "type": "boolean"
+    },
+    {
+     "name": "archivedAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
    "path": "/api/ops/inventory/migration",
    "perm": "system:param:read",
    "perms": [
@@ -54153,6 +55160,25 @@
    "OBSOLETE",
    "OTHER"
   ],
+  "MaterialDocKind": [
+   "INBOUND",
+   "OUTBOUND",
+   "TRANSFER"
+  ],
+  "MaterialDocPurpose": [
+   "PURCHASE",
+   "OPENING",
+   "RETURN",
+   "REQUISITION",
+   "SCRAP",
+   "RETURN_SUPPLIER",
+   "TRANSFER"
+  ],
+  "MaterialCategory": [
+   "DEVICE",
+   "SPARE_PART",
+   "CONSUMABLE"
+  ],
   "TransferSource": [
    "MANUAL",
    "REMOVAL"
@@ -54165,6 +55191,10 @@
    "TRANSFER",
    "ISSUE",
    "DISPOSAL"
+  ],
+  "MaterialTracking": [
+   "SERIAL",
+   "QUANTITY"
   ],
   "AssetDiffKind": [
    "MISSING",
@@ -54801,10 +55831,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 616,
-  "records": 593,
-  "withPerm": 534,
-  "withBody": 253,
-  "shapedResponses": 479
+  "endpoints": 626,
+  "records": 603,
+  "withPerm": 544,
+  "withBody": 257,
+  "shapedResponses": 488
  }
 }

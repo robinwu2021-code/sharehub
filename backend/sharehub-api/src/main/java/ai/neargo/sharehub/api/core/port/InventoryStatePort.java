@@ -16,10 +16,11 @@ public interface InventoryStatePort {
     record OpenIntake(String intakeNo, String kind, String warehouseNo, String sourceRef, LocalDateTime arrivedAt, int pending) {
     }
 
-    /** 低于安全库存的仓 × 设备类型（V204）。 */
+    /** 低于安全库存的仓 × 设备类型（V204）与仓 × 物料（V210）。 */
     List<LowStock> lowStock();
 
-    record LowStock(String warehouseNo, String warehouseName, String itemType, int minQty, int available) {
+    /** itemType：CABINET / POWERBANK，或物料号；label 是给人看的名字。 */
+    record LowStock(String warehouseNo, String warehouseName, String itemType, String label, int minQty, int available) {
     }
 
     /** 给定撤机工单号里，已经生成回仓调拨单的那些。 */

@@ -158,16 +158,16 @@ export interface DeviceApi {
   /** 处理一条差异：写明去向结论。**结论必填** —— 没有结论的「已处理」等于把差异藏起来。 */
   resolveAssetDiff(diffNo: string, note: string): Promise<AssetDiff>;
 
-  // === 出库池与绑定（docs/technical/设备出库与绑定-技术设计.md §3.2 ~ 3.4）===
+  // === 出库单与绑定（docs/technical/设备出库与绑定-技术设计.md §3.2 ~ 3.4）===
   /** 出库给商家：一个事务，全成或全不成。商家须已补齐资料（有默认站点）。 */
   issueDevices(x: IssueDevicesReq): Promise<Cabinet[]>;
-  /** 出库池退回仓库：只收未绑定的设备；原因必填。 */
+  /** 出库退回仓库：只收未绑定的设备；原因必填。 */
   returnPoolDevices(x: PoolReturnReq): Promise<Cabinet[]>;
   /** 接收人签收（V195）：只能签给自己的、未签收的。 */
   claimDevices(x: ClaimDevicesReq): Promise<Cabinet[]>;
   /** 出库调整（V195）：改商家 / 站点 / 接收人。 */
   redirectIssue(x: IssueRedirectReq): Promise<Cabinet[]>;
-  /** 出库池按商家汇总：未绑定 / 已绑定 / 已上线。 */
+  /** 出库单按商家汇总：未绑定 / 已绑定 / 已上线。 */
   issuedSummary(agentNo?: string): Promise<IssuedSummary[]>;
   /** 仓库列表（含已归档；选仓下拉用 activeWarehouses 过滤）。 */
   listWarehouses(): Promise<Warehouse[]>;
@@ -200,10 +200,10 @@ export interface DeviceApi {
   inspectIntakeItem(intakeNo: string, itemType: IntakeItemType, itemNo: string, req: QcReq): Promise<IntakeDetail>;
   inboundIntake(intakeNo: string, items: IntakeItemRef[]): Promise<IntakeDetail>;
   disposeIntake(intakeNo: string, x: IntakeDisposeReq): Promise<IntakeDetail>;
-  /** 绑定：不给点位 = 出库池商家的默认站点默认点位；点位商家 ≠ 出库池商家 409。 */
+  /** 绑定：不给点位 = 出库单商家的默认站点默认点位；点位商家 ≠ 出库单商家 409。 */
   bindDevice(deviceNo: string, x?: BindReq): Promise<BindResult>;
   /** 批量绑定：一个事务。 */
   bindDevices(x: BindBatchReq): Promise<BindResult[]>;
-  /** 解绑：只限已绑定未上线，回到同一商家的出库池。 */
+  /** 解绑：只限已绑定未上线，回到同一商家名下（已出库待绑定）。 */
   unbindDevice(deviceNo: string, reason: string): Promise<Cabinet>;
 }

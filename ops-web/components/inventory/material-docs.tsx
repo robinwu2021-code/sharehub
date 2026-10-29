@@ -23,6 +23,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ReadOnlyNotice } from "@/components/read-only-notice";
+import { Notice } from "@/components/ui/notice";
 import { activeWarehouses } from "@/components/inventory/warehouses";
 import { INBOUND_PURPOSES, KIND, OUTBOUND_PURPOSES, PURPOSE_LABEL, SCRAP_REASON } from "@/components/inventory/material-maps";
 
@@ -45,6 +46,8 @@ export function MaterialDocsTab() {
   const [openNo, setOpenNo] = useState<string | null>(null);
 
   const whQ = useQuery({ queryKey: ["warehouses"], queryFn: () => api.listWarehouses() });
+  const engineQ = useQuery({ queryKey: ["inventory-engine"], queryFn: () => api.getInventoryEngine() });
+  const service = engineQ.data?.engine === "SERVICE";
   const q = useQuery({
     queryKey: ["material-docs", paging.page, paging.size, keyword, kind],
     queryFn: () => api.listMaterialDocs({ page: paging.page, size: paging.size, keyword, kind: (kind || undefined) as MaterialDocKind | undefined }),
@@ -67,11 +70,12 @@ export function MaterialDocsTab() {
 
   return (
     <div>
+      {engineQ.data && !service && <Notice>物料的账记在独立进销存（库存服务）：切到独立进销存引擎（库存设置 › 库存引擎 = SERVICE）后可用。物料档案不受影响，可先建档。</Notice>}
       {!purposes.length && <ReadOnlyNotice what="物料出入库" perm="device:inventory:inbound" note="不能建物料单据" className="mb-3" />}
       <Toolbar search={keyword} onSearch={(v) => { setKeyword(v); paging.reset(); }} searchPlaceholder="单号 / 说明 / 工单 / 序列号"
         onAdd={() => setDraft({ purpose: purposes[0], warehouseNo: whQ.data?.find((w) => w.isDefault)?.warehouseNo ?? "", toWarehouseNo: "",
           supplierNo: "", reasonCode: "", receiverNo: "", woNo: "", currency: "AED", note: "", lines: [emptyLine()] })}
-        addLabel="新建物料单据" canAdd={purposes.length > 0}>
+        addLabel="新建物料单据" canAdd={purposes.length > 0 && service}>
         <FilterSelect aria-label="类型" value={kind} onChange={(v) => { setKind(v); paging.reset(); }} options={KIND} allLabel="全部类型" />
       </Toolbar>
       <PagedTable query={q} paging={paging} rowKey={(d: MaterialDoc) => d.docNo} columns={cols}

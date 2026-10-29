@@ -72,11 +72,10 @@ public class InventoryEvaluator implements StateEvaluator {
         }
 
         for (InventoryStatePort.LowStock l : inventory.lowStock()) {
-            String label = "CABINET".equals(l.itemType()) ? "机柜" : "充电宝";
             out.add(new Finding(LOW_STOCK, AlarmSubjectType.WAREHOUSE, l.warehouseNo() + ":" + l.itemType(), null, null, null, null,
                     AlarmCause.NO_STOCK, ImpactScope.ENTITY, 0,
                     List.of(new Finding.Evidence("BELOW_MIN", null, null, now,
-                            (l.warehouseName() == null ? l.warehouseNo() : l.warehouseName()) + " " + label + "可用 " + l.available()
+                            (l.warehouseName() == null ? l.warehouseNo() : l.warehouseName()) + " " + l.label() + " 可用 " + l.available()
                                     + " 台，低于安全库存 " + l.minQty())),
                     Map.of("warehouseNo", l.warehouseNo(), "itemType", l.itemType())));
         }

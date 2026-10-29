@@ -132,7 +132,7 @@ export function createIntake(x: IntakeCreateReq): IntakeDetail {
     else if (c.archivedAt) bad.push(`${no}：已归档`);
     else if (c.status !== "IN_STOCK") bad.push(`${no}：不在库（${c.status}）`);
     else if (c.locationNo) bad.push(`${no}：已绑定点位`);
-    else if (c.issuedAgentNo) bad.push(`${no}：在商家出库池`);
+    else if (c.issuedAgentNo) bad.push(`${no}：已出库给商家`);
     else if (openNos.has(`CABINET:${no}`)) bad.push(`${no}：已在未处理的待检单上`);
   }
   for (const no of pbNos) {

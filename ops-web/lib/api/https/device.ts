@@ -135,7 +135,7 @@ export const deviceHttp: DeviceApi = {
   listAssetDiffs: (q) => client.get("/api/ops/asset-diffs", q),
   resolveAssetDiff: (diffNo, note) => client.post(`/api/ops/asset-diffs/${diffNo}/resolve`, { note }),
 
-  // 出库池（商户入驻会话 0a5c511f，V161；契约 6f275650）。整批一个事务；
+  // 出库单（商户入驻会话 0a5c511f，V161；契约 6f275650）。整批一个事务；
   // 错误码 error.issue.agent_not_ready / not_issuable / not_in_pool、error.device.qc_not_passed 均为 409。
   issueDevices: (x) => client.post("/api/ops/devices/issue", x),
   returnPoolDevices: (x) => client.post("/api/ops/devices/pool-return", x),
@@ -166,8 +166,8 @@ export const deviceHttp: DeviceApi = {
   inspectIntakeItem: (no, type, itemNo, req) => client.post(`/api/ops/inventory/intakes/${no}/items/${type}/${itemNo}/qc`, req),
   inboundIntake: (no, items) => client.post(`/api/ops/inventory/intakes/${no}/inbound`, { items }),
   disposeIntake: (no, x) => client.post(`/api/ops/inventory/intakes/${no}/dispose`, x),
-  // 绑定（商户入驻会话 ae233365 · V164）：不给点位 = 出库池商家默认站点的默认点位；
-  // 点位商家 ≠ 出库池商家 409 error.bind.agent_mismatch；批量一个事务。错误文案由后端按语言给。
+  // 绑定（商户入驻会话 ae233365 · V164）：不给点位 = 出库单商家默认站点的默认点位；
+  // 点位商家 ≠ 出库单商家 409 error.bind.agent_mismatch；批量一个事务。错误文案由后端按语言给。
   bindDevice: (no, x) => client.post(`/api/ops/devices/${no}/bind`, x ?? {}),
   bindDevices: (x) => client.post("/api/ops/devices/bind-batch", x),
   unbindDevice: (no, reason) => client.post(`/api/ops/devices/${no}/unbind`, { reason }),

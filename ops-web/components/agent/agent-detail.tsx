@@ -246,7 +246,7 @@ export function AgentDetailDrawer({
           <Tabs
             tabs={[
               { key: "overview", label: "概况" },
-              // 2026-10-28 设备出库与绑定（开发计划 F3）：站点就是门店，一期运营代建；设备从出库池绑定到这里
+              // 2026-10-28 设备出库与绑定（开发计划 F3）：站点就是门店，一期运营代建；设备从出库单绑定到这里
               { key: "sites", label: "站点与点位" },
               { key: "devices", label: "设备" },
               { key: "assessments", label: "运维考核" },

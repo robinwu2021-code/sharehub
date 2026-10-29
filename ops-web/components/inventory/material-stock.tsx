@@ -19,6 +19,7 @@ import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
 import { CATEGORY, PURPOSE_LABEL } from "@/components/inventory/material-maps";
+import { Notice } from "@/components/ui/notice";
 
 /** 抽屉里「最近单据」的条数。 */
 const RECENT_DOCS = PAGE_SIZE * 2;
@@ -36,8 +37,11 @@ export function MaterialStockTab() {
   const [open, setOpen] = useState<MaterialBalance | null>(null);
 
   const whQ = useQuery({ queryKey: ["warehouses"], queryFn: () => api.listWarehouses() });
+  const engineQ = useQuery({ queryKey: ["inventory-engine"], queryFn: () => api.getInventoryEngine() });
+  const service = engineQ.data?.engine === "SERVICE";
   const q = useQuery({
     queryKey: ["material-balances", warehouseNo, category, lowOnly],
+    enabled: service,
     queryFn: () => api.listMaterialBalances({ warehouseNo: warehouseNo || undefined, lowOnly: lowOnly || undefined,
       category: (category || undefined) as MaterialCategory | undefined }),
   });
@@ -86,6 +90,8 @@ export function MaterialStockTab() {
     { header: "安全库存", value: (b) => b.minQty },
     { header: "序列号", value: (b) => b.serialNos.join(" ") },
   ], rows);
+
+  if (engineQ.data && !service) return <Notice>物料的账记在独立进销存（库存服务）：切到独立进销存引擎（库存设置 › 库存引擎 = SERVICE）后可用。物料档案不受影响，可先建档。</Notice>;
 
   return (
     <div>

@@ -56,23 +56,23 @@ export interface Cabinet extends Archivable {
   /** 所在仓；在库设备才有。调拨按仓选设备要用它。 */
   warehouseNo: string | null;
   /**
-   * 出库池归属：出库给了哪个商家（V161，商户入驻会话）。空 = 在仓或平台直营。
-   * 与 `warehouseNo` 互斥（在仓就不在出库池）。绑定只能绑到这个商家的站点点位上；
-   * `agentNo` 仍只由点位派生 —— 设备在出库池里、还没绑定时 `agentNo` 为空。
+   * 出库单归属：出库给了哪个商家（V161，商户入驻会话）。空 = 在仓或平台直营。
+   * 与 `warehouseNo` 互斥（在仓就不在出库单）。绑定只能绑到这个商家的站点点位上；
+   * `agentNo` 仍只由点位派生 —— 设备在出库单里、还没绑定时 `agentNo` 为空。
    * 设计：docs/technical/设备出库与绑定-技术设计.md §2.1。
    */
   issuedAgentNo?: string | null;
-  /** 进入出库池的时刻。 */
+  /** 进入出库单的时刻。 */
   issuedAt?: string | null;
   /** 出库目的站点（V195）；空 = 到商家，可绑该商家任一站点。 */
   issuedSiteNo?: string | null;
   /** 出库内部接收人员工号（V195）。 */
   issueReceiverNo?: string | null;
-  /** 接收人签收时刻（V195）；出库池里为空 = 已发货待签收，不能绑定。 */
+  /** 接收人签收时刻（V195）；出库单里为空 = 已发货待签收，不能绑定。 */
   issueClaimedAt?: string | null;
 }
 
-/** 出库池筛选：待绑定（已签收未绑定，即绑定候选）/ 已绑定（含已上线）/ 全部 / 已发货待签收 / 待我签收。 */
+/** 出库单筛选：待绑定（已签收未绑定，即绑定候选）/ 已绑定（含已上线）/ 全部 / 已发货待签收 / 待我签收。 */
 export type PoolFilter = "UNBOUND" | "BOUND" | "ALL" | "UNCLAIMED" | "MINE";
 
 /** 出库给商家（POST /api/ops/devices/issue）。一个事务，全成或全不成。 */
@@ -99,7 +99,7 @@ export interface IssueRedirectReq {
   receiverNo?: string;
   reason: string;
 }
-/** 出库池退回仓库（POST /api/ops/devices/pool-return）。只收未绑定的设备；原因必填。 */
+/** 出库退回仓库（POST /api/ops/devices/pool-return）。只收未绑定的设备；原因必填。 */
 export interface PoolReturnReq {
   cabinetNos: string[];
   warehouseNo?: string;
@@ -107,7 +107,7 @@ export interface PoolReturnReq {
 }
 /**
  * 仓库（GET /api/ops/inventory/warehouses）。V182 种入、V201 起可新建 / 编辑 / 归档。
- * isDefault = 撤机回仓与出库池退回不选仓时落到的仓（系统参数 inv.return_warehouse）。
+ * isDefault = 撤机回仓与出库退回不选仓时落到的仓（系统参数 inv.return_warehouse）。
  * 列表含已归档的仓；选仓下拉用 {@link activeWarehouses} 滤掉。
  */
 export interface Warehouse {
@@ -159,7 +159,7 @@ export interface Shipment {
 }
 /**
  * 安全库存（V204，GET /api/ops/inventory/stock-thresholds）：启用中的仓 × 柜 / 宝各一行，未设下限 minQty = 0。
- * available = 在该仓在库、未绑点位、不在出库池（宝：不在柜内）；low = 低于下限（告警 LOW_STOCK 给仓管待办）。
+ * available = 在该仓在库、未绑点位、不在出库单（宝：不在柜内）；low = 低于下限（告警 LOW_STOCK 给仓管待办）。
  */
 export interface StockThreshold {
   warehouseNo: string;
@@ -306,11 +306,11 @@ export interface IntakeDisposeReq {
   disposition: IntakeDisposal;
   note: string;
 }
-/** 出库池按商家汇总（GET /api/ops/inventory/issued-summary）。 */
+/** 出库单按商家汇总（GET /api/ops/inventory/issued-summary）。 */
 export interface IssuedSummary {
   agentNo: string;
   agentName: string;
-  /** 在出库池、未绑定 */
+  /** 在出库单、未绑定 */
   unbound: number;
   /** 已绑定点位、尚未上线 */
   bound: number;
@@ -318,8 +318,8 @@ export interface IssuedSummary {
   live: number;
 }
 /**
- * 绑定（POST /api/ops/devices/{deviceNo}/bind）。`locationNo` 缺省 = 出库池商家的默认站点默认点位。
- * 点位所属站点的商家必须等于设备的出库池商家，否则 409。
+ * 绑定（POST /api/ops/devices/{deviceNo}/bind）。`locationNo` 缺省 = 出库单商家的默认站点默认点位。
+ * 点位所属站点的商家必须等于设备名下（已出库待绑定）商家，否则 409。
  */
 export interface BindReq {
   locationNo?: string;
@@ -901,7 +901,7 @@ export interface StockStage {
 
 /**
  * 阶段下钻的一台设备（P2 #6，GET /api/ops/inventory/stage-items）。
- * model：柜为型号、宝为厂商码；agentNo：出库池或绑定商家；locationRef：柜为点位号、宝为所在柜号。
+ * model：柜为型号、宝为厂商码；agentNo：出库单或绑定商家；locationRef：柜为点位号、宝为所在柜号。
  */
 export interface StageItem {
   itemType: IntakeItemType;

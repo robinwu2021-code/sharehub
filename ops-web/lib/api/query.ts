@@ -45,9 +45,9 @@ export type ArchiveQ = PageQ & { showArchived?: boolean };
 /** 设备：在线状态 + 业务状态双筛。 */
 export type CabinetQ = PageQ & {
   onlineStatus?: string; status?: string; showArchived?: boolean;
-  /** 出库池商家（技术设计 §3.3） */
+  /** 出库单商家（技术设计 §3.3） */
   issuedAgentNo?: string;
-  /** 出库池筛选：未绑定 / 已绑定 / 全部 */
+  /** 出库单筛选：未绑定 / 已绑定 / 全部 */
   pool?: PoolFilter;
 };
 /** 站点列表：加按商家筛（技术设计 §3.6）。 */

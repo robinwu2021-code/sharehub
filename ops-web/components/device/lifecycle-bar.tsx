@@ -1,7 +1,7 @@
 "use client";
 
 // 设备详情的生命周期进度条（设计 §五.3）：高亮当前所处环节，下面一行写「卡在哪 / 下一步谁做」并给去处。
-// 环节由存储态 + 出库池 / 点位 / 质检派生（lib/device-lifecycle），不额外请求。
+// 环节由存储态 + 出库单 / 点位 / 质检派生（lib/device-lifecycle），不额外请求。
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";

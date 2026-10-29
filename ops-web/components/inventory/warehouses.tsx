@@ -247,7 +247,7 @@ function ThresholdDrawer({ warehouse, canWrite, onClose }: { warehouse: Warehous
   ];
   return (
     <Drawer open={!!warehouse} onOpenChange={(o) => { if (!o) { setDraft({}); onClose(); } }} title={`安全库存 · ${warehouse?.name ?? ""}`}>
-      <div className="mb-3 txt-caption text-muted-foreground">可用 = 在本仓在库、未绑点位、不在出库池。低于下限给仓管发待办，补到下限自动消除；0 = 不预警。</div>
+      <div className="mb-3 txt-caption text-muted-foreground">可用 = 在本仓在库、未绑点位、不在出库单。低于下限给仓管发待办，补到下限自动消除；0 = 不预警。</div>
       <DataTable rowKey={(t: StockThreshold) => t.itemType} columns={cols} rows={q.data}
         loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="无" />
     </Drawer>

@@ -114,20 +114,38 @@ public class HttpInventoryApi implements InventoryApi {
     // —— 出库与出库池 ——
 
     @Override
-    public String createOutbound(String locationId, String purpose, Map<String, String> targets, String remark, List<String> serialNos,
-                                 String idempotencyKey) {
+    public String createOutbound(String locationId, String purpose, String reasonCode, Map<String, String> targets, String remark,
+                                 List<OutboundLine> lines, List<String> serialNos, String idempotencyKey) {
         Map<String, Object> body = new HashMap<>();
         body.put("locationId", locationId);
         body.put("purpose", purpose);
-        body.put("targets", targets);
+        body.put("reasonCode", reasonCode);
+        body.put("targets", targets == null ? Map.of() : targets);
         body.put("remark", remark);
-        body.put("serialNos", serialNos);
+        body.put("lines", lines == null ? List.of() : lines);
+        body.put("serialNos", serialNos == null ? List.of() : serialNos);
         return call(HttpMethod.POST, V1 + "/outbounds", body, idempotencyKey).path("docNo").asText();
     }
 
     @Override
     public void postOutbound(String docNo, String idempotencyKey) {
         call(HttpMethod.POST, V1 + "/outbounds/" + docNo + "/post", Map.of(), idempotencyKey);
+    }
+
+    @Override
+    public List<Balance> balances(String locationId, String itemId) {
+        UriComponentsBuilder b = UriComponentsBuilder.fromPath(V1 + "/balances");
+        if (locationId != null) b.queryParam("locationId", locationId);
+        if (itemId != null) b.queryParam("itemId", itemId);
+        return read(call(HttpMethod.GET, b.build().toUriString(), null, null), new TypeReference<>() { });
+    }
+
+    @Override
+    public List<InStock> serials(String itemId, String locationId) {
+        UriComponentsBuilder b = UriComponentsBuilder.fromPath(V1 + "/serials");
+        if (itemId != null) b.queryParam("itemId", itemId);
+        if (locationId != null) b.queryParam("locationId", locationId);
+        return read(call(HttpMethod.GET, b.build().toUriString(), null, null), new TypeReference<>() { });
     }
 
     @Override

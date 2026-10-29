@@ -209,7 +209,7 @@ export const NAV: NavSection[] = [
     // 2026-10-28 按设备生命周期重排（docs/requirements/设备生命周期管理-运营端设计.md §五）：
     //   设备档案 → 仓储与出库 → 部署与安装 → 绑定上线 → 运行监控 → 维护与退出
     //   （采购入库等后端；V165 补上装机、待上线、故障与维修、撤机与回仓、报废与遗失五个设备视图）。
-    // 「出库池」（设备出库与绑定 · 开发计划 F3）：绑定商家先出库，出库必须选商家；绑定只从出库池里选，
+    // 「出库单」（设备出库与绑定 · 开发计划 F3）：绑定商家先出库，出库必须选商家；绑定只从出库单里选，
     // 默认绑到商家的默认站点、默认点位。
     // 「供应商接入」更名「厂商接入」：它是硬件厂商的协议接入，「供应商」留给采购。
     // ⚠️ 菜单真源在库里：本段的行由 V150 重编号、V163 / V165 再重排，改这里要同步新开迁移（见 nav-seed.test.ts）。
@@ -236,20 +236,20 @@ export const NAV: NavSection[] = [
     //   主数据 → 出入库 → 库内作业 → 库存账 → 设置。管的是「东西在不在库、在哪个仓、有多少」——
     //   设备（柜 / 宝 / 其他整机，逐件）与物料（备件、耗材，按数量）同一套账；设备上线后的生命周期留在设备管理。
     // 将来的独立系统以 ai-shop 库存服务为准（docs/technical/独立进销存/），这里是运营端的统一入口。
-    // 权限码沿用 device:inventory:*。物料三项（物料档案 / 物料单据 / 物料库存）后端未实现：ready 未置，真实后端下灰显。
+    // 权限码沿用 device:inventory:*。物料三项（V210）的账在 ai-shop 库存服务：物料单据与物料库存只在独立进销存引擎下可用。
     // ⚠️ 菜单真源在库里：本段的行由 V209 建立，改这里要同步新开迁移（见 nav-seed.test.ts）。
     key: "inventory", label: "库存管理", icon: "Warehouse", module: "device", href: "/inventory?tab=stock",
     match: ["/inventory"],
     children: [
-      { href: "/inventory?tab=materials", label: "物料档案", perm: "device:inventory:read", phase: 1, group: "主数据" },
+      { href: "/inventory?tab=materials", label: "物料档案", perm: "device:inventory:read", phase: 1, ready: true, group: "主数据" },
       // 仓库（V190 只读 → V201 可维护，写码 device:inventory:warehouse）；供应商（V201）为到货来源与退供应商去向
       { href: "/inventory?tab=warehouses", label: "仓库", perm: "device:inventory:read", phase: 1, ready: true, group: "主数据" },
       { href: "/inventory?tab=suppliers", label: "供应商", perm: "device:inventory:read", phase: 1, ready: true, group: "主数据" },
       // 入库单（原「到仓待检」V193；V202 起承载采购到货 / 期初建账 / 撤机回仓）
       { href: "/inventory?tab=intakes", label: "入库单", perm: "device:inventory:read", phase: 1, ready: true, group: "出入库" },
       // 物料单据：数量物料（备件、耗材）与其他整机的入库 / 领用 / 报废 / 退供应商 / 调拨
-      { href: "/inventory?tab=material-docs", label: "物料单据", perm: "device:inventory:read", phase: 1, group: "出入库" },
-      { href: "/inventory?tab=issued", label: "出库池", perm: "device:inventory:read", group: "出入库" },
+      { href: "/inventory?tab=material-docs", label: "物料单据", perm: "device:inventory:read", phase: 1, ready: true, group: "出入库" },
+      { href: "/inventory?tab=issued", label: "出库单", perm: "device:inventory:read", group: "出入库" },
       // 处置出库（V203）：在库设备报废 / 退供应商，写码 device:inventory:transfer
       { href: "/inventory?tab=disposals", label: "处置出库", perm: "device:inventory:read", phase: 1, ready: true, group: "出入库" },
       { href: "/inventory?tab=transfers", label: "库存调拨", perm: "device:inventory:read", phase: 1, ready: true, group: "库内作业" },
@@ -257,7 +257,7 @@ export const NAV: NavSection[] = [
       { href: "/inventory?tab=counts", label: "盘点", perm: "device:inventory:read", phase: 1, ready: true, group: "库内作业" },
       { href: "/inventory?tab=asset-diffs", label: "资产差异", perm: "device:inventory:read", phase: 1, ready: true, group: "库内作业" },
       { href: "/inventory?tab=stock", label: "库存余额", perm: "device:inventory:read", phase: 1, ready: true, group: "库存账" },
-      { href: "/inventory?tab=material-stock", label: "物料库存", perm: "device:inventory:read", phase: 1, group: "库存账" },
+      { href: "/inventory?tab=material-stock", label: "物料库存", perm: "device:inventory:read", phase: 1, ready: true, group: "库存账" },
       { href: "/inventory?tab=ledger", label: "库存流水", perm: "device:inventory:read", phase: 1, ready: true, group: "库存账" },
       // 库存设置：系统参数「库存」组（V207），复用 /api/platform/sys-params，写码 system:param:update
       { href: "/inventory?tab=settings", label: "库存设置", perm: "device:inventory:read", phase: 1, ready: true, group: "设置" },
@@ -348,7 +348,7 @@ export const NAV: NavSection[] = [
       // 先定分润、再划资产：划拨只影响之后的订单归属，规则得先在
       { href: "/agents?tab=commission", label: "商家分润规则", perm: "agent:share:config", group: "分润与划拨" },
       // 2026-10-28 更名「整站换商家」（V171）：划拨只剩站点粒度（620656d9），站内柜子与运维责任行一并换；
-      // 单台设备换位置走设备管理 › 出库池的绑定 / 解绑或撤机
+      // 单台设备换位置走库存管理 › 出库单的绑定 / 解绑或撤机
       { href: "/agents?tab=assign", label: "整站换商家", perm: "agent:scope:assign", group: "分润与划拨" },
       // 经营视图由三个既有读端点在页内拼出（商家 / 绩效 / 分润汇总），不新增后端端点
       { href: "/agents?tab=business", label: "商家经营视图", perm: "agent:agent:read", phase: 1, ready: true, group: "经营与退出" },

@@ -27,6 +27,12 @@ public class InventoryFake implements InventoryApi {
     public final Map<String, String> stock = new HashMap<>();
     /** 序列号 → 已用过的 gateRef。 */
     public final Map<String, List<String>> gates = new HashMap<>();
+    /** 「locationId|itemId」→ 数量物料在手（物料单据，V210）。 */
+    public final Map<String, BigDecimal> qty = new HashMap<>();
+    /** 序列号 → itemId（入库时记下，余额按物料汇总用）。 */
+    public final Map<String, String> serialItem = new HashMap<>();
+    /** 免检物料（gatePolicy = NONE）：入库不要 gateRef。 */
+    public final java.util.Set<String> noGate = new java.util.HashSet<>();
     public final Map<String, Doc> docs = new HashMap<>();
     public final Map<String, DispatchView> pool = new LinkedHashMap<>();
     public final Map<String, Claim> claims = new HashMap<>();
@@ -37,7 +43,11 @@ public class InventoryFake implements InventoryApi {
     private final AtomicLong seq = new AtomicLong();
 
     public record Doc(String kind, String locationId, String purpose, List<InboundLine> lines, List<String> serials,
-                      Map<String, String> targets, boolean[] posted) {
+                      Map<String, String> targets, boolean[] posted, String reasonCode, List<OutboundLine> outLines) {
+        Doc(String kind, String locationId, String purpose, List<InboundLine> lines, List<String> serials,
+            Map<String, String> targets, boolean[] posted) {
+            this(kind, locationId, purpose, lines, serials, targets, posted, null, List.of());
+        }
     }
 
     @Override
@@ -59,7 +69,9 @@ public class InventoryFake implements InventoryApi {
 
     @Override
     public String upsertItem(String externalRef, ItemSpec spec) {
-        return items.computeIfAbsent(externalRef, k -> "IT-" + k);
+        String id = items.computeIfAbsent(externalRef, k -> "IT-" + k);
+        if ("NONE".equals(spec.gatePolicy())) noGate.add(id);
+        return id;
     }
 
     @Override
@@ -93,16 +105,23 @@ public class InventoryFake implements InventoryApi {
     public void postInbound(String docNo, String idempotencyKey) {
         Doc d = docs.get(docNo);
         for (InboundLine l : d.lines()) {
-            for (Serial s : l.serials()) {
-                if (s.gateRef() == null) throw err(400, "inventory.gate.ref_missing", s.serialNo());
-                if (gates.getOrDefault(s.serialNo(), List.of()).contains(s.gateRef())) throw err(409, "inventory.serial.conflict", s.serialNo() + ":gate_reused");
+            if (l.qty() != null && l.qty() <= 0) throw err(400, "inventory.bad_request", "qty");
+            for (Serial s : l.serials() == null ? List.<Serial>of() : l.serials()) {
+                if (s.gateRef() == null && !noGate.contains(l.itemId())) throw err(400, "inventory.gate.ref_missing", s.serialNo());
+                if (s.gateRef() != null && gates.getOrDefault(s.serialNo(), List.of()).contains(s.gateRef()))
+                    throw err(409, "inventory.serial.conflict", s.serialNo() + ":gate_reused");
                 if (stock.containsKey(s.serialNo())) throw err(409, "inventory.serial.conflict", s.serialNo() + ":in_stock");
             }
         }
         for (InboundLine l : d.lines()) {
+            if (l.serials() == null || l.serials().isEmpty()) {
+                qty.merge(d.locationId() + "|" + l.itemId(), BigDecimal.valueOf(l.qty()), BigDecimal::add);
+                continue;
+            }
             for (Serial s : l.serials()) {
                 stock.put(s.serialNo(), d.locationId());
-                gates.computeIfAbsent(s.serialNo(), k -> new ArrayList<>()).add(s.gateRef());
+                serialItem.put(s.serialNo(), l.itemId());
+                if (s.gateRef() != null) gates.computeIfAbsent(s.serialNo(), k -> new ArrayList<>()).add(s.gateRef());
                 if ("RETURN".equals(d.purpose())) {
                     pool.replaceAll((id, v) -> v.serialNo().equals(s.serialNo()) && ("AVAILABLE".equals(v.status()) || "CLAIMED".equals(v.status()))
                             ? with(v, "RETURNED") : v);
@@ -119,15 +138,19 @@ public class InventoryFake implements InventoryApi {
     }
 
     @Override
-    public String createOutbound(String locationId, String purpose, Map<String, String> t, String remark, List<String> serialNos,
-                                 String idempotencyKey) {
+    public String createOutbound(String locationId, String purpose, String reasonCode, Map<String, String> t, String remark,
+                                 List<OutboundLine> lines, List<String> serialNos, String idempotencyKey) {
         maybeFail();
+        if (t == null) t = Map.of();
+        if ("SCRAP".equals(purpose) && (reasonCode == null || reasonCode.isBlank())) throw err(400, "inventory.bad_request", "reasonCode");
+        if ("RETURN_SUPPLIER".equals(purpose) && !t.containsKey("SUPPLIER")) throw err(400, "inventory.bad_request", "targets");
         if ("ISSUE".equals(purpose) && (!t.containsKey("MERCHANT") || !t.containsKey("PERSON"))) {
             throw err(400, "inventory.bad_request", "targets");
         }
         for (var e : t.entrySet()) if (!targets.containsKey(e.getKey() + ":" + e.getValue())) throw err(404, "inventory.not_found", e.getKey());
         String no = "OUT-" + UUID.randomUUID().toString().substring(0, 8);
-        docs.put(no, new Doc("OUT", locationId, purpose, List.of(), serialNos, t, new boolean[]{false}));
+        docs.put(no, new Doc("OUT", locationId, purpose, List.of(), serialNos == null ? List.of() : serialNos, t, new boolean[]{false},
+                reasonCode, lines == null ? List.of() : lines));
         return no;
     }
 
@@ -135,6 +158,16 @@ public class InventoryFake implements InventoryApi {
     public void postOutbound(String docNo, String idempotencyKey) {
         Doc d = docs.get(docNo);
         for (String s : d.serials()) if (!d.locationId().equals(stock.get(s))) throw err(409, "inventory.serial.conflict", s + ":not_in_stock");
+        Map<String, BigDecimal> need = new HashMap<>();
+        for (OutboundLine l : d.outLines()) need.merge(d.locationId() + "|" + l.itemId(), BigDecimal.valueOf(l.qty()), BigDecimal::add);
+        for (var e : need.entrySet())
+            if (qty.getOrDefault(e.getKey(), BigDecimal.ZERO).compareTo(e.getValue()) < 0) throw err(409, "inventory.stock.insufficient", e.getKey());
+        need.forEach((k, v) -> qty.merge(k, v.negate(), BigDecimal::add));
+        if (!"ISSUE".equals(d.purpose())) {
+            d.serials().forEach(stock::remove);
+            d.posted()[0] = true;
+            return;
+        }
         for (String s : d.serials()) {
             stock.remove(s);
             String id = "DP-" + UUID.randomUUID().toString().substring(0, 8);
@@ -143,6 +176,29 @@ public class InventoryFake implements InventoryApi {
             emit("DispatchCreated", id, payload(pool.get(id)));
         }
         d.posted()[0] = true;
+    }
+
+    @Override
+    public List<Balance> balances(String locationId, String itemId) {
+        Map<String, BigDecimal> all = new HashMap<>(qty);
+        stock.forEach((sn, loc) -> {
+            String item = serialItem.get(sn);
+            if (item != null) all.merge(loc + "|" + item, BigDecimal.ONE, BigDecimal::add);
+        });
+        List<Balance> out = new ArrayList<>();
+        all.forEach((k, v) -> {
+            String[] p = k.split("\\|");
+            if ((locationId == null || locationId.equals(p[0])) && (itemId == null || itemId.equals(p[1])))
+                out.add(new Balance(p[1], p[0], v, BigDecimal.ZERO, BigDecimal.ZERO, v));
+        });
+        return out;
+    }
+
+    @Override
+    public List<InStock> serials(String itemId, String locationId) {
+        return stock.entrySet().stream().filter(e -> (locationId == null || locationId.equals(e.getValue()))
+                        && (itemId == null || itemId.equals(serialItem.get(e.getKey()))))
+                .map(e -> new InStock(e.getKey(), serialItem.get(e.getKey()), e.getValue())).toList();
     }
 
     @Override

@@ -519,7 +519,7 @@ export const unarchivePowerbank = (no: string) => unarchiveRow(powerbanks, "powe
 export function importCabinets(rows: Partial<Cabinet>[]): { imported: number; updated: number } {
   let imported = 0, updated = 0;
   for (const r of rows) {
-    // 2026-10-28：导入不再受理点位（模板也去掉了这一列）—— 上点位只走出库池的绑定（ae233365 · V164）。
+    // 2026-10-28：导入不再受理点位（模板也去掉了这一列）—— 上点位只走出库单的绑定（ae233365 · V164）。
     // 新导入的柜子一律在库、无归属；已存在的柜子重导不动它的点位与归属。
     const { locationNo: _ignored, siteNo: _s, agentNo: _a, locationName: _n, ...rest } = r;
     const row = rest;
@@ -574,10 +574,10 @@ export function saveCabinet(x: Partial<Cabinet> & { cabinetNo?: string }): Cabin
     throw new CabinetError(`仓位数不得小于当前在仓充电宝数（${prev.availableCount}）：请先调拨出宝再缩仓`);
   }
 
-  // 改点位不走编辑（后端 400 error.device.bind_via_action，ae233365 · V164）：上点位只经出库池绑定，
-  // 那里校验「点位商家 = 出库池商家」。编辑带了不同的点位直接拒；新建一律在库、无点位。
+  // 改点位不走编辑（后端 400 error.device.bind_via_action，ae233365 · V164）：上点位只经出库单绑定，
+  // 那里校验「点位商家 = 出库单商家」。编辑带了不同的点位直接拒；新建一律在库、无点位。
   if (x.locationNo !== undefined && (x.locationNo || null) !== (prev?.locationNo ?? null)) {
-    throw new CabinetError("改点位请走「设备管理 › 出库池」的绑定 / 解绑，编辑不改点位");
+    throw new CabinetError("改点位请走「库存管理 › 出库单」的绑定 / 解绑，编辑不改点位");
   }
   const locationNo = prev?.locationNo ?? null;
 

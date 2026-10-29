@@ -90,7 +90,7 @@ function fieldsFor(
     // 只在新建时选；建好后换商家走「整站换商家」，不在编辑里改归属。后端未上线时不出这一格（merchants 为 null）。
     ...(merchants ? [{ key: "agentNo", label: "商家（可选）", type: "select", section: "基本信息", readOnlyOnEdit: true,
       options: [{ value: "", label: "平台直营（不选商家）" }, ...merchants],
-      help: "选了商家 = 商家站点：同时建默认点位与运维责任行，场地方与区域可不填（场地方一期只记录）。设备从该商家的出库池绑定到这里" } as FieldDef] : []),
+      help: "选了商家 = 商家站点：同时建默认点位与运维责任行，场地方与区域可不填（场地方一期只记录）。设备从该商家名下（已出库待绑定）绑定到这里" } as FieldDef] : []),
     { key: "name", label: "站点名称", required: true, maxLength: 128, section: "基本信息" },
     // 这里**没有**阿语名那一格（2026-09-26 去掉）。`loc_site.name_ar` 有列、SiteReq 也收，
     // 但 C 端 BFF（MpNearbyController）里没有任何 lang 处理、一次都没读过它 ——

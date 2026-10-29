@@ -1,4 +1,4 @@
-// 出库池与绑定 mock 的不变式（技术设计 §二.6）与全链路。规则在 db 层强制，这里直接调 db 函数。
+// 出库单与绑定 mock 的不变式（技术设计 §二.6）与全链路。规则在 db 层强制，这里直接调 db 函数。
 import { describe, it, expect, beforeAll } from "vitest";
 import { cabinets } from "./device";
 import { sites, locations } from "./location";
@@ -14,7 +14,7 @@ const cab = (no: string) => cabinets.find((c) => c.cabinetNo === no)!;
 const inWarehouse = () => cabinets.filter((c) => c.status === "IN_STOCK" && c.warehouseNo && !c.issuedAgentNo && !c.archivedAt);
 const agent = (no: string) => agents.find((a) => a.agentNo === no)!;
 
-describe("出库池与绑定", () => {
+describe("出库单与绑定", () => {
   beforeAll(() => ensurePoolSeed());
 
   it("种子：资料齐全的商家有默认站点 + 默认点位 + OPERATE 责任行；仓里有待出库设备", () => {
@@ -36,7 +36,7 @@ describe("出库池与绑定", () => {
     // I1：出库后不在仓
     issueDevices({ agentNo: "AG002", cabinetNos: [a.cabinetNo, b.cabinetNo] });
     expect(cab(a.cabinetNo)).toMatchObject({ issuedAgentNo: "AG002", warehouseNo: null, agentNo: null, locationNo: null });
-    expect(() => issueDevices({ agentNo: "AG003", cabinetNos: [a.cabinetNo] })).toThrow(/出库池/);
+    expect(() => issueDevices({ agentNo: "AG003", cabinetNos: [a.cabinetNo] })).toThrow(/已出库待绑定/);
   });
 
   it("绑定不给点位 = 默认站点默认点位；商家由点位派生（I3）；可同时建装机工单", () => {
@@ -61,14 +61,14 @@ describe("出库池与绑定", () => {
     expect(cab(no).locationNo).toBeNull();
   });
 
-  it("批量绑定一个事务：混进一台不在该商家出库池的设备，整批不动", () => {
+  it("批量绑定一个事务：混进一台不在该商家出库单的设备，整批不动", () => {
     const pool = cabinets.filter((c) => poolHit(c, "AG002", "UNBOUND")).map((c) => c.cabinetNo);
     const stranger = inWarehouse()[0].cabinetNo;
-    expect(() => bindDevices({ agentNo: "AG002", deviceNos: [...pool, stranger] })).toThrow(/不在 AG002 的出库池/);
+    expect(() => bindDevices({ agentNo: "AG002", deviceNos: [...pool, stranger] })).toThrow(/不在 AG002 名下（已出库待绑定）/);
     for (const no of pool) expect(cab(no).locationNo).toBeNull();
   });
 
-  it("解绑回到同一商家的出库池；已上线的不能解绑", () => {
+  it("解绑回到同一商家名下（已出库待绑定）；已上线的不能解绑", () => {
     const bound = cabinets.find((c) => poolHit(c, "AG002", "BOUND") && c.status === "IN_STOCK")!;
     const back = unbindDevice(bound.cabinetNo, "换点位");
     expect(back).toMatchObject({ locationNo: null, agentNo: null, siteNo: null, issuedAgentNo: "AG002", warehouseNo: null });
@@ -76,7 +76,7 @@ describe("出库池与绑定", () => {
     expect(() => unbindDevice(live.cabinetNo, "x")).toThrow(/撤机/);
   });
 
-  it("退回仓库只收未绑定的；退回后离开出库池、回到仓里（I1）", () => {
+  it("退回仓库只收未绑定的；退回后离开出库单、回到仓里（I1）", () => {
     const pool = cabinets.filter((c) => poolHit(c, "AG002", "UNBOUND")).map((c) => c.cabinetNo);
     expect(() => returnDevicesToWarehouse({ cabinetNos: pool, reason: "" })).toThrow(/原因/);
     returnDevicesToWarehouse({ cabinetNos: [pool[0]], reason: "多发了" });

@@ -414,7 +414,7 @@ function WorkOrdersInner() {
       { key: "disposition", label: "撤机去向", type: "select", section: "基本信息",
         options: (Object.keys(REMOVAL_DISPOSITION_LABEL) as RemovalDisposition[]).map((k) => ({ value: k, label: REMOVAL_DISPOSITION_LABEL[k] })),
         disabledWhen: (v) => v.type !== "REMOVE",
-        help: "回出库池：柜子撤下后留在同一商家名下，可再绑到它的其它站点点位；回仓：撤下后生成回仓调拨单，离开商家" },
+        help: "回商家待绑定：柜子撤下后留在同一商家名下，可再绑到它的其它站点点位；回仓：撤下后生成回仓调拨单，离开商家" },
     ];
   }, [cabinetOpts.data, cabinetOpts.isLoading]);
 

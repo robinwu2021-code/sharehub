@@ -35,6 +35,8 @@ public class InventoryController {
     private final ai.neargo.sharehub.inv.service.DisposalService disposals;
     private final ai.neargo.sharehub.inv.service.StockThresholdService thresholds;
     private final ai.neargo.sharehub.inv.service.ShipmentService shipmentService;
+    private final ai.neargo.sharehub.inv.service.MaterialService materials;
+    private final ai.neargo.common.security.rbac.PermChecker perm;
 
     public InventoryController(InventoryTransferService transferService,
                                CommandLogService commandLogService,
@@ -46,7 +48,11 @@ public class InventoryController {
                                ai.neargo.sharehub.inv.service.SupplierService suppliers,
                                ai.neargo.sharehub.inv.service.DisposalService disposals,
                                ai.neargo.sharehub.inv.service.StockThresholdService thresholds,
-                               ai.neargo.sharehub.inv.service.ShipmentService shipmentService) {
+                               ai.neargo.sharehub.inv.service.ShipmentService shipmentService,
+                               ai.neargo.sharehub.inv.service.MaterialService materials,
+                               ai.neargo.common.security.rbac.PermChecker perm) {
+        this.materials = materials;
+        this.perm = perm;
         this.shipmentService = shipmentService;
         this.thresholds = thresholds;
         this.disposals = disposals;
@@ -280,6 +286,80 @@ public class InventoryController {
     @PreAuthorize("@perm.can('device:inventory:transfer')")
     public ai.neargo.sharehub.inv.dto.DisposalDtos.DisposalDetail createDisposal(@RequestBody ai.neargo.sharehub.inv.dto.DisposalDtos.DisposalReq req) {
         return disposals.create(req);
+    }
+
+    // —— 物料（V210；菜单：库存管理 › 物料档案 / 物料单据 / 物料库存）——
+
+    @GetMapping("/inventory/materials")
+    @PreAuthorize("@perm.can('device:inventory:read')")
+    public PageResult<ai.neargo.sharehub.inv.dto.MaterialDtos.Material> materials(@RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size,
+                                               @RequestParam(required = false) String keyword, @RequestParam(required = false) String category,
+                                               @RequestParam(required = false) Boolean showArchived) {
+        return materials.page(page, size, keyword, category, showArchived);
+    }
+
+    @PostMapping("/inventory/materials")
+    @PreAuthorize("@perm.can('device:inventory:warehouse')")
+    public ai.neargo.sharehub.inv.dto.MaterialDtos.Material createMaterial(@RequestBody ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialReq req) {
+        return materials.create(req);
+    }
+
+    @PostMapping("/inventory/materials/{materialNo}")
+    @PreAuthorize("@perm.can('device:inventory:warehouse')")
+    public ai.neargo.sharehub.inv.dto.MaterialDtos.Material updateMaterial(@PathVariable String materialNo, @RequestBody ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialReq req) {
+        return materials.update(materialNo, req);
+    }
+
+    @PostMapping("/inventory/materials/{materialNo}/archive")
+    @PreAuthorize("@perm.can('device:inventory:warehouse')")
+    public ai.neargo.sharehub.inv.dto.MaterialDtos.Material archiveMaterial(@PathVariable String materialNo) {
+        return materials.archive(materialNo);
+    }
+
+    @PostMapping("/inventory/materials/{materialNo}/unarchive")
+    @PreAuthorize("@perm.can('device:inventory:warehouse')")
+    public ai.neargo.sharehub.inv.dto.MaterialDtos.Material unarchiveMaterial(@PathVariable String materialNo) {
+        return materials.unarchive(materialNo);
+    }
+
+    @GetMapping("/inventory/material-docs")
+    @PreAuthorize("@perm.can('device:inventory:read')")
+    public PageResult<ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialDoc> materialDocs(@RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size,
+                                                     @RequestParam(required = false) String keyword, @RequestParam(required = false) String kind,
+                                                     @RequestParam(required = false) String purpose, @RequestParam(required = false) String warehouseNo,
+                                                     @RequestParam(required = false) String materialNo) {
+        return materials.docs(page, size, keyword, kind, purpose, warehouseNo, materialNo);
+    }
+
+    @GetMapping("/inventory/material-docs/{docNo}")
+    @PreAuthorize("@perm.can('device:inventory:read')")
+    public ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialDoc materialDoc(@PathVariable String docNo) {
+        return materials.doc(docNo);
+    }
+
+    /** 入库类用途判 :inbound，出库与调拨判 :transfer（与设备单据同口径）。 */
+    @PostMapping("/inventory/material-docs")
+    @PreAuthorize("@perm.can('device:inventory:inbound') or @perm.can('device:inventory:transfer')")
+    public ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialDoc createMaterialDoc(@RequestBody ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialDocReq req) {
+        boolean inbound = req != null && req.purpose() != null && java.util.Set.of("PURCHASE", "OPENING", "RETURN").contains(req.purpose());
+        if (!perm.can(inbound ? "device:inventory:inbound" : "device:inventory:transfer"))
+            throw new org.springframework.security.access.AccessDeniedException(inbound ? "device:inventory:inbound" : "device:inventory:transfer");
+        return materials.createDoc(req);
+    }
+
+    @GetMapping("/inventory/material-balances")
+    @PreAuthorize("@perm.can('device:inventory:read')")
+    public java.util.List<ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialBalance> materialBalances(@RequestParam(required = false) String warehouseNo,
+                                                                 @RequestParam(required = false) String materialNo,
+                                                                 @RequestParam(required = false) String category,
+                                                                 @RequestParam(required = false) Boolean lowOnly) {
+        return materials.balances(warehouseNo, materialNo, category, lowOnly);
+    }
+
+    @PostMapping("/inventory/material-thresholds")
+    @PreAuthorize("@perm.can('device:inventory:warehouse')")
+    public ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialBalance saveMaterialMinQty(@RequestBody ai.neargo.sharehub.inv.dto.MaterialDtos.MaterialMinQtyReq req) {
+        return materials.saveMinQty(req);
     }
 
     // —— 发货物流（V205）：按单据（docType + docRef）或设备号查 ——

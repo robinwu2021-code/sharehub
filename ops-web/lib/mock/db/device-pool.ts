@@ -1,15 +1,15 @@
-// 出库池与绑定（mock）—— 设计：docs/technical/设备出库与绑定-技术设计.md §二.6、§三.3 ~ 3.4；
+// 出库单与绑定（mock）—— 设计：docs/technical/设备出库与绑定-技术设计.md §二.6、§三.3 ~ 3.4；
 // 路径以商户入驻会话落地为准（V161：issue / pool-return / issued-summary）。
 //
-// 口径（用户 2026-10-28）：绑定商家先出库，出库必须选商家；绑定的设备只从该商家的出库池里选，
+// 口径（用户 2026-10-28）：绑定商家先出库，出库必须选商家；绑定的设备只从该商家名下（已出库待绑定）选，
 // 默认绑到商家的默认站点、默认点位；站点与点位一期由运营代建；绑定在运营端做。
 //
 // **不变式在这一层强制**（与后端同口径，非法动作抛错，不靠界面拦）：
-//   I1 在仓（warehouseNo）与在出库池（issuedAgentNo）互斥
-//   I2 绑定的点位所属站点的商家 = 设备的出库池商家
+//   I1 在仓（warehouseNo）与在出库单（issuedAgentNo）互斥
+//   I2 绑定的点位所属站点的商家 = 设备名下（已出库待绑定）商家
 //   I3 agentNo 只由点位派生（绑定时写、解绑时清）
 //   I4 一个事务：批量动作先全部校验，任一不过整批不动
-//   I5 平台直营站点（站点无商家）的设备不经出库池：可从仓直接绑定
+//   I5 平台直营站点（站点无商家）的设备不经出库单：可从仓直接绑定
 import type {
   Cabinet, IssueDevicesReq, ClaimDevicesReq, IssueRedirectReq, PoolReturnReq, IssuedSummary, BindReq, BindBatchReq, BindResult, SitePoint, Warehouse } from "../../types";
 import { agentCoreComplete } from "../../types";
@@ -68,9 +68,9 @@ export function provisionMerchantSite(siteNo: string, agentNo: string) {
 
 let seeded = false;
 /**
- * 惰性补种：在全局种子上直接加柜子会改动别处依赖的计数，所以只在第一次用到出库池时补。
+ * 惰性补种：在全局种子上直接加柜子会改动别处依赖的计数，所以只在第一次用到出库单时补。
  *  · 资料齐全的前三个商家各有默认站点（与默认站点的同步规则同一个方法）+ 默认点位 + OPERATE 责任行；
- *  · 仓里 6 台待出库（质检放行）；AG002 出库池 3 台未绑定 + 1 台已绑定待安装；
+ *  · 仓里 6 台待出库（质检放行）；AG002 出库单 3 台未绑定 + 1 台已绑定待安装；
  *  · 存量已绑定的柜子回填 issuedAgentNo = agentNo（技术设计 §2.1 回填口径；直营的保持空）。
  */
 export function ensurePoolSeed() {
@@ -78,7 +78,7 @@ export function ensurePoolSeed() {
   seeded = true;
   for (const c of cabinets) {
     if (c.issuedAgentNo === undefined) c.issuedAgentNo = c.locationNo && c.agentNo ? c.agentNo : null;
-    // V195 回填：存量出库池设备视为已签收
+    // V195 回填：存量出库单设备视为已签收
     if (c.issueClaimedAt === undefined) c.issueClaimedAt = c.issuedAgentNo ? (c.issuedAt ?? now()) : null;
   }
   for (const a of agents.filter((x) => agentCoreComplete(x) && !x.archivedAt).slice(0, 3)) {
@@ -124,7 +124,7 @@ export function issueDevices(x: IssueDevicesReq): Cabinet[] {
   const bad = rows.flatMap((c) => {
     if (c.archivedAt) return [`${c.cabinetNo} 已归档`];
     if (c.status !== "IN_STOCK") return [`${c.cabinetNo} 不在库（${c.status}）`];
-    if (c.issuedAgentNo) return [`${c.cabinetNo} 已在 ${c.issuedAgentNo} 的出库池里`];
+    if (c.issuedAgentNo) return [`${c.cabinetNo} 已在 ${c.issuedAgentNo} 名下（已出库待绑定）`];
     if (c.locationNo) return [`${c.cabinetNo} 已绑定点位 ${c.locationNo}`];
     if (c.qcStatus && c.qcStatus !== "PASSED") return [`${c.cabinetNo} 质检未放行`];
     return [];
@@ -184,7 +184,7 @@ export function redirectIssue(x: IssueRedirectReq): Cabinet[] {
   if (!nos.length) fail("请至少选择一台设备", "Select at least one device");
   const rows = nos.map(cabOf);
   const bad = rows.filter((c) => !c.issuedAgentNo || c.locationNo || c.status !== "IN_STOCK").map((c) => c.cabinetNo);
-  if (bad.length) fail(`这些设备不在出库池或已绑定：${bad.join("、")}`, `Not in pool or already bound: ${bad.join(", ")}`);
+  if (bad.length) fail(`这些设备不在出库单或已绑定：${bad.join("、")}`, `Not in pool or already bound: ${bad.join(", ")}`);
   const at = now();
   for (const c of rows) {
     const keep = !!c.issueClaimedAt && receiver === (c.issueReceiverNo ?? null);
@@ -196,7 +196,7 @@ export function redirectIssue(x: IssueRedirectReq): Cabinet[] {
   return rows;
 }
 
-/** 出库池退回仓库（POST /api/ops/devices/pool-return）：只收未绑定的；原因必填。 */
+/** 出库退回仓库（POST /api/ops/devices/pool-return）：只收未绑定的；原因必填。 */
 export function returnDevicesToWarehouse(x: PoolReturnReq): Cabinet[] {
   ensurePoolSeed();
   if (!x.reason?.trim()) fail("请写退回原因", "A return reason is required");
@@ -204,7 +204,7 @@ export function returnDevicesToWarehouse(x: PoolReturnReq): Cabinet[] {
   if (!nos.length) fail("请至少选择一台设备", "Select at least one device");
   const rows = nos.map(cabOf);
   const bad = rows.flatMap((c) => {
-    if (!c.issuedAgentNo) return [`${c.cabinetNo} 不在任何商家的出库池里`];
+    if (!c.issuedAgentNo) return [`${c.cabinetNo} 不在任何商家名下（已出库待绑定）`];
     if (c.locationNo) return [`${c.cabinetNo} 已绑定点位，先解绑再退回`];
     if (c.status !== "IN_STOCK") return [`${c.cabinetNo} 不在库（${c.status}）`];
     return [];
@@ -222,7 +222,7 @@ export function returnDevicesToWarehouse(x: PoolReturnReq): Cabinet[] {
   return rows;
 }
 
-/** 出库池按商家汇总（GET /api/ops/inventory/issued-summary）。 */
+/** 出库单按商家汇总（GET /api/ops/inventory/issued-summary）。 */
 export function issuedSummary(agentNo?: string): IssuedSummary[] {
   ensurePoolSeed();
   const by = new Map<string, IssuedSummary>();
@@ -241,7 +241,7 @@ export function issuedSummary(agentNo?: string): IssuedSummary[] {
   return [...by.values()].sort((a, b) => b.unbound - a.unbound || a.agentNo.localeCompare(b.agentNo));
 }
 
-/** 列表筛选：出库池商家 + 是否已绑定（技术设计 §3.3）。 */
+/** 列表筛选：出库单商家 + 是否已绑定（技术设计 §3.3）。 */
 export function poolHit(c: Cabinet, issuedAgentNo?: string, pool?: string, me?: string): boolean {
   if (issuedAgentNo && c.issuedAgentNo !== issuedAgentNo) return false;
   if (pool === "UNCLAIMED") return !!c.issuedAgentNo && !c.issueClaimedAt;
@@ -265,7 +265,7 @@ function checkBind(c: Cabinet, req: BindReq): SitePoint {
     loc = locations.find((l) => l.locationNo === req.locationNo && !l.archivedAt);
     if (!loc) notFound("点位", "Point", req.locationNo);
   } else {
-    if (!c.issuedAgentNo) fail(`${c.cabinetNo} 不在任何商家的出库池里：先出库，或指定平台直营站点的点位`,
+    if (!c.issuedAgentNo) fail(`${c.cabinetNo} 不在任何商家名下（已出库待绑定）：先出库，或指定平台直营站点的点位`,
       `${c.cabinetNo} is not in any merchant's pool`);
     const agent = agentOf(c.issuedAgentNo!);
     const target = c.issuedSiteNo ?? agent.defaultSiteNo;
@@ -289,7 +289,7 @@ function checkBind(c: Cabinet, req: BindReq): SitePoint {
         `${c.cabinetNo} was issued to ${c.issuedAgentNo} and cannot be bound to a site of ${siteAgent ?? "the platform"}`);
     }
   } else if (siteAgent) {
-    // I5 的反面：商家站点只收出库池里的设备
+    // I5 的反面：商家站点只收出库单里的设备
     fail(`商家站点 ${site!.name} 只能绑定出库给 ${siteAgent} 的设备：先出库`,
       `Merchant site ${site!.name} only accepts devices issued to ${siteAgent}`);
   } else if (c.status === "IN_STOCK" && !c.warehouseNo) {
@@ -313,7 +313,7 @@ function bindOne(c: Cabinet, req: BindReq): BindResult {
   if (req.openInstallWo) {
     woNo = createWorkOrder({
       type: "INSTALL", source: "MANUAL", cabinetNo: c.cabinetNo, locationName: loc.name,
-      description: `装机：${c.cabinetNo} → ${site.name} · ${loc.name}（出库池绑定生成）`,
+      description: `装机：${c.cabinetNo} → ${site.name} · ${loc.name}（出库单绑定生成）`,
     } as Parameters<typeof createWorkOrder>[0]).woNo;
   }
   return { cabinet: c, woNo };
@@ -332,7 +332,7 @@ export function bindDevices(x: BindBatchReq): BindResult[] {
   if (!nos.length) fail("请至少选择一台设备", "Select at least one device");
   const rows = nos.map(cabOf);
   const wrong = rows.filter((c) => c.issuedAgentNo !== x.agentNo).map((c) => c.cabinetNo);
-  if (wrong.length) fail(`这些设备不在 ${x.agentNo} 的出库池里：${wrong.join("、")}`, `Not in ${x.agentNo}'s pool: ${wrong.join(", ")}`);
+  if (wrong.length) fail(`这些设备不在 ${x.agentNo} 名下（已出库待绑定）：${wrong.join("、")}`, `Not in ${x.agentNo}'s pool: ${wrong.join(", ")}`);
   const errors: string[] = [];
   for (const c of rows) {
     try { checkBind(c, x); } catch (e) { errors.push((e as Error).message); }
@@ -341,7 +341,7 @@ export function bindDevices(x: BindBatchReq): BindResult[] {
   return rows.map((c) => bindOne(c, x));
 }
 
-/** 解绑（POST /api/ops/devices/{deviceNo}/unbind）：只限已绑定、未上线；回到同一商家的出库池。 */
+/** 解绑（POST /api/ops/devices/{deviceNo}/unbind）：只限已绑定、未上线；回到同一商家名下（已出库待绑定）。 */
 export function unbindDevice(deviceNo: string, reason: string): Cabinet {
   ensurePoolSeed();
   const c = cabOf(deviceNo);

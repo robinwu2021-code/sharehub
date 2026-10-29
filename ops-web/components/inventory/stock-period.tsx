@@ -14,7 +14,7 @@ const ITEM_LABEL: Record<string, string> = { CABINET: "机柜", POWERBANK: "充�
 /** 本地日期 → YYYY-MM-DD（不能用 toISOString：东四区本地零点换成 UTC 会退到前一天）。 */
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const REASON_LABEL: Record<string, string> = {
-  INBOUND: "入库", ISSUE: "出库", POOL_RETURN: "出库池退回", SHIP: "调拨发货", RECEIVE: "调拨签收", RETIRE: "报废", BIND: "绑定出仓",
+  INBOUND: "入库", ISSUE: "出库", POOL_RETURN: "出库退回", SHIP: "调拨发货", RECEIVE: "调拨签收", RETIRE: "报废", BIND: "绑定出仓",
   UNBIND: "解绑回仓", PURCHASE: "采购入库", RETURN: "退货入库", CORRECTION: "冲正", SCRAP: "报废出库",
 };
 const reasons = (m: Record<string, number>) =>

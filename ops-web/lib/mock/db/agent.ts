@@ -330,8 +330,8 @@ export function assignAgentAssets(x: AssignAssetsPayload): AgentAssignmentRecord
     throw new AgentAssignError(`商家 ${agent.agentNo} 的核心资料未补齐：位置（地址与地图坐标）和行业都填好后才能划拨设备`);
   }
   // 划拨只剩站点粒度（620656d9：CABINET / LOCATION → 400 error.assign.granularity_retired）。
-  // 机柜随站点走；单台设备换位置走出库池的绑定 / 解绑，或撤机。
-  if (uniq(x.cabinetNos).length) throw new AgentAssignError("按机柜划拨已下线：机柜随站点整站换商家，单台设备在出库池里绑定 / 解绑");
+  // 机柜随站点走；单台设备换位置走出库单的绑定 / 解绑，或撤机。
+  if (uniq(x.cabinetNos).length) throw new AgentAssignError("按机柜划拨已下线：机柜随站点整站换商家，单台设备在出库单里绑定 / 解绑");
   const siteNos = uniq(x.siteNos);
   if (!siteNos.length) throw new AgentAssignError("请至少选择一个站点");
 
@@ -349,9 +349,9 @@ export function assignAgentAssets(x: AssignAssetsPayload): AgentAssignmentRecord
 }
 
 /**
- * 整站换商家（620656d9）：同一事务改站点、站上柜子的商家与出库池归属、OPERATE 责任行。
+ * 整站换商家（620656d9）：同一事务改站点、站上柜子的商家与出库单归属、OPERATE 责任行。
  * 只写站点不写责任行，钱会继续分给原商家（设备绑定与商家归属分析 §四.1）。
- * `to` 为空 = 收回平台直营：柜子的商家与出库池归属一并清空（直营站点不经出库池）。
+ * `to` 为空 = 收回平台直营：柜子的商家与出库单归属一并清空（直营站点不经出库单）。
  */
 function moveSite(siteNo: string, to: string | null) {
   const site = sites.find((x) => x.siteNo === siteNo)!;
@@ -370,7 +370,7 @@ function moveSite(siteNo: string, to: string | null) {
 
 /** 回收：资产收回平台直营（agentNo 置 null）。流水记的是收回前的归属方。 */
 export function reclaimAgentAssets(x: ReclaimAssetsPayload): AgentAssignmentRecord[] {
-  if (uniq(x.cabinetNos).length) throw new AgentAssignError("按机柜回收已下线：整站收回，或在出库池里解绑 / 撤机");
+  if (uniq(x.cabinetNos).length) throw new AgentAssignError("按机柜回收已下线：整站收回，或在出库单里解绑 / 撤机");
   const siteNos = uniq(x.siteNos);
   if (!siteNos.length) throw new AgentAssignError("请至少选择一个站点");
 

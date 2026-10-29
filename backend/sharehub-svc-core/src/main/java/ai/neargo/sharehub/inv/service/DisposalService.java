@@ -7,7 +7,7 @@ import ai.neargo.sharehub.inv.dto.DisposalDtos.DisposalReq;
 
 /**
  * 处置出库（V203）：在库设备报废 / 退供应商。设备须在该仓、在库、未绑点位、不在出库池、不在未结待检单上；
- * 不符的一次列全、整单不建。独立进销存引擎（SERVICE）下暂不支持 —— 远程出库要带原因码与供应商去向，接口未接。
+ * 不符的一次列全、整单不建。独立进销存引擎（SERVICE）下同事务在库存服务做一张出库（V210 起）。
  */
 public interface DisposalService {
 

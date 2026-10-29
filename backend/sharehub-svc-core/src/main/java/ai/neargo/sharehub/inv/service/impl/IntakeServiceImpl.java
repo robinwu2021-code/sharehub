@@ -194,7 +194,7 @@ public class IntakeServiceImpl implements IntakeService {
             else if (c.getArchivedAt() != null) bad.add(no + "：已归档");
             else if (!CabinetStatus.IN_STOCK.name().equals(c.getStatus())) bad.add(no + "：不在库（" + c.getStatus() + "）");
             else if (c.getLocationNo() != null) bad.add(no + "：已绑定点位");
-            else if (c.getIssuedAgentNo() != null) bad.add(no + "：在商家出库池");
+            else if (c.getIssuedAgentNo() != null) bad.add(no + "：已出库给商家");
         }
         Map<String, DevPowerbank> pbs = pbNos.isEmpty() ? Map.of() : powerbanks.selectList(new LambdaQueryWrapper<DevPowerbank>()
                 .in(DevPowerbank::getPowerbankNo, pbNos)).stream().collect(Collectors.toMap(DevPowerbank::getPowerbankNo, Function.identity(), (a, b) -> a));

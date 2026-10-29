@@ -11,7 +11,7 @@ export function effectiveRoles(rows: SiteAgent[], today = new Date().toISOString
 /**
  * 判定「看得到」与「分得到」是否一致。返回问题描述；一致返回 null。
  * 规则：站点配了逐单分成的责任行（不含牵线）时，机柜的商家必须在其中；没配时分成回落到机柜的商家，天然一致。
- * 另：设备在出库池里时，绑定的站点商家必须等于出库池商家。
+ * 另：设备在出库单里时，绑定的站点商家必须等于出库单商家。
  */
 export function ownershipIssues(c: Pick<Cabinet, "agentNo" | "issuedAgentNo" | "locationNo">, roles: SiteAgent[]): string[] {
   const out: string[] = [];

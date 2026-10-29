@@ -53,7 +53,7 @@ function woCols(): Column<WorkOrder>[] {
 
 // ————————————————————————————— 部署与装机 —————————————————————————————
 
-/** 部署与装机：装机工单按「未完结 / 已完结」看。绑定时可同时生成装机工单（出库池）。 */
+/** 部署与装机：装机工单按「未完结 / 已完结」看。绑定时可同时生成装机工单（出库单）。 */
 export function InstallsTab() {
   const q = useWorkOrders("INSTALL");
   const [scope, setScope] = useState<"OPEN" | "DONE" | "">("OPEN");
@@ -62,7 +62,7 @@ export function InstallsTab() {
   return (
     <div className="space-y-4">
       <Notice className="mb-0">
-        装机工单由出库池的「绑定」生成（勾选「同时建装机工单」），也可在运维管理 › 工单里手工新建。
+        装机工单由出库单的「绑定」生成（勾选「同时建装机工单」），也可在运维管理 › 工单里手工新建。
         完工时现场扫码确认点位，之后试借还、过上线门禁才上线 —— 门禁卡在哪一项看「待上线」。
       </Notice>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -75,7 +75,7 @@ export function InstallsTab() {
       </div>
       <DataTable rowKey={(w: WorkOrder) => w.woNo} columns={woCols()} rows={q.data ? rows : undefined}
         loading={q.isLoading} error={q.error} onRetry={q.refetch}
-        empty="没有装机工单 —— 在出库池绑定设备时勾选「同时建装机工单」即会生成" />
+        empty="没有装机工单 —— 在出库单绑定设备时勾选「同时建装机工单」即会生成" />
     </div>
   );
 }
@@ -126,7 +126,7 @@ export function PendingLiveTab() {
       <DataTable rowKey={(c: Cabinet) => c.cabinetNo} columns={cols} rows={q.data ? rows : undefined}
         loading={q.isLoading} error={q.error} onRetry={q.refetch}
         expandable={(c) => <GateRow cabinetNo={c.cabinetNo} />}
-        empty="没有待上线的设备 —— 设备从出库池绑定点位后出现在这里" />
+        empty="没有待上线的设备 —— 设备从出库单绑定点位后出现在这里" />
     </div>
   );
 }
@@ -206,7 +206,7 @@ export function RemovalsTab() {
   return (
     <div className="space-y-4">
       <Notice className="mb-0">
-        撤机单的去向：「回出库池」= 同一商家换点位 / 换站点，柜子留在商家名下、不生成回仓单；
+        撤机单的去向：「回商家待绑定」= 同一商家换点位 / 换站点，柜子留在商家名下、不生成回仓单；
         「回仓」= 退出、维修、返厂，完工后自动生成回仓调拨单，签收后离开商家。完工须拍照并清点充电宝数，少了落资产差异。
       </Notice>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

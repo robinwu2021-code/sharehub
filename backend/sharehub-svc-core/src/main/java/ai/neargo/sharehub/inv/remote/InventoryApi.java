@@ -52,10 +52,37 @@ public interface InventoryApi {
     // —— 出库与出库池 ——
 
     /** 建出库草稿（purpose：ISSUE 进出库池），返回单号。targets：MERCHANT / SITE / PERSON。 */
-    String createOutbound(String locationId, String purpose, Map<String, String> targets, String remark, List<String> serialNos,
-                          String idempotencyKey);
+    default String createOutbound(String locationId, String purpose, Map<String, String> targets, String remark, List<String> serialNos,
+                                  String idempotencyKey) {
+        return createOutbound(locationId, purpose, null, targets, remark, List.of(), serialNos, idempotencyKey);
+    }
+
+    /** 数量物料的出库行（物料单据，V210）。 */
+    record OutboundLine(String itemId, Integer qty, String parentSerialNo) {
+    }
+
+    /**
+     * 建出库草稿（通用）：reasonCode 报废时必填；targets 退供应商时为 {@code SUPPLIER → 供应商号}；
+     * lines 为数量物料，serialNos 为逐件物料（可同单混装）。
+     */
+    String createOutbound(String locationId, String purpose, String reasonCode, Map<String, String> targets, String remark,
+                          List<OutboundLine> lines, List<String> serialNos, String idempotencyKey);
 
     void postOutbound(String docNo, String idempotencyKey);
+
+    // —— 余额与在库序列号（物料库存，V210）——
+
+    record Balance(String itemId, String locationId, BigDecimal onHand, BigDecimal reserved, BigDecimal unavailable, BigDecimal available) {
+    }
+
+    /** 余额：locationId / itemId 都可空（空 = 不限）。 */
+    List<Balance> balances(String locationId, String itemId);
+
+    record InStock(String serialNo, String itemId, String locationId) {
+    }
+
+    /** 在库序列号。 */
+    List<InStock> serials(String itemId, String locationId);
 
     record DispatchView(String dispatchId, String outboundNo, String itemId, String serialNo, BigDecimal qty, String locationId,
                         String status, String parentDispatchId, String rootTargetType, String rootTargetRef, int resourceVersion) {

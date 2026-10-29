@@ -197,6 +197,10 @@ class VocabularyWriteCoverageTest {
             "inv_stock_threshold.item_type",
             // V205 发货物流：doc_type 用 ShipmentDocType 常量，item_type 来自所属单据
             "inv_shipment.doc_type", "inv_shipment_item.item_type",
+            // V210 物料：category / tracking_mode / kind / purpose / reason_code 经 MaterialCategory / MaterialTracking /
+            // MaterialDocPurpose（kind 由用途派生）/ DisposalReason 校验；device_type 只由迁移种入
+            "inv_material.category", "inv_material.tracking_mode", "inv_material.device_type",
+            "inv_material_doc.kind", "inv_material_doc.purpose", "inv_material_doc.reason_code", "inv_material_doc.currency",
             "inv_intake_item.item_type", "inv_intake_item.qc_result", "inv_intake_item.disposition",
             // dev_movement_log（V196 设备履历）：event 只由 MovementEvent 枚举的 name() 写入，item_type 只取 MovementRecorder 常量
             // 或待检单明细已校验的类型；没有外部写入口（Mapper 只许 MovementRecorder 用，ArchitectureTest 守）

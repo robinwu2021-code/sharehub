@@ -189,6 +189,55 @@ try:
     check("S7：库存服务在 WH002 对应位置有这台", any(x.get("serialNo") == legacy for x in inv(f"/serials?locationId={loc_b}")), loc_b)
     st, res, raw = sh("POST", "/api/ops/inventory/migration", {"limit": 10}, admin)
     check("S7：重跑不重复", st == 200 and res["processed"] == 0, raw)
+
+    # 11. 物料（V210）：物料档案同步为库存服务物料；数量物料期初 → 领用；逐件物料采购 → 调拨 → 退供应商。账以库存服务为准
+    st, mq, raw = sh("POST", "/api/ops/inventory/materials", {"name": "锁舌E2E" + tag, "category": "SPARE_PART", "trackingMode": "QUANTITY", "uom": "个"}, admin)
+    mat = mq["materialNo"]
+    st, d, raw = sh("POST", "/api/ops/inventory/material-docs", {"purpose": "OPENING", "warehouseNo": "WH001", "note": "E2E 期初 " + tag,
+        "lines": [{"materialNo": mat, "qty": 10}]}, wh)
+    check("物料：期初入库（仓管）", st == 200 and d["kind"] == "INBOUND", raw)
+    st, d, raw = sh("POST", "/api/ops/inventory/material-docs", {"purpose": "REQUISITION", "warehouseNo": "WH001", "woNo": "WO-E2E-" + tag,
+        "note": "E2E 领用 " + tag, "lines": [{"materialNo": mat, "qty": 11}]}, wh)
+    check("物料：领用超过在手被拒（预检列出不够的数）", st == 409 and "不够出 11" in json.dumps(raw, ensure_ascii=False), raw)
+    st, d, raw = sh("POST", "/api/ops/inventory/material-docs", {"purpose": "REQUISITION", "warehouseNo": "WH001", "woNo": "WO-E2E-" + tag,
+        "note": "E2E 领用 " + tag, "lines": [{"materialNo": mat, "qty": 3}]}, wh)
+    check("物料：领用 3", st == 200, raw)
+    item = sql(f"SELECT v FROM test_sharehub.inventory_sync_state WHERE k='mat:{mat}'")
+    loc = sql("SELECT v FROM test_sharehub.inventory_sync_state WHERE k='wh:WH001'")
+    remote_qty = sum(float(b["onHand"]) for b in inv(f"/balances?locationId={loc}&itemId={item}"))
+    st, bal, raw = sh("GET", f"/api/ops/inventory/material-balances?warehouseNo=WH001&materialNo={mat}", token=admin)
+    check("物料库存：ShareHub = 库存服务 = 7", st == 200 and bal and bal[0]["onHand"] == 7 and remote_qty == 7, (bal, remote_qty))
+
+    st, sp, raw = sh("POST", "/api/ops/inventory/suppliers", {"name": "E2E 供应商 " + tag}, admin)
+    st, pq, raw = sh("POST", "/api/ops/inventory/materials", {"name": "POS-E2E" + tag, "category": "DEVICE", "trackingMode": "SERIAL", "uom": "台"}, admin)
+    pos = pq["materialNo"]
+    sns = ["POSE2E" + tag + "1", "POSE2E" + tag + "2"]
+    st, d, raw = sh("POST", "/api/ops/inventory/material-docs", {"purpose": "PURCHASE", "supplierNo": sp["supplierNo"], "warehouseNo": "WH001",
+        "currency": "AED", "note": "E2E 采购 " + tag, "lines": [{"materialNo": pos, "serialNos": sns, "unitCost": 500}]}, wh)
+    check("逐件物料：采购入库 2 台（带单价）", st == 200 and d["totalQty"] == 2, raw)
+    st, d, raw = sh("POST", "/api/ops/inventory/material-docs", {"purpose": "TRANSFER", "warehouseNo": "WH001", "toWarehouseNo": "WH002",
+        "note": "E2E 调拨 " + tag, "lines": [{"materialNo": pos, "serialNos": [sns[0]]}]}, wh)
+    loc2 = sql("SELECT v FROM test_sharehub.inventory_sync_state WHERE k='wh:WH002'")
+    check("逐件物料：调拨后序列号在库存服务的 WH002", st == 200 and any(x.get("serialNo") == sns[0] for x in inv(f"/serials?locationId={loc2}")), raw)
+    st, d, raw = sh("POST", "/api/ops/inventory/material-docs", {"purpose": "RETURN_SUPPLIER", "supplierNo": sp["supplierNo"], "warehouseNo": "WH001",
+        "note": "E2E 退货 " + tag, "lines": [{"materialNo": pos, "serialNos": [sns[1]]}]}, wh)
+    check("逐件物料：退供应商（SUPPLIER 去向）后库存服务里没有了",
+          st == 200 and not any(x.get("serialNo") == sns[1] for x in inv(f"/serials?locationId={loc}")), raw)
+    st, _, raw = sh("POST", f"/api/ops/inventory/materials/{mat}/archive", {}, admin)
+    check("物料：有库存不能归档", st == 409, raw)
+
+    # 12. 处置出库在 SERVICE 引擎下：报废同步库存服务（SCRAP 带原因码）
+    scrap = "CABSCR" + tag
+    sh("POST", "/api/ops/cabinets", {"cabinetNo": scrap, "sn": scrap, "vendorCode": "TEST", "slotTotal": 8}, admin)
+    sql(f"UPDATE test_sharehub.dev_cabinet SET warehouse_no=NULL WHERE cabinet_no='{scrap}'")
+    st, ik, raw = sh("POST", "/api/ops/inventory/intakes", {"warehouseNo": "WH001", "sourceRef": "DN-SCR-" + tag, "cabinetNos": [scrap]}, wh)
+    no = ik["intake"]["intakeNo"]
+    sh("POST", f"/api/ops/inventory/intakes/{no}/items/CABINET/{scrap}/qc", {"powerOn": True, "slotsOk": True}, wh)
+    sh("POST", f"/api/ops/inventory/intakes/{no}/inbound", {"items": [{"itemType": "CABINET", "itemNo": scrap}]}, wh)
+    st, d, raw = sh("POST", "/api/ops/inventory/disposals", {"kind": "SCRAP", "reasonCode": "BROKEN", "warehouseNo": "WH001",
+        "note": "E2E 报废 " + tag, "cabinetNos": [scrap]}, wh)
+    check("处置出库（SERVICE）：报废后库存服务里没有这台",
+          st == 200 and not any(x.get("serialNo") == scrap for x in inv(f"/serials?locationId={loc}")), raw)
 finally:
     sql("UPDATE test_sharehub.sys_param SET value='LOCAL' WHERE param_key='inv.engine'")
     print(f"\n{sum(ok for _, ok, _ in results)}/{len(results)} 通过；引擎已复原 LOCAL")

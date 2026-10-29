@@ -1,7 +1,7 @@
 "use client";
 
 // 物料档案（库存管理 › 主数据，V209）：设备之外，备件、耗材、其他整机也在这里建档，同一套仓库与单据管账。
-// 机柜、充电宝是内置物料（只读）：它们的账走设备流程（入库单、出库池、调拨），台账在设备管理。
+// 机柜、充电宝是内置物料（只读）：它们的账走设备流程（入库单、出库单、调拨），台账在设备管理。
 // 跟踪方式：逐件（序列号）/ 按数量 —— 有出入库流水后不可改（对齐 ai-shop 库存服务）。写码 device:inventory:warehouse。
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";

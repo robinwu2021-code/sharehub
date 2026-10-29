@@ -48,7 +48,7 @@ export function createDisposal(x: DisposalReq): DisposalDetail {
     if (!c) bad.push(`${no}：不存在`);
     else if (c.status !== "IN_STOCK") bad.push(`${no}：不在库（${c.status}）`);
     else if (c.locationNo) bad.push(`${no}：已绑定点位`);
-    else if (c.issuedAgentNo) bad.push(`${no}：在商家出库池`);
+    else if (c.issuedAgentNo) bad.push(`${no}：已出库给商家`);
     else if (c.warehouseNo !== wh.warehouseNo) bad.push(`${no}：不在 ${wh.name}`);
   }
   for (const no of pbNos) {

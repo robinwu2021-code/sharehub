@@ -16,7 +16,7 @@ import { StockPeriodTable } from "./stock-period";
 const ITEM_TYPES = [{ value: "CABINET", label: "机柜" }, { value: "POWERBANK", label: "充电宝" }];
 const ITEM_LABEL: Record<string, string> = { CABINET: "机柜", POWERBANK: "充电宝" };
 const DOC_LABEL: Record<string, string> = {
-  INBOUND: "入库", ISSUE: "出库", POOL_RETURN: "出库池退回", SHIP: "调拨发货", RECEIVE: "调拨签收", RETIRE: "报废",
+  INBOUND: "入库", ISSUE: "出库", POOL_RETURN: "出库退回", SHIP: "调拨发货", RECEIVE: "调拨签收", RETIRE: "报废",
   BIND: "绑定出仓", UNBIND: "解绑回仓", IN: "入库单", OUT: "出库单",
 };
 

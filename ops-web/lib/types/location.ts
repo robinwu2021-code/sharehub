@@ -198,7 +198,7 @@ export interface SitePoint extends Archivable {
   status: "ACTIVE" | "PAUSED";
   /**
    * 站点的默认点位：建站时同事务自动建，每站至多一个（技术设计 §2.3）。
-   * 绑定设备时不选点位就落到出库池商家默认站点的这一个。
+   * 绑定设备时不选点位就落到出库单商家默认站点的这一个。
    */
   isDefault?: boolean;
   /** 归属商家：由所属站点派生（只读）；空 = 平台直营站点。 */

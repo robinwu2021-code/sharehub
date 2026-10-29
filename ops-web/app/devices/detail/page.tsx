@@ -158,7 +158,7 @@ function Overview({ cabinet, gateQ, onQc }: {
         </CardContent>
       </Card>
 
-      {/* 归属站点 / 归属代理 两格挪进归属卡：与出库池、分成对象并排看（开发计划 F0-2） */}
+      {/* 归属站点 / 归属代理 两格挪进归属卡：与出库单、分成对象并排看（开发计划 F0-2） */}
       <OwnershipCard cabinet={cabinet} />
 
       {cabinet.status === "IN_STOCK" ? (

@@ -95,7 +95,7 @@ const NAV: Record<string, Pair> = {
   "设置": { en: "Settings", ar: "الإعدادات" },
   "库存报表": { en: "Inventory Report", ar: "تقرير المخزون" },
   "仓储与出库": { en: "Stock & Outbound", ar: "المخزون والإخراج" },
-  "出库池": { en: "Outbound Pool", ar: "مجمع الإخراج" },
+  "出库单": { en: "Outbound Orders", ar: "أوامر الصرف" },
   "仓库": { en: "Warehouses", ar: "المستودعات" },
   // 设备生命周期五个视图（V165）
   "部署与安装": { en: "Deploy & Install", ar: "النشر والتركيب" },

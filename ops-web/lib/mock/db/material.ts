@@ -163,7 +163,7 @@ export function createMaterialDoc(x: MaterialDocReq): MaterialDoc {
   const lines = x.lines.map((l) => {
     const m = materials.find((k) => k.materialNo === l.materialNo);
     if (!m) { bad.push(`${l.materialNo}：物料不存在`); return null; }
-    if (m.builtin) { bad.push(`${m.name}：机柜与充电宝走设备流程（入库单 / 出库池 / 调拨）`); return null; }
+    if (m.builtin) { bad.push(`${m.name}：机柜与充电宝走设备流程（入库单 / 出库单 / 调拨）`); return null; }
     if (m.archivedAt && kind !== "OUTBOUND") { bad.push(`${m.name}：已归档`); return null; }
     let qty = l.qty;
     const sns = [...new Set((l.serialNos ?? []).map((s) => s.trim()).filter(Boolean))];

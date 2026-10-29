@@ -1,6 +1,6 @@
 // 库存管理 · 物料（V209 起的独立模块；承载方以 ai-shop 库存服务为准，见 docs/technical/独立进销存/）。
 // 字段口径对齐 ai-shop 物料：trackingMode = SERIAL（逐件，按序列号）/ QUANTITY（按数量），有流水后不可改。
-// 后端未实现：契约先行，见 lib/api/https/inventory.ts 的缺口登记。
+// 后端 V210（InventoryController）；物料单据与物料库存的账在 ai-shop 库存服务，只在独立进销存引擎下可用。
 
 /** 物料大类：整机设备 / 备件与配件 / 耗材与物料。 */
 export type MaterialCategory = "DEVICE" | "SPARE_PART" | "CONSUMABLE";
@@ -9,7 +9,7 @@ export type MaterialTracking = "SERIAL" | "QUANTITY";
 
 /**
  * 物料档案（GET /api/ops/inventory/materials）。
- * builtin = 机柜、充电宝两条内置物料：它们的账走设备流程（入库单、出库池、调拨），不能在物料单据里出入，也不能归档。
+ * builtin = 机柜、充电宝两条内置物料：它们的账走设备流程（入库单、出库单、调拨），不能在物料单据里出入，也不能归档。
  */
 export interface Material {
   materialNo: string;

@@ -29,6 +29,13 @@ public class LocalInventoryState implements InventoryStatePort {
     private final InvTransferMapper transfers;
 
     private final ai.neargo.sharehub.inv.service.StockThresholdService thresholds;
+    private ai.neargo.sharehub.inv.service.MaterialService materials;
+
+    /** 物料低库存（V210）：setter 注入 —— MaterialService 依赖远程端口，构造期注入会成环。 */
+    @org.springframework.beans.factory.annotation.Autowired
+    void setMaterials(@org.springframework.context.annotation.Lazy ai.neargo.sharehub.inv.service.MaterialService materials) {
+        this.materials = materials;
+    }
 
     public LocalInventoryState(InvIntakeMapper intakes, InvIntakeItemMapper items, InvTransferMapper transfers,
                                ai.neargo.sharehub.inv.service.StockThresholdService thresholds) {
@@ -56,8 +63,13 @@ public class LocalInventoryState implements InventoryStatePort {
 
     @Override
     public List<LowStock> lowStock() {
-        return thresholds.lowRows().stream()
-                .map(t -> new LowStock(t.warehouseNo(), t.warehouseName(), t.itemType(), t.minQty(), t.available())).toList();
+        List<LowStock> out = new java.util.ArrayList<>(thresholds.lowRows().stream()
+                .map(t -> new LowStock(t.warehouseNo(), t.warehouseName(), t.itemType(), "CABINET".equals(t.itemType()) ? "机柜" : "充电宝",
+                        t.minQty(), t.available())).toList());
+        // 物料（V210）：账在库存服务，只在 SERVICE 引擎下判定；服务不可用时 lowRows 返回空，下一轮再看
+        materials.lowRows().forEach(b -> out.add(new LowStock(b.warehouseNo(), b.warehouseName(), b.materialNo(), b.materialName(),
+                b.minQty(), b.onHand())));
+        return out;
     }
 
     @Override
