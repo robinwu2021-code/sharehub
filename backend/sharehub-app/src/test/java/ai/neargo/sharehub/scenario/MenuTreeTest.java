@@ -49,7 +49,8 @@ class MenuTreeTest extends ApiTestSupport {
         // V154 结算 −1（财务管理的「代理分润配置」跨段深链撤销；其余八项从财务、运营管理搬来，不增减）
         // V156 财务管理 +1（调整单从结算单页签里的视图升为叶子）
         // V163 设备管理 +1（出库池）；V165 +5（部署与装机、待上线、故障与维修、撤机与回仓、报废与遗失）
-        assertThat(leaves).as("ADMIN 看得到的叶子数").isEqualTo(120);
+        // V190 设备管理 +1（仓库）
+        assertThat(leaves).as("ADMIN 看得到的叶子数").isEqualTo(121);
     }
 
     @Test

@@ -80,6 +80,7 @@ const NAV: Record<string, Pair> = {
   // 设备管理四组（2026-10-28 按运营顺序，OM03）；原「资产流转」作废
   "仓储与出库": { en: "Stock & Outbound", ar: "المخزون والإخراج" },
   "出库池": { en: "Outbound Pool", ar: "مجمع الإخراج" },
+  "仓库": { en: "Warehouses", ar: "المستودعات" },
   // 设备生命周期五个视图（V165）
   "部署与安装": { en: "Deploy & Install", ar: "النشر والتركيب" },
   "部署与装机": { en: "Installations", ar: "عمليات التركيب" },

@@ -69,6 +69,7 @@ const LEAF_TUPLES = [
   // 2026-10-28 设备管理按生命周期（V163）：设备档案 → 仓储与出库（含出库池）→ 绑定上线 → 运行监控
   "/devices|设备台账|device:cabinet:read||设备档案",
   "/devices?tab=powerbanks|充电宝管理|device:powerbank:read||设备档案",
+  "/devices?tab=warehouses|仓库|device:inventory:read|1|仓储与出库",
   "/devices?tab=stock|库存余额|device:inventory:read|1|仓储与出库",
   "/devices?tab=inventory|库存调拨|device:inventory:read|2|仓储与出库",
   "/devices?tab=issued|出库池|device:inventory:read||仓储与出库",

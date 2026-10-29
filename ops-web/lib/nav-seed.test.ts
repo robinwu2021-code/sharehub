@@ -544,6 +544,24 @@ const PATCHES: { file: string; mustContain: string; apply: (rows: Row[]) => void
       at("M_system").modules = '["system","org"]';
     },
   },
+  {
+    // 仓储与出库加「仓库」（只读，S0 接口），排在库存余额前；设备叶子重编为 1 ~ 18。
+    file: "V190__menu_device_warehouses.sql",
+    mustContain: "UPDATE iam_menu SET menu_no = CONCAT('M_tmp190_', id) WHERE parent_no = 'M_device'",
+    apply: (rows) => {
+      const order = ["/devices", "/devices?tab=powerbanks", null, "/devices?tab=stock", "/devices?tab=inventory",
+        "/devices?tab=issued", "/devices?tab=asset-diffs", "/devices?tab=installs", "/devices?tab=pending-live",
+        "/devices?tab=codes", "/devices?tab=vendors", "/devices?tab=monitor", "/devices?tab=commands",
+        "/devices?tab=logs", "/devices?tab=ota", "/devices?tab=repairs", "/devices?tab=removals", "/devices?tab=retired"];
+      const targets = order.map((path) => (path ? rows.find((r) => r.parent_no === "M_device" && r.path === path)! : null));
+      targets.forEach((r, i) => { if (r) Object.assign(r, { menu_no: `M_device__${i + 1}`, sort: String(i + 1) }); });
+      rows.push({
+        menu_no: "M_device__3", parent_no: "M_device", name: "仓库", name_en: "Warehouses", name_ar: "المستودعات", type: "ITEM",
+        path: "/devices?tab=warehouses", icon: "NULL", group_name: "仓储与出库", sort: "3", perm: "device:inventory:read",
+        phase: "1", ready: "1", module: "NULL", modules: "NULL", match_paths: "NULL", pin_bottom: "0", portal_for: "NULL",
+      });
+    },
+  },
 ];
 
 const COLS = [
