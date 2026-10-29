@@ -516,7 +516,7 @@ function SystemInner() {
 
   // —— 其余分页 tab ——
   // 筛选值一并进 queryKey：否则改筛选器不会重新取数。
-  const filterKey = [logChannel, logStatus, logSort.key, logSort.dir, blChannel, blReason, showArchived ? "arc" : ""].join("|");
+  const filterKey = [logChannel, logStatus, logSort.key, logSort.dir, blChannel, blReason, showArchived ? "arc" : "", pendingOnly ? "pending" : ""].join("|");
   // 切 tab 要把上一个 tab 的筛选条件全部清掉。此前这段只写在 TabHeader 的 onChange 里，
   // 从 URL 换 tab（点侧边菜单）的那一路只复位了页码，筛选会带到新 tab 上——
   // 表现是切过去看到一张空表，而筛选器不在视野里。

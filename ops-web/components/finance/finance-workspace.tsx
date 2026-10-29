@@ -1552,8 +1552,9 @@ export function FinanceWorkspace({ path, tabKeys }: {
           代价是错误态要自己接——上面每个列表都接了，棘轮 lib/table-wiring.test.ts 守住不回退。 */}
       {/* 调整项视图自带分页（PagedTable），这里的分页属于上面那张共享列表 */}
       {q.data && tab !== "adjustments" && !(tab === "invoices" && invView !== "B2B") && <Pagination page={paging.page} size={paging.size} total={q.data.total} onPage={paging.setPage} onSize={paging.setSize} />}
-      {/* 跨期应付（SHR-05）：分润统计只看单期，这里看各期累积下来还欠多少 */}
-      {tab === "summary" && <PayablesPanel />}
+      {/* 跨期应付（SHR-05）：结算单是逐期的，这里看各期累积下来还欠多少。
+          放结算单页而不是分润统计 —— 后者在部分部署的菜单里没有（phase 1），放那里就够不着 */}
+      {tab === "settlements" && <PayablesPanel />}
 
       {/* 提现审批抽屉：通过 → 转打款中；驳回必填原因；审批人取当前登录账号 */}
       <Drawer
