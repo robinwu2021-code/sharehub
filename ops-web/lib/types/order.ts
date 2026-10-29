@@ -254,7 +254,8 @@ export interface DepositRecord {
 }
 
 /** 催缴渠道（欠费催缴必选，决定走哪条触达通道）。 */
-export type DunChannel = "SMS" | "PUSH" | "PHONE";
+// 与 DDL 列注释 SMS/PUSH/CALL 一致（2026-10-29 对齐：前端曾写 PHONE，后端 DunChannel.of 会拒）
+export type DunChannel = "SMS" | "PUSH" | "CALL";
 
 /** 押金处置动作。`dun` 只留痕不改状态（沿用工单 process 的口径）。 */
 export type DepositAction = "release" | "buyout" | "dun";

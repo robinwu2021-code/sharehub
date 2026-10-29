@@ -103,6 +103,7 @@ class VocabularyWriteCoverageTest {
             "notify_template.status",                            // NotifyTemplateStatus.of
             "dev_alarm_rule.channel", "dev_alarm_rule.method", "dev_alarm_rule.status",
             "wo_sla_rule.wo_type",                               // WorkOrderType.of
+            "wo_sla_rule.priority",                              // WoPriority.of，外加「*」= 类型默认的哨兵（SlaRuleServiceImpl）
             "loc_lead.stage", "loc_lead.owner_type",             // checkStage / checkOwnerType
             // 服务端全权（第三种答案）：创建写常量、编辑抄 current、状态迁移走专门端点
             "notify_blacklist.status", "usr_free_whitelist.status",

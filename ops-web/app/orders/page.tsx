@@ -153,7 +153,7 @@ const IV_PERM: Record<OrderInterventionAction, string> = {
 
 // —— 押金处置（S1：押金页原先纯只读）——
 const DEP_ACTION_LABEL: Record<DepositAction, string> = { release: "解冻", buyout: "买断", dun: "催缴" };
-const DUN_CHANNEL_LABEL: Record<DunChannel, string> = { SMS: "短信", PUSH: "App 推送", PHONE: "电话" };
+const DUN_CHANNEL_LABEL: Record<DunChannel, string> = { SMS: "短信", PUSH: "App 推送", CALL: "电话" };
 
 const EXC_TYPE_LABEL: Record<OrderException["type"], string> = {
   NOT_EJECTED: "未弹出",

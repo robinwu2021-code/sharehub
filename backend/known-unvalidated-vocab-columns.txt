@@ -62,9 +62,8 @@
 # ⚠️ 已知漏网 8 列：按取值形状判成了非枚举，其中 6 个确实是自由文本
 # （sys_app_version.version_id / sys_outbox.aggregate_id / iam_dept.path /
 # wo_order.wo_created_at / share_record.period / price_schedule.period），
-# iam_role.code 是可扩展的角色码（191 种）不算固定枚举，
-# 而 wo_sla_rule.priority **是真枚举**，只因词表里有个 `*` 哨兵值（「类型默认」）
-# 不合大写形而掉了出去。它是这份判据目前唯一的假阴性，记在这里以免被当成不存在。
+# iam_role.code 是可扩展的角色码不算固定枚举（V178 起列注释也不再写成词表形），
+# wo_sla_rule.priority **是真枚举**（带 `*` 哨兵「类型默认」），写入侧早有 WoPriority.of，2026-10-29 已进 COVERED。
 #
 # 2026-09-28 建账：词表列 279，已核实 22，待核实 257。
 # 同日核实第一批（钱那一侧）：已核实 27，待核实 252。（fin_invoice.status 接上校验；

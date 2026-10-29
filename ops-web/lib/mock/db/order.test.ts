@@ -211,7 +211,7 @@ describe("押金状态机", () => {
     expect(r1.dunCount).toBe(1);
     expect(r1.lastDunChannel).toBe("SMS");
     expect(r1.lastDunAt).toBeTruthy();
-    const r2 = dunArrears(d.depositNo, { channel: "PHONE", note: "已联系用户本人" });
+    const r2 = dunArrears(d.depositNo, { channel: "CALL", note: "已联系用户本人" });
     expect(r2.dunCount).toBe(2);
     expect(r2.note).toBe("已联系用户本人");
   });

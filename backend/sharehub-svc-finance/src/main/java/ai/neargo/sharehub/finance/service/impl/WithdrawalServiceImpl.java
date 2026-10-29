@@ -131,7 +131,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
              * 能在申请时拦的，就不要留到审批之后。
              */
             if (payoutAccounts.defaultOf(req.payeeType(), req.payeeNo()).isEmpty()) {
-                throw new IllegalArgumentException("该受益方还没有可用的收款账户，无法提交提现 —— 请先补录收款账户");
+                throw ai.neargo.sharehub.common.BizException.badRequest("error.withdrawal.no_payout_account");
             }
             e.setApprovalState(WithdrawalApprovalState.SUBMITTING.name());
             e.setApprovalRound(1);

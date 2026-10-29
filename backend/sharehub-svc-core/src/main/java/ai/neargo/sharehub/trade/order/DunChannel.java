@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.trade.order;
 
+import ai.neargo.sharehub.common.BizException;
+
 /**
  * 催缴渠道（{@code ord_deposit.last_dun_channel}，DDL 注释 {@code 'SMS/PUSH/CALL'}）。
  *
@@ -16,13 +18,13 @@ public enum DunChannel {
     /** 人工电话。 */
     CALL;
 
-    /** 宽松解析：非法值抛 {@link IllegalArgumentException}（全局映射 400）。 */
+    /** 宽松解析：非法值抛 {@link BizException}（400，文案走 i18n key —— 中文字面量会原样送到英文 / 阿语界面）。 */
     public static DunChannel of(String v) {
-        if (v == null || v.isBlank()) throw new IllegalArgumentException("催缴渠道必填");
+        if (v == null || v.isBlank()) throw BizException.badRequest("error.common.missing_parameter", "channel");
         try {
             return valueOf(v.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("催缴渠道非法: " + v + "（仅 SMS/PUSH/CALL）");
+            throw BizException.badRequest("error.common.invalid_value", v + " (SMS/PUSH/CALL)");
         }
     }
 

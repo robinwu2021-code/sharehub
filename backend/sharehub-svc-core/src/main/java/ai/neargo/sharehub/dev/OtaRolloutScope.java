@@ -1,5 +1,7 @@
 package ai.neargo.sharehub.dev;
 
+import ai.neargo.sharehub.common.BizException;
+
 /**
  * OTA 投放范围（{@code dev_ota_rollout.scope}，DDL 注释 {@code 'DEVICE/LOCATION/ALL'}）。
  *
@@ -16,13 +18,13 @@ public enum OtaRolloutScope {
     /** 全量（DDL 默认值）。 */
     ALL;
 
-    /** 宽松解析：非法值抛 {@link IllegalArgumentException}（全局映射 400）。 */
+    /** 宽松解析：非法值抛 {@link BizException}（400，文案走 i18n key —— 中文字面量会原样送到英文 / 阿语界面）。 */
     public static OtaRolloutScope of(String v) {
-        if (v == null || v.isBlank()) throw new IllegalArgumentException("投放范围必填");
+        if (v == null || v.isBlank()) throw BizException.badRequest("error.common.missing_parameter", "scope");
         try {
             return valueOf(v.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("投放范围非法: " + v + "（仅 DEVICE/LOCATION/ALL）");
+            throw BizException.badRequest("error.common.invalid_value", v + " (DEVICE/LOCATION/ALL)");
         }
     }
 }
