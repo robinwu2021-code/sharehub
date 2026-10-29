@@ -18,6 +18,7 @@ import { TaxInvoicePanel } from "@/components/finance/tax-invoice-panel";
 import { SelfBillPanel } from "@/components/finance/self-bill-panel";
 import { PayablesPanel } from "@/components/finance/payables-panel";
 import { ApprovalsPanel } from "@/components/finance/approvals-panel";
+import { MySelfBills } from "@/components/finance/my-self-bills";
 import { DataTable, type Column, type SortDir } from "@/components/ui/data-table";
 import { Drawer, Field } from "@/components/ui/drawer";
 import { FilterSelect } from "@/components/ui/filter-select";
@@ -1313,6 +1314,8 @@ export function FinanceWorkspace({ path, tabKeys }: {
 
       {/* 付款任务（V158）：一期提现 = 平台主动付款，运营端在这里发起；商家端不出现 */}
       {tab === "withdrawals" && realm !== "AGENT" && <PayoutTasks />}
+      {/* 商家门户：分成到账对应的自开票（C10）就在提现记录下面 */}
+      {tab === "withdrawals" && realm === "AGENT" && <MySelfBills />}
       {tab === "withdrawals" && (
         <Toolbar
           search={keyword}

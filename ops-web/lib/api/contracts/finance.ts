@@ -118,6 +118,9 @@ export interface FinanceApi {
   rejectApproval(requestNo: string, note: string): Promise<ApprovalRequest>;
   issueSelfBill(withdrawNo: string): Promise<SelfBill>;
   downloadSelfBillPdf(billNo: string): Promise<void>;
+  /** 商家门户：本商家的自开票（商家号只取会话），与下载。 */
+  listMySelfBills(q?: PageQ): Promise<PageResult<SelfBill>>;
+  downloadMySelfBillPdf(billNo: string): Promise<void>;
   saveShareRule(x: Partial<ShareRule> & { ruleNo?: string }): Promise<ShareRule>;
   /** 登记/编辑发票草稿。开具后（ISSUED/VOID）抬头与金额由服务端拒绝修改。 */
   saveInvoice(x: Partial<Invoice> & { invoiceNo?: string }): Promise<Invoice>;

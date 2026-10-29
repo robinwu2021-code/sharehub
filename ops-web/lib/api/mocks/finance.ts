@@ -67,6 +67,9 @@ export const financeMock: FinanceApi = {
   approveApproval: async (no) => fail(`审批单 ${no} 不存在`, `Approval ${no} not found`),
   rejectApproval: async (no) => fail(`审批单 ${no} 不存在`, `Approval ${no} not found`),
   issueSelfBill: async (withdrawNo) => wait(db.issueSelfBill(withdrawNo)),
+  // 演示数据模式的自开票只由「补出」产生、默认为空；真后端按会话商家号收敛
+  listMySelfBills: (q: PageQ = {}) => wait(db.listSelfBills(q)),
+  downloadMySelfBillPdf: async () => fail("演示数据模式不生成文件，接真后端后可下载", "Download needs the real backend; not available in demo mode"),
   downloadSelfBillPdf: async () => fail("演示数据模式不生成文件，接真后端后可下载", "Download needs the real backend; not available in demo mode"),
   downloadTaxInvoicePdf: async () => fail("演示数据模式不生成文件，接真后端后可下载", "Download needs the real backend; not available in demo mode"),
   // async：让校验抛的 ApiError 变成 rejected promise，交给全局 MutationCache 弹错

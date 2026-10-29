@@ -119,6 +119,29 @@ class SelfBillingTest extends ApiTestSupport {
     }
 
     @Test
+    @DisplayName("★ 商家门户只看得到自己的自开票，下得了自己的 PDF；别家的单当不存在；运营账号走这个口 403")
+    void merchant_sees_only_own_self_bills() throws Exception {
+        Map<String, String> w = payAll();
+        String bill = (String) bills(w.get(withTrn)).get(0).get("bill_no");
+        String mine = login("AGENT", "merchant-" + withTrn, withTrn);
+        JsonNode list = get("/api/agent/me/self-bills", mine).okData();
+        assertThat(list.path("total").asInt()).isEqualTo(1);
+        assertThat(list.path("list").get(0).path("billNo").asText()).isEqualTo(bill);
+        HttpResponse<byte[]> pdf = http.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port
+                + "/api/agent/me/self-bills/" + bill + "/pdf")).header("Authorization", "Bearer " + mine).GET().build(),
+                HttpResponse.BodyHandlers.ofByteArray());
+        assertThat(pdf.statusCode()).isEqualTo(200);
+
+        String other = login("AGENT", "merchant-" + noTrn, noTrn);
+        assertThat(get("/api/agent/me/self-bills", other).okData().path("total").asInt()).isZero();
+        HttpResponse<byte[]> theirs = http.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port
+                + "/api/agent/me/self-bills/" + bill + "/pdf")).header("Authorization", "Bearer " + other).GET().build(),
+                HttpResponse.BodyHandlers.ofByteArray());
+        assertThat(theirs.statusCode()).as("别家的单按「不存在」回（本项目 notFound 映射 400）").isEqualTo(400);
+        assertThat(get("/api/agent/me/self-bills", login("ADMIN")).status).isEqualTo(403);
+    }
+
+    @Test
     @DisplayName("开关关着 → 到账不出单据")
     void disabled_issues_nothing() {
         jdbc.update("UPDATE sys_param SET value = '0' WHERE param_key = 'finance.share.self_billing'");

@@ -2256,6 +2256,121 @@
   },
   {
    "verb": "GET",
+   "path": "/api/agent/me/self-bills",
+   "perm": "finance:withdrawal:read",
+   "perms": [
+    "finance:withdrawal:read"
+   ],
+   "handler": "MerchantSelfBillController#mine",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<SelfBillView>",
+   "returnContainer": "PageResult",
+   "returnElement": "SelfBillView",
+   "responseShape": [
+    {
+     "name": "billNo",
+     "type": "String"
+    },
+    {
+     "name": "withdrawNo",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "supplierName",
+     "type": "String"
+    },
+    {
+     "name": "supplierAddress",
+     "type": "String"
+    },
+    {
+     "name": "supplierTrn",
+     "type": "String"
+    },
+    {
+     "name": "recipientName",
+     "type": "String"
+    },
+    {
+     "name": "recipientTrn",
+     "type": "String"
+    },
+    {
+     "name": "taxRatePercent",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "netAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "taxAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "grossAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "payRef",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/agent/me/self-bills/{billNo}/pdf",
+   "perm": "finance:withdrawal:read",
+   "perms": [
+    "finance:withdrawal:read"
+   ],
+   "handler": "MerchantSelfBillController#pdf",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "billNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "void",
+   "returnContainer": null,
+   "returnElement": "void",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
    "path": "/api/agent/performance",
    "perm": "agent:performance:read",
    "perms": [
@@ -14212,6 +14327,907 @@
     }
    ],
    "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/intakes",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#intakes",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "keyword",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "status",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "warehouseNo",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<ai.neargo.sharehub.inv.dto.IntakeDtos.Intake>",
+   "returnContainer": "PageResult",
+   "returnElement": "ai.neargo.sharehub.inv.dto.IntakeDtos.Intake",
+   "responseShape": [
+    {
+     "name": "intakeNo",
+     "type": "String"
+    },
+    {
+     "name": "kind",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "warehouseName",
+     "type": "String"
+    },
+    {
+     "name": "sourceRef",
+     "type": "String"
+    },
+    {
+     "name": "arrivedAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    },
+    {
+     "name": "total",
+     "type": "int"
+    },
+    {
+     "name": "pending",
+     "type": "int"
+    },
+    {
+     "name": "passed",
+     "type": "int"
+    },
+    {
+     "name": "failed",
+     "type": "int"
+    },
+    {
+     "name": "inbound",
+     "type": "int"
+    },
+    {
+     "name": "disposed",
+     "type": "int"
+    },
+    {
+     "name": "createdBy",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/intakes",
+   "perm": "device:inventory:inbound",
+   "perms": [
+    "device:inventory:inbound"
+   ],
+   "handler": "InventoryController#createIntake",
+   "summary": "",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.inv.dto.IntakeDtos.CreateReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.IntakeDtos.IntakeDetail",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.IntakeDtos.IntakeDetail",
+   "responseShape": [
+    {
+     "name": "intake",
+     "type": "Intake",
+     "fields": [
+      {
+       "name": "intakeNo",
+       "type": "String"
+      },
+      {
+       "name": "kind",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseName",
+       "type": "String"
+      },
+      {
+       "name": "sourceRef",
+       "type": "String"
+      },
+      {
+       "name": "arrivedAt",
+       "type": "LocalDateTime"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "note",
+       "type": "String"
+      },
+      {
+       "name": "total",
+       "type": "int"
+      },
+      {
+       "name": "pending",
+       "type": "int"
+      },
+      {
+       "name": "passed",
+       "type": "int"
+      },
+      {
+       "name": "failed",
+       "type": "int"
+      },
+      {
+       "name": "inbound",
+       "type": "int"
+      },
+      {
+       "name": "disposed",
+       "type": "int"
+      },
+      {
+       "name": "createdBy",
+       "type": "String"
+      },
+      {
+       "name": "createdAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    },
+    {
+     "name": "items",
+     "type": "List<IntakeItem>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "itemNo",
+       "type": "String"
+      },
+      {
+       "name": "sn",
+       "type": "String"
+      },
+      {
+       "name": "model",
+       "type": "String"
+      },
+      {
+       "name": "qcNo",
+       "type": "String"
+      },
+      {
+       "name": "qcResult",
+       "type": "String"
+      },
+      {
+       "name": "disposition",
+       "type": "String"
+      },
+      {
+       "name": "dispositionNote",
+       "type": "String"
+      },
+      {
+       "name": "handledBy",
+       "type": "String"
+      },
+      {
+       "name": "handledAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "sourceRef",
+     "type": "String"
+    },
+    {
+     "name": "arrivedAt",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    },
+    {
+     "name": "cabinetNos",
+     "type": "List<String>"
+    },
+    {
+     "name": "powerbankNos",
+     "type": "List<String>"
+    }
+   ]
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/intakes/{intakeNo}",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#intake",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "intakeNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.IntakeDtos.IntakeDetail",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.IntakeDtos.IntakeDetail",
+   "responseShape": [
+    {
+     "name": "intake",
+     "type": "Intake",
+     "fields": [
+      {
+       "name": "intakeNo",
+       "type": "String"
+      },
+      {
+       "name": "kind",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseName",
+       "type": "String"
+      },
+      {
+       "name": "sourceRef",
+       "type": "String"
+      },
+      {
+       "name": "arrivedAt",
+       "type": "LocalDateTime"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "note",
+       "type": "String"
+      },
+      {
+       "name": "total",
+       "type": "int"
+      },
+      {
+       "name": "pending",
+       "type": "int"
+      },
+      {
+       "name": "passed",
+       "type": "int"
+      },
+      {
+       "name": "failed",
+       "type": "int"
+      },
+      {
+       "name": "inbound",
+       "type": "int"
+      },
+      {
+       "name": "disposed",
+       "type": "int"
+      },
+      {
+       "name": "createdBy",
+       "type": "String"
+      },
+      {
+       "name": "createdAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    },
+    {
+     "name": "items",
+     "type": "List<IntakeItem>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "itemNo",
+       "type": "String"
+      },
+      {
+       "name": "sn",
+       "type": "String"
+      },
+      {
+       "name": "model",
+       "type": "String"
+      },
+      {
+       "name": "qcNo",
+       "type": "String"
+      },
+      {
+       "name": "qcResult",
+       "type": "String"
+      },
+      {
+       "name": "disposition",
+       "type": "String"
+      },
+      {
+       "name": "dispositionNote",
+       "type": "String"
+      },
+      {
+       "name": "handledBy",
+       "type": "String"
+      },
+      {
+       "name": "handledAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/intakes/{intakeNo}/dispose",
+   "perm": "device:inventory:inbound",
+   "perms": [
+    "device:inventory:inbound"
+   ],
+   "handler": "InventoryController#disposeIntake",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "intakeNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "ai.neargo.sharehub.inv.dto.IntakeDtos.DisposeReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.IntakeDtos.IntakeDetail",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.IntakeDtos.IntakeDetail",
+   "responseShape": [
+    {
+     "name": "intake",
+     "type": "Intake",
+     "fields": [
+      {
+       "name": "intakeNo",
+       "type": "String"
+      },
+      {
+       "name": "kind",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseName",
+       "type": "String"
+      },
+      {
+       "name": "sourceRef",
+       "type": "String"
+      },
+      {
+       "name": "arrivedAt",
+       "type": "LocalDateTime"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "note",
+       "type": "String"
+      },
+      {
+       "name": "total",
+       "type": "int"
+      },
+      {
+       "name": "pending",
+       "type": "int"
+      },
+      {
+       "name": "passed",
+       "type": "int"
+      },
+      {
+       "name": "failed",
+       "type": "int"
+      },
+      {
+       "name": "inbound",
+       "type": "int"
+      },
+      {
+       "name": "disposed",
+       "type": "int"
+      },
+      {
+       "name": "createdBy",
+       "type": "String"
+      },
+      {
+       "name": "createdAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    },
+    {
+     "name": "items",
+     "type": "List<IntakeItem>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "itemNo",
+       "type": "String"
+      },
+      {
+       "name": "sn",
+       "type": "String"
+      },
+      {
+       "name": "model",
+       "type": "String"
+      },
+      {
+       "name": "qcNo",
+       "type": "String"
+      },
+      {
+       "name": "qcResult",
+       "type": "String"
+      },
+      {
+       "name": "disposition",
+       "type": "String"
+      },
+      {
+       "name": "dispositionNote",
+       "type": "String"
+      },
+      {
+       "name": "handledBy",
+       "type": "String"
+      },
+      {
+       "name": "handledAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "items",
+     "type": "List<ItemRef>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "itemNo",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "disposition",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/intakes/{intakeNo}/inbound",
+   "perm": "device:inventory:inbound",
+   "perms": [
+    "device:inventory:inbound"
+   ],
+   "handler": "InventoryController#inboundIntake",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "intakeNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "ai.neargo.sharehub.inv.dto.IntakeDtos.ItemsReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.IntakeDtos.IntakeDetail",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.IntakeDtos.IntakeDetail",
+   "responseShape": [
+    {
+     "name": "intake",
+     "type": "Intake",
+     "fields": [
+      {
+       "name": "intakeNo",
+       "type": "String"
+      },
+      {
+       "name": "kind",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseName",
+       "type": "String"
+      },
+      {
+       "name": "sourceRef",
+       "type": "String"
+      },
+      {
+       "name": "arrivedAt",
+       "type": "LocalDateTime"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "note",
+       "type": "String"
+      },
+      {
+       "name": "total",
+       "type": "int"
+      },
+      {
+       "name": "pending",
+       "type": "int"
+      },
+      {
+       "name": "passed",
+       "type": "int"
+      },
+      {
+       "name": "failed",
+       "type": "int"
+      },
+      {
+       "name": "inbound",
+       "type": "int"
+      },
+      {
+       "name": "disposed",
+       "type": "int"
+      },
+      {
+       "name": "createdBy",
+       "type": "String"
+      },
+      {
+       "name": "createdAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    },
+    {
+     "name": "items",
+     "type": "List<IntakeItem>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "itemNo",
+       "type": "String"
+      },
+      {
+       "name": "sn",
+       "type": "String"
+      },
+      {
+       "name": "model",
+       "type": "String"
+      },
+      {
+       "name": "qcNo",
+       "type": "String"
+      },
+      {
+       "name": "qcResult",
+       "type": "String"
+      },
+      {
+       "name": "disposition",
+       "type": "String"
+      },
+      {
+       "name": "dispositionNote",
+       "type": "String"
+      },
+      {
+       "name": "handledBy",
+       "type": "String"
+      },
+      {
+       "name": "handledAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "itemNos",
+     "type": "List<String>"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/intakes/{intakeNo}/items/{itemType}/{itemNo}/qc",
+   "perm": "device:qc:inspect",
+   "perms": [
+    "device:qc:inspect"
+   ],
+   "handler": "InventoryController#inspectIntakeItem",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "intakeNo",
+     "type": "String",
+     "required": true
+    },
+    {
+     "in": "path",
+     "name": "itemType",
+     "type": "String",
+     "required": true
+    },
+    {
+     "in": "path",
+     "name": "itemNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "ai.neargo.sharehub.dev.dto.DeviceOpsDtos.QcReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.IntakeDtos.IntakeDetail",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.IntakeDtos.IntakeDetail",
+   "responseShape": [
+    {
+     "name": "intake",
+     "type": "Intake",
+     "fields": [
+      {
+       "name": "intakeNo",
+       "type": "String"
+      },
+      {
+       "name": "kind",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseName",
+       "type": "String"
+      },
+      {
+       "name": "sourceRef",
+       "type": "String"
+      },
+      {
+       "name": "arrivedAt",
+       "type": "LocalDateTime"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "note",
+       "type": "String"
+      },
+      {
+       "name": "total",
+       "type": "int"
+      },
+      {
+       "name": "pending",
+       "type": "int"
+      },
+      {
+       "name": "passed",
+       "type": "int"
+      },
+      {
+       "name": "failed",
+       "type": "int"
+      },
+      {
+       "name": "inbound",
+       "type": "int"
+      },
+      {
+       "name": "disposed",
+       "type": "int"
+      },
+      {
+       "name": "createdBy",
+       "type": "String"
+      },
+      {
+       "name": "createdAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    },
+    {
+     "name": "items",
+     "type": "List<IntakeItem>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "itemNo",
+       "type": "String"
+      },
+      {
+       "name": "sn",
+       "type": "String"
+      },
+      {
+       "name": "model",
+       "type": "String"
+      },
+      {
+       "name": "qcNo",
+       "type": "String"
+      },
+      {
+       "name": "qcResult",
+       "type": "String"
+      },
+      {
+       "name": "disposition",
+       "type": "String"
+      },
+      {
+       "name": "dispositionNote",
+       "type": "String"
+      },
+      {
+       "name": "handledBy",
+       "type": "String"
+      },
+      {
+       "name": "handledAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "powerOn",
+     "type": "Boolean"
+    },
+    {
+     "name": "slotsOk",
+     "type": "Boolean"
+    },
+    {
+     "name": "battery",
+     "type": "Integer"
+    },
+    {
+     "name": "cycles",
+     "type": "Integer"
+    },
+    {
+     "name": "result",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "GET",
@@ -32662,6 +33678,12 @@
      "name": "groupName",
      "type": "String",
      "required": false
+    },
+    {
+     "in": "query",
+     "name": "pendingDecision",
+     "type": "String",
+     "required": false
     }
    ],
    "bodyType": null,
@@ -32688,6 +33710,48 @@
     {
      "name": "updatedAt",
      "type": "String"
+    },
+    {
+     "name": "valueType",
+     "type": "String"
+    },
+    {
+     "name": "options",
+     "type": "List<ParamOption>",
+     "fields": [
+      {
+       "name": "value",
+       "type": "String"
+      },
+      {
+       "name": "label",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "minValue",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "maxValue",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "pattern",
+     "type": "String"
+    },
+    {
+     "name": "nullable",
+     "type": "Boolean"
+    },
+    {
+     "name": "hint",
+     "type": "String"
+    },
+    {
+     "name": "pendingDecision",
+     "type": "Boolean"
     }
    ],
    "requestShape": null
@@ -32726,6 +33790,48 @@
     {
      "name": "updatedAt",
      "type": "String"
+    },
+    {
+     "name": "valueType",
+     "type": "String"
+    },
+    {
+     "name": "options",
+     "type": "List<ParamOption>",
+     "fields": [
+      {
+       "name": "value",
+       "type": "String"
+      },
+      {
+       "name": "label",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "minValue",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "maxValue",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "pattern",
+     "type": "String"
+    },
+    {
+     "name": "nullable",
+     "type": "Boolean"
+    },
+    {
+     "name": "hint",
+     "type": "String"
+    },
+    {
+     "name": "pendingDecision",
+     "type": "Boolean"
     }
    ],
    "requestShape": [
@@ -32744,6 +33850,38 @@
     {
      "name": "groupName",
      "type": "String"
+    },
+    {
+     "name": "valueType",
+     "type": "String"
+    },
+    {
+     "name": "valueOptions",
+     "type": "String"
+    },
+    {
+     "name": "minValue",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "maxValue",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "pattern",
+     "type": "String"
+    },
+    {
+     "name": "nullable",
+     "type": "Integer"
+    },
+    {
+     "name": "hint",
+     "type": "String"
+    },
+    {
+     "name": "pendingDecision",
+     "type": "Integer"
     },
     {
      "name": "id",
@@ -32837,6 +33975,48 @@
     {
      "name": "updatedAt",
      "type": "String"
+    },
+    {
+     "name": "valueType",
+     "type": "String"
+    },
+    {
+     "name": "options",
+     "type": "List<ParamOption>",
+     "fields": [
+      {
+       "name": "value",
+       "type": "String"
+      },
+      {
+       "name": "label",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "minValue",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "maxValue",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "pattern",
+     "type": "String"
+    },
+    {
+     "name": "nullable",
+     "type": "Boolean"
+    },
+    {
+     "name": "hint",
+     "type": "String"
+    },
+    {
+     "name": "pendingDecision",
+     "type": "Boolean"
     }
    ],
    "requestShape": [
@@ -32855,6 +34035,38 @@
     {
      "name": "groupName",
      "type": "String"
+    },
+    {
+     "name": "valueType",
+     "type": "String"
+    },
+    {
+     "name": "valueOptions",
+     "type": "String"
+    },
+    {
+     "name": "minValue",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "maxValue",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "pattern",
+     "type": "String"
+    },
+    {
+     "name": "nullable",
+     "type": "Integer"
+    },
+    {
+     "name": "hint",
+     "type": "String"
+    },
+    {
+     "name": "pendingDecision",
+     "type": "Integer"
     },
     {
      "name": "id",
@@ -50651,10 +51863,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 572,
-  "records": 532,
-  "withPerm": 490,
-  "withBody": 235,
-  "shapedResponses": 442
+  "endpoints": 580,
+  "records": 539,
+  "withPerm": 498,
+  "withBody": 239,
+  "shapedResponses": 449
  }
 }
