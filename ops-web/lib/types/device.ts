@@ -732,6 +732,57 @@ export interface QcRecord {
   consumedBy: string | null;
 }
 
+/** 库存引擎（S3 / S4）：LOCAL 本地设备表 / SERVICE 独立进销存。 */
+export type InventoryEngineKind = "LOCAL" | "SERVICE";
+export interface InventoryEngine {
+  engine: InventoryEngineKind;
+  /** SERVICE 时凭证是否已配。 */
+  configured: boolean;
+}
+
+/** 一条库存流水（后端 `StockLedgerRow`）：qtyDelta 进仓 +、出仓 −。 */
+export interface StockLedgerRow {
+  id: string;
+  warehouseNo: string | null;
+  itemType: string | null;
+  itemNo: string | null;
+  /** 本地是履历事件（INBOUND / ISSUE …），进销存是单据类型。 */
+  docKind: string | null;
+  docNo: string | null;
+  qtyDelta: number;
+  occurredAt: string | null;
+  operator: string | null;
+}
+
+/** 盘点单状态（库存服务原样）。 */
+export type StockCountStatus = "OPEN" | "SUBMITTED" | "APPROVED" | "POSTED" | "CANCELLED" | "UNKNOWN";
+
+export interface StockCount {
+  countNo: string;
+  warehouseNo: string | null;
+  status: StockCountStatus;
+  openedAt: string | null;
+}
+
+export interface StockCountLine {
+  itemType: string | null;
+  bookQty: number;
+  countedQty: number | null;
+  diffQty: number | null;
+}
+
+export interface StockCountScan {
+  serialNo: string;
+  verdict: string;
+}
+
+export interface StockCountDetail {
+  count: StockCount;
+  lines: StockCountLine[];
+  exceptions: StockCountScan[];
+  missingSerials: string[];
+}
+
 /** 设备履历事件（与后端 `MovementEvent` 同名同值，V196）。 */
 export type MovementEvent =
   | "ISSUE" | "CLAIM" | "REDIRECT" | "POOL_RETURN" | "BIND" | "UNBIND" | "SHIP" | "RECEIVE"

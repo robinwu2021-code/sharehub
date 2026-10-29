@@ -188,6 +188,89 @@ public class InventoryFake implements InventoryApi {
         emit("DispatchRevoked", dispatchId, payload(pool.get(dispatchId)));
     }
 
+    // —— 流水与盘点 ——
+
+    /** 盘点单：countNo → [locationId, status, 扫到的序列号]。 */
+    public final Map<String, Object[]> counts = new LinkedHashMap<>();
+
+    @Override
+    public List<LedgerEntry> ledger(String itemId, String locationId, String docNo, Long afterId, int limit) {
+        List<LedgerEntry> out = new ArrayList<>();
+        long id = 0;
+        for (Doc d : docs.values()) {
+            if (!d.posted()[0] || (locationId != null && !locationId.equals(d.locationId()))) continue;
+            int n = "IN".equals(d.kind()) ? d.lines().stream().mapToInt(l -> l.serials().size()).sum() : -d.serials().size();
+            out.add(new LedgerEntry(++id, items.get("CABINET"), d.locationId(), d.kind(), "doc", 1, null, BigDecimal.valueOf(n), null,
+                    LocalDateTime.now(), "fake"));
+        }
+        return out;
+    }
+
+    @Override
+    public String openCount(String locationId, List<String> itemIds, String idempotencyKey) {
+        String no = "CNT-" + UUID.randomUUID().toString().substring(0, 8);
+        counts.put(no, new Object[]{locationId, "OPEN", new ArrayList<String>()});
+        return no;
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public CountView count(String countNo) {
+        Object[] c = counts.get(countNo);
+        if (c == null) throw err(404, "inventory.not_found", countNo);
+        String loc = (String) c[0];
+        List<String> scanned = (List<String>) c[2];
+        List<String> book = stock.entrySet().stream().filter(e -> loc.equals(e.getValue())).map(Map.Entry::getKey).toList();
+        int counted = (int) scanned.stream().filter(book::contains).count();
+        List<String> missing = book.stream().filter(x -> !scanned.contains(x)).toList();
+        List<CountScan> extra = scanned.stream().filter(x -> !book.contains(x)).map(x -> new CountScan(x, "NOT_IN_BOOK")).toList();
+        return new CountView(countNo, loc, (String) c[1], 1, null, null, null,
+                List.of(new CountLine(items.get("CABINET"), "SERIAL", book.size(), counted, counted - book.size())), extra, missing);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public List<CountScan> scanCount(String countNo, List<String> serialNos, String idempotencyKey) {
+        Object[] c = counts.get(countNo);
+        if (!"OPEN".equals(c[1])) throw err(409, "inventory.conflict", countNo);
+        ((List<String>) c[2]).addAll(serialNos);
+        return serialNos.stream().map(x -> new CountScan(x, "OK")).toList();
+    }
+
+    private void move(String countNo, String from, String to) {
+        Object[] c = counts.get(countNo);
+        if (!from.equals(c[1])) throw err(409, "inventory.conflict", countNo + ":" + c[1]);
+        c[1] = to;
+    }
+
+    @Override
+    public void submitCount(String countNo, String idempotencyKey) {
+        move(countNo, "OPEN", "SUBMITTED");
+    }
+
+    @Override
+    public void approveCount(String countNo, String note, String idempotencyKey) {
+        move(countNo, "SUBMITTED", "APPROVED");
+    }
+
+    @Override
+    public void rejectCount(String countNo, String note, String idempotencyKey) {
+        move(countNo, "SUBMITTED", "OPEN");
+    }
+
+    @Override
+    public CountPosted postCount(String countNo, String idempotencyKey) {
+        move(countNo, "APPROVED", "POSTED");
+        return new CountPosted(null, null);
+    }
+
+    @Override
+    public void cancelCount(String countNo, String idempotencyKey) {
+        Object[] c = counts.get(countNo);
+        if ("POSTED".equals(c[1])) throw err(409, "inventory.conflict", countNo);
+        c[1] = "CANCELLED";
+    }
+
     @Override
     public EventPage pullEvents(Long afterSeq, int limit) {
         long from = afterSeq == null ? acked : afterSeq;

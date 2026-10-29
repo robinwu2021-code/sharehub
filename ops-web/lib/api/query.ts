@@ -172,3 +172,8 @@ export interface WithdrawalQ extends PageQ {
   payeeNo?: string;
   status?: string;
 }
+
+/** 库存流水（S4）：按仓 / 设备类型 / 设备号或单号筛。 */
+export interface StockLedgerQ extends PageQ { warehouseNo?: string; itemType?: string; }
+/** 盘点单列表（S4）。 */
+export interface StockCountQ { warehouseNo?: string; status?: string; [k: string]: unknown; }

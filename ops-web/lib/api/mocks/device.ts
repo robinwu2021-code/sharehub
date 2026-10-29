@@ -4,6 +4,7 @@ import * as da from "../../mock/db/device-asset";
 import * as dp from "../../mock/db/device-pool";
 import * as ik from "../../mock/db/intake";
 import * as mv from "../../mock/db/movement";
+import * as st from "../../mock/db/stock";
 import * as db from "../../mock/db";
 import type { DeviceApi } from "../contracts/device";
 import type { PageQ, CabinetQ, DeviceLogQ, ArchiveQ, OtaReleaseQ } from "../query";
@@ -83,6 +84,17 @@ export const deviceMock: DeviceApi = {
   dismissPowerbankLost: async (no, note) => wait(da.dismissPowerbankLost(no, note), 300),
   listQcRecords: async (itemNo) => wait(da.listQcRecords(itemNo)),
   listDeviceMovements: async (itemNo) => wait(mv.listDeviceMovements(itemNo)),
+  getInventoryEngine: async () => wait(st.engine()),
+  listStockLedger: async (q = {}) => wait(st.listStockLedger(q)),
+  listStockCounts: async (q = {}) => wait(st.listStockCounts(q)),
+  getStockCount: async (no) => wait(st.getStockCount(no)),
+  openStockCount: async (wh) => wait(st.openStockCount(wh), 350),
+  scanStockCount: async (no, nos) => wait(st.scanStockCount(no, nos), 300),
+  submitStockCount: async (no) => wait(st.moveStockCount(no, "OPEN", "SUBMITTED"), 300),
+  approveStockCount: async (no) => wait(st.moveStockCount(no, "SUBMITTED", "APPROVED"), 300),
+  rejectStockCount: async (no, note) => wait(st.rejectStockCount(no, note), 300),
+  postStockCount: async (no) => wait(st.moveStockCount(no, "APPROVED", "POSTED"), 300),
+  cancelStockCount: async (no) => wait(st.cancelStockCount(no), 300),
   setTransferItems: async (no, itemNos) => wait(da.setTransferItems(no, itemNos), 350),
   shipTransfer: async (no) => wait(da.shipTransfer(no), 400),
   receiveTransfer: async (no, receivedNos, note) => wait(da.receiveTransfer(no, receivedNos, note), 400),

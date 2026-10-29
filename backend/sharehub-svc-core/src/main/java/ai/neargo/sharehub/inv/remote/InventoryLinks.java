@@ -49,6 +49,28 @@ public class InventoryLinks {
         state.put(k, v);
     }
 
+    /** 反查：库存服务 locationId → 本地仓号（没有映射返回原值，界面上至少看得到）。 */
+    public String warehouseNoOf(String locationId) {
+        if (locationId == null) return null;
+        return state.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<InventorySyncState>()
+                        .likeRight(InventorySyncState::getK, "wh:").eq(InventorySyncState::getV, locationId))
+                .stream().findFirst().map(x -> x.getK().substring(3)).orElse(locationId);
+    }
+
+    /** 反查：itemId → 设备类型（CABINET / POWERBANK）。 */
+    public String itemTypeOf(String itemId) {
+        if (itemId == null) return null;
+        return state.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<InventorySyncState>()
+                        .likeRight(InventorySyncState::getK, "item:").eq(InventorySyncState::getV, itemId))
+                .stream().findFirst().map(x -> x.getK().substring(5)).orElse(itemId);
+    }
+
+    /** 某前缀下的全部键值（盘点单登记等）。 */
+    public java.util.List<InventorySyncState> listByPrefix(String prefix) {
+        return state.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<InventorySyncState>()
+                .likeRight(InventorySyncState::getK, prefix).orderByDesc(InventorySyncState::getUpdatedAt));
+    }
+
     /** 设备类型 → itemId：序列号管理、入库须质检凭证（gateRef = 质检记录号）。 */
     public String itemId(InventoryApi api, String itemType) {
         String k = "item:" + itemType;

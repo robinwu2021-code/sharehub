@@ -19,7 +19,6 @@
 
 声明未强制 device:cabinet:export
 声明未强制 device:command:batch
-声明未强制 device:inventory:stocktake
 声明未强制 device:ota:publish
 声明未强制 device:ota:rollback
 声明未强制 device:slot:read

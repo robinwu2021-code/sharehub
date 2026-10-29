@@ -578,6 +578,26 @@ const PATCHES: { file: string; mustContain: string; apply: (rows: Row[]) => void
       });
     },
   },
+  {
+    // S4：仓储与出库加「库存流水」「盘点」（排在库存余额之后，sort 6 / 7）；设备叶子整体按 sort 重编号。
+    file: "V199__stock_ledger_count_menu.sql",
+    mustContain: "UPDATE iam_menu SET menu_no = CONCAT('M_tmp199_', id) WHERE parent_no = 'M_device'",
+    apply: (rows) => {
+      const dev = rows.filter((r) => r.parent_no === "M_device");
+      dev.filter((r) => Number(r.sort) >= 6).forEach((r) => { r.sort = String(Number(r.sort) + 2); });
+      dev.forEach((r) => { r.menu_no = `M_device__${r.sort}`; });
+      for (const [sort, name, en, ar, tab] of [
+        ["6", "库存流水", "Stock Ledger", "سجل المخزون", "ledger"],
+        ["7", "盘点", "Stock Count", "الجرد", "counts"],
+      ]) {
+        rows.push({
+          menu_no: `M_device__${sort}`, parent_no: "M_device", name, name_en: en, name_ar: ar, type: "ITEM",
+          path: `/devices?tab=${tab}`, icon: "NULL", group_name: "仓储与出库", sort, perm: "device:inventory:read",
+          phase: "1", ready: "1", module: "NULL", modules: "NULL", match_paths: "NULL", pin_bottom: "0", portal_for: "NULL",
+        });
+      }
+    },
+  },
 ];
 
 const COLS = [

@@ -1,11 +1,11 @@
 // 覆盖范围：机柜与仓位、下发指令、充电宝、实时监控、指令记录、调拨、OTA、设备日志、设备编码批次。
-import type { PageQ, CabinetQ, DeviceLogQ, ArchiveQ, OtaReleaseQ } from "../query";
+import type { PageQ, CabinetQ, DeviceLogQ, ArchiveQ, OtaReleaseQ, StockLedgerQ, StockCountQ } from "../query";
 import type {
   PageResult, Cabinet, Slot, Powerbank, CabinetMonitor, CommandRecord,
   InventoryTransfer, InventoryTransferDetail, OtaRollout, OtaRelease, OtaTask, DeviceLog, DeviceCodeBatch,
   Checklist, TrialRent, Protection, ProtectionReq, SignalCode,
   InvTransferReq, QcReq, QcRecord, ReceiveResult, AssetDiff, AssetDiffStatus, PowerbankAction,
-  DeviceMovement, IssueDevicesReq, ClaimDevicesReq, IssueRedirectReq, PoolReturnReq, IssuedSummary, Warehouse, Intake, IntakeDetail, IntakeCreateReq, IntakeItemRef, IntakeDisposeReq, IntakeItemType, IntakeStatus, BindReq, BindBatchReq, BindResult,
+  DeviceMovement, InventoryEngine, StockLedgerRow, StockCount, StockCountDetail, IssueDevicesReq, ClaimDevicesReq, IssueRedirectReq, PoolReturnReq, IssuedSummary, Warehouse, Intake, IntakeDetail, IntakeCreateReq, IntakeItemRef, IntakeDisposeReq, IntakeItemType, IntakeStatus, BindReq, BindBatchReq, BindResult,
 } from "../../types";
 
 export interface DeviceApi {
@@ -118,6 +118,19 @@ export interface DeviceApi {
   listQcRecords(itemNo: string): Promise<QcRecord[]>;
   /** 设备履历（V196）：位置与归属的每一次变化，新的在前。 */
   listDeviceMovements(itemNo: string): Promise<DeviceMovement[]>;
+
+  // === 库存流水与盘点（S4）：盘点只在独立进销存引擎下可用（本地 409）===
+  getInventoryEngine(): Promise<InventoryEngine>;
+  listStockLedger(q?: StockLedgerQ): Promise<PageResult<StockLedgerRow>>;
+  listStockCounts(q?: StockCountQ): Promise<StockCount[]>;
+  getStockCount(countNo: string): Promise<StockCountDetail>;
+  openStockCount(warehouseNo: string): Promise<StockCountDetail>;
+  scanStockCount(countNo: string, serialNos: string[]): Promise<StockCountDetail>;
+  submitStockCount(countNo: string): Promise<StockCountDetail>;
+  approveStockCount(countNo: string, note?: string): Promise<StockCountDetail>;
+  rejectStockCount(countNo: string, note: string): Promise<StockCountDetail>;
+  postStockCount(countNo: string): Promise<StockCountDetail>;
+  cancelStockCount(countNo: string): Promise<StockCountDetail>;
 
   /** 草稿期设定调拨明细（整体替换）。每件都要在库且质检已过。 */
   setTransferItems(transferNo: string, itemNos: string[]): Promise<InventoryTransferDetail>;

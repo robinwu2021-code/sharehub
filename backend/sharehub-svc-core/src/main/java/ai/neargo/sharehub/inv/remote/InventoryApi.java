@@ -75,6 +75,44 @@ public interface InventoryApi {
 
     void revoke(String dispatchId, String reason, String idempotencyKey);
 
+    // —— 流水与盘点（S4）——
+
+    record LedgerEntry(Long id, String itemId, String locationId, String docKind, String docNo, Integer lineNo, String reasonCode,
+                       BigDecimal qtyDelta, BigDecimal balanceAfter, LocalDateTime occurredAt, String operator) {
+    }
+
+    /** 库存流水，按 id 升序；afterId 翻页。 */
+    List<LedgerEntry> ledger(String itemId, String locationId, String docNo, Long afterId, int limit);
+
+    record CountLine(String itemId, String trackingMode, int bookQty, Integer countedQty, Integer diffQty) {
+    }
+
+    record CountScan(String serialNo, String verdict) {
+    }
+
+    record CountView(String countNo, String locationId, String status, int contentVersion, Integer approvedVersion, String submittedBy,
+                     String reviewer, List<CountLine> lines, List<CountScan> exceptions, List<String> missingSerials) {
+    }
+
+    record CountPosted(String gainInboundNo, String lossOutboundNo) {
+    }
+
+    String openCount(String locationId, List<String> itemIds, String idempotencyKey);
+
+    CountView count(String countNo);
+
+    List<CountScan> scanCount(String countNo, List<String> serialNos, String idempotencyKey);
+
+    void submitCount(String countNo, String idempotencyKey);
+
+    void approveCount(String countNo, String note, String idempotencyKey);
+
+    void rejectCount(String countNo, String note, String idempotencyKey);
+
+    CountPosted postCount(String countNo, String idempotencyKey);
+
+    void cancelCount(String countNo, String idempotencyKey);
+
     // —— 事件 ——
 
     record Event(long seq, String eventId, String type, String resourceType, String resourceId, int resourceVersion,

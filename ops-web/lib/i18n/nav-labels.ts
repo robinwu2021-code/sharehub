@@ -120,6 +120,8 @@ const NAV: Record<string, Pair> = {
   "实时监控": { en: "Monitoring", ar: "المراقبة" },
   "远程控制与指令记录": { en: "Remote & Commands", ar: "التحكم والأوامر" },
   "库存余额": { en: "Stock Balance", ar: "رصيد المخزون" },
+  "库存流水": { en: "Stock Ledger", ar: "سجل المخزون" },
+  "盘点": { en: "Stock Count", ar: "الجرد" },
   "资产差异": { en: "Asset Discrepancies", ar: "فروقات الأصول" },
   "库存调拨": { en: "Inventory", ar: "المخزون" },
   "固件 OTA": { en: "Firmware OTA", ar: "تحديث البرمجيات" },

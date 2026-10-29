@@ -61,6 +61,28 @@ public class MovementRecorder {
                         e.getOccurredAt())).toList();
     }
 
+    /**
+     * 进出仓的履历（本地引擎的库存流水，S4）：from 或 to 是仓（WH:），新的在前。
+     * warehouseNo 为空 = 所有仓；itemType / itemNo 可空。
+     */
+    public ai.neargo.common.core.PageResult<DeviceMovement> warehouseMoves(String warehouseNo, String itemType, String itemNo,
+                                                                         int page, int size) {
+        LambdaQueryWrapper<DevMovementLog> w = new LambdaQueryWrapper<DevMovementLog>().orderByDesc(DevMovementLog::getId);
+        if (warehouseNo != null && !warehouseNo.isBlank()) {
+            String ref = wh(warehouseNo.trim());
+            w.and(x -> x.eq(DevMovementLog::getFromRef, ref).or().eq(DevMovementLog::getToRef, ref));
+        } else {
+            w.and(x -> x.likeRight(DevMovementLog::getFromRef, "WH:").or().likeRight(DevMovementLog::getToRef, "WH:"));
+        }
+        if (itemType != null && !itemType.isBlank()) w.eq(DevMovementLog::getItemType, itemType.trim());
+        if (itemNo != null && !itemNo.isBlank()) w.like(DevMovementLog::getItemNo, itemNo.trim());
+        var p = logs.selectPage(new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(Math.max(1, page),
+                Math.min(Math.max(1, size), 200)), w);
+        return new ai.neargo.common.core.PageResult<>(p.getRecords().stream().map(e -> new DeviceMovement(e.getId(), e.getItemType(),
+                e.getItemNo(), e.getEvent(), e.getFromRef(), e.getToRef(), e.getAgentBefore(), e.getAgentAfter(), e.getReason(),
+                e.getSourceRef(), e.getOperatorNo(), e.getOccurredAt())).toList(), p.getTotal());
+    }
+
     public static String wh(String no) {
         return no == null ? null : "WH:" + no;
     }

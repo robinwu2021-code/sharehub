@@ -161,6 +161,68 @@ public class HttpInventoryApi implements InventoryApi {
         call(HttpMethod.POST, V1 + "/dispatch-pool/" + dispatchId + "/revoke", Map.of("reason", reason), idempotencyKey);
     }
 
+    // —— 流水与盘点 ——
+
+    @Override
+    public List<LedgerEntry> ledger(String itemId, String locationId, String docNo, Long afterId, int limit) {
+        UriComponentsBuilder b = UriComponentsBuilder.fromPath(V1 + "/ledger").queryParam("limit", limit);
+        if (itemId != null) b.queryParam("itemId", itemId);
+        if (locationId != null) b.queryParam("locationId", locationId);
+        if (docNo != null) b.queryParam("docNo", docNo);
+        if (afterId != null) b.queryParam("afterId", afterId);
+        return read(call(HttpMethod.GET, b.build().toUriString(), null, null), new TypeReference<>() { });
+    }
+
+    @Override
+    public String openCount(String locationId, List<String> itemIds, String idempotencyKey) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("locationId", locationId);
+        body.put("itemIds", itemIds);
+        return call(HttpMethod.POST, V1 + "/counts", body, idempotencyKey).path("docNo").asText();
+    }
+
+    @Override
+    public CountView count(String countNo) {
+        return read(call(HttpMethod.GET, V1 + "/counts/" + countNo, null, null), new TypeReference<>() { });
+    }
+
+    @Override
+    public List<CountScan> scanCount(String countNo, List<String> serialNos, String idempotencyKey) {
+        return read(call(HttpMethod.POST, V1 + "/counts/" + countNo + "/scans", Map.of("serialNos", serialNos), idempotencyKey),
+                new TypeReference<>() { });
+    }
+
+    @Override
+    public void submitCount(String countNo, String idempotencyKey) {
+        call(HttpMethod.POST, V1 + "/counts/" + countNo + "/submit", Map.of(), idempotencyKey);
+    }
+
+    @Override
+    public void approveCount(String countNo, String note, String idempotencyKey) {
+        call(HttpMethod.POST, V1 + "/counts/" + countNo + "/approve", noteBody(note), idempotencyKey);
+    }
+
+    @Override
+    public void rejectCount(String countNo, String note, String idempotencyKey) {
+        call(HttpMethod.POST, V1 + "/counts/" + countNo + "/reject", noteBody(note), idempotencyKey);
+    }
+
+    @Override
+    public CountPosted postCount(String countNo, String idempotencyKey) {
+        return read(call(HttpMethod.POST, V1 + "/counts/" + countNo + "/post", Map.of(), idempotencyKey), new TypeReference<>() { });
+    }
+
+    @Override
+    public void cancelCount(String countNo, String idempotencyKey) {
+        call(HttpMethod.POST, V1 + "/counts/" + countNo + "/cancel", Map.of(), idempotencyKey);
+    }
+
+    private static Map<String, Object> noteBody(String note) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("note", note);
+        return m;
+    }
+
     // —— 事件 ——
 
     @Override

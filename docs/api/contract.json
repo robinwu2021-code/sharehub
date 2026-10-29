@@ -14805,6 +14805,771 @@
   },
   {
    "verb": "GET",
+   "path": "/api/ops/inventory/counts",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#counts",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "warehouseNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "status",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "java.util.List<ai.neargo.sharehub.inv.dto.StockDtos.StockCount>",
+   "returnContainer": null,
+   "returnElement": "java.util.List<ai.neargo.sharehub.inv.dto.StockDtos.StockCount>",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/counts",
+   "perm": "device:inventory:stocktake",
+   "perms": [
+    "device:inventory:stocktake"
+   ],
+   "handler": "InventoryController#openCount",
+   "summary": "",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.inv.dto.StockDtos.OpenCountReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "responseShape": [
+    {
+     "name": "count",
+     "type": "StockCount",
+     "fields": [
+      {
+       "name": "countNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "openedAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    },
+    {
+     "name": "lines",
+     "type": "List<StockCountLine>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "bookQty",
+       "type": "int"
+      },
+      {
+       "name": "countedQty",
+       "type": "Integer"
+      },
+      {
+       "name": "diffQty",
+       "type": "Integer"
+      }
+     ]
+    },
+    {
+     "name": "exceptions",
+     "type": "List<StockCountScan>",
+     "fields": [
+      {
+       "name": "serialNo",
+       "type": "String"
+      },
+      {
+       "name": "verdict",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "missingSerials",
+     "type": "List<String>"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/counts/{countNo}",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#count",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "countNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "responseShape": [
+    {
+     "name": "count",
+     "type": "StockCount",
+     "fields": [
+      {
+       "name": "countNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "openedAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    },
+    {
+     "name": "lines",
+     "type": "List<StockCountLine>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "bookQty",
+       "type": "int"
+      },
+      {
+       "name": "countedQty",
+       "type": "Integer"
+      },
+      {
+       "name": "diffQty",
+       "type": "Integer"
+      }
+     ]
+    },
+    {
+     "name": "exceptions",
+     "type": "List<StockCountScan>",
+     "fields": [
+      {
+       "name": "serialNo",
+       "type": "String"
+      },
+      {
+       "name": "verdict",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "missingSerials",
+     "type": "List<String>"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/counts/{countNo}/approve",
+   "perm": "device:inventory:stocktake",
+   "perms": [
+    "device:inventory:stocktake"
+   ],
+   "handler": "InventoryController#approveCount",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "countNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "ai.neargo.sharehub.inv.dto.StockDtos.CountNoteReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "responseShape": [
+    {
+     "name": "count",
+     "type": "StockCount",
+     "fields": [
+      {
+       "name": "countNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "openedAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    },
+    {
+     "name": "lines",
+     "type": "List<StockCountLine>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "bookQty",
+       "type": "int"
+      },
+      {
+       "name": "countedQty",
+       "type": "Integer"
+      },
+      {
+       "name": "diffQty",
+       "type": "Integer"
+      }
+     ]
+    },
+    {
+     "name": "exceptions",
+     "type": "List<StockCountScan>",
+     "fields": [
+      {
+       "name": "serialNo",
+       "type": "String"
+      },
+      {
+       "name": "verdict",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "missingSerials",
+     "type": "List<String>"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "note",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/counts/{countNo}/cancel",
+   "perm": "device:inventory:stocktake",
+   "perms": [
+    "device:inventory:stocktake"
+   ],
+   "handler": "InventoryController#cancelCount",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "countNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "responseShape": [
+    {
+     "name": "count",
+     "type": "StockCount",
+     "fields": [
+      {
+       "name": "countNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "openedAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    },
+    {
+     "name": "lines",
+     "type": "List<StockCountLine>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "bookQty",
+       "type": "int"
+      },
+      {
+       "name": "countedQty",
+       "type": "Integer"
+      },
+      {
+       "name": "diffQty",
+       "type": "Integer"
+      }
+     ]
+    },
+    {
+     "name": "exceptions",
+     "type": "List<StockCountScan>",
+     "fields": [
+      {
+       "name": "serialNo",
+       "type": "String"
+      },
+      {
+       "name": "verdict",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "missingSerials",
+     "type": "List<String>"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/counts/{countNo}/post",
+   "perm": "device:inventory:stocktake",
+   "perms": [
+    "device:inventory:stocktake"
+   ],
+   "handler": "InventoryController#postCount",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "countNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "responseShape": [
+    {
+     "name": "count",
+     "type": "StockCount",
+     "fields": [
+      {
+       "name": "countNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "openedAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    },
+    {
+     "name": "lines",
+     "type": "List<StockCountLine>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "bookQty",
+       "type": "int"
+      },
+      {
+       "name": "countedQty",
+       "type": "Integer"
+      },
+      {
+       "name": "diffQty",
+       "type": "Integer"
+      }
+     ]
+    },
+    {
+     "name": "exceptions",
+     "type": "List<StockCountScan>",
+     "fields": [
+      {
+       "name": "serialNo",
+       "type": "String"
+      },
+      {
+       "name": "verdict",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "missingSerials",
+     "type": "List<String>"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/counts/{countNo}/reject",
+   "perm": "device:inventory:stocktake",
+   "perms": [
+    "device:inventory:stocktake"
+   ],
+   "handler": "InventoryController#rejectCount",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "countNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "ai.neargo.sharehub.inv.dto.StockDtos.CountNoteReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "responseShape": [
+    {
+     "name": "count",
+     "type": "StockCount",
+     "fields": [
+      {
+       "name": "countNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "openedAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    },
+    {
+     "name": "lines",
+     "type": "List<StockCountLine>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "bookQty",
+       "type": "int"
+      },
+      {
+       "name": "countedQty",
+       "type": "Integer"
+      },
+      {
+       "name": "diffQty",
+       "type": "Integer"
+      }
+     ]
+    },
+    {
+     "name": "exceptions",
+     "type": "List<StockCountScan>",
+     "fields": [
+      {
+       "name": "serialNo",
+       "type": "String"
+      },
+      {
+       "name": "verdict",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "missingSerials",
+     "type": "List<String>"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "note",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/counts/{countNo}/scans",
+   "perm": "device:inventory:stocktake",
+   "perms": [
+    "device:inventory:stocktake"
+   ],
+   "handler": "InventoryController#scanCount",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "countNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "ai.neargo.sharehub.inv.dto.StockDtos.CountScanReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "responseShape": [
+    {
+     "name": "count",
+     "type": "StockCount",
+     "fields": [
+      {
+       "name": "countNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "openedAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    },
+    {
+     "name": "lines",
+     "type": "List<StockCountLine>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "bookQty",
+       "type": "int"
+      },
+      {
+       "name": "countedQty",
+       "type": "Integer"
+      },
+      {
+       "name": "diffQty",
+       "type": "Integer"
+      }
+     ]
+    },
+    {
+     "name": "exceptions",
+     "type": "List<StockCountScan>",
+     "fields": [
+      {
+       "name": "serialNo",
+       "type": "String"
+      },
+      {
+       "name": "verdict",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "missingSerials",
+     "type": "List<String>"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "serialNos",
+     "type": "List<String>"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/counts/{countNo}/submit",
+   "perm": "device:inventory:stocktake",
+   "perms": [
+    "device:inventory:stocktake"
+   ],
+   "handler": "InventoryController#submitCount",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "countNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail",
+   "responseShape": [
+    {
+     "name": "count",
+     "type": "StockCount",
+     "fields": [
+      {
+       "name": "countNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "status",
+       "type": "String"
+      },
+      {
+       "name": "openedAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    },
+    {
+     "name": "lines",
+     "type": "List<StockCountLine>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "bookQty",
+       "type": "int"
+      },
+      {
+       "name": "countedQty",
+       "type": "Integer"
+      },
+      {
+       "name": "diffQty",
+       "type": "Integer"
+      }
+     ]
+    },
+    {
+     "name": "exceptions",
+     "type": "List<StockCountScan>",
+     "fields": [
+      {
+       "name": "serialNo",
+       "type": "String"
+      },
+      {
+       "name": "verdict",
+       "type": "String"
+      }
+     ]
+    },
+    {
+     "name": "missingSerials",
+     "type": "List<String>"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/engine",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#engine",
+   "summary": "当前库存引擎：盘点只在 SERVICE 下可用，页面据此提示。",
+   "params": [],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.StockDtos.InventoryEngine",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.StockDtos.InventoryEngine",
+   "responseShape": [
+    {
+     "name": "engine",
+     "type": "String"
+    },
+    {
+     "name": "configured",
+     "type": "boolean"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
    "path": "/api/ops/inventory/intakes",
    "perm": "device:inventory:read",
    "perms": [
@@ -15745,6 +16510,91 @@
     {
      "name": "live",
      "type": "int"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/ledger",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#ledger",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "warehouseNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "itemType",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "keyword",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<ai.neargo.sharehub.inv.dto.StockDtos.StockLedgerRow>",
+   "returnContainer": "PageResult",
+   "returnElement": "ai.neargo.sharehub.inv.dto.StockDtos.StockLedgerRow",
+   "responseShape": [
+    {
+     "name": "id",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "itemType",
+     "type": "String"
+    },
+    {
+     "name": "itemNo",
+     "type": "String"
+    },
+    {
+     "name": "docKind",
+     "type": "String"
+    },
+    {
+     "name": "docNo",
+     "type": "String"
+    },
+    {
+     "name": "qtyDelta",
+     "type": "int"
+    },
+    {
+     "name": "occurredAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "operator",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -51758,6 +52608,10 @@
    "EXTRA",
    "COUNT_MISMATCH"
   ],
+  "InboxStatus": [
+   "DONE",
+   "FAILED"
+  ],
   "OrderStatus": [
    "CREATED",
    "DISPENSING",
@@ -52047,7 +52901,8 @@
    "CONTRACT",
    "PAYEE",
    "AGENT",
-   "WORK_ORDER"
+   "WORK_ORDER",
+   "PAYMENT"
   ],
   "AlarmStatus": [
    "OPEN",
@@ -52382,10 +53237,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 583,
-  "records": 543,
-  "withPerm": 501,
-  "withBody": 241,
-  "shapedResponses": 452
+  "endpoints": 594,
+  "records": 567,
+  "withPerm": 512,
+  "withBody": 245,
+  "shapedResponses": 462
  }
 }

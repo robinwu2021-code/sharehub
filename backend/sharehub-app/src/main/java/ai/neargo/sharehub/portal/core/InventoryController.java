@@ -28,15 +28,95 @@ public class InventoryController {
     private final CommandLogService commandLogService;
     private final ai.neargo.sharehub.inv.WarehouseDirectory warehouses;
     private final ai.neargo.sharehub.inv.service.IntakeService intakes;
+    private final ai.neargo.sharehub.inv.service.StockViewService stock;
 
     public InventoryController(InventoryTransferService transferService,
                                CommandLogService commandLogService,
                                ai.neargo.sharehub.inv.WarehouseDirectory warehouses,
-                               ai.neargo.sharehub.inv.service.IntakeService intakes) {
+                               ai.neargo.sharehub.inv.service.IntakeService intakes,
+                               ai.neargo.sharehub.inv.service.StockViewService stock) {
         this.transferService = transferService;
         this.commandLogService = commandLogService;
         this.warehouses = warehouses;
         this.intakes = intakes;
+        this.stock = stock;
+    }
+
+    // —— 库存流水与盘点（S4；菜单叶：设备管理 › 仓储与出库 › 库存流水 / 盘点）——
+
+    /** 当前库存引擎：盘点只在 SERVICE 下可用，页面据此提示。 */
+    @GetMapping("/inventory/engine")
+    @PreAuthorize("@perm.can('device:inventory:read')")
+    public ai.neargo.sharehub.inv.dto.StockDtos.InventoryEngine engine() {
+        return stock.engine();
+    }
+
+    @GetMapping("/inventory/ledger")
+    @PreAuthorize("@perm.can('device:inventory:read')")
+    public PageResult<ai.neargo.sharehub.inv.dto.StockDtos.StockLedgerRow> ledger(
+            @RequestParam(required = false) String warehouseNo, @RequestParam(required = false) String itemType,
+            @RequestParam(required = false) String keyword, @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        return stock.ledger(warehouseNo, itemType, keyword, page, size);
+    }
+
+    @GetMapping("/inventory/counts")
+    @PreAuthorize("@perm.can('device:inventory:read')")
+    public java.util.List<ai.neargo.sharehub.inv.dto.StockDtos.StockCount> counts(
+            @RequestParam(required = false) String warehouseNo, @RequestParam(required = false) String status) {
+        return stock.counts(warehouseNo, status);
+    }
+
+    @GetMapping("/inventory/counts/{countNo}")
+    @PreAuthorize("@perm.can('device:inventory:read')")
+    public ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail count(@PathVariable String countNo) {
+        return stock.count(countNo);
+    }
+
+    @PostMapping("/inventory/counts")
+    @PreAuthorize("@perm.can('device:inventory:stocktake')")
+    public ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail openCount(
+            @RequestBody ai.neargo.sharehub.inv.dto.StockDtos.OpenCountReq req) {
+        return stock.openCount(req == null ? null : req.warehouseNo());
+    }
+
+    @PostMapping("/inventory/counts/{countNo}/scans")
+    @PreAuthorize("@perm.can('device:inventory:stocktake')")
+    public ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail scanCount(@PathVariable String countNo,
+            @RequestBody ai.neargo.sharehub.inv.dto.StockDtos.CountScanReq req) {
+        return stock.scan(countNo, req == null ? null : req.serialNos());
+    }
+
+    @PostMapping("/inventory/counts/{countNo}/submit")
+    @PreAuthorize("@perm.can('device:inventory:stocktake')")
+    public ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail submitCount(@PathVariable String countNo) {
+        return stock.submit(countNo);
+    }
+
+    @PostMapping("/inventory/counts/{countNo}/approve")
+    @PreAuthorize("@perm.can('device:inventory:stocktake')")
+    public ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail approveCount(@PathVariable String countNo,
+            @RequestBody(required = false) ai.neargo.sharehub.inv.dto.StockDtos.CountNoteReq req) {
+        return stock.approve(countNo, req == null ? null : req.note());
+    }
+
+    @PostMapping("/inventory/counts/{countNo}/reject")
+    @PreAuthorize("@perm.can('device:inventory:stocktake')")
+    public ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail rejectCount(@PathVariable String countNo,
+            @RequestBody(required = false) ai.neargo.sharehub.inv.dto.StockDtos.CountNoteReq req) {
+        return stock.reject(countNo, req == null ? null : req.note());
+    }
+
+    @PostMapping("/inventory/counts/{countNo}/post")
+    @PreAuthorize("@perm.can('device:inventory:stocktake')")
+    public ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail postCount(@PathVariable String countNo) {
+        return stock.post(countNo);
+    }
+
+    @PostMapping("/inventory/counts/{countNo}/cancel")
+    @PreAuthorize("@perm.can('device:inventory:stocktake')")
+    public ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail cancelCount(@PathVariable String countNo) {
+        return stock.cancel(countNo);
     }
 
     // —— 到仓待检（V192；菜单叶：设备管理 › 入库与质检 › 到仓待检）——

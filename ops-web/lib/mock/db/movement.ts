@@ -26,3 +26,6 @@ export function recordMovement(m: {
 /** 某台设备的履历，新的在前。 */
 export const listDeviceMovements = (itemNo: string): DeviceMovement[] =>
   rows.filter((r) => r.itemNo === itemNo).sort((a, b) => b.id - a.id).map((r) => ({ ...r }));
+
+/** 全部履历（流水视图用）。 */
+export const allMovements = (): DeviceMovement[] => [...rows].sort((a, b) => b.id - a.id);
