@@ -92,6 +92,8 @@ export type ShareSummaryQ = PageQ & {
 export type ReconQ = PageQ & { status?: string; handleStatus?: string };
 /** 发票：状态筛选（DRAFT/ISSUED/VOID）。 */
 export type InvoiceQ = PageQ & { status?: string };
+/** 租赁税务票据（V181）：按订单号精确查，按票种/状态筛。 */
+export type TaxInvoiceQ = PageQ & { orderNo?: string; kind?: string; status?: string };
 /** 充值订单：状态 + 日期范围。 */
 export type RechargeQ = PageQ & { status?: string; from?: string; to?: string };
 /** 免费订单：按减免原因筛选。 */

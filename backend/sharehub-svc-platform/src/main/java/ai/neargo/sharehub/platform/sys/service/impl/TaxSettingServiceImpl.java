@@ -79,6 +79,7 @@ public class TaxSettingServiceImpl extends AbstractCrudService<SysTaxSetting, Ta
     @Override
     protected TaxSetting toVO(SysTaxSetting e) {
         return new TaxSetting(e.getCountry(), e.getCountryName(), e.getTaxName(), e.getRatePercent(),
-                e.getTrn(), e.getInvoiceTitle(), SysCtx.bool(e.getIncludedInPrice()), e.getEffectiveFrom());
+                e.getTrn(), e.getInvoiceTitle(), SysCtx.bool(e.getIncludedInPrice()), e.getEffectiveFrom(),
+                e.getIssuerLegalName(), e.getIssuerAddress());
     }
 }

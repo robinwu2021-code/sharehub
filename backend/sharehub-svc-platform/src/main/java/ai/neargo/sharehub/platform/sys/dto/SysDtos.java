@@ -135,7 +135,8 @@ public final class SysDtos {
 
     /** 税率与发票行，镜像前端 {@code TaxSetting}。{@code ratePercent} 为 0..100。 */
     public record TaxSetting(String country, String countryName, String taxName, BigDecimal ratePercent,
-                             String trn, String invoiceTitle, Boolean includedInPrice, String effectiveFrom) {
+                             String trn, String invoiceTitle, Boolean includedInPrice, String effectiveFrom,
+                             String issuerLegalName, String issuerAddress) {
     }
 
     /** OpenAPI 应用行，镜像前端 {@code OpenApiApp}。**不含 appSecretHash**（密钥不出参）。 */

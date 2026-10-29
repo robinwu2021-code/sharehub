@@ -5,7 +5,7 @@ import * as pt from "../../mock/db/payout-task";
 import { currentAuth } from "../../auth";
 // 走具体模块不改变行为——同一份模块级状态，只是绕过桶文件
 import type { FinanceApi } from "../contracts/finance";
-import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ , ReportQ, WithdrawalQ } from "../query";
+import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ, TaxInvoiceQ, ReportQ, WithdrawalQ } from "../query";
 import { wait } from "./_wait";
 
 export const financeMock: FinanceApi = {
@@ -54,6 +54,9 @@ export const financeMock: FinanceApi = {
   listInvoices: (q: InvoiceQ = {}) => wait(db.listInvoices(q)),
   // async：理由同 getInventoryTransfer —— 同步抛出的 404 不会变成 rejected promise
   getInvoice: async (invoiceNo) => wait(db.getInvoice(invoiceNo)),
+  listTaxInvoices: (q: TaxInvoiceQ = {}) => wait(db.listTaxInvoices(q)),
+  getTaxInvoice: async (invoiceNo) => wait(db.getTaxInvoice(invoiceNo)),
+  retryTaxInvoice: async (invoiceNo) => wait(db.retryTaxInvoice(invoiceNo)),
   // async：让校验抛的 ApiError 变成 rejected promise，交给全局 MutationCache 弹错
   //（同 saveSite 的理由——同步抛出时那条「请选择分成方」根本到不了界面上）
   saveShareRule: async (x) => wait(db.saveShareRule(x), 350),

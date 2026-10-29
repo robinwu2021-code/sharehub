@@ -1,8 +1,8 @@
 // 覆盖范围：分账规则与流水、总账、结算、提现审批、对账、发票、分润统计、充值订单。
-import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ , ReportQ, PayoutAccountQ, WithdrawalQ, AdjustmentQ } from "../query";
+import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ, TaxInvoiceQ, ReportQ, PayoutAccountQ, WithdrawalQ, AdjustmentQ } from "../query";
 import type {
   PageResult, ShareRule, LedgerEntry, Settlement, SettlementDraft, Withdrawal,
-  ShareRecord, Reconcile, ReconAction, ReconDiff, ReconStats, Invoice, InvoiceView, ShareSummary, RechargeOrder,
+  ShareRecord, Reconcile, ReconAction, ReconDiff, ReconStats, Invoice, InvoiceView, TaxInvoice, ShareSummary, RechargeOrder,
 
   VoucherDetail,
   VoucherCreatePayload, PayoutAccount, PayReceiptPayload, WithdrawApplyPayload,
@@ -98,6 +98,11 @@ export interface FinanceApi {
   listInvoices(q?: InvoiceQ): Promise<PageResult<Invoice>>;
   /** 发票详情：发票 + 它由哪几笔订单开出来。列表里没有订单号清单。 */
   getInvoice(invoiceNo: string): Promise<InvoiceView>;
+  /** C 端租赁税务票据（V181）：系统自动开出，运营只看与重试。 */
+  listTaxInvoices(q?: TaxInvoiceQ): Promise<PageResult<TaxInvoice>>;
+  getTaxInvoice(invoiceNo: string): Promise<TaxInvoice>;
+  /** BLOCKED（开票主体不全）的票在补齐主体后重开。 */
+  retryTaxInvoice(invoiceNo: string): Promise<TaxInvoice>;
   saveShareRule(x: Partial<ShareRule> & { ruleNo?: string }): Promise<ShareRule>;
   /** 登记/编辑发票草稿。开具后（ISSUED/VOID）抬头与金额由服务端拒绝修改。 */
   saveInvoice(x: Partial<Invoice> & { invoiceNo?: string }): Promise<Invoice>;

@@ -539,6 +539,43 @@ export interface InvoiceView {
   orderNos: string[];
 }
 
+/** 租赁税务票据状态（ord_tax_invoice.status，V181）：开票主体不全时 BLOCKED，补齐后重试。 */
+export type TaxInvoiceStatus = "ISSUED" | "BLOCKED";
+export type TaxInvoiceKind = "INVOICE" | "CREDIT_NOTE";
+
+/**
+ * C 端租赁税务票据（V181，运营方原始需求 C01 / RQ-INV）：收款时系统自动开出，退款批准自动冲红。
+ * 主体、税率随票快照 —— 改税务设置只影响之后的票。运营只能看与重试，不能手工改。
+ */
+export interface TaxInvoice {
+  invoiceNo: string;
+  kind: TaxInvoiceKind;
+  /** 贷项通知单冲的那张发票。 */
+  refInvoiceNo: string | null;
+  orderNo: string;
+  cUserNo: string | null;
+  payNo: string | null;
+  refundNo: string | null;
+  issuerCountry: string | null;
+  issuerLegalName: string | null;
+  issuerAddress: string | null;
+  issuerTrn: string | null;
+  issuerTitle: string | null;
+  taxRatePercent: number;
+  taxIncluded: boolean;
+  /** 贷项通知单三项均为负数。 */
+  netAmount: number;
+  taxAmount: number;
+  grossAmount: number;
+  currency: string;
+  lineDesc: string | null;
+  status: TaxInvoiceStatus;
+  /** BLOCKED 的原因，如 ISSUER_MISSING:trn。 */
+  failReason: string | null;
+  issuedAt: string | null;
+  createdAt: string;
+}
+
 export interface Invoice {
   invoiceNo: string;
   /**

@@ -6,7 +6,7 @@ import { currentAuth } from "../../auth";
 import { useLocaleStore } from "../../stores/locale";
 import { translate, LOCALE_TAG } from "../../i18n";
 import type { FinanceApi } from "../contracts/finance";
-import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ , ReportQ } from "../query";
+import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ, TaxInvoiceQ, ReportQ } from "../query";
 
 /**
  * 非信封端点（整页 HTML）的取数：带同一套 Authorization / Accept-Language，返回文本。
@@ -93,6 +93,9 @@ export const financeHttp: FinanceApi = {
   listReconciles: (q?: ReconQ) => client.get("/api/trade/reconciles", q),
   listInvoices: (q?: InvoiceQ) => client.get("/api/trade/invoices", q),
   getInvoice: (invoiceNo) => client.get(`/api/trade/invoices/${invoiceNo}`),
+  listTaxInvoices: (q?: TaxInvoiceQ) => client.get("/api/trade/tax-invoices", q),
+  getTaxInvoice: (invoiceNo) => client.get(`/api/trade/tax-invoices/${invoiceNo}`),
+  retryTaxInvoice: (invoiceNo) => client.post(`/api/trade/tax-invoices/${invoiceNo}/retry`, {}),
   saveShareRule: (x) => client.post(x.ruleNo ? `/api/trade/share-rules/${x.ruleNo}` : "/api/trade/share-rules", x),
   saveInvoice: (x) => client.post(x.invoiceNo ? `/api/trade/invoices/${x.invoiceNo}` : "/api/trade/invoices", x),
 

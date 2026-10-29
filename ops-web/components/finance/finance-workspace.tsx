@@ -14,6 +14,7 @@ import { Toolbar } from "@/components/ui/toolbar";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
 import { PayoutAccountDrawer } from "@/components/finance/payout-account-drawer";
 import { PayoutTasks } from "@/components/finance/payout-tasks";
+import { TaxInvoicePanel } from "@/components/finance/tax-invoice-panel";
 import { DataTable, type Column, type SortDir } from "@/components/ui/data-table";
 import { Drawer, Field } from "@/components/ui/drawer";
 import { FilterSelect } from "@/components/ui/filter-select";
@@ -180,6 +181,11 @@ const diffSideLabel = (diff: number) =>
   diff === 0 ? "已平" : diff > 0 ? "渠道多 / 账务少记" : "账务多记 / 渠道少到账";
 
 // —— 发票（S2）——
+const INV_VIEWS = [
+  { key: "B2B", label: "B 端发票" },
+  { key: "RENTAL", label: "租赁发票（C 端）" },
+];
+
 const INV_STATUS: StatusMap<InvoiceStatus> = {
   DRAFT: { label: "草稿", tone: "muted" },
   ISSUED: { label: "已开具", tone: "success" },
@@ -251,6 +257,8 @@ export function FinanceWorkspace({ path, tabKeys }: {
   const [invVoid, setInvVoid] = useState<Invoice | null>(null);
   const [invVoidReason, setInvVoidReason] = useState("");
   const [invStatusFilter, setInvStatusFilter] = useState("");
+  // 发票页两个视图：B 端（对商家/合作方，手工登记开具）/ 租赁（C 端，系统自动开，V181）
+  const [invView, setInvView] = useState<"B2B" | "RENTAL">("B2B");
   // 提现审批：走抽屉而非行内按钮——驳回必须留原因，是资金审批的留痕底线
   const [wdAudit, setWdAudit] = useState<Withdrawal | null>(null);
   // 申请提现（代理端自助）。运营端没有也不该有创建入口（api/README §六·A）
@@ -1410,6 +1418,10 @@ export function FinanceWorkspace({ path, tabKeys }: {
         </>
       )}
       {tab === "invoices" && (
+        <Tabs tabs={INV_VIEWS} value={invView} onChange={(k) => setInvView(k as "B2B" | "RENTAL")} />
+      )}
+      {tab === "invoices" && invView === "RENTAL" && <TaxInvoicePanel />}
+      {tab === "invoices" && invView === "B2B" && (
         <Toolbar
           search={keyword}
           onSearch={(v) => { setKeyword(v); paging.reset(); }}
@@ -1513,15 +1525,15 @@ export function FinanceWorkspace({ path, tabKeys }: {
         <ReadOnlyNotice what="对账差错处理" perm="finance:recon:handle" />
       )}
       {tab === "reconcile" && <DataTable rowKey={(r: Reconcile) => r.batchNo} columns={reconcileCols} rows={q.data?.list as Reconcile[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无对账批次——每日与 nearpay 流水自动跑批比对，本周期尚未生成批次；也可能是「处置进度」筛窄了" />}
-      {tab === "invoices" && !canEditInvoice && !canVoidInvoice && (
+      {tab === "invoices" && invView === "B2B" && !canEditInvoice && !canVoidInvoice && (
         <ReadOnlyNotice what="发票开具/作废" perm={["finance:invoice:issue", ":void"]} />
       )}
-      {tab === "invoices" && <DataTable rowKey={(i: Invoice) => i.invoiceNo} columns={invoiceCols} rows={q.data?.list as Invoice[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无发票——商户提出开票需求后点右上「登记发票草稿」挂到对应结算单，再开具" />}
+      {tab === "invoices" && invView === "B2B" && <DataTable rowKey={(i: Invoice) => i.invoiceNo} columns={invoiceCols} rows={q.data?.list as Invoice[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="暂无发票——商户提出开票需求后点右上「登记发票草稿」挂到对应结算单，再开具" />}
       {/* 9 个 tab 共用同一个查询与同一条分页条，所以这里是 DataTable + Pagination
           而不是 PagedTable：共用查询是 union 类型，逐 tab 断言反而更容易出错。
           代价是错误态要自己接——上面每个列表都接了，棘轮 lib/table-wiring.test.ts 守住不回退。 */}
       {/* 调整项视图自带分页（PagedTable），这里的分页属于上面那张共享列表 */}
-      {q.data && tab !== "adjustments" && <Pagination page={paging.page} size={paging.size} total={q.data.total} onPage={paging.setPage} onSize={paging.setSize} />}
+      {q.data && tab !== "adjustments" && !(tab === "invoices" && invView === "RENTAL") && <Pagination page={paging.page} size={paging.size} total={q.data.total} onPage={paging.setPage} onSize={paging.setSize} />}
 
       {/* 提现审批抽屉：通过 → 转打款中；驳回必填原因；审批人取当前登录账号 */}
       <Drawer

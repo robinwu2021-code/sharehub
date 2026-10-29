@@ -203,6 +203,8 @@ SysTaxSetting.countryName
 SysTaxSetting.effectiveFrom
 SysTaxSetting.includedInPrice
 SysTaxSetting.invoiceTitle
+SysTaxSetting.issuerAddress
+SysTaxSetting.issuerLegalName
 SysTaxSetting.ratePercent
 SysTaxSetting.taxName
 SysTaxSetting.trn

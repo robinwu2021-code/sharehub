@@ -30,6 +30,15 @@ public class LocalTaxRate implements TaxRatePort {
         return new TaxRate(s.getCountry(), rate, s.getIncludedInPrice() == null || s.getIncludedInPrice() != 0);
     }
 
+    @Override
+    public Issuer issuerOf(String country) {
+        SysTaxSetting s = find(country);
+        if (s == null) return null;
+        BigDecimal rate = s.getRatePercent() == null ? BigDecimal.ZERO : s.getRatePercent();
+        return new Issuer(s.getCountry(), s.getIssuerLegalName(), s.getIssuerAddress(), s.getTrn(), s.getInvoiceTitle(),
+                rate, s.getIncludedInPrice() == null || s.getIncludedInPrice() != 0);
+    }
+
     private SysTaxSetting find(String country) {
         return settings.selectOne(new LambdaQueryWrapper<SysTaxSetting>()
                 .eq(SysTaxSetting::getTenantId, TENANT).eq(SysTaxSetting::getCountry, country).last("limit 1"));

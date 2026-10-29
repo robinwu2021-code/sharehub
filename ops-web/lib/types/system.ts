@@ -395,4 +395,7 @@ export interface TaxSetting {
   invoiceTitle: string; // 默认开票抬头
   includedInPrice: boolean; // 价内税 / 价外税（影响 C 端计费展示）
   effectiveFrom: string;
+  /** 开票主体法定名称 / 注册地址（V181，C01）：任一为空则 C 端税务发票开不出（BLOCKED）。 */
+  issuerLegalName?: string | null;
+  issuerAddress?: string | null;
 }

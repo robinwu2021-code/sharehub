@@ -3,6 +3,7 @@
 import { client, upload, downloadAuthed } from "./http-client";
 import type { McpApi, LoginParams, LoginMethods, RentParams, RentReceipt, PayParams, PayResult, OrderQ, NearbyQ, PageQ, ProfilePatch } from "./contract";
 import type {
+  TaxInvoice,
   PageResult,
   NearbyCabinet,
   CabinetAvailability,
@@ -60,6 +61,7 @@ export const httpApi: McpApi = {
   listOrders: (q?: OrderQ) => client.get<PageResult<ConsumerOrder>>("/mp/trade/orders", q),
   ongoingOrder: () => client.get<ConsumerOrder | null>("/mp/trade/orders/ongoing"),
   buyout: (orderNo: string) => client.post<ConsumerOrder>(`/mp/trade/orders/${orderNo}/buyout`),
+  orderInvoices: (orderNo: string) => client.get<TaxInvoice[]>(`/mp/trade/orders/${orderNo}/invoices`),
 
   depositFree: (cabinetNo: string) => client.post<{ authNo: string; frozen: number }>("/mp/trade/deposit/free", { cabinetNo }),
   pay: (p: PayParams) => client.post<PayResult>("/mp/trade/pay", p),

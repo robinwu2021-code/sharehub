@@ -32893,6 +32893,14 @@
     {
      "name": "effectiveFrom",
      "type": "String"
+    },
+    {
+     "name": "issuerLegalName",
+     "type": "String"
+    },
+    {
+     "name": "issuerAddress",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -32943,6 +32951,14 @@
     {
      "name": "effectiveFrom",
      "type": "String"
+    },
+    {
+     "name": "issuerLegalName",
+     "type": "String"
+    },
+    {
+     "name": "issuerAddress",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -32968,6 +32984,14 @@
     },
     {
      "name": "invoiceTitle",
+     "type": "String"
+    },
+    {
+     "name": "issuerLegalName",
+     "type": "String"
+    },
+    {
+     "name": "issuerAddress",
      "type": "String"
     },
     {
@@ -33065,6 +33089,14 @@
     {
      "name": "effectiveFrom",
      "type": "String"
+    },
+    {
+     "name": "issuerLegalName",
+     "type": "String"
+    },
+    {
+     "name": "issuerAddress",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -33090,6 +33122,14 @@
     },
     {
      "name": "invoiceTitle",
+     "type": "String"
+    },
+    {
+     "name": "issuerLegalName",
+     "type": "String"
+    },
+    {
+     "name": "issuerAddress",
      "type": "String"
     },
     {
@@ -39354,6 +39394,381 @@
     {
      "name": "invalid",
      "type": "int"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/trade/tax-invoices",
+   "perm": "finance:invoice:read",
+   "perms": [
+    "finance:invoice:read"
+   ],
+   "handler": "FinanceController#taxInvoices",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "orderNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "kind",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "status",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<TaxInvoiceView>",
+   "returnContainer": "PageResult",
+   "returnElement": "TaxInvoiceView",
+   "responseShape": [
+    {
+     "name": "invoiceNo",
+     "type": "String"
+    },
+    {
+     "name": "kind",
+     "type": "String"
+    },
+    {
+     "name": "refInvoiceNo",
+     "type": "String"
+    },
+    {
+     "name": "orderNo",
+     "type": "String"
+    },
+    {
+     "name": "cUserNo",
+     "type": "String"
+    },
+    {
+     "name": "payNo",
+     "type": "String"
+    },
+    {
+     "name": "refundNo",
+     "type": "String"
+    },
+    {
+     "name": "issuerCountry",
+     "type": "String"
+    },
+    {
+     "name": "issuerLegalName",
+     "type": "String"
+    },
+    {
+     "name": "issuerAddress",
+     "type": "String"
+    },
+    {
+     "name": "issuerTrn",
+     "type": "String"
+    },
+    {
+     "name": "issuerTitle",
+     "type": "String"
+    },
+    {
+     "name": "taxRatePercent",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "taxIncluded",
+     "type": "boolean"
+    },
+    {
+     "name": "netAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "taxAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "grossAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "lineDesc",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "failReason",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/trade/tax-invoices/{invoiceNo}",
+   "perm": "finance:invoice:read",
+   "perms": [
+    "finance:invoice:read"
+   ],
+   "handler": "FinanceController#taxInvoice",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "invoiceNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "TaxInvoiceView",
+   "returnContainer": null,
+   "returnElement": "TaxInvoiceView",
+   "responseShape": [
+    {
+     "name": "invoiceNo",
+     "type": "String"
+    },
+    {
+     "name": "kind",
+     "type": "String"
+    },
+    {
+     "name": "refInvoiceNo",
+     "type": "String"
+    },
+    {
+     "name": "orderNo",
+     "type": "String"
+    },
+    {
+     "name": "cUserNo",
+     "type": "String"
+    },
+    {
+     "name": "payNo",
+     "type": "String"
+    },
+    {
+     "name": "refundNo",
+     "type": "String"
+    },
+    {
+     "name": "issuerCountry",
+     "type": "String"
+    },
+    {
+     "name": "issuerLegalName",
+     "type": "String"
+    },
+    {
+     "name": "issuerAddress",
+     "type": "String"
+    },
+    {
+     "name": "issuerTrn",
+     "type": "String"
+    },
+    {
+     "name": "issuerTitle",
+     "type": "String"
+    },
+    {
+     "name": "taxRatePercent",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "taxIncluded",
+     "type": "boolean"
+    },
+    {
+     "name": "netAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "taxAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "grossAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "lineDesc",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "failReason",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/trade/tax-invoices/{invoiceNo}/retry",
+   "perm": "finance:invoice:issue",
+   "perms": [
+    "finance:invoice:issue"
+   ],
+   "handler": "FinanceController#retryTaxInvoice",
+   "summary": "BLOCKED（开票主体不全）的票在补齐主体后重开；ISSUED 的不可动。",
+   "params": [
+    {
+     "in": "path",
+     "name": "invoiceNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "TaxInvoiceView",
+   "returnContainer": null,
+   "returnElement": "TaxInvoiceView",
+   "responseShape": [
+    {
+     "name": "invoiceNo",
+     "type": "String"
+    },
+    {
+     "name": "kind",
+     "type": "String"
+    },
+    {
+     "name": "refInvoiceNo",
+     "type": "String"
+    },
+    {
+     "name": "orderNo",
+     "type": "String"
+    },
+    {
+     "name": "cUserNo",
+     "type": "String"
+    },
+    {
+     "name": "payNo",
+     "type": "String"
+    },
+    {
+     "name": "refundNo",
+     "type": "String"
+    },
+    {
+     "name": "issuerCountry",
+     "type": "String"
+    },
+    {
+     "name": "issuerLegalName",
+     "type": "String"
+    },
+    {
+     "name": "issuerAddress",
+     "type": "String"
+    },
+    {
+     "name": "issuerTrn",
+     "type": "String"
+    },
+    {
+     "name": "issuerTitle",
+     "type": "String"
+    },
+    {
+     "name": "taxRatePercent",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "taxIncluded",
+     "type": "boolean"
+    },
+    {
+     "name": "netAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "taxAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "grossAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "lineDesc",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "failReason",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
     }
    ],
    "requestShape": null
@@ -46890,7 +47305,7 @@
    "perm": null,
    "perms": [],
    "handler": "RentController#buyout",
-   "summary": "买断：不还了，按 `sys_biz_rule` 计费兜底分区的买断价结单（属主鉴权）。",
+   "summary": "",
    "params": [
     {
      "in": "path",
@@ -47007,6 +47422,121 @@
     {
      "name": "payStatus",
      "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/mp/trade/orders/{orderNo}/invoices",
+   "perm": null,
+   "perms": [],
+   "handler": "RentController#invoices",
+   "summary": "买断：不还了，按 `sys_biz_rule` 计费兜底分区的买断价结单（属主鉴权）。",
+   "params": [
+    {
+     "in": "path",
+     "name": "orderNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "List<ai.neargo.sharehub.portal.finance.TaxInvoiceView>",
+   "returnContainer": "List",
+   "returnElement": "ai.neargo.sharehub.portal.finance.TaxInvoiceView",
+   "responseShape": [
+    {
+     "name": "invoiceNo",
+     "type": "String"
+    },
+    {
+     "name": "kind",
+     "type": "String"
+    },
+    {
+     "name": "refInvoiceNo",
+     "type": "String"
+    },
+    {
+     "name": "orderNo",
+     "type": "String"
+    },
+    {
+     "name": "cUserNo",
+     "type": "String"
+    },
+    {
+     "name": "payNo",
+     "type": "String"
+    },
+    {
+     "name": "refundNo",
+     "type": "String"
+    },
+    {
+     "name": "issuerCountry",
+     "type": "String"
+    },
+    {
+     "name": "issuerLegalName",
+     "type": "String"
+    },
+    {
+     "name": "issuerAddress",
+     "type": "String"
+    },
+    {
+     "name": "issuerTrn",
+     "type": "String"
+    },
+    {
+     "name": "issuerTitle",
+     "type": "String"
+    },
+    {
+     "name": "taxRatePercent",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "taxIncluded",
+     "type": "boolean"
+    },
+    {
+     "name": "netAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "taxAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "grossAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "lineDesc",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "failReason",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
     }
    ],
    "requestShape": null
@@ -49295,10 +49825,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 556,
-  "records": 519,
-  "withPerm": 476,
+  "endpoints": 560,
+  "records": 521,
+  "withPerm": 479,
   "withBody": 233,
-  "shapedResponses": 433
+  "shapedResponses": 437
  }
 }

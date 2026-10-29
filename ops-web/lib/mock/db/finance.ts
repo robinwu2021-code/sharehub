@@ -7,7 +7,7 @@ import type {
   ShareSummary, RechargeOrder, RechargePackage, PageQuery,
   ReconHandleStatus, ReconHandleResult, ReconAction, ReconStats,
   InvoiceStatus, InvoiceAction,
-  PayoutAccount, PayReceiptPayload, WithdrawApplyPayload, InvoiceView,} from "../../types";
+  PayoutAccount, PayReceiptPayload, WithdrawApplyPayload, InvoiceView, TaxInvoice,} from "../../types";
 import {
   STL_TRANSITIONS, canSettlementTransition,
   RECON_TRANSITIONS, canReconTransition, RECON_TERMINAL,
@@ -21,7 +21,7 @@ import { paginate, kwHit, upsert, nextNo, liveHit, archiveRow, unarchiveRow } fr
 import { agents } from "./agent";
 import { venues } from "./location";
 // 提现手续费口径唯一来源（系统域 §11 业务规则）；只读不写，财务域不另存一份费率
-import { bizRules } from "./system";
+import { bizRules, taxSettings } from "./system";
 import { orders } from "./order";
 import { cUsers } from "./user";
 // 期间筛选与报表域共用 REPORT_PERIODS 的窗口换算
@@ -410,6 +410,67 @@ export const listReconciles = (q: ReconQuery = {}) =>
     kwHit(q.keyword, x.batchNo, x.period, x.handledBy, x.handleNote) &&
     (!q.status || x.status === q.status) &&
     (!q.handleStatus || x.handleStatus === q.handleStatus));
+
+// ————————————————————————————————————————————————————————————————
+// C 端租赁税务票据（V181，运营方原始需求 C01）：后端收款时自动开、退款批准自动冲红。
+// mock 只种几张，覆盖 已开 / 贷项通知单 / 主体缺项被挡 三态；retry 按当前税务设置重判主体。
+
+const taxSplit = (gross: number, rate: number) => {
+  const net = round2(gross / (1 + rate / 100));
+  return { netAmount: net, taxAmount: round2(gross - net), grossAmount: round2(gross) };
+};
+const issuerMissing = () => {
+  const s = taxSettings.find((t) => t.country === "AE");
+  const miss: string[] = [];
+  if (!s?.issuerLegalName) miss.push("issuerLegalName");
+  if (!s?.issuerAddress) miss.push("issuerAddress");
+  if (!s?.trn || s.trn === "-") miss.push("trn");
+  return { s, miss };
+};
+export const taxInvoices: TaxInvoice[] = orders.filter((o) => o.feeAmount > 0).slice(0, 6).map((o, i) => {
+  const blocked = i === 5;
+  const amt = taxSplit(o.feeAmount, 5);
+  return {
+    invoiceNo: `INV-2026-${String(i + 1).padStart(6, "0")}`, kind: "INVOICE", refInvoiceNo: null,
+    orderNo: o.orderNo, cUserNo: o.cUserNo, payNo: `PAY${o.orderNo.slice(-8)}`, refundNo: null,
+    issuerCountry: "AE", issuerLegalName: blocked ? null : "ShareHub FZ-LLC", issuerAddress: blocked ? null : "Dubai Silicon Oasis, Dubai, UAE",
+    issuerTrn: "1000****00003", issuerTitle: "ShareHub FZ-LLC", taxRatePercent: 5, taxIncluded: true, ...amt,
+    currency: o.currency, lineDesc: `Power bank rental @${o.cabinetNo}`,
+    status: blocked ? "BLOCKED" : "ISSUED", failReason: blocked ? "ISSUER_MISSING:issuerLegalName,issuerAddress" : null,
+    issuedAt: blocked ? null : iso((i + 1) * 86_400_000), createdAt: iso((i + 1) * 86_400_000),
+  };
+});
+{
+  const ref = taxInvoices[0];
+  taxInvoices.push({
+    ...ref, invoiceNo: "CN-2026-000001", kind: "CREDIT_NOTE", refInvoiceNo: ref.invoiceNo, payNo: null, refundNo: "RFD00000001",
+    ...taxSplit(-Math.min(5, ref.grossAmount), 5), lineDesc: `Credit note for ${ref.invoiceNo}`,
+  });
+}
+export const listTaxInvoices = (q: PageQuery & { orderNo?: string; kind?: string; status?: string } = {}) =>
+  paginate([...taxInvoices].reverse(), q.page, q.size, (x) =>
+    (!q.orderNo || x.orderNo === q.orderNo.trim()) && (!q.kind || x.kind === q.kind) && (!q.status || x.status === q.status));
+export const getTaxInvoice = (invoiceNo: string) => {
+  const t = taxInvoices.find((x) => x.invoiceNo === invoiceNo);
+  if (!t) notFound("税务发票", "Tax invoice", invoiceNo);
+  return t!;
+};
+/** 只有 BLOCKED 可重试；主体仍缺项 → 原样 BLOCKED 并更新原因（与后端一致：不报错，如实告诉缺什么）。 */
+export const retryTaxInvoice = (invoiceNo: string) => {
+  const t = getTaxInvoice(invoiceNo);
+  if (t.status !== "BLOCKED") fail("该票已开出，不能重试", "Invoice already issued");
+  const { s, miss } = issuerMissing();
+  Object.assign(t, {
+    issuerCountry: s?.country ?? null, issuerLegalName: s?.issuerLegalName ?? null, issuerAddress: s?.issuerAddress ?? null,
+    issuerTrn: s?.trn ?? null, issuerTitle: s?.invoiceTitle ?? null, taxRatePercent: s?.ratePercent ?? 0, taxIncluded: s?.includedInPrice ?? true,
+  });
+  if (miss.length) {
+    t.failReason = `ISSUER_MISSING:${miss.join(",")}`;
+  } else {
+    Object.assign(t, taxSplit(t.grossAmount, t.taxRatePercent), { status: "ISSUED", failReason: null, issuedAt: new Date().toISOString() });
+  }
+  return { ...t };
+};
 
 export type InvoiceQuery = PageQuery & { status?: string };
 export const listInvoices = (q: InvoiceQuery = {}) =>

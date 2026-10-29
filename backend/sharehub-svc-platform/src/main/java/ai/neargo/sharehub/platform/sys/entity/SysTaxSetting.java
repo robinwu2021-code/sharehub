@@ -30,6 +30,12 @@ public class SysTaxSetting extends BaseEntity {
     /** 税号 Tax Registration Number。 */
     private String trn;
     private String invoiceTitle;
+
+    /** 开票主体法定名称（V181/182，C01）：税务发票抬头上的法律实体名。 */
+    private String issuerLegalName;
+
+    /** 开票主体注册地址（同上）。 */
+    private String issuerAddress;
     /** 1=含税价，0=价外税。 */
     private Integer includedInPrice;
     /** 生效日（仅日期语义）。 */

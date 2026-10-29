@@ -47,10 +47,13 @@ public class RefundServiceImpl implements RefundService {
     private final OrdRefundMapper mapper;
     private final OrderEventLogService eventLog;
     private final ai.neargo.sharehub.common.event.DomainEventBus events;
+    private final ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoices;
 
     public RefundServiceImpl(OrdRefundMapper mapper, OrderEventLogService eventLog,
-                             ai.neargo.sharehub.common.event.DomainEventBus events) {
+                             ai.neargo.sharehub.common.event.DomainEventBus events,
+                             ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoices) {
         this.mapper = mapper;
+        this.taxInvoices = taxInvoices;
         this.eventLog = eventLog;
         this.events = events;
     }
@@ -150,6 +153,8 @@ public class RefundServiceImpl implements RefundService {
         if (approved) {
             events.publish(new ai.neargo.sharehub.api.core.event.OrderRefundedEvent(
                     e.getOrderNo(), e.getRefundNo(), e.getAmount(), e.getCurrency()));
+            // 冲红（V181）：按 invoice.credit_note.on_refund；失败只记 ERROR，不挡审批
+            taxInvoices.onRefundApproved(e.getOrderNo(), e.getRefundNo(), e.getAmount(), e.getCurrency());
         }
         return toVO(selectByNo(refundNo));
     }

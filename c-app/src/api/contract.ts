@@ -1,6 +1,7 @@
 // 单一 API 契约（McpApi）。mock 与真实后端各实现一份（mock.ts / http.ts），
 // 页面只依赖此接口，切换靠 index.ts 一处开关（消除散落的 if(USE_MOCK)）。对齐 ops-web 模式。
 import type {
+  TaxInvoice,
   PageResult,
   NearbyCabinet,
   CabinetAvailability,
@@ -187,6 +188,8 @@ export interface McpApi {
   listOrders(q?: OrderQ): Promise<PageResult<ConsumerOrder>>;
   ongoingOrder(): Promise<ConsumerOrder | null>;
   buyout(orderNo: string): Promise<ConsumerOrder>;
+  /** 订单的税务票据（V181）：未开开关时为空。 */
+  orderInvoices(orderNo: string): Promise<TaxInvoice[]>;
   // 支付 / 免押（经 PaymentPort→nearpay，MVP Stub）
   depositFree(cabinetNo: string): Promise<{ authNo: string; frozen: number }>;
   pay(p: PayParams): Promise<PayResult>;

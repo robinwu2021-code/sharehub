@@ -46,13 +46,16 @@ public class FinanceController {
     private final PayoutAccountService payoutAccountService;
     private final ReconcileService reconcileService;
     private final InvoiceService invoiceService;
+    private final ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoiceService;
 
     public FinanceController(ShareService shareService, SettlementService settlementService,
                              WithdrawalService withdrawalService,
                              PayoutAccountService payoutAccountService, ReconcileService reconcileService,
                              InvoiceService invoiceService,
                              ai.neargo.sharehub.finance.service.LedgerService ledgerService,
-                             ai.neargo.sharehub.trade.order.service.DepositService depositService) {
+                             ai.neargo.sharehub.trade.order.service.DepositService depositService,
+                             ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoiceService) {
+        this.taxInvoiceService = taxInvoiceService;
         this.ledgerService = ledgerService;
         this.depositService = depositService;
         this.shareService = shareService;
@@ -365,6 +368,33 @@ public class FinanceController {
     public FinDtos.InvoiceView updateInvoice(@PathVariable String invoiceNo,
                                              @RequestBody FinDtos.InvoiceSaveReq body) {
         return invoiceService.save(withInvoiceNo(body, invoiceNo)); // 路径为准，防越权改他人发票
+    }
+
+    // ——————————— 租赁税务发票（C 端，V181）：自动开出，运营只看与重试 ———————————
+
+    @GetMapping("/api/trade/tax-invoices")
+    @PreAuthorize("@perm.can('finance:invoice:read')")
+    public PageResult<TaxInvoiceView> taxInvoices(@RequestParam(required = false) Integer page,
+                                                  @RequestParam(required = false) Integer size,
+                                                  @RequestParam(required = false) String orderNo,
+                                                  @RequestParam(required = false) String kind,
+                                                  @RequestParam(required = false) String status) {
+        PageResult<ai.neargo.sharehub.trade.order.entity.OrdTaxInvoice> r = taxInvoiceService.page(orderNo, kind, status,
+                page == null ? 1 : page, size == null ? 20 : size);
+        return new PageResult<>(r.getList().stream().map(TaxInvoiceView::of).toList(), r.getTotal());
+    }
+
+    @GetMapping("/api/trade/tax-invoices/{invoiceNo}")
+    @PreAuthorize("@perm.can('finance:invoice:read')")
+    public TaxInvoiceView taxInvoice(@PathVariable String invoiceNo) {
+        return TaxInvoiceView.of(taxInvoiceService.get(invoiceNo));
+    }
+
+    /** BLOCKED（开票主体不全）的票在补齐主体后重开；ISSUED 的不可动。 */
+    @PostMapping("/api/trade/tax-invoices/{invoiceNo}/retry")
+    @PreAuthorize("@perm.can('finance:invoice:issue')")
+    public TaxInvoiceView retryTaxInvoice(@PathVariable String invoiceNo) {
+        return TaxInvoiceView.of(taxInvoiceService.retry(invoiceNo));
     }
 
     /** record 不可变，改键只能重建一个（比让 DTO 变可变类划算）。 */

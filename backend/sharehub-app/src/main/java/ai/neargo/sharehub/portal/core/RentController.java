@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -35,9 +36,12 @@ public class RentController {
     private final ConsumerOrderAssembler cards;
     private final PaymentService payments;
     private final BizRuleService bizRules;
+    private final ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoices;
 
     public RentController(RentOrderService orders, PaymentService payments, BizRuleService bizRules,
-                          ConsumerOrderAssembler cards) {
+                          ConsumerOrderAssembler cards,
+                          ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoices) {
+        this.taxInvoices = taxInvoices;
         this.cards = cards;
         this.orders = orders;
         this.payments = payments;
@@ -96,6 +100,15 @@ public class RentController {
     }
 
     /** 买断：不还了，按 {@code sys_biz_rule} 计费兜底分区的买断价结单（属主鉴权）。 */
+    /** 本人某订单的税务票据（V181，只含已开出的；开关关着时为空列表）。 */
+    @GetMapping("/orders/{orderNo}/invoices")
+    public List<ai.neargo.sharehub.portal.finance.TaxInvoiceView> invoices(@PathVariable String orderNo) {
+        RentOrder o = orders.detailForConsumer(orderNo);
+        ConsumerContext.assertOwner(o.cUserNo());
+        return taxInvoices.listForUser(o.cUserNo(), orderNo).stream()
+                .map(ai.neargo.sharehub.portal.finance.TaxInvoiceView::of).toList();
+    }
+
     @PostMapping("/orders/{orderNo}/buyout")
     public ConsumerOrderVO buyout(@PathVariable String orderNo) {
         RentOrder o = orders.detailForConsumer(orderNo);

@@ -97,6 +97,9 @@ public class RentOrderServiceImpl implements RentOrderService {
     /** 结算即请款、补缴（C-BL-04）。 */
     private final ai.neargo.sharehub.trade.pay.service.PaymentService payments;
 
+    /** C 端税务发票（V181）：收款即开 / 结单才开，按 invoice.b2c.* 配置；失败不影响收款。 */
+    private final ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoices;
+
     public RentOrderServiceImpl(OrdMapper mapper, OrdStateMachine stateMachine,
                                 OrdRentExtMapper rentExtMapper, InterventionMapper interventionMapper,
                                 PriceResolver priceResolver, PriceEngine priceEngine,
@@ -112,8 +115,10 @@ public class RentOrderServiceImpl implements RentOrderService {
                                 ai.neargo.sharehub.common.time.BizClock clock,
                                 ai.neargo.sharehub.dev.port.CabinetCommandPort cabinetCommands,
                                 ai.neargo.sharehub.trade.EjectSimulation ejectSimulation,
-                                ai.neargo.sharehub.trade.pay.service.PaymentService payments) {
+                                ai.neargo.sharehub.trade.pay.service.PaymentService payments,
+                                ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoices) {
         this.payments = payments;
+        this.taxInvoices = taxInvoices;
         this.cabinetCommands = cabinetCommands;
         this.ejectSimulation = ejectSimulation;
         this.clock = clock;
@@ -770,6 +775,7 @@ public class RentOrderServiceImpl implements RentOrderService {
         updateOrConflict(e);
         appendEvent(e.getOrderNo(), before, e.getStatus(), "RETURN_AFTER_OVERDUE_CHARGE", OPERATOR_SYSTEM);
         if (trackBank) powerbankTracker.returned(e.getPowerbankNo(), returnCabinetNo, null);
+        taxInvoices.onSettled(e.getOrderNo());
         log.info("已扣款未归还的单归还 orderNo={}，不冲销已收的最高收费 amount={}", e.getOrderNo(), e.getAmount());
         return new OkResult(true);
     }
@@ -852,6 +858,8 @@ public class RentOrderServiceImpl implements RentOrderService {
         e.setPayNo(payNo);
         mapper.updateById(e);
         publishSettled(e);
+        // 已扣款未归还（OVERDUE_CHARGED）的收款还没结单：ON_SETTLE 模式下等归还再开
+        taxInvoices.onPaid(e.getOrderNo(), payNo, !OrderStatus.OVERDUE_CHARGED.name().equals(e.getStatus()));
     }
 
     private static final String PAY_PAID = "PAID";

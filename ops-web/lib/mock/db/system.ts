@@ -774,7 +774,7 @@ export const saveProblem = (x: Partial<ProblemEntry>) => upsert(problems, x, "pr
 // —— §16 税率与发票（阶段 3）——
 // 税号一律占位（`****`）：合规资料不落前端 mock。
 export const taxSettings: TaxSetting[] = [
-  { country: "AE", countryName: "阿联酋", taxName: "VAT", ratePercent: 5, trn: "1000****00003", invoiceTitle: "ShareHub FZ-LLC", includedInPrice: true, effectiveFrom: "2026-01-01" },
+  { country: "AE", countryName: "阿联酋", taxName: "VAT", ratePercent: 5, trn: "1000****00003", invoiceTitle: "ShareHub FZ-LLC", includedInPrice: true, effectiveFrom: "2026-01-01", issuerLegalName: "ShareHub FZ-LLC", issuerAddress: "Dubai Silicon Oasis, Dubai, UAE" },
   { country: "SA", countryName: "沙特", taxName: "ZATCA VAT", ratePercent: 15, trn: "3000****00003", invoiceTitle: "ShareHub Arabia LLC", includedInPrice: true, effectiveFrom: "2026-04-01" },
   { country: "QA", countryName: "卡塔尔", taxName: "VAT（待立法）", ratePercent: 0, trn: "-", invoiceTitle: "ShareHub Qatar", includedInPrice: false, effectiveFrom: "2027-01-01" },
   { country: "KW", countryName: "科威特", taxName: "VAT（待立法）", ratePercent: 0, trn: "-", invoiceTitle: "ShareHub Kuwait", includedInPrice: false, effectiveFrom: "2027-01-01" },

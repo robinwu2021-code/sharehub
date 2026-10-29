@@ -248,6 +248,9 @@ const TAX_FIELDS: FieldDef[] = [
   { key: "trn", label: "税号（TRN）", required: true, maxLength: 20, section: "开票信息", placeholder: "1000****00003", help: "前端仅存掩码占位，完整税号由后端保管" },
   { key: "invoiceTitle", label: "默认开票抬头", required: true, maxLength: 60, section: "开票信息", placeholder: "ShareHub FZ-LLC" },
   { key: "effectiveFrom", label: "生效日期", type: "date", required: true, section: "开票信息" },
+  // 开票主体（V181，C01）：C 端租赁税务发票的抬头。任一为空 → 那张票不开，挂在 财务 › 发票 › 租赁发票 等重试
+  { key: "issuerLegalName", label: "开票主体法定名称", maxLength: 120, section: "开票主体", placeholder: "Junverse Technology LLC", help: "C 端租赁税务发票上的法律实体名；换主体改这里，已开的票不受影响" },
+  { key: "issuerAddress", label: "开票主体注册地址", maxLength: 250, section: "开票主体", placeholder: "Office 1, Dubai, UAE" },
 ];
 
 /** ✓/✗ 图标组：登录设置列表用它一眼看清"哪个国家开了什么"（比 是/否 文字更快扫读）。 */

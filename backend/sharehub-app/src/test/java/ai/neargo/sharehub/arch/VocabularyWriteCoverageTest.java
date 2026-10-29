@@ -179,6 +179,8 @@ class VocabularyWriteCoverageTest {
              * 没有进过这一列。
              */
             "stl_withdrawal.approval_state",
+            // ord_tax_invoice（V181）：无任何请求体能写它，kind/status 只由 TaxInvoiceServiceImpl 用常量赋值
+            "ord_tax_invoice.kind", "ord_tax_invoice.status",
 
             // ——— 2026-09-28 第六批：钱那一侧剩下的 21 列，全部是「读代码核实」，一处新缺口都没有 ———
             // 这一批一个真缺口都没查出来，值得记一笔：finance 域的守法很统一 ——
