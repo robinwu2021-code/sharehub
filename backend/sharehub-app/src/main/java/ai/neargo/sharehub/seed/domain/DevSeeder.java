@@ -69,7 +69,12 @@ public class DevSeeder implements CommandLineRunner {
                 LocSite site = loc.getSiteNo() == null ? null : sites.selectOne(
                         new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<LocSite>()
                                 .eq(LocSite::getSiteNo, loc.getSiteNo()).last("limit 1"));
-                if (site != null) e.setAgentNo(site.getAgentNo());
+                if (site != null) {
+                    e.setAgentNo(site.getAgentNo());
+                    // 绑在商家点位上的柜子必然先出库给了这个商家（V164 chk_cab_bound_issued）——
+                    // 只填 agent_no 的话空库灌种子当场违反约束、应用起不来（2026-10-29 真后端联调撞到）
+                    e.setIssuedAgentNo(site.getAgentNo());
+                }
             }
             e.setSlotTotal(c.slotTotal());
             e.setAvailableCount(c.availableCount());

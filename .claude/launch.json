@@ -49,6 +49,25 @@
         ".e2e/flow-e2e-mock/out"
       ],
       "port": 4310
+    },
+    {
+      "name": "backend-walk",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "set -a; [ -f backend/.env.mail.local ] && . backend/.env.mail.local; set +a; exec $HOME/.local/opt/jdk-21.0.13+9/Contents/Home/bin/java -Duser.timezone=UTC -jar backend/sharehub-app/target/sharehub-app-0.1.0-SNAPSHOT.jar --spring.datasource.url='jdbc:mysql://127.0.0.1:3306/test_walk?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=UTF-8' --sharehub.dev-mode.enabled=true --sharehub.seed.enabled=true"
+      ],
+      "port": 8080
+    },
+    {
+      "name": "ops-web-real",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://localhost:8080 exec npm run dev"
+      ],
+      "port": 3000,
+      "cwd": "ops-web"
     }
   ]
 }

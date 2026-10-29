@@ -33,7 +33,7 @@ export const ar: Messages = {
     mockData: "بيانات تجريبية",
     logout: "تسجيل الخروج",
     menu: "القائمة",
-    agent: "وكيل",
+    agent: "تاجر",
     soon: "قريباً",
     switchView: "تبديل العرض",
     more: "المزيد",

@@ -32,7 +32,7 @@ export const en: Messages = {
     mockData: "Mock data",
     logout: "Sign out",
     menu: "Menu",
-    agent: "Agent",
+    agent: "Merchant",
     soon: "Soon",
     switchView: "Switch view",
     more: "More",
