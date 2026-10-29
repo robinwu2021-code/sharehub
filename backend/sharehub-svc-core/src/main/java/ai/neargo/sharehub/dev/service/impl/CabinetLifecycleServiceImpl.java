@@ -226,6 +226,7 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
     public Cabinet markFault(String cabinetNo, String reason) {
         String r = requireReason(reason);
         DevCabinet c = require(cabinetNo);
+        AuditChanges.record("故障原因", c.getFaultReason(), r);
         transit(c, "MARK_FAULT", u -> u.set(DevCabinet::getFaultReason, r), x -> x.setFaultReason(r));
         return CabinetServiceImpl.toVO(c);
     }
@@ -234,6 +235,7 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
     @Transactional
     public Cabinet repair(String cabinetNo) {
         DevCabinet c = require(cabinetNo);
+        AuditChanges.record("故障原因", c.getFaultReason(), null);
         transit(c, "REPAIR", u -> u.set(DevCabinet::getFaultReason, null), x -> x.setFaultReason(null));
         return CabinetServiceImpl.toVO(c);
     }
@@ -247,6 +249,11 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
         // 出库池归属 issued_agent_no 保留 —— 去向是回出库池就留在原商家那里，回仓则签收进仓时清（V161）。
         // 换点位后试借还随 bound_at 失效
         AuditChanges.record("所属点位", c.getLocationNo(), null);
+        /*
+         * 原因进审计（D5，2026-10-29）：fault_reason 只存「当前原因」，下一次撤机 / 报废 / 标故障会覆盖它。
+         * 每次变动的原因记进审计改前改后表，移动履历（撤出原因、报废原因）才不会丢。
+         */
+        AuditChanges.record("撤机原因", c.getFaultReason(), r);
         transit(c, "UNDEPLOY", u -> u.set(DevCabinet::getLocationNo, null).set(DevCabinet::getLocationName, null)
                         .set(DevCabinet::getSiteNo, null).set(DevCabinet::getAgentNo, null).set(DevCabinet::getFaultReason, r),
                 x -> {
@@ -265,6 +272,7 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
         String r = requireReason(reason);
         DevCabinet c = require(cabinetNo);
         LocalDateTime now = LocalDateTime.now();
+        AuditChanges.record("报废原因", c.getFaultReason(), r);
         transit(c, "RETIRE", u -> u.set(DevCabinet::getRetiredAt, now).set(DevCabinet::getFaultReason, r),
                 x -> {
                     x.setRetiredAt(now);

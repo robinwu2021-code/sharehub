@@ -37,6 +37,9 @@ public class PayOrder extends BaseEntity {
     /** 走哪个渠道（→ {@link PayChannel#getChannelCode()}）。 */
     private String channelCode;
 
+    /** 请款幂等键（V179）：同一键只请款一次，重复请求返回首单。存量行为空。 */
+    private String idempotencyKey;
+
     /** INIT / PAYING / PAID / FAILED / CLOSED。 */
     private String status;
 

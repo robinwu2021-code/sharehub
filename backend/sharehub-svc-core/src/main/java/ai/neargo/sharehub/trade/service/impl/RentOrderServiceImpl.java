@@ -258,7 +258,7 @@ public class RentOrderServiceImpl implements RentOrderService {
             String beforeBuyout = e.getStatus();
             e.setStatus(stateMachine.next(e.getStatus(), "RETURN"));
             e.setStatus(stateMachine.next(e.getStatus(), "SETTLE"));
-            mapper.updateById(e);
+            updateOrConflict(e);   // D2：与归还并发时只能有一方落库，输的一方在请款之前停下
             // 买断是两跳一次做完，只记一条 BUYOUT —— 记成 RETURN+SETTLE 会让时间线
             // 看起来像「他还了柜子然后结算」，而事实是他没还
             appendEvent(orderNo, beforeBuyout, e.getStatus(), "BUYOUT", e.getCUserNo());
@@ -603,7 +603,7 @@ public class RentOrderServiceImpl implements RentOrderService {
         e.setFeeAmount(charged.payable().doubleValue());   // 过渡期双写，待前端与报表切到 amount 后移除
         String beforeSettle = e.getStatus();
         e.setStatus(stateMachine.next(e.getStatus(), "SETTLE"));   // RETURNED→SETTLED；请款见 collect
-        mapper.updateById(e);
+        updateOrConflict(e);   // D2：同上，与逾期买断并发时不重复请款
         appendEvent(orderNo, beforeSettle, e.getStatus(), "SETTLE", OPERATOR_SYSTEM);
 
         collect(e, "RENT");   // 收到钱才发结算事件（分润），见 #collect
@@ -669,7 +669,13 @@ public class RentOrderServiceImpl implements RentOrderService {
             ChargeChain.Charged charged = chargeChain.charge(gross, PriceResolver.multiplierFromSnapshot(e.getPriceSnapshot()),
                     null, cap, null);
             if (!charged.buyout()) return false;
-            buyout(orderNo, cap);   // 买断也是收入：请款与分润在 buyout 里（collect）
+            try {
+                buyout(orderNo, cap);   // 买断也是收入：请款与分润在 buyout 里（collect）
+            } catch (BizException lost) {
+                // 读到 IN_USE 之后用户恰好归还（或别处已结）：那边已经请过款，这里不再扣
+                log.info("逾期买断让位于并发的归还/结算 orderNo={} reason={}", orderNo, lost.getMessage());
+                return false;
+            }
             log.info("逾期达封顶自动买断 orderNo={} minutes={} cap={}", orderNo, min, cap);
             return true;
         }));
@@ -727,6 +733,19 @@ public class RentOrderServiceImpl implements RentOrderService {
      * <p>资金来源一期统一走通道（桩恒成功；接 nearpay 后由通道扣卡 / 扣预授权）。
      * 押金、预授权、钱包三个来源的前提都还不存在，见 TDD-欠费补缴与结算请款.md §6。
      */
+    /**
+     * 带乐观锁的落库：0 行 = 这期间别处已改过这张单（典型是逾期买断与用户归还同时到达），抛冲突。
+     *
+     * <p>D2（2026-10-29）：此前 {@code updateById} 的返回值没人看 —— 输掉竞争的一方状态没写进去，
+     * 却照常往下走到 {@link #collect}，于是同一单请款两次，而 {@code pay_order} 没有唯一约束兜底。
+     * 冲突必须在请款**之前**抛出。
+     */
+    private void updateOrConflict(OrdOrder e) {
+        if (mapper.updateById(e) == 0) {
+            throw BizException.conflict("error.common.state_changed");
+        }
+    }
+
     private void collect(OrdOrder e, String payType) {
         java.math.BigDecimal due = e.getAmount() == null ? java.math.BigDecimal.ZERO : e.getAmount();
         if (due.signum() <= 0) {

@@ -90,6 +90,14 @@ public class InvoiceServiceImpl implements InvoiceService {
                 // 红冲后的发票是终态凭证，再改就等于改了已交付给对方的税务单据
                 throw new IllegalArgumentException("已红冲的发票不可修改: " + no);
             }
+            /*
+             * 已开具（ISSUED）同样不可再改（D1，2026-10-29）。此前只拦 VOID：已开出的发票还能改金额、抬头、TRN，
+             * 而且请求不带 status 时会被**置回草稿** —— 运营端编辑表单恰好不传 status。
+             * 税务单据开出去就是对外的事实，改错了的唯一修法是作废重开（将来是贷项通知单），不是原地改。
+             */
+            if (InvoiceStatus.ISSUED.name().equals(e.getStatus())) {
+                throw ai.neargo.sharehub.common.BizException.conflict("error.invoice.issued_immutable", no);
+            }
         }
 
         e.setPayeeType(req.payeeType());
@@ -103,8 +111,10 @@ public class InvoiceServiceImpl implements InvoiceService {
          * 串一个字母（"ISUED"）的后果不是报错而是**这张发票从此筛不出来**，
          * 而它是税务单据。顺带归一大小写：of() 认 "draft"，存的是 DRAFT。
          */
+        // 不带 status = 保持现状（新建才默认草稿）—— 不再把已有发票悄悄置回草稿
         String status = (req.status() == null || req.status().isBlank())
-                ? InvoiceStatus.DRAFT.name() : InvoiceStatus.of(req.status()).name();
+                ? (e.getStatus() == null ? InvoiceStatus.DRAFT.name() : e.getStatus())
+                : InvoiceStatus.of(req.status()).name();
         e.setStatus(status);
         if (InvoiceStatus.ISSUED.name().equals(status) && e.getIssuedAt() == null) {
             e.setIssuedAt(LocalDateTime.now().format(TS)); // 开票时间只在首次开出时落，重复保存不覆盖
