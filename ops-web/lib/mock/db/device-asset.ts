@@ -59,6 +59,9 @@ function record(itemType: QcItemType, itemNo: string, req: QcReq, result: QcStat
   };
   qcRecords.unshift(r);
   qcStatus.set(itemNo, result);
+  // 设备本身的质检状态同步（同后端：qc_status 取最近一次结论）—— 列表与出库可选设备按它过滤
+  const dev = itemType === "CABINET" ? cabinets.find((c) => c.cabinetNo === itemNo) : powerbanks.find((p) => p.powerbankNo === itemNo);
+  if (dev) (dev as { qcStatus?: QcStatus | null }).qcStatus = result;
   return r;
 }
 

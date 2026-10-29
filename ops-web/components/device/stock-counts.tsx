@@ -24,6 +24,9 @@ const STATUS: StatusMap<StockCountStatus> = {
   POSTED: { label: "已过账", tone: "success" }, CANCELLED: { label: "已作废", tone: "muted" }, UNKNOWN: { label: "未知", tone: "outline" },
 };
 const ITEM_LABEL: Record<string, string> = { CABINET: "机柜", POWERBANK: "充电宝" };
+/** 筛选不出「未知」：那是读不到库存服务时的兜底展示，不是可选状态。 */
+const STATUS_FILTER = (Object.keys(STATUS) as StockCountStatus[]).filter((k) => k !== "UNKNOWN")
+  .map((k) => ({ value: k, label: STATUS[k].label }));
 
 export function StockCountsTab() {
   const qc = useQueryClient();
@@ -66,7 +69,7 @@ export function StockCountsTab() {
       {!canWrite && <ReadOnlyNotice what="盘点" perm="device:inventory:stocktake" className="mb-3" />}
       <Toolbar onAdd={() => setOpenFor(whQ.data?.find((w) => w.isDefault)?.warehouseNo ?? "")} addLabel="开盘点" canAdd={canWrite}>
         <FilterSelect aria-label="仓库" value={warehouseNo} onChange={setWarehouseNo} options={whOptions} allLabel="全部仓库" />
-        <FilterSelect aria-label="状态" value={status} onChange={setStatus} options={STATUS} allLabel="全部状态" />
+        <FilterSelect aria-label="状态" value={status} onChange={setStatus} options={STATUS_FILTER} allLabel="全部状态" />
       </Toolbar>
       <DataTable rowKey={(c: StockCount) => c.countNo} columns={cols} rows={q.data} loading={q.isLoading} error={q.error}
         onRetry={q.refetch} empty={warehouseNo || status ? "没有匹配的盘点单" : "暂无盘点单"} />

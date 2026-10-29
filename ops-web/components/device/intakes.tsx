@@ -80,15 +80,15 @@ export function IntakesTab() {
   const cols: Column<Intake>[] = [
     { header: "单号", cell: (h) => <button type="button" className="font-mono text-primary hover:underline" onClick={() => setOpenNo(h.intakeNo)}>{h.intakeNo}</button> },
     { header: "类型", className: "whitespace-nowrap", cell: (h) => KIND_LABEL[h.kind] },
-    { header: "仓库", cell: (h) => h.warehouseName ?? h.warehouseNo },
+    { header: "仓库", className: "whitespace-nowrap", cell: (h) => h.warehouseName ?? h.warehouseNo },
     { header: "来源单号", cell: (h) => h.sourceRef ?? <span className="text-muted-foreground">-</span> },
     { header: "到达", className: "whitespace-nowrap", cell: (h) => fmtTime(h.arrivedAt) },
-    { header: "台数", className: "text-right tabular-nums", cell: (h) => h.total },
-    { header: "待检", className: "text-right tabular-nums", cell: (h) => h.pending },
-    { header: "合格", className: "text-right tabular-nums", cell: (h) => h.passed },
-    { header: "不合格", className: "text-right tabular-nums", cell: (h) => h.failed },
-    { header: "已入库", className: "text-right tabular-nums", cell: (h) => h.inbound },
-    { header: "已处置", className: "text-right tabular-nums", cell: (h) => h.disposed },
+    { header: "台数", className: "text-right tabular-nums whitespace-nowrap", cell: (h) => h.total },
+    { header: "待检", className: "text-right tabular-nums whitespace-nowrap", cell: (h) => h.pending },
+    { header: "合格", className: "text-right tabular-nums whitespace-nowrap", cell: (h) => h.passed },
+    { header: "不合格", className: "text-right tabular-nums whitespace-nowrap", cell: (h) => h.failed },
+    { header: "已入库", className: "text-right tabular-nums whitespace-nowrap", cell: (h) => h.inbound },
+    { header: "已处置", className: "text-right tabular-nums whitespace-nowrap", cell: (h) => h.disposed },
     { header: "状态", className: "whitespace-nowrap", cell: (h) => <StatusBadge map={STATUS} value={h.status} /> },
   ];
 

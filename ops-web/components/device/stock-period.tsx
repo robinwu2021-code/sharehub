@@ -11,8 +11,14 @@ import { Input } from "@/components/ui/input";
 import { DataTable, type Column } from "@/components/ui/data-table";
 
 const ITEM_LABEL: Record<string, string> = { CABINET: "机柜", POWERBANK: "充电宝" };
-const iso = (d: Date) => d.toISOString().slice(0, 10);
-const reasons = (m: Record<string, number>) => Object.entries(m).map(([k, v]) => `${k} ${v}`).join(" · ") || "-";
+/** 本地日期 → YYYY-MM-DD（不能用 toISOString：东四区本地零点换成 UTC 会退到前一天）。 */
+const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const REASON_LABEL: Record<string, string> = {
+  INBOUND: "入库", ISSUE: "出库", POOL_RETURN: "出库池退回", SHIP: "调拨发货", RECEIVE: "调拨签收", RETIRE: "报废", BIND: "绑定出仓",
+  UNBIND: "解绑回仓", PURCHASE: "采购入库", RETURN: "退货入库", CORRECTION: "冲正", SCRAP: "报废出库",
+};
+const reasons = (m: Record<string, number>) =>
+  Object.entries(m).map(([k, v]) => `${REASON_LABEL[k] ?? k} ${v}`).join(" · ") || "-";
 
 export function StockPeriodTable() {
   const today = new Date();

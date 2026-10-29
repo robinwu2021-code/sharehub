@@ -6,7 +6,7 @@ import type {
 import { fail, notFound } from "../../biz-error";
 import { cabinets, powerbanks } from "./device";
 import { allMovements } from "./movement";
-import { WAREHOUSES } from "./device-pool";
+import { WAREHOUSES, ensurePoolSeed } from "./device-pool";
 
 const counts: (StockCount & { scanned: string[] })[] = [];
 let seq = 0;
@@ -93,6 +93,7 @@ export function cancelStockCount(no: string): StockCountDetail {
 
 /** 统一库存视图（同后端 stages 口径）。 */
 export function stages(): StockStage[] {
+  ensurePoolSeed();
   const cab = cabinets.filter((c) => !c.archivedAt);
   const pb = powerbanks.filter((p) => !p.archivedAt);
   const n = <T>(xs: T[], f: (x: T) => boolean) => xs.filter(f).length;
@@ -114,6 +115,7 @@ export function stages(): StockStage[] {
 
 /** 期间报表（同后端本地口径：期末 = 当前在仓 − 期后净进出；期初 = 期末 − 入 + 出）。 */
 export function periodSummary(q: { from: string; to: string; warehouseNo?: string }): StockPeriodRow[] {
+  ensurePoolSeed();
   const start = q.from;
   const end = new Date(new Date(q.to).getTime() + 86400000).toISOString().slice(0, 10);
   const key = (wh: string, t: string) => `${wh}|${t}`;
@@ -158,6 +160,7 @@ export function periodSummary(q: { from: string; to: string; warehouseNo?: strin
 const migrated = new Set<string>();
 
 function candidates(): MigrationCandidate[] {
+  ensurePoolSeed();
   const base = { warehouseNo: null, agentNo: null, siteNo: null, claimed: false, reason: null };
   return cabinets.filter((c) => !c.archivedAt && c.status !== "RETIRED").map((c): MigrationCandidate => {
     if (c.status === "IN_TRANSIT") return { ...base, itemType: "CABINET", itemNo: c.cabinetNo, kind: "SKIP", reason: "调拨在途：签收后再迁" };
