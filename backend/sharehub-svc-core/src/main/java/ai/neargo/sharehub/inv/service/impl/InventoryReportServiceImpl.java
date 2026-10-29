@@ -40,9 +40,12 @@ public class InventoryReportServiceImpl implements InventoryReportService {
     private final InvDisposalMapper disposals;
     private final InvIntakeMapper intakes;
     private final InvIntakeItemMapper intakeItems;
+    private final ai.neargo.sharehub.common.time.BizClock clock;
 
     public InventoryReportServiceImpl(StockViewService stock, StockThresholdService thresholds, InvDisposalMapper disposals,
-                                      InvIntakeMapper intakes, InvIntakeItemMapper intakeItems) {
+                                      InvIntakeMapper intakes, InvIntakeItemMapper intakeItems,
+                                      ai.neargo.sharehub.common.time.BizClock clock) {
+        this.clock = clock;
         this.stock = stock;
         this.thresholds = thresholds;
         this.disposals = disposals;
@@ -52,7 +55,8 @@ public class InventoryReportServiceImpl implements InventoryReportService {
 
     @Override
     public InventoryReport report(LocalDate from, LocalDate to, String warehouseNo) {
-        LocalDate t = to == null ? LocalDate.now() : to;
+        // 「本月」是业务日期：按运营时区切日（BizClock），不是服务器时区
+        LocalDate t = to == null ? clock.today() : to;
         LocalDate f = from == null ? t.withDayOfMonth(1) : from;
         if (f.isAfter(t)) throw BizException.badRequest("error.common.invalid_value", "from");
         if (ChronoUnit.DAYS.between(f, t) > 366) throw BizException.badRequest("error.common.invalid_value", "to");
