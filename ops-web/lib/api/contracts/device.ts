@@ -5,7 +5,7 @@ import type {
   InventoryTransfer, InventoryTransferDetail, OtaRollout, OtaRelease, OtaTask, DeviceLog, DeviceCodeBatch,
   Checklist, TrialRent, Protection, ProtectionReq, SignalCode,
   InvTransferReq, QcReq, QcRecord, ReceiveResult, AssetDiff, AssetDiffStatus, PowerbankAction,
-  IssueDevicesReq, ClaimDevicesReq, IssueRedirectReq, PoolReturnReq, IssuedSummary, Warehouse, Intake, IntakeDetail, IntakeCreateReq, IntakeItemRef, IntakeDisposeReq, IntakeItemType, IntakeStatus, BindReq, BindBatchReq, BindResult,
+  DeviceMovement, IssueDevicesReq, ClaimDevicesReq, IssueRedirectReq, PoolReturnReq, IssuedSummary, Warehouse, Intake, IntakeDetail, IntakeCreateReq, IntakeItemRef, IntakeDisposeReq, IntakeItemType, IntakeStatus, BindReq, BindBatchReq, BindResult,
 } from "../../types";
 
 export interface DeviceApi {
@@ -116,6 +116,8 @@ export interface DeviceApi {
   dismissPowerbankLost(powerbankNo: string, note: string): Promise<Powerbank>;
   /** 某台设备（机柜号或充电宝号）的质检记录，新的在前。 */
   listQcRecords(itemNo: string): Promise<QcRecord[]>;
+  /** 设备履历（V196）：位置与归属的每一次变化，新的在前。 */
+  listDeviceMovements(itemNo: string): Promise<DeviceMovement[]>;
 
   /** 草稿期设定调拨明细（整体替换）。每件都要在库且质检已过。 */
   setTransferItems(transferNo: string, itemNos: string[]): Promise<InventoryTransferDetail>;

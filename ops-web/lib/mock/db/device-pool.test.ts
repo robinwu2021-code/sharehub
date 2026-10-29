@@ -8,6 +8,7 @@ import {
   ensurePoolSeed, issueDevices, returnDevicesToWarehouse, issuedSummary, bindDevice, bindDevices, unbindDevice,
   poolHit, POOL_WAREHOUSE, claimDevices, redirectIssue,
 } from "./device-pool";
+import { listDeviceMovements } from "./movement";
 
 const cab = (no: string) => cabinets.find((c) => c.cabinetNo === no)!;
 const inWarehouse = () => cabinets.filter((c) => c.status === "IN_STOCK" && c.warehouseNo && !c.issuedAgentNo && !c.archivedAt);
@@ -96,6 +97,18 @@ describe("出库池与绑定", () => {
     expect(cab(c.cabinetNo).issueClaimedAt).toBeTruthy();
     bindDevice(c.cabinetNo, {});
     expect(cab(c.cabinetNo).siteNo).toBe(site);
+  });
+
+  it("V196 履历：出库 → 签收 → 绑定 → 解绑 → 退回，每个动作恰好一行", () => {
+    const [c] = inWarehouse();
+    issueDevices({ agentNo: "AG002", receiverNo: "EMP-M", cabinetNos: [c.cabinetNo] });
+    claimDevices({ cabinetNos: [c.cabinetNo] }, "EMP-M");
+    bindDevice(c.cabinetNo, {});
+    unbindDevice(c.cabinetNo, "换点位");
+    returnDevicesToWarehouse({ cabinetNos: [c.cabinetNo], reason: "多发了" });
+    expect(() => unbindDevice(c.cabinetNo, "x")).toThrow();
+    expect(listDeviceMovements(c.cabinetNo).map((r) => r.event).reverse())
+      .toEqual(["ISSUE", "CLAIM", "BIND", "UNBIND", "POOL_RETURN"]);
   });
 
   it("汇总按商家统计未绑定 / 已绑定 / 已上线", () => {

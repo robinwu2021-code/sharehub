@@ -34,10 +34,13 @@ public class AssetOpsController {
 
     private final QcService qc;
     private final TransferOpsService transfers;
+    private final ai.neargo.sharehub.dev.movement.MovementRecorder movements;
 
-    public AssetOpsController(QcService qc, TransferOpsService transfers) {
+    public AssetOpsController(QcService qc, TransferOpsService transfers,
+                              ai.neargo.sharehub.dev.movement.MovementRecorder movements) {
         this.qc = qc;
         this.transfers = transfers;
+        this.movements = movements;
     }
 
     // —— 入库质检 ——
@@ -58,6 +61,13 @@ public class AssetOpsController {
     @PreAuthorize("@perm.can('device:cabinet:read')")
     public List<QcRecord> qcRecords(@RequestParam String itemNo) {
         return qc.records(itemNo);
+    }
+
+    /** 设备履历（V196，仓外段）：位置与归属的每一次变化，新的在前。 */
+    @GetMapping("/device-movements")
+    @PreAuthorize("@perm.can('device:cabinet:read')")
+    public List<ai.neargo.sharehub.dev.dto.DeviceOpsDtos.DeviceMovement> movements(@RequestParam String itemNo) {
+        return movements.of(itemNo);
     }
 
     // —— 调拨作业 ——

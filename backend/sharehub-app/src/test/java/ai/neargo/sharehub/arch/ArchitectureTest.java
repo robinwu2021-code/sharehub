@@ -106,6 +106,21 @@ class ArchitectureTest {
                 .check(ALL);
     }
 
+    @Test
+    @DisplayName("设备履历只追加：只有 MovementRecorder 碰得到履历 Mapper，且只插入、只查询（V196，I8）")
+    void movementLogIsAppendOnly() {
+        noClasses().that().doNotHaveFullyQualifiedName("ai.neargo.sharehub.dev.movement.MovementRecorder")
+                .should().dependOnClassesThat().haveFullyQualifiedName("ai.neargo.sharehub.dev.movement.DevMovementLogMapper")
+                .because("履历的写口只有一个：散落的写入点就是漏记与改写的来源")
+                .check(ALL);
+        var writes = ALL.get("ai.neargo.sharehub.dev.movement.MovementRecorder").getMethodCallsFromSelf().stream()
+                .filter(c -> c.getTargetOwner().getName().endsWith("DevMovementLogMapper"))
+                .map(c -> c.getName())
+                .filter(n -> n.startsWith("update") || n.startsWith("delete"))
+                .toList();
+        assertThat(writes).as("履历只追加，不改不删").isEmpty();
+    }
+
     // ───────────────────────── 棘轮：控制器直连 Mapper ─────────────────────────
 
     @Test

@@ -118,6 +118,32 @@ class DeviceBindTest extends ApiTestSupport {
     }
 
     @Test
+    @DisplayName("★★ 设备履历（V196，I8）：出库 → 签收 → 绑定 → 解绑 → 退回仓库，每个动作恰好一行，按序可查")
+    void every_move_leaves_exactly_one_movement_row() {
+        String admin = login("ADMIN");
+        String[] m = merchant();
+        String receiver = employee();
+        String c = cabinet();
+        post("/api/ops/devices/issue", Map.of("agentNo", m[0], "receiverNo", receiver, "cabinetNos", List.of(c)), admin).okData();
+        post("/api/ops/devices/claim", Map.of("cabinetNos", List.of(c)), login("OPS", receiver, null)).okData();
+        post("/api/ops/devices/" + c + "/bind", Map.of(), admin).okData();
+        post("/api/ops/devices/" + c + "/unbind", Map.of("reason", "换点位"), admin).okData();
+        post("/api/ops/devices/pool-return", Map.of("cabinetNos", List.of(c), "reason", "多发了"), admin).okData();
+        // 失败的动作不留履历（与业务同事务）
+        assertThat(post("/api/ops/devices/" + c + "/unbind", Map.of("reason", "x"), admin).status).isEqualTo(409);
+
+        JsonNode rows = get("/api/ops/device-movements?itemNo=" + c, admin).okData();
+        List<String> events = new java.util.ArrayList<>();
+        rows.forEach(r -> events.add(0, r.path("event").asText()));
+        assertThat(events).containsExactly("ISSUE", "CLAIM", "BIND", "UNBIND", "POOL_RETURN");
+        JsonNode bind = rows.get(2);
+        assertThat(bind.path("fromRef").asText()).isEqualTo("AGENT:" + m[0]);
+        assertThat(bind.path("toRef").asText()).isEqualTo("LOC:" + defaultPoint(m[1]));
+        assertThat(bind.path("agentAfter").asText()).isEqualTo(m[0]);
+        assertThat(rows.get(0).path("toRef").asText()).isEqualTo("WH:WH001");
+    }
+
+    @Test
     @DisplayName("★ 出库到站点：不指定点位时默认绑该站点的默认点位；站点不属于该商家 → 409")
     void issue_to_site_defaults_to_that_sites_point() {
         String admin = login("ADMIN");

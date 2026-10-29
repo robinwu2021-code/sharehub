@@ -20,6 +20,7 @@ import { RefLink } from "@/components/ref-link";
 import { CabinetStatusBadge, OnlineBadge } from "@/components/status";
 import { useCabinetActions } from "@/components/device/cabinet-actions";
 import { QcDrawer, QcRecords, type QcTarget } from "@/components/device/qc";
+import { MovementTable } from "@/components/device/movements";
 import { TrialRentPanel } from "@/components/device/trial-rents";
 import { ProtectionPanel, useSlotProtections } from "@/components/device/protections";
 import { SignalCodesTable } from "@/components/device/signal-codes";
@@ -41,6 +42,7 @@ const TABS = [
   { key: "trial", label: "试借还" },
   { key: "protections", label: "保护" },
   { key: "qc", label: "入库质检" },
+  { key: "movements", label: "履历" },
   { key: "signals", label: "设备信号" },
 ];
 /** 后端 fixHref 里出现过、但本页不单列的页签 → 落到哪一格。 */
@@ -307,6 +309,7 @@ function CabinetDetail() {
                 <QcRecords itemNo={cabinet.cabinetNo} />
               </div>
             )}
+            {tab === "movements" && <MovementTable itemNo={cabinet.cabinetNo} />}
             {tab === "signals" && (
               <div className="space-y-3">
                 <div className="txt-caption text-muted-foreground">

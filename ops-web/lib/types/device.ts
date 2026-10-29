@@ -732,6 +732,27 @@ export interface QcRecord {
   consumedBy: string | null;
 }
 
+/** 设备履历事件（与后端 `MovementEvent` 同名同值，V196）。 */
+export type MovementEvent =
+  | "ISSUE" | "CLAIM" | "REDIRECT" | "POOL_RETURN" | "BIND" | "UNBIND" | "SHIP" | "RECEIVE"
+  | "UNDEPLOY" | "RETURN_INTAKE" | "INBOUND" | "REASSIGN" | "RETIRE" | "LOST";
+
+/** 设备履历一行（后端 `MovementRow`）：位置与归属的每一次变化。fromRef / toRef 带前缀 WH: / AGENT: / SITE: / LOC: / TRANSIT / OUT。 */
+export interface DeviceMovement {
+  id: number;
+  itemType: QcItemType;
+  itemNo: string;
+  event: MovementEvent;
+  fromRef: string | null;
+  toRef: string | null;
+  agentBefore: string | null;
+  agentAfter: string | null;
+  reason: string | null;
+  sourceRef: string | null;
+  operatorNo: string;
+  occurredAt: string;
+}
+
 /** 调拨两端的类型（与后端 `TransferEndpointType` 同名同值）：决定 fromRef / toRef 指向仓库、站点还是点位。 */
 export type TransferEndpointType = "WAREHOUSE" | "SITE" | "LOCATION";
 

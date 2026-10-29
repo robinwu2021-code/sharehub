@@ -112,6 +112,7 @@ export const deviceHttp: DeviceApi = {
   confirmPowerbankLost: (no, note) => client.post(`/api/ops/powerbanks/${no}/confirm-lost`, { note }),
   dismissPowerbankLost: (no, note) => client.post(`/api/ops/powerbanks/${no}/dismiss-lost`, { note }),
   listQcRecords: (itemNo) => client.get("/api/ops/qc-records", { itemNo }),
+  listDeviceMovements: (itemNo) => client.get("/api/ops/device-movements", { itemNo }),
   setTransferItems: (no, itemNos) => client.post(`/api/ops/inventory-transfers/${no}/items`, { itemNos }),
   shipTransfer: (no) => client.post(`/api/ops/inventory-transfers/${no}/ship`, {}),
   receiveTransfer: (no, receivedNos, note) => client.post(`/api/ops/inventory-transfers/${no}/receive`, { receivedNos, note }),

@@ -11644,6 +11644,79 @@
   },
   {
    "verb": "GET",
+   "path": "/api/ops/device-movements",
+   "perm": "device:cabinet:read",
+   "perms": [
+    "device:cabinet:read"
+   ],
+   "handler": "AssetOpsController#movements",
+   "summary": "设备履历（V196，仓外段）：位置与归属的每一次变化，新的在前。",
+   "params": [
+    {
+     "in": "query",
+     "name": "itemNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "List<ai.neargo.sharehub.dev.dto.DeviceOpsDtos.DeviceMovement>",
+   "returnContainer": "List",
+   "returnElement": "ai.neargo.sharehub.dev.dto.DeviceOpsDtos.DeviceMovement",
+   "responseShape": [
+    {
+     "name": "id",
+     "type": "Long"
+    },
+    {
+     "name": "itemType",
+     "type": "String"
+    },
+    {
+     "name": "itemNo",
+     "type": "String"
+    },
+    {
+     "name": "event",
+     "type": "String"
+    },
+    {
+     "name": "fromRef",
+     "type": "String"
+    },
+    {
+     "name": "toRef",
+     "type": "String"
+    },
+    {
+     "name": "agentBefore",
+     "type": "String"
+    },
+    {
+     "name": "agentAfter",
+     "type": "String"
+    },
+    {
+     "name": "reason",
+     "type": "String"
+    },
+    {
+     "name": "sourceRef",
+     "type": "String"
+    },
+    {
+     "name": "operatorNo",
+     "type": "String"
+    },
+    {
+     "name": "occurredAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
    "path": "/api/ops/device-signals",
    "perm": "device:cabinet:read",
    "perms": [
@@ -51862,6 +51935,22 @@
    "DEVICE",
    "LOCATION"
   ],
+  "MovementEvent": [
+   "ISSUE",
+   "CLAIM",
+   "REDIRECT",
+   "POOL_RETURN",
+   "BIND",
+   "UNBIND",
+   "SHIP",
+   "RECEIVE",
+   "UNDEPLOY",
+   "RETURN_INTAKE",
+   "INBOUND",
+   "REASSIGN",
+   "RETIRE",
+   "LOST"
+  ],
   "ShareRecordStatus": [
    "PENDING"
   ],
@@ -52293,10 +52382,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 582,
-  "records": 541,
-  "withPerm": 500,
+  "endpoints": 583,
+  "records": 543,
+  "withPerm": 501,
   "withBody": 241,
-  "shapedResponses": 451
+  "shapedResponses": 452
  }
 }

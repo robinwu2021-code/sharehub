@@ -3,6 +3,7 @@ import * as dg from "../../mock/db/device-gate";
 import * as da from "../../mock/db/device-asset";
 import * as dp from "../../mock/db/device-pool";
 import * as ik from "../../mock/db/intake";
+import * as mv from "../../mock/db/movement";
 import * as db from "../../mock/db";
 import type { DeviceApi } from "../contracts/device";
 import type { PageQ, CabinetQ, DeviceLogQ, ArchiveQ, OtaReleaseQ } from "../query";
@@ -81,6 +82,7 @@ export const deviceMock: DeviceApi = {
   confirmPowerbankLost: async (no, note) => wait(da.confirmPowerbankLost(no, note), 300),
   dismissPowerbankLost: async (no, note) => wait(da.dismissPowerbankLost(no, note), 300),
   listQcRecords: async (itemNo) => wait(da.listQcRecords(itemNo)),
+  listDeviceMovements: async (itemNo) => wait(mv.listDeviceMovements(itemNo)),
   setTransferItems: async (no, itemNos) => wait(da.setTransferItems(no, itemNos), 350),
   shipTransfer: async (no) => wait(da.shipTransfer(no), 400),
   receiveTransfer: async (no, receivedNos, note) => wait(da.receiveTransfer(no, receivedNos, note), 400),

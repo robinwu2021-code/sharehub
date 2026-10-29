@@ -13,6 +13,9 @@ import ai.neargo.sharehub.dev.QcStatus;
 import ai.neargo.sharehub.dev.dto.DevLegacyDtos.Cabinet;
 import ai.neargo.sharehub.dev.entity.DevCabinet;
 import ai.neargo.sharehub.dev.mapper.CabinetMapper;
+import ai.neargo.sharehub.dev.movement.MovementEvent;
+import ai.neargo.sharehub.dev.movement.MovementRecorder;
+import ai.neargo.sharehub.dev.movement.MovementRecorder.Move;
 import ai.neargo.sharehub.dev.service.CabinetPoolService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -45,16 +48,19 @@ public class CabinetPoolServiceImpl implements CabinetPoolService {
 
     private static final Logger log = LoggerFactory.getLogger(CabinetPoolServiceImpl.class);
     private static final int MAX_BATCH = 200;
+    private static final String CABINET = MovementRecorder.CABINET;
 
     private final CabinetMapper cabinets;
     private final AgentDirectoryPort agents;
     private final ai.neargo.sharehub.dev.port.WarehouseLookup warehouseLookup;
     private final SiteQueryPort sites;
     private final EmployeeDirectoryPort employees;
+    private final MovementRecorder movements;
 
     public CabinetPoolServiceImpl(CabinetMapper cabinets, AgentDirectoryPort agents,
                                   ai.neargo.sharehub.dev.port.WarehouseLookup warehouseLookup,
-                                  SiteQueryPort sites, EmployeeDirectoryPort employees) {
+                                  SiteQueryPort sites, EmployeeDirectoryPort employees, MovementRecorder movements) {
+        this.movements = movements;
         this.cabinets = cabinets;
         this.agents = agents;
         this.warehouseLookup = warehouseLookup;
@@ -92,6 +98,8 @@ public class CabinetPoolServiceImpl implements CabinetPoolService {
             if (n == 0) throw BizException.conflict("error.common.state_changed");
             AuditChanges.record("出库池", null, agentNo);
             AuditChanges.record("所在仓", c.getWarehouseNo(), null);
+            movements.record(new Move(CABINET, no, MovementEvent.ISSUE, MovementRecorder.wh(c.getWarehouseNo()),
+                    MovementRecorder.pool(agentNo, site), null, agentNo, receiver == null ? null : "接收人 " + receiver, null));
             c.setIssuedAgentNo(agentNo);
             c.setIssuedAt(now);
             c.setIssuedBy(by);
@@ -138,6 +146,8 @@ public class CabinetPoolServiceImpl implements CabinetPoolService {
             if (n == 0) throw BizException.conflict("error.common.state_changed");
             AuditChanges.record("出库池", c.getIssuedAgentNo(), null);
             AuditChanges.record("所在仓", null, wh);
+            movements.record(new Move(CABINET, no, MovementEvent.POOL_RETURN, MovementRecorder.pool(c.getIssuedAgentNo(), c.getIssuedSiteNo()),
+                    MovementRecorder.wh(wh), c.getIssuedAgentNo(), null, reason.trim(), null));
             log.info("出库池退回 cabinetNo={} 原商家={} 回仓={} 原因={}", no, c.getIssuedAgentNo(), wh, reason.trim());
             c.setIssuedAgentNo(null);
             c.setIssuedAt(null);
@@ -165,6 +175,8 @@ public class CabinetPoolServiceImpl implements CabinetPoolService {
                     .isNull(DevCabinet::getIssueClaimedAt).set(DevCabinet::getIssueClaimedAt, now));
             if (n == 0) throw BizException.conflict("error.common.state_changed");
             AuditChanges.record("签收", null, me);
+            String at = MovementRecorder.pool(c.getIssuedAgentNo(), c.getIssuedSiteNo());
+            movements.record(new Move(CABINET, no, MovementEvent.CLAIM, at, at, c.getIssuedAgentNo(), c.getIssuedAgentNo(), null, null));
             c.setIssueClaimedAt(now);
             out.add(CabinetServiceImpl.toVO(c));
         }
@@ -201,6 +213,8 @@ public class CabinetPoolServiceImpl implements CabinetPoolService {
             AuditChanges.record("出库池", c.getIssuedAgentNo(), agentNo);
             AuditChanges.record("出库站点", c.getIssuedSiteNo(), site);
             AuditChanges.record("接收人", c.getIssueReceiverNo(), receiver);
+            movements.record(new Move(CABINET, no, MovementEvent.REDIRECT, MovementRecorder.pool(c.getIssuedAgentNo(), c.getIssuedSiteNo()),
+                    MovementRecorder.pool(agentNo, site), c.getIssuedAgentNo(), agentNo, reason.trim(), null));
             log.info("出库调整 cabinetNo={} 商家 {}→{} 站点 {}→{} 接收人 {}→{} 原因={}", no, c.getIssuedAgentNo(), agentNo,
                     c.getIssuedSiteNo(), site, c.getIssueReceiverNo(), receiver, reason.trim());
             c.setIssuedAgentNo(agentNo);

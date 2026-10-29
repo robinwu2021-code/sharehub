@@ -26,6 +26,8 @@ import ai.neargo.sharehub.api.platform.port.SysParamPort;
 import ai.neargo.sharehub.dev.dto.DevLegacyDtos.Cabinet;
 import ai.neargo.sharehub.dev.entity.DevCabinet;
 import ai.neargo.sharehub.dev.mapper.CabinetMapper;
+import ai.neargo.sharehub.dev.movement.MovementEvent;
+import ai.neargo.sharehub.dev.movement.MovementRecorder;
 import ai.neargo.sharehub.dev.port.PricingProbe;
 import ai.neargo.sharehub.dev.service.CabinetLifecycleService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -180,6 +182,7 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
     public void ship(String cabinetNo, String transferNo) {
         DevCabinet c = require(cabinetNo);
         if (!QcStatus.cleared(c.getQcStatus())) throw BizException.conflict("error.device.qc_not_passed", cabinetNo);
+        move(c, MovementEvent.SHIP, where(c), MovementRecorder.TRANSIT, c.getAgentNo(), c.getAgentNo(), null, transferNo);
         transit(c, "SHIP", u -> { }, x -> { });
         log.info("机柜随调拨发货 cabinetNo={} transferNo={}", cabinetNo, transferNo);
     }
@@ -188,6 +191,9 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
     @Transactional
     public void receive(String cabinetNo, String warehouseNo) {
         DevCabinet c = require(cabinetNo);
+        boolean toWh = warehouseNo != null && !warehouseNo.isBlank();
+        move(c, MovementEvent.RECEIVE, MovementRecorder.TRANSIT, toWh ? MovementRecorder.wh(warehouseNo) : null,
+                c.getIssuedAgentNo(), toWh ? null : c.getIssuedAgentNo(), null, null);
         // 进仓即离开出库池（V161，I1：库里有 CHECK 保证两者互斥 —— 只写仓不清出库池会被库拒掉）。
         // 签收到站点 / 点位（warehouseNo 为空）不是进仓，出库池不动
         boolean intoWarehouse = warehouseNo != null && !warehouseNo.isBlank();
@@ -211,6 +217,7 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
     @Transactional
     public void receiveForInspection(String cabinetNo) {
         DevCabinet c = require(cabinetNo);
+        move(c, MovementEvent.RETURN_INTAKE, MovementRecorder.TRANSIT, null, c.getIssuedAgentNo(), null, "到仓待检", null);
         // 撤机回仓：人已回到仓库，但旧的质检结论不再算数 —— 离开出库池、不进仓、质检打回待检，等待检单复检后入库
         transit(c, "RECEIVE", u -> u.set(DevCabinet::getWarehouseNo, null).set(DevCabinet::getIssuedAgentNo, null)
                         .set(DevCabinet::getIssuedAt, null).set(DevCabinet::getIssuedBy, null)
@@ -274,6 +281,8 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
          * 每次变动的原因记进审计改前改后表，移动履历（撤出原因、报废原因）才不会丢。
          */
         AuditChanges.record("撤机原因", c.getFaultReason(), r);
+        move(c, MovementEvent.UNDEPLOY, MovementRecorder.loc(c.getLocationNo()), MovementRecorder.pool(c.getIssuedAgentNo(), c.getIssuedSiteNo()),
+                c.getAgentNo(), null, r, null);
         transit(c, "UNDEPLOY", u -> u.set(DevCabinet::getLocationNo, null).set(DevCabinet::getLocationName, null)
                         .set(DevCabinet::getSiteNo, null).set(DevCabinet::getAgentNo, null).set(DevCabinet::getFaultReason, r),
                 x -> {
@@ -293,6 +302,8 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
         DevCabinet c = require(cabinetNo);
         LocalDateTime now = LocalDateTime.now();
         AuditChanges.record("报废原因", c.getFaultReason(), r);
+        move(c, MovementEvent.RETIRE, where(c), MovementRecorder.OUT, c.getAgentNo() != null ? c.getAgentNo() : c.getIssuedAgentNo(),
+                null, r, null);
         transit(c, "RETIRE", u -> u.set(DevCabinet::getRetiredAt, now).set(DevCabinet::getFaultReason, r),
                 x -> {
                     x.setRetiredAt(now);
@@ -302,6 +313,27 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
     }
 
     // —— 骨架 ——
+
+    /** 设备履历（V196）：setter 注入，构造参数已经很长。 */
+    private MovementRecorder movements;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setMovements(MovementRecorder movements) {
+        this.movements = movements;
+    }
+
+    private void move(DevCabinet c, MovementEvent event, String from, String to, String agentBefore, String agentAfter,
+                      String reason, String sourceRef) {
+        movements.record(new MovementRecorder.Move(MovementRecorder.CABINET, c.getCabinetNo(), event, from, to,
+                agentBefore, agentAfter, reason, sourceRef));
+    }
+
+    /** 当前位置：点位 › 出库池 › 仓。 */
+    private static String where(DevCabinet c) {
+        if (c.getLocationNo() != null) return MovementRecorder.loc(c.getLocationNo());
+        if (c.getIssuedAgentNo() != null) return MovementRecorder.pool(c.getIssuedAgentNo(), c.getIssuedSiteNo());
+        return MovementRecorder.wh(c.getWarehouseNo());
+    }
 
     private void transit(DevCabinet c, String event, Consumer<LambdaUpdateWrapper<DevCabinet>> sets, Consumer<DevCabinet> local) {
         String from = c.getStatus();

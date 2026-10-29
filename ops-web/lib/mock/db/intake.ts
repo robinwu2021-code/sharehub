@@ -8,6 +8,7 @@ import { cabinets, powerbanks } from "./device";
 import { consumeQc, inspectCabinet, inspectPowerbank } from "./device-asset";
 import { WAREHOUSES } from "./device-pool";
 import { paginate } from "./helpers";
+import { recordMovement, ref } from "./movement";
 
 interface Head extends Omit<Intake, "total" | "pending" | "passed" | "failed" | "inbound" | "disposed"> {}
 
@@ -154,6 +155,8 @@ export function inboundIntake(no: string, refs: IntakeItemRef[]): IntakeDetail {
       if (p.status !== "IN_STOCK" || p.cabinetNo) fail("设备状态已变化，请刷新", "State changed");
       p.warehouseNo = h.warehouseNo;
     }
+    recordMovement({ itemType: i.itemType, itemNo: i.itemNo, event: "INBOUND", toRef: ref.wh(h.warehouseNo),
+      reason: `质检凭证 ${i.qcNo}`, sourceRef: no });
     Object.assign(i, { disposition: "INBOUND", handledBy: "mock", handledAt: now() });
   }
   closeIfDone(h);

@@ -13,6 +13,8 @@ import ai.neargo.sharehub.dev.entity.DevCabinet;
 import ai.neargo.sharehub.dev.entity.DevPowerbank;
 import ai.neargo.sharehub.dev.mapper.CabinetMapper;
 import ai.neargo.sharehub.dev.mapper.PowerbankMapper;
+import ai.neargo.sharehub.dev.movement.MovementEvent;
+import ai.neargo.sharehub.dev.movement.MovementRecorder;
 import ai.neargo.sharehub.dev.service.QcService;
 import ai.neargo.sharehub.inv.IntakeStatus;
 import ai.neargo.sharehub.inv.WarehouseDirectory;
@@ -80,6 +82,14 @@ public class IntakeServiceImpl implements IntakeService {
         this.powerbanks = powerbanks;
         this.qc = qc;
         this.warehouses = warehouses;
+    }
+
+    /** 设备履历（V196）。 */
+    private MovementRecorder movements;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setMovements(MovementRecorder movements) {
+        this.movements = movements;
     }
 
     // —— 查询 ——
@@ -251,6 +261,8 @@ public class IntakeServiceImpl implements IntakeService {
                     .eq(DevPowerbank::getStatus, PowerbankStatus.IN_STOCK.name()).isNull(DevPowerbank::getCabinetNo)
                     .set(DevPowerbank::getWarehouseNo, h.getWarehouseNo()));
             if (n == 0) throw BizException.conflict("error.common.state_changed");
+            movements.record(new MovementRecorder.Move(i.getItemType(), i.getItemNo(), MovementEvent.INBOUND, null,
+                    MovementRecorder.wh(h.getWarehouseNo()), null, null, "质检凭证 " + i.getQcNo(), intakeNo));
             mark(i, INBOUND, null, me, now);
         }
         closeIfDone(h);

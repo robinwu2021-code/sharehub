@@ -190,6 +190,9 @@ class VocabularyWriteCoverageTest {
             // disposition 来自请求体，但写库前经 DISPOSALS 白名单（RETURN_SUPPLIER / SCRAP），不在白名单 400
             "inv_intake.kind", "inv_intake.status",
             "inv_intake_item.item_type", "inv_intake_item.qc_result", "inv_intake_item.disposition",
+            // dev_movement_log（V196 设备履历）：event 只由 MovementEvent 枚举的 name() 写入，item_type 只取 MovementRecorder 常量
+            // 或待检单明细已校验的类型；没有外部写入口（Mapper 只许 MovementRecorder 用，ArchitectureTest 守）
+            "dev_movement_log.event", "dev_movement_log.item_type",
 
             // ——— 2026-09-28 第六批：钱那一侧剩下的 21 列，全部是「读代码核实」，一处新缺口都没有 ———
             // 这一批一个真缺口都没查出来，值得记一笔：finance 域的守法很统一 ——

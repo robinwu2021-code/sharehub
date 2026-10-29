@@ -12,6 +12,8 @@ import ai.neargo.sharehub.dev.PowerbankStatus;
 import ai.neargo.sharehub.dev.dto.DevDtos.PowerbankRow;
 import ai.neargo.sharehub.dev.entity.DevPowerbank;
 import ai.neargo.sharehub.dev.mapper.PowerbankMapper;
+import ai.neargo.sharehub.dev.movement.MovementEvent;
+import ai.neargo.sharehub.dev.movement.MovementRecorder;
 import ai.neargo.sharehub.dev.port.CabinetAvailabilitySource;
 import ai.neargo.sharehub.dev.service.PowerbankLossService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -117,6 +119,14 @@ public class PowerbankLossServiceImpl implements PowerbankLossService {
         });
     }
 
+    /** 设备履历（V196）。 */
+    private MovementRecorder movements;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setMovements(MovementRecorder movements) {
+        this.movements = movements;
+    }
+
     @Override
     @Transactional
     public PowerbankRow confirmLost(String powerbankNo, String note) {
@@ -132,6 +142,8 @@ public class PowerbankLossServiceImpl implements PowerbankLossService {
         if (!to.equals(after.getStatus())) {
             throw BizException.conflict("error.powerbank.lost_state_changed", powerbankNo);
         }
+        movements.record(new MovementRecorder.Move(MovementRecorder.POWERBANK, powerbankNo, MovementEvent.LOST,
+                e.getCabinetNo() == null ? null : "CAB:" + e.getCabinetNo(), MovementRecorder.OUT, null, null, note, null));
         log.info("充电宝确认丢失 powerbankNo={} operator={} note={}", powerbankNo, operator(), note);
         return PowerbankServiceImpl.toVO(after);
     }

@@ -11,6 +11,8 @@ import ai.neargo.sharehub.dev.dto.BindDtos.BindResult;
 import ai.neargo.sharehub.dev.dto.DevLegacyDtos.Cabinet;
 import ai.neargo.sharehub.dev.entity.DevCabinet;
 import ai.neargo.sharehub.dev.mapper.CabinetMapper;
+import ai.neargo.sharehub.dev.movement.MovementEvent;
+import ai.neargo.sharehub.dev.movement.MovementRecorder;
 import ai.neargo.sharehub.dev.service.CabinetBindService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -46,8 +48,11 @@ public class CabinetBindServiceImpl implements CabinetBindService {
     private final AgentDirectoryPort agents;
     private final WorkOrderCommandPort workOrders;
 
+    private final MovementRecorder movements;
+
     public CabinetBindServiceImpl(CabinetMapper cabinets, LocationQueryPort locations, AgentDirectoryPort agents,
-                                  WorkOrderCommandPort workOrders) {
+                                  WorkOrderCommandPort workOrders, MovementRecorder movements) {
+        this.movements = movements;
         this.cabinets = cabinets;
         this.locations = locations;
         this.agents = agents;
@@ -112,6 +117,9 @@ public class CabinetBindServiceImpl implements CabinetBindService {
                 .set(DevCabinet::getSiteNo, null).set(DevCabinet::getAgentNo, null));
         if (n == 0) throw BizException.conflict("error.common.state_changed");
         AuditChanges.record("所属点位", c.getLocationNo(), null);
+        movements.record(new MovementRecorder.Move(MovementRecorder.CABINET, cabinetNo, MovementEvent.UNBIND,
+                MovementRecorder.loc(c.getLocationNo()), MovementRecorder.pool(c.getIssuedAgentNo(), c.getIssuedSiteNo()),
+                c.getAgentNo(), null, reason.trim(), null));
         log.info("设备解绑回出库池 cabinetNo={} 原点位={} 出库池商家={} 原因={}", cabinetNo, c.getLocationNo(),
                 c.getIssuedAgentNo(), reason.trim());
         c.setLocationNo(null);
@@ -167,6 +175,11 @@ public class CabinetBindServiceImpl implements CabinetBindService {
         if (c.getLocationNo() == null) u.isNull(DevCabinet::getLocationNo); else u.eq(DevCabinet::getLocationNo, c.getLocationNo());
         if (cabinets.update(null, u) == 0) throw BizException.conflict("error.common.state_changed");
         AuditChanges.record("所属点位", c.getLocationNo(), own.locationNo());
+        String from = c.getLocationNo() != null ? MovementRecorder.loc(c.getLocationNo())
+                : c.getIssuedAgentNo() != null ? MovementRecorder.pool(c.getIssuedAgentNo(), c.getIssuedSiteNo())
+                : MovementRecorder.wh(c.getWarehouseNo());
+        movements.record(new MovementRecorder.Move(MovementRecorder.CABINET, c.getCabinetNo(), MovementEvent.BIND, from,
+                MovementRecorder.loc(own.locationNo()), c.getAgentNo(), own.agentNo(), null, null));
         AuditChanges.record("归属商家", c.getAgentNo(), own.agentNo());
         c.setLocationNo(own.locationNo());
         c.setLocationName(own.locationName());

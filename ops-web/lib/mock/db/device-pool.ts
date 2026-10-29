@@ -17,6 +17,7 @@ import { cabinets } from "./device";
 import { sites, locations, ensureDefaultPoint } from "./location";
 import { agents, syncDefaultSite, saveSiteAgent, listSiteAgents } from "./agent";
 import { createWorkOrder } from "./workorder";
+import { recordMovement, ref } from "./movement";
 import { fail, notFound } from "@/lib/biz-error";
 
 /** 仓库：与后端 V182 种的四个仓同号同名；默认回仓为迪拜仓（inv.return_warehouse）。 */
@@ -121,6 +122,8 @@ export function issueDevices(x: IssueDevicesReq): Cabinet[] {
   const receiver = x.receiverNo?.trim() || null;
   const at = now();
   for (const c of rows) {
+    recordMovement({ itemNo: c.cabinetNo, event: "ISSUE", fromRef: ref.wh(c.warehouseNo), toRef: ref.pool(agent.agentNo, siteNo),
+      agentAfter: agent.agentNo, reason: receiver ? `接收人 ${receiver}` : null });
     Object.assign(c, { warehouseNo: null, issuedAgentNo: agent.agentNo, issuedAt: at, issuedSiteNo: siteNo,
       issueReceiverNo: receiver, issueClaimedAt: receiver ? null : at });
   }
@@ -148,7 +151,11 @@ export function claimDevices(x: ClaimDevicesReq, me: string): Cabinet[] {
     if (c.issueReceiverNo !== me) fail(`设备 ${c.cabinetNo} 不是发给你的，只有接收人本人能签收`, `${c.cabinetNo} was not sent to you`);
   }
   const at = now();
-  for (const c of rows) c.issueClaimedAt = at;
+  for (const c of rows) {
+    c.issueClaimedAt = at;
+    const here = ref.pool(c.issuedAgentNo, c.issuedSiteNo);
+    recordMovement({ itemNo: c.cabinetNo, event: "CLAIM", fromRef: here, toRef: here, agentBefore: c.issuedAgentNo, agentAfter: c.issuedAgentNo });
+  }
   return rows;
 }
 
@@ -170,6 +177,8 @@ export function redirectIssue(x: IssueRedirectReq): Cabinet[] {
   for (const c of rows) {
     const keep = !!c.issueClaimedAt && receiver === (c.issueReceiverNo ?? null);
     const claimed = receiver == null ? (c.issueClaimedAt ?? at) : keep ? c.issueClaimedAt : null;
+    recordMovement({ itemNo: c.cabinetNo, event: "REDIRECT", fromRef: ref.pool(c.issuedAgentNo, c.issuedSiteNo),
+      toRef: ref.pool(agent.agentNo, siteNo), agentBefore: c.issuedAgentNo, agentAfter: agent.agentNo, reason: x.reason });
     Object.assign(c, { issuedAgentNo: agent.agentNo, issuedSiteNo: siteNo, issueReceiverNo: receiver, issueClaimedAt: claimed });
   }
   return rows;
@@ -194,6 +203,8 @@ export function returnDevicesToWarehouse(x: PoolReturnReq): Cabinet[] {
   if (!wh) fail("还没有任何仓库，无法退回仓库", "No warehouse exists yet");
   if (!WAREHOUSES.some((w) => w.warehouseNo === wh)) notFound("仓库", "Warehouse", wh!);
   for (const c of rows) {
+    recordMovement({ itemNo: c.cabinetNo, event: "POOL_RETURN", fromRef: ref.pool(c.issuedAgentNo, c.issuedSiteNo), toRef: ref.wh(wh),
+      agentBefore: c.issuedAgentNo, reason: x.reason });
     Object.assign(c, { issuedAgentNo: null, issuedAt: null, warehouseNo: wh, issuedSiteNo: null, issueReceiverNo: null, issueClaimedAt: null });
   }
   return rows;
@@ -277,6 +288,9 @@ function checkBind(c: Cabinet, req: BindReq): SitePoint {
 function bindOne(c: Cabinet, req: BindReq): BindResult {
   const loc = checkBind(c, req);
   const site = siteOf(loc.siteNo)!;
+  recordMovement({ itemNo: c.cabinetNo, event: "BIND",
+    fromRef: c.locationNo ? ref.loc(c.locationNo) : c.issuedAgentNo ? ref.pool(c.issuedAgentNo, c.issuedSiteNo) : ref.wh(c.warehouseNo),
+    toRef: ref.loc(loc.locationNo), agentBefore: c.agentNo, agentAfter: site.agentNo ?? null });
   // I3：站点、站点名、商家都由点位派生；直营站点从仓里直接出（I5）
   Object.assign(c, {
     locationNo: loc.locationNo, siteNo: site.siteNo, locationName: site.name,
@@ -322,6 +336,8 @@ export function unbindDevice(deviceNo: string, reason: string): Cabinet {
   if (!c.locationNo) fail(`${c.cabinetNo} 没有绑定点位`, `${c.cabinetNo} is not bound`);
   if (c.status !== "IN_STOCK") fail(`${c.cabinetNo} 已上线（${c.status}），要走撤机工单`, `${c.cabinetNo} is live; use a removal work order`);
   const toWarehouse = !c.issuedAgentNo;   // 直营站点绑定的，解绑回仓
+  recordMovement({ itemNo: c.cabinetNo, event: "UNBIND", fromRef: ref.loc(c.locationNo),
+    toRef: ref.pool(c.issuedAgentNo, c.issuedSiteNo), agentBefore: c.agentNo, reason });
   Object.assign(c, {
     locationNo: null, siteNo: null, locationName: null, agentNo: null,
     warehouseNo: toWarehouse ? POOL_WAREHOUSE : null,
