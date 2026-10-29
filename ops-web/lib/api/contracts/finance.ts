@@ -1,8 +1,8 @@
 // 覆盖范围：分账规则与流水、总账、结算、提现审批、对账、发票、分润统计、充值订单。
-import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ, TaxInvoiceQ, TaxInvoiceExportQ, ReportQ, PayoutAccountQ, WithdrawalQ, AdjustmentQ } from "../query";
+import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ, TaxInvoiceQ, TaxInvoiceExportQ, SelfBillQ, ReportQ, PayoutAccountQ, WithdrawalQ, AdjustmentQ } from "../query";
 import type {
   PageResult, ShareRule, LedgerEntry, Settlement, SettlementDraft, Withdrawal,
-  ShareRecord, Reconcile, ReconAction, ReconDiff, ReconStats, Invoice, InvoiceView, TaxInvoice, ShareSummary, RechargeOrder,
+  ShareRecord, Reconcile, ReconAction, ReconDiff, ReconStats, Invoice, InvoiceView, TaxInvoice, SelfBill, ShareSummary, RechargeOrder,
 
   VoucherDetail,
   VoucherCreatePayload, PayoutAccount, PayReceiptPayload, WithdrawApplyPayload,
@@ -107,6 +107,10 @@ export interface FinanceApi {
   exportTaxInvoices(q: TaxInvoiceExportQ): Promise<void>;
   /** 单张票 PDF（RQ-INV-06）；BLOCKED 的票后端 409。 */
   downloadTaxInvoicePdf(invoiceNo: string): Promise<void>;
+  /** 商家分成自开票（V183，C10）：到账自动出；补出 = 对一笔已到账提现补一张（已出过原样返回）。 */
+  listSelfBills(q?: SelfBillQ): Promise<PageResult<SelfBill>>;
+  issueSelfBill(withdrawNo: string): Promise<SelfBill>;
+  downloadSelfBillPdf(billNo: string): Promise<void>;
   saveShareRule(x: Partial<ShareRule> & { ruleNo?: string }): Promise<ShareRule>;
   /** 登记/编辑发票草稿。开具后（ISSUED/VOID）抬头与金额由服务端拒绝修改。 */
   saveInvoice(x: Partial<Invoice> & { invoiceNo?: string }): Promise<Invoice>;

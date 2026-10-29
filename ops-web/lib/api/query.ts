@@ -96,6 +96,7 @@ export type InvoiceQ = PageQ & { status?: string };
 export type TaxInvoiceQ = PageQ & { orderNo?: string; kind?: string; status?: string };
 /** 后端导出（K8）：报表 xlsx / pdf；税务发票再加 zip（批量 PDF）与开票日期区间（业务日，含两端）。 */
 export type ExportFormat = "xlsx" | "pdf";
+export type SelfBillQ = PageQ & { agentNo?: string };
 export type ReportExportQ = { keyword?: string; period?: string };
 export type TaxInvoiceExportQ = { format: ExportFormat | "zip"; orderNo?: string; kind?: string; status?: string; from?: string; to?: string };
 /** 充值订单：状态 + 日期范围。 */

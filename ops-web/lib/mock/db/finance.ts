@@ -7,7 +7,7 @@ import type {
   ShareSummary, RechargeOrder, RechargePackage, PageQuery,
   ReconHandleStatus, ReconHandleResult, ReconAction, ReconStats,
   InvoiceStatus, InvoiceAction,
-  PayoutAccount, PayReceiptPayload, WithdrawApplyPayload, InvoiceView, TaxInvoice,} from "../../types";
+  PayoutAccount, PayReceiptPayload, WithdrawApplyPayload, InvoiceView, TaxInvoice, SelfBill,} from "../../types";
 import {
   STL_TRANSITIONS, canSettlementTransition,
   RECON_TRANSITIONS, canReconTransition, RECON_TERMINAL,
@@ -447,6 +447,32 @@ export const taxInvoices: TaxInvoice[] = orders.filter((o) => o.feeAmount > 0).s
     ...taxSplit(-Math.min(5, ref.grossAmount), 5), lineDesc: `Credit note for ${ref.invoiceNo}`,
   });
 }
+// 商家分成自开票（V183，C10）：后端在提现到账时出；mock 不预置，补出走 issueSelfBill，规则与后端一致
+export const selfBills: SelfBill[] = [];
+export const listSelfBills = (q: PageQuery & { agentNo?: string } = {}) =>
+  paginate([...selfBills].reverse(), q.page, q.size, (x) =>
+    (!q.agentNo || x.agentNo === q.agentNo) && kwHit(q.keyword, x.billNo, x.withdrawNo, x.supplierName));
+export const issueSelfBill = (withdrawNo: string) => {
+  const had = selfBills.find((b) => b.withdrawNo === withdrawNo);
+  if (had) return { ...had };
+  const w = withdrawals.find((x) => x.withdrawNo === withdrawNo);
+  if (!w) notFound("提现单", "Withdrawal", withdrawNo);
+  if (w!.status !== "PAID") fail(`提现单 ${withdrawNo} 尚未到账，不能出自开票`, `Withdrawal ${withdrawNo} has not been paid`);
+  const m = agents.find((a) => a.agentNo === w!.payeeNo);
+  if (!m?.vatTrn) fail(`商家 ${w!.payeeNo} 没有 VAT 税号，请先在商家档案补录`, `Merchant ${w!.payeeNo} has no VAT TRN`);
+  const { s, miss } = issuerMissing();
+  if (miss.length) fail(`平台开票主体缺 ${miss.join("、")}`, `Platform issuer is missing ${miss.join(", ")}`);
+  const b: SelfBill = {
+    billNo: `SB-2026-${String(selfBills.length + 1).padStart(6, "0")}`, withdrawNo, agentNo: w!.payeeNo,
+    supplierName: m!.name, supplierAddress: m!.address ?? null, supplierTrn: m!.vatTrn!,
+    recipientName: s!.issuerLegalName ?? null, recipientTrn: s!.trn, taxRatePercent: s!.ratePercent,
+    ...(({ netAmount, taxAmount, grossAmount }) => ({ netAmount, taxAmount, grossAmount }))(taxSplit(Number(w!.amount), s!.ratePercent)),
+    currency: w!.currency ?? "AED", payRef: w!.payRef ?? null, issuedAt: new Date().toISOString(),
+  };
+  selfBills.push(b);
+  return { ...b };
+};
+
 export const listTaxInvoices = (q: PageQuery & { orderNo?: string; kind?: string; status?: string } = {}) =>
   paginate([...taxInvoices].reverse(), q.page, q.size, (x) =>
     (!q.orderNo || x.orderNo === q.orderNo.trim()) && (!q.kind || x.kind === q.kind) && (!q.status || x.status === q.status));

@@ -71,6 +71,30 @@ public class TaxInvoiceDocuments {
                 List.of("Description", "Net (" + cur + ")", "VAT %", "VAT (" + cur + ")", "Total (" + cur + ")"), rows, footer);
     }
 
+    /**
+     * 自开票单据 PDF（C10，V183）。票面按 UAE 自开票要求写明 "Self-billing"：
+     * 供方（商家）名称地址 TRN、收货方（平台）名称地址 TRN、税率税额。
+     */
+    public ExportFile selfBillPdf(ai.neargo.sharehub.finance.entity.StlSelfBill b) {
+        String cur = b.getCurrency();
+        List<String> meta = List.of(
+                "Invoice no.: " + b.getBillNo() + "    Date of issue: " + (b.getIssuedAt() == null ? "-" : b.getIssuedAt().format(DAY)),
+                "Supplier: " + nz(b.getSupplierName()) + "    TRN: " + nz(b.getSupplierTrn()),
+                "Supplier address: " + nz(b.getSupplierAddress()),
+                "Recipient: " + nz(b.getRecipientName()) + "    TRN: " + nz(b.getRecipientTrn()),
+                "Recipient address: " + nz(b.getRecipientAddress()),
+                "Payment ref.: " + nz(b.getPayRef()) + "    Withdrawal: " + b.getWithdrawNo());
+        List<List<Object>> rows = List.of(Arrays.asList("Revenue share for power bank rental services",
+                b.getNetAmount(), b.getTaxRatePercent(), b.getTaxAmount(), b.getGrossAmount()));
+        List<String> footer = List.of(
+                "Total excl. VAT: " + money(b.getNetAmount(), cur),
+                "VAT " + b.getTaxRatePercent().stripTrailingZeros().toPlainString() + "%: " + money(b.getTaxAmount(), cur),
+                "Total incl. VAT: " + money(b.getGrossAmount(), cur),
+                "Self-billing: this tax invoice is issued by the recipient on behalf of the supplier under a self-billing agreement.");
+        return new ExportFile(b.getBillNo() + ".pdf", ExportFile.PDF, pdf.write(new ExportTable("TAX INVOICE (SELF-BILLING)", meta,
+                List.of("Description", "Net (" + cur + ")", "VAT %", "VAT (" + cur + ")", "Total (" + cur + ")"), rows, footer)));
+    }
+
     /** 登记表（RQ-INV-08）：一行一张票，含 BLOCKED（登记表要看得到哪些没开出来）。 */
     public ExportFile register(ExportFormat fmt, List<OrdTaxInvoice> list, boolean truncated, String filter) {
         List<List<Object>> rows = list.stream().map(t -> Arrays.<Object>asList(t.getInvoiceNo(), t.getKind(),

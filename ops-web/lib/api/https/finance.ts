@@ -6,7 +6,7 @@ import { currentAuth } from "../../auth";
 import { useLocaleStore } from "../../stores/locale";
 import { translate, LOCALE_TAG } from "../../i18n";
 import type { FinanceApi } from "../contracts/finance";
-import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ, TaxInvoiceQ, ReportQ } from "../query";
+import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ, TaxInvoiceQ, SelfBillQ, ReportQ } from "../query";
 import { downloadFile } from "../download";
 
 /**
@@ -98,6 +98,9 @@ export const financeHttp: FinanceApi = {
   getTaxInvoice: (invoiceNo) => client.get(`/api/trade/tax-invoices/${invoiceNo}`),
   retryTaxInvoice: (invoiceNo) => client.post(`/api/trade/tax-invoices/${invoiceNo}/retry`, {}),
   exportTaxInvoices: (q) => downloadFile("/api/trade/tax-invoices/export", q, `tax-invoices.${q.format}`),
+  listSelfBills: (q?: SelfBillQ) => client.get("/api/trade/self-bills", q),
+  issueSelfBill: (withdrawNo) => client.post("/api/trade/self-bills/issue", { withdrawNo }),
+  downloadSelfBillPdf: (billNo) => downloadFile(`/api/trade/self-bills/${billNo}/pdf`, {}, `${billNo}.pdf`),
   downloadTaxInvoicePdf: (invoiceNo) => downloadFile(`/api/trade/tax-invoices/${invoiceNo}/pdf`, {}, `${invoiceNo}.pdf`),
   saveShareRule: (x) => client.post(x.ruleNo ? `/api/trade/share-rules/${x.ruleNo}` : "/api/trade/share-rules", x),
   saveInvoice: (x) => client.post(x.invoiceNo ? `/api/trade/invoices/${x.invoiceNo}` : "/api/trade/invoices", x),

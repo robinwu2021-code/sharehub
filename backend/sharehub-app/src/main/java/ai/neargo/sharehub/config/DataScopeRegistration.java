@@ -143,6 +143,8 @@ public class DataScopeRegistration implements DataScopeRegistrar {
         // 而多注册的后果只是 fail-closed 方向的「看不到」——两种错的代价不对称。
         registry.register("stl_withdrawal", Map.of("AGENT", "agent_no"));
         registry.register("stl_settlement", Map.of("AGENT", "agent_no"));
+        // 自开票单据（V183，C10）：同提现单，商家只能看到自己的
+        registry.register("stl_self_bill", Map.of("AGENT", "agent_no"));
 
         /*
          * —— 运营核心流程（2026-09-25，TDD-运营核心流程）——

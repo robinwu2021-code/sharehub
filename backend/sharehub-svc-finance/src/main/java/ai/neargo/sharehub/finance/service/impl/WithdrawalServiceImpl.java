@@ -54,6 +54,8 @@ public class WithdrawalServiceImpl implements WithdrawalService {
 
     private final StlWithdrawalMapper mapper;
     private final PayoutLedgerPoster postings;
+    /** C10 自开票（V183）：到账即出，开关与税号不满足时什么都不做。 */
+    private final ai.neargo.sharehub.finance.service.SelfBillService selfBills;
     private final WithdrawFeePolicy feePolicy;
     private final WithdrawalStateMachine stateMachine;
     private final PayoutAccountService payoutAccounts;
@@ -81,8 +83,10 @@ public class WithdrawalServiceImpl implements WithdrawalService {
                                  ai.neargo.sharehub.api.platform.port.SysParamPort params,
                                  ai.neargo.sharehub.common.event.DomainEventBus events,
                                  @org.springframework.beans.factory.annotation.Value("${sharehub.flow.withdrawal.engine:LOCAL}") String engine,
-                                 PayoutLedgerPoster postings) {
+                                 PayoutLedgerPoster postings,
+                                 ai.neargo.sharehub.finance.service.SelfBillService selfBills) {
         this.postings = postings;
+        this.selfBills = selfBills;
         this.events = events;
         this.viaOpsKit = "OPSKIT".equalsIgnoreCase(engine == null ? "" : engine.trim());
         this.params = params;
@@ -396,6 +400,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         }
         // 到账即冲减应付（G19）：付款任务批量确认与单笔登记回执都走这里，记账只有这一个入口
         if (ok) postings.onWithdrawalPaid(e);
+        if (ok) selfBills.onWithdrawalPaid(e);
         return toVO(require(withdrawNo));
     }
 

@@ -91,6 +91,13 @@ public class LocalAgentDirectory implements AgentDirectoryPort {
         return a == null ? null : a.getDefaultSiteNo();
     }
 
+    @Override
+    public MerchantTaxProfile taxProfileOf(String agentNo) {
+        AgtAgent a = agentNo == null || agentNo.isBlank() ? null : agents.selectOne(new LambdaQueryWrapper<AgtAgent>()
+                .eq(AgtAgent::getAgentNo, agentNo).last("limit 1"));
+        return a == null ? null : new MerchantTaxProfile(a.getAgentNo(), a.getName(), a.getAddress(), a.getVatTrn());
+    }
+
     private AgentBrief toBrief(AgtAgent a) {
         boolean settling = !ai.neargo.sharehub.agent.AgentStatus.ENABLED.name().equals(a.getStatus()) && exits.selectCount(new LambdaQueryWrapper<ai.neargo.sharehub.agent.ext.entity.AgtExit>()
                 .eq(ai.neargo.sharehub.agent.ext.entity.AgtExit::getAgentNo, a.getAgentNo())

@@ -40,6 +40,9 @@ public class AgtAgent extends BaseEntity implements ai.neargo.sharehub.common.cr
     private String industry;
     /** 默认站点（V157）：补齐位置时系统所建，商家端不出现「站点」这个词。 */
     private String defaultSiteNo;
+    /** VAT 税号（V183，C10 自开票）：空 = 非 VAT 登记户，分成付款不出自开票单据。 */
+    @com.baomidou.mybatisplus.annotation.TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
+    private String vatTrn;
     private String regionScope;
 
     /**

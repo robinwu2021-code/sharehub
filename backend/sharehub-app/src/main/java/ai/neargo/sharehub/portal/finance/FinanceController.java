@@ -48,6 +48,7 @@ public class FinanceController {
     private final InvoiceService invoiceService;
     private final ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoiceService;
     private final TaxInvoiceDocuments taxInvoiceDocs;
+    private final ai.neargo.sharehub.finance.service.SelfBillService selfBills;
 
     public FinanceController(ShareService shareService, SettlementService settlementService,
                              WithdrawalService withdrawalService,
@@ -56,7 +57,9 @@ public class FinanceController {
                              ai.neargo.sharehub.finance.service.LedgerService ledgerService,
                              ai.neargo.sharehub.trade.order.service.DepositService depositService,
                              ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoiceService,
-                             TaxInvoiceDocuments taxInvoiceDocs) {
+                             TaxInvoiceDocuments taxInvoiceDocs,
+                             ai.neargo.sharehub.finance.service.SelfBillService selfBills) {
+        this.selfBills = selfBills;
         this.taxInvoiceService = taxInvoiceService;
         this.taxInvoiceDocs = taxInvoiceDocs;
         this.ledgerService = ledgerService;
@@ -425,6 +428,38 @@ public class FinanceController {
         boolean truncated = list.size() > cap;
         taxInvoiceDocs.register(ai.neargo.sharehub.common.export.ExportFormat.of(format),
                 truncated ? list.subList(0, cap) : list, truncated, filter).writeTo(response);
+    }
+
+    // ——————————— 商家分成自开票（C10，V183）———————————
+
+    @GetMapping("/api/trade/self-bills")
+    @PreAuthorize("@perm.can('finance:invoice:read')")
+    public PageResult<SelfBillView> selfBills(@RequestParam(required = false) Integer page,
+                                              @RequestParam(required = false) Integer size,
+                                              @RequestParam(required = false) String agentNo,
+                                              @RequestParam(required = false) String keyword) {
+        var r = selfBills.page(page, size, agentNo, keyword);
+        return new PageResult<>(r.getList().stream().map(SelfBillView::of).toList(), r.getTotal());
+    }
+
+    @GetMapping("/api/trade/self-bills/{billNo}/pdf")
+    @PreAuthorize("@perm.can('finance:invoice:read')")
+    public void selfBillPdf(@PathVariable String billNo,
+                            jakarta.servlet.http.HttpServletResponse response) throws java.io.IOException {
+        taxInvoiceDocs.selfBillPdf(selfBills.get(billNo)).writeTo(response);
+    }
+
+    /** 补出：开关当时关着、商家后补了税号、或自动出单失败时，对一笔已到账的提现补一张。已出过则原样返回。 */
+    @PostMapping("/api/trade/self-bills/issue")
+    @PreAuthorize("@perm.can('finance:invoice:issue')")
+    public SelfBillView issueSelfBill(@RequestBody SelfBillIssueReq body) {
+        if (body == null || body.withdrawNo() == null || body.withdrawNo().isBlank()) {
+            throw ai.neargo.sharehub.common.BizException.badRequest("error.common.missing_parameter", "withdrawNo");
+        }
+        return SelfBillView.of(selfBills.issueFor(body.withdrawNo().trim()));
+    }
+
+    public record SelfBillIssueReq(String withdrawNo) {
     }
 
     /** 单张票 PDF（RQ-INV-06）。BLOCKED 的票 409。 */

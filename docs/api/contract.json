@@ -396,6 +396,10 @@
     {
      "name": "defaultSiteNo",
      "type": "String"
+    },
+    {
+     "name": "vatTrn",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -489,6 +493,10 @@
     {
      "name": "defaultSiteNo",
      "type": "String"
+    },
+    {
+     "name": "vatTrn",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -558,6 +566,10 @@
     },
     {
      "name": "defaultSiteNo",
+     "type": "String"
+    },
+    {
+     "name": "vatTrn",
      "type": "String"
     }
    ]
@@ -38280,6 +38292,216 @@
   },
   {
    "verb": "GET",
+   "path": "/api/trade/self-bills",
+   "perm": "finance:invoice:read",
+   "perms": [
+    "finance:invoice:read"
+   ],
+   "handler": "FinanceController#selfBills",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "agentNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "keyword",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<SelfBillView>",
+   "returnContainer": "PageResult",
+   "returnElement": "SelfBillView",
+   "responseShape": [
+    {
+     "name": "billNo",
+     "type": "String"
+    },
+    {
+     "name": "withdrawNo",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "supplierName",
+     "type": "String"
+    },
+    {
+     "name": "supplierAddress",
+     "type": "String"
+    },
+    {
+     "name": "supplierTrn",
+     "type": "String"
+    },
+    {
+     "name": "recipientName",
+     "type": "String"
+    },
+    {
+     "name": "recipientTrn",
+     "type": "String"
+    },
+    {
+     "name": "taxRatePercent",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "netAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "taxAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "grossAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "payRef",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/trade/self-bills/issue",
+   "perm": "finance:invoice:issue",
+   "perms": [
+    "finance:invoice:issue"
+   ],
+   "handler": "FinanceController#issueSelfBill",
+   "summary": "补出：开关当时关着、商家后补了税号、或自动出单失败时，对一笔已到账的提现补一张。",
+   "params": [],
+   "bodyType": "SelfBillIssueReq",
+   "returnType": "SelfBillView",
+   "returnContainer": null,
+   "returnElement": "SelfBillView",
+   "responseShape": [
+    {
+     "name": "billNo",
+     "type": "String"
+    },
+    {
+     "name": "withdrawNo",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "supplierName",
+     "type": "String"
+    },
+    {
+     "name": "supplierAddress",
+     "type": "String"
+    },
+    {
+     "name": "supplierTrn",
+     "type": "String"
+    },
+    {
+     "name": "recipientName",
+     "type": "String"
+    },
+    {
+     "name": "recipientTrn",
+     "type": "String"
+    },
+    {
+     "name": "taxRatePercent",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "netAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "taxAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "grossAmount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "payRef",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "withdrawNo",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "GET",
+   "path": "/api/trade/self-bills/{billNo}/pdf",
+   "perm": "finance:invoice:read",
+   "perms": [
+    "finance:invoice:read"
+   ],
+   "handler": "FinanceController#selfBillPdf",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "billNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "void",
+   "returnContainer": null,
+   "returnElement": "void",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
    "path": "/api/trade/settlements",
    "perm": "finance:settlement:read",
    "perms": [
@@ -49978,10 +50200,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 564,
-  "records": 523,
-  "withPerm": 482,
-  "withBody": 233,
-  "shapedResponses": 437
+  "endpoints": 567,
+  "records": 526,
+  "withPerm": 485,
+  "withBody": 234,
+  "shapedResponses": 439
  }
 }

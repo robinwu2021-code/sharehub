@@ -99,7 +99,11 @@ public class AgentServiceImpl implements AgentService {
             AuditChanges.record("状态", e.getStatus(), in.status() == null ? "ENABLED" : in.status());
             if (in.address() != null) AuditChanges.record("位置", e.getAddress(), in.address());
             if (in.industry() != null) AuditChanges.record("行业", e.getIndustry(), in.industry());
+            // 税号决定分成付款出不出自开票单据，改动要能追溯
+            if (in.vatTrn() != null) AuditChanges.record("VAT 税号", e.getVatTrn(), in.vatTrn());
         }
+        // 不传 = 不改；空串 = 清掉（商家注销 VAT 登记）
+        if (in.vatTrn() != null) e.setVatTrn(in.vatTrn().isBlank() ? null : in.vatTrn().trim());
         String nameBefore = e.getName(), addressBefore = e.getAddress();
         java.math.BigDecimal lngBefore = e.getLng(), latBefore = e.getLat();
         applyCoreProfile(e, in);
@@ -233,7 +237,7 @@ public class AgentServiceImpl implements AgentService {
                  */
                 0, e.getStatus(), e.getArchivedAt() == null ? null : e.getArchivedAt().toString(),
                 e.getContactName(), e.getPhone(), e.getEmail(),
-                e.getAddress(), e.getLng(), e.getLat(), e.getIndustry(), e.getDefaultSiteNo());
+                e.getAddress(), e.getLng(), e.getLat(), e.getIndustry(), e.getDefaultSiteNo(), e.getVatTrn());
     }
 
     // ── 归档 / 取消归档（前端契约 Archivable）──

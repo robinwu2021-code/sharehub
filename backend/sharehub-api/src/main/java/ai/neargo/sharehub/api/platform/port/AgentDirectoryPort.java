@@ -50,6 +50,15 @@ public interface AgentDirectoryPort {
     String defaultSiteNo(String agentNo);
 
     /**
+     * 商家的税务身份（V183，C10 自开票的供方信息）：名称、地址、VAT 税号。
+     * 商家不存在返回 {@code null}；{@code trn} 为空 = 非 VAT 登记户。
+     */
+    MerchantTaxProfile taxProfileOf(String agentNo);
+
+    record MerchantTaxProfile(String agentNo, String name, String address, String trn) {
+    }
+
+    /**
      * 运维分成系数（批次 F5，裁决 #1）：该代理在 {@code period}（YYYY-MM，订单归属账期）适用的系数 ——
      * 取上一月考核的结果；没有考核记录按 1（不打折）。乘在 OPERATE 分润比例上。
      */

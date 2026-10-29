@@ -576,6 +576,25 @@ export interface TaxInvoice {
   createdAt: string;
 }
 
+/** 商家分成自开票单据（V183，C10）：提现到账时平台代商家开出；供方 = 商家，收货方 = 平台开票主体。 */
+export interface SelfBill {
+  billNo: string;
+  withdrawNo: string;
+  agentNo: string;
+  supplierName: string | null;
+  supplierAddress: string | null;
+  supplierTrn: string | null;
+  recipientName: string | null;
+  recipientTrn: string | null;
+  taxRatePercent: number;
+  netAmount: number;
+  taxAmount: number;
+  grossAmount: number;
+  currency: string;
+  payRef: string | null;
+  issuedAt: string;
+}
+
 export interface Invoice {
   invoiceNo: string;
   /**

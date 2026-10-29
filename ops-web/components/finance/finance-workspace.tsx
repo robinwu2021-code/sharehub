@@ -15,6 +15,7 @@ import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
 import { PayoutAccountDrawer } from "@/components/finance/payout-account-drawer";
 import { PayoutTasks } from "@/components/finance/payout-tasks";
 import { TaxInvoicePanel } from "@/components/finance/tax-invoice-panel";
+import { SelfBillPanel } from "@/components/finance/self-bill-panel";
 import { DataTable, type Column, type SortDir } from "@/components/ui/data-table";
 import { Drawer, Field } from "@/components/ui/drawer";
 import { FilterSelect } from "@/components/ui/filter-select";
@@ -184,6 +185,7 @@ const diffSideLabel = (diff: number) =>
 const INV_VIEWS = [
   { key: "B2B", label: "B 端发票" },
   { key: "RENTAL", label: "租赁发票（C 端）" },
+  { key: "SELF_BILL", label: "商家自开票" },
 ];
 
 const INV_STATUS: StatusMap<InvoiceStatus> = {
@@ -258,7 +260,7 @@ export function FinanceWorkspace({ path, tabKeys }: {
   const [invVoidReason, setInvVoidReason] = useState("");
   const [invStatusFilter, setInvStatusFilter] = useState("");
   // 发票页两个视图：B 端（对商家/合作方，手工登记开具）/ 租赁（C 端，系统自动开，V181）
-  const [invView, setInvView] = useState<"B2B" | "RENTAL">("B2B");
+  const [invView, setInvView] = useState<"B2B" | "RENTAL" | "SELF_BILL">("B2B");
   // 提现审批：走抽屉而非行内按钮——驳回必须留原因，是资金审批的留痕底线
   const [wdAudit, setWdAudit] = useState<Withdrawal | null>(null);
   // 申请提现（代理端自助）。运营端没有也不该有创建入口（api/README §六·A）
@@ -1418,9 +1420,10 @@ export function FinanceWorkspace({ path, tabKeys }: {
         </>
       )}
       {tab === "invoices" && (
-        <Tabs tabs={INV_VIEWS} value={invView} onChange={(k) => setInvView(k as "B2B" | "RENTAL")} />
+        <Tabs tabs={INV_VIEWS} value={invView} onChange={(k) => setInvView(k as "B2B" | "RENTAL" | "SELF_BILL")} />
       )}
       {tab === "invoices" && invView === "RENTAL" && <TaxInvoicePanel />}
+      {tab === "invoices" && invView === "SELF_BILL" && <SelfBillPanel />}
       {tab === "invoices" && invView === "B2B" && (
         <Toolbar
           search={keyword}
@@ -1533,7 +1536,7 @@ export function FinanceWorkspace({ path, tabKeys }: {
           而不是 PagedTable：共用查询是 union 类型，逐 tab 断言反而更容易出错。
           代价是错误态要自己接——上面每个列表都接了，棘轮 lib/table-wiring.test.ts 守住不回退。 */}
       {/* 调整项视图自带分页（PagedTable），这里的分页属于上面那张共享列表 */}
-      {q.data && tab !== "adjustments" && !(tab === "invoices" && invView === "RENTAL") && <Pagination page={paging.page} size={paging.size} total={q.data.total} onPage={paging.setPage} onSize={paging.setSize} />}
+      {q.data && tab !== "adjustments" && !(tab === "invoices" && invView !== "B2B") && <Pagination page={paging.page} size={paging.size} total={q.data.total} onPage={paging.setPage} onSize={paging.setSize} />}
 
       {/* 提现审批抽屉：通过 → 转打款中；驳回必填原因；审批人取当前登录账号 */}
       <Drawer
