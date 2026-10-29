@@ -30,4 +30,5 @@ export const reportHttp: ReportApi = {
   listReportMetrics: () => client.get("/api/ops/reports/metrics"),
   // ⚠️ 后端缺口：消费者漏斗 + 画像
   getConsumerInsight: () => client.get("/api/ops/reports/consumer-insight"),
+  getInventoryReport: (q) => client.get("/api/ops/reports/inventory", q ?? {}),
 };

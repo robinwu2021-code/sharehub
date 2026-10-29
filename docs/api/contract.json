@@ -22329,6 +22329,137 @@
   },
   {
    "verb": "GET",
+   "path": "/api/ops/reports/inventory",
+   "perm": "report:inventory:read",
+   "perms": [
+    "report:inventory:read"
+   ],
+   "handler": "ReportController#inventory",
+   "summary": "库存报表（V206）：现算，不走 T+1 快照；期间默认本月。",
+   "params": [
+    {
+     "in": "query",
+     "name": "from",
+     "type": "java.time.LocalDate",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "to",
+     "type": "java.time.LocalDate",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "warehouseNo",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.InventoryReportDtos.InventoryReport",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.InventoryReportDtos.InventoryReport",
+   "responseShape": [
+    {
+     "name": "from",
+     "type": "String"
+    },
+    {
+     "name": "to",
+     "type": "String"
+    },
+    {
+     "name": "stages",
+     "type": "List<StockDtos.StockStage>",
+     "fields": [
+      {
+       "name": "stage",
+       "type": "String"
+      },
+      {
+       "name": "cabinets",
+       "type": "long"
+      },
+      {
+       "name": "powerbanks",
+       "type": "long"
+      }
+     ]
+    },
+    {
+     "name": "rows",
+     "type": "List<WarehouseRow>",
+     "fields": [
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseName",
+       "type": "String"
+      },
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "opening",
+       "type": "long"
+      },
+      {
+       "name": "inQty",
+       "type": "long"
+      },
+      {
+       "name": "outQty",
+       "type": "long"
+      },
+      {
+       "name": "closing",
+       "type": "long"
+      },
+      {
+       "name": "available",
+       "type": "int"
+      },
+      {
+       "name": "minQty",
+       "type": "int"
+      },
+      {
+       "name": "low",
+       "type": "boolean"
+      }
+     ]
+    },
+    {
+     "name": "disposals",
+     "type": "Map<String, Long>"
+    },
+    {
+     "name": "purchases",
+     "type": "List<PurchaseRow>",
+     "fields": [
+      {
+       "name": "currency",
+       "type": "String"
+      },
+      {
+       "name": "qty",
+       "type": "long"
+      },
+      {
+       "name": "amount",
+       "type": "BigDecimal"
+      }
+     ]
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
    "path": "/api/ops/reports/location",
    "perm": "report:location:read",
    "perms": [
@@ -54578,10 +54709,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 613,
-  "records": 587,
-  "withPerm": 531,
+  "endpoints": 614,
+  "records": 590,
+  "withPerm": 532,
   "withBody": 253,
-  "shapedResponses": 477
+  "shapedResponses": 478
  }
 }

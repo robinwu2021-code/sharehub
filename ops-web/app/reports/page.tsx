@@ -11,6 +11,7 @@ import { UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
 import { Pagination, Skeleton, StatCard } from "@/components/ui/misc";
 import { usePaging } from "@/lib/hooks/use-paging";
+import { InventoryReportTab } from "@/components/report/inventory-report";
 import { useNavTabs, usePageTab, keepWithinTab } from "@/lib/hooks/use-page-tab";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,7 +33,7 @@ import type {
 } from "@/lib/types";
 
 // tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）
-const TAB_KEYS = ["device", "location", "finance", "screen", "custom", "consumer"] as const;
+const TAB_KEYS = ["device", "location", "finance", "inventory", "screen", "custom", "consumer"] as const;
 
 /** 三张周期报表 → 趋势口径。tab 与 kind 一一对应，别在多处各写一次映射。 */
 const TREND_KIND: Record<string, ReportTrendKind> = {
@@ -588,6 +589,8 @@ function ReportsInner() {
           <TrendChart trend={trendQ.data} loading={trendQ.isLoading} />
         </>
       )}
+
+      {tab === "inventory" && <InventoryReportTab />}
 
       {tab === "device" && (
         <DataTable

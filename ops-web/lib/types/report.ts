@@ -1,3 +1,4 @@
+import type { IntakeItemType, StockStage } from "./device";
 // 覆盖范围：报表域（bi）——设备/点位/财务三张周期报表、实时大屏、自定义报表、
 // 消费者分群与洞察（漏斗 / 画像）。
 //
@@ -194,4 +195,35 @@ export interface ConsumerInsight {
   profiles: ConsumerProfileSlice[];
   /** = 人群分层表的用户数合计，也是漏斗「成功借出」环节的人数。 */
   totalUsers: number;
+}
+
+/**
+ * 库存报表（V206，GET /api/ops/reports/inventory）：现算，期间默认本月。
+ * rows：各启用中的仓 × 柜 / 宝，期初 / 入 / 出 / 期末（同期间报表口径）+ 当前可用与安全库存；
+ * disposals：期间处置出库台数，键「SCRAP:原因码」或「RETURN_SUPPLIER」；purchases：期间入库单金额按币种。
+ */
+export interface InventoryReport {
+  from: string;
+  to: string;
+  stages: StockStage[];
+  rows: InventoryReportRow[];
+  disposals: Record<string, number>;
+  purchases: InventoryPurchaseRow[];
+}
+export interface InventoryReportRow {
+  warehouseNo: string;
+  warehouseName: string;
+  itemType: IntakeItemType;
+  opening: number;
+  inQty: number;
+  outQty: number;
+  closing: number;
+  available: number;
+  minQty: number;
+  low: boolean;
+}
+export interface InventoryPurchaseRow {
+  currency: string;
+  qty: number;
+  amount: number;
 }

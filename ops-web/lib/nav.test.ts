@@ -171,6 +171,7 @@ const LEAF_TUPLES = [
   "/reports?tab=device|设备运营分析|report:device:read|2|",
   "/reports?tab=location|点位坪效|report:location:read|2|",
   "/reports?tab=finance|财务报表|report:finance:read|2|",
+  "/reports?tab=inventory|库存报表|report:inventory:read|1|",
   "/reports?tab=screen|实时大屏|report:screen:read|3|",
   "/reports?tab=custom|自定义报表|report:custom:read|3|",
   "/reports?tab=consumer|消费者分析|report:consumer:read|3|",
@@ -538,11 +539,11 @@ describe("分级屏蔽（tier gating，默认 CURRENT_PHASE=0）", () => {
     expect(isLeafLocked(leaf)).toBe(true);
     expect(isLeafDisabled(leaf)).toBe(true);
   });
-  it("isSectionLocked：报表 P1 下全叶被锁 → 整体锁；用户因「风控用户」已 ready → 不锁", () => {
+  it("isSectionLocked：用户因「风控用户」已 ready、报表因「库存报表」已 ready → 都不整体锁", () => {
     // 用户 section 曾经整体锁（全叶 P2）。2026-07-30「风控用户」标 ready 后，
-    // 段内有可用叶 → 整段解锁。这正是逐叶解锁机制该有的表现，不是回归。
+    // 段内有可用叶 → 整段解锁。报表同理：2026-10-29 库存报表（V206）L1 就绪。逐叶解锁该有的表现，不是回归。
     expect(isSectionLocked(sec("user"), "ADMIN")).toBe(false);
-    expect(isSectionLocked(sec("report"), "ADMIN")).toBe(true);
+    expect(isSectionLocked(sec("report"), "ADMIN")).toBe(false);
   });
   // 2026-10-28：营销并入销售管理，段内有订单列表等 L0 叶 → 不锁；/marketing 首页仍靠「优惠券」ready 不锁（见下）
   it("isSectionLocked：销售管理含 L0 叶 → 不整体锁定", () => {

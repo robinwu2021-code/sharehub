@@ -637,6 +637,21 @@ const PATCHES: { file: string; mustContain: string; apply: (rows: Row[]) => void
       });
     },
   },
+  {
+    // 数据报表加「库存报表」（sort 4，排在财务报表后）；原 4 起顺延，报表叶子按 sort 重编号。
+    file: "V206__report_inventory.sql",
+    mustContain: "UPDATE iam_menu SET menu_no = CONCAT('M_tmp206_', id) WHERE parent_no = 'M_report'",
+    apply: (rows) => {
+      const rep = rows.filter((r) => r.parent_no === "M_report");
+      rep.filter((r) => Number(r.sort) >= 4).forEach((r) => { r.sort = String(Number(r.sort) + 1); });
+      rep.forEach((r) => { r.menu_no = `M_report__${r.sort}`; });
+      rows.push({
+        menu_no: "M_report__4", parent_no: "M_report", name: "库存报表", name_en: "Inventory Report", name_ar: "تقرير المخزون", type: "ITEM",
+        path: "/reports?tab=inventory", icon: "NULL", group_name: "NULL", sort: "4", perm: "report:inventory:read",
+        phase: "1", ready: "1", module: "NULL", modules: "NULL", match_paths: "NULL", pin_bottom: "0", portal_for: "NULL",
+      });
+    },
+  },
 ];
 
 const COLS = [

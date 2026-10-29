@@ -3,6 +3,7 @@ import * as db from "../../mock/db";
 import type { ReportApi } from "../contracts/report";
 import type { PageQ, ReportQ, ReportTrendQ, ReportCustomQ } from "../query";
 import { wait } from "./_wait";
+import { inventoryReport } from "../../mock/db/inventory-report";
 import { fail } from "../../biz-error";
 
 export const reportMock: ReportApi = {
@@ -17,4 +18,5 @@ export const reportMock: ReportApi = {
   getScreenBoard: () => wait(db.getScreenBoard()),
   listReportMetrics: () => wait(db.listReportMetrics()),
   getConsumerInsight: () => wait(db.getConsumerInsight()),
+  getInventoryReport: (q) => wait(inventoryReport(q)),
 };

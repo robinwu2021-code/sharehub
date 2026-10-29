@@ -137,6 +137,7 @@ report:*	报表 全部	report	0
 report:consumer:read	消费者分析 查看	report	1
 report:custom:read	自定义报表 查看	report	1
 report:device:read	设备报表 查看	report	1
+report:inventory:read	库存报表 查看	report	1
 report:finance:read	财务报表 查看	report	1
 report:location:read	点位报表 查看	report	1
 report:screen:read	实时大屏 查看	report	1

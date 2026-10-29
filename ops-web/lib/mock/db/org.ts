@@ -204,6 +204,7 @@ const PERM_CATALOG: ReadonlyArray<readonly [string, string]> = [
   ["org:performance:read", "绩效报表 查看"],
 
   ["report:device:read", "设备报表 查看"],
+  ["report:inventory:read", "库存报表 查看"],
   ["report:device:export", "设备报表 导出"],
   ["report:location:read", "点位报表 查看"],
   ["report:location:export", "点位报表 导出"],

@@ -82,6 +82,7 @@ const NAV: Record<string, Pair> = {
   "到仓待检": { en: "Intake Inspection", ar: "فحص الاستلام" },
   "供应商": { en: "Suppliers", ar: "الموردون" },
   "处置出库": { en: "Disposals", ar: "الإخراج والإتلاف" },
+  "库存报表": { en: "Inventory Report", ar: "تقرير المخزون" },
   "仓储与出库": { en: "Stock & Outbound", ar: "المخزون والإخراج" },
   "出库池": { en: "Outbound Pool", ar: "مجمع الإخراج" },
   "仓库": { en: "Warehouses", ar: "المستودعات" },

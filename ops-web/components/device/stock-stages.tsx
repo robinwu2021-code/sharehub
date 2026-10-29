@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import type { StockStage, StockStageCode } from "@/lib/types";
 import { DataTable, type Column } from "@/components/ui/data-table";
 
-const STAGE_LABEL: Record<StockStageCode, string> = {
+export const STAGE_LABEL: Record<StockStageCode, string> = {
   INTAKE: "到仓待检", IN_STOCK: "在仓", IN_TRANSIT: "调拨在途", DISPATCHED: "已发货 · 待签收", ISSUED: "已交付 · 待绑定",
   BOUND: "已绑定 · 待上线", LIVE: "投放中（宝：在柜）", RENTED: "借出", FAULT: "故障", LOST: "遗失", RETIRED: "已离开（报废 / 售出）",
 };

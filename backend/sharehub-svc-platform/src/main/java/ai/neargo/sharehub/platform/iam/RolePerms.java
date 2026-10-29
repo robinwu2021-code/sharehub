@@ -31,7 +31,7 @@ public final class RolePerms {
                     "location:contract:read",
                     "order:order:read", "order:exception:read", "order:exception:handle",
                     "workorder:*", "agent:scope:assign",
-                    "report:device:read", "report:location:read",
+                    "report:device:read", "report:location:read", "report:inventory:read",
                     "system:notify_template:read", "system:dict:read",
                     // —— D6d 权限对账补配（2026-09-23）——
                     // 判据：功能权限清单（RBAC SSOT）明确给了本角色 + 端点确实存在，
@@ -120,7 +120,9 @@ public final class RolePerms {
                     "dashboard:overview:read", "dashboard:todo:read",
                     "device:cabinet:read", "device:cabinet:import", "device:slot:read", "device:powerbank:read",
                     "device:qc:inspect",
-                    "device:inventory:read", "device:inventory:inbound", "device:inventory:transfer", "device:inventory:stocktake"),
+                    "device:inventory:read", "device:inventory:inbound", "device:inventory:transfer", "device:inventory:stocktake",
+                    // 库存报表（V206）
+                    "report:inventory:read"),
             "AGENT", List.of(
                     // 流程与工单（强制方 OpsKit，功能权限清单 §16）
                     "flow:todo:read", "flow:ticket:read", "flow:ticket:handle",

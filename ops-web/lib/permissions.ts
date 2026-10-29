@@ -32,7 +32,7 @@ export const BACKEND_ROLE_PERMS: Record<Role, string[]> = {
     "device:powerbank:*", "device:command:*", "device:inventory:*", "device:ota:*",
     "device:vendor:read", "location:poi:read", "location:venue:read", "location:overview:read", "location:contract:read",
     "order:order:read", "order:exception:read", "order:exception:handle", "workorder:*",
-    "agent:scope:assign", "report:device:read", "report:location:read",
+    "agent:scope:assign", "report:device:read", "report:location:read", "report:inventory:read",
     "system:notify_template:read", "system:dict:read", "system:notify_log:read",
     "system:app_version:read", "system:market:read", "system:param:read",
   ],
@@ -104,6 +104,8 @@ export const BACKEND_ROLE_PERMS: Record<Role, string[]> = {
     "device:cabinet:read", "device:cabinet:import", "device:slot:read", "device:powerbank:read",
     "device:qc:inspect",
     "device:inventory:read", "device:inventory:inbound", "device:inventory:transfer", "device:inventory:stocktake",
+    // 库存报表（V206）
+    "report:inventory:read",
   ],
   AGENT: [
     // 流程与工单（强制方 OpsKit，功能权限清单 §16）

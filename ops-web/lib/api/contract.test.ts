@@ -28,7 +28,7 @@ const API_METHODS: Record<string, readonly string[]> = {
   user: ["listUsers", "setBlacklist", "getUserProfile", "listMembers", "listWallets", "listWalletTxns", "saveMember", "listMemberPlans", "saveMemberPlan", "enableMemberPlan", "disableMemberPlan", "listMemberBenefits", "saveMemberBenefit", "listMemberCards", "grantMemberCard", "saveWallet", "listConsumerSegments", "listUserRisks", "listUserBlacklist", "adjustCreditScore", "listCreditScoreChanges", "listFreeWhitelist", "saveFreeWhitelist", "revokeFreeWhitelist", "listRechargePackages", "saveRechargePackage", "archiveRechargePackage", "unarchiveRechargePackage", "listLogoffs", "revokeLogoff", "listCUserInvoices", "issueCUserInvoice", "rejectCUserInvoice"],
   marketing: ["listCoupons", "saveCoupon", "issueCoupon", "listCouponIssueRecords", "listCampaigns", "listPushMessages", "listReferrals", "listAdSlots", "listAdCampaigns", "listAdDeliveries", "transitionAdCampaign", "listReferralRules", "saveReferralRule", "saveCampaign", "transitionCampaign", "savePushMessage", "sendPushMessage", "finishPushMessage", "saveAdSlot", "saveAdCampaign", "listNotices", "saveNotice", "transitionNotice", "archiveCoupon", "unarchiveCoupon", "archiveNotice", "unarchiveNotice"],
   cs: ["listCsTickets", "getCsTicket", "listCsSessions", "saveCsTicket", "refundCsTicket", "woCsTicket", "listCsMessages", "replyCsSession"],
-  report: ["listReportDevice", "listReportLocation", "listReportFinance", "exportReport", "listReportScreen", "listReportCustom", "getReportTrend", "getScreenBoard", "listReportMetrics", "getConsumerInsight"],
+  report: ["listReportDevice", "listReportLocation", "listReportFinance", "exportReport", "listReportScreen", "listReportCustom", "getReportTrend", "getScreenBoard", "listReportMetrics", "getConsumerInsight", "getInventoryReport"],
   org: ["listEmployees", "listRoles", "listAudits", "listDepartments", "listStaffPerformance", "saveDepartment", "saveRoleRow", "saveEmployee", "resetEmployeeCredential", "getDataScope", "saveDataScope", "listAllMenus", "updateMenu", "listPermissions", "listRolePermissions", "saveRolePermissions", "getAuditDetail", "archiveRole", "unarchiveRole"],
   system: ["uploadFile", "fileUrl", "fileBlobUrl", "listBrands", "saveBrand", "archiveBrand", "unarchiveBrand", "listVendors", "saveVendor", "testVendorConnectivity", "listNotifyTemplates", "listDictEntries", "listRegions", "listSysParams", "getTimezoneOptions", "listOpenApiApps", "listMarketCountries", "saveNotifyTemplate", "saveDictEntry", "saveRegion", "saveSysParam", "saveOpenApiApp", "saveMarketCountry", "listRegionTree", "previewNotifyTemplate", "testSendNotifyTemplate", "resetOpenApiAppSecret", "listPaymentChannels", "savePaymentChannel", "listNotifyLogs", "getNotifyLogStats", "resendNotifyLog", "listNotifyBlacklist", "saveNotifyBlacklist", "releaseNotifyBlacklist", "getBizRules", "saveBizRules", "listLoginSettings", "saveLoginSetting", "listAppVersions", "saveAppVersion", "rollbackAppVersion", "listBanks", "saveBank", "listProblems", "saveProblem", "listTaxSettings", "saveTaxSetting", "archiveBank", "unarchiveBank", "archiveProblem", "unarchiveProblem"],
   operation: ["getOperationOverview", "getSiteStats", "pauseSite", "resumeSite", "listPriceAdjustments", "savePriceAdjustment", "cancelPriceAdjustment", "revertPriceAdjustment", "retryPriceAdjustment", "listSiteSharing", "getSiteSharingStats", "listPayeeSharing"],
@@ -85,7 +85,7 @@ describe("域切片划分", () => {
     expect(sorted(keysOf((HTTP_SLICES as Record<string, object>)[domain]))).toEqual(expected);
   });
 
-  it("方法总数仍为 493（新增/删除 API 时须自觉更新此数）", () => {
+  it("方法总数仍为 494（新增/删除 API 时须自觉更新此数）", () => {
     // 2026-09-23：差异化定价 2 个退役，适用范围 3 个新增（ADR-028 / V49），净 +1。
     // 2026-09-23 B1：品牌四个端点（list/save/archive/unarchive）。
         // 2026-09-23 A2-1：站点伙伴责任三个端点。
@@ -134,6 +134,6 @@ describe("域切片划分", () => {
     // 449：+1 = listPayables（跨期应付 SHR-05，2026-10-29）
     // 452：+3 = 资金操作审批 list / approve / reject（SEC-03，V189，2026-10-29）
     // 454：+2 = 商家门户我的自开票 list / pdf（2026-10-29）
-    expect(ALL_METHODS.length).toBe(493);
+    expect(ALL_METHODS.length).toBe(494);
   });
 });

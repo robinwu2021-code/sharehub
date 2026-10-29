@@ -48,7 +48,11 @@ public class ReportController {
     private final PermChecker perm;
     private final ExportSupport exports;
 
-    public ReportController(ReportService reportService, PermChecker perm, ExportSupport exports) {
+    private final ai.neargo.sharehub.inv.service.InventoryReportService inventoryReports;
+
+    public ReportController(ReportService reportService, PermChecker perm, ExportSupport exports,
+                            ai.neargo.sharehub.inv.service.InventoryReportService inventoryReports) {
+        this.inventoryReports = inventoryReports;
         this.reportService = reportService;
         this.perm = perm;
         this.exports = exports;
@@ -125,6 +129,15 @@ public class ReportController {
                                                @RequestParam(required = false) String keyword,
                                                @RequestParam(required = false) String period) {
         return reportService.location(page, size, keyword, period);
+    }
+
+    /** 库存报表（V206）：现算，不走 T+1 快照；期间默认本月。 */
+    @GetMapping("/inventory")
+    @PreAuthorize("@perm.can('report:inventory:read')")
+    public ai.neargo.sharehub.inv.dto.InventoryReportDtos.InventoryReport inventory(
+            @RequestParam(required = false) java.time.LocalDate from, @RequestParam(required = false) java.time.LocalDate to,
+            @RequestParam(required = false) String warehouseNo) {
+        return inventoryReports.report(from, to, warehouseNo);
     }
 
     @GetMapping("/finance")

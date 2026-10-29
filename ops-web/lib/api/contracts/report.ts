@@ -6,7 +6,7 @@
 import type { PageQ, ReportQ, ReportTrendQ, ReportCustomQ, ExportFormat, ReportExportQ } from "../query";
 import type {
   PageResult, ReportDevice, ReportLocation, ReportFinance, ReportScreen, ReportCustom,
-  ReportTrend, ReportMetricDef, ScreenBoard, ConsumerInsight,
+  ReportTrend, ReportMetricDef, ScreenBoard, ConsumerInsight, InventoryReport,
 } from "../../types";
 
 export interface ReportApi {
@@ -25,4 +25,6 @@ export interface ReportApi {
   listReportMetrics(): Promise<ReportMetricDef[]>;
   /** 消费者洞察：转化漏斗 + 画像分布。 */
   getConsumerInsight(): Promise<ConsumerInsight>;
+  /** 库存报表（V206）：from / to 为 yyyy-MM-dd，空取本月。 */
+  getInventoryReport(q?: { from?: string; to?: string; warehouseNo?: string }): Promise<InventoryReport>;
 }

@@ -453,6 +453,8 @@ export const NAV: NavSection[] = [
       { href: "/reports?tab=device", label: "设备运营分析", perm: "report:device:read", phase: 2 },
       { href: "/reports?tab=location", label: "点位坪效", perm: "report:location:read", phase: 2 },
       { href: "/reports?tab=finance", label: "财务报表", phase: 2, perm: "report:finance:read" },
+      // 库存报表（V206）：现算，阶段 / 各仓进出 / 处置 / 采购金额
+      { href: "/reports?tab=inventory", label: "库存报表", perm: "report:inventory:read", phase: 1, ready: true },
       { href: "/reports?tab=screen", label: "实时大屏", phase: 3, perm: "report:screen:read" },
       { href: "/reports?tab=custom", label: "自定义报表", phase: 3, perm: "report:custom:read" },
       { href: "/reports?tab=consumer", label: "消费者分析", phase: 3, perm: "report:consumer:read" },

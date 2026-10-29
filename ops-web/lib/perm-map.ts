@@ -234,6 +234,7 @@ export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   "report:custom:read": "report:custom:read",
   "report:device:export": "report:device:export",
   "report:device:read": "report:device:read",
+  "report:inventory:read": "report:inventory:read", // V206：库存报表
   "report:finance:export": "report:finance:export",
   "report:finance:read": "report:finance:read",
   "report:location:export": "report:location:export",
