@@ -14236,6 +14236,23 @@
   },
   {
    "verb": "GET",
+   "path": "/api/ops/inventory/warehouses",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#warehouses",
+   "summary": "",
+   "params": [],
+   "bodyType": null,
+   "returnType": "java.util.List<ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseItem>",
+   "returnContainer": null,
+   "returnElement": "java.util.List<ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseItem>",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
    "path": "/api/ops/leads",
    "perm": "location:crm:read",
    "perms": [
@@ -49278,9 +49295,9 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 555,
-  "records": 518,
-  "withPerm": 475,
+  "endpoints": 556,
+  "records": 519,
+  "withPerm": 476,
   "withBody": 233,
   "shapedResponses": 433
  }

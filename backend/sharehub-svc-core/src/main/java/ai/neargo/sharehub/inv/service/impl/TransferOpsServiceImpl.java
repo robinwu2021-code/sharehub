@@ -71,6 +71,13 @@ public class TransferOpsServiceImpl implements TransferOpsService {
     private final PowerbankMapper powerbanks;
     private final CabinetLifecycleService lifecycle;
     private final SysParamPort params;
+    /** 默认回仓规则的唯一实现（与出库池退回共用）。 */
+    private ai.neargo.sharehub.inv.WarehouseDirectory warehouseDirectory;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setWarehouseDirectory(ai.neargo.sharehub.inv.WarehouseDirectory warehouseDirectory) {
+        this.warehouseDirectory = warehouseDirectory;
+    }
 
     public TransferOpsServiceImpl(InvTransferMapper transfers, InvTransferItemMapper items, InvAssetDiffMapper diffs,
                                   InvWarehouseMapper warehouses, InvTransferStateMachine sm, CabinetMapper cabinets,
@@ -277,13 +284,7 @@ public class TransferOpsServiceImpl implements TransferOpsService {
     }
 
     private InvWarehouse returnWarehouse() {
-        // 配了且存在就用配的仓；否则取第一个仓 —— 单仓运营时不必额外配置
-        String configured = params.textOf("inv.return_warehouse", null);
-        if (configured != null) {
-            InvWarehouse w = warehouses.selectOne(new LambdaQueryWrapper<InvWarehouse>().eq(InvWarehouse::getWarehouseNo, configured).last("limit 1"));
-            if (w != null) return w;
-        }
-        return warehouses.selectOne(new LambdaQueryWrapper<InvWarehouse>().orderByAsc(InvWarehouse::getId).last("limit 1"));
+        return warehouseDirectory.defaultReturn();
     }
 
     // —— 工具 ——

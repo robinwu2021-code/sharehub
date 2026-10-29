@@ -80,6 +80,17 @@ export interface PoolReturnReq {
   warehouseNo?: string;
   reason: string;
 }
+/**
+ * 仓库（GET /api/ops/inventory/warehouses，只读）。过渡期由迁移种入（V182：每个酋长国一个），
+ * 仓库管理将来在独立库存服务里做。isDefault = 撤机回仓与出库池退回不选仓时落到的仓。
+ */
+export interface Warehouse {
+  warehouseNo: string;
+  name: string;
+  regionId: string | null;
+  address: string | null;
+  isDefault: boolean;
+}
 /** 出库池按商家汇总（GET /api/ops/inventory/issued-summary）。 */
 export interface IssuedSummary {
   agentNo: string;

@@ -26,11 +26,22 @@ public class InventoryController {
 
     private final InventoryTransferService transferService;
     private final CommandLogService commandLogService;
+    private final ai.neargo.sharehub.inv.WarehouseDirectory warehouses;
 
     public InventoryController(InventoryTransferService transferService,
-                               CommandLogService commandLogService) {
+                               CommandLogService commandLogService,
+                               ai.neargo.sharehub.inv.WarehouseDirectory warehouses) {
         this.transferService = transferService;
         this.commandLogService = commandLogService;
+        this.warehouses = warehouses;
+    }
+
+    // —— 仓库（只读，过渡期：仓库由迁移种入，管理将来在独立库存服务里做）——
+
+    @GetMapping("/inventory/warehouses")
+    @PreAuthorize("@perm.can('device:inventory:read')")
+    public java.util.List<ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseItem> warehouses() {
+        return warehouses.list();
     }
 
     // —— 库存调拨（菜单叶：设备管理 › 库存调拨）——

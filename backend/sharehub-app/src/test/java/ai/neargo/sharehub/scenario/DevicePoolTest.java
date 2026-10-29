@@ -137,12 +137,41 @@ class DevicePoolTest extends ApiTestSupport {
         String admin = login("ADMIN");
 
         assertThat(post("/api/ops/devices/pool-return", Map.of("cabinetNos", List.of(c)), admin).status).isEqualTo(400);
-        post("/api/ops/devices/pool-return", Map.of("cabinetNos", List.of(c), "warehouseNo", "WH-T", "reason", "多出库了一台"), admin).okData();
+        post("/api/ops/devices/pool-return", Map.of("cabinetNos", List.of(c), "warehouseNo", "WH002", "reason", "多出库了一台"), admin).okData();
         Map<String, Object> r = row(c);
         assertThat(r.get("issued_agent_no")).isNull();
-        assertThat(r.get("warehouse_no")).isEqualTo("WH-T");
+        assertThat(r.get("warehouse_no")).isEqualTo("WH002");
         assertThat(post("/api/ops/devices/pool-return", Map.of("cabinetNos", List.of(c), "reason", "再退一次"), admin).status)
                 .as("不在出库池的不能再退").isEqualTo(409);
+    }
+
+    @Test
+    @DisplayName("★ 退回仓库不填仓 → 落到默认回仓仓（V182 种的迪拜仓），不再落到「不在任何仓」；填了不存在的仓 → 400（项目约定 notFound 为 400）")
+    void return_to_warehouse_defaults_and_validates() {
+        String agentNo = merchant(true);
+        String c = cabinet();
+        issue(agentNo, List.of(c)).okData();
+        String admin = login("ADMIN");
+
+        assertThat(post("/api/ops/devices/pool-return",
+                Map.of("cabinetNos", List.of(c), "warehouseNo", "WH-NOPE", "reason", "填错仓"), admin).status)
+                .as("仓号不存在").isEqualTo(400);
+        assertThat(row(c).get("issued_agent_no")).as("被拒时不能半成功").isEqualTo(agentNo);
+
+        post("/api/ops/devices/pool-return", Map.of("cabinetNos", List.of(c), "reason", "不填仓"), admin).okData();
+        assertThat(row(c).get("warehouse_no")).as("默认回仓仓").isEqualTo("WH001");
+    }
+
+    @Test
+    @DisplayName("仓库只读列表：四个酋长国各一个仓，迪拜仓标为默认回仓")
+    void warehouses_are_listed_with_the_default_marked() {
+        String admin = login("ADMIN");
+        com.fasterxml.jackson.databind.JsonNode list = get("/api/ops/inventory/warehouses", admin).okData();
+        List<String> nos = new java.util.ArrayList<>();
+        list.forEach(w -> nos.add(w.path("warehouseNo").asText()));
+        assertThat(nos).contains("WH001", "WH002", "WH003", "WH004");
+        list.forEach(w -> assertThat(w.path("isDefault").asBoolean())
+                .as(w.path("warehouseNo").asText() + " 的默认标记").isEqualTo("WH001".equals(w.path("warehouseNo").asText())));
     }
 
     @Test

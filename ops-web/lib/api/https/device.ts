@@ -123,6 +123,7 @@ export const deviceHttp: DeviceApi = {
   issueDevices: (x) => client.post("/api/ops/devices/issue", x),
   returnPoolDevices: (x) => client.post("/api/ops/devices/pool-return", x),
   issuedSummary: (agentNo) => client.get("/api/ops/inventory/issued-summary", agentNo ? { agentNo } : {}),
+  listWarehouses: () => client.get("/api/ops/inventory/warehouses"),
   // 绑定（商户入驻会话 ae233365 · V164）：不给点位 = 出库池商家默认站点的默认点位；
   // 点位商家 ≠ 出库池商家 409 error.bind.agent_mismatch；批量一个事务。错误文案由后端按语言给。
   bindDevice: (no, x) => client.post(`/api/ops/devices/${no}/bind`, x ?? {}),

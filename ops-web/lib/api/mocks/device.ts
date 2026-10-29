@@ -89,6 +89,7 @@ export const deviceMock: DeviceApi = {
   issueDevices: async (x) => wait(dp.issueDevices(x), 400),
   returnPoolDevices: async (x) => wait(dp.returnDevicesToWarehouse(x), 400),
   issuedSummary: async (agentNo) => wait(dp.issuedSummary(agentNo)),
+  listWarehouses: async () => wait(dp.listWarehouses()),
   bindDevice: async (no, x) => wait(dp.bindDevice(no, x), 400),
   bindDevices: async (x) => wait(dp.bindDevices(x), 500),
   unbindDevice: async (no, reason) => wait(dp.unbindDevice(no, reason), 400),

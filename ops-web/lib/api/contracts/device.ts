@@ -5,7 +5,7 @@ import type {
   InventoryTransfer, InventoryTransferDetail, OtaRollout, OtaRelease, OtaTask, DeviceLog, DeviceCodeBatch,
   Checklist, TrialRent, Protection, ProtectionReq, SignalCode,
   InvTransferReq, QcReq, QcRecord, ReceiveResult, AssetDiff, AssetDiffStatus, PowerbankAction,
-  IssueDevicesReq, PoolReturnReq, IssuedSummary, BindReq, BindBatchReq, BindResult,
+  IssueDevicesReq, PoolReturnReq, IssuedSummary, Warehouse, BindReq, BindBatchReq, BindResult,
 } from "../../types";
 
 export interface DeviceApi {
@@ -139,6 +139,8 @@ export interface DeviceApi {
   returnPoolDevices(x: PoolReturnReq): Promise<Cabinet[]>;
   /** 出库池按商家汇总：未绑定 / 已绑定 / 已上线。 */
   issuedSummary(agentNo?: string): Promise<IssuedSummary[]>;
+  /** 仓库只读列表（过渡期；选仓下拉用）。 */
+  listWarehouses(): Promise<Warehouse[]>;
   /** 绑定：不给点位 = 出库池商家的默认站点默认点位；点位商家 ≠ 出库池商家 409。 */
   bindDevice(deviceNo: string, x?: BindReq): Promise<BindResult>;
   /** 批量绑定：一个事务。 */

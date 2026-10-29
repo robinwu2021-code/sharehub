@@ -11,8 +11,7 @@
 //   I4 一个事务：批量动作先全部校验，任一不过整批不动
 //   I5 平台直营站点（站点无商家）的设备不经出库池：可从仓直接绑定
 import type {
-  Cabinet, IssueDevicesReq, PoolReturnReq, IssuedSummary, BindReq, BindBatchReq, BindResult, SitePoint,
-} from "../../types";
+  Cabinet, IssueDevicesReq, PoolReturnReq, IssuedSummary, BindReq, BindBatchReq, BindResult, SitePoint, Warehouse } from "../../types";
 import { agentCoreComplete } from "../../types";
 import { cabinets } from "./device";
 import { sites, locations, ensureDefaultPoint } from "./location";
@@ -20,8 +19,19 @@ import { agents, syncDefaultSite, saveSiteAgent, listSiteAgents } from "./agent"
 import { createWorkOrder } from "./workorder";
 import { fail, notFound } from "@/lib/biz-error";
 
-/** 演示仓：S10 指出生产里仓库主数据还没有读写端点，mock 先固定一个。 */
-export const POOL_WAREHOUSE = "WH-DXB01";
+/** 仓库：与后端 V182 种的四个仓同号同名；默认回仓为迪拜仓（inv.return_warehouse）。 */
+export const WAREHOUSES: Warehouse[] = [
+  { warehouseNo: "WH001", name: "迪拜仓", regionId: "AE-DU", address: null, isDefault: true },
+  { warehouseNo: "WH002", name: "阿布扎比仓", regionId: "AE-AZ", address: null, isDefault: false },
+  { warehouseNo: "WH003", name: "沙迦仓", regionId: "AE-SH", address: null, isDefault: false },
+  { warehouseNo: "WH004", name: "阿治曼仓", regionId: "AE-AJ", address: null, isDefault: false },
+];
+/** 演示设备默认所在仓 = 默认回仓仓。 */
+export const POOL_WAREHOUSE = "WH001";
+
+export function listWarehouses(): Warehouse[] {
+  return WAREHOUSES.map((w) => ({ ...w }));
+}
 
 const now = () => new Date().toISOString();
 const agentOf = (agentNo: string) => agents.find((a) => a.agentNo === agentNo) ?? notFound("商家", "Merchant", agentNo);
@@ -124,7 +134,11 @@ export function returnDevicesToWarehouse(x: PoolReturnReq): Cabinet[] {
     return [];
   });
   if (bad.length) fail(`退回被拒（整批未动）：${bad.join("；")}`, `Return rejected (nothing changed): ${bad.join("; ")}`);
-  for (const c of rows) Object.assign(c, { issuedAgentNo: null, issuedAt: null, warehouseNo: x.warehouseNo || POOL_WAREHOUSE });
+  // 与后端同：不选仓 → 默认回仓仓；选了不存在的仓 → notFound（此前不填会落到「不在任何仓」）
+  const wh = x.warehouseNo?.trim() || WAREHOUSES.find((w) => w.isDefault)?.warehouseNo;
+  if (!wh) fail("还没有任何仓库，无法退回仓库", "No warehouse exists yet");
+  if (!WAREHOUSES.some((w) => w.warehouseNo === wh)) notFound("仓库", "Warehouse", wh!);
+  for (const c of rows) Object.assign(c, { issuedAgentNo: null, issuedAt: null, warehouseNo: wh });
   return rows;
 }
 

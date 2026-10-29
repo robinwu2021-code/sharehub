@@ -45,10 +45,13 @@ public class CabinetPoolServiceImpl implements CabinetPoolService {
 
     private final CabinetMapper cabinets;
     private final AgentDirectoryPort agents;
+    private final ai.neargo.sharehub.dev.port.WarehouseLookup warehouseLookup;
 
-    public CabinetPoolServiceImpl(CabinetMapper cabinets, AgentDirectoryPort agents) {
+    public CabinetPoolServiceImpl(CabinetMapper cabinets, AgentDirectoryPort agents,
+                                  ai.neargo.sharehub.dev.port.WarehouseLookup warehouseLookup) {
         this.cabinets = cabinets;
         this.agents = agents;
+        this.warehouseLookup = warehouseLookup;
     }
 
     @Override
@@ -91,7 +94,16 @@ public class CabinetPoolServiceImpl implements CabinetPoolService {
     public List<Cabinet> returnToWarehouse(List<String> cabinetNos, String warehouseNo, String reason) {
         if (reason == null || reason.isBlank()) throw BizException.badRequest("error.common.reason_required");
         List<String> nos = distinct(cabinetNos);
-        String wh = warehouseNo == null || warehouseNo.isBlank() ? null : warehouseNo.trim();
+        // 不填仓 → 默认回仓仓；填了但不存在 → notFound（400）；一个仓都没有 → 409。
+        // 此前不填就写 null：设备落到「在库、不在任何仓、也不在出库池」，在台账上等于失踪
+        String wh;
+        if (warehouseNo == null || warehouseNo.isBlank()) {
+            wh = warehouseLookup.defaultReturnWarehouse();
+            if (wh == null) throw BizException.conflict("error.issue.no_warehouse");
+        } else {
+            wh = warehouseNo.trim();
+            if (!warehouseLookup.exists(wh)) throw BizException.notFound(wh);
+        }
         List<Cabinet> out = new ArrayList<>();
         for (String no : nos) {
             DevCabinet c = require(no);

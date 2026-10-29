@@ -304,6 +304,8 @@ function ReasonDrawer({ target, onClose, onDone }: {
   const [reason, setReason] = useState("");
   const [warehouseNo, setWarehouseNo] = useState("");
   const isReturn = target?.kind === "return";
+  const whQ = useQuery({ queryKey: ["warehouses"], queryFn: () => api.listWarehouses(), enabled: isReturn });
+  const defaultWh = whQ.data?.find((w) => w.isDefault);
   const m = useMutation({
     mutationFn: async () => isReturn
       ? api.returnPoolDevices({ cabinetNos: target!.cabinetNos, reason, warehouseNo: warehouseNo || undefined })
@@ -322,8 +324,11 @@ function ReasonDrawer({ target, onClose, onDone }: {
         <Textarea value={reason} onChange={setReason} placeholder={isReturn ? "如：多发了 / 商家暂不需要" : "如：换点位"} />
       </Field>
       {isReturn && (
-        <Field label="退回到仓（可选）">
-          <Input value={warehouseNo} onChange={(e) => setWarehouseNo(e.target.value)} placeholder="不填按系统默认回仓" />
+        <Field label="退回到仓">
+          <Select aria-label="退回到仓" value={warehouseNo} onChange={(e) => setWarehouseNo(e.target.value)}>
+            <option value="">默认回仓仓{defaultWh ? `（${defaultWh.name}）` : ""}</option>
+            {(whQ.data ?? []).map((w) => <option key={w.warehouseNo} value={w.warehouseNo}>{w.name} · {w.warehouseNo}</option>)}
+          </Select>
         </Field>
       )}
       <div className="txt-caption text-muted-foreground">设备：{target?.cabinetNos.join("、")}</div>

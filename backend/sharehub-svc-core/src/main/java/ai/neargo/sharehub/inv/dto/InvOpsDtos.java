@@ -21,6 +21,10 @@ public final class InvOpsDtos {
                                 List<AssetDiff> diffs) {
     }
 
+    /** 仓库（只读，过渡期）。isDefault = 撤机回仓与出库池退回不填仓时落到的仓。 */
+    public record WarehouseItem(String warehouseNo, String name, String regionId, String address, boolean isDefault) {
+    }
+
     public record ResolveReq(String note) {
     }
 
