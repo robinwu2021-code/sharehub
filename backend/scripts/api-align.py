@@ -59,12 +59,13 @@ def scan_frontend_calls():
 # 除了 client.get/post/…，两端还有**不带动词名的助手**，它们也是真实调用：
 #   · upload / uploadFile   → POST（multipart，必须让浏览器/端自己拼 boundary，所以不走 client.post）
 #   · downloadAuthed / fetchBlobUrl → GET（取受鉴权保护的二进制：<img>/<image> 发不了 Authorization 头）
+#   · downloadFile → GET（ops-web 后端导出 Excel / PDF / zip，K8，2026-10-29）
 # 不认它们的后果不是漏防，而是**误报成「后端建了、前端没调」**：
 # `/api/platform/files` 的上传与下载就这样被当成缺口写进了台账（2026-09-28 查实并删除），
 # 而台账上的假条目会让人去做不存在的工作 —— 与本文件 84% 误报那次同形。
-HELPER_VERB = {'upload': 'POST', 'uploadFile': 'POST', 'downloadAuthed': 'GET', 'fetchBlobUrl': 'GET'}
+HELPER_VERB = {'upload': 'POST', 'uploadFile': 'POST', 'downloadAuthed': 'GET', 'fetchBlobUrl': 'GET', 'downloadFile': 'GET'}
 VERB_CALL = re.compile(
-    r'\b(get|post|put|del|delete|patch|upload|uploadFile|downloadAuthed|fetchBlobUrl)\s*(?:<[^()]*>)?\s*\(')
+    r'\b(get|post|put|del|delete|patch|upload|uploadFile|downloadAuthed|fetchBlobUrl|downloadFile)\s*(?:<[^()]*>)?\s*\(')
 PATH_LIT = re.compile(r'[`"\'](/(?:api|internal|mp)/[^`"\']*)[`"\']')
 
 

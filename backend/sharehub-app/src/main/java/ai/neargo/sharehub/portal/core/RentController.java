@@ -37,11 +37,14 @@ public class RentController {
     private final PaymentService payments;
     private final BizRuleService bizRules;
     private final ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoices;
+    private final ai.neargo.sharehub.portal.finance.TaxInvoiceDocuments taxInvoiceDocs;
 
     public RentController(RentOrderService orders, PaymentService payments, BizRuleService bizRules,
                           ConsumerOrderAssembler cards,
-                          ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoices) {
+                          ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoices,
+                          ai.neargo.sharehub.portal.finance.TaxInvoiceDocuments taxInvoiceDocs) {
         this.taxInvoices = taxInvoices;
+        this.taxInvoiceDocs = taxInvoiceDocs;
         this.cards = cards;
         this.orders = orders;
         this.payments = payments;
@@ -107,6 +110,18 @@ public class RentController {
         ConsumerContext.assertOwner(o.cUserNo());
         return taxInvoices.listForUser(o.cUserNo(), orderNo).stream()
                 .map(ai.neargo.sharehub.portal.finance.TaxInvoiceView::of).toList();
+    }
+
+    /** 下载本人某张税务票据的 PDF（K8 / RQ-APP-05）。票必须属于这张单，单必须属于本人。 */
+    @GetMapping("/orders/{orderNo}/invoices/{invoiceNo}/pdf")
+    public void invoicePdf(@PathVariable String orderNo, @PathVariable String invoiceNo,
+                           jakarta.servlet.http.HttpServletResponse response) throws java.io.IOException {
+        RentOrder o = orders.detailForConsumer(orderNo);
+        ConsumerContext.assertOwner(o.cUserNo());
+        var t = taxInvoices.listForUser(o.cUserNo(), orderNo).stream()
+                .filter(x -> x.getInvoiceNo().equals(invoiceNo)).findFirst()
+                .orElseThrow(() -> ai.neargo.sharehub.common.BizException.notFound(invoiceNo));
+        taxInvoiceDocs.pdf(t).writeTo(response);
     }
 
     @PostMapping("/orders/{orderNo}/buyout")

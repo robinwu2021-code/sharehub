@@ -44,6 +44,12 @@
       <groupId>ai.neargo</groupId>
       <artifactId>neargo-common-core</artifactId>
     </dependency>
+    <!-- 后端 PDF 导出（运营方原始需求 K8 / RQ-RPT-03 / RQ-INV-06~08，2026-10-29）。Excel 自写最小 xlsx，不引 POI -->
+    <dependency>
+      <groupId>org.apache.pdfbox</groupId>
+      <artifactId>pdfbox</artifactId>
+      <version>3.0.8</version>
+    </dependency>
     <dependency>
       <groupId>ai.neargo</groupId>
       <artifactId>neargo-common-security</artifactId>

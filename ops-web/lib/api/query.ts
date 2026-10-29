@@ -94,6 +94,10 @@ export type ReconQ = PageQ & { status?: string; handleStatus?: string };
 export type InvoiceQ = PageQ & { status?: string };
 /** 租赁税务票据（V181）：按订单号精确查，按票种/状态筛。 */
 export type TaxInvoiceQ = PageQ & { orderNo?: string; kind?: string; status?: string };
+/** 后端导出（K8）：报表 xlsx / pdf；税务发票再加 zip（批量 PDF）与开票日期区间（业务日，含两端）。 */
+export type ExportFormat = "xlsx" | "pdf";
+export type ReportExportQ = { keyword?: string; period?: string };
+export type TaxInvoiceExportQ = { format: ExportFormat | "zip"; orderNo?: string; kind?: string; status?: string; from?: string; to?: string };
 /** 充值订单：状态 + 日期范围。 */
 export type RechargeQ = PageQ & { status?: string; from?: string; to?: string };
 /** 免费订单：按减免原因筛选。 */

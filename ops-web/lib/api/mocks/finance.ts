@@ -7,6 +7,7 @@ import { currentAuth } from "../../auth";
 import type { FinanceApi } from "../contracts/finance";
 import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ, TaxInvoiceQ, ReportQ, WithdrawalQ } from "../query";
 import { wait } from "./_wait";
+import { fail } from "../../biz-error";
 
 export const financeMock: FinanceApi = {
   // 收款账户（B3）：写操作走 db 层（「恰好一个默认」与「默认不能直接停」都在那强制）
@@ -57,6 +58,9 @@ export const financeMock: FinanceApi = {
   listTaxInvoices: (q: TaxInvoiceQ = {}) => wait(db.listTaxInvoices(q)),
   getTaxInvoice: async (invoiceNo) => wait(db.getTaxInvoice(invoiceNo)),
   retryTaxInvoice: async (invoiceNo) => wait(db.retryTaxInvoice(invoiceNo)),
+  // 文件由后端生成；演示数据模式如实拒绝，不下载假文件
+  exportTaxInvoices: async () => fail("演示数据模式不生成文件，接真后端后可导出", "Export needs the real backend; not available in demo mode"),
+  downloadTaxInvoicePdf: async () => fail("演示数据模式不生成文件，接真后端后可下载", "Download needs the real backend; not available in demo mode"),
   // async：让校验抛的 ApiError 变成 rejected promise，交给全局 MutationCache 弹错
   //（同 saveSite 的理由——同步抛出时那条「请选择分成方」根本到不了界面上）
   saveShareRule: async (x) => wait(db.saveShareRule(x), 350),

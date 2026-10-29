@@ -47,6 +47,7 @@ public class FinanceController {
     private final ReconcileService reconcileService;
     private final InvoiceService invoiceService;
     private final ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoiceService;
+    private final TaxInvoiceDocuments taxInvoiceDocs;
 
     public FinanceController(ShareService shareService, SettlementService settlementService,
                              WithdrawalService withdrawalService,
@@ -54,8 +55,10 @@ public class FinanceController {
                              InvoiceService invoiceService,
                              ai.neargo.sharehub.finance.service.LedgerService ledgerService,
                              ai.neargo.sharehub.trade.order.service.DepositService depositService,
-                             ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoiceService) {
+                             ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoiceService,
+                             TaxInvoiceDocuments taxInvoiceDocs) {
         this.taxInvoiceService = taxInvoiceService;
+        this.taxInvoiceDocs = taxInvoiceDocs;
         this.ledgerService = ledgerService;
         this.depositService = depositService;
         this.shareService = shareService;
@@ -388,6 +391,57 @@ public class FinanceController {
     @PreAuthorize("@perm.can('finance:invoice:read')")
     public TaxInvoiceView taxInvoice(@PathVariable String invoiceNo) {
         return TaxInvoiceView.of(taxInvoiceService.get(invoiceNo));
+    }
+
+    /**
+     * 导出（K8 / RQ-INV-07~08）：{@code format=xlsx|pdf} 出登记表，{@code format=zip} 把区间内已开出的票逐张出 PDF 打包。
+     * 日期是业务日（含两端）。登记表上限 {@link ai.neargo.sharehub.portal.shared.ExportSupport#MAX_ROWS} 行，
+     * 打包上限 {@link TaxInvoiceDocuments#MAX_ZIP} 张 —— 超了 400，让人缩小区间，而不是悄悄少给。
+     * 静态段 {@code /export} 优先于 {@code /{invoiceNo}} 匹配。
+     */
+    @GetMapping("/api/trade/tax-invoices/export")
+    @PreAuthorize("@perm.can('finance:invoice:read')")
+    public void exportTaxInvoices(@RequestParam(required = false) String format,
+                                  @RequestParam(required = false) String orderNo,
+                                  @RequestParam(required = false) String kind,
+                                  @RequestParam(required = false) String status,
+                                  @RequestParam(required = false) String from,
+                                  @RequestParam(required = false) String to,
+                                  jakarta.servlet.http.HttpServletResponse response) throws java.io.IOException {
+        java.time.LocalDate f = day(from, "from");
+        java.time.LocalDate t = day(to, "to");
+        String filter = java.util.stream.Stream.of(orderNo, kind, status, from == null ? null : from + " ~ " + (to == null ? "" : to))
+                .filter(v -> v != null && !v.isBlank()).collect(java.util.stream.Collectors.joining(" · "));
+        if ("zip".equalsIgnoreCase(format == null ? "" : format.trim())) {
+            var list = taxInvoiceService.listForExport(orderNo, kind, ai.neargo.sharehub.trade.order.service.TaxInvoiceService.ISSUED, f, t, TaxInvoiceDocuments.MAX_ZIP + 1);
+            if (list.size() > TaxInvoiceDocuments.MAX_ZIP) {
+                throw ai.neargo.sharehub.common.BizException.badRequest("error.export.too_many", TaxInvoiceDocuments.MAX_ZIP);
+            }
+            taxInvoiceDocs.zip(list, "tax-invoices-" + (from == null ? "all" : from) + (to == null ? "" : "_" + to)).writeTo(response);
+            return;
+        }
+        int cap = ai.neargo.sharehub.portal.shared.ExportSupport.MAX_ROWS;
+        var list = taxInvoiceService.listForExport(orderNo, kind, status, f, t, cap + 1);
+        boolean truncated = list.size() > cap;
+        taxInvoiceDocs.register(ai.neargo.sharehub.common.export.ExportFormat.of(format),
+                truncated ? list.subList(0, cap) : list, truncated, filter).writeTo(response);
+    }
+
+    /** 单张票 PDF（RQ-INV-06）。BLOCKED 的票 409。 */
+    @GetMapping("/api/trade/tax-invoices/{invoiceNo}/pdf")
+    @PreAuthorize("@perm.can('finance:invoice:read')")
+    public void taxInvoicePdf(@PathVariable String invoiceNo,
+                              jakarta.servlet.http.HttpServletResponse response) throws java.io.IOException {
+        taxInvoiceDocs.pdf(taxInvoiceService.get(invoiceNo)).writeTo(response);
+    }
+
+    private static java.time.LocalDate day(String v, String name) {
+        if (v == null || v.isBlank()) return null;
+        try {
+            return java.time.LocalDate.parse(v.trim());
+        } catch (java.time.format.DateTimeParseException e) {
+            throw ai.neargo.sharehub.common.BizException.badRequest("error.common.invalid_value", name);
+        }
     }
 
     /** BLOCKED（开票主体不全）的票在补齐主体后重开；ISSUED 的不可动。 */

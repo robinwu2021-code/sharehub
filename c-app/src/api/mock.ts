@@ -122,6 +122,8 @@ export const mockApi: McpApi = {
     db.delay(withEstimate(db.orders.find((o) => o.status === "IN_USE" || o.status === "DISPENSING") ?? null)),
   // 运营方缺省不开 C 端税务发票（invoice.b2c.enabled=0），mock 与之一致
   orderInvoices: (_orderNo: string) => db.delay([] as TaxInvoice[]),
+  // mock 下没有票（开关缺省关），也就没有可下载的 PDF
+  invoicePdf: (_orderNo: string, invoiceNo: string) => Promise.reject(new Error(`no invoice ${invoiceNo} in mock`)),
   buyout: (orderNo: string) => {
     const o = db.orders.find((x) => x.orderNo === orderNo);
     if (o) {

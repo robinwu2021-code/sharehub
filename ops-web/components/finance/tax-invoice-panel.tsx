@@ -14,6 +14,7 @@ import { FilterSelect } from "@/components/ui/filter-select";
 import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
 import { Drawer, Field } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { Notice } from "@/components/ui/notice";
 import { ReadOnlyNotice } from "@/components/read-only-notice";
 import { StateActions } from "@/components/state-actions";
@@ -51,6 +52,17 @@ export function TaxInvoicePanel() {
   const [kind, setKind] = React.useState("");
   const [status, setStatus] = React.useState("");
   const [detail, setDetail] = React.useState<TaxInvoice | null>(null);
+  // 导出区间（业务日，含两端）只作用于导出，不筛列表：列表按订单号/票种/状态看，导出按期间交给会计
+  const [from, setFrom] = React.useState("");
+  const [to, setTo] = React.useState("");
+  // 导出与下载走后端（K8 / RQ-INV-06~08）；mutation 只为接上全局错误弹窗与处理中态
+  const exportFile = useMutation({
+    mutationFn: (format: "xlsx" | "pdf" | "zip") => api.exportTaxInvoices({
+      format, orderNo: orderNo || undefined, kind: kind || undefined, status: status || undefined,
+      from: from || undefined, to: to || undefined,
+    }),
+  });
+  const pdf = useMutation({ mutationFn: (no: string) => api.downloadTaxInvoicePdf(no) });
   const q = useQuery({
     queryKey: ["tax-invoices", paging.page, paging.size, orderNo, kind, status],
     queryFn: () => api.listTaxInvoices({ page: paging.page, size: paging.size, orderNo: orderNo || undefined, kind: kind || undefined, status: status || undefined }),
@@ -91,6 +103,9 @@ export function TaxInvoicePanel() {
               onRun: () => retry.mutate(t.invoiceNo),
             }]} />
           )}
+          {t.status === "ISSUED" && (
+            <Button size="sm" variant="outline" disabled={pdf.isPending} onClick={() => pdf.mutate(t.invoiceNo)}>PDF</Button>
+          )}
           <Button size="sm" variant="outline" onClick={() => setDetail(t)}>详情</Button>
         </div>
       ),
@@ -108,6 +123,16 @@ export function TaxInvoicePanel() {
         <FilterSelect value={kind} onChange={(v) => { setKind(v); paging.reset(); }} allLabel="全部票种" options={TAX_INV_KIND} />
         <FilterSelect value={status} onChange={(v) => { setStatus(v); paging.reset(); }} allLabel="全部状态" options={TAX_INV_STATUS} />
       </Toolbar>
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <span className="txt-body text-muted-foreground">导出开票期间</span>
+        <DateInput aria-label="导出起始日" value={from} onChange={(e) => setFrom(e.target.value)} className="w-40" />
+        <span className="text-muted-foreground">~</span>
+        <DateInput aria-label="导出截止日" value={to} onChange={(e) => setTo(e.target.value)} className="w-40" />
+        <Button variant="outline" disabled={exportFile.isPending} onClick={() => exportFile.mutate("xlsx")}>登记表 Excel</Button>
+        <Button variant="outline" disabled={exportFile.isPending} onClick={() => exportFile.mutate("pdf")}>登记表 PDF</Button>
+        <Button variant="outline" disabled={exportFile.isPending} onClick={() => exportFile.mutate("zip")}>批量下载 PDF</Button>
+        {exportFile.isPending && <span className="txt-body text-muted-foreground">生成中…</span>}
+      </div>
       <PagedTable
         rowKey={(t: TaxInvoice) => t.invoiceNo}
         columns={cols}

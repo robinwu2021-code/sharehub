@@ -38,7 +38,6 @@ public class TaxInvoiceServiceImpl implements TaxInvoiceService {
     static final String ON_SETTLE = "ON_SETTLE";
     static final String KIND_INVOICE = "INVOICE";
     static final String KIND_CREDIT_NOTE = "CREDIT_NOTE";
-    static final String ISSUED = "ISSUED";
     static final String BLOCKED = "BLOCKED";
     private static final String TENANT = "MAIN";
 
@@ -239,6 +238,18 @@ public class TaxInvoiceServiceImpl implements TaxInvoiceService {
                 .eq(OrdTaxInvoice::getInvoiceNo, invoiceNo).last("limit 1"));
         if (t == null) throw BizException.notFound(invoiceNo);
         return t;
+    }
+
+    @Override
+    public List<OrdTaxInvoice> listForExport(String orderNo, String kind, String status,
+                                             java.time.LocalDate from, java.time.LocalDate to, int limit) {
+        return mapper.selectList(new LambdaQueryWrapper<OrdTaxInvoice>()
+                .eq(orderNo != null && !orderNo.isBlank(), OrdTaxInvoice::getOrderNo, orderNo)
+                .eq(kind != null && !kind.isBlank(), OrdTaxInvoice::getKind, kind)
+                .eq(status != null && !status.isBlank(), OrdTaxInvoice::getStatus, status)
+                .ge(from != null, OrdTaxInvoice::getCreatedAt, from == null ? null : clock.startOfDayAsStored(from))
+                .lt(to != null, OrdTaxInvoice::getCreatedAt, to == null ? null : clock.startOfDayAsStored(to.plusDays(1)))
+                .orderByAsc(OrdTaxInvoice::getInvoiceNo).last("limit " + Math.max(1, limit)));
     }
 
     @Override

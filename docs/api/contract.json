@@ -18979,6 +18979,50 @@
   },
   {
    "verb": "GET",
+   "path": "/api/ops/reports/{kind}/export",
+   "perm": "report:device:read",
+   "perms": [
+    "report:device:read",
+    "report:location:read",
+    "report:finance:read"
+   ],
+   "handler": "ReportController#export",
+   "summary": "三张周期报表的后端导出（K8 / RQ-RPT-03 / AC-09）：同列表的筛选、全量（到 `ExportSupport#MAX_ROWS`）， `format=xlsx|pdf`。",
+   "params": [
+    {
+     "in": "path",
+     "name": "kind",
+     "type": "String",
+     "required": true
+    },
+    {
+     "in": "query",
+     "name": "format",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "keyword",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "period",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "void",
+   "returnContainer": null,
+   "returnElement": "void",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
    "path": "/api/ops/settlement-adjustments",
    "perm": "finance:settlement:read",
    "perms": [
@@ -39541,6 +39585,60 @@
   },
   {
    "verb": "GET",
+   "path": "/api/trade/tax-invoices/export",
+   "perm": "finance:invoice:read",
+   "perms": [
+    "finance:invoice:read"
+   ],
+   "handler": "FinanceController#exportTaxInvoices",
+   "summary": "导出（K8 / RQ-INV-07~08）：`format=xlsx|pdf` 出登记表，`format=zip` 把区间内已开出的票逐张出 PDF 打包。",
+   "params": [
+    {
+     "in": "query",
+     "name": "format",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "orderNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "kind",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "status",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "from",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "to",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "void",
+   "returnContainer": null,
+   "returnElement": "void",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
    "path": "/api/trade/tax-invoices/{invoiceNo}",
    "perm": "finance:invoice:read",
    "perms": [
@@ -39654,6 +39752,30 @@
      "type": "LocalDateTime"
     }
    ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/trade/tax-invoices/{invoiceNo}/pdf",
+   "perm": "finance:invoice:read",
+   "perms": [
+    "finance:invoice:read"
+   ],
+   "handler": "FinanceController#taxInvoicePdf",
+   "summary": "单张票 PDF（RQ-INV-06）。",
+   "params": [
+    {
+     "in": "path",
+     "name": "invoiceNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "void",
+   "returnContainer": null,
+   "returnElement": "void",
+   "responseShape": null,
    "requestShape": null
   },
   {
@@ -47542,6 +47664,34 @@
    "requestShape": null
   },
   {
+   "verb": "GET",
+   "path": "/mp/trade/orders/{orderNo}/invoices/{invoiceNo}/pdf",
+   "perm": null,
+   "perms": [],
+   "handler": "RentController#invoicePdf",
+   "summary": "下载本人某张税务票据的 PDF（K8 / RQ-APP-05）。",
+   "params": [
+    {
+     "in": "path",
+     "name": "orderNo",
+     "type": "String",
+     "required": true
+    },
+    {
+     "in": "path",
+     "name": "invoiceNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "void",
+   "returnContainer": null,
+   "returnElement": "void",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
    "verb": "POST",
    "path": "/mp/trade/pay",
    "perm": null,
@@ -49190,6 +49340,9 @@
    "SCHEDULED",
    "MANUAL"
   ],
+  "ExportFormat": [
+   "XLSX"
+  ],
   "OutboxStatus": [
    "PENDING",
    "SENT",
@@ -49825,9 +49978,9 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 560,
-  "records": 521,
-  "withPerm": 479,
+  "endpoints": 564,
+  "records": 523,
+  "withPerm": 482,
   "withBody": 233,
   "shapedResponses": 437
  }

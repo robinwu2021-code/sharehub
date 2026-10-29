@@ -73,6 +73,16 @@ class B2cTaxInvoiceTest extends ApiTestSupport {
         return no;
     }
 
+    private java.net.http.HttpResponse<byte[]> download(String path, String token) {
+        try {
+            return java.net.http.HttpClient.newHttpClient().send(java.net.http.HttpRequest.newBuilder(
+                            java.net.URI.create("http://localhost:" + port + path)).header("Authorization", "Bearer " + token).GET().build(),
+                    java.net.http.HttpResponse.BodyHandlers.ofByteArray());
+        } catch (Exception e) {
+            throw new AssertionError(e);
+        }
+    }
+
     private List<Map<String, Object>> invoices(String orderNo) {
         return jdbc.queryForList("SELECT * FROM ord_tax_invoice WHERE order_no = ? ORDER BY id", orderNo);
     }
@@ -100,6 +110,15 @@ class B2cTaxInvoiceTest extends ApiTestSupport {
         var mine = get("/mp/trade/orders/" + no + "/invoices", lastToken).okData();
         assertThat(mine.size()).isEqualTo(1);
         assertThat(mine.get(0).path("invoiceNo").asText()).isEqualTo(inv.get("invoice_no"));
+
+        // C 端下载本人票的 PDF（K8）；别人的单拿不到
+        assertThat(download("/mp/trade/orders/" + no + "/invoices/" + inv.get("invoice_no") + "/pdf", lastToken).statusCode())
+                .isEqualTo(200);
+        String other = post("/mp/auth/login", Map.of("grantType", "phone_otp", "phone", "+971529990001",
+                "otp", post("/mp/auth/otp", Map.of("phone", "+971529990001"), null).okData().path("devCode").asText()), null)
+                .okData().path("token").asText();
+        assertThat(download("/mp/trade/orders/" + no + "/invoices/" + inv.get("invoice_no") + "/pdf", other).statusCode())
+                .isEqualTo(403);
     }
 
     @Test

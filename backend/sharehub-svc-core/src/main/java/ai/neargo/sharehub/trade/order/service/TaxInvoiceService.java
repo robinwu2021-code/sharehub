@@ -14,6 +14,9 @@ import java.util.List;
  */
 public interface TaxInvoiceService {
 
+    /** 已开出（可下载、可冲红）；另一个状态 BLOCKED 见实现类。 */
+    String ISSUED = "ISSUED";
+
     /** 一笔收款成功后调用；按 {@code invoice.b2c.trigger} 决定现在开还是等结单。 */
     void onPaid(String orderNo, String payNo, boolean orderSettled);
 
@@ -26,6 +29,13 @@ public interface TaxInvoiceService {
     PageResult<OrdTaxInvoice> page(String orderNo, String kind, String status, int pageNum, int pageSize);
 
     OrdTaxInvoice get(String invoiceNo);
+
+    /**
+     * 导出用（K8 / RQ-INV-07~08）：同列表筛选再加开票日期区间（业务日，含两端），按票号升序，最多 {@code limit} 张。
+     * 日期区间按 {@code created_at} 落：BLOCKED 的票没有开出时间，但登记表里也要看到它。
+     */
+    List<OrdTaxInvoice> listForExport(String orderNo, String kind, String status,
+                                      java.time.LocalDate from, java.time.LocalDate to, int limit);
 
     /** 运营重试 BLOCKED 的票（补齐开票主体后）。 */
     OrdTaxInvoice retry(String invoiceNo);

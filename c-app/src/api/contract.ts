@@ -190,6 +190,8 @@ export interface McpApi {
   buyout(orderNo: string): Promise<ConsumerOrder>;
   /** 订单的税务票据（V181）：未开开关时为空。 */
   orderInvoices(orderNo: string): Promise<TaxInvoice[]>;
+  /** 下载某张票的 PDF（K8），返回本地临时文件路径（uni.downloadFile），交给 uni.openDocument 打开。 */
+  invoicePdf(orderNo: string, invoiceNo: string): Promise<string>;
   // 支付 / 免押（经 PaymentPort→nearpay，MVP Stub）
   depositFree(cabinetNo: string): Promise<{ authNo: string; frozen: number }>;
   pay(p: PayParams): Promise<PayResult>;

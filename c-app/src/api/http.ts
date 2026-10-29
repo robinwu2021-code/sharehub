@@ -62,6 +62,7 @@ export const httpApi: McpApi = {
   ongoingOrder: () => client.get<ConsumerOrder | null>("/mp/trade/orders/ongoing"),
   buyout: (orderNo: string) => client.post<ConsumerOrder>(`/mp/trade/orders/${orderNo}/buyout`),
   orderInvoices: (orderNo: string) => client.get<TaxInvoice[]>(`/mp/trade/orders/${orderNo}/invoices`),
+  invoicePdf: (orderNo: string, invoiceNo: string) => downloadAuthed(`/mp/trade/orders/${orderNo}/invoices/${invoiceNo}/pdf`),
 
   depositFree: (cabinetNo: string) => client.post<{ authNo: string; frozen: number }>("/mp/trade/deposit/free", { cabinetNo }),
   pay: (p: PayParams) => client.post<PayResult>("/mp/trade/pay", p),
