@@ -68,6 +68,25 @@
       ],
       "port": 3000,
       "cwd": "ops-web"
+    },
+    {
+      "name": "inventory-svc-local",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "INVENTORY_INSTANCE_CODE=TEST INVENTORY_INSTANCE_ALLOWED_SYSTEMS=SHAREHUB INVENTORY_ADMIN_TOKEN=local-admin-token INVENTORY_DATASOURCE_URL='jdbc:mysql://127.0.0.1:3306/inventory_test?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false' INVENTORY_DATASOURCE_USERNAME=root INVENTORY_DATASOURCE_PASSWORD= SERVER_PORT=8086 exec $HOME/.local/opt/jdk-21.0.13+9/Contents/Home/bin/java -Duser.timezone=UTC -jar $HOME/.local/opt/inventory-svc/inventory-svc.jar --inventory.flyway-locations=filesystem:/Users/workingowl/.local/var/mysql/flyway-conv/inventory"
+      ],
+      "port": 8086,
+      "cwd": "."
+    },
+    {
+      "name": "backend-inv",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "CRED=$HOME/.local/etc/inventory-sharehub-cred.json; KEY=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))[\"appKey\"])' $CRED); SEC=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))[\"appSecret\"])' $CRED); exec $HOME/.local/opt/jdk-21.0.13+9/Contents/Home/bin/java -Duser.timezone=UTC -cp backend/sharehub-app/target/classes:$(cat backend/sharehub-app/target/runtime-classpath.txt) ai.neargo.sharehub.SharehubApplication --server.port=8085 --spring.datasource.url='jdbc:mysql://127.0.0.1:3306/test_sharehub?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=UTF-8' --sharehub.dev-mode.enabled=true --sharehub.inventory.base-url=http://127.0.0.1:8086 --sharehub.inventory.app-key=$KEY --sharehub.inventory.app-secret=$SEC"
+      ],
+      "port": 8085
     }
   ]
 }
