@@ -33244,6 +33244,263 @@
   },
   {
    "verb": "GET",
+   "path": "/api/trade/approvals",
+   "perm": "order:refund:audit",
+   "perms": [
+    "order:refund:audit",
+    "finance:ledger:create"
+   ],
+   "handler": "ApprovalController#list",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "status",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "kind",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<ApprovalRequest>",
+   "returnContainer": "PageResult",
+   "returnElement": "ApprovalRequest",
+   "responseShape": [
+    {
+     "name": "requestNo",
+     "type": "String"
+    },
+    {
+     "name": "kind",
+     "type": "String"
+    },
+    {
+     "name": "refNo",
+     "type": "String"
+    },
+    {
+     "name": "amount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "reason",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "applicantName",
+     "type": "String"
+    },
+    {
+     "name": "approverName",
+     "type": "String"
+    },
+    {
+     "name": "decidedAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "decideNote",
+     "type": "String"
+    },
+    {
+     "name": "resultRef",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/trade/approvals/{requestNo}/approve",
+   "perm": "order:refund:audit",
+   "perms": [
+    "order:refund:audit",
+    "finance:ledger:create"
+   ],
+   "handler": "ApprovalController#approve",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "requestNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ApprovalRequest",
+   "returnContainer": null,
+   "returnElement": "ApprovalRequest",
+   "responseShape": [
+    {
+     "name": "requestNo",
+     "type": "String"
+    },
+    {
+     "name": "kind",
+     "type": "String"
+    },
+    {
+     "name": "refNo",
+     "type": "String"
+    },
+    {
+     "name": "amount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "reason",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "applicantName",
+     "type": "String"
+    },
+    {
+     "name": "approverName",
+     "type": "String"
+    },
+    {
+     "name": "decidedAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "decideNote",
+     "type": "String"
+    },
+    {
+     "name": "resultRef",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/trade/approvals/{requestNo}/reject",
+   "perm": "order:refund:audit",
+   "perms": [
+    "order:refund:audit",
+    "finance:ledger:create"
+   ],
+   "handler": "ApprovalController#reject",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "requestNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "RejectReq",
+   "returnType": "ApprovalRequest",
+   "returnContainer": null,
+   "returnElement": "ApprovalRequest",
+   "responseShape": [
+    {
+     "name": "requestNo",
+     "type": "String"
+    },
+    {
+     "name": "kind",
+     "type": "String"
+    },
+    {
+     "name": "refNo",
+     "type": "String"
+    },
+    {
+     "name": "amount",
+     "type": "BigDecimal"
+    },
+    {
+     "name": "currency",
+     "type": "String"
+    },
+    {
+     "name": "reason",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "applicantName",
+     "type": "String"
+    },
+    {
+     "name": "approverName",
+     "type": "String"
+    },
+    {
+     "name": "decidedAt",
+     "type": "LocalDateTime"
+    },
+    {
+     "name": "decideNote",
+     "type": "String"
+    },
+    {
+     "name": "resultRef",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "reason",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "GET",
    "path": "/api/trade/complaints",
    "perm": "order:exception:read",
    "perms": [
@@ -35362,175 +35619,10 @@
     }
    ],
    "bodyType": "InterventionDtos.InterveneReq",
-   "returnType": "InterventionDtos.OrderInterveneResult",
+   "returnType": "Object",
    "returnContainer": null,
-   "returnElement": "InterventionDtos.OrderInterveneResult",
-   "responseShape": [
-    {
-     "name": "order",
-     "type": "RentOrder",
-     "fields": [
-      {
-       "name": "orderNo",
-       "type": "String"
-      },
-      {
-       "name": "cUserNo",
-       "type": "String"
-      },
-      {
-       "name": "cabinetNo",
-       "type": "String"
-      },
-      {
-       "name": "returnCabinetNo",
-       "type": "String"
-      },
-      {
-       "name": "powerbankNo",
-       "type": "String"
-      },
-      {
-       "name": "locationName",
-       "type": "String"
-      },
-      {
-       "name": "status",
-       "type": "String"
-      },
-      {
-       "name": "rentStartAt",
-       "type": "String"
-      },
-      {
-       "name": "rentEndAt",
-       "type": "String"
-      },
-      {
-       "name": "durationMin",
-       "type": "Integer"
-      },
-      {
-       "name": "feeAmount",
-       "type": "double"
-      },
-      {
-       "name": "depositAmount",
-       "type": "double"
-      },
-      {
-       "name": "currency",
-       "type": "String"
-      },
-      {
-       "name": "waivedAmount",
-       "type": "java.math.BigDecimal"
-      },
-      {
-       "name": "compensateAmount",
-       "type": "java.math.BigDecimal"
-      },
-      {
-       "name": "ejectCount",
-       "type": "Integer"
-      },
-      {
-       "name": "lastEjectAt",
-       "type": "String"
-      },
-      {
-       "name": "couponAmount",
-       "type": "java.math.BigDecimal"
-      },
-      {
-       "name": "memberDiscountAmount",
-       "type": "java.math.BigDecimal"
-      },
-      {
-       "name": "payStatus",
-       "type": "String"
-      },
-      {
-       "name": "agentNo",
-       "type": "String"
-      },
-      {
-       "name": "agentName",
-       "type": "String"
-      },
-      {
-       "name": "siteNo",
-       "type": "String"
-      },
-      {
-       "name": "maxCharge",
-       "type": "java.math.BigDecimal"
-      },
-      {
-       "name": "liveDurationMin",
-       "type": "Integer"
-      },
-      {
-       "name": "accruedFee",
-       "type": "java.math.BigDecimal"
-      },
-      {
-       "name": "payNo",
-       "type": "String"
-      },
-      {
-       "name": "payChannel",
-       "type": "String"
-      }
-     ]
-    },
-    {
-     "name": "intervention",
-     "type": "OrderIntervention",
-     "fields": [
-      {
-       "name": "interventionNo",
-       "type": "String"
-      },
-      {
-       "name": "orderNo",
-       "type": "String"
-      },
-      {
-       "name": "action",
-       "type": "String"
-      },
-      {
-       "name": "operatorName",
-       "type": "String"
-      },
-      {
-       "name": "reason",
-       "type": "String"
-      },
-      {
-       "name": "amount",
-       "type": "BigDecimal"
-      },
-      {
-       "name": "currency",
-       "type": "String"
-      },
-      {
-       "name": "beforeStatus",
-       "type": "String"
-      },
-      {
-       "name": "afterStatus",
-       "type": "String"
-      },
-      {
-       "name": "createdAt",
-       "type": "String"
-      }
-     ]
-    }
-   ],
+   "returnElement": "Object",
+   "responseShape": null,
    "requestShape": [
     {
      "name": "action",
@@ -50559,10 +50651,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 569,
-  "records": 529,
-  "withPerm": 487,
-  "withBody": 234,
-  "shapedResponses": 440
+  "endpoints": 572,
+  "records": 532,
+  "withPerm": 490,
+  "withBody": 235,
+  "shapedResponses": 442
  }
 }

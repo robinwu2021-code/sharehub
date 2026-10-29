@@ -21,7 +21,8 @@ export interface OrderApi {
    * **原因必填**（沿用退款审批口径），合法性按 ORDER_INTERVENTIONS 状态机校验，
    * 返回落库后的订单 + 刚写入的干预记录。
    */
-  interveneOrder(orderNo: string, action: OrderInterventionAction, payload: OrderIntervenePayload): Promise<OrderInterveneResult>;
+  /** 补偿 / 免单 ≥ approval.compensation.threshold 时不执行、返回 PendingApproval（SEC-03）。 */
+  interveneOrder(orderNo: string, action: OrderInterventionAction, payload: OrderIntervenePayload): Promise<OrderInterveneResult | import("../../types").PendingApproval>;
   /** 干预记录（审计）：订单详情抽屉的时间线按 `orderNo` 精确过滤。 */
   listOrderInterventions(q?: PageQ & { orderNo?: string; action?: string }): Promise<PageResult<OrderIntervention>>;
   /**

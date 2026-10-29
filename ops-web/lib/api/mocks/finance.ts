@@ -5,7 +5,7 @@ import * as pt from "../../mock/db/payout-task";
 import { currentAuth } from "../../auth";
 // 走具体模块不改变行为——同一份模块级状态，只是绕过桶文件
 import type { FinanceApi } from "../contracts/finance";
-import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ, TaxInvoiceQ, SelfBillQ, PayableQ, ReportQ, WithdrawalQ } from "../query";
+import type { PageQ, ShareRuleQ, ShareSummaryQ, RechargeQ, SettlementQ, ShareRecordQ, ReconQ, InvoiceQ, TaxInvoiceQ, SelfBillQ, PayableQ, ApprovalQ, ReportQ, WithdrawalQ } from "../query";
 import { wait } from "./_wait";
 import { fail } from "../../biz-error";
 
@@ -62,6 +62,10 @@ export const financeMock: FinanceApi = {
   exportTaxInvoices: async () => fail("演示数据模式不生成文件，接真后端后可导出", "Export needs the real backend; not available in demo mode"),
   listSelfBills: (q: SelfBillQ = {}) => wait(db.listSelfBills(q)),
   listPayables: (q: PayableQ = {}) => wait(db.listPayables(q)),
+  // 演示数据模式阈值缺省关，补偿 / 凭证都即时生效，所以审批待办恒为空；批 / 驳一张不存在的单按 404
+  listApprovals: (q: ApprovalQ = {}) => wait(db.paginate([], q.page, q.size)),
+  approveApproval: async (no) => fail(`审批单 ${no} 不存在`, `Approval ${no} not found`),
+  rejectApproval: async (no) => fail(`审批单 ${no} 不存在`, `Approval ${no} not found`),
   issueSelfBill: async (withdrawNo) => wait(db.issueSelfBill(withdrawNo)),
   downloadSelfBillPdf: async () => fail("演示数据模式不生成文件，接真后端后可下载", "Download needs the real backend; not available in demo mode"),
   downloadTaxInvoicePdf: async () => fail("演示数据模式不生成文件，接真后端后可下载", "Download needs the real backend; not available in demo mode"),

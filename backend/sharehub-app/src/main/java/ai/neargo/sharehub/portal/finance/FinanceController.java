@@ -50,6 +50,7 @@ public class FinanceController {
     private final TaxInvoiceDocuments taxInvoiceDocs;
     private final ai.neargo.sharehub.finance.service.SelfBillService selfBills;
     private final ai.neargo.sharehub.finance.service.PayableReportService payables;
+    private final ai.neargo.sharehub.portal.approval.ApprovalGate approvals;
 
     public FinanceController(ShareService shareService, SettlementService settlementService,
                              WithdrawalService withdrawalService,
@@ -60,7 +61,9 @@ public class FinanceController {
                              ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoiceService,
                              TaxInvoiceDocuments taxInvoiceDocs,
                              ai.neargo.sharehub.finance.service.SelfBillService selfBills,
-                             ai.neargo.sharehub.finance.service.PayableReportService payables) {
+                             ai.neargo.sharehub.finance.service.PayableReportService payables,
+                             ai.neargo.sharehub.portal.approval.ApprovalGate approvals) {
+        this.approvals = approvals;
         this.payables = payables;
         this.selfBills = selfBills;
         this.taxInvoiceService = taxInvoiceService;
@@ -516,8 +519,8 @@ public class FinanceController {
     @PostMapping("/api/trade/ledger/vouchers")
     @PreAuthorize("@perm.can('finance:ledger:create')")
     public Object createVoucher(@RequestBody FinDtos.LedgerPostReq body) {
-        String voucherNo = ledgerService.post(body);
-        return java.util.Map.of("voucherNo", voucherNo);
+        // 借方合计 ≥ approval.voucher.threshold 时转审批（SEC-03），返回 {pendingApproval}；否则照旧即时入账
+        return approvals.postVoucher(body);
     }
 
     /**

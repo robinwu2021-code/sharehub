@@ -576,6 +576,38 @@ export interface TaxInvoice {
   createdAt: string;
 }
 
+/**
+ * 资金操作转审批的回执（SEC-03，V189）：补偿 / 免单、手工凭证 ≥ 阈值时后端不执行、返回这个。
+ * 前端据此提示「已提交审批」而不是「已执行」。
+ */
+export interface PendingApproval {
+  pendingApproval: string;
+  kind: ApprovalKind;
+  amount: number;
+  threshold: number;
+}
+export type ApprovalKind = "ORDER_COMPENSATE" | "ORDER_WAIVE" | "LEDGER_VOUCHER";
+export type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED" | "FAILED";
+export interface ApprovalRequest {
+  requestNo: string;
+  kind: ApprovalKind;
+  refNo: string | null;
+  amount: number;
+  currency: string;
+  reason: string | null;
+  status: ApprovalStatus;
+  applicantName: string | null;
+  approverName: string | null;
+  decidedAt: string | null;
+  /** 驳回原因，或批准后重放失败的原因（前提已变）。 */
+  decideNote: string | null;
+  /** 批准后的产物：干预单号 / 凭证号。 */
+  resultRef: string | null;
+  createdAt: string;
+}
+export const isPendingApproval = (r: unknown): r is PendingApproval =>
+  !!r && typeof r === "object" && "pendingApproval" in (r as Record<string, unknown>);
+
 /** 跨期应付一行（SHR-05）：收款方 × 期间。未付 = 应得 − 已付；应得含退款冲回的负数明细。 */
 export interface PayableRow {
   payeeType: "AGENT" | "VENUE" | string;

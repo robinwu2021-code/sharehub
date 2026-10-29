@@ -21,6 +21,7 @@ import { ReadOnlyNotice } from "@/components/read-only-notice";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DateInput } from "@/components/ui/date-input";
+import { ApprovalsPanel } from "@/components/finance/approvals-panel";
 import { OrderStatusBadge } from "@/components/status";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { money, fmtTime } from "@/lib/utils";
@@ -30,7 +31,7 @@ import { notify } from "@/lib/notify";
 import { exportCsv } from "@/lib/export-csv";
 import { PaymentChannelsTab } from "@/components/system/payment-channels-tab";
 import { MemberPlansTab, MembersTab } from "@/components/user/membership";
-import { ORDER_INTERVENTIONS, interveneActions, depositActions, exceptionHandleActions, EXCEPTION_HANDLINGS } from "@/lib/types";
+import { ORDER_INTERVENTIONS, interveneActions, depositActions, exceptionHandleActions, EXCEPTION_HANDLINGS, isPendingApproval } from "@/lib/types";
 import type {
   RentOrder, OrderException, OrderExceptionStatus, ExceptionHandleAction, DepositRecord,
   OrderComplaint, RefundRecord, ComplaintIssueType, ComplaintResolution,
@@ -246,6 +247,13 @@ function OrdersInner() {
     mutationFn: (v: { no: string; action: OrderInterventionAction; reason: string; amount?: number }) =>
       api.interveneOrder(v.no, v.action, { reason: v.reason, amount: v.amount }),
     onSuccess: (r, v) => {
+      if (isPendingApproval(r)) {
+        // 超过审批阈值（SEC-03）：没有执行，等财务在「审批待办」里批准
+        notify.success(`${IV_LABEL[v.action]}金额 ${r.amount} 达到审批线 ${r.threshold}，已提交财务审批（${r.pendingApproval}），批准后生效`);
+        qc.invalidateQueries({ queryKey: ["approvals"] });
+        setIv(null);
+        return;
+      }
       notify.success(`${IV_LABEL[v.action]}已执行 · ${r.intervention.interventionNo} · 状态 ${t(`orderStatus.${r.intervention.beforeStatus}`)} → ${t(`orderStatus.${r.intervention.afterStatus}`)}`);
       qc.invalidateQueries({ queryKey: ["orders"] });
       qc.invalidateQueries({ queryKey: ["order-interventions"] });
@@ -929,6 +937,10 @@ function OrdersInner() {
         </>
       )}
 
+      {/* 客服补偿 / 免单超审批线的待办（SEC-03）：财务在这里批，与退款审批同一个工作台 */}
+      {tab === "refunds" && allow("order:refund:audit") && (
+        <ApprovalsPanel kinds={["ORDER_COMPENSATE", "ORDER_WAIVE"]} title="补偿 / 免单审批" />
+      )}
       {tab === "refunds" && (
         <>
           <Toolbar

@@ -28,9 +28,12 @@ public class TradeController {
     private final OrderEventLogService eventLogService;
 
     private final ai.neargo.sharehub.portal.shared.ExportSupport exports;
+    private final ai.neargo.sharehub.portal.approval.ApprovalGate approvals;
 
     public TradeController(RentOrderService orderService, OrderEventLogService eventLogService,
-                           ai.neargo.sharehub.portal.shared.ExportSupport exports) {
+                           ai.neargo.sharehub.portal.shared.ExportSupport exports,
+                           ai.neargo.sharehub.portal.approval.ApprovalGate approvals) {
+        this.approvals = approvals;
         this.exports = exports;
         this.eventLogService = eventLogService;
         this.orderService = orderService;
@@ -108,9 +111,9 @@ public class TradeController {
 
     @PostMapping("/orders/{orderNo}/intervene")
     @PreAuthorize("@perm.can('order:intervene:execute')")
-    public InterventionDtos.OrderInterveneResult intervene(@PathVariable String orderNo,
-                                                           @RequestBody InterventionDtos.InterveneReq body) {
-        return orderService.intervene(orderNo, body);
+    public Object intervene(@PathVariable String orderNo, @RequestBody InterventionDtos.InterveneReq body) {
+        // 补偿 / 免单 ≥ approval.compensation.threshold 时转审批（SEC-03），返回 {pendingApproval}；否则照旧即时执行
+        return approvals.intervene(orderNo, body);
     }
 
     /** 干预留痕分页（审计视图，append-only 表 {@code ord_intervention}）。 */

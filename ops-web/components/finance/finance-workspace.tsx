@@ -17,6 +17,7 @@ import { PayoutTasks } from "@/components/finance/payout-tasks";
 import { TaxInvoicePanel } from "@/components/finance/tax-invoice-panel";
 import { SelfBillPanel } from "@/components/finance/self-bill-panel";
 import { PayablesPanel } from "@/components/finance/payables-panel";
+import { ApprovalsPanel } from "@/components/finance/approvals-panel";
 import { DataTable, type Column, type SortDir } from "@/components/ui/data-table";
 import { Drawer, Field } from "@/components/ui/drawer";
 import { FilterSelect } from "@/components/ui/filter-select";
@@ -45,6 +46,7 @@ import type {
   VoucherCreatePayload, PayoutAccount, PayReceiptPayload, PayChannel,
 } from "@/lib/types";
 import {
+  isPendingApproval,
   SHARE_BASES,
   RECON_TRANSITIONS, RECON_TERMINAL, canReconTransition, canEditInvoiceFields, parseReconDiffDetail,
   canSettlementTransition,
@@ -857,10 +859,17 @@ export function FinanceWorkspace({ path, tabKeys }: {
   const postVoucher = useMutation({
     // 借贷平衡等五条校验全在 mock/后端强制，页面只管把错误提示出来（全局 MutationCache 接管）
     mutationFn: (x: VoucherCreatePayload) => api.createVoucher(x),
-    onSuccess: (rows) => {
-      qc.invalidateQueries({ queryKey: ["fin"] });
-      notify.success(`凭证 ${rows[0]?.voucherNo} 已记账（${rows.length} 条分录）`);
+    onSuccess: (r) => {
       setEntryDraft(null);
+      if (isPendingApproval(r)) {
+        // 借方合计达到审批线（SEC-03）：未入账，等另一位财务批准
+        notify.success(`凭证借方 ${r.amount} 达到审批线 ${r.threshold}，已提交审批（${r.pendingApproval}），批准后入账`);
+        qc.invalidateQueries({ queryKey: ["approvals"] });
+        return;
+      }
+      qc.invalidateQueries({ queryKey: ["fin"] });
+      // 真后端回 {voucherNo}，mock 回分录行 —— 此前只认后者，接真后端时提示里是「凭证 undefined」
+      notify.success(Array.isArray(r) ? `凭证 ${r[0]?.voucherNo} 已记账（${r.length} 条分录）` : `凭证 ${r.voucherNo} 已记账`);
     },
   });
 
@@ -1216,6 +1225,8 @@ export function FinanceWorkspace({ path, tabKeys }: {
           />
         </>
       )}
+      {/* 手工凭证超审批线的待办（SEC-03）：由另一位记账人批 */}
+      {tab === "ledger" && canPostVoucher && <ApprovalsPanel kinds={["LEDGER_VOUCHER"]} title="手工凭证审批" />}
       {tab === "ledger" && (
         <Toolbar
           search={keyword}
