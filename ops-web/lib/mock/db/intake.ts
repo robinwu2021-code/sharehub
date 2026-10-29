@@ -5,7 +5,7 @@ import type {
 } from "../../types";
 import { fail, notFound } from "../../biz-error";
 import { cabinets, powerbanks } from "./device";
-import { inspectCabinet, inspectPowerbank } from "./device-asset";
+import { consumeQc, inspectCabinet, inspectPowerbank } from "./device-asset";
 import { WAREHOUSES } from "./device-pool";
 import { paginate } from "./helpers";
 
@@ -131,7 +131,7 @@ export function inspectIntakeItem(no: string, type: IntakeItemType, itemNo: stri
   openHead(no);
   const it = itemOf(no, type, itemNo);
   if (it.disposition !== "PENDING") fail(`设备 ${itemNo} 已入库或已处置`, "Already handled");
-  const rec = type === "CABINET" ? inspectCabinet(itemNo, req) : inspectPowerbank(itemNo, req);
+  const rec = type === "CABINET" ? inspectCabinet(itemNo, req, no) : inspectPowerbank(itemNo, req, no);
   Object.assign(it, { qcNo: rec.qcNo, qcResult: rec.result });
   return detail(no);
 }
@@ -144,6 +144,7 @@ export function inboundIntake(no: string, refs: IntakeItemRef[]): IntakeDetail {
     .map((i) => `${i.itemNo}：${i.disposition === "PENDING" ? "质检未通过或未质检" : "已处理"}`);
   if (bad.length) fail(`以下设备不能办理：${bad.join("；")}`, `Rejected: ${bad.join("; ")}`);
   for (const i of picked) {
+    if (!consumeQc(i.qcNo, i.itemNo, no)) fail(`设备 ${i.itemNo} 的质检凭证不可用：须在本单上重新质检通过，且每份凭证只能入库一次`, "QC voucher not usable");
     if (i.itemType === "CABINET") {
       const c = cabinets.find((k) => k.cabinetNo === i.itemNo)!;
       if (c.status !== "IN_STOCK" || c.locationNo || c.issuedAgentNo) fail("设备状态已变化，请刷新", "State changed");

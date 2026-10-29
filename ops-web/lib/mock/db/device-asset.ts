@@ -49,12 +49,13 @@ function decide(req: QcReq, checksPass: boolean): QcStatus {
   return "PASSED";
 }
 
-function record(itemType: QcItemType, itemNo: string, req: QcReq, result: QcStatus): QcRecord {
+function record(itemType: QcItemType, itemNo: string, req: QcReq, result: QcStatus, rule: object, intakeNo?: string): QcRecord {
   const r: QcRecord = {
     qcNo: `QC${String(qcSeq++).padStart(6, "0")}`, itemType, itemNo,
     powerOn: req.powerOn ?? null, slotsOk: req.slotsOk ?? null,
     battery: req.battery ?? null, cycles: req.cycles ?? null,
     result, note: req.note?.trim() || null, inspectedBy: "admin", inspectedAt: now(),
+    ruleSnapshot: JSON.stringify(rule), intakeNo: intakeNo ?? null, consumedBy: null,
   };
   qcRecords.unshift(r);
   qcStatus.set(itemNo, result);
@@ -62,12 +63,12 @@ function record(itemType: QcItemType, itemNo: string, req: QcReq, result: QcStat
 }
 
 /** 机柜入库质检。**只在在库时能做**：已布放的设备出问题走故障 / 维修，不走入库质检。 */
-export function inspectCabinet(cabinetNo: string, req: QcReq): QcRecord {
+export function inspectCabinet(cabinetNo: string, req: QcReq, intakeNo?: string): QcRecord {
   const c = cabinets.find((x) => x.cabinetNo === cabinetNo);
   if (!c) notFound("机柜", "Cabinet", cabinetNo);
   if (c!.status !== "IN_STOCK") fail(`只有在库设备可以做入库质检，当前是「${c!.status}」`, "In-stock only", "في المخزون فقط");
   if (req?.powerOn == null || req.slotsOk == null) fail("缺少检查项：通电 / 仓位", "Missing powerOn / slotsOk", "بيانات ناقصة");
-  return record("CABINET", cabinetNo, req, decide(req, !!req.powerOn && !!req.slotsOk));
+  return record("CABINET", cabinetNo, req, decide(req, !!req.powerOn && !!req.slotsOk), { powerOn: true, slotsOk: true }, intakeNo);
 }
 
 /** 质检阈值（后端系统参数 device.qc.min_battery / max_cycles 的默认值）。 */
@@ -108,7 +109,7 @@ export function dismissPowerbankLost(powerbankNo: string, note: string): Powerba
 }
 
 /** 充电宝入库质检。电量 ≥ 60 且循环 ≤ 500 才算检查项通过；质检时顺带回写电量与循环次数。 */
-export function inspectPowerbank(powerbankNo: string, req: QcReq): QcRecord {
+export function inspectPowerbank(powerbankNo: string, req: QcReq, intakeNo?: string): QcRecord {
   const p = powerbanks.find((x) => x.powerbankNo === powerbankNo);
   if (!p) notFound("充电宝", "Powerbank", powerbankNo);
   if (p!.status !== "IN_STOCK") fail(`只有在库充电宝可以做入库质检，当前是「${p!.status}」`, "In-stock only", "في المخزون فقط");
@@ -116,10 +117,18 @@ export function inspectPowerbank(powerbankNo: string, req: QcReq): QcRecord {
   const result = decide(req, req.battery >= QC_MIN_BATTERY && req.cycles <= QC_MAX_CYCLES);
   p!.battery = req.battery;
   p!.cycles = req.cycles;
-  return record("POWERBANK", powerbankNo, req, result);
+  return record("POWERBANK", powerbankNo, req, result, { minBattery: QC_MIN_BATTERY, maxCycles: QC_MAX_CYCLES }, intakeNo);
 }
 
 export const listQcRecords = (itemNo: string): QcRecord[] => qcRecords.filter((r) => r.itemNo === itemNo);
+
+/** 用掉放行凭证（同后端 QcService.consume）：本设备、本待检单、通过、未用过。 */
+export function consumeQc(qcNo: string | null, itemNo: string, intakeNo: string): boolean {
+  const r = qcRecords.find((x) => x.qcNo === qcNo);
+  if (!r || r.itemNo !== itemNo || r.intakeNo !== intakeNo || r.result !== "PASSED" || r.consumedBy) return false;
+  r.consumedBy = intakeNo;
+  return true;
+}
 
 // ——— 充电宝人工状态动作 ———
 

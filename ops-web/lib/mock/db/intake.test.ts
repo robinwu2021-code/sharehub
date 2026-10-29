@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest";
 import * as ik from "./intake";
 import { cabinets } from "./device";
+import * as da from "./device-asset";
 import type { Cabinet } from "../../types";
 
-/** 到仓待检 mock：与后端 IntakeFlowTest 同四条。 */
+/** 到仓待检 mock：与后端 IntakeFlowTest 同规则。 */
 let n = 0;
 const newCabinet = (): string => {
   const no = `CAB-IK${Date.now()}${n++}`;
@@ -40,6 +41,18 @@ describe("到仓待检", () => {
     expect(() => ik.disposeIntake(no, { items: [{ itemType: "CABINET", itemNo: bad }], disposition: "SCRAP", note: " " })).toThrow();
     const d = ik.disposeIntake(no, { items: [{ itemType: "CABINET", itemNo: bad }], disposition: "RETURN_SUPPLIER", note: "通电失败" });
     expect(d.intake.status).toBe("OPEN");
+  });
+
+  it("★ 放行凭证：只认本单上新做的通过，用过即废", () => {
+    const c = newCabinet();
+    const no = ik.createIntake({ warehouseNo: "WH002", cabinetNos: [c] }).intake.intakeNo;
+    const old = da.inspectCabinet(c, pass);
+    const fresh = ik.inspectIntakeItem(no, "CABINET", c, pass).items[0].qcNo!;
+    expect(da.listQcRecords(c).find((r) => r.qcNo === fresh)?.ruleSnapshot).toContain("powerOn");
+    expect(da.consumeQc(old.qcNo, c, no)).toBe(false);
+    ik.inboundIntake(no, [{ itemType: "CABINET", itemNo: c }]);
+    expect(da.listQcRecords(c).find((r) => r.qcNo === fresh)?.consumedBy).toBe(no);
+    expect(da.consumeQc(fresh, c, no)).toBe(false);
   });
 
   it("登记拦截：一台设备不能同时在两张未处理的待检单上；原因一次列全", () => {

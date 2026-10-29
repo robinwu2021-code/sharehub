@@ -146,6 +146,32 @@ class IntakeFlowTest extends ApiTestSupport {
     }
 
     @Test
+    @DisplayName("★ 放行凭证：只认本单上新做的通过（旧的通过不能复用）；机柜质检记下判定规则快照")
+    void voucher_must_be_fresh_and_single_use() {
+        String token = login("WAREHOUSE");
+        String c = newCabinet();
+        String no = create(token, List.of(c)).path("intake").path("intakeNo").asText();
+        // 本单上检过一次通过 → 凭证挂单号、带规则快照
+        JsonNode d = post("/api/ops/inventory/intakes/" + no + "/items/CABINET/" + c + "/qc", qc(true), token).okData();
+        String fresh = d.path("items").get(0).path("qcNo").asText();
+        assertThat(jdbc.queryForMap("SELECT intake_no, rule_snapshot, consumed_by FROM dev_qc_record WHERE qc_no=?", fresh))
+                .containsEntry("intake_no", no).containsEntry("consumed_by", null)
+                .extractingByKey("rule_snapshot").asString().contains("powerOn");
+        // 把明细上的凭证换成一条不属于本单的旧通过（模拟回仓设备拿旧凭证入库）→ 拒
+        String old = "QCOLD" + tag;
+        jdbc.update("INSERT INTO dev_qc_record (qc_no, tenant_id, item_type, item_no, power_on, slots_ok, result, inspected_by, inspected_at)"
+                + " VALUES (?, 'MAIN', 'CABINET', ?, 1, 1, 'PASSED', 'old', NOW(3))", old, c);
+        jdbc.update("UPDATE inv_intake_item SET qc_no=? WHERE intake_no=? AND item_no=?", old, no, c);
+        Map<String, Object> body = Map.of("items", List.of(Map.of("itemType", "CABINET", "itemNo", c)));
+        assertThat(post("/api/ops/inventory/intakes/" + no + "/inbound", body, token).status).isEqualTo(409);
+        // 换回本单的凭证 → 入库成功，凭证被用掉
+        jdbc.update("UPDATE inv_intake_item SET qc_no=? WHERE intake_no=? AND item_no=?", fresh, no, c);
+        post("/api/ops/inventory/intakes/" + no + "/inbound", body, token).okData();
+        assertThat(jdbc.queryForObject("SELECT consumed_by FROM dev_qc_record WHERE qc_no=?", String.class, fresh)).isEqualTo(no);
+        jdbc.update("DELETE FROM dev_qc_record WHERE qc_no=?", old);
+    }
+
+    @Test
     @DisplayName("登记拦截：一台设备不能同时在两张未处理的待检单上；原因一次列全")
     void duplicate_open_intake_is_refused() {
         String token = login("WAREHOUSE");

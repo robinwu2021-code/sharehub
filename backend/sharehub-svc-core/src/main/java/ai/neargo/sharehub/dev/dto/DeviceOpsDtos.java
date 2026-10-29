@@ -19,7 +19,8 @@ public final class DeviceOpsDtos {
     }
 
     public record QcRecord(String qcNo, String itemType, String itemNo, Boolean powerOn, Boolean slotsOk, Integer battery,
-                           Integer cycles, String result, String note, String inspectedBy, LocalDateTime inspectedAt) {
+                           Integer cycles, String result, String note, String inspectedBy, LocalDateTime inspectedAt,
+                           String ruleSnapshot, String intakeNo, String consumedBy) {
     }
 
     public record ReasonReq(String reason) {

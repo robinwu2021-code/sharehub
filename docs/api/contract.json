@@ -12142,6 +12142,18 @@
     {
      "name": "inspectedAt",
      "type": "LocalDateTime"
+    },
+    {
+     "name": "ruleSnapshot",
+     "type": "String"
+    },
+    {
+     "name": "intakeNo",
+     "type": "String"
+    },
+    {
+     "name": "consumedBy",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -19222,6 +19234,18 @@
     {
      "name": "inspectedAt",
      "type": "LocalDateTime"
+    },
+    {
+     "name": "ruleSnapshot",
+     "type": "String"
+    },
+    {
+     "name": "intakeNo",
+     "type": "String"
+    },
+    {
+     "name": "consumedBy",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -19316,6 +19340,18 @@
     {
      "name": "inspectedAt",
      "type": "LocalDateTime"
+    },
+    {
+     "name": "ruleSnapshot",
+     "type": "String"
+    },
+    {
+     "name": "intakeNo",
+     "type": "String"
+    },
+    {
+     "name": "consumedBy",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -51240,6 +51276,10 @@
   "AssetDiffStatus": [
    "OPEN",
    "RESOLVED"
+  ],
+  "IntakeStatus": [
+   "OPEN",
+   "DONE"
   ],
   "TransferEndpointType": [
    "WAREHOUSE",

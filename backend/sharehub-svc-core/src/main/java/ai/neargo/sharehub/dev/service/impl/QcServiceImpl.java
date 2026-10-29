@@ -48,13 +48,19 @@ public class QcServiceImpl implements QcService {
     @Override
     @Transactional
     public QcRecord inspectCabinet(String cabinetNo, QcReq r) {
+        return inspectCabinet(cabinetNo, r, null);
+    }
+
+    @Override
+    @Transactional
+    public QcRecord inspectCabinet(String cabinetNo, QcReq r, String intakeNo) {
         DevCabinet c = cabinets.selectOne(new LambdaQueryWrapper<DevCabinet>().eq(DevCabinet::getCabinetNo, cabinetNo).last("limit 1"));
         if (c == null) throw BizException.notFound(cabinetNo);
         if (!CabinetStatus.IN_STOCK.name().equals(c.getStatus())) throw BizException.conflict("error.qc.in_stock_only", cabinetNo);
         QcReq req = require(r);
         if (req.powerOn() == null || req.slotsOk() == null) throw BizException.badRequest("error.common.missing_parameter", "powerOn / slotsOk");
         QcStatus result = decide(req, req.powerOn() && req.slotsOk());
-        DevQcRecord rec = record("CABINET", cabinetNo, req, result);
+        DevQcRecord rec = record("CABINET", cabinetNo, req, result, CABINET_RULE, intakeNo);
         cabinets.update(null, new LambdaUpdateWrapper<DevCabinet>().eq(DevCabinet::getCabinetNo, cabinetNo)
                 .set(DevCabinet::getQcStatus, result.name()));
         log.info("机柜入库质检 cabinetNo={} result={}", cabinetNo, result);
@@ -64,6 +70,12 @@ public class QcServiceImpl implements QcService {
     @Override
     @Transactional
     public QcRecord inspectPowerbank(String powerbankNo, QcReq r) {
+        return inspectPowerbank(powerbankNo, r, null);
+    }
+
+    @Override
+    @Transactional
+    public QcRecord inspectPowerbank(String powerbankNo, QcReq r, String intakeNo) {
         DevPowerbank p = powerbanks.selectOne(new LambdaQueryWrapper<DevPowerbank>().eq(DevPowerbank::getPowerbankNo, powerbankNo).last("limit 1"));
         if (p == null) throw BizException.notFound(powerbankNo);
         if (!PowerbankStatus.IN_STOCK.name().equals(p.getStatus())) throw BizException.conflict("error.qc.in_stock_only", powerbankNo);
@@ -72,7 +84,8 @@ public class QcServiceImpl implements QcService {
         int minBattery = params.intOf("device.qc.min_battery", 60);
         int maxCycles = params.intOf("device.qc.max_cycles", 500);
         QcStatus result = decide(req, req.battery() >= minBattery && req.cycles() <= maxCycles);
-        DevQcRecord rec = record("POWERBANK", powerbankNo, req, result);
+        DevQcRecord rec = record("POWERBANK", powerbankNo, req, result,
+                "{\"minBattery\":" + minBattery + ",\"maxCycles\":" + maxCycles + "}", intakeNo);
         powerbanks.update(null, new LambdaUpdateWrapper<DevPowerbank>().eq(DevPowerbank::getPowerbankNo, powerbankNo)
                 .set(DevPowerbank::getQcStatus, result.name()).set(DevPowerbank::getBattery, req.battery())
                 .set(DevPowerbank::getCycles, req.cycles()));
@@ -81,10 +94,24 @@ public class QcServiceImpl implements QcService {
     }
 
     @Override
+    @Transactional
+    public boolean consume(String qcNo, String itemNo, String intakeNo) {
+        if (qcNo == null || intakeNo == null) return false;
+        // 条件更新一次定胜负：并发两次入库只有一次能把 consumed_by 从空写成单号
+        return records.update(null, new LambdaUpdateWrapper<DevQcRecord>().eq(DevQcRecord::getQcNo, qcNo)
+                .eq(DevQcRecord::getItemNo, itemNo).eq(DevQcRecord::getIntakeNo, intakeNo)
+                .eq(DevQcRecord::getResult, QcStatus.PASSED.name()).isNull(DevQcRecord::getConsumedBy)
+                .set(DevQcRecord::getConsumedBy, intakeNo)) == 1;
+    }
+
+    @Override
     public List<QcRecord> records(String itemNo) {
         return records.selectList(new LambdaQueryWrapper<DevQcRecord>().eq(DevQcRecord::getItemNo, itemNo)
                 .orderByDesc(DevQcRecord::getId)).stream().map(QcServiceImpl::vo).toList();
     }
+
+    /** 机柜的判定规则是固定的两项必过，没有可调阈值；快照记下来，规则以后变了也能解释。 */
+    private static final String CABINET_RULE = "{\"powerOn\":true,\"slotsOk\":true}";
 
     /** 检查项定结论；人可以把「过了」判成不过（带原因），不能把「不过」判成过。 */
     private static QcStatus decide(QcReq req, boolean checksPass) {
@@ -98,7 +125,7 @@ public class QcServiceImpl implements QcService {
         return QcStatus.PASSED;
     }
 
-    private DevQcRecord record(String type, String itemNo, QcReq r, QcStatus result) {
+    private DevQcRecord record(String type, String itemNo, QcReq r, QcStatus result, String rule, String intakeNo) {
         DevQcRecord e = new DevQcRecord();
         e.setQcNo(IdGenerator.next("QC"));
         e.setTenantId("MAIN");
@@ -109,6 +136,8 @@ public class QcServiceImpl implements QcService {
         e.setBattery(r.battery());
         e.setCycles(r.cycles());
         e.setResult(result.name());
+        e.setRuleSnapshot(rule);
+        e.setIntakeNo(intakeNo);
         e.setNote(r.note() == null || r.note().isBlank() ? null : r.note().trim());
         e.setInspectedBy(SecurityUtils.currentUser().map(LoginUser::userNo).orElse("SYSTEM"));
         e.setInspectedAt(LocalDateTime.now());
@@ -123,6 +152,7 @@ public class QcServiceImpl implements QcService {
 
     private static QcRecord vo(DevQcRecord e) {
         return new QcRecord(e.getQcNo(), e.getItemType(), e.getItemNo(), e.getPowerOn(), e.getSlotsOk(), e.getBattery(),
-                e.getCycles(), e.getResult(), e.getNote(), e.getInspectedBy(), e.getInspectedAt());
+                e.getCycles(), e.getResult(), e.getNote(), e.getInspectedBy(), e.getInspectedAt(),
+                e.getRuleSnapshot(), e.getIntakeNo(), e.getConsumedBy());
     }
 }

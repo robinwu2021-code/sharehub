@@ -219,7 +219,7 @@ public class IntakeServiceImpl implements IntakeService {
         InvIntake h = requireOpen(intakeNo);
         InvIntakeItem it = requireItem(intakeNo, itemType, itemNo);
         if (!PENDING.equals(it.getDisposition())) throw BizException.conflict("error.intake.item_handled", itemNo);
-        QcRecord rec = CABINET.equals(it.getItemType()) ? qc.inspectCabinet(itemNo, req) : qc.inspectPowerbank(itemNo, req);
+        QcRecord rec = CABINET.equals(it.getItemType()) ? qc.inspectCabinet(itemNo, req, intakeNo) : qc.inspectPowerbank(itemNo, req, intakeNo);
         items.update(null, new LambdaUpdateWrapper<InvIntakeItem>().eq(InvIntakeItem::getId, it.getId())
                 .eq(InvIntakeItem::getDisposition, PENDING)
                 .set(InvIntakeItem::getQcNo, rec.qcNo()).set(InvIntakeItem::getQcResult, rec.result()));
@@ -240,6 +240,8 @@ public class IntakeServiceImpl implements IntakeService {
         String me = operator();
         LocalDateTime now = LocalDateTime.now();
         for (InvIntakeItem i : picked) {
+            // 放行凭证一次性，且须是本单上做的质检（回仓设备旧的通过不能复用）
+            if (!qc.consume(i.getQcNo(), i.getItemNo(), intakeNo)) throw BizException.conflict("error.intake.voucher_invalid", i.getItemNo());
             // 条件更新：设备须仍在库、未绑定、未出库 —— 质检后被人拿去出库了，这里要拦住而不是把它写回仓里
             int n = CABINET.equals(i.getItemType())
                     ? cabinets.update(null, new LambdaUpdateWrapper<DevCabinet>().eq(DevCabinet::getCabinetNo, i.getItemNo())

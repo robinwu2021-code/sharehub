@@ -24,6 +24,12 @@ public class DevQcRecord {
     private Integer cycles;
     /** PASSED / FAILED。 */
     private String result;
+    /** 判定阈值快照（JSON，V194）。 */
+    private String ruleSnapshot;
+    /** 所属到仓待检单（V194）。 */
+    private String intakeNo;
+    /** 用掉本放行凭证的待检单（V194）；非空即已用。 */
+    private String consumedBy;
     private String note;
     private String inspectedBy;
     private LocalDateTime inspectedAt;

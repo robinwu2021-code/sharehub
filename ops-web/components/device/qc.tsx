@@ -110,6 +110,18 @@ export function QcDrawer({ target, onClose, intakeNo }: { target: QcTarget | nul
   );
 }
 
+/** 阈值快照 → 短文本；老记录没有快照显示「-」。 */
+function ruleText(json: string | null): string {
+  if (!json) return "-";
+  try {
+    const r = JSON.parse(json) as { minBattery?: number; maxCycles?: number; powerOn?: boolean; slotsOk?: boolean };
+    if (r.minBattery != null) return `电量 ≥ ${r.minBattery}% · 循环 ≤ ${r.maxCycles}`;
+    return "通电 · 仓位 必过";
+  } catch {
+    return "-";
+  }
+}
+
 const cols: Column<QcRecord>[] = [
   { header: "质检单号", cell: (r) => <span className="tabular-nums">{r.qcNo}</span> },
   { header: "结论", cell: (r) => <StatusBadge map={QC_STATUS} value={r.result} /> },
@@ -123,6 +135,7 @@ const cols: Column<QcRecord>[] = [
       </span>
     ),
   },
+  { header: "判定规则", cell: (r) => <span className="txt-caption text-muted-foreground">{ruleText(r.ruleSnapshot)}</span> },
   { header: "备注", cell: (r) => <span className="txt-caption">{r.note ?? "-"}</span> },
   { header: "质检人", cell: (r) => <span className="text-muted-foreground">{r.inspectedBy}</span> },
   { header: "时间", cell: (r) => <span className="text-muted-foreground">{fmtTime(r.inspectedAt)}</span> },

@@ -702,6 +702,12 @@ export interface QcRecord {
   note: string | null;
   inspectedBy: string;
   inspectedAt: string;
+  /** 判定阈值快照（JSON，V194）：改了参数，历史结论仍能解释。 */
+  ruleSnapshot: string | null;
+  /** 所属到仓待检单（V194）。 */
+  intakeNo: string | null;
+  /** 用掉本放行凭证的待检单（V194）；非空即已用。 */
+  consumedBy: string | null;
 }
 
 /** 调拨两端的类型（与后端 `TransferEndpointType` 同名同值）：决定 fromRef / toRef 指向仓库、站点还是点位。 */
