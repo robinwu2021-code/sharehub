@@ -23,4 +23,18 @@ public class SysParam extends BaseEntity {
     private String value;
     /** 分组，运营端分栏用。 */
     private String groupName;
+
+    // —— 字典元数据（V191）：只由迁移维护，界面只改取值；保存时一律以库里的为准，请求体里带了也不认 ——
+    /** TEXT / INT / DECIMAL / BOOL / ENUM；空 = TEXT。 */
+    private String valueType;
+    /** ENUM 可选值 JSON：[{"value":"CEIL","label":"…"}]。 */
+    private String valueOptions;
+    private java.math.BigDecimal minValue;
+    private java.math.BigDecimal maxValue;
+    private String pattern;
+    /** 1 = 允许留空（留空 = 关闭）。 */
+    private Integer nullable;
+    private String hint;
+    /** 1 = 运营方待拍板项。 */
+    private Integer pendingDecision;
 }

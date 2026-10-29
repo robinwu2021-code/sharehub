@@ -2,6 +2,7 @@ package ai.neargo.sharehub.platform.sys.dto;
 
 import ai.neargo.sharehub.platform.sys.AppPlatform;
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * platform/sys 子域出参 VO。字段镜像 ops-web {@code lib/types/system.ts} 的同名 interface。
@@ -22,7 +23,15 @@ public final class SysDtos {
 
     /** 系统参数行，镜像前端 {@code SysParam}。 */
     public record SysParamEntry(String paramKey, String label, String value,
-                                String groupName, String updatedAt) {
+                                String groupName, String updatedAt,
+                                /* V191 字典元数据：界面据此渲染下拉 / 开关 / 数字框，并标出待拍板项 */
+                                String valueType, List<ParamOption> options, java.math.BigDecimal minValue,
+                                java.math.BigDecimal maxValue, String pattern, Boolean nullable, String hint,
+                                Boolean pendingDecision) {
+    }
+
+    /** 枚举型参数的一个可选值与它的中文含义。 */
+    public record ParamOption(String value, String label) {
     }
 
     // ——————————————————— 业务规则（三分区单例）———————————————————
