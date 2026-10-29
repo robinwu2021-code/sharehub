@@ -51,6 +51,18 @@ class ReconHandleTraceTest extends ApiTestSupport {
     }
 
     @Test
+    @DisplayName("对账统计可查：处置一笔后已处理数 +1（此前查不存在的 status 列，统计接口恒 500）")
+    void statsCountResolvedDiffs() {
+        String admin = login("ADMIN");
+        long before = get("/api/trade/reconciles/stats", admin).okData().path("resolved").asLong();
+        String batch = batch();
+        long diffId = diff(batch, "PAYS" + rnd());
+        post("/api/trade/reconciles/" + batch + "/resolve", Map.of("action", "verify", "handleNote", "核对无误", "diffId", diffId), admin)
+                .okData();
+        assertThat(get("/api/trade/reconciles/stats", admin).okData().path("resolved").asLong()).isEqualTo(before + 1);
+    }
+
+    @Test
     @DisplayName("处置人只认会话：请求体里的 operatorName 一律不作数")
     void handledByComesFromTheSessionNotTheBody() {
         String batch = batch();
