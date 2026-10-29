@@ -25,10 +25,14 @@ public class DevicePoolController {
 
     private final CabinetPoolService pool;
     private final ai.neargo.sharehub.dev.service.CabinetBindService binds;
+    /** 库存账动作（出库 / 签收 / 调整 / 退回）一律经端口（S2.5）；汇总是只读，仍直接查。 */
+    private final ai.neargo.sharehub.inv.port.InventoryPort inventory;
 
-    public DevicePoolController(CabinetPoolService pool, ai.neargo.sharehub.dev.service.CabinetBindService binds) {
+    public DevicePoolController(CabinetPoolService pool, ai.neargo.sharehub.dev.service.CabinetBindService binds,
+                                ai.neargo.sharehub.inv.port.InventoryPort inventory) {
         this.pool = pool;
         this.binds = binds;
+        this.inventory = inventory;
     }
 
     /**
@@ -64,14 +68,14 @@ public class DevicePoolController {
     @PreAuthorize("@perm.can('device:inventory:transfer')")
     public List<Cabinet> issue(@RequestBody IssueReq req) {
         if (req == null) throw ai.neargo.sharehub.common.BizException.badRequest("error.common.missing_parameter", "body");
-        return pool.issue(req.agentNo(), req.siteNo(), req.receiverNo(), req.cabinetNos());
+        return inventory.dispatch(req.agentNo(), req.siteNo(), req.receiverNo(), req.cabinetNos());
     }
 
     /** 接收人签收（V195）：只能签给自己的 —— 权限码只是门槛，「本人 = 接收人」在服务里校验。 */
     @PostMapping("/api/ops/devices/claim")
     @PreAuthorize("@perm.can('device:cabinet:update')")
     public List<Cabinet> claim(@RequestBody ai.neargo.sharehub.dev.dto.PoolDtos.ClaimReq req) {
-        return pool.claim(req == null ? null : req.cabinetNos());
+        return inventory.claim(req == null ? null : req.cabinetNos());
     }
 
     /** 出库调整（V195）：改商家 / 站点 / 接收人，只收未绑定的。 */
@@ -79,13 +83,13 @@ public class DevicePoolController {
     @PreAuthorize("@perm.can('device:inventory:transfer')")
     public List<Cabinet> redirect(@RequestBody ai.neargo.sharehub.dev.dto.PoolDtos.RedirectReq req) {
         if (req == null) throw ai.neargo.sharehub.common.BizException.badRequest("error.common.missing_parameter", "body");
-        return pool.redirect(req.cabinetNos(), req.agentNo(), req.siteNo(), req.receiverNo(), req.reason());
+        return inventory.redirect(req.cabinetNos(), req.agentNo(), req.siteNo(), req.receiverNo(), req.reason());
     }
 
     @PostMapping("/api/ops/devices/pool-return")
     @PreAuthorize("@perm.can('device:inventory:transfer')")
     public List<Cabinet> poolReturn(@RequestBody PoolReturnReq req) {
-        return pool.returnToWarehouse(req == null ? null : req.cabinetNos(),
+        return inventory.returnToWarehouse(req == null ? null : req.cabinetNos(),
                 req == null ? null : req.warehouseNo(), req == null ? null : req.reason());
     }
 

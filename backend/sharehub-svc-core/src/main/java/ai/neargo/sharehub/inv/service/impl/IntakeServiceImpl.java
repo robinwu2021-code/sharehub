@@ -13,8 +13,6 @@ import ai.neargo.sharehub.dev.entity.DevCabinet;
 import ai.neargo.sharehub.dev.entity.DevPowerbank;
 import ai.neargo.sharehub.dev.mapper.CabinetMapper;
 import ai.neargo.sharehub.dev.mapper.PowerbankMapper;
-import ai.neargo.sharehub.dev.movement.MovementEvent;
-import ai.neargo.sharehub.dev.movement.MovementRecorder;
 import ai.neargo.sharehub.dev.service.QcService;
 import ai.neargo.sharehub.inv.IntakeStatus;
 import ai.neargo.sharehub.inv.WarehouseDirectory;
@@ -84,12 +82,12 @@ public class IntakeServiceImpl implements IntakeService {
         this.warehouses = warehouses;
     }
 
-    /** 设备履历（V196）。 */
-    private MovementRecorder movements;
+    /** 库存账入口（S2.5）：入库经它，切到独立进销存时只换实现。 */
+    private ai.neargo.sharehub.inv.port.InventoryPort inventory;
 
     @org.springframework.beans.factory.annotation.Autowired
-    void setMovements(MovementRecorder movements) {
-        this.movements = movements;
+    void setInventory(ai.neargo.sharehub.inv.port.InventoryPort inventory) {
+        this.inventory = inventory;
     }
 
     // —— 查询 ——
@@ -252,17 +250,7 @@ public class IntakeServiceImpl implements IntakeService {
         for (InvIntakeItem i : picked) {
             // 放行凭证一次性，且须是本单上做的质检（回仓设备旧的通过不能复用）
             if (!qc.consume(i.getQcNo(), i.getItemNo(), intakeNo)) throw BizException.conflict("error.intake.voucher_invalid", i.getItemNo());
-            // 条件更新：设备须仍在库、未绑定、未出库 —— 质检后被人拿去出库了，这里要拦住而不是把它写回仓里
-            int n = CABINET.equals(i.getItemType())
-                    ? cabinets.update(null, new LambdaUpdateWrapper<DevCabinet>().eq(DevCabinet::getCabinetNo, i.getItemNo())
-                    .eq(DevCabinet::getStatus, CabinetStatus.IN_STOCK.name()).isNull(DevCabinet::getLocationNo)
-                    .isNull(DevCabinet::getIssuedAgentNo).set(DevCabinet::getWarehouseNo, h.getWarehouseNo()))
-                    : powerbanks.update(null, new LambdaUpdateWrapper<DevPowerbank>().eq(DevPowerbank::getPowerbankNo, i.getItemNo())
-                    .eq(DevPowerbank::getStatus, PowerbankStatus.IN_STOCK.name()).isNull(DevPowerbank::getCabinetNo)
-                    .set(DevPowerbank::getWarehouseNo, h.getWarehouseNo()));
-            if (n == 0) throw BizException.conflict("error.common.state_changed");
-            movements.record(new MovementRecorder.Move(i.getItemType(), i.getItemNo(), MovementEvent.INBOUND, null,
-                    MovementRecorder.wh(h.getWarehouseNo()), null, null, "质检凭证 " + i.getQcNo(), intakeNo));
+            inventory.inbound(i.getItemType(), i.getItemNo(), h.getWarehouseNo(), i.getQcNo(), intakeNo);
             mark(i, INBOUND, null, me, now);
         }
         closeIfDone(h);

@@ -121,6 +121,20 @@ class ArchitectureTest {
         assertThat(writes).as("履历只追加，不改不删").isEmpty();
     }
 
+    @Test
+    @DisplayName("库存账动作只经 InventoryPort（S2.5）：出库 / 签收 / 调整 / 退回不得绕过端口直调出库池服务")
+    void ledgerActionsGoThroughInventoryPort() {
+        var bypass = ALL.stream()
+                .filter(c -> !c.getPackageName().startsWith("ai.neargo.sharehub.inv.port")
+                        && !c.getPackageName().startsWith("ai.neargo.sharehub.dev.service"))
+                .flatMap(c -> c.getMethodCallsFromSelf().stream())
+                .filter(call -> call.getTargetOwner().getName().equals("ai.neargo.sharehub.dev.service.CabinetPoolService"))
+                .filter(call -> java.util.Set.of("issue", "claim", "redirect", "returnToWarehouse").contains(call.getName()))
+                .map(call -> call.getOriginOwner().getSimpleName() + "." + call.getName())
+                .toList();
+        assertThat(bypass).as("切到独立进销存时只换端口实现 —— 绕过端口的调用会在切换后继续改本地表").isEmpty();
+    }
+
     // ───────────────────────── 棘轮：控制器直连 Mapper ─────────────────────────
 
     @Test
