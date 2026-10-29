@@ -183,6 +183,13 @@ class VocabularyWriteCoverageTest {
             "ord_tax_invoice.kind", "ord_tax_invoice.status",
             // ops_approval_request（V189）：请求体里没有这两列，kind/status 只由 ApprovalGate 用常量赋值
             "ops_approval_request.kind", "ops_approval_request.status",
+            // sys_param.value_type（V191）：只由迁移写；SysParamServiceImpl.save 的 lockDictionary 以库里为准覆盖请求体
+            "sys_param.value_type",
+            // inv_intake / inv_intake_item（V192 到仓待检）：kind / status / item_type 只由 IntakeServiceImpl 用常量赋值
+            //（登记入参是 cabinetNos / powerbankNos 两个列表，类型由列表决定）；qc_result 取 QcService 的结论（QcStatus.name()）；
+            // disposition 来自请求体，但写库前经 DISPOSALS 白名单（RETURN_SUPPLIER / SCRAP），不在白名单 400
+            "inv_intake.kind", "inv_intake.status",
+            "inv_intake_item.item_type", "inv_intake_item.qc_result", "inv_intake_item.disposition",
 
             // ——— 2026-09-28 第六批：钱那一侧剩下的 21 列，全部是「读代码核实」，一处新缺口都没有 ———
             // 这一批一个真缺口都没查出来，值得记一笔：finance 域的守法很统一 ——

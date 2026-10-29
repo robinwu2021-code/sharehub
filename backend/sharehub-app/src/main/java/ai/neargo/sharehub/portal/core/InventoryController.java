@@ -27,13 +27,62 @@ public class InventoryController {
     private final InventoryTransferService transferService;
     private final CommandLogService commandLogService;
     private final ai.neargo.sharehub.inv.WarehouseDirectory warehouses;
+    private final ai.neargo.sharehub.inv.service.IntakeService intakes;
 
     public InventoryController(InventoryTransferService transferService,
                                CommandLogService commandLogService,
-                               ai.neargo.sharehub.inv.WarehouseDirectory warehouses) {
+                               ai.neargo.sharehub.inv.WarehouseDirectory warehouses,
+                               ai.neargo.sharehub.inv.service.IntakeService intakes) {
         this.transferService = transferService;
         this.commandLogService = commandLogService;
         this.warehouses = warehouses;
+        this.intakes = intakes;
+    }
+
+    // —— 到仓待检（V192；菜单叶：设备管理 › 入库与质检 › 到仓待检）——
+
+    @GetMapping("/inventory/intakes")
+    @PreAuthorize("@perm.can('device:inventory:read')")
+    public PageResult<ai.neargo.sharehub.inv.dto.IntakeDtos.Intake> intakes(@RequestParam(required = false) Integer page,
+                                                                         @RequestParam(required = false) Integer size,
+                                                                         @RequestParam(required = false) String keyword,
+                                                                         @RequestParam(required = false) String status,
+                                                                         @RequestParam(required = false) String warehouseNo) {
+        return intakes.page(page, size, keyword, status, warehouseNo);
+    }
+
+    @GetMapping("/inventory/intakes/{intakeNo}")
+    @PreAuthorize("@perm.can('device:inventory:read')")
+    public ai.neargo.sharehub.inv.dto.IntakeDtos.IntakeDetail intake(@PathVariable String intakeNo) {
+        return intakes.get(intakeNo);
+    }
+
+    @PostMapping("/inventory/intakes")
+    @PreAuthorize("@perm.can('device:inventory:inbound')")
+    public ai.neargo.sharehub.inv.dto.IntakeDtos.IntakeDetail createIntake(@RequestBody ai.neargo.sharehub.inv.dto.IntakeDtos.CreateReq req) {
+        return intakes.create(req);
+    }
+
+    @PostMapping("/inventory/intakes/{intakeNo}/items/{itemType}/{itemNo}/qc")
+    @PreAuthorize("@perm.can('device:qc:inspect')")
+    public ai.neargo.sharehub.inv.dto.IntakeDtos.IntakeDetail inspectIntakeItem(@PathVariable String intakeNo, @PathVariable String itemType,
+                                                                          @PathVariable String itemNo,
+                                                                          @RequestBody ai.neargo.sharehub.dev.dto.DeviceOpsDtos.QcReq req) {
+        return intakes.inspect(intakeNo, itemType, itemNo, req);
+    }
+
+    @PostMapping("/inventory/intakes/{intakeNo}/inbound")
+    @PreAuthorize("@perm.can('device:inventory:inbound')")
+    public ai.neargo.sharehub.inv.dto.IntakeDtos.IntakeDetail inboundIntake(@PathVariable String intakeNo,
+                                                                      @RequestBody ai.neargo.sharehub.inv.dto.IntakeDtos.ItemsReq req) {
+        return intakes.inbound(intakeNo, req);
+    }
+
+    @PostMapping("/inventory/intakes/{intakeNo}/dispose")
+    @PreAuthorize("@perm.can('device:inventory:inbound')")
+    public ai.neargo.sharehub.inv.dto.IntakeDtos.IntakeDetail disposeIntake(@PathVariable String intakeNo,
+                                                                      @RequestBody ai.neargo.sharehub.inv.dto.IntakeDtos.DisposeReq req) {
+        return intakes.dispose(intakeNo, req);
     }
 
     // —— 仓库（只读，过渡期：仓库由迁移种入，管理将来在独立库存服务里做）——

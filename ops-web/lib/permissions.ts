@@ -103,7 +103,7 @@ export const BACKEND_ROLE_PERMS: Record<Role, string[]> = {
     "dashboard:overview:read", "dashboard:todo:read",
     "device:cabinet:read", "device:cabinet:import", "device:slot:read", "device:powerbank:read",
     "device:qc:inspect",
-    "device:inventory:read", "device:inventory:transfer", "device:inventory:stocktake",
+    "device:inventory:read", "device:inventory:inbound", "device:inventory:transfer", "device:inventory:stocktake",
   ],
   AGENT: [
     // 流程与工单（强制方 OpsKit，功能权限清单 §16）

@@ -120,7 +120,7 @@ public final class RolePerms {
                     "dashboard:overview:read", "dashboard:todo:read",
                     "device:cabinet:read", "device:cabinet:import", "device:slot:read", "device:powerbank:read",
                     "device:qc:inspect",
-                    "device:inventory:read", "device:inventory:transfer", "device:inventory:stocktake"),
+                    "device:inventory:read", "device:inventory:inbound", "device:inventory:transfer", "device:inventory:stocktake"),
             "AGENT", List.of(
                     // 流程与工单（强制方 OpsKit，功能权限清单 §16）
                     "flow:todo:read", "flow:ticket:read", "flow:ticket:handle",

@@ -30,6 +30,7 @@ device:command:send	远程指令 下发	device	1
 device:inventory:*	库存调拨 全部	device	0
 device:inventory:read	库存/调拨/盘点 查看	device	1
 device:inventory:diff	资产差异 处置	device	1
+device:inventory:inbound	到货登记 / 入库 / 不合格处置	device	1
 device:inventory:transfer	调拨 执行	device	1
 device:ota:*	固件 全部	device	0
 device:ota:manage	固件投放 建/改	device	1
