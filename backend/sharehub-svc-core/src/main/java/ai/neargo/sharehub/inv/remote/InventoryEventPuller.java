@@ -165,7 +165,7 @@ public class InventoryEventPuller {
         try {
             return payload == null ? JSON.createObjectNode() : JSON.readTree(payload);
         } catch (Exception ex) {
-            throw new IllegalArgumentException("库存事件 payload 不是 JSON：" + payload, ex);
+            throw new IllegalArgumentException("inventory event payload is not JSON: " + payload, ex);
         }
     }
 }
