@@ -92,6 +92,23 @@ public class ShareGeneratorImpl implements ShareGenerator {
     static final String KEY_TAX_COUNTRY = "finance.share.tax_country";
     static final String KEY_VENUE_ENABLED = "finance.share.venue_enabled";
 
+    static final String KEY_SCALE = "finance.rounding.scale";
+    static final String KEY_ROUNDING = "finance.share.rounding";
+
+    /** 小数位 0..4，越界按 2（分）。 */
+    private int shareScale() {
+        int v = params.intOf(KEY_SCALE, 2);
+        return v < 0 || v > 4 ? 2 : v;
+    }
+
+    /** 只认 DOWN / HALF_UP；别的值按 DOWN 并 WARN（错配不该让分出去的钱变多）。 */
+    private RoundingMode shareRounding() {
+        String v = params.textOf(KEY_ROUNDING, "DOWN").trim().toUpperCase();
+        if ("HALF_UP".equals(v)) return RoundingMode.HALF_UP;
+        if (!"DOWN".equals(v)) log.warn("系统参数 {}={} 不认识，按 DOWN 处理；请运营改为 DOWN 或 HALF_UP", KEY_ROUNDING, v);
+        return RoundingMode.DOWN;
+    }
+
     public ShareGeneratorImpl(ShareRecordMapper records, ShareRuleMapper rules,
                               SiteSharingQueryPort siteSharing, SiteAgentQueryPort siteAgents,
                               ai.neargo.sharehub.api.platform.port.AgentDirectoryPort agentDirectory,
@@ -286,8 +303,9 @@ public class ShareGeneratorImpl implements ShareGenerator {
         r.setBaseMode(base.mode().name());
         r.setTaxRate(base.taxRate());
         r.setBaseAmount(base.amount());
-        // 向下取整到分：分账合计不得超过基数
-        r.setAmount(base.amount().multiply(rate).setScale(2, RoundingMode.DOWN));
+        // 舍入可配（C08，V184）：缺省向下取整到分 —— 分账合计不超基数，尾差归平台；HALF_UP 四舍五入。
+        // 分润明细生成即定格，改配置只影响之后生成的
+        r.setAmount(base.amount().multiply(rate).setScale(shareScale(), shareRounding()));
         r.setCurrency(currency == null ? e.currency() : currency);
         r.setMode(ShareMode.LEDGER.name());
         r.setStatus(ShareRecordStatus.PENDING.name());

@@ -54,9 +54,14 @@ public class ShareServiceImpl implements ShareService {
     private final ShareRecordMapper recordMapper;
     private final ShareRuleMapper ruleMapper;
 
-    public ShareServiceImpl(ShareRecordMapper recordMapper, ShareRuleMapper ruleMapper) {
+    /** 分成比例范围（C11，V184）：finance.share.rate_min / rate_max。 */
+    private final ai.neargo.sharehub.api.platform.port.SysParamPort params;
+
+    public ShareServiceImpl(ShareRecordMapper recordMapper, ShareRuleMapper ruleMapper,
+                            ai.neargo.sharehub.api.platform.port.SysParamPort params) {
         this.recordMapper = recordMapper;
         this.ruleMapper = ruleMapper;
+        this.params = params;
     }
 
     // ——————————————————————— 分润明细 ———————————————————————
@@ -188,6 +193,17 @@ public class ShareServiceImpl implements ShareService {
                 && (body.getRate().signum() < 0 || body.getRate().compareTo(BigDecimal.ONE) > 0)) {
             // [db-design §1.5]：*_rate 是 0..1 的小数，不是百分数。传 30 表示 30% 是最常见的踩坑
             throw new IllegalArgumentException("分成比率 rate 必须是 0..1 的小数（不是百分数）: " + body.getRate());
+        }
+        // 运营方约定的分成区间（原文 SHR-02「15%–50%」，C11 做成配置）。0 是明确的「不分」，不受区间约束
+        if (body.getRate() != null && body.getRate().signum() > 0) {
+            // 缺省 0 / 1 = 不额外约束（现行）；原文的 15%–50% 由运营在系统参数里开
+            BigDecimal min = params.decimalOf("finance.share.rate_min", BigDecimal.ZERO);
+            BigDecimal max = params.decimalOf("finance.share.rate_max", BigDecimal.ONE);
+            if (body.getRate().compareTo(min) < 0 || body.getRate().compareTo(max) > 0) {
+                throw ai.neargo.sharehub.common.BizException.badRequest("error.share.rate_out_of_range",
+                        body.getRate().stripTrailingZeros().toPlainString(), min.stripTrailingZeros().toPlainString(),
+                        max.stripTrailingZeros().toPlainString());
+            }
         }
 
         String no = body.getRuleNo();

@@ -34971,6 +34971,36 @@
      "name": "payStatus",
      "type": "String",
      "required": false
+    },
+    {
+     "in": "query",
+     "name": "from",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "to",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "agentNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "siteNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "cabinetNo",
+     "type": "String",
+     "required": false
     }
    ],
    "bodyType": null,
@@ -35057,8 +35087,112 @@
     {
      "name": "payStatus",
      "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "agentName",
+     "type": "String"
+    },
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "maxCharge",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "liveDurationMin",
+     "type": "Integer"
+    },
+    {
+     "name": "accruedFee",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "payNo",
+     "type": "String"
+    },
+    {
+     "name": "payChannel",
+     "type": "String"
     }
    ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/trade/orders/export",
+   "perm": "order:order:export",
+   "perms": [
+    "order:order:export"
+   ],
+   "handler": "TradeController#exportOrders",
+   "summary": "订单导出（RNT-03 / AC-09）：同列表筛选、全量（上限 `ai.neargo.sharehub.portal.shared.ExportSupport#MAX_ROWS`）， `format=xlsx|pdf`。",
+   "params": [
+    {
+     "in": "query",
+     "name": "format",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "keyword",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "status",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "payStatus",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "from",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "to",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "agentNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "siteNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "cabinetNo",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "void",
+   "returnContainer": null,
+   "returnElement": "void",
+   "responseShape": null,
    "requestShape": null
   },
   {
@@ -35161,6 +35295,38 @@
     },
     {
      "name": "payStatus",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "agentName",
+     "type": "String"
+    },
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "maxCharge",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "liveDurationMin",
+     "type": "Integer"
+    },
+    {
+     "name": "accruedFee",
+     "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "payNo",
+     "type": "String"
+    },
+    {
+     "name": "payChannel",
      "type": "String"
     }
    ],
@@ -35270,6 +35436,38 @@
       },
       {
        "name": "payStatus",
+       "type": "String"
+      },
+      {
+       "name": "agentNo",
+       "type": "String"
+      },
+      {
+       "name": "agentName",
+       "type": "String"
+      },
+      {
+       "name": "siteNo",
+       "type": "String"
+      },
+      {
+       "name": "maxCharge",
+       "type": "java.math.BigDecimal"
+      },
+      {
+       "name": "liveDurationMin",
+       "type": "Integer"
+      },
+      {
+       "name": "accruedFee",
+       "type": "java.math.BigDecimal"
+      },
+      {
+       "name": "payNo",
+       "type": "String"
+      },
+      {
+       "name": "payChannel",
        "type": "String"
       }
      ]
@@ -36805,6 +37003,10 @@
     {
      "name": "lostFee",
      "type": "BigDecimal"
+    },
+    {
+     "name": "unitRounding",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -36871,6 +37073,10 @@
     {
      "name": "lostFee",
      "type": "BigDecimal"
+    },
+    {
+     "name": "unitRounding",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -36917,6 +37123,10 @@
     {
      "name": "lostFee",
      "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "unitRounding",
+     "type": "String"
     }
    ]
   },
@@ -37037,6 +37247,10 @@
     {
      "name": "lostFee",
      "type": "BigDecimal"
+    },
+    {
+     "name": "unitRounding",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -37083,6 +37297,10 @@
     {
      "name": "lostFee",
      "type": "java.math.BigDecimal"
+    },
+    {
+     "name": "unitRounding",
+     "type": "String"
     }
    ]
   },
@@ -45440,6 +45658,38 @@
       {
        "name": "payStatus",
        "type": "String"
+      },
+      {
+       "name": "agentNo",
+       "type": "String"
+      },
+      {
+       "name": "agentName",
+       "type": "String"
+      },
+      {
+       "name": "siteNo",
+       "type": "String"
+      },
+      {
+       "name": "maxCharge",
+       "type": "java.math.BigDecimal"
+      },
+      {
+       "name": "liveDurationMin",
+       "type": "Integer"
+      },
+      {
+       "name": "accruedFee",
+       "type": "java.math.BigDecimal"
+      },
+      {
+       "name": "payNo",
+       "type": "String"
+      },
+      {
+       "name": "payChannel",
+       "type": "String"
       }
      ]
     },
@@ -50200,9 +50450,9 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 567,
-  "records": 526,
-  "withPerm": 485,
+  "endpoints": 568,
+  "records": 527,
+  "withPerm": 486,
   "withBody": 234,
   "shapedResponses": 439
  }

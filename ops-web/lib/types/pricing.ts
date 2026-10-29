@@ -21,6 +21,8 @@ export interface PricePlan extends Archivable {
   buyoutPrice: number; // 买断价
   /** 遗失费（V180）：空 = 与买断价合一；填了 = 用户不还时按它收，与最高租赁收费独立。 */
   lostFee?: number | null;
+  /** C03 计费周期取整（存在计时费用项上）：CEIL 进一 / FLOOR 舍去 / HALF_UP 过半进一。 */
+  unitRounding?: "CEIL" | "FLOOR" | "HALF_UP" | null;
   currency: string;
   scope: string; // 默认/点位/场景
   status: PricePlanStatus;

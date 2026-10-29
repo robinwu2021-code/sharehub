@@ -10,7 +10,11 @@ export interface PageQ { page?: number; size?: number; keyword?: string; [k: str
 /** 单 status 过滤。原 OrderQ / StatusQ 结构相同，已合并。 */
 export type StatusQ = PageQ & { status?: string };
 /** 订单列表：StatusQ + 收款态（PAID / UNPAID，C-BL-04 —— 运营催缴筛欠费单）。 */
-export type OrderQ = StatusQ & { payStatus?: string };
+export type OrderQ = StatusQ & {
+  payStatus?: string;
+  /** 第 5 批：借出日期（业务日，含两端）、商家、站点、设备（借出或归还柜）。 */
+  from?: string; to?: string; agentNo?: string; siteNo?: string; cabinetNo?: string;
+};
 
 /** status + type 双筛。原 WoQ / ReservationQ 结构相同，已合并。 */
 export type StatusTypeQ = PageQ & { status?: string; type?: string };

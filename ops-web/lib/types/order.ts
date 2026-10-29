@@ -54,6 +54,19 @@ export interface RentOrder {
    * 结算时自动请款，失败即欠费；欠费用户借不了下一单，需在 App 补缴。
    */
   payStatus?: "PAID" | "UNPAID" | null;
+  // —— 第 5 批（运营方原文 MON-01 / PAY-01 / RNT-03）——
+  /** 商家与站点：列表按它们筛选。 */
+  agentNo?: string | null;
+  agentName?: string | null;
+  siteNo?: string | null;
+  /** 最高收费额 = 借出时定格的总封顶；null = 方案不封顶。 */
+  maxCharge?: number | null;
+  /** 进行中订单：列表请求那一刻的实时时长与已累计费用（试算，不落库）；非进行中为 null。 */
+  liveDurationMin?: number | null;
+  accruedFee?: number | null;
+  /** 支付单号与渠道（收过款才有）。 */
+  payNo?: string | null;
+  payChannel?: string | null;
 }
 
 // —— 订单人工干预（S1：修 F0 伪实现）——

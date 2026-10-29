@@ -29,10 +29,107 @@ public class PricePlanServiceImpl extends AbstractCrudService<PricePlan, PricePl
     private static final String PLAN_PREFIX = "PP";
 
     private final PricePlanScopeMapper scopeMapper;
+    private final ai.neargo.sharehub.trade.price.mapper.PricePlanItemMapper items;
+    private final ai.neargo.sharehub.trade.price.mapper.PriceLadderMapper ladders;
+    private final ai.neargo.sharehub.api.platform.port.SysParamPort params;
 
-    public PricePlanServiceImpl(PricePlanMapper mapper, JdbcTemplate jdbc, PricePlanScopeMapper scopeMapper) {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PricePlanServiceImpl.class);
+    /** 计费周期取整的系统缺省（C03，V184）。 */
+    static final String KEY_UNIT_ROUNDING = "billing.unit_rounding";
+    private static final java.util.Set<String> ROUNDINGS = java.util.Set.of("CEIL", "FLOOR", "HALF_UP");
+    private static final String TIME_FEE = "TIME_FEE";
+    /** price_plan_item 自己的状态词表（与方案状态不是一套，见 PricePlanStatus 注释）。 */
+    private static final String ITEM_ENABLED = "ENABLED";
+
+    public PricePlanServiceImpl(PricePlanMapper mapper, JdbcTemplate jdbc, PricePlanScopeMapper scopeMapper,
+                                ai.neargo.sharehub.trade.price.mapper.PricePlanItemMapper items,
+                                ai.neargo.sharehub.trade.price.mapper.PriceLadderMapper ladders,
+                                ai.neargo.sharehub.api.platform.port.SysParamPort params) {
         super(mapper, jdbc);
         this.scopeMapper = scopeMapper;
+        this.items = items;
+        this.ladders = ladders;
+        this.params = params;
+    }
+
+    /**
+     * 保存后把表单上的扁平字段同步进计时费用项与它的单段阶梯（2026-10-29 修）。
+     *
+     * <p><b>此前没有任何代码写 {@code price_plan_item}</b>：只有 V17 / V18 迁移平移过一次。取价引擎只读费用项，
+     * 于是界面新建的方案一借就报「没有启用的费用项」，改存量方案的免费时长 / 单价**对计费毫无作用** ——
+     * 界面上看着改了，用户照旧按老价付。
+     *
+     * <p>只同步「一条计时项 + 一段阶梯」的简单方案；多段阶梯 / 多费用项的方案是另行配置的，不拿四个字段覆盖它，
+     * 打 WARN 说明。
+     */
+    @Override
+    @Transactional
+    public PricePlanEntry save(PricePlan body) {
+        if (body.getUnitRounding() != null && !body.getUnitRounding().isBlank()
+                && !ROUNDINGS.contains(body.getUnitRounding().trim().toUpperCase())) {
+            throw BizException.badRequest("error.common.invalid_value", "unitRounding");
+        }
+        PricePlanEntry saved = super.save(body);
+        syncTimeItem(saved.planNo(), body.getUnitRounding());
+        return toVO(mapper.selectOne(new LambdaQueryWrapper<PricePlan>().eq(PricePlan::getPlanNo, saved.planNo()).last("limit 1")));
+    }
+
+    private void syncTimeItem(String planNo, String rounding) {
+        PricePlan p = mapper.selectOne(new LambdaQueryWrapper<PricePlan>().eq(PricePlan::getPlanNo, planNo).last("limit 1"));
+        List<ai.neargo.sharehub.trade.price.entity.PricePlanItem> its = items.selectList(
+                new LambdaQueryWrapper<ai.neargo.sharehub.trade.price.entity.PricePlanItem>()
+                        .eq(ai.neargo.sharehub.trade.price.entity.PricePlanItem::getPlanNo, planNo));
+        if (its.size() > 1) {
+            log.warn("方案有多条费用项，表单的免费时长/单价不覆盖它 planNo={}；请在费用项配置里改", planNo);
+            return;
+        }
+        var item = its.isEmpty() ? null : its.get(0);
+        List<ai.neargo.sharehub.trade.price.entity.PriceLadder> ls = item == null ? List.of() : ladders.selectList(
+                new LambdaQueryWrapper<ai.neargo.sharehub.trade.price.entity.PriceLadder>()
+                        .eq(ai.neargo.sharehub.trade.price.entity.PriceLadder::getItemNo, item.getItemNo()));
+        if (ls.size() > 1) {
+            log.warn("方案是多段阶梯，表单单价不覆盖它 planNo={}；请在阶梯配置里改", planNo);
+            return;
+        }
+        String r = rounding != null && !rounding.isBlank() ? rounding.trim().toUpperCase()
+                : item != null && item.getRounding() != null ? item.getRounding()
+                : params.textOf(KEY_UNIT_ROUNDING, "CEIL").trim().toUpperCase();
+        String suffix = Long.toString(System.nanoTime(), 36).toUpperCase();
+        boolean insert = item == null;
+        if (insert) {
+            item = new ai.neargo.sharehub.trade.price.entity.PricePlanItem();
+            item.setItemNo("PI" + suffix);
+            item.setTenantId(p.getTenantId() == null ? "MAIN" : p.getTenantId());
+            item.setPlanNo(planNo);
+            item.setItemType(TIME_FEE);
+            item.setMetering("MINUTE");
+            item.setSort(1);
+            item.setStatus(ITEM_ENABLED);
+        }
+        item.setFreeQty(java.math.BigDecimal.valueOf(p.getFreeMinutes() == null ? 0 : p.getFreeMinutes()));
+        item.setUnitQty(java.math.BigDecimal.valueOf(p.getUnitMinutes() == null || p.getUnitMinutes() <= 0 ? 1 : p.getUnitMinutes()));
+        item.setCapDaily(p.getCapDaily());
+        item.setRounding(ROUNDINGS.contains(r) ? r : "CEIL");
+        if (insert) items.insert(item); else items.updateById(item);
+        var ladder = ls.isEmpty() ? new ai.neargo.sharehub.trade.price.entity.PriceLadder() : ls.get(0);
+        ladder.setUnitPrice(p.getUnitPrice() == null ? java.math.BigDecimal.ZERO : p.getUnitPrice());
+        if (ls.isEmpty()) {
+            ladder.setLadderNo("PL" + suffix);
+            ladder.setTenantId(item.getTenantId());
+            ladder.setItemNo(item.getItemNo());
+            ladder.setSeq(1);
+            ladder.setFromQty(java.math.BigDecimal.ZERO);
+            ladders.insert(ladder);
+        } else {
+            ladders.updateById(ladder);
+        }
+    }
+
+    private String roundingOf(String planNo) {
+        var it = items.selectOne(new LambdaQueryWrapper<ai.neargo.sharehub.trade.price.entity.PricePlanItem>()
+                .eq(ai.neargo.sharehub.trade.price.entity.PricePlanItem::getPlanNo, planNo)
+                .eq(ai.neargo.sharehub.trade.price.entity.PricePlanItem::getItemType, TIME_FEE).last("limit 1"));
+        return it == null ? null : it.getRounding();
     }
 
     @Override
@@ -75,7 +172,7 @@ public class PricePlanServiceImpl extends AbstractCrudService<PricePlan, PricePl
     protected PricePlanEntry toVO(PricePlan e) {
         return new PricePlanEntry(e.getPlanNo(), e.getName(), e.getFreeMinutes(), e.getUnitMinutes(),
                 e.getUnitPrice(), e.getCapDaily(), e.getCapTotal(), e.getCurrency(), e.getScope(), e.getStatus(),
-                e.getArchivedAt() == null ? null : e.getArchivedAt().toString(), e.getLostFee());
+                e.getArchivedAt() == null ? null : e.getArchivedAt().toString(), e.getLostFee(), roundingOf(e.getPlanNo()));
     }
 
     // ——————————————————————— §1.7 多值拆表 ———————————————————————

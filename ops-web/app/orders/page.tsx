@@ -20,6 +20,7 @@ import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
 import { ReadOnlyNotice } from "@/components/read-only-notice";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { OrderStatusBadge } from "@/components/status";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { money, fmtTime } from "@/lib/utils";
@@ -197,6 +198,18 @@ function OrdersInner() {
   useEffect(() => { if (qKeyword != null) { setKeyword(qKeyword); paging.reset(); } }, [qKeyword]);
   const [status, setStatus] = useState("");
   const [payStatus, setPayStatus] = useState("");
+  // 第 5 批筛选（RNT-03 / R02 / MON-06）：借出日期、商家、站点、设备 —— 后端筛，不是当前页里挑
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [agentNo, setAgentNo] = useState("");
+  const [siteNo, setSiteNo] = useState("");
+  const [cabinetNo, setCabinetNo] = useState("");
+  const orderFilter = {
+    keyword, status: status || undefined, payStatus: payStatus || undefined, from: from || undefined, to: to || undefined,
+    agentNo: agentNo.trim() || undefined, siteNo: siteNo.trim() || undefined, cabinetNo: cabinetNo.trim() || undefined,
+  };
+  // 导出走后端全量（此前导出的是当前页 CSV）；mutation 只为接上全局错误弹窗与处理中态
+  const exportOrders = useMutation({ mutationFn: (format: "xlsx" | "pdf") => api.exportOrders(format, orderFilter) });
   const [detail, setDetail] = useState<RentOrder | null>(null);
   // 干预确认抽屉：原因必填（沿用退款审批口径），补偿另需金额
   const [iv, setIv] = useState<{ order: RentOrder; action: OrderInterventionAction } | null>(null);
@@ -204,9 +217,8 @@ function OrdersInner() {
   const [ivAmount, setIvAmount] = useState("");
 
   const listQ = useQuery({
-    queryKey: ["orders", paging.page, paging.size, keyword, status, payStatus],
-    queryFn: () => api.listOrders({ page: paging.page, size: paging.size, keyword, status: status || undefined,
-      payStatus: payStatus || undefined }),
+    queryKey: ["orders", paging.page, paging.size, keyword, status, payStatus, from, to, agentNo, siteNo, cabinetNo],
+    queryFn: () => api.listOrders({ page: paging.page, size: paging.size, ...orderFilter }),
     placeholderData: keepPreviousData,
     enabled: tab === "list",
   });
@@ -537,8 +549,27 @@ function OrdersInner() {
     { header: "用户", cell: (o) => <span className="text-muted-foreground tabular-nums">{o.cUserNo}</span> },
     { header: "借出柜机", cell: (o) => <span className="tabular-nums">{o.cabinetNo}</span> },
     { header: "点位", cell: (o) => <span className="text-muted-foreground">{o.locationName}</span> },
-    { header: "时长", className: "text-right", cell: (o) => <span className="tabular-nums">{o.durationMin != null ? `${o.durationMin} 分` : "-"}</span> },
-    { header: "费用", className: "text-right", cell: (o) => <span className="tabular-nums">{money(o.feeAmount, o.currency)}</span> },
+    { header: "商家", cell: (o) => <span className="text-muted-foreground">{o.agentName ?? o.agentNo ?? "-"}</span> },
+    // 进行中订单：实时时长与已累计费用是列表请求那一刻的试算（MON-01），最高收费 = 借出时定格的总封顶
+    {
+      header: "时长", className: "text-right",
+      cell: (o) => {
+        const live = o.liveDurationMin != null;
+        const m = live ? o.liveDurationMin : o.durationMin;
+        return <span className="tabular-nums">{m != null ? `${m} 分` : "-"}{live && <span className="ms-1 text-muted-foreground">进行中</span>}</span>;
+      },
+    },
+    {
+      header: "费用", className: "text-right",
+      cell: (o) => (
+        <span className="tabular-nums">
+          {money(o.accruedFee ?? o.feeAmount, o.currency)}
+          {o.accruedFee != null && <span className="ms-1 text-muted-foreground">已累计</span>}
+          {o.maxCharge != null && <span className="block text-muted-foreground">封顶 {money(o.maxCharge, o.currency)}</span>}
+        </span>
+      ),
+    },
+    { header: "支付", cell: (o) => o.payNo ? <span className="tabular-nums text-muted-foreground">{o.payNo}<span className="block">{o.payChannel ?? "-"}</span></span> : <span className="text-muted-foreground">-</span> },
     {
       header: "状态",
       cell: (o) => (
@@ -716,20 +747,22 @@ function OrdersInner() {
             search={keyword}
             onSearch={(v) => { setKeyword(v); paging.reset(); }}
             searchPlaceholder="搜索订单号 / 用户"
-            onExport={() => exportCsv<RentOrder>("订单列表", [
-              { header: "订单号", value: (o) => o.orderNo },
-              { header: "用户", value: (o) => o.cUserNo },
-              { header: "借出柜机", value: (o) => o.cabinetNo },
-              { header: "点位", value: (o) => o.locationName },
-              { header: "时长(分)", value: (o) => o.durationMin },
-              { header: "费用", value: (o) => o.feeAmount },
-              { header: "币种", value: (o) => o.currency },
-              { header: "状态", value: (o) => t(`orderStatus.${o.status}`) },
-            ], listQ.data?.list ?? [])}
+            onExport={() => exportOrders.mutate("xlsx")}
+            exportLabel={exportOrders.isPending ? "导出中…" : "导出 Excel"}
           >
             <FilterSelect value={status} onChange={(v) => { setStatus(v); paging.reset(); }} allLabel="全部状态" options={ORDER_STATUS_FILTER} />
             <FilterSelect value={payStatus} onChange={(v) => { setPayStatus(v); paging.reset(); }} allLabel="全部收款" options={PAY_STATUS_FILTER} />
+            <Button variant="outline" disabled={exportOrders.isPending} onClick={() => exportOrders.mutate("pdf")}>导出 PDF</Button>
           </Toolbar>
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <span className="txt-body text-muted-foreground">借出日期</span>
+            <DateInput aria-label="借出起始日" className="w-40" value={from} onChange={(e) => { setFrom(e.target.value); paging.reset(); }} />
+            <span className="text-muted-foreground">~</span>
+            <DateInput aria-label="借出截止日" className="w-40" value={to} onChange={(e) => { setTo(e.target.value); paging.reset(); }} />
+            <Input aria-label="商家编号" className="w-36" placeholder="商家编号" value={agentNo} onChange={(e) => { setAgentNo(e.target.value); paging.reset(); }} />
+            <Input aria-label="站点编号" className="w-36" placeholder="站点编号" value={siteNo} onChange={(e) => { setSiteNo(e.target.value); paging.reset(); }} />
+            <Input aria-label="设备（机柜号）" className="w-36" placeholder="机柜号" value={cabinetNo} onChange={(e) => { setCabinetNo(e.target.value); paging.reset(); }} />
+          </div>
           <DataTable
             rowKey={(o: RentOrder) => o.orderNo}
             columns={listCols}

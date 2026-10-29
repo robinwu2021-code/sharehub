@@ -32,7 +32,30 @@ public final class TradeLegacyDtos {
                            // 少了这一项，费用明细就加不出实付来（见 ConsumerOrderAssembler#fees）
                            java.math.BigDecimal memberDiscountAmount,
                            // 收款态：PAID 已收 / UNPAID 欠费；进行中为空（V134，C-BL-04）
-                           String payStatus) {
+                           String payStatus,
+                           // —— 第 5 批（运营方原文 MON-01 / PAY-01 / RNT-03）——
+                           // 商家与站点：订单列表按它们筛选，也要能看见
+                           String agentNo, String agentName, String siteNo,
+                           // 最高收费额 = 本单快照的总封顶（借出时定格）；null = 方案不封顶
+                           java.math.BigDecimal maxCharge,
+                           // 进行中订单的实时时长与已累计费用（列表请求那一刻试算，不落库）；非进行中为 null
+                           Integer liveDurationMin, java.math.BigDecimal accruedFee,
+                           // 支付单号与渠道（PAY-01）：收过款才有
+                           String payNo, String payChannel) {
+
+        /** 兼容旧 20 参调用：第 5 批新增字段缺省 null。 */
+        public RentOrder(String orderNo, String cUserNo, String cabinetNo, String returnCabinetNo,
+                         String powerbankNo, String locationName, String status,
+                         String rentStartAt, String rentEndAt, Integer durationMin,
+                         double feeAmount, double depositAmount, String currency,
+                         java.math.BigDecimal waivedAmount, java.math.BigDecimal compensateAmount,
+                         Integer ejectCount, String lastEjectAt, java.math.BigDecimal couponAmount,
+                         java.math.BigDecimal memberDiscountAmount, String payStatus) {
+            this(orderNo, cUserNo, cabinetNo, returnCabinetNo, powerbankNo, locationName, status,
+                    rentStartAt, rentEndAt, durationMin, feeAmount, depositAmount, currency,
+                    waivedAmount, compensateAmount, ejectCount, lastEjectAt, couponAmount, memberDiscountAmount,
+                    payStatus, null, null, null, null, null, null, null, null);
+        }
 
         /** 兼容旧 19 参调用：收款态缺省 null。 */
         public RentOrder(String orderNo, String cUserNo, String cabinetNo, String returnCabinetNo,

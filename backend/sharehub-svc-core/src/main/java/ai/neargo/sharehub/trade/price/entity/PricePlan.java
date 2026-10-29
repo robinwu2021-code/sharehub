@@ -53,6 +53,10 @@ public class PricePlan extends BaseEntity implements ai.neargo.sharehub.common.c
     @com.baomidou.mybatisplus.annotation.TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
     private BigDecimal lostFee;
 
+    /** 计费周期取整（C03）—— 不落 price_plan，存在计时费用项上；这里只是写入面的搬运字段。 */
+    @com.baomidou.mybatisplus.annotation.TableField(exist = false)
+    private String unitRounding;
+
     private String currency;
 
     /** v1 遗留的 CSV 适用范围；权威落法见 {@link PricePlanScope}。 */

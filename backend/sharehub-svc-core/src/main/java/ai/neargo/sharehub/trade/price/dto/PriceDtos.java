@@ -51,7 +51,10 @@ public final class PriceDtos {
                                java.math.BigDecimal buyoutPrice, String currency, String scope,
                                String deviceType,
                                // V180 遗失费（K5）：空 = 与买断价 / 总封顶合一
-                               java.math.BigDecimal lostFee) {
+                               java.math.BigDecimal lostFee,
+                               // C03（第 5 批）：免费时段后不足一个计费周期怎么算 CEIL / FLOOR / HALF_UP；
+                               // 空 = 新建取 billing.unit_rounding、修改保持原值
+                               String unitRounding) {
         /** 映射到实体。**status / archivedAt 有意不设**（见类注释）。 */
         public ai.neargo.sharehub.trade.price.entity.PricePlan toEntity() {
             var e = new ai.neargo.sharehub.trade.price.entity.PricePlan();
@@ -66,6 +69,7 @@ public final class PriceDtos {
             e.setCurrency(currency);
             e.setScope(scope);
             e.setDeviceType(deviceType);
+            e.setUnitRounding(unitRounding);
             return e;
         }
     }
@@ -73,7 +77,8 @@ public final class PriceDtos {
     public record PricePlanEntry(String planNo, String name, Integer freeMinutes, Integer unitMinutes,
                                  BigDecimal unitPrice, BigDecimal capDaily, BigDecimal buyoutPrice,
                                  String currency, String scope, String status, String archivedAt,
-                                 /* V180 遗失费；null = 与 buyoutPrice 合一 */ BigDecimal lostFee) {
+                                 /* V180 遗失费；null = 与 buyoutPrice 合一 */ BigDecimal lostFee,
+                                 /* C03 计费周期取整：CEIL / FLOOR / HALF_UP（取自计时费用项） */ String unitRounding) {
     }
 
     /**

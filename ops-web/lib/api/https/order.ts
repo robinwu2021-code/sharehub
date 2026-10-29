@@ -4,9 +4,12 @@
 import { client } from "../http-client";
 import type { OrderApi } from "../contracts/order";
 import type { PageQ, OrderQ, StatusQ, ReservationQ, FreeOrderQ } from "../query";
+import { downloadFile } from "../download";
 
 export const orderHttp: OrderApi = {
   listOrders: (q?: OrderQ) => client.get("/api/trade/orders", q),
+  exportOrders: (format, q = {}) => downloadFile("/api/trade/orders/export",
+    { format, ...Object.fromEntries(Object.entries(q).map(([k, v]) => [k, v == null ? undefined : String(v)])) }, `orders.${format}`),
   getOrder: (no) => client.get(`/api/trade/orders/${no}`),
   interveneOrder: (no, action, payload) => client.post(`/api/trade/orders/${no}/intervene`, { action, ...payload }),
   listOrderInterventions: (q?: PageQ & { orderNo?: string; action?: string }) => client.get("/api/trade/order-interventions", q),

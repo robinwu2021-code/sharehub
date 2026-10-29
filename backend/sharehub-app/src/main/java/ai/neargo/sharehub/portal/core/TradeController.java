@@ -27,7 +27,11 @@ public class TradeController {
     private final RentOrderService orderService;
     private final OrderEventLogService eventLogService;
 
-    public TradeController(RentOrderService orderService, OrderEventLogService eventLogService) {
+    private final ai.neargo.sharehub.portal.shared.ExportSupport exports;
+
+    public TradeController(RentOrderService orderService, OrderEventLogService eventLogService,
+                           ai.neargo.sharehub.portal.shared.ExportSupport exports) {
+        this.exports = exports;
         this.eventLogService = eventLogService;
         this.orderService = orderService;
     }
@@ -39,8 +43,61 @@ public class TradeController {
                                         @RequestParam(required = false) String keyword,
                                         @RequestParam(required = false) String status,
                                         // 收款态 PAID / UNPAID（C-BL-04）：运营催缴筛欠费单
-                                        @RequestParam(required = false) String payStatus) {
-        return orderService.pageAdmin(page, size, keyword, status, payStatus);
+                                        @RequestParam(required = false) String payStatus,
+                                        // 第 5 批（RNT-03 / R02 / MON-06）：借出日期（业务日，含两端）、商家、站点、设备
+                                        @RequestParam(required = false) String from,
+                                        @RequestParam(required = false) String to,
+                                        @RequestParam(required = false) String agentNo,
+                                        @RequestParam(required = false) String siteNo,
+                                        @RequestParam(required = false) String cabinetNo) {
+        return orderService.pageAdmin(page, size, filter(keyword, status, payStatus, from, to, agentNo, siteNo, cabinetNo));
+    }
+
+    /**
+     * 订单导出（RNT-03 / AC-09）：同列表筛选、全量（上限 {@link ai.neargo.sharehub.portal.shared.ExportSupport#MAX_ROWS}），
+     * {@code format=xlsx|pdf}。此前前端只能导出当前页。
+     */
+    @GetMapping("/orders/export")
+    @PreAuthorize("@perm.can('order:order:export')")
+    public void exportOrders(@RequestParam(required = false) String format,
+                             @RequestParam(required = false) String keyword,
+                             @RequestParam(required = false) String status,
+                             @RequestParam(required = false) String payStatus,
+                             @RequestParam(required = false) String from,
+                             @RequestParam(required = false) String to,
+                             @RequestParam(required = false) String agentNo,
+                             @RequestParam(required = false) String siteNo,
+                             @RequestParam(required = false) String cabinetNo,
+                             jakarta.servlet.http.HttpServletResponse response) throws java.io.IOException {
+        var f = filter(keyword, status, payStatus, from, to, agentNo, siteNo, cabinetNo);
+        var all = ai.neargo.sharehub.portal.shared.ExportSupport.fetchAll((p, s) -> orderService.pageAdmin(p, s, f).getList());
+        String desc = java.util.stream.Stream.of(keyword, status, payStatus, from == null && to == null ? null : (from == null ? "" : from) + " ~ " + (to == null ? "" : to),
+                        agentNo, siteNo, cabinetNo).filter(v -> v != null && !v.isBlank())
+                .collect(java.util.stream.Collectors.joining(" · "));
+        exports.render(ai.neargo.sharehub.common.export.ExportFormat.of(format), "export.orders", desc, java.util.List.of(
+                        "export.col.order_no", "export.col.status", "export.col.merchant", "export.col.site", "export.col.cabinet",
+                        "export.col.rent_start", "export.col.rent_end", "export.col.duration_min", "export.col.fee",
+                        "export.col.max_charge", "export.col.currency", "export.col.pay_status", "export.col.pay_no", "export.col.pay_channel"),
+                all.rows().stream().map(o -> java.util.Arrays.<Object>asList(o.orderNo(), o.status(),
+                        o.agentName() != null ? o.agentName() : o.agentNo(), o.siteNo(), o.cabinetNo(), o.rentStartAt(), o.rentEndAt(),
+                        o.liveDurationMin() != null ? o.liveDurationMin() : o.durationMin(),
+                        o.accruedFee() != null ? o.accruedFee() : java.math.BigDecimal.valueOf(o.feeAmount()),
+                        o.maxCharge(), o.currency(), o.payStatus(), o.payNo(), o.payChannel())).toList(),
+                all.truncated(), "orders").writeTo(response);
+    }
+
+    private static RentOrderService.OrderFilter filter(String keyword, String status, String payStatus, String from, String to,
+                                                       String agentNo, String siteNo, String cabinetNo) {
+        return new RentOrderService.OrderFilter(keyword, status, payStatus, day(from, "from"), day(to, "to"), agentNo, siteNo, cabinetNo);
+    }
+
+    private static java.time.LocalDate day(String v, String name) {
+        if (v == null || v.isBlank()) return null;
+        try {
+            return java.time.LocalDate.parse(v.trim());
+        } catch (java.time.format.DateTimeParseException e) {
+            throw ai.neargo.sharehub.common.BizException.badRequest("error.common.invalid_value", name);
+        }
     }
 
     @GetMapping("/orders/{orderNo}")

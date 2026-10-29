@@ -97,6 +97,10 @@ public class RentOrderServiceImpl implements RentOrderService {
     /** 结算即请款、补缴（C-BL-04）。 */
     private final ai.neargo.sharehub.trade.pay.service.PaymentService payments;
 
+    /** 订单列表的商家名与支付渠道（第 5 批）：批量取，不逐行回表。 */
+    private final ObjectProvider<ai.neargo.sharehub.api.platform.port.AgentDirectoryPort> agentDirectory;
+    private final ai.neargo.sharehub.trade.pay.mapper.PayOrderMapper payOrders;
+
     /** C 端税务发票（V181）：收款即开 / 结单才开，按 invoice.b2c.* 配置；失败不影响收款。 */
     private final ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoices;
 
@@ -116,7 +120,11 @@ public class RentOrderServiceImpl implements RentOrderService {
                                 ai.neargo.sharehub.dev.port.CabinetCommandPort cabinetCommands,
                                 ai.neargo.sharehub.trade.EjectSimulation ejectSimulation,
                                 ai.neargo.sharehub.trade.pay.service.PaymentService payments,
-                                ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoices) {
+                                ai.neargo.sharehub.trade.order.service.TaxInvoiceService taxInvoices,
+                                ObjectProvider<ai.neargo.sharehub.api.platform.port.AgentDirectoryPort> agentDirectory,
+                                ai.neargo.sharehub.trade.pay.mapper.PayOrderMapper payOrders) {
+        this.agentDirectory = agentDirectory;
+        this.payOrders = payOrders;
         this.payments = payments;
         this.taxInvoices = taxInvoices;
         this.cabinetCommands = cabinetCommands;
@@ -148,13 +156,33 @@ public class RentOrderServiceImpl implements RentOrderService {
 
     @Override
     public PageResult<RentOrder> pageAdmin(Integer page, Integer size, String keyword, String status, String payStatus) {
+        return pageAdmin(page, size, new OrderFilter(keyword, status, payStatus, null, null, null, null, null));
+    }
+
+    private static boolean has(String v) {
+        return v != null && !v.isBlank();
+    }
+
+    @Override
+    public PageResult<RentOrder> pageAdmin(Integer page, Integer size, OrderFilter f) {
         int p = pg(page), s = sz(size);
         LambdaQueryWrapper<OrdOrder> w = new LambdaQueryWrapper<>();
+        String keyword = f.keyword();
         if (keyword != null && !keyword.isBlank()) {
             w.and(q -> q.like(OrdOrder::getOrderNo, keyword).or().like(OrdOrder::getCUserNo, keyword));
         }
-        if (status != null && !status.isBlank()) w.eq(OrdOrder::getStatus, status);
-        if (payStatus != null && !payStatus.isBlank()) w.eq(OrdOrder::getPayStatus, payStatus);
+        if (has(f.status())) w.eq(OrdOrder::getStatus, f.status());
+        if (has(f.payStatus())) w.eq(OrdOrder::getPayStatus, f.payStatus());
+        if (has(f.agentNo())) w.eq(OrdOrder::getAgentNo, f.agentNo().trim());
+        if (has(f.siteNo())) w.eq(OrdOrder::getSiteNo, f.siteNo().trim());
+        // 设备：借出柜或归还柜任一命中 —— 查「这台柜子经手的单」，两头都算
+        if (has(f.cabinetNo())) {
+            String c = f.cabinetNo().trim();
+            w.and(q -> q.eq(OrdOrder::getCabinetNo, c).or().eq(OrdOrder::getReturnCabinetNo, c));
+        }
+        // 借出日期按业务日（迪拜）界，折到存储时区再比 —— 同 BizClock.startOfDayAsStored 的理由
+        if (f.from() != null) w.ge(OrdOrder::getStartedAt, clock.startOfDayAsStored(f.from()));
+        if (f.to() != null) w.lt(OrdOrder::getStartedAt, clock.startOfDayAsStored(f.to().plusDays(1)));
         w.orderByDesc(OrdOrder::getId);
         Page<OrdOrder> r = mapper.selectPage(new Page<>(p, s), w);
         return new PageResult<>(enrich(r.getRecords()), r.getTotal());
@@ -220,14 +248,41 @@ public class RentOrderServiceImpl implements RentOrderService {
                         i.getCreatedAt() == null ? null : i.getCreatedAt().toString());
             }
         }
+        // 商家名、支付渠道：各一次批量查
+        var dir = agentDirectory.getIfAvailable();
+        java.util.Map<String, ai.neargo.sharehub.api.platform.dto.AgentBrief> briefs = dir == null ? java.util.Map.of()
+                : dir.briefsOf(rows.stream().map(OrdOrder::getAgentNo).filter(java.util.Objects::nonNull).distinct().toList());
+        List<String> payNos = rows.stream().map(OrdOrder::getPayNo).filter(java.util.Objects::nonNull).distinct().toList();
+        java.util.Map<String, String> channels = new java.util.HashMap<>();
+        if (!payNos.isEmpty()) {
+            for (var po : payOrders.selectList(new LambdaQueryWrapper<ai.neargo.sharehub.trade.pay.entity.PayOrder>()
+                    .in(ai.neargo.sharehub.trade.pay.entity.PayOrder::getPayNo, payNos))) {
+                if (po.getChannelCode() != null) channels.put(po.getPayNo(), po.getChannelCode());
+            }
+        }
         return rows.stream().map(e -> {
             RentOrder base = toVO(e);
+            boolean live = OrderStatus.IN_USE.name().equals(e.getStatus());
+            ai.neargo.sharehub.trade.dto.TradeLegacyDtos.FeeEstimate est = null;
+            if (live) {
+                try {
+                    est = estimateNow(e.getOrderNo());
+                } catch (RuntimeException ex) {
+                    // 试算失败（快照残缺等）不该让整页列表挂掉：这一行不显示累计费用
+                    log.warn("进行中订单试算失败，列表该行不显示累计费用 orderNo={}", e.getOrderNo(), ex);
+                }
+            }
+            var brief = e.getAgentNo() == null ? null : briefs.get(e.getAgentNo());
             return new RentOrder(base.orderNo(), base.cUserNo(), base.cabinetNo(), base.returnCabinetNo(),
                     base.powerbankNo(), base.locationName(), base.status(), base.rentStartAt(),
                     base.rentEndAt(), base.durationMin(), base.feeAmount(), base.depositAmount(),
                     base.currency(), e.getWaivedAmount(),
                     compensate.get(e.getOrderNo()), ejects.getOrDefault(e.getOrderNo(), 0),
-                    lastEject.get(e.getOrderNo()), e.getCouponAmount(), e.getMemberDiscountAmount(), e.getPayStatus());
+                    lastEject.get(e.getOrderNo()), e.getCouponAmount(), e.getMemberDiscountAmount(), e.getPayStatus(),
+                    e.getAgentNo(), brief == null ? null : brief.name(), e.getSiteNo(),
+                    PriceResolver.capTotalFromSnapshot(e.getPriceSnapshot()),
+                    est == null ? null : est.durationMin(), est == null ? null : est.payable(),
+                    e.getPayNo(), e.getPayNo() == null ? null : channels.get(e.getPayNo()));
         }).toList();
     }
 

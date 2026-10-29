@@ -43,8 +43,14 @@ public class PaymentServiceImpl implements PaymentService {
     private final PayRefundMapper refundMapper;
     private final PaymentPort port;
 
+    /** 支付方式（第 5 批，运营方原文 PAY-01）：调用方没指明渠道时的缺省，系统参数 pay.default_channel。 */
+    private final ai.neargo.sharehub.api.platform.port.SysParamPort params;
+    static final String KEY_DEFAULT_CHANNEL = "pay.default_channel";
+
     public PaymentServiceImpl(PayOrderMapper payMapper, PayAuthMapper authMapper,
-                              PayRefundMapper refundMapper, PaymentPort port) {
+                              PayRefundMapper refundMapper, PaymentPort port,
+                              ai.neargo.sharehub.api.platform.port.SysParamPort params) {
+        this.params = params;
         this.payMapper = payMapper;
         this.authMapper = authMapper;
         this.refundMapper = refundMapper;
@@ -58,6 +64,8 @@ public class PaymentServiceImpl implements PaymentService {
         require(orderNo, "orderNo");
         require(type, "type");
         requirePositive(amount, "amount");
+        // 此前结算请款一律传 null，pay_order.channel_code 全是空 —— 运营看不出钱从哪个渠道收的（PAY-01）
+        if (channelCode == null || channelCode.isBlank()) channelCode = params.textOf(KEY_DEFAULT_CHANNEL, "NEARPAY");
 
         /*
          * 幂等（V179，D2 / D3）：同一键已经请过款就返回那一单，不再请第二次。

@@ -6,12 +6,18 @@ import * as db from "../../mock/db";
 import type { OrderApi } from "../contracts/order";
 import type { PageQ, OrderQ, StatusQ, ReservationQ, FreeOrderQ } from "../query";
 import { wait } from "./_wait";
+import { fail } from "../../biz-error";
 
 export const orderMock: OrderApi = {
   listOrders: (q: OrderQ = {}) =>
     wait(db.paginate(db.orders, q.page, q.size, (o) =>
       db.kwHit(q.keyword, o.orderNo, o.cUserNo) && (!q.status || o.status === q.status)
-      && (!q.payStatus || o.payStatus === q.payStatus))),
+      && (!q.payStatus || o.payStatus === q.payStatus)
+      // 第 5 批筛选：设备（借出或归还柜）、站点、商家、借出日期（按 rentStartAt 的日期部分）
+      && (!q.cabinetNo || o.cabinetNo === q.cabinetNo || o.returnCabinetNo === q.cabinetNo)
+      && (!q.siteNo || o.siteNo === q.siteNo) && (!q.agentNo || o.agentNo === q.agentNo)
+      && (!q.from || (o.rentStartAt ?? "").slice(0, 10) >= q.from) && (!q.to || (o.rentStartAt ?? "").slice(0, 10) <= q.to))),
+  exportOrders: async () => fail("演示数据模式不生成文件，接真后端后可导出", "Export needs the real backend; not available in demo mode"),
   getOrder: (no) => wait(db.orders.find((o) => o.orderNo === no)!),
   // 四个干预动作在 db 层真改订单状态并落干预记录（见 mock/db/order.ts 的状态机）。
   // 「申请退款」不是终态动作：先落一条 PENDING 退款申请（进 /orders?tab=refunds 审批队列），

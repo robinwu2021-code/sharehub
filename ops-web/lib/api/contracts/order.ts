@@ -13,6 +13,8 @@ import type {
 
 export interface OrderApi {
   listOrders(q?: OrderQ): Promise<PageResult<RentOrder>>;
+  /** 后端导出全量（RNT-03 / AC-09），同列表筛选；浏览器直接下载。 */
+  exportOrders(format: "xlsx" | "pdf", q?: Omit<OrderQ, "page" | "size">): Promise<void>;
   getOrder(orderNo: string): Promise<RentOrder>;
   /**
    * 人工干预（order:intervene:execute）：远程弹出 / 强制归还 / 免单 / 补偿 / 申请退款。
