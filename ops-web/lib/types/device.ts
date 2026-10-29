@@ -91,6 +91,64 @@ export interface Warehouse {
   address: string | null;
   isDefault: boolean;
 }
+/** 到仓待检（V192，GET /api/ops/inventory/intakes）。 */
+export type IntakeStatus = "OPEN" | "DONE";
+export type IntakeQcResult = "PENDING" | "PASSED" | "FAILED";
+export type IntakeDisposition = "PENDING" | "INBOUND" | "RETURN_SUPPLIER" | "SCRAP";
+export type IntakeItemType = "CABINET" | "POWERBANK";
+export type IntakeKind = "ARRIVAL" | "RETURN";
+export type IntakeDisposal = "RETURN_SUPPLIER" | "SCRAP";
+export interface Intake {
+  intakeNo: string;
+  kind: IntakeKind;
+  warehouseNo: string;
+  warehouseName: string | null;
+  sourceRef: string | null;
+  arrivedAt: string;
+  status: IntakeStatus;
+  note: string | null;
+  total: number;
+  pending: number;
+  passed: number;
+  failed: number;
+  inbound: number;
+  disposed: number;
+  createdBy: string | null;
+  createdAt: string | null;
+}
+export interface IntakeItem {
+  itemType: IntakeItemType;
+  itemNo: string;
+  sn: string | null;
+  model: string | null;
+  qcNo: string | null;
+  qcResult: IntakeQcResult;
+  disposition: IntakeDisposition;
+  dispositionNote: string | null;
+  handledBy: string | null;
+  handledAt: string | null;
+}
+export interface IntakeDetail {
+  intake: Intake;
+  items: IntakeItem[];
+}
+export interface IntakeCreateReq {
+  warehouseNo: string;
+  sourceRef?: string;
+  arrivedAt?: string;
+  note?: string;
+  cabinetNos?: string[];
+  powerbankNos?: string[];
+}
+export interface IntakeItemRef {
+  itemType: IntakeItemType;
+  itemNo: string;
+}
+export interface IntakeDisposeReq {
+  items: IntakeItemRef[];
+  disposition: IntakeDisposal;
+  note: string;
+}
 /** 出库池按商家汇总（GET /api/ops/inventory/issued-summary）。 */
 export interface IssuedSummary {
   agentNo: string;

@@ -78,6 +78,8 @@ const NAV: Record<string, Pair> = {
   "设备档案": { en: "Device Records", ar: "سجلات الأجهزة" },
   "运行监控": { en: "Monitoring", ar: "المراقبة" },
   // 设备管理四组（2026-10-28 按运营顺序，OM03）；原「资产流转」作废
+  "入库与质检": { en: "Intake & QC", ar: "الاستلام والفحص" },
+  "到仓待检": { en: "Intake Inspection", ar: "فحص الاستلام" },
   "仓储与出库": { en: "Stock & Outbound", ar: "المخزون والإخراج" },
   "出库池": { en: "Outbound Pool", ar: "مجمع الإخراج" },
   "仓库": { en: "Warehouses", ar: "المستودعات" },

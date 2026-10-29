@@ -124,6 +124,12 @@ export const deviceHttp: DeviceApi = {
   returnPoolDevices: (x) => client.post("/api/ops/devices/pool-return", x),
   issuedSummary: (agentNo) => client.get("/api/ops/inventory/issued-summary", agentNo ? { agentNo } : {}),
   listWarehouses: () => client.get("/api/ops/inventory/warehouses"),
+  listIntakes: (q) => client.get("/api/ops/inventory/intakes", q),
+  getIntake: (no) => client.get(`/api/ops/inventory/intakes/${no}`),
+  createIntake: (x) => client.post("/api/ops/inventory/intakes", x),
+  inspectIntakeItem: (no, type, itemNo, req) => client.post(`/api/ops/inventory/intakes/${no}/items/${type}/${itemNo}/qc`, req),
+  inboundIntake: (no, items) => client.post(`/api/ops/inventory/intakes/${no}/inbound`, { items }),
+  disposeIntake: (no, x) => client.post(`/api/ops/inventory/intakes/${no}/dispose`, x),
   // 绑定（商户入驻会话 ae233365 · V164）：不给点位 = 出库池商家默认站点的默认点位；
   // 点位商家 ≠ 出库池商家 409 error.bind.agent_mismatch；批量一个事务。错误文案由后端按语言给。
   bindDevice: (no, x) => client.post(`/api/ops/devices/${no}/bind`, x ?? {}),

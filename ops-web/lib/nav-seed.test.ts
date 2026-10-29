@@ -562,6 +562,22 @@ const PATCHES: { file: string; mustContain: string; apply: (rows: Row[]) => void
       });
     },
   },
+  {
+    // 新增「入库与质检」组：到仓待检取 sort 3，原 3 ~ 18 顺延为 4 ~ 19。
+    file: "V193__menu_device_intakes.sql",
+    mustContain: "UPDATE iam_menu SET menu_no = CONCAT('M_tmp193_', id) WHERE parent_no = 'M_device' AND sort >= 3",
+    apply: (rows) => {
+      rows.filter((r) => r.parent_no === "M_device" && Number(r.sort) >= 3).forEach((r) => {
+        const sort = String(Number(r.sort) + 1);
+        Object.assign(r, { sort, menu_no: `M_device__${sort}` });
+      });
+      rows.push({
+        menu_no: "M_device__3", parent_no: "M_device", name: "到仓待检", name_en: "Intake Inspection", name_ar: "فحص الاستلام", type: "ITEM",
+        path: "/devices?tab=intakes", icon: "NULL", group_name: "入库与质检", sort: "3", perm: "device:inventory:read",
+        phase: "1", ready: "1", module: "NULL", modules: "NULL", match_paths: "NULL", pin_bottom: "0", portal_for: "NULL",
+      });
+    },
+  },
 ];
 
 const COLS = [

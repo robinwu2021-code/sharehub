@@ -55,7 +55,8 @@ export interface QcTarget {
 }
 
 /** 质检抽屉。`target` 为 null 时关闭。 */
-export function QcDrawer({ target, onClose }: { target: QcTarget | null; onClose: () => void }) {
+/** intakeNo：在到仓待检里质检时传入，结论写回待检明细（V192）；不传则是设备详情里的单台质检。 */
+export function QcDrawer({ target, onClose, intakeNo }: { target: QcTarget | null; onClose: () => void; intakeNo?: string }) {
   const qc = useQueryClient();
   const [form, setForm] = useState<Record<string, unknown>>({});
   useEffect(() => {
@@ -71,12 +72,22 @@ export function QcDrawer({ target, onClose }: { target: QcTarget | null; onClose
         result: form.result === "FAILED" ? "FAILED" : null,
         note: String(form.note ?? "").trim() || null,
       };
-      return t.itemType === "CABINET" ? api.inspectCabinet(t.itemNo, req) : api.inspectPowerbank(t.itemNo, req);
+      if (intakeNo) {
+        return api.inspectIntakeItem(intakeNo, t.itemType, t.itemNo, req).then((d) => ({
+          itemNo: t.itemNo, result: d.items.find((i) => i.itemType === t.itemType && i.itemNo === t.itemNo)?.qcResult,
+        }));
+      }
+      return (t.itemType === "CABINET" ? api.inspectCabinet(t.itemNo, req) : api.inspectPowerbank(t.itemNo, req))
+        .then((r) => ({ itemNo: r.itemNo, result: r.result }));
     },
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ["qc-records", r.itemNo] });
       qc.invalidateQueries({ queryKey: ["go-live-gate", r.itemNo] });
       qc.invalidateQueries({ queryKey: ["devices"] });
+      if (intakeNo) {
+        qc.invalidateQueries({ queryKey: ["intake", intakeNo] });
+        qc.invalidateQueries({ queryKey: ["intakes"] });
+      }
       if (r.result === "PASSED") notify.success(`${r.itemNo} 质检通过，可以发货调拨 / 上线`);
       else notify.info(`${r.itemNo} 已判质检不通过：不能发货调拨、也不能上线`);
       onClose();

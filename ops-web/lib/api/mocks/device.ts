@@ -2,6 +2,7 @@
 import * as dg from "../../mock/db/device-gate";
 import * as da from "../../mock/db/device-asset";
 import * as dp from "../../mock/db/device-pool";
+import * as ik from "../../mock/db/intake";
 import * as db from "../../mock/db";
 import type { DeviceApi } from "../contracts/device";
 import type { PageQ, CabinetQ, DeviceLogQ, ArchiveQ, OtaReleaseQ } from "../query";
@@ -90,6 +91,12 @@ export const deviceMock: DeviceApi = {
   returnPoolDevices: async (x) => wait(dp.returnDevicesToWarehouse(x), 400),
   issuedSummary: async (agentNo) => wait(dp.issuedSummary(agentNo)),
   listWarehouses: async () => wait(dp.listWarehouses()),
+  listIntakes: async (q) => wait(ik.listIntakes(q)),
+  getIntake: async (no) => wait(ik.getIntake(no)),
+  createIntake: async (x) => wait(ik.createIntake(x), 400),
+  inspectIntakeItem: async (no, type, itemNo, req) => wait(ik.inspectIntakeItem(no, type, itemNo, req), 350),
+  inboundIntake: async (no, items) => wait(ik.inboundIntake(no, items), 400),
+  disposeIntake: async (no, x) => wait(ik.disposeIntake(no, x), 400),
   bindDevice: async (no, x) => wait(dp.bindDevice(no, x), 400),
   bindDevices: async (x) => wait(dp.bindDevices(x), 500),
   unbindDevice: async (no, reason) => wait(dp.unbindDevice(no, reason), 400),

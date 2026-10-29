@@ -5,7 +5,7 @@ import type {
   InventoryTransfer, InventoryTransferDetail, OtaRollout, OtaRelease, OtaTask, DeviceLog, DeviceCodeBatch,
   Checklist, TrialRent, Protection, ProtectionReq, SignalCode,
   InvTransferReq, QcReq, QcRecord, ReceiveResult, AssetDiff, AssetDiffStatus, PowerbankAction,
-  IssueDevicesReq, PoolReturnReq, IssuedSummary, Warehouse, BindReq, BindBatchReq, BindResult,
+  IssueDevicesReq, PoolReturnReq, IssuedSummary, Warehouse, Intake, IntakeDetail, IntakeCreateReq, IntakeItemRef, IntakeDisposeReq, IntakeItemType, IntakeStatus, BindReq, BindBatchReq, BindResult,
 } from "../../types";
 
 export interface DeviceApi {
@@ -141,6 +141,13 @@ export interface DeviceApi {
   issuedSummary(agentNo?: string): Promise<IssuedSummary[]>;
   /** 仓库只读列表（过渡期；选仓下拉用）。 */
   listWarehouses(): Promise<Warehouse[]>;
+  /** 到仓待检（V192）：列表 / 详情 / 到货登记 / 逐台质检 / 合格入库 / 不合格处置。 */
+  listIntakes(q?: PageQ & { status?: IntakeStatus; warehouseNo?: string }): Promise<PageResult<Intake>>;
+  getIntake(intakeNo: string): Promise<IntakeDetail>;
+  createIntake(x: IntakeCreateReq): Promise<IntakeDetail>;
+  inspectIntakeItem(intakeNo: string, itemType: IntakeItemType, itemNo: string, req: QcReq): Promise<IntakeDetail>;
+  inboundIntake(intakeNo: string, items: IntakeItemRef[]): Promise<IntakeDetail>;
+  disposeIntake(intakeNo: string, x: IntakeDisposeReq): Promise<IntakeDetail>;
   /** 绑定：不给点位 = 出库池商家的默认站点默认点位；点位商家 ≠ 出库池商家 409。 */
   bindDevice(deviceNo: string, x?: BindReq): Promise<BindResult>;
   /** 批量绑定：一个事务。 */
