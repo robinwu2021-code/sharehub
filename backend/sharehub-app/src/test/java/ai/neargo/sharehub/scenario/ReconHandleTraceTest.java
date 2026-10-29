@@ -101,7 +101,9 @@ class ReconHandleTraceTest extends ApiTestSupport {
 
     /** recon_task 有 uk_recon_channel_date(tenant_id, channel, bill_date) —— 一个渠道一天只一批，
      *  所以每个夹具往前挪一天，两个用例才能各建一批。 */
-    private final java.util.concurrent.atomic.AtomicInteger dayOffset = new java.util.concurrent.atomic.AtomicInteger(1);
+    // 对账日从 400 天前起排：唯一键是 (租户, 渠道, 对账日)，近几天被演示种子（RCN0001/0002）占着 ——
+    // 从昨天起排会撞它们（2026-10-29 实测 Duplicate entry）。用例跑完自己删自己的批次，不留尾巴
+    private final java.util.concurrent.atomic.AtomicInteger dayOffset = new java.util.concurrent.atomic.AtomicInteger(400);
 
     private String batch() {
         String no = "RCB" + rnd();

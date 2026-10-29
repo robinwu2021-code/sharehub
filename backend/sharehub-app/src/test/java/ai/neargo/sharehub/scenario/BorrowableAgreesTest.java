@@ -47,9 +47,7 @@ class BorrowableAgreesTest extends ApiTestSupport {
     @Test
     @DisplayName("机柜故障：列表不再报可借台数，详情也说借不了 —— 两边一致")
     void listAndDetailAgreeWhenCabinetIsFaulty() {
-        cabinetNo = jdbc.queryForObject(
-                "select cabinet_no from dev_cabinet where deleted=0 and available_count>0 "
-                        + "and online_status='ONLINE' and status<>'FAULT' limit 1", String.class);
+        cabinetNo = ai.neargo.sharehub.support.RentFixture.rentable(jdbc);
         assertThat(cabinetNo).isNotBlank();
         String siteNo = jdbc.queryForObject("select site_no from dev_cabinet where cabinet_no=?", String.class, cabinetNo);
 

@@ -29,6 +29,15 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class ScopeAnchorOnCreateTest extends ApiTestSupport {
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private org.springframework.jdbc.core.JdbcTemplate rentJdbc;
+
+    /** 共享测试库里这台柜子会被历次运行借空 / 站点被别的用例暂停 —— 每条用例前摆回能借（见 RentFixture）。 */
+    @org.junit.jupiter.api.BeforeEach
+    void restockCabinet() {
+        ai.neargo.sharehub.support.RentFixture.rentable(rentJdbc);
+    }
+
     /** CAB1005 → LOC205 / ST305 / AG006（种子里这台柜子有明确归属）。 */
     private static final String CABINET_OF_AG006 = "CAB1005";
     private static final String AGENT_OF_CABINET = "AG006";

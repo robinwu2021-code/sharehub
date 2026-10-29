@@ -22,10 +22,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>2026-09-27 实测吃过这个亏：退回旧实现做负对照，用例照样绿，
  * 因为那一刻上海与迪拜同日。于是「负对照通过」这句话在白天根本做不出来。
  *
- * <p>所以这里用固定 {@link Clock} 把「现在」钉在 <b>UTC 2026-09-30T20:30</b>：
+ * <p>所以这里用固定 {@link Clock} 把「现在」钉在 <b>UTC 2030-06-30T20:30</b>：
  * <ul>
- *   <li>业务时区（+4）= <b>2026-10-01 00:30</b> —— 业务日历已经翻篇；</li>
- *   <li>服务器时区若是 +8 则是 2026-10-01 04:30，若是别的又不一样 ——
+ *   <li>业务时区（+4）= <b>2030-07-01 00:30</b> —— 业务日历已经翻篇；</li>
+ *   <li>服务器时区若是 +8 则是 2030-07-01 04:30，若是别的又不一样 ——
  *       而这条用例**不依赖服务器时区是什么**，因为它比的是业务日。</li>
  * </ul>
  *
@@ -57,8 +57,8 @@ class CouponExpiryOnBizCalendarTest extends ai.neargo.sharehub.support.ApiTestSu
     @Test
     @DisplayName("★ 业务日历已翻篇 → 有效期到前一天的券过期")
     void expired_when_the_business_calendar_has_moved_on() {
-        clock.at = FixedBizClock.JUST_AFTER_BIZ_MIDNIGHT;                 // 迪拜 2026-10-01 00:30
-        String no = seedCoupon("CP-TZ-A", "2026-09-30");
+        clock.at = FixedBizClock.JUST_AFTER_BIZ_MIDNIGHT;                 // 迪拜 2030-07-01 00:30
+        String no = seedCoupon("CP-TZ-A", "2030-06-30");
         assertThat(coupons.offerOf(USER, no, "AED"))
                 .as("业务日已是 10-01，有效期到 09-30 的券应当已过期")
                 .isNull();
@@ -68,12 +68,12 @@ class CouponExpiryOnBizCalendarTest extends ai.neargo.sharehub.support.ApiTestSu
     @DisplayName("★ 业务日历还没翻篇 → 有效期最后一天的券仍可用（这才是被修掉的那个 bug）")
     void still_usable_on_the_last_business_day() {
         /*
-         * 旧实现用服务器时区的「今天」：迪拜 9-30 20:00 之后服务器已是 10-01，
+         * 旧实现用服务器时区的「今天」：迪拜 6-30 20:00 之后服务器已是 10-01，
          * 于是这张券当场作废 —— 而在业务日历上它还有 4 个小时。
          * 用户看得见、又说不出所以然的损失，那段代码的注释正是这么写的。
          */
-        clock.at = FixedBizClock.JUST_BEFORE_BIZ_MIDNIGHT;                // 迪拜 2026-09-30 23:30
-        String no = seedCoupon("CP-TZ-B", "2026-09-30");
+        clock.at = FixedBizClock.JUST_BEFORE_BIZ_MIDNIGHT;                // 迪拜 2030-06-30 23:30
+        String no = seedCoupon("CP-TZ-B", "2030-06-30");
         assertThat(coupons.offerOf(USER, no, "AED"))
                 .as("业务日仍是 09-30，有效期到 09-30 的券不该被判过期")
                 .isNotNull();

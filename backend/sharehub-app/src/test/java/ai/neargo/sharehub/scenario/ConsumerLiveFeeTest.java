@@ -45,9 +45,7 @@ class ConsumerLiveFeeTest extends ApiTestSupport {
     @Test
     @DisplayName("进行中订单：带实时试算，且试算 = 立即归还后的实付")
     void inUseOrderCarriesEstimateThatMatchesSettlement() {
-        String cabinetNo = jdbc.queryForObject(
-                "select cabinet_no from dev_cabinet where deleted=0 and available_count>0 "
-                        + "and online_status='ONLINE' and status<>'FAULT' limit 1", String.class);
+        String cabinetNo = ai.neargo.sharehub.support.RentFixture.rentable(jdbc);
         assertThat(cabinetNo).as("测试库里得有一台在线、非故障、有宝的柜机").isNotBlank();
 
         String phone = "+97150" + (System.nanoTime() % 10000000L);

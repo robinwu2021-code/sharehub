@@ -55,9 +55,7 @@ class RentDeliveredBySignalTest extends ApiTestSupport {
     @Test
     @DisplayName("没有回执就停在出宝中；回执到了才 IN_USE；超时则撤单不收费")
     void deliveryIsDrivenByDeviceSignal() {
-        String cabinetNo = jdbc.queryForObject(
-                "select cabinet_no from dev_cabinet where deleted=0 and available_count>0 "
-                        + "and online_status='ONLINE' and status<>'FAULT' limit 1", String.class);
+        String cabinetNo = ai.neargo.sharehub.support.RentFixture.rentable(jdbc);
         assertThat(cabinetNo).as("测试库里得有一台在线、非故障、有宝的柜机").isNotBlank();
 
         String token = consumer();
@@ -93,9 +91,7 @@ class RentDeliveredBySignalTest extends ApiTestSupport {
     @Test
     @DisplayName("驱动词表（EJECT_OK / ITEM_INSERTED）进来要被认出来，不能当未知码丢掉")
     void driverVocabularyIsTranslated() {
-        String cabinetNo = jdbc.queryForObject(
-                "select cabinet_no from dev_cabinet where deleted=0 and available_count>0 "
-                        + "and online_status='ONLINE' and status<>'FAULT' limit 1", String.class);
+        String cabinetNo = ai.neargo.sharehub.support.RentFixture.rentable(jdbc);
         String token = consumer();
         String orderNo = post("/mp/trade/orders/rent",
                 Map.of("cabinetNo", cabinetNo, "useFreeDeposit", true), token)

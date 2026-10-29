@@ -32,6 +32,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 @LegacyShareParams
 class OrderShareGenerationTest extends ApiTestSupport {
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private org.springframework.jdbc.core.JdbcTemplate rentJdbc;
+
+    /** 共享测试库里这台柜子会被历次运行借空 / 站点被别的用例暂停 —— 每条用例前摆回能借（见 RentFixture）。 */
+    @org.junit.jupiter.api.BeforeEach
+    void restockCabinet() {
+        ai.neargo.sharehub.support.RentFixture.rentable(rentJdbc);
+    }
+
     /** ST305 挂着场地方 VEN300，且有生效合同 CT405（V38 回填）。 */
     private static final String SITE = "ST305";
     private static final String AGENT = "AG006";
