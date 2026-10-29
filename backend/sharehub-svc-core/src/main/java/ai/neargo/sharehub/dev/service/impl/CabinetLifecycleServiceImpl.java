@@ -208,6 +208,23 @@ public class CabinetLifecycleServiceImpl implements CabinetLifecycleService {
 
     @Override
     @Transactional
+    public void receiveForInspection(String cabinetNo) {
+        DevCabinet c = require(cabinetNo);
+        // 撤机回仓：人已回到仓库，但旧的质检结论不再算数 —— 离开出库池、不进仓、质检打回待检，等待检单复检后入库
+        transit(c, "RECEIVE", u -> u.set(DevCabinet::getWarehouseNo, null).set(DevCabinet::getIssuedAgentNo, null)
+                        .set(DevCabinet::getIssuedAt, null).set(DevCabinet::getIssuedBy, null)
+                        .set(DevCabinet::getQcStatus, QcStatus.PENDING.name()),
+                x -> {
+                    x.setWarehouseNo(null);
+                    x.setIssuedAgentNo(null);
+                    x.setIssuedAt(null);
+                    x.setIssuedBy(null);
+                    x.setQcStatus(QcStatus.PENDING.name());
+                });
+    }
+
+    @Override
+    @Transactional
     public boolean goLiveIfReady(String cabinetNo, String cause) {
         DevCabinet c = DataScopeContext.executeWithoutScope(() -> require(cabinetNo));
         if (!CabinetStatus.IN_STOCK.name().equals(c.getStatus())) return false;

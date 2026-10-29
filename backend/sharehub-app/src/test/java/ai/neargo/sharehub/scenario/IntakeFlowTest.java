@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.scenario;
 
+import ai.neargo.sharehub.inv.service.TransferOpsService;
 import ai.neargo.sharehub.support.ApiTestSupport;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.AfterAll;
@@ -25,13 +26,22 @@ class IntakeFlowTest extends ApiTestSupport {
     @Autowired
     JdbcTemplate jdbc;
 
+    @Autowired
+    TransferOpsService transferOps;
+
     private final String tag = Long.toString(System.nanoTime(), 36).toUpperCase();
     private int seq;
     private final List<String> cabinets = new ArrayList<>();
     private final List<String> intakeNos = new ArrayList<>();
+    private final List<String> removalWos = new ArrayList<>();
 
     @AfterAll
     void cleanup() {
+        for (String wo : removalWos) {
+            jdbc.update("DELETE FROM inv_transfer_item WHERE transfer_no IN (SELECT transfer_no FROM inv_transfer WHERE source_type='REMOVAL' AND source_ref=?)", wo);
+            jdbc.update("DELETE FROM inv_transfer WHERE source_type='REMOVAL' AND source_ref=?", wo);
+            for (String no : jdbc.queryForList("SELECT intake_no FROM inv_intake WHERE source_ref=?", String.class, wo)) intakeNos.add(no);
+        }
         for (String no : intakeNos) {
             jdbc.update("DELETE FROM inv_intake_item WHERE intake_no=?", no);
             jdbc.update("DELETE FROM inv_intake WHERE intake_no=?", no);
@@ -103,6 +113,36 @@ class IntakeFlowTest extends ApiTestSupport {
                 Map.of("items", List.of(Map.of("itemType", "CABINET", "itemNo", bad)), "disposition", "RETURN_SUPPLIER", "note", "通电失败"), token).okData();
         assertThat(d.path("intake").path("status").asText()).as("还有一台合格未入库").isEqualTo("OPEN");
         assertThat(jdbc.queryForObject("SELECT warehouse_no FROM dev_cabinet WHERE cabinet_no=?", String.class, bad)).isNull();
+    }
+
+    @Test
+    @DisplayName("★ 撤机回仓：签收不直接进仓 —— 离开出库池、质检打回待检、生成回仓待检单；复检合格才入库")
+    void removal_return_goes_through_intake() {
+        String admin = login("ADMIN");
+        String c = newCabinet();
+        // 撤机后的柜：在库、已解绑、旧质检是合格、仍挂在商家出库池（撤机监听器的 undeploy 之后就是这个样子）
+        jdbc.update("UPDATE dev_cabinet SET qc_status='PASSED', issued_agent_no='AG-TEST', issued_at=NOW() WHERE cabinet_no=?", c);
+        String wo = "WO-RM-" + tag;
+        removalWos.add(wo);
+        String transferNo = transferOps.openReturn("ST-TEST-" + tag, "测试站点", c, wo);
+        String wh = jdbc.queryForObject("SELECT to_ref FROM inv_transfer WHERE transfer_no=?", String.class, transferNo);
+
+        post("/api/ops/inventory-transfers/" + transferNo + "/ship", Map.of(), admin).okData();
+        post("/api/ops/inventory-transfers/" + transferNo + "/receive", Map.of("receivedNos", List.of(c)), admin).okData();
+
+        assertThat(jdbc.queryForMap("SELECT status, warehouse_no, issued_agent_no, qc_status FROM dev_cabinet WHERE cabinet_no=?", c))
+                .containsEntry("status", "IN_STOCK").containsEntry("warehouse_no", null)
+                .containsEntry("issued_agent_no", null).containsEntry("qc_status", "PENDING");
+        Map<String, Object> ik = jdbc.queryForMap("SELECT intake_no, kind, warehouse_no, status FROM inv_intake WHERE source_ref=?", wo);
+        assertThat(ik).containsEntry("kind", "RETURN").containsEntry("warehouse_no", wh).containsEntry("status", "OPEN");
+        String no = (String) ik.get("intake_no");
+        intakeNos.add(no);
+
+        String token = login("WAREHOUSE");
+        JsonNode after = post("/api/ops/inventory/intakes/" + no + "/items/CABINET/" + c + "/qc", qc(true), token).okData();
+        assertThat(after.path("items").get(0).path("qcNo").asText()).as("复检新开一条质检记录").isNotBlank();
+        post("/api/ops/inventory/intakes/" + no + "/inbound", Map.of("items", List.of(Map.of("itemType", "CABINET", "itemNo", c))), token).okData();
+        assertThat(jdbc.queryForObject("SELECT warehouse_no FROM dev_cabinet WHERE cabinet_no=?", String.class, c)).isEqualTo(wh);
     }
 
     @Test

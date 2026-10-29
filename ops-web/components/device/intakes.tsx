@@ -29,6 +29,7 @@ const DISPOSITION: StatusMap<"PENDING" | "INBOUND" | "RETURN_SUPPLIER" | "SCRAP"
   RETURN_SUPPLIER: { label: "退供应商", tone: "warning" }, SCRAP: { label: "报废", tone: "danger" },
 };
 const TYPE_LABEL = { CABINET: "机柜", POWERBANK: "充电宝" } as const;
+const KIND_LABEL = { ARRIVAL: "到货", RETURN: "撤机回仓" } as const;
 const lines = (v: unknown) => String(v ?? "").split(/[\s,，]+/).map((s) => s.trim()).filter(Boolean);
 const keyOf = (i: IntakeItem) => `${i.itemType}:${i.itemNo}`;
 const refOf = (k: string): IntakeItemRef => { const [itemType, itemNo] = k.split(":"); return { itemType: itemType as IntakeItemRef["itemType"], itemNo }; };
@@ -78,6 +79,7 @@ export function IntakesTab() {
 
   const cols: Column<Intake>[] = [
     { header: "单号", cell: (h) => <button type="button" className="font-mono text-primary hover:underline" onClick={() => setOpenNo(h.intakeNo)}>{h.intakeNo}</button> },
+    { header: "类型", className: "whitespace-nowrap", cell: (h) => KIND_LABEL[h.kind] },
     { header: "仓库", cell: (h) => h.warehouseName ?? h.warehouseNo },
     { header: "来源单号", cell: (h) => h.sourceRef ?? <span className="text-muted-foreground">-</span> },
     { header: "到达", className: "whitespace-nowrap", cell: (h) => fmtTime(h.arrivedAt) },

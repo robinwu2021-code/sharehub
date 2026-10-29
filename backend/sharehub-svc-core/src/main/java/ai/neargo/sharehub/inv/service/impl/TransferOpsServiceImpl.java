@@ -79,6 +79,14 @@ public class TransferOpsServiceImpl implements TransferOpsService {
         this.warehouseDirectory = warehouseDirectory;
     }
 
+    /** 撤机回仓签收后进到仓待检（D §2.4 ⑤）。 */
+    private ai.neargo.sharehub.inv.service.IntakeService intakes;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setIntakes(ai.neargo.sharehub.inv.service.IntakeService intakes) {
+        this.intakes = intakes;
+    }
+
     public TransferOpsServiceImpl(InvTransferMapper transfers, InvTransferItemMapper items, InvAssetDiffMapper diffs,
                                   InvWarehouseMapper warehouses, InvTransferStateMachine sm, CabinetMapper cabinets,
                                   PowerbankMapper powerbanks, CabinetLifecycleService lifecycle, SysParamPort params) {
@@ -181,6 +189,10 @@ public class TransferOpsServiceImpl implements TransferOpsService {
         if (n == 0) throw BizException.conflict("error.common.state_changed");
 
         String warehouseNo = TransferEndpointType.WAREHOUSE.name().equals(t.getToType()) ? t.getToRef() : null;
+        // 撤机回仓：签收不直接进仓，先进到仓待检，复检合格才入库
+        boolean returnForQc = warehouseNo != null && CABINET.equals(t.getItemType())
+                && TransferSource.REMOVAL.name().equals(t.getSourceType());
+        List<String> forQc = new ArrayList<>();
         List<String> missing = new ArrayList<>();
         List<AssetDiff> out = new ArrayList<>();
         int received = 0;
@@ -193,13 +205,17 @@ public class TransferOpsServiceImpl implements TransferOpsService {
             }
             received++;
             items.update(null, new LambdaUpdateWrapper<InvTransferItem>().eq(InvTransferItem::getId, i.getId()).set(InvTransferItem::getChecked, 1));
-            if (CABINET.equals(t.getItemType())) {
+            if (returnForQc) {
+                lifecycle.receiveForInspection(no);
+                forQc.add(no);
+            } else if (CABINET.equals(t.getItemType())) {
                 lifecycle.receive(no, warehouseNo);
             } else if (warehouseNo != null) {
                 powerbanks.update(null, new LambdaUpdateWrapper<DevPowerbank>().eq(DevPowerbank::getPowerbankNo, no)
                         .set(DevPowerbank::getWarehouseNo, warehouseNo));
             }
         }
+        if (!forQc.isEmpty()) intakes.openReturn(warehouseNo, t.getSourceRef(), "回仓调拨 " + transferNo, forQc);
         List<String> extra = got.stream().filter(no -> !expected.contains(no)).toList();
         for (String no : extra) out.add(vo(diff("TRANSFER", transferNo, AssetDiffKind.EXTRA, t.getItemType(), no, null, 0, 1)));
         if (!out.isEmpty()) {

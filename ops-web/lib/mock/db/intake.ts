@@ -1,7 +1,7 @@
 // 到仓待检（V192）mock：与后端 IntakeServiceImpl 同规则（登记拦截一次列全、只有合格能入库、只有不合格能处置）。
 import type {
   Cabinet, Intake, IntakeDetail, IntakeItem, IntakeCreateReq, IntakeItemRef, IntakeDisposeReq, IntakeItemType,
-  IntakeStatus, PageResult, QcReq,
+  IntakeKind, IntakeStatus, PageResult, QcReq,
 } from "../../types";
 import { fail, notFound } from "../../biz-error";
 import { cabinets, powerbanks } from "./device";
@@ -17,11 +17,11 @@ let seq = 0;
 let seeded = false;
 const now = () => new Date().toISOString();
 
-/** 演示：三台新到货的柜，一张未处理的待检单。 */
+/** 演示：三台新到货的柜一张到货单；一台撤机回仓的柜一张回仓单（后端由回仓调拨签收生成）。 */
 function ensureSeed() {
   if (seeded) return;
   seeded = true;
-  const demo = ["CAB1200", "CAB1201", "CAB1202"];
+  const demo = ["CAB1200", "CAB1201", "CAB1202", "CAB1203"];
   for (const no of demo) {
     if (!cabinets.some((c) => c.cabinetNo === no)) {
       cabinets.push({
@@ -31,7 +31,8 @@ function ensureSeed() {
       } as Cabinet);
     }
   }
-  insert({ warehouseNo: "WH001", sourceRef: "DN-2026-1029", cabinetNos: demo });
+  insert({ warehouseNo: "WH001", sourceRef: "DN-2026-1029", cabinetNos: demo.slice(0, 3) });
+  insert({ warehouseNo: "WH001", sourceRef: "WO20261028001", note: "回仓调拨 TR20261028001", cabinetNos: ["CAB1203"] }, "RETURN");
 }
 
 function counts(no: string) {
@@ -65,11 +66,11 @@ function closeIfDone(h: Head) {
   if ((items.get(h.intakeNo) ?? []).every((i) => i.disposition !== "PENDING")) h.status = "DONE";
 }
 
-function insert(x: IntakeCreateReq): IntakeDetail {
+function insert(x: IntakeCreateReq, kind: IntakeKind = "ARRIVAL"): IntakeDetail {
   const wh = WAREHOUSES.find((w) => w.warehouseNo === x.warehouseNo) ?? notFound("仓库", "Warehouse", x.warehouseNo);
   const no = `IK${String(++seq).padStart(4, "0")}`;
   heads.unshift({
-    intakeNo: no, kind: "ARRIVAL", warehouseNo: wh.warehouseNo, warehouseName: wh.name, sourceRef: x.sourceRef?.trim() || null,
+    intakeNo: no, kind, warehouseNo: wh.warehouseNo, warehouseName: wh.name, sourceRef: x.sourceRef?.trim() || null,
     arrivedAt: x.arrivedAt || now(), status: "OPEN", note: x.note?.trim() || null, createdBy: "mock", createdAt: now(),
   });
   const mk = (itemType: IntakeItemType, itemNo: string): IntakeItem => {

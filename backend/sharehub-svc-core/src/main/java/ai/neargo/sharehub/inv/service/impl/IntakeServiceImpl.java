@@ -181,6 +181,36 @@ public class IntakeServiceImpl implements IntakeService {
         return get(h.getIntakeNo());
     }
 
+    /**
+     * 撤机回仓（D §2.4 ⑤）：回仓调拨签收时由调拨调用，与签收同一事务。设备已由签收打回待检、离开出库池，
+     * 这里不再走登记校验；复检必须新做一条质检记录，旧的放行凭证不再算数。
+     */
+    @Override
+    @Transactional
+    public String openReturn(String warehouseNo, String sourceRef, String note, List<String> cabinetNos) {
+        List<String> cabNos = distinct(cabinetNos);
+        if (cabNos.isEmpty()) return null;
+        WarehouseItem wh = warehouses.list().stream().filter(x -> x.warehouseNo().equals(warehouseNo)).findFirst()
+                .orElseThrow(() -> BizException.notFound(warehouseNo));
+        List<String> open = openItems(cabNos, List.of()).stream().map(InvIntakeItem::getItemNo).toList();
+        if (!open.isEmpty()) throw BizException.conflict("error.intake.items_rejected", String.join("；", open));
+        InvIntake h = new InvIntake();
+        h.setIntakeNo(IdGenerator.next("IK"));
+        h.setTenantId("MAIN");
+        h.setKind("RETURN");
+        h.setWarehouseNo(wh.warehouseNo());
+        h.setWarehouseName(wh.name());
+        h.setSourceRef(blankToNull(sourceRef));
+        h.setArrivedAt(LocalDateTime.now());
+        h.setStatus(IntakeStatus.OPEN.name());
+        h.setNote(blankToNull(note));
+        h.setCreatedBy(operator());
+        intakes.insert(h);
+        cabNos.forEach(no -> insertItem(h.getIntakeNo(), CABINET, no));
+        log.info("撤机回仓待检 intakeNo={} warehouseNo={} sourceRef={} 柜={}", h.getIntakeNo(), wh.warehouseNo(), sourceRef, cabNos);
+        return h.getIntakeNo();
+    }
+
     // —— 质检 ——
 
     @Override

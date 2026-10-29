@@ -108,7 +108,8 @@ public class RemovalCompletedListener {
             log.info("撤机回出库池 woNo={} cabinetNo={} 出库池商家={}", e.woNo(), c.getCabinetNo(), c.getIssuedAgentNo());
             return;
         }
-        //    回仓调拨草稿：发货 / 签收仍由人操作，签收时逐件核对；签收进仓时离开出库池（V161）
+        //    回仓调拨草稿：发货 / 签收仍由人操作，签收时逐件核对；签收即离开出库池（V161），但不直接进仓 ——
+        //    进到仓待检单（RETURN），复检合格才入库（D §2.4 ⑤）
         String siteName = siteNo == null ? null
                 : sites.briefsByNos(List.of(siteNo)).stream().findFirst().map(SiteBrief::name).orElse(null);
         if (siteNo != null) transfers.openReturn(siteNo, siteName, c.getCabinetNo(), e.woNo());

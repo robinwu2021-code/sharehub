@@ -8,6 +8,8 @@ import ai.neargo.sharehub.inv.dto.IntakeDtos.Intake;
 import ai.neargo.sharehub.inv.dto.IntakeDtos.IntakeDetail;
 import ai.neargo.sharehub.inv.dto.IntakeDtos.ItemsReq;
 
+import java.util.List;
+
 /** 到仓待检（V192；docs/technical/独立进销存/D §1.3）。 */
 public interface IntakeService {
 
@@ -17,6 +19,9 @@ public interface IntakeService {
 
     /** 到货登记。 */
     IntakeDetail create(CreateReq req);
+
+    /** 撤机回仓签收后生成回仓待检单（kind=RETURN），返回单号。 */
+    String openReturn(String warehouseNo, String sourceRef, String note, List<String> cabinetNos);
 
     /** 逐台质检（复用设备质检），结论写回明细。 */
     IntakeDetail inspect(String intakeNo, String itemType, String itemNo, QcReq req);
