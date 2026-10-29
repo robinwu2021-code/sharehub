@@ -205,6 +205,7 @@ export function InventorySettingsTab() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sys-params"] });
       qc.invalidateQueries({ queryKey: ["warehouses"] });
+      qc.invalidateQueries({ queryKey: ["inventory-engine"] });
       notify.success("已保存");
     },
   });

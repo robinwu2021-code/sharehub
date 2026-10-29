@@ -1,19 +1,24 @@
 """S5 本机联调：ShareHub(8085, inv.engine=SERVICE) ↔ ai-shop 独立进销存(8086)。只读凭证文件，不打印密钥。
 
 用法：python3 e2e.py [凭证文件]（默认 ~/.local/etc/inventory-sharehub-cred.json）。
+在跑着的运营台上验（backend-local 8080 / pb_local）：SH_BASE=http://127.0.0.1:8080 SH_DB=pb_local LIVE=1 ADMIN_PASSWORD=… INVENTORY_BASE=http://127.0.0.1:8088 python3 e2e.py ~/.local/etc/inventory-pblocal-cred.json
+LIVE=1 不清映射表、不切也不复原引擎（须已在库存设置切到 SERVICE）、跳过 S7（存量已从页面真迁过，测试的造数会把迁移标记写乱）。
 前提：.claude/launch.json 的 inventory-svc-local 与 backend-inv 已启动（backend-inv 用的运行时类路径：
 mvn -o dependency:build-classpath -pl sharehub-app -Dmdep.outputFile=sharehub-app/target/runtime-classpath.txt）；运行期间临时把 test_sharehub 的 inv.engine 改成 SERVICE，结束（含失败）复原 LOCAL。
 """
 import json, os, sys, time, urllib.request, urllib.error, subprocess, random
 
-SH = "http://127.0.0.1:8085"
+SH = os.environ.get("SH_BASE", "http://127.0.0.1:8085")
+DB = os.environ.get("SH_DB", "test_sharehub")
+LIVE = os.environ.get("LIVE") == "1"
 INV = os.environ.get("INVENTORY_BASE", "http://127.0.0.1:8086") + "/api/inventory/v1"
 import os
 CRED = json.load(open(sys.argv[1] if len(sys.argv) > 1 else os.path.expanduser("~/.local/etc/inventory-sharehub-cred.json")))
 MYSQL = ["/Users/workingowl/.local/opt/mysql/bin/mysql", "-uroot", "-S", "/tmp/mysql.sock", "-N", "-e"]
 results = []
 
-def sql(q): return subprocess.run(MYSQL + [q], capture_output=True, text=True).stdout.strip()
+def sql(q):  # 语句里统一写 test_sharehub.，按 SH_DB 换库
+    return subprocess.run(MYSQL + [q.replace("test_sharehub.", DB + ".")], capture_output=True, text=True).stdout.strip()
 
 def req(method, url, body=None, headers=None):
     data = None if body is None else json.dumps(body).encode()
@@ -36,12 +41,15 @@ def check(name, ok, detail=""):
     print(("✓ " if ok else "✗ ") + name + ("" if ok else f"  —— {detail}"))
 
 def login(role, user=None):
-    st, d, raw = sh("POST", "/api/auth/login", {"username": user or role.lower() + ".user", "role": role})
+    # LIVE：运营台开着 admin 口令闸，只有 admin 能登（口令取环境变量 ADMIN_PASSWORD），三个角色都用它
+    body = {"username": "admin", "password": os.environ["ADMIN_PASSWORD"]} if LIVE else {"username": user or role.lower() + ".user", "role": role}
+    st, d, raw = sh("POST", "/api/auth/login", body)
     assert st == 200, raw
     return d["token"]
 
 tag = hex(int(time.time()))[2:].upper()
-sql("UPDATE test_sharehub.sys_param SET value='SERVICE' WHERE param_key='inv.engine'; DELETE FROM test_sharehub.inventory_sync_state")
+if not LIVE:
+    sql("UPDATE test_sharehub.sys_param SET value='SERVICE' WHERE param_key='inv.engine'; DELETE FROM test_sharehub.inventory_sync_state")
 try:
     admin, wh, bd = login("ADMIN"), login("WAREHOUSE"), login("BD")
     st, eng, _ = sh("GET", "/api/ops/inventory/engine", token=admin)
@@ -62,14 +70,19 @@ try:
     check("入库：库存服务在库，gateRef = 质检记录号", s and str(s.get("gateRef", "")).startswith("QC"), serials)
 
     # 2. 出库给商家（只选商户）→ 出库池记录 CLAIMED
-    phone = "+97156" + str(1000000 + random.randint(0, 8999999))
-    st, ap, raw = sh("POST", "/api/agent/applies", {"phone": phone, "email": f"e2e{tag}@example.com", "operatorName": "联调商家 " + tag, "operatorType": "AGENT"}, bd)
-    sh("POST", f"/api/agent/applies/{ap['applyNo']}/accept", {}, admin)
-    st, au, raw = sh("POST", f"/api/agent/applies/{ap['applyNo']}/audit", {"approve": True}, admin)
-    agent = au["operatorNo"]
-    st, cur, _ = sh("GET", f"/api/agent/agents?page=1&size=5&keyword={agent}", token=admin)
-    nm = cur["list"][0]["name"]
-    sh("POST", f"/api/agent/agents/{agent}", {"name": nm, "agentType": "AGENT", "status": "ENABLED", "address": "Al Barsha", "lng": 55.2, "lat": 25.11, "industry": "HOTEL"}, admin)
+    if LIVE:  # 入驻审核要求另一人放行，单账号建不了商家：用库里已启用的商户
+        st, cur, raw = sh("GET", "/api/agent/agents?page=1&size=50", token=admin)
+        agent = next(a["agentNo"] for a in cur["list"] if a.get("status") == "ENABLED" and a.get("agentType") == "AGENT"
+                     and a.get("address") and a.get("lng") is not None and a.get("industry"))  # 能接收设备的
+    else:
+        phone = "+97156" + str(1000000 + random.randint(0, 8999999))
+        st, ap, raw = sh("POST", "/api/agent/applies", {"phone": phone, "email": f"e2e{tag}@example.com", "operatorName": "联调商家 " + tag, "operatorType": "AGENT"}, bd)
+        sh("POST", f"/api/agent/applies/{ap['applyNo']}/accept", {}, admin)
+        st, au, raw = sh("POST", f"/api/agent/applies/{ap['applyNo']}/audit", {"approve": True}, admin)
+        agent = au["operatorNo"]
+        st, cur, _ = sh("GET", f"/api/agent/agents?page=1&size=5&keyword={agent}", token=admin)
+        nm = cur["list"][0]["name"]
+        sh("POST", f"/api/agent/agents/{agent}", {"name": nm, "agentType": "AGENT", "status": "ENABLED", "address": "Al Barsha", "lng": 55.2, "lat": 25.11, "industry": "HOTEL"}, admin)
     st, d, raw = sh("POST", "/api/ops/devices/issue", {"agentNo": agent, "cabinetNos": [cab]}, admin)
     check("出库：ShareHub 返回成功", st == 200, raw)
     pool = inv(f"/dispatch-pool?serialNo={cab}")
@@ -116,10 +129,14 @@ try:
     check("盘点：提交", st == 200, raw)
     st, c, raw = sh("POST", f"/api/ops/inventory/counts/{cn}/approve", {}, wh)
     check("盘点：提交人自己复核被拒（reviewerMustDiffer）", st == 409, (st, raw))
-    st, c, raw = sh("POST", f"/api/ops/inventory/counts/{cn}/approve", {}, admin)
-    check("盘点：另一人复核通过", st == 200, raw)
-    st, c, raw = sh("POST", f"/api/ops/inventory/counts/{cn}/post", {}, admin)
-    check("盘点：过账", st == 200 and c and c["count"]["status"] == "POSTED", raw)
+    if LIVE:  # 只有一个账号，复核做不了：作废，免得盘点单一直占着仓
+        st, c, raw = sh("POST", f"/api/ops/inventory/counts/{cn}/cancel", {}, admin)
+        check("盘点：作废", st == 200, raw)
+    else:
+        st, c, raw = sh("POST", f"/api/ops/inventory/counts/{cn}/approve", {}, admin)
+        check("盘点：另一人复核通过", st == 200, raw)
+        st, c, raw = sh("POST", f"/api/ops/inventory/counts/{cn}/post", {}, admin)
+        check("盘点：过账", st == 200 and c and c["count"]["status"] == "POSTED", raw)
 
     # 8. 撤机回仓：出库（已领取）→ 绑定 → 投放 → 撤机完工（回仓）→ 回仓调拨发货 / 签收 → 回仓待检 → 复检 → RETURN 入库 + 业务确认
     cab2 = "CABRET" + tag
@@ -174,21 +191,22 @@ try:
     check("S6：库存服务期间汇总有进有出、期初 + 入 − 出 = 期末", ok, raw)
 
     # 10. S7 存量迁移：一台本地在 WH002、库存服务里没有的柜（模拟存量）；其余候选先标为已完成，免得把整个测试库推过去
-    legacy = "CABMIG" + tag
-    sh("POST", "/api/ops/cabinets", {"cabinetNo": legacy, "sn": legacy, "vendorCode": "TEST", "slotTotal": 8}, admin)
-    sql(f"UPDATE test_sharehub.dev_cabinet SET warehouse_no='WH002', qc_status='PASSED' WHERE cabinet_no='{legacy}'")
-    sql(f"INSERT INTO test_sharehub.inventory_sync_state (k, v) SELECT CONCAT('mig:CABINET:', cabinet_no), 'OUT' "
-        f"FROM test_sharehub.dev_cabinet WHERE cabinet_no <> '{legacy}' ON DUPLICATE KEY UPDATE v = VALUES(v)")
-    sql("INSERT INTO test_sharehub.inventory_sync_state (k, v) SELECT CONCAT('mig:POWERBANK:', powerbank_no), 'IN' "
-        "FROM test_sharehub.dev_powerbank ON DUPLICATE KEY UPDATE v = VALUES(v)")
-    st, plan, raw = sh("GET", "/api/ops/inventory/migration", token=admin)
-    check("S7：试跑看得到 1 台待入库", st == 200 and plan["toInbound"] == 1, raw)
-    st, res, raw = sh("POST", "/api/ops/inventory/migration", {"limit": 10}, admin)
-    check("S7：执行一批成功 1 台", st == 200 and res["processed"] == 1 and res["failed"] == 0, raw)
-    loc_b = sql("SELECT v FROM test_sharehub.inventory_sync_state WHERE k='wh:WH002'")
-    check("S7：库存服务在 WH002 对应位置有这台", any(x.get("serialNo") == legacy for x in inv(f"/serials?locationId={loc_b}")), loc_b)
-    st, res, raw = sh("POST", "/api/ops/inventory/migration", {"limit": 10}, admin)
-    check("S7：重跑不重复", st == 200 and res["processed"] == 0, raw)
+    if not LIVE:
+        legacy = "CABMIG" + tag
+        sh("POST", "/api/ops/cabinets", {"cabinetNo": legacy, "sn": legacy, "vendorCode": "TEST", "slotTotal": 8}, admin)
+        sql(f"UPDATE test_sharehub.dev_cabinet SET warehouse_no='WH002', qc_status='PASSED' WHERE cabinet_no='{legacy}'")
+        sql(f"INSERT INTO test_sharehub.inventory_sync_state (k, v) SELECT CONCAT('mig:CABINET:', cabinet_no), 'OUT' "
+            f"FROM test_sharehub.dev_cabinet WHERE cabinet_no <> '{legacy}' ON DUPLICATE KEY UPDATE v = VALUES(v)")
+        sql("INSERT INTO test_sharehub.inventory_sync_state (k, v) SELECT CONCAT('mig:POWERBANK:', powerbank_no), 'IN' "
+            "FROM test_sharehub.dev_powerbank ON DUPLICATE KEY UPDATE v = VALUES(v)")
+        st, plan, raw = sh("GET", "/api/ops/inventory/migration", token=admin)
+        check("S7：试跑看得到 1 台待入库", st == 200 and plan["toInbound"] == 1, raw)
+        st, res, raw = sh("POST", "/api/ops/inventory/migration", {"limit": 10}, admin)
+        check("S7：执行一批成功 1 台", st == 200 and res["processed"] == 1 and res["failed"] == 0, raw)
+        loc_b = sql("SELECT v FROM test_sharehub.inventory_sync_state WHERE k='wh:WH002'")
+        check("S7：库存服务在 WH002 对应位置有这台", any(x.get("serialNo") == legacy for x in inv(f"/serials?locationId={loc_b}")), loc_b)
+        st, res, raw = sh("POST", "/api/ops/inventory/migration", {"limit": 10}, admin)
+        check("S7：重跑不重复", st == 200 and res["processed"] == 0, raw)
 
     # 11. 物料（V210）：物料档案同步为库存服务物料；数量物料期初 → 领用；逐件物料采购 → 调拨 → 退供应商。账以库存服务为准
     st, mq, raw = sh("POST", "/api/ops/inventory/materials", {"name": "锁舌E2E" + tag, "category": "SPARE_PART", "trackingMode": "QUANTITY", "uom": "个"}, admin)
@@ -239,5 +257,6 @@ try:
     check("处置出库（SERVICE）：报废后库存服务里没有这台",
           st == 200 and not any(x.get("serialNo") == scrap for x in inv(f"/serials?locationId={loc}")), raw)
 finally:
-    sql("UPDATE test_sharehub.sys_param SET value='LOCAL' WHERE param_key='inv.engine'")
-    print(f"\n{sum(ok for _, ok, _ in results)}/{len(results)} 通过；引擎已复原 LOCAL")
+    if not LIVE:
+        sql("UPDATE test_sharehub.sys_param SET value='LOCAL' WHERE param_key='inv.engine'")
+    print(f"\n{sum(ok for _, ok, _ in results)}/{len(results)} 通过" + ("" if LIVE else "；引擎已复原 LOCAL"))
