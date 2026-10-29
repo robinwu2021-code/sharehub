@@ -217,8 +217,8 @@ public class DisposalServiceImpl implements DisposalService {
     private void remoteOutbound(DisposalKind kind, String reason, String supplierNo, String supplierName, String warehouseNo,
                                 List<String> cabNos, List<String> pbNos, InvDisposal d) {
         ai.neargo.sharehub.inv.remote.InventoryApi api = remote.api();
-        if (!api.configured()) throw BizException.conflict("error.inventory.not_configured");
-        try {
+        ai.neargo.sharehub.inv.remote.InventoryCalls.requireConfigured(api);
+        ai.neargo.sharehub.inv.remote.InventoryCalls.run(() -> {
             String loc = links.locationId(api, warehouseNo);
             // 确保两种设备的物料已在库存服务登记（出库按序列号，不需要 itemId，但首次接入时要有物料）
             if (!cabNos.isEmpty()) links.itemId(api, MovementRecorder.CABINET);
@@ -234,10 +234,7 @@ public class DisposalServiceImpl implements DisposalService {
                     List.of(), sns, "dp-out-" + d.getDisposalNo());
             api.postOutbound(out, "dp-out-post-" + d.getDisposalNo());
             log.info("处置出库同步库存服务 disposalNo={} outNo={}", d.getDisposalNo(), out);
-        } catch (ai.neargo.sharehub.inv.remote.InventoryRemoteException e) {
-            log.warn("库存服务拒绝处置出库 disposalNo={} code={} args={}：本地改动已回滚", d.getDisposalNo(), e.code, e.args);
-            throw BizException.conflict("error.inventory.remote", e.code, String.join("；", e.args));
-        }
+        });
     }
 
     private ai.neargo.sharehub.inv.remote.RemoteInventoryPort remote;

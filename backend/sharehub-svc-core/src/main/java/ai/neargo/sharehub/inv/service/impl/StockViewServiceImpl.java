@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.inv.service.impl;
 
+import static ai.neargo.sharehub.inv.remote.InventoryCalls.call;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.sharehub.api.platform.port.SysParamPort;
 import ai.neargo.sharehub.common.BizException;
@@ -42,7 +43,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
-import java.util.function.Supplier;
 
 /**
  * 库存流水与盘点（S4）。
@@ -265,9 +265,28 @@ public class StockViewServiceImpl implements StockViewService {
         return "SERVICE".equalsIgnoreCase(params.textOf("inv.engine", "LOCAL"));
     }
 
+    /** 寻址方式（展示用）：setter 注入，构造参数已经很长。 */
+    private ai.neargo.sharehub.inv.remote.InventoryEndpoint endpoint;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setEndpoint(ai.neargo.sharehub.inv.remote.InventoryEndpoint endpoint) {
+        this.endpoint = endpoint;
+    }
+
     @Override
     public InventoryEngine engine() {
-        return service() ? new InventoryEngine("SERVICE", remote.api().configured()) : new InventoryEngine("LOCAL", true);
+        String mode = endpoint == null ? null : endpoint.mode();
+        if (!service()) return new InventoryEngine("LOCAL", true, mode, null, null);
+        InventoryApi api = remote.api();
+        if (!api.configured()) return new InventoryEngine("SERVICE", false, mode, null, null);
+        // 现探一次：读仓库列表（最轻的只读接口）。页面每次打开都会问，恢复后自然变回「正常」
+        try {
+            api.warehouses();
+            return new InventoryEngine("SERVICE", true, mode, true, null);
+        } catch (InventoryRemoteException e) {
+            log.warn("库存服务连通性探测失败 code={} status={}：检查 sharehub.inventory.* 与库存服务健康", e.code, e.status);
+            return new InventoryEngine("SERVICE", true, mode, false, e.code);
+        }
     }
 
     // —— 流水 ——
@@ -406,14 +425,6 @@ public class StockViewServiceImpl implements StockViewService {
     private void requireService() {
         if (!service()) throw BizException.conflict("error.inventory.service_only");
         if (!remote.api().configured()) throw BizException.conflict("error.inventory.not_configured");
-    }
-
-    private static <T> T call(Supplier<T> s) {
-        try {
-            return s.get();
-        } catch (InventoryRemoteException e) {
-            throw BizException.conflict("error.inventory.remote", e.code, String.join("；", e.args));
-        }
     }
 
     private static String key(String kind) {

@@ -38,16 +38,17 @@ public class HttpInventoryApi implements InventoryApi {
 
     private final RestClient http;
     private final ObjectMapper json = JSON;
-    private final String baseUrl;
+    /** 寻址（固定地址 / 服务发现），每次调用前解析。 */
+    private final InventoryEndpoint endpoint;
     private final String appKey;
     private final String appSecret;
 
-    public HttpInventoryApi(@Value("${sharehub.inventory.base-url:}") String baseUrl,
+    public HttpInventoryApi(InventoryEndpoint endpoint,
                             @Value("${sharehub.inventory.app-key:}") String appKey,
                             @Value("${sharehub.inventory.app-secret:}") String appSecret,
                             @Value("${sharehub.inventory.connect-timeout:2s}") Duration connectTimeout,
                             @Value("${sharehub.inventory.read-timeout:5s}") Duration readTimeout) {
-        this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+        this.endpoint = endpoint;
         this.appKey = appKey;
         this.appSecret = appSecret;
         SimpleClientHttpRequestFactory f = new SimpleClientHttpRequestFactory();
@@ -58,7 +59,7 @@ public class HttpInventoryApi implements InventoryApi {
 
     @Override
     public boolean configured() {
-        return !baseUrl.isBlank() && !appKey.isBlank() && !appSecret.isBlank();
+        return endpoint.configured() && !appKey.isBlank() && !appSecret.isBlank();
     }
 
     // —— 主数据 ——
@@ -275,8 +276,9 @@ public class HttpInventoryApi implements InventoryApi {
         if (!configured()) {
             throw new InventoryRemoteException(503, "inventory.not_configured", List.of(), "库存服务未配置（sharehub.inventory.*）", null);
         }
+        String base = endpoint.baseUrl();
         try {
-            RestClient.RequestBodySpec req = http.method(method).uri(baseUrl + path)
+            RestClient.RequestBodySpec req = http.method(method).uri(base + path)
                     .header("Authorization", "Bearer " + appKey + ":" + appSecret)
                     .accept(MediaType.APPLICATION_JSON);
             String actor = SecurityUtils.userNo();
@@ -290,6 +292,7 @@ public class HttpInventoryApi implements InventoryApi {
         } catch (InventoryRemoteException e) {
             throw e;
         } catch (Exception e) {
+            endpoint.failed(base, e);
             throw new InventoryRemoteException(503, "inventory.unreachable", List.of(), "库存服务不可达：" + path, e);
         }
     }

@@ -205,13 +205,8 @@ public class RemoteInventoryPort implements InventoryPort {
 
     /** 库存服务拒绝 / 不可达 → 业务异常（整笔回滚），带对方错误码与参数，日志能直接定位。 */
     private <T> T remote(Supplier<T> call) {
-        if (!api.configured()) throw BizException.conflict("error.inventory.not_configured");
-        try {
-            return call.get();
-        } catch (InventoryRemoteException e) {
-            log.warn("库存服务拒绝 code={} args={} status={}：本地改动已回滚，按错误码处理后重试", e.code, e.args, e.status);
-            throw BizException.conflict("error.inventory.remote", e.code, String.join("；", e.args));
-        }
+        InventoryCalls.requireConfigured(api);
+        return InventoryCalls.call(call);
     }
 
     private static String operator() {

@@ -192,4 +192,29 @@ class MaterialServiceTest extends ApiTestSupport {
             ai.neargo.sharehub.support.FixtureCleanup.dropCabinets(jdbc, List.of(a, b));
         }
     }
+
+    @Test
+    @DisplayName("引擎接口报连通性（M0 0.3）：可达 / 不可达带对方错误码 / LOCAL 不探测；寻址方式为固定地址")
+    void engineReportsConnectivity() {
+        String token = login("ADMIN");
+        JsonNode ok = get("/api/ops/inventory/engine", token).okData();
+        assertThat(ok.path("engine").asText()).isEqualTo("SERVICE");
+        assertThat(ok.path("reachable").asBoolean()).isTrue();
+        assertThat(ok.path("endpointMode").asText()).isEqualTo("STATIC");
+
+        remote.useApi(new InventoryFake() {
+            @Override
+            public List<Warehouse> warehouses() {
+                throw new ai.neargo.sharehub.inv.remote.InventoryRemoteException(503, "inventory.unreachable", List.of(), "down", null);
+            }
+        });
+        JsonNode down = get("/api/ops/inventory/engine", token).okData();
+        assertThat(down.path("reachable").asBoolean()).isFalse();
+        assertThat(down.path("failure").asText()).isEqualTo("inventory.unreachable");
+
+        jdbc.update("UPDATE sys_param SET value='LOCAL' WHERE param_key='inv.engine'");
+        JsonNode local = get("/api/ops/inventory/engine", token).okData();
+        assertThat(local.path("engine").asText()).isEqualTo("LOCAL");
+        assertThat(local.path("reachable").isNull()).isTrue();
+    }
 }

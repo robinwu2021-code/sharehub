@@ -873,7 +873,14 @@ export interface InventoryEngine {
   engine: InventoryEngineKind;
   /** SERVICE 时凭证是否已配。 */
   configured: boolean;
+  /** 寻址方式：STATIC 固定地址 / DISCOVERY 服务发现（M0 0.3）。 */
+  endpointMode?: InventoryEndpointMode | null;
+  /** SERVICE 且已配置时现探一次的结果；LOCAL 或未配置为 null。 */
+  reachable?: boolean | null;
+  /** 不可达时库存服务侧错误码（如 inventory.unreachable）。 */
+  failure?: string | null;
 }
+export type InventoryEndpointMode = "STATIC" | "DISCOVERY";
 
 /** 一条库存流水（后端 `StockLedgerRow`）：qtyDelta 进仓 +、出仓 −。 */
 export interface StockLedgerRow {

@@ -4,10 +4,10 @@
 前提：.claude/launch.json 的 inventory-svc-local 与 backend-inv 已启动（backend-inv 用的运行时类路径：
 mvn -o dependency:build-classpath -pl sharehub-app -Dmdep.outputFile=sharehub-app/target/runtime-classpath.txt）；运行期间临时把 test_sharehub 的 inv.engine 改成 SERVICE，结束（含失败）复原 LOCAL。
 """
-import json, sys, time, urllib.request, urllib.error, subprocess, random
+import json, os, sys, time, urllib.request, urllib.error, subprocess, random
 
 SH = "http://127.0.0.1:8085"
-INV = "http://127.0.0.1:8086/api/inventory/v1"
+INV = os.environ.get("INVENTORY_BASE", "http://127.0.0.1:8086") + "/api/inventory/v1"
 import os
 CRED = json.load(open(sys.argv[1] if len(sys.argv) > 1 else os.path.expanduser("~/.local/etc/inventory-sharehub-cred.json")))
 MYSQL = ["/Users/workingowl/.local/opt/mysql/bin/mysql", "-uroot", "-S", "/tmp/mysql.sock", "-N", "-e"]
@@ -45,7 +45,7 @@ sql("UPDATE test_sharehub.sys_param SET value='SERVICE' WHERE param_key='inv.eng
 try:
     admin, wh, bd = login("ADMIN"), login("WAREHOUSE"), login("BD")
     st, eng, _ = sh("GET", "/api/ops/inventory/engine", token=admin)
-    check("引擎 = SERVICE 且凭证已配", eng == {"engine": "SERVICE", "configured": True}, eng)
+    check("引擎 = SERVICE、凭证已配、库存服务可达", eng["engine"] == "SERVICE" and eng["configured"] and eng["reachable"] is True, eng)
 
     # 1. 入库：到货登记 → 质检 → 入库 → 库存服务在 WH001 对应位置有这个序列号
     cab = "CABE2E" + tag

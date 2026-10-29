@@ -15896,6 +15896,18 @@
     {
      "name": "configured",
      "type": "boolean"
+    },
+    {
+     "name": "endpointMode",
+     "type": "String"
+    },
+    {
+     "name": "reachable",
+     "type": "Boolean"
+    },
+    {
+     "name": "failure",
+     "type": "String"
     }
    ],
    "requestShape": null

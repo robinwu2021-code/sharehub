@@ -11,7 +11,7 @@ import { WAREHOUSES, ensurePoolSeed } from "./device-pool";
 const counts: (StockCount & { scanned: string[] })[] = [];
 let seq = 0;
 
-export const engine = (): InventoryEngine => ({ engine: "SERVICE", configured: true });
+export const engine = (): InventoryEngine => ({ engine: "SERVICE", configured: true, endpointMode: "STATIC", reachable: true, failure: null });
 
 export function listStockLedger(q: { warehouseNo?: string; itemType?: string; keyword?: string; page?: number; size?: number } = {})
   : PageResult<StockLedgerRow> {

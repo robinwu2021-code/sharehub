@@ -1,5 +1,6 @@
 package ai.neargo.sharehub.inv.service.impl;
 
+import static ai.neargo.sharehub.inv.remote.InventoryCalls.call;
 import ai.neargo.common.core.IdGenerator;
 import ai.neargo.common.core.PageResult;
 import ai.neargo.common.data.scope.DataScopeContext;
@@ -54,7 +55,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /** 库存管理 · 物料（V210），口径见 {@link MaterialService}。 */
@@ -537,15 +537,7 @@ public class MaterialServiceImpl implements MaterialService {
 
     private void requireService() {
         if (!service()) throw BizException.conflict("error.inventory.material_service_only");
-        if (!remote.api().configured()) throw BizException.conflict("error.inventory.not_configured");
-    }
-
-    private static <T> T call(Supplier<T> s) {
-        try {
-            return s.get();
-        } catch (InventoryRemoteException e) {
-            throw BizException.conflict("error.inventory.remote", e.code, String.join("；", e.args));
-        }
+        ai.neargo.sharehub.inv.remote.InventoryCalls.requireConfigured(remote.api());
     }
 
     private static <E extends Enum<E>> E enumOf(E[] values, String v, String field) {

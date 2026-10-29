@@ -8,7 +8,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil } from "lucide-react";
 import { api } from "@/lib/api";
 import { UNPAGED_SIZE } from "@/lib/constants";
-import type { InventoryMigrationResult, MigrationCandidate, MigrationFailure, StockThreshold, SysParam, Warehouse, WarehouseReq } from "@/lib/types";
+import type { InventoryEngine, InventoryMigrationResult, MigrationCandidate, MigrationFailure, StockThreshold, SysParam, Warehouse, WarehouseReq } from "@/lib/types";
 import { Select } from "@/components/ui/input";
 import { Input } from "@/components/ui/input";
 import { useCan } from "@/lib/hooks/use-can";
@@ -158,6 +158,33 @@ export function WarehousesTab() {
   );
 }
 
+const ENGINE_REFRESH_MS = 30_000;
+const ENGINE_KIND: StatusMap<"LOCAL" | "SERVICE"> = { LOCAL: { label: "本地设备表", tone: "muted" }, SERVICE: { label: "独立进销存", tone: "info" } };
+const LINK: StatusMap<"OK" | "DOWN" | "UNCONFIGURED"> = {
+  OK: { label: "连接正常", tone: "success" }, DOWN: { label: "不可达", tone: "danger" }, UNCONFIGURED: { label: "未配置", tone: "warning" },
+};
+const MODE_LABEL = { STATIC: "固定地址", DISCOVERY: "服务发现" } as const;
+
+/** 库存引擎与库存服务连通性（M0 0.3）：LOCAL 下不探测。 */
+function EngineStatus({ engine }: { engine: InventoryEngine | undefined }) {
+  if (!engine) return null;
+  const link = engine.engine !== "SERVICE" ? null : !engine.configured ? "UNCONFIGURED" : engine.reachable ? "OK" : "DOWN";
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-2 txt-body">
+      <span className="text-muted-foreground">库存引擎</span>
+      <StatusBadge map={ENGINE_KIND} value={engine.engine} />
+      {link && (
+        <>
+          <span className="text-muted-foreground">库存服务</span>
+          <StatusBadge map={LINK} value={link} />
+          {engine.endpointMode && <span className="txt-caption text-muted-foreground">寻址：{MODE_LABEL[engine.endpointMode]}</span>}
+          {link === "DOWN" && engine.failure && <span className="font-mono txt-caption text-destructive-ink">{engine.failure}</span>}
+        </>
+      )}
+    </div>
+  );
+}
+
 /**
  * 库存设置（库存管理 › 设置，V207 参数 / V209 独立成页签）：系统参数「库存」组的统一入口，
  * 控件按字典渲染（枚举 → 下拉、整数 → 数字），默认回仓仓给仓库下拉。
@@ -171,6 +198,8 @@ export function InventorySettingsTab() {
   const [draft, setDraft] = useState<Record<string, string>>({});
   const q = useQuery({ queryKey: ["sys-params", "库存"],
     queryFn: () => api.listSysParams({ groupName: "库存", page: 1, size: UNPAGED_SIZE }) });
+  // 连通性：30 秒重探一次，库存服务恢复后自动变回「正常」
+  const engineQ = useQuery({ queryKey: ["inventory-engine"], queryFn: () => api.getInventoryEngine(), refetchInterval: ENGINE_REFRESH_MS });
   const save = useMutation({
     mutationFn: (p: SysParam) => api.saveSysParam({ paramKey: p.paramKey, value: draft[p.paramKey] ?? p.value }),
     onSuccess: () => {
@@ -212,6 +241,7 @@ export function InventorySettingsTab() {
   ];
   return (
     <div>
+      <EngineStatus engine={engineQ.data} />
       {!canWrite && <ReadOnlyNotice what="库存设置" perm="system:param:update" className="mb-3" />}
       <DataTable rowKey={(p: SysParam) => p.paramKey} columns={cols} rows={q.data?.list}
         loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="没有库存参数" />
