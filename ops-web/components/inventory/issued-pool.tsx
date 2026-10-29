@@ -14,7 +14,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { activeWarehouses } from "@/components/device/warehouses";
+import { activeWarehouses } from "@/components/inventory/warehouses";
 import { UNPAGED_SIZE } from "@/lib/constants";
 import { featureReady } from "@/lib/backend-ready";
 import { usePaging } from "@/lib/hooks/use-paging";
@@ -35,7 +35,7 @@ import { RefLink } from "@/components/ref-link";
 import { agentCoreComplete } from "@/lib/types";
 import { useAuth } from "@/lib/auth";
 import type { Agent, Cabinet, IssuedSummary, PoolFilter, ShipInfo } from "@/lib/types";
-import { ShipFields } from "@/components/device/shipments";
+import { ShipFields } from "@/components/inventory/shipments";
 
 type PoolState = "UNCLAIMED" | "UNBOUND" | "BOUND" | "LIVE" | "FAULT";
 export const POOL_STATE_MAP: StatusMap<PoolState> = {

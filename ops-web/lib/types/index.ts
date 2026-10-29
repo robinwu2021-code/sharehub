@@ -23,3 +23,4 @@ export * from "./org";
 export * from "./system";
 export * from "./operation";
 export * from "./file";
+export * from "./inventory";

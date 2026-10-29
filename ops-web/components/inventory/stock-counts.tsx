@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { activeWarehouses } from "@/components/device/warehouses";
+import { activeWarehouses } from "@/components/inventory/warehouses";
 import { useCan } from "@/lib/hooks/use-can";
 import { notify } from "@/lib/notify";
 import { fmtTime } from "@/lib/utils";

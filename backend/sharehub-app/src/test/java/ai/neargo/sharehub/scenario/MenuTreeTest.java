@@ -36,7 +36,7 @@ class MenuTreeTest extends ApiTestSupport {
         // 2026-09-28 +1：流程与工单（V136，放在最末）；2026-10-28 −1：营销管理并入销售管理（V151）；
         // 2026-10-28 −2：告警管理、客服管理并入运维管理（V153）；+1：从财务管理拆出结算（V154）；
         // −2：员工与权限、运营管理并入系统管理（V172）
-        assertThat(t.size()).as("运营侧 section 数（15 个里 3 个是代理门户）").isEqualTo(12);
+        assertThat(t.size()).as("运营侧 section 数（16 个里 3 个是代理门户；V209 拆出库存管理）").isEqualTo(13);
         int leaves = 0;
         for (JsonNode s : t) leaves += s.path("children").size();
         // 2026-09-25 +2：用户管理 › 注销申请 / 开票申请（C 端一直在产生这两类待办，运营端此前没有入口）
@@ -50,7 +50,7 @@ class MenuTreeTest extends ApiTestSupport {
         // V156 财务管理 +1（调整单从结算单页签里的视图升为叶子）
         // V163 设备管理 +1（出库池）；V165 +5（部署与装机、待上线、故障与维修、撤机与回仓、报废与遗失）
         // V190 设备管理 +1（仓库）；V193 +1（到仓待检，新组「入库与质检」）；V199 +2（库存流水、盘点）
-        assertThat(leaves).as("ADMIN 看得到的叶子数").isEqualTo(127);
+        assertThat(leaves).as("ADMIN 看得到的叶子数").isEqualTo(131);
     }
 
     @Test

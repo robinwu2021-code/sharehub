@@ -44,7 +44,7 @@ class MenuAdminTest extends ApiTestSupport {
         // 菜单管理要能看到、也能改管理员自己都看不到的项
         String admin = login("ADMIN");
         assertThat(get(MENUS, admin).okData().size())
-                .as("全量 section 数（含商家门户 3 个；V172 合并 L1 后为 15，与 ops-web/lib/nav.ts 一致）").isEqualTo(15);
+                .as("全量 section 数（含商家门户 3 个；V172 合并 L1 后为 15，V209 拆出库存管理后 16，与 ops-web/lib/nav.ts 一致）").isEqualTo(16);
     }
 
     @Test

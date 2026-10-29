@@ -21,7 +21,7 @@ import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { RefLink } from "@/components/ref-link";
-import { POOL_STATE_MAP, poolStateOf } from "@/components/device/issued-pool";
+import { POOL_STATE_MAP, poolStateOf } from "@/components/inventory/issued-pool";
 import type { Agent, Cabinet, Site, SitePoint } from "@/lib/types";
 
 /** @form POST /api/ops/sites */
@@ -141,7 +141,7 @@ export function AgentDevices({ agentNo }: { agentNo: string }) {
         <SummaryCard label="已上线" value={String(s?.live ?? 0)} sub="产生营收" />
       </div>
       <div className="flex justify-end">
-        <Link href="/devices?tab=issued" className="txt-caption text-primary hover:underline">去出库池出库 / 绑定 →</Link>
+        <Link href="/inventory?tab=issued" className="txt-caption text-primary hover:underline">去出库池出库 / 绑定 →</Link>
       </div>
       <DataTable rowKey={(c: Cabinet) => c.cabinetNo} columns={cols} rows={listQ.data?.list}
         loading={listQ.isLoading} error={listQ.error} onRetry={listQ.refetch}

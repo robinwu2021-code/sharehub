@@ -18,7 +18,7 @@ import { FilterSelect } from "@/components/ui/filter-select";
 import { Notice } from "@/components/ui/notice";
 import { useCan } from "@/lib/hooks/use-can";
 import { exportCsv } from "@/lib/export-csv";
-import { CAB_STATUS, PB_STATUS } from "./device-maps";
+import { CAB_STATUS, PB_STATUS } from "@/components/device/device-maps";
 import type { Cabinet, CabinetStatus, Powerbank, PowerbankStatus } from "@/lib/types";
 import { tally, totalRow, type StockRow as Row } from "@/lib/stock-tally";
 import { StockStagesTable } from "./stock-stages";

@@ -26,7 +26,7 @@ describe("设备生命周期环节（展示态派生）", () => {
     expect(lifecyclePhase("ISSUED")).toBe("DEPLOY");
     expect(lifecyclePhase("BOUND")).toBe("INSTALL");
     expect(lifecyclePhase("FAULT")).toBe("MAINTAIN");
-    expect(nextStep({ ...base, warehouseNo: null, issuedAgentNo: "AG1" }).href).toBe("/devices?tab=issued");
+    expect(nextStep({ ...base, warehouseNo: null, issuedAgentNo: "AG1" }).href).toBe("/inventory?tab=issued");
     expect(nextStep({ ...base, locationNo: "L1", issuedAgentNo: "AG1" }).who).toBe("运维");
   });
 });

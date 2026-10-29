@@ -216,22 +216,6 @@ export const NAV: NavSection[] = [
     children: [
       { href: "/devices", label: "设备台账", perm: "device:cabinet:read", group: "设备档案" },
       { href: "/devices?tab=powerbanks", label: "充电宝管理", perm: "device:powerbank:read", group: "设备档案" },
-      // 入库与质检（V193，矩阵 M1）：到仓待检 → 质检 → 入库；供应商（V201）为到货来源与退供应商去向
-      { href: "/devices?tab=intakes", label: "到仓待检", perm: "device:inventory:read", phase: 1, ready: true, group: "入库与质检" },
-      { href: "/devices?tab=suppliers", label: "供应商", perm: "device:inventory:read", phase: 1, ready: true, group: "入库与质检" },
-      // 仓库（V190 只读 → V201 可新建 / 编辑 / 归档，写码 device:inventory:warehouse）
-      { href: "/devices?tab=warehouses", label: "仓库", perm: "device:inventory:read", phase: 1, ready: true, group: "仓储与出库" },
-      // 库存余额由柜机 / 充电宝两个既有读端点在页内汇总，不新增后端端点
-      { href: "/devices?tab=stock", label: "库存余额", perm: "device:inventory:read", phase: 1, ready: true, group: "仓储与出库" },
-      // 库存流水 / 盘点（V199，S4）：GET /api/ops/inventory/ledger、/inventory/counts*；盘点只在独立进销存引擎下可用
-      { href: "/devices?tab=ledger", label: "库存流水", perm: "device:inventory:read", phase: 1, ready: true, group: "仓储与出库" },
-      { href: "/devices?tab=counts", label: "盘点", perm: "device:inventory:read", phase: 1, ready: true, group: "仓储与出库" },
-      { href: "/devices?tab=inventory", label: "库存调拨", perm: "device:inventory:read", phase: 1, ready: true, group: "仓储与出库" },
-      { href: "/devices?tab=issued", label: "出库池", perm: "device:inventory:read", group: "仓储与出库" },
-      // 处置出库（V203）：在库设备报废 / 退供应商，写码 device:inventory:transfer
-      { href: "/devices?tab=disposals", label: "处置出库", perm: "device:inventory:read", phase: 1, ready: true, group: "仓储与出库" },
-      // 此前是库存调拨里的子视图（同分期），菜单里找不到；拆出来不改分期
-      { href: "/devices?tab=asset-diffs", label: "资产差异", perm: "device:inventory:read", phase: 1, ready: true, group: "仓储与出库" },
       // 五个生命周期视图（V165）：都是既有数据的设备视角，不新增后端端点；装机 / 撤机单仍在运维管理 › 工单里办理
       { href: "/devices?tab=installs", label: "部署与装机", perm: "workorder:wo:read", group: "部署与安装" },
       { href: "/devices?tab=pending-live", label: "待上线", perm: "device:cabinet:read", group: "绑定上线" },
@@ -245,6 +229,38 @@ export const NAV: NavSection[] = [
       { href: "/devices?tab=repairs", label: "故障与维修", perm: "device:cabinet:read", group: "维护与退出" },
       { href: "/devices?tab=removals", label: "撤机与回仓", perm: "workorder:wo:read", group: "维护与退出" },
       { href: "/devices?tab=retired", label: "报废与遗失", perm: "device:cabinet:read", group: "维护与退出" },
+    ],
+  },
+  {
+    // 2026-10-29 从设备管理拆出「库存管理」（V209；规范见 docs/technical/设计规范-库存管理菜单.md）：
+    //   主数据 → 出入库 → 库内作业 → 库存账 → 设置。管的是「东西在不在库、在哪个仓、有多少」——
+    //   设备（柜 / 宝 / 其他整机，逐件）与物料（备件、耗材，按数量）同一套账；设备上线后的生命周期留在设备管理。
+    // 将来的独立系统以 ai-shop 库存服务为准（docs/technical/独立进销存/），这里是运营端的统一入口。
+    // 权限码沿用 device:inventory:*。物料三项（物料档案 / 物料单据 / 物料库存）后端未实现：ready 未置，真实后端下灰显。
+    // ⚠️ 菜单真源在库里：本段的行由 V209 建立，改这里要同步新开迁移（见 nav-seed.test.ts）。
+    key: "inventory", label: "库存管理", icon: "Warehouse", module: "device", href: "/inventory?tab=stock",
+    match: ["/inventory"],
+    children: [
+      { href: "/inventory?tab=materials", label: "物料档案", perm: "device:inventory:read", phase: 1, group: "主数据" },
+      // 仓库（V190 只读 → V201 可维护，写码 device:inventory:warehouse）；供应商（V201）为到货来源与退供应商去向
+      { href: "/inventory?tab=warehouses", label: "仓库", perm: "device:inventory:read", phase: 1, ready: true, group: "主数据" },
+      { href: "/inventory?tab=suppliers", label: "供应商", perm: "device:inventory:read", phase: 1, ready: true, group: "主数据" },
+      // 入库单（原「到仓待检」V193；V202 起承载采购到货 / 期初建账 / 撤机回仓）
+      { href: "/inventory?tab=intakes", label: "入库单", perm: "device:inventory:read", phase: 1, ready: true, group: "出入库" },
+      // 物料单据：数量物料（备件、耗材）与其他整机的入库 / 领用 / 报废 / 退供应商 / 调拨
+      { href: "/inventory?tab=material-docs", label: "物料单据", perm: "device:inventory:read", phase: 1, group: "出入库" },
+      { href: "/inventory?tab=issued", label: "出库池", perm: "device:inventory:read", group: "出入库" },
+      // 处置出库（V203）：在库设备报废 / 退供应商，写码 device:inventory:transfer
+      { href: "/inventory?tab=disposals", label: "处置出库", perm: "device:inventory:read", phase: 1, ready: true, group: "出入库" },
+      { href: "/inventory?tab=transfers", label: "库存调拨", perm: "device:inventory:read", phase: 1, ready: true, group: "库内作业" },
+      // 盘点（V199，S4）：只在独立进销存引擎下可用
+      { href: "/inventory?tab=counts", label: "盘点", perm: "device:inventory:read", phase: 1, ready: true, group: "库内作业" },
+      { href: "/inventory?tab=asset-diffs", label: "资产差异", perm: "device:inventory:read", phase: 1, ready: true, group: "库内作业" },
+      { href: "/inventory?tab=stock", label: "库存余额", perm: "device:inventory:read", phase: 1, ready: true, group: "库存账" },
+      { href: "/inventory?tab=material-stock", label: "物料库存", perm: "device:inventory:read", phase: 1, group: "库存账" },
+      { href: "/inventory?tab=ledger", label: "库存流水", perm: "device:inventory:read", phase: 1, ready: true, group: "库存账" },
+      // 库存设置：系统参数「库存」组（V207），复用 /api/platform/sys-params，写码 system:param:update
+      { href: "/inventory?tab=settings", label: "库存设置", perm: "device:inventory:read", phase: 1, ready: true, group: "设置" },
     ],
   },
   {

@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState, useMemo, type ReactNode } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { UNPAGED_SIZE } from "@/lib/constants";
 import { api } from "@/lib/api";
@@ -38,43 +38,35 @@ import { ReadOnlyNotice } from "@/components/read-only-notice";
 // 值导入：指令的「必须指定仓位」规则与 mock 落库校验同源，不在页面里另写一份
 import { SLOT_REQUIRED_COMMANDS } from "@/lib/types";
 import type {
-  Cabinet, Powerbank, CabinetMonitor, CommandRecord, CommandType, InventoryTransfer, InvTransferReq,
+  Cabinet, Powerbank, CabinetMonitor, CommandRecord, CommandType,
   OtaRollout, PageResult, OtaRelease, OtaTask, DeviceLog, DeviceCodeBatch,
 } from "@/lib/types";
 import { RefLink } from "@/components/ref-link";
 import { CAB_STATUS, PB_STATUS, PB_HEALTH, TRANSFER_STATUS, daysSince } from "@/components/device/device-maps";
-import { TransferForm, TransferDetailDrawer, AssetDiffsTable } from "@/components/device/transfer";
-import { StockBalanceTab } from "@/components/device/stock-balance";
 import { VendorsTab } from "@/components/device/vendors-tab";
-import { IssuedPoolTab } from "@/components/device/issued-pool";
-import { WarehousesTab } from "@/components/device/warehouses";
-import { SuppliersTab } from "@/components/device/suppliers";
-import { DisposalsTab } from "@/components/device/disposals";
-import { IntakesTab } from "@/components/device/intakes";
-import { StockLedgerTab } from "@/components/device/stock-ledger";
-import { StockCountsTab } from "@/components/device/stock-counts";
 import { InstallsTab, PendingLiveTab, RepairsTab, RemovalsTab, RetiredTab } from "@/components/device/lifecycle-views";
 import { lifecycleStage, STAGE_LABEL, STAGE_TONE } from "@/lib/device-lifecycle";
 import { PowerbankActions } from "@/components/device/powerbank-actions";
 import { ReasonDrawer, type ReasonRequest } from "@/components/device/reason-drawer";
 import { QcDrawer, type QcTarget } from "@/components/device/qc";
 import { CabinetSummaryStrip } from "@/components/device/cabinet-summary";
+import { inventoryRedirect } from "@/lib/inventory-routes";
 
 // tab 只声明有哪些、什么顺序；名字与权限来自 nav.ts（见 navTabs）。
 // 「机柜」在菜单里叫「设备台账」——以菜单为准。
 // 2026-10-28 按运营顺序（OM03）：资产台账 → 库存与流转 → 设备接入 → 在线运行。
 // 资产差异从「库存调拨」的子视图拆成独立页签；供应商接入从系统设置搬来；库存余额新增。
-// 2026-10-28 与菜单同序（按设备生命周期）：设备档案 → 仓储与出库（含出库池）→ 绑定上线 → 运行监控
+// 2026-10-28 与菜单同序（按设备生命周期）：设备档案 → 部署与安装 → 绑定上线 → 运行监控 → 维护与退出
+// 2026-10-29 库存页签（仓库、入库、出库池、调拨、盘点、余额、流水…）整体搬到 /inventory（V209），
+// 旧链接由 inventoryRedirect 转过去（lib/inventory-routes.ts）。
 const TAB_KEYS = ["cabinets", "powerbanks",
-  "intakes", "suppliers",
-  "warehouses", "stock", "ledger", "counts", "inventory", "issued", "disposals", "asset-diffs",
   "installs",
   "pending-live", "codes", "vendors",
   "monitor", "commands", "logs", "ota",
   "repairs", "removals", "retired"] as const;
 // 自建 tab（自带筛选器与查询），不走页面共用的 keyword/Toolbar/分页那一套
 // issued 与五个生命周期视图（installs … retired）自带查询与分页
-const STANDALONE_TABS = ["cabinets", "logs", "codes", "intakes", "suppliers", "warehouses", "stock", "ledger", "counts", "issued", "disposals", "asset-diffs", "vendors",
+const STANDALONE_TABS = ["cabinets", "logs", "codes", "vendors",
   "installs", "pending-live", "repairs", "removals", "retired"];
 
 /**
@@ -932,35 +924,6 @@ const cmdCols: Column<CommandRecord>[] = [
   { header: "操作人", cell: (r) => <span className="text-muted-foreground">{r.operator}</span> },
   { header: "时间", cell: (r) => <span className="text-muted-foreground">{fmtTime(r.createdAt)}</span> },
 ];
-/**
- * 调拨列表只说得出「从哪到哪、多少台」。**盘点对不上时要查的是「具体哪几台」**，
- * 那一层在详情里（列表的出参类型根本没有明细行）。故单号做成详情入口。
- */
-function invColsWith(onOpen: (r: InventoryTransfer) => void): Column<InventoryTransfer>[] {
-  return [
-  { header: "调拨单号", cell: (r) => (
-    <button type="button" className="font-medium tabular-nums underline-offset-4 hover:underline"
-      onClick={() => onOpen(r)}>{r.transferNo}</button>
-  ) },
-  // 名字是给人看的，编号才说得清「到底去了哪个站点/仓库」
-  { header: "调出", cell: (r) => (
-    <div className="min-w-0">
-      <div className="truncate">{r.fromLocation}</div>
-      {r.fromRef ? <div className="truncate txt-caption text-muted-foreground tabular-nums">{r.fromRef}</div> : null}
-    </div>
-  ) },
-  { header: "调入", cell: (r) => (
-    <div className="min-w-0">
-      <div className="truncate">{r.toLocation}</div>
-      {r.toRef ? <div className="truncate txt-caption text-muted-foreground tabular-nums">{r.toRef}</div> : null}
-    </div>
-  ) },
-  { header: "充电宝数", cell: (r) => <span className="tabular-nums">{Math.round(r.powerbankCount)}</span> },
-  { header: "状态", cell: (r) => <StatusBadge map={TRANSFER_STATUS} value={r.status} /> },
-  { header: "操作人", cell: (r) => <span className="text-muted-foreground">{r.operator}</span> },
-  { header: "创建时间", cell: (r) => <span className="text-muted-foreground">{fmtTime(r.createdAt)}</span> },
-  ];
-}
 /** 投放范围的人话。ALL 不写「全部」而写「全部设备」—— 前者容易被读成「全部站点」。 */
 const rolloutScope = (r: OtaRollout) =>
   r.scope === "ALL" ? "全部设备"
@@ -993,7 +956,7 @@ const otaCols: Column<OtaRollout>[] = [
   { header: "创建时间", cell: (r) => <span className="text-muted-foreground">{fmtTime(r.createdAt)}</span> },
 ];
 
-type Row = Powerbank | CabinetMonitor | CommandRecord | InventoryTransfer | OtaRollout;
+type Row = Powerbank | CabinetMonitor | CommandRecord | OtaRollout;
 
 // —— 可编辑实体的表单字段定义 ——
 /**
@@ -1090,18 +1053,6 @@ const EXPORTS: Record<string, { name: string; run: (rows: Row[]) => void }> = {
       { header: "时间", value: (r) => r.createdAt },
     ], rows as CommandRecord[]),
   },
-  inventory: {
-    name: "库存调拨",
-    run: (rows) => exportCsv<InventoryTransfer>("库存调拨", [
-      { header: "调拨单号", value: (r) => r.transferNo },
-      { header: "调出点位", value: (r) => r.fromLocation },
-      { header: "调入点位", value: (r) => r.toLocation },
-      { header: "充电宝数", value: (r) => Math.round(r.powerbankCount) },
-      { header: "状态", value: (r) => TRANSFER_STATUS[r.status]?.label ?? r.status },
-      { header: "操作人", value: (r) => r.operator },
-      { header: "创建时间", value: (r) => r.createdAt },
-    ], rows as InventoryTransfer[]),
-  },
   ota: {
     name: "固件 OTA",
     run: (rows) => exportCsv<OtaRollout>("固件OTA", [
@@ -1123,7 +1074,6 @@ const SEARCH_HINT: Record<string, string> = {
   powerbanks: "搜索充电宝号 / 柜机号",
   monitor: "搜索柜机号 / 点位",
   commands: "搜索指令ID / 柜机号 / 操作人",
-  inventory: "搜索调拨单号 / 点位",
   ota: "搜索发布单号 / 版本 / 供应商",
 };
 
@@ -1431,21 +1381,6 @@ function DevicesInner() {
   const { tab, setTab } = usePageTab(tabs, () => { paging.reset(); setKeyword(""); });
   const [keyword, setKeyword] = useState("");
   const [pbForm, setPbForm] = useState<Partial<Powerbank> | null>(null);
-  const [invForm, setInvForm] = useState<Partial<InvTransferReq> | null>(null);
-  // 调拨详情：支持 `?no=` 深链（RefLink transfer → /devices?tab=inventory&no=），关抽屉时把参数清掉
-  const sp = useSearchParams();
-  const router = useRouter();
-  const pathname = usePathname();
-  const [invDetail, setInvDetailState] = useState<string | null>(() => sp.get("no"));
-  const setInvDetail = (no: string | null) => {
-    setInvDetailState(no);
-    if (!no && sp.get("no")) {
-      const q = new URLSearchParams(sp.toString());
-      q.delete("no");
-      router.replace(`${pathname}?${q.toString()}`, { scroll: false });
-    }
-  };
-  useEffect(() => { const n = sp.get("no"); if (n) setInvDetailState(n); }, [sp]);
   const [qcTarget, setQcTarget] = useState<QcTarget | null>(null);
   // 「已找回 / 误判」要填说明（后端必填）：复用写原因抽屉，打开它本身无副作用
   const [lostDismiss, setLostDismiss] = useState<ReasonRequest | null>(null);
@@ -1490,7 +1425,6 @@ function DevicesInner() {
   const canEditCode = canEditCabinet;
   const canEditPowerbank = allow("device:powerbank:update");
   // 调拨的建单 / 发出 / 签收后端都判 device:inventory:transfer（perm-map 里 :update 也翻译成它）
-  const canEditInventory = allow("device:inventory:transfer");
   const canEditOta = allow("device:ota:publish");
   // 指令下发与「看指令记录」是两个权限：能看流水不等于能动设备（后端 sendCommand 也这么标）
   const canSendCommand = allow("device:command:send");
@@ -1556,7 +1490,6 @@ function DevicesInner() {
       tab === "powerbanks" ? api.listPowerbanks({ page: paging.page, size: paging.size, keyword, showArchived: showArchived || undefined })
       : tab === "monitor" ? api.listCabinetMonitor({ page: paging.page, size: paging.size, keyword })
       : tab === "commands" ? api.listCommandRecords({ page: paging.page, size: paging.size, keyword })
-      : tab === "inventory" ? api.listInventoryTransfers({ page: paging.page, size: paging.size, keyword })
       : api.listOtaRollouts({ page: paging.page, size: paging.size, keyword }),
     placeholderData: keepWithinTab(tab),
     enabled: !isStandalone,
@@ -1609,18 +1542,6 @@ function DevicesInner() {
       ),
     },
   ];
-  const invColsFull: Column<InventoryTransfer>[] = [
-    ...invColsWith((r) => setInvDetail(r.transferNo)),
-    {
-      header: "操作",
-      cell: (r) => (
-        <Button size="sm" variant="outline" onClick={() => setInvDetail(r.transferNo)}>
-          {/* 动作按状态给名字：草稿要设明细发出、在途要签收，完成的只剩查看 */}
-          {!canEditInventory ? "查看" : r.status === "DRAFT" ? "明细 / 发出" : r.status === "IN_TRANSIT" ? "签收" : "查看"}
-        </Button>
-      ),
-    },
-  ];
   // 指令记录不可编辑（历史流水），能做的只有「照这条再发一次」——超时/失败的指令最常见的处置
   const cmdColsFull: Column<CommandRecord>[] = canSendCommand ? [...cmdCols, {
     header: "操作",
@@ -1653,13 +1574,12 @@ function DevicesInner() {
           searchPlaceholder={SEARCH_HINT[tab]}
           onAdd={
             tab === "powerbanks" && canEditPowerbank ? () => setPbForm({ sn: "", vendorCode: "", cabinetNo: "", battery: 100, health: "OK", cycles: 0 })
-            : tab === "inventory" && canEditInventory ? () => setInvForm({ itemType: "CABINET", fromType: "WAREHOUSE", fromRef: "", toType: "SITE", toRef: "" })
             : tab === "ota" && canEditOta ? () => setOtaForm({ releaseNo: "", scope: "ALL", targetRef: null, strategy: "GRAY", status: "PENDING" })
             // 指令记录 tab 的下发入口：默认预填「重启」（最常用的整机处置），机柜由用户选
             : tab === "commands" && canSendCommand ? () => setCmdDraft({ type: "REBOOT", cabinetNo: "", slotIndex: "" })
             : undefined
           }
-          addLabel={tab === "powerbanks" ? "新增充电宝" : tab === "inventory" ? "新增调拨单" : tab === "ota" ? "新增发布单" : tab === "commands" ? "下发指令" : undefined}
+          addLabel={tab === "powerbanks" ? "新增充电宝" : tab === "ota" ? "新增发布单" : tab === "commands" ? "下发指令" : undefined}
           onExport={EXPORTS[tab] ? () => EXPORTS[tab].run(q.data?.list ?? []) : undefined}
         >
           {/* 监控 tab：列表 / 地图 双视图（G4）。地图按站点聚合，点 marker 回列表并带上站点筛选。 */}
@@ -1710,25 +1630,7 @@ function DevicesInner() {
           <DataTable rowKey={(r: CommandRecord) => r.commandId} columns={cmdColsFull} rows={q.data?.list as CommandRecord[]} loading={q.isLoading} error={q.error} onRetry={q.refetch} />
         </>
       )}
-      {tab === "inventory" && (
-        <>
-          {!canEditInventory && <ReadOnlyNotice what="调拨执行" perm="device:inventory:transfer" note="不能建单、发出或签收" />}
-          <DataTable rowKey={(r: InventoryTransfer) => r.transferNo} columns={invColsFull} rows={q.data?.list as InventoryTransfer[]} loading={q.isLoading} error={q.error} onRetry={q.refetch}
-            empty="还没有调拨单——仓库之间、仓库与站点之间搬设备前先建单，发出与签收都按单逐件核对" />
-        </>
-      )}
-      {/* 资产差异（OM03-12）：调拨签收、撤机清点、巡检清点、盘点发现的账实不符，逐条处置。
-          此前是「库存调拨」页签里的一个子视图，菜单里找不到；现在独立成页签。AssetDiffsTable 自带筛选与分页 */}
-      {tab === "asset-diffs" && <AssetDiffsTable />}
-      {tab === "stock" && <StockBalanceTab />}
       {tab === "vendors" && <VendorsTab />}
-      {tab === "issued" && <IssuedPoolTab />}
-      {tab === "warehouses" && <WarehousesTab />}
-      {tab === "suppliers" && <SuppliersTab />}
-      {tab === "disposals" && <DisposalsTab />}
-      {tab === "intakes" && <IntakesTab />}
-      {tab === "ledger" && <StockLedgerTab />}
-      {tab === "counts" && <StockCountsTab />}
       {tab === "installs" && <InstallsTab />}
       {tab === "pending-live" && <PendingLiveTab />}
       {tab === "repairs" && <RepairsTab />}
@@ -1756,7 +1658,6 @@ function DevicesInner() {
         }}
         submitting={savePb.isPending}
       />
-      <TransferForm value={invForm} onClose={() => setInvForm(null)} />
       <FormDrawer
         open={!!otaForm}
         onOpenChange={(o) => !o && setOtaForm(null)}
@@ -1769,7 +1670,6 @@ function DevicesInner() {
         onSubmit={() => otaForm && saveOta.mutate(otaForm)}
         submitting={saveOta.isPending}
       />
-      <TransferDetailDrawer transferNo={invDetail} onClose={() => setInvDetail(null)} onEdit={(t) => setInvForm(t)} />
       <QcDrawer target={qcTarget} onClose={() => setQcTarget(null)} />
       <ReasonDrawer req={lostDismiss} onClose={() => setLostDismiss(null)} />
       <OtaTasksDrawer rollout={taskRollout} onOpenChange={(o) => !o && setTaskRollout(null)} />
@@ -1778,6 +1678,16 @@ function DevicesInner() {
   );
 }
 
+/** 库存页签的旧链接（/devices?tab=issued 等）转到 /inventory，其余照常渲染设备页。 */
+function DevicesRoute() {
+  const sp = useSearchParams();
+  const router = useRouter();
+  const to = inventoryRedirect(new URLSearchParams(sp.toString()));
+  useEffect(() => { if (to) router.replace(to); }, [to, router]);
+  if (to) return null;
+  return <DevicesInner />;
+}
+
 export default function DevicesPage() {
-  return <Suspense fallback={null}><DevicesInner /></Suspense>;
+  return <Suspense fallback={null}><DevicesRoute /></Suspense>;
 }

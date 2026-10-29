@@ -197,7 +197,7 @@ export function RemovalsTab() {
   const trQ = useQuery({ queryKey: ["inventory-transfers", "returns"], queryFn: () => api.listInventoryTransfers({ size: UNPAGED_SIZE }) });
   const returns = (trQ.data?.list ?? []).filter((t) => t.fromType === "SITE" && t.toType === "WAREHOUSE");
   const trCols: Column<InventoryTransfer>[] = [
-    { header: "调拨单", cell: (t) => <Link href={`/devices?tab=inventory&no=${t.transferNo}`} className="tabular-nums hover:underline">{t.transferNo}</Link> },
+    { header: "调拨单", cell: (t) => <Link href={`/inventory?tab=transfers&no=${t.transferNo}`} className="tabular-nums hover:underline">{t.transferNo}</Link> },
     { header: "从", cell: (t) => t.fromLocation },
     { header: "回到", cell: (t) => t.toLocation },
     { header: "状态", cell: (t) => <span>{t.status === "DONE" ? "已签收" : t.status === "IN_TRANSIT" ? "在途" : "草稿"}</span> },

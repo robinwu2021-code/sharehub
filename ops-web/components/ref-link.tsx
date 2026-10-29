@@ -24,7 +24,7 @@ export const REF_ROUTES: Record<RefKind, { href: (no: string) => string; perm: s
   order: { href: (no) => `/orders?no=${encodeURIComponent(no)}`, perm: "order:order:read" },
   lead: { href: (no) => `/venues?tab=crm&no=${encodeURIComponent(no)}`, perm: "location:lead:read" },
   agent: { href: (no) => `/agents?no=${encodeURIComponent(no)}`, perm: "agent:agent:read" },
-  transfer: { href: (no) => `/devices?tab=inventory&no=${encodeURIComponent(no)}`, perm: "device:inventory:read" },
+  transfer: { href: (no) => `/inventory?tab=transfers&no=${encodeURIComponent(no)}`, perm: "device:inventory:read" },
   settlement: { href: (no) => `/settlement?tab=settlements&no=${encodeURIComponent(no)}`, perm: "finance:settlement:read" },
 };
 

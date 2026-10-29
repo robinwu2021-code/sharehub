@@ -35,12 +35,15 @@ function run(script: string): string {
 }
 
 describe("前后端漂移棘轮（数字只许降）", () => {
-  it("契约缺口 ≤ 0、动词不符 ≤ 6", () => {
+  // 契约缺口 0 → 10（2026-10-29，用户确认「先上契约，显式登记缺口」）：库存管理 · 物料十个端点
+  // （/api/ops/inventory/materials、material-docs、material-balances、material-thresholds）前端先行，
+  // 后端以 ai-shop 库存服务为账本实现。清单见 lib/api/https/inventory.ts；后端每补一个就把这个数往下调。
+  it("契约缺口 ≤ 10、动词不符 ≤ 6", () => {
     const head = run("check-backend-parity.py").split("\n")[0];
     const gap = Number(head.match(/缺 (\d+)/)?.[1]);
     const verb = Number(head.match(/动词不符 (\d+)/)?.[1]);
     expect(Number.isFinite(gap) && Number.isFinite(verb), `没解析出数字：${head}`).toBe(true);
-    expect(gap, head).toBeLessThanOrEqual(0);
+    expect(gap, head).toBeLessThanOrEqual(10);
     expect(verb, head).toBeLessThanOrEqual(6);
   });
 

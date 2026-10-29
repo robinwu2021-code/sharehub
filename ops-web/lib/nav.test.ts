@@ -25,7 +25,7 @@ const sectionKeys = (role: Role) => visibleSections(role).map((s) => s.key);
 // L1 顺序即 Rail 顺序；改动必须是有意识的产品决策，连带更新 docs。
 const L1_KEYS = [
   "my-biz", "my-asset", "my-service", // 代理端门户（portalFor: AGENT）
-  "dashboard", "device", "workorder", "venue", "agent", "order",
+  "dashboard", "device", "inventory", "workorder", "venue", "agent", "order",
   "settlement", "finance", "user", "report", "system", "flow",
 ];
 // 叶子五元组 href|label|perm|phase|group —— 2026-07-30 层级重构前后逐条比对为零差异。
@@ -69,16 +69,6 @@ const LEAF_TUPLES = [
   // 2026-10-28 设备管理按生命周期（V163）：设备档案 → 仓储与出库（含出库池）→ 绑定上线 → 运行监控
   "/devices|设备台账|device:cabinet:read||设备档案",
   "/devices?tab=powerbanks|充电宝管理|device:powerbank:read||设备档案",
-  "/devices?tab=intakes|到仓待检|device:inventory:read|1|入库与质检",
-  "/devices?tab=suppliers|供应商|device:inventory:read|1|入库与质检",
-  "/devices?tab=warehouses|仓库|device:inventory:read|1|仓储与出库",
-  "/devices?tab=stock|库存余额|device:inventory:read|1|仓储与出库",
-  "/devices?tab=ledger|库存流水|device:inventory:read|1|仓储与出库",
-  "/devices?tab=counts|盘点|device:inventory:read|1|仓储与出库",
-  "/devices?tab=inventory|库存调拨|device:inventory:read|1|仓储与出库",
-  "/devices?tab=issued|出库池|device:inventory:read||仓储与出库",
-  "/devices?tab=disposals|处置出库|device:inventory:read|1|仓储与出库",
-  "/devices?tab=asset-diffs|资产差异|device:inventory:read|1|仓储与出库",
   "/devices?tab=installs|部署与装机|workorder:wo:read||部署与安装",
   "/devices?tab=pending-live|待上线|device:cabinet:read||绑定上线",
   "/devices?tab=codes|设备编码|device:cabinet:read|1|绑定上线",
@@ -90,6 +80,21 @@ const LEAF_TUPLES = [
   "/devices?tab=repairs|故障与维修|device:cabinet:read||维护与退出",
   "/devices?tab=removals|撤机与回仓|workorder:wo:read||维护与退出",
   "/devices?tab=retired|报废与遗失|device:cabinet:read||维护与退出",
+  // 2026-10-29 从设备管理拆出库存管理（V209）：主数据 → 出入库 → 库内作业 → 库存账 → 设置
+  "/inventory?tab=materials|物料档案|device:inventory:read|1|主数据",
+  "/inventory?tab=warehouses|仓库|device:inventory:read|1|主数据",
+  "/inventory?tab=suppliers|供应商|device:inventory:read|1|主数据",
+  "/inventory?tab=intakes|入库单|device:inventory:read|1|出入库",
+  "/inventory?tab=material-docs|物料单据|device:inventory:read|1|出入库",
+  "/inventory?tab=issued|出库池|device:inventory:read||出入库",
+  "/inventory?tab=disposals|处置出库|device:inventory:read|1|出入库",
+  "/inventory?tab=transfers|库存调拨|device:inventory:read|1|库内作业",
+  "/inventory?tab=counts|盘点|device:inventory:read|1|库内作业",
+  "/inventory?tab=asset-diffs|资产差异|device:inventory:read|1|库内作业",
+  "/inventory?tab=stock|库存余额|device:inventory:read|1|库存账",
+  "/inventory?tab=material-stock|物料库存|device:inventory:read|1|库存账",
+  "/inventory?tab=ledger|库存流水|device:inventory:read|1|库存账",
+  "/inventory?tab=settings|库存设置|device:inventory:read|1|设置",
   // 2026-10-28 运维管理（OM06）：告警 + 客服 + 工单三个 L1 合一；客服两个快捷入口撤销
   "/alarms|告警记录|workorder:alarm:read||告警",
   "/alarms?tab=notices|告警通知|workorder:alarm:read||告警",
@@ -220,9 +225,9 @@ describe("结构回归基线（层级重构不改内容）", () => {
   // 2026-10-28：「告警管理」「客服管理」并入「运维管理」（15 → 13，V153）。
   // 2026-10-28：从财务管理拆出「结算」（13 → 14，V154）。
   // 2026-10-28：「员工与权限」「运营管理」并入「系统管理」（14 → 12，V172）。
-  it("L1 = 12 个运营项 + 3 个代理门户项，顺序固定", () => {
+  it("L1 = 13 个运营项 + 3 个代理门户项，顺序固定", () => {
     expect(NAV.map((s) => s.key)).toEqual(L1_KEYS);
-    expect(NAV.filter((s) => !s.portalFor)).toHaveLength(12);
+    expect(NAV.filter((s) => !s.portalFor)).toHaveLength(13);
     expect(NAV.filter((s) => s.portalFor)).toHaveLength(3);
   });
   it("叶子五元组集合与顺序逐条不变（href|label|perm|phase|group）", () => {
@@ -237,9 +242,9 @@ describe("结构回归基线（层级重构不改内容）", () => {
 });
 
 describe("A.9 角色×L1 可见性矩阵（抽查）", () => {
-  it("ADMIN 见全部 12 个运营项", () => {
+  it("ADMIN 见全部 13 个运营项", () => {
     expect(sectionKeys("ADMIN")).toEqual([
-      "dashboard", "device", "workorder", "venue", "agent", "order",
+      "dashboard", "device", "inventory", "workorder", "venue", "agent", "order",
       "settlement", "finance", "user", "report", "system", "flow",
     ]);
   });
@@ -427,7 +432,8 @@ describe("默认落地与面包屑", () => {
   });
   it("面包屑三级：L1 › 分组 › 子功能", () => {
     expect(breadcrumb("/devices", "monitor", null, "OPS")).toEqual(["设备管理", "运行监控", "实时监控"]);
-    expect(breadcrumb("/devices", "issued", null, "OPS")).toEqual(["设备管理", "仓储与出库", "出库池"]);
+    // 2026-10-29 出库池随库存管理拆出（V209）
+    expect(breadcrumb("/inventory", "issued", null, "OPS")).toEqual(["库存管理", "出入库", "出库池"]);
   });
   it("面包屑：工单在运维管理下三级（OM06 起工单有分组）", () => {
     expect(breadcrumb("/work-orders", null, "board", "OPS")).toEqual(["运维管理", "工单", "工单看板"]);

@@ -11,7 +11,7 @@ import { Input, Select } from "@/components/ui/input";
 import { Toolbar } from "@/components/ui/toolbar";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
-import { STAGE_LABEL } from "@/components/device/stock-stages";
+import { STAGE_LABEL } from "@/components/inventory/stock-stages";
 import { exportCsv } from "@/lib/export-csv";
 
 const TYPE_LABEL = { CABINET: "机柜", POWERBANK: "充电宝" } as const;

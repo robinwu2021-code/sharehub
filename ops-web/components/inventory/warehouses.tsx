@@ -53,7 +53,6 @@ export function WarehousesTab() {
   const canMigrate = canSetDefault;
   const [migrating, setMigrating] = useState(false);
   const [thresholdOf, setThresholdOf] = useState<Warehouse | null>(null);
-  const [settings, setSettings] = useState(false);
   const q = useQuery({ queryKey: ["warehouses"], queryFn: () => api.listWarehouses() });
   const thQ = useQuery({ queryKey: ["stock-thresholds"], queryFn: () => api.listStockThresholds() });
   const lowWh = new Set((thQ.data ?? []).filter((t) => t.low).map((t) => t.warehouseNo));
@@ -134,7 +133,6 @@ export function WarehousesTab() {
         onExport={rows.length ? onExport : undefined}
         onAdd={() => setForm({ name: "", regionId: null, address: "" })} addLabel="新建仓库" canAdd={canWrite}>
         <ShowArchivedToggle checked={showArchived} onChange={setShowArchived} />
-        <Button size="sm" variant="outline" onClick={() => setSettings(true)}>库存设置</Button>
         {canMigrate && <Button size="sm" variant="outline" onClick={() => setMigrating(true)}>迁移到独立进销存</Button>}
       </Toolbar>
       <DataTable rowKey={(w: Warehouse) => w.warehouseNo} columns={cols} rows={q.data ? rows : undefined}
@@ -155,23 +153,23 @@ export function WarehousesTab() {
       />
       <MigrationDrawer open={migrating} onClose={() => setMigrating(false)} />
       <ThresholdDrawer warehouse={thresholdOf} canWrite={canWrite} onClose={() => setThresholdOf(null)} />
-      <SettingsDrawer open={settings} canWrite={canSetDefault} warehouses={activeWarehouses(q.data)} onClose={() => setSettings(false)} />
       {dialog}
     </div>
   );
 }
 
 /**
- * 库存设置（V207）：系统参数「库存」组的统一入口，控件按字典渲染（枚举 → 下拉、整数 → 数字），
- * 默认回仓仓给仓库下拉。改动走系统参数接口（system:param:update），后端按字典校验。
- * 跟踪方式不设参数：柜与宝都是逐件（序列号）跟踪。
+ * 库存设置（库存管理 › 设置，V207 参数 / V209 独立成页签）：系统参数「库存」组的统一入口，
+ * 控件按字典渲染（枚举 → 下拉、整数 → 数字），默认回仓仓给仓库下拉。
+ * 改动走系统参数接口（system:param:update），后端按字典校验。跟踪方式在物料档案上按物料定，不设全局参数。
  */
-function SettingsDrawer({ open, canWrite, warehouses, onClose }: {
-  open: boolean; canWrite: boolean; warehouses: Warehouse[]; onClose: () => void;
-}) {
+export function InventorySettingsTab() {
   const qc = useQueryClient();
+  const canWrite = useCan()("system:param:update");
+  const whQ = useQuery({ queryKey: ["warehouses"], queryFn: () => api.listWarehouses() });
+  const warehouses = activeWarehouses(whQ.data);
   const [draft, setDraft] = useState<Record<string, string>>({});
-  const q = useQuery({ queryKey: ["sys-params", "库存"], enabled: open,
+  const q = useQuery({ queryKey: ["sys-params", "库存"],
     queryFn: () => api.listSysParams({ groupName: "库存", page: 1, size: UNPAGED_SIZE }) });
   const save = useMutation({
     mutationFn: (p: SysParam) => api.saveSysParam({ paramKey: p.paramKey, value: draft[p.paramKey] ?? p.value }),
@@ -213,11 +211,11 @@ function SettingsDrawer({ open, canWrite, warehouses, onClose }: {
       : null) },
   ];
   return (
-    <Drawer open={open} onOpenChange={(o) => { if (!o) { setDraft({}); onClose(); } }} width="w-[720px]" title="库存设置">
+    <div>
       {!canWrite && <ReadOnlyNotice what="库存设置" perm="system:param:update" className="mb-3" />}
       <DataTable rowKey={(p: SysParam) => p.paramKey} columns={cols} rows={q.data?.list}
         loading={q.isLoading} error={q.error} onRetry={q.refetch} empty="没有库存参数" />
-    </Drawer>
+    </div>
   );
 }
 

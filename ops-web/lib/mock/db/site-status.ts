@@ -132,7 +132,7 @@ export function siteCloseGate(no: string): Checklist {
     {
       key: "cabinets", label: "设备已全部撤出", passed: cabinets === 0,
       detail: cabinets === 0 ? null : `还有 ${cabinets} 台设备在站 —— 关站后它们会变成找不到归属的资产`,
-      fixHref: cabinets === 0 ? null : "/devices?tab=inventory",
+      fixHref: cabinets === 0 ? null : "/inventory?tab=transfers",
     },
     {
       key: "contract", label: "合同已终止或到期", passed: !activeContract,

@@ -34,7 +34,7 @@ import {
   type AssetDiff, type AssetDiffStatus, type InventoryTransfer, type InvTransferReq, type ReceiveResult,
   type TransferEndpointType, type TransferItem, type TransferItemType,
 } from "@/lib/types";
-import { DIFF_KIND, DIFF_STATUS, ENDPOINT_TYPE_LABEL, ITEM_TYPE_LABEL, TRANSFER_STATUS } from "./device-maps";
+import { DIFF_KIND, DIFF_STATUS, ENDPOINT_TYPE_LABEL, ITEM_TYPE_LABEL, TRANSFER_STATUS } from "@/components/device/device-maps";
 import { ShipFields, ShipmentList } from "./shipments";
 import type { ShipInfo } from "@/lib/types";
 

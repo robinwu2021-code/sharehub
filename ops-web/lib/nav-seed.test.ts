@@ -652,6 +652,48 @@ const PATCHES: { file: string; mustContain: string; apply: (rows: Row[]) => void
       });
     },
   },
+  {
+    // 从设备管理拆出库存管理（L1，插在设备管理之后，其后 L1 顺延）：库存叶子换段、换 path、换分组；
+    // 到仓待检更名入库单；库存调拨页签键 inventory → transfers；新增物料档案 / 物料单据 / 物料库存（未就绪）与库存设置。
+    file: "V209__menu_inventory_section.sql",
+    mustContain: "UPDATE iam_menu SET menu_no = CONCAT('M_tmp209_', id) WHERE parent_no IN ('M_device', 'M_inventory')",
+    apply: (rows) => {
+      rows.filter((r) => r.parent_no === "NULL" && Number(r.sort) >= 6).forEach((r) => { r.sort = String(Number(r.sort) + 1); });
+      rows.push({ menu_no: "M_inventory", parent_no: "NULL", name: "库存管理", name_en: "Inventory", name_ar: "المخزون",
+        type: "MENU", path: "/inventory?tab=stock", icon: "Warehouse", group_name: "NULL", sort: "6", perm: "NULL",
+        phase: "1", ready: "0", module: "device", modules: "NULL", match_paths: '["/inventory"]', pin_bottom: "0", portal_for: "NULL" });
+      const inv: [string, string, string, string][] = [
+        ["/devices?tab=warehouses", "warehouses", "2", "主数据"],
+        ["/devices?tab=suppliers", "suppliers", "3", "主数据"],
+        ["/devices?tab=intakes", "intakes", "4", "出入库"],
+        ["/devices?tab=issued", "issued", "6", "出入库"],
+        ["/devices?tab=disposals", "disposals", "7", "出入库"],
+        ["/devices?tab=inventory", "transfers", "8", "库内作业"],
+        ["/devices?tab=counts", "counts", "9", "库内作业"],
+        ["/devices?tab=asset-diffs", "asset-diffs", "10", "库内作业"],
+        ["/devices?tab=stock", "stock", "11", "库存账"],
+        ["/devices?tab=ledger", "ledger", "13", "库存账"],
+      ];
+      for (const [from, tab, sort, group] of inv) {
+        const r = rows.find((x) => x.parent_no === "M_device" && x.path === from)!;
+        Object.assign(r, { menu_no: `M_inventory__${sort}`, parent_no: "M_inventory", sort, group_name: group, path: `/inventory?tab=${tab}` });
+        if (tab === "intakes") Object.assign(r, { name: "入库单", name_en: "Receipts", name_ar: "إيصالات الاستلام" });
+      }
+      const dev = ["/devices", "/devices?tab=powerbanks", "/devices?tab=installs", "/devices?tab=pending-live", "/devices?tab=codes",
+        "/devices?tab=vendors", "/devices?tab=monitor", "/devices?tab=commands", "/devices?tab=logs", "/devices?tab=ota",
+        "/devices?tab=repairs", "/devices?tab=removals", "/devices?tab=retired"];
+      dev.forEach((path, i) => Object.assign(rows.find((x) => x.parent_no === "M_device" && x.path === path)!,
+        { menu_no: `M_device__${i + 1}`, sort: String(i + 1) }));
+      const leaf = (sort: string, name: string, en: string, ar: string, tab: string, group: string, ready: string): Row => ({
+        menu_no: `M_inventory__${sort}`, parent_no: "M_inventory", name, name_en: en, name_ar: ar, type: "ITEM",
+        path: `/inventory?tab=${tab}`, icon: "NULL", group_name: group, sort, perm: "device:inventory:read",
+        phase: "1", ready, module: "NULL", modules: "NULL", match_paths: "NULL", pin_bottom: "0", portal_for: "NULL" });
+      rows.push(leaf("1", "物料档案", "Materials", "المواد", "materials", "主数据", "0"));
+      rows.push(leaf("5", "物料单据", "Material Documents", "مستندات المواد", "material-docs", "出入库", "0"));
+      rows.push(leaf("12", "物料库存", "Material Stock", "مخزون المواد", "material-stock", "库存账", "0"));
+      rows.push(leaf("14", "库存设置", "Inventory Settings", "إعدادات المخزون", "settings", "设置", "1"));
+    },
+  },
 ];
 
 const COLS = [

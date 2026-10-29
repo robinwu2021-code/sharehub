@@ -76,10 +76,10 @@ export function lifecyclePhase(stage: LifecycleStage): LifecyclePhase {
 export function nextStep(c: CabLike): { text: string; who: string; href?: string } {
   switch (lifecycleStage(c)) {
     case "PENDING_QC": return { text: c.qcStatus === "FAILED" ? "质检未通过：返修或报废" : "待入库质检：质检放行后才能出库", who: "仓管" };
-    case "IN_STOCK": return { text: "在仓可用：出库给商家后进入它的出库池", who: "仓管 / 运营", href: "/devices?tab=issued" };
-    case "IN_TRANSIT": return { text: "调拨在途：签收后回到在库", who: "仓管", href: "/devices?tab=inventory" };
-    case "DISPATCHED": return { text: "已发货待签收：接收人签收后才能绑定", who: "接收人", href: "/devices?tab=issued" };
-    case "ISSUED": return { text: "在商家出库池：绑定到它的站点点位（默认站点默认点位）", who: "运营", href: "/devices?tab=issued" };
+    case "IN_STOCK": return { text: "在仓可用：出库给商家后进入它的出库池", who: "仓管 / 运营", href: "/inventory?tab=issued" };
+    case "IN_TRANSIT": return { text: "调拨在途：签收后回到在库", who: "仓管", href: "/inventory?tab=transfers" };
+    case "DISPATCHED": return { text: "已发货待签收：接收人签收后才能绑定", who: "接收人", href: "/inventory?tab=issued" };
+    case "ISSUED": return { text: "在商家出库池：绑定到它的站点点位（默认站点默认点位）", who: "运营", href: "/inventory?tab=issued" };
     case "BOUND": return { text: "已绑定点位：装机完工、试借还、过上线门禁后上线", who: "运维", href: "/devices?tab=pending-live" };
     case "LIVE": return { text: "运行中：在线与可借看实时监控；移位走撤机工单", who: "运维", href: "/devices?tab=monitor" };
     case "FAULT": return { text: "故障：派维修工单，修复后恢复运行；修不好撤机回仓", who: "运维", href: "/devices?tab=repairs" };

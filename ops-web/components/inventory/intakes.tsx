@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { UNPAGED_SIZE } from "@/lib/constants";
-import { activeWarehouses } from "@/components/device/warehouses";
+import { activeWarehouses } from "@/components/inventory/warehouses";
 import { useCan } from "@/lib/hooks/use-can";
 import { usePaging } from "@/lib/hooks/use-paging";
 import { notify } from "@/lib/notify";
