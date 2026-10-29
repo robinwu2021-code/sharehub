@@ -6,7 +6,7 @@ import { agents, siteAgents } from "./agent";
 import { workOrders } from "./workorder";
 import {
   ensurePoolSeed, issueDevices, returnDevicesToWarehouse, issuedSummary, bindDevice, bindDevices, unbindDevice,
-  poolHit, POOL_WAREHOUSE,
+  poolHit, POOL_WAREHOUSE, claimDevices, redirectIssue,
 } from "./device-pool";
 
 const cab = (no: string) => cabinets.find((c) => c.cabinetNo === no)!;
@@ -80,6 +80,22 @@ describe("出库池与绑定", () => {
     expect(() => returnDevicesToWarehouse({ cabinetNos: pool, reason: "" })).toThrow(/原因/);
     returnDevicesToWarehouse({ cabinetNos: [pool[0]], reason: "多发了" });
     expect(cab(pool[0])).toMatchObject({ issuedAgentNo: null, warehouseNo: POOL_WAREHOUSE });
+  });
+
+  it("V195 出库到站点 + 接收人：未签收不能绑；只有接收人能签；只能绑目的站点；调整后可换", () => {
+    const [c] = inWarehouse();
+    const site = agent("AG002").defaultSiteNo!;
+    issueDevices({ agentNo: "AG002", siteNo: site, receiverNo: "EMP-R", cabinetNos: [c.cabinetNo] });
+    expect(poolHit(cab(c.cabinetNo), undefined, "MINE", "EMP-R")).toBe(true);
+    expect(() => bindDevice(c.cabinetNo, {})).toThrow(/签收/);
+    expect(() => claimDevices({ cabinetNos: [c.cabinetNo] }, "someone")).toThrow(/接收人/);
+    claimDevices({ cabinetNos: [c.cabinetNo] }, "EMP-R");
+    expect(() => redirectIssue({ cabinetNos: [c.cabinetNo], agentNo: "AG002", reason: " " })).toThrow(/原因/);
+    redirectIssue({ cabinetNos: [c.cabinetNo], agentNo: "AG002", receiverNo: "EMP-R", reason: "站点写错" });
+    expect(cab(c.cabinetNo)).toMatchObject({ issuedSiteNo: null, issueReceiverNo: "EMP-R" });
+    expect(cab(c.cabinetNo).issueClaimedAt).toBeTruthy();
+    bindDevice(c.cabinetNo, {});
+    expect(cab(c.cabinetNo).siteNo).toBe(site);
   });
 
   it("汇总按商家统计未绑定 / 已绑定 / 已上线", () => {

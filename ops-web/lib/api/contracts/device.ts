@@ -5,7 +5,7 @@ import type {
   InventoryTransfer, InventoryTransferDetail, OtaRollout, OtaRelease, OtaTask, DeviceLog, DeviceCodeBatch,
   Checklist, TrialRent, Protection, ProtectionReq, SignalCode,
   InvTransferReq, QcReq, QcRecord, ReceiveResult, AssetDiff, AssetDiffStatus, PowerbankAction,
-  IssueDevicesReq, PoolReturnReq, IssuedSummary, Warehouse, Intake, IntakeDetail, IntakeCreateReq, IntakeItemRef, IntakeDisposeReq, IntakeItemType, IntakeStatus, BindReq, BindBatchReq, BindResult,
+  IssueDevicesReq, ClaimDevicesReq, IssueRedirectReq, PoolReturnReq, IssuedSummary, Warehouse, Intake, IntakeDetail, IntakeCreateReq, IntakeItemRef, IntakeDisposeReq, IntakeItemType, IntakeStatus, BindReq, BindBatchReq, BindResult,
 } from "../../types";
 
 export interface DeviceApi {
@@ -137,6 +137,10 @@ export interface DeviceApi {
   issueDevices(x: IssueDevicesReq): Promise<Cabinet[]>;
   /** 出库池退回仓库：只收未绑定的设备；原因必填。 */
   returnPoolDevices(x: PoolReturnReq): Promise<Cabinet[]>;
+  /** 接收人签收（V195）：只能签给自己的、未签收的。 */
+  claimDevices(x: ClaimDevicesReq): Promise<Cabinet[]>;
+  /** 出库调整（V195）：改商家 / 站点 / 接收人。 */
+  redirectIssue(x: IssueRedirectReq): Promise<Cabinet[]>;
   /** 出库池按商家汇总：未绑定 / 已绑定 / 已上线。 */
   issuedSummary(agentNo?: string): Promise<IssuedSummary[]>;
   /** 仓库只读列表（过渡期；选仓下拉用）。 */

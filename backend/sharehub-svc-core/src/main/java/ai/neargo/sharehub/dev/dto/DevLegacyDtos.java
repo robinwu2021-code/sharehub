@@ -28,7 +28,20 @@ public final class DevLegacyDtos {
                           String siteNo, String agentNo, String archivedAt,
                           String qcStatus, String warehouseNo,
                           // V161 出库池：追加在末尾（理由同 LocDtos.Site —— 参数几乎全是 String，插中间会静默错位）
-                          String issuedAgentNo, String issuedAt) {
+                          String issuedAgentNo, String issuedAt,
+                          // V195 出库目的地与签收：同样追加在末尾
+                          String issuedSiteNo, String issueReceiverNo, String issueClaimedAt) {
+
+        /** V195 之前的形状：目的地与签收三项缺省 null。 */
+        public Cabinet(String cabinetNo, String sn, String vendorCode, String model,
+                       String locationNo, String locationName, int slotTotal, int availableCount,
+                       String onlineStatus, String status, String fwVersion, String lastHeartbeatAt,
+                       String siteNo, String agentNo, String archivedAt, String qcStatus, String warehouseNo,
+                       String issuedAgentNo, String issuedAt) {
+            this(cabinetNo, sn, vendorCode, model, locationNo, locationName, slotTotal, availableCount,
+                    onlineStatus, status, fwVersion, lastHeartbeatAt, siteNo, agentNo, archivedAt, qcStatus, warehouseNo,
+                    issuedAgentNo, issuedAt, null, null, null);
+        }
 
         /** V161 之前的形状：出库池两项缺省 null。 */
         public Cabinet(String cabinetNo, String sn, String vendorCode, String model,

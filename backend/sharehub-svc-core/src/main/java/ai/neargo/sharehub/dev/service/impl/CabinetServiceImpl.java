@@ -146,6 +146,10 @@ public class CabinetServiceImpl implements CabinetService {
         if (issuedAgentNo != null && !issuedAgentNo.isBlank()) w.eq(DevCabinet::getIssuedAgentNo, issuedAgentNo);
         if ("UNBOUND".equalsIgnoreCase(pool)) w.isNotNull(DevCabinet::getIssuedAgentNo).isNull(DevCabinet::getLocationNo);
         else if ("BOUND".equalsIgnoreCase(pool)) w.isNotNull(DevCabinet::getIssuedAgentNo).isNotNull(DevCabinet::getLocationNo);
+        // V195：UNCLAIMED = 已发货待签收；MINE = 待我签收（接收人是当前登录人）
+        else if ("UNCLAIMED".equalsIgnoreCase(pool)) w.isNotNull(DevCabinet::getIssuedAgentNo).isNull(DevCabinet::getIssueClaimedAt);
+        else if ("MINE".equalsIgnoreCase(pool)) w.isNotNull(DevCabinet::getIssuedAgentNo).isNull(DevCabinet::getIssueClaimedAt)
+                .eq(DevCabinet::getIssueReceiverNo, ai.neargo.sharehub.auth.SecurityUtils.userNo());
         w.orderByAsc(DevCabinet::getId);
         Page<DevCabinet> r = mapper.selectPage(new Page<>(p, s), w);
         List<Cabinet> rows = r.getRecords().stream().map(CabinetServiceImpl::toVO).toList();
@@ -196,7 +200,8 @@ public class CabinetServiceImpl implements CabinetService {
                 e.getSiteNo(), e.getAgentNo(),
                 e.getArchivedAt() == null ? null : e.getArchivedAt().toString(),
                 e.getQcStatus(), e.getWarehouseNo(),
-                e.getIssuedAgentNo(), e.getIssuedAt() == null ? null : e.getIssuedAt().toString());
+                e.getIssuedAgentNo(), e.getIssuedAt() == null ? null : e.getIssuedAt().toString(),
+                e.getIssuedSiteNo(), e.getIssueReceiverNo(), e.getIssueClaimedAt() == null ? null : e.getIssueClaimedAt().toString());
     }
 
     // ── 归档 / 取消归档（前端契约 Archivable）──

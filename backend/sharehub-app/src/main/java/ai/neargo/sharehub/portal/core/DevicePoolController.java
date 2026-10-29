@@ -63,7 +63,23 @@ public class DevicePoolController {
     @PostMapping("/api/ops/devices/issue")
     @PreAuthorize("@perm.can('device:inventory:transfer')")
     public List<Cabinet> issue(@RequestBody IssueReq req) {
-        return pool.issue(req == null ? null : req.agentNo(), req == null ? null : req.cabinetNos());
+        if (req == null) throw ai.neargo.sharehub.common.BizException.badRequest("error.common.missing_parameter", "body");
+        return pool.issue(req.agentNo(), req.siteNo(), req.receiverNo(), req.cabinetNos());
+    }
+
+    /** 接收人签收（V195）：只能签给自己的 —— 权限码只是门槛，「本人 = 接收人」在服务里校验。 */
+    @PostMapping("/api/ops/devices/claim")
+    @PreAuthorize("@perm.can('device:cabinet:update')")
+    public List<Cabinet> claim(@RequestBody ai.neargo.sharehub.dev.dto.PoolDtos.ClaimReq req) {
+        return pool.claim(req == null ? null : req.cabinetNos());
+    }
+
+    /** 出库调整（V195）：改商家 / 站点 / 接收人，只收未绑定的。 */
+    @PostMapping("/api/ops/devices/issue-redirect")
+    @PreAuthorize("@perm.can('device:inventory:transfer')")
+    public List<Cabinet> redirect(@RequestBody ai.neargo.sharehub.dev.dto.PoolDtos.RedirectReq req) {
+        if (req == null) throw ai.neargo.sharehub.common.BizException.badRequest("error.common.missing_parameter", "body");
+        return pool.redirect(req.cabinetNos(), req.agentNo(), req.siteNo(), req.receiverNo(), req.reason());
     }
 
     @PostMapping("/api/ops/devices/pool-return")

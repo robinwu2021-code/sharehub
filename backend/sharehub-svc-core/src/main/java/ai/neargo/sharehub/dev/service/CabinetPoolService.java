@@ -20,7 +20,21 @@ public interface CabinetPoolService {
      * <p>每台须：在库（IN_STOCK）、未绑定点位、未在任何出库池、质检放行、未归档。
      * 商家须启用且已补齐位置与行业。
      */
-    List<Cabinet> issue(String agentNo, List<String> cabinetNos);
+    default List<Cabinet> issue(String agentNo, List<String> cabinetNos) {
+        return issue(agentNo, null, null, cabinetNos);
+    }
+
+    /**
+     * 出库到商家（可指定站点）并指定内部接收人（V195）。站点须属于该商家；
+     * 有接收人 = 已发货待签收，签收前不能绑定；没有接收人 = 出库即签收。
+     */
+    List<Cabinet> issue(String agentNo, String siteNo, String receiverNo, List<String> cabinetNos);
+
+    /** 接收人签收（PB-D1）：只能签给自己的、未签收的。 */
+    List<Cabinet> claim(List<String> cabinetNos);
+
+    /** 出库调整（出错时改商家 / 站点 / 接收人）：只收出库池里未绑定的；改了接收人须重新签收。 */
+    List<Cabinet> redirect(List<String> cabinetNos, String agentNo, String siteNo, String receiverNo, String reason);
 
     /**
      * 出库池退回仓库：只收出库池里**未绑定**的设备；已绑定的先解绑。

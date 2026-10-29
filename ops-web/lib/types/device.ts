@@ -64,15 +64,37 @@ export interface Cabinet extends Archivable {
   issuedAgentNo?: string | null;
   /** 进入出库池的时刻。 */
   issuedAt?: string | null;
+  /** 出库目的站点（V195）；空 = 到商家，可绑该商家任一站点。 */
+  issuedSiteNo?: string | null;
+  /** 出库内部接收人员工号（V195）。 */
+  issueReceiverNo?: string | null;
+  /** 接收人签收时刻（V195）；出库池里为空 = 已发货待签收，不能绑定。 */
+  issueClaimedAt?: string | null;
 }
 
-/** 出库池筛选：未绑定 / 已绑定（含已上线）/ 全部。 */
-export type PoolFilter = "UNBOUND" | "BOUND" | "ALL";
+/** 出库池筛选：未绑定 / 已绑定（含已上线）/ 全部 / 已发货待签收 / 待我签收。 */
+export type PoolFilter = "UNBOUND" | "BOUND" | "ALL" | "UNCLAIMED" | "MINE";
 
 /** 出库给商家（POST /api/ops/devices/issue）。一个事务，全成或全不成。 */
 export interface IssueDevicesReq {
   agentNo: string;
+  /** 目的站点（须属于该商家）；空 = 到商家。 */
+  siteNo?: string;
+  /** 内部接收人；空 = 出库即签收。 */
+  receiverNo?: string;
   cabinetNos: string[];
+}
+/** 接收人签收（POST /api/ops/devices/claim）：只能签给自己的。 */
+export interface ClaimDevicesReq {
+  cabinetNos: string[];
+}
+/** 出库调整（POST /api/ops/devices/issue-redirect）：只收未绑定的；原因必填；换接收人须重新签收。 */
+export interface IssueRedirectReq {
+  cabinetNos: string[];
+  agentNo: string;
+  siteNo?: string;
+  receiverNo?: string;
+  reason: string;
 }
 /** 出库池退回仓库（POST /api/ops/devices/pool-return）。只收未绑定的设备；原因必填。 */
 export interface PoolReturnReq {

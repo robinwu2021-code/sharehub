@@ -1,7 +1,10 @@
 package ai.neargo.sharehub.dev.service.impl;
 
 import ai.neargo.sharehub.api.platform.dto.AgentBrief;
+import ai.neargo.sharehub.api.platform.dto.SiteBrief;
 import ai.neargo.sharehub.api.platform.port.AgentDirectoryPort;
+import ai.neargo.sharehub.api.platform.port.EmployeeDirectoryPort;
+import ai.neargo.sharehub.api.platform.port.SiteQueryPort;
 import ai.neargo.sharehub.audit.AuditChanges;
 import ai.neargo.sharehub.auth.SecurityUtils;
 import ai.neargo.sharehub.common.BizException;
@@ -46,20 +49,27 @@ public class CabinetPoolServiceImpl implements CabinetPoolService {
     private final CabinetMapper cabinets;
     private final AgentDirectoryPort agents;
     private final ai.neargo.sharehub.dev.port.WarehouseLookup warehouseLookup;
+    private final SiteQueryPort sites;
+    private final EmployeeDirectoryPort employees;
 
     public CabinetPoolServiceImpl(CabinetMapper cabinets, AgentDirectoryPort agents,
-                                  ai.neargo.sharehub.dev.port.WarehouseLookup warehouseLookup) {
+                                  ai.neargo.sharehub.dev.port.WarehouseLookup warehouseLookup,
+                                  SiteQueryPort sites, EmployeeDirectoryPort employees) {
         this.cabinets = cabinets;
         this.agents = agents;
         this.warehouseLookup = warehouseLookup;
+        this.sites = sites;
+        this.employees = employees;
     }
 
     @Override
     @Transactional
-    public List<Cabinet> issue(String agentNo, List<String> cabinetNos) {
+    public List<Cabinet> issue(String agentNo, String siteNo, String receiverNo, List<String> cabinetNos) {
         if (agentNo == null || agentNo.isBlank()) throw BizException.badRequest("error.common.missing_parameter", "agentNo");
         List<String> nos = distinct(cabinetNos);
         if (!agents.readyForDevices(agentNo)) throw BizException.conflict("error.issue.agent_not_ready", agentNo);
+        String site = requireSiteOf(agentNo, siteNo);
+        String receiver = requireReceiver(receiverNo);
 
         String by = SecurityUtils.userNo();
         LocalDateTime now = LocalDateTime.now();
@@ -75,7 +85,10 @@ public class CabinetPoolServiceImpl implements CabinetPoolService {
                     .eq(DevCabinet::getCabinetNo, no).eq(DevCabinet::getStatus, CabinetStatus.IN_STOCK.name())
                     .isNull(DevCabinet::getLocationNo).isNull(DevCabinet::getIssuedAgentNo)
                     .set(DevCabinet::getIssuedAgentNo, agentNo).set(DevCabinet::getIssuedAt, now)
-                    .set(DevCabinet::getIssuedBy, by).set(DevCabinet::getWarehouseNo, null));
+                    .set(DevCabinet::getIssuedBy, by).set(DevCabinet::getWarehouseNo, null)
+                    .set(DevCabinet::getIssuedSiteNo, site).set(DevCabinet::getIssueReceiverNo, receiver)
+                    // 没指定接收人 = 经办人当面交付，出库即签收
+                    .set(DevCabinet::getIssueClaimedAt, receiver == null ? now : null));
             if (n == 0) throw BizException.conflict("error.common.state_changed");
             AuditChanges.record("出库池", null, agentNo);
             AuditChanges.record("所在仓", c.getWarehouseNo(), null);
@@ -83,9 +96,12 @@ public class CabinetPoolServiceImpl implements CabinetPoolService {
             c.setIssuedAt(now);
             c.setIssuedBy(by);
             c.setWarehouseNo(null);
+            c.setIssuedSiteNo(site);
+            c.setIssueReceiverNo(receiver);
+            c.setIssueClaimedAt(receiver == null ? now : null);
             out.add(CabinetServiceImpl.toVO(c));
         }
-        log.info("出库给商家 agentNo={} 台数={} 经办={}", agentNo, out.size(), by);
+        log.info("出库给商家 agentNo={} siteNo={} 接收人={} 台数={} 经办={}", agentNo, site, receiver, out.size(), by);
         return out;
     }
 
@@ -116,7 +132,9 @@ public class CabinetPoolServiceImpl implements CabinetPoolService {
                     .eq(DevCabinet::getCabinetNo, no).eq(DevCabinet::getIssuedAgentNo, c.getIssuedAgentNo())
                     .isNull(DevCabinet::getLocationNo)
                     .set(DevCabinet::getIssuedAgentNo, null).set(DevCabinet::getIssuedAt, null)
-                    .set(DevCabinet::getIssuedBy, null).set(DevCabinet::getWarehouseNo, wh));
+                    .set(DevCabinet::getIssuedBy, null).set(DevCabinet::getWarehouseNo, wh)
+                    .set(DevCabinet::getIssuedSiteNo, null).set(DevCabinet::getIssueReceiverNo, null)
+                    .set(DevCabinet::getIssueClaimedAt, null));
             if (n == 0) throw BizException.conflict("error.common.state_changed");
             AuditChanges.record("出库池", c.getIssuedAgentNo(), null);
             AuditChanges.record("所在仓", null, wh);
@@ -128,6 +146,87 @@ public class CabinetPoolServiceImpl implements CabinetPoolService {
             out.add(CabinetServiceImpl.toVO(c));
         }
         return out;
+    }
+
+    @Override
+    @Transactional
+    public List<Cabinet> claim(List<String> cabinetNos) {
+        List<String> nos = distinct(cabinetNos);
+        String me = SecurityUtils.userNo();
+        LocalDateTime now = LocalDateTime.now();
+        List<Cabinet> out = new ArrayList<>();
+        for (String no : nos) {
+            DevCabinet c = require(no);
+            if (c.getIssuedAgentNo() == null || c.getIssueClaimedAt() != null) throw BizException.conflict("error.issue.not_claimable", no);
+            // 本人 = 接收人：签收是交接凭证，别人代签等于没交接
+            if (me == null || !me.equals(c.getIssueReceiverNo())) throw BizException.conflict("error.issue.not_receiver", no);
+            int n = cabinets.update(null, new LambdaUpdateWrapper<DevCabinet>().eq(DevCabinet::getCabinetNo, no)
+                    .eq(DevCabinet::getIssuedAgentNo, c.getIssuedAgentNo()).eq(DevCabinet::getIssueReceiverNo, me)
+                    .isNull(DevCabinet::getIssueClaimedAt).set(DevCabinet::getIssueClaimedAt, now));
+            if (n == 0) throw BizException.conflict("error.common.state_changed");
+            AuditChanges.record("签收", null, me);
+            c.setIssueClaimedAt(now);
+            out.add(CabinetServiceImpl.toVO(c));
+        }
+        log.info("出库签收 接收人={} 台数={}", me, out.size());
+        return out;
+    }
+
+    @Override
+    @Transactional
+    public List<Cabinet> redirect(List<String> cabinetNos, String agentNo, String siteNo, String receiverNo, String reason) {
+        if (reason == null || reason.isBlank()) throw BizException.badRequest("error.common.reason_required");
+        if (agentNo == null || agentNo.isBlank()) throw BizException.badRequest("error.common.missing_parameter", "agentNo");
+        List<String> nos = distinct(cabinetNos);
+        if (!agents.readyForDevices(agentNo)) throw BizException.conflict("error.issue.agent_not_ready", agentNo);
+        String site = requireSiteOf(agentNo, siteNo);
+        String receiver = requireReceiver(receiverNo);
+        LocalDateTime now = LocalDateTime.now();
+        List<Cabinet> out = new ArrayList<>();
+        for (String no : nos) {
+            DevCabinet c = require(no);
+            if (c.getIssuedAgentNo() == null || c.getLocationNo() != null
+                    || !CabinetStatus.IN_STOCK.name().equals(c.getStatus())) {
+                throw BizException.conflict("error.issue.not_in_pool", no);
+            }
+            // 接收人没变且已签收的，保留签收；换了接收人（或改成指定接收人）要重新签
+            boolean keepClaim = c.getIssueClaimedAt() != null && java.util.Objects.equals(receiver, c.getIssueReceiverNo());
+            LocalDateTime claimed = receiver == null ? (c.getIssueClaimedAt() != null ? c.getIssueClaimedAt() : now)
+                    : keepClaim ? c.getIssueClaimedAt() : null;
+            int n = cabinets.update(null, new LambdaUpdateWrapper<DevCabinet>().eq(DevCabinet::getCabinetNo, no)
+                    .eq(DevCabinet::getIssuedAgentNo, c.getIssuedAgentNo()).isNull(DevCabinet::getLocationNo)
+                    .set(DevCabinet::getIssuedAgentNo, agentNo).set(DevCabinet::getIssuedSiteNo, site)
+                    .set(DevCabinet::getIssueReceiverNo, receiver).set(DevCabinet::getIssueClaimedAt, claimed));
+            if (n == 0) throw BizException.conflict("error.common.state_changed");
+            AuditChanges.record("出库池", c.getIssuedAgentNo(), agentNo);
+            AuditChanges.record("出库站点", c.getIssuedSiteNo(), site);
+            AuditChanges.record("接收人", c.getIssueReceiverNo(), receiver);
+            log.info("出库调整 cabinetNo={} 商家 {}→{} 站点 {}→{} 接收人 {}→{} 原因={}", no, c.getIssuedAgentNo(), agentNo,
+                    c.getIssuedSiteNo(), site, c.getIssueReceiverNo(), receiver, reason.trim());
+            c.setIssuedAgentNo(agentNo);
+            c.setIssuedSiteNo(site);
+            c.setIssueReceiverNo(receiver);
+            c.setIssueClaimedAt(claimed);
+            out.add(CabinetServiceImpl.toVO(c));
+        }
+        return out;
+    }
+
+    /** 站点可空（到商家）；填了须属于该商家。 */
+    private String requireSiteOf(String agentNo, String siteNo) {
+        if (siteNo == null || siteNo.isBlank()) return null;
+        String no = siteNo.trim();
+        SiteBrief s = sites.briefsByNos(List.of(no)).stream().findFirst().orElseThrow(() -> BizException.notFound(no));
+        if (!agentNo.equals(s.agentNo())) throw BizException.conflict("error.issue.site_not_of_agent", no, agentNo);
+        return no;
+    }
+
+    /** 接收人可空；填了须是存在的员工。 */
+    private String requireReceiver(String receiverNo) {
+        if (receiverNo == null || receiverNo.isBlank()) return null;
+        String no = receiverNo.trim();
+        if (!employees.briefsOf(List.of(no)).containsKey(no)) throw BizException.notFound(no);
+        return no;
     }
 
     @Override

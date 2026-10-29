@@ -1,6 +1,7 @@
 // 统一查询参数类型。全部列表接口的 q 参数只能从这里取，禁止在域文件里就地 `PageQ & {...}`。
 // 合并规则：结构完全等价的类型收敛到一个「形状名」，旧名以 alias 保留（类型等价，不破坏任何引用）。
 // 分类：① 通用形状（PageQ / StatusQ / StatusTypeQ）② 域特有形状（各 <Domain>Q）。
+import type { PoolFilter } from "../types";
 
 /** 分页三件套 + 关键词。索引签名保留：http-client 的 qs() 直接序列化整个 q。 */
 export interface PageQ { page?: number; size?: number; keyword?: string; [k: string]: unknown; }
@@ -47,7 +48,7 @@ export type CabinetQ = PageQ & {
   /** 出库池商家（技术设计 §3.3） */
   issuedAgentNo?: string;
   /** 出库池筛选：未绑定 / 已绑定 / 全部 */
-  pool?: "UNBOUND" | "BOUND" | "ALL";
+  pool?: PoolFilter;
 };
 /** 站点列表：加按商家筛（技术设计 §3.6）。 */
 export type SiteQ = ArchiveQ & { agentNo?: string };

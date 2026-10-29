@@ -11,7 +11,7 @@
 //   I4 一个事务：批量动作先全部校验，任一不过整批不动
 //   I5 平台直营站点（站点无商家）的设备不经出库池：可从仓直接绑定
 import type {
-  Cabinet, IssueDevicesReq, PoolReturnReq, IssuedSummary, BindReq, BindBatchReq, BindResult, SitePoint, Warehouse } from "../../types";
+  Cabinet, IssueDevicesReq, ClaimDevicesReq, IssueRedirectReq, PoolReturnReq, IssuedSummary, BindReq, BindBatchReq, BindResult, SitePoint, Warehouse } from "../../types";
 import { agentCoreComplete } from "../../types";
 import { cabinets } from "./device";
 import { sites, locations, ensureDefaultPoint } from "./location";
@@ -65,6 +65,8 @@ export function ensurePoolSeed() {
   seeded = true;
   for (const c of cabinets) {
     if (c.issuedAgentNo === undefined) c.issuedAgentNo = c.locationNo && c.agentNo ? c.agentNo : null;
+    // V195 回填：存量出库池设备视为已签收
+    if (c.issueClaimedAt === undefined) c.issueClaimedAt = c.issuedAgentNo ? (c.issuedAt ?? now()) : null;
   }
   for (const a of agents.filter((x) => agentCoreComplete(x) && !x.archivedAt).slice(0, 3)) {
     syncDefaultSite(a, false);
@@ -83,7 +85,7 @@ export function ensurePoolSeed() {
   if (ag2?.defaultSiteNo) {
     for (let i = 0; i < 4; i++) {
       cabinets.push({ ...base, cabinetNo: `CAB${1110 + i}`, sn: `SN9${1110 + i}`, qcStatus: "PASSED",
-        warehouseNo: null, issuedAgentNo: "AG002", issuedAt: now() } as Cabinet);
+        warehouseNo: null, issuedAgentNo: "AG002", issuedAt: now(), issueClaimedAt: now() } as Cabinet);
     }
     bindOne(cabOf("CAB1113"), {});
   }
@@ -115,8 +117,61 @@ export function issueDevices(x: IssueDevicesReq): Cabinet[] {
     return [];
   });
   if (bad.length) fail(`出库被拒（整批未动）：${bad.join("；")}`, `Outbound rejected (nothing changed): ${bad.join("; ")}`);
+  const siteNo = siteOfAgent(agent.agentNo, x.siteNo);
+  const receiver = x.receiverNo?.trim() || null;
   const at = now();
-  for (const c of rows) Object.assign(c, { warehouseNo: null, issuedAgentNo: agent.agentNo, issuedAt: at });
+  for (const c of rows) {
+    Object.assign(c, { warehouseNo: null, issuedAgentNo: agent.agentNo, issuedAt: at, issuedSiteNo: siteNo,
+      issueReceiverNo: receiver, issueClaimedAt: receiver ? null : at });
+  }
+  return rows;
+}
+
+/** 目的站点可空；填了须属于该商家（同后端 requireSiteOf）。 */
+function siteOfAgent(agentNo: string, siteNo?: string): string | null {
+  const no = siteNo?.trim();
+  if (!no) return null;
+  const s = siteOf(no);
+  if (!s) notFound("站点", "Site", no);
+  if (s!.agentNo !== agentNo) fail(`站点 ${s!.name} 不属于商家 ${agentNo}`, `Site ${no} does not belong to ${agentNo}`);
+  return no;
+}
+
+/** 接收人签收（POST /api/ops/devices/claim）：只能签给自己的、未签收的。 */
+export function claimDevices(x: ClaimDevicesReq, me: string): Cabinet[] {
+  ensurePoolSeed();
+  const nos = [...new Set(x.cabinetNos ?? [])];
+  if (!nos.length) fail("请至少选择一台设备", "Select at least one device");
+  const rows = nos.map(cabOf);
+  for (const c of rows) {
+    if (!c.issuedAgentNo || c.issueClaimedAt) fail(`设备 ${c.cabinetNo} 不在待签收状态`, `${c.cabinetNo} is not awaiting sign-off`);
+    if (c.issueReceiverNo !== me) fail(`设备 ${c.cabinetNo} 不是发给你的，只有接收人本人能签收`, `${c.cabinetNo} was not sent to you`);
+  }
+  const at = now();
+  for (const c of rows) c.issueClaimedAt = at;
+  return rows;
+}
+
+/** 出库调整（POST /api/ops/devices/issue-redirect）：只收未绑定的；换接收人须重新签收。 */
+export function redirectIssue(x: IssueRedirectReq): Cabinet[] {
+  ensurePoolSeed();
+  if (!x.reason?.trim()) fail("请写调整原因", "A reason is required");
+  if (!x.agentNo) fail("请选择商家", "Choose a merchant");
+  const agent = agentOf(x.agentNo);
+  if (agent.archivedAt || agent.status !== "ENABLED") fail(`商家 ${agent.name} 未启用`, `Merchant ${agent.name} is not enabled`);
+  const siteNo = siteOfAgent(agent.agentNo, x.siteNo);
+  const receiver = x.receiverNo?.trim() || null;
+  const nos = [...new Set(x.cabinetNos ?? [])];
+  if (!nos.length) fail("请至少选择一台设备", "Select at least one device");
+  const rows = nos.map(cabOf);
+  const bad = rows.filter((c) => !c.issuedAgentNo || c.locationNo || c.status !== "IN_STOCK").map((c) => c.cabinetNo);
+  if (bad.length) fail(`这些设备不在出库池或已绑定：${bad.join("、")}`, `Not in pool or already bound: ${bad.join(", ")}`);
+  const at = now();
+  for (const c of rows) {
+    const keep = !!c.issueClaimedAt && receiver === (c.issueReceiverNo ?? null);
+    const claimed = receiver == null ? (c.issueClaimedAt ?? at) : keep ? c.issueClaimedAt : null;
+    Object.assign(c, { issuedAgentNo: agent.agentNo, issuedSiteNo: siteNo, issueReceiverNo: receiver, issueClaimedAt: claimed });
+  }
   return rows;
 }
 
@@ -138,7 +193,9 @@ export function returnDevicesToWarehouse(x: PoolReturnReq): Cabinet[] {
   const wh = x.warehouseNo?.trim() || WAREHOUSES.find((w) => w.isDefault)?.warehouseNo;
   if (!wh) fail("还没有任何仓库，无法退回仓库", "No warehouse exists yet");
   if (!WAREHOUSES.some((w) => w.warehouseNo === wh)) notFound("仓库", "Warehouse", wh!);
-  for (const c of rows) Object.assign(c, { issuedAgentNo: null, issuedAt: null, warehouseNo: wh });
+  for (const c of rows) {
+    Object.assign(c, { issuedAgentNo: null, issuedAt: null, warehouseNo: wh, issuedSiteNo: null, issueReceiverNo: null, issueClaimedAt: null });
+  }
   return rows;
 }
 
@@ -162,8 +219,10 @@ export function issuedSummary(agentNo?: string): IssuedSummary[] {
 }
 
 /** 列表筛选：出库池商家 + 是否已绑定（技术设计 §3.3）。 */
-export function poolHit(c: Cabinet, issuedAgentNo?: string, pool?: string): boolean {
+export function poolHit(c: Cabinet, issuedAgentNo?: string, pool?: string, me?: string): boolean {
   if (issuedAgentNo && c.issuedAgentNo !== issuedAgentNo) return false;
+  if (pool === "UNCLAIMED") return !!c.issuedAgentNo && !c.issueClaimedAt;
+  if (pool === "MINE") return !!c.issuedAgentNo && !c.issueClaimedAt && !!me && c.issueReceiverNo === me;
   if (pool === "UNBOUND") return !!c.issuedAgentNo && !c.locationNo;
   if (pool === "BOUND") return !!c.issuedAgentNo && !!c.locationNo;
   if (pool === "ALL") return !!c.issuedAgentNo;
@@ -185,14 +244,21 @@ function checkBind(c: Cabinet, req: BindReq): SitePoint {
     if (!c.issuedAgentNo) fail(`${c.cabinetNo} 不在任何商家的出库池里：先出库，或指定平台直营站点的点位`,
       `${c.cabinetNo} is not in any merchant's pool`);
     const agent = agentOf(c.issuedAgentNo!);
-    if (!agent.defaultSiteNo) fail(`商家 ${agent.name} 没有默认站点`, `Merchant ${agent.name} has no default site`);
-    loc = ensureDefaultPoint(agent.defaultSiteNo!);
+    const target = c.issuedSiteNo ?? agent.defaultSiteNo;
+    if (!target) fail(`商家 ${agent.name} 没有默认站点`, `Merchant ${agent.name} has no default site`);
+    loc = ensureDefaultPoint(target!);
   }
   const site = siteOf(loc!.siteNo);
   if (!site) notFound("站点", "Site", loc!.siteNo);
   if (loc!.status !== "ACTIVE") fail(`点位 ${loc!.name} 已暂停，不能绑定`, `Point ${loc!.name} is paused`);
   const siteAgent = site!.agentNo ?? null;
   if (c.issuedAgentNo) {
+    // PB-D4 / D2（V195）：未签收不能绑；出库到站点的只能绑该站点
+    if (!c.issueClaimedAt) fail(`设备 ${c.cabinetNo} 已发货但接收人还没签收，签收后才能绑定`, `${c.cabinetNo} is not signed for yet`);
+    if (c.issuedSiteNo && c.issuedSiteNo !== loc!.siteNo) {
+      fail(`设备 ${c.cabinetNo} 出库到站点 ${c.issuedSiteNo}，只能绑该站点的点位；要换站点请先在出库处调整目的地`,
+        `${c.cabinetNo} was issued to site ${c.issuedSiteNo}`);
+    }
     // I2：出库给 A 的柜子不能绑到 B 的站点（也不能绑到直营站点）
     if (siteAgent !== c.issuedAgentNo) {
       fail(`设备 ${c.cabinetNo} 出库给了 ${c.issuedAgentNo}，不能绑到 ${siteAgent ?? "平台直营"} 的站点 ${site!.name}`,

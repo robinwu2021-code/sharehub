@@ -65,9 +65,10 @@ public class CabinetBindServiceImpl implements CabinetBindService {
             // 在仓、未出库，又没指定点位：既没有出库池商家可取默认点位，也说不清要绑到哪
             throw BizException.conflict("error.bind.not_in_pool", cabinetNo);
         }
-        String loc = isBlank(locationNo) ? defaultLocationOf(c.getIssuedAgentNo(), cabinetNo) : locationNo.trim();
+        String loc = isBlank(locationNo) ? defaultLocationOf(c, cabinetNo) : locationNo.trim();
         LocationOwnership own = ownershipOf(loc);
         requireSameMerchant(c, own);
+        requireDestination(c, own);
         write(c, own);
         String woNo = openInstallWo ? workOrders.openInstall(cabinetNo, own.locationNo(), own.locationName(), expectedAt) : null;
         log.info("设备绑定 cabinetNo={} locationNo={} siteNo={} agentNo={} 装机单={}", cabinetNo, own.locationNo(),
@@ -84,7 +85,7 @@ public class CabinetBindServiceImpl implements CabinetBindService {
                 : cabinetNos.stream().filter(n -> !isBlank(n)).map(String::trim).distinct().toList();
         if (nos.isEmpty()) throw BizException.badRequest("error.common.missing_parameter", "deviceNos");
         if (nos.size() > MAX_BATCH) throw BizException.badRequest("error.common.invalid_value", "deviceNos > " + MAX_BATCH);
-        String loc = isBlank(locationNo) ? defaultLocationOf(agentNo, nos.get(0)) : locationNo.trim();
+        String loc = isBlank(locationNo) ? defaultLocationOf(require(nos.get(0)), nos.get(0)) : locationNo.trim();
         List<BindResult> out = new ArrayList<>();
         for (String no : nos) {
             DevCabinet c = require(no);
@@ -127,6 +128,7 @@ public class CabinetBindServiceImpl implements CabinetBindService {
         if (!CabinetStatus.IN_STOCK.name().equals(c.getStatus())) throw BizException.conflict("error.bind.not_bindable", cabinetNo);
         LocationOwnership own = ownershipOf(locationNo);
         requireSameMerchant(c, own);
+        requireDestination(c, own);
         write(c, own);
     }
 
@@ -137,6 +139,18 @@ public class CabinetBindServiceImpl implements CabinetBindService {
         if (!Objects.equals(own.agentNo(), c.getIssuedAgentNo())) {
             throw BizException.conflict("error.bind.agent_mismatch", c.getCabinetNo(),
                     c.getIssuedAgentNo() == null ? "-" : c.getIssuedAgentNo());
+        }
+    }
+
+    /**
+     * PB-D4 / D2（V195）：出库池里的设备须已签收；出库到站点的只能绑该站点的点位。
+     * 违反时让人回出库处调整目的地，而不是在绑定处绕过 —— 否则交接单与实物对不上。
+     */
+    private static void requireDestination(DevCabinet c, LocationOwnership own) {
+        if (c.getIssuedAgentNo() == null) return;
+        if (c.getIssueClaimedAt() == null) throw BizException.conflict("error.bind.not_claimed", c.getCabinetNo());
+        if (c.getIssuedSiteNo() != null && !c.getIssuedSiteNo().equals(own.siteNo())) {
+            throw BizException.conflict("error.bind.site_mismatch", c.getCabinetNo(), c.getIssuedSiteNo());
         }
     }
 
@@ -169,10 +183,12 @@ public class CabinetBindServiceImpl implements CabinetBindService {
         return own;
     }
 
-    /** 出库池商家的默认站点的默认点位。 */
-    private String defaultLocationOf(String agentNo, String cabinetNo) {
+    /** 出库到的站点的默认点位；只到商家的，取商家默认站点的默认点位。 */
+    private String defaultLocationOf(DevCabinet c, String cabinetNo) {
+        String agentNo = c.getIssuedAgentNo();
         if (isBlank(agentNo)) throw BizException.conflict("error.bind.not_in_pool", cabinetNo);
-        String loc = locations.defaultLocationOf(agents.defaultSiteNo(agentNo));
+        String site = c.getIssuedSiteNo() != null ? c.getIssuedSiteNo() : agents.defaultSiteNo(agentNo);
+        String loc = locations.defaultLocationOf(site);
         if (loc == null) throw BizException.conflict("error.bind.no_default_point", agentNo);
         return loc;
     }

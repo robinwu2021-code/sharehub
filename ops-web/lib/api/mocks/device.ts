@@ -7,13 +7,14 @@ import * as db from "../../mock/db";
 import type { DeviceApi } from "../contracts/device";
 import type { PageQ, CabinetQ, DeviceLogQ, ArchiveQ, OtaReleaseQ } from "../query";
 import { wait } from "./_wait";
+import { currentAuth } from "../../auth";
 
 export const deviceMock: DeviceApi = {
   listCabinets: (q: CabinetQ = {}) => {
     // 出库池字段回填与演示数据（见 device-pool.ensurePoolSeed；后端 V161 对存量设备同样回填）
     dp.ensurePoolSeed();
     return wait(db.paginate(db.cabinets, q.page, q.size, (c) =>
-      dp.poolHit(c, q.issuedAgentNo, q.pool) &&
+      dp.poolHit(c, q.issuedAgentNo, q.pool, currentAuth()?.username) &&
       db.liveHit(c, q.showArchived) &&
       // 站点号也进搜索：从站点相关页面（坪效/生命周期）拿到 ST3xx 时能直接搜出这个站的机柜
       db.kwHit(q.keyword, c.cabinetNo, c.locationName, c.siteNo) &&
@@ -89,6 +90,8 @@ export const deviceMock: DeviceApi = {
   // —— 出库池与绑定：规则（不变式 I1 ~ I5）在 db 层，这里只延迟透传；async 让同步抛错变成 rejected promise ——
   issueDevices: async (x) => wait(dp.issueDevices(x), 400),
   returnPoolDevices: async (x) => wait(dp.returnDevicesToWarehouse(x), 400),
+  claimDevices: async (x) => wait(dp.claimDevices(x, currentAuth()?.username ?? ""), 350),
+  redirectIssue: async (x) => wait(dp.redirectIssue(x), 400),
   issuedSummary: async (agentNo) => wait(dp.issuedSummary(agentNo)),
   listWarehouses: async () => wait(dp.listWarehouses()),
   listIntakes: async (q) => wait(ik.listIntakes(q)),

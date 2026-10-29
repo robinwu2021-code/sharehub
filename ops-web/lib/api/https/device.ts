@@ -122,6 +122,9 @@ export const deviceHttp: DeviceApi = {
   // 错误码 error.issue.agent_not_ready / not_issuable / not_in_pool、error.device.qc_not_passed 均为 409。
   issueDevices: (x) => client.post("/api/ops/devices/issue", x),
   returnPoolDevices: (x) => client.post("/api/ops/devices/pool-return", x),
+  // V195：error.issue.not_claimable / not_receiver / site_not_of_agent 为 409
+  claimDevices: (x) => client.post("/api/ops/devices/claim", x),
+  redirectIssue: (x) => client.post("/api/ops/devices/issue-redirect", x),
   issuedSummary: (agentNo) => client.get("/api/ops/inventory/issued-summary", agentNo ? { agentNo } : {}),
   listWarehouses: () => client.get("/api/ops/inventory/warehouses"),
   listIntakes: (q) => client.get("/api/ops/inventory/intakes", q),

@@ -5904,6 +5904,18 @@
     {
      "name": "issuedAt",
      "type": "String"
+    },
+    {
+     "name": "issuedSiteNo",
+     "type": "String"
+    },
+    {
+     "name": "issueReceiverNo",
+     "type": "String"
+    },
+    {
+     "name": "issueClaimedAt",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -6049,6 +6061,18 @@
       },
       {
        "name": "issuedAt",
+       "type": "String"
+      },
+      {
+       "name": "issuedSiteNo",
+       "type": "String"
+      },
+      {
+       "name": "issueReceiverNo",
+       "type": "String"
+      },
+      {
+       "name": "issueClaimedAt",
        "type": "String"
       }
      ]
@@ -11762,6 +11786,18 @@
       {
        "name": "issuedAt",
        "type": "String"
+      },
+      {
+       "name": "issuedSiteNo",
+       "type": "String"
+      },
+      {
+       "name": "issueReceiverNo",
+       "type": "String"
+      },
+      {
+       "name": "issueClaimedAt",
+       "type": "String"
       }
      ]
     },
@@ -11790,6 +11826,117 @@
     {
      "name": "expectedAt",
      "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/devices/claim",
+   "perm": "device:cabinet:update",
+   "perms": [
+    "device:cabinet:update"
+   ],
+   "handler": "DevicePoolController#claim",
+   "summary": "接收人签收（V195）：只能签给自己的 —— 权限码只是门槛，「本人 = 接收人」在服务里校验。",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.dev.dto.PoolDtos.ClaimReq",
+   "returnType": "List<Cabinet>",
+   "returnContainer": "List",
+   "returnElement": "Cabinet",
+   "responseShape": [
+    {
+     "name": "cabinetNo",
+     "type": "String"
+    },
+    {
+     "name": "sn",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "model",
+     "type": "String"
+    },
+    {
+     "name": "locationNo",
+     "type": "String"
+    },
+    {
+     "name": "locationName",
+     "type": "String"
+    },
+    {
+     "name": "slotTotal",
+     "type": "int"
+    },
+    {
+     "name": "availableCount",
+     "type": "int"
+    },
+    {
+     "name": "onlineStatus",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "fwVersion",
+     "type": "String"
+    },
+    {
+     "name": "lastHeartbeatAt",
+     "type": "String"
+    },
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    },
+    {
+     "name": "qcStatus",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAgentNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "String"
+    },
+    {
+     "name": "issuedSiteNo",
+     "type": "String"
+    },
+    {
+     "name": "issueReceiverNo",
+     "type": "String"
+    },
+    {
+     "name": "issueClaimedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "cabinetNos",
+     "type": "List<String>"
     }
    ]
   },
@@ -11883,6 +12030,18 @@
     {
      "name": "issuedAt",
      "type": "String"
+    },
+    {
+     "name": "issuedSiteNo",
+     "type": "String"
+    },
+    {
+     "name": "issueReceiverNo",
+     "type": "String"
+    },
+    {
+     "name": "issueClaimedAt",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -11891,8 +12050,143 @@
      "type": "String"
     },
     {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "receiverNo",
+     "type": "String"
+    },
+    {
      "name": "cabinetNos",
      "type": "List<String>"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/devices/issue-redirect",
+   "perm": "device:inventory:transfer",
+   "perms": [
+    "device:inventory:transfer"
+   ],
+   "handler": "DevicePoolController#redirect",
+   "summary": "出库调整（V195）：改商家 / 站点 / 接收人，只收未绑定的。",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.dev.dto.PoolDtos.RedirectReq",
+   "returnType": "List<Cabinet>",
+   "returnContainer": "List",
+   "returnElement": "Cabinet",
+   "responseShape": [
+    {
+     "name": "cabinetNo",
+     "type": "String"
+    },
+    {
+     "name": "sn",
+     "type": "String"
+    },
+    {
+     "name": "vendorCode",
+     "type": "String"
+    },
+    {
+     "name": "model",
+     "type": "String"
+    },
+    {
+     "name": "locationNo",
+     "type": "String"
+    },
+    {
+     "name": "locationName",
+     "type": "String"
+    },
+    {
+     "name": "slotTotal",
+     "type": "int"
+    },
+    {
+     "name": "availableCount",
+     "type": "int"
+    },
+    {
+     "name": "onlineStatus",
+     "type": "String"
+    },
+    {
+     "name": "status",
+     "type": "String"
+    },
+    {
+     "name": "fwVersion",
+     "type": "String"
+    },
+    {
+     "name": "lastHeartbeatAt",
+     "type": "String"
+    },
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    },
+    {
+     "name": "qcStatus",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAgentNo",
+     "type": "String"
+    },
+    {
+     "name": "issuedAt",
+     "type": "String"
+    },
+    {
+     "name": "issuedSiteNo",
+     "type": "String"
+    },
+    {
+     "name": "issueReceiverNo",
+     "type": "String"
+    },
+    {
+     "name": "issueClaimedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "cabinetNos",
+     "type": "List<String>"
+    },
+    {
+     "name": "agentNo",
+     "type": "String"
+    },
+    {
+     "name": "siteNo",
+     "type": "String"
+    },
+    {
+     "name": "receiverNo",
+     "type": "String"
+    },
+    {
+     "name": "reason",
+     "type": "String"
     }
    ]
   },
@@ -11985,6 +12279,18 @@
     },
     {
      "name": "issuedAt",
+     "type": "String"
+    },
+    {
+     "name": "issuedSiteNo",
+     "type": "String"
+    },
+    {
+     "name": "issueReceiverNo",
+     "type": "String"
+    },
+    {
+     "name": "issueClaimedAt",
      "type": "String"
     }
    ],
@@ -12277,6 +12583,18 @@
       {
        "name": "issuedAt",
        "type": "String"
+      },
+      {
+       "name": "issuedSiteNo",
+       "type": "String"
+      },
+      {
+       "name": "issueReceiverNo",
+       "type": "String"
+      },
+      {
+       "name": "issueClaimedAt",
+       "type": "String"
       }
      ]
     },
@@ -12396,6 +12714,18 @@
     },
     {
      "name": "issuedAt",
+     "type": "String"
+    },
+    {
+     "name": "issuedSiteNo",
+     "type": "String"
+    },
+    {
+     "name": "issueReceiverNo",
+     "type": "String"
+    },
+    {
+     "name": "issueClaimedAt",
      "type": "String"
     }
    ],
@@ -12552,6 +12882,18 @@
     },
     {
      "name": "issuedAt",
+     "type": "String"
+    },
+    {
+     "name": "issuedSiteNo",
+     "type": "String"
+    },
+    {
+     "name": "issueReceiverNo",
+     "type": "String"
+    },
+    {
+     "name": "issueClaimedAt",
      "type": "String"
     }
    ],
@@ -12816,6 +13158,18 @@
     {
      "name": "issuedAt",
      "type": "String"
+    },
+    {
+     "name": "issuedSiteNo",
+     "type": "String"
+    },
+    {
+     "name": "issueReceiverNo",
+     "type": "String"
+    },
+    {
+     "name": "issueClaimedAt",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -12916,6 +13270,18 @@
     },
     {
      "name": "issuedAt",
+     "type": "String"
+    },
+    {
+     "name": "issuedSiteNo",
+     "type": "String"
+    },
+    {
+     "name": "issueReceiverNo",
+     "type": "String"
+    },
+    {
+     "name": "issueClaimedAt",
      "type": "String"
     }
    ],
@@ -13146,6 +13512,18 @@
     {
      "name": "issuedAt",
      "type": "String"
+    },
+    {
+     "name": "issuedSiteNo",
+     "type": "String"
+    },
+    {
+     "name": "issueReceiverNo",
+     "type": "String"
+    },
+    {
+     "name": "issueClaimedAt",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -13251,6 +13629,18 @@
     },
     {
      "name": "issuedAt",
+     "type": "String"
+    },
+    {
+     "name": "issuedSiteNo",
+     "type": "String"
+    },
+    {
+     "name": "issueReceiverNo",
+     "type": "String"
+    },
+    {
+     "name": "issueClaimedAt",
      "type": "String"
     }
    ],
@@ -51903,10 +52293,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 580,
-  "records": 539,
-  "withPerm": 498,
-  "withBody": 239,
-  "shapedResponses": 449
+  "endpoints": 582,
+  "records": 541,
+  "withPerm": 500,
+  "withBody": 241,
+  "shapedResponses": 451
  }
 }

@@ -8,6 +8,7 @@ export type LifecycleStage =
   | "PENDING_QC"     // 在仓 · 待质检
   | "IN_STOCK"       // 在仓 · 可出库
   | "IN_TRANSIT"     // 在途
+  | "DISPATCHED"     // 已发货 · 待签收（V195：有接收人、还没签收；不能绑定）
   | "ISSUED"         // 已出库 · 待绑定（在商家出库池）
   | "BOUND"          // 已绑定 · 待上线（装机、试借还、过门禁）
   | "LIVE"           // 已上线
@@ -30,6 +31,7 @@ export const STAGE_LABEL: Record<LifecycleStage, string> = {
   PENDING_QC: "在仓 · 待质检",
   IN_STOCK: "在仓 · 可出库",
   IN_TRANSIT: "在途",
+  DISPATCHED: "已发货 · 待签收",
   ISSUED: "已出库 · 待绑定",
   BOUND: "已绑定 · 待上线",
   LIVE: "已上线",
@@ -38,11 +40,11 @@ export const STAGE_LABEL: Record<LifecycleStage, string> = {
 };
 
 export const STAGE_TONE: Record<LifecycleStage, "muted" | "warning" | "info" | "success" | "danger" | "outline"> = {
-  PENDING_QC: "warning", IN_STOCK: "muted", IN_TRANSIT: "info", ISSUED: "warning",
+  PENDING_QC: "warning", IN_STOCK: "muted", IN_TRANSIT: "info", DISPATCHED: "info", ISSUED: "warning",
   BOUND: "info", LIVE: "success", FAULT: "danger", RETIRED: "outline",
 };
 
-type CabLike = Pick<Cabinet, "status" | "locationNo" | "warehouseNo" | "qcStatus" | "issuedAgentNo">;
+type CabLike = Pick<Cabinet, "status" | "locationNo" | "warehouseNo" | "qcStatus" | "issuedAgentNo" | "issueClaimedAt">;
 
 /** 机柜当前的生命周期环节。 */
 export function lifecycleStage(c: CabLike): LifecycleStage {
@@ -53,7 +55,8 @@ export function lifecycleStage(c: CabLike): LifecycleStage {
     case "IN_TRANSIT": return "IN_TRANSIT";
     default:
       if (c.locationNo) return "BOUND";
-      if (c.issuedAgentNo) return "ISSUED";
+      // 字段缺省（V195 之前的数据形状）按已签收算
+      if (c.issuedAgentNo) return c.issueClaimedAt === null ? "DISPATCHED" : "ISSUED";
       return c.qcStatus === "PENDING" || c.qcStatus === "FAILED" ? "PENDING_QC" : "IN_STOCK";
   }
 }
@@ -61,7 +64,7 @@ export function lifecycleStage(c: CabLike): LifecycleStage {
 export function lifecyclePhase(stage: LifecycleStage): LifecyclePhase {
   switch (stage) {
     case "PENDING_QC": return "INBOUND";
-    case "IN_STOCK": case "IN_TRANSIT": return "WAREHOUSE";
+    case "IN_STOCK": case "IN_TRANSIT": case "DISPATCHED": return "WAREHOUSE";
     case "ISSUED": return "DEPLOY";
     case "BOUND": return "INSTALL";
     case "LIVE": return "LIVE";
@@ -75,6 +78,7 @@ export function nextStep(c: CabLike): { text: string; who: string; href?: string
     case "PENDING_QC": return { text: c.qcStatus === "FAILED" ? "质检未通过：返修或报废" : "待入库质检：质检放行后才能出库", who: "仓管" };
     case "IN_STOCK": return { text: "在仓可用：出库给商家后进入它的出库池", who: "仓管 / 运营", href: "/devices?tab=issued" };
     case "IN_TRANSIT": return { text: "调拨在途：签收后回到在库", who: "仓管", href: "/devices?tab=inventory" };
+    case "DISPATCHED": return { text: "已发货待签收：接收人签收后才能绑定", who: "接收人", href: "/devices?tab=issued" };
     case "ISSUED": return { text: "在商家出库池：绑定到它的站点点位（默认站点默认点位）", who: "运营", href: "/devices?tab=issued" };
     case "BOUND": return { text: "已绑定点位：装机完工、试借还、过上线门禁后上线", who: "运维", href: "/devices?tab=pending-live" };
     case "LIVE": return { text: "运行中：在线与可借看实时监控；移位走撤机工单", who: "运维", href: "/devices?tab=monitor" };

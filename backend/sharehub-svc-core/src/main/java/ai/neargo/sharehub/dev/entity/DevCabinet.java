@@ -58,4 +58,10 @@ public class DevCabinet extends BaseEntity implements ai.neargo.sharehub.common.
     private String issuedAgentNo;
     private java.time.LocalDateTime issuedAt;
     private String issuedBy;
+    /** 出库目的站点（V195）；空 = 到商家。 */
+    private String issuedSiteNo;
+    /** 出库内部接收人（V195）。 */
+    private String issueReceiverNo;
+    /** 签收时刻（V195）；空 = 已发货待签收。 */
+    private java.time.LocalDateTime issueClaimedAt;
 }

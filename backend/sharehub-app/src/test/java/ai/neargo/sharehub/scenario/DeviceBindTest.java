@@ -73,6 +73,66 @@ class DeviceBindTest extends ApiTestSupport {
         return jdbc.queryForObject("SELECT location_no FROM loc_location WHERE site_no = ? AND is_default = 1 AND deleted = 0", String.class, siteNo);
     }
 
+    /** 内部员工（运维角色），用员工号登录即带员工档案上的角色。 */
+    private String employee() {
+        Map<String, Object> m = new HashMap<>();
+        m.put("employeeNo", "EMP_T" + System.nanoTime());
+        m.put("name", "签收测试-" + tag);
+        m.put("roleNo", "OPS");
+        m.put("roleNos", List.of("OPS"));
+        m.put("status", "ACTIVE");
+        return post("/api/platform/employees", m, login("ADMIN")).okData().path("employeeNo").asText();
+    }
+
+    @Test
+    @DisplayName("★★ 出库到站点 + 接收人（V195）：未签收不能绑；只有接收人本人能签；只能绑目的站点的点位；调整目的地后可绑别的站点")
+    void issue_to_site_with_receiver_then_claim_and_bind() {
+        String admin = login("ADMIN");
+        String[] m = merchant();
+        String site2 = post("/api/ops/sites", Map.of("name", "二号站 " + tag + (++seq), "agentNo", m[0],
+                "address", "Mall of the Emirates", "lng", 55.2, "lat", 25.11), admin).okData()
+                .path("siteNo").asText();
+        String receiver = employee();
+        String c = cabinet();
+        post("/api/ops/devices/issue", Map.of("agentNo", m[0], "siteNo", site2, "receiverNo", receiver, "cabinetNos", List.of(c)),
+                admin).okData();
+        assertThat(jdbc.queryForMap("SELECT issued_site_no, issue_receiver_no, issue_claimed_at FROM dev_cabinet WHERE cabinet_no=?", c))
+                .containsEntry("issued_site_no", site2).containsEntry("issue_receiver_no", receiver).containsEntry("issue_claimed_at", null);
+
+        assertThat(post("/api/ops/devices/" + c + "/bind", Map.of(), admin).status).as("未签收不能绑（PB-D4）").isEqualTo(409);
+        assertThat(post("/api/ops/devices/claim", Map.of("cabinetNos", List.of(c)), admin).status).as("别人不能代签").isEqualTo(409);
+        String me = login("OPS", receiver, null);
+        JsonNode mine = get("/api/ops/cabinets?page=1&size=20&pool=MINE", me).okData().path("list");
+        assertThat(mine.toString()).as("待我签收").contains(c);
+        post("/api/ops/devices/claim", Map.of("cabinetNos", List.of(c)), me).okData();
+
+        assertThat(post("/api/ops/devices/" + c + "/bind", Map.of("locationNo", defaultPoint(m[1])), admin).status)
+                .as("只能绑目的站点的点位（PB-D2）").isEqualTo(409);
+        // 调整：改成只到商家（不指定站点、接收人不变 → 签收保留）→ 可绑商家默认站点
+        assertThat(post("/api/ops/devices/issue-redirect", Map.of("cabinetNos", List.of(c), "agentNo", m[0], "receiverNo", receiver), admin)
+                .status).as("调整原因必填").isEqualTo(400);
+        post("/api/ops/devices/issue-redirect", Map.of("cabinetNos", List.of(c), "agentNo", m[0], "receiverNo", receiver,
+                "reason", "站点写错"), admin).okData();
+        post("/api/ops/devices/" + c + "/bind", Map.of("locationNo", defaultPoint(m[1])), admin).okData();
+        assertThat(row(c).get("site_no")).isEqualTo(m[1]);
+    }
+
+    @Test
+    @DisplayName("★ 出库到站点：不指定点位时默认绑该站点的默认点位；站点不属于该商家 → 409")
+    void issue_to_site_defaults_to_that_sites_point() {
+        String admin = login("ADMIN");
+        String[] m = merchant(), other = merchant();
+        String site2 = post("/api/ops/sites", Map.of("name", "二号站 " + tag + (++seq), "agentNo", m[0],
+                "address", "Mall of the Emirates", "lng", 55.2, "lat", 25.11), admin).okData()
+                .path("siteNo").asText();
+        String c = cabinet();
+        assertThat(post("/api/ops/devices/issue", Map.of("agentNo", m[0], "siteNo", other[1], "cabinetNos", List.of(c)), admin).status)
+                .isEqualTo(409);
+        post("/api/ops/devices/issue", Map.of("agentNo", m[0], "siteNo", site2, "cabinetNos", List.of(c)), admin).okData();
+        post("/api/ops/devices/" + c + "/bind", Map.of(), admin).okData();
+        assertThat(row(c).get("location_no")).isEqualTo(defaultPoint(site2));
+    }
+
     @Test
     @DisplayName("★★ 不指定点位 → 绑到默认站点的默认点位；agent_no 随点位；可同事务开装机单（AC3）")
     void bind_defaults_to_the_default_point_and_opens_install() {

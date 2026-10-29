@@ -32,19 +32,21 @@ import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
 import { ReadOnlyNotice } from "@/components/read-only-notice";
 import { RefLink } from "@/components/ref-link";
 import { agentCoreComplete } from "@/lib/types";
+import { useAuth } from "@/lib/auth";
 import type { Agent, Cabinet, IssuedSummary, PoolFilter } from "@/lib/types";
 
-type PoolState = "UNBOUND" | "BOUND" | "LIVE" | "FAULT";
+type PoolState = "UNCLAIMED" | "UNBOUND" | "BOUND" | "LIVE" | "FAULT";
 export const POOL_STATE_MAP: StatusMap<PoolState> = {
+  UNCLAIMED: { label: "待签收", tone: "info" },
   UNBOUND: { label: "待绑定", tone: "warning" },
   BOUND: { label: "已绑定 · 待安装", tone: "info" },
   LIVE: { label: "已上线", tone: "success" },
   FAULT: { label: "故障", tone: "danger" },
 };
 export const poolStateOf = (c: Cabinet): PoolState =>
-  !c.locationNo ? "UNBOUND" : c.status === "DEPLOYED" ? "LIVE" : c.status === "FAULT" ? "FAULT" : "BOUND";
+  !c.locationNo ? (c.issueClaimedAt === null ? "UNCLAIMED" : "UNBOUND") : c.status === "DEPLOYED" ? "LIVE" : c.status === "FAULT" ? "FAULT" : "BOUND";
 
-const POOL_FILTER: Record<PoolFilter, string> = { UNBOUND: "未绑定", BOUND: "已绑定", ALL: "全部" };
+const POOL_FILTER: Record<PoolFilter, string> = { UNBOUND: "未绑定", BOUND: "已绑定", UNCLAIMED: "待签收", MINE: "待我签收", ALL: "全部" };
 
 export function IssuedPoolTab() {
   const qc = useQueryClient();
@@ -59,8 +61,10 @@ export function IssuedPoolTab() {
   const [keyword, setKeyword] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [issueOpen, setIssueOpen] = useState(false);
-  const [bindTarget, setBindTarget] = useState<{ agentNo: string; cabinetNos: string[] } | null>(null);
+  const [bindTarget, setBindTarget] = useState<{ agentNo: string; siteNo?: string; cabinetNos: string[] } | null>(null);
   const [reasonFor, setReasonFor] = useState<{ kind: "unbind" | "return"; cabinetNos: string[] } | null>(null);
+  const [redirectFor, setRedirectFor] = useState<Cabinet[] | null>(null);
+  const me = useAuth((a) => a.username);
 
   const summaryQ = useQuery({ queryKey: ["issued-summary"], queryFn: () => api.issuedSummary(), enabled: poolReady });
   const listQ = useQuery({
@@ -80,6 +84,11 @@ export function IssuedPoolTab() {
   const selectedRows = rows.filter((c) => selected.includes(c.cabinetNo));
   const selAgents = [...new Set(selectedRows.map((c) => c.issuedAgentNo))];
   const selUnbound = selectedRows.length > 0 && selectedRows.every((c) => !c.locationNo);
+  const selMine = selectedRows.length > 0 && selectedRows.every((c) => poolStateOf(c) === "UNCLAIMED" && c.issueReceiverNo === me);
+  const claimM = useMutation({
+    mutationFn: (cabinetNos: string[]) => api.claimDevices({ cabinetNos }),
+    onSuccess: (r) => { notify.success(`已签收 ${r.length} 台`); refresh(); },
+  });
 
   const summaryCols: Column<IssuedSummary>[] = [
     { header: "商家", cell: (r) => (
@@ -95,6 +104,8 @@ export function IssuedPoolTab() {
     { header: "柜机号", cell: (c) => <Link href={`/devices/detail?no=${c.cabinetNo}`} className="txt-strong tabular-nums hover:underline">{c.cabinetNo}</Link> },
     { header: "SN / 型号", cell: (c) => <span className="tabular-nums">{c.sn}<span className="text-muted-foreground"> · {c.model}</span></span> },
     { header: "出库给", cell: (c) => c.issuedAgentNo ? <RefLink kind="agent" no={c.issuedAgentNo} /> : "-" },
+    { header: "目的站点", cell: (c) => c.issuedSiteNo ? <RefLink kind="site" no={c.issuedSiteNo} /> : <span className="text-muted-foreground">到商家</span> },
+    { header: "接收人", cell: (c) => <span className="tabular-nums">{c.issueReceiverNo ?? "-"}</span> },
     { header: "状态", cell: (c) => <StatusBadge map={POOL_STATE_MAP} value={poolStateOf(c)} /> },
     { header: "站点 › 点位", cell: (c) => c.siteNo
       ? <span><RefLink kind="site" no={c.siteNo} label={c.locationName ?? c.siteNo} /> <span className="text-muted-foreground tabular-nums">› {c.locationNo}</span></span>
@@ -104,13 +115,19 @@ export function IssuedPoolTab() {
       const s = poolStateOf(c);
       return (
         <span className="inline-flex gap-1.5">
+          {s === "UNCLAIMED" && c.issueReceiverNo === me && (
+            <Button size="sm" disabled={claimM.isPending} onClick={() => claimM.mutate([c.cabinetNo])}>签收</Button>
+          )}
+          {(s === "UNCLAIMED" || s === "UNBOUND") && canTransfer && (
+            <Button size="sm" variant="outline" onClick={() => setRedirectFor([c])}>调整</Button>
+          )}
           {s === "UNBOUND" && canBind && bindReady && (
-            <Button size="sm" onClick={() => setBindTarget({ agentNo: c.issuedAgentNo!, cabinetNos: [c.cabinetNo] })}>绑定</Button>
+            <Button size="sm" onClick={() => setBindTarget({ agentNo: c.issuedAgentNo!, siteNo: c.issuedSiteNo ?? undefined, cabinetNos: [c.cabinetNo] })}>绑定</Button>
           )}
           {s === "BOUND" && canBind && bindReady && (
             <Button size="sm" variant="outline" onClick={() => setReasonFor({ kind: "unbind", cabinetNos: [c.cabinetNo] })}>解绑</Button>
           )}
-          {s === "UNBOUND" && canTransfer && (
+          {(s === "UNCLAIMED" || s === "UNBOUND") && canTransfer && (
             <Button size="sm" variant="outline" onClick={() => setReasonFor({ kind: "return", cabinetNos: [c.cabinetNo] })}>退回仓库</Button>
           )}
           {(s === "LIVE" || s === "FAULT") && <span className="txt-caption text-muted-foreground">已上线，移位走撤机工单</span>}
@@ -152,7 +169,7 @@ export function IssuedPoolTab() {
           <option value="">全部商家</option>
           {(summaryQ.data ?? []).map((r) => <option key={r.agentNo} value={r.agentNo}>{r.agentName}</option>)}
         </Select>
-        <Select className="w-32" aria-label="绑定情况" value={pool} onChange={(e) => { setPool(e.target.value as PoolFilter); paging.reset(); }}>
+        <Select className="w-32" aria-label="出库池状态" value={pool} onChange={(e) => { setPool(e.target.value as PoolFilter); paging.reset(); }}>
           {(Object.keys(POOL_FILTER) as PoolFilter[]).map((k) => <option key={k} value={k}>{POOL_FILTER[k]}</option>)}
         </Select>
       </Toolbar>
@@ -160,7 +177,8 @@ export function IssuedPoolTab() {
       {selectedRows.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-card bg-muted px-3.5 py-2 txt-body">
           <span>已选 {selectedRows.length} 台</span>
-          {canBind && bindReady && selUnbound && selAgents.length === 1 && (
+          {selMine && <Button size="sm" disabled={claimM.isPending} onClick={() => claimM.mutate(selectedRows.map((c) => c.cabinetNo))}>批量签收</Button>}
+          {canBind && bindReady && selUnbound && selAgents.length === 1 && selectedRows.every((c) => poolStateOf(c) === "UNBOUND") && (
             <Button size="sm" onClick={() => setBindTarget({ agentNo: selAgents[0]!, cabinetNos: selectedRows.map((c) => c.cabinetNo) })}>批量绑定</Button>
           )}
           {canTransfer && selUnbound && (
@@ -187,6 +205,7 @@ export function IssuedPoolTab() {
       <IssueDrawer open={issueOpen} onClose={() => setIssueOpen(false)} defaultAgent={agentNo} onDone={refresh} />
       <BindDrawer target={bindTarget} onClose={() => setBindTarget(null)} onDone={refresh} />
       <ReasonDrawer target={reasonFor} onClose={() => setReasonFor(null)} onDone={refresh} />
+      <RedirectDrawer rows={redirectFor} onClose={() => setRedirectFor(null)} onDone={refresh} />
     </div>
   );
 }
@@ -196,6 +215,8 @@ function IssueDrawer({ open, onClose, defaultAgent, onDone }: {
   open: boolean; onClose: () => void; defaultAgent: string; onDone: () => void;
 }) {
   const [agentNo, setAgentNo] = useState("");
+  const [siteNo, setSiteNo] = useState("");
+  const [receiverNo, setReceiverNo] = useState("");
   const [picked, setPicked] = useState<string[]>([]);
   const agentsQ = useQuery({ queryKey: ["agents", "issuable"], queryFn: () => api.listAgents({ size: UNPAGED_SIZE }), enabled: open });
   const stockQ = useQuery({
@@ -209,8 +230,11 @@ function IssueDrawer({ open, onClose, defaultAgent, onDone }: {
   const chosen = issuable.find((a) => a.agentNo === (agentNo || defaultAgent));
   const notReady = chosen && (!agentCoreComplete(chosen) || !chosen.defaultSiteNo);
   const m = useMutation({
-    mutationFn: () => api.issueDevices({ agentNo: chosen!.agentNo, cabinetNos: picked }),
-    onSuccess: (r) => { notify.success(`已出库 ${r.length} 台给 ${chosen!.name}`); setPicked([]); setAgentNo(""); onClose(); onDone(); },
+    mutationFn: () => api.issueDevices({ agentNo: chosen!.agentNo, siteNo: siteNo || undefined, receiverNo: receiverNo || undefined, cabinetNos: picked }),
+    onSuccess: (r) => {
+      notify.success(`已出库 ${r.length} 台给 ${chosen!.name}`);
+      setPicked([]); setAgentNo(""); setSiteNo(""); setReceiverNo(""); onClose(); onDone();
+    },
   });
   return (
     <Drawer open={open} onOpenChange={(o) => !o && onClose()} title="出库给商家" desc="设备离开仓库，进入该商家的出库池；之后从出库池绑定到它的站点点位"
@@ -222,6 +246,7 @@ function IssueDrawer({ open, onClose, defaultAgent, onDone }: {
         </Select>
         {notReady && <div className="mt-1 txt-caption text-destructive-ink">该商家还没补齐位置与行业（没有默认站点），补齐后才能出库：去 <RefLink kind="agent" no={chosen!.agentNo} label="商家档案" /></div>}
       </Field>
+      <DestinationFields agentNo={chosen?.agentNo ?? ""} siteNo={siteNo} onSite={setSiteNo} receiverNo={receiverNo} onReceiver={setReceiverNo} />
       <Field label={`仓里可出库的设备（在库 · 质检放行 · ${stock.length} 台）`}>
         {stockQ.isLoading ? <span className="text-muted-foreground">加载中…</span>
           : !stock.length ? <span className="text-muted-foreground">仓里没有可出库的设备</span>
@@ -244,16 +269,18 @@ function IssueDrawer({ open, onClose, defaultAgent, onDone }: {
 
 /** 绑定：默认选中商家的默认站点、默认点位，可改选该商家的其它站点与点位；可同时建装机工单。 */
 function BindDrawer({ target, onClose, onDone }: {
-  target: { agentNo: string; cabinetNos: string[] } | null; onClose: () => void; onDone: () => void;
+  target: { agentNo: string; siteNo?: string; cabinetNos: string[] } | null; onClose: () => void; onDone: () => void;
 }) {
   const agentNo = target?.agentNo ?? "";
+  const fixedSite = target?.siteNo;
   const [siteNo, setSiteNo] = useState("");
   const [locationNo, setLocationNo] = useState("");
   const [openWo, setOpenWo] = useState(true);
   const agentQ = useQuery({ queryKey: ["agent", agentNo], queryFn: () => api.listAgents({ keyword: agentNo, size: 5 }), enabled: !!agentNo });
   const agent = agentQ.data?.list.find((a) => a.agentNo === agentNo);
   const sitesQ = useQuery({ queryKey: ["sites", "of-agent", agentNo], queryFn: () => api.listSites({ agentNo, size: UNPAGED_SIZE }), enabled: !!agentNo });
-  const site = siteNo || agent?.defaultSiteNo || "";
+  // 出库到站点的只能绑该站点（V195）
+  const site = fixedSite || siteNo || agent?.defaultSiteNo || "";
   const pointsQ = useQuery({ queryKey: ["locations", "of-site", site], queryFn: () => api.listLocations({ siteNo: site, size: UNPAGED_SIZE }), enabled: !!site });
   const points = (pointsQ.data?.list ?? []).filter((l) => l.status === "ACTIVE" && !l.archivedAt);
   const point = locationNo || points.find((l) => l.isDefault)?.locationNo || "";
@@ -274,7 +301,7 @@ function BindDrawer({ target, onClose, onDone }: {
       desc="只能绑到这个商家的站点与点位；默认是它的默认站点、默认点位"
       footer={<Button disabled={!point || m.isPending} onClick={() => m.mutate()}>确认绑定</Button>}>
       <Field label="站点">
-        <Select aria-label="站点" value={site} onChange={(e) => { setSiteNo(e.target.value); setLocationNo(""); }}>
+        <Select aria-label="站点" value={site} disabled={!!fixedSite} onChange={(e) => { setSiteNo(e.target.value); setLocationNo(""); }}>
           {!site && <option value="">请选择站点</option>}
           {(sitesQ.data?.list ?? []).map((s) => (
             <option key={s.siteNo} value={s.siteNo}>{s.name}{s.siteNo === agent?.defaultSiteNo ? "（默认站点）" : ""}</option>
@@ -332,6 +359,67 @@ function ReasonDrawer({ target, onClose, onDone }: {
         </Field>
       )}
       <div className="txt-caption text-muted-foreground">设备：{target?.cabinetNos.join("、")}</div>
+    </Drawer>
+  );
+}
+
+/** 目的站点（可空 = 到商家）+ 内部接收人（可空 = 出库即签收）。出库与调整共用。 */
+function DestinationFields({ agentNo, siteNo, onSite, receiverNo, onReceiver }: {
+  agentNo: string; siteNo: string; onSite: (v: string) => void; receiverNo: string; onReceiver: (v: string) => void;
+}) {
+  const sitesQ = useQuery({ queryKey: ["sites", "of-agent", agentNo], queryFn: () => api.listSites({ agentNo, size: UNPAGED_SIZE }), enabled: !!agentNo });
+  const empQ = useQuery({ queryKey: ["employees", "all"], queryFn: () => api.listEmployees({ size: UNPAGED_SIZE }) });
+  return (
+    <>
+      <Field label="目的站点">
+        <Select aria-label="目的站点" value={siteNo} onChange={(e) => onSite(e.target.value)} disabled={!agentNo}>
+          <option value="">到商家（不限站点）</option>
+          {(sitesQ.data?.list ?? []).map((s) => <option key={s.siteNo} value={s.siteNo}>{s.name}</option>)}
+        </Select>
+      </Field>
+      <Field label="接收人">
+        <Select aria-label="接收人" value={receiverNo} onChange={(e) => onReceiver(e.target.value)}>
+          <option value="">不指定（出库即签收）</option>
+          {(empQ.data?.list ?? []).filter((e) => e.status === "ACTIVE").map((e) => (
+            <option key={e.employeeNo} value={e.employeeNo}>{e.name}（{e.employeeNo}）</option>
+          ))}
+        </Select>
+      </Field>
+    </>
+  );
+}
+
+/** 出库调整：改商家 / 目的站点 / 接收人；原因必填；换了接收人要重新签收。 */
+function RedirectDrawer({ rows, onClose, onDone }: { rows: Cabinet[] | null; onClose: () => void; onDone: () => void }) {
+  const first = rows?.[0];
+  const [agentNo, setAgentNo] = useState<string | null>(null);
+  const [siteNo, setSiteNo] = useState<string | null>(null);
+  const [receiverNo, setReceiverNo] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
+  const agentsQ = useQuery({ queryKey: ["agents", "issuable"], queryFn: () => api.listAgents({ size: UNPAGED_SIZE }), enabled: !!rows });
+  const agent = agentNo ?? first?.issuedAgentNo ?? "";
+  const site = siteNo ?? first?.issuedSiteNo ?? "";
+  const receiver = receiverNo ?? first?.issueReceiverNo ?? "";
+  const reset = () => { setAgentNo(null); setSiteNo(null); setReceiverNo(null); setReason(""); };
+  const m = useMutation({
+    mutationFn: () => api.redirectIssue({ cabinetNos: rows!.map((c) => c.cabinetNo), agentNo: agent, siteNo: site || undefined,
+      receiverNo: receiver || undefined, reason }),
+    onSuccess: (r) => { notify.success(`已调整 ${r.length} 台`); reset(); onClose(); onDone(); },
+  });
+  return (
+    <Drawer open={!!rows} onOpenChange={(o) => { if (!o) { reset(); onClose(); } }} title={`调整出库 ${rows?.length ?? 0} 台`}
+      footer={<Button disabled={!agent || !reason.trim() || m.isPending} onClick={() => m.mutate()}>确认调整</Button>}>
+      <Field label="商家">
+        <Select aria-label="商家" value={agent} onChange={(e) => { setAgentNo(e.target.value); setSiteNo(""); }}>
+          {(agentsQ.data?.list ?? []).filter((a) => a.status === "ENABLED" && !a.archivedAt)
+            .map((a) => <option key={a.agentNo} value={a.agentNo}>{a.name}（{a.agentNo}）</option>)}
+        </Select>
+      </Field>
+      <DestinationFields agentNo={agent} siteNo={site} onSite={setSiteNo} receiverNo={receiver} onReceiver={setReceiverNo} />
+      <Field label="原因（必填）">
+        <Textarea value={reason} onChange={setReason} />
+      </Field>
+      <div className="txt-caption text-muted-foreground">设备：{rows?.map((c) => c.cabinetNo).join("、")}</div>
     </Drawer>
   );
 }
