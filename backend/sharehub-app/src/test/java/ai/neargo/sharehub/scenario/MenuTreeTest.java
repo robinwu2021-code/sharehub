@@ -50,7 +50,7 @@ class MenuTreeTest extends ApiTestSupport {
         // V156 财务管理 +1（调整单从结算单页签里的视图升为叶子）
         // V163 设备管理 +1（出库池）；V165 +5（部署与装机、待上线、故障与维修、撤机与回仓、报废与遗失）
         // V190 设备管理 +1（仓库）；V193 +1（到仓待检，新组「入库与质检」）；V199 +2（库存流水、盘点）
-        assertThat(leaves).as("ADMIN 看得到的叶子数").isEqualTo(125);
+        assertThat(leaves).as("ADMIN 看得到的叶子数").isEqualTo(126);
     }
 
     @Test

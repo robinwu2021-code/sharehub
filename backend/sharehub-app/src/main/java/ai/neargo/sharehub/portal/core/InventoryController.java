@@ -32,6 +32,7 @@ public class InventoryController {
     private final ai.neargo.sharehub.inv.remote.InventoryMigration migration;
     private final ai.neargo.sharehub.inv.service.WarehouseAdminService warehouseAdmin;
     private final ai.neargo.sharehub.inv.service.SupplierService suppliers;
+    private final ai.neargo.sharehub.inv.service.DisposalService disposals;
 
     public InventoryController(InventoryTransferService transferService,
                                CommandLogService commandLogService,
@@ -40,7 +41,9 @@ public class InventoryController {
                                ai.neargo.sharehub.inv.service.StockViewService stock,
                                ai.neargo.sharehub.inv.remote.InventoryMigration migration,
                                ai.neargo.sharehub.inv.service.WarehouseAdminService warehouseAdmin,
-                               ai.neargo.sharehub.inv.service.SupplierService suppliers) {
+                               ai.neargo.sharehub.inv.service.SupplierService suppliers,
+                               ai.neargo.sharehub.inv.service.DisposalService disposals) {
+        this.disposals = disposals;
         this.warehouseAdmin = warehouseAdmin;
         this.suppliers = suppliers;
         this.transferService = transferService;
@@ -237,6 +240,32 @@ public class InventoryController {
     @PreAuthorize("@perm.can('device:inventory:warehouse')")
     public ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseItem unarchiveWarehouse(@PathVariable String warehouseNo) {
         return warehouseAdmin.unarchive(warehouseNo);
+    }
+
+    // —— 处置出库（V203；菜单叶：设备管理 › 仓储与出库 › 处置出库）——
+
+    @GetMapping("/inventory/disposals")
+    @PreAuthorize("@perm.can('device:inventory:read')")
+    public PageResult<ai.neargo.sharehub.inv.dto.DisposalDtos.Disposal> disposals(@RequestParam(required = false) Integer page,
+                                              @RequestParam(required = false) Integer size,
+                                              @RequestParam(required = false) String keyword,
+                                              @RequestParam(required = false) String kind,
+                                              @RequestParam(required = false) String warehouseNo,
+                                              @RequestParam(required = false) String supplierNo) {
+        return disposals.page(page, size, keyword, kind, warehouseNo, supplierNo);
+    }
+
+    @GetMapping("/inventory/disposals/{disposalNo}")
+    @PreAuthorize("@perm.can('device:inventory:read')")
+    public ai.neargo.sharehub.inv.dto.DisposalDtos.DisposalDetail disposal(@PathVariable String disposalNo) {
+        return disposals.get(disposalNo);
+    }
+
+    /** 建单即过账：报废须原因码，退供应商须供应商。与发货同属出库，判 device:inventory:transfer（功能矩阵）。 */
+    @PostMapping("/inventory/disposals")
+    @PreAuthorize("@perm.can('device:inventory:transfer')")
+    public ai.neargo.sharehub.inv.dto.DisposalDtos.DisposalDetail createDisposal(@RequestBody ai.neargo.sharehub.inv.dto.DisposalDtos.DisposalReq req) {
+        return disposals.create(req);
     }
 
     // —— 供应商（V201）——

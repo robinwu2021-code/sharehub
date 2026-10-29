@@ -132,6 +132,40 @@ export interface Supplier {
   note: string | null;
   archivedAt: string | null;
 }
+/** 处置出库（V203，GET /api/ops/inventory/disposals）：在库设备报废 / 退供应商，建单即过账。 */
+export type DisposalKind = "SCRAP" | "RETURN_SUPPLIER";
+/** 报废原因码：BROKEN 损坏 / OBSOLETE 淘汰 / OTHER 其他（SCRAP 必填）。 */
+export type DisposalReason = "BROKEN" | "OBSOLETE" | "OTHER";
+export interface Disposal {
+  disposalNo: string;
+  kind: DisposalKind;
+  warehouseNo: string;
+  warehouseName: string | null;
+  supplierNo: string | null;
+  supplierName: string | null;
+  reasonCode: DisposalReason | null;
+  note: string;
+  itemCount: number;
+  createdBy: string | null;
+  createdAt: string | null;
+}
+export interface DisposalItem {
+  itemType: IntakeItemType;
+  itemNo: string;
+}
+export interface DisposalDetail {
+  disposal: Disposal;
+  items: DisposalItem[];
+}
+export interface DisposalReq {
+  kind: DisposalKind;
+  warehouseNo: string;
+  supplierNo?: string | null;
+  reasonCode?: DisposalReason | null;
+  note: string;
+  cabinetNos?: string[];
+  powerbankNos?: string[];
+}
 export interface SupplierReq {
   name: string;
   contactName?: string | null;

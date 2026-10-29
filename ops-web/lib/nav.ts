@@ -228,6 +228,8 @@ export const NAV: NavSection[] = [
       { href: "/devices?tab=counts", label: "盘点", perm: "device:inventory:read", phase: 1, ready: true, group: "仓储与出库" },
       { href: "/devices?tab=inventory", label: "库存调拨", perm: "device:inventory:read", phase: 1, ready: true, group: "仓储与出库" },
       { href: "/devices?tab=issued", label: "出库池", perm: "device:inventory:read", group: "仓储与出库" },
+      // 处置出库（V203）：在库设备报废 / 退供应商，写码 device:inventory:transfer
+      { href: "/devices?tab=disposals", label: "处置出库", perm: "device:inventory:read", phase: 1, ready: true, group: "仓储与出库" },
       // 此前是库存调拨里的子视图（同分期），菜单里找不到；拆出来不改分期
       { href: "/devices?tab=asset-diffs", label: "资产差异", perm: "device:inventory:read", phase: 1, ready: true, group: "仓储与出库" },
       // 五个生命周期视图（V165）：都是既有数据的设备视角，不新增后端端点；装机 / 撤机单仍在运维管理 › 工单里办理

@@ -77,6 +77,7 @@ const LEAF_TUPLES = [
   "/devices?tab=counts|盘点|device:inventory:read|1|仓储与出库",
   "/devices?tab=inventory|库存调拨|device:inventory:read|1|仓储与出库",
   "/devices?tab=issued|出库池|device:inventory:read||仓储与出库",
+  "/devices?tab=disposals|处置出库|device:inventory:read|1|仓储与出库",
   "/devices?tab=asset-diffs|资产差异|device:inventory:read|1|仓储与出库",
   "/devices?tab=installs|部署与装机|workorder:wo:read||部署与安装",
   "/devices?tab=pending-live|待上线|device:cabinet:read||绑定上线",

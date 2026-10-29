@@ -4,6 +4,7 @@ import * as da from "../../mock/db/device-asset";
 import * as dp from "../../mock/db/device-pool";
 import * as ik from "../../mock/db/intake";
 import * as ia from "../../mock/db/inventory-admin";
+import * as dp2 from "../../mock/db/disposal";
 import * as mv from "../../mock/db/movement";
 import * as st from "../../mock/db/stock";
 import * as db from "../../mock/db";
@@ -117,6 +118,9 @@ export const deviceMock: DeviceApi = {
   updateWarehouse: async (no, x) => wait(ia.updateWarehouse(no, x), 350),
   archiveWarehouse: async (no) => wait(ia.archiveWarehouse(no), 350),
   unarchiveWarehouse: async (no) => wait(ia.unarchiveWarehouse(no), 350),
+  listDisposals: async (q) => wait(dp2.listDisposals(q)),
+  getDisposal: async (no) => wait(dp2.getDisposal(no)),
+  createDisposal: async (x) => wait(dp2.createDisposal(x), 400),
   listSuppliers: async (q) => wait(ia.listSuppliers(q)),
   createSupplier: async (x) => wait(ia.createSupplier(x), 350),
   updateSupplier: async (no, x) => wait(ia.updateSupplier(no, x), 350),

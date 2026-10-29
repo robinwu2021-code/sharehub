@@ -49,3 +49,18 @@ describe("入库单（V202 mock）", () => {
     expect(ar.intake.currency).toBe("AED");
   });
 });
+
+describe("处置出库（V203 mock）", () => {
+  it("报废须原因；退供应商须供应商；不在该仓的一次列出；过账后落终态", async () => {
+    const dsp = await import("./disposal");
+    for (const no of ["CABDP1", "CABDP2"]) cabinets.push({ ...cabinets[0], cabinetNo: no, sn: no, status: "IN_STOCK", archivedAt: null,
+      locationNo: null, issuedAgentNo: null, warehouseNo: no === "CABDP1" ? "WH002" : "WH003" });
+    expect(() => dsp.createDisposal({ kind: "SCRAP", warehouseNo: "WH002", note: "x", cabinetNos: ["CABDP1"] })).toThrow(/原因/);
+    expect(() => dsp.createDisposal({ kind: "RETURN_SUPPLIER", warehouseNo: "WH002", note: "x", cabinetNos: ["CABDP1"] })).toThrow(/供应商/);
+    expect(() => dsp.createDisposal({ kind: "SCRAP", reasonCode: "BROKEN", warehouseNo: "WH002", note: "x", cabinetNos: ["CABDP1", "CABDP2"] })).toThrow(/CABDP2/);
+    const d = dsp.createDisposal({ kind: "RETURN_SUPPLIER", supplierNo: "SP0001", warehouseNo: "WH002", note: "批次不良", cabinetNos: ["CABDP1"] });
+    expect(d.disposal.supplierName).toBe("深圳云充科技");
+    expect(cabinets.find((c) => c.cabinetNo === "CABDP1")!.status).toBe("RETIRED");
+    expect(dsp.listDisposals({ keyword: "CABDP1" }).total).toBe(1);
+  });
+});

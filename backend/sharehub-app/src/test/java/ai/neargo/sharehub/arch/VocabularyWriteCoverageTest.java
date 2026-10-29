@@ -191,6 +191,8 @@ class VocabularyWriteCoverageTest {
             "inv_intake.kind", "inv_intake.status",
             // V202：currency 是 ISO 4217 币种码，服务端只做 trim + 大写，不是枚举
             "inv_intake.currency",
+            // inv_disposal / inv_disposal_item（V203 处置出库）：kind / reason_code 经 DisposalKind / DisposalReason 校验，item_type 用常量
+            "inv_disposal.kind", "inv_disposal.reason_code", "inv_disposal_item.item_type",
             "inv_intake_item.item_type", "inv_intake_item.qc_result", "inv_intake_item.disposition",
             // dev_movement_log（V196 设备履历）：event 只由 MovementEvent 枚举的 name() 写入，item_type 只取 MovementRecorder 常量
             // 或待检单明细已校验的类型；没有外部写入口（Mapper 只许 MovementRecorder 用，ArchitectureTest 守）

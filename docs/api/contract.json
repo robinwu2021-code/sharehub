@@ -15544,6 +15544,305 @@
   },
   {
    "verb": "GET",
+   "path": "/api/ops/inventory/disposals",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#disposals",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "keyword",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "kind",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "warehouseNo",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "supplierNo",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<ai.neargo.sharehub.inv.dto.DisposalDtos.Disposal>",
+   "returnContainer": "PageResult",
+   "returnElement": "ai.neargo.sharehub.inv.dto.DisposalDtos.Disposal",
+   "responseShape": [
+    {
+     "name": "disposalNo",
+     "type": "String"
+    },
+    {
+     "name": "kind",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "warehouseName",
+     "type": "String"
+    },
+    {
+     "name": "supplierNo",
+     "type": "String"
+    },
+    {
+     "name": "supplierName",
+     "type": "String"
+    },
+    {
+     "name": "reasonCode",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    },
+    {
+     "name": "itemCount",
+     "type": "int"
+    },
+    {
+     "name": "createdBy",
+     "type": "String"
+    },
+    {
+     "name": "createdAt",
+     "type": "LocalDateTime"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/disposals",
+   "perm": "device:inventory:transfer",
+   "perms": [
+    "device:inventory:transfer"
+   ],
+   "handler": "InventoryController#createDisposal",
+   "summary": "建单即过账：报废须原因码，退供应商须供应商。",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.inv.dto.DisposalDtos.DisposalReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.DisposalDtos.DisposalDetail",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.DisposalDtos.DisposalDetail",
+   "responseShape": [
+    {
+     "name": "disposal",
+     "type": "Disposal",
+     "fields": [
+      {
+       "name": "disposalNo",
+       "type": "String"
+      },
+      {
+       "name": "kind",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseName",
+       "type": "String"
+      },
+      {
+       "name": "supplierNo",
+       "type": "String"
+      },
+      {
+       "name": "supplierName",
+       "type": "String"
+      },
+      {
+       "name": "reasonCode",
+       "type": "String"
+      },
+      {
+       "name": "note",
+       "type": "String"
+      },
+      {
+       "name": "itemCount",
+       "type": "int"
+      },
+      {
+       "name": "createdBy",
+       "type": "String"
+      },
+      {
+       "name": "createdAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    },
+    {
+     "name": "items",
+     "type": "List<DisposalItem>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "itemNo",
+       "type": "String"
+      }
+     ]
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "kind",
+     "type": "String"
+    },
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "supplierNo",
+     "type": "String"
+    },
+    {
+     "name": "reasonCode",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    },
+    {
+     "name": "cabinetNos",
+     "type": "List<String>"
+    },
+    {
+     "name": "powerbankNos",
+     "type": "List<String>"
+    }
+   ]
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/disposals/{disposalNo}",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#disposal",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "disposalNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.DisposalDtos.DisposalDetail",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.DisposalDtos.DisposalDetail",
+   "responseShape": [
+    {
+     "name": "disposal",
+     "type": "Disposal",
+     "fields": [
+      {
+       "name": "disposalNo",
+       "type": "String"
+      },
+      {
+       "name": "kind",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "warehouseName",
+       "type": "String"
+      },
+      {
+       "name": "supplierNo",
+       "type": "String"
+      },
+      {
+       "name": "supplierName",
+       "type": "String"
+      },
+      {
+       "name": "reasonCode",
+       "type": "String"
+      },
+      {
+       "name": "note",
+       "type": "String"
+      },
+      {
+       "name": "itemCount",
+       "type": "int"
+      },
+      {
+       "name": "createdBy",
+       "type": "String"
+      },
+      {
+       "name": "createdAt",
+       "type": "LocalDateTime"
+      }
+     ]
+    },
+    {
+     "name": "items",
+     "type": "List<DisposalItem>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "itemNo",
+       "type": "String"
+      }
+     ]
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
    "path": "/api/ops/inventory/engine",
    "perm": "device:inventory:read",
    "perms": [
@@ -53478,9 +53777,18 @@
    "SITE",
    "LOCATION"
   ],
+  "DisposalReason": [
+   "BROKEN",
+   "OBSOLETE",
+   "OTHER"
+  ],
   "TransferSource": [
    "MANUAL",
    "REMOVAL"
+  ],
+  "DisposalKind": [
+   "SCRAP",
+   "RETURN_SUPPLIER"
   ],
   "AssetDiffKind": [
    "MISSING",
@@ -54116,10 +54424,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 607,
-  "records": 578,
-  "withPerm": 525,
-  "withBody": 250,
-  "shapedResponses": 473
+  "endpoints": 610,
+  "records": 582,
+  "withPerm": 528,
+  "withBody": 251,
+  "shapedResponses": 476
  }
 }

@@ -49,6 +49,7 @@ import { VendorsTab } from "@/components/device/vendors-tab";
 import { IssuedPoolTab } from "@/components/device/issued-pool";
 import { WarehousesTab } from "@/components/device/warehouses";
 import { SuppliersTab } from "@/components/device/suppliers";
+import { DisposalsTab } from "@/components/device/disposals";
 import { IntakesTab } from "@/components/device/intakes";
 import { StockLedgerTab } from "@/components/device/stock-ledger";
 import { StockCountsTab } from "@/components/device/stock-counts";
@@ -66,14 +67,14 @@ import { CabinetSummaryStrip } from "@/components/device/cabinet-summary";
 // 2026-10-28 与菜单同序（按设备生命周期）：设备档案 → 仓储与出库（含出库池）→ 绑定上线 → 运行监控
 const TAB_KEYS = ["cabinets", "powerbanks",
   "intakes", "suppliers",
-  "warehouses", "stock", "ledger", "counts", "inventory", "issued", "asset-diffs",
+  "warehouses", "stock", "ledger", "counts", "inventory", "issued", "disposals", "asset-diffs",
   "installs",
   "pending-live", "codes", "vendors",
   "monitor", "commands", "logs", "ota",
   "repairs", "removals", "retired"] as const;
 // 自建 tab（自带筛选器与查询），不走页面共用的 keyword/Toolbar/分页那一套
 // issued 与五个生命周期视图（installs … retired）自带查询与分页
-const STANDALONE_TABS = ["cabinets", "logs", "codes", "intakes", "suppliers", "warehouses", "stock", "ledger", "counts", "issued", "asset-diffs", "vendors",
+const STANDALONE_TABS = ["cabinets", "logs", "codes", "intakes", "suppliers", "warehouses", "stock", "ledger", "counts", "issued", "disposals", "asset-diffs", "vendors",
   "installs", "pending-live", "repairs", "removals", "retired"];
 
 /**
@@ -1724,6 +1725,7 @@ function DevicesInner() {
       {tab === "issued" && <IssuedPoolTab />}
       {tab === "warehouses" && <WarehousesTab />}
       {tab === "suppliers" && <SuppliersTab />}
+      {tab === "disposals" && <DisposalsTab />}
       {tab === "intakes" && <IntakesTab />}
       {tab === "ledger" && <StockLedgerTab />}
       {tab === "counts" && <StockCountsTab />}

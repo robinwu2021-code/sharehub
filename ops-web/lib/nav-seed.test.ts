@@ -622,6 +622,21 @@ const PATCHES: { file: string; mustContain: string; apply: (rows: Row[]) => void
       });
     },
   },
+  {
+    // 仓储与出库加「处置出库」（sort 11，排在出库池后）；原 11 起顺延，设备叶子按 sort 重编号。
+    file: "V203__inventory_disposal.sql",
+    mustContain: "UPDATE iam_menu SET menu_no = CONCAT('M_tmp203_', id) WHERE parent_no = 'M_device'",
+    apply: (rows) => {
+      const dev = rows.filter((r) => r.parent_no === "M_device");
+      dev.filter((r) => Number(r.sort) >= 11).forEach((r) => { r.sort = String(Number(r.sort) + 1); });
+      dev.forEach((r) => { r.menu_no = `M_device__${r.sort}`; });
+      rows.push({
+        menu_no: "M_device__11", parent_no: "M_device", name: "处置出库", name_en: "Disposals", name_ar: "الإخراج والإتلاف", type: "ITEM",
+        path: "/devices?tab=disposals", icon: "NULL", group_name: "仓储与出库", sort: "11", perm: "device:inventory:read",
+        phase: "1", ready: "1", module: "NULL", modules: "NULL", match_paths: "NULL", pin_bottom: "0", portal_for: "NULL",
+      });
+    },
+  },
 ];
 
 const COLS = [

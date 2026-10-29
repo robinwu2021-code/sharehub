@@ -101,6 +101,12 @@ export function listIntakes(q: { page?: number; size?: number; keyword?: string;
     && (!kw || h.intakeNo.toLowerCase().includes(kw) || (h.sourceRef ?? "").toLowerCase().includes(kw)));
 }
 
+/** 未结待检单上的设备号（处置出库据此拦截：在待检单上的要在待检单里处置）。 */
+export function openIntakeItems(): { itemNo: string; intakeNo: string }[] {
+  ensureSeed();
+  return [...items.entries()].flatMap(([intakeNo, xs]) => xs.filter((i) => i.disposition === "PENDING").map((i) => ({ itemNo: i.itemNo, intakeNo })));
+}
+
 export function getIntake(no: string): IntakeDetail {
   ensureSeed();
   return detail(no);
