@@ -216,9 +216,10 @@ export const NAV: NavSection[] = [
     children: [
       { href: "/devices", label: "设备台账", perm: "device:cabinet:read", group: "设备档案" },
       { href: "/devices?tab=powerbanks", label: "充电宝管理", perm: "device:powerbank:read", group: "设备档案" },
-      // 入库与质检（V193，矩阵 M1）：到仓待检 → 质检 → 入库；入库单、供应商随独立库存服务（S4）
+      // 入库与质检（V193，矩阵 M1）：到仓待检 → 质检 → 入库；供应商（V201）为到货来源与退供应商去向
       { href: "/devices?tab=intakes", label: "到仓待检", perm: "device:inventory:read", phase: 1, ready: true, group: "入库与质检" },
-      // 仓库（V190）：只读，GET /api/ops/inventory/warehouses（S0 / V182 种仓）；增改停用随独立库存服务（S4）
+      { href: "/devices?tab=suppliers", label: "供应商", perm: "device:inventory:read", phase: 1, ready: true, group: "入库与质检" },
+      // 仓库（V190 只读 → V201 可新建 / 编辑 / 归档，写码 device:inventory:warehouse）
       { href: "/devices?tab=warehouses", label: "仓库", perm: "device:inventory:read", phase: 1, ready: true, group: "仓储与出库" },
       // 库存余额由柜机 / 充电宝两个既有读端点在页内汇总，不新增后端端点
       { href: "/devices?tab=stock", label: "库存余额", perm: "device:inventory:read", phase: 1, ready: true, group: "仓储与出库" },

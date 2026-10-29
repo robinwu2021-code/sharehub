@@ -14,6 +14,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { activeWarehouses } from "@/components/device/warehouses";
 import { UNPAGED_SIZE } from "@/lib/constants";
 import { featureReady } from "@/lib/backend-ready";
 import { usePaging } from "@/lib/hooks/use-paging";
@@ -351,7 +352,7 @@ function ReasonDrawer({ target, onClose, onDone }: {
         <Field label="退回到仓">
           <Select aria-label="退回到仓" value={warehouseNo} onChange={(e) => setWarehouseNo(e.target.value)}>
             <option value="">默认回仓仓{defaultWh ? `（${defaultWh.name}）` : ""}</option>
-            {(whQ.data ?? []).map((w) => <option key={w.warehouseNo} value={w.warehouseNo}>{w.name} · {w.warehouseNo}</option>)}
+            {activeWarehouses(whQ.data).map((w) => <option key={w.warehouseNo} value={w.warehouseNo}>{w.name} · {w.warehouseNo}</option>)}
           </Select>
         </Field>
       )}

@@ -93,6 +93,26 @@ st, ota, raw = req("POST", "/api/ops/ota-rollouts", {"releaseNo": rel["releaseNo
     "strategy": "GRAY", "status": "PENDING"}, admin)
 ck("固件 OTA：新增发布单（版本号取版本库）", st == 200 and ota["fwVersion"] == "SMK" + tag, raw)
 st, _, raw = req("GET", "/api/ops/device-logs?page=1&size=5", tok=admin); ck("设备日志：可查", st == 200, raw)
+# 仓库管理与供应商（V201）
+st, nw, raw = req("POST", "/api/ops/inventory/warehouses", {"name": "冒烟仓 " + tag, "regionId": "AE-AJ"}, admin)
+ck("仓库：新建", st == 200 and nw["warehouseNo"].startswith("WH"), raw)
+st, _, raw = req("POST", f"/api/ops/inventory/warehouses/{nw['warehouseNo']}", {"name": "冒烟仓改 " + tag}, admin); ck("仓库：编辑", st == 200, raw)
+whs = req("GET", "/api/ops/inventory/warehouses", tok=admin)[1]
+dw = next(w["warehouseNo"] for w in whs if w["isDefault"])
+st, _, raw = req("POST", f"/api/ops/inventory/warehouses/{dw}/archive", {}, admin); ck("仓库：默认回仓仓不能归档（409）", st == 409, raw)
+st, aw, raw = req("POST", f"/api/ops/inventory/warehouses/{nw['warehouseNo']}/archive", {}, admin)
+ck("仓库：空仓归档", st == 200 and aw["archivedAt"], raw)
+st, _, raw = req("POST", f"/api/ops/inventory/warehouses/{nw['warehouseNo']}/unarchive", {}, admin); ck("仓库：恢复", st == 200, raw)
+req("POST", f"/api/ops/inventory/warehouses/{nw['warehouseNo']}/archive", {}, admin)
+st, sp, raw = req("POST", "/api/ops/inventory/suppliers", {"name": "冒烟供应商 " + tag, "phone": "+971400000"}, admin)
+ck("供应商：新建", st == 200 and sp["supplierNo"], raw)
+st, sl, raw = req("GET", f"/api/ops/inventory/suppliers?page=1&size=5&keyword={tag}", tok=admin)
+ck("供应商：列表可查", st == 200 and sl["total"] == 1, raw)
+cab3 = "CABSP" + tag
+req("POST", "/api/ops/cabinets", {"cabinetNo": cab3, "sn": cab3, "vendorCode": "TEST", "slotTotal": 8}, admin)
+st, ik3, raw = req("POST", "/api/ops/inventory/intakes", {"warehouseNo": "WH002", "supplierNo": sp["supplierNo"], "cabinetNos": [cab3]}, admin)
+ck("到货登记带供应商", st == 200 and ik3["intake"]["supplierName"] == "冒烟供应商 " + tag, raw)
+st, _, raw = req("POST", f"/api/ops/inventory/suppliers/{sp['supplierNo']}/archive", {}, admin); ck("供应商：归档", st == 200, raw)
 for p in ["/api/ops/dashboard", "/api/trade/orders?page=1&size=5", "/api/ops/work-orders?page=1&size=5", "/api/ops/sites?page=1&size=5"]:
     st, _, raw = req("GET", p, tok=admin); ck("GET " + p.split("?")[0], st == 200, raw)
 print(f"\n{sum(res)}/{len(res)} 通过")

@@ -30,13 +30,19 @@ public class InventoryController {
     private final ai.neargo.sharehub.inv.service.IntakeService intakes;
     private final ai.neargo.sharehub.inv.service.StockViewService stock;
     private final ai.neargo.sharehub.inv.remote.InventoryMigration migration;
+    private final ai.neargo.sharehub.inv.service.WarehouseAdminService warehouseAdmin;
+    private final ai.neargo.sharehub.inv.service.SupplierService suppliers;
 
     public InventoryController(InventoryTransferService transferService,
                                CommandLogService commandLogService,
                                ai.neargo.sharehub.inv.WarehouseDirectory warehouses,
                                ai.neargo.sharehub.inv.service.IntakeService intakes,
                                ai.neargo.sharehub.inv.service.StockViewService stock,
-                               ai.neargo.sharehub.inv.remote.InventoryMigration migration) {
+                               ai.neargo.sharehub.inv.remote.InventoryMigration migration,
+                               ai.neargo.sharehub.inv.service.WarehouseAdminService warehouseAdmin,
+                               ai.neargo.sharehub.inv.service.SupplierService suppliers) {
+        this.warehouseAdmin = warehouseAdmin;
+        this.suppliers = suppliers;
         this.transferService = transferService;
         this.commandLogService = commandLogService;
         this.warehouses = warehouses;
@@ -200,12 +206,73 @@ public class InventoryController {
         return intakes.dispose(intakeNo, req);
     }
 
-    // —— 仓库（只读，过渡期：仓库由迁移种入，管理将来在独立库存服务里做）——
+    // —— 仓库（V201 起可维护；默认回仓仓经系统参数 inv.return_warehouse 设置）——
 
     @GetMapping("/inventory/warehouses")
     @PreAuthorize("@perm.can('device:inventory:read')")
     public java.util.List<ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseItem> warehouses() {
         return warehouses.list();
+    }
+
+    @PostMapping("/inventory/warehouses")
+    @PreAuthorize("@perm.can('device:inventory:warehouse')")
+    public ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseItem createWarehouse(@RequestBody ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseReq req) {
+        return warehouseAdmin.create(req);
+    }
+
+    @PostMapping("/inventory/warehouses/{warehouseNo}")
+    @PreAuthorize("@perm.can('device:inventory:warehouse')")
+    public ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseItem updateWarehouse(@PathVariable String warehouseNo,
+                                @RequestBody ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseReq req) {
+        return warehouseAdmin.update(warehouseNo, req);
+    }
+
+    @PostMapping("/inventory/warehouses/{warehouseNo}/archive")
+    @PreAuthorize("@perm.can('device:inventory:warehouse')")
+    public ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseItem archiveWarehouse(@PathVariable String warehouseNo) {
+        return warehouseAdmin.archive(warehouseNo);
+    }
+
+    @PostMapping("/inventory/warehouses/{warehouseNo}/unarchive")
+    @PreAuthorize("@perm.can('device:inventory:warehouse')")
+    public ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseItem unarchiveWarehouse(@PathVariable String warehouseNo) {
+        return warehouseAdmin.unarchive(warehouseNo);
+    }
+
+    // —— 供应商（V201）——
+
+    @GetMapping("/inventory/suppliers")
+    @PreAuthorize("@perm.can('device:inventory:read')")
+    public PageResult<ai.neargo.sharehub.inv.dto.SupplierDtos.Supplier> suppliers(@RequestParam(required = false) Integer page,
+                                     @RequestParam(required = false) Integer size,
+                                     @RequestParam(required = false) String keyword,
+                                     @RequestParam(required = false) Boolean showArchived) {
+        return suppliers.page(page, size, keyword, showArchived);
+    }
+
+    @PostMapping("/inventory/suppliers")
+    @PreAuthorize("@perm.can('device:inventory:warehouse')")
+    public ai.neargo.sharehub.inv.dto.SupplierDtos.Supplier createSupplier(@RequestBody ai.neargo.sharehub.inv.dto.SupplierDtos.SupplierReq req) {
+        return suppliers.create(req);
+    }
+
+    @PostMapping("/inventory/suppliers/{supplierNo}")
+    @PreAuthorize("@perm.can('device:inventory:warehouse')")
+    public ai.neargo.sharehub.inv.dto.SupplierDtos.Supplier updateSupplier(@PathVariable String supplierNo,
+                              @RequestBody ai.neargo.sharehub.inv.dto.SupplierDtos.SupplierReq req) {
+        return suppliers.update(supplierNo, req);
+    }
+
+    @PostMapping("/inventory/suppliers/{supplierNo}/archive")
+    @PreAuthorize("@perm.can('device:inventory:warehouse')")
+    public ai.neargo.sharehub.inv.dto.SupplierDtos.Supplier archiveSupplier(@PathVariable String supplierNo) {
+        return suppliers.archive(supplierNo);
+    }
+
+    @PostMapping("/inventory/suppliers/{supplierNo}/unarchive")
+    @PreAuthorize("@perm.can('device:inventory:warehouse')")
+    public ai.neargo.sharehub.inv.dto.SupplierDtos.Supplier unarchiveSupplier(@PathVariable String supplierNo) {
+        return suppliers.unarchive(supplierNo);
     }
 
     // —— 库存调拨（菜单叶：设备管理 › 库存调拨）——

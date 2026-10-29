@@ -106,6 +106,7 @@ export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   "device:inventory:stocktake": "device:inventory:stocktake",
   "device:inventory:diff": "device:inventory:diff",
   "device:inventory:inbound": "device:inventory:inbound", // V192：到货登记 / 入库 / 不合格处置   // V186：资产差异处置（原借 :transfer）
+  "device:inventory:warehouse": "device:inventory:warehouse", // V201：仓库 / 供应商 新建编辑归档
   "device:qc:inspect": "device:qc:inspect",           // V186：质检（原借 cabinet / powerbank :update）
   "device:inventory:transfer": "device:inventory:transfer",
   "device:inventory:update": "device:inventory:transfer",   // 翻译：界面守的是调拨单新建/编辑 → POST /api/ops/inventory-transfers（后端无 :update 这个码）

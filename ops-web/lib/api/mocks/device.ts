@@ -3,6 +3,7 @@ import * as dg from "../../mock/db/device-gate";
 import * as da from "../../mock/db/device-asset";
 import * as dp from "../../mock/db/device-pool";
 import * as ik from "../../mock/db/intake";
+import * as ia from "../../mock/db/inventory-admin";
 import * as mv from "../../mock/db/movement";
 import * as st from "../../mock/db/stock";
 import * as db from "../../mock/db";
@@ -112,6 +113,15 @@ export const deviceMock: DeviceApi = {
   redirectIssue: async (x) => wait(dp.redirectIssue(x), 400),
   issuedSummary: async (agentNo) => wait(dp.issuedSummary(agentNo)),
   listWarehouses: async () => wait(dp.listWarehouses()),
+  createWarehouse: async (x) => wait(ia.createWarehouse(x), 350),
+  updateWarehouse: async (no, x) => wait(ia.updateWarehouse(no, x), 350),
+  archiveWarehouse: async (no) => wait(ia.archiveWarehouse(no), 350),
+  unarchiveWarehouse: async (no) => wait(ia.unarchiveWarehouse(no), 350),
+  listSuppliers: async (q) => wait(ia.listSuppliers(q)),
+  createSupplier: async (x) => wait(ia.createSupplier(x), 350),
+  updateSupplier: async (no, x) => wait(ia.updateSupplier(no, x), 350),
+  archiveSupplier: async (no) => wait(ia.archiveSupplier(no), 350),
+  unarchiveSupplier: async (no) => wait(ia.unarchiveSupplier(no), 350),
   listIntakes: async (q) => wait(ik.listIntakes(q)),
   getIntake: async (no) => wait(ik.getIntake(no)),
   createIntake: async (x) => wait(ik.createIntake(x), 400),

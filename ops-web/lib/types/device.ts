@@ -103,8 +103,9 @@ export interface PoolReturnReq {
   reason: string;
 }
 /**
- * 仓库（GET /api/ops/inventory/warehouses，只读）。过渡期由迁移种入（V182：每个酋长国一个），
- * 仓库管理将来在独立库存服务里做。isDefault = 撤机回仓与出库池退回不选仓时落到的仓。
+ * 仓库（GET /api/ops/inventory/warehouses）。V182 种入、V201 起可新建 / 编辑 / 归档。
+ * isDefault = 撤机回仓与出库池退回不选仓时落到的仓（系统参数 inv.return_warehouse）。
+ * 列表含已归档的仓；选仓下拉用 {@link activeWarehouses} 滤掉。
  */
 export interface Warehouse {
   warehouseNo: string;
@@ -112,6 +113,32 @@ export interface Warehouse {
   regionId: string | null;
   address: string | null;
   isDefault: boolean;
+  archivedAt: string | null;
+}
+/** 新建 / 编辑仓库（仓号新建时系统生成）。 */
+export interface WarehouseReq {
+  name: string;
+  regionId?: string | null;
+  address?: string | null;
+}
+/** 设备供应商（V201，GET /api/ops/inventory/suppliers）：到货登记的来源、退供应商的去向。 */
+export interface Supplier {
+  supplierNo: string;
+  name: string;
+  contactName: string | null;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  note: string | null;
+  archivedAt: string | null;
+}
+export interface SupplierReq {
+  name: string;
+  contactName?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  note?: string | null;
 }
 /** 到仓待检（V192，GET /api/ops/inventory/intakes）。 */
 export type IntakeStatus = "OPEN" | "DONE";
@@ -126,6 +153,9 @@ export interface Intake {
   warehouseNo: string;
   warehouseName: string | null;
   sourceRef: string | null;
+  /** 供应商（V201，到货登记可选）与名称快照。 */
+  supplierNo: string | null;
+  supplierName: string | null;
   arrivedAt: string;
   status: IntakeStatus;
   note: string | null;
@@ -156,6 +186,7 @@ export interface IntakeDetail {
 }
 export interface IntakeCreateReq {
   warehouseNo: string;
+  supplierNo?: string | null;
   sourceRef?: string;
   arrivedAt?: string;
   note?: string;

@@ -5,7 +5,7 @@ import type {
   InventoryTransfer, InventoryTransferDetail, OtaRollout, OtaRelease, OtaTask, DeviceLog, DeviceCodeBatch,
   Checklist, TrialRent, Protection, ProtectionReq, SignalCode,
   InvTransferReq, QcReq, QcRecord, ReceiveResult, AssetDiff, AssetDiffStatus, PowerbankAction,
-  DeviceMovement, InventoryEngine, StockStage, StockPeriodRow, InventoryMigrationPlan, InventoryMigrationResult, StockLedgerRow, StockCount, StockCountDetail, IssueDevicesReq, ClaimDevicesReq, IssueRedirectReq, PoolReturnReq, IssuedSummary, Warehouse, Intake, IntakeDetail, IntakeCreateReq, IntakeItemRef, IntakeDisposeReq, IntakeItemType, IntakeStatus, BindReq, BindBatchReq, BindResult,
+  DeviceMovement, InventoryEngine, StockStage, StockPeriodRow, InventoryMigrationPlan, InventoryMigrationResult, StockLedgerRow, StockCount, StockCountDetail, IssueDevicesReq, ClaimDevicesReq, IssueRedirectReq, PoolReturnReq, IssuedSummary, Warehouse, WarehouseReq, Supplier, SupplierReq, Intake, IntakeDetail, IntakeCreateReq, IntakeItemRef, IntakeDisposeReq, IntakeItemType, IntakeStatus, BindReq, BindBatchReq, BindResult,
 } from "../../types";
 
 export interface DeviceApi {
@@ -166,8 +166,19 @@ export interface DeviceApi {
   redirectIssue(x: IssueRedirectReq): Promise<Cabinet[]>;
   /** 出库池按商家汇总：未绑定 / 已绑定 / 已上线。 */
   issuedSummary(agentNo?: string): Promise<IssuedSummary[]>;
-  /** 仓库只读列表（过渡期；选仓下拉用）。 */
+  /** 仓库列表（含已归档；选仓下拉用 activeWarehouses 过滤）。 */
   listWarehouses(): Promise<Warehouse[]>;
+  /** 仓库管理（V201）：归档前须不是默认回仓仓、仓里无设备、无未结待检单。 */
+  createWarehouse(x: WarehouseReq): Promise<Warehouse>;
+  updateWarehouse(warehouseNo: string, x: WarehouseReq): Promise<Warehouse>;
+  archiveWarehouse(warehouseNo: string): Promise<Warehouse>;
+  unarchiveWarehouse(warehouseNo: string): Promise<Warehouse>;
+  /** 供应商（V201）。 */
+  listSuppliers(q?: ArchiveQ): Promise<PageResult<Supplier>>;
+  createSupplier(x: SupplierReq): Promise<Supplier>;
+  updateSupplier(supplierNo: string, x: SupplierReq): Promise<Supplier>;
+  archiveSupplier(supplierNo: string): Promise<Supplier>;
+  unarchiveSupplier(supplierNo: string): Promise<Supplier>;
   /** 到仓待检（V192）：列表 / 详情 / 到货登记 / 逐台质检 / 合格入库 / 不合格处置。 */
   listIntakes(q?: PageQ & { status?: IntakeStatus; warehouseNo?: string }): Promise<PageResult<Intake>>;
   getIntake(intakeNo: string): Promise<IntakeDetail>;

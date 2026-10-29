@@ -70,6 +70,7 @@ const LEAF_TUPLES = [
   "/devices|设备台账|device:cabinet:read||设备档案",
   "/devices?tab=powerbanks|充电宝管理|device:powerbank:read||设备档案",
   "/devices?tab=intakes|到仓待检|device:inventory:read|1|入库与质检",
+  "/devices?tab=suppliers|供应商|device:inventory:read|1|入库与质检",
   "/devices?tab=warehouses|仓库|device:inventory:read|1|仓储与出库",
   "/devices?tab=stock|库存余额|device:inventory:read|1|仓储与出库",
   "/devices?tab=ledger|库存流水|device:inventory:read|1|仓储与出库",

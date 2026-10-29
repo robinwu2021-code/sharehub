@@ -20,4 +20,7 @@ public class InvWarehouse extends BaseEntity {
     private String name;
 
     private String address;
+
+    /** 归档时间（V201）；空为启用。 */
+    private java.time.LocalDateTime archivedAt;
 }

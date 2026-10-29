@@ -4,6 +4,8 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { UNPAGED_SIZE } from "@/lib/constants";
+import { activeWarehouses } from "@/components/device/warehouses";
 import { useCan } from "@/lib/hooks/use-can";
 import { usePaging } from "@/lib/hooks/use-paging";
 import { notify } from "@/lib/notify";
@@ -46,7 +48,9 @@ export function IntakesTab() {
   const [openNo, setOpenNo] = useState<string | null>(null);
 
   const whQ = useQuery({ queryKey: ["warehouses"], queryFn: () => api.listWarehouses() });
-  const whOptions = (whQ.data ?? []).map((w) => ({ value: w.warehouseNo, label: w.name }));
+  const whOptions = activeWarehouses(whQ.data).map((w) => ({ value: w.warehouseNo, label: w.name }));
+  const spQ = useQuery({ queryKey: ["suppliers", "active"], queryFn: () => api.listSuppliers({ page: 1, size: UNPAGED_SIZE }) });
+  const spOptions = (spQ.data?.list ?? []).map((s) => ({ value: s.supplierNo, label: s.name }));
   const q = useQuery({
     queryKey: ["intakes", paging.page, paging.size, keyword, status, warehouseNo],
     queryFn: () => api.listIntakes({ page: paging.page, size: paging.size, keyword, status: (status || undefined) as Intake["status"] | undefined, warehouseNo: warehouseNo || undefined }),
@@ -55,7 +59,7 @@ export function IntakesTab() {
 
   const create = useMutation({
     mutationFn: (v: Record<string, unknown>) => api.createIntake({
-      warehouseNo: String(v.warehouseNo ?? ""), sourceRef: String(v.sourceRef ?? "") || undefined, note: String(v.note ?? "") || undefined,
+      warehouseNo: String(v.warehouseNo ?? ""), supplierNo: String(v.supplierNo ?? "") || null, sourceRef: String(v.sourceRef ?? "") || undefined, note: String(v.note ?? "") || undefined,
       cabinetNos: lines(v.cabinetNos), powerbankNos: lines(v.powerbankNos),
     }),
     onSuccess: (d) => {
@@ -71,6 +75,7 @@ export function IntakesTab() {
    */
   const FIELDS: FieldDef[] = [
     { key: "warehouseNo", label: "仓库", type: "select", required: true, options: whOptions },
+    { key: "supplierNo", label: "供应商", type: "select", options: spOptions, help: "采购到货选供应商；不合格「退供应商」时据此知道退给谁" },
     { key: "sourceRef", label: "来源单号", maxLength: 64 },
     { key: "cabinetNos", label: "机柜编号", type: "textarea", rows: 4, placeholder: "每行一个，可扫码" },
     { key: "powerbankNos", label: "充电宝编号", type: "textarea", rows: 4, placeholder: "每行一个，可扫码" },
@@ -81,6 +86,7 @@ export function IntakesTab() {
     { header: "单号", cell: (h) => <button type="button" className="font-mono text-primary hover:underline" onClick={() => setOpenNo(h.intakeNo)}>{h.intakeNo}</button> },
     { header: "类型", className: "whitespace-nowrap", cell: (h) => KIND_LABEL[h.kind] },
     { header: "仓库", className: "whitespace-nowrap", cell: (h) => h.warehouseName ?? h.warehouseNo },
+    { header: "供应商", cell: (h) => h.supplierName ?? <span className="text-muted-foreground">-</span> },
     { header: "来源单号", cell: (h) => h.sourceRef ?? <span className="text-muted-foreground">-</span> },
     { header: "到达", className: "whitespace-nowrap", cell: (h) => fmtTime(h.arrivedAt) },
     { header: "台数", className: "text-right tabular-nums whitespace-nowrap", cell: (h) => h.total },

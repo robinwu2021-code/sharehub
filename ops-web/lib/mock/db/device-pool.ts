@@ -19,19 +19,31 @@ import { agents, syncDefaultSite, saveSiteAgent, listSiteAgents } from "./agent"
 import { createWorkOrder } from "./workorder";
 import { recordMovement, ref } from "./movement";
 import { fail, notFound } from "@/lib/biz-error";
+import { sysParams } from "./system";
 
-/** 仓库：与后端 V182 种的四个仓同号同名；默认回仓为迪拜仓（inv.return_warehouse）。 */
+/**
+ * 仓库：与后端 V182 种的四个仓同号同名；增改归档见 inventory-admin（V201）。
+ * isDefault 不存在行上：按系统参数 inv.return_warehouse 现算（与后端 WarehouseDirectory 同口径）。
+ */
 export const WAREHOUSES: Warehouse[] = [
-  { warehouseNo: "WH001", name: "迪拜仓", regionId: "AE-DU", address: null, isDefault: true },
-  { warehouseNo: "WH002", name: "阿布扎比仓", regionId: "AE-AZ", address: null, isDefault: false },
-  { warehouseNo: "WH003", name: "沙迦仓", regionId: "AE-SH", address: null, isDefault: false },
-  { warehouseNo: "WH004", name: "阿治曼仓", regionId: "AE-AJ", address: null, isDefault: false },
+  { warehouseNo: "WH001", name: "迪拜仓", regionId: "AE-DU", address: null, isDefault: false, archivedAt: null },
+  { warehouseNo: "WH002", name: "阿布扎比仓", regionId: "AE-AZ", address: null, isDefault: false, archivedAt: null },
+  { warehouseNo: "WH003", name: "沙迦仓", regionId: "AE-SH", address: null, isDefault: false, archivedAt: null },
+  { warehouseNo: "WH004", name: "阿治曼仓", regionId: "AE-AJ", address: null, isDefault: false, archivedAt: null },
 ];
 /** 演示设备默认所在仓 = 默认回仓仓。 */
 export const POOL_WAREHOUSE = "WH001";
 
+/** 默认回仓仓：配置的仓启用中就用它，否则第一个启用的仓。 */
+export function defaultWarehouseNo(): string | undefined {
+  const cfg = sysParams.find((p) => p.paramKey === "inv.return_warehouse")?.value;
+  const live = WAREHOUSES.filter((w) => !w.archivedAt);
+  return (live.find((w) => w.warehouseNo === cfg) ?? live[0])?.warehouseNo;
+}
+
 export function listWarehouses(): Warehouse[] {
-  return WAREHOUSES.map((w) => ({ ...w }));
+  const def = defaultWarehouseNo();
+  return WAREHOUSES.map((w) => ({ ...w, isDefault: w.warehouseNo === def }));
 }
 
 const now = () => new Date().toISOString();
@@ -199,9 +211,9 @@ export function returnDevicesToWarehouse(x: PoolReturnReq): Cabinet[] {
   });
   if (bad.length) fail(`退回被拒（整批未动）：${bad.join("；")}`, `Return rejected (nothing changed): ${bad.join("; ")}`);
   // 与后端同：不选仓 → 默认回仓仓；选了不存在的仓 → notFound（此前不填会落到「不在任何仓」）
-  const wh = x.warehouseNo?.trim() || WAREHOUSES.find((w) => w.isDefault)?.warehouseNo;
+  const wh = x.warehouseNo?.trim() || defaultWarehouseNo();
   if (!wh) fail("还没有任何仓库，无法退回仓库", "No warehouse exists yet");
-  if (!WAREHOUSES.some((w) => w.warehouseNo === wh)) notFound("仓库", "Warehouse", wh!);
+  if (!WAREHOUSES.some((w) => w.warehouseNo === wh && !w.archivedAt)) notFound("仓库", "Warehouse", wh!);
   for (const c of rows) {
     recordMovement({ itemNo: c.cabinetNo, event: "POOL_RETURN", fromRef: ref.pool(c.issuedAgentNo, c.issuedSiteNo), toRef: ref.wh(wh),
       agentBefore: c.issuedAgentNo, reason: x.reason });

@@ -607,6 +607,21 @@ const PATCHES: { file: string; mustContain: string; apply: (rows: Row[]) => void
       rows.filter((r) => r.parent_no === "M_device" && paths.includes(r.path)).forEach((r) => Object.assign(r, { phase: "1", ready: "1" }));
     },
   },
+  {
+    // 入库与质检加「供应商」（sort 4，排在到仓待检后）；原 4 起顺延，设备叶子按 sort 重编号。
+    file: "V201__inventory_supplier_warehouse_admin.sql",
+    mustContain: "UPDATE iam_menu SET menu_no = CONCAT('M_tmp201_', id) WHERE parent_no = 'M_device'",
+    apply: (rows) => {
+      const dev = rows.filter((r) => r.parent_no === "M_device");
+      dev.filter((r) => Number(r.sort) >= 4).forEach((r) => { r.sort = String(Number(r.sort) + 1); });
+      dev.forEach((r) => { r.menu_no = `M_device__${r.sort}`; });
+      rows.push({
+        menu_no: "M_device__4", parent_no: "M_device", name: "供应商", name_en: "Suppliers", name_ar: "الموردون", type: "ITEM",
+        path: "/devices?tab=suppliers", icon: "NULL", group_name: "入库与质检", sort: "4", perm: "device:inventory:read",
+        phase: "1", ready: "1", module: "NULL", modules: "NULL", match_paths: "NULL", pin_bottom: "0", portal_for: "NULL",
+      });
+    },
+  },
 ];
 
 const COLS = [

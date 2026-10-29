@@ -15635,6 +15635,14 @@
      "type": "String"
     },
     {
+     "name": "supplierNo",
+     "type": "String"
+    },
+    {
+     "name": "supplierName",
+     "type": "String"
+    },
+    {
      "name": "arrivedAt",
      "type": "LocalDateTime"
     },
@@ -15718,6 +15726,14 @@
       },
       {
        "name": "sourceRef",
+       "type": "String"
+      },
+      {
+       "name": "supplierNo",
+       "type": "String"
+      },
+      {
+       "name": "supplierName",
        "type": "String"
       },
       {
@@ -15819,6 +15835,10 @@
      "type": "String"
     },
     {
+     "name": "supplierNo",
+     "type": "String"
+    },
+    {
      "name": "sourceRef",
      "type": "String"
     },
@@ -15884,6 +15904,14 @@
       },
       {
        "name": "sourceRef",
+       "type": "String"
+      },
+      {
+       "name": "supplierNo",
+       "type": "String"
+      },
+      {
+       "name": "supplierName",
        "type": "String"
       },
       {
@@ -16025,6 +16053,14 @@
       },
       {
        "name": "sourceRef",
+       "type": "String"
+      },
+      {
+       "name": "supplierNo",
+       "type": "String"
+      },
+      {
+       "name": "supplierName",
        "type": "String"
       },
       {
@@ -16192,6 +16228,14 @@
        "type": "String"
       },
       {
+       "name": "supplierNo",
+       "type": "String"
+      },
+      {
+       "name": "supplierName",
+       "type": "String"
+      },
+      {
        "name": "arrivedAt",
        "type": "LocalDateTime"
       },
@@ -16347,6 +16391,14 @@
       },
       {
        "name": "sourceRef",
+       "type": "String"
+      },
+      {
+       "name": "supplierNo",
+       "type": "String"
+      },
+      {
+       "name": "supplierName",
        "type": "String"
       },
       {
@@ -16787,6 +16839,352 @@
   },
   {
    "verb": "GET",
+   "path": "/api/ops/inventory/suppliers",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#suppliers",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "page",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "size",
+     "type": "Integer",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "keyword",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "showArchived",
+     "type": "Boolean",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "PageResult<ai.neargo.sharehub.inv.dto.SupplierDtos.Supplier>",
+   "returnContainer": "PageResult",
+   "returnElement": "ai.neargo.sharehub.inv.dto.SupplierDtos.Supplier",
+   "responseShape": [
+    {
+     "name": "supplierNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "contactName",
+     "type": "String"
+    },
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "email",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/suppliers",
+   "perm": "device:inventory:warehouse",
+   "perms": [
+    "device:inventory:warehouse"
+   ],
+   "handler": "InventoryController#createSupplier",
+   "summary": "",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.inv.dto.SupplierDtos.SupplierReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.SupplierDtos.Supplier",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.SupplierDtos.Supplier",
+   "responseShape": [
+    {
+     "name": "supplierNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "contactName",
+     "type": "String"
+    },
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "email",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "contactName",
+     "type": "String"
+    },
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "email",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/suppliers/{supplierNo}",
+   "perm": "device:inventory:warehouse",
+   "perms": [
+    "device:inventory:warehouse"
+   ],
+   "handler": "InventoryController#updateSupplier",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "supplierNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "ai.neargo.sharehub.inv.dto.SupplierDtos.SupplierReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.SupplierDtos.Supplier",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.SupplierDtos.Supplier",
+   "responseShape": [
+    {
+     "name": "supplierNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "contactName",
+     "type": "String"
+    },
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "email",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "contactName",
+     "type": "String"
+    },
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "email",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/suppliers/{supplierNo}/archive",
+   "perm": "device:inventory:warehouse",
+   "perms": [
+    "device:inventory:warehouse"
+   ],
+   "handler": "InventoryController#archiveSupplier",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "supplierNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.SupplierDtos.Supplier",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.SupplierDtos.Supplier",
+   "responseShape": [
+    {
+     "name": "supplierNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "contactName",
+     "type": "String"
+    },
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "email",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/suppliers/{supplierNo}/unarchive",
+   "perm": "device:inventory:warehouse",
+   "perms": [
+    "device:inventory:warehouse"
+   ],
+   "handler": "InventoryController#unarchiveSupplier",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "supplierNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.SupplierDtos.Supplier",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.SupplierDtos.Supplier",
+   "responseShape": [
+    {
+     "name": "supplierNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "contactName",
+     "type": "String"
+    },
+    {
+     "name": "phone",
+     "type": "String"
+    },
+    {
+     "name": "email",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
    "path": "/api/ops/inventory/warehouses",
    "perm": "device:inventory:read",
    "perms": [
@@ -16800,6 +17198,221 @@
    "returnContainer": null,
    "returnElement": "java.util.List<ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseItem>",
    "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/warehouses",
+   "perm": "device:inventory:warehouse",
+   "perms": [
+    "device:inventory:warehouse"
+   ],
+   "handler": "InventoryController#createWarehouse",
+   "summary": "",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseItem",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseItem",
+   "responseShape": [
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "regionId",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "isDefault",
+     "type": "boolean"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "regionId",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/warehouses/{warehouseNo}",
+   "perm": "device:inventory:warehouse",
+   "perms": [
+    "device:inventory:warehouse"
+   ],
+   "handler": "InventoryController#updateWarehouse",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "warehouseNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": "ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseReq",
+   "returnType": "ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseItem",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseItem",
+   "responseShape": [
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "regionId",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "isDefault",
+     "type": "boolean"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "regionId",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    }
+   ]
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/warehouses/{warehouseNo}/archive",
+   "perm": "device:inventory:warehouse",
+   "perms": [
+    "device:inventory:warehouse"
+   ],
+   "handler": "InventoryController#archiveWarehouse",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "warehouseNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseItem",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseItem",
+   "responseShape": [
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "regionId",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "isDefault",
+     "type": "boolean"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/warehouses/{warehouseNo}/unarchive",
+   "perm": "device:inventory:warehouse",
+   "perms": [
+    "device:inventory:warehouse"
+   ],
+   "handler": "InventoryController#unarchiveWarehouse",
+   "summary": "",
+   "params": [
+    {
+     "in": "path",
+     "name": "warehouseNo",
+     "type": "String",
+     "required": true
+    }
+   ],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseItem",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.dto.InvOpsDtos.WarehouseItem",
+   "responseShape": [
+    {
+     "name": "warehouseNo",
+     "type": "String"
+    },
+    {
+     "name": "name",
+     "type": "String"
+    },
+    {
+     "name": "regionId",
+     "type": "String"
+    },
+    {
+     "name": "address",
+     "type": "String"
+    },
+    {
+     "name": "isDefault",
+     "type": "boolean"
+    },
+    {
+     "name": "archivedAt",
+     "type": "String"
+    }
+   ],
    "requestShape": null
   },
   {
@@ -53423,10 +54036,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 598,
-  "records": 575,
-  "withPerm": 516,
-  "withBody": 246,
-  "shapedResponses": 464
+  "endpoints": 607,
+  "records": 578,
+  "withPerm": 525,
+  "withBody": 250,
+  "shapedResponses": 473
  }
 }

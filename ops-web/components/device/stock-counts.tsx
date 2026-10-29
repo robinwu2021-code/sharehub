@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { activeWarehouses } from "@/components/device/warehouses";
 import { useCan } from "@/lib/hooks/use-can";
 import { notify } from "@/lib/notify";
 import { fmtTime } from "@/lib/utils";
@@ -38,7 +39,7 @@ export function StockCountsTab() {
   const engineQ = useQuery({ queryKey: ["inventory-engine"], queryFn: () => api.getInventoryEngine() });
   const service = engineQ.data?.engine === "SERVICE";
   const whQ = useQuery({ queryKey: ["warehouses"], queryFn: () => api.listWarehouses() });
-  const whOptions = (whQ.data ?? []).map((w) => ({ value: w.warehouseNo, label: w.name }));
+  const whOptions = activeWarehouses(whQ.data).map((w) => ({ value: w.warehouseNo, label: w.name }));
   const whName = (no: string | null) => (no ? whQ.data?.find((w) => w.warehouseNo === no)?.name ?? no : "-");
   const q = useQuery({
     queryKey: ["stock-counts", warehouseNo, status],

@@ -7,6 +7,7 @@ import { fail, notFound } from "../../biz-error";
 import { cabinets, powerbanks } from "./device";
 import { consumeQc, inspectCabinet, inspectPowerbank } from "./device-asset";
 import { WAREHOUSES } from "./device-pool";
+import { activeSupplierName } from "./inventory-admin";
 import { paginate } from "./helpers";
 import { recordMovement, ref } from "./movement";
 
@@ -68,10 +69,12 @@ function closeIfDone(h: Head) {
 }
 
 function insert(x: IntakeCreateReq, kind: IntakeKind = "ARRIVAL"): IntakeDetail {
-  const wh = WAREHOUSES.find((w) => w.warehouseNo === x.warehouseNo) ?? notFound("仓库", "Warehouse", x.warehouseNo);
+  const wh = WAREHOUSES.find((w) => w.warehouseNo === x.warehouseNo && !w.archivedAt) ?? notFound("仓库", "Warehouse", x.warehouseNo);
+  const supplierNo = x.supplierNo?.trim() || null;
+  const supplierName = supplierNo ? activeSupplierName(supplierNo) ?? notFound("供应商", "Supplier", supplierNo) : null;
   const no = `IK${String(++seq).padStart(4, "0")}`;
   heads.unshift({
-    intakeNo: no, kind, warehouseNo: wh.warehouseNo, warehouseName: wh.name, sourceRef: x.sourceRef?.trim() || null,
+    intakeNo: no, kind, warehouseNo: wh.warehouseNo, warehouseName: wh.name, sourceRef: x.sourceRef?.trim() || null, supplierNo, supplierName,
     arrivedAt: x.arrivedAt || now(), status: "OPEN", note: x.note?.trim() || null, createdBy: "mock", createdAt: now(),
   });
   const mk = (itemType: IntakeItemType, itemNo: string): IntakeItem => {

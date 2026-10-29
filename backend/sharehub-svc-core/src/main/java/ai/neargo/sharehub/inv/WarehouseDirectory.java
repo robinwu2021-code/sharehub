@@ -13,8 +13,8 @@ import java.util.List;
 /**
  * 仓库目录（过渡期，独立进销存上线前；见 docs/technical/独立进销存/D §2.10）。
  *
- * <p>只读：仓库由迁移种入（V182），本期不提供建 / 改 / 停用 —— 仓库管理将来在独立库存服务里做，
- * 这里再造一套写入口，切换时就要多迁一份、多关一个口子。
+ * <p>仓库由迁移种入（V182）；增改归档见 {@link ai.neargo.sharehub.inv.service.WarehouseAdminService}（V201，用户 2026-10-29
+ * 要求补仓库管理）。切到独立进销存后，本地仓号仍是主数据，库存服务侧按名称认领 / 建仓（InventoryLinks）。
  *
  * <p>「默认回仓仓」的规则只有这一处：撤机回仓（调拨单终点）、出库池退回仓库（不填仓时）、
  * 只读列表的默认标记都读它。此前它只在撤机回仓里，出库池退回不填仓时设备会落到「在库、不在任何仓、也不在出库池」。
@@ -36,7 +36,7 @@ public class WarehouseDirectory implements WarehouseLookup {
         String def = defaultReturnWarehouse();
         return warehouses.selectList(new LambdaQueryWrapper<InvWarehouse>().orderByAsc(InvWarehouse::getId)).stream()
                 .map(w -> new WarehouseItem(w.getWarehouseNo(), w.getName(), w.getRegionId(), w.getAddress(),
-                        w.getWarehouseNo().equals(def)))
+                        w.getWarehouseNo().equals(def), w.getArchivedAt() == null ? null : w.getArchivedAt().toString()))
                 .toList();
     }
 
@@ -45,15 +45,18 @@ public class WarehouseDirectory implements WarehouseLookup {
         String configured = params.textOf(RETURN_PARAM, null);
         if (configured != null) {
             InvWarehouse w = byNo(configured);
-            if (w != null) return w;
+            if (w != null && w.getArchivedAt() == null) return w;
         }
         // 没配或配的仓不存在：取第一个仓 —— 单仓运营时不必额外配置
-        return warehouses.selectOne(new LambdaQueryWrapper<InvWarehouse>().orderByAsc(InvWarehouse::getId).last("limit 1"));
+        return warehouses.selectOne(new LambdaQueryWrapper<InvWarehouse>().isNull(InvWarehouse::getArchivedAt)
+                .orderByAsc(InvWarehouse::getId).last("limit 1"));
     }
 
+    /** 启用中的仓（已归档的仓不能再收货 / 退回 / 调入）。 */
     @Override
     public boolean exists(String warehouseNo) {
-        return warehouseNo != null && byNo(warehouseNo) != null;
+        InvWarehouse w = warehouseNo == null ? null : byNo(warehouseNo);
+        return w != null && w.getArchivedAt() == null;
     }
 
     @Override

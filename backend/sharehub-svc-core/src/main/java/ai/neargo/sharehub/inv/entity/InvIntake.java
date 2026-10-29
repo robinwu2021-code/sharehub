@@ -18,6 +18,9 @@ public class InvIntake {
     /** ARRIVAL / RETURN。 */
     private String kind;
     private String warehouseNo;
+    /** 供应商（V201，到货登记可选）与名称快照。 */
+    private String supplierNo;
+    private String supplierName;
     private String warehouseName;
     private String sourceRef;
     private LocalDateTime arrivedAt;

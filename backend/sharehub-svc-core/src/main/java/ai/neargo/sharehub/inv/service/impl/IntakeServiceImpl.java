@@ -73,9 +73,12 @@ public class IntakeServiceImpl implements IntakeService {
     private final PowerbankMapper powerbanks;
     private final QcService qc;
     private final WarehouseDirectory warehouses;
+    private final ai.neargo.sharehub.inv.service.SupplierService suppliers;
 
     public IntakeServiceImpl(InvIntakeMapper intakes, InvIntakeItemMapper items, CabinetMapper cabinets,
-                             PowerbankMapper powerbanks, QcService qc, WarehouseDirectory warehouses) {
+                             PowerbankMapper powerbanks, QcService qc, WarehouseDirectory warehouses,
+                             ai.neargo.sharehub.inv.service.SupplierService suppliers) {
+        this.suppliers = suppliers;
         this.intakes = intakes;
         this.items = items;
         this.cabinets = cabinets;
@@ -153,8 +156,11 @@ public class IntakeServiceImpl implements IntakeService {
     @Transactional
     public IntakeDetail create(CreateReq r) {
         if (r == null || !notBlank(r.warehouseNo())) throw BizException.badRequest("error.common.missing_parameter", "warehouseNo");
-        WarehouseItem wh = warehouses.list().stream().filter(x -> x.warehouseNo().equals(r.warehouseNo().trim())).findFirst()
+        WarehouseItem wh = warehouses.list().stream().filter(x -> x.warehouseNo().equals(r.warehouseNo().trim()) && x.archivedAt() == null)
+                .findFirst()
                 .orElseThrow(() -> BizException.notFound(r.warehouseNo()));
+        String supplierName = notBlank(r.supplierNo()) ? suppliers.activeName(r.supplierNo()) : null;
+        if (notBlank(r.supplierNo()) && supplierName == null) throw BizException.notFound(r.supplierNo());
         List<String> cabNos = distinct(r.cabinetNos());
         List<String> pbNos = distinct(r.powerbankNos());
         if (cabNos.isEmpty() && pbNos.isEmpty()) throw BizException.badRequest("error.common.missing_parameter", "cabinetNos / powerbankNos");
@@ -189,6 +195,8 @@ public class IntakeServiceImpl implements IntakeService {
         h.setKind("ARRIVAL");
         h.setWarehouseNo(wh.warehouseNo());
         h.setWarehouseName(wh.name());
+        h.setSupplierNo(supplierName == null ? null : r.supplierNo().trim());
+        h.setSupplierName(supplierName);
         h.setSourceRef(blankToNull(r.sourceRef()));
         h.setArrivedAt(notBlank(r.arrivedAt()) ? LocalDateTime.parse(r.arrivedAt().trim().replace(' ', 'T')) : LocalDateTime.now());
         h.setStatus(IntakeStatus.OPEN.name());
@@ -391,6 +399,7 @@ public class IntakeServiceImpl implements IntakeService {
             else pending++;
         }
         return new Intake(h.getIntakeNo(), h.getKind(), h.getWarehouseNo(), h.getWarehouseName(), h.getSourceRef(),
+                h.getSupplierNo(), h.getSupplierName(),
                 h.getArrivedAt(), h.getStatus(), h.getNote(), rows.size(), pending, passed, failed, inbound, disposed,
                 h.getCreatedBy(), h.getCreatedAt());
     }

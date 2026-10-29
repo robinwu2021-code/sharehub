@@ -105,6 +105,7 @@ const PERM_CATALOG: ReadonlyArray<readonly [string, string]> = [
   ["device:command:batch", "批量指令 下发"],
   ["device:inventory:read", "库存/调拨/盘点 查看"],
   ["device:inventory:transfer", "调拨 执行"],
+  ["device:inventory:warehouse", "仓库与供应商 维护"],
   ["device:inventory:stocktake", "盘点 执行"],
   ["device:ota:read", "固件版本库 查看"],
   ["device:ota:publish", "固件 发布投放"],

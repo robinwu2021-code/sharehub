@@ -10,6 +10,7 @@ public final class IntakeDtos {
 
     /** 列表行：单头 + 明细计数。 */
     public record Intake(String intakeNo, String kind, String warehouseNo, String warehouseName, String sourceRef,
+                         String supplierNo, String supplierName,
                          LocalDateTime arrivedAt, String status, String note,
                          int total, int pending, int passed, int failed, int inbound, int disposed,
                          String createdBy, LocalDateTime createdAt) {
@@ -23,7 +24,7 @@ public final class IntakeDtos {
     }
 
     /** 到货登记：仓 + 设备号（柜与宝分开列）。arrivedAt 为空取现在。 */
-    public record CreateReq(String warehouseNo, String sourceRef, String arrivedAt, String note,
+    public record CreateReq(String warehouseNo, String supplierNo, String sourceRef, String arrivedAt, String note,
                             List<String> cabinetNos, List<String> powerbankNos) {
     }
 
