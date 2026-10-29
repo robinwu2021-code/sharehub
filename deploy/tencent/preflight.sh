@@ -122,6 +122,34 @@ else
     fail "env 中有 IP 字面量：$(echo "$IPS" | tr '\n' ' ') —— 未来换 IP 会炸"
   fi
 
+  # ⑥ 邮件通道（2026-10-29，商家一期）：商家登录验证码与开通邀请（含一次性口令）都靠邮件。
+  #    桩开着 = 页面说「已发送」而商家收不到；关了却缺账号密码 = 应用起不来（SmtpMailGateway fail-fast）
+  if remote "sudo grep -q '^SHAREHUB_MAIL_STUB=false' $ENV_FILE"; then
+    if remote "sudo grep -qE '^MAIL_USERNAME=.+' $ENV_FILE" && remote "sudo grep -qE '^MAIL_PASSWORD=.+' $ENV_FILE"; then
+      pass "邮件通道已开（SHAREHUB_MAIL_STUB=false），MAIL_USERNAME / MAIL_PASSWORD 已配"
+    else
+      fail "SHAREHUB_MAIL_STUB=false 但缺 MAIL_USERNAME 或 MAIL_PASSWORD —— **应用起不来**"
+    fi
+    U=$(remote "sudo grep -oP '^MAIL_USERNAME=\\K.*' $ENV_FILE" | tr 'A-Z' 'a-z')
+    F=$(remote "sudo grep -oP '^MAIL_FROM=\\K.*' $ENV_FILE" | tr 'A-Z' 'a-z')
+    if [ -n "$F" ] && [ "$F" != "$U" ]; then
+      warn "MAIL_FROM 与 MAIL_USERNAME 不同 —— Office 365 需在后台授「发送为」，否则认证成功而投递被拒（554 SendAsDenied）"
+    fi
+  else
+    warn "邮件通道是桩（SHAREHUB_MAIL_STUB 未设为 false）—— 商家收不到验证码与开通邀请，只有运营当面转告的口令能用"
+  fi
+
+  # ⑦ 时区：JVM 钉在 Asia/Shanghai（本 unit 的 JAVA_OPTS），库的会话时区必须同一个钟 ——
+  #    代码用 LocalDateTime.now() 写与比时间，SQL 默认值用 NOW()；两者差 N 小时 = 心跳判离线、「今日」窗口错位
+  DBTZ=$(remote "mysql -N -e 'SELECT @@global.time_zone, @@system_time_zone' 2>/dev/null" | tr '\t' ' ')
+  if [ -z "$DBTZ" ]; then
+    warn "读不到库时区（无 mysql 客户端权限）—— 手工确认：SELECT @@global.time_zone, @@system_time_zone 应为 SYSTEM / CST（+08）"
+  elif echo "$DBTZ" | grep -qE '^(SYSTEM CST|SYSTEM \+08|\+08:00)'; then
+    pass "库时区与 JVM（Asia/Shanghai）一致：$DBTZ"
+  else
+    fail "库时区 $DBTZ 与 JVM（Asia/Shanghai）不一致 —— 心跳会被判离线、今日统计错位"
+  fi
+
   head_ "迁移号顺序（这次带上去的最小号 vs 现网已应用的最高版本）"
 
   # Flyway 没开 out-of-order，版本号低于现网最高版本的迁移再也进不去，且会让启动失败。
