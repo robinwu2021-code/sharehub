@@ -1096,6 +1096,8 @@ public class RentOrderServiceImpl implements RentOrderService {
 
         OrdOrder e = require(orderNo);
         String before = e.getStatus();
+        java.math.BigDecimal amountBefore = e.getAmount();
+        String payBefore = e.getPayStatus();
         if (!rule.from().contains(OrderStatus.of(before)))
             throw new IllegalArgumentException("状态 " + before + " 不允许 " + req.action() + "，允许自: " + rule.from());
         String after = rule.to() == null ? before : rule.to().name();
@@ -1106,6 +1108,13 @@ public class RentOrderServiceImpl implements RentOrderService {
             e.setStatus(after);
             mapper.updateById(e);
         }
+
+        // 字段级改前改后进操作审计（SEC-09，第 6 批）：干预记录答「做了什么动作」，这里答「哪些字段从什么变成什么」
+        OrdOrder now = require(orderNo);
+        ai.neargo.sharehub.audit.AuditChanges.record("状态", before, now.getStatus());
+        ai.neargo.sharehub.audit.AuditChanges.record("应收", amountBefore, now.getAmount());
+        ai.neargo.sharehub.audit.AuditChanges.record("收款状态", payBefore, now.getPayStatus());
+        if (req.amount() != null) ai.neargo.sharehub.audit.AuditChanges.record(req.action() + " 金额", null, req.amount());
 
         OrdIntervention log = new OrdIntervention();
         log.setInterventionNo(IdGenerator.next(BizKey.ORDER_INTERVENTION));

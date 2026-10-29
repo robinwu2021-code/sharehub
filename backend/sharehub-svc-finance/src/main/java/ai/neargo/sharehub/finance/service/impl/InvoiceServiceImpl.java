@@ -100,6 +100,17 @@ public class InvoiceServiceImpl implements InvoiceService {
             }
         }
 
+        // 字段级改前改后（SEC-09，第 6 批）：发票是对外的税务单据，草稿阶段的每次改动都要能追溯
+        if (e.getId() != null) {
+            ai.neargo.sharehub.audit.AuditChanges.record("收款方", e.getPayeeNo(), req.payeeNo());
+            ai.neargo.sharehub.audit.AuditChanges.record("抬头", e.getPayeeName(), req.payeeName());
+            ai.neargo.sharehub.audit.AuditChanges.record("金额", e.getAmount(), req.amount());
+            ai.neargo.sharehub.audit.AuditChanges.record("VAT 税号", e.getVatTrn(), req.vatTrn());
+            ai.neargo.sharehub.audit.AuditChanges.record("币种", e.getCurrency(), req.currency());
+            if (req.status() != null && !req.status().isBlank()) {
+                ai.neargo.sharehub.audit.AuditChanges.record("状态", e.getStatus(), InvoiceStatus.of(req.status()).name());
+            }
+        }
         e.setPayeeType(req.payeeType());
         e.setPayeeNo(req.payeeNo());
         e.setPayeeName(req.payeeName());
