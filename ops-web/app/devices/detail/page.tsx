@@ -42,7 +42,7 @@ const TABS = [
   { key: "trial", label: "试借还" },
   { key: "protections", label: "保护" },
   { key: "qc", label: "入库质检" },
-  { key: "movements", label: "履历" },
+  { key: "movements", label: "时间轴" },
   { key: "signals", label: "设备信号" },
 ];
 /** 后端 fixHref 里出现过、但本页不单列的页签 → 落到哪一格。 */
