@@ -400,6 +400,10 @@
     {
      "name": "vatTrn",
      "type": "String"
+    },
+    {
+     "name": "licenseNo",
+     "type": "String"
     }
    ],
    "requestShape": null
@@ -497,6 +501,10 @@
     {
      "name": "vatTrn",
      "type": "String"
+    },
+    {
+     "name": "licenseNo",
+     "type": "String"
     }
    ],
    "requestShape": [
@@ -570,6 +578,10 @@
     },
     {
      "name": "vatTrn",
+     "type": "String"
+    },
+    {
+     "name": "licenseNo",
      "type": "String"
     }
    ]
@@ -5486,9 +5498,9 @@
   {
    "verb": "POST",
    "path": "/api/ops/asset-diffs/{diffNo}/resolve",
-   "perm": "device:inventory:transfer",
+   "perm": "device:inventory:diff",
    "perms": [
-    "device:inventory:transfer"
+    "device:inventory:diff"
    ],
    "handler": "AssetOpsController#resolve",
    "summary": "",
@@ -5808,9 +5820,9 @@
   {
    "verb": "POST",
    "path": "/api/ops/cabinets/import",
-   "perm": "device:cabinet:create",
+   "perm": "device:cabinet:import",
    "perms": [
-    "device:cabinet:create"
+    "device:cabinet:import"
    ],
    "handler": "OpsController#importCabinets",
    "summary": "批量导入机柜。",
@@ -11953,9 +11965,9 @@
   {
    "verb": "POST",
    "path": "/api/ops/devices/{cabinetNo}/qc",
-   "perm": "device:cabinet:update",
+   "perm": "device:qc:inspect",
    "perms": [
-    "device:cabinet:update"
+    "device:qc:inspect"
    ],
    "handler": "AssetOpsController#inspectCabinet",
    "summary": "",
@@ -18132,9 +18144,9 @@
   {
    "verb": "POST",
    "path": "/api/ops/powerbanks/{powerbankNo}/qc",
-   "perm": "device:powerbank:update",
+   "perm": "device:qc:inspect",
    "perms": [
-    "device:powerbank:update"
+    "device:qc:inspect"
    ],
    "handler": "AssetOpsController#inspectPowerbank",
    "summary": "",
@@ -50451,7 +50463,7 @@
  ],
  "stats": {
   "endpoints": 568,
-  "records": 527,
+  "records": 528,
   "withPerm": 486,
   "withBody": 234,
   "shapedResponses": 439

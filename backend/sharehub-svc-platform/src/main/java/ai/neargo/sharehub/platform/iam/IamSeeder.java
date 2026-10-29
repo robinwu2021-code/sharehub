@@ -24,7 +24,7 @@ public class IamSeeder implements ApplicationRunner {
 
     private static final Map<String, String> ROLE_NAME = Map.of(
             "ADMIN", "运营管理员", "OPS", "运维", "CS", "客服", "FINANCE", "财务",
-            "BD", "拓展", "VIEWER", "只读", "AGENT", "代理商");
+            "BD", "拓展", "VIEWER", "只读", "AGENT", "代理商", "WAREHOUSE", "仓管");
 
     // 12 模块菜单：{module, name, path, icon, 代表查看码}
     /*

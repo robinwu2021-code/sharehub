@@ -323,6 +323,8 @@ const cabinetFields = (vendorCodes: string[]): FieldDef[] => [
 ];
 
 function CabinetsTab({ canWrite }: { canWrite: boolean }) {
+  // 导入按 device:cabinet:import（V186 起后端也判它）：仓管有导入、没有改设备
+  const canImport = useCan()("device:cabinet:import");
   const qc = useQueryClient();
   const { confirm, dialog } = useConfirm();
   const paging = usePaging();
@@ -524,7 +526,7 @@ function CabinetsTab({ canWrite }: { canWrite: boolean }) {
           aria-label="按机柜状态筛选"
         />
         <ShowArchivedToggle checked={showArchived} onChange={(v) => resetPage(() => setShowArchived(v))} />
-        {canWrite && <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>导入台账</Button>}
+        {canImport && <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>导入台账</Button>}
       </Toolbar>
 
       {!canWrite && (

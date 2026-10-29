@@ -104,6 +104,8 @@ export const UI_PERM_MAP: Record<string, string | typeof UNIMPLEMENTED> = {
   "device:command:send": "device:command:send",
   "device:inventory:read": "device:inventory:read",
   "device:inventory:stocktake": "device:inventory:stocktake",
+  "device:inventory:diff": "device:inventory:diff",   // V186：资产差异处置（原借 :transfer）
+  "device:qc:inspect": "device:qc:inspect",           // V186：质检（原借 cabinet / powerbank :update）
   "device:inventory:transfer": "device:inventory:transfer",
   "device:inventory:update": "device:inventory:transfer",   // 翻译：界面守的是调拨单新建/编辑 → POST /api/ops/inventory-transfers（后端无 :update 这个码）
   "device:ota:manage": "device:ota:manage",   // ⚠️ D6d：后端无角色持有 → 除 ADMIN 外必 403

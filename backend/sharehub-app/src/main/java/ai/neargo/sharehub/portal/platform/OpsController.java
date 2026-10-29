@@ -229,7 +229,7 @@ public class OpsController {
      * 部分成功会让运营不知道该重传全部还是补传剩余，重传已成功的行还会撞唯一键。
      */
     @PostMapping("/cabinets/import")
-    @PreAuthorize("@perm.can('device:cabinet:create')")
+    @PreAuthorize("@perm.can('device:cabinet:import')")
     @SuppressWarnings("unchecked")
     public Object importCabinets(@RequestBody java.util.Map<String, Object> body) {
         Object rows = body == null ? null : body.get("rows");

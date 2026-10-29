@@ -37,6 +37,8 @@ import {
 import { DIFF_KIND, DIFF_STATUS, ENDPOINT_TYPE_LABEL, ITEM_TYPE_LABEL, TRANSFER_STATUS } from "./device-maps";
 
 const PERM = "device:inventory:transfer";
+/** 资产差异处置（V186）：从调拨的 :transfer 拆出，运维收回发货后仍要处置撤机清点差异。 */
+const DIFF_PERM = "device:inventory:diff";
 /** 设定明细时给出的「当前在库可调」样本条数：只是扫码前核对用的提示，不是列表。 */
 const CANDIDATE_LIMIT = 12;
 /** 充电宝列表接口不带状态筛选参数（契约里没有），取一页再在前端挑在库的。 */
@@ -390,7 +392,7 @@ const resolveFields: FieldDef[] = [
 /** 资产差异列表 + 处理。`sourceRef` 给了就只看这一张单的。 */
 export function AssetDiffsTable({ sourceRef, compact }: { sourceRef?: string; compact?: boolean }) {
   const qc = useQueryClient();
-  const canTransfer = useCan()(PERM);
+  const canTransfer = useCan()(DIFF_PERM);
   const [status, setStatus] = useState<string>(compact ? "" : "OPEN");
   const paging = usePaging();
   const [resolving, setResolving] = useState<AssetDiff | null>(null);
@@ -439,7 +441,7 @@ export function AssetDiffsTable({ sourceRef, compact }: { sourceRef?: string; co
       cell: (d) => (d.status === "OPEN"
         ? (
           <Button size="sm" variant="outline" disabled={!canTransfer}
-            title={canTransfer ? undefined : `无权限（需要 ${PERM}）`}
+            title={canTransfer ? undefined : `无权限（需要 ${DIFF_PERM}）`}
             onClick={() => { setForm({}); setResolving(d); }}>
             处理
           </Button>

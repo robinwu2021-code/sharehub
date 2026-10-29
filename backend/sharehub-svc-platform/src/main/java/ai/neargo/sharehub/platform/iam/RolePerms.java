@@ -18,6 +18,9 @@ public final class RolePerms {
     public static final Map<String, List<String>> MAP = Map.of(
             "ADMIN", List.of("*"),
             "OPS", List.of(
+                    // 设备质检（V186，矩阵 Q2）：此前经 device:cabinet:* / device:powerbank:* 隐含；
+                    // 运维的 device:inventory:* 暂留（Q1 过渡，仓管有人后收回到 read + receive）
+                    "device:qc:inspect",
                     // 流程与工单（强制方 OpsKit，功能权限清单 §16）
                     "flow:todo:read", "flow:approval:read", "flow:approval:submit", "flow:approval:decide", "flow:queue:claim", "flow:ticket:read", "flow:ticket:handle", "flow:ticket:dispatch", "flow:config:manage",
                     "dashboard:overview:read", "dashboard:todo:read",
@@ -66,6 +69,8 @@ public final class RolePerms {
                     "system:notify_log:read", "system:notify_blacklist:read", "system:notify_blacklist:update",
                     "system:problem:read", "system:problem:update"),
             "FINANCE", List.of(
+                    // 库存只读（V186，矩阵 Q4）：资产对账
+                    "device:inventory:read",
                     // 流程与工单（强制方 OpsKit，功能权限清单 §16）
                     "flow:todo:read", "flow:approval:read", "flow:approval:submit", "flow:approval:decide",
                     "dashboard:overview:read", "dashboard:todo:read",
@@ -100,6 +105,8 @@ public final class RolePerms {
                     "marketing:*", "agent:*",
                     "finance:share_rule:read", "finance:share_record:read", "report:*"),
             "VIEWER", List.of(
+                    // 库存 / 充电宝 / 台账导出只读（V186）：功能权限清单早已给，此前漏配
+                    "device:inventory:read", "device:powerbank:read", "device:cabinet:export",
                     // 流程与工单（强制方 OpsKit，功能权限清单 §16）
                     "flow:approval:read", "flow:ticket:read",
                     "dashboard:overview:read", "dashboard:todo:read",
@@ -107,6 +114,13 @@ public final class RolePerms {
                     "location:poi:read", "location:venue:read", "location:analysis:read", "location:overview:read",
                     "finance:share_rule:read", "finance:share_record:read", "finance:settlement:read",
                     "finance:withdrawal:read", "agent:agent:read", "report:*"),
+            "WAREHOUSE", List.of(
+                    // 仓管（V186，矩阵 Q3）：到货质检、发货、盘点录入、期初导入。
+                    // 入库 / 签收 / 盘点复核等码随 S4 端点登记后再补
+                    "dashboard:overview:read", "dashboard:todo:read",
+                    "device:cabinet:read", "device:cabinet:import", "device:slot:read", "device:powerbank:read",
+                    "device:qc:inspect",
+                    "device:inventory:read", "device:inventory:transfer", "device:inventory:stocktake"),
             "AGENT", List.of(
                     // 流程与工单（强制方 OpsKit，功能权限清单 §16）
                     "flow:todo:read", "flow:ticket:read", "flow:ticket:handle",

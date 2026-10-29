@@ -65,6 +65,7 @@ export const roles: RoleRow[] = [
   { roleNo: "R5", code: "BD", name: "拓展", permCount: 0, memberCount: 5, builtin: true, dataScope: "REGION", scopeRefs: "DU-MAR,DU-DEI,DU-DT", archivedAt: null },
   { roleNo: "R6", code: "VIEWER", name: "只读", permCount: 0, memberCount: 2, builtin: true, dataScope: "ALL", scopeRefs: "", archivedAt: null },
   { roleNo: "R7", code: "AGENT", name: "代理商", permCount: 0, memberCount: 9, builtin: true, dataScope: "AGENT", scopeRefs: "AG001,AG002", archivedAt: null },
+  { roleNo: "R8", code: "WAREHOUSE", name: "仓管", permCount: 0, memberCount: 2, builtin: true, dataScope: "REGION", scopeRefs: "AE-DU", archivedAt: null },
   /*
    * 自定义（非内置）角色。**没有它，离线根本走不通「改角色权限」这条路** ——
    * 内置角色只读，勾选树、全选/清空、可见菜单预览全是禁用态。

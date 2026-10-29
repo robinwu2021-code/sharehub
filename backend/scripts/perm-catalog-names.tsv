@@ -22,12 +22,14 @@ dashboard:overview:read	经营总览 查看	dashboard	1
 dashboard:todo:read	待办聚合 查看	dashboard	0
 device:cabinet:*	机柜 全部	device	0
 device:cabinet:create	机柜 新增	device	1
+device:cabinet:import	机柜台账 导入（期初）	device	1
 device:cabinet:read	机柜台账 查看	device	1
 device:cabinet:update	机柜 编辑	device	1
 device:command:*	远程指令 全部	device	0
 device:command:send	远程指令 下发	device	1
 device:inventory:*	库存调拨 全部	device	0
 device:inventory:read	库存/调拨/盘点 查看	device	1
+device:inventory:diff	资产差异 处置	device	1
 device:inventory:transfer	调拨 执行	device	1
 device:ota:*	固件 全部	device	0
 device:ota:manage	固件投放 建/改	device	1
@@ -35,6 +37,7 @@ device:ota:read	固件版本库 查看	device	1
 device:powerbank:*	充电宝 全部	device	0
 device:powerbank:read	充电宝 查看	device	1
 device:powerbank:update	充电宝 报废/标记	device	1
+device:qc:inspect	设备质检（到货 / 回仓）	device	1
 device:slot:read	仓位 查看	device	0
 device:vendor:config	供应商接入 配置	device	1
 device:vendor:read	供应商接入 查看	device	1

@@ -85,7 +85,7 @@ export function PowerbankActions({
     );
   }
   actions.unshift({
-    key: "qc", label: "入库质检", perm: PERM,
+    key: "qc", label: "入库质检", perm: "device:qc:inspect",
     // 只在在库时质检：在仓 / 借出的宝出问题走「标记故障」
     when: pb.status === "IN_STOCK", blockedReason: archived,
     onRun: () => onQc(pb),

@@ -43,13 +43,13 @@ public class AssetOpsController {
     // —— 入库质检 ——
 
     @PostMapping("/devices/{cabinetNo}/qc")
-    @PreAuthorize("@perm.can('device:cabinet:update')")
+    @PreAuthorize("@perm.can('device:qc:inspect')")
     public QcRecord inspectCabinet(@PathVariable String cabinetNo, @RequestBody QcReq r) {
         return qc.inspectCabinet(cabinetNo, r);
     }
 
     @PostMapping("/powerbanks/{powerbankNo}/qc")
-    @PreAuthorize("@perm.can('device:powerbank:update')")
+    @PreAuthorize("@perm.can('device:qc:inspect')")
     public QcRecord inspectPowerbank(@PathVariable String powerbankNo, @RequestBody QcReq r) {
         return qc.inspectPowerbank(powerbankNo, r);
     }
@@ -91,7 +91,7 @@ public class AssetOpsController {
     }
 
     @PostMapping("/asset-diffs/{diffNo}/resolve")
-    @PreAuthorize("@perm.can('device:inventory:transfer')")
+    @PreAuthorize("@perm.can('device:inventory:diff')")
     public AssetDiff resolve(@PathVariable String diffNo, @RequestBody ResolveReq r) {
         return transfers.resolveDiff(diffNo, r == null ? null : r.note());
     }

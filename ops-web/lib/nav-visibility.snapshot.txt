@@ -223,7 +223,11 @@ flow›审批列表
 flow›审核队列
 flow›工单工作台
 
-## FINANCE（49 项）
+## FINANCE（53 项）
+device›库存余额
+device›库存调拨
+device›出库池
+device›资产差异
 venue›门店 Onboarding
 venue›场地方
 venue›进场合同
@@ -330,8 +334,13 @@ flow›审批列表
 flow›审核队列
 flow›工单工作台
 
-## VIEWER（37 项）
+## VIEWER（42 项）
 device›设备台账
+device›充电宝管理
+device›库存余额
+device›库存调拨
+device›出库池
+device›资产差异
 device›待上线
 device›设备编码
 device›实时监控
@@ -368,3 +377,17 @@ report›消费者分析
 system›流程实例
 flow›审批列表
 flow›工单工作台
+
+## WAREHOUSE（12 项）
+device›设备台账
+device›充电宝管理
+device›库存余额
+device›库存调拨
+device›出库池
+device›资产差异
+device›待上线
+device›设备编码
+device›实时监控
+device›设备日志
+device›故障与维修
+device›报废与遗失

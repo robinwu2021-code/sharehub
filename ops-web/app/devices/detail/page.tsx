@@ -132,6 +132,8 @@ function Overview({ cabinet, gateQ, onQc }: {
   onQc: () => void;
 }) {
   const canUpdate = useCan()("device:cabinet:update");
+  // 质检单独判 device:qc:inspect（V186）：仓管能质检，但不该因此拿到上线 / 改设备
+  const canQc = useCan()("device:qc:inspect");
   const qcQ = useQuery({ queryKey: ["qc-records", cabinet.cabinetNo], queryFn: () => api.listQcRecords(cabinet.cabinetNo) });
   const lastQc = qcQ.data?.[0];
   return (
@@ -167,7 +169,7 @@ function Overview({ cabinet, gateQ, onQc }: {
               passedHint="门禁全部通过，可以点右上角「上线」"
               blockedHint="还差 {n} 项，逐条处理后再上线；每条都给了去处"
             />
-            {canUpdate && (
+            {canQc && (
               <div className="flex justify-end">
                 <Button size="sm" variant="outline" onClick={onQc}>做入库质检</Button>
               </div>
@@ -294,7 +296,7 @@ function CabinetDetail() {
                   <div className="txt-caption text-muted-foreground">
                     入库质检只在在库时做；质检未过的柜子不能发货调拨，也过不了上线门禁。
                   </div>
-                  {allow("device:cabinet:update") && (
+                  {allow("device:qc:inspect") && (
                     <Button size="sm" disabled={cabinet.status !== "IN_STOCK"}
                       title={cabinet.status !== "IN_STOCK" ? "只有在库的柜子能做入库质检；已布放的出问题走标记故障 / 修复" : undefined}
                       onClick={() => setQcTarget({ itemType: "CABINET", itemNo: cabinet.cabinetNo })}>
