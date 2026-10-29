@@ -35,7 +35,7 @@ class MailDeliveryTest {
             return new NotifyLogVO("NL1", e.getChannel(), null, "m***@x.ae", e.getScene(), e.getSentAt(),
                     e.getStatus(), e.getFailReason(), e.getCost(), null, null, null);
         });
-        return new NotifySendServiceImpl(bl, logs, mail);
+        return new NotifySendServiceImpl(bl, logs, mail, new ai.neargo.sharehub.platform.notify.port.StubSmsGateway());
     }
 
     private static MailGateway gateway(boolean live, RuntimeException fail, List<String> subjects) {
@@ -67,6 +67,14 @@ class MailDeliveryTest {
                 .send(new SendReq("EMAIL", null, "m@x.ae", "OTP_login", "code 1", null, null));
         assertThat(r.status()).isEqualTo("FAILED");
         assertThat(r.failReason()).isEqualTo("SMTP_AUTH_FAILED");
+    }
+
+    @Test
+    @DisplayName("短信一期是桩 → 记 SENT 并标 STUB")
+    void smsStub() {
+        service(gateway(true, null, new ArrayList<>())).send(new SendReq("SMS", null, "+971500000000", "OTP_login", "c", null, null));
+        assertThat(logged.get(0).getStatus()).isEqualTo("SENT");
+        assertThat(logged.get(0).getFailReason()).isEqualTo("STUB");
     }
 
     @Test

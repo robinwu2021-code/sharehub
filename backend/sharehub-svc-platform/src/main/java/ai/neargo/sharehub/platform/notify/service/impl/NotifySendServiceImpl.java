@@ -10,6 +10,7 @@ import ai.neargo.sharehub.platform.notify.service.NotifyBlacklistService;
 import ai.neargo.sharehub.platform.notify.service.NotifyLogService;
 import ai.neargo.sharehub.platform.notify.service.NotifySendService;
 import ai.neargo.sharehub.platform.notify.port.MailGateway;
+import ai.neargo.sharehub.platform.notify.port.SmsGateway;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -25,7 +26,7 @@ import java.time.format.DateTimeFormatter;
  *
  * <p>渠道接入：**邮件已接**（{@link MailGateway}，Office 365 SMTP，2026-10-29）—— 投递成功记 SENT、
  * 失败记 FAILED 并带原因；桩模式（缺省）不投递，记 SENT 且 failReason=STUB，免得有人去收件箱找信。
- * 短信渠道仍待接入。
+ * 短信走 {@link SmsGateway}，一期只有桩（用户 2026-10-29：短信先用 mock），同样标 STUB。
  */
 @Slf4j
 @Service
@@ -36,12 +37,14 @@ public class NotifySendServiceImpl implements NotifySendService {
     private final NotifyBlacklistService blacklistService;
     private final NotifyLogService logService;
     private final MailGateway mail;
+    private final SmsGateway sms;
 
     public NotifySendServiceImpl(NotifyBlacklistService blacklistService, NotifyLogService logService,
-                                 MailGateway mail) {
+                                 MailGateway mail, SmsGateway sms) {
         this.blacklistService = blacklistService;
         this.logService = logService;
         this.mail = mail;
+        this.sms = sms;
     }
 
     @Override
@@ -82,7 +85,19 @@ public class NotifySendServiceImpl implements NotifySendService {
                 return new SendResult(vo.logNo(), vo.status(), false, ex.getMessage());
             }
         }
-        // TODO(接入层)：短信渠道商投递，按其回执回填 status/failReason/cost。
+        if ("SMS".equalsIgnoreCase(channel)) {
+            try {
+                sms.send(req.target(), req.content() == null ? "" : req.content());
+                if (!sms.live()) e.setFailReason("STUB");   // 一期短信是桩（2026-10-29），记成功但标明没真发
+            } catch (SmsGateway.SmsSendException ex) {
+                log.warn("短信投递失败 scene={} reason={}，请运维核对短信通道配置", req.scene(), ex.getMessage(), ex);
+                e.setStatus(NotifyLogStatus.FAILED.name());
+                e.setFailReason(ex.getMessage());
+                e.setCost(java.math.BigDecimal.ZERO);
+                NotifyLogVO vo = logService.append(e);
+                return new SendResult(vo.logNo(), vo.status(), false, ex.getMessage());
+            }
+        }
         e.setStatus(NotifyLogStatus.SENT.name());
         e.setSentAt(LocalDateTime.now().format(TS));
         e.setCost(req.cost());
