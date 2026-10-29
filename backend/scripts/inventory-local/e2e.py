@@ -164,6 +164,31 @@ try:
     st, b, raw = sh("POST", "/api/ops/devices/issue", {"agentNo": agent, "cabinetNos": [cab2]}, admin)
     check("撤机回仓：可再次出库", st == 200, raw)
     sh("POST", "/api/ops/devices/pool-return", {"cabinetNos": [cab2], "reason": "联调收尾"}, admin)
+
+    # 9. S6 统一视图与期间报表（期间报表读库存服务）
+    st, stg, raw = sh("GET", "/api/ops/inventory/stages", token=admin)
+    check("S6：统一视图有数据", st == 200 and any(r["stage"] == "IN_STOCK" and r["cabinets"] > 0 for r in stg), raw)
+    day = time.strftime("%Y-%m-%d", time.gmtime())
+    st, rows, raw = sh("GET", f"/api/ops/inventory/period-summary?from={day}&to={day}&warehouseNo=WH001", token=admin)
+    ok = st == 200 and rows and all(r["opening"] + r["inQty"] - r["outQty"] == r["closing"] for r in rows) and any(r["inQty"] > 0 for r in rows)
+    check("S6：库存服务期间汇总有进有出、期初 + 入 − 出 = 期末", ok, raw)
+
+    # 10. S7 存量迁移：一台本地在 WH002、库存服务里没有的柜（模拟存量）；其余候选先标为已完成，免得把整个测试库推过去
+    legacy = "CABMIG" + tag
+    sh("POST", "/api/ops/cabinets", {"cabinetNo": legacy, "sn": legacy, "vendorCode": "TEST", "slotTotal": 8}, admin)
+    sql(f"UPDATE test_sharehub.dev_cabinet SET warehouse_no='WH002', qc_status='PASSED' WHERE cabinet_no='{legacy}'")
+    sql(f"INSERT INTO test_sharehub.inventory_sync_state (k, v) SELECT CONCAT('mig:CABINET:', cabinet_no), 'OUT' "
+        f"FROM test_sharehub.dev_cabinet WHERE cabinet_no <> '{legacy}' ON DUPLICATE KEY UPDATE v = VALUES(v)")
+    sql("INSERT INTO test_sharehub.inventory_sync_state (k, v) SELECT CONCAT('mig:POWERBANK:', powerbank_no), 'IN' "
+        "FROM test_sharehub.dev_powerbank ON DUPLICATE KEY UPDATE v = VALUES(v)")
+    st, plan, raw = sh("GET", "/api/ops/inventory/migration", token=admin)
+    check("S7：试跑看得到 1 台待入库", st == 200 and plan["toInbound"] == 1, raw)
+    st, res, raw = sh("POST", "/api/ops/inventory/migration", {"limit": 10}, admin)
+    check("S7：执行一批成功 1 台", st == 200 and res["processed"] == 1 and res["failed"] == 0, raw)
+    loc_b = sql("SELECT v FROM test_sharehub.inventory_sync_state WHERE k='wh:WH002'")
+    check("S7：库存服务在 WH002 对应位置有这台", any(x.get("serialNo") == legacy for x in inv(f"/serials?locationId={loc_b}")), loc_b)
+    st, res, raw = sh("POST", "/api/ops/inventory/migration", {"limit": 10}, admin)
+    check("S7：重跑不重复", st == 200 and res["processed"] == 0, raw)
 finally:
     sql("UPDATE test_sharehub.sys_param SET value='LOCAL' WHERE param_key='inv.engine'")
     print(f"\n{sum(ok for _, ok, _ in results)}/{len(results)} 通过；引擎已复原 LOCAL")

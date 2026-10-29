@@ -754,6 +754,66 @@ export interface StockLedgerRow {
   operator: string | null;
 }
 
+/** 统一库存视图的阶段（后端 `StockStage.stage`，S6）。 */
+export type StockStageCode =
+  | "INTAKE" | "IN_STOCK" | "IN_TRANSIT" | "DISPATCHED" | "ISSUED" | "BOUND" | "LIVE" | "RENTED" | "FAULT" | "LOST" | "RETIRED";
+
+export interface StockStage {
+  stage: StockStageCode;
+  cabinets: number;
+  powerbanks: number;
+}
+
+/** 期间报表一行（S6）：期初 + 入 − 出 = 期末。 */
+export interface StockPeriodRow {
+  warehouseNo: string | null;
+  itemType: string | null;
+  opening: number;
+  inQty: number;
+  outQty: number;
+  closing: number;
+  inByReason: Record<string, number>;
+  outByReason: Record<string, number>;
+}
+
+/** 存量迁移候选的去向：IN 只入库 / OUT 入库后出库给商家 / SKIP 不迁。 */
+export type MigrationKind = "IN" | "OUT" | "SKIP";
+
+/** 存量迁移（S7）一台候选（reason 说明为何跳过）。 */
+export interface MigrationCandidate {
+  itemType: string;
+  itemNo: string;
+  kind: MigrationKind;
+  warehouseNo: string | null;
+  agentNo: string | null;
+  siteNo: string | null;
+  claimed: boolean;
+  reason: string | null;
+}
+
+export interface InventoryMigrationPlan {
+  configured: boolean;
+  toInbound: number;
+  toIssue: number;
+  skipped: number;
+  done: number;
+  skippedItems: MigrationCandidate[];
+}
+
+export interface MigrationFailure {
+  itemType: string;
+  itemNo: string;
+  code: string;
+  detail: string;
+}
+
+export interface InventoryMigrationResult {
+  processed: number;
+  failed: number;
+  remaining: number;
+  failures: MigrationFailure[];
+}
+
 /** 盘点单状态（库存服务原样）。 */
 export type StockCountStatus = "OPEN" | "SUBMITTED" | "APPROVED" | "POSTED" | "CANCELLED" | "UNKNOWN";
 

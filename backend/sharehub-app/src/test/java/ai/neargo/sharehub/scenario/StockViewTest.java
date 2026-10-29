@@ -26,10 +26,11 @@ class StockViewTest extends ApiTestSupport {
     HttpInventoryApi http;
 
     private final String tag = Long.toString(System.nanoTime(), 36).toUpperCase();
+    private int seq;
 
     /** 新柜经到仓待检入库到 WH003。 */
     private String stocked() {
-        String c = "CABV" + tag;
+        String c = "CABV" + tag + (++seq);
         post("/api/ops/cabinets", Map.of("cabinetNo", c, "sn", c, "vendorCode", "TEST", "slotTotal", 8), login("ADMIN")).okData();
         jdbc.update("UPDATE dev_cabinet SET warehouse_no = NULL WHERE cabinet_no = ?", c);
         String wh = login("WAREHOUSE");
@@ -51,6 +52,65 @@ class StockViewTest extends ApiTestSupport {
         assertThat(rows.get(0).path("qtyDelta").asInt()).isEqualTo(1);
         assertThat(rows.get(0).path("docKind").asText()).isEqualTo("INBOUND");
         assertThat(post("/api/ops/inventory/counts", Map.of("warehouseNo", "WH003"), admin).status).isEqualTo(409);
+    }
+
+    @Test
+    @DisplayName("★ S6 统一视图与期间报表（本地引擎）：入库后在仓 +1；当天期间报表该仓入 ≥ 1、期初 + 入 − 出 = 期末")
+    void stages_and_period_local() {
+        String admin = login("ADMIN");
+        JsonNode before = get("/api/ops/inventory/stages", admin).okData();
+        long inStock = 0;
+        for (JsonNode r : before) if ("IN_STOCK".equals(r.path("stage").asText())) inStock = r.path("cabinets").asLong();
+        stocked();
+        JsonNode after = get("/api/ops/inventory/stages", admin).okData();
+        long inStock2 = 0;
+        for (JsonNode r : after) if ("IN_STOCK".equals(r.path("stage").asText())) inStock2 = r.path("cabinets").asLong();
+        assertThat(inStock2).isEqualTo(inStock + 1);
+
+        String today = java.time.LocalDate.now(java.time.ZoneOffset.UTC).toString();
+        JsonNode rows = get("/api/ops/inventory/period-summary?from=" + today + "&to=" + today + "&warehouseNo=WH003", admin).okData();
+        JsonNode cab = null;
+        for (JsonNode r : rows) if ("CABINET".equals(r.path("itemType").asText())) cab = r;
+        assertThat(cab).isNotNull();
+        assertThat(cab.path("inQty").asLong()).isGreaterThanOrEqualTo(1);
+        assertThat(cab.path("opening").asLong() + cab.path("inQty").asLong() - cab.path("outQty").asLong())
+                .isEqualTo(cab.path("closing").asLong());
+    }
+
+    @Test
+    @DisplayName("★ S7 存量迁移（对 Fake）：在仓的入库、出库池的入库 + 出库 + 领取；重跑不重复；只有系统参数权限能执行")
+    void migration_against_fake() {
+        InventoryFake fake = new InventoryFake();
+        remote.useApi(fake);
+        jdbc.update("DELETE FROM inventory_sync_state");
+        try {
+            String inWh = stocked();
+            String admin = login("ADMIN");
+            String out = stocked();
+            String agent = jdbc.queryForObject("SELECT issued_agent_no FROM dev_cabinet WHERE issued_agent_no IS NOT NULL LIMIT 1", String.class);
+            jdbc.update("UPDATE dev_cabinet SET warehouse_no=NULL, issued_agent_no=?, issued_at=NOW(3), issue_claimed_at=NOW(3) WHERE cabinet_no=?",
+                    agent, out);
+            assertThat(post("/api/ops/inventory/migration", Map.of("limit", 5), login("WAREHOUSE")).status).isEqualTo(403);
+            JsonNode plan = get("/api/ops/inventory/migration", admin).okData();
+            assertThat(plan.path("toInbound").asInt()).isPositive();
+            assertThat(plan.path("toIssue").asInt()).isPositive();
+
+            // 只迁这两台：把别的候选先标成已完成，避免把共享测试库里的存量全推一遍
+            jdbc.update("INSERT INTO inventory_sync_state (k, v) SELECT CONCAT('mig:CABINET:', cabinet_no), 'OUT' FROM dev_cabinet "
+                    + "WHERE cabinet_no NOT IN (?, ?) ON DUPLICATE KEY UPDATE v = VALUES(v)", inWh, out);
+            jdbc.update("INSERT INTO inventory_sync_state (k, v) SELECT CONCAT('mig:POWERBANK:', powerbank_no), 'IN' FROM dev_powerbank "
+                    + "ON DUPLICATE KEY UPDATE v = VALUES(v)");
+            JsonNode r = post("/api/ops/inventory/migration", Map.of("limit", 50), admin).okData();
+            assertThat(r.path("failed").asInt()).as("%s", r).isZero();
+            assertThat(r.path("processed").asInt()).isEqualTo(2);
+            assertThat(fake.stock).containsKey(inWh);
+            assertThat(fake.dispatchesBySerial(out)).anyMatch(v -> "CLAIMED".equals(v.status()) && agent.equals(v.rootTargetRef()));
+            assertThat(post("/api/ops/inventory/migration", Map.of("limit", 50), admin).okData().path("processed").asInt())
+                    .as("重跑不重复").isZero();
+        } finally {
+            jdbc.update("DELETE FROM inventory_sync_state");
+            remote.useApi(http);
+        }
     }
 
     @Test

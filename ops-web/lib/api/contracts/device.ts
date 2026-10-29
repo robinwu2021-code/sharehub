@@ -1,11 +1,11 @@
 // 覆盖范围：机柜与仓位、下发指令、充电宝、实时监控、指令记录、调拨、OTA、设备日志、设备编码批次。
-import type { PageQ, CabinetQ, DeviceLogQ, ArchiveQ, OtaReleaseQ, StockLedgerQ, StockCountQ } from "../query";
+import type { PageQ, CabinetQ, DeviceLogQ, ArchiveQ, OtaReleaseQ, StockLedgerQ, StockCountQ, StockPeriodQ } from "../query";
 import type {
   PageResult, Cabinet, Slot, Powerbank, CabinetMonitor, CommandRecord,
   InventoryTransfer, InventoryTransferDetail, OtaRollout, OtaRelease, OtaTask, DeviceLog, DeviceCodeBatch,
   Checklist, TrialRent, Protection, ProtectionReq, SignalCode,
   InvTransferReq, QcReq, QcRecord, ReceiveResult, AssetDiff, AssetDiffStatus, PowerbankAction,
-  DeviceMovement, InventoryEngine, StockLedgerRow, StockCount, StockCountDetail, IssueDevicesReq, ClaimDevicesReq, IssueRedirectReq, PoolReturnReq, IssuedSummary, Warehouse, Intake, IntakeDetail, IntakeCreateReq, IntakeItemRef, IntakeDisposeReq, IntakeItemType, IntakeStatus, BindReq, BindBatchReq, BindResult,
+  DeviceMovement, InventoryEngine, StockStage, StockPeriodRow, InventoryMigrationPlan, InventoryMigrationResult, StockLedgerRow, StockCount, StockCountDetail, IssueDevicesReq, ClaimDevicesReq, IssueRedirectReq, PoolReturnReq, IssuedSummary, Warehouse, Intake, IntakeDetail, IntakeCreateReq, IntakeItemRef, IntakeDisposeReq, IntakeItemType, IntakeStatus, BindReq, BindBatchReq, BindResult,
 } from "../../types";
 
 export interface DeviceApi {
@@ -121,6 +121,14 @@ export interface DeviceApi {
 
   // === 库存流水与盘点（S4）：盘点只在独立进销存引擎下可用（本地 409）===
   getInventoryEngine(): Promise<InventoryEngine>;
+  /** 统一库存视图（S6）：按生命周期阶段的台数。 */
+  getStockStages(): Promise<StockStage[]>;
+  /** 期间报表（S6）：from / to 为日期（含）。 */
+  getStockPeriodSummary(q: StockPeriodQ): Promise<StockPeriodRow[]>;
+  /** 存量迁移试跑（S7，system:param:read）。 */
+  getInventoryMigrationPlan(): Promise<InventoryMigrationPlan>;
+  /** 存量迁移执行一批（S7，system:param:update）：每台独立、可重跑。 */
+  runInventoryMigration(limit?: number): Promise<InventoryMigrationResult>;
   listStockLedger(q?: StockLedgerQ): Promise<PageResult<StockLedgerRow>>;
   listStockCounts(q?: StockCountQ): Promise<StockCount[]>;
   getStockCount(countNo: string): Promise<StockCountDetail>;

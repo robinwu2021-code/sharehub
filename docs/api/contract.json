@@ -16601,6 +16601,192 @@
   },
   {
    "verb": "GET",
+   "path": "/api/ops/inventory/migration",
+   "perm": "system:param:read",
+   "perms": [
+    "system:param:read"
+   ],
+   "handler": "InventoryController#migrationPlan",
+   "summary": "存量迁移试跑（S7）：要入库的、要出库的、跳过的（附原因）、已完成的。",
+   "params": [],
+   "bodyType": null,
+   "returnType": "ai.neargo.sharehub.inv.remote.InventoryMigration.InventoryMigrationPlan",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.remote.InventoryMigration.InventoryMigrationPlan",
+   "responseShape": [
+    {
+     "name": "configured",
+     "type": "boolean"
+    },
+    {
+     "name": "toInbound",
+     "type": "int"
+    },
+    {
+     "name": "toIssue",
+     "type": "int"
+    },
+    {
+     "name": "skipped",
+     "type": "int"
+    },
+    {
+     "name": "done",
+     "type": "int"
+    },
+    {
+     "name": "skippedItems",
+     "type": "List<MigrationCandidate>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "itemNo",
+       "type": "String"
+      },
+      {
+       "name": "kind",
+       "type": "String"
+      },
+      {
+       "name": "warehouseNo",
+       "type": "String"
+      },
+      {
+       "name": "agentNo",
+       "type": "String"
+      },
+      {
+       "name": "siteNo",
+       "type": "String"
+      },
+      {
+       "name": "claimed",
+       "type": "boolean"
+      },
+      {
+       "name": "reason",
+       "type": "String"
+      }
+     ]
+    }
+   ],
+   "requestShape": null
+  },
+  {
+   "verb": "POST",
+   "path": "/api/ops/inventory/migration",
+   "perm": "system:param:update",
+   "perms": [
+    "system:param:update"
+   ],
+   "handler": "InventoryController#runMigration",
+   "summary": "存量迁移执行一批（S7）：每台独立、可重跑；失败逐台列出。",
+   "params": [],
+   "bodyType": "ai.neargo.sharehub.inv.dto.StockDtos.MigrationRunReq",
+   "returnType": "ai.neargo.sharehub.inv.remote.InventoryMigration.InventoryMigrationResult",
+   "returnContainer": null,
+   "returnElement": "ai.neargo.sharehub.inv.remote.InventoryMigration.InventoryMigrationResult",
+   "responseShape": [
+    {
+     "name": "processed",
+     "type": "int"
+    },
+    {
+     "name": "failed",
+     "type": "int"
+    },
+    {
+     "name": "remaining",
+     "type": "int"
+    },
+    {
+     "name": "failures",
+     "type": "List<MigrationFailure>",
+     "fields": [
+      {
+       "name": "itemType",
+       "type": "String"
+      },
+      {
+       "name": "itemNo",
+       "type": "String"
+      },
+      {
+       "name": "code",
+       "type": "String"
+      },
+      {
+       "name": "detail",
+       "type": "String"
+      }
+     ]
+    }
+   ],
+   "requestShape": [
+    {
+     "name": "limit",
+     "type": "Integer"
+    }
+   ]
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/period-summary",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#periodSummary",
+   "summary": "期间报表（S6）：期初 / 入 / 出 / 期末，按仓与设备类型。",
+   "params": [
+    {
+     "in": "query",
+     "name": "from",
+     "type": "java.time.LocalDate",
+     "required": true
+    },
+    {
+     "in": "query",
+     "name": "to",
+     "type": "java.time.LocalDate",
+     "required": true
+    },
+    {
+     "in": "query",
+     "name": "warehouseNo",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "java.util.List<ai.neargo.sharehub.inv.dto.StockDtos.StockPeriodRow>",
+   "returnContainer": null,
+   "returnElement": "java.util.List<ai.neargo.sharehub.inv.dto.StockDtos.StockPeriodRow>",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/stages",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#stages",
+   "summary": "统一库存视图（S6）：按生命周期阶段的台数。",
+   "params": [],
+   "bodyType": null,
+   "returnType": "java.util.List<ai.neargo.sharehub.inv.dto.StockDtos.StockStage>",
+   "returnContainer": null,
+   "returnElement": "java.util.List<ai.neargo.sharehub.inv.dto.StockDtos.StockStage>",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
    "path": "/api/ops/inventory/warehouses",
    "perm": "device:inventory:read",
    "perms": [
@@ -53237,10 +53423,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 594,
-  "records": 567,
-  "withPerm": 512,
-  "withBody": 245,
-  "shapedResponses": 462
+  "endpoints": 598,
+  "records": 575,
+  "withPerm": 516,
+  "withBody": 246,
+  "shapedResponses": 464
  }
 }

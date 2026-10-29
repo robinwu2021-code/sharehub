@@ -177,3 +177,5 @@ export interface WithdrawalQ extends PageQ {
 export interface StockLedgerQ extends PageQ { warehouseNo?: string; itemType?: string; }
 /** 盘点单列表（S4）。 */
 export interface StockCountQ { warehouseNo?: string; status?: string; [k: string]: unknown; }
+/** 期间报表（S6）：日期含两端，YYYY-MM-DD。 */
+export interface StockPeriodQ { from: string; to: string; warehouseNo?: string; [k: string]: unknown; }

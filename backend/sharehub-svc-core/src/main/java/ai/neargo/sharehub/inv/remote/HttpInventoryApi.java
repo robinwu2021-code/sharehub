@@ -14,6 +14,7 @@ import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -221,6 +222,14 @@ public class HttpInventoryApi implements InventoryApi {
         Map<String, Object> m = new HashMap<>();
         m.put("note", note);
         return m;
+    }
+
+    @Override
+    public List<PeriodRow> periodSummary(LocalDateTime from, LocalDateTime to, String locationId) {
+        UriComponentsBuilder b = UriComponentsBuilder.fromPath(V1 + "/reports/period-summary")
+                .queryParam("from", from.toString()).queryParam("to", to.toString());
+        if (locationId != null) b.queryParam("locationId", locationId);
+        return read(call(HttpMethod.GET, b.build().toUriString(), null, null), new TypeReference<>() { });
     }
 
     // —— 事件 ——

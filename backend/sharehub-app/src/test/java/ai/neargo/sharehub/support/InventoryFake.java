@@ -272,6 +272,20 @@ public class InventoryFake implements InventoryApi {
     }
 
     @Override
+    public List<PeriodRow> periodSummary(LocalDateTime from, LocalDateTime to, String locationId) {
+        Map<String, Long> close = new HashMap<>();
+        stock.forEach((sn, loc) -> close.merge(loc, 1L, Long::sum));
+        List<PeriodRow> out = new ArrayList<>();
+        close.forEach((loc, n) -> {
+            if (locationId == null || locationId.equals(loc)) {
+                out.add(new PeriodRow(loc, items.get("CABINET"), BigDecimal.ZERO, Map.of("PURCHASE", BigDecimal.valueOf(n)), Map.of(),
+                        BigDecimal.valueOf(n)));
+            }
+        });
+        return out;
+    }
+
+    @Override
     public EventPage pullEvents(Long afterSeq, int limit) {
         long from = afterSeq == null ? acked : afterSeq;
         List<Event> page = events.stream().filter(e -> e.seq() > from).limit(limit).toList();

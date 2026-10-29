@@ -5,6 +5,22 @@ import ai.neargo.sharehub.api.platform.port.SysParamPort;
 import ai.neargo.sharehub.common.BizException;
 import ai.neargo.sharehub.dev.dto.DeviceOpsDtos.DeviceMovement;
 import ai.neargo.sharehub.dev.movement.MovementRecorder;
+import ai.neargo.common.data.scope.DataScopeContext;
+import ai.neargo.sharehub.dev.CabinetStatus;
+import ai.neargo.sharehub.dev.PowerbankStatus;
+import ai.neargo.sharehub.dev.entity.DevCabinet;
+import ai.neargo.sharehub.dev.entity.DevPowerbank;
+import ai.neargo.sharehub.dev.mapper.CabinetMapper;
+import ai.neargo.sharehub.dev.mapper.PowerbankMapper;
+import ai.neargo.sharehub.inv.dto.StockDtos.StockPeriodRow;
+import ai.neargo.sharehub.inv.dto.StockDtos.StockStage;
+import ai.neargo.sharehub.inv.entity.InvIntakeItem;
+import ai.neargo.sharehub.inv.mapper.InvIntakeItemMapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import java.time.LocalDate;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.TreeMap;
 import ai.neargo.sharehub.inv.dto.StockDtos.InventoryEngine;
 import ai.neargo.sharehub.inv.dto.StockDtos.StockCount;
 import ai.neargo.sharehub.inv.dto.StockDtos.StockCountDetail;
@@ -45,12 +61,144 @@ public class StockViewServiceImpl implements StockViewService {
     private final MovementRecorder movements;
     private final RemoteInventoryPort remote;
     private final InventoryLinks links;
+    private final CabinetMapper cabinets;
+    private final PowerbankMapper powerbanks;
+    private final InvIntakeItemMapper intakeItems;
 
-    public StockViewServiceImpl(SysParamPort params, MovementRecorder movements, RemoteInventoryPort remote, InventoryLinks links) {
+    public StockViewServiceImpl(SysParamPort params, MovementRecorder movements, RemoteInventoryPort remote, InventoryLinks links,
+                                CabinetMapper cabinets, PowerbankMapper powerbanks, InvIntakeItemMapper intakeItems) {
         this.params = params;
         this.movements = movements;
         this.remote = remote;
         this.links = links;
+        this.cabinets = cabinets;
+        this.powerbanks = powerbanks;
+        this.intakeItems = intakeItems;
+    }
+
+    // —— 统一库存视图 ——
+
+    @Override
+    public List<StockStage> stages() {
+        return DataScopeContext.executeWithoutScope(() -> {
+            List<StockStage> out = new ArrayList<>();
+            out.add(new StockStage("INTAKE", pendingIntake("CABINET"), pendingIntake("POWERBANK")));
+            out.add(new StockStage("IN_STOCK", cab(w -> w.eq(DevCabinet::getStatus, CabinetStatus.IN_STOCK.name())
+                    .isNotNull(DevCabinet::getWarehouseNo).isNull(DevCabinet::getLocationNo).isNull(DevCabinet::getIssuedAgentNo)),
+                    pb(w -> w.eq(DevPowerbank::getStatus, PowerbankStatus.IN_STOCK.name()).isNotNull(DevPowerbank::getWarehouseNo))));
+            out.add(new StockStage("IN_TRANSIT", cab(w -> w.eq(DevCabinet::getStatus, CabinetStatus.IN_TRANSIT.name())), 0));
+            out.add(new StockStage("DISPATCHED", cab(w -> w.isNotNull(DevCabinet::getIssuedAgentNo).isNull(DevCabinet::getLocationNo)
+                    .isNull(DevCabinet::getIssueClaimedAt).eq(DevCabinet::getStatus, CabinetStatus.IN_STOCK.name())), 0));
+            out.add(new StockStage("ISSUED", cab(w -> w.isNotNull(DevCabinet::getIssuedAgentNo).isNull(DevCabinet::getLocationNo)
+                    .isNotNull(DevCabinet::getIssueClaimedAt).eq(DevCabinet::getStatus, CabinetStatus.IN_STOCK.name())), 0));
+            out.add(new StockStage("BOUND", cab(w -> w.isNotNull(DevCabinet::getLocationNo).eq(DevCabinet::getStatus, CabinetStatus.IN_STOCK.name())), 0));
+            out.add(new StockStage("LIVE", cab(w -> w.eq(DevCabinet::getStatus, CabinetStatus.DEPLOYED.name())),
+                    pb(w -> w.eq(DevPowerbank::getStatus, PowerbankStatus.IN_CABINET.name()))));
+            out.add(new StockStage("RENTED", 0, pb(w -> w.eq(DevPowerbank::getStatus, PowerbankStatus.RENTED.name()))));
+            out.add(new StockStage("FAULT", cab(w -> w.eq(DevCabinet::getStatus, CabinetStatus.FAULT.name())),
+                    pb(w -> w.eq(DevPowerbank::getStatus, PowerbankStatus.FAULT.name()))));
+            out.add(new StockStage("LOST", 0, pb(w -> w.eq(DevPowerbank::getStatus, PowerbankStatus.LOST.name()))));
+            out.add(new StockStage("RETIRED", cab(w -> w.eq(DevCabinet::getStatus, CabinetStatus.RETIRED.name())),
+                    pb(w -> w.in(DevPowerbank::getStatus, PowerbankStatus.SCRAP.name(), PowerbankStatus.SOLD.name()))));
+            return out;
+        });
+    }
+
+    private long cab(java.util.function.Consumer<LambdaQueryWrapper<DevCabinet>> f) {
+        LambdaQueryWrapper<DevCabinet> w = new LambdaQueryWrapper<DevCabinet>().isNull(DevCabinet::getArchivedAt);
+        f.accept(w);
+        return cabinets.selectCount(w);
+    }
+
+    private long pb(java.util.function.Consumer<LambdaQueryWrapper<DevPowerbank>> f) {
+        LambdaQueryWrapper<DevPowerbank> w = new LambdaQueryWrapper<DevPowerbank>().isNull(DevPowerbank::getArchivedAt);
+        f.accept(w);
+        return powerbanks.selectCount(w);
+    }
+
+    private long pendingIntake(String itemType) {
+        return intakeItems.selectCount(new LambdaQueryWrapper<InvIntakeItem>().eq(InvIntakeItem::getItemType, itemType)
+                .eq(InvIntakeItem::getDisposition, "PENDING"));
+    }
+
+    // —— 期间报表 ——
+
+    @Override
+    public List<StockPeriodRow> periodSummary(LocalDate from, LocalDate to, String warehouseNo) {
+        if (from == null || to == null || to.isBefore(from)) throw BizException.badRequest("error.common.invalid_value", "from / to");
+        LocalDateTime start = from.atStartOfDay();
+        LocalDateTime end = to.plusDays(1).atStartOfDay();
+        String wh = warehouseNo == null || warehouseNo.isBlank() ? null : warehouseNo.trim();
+        if (service()) {
+            InventoryApi api = remote.api();
+            return call(() -> api.periodSummary(start, end, wh == null ? null : links.locationId(api, wh))).stream()
+                    .map(r -> new StockPeriodRow(links.warehouseNoOf(r.locationId()), links.itemTypeOf(r.itemId()), n(r.opening()),
+                            sum(r.inByReason()), sum(r.outByReason()), n(r.closing()), longs(r.inByReason()), longs(r.outByReason())))
+                    .toList();
+        }
+        return localPeriod(start, end, wh);
+    }
+
+    /**
+     * 本地口径：期末 = 当前在仓数 − 期末之后的净进出；期初 = 期末 − 期内入 + 期内出。
+     * 履历自 V196 起才有，更早的期间期初不可信（页面提示）。
+     */
+    private List<StockPeriodRow> localPeriod(LocalDateTime start, LocalDateTime end, String wh) {
+        Map<String, long[]> now = new TreeMap<>();
+        DataScopeContext.executeWithoutScope(() -> {
+            for (DevCabinet c : cabinets.selectList(new LambdaQueryWrapper<DevCabinet>().select(DevCabinet::getWarehouseNo)
+                    .eq(DevCabinet::getStatus, CabinetStatus.IN_STOCK.name()).isNotNull(DevCabinet::getWarehouseNo).isNull(DevCabinet::getArchivedAt))) {
+                now.computeIfAbsent(c.getWarehouseNo() + "|CABINET", k -> new long[1])[0]++;
+            }
+            for (DevPowerbank p : powerbanks.selectList(new LambdaQueryWrapper<DevPowerbank>().select(DevPowerbank::getWarehouseNo)
+                    .eq(DevPowerbank::getStatus, PowerbankStatus.IN_STOCK.name()).isNotNull(DevPowerbank::getWarehouseNo).isNull(DevPowerbank::getArchivedAt))) {
+                now.computeIfAbsent(p.getWarehouseNo() + "|POWERBANK", k -> new long[1])[0]++;
+            }
+            return null;
+        });
+        Map<String, Long> after = new HashMap<>();
+        Map<String, Map<String, Long>> in = new TreeMap<>();
+        Map<String, Map<String, Long>> out = new TreeMap<>();
+        for (DeviceMovement m : movements.warehouseMovesSince(start)) {
+            boolean inPeriod = m.occurredAt() != null && m.occurredAt().isBefore(end);
+            if (m.toRef() != null && m.toRef().startsWith("WH:")) {
+                String k = m.toRef().substring(3) + "|" + m.itemType();
+                if (inPeriod) in.computeIfAbsent(k, x -> new TreeMap<>()).merge(m.event(), 1L, Long::sum);
+                else after.merge(k, 1L, Long::sum);
+            }
+            if (m.fromRef() != null && m.fromRef().startsWith("WH:")) {
+                String k = m.fromRef().substring(3) + "|" + m.itemType();
+                if (inPeriod) out.computeIfAbsent(k, x -> new TreeMap<>()).merge(m.event(), 1L, Long::sum);
+                else after.merge(k, -1L, Long::sum);
+            }
+        }
+        java.util.Set<String> keys = new java.util.TreeSet<>(now.keySet());
+        keys.addAll(in.keySet());
+        keys.addAll(out.keySet());
+        List<StockPeriodRow> rows = new ArrayList<>();
+        for (String k : keys) {
+            String[] p = k.split("\\|", 2);
+            if (wh != null && !wh.equals(p[0])) continue;
+            long closing = (now.containsKey(k) ? now.get(k)[0] : 0) - after.getOrDefault(k, 0L);
+            Map<String, Long> i = in.getOrDefault(k, Map.of()), o = out.getOrDefault(k, Map.of());
+            long inQ = i.values().stream().mapToLong(Long::longValue).sum(), outQ = o.values().stream().mapToLong(Long::longValue).sum();
+            rows.add(new StockPeriodRow(p[0], p[1], closing - inQ + outQ, inQ, outQ, closing, i, o));
+        }
+        return rows;
+    }
+
+    private static long n(java.math.BigDecimal v) {
+        return v == null ? 0 : v.longValue();
+    }
+
+    private static long sum(Map<String, java.math.BigDecimal> m) {
+        return m == null ? 0 : m.values().stream().mapToLong(StockViewServiceImpl::n).sum();
+    }
+
+    private static Map<String, Long> longs(Map<String, java.math.BigDecimal> m) {
+        Map<String, Long> r = new TreeMap<>();
+        if (m != null) m.forEach((k, v) -> r.put(k, n(v)));
+        return r;
     }
 
     private boolean service() {

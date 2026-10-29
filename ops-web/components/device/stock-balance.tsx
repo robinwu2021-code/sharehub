@@ -21,6 +21,7 @@ import { exportCsv } from "@/lib/export-csv";
 import { CAB_STATUS, PB_STATUS } from "./device-maps";
 import type { Cabinet, CabinetStatus, Powerbank, PowerbankStatus } from "@/lib/types";
 import { tally, totalRow, type StockRow as Row } from "@/lib/stock-tally";
+import { StockStagesTable } from "./stock-stages";
 
 type Kind = "CABINET" | "POWERBANK";
 type Dim = "WAREHOUSE" | "OWNER" | "MODEL";
@@ -28,7 +29,21 @@ const DIM_LABEL: Record<Dim, string> = { WAREHOUSE: "按仓库", OWNER: "按商�
 const CAB_KEYS = Object.keys(CAB_STATUS) as CabinetStatus[];
 const PB_KEYS = Object.keys(PB_STATUS) as PowerbankStatus[];
 
+/** 库存余额：按状态汇总（台账口径）/ 按生命周期阶段（S6 统一视图）。 */
 export function StockBalanceTab() {
+  const [view, setView] = useState<"STATUS" | "STAGE">("STATUS");
+  return (
+    <div>
+      <div className="mb-3">
+        <FilterSelect aria-label="视图" value={view} onChange={(v) => setView(v as "STATUS" | "STAGE")}
+          options={[{ value: "STATUS", label: "按状态汇总" }, { value: "STAGE", label: "按生命周期阶段" }]} />
+      </div>
+      {view === "STATUS" ? <StatusBalance /> : <StockStagesTable />}
+    </div>
+  );
+}
+
+function StatusBalance() {
   const allow = useCan();
   const canCab = allow("device:cabinet:read");
   const canPb = allow("device:powerbank:read");

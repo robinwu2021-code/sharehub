@@ -11,6 +11,7 @@ import { Toolbar } from "@/components/ui/toolbar";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { PagedTable } from "@/components/ui/paged-table";
 import { type Column } from "@/components/ui/data-table";
+import { StockPeriodTable } from "./stock-period";
 
 const ITEM_TYPES = [{ value: "CABINET", label: "机柜" }, { value: "POWERBANK", label: "充电宝" }];
 const ITEM_LABEL: Record<string, string> = { CABINET: "机柜", POWERBANK: "充电宝" };
@@ -19,7 +20,21 @@ const DOC_LABEL: Record<string, string> = {
   BIND: "绑定出仓", UNBIND: "解绑回仓", IN: "入库单", OUT: "出库单",
 };
 
+/** 库存流水：明细 / 期间汇总（S6）。 */
 export function StockLedgerTab() {
+  const [view, setView] = useState<"DETAIL" | "PERIOD">("DETAIL");
+  return (
+    <div>
+      <div className="mb-3">
+        <FilterSelect aria-label="视图" value={view} onChange={(v) => setView(v as "DETAIL" | "PERIOD")}
+          options={[{ value: "DETAIL", label: "流水明细" }, { value: "PERIOD", label: "期间汇总" }]} />
+      </div>
+      {view === "DETAIL" ? <LedgerDetail /> : <StockPeriodTable />}
+    </div>
+  );
+}
+
+function LedgerDetail() {
   const paging = usePaging();
   const [keyword, setKeyword] = useState("");
   const [warehouseNo, setWarehouseNo] = useState("");

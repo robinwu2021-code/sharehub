@@ -113,6 +113,13 @@ public interface InventoryApi {
 
     void cancelCount(String countNo, String idempotencyKey);
 
+    record PeriodRow(String locationId, String itemId, BigDecimal opening, Map<String, BigDecimal> inByReason,
+                     Map<String, BigDecimal> outByReason, BigDecimal closing) {
+    }
+
+    /** 期间汇总（S6）：期初、按原因的入 / 出、期末。 */
+    List<PeriodRow> periodSummary(LocalDateTime from, LocalDateTime to, String locationId);
+
     // —— 事件 ——
 
     record Event(long seq, String eventId, String type, String resourceType, String resourceId, int resourceVersion,

@@ -83,6 +83,16 @@ public class MovementRecorder {
                 e.getSourceRef(), e.getOperatorNo(), e.getOccurredAt())).toList(), p.getTotal());
     }
 
+    /** {@code since} 之后所有进出仓的履历，时间升序（本地引擎的期间报表用；上限 20000 行）。 */
+    public List<DeviceMovement> warehouseMovesSince(LocalDateTime since) {
+        return logs.selectList(new LambdaQueryWrapper<DevMovementLog>().ge(DevMovementLog::getOccurredAt, since)
+                        .and(x -> x.likeRight(DevMovementLog::getFromRef, "WH:").or().likeRight(DevMovementLog::getToRef, "WH:"))
+                        .orderByAsc(DevMovementLog::getId).last("limit 20000"))
+                .stream().map(e -> new DeviceMovement(e.getId(), e.getItemType(), e.getItemNo(), e.getEvent(), e.getFromRef(),
+                        e.getToRef(), e.getAgentBefore(), e.getAgentAfter(), e.getReason(), e.getSourceRef(), e.getOperatorNo(),
+                        e.getOccurredAt())).toList();
+    }
+
     public static String wh(String no) {
         return no == null ? null : "WH:" + no;
     }

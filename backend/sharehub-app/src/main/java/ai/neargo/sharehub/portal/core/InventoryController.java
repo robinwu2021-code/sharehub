@@ -29,17 +29,20 @@ public class InventoryController {
     private final ai.neargo.sharehub.inv.WarehouseDirectory warehouses;
     private final ai.neargo.sharehub.inv.service.IntakeService intakes;
     private final ai.neargo.sharehub.inv.service.StockViewService stock;
+    private final ai.neargo.sharehub.inv.remote.InventoryMigration migration;
 
     public InventoryController(InventoryTransferService transferService,
                                CommandLogService commandLogService,
                                ai.neargo.sharehub.inv.WarehouseDirectory warehouses,
                                ai.neargo.sharehub.inv.service.IntakeService intakes,
-                               ai.neargo.sharehub.inv.service.StockViewService stock) {
+                               ai.neargo.sharehub.inv.service.StockViewService stock,
+                               ai.neargo.sharehub.inv.remote.InventoryMigration migration) {
         this.transferService = transferService;
         this.commandLogService = commandLogService;
         this.warehouses = warehouses;
         this.intakes = intakes;
         this.stock = stock;
+        this.migration = migration;
     }
 
     // —— 库存流水与盘点（S4；菜单叶：设备管理 › 仓储与出库 › 库存流水 / 盘点）——
@@ -49,6 +52,38 @@ public class InventoryController {
     @PreAuthorize("@perm.can('device:inventory:read')")
     public ai.neargo.sharehub.inv.dto.StockDtos.InventoryEngine engine() {
         return stock.engine();
+    }
+
+    /** 统一库存视图（S6）：按生命周期阶段的台数。 */
+    @GetMapping("/inventory/stages")
+    @PreAuthorize("@perm.can('device:inventory:read')")
+    public java.util.List<ai.neargo.sharehub.inv.dto.StockDtos.StockStage> stages() {
+        return stock.stages();
+    }
+
+    /** 期间报表（S6）：期初 / 入 / 出 / 期末，按仓与设备类型。 */
+    @GetMapping("/inventory/period-summary")
+    @PreAuthorize("@perm.can('device:inventory:read')")
+    public java.util.List<ai.neargo.sharehub.inv.dto.StockDtos.StockPeriodRow> periodSummary(
+            @RequestParam java.time.LocalDate from, @RequestParam java.time.LocalDate to,
+            @RequestParam(required = false) String warehouseNo) {
+        return stock.periodSummary(from, to, warehouseNo);
+    }
+
+    /** 存量迁移试跑（S7）：要入库的、要出库的、跳过的（附原因）、已完成的。与切换引擎同级 —— 系统参数权限。 */
+    @GetMapping("/inventory/migration")
+    @PreAuthorize("@perm.can('system:param:read')")
+    public ai.neargo.sharehub.inv.remote.InventoryMigration.InventoryMigrationPlan migrationPlan() {
+        return migration.plan();
+    }
+
+    /** 存量迁移执行一批（S7）：每台独立、可重跑；失败逐台列出。 */
+    @PostMapping("/inventory/migration")
+    @PreAuthorize("@perm.can('system:param:update')")
+    public ai.neargo.sharehub.inv.remote.InventoryMigration.InventoryMigrationResult runMigration(
+            @RequestBody(required = false) ai.neargo.sharehub.inv.dto.StockDtos.MigrationRunReq req) {
+        int limit = req == null || req.limit() == null ? 200 : Math.max(1, Math.min(req.limit(), 1000));
+        return migration.run(limit);
     }
 
     @GetMapping("/inventory/ledger")

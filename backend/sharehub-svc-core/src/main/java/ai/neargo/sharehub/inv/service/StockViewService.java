@@ -16,6 +16,13 @@ public interface StockViewService {
 
     InventoryEngine engine();
 
+    /** 统一库存视图（S6）：取本地投影，两个引擎同口径。 */
+    List<ai.neargo.sharehub.inv.dto.StockDtos.StockStage> stages();
+
+    /** 期间报表（S6）：SERVICE 读库存服务期间汇总；LOCAL 由当前在仓数与履历倒推（履历自 V196 起）。 */
+    List<ai.neargo.sharehub.inv.dto.StockDtos.StockPeriodRow> periodSummary(java.time.LocalDate from, java.time.LocalDate to,
+                                                                          String warehouseNo);
+
     PageResult<StockLedgerRow> ledger(String warehouseNo, String itemType, String keyword, Integer page, Integer size);
 
     List<StockCount> counts(String warehouseNo, String status);
