@@ -15,6 +15,8 @@ import ai.neargo.sharehub.platform.org.entity.IamDept;
 import ai.neargo.sharehub.platform.org.entity.IamEmployee;
 import ai.neargo.sharehub.platform.org.mapper.IamDeptMapper;
 import ai.neargo.sharehub.platform.org.mapper.IamEmployeeMapper;
+import ai.neargo.sharehub.platform.org.mapper.IamEmployeeRoleMapper;
+import ai.neargo.sharehub.platform.org.entity.IamEmployeeRole;
 import ai.neargo.sharehub.trade.entity.OrdOrder;
 import ai.neargo.sharehub.trade.mapper.OrdMapper;
 import ai.neargo.sharehub.wo.ext.entity.WoInspectionPlan;
@@ -70,6 +72,7 @@ public class DemoOpsFinanceSeeder implements CommandLineRunner {
     private final AcctAccountMapper accounts;
     private final IamDeptMapper depts;
     private final IamEmployeeMapper employees;
+    private final IamEmployeeRoleMapper employeeRoles;
     private final OrdMapper orders;
 
     public DemoOpsFinanceSeeder(DevAlarmCodeMapper alarmCodes, DevAlarmMapper alarms, CabinetMapper cabinets,
@@ -80,7 +83,8 @@ public class DemoOpsFinanceSeeder implements CommandLineRunner {
                                 ShareRuleMapper shareRules,
                                 AgentMapper agents,
                                 AcctLedgerMapper ledgers, AcctAccountMapper accounts,
-                                IamDeptMapper depts, IamEmployeeMapper employees, OrdMapper orders) {
+                                IamDeptMapper depts, IamEmployeeMapper employees, OrdMapper orders,
+                                IamEmployeeRoleMapper employeeRoles) {
         this.alarmCodes = alarmCodes;
         this.alarms = alarms;
         this.cabinets = cabinets;
@@ -98,6 +102,7 @@ public class DemoOpsFinanceSeeder implements CommandLineRunner {
         this.accounts = accounts;
         this.depts = depts;
         this.employees = employees;
+        this.employeeRoles = employeeRoles;
         this.orders = orders;
     }
 
@@ -478,5 +483,11 @@ public class DemoOpsFinanceSeeder implements CommandLineRunner {
         e.setRoleNo(roleNo);
         e.setStatus("ACTIVE");
         employees.insert(e);
+        // 授权读的是 iam_employee_role，不是 role_no 这一列（V78 注释：只写 role_no 时登录拿不到档案角色）。
+        // 新库里本种子晚于 V78 回填执行，不在这里写，E1001 ~ E1005 登录就会退回「按请求声称的角色」
+        IamEmployeeRole r = new IamEmployeeRole();
+        r.setEmployeeNo(no);
+        r.setRoleNo(roleNo);
+        employeeRoles.insert(r);
     }
 }

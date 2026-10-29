@@ -533,6 +533,17 @@ const PATCHES: { file: string; mustContain: string; apply: (rows: Row[]) => void
         .forEach((no, i) => { at(no).sort = String(i + 5); });
     },
   },
+  {
+    // 合并 L1 后补回模块前缀：营销 / 计费并入销售管理、营销（充值）并入用户管理、组织并入系统管理。
+    file: "V176__menu_section_modules_after_merge.sql",
+    mustContain: "UPDATE iam_menu SET modules = '[\"system\",\"org\"]'",
+    apply: (rows) => {
+      const at = (no: string) => rows.find((r) => r.menu_no === no)!;
+      at("M_order").modules = '["order","marketing","pricing"]';
+      at("M_user").modules = '["user","marketing"]';
+      at("M_system").modules = '["system","org"]';
+    },
+  },
 ];
 
 const COLS = [

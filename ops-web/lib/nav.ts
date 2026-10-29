@@ -338,7 +338,7 @@ export const NAV: NavSection[] = [
     // 跨三条路径：/orders（订单、支付渠道、会员 tab）、/marketing、/operation/fee-*（match 最长前缀认领）。
     // 落地页是订单列表（href），不是第一项收费方案。
     // ⚠️ 菜单真源在库里：本段及其它四段的行由 V151 重编号，改这里要同步新开迁移（见 nav-seed.test.ts）。
-    key: "order", label: "销售管理", icon: "ReceiptText", module: "order", href: "/orders",
+    key: "order", label: "销售管理", icon: "ReceiptText", module: "order", modules: ["order", "marketing", "pricing"], href: "/orders",
     match: ["/orders", "/marketing", "/operation/fee-plans", "/operation/fee-adjustments"],
     children: [
       ...opLeaves([
@@ -418,7 +418,7 @@ export const NAV: NavSection[] = [
     // 会员两项迁到销售管理（OM04）；充值订单自财务管理迁入，与充值套餐合为一项；
     // 开票申请属发票模块（OM09），该模块调整时迁走，暂留资产组末尾。
     // ⚠️ 菜单真源在库里：本段与财务管理段的行由 V152 重编号，改这里要同步新开迁移（见 nav-seed.test.ts）。
-    key: "user", label: "用户管理", icon: "UserCircle", module: "user", href: "/users",
+    key: "user", label: "用户管理", icon: "UserCircle", module: "user", modules: ["user", "marketing"], href: "/users",
     children: [
       { href: "/users", label: "用户列表", perm: "user:cuser:read", phase: 1, group: "用户" },
       { href: "/users?tab=logoffs", label: "注销申请", perm: "user:logoff:read", phase: 2, group: "用户" },
@@ -459,7 +459,7 @@ export const NAV: NavSection[] = [
     // 靠 match 认领；/flow/todo 等仍归流程与工单（/flow 前缀短，配置五页按完整路径认领）。
     // D1：菜单按 system 模块过滤（供应商接入已于 2026-10-28 搬到设备管理，其 device:vendor:* 码随之归设备段）
     // ⚠️ 菜单真源在库里：本段与员工与权限、运营管理、流程与工单三段的行由 V172 重编号，改这里要同步新开迁移（见 nav-seed.test.ts）。
-    key: "system", label: "系统管理", icon: "Settings", module: "system", href: "/employees?tab=employees",
+    key: "system", label: "系统管理", icon: "Settings", module: "system", modules: ["system", "org"], href: "/employees?tab=employees",
     match: ["/system", "/employees", "/operation", "/flow/processes", "/flow/settings", "/flow/access", "/flow/instances", "/flow/stats"],
     pinBottom: true,
     children: [
