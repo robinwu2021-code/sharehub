@@ -215,8 +215,6 @@ function IssueDrawer({ open, onClose, defaultAgent, onDone }: {
   open: boolean; onClose: () => void; defaultAgent: string; onDone: () => void;
 }) {
   const [agentNo, setAgentNo] = useState("");
-  const [siteNo, setSiteNo] = useState("");
-  const [receiverNo, setReceiverNo] = useState("");
   const [picked, setPicked] = useState<string[]>([]);
   const agentsQ = useQuery({ queryKey: ["agents", "issuable"], queryFn: () => api.listAgents({ size: UNPAGED_SIZE }), enabled: open });
   const stockQ = useQuery({
@@ -230,10 +228,10 @@ function IssueDrawer({ open, onClose, defaultAgent, onDone }: {
   const chosen = issuable.find((a) => a.agentNo === (agentNo || defaultAgent));
   const notReady = chosen && (!agentCoreComplete(chosen) || !chosen.defaultSiteNo);
   const m = useMutation({
-    mutationFn: () => api.issueDevices({ agentNo: chosen!.agentNo, siteNo: siteNo || undefined, receiverNo: receiverNo || undefined, cabinetNos: picked }),
+    mutationFn: () => api.issueDevices({ agentNo: chosen!.agentNo, cabinetNos: picked }),
     onSuccess: (r) => {
       notify.success(`已出库 ${r.length} 台给 ${chosen!.name}`);
-      setPicked([]); setAgentNo(""); setSiteNo(""); setReceiverNo(""); onClose(); onDone();
+      setPicked([]); setAgentNo(""); onClose(); onDone();
     },
   });
   return (
@@ -246,7 +244,6 @@ function IssueDrawer({ open, onClose, defaultAgent, onDone }: {
         </Select>
         {notReady && <div className="mt-1 txt-caption text-destructive-ink">该商家还没补齐位置与行业（没有默认站点），补齐后才能出库：去 <RefLink kind="agent" no={chosen!.agentNo} label="商家档案" /></div>}
       </Field>
-      <DestinationFields agentNo={chosen?.agentNo ?? ""} siteNo={siteNo} onSite={setSiteNo} receiverNo={receiverNo} onReceiver={setReceiverNo} />
       <Field label={`仓里可出库的设备（在库 · 质检放行 · ${stock.length} 台）`}>
         {stockQ.isLoading ? <span className="text-muted-foreground">加载中…</span>
           : !stock.length ? <span className="text-muted-foreground">仓里没有可出库的设备</span>
@@ -363,44 +360,18 @@ function ReasonDrawer({ target, onClose, onDone }: {
   );
 }
 
-/** 目的站点（可空 = 到商家）+ 内部接收人（可空 = 出库即签收）。出库与调整共用。 */
-function DestinationFields({ agentNo, siteNo, onSite, receiverNo, onReceiver }: {
-  agentNo: string; siteNo: string; onSite: (v: string) => void; receiverNo: string; onReceiver: (v: string) => void;
-}) {
-  const sitesQ = useQuery({ queryKey: ["sites", "of-agent", agentNo], queryFn: () => api.listSites({ agentNo, size: UNPAGED_SIZE }), enabled: !!agentNo });
-  const empQ = useQuery({ queryKey: ["employees", "all"], queryFn: () => api.listEmployees({ size: UNPAGED_SIZE }) });
-  return (
-    <>
-      <Field label="目的站点">
-        <Select aria-label="目的站点" value={siteNo} onChange={(e) => onSite(e.target.value)} disabled={!agentNo}>
-          <option value="">到商家（不限站点）</option>
-          {(sitesQ.data?.list ?? []).map((s) => <option key={s.siteNo} value={s.siteNo}>{s.name}</option>)}
-        </Select>
-      </Field>
-      <Field label="接收人">
-        <Select aria-label="接收人" value={receiverNo} onChange={(e) => onReceiver(e.target.value)}>
-          <option value="">不指定（出库即签收）</option>
-          {(empQ.data?.list ?? []).filter((e) => e.status === "ACTIVE").map((e) => (
-            <option key={e.employeeNo} value={e.employeeNo}>{e.name}（{e.employeeNo}）</option>
-          ))}
-        </Select>
-      </Field>
-    </>
-  );
-}
-
-/** 出库调整：改商家 / 目的站点 / 接收人；原因必填；换了接收人要重新签收。 */
+/** 出库调整：改商家（A5：powerbank 出库只选商户）；原因必填。目的站点与接收人后端仍支持，界面不再提供。 */
 function RedirectDrawer({ rows, onClose, onDone }: { rows: Cabinet[] | null; onClose: () => void; onDone: () => void }) {
   const first = rows?.[0];
   const [agentNo, setAgentNo] = useState<string | null>(null);
   const [siteNo, setSiteNo] = useState<string | null>(null);
-  const [receiverNo, setReceiverNo] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const agentsQ = useQuery({ queryKey: ["agents", "issuable"], queryFn: () => api.listAgents({ size: UNPAGED_SIZE }), enabled: !!rows });
   const agent = agentNo ?? first?.issuedAgentNo ?? "";
   const site = siteNo ?? first?.issuedSiteNo ?? "";
-  const receiver = receiverNo ?? first?.issueReceiverNo ?? "";
-  const reset = () => { setAgentNo(null); setSiteNo(null); setReceiverNo(null); setReason(""); };
+  // 接收人不在界面上改（A5），保持原值，避免改商家时把已签收的打回待签收
+  const receiver = first?.issueReceiverNo ?? "";
+  const reset = () => { setAgentNo(null); setSiteNo(null); setReason(""); };
   const m = useMutation({
     mutationFn: () => api.redirectIssue({ cabinetNos: rows!.map((c) => c.cabinetNo), agentNo: agent, siteNo: site || undefined,
       receiverNo: receiver || undefined, reason }),
@@ -415,7 +386,6 @@ function RedirectDrawer({ rows, onClose, onDone }: { rows: Cabinet[] | null; onC
             .map((a) => <option key={a.agentNo} value={a.agentNo}>{a.name}（{a.agentNo}）</option>)}
         </Select>
       </Field>
-      <DestinationFields agentNo={agent} siteNo={site} onSite={setSiteNo} receiverNo={receiver} onReceiver={setReceiverNo} />
       <Field label="原因（必填）">
         <Textarea value={reason} onChange={setReason} />
       </Field>
