@@ -5,7 +5,7 @@ import type {
   InventoryTransfer, InventoryTransferDetail, OtaRollout, OtaRelease, OtaTask, DeviceLog, DeviceCodeBatch,
   Checklist, TrialRent, Protection, ProtectionReq, SignalCode,
   InvTransferReq, QcReq, QcRecord, ReceiveResult, AssetDiff, AssetDiffStatus, PowerbankAction,
-  DeviceMovement, InventoryEngine, StockStage, StockPeriodRow, InventoryMigrationPlan, InventoryMigrationResult, StockLedgerRow, StockCount, StockCountDetail, IssueDevicesReq, ClaimDevicesReq, IssueRedirectReq, PoolReturnReq, IssuedSummary, Warehouse, WarehouseReq, Supplier, SupplierReq, Disposal, DisposalDetail, DisposalReq, DisposalKind, StockThreshold, StockThresholdReq, Intake, IntakeDetail, IntakeCreateReq, IntakeItemRef, IntakeDisposeReq, IntakeItemType, IntakeStatus, BindReq, BindBatchReq, BindResult,
+  DeviceMovement, InventoryEngine, StockStage, StockPeriodRow, InventoryMigrationPlan, InventoryMigrationResult, StockLedgerRow, StockCount, StockCountDetail, IssueDevicesReq, ClaimDevicesReq, IssueRedirectReq, PoolReturnReq, IssuedSummary, Warehouse, WarehouseReq, Supplier, SupplierReq, Disposal, DisposalDetail, DisposalReq, DisposalKind, StockThreshold, StockThresholdReq, Shipment, ShipInfo, ShipmentDocType, Intake, IntakeDetail, IntakeCreateReq, IntakeItemRef, IntakeDisposeReq, IntakeItemType, IntakeStatus, BindReq, BindBatchReq, BindResult,
 } from "../../types";
 
 export interface DeviceApi {
@@ -143,7 +143,8 @@ export interface DeviceApi {
   /** 草稿期设定调拨明细（整体替换）。每件都要在库且质检已过。 */
   setTransferItems(transferNo: string, itemNos: string[]): Promise<InventoryTransferDetail>;
   /** 发货：DRAFT → IN_TRANSIT；机柜类随之 IN_STOCK → IN_TRANSIT。发货这一刻再核一遍在库与质检。 */
-  shipTransfer(transferNo: string): Promise<InventoryTransferDetail>;
+  /** 发出：可带物流（V205）。 */
+  shipTransfer(transferNo: string, ship?: ShipInfo): Promise<InventoryTransferDetail>;
   /**
    * 逐件签收：传现场实收的件号。**签收不因差异而卡住** ——
    * 少的记缺件、多的记多件，都落资产差异，返回里当场告诉你是哪几件。
@@ -173,6 +174,8 @@ export interface DeviceApi {
   updateWarehouse(warehouseNo: string, x: WarehouseReq): Promise<Warehouse>;
   archiveWarehouse(warehouseNo: string): Promise<Warehouse>;
   unarchiveWarehouse(warehouseNo: string): Promise<Warehouse>;
+  /** 发货物流（V205）：按单据或设备号查。 */
+  listShipments(q: { docType?: ShipmentDocType; docRef?: string; itemNo?: string }): Promise<Shipment[]>;
   /** 安全库存（V204）：下限 0 = 不预警。 */
   listStockThresholds(warehouseNo?: string): Promise<StockThreshold[]>;
   saveStockThreshold(x: StockThresholdReq): Promise<StockThreshold>;

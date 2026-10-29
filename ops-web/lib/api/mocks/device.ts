@@ -5,6 +5,7 @@ import * as dp from "../../mock/db/device-pool";
 import * as ik from "../../mock/db/intake";
 import * as ia from "../../mock/db/inventory-admin";
 import * as dp2 from "../../mock/db/disposal";
+import * as sh from "../../mock/db/shipment";
 import * as mv from "../../mock/db/movement";
 import * as st from "../../mock/db/stock";
 import * as db from "../../mock/db";
@@ -102,13 +103,22 @@ export const deviceMock: DeviceApi = {
   postStockCount: async (no) => wait(st.moveStockCount(no, "APPROVED", "POSTED"), 300),
   cancelStockCount: async (no) => wait(st.cancelStockCount(no), 300),
   setTransferItems: async (no, itemNos) => wait(da.setTransferItems(no, itemNos), 350),
-  shipTransfer: async (no) => wait(da.shipTransfer(no), 400),
+  shipTransfer: async (no, ship) => wait((() => {
+    const d = da.shipTransfer(no);
+    sh.recordShipment("TRANSFER", no, d.items.map((i) => i.itemNo), ship);
+    return d;
+  })(), 400),
   receiveTransfer: async (no, receivedNos, note) => wait(da.receiveTransfer(no, receivedNos, note), 400),
   listAssetDiffs: async (q = {}) => wait(da.listAssetDiffs(q)),
   resolveAssetDiff: async (diffNo, note) => wait(da.resolveAssetDiff(diffNo, note), 350),
 
   // —— 出库池与绑定：规则（不变式 I1 ~ I5）在 db 层，这里只延迟透传；async 让同步抛错变成 rejected promise ——
-  issueDevices: async (x) => wait(dp.issueDevices(x), 400),
+  issueDevices: async (x) => wait((() => {
+    sh.validateShip(x);
+    const r = dp.issueDevices(x);
+    sh.recordShipment("ISSUE", x.agentNo, x.cabinetNos, x);
+    return r;
+  })(), 400),
   returnPoolDevices: async (x) => wait(dp.returnDevicesToWarehouse(x), 400),
   claimDevices: async (x) => wait(dp.claimDevices(x, currentAuth()?.username ?? ""), 350),
   redirectIssue: async (x) => wait(dp.redirectIssue(x), 400),
@@ -118,6 +128,7 @@ export const deviceMock: DeviceApi = {
   updateWarehouse: async (no, x) => wait(ia.updateWarehouse(no, x), 350),
   archiveWarehouse: async (no) => wait(ia.archiveWarehouse(no), 350),
   unarchiveWarehouse: async (no) => wait(ia.unarchiveWarehouse(no), 350),
+  listShipments: async (q) => wait(sh.listShipments(q)),
   listStockThresholds: async (wh) => wait(ia.listStockThresholds(wh)),
   saveStockThreshold: async (x) => wait(ia.saveStockThreshold(x), 300),
   listDisposals: async (q) => wait(dp2.listDisposals(q)),

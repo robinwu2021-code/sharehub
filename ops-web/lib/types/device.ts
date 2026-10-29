@@ -83,6 +83,9 @@ export interface IssueDevicesReq {
   /** 内部接收人；空 = 出库即签收。 */
   receiverNo?: string;
   cabinetNos: string[];
+  /** 物流（V205，可选）。 */
+  carrier?: string | null;
+  trackingNo?: string | null;
 }
 /** 接收人签收（POST /api/ops/devices/claim）：只能签给自己的。 */
 export interface ClaimDevicesReq {
@@ -131,6 +134,26 @@ export interface Supplier {
   address: string | null;
   note: string | null;
   archivedAt: string | null;
+}
+/** 发货物流（V205）：挂在调拨单 / 商家（出库）/ 处置单上。 */
+export type ShipmentDocType = "TRANSFER" | "ISSUE" | "DISPOSAL";
+/** 随发出动作提交；承运商与运单号都空 = 不记。 */
+export interface ShipInfo {
+  carrier?: string | null;
+  trackingNo?: string | null;
+  shippedAt?: string | null;
+  note?: string | null;
+}
+export interface Shipment {
+  shipmentNo: string;
+  docType: ShipmentDocType;
+  docRef: string;
+  carrier: string | null;
+  trackingNo: string | null;
+  shippedAt: string;
+  note: string | null;
+  itemNos: string[];
+  createdBy: string | null;
 }
 /**
  * 安全库存（V204，GET /api/ops/inventory/stock-thresholds）：启用中的仓 × 柜 / 宝各一行，未设下限 minQty = 0。
@@ -182,6 +205,9 @@ export interface DisposalReq {
   note: string;
   cabinetNos?: string[];
   powerbankNos?: string[];
+  /** 退供应商的物流（V205，可选）。 */
+  carrier?: string | null;
+  trackingNo?: string | null;
 }
 export interface SupplierReq {
   name: string;

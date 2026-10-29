@@ -21,6 +21,7 @@ import { Drawer } from "@/components/ui/drawer";
 import { FormDrawer, type FieldDef } from "@/components/ui/form-drawer";
 import { StatusBadge, type StatusMap } from "@/components/ui/status-badge";
 import { ReadOnlyNotice } from "@/components/read-only-notice";
+import { ShipmentList } from "@/components/device/shipments";
 
 const KIND: StatusMap<DisposalKind> = { SCRAP: { label: "报废", tone: "danger" }, RETURN_SUPPLIER: { label: "退供应商", tone: "warning" } };
 const REASON: Record<DisposalReason, string> = { BROKEN: "损坏", OBSOLETE: "淘汰", OTHER: "其他" };
@@ -54,6 +55,8 @@ export function DisposalsTab() {
         supplierNo: k === "RETURN_SUPPLIER" ? String(v.supplierNo ?? "") || null : null,
         reasonCode: k === "SCRAP" ? (String(v.reasonCode ?? "") || null) as DisposalReason | null : null,
         cabinetNos: parseLines(v.cabinetNos).nos, powerbankNos: parseLines(v.powerbankNos).nos,
+        carrier: k === "RETURN_SUPPLIER" ? String(v.carrier ?? "") || null : null,
+        trackingNo: k === "RETURN_SUPPLIER" ? String(v.trackingNo ?? "") || null : null,
       });
     },
     onSuccess: (d) => {
@@ -76,6 +79,10 @@ export function DisposalsTab() {
       : { key: "supplierNo", label: "退给供应商", type: "select", required: true, options: spOptions },
     { key: "cabinetNos", label: "机柜编号", type: "textarea", rows: 4, placeholder: "每行一个，可扫码" },
     { key: "powerbankNos", label: "充电宝编号", type: "textarea", rows: 4, placeholder: "每行一个，可扫码" },
+    ...(scrap ? [] : [
+      { key: "carrier", label: "承运商", maxLength: 64, placeholder: "可选" },
+      { key: "trackingNo", label: "运单号", maxLength: 64, placeholder: "可选" },
+    ] as FieldDef[]),
     { key: "note", label: "说明", type: "textarea", required: true, rows: 2, maxLength: 512, help: "提交即出库，设备落为报废，不可撤回" },
   ];
 
@@ -117,8 +124,11 @@ export function DisposalsTab() {
       />
       <Drawer open={!!openNo} onOpenChange={(o) => { if (!o) setOpenNo(null); }}
         title={detailQ.data ? `${detailQ.data.disposal.disposalNo} · ${KIND[detailQ.data.disposal.kind].label}` : openNo ?? ""}>
-        <DataTable rowKey={(i: DisposalItem) => `${i.itemType}:${i.itemNo}`} columns={itemCols} rows={detailQ.data?.items}
-          loading={detailQ.isLoading} error={detailQ.error} onRetry={detailQ.refetch} empty="无明细" />
+        <div className="space-y-4">
+          <DataTable rowKey={(i: DisposalItem) => `${i.itemType}:${i.itemNo}`} columns={itemCols} rows={detailQ.data?.items}
+            loading={detailQ.isLoading} error={detailQ.error} onRetry={detailQ.refetch} empty="无明细" />
+          <ShipmentList docType="DISPOSAL" docRef={openNo} />
+        </div>
       </Drawer>
     </div>
   );

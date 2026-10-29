@@ -76,3 +76,15 @@ describe("安全库存（V204 mock）", () => {
     expect(ia.listStockThresholds(w.warehouseNo).find((t) => t.itemType === "CABINET")!.low).toBe(false);
   });
 });
+
+describe("发货物流（V205 mock）", () => {
+  it("填了才记；按单据、按设备号可查；超长拒", async () => {
+    const sh = await import("./shipment");
+    expect(sh.recordShipment("TRANSFER", "TR-X", ["A1"], {})).toBeNull();
+    sh.recordShipment("TRANSFER", "TR-X", ["A1", "A2"], { carrier: "Aramex", trackingNo: "AX1" });
+    expect(sh.listShipments({ docType: "TRANSFER", docRef: "TR-X" })).toHaveLength(1);
+    expect(sh.listShipments({ itemNo: "A2" })[0].trackingNo).toBe("AX1");
+    expect(() => sh.recordShipment("ISSUE", "AG1", ["A3"], { trackingNo: "X".repeat(65) })).toThrow();
+    expect(() => sh.listShipments({})).toThrow();
+  });
+});

@@ -34,7 +34,8 @@ import { ReadOnlyNotice } from "@/components/read-only-notice";
 import { RefLink } from "@/components/ref-link";
 import { agentCoreComplete } from "@/lib/types";
 import { useAuth } from "@/lib/auth";
-import type { Agent, Cabinet, IssuedSummary, PoolFilter } from "@/lib/types";
+import type { Agent, Cabinet, IssuedSummary, PoolFilter, ShipInfo } from "@/lib/types";
+import { ShipFields } from "@/components/device/shipments";
 
 type PoolState = "UNCLAIMED" | "UNBOUND" | "BOUND" | "LIVE" | "FAULT";
 export const POOL_STATE_MAP: StatusMap<PoolState> = {
@@ -228,11 +229,12 @@ function IssueDrawer({ open, onClose, defaultAgent, onDone }: {
     !c.issuedAgentNo && !c.locationNo && !c.archivedAt && (!c.qcStatus || c.qcStatus === "PASSED")), [stockQ.data]);
   const chosen = issuable.find((a) => a.agentNo === (agentNo || defaultAgent));
   const notReady = chosen && (!agentCoreComplete(chosen) || !chosen.defaultSiteNo);
+  const [ship, setShip] = useState<ShipInfo>({});
   const m = useMutation({
-    mutationFn: () => api.issueDevices({ agentNo: chosen!.agentNo, cabinetNos: picked }),
+    mutationFn: () => api.issueDevices({ agentNo: chosen!.agentNo, cabinetNos: picked, carrier: ship.carrier || null, trackingNo: ship.trackingNo || null }),
     onSuccess: (r) => {
       notify.success(`已出库 ${r.length} 台给 ${chosen!.name}`);
-      setPicked([]); setAgentNo(""); onClose(); onDone();
+      setPicked([]); setAgentNo(""); setShip({}); onClose(); onDone();
     },
   });
   return (
@@ -261,6 +263,7 @@ function IssueDrawer({ open, onClose, defaultAgent, onDone }: {
               </div>
             )}
       </Field>
+      <ShipFields value={ship} onChange={setShip} />
     </Drawer>
   );
 }

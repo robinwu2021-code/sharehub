@@ -35,9 +35,12 @@ public class AssetOpsController {
     private final QcService qc;
     private final TransferOpsService transfers;
     private final ai.neargo.sharehub.dev.movement.MovementRecorder movements;
+    private final ai.neargo.sharehub.inv.service.ShipmentService shipments;
 
     public AssetOpsController(QcService qc, TransferOpsService transfers,
-                              ai.neargo.sharehub.dev.movement.MovementRecorder movements) {
+                              ai.neargo.sharehub.dev.movement.MovementRecorder movements,
+                              ai.neargo.sharehub.inv.service.ShipmentService shipments) {
+        this.shipments = shipments;
         this.qc = qc;
         this.transfers = transfers;
         this.movements = movements;
@@ -80,8 +83,13 @@ public class AssetOpsController {
 
     @PostMapping("/inventory-transfers/{transferNo}/ship")
     @PreAuthorize("@perm.can('device:inventory:transfer')")
-    public InventoryTransferDetail ship(@PathVariable String transferNo) {
-        return transfers.ship(transferNo);
+    public InventoryTransferDetail ship(@PathVariable String transferNo, @RequestBody(required = false) ai.neargo.sharehub.inv.dto.ShipmentDtos.ShipInfo ship) {
+        // 物流可选（V205）：先校验，发出成功后按明细记一条
+        shipments.validate(ship);
+        InventoryTransferDetail d = transfers.ship(transferNo);
+        shipments.record(ai.neargo.sharehub.inv.ShipmentDocType.TRANSFER, transferNo, java.util.Map.of(d.transfer().itemType(),
+                d.items().stream().map(ai.neargo.sharehub.inv.dto.InvDtos.TransferItem::itemNo).toList()), ship);
+        return d;
     }
 
     @PostMapping("/inventory-transfers/{transferNo}/receive")

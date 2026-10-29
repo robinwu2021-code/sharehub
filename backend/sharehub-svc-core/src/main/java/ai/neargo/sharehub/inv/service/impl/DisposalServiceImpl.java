@@ -63,6 +63,13 @@ public class DisposalServiceImpl implements DisposalService {
     private final WarehouseDirectory warehouses;
     private final SupplierService suppliers;
     private final InventoryPort inventory;
+    private ai.neargo.sharehub.inv.service.ShipmentService shipments;
+
+    /** 物流（V205）：setter 注入，构造参数已经很长。 */
+    @org.springframework.beans.factory.annotation.Autowired
+    void setShipments(ai.neargo.sharehub.inv.service.ShipmentService shipments) {
+        this.shipments = shipments;
+    }
 
     public DisposalServiceImpl(InvDisposalMapper disposals, InvDisposalItemMapper items, InvIntakeItemMapper intakeItems,
                                CabinetMapper cabinets, PowerbankMapper powerbanks, CabinetLifecycleService lifecycle,
@@ -167,6 +174,8 @@ public class DisposalServiceImpl implements DisposalService {
                         .eq(InvIntakeItem::getDisposition, IntakeServiceImpl.PENDING))
                 .forEach(i -> bad.add(i.getItemNo() + "：在未结待检单 " + i.getIntakeNo() + " 上，请在待检单里处置"));
         if (!bad.isEmpty()) throw BizException.conflict("error.intake.items_rejected", String.join("；", bad));
+        ai.neargo.sharehub.inv.dto.ShipmentDtos.ShipInfo ship = kind == DisposalKind.RETURN_SUPPLIER ? new ai.neargo.sharehub.inv.dto.ShipmentDtos.ShipInfo(r.carrier(), r.trackingNo(), null, null) : null;
+        shipments.validate(ship);
 
         InvDisposal d = new InvDisposal();
         d.setDisposalNo(IdGenerator.next("DP"));
@@ -195,6 +204,8 @@ public class DisposalServiceImpl implements DisposalService {
             movements.record(new MovementRecorder.Move(MovementRecorder.POWERBANK, no, MovementEvent.RETIRE, MovementRecorder.wh(wh.warehouseNo()),
                     MovementRecorder.OUT, null, null, why, d.getDisposalNo()));
         }
+        if (ship != null) shipments.record(ai.neargo.sharehub.inv.ShipmentDocType.DISPOSAL, d.getDisposalNo(),
+                Map.of(MovementRecorder.CABINET, cabNos, MovementRecorder.POWERBANK, pbNos), ship);
         log.info("处置出库 disposalNo={} kind={} warehouseNo={} supplierNo={} 柜={} 宝={}", d.getDisposalNo(), kind,
                 wh.warehouseNo(), supplierNo, cabNos.size(), pbNos.size());
         return get(d.getDisposalNo());

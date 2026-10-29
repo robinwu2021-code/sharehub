@@ -8,6 +8,7 @@ import { openIntakeItems } from "./intake";
 import { activeSupplierName } from "./inventory-admin";
 import { paginate } from "./helpers";
 import { recordMovement, ref } from "./movement";
+import { recordShipment, validateShip } from "./shipment";
 
 const heads: Disposal[] = [];
 const items = new Map<string, DisposalItem[]>();
@@ -60,6 +61,7 @@ export function createDisposal(x: DisposalReq): DisposalDetail {
   const all = new Set([...cabNos, ...pbNos]);
   for (const o of openIntakeItems()) if (all.has(o.itemNo)) bad.push(`${o.itemNo}：在未结待检单 ${o.intakeNo} 上，请在待检单里处置`);
   if (bad.length) fail(`以下设备不能办理：${bad.join("；")}`, `Rejected: ${bad.join("; ")}`);
+  if (x.kind === "RETURN_SUPPLIER") validateShip(x);
 
   const no = `DP${String(++seq).padStart(4, "0")}`;
   const why = `${x.kind === "SCRAP" ? "报废" : `退供应商 ${supplierName}`}（处置出库 ${no}）：${x.note.trim()}`;
@@ -76,5 +78,6 @@ export function createDisposal(x: DisposalReq): DisposalDetail {
     createdBy: "mock", createdAt: new Date().toISOString(),
   });
   items.set(no, rows);
+  if (x.kind === "RETURN_SUPPLIER") recordShipment("DISPOSAL", no, rows.map((r) => r.itemNo), x);
   return getDisposal(no);
 }

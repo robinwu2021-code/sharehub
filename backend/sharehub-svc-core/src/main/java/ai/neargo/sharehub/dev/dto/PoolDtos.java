@@ -10,9 +10,10 @@ public final class PoolDtos {
 
     /**
      * 出库给商家：整批一个事务。siteNo 可空（到商家）；receiverNo 可空 = 出库即签收（经办人当面交付），
-     * 填了则须由该接收人签收后才能绑定（V195）。
+     * 填了则须由该接收人签收后才能绑定（V195）。carrier / trackingNo 可选：寄送时的物流（V205）。
      */
-    public record IssueReq(String agentNo, String siteNo, String receiverNo, List<String> cabinetNos) {
+    public record IssueReq(String agentNo, String siteNo, String receiverNo, List<String> cabinetNos,
+                           String carrier, String trackingNo) {
     }
 
     /** 接收人签收：只能签给自己的。 */

@@ -35,6 +35,8 @@ import {
   type TransferEndpointType, type TransferItem, type TransferItemType,
 } from "@/lib/types";
 import { DIFF_KIND, DIFF_STATUS, ENDPOINT_TYPE_LABEL, ITEM_TYPE_LABEL, TRANSFER_STATUS } from "./device-maps";
+import { ShipFields, ShipmentList } from "./shipments";
+import type { ShipInfo } from "@/lib/types";
 
 const PERM = "device:inventory:transfer";
 /** 资产差异处置（V186）：从调拨的 :transfer 拆出，运维收回发货后仍要处置撤机清点差异。 */
@@ -242,6 +244,7 @@ export function TransferDetailDrawer({ transferNo, onClose, onEdit }: {
   const canTransfer = useCan()(PERM);
   const [itemsForm, setItemsForm] = useState<Record<string, unknown> | null>(null);
   const [receiving, setReceiving] = useState(false);
+  const [shipping, setShipping] = useState<ShipInfo | null>(null);
   const [result, setResult] = useState<ReceiveResult | null>(null);
   useEffect(() => { setReceiving(false); setResult(null); }, [transferNo]);
 
@@ -275,9 +278,11 @@ export function TransferDetailDrawer({ transferNo, onClose, onEdit }: {
     onSuccess: (d) => { refresh(); notify.success(`明细已设定：${d.items.length} 件`); setItemsForm(null); },
   });
   const ship = useMutation({
-    mutationFn: () => api.shipTransfer(transferNo!),
+    mutationFn: (s: ShipInfo) => api.shipTransfer(transferNo!, s),
     onSuccess: (d) => {
       refresh();
+      setShipping(null);
+      qc.invalidateQueries({ queryKey: ["shipments"] });
       notify.success(`${d.transfer.transferNo} 已发出${d.transfer.itemType === "CABINET" ? `：${d.items.length} 台机柜转为运输中` : ""}`);
     },
   });
@@ -299,12 +304,7 @@ export function TransferDetailDrawer({ transferNo, onClose, onEdit }: {
     {
       key: "ship", label: "发出", perm: PERM, primary: true, when: !!status && canTransferAction(status, "ship"),
       blockedReason: items.length === 0 ? "还没有逐件明细：先「设定明细」，否则收货时无从核对少了哪件" : null,
-      confirm: {
-        title: `发出 ${t.transferNo}`,
-        desc: `共 ${items.length} 件${itemType === "CABINET" ? "机柜，发出后转为「运输中」，不能再上线或被别的单调走" : "充电宝"}。发出后明细不能再改。`,
-        confirmText: "发出",
-      },
-      onRun: () => ship.mutateAsync().catch(() => undefined),
+      onRun: () => setShipping({}),
     },
     {
       key: "receive", label: "确认收货", perm: PERM, primary: true,
@@ -332,6 +332,19 @@ export function TransferDetailDrawer({ transferNo, onClose, onEdit }: {
           />
           {!canTransfer && <ReadOnlyNotice what="调拨执行" perm={PERM} note="不能设定明细、发出或签收" />}
 
+          {shipping && (
+            <Notice>
+              <div className="space-y-3">
+                <div>共 {items.length} 件{itemType === "CABINET" ? "机柜，发出后转为「运输中」，不能再上线或被别的单调走" : "充电宝"}。发出后明细不能再改。</div>
+                <ShipFields value={shipping} onChange={setShipping} />
+                <div className="flex gap-2">
+                  <Button size="sm" disabled={ship.isPending} onClick={() => ship.mutate(shipping)}>确认发出</Button>
+                  <Button size="sm" variant="outline" onClick={() => setShipping(null)}>取消</Button>
+                </div>
+              </div>
+            </Notice>
+          )}
+          <ShipmentList docType="TRANSFER" docRef={t.transferNo} />
           {result && <ReceiveSummary r={result} transfer={t} items={items} />}
           {receiving && status === "IN_TRANSIT" && (
             <ReceivePanel transfer={t} items={items} onDone={(r) => { setResult(r); setReceiving(false); refresh(); }} />

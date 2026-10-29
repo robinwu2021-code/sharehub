@@ -27,9 +27,12 @@ public class DevicePoolController {
     private final ai.neargo.sharehub.dev.service.CabinetBindService binds;
     /** 库存账动作（出库 / 签收 / 调整 / 退回）一律经端口（S2.5）；汇总是只读，仍直接查。 */
     private final ai.neargo.sharehub.inv.port.InventoryPort inventory;
+    private final ai.neargo.sharehub.inv.service.ShipmentService shipments;
 
     public DevicePoolController(CabinetPoolService pool, ai.neargo.sharehub.dev.service.CabinetBindService binds,
-                                ai.neargo.sharehub.inv.port.InventoryPort inventory) {
+                                ai.neargo.sharehub.inv.port.InventoryPort inventory,
+                                ai.neargo.sharehub.inv.service.ShipmentService shipments) {
+        this.shipments = shipments;
         this.pool = pool;
         this.binds = binds;
         this.inventory = inventory;
@@ -68,7 +71,12 @@ public class DevicePoolController {
     @PreAuthorize("@perm.can('device:inventory:transfer')")
     public List<Cabinet> issue(@RequestBody IssueReq req) {
         if (req == null) throw ai.neargo.sharehub.common.BizException.badRequest("error.common.missing_parameter", "body");
-        return inventory.dispatch(req.agentNo(), req.siteNo(), req.receiverNo(), req.cabinetNos());
+        ai.neargo.sharehub.inv.dto.ShipmentDtos.ShipInfo ship = new ai.neargo.sharehub.inv.dto.ShipmentDtos.ShipInfo(req.carrier(), req.trackingNo(), null, null);
+        shipments.validate(ship);
+        List<Cabinet> out = inventory.dispatch(req.agentNo(), req.siteNo(), req.receiverNo(), req.cabinetNos());
+        shipments.record(ai.neargo.sharehub.inv.ShipmentDocType.ISSUE, req.agentNo(),
+                java.util.Map.of("CABINET", req.cabinetNos() == null ? List.of() : req.cabinetNos()), ship);
+        return out;
     }
 
     /** 接收人签收（V195）：只能签给自己的 —— 权限码只是门槛，「本人 = 接收人」在服务里校验。 */

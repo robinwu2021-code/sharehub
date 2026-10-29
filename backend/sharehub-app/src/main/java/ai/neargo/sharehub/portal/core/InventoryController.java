@@ -34,6 +34,7 @@ public class InventoryController {
     private final ai.neargo.sharehub.inv.service.SupplierService suppliers;
     private final ai.neargo.sharehub.inv.service.DisposalService disposals;
     private final ai.neargo.sharehub.inv.service.StockThresholdService thresholds;
+    private final ai.neargo.sharehub.inv.service.ShipmentService shipmentService;
 
     public InventoryController(InventoryTransferService transferService,
                                CommandLogService commandLogService,
@@ -44,7 +45,9 @@ public class InventoryController {
                                ai.neargo.sharehub.inv.service.WarehouseAdminService warehouseAdmin,
                                ai.neargo.sharehub.inv.service.SupplierService suppliers,
                                ai.neargo.sharehub.inv.service.DisposalService disposals,
-                               ai.neargo.sharehub.inv.service.StockThresholdService thresholds) {
+                               ai.neargo.sharehub.inv.service.StockThresholdService thresholds,
+                               ai.neargo.sharehub.inv.service.ShipmentService shipmentService) {
+        this.shipmentService = shipmentService;
         this.thresholds = thresholds;
         this.disposals = disposals;
         this.warehouseAdmin = warehouseAdmin;
@@ -269,6 +272,16 @@ public class InventoryController {
     @PreAuthorize("@perm.can('device:inventory:transfer')")
     public ai.neargo.sharehub.inv.dto.DisposalDtos.DisposalDetail createDisposal(@RequestBody ai.neargo.sharehub.inv.dto.DisposalDtos.DisposalReq req) {
         return disposals.create(req);
+    }
+
+    // —— 发货物流（V205）：按单据（docType + docRef）或设备号查 ——
+
+    @GetMapping("/inventory/shipments")
+    @PreAuthorize("@perm.can('device:inventory:read')")
+    public java.util.List<ai.neargo.sharehub.inv.dto.ShipmentDtos.Shipment> shipments(@RequestParam(required = false) String docType,
+                                                                                  @RequestParam(required = false) String docRef,
+                                                                                  @RequestParam(required = false) String itemNo) {
+        return shipmentService.list(docType, docRef, itemNo);
     }
 
     // —— 安全库存（V204；仓库页「安全库存」）——

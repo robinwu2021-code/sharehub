@@ -195,6 +195,8 @@ class VocabularyWriteCoverageTest {
             "inv_disposal.kind", "inv_disposal.reason_code", "inv_disposal_item.item_type",
             // V204 安全库存：item_type 经 StockThresholdServiceImpl.TYPES 白名单校验
             "inv_stock_threshold.item_type",
+            // V205 发货物流：doc_type 用 ShipmentDocType 常量，item_type 来自所属单据
+            "inv_shipment.doc_type", "inv_shipment_item.item_type",
             "inv_intake_item.item_type", "inv_intake_item.qc_result", "inv_intake_item.disposition",
             // dev_movement_log（V196 设备履历）：event 只由 MovementEvent 枚举的 name() 写入，item_type 只取 MovementRecorder 常量
             // 或待检单明细已校验的类型；没有外部写入口（Mapper 只许 MovementRecorder 用，ArchitectureTest 守）

@@ -12133,6 +12133,14 @@
     {
      "name": "cabinetNos",
      "type": "List<String>"
+    },
+    {
+     "name": "carrier",
+     "type": "String"
+    },
+    {
+     "name": "trackingNo",
+     "type": "String"
     }
    ]
   },
@@ -14723,7 +14731,7 @@
      "required": true
     }
    ],
-   "bodyType": null,
+   "bodyType": "ai.neargo.sharehub.inv.dto.ShipmentDtos.ShipInfo",
    "returnType": "InventoryTransferDetail",
    "returnContainer": null,
    "returnElement": "InventoryTransferDetail",
@@ -14801,7 +14809,24 @@
      ]
     }
    ],
-   "requestShape": null
+   "requestShape": [
+    {
+     "name": "carrier",
+     "type": "String"
+    },
+    {
+     "name": "trackingNo",
+     "type": "String"
+    },
+    {
+     "name": "shippedAt",
+     "type": "String"
+    },
+    {
+     "name": "note",
+     "type": "String"
+    }
+   ]
   },
   {
    "verb": "GET",
@@ -15749,6 +15774,14 @@
     {
      "name": "powerbankNos",
      "type": "List<String>"
+    },
+    {
+     "name": "carrier",
+     "type": "String"
+    },
+    {
+     "name": "trackingNo",
+     "type": "String"
     }
    ]
   },
@@ -17196,6 +17229,42 @@
    "returnType": "java.util.List<ai.neargo.sharehub.inv.dto.StockDtos.StockPeriodRow>",
    "returnContainer": null,
    "returnElement": "java.util.List<ai.neargo.sharehub.inv.dto.StockDtos.StockPeriodRow>",
+   "responseShape": null,
+   "requestShape": null
+  },
+  {
+   "verb": "GET",
+   "path": "/api/ops/inventory/shipments",
+   "perm": "device:inventory:read",
+   "perms": [
+    "device:inventory:read"
+   ],
+   "handler": "InventoryController#shipments",
+   "summary": "",
+   "params": [
+    {
+     "in": "query",
+     "name": "docType",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "docRef",
+     "type": "String",
+     "required": false
+    },
+    {
+     "in": "query",
+     "name": "itemNo",
+     "type": "String",
+     "required": false
+    }
+   ],
+   "bodyType": null,
+   "returnType": "java.util.List<ai.neargo.sharehub.inv.dto.ShipmentDtos.Shipment>",
+   "returnContainer": null,
+   "returnElement": "java.util.List<ai.neargo.sharehub.inv.dto.ShipmentDtos.Shipment>",
    "responseShape": null,
    "requestShape": null
   },
@@ -53869,6 +53938,11 @@
    "SCRAP",
    "RETURN_SUPPLIER"
   ],
+  "ShipmentDocType": [
+   "TRANSFER",
+   "ISSUE",
+   "DISPOSAL"
+  ],
   "AssetDiffKind": [
    "MISSING",
    "EXTRA",
@@ -54504,10 +54578,10 @@
   "entityRequestShape"
  ],
  "stats": {
-  "endpoints": 612,
-  "records": 585,
-  "withPerm": 530,
-  "withBody": 252,
+  "endpoints": 613,
+  "records": 587,
+  "withPerm": 531,
+  "withBody": 253,
   "shapedResponses": 477
  }
 }
