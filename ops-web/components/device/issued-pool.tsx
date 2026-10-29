@@ -46,7 +46,7 @@ export const POOL_STATE_MAP: StatusMap<PoolState> = {
 export const poolStateOf = (c: Cabinet): PoolState =>
   !c.locationNo ? (c.issueClaimedAt === null ? "UNCLAIMED" : "UNBOUND") : c.status === "DEPLOYED" ? "LIVE" : c.status === "FAULT" ? "FAULT" : "BOUND";
 
-const POOL_FILTER: Record<PoolFilter, string> = { UNBOUND: "未绑定", BOUND: "已绑定", UNCLAIMED: "待签收", MINE: "待我签收", ALL: "全部" };
+const POOL_FILTER: Record<PoolFilter, string> = { UNBOUND: "待绑定", BOUND: "待安装", UNCLAIMED: "待签收", MINE: "待我签收", ALL: "全部" };
 
 export function IssuedPoolTab() {
   const qc = useQueryClient();

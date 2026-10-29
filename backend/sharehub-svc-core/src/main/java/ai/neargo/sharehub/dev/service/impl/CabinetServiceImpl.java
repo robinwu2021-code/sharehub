@@ -144,7 +144,9 @@ public class CabinetServiceImpl implements CabinetService {
         if (onlineStatus != null && !onlineStatus.isBlank()) w.eq(DevCabinet::getOnlineStatus, onlineStatus);
         if (status != null && !status.isBlank()) w.eq(DevCabinet::getStatus, status);
         if (issuedAgentNo != null && !issuedAgentNo.isBlank()) w.eq(DevCabinet::getIssuedAgentNo, issuedAgentNo);
-        if ("UNBOUND".equalsIgnoreCase(pool)) w.isNotNull(DevCabinet::getIssuedAgentNo).isNull(DevCabinet::getLocationNo);
+        // UNBOUND = 绑定候选：已签收、未绑定（V195：未签收的不能绑，归 UNCLAIMED）
+        if ("UNBOUND".equalsIgnoreCase(pool)) w.isNotNull(DevCabinet::getIssuedAgentNo).isNull(DevCabinet::getLocationNo)
+                .isNotNull(DevCabinet::getIssueClaimedAt);
         else if ("BOUND".equalsIgnoreCase(pool)) w.isNotNull(DevCabinet::getIssuedAgentNo).isNotNull(DevCabinet::getLocationNo);
         // V195：UNCLAIMED = 已发货待签收；MINE = 待我签收（接收人是当前登录人）
         else if ("UNCLAIMED".equalsIgnoreCase(pool)) w.isNotNull(DevCabinet::getIssuedAgentNo).isNull(DevCabinet::getIssueClaimedAt);

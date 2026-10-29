@@ -72,7 +72,7 @@ export interface Cabinet extends Archivable {
   issueClaimedAt?: string | null;
 }
 
-/** 出库池筛选：未绑定 / 已绑定（含已上线）/ 全部 / 已发货待签收 / 待我签收。 */
+/** 出库池筛选：待绑定（已签收未绑定，即绑定候选）/ 已绑定（含已上线）/ 全部 / 已发货待签收 / 待我签收。 */
 export type PoolFilter = "UNBOUND" | "BOUND" | "ALL" | "UNCLAIMED" | "MINE";
 
 /** 出库给商家（POST /api/ops/devices/issue）。一个事务，全成或全不成。 */

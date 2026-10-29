@@ -87,7 +87,15 @@ export function PendingLiveTab() {
   const qc = useQueryClient();
   const canGoLive = useCan()("device:cabinet:update");
   const q = useCabinets("IN_STOCK");
-  const rows = (q.data?.list ?? []).filter((c) => c.locationNo && !c.archivedAt);
+  const [agentNo, setAgentNo] = useState("");
+  const agentsQ = useQuery({ queryKey: ["agents", "all"], queryFn: () => api.listAgents({ size: UNPAGED_SIZE }) });
+  const all = (q.data?.list ?? []).filter((c) => c.locationNo && !c.archivedAt);
+  const rows = agentNo ? all.filter((c) => c.agentNo === agentNo) : all;
+  // 只列有待安装设备的商家，按名称选
+  const agentOptions = useMemo(() => {
+    const has = new Set(all.map((c) => c.agentNo).filter(Boolean));
+    return (agentsQ.data?.list ?? []).filter((a) => has.has(a.agentNo)).map((a) => ({ value: a.agentNo, label: a.name }));
+  }, [all, agentsQ.data]);
   const live = useMutation({
     mutationFn: (no: string) => api.goLive(no),
     onSuccess: (c) => {
@@ -112,6 +120,9 @@ export function PendingLiveTab() {
         由后端强制；其中合同与勘测一期跳过，由平台运营直接操作（系统参数 site.venue_gate.enabled 改 1 即恢复）。
         展开一行看卡在哪一项，每项都给了去处。门禁没过时点「上线」会被拒并说明原因。
       </Notice>
+      <div className="flex items-center gap-2">
+        <FilterSelect aria-label="商家" value={agentNo} onChange={setAgentNo} options={agentOptions} allLabel="全部商家" className="w-56" />
+      </div>
       <DataTable rowKey={(c: Cabinet) => c.cabinetNo} columns={cols} rows={q.data ? rows : undefined}
         loading={q.isLoading} error={q.error} onRetry={q.refetch}
         expandable={(c) => <GateRow cabinetNo={c.cabinetNo} />}

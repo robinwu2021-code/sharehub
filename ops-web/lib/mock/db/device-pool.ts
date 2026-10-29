@@ -234,7 +234,8 @@ export function poolHit(c: Cabinet, issuedAgentNo?: string, pool?: string, me?: 
   if (issuedAgentNo && c.issuedAgentNo !== issuedAgentNo) return false;
   if (pool === "UNCLAIMED") return !!c.issuedAgentNo && !c.issueClaimedAt;
   if (pool === "MINE") return !!c.issuedAgentNo && !c.issueClaimedAt && !!me && c.issueReceiverNo === me;
-  if (pool === "UNBOUND") return !!c.issuedAgentNo && !c.locationNo;
+  // 待绑定 = 绑定候选：已签收、未绑定（未签收的在「待签收」里，不能绑）
+  if (pool === "UNBOUND") return !!c.issuedAgentNo && !c.locationNo && c.issueClaimedAt !== null;
   if (pool === "BOUND") return !!c.issuedAgentNo && !!c.locationNo;
   if (pool === "ALL") return !!c.issuedAgentNo;
   return true;

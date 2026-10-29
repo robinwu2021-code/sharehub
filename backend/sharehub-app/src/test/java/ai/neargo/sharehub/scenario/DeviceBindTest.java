@@ -100,11 +100,15 @@ class DeviceBindTest extends ApiTestSupport {
                 .containsEntry("issued_site_no", site2).containsEntry("issue_receiver_no", receiver).containsEntry("issue_claimed_at", null);
 
         assertThat(post("/api/ops/devices/" + c + "/bind", Map.of(), admin).status).as("未签收不能绑（PB-D4）").isEqualTo(409);
+        assertThat(get("/api/ops/cabinets?page=1&size=200&pool=UNBOUND&issuedAgentNo=" + m[0], admin).okData().path("list").toString())
+                .as("绑定候选按商家过滤，且不含未签收的").doesNotContain(c);
         assertThat(post("/api/ops/devices/claim", Map.of("cabinetNos", List.of(c)), admin).status).as("别人不能代签").isEqualTo(409);
         String me = login("OPS", receiver, null);
         JsonNode mine = get("/api/ops/cabinets?page=1&size=20&pool=MINE", me).okData().path("list");
         assertThat(mine.toString()).as("待我签收").contains(c);
         post("/api/ops/devices/claim", Map.of("cabinetNos", List.of(c)), me).okData();
+        assertThat(get("/api/ops/cabinets?page=1&size=200&pool=UNBOUND&issuedAgentNo=" + m[0], admin).okData().path("list").toString())
+                .as("签收后进入该商家的绑定候选").contains(c);
 
         assertThat(post("/api/ops/devices/" + c + "/bind", Map.of("locationNo", defaultPoint(m[1])), admin).status)
                 .as("只能绑目的站点的点位（PB-D2）").isEqualTo(409);
