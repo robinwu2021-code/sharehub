@@ -83,10 +83,11 @@ class StockViewTest extends ApiTestSupport {
         InventoryFake fake = new InventoryFake();
         remote.useApi(fake);
         jdbc.update("DELETE FROM inventory_sync_state");
+        String out = null;
         try {
             String inWh = stocked();
             String admin = login("ADMIN");
-            String out = stocked();
+            out = stocked();
             String agent = jdbc.queryForObject("SELECT issued_agent_no FROM dev_cabinet WHERE issued_agent_no IS NOT NULL LIMIT 1", String.class);
             jdbc.update("UPDATE dev_cabinet SET warehouse_no=NULL, issued_agent_no=?, issued_at=NOW(3), issue_claimed_at=NOW(3) WHERE cabinet_no=?",
                     agent, out);
@@ -110,6 +111,11 @@ class StockViewTest extends ApiTestSupport {
         } finally {
             jdbc.update("DELETE FROM inventory_sync_state");
             remote.useApi(http);
+            // 借用的商家出库池不能留下这台无点位的柜：别的用例（数据范围）按「商家可见的柜必有点位」断言
+            if (out != null) {
+                jdbc.update("UPDATE dev_cabinet SET issued_agent_no=NULL, issued_at=NULL, issue_claimed_at=NULL, warehouse_no='WH003', "
+                        + "archived_at=NOW(3) WHERE cabinet_no=?", out);
+            }
         }
     }
 
