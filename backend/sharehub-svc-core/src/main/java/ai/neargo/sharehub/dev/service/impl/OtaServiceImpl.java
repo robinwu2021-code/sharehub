@@ -151,7 +151,19 @@ public class OtaServiceImpl implements OtaService {
             body.setScope(body.getScope() == null || body.getScope().isBlank()
                     ? OtaRolloutScope.ALL.name() : OtaRolloutScope.of(body.getScope()).name());
             if (body.getProgress() == null) body.setProgress(0);
-            fillFwVersion(body);
+            // 发布单必须挂在版本库的一个版本上（release_no 非空）；版本号与供应商一律取版本库 ——
+            // 此前缺 releaseNo 直接 500（库约束兜底），手填的版本号也可能与版本库对不上
+            DevOtaRelease rel = selectRelease(body.getReleaseNo());
+            if (body.getReleaseNo() == null || body.getReleaseNo().isBlank()) {
+                throw BizException.badRequest("error.common.missing_parameter", "releaseNo");
+            }
+            if (rel == null) throw BizException.notFound(body.getReleaseNo());
+            body.setFwVersion(rel.getVersion());
+            body.setVendorCode(rel.getVendorCode());
+            // 不是「全部设备」就必须说清打给谁 —— 空的投放对象会让执行器无从下发
+            if (!OtaRolloutScope.ALL.name().equals(body.getScope()) && (body.getTargetRef() == null || body.getTargetRef().isBlank())) {
+                throw BizException.badRequest("error.common.missing_parameter", "targetRef");
+            }
             rolloutMapper.insert(body);
             return toVO(selectRollout(body.getRolloutNo()));
         }
@@ -193,16 +205,6 @@ public class OtaServiceImpl implements OtaService {
         Set<String> allowed = ROLLOUT_TRANSITIONS.getOrDefault(from, Set.of());
         if (!allowed.contains(to)) {
             throw new IllegalArgumentException("OTA 投放状态非法迁移: " + from + " --> " + to);
-        }
-    }
-
-    /** 投放冗余固件版本号：调用方没给就按 releaseNo 回填，保证列表免联表。 */
-    private void fillFwVersion(DevOtaRollout body) {
-        if (body.getFwVersion() != null && !body.getFwVersion().isBlank()) return;
-        DevOtaRelease rel = selectRelease(body.getReleaseNo());
-        if (rel != null) {
-            body.setFwVersion(rel.getVersion());
-            if (body.getVendorCode() == null) body.setVendorCode(rel.getVendorCode());
         }
     }
 

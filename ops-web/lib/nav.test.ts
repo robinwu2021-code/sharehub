@@ -74,9 +74,9 @@ const LEAF_TUPLES = [
   "/devices?tab=stock|库存余额|device:inventory:read|1|仓储与出库",
   "/devices?tab=ledger|库存流水|device:inventory:read|1|仓储与出库",
   "/devices?tab=counts|盘点|device:inventory:read|1|仓储与出库",
-  "/devices?tab=inventory|库存调拨|device:inventory:read|2|仓储与出库",
+  "/devices?tab=inventory|库存调拨|device:inventory:read|1|仓储与出库",
   "/devices?tab=issued|出库池|device:inventory:read||仓储与出库",
-  "/devices?tab=asset-diffs|资产差异|device:inventory:read|2|仓储与出库",
+  "/devices?tab=asset-diffs|资产差异|device:inventory:read|1|仓储与出库",
   "/devices?tab=installs|部署与装机|workorder:wo:read||部署与安装",
   "/devices?tab=pending-live|待上线|device:cabinet:read||绑定上线",
   "/devices?tab=codes|设备编码|device:cabinet:read|1|绑定上线",
@@ -84,7 +84,7 @@ const LEAF_TUPLES = [
   "/devices?tab=monitor|实时监控|device:cabinet:read||运行监控",
   "/devices?tab=commands|远程控制与指令记录|device:command:send||运行监控",
   "/devices?tab=logs|设备日志|device:cabinet:read|1|运行监控",
-  "/devices?tab=ota|固件 OTA|device:ota:read|2|运行监控",
+  "/devices?tab=ota|固件 OTA|device:ota:read|1|运行监控",
   "/devices?tab=repairs|故障与维修|device:cabinet:read||维护与退出",
   "/devices?tab=removals|撤机与回仓|workorder:wo:read||维护与退出",
   "/devices?tab=retired|报废与遗失|device:cabinet:read||维护与退出",
@@ -374,9 +374,14 @@ describe("activeLeafIndex 深链高亮（4.2-6）", () => {
     const leaves = visibleLeaves(sec("workorder"), "OPS");
     expect(leaves[activeLeafIndex(leaves, "/work-orders", null, "board")].label).toBe("工单看板");
   });
-  it("固件 OTA Phase 2 → 当前 P1 下 ?tab=ota 不命中(-1)", () => {
+  // 原用例取「固件 OTA」，2026-10-29 设备管理一期收齐后 OTA 已就绪，改取仍是 P2 的「巡检计划」
+  it("巡检计划 Phase 2 → 当前 P1 下 ?view=inspection 不命中(-1)", () => {
+    const leaves = visibleLeaves(sec("workorder"), "OPS");
+    expect(activeLeafIndex(leaves, "/work-orders", null, "inspection")).toBe(-1);
+  });
+  it("固件 OTA 已就绪（设备管理一期收齐）→ ?tab=ota 命中", () => {
     const leaves = visibleLeaves(sec("device"), "OPS");
-    expect(activeLeafIndex(leaves, "/devices", "ota", null)).toBe(-1);
+    expect(leaves[activeLeafIndex(leaves, "/devices", "ota", null)].label).toBe("固件 OTA");
   });
 });
 
@@ -526,10 +531,10 @@ describe("分级屏蔽（tier gating，默认 CURRENT_PHASE=0）", () => {
     expect(isPhaseLocked(0)).toBe(false);
     expect(isPhaseLocked(undefined)).toBe(false);
   });
-  it("isLeafLocked / isLeafDisabled：固件 OTA(P2) 被锁且不可点", () => {
-    const ota = sec("device").children!.find((l) => l.href.includes("ota"))!;
-    expect(isLeafLocked(ota)).toBe(true);
-    expect(isLeafDisabled(ota)).toBe(true);
+  it("isLeafLocked / isLeafDisabled：巡检计划(P2) 被锁且不可点", () => {
+    const leaf = sec("workorder").children!.find((l) => l.href.includes("view=inspection"))!;
+    expect(isLeafLocked(leaf)).toBe(true);
+    expect(isLeafDisabled(leaf)).toBe(true);
   });
   it("isSectionLocked：报表 P1 下全叶被锁 → 整体锁；用户因「风控用户」已 ready → 不锁", () => {
     // 用户 section 曾经整体锁（全叶 P2）。2026-07-30「风控用户」标 ready 后，
@@ -544,8 +549,9 @@ describe("分级屏蔽（tier gating，默认 CURRENT_PHASE=0）", () => {
   it("isSectionLocked：设备含 P1 叶 → 不锁", () => {
     expect(isSectionLocked(sec("device"), "ADMIN")).toBe(false);
   });
-  it("routeLockedPhase：/devices?tab=ota → 被 P2 锁", () => {
-    expect(routeLockedPhase("/devices", "ota", null, "ADMIN")).toBe(2);
+  it("routeLockedPhase：/work-orders?view=inspection → 被 P2 锁；/devices?tab=ota 已就绪不锁", () => {
+    expect(routeLockedPhase("/work-orders", null, "inspection", "ADMIN")).toBe(2);
+    expect(routeLockedPhase("/devices", "ota", null, "ADMIN")).toBeUndefined();
   });
   it("routeLockedPhase：/devices（台账 P1）→ 不锁", () => {
     expect(routeLockedPhase("/devices", null, null, "ADMIN")).toBeUndefined();

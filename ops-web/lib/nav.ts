@@ -225,20 +225,20 @@ export const NAV: NavSection[] = [
       // 库存流水 / 盘点（V199，S4）：GET /api/ops/inventory/ledger、/inventory/counts*；盘点只在独立进销存引擎下可用
       { href: "/devices?tab=ledger", label: "库存流水", perm: "device:inventory:read", phase: 1, ready: true, group: "仓储与出库" },
       { href: "/devices?tab=counts", label: "盘点", perm: "device:inventory:read", phase: 1, ready: true, group: "仓储与出库" },
-      { href: "/devices?tab=inventory", label: "库存调拨", perm: "device:inventory:read", phase: 2, group: "仓储与出库" },
+      { href: "/devices?tab=inventory", label: "库存调拨", perm: "device:inventory:read", phase: 1, ready: true, group: "仓储与出库" },
       { href: "/devices?tab=issued", label: "出库池", perm: "device:inventory:read", group: "仓储与出库" },
       // 此前是库存调拨里的子视图（同分期），菜单里找不到；拆出来不改分期
-      { href: "/devices?tab=asset-diffs", label: "资产差异", perm: "device:inventory:read", phase: 2, group: "仓储与出库" },
+      { href: "/devices?tab=asset-diffs", label: "资产差异", perm: "device:inventory:read", phase: 1, ready: true, group: "仓储与出库" },
       // 五个生命周期视图（V165）：都是既有数据的设备视角，不新增后端端点；装机 / 撤机单仍在运维管理 › 工单里办理
       { href: "/devices?tab=installs", label: "部署与装机", perm: "workorder:wo:read", group: "部署与安装" },
       { href: "/devices?tab=pending-live", label: "待上线", perm: "device:cabinet:read", group: "绑定上线" },
       // 设备码是绑定的第一层（码 ↔ 设备）；厂商接入是第二层（网关 ↔ 设备）
-      { href: "/devices?tab=codes", label: "设备编码", perm: "device:cabinet:read", phase: 1, group: "绑定上线" },
+      { href: "/devices?tab=codes", label: "设备编码", perm: "device:cabinet:read", phase: 1, ready: true, group: "绑定上线" },
       { href: "/devices?tab=vendors", label: "厂商接入", perm: "device:vendor:read", group: "绑定上线" },
       { href: "/devices?tab=monitor", label: "实时监控", perm: "device:cabinet:read", group: "运行监控" },
       { href: "/devices?tab=commands", label: "远程控制与指令记录", perm: "device:command:send", group: "运行监控" },
-      { href: "/devices?tab=logs", label: "设备日志", perm: "device:cabinet:read", phase: 1, group: "运行监控" },
-      { href: "/devices?tab=ota", label: "固件 OTA", perm: "device:ota:read", phase: 2, group: "运行监控" },
+      { href: "/devices?tab=logs", label: "设备日志", perm: "device:cabinet:read", phase: 1, ready: true, group: "运行监控" },
+      { href: "/devices?tab=ota", label: "固件 OTA", perm: "device:ota:read", phase: 1, ready: true, group: "运行监控" },
       { href: "/devices?tab=repairs", label: "故障与维修", perm: "device:cabinet:read", group: "维护与退出" },
       { href: "/devices?tab=removals", label: "撤机与回仓", perm: "workorder:wo:read", group: "维护与退出" },
       { href: "/devices?tab=retired", label: "报废与遗失", perm: "device:cabinet:read", group: "维护与退出" },

@@ -1020,14 +1020,18 @@ const PB_FIELDS: FieldDef[] = [
  * @form POST /api/ops/ota-rollouts
  * @form POST /api/ops/ota-rollouts/{rolloutNo}
  */
-const OTA_FIELDS: FieldDef[] = [
+/** 发布单表单：版本从版本库选（版本号 / 供应商随之确定，不手填）；scope 说发给谁，非「全部」须给对象。 */
+const otaFields = (releases: OtaRelease[]): FieldDef[] => [
   { key: "rolloutNo", label: "发布单号", readOnlyOnEdit: true, placeholder: "系统生成" },
-  { key: "fwVersion", label: "固件版本", placeholder: "v1.2.0" },
-  { key: "vendorCode", label: "供应商" },
+  { key: "releaseNo", label: "固件版本", type: "select", required: true, readOnlyOnEdit: true,
+    options: releases.filter((r) => r.status !== "ARCHIVED").map((r) => ({ value: r.releaseNo, label: `${r.version} · ${r.vendorCode ?? "通用"} · ${r.fwType}` })) },
+  { key: "scope", label: "投放范围", type: "select", required: true, options: [
+    { value: "ALL", label: "全部设备" }, { value: "LOCATION", label: "点位" }, { value: "DEVICE", label: "单台柜机" },
+  ] },
+  { key: "targetRef", label: "投放对象", placeholder: "点位号 / 柜机号；全部设备留空" },
   { key: "strategy", label: "策略", type: "select", options: [
     { value: "GRAY", label: "灰度" }, { value: "FULL", label: "全量" },
   ] },
-  { key: "progress", label: "进度（%）", type: "number" },
   { key: "status", label: "状态", type: "select", options: [
     { value: "PENDING", label: "待发布" }, { value: "RUNNING", label: "升级中" },
     { value: "DONE", label: "已完成" }, { value: "ROLLBACK", label: "已回滚" },
@@ -1444,6 +1448,9 @@ function DevicesInner() {
   // 「已找回 / 误判」要填说明（后端必填）：复用写原因抽屉，打开它本身无副作用
   const [lostDismiss, setLostDismiss] = useState<ReasonRequest | null>(null);
   const [otaForm, setOtaForm] = useState<Partial<OtaRollout> | null>(null);
+  // 发布单表单的版本下拉（只在打开表单时拉）
+  const otaReleasesQ = useQuery({ queryKey: ["ota-releases", "for-rollout"], queryFn: () => api.listOtaReleases({ page: 1, size: UNPAGED_SIZE }),
+    enabled: !!otaForm });
   // 指令记录 tab 的下发抽屉：null = 关，对象 = 打开并按内容预填（「重新下发」带着原记录进来）
   const [cmdDraft, setCmdDraft] = useState<CmdDraft | null>(null);
   const [showArchived, setShowArchived] = useState(false);
@@ -1645,7 +1652,7 @@ function DevicesInner() {
           onAdd={
             tab === "powerbanks" && canEditPowerbank ? () => setPbForm({ sn: "", vendorCode: "", cabinetNo: "", battery: 100, health: "OK", cycles: 0 })
             : tab === "inventory" && canEditInventory ? () => setInvForm({ itemType: "CABINET", fromType: "WAREHOUSE", fromRef: "", toType: "SITE", toRef: "" })
-            : tab === "ota" && canEditOta ? () => setOtaForm({ fwVersion: "", vendorCode: "", strategy: "GRAY", progress: 0, status: "PENDING" })
+            : tab === "ota" && canEditOta ? () => setOtaForm({ releaseNo: "", scope: "ALL", targetRef: null, strategy: "GRAY", status: "PENDING" })
             // 指令记录 tab 的下发入口：默认预填「重启」（最常用的整机处置），机柜由用户选
             : tab === "commands" && canSendCommand ? () => setCmdDraft({ type: "REBOOT", cabinetNo: "", slotIndex: "" })
             : undefined
@@ -1752,7 +1759,7 @@ function DevicesInner() {
         titleNew="新增发布单"
         titleEdit={`编辑发布单 ${otaForm?.rolloutNo ?? ""}`}
         isEdit={!!otaForm?.rolloutNo}
-        fields={OTA_FIELDS}
+        fields={otaFields(otaReleasesQ.data?.list ?? [])}
         value={(otaForm ?? {}) as Record<string, unknown>}
         onChange={(v) => setOtaForm(v as Partial<OtaRollout>)}
         onSubmit={() => otaForm && saveOta.mutate(otaForm)}

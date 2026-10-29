@@ -460,7 +460,18 @@ const TRANSFER_STATUS_LABEL: Record<InvTransferStatus, string> = {
 export class TransferError extends Error {
   constructor(msg: string) { super(msg); this.name = "TransferError"; }
 }
-export const saveOtaRollout = (x: Partial<OtaRollout>) => upsert(otaRollouts, x, "rolloutNo", () => nextNo("OTA", otaRollouts));
+/** 新建投放：必须挂版本库（版本号 / 供应商取版本库）；按设备 / 点位投放须给对象（同后端 OtaServiceImpl）。 */
+export const saveOtaRollout = (x: Partial<OtaRollout>) => {
+  if (!x.rolloutNo) {
+    if (!x.releaseNo) fail("请选择版本库里的固件版本", "releaseNo is required");
+    const rel = otaReleases.find((r) => r.releaseNo === x.releaseNo) ?? notFound("固件版本", "Release", x.releaseNo!);
+    const scope = x.scope ?? "ALL";
+    if (scope !== "ALL" && !x.targetRef?.trim()) fail("按设备或点位投放须填写投放对象", "targetRef is required");
+    x = { ...x, fwVersion: rel.version, vendorCode: rel.vendorCode ?? undefined, scope, targetRef: scope === "ALL" ? null : x.targetRef!.trim(),
+      strategy: x.strategy ?? "GRAY", progress: x.progress ?? 0, status: x.status ?? "PENDING" };
+  }
+  return upsert(otaRollouts, x, "rolloutNo", () => nextNo("OTA", otaRollouts));
+};
 
 /** 版本库查询：关键词(版本号/发布单号/说明) + 固件类型 / 供应商 / 发布状态三筛。 */
 export const listOtaReleases = (q: PageQuery & { fwType?: string; vendorCode?: string; status?: string } = {}) =>

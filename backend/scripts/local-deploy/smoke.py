@@ -60,6 +60,39 @@ day = time.strftime("%Y-%m-%d", time.gmtime())
 st, pr, raw = req("GET", f"/api/ops/inventory/period-summary?from={day}&to={day}", tok=admin); ck("期间报表（本地口径）", st == 200, raw)
 st, lg, raw = req("GET", "/api/ops/inventory/ledger?size=5", tok=admin); ck("库存流水（本地口径）", st == 200, raw)
 st, _, raw = req("POST", "/api/ops/inventory/counts", {"warehouseNo": "WH001"}, admin); ck("盘点在本地引擎下被拒（409）", st == 409, raw)
+# —— 设备管理一期收齐的五页：调拨 → 资产差异、设备编码、固件 OTA、设备日志（真实接口写读）——
+cab2 = "CABSMT" + tag
+req("POST", "/api/ops/cabinets", {"cabinetNo": cab2, "sn": cab2, "vendorCode": "TEST", "slotTotal": 8}, admin)
+req("POST", f"/api/ops/devices/{cab2}/qc", {"powerOn": True, "slotsOk": True}, admin)
+st, d, raw = req("GET", f"/api/ops/cabinets?page=1&size=5&keyword={cab2}", tok=admin)
+src = d["list"][0].get("warehouseNo") or "WH001"
+st, tr, raw = req("POST", "/api/ops/inventory-transfers", {"fromType": "WAREHOUSE", "fromRef": src, "toType": "WAREHOUSE", "toRef": "WH002",
+    "itemType": "CABINET"}, admin)
+ck("调拨：建单", st == 200 and tr, raw)
+tno = tr["transferNo"]
+st, _, raw = req("POST", f"/api/ops/inventory-transfers/{tno}/items", {"itemNos": [cab2]}, admin); ck("调拨：明细", st == 200, raw)
+st, _, raw = req("POST", f"/api/ops/inventory-transfers/{tno}/ship", {}, admin); ck("调拨：发货（柜在途）", st == 200, raw)
+st, rc, raw = req("POST", f"/api/ops/inventory-transfers/{tno}/receive", {"receivedNos": ["CAB-NOT-ON-LIST"], "note": "少一台多一台"}, admin)
+ck("调拨：签收（缺 1 多 1 → 资产差异）", st == 200 and len(rc["diffs"]) == 2, raw)
+st, df, raw = req("GET", f"/api/ops/asset-diffs?page=1&size=10&sourceRef={tno}", tok=admin)
+ck("资产差异：按调拨单查到 2 条", st == 200 and df["total"] == 2, raw)
+st, _, raw = req("POST", f"/api/ops/asset-diffs/{df['list'][0]['diffNo']}/resolve", {"note": "现场找回"}, admin); ck("资产差异：处置", st == 200, raw)
+vendors = req("GET", "/api/ops/vendors", tok=admin)[1] or []
+vc = (vendors[0]["vendorCode"] if isinstance(vendors, list) and vendors else "cd-tech")
+st, cb, raw = req("POST", "/api/ops/device-code-batches", {"vendorCode": vc, "codeType": "SN", "rangeStart": "SM" + tag + "0000",
+    "rangeEnd": "SM" + tag + "0099", "total": 100, "bound": 0, "producedAt": day if 'day' in dir() else time.strftime("%Y-%m-%d"), "status": "PENDING"}, admin)
+ck("设备编码：新增贴码批次", st == 200, raw)
+st, rel, raw = req("POST", "/api/ops/ota-releases", {"fwType": "CABINET", "vendorCode": vc, "version": "SMK" + tag, "versionCode": 100,
+    "status": "DRAFT"}, admin)
+ck("固件 OTA：版本库新增版本", st == 200, raw)
+st, ota, raw = req("POST", "/api/ops/ota-rollouts", {"fwVersion": "1.9.9", "strategy": "GRAY", "progress": 0, "status": "PENDING"}, admin)
+ck("固件 OTA：不选版本库被拒（400，不再 500）", st == 400, raw)
+st, ota, raw = req("POST", "/api/ops/ota-rollouts", {"releaseNo": rel["releaseNo"], "scope": "DEVICE", "strategy": "GRAY"}, admin)
+ck("固件 OTA：按设备投放不给对象被拒（400）", st == 400, raw)
+st, ota, raw = req("POST", "/api/ops/ota-rollouts", {"releaseNo": rel["releaseNo"], "scope": "DEVICE", "targetRef": cab2,
+    "strategy": "GRAY", "status": "PENDING"}, admin)
+ck("固件 OTA：新增发布单（版本号取版本库）", st == 200 and ota["fwVersion"] == "SMK" + tag, raw)
+st, _, raw = req("GET", "/api/ops/device-logs?page=1&size=5", tok=admin); ck("设备日志：可查", st == 200, raw)
 for p in ["/api/ops/dashboard", "/api/trade/orders?page=1&size=5", "/api/ops/work-orders?page=1&size=5", "/api/ops/sites?page=1&size=5"]:
     st, _, raw = req("GET", p, tok=admin); ck("GET " + p.split("?")[0], st == 200, raw)
 print(f"\n{sum(res)}/{len(res)} 通过")

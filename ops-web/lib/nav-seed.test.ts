@@ -598,6 +598,15 @@ const PATCHES: { file: string; mustContain: string; apply: (rows: Row[]) => void
       }
     },
   },
+  {
+    // 设备管理一期收齐：五个叶子改 L1 + 就绪。
+    file: "V200__menu_device_phase1_ready.sql",
+    mustContain: "UPDATE iam_menu SET phase = 1, ready = 1",
+    apply: (rows) => {
+      const paths = ["/devices?tab=inventory", "/devices?tab=asset-diffs", "/devices?tab=codes", "/devices?tab=logs", "/devices?tab=ota"];
+      rows.filter((r) => r.parent_no === "M_device" && paths.includes(r.path)).forEach((r) => Object.assign(r, { phase: "1", ready: "1" }));
+    },
+  },
 ];
 
 const COLS = [
