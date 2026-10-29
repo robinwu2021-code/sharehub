@@ -120,6 +120,50 @@ try:
     check("盘点：另一人复核通过", st == 200, raw)
     st, c, raw = sh("POST", f"/api/ops/inventory/counts/{cn}/post", {}, admin)
     check("盘点：过账", st == 200 and c and c["count"]["status"] == "POSTED", raw)
+
+    # 8. 撤机回仓：出库（已领取）→ 绑定 → 投放 → 撤机完工（回仓）→ 回仓调拨发货 / 签收 → 回仓待检 → 复检 → RETURN 入库 + 业务确认
+    cab2 = "CABRET" + tag
+    sh("POST", "/api/ops/cabinets", {"cabinetNo": cab2, "sn": cab2, "vendorCode": "TEST", "slotTotal": 8}, admin)
+    sql(f"UPDATE test_sharehub.dev_cabinet SET warehouse_no=NULL WHERE cabinet_no='{cab2}'")
+    st, ik, _ = sh("POST", "/api/ops/inventory/intakes", {"warehouseNo": "WH001", "cabinetNos": [cab2]}, wh)
+    ino = ik["intake"]["intakeNo"]
+    sh("POST", f"/api/ops/inventory/intakes/{ino}/items/CABINET/{cab2}/qc", {"powerOn": True, "slotsOk": True}, wh)
+    sh("POST", f"/api/ops/inventory/intakes/{ino}/inbound", {"items": [{"itemType": "CABINET", "itemNo": cab2}]}, wh)
+    sh("POST", "/api/ops/devices/issue", {"agentNo": agent, "cabinetNos": [cab2]}, admin)
+    st, b, raw = sh("POST", f"/api/ops/devices/{cab2}/bind", {}, admin)
+    check("撤机回仓：出库后绑定点位", st == 200, raw)
+    site = sql(f"SELECT site_no FROM test_sharehub.dev_cabinet WHERE cabinet_no='{cab2}'")
+    # 投放：上线门禁不在本次联调范围，直接置为已投放
+    sql(f"UPDATE test_sharehub.dev_cabinet SET status='DEPLOYED', online_status='ONLINE', available_count=0 WHERE cabinet_no='{cab2}'")
+    wo = "WOE2E" + tag
+    sql(f"INSERT INTO test_sharehub.wo_order (wo_no, tenant_id, type, source, status, cabinet_no, site_no, removal_disposition) "
+        f"VALUES ('{wo}', 'MAIN', 'REMOVE', 'MANUAL', 'PROCESSING', '{cab2}', '{site}', 'RETURN_TO_WAREHOUSE')")
+    st, b, raw = sh("POST", f"/api/ops/work-orders/{wo}/complete", {"photos": '["remove.jpg"]', "countedQty": 0}, admin)
+    check("撤机回仓：撤机工单完工", st == 200, raw)
+    tr = ""
+    for _ in range(20):
+        tr = sql(f"SELECT transfer_no FROM test_sharehub.inv_transfer WHERE source_type='REMOVAL' AND source_ref='{wo}'")
+        if tr: break
+        time.sleep(0.5)
+    check("撤机回仓：生成回仓调拨单", bool(tr), tr)
+    st, b, raw = sh("POST", f"/api/ops/inventory-transfers/{tr}/ship", {}, admin)
+    check("撤机回仓：回仓调拨发货", st == 200, raw)
+    st, b, raw = sh("POST", f"/api/ops/inventory-transfers/{tr}/receive", {"receivedNos": [cab2]}, admin)
+    check("撤机回仓：签收", st == 200, raw)
+    rik = sql(f"SELECT intake_no FROM test_sharehub.inv_intake WHERE kind='RETURN' AND source_ref='{wo}'")
+    check("撤机回仓：生成回仓待检单", bool(rik), rik)
+    sh("POST", f"/api/ops/inventory/intakes/{rik}/items/CABINET/{cab2}/qc", {"powerOn": True, "slotsOk": True}, wh)
+    st, b, raw = sh("POST", f"/api/ops/inventory/intakes/{rik}/inbound", {"items": [{"itemType": "CABINET", "itemNo": cab2}]}, wh)
+    check("撤机回仓：复检合格入库（RETURN）", st == 200, raw)
+    pool = inv(f"/dispatch-pool?serialNo={cab2}")
+    check("撤机回仓：库存服务出库池 RETURNED", pool and pool[-1]["status"] == "RETURNED", pool)
+    whs = sql(f"SELECT warehouse_no FROM test_sharehub.dev_cabinet WHERE cabinet_no='{cab2}'")
+    loc2 = sql(f"SELECT v FROM test_sharehub.inventory_sync_state WHERE k='wh:{whs}'")
+    s2 = next((x for x in inv(f"/serials?locationId={loc2}") if x.get("serialNo") == cab2), None)
+    check("撤机回仓：库存服务重新在库、无冻结（业务确认已解冻）", s2 and not s2.get("holdReasons"), s2)
+    st, b, raw = sh("POST", "/api/ops/devices/issue", {"agentNo": agent, "cabinetNos": [cab2]}, admin)
+    check("撤机回仓：可再次出库", st == 200, raw)
+    sh("POST", "/api/ops/devices/pool-return", {"cabinetNos": [cab2], "reason": "联调收尾"}, admin)
 finally:
     sql("UPDATE test_sharehub.sys_param SET value='LOCAL' WHERE param_key='inv.engine'")
     print(f"\n{sum(ok for _, ok, _ in results)}/{len(results)} 通过；引擎已复原 LOCAL")
