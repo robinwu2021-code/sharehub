@@ -172,7 +172,18 @@ export function disposeIntake(no: string, x: IntakeDisposeReq): IntakeDetail {
   const bad = picked.filter((i) => i.disposition !== "PENDING" || i.qcResult !== "FAILED")
     .map((i) => `${i.itemNo}：${i.disposition === "PENDING" ? "质检未判不合格" : "已处理"}`);
   if (bad.length) fail(`以下设备不能办理：${bad.join("；")}`, `Rejected: ${bad.join("; ")}`);
-  for (const i of picked) Object.assign(i, { disposition: x.disposition, dispositionNote: x.note.trim(), handledBy: "mock", handledAt: now() });
+  for (const i of picked) {
+    // 退供应商与报废都是离开库存：设备落到终态（同后端）
+    if (i.itemType === "CABINET") {
+      const c = cabinets.find((k) => k.cabinetNo === i.itemNo);
+      if (c) c.status = "RETIRED";
+    } else {
+      const p = powerbanks.find((k) => k.powerbankNo === i.itemNo);
+      if (p) p.status = "SCRAP";
+    }
+    recordMovement({ itemType: i.itemType, itemNo: i.itemNo, event: "RETIRE", toRef: "OUT", reason: x.note, sourceRef: no });
+    Object.assign(i, { disposition: x.disposition, dispositionNote: x.note.trim(), handledBy: "mock", handledAt: now() });
+  }
   closeIfDone(h);
   return detail(no);
 }

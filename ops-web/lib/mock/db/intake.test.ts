@@ -41,6 +41,7 @@ describe("到仓待检", () => {
     expect(() => ik.disposeIntake(no, { items: [{ itemType: "CABINET", itemNo: bad }], disposition: "SCRAP", note: " " })).toThrow();
     const d = ik.disposeIntake(no, { items: [{ itemType: "CABINET", itemNo: bad }], disposition: "RETURN_SUPPLIER", note: "通电失败" });
     expect(d.intake.status).toBe("OPEN");
+    expect(cabinets.find((c) => c.cabinetNo === bad)!.status).toBe("RETIRED");
   });
 
   it("★ 放行凭证：只认本单上新做的通过，用过即废", () => {

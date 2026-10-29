@@ -113,6 +113,8 @@ class IntakeFlowTest extends ApiTestSupport {
                 Map.of("items", List.of(Map.of("itemType", "CABINET", "itemNo", bad)), "disposition", "RETURN_SUPPLIER", "note", "通电失败"), token).okData();
         assertThat(d.path("intake").path("status").asText()).as("还有一台合格未入库").isEqualTo("OPEN");
         assertThat(jdbc.queryForObject("SELECT warehouse_no FROM dev_cabinet WHERE cabinet_no=?", String.class, bad)).isNull();
+        assertThat(jdbc.queryForObject("SELECT status FROM dev_cabinet WHERE cabinet_no=?", String.class, bad))
+                .as("处置即离开库存：设备落到报废终态").isEqualTo("RETIRED");
     }
 
     @Test

@@ -13,6 +13,8 @@ import ai.neargo.sharehub.dev.entity.DevCabinet;
 import ai.neargo.sharehub.dev.entity.DevPowerbank;
 import ai.neargo.sharehub.dev.mapper.CabinetMapper;
 import ai.neargo.sharehub.dev.mapper.PowerbankMapper;
+import ai.neargo.sharehub.dev.movement.MovementEvent;
+import ai.neargo.sharehub.dev.movement.MovementRecorder;
 import ai.neargo.sharehub.dev.service.QcService;
 import ai.neargo.sharehub.inv.IntakeStatus;
 import ai.neargo.sharehub.inv.WarehouseDirectory;
@@ -80,6 +82,16 @@ public class IntakeServiceImpl implements IntakeService {
         this.powerbanks = powerbanks;
         this.qc = qc;
         this.warehouses = warehouses;
+    }
+
+    /** 不合格处置联动设备终态（报废）。 */
+    private ai.neargo.sharehub.dev.service.CabinetLifecycleService lifecycle;
+    private MovementRecorder movements;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setLifecycle(ai.neargo.sharehub.dev.service.CabinetLifecycleService lifecycle, MovementRecorder movements) {
+        this.lifecycle = lifecycle;
+        this.movements = movements;
     }
 
     /** 库存账入口（S2.5）：入库经它，切到独立进销存时只换实现。 */
@@ -270,7 +282,20 @@ public class IntakeServiceImpl implements IntakeService {
         if (!bad.isEmpty()) throw BizException.conflict("error.intake.items_rejected", String.join("；", bad));
         String me = operator();
         LocalDateTime now = LocalDateTime.now();
-        picked.forEach(i -> mark(i, req.disposition(), req.note().trim(), me, now));
+        String why = ("SCRAP".equals(req.disposition()) ? "报废" : "退供应商") + "（待检单 " + intakeNo + "）：" + req.note().trim();
+        for (InvIntakeItem i : picked) {
+            // 退供应商与报废都是离开库存、不再回来：设备本身也要落到终态，否则它在台账上是「在库、不在任何仓」的幽灵
+            if (CABINET.equals(i.getItemType())) {
+                lifecycle.retire(i.getItemNo(), why);
+            } else {
+                int n = powerbanks.update(null, new LambdaUpdateWrapper<DevPowerbank>().eq(DevPowerbank::getPowerbankNo, i.getItemNo())
+                        .eq(DevPowerbank::getStatus, PowerbankStatus.IN_STOCK.name()).set(DevPowerbank::getStatus, PowerbankStatus.SCRAP.name()));
+                if (n == 0) throw BizException.conflict("error.common.state_changed");
+                movements.record(new MovementRecorder.Move(POWERBANK, i.getItemNo(), MovementEvent.RETIRE, null, MovementRecorder.OUT,
+                        null, null, why, intakeNo));
+            }
+            mark(i, req.disposition(), req.note().trim(), me, now);
+        }
         closeIfDone(h);
         log.info("待检处置 intakeNo={} disposition={} 台数={}", intakeNo, req.disposition(), picked.size());
         return get(intakeNo);
