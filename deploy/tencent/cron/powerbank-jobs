@@ -48,6 +48,9 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 # trial-rent-expire · 试借还超时（core.dev）· 声明 cron: 0 */5 * * * *
 */5 * * * * deploy flock -n /run/lock/powerbank-job-trial-rent-expire.lock curl -s -m 240 -X POST 'http://127.0.0.1:8082/internal/job/trial-rent-expire/trigger' -o /dev/null
 
+# inventory-event-pull · 拉取独立进销存事件并投影（inv.remote）· 声明 cron: 0 * * * * *
+* * * * * deploy flock -n /run/lock/powerbank-job-inventory-event-pull.lock curl -s -m 55 -X POST 'http://127.0.0.1:8082/internal/job/inventory-event-pull/trigger' -o /dev/null
+
 # order-overdue-buyout · 超时扣款（触顶买断 / 到时限最高收费，按 rent.overdue.mode）（trade）· 声明 cron: 0 15 * * * *
 15 * * * * deploy flock -n /run/lock/powerbank-job-order-overdue-buyout.lock curl -s -m 900 -X POST 'http://127.0.0.1:8082/internal/job/order-overdue-buyout/trigger' -o /dev/null
 

@@ -1,0 +1,222 @@
+package ai.neargo.sharehub.support;
+
+import ai.neargo.sharehub.inv.remote.InventoryApi;
+import ai.neargo.sharehub.inv.remote.InventoryRemoteException;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
+
+/**
+ * 独立进销存的内存替身（S1.2）：按 ai-shop backend/inventory 的契约强制关键规则 ——
+ * 序列号入库须 gateRef、出库须在库、出库池状态机（AVAILABLE → CLAIMED / REVOKED / RETURNED）、
+ * 只有待领取的能重定向 / 撤回、事件至少一次投递。
+ */
+public class InventoryFake implements InventoryApi {
+
+    public final Map<String, String> items = new HashMap<>();
+    public final Map<String, String> targets = new HashMap<>();
+    public final Map<String, Warehouse> warehouses = new LinkedHashMap<>();
+    /** 序列号 → 所在 locationId（在库）。 */
+    public final Map<String, String> stock = new HashMap<>();
+    /** 序列号 → 已用过的 gateRef。 */
+    public final Map<String, List<String>> gates = new HashMap<>();
+    public final Map<String, Doc> docs = new HashMap<>();
+    public final Map<String, DispatchView> pool = new LinkedHashMap<>();
+    public final Map<String, Claim> claims = new HashMap<>();
+    public final List<Event> events = new ArrayList<>();
+    public long acked;
+    /** 设了就让下一次写操作失败（模拟库存服务拒绝）。 */
+    public InventoryRemoteException failNext;
+    private final AtomicLong seq = new AtomicLong();
+
+    public record Doc(String kind, String locationId, String purpose, List<InboundLine> lines, List<String> serials,
+                      Map<String, String> targets, boolean[] posted) {
+    }
+
+    @Override
+    public boolean configured() {
+        return true;
+    }
+
+    private void maybeFail() {
+        if (failNext != null) {
+            InventoryRemoteException e = failNext;
+            failNext = null;
+            throw e;
+        }
+    }
+
+    private static InventoryRemoteException err(int status, String code, String... args) {
+        return new InventoryRemoteException(status, code, List.of(args), code, null);
+    }
+
+    @Override
+    public String upsertItem(String externalRef, ItemSpec spec) {
+        return items.computeIfAbsent(externalRef, k -> "IT-" + k);
+    }
+
+    @Override
+    public void upsertTarget(String type, String ref, String name, String parentRef) {
+        if ("SITE".equals(type) && parentRef == null) throw err(400, "inventory.bad_request", "target.parent:SITE");
+        targets.put(type + ":" + ref, name);
+    }
+
+    @Override
+    public List<Warehouse> warehouses() {
+        return List.copyOf(warehouses.values());
+    }
+
+    @Override
+    public String createWarehouse(String name, String idempotencyKey) {
+        String id = "LOC-" + (warehouses.size() + 1);
+        warehouses.put(id, new Warehouse(id, name, null, "ACTIVE"));
+        return id;
+    }
+
+    @Override
+    public String createInbound(String locationId, String purpose, String sourceRef, String remark, List<InboundLine> lines,
+                                String idempotencyKey) {
+        maybeFail();
+        String no = "IN-" + UUID.randomUUID().toString().substring(0, 8);
+        docs.put(no, new Doc("IN", locationId, purpose, lines, List.of(), Map.of(), new boolean[]{false}));
+        return no;
+    }
+
+    @Override
+    public void postInbound(String docNo, String idempotencyKey) {
+        Doc d = docs.get(docNo);
+        for (InboundLine l : d.lines()) {
+            for (Serial s : l.serials()) {
+                if (s.gateRef() == null) throw err(400, "inventory.gate.ref_missing", s.serialNo());
+                if (gates.getOrDefault(s.serialNo(), List.of()).contains(s.gateRef())) throw err(409, "inventory.serial.conflict", s.serialNo() + ":gate_reused");
+                if (stock.containsKey(s.serialNo())) throw err(409, "inventory.serial.conflict", s.serialNo() + ":in_stock");
+            }
+        }
+        for (InboundLine l : d.lines()) {
+            for (Serial s : l.serials()) {
+                stock.put(s.serialNo(), d.locationId());
+                gates.computeIfAbsent(s.serialNo(), k -> new ArrayList<>()).add(s.gateRef());
+                if ("RETURN".equals(d.purpose())) {
+                    pool.replaceAll((id, v) -> v.serialNo().equals(s.serialNo()) && ("AVAILABLE".equals(v.status()) || "CLAIMED".equals(v.status()))
+                            ? with(v, "RETURNED") : v);
+                }
+            }
+        }
+        d.posted()[0] = true;
+        emit("InboundPosted", docNo, "{\"purpose\":\"" + d.purpose() + "\"}");
+    }
+
+    @Override
+    public void businessClearance(String docNo, String idempotencyKey) {
+        emit("ReturnCleared", docNo, "{\"released\":1}");
+    }
+
+    @Override
+    public String createOutbound(String locationId, String purpose, Map<String, String> t, String remark, List<String> serialNos,
+                                 String idempotencyKey) {
+        maybeFail();
+        if ("ISSUE".equals(purpose) && (!t.containsKey("MERCHANT") || !t.containsKey("PERSON"))) {
+            throw err(400, "inventory.bad_request", "targets");
+        }
+        for (var e : t.entrySet()) if (!targets.containsKey(e.getKey() + ":" + e.getValue())) throw err(404, "inventory.not_found", e.getKey());
+        String no = "OUT-" + UUID.randomUUID().toString().substring(0, 8);
+        docs.put(no, new Doc("OUT", locationId, purpose, List.of(), serialNos, t, new boolean[]{false}));
+        return no;
+    }
+
+    @Override
+    public void postOutbound(String docNo, String idempotencyKey) {
+        Doc d = docs.get(docNo);
+        for (String s : d.serials()) if (!d.locationId().equals(stock.get(s))) throw err(409, "inventory.serial.conflict", s + ":not_in_stock");
+        for (String s : d.serials()) {
+            stock.remove(s);
+            String id = "DP-" + UUID.randomUUID().toString().substring(0, 8);
+            pool.put(id, new DispatchView(id, docNo, items.get("CABINET"), s, BigDecimal.ONE, d.locationId(), "AVAILABLE", null,
+                    "MERCHANT", d.targets().get("MERCHANT"), 1));
+            emit("DispatchCreated", id, payload(pool.get(id)));
+        }
+        d.posted()[0] = true;
+    }
+
+    @Override
+    public List<DispatchView> dispatchesBySerial(String serialNo) {
+        return pool.values().stream().filter(v -> serialNo.equals(v.serialNo())).toList();
+    }
+
+    @Override
+    public Claim claim(List<String> dispatchIds, String businessRef, String idempotencyKey) {
+        maybeFail();
+        for (String id : dispatchIds) if (!"AVAILABLE".equals(pool.get(id).status())) throw err(409, "inventory.dispatch.not_available", id);
+        dispatchIds.forEach(id -> pool.put(id, with(pool.get(id), "CLAIMED")));
+        Claim c = new Claim("CL-" + UUID.randomUUID().toString().substring(0, 8), List.copyOf(dispatchIds));
+        claims.put(c.claimNo(), c);
+        dispatchIds.forEach(id -> emit("DispatchClaimed", id, payload(pool.get(id))));
+        return c;
+    }
+
+    @Override
+    public void releaseClaim(String claimNo, String idempotencyKey) {
+        Claim c = claims.remove(claimNo);
+        if (c == null) throw err(404, "inventory.not_found", claimNo);
+        c.dispatchIds().forEach(id -> {
+            if ("CLAIMED".equals(pool.get(id).status())) pool.put(id, with(pool.get(id), "AVAILABLE"));
+        });
+    }
+
+    @Override
+    public void redirect(String dispatchId, Map<String, String> t, String reason, String idempotencyKey) {
+        DispatchView v = pool.get(dispatchId);
+        if (!"AVAILABLE".equals(v.status())) throw err(409, "inventory.dispatch.not_available", dispatchId);
+        pool.put(dispatchId, new DispatchView(v.dispatchId(), v.outboundNo(), v.itemId(), v.serialNo(), v.qty(), v.locationId(), v.status(),
+                v.parentDispatchId(), "MERCHANT", t.get("MERCHANT"), v.resourceVersion() + 1));
+        emit("DispatchRedirected", dispatchId, payload(pool.get(dispatchId)));
+    }
+
+    @Override
+    public void revoke(String dispatchId, String reason, String idempotencyKey) {
+        DispatchView v = pool.get(dispatchId);
+        if (!"AVAILABLE".equals(v.status())) throw err(409, "inventory.dispatch.not_available", dispatchId);
+        pool.put(dispatchId, with(v, "REVOKED"));
+        stock.put(v.serialNo(), v.locationId());
+        emit("DispatchRevoked", dispatchId, payload(pool.get(dispatchId)));
+    }
+
+    @Override
+    public EventPage pullEvents(Long afterSeq, int limit) {
+        long from = afterSeq == null ? acked : afterSeq;
+        List<Event> page = events.stream().filter(e -> e.seq() > from).limit(limit).toList();
+        return new EventPage(page, page.isEmpty() ? from : page.get(page.size() - 1).seq(), acked);
+    }
+
+    @Override
+    public void ackEvents(long s) {
+        acked = Math.max(acked, s);
+    }
+
+    /** 库存服务侧（不经本系统）发生的事件，测试用来模拟在进销存界面上的操作。 */
+    public void emitExternal(String type, String resourceId, String payload) {
+        emit(type, resourceId, payload);
+    }
+
+    private void emit(String type, String resourceId, String payload) {
+        long s = seq.incrementAndGet();
+        events.add(new Event(s, "EV-" + UUID.randomUUID(), type, "DISPATCH", resourceId, 1, LocalDateTime.now(), payload));
+    }
+
+    private static DispatchView with(DispatchView v, String status) {
+        return new DispatchView(v.dispatchId(), v.outboundNo(), v.itemId(), v.serialNo(), v.qty(), v.locationId(), status,
+                v.parentDispatchId(), v.rootTargetType(), v.rootTargetRef(), v.resourceVersion() + 1);
+    }
+
+    private static String payload(DispatchView v) {
+        return "{\"serialNo\":\"" + v.serialNo() + "\",\"status\":\"" + v.status() + "\",\"parentDispatchId\":null,"
+                + "\"rootTargetType\":\"MERCHANT\",\"rootTargetRef\":\"" + v.rootTargetRef() + "\"}";
+    }
+}
